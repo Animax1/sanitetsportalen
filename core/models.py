@@ -132,3 +132,74 @@ class ModuleSettings(models.Model):
                 slug=module.slug,
                 defaults={'enabled': True},
             )
+
+
+class ModuleBackupConfig(models.Model):
+    """Per-modul backup-konfigurasjon.
+
+    Erstatter den gamle singleton-modellen ``patients.BackupConfig``.
+    Hver registrerte modul kan ha sin egen backup-konfigurasjon med
+    eget intervall, max-antall og av/på-bryter. Configs uten matchende
+    backup-handler ignoreres av scheduleren.
+
+    Data-migrering: ved oppgradering kopieres den eksisterende
+    ``patients.BackupConfig.interval_minutes``-verdien til en ny rad
+    med ``module_slug='patients'``.
+    """
+    INTERVAL_CHOICES = [
+        (0,    'Av'),
+        (5,    'Hvert 5. minutt'),
+        (15,   'Hvert 15. minutt'),
+        (30,   'Hvert 30. minutt'),
+        (60,   'Hver time'),
+        (360,  'Hver 6. time'),
+        (1440, 'Hver 24. time'),
+    ]
+
+    module_slug = models.CharField(
+        max_length=64,
+        unique=True,
+        verbose_name='Modul-slug',
+        help_text='Matcher slug på en registrert backup-handler.',
+    )
+    enabled = models.BooleanField(
+        default=True,
+        verbose_name='Backup aktivert',
+        help_text='Hvis avkrysset kjøres automatisk backup på intervallet under.',
+    )
+    interval_minutes = models.IntegerField(
+        choices=INTERVAL_CHOICES,
+        default=60,
+        verbose_name='Backup-intervall',
+        help_text='Hvor ofte automatisk backup skal kjøres.',
+    )
+    max_backups = models.IntegerField(
+        default=50,
+        verbose_name='Maks antall backuper',
+        help_text=(
+            'Eldste backuper slettes automatisk slik at totalt antall ikke '
+            'overstiger denne verdien. Pre-restore-snapshots telles ikke.'
+        ),
+    )
+    last_run_at = models.DateTimeField(
+        null=True, blank=True,
+        verbose_name='Sist kjørt',
+    )
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = 'Modul-backup-konfigurasjon'
+        verbose_name_plural = 'Modul-backup-konfigurasjoner'
+        ordering = ['module_slug']
+
+    def __str__(self) -> str:
+        return f'{self.module_slug} ({"av" if not self.enabled else self.get_interval_minutes_display()})'
+
+    @classmethod
+    def get_or_default(cls, slug: str):
+        """Hent config for slug, eller opprett med defaults.
+
+        Brukt av admin-UI og scheduler. Idempotent.
+        """
+        obj, _ = cls.objects.get_or_create(module_slug=slug)
+        return obj

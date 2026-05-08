@@ -1,0 +1,76 @@
+{% extends "core/base_portal.html" %}
+
+{% block title %}Backup-administrasjon – Sanitetsportal{% endblock %}
+
+{% block content %}
+<section class="mb-3">
+  <h1 class="mb-1"><i class="bi bi-cloud-arrow-up me-2"></i>Backup-administrasjon</h1>
+  <p class="text-muted mb-0">
+    Per-modul backup-konfigurasjon og oversikt. Hver modul har sin egen
+    plan, sitt eget intervall og sin egen cap på antall backuper.
+  </p>
+</section>
+
+<div class="card" style="background: var(--portal-surface); border-color: var(--portal-border);">
+  <div class="card-body p-0">
+    <table class="table table-dark table-hover mb-0" style="background: transparent;">
+      <thead>
+        <tr>
+          <th>Modul</th>
+          <th>Status</th>
+          <th>Intervall</th>
+          <th>Cap</th>
+          <th>Sist kjørt</th>
+          <th>Backuper</th>
+          <th class="text-end">Handlinger</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in rows %}
+        <tr>
+          <td>
+            <strong>{{ row.display_name }}</strong>
+            <div class="small text-muted">{{ row.slug }}</div>
+          </td>
+          <td>
+            {% if row.config.enabled %}
+              <span class="badge bg-success">
+                <i class="bi bi-check-circle me-1"></i>Aktiv
+              </span>
+            {% else %}
+              <span class="badge bg-secondary">
+                <i class="bi bi-pause-circle me-1"></i>Inaktiv
+              </span>
+            {% endif %}
+          </td>
+          <td>{{ row.config.get_interval_minutes_display }}</td>
+          <td>{{ row.config.max_backups }}</td>
+          <td>
+            {% if row.config.last_run_at %}
+              {{ row.config.last_run_at|date:"d.m.Y H:i" }}
+            {% else %}
+              <span class="text-muted">Aldri</span>
+            {% endif %}
+          </td>
+          <td>
+            <span class="badge bg-info">{{ row.backup_count }}</span>
+          </td>
+          <td class="text-end">
+            <a href="{% url 'core:backup_admin_module' slug=row.slug %}"
+               class="btn btn-sm btn-outline-light">
+              <i class="bi bi-gear me-1"></i>Åpne
+            </a>
+          </td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="7" class="text-center text-muted py-4">
+            Ingen backup-handlere er registrert.
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

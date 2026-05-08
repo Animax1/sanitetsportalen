@@ -59,3 +59,76 @@ class ModuleSettingsForm(forms.ModelForm):
                 'portalen krever den for å fungere.'
             )
         return enabled
+
+
+class ModuleBackupConfigForm(forms.ModelForm):
+    """Skjema for ModuleBackupConfig — admin redigerer interval/cap/enabled."""
+
+    class Meta:
+        from core.models import ModuleBackupConfig as _MBC
+        model = _MBC
+        fields = ['enabled', 'interval_minutes', 'max_backups']
+        widgets = {
+            'enabled': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+            'interval_minutes': forms.Select(attrs={'class': 'form-select'}),
+            'max_backups': forms.NumberInput(attrs={
+                'class': 'form-control',
+                'min': 1,
+                'max': 1000,
+                'step': 1,
+            }),
+        }
+        labels = {
+            'enabled': 'Automatisk backup aktivert',
+            'interval_minutes': 'Backup-intervall',
+            'max_backups': 'Maks antall backuper',
+        }
+        help_texts = {
+            'enabled': (
+                'Hvis avkrysset kjøres backup automatisk på intervallet under. '
+                'Hvis ikke avkrysset må admin starte backup manuelt.'
+            ),
+            'max_backups': (
+                'Eldste backuper slettes når dette antallet overstiges. '
+                'Pre-restore-snapshots telles ikke.'
+            ),
+        }
+
+    def clean_max_backups(self):
+        value = self.cleaned_data['max_backups']
+        if value < 1:
+            raise forms.ValidationError(
+                'Maks antall backuper må være minst 1.'
+            )
+        if value > 1000:
+            raise forms.ValidationError(
+                'Maks antall backuper kan ikke overstige 1000.'
+            )
+        return value
+
+
+class BackupRestoreConfirmForm(forms.Form):
+    """Bekreftelses-skjema før restore. Admin må skrive modul-slug eksakt."""
+
+    confirm_slug = forms.CharField(
+        max_length=64,
+        label='Skriv modul-navnet for å bekrefte',
+        widget=forms.TextInput(attrs={
+            'class': 'form-control',
+            'autocomplete': 'off',
+            'autofocus': 'autofocus',
+        }),
+        help_text='Skriv inn slug på modulen for å bekrefte gjenopprettingen.',
+    )
+
+    def __init__(self, *args, expected_slug: str = '', **kwargs):
+        super().__init__(*args, **kwargs)
+        self._expected_slug = expected_slug
+
+    def clean_confirm_slug(self):
+        value = (self.cleaned_data.get('confirm_slug') or '').strip()
+        if value != self._expected_slug:
+            raise forms.ValidationError(
+                f'Bekreftelsen må være eksakt «{self._expected_slug}».'
+            )
+        return value

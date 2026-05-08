@@ -1,0 +1,174 @@
+{% extends "core/base_portal.html" %}
+
+{% block title %}Backup: {{ handler.display_name }} – Sanitetsportal{% endblock %}
+
+{% block extra_head %}
+<style>
+  .backup-table tbody tr:hover { background: rgba(255,255,255,0.04); }
+  .kind-auto { color: #60a5fa; }
+  .kind-manual { color: #34d399; }
+  .kind-pre_restore { color: #fbbf24; }
+  .kind-pre_reset { color: #f87171; }
+  .filename-cell {
+    font-family: ui-monospace, "Cascadia Code", monospace;
+    font-size: 0.82rem;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<nav aria-label="breadcrumb" class="mb-2">
+  <ol class="breadcrumb" style="background: transparent;">
+    <li class="breadcrumb-item">
+      <a href="{% url 'core:backup_admin_overview' %}" class="text-info">
+        <i class="bi bi-cloud-arrow-up me-1"></i>Backup
+      </a>
+    </li>
+    <li class="breadcrumb-item active text-muted" aria-current="page">
+      {{ handler.display_name|default:slug }}
+    </li>
+  </ol>
+</nav>
+
+<section class="mb-3">
+  <h1 class="mb-1">{{ handler.display_name|default:slug }}</h1>
+  <p class="text-muted mb-0">Slug: <code>{{ slug }}</code></p>
+</section>
+
+<div class="row g-3">
+  {# ── Konfigurasjons-kort ────────────────────────────────────────────── #}
+  <div class="col-lg-5">
+    <div class="card" style="background: var(--portal-surface); border-color: var(--portal-border);">
+      <div class="card-header" style="background: var(--portal-surface-2); color: var(--portal-text);">
+        <i class="bi bi-sliders me-2"></i>Konfigurasjon
+      </div>
+      <div class="card-body">
+        <form method="post">
+          {% csrf_token %}
+          <div class="form-check mb-3">
+            {{ form.enabled }}
+            <label class="form-check-label" for="{{ form.enabled.id_for_label }}">
+              {{ form.enabled.label }}
+            </label>
+            {% if form.enabled.help_text %}
+              <div class="form-text small">{{ form.enabled.help_text }}</div>
+            {% endif %}
+          </div>
+
+          <div class="mb-3">
+            <label for="{{ form.interval_minutes.id_for_label }}" class="form-label">
+              {{ form.interval_minutes.label }}
+            </label>
+            {{ form.interval_minutes }}
+          </div>
+
+          <div class="mb-3">
+            <label for="{{ form.max_backups.id_for_label }}" class="form-label">
+              {{ form.max_backups.label }}
+            </label>
+            {{ form.max_backups }}
+            {% if form.max_backups.help_text %}
+              <div class="form-text small">{{ form.max_backups.help_text }}</div>
+            {% endif %}
+            {% if form.max_backups.errors %}
+              <div class="text-danger small mt-1">{{ form.max_backups.errors.0 }}</div>
+            {% endif %}
+          </div>
+
+          <button type="submit" class="btn btn-primary btn-sm">
+            <i class="bi bi-save me-1"></i>Lagre innstillinger
+          </button>
+        </form>
+
+        <hr style="border-color: var(--portal-border);">
+
+        <form method="post" action="{% url 'core:backup_admin_run' slug=slug %}"
+              onsubmit="return confirm('Kjøre backup nå?');">
+          {% csrf_token %}
+          <button type="submit" class="btn btn-outline-success btn-sm w-100">
+            <i class="bi bi-play-circle me-1"></i>Kjør backup nå
+          </button>
+        </form>
+
+        <div class="mt-3 small text-muted">
+          {% if config.last_run_at %}
+            Sist kjørt: {{ config.last_run_at|date:"d.m.Y H:i:s" }}
+          {% else %}
+            Aldri kjørt.
+          {% endif %}
+          <br>
+          Totalt på disk: <strong>{{ backup_count }}</strong>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  {# ── Backup-liste ──────────────────────────────────────────────────── #}
+  <div class="col-lg-7">
+    <div class="card" style="background: var(--portal-surface); border-color: var(--portal-border);">
+      <div class="card-header" style="background: var(--portal-surface-2); color: var(--portal-text);">
+        <i class="bi bi-archive me-2"></i>Backuper
+        <span class="badge bg-secondary ms-2">{{ backup_count }}</span>
+      </div>
+      <div class="card-body p-0">
+        <div class="table-responsive">
+          <table class="table table-dark backup-table mb-0" style="background: transparent;">
+            <thead>
+              <tr>
+                <th>Tidspunkt</th>
+                <th>Type</th>
+                <th>Filnavn</th>
+                <th>Størrelse</th>
+                <th class="text-end">Handlinger</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for b in backups %}
+              <tr>
+                <td>{{ b.created_at|date:"d.m.Y H:i:s" }}</td>
+                <td>
+                  <span class="kind-{{ b.kind }}">
+                    {{ b.get_kind_display }}
+                  </span>
+                </td>
+                <td class="filename-cell">{{ b.filename }}</td>
+                <td>{{ b.size_bytes|filesizeformat }}</td>
+                <td class="text-end">
+                  <div class="btn-group btn-group-sm" role="group">
+                    <a href="{% url 'core:backup_admin_download' slug=slug pk=b.pk %}"
+                       class="btn btn-outline-light"
+                       title="Last ned">
+                      <i class="bi bi-download"></i>
+                    </a>
+                    <a href="{% url 'core:backup_admin_restore' slug=slug pk=b.pk %}"
+                       class="btn btn-outline-warning"
+                       title="Gjenopprett">
+                      <i class="bi bi-arrow-counterclockwise"></i>
+                    </a>
+                    <form method="post"
+                          action="{% url 'core:backup_admin_delete' slug=slug pk=b.pk %}"
+                          class="d-inline"
+                          onsubmit="return confirm('Slette {{ b.filename }}?');">
+                      {% csrf_token %}
+                      <button type="submit" class="btn btn-outline-danger" title="Slett">
+                        <i class="bi bi-trash"></i>
+                      </button>
+                    </form>
+                  </div>
+                </td>
+              </tr>
+              {% empty %}
+              <tr>
+                <td colspan="5" class="text-center text-muted py-4">
+                  Ingen backuper laget enda. Klikk «Kjør backup nå» for å lage den første.
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

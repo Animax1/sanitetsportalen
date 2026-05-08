@@ -8,5 +8,7 @@ class PatientsConfig(AppConfig):
     verbose_name = 'Pasienter'
 
     def ready(self):
-        """Koble signals når appen er klar."""
+        """Koble signals + registrer backup-handler når appen er klar."""
         import patients.signals  # noqa: F401
+        from patients.backup import register_handlers
+        register_handlers()

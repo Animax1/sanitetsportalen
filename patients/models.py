@@ -248,11 +248,20 @@ class Backup(models.Model):
         help_text='SHA256 over ukomprimert JSON-innhold. '
                   'Brukes til å hoppe over identiske auto-backups.',
     )
+    module_slug = models.CharField(
+        max_length=64,
+        default='patients',
+        db_index=True,
+        help_text='Hvilken modul backupen tilhører. Brukes av core.backup '
+                  'for per-modul-cap og restore-rutting.',
+    )
 
     class Meta:
         ordering = ['-created_at']
         indexes = [
             models.Index(fields=['kind', '-created_at'], name='backup_kind_created_idx'),
+            models.Index(fields=['module_slug', '-created_at'],
+                         name='backup_module_created_idx'),
         ]
 
     def __str__(self):

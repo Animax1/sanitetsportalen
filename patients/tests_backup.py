@@ -108,21 +108,29 @@ class BackupServiceTests(TestCase):
         self.assertIn(101, pnr_list, 'Pasient A skal finnes etter restore')
         self.assertNotIn(102, pnr_list, 'Pasient B skal ikke finnes etter restore')
 
-    def test_purge_deletes_old_backups(self):
-        """purge_old_backups skal slette backups eldre enn 72 timer."""
-        with patch.dict(os.environ, {'BACKUP_DIR': str(self.backup_dir)}):
-            backup = create_backup(kind='manual', user=self.admin)
+    def test_purge_enforces_cap(self):
+        """purge_old_backups (Fase 4) håndhever ModuleBackupConfig.max_backups.
 
-        # Manipulér created_at til >72 timer siden
-        old_time = timezone.now() - timezone.timedelta(hours=73)
-        Backup.objects.filter(pk=backup.pk).update(created_at=old_time)
+        Tids-basert retention er erstattet med count-basert cap. Vi setter
+        cap til 1 og lager 3 backuper — de 2 eldste skal slettes.
+        """
+        from core.models import ModuleBackupConfig
+        cfg = ModuleBackupConfig.get_or_default('patients')
+        cfg.max_backups = 1
+        cfg.save()
 
         with patch.dict(os.environ, {'BACKUP_DIR': str(self.backup_dir)}):
+            create_backup(kind='manual', user=self.admin)
+            create_backup(kind='manual', user=self.admin)
+            create_backup(kind='manual', user=self.admin)
+
             purged = purge_old_backups()
 
-        self.assertEqual(purged, 1)
-        self.assertFalse(Backup.objects.filter(pk=backup.pk).exists(),
-                         'Gammel backup skal slettes fra databasen')
+        self.assertEqual(purged, 2,
+                         'Cap=1 → 2 av 3 backups skal slettes')
+        self.assertEqual(
+            Backup.objects.filter(module_slug='patients').count(), 1,
+        )
 
     def test_purge_keeps_recent_backups(self):
         """purge_old_backups skal ikke slette ferske backups (<72 timer)."""

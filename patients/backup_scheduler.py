@@ -1,4 +1,4 @@
-"""In-process scheduler for automatisk backup.
+"""In-process scheduler for automatisk backup — per modul (Fase 4).
 
 Designvalg: I stedet for en egen cron-service (som krever delt volum med
 web-servicen), kjører vi backup-sjekken inne i web-prosessen. En middleware
@@ -9,7 +9,14 @@ Selve backup-operasjonen kjøres i en bakgrunnstråd slik at request-latency
 ikke påvirkes. Vi bruker en database-lås via select_for_update for å unngå
 at to prosesser/tråder lager samme backup samtidig når Gunicorn kjører med
 flere arbeidere.
+
+**Per-modul (Fase 4):** Tidligere var det én singleton ``BackupConfig`` for
+patients. Nå itererer vi alle ``ModuleBackupConfig``-rader hvor
+``enabled=True`` og en backup-handler er registrert, og kjører backup
+uavhengig per modul (med eget intervall + cap).
 """
+from __future__ import annotations
+
 import logging
 import threading
 import time
@@ -18,28 +25,27 @@ from datetime import timedelta
 from django.db import transaction, OperationalError
 from django.utils import timezone
 
-from .backup_service import create_backup, purge_old_backups
-from .models import BackupConfig
-
 logger = logging.getLogger(__name__)
 
 # Minimum tid mellom throttle-sjekker (per prosess). Dette er IKKE
-# backup-intervallet – det er hvor ofte vi i det hele tatt leser
-# BackupConfig fra databasen.
+# backup-intervallet — det er hvor ofte vi i det hele tatt leser
+# ModuleBackupConfig fra databasen.
 _THROTTLE_SECONDS = 60
 
-# Per-prosess state for throttle
+# Per-prosess state for throttle.
 _last_check_ts = 0.0
 _check_lock = threading.Lock()
 
 # Per-prosess lås for å unngå at samme prosess starter flere
-# bakgrunnstråder samtidig
+# bakgrunnstråder samtidig.
 _running_lock = threading.Lock()
 _is_running = False
 
 
-def _should_run_now(cfg):
+def _should_run_now(cfg) -> bool:
     """Avgjør om en automatisk backup skal kjøre nå basert på konfig."""
+    if not cfg.enabled:
+        return False
     if cfg.interval_minutes == 0:
         return False
     if cfg.last_run_at is None:
@@ -48,8 +54,8 @@ def _should_run_now(cfg):
     return elapsed >= timedelta(minutes=cfg.interval_minutes)
 
 
-def _run_backup_with_db_lock():
-    """Kjører backup-operasjonen med database-lås for å unngå duplikater
+def _run_backup_for_module(slug: str) -> None:
+    """Kjør backup for én modul med database-lås for å unngå duplikater
     på tvers av Gunicorn-arbeidere.
 
     Bruker select_for_update + dobbeltsjekk: vi tar raden med lås, sjekker
@@ -57,82 +63,128 @@ def _run_backup_with_db_lock():
     backupen kjøres. Dermed vil andre arbeidere som kommer like etter se
     den oppdaterte last_run_at og hoppe over.
     """
-    global _is_running
+    # Lazy-import for å unngå sirkulære avhengigheter ved app-loading.
+    from core.backup import (
+        KIND_AUTO,
+        create_backup,
+        enforce_cap,
+        get_handler,
+    )
+    from core.models import ModuleBackupConfig
+
+    if get_handler(slug) is None:
+        logger.debug('backup_scheduler: ingen handler for %s, hopper over', slug)
+        return
+
     try:
         with transaction.atomic():
             try:
-                cfg = BackupConfig.objects.select_for_update(nowait=True).get(pk=1)
+                cfg = (
+                    ModuleBackupConfig.objects
+                    .select_for_update(nowait=True)
+                    .get(module_slug=slug)
+                )
             except OperationalError:
-                # En annen arbeider holder låsen akkurat nå – hopp over
-                logger.debug('backup_scheduler: kunne ikke ta lås, hopper over')
+                logger.debug(
+                    'backup_scheduler: kunne ikke ta l\xe5s for %s, hopper over', slug,
+                )
+                return
+            except ModuleBackupConfig.DoesNotExist:
                 return
 
             if not _should_run_now(cfg):
-                logger.debug('backup_scheduler: konfig sier at det ikke er tid ennå')
                 return
 
-            # Reserver slotten ved å oppdatere last_run_at først.
-            # Hvis create_backup feiler rulles dette tilbake av transaction.atomic.
+            # Reserver slot ved \xe5 oppdatere last_run_at f\xf8rst.
             cfg.last_run_at = timezone.now()
             cfg.save(update_fields=['last_run_at'])
 
-            backup = create_backup(kind='auto', note='Automatisk (in-process)')
-            purged = purge_old_backups()
+            backup = create_backup(
+                slug=slug, kind=KIND_AUTO,
+                note='Automatisk (in-process)',
+            )
+            purged = enforce_cap(slug, cfg.max_backups)
             if backup is None:
-                # #0: identisk innhold som forrige auto-backup — hoppet over.
-                # last_run_at er allerede oppdatert ovenfor, slik at vi ikke
-                # spammer dumpdata for hver request. Neste sjekk skjer etter
-                # cfg.interval_minutes som vanlig.
                 logger.info(
-                    'backup_scheduler: auto-backup hoppet over (identisk innhold). '
-                    'Slettet %d gamle.', purged,
+                    'backup_scheduler[%s]: hoppet over (identisk innhold). '
+                    'Slettet %d gamle.', slug, purged,
                 )
             else:
                 logger.info(
-                    'backup_scheduler: OK %s (%d bytes). Slettet %d gamle.',
-                    backup.filename, backup.size_bytes, purged,
+                    'backup_scheduler[%s]: OK %s (%d bytes). Slettet %d gamle.',
+                    slug, backup.filename, backup.size_bytes, purged,
                 )
     except Exception:
-        logger.exception('backup_scheduler: feil under automatisk backup')
+        logger.exception('backup_scheduler[%s]: feil under automatisk backup', slug)
+
+
+def _run_all_modules() -> None:
+    """Iterer alle aktive ModuleBackupConfig og kj\xf8r backup der det trengs.
+
+    Kalt fra bakgrunnstr\xe5d i ``maybe_run_backup``.
+    """
+    global _is_running
+    try:
+        from core.backup import get_handler
+        from core.models import ModuleBackupConfig
+
+        active_configs = ModuleBackupConfig.objects.filter(enabled=True)
+        for cfg in active_configs:
+            if get_handler(cfg.module_slug) is None:
+                continue
+            if not _should_run_now(cfg):
+                continue
+            _run_backup_for_module(cfg.module_slug)
     finally:
         with _running_lock:
             _is_running = False
 
 
-def maybe_run_backup():
+def maybe_run_backup() -> None:
     """Hoved-inngangspunkt. Kalt fra middleware ved hver request.
 
-    Returner raskt uten å blokkere. Selve backupen kjøres i en bakgrunnstråd
-    hvis det er tid for en ny backup.
+    Returnerer raskt uten \xe5 blokkere. Selve backupen kj\xf8res i en
+    bakgrunnstr\xe5d hvis det er tid for en eller flere moduler.
     """
     global _last_check_ts, _is_running
 
-    # Throttle: maks én sjekk per _THROTTLE_SECONDS per prosess
+    # Throttle: maks \xe9n sjekk per _THROTTLE_SECONDS per prosess.
     now = time.monotonic()
     with _check_lock:
         if now - _last_check_ts < _THROTTLE_SECONDS:
             return
         _last_check_ts = now
 
-    # Unngå flere samtidige bakgrunnstråder i samme prosess
+    # Unng\xe5 flere samtidige bakgrunnstr\xe5der i samme prosess.
     with _running_lock:
         if _is_running:
             return
         _is_running = True
 
-    # Rask sjekk uten lås for å unngå unødvendig bakgrunnstråd
+    # Rask sjekk om det finnes minst \xe9n aktiv konfig som faktisk trenger backup.
+    # (Sparer oss for en bakgrunnstr\xe5d hvis ingenting er due.)
     try:
-        cfg = BackupConfig.objects.get(pk=1)
-    except BackupConfig.DoesNotExist:
+        from core.backup import get_handler
+        from core.models import ModuleBackupConfig
+
+        any_due = False
+        for cfg in ModuleBackupConfig.objects.filter(enabled=True):
+            if get_handler(cfg.module_slug) is None:
+                continue
+            if _should_run_now(cfg):
+                any_due = True
+                break
+
+        if not any_due:
+            with _running_lock:
+                _is_running = False
+            return
+    except Exception:
+        # Hvis vi ikke kan sp\xf8rre DB (f.eks. under migrate), gi opp stille.
         with _running_lock:
             _is_running = False
         return
 
-    if not _should_run_now(cfg):
-        with _running_lock:
-            _is_running = False
-        return
-
-    # Kjør backup i bakgrunnstråd slik at request-latency ikke påvirkes
-    t = threading.Thread(target=_run_backup_with_db_lock, daemon=True)
+    # Kj\xf8r backup i bakgrunnstr\xe5d slik at request-latency ikke p\xe5virkes.
+    t = threading.Thread(target=_run_all_modules, daemon=True)
     t.start()

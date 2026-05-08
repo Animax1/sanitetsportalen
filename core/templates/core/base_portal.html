@@ -201,6 +201,9 @@
           <li><a class="dropdown-item" href="{% url 'core:audit_log_list' %}" style="color:var(--portal-text)">
             <i class="bi bi-journal-text me-2"></i>Revisjonslogg
           </a></li>
+          <li><a class="dropdown-item" href="{% url 'core:backup_admin_overview' %}" style="color:var(--portal-text)">
+            <i class="bi bi-cloud-arrow-up me-2"></i>Backup
+          </a></li>
           {% endif %}
           <li><hr class="dropdown-divider" style="border-color:var(--portal-border)"></li>
           <li><a class="dropdown-item" href="{% url 'accounts:logout' %}" style="color:#f87171">
@@ -234,6 +237,9 @@
     </a>
     <a href="{% url 'core:audit_log_list' %}" {% if '/portal-admin/auditlog' in request.path %}class="active"{% endif %}>
       <i class="bi bi-journal-text me-1"></i>Revisjonslogg
+    </a>
+    <a href="{% url 'core:backup_admin_overview' %}" {% if '/portal-admin/backup' in request.path %}class="active"{% endif %}>
+      <i class="bi bi-cloud-arrow-up me-1"></i>Backup
     </a>
     <a href="/django-admin/" target="_blank" rel="noopener">
       <i class="bi bi-gear me-1"></i>Django-admin

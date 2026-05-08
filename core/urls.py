@@ -47,6 +47,38 @@ urlpatterns = [
         name='audit_log_csv_export',
     ),
 
+    # ── Backup-admin (Fase 4) ────────────────────────────────────────
+    path(
+        'portal-admin/backup/',
+        views.backup_admin_overview_view,
+        name='backup_admin_overview',
+    ),
+    path(
+        'portal-admin/backup/<slug:slug>/',
+        views.backup_admin_module_view,
+        name='backup_admin_module',
+    ),
+    path(
+        'portal-admin/backup/<slug:slug>/run/',
+        views.backup_admin_run_view,
+        name='backup_admin_run',
+    ),
+    path(
+        'portal-admin/backup/<slug:slug>/restore/<int:pk>/',
+        views.backup_admin_restore_view,
+        name='backup_admin_restore',
+    ),
+    path(
+        'portal-admin/backup/<slug:slug>/last-ned/<int:pk>/',
+        views.backup_admin_download_view,
+        name='backup_admin_download',
+    ),
+    path(
+        'portal-admin/backup/<slug:slug>/slett/<int:pk>/',
+        views.backup_admin_delete_view,
+        name='backup_admin_delete',
+    ),
+
     # ── Legacy-redirects ────────────────────────────────────────────────────
     # Gamle URL-er som flyttet til /pasienter/ i Fase 2.
     # OBS: Disse må stå ETTER alle vanlige routes for å unngå at de "stjeler"

@@ -337,3 +337,220 @@ def legacy_root_redirect(request, subpath: str = '') -> HttpResponse:
     if request.META.get('QUERY_STRING'):
         new_path = f"{new_path}?{request.META['QUERY_STRING']}"
     return HttpResponsePermanentRedirect(new_path)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Fase 4: Backup-admin
+# ─────────────────────────────────────────────────────────────────────────────
+
+@admin_required
+@require_GET
+def backup_admin_overview_view(request):
+    """Oversikt: alle moduler med backup-handler + status.
+
+    Viser én rad per modul: konfig (intervall, enabled, max_backups),
+    siste-kjørt-tid og antall backuper på disk.
+    """
+    from core.backup import all_handlers
+    from core.models import ModuleBackupConfig
+    from patients.models import Backup
+
+    handlers = all_handlers()
+    # Sørg for at det finnes en konfig per registrert modul.
+    for h in handlers:
+        ModuleBackupConfig.get_or_default(h.slug)
+
+    rows = []
+    for h in handlers:
+        cfg = ModuleBackupConfig.objects.get(module_slug=h.slug)
+        backup_count = Backup.objects.filter(module_slug=h.slug).count()
+        rows.append({
+            'slug': h.slug,
+            'display_name': h.display_name or h.slug,
+            'config': cfg,
+            'backup_count': backup_count,
+        })
+
+    return render(request, 'core/backup_admin_overview.html', {
+        'rows': rows,
+    })
+
+
+@admin_required
+@require_http_methods(['GET', 'POST'])
+def backup_admin_module_view(request, slug: str):
+    """Per-modul backup-side: rediger konfig + se backup-liste."""
+    from core.backup import all_handlers, get_handler
+    from core.forms import ModuleBackupConfigForm
+    from core.models import ModuleBackupConfig
+    from patients.models import Backup
+
+    handler = get_handler(slug)
+    if handler is None:
+        messages.error(request, f'Ingen backup-handler registrert for «{slug}».')
+        return redirect('core:backup_admin_overview')
+
+    cfg = ModuleBackupConfig.get_or_default(slug)
+
+    if request.method == 'POST':
+        form = ModuleBackupConfigForm(request.POST, instance=cfg)
+        if form.is_valid():
+            form.save()
+            messages.success(
+                request,
+                f'Backup-innstillinger for «{handler.display_name or slug}» lagret.',
+            )
+            return redirect('core:backup_admin_module', slug=slug)
+    else:
+        form = ModuleBackupConfigForm(instance=cfg)
+
+    backups = (
+        Backup.objects
+        .filter(module_slug=slug)
+        .order_by('-created_at')[:200]
+    )
+
+    return render(request, 'core/backup_admin_module.html', {
+        'slug': slug,
+        'handler': handler,
+        'config': cfg,
+        'form': form,
+        'backups': backups,
+        'backup_count': Backup.objects.filter(module_slug=slug).count(),
+        'all_handlers': all_handlers(),
+    })
+
+
+@admin_required
+@require_http_methods(['POST'])
+def backup_admin_run_view(request, slug: str):
+    """Trigger en manuell backup for modulen NÅ."""
+    from core.backup import KIND_MANUAL, create_backup, enforce_cap, get_handler
+    from core.models import ModuleBackupConfig
+
+    handler = get_handler(slug)
+    if handler is None:
+        messages.error(request, f'Ingen backup-handler for «{slug}».')
+        return redirect('core:backup_admin_overview')
+
+    try:
+        backup = create_backup(
+            slug=slug, kind=KIND_MANUAL, user=request.user,
+            note=f'Manuelt startet av {request.user.username}',
+        )
+        cfg = ModuleBackupConfig.get_or_default(slug)
+        purged = enforce_cap(slug, cfg.max_backups)
+        if backup is None:
+            # Burde aldri skje for manual, men vi er defensive.
+            messages.info(request, 'Ingen ny backup ble lagret.')
+        else:
+            msg = f'Backup laget: {backup.filename}'
+            if purged:
+                msg += f' (slettet {purged} eldre).'
+            messages.success(request, msg)
+    except Exception as exc:  # noqa: BLE001 — vises i UI
+        messages.error(request, f'Backup feilet: {exc}')
+
+    return redirect('core:backup_admin_module', slug=slug)
+
+
+@admin_required
+@require_http_methods(['GET', 'POST'])
+def backup_admin_restore_view(request, slug: str, pk: int):
+    """Restore-flyt med slug-bekreftelse + audit-log-oppføring."""
+    from core.backup import get_handler, restore_backup
+    from core.forms import BackupRestoreConfirmForm
+    from patients.models import Backup
+    from audit.models import AuditLog
+
+    handler = get_handler(slug)
+    if handler is None:
+        messages.error(request, f'Ingen backup-handler for «{slug}».')
+        return redirect('core:backup_admin_overview')
+
+    backup = get_object_or_404(Backup, pk=pk, module_slug=slug)
+
+    if request.method == 'POST':
+        form = BackupRestoreConfirmForm(request.POST, expected_slug=slug)
+        if form.is_valid():
+            try:
+                restore_backup(backup, user=request.user)
+            except Exception as exc:  # noqa: BLE001
+                messages.error(request, f'Restore feilet: {exc}')
+                return redirect('core:backup_admin_module', slug=slug)
+
+            # Logg restore-handlingen i audit-log.
+            AuditLog.objects.create(
+                table_name=f'{slug}_backup_restore',
+                record_id=backup.pk,
+                action='UPDATE',
+                user=request.user,
+                app_label='core',
+                field_name='restore',
+                old_value='',
+                new_value=backup.filename,
+            )
+            messages.success(
+                request,
+                f'Modul «{handler.display_name or slug}» gjenopprettet '
+                f'fra {backup.filename}. Et pre-restore-snapshot ble laget '
+                'først som sikkerhetsnett.',
+            )
+            return redirect('core:backup_admin_module', slug=slug)
+    else:
+        form = BackupRestoreConfirmForm(expected_slug=slug)
+
+    return render(request, 'core/backup_admin_restore.html', {
+        'slug': slug,
+        'handler': handler,
+        'backup': backup,
+        'form': form,
+    })
+
+
+@admin_required
+@require_GET
+def backup_admin_download_view(request, slug: str, pk: int):
+    """Last ned en backup-fil som application/gzip."""
+    from core.backup import get_backup_dir
+    from patients.models import Backup
+
+    backup = get_object_or_404(Backup, pk=pk, module_slug=slug)
+    path = get_backup_dir() / backup.filename
+    if not path.exists():
+        messages.error(request, f'Filen «{backup.filename}» mangler på disk.')
+        return redirect('core:backup_admin_module', slug=slug)
+
+    # Streamer ikke — backups er typisk små (< 50 MB), og enklere å lese
+    # hele i minne enn å håndtere chunked transfer + close-callbacks.
+    response = HttpResponse(
+        path.read_bytes(),
+        content_type='application/gzip',
+    )
+    response['Content-Disposition'] = (
+        f'attachment; filename="{backup.filename}"'
+    )
+    return response
+
+
+@admin_required
+@require_http_methods(['POST'])
+def backup_admin_delete_view(request, slug: str, pk: int):
+    """Slett én enkelt backup-fil + DB-rad."""
+    from core.backup import get_backup_dir
+    from patients.models import Backup
+
+    backup = get_object_or_404(Backup, pk=pk, module_slug=slug)
+    path = get_backup_dir() / backup.filename
+    filename = backup.filename
+    if path.exists():
+        try:
+            path.unlink()
+        except OSError as exc:
+            messages.warning(
+                request,
+                f'Kunne ikke slette filen på disk ({exc}). DB-rad fjernes likevel.',
+            )
+    backup.delete()
+    messages.success(request, f'Slettet backup «{filename}».')
+    return redirect('core:backup_admin_module', slug=slug)

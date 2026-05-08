@@ -1,175 +1,90 @@
-"""Backup- og restore-tjeneste.
+"""Backup- og restore-tjeneste for patients-modulen.
 
-Bruker Django dumpdata/loaddata (ren Python) for å unngå pg_dump-avhengighet.
-Backups lagres som gzip-komprimerte JSON-filer i BACKUP_DIR.
+**Fase 4-endring:** Logikken er flyttet til ``core.backup`` for å støtte
+per-modul backup. Denne fila er nå en tynn proxy som beholder bakoverkompatibel
+API for eksisterende kode (admin-views, kommandoer, tester).
 
-Forbedring #0 (mai 2026): Auto-backups beregner SHA256 over JSON-innholdet og
-hopper over filskriving + DB-rad hvis siste auto-backup har samme hash. Dette
-hindrer opphoping av identiske backups når appen er aktiv men data er stabile.
-Manuelle backups (kind != 'auto') lagres alltid.
+Nye moduler som vil ha backup skal IKKE bruke denne fila — de skal
+registrere en ``BaseBackupHandler`` i ``core.backup`` og bruke
+``core.backup.create_backup(slug=...)`` direkte.
 """
-import gzip
-import hashlib
-import io
-import json
-import logging
-import os
-from datetime import timedelta
-from pathlib import Path
+from __future__ import annotations
 
-from django.conf import settings
-from django.core import management
-from django.core.management import CommandError
-from django.db import transaction
-from django.utils import timezone
+import logging
+
+from core.backup import (
+    KIND_AUTO,
+    create_backup as _core_create_backup,
+    enforce_cap as _core_enforce_cap,
+    get_backup_dir as _core_get_backup_dir,
+    restore_backup as _core_restore_backup,
+)
+from core.backup.service import _serialize_with_handler  # noqa: F401 — testbruk
 
 from .models import Backup
 
 logger = logging.getLogger(__name__)
 
 
-# Apper som skal inkluderes i backup.
-# SIKKERHET: Vi inkluderer KUN pasientrelaterte data.
-# Brukere (accounts) og revisjonslogg (audit) ekskluderes bevisst fordi:
-#  - accounts inneholder passord-hasher og MFA-hemmeligheter
-#  - audit/LoginEvent inneholder innloggingshistorikk og sensitive spor
-#  - sessions inneholder aktive øktnøkler
-# Disse skal aldri havne i en nedlastbar backup-fil.
-# Backup og BackupConfig ekskluderes fra dumpdata for å unngå selvreferanse
-# (backupen som lages lagrer en Backup-rad – den skal ikke være med i innholdet).
+# Apper og ekskluderinger oppgis nå av PatientsBackupHandler.
+# Disse beholdes som dokumentasjon-konstanter for å hindre at gammel
+# kode/tester importerer ikke-eksisterende navn.
 BACKUP_APPS = ['patients']
-BACKUP_EXCLUDE = ['patients.Backup', 'patients.BackupConfig']
+BACKUP_EXCLUDE = ['patients.Backup', 'patients.BackupConfig', 'patients.VaktArkiv']
+
+# Beholdes for bakoverkompatibilitet, men brukes ikke aktivt — cap erstatter
+# tidsbasert retention. Fra Fase 4 styres oppryddingen av
+# ModuleBackupConfig.max_backups (default 50).
 RETENTION_HOURS = 72
+
+# Default cap for legacy-kall som ikke spesifiserer noe.
+_DEFAULT_CAP = 50
 
 
 def get_backup_dir():
-    """Returnerer Path til backup-mappen, opprett den hvis den ikke finnes."""
-    path = Path(os.environ.get('BACKUP_DIR', settings.BASE_DIR / 'backups'))
-    path.mkdir(parents=True, exist_ok=True)
-    return path
+    """Proxy mot core.backup.get_backup_dir()."""
+    return _core_get_backup_dir()
 
 
-def _serialize_db_to_json():
-    """Kjør dumpdata for valgte apper og returner (bytes, sha256_hex).
+def create_backup(kind: str = 'manual', user=None, note: str = ''):
+    """Bakoverkompatibel: lag backup for ``patients``-modulen.
 
-    Ekskluderer Backup og BackupConfig for å unngå selvreferanse.
-    SHA256 beregnes over ukomprimert JSON slik at samme data alltid gir samme
-    hash uansett gzip-nivå eller dato-stempel i filnavn.
+    For ``kind='auto'`` med identisk innhold returneres None (hash-skip).
+    For andre typer lagres alltid.
     """
-    buf = io.StringIO()
-    management.call_command(
-        'dumpdata',
-        *BACKUP_APPS,
-        exclude=BACKUP_EXCLUDE,
-        format='json',
-        indent=None,
-        natural_foreign=True,
-        natural_primary=True,
-        stdout=buf,
-    )
-    raw = buf.getvalue().encode('utf-8')
-    content_hash = hashlib.sha256(raw).hexdigest()
-    return raw, content_hash
+    return _core_create_backup(slug='patients', kind=kind, user=user, note=note)
 
 
-def create_backup(kind='manual', user=None, note=''):
-    """Lag en ny backup og lagre metadata.
+def restore_backup(backup, user=None) -> None:
+    """Bakoverkompatibel: gjenopprett en backup.
 
-    For kind='auto': hvis innholdet er identisk med siste auto-backup,
-    hoppes filskriving og DB-rad over. Returnerer da None.
-    For andre kind ('manual', 'pre_restore', 'pre_reset') lagres alltid.
-
-    Returnerer Backup-instansen, eller None hvis auto-backup ble hoppet over.
+    Routes til core.backup.restore_backup, som bruker handler-en
+    registrert for backup.module_slug.
     """
-    assert kind in dict(Backup.KIND_CHOICES), f'Ugyldig kind: {kind}'
-
-    raw, content_hash = _serialize_db_to_json()
-
-    # Forbedring #0: hopp over identiske auto-backups.
-    # Manuelle og pre_*-backups skal alltid lagres (audit-spor / sikkerhetsnett).
-    if kind == 'auto':
-        last_auto = (
-            Backup.objects
-            .filter(kind='auto')
-            .exclude(content_hash='')
-            .order_by('-created_at')
-            .first()
-        )
-        if last_auto is not None and last_auto.content_hash == content_hash:
-            logger.info(
-                'backup_service: auto-backup hoppet over (identisk med %s, hash=%s)',
-                last_auto.filename, content_hash[:12],
-            )
-            return None
-
-    ts = timezone.now().strftime('%Y%m%d-%H%M%S')
-    filename = f'backup-{kind}-{ts}.json.gz'
-    path = get_backup_dir() / filename
-
-    with gzip.open(path, 'wb', compresslevel=6) as f:
-        f.write(raw)
-
-    size = path.stat().st_size
-    backup = Backup.objects.create(
-        filename=filename, kind=kind, size_bytes=size,
-        created_by=user, note=note, content_hash=content_hash,
-    )
-    return backup
+    _core_restore_backup(backup, user=user)
 
 
-def restore_backup(backup, user=None):
-    """Gjenopprett en backup av pasientdata.
+def purge_old_backups() -> int:
+    """Bakoverkompatibel: håndhev cap for patients-modulen.
 
-    SIKKERHET: Brukere, revisjonslogg, LoginEvent og sesjoner berøres IKKE.
-    Kun pasientrelaterte data (Patient, Behandler, Helsepersonell, AppSetting)
-    slettes og erstattes med innholdet fra backupen.
-
-    Lager en pre-restore backup FØR sletting. Kjører i transaksjon slik at en
-    feil ruller tilbake slettingen.
+    Bruker default-capen (50). Auto-backup-flyten i scheduleren bruker
+    config.max_backups direkte og kaller ikke denne funksjonen.
     """
-    path = get_backup_dir() / backup.filename
-    if not path.exists():
-        raise FileNotFoundError(f'Backup-fil mangler: {backup.filename}')
-
-    # 1) Sikkerhetsnett – tar snapshot av nåværende pasientdata
-    create_backup(kind='pre_restore', user=user,
-                  note=f'Før gjenoppretting av {backup.filename}')
-
-    # 2) Les og dekomprimer
-    with gzip.open(path, 'rb') as f:
-        raw = f.read()
-
-    # 3) Slett kun pasientrelaterte data + loaddata i samme transaksjon.
-    #    Vi rører IKKE CustomUser, AuditLog, LoginEvent eller sesjoner –
-    #    disse bevares på tvers av restore.
-    from patients.models import Patient, Behandler, Helsepersonell, AppSetting
-
-    with transaction.atomic():
-        # Slett i rekkefølge som respekterer FK-er
-        Patient.objects.all().delete()
-        Behandler.objects.all().delete()
-        Helsepersonell.objects.all().delete()
-        AppSetting.objects.all().delete()
-
-        # Skriv midlertidig fil som loaddata kan lese
-        tmp_path = get_backup_dir() / f'.restore-tmp-{backup.pk}.json'
-        try:
-            tmp_path.write_bytes(raw)
-            management.call_command('loaddata', str(tmp_path), verbosity=0)
-        finally:
-            if tmp_path.exists():
-                tmp_path.unlink()
+    from core.models import ModuleBackupConfig
+    cfg = ModuleBackupConfig.objects.filter(module_slug='patients').first()
+    cap = cfg.max_backups if cfg else _DEFAULT_CAP
+    return _core_enforce_cap('patients', cap)
 
 
-def purge_old_backups():
-    """Slett backup-filer og metadata eldre enn RETENTION_HOURS."""
-    cutoff = timezone.now() - timedelta(hours=RETENTION_HOURS)
-    old = Backup.objects.filter(created_at__lt=cutoff)
-    count = 0
-    for b in old:
-        path = get_backup_dir() / b.filename
-        if path.exists():
-            path.unlink()
-        b.delete()
-        count += 1
-    return count
+# Re-eksporter konstant for legacy-tester.
+__all__ = [
+    'BACKUP_APPS',
+    'BACKUP_EXCLUDE',
+    'RETENTION_HOURS',
+    'Backup',
+    'KIND_AUTO',
+    'create_backup',
+    'get_backup_dir',
+    'purge_old_backups',
+    'restore_backup',
+]
