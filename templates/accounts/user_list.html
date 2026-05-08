@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% block title %}Brukere{% endblock %}
+{% block content %}
+<div class="d-flex align-items-center justify-content-between mb-3">
+  <h4 class="mb-0"><i class="bi bi-people me-2"></i>Brukere</h4>
+  <a href="{% url 'accounts:user_create' %}" class="btn btn-primary btn-sm">
+    <i class="bi bi-person-plus me-1"></i>Ny bruker
+  </a>
+</div>
+
+<div class="card">
+  <div class="card-body p-0">
+    <table class="table mb-0">
+      <thead>
+        <tr>
+          <th>Brukernavn</th>
+          <th>E-post</th>
+          <th>Rolle</th>
+          <th>Status</th>
+          <th>Siste innlogging</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for user in users %}
+        <tr>
+          <td>
+            <strong>{{ user.username }}</strong>
+            {% if user.must_change_password %}<span class="badge bg-warning ms-1" title="Må bytte passord">Midl. passord</span>{% endif %}
+          </td>
+          <td class="text-muted">{{ user.email|default:"–" }}</td>
+          <td>
+            {% if user.role == 'admin' %}
+              <span class="badge bg-danger">{{ user.get_role_display }}</span>
+            {% elif user.role == 'lead' %}
+              <span class="badge" style="background:#a855f7;">{{ user.get_role_display }}</span>
+            {% elif user.role == 'read_write' %}
+              <span class="badge bg-primary">{{ user.get_role_display }}</span>
+            {% else %}
+              <span class="badge bg-secondary">{{ user.get_role_display }}</span>
+            {% endif %}
+          </td>
+          <td>
+            {% if user.is_active %}
+              {% if user.is_locked %}
+                <span class="badge bg-warning">Låst</span>
+              {% else %}
+                <span class="badge bg-success">Aktiv</span>
+              {% endif %}
+            {% else %}
+              <span class="badge bg-secondary">Deaktivert</span>
+            {% endif %}
+          </td>
+          <td class="text-muted" style="font-size:0.82rem;">
+            {{ user.last_login_at|date:"d.m.Y H:i"|default:"–" }}
+          </td>
+          <td>
+            <a href="{% url 'accounts:user_detail' user.pk %}" class="btn btn-outline-secondary btn-sm">
+              <i class="bi bi-pencil"></i>
+            </a>
+          </td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="6" class="text-center text-muted py-3">Ingen brukere funnet.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

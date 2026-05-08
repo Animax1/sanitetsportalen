@@ -1,0 +1,147 @@
+{% extends "base.html" %}
+{% block title %}{{ target_user.username }}{% endblock %}
+{% block content %}
+<div style="max-width:760px">
+  <div class="d-flex align-items-center mb-3">
+    <a href="{% url 'accounts:user_list' %}" class="btn btn-outline-secondary btn-sm me-3">
+      <i class="bi bi-arrow-left"></i>
+    </a>
+    <h4 class="mb-0"><i class="bi bi-person me-2"></i>{{ target_user.username }}</h4>
+    {% if target_user.role == 'admin' %}
+      <span class="badge bg-danger ms-2">{{ target_user.get_role_display }}</span>
+    {% elif target_user.role == 'lead' %}
+      <span class="badge ms-2" style="background:#a855f7;">{{ target_user.get_role_display }}</span>
+    {% elif target_user.role == 'read_write' %}
+      <span class="badge bg-primary ms-2">{{ target_user.get_role_display }}</span>
+    {% else %}
+      <span class="badge bg-secondary ms-2">{{ target_user.get_role_display }}</span>
+    {% endif %}
+  </div>
+
+  {% if temp_password %}
+  <div class="alert alert-success mb-3">
+    <strong><i class="bi bi-key me-1"></i>Nytt midlertidig passord (vises kun én gang):</strong>
+    <div class="mt-1 p-2" style="background:#052e16;border-radius:6px;font-family:monospace;font-size:1rem;color:#86efac;">
+      {{ temp_password }}
+    </div>
+  </div>
+  {% endif %}
+
+  <div class="row g-3 mb-3">
+    <!-- Rediger bruker -->
+    <div class="col-md-6">
+      <div class="card h-100">
+        <div class="card-header"><strong>Rediger</strong></div>
+        <div class="card-body p-3">
+          <form method="post">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="edit">
+            <div class="mb-2">
+              <label class="form-label">E-post</label>
+              {{ form.email }}
+            </div>
+            <div class="mb-2">
+              <label class="form-label">Rolle</label>
+              {{ form.role }}
+            </div>
+            <div class="mb-3 form-check">
+              {{ form.is_active }}
+              <label class="form-check-label" for="{{ form.is_active.id_for_label }}" style="color:#cbd5e1;">Aktiv konto</label>
+            </div>
+            <button type="submit" class="btn btn-primary btn-sm w-100">Lagre endringer</button>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <!-- Handlinger -->
+    <div class="col-md-6">
+      <div class="card h-100">
+        <div class="card-header"><strong>Handlinger</strong></div>
+        <div class="card-body p-3 d-flex flex-column gap-2">
+          {% if target_user.is_locked %}
+          <form method="post">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="unlock">
+            <button type="submit" class="btn btn-warning btn-sm w-100">
+              <i class="bi bi-unlock me-1"></i>Lås opp konto
+            </button>
+          </form>
+          {% else %}
+          <div class="text-muted small p-2 text-center" style="border:1px solid var(--border-color);border-radius:6px;">
+            <i class="bi bi-check-circle me-1 text-success"></i>Kontoen er ikke låst
+          </div>
+          {% endif %}
+
+          <form method="post">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="reset_password">
+            <button type="submit" class="btn btn-outline-warning btn-sm w-100">
+              <i class="bi bi-key me-1"></i>Generer nytt midlertidig passord
+            </button>
+          </form>
+
+          {% if target_user.mfa_required or has_totp_device %}
+          <form method="post" onsubmit="return confirm('Er du sikker? Dette nullstiller MFA for brukeren og de m\u00e5 sette opp p\u00e5 nytt ved neste p\u00e5logging.')">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="reset_mfa">
+            <button type="submit" class="btn btn-outline-danger btn-sm w-100">
+              <i class="bi bi-shield-x me-1"></i>Nullstill MFA
+            </button>
+          </form>
+          {% endif %}
+
+          <div class="small text-muted mt-2" style="line-height:1.6;">
+            <div><strong>Siste innlogging:</strong> {{ target_user.last_login_at|date:"d.m.Y H:i"|default:"–" }}</div>
+            <div><strong>Opprettet:</strong> {{ target_user.created_at|date:"d.m.Y H:i" }}</div>
+            <div><strong>Mislykkede forsøk:</strong> {{ target_user.failed_login_attempts }}</div>
+            {% if target_user.locked_until %}
+            <div class="text-warning"><strong>Låst til:</strong> {{ target_user.locked_until|date:"d.m.Y H:i" }}</div>
+            {% endif %}
+            <div>
+              <strong>MFA:</strong>
+              {% if has_totp_device %}
+                <span class="text-success">Aktivt</span>
+              {% elif target_user.mfa_required %}
+                <span class="text-warning">Påkrevd, ikke konfigurert</span>
+              {% else %}
+                <span class="text-muted">Ikke påkrevd</span>
+              {% endif %}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Siste innloggingshendelser -->
+  <div class="card">
+    <div class="card-header"><strong>Siste 20 innloggingshendelser</strong></div>
+    <div class="card-body p-0">
+      <table class="table mb-0">
+        <thead>
+          <tr><th>Tidspunkt</th><th>Resultat</th><th>IP</th></tr>
+        </thead>
+        <tbody>
+          {% for evt in recent_events %}
+          <tr>
+            <td style="font-size:0.82rem;">{{ evt.created_at|date:"d.m.Y H:i:s" }}</td>
+            <td>
+              {% if evt.success %}
+                <span class="badge bg-success">OK</span>
+              {% else %}
+                <span class="badge bg-danger">Feilet</span>
+              {% endif %}
+            </td>
+            <td class="text-muted" style="font-size:0.82rem;">{{ evt.ip|default:"–" }}</td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="3" class="text-center text-muted py-2">Ingen innloggingshendelser.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+{% endblock %}

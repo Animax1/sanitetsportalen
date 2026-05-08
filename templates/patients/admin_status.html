@@ -1,0 +1,453 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Server-status – Pasientregistrering{% endblock %}
+
+{% block extra_head %}
+<style>
+  .status-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem; }
+  .status-card { background: var(--surface-1); border: 1px solid var(--border-color); border-radius: 10px; padding: 1rem; }
+  .status-card h3 { font-size: 0.85rem; color: var(--text-muted); text-transform: uppercase; margin: 0 0 0.5rem; letter-spacing: 0.5px; }
+  .status-card .big-number { font-size: 1.8rem; font-weight: 700; color: var(--text-main); }
+  .status-card .unit { font-size: 0.9rem; color: var(--text-muted); margin-left: 0.3rem; }
+  .status-card .sub { font-size: 0.8rem; color: var(--text-muted); margin-top: 0.3rem; }
+  .status-ok { color: #86efac; }
+  .status-warn { color: #fbbf24; }
+  .status-crit { color: #fca5a5; }
+  .status-row { display: flex; justify-content: space-between; padding: 0.25rem 0; border-bottom: 1px dashed var(--border-color); font-size: 0.88rem; }
+  .status-row:last-child { border-bottom: none; }
+  .status-row .label { color: var(--text-muted); }
+  .status-row .val { color: var(--text-main); font-family: ui-monospace, monospace; }
+  .flag-toggle { display: flex; align-items: center; gap: 0.5rem; margin-top: 0.5rem; }
+  .flag-toggle button { font-size: 0.8rem; padding: 0.25rem 0.75rem; }
+  pre.json-preview { background: var(--surface-2); padding: 0.75rem; border-radius: 6px; font-size: 0.75rem; max-height: 300px; overflow: auto; color: #cbd5e1; }
+  .refresh-indicator { font-size: 0.75rem; color: var(--text-muted); }
+  .refresh-indicator .dot { display: inline-block; width: 8px; height: 8px; background: #86efac; border-radius: 50%; margin-right: 0.3rem; animation: pulse 1.5s infinite; }
+  /* Sesjons-kort */
+  .sessions-card { grid-column: 1 / -1; }
+  .sessions-list { max-height: 260px; overflow-y: auto; margin-top: 0.5rem; border: 1px solid var(--border-color); border-radius: 6px; }
+  .session-item { display: flex; justify-content: space-between; align-items: center; padding: 0.5rem 0.75rem; border-bottom: 1px solid var(--border-color); font-size: 0.88rem; gap: 0.75rem; }
+  .session-item:last-child { border-bottom: none; }
+  .session-item .who { display: flex; flex-direction: column; min-width: 0; flex: 1; }
+  .session-item .username { color: var(--text-main); font-weight: 600; word-break: break-all; }
+  .session-item .role { color: var(--text-muted); font-size: 0.78rem; }
+  .session-item .meta { color: var(--text-muted); font-size: 0.78rem; }
+  .session-item .self-tag { color: #86efac; font-size: 0.75rem; font-weight: 600; }
+  .btn-kill { font-size: 0.78rem; padding: 0.2rem 0.6rem; background: #b91c1c; color: white; border: none; border-radius: 4px; cursor: pointer; }
+  .btn-kill:hover:not(:disabled) { background: #dc2626; }
+  .btn-kill:disabled { opacity: 0.4; cursor: not-allowed; }
+  .btn-kill-all { font-size: 0.85rem; padding: 0.4rem 0.9rem; background: #b91c1c; color: white; border: none; border-radius: 6px; cursor: pointer; }
+  .btn-kill-all:hover { background: #dc2626; }
+  .sessions-toolbar { display: flex; justify-content: space-between; align-items: center; margin-top: 0.5rem; gap: 0.5rem; flex-wrap: wrap; }
+  .sessions-empty { padding: 1rem; text-align: center; color: var(--text-muted); font-size: 0.85rem; }
+  @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+</style>
+{% endblock %}
+
+{% block content %}
+{# CSRF-token for fetch()-kall – nødvendig fordi CSRF_COOKIE_HTTPONLY=True #}
+<div id="csrf-token-holder" style="display:none">{% csrf_token %}</div>
+<div class="admin-content">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;">
+    <h1 style="margin:0;font-size:1.4rem;">Server-status</h1>
+    <div class="refresh-indicator"><span class="dot"></span>Oppdaterer hvert 10. sek – <span id="last-update">…</span></div>
+  </div>
+
+  <div class="status-grid" id="status-grid">
+    <!-- Requests siste 1 min -->
+    <div class="status-card">
+      <h3>Requests siste 1 min</h3>
+      <div><span class="big-number" id="rps-1min">–</span><span class="unit">req/s</span></div>
+      <div class="sub" id="count-1min">–</div>
+    </div>
+
+    <!-- Responstid siste 5 min -->
+    <div class="status-card">
+      <h3>Responstid siste 5 min</h3>
+      <div><span class="big-number" id="avg-5min">–</span><span class="unit">ms snitt</span></div>
+      <div class="status-row"><span class="label">P50</span><span class="val" id="p50-5min">–</span></div>
+      <div class="status-row"><span class="label">P95</span><span class="val" id="p95-5min">–</span></div>
+      <div class="status-row"><span class="label">Max</span><span class="val" id="max-5min">–</span></div>
+    </div>
+
+    <!-- Feil siste 5 min -->
+    <div class="status-card">
+      <h3>Feilresponser siste 5 min</h3>
+      <div class="status-row"><span class="label">4xx (klientfeil)</span><span class="val" id="err-4xx">–</span></div>
+      <div class="status-row"><span class="label">5xx (serverfeil)</span><span class="val" id="err-5xx">–</span></div>
+      <div class="sub" style="margin-top:0.5rem;">Av <span id="count-5min">–</span> requests totalt</div>
+    </div>
+
+    <!-- Sesjoner med liste og handlinger -->
+    <div class="status-card sessions-card">
+      <h3>Aktive sesjoner</h3>
+      <div><span class="big-number" id="sessions">–</span><span class="unit">påloggede brukere</span></div>
+      <div class="sub">Tabellen oppdateres hvert 10. sekund. Bruk “Logg ut” for å frigjøre ressurser ved høy last.</div>
+      <div class="sessions-list" id="sessions-list">
+        <div class="sessions-empty">Laster…</div>
+      </div>
+      <div class="sessions-toolbar">
+        <span class="sub" id="sessions-status"></span>
+        <button class="btn-kill-all" id="btn-kill-all" type="button" title="Logger ut alle brukere unntatt deg selv">Nødbrems: logg ut alle (unntatt meg)</button>
+      </div>
+    </div>
+
+    <!-- Minnebruk -->
+    <div class="status-card">
+      <h3>Minne (RSS)</h3>
+      <div><span class="big-number" id="memory">–</span><span class="unit">MB</span></div>
+      <div class="sub">Denne worker-prosessen</div>
+    </div>
+
+    <!-- Worker-config -->
+    <div class="status-card">
+      <h3>Worker-konfigurasjon</h3>
+      <div class="status-row"><span class="label">WEB_WORKERS</span><span class="val" id="cfg-workers">–</span></div>
+      <div class="status-row"><span class="label">WEB_THREADS</span><span class="val" id="cfg-threads">–</span></div>
+      <div class="status-row"><span class="label">MAX_REQUESTS</span><span class="val" id="cfg-maxreq">–</span></div>
+      <div class="status-row"><span class="label">PID</span><span class="val" id="cfg-pid">–</span></div>
+      <div class="status-row"><span class="label">Oppetid</span><span class="val" id="cfg-uptime">–</span></div>
+    </div>
+
+    <!-- Cache-helse -->
+    <div class="status-card">
+      <h3>Cache-backend</h3>
+      <div class="status-row"><span class="label">Type</span><span class="val" id="cache-backend">–</span></div>
+      <div class="status-row"><span class="label">Status</span><span class="val" id="cache-healthy">–</span></div>
+      <div class="status-row"><span class="label">Latency</span><span class="val" id="cache-latency">–</span></div>
+      <div class="sub" id="cache-hint" style="margin-top:0.5rem;">–</div>
+    </div>
+
+    <!-- Backup -->
+    <div class="status-card">
+      <h3>Siste vellykkede backup</h3>
+      <div><span class="big-number" id="backup-age">–</span><span class="unit">min siden</span></div>
+      <div class="sub" id="backup-details">–</div>
+    </div>
+
+    <!-- Feature flags -->
+    <div class="status-card">
+      <h3>Feature-flagg</h3>
+      <div class="status-row">
+        <span class="label">Live statistikk <em style="font-size:0.75rem;color:var(--text-muted);font-style:italic;">(planlagt)</em></span>
+        <span class="val" id="flag-live-stats">–</span>
+      </div>
+      <div class="sub" style="margin-top:0.5rem;">Flagg for fremtidig live-statistikk-fane. Funksjonen er ikke implementert ennå — default er derfor <code>false</code>. Endring trer i kraft ved neste request (ingen restart).</div>
+    </div>
+  </div>
+
+  <!-- Beredskap under vakt -->
+  <div style="margin-top:1.5rem;padding:1rem;background:var(--surface-1);border:1px solid var(--border-color);border-radius:10px;">
+    <h3 style="margin:0 0 0.5rem;font-size:0.9rem;color:var(--text-muted);text-transform:uppercase;">Beredskap under vakt</h3>
+    <p style="margin:0 0 0.75rem;font-size:0.88rem;">
+      Les av <strong>P95 (siste 5 min)</strong> på dashbordet — det er det viktigste tallet. Tabellen under er en hurtigreferanse; full prosedyre i <code>RUNBOOK_VAKT.md</code>.
+    </p>
+    <table class="table table-sm" style="font-size:0.82rem;">
+      <thead>
+        <tr><th>P95 / 5xx</th><th>Status</th><th>Handling</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>&lt; 300 ms, 0 feil</td>
+          <td><span style="color:var(--success,#22c55e);font-weight:600;">Grønt</span></td>
+          <td>Ingen endring. Fortsett å observere.</td>
+        </tr>
+        <tr>
+          <td>300–500 ms, 0 feil</td>
+          <td><span style="color:#eab308;font-weight:600;">Gult</span></td>
+          <td>Observer. Hvis vedvarer &gt; 15 min: logg ut inaktive sesjoner («Aktive sesjoner»-kortet → per bruker).</td>
+        </tr>
+        <tr>
+          <td>500–1000 ms eller 1–2 5xx</td>
+          <td><span style="color:#f97316;font-weight:600;">Oransje</span></td>
+          <td><strong>Sjekk først at Cache-backend = REDIS / OK</strong>. Sett deretter <code>WEB_WORKERS=2</code> i Railway → Save (auto-redeploy ~60 sek).</td>
+        </tr>
+        <tr>
+          <td>&gt; 1000 ms eller ≥3 5xx</td>
+          <td><span style="color:#ef4444;font-weight:600;">Rødt</span></td>
+          <td>Krever Redis. Sett <code>WEB_WORKERS=2 WEB_THREADS=6</code>. Hvis fortsatt problem: nødbrems med <code>RATELIMIT_ENABLE=false</code>.</td>
+        </tr>
+        <tr>
+          <td>Fortsatt tregt etter alle tiltak</td>
+          <td><span style="color:#dc2626;font-weight:600;">Kritisk</span></td>
+          <td>Nødbrems alle sesjoner («Logg ut alle unntatt meg»). Eskaler til Railway-status og vurder Pro-plan.</td>
+        </tr>
+      </tbody>
+    </table>
+    <p style="margin:0.75rem 0 0;font-size:0.8rem;color:var(--text-muted);">
+      <strong>Viktig:</strong> 2+ workers krever at Cache-backend-kortet viser <code>REDIS / OK</code>. Med LocMemCache vil rate-limit og stats-cache fragmenteres mellom workers.
+    </p>
+  </div>
+
+  <!-- JSON preview -->
+  <details style="margin-top:1rem;">
+    <summary style="cursor:pointer;color:var(--text-muted);font-size:0.85rem;">Vis rå JSON (for debugging)</summary>
+    <pre class="json-preview" id="json-preview">{{ payload_json }}</pre>
+  </details>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+(function() {
+  'use strict';
+
+  function fmt(n, fallback) {
+    if (n === null || n === undefined) return fallback || '–';
+    return n;
+  }
+
+  function classifyP95(p95) {
+    if (p95 < 300) return 'status-ok';
+    if (p95 < 500) return 'status-ok';
+    if (p95 < 1000) return 'status-warn';
+    return 'status-crit';
+  }
+
+  async function refresh() {
+    try {
+      const res = await fetch('/admin/server-status/json/', {
+        headers: {'Accept': 'application/json'},
+      });
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const data = await res.json();
+      render(data);
+      document.getElementById('last-update').textContent =
+        new Date().toLocaleTimeString('no-NO');
+    } catch (err) {
+      console.error('Status-refresh feilet:', err);
+      document.getElementById('last-update').textContent =
+        'Feil: ' + err.message;
+    }
+  }
+
+  function render(d) {
+    const m1 = d.metrics_1min || {};
+    const m5 = d.metrics_5min || {};
+
+    document.getElementById('rps-1min').textContent = fmt(m1.rps);
+    document.getElementById('count-1min').textContent = fmt(m1.count) + ' requests totalt';
+
+    document.getElementById('avg-5min').textContent = fmt(m5.avg_ms);
+    document.getElementById('p50-5min').textContent = fmt(m5.p50_ms) + ' ms';
+
+    const p95El = document.getElementById('p95-5min');
+    p95El.textContent = fmt(m5.p95_ms) + ' ms';
+    p95El.className = 'val ' + classifyP95(m5.p95_ms || 0);
+
+    document.getElementById('max-5min').textContent = fmt(m5.max_ms) + ' ms';
+    document.getElementById('err-4xx').textContent = fmt(m5.errors_4xx);
+
+    const err5El = document.getElementById('err-5xx');
+    err5El.textContent = fmt(m5.errors_5xx);
+    err5El.className = 'val ' + ((m5.errors_5xx || 0) > 0 ? 'status-crit' : 'status-ok');
+
+    document.getElementById('count-5min').textContent = fmt(m5.count);
+
+    document.getElementById('sessions').textContent = fmt(d.active_sessions);
+    document.getElementById('memory').textContent = fmt(d.memory_mb);
+    refreshSessionsList();
+
+    const cfg = d.worker_config || {};
+    document.getElementById('cfg-workers').textContent = fmt(cfg.workers);
+    document.getElementById('cfg-threads').textContent = fmt(cfg.threads);
+    document.getElementById('cfg-maxreq').textContent = fmt(cfg.max_requests);
+    document.getElementById('cfg-pid').textContent = fmt(cfg.pid);
+
+    const ch = d.cache_health || {};
+    const backendEl = document.getElementById('cache-backend');
+    const healthyEl = document.getElementById('cache-healthy');
+    const latencyEl = document.getElementById('cache-latency');
+    const hintEl = document.getElementById('cache-hint');
+    backendEl.textContent = (ch.backend || '–').toUpperCase();
+    if (ch.healthy === true) {
+      healthyEl.textContent = 'OK';
+      healthyEl.style.color = 'var(--success, #16a34a)';
+    } else if (ch.healthy === false) {
+      healthyEl.textContent = 'FEIL';
+      healthyEl.style.color = 'var(--danger, #dc2626)';
+    } else {
+      healthyEl.textContent = '–';
+      healthyEl.style.color = '';
+    }
+    latencyEl.textContent = (ch.latency_ms !== undefined) ? (ch.latency_ms + ' ms') : '–';
+    if (ch.backend === 'redis') {
+      hintEl.textContent = 'Delt cache mellom workers — rate-limit og stats-cache er konsistente.';
+    } else if (ch.backend === 'locmem') {
+      hintEl.textContent = 'Per-prosess cache. OK for 1 worker. Aktiver Redis før du øker WEB_WORKERS.';
+    } else {
+      hintEl.textContent = ch.error || '';
+    }
+
+    const uptime = m5.uptime_seconds || 0;
+    const hrs = Math.floor(uptime / 3600);
+    const mins = Math.floor((uptime % 3600) / 60);
+    document.getElementById('cfg-uptime').textContent = hrs + 't ' + mins + 'm';
+
+    const b = d.last_backup || {};
+    if (b.found) {
+      const ageEl = document.getElementById('backup-age');
+      ageEl.textContent = fmt(b.age_minutes);
+      ageEl.className = 'big-number ' + (b.age_minutes > 60 ? 'status-warn' : 'status-ok');
+      document.getElementById('backup-details').textContent =
+        (b.filename || '') + ' (' + Math.round((b.size_bytes || 0) / 1024) + ' KB)';
+    } else {
+      document.getElementById('backup-age').textContent = '–';
+      document.getElementById('backup-details').textContent = 'Ingen backup funnet';
+    }
+
+    const flags = d.feature_flags || {};
+    document.getElementById('flag-live-stats').textContent =
+      flags['feature.live_stats_enabled'] || 'false';
+
+    // Oppdater JSON-preview
+    document.getElementById('json-preview').textContent =
+      JSON.stringify(d, null, 2);
+  }
+
+  // ── Sesjonshåndtering ─────────────────────────────────────────
+
+  // CSRF-token: prosjektet har CSRF_COOKIE_HTTPONLY=True, så document.cookie
+  // kan IKKE lese csrftoken. script.js (med getCsrfToken-helperen) lastes kun
+  // på index.html, ikke på denne admin-siden. Vi har derfor en lokal lesefunksjon
+  // som leser fra <input name="csrfmiddlewaretoken"> i #csrf-token-holder
+  // (rendret av {% csrf_token %} i template-en).
+  function _getCsrfToken() {
+    const holder = document.getElementById('csrf-token-holder');
+    if (holder) {
+      const input = holder.querySelector('input[name="csrfmiddlewaretoken"]');
+      if (input && input.value) return input.value;
+    }
+    // Best-effort fallback: prov å lese cookien (fungerer ikke når HttpOnly=True,
+    // men hvis noen senere skrur av flagget skal det fortsatt virke).
+    const m = document.cookie.match(/(?:^|; )csrftoken=([^;]+)/);
+    return m ? decodeURIComponent(m[1]) : '';
+  }
+
+  function _csrfHeader() {
+    const tok = _getCsrfToken();
+    if (!tok) {
+      console.error('CSRF-token ikke funnet i #csrf-token-holder – POST vil feile med 403');
+    }
+    return tok ? {'X-CSRFToken': tok} : {};
+  }
+
+  function escapeHtml(s) {
+    if (s == null) return '';
+    return String(s)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  }
+
+  // Vi sender ikke session_key fra server til klient som identifierer min sesjon,
+  // men vi kan be backend avvise self-kill. UI gjenkjenner egen sesjon ved at
+  // backend returnerer 400 dersom man prøver å logge ut seg selv.
+  let lastSessions = [];
+
+  async function refreshSessionsList() {
+    const list = document.getElementById('sessions-list');
+    const status = document.getElementById('sessions-status');
+    try {
+      const res = await fetch('/admin/server-status/sessions/', {
+        headers: {'Accept': 'application/json'},
+      });
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const data = await res.json();
+      lastSessions = data.sessions || [];
+      if (lastSessions.length === 0) {
+        list.innerHTML = '<div class="sessions-empty">Ingen aktive påloggede brukere</div>';
+        status.textContent = '';
+        return;
+      }
+      list.innerHTML = lastSessions.map(s => `
+        <div class="session-item" data-key="${escapeHtml(s.session_key)}">
+          <div class="who">
+            <span class="username">${escapeHtml(s.username)}</span>
+            <span class="role">${escapeHtml(s.role || 'bruker')}</span>
+          </div>
+          <button class="btn-kill" data-key="${escapeHtml(s.session_key)}" data-username="${escapeHtml(s.username)}" type="button">Logg ut</button>
+        </div>
+      `).join('');
+      status.textContent = lastSessions.length + ' påloggede brukere vises';
+    } catch (err) {
+      list.innerHTML = '<div class="sessions-empty">Kunne ikke hente sesjoner: ' + escapeHtml(err.message) + '</div>';
+    }
+  }
+
+  async function killSession(sessionKey, username, btn) {
+    if (!confirm('Logge ut ' + username + '?\n\nBrukeren må logge inn på nytt for å fortsette.')) return;
+    btn.disabled = true;
+    btn.textContent = 'Logger ut…';
+    try {
+      const fd = new FormData();
+      fd.append('session_key', sessionKey);
+      const res = await fetch('/admin/server-status/sessions/kill/', {
+        method: 'POST',
+        headers: _csrfHeader(),
+        body: fd,
+      });
+      const data = await res.json();
+      if (!res.ok || !data.ok) {
+        alert('Kunne ikke logge ut: ' + (data.error || 'HTTP ' + res.status));
+        btn.disabled = false;
+        btn.textContent = 'Logg ut';
+        return;
+      }
+      // Fjern raden umiddelbart for visuell respons
+      const row = btn.closest('.session-item');
+      if (row) row.remove();
+      refreshSessionsList();
+    } catch (err) {
+      alert('Feil ved utlogging: ' + err.message);
+      btn.disabled = false;
+      btn.textContent = 'Logg ut';
+    }
+  }
+
+  async function killAllSessions() {
+    const count = lastSessions.length;
+    if (count === 0) {
+      alert('Ingen aktive sesjoner å logge ut.');
+      return;
+    }
+    if (!confirm('NØDBREMS:\n\nLogge ut ' + count + ' brukere?\n\nDin egen sesjon påvirkes ikke.\nAlle andre må logge inn på nytt for å fortsette.')) return;
+    const btn = document.getElementById('btn-kill-all');
+    btn.disabled = true;
+    btn.textContent = 'Logger ut…';
+    try {
+      const fd = new FormData();
+      fd.append('confirm', 'YES');
+      const res = await fetch('/admin/server-status/sessions/kill-all/', {
+        method: 'POST',
+        headers: _csrfHeader(),
+        body: fd,
+      });
+      const data = await res.json();
+      if (!res.ok || !data.ok) {
+        alert('Kunne ikke logge ut alle: ' + (data.error || 'HTTP ' + res.status));
+      } else {
+        alert('Logget ut ' + (data.deleted || 0) + ' brukere.');
+      }
+    } catch (err) {
+      alert('Feil: ' + err.message);
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Nødbrems: logg ut alle (unntatt meg)';
+      refreshSessionsList();
+    }
+  }
+
+  // Event-delegation for “Logg ut”-knapper
+  document.getElementById('sessions-list').addEventListener('click', (e) => {
+    const btn = e.target.closest('.btn-kill');
+    if (!btn) return;
+    killSession(btn.dataset.key, btn.dataset.username, btn);
+  });
+  document.getElementById('btn-kill-all').addEventListener('click', killAllSessions);
+
+  // Initial render fra server-siden, så polling hvert 10. sek
+  refresh();
+  setInterval(refresh, 10000);
+})();
+</script>
+{% endblock %}

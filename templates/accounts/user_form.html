@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block title %}Ny bruker{% endblock %}
+{% block content %}
+<div style="max-width:540px">
+  <div class="d-flex align-items-center mb-3">
+    <a href="{% url 'accounts:user_list' %}" class="btn btn-outline-secondary btn-sm me-3">
+      <i class="bi bi-arrow-left"></i>
+    </a>
+    <h4 class="mb-0"><i class="bi bi-person-plus me-2"></i>Ny bruker</h4>
+  </div>
+
+  {% if temp_password %}
+  <div class="alert alert-success mb-3">
+    <strong><i class="bi bi-check2-circle me-1"></i>Bruker «{{ created_user.username }}» er opprettet!</strong><br>
+    <small>Midlertidig passord (vises kun én gang):</small>
+    <div class="mt-1 p-2" style="background:#052e16;border-radius:6px;font-family:monospace;font-size:1rem;letter-spacing:0.05em;color:#86efac;">
+      {{ temp_password }}
+    </div>
+    <small class="mt-1 d-block">Brukeren må bytte passord ved første innlogging.</small>
+  </div>
+  {% endif %}
+
+  <div class="card">
+    <div class="card-body p-4">
+      <form method="post">
+        {% csrf_token %}
+        <div class="mb-3">
+          <label class="form-label">Brukernavn</label>
+          {{ form.username }}
+        </div>
+        <div class="mb-3">
+          <label class="form-label">E-post (valgfri)</label>
+          {{ form.email }}
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Rolle</label>
+          {{ form.role }}
+        </div>
+        <button type="submit" class="btn btn-primary w-100">
+          <i class="bi bi-person-plus me-1"></i>Opprett bruker
+        </button>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

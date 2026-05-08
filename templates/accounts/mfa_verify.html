@@ -1,0 +1,103 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="no">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>To-faktor-verifisering – Pasientregistrering</title>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+<style>
+  body { background: #0f172a; color: #e5e7eb; display: flex; align-items: center; justify-content: center; min-height: 100vh; font-family: "Segoe UI", system-ui, sans-serif; }
+  .login-card { background: #111827; border: 1px solid #334155; border-radius: 12px; padding: 2rem; width: 100%; max-width: 400px; }
+  .login-title { font-size: 1.3rem; font-weight: 700; margin-bottom: 0.25rem; }
+  .login-sub { font-size: 0.85rem; color: #94a3b8; margin-bottom: 1.5rem; }
+  .form-control { background: #1e293b !important; color: #e5e7eb !important; border-color: #334155 !important; }
+  .form-control:focus { box-shadow: 0 0 0 0.2rem rgba(59,130,246,0.2) !important; border-color: #3b82f6 !important; }
+  .form-label { color: #cbd5e1; font-size: 0.85rem; font-weight: 600; }
+  .alert-danger { background: #450a0a; border-color: #7f1d1d; color: #fca5a5; font-size: 0.85rem; }
+  .form-check-label { color: #94a3b8; font-size: 0.85rem; }
+  .backup-toggle { color: #60a5fa; font-size: 0.82rem; cursor: pointer; background: none; border: none; padding: 0; }
+  .backup-toggle:hover { text-decoration: underline; }
+</style>
+</head>
+<body>
+<div class="login-card">
+  <div class="text-center mb-3">
+    <i class="bi bi-shield-lock-fill" style="font-size:2rem;color:#3b82f6;"></i>
+  </div>
+  <div class="login-title text-center">To-faktor-verifisering</div>
+  <div class="login-sub text-center">Skriv inn koden fra authenticator-appen</div>
+
+  {% if error %}
+  <div class="alert alert-danger">
+    <i class="bi bi-exclamation-circle me-1"></i>{{ error }}
+  </div>
+  {% endif %}
+
+  <form method="post" id="verify-form">
+    {% csrf_token %}
+
+    <!-- TOTP-kode (standard) -->
+    <div id="totp-section" class="mb-3">
+      <label class="form-label" for="id_totp_code">Kode fra authenticator-app</label>
+      <input type="text" name="totp_code" id="id_totp_code" class="form-control"
+             inputmode="numeric" pattern="[0-9 ]*" maxlength="7"
+             autocomplete="one-time-code" autofocus placeholder="123 456">
+    </div>
+
+    <!-- Backup-kode (skjult som standard) -->
+    <div id="backup-section" class="mb-3" style="display:none;">
+      <label class="form-label" for="id_backup_code">Backup-kode</label>
+      <input type="text" name="backup_code" id="id_backup_code" class="form-control"
+             maxlength="20" autocomplete="off" placeholder="f.eks. A1B2C3D4">
+      <div class="form-text text-muted" style="font-size:0.78rem;">
+        Skriv inn en av de 10 backup-kodene du fikk ved oppsett. Koden blir ugyldig etter bruk.
+      </div>
+    </div>
+
+    <!-- Stol på enheten -->
+    <div class="mb-3 form-check">
+      <input type="checkbox" name="trust_device" id="id_trust_device" class="form-check-input">
+      <label class="form-check-label" for="id_trust_device">
+        Stol på denne enheten i 30 dager
+      </label>
+    </div>
+
+    <button type="submit" class="btn btn-primary w-100 mb-2">
+      <i class="bi bi-shield-check me-1"></i>Bekreft
+    </button>
+
+    <div class="text-center">
+      <button type="button" class="backup-toggle" id="backup-toggle-btn">
+        Bruk backup-kode i stedet
+      </button>
+    </div>
+  </form>
+</div>
+
+<script>
+  // Vis/skjul backup-kode-felt
+  const toggleBtn = document.getElementById('backup-toggle-btn');
+  const totpSection = document.getElementById('totp-section');
+  const backupSection = document.getElementById('backup-section');
+  let showingBackup = false;
+
+  toggleBtn.addEventListener('click', () => {
+    showingBackup = !showingBackup;
+    if (showingBackup) {
+      totpSection.style.display = 'none';
+      backupSection.style.display = 'block';
+      document.getElementById('id_backup_code').focus();
+      toggleBtn.textContent = 'Bruk authenticator-kode i stedet';
+    } else {
+      totpSection.style.display = 'block';
+      backupSection.style.display = 'none';
+      document.getElementById('id_totp_code').focus();
+      toggleBtn.textContent = 'Bruk backup-kode i stedet';
+    }
+  });
+</script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

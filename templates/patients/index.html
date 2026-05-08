@@ -1,0 +1,1021 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="no">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pasientregistrering</title>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+<link href="https://unpkg.com/tabulator-tables@6.2.5/dist/css/tabulator_bootstrap5.min.css" rel="stylesheet">
+<link rel="stylesheet" href="{% static 'css/style.css' %}">
+</head>
+<body>
+
+<!-- CSRF-token for JS -->
+<div id="csrf-token-holder" style="display:none">{% csrf_token %}</div>
+
+<!-- Brukerrolle for JS -->
+<script>
+  window.USER_ROLE = "{{ request.user.role }}";
+  window.USER_NAME = "{{ request.user.username }}";
+</script>
+
+<!-- ══════════ HEADER ══════════ -->
+<header id="main-header">
+  <div class="brand">Pasientregistrering <span id="event-name-display">LS26</span></div>
+
+  <div class="stat-chip rod">
+    <span class="num" id="hdr-rod">0</span><span>Rød</span>
+  </div>
+  <div class="stat-chip gul">
+    <span class="num" id="hdr-gul">0</span><span>Gul</span>
+  </div>
+  <div class="stat-chip gronn">
+    <span class="num" id="hdr-gronn">0</span><span>Grønn</span>
+  </div>
+  <div class="stat-chip neutral">
+    <i class="bi bi-people-fill"></i>
+    <span class="num" id="hdr-tilstede">0</span><span>Tilstede</span>
+  </div>
+  <div class="stat-chip neutral">
+    <i class="bi bi-hourglass-split"></i>
+    <span class="num" id="hdr-ventende">0</span><span>Ventende</span>
+  </div>
+  <div class="stat-chip neutral">
+    <i class="bi bi-hospital"></i>
+    <span class="num" id="hdr-obs">0</span><span>I obs</span>
+  </div>
+  <div class="stat-chip neutral">
+    <i class="bi bi-check2-circle"></i>
+    <span class="num" id="hdr-utskrevet">0</span><span>Utskrevet</span>
+  </div>
+
+  <div id="header-dt" style="margin-left:auto;text-align:right;line-height:1.2;"></div>
+
+  <!-- Bruker-dropdown -->
+  <div class="dropdown ms-2">
+    <div class="user-avatar-btn dropdown-toggle" data-bs-toggle="dropdown" title="{{ request.user.username }}">
+      <i class="bi bi-person-circle" style="font-size:1.4rem;color:var(--header-fg);cursor:pointer;"></i>
+    </div>
+    <ul class="dropdown-menu dropdown-menu-end" style="background:#111827;border-color:#334155;min-width:200px;">
+      <li class="px-3 py-2">
+        <div style="font-weight:700;font-size:0.9rem;color:#e5e7eb;">{{ request.user.username }}</div>
+        <div style="font-size:0.75rem;color:#94a3b8;">{{ request.user.get_role_display }}</div>
+      </li>
+      <li><hr class="dropdown-divider" style="border-color:#334155;margin:0;"></li>
+      <li><a class="dropdown-item" href="{% url 'accounts:change_password' %}" style="color:#e5e7eb;"><i class="bi bi-key me-2"></i>Endre passord</a></li>
+      {% if request.user.role == 'admin' %}
+      <li><a class="dropdown-item" href="{% url 'accounts:user_list' %}" style="color:#e5e7eb;"><i class="bi bi-people me-2"></i>Administrer brukere</a></li>
+      {% endif %}
+      <li><hr class="dropdown-divider" style="border-color:#334155;margin:0;"></li>
+      <li><a class="dropdown-item" href="{% url 'accounts:logout' %}" style="color:#f87171;"><i class="bi bi-box-arrow-right me-2"></i>Logg ut</a></li>
+    </ul>
+  </div>
+</header>
+
+<!-- ══════════ TABS ══════════ -->
+<nav id="nav-tabs">
+  <ul class="nav" role="tablist">
+    <li class="list-only"><a class="nav-link active" data-tab="liste"        href="#"><i class="bi bi-table me-1"></i>Pasientliste</a></li>
+    <li><a class="nav-link"        data-tab="tavle"        href="#"><i class="bi bi-grid me-1"></i>Tavle</a></li>
+    <li class="stats-only"><a class="nav-link"        data-tab="statistikk"   href="#"><i class="bi bi-bar-chart-line me-1"></i>Statistikk</a></li>
+    <li><a class="nav-link"        data-tab="innstillinger" href="#"><i class="bi bi-gear me-1"></i>Innstillinger</a></li>
+  </ul>
+</nav>
+
+<!-- ══════════ PASIENTLISTE ══════════ -->
+<div id="tab-liste" class="tab-panel active">
+  <div id="grid-toolbar">
+    <button class="btn btn-primary btn-sm write-only" onclick="openNewModal()">
+      <i class="bi bi-plus-lg me-1"></i>Ny pasient
+    </button>
+    <div class="position-relative">
+      <i class="bi bi-search position-absolute" style="left:9px;top:50%;transform:translateY(-50%);color:#94a3b8;font-size:0.8rem;pointer-events:none"></i>
+      <input type="search" id="grid-search" placeholder="Søk i alle felt…" oninput="applyFilter()" style="padding-left:28px">
+    </div>
+    <span class="vis-label ms-1">Vis:</span>
+    <button id="btn-alle"       class="btn btn-outline-secondary filter-btn active-alle" onclick="setFilter('alle')">Alle</button>
+    <button id="btn-rod"        class="btn btn-outline-danger    filter-btn"             onclick="setFilter('rod')">Rød</button>
+    <button id="btn-gul"        class="btn btn-outline-warning   filter-btn"             onclick="setFilter('gul')">Gul</button>
+    <button id="btn-rodgul"     class="btn btn-outline-warning   filter-btn"             onclick="setFilter('rodgul')"><span style="color:#dc2626">Rød</span>+<span style="color:#ca8a04">Gul</span></button>
+    <button id="btn-gronn"      class="btn btn-outline-success   filter-btn"             onclick="setFilter('gronn')">Grønn</button>
+    <button id="btn-aktive"     class="btn btn-outline-primary   filter-btn"             onclick="setFilter('aktive')">Aktive</button>
+    <button id="btn-utskrevet"  class="btn btn-outline-secondary filter-btn"             onclick="setFilter('utskrevet')">Utskrevet</button>
+    <span class="ms-auto" id="row-count"></span>
+  </div>
+  <div id="patient-grid"></div>
+</div>
+
+<!-- ══════════ TAVLE ══════════ -->
+<div id="tab-tavle" class="tab-panel">
+
+  <div style="padding:0.5rem 1rem 0 1rem;">
+    <button class="btn btn-primary btn-sm write-only" onclick="openNewModal()">
+      <i class="bi bi-plus-lg me-1"></i>Ny pasient
+    </button>
+  </div>
+
+  <!-- Grønn + Gul sone (delt – flere pasienter) -->
+  <div class="row g-3 mb-3">
+    <div class="col-md-6">
+      <div class="board-section mb-0">
+        <div class="board-section-title">
+          <span style="color:var(--gronn-bd)">&#9679;</span> Grønn sone
+          <span class="text-muted fw-normal" style="font-size:0.68rem;margin-left:0.4rem">(delt – flere pasienter)</span>
+        </div>
+        <div class="zone-list zone-gronn-bg" id="zone-gronn"></div>
+      </div>
+    </div>
+    <div class="col-md-6">
+      <div class="board-section mb-0">
+        <div class="board-section-title">
+          <span style="color:var(--gul-bd)">&#9679;</span> Gul sone
+          <span class="text-muted fw-normal" style="font-size:0.68rem;margin-left:0.4rem">(delt – flere pasienter)</span>
+        </div>
+        <div class="zone-list zone-gul-bg" id="zone-gul"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Behandling 1-5 -->
+  <div class="board-section">
+    <div class="board-section-title"><i class="bi bi-clipboard2-pulse me-1"></i>Behandling (1–5)</div>
+    <div class="behandling-grid" id="behandling-grid"></div>
+  </div>
+
+  <!-- Akutt seng 1-4 -->
+  <div class="board-section">
+    <div class="board-section-title">
+      <span style="color:var(--rod-bd)">&#9679;</span> Akutt (Seng 1–4)
+    </div>
+    <div class="behandling-grid" id="akutt-grid"></div>
+  </div>
+
+  <!-- Obspost 1-20 -->
+  <div class="board-section">
+    <div class="board-section-title"><i class="bi bi-hospital me-1"></i>Obspost (Obs 1–20)</div>
+    <div class="obs-grid" id="obs-grid"></div>
+  </div>
+
+</div>
+
+<!-- ══════════ STATISTIKK ══════════ -->
+<div id="tab-statistikk" class="tab-panel stats-only">
+
+  <!-- Arkiv-modus-banner (vises kun når statistikk er fra et arkiv) -->
+  <div id="arkiv-stats-banner" class="alert alert-info d-none d-flex justify-content-between align-items-center py-2 mb-2">
+    <div>
+      <i class="bi bi-archive me-2"></i>
+      <strong>Arkiv-modus:</strong>
+      <span id="arkiv-stats-banner-tittel"></span>
+      <span class="text-muted small ms-2" id="arkiv-stats-banner-meta"></span>
+    </div>
+    <button type="button" class="btn btn-sm btn-outline-secondary" onclick="exitArkivStatsMode()">
+      <i class="bi bi-x-circle me-1"></i>Tilbake til live-statistikk
+    </button>
+  </div>
+
+  <!-- Sub-nav -->
+  <div class="stats-subnav">
+    <button class="stats-subbtn active" data-stab="oversikt">
+      <i class="bi bi-speedometer2 me-1"></i>Oversikt
+    </button>
+    <button class="stats-subbtn" data-stab="tidsanalyse">
+      <i class="bi bi-stopwatch me-1"></i>Tidsanalyse
+    </button>
+    <button class="stats-subbtn" data-stab="krysstabeller">
+      <i class="bi bi-table me-1"></i>Krysstabeller
+    </button>
+    <button class="stats-subbtn" data-stab="obspost">
+      <i class="bi bi-clipboard2-pulse me-1"></i>Obspost
+    </button>
+    <button class="stats-subbtn" data-stab="tester">
+      <i class="bi bi-calculator me-1"></i>Statistiske tester
+    </button>
+  </div>
+
+  <!-- ── Oversikt ────────────────────────────── -->
+  <div class="stab-panel active" id="stab-oversikt">
+    <!-- KPI row 1 -->
+    <div class="row g-2 mb-2">
+      <div class="col-6 col-sm-4 col-md-2">
+        <div class="kpi-card kpi-blue">
+          <div class="kpi-label">Totalt</div>
+          <div class="kpi-value" id="kpi-total">0</div>
+          <div class="kpi-sub">alle pasienter</div>
+        </div>
+      </div>
+      <div class="col-6 col-sm-4 col-md-2">
+        <div class="kpi-card">
+          <div class="kpi-label">Tilstede nå</div>
+          <div class="kpi-value" id="kpi-tilstede">0</div>
+          <div class="kpi-sub">ikke utskrevet</div>
+        </div>
+      </div>
+      <div class="col-6 col-sm-4 col-md-2">
+        <div class="kpi-card kpi-red">
+          <div class="kpi-label">Rød</div>
+          <div class="kpi-value" id="kpi-rod">0</div>
+          <div class="kpi-sub">kritisk</div>
+        </div>
+      </div>
+      <div class="col-6 col-sm-4 col-md-2">
+        <div class="kpi-card kpi-yellow">
+          <div class="kpi-label">Gul</div>
+          <div class="kpi-value" id="kpi-gul">0</div>
+          <div class="kpi-sub">haster</div>
+        </div>
+      </div>
+      <div class="col-6 col-sm-4 col-md-2">
+        <div class="kpi-card kpi-green">
+          <div class="kpi-label">Grønn</div>
+          <div class="kpi-value" id="kpi-gronn">0</div>
+          <div class="kpi-sub">ikke haster</div>
+        </div>
+      </div>
+      <div class="col-6 col-sm-4 col-md-2">
+        <div class="kpi-card kpi-gray">
+          <div class="kpi-label">Utskrevet</div>
+          <div class="kpi-value" id="kpi-utskrevet">0</div>
+          <div class="kpi-sub">ferdigbehandlet</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- KPI row 2: time -->
+    <div class="row g-2 mb-2">
+      <div class="col-md-3">
+        <div class="kpi-card d-flex gap-3 align-items-center">
+          <i class="bi bi-stopwatch text-primary" style="font-size:1.7rem;flex-shrink:0"></i>
+          <div>
+            <div class="kpi-label">Ventetid behandlingsstart</div>
+            <div style="font-size:1.15rem;font-weight:700;color:#1e293b" id="kpi-wait-both">–</div>
+            <div class="kpi-sub">snitt / median</div>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="kpi-card d-flex gap-3 align-items-center">
+          <i class="bi bi-hospital text-info" style="font-size:1.7rem;flex-shrink:0"></i>
+          <div>
+            <div class="kpi-label">Tid på obspost</div>
+            <div style="font-size:1.15rem;font-weight:700;color:#1e293b" id="kpi-obs-both">–</div>
+            <div class="kpi-sub">snitt / median</div>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="kpi-card d-flex gap-3 align-items-center">
+          <i class="bi bi-clock-history text-success" style="font-size:1.7rem;flex-shrink:0"></i>
+          <div>
+            <div class="kpi-label">Total behandlingstid</div>
+            <div style="font-size:1.15rem;font-weight:700;color:#1e293b" id="kpi-total-both">–</div>
+            <div class="kpi-sub">snitt / median</div>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="kpi-card kpi-teal">
+          <div class="kpi-label">Obspost-andel</div>
+          <div class="kpi-value" id="kpi-obs-pct">–</div>
+          <div class="kpi-sub" id="kpi-obs-sub">av alle pasienter</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Charts row 1 -->
+    <div class="row g-2 mb-2">
+      <div class="col-md-3">
+        <div class="chart-card">
+          <div class="chart-title">Triage-fordeling</div>
+          <canvas id="chart-triage" height="180"></canvas>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="chart-card">
+          <div class="chart-title">Transport</div>
+          <canvas id="chart-transport" height="180"></canvas>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="chart-card">
+          <div class="chart-title">Utfall (utskrevet til)</div>
+          <canvas id="chart-utfall" height="180"></canvas>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="chart-card">
+          <div class="chart-title">Topp problemstillinger</div>
+          <canvas id="chart-problems" height="180"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <!-- Arrivals -->
+    <div class="row g-2">
+      <div class="col-12">
+        <div class="chart-card">
+          <div class="chart-title">Ankomster per time</div>
+          <canvas id="chart-arrivals" height="90"></canvas>
+        </div>
+      </div>
+    </div>
+  </div><!-- /stab-oversikt -->
+
+  <!-- ── Tidsanalyse ──────────────────────────── -->
+  <div class="stab-panel" id="stab-tidsanalyse">
+    <div class="row g-3 mb-3">
+      <div class="col-md-5">
+        <div class="chart-card h-100">
+          <div class="chart-title">Tid per grovsortering</div>
+          <canvas id="chart-time-triage" height="130"></canvas>
+          <div class="mt-3" id="tbl-time-triage"></div>
+        </div>
+      </div>
+      <div class="col-md-7">
+        <div class="chart-card h-100">
+          <div class="chart-title">Tid per transportmåte</div>
+          <canvas id="chart-time-transport" height="130"></canvas>
+          <div class="mt-3" id="tbl-time-transport"></div>
+        </div>
+      </div>
+    </div>
+    <div class="row g-3">
+      <div class="col-12">
+        <div class="chart-card">
+          <div class="chart-title">Total tid per problemstilling (sortert etter gjennomsnitt)</div>
+          <canvas id="chart-time-problem" height="100"></canvas>
+          <div class="mt-3" id="tbl-time-problem"></div>
+        </div>
+      </div>
+    </div>
+  </div><!-- /stab-tidsanalyse -->
+
+  <!-- ── Krysstabeller ────────────────────────── -->
+  <div class="stab-panel" id="stab-krysstabeller">
+    <div class="row g-3 mb-3">
+      <div class="col-md-6">
+        <div class="chart-card">
+          <div class="chart-title">
+            <span>Problemstilling × Grovsortering</span>
+            <span id="chi2-badge-prob-triage" class="chi2-badge chi2-nd">Ingen data</span>
+          </div>
+          <div class="small text-muted mb-2" style="font-size:0.72rem">Antall (rad %)</div>
+          <div style="overflow-x:auto" id="xt-prob-triage"></div>
+        </div>
+      </div>
+      <div class="col-md-6">
+        <div class="chart-card">
+          <div class="chart-title">
+            <span>Grovsortering × Transport</span>
+            <span id="chi2-badge-triage-transport" class="chi2-badge chi2-nd">Ingen data</span>
+          </div>
+          <div class="small text-muted mb-2" style="font-size:0.72rem">Antall (rad %)</div>
+          <div style="overflow-x:auto" id="xt-triage-transport"></div>
+        </div>
+      </div>
+    </div>
+    <div class="row g-3">
+      <div class="col-12">
+        <div class="chart-card">
+          <div class="chart-title">
+            <span>Problemstilling × Utfall</span>
+            <span id="chi2-badge-prob-utfall" class="chi2-badge chi2-nd">Ingen data</span>
+          </div>
+          <div class="small text-muted mb-2" style="font-size:0.72rem">Antall (rad %)</div>
+          <div style="overflow-x:auto" id="xt-prob-utfall"></div>
+        </div>
+      </div>
+    </div>
+  </div><!-- /stab-krysstabeller -->
+
+  <!-- ── Obspost ──────────────────────────────── -->
+  <div class="stab-panel" id="stab-obspost">
+    <!-- KPI row -->
+    <div class="row g-2 mb-3">
+      <div class="col-6 col-md-3">
+        <div class="kpi-card kpi-blue">
+          <div class="kpi-label">Totalt på obspost</div>
+          <div class="kpi-value" id="obs-total-n">–</div>
+          <div class="kpi-sub" id="obs-total-pct-text">av alle pasienter</div>
+        </div>
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="kpi-card">
+          <div class="kpi-label">Snitt obspost-tid</div>
+          <div class="kpi-value" id="obs-avg-time">–</div>
+          <div class="kpi-sub">gjennomsnitt</div>
+        </div>
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="kpi-card">
+          <div class="kpi-label">Median obspost-tid</div>
+          <div class="kpi-value" id="obs-med-time">–</div>
+          <div class="kpi-sub">median</div>
+        </div>
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="kpi-card">
+          <div class="kpi-label">Obs-bruk × Triage</div>
+          <div style="margin-top:6px" id="obs-chi2-display"></div>
+          <div class="kpi-sub">chi-square test</div>
+        </div>
+      </div>
+    </div>
+    <!-- Tables -->
+    <div class="row g-3">
+      <div class="col-md-4">
+        <div class="chart-card">
+          <div class="chart-title">Obspost-bruk per grovsortering</div>
+          <div id="tbl-obs-triage" class="mt-2"></div>
+        </div>
+      </div>
+      <div class="col-md-8">
+        <div class="chart-card">
+          <div class="chart-title">Obspost-bruk per problemstilling</div>
+          <div id="tbl-obs-problem" class="mt-2"></div>
+        </div>
+      </div>
+    </div>
+  </div><!-- /stab-obspost -->
+
+  <!-- ── Statistiske tester ───────────────────── -->
+  <div class="stab-panel" id="stab-tester">
+    <div class="row g-3 mb-3">
+      <div class="col-12">
+        <div class="chart-card">
+          <div class="chart-title">Chi-square tester (uavhengighetstest)</div>
+          <div id="tbl-chi2" class="mt-2"></div>
+        </div>
+      </div>
+    </div>
+    <div class="row g-3">
+      <div class="col-md-6">
+        <div class="chart-card">
+          <div class="chart-title">Kruskal-Wallis tester (tid)</div>
+          <div id="tbl-kw" class="mt-2"></div>
+        </div>
+      </div>
+      <div class="col-md-6">
+        <div class="chart-card">
+          <div class="chart-title">Automatisk tolkning</div>
+          <div id="tbl-interpretation" class="mt-2"></div>
+        </div>
+      </div>
+    </div>
+  </div><!-- /stab-tester -->
+
+</div><!-- /tab-statistikk -->
+
+
+<!-- INNSTILLINGER -->
+<div id="tab-innstillinger" class="tab-panel">
+  <div class="d-flex flex-column gap-3" style="max-width:580px">
+
+    <div class="settings-card">
+      <h6><i class="bi bi-calendar-event me-2"></i>Arrangement</h6>
+      <label class="form-label mt-2 small">Navn på arrangement</label>
+      <div class="input-group input-group-sm">
+        <input type="text" id="setting-event-name" class="form-control" value="LS26">
+        <button class="btn btn-primary write-only" onclick="saveEventName()">Lagre</button>
+      </div>
+      <div class="form-text">Vises i topplinjen.</div>
+    </div>
+
+    {% if user.role == 'admin' %}
+    <div class="card mb-3">
+      <div class="card-header"><strong>Sesjon</strong></div>
+      <div class="card-body">
+        <label class="form-label">Timeout (timer)</label>
+        <input type="number" id="session-timeout-input" class="form-control form-control-sm" min="1" max="24" style="max-width:120px;">
+        <div class="form-text">1–24 timer. Endringer gjelder fra neste innlogging.</div>
+        <button class="btn btn-sm btn-primary mt-2" onclick="saveSessionTimeout()">Lagre</button>
+      </div>
+    </div>
+    {% endif %}
+
+    <div class="settings-card admin-only">
+      <h6><i class="bi bi-people me-2"></i>Behandlere</h6>
+      <p class="small text-muted mb-2">Legg til, endre eller deaktiver behandlere.</p>
+      <div id="behandlere-list"><span class="text-muted small">Laster...</span></div>
+      <div class="input-group input-group-sm mt-2">
+        <input type="text" id="new-behandler-name" class="form-control" placeholder="Navn på ny behandler">
+        <button class="btn btn-primary" onclick="addBehandler()">Legg til</button>
+      </div>
+    </div>
+
+    <div class="settings-card admin-only">
+      <h6><i class="bi bi-person-badge me-2"></i>Helsepersonell</h6>
+      <p class="small text-muted mb-2">Legg til, endre eller deaktiver helsepersonell.</p>
+      <div id="helsepersonell-list"><span class="text-muted small">Laster...</span></div>
+      <div class="input-group input-group-sm mt-2">
+        <input type="text" id="new-helsepersonell-name" class="form-control" placeholder="Navn på ny helsepersonell">
+        <button class="btn btn-primary" onclick="addHelsepersonell()">Legg til</button>
+      </div>
+    </div>
+
+    <div class="settings-card admin-only">
+      <h6><i class="bi bi-cloud-arrow-up me-2"></i>Backup</h6>
+      <p class="small text-muted mb-2">Automatisk og manuell backup. Sletter automatisk etter 72 timer.</p>
+
+      <div class="mb-2">
+        <label class="form-label small mb-1">
+          Automatisk intervall
+          <span id="backup-interval-status" class="small ms-2"></span>
+        </label>
+        <select id="backup-interval" class="form-select form-select-sm">
+          <option value="0">Av</option>
+          <option value="30">Hver 30. min</option>
+          <option value="60" selected>Hver time</option>
+          <option value="360">Hver 6. time</option>
+          <option value="1440">Hver 24. time</option>
+        </select>
+        <div class="small text-muted mt-1">
+          Endringer lagres automatisk når du velger en verdi.
+        </div>
+        <div class="small text-muted mt-1" id="backup-last-run"></div>
+      </div>
+
+      <div class="d-flex gap-2 mb-2">
+        <input type="text" id="backup-note" class="form-control form-control-sm"
+               placeholder="Notat (valgfritt)" maxlength="200">
+        <button class="btn btn-primary btn-sm" onclick="createBackupNow()">
+          <i class="bi bi-plus-circle"></i> Ta backup nå
+        </button>
+      </div>
+
+      <div id="backup-list" class="small"><span class="text-muted">Laster...</span></div>
+    </div>
+
+    <div class="settings-card danger-zone admin-only">
+      <h6 class="text-danger"><i class="bi bi-trash me-2"></i>Nullstill aktiv vakt</h6>
+      <p class="small">
+        Sletter permanent alle pasienter i aktiv vakt. Brukes kun for å tømme testdata.
+        <strong>Denne handlingen kan ikke angres.</strong>
+      </p>
+      <div id="reset-year-label" class="small text-muted mb-2">Aktiv vakt: laster...</div>
+      <button class="btn btn-danger btn-sm" data-bs-toggle="modal" data-bs-target="#resetModal">
+        <i class="bi bi-trash me-1"></i>Nullstill aktiv vakt
+      </button>
+    </div>
+
+    <div class="settings-card admin-only">
+      <h6><i class="bi bi-archive me-2"></i>Vaktarkiv</h6>
+      <p class="small text-muted mb-2">Lagre et låst arkiv-snapshot av nåværende aktive vakt.</p>
+      <div class="d-flex gap-2 flex-wrap mb-2">
+        <button class="btn btn-success btn-sm" data-bs-toggle="modal" data-bs-target="#arkivLagreModal">
+          <i class="bi bi-archive-fill me-1"></i>Lagre nåværende vakt som arkiv
+        </button>
+        <button class="btn btn-outline-primary btn-sm" data-bs-toggle="modal" data-bs-target="#arkivListeModal" onclick="loadArkivListe()">
+          <i class="bi bi-list-ul me-1"></i>Vis arkiverte vakter
+        </button>
+      </div>
+    </div>
+
+    <div class="settings-card">
+      <h6><i class="bi bi-archive me-2"></i>Arkiv (filer)</h6>
+      <div id="archive-list"><span class="text-muted small">Laster...</span></div>
+    </div>
+
+  </div>
+</div>
+
+
+<!-- ══════════════════════════════════════════════════
+     RESET MODAL (Kun admin)
+══════════════════════════════════════════════════ -->
+{% if request.user.role == 'admin' %}
+<div class="modal fade" id="resetModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header" style="background:#7f1d1d;color:#fff;padding:0.65rem 1rem">
+        <h5 class="modal-title fw-bold"><i class="bi bi-trash me-2"></i>Bekreft nullstilling</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <p>Er du sikker på at du vil nullstille <strong>aktiv vakt</strong>?</p>
+        <p class="text-danger small"><strong>Denne handlingen kan ikke angres.</strong></p>
+        <div id="reset-modal-year" class="fw-bold mb-2"></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Avbryt</button>
+        <button type="button" class="btn btn-danger" onclick="doResetActiveYear()">Nullstill aktiv vakt</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Vaktarkiv: Lagre modal -->
+<div class="modal fade" id="arkivLagreModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header" style="background:#0f3460;color:#fff;padding:0.65rem 1rem">
+        <h5 class="modal-title fw-bold"><i class="bi bi-archive-fill me-2"></i>Lagre vakt som arkiv</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="mb-3">
+          <label class="form-label small fw-bold" for="arkiv-arrangement-navn">Arrangementsnavn <span class="text-danger">*</span></label>
+          <input type="text" id="arkiv-arrangement-navn" class="form-control" placeholder="Navn på arrangementet">
+        </div>
+        <div class="mb-3">
+          <label class="form-label small fw-bold" for="arkiv-notat">Notat (valgfritt)</label>
+          <textarea id="arkiv-notat" class="form-control" rows="3" placeholder="Eventuelt notat om vakten..."></textarea>
+        </div>
+        <div id="arkiv-lagre-feil" class="text-danger small d-none"></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Avbryt</button>
+        <button type="button" class="btn btn-success" onclick="lagreVaktSomArkiv()">
+          <i class="bi bi-archive-fill me-1"></i>Lagre arkiv
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Vaktarkiv: Liste modal -->
+<div class="modal fade" id="arkivListeModal" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header" style="background:#0f3460;color:#fff;padding:0.65rem 1rem">
+        <h5 class="modal-title fw-bold"><i class="bi bi-list-ul me-2"></i>Arkiverte vakter</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div id="arkiv-liste-innhold"><span class="text-muted small">Laster...</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Vaktarkiv: Detalj modal -->
+<div class="modal fade" id="arkivDetaljModal" tabindex="-1">
+  <div class="modal-dialog modal-xl">
+    <div class="modal-content">
+      <div class="modal-header" style="background:#0f3460;color:#fff;padding:0.65rem 1rem">
+        <h5 class="modal-title fw-bold" id="arkiv-detalj-tittel"><i class="bi bi-archive me-2"></i>Arkivdetalj</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div id="arkiv-detalj-meta" class="mb-3 small text-muted"></div>
+        <div id="arkiv-detalj-tamper" class="alert alert-danger d-none">
+          <strong>Advarsel:</strong> SHA-256-sjekksummen avviker &mdash; dataene kan ha blitt manipulert.
+        </div>
+        <div id="arkiv-detalj-stats"></div>
+        <div class="mt-3 d-flex gap-2 flex-wrap">
+          <button id="arkiv-detalj-fullstats-btn" class="btn btn-sm btn-primary d-none" onclick="visArkivFullStatistikk()">
+            <i class="bi bi-bar-chart-line me-1"></i>Vis full statistikk
+          </button>
+        </div>
+        <div id="arkiv-detalj-slett" class="mt-3 d-none">
+          <button class="btn btn-sm btn-outline-danger" onclick="slettArkivFraDetalj()">
+            <i class="bi bi-trash me-1"></i>Slett arkiv
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+
+
+<!-- ══════════════════════════════════════════════════
+     NY PASIENT MODAL
+══════════════════════════════════════════════════ -->
+<div class="modal fade" id="newModal" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header" style="background:#0f3460;color:#fff;padding:0.65rem 1rem">
+        <h5 class="modal-title fw-bold"><i class="bi bi-person-plus me-2"></i>Registrer ny pasient</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body py-2 px-3">
+
+        <!-- Triage -->
+        <div class="form-section-title mt-1" style="color:#b91c1c">Grovsortering<span class="req"> *</span></div>
+        <div class="d-flex gap-2 mb-1">
+          <div class="flex-fill"><input type="radio" name="n-triage" id="n-t-gronn" value="Grønn" class="d-none"><label for="n-t-gronn" class="triage-lbl lbl-gronn">🟢 Grønn</label></div>
+          <div class="flex-fill"><input type="radio" name="n-triage" id="n-t-gul"   value="Gul"   class="d-none"><label for="n-t-gul"   class="triage-lbl lbl-gul">🟡 Gul</label></div>
+          <div class="flex-fill"><input type="radio" name="n-triage" id="n-t-rod"   value="Rød"   class="d-none"><label for="n-t-rod"   class="triage-lbl lbl-rod">🔴 Rød</label></div>
+        </div>
+        <div class="triage-req-warn" id="n-triage-warn">Velg grovsortering</div>
+
+        <!-- Klinisk -->
+        <div class="form-section-title mt-2">Klinisk</div>
+        <div class="row g-2 mb-3">
+          <div class="col-md-6">
+            <label class="form-label rlbl">Problemstilling<span class="req"> *</span></label>
+            <select id="n-problemstilling" class="form-select form-select-sm">
+              <option value="">– Velg –</option>
+              <option>Stor ytre blødning</option>
+              <option>Bevisstløs</option>
+              <option>Nedsatt bevissthet</option>
+              <option>Pustevansker</option>
+              <option>Brystsmerter</option>
+              <option>Magesmerter</option>
+              <option>Blodsukker forstyrrelse</option>
+              <option>Kramper</option>
+              <option>Temperatur forstyrrelse</option>
+              <option>Brannskade</option>
+              <option>Skade bein/fot</option>
+              <option>Skade arm/håndledd</option>
+              <option>Skade skulder/kragebein</option>
+              <option>Skade overkropp</option>
+              <option>Skade nakke</option>
+              <option>Skade hode</option>
+              <option>Skade øye/nese/øre/tann</option>
+              <option>Psykiatri</option>
+              <option>Annen sykdom</option>
+              <option>Annen skade</option>
+              <option>Mistanke overgrep</option>
+            </select>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label rlbl">Årsak<span class="req"> *</span></label>
+            <select id="n-arsak" class="form-select form-select-sm">
+              <option value="">– Velg –</option>
+              <option>Rus</option>
+              <option>Fall</option>
+              <option>Vold</option>
+              <option>Moshpit</option>
+              <option>Underliggende sykdom</option>
+              <option>Ulykke</option>
+              <option>Brann</option>
+              <option>Annet</option>
+              <option>Ukjent</option>
+            </select>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label rlbl">Transport<span class="req"> *</span></label>
+            <select id="n-transport" class="form-select form-select-sm">
+              <option value="">– Velg –</option>
+              <option>Gående</option>
+              <option>Lag</option>
+              <option>Mannskapsbil</option>
+              <option>Beredskapsambulanse</option>
+            </select>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label rlbl">Inntid<span class="req"> *</span></label>
+            <div class="input-group input-group-sm">
+              <input type="text" id="n-inntid" class="form-control" placeholder="dd.mm.åååå tt:mm">
+              <button class="btn btn-outline-secondary" onclick="document.getElementById('n-inntid').value=nowStr()" title="Nå"><i class="bi bi-clock"></i></button>
+            </div>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label rlbl">Plassering<span class="req"> *</span></label>
+            <select id="n-plassering" class="form-select form-select-sm">
+              <option value="">– Velg –</option>
+              <optgroup label="Sone (delt – flere pasienter)">
+                <option>Grønn sone</option>
+                <option>Gul sone</option>
+              </optgroup>
+              <optgroup label="Behandling">
+                <option>Behandling 1</option><option>Behandling 2</option><option>Behandling 3</option>
+                <option>Behandling 4</option><option>Behandling 5</option>
+              </optgroup>
+              <optgroup label="Akutt (seng)">
+                <option>Akutt 1</option><option>Akutt 2</option><option>Akutt 3</option><option>Akutt 4</option>
+              </optgroup>
+              <optgroup label="Obspost">
+                <option>Obs 1</option><option>Obs 2</option><option>Obs 3</option><option>Obs 4</option><option>Obs 5</option>
+                <option>Obs 6</option><option>Obs 7</option><option>Obs 8</option><option>Obs 9</option><option>Obs 10</option>
+                <option>Obs 11</option><option>Obs 12</option><option>Obs 13</option><option>Obs 14</option><option>Obs 15</option>
+                <option>Obs 16</option><option>Obs 17</option><option>Obs 18</option><option>Obs 19</option><option>Obs 20</option>
+              </optgroup>
+            </select>
+          </div>
+        </div>
+
+        <!-- Personell -->
+        <div class="form-section-title">Personell</div>
+        <div class="row g-2 mb-2">
+          <div class="col-md-6">
+            <label class="form-label">Behandler</label>
+            <select id="n-behandler" class="form-select form-select-sm">
+              <option value="">—</option>
+            </select>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Helsepersonell</label>
+            <select id="n-helsepersonell" class="form-select form-select-sm">
+              <option value="">—</option>
+            </select>
+          </div>
+        </div>
+
+      </div>
+      <div id="new-form-error" class="alert alert-danger py-1 px-3 mx-3 small mb-0" style="display:none">
+        <i class="bi bi-exclamation-circle me-1"></i><span id="new-form-error-text"></span>
+      </div>
+      <div class="modal-footer py-2">
+        <button class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Avbryt</button>
+        <button id="btn-save-new" class="btn btn-primary btn-sm" onclick="saveNew()">
+          <i class="bi bi-save me-1"></i>Registrer pasient
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ══════════════════════════════════════════════════
+     REDIGER PASIENT MODAL
+══════════════════════════════════════════════════ -->
+<div class="modal fade" id="editModal" tabindex="-1">
+  <div class="modal-dialog modal-xl">
+    <div class="modal-content">
+      <div class="modal-header" style="background:#1e40af;color:#fff;padding:0.65rem 1rem">
+        <h5 class="modal-title fw-bold" id="edit-title">Rediger pasient</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div id="edit-form-error" class="alert alert-danger py-1 px-3 mx-3 mt-2 small mb-0" style="display:none">
+        <i class="bi bi-exclamation-circle me-1"></i><span id="edit-form-error-text"></span>
+      </div>
+      <div class="modal-body py-2 px-3">
+
+        <!-- ── INNKOMST ───────────────────────────────── -->
+        <div class="form-section-title mt-1" style="color:#0f3460;border-color:#0f3460">Innkomst</div>
+        <div class="d-flex gap-2 mb-2">
+          <div class="flex-fill"><input type="radio" name="e-triage" id="e-t-gronn" value="Grønn" class="d-none"><label for="e-t-gronn" class="triage-lbl lbl-gronn">🟢 Grønn</label></div>
+          <div class="flex-fill"><input type="radio" name="e-triage" id="e-t-gul"   value="Gul"   class="d-none"><label for="e-t-gul"   class="triage-lbl lbl-gul">🟡 Gul</label></div>
+          <div class="flex-fill"><input type="radio" name="e-triage" id="e-t-rod"   value="Rød"   class="d-none"><label for="e-t-rod"   class="triage-lbl lbl-rod">🔴 Rød</label></div>
+        </div>
+        <div class="row g-2 mb-2">
+          <div class="col-md-4">
+            <label class="form-label">Problemstilling</label>
+            <select id="e-problemstilling" class="form-select form-select-sm">
+              <option value="">– Velg –</option>
+              <option>Stor ytre blødning</option><option>Bevisstløs</option><option>Nedsatt bevissthet</option>
+              <option>Pustevansker</option><option>Brystsmerter</option><option>Magesmerter</option>
+              <option>Blodsukker forstyrrelse</option><option>Kramper</option><option>Temperatur forstyrrelse</option>
+              <option>Brannskade</option><option>Skade bein/fot</option><option>Skade arm/håndledd</option>
+              <option>Skade skulder/kragebein</option><option>Skade overkropp</option><option>Skade nakke</option>
+              <option>Skade hode</option><option>Skade øye/nese/øre/tann</option><option>Psykiatri</option>
+              <option>Annen sykdom</option><option>Annen skade</option><option>Mistanke overgrep</option>
+            </select>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">Årsak</label>
+            <select id="e-arsak" class="form-select form-select-sm">
+              <option value="">– Velg –</option>
+              <option>Rus</option><option>Fall</option><option>Vold</option><option>Moshpit</option>
+              <option>Underliggende sykdom</option><option>Ulykke</option><option>Brann</option>
+              <option>Annet</option><option>Ukjent</option>
+            </select>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">Transport</label>
+            <select id="e-transport" class="form-select form-select-sm">
+              <option value="">– Velg –</option>
+              <option>Gående</option><option>Lag</option><option>Mannskapsbil</option><option>Beredskapsambulanse</option>
+            </select>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Inntid</label>
+            <div class="input-group input-group-sm">
+              <input type="text" id="e-inntid" class="form-control" placeholder="dd.mm.åååå tt:mm">
+              <button class="btn btn-outline-secondary" onclick="stamp('e-inntid')" title="Nå"><i class="bi bi-clock"></i></button>
+            </div>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Plassering</label>
+            <select id="e-plassering" class="form-select form-select-sm">
+              <option value="">– Velg –</option>
+              <optgroup label="Sone (delt – flere pasienter)">
+                <option>Grønn sone</option>
+                <option>Gul sone</option>
+              </optgroup>
+              <optgroup label="Behandling">
+                <option>Behandling 1</option><option>Behandling 2</option><option>Behandling 3</option>
+                <option>Behandling 4</option><option>Behandling 5</option>
+              </optgroup>
+              <optgroup label="Akutt (seng)">
+                <option>Akutt 1</option><option>Akutt 2</option><option>Akutt 3</option><option>Akutt 4</option>
+              </optgroup>
+              <optgroup label="Obspost">
+                <option>Obs 1</option><option>Obs 2</option><option>Obs 3</option><option>Obs 4</option><option>Obs 5</option>
+                <option>Obs 6</option><option>Obs 7</option><option>Obs 8</option><option>Obs 9</option><option>Obs 10</option>
+                <option>Obs 11</option><option>Obs 12</option><option>Obs 13</option><option>Obs 14</option><option>Obs 15</option>
+                <option>Obs 16</option><option>Obs 17</option><option>Obs 18</option><option>Obs 19</option><option>Obs 20</option>
+              </optgroup>
+            </select>
+          </div>
+        </div>
+
+        <!-- ── STATUS ─────────────────────────────────── -->
+        <div class="form-section-title">Status</div>
+        <div class="row g-2 mb-2">
+          <div class="col-md-6">
+            <label class="form-label">Påbegynt behandling</label>
+            <div class="input-group input-group-sm">
+              <input type="text" id="e-pabegynt" class="form-control" placeholder="dd.mm.åååå tt:mm">
+              <button class="btn btn-outline-secondary" onclick="stamp('e-pabegynt')" title="Nå"><i class="bi bi-clock"></i></button>
+            </div>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Total tid (innkomst → utskrevet)</label>
+            <div id="e-total-time" class="form-control form-control-sm bg-light text-secondary">–</div>
+          </div>
+        </div>
+
+        <!-- ── BEHANDLING ──────────────────────────────── -->
+        <div class="form-section-title">Behandling</div>
+        <div class="row g-2 mb-2">
+          <div class="col-md-4">
+            <label class="form-label">Behandler</label>
+            <select id="e-behandler" class="form-select form-select-sm">
+              <option value="">—</option>
+            </select>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">Helsepersonell</label>
+            <select id="e-helsepersonell-ref" class="form-select form-select-sm">
+              <option value="">—</option>
+            </select>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">Lege</label>
+            <select id="e-lege" class="form-select form-select-sm">
+              <option value="">– Velg –</option><option>Ja</option><option>Nei</option>
+            </select>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Medisiner gitt</label>
+            <select id="e-medisiner" class="form-select form-select-sm">
+              <option value="">– Velg –</option><option>Ja</option><option>Nei</option>
+            </select>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Journal</label>
+            <select id="e-journal" class="form-select form-select-sm">
+              <option value="">– Velg –</option><option>Ja</option><option>Nei</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- ── OBSPOST ─────────────────────────────────── -->
+        <div class="form-section-title">Obspost</div>
+        <div class="row g-2 mb-2">
+          <div class="col-md-6">
+            <label class="form-label">Inn-Obspost</label>
+            <div class="input-group input-group-sm">
+              <input type="text" id="e-inn-obspost" class="form-control" placeholder="dd.mm.åååå tt:mm">
+              <button class="btn btn-outline-secondary" onclick="stamp('e-inn-obspost')" title="Nå"><i class="bi bi-clock"></i></button>
+            </div>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">UT-Obspost</label>
+            <div class="input-group input-group-sm">
+              <input type="text" id="e-ut-obspost" class="form-control" placeholder="dd.mm.åååå tt:mm">
+              <button class="btn btn-outline-secondary" onclick="stamp('e-ut-obspost')" title="Nå"><i class="bi bi-clock"></i></button>
+            </div>
+          </div>
+        </div>
+
+        <!-- ── UTSKRIVING ──────────────────────────────── -->
+        <div class="form-section-title">Utskriving</div>
+        <div class="row g-2 mb-2">
+          <div class="col-md-6">
+            <label class="form-label">Utskrevet (tid)</label>
+            <div class="input-group input-group-sm">
+              <input type="text" id="e-utskrevet" class="form-control" placeholder="dd.mm.åååå tt:mm" oninput="updateTotal()">
+              <button class="btn btn-outline-secondary" onclick="stamp('e-utskrevet');updateTotal()" title="Nå"><i class="bi bi-clock"></i></button>
+            </div>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Utskrevet til (utfall)</label>
+            <select id="e-utskrevet-til" class="form-select form-select-sm">
+              <option value="">– Velg –</option>
+              <option>Hjem/park</option><option>Forlatt stedet</option>
+              <option>LV</option><option>Sykehus</option><option>Skadepol</option>
+            </select>
+          </div>
+        </div>
+
+      </div>
+      <div class="modal-footer py-2">
+        <button class="btn btn-outline-danger btn-sm me-auto admin-only" onclick="delPatient()">
+          <i class="bi bi-trash me-1"></i>Slett
+        </button>
+        <button class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Avbryt</button>
+        <button id="btn-save-edit" class="btn btn-primary btn-sm write-only" onclick="saveEdit()">
+          <i class="bi bi-save me-1"></i>Lagre endringer
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+
+<!-- ══════════ SCRIPTS ══════════ -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://unpkg.com/tabulator-tables@6.2.5/dist/js/tabulator.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+<script src="{% static 'js/script.js' %}"></script>
+</body>
+</html>
