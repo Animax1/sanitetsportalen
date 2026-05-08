@@ -202,9 +202,7 @@
   </div>
 </div>
 
-{# Modul-meny: dashboard-lenken er alltid tilstede. Modul-lenker leses fra
-   nav_modules (context_processor) og filtreres på permissions/enabled.
-   Admin-lenker holdes hardkodet siden de ikke er fullverdige moduler. #}
+{# Modul-meny — dashboard-lenken er alltid tilstede; lenker fra nav_modules filtreres på permissions/enabled. #}
 <nav class="portal-nav">
   <a href="{% url 'core:portal_dashboard' %}" {% if request.resolver_match.url_name == 'portal_dashboard' %}class="active"{% endif %}>
     <i class="bi bi-grid-3x3-gap me-1"></i>Dashboard

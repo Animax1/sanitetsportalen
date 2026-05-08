@@ -109,9 +109,7 @@
 </section>
 
 <div class="module-grid">
-  {# Modul-kort genereres fra core.modules-registret. Filtreres i view (get_dashboard_modules)
-     basert på ModuleSettings.enabled og brukerens permission-flagg. Kjernemoduler
-     (is_core=True) med show_in_dashboard=False vises IKKE her — de er ikke brukervendte. #}
+  {# Modul-kort genereres fra core.modules-registret og filtreres i get_dashboard_modules basert på ModuleSettings.enabled og brukerens permission-flagg. #}
   {% for module in modules %}
     <a href="{{ module.url }}"
        class="module-card active"
