@@ -45,41 +45,42 @@
         </div>
 
         <dl class="row mb-3">
-          <dt class="col-sm-4 text-main">Modul</dt>
-          <dd class="col-sm-8">{{ handler.display_name|default:slug }}</dd>
+          <dt class="col-sm-4 text-main" style="color: var(--portal-text-muted);">Modul</dt>
+          <dd class="col-sm-8" style="color: var(--portal-text);">{{ handler.display_name|default:slug }}</dd>
 
-          <dt class="col-sm-4 text-main">Filnavn</dt>
-          <dd class="col-sm-8"><code>{{ backup.filename }}</code></dd>
+          <dt class="col-sm-4 text-main" style="color: var(--portal-text-muted);">Filnavn</dt>
+          <dd class="col-sm-8" style="color: var(--portal-text);"><code>{{ backup.filename }}</code></dd>
 
-          <dt class="col-sm-4 text-main">Type</dt>
-          <dd class="col-sm-8">{{ backup.get_kind_display }}</dd>
+          <dt class="col-sm-4 text-main" style="color: var(--portal-text-muted);">Type</dt>
+          <dd class="col-sm-8" style="color: var(--portal-text);">{{ backup.get_kind_display }}</dd>
 
-          <dt class="col-sm-4 text-main">Opprettet</dt>
-          <dd class="col-sm-8">{{ backup.created_at|date:"d.m.Y H:i:s" }}</dd>
+          <dt class="col-sm-4 text-main" style="color: var(--portal-text-muted);">Opprettet</dt>
+          <dd class="col-sm-8" style="color: var(--portal-text);">{{ backup.created_at|date:"d.m.Y H:i:s" }}</dd>
 
-          <dt class="col-sm-4 text-main">Størrelse</dt>
-          <dd class="col-sm-8">{{ backup.size_bytes|filesizeformat }}</dd>
+          <dt class="col-sm-4 text-main" style="color: var(--portal-text-muted);">Størrelse</dt>
+          <dd class="col-sm-8" style="color: var(--portal-text);">{{ backup.size_bytes|filesizeformat }}</dd>
 
           {% if backup.note %}
-          <dt class="col-sm-4 text-main">Notat</dt>
-          <dd class="col-sm-8">{{ backup.note }}</dd>
+          <dt class="col-sm-4 text-main" style="color: var(--portal-text-muted);">Notat</dt>
+          <dd class="col-sm-8" style="color: var(--portal-text);">{{ backup.note }}</dd>
           {% endif %}
         </dl>
 
         <form method="post">
           {% csrf_token %}
           <div class="mb-3">
-            <label for="{{ form.confirm_slug.id_for_label }}" class="form-label">
+            <label for="{{ form.confirm_slug.id_for_label }}" class="form-label" style="color: var(--portal-text);">
               {{ form.confirm_slug.label }}
             </label>
             {{ form.confirm_slug }}
-            <div class="form-text">
+            <div class="form-text" style="color: var(--portal-text-muted);">
               Skriv <code>{{ slug }}</code> for å bekrefte.
             </div>
             {% if form.confirm_slug.errors %}
               <div class="text-danger small mt-1">{{ form.confirm_slug.errors.0 }}</div>
             {% endif %}
           </div>
+        </form>
 
           <div class="d-flex gap-2 justify-content-end">
             <a href="{% url 'core:backup_admin_module' slug=slug %}"
