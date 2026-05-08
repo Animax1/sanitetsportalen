@@ -15,7 +15,7 @@
         {{ handler.display_name|default:slug }}
       </a>
     </li>
-    <li class="breadcrumb-item active text-muted" aria-current="page">
+    <li class="breadcrumb-item active text-main" aria-current="page">
       Gjenopprett
     </li>
   </ol>
@@ -45,23 +45,23 @@
         </div>
 
         <dl class="row mb-3">
-          <dt class="col-sm-4 text-muted">Modul</dt>
+          <dt class="col-sm-4 text-main">Modul</dt>
           <dd class="col-sm-8">{{ handler.display_name|default:slug }}</dd>
 
-          <dt class="col-sm-4 text-muted">Filnavn</dt>
+          <dt class="col-sm-4 text-main">Filnavn</dt>
           <dd class="col-sm-8"><code>{{ backup.filename }}</code></dd>
 
-          <dt class="col-sm-4 text-muted">Type</dt>
+          <dt class="col-sm-4 text-main">Type</dt>
           <dd class="col-sm-8">{{ backup.get_kind_display }}</dd>
 
-          <dt class="col-sm-4 text-muted">Opprettet</dt>
+          <dt class="col-sm-4 text-main">Opprettet</dt>
           <dd class="col-sm-8">{{ backup.created_at|date:"d.m.Y H:i:s" }}</dd>
 
-          <dt class="col-sm-4 text-muted">Størrelse</dt>
+          <dt class="col-sm-4 text-main">Størrelse</dt>
           <dd class="col-sm-8">{{ backup.size_bytes|filesizeformat }}</dd>
 
           {% if backup.note %}
-          <dt class="col-sm-4 text-muted">Notat</dt>
+          <dt class="col-sm-4 text-main">Notat</dt>
           <dd class="col-sm-8">{{ backup.note }}</dd>
           {% endif %}
         </dl>
