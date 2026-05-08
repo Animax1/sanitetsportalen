@@ -1,0 +1,242 @@
+{% extends "core/base_portal.html" %}
+{% load static %}
+
+{% block title %}Min profil – Sanitetsportal{% endblock %}
+
+{% block extra_head %}
+<style>
+  .profile-card {
+    background: var(--portal-surface);
+    border: 1px solid var(--portal-border);
+    border-radius: 10px;
+    margin-bottom: 1rem;
+  }
+  .profile-card .card-header {
+    background: var(--portal-surface-2);
+    border-bottom: 1px solid var(--portal-border);
+    color: var(--portal-text);
+    font-weight: 600;
+  }
+  .perm-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.4rem 0;
+    border-bottom: 1px dashed var(--portal-border);
+  }
+  .perm-row:last-child { border-bottom: none; }
+  .perm-yes { color: var(--portal-success); font-weight: 600; }
+  .perm-no { color: var(--portal-text-muted); }
+  .module-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.35rem 0.7rem;
+    border-radius: 999px;
+    background: var(--portal-surface-2);
+    color: var(--portal-text);
+    font-size: 0.85rem;
+    margin: 0.15rem;
+    border: 1px solid var(--portal-border);
+  }
+  .event-row {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.45rem 0.2rem;
+    border-bottom: 1px dashed var(--portal-border);
+    font-size: 0.86rem;
+  }
+  .event-row:last-child { border-bottom: none; }
+  .event-time {
+    color: var(--portal-text-muted);
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+    min-width: 145px;
+  }
+  .event-type {
+    flex: 1;
+    color: var(--portal-text);
+  }
+  .event-ip {
+    color: var(--portal-text-muted);
+    font-size: 0.8rem;
+    font-family: ui-monospace, "Cascadia Code", monospace;
+  }
+  .stat-card {
+    background: var(--portal-surface-2);
+    border: 1px solid var(--portal-border);
+    border-radius: 8px;
+    padding: 0.9rem 1rem;
+    text-align: center;
+  }
+  .stat-card .value {
+    font-size: 1.8rem;
+    font-weight: 700;
+    color: var(--portal-accent);
+    line-height: 1;
+  }
+  .stat-card .label {
+    color: var(--portal-text-muted);
+    font-size: 0.78rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-top: 0.3rem;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<section class="mb-3">
+  <h1 class="mb-1"><i class="bi bi-person-circle me-2"></i>Min profil</h1>
+  <p class="text-muted mb-0">
+    {{ request.user.username }} · {{ request.user.get_role_display }}
+  </p>
+</section>
+
+<div class="row g-3">
+  {# ── Kolonne 1: Konto + tilganger ─────────────────────────────────── #}
+  <div class="col-lg-6">
+    <div class="card profile-card">
+      <div class="card-header">
+        <i class="bi bi-person-badge me-2"></i>Konto
+      </div>
+      <div class="card-body">
+        <div class="perm-row">
+          <span class="text-muted">Brukernavn</span>
+          <strong>{{ request.user.username }}</strong>
+        </div>
+        <div class="perm-row">
+          <span class="text-muted">E-post</span>
+          <span>{{ request.user.email|default:"–" }}</span>
+        </div>
+        <div class="perm-row">
+          <span class="text-muted">Rolle</span>
+          <span class="badge bg-secondary">{{ request.user.get_role_display }}</span>
+        </div>
+        <div class="perm-row">
+          <span class="text-muted">MFA</span>
+          {% if request.user.mfa_required %}
+            <span class="perm-yes"><i class="bi bi-shield-check me-1"></i>Aktiv</span>
+          {% else %}
+            <span class="perm-no">Ikke aktivert</span>
+          {% endif %}
+        </div>
+        <div class="perm-row">
+          <span class="text-muted">Sist logget inn</span>
+          <span>{{ request.user.last_login_at|date:"d.m.Y H:i"|default:"–" }}</span>
+        </div>
+        <div class="perm-row">
+          <span class="text-muted">Konto opprettet</span>
+          <span>{{ request.user.created_at|date:"d.m.Y" }}</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="card profile-card">
+      <div class="card-header">
+        <i class="bi bi-key me-2"></i>Modul-tilganger
+      </div>
+      <div class="card-body">
+        {% if request.user.role == 'admin' %}
+          <div class="alert alert-info mb-2 py-2 px-3" style="font-size:0.88rem;">
+            <i class="bi bi-info-circle me-1"></i>
+            Som administrator har du tilgang til alle moduler uavhengig av flaggene under.
+          </div>
+        {% endif %}
+        {% for label, value in permissions %}
+          <div class="perm-row">
+            <span>{{ label }}</span>
+            {% if value %}
+              <span class="perm-yes"><i class="bi bi-check-circle me-1"></i>Ja</span>
+            {% else %}
+              <span class="perm-no"><i class="bi bi-x-circle me-1"></i>Nei</span>
+            {% endif %}
+          </div>
+        {% endfor %}
+        <p class="text-muted small mb-0 mt-3">
+          <i class="bi bi-info-circle me-1"></i>
+          Tilganger styres av en administrator. Ta kontakt om du trenger
+          flere tilganger.
+        </p>
+      </div>
+    </div>
+  </div>
+
+  {# ── Kolonne 2: Aktivitet + moduler ────────────────────────────────── #}
+  <div class="col-lg-6">
+    <div class="row g-2 mb-3">
+      <div class="col-6">
+        <div class="stat-card">
+          <div class="value">{{ weekly_login_count }}</div>
+          <div class="label">Innlogginger siste 7 dager</div>
+        </div>
+      </div>
+      <div class="col-6">
+        <div class="stat-card">
+          <div class="value">{{ visible_modules|length }}</div>
+          <div class="label">Tilgjengelige moduler</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card profile-card">
+      <div class="card-header">
+        <i class="bi bi-grid-3x3-gap me-2"></i>Mine moduler
+      </div>
+      <div class="card-body">
+        {% if visible_modules %}
+          {% for modul in visible_modules %}
+            {% if modul.url %}
+              <a href="{{ modul.url }}" class="module-pill">
+                <i class="bi bi-{{ modul.icon }}"></i>{{ modul.name }}
+              </a>
+            {% else %}
+              <span class="module-pill">
+                <i class="bi bi-{{ modul.icon }}"></i>{{ modul.name }}
+              </span>
+            {% endif %}
+          {% endfor %}
+        {% else %}
+          <p class="text-muted mb-0">Du har foreløpig ikke tilgang til noen moduler.</p>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="card profile-card">
+      <div class="card-header">
+        <i class="bi bi-clock-history me-2"></i>Siste 10 hendelser
+      </div>
+      <div class="card-body">
+        {% for evt in recent_events %}
+          <div class="event-row">
+            <span class="event-time">{{ evt.created_at|date:"d.m.Y H:i:s" }}</span>
+            <span class="event-type">
+              {{ evt.get_event_type_display }}
+              {% if evt.success %}
+                <span class="badge bg-success ms-1">OK</span>
+              {% else %}
+                <span class="badge bg-danger ms-1">Feilet</span>
+              {% endif %}
+            </span>
+            <span class="event-ip">{{ evt.ip|default:"" }}</span>
+          </div>
+        {% empty %}
+          <p class="text-muted mb-0">Ingen registrerte hendelser ennå.</p>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div class="card profile-card">
+      <div class="card-header">
+        <i class="bi bi-tools me-2"></i>Handlinger
+      </div>
+      <div class="card-body d-flex flex-wrap gap-2">
+        <a href="{% url 'accounts:change_password' %}" class="btn btn-outline-light btn-sm">
+          <i class="bi bi-key me-1"></i>Endre passord
+        </a>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

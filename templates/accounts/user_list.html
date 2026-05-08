@@ -1,11 +1,27 @@
 {% extends "base.html" %}
 {% block title %}Brukere{% endblock %}
 {% block content %}
-<div class="d-flex align-items-center justify-content-between mb-3">
+<div class="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
   <h4 class="mb-0"><i class="bi bi-people me-2"></i>Brukere</h4>
-  <a href="{% url 'accounts:user_create' %}" class="btn btn-primary btn-sm">
-    <i class="bi bi-person-plus me-1"></i>Ny bruker
-  </a>
+  <div class="d-flex gap-2 flex-wrap">
+    <form method="post" class="d-inline" onsubmit="return confirm('Aktivere pasientregistrering for alle leder-brukere?');">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="grant_pasienter_to_leads">
+      <button type="submit" class="btn btn-outline-success btn-sm">
+        <i class="bi bi-check2-square me-1"></i>Gi ledere pasienttilgang
+      </button>
+    </form>
+    <form method="post" class="d-inline" onsubmit="return confirm('Fjerne pasientregistrering fra alle ikke-admin-brukere? Dette kan ikke angres.');">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="revoke_pasienter_from_all">
+      <button type="submit" class="btn btn-outline-warning btn-sm">
+        <i class="bi bi-x-square me-1"></i>Fjern pasienttilgang
+      </button>
+    </form>
+    <a href="{% url 'accounts:user_create' %}" class="btn btn-primary btn-sm">
+      <i class="bi bi-person-plus me-1"></i>Ny bruker
+    </a>
+  </div>
 </div>
 
 <div class="card">

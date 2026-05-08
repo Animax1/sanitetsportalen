@@ -1,0 +1,82 @@
+{% extends "core/base_portal.html" %}
+{% load static %}
+
+{% block title %}Modul-administrasjon – Sanitetsportal{% endblock %}
+
+{% block content %}
+<section class="mb-4">
+  <h1 class="mb-2">Modul-administrasjon</h1>
+  <p class="text-muted mb-0">
+    Aktiver eller deaktiver moduler i sanntid uten deploy. Kjernemoduler
+    kan ikke deaktiveres — de er nødvendige for at portalen skal fungere.
+    Permissions per bruker administreres på <a href="{% url 'accounts:user_list' %}">Brukere</a>.
+  </p>
+</section>
+
+<div class="table-responsive">
+<table class="table table-hover align-middle" style="background:var(--portal-surface);color:var(--portal-text);">
+  <thead style="background:var(--portal-surface-2);">
+    <tr>
+      <th style="width:40px;"></th>
+      <th>Modul</th>
+      <th>Slug</th>
+      <th>Status</th>
+      <th>Backup</th>
+      <th>Sist endret</th>
+      <th>Av</th>
+      <th>Notat</th>
+      <th></th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for row in rows %}
+    <tr>
+      <td><i class="bi bi-{{ row.module.icon }}" style="color:var(--portal-accent);"></i></td>
+      <td>
+        <strong>{{ row.module.name }}</strong>
+        {% if row.module.is_core %}
+          <span class="badge bg-secondary ms-1" title="Kjernemodul – kan ikke deaktiveres">Kjerne</span>
+        {% endif %}
+        <div class="text-muted" style="font-size:0.82rem;">{{ row.module.description|default:"" }}</div>
+      </td>
+      <td><code style="color:var(--portal-text-muted);">{{ row.module.slug }}</code></td>
+      <td>
+        {% if row.settings %}
+          {% if row.settings.enabled %}
+            <span class="badge" style="background:var(--portal-success);color:#fff;">Aktiv</span>
+          {% else %}
+            <span class="badge bg-secondary">Deaktivert</span>
+          {% endif %}
+        {% else %}
+          <span class="badge bg-warning text-dark">Ingen rad</span>
+        {% endif %}
+      </td>
+      <td>
+        {% if row.settings.backup_enabled %}
+          <i class="bi bi-check-circle-fill" style="color:var(--portal-success);"></i>
+        {% else %}
+          <span class="text-muted">—</span>
+        {% endif %}
+      </td>
+      <td style="font-size:0.85rem;color:var(--portal-text-muted);">
+        {% if row.settings %}{{ row.settings.updated_at|date:"d.m.Y H:i" }}{% endif %}
+      </td>
+      <td style="font-size:0.85rem;color:var(--portal-text-muted);">
+        {% if row.settings.updated_by %}{{ row.settings.updated_by.username }}{% endif %}
+      </td>
+      <td style="max-width:240px;color:var(--portal-text-muted);font-size:0.85rem;">
+        {{ row.settings.note|default:"" }}
+      </td>
+      <td>
+        {% if row.settings %}
+          <a href="{% url 'core:module_admin_edit' slug=row.module.slug %}" class="btn btn-sm btn-primary">
+            <i class="bi bi-pencil me-1"></i>Rediger
+          </a>
+        {% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+</div>
+{% endblock %}

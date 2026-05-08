@@ -342,3 +342,161 @@ class FreezeThawAdminActionTests(TestCase):
         if resp.status_code == 302:
             self.assertNotIn('/patients', resp.url)
             self.assertNotIn('/index', resp.url)
+
+
+# ════════════════════════════════════════════════════════════════════════════
+# Fase 3b: Bulk-aksjoner og permission-redigering
+# ════════════════════════════════════════════════════════════════════════════
+
+
+@override_settings(SECURE_SSL_REDIRECT=False)
+class BulkPermissionActionsTests(TestCase):
+    """Tester bulk-aksjoner for pasient-permissions på user_list_view."""
+
+    def setUp(self):
+        self.client = Client()
+        self.admin = CustomUser.objects.create_user(
+            username='bulk_admin', password='x', role='admin',
+            must_change_password=False, is_staff=True,
+        )
+        self.lead = CustomUser.objects.create_user(
+            username='bulk_lead', password='x', role='lead',
+            must_change_password=False,
+            kan_redigere_pasienter=False,
+        )
+        self.lead_view = CustomUser.objects.create_user(
+            username='bulk_lead_view', password='x', role='lead_view',
+            must_change_password=False,
+            kan_redigere_pasienter=False,
+        )
+        self.read_only = CustomUser.objects.create_user(
+            username='bulk_ro', password='x', role='read_only',
+            must_change_password=False,
+            kan_redigere_pasienter=True,
+        )
+        self.client.force_login(self.admin)
+
+    def test_grant_pasienter_to_leads_setter_flag_paa_alle_leder(self):
+        resp = self.client.post(
+            reverse('accounts:user_list'),
+            {'action': 'grant_pasienter_to_leads'},
+        )
+        self.assertEqual(resp.status_code, 302)
+        self.lead.refresh_from_db()
+        self.lead_view.refresh_from_db()
+        self.read_only.refresh_from_db()
+        self.assertTrue(self.lead.kan_redigere_pasienter)
+        self.assertTrue(self.lead_view.kan_redigere_pasienter)
+        # Read-only-brukere skal IKKE påvirkes av grant-aksjonen
+        self.assertTrue(self.read_only.kan_redigere_pasienter)
+
+    def test_revoke_pasienter_from_all_skipper_admin(self):
+        # Sett admin-flagget for å bekrefte at den ikke endres
+        self.admin.kan_redigere_pasienter = True
+        self.admin.save(update_fields=['kan_redigere_pasienter'])
+
+        resp = self.client.post(
+            reverse('accounts:user_list'),
+            {'action': 'revoke_pasienter_from_all'},
+        )
+        self.assertEqual(resp.status_code, 302)
+        self.admin.refresh_from_db()
+        self.read_only.refresh_from_db()
+        self.assertTrue(self.admin.kan_redigere_pasienter,
+                        'Admin skal ikke få fjernet flagget')
+        self.assertFalse(self.read_only.kan_redigere_pasienter,
+                         'Read-only skal få fjernet flagget')
+
+    def test_grant_er_idempotent(self):
+        """Kjøres aksjonen to ganger skal resultatet være det samme."""
+        for _ in range(2):
+            self.client.post(
+                reverse('accounts:user_list'),
+                {'action': 'grant_pasienter_to_leads'},
+            )
+        self.lead.refresh_from_db()
+        self.assertTrue(self.lead.kan_redigere_pasienter)
+
+    def test_bulk_aksjon_kun_admin(self):
+        """Read-only skal ikke kunne kjøre bulk-aksjon."""
+        self.client.force_login(self.read_only)
+        resp = self.client.post(
+            reverse('accounts:user_list'),
+            {'action': 'grant_pasienter_to_leads'},
+        )
+        # Ikke 302 til user_list — admin_required skal blokkere
+        # (typisk 302 til /-redirect eller 403)
+        self.assertIn(resp.status_code, (302, 403))
+        self.lead.refresh_from_db()
+        self.assertFalse(self.lead.kan_redigere_pasienter)
+
+    def test_bulk_knapper_synlige_paa_user_list(self):
+        resp = self.client.get(reverse('accounts:user_list'))
+        self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, 'grant_pasienter_to_leads')
+        self.assertContains(resp, 'revoke_pasienter_from_all')
+
+
+@override_settings(SECURE_SSL_REDIRECT=False)
+class AdminUserEditFormPermissionTests(TestCase):
+    """Tester at AdminUserEditForm aksepterer og lagrer alle 5 permission-flagg."""
+
+    def setUp(self):
+        self.client = Client()
+        self.admin = CustomUser.objects.create_user(
+            username='edit_admin', password='x', role='admin',
+            must_change_password=False, is_staff=True,
+        )
+        self.target = CustomUser.objects.create_user(
+            username='edit_target', password='x', role='read_only',
+            must_change_password=False,
+            kan_redigere_pasienter=False,
+            kan_redigere_vakter=False,
+            kan_redigere_utstyr=False,
+            kan_se_rapport=False,
+            kan_redigere_beredskap=False,
+        )
+        self.client.force_login(self.admin)
+
+    def test_form_inneholder_alle_fem_flagg(self):
+        from accounts.forms import AdminUserEditForm
+        form = AdminUserEditForm(instance=self.target)
+        for felt in [
+            'kan_redigere_pasienter',
+            'kan_redigere_vakter',
+            'kan_redigere_utstyr',
+            'kan_se_rapport',
+            'kan_redigere_beredskap',
+        ]:
+            self.assertIn(felt, form.fields, f'Form mangler {felt}')
+
+    def test_redigering_lagrer_alle_fem_flagg(self):
+        url = reverse('accounts:user_detail', kwargs={'pk': self.target.pk})
+        resp = self.client.post(url, {
+            'action': 'edit',
+            'role': 'read_only',
+            'is_active': 'on',
+            'kan_redigere_pasienter': 'on',
+            'kan_redigere_vakter': 'on',
+            'kan_redigere_utstyr': 'on',
+            'kan_se_rapport': 'on',
+            'kan_redigere_beredskap': 'on',
+        })
+        self.assertEqual(resp.status_code, 302)
+        self.target.refresh_from_db()
+        self.assertTrue(self.target.kan_redigere_pasienter)
+        self.assertTrue(self.target.kan_redigere_vakter)
+        self.assertTrue(self.target.kan_redigere_utstyr)
+        self.assertTrue(self.target.kan_se_rapport)
+        self.assertTrue(self.target.kan_redigere_beredskap)
+
+    def test_user_detail_template_viser_permission_felt(self):
+        url = reverse('accounts:user_detail', kwargs={'pk': self.target.pk})
+        resp = self.client.get(url)
+        self.assertEqual(resp.status_code, 200)
+        # Sjekkboksene (form-feltene) skal være med
+        self.assertContains(resp, 'name="kan_redigere_pasienter"')
+        self.assertContains(resp, 'name="kan_redigere_vakter"')
+        self.assertContains(resp, 'name="kan_redigere_utstyr"')
+        self.assertContains(resp, 'name="kan_se_rapport"')
+        self.assertContains(resp, 'name="kan_redigere_beredskap"')

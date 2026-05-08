@@ -86,22 +86,45 @@ class AdminUserCreateForm(forms.ModelForm):
 
 
 class AdminUserEditForm(forms.ModelForm):
-    """Skjema for admin til å redigere eksisterende bruker."""
+    """Skjema for admin til å redigere eksisterende bruker.
+
+    Fra Fase 3b inkluderer skjemaet også de 5 modul-permission-flaggene som
+    bestemmer hvilke moduler brukeren ser i dashboard og nav-meny. Admin har
+    bypass i ``Module.is_visible_for``, så disse flaggene gjelder kun for
+    ikke-admin-brukere.
+    """
 
     class Meta:
         model = CustomUser
-        fields = ['email', 'role', 'is_active']
+        fields = [
+            'email', 'role', 'is_active',
+            'kan_redigere_pasienter',
+            'kan_redigere_vakter',
+            'kan_redigere_utstyr',
+            'kan_se_rapport',
+            'kan_redigere_beredskap',
+        ]
         widgets = {
             'email': forms.EmailInput(attrs={
                 'class': 'form-control',
                 'placeholder': 'Valgfritt',
             }),
             'role': forms.Select(attrs={'class': 'form-select'}),
+            'kan_redigere_pasienter': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+            'kan_redigere_vakter': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+            'kan_redigere_utstyr': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+            'kan_se_rapport': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+            'kan_redigere_beredskap': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
         }
         labels = {
             'email': 'E-post (valgfritt)',
             'role': 'Rolle',
             'is_active': 'Aktiv konto',
+            'kan_redigere_pasienter': 'Pasientregistrering',
+            'kan_redigere_vakter': 'Vakter',
+            'kan_redigere_utstyr': 'Utstyr',
+            'kan_se_rapport': 'Rapport',
+            'kan_redigere_beredskap': 'Beredskap',
         }
         help_texts = {
             'email': 'Brukes kun som kontaktinformasjon. Kan stå tom.',
@@ -112,5 +135,5 @@ class AdminUserEditForm(forms.ModelForm):
         self.fields['email'].required = False
 
     def clean_email(self):
-        email = self.cleaned_data.get('email', '').strip()
+        email = (self.cleaned_data.get('email') or '').strip()
         return email or None

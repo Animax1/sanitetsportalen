@@ -48,6 +48,35 @@
               {{ form.is_active }}
               <label class="form-check-label" for="{{ form.is_active.id_for_label }}" style="color:#cbd5e1;">Aktiv konto</label>
             </div>
+
+            <hr style="border-color:#334155;">
+            <div class="mb-2">
+              <label class="form-label mb-2">Modul-tilganger</label>
+              <div class="text-muted small mb-2" style="font-size:0.78rem;">
+                Administratorer ser alltid alle moduler — flaggene gjelder kun for andre roller.
+              </div>
+              <div class="form-check mb-1">
+                {{ form.kan_redigere_pasienter }}
+                <label class="form-check-label" for="{{ form.kan_redigere_pasienter.id_for_label }}" style="color:#cbd5e1;">Pasientregistrering</label>
+              </div>
+              <div class="form-check mb-1">
+                {{ form.kan_redigere_vakter }}
+                <label class="form-check-label" for="{{ form.kan_redigere_vakter.id_for_label }}" style="color:#cbd5e1;">Vakter</label>
+              </div>
+              <div class="form-check mb-1">
+                {{ form.kan_redigere_utstyr }}
+                <label class="form-check-label" for="{{ form.kan_redigere_utstyr.id_for_label }}" style="color:#cbd5e1;">Utstyr</label>
+              </div>
+              <div class="form-check mb-1">
+                {{ form.kan_se_rapport }}
+                <label class="form-check-label" for="{{ form.kan_se_rapport.id_for_label }}" style="color:#cbd5e1;">Rapport</label>
+              </div>
+              <div class="form-check mb-3">
+                {{ form.kan_redigere_beredskap }}
+                <label class="form-check-label" for="{{ form.kan_redigere_beredskap.id_for_label }}" style="color:#cbd5e1;">Beredskap</label>
+              </div>
+            </div>
+
             <button type="submit" class="btn btn-primary btn-sm w-100">Lagre endringer</button>
           </form>
         </div>

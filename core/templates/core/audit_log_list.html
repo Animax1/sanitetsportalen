@@ -1,0 +1,213 @@
+{% extends "core/base_portal.html" %}
+{% load static %}
+
+{% block title %}Revisjonslogg – Sanitetsportal{% endblock %}
+
+{% block extra_head %}
+<style>
+  .filter-card {
+    background: var(--portal-surface);
+    border: 1px solid var(--portal-border);
+    border-radius: 8px;
+    padding: 1rem;
+    margin-bottom: 1rem;
+  }
+  .filter-card label {
+    color: var(--portal-text-muted);
+    font-size: 0.82rem;
+    margin-bottom: 0.25rem;
+  }
+  .filter-card .form-control,
+  .filter-card .form-select {
+    background: var(--portal-surface-2);
+    color: var(--portal-text);
+    border-color: var(--portal-border);
+  }
+  .audit-table {
+    background: var(--portal-surface);
+    color: var(--portal-text);
+    font-size: 0.88rem;
+  }
+  .audit-table th {
+    background: var(--portal-surface-2);
+    border-color: var(--portal-border);
+    color: var(--portal-text-muted);
+    font-weight: 600;
+    font-size: 0.78rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  .audit-table td {
+    border-color: var(--portal-border);
+    vertical-align: top;
+  }
+  .audit-action-CREATE { color: #10b981; }
+  .audit-action-UPDATE { color: #3b82f6; }
+  .audit-action-DELETE { color: #ef4444; }
+  .audit-app-badge {
+    background: var(--portal-surface-2);
+    color: var(--portal-text-muted);
+    padding: 0.1rem 0.45rem;
+    border-radius: 4px;
+    font-size: 0.78rem;
+    font-family: ui-monospace, "Cascadia Code", monospace;
+  }
+  .audit-value-cell {
+    max-width: 220px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .pagination .page-link {
+    background: var(--portal-surface);
+    color: var(--portal-text);
+    border-color: var(--portal-border);
+  }
+  .pagination .page-item.active .page-link {
+    background: var(--portal-accent);
+    border-color: var(--portal-accent);
+  }
+  .pagination .page-item.disabled .page-link {
+    background: var(--portal-surface);
+    color: var(--portal-text-muted);
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<section class="mb-3 d-flex justify-content-between align-items-end flex-wrap gap-2">
+  <div>
+    <h1 class="mb-1">Revisjonslogg</h1>
+    <p class="text-muted mb-0">
+      {{ total_count|default:0 }} hendelse{{ total_count|pluralize:"r" }}
+      {% if filters.app_label or filters.action or filters.user or filters.date_from or filters.date_to or filters.q %}
+        matcher filteret.
+      {% else %}
+        totalt.
+      {% endif %}
+    </p>
+  </div>
+  <div>
+    <a href="{% url 'core:audit_log_csv_export' %}?{{ request.GET.urlencode }}" class="btn btn-outline-light btn-sm">
+      <i class="bi bi-download me-1"></i>Eksporter CSV
+    </a>
+  </div>
+</section>
+
+<form method="get" class="filter-card">
+  <div class="row g-2">
+    <div class="col-md-2">
+      <label for="filter-app">App / modul</label>
+      <select id="filter-app" name="app_label" class="form-select form-select-sm">
+        <option value="">Alle</option>
+        {% for label in distinct_app_labels %}
+          <option value="{{ label }}" {% if filters.app_label == label %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-md-2">
+      <label for="filter-action">Handling</label>
+      <select id="filter-action" name="action" class="form-select form-select-sm">
+        <option value="">Alle</option>
+        {% for value, display in action_choices %}
+          <option value="{{ value }}" {% if filters.action == value %}selected{% endif %}>{{ display }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-md-2">
+      <label for="filter-user">Bruker</label>
+      <select id="filter-user" name="user" class="form-select form-select-sm">
+        <option value="">Alle</option>
+        {% for u in all_users %}
+          <option value="{{ u.id }}" {% if filters.user == u.id|stringformat:"s" %}selected{% endif %}>{{ u.username }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-md-2">
+      <label for="filter-date-from">Fra dato</label>
+      <input id="filter-date-from" type="date" name="date_from" value="{{ filters.date_from }}" class="form-control form-control-sm">
+    </div>
+    <div class="col-md-2">
+      <label for="filter-date-to">Til dato</label>
+      <input id="filter-date-to" type="date" name="date_to" value="{{ filters.date_to }}" class="form-control form-control-sm">
+    </div>
+    <div class="col-md-2">
+      <label for="filter-q">Fritekst</label>
+      <input id="filter-q" type="text" name="q" value="{{ filters.q }}" placeholder="tabell, felt, verdi…" class="form-control form-control-sm">
+    </div>
+  </div>
+  <div class="mt-2 d-flex gap-2">
+    <button type="submit" class="btn btn-primary btn-sm">
+      <i class="bi bi-funnel me-1"></i>Bruk filter
+    </button>
+    <a href="{% url 'core:audit_log_list' %}" class="btn btn-outline-light btn-sm">
+      <i class="bi bi-x-lg me-1"></i>Nullstill
+    </a>
+  </div>
+</form>
+
+<div class="table-responsive">
+<table class="table table-hover audit-table align-middle">
+  <thead>
+    <tr>
+      <th style="white-space:nowrap;">Tidspunkt</th>
+      <th>App</th>
+      <th>Tabell</th>
+      <th>ID</th>
+      <th>Handling</th>
+      <th>Felt</th>
+      <th>Gammel</th>
+      <th>Ny</th>
+      <th>Bruker</th>
+      <th>IP</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for row in page_obj.object_list %}
+    <tr>
+      <td style="white-space:nowrap;color:var(--portal-text-muted);">{{ row.created_at|date:"d.m.Y H:i:s" }}</td>
+      <td><span class="audit-app-badge">{{ row.app_label|default:"—" }}</span></td>
+      <td><code>{{ row.table_name }}</code></td>
+      <td>{{ row.record_id }}</td>
+      <td><span class="audit-action-{{ row.action }}">{{ row.get_action_display }}</span></td>
+      <td>{{ row.field_name|default:"—" }}</td>
+      <td class="audit-value-cell" title="{{ row.old_value|default:'' }}">{{ row.old_value|default:"—"|truncatechars:40 }}</td>
+      <td class="audit-value-cell" title="{{ row.new_value|default:'' }}">{{ row.new_value|default:"—"|truncatechars:40 }}</td>
+      <td>{% if row.user %}{{ row.user.username }}{% else %}<span class="text-muted">system</span>{% endif %}</td>
+      <td style="font-size:0.82rem;color:var(--portal-text-muted);">{{ row.ip|default:"" }}</td>
+    </tr>
+    {% empty %}
+    <tr><td colspan="10" class="text-center text-muted py-4">Ingen treff for det valgte filteret.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+</div>
+
+{% if page_obj.has_other_pages %}
+<nav class="mt-3">
+  <ul class="pagination pagination-sm justify-content-center">
+    {% if page_obj.has_previous %}
+      <li class="page-item">
+        <a class="page-link" href="?{% for k, v in filters.items %}{% if v %}{{ k }}={{ v }}&{% endif %}{% endfor %}page={{ page_obj.previous_page_number }}">Forrige</a>
+      </li>
+    {% else %}
+      <li class="page-item disabled"><span class="page-link">Forrige</span></li>
+    {% endif %}
+
+    <li class="page-item disabled">
+      <span class="page-link">
+        Side {{ page_obj.number }} av {{ page_obj.paginator.num_pages }}
+      </span>
+    </li>
+
+    {% if page_obj.has_next %}
+      <li class="page-item">
+        <a class="page-link" href="?{% for k, v in filters.items %}{% if v %}{{ k }}={{ v }}&{% endif %}{% endfor %}page={{ page_obj.next_page_number }}">Neste</a>
+      </li>
+    {% else %}
+      <li class="page-item disabled"><span class="page-link">Neste</span></li>
+    {% endif %}
+  </ul>
+</nav>
+{% endif %}
+{% endblock %}

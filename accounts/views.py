@@ -433,7 +433,34 @@ def change_password_view(request):
 
 @admin_required
 def user_list_view(request):
-    """Liste over alle brukere."""
+    """Liste over alle brukere med valgfri bulk-aksjon.
+
+    Bulk-aksjoner (Fase 3b) lar admin slå på ett permission-flagg på en gruppe
+    brukere i én operasjon — typisk «gi alle leads tilgang til
+    pasientregistrering». Aksjonene skal være idempotente og lesbare.
+    """
+    if request.method == 'POST':
+        action = request.POST.get('action', '')
+
+        if action == 'grant_pasienter_to_leads':
+            qs = CustomUser.objects.filter(role__in=['lead', 'lead_view'])
+            updated = qs.update(kan_redigere_pasienter=True)
+            messages.success(
+                request,
+                f'Aktivert pasientregistrering for {updated} lead-bruker(e).',
+            )
+            return redirect('accounts:user_list')
+
+        elif action == 'revoke_pasienter_from_all':
+            # Trygg "reset" — fjerner kun pasient-flagget, beholder andre
+            qs = CustomUser.objects.exclude(role='admin')
+            updated = qs.update(kan_redigere_pasienter=False)
+            messages.success(
+                request,
+                f'Fjernet pasientregistrering fra {updated} ikke-admin-bruker(e).',
+            )
+            return redirect('accounts:user_list')
+
     users = CustomUser.objects.all().order_by('username')
     return render(request, 'accounts/user_list.html', {'users': users})
 

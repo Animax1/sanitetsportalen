@@ -880,3 +880,347 @@ class CustomUserPermissionFlagsTests(TestCase):
             # Default skal være False for nye brukere.
             self.assertFalse(getattr(bruker, felt),
                              f'{felt} skal default være False')
+
+
+# ════════════════════════════════════════════════════════════════════════════
+# Fase 3b: Admin-UI for moduler, AuditLog, og Min profil
+# ════════════════════════════════════════════════════════════════════════════
+
+
+@override_settings(SECURE_SSL_REDIRECT=False)
+class ModuleAdminUITests(TestCase):
+    """Tester for /portal-admin/moduler/ og /portal-admin/moduler/<slug>/.
+
+    Dekker tilgangskontroll, listevisning, redigering og kjernemodul-vern.
+    """
+
+    def setUp(self):
+        from core.models import ModuleSettings
+        # Sørg for at default-rader finnes
+        ModuleSettings.ensure_defaults_exist()
+        self.admin = User.objects.create_user(
+            username='3b_admin', password='x', role='admin',
+            must_change_password=False, is_staff=True,
+        )
+        self.read_only = User.objects.create_user(
+            username='3b_ro', password='x', role='read_only',
+            must_change_password=False,
+        )
+        self.client = Client()
+
+    def test_modulliste_kun_admin(self):
+        """GET /portal-admin/moduler/ skal kreve admin."""
+        # Uautentisert → redirect/forbidden
+        resp = self.client.get('/portal-admin/moduler/')
+        self.assertIn(resp.status_code, (302, 403))
+
+        # Read-only → forbidden eller redirect
+        self.client.force_login(self.read_only)
+        resp = self.client.get('/portal-admin/moduler/')
+        self.assertIn(resp.status_code, (302, 403))
+
+    def test_modulliste_admin_ser_moduler(self):
+        """Admin skal se modul-listen og alle registrerte moduler."""
+        from core.modules import get_all_modules
+        self.client.force_login(self.admin)
+        resp = self.client.get('/portal-admin/moduler/')
+        self.assertEqual(resp.status_code, 200)
+        # Skal vise minst kjernemodulene
+        for modul in get_all_modules():
+            self.assertContains(resp, modul.slug)
+
+    def test_modulliste_url_loeses(self):
+        self.assertEqual(
+            reverse('core:module_admin_list'),
+            '/portal-admin/moduler/',
+        )
+
+    def test_redigering_av_modul_lagrer(self):
+        """POST på edit-view skal lagre `note`-felt og sette updated_by."""
+        from core.models import ModuleSettings
+        # Bruker en ikke-kjernemodul. Hvis ingen finnes, lager vi en.
+        non_core = (
+            ModuleSettings.objects
+            .exclude(slug__in=['core', 'accounts'])
+            .first()
+        )
+        if non_core is None:
+            non_core = ModuleSettings.objects.create(slug='patients', enabled=True)
+
+        self.client.force_login(self.admin)
+        resp = self.client.post(
+            reverse('core:module_admin_edit', kwargs={'slug': non_core.slug}),
+            {'enabled': 'on', 'backup_enabled': 'on', 'note': 'Test-notat'},
+        )
+        # Redirect etter suksess
+        self.assertEqual(resp.status_code, 302)
+        non_core.refresh_from_db()
+        self.assertEqual(non_core.note, 'Test-notat')
+        self.assertEqual(non_core.updated_by, self.admin)
+
+    def test_kjernemodul_kan_ikke_deaktiveres(self):
+        """Form skal avvise enabled=False for kjernemoduler."""
+        from core.forms import ModuleSettingsForm
+        from core.models import ModuleSettings
+        from core.modules import get_all_modules
+
+        kjerne = next(
+            (m for m in get_all_modules() if m.is_core),
+            None,
+        )
+        self.assertIsNotNone(kjerne, 'Forventer minst én kjernemodul')
+
+        settings_obj, _ = ModuleSettings.objects.get_or_create(
+            slug=kjerne.slug, defaults={'enabled': True},
+        )
+        form = ModuleSettingsForm(
+            data={'enabled': False, 'backup_enabled': False, 'note': ''},
+            instance=settings_obj,
+        )
+        self.assertFalse(form.is_valid())
+        self.assertIn('enabled', form.errors)
+
+    def test_redigering_404_for_ukjent_slug(self):
+        self.client.force_login(self.admin)
+        resp = self.client.get(
+            reverse('core:module_admin_edit', kwargs={'slug': 'finnes-ikke'}),
+        )
+        self.assertEqual(resp.status_code, 404)
+
+    def test_modulliste_lenker_til_redigering(self):
+        from core.models import ModuleSettings
+        self.client.force_login(self.admin)
+        resp = self.client.get('/portal-admin/moduler/')
+        # Minst én rediger-lenke skal finnes
+        first = ModuleSettings.objects.first()
+        if first:
+            self.assertContains(resp, f'/portal-admin/moduler/{first.slug}/')
+
+
+@override_settings(SECURE_SSL_REDIRECT=False)
+class AuditLogListViewTests(TestCase):
+    """Tester for /portal-admin/auditlog/ med filter, pagination og CSV-eksport."""
+
+    def setUp(self):
+        from audit.models import AuditLog
+        self.admin = User.objects.create_user(
+            username='3b_audit_admin', password='x', role='admin',
+            must_change_password=False, is_staff=True,
+        )
+        self.read_only = User.objects.create_user(
+            username='3b_audit_ro', password='x', role='read_only',
+            must_change_password=False,
+        )
+        # Lag noen AuditLog-rader vi kan filtrere på
+        AuditLog.objects.create(
+            table_name='patients_patient', record_id=1,
+            action='CREATE', user=self.admin, app_label='patients',
+        )
+        AuditLog.objects.create(
+            table_name='patients_patient', record_id=1,
+            action='UPDATE', user=self.admin, app_label='patients',
+            field_name='inntid', old_value='10:00', new_value='11:00',
+        )
+        AuditLog.objects.create(
+            table_name='accounts_customuser', record_id=1,
+            action='UPDATE', user=self.admin, app_label='accounts',
+        )
+        self.client = Client()
+
+    def test_auditlog_kun_admin(self):
+        resp = self.client.get('/portal-admin/auditlog/')
+        self.assertIn(resp.status_code, (302, 403))
+
+        self.client.force_login(self.read_only)
+        resp = self.client.get('/portal-admin/auditlog/')
+        self.assertIn(resp.status_code, (302, 403))
+
+    def test_auditlog_admin_ser_alle_rader(self):
+        self.client.force_login(self.admin)
+        resp = self.client.get('/portal-admin/auditlog/')
+        self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, 'patients_patient')
+        self.assertContains(resp, 'accounts_customuser')
+
+    def test_auditlog_filter_app_label(self):
+        self.client.force_login(self.admin)
+        resp = self.client.get('/portal-admin/auditlog/?app_label=accounts')
+        self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, 'accounts_customuser')
+        self.assertNotContains(resp, 'patients_patient')
+
+    def test_auditlog_filter_action(self):
+        self.client.force_login(self.admin)
+        resp = self.client.get('/portal-admin/auditlog/?action=CREATE')
+        self.assertEqual(resp.status_code, 200)
+        # Bare CREATE-rader skal være med — UPDATE skal ikke
+        # (Vi sjekker antall via paginator-context)
+        page_obj = resp.context['page_obj']
+        for row in page_obj.object_list:
+            self.assertEqual(row.action, 'CREATE')
+
+    def test_auditlog_filter_user(self):
+        self.client.force_login(self.admin)
+        resp = self.client.get(f'/portal-admin/auditlog/?user={self.admin.id}')
+        self.assertEqual(resp.status_code, 200)
+        page_obj = resp.context['page_obj']
+        for row in page_obj.object_list:
+            self.assertEqual(row.user_id, self.admin.id)
+
+    def test_auditlog_filter_q_fritekst(self):
+        self.client.force_login(self.admin)
+        resp = self.client.get('/portal-admin/auditlog/?q=inntid')
+        self.assertEqual(resp.status_code, 200)
+        page_obj = resp.context['page_obj']
+        # Skal kun finne rad med field_name='inntid'
+        self.assertEqual(len(page_obj.object_list), 1)
+        self.assertEqual(page_obj.object_list[0].field_name, 'inntid')
+
+    def test_auditlog_filter_ugyldig_user_id_ignoreres(self):
+        """Ugyldig user-param skal ikke krasje viewet."""
+        self.client.force_login(self.admin)
+        resp = self.client.get('/portal-admin/auditlog/?user=ikke-tall')
+        self.assertEqual(resp.status_code, 200)
+
+    def test_auditlog_pagination_50_per_side(self):
+        """50 rader per side."""
+        from audit.models import AuditLog
+        # Lag 60 ekstra rader
+        for i in range(60):
+            AuditLog.objects.create(
+                table_name='patients_patient', record_id=i + 100,
+                action='CREATE', user=self.admin, app_label='patients',
+            )
+        self.client.force_login(self.admin)
+        resp = self.client.get('/portal-admin/auditlog/')
+        self.assertEqual(resp.status_code, 200)
+        page_obj = resp.context['page_obj']
+        self.assertEqual(len(page_obj.object_list), 50)
+
+    def test_csv_eksport_returnerer_csv(self):
+        self.client.force_login(self.admin)
+        resp = self.client.get('/portal-admin/auditlog/eksport.csv')
+        self.assertEqual(resp.status_code, 200)
+        self.assertIn('text/csv', resp['Content-Type'])
+        body = resp.content.decode('utf-8-sig')
+        self.assertIn('Tidspunkt', body)
+        self.assertIn('patients_patient', body)
+        # Semikolon-separert
+        first_data_line = body.split('\n')[1] if '\n' in body else ''
+        self.assertIn(';', first_data_line)
+
+    def test_csv_eksport_har_bom(self):
+        """UTF-8 BOM for Excel-kompatibilitet."""
+        self.client.force_login(self.admin)
+        resp = self.client.get('/portal-admin/auditlog/eksport.csv')
+        self.assertTrue(resp.content.startswith(b'\xef\xbb\xbf'))
+
+    def test_csv_eksport_filename_attachment(self):
+        self.client.force_login(self.admin)
+        resp = self.client.get('/portal-admin/auditlog/eksport.csv')
+        self.assertIn('attachment', resp['Content-Disposition'])
+        self.assertIn('auditlog_', resp['Content-Disposition'])
+
+    def test_csv_eksport_kun_admin(self):
+        self.client.force_login(self.read_only)
+        resp = self.client.get('/portal-admin/auditlog/eksport.csv')
+        self.assertIn(resp.status_code, (302, 403))
+
+
+@override_settings(SECURE_SSL_REDIRECT=False)
+class ProfileViewTests(TestCase):
+    """Tester for /min-profil/."""
+
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username='profilbruker', password='x', role='read_only',
+            must_change_password=False,
+            kan_redigere_pasienter=True,
+            kan_se_rapport=False,
+        )
+        self.client = Client()
+
+    def test_profil_url_loeses(self):
+        self.assertEqual(reverse('core:profile'), '/min-profil/')
+
+    def test_profil_krever_innlogging(self):
+        resp = self.client.get('/min-profil/')
+        self.assertEqual(resp.status_code, 302)
+        self.assertIn('/accounts/login', resp['Location'])
+
+    def test_profil_innlogget_bruker_ser_brukernavn(self):
+        self.client.force_login(self.user)
+        resp = self.client.get('/min-profil/')
+        self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, 'profilbruker')
+        self.assertContains(resp, 'Min profil')
+
+    def test_profil_viser_permissions(self):
+        """Permissions-kortet skal vise alle 5 flagg."""
+        self.client.force_login(self.user)
+        resp = self.client.get('/min-profil/')
+        self.assertContains(resp, 'Pasientregistrering')
+        self.assertContains(resp, 'Vakter')
+        self.assertContains(resp, 'Utstyr')
+        self.assertContains(resp, 'Rapport')
+        self.assertContains(resp, 'Beredskap')
+
+    def test_profil_kun_GET(self):
+        self.client.force_login(self.user)
+        resp = self.client.post('/min-profil/')
+        self.assertEqual(resp.status_code, 405)
+
+    def test_profil_inkluderer_aktivitetslogg(self):
+        """Recent_events skal være i context (selv om tom)."""
+        self.client.force_login(self.user)
+        resp = self.client.get('/min-profil/')
+        self.assertIn('recent_events', resp.context)
+        self.assertIn('weekly_login_count', resp.context)
+        self.assertIn('visible_modules', resp.context)
+        self.assertIn('permissions', resp.context)
+
+    def test_profil_admin_info_vises_for_admin(self):
+        admin = User.objects.create_user(
+            username='profil_admin', password='x', role='admin',
+            must_change_password=False,
+        )
+        self.client.force_login(admin)
+        resp = self.client.get('/min-profil/')
+        # Admin har bypass — info-meldingen skal vises
+        self.assertContains(resp, 'administrator')
+
+
+@override_settings(SECURE_SSL_REDIRECT=False)
+class NavMenuFase3bTests(TestCase):
+    """Verifiserer at Min profil og admin-lenker er i nav-meny + dropdown."""
+
+    def setUp(self):
+        self.admin = User.objects.create_user(
+            username='nav_admin', password='x', role='admin',
+            must_change_password=False, is_staff=True,
+            kan_redigere_pasienter=True,
+        )
+        self.read_only = User.objects.create_user(
+            username='nav_ro', password='x', role='read_only',
+            must_change_password=False,
+            kan_redigere_pasienter=True,
+        )
+        self.client = Client()
+
+    def test_min_profil_lenke_i_dropdown_for_alle(self):
+        self.client.force_login(self.read_only)
+        resp = self.client.get('/')
+        self.assertContains(resp, '/min-profil/')
+        self.assertContains(resp, 'Min profil')
+
+    def test_admin_lenker_i_nav_for_admin(self):
+        self.client.force_login(self.admin)
+        resp = self.client.get('/')
+        self.assertContains(resp, '/portal-admin/moduler/')
+        self.assertContains(resp, '/portal-admin/auditlog/')
+
+    def test_admin_lenker_skjult_for_read_only(self):
+        self.client.force_login(self.read_only)
+        resp = self.client.get('/')
+        self.assertNotContains(resp, '/portal-admin/moduler/')
+        self.assertNotContains(resp, '/portal-admin/auditlog/')
