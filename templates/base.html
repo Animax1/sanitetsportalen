@@ -65,11 +65,11 @@
 </div>
 
 <div class="admin-nav">
-  <a href="/" {% if request.path == '/' %}class="active"{% endif %}><i class="bi bi-house me-1"></i>Pasientliste</a>
+  <a href="/" {% if request.path == '/' %}class="active"{% endif %}><i class="bi bi-grid-3x3-gap me-1"></i>Portal</a>
   {% if request.user.role == 'admin' %}
   <a href="{% url 'accounts:user_list' %}" {% if '/accounts/users' in request.path %}class="active"{% endif %}><i class="bi bi-people me-1"></i>Brukere</a>
   <a href="{% url 'admin_server_status' %}" {% if '/admin/server-status' in request.path %}class="active"{% endif %}><i class="bi bi-speedometer2 me-1"></i>Server-status</a>
-  <a href="/django-admin" target="_blank" rel="noopener"><i class="bi bi-gear me-1"></i>Django-admin <i class="bi bi-box-arrow-up-right" style="font-size:0.7rem;"></i></a>
+  <a href="/admin/" target="_blank" rel="noopener"><i class="bi bi-gear me-1"></i>Django-admin <i class="bi bi-box-arrow-up-right" style="font-size:0.7rem;"></i></a>
   {% endif %}
 </div>
 

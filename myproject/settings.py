@@ -249,7 +249,7 @@ RATELIMIT_ENABLE = os.environ.get('RATELIMIT_ENABLE', 'True') == 'True'
 # Antall dager en enhet kan stoles på uten ny TOTP-kode
 MFA_TRUST_DEVICE_DAYS = 30
 # Utsteder som vises i authenticator-appen
-OTP_TOTP_ISSUER = 'Pasientregistrering'
+OTP_TOTP_ISSUER = 'Sanitetsportalen'
 
 # ── Standard primærnøkkeltype ─────────────────────────────────────────────────
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'

@@ -324,7 +324,7 @@ class PortalDashboardViewTests(TestCase):
         self.assertContains(resp, 'href="/pasienter/"')
 
     def test_dashboard_inneholder_portal_navigasjon(self):
-        """Dashbordet skal vise portal-meny med Dashboard og Pasienter."""
+        """Dashbordet skal vise portal-meny med Dashboard og Pasientregistrering."""
         self.client.force_login(self.user)
         resp = self.client.get('/')
         # Brand-lenke til dashboard
@@ -333,7 +333,7 @@ class PortalDashboardViewTests(TestCase):
         # ikon og tekst, så vi sjekker bare at navnene finnes i nav-en)
         self.assertContains(resp, 'class="portal-nav"')
         self.assertContains(resp, 'Dashboard')
-        self.assertContains(resp, 'Pasienter')
+        self.assertContains(resp, 'Pasientregistrering')
 
     def test_dashboard_velkomst_inkluderer_brukernavn(self):
         """Hero-seksjonen skal hilse på brukeren med brukernavn."""
@@ -518,3 +518,47 @@ class PasientAppPaaNyURLTests(TestCase):
             r('admin_server_status'),
             '/pasienter/admin/server-status/',
         )
+
+    def test_pasient_index_har_synlig_portal_knapp(self):
+        """Pasient-app header skal ha en synlig 'Portal'-knapp som lenker til /."""
+        resp = self.client.get('/pasienter/')
+        self.assertEqual(resp.status_code, 200)
+        # Synlig knapp i header med klassen portal-back-btn
+        self.assertContains(resp, 'class="portal-back-btn"')
+        # Knappen skal lenke til portal-roten
+        self.assertContains(resp, 'href="/" class="portal-back-btn"')
+        # Knappen skal ha tekst-label 'Portal'
+        self.assertContains(resp, 'portal-back-label')
+
+
+@override_settings(SECURE_SSL_REDIRECT=False)
+class AdminNavPortalLenkeTests(TestCase):
+    """Verifiserer at admin-nav (base.html) viser 'Portal' i stedet for 'Pasientliste'."""
+
+    def setUp(self):
+        self.admin = User.objects.create_user(
+            username='nav_admin', password='x', role='admin',
+            must_change_password=False,
+        )
+        self.client.force_login(self.admin)
+
+    def test_endre_passord_har_portal_lenke(self):
+        """Endre-passord-siden skal ha 'Portal'-lenke i admin-nav, ikke 'Pasientliste'."""
+        resp = self.client.get('/accounts/change-password/')
+        self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, '>Portal</a>')
+        self.assertNotContains(resp, '>Pasientliste</a>')
+
+    def test_brukere_har_portal_lenke(self):
+        """Brukere-siden skal ha 'Portal'-lenke i admin-nav, ikke 'Pasientliste'."""
+        resp = self.client.get('/accounts/users/')
+        self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, '>Portal</a>')
+        self.assertNotContains(resp, '>Pasientliste</a>')
+
+    def test_server_status_har_portal_lenke(self):
+        """Server-status-siden skal ha 'Portal'-lenke i admin-nav, ikke 'Pasientliste'."""
+        resp = self.client.get('/pasienter/admin/server-status/')
+        self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, '>Portal</a>')
+        self.assertNotContains(resp, '>Pasientliste</a>')

@@ -60,6 +60,56 @@
     margin-left: 0.35rem;
   }
 
+  /* Portal-tilbake-knapp i pasient-app header */
+  #main-header .portal-back-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.35rem 0.7rem;
+    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    color: var(--header-fg);
+    text-decoration: none;
+    font-size: 0.82rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    transition: background-color 0.15s ease, border-color 0.15s ease, transform 0.1s ease;
+    white-space: nowrap;
+  }
+
+  #main-header .portal-back-btn:hover,
+  #main-header .portal-back-btn:focus-visible {
+    background: rgba(255, 255, 255, 0.16);
+    border-color: rgba(255, 255, 255, 0.32);
+    color: var(--header-fg);
+    text-decoration: none;
+    outline: none;
+  }
+
+  #main-header .portal-back-btn:active {
+    transform: translateY(1px);
+  }
+
+  #main-header .portal-back-btn i {
+    font-size: 0.95rem;
+    line-height: 1;
+  }
+
+  #main-header .portal-back-label {
+    line-height: 1;
+  }
+
+  /* På smale skjermer skjul label, vis bare ikon */
+  @media (max-width: 640px) {
+    #main-header .portal-back-label {
+      display: none;
+    }
+    #main-header .portal-back-btn {
+      padding: 0.4rem 0.55rem;
+    }
+  }
+
   .stat-chip {
     display: inline-flex;
     align-items: center;
