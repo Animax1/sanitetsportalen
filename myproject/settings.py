@@ -76,6 +76,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'core',         # Sanitetsportal-fellesprimitiver (BaseTimeStampedModel, validatorer, RBAC)
     'accounts',
     'patients',
     'audit',
@@ -175,8 +176,9 @@ SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 
 # HTTPS-tvang (kun produksjon, aldri offline-modus)
 SECURE_SSL_REDIRECT = _HTTPS_ENABLED
+
 # Health-endepunktet må svare 200 også på ren HTTP fra Railways interne
-# healthcheck (som ikke går via proxy og derfor ikke har X-Forwarded-Proto).
+# healthcheck (som ikke går via proxy og derfor mangler X-Forwarded-Proto).
 # Resten av appen redirectes fortsatt til HTTPS, og HSTS holder nettlesere på HTTPS.
 SECURE_REDIRECT_EXEMPT = [r'^healthz/$']
 

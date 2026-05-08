@@ -2,8 +2,12 @@
 Statistikk- og tjeneste-funksjoner for pasientregistreringssystemet.
 
 All statistikk-beregning er samlet her (migrert fra Flask /api/stats og /api/full-stats).
+
+Felles primitiver (tids-validatorer, lokal-tid-helper, RBAC) ble flyttet
+til core-appen i fase 1 av sanitetsportal-migreringen. Denne filen
+re-eksporterer de samme navnene slik at all eksisterende kode (i views.py,
+tester m.m.) fortsetter å fungere uten endring.
 """
-import re
 import statistics as smod
 from datetime import datetime
 
@@ -12,93 +16,28 @@ from django.db import transaction
 from django.db.models import Q
 from django.utils import timezone as djtz
 
+# Re-eksport fra core (bakoverkompatibilitet)
+from core.validators import (  # noqa: F401
+    TIME_FIELDS,
+    TIME_FORMAT,
+    TIME_FORMAT_HUMAN,
+    now_local_str,
+    parse_minutes,
+    validate_patient_time_fields,
+    validate_time_string,
+)
+from core.auth_decorators import (  # noqa: F401
+    ROLE_HIERARKI,
+    has_role_at_least,
+)
+
 from .models import Patient, AppSetting, Behandler, VaktArkiv, ArkivertPasient
 
 
-# ── Lokal tid-helper ─────────────────────────────────────────────────────────
-#
-# Containere på Railway kjører i UTC. `datetime.now()` returnerer naiv
-# server-lokaltid (UTC) og ignorerer Djangos TIME_ZONE-innstilling.
-#
-# Alle pasient-tidsstempler skal være i Europe/Oslo (samme TZ som frontend),
-# så vi konverterer bevisst via Djangos timezone-API.
-
-def now_local_str():
-    """Returner naiv 'dd.mm.YYYY HH:MM'-streng i Djangos TIME_ZONE (Europe/Oslo).
-
-    Brukes for ALLE auto-tidsstempler på Patient. Erstatter
-    `datetime.now().strftime(...)` som tidligere ga UTC i produksjon.
-    """
-    return djtz.localtime(djtz.now()).strftime('%d.%m.%Y %H:%M')
-
-
-# ── Tidsvalidering ──────────────────────────────────────────────────
-
-# Kun ett gyldig tidsformat aksepteres i databasen: dd.mm.åååå tt:mm
-TIME_FORMAT = '%d.%m.%Y %H:%M'
-TIME_FORMAT_HUMAN = 'dd.mm.åååå tt:mm'
-_TIME_REGEX = re.compile(r'^\d{2}\.\d{2}\.\d{4} \d{2}:\d{2}$')
-
-# Tidsfelter på Patient som må valideres når de kommer inn fra klient
-TIME_FIELDS = ('inntid', 'pabegynt', 'inn_obspost', 'ut_obspost', 'utskrevet')
-
-
-def validate_time_string(value, field_name=''):
-    """Valider at tidsstreng er nettopp formatet dd.mm.åååå tt:mm.
-
-    Tom streng / None er OK (feltet er ikke satt enda).
-    Kaster ValidationError ved ugyldig format eller ugyldig dato.
-    Returnerer en normalisert streng (trimmet) eller '' hvis input var tom.
-    """
-    if value is None:
-        return ''
-    s = str(value).strip()
-    if s == '':
-        return ''
-    if not _TIME_REGEX.match(s):
-        label = f'{field_name}: ' if field_name else ''
-        raise ValidationError(
-            f'{label}Ugyldig tidsformat. Forventet {TIME_FORMAT_HUMAN} '
-            f'(f.eks. 19.04.2026 14:30). Fikk: «{s}»'
-        )
-    try:
-        datetime.strptime(s, TIME_FORMAT)
-    except ValueError as exc:
-        label = f'{field_name}: ' if field_name else ''
-        raise ValidationError(
-            f'{label}Ugyldig dato/tid «{s}» ({exc}). '
-            f'Forventet {TIME_FORMAT_HUMAN}.'
-        )
-    return s
-
-
-def validate_patient_time_fields(data):
-    """Valider alle kjente tidsfelter i en dict av innkommende data.
-
-    Muterer data in-place (normaliserer strenger). Kaster ValidationError
-    hvis noen av feltene er ugyldige.
-    """
-    for field in TIME_FIELDS:
-        if field in data:
-            data[field] = validate_time_string(data[field], field_name=field)
-    return data
-
-
 # ── Hjelpefunksjoner ─────────────────────────────────────────────────────────
-
-def parse_minutes(t1_str, t2_str):
-    """Returner varighet i minutter mellom to 'dd.mm.YYYY HH:MM'-strenger, eller None."""
-    for fmt in ('%d.%m.%Y %H:%M', '%Y-%m-%dT%H:%M', '%Y-%m-%d %H:%M'):
-        try:
-            t1 = datetime.strptime(t1_str.strip(), fmt)
-            t2 = datetime.strptime(t2_str.strip(), fmt)
-            diff = (t2 - t1).total_seconds() / 60
-            if 0 <= diff <= 2880:
-                return diff
-            break
-        except (ValueError, AttributeError):
-            continue
-    return None
+# (now_local_str, validate_time_string, validate_patient_time_fields,
+#  parse_minutes, TIME_FORMAT, TIME_FIELDS m.m. er flyttet til core.validators
+#  og re-eksporteres øverst i denne filen.)
 
 
 def next_patient_nr():
@@ -117,7 +56,7 @@ def next_patient_nr():
         return nr
 
 
-# ── Rolle-hierarki og tilgangskontroll ───────────────────────────────────────
+# ── Arkiv-tilgang (modul-spesifikk konfig) ───────────────────────────────────
 
 # Konfigurerbar min-rolle for å SE arkiv. Endre til 'lead_view' eller 'lead' for å åpne for leads.
 ARKIV_VIEW_MIN_ROLE = 'admin'
@@ -125,23 +64,8 @@ ARKIV_VIEW_MIN_ROLE = 'admin'
 # Skriving/sletting holdes ALLTID på admin
 ARKIV_WRITE_ROLE = 'admin'
 
-ROLE_HIERARKI = {
-    'read_only': 0,
-    'read_write': 1,
-    'lead_view': 2,
-    'lead': 3,
-    'admin': 4,
-}
-
-
-def has_role_at_least(user, min_role):
-    """Returner True hvis user har min_role eller høyere rolle.
-
-    False hvis brukeren ikke er autentisert eller ikke har en kjent rolle.
-    """
-    if not user.is_authenticated:
-        return False
-    return ROLE_HIERARKI.get(getattr(user, 'role', None), -1) >= ROLE_HIERARKI.get(min_role, 99)
+# ROLE_HIERARKI og has_role_at_least er flyttet til core.auth_decorators
+# og re-eksporteres øverst i denne filen.
 
 
 # ── Recycle av pasientnummer ved slett ────────────────────────────────────────

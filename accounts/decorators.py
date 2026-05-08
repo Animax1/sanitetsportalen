@@ -1,40 +1,19 @@
-"""Tilgangskontroll-dekoratorer basert på brukerrolle."""
-from functools import wraps
+"""Tilgangskontroll-dekoratorer (SHIM for bakoverkompatibilitet).
 
-from django.core.exceptions import PermissionDenied
-from django.contrib.auth.decorators import login_required
+Selve implementasjonen er flyttet til core/auth_decorators.py i fase 1
+av sanitetsportal-migreringen. Denne filen re-eksporterer de samme
+navnene slik at all eksisterende kode (`from accounts.decorators import
+admin_required` osv.) fortsetter å fungere uten endring.
 
+Nye apps SKAL importere fra core.auth_decorators direkte:
 
-def role_required(*roles):
-    """
-    Dekorator som krever at innlogget bruker har én av de angitte rollene.
-    Gir 403 Forbudt hvis rollen mangler.
-    """
-    def decorator(view_func):
-        @wraps(view_func)
-        @login_required
-        def wrapper(request, *args, **kwargs):
-            if request.user.role not in roles:
-                raise PermissionDenied
-            return view_func(request, *args, **kwargs)
-        return wrapper
-    return decorator
-
-
-# Snarveier
-# Rollehierarki:
-#   admin       – full tilgang (brukeradmin, audit, nullstill)
-#   lead        – kan lese/skrive pasienter og se full statistikk
-#   lead_view   – kan lese pasienter og se statistikk, IKKE skrivetilgang
-#   read_write  – kan lese/skrive pasienter (ingen statistikk-dashboard)
-#   read_only   – kun lesing av pasientliste/tavle
-admin_required = role_required('admin')
-
-# Skrivetilgang: admin, lead, read_write (IKKE lead_view)
-write_required = role_required('admin', 'lead', 'read_write')
-
-# Statistikk/full oversikt: admin, lead, lead_view
-stats_required = role_required('admin', 'lead', 'lead_view')
-
-# Kan se andre år/datasett: admin, lead, lead_view
-dataset_scope_all = role_required('admin', 'lead', 'lead_view')
+    from core.auth_decorators import admin_required, has_role_at_least
+"""
+# Re-eksport fra core. Holder alle eksisterende imports i drift.
+from core.auth_decorators import (  # noqa: F401
+    admin_required,
+    dataset_scope_all,
+    role_required,
+    stats_required,
+    write_required,
+)
