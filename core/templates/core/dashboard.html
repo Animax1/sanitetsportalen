@@ -46,10 +46,6 @@
     box-shadow: 0 6px 18px rgba(59,130,246,0.18);
     color: inherit;
   }
-  .module-card.placeholder {
-    opacity: 0.55;
-    cursor: not-allowed;
-  }
 
   .module-icon {
     font-size: 1.8rem;
@@ -61,9 +57,6 @@
     justify-content: center;
     background: var(--portal-surface-2);
     color: var(--portal-accent);
-  }
-  .module-card.placeholder .module-icon {
-    color: var(--portal-text-muted);
   }
 
   .module-title {
@@ -87,7 +80,6 @@
     margin-top: auto;
   }
   .module-status.active { color: var(--portal-success); }
-  .module-status.planned { color: var(--portal-text-muted); }
 
   .module-card.active .module-cta {
     color: var(--portal-accent);
@@ -96,6 +88,16 @@
     display: flex;
     align-items: center;
     gap: 0.3rem;
+  }
+
+  .module-empty {
+    background: var(--portal-surface);
+    border: 1px dashed var(--portal-border);
+    border-radius: 12px;
+    padding: 2rem;
+    text-align: center;
+    color: var(--portal-text-muted);
+    font-size: 0.95rem;
   }
 </style>
 {% endblock %}
@@ -107,24 +109,32 @@
 </section>
 
 <div class="module-grid">
-  {# ──── Pasientregistrering (aktiv modul) ──── #}
-  <a href="/pasienter/" class="module-card active" aria-label="Åpne pasientregistrering">
-    <div class="module-icon">
-      <i class="bi bi-clipboard-pulse"></i>
+  {# Modul-kort genereres fra core.modules-registret. Filtreres i view (get_dashboard_modules)
+     basert på ModuleSettings.enabled og brukerens permission-flagg. Kjernemoduler
+     (is_core=True) med show_in_dashboard=False vises IKKE her — de er ikke brukervendte. #}
+  {% for module in modules %}
+    <a href="{{ module.url }}"
+       class="module-card active"
+       aria-label="Åpne {{ module.name }}">
+      <div class="module-icon">
+        <i class="bi bi-{{ module.icon }}"></i>
+      </div>
+      <div>
+        <h3 class="module-title">{{ module.name }}</h3>
+        <p class="module-description">{{ module.description }}</p>
+      </div>
+      <div class="module-status active">
+        <i class="bi bi-check-circle-fill me-1"></i>Aktiv
+      </div>
+      <div class="module-cta">
+        Åpne modul <i class="bi bi-arrow-right"></i>
+      </div>
+    </a>
+  {% empty %}
+    <div class="module-empty" style="grid-column: 1 / -1;">
+      Ingen moduler er tilgjengelige for kontoen din. Kontakt en administrator
+      hvis du mener du skal ha tilgang.
     </div>
-    <div>
-      <h3 class="module-title">Pasientregistrering</h3>
-      <p class="module-description">
-        Registrering, statusoppfølging og statistikk for sanitetsvakt.
-        Triagering, obspost og ut-tider.
-      </p>
-    </div>
-    <div class="module-status active">
-      <i class="bi bi-check-circle-fill me-1"></i>Aktiv
-    </div>
-    <div class="module-cta">
-      Åpne modul <i class="bi bi-arrow-right"></i>
-    </div>
-  </a>
+  {% endfor %}
 </div>
 {% endblock %}

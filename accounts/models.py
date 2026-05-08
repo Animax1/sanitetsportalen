@@ -52,6 +52,44 @@ class CustomUser(AbstractBaseUser, PermissionsMixin):
     updated_at = models.DateTimeField(auto_now=True, verbose_name='Oppdatert')
     last_login_at = models.DateTimeField(null=True, blank=True, verbose_name='Siste innlogging')
 
+    # ── Modul-permissions (Fase 3a) ────────────────────────────────────────
+    # Boolske flag som bestemmer om brukeren ser/redigerer hver portal-modul.
+    # Roller (admin/lead/lead_view/read_write/read_only) styrer fortsatt
+    # overordnet tilgang innenfor hver app, mens disse flaggene styrer hvilke
+    # moduler som vises i dashboard og nav-meny.
+    #
+    # Admin (role='admin') ser alle moduler uavhengig av flagg.
+    # Vi pre-registrerer alle 5 flagg i samme migrasjon for å unngå
+    # fragmenterte migrasjoner når framtidige moduler aktiveres.
+    kan_redigere_pasienter = models.BooleanField(
+        default=False,
+        verbose_name='Kan se pasientregistrering',
+        help_text='Gir tilgang til /pasienter/-modulen i dashboard og nav-meny.',
+    )
+    kan_redigere_vakter = models.BooleanField(
+        default=False,
+        verbose_name='Kan se vakt-modulen',
+        help_text='Reservert for fremtidig vakt-administrasjon (planlagt).',
+    )
+    kan_redigere_utstyr = models.BooleanField(
+        default=False,
+        verbose_name='Kan se utstyr-modulen',
+        help_text='Reservert for fremtidig utstyrs-/lager-modul (planlagt).',
+    )
+    kan_se_rapport = models.BooleanField(
+        default=False,
+        verbose_name='Kan se rapport-modulen',
+        help_text='Reservert for fremtidig rapport-/statistikk-modul (planlagt).',
+    )
+    kan_redigere_beredskap = models.BooleanField(
+        default=False,
+        verbose_name='Kan se beredskap-modulen',
+        help_text=(
+            'Reservert for fremtidig beredskap-/ambulanse-modul (planlagt). '
+            'Krever egen GDPR-vurdering før aktivering.'
+        ),
+    )
+
     objects = CustomUserManager()
 
     USERNAME_FIELD = 'username'

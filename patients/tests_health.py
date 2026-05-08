@@ -112,6 +112,7 @@ class HealthzTests(TestCase):
             f"healthz/ må være i SECURE_REDIRECT_EXEMPT, fant: {exempt}",
         )
 
+
 @override_settings(SECURE_SSL_REDIRECT=False, RATELIMIT_ENABLE=False)
 class HealthzMiddlewareIsolationTests(TestCase):
     """Verifiser at /healthz/ ikke forstyrrer andre middleware-mekanismer."""

@@ -298,9 +298,13 @@ class PortalDashboardViewTests(TestCase):
     """Verifiserer at portal-dashboardet ligger på / og krever innlogging."""
 
     def setUp(self):
+        # Bruker med kan_redigere_pasienter=True slik at pasient-modulen vises.
+        # (Fase 3a la til permission-flagg som default er False; tester som
+        # forventer modulen synlig må sette flagget eksplisitt.)
         self.user = User.objects.create_user(
             username='dashbruker', password='x', role='read_only',
             must_change_password=False,
+            kan_redigere_pasienter=True,
         )
         self.client = Client()
 
@@ -562,3 +566,317 @@ class AdminNavPortalLenkeTests(TestCase):
         self.assertEqual(resp.status_code, 200)
         self.assertContains(resp, '>Portal</a>')
         self.assertNotContains(resp, '>Pasientliste</a>')
+
+
+# ════════════════════════════════════════════════════════════════════════════
+# Fase 3a: Modul-registry, ModuleSettings, permissions, AuditLog app_label
+# ════════════════════════════════════════════════════════════════════════════
+
+
+from core.models import ModuleSettings
+from core.modules import (
+    Module,
+    get_all_modules,
+    get_dashboard_modules,
+    get_module,
+    get_nav_modules,
+    get_visible_modules,
+    reset_registry_cache,
+)
+
+
+@override_settings(SECURE_SSL_REDIRECT=False)
+class ModuleRegistryTests(TestCase):
+    """Verifiserer at modul-registret er konsistent og inneholder forventede moduler."""
+
+    def setUp(self):
+        reset_registry_cache()
+
+    def test_alle_registrerte_moduler_har_unik_slug(self):
+        slugs = [m.slug for m in get_all_modules()]
+        self.assertEqual(len(slugs), len(set(slugs)),
+                         f'Duplikate slugs i registret: {slugs}')
+
+    def test_patients_modul_er_registrert(self):
+        modul = get_module('patients')
+        self.assertIsNotNone(modul)
+        self.assertEqual(modul.slug, 'patients')
+        self.assertEqual(modul.permission_flag, 'kan_redigere_pasienter')
+        self.assertFalse(modul.is_core)
+        self.assertTrue(modul.show_in_dashboard)
+
+    def test_core_og_accounts_er_kjernemoduler(self):
+        for slug in ('core', 'accounts'):
+            modul = get_module(slug)
+            self.assertIsNotNone(modul, f'{slug} mangler i registret')
+            self.assertTrue(modul.is_core, f'{slug} skal være is_core=True')
+            self.assertFalse(modul.show_in_dashboard,
+                             f'{slug} skal ikke vises på dashboardet')
+
+    def test_get_module_med_ukjent_slug_returnerer_none(self):
+        self.assertIsNone(get_module('finnes-ikke'))
+
+    def test_modul_sortering_etter_order(self):
+        moduler = list(get_all_modules())
+        orders = [m.order for m in moduler]
+        self.assertEqual(orders, sorted(orders),
+                         'Moduler skal være sortert etter order')
+
+
+@override_settings(SECURE_SSL_REDIRECT=False)
+class ModuleVisibilityTests(TestCase):
+    """Verifiserer permission-styring for modul-synlighet."""
+
+    def setUp(self):
+        reset_registry_cache()
+        ModuleSettings.ensure_defaults_exist()
+
+    def test_uautentisert_bruker_ser_ingen_moduler(self):
+        self.assertEqual(get_dashboard_modules(None), [])
+
+    def test_admin_ser_alle_dashboard_moduler(self):
+        admin = User.objects.create_user(
+            username='vis_admin', password='x', role='admin',
+            must_change_password=False,
+        )
+        moduler = get_dashboard_modules(admin)
+        slugs = {m.slug for m in moduler}
+        # Admin skal i hvert fall se patients-modulen.
+        self.assertIn('patients', slugs)
+
+    def test_bruker_uten_kan_redigere_pasienter_ser_ikke_patients(self):
+        bruker = User.objects.create_user(
+            username='no_pas', password='x', role='read_only',
+            must_change_password=False,
+        )
+        # Default for nye brukere er kan_redigere_pasienter=False.
+        self.assertFalse(bruker.kan_redigere_pasienter)
+        slugs = {m.slug for m in get_dashboard_modules(bruker)}
+        self.assertNotIn('patients', slugs)
+
+    def test_bruker_med_kan_redigere_pasienter_ser_patients(self):
+        bruker = User.objects.create_user(
+            username='ja_pas', password='x', role='read_only',
+            must_change_password=False,
+        )
+        bruker.kan_redigere_pasienter = True
+        bruker.save(update_fields=['kan_redigere_pasienter'])
+        slugs = {m.slug for m in get_dashboard_modules(bruker)}
+        self.assertIn('patients', slugs)
+
+    def test_deaktivert_modul_skjules_for_ikke_admin(self):
+        bruker = User.objects.create_user(
+            username='ja_pas2', password='x', role='read_only',
+            must_change_password=False,
+            kan_redigere_pasienter=True,
+        )
+        # Deaktiver patients i ModuleSettings.
+        ms, _ = ModuleSettings.objects.get_or_create(slug='patients')
+        ms.enabled = False
+        ms.save()
+
+        slugs = {m.slug for m in get_dashboard_modules(bruker)}
+        self.assertNotIn('patients', slugs,
+                         'Deaktiverte moduler skal ikke vises i dashboard')
+
+    def test_kjernemodul_synlig_selv_om_modulesettings_deaktivert(self):
+        """Kjernemoduler skal IKKE kunne skjules via ModuleSettings.enabled.
+
+        Dette er en defensiv test: get_visible_modules har en eksplisitt
+        is_core-bypass slik at en feilkonfigurasjon ikke kan låse ute admin.
+        """
+        admin = User.objects.create_user(
+            username='kjerne_admin', password='x', role='admin',
+            must_change_password=False,
+        )
+        # Forsøk å deaktivere accounts (kjernemodul) — selv om admin-UI hindrer
+        # dette, kan en SQL-redigering av ModuleSettings gjøre det. Vi tester
+        # at koden er robust likevel.
+        ms, _ = ModuleSettings.objects.get_or_create(slug='accounts')
+        ms.enabled = False
+        ms.save()
+
+        synlige = get_visible_modules(admin, only_enabled=True)
+        slugs = {m.slug for m in synlige}
+        self.assertIn('accounts', slugs)
+
+
+@override_settings(SECURE_SSL_REDIRECT=False)
+class ModuleSettingsModelTests(TestCase):
+    """Verifiserer ModuleSettings-modellen og ensure_defaults_exist."""
+
+    def test_ensure_defaults_oppretter_rad_for_hver_modul(self):
+        # Slett alle rader og kjør på nytt — skal være idempotent.
+        ModuleSettings.objects.all().delete()
+        ModuleSettings.ensure_defaults_exist()
+
+        slugs_i_db = set(ModuleSettings.objects.values_list('slug', flat=True))
+        slugs_i_registry = {m.slug for m in get_all_modules()}
+        self.assertEqual(slugs_i_db, slugs_i_registry)
+
+    def test_ensure_defaults_er_idempotent(self):
+        ModuleSettings.ensure_defaults_exist()
+        antall_for = ModuleSettings.objects.count()
+        ModuleSettings.ensure_defaults_exist()
+        self.assertEqual(ModuleSettings.objects.count(), antall_for)
+
+    def test_get_enabled_slugs_returnerer_kun_aktive(self):
+        ModuleSettings.ensure_defaults_exist()
+        # Deaktiver patients
+        ModuleSettings.objects.filter(slug='patients').update(enabled=False)
+        aktive = ModuleSettings.get_enabled_slugs()
+        self.assertNotIn('patients', aktive)
+        self.assertIn('core', aktive)
+
+    def test_str_representasjon(self):
+        ms = ModuleSettings(slug='testmodul', enabled=True)
+        self.assertEqual(str(ms), 'testmodul (aktiv)')
+        ms.enabled = False
+        self.assertEqual(str(ms), 'testmodul (deaktivert)')
+
+
+@override_settings(SECURE_SSL_REDIRECT=False)
+class DashboardRendringTests(TestCase):
+    """End-to-end: dashboard rendrer riktige modul-kort basert på permissions."""
+
+    def setUp(self):
+        reset_registry_cache()
+        ModuleSettings.ensure_defaults_exist()
+
+    def test_admin_ser_pasient_kort(self):
+        admin = User.objects.create_user(
+            username='dash_admin', password='x', role='admin',
+            must_change_password=False,
+        )
+        self.client.force_login(admin)
+        resp = self.client.get('/')
+        self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, 'Pasientregistrering')
+        self.assertContains(resp, 'href="/pasienter/"')
+
+    def test_bruker_uten_pasient_flagg_ser_ikke_pasient_kort(self):
+        bruker = User.objects.create_user(
+            username='dash_no', password='x', role='read_only',
+            must_change_password=False,
+        )
+        self.client.force_login(bruker)
+        resp = self.client.get('/')
+        self.assertEqual(resp.status_code, 200)
+        # Kortet skal ikke vises (Pasientregistrering finnes hverken som tittel
+        # eller modul-link). Vi sjekker fraværet av modul-kortets href.
+        self.assertNotContains(resp, 'aria-label="Åpne Pasientregistrering"')
+        # Empty-state skal vises
+        self.assertContains(resp, 'Ingen moduler er tilgjengelige')
+
+    def test_deaktivert_pasient_skjules_for_ikke_admin(self):
+        bruker = User.objects.create_user(
+            username='dash_dis', password='x', role='read_only',
+            must_change_password=False,
+            kan_redigere_pasienter=True,
+        )
+        ModuleSettings.objects.filter(slug='patients').update(enabled=False)
+        self.client.force_login(bruker)
+        resp = self.client.get('/')
+        self.assertNotContains(resp, 'aria-label="Åpne Pasientregistrering"')
+
+
+@override_settings(SECURE_SSL_REDIRECT=False)
+class NavMenuTests(TestCase):
+    """Verifiserer at base_portal.html-nav rendres fra registry."""
+
+    def setUp(self):
+        reset_registry_cache()
+        ModuleSettings.ensure_defaults_exist()
+
+    def test_admin_ser_pasient_lenke_i_nav(self):
+        admin = User.objects.create_user(
+            username='nav_a', password='x', role='admin',
+            must_change_password=False,
+        )
+        self.client.force_login(admin)
+        resp = self.client.get('/')
+        # Sjekker at nav-baren har patients-lenken (i tillegg til dashboard-kortet).
+        # Søk etter href="/pasienter/" som forekommer både i nav og kort —
+        # vi forventer minst 2 forekomster.
+        self.assertGreaterEqual(resp.content.decode().count('href="/pasienter/"'), 2)
+
+    def test_bruker_uten_flagg_ser_ikke_pasient_i_nav(self):
+        bruker = User.objects.create_user(
+            username='nav_no', password='x', role='read_only',
+            must_change_password=False,
+        )
+        self.client.force_login(bruker)
+        resp = self.client.get('/')
+        # Verken nav-lenke eller kort skal være med.
+        self.assertNotContains(resp, 'href="/pasienter/"')
+
+
+@override_settings(SECURE_SSL_REDIRECT=False)
+class AuditLogAppLabelTests(TestCase):
+    """Verifiserer at AuditLog.app_label fylles automatisk fra table_name."""
+
+    def test_pre_save_fyller_patients_for_patient_tabell(self):
+        from audit.models import AuditLog
+        log = AuditLog.objects.create(
+            table_name='patients_patient',
+            record_id=1,
+            action='CREATE',
+        )
+        self.assertEqual(log.app_label, 'patients')
+
+    def test_pre_save_fyller_patients_for_backup(self):
+        from audit.models import AuditLog
+        log = AuditLog.objects.create(
+            table_name='backup',
+            record_id=0,
+            action='CREATE',
+            field_name='backup_created',
+        )
+        self.assertEqual(log.app_label, 'patients',
+                         'backup-rader skal mappes til patients-modulen')
+
+    def test_eksplisitt_app_label_overstyrer_auto(self):
+        from audit.models import AuditLog
+        log = AuditLog.objects.create(
+            table_name='patients_patient',
+            record_id=2,
+            action='UPDATE',
+            app_label='custom_label',
+        )
+        self.assertEqual(log.app_label, 'custom_label')
+
+    def test_utled_app_label_helper(self):
+        from audit.signals import utled_app_label
+        self.assertEqual(utled_app_label('patients_patient'), 'patients')
+        self.assertEqual(utled_app_label('accounts_customuser'), 'accounts')
+        self.assertEqual(utled_app_label('backup'), 'patients')
+        self.assertEqual(utled_app_label(''), '')
+
+    def test_index_paa_app_label_finnes(self):
+        from audit.models import AuditLog
+        index_felt = [
+            tuple(idx.fields) for idx in AuditLog._meta.indexes
+        ]
+        self.assertIn(('app_label', 'created_at'), index_felt)
+
+
+@override_settings(SECURE_SSL_REDIRECT=False)
+class CustomUserPermissionFlagsTests(TestCase):
+    """Verifiserer at de 5 permission-flaggene finnes på CustomUser."""
+
+    def test_alle_fem_flagg_eksisterer(self):
+        bruker = User.objects.create_user(
+            username='flag_test', password='x', role='read_only',
+            must_change_password=False,
+        )
+        for felt in [
+            'kan_redigere_pasienter',
+            'kan_redigere_vakter',
+            'kan_redigere_utstyr',
+            'kan_se_rapport',
+            'kan_redigere_beredskap',
+        ]:
+            self.assertTrue(hasattr(bruker, felt), f'CustomUser mangler {felt}')
+            # Default skal være False for nye brukere.
+            self.assertFalse(getattr(bruker, felt),
+                             f'{felt} skal default være False')

@@ -202,14 +202,21 @@
   </div>
 </div>
 
-{# ──── Modul-meny ──── #}
+{# Modul-meny: dashboard-lenken er alltid tilstede. Modul-lenker leses fra
+   nav_modules (context_processor) og filtreres på permissions/enabled.
+   Admin-lenker holdes hardkodet siden de ikke er fullverdige moduler. #}
 <nav class="portal-nav">
   <a href="{% url 'core:portal_dashboard' %}" {% if request.resolver_match.url_name == 'portal_dashboard' %}class="active"{% endif %}>
     <i class="bi bi-grid-3x3-gap me-1"></i>Dashboard
   </a>
-  <a href="/pasienter/" {% if '/pasienter' in request.path %}class="active"{% endif %}>
-    <i class="bi bi-clipboard-pulse me-1"></i>Pasientregistrering
-  </a>
+  {% for module in nav_modules %}
+    {% if module.url %}
+      <a href="{{ module.url }}"
+         {% if module.url in request.path %}class="active"{% endif %}>
+        <i class="bi bi-{{ module.icon }} me-1"></i>{{ module.name }}
+      </a>
+    {% endif %}
+  {% endfor %}
   {% if request.user.is_authenticated and request.user.role == 'admin' %}
     <a href="{% url 'admin_server_status' %}" {% if '/admin/server-status' in request.path %}class="active"{% endif %}>
       <i class="bi bi-speedometer2 me-1"></i>Server-status

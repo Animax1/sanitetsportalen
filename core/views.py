@@ -10,6 +10,8 @@ from django.http import HttpResponse, HttpResponsePermanentRedirect
 from django.shortcuts import render
 from django.views.decorators.http import require_GET
 
+from core.modules import get_dashboard_modules
+
 
 @login_required
 @require_GET
@@ -19,8 +21,14 @@ def portal_dashboard_view(request):
     Vises på `/`. Krever innlogging — uautentiserte brukere blir sendt til
     login-siden via `@login_required`. Etter innlogging redirecter Django
     automatisk tilbake hit (settings.LOGIN_REDIRECT_URL = '/').
+
+    Modul-kortene leses fra ``core.modules``-registret og filtreres på:
+    - ``ModuleSettings.enabled`` (admin kan toggle moduler i sanntid)
+    - Brukerens ``permission_flag`` på CustomUser (admin ser alt)
+    - ``Module.show_in_dashboard``
     """
-    return render(request, 'core/dashboard.html')
+    modules = get_dashboard_modules(request.user)
+    return render(request, 'core/dashboard.html', {'modules': modules})
 
 
 # ─────────────────────────────────────────────────────────────────────────────

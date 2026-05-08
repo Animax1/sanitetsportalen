@@ -1,7 +1,24 @@
-# Pasientregistreringssystem – Django
+# Sanitetsportalen — Django
 
-Et sanntids pasientregistreringssystem for legesenter og arrangementer.
-Bygget med Django 5.2+, Bootstrap 5, Chart.js og Tabulator.
+Portal for sanitetsvakt og beredskap. Pasientregistrering er den første
+brukervendte modulen; system er bygget for å utvides med vakt-, utstyrs-,
+rapport- og beredskapsmoduler i framtidige faser.
+
+Bygget med Django 5.1, Bootstrap 5, Chart.js og Tabulator. Drift på Railway
+(prod) eller PowerShell-lokalt.
+
+## Arkitektur på høyt nivå (Fase 3a)
+
+- **Modul-registry** (`core/modules.py`) — eksplisitt liste over alle moduler.
+  Hver app deklarerer sin modul i `<app>/module.py`.
+- **ModuleSettings** (`core_modulesettings`) — DB-rad per modul. Admin kan
+  toggle moduler i sanntid via Django-admin uten deploy.
+- **Permission-flagg på CustomUser** — 5 BooleanField (`kan_redigere_pasienter`
+  m.fl.) som styrer hvilke moduler en bruker ser i dashboard og nav-meny.
+- **AuditLog.app_label** — auto-fylles fra `table_name` via pre_save-signal,
+  filtrerbart i Django-admin per modul.
+
+Se [`SANITETSPORTAL_FASE_3A.md`](../SANITETSPORTAL_FASE_3A.md) for full beskrivelse.
 
 ---
 
@@ -26,12 +43,20 @@ django_project/
 
 ### Datamodeller
 
+**core** (Fase 3a)
+- **ModuleSettings** — slug, enabled, backup_enabled (reservert), note,
+  updated_at, updated_by
+
 **accounts**
-- **CustomUser** – `AbstractBaseUser + PermissionsMixin` med roller og MFA-støtte
+- **CustomUser** – `AbstractBaseUser + PermissionsMixin` med roller, MFA-støtte
+  og 5 modul-permission-flagg (Fase 3a):
+  `kan_redigere_pasienter`, `kan_redigere_vakter`, `kan_redigere_utstyr`,
+  `kan_se_rapport`, `kan_redigere_beredskap`
 - **LoginEvent** – loggpost for inn-/utlogging, MFA og passordbytte
 
 **audit**
-- **AuditLog** – endringslogg på feltnivå for alle pasientoperasjoner
+- **AuditLog** – endringslogg på feltnivå for alle auditerte tabeller.
+  Felt `app_label` (Fase 3a) auto-fylles fra `table_name` for filtrering per modul.
 
 **patients**
 - **Patient** – pasientnummer (globalt unikt), year, behandler (FK PROTECT),

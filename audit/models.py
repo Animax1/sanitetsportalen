@@ -1,10 +1,17 @@
-"""Revisjonslogg-modell."""
+"""Revisjonslogg-modell.
+
+Fase 3a tilføyde feltet ``app_label`` slik at audit-loggen kan filtreres per
+modul (pasienter, accounts, framtidige moduler) i Django-admin og rapporter.
+Feltet fylles automatisk via et ``pre_save``-signal i ``audit.signals`` —
+eksisterende kode som kaller ``AuditLog.objects.create(table_name=…)`` trenger
+ikke endring.
+"""
 from django.conf import settings
 from django.db import models
 
 
 class AuditLog(models.Model):
-    """Logg over alle endringer i pasientdatabasen."""
+    """Logg over alle endringer i pasientdatabasen og andre auditerte tabeller."""
 
     ACTION_CHOICES = [
         ('CREATE', 'Opprettet'),
@@ -12,6 +19,17 @@ class AuditLog(models.Model):
         ('DELETE', 'Slettet'),
     ]
 
+    app_label = models.CharField(
+        max_length=64,
+        blank=True,
+        default='',
+        db_index=True,
+        verbose_name='App / modul',
+        help_text=(
+            'Django app-label modulen tilhører (eks. "patients", "accounts"). '
+            'Fylles automatisk fra table_name hvis ikke satt eksplisitt.'
+        ),
+    )
     table_name = models.CharField(max_length=64, verbose_name='Tabell')
     record_id = models.BigIntegerField(verbose_name='Post-ID')
     action = models.CharField(max_length=10, choices=ACTION_CHOICES, verbose_name='Handling')
@@ -36,6 +54,7 @@ class AuditLog(models.Model):
         indexes = [
             models.Index(fields=['table_name', 'record_id']),
             models.Index(fields=['created_at']),
+            models.Index(fields=['app_label', 'created_at']),
         ]
 
     def __str__(self):
