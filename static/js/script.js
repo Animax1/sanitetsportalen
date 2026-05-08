@@ -338,7 +338,7 @@ function initTable() {
 // DATA LOADING
 // ════════════════════════════════════════════════════════
 async function loadPatients() {
-  const res  = await fetch('/api/patients/');
+  const res  = await fetch('/pasienter/api/patients/');
   allPatients = await res.json();
   if (!table) return;
   await table.setData(allPatients);
@@ -513,7 +513,7 @@ async function _saveNewImpl() {
     behandler:       parseInt(document.getElementById('n-behandler').value) || null,
     helsepersonell_ref: parseInt(document.getElementById('n-helsepersonell').value) || null,
   };
-  const res = await apiFetch('/api/patients/', {
+  const res = await apiFetch('/pasienter/api/patients/', {
     method: 'POST',
     body: JSON.stringify(body)
   });
@@ -615,7 +615,7 @@ async function _saveEditImpl() {
     utskrevet:       document.getElementById('e-utskrevet').value,
     utskrevet_til:   document.getElementById('e-utskrevet-til').value,
   };
-  const res = await apiFetch(`/api/patients/${currentEditId}/`, {
+  const res = await apiFetch(`/pasienter/api/patients/${currentEditId}/`, {
     method: 'PUT',
     body: JSON.stringify(body)
   });
@@ -643,7 +643,7 @@ async function _saveEditImpl() {
 async function delPatient() {
   if (!currentEditId) return;
   if (!confirm('Slett pasient? Dette kan ikke angres.')) return;
-  await apiFetch(`/api/patients/${currentEditId}/`, { method: 'DELETE' });
+  await apiFetch(`/pasienter/api/patients/${currentEditId}/`, { method: 'DELETE' });
   bsEdit.hide();
   await loadPatients();
   const activeTab = document.querySelector('[data-tab].active')?.dataset.tab;
@@ -688,7 +688,7 @@ function totalDuration(p) {
 // BOARD (TAVLE)
 // ════════════════════════════════════════════════════════
 async function renderBoard() {
-  const res = await fetch('/api/patients/');
+  const res = await fetch('/pasienter/api/patients/');
   const pts = await res.json();
   const act = pts.filter(p => !p.utskrevet);
 
@@ -985,7 +985,7 @@ async function loadStats() {
     return;
   }
   try {
-    const res = await fetch('/api/full-stats/');
+    const res = await fetch('/pasienter/api/full-stats/');
     if (res.status === 403) {
       console.warn('Ingen tilgang til statistikk');
       return;
@@ -1036,7 +1036,7 @@ async function visArkivFullStatistikk() {
   }
 
   try {
-    const res = await apiFetch(`/api/innstillinger/arkiv/${id}/full-stats/`);
+    const res = await apiFetch(`/pasienter/api/innstillinger/arkiv/${id}/full-stats/`);
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
       alert(err.error || 'Kunne ikke hente full statistikk for arkivet.');
@@ -1371,7 +1371,7 @@ function mkInterpretation(s) {
 // SETTINGS  (GET /api/settings/ , PUT /api/settings/)
 // ════════════════════════════════════════════════════════
 async function loadSettings() {
-  const s = await (await fetch('/api/settings/')).json();
+  const s = await (await fetch('/pasienter/api/settings/')).json();
   if (s.event_name) {
     const inp = document.getElementById('setting-event-name');
     if (inp) inp.value = s.event_name;
@@ -1383,7 +1383,7 @@ async function loadSettings() {
 async function saveEventName() {
   const name = (document.getElementById('setting-event-name')?.value || '').trim();
   if (!name) return;
-  await apiFetch('/api/settings/', {
+  await apiFetch('/pasienter/api/settings/', {
     method: 'PUT',
     body: JSON.stringify({ event_name: name })
   });
@@ -1395,7 +1395,7 @@ async function saveEventName() {
 // ARCHIVES  (GET /api/archives/)
 // ════════════════════════════════════════════════════════
 async function loadArchives() {
-  const archives = await (await fetch('/api/archives/')).json();
+  const archives = await (await fetch('/pasienter/api/archives/')).json();
   const el = document.getElementById('archive-list');
   if (!el) return;
   if (!archives.length) {
@@ -1417,7 +1417,7 @@ async function loadSessionTimeout() {
   const el = document.getElementById('session-timeout-input');
   if (!el) return;
   try {
-    const res = await apiFetch('/api/session-timeout/');
+    const res = await apiFetch('/pasienter/api/session-timeout/');
     const d = await res.json();
     el.value = d.hours;
   } catch (e) {}
@@ -1432,7 +1432,7 @@ async function saveSessionTimeout() {
     return;
   }
   try {
-    await apiFetch('/api/session-timeout/', {method:'PUT', body: JSON.stringify({hours})});
+    await apiFetch('/pasienter/api/session-timeout/', {method:'PUT', body: JSON.stringify({hours})});
     alert('Sesjonstimeout oppdatert.');
   } catch (e) {
     alert('Kunne ikke lagre: ' + e.message);
@@ -1457,7 +1457,7 @@ async function loadBehandlere() {
   if (lastBehandlereEtag) {
     headers['If-None-Match'] = lastBehandlereEtag;
   }
-  const res = await fetch('/api/behandlere/', {
+  const res = await fetch('/pasienter/api/behandlere/', {
     cache: 'no-store',
     headers,
   });
@@ -1563,7 +1563,7 @@ async function addBehandler() {
   const nameEl = document.getElementById('new-behandler-name');
   const name = (nameEl?.value || '').trim();
   if (!name) { alert('Skriv inn et navn.'); return; }
-  const res = await apiFetch('/api/behandlere/', {
+  const res = await apiFetch('/pasienter/api/behandlere/', {
     method: 'POST',
     body: JSON.stringify({ name })
   });
@@ -1579,7 +1579,7 @@ async function addBehandler() {
 async function toggleBehandler(id) {
   const b = behandlere.find(x => x.id === id);
   if (!b) return;
-  const res = await apiFetch(`/api/behandlere/${id}/`, {
+  const res = await apiFetch(`/pasienter/api/behandlere/${id}/`, {
     method: 'PUT',
     body: JSON.stringify({ is_active: !b.is_active })
   });
@@ -1588,7 +1588,7 @@ async function toggleBehandler(id) {
 
 async function deleteBehandler(id) {
   if (!confirm('Slett behandler? Hvis behandleren er knyttet til pasienter, vil slettingen blokkeres.')) return;
-  const res = await apiFetch(`/api/behandlere/${id}/`, { method: 'DELETE' });
+  const res = await apiFetch(`/pasienter/api/behandlere/${id}/`, { method: 'DELETE' });
   if (res.ok) {
     await loadBehandlere();
   } else {
@@ -1607,7 +1607,7 @@ async function loadHelsepersonell() {
   if (lastHelsepersonellEtag) {
     headers['If-None-Match'] = lastHelsepersonellEtag;
   }
-  const res = await fetch('/api/helsepersonell/', {
+  const res = await fetch('/pasienter/api/helsepersonell/', {
     cache: 'no-store',
     headers,
   });
@@ -1667,7 +1667,7 @@ async function addHelsepersonell() {
   const nameEl = document.getElementById('new-helsepersonell-name');
   const name = (nameEl?.value || '').trim();
   if (!name) { alert('Skriv inn et navn.'); return; }
-  const res = await apiFetch('/api/helsepersonell/', {
+  const res = await apiFetch('/pasienter/api/helsepersonell/', {
     method: 'POST',
     body: JSON.stringify({ name })
   });
@@ -1683,7 +1683,7 @@ async function addHelsepersonell() {
 async function toggleHelsepersonell(id) {
   const h = helsepersonellListe.find(x => x.id === id);
   if (!h) return;
-  const res = await apiFetch(`/api/helsepersonell/${id}/`, {
+  const res = await apiFetch(`/pasienter/api/helsepersonell/${id}/`, {
     method: 'PUT',
     body: JSON.stringify({ is_active: !h.is_active })
   });
@@ -1692,7 +1692,7 @@ async function toggleHelsepersonell(id) {
 
 async function deleteHelsepersonell(id) {
   if (!confirm('Slett helsepersonell? Hvis helsepersonellet er knyttet til pasienter, vil slettingen blokkeres.')) return;
-  const res = await apiFetch(`/api/helsepersonell/${id}/`, { method: 'DELETE' });
+  const res = await apiFetch(`/pasienter/api/helsepersonell/${id}/`, { method: 'DELETE' });
   if (res.ok) {
     await loadHelsepersonell();
   } else {
@@ -1707,7 +1707,7 @@ async function deleteHelsepersonell(id) {
 // ════════════════════════════════════════════════════════
 
 async function doResetActiveYear() {
-  const res = await apiFetch('/api/reset-active-year/', {
+  const res = await apiFetch('/pasienter/api/reset-active-year/', {
     method: 'POST',
     body: JSON.stringify({ confirm: true })
   });
@@ -1803,7 +1803,7 @@ document.addEventListener('visibilitychange', async () => {
 // ════════════════════════════════════════════════════════
 
 async function loadBackupPanel() {
-  const res = await fetch('/api/backup/', { cache: 'no-store' });
+  const res = await fetch('/pasienter/api/backup/', { cache: 'no-store' });
   if (!res.ok) {
     document.getElementById('backup-list').innerHTML =
       '<span class="text-danger">Kunne ikke laste backups.</span>';
@@ -1839,7 +1839,7 @@ async function loadBackupPanel() {
           <div><strong>${when}</strong> <span class="badge bg-secondary">${escapeHtml(b.kind_display)}</span></div>
           <div class="text-muted">${kb} KB · ${escapeHtml(b.filename)}${note}</div>
         </div>
-        <a class="btn btn-outline-secondary btn-sm py-0 px-1" href="/api/backup/${b.id}/download/" title="Last ned">
+        <a class="btn btn-outline-secondary btn-sm py-0 px-1" href="/pasienter/api/backup/${b.id}/download/" title="Last ned">
           <i class="bi bi-download"></i>
         </a>
         <button class="btn btn-outline-warning btn-sm py-0 px-1" onclick="restoreBackup(${b.id}, '${escapeHtml(b.filename)}')" title="Gjenopprett">
@@ -1855,7 +1855,7 @@ async function loadBackupPanel() {
 async function createBackupNow() {
   const noteEl = document.getElementById('backup-note');
   const note = (noteEl?.value || '').trim();
-  const res = await apiFetch('/api/backup/create/', {
+  const res = await apiFetch('/pasienter/api/backup/create/', {
     method: 'POST',
     body: JSON.stringify({ note }),
   });
@@ -1875,7 +1875,7 @@ async function restoreBackup(id, filename) {
   const ans = prompt(warning);
   if (ans !== 'GJENOPPRETT') return;
 
-  const res = await apiFetch(`/api/backup/${id}/restore/`, {
+  const res = await apiFetch(`/pasienter/api/backup/${id}/restore/`, {
     method: 'POST',
     body: JSON.stringify({ confirm: 'GJENOPPRETT' }),
   });
@@ -1890,7 +1890,7 @@ async function restoreBackup(id, filename) {
 
 async function deleteBackup(id) {
   if (!confirm('Slett denne backupen?')) return;
-  const res = await apiFetch(`/api/backup/${id}/`, { method: 'DELETE' });
+  const res = await apiFetch(`/pasienter/api/backup/${id}/`, { method: 'DELETE' });
   if (res.ok) await loadBackupPanel();
   else {
     const d = await res.json();
@@ -1908,7 +1908,7 @@ document.addEventListener('DOMContentLoaded', () => {
         statusEl.textContent = 'Lagrer…';
         statusEl.className = 'small text-muted ms-2';
       }
-      const res = await apiFetch('/api/backup/config/', {
+      const res = await apiFetch('/pasienter/api/backup/config/', {
         method: 'POST',
         body: JSON.stringify({ interval_minutes: parseInt(e.target.value) }),
       });
@@ -1972,7 +1972,7 @@ async function lagreVaktSomArkiv() {
   }
   if (feilEl) feilEl.classList.add('d-none');
 
-  const res = await apiFetch('/api/innstillinger/arkiv/lagre/', {
+  const res = await apiFetch('/pasienter/api/innstillinger/arkiv/lagre/', {
     method: 'POST',
     body: JSON.stringify({ arrangement_navn: navn, notat })
   });
@@ -1994,7 +1994,7 @@ async function loadArkivListe() {
   if (!container) return;
   container.innerHTML = '<span class="text-muted small">Laster...</span>';
 
-  const res = await apiFetch('/api/innstillinger/arkiv/');
+  const res = await apiFetch('/pasienter/api/innstillinger/arkiv/');
   if (!res.ok) {
     container.innerHTML = '<span class="text-danger small">Kunne ikke hente arkivliste.</span>';
     return;
@@ -2049,7 +2049,7 @@ async function visArkivDetalj(id) {
   document.getElementById('arkiv-detalj-slett')?.classList.add('d-none');
   document.getElementById('arkiv-detalj-fullstats-btn')?.classList.add('d-none');
 
-  const res = await apiFetch(`/api/innstillinger/arkiv/${id}/`);
+  const res = await apiFetch(`/pasienter/api/innstillinger/arkiv/${id}/`);
   if (!res.ok) {
     document.getElementById('arkiv-detalj-stats').innerHTML =
       '<span class="text-danger">Kunne ikke hente arkivdata.</span>';
@@ -2140,7 +2140,7 @@ async function slettArkivFraDetalj() {
  */
 async function slettArkiv(id) {
   if (!confirm('Er du sikker på at du vil slette dette arkivet? Handlingen kan ikke angres.')) return;
-  const res = await apiFetch(`/api/innstillinger/arkiv/${id}/`, {
+  const res = await apiFetch(`/pasienter/api/innstillinger/arkiv/${id}/`, {
     method: 'DELETE',
     body: JSON.stringify({ confirm: true })
   });

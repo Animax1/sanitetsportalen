@@ -287,14 +287,14 @@ class BackupAPITests(TestCase):
         """lead, read_write og read_only skal få 403 på backup-listen."""
         for user in [self.lead, self.rw, self.ro]:
             c = self._client_for(user)
-            resp = c.get('/api/backup/')
+            resp = c.get('/pasienter/api/backup/')
             self.assertEqual(resp.status_code, 403,
                              f'Bruker med rolle {user.role} skal få 403')
 
     def test_admin_can_list_backups(self):
         """Admin kan hente backup-listen med 200."""
         c = self._admin_client()
-        resp = c.get('/api/backup/')
+        resp = c.get('/pasienter/api/backup/')
         self.assertEqual(resp.status_code, 200)
         body = resp.json()
         self.assertIn('config', body)
@@ -304,7 +304,7 @@ class BackupAPITests(TestCase):
         """Ikke-admin brukere skal få 403 ved forsøk på å lage backup."""
         for user in [self.lead, self.rw, self.ro]:
             c = self._client_for(user)
-            resp = c.post('/api/backup/create/',
+            resp = c.post('/pasienter/api/backup/create/',
                           data='{}',
                           content_type='application/json')
             self.assertEqual(resp.status_code, 403,
@@ -314,7 +314,7 @@ class BackupAPITests(TestCase):
         """Admin kan lage en manuell backup."""
         with patch.dict(os.environ, {'BACKUP_DIR': str(self.backup_dir)}):
             c = self._admin_client()
-            resp = c.post('/api/backup/create/',
+            resp = c.post('/pasienter/api/backup/create/',
                           data=json.dumps({'note': 'Testbackup'}),
                           content_type='application/json')
         self.assertEqual(resp.status_code, 201)
@@ -329,7 +329,7 @@ class BackupAPITests(TestCase):
             backup = create_backup(kind='manual', user=self.admin)
             c = self._admin_client()
             # Feil confirm-verdi
-            resp = c.post(f'/api/backup/{backup.pk}/restore/',
+            resp = c.post(f'/pasienter/api/backup/{backup.pk}/restore/',
                           data=json.dumps({'confirm': 'ja'}),
                           content_type='application/json')
         self.assertEqual(resp.status_code, 400)
@@ -339,7 +339,7 @@ class BackupAPITests(TestCase):
         with patch.dict(os.environ, {'BACKUP_DIR': str(self.backup_dir)}):
             backup = create_backup(kind='manual', user=self.admin)
             c = self._admin_client()
-            resp = c.post(f'/api/backup/{backup.pk}/restore/',
+            resp = c.post(f'/pasienter/api/backup/{backup.pk}/restore/',
                           data=json.dumps({'confirm': 'GJENOPPRETT'}),
                           content_type='application/json')
         self.assertEqual(resp.status_code, 200)
@@ -351,7 +351,7 @@ class BackupAPITests(TestCase):
             backup = create_backup(kind='manual', user=self.admin)
             c = self._admin_client()
             count_before = AuditLog.objects.filter(field_name='backup_downloaded').count()
-            resp = c.get(f'/api/backup/{backup.pk}/download/')
+            resp = c.get(f'/pasienter/api/backup/{backup.pk}/download/')
 
         self.assertEqual(resp.status_code, 200)
         # Les streaming-innholdet og lukk FileResponse eksplisitt – Windows
@@ -365,7 +365,7 @@ class BackupAPITests(TestCase):
     def test_config_update_rejects_invalid_interval(self):
         """Backup-konfig med ugyldig intervall skal avvises med 400."""
         c = self._admin_client()
-        resp = c.post('/api/backup/config/',
+        resp = c.post('/pasienter/api/backup/config/',
                       data=json.dumps({'interval_minutes': 999}),
                       content_type='application/json')
         self.assertEqual(resp.status_code, 400)
@@ -374,7 +374,7 @@ class BackupAPITests(TestCase):
         """Gyldig intervall (0, 30, 60, 360, 1440) skal aksepteres med 200."""
         c = self._admin_client()
         for interval in [0, 30, 60, 360, 1440]:
-            resp = c.post('/api/backup/config/',
+            resp = c.post('/pasienter/api/backup/config/',
                           data=json.dumps({'interval_minutes': interval}),
                           content_type='application/json')
             self.assertEqual(resp.status_code, 200,
@@ -387,7 +387,7 @@ class BackupAPITests(TestCase):
         with patch.dict(os.environ, {'BACKUP_DIR': str(self.backup_dir)}):
             backup = create_backup(kind='manual', user=self.admin)
             c = self._admin_client()
-            resp = c.delete(f'/api/backup/{backup.pk}/')
+            resp = c.delete(f'/pasienter/api/backup/{backup.pk}/')
 
         self.assertEqual(resp.status_code, 200)
         self.assertFalse(Backup.objects.filter(pk=backup.pk).exists())
@@ -416,7 +416,7 @@ class BackupResetIntegrationTests(TestCase):
         with patch.dict(os.environ, {'BACKUP_DIR': str(self.backup_dir)}):
             c = Client()
             c.force_login(self.admin)
-            resp = c.post('/api/reset-active-year/',
+            resp = c.post('/pasienter/api/reset-active-year/',
                           data=json.dumps({'confirm': True}),
                           content_type='application/json')
 

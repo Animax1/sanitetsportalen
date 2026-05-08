@@ -312,8 +312,9 @@ class RequestMetricsMiddleware:
 
     _SKIP_PREFIXES = ('/static/', '/media/')
     _SKIP_EXACT = (
-        '/admin/server-status/',
-        '/admin/server-status/json/',
+        # Fra Fase 2 ligger admin-status under /pasienter/-prefikset.
+        '/pasienter/admin/server-status/',
+        '/pasienter/admin/server-status/json/',
         '/healthz/',  # #2: hyppige health-checks skal ikke støye metrikkene
     )
 

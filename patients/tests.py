@@ -212,7 +212,7 @@ class AccessControlTests(TestCase):
         """read_only-bruker skal ikke kunne opprette behandler."""
         c = self._login(self.ro)
         import json as _j
-        resp = c.post('/api/behandlere/',
+        resp = c.post('/pasienter/api/behandlere/',
                       data=_j.dumps({'name': 'X'}),
                       content_type='application/json')
         self.assertEqual(resp.status_code, 403)
@@ -221,7 +221,7 @@ class AccessControlTests(TestCase):
         """read_write-bruker skal ikke kunne opprette behandler (kun admin)."""
         c = self._login(self.rw)
         import json as _j
-        resp = c.post('/api/behandlere/',
+        resp = c.post('/pasienter/api/behandlere/',
                       data=_j.dumps({'name': 'X'}),
                       content_type='application/json')
         self.assertEqual(resp.status_code, 403)
@@ -230,7 +230,7 @@ class AccessControlTests(TestCase):
         """Admin-bruker skal kunne opprette behandler."""
         c = self._login(self.admin)
         import json as _j
-        resp = c.post('/api/behandlere/',
+        resp = c.post('/pasienter/api/behandlere/',
                       data=_j.dumps({'name': 'X'}),
                       content_type='application/json')
         self.assertEqual(resp.status_code, 201)
@@ -239,7 +239,7 @@ class AccessControlTests(TestCase):
         """read_only-bruker skal ikke kunne opprette pasient."""
         c = self._login(self.ro)
         import json as _j
-        resp = c.post('/api/patients/',
+        resp = c.post('/pasienter/api/patients/',
                       data=_j.dumps({'problemstilling': 'X'}),
                       content_type='application/json')
         self.assertEqual(resp.status_code, 403)
@@ -247,7 +247,7 @@ class AccessControlTests(TestCase):
     def test_unauthenticated_cannot_access_patients(self):
         """Uautentisert bruker skal bli videresendt til innlogging."""
         c = Client()
-        resp = c.get('/api/patients/')
+        resp = c.get('/pasienter/api/patients/')
         self.assertIn(resp.status_code, [302, 403])
 
 # ── Obs-stempler ──────────────────────────────────────────────────────────────
@@ -361,20 +361,20 @@ class LeadViewTests(TestCase):
 
     def test_lead_view_kan_lese_pasienter(self):
         """lead_view kan hente pasientliste for aktivt år."""
-        resp = self.client.get('/api/patients/')
+        resp = self.client.get('/pasienter/api/patients/')
         self.assertEqual(resp.status_code, 200)
 
     def test_lead_view_kan_ikke_opprette_pasient(self):
         """lead_view kan ikke opprette ny pasient."""
         import json as _j
-        resp = self.client.post('/api/patients/',
+        resp = self.client.post('/pasienter/api/patients/',
                                 data=_j.dumps({'problemstilling': 'Test'}),
                                 content_type='application/json')
         self.assertEqual(resp.status_code, 403)
 
     def test_lead_view_kan_lese_full_stats(self):
         """lead_view kan hente full statistikk."""
-        resp = self.client.get('/api/full-stats/')
+        resp = self.client.get('/pasienter/api/full-stats/')
         self.assertIn(resp.status_code, [200, 500])  # 500 OK hvis scipy mangler
 
 
@@ -403,7 +403,7 @@ class ResetTests(TestCase):
         """Reset uten confirm=true skal gi 400."""
         import json as _j
         c = self._client(self.admin)
-        resp = c.post('/api/reset-active-year/',
+        resp = c.post('/pasienter/api/reset-active-year/',
                       data=_j.dumps({}),
                       content_type='application/json')
         self.assertEqual(resp.status_code, 400)
@@ -412,7 +412,7 @@ class ResetTests(TestCase):
         """Reset sletter kun pasienter i aktivt år."""
         import json as _j
         c = self._client(self.admin)
-        resp = c.post('/api/reset-active-year/',
+        resp = c.post('/pasienter/api/reset-active-year/',
                       data=_j.dumps({'confirm': True}),
                       content_type='application/json')
         self.assertEqual(resp.status_code, 200)
@@ -424,7 +424,7 @@ class ResetTests(TestCase):
         """lead kan ikke kalle reset-endepunktet."""
         import json as _j
         c = self._client(self.lead)
-        resp = c.post('/api/reset-active-year/',
+        resp = c.post('/pasienter/api/reset-active-year/',
                       data=_j.dumps({'confirm': True}),
                       content_type='application/json')
         self.assertEqual(resp.status_code, 403)
@@ -446,7 +446,7 @@ class BehandlerETagTests(TestCase):
 
     def test_behandlere_returns_etag_header(self):
         """GET /api/behandlere/ skal returnere ETag-header."""
-        resp = self.client.get('/api/behandlere/')
+        resp = self.client.get('/pasienter/api/behandlere/')
         self.assertEqual(resp.status_code, 200)
         self.assertIn('ETag', resp)
         self.assertTrue(resp['ETag'].startswith('"v1:'))
@@ -454,23 +454,23 @@ class BehandlerETagTests(TestCase):
     def test_behandlere_returns_304_when_etag_matches(self):
         """GET med If-None-Match som matcher ETag skal gi 304."""
         # Hent ETag fra første request
-        resp1 = self.client.get('/api/behandlere/')
+        resp1 = self.client.get('/pasienter/api/behandlere/')
         etag = resp1['ETag']
         # Send If-None-Match med samme ETag
         resp2 = self.client.get(
-            '/api/behandlere/',
+            '/pasienter/api/behandlere/',
             HTTP_IF_NONE_MATCH=etag,
         )
         self.assertEqual(resp2.status_code, 304)
 
     def test_behandlere_returns_200_with_new_etag_when_behandler_added(self):
         """Ny behandler skal gi ny ETag og 200 selv om klient sender gammel ETag."""
-        resp1 = self.client.get('/api/behandlere/')
+        resp1 = self.client.get('/pasienter/api/behandlere/')
         old_etag = resp1['ETag']
         # Legg til ny behandler
         Behandler.objects.create(name='Behandler B', is_active=True)
         resp2 = self.client.get(
-            '/api/behandlere/',
+            '/pasienter/api/behandlere/',
             HTTP_IF_NONE_MATCH=old_etag,
         )
         self.assertEqual(resp2.status_code, 200)
@@ -478,14 +478,14 @@ class BehandlerETagTests(TestCase):
 
     def test_behandlere_returns_200_with_new_etag_when_behandler_renamed(self):
         """Omdøpt behandler skal gi ny ETag og 200."""
-        resp1 = self.client.get('/api/behandlere/')
+        resp1 = self.client.get('/pasienter/api/behandlere/')
         old_etag = resp1['ETag']
         # Omdøp behandleren
         b = Behandler.objects.get(name='Behandler A')
         b.name = 'Ny Behandler A'
         b.save()
         resp2 = self.client.get(
-            '/api/behandlere/',
+            '/pasienter/api/behandlere/',
             HTTP_IF_NONE_MATCH=old_etag,
         )
         self.assertEqual(resp2.status_code, 200)
@@ -510,7 +510,7 @@ class TimeFormatValidationTests(TestCase):
     def _post(self, data):
         import json as _j
         return self.client.post(
-            '/api/patients/',
+            '/pasienter/api/patients/',
             data=_j.dumps(data),
             content_type='application/json',
         )
@@ -518,7 +518,7 @@ class TimeFormatValidationTests(TestCase):
     def _put(self, pk, data):
         import json as _j
         return self.client.put(
-            f'/api/patients/{pk}/',
+            f'/pasienter/api/patients/{pk}/',
             data=_j.dumps(data),
             content_type='application/json',
         )
@@ -619,7 +619,7 @@ class PlasseringUniqueTests(TestCase):
     def _post(self, data):
         import json as _j
         return self.client.post(
-            '/api/patients/',
+            '/pasienter/api/patients/',
             data=_j.dumps(data),
             content_type='application/json',
         )
@@ -627,7 +627,7 @@ class PlasseringUniqueTests(TestCase):
     def _put(self, pk, data):
         import json as _j
         return self.client.put(
-            f'/api/patients/{pk}/',
+            f'/pasienter/api/patients/{pk}/',
             data=_j.dumps(data),
             content_type='application/json',
         )
@@ -838,7 +838,7 @@ class HelsepersonellTests(TestCase):
     def test_create_helsepersonell(self):
         """Admin kan opprette ny helsepersonell via API."""
         res = self.client.post(
-            '/api/helsepersonell/',
+            '/pasienter/api/helsepersonell/',
             data='{"name": "Kari"}',
             content_type='application/json',
         )
@@ -850,7 +850,7 @@ class HelsepersonellTests(TestCase):
         """Samme navn skal avvises med 400."""
         Helsepersonell.objects.create(name='Kari')
         res = self.client.post(
-            '/api/helsepersonell/',
+            '/pasienter/api/helsepersonell/',
             data='{"name": "Kari"}',
             content_type='application/json',
         )
@@ -859,11 +859,11 @@ class HelsepersonellTests(TestCase):
     def test_list_with_etag(self):
         """GET returnerer ETag, og If-None-Match gir 304."""
         Helsepersonell.objects.create(name='Kari')
-        res1 = self.client.get('/api/helsepersonell/')
+        res1 = self.client.get('/pasienter/api/helsepersonell/')
         self.assertEqual(res1.status_code, 200)
         etag = res1.get('ETag')
         self.assertTrue(etag)
-        res2 = self.client.get('/api/helsepersonell/', HTTP_IF_NONE_MATCH=etag)
+        res2 = self.client.get('/pasienter/api/helsepersonell/', HTTP_IF_NONE_MATCH=etag)
         self.assertEqual(res2.status_code, 304)
 
     def test_cannot_delete_helsepersonell_in_use(self):
@@ -896,7 +896,7 @@ class HelsepersonellTests(TestCase):
         h = Helsepersonell.objects.create(name='Kari')
         import json
         res = self.client.post(
-            '/api/patients/',
+            '/pasienter/api/patients/',
             data=json.dumps({
                 'problemstilling': 'Test',
                 'inntid': '19.04.2026 14:00',
@@ -918,7 +918,7 @@ class HelsepersonellTests(TestCase):
                                     inntid='19.04.2026 14:00')
         import json
         res = self.client.put(
-            f'/api/patients/{p.pk}/',
+            f'/pasienter/api/patients/{p.pk}/',
             data=json.dumps({'helsepersonell_ref': None}),
             content_type='application/json',
         )
@@ -932,7 +932,7 @@ class HelsepersonellTests(TestCase):
         rw = CustomUser.objects.create_user(username='rw', password='pwd', role='read_write', must_change_password=False)
         self.client.force_login(rw)
         res = self.client.post(
-            '/api/helsepersonell/',
+            '/pasienter/api/helsepersonell/',
             data='{"name": "Nei"}',
             content_type='application/json',
         )

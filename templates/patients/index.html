@@ -64,6 +64,8 @@
         <div style="font-size:0.75rem;color:#94a3b8;">{{ request.user.get_role_display }}</div>
       </li>
       <li><hr class="dropdown-divider" style="border-color:#334155;margin:0;"></li>
+      <li><a class="dropdown-item" href="/" style="color:#93c5fd;"><i class="bi bi-grid-3x3-gap me-2"></i>Tilbake til portal</a></li>
+      <li><hr class="dropdown-divider" style="border-color:#334155;margin:0;"></li>
       <li><a class="dropdown-item" href="{% url 'accounts:change_password' %}" style="color:#e5e7eb;"><i class="bi bi-key me-2"></i>Endre passord</a></li>
       {% if request.user.role == 'admin' %}
       <li><a class="dropdown-item" href="{% url 'accounts:user_list' %}" style="color:#e5e7eb;"><i class="bi bi-people me-2"></i>Administrer brukere</a></li>

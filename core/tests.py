@@ -7,12 +7,16 @@ Dekker:
 4.  Bakoverkompatibilitet: at re-eksporter fra patients.services og
     accounts.decorators fortsatt fungerer slik at eksisterende kode
     ikke brekker.
+5.  Portal-skall (Fase 2): dashboard-view, legacy-redirects fra gamle
+    root-URL-er, og at navigasjonen i base_portal.html peker på riktig.
 """
 from datetime import datetime
 from unittest import mock
 
+from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
-from django.test import TestCase, override_settings
+from django.test import Client, TestCase, override_settings
+from django.urls import reverse
 from django.utils import timezone as djtz
 
 from core.auth_decorators import (
@@ -279,3 +283,238 @@ class BakoverkompatibilitetTests(TestCase):
         from patients.services import ARKIV_VIEW_MIN_ROLE, ARKIV_WRITE_ROLE
         self.assertEqual(ARKIV_VIEW_MIN_ROLE, 'admin')
         self.assertEqual(ARKIV_WRITE_ROLE, 'admin')
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Fase 2: Portal-dashboard
+# ═══════════════════════════════════════════════════════════════════════════
+
+
+User = get_user_model()
+
+
+@override_settings(SECURE_SSL_REDIRECT=False)
+class PortalDashboardViewTests(TestCase):
+    """Verifiserer at portal-dashboardet ligger på / og krever innlogging."""
+
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username='dashbruker', password='x', role='read_only',
+            must_change_password=False,
+        )
+        self.client = Client()
+
+    def test_dashboard_url_loeses(self):
+        """`core:portal_dashboard` skal løse til /."""
+        self.assertEqual(reverse('core:portal_dashboard'), '/')
+
+    def test_uautentisert_redirectes_til_login(self):
+        """Anonyme brukere blir sendt til login."""
+        resp = self.client.get('/')
+        self.assertEqual(resp.status_code, 302)
+        self.assertIn('/accounts/login', resp['Location'])
+
+    def test_innlogget_bruker_ser_dashboard(self):
+        """Innlogget bruker får dashbordet (200)."""
+        self.client.force_login(self.user)
+        resp = self.client.get('/')
+        self.assertEqual(resp.status_code, 200)
+        # Skal inneholde modulkortet for pasientregistrering
+        self.assertContains(resp, 'Pasientregistrering')
+        self.assertContains(resp, 'href="/pasienter/"')
+
+    def test_dashboard_inneholder_portal_navigasjon(self):
+        """Dashbordet skal vise portal-meny med Dashboard og Pasienter."""
+        self.client.force_login(self.user)
+        resp = self.client.get('/')
+        # Brand-lenke til dashboard
+        self.assertContains(resp, 'Sanitetsportal')
+        # Modul-meny — sjekker nøkkelinnhold (HTML har whitespace mellom
+        # ikon og tekst, så vi sjekker bare at navnene finnes i nav-en)
+        self.assertContains(resp, 'class="portal-nav"')
+        self.assertContains(resp, 'Dashboard')
+        self.assertContains(resp, 'Pasienter')
+
+    def test_dashboard_velkomst_inkluderer_brukernavn(self):
+        """Hero-seksjonen skal hilse på brukeren med brukernavn."""
+        self.client.force_login(self.user)
+        resp = self.client.get('/')
+        self.assertContains(resp, 'Velkommen, dashbruker')
+
+    def test_dashboard_kun_GET_tillatt(self):
+        """POST/PUT/DELETE skal gi 405."""
+        self.client.force_login(self.user)
+        resp = self.client.post('/')
+        self.assertEqual(resp.status_code, 405)
+
+    def test_admin_ser_admin_lenker_i_meny(self):
+        """Admin skal se Server-status og Django-admin i portal-meny."""
+        admin = User.objects.create_superuser(
+            username='superadm', password='x', role='admin',
+        )
+        self.client.force_login(admin)
+        resp = self.client.get('/')
+        self.assertContains(resp, 'Server-status')
+        self.assertContains(resp, 'Django-admin')
+
+    def test_read_only_ser_ikke_admin_lenker(self):
+        """Vanlig bruker skal IKKE se admin-lenker."""
+        self.client.force_login(self.user)
+        resp = self.client.get('/')
+        self.assertNotContains(resp, 'Server-status')
+        self.assertNotContains(resp, 'Django-admin')
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Fase 2: Legacy-redirects fra gamle root-URL-er
+# ═══════════════════════════════════════════════════════════════════════════
+
+
+@override_settings(SECURE_SSL_REDIRECT=False)
+class LegacyRedirectTests(TestCase):
+    """Verifiserer at gamle root-URL-er gir 301 til /pasienter/-versjonen.
+
+    I Fase 2 flyttet vi pasient-modulen fra `/` til `/pasienter/`. Gamle
+    bokmerker, lenker og e-post-referanser må fortsatt fungere via 301.
+    """
+
+    def test_api_patients_redirectes(self):
+        """/api/patients/ → 301 → /pasienter/api/patients/"""
+        resp = self.client.get('/api/patients/')
+        self.assertEqual(resp.status_code, 301)
+        self.assertEqual(resp['Location'], '/pasienter/api/patients/')
+
+    def test_api_full_stats_redirectes(self):
+        resp = self.client.get('/api/full-stats/')
+        self.assertEqual(resp.status_code, 301)
+        self.assertEqual(resp['Location'], '/pasienter/api/full-stats/')
+
+    def test_api_med_pk_redirectes(self):
+        resp = self.client.get('/api/patients/42/')
+        self.assertEqual(resp.status_code, 301)
+        self.assertEqual(resp['Location'], '/pasienter/api/patients/42/')
+
+    def test_api_med_query_string_bevares(self):
+        """Query string skal bevares i redirect."""
+        resp = self.client.get('/api/patients/?foo=bar&baz=2')
+        self.assertEqual(resp.status_code, 301)
+        self.assertEqual(
+            resp['Location'],
+            '/pasienter/api/patients/?foo=bar&baz=2',
+        )
+
+    def test_api_arkiv_redirectes(self):
+        resp = self.client.get('/api/innstillinger/arkiv/5/full-stats/')
+        self.assertEqual(resp.status_code, 301)
+        self.assertEqual(
+            resp['Location'],
+            '/pasienter/api/innstillinger/arkiv/5/full-stats/',
+        )
+
+    def test_admin_server_status_redirectes(self):
+        """/admin/server-status/ → 301 → /pasienter/admin/server-status/"""
+        resp = self.client.get('/admin/server-status/')
+        self.assertEqual(resp.status_code, 301)
+        self.assertEqual(
+            resp['Location'],
+            '/pasienter/admin/server-status/',
+        )
+
+    def test_admin_server_status_subpath_redirectes(self):
+        resp = self.client.get('/admin/server-status/json/')
+        self.assertEqual(resp.status_code, 301)
+        self.assertEqual(
+            resp['Location'],
+            '/pasienter/admin/server-status/json/',
+        )
+
+    def test_django_admin_paavirkes_ikke(self):
+        """/django-admin/ skal IKKE bli redirected (det er Django-admin selv)."""
+        resp = self.client.get('/django-admin/')
+        # Django-admin redirecter selv til login (302), ikke 301 fra core.
+        self.assertNotEqual(resp.status_code, 301)
+
+    def test_healthz_paavirkes_ikke(self):
+        """/healthz/ skal forbli aktiv på root, ikke redirected."""
+        resp = self.client.get('/healthz/')
+        # healthz returnerer enten 200 eller 503 — aldri 301.
+        self.assertNotEqual(resp.status_code, 301)
+        self.assertIn(resp.status_code, [200, 503])
+
+    def test_accounts_paavirkes_ikke(self):
+        """/accounts/login/ skal forbli på root."""
+        resp = self.client.get('/accounts/login/')
+        # accounts/login returnerer 200 (loginskjema), ikke 301.
+        self.assertNotEqual(resp.status_code, 301)
+
+    def test_redirect_er_permanent_301_ikke_302(self):
+        """Bekrefter eksplisitt 301 (Moved Permanently), ikke 302 (Found).
+
+        Forskjellen er kritisk: 301 cacher i nettleseren og oppdaterer
+        bokmerker; 302 gjør ikke det.
+        """
+        resp = self.client.get('/api/patients/')
+        self.assertEqual(resp.status_code, 301)
+        # Django setter kun status — ingen Cache-Control-header trengs.
+
+    def test_post_til_legacy_redirectes_med_307_kompatibel(self):
+        """POST til legacy-URL skal også redirecte (HttpResponsePermanentRedirect).
+
+        Django bruker 308 for POST-redirect via HttpResponsePermanentRedirect
+        i nyere versjoner — men i dag returnerer den 301 selv for POST. Vi
+        sjekker bare at det IKKE er 200 (ingen åpen ende) og at klient
+        kommer seg videre til /pasienter/.
+        """
+        # Bruker en URL som finnes både på gammel og ny path.
+        resp = self.client.post('/api/patients/', data='{}',
+                                content_type='application/json')
+        self.assertIn(resp.status_code, [301, 308])
+        self.assertTrue(resp['Location'].startswith('/pasienter/api/patients/'))
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Fase 2: Pasient-app fortsatt funksjonell på ny URL
+# ═══════════════════════════════════════════════════════════════════════════
+
+
+@override_settings(SECURE_SSL_REDIRECT=False)
+class PasientAppPaaNyURLTests(TestCase):
+    """Sanity-tester: pasient-app fungerer fra /pasienter/-prefiks."""
+
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username='paspruker', password='x', role='read_only',
+            must_change_password=False,
+        )
+        self.client.force_login(self.user)
+
+    def test_pasient_index_paa_ny_url(self):
+        """GET /pasienter/ skal rendre pasient-index."""
+        resp = self.client.get('/pasienter/')
+        self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, 'Pasientregistrering')
+
+    def test_pasient_api_paa_ny_url(self):
+        """GET /pasienter/api/patients/ skal returnere JSON-liste."""
+        from patients.services import set_active_year
+        set_active_year(2026)
+        resp = self.client.get('/pasienter/api/patients/')
+        self.assertEqual(resp.status_code, 200)
+
+    def test_url_navn_for_index_loeses_riktig(self):
+        """reverse('index') skal nå gi /pasienter/."""
+        from django.urls import reverse as r
+        self.assertEqual(r('index'), '/pasienter/')
+
+    def test_url_navn_for_api_løses_riktig(self):
+        """reverse('api_patients_list') skal nå gi /pasienter/api/patients/."""
+        from django.urls import reverse as r
+        self.assertEqual(r('api_patients_list'), '/pasienter/api/patients/')
+
+    def test_url_navn_for_admin_status_loeses_riktig(self):
+        """reverse('admin_server_status') skal nå gi /pasienter/admin/server-status/."""
+        from django.urls import reverse as r
+        self.assertEqual(
+            r('admin_server_status'),
+            '/pasienter/admin/server-status/',
+        )

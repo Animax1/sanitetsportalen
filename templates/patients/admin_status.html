@@ -206,7 +206,7 @@
 
   async function refresh() {
     try {
-      const res = await fetch('/admin/server-status/json/', {
+      const res = await fetch('/pasienter/admin/server-status/json/', {
         headers: {'Accept': 'application/json'},
       });
       if (!res.ok) throw new Error('HTTP ' + res.status);
@@ -348,7 +348,7 @@
     const list = document.getElementById('sessions-list');
     const status = document.getElementById('sessions-status');
     try {
-      const res = await fetch('/admin/server-status/sessions/', {
+      const res = await fetch('/pasienter/admin/server-status/sessions/', {
         headers: {'Accept': 'application/json'},
       });
       if (!res.ok) throw new Error('HTTP ' + res.status);
@@ -381,7 +381,7 @@
     try {
       const fd = new FormData();
       fd.append('session_key', sessionKey);
-      const res = await fetch('/admin/server-status/sessions/kill/', {
+      const res = await fetch('/pasienter/admin/server-status/sessions/kill/', {
         method: 'POST',
         headers: _csrfHeader(),
         body: fd,
@@ -417,7 +417,7 @@
     try {
       const fd = new FormData();
       fd.append('confirm', 'YES');
-      const res = await fetch('/admin/server-status/sessions/kill-all/', {
+      const res = await fetch('/pasienter/admin/server-status/sessions/kill-all/', {
         method: 'POST',
         headers: _csrfHeader(),
         body: fd,

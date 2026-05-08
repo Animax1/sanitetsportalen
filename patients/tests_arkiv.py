@@ -81,7 +81,7 @@ class ArkivTestMixin:
     def _lagre_arkiv_post(self, navn='Testfestival', notat='', client=None):
         c = client or self.admin_client
         return c.post(
-            '/api/innstillinger/arkiv/lagre/',
+            '/pasienter/api/innstillinger/arkiv/lagre/',
             data=json.dumps({'arrangement_navn': navn, 'notat': notat}),
             content_type='application/json',
         )
@@ -101,7 +101,7 @@ class LagreArkivTests(ArkivTestMixin, TestCase):
     def test_lagre_arkiv_krever_arrangement_navn(self):
         """Tom arrangement_navn → 400."""
         resp = self.admin_client.post(
-            '/api/innstillinger/arkiv/lagre/',
+            '/pasienter/api/innstillinger/arkiv/lagre/',
             data=json.dumps({'arrangement_navn': '  ', 'notat': ''}),
             content_type='application/json',
         )
@@ -164,7 +164,7 @@ class ArkivListeTests(ArkivTestMixin, TestCase):
         arkiv_a, _ = arkiver_aktiv_vakt('Festival A', '', self.admin)
         arkiv_b, _ = arkiver_aktiv_vakt('Festival B', '', self.admin)
 
-        resp = self.admin_client.get('/api/innstillinger/arkiv/')
+        resp = self.admin_client.get('/pasienter/api/innstillinger/arkiv/')
         self.assertEqual(resp.status_code, 200)
         data = resp.json()
         ids = [d['id'] for d in data]
@@ -176,7 +176,7 @@ class ArkivListeTests(ArkivTestMixin, TestCase):
         for role_user in [self.read_write, self.lead, self.lead_view, self.read_only]:
             c = Client()
             c.force_login(role_user)
-            resp = c.get('/api/innstillinger/arkiv/')
+            resp = c.get('/pasienter/api/innstillinger/arkiv/')
             self.assertEqual(resp.status_code, 403, f'Forventet 403 for rolle {role_user.role}')
 
 
@@ -195,7 +195,7 @@ class ArkivDetaljTests(ArkivTestMixin, TestCase):
 
     def test_arkiv_detalj_inkluderer_statistikk(self):
         """Statistikk i detalj-response skal ha riktige tall for total/gronn/gul/rod."""
-        resp = self.admin_client.get(f'/api/innstillinger/arkiv/{self.arkiv.pk}/')
+        resp = self.admin_client.get(f'/pasienter/api/innstillinger/arkiv/{self.arkiv.pk}/')
         self.assertEqual(resp.status_code, 200)
         data = resp.json()
         self.assertIn('stats', data)
@@ -212,7 +212,7 @@ class ArkivDetaljTests(ArkivTestMixin, TestCase):
         ap.grovsortering = 'Rød'  # Endre uten å oppdatere sha256
         ap.save()
 
-        resp = self.admin_client.get(f'/api/innstillinger/arkiv/{self.arkiv.pk}/')
+        resp = self.admin_client.get(f'/pasienter/api/innstillinger/arkiv/{self.arkiv.pk}/')
         self.assertEqual(resp.status_code, 200)
         self.assertTrue(resp.json()['tamper_detected'])
 
@@ -223,7 +223,7 @@ class ArkivDetaljTests(ArkivTestMixin, TestCase):
         time_per_triage, crosstab_*, chi2_table, kw_*).
         """
         resp = self.admin_client.get(
-            f'/api/innstillinger/arkiv/{self.arkiv.pk}/full-stats/'
+            f'/pasienter/api/innstillinger/arkiv/{self.arkiv.pk}/full-stats/'
         )
         self.assertEqual(resp.status_code, 200)
         data = resp.json()
@@ -253,7 +253,7 @@ class ArkivDetaljTests(ArkivTestMixin, TestCase):
         for role_user in [self.read_only, self.read_write, self.lead_view, self.lead]:
             c = Client()
             c.force_login(role_user)
-            resp = c.get(f'/api/innstillinger/arkiv/{self.arkiv.pk}/full-stats/')
+            resp = c.get(f'/pasienter/api/innstillinger/arkiv/{self.arkiv.pk}/full-stats/')
             self.assertEqual(
                 resp.status_code, 403,
                 f'Forventet 403 for rolle {role_user.role}',
@@ -261,7 +261,7 @@ class ArkivDetaljTests(ArkivTestMixin, TestCase):
 
     def test_arkiv_full_stats_404_for_ukjent_id(self):
         """Ukjent arkiv-ID skal gi 404."""
-        resp = self.admin_client.get('/api/innstillinger/arkiv/999999/full-stats/')
+        resp = self.admin_client.get('/pasienter/api/innstillinger/arkiv/999999/full-stats/')
         self.assertEqual(resp.status_code, 404)
 
 
@@ -278,7 +278,7 @@ class ArkivSlettTests(ArkivTestMixin, TestCase):
         c = client or self.admin_client
         body = {'confirm': True} if confirm else {}
         return c.delete(
-            f'/api/innstillinger/arkiv/{pk}/',
+            f'/pasienter/api/innstillinger/arkiv/{pk}/',
             data=json.dumps(body),
             content_type='application/json',
         )

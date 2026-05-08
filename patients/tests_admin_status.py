@@ -9,7 +9,6 @@ from accounts.models import CustomUser
 from .middleware import metrics_store, _MetricsStore
 from .models import AppSetting
 
-#
 
 class MetricsStoreTests(TestCase):
     """Unit-tester for ringbuffer-logikken."""
@@ -26,7 +25,7 @@ class MetricsStoreTests(TestCase):
 
     def test_record_og_snapshot(self):
         for ms in [10, 20, 30, 40, 50]:
-            self.store.record('/api/test/', 'GET', 200, ms)
+            self.store.record('/pasienter/api/test/', 'GET', 200, ms)
 
         snap = self.store.snapshot(window_seconds=60)
         self.assertEqual(snap['count'], 5)
@@ -37,7 +36,7 @@ class MetricsStoreTests(TestCase):
     def test_percentiler(self):
         # 100 samples, duration = 1..100
         for i in range(1, 101):
-            self.store.record('/api/test/', 'GET', 200, float(i))
+            self.store.record('/pasienter/api/test/', 'GET', 200, float(i))
         snap = self.store.snapshot(window_seconds=60)
         self.assertEqual(snap['count'], 100)
         # P50 ligger rundt 50, P95 rundt 95
@@ -45,10 +44,10 @@ class MetricsStoreTests(TestCase):
         self.assertAlmostEqual(snap['p95_ms'], 95.0, delta=1.0)
 
     def test_feil_telles(self):
-        self.store.record('/api/x/', 'GET', 200, 10)
-        self.store.record('/api/y/', 'GET', 404, 20)
-        self.store.record('/api/z/', 'POST', 500, 30)
-        self.store.record('/api/w/', 'GET', 503, 40)
+        self.store.record('/pasienter/api/x/', 'GET', 200, 10)
+        self.store.record('/pasienter/api/y/', 'GET', 404, 20)
+        self.store.record('/pasienter/api/z/', 'POST', 500, 30)
+        self.store.record('/pasienter/api/w/', 'GET', 503, 40)
 
         snap = self.store.snapshot(window_seconds=60)
         self.assertEqual(snap['errors_4xx'], 1)
@@ -58,17 +57,17 @@ class MetricsStoreTests(TestCase):
         from .middleware import MAX_SAMPLES
         # Fyll til over maks
         for i in range(MAX_SAMPLES + 100):
-            self.store.record('/api/x/', 'GET', 200, float(i))
+            self.store.record('/pasienter/api/x/', 'GET', 200, float(i))
 
         snap = self.store.snapshot(window_seconds=60)
         self.assertEqual(snap['sample_size'], MAX_SAMPLES)
 
     def test_vindu_filtrerer_gamle_samples(self):
         # Manipuler en gammel timestamp direkte
-        self.store.record('/api/x/', 'GET', 200, 10)
+        self.store.record('/pasienter/api/x/', 'GET', 200, 10)
         with self.store._lock:
             self.store._samples[0]['ts'] = time.time() - 3600  # 1 time gammel
-        self.store.record('/api/y/', 'GET', 200, 20)
+        self.store.record('/pasienter/api/y/', 'GET', 200, 20)
 
         snap = self.store.snapshot(window_seconds=60)
         self.assertEqual(snap['count'], 1)  # kun den nye
@@ -241,29 +240,29 @@ class AdminStatusTilgangTests(TestCase):
         )
 
     def test_uinnlogget_omdirigeres_til_login(self):
-        resp = self.client.get('/admin/server-status/')
+        resp = self.client.get('/pasienter/admin/server-status/')
         self.assertEqual(resp.status_code, 302)
         self.assertIn('/accounts/login/', resp.url)
 
     def test_lead_nektes(self):
         self.client.force_login(self.lead)
-        resp = self.client.get('/admin/server-status/')
+        resp = self.client.get('/pasienter/admin/server-status/')
         self.assertEqual(resp.status_code, 403)
 
     def test_read_only_nektes(self):
         self.client.force_login(self.read_only)
-        resp = self.client.get('/admin/server-status/')
+        resp = self.client.get('/pasienter/admin/server-status/')
         self.assertEqual(resp.status_code, 403)
 
     def test_admin_har_tilgang_html(self):
         self.client.force_login(self.admin)
-        resp = self.client.get('/admin/server-status/')
+        resp = self.client.get('/pasienter/admin/server-status/')
         self.assertEqual(resp.status_code, 200)
         self.assertContains(resp, 'Server-status')
 
     def test_admin_har_tilgang_json(self):
         self.client.force_login(self.admin)
-        resp = self.client.get('/admin/server-status/json/')
+        resp = self.client.get('/pasienter/admin/server-status/json/')
         self.assertEqual(resp.status_code, 200)
         self.assertEqual(resp['Content-Type'], 'application/json')
         data = resp.json()
@@ -299,14 +298,14 @@ class FeatureFlagTests(TestCase):
         # Verifiser at JSON-endepunktet faktisk leverer 'false' når ingen AppSetting-rad finnes
         AppSetting.objects.filter(key='feature.live_stats_enabled').delete()
         self.client.force_login(self.admin)
-        resp = self.client.get('/admin/server-status/json/')
+        resp = self.client.get('/pasienter/admin/server-status/json/')
         self.assertEqual(resp.status_code, 200)
         flags = resp.json().get('feature_flags', {})
         self.assertEqual(flags.get('feature.live_stats_enabled'), 'false')
 
     def test_admin_kan_sette_flagg(self):
         self.client.force_login(self.admin)
-        resp = self.client.post('/admin/server-status/flag/', {
+        resp = self.client.post('/pasienter/admin/server-status/flag/', {
             'key': 'feature.live_stats_enabled',
             'value': 'false',
         })
@@ -319,7 +318,7 @@ class FeatureFlagTests(TestCase):
 
     def test_lead_kan_ikke_sette_flagg(self):
         self.client.force_login(self.lead)
-        resp = self.client.post('/admin/server-status/flag/', {
+        resp = self.client.post('/pasienter/admin/server-status/flag/', {
             'key': 'feature.live_stats_enabled',
             'value': 'false',
         })
@@ -327,7 +326,7 @@ class FeatureFlagTests(TestCase):
 
     def test_ukjent_flagg_avvises(self):
         self.client.force_login(self.admin)
-        resp = self.client.post('/admin/server-status/flag/', {
+        resp = self.client.post('/pasienter/admin/server-status/flag/', {
             'key': 'random.unknown.flag',
             'value': 'true',
         })
@@ -335,7 +334,7 @@ class FeatureFlagTests(TestCase):
 
     def test_ugyldig_verdi_avvises(self):
         self.client.force_login(self.admin)
-        resp = self.client.post('/admin/server-status/flag/', {
+        resp = self.client.post('/pasienter/admin/server-status/flag/', {
             'key': 'feature.live_stats_enabled',
             'value': 'maybe',
         })
@@ -343,7 +342,7 @@ class FeatureFlagTests(TestCase):
 
     def test_get_ikke_tillatt(self):
         self.client.force_login(self.admin)
-        resp = self.client.get('/admin/server-status/flag/')
+        resp = self.client.get('/pasienter/admin/server-status/flag/')
         self.assertEqual(resp.status_code, 405)
 
 
@@ -399,7 +398,7 @@ class LastBackupInfoTests(TestCase):
         from .models import Backup
         Backup.objects.create(filename='end2end.json.gz', kind='auto', size_bytes=999)
         self.client.force_login(self.admin)
-        resp = self.client.get('/admin/server-status/json/')
+        resp = self.client.get('/pasienter/admin/server-status/json/')
         self.assertEqual(resp.status_code, 200)
         backup = resp.json().get('last_backup', {})
         self.assertTrue(backup.get('found'))
@@ -420,7 +419,7 @@ class MetricsMiddlewareIntegrationTests(TestCase):
     def test_request_registreres_i_metrics(self):
         self.client.force_login(self.admin)
         # Kall et vanlig API-endepunkt (ikke selve status)
-        self.client.get('/api/stats/')
+        self.client.get('/pasienter/api/stats/')
 
         snap = metrics_store.snapshot(window_seconds=60)
         self.assertGreaterEqual(snap['count'], 1)
@@ -430,7 +429,7 @@ class MetricsMiddlewareIntegrationTests(TestCase):
         metrics_store.reset()
 
         # Kun kall server-status – skal IKKE telles
-        self.client.get('/admin/server-status/json/')
+        self.client.get('/pasienter/admin/server-status/json/')
 
         snap = metrics_store.snapshot(window_seconds=60)
         self.assertEqual(snap['count'], 0)
@@ -460,12 +459,12 @@ class AdminSessionsListTests(TestCase):
         )
 
     def test_uinnlogget_nektes(self):
-        resp = self.client.get('/admin/server-status/sessions/')
+        resp = self.client.get('/pasienter/admin/server-status/sessions/')
         self.assertEqual(resp.status_code, 302)
 
     def test_lead_nektes(self):
         self.client.force_login(self.lead)
-        resp = self.client.get('/admin/server-status/sessions/')
+        resp = self.client.get('/pasienter/admin/server-status/sessions/')
         self.assertEqual(resp.status_code, 403)
 
     def test_status_side_inneholder_csrf_token_holder(self):
@@ -474,7 +473,7 @@ class AdminSessionsListTests(TestCase):
         X-CSRFToken-header (cookien er HttpOnly), og POST-handlinger som
         utlogging gir 403 Forbidden."""
         self.client.force_login(self.admin)
-        resp = self.client.get('/admin/server-status/')
+        resp = self.client.get('/pasienter/admin/server-status/')
         self.assertEqual(resp.status_code, 200)
         body = resp.content.decode('utf-8')
         self.assertIn('id="csrf-token-holder"', body,
@@ -490,7 +489,7 @@ class AdminSessionsListTests(TestCase):
         c3.login(username='leser', password='testpass123')
 
         self.client.force_login(self.admin)
-        resp = self.client.get('/admin/server-status/sessions/')
+        resp = self.client.get('/pasienter/admin/server-status/sessions/')
         self.assertEqual(resp.status_code, 200)
         data = resp.json()
         usernames = {s['username'] for s in data['sessions']}
@@ -509,7 +508,7 @@ class AdminSessionsListTests(TestCase):
         c2.get('/accounts/login/')  # initierer en anonym sesjon
 
         self.client.force_login(self.admin)
-        resp = self.client.get('/admin/server-status/sessions/')
+        resp = self.client.get('/pasienter/admin/server-status/sessions/')
         data = resp.json()
         # Sesjoner i listen skal alle ha brukernavn (ingen anonyme)
         for s in data['sessions']:
@@ -537,24 +536,24 @@ class AdminSessionKillTests(TestCase):
 
     def test_lead_nektes(self):
         self.client.force_login(self.lead)
-        resp = self.client.post('/admin/server-status/sessions/kill/', {'session_key': 'x'})
+        resp = self.client.post('/pasienter/admin/server-status/sessions/kill/', {'session_key': 'x'})
         self.assertEqual(resp.status_code, 403)
 
     def test_mangler_session_key_gir_400(self):
         self.client.force_login(self.admin)
-        resp = self.client.post('/admin/server-status/sessions/kill/', {})
+        resp = self.client.post('/pasienter/admin/server-status/sessions/kill/', {})
         self.assertEqual(resp.status_code, 400)
 
     def test_ukjent_session_key_gir_404(self):
         self.client.force_login(self.admin)
-        resp = self.client.post('/admin/server-status/sessions/kill/',
+        resp = self.client.post('/pasienter/admin/server-status/sessions/kill/',
                                 {'session_key': 'finnesikke'})
         self.assertEqual(resp.status_code, 404)
 
     def test_admin_kan_ikke_logge_ut_seg_selv(self):
         self.client.force_login(self.admin)
         my_key = self.client.session.session_key
-        resp = self.client.post('/admin/server-status/sessions/kill/',
+        resp = self.client.post('/pasienter/admin/server-status/sessions/kill/',
                                 {'session_key': my_key})
         self.assertEqual(resp.status_code, 400)
         # Min sesjon skal fortsatt finnes
@@ -565,7 +564,7 @@ class AdminSessionKillTests(TestCase):
         self.assertTrue(Session.objects.filter(session_key=lead_key).exists())
 
         self.client.force_login(self.admin)
-        resp = self.client.post('/admin/server-status/sessions/kill/',
+        resp = self.client.post('/pasienter/admin/server-status/sessions/kill/',
                                 {'session_key': lead_key})
         self.assertEqual(resp.status_code, 200)
         data = resp.json()
@@ -580,7 +579,7 @@ class AdminSessionKillTests(TestCase):
         at suksess-respons har Content-Type=application/json og parser-bar JSON."""
         lead_key = self._get_session_key('lederen', 'testpass123')
         self.client.force_login(self.admin)
-        resp = self.client.post('/admin/server-status/sessions/kill/',
+        resp = self.client.post('/pasienter/admin/server-status/sessions/kill/',
                                 {'session_key': lead_key})
         self.assertEqual(resp.status_code, 200)
         self.assertIn('application/json', resp['Content-Type'])
@@ -595,7 +594,7 @@ class AdminSessionKillTests(TestCase):
         lead_key = self._get_session_key('lederen', 'testpass123')
         self.client.force_login(self.admin)
         AuditLog.objects.all().delete()
-        self.client.post('/admin/server-status/sessions/kill/',
+        self.client.post('/pasienter/admin/server-status/sessions/kill/',
                          {'session_key': lead_key})
         log = AuditLog.objects.filter(field_name='force_logout').first()
         self.assertIsNotNone(log)
@@ -621,13 +620,13 @@ class AdminSessionKillAllTests(TestCase):
 
     def test_lead_nektes(self):
         self.client.force_login(self.lead)
-        resp = self.client.post('/admin/server-status/sessions/kill-all/',
+        resp = self.client.post('/pasienter/admin/server-status/sessions/kill-all/',
                                 {'confirm': 'YES'})
         self.assertEqual(resp.status_code, 403)
 
     def test_mangler_bekreftelse_gir_400(self):
         self.client.force_login(self.admin)
-        resp = self.client.post('/admin/server-status/sessions/kill-all/', {})
+        resp = self.client.post('/pasienter/admin/server-status/sessions/kill-all/', {})
         self.assertEqual(resp.status_code, 400)
 
     def test_logger_ut_alle_unntatt_admin(self):
@@ -640,7 +639,7 @@ class AdminSessionKillAllTests(TestCase):
         self.client.force_login(self.admin)
         my_key = self.client.session.session_key
 
-        resp = self.client.post('/admin/server-status/sessions/kill-all/',
+        resp = self.client.post('/pasienter/admin/server-status/sessions/kill-all/',
                                 {'confirm': 'YES'})
         self.assertEqual(resp.status_code, 200)
         data = resp.json()
@@ -656,7 +655,7 @@ class AdminSessionKillAllTests(TestCase):
         c2 = Client(); c2.login(username='lederen', password='testpass123')
         self.client.force_login(self.admin)
         AuditLog.objects.all().delete()
-        self.client.post('/admin/server-status/sessions/kill-all/',
+        self.client.post('/pasienter/admin/server-status/sessions/kill-all/',
                          {'confirm': 'YES'})
         log = AuditLog.objects.filter(field_name='force_logout').first()
         self.assertIsNotNone(log)

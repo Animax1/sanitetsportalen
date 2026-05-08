@@ -50,7 +50,7 @@ class PatientDeleteSetupMixin:
     def _slett(self, pk, client=None):
         c = client or self.admin_client
         return c.delete(
-            f'/api/patients/{pk}/',
+            f'/pasienter/api/patients/{pk}/',
             content_type='application/json',
         )
 
@@ -139,7 +139,7 @@ class RecycleFunctionTests(PatientDeleteSetupMixin, TestCase):
 
         # Ny pasient opprettet via API skal få nummer 1
         resp2 = self.admin_client.post(
-            '/api/patients/',
+            '/pasienter/api/patients/',
             data=json.dumps({'problemstilling': 'Ny', 'inntid': '01.01.2099 10:00'}),
             content_type='application/json',
         )

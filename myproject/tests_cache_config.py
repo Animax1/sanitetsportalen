@@ -130,7 +130,7 @@ class CacheHealthHelperTests(TestCase):
             return JsonResponse({'ok': True})
 
         rf = RequestFactory()
-        req = rf.get('/api/stats/')
+        req = rf.get('/pasienter/api/stats/')
 
         # Simuler at cache-backenden kaster på alle operasjoner
         with mock.patch.object(
