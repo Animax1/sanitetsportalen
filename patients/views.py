@@ -22,6 +22,7 @@ from django.conf import settings
 from django.core.exceptions import ValidationError
 
 from django.db import transaction
+from django.db.models import Q
 
 from .models import Patient, AppSetting, Behandler, Helsepersonell
 from .services import (
@@ -183,10 +184,20 @@ def patients_list_view(request):
 
         filter_name = request.GET.get('filter', 'alle')
         include_archived = request.GET.get('include_archived') == '1'
+        # Fase 5: "mine"-filter — default AV, slås på via ?mine=1.
+        # Filtrerer på Behandler.user ELLER Helsepersonell.user lik innlogget bruker.
+        # Tilgjengelig for alle innloggede roller, også read_only.
+        mine_only = request.GET.get('mine') == '1'
 
         qs = Patient.objects.order_by('pasientnummer')
         if not include_archived:
             qs = qs.filter(is_active=True)
+
+        if mine_only and request.user.is_authenticated:
+            qs = qs.filter(
+                Q(behandler__user=request.user)
+                | Q(helsepersonell_ref__user=request.user)
+            )
 
         qs = apply_list_filter(qs, filter_name=filter_name, year=year)
         return JsonResponse([_patient_to_dict(p) for p in qs], safe=False)

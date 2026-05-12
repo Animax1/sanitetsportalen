@@ -1329,16 +1329,3 @@
   background: #2a1317;
   color: #f87171 !important;
 }
-
-.form-text {
-  color: var(--portal-text-muted) !important;
-}
-
-.form-check-label,
-.form-label {
-  color: var(--portal-text) !important;
-}
-
-.text-main {
-  color: var(--portal-text-muted) !important;
-}

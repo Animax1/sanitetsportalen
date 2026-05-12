@@ -14,5 +14,14 @@ arkiv/
 *.lock
 .DS_Store
 
-PERSONVERN_DOKUMENTASJON.md
 TEKNISK_DOKUMENTASJON.md
+PERSONVERN_DOKUMENTASJON.md
+
+# Offline-modus
+OFFLINE_PASSORD.md
+offline.sqlite3
+.env.offline
+vendor/
+usb_package_builder/build/
+usb_package_builder/output/
+start_offline.bat

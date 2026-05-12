@@ -554,3 +554,75 @@ def backup_admin_delete_view(request, slug: str, pk: int):
     backup.delete()
     messages.success(request, f'Slettet backup «{filename}».')
     return redirect('core:backup_admin_module', slug=slug)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Fase 5: Varsler (notifications)
+# ─────────────────────────────────────────────────────────────────────────────
+
+@login_required
+@require_GET
+def notification_unread_count_view(request):
+    """JSON-endepunkt for bjelle-badge: { "unread": <int> }.
+
+    Pollet av JS i base_portal.html hvert 30. sekund. Kun innloggede
+    brukere, bruker en effektiv COUNT-query.
+    """
+    from django.http import JsonResponse
+    from core.models import Notification
+    count = Notification.objects.filter(user=request.user, is_read=False).count()
+    return JsonResponse({'unread': count})
+
+
+@login_required
+@require_GET
+def notification_list_view(request):
+    """Varselside: paginert liste over varsler for innlogget bruker.
+
+    Default: nyeste først, paginert 50 per side. Klikk på et varsel
+    går til /varsler/<id>/lest/ som markerer som lest og redirecter
+    til varselets URL.
+    """
+    from core.models import Notification
+    qs = Notification.objects.filter(user=request.user).order_by('-created_at')
+    paginator = Paginator(qs, 50)
+    page_obj = paginator.get_page(request.GET.get('page'))
+    unread_total = Notification.objects.filter(user=request.user, is_read=False).count()
+    return render(request, 'core/notification_list.html', {
+        'page_obj': page_obj,
+        'unread_total': unread_total,
+    })
+
+
+@login_required
+@require_http_methods(['POST', 'GET'])
+def notification_mark_read_view(request, pk: int):
+    """Marker et varsel som lest, redirect til varselets URL.
+
+    GET støttes så vanlige <a>-lenker fungerer. Det er trygt fordi
+    handlingen kun påvirker brukerens egne varsler og er idempotent.
+    POST anbefales for forms.
+    """
+    from core.models import Notification
+    notif = get_object_or_404(Notification, pk=pk, user=request.user)
+    if not notif.is_read:
+        notif.is_read = True
+        notif.read_at = timezone.now()
+        notif.save(update_fields=['is_read', 'read_at'])
+    target_url = notif.url or '/varsler/'
+    return redirect(target_url)
+
+
+@login_required
+@require_http_methods(['POST'])
+def notification_mark_all_read_view(request):
+    """Marker ALLE uleste varsler for brukeren som lest."""
+    from core.models import Notification
+    updated = Notification.objects.filter(
+        user=request.user, is_read=False,
+    ).update(is_read=True, read_at=timezone.now())
+    if updated:
+        messages.success(request, f'Markerte {updated} varsler som lest.')
+    else:
+        messages.info(request, 'Ingen uleste varsler å markere.')
+    return redirect('core:notification_list')

@@ -108,6 +108,10 @@
     <button id="btn-gronn"      class="btn btn-outline-success   filter-btn"             onclick="setFilter('gronn')">Grønn</button>
     <button id="btn-aktive"     class="btn btn-outline-primary   filter-btn"             onclick="setFilter('aktive')">Aktive</button>
     <button id="btn-utskrevet"  class="btn btn-outline-secondary filter-btn"             onclick="setFilter('utskrevet')">Utskrevet</button>
+    <div class="form-check form-switch ms-2" title="Vis kun pasienter der jeg er førstehjelper eller oppfølgingsansvarlig">
+      <input class="form-check-input" type="checkbox" id="toggle-mine" onchange="toggleMine(this.checked)">
+      <label class="form-check-label small" for="toggle-mine">Mine pasienter</label>
+    </div>
     <span class="ms-auto" id="row-count"></span>
   </div>
   <div id="patient-grid"></div>

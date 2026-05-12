@@ -180,6 +180,9 @@ Chart.defaults.font.size = 11;
 
 let activeFilter = 'alle';
 let allPatients = [];  // fullt datasett for klient-side filtrering
+// Fase 5: "Mine pasienter"-toggle. Server-side filter via ?mine=1.
+// Persistert i localStorage slik at valget overlever sidereload.
+let mineOnly = (typeof localStorage !== 'undefined' && localStorage.getItem('mineOnly') === '1');
 let activeStatTab = 'oversikt';
 let fullStats = null;
 
@@ -338,12 +341,26 @@ function initTable() {
 // DATA LOADING
 // ════════════════════════════════════════════════════════
 async function loadPatients() {
-  const res  = await fetch('/pasienter/api/patients/');
+  const url = '/pasienter/api/patients/' + (mineOnly ? '?mine=1' : '');
+  const res  = await fetch(url);
   allPatients = await res.json();
   if (!table) return;
   await table.setData(allPatients);
   applyFilter();
   updateHeader(allPatients);
+}
+
+// Fase 5: Slå "Mine pasienter"-filter av/på. Refetcher fra server fordi
+// filtreringen skjer server-side (Behandler.user / Helsepersonell.user).
+async function toggleMine(checked) {
+  mineOnly = !!checked;
+  try { localStorage.setItem('mineOnly', mineOnly ? '1' : '0'); } catch (_) {}
+  await loadPatients();
+  // Hvis tavle-fanen er aktiv, oppdater den også
+  const tavleTab = document.getElementById('tab-tavle');
+  if (tavleTab && tavleTab.classList.contains('active')) {
+    renderBoard();
+  }
 }
 
 function updateHeader(pts) {
@@ -688,7 +705,8 @@ function totalDuration(p) {
 // BOARD (TAVLE)
 // ════════════════════════════════════════════════════════
 async function renderBoard() {
-  const res = await fetch('/pasienter/api/patients/');
+  const url = '/pasienter/api/patients/' + (mineOnly ? '?mine=1' : '');
+  const res = await fetch(url);
   const pts = await res.json();
   const act = pts.filter(p => !p.utskrevet);
 
@@ -1936,6 +1954,9 @@ document.addEventListener('DOMContentLoaded', () => {
 document.addEventListener('DOMContentLoaded', async () => {
   applyRoleVisibility();
   initTable();
+  // Fase 5: Synk "Mine pasienter"-checkbox med persisted state før første load
+  const mineToggle = document.getElementById('toggle-mine');
+  if (mineToggle) mineToggle.checked = mineOnly;
   await loadBehandlere();
   await loadHelsepersonell();
   await loadPatients();

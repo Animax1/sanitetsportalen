@@ -1009,6 +1009,7 @@ class DoubleClickGuardTests(TestCase):
 
 # ── FORBEDRINGER #19 + klokkedrift-fix ───────────────────────────────────────
 
+@override_settings(SECURE_SSL_REDIRECT=False, RATELIMIT_ENABLE=False)
 class PatientNumberGapTests(TestCase):
     """Tester for at pasientnummer ikke hopper når validering feiler.
 
@@ -1069,6 +1070,7 @@ class PatientNumberGapTests(TestCase):
         self.assertEqual(r2.json()['pasientnummer'], 3)
 
 
+@override_settings(SECURE_SSL_REDIRECT=False, RATELIMIT_ENABLE=False)
 class PabegyntNotBeforeInntidTests(TestCase):
     """Tester for sikkerhetsnett mot pabegynt < inntid (klient-klokkedrift)."""
 
@@ -1155,6 +1157,7 @@ class PabegyntNotBeforeInntidTests(TestCase):
             f'pabegynt ({body["pabegynt"]}) må være >= inntid ({body["inntid"]})')
 
 
+@override_settings(SECURE_SSL_REDIRECT=False, RATELIMIT_ENABLE=False)
 class BlankInntidFallbackTests(TestCase):
     """Hvis frontend sender inntid='' skal server-tid brukes som fallback."""
 

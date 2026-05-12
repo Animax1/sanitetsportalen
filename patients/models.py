@@ -41,9 +41,26 @@ class Behandler(models.Model):
 
     Inaktive behandlere vises ikke i dropdown, men beholdes som FK
     på historiske pasienter for å bevare referanseintegriteten.
+
+    Fase 5: ``user`` er en valgfri 1:1-kobling til CustomUser slik at
+    en innlogget bruker kan filtrere «mine pasienter» og motta varsel
+    ved tildeling. ``SET_NULL`` sørger for at navnet beholdes på
+    historiske pasienter selv om brukeren slettes.
     """
 
     name = models.CharField(max_length=120, unique=True, verbose_name='Navn')
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name='behandler_profil',
+        verbose_name='Koblet bruker',
+        help_text=(
+            'Valgfri kobling til en portalbruker. Hvis satt, kan brukeren '
+            'filtrere egne pasienter og får varsel ved tildeling.'
+        ),
+    )
     is_active = models.BooleanField(default=True, verbose_name='Aktiv')
     created_at = models.DateTimeField(auto_now_add=True, verbose_name='Opprettet')
 
@@ -62,9 +79,24 @@ class Helsepersonell(models.Model):
 
     Samme mønster som Behandler – inaktive vises ikke i dropdown, men
     beholdes som FK på historiske pasienter for referanseintegritet.
+
+    Fase 5: ``user`` er en valgfri 1:1-kobling til CustomUser. Se
+    docstring på Behandler for detaljer.
     """
 
     name = models.CharField(max_length=120, unique=True, verbose_name='Navn')
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name='helsepersonell_profil',
+        verbose_name='Koblet bruker',
+        help_text=(
+            'Valgfri kobling til en portalbruker. Hvis satt, kan brukeren '
+            'filtrere egne pasienter og får varsel ved tildeling.'
+        ),
+    )
     is_active = models.BooleanField(default=True, verbose_name='Aktiv')
     created_at = models.DateTimeField(auto_now_add=True, verbose_name='Opprettet')
 

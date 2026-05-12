@@ -9,6 +9,26 @@ from __future__ import annotations
 from core.modules import get_nav_modules
 
 
+def notification_unread_count(request):
+    """Eksponer ``notification_unread_count`` til alle templates.
+
+    Brukes av bjelle-badge i ``base_portal.html``. Returnerer 0 for
+    uautentiserte requests slik at templates kan rendre uten try/except.
+    Bruker en effektiv COUNT-query (en heltallsverdi, ingen join).
+    """
+    user = getattr(request, 'user', None)
+    if user is None or not user.is_authenticated:
+        return {'notification_unread_count': 0}
+    # Lokal import for å unngå cirkulær import (core.models -> apps boot)
+    from core.models import Notification
+    try:
+        count = Notification.objects.filter(user=user, is_read=False).count()
+    except Exception:
+        # Defensiv: hvis migrasjoner ikke er kjørt ennå, ikke kræsj nav-baren
+        count = 0
+    return {'notification_unread_count': count}
+
+
 def portal_modules(request):
     """Legg til ``nav_modules`` i template-context.
 

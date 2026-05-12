@@ -203,3 +203,121 @@ class ModuleBackupConfig(models.Model):
         """
         obj, _ = cls.objects.get_or_create(module_slug=slug)
         return obj
+
+
+class Notification(models.Model):
+    """Generisk varsel som vises i bjella i topp-nav.
+
+    Fase 5: Første bruksområde er pasient-tildeling (modul ``patients``),
+    men modellen er designet generisk slik at framtidige moduler (vakter,
+    utstyr, beredskap) kan opprette varsler uten endring i denne fila.
+
+    Bruks-API: ``core.notifications.notify(user, module_slug, kind, ...)``.
+
+    Felt-beskrivelse:
+        user         — mottaker (FK til CustomUser)
+        module_slug  — hvilken modul som lagde varselet ('patients', 'vakter', ...)
+        kind         — fri streng som identifiserer varseltypen for filter
+                       og dedup ('patient_assigned', 'patient_transferred_away',
+                       'shift_assigned', osv.)
+        level        — alvorlighetsgrad. ``info`` (default) er grønn,
+                       ``warning`` gul, ``critical`` rød. Brukes som hook
+                       for fremtidige UI-features (badge-farge, lyd, push).
+                       Per Fase 5 vises alle varsler likt i bjella.
+        title        — kort overskrift (vises fett i liste)
+        message      — detaljtekst (under tittel)
+        url          — hvor brukeren skal sendes ved klikk (relativ URL)
+        is_read      — om mottakeren har åpnet eller markert som lest
+        created_at   — når varselet ble opprettet
+    """
+
+    LEVEL_INFO = 'info'
+    LEVEL_WARNING = 'warning'
+    LEVEL_CRITICAL = 'critical'
+    LEVEL_CHOICES = [
+        (LEVEL_INFO, 'Info'),
+        (LEVEL_WARNING, 'Advarsel'),
+        (LEVEL_CRITICAL, 'Kritisk'),
+    ]
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='notifications',
+        verbose_name='Mottaker',
+    )
+    module_slug = models.CharField(
+        max_length=64,
+        db_index=True,
+        verbose_name='Modul',
+        help_text='Slug for modulen som lagde varselet.',
+    )
+    kind = models.CharField(
+        max_length=64,
+        verbose_name='Varseltype',
+        help_text='Maskinell identifikator for varseltypen (brukes til filter og dedup).',
+    )
+    level = models.CharField(
+        max_length=16,
+        choices=LEVEL_CHOICES,
+        default=LEVEL_INFO,
+        verbose_name='Nivå',
+        help_text=(
+            'Alvorlighetsgrad. Reservert for fremtidige UI-features '
+            '(badge-farge, lyd, push). Per Fase 5 vises alle likt.'
+        ),
+    )
+    title = models.CharField(
+        max_length=200,
+        verbose_name='Tittel',
+    )
+    message = models.CharField(
+        max_length=500,
+        blank=True,
+        default='',
+        verbose_name='Melding',
+    )
+    url = models.CharField(
+        max_length=500,
+        blank=True,
+        default='',
+        verbose_name='Lenke',
+        help_text='Relativ URL som brukeren sendes til ved klikk.',
+    )
+    is_read = models.BooleanField(
+        default=False,
+        db_index=True,
+        verbose_name='Lest',
+    )
+    read_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        verbose_name='Lest tidspunkt',
+        help_text='Settes til timezone.now() når brukeren markerer varselet som lest.',
+    )
+    created_at = models.DateTimeField(
+        auto_now_add=True,
+        db_index=True,
+        verbose_name='Opprettet',
+    )
+
+    class Meta:
+        verbose_name = 'Varsel'
+        verbose_name_plural = 'Varsler'
+        ordering = ['-created_at']
+        indexes = [
+            # Bjelle-count: hent ulest pr. bruker, ferskeste først
+            models.Index(
+                fields=['user', 'is_read', '-created_at'],
+                name='core_notif_user_read_idx',
+            ),
+            # Filter pr. modul: framtidig moduldropdown i varselliste
+            models.Index(
+                fields=['user', 'module_slug', '-created_at'],
+                name='core_notif_user_module_idx',
+            ),
+        ]
+
+    def __str__(self) -> str:
+        status = 'lest' if self.is_read else 'ulest'
+        return f'[{self.module_slug}] {self.title} ({status})'

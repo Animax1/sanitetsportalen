@@ -1,13 +1,23 @@
 """
 Signals for pasient-app.
-Loggfører CREATE, UPDATE og DELETE til AuditLog.
+
+- AuditLog: CREATE/UPDATE/DELETE logges for hver pasient-endring.
+- Notification (Fase 5): når ``behandler`` eller ``helsepersonell_ref``
+  tildeles eller flyttes mellom brukere, varsles berørte parter via
+  core.notifications.notify(). Både ny mottaker og forrige eier varsles
+  ved flytting, kun ny mottaker ved første tildeling.
 """
+import logging
+
 from django.db.models.signals import pre_save, post_save, post_delete
 from django.dispatch import receiver
 
-from .models import Patient
+from .models import Patient, Behandler, Helsepersonell
 from audit.models import AuditLog
 from audit.utils import get_current_request
+from core.notifications import notify
+
+logger = logging.getLogger(__name__)
 
 
 def _get_user_and_ip():
@@ -29,14 +39,30 @@ def _get_user_and_ip():
 
 @receiver(pre_save, sender=Patient)
 def patient_pre_save(sender, instance, **kwargs):
-    """Logg feltendringer (UPDATE) for eksisterende pasienter."""
+    """Logg feltendringer (UPDATE) for eksisterende pasienter.
+
+    Lagrer også originale FK-ID-er som transient attributter på ``instance``
+    (``_orig_behandler_id``, ``_orig_helsepersonell_ref_id``) slik at
+    post_save kan oppdage flyttinger og sende varsler.
+    """
     if not instance.pk:
-        return  # Ny pasient – håndteres av post_save
+        # Ny pasient – håndteres av post_save. Marker som ny slik at
+        # tildelings-varsel sendes for behandler/helsepersonell som
+        # settes ved opprettelsen.
+        instance._orig_behandler_id = None
+        instance._orig_helsepersonell_ref_id = None
+        return
 
     try:
         old = Patient.objects.get(pk=instance.pk)
     except Patient.DoesNotExist:
+        instance._orig_behandler_id = None
+        instance._orig_helsepersonell_ref_id = None
         return
+
+    # Lagre originalverdier for post_save (varsel-signal)
+    instance._orig_behandler_id = old.behandler_id
+    instance._orig_helsepersonell_ref_id = old.helsepersonell_ref_id
 
     user, ip = _get_user_and_ip()
 
@@ -67,21 +93,113 @@ def patient_pre_save(sender, instance, **kwargs):
 
 @receiver(post_save, sender=Patient)
 def patient_post_save(sender, instance, created, **kwargs):
-    """Logg opprettelse (CREATE) av ny pasient."""
-    if not created:
+    """Logg opprettelse (CREATE) av ny pasient + send varsler."""
+    if created:
+        user, ip = _get_user_and_ip()
+        AuditLog.objects.create(
+            table_name='patients_patient',
+            record_id=instance.pk,
+            action='CREATE',
+            field_name=None,
+            old_value=None,
+            new_value=str(instance.pasientnummer),
+            user=user,
+            ip=ip,
+        )
+
+    # ── Fase 5: varsel om tildeling/flytting ──
+    _send_assignment_notifications(instance, created)
+
+
+def _send_assignment_notifications(patient, created):
+    """Send varsel når behandler eller helsepersonell_ref endret seg.
+
+    Logikk:
+    - Ved CREATE: varsle ny mottaker hvis FK er satt.
+    - Ved UPDATE der FK endret seg:
+        * Ny verdi != None  → varsle ny mottaker ('patient_assigned')
+        * Gammel verdi != None → varsle forrige eier ('patient_transferred_away')
+    - Hvis FK ikke endret seg: ingen varsel.
+
+    Defensiv design: feiler aldri — logger evt. unntak og lar lagring
+    fortsette uten varsel. Varsler skal aldri kunne hindre pasient-lagring.
+    """
+    try:
+        # ── Behandler-FK ──
+        orig_b_id = getattr(patient, '_orig_behandler_id', None) if not created else None
+        new_b_id = patient.behandler_id
+        if created:
+            # Ved CREATE: kun varsle ny mottaker (ingen forrige)
+            if new_b_id is not None:
+                _notify_assignment(patient, patient.behandler, role='førstehjelper')
+        elif orig_b_id != new_b_id:
+            # FK endret seg
+            if new_b_id is not None:
+                _notify_assignment(patient, patient.behandler, role='førstehjelper')
+            if orig_b_id is not None:
+                try:
+                    prev = Behandler.objects.get(pk=orig_b_id)
+                except Behandler.DoesNotExist:
+                    prev = None
+                if prev is not None:
+                    _notify_transfer(patient, prev, new_owner=patient.behandler,
+                                     role='førstehjelper')
+
+        # ── Helsepersonell-FK ──
+        orig_h_id = getattr(patient, '_orig_helsepersonell_ref_id', None) if not created else None
+        new_h_id = patient.helsepersonell_ref_id
+        if created:
+            if new_h_id is not None:
+                _notify_assignment(patient, patient.helsepersonell_ref,
+                                   role='oppfølgingsansvarlig')
+        elif orig_h_id != new_h_id:
+            if new_h_id is not None:
+                _notify_assignment(patient, patient.helsepersonell_ref,
+                                   role='oppfølgingsansvarlig')
+            if orig_h_id is not None:
+                try:
+                    prev = Helsepersonell.objects.get(pk=orig_h_id)
+                except Helsepersonell.DoesNotExist:
+                    prev = None
+                if prev is not None:
+                    _notify_transfer(patient, prev,
+                                     new_owner=patient.helsepersonell_ref,
+                                     role='oppfølgingsansvarlig')
+    except Exception:
+        # Varsler skal ALDRI kunne føre til at pasient-lagring feiler.
+        logger.exception('Feil ved opprettelse av tildelings-varsel for pasient pk=%s',
+                         patient.pk)
+
+
+def _notify_assignment(patient, role_obj, *, role):
+    """Varsle ny mottaker om at de er tildelt en pasient."""
+    if role_obj is None or role_obj.user is None:
         return
+    notify(
+        user=role_obj.user,
+        module_slug='patients',
+        kind='patient_assigned',
+        title=f'Ny pasient tildelt',
+        message=f'Du er satt som {role} for pasient #{patient.pasientnummer}.',
+        url=f'/pasienter/?focus={patient.pasientnummer}',
+    )
 
-    user, ip = _get_user_and_ip()
 
-    AuditLog.objects.create(
-        table_name='patients_patient',
-        record_id=instance.pk,
-        action='CREATE',
-        field_name=None,
-        old_value=None,
-        new_value=str(instance.pasientnummer),
-        user=user,
-        ip=ip,
+def _notify_transfer(patient, previous_obj, *, new_owner, role):
+    """Varsle forrige eier om at pasienten er flyttet til en annen."""
+    if previous_obj is None or previous_obj.user is None:
+        return
+    new_name = new_owner.name if new_owner is not None else 'ingen'
+    notify(
+        user=previous_obj.user,
+        module_slug='patients',
+        kind='patient_transferred_away',
+        title='Pasient flyttet',
+        message=(
+            f'Pasient #{patient.pasientnummer} er flyttet fra deg som '
+            f'{role} til {new_name}.'
+        ),
+        url=f'/pasienter/?focus={patient.pasientnummer}',
     )
 
 

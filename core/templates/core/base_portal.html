@@ -179,6 +179,20 @@
     {% if request.user.is_authenticated %}
       <span class="username">{{ request.user.username }}</span>
       <span class="badge bg-secondary">{{ request.user.get_role_display }}</span>
+      {# Fase 5: Varsel-bjelle med ulest-badge. Felles ikon for alle moduler. #}
+      <a id="notification-bell"
+         href="{% url 'core:notification_list' %}"
+         class="position-relative d-inline-flex align-items-center justify-content-center text-decoration-none ms-1 me-1"
+         title="Varsler"
+         aria-label="Varsler"
+         style="width:32px;height:32px;border-radius:50%;background:transparent;color:var(--portal-text);">
+        <i class="bi bi-bell-fill" style="font-size:1rem;"></i>
+        <span id="notification-badge"
+              class="position-absolute badge rounded-pill bg-danger"
+              style="top:-2px;right:-4px;font-size:0.62rem;padding:0.18rem 0.34rem;line-height:1;
+                     display:{% if notification_unread_count %}inline-block{% else %}none{% endif %};"
+              data-count="{{ notification_unread_count|default:0 }}">{{ notification_unread_count|default:0 }}</span>
+      </a>
       <div class="dropdown">
         <div class="user-avatar dropdown-toggle" data-bs-toggle="dropdown">
           {{ request.user.username|first|upper }}
@@ -268,6 +282,45 @@
 </footer>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+{# Fase 5: Bjelle-polling — oppdaterer ulest-badge hvert 30. sekund. #}
+{% if request.user.is_authenticated %}
+<script>
+(function() {
+  const POLL_MS = 30000;
+  const ENDPOINT = '{% url "core:notification_unread_count" %}';
+  const badgeEl = document.getElementById('notification-badge');
+  if (!badgeEl) return;
+
+  function setBadge(count) {
+    const n = parseInt(count, 10) || 0;
+    badgeEl.dataset.count = String(n);
+    if (n > 0) {
+      badgeEl.textContent = n > 99 ? '99+' : String(n);
+      badgeEl.style.display = 'inline-block';
+    } else {
+      badgeEl.style.display = 'none';
+    }
+  }
+
+  async function pollUnread() {
+    if (document.visibilityState !== 'visible') return;
+    try {
+      const res = await fetch(ENDPOINT, { credentials: 'same-origin' });
+      if (!res.ok) return;
+      const data = await res.json();
+      setBadge(data.unread);
+    } catch (_err) {
+      // Stille feil — polling fortsetter ved neste intervall
+    }
+  }
+
+  setInterval(pollUnread, POLL_MS);
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') pollUnread();
+  });
+})();
+</script>
+{% endif %}
 {% block extra_scripts %}{% endblock %}
 </body>
 </html>

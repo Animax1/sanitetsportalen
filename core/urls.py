@@ -79,7 +79,29 @@ urlpatterns = [
         name='backup_admin_delete',
     ),
 
-    # ── Legacy-redirects ────────────────────────────────────────────────────
+    # ── Fase 5: Varsler ─────────────────────────────────────────────────────
+    path(
+        'varsler/',
+        views.notification_list_view,
+        name='notification_list',
+    ),
+    path(
+        'varsler/<int:pk>/lest/',
+        views.notification_mark_read_view,
+        name='notification_mark_read',
+    ),
+    path(
+        'varsler/marker-alle-lest/',
+        views.notification_mark_all_read_view,
+        name='notification_mark_all_read',
+    ),
+    path(
+        'api/varsler/ulest-antall/',
+        views.notification_unread_count_view,
+        name='notification_unread_count',
+    ),
+
+    # ── Legacy-redirects ───────────────────────────────────────────────
     # Gamle URL-er som flyttet til /pasienter/ i Fase 2.
     # OBS: Disse må stå ETTER alle vanlige routes for å unngå at de "stjeler"
     # nye dashboard-routes. I praksis fanger de kun root-prefiks som ikke
