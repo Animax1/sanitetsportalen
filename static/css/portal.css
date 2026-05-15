@@ -1,0 +1,85 @@
+/*
+ * portal.css — Bootstrap dark-theme overrides for Sanitetsportalen
+ *
+ * Lastes av base_portal.html. Dekker alle Bootstrap-komponenter som trenger
+ * mørk bakgrunn: kort, tabeller, skjema, alerts, kode, paginering.
+ * Bruk --portal-*-variablene fra base_portal.html :root for nye regler.
+ */
+
+/* ──── Tekst-utilities ──── */
+
+.text-muted {
+  color: var(--portal-text-muted) !important;
+}
+
+/* ──── Skjema (mørk bakgrunn på portal-sider) ──── */
+
+.form-control, .form-select {
+  background: var(--portal-surface-2) !important;
+  color: var(--portal-text) !important;
+  border-color: var(--portal-border) !important;
+}
+.form-control:focus, .form-select:focus {
+  background: var(--portal-surface-2) !important;
+  box-shadow: 0 0 0 0.2rem rgba(59, 130, 246, 0.2) !important;
+  border-color: var(--portal-accent) !important;
+}
+.form-label { color: #cbd5e1; font-size: 0.85rem; font-weight: 600; }
+
+/* ──── Tabeller ──── */
+
+.table {
+  --bs-table-bg: transparent;
+}
+.table thead th {
+  background-color: var(--portal-surface-2);
+  color: var(--portal-text-muted);
+  border-color: var(--portal-border);
+}
+.table td, .table th { border-color: var(--portal-border); color: var(--portal-text); }
+
+/* ──── Kode (dark-theme) ──── */
+
+code {
+  color: var(--portal-accent);
+  background: rgba(59, 130, 246, 0.1);
+  border-radius: 3px;
+  padding: 0.1em 0.35em;
+  font-size: 0.875em;
+}
+
+/* ──── Kort (dark-theme) ──── */
+
+.card {
+  background-color: var(--portal-surface);
+  border-color: var(--portal-border);
+  color: var(--portal-text);
+}
+.card-header, .card-footer {
+  background-color: var(--portal-surface-2);
+  border-color: var(--portal-border);
+}
+
+/* ──── Alerts (dark-theme) ──── */
+
+.alert-danger  { background: #450a0a; border-color: #7f1d1d; color: #fca5a5; }
+.alert-success { background: #052e16; border-color: #166534; color: #86efac; }
+.alert-info    { background: #0c1a4a; border-color: #1e40af; color: #93c5fd; }
+
+/* ──── Paginering (dark-theme) ──── */
+
+.pagination .page-link {
+  background: var(--portal-surface);
+  color: var(--portal-text);
+  border-color: var(--portal-border);
+}
+.pagination .page-item.active .page-link {
+  background: var(--portal-accent);
+  border-color: var(--portal-accent);
+  color: #fff;
+}
+.pagination .page-item.disabled .page-link {
+  background: var(--portal-surface);
+  color: var(--portal-text-muted);
+  border-color: var(--portal-border);
+}

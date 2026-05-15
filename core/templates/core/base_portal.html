@@ -9,6 +9,7 @@
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
 <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
 <link rel="stylesheet" href="{% static 'css/notifications.css' %}">
+<link rel="stylesheet" href="{% static 'css/portal.css' %}">
 <style>
   :root {
     --portal-bg: #0f172a;
@@ -24,6 +25,18 @@
     --portal-success: #10b981;
     --portal-warning: #f59e0b;
     --portal-danger: #ef4444;
+
+    /* Aliaser — bakover-kompatibilitet for templates som bruker gammel nomenklatur */
+    --app-bg: var(--portal-bg);
+    --surface-1: var(--portal-surface);
+    --surface-2: var(--portal-surface-2);
+    --border-color: var(--portal-border);
+    --text-main: var(--portal-text);
+
+    /* Bootstrap-tokens — gir mørkt tema til .card, borders og tekst-utilities */
+    --bs-body-bg: var(--portal-bg);
+    --bs-body-color: var(--portal-text);
+    --bs-border-color: var(--portal-border);
   }
   html, body {
     background: var(--portal-bg);
@@ -129,43 +142,7 @@
     margin-top: 3rem;
   }
 
-  /* ──── Felles komponenter ──── */
-  .card {
-    background: var(--portal-surface);
-    border: 1px solid var(--portal-border);
-    border-radius: 10px;
-  }
-  .card-header {
-    background: var(--portal-surface-2);
-    border-bottom: 1px solid var(--portal-border);
-  }
-  .table { color: var(--portal-text); }
-  .table thead th {
-    background: var(--portal-surface-2);
-    color: var(--portal-text-muted);
-    border-color: var(--portal-border);
-  }
-  .table td, .table th { border-color: var(--portal-border); }
-  .form-control, .form-select {
-    background: var(--portal-surface-2) !important;
-    color: var(--portal-text) !important;
-    border-color: var(--portal-border) !important;
-  }
-  .form-control:focus, .form-select:focus {
-    background: var(--portal-surface-2) !important;
-    box-shadow: 0 0 0 0.2rem rgba(59,130,246,0.2) !important;
-    border-color: var(--portal-accent) !important;
-  }
-  .form-label { color: #cbd5e1; font-size: 0.85rem; font-weight: 600; }
-  .alert-danger {
-    background: #450a0a; border-color: #7f1d1d; color: #fca5a5;
-  }
-  .alert-success {
-    background: #052e16; border-color: #166534; color: #86efac;
-  }
-  .alert-info {
-    background: #0c1a4a; border-color: #1e40af; color: #93c5fd;
-  }
+  /* ──── Felles komponenter: se static/css/portal.css ──── */
 </style>
 {% block extra_head %}{% endblock %}
 </head>

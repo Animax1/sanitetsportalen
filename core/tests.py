@@ -546,11 +546,11 @@ class AdminNavPortalLenkeTests(TestCase):
         )
         self.client.force_login(self.admin)
 
-    def test_endre_passord_har_portal_lenke(self):
-        """Endre-passord-siden skal ha 'Portal'-lenke i admin-nav, ikke 'Pasientliste'."""
+    def test_endre_passord_har_dashboard_lenke(self):
+        """Endre-passord-siden bruker base_portal.html og har Dashboard-lenke i portal-nav."""
         resp = self.client.get('/accounts/change-password/')
         self.assertEqual(resp.status_code, 200)
-        self.assertContains(resp, '>Portal</a>')
+        self.assertContains(resp, 'Dashboard')
         self.assertNotContains(resp, '>Pasientliste</a>')
 
     def test_brukere_har_dashboard_lenke(self):
