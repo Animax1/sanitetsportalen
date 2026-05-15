@@ -100,6 +100,21 @@ urlpatterns = [
         views.notification_unread_count_view,
         name='notification_unread_count',
     ),
+    path(
+        'api/varsler/',
+        views.notification_api_list_view,
+        name='notification_api_list',
+    ),
+    path(
+        'api/varsler/<int:pk>/lest/',
+        views.notification_api_mark_read_view,
+        name='notification_api_mark_read',
+    ),
+    path(
+        'api/varsler/marker-alle-lest/',
+        views.notification_api_mark_all_read_view,
+        name='notification_api_mark_all_read',
+    ),
 
     # ── Legacy-redirects ───────────────────────────────────────────────
     # Gamle URL-er som flyttet til /pasienter/ i Fase 2.

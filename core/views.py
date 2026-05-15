@@ -19,7 +19,7 @@ from django.db.models import Q
 from django.http import HttpResponse, HttpResponsePermanentRedirect
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
-from django.views.decorators.http import require_GET, require_http_methods
+from django.views.decorators.http import require_GET, require_http_methods, require_POST
 
 from accounts.decorators import admin_required
 from accounts.models import CustomUser, LoginEvent
@@ -626,3 +626,68 @@ def notification_mark_all_read_view(request):
     else:
         messages.info(request, 'Ingen uleste varsler å markere.')
     return redirect('core:notification_list')
+
+
+# ── JSON API for dropdown-bjelle ──────────────────────────────────────────────
+
+@login_required
+@require_GET
+def notification_api_list_view(request):
+    """JSON: siste 10 varsler for innlogget bruker.
+
+    Brukes av notifications.js for å populere dropdown-panelet.
+    Returnerer { notifications: [...], unread_count: int }.
+    """
+    from django.http import JsonResponse
+    from core.models import Notification
+    qs = Notification.objects.filter(user=request.user).order_by('-created_at')[:10]
+    unread_count = Notification.objects.filter(user=request.user, is_read=False).count()
+    return JsonResponse({
+        'notifications': [
+            {
+                'id': n.pk,
+                'title': n.title,
+                'message': n.message,
+                'url': n.url,
+                'module_slug': n.module_slug,
+                'level': n.level,
+                'is_read': n.is_read,
+                'created_at': n.created_at.isoformat(),
+            }
+            for n in qs
+        ],
+        'unread_count': unread_count,
+    })
+
+
+@login_required
+@require_POST
+def notification_api_mark_read_view(request, pk: int):
+    """JSON: marker ett varsel som lest. Brukes av dropdown inline.
+
+    Returnerer { ok: true, unread_count: int } etter oppdatering.
+    """
+    from django.http import JsonResponse
+    from core.models import Notification
+    notif = get_object_or_404(Notification, pk=pk, user=request.user)
+    if not notif.is_read:
+        notif.is_read = True
+        notif.read_at = timezone.now()
+        notif.save(update_fields=['is_read', 'read_at'])
+    unread_count = Notification.objects.filter(user=request.user, is_read=False).count()
+    return JsonResponse({'ok': True, 'unread_count': unread_count})
+
+
+@login_required
+@require_POST
+def notification_api_mark_all_read_view(request):
+    """JSON: marker alle uleste varsler som lest.
+
+    Returnerer { ok: true, updated: int }.
+    """
+    from django.http import JsonResponse
+    from core.models import Notification
+    updated = Notification.objects.filter(
+        user=request.user, is_read=False,
+    ).update(is_read=True, read_at=timezone.now())
+    return JsonResponse({'ok': True, 'updated': updated})

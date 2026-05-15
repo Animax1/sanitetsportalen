@@ -1,0 +1,166 @@
+/* notifications.css — varsel-bjelle og dropdown-panel
+ *
+ * Lastes av base_portal.html, base.html og patients/index.html.
+ * Alle farger har hardkodet fallback slik at stilene fungerer
+ * uavhengig av hvilke CSS-variabler det aktuelle templateet definerer.
+ */
+
+/* ── Bjelle-knapp ──────────────────────────────────────────────────────── */
+.notif-bell {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: none;
+  background: transparent;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--header-fg, #e2e8f0);
+  font-size: 1rem;
+  text-decoration: none;
+  cursor: pointer;
+  padding: 0;
+  transition: background 0.15s;
+}
+.notif-bell:hover,
+.notif-bell:focus-visible {
+  background: rgba(255, 255, 255, 0.12);
+  color: var(--header-fg, #e2e8f0);
+  outline: none;
+}
+
+/* ── Ulest-badge (rød sirkel opp-høyre) ─────────────────────────────────── */
+.notif-badge {
+  position: absolute;
+  top: -3px;
+  right: -5px;
+  background: #dc2626;
+  color: #fff;
+  border-radius: 9999px;
+  min-width: 16px;
+  height: 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.65rem;
+  font-weight: 700;
+  line-height: 1;
+  padding: 0 3px;
+  pointer-events: none;
+}
+
+/* ── Dropdown-panel ──────────────────────────────────────────────────────── */
+.notif-panel {
+  min-width: 320px;
+  max-width: 360px;
+  background: var(--surface-1, #111827);
+  border: 1px solid var(--border-color, #334155) !important;
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+  padding: 0;
+}
+
+.notif-panel-hdr {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.55rem 1rem;
+  border-bottom: 1px solid var(--border-color, #334155);
+  font-weight: 600;
+  font-size: 0.88rem;
+  color: var(--text-main, #e5e7eb);
+}
+.notif-panel-hdr .btn-link {
+  color: var(--text-muted, #94a3b8);
+  font-size: 0.78rem;
+  text-decoration: none;
+}
+.notif-panel-hdr .btn-link:hover {
+  color: var(--text-main, #e5e7eb);
+}
+
+.notif-panel-body {
+  max-height: 360px;
+  overflow-y: auto;
+}
+
+.notif-panel-ftr {
+  text-align: center;
+  padding: 0.45rem;
+  border-top: 1px solid var(--border-color, #334155);
+  font-size: 0.8rem;
+}
+.notif-panel-ftr a {
+  color: var(--text-muted, #94a3b8);
+  text-decoration: none;
+}
+.notif-panel-ftr a:hover {
+  color: var(--text-main, #e5e7eb);
+}
+
+/* ── Varsel-element ──────────────────────────────────────────────────────── */
+.notif-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  padding: 0.65rem 1rem;
+  border-bottom: 1px solid var(--border-color, #334155);
+  cursor: pointer;
+  transition: background 0.1s;
+}
+.notif-item:last-child {
+  border-bottom: none;
+}
+.notif-item:hover {
+  background: var(--surface-2, #1e293b);
+}
+.notif-item.unread {
+  background: rgba(59, 130, 246, 0.07);
+}
+.notif-item.unread:hover {
+  background: rgba(59, 130, 246, 0.13);
+}
+
+.notif-item-body {
+  flex: 1;
+  min-width: 0;
+}
+.notif-item-title {
+  font-size: 0.84rem;
+  font-weight: 600;
+  color: var(--text-main, #e5e7eb);
+  line-height: 1.3;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.notif-item-msg {
+  font-size: 0.78rem;
+  color: var(--text-muted, #94a3b8);
+  margin-top: 0.1rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.notif-item-time {
+  font-size: 0.71rem;
+  color: var(--text-soft, #64748b);
+  margin-top: 0.2rem;
+}
+
+.notif-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #3b82f6;
+  flex-shrink: 0;
+  margin-top: 5px;
+}
+
+.notif-empty {
+  text-align: center;
+  padding: 1.75rem 1rem;
+  color: var(--text-muted, #94a3b8);
+  font-size: 0.85rem;
+  line-height: 1.8;
+}

@@ -1250,6 +1250,21 @@
   background: rgba(255,255,255,0.20);
 }
 
+/* Bokstav-sirkel bruker-avatar (matcher portal-design) */
+.user-avatar {
+  width: 32px;
+  height: 32px;
+  background: #1e40af;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 0.85rem;
+  color: #fff;
+  cursor: pointer;
+}
+
 /* Dropdown items inside user menu */
 .dropdown-item {
   color: var(--text-main);
