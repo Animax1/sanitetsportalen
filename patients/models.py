@@ -135,8 +135,6 @@ class Patient(models.Model):
         related_name='patients',
         verbose_name='Behandler',
     )
-    # Gammelt tekstfelt – beholdes for historiske pasienter, brukes ikke ved nye registreringer
-    helsepersonell = models.CharField(max_length=50, default='', blank=True, verbose_name='Helsepersonell (tekst, utgående)')
     helsepersonell_ref = models.ForeignKey(
         Helsepersonell,
         null=True,

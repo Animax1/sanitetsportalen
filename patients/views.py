@@ -95,7 +95,6 @@ def _patient_to_dict(p):
             {'id': p.behandler.id, 'name': p.behandler.name}
             if p.behandler else None
         ),
-        'helsepersonell': p.helsepersonell,  # gammelt tekst-felt (bevart for historiske)
         'helsepersonell_ref': (
             {'id': p.helsepersonell_ref.id, 'name': p.helsepersonell_ref.name}
             if p.helsepersonell_ref else None
@@ -268,7 +267,6 @@ def patients_list_view(request):
             plassering=data.get('plassering', ''),
             behandler=behandler_obj,
             helsepersonell_ref=helsepersonell_obj,
-            helsepersonell=data.get('helsepersonell', ''),
             lege=data.get('lege', ''),
             medisiner=data.get('medisiner', ''),
             inn_obspost=data.get('inn_obspost', ''),
@@ -326,7 +324,7 @@ def patient_detail_view(request, pk):
 
         allowed_text_fields = {
             'problemstilling', 'arsak', 'transport', 'inntid', 'grovsortering',
-            'pabegynt', 'plassering', 'helsepersonell', 'lege',
+            'pabegynt', 'plassering', 'lege',
             'medisiner', 'inn_obspost', 'ut_obspost', 'utskrevet',
             'utskrevet_til', 'journal',
         }
@@ -567,12 +565,10 @@ def _log_audit(request, action, detail):
 
 
 @login_required
+@admin_required
 @require_http_methods(['GET'])
 def backup_list_view(request):
     """Liste alle backups. Admin-only."""
-    if request.user.role != 'admin':
-        return JsonResponse({'error': 'Ingen tilgang'}, status=403)
-
     from .models import Backup, BackupConfig
     cfg = BackupConfig.get()
     backups = [{
@@ -597,12 +593,10 @@ def backup_list_view(request):
 
 
 @login_required
+@admin_required
 @require_http_methods(['POST'])
 def backup_config_view(request):
     """Oppdater intervall. Admin-only."""
-    if request.user.role != 'admin':
-        return JsonResponse({'error': 'Ingen tilgang'}, status=403)
-
     from .models import BackupConfig
     data = _json_body(request)
     interval = int(data.get('interval_minutes', 60))
@@ -617,12 +611,10 @@ def backup_config_view(request):
 
 
 @login_required
+@admin_required
 @require_http_methods(['POST'])
 def backup_create_now_view(request):
     """Lag en manuell backup nå. Admin-only."""
-    if request.user.role != 'admin':
-        return JsonResponse({'error': 'Ingen tilgang'}, status=403)
-
     from .backup_service import create_backup
     data = _json_body(request)
     note = (data.get('note') or '').strip()[:200]
@@ -637,12 +629,10 @@ def backup_create_now_view(request):
 
 
 @login_required
+@admin_required
 @require_http_methods(['POST'])
 def backup_restore_view(request, pk):
     """Gjenopprett fra en backup. Krever confirm='GJENOPPRETT'. Admin-only."""
-    if request.user.role != 'admin':
-        return JsonResponse({'error': 'Ingen tilgang'}, status=403)
-
     from .models import Backup
     from .backup_service import restore_backup
     data = _json_body(request)
@@ -673,12 +663,10 @@ def backup_restore_view(request, pk):
 
 
 @login_required
+@admin_required
 @require_http_methods(['GET'])
 def backup_download_view(request, pk):
     """Last ned en backup-fil. Admin-only. Logges i audit."""
-    if request.user.role != 'admin':
-        return JsonResponse({'error': 'Ingen tilgang'}, status=403)
-
     from .models import Backup
     from .backup_service import get_backup_dir
     from django.http import FileResponse
@@ -697,12 +685,10 @@ def backup_download_view(request, pk):
 
 
 @login_required
+@admin_required
 @require_http_methods(['DELETE'])
 def backup_delete_view(request, pk):
     """Slett en backup-fil og metadata. Admin-only."""
-    if request.user.role != 'admin':
-        return JsonResponse({'error': 'Ingen tilgang'}, status=403)
-
     from .models import Backup
     from .backup_service import get_backup_dir
 
@@ -723,15 +709,13 @@ def backup_delete_view(request, pk):
 # ── Reset testdata ─────────────────────────────────────────────────────────────
 
 @login_required
+@admin_required
 @require_http_methods(['POST'])
 def reset_active_year_view(request):
     """Slett alle pasienter i aktivt år. Kun admin.
 
     Krever at request-body inneholder {"confirm": true} for å unngå feilklikk.
     """
-    if request.user.role != 'admin':
-        return JsonResponse({'error': 'Ingen tilgang'}, status=403)
-
     data = _json_body(request)
     if not data.get('confirm'):
         return JsonResponse(

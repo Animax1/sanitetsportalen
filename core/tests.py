@@ -416,12 +416,12 @@ class LegacyRedirectTests(TestCase):
         )
 
     def test_admin_server_status_redirectes(self):
-        """/admin/server-status/ → 301 → /pasienter/admin/server-status/"""
+        """/admin/server-status/ → 301 → /portal-admin/server-status/"""
         resp = self.client.get('/admin/server-status/')
         self.assertEqual(resp.status_code, 301)
         self.assertEqual(
             resp['Location'],
-            '/pasienter/admin/server-status/',
+            '/portal-admin/server-status/',
         )
 
     def test_admin_server_status_subpath_redirectes(self):
@@ -429,7 +429,7 @@ class LegacyRedirectTests(TestCase):
         self.assertEqual(resp.status_code, 301)
         self.assertEqual(
             resp['Location'],
-            '/pasienter/admin/server-status/json/',
+            '/portal-admin/server-status/json/',
         )
 
     def test_django_admin_paavirkes_ikke(self):
@@ -516,11 +516,11 @@ class PasientAppPaaNyURLTests(TestCase):
         self.assertEqual(r('api_patients_list'), '/pasienter/api/patients/')
 
     def test_url_navn_for_admin_status_loeses_riktig(self):
-        """reverse('admin_server_status') skal nå gi /pasienter/admin/server-status/."""
+        """reverse('admin_server_status') skal gi /portal-admin/server-status/."""
         from django.urls import reverse as r
         self.assertEqual(
             r('admin_server_status'),
-            '/pasienter/admin/server-status/',
+            '/portal-admin/server-status/',
         )
 
     def test_pasient_index_har_synlig_portal_knapp(self):
@@ -553,18 +553,18 @@ class AdminNavPortalLenkeTests(TestCase):
         self.assertContains(resp, '>Portal</a>')
         self.assertNotContains(resp, '>Pasientliste</a>')
 
-    def test_brukere_har_portal_lenke(self):
-        """Brukere-siden skal ha 'Portal'-lenke i admin-nav, ikke 'Pasientliste'."""
+    def test_brukere_har_dashboard_lenke(self):
+        """Brukere-siden bruker base_portal.html og har Dashboard-lenke i portal-nav."""
         resp = self.client.get('/accounts/users/')
         self.assertEqual(resp.status_code, 200)
-        self.assertContains(resp, '>Portal</a>')
+        self.assertContains(resp, 'Dashboard')
         self.assertNotContains(resp, '>Pasientliste</a>')
 
-    def test_server_status_har_portal_lenke(self):
-        """Server-status-siden skal ha 'Portal'-lenke i admin-nav, ikke 'Pasientliste'."""
-        resp = self.client.get('/pasienter/admin/server-status/')
+    def test_server_status_har_dashboard_lenke(self):
+        """Server-status-siden bruker base_portal.html og har Dashboard-lenke i portal-nav."""
+        resp = self.client.get('/portal-admin/server-status/')
         self.assertEqual(resp.status_code, 200)
-        self.assertContains(resp, '>Portal</a>')
+        self.assertContains(resp, 'Dashboard')
         self.assertNotContains(resp, '>Pasientliste</a>')
 
 

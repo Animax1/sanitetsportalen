@@ -179,45 +179,17 @@
   </div>
   <div class="user-info">
     {% if request.user.is_authenticated %}
-      <span class="username">{{ request.user.username }}</span>
-      <span class="badge bg-secondary">{{ request.user.get_role_display }}</span>
-      {# Fase 5: Varsel-bjelle med dropdown-panel #}
+      {% include "partials/_notification_bell.html" %}
       <div class="dropdown">
-        <button type="button"
-                id="notif-bell-btn"
-                class="position-relative d-inline-flex align-items-center justify-content-center border-0 ms-1 me-1"
-                style="width:32px;height:32px;border-radius:50%;background:transparent;color:var(--portal-text);cursor:pointer;padding:0;transition:background .15s;"
-                data-bs-toggle="dropdown"
-                data-bs-auto-close="outside"
-                aria-expanded="false"
-                title="Varsler"
-                aria-label="Varsler"
-                onmouseover="this.style.background='rgba(255,255,255,0.1)'"
-                onmouseout="this.style.background='transparent'">
-          <i class="bi bi-bell-fill" style="font-size:1rem;"></i>
-          <span id="notification-badge"
-                class="position-absolute badge rounded-pill bg-danger"
-                style="top:-2px;right:-4px;font-size:0.62rem;padding:0.18rem 0.34rem;line-height:1;
-                       display:{% if notification_unread_count %}inline-flex{% else %}none{% endif %};">
-            {{ notification_unread_count|default:0 }}
-          </span>
-        </button>
-        <div class="dropdown-menu dropdown-menu-end notif-panel" aria-labelledby="notif-bell-btn">
-          <div class="notif-panel-hdr">
-            <span>Varsler</span>
-            <button type="button" id="notif-mark-all-btn" class="btn btn-link btn-sm p-0">Marker alle lest</button>
-          </div>
-          <div id="notif-list" class="notif-panel-body"></div>
-          <div class="notif-panel-ftr">
-            <a href="{% url 'core:notification_list' %}">Vis alle varsler</a>
-          </div>
-        </div>
-      </div>
-      <div class="dropdown">
-        <div class="user-avatar dropdown-toggle" data-bs-toggle="dropdown">
+        <div class="user-avatar dropdown-toggle" data-bs-toggle="dropdown" title="{{ request.user.username }}">
           {{ request.user.username|first|upper }}
         </div>
-        <ul class="dropdown-menu dropdown-menu-end" style="background:var(--portal-surface);border-color:var(--portal-border);">
+        <ul class="dropdown-menu dropdown-menu-end" style="background:var(--portal-surface);border-color:var(--portal-border);min-width:200px;">
+          <li class="px-3 py-2">
+            <div style="font-weight:700;font-size:0.9rem;color:var(--portal-text);">{{ request.user.username }}</div>
+            <div style="font-size:0.75rem;color:var(--portal-text-muted);">{{ request.user.get_role_display }}</div>
+          </li>
+          <li><hr class="dropdown-divider" style="border-color:var(--portal-border);margin:0;"></li>
           <li><a class="dropdown-item" href="{% url 'core:profile' %}" style="color:var(--portal-text)">
             <i class="bi bi-person-circle me-2"></i>Min profil
           </a></li>
@@ -263,7 +235,10 @@
     {% endif %}
   {% endfor %}
   {% if request.user.is_authenticated and request.user.role == 'admin' %}
-    <a href="{% url 'admin_server_status' %}" {% if '/admin/server-status' in request.path %}class="active"{% endif %}>
+    <a href="{% url 'accounts:user_list' %}" {% if '/accounts/users' in request.path %}class="active"{% endif %}>
+      <i class="bi bi-people me-1"></i>Brukere
+    </a>
+    <a href="{% url 'admin_server_status' %}" {% if '/portal-admin/server-status' in request.path %}class="active"{% endif %}>
       <i class="bi bi-speedometer2 me-1"></i>Server-status
     </a>
     <a href="{% url 'core:module_admin_list' %}" {% if '/portal-admin/moduler' in request.path %}class="active"{% endif %}>

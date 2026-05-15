@@ -1,4 +1,4 @@
-{% extends "base.html" %}
+{% extends "core/base_portal.html" %}
 {% load static %}
 
 {% block title %}Server-status – Sanitetsportalen{% endblock %}
@@ -6,32 +6,32 @@
 {% block extra_head %}
 <style>
   .status-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem; }
-  .status-card { background: var(--surface-1); border: 1px solid var(--border-color); border-radius: 10px; padding: 1rem; }
-  .status-card h3 { font-size: 0.85rem; color: var(--text-muted); text-transform: uppercase; margin: 0 0 0.5rem; letter-spacing: 0.5px; }
-  .status-card .big-number { font-size: 1.8rem; font-weight: 700; color: var(--text-main); }
-  .status-card .unit { font-size: 0.9rem; color: var(--text-muted); margin-left: 0.3rem; }
-  .status-card .sub { font-size: 0.8rem; color: var(--text-muted); margin-top: 0.3rem; }
+  .status-card { background: var(--portal-surface); border: 1px solid var(--portal-border); border-radius: 10px; padding: 1rem; }
+  .status-card h3 { font-size: 0.85rem; color: var(--portal-text-muted); text-transform: uppercase; margin: 0 0 0.5rem; letter-spacing: 0.5px; }
+  .status-card .big-number { font-size: 1.8rem; font-weight: 700; color: var(--portal-text); }
+  .status-card .unit { font-size: 0.9rem; color: var(--portal-text-muted); margin-left: 0.3rem; }
+  .status-card .sub { font-size: 0.8rem; color: var(--portal-text-muted); margin-top: 0.3rem; }
   .status-ok { color: #86efac; }
   .status-warn { color: #fbbf24; }
   .status-crit { color: #fca5a5; }
-  .status-row { display: flex; justify-content: space-between; padding: 0.25rem 0; border-bottom: 1px dashed var(--border-color); font-size: 0.88rem; }
+  .status-row { display: flex; justify-content: space-between; padding: 0.25rem 0; border-bottom: 1px dashed var(--portal-border); font-size: 0.88rem; }
   .status-row:last-child { border-bottom: none; }
-  .status-row .label { color: var(--text-muted); }
-  .status-row .val { color: var(--text-main); font-family: ui-monospace, monospace; }
+  .status-row .label { color: var(--portal-text-muted); }
+  .status-row .val { color: var(--portal-text); font-family: ui-monospace, monospace; }
   .flag-toggle { display: flex; align-items: center; gap: 0.5rem; margin-top: 0.5rem; }
   .flag-toggle button { font-size: 0.8rem; padding: 0.25rem 0.75rem; }
-  pre.json-preview { background: var(--surface-2); padding: 0.75rem; border-radius: 6px; font-size: 0.75rem; max-height: 300px; overflow: auto; color: #cbd5e1; }
-  .refresh-indicator { font-size: 0.75rem; color: var(--text-muted); }
+  pre.json-preview { background: var(--portal-surface-2); padding: 0.75rem; border-radius: 6px; font-size: 0.75rem; max-height: 300px; overflow: auto; color: #cbd5e1; }
+  .refresh-indicator { font-size: 0.75rem; color: var(--portal-text-muted); }
   .refresh-indicator .dot { display: inline-block; width: 8px; height: 8px; background: #86efac; border-radius: 50%; margin-right: 0.3rem; animation: pulse 1.5s infinite; }
   /* Sesjons-kort */
   .sessions-card { grid-column: 1 / -1; }
-  .sessions-list { max-height: 260px; overflow-y: auto; margin-top: 0.5rem; border: 1px solid var(--border-color); border-radius: 6px; }
-  .session-item { display: flex; justify-content: space-between; align-items: center; padding: 0.5rem 0.75rem; border-bottom: 1px solid var(--border-color); font-size: 0.88rem; gap: 0.75rem; }
+  .sessions-list { max-height: 260px; overflow-y: auto; margin-top: 0.5rem; border: 1px solid var(--portal-border); border-radius: 6px; }
+  .session-item { display: flex; justify-content: space-between; align-items: center; padding: 0.5rem 0.75rem; border-bottom: 1px solid var(--portal-border); font-size: 0.88rem; gap: 0.75rem; }
   .session-item:last-child { border-bottom: none; }
   .session-item .who { display: flex; flex-direction: column; min-width: 0; flex: 1; }
-  .session-item .username { color: var(--text-main); font-weight: 600; word-break: break-all; }
-  .session-item .role { color: var(--text-muted); font-size: 0.78rem; }
-  .session-item .meta { color: var(--text-muted); font-size: 0.78rem; }
+  .session-item .username { color: var(--portal-text); font-weight: 600; word-break: break-all; }
+  .session-item .role { color: var(--portal-text-muted); font-size: 0.78rem; }
+  .session-item .meta { color: var(--portal-text-muted); font-size: 0.78rem; }
   .session-item .self-tag { color: #86efac; font-size: 0.75rem; font-weight: 600; }
   .btn-kill { font-size: 0.78rem; padding: 0.2rem 0.6rem; background: #b91c1c; color: white; border: none; border-radius: 4px; cursor: pointer; }
   .btn-kill:hover:not(:disabled) { background: #dc2626; }
@@ -39,7 +39,7 @@
   .btn-kill-all { font-size: 0.85rem; padding: 0.4rem 0.9rem; background: #b91c1c; color: white; border: none; border-radius: 6px; cursor: pointer; }
   .btn-kill-all:hover { background: #dc2626; }
   .sessions-toolbar { display: flex; justify-content: space-between; align-items: center; margin-top: 0.5rem; gap: 0.5rem; flex-wrap: wrap; }
-  .sessions-empty { padding: 1rem; text-align: center; color: var(--text-muted); font-size: 0.85rem; }
+  .sessions-empty { padding: 1rem; text-align: center; color: var(--portal-text-muted); font-size: 0.85rem; }
   @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
 </style>
 {% endblock %}
@@ -47,7 +47,6 @@
 {% block content %}
 {# CSRF-token for fetch()-kall – nødvendig fordi CSRF_COOKIE_HTTPONLY=True #}
 <div id="csrf-token-holder" style="display:none">{% csrf_token %}</div>
-<div class="admin-content">
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;">
     <h1 style="margin:0;font-size:1.4rem;">Server-status</h1>
     <div class="refresh-indicator"><span class="dot"></span>Oppdaterer hvert 10. sek – <span id="last-update">…</span></div>
@@ -129,7 +128,7 @@
     <div class="status-card">
       <h3>Feature-flagg</h3>
       <div class="status-row">
-        <span class="label">Live statistikk <em style="font-size:0.75rem;color:var(--text-muted);font-style:italic;">(planlagt)</em></span>
+        <span class="label">Live statistikk <em style="font-size:0.75rem;color:var(--portal-text-muted);font-style:italic;">(planlagt)</em></span>
         <span class="val" id="flag-live-stats">–</span>
       </div>
       <div class="sub" style="margin-top:0.5rem;">Flagg for fremtidig live-statistikk-fane. Funksjonen er ikke implementert ennå — default er derfor <code>false</code>. Endring trer i kraft ved neste request (ingen restart).</div>
@@ -137,8 +136,8 @@
   </div>
 
   <!-- Beredskap under vakt -->
-  <div style="margin-top:1.5rem;padding:1rem;background:var(--surface-1);border:1px solid var(--border-color);border-radius:10px;">
-    <h3 style="margin:0 0 0.5rem;font-size:0.9rem;color:var(--text-muted);text-transform:uppercase;">Beredskap under vakt</h3>
+  <div style="margin-top:1.5rem;padding:1rem;background:var(--portal-surface);border:1px solid var(--portal-border);border-radius:10px;">
+    <h3 style="margin:0 0 0.5rem;font-size:0.9rem;color:var(--portal-text-muted);text-transform:uppercase;">Beredskap under vakt</h3>
     <p style="margin:0 0 0.75rem;font-size:0.88rem;">
       Les av <strong>P95 (siste 5 min)</strong> på dashbordet — det er det viktigste tallet. Tabellen under er en hurtigreferanse; full prosedyre i <code>RUNBOOK_VAKT.md</code>.
     </p>
@@ -174,20 +173,27 @@
         </tr>
       </tbody>
     </table>
-    <p style="margin:0.75rem 0 0;font-size:0.8rem;color:var(--text-muted);">
+    <p style="margin:0.75rem 0 0;font-size:0.8rem;color:var(--portal-text-muted);">
       <strong>Viktig:</strong> 2+ workers krever at Cache-backend-kortet viser <code>REDIS / OK</code>. Med LocMemCache vil rate-limit og stats-cache fragmenteres mellom workers.
     </p>
   </div>
 
   <!-- JSON preview -->
   <details style="margin-top:1rem;">
-    <summary style="cursor:pointer;color:var(--text-muted);font-size:0.85rem;">Vis rå JSON (for debugging)</summary>
+    <summary style="cursor:pointer;color:var(--portal-text-muted);font-size:0.85rem;">Vis rå JSON (for debugging)</summary>
     <pre class="json-preview" id="json-preview">{{ payload_json }}</pre>
   </details>
-</div>
 {% endblock %}
 
 {% block extra_scripts %}
+<script>
+const ADMIN_URLS = {
+  json:     "{% url 'admin_server_status_json' %}",
+  sessions: "{% url 'admin_sessions_list' %}",
+  kill:     "{% url 'admin_session_kill' %}",
+  killAll:  "{% url 'admin_session_kill_all' %}",
+};
+</script>
 <script>
 (function() {
   'use strict';
@@ -206,7 +212,7 @@
 
   async function refresh() {
     try {
-      const res = await fetch('/pasienter/admin/server-status/json/', {
+      const res = await fetch(ADMIN_URLS.json, {
         headers: {'Accept': 'application/json'},
       });
       if (!res.ok) throw new Error('HTTP ' + res.status);
@@ -348,7 +354,7 @@
     const list = document.getElementById('sessions-list');
     const status = document.getElementById('sessions-status');
     try {
-      const res = await fetch('/pasienter/admin/server-status/sessions/', {
+      const res = await fetch(ADMIN_URLS.sessions, {
         headers: {'Accept': 'application/json'},
       });
       if (!res.ok) throw new Error('HTTP ' + res.status);
@@ -381,7 +387,7 @@
     try {
       const fd = new FormData();
       fd.append('session_key', sessionKey);
-      const res = await fetch('/pasienter/admin/server-status/sessions/kill/', {
+      const res = await fetch(ADMIN_URLS.kill, {
         method: 'POST',
         headers: _csrfHeader(),
         body: fd,
@@ -417,7 +423,7 @@
     try {
       const fd = new FormData();
       fd.append('confirm', 'YES');
-      const res = await fetch('/pasienter/admin/server-status/sessions/kill-all/', {
+      const res = await fetch(ADMIN_URLS.killAll, {
         method: 'POST',
         headers: _csrfHeader(),
         body: fd,

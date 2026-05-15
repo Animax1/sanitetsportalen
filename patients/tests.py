@@ -102,23 +102,23 @@ class PabegyntTests(TestCase):
         result = stamp_pabegynt_if_needed(p, {'behandler': b.id})
         self.assertTrue(result)
 
-    def test_helsepersonell_triggers_pabegynt(self):
-        """Helsepersonell-felt skal utløse påbegynt-stempling."""
+    def test_helsepersonell_ref_triggers_pabegynt(self):
+        """helsepersonell_ref-felt skal utløse påbegynt-stempling."""
         p = Patient(pasientnummer=1, year=2026)
-        result = stamp_pabegynt_if_needed(p, {'helsepersonell': '2'})
+        result = stamp_pabegynt_if_needed(p, {'helsepersonell_ref': 2})
         self.assertTrue(result)
 
     def test_pabegynt_not_overwritten(self):
         """Påbegynt skal ikke overskrives hvis det allerede er satt."""
         p = Patient(pasientnummer=1, year=2026, pabegynt='15.04.2026 10:00')
-        result = stamp_pabegynt_if_needed(p, {'helsepersonell': '2'})
+        result = stamp_pabegynt_if_needed(p, {'helsepersonell_ref': 2})
         self.assertFalse(result)
         self.assertEqual(p.pabegynt, '15.04.2026 10:00')
 
     def test_empty_trigger_does_not_stamp(self):
         """Tom trigger-verdi skal ikke utløse stempling."""
         p = Patient(pasientnummer=1, year=2026)
-        result = stamp_pabegynt_if_needed(p, {'helsepersonell': ''})
+        result = stamp_pabegynt_if_needed(p, {'helsepersonell_ref': None})
         self.assertFalse(result)
         self.assertFalse(p.pabegynt)
 

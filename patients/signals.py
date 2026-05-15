@@ -69,7 +69,7 @@ def patient_pre_save(sender, instance, **kwargs):
     # Spor alle endrede felt (behandler_id logges automatisk som FK-endring)
     felt_to_track = [
         'problemstilling', 'arsak', 'transport', 'inntid', 'grovsortering',
-        'pabegynt', 'plassering', 'behandler_id', 'helsepersonell', 'lege',
+        'pabegynt', 'plassering', 'behandler_id', 'lege',
         'medisiner', 'inn_obspost', 'ut_obspost', 'utskrevet',
         'utskrevet_til', 'journal', 'year', 'is_active',
     ]

@@ -58,33 +58,7 @@
   </div>
 
   <div style="margin-left:auto;display:flex;align-items:center;gap:0.75rem;">
-    <!-- Varsel-bjelle -->
-    <div class="dropdown">
-      <button type="button"
-              id="notif-bell-btn"
-              class="notif-bell position-relative"
-              data-bs-toggle="dropdown"
-              data-bs-auto-close="outside"
-              aria-expanded="false"
-              title="Varsler" aria-label="Varsler">
-        <i class="bi bi-bell-fill"></i>
-        <span id="notification-badge"
-              class="notif-badge"
-              style="display:{% if notification_unread_count %}inline-flex{% else %}none{% endif %};">
-          {{ notification_unread_count|default:0 }}
-        </span>
-      </button>
-      <div class="dropdown-menu dropdown-menu-end notif-panel" aria-labelledby="notif-bell-btn">
-        <div class="notif-panel-hdr">
-          <span>Varsler</span>
-          <button type="button" id="notif-mark-all-btn" class="btn btn-link btn-sm p-0">Marker alle lest</button>
-        </div>
-        <div id="notif-list" class="notif-panel-body"></div>
-        <div class="notif-panel-ftr">
-          <a href="{% url 'core:notification_list' %}">Vis alle varsler</a>
-        </div>
-      </div>
-    </div>
+    {% include "partials/_notification_bell.html" %}
 
     <!-- Dato/tid -->
     <div id="header-dt" style="text-align:right;line-height:1.2;"></div>
@@ -102,6 +76,7 @@
         <li><hr class="dropdown-divider" style="border-color:#334155;margin:0;"></li>
         <li><a class="dropdown-item" href="/" style="color:#93c5fd;"><i class="bi bi-grid-3x3-gap me-2"></i>Tilbake til portal</a></li>
         <li><hr class="dropdown-divider" style="border-color:#334155;margin:0;"></li>
+        <li><a class="dropdown-item" href="{% url 'core:profile' %}" style="color:#e5e7eb;"><i class="bi bi-person-circle me-2"></i>Min profil</a></li>
         <li><a class="dropdown-item" href="{% url 'accounts:change_password' %}" style="color:#e5e7eb;"><i class="bi bi-key me-2"></i>Endre passord</a></li>
         {% if request.user.role == 'admin' %}
         <li><a class="dropdown-item" href="{% url 'accounts:user_list' %}" style="color:#e5e7eb;"><i class="bi bi-people me-2"></i>Administrer brukere</a></li>
@@ -1059,7 +1034,10 @@
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 <script src="https://unpkg.com/tabulator-tables@6.2.5/dist/js/tabulator.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
-<script src="{% static 'js/script.js' %}"></script>
+<script src="{% static 'js/patients-utils.js' %}"></script>
+<script src="{% static 'js/patients-table.js' %}"></script>
+<script src="{% static 'js/patients-forms.js' %}"></script>
+<script src="{% static 'js/patients-stats.js' %}"></script>
 <script src="{% static 'js/notifications.js' %}"></script>
 </body>
 </html>

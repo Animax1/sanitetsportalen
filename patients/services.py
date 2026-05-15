@@ -167,7 +167,7 @@ def get_event_name_or_legacy(year):
 # ── Automatisk tidsstempel for påbegynt behandling ────────────────────────────
 
 TREATMENT_TRIGGER_FIELDS = (
-    'behandler', 'helsepersonell_ref', 'helsepersonell', 'lege', 'medisiner',
+    'behandler', 'helsepersonell_ref', 'lege', 'medisiner',
     'inn_obspost', 'ut_obspost', 'utskrevet', 'utskrevet_til',
 )
 

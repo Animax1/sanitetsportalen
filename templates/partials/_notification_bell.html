@@ -1,0 +1,29 @@
+{% if request.user.is_authenticated %}
+<div class="dropdown">
+  <button type="button"
+          id="notif-bell-btn"
+          class="notif-bell position-relative"
+          data-bs-toggle="dropdown"
+          data-bs-auto-close="outside"
+          aria-expanded="false"
+          title="Varsler"
+          aria-label="Varsler">
+    <i class="bi bi-bell-fill"></i>
+    <span id="notification-badge"
+          class="notif-badge"
+          style="display:{% if notification_unread_count %}inline-flex{% else %}none{% endif %};">
+      {{ notification_unread_count|default:0 }}
+    </span>
+  </button>
+  <div class="dropdown-menu dropdown-menu-end notif-panel" aria-labelledby="notif-bell-btn">
+    <div class="notif-panel-hdr">
+      <span>Varsler</span>
+      <button type="button" id="notif-mark-all-btn" class="btn btn-link btn-sm p-0">Marker alle lest</button>
+    </div>
+    <div id="notif-list" class="notif-panel-body"></div>
+    <div class="notif-panel-ftr">
+      <a href="{% url 'core:notification_list' %}">Vis alle varsler</a>
+    </div>
+  </div>
+</div>
+{% endif %}

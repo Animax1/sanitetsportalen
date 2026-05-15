@@ -11,6 +11,7 @@ Legacy-redirects gjelder kun URL-er som tidligere ble servert direkte fra root
 `/django-admin/`, `/accounts/...` er IKKE påvirket — de håndteres uendret av
 myproject/urls.py.
 """
+from django.shortcuts import redirect
 from django.urls import path, re_path
 
 from . import views
@@ -125,15 +126,10 @@ urlpatterns = [
     # /api/<alt> → /pasienter/api/<alt>
     re_path(r'^api/.*$', views.legacy_root_redirect, name='legacy_api'),
 
-    # /admin/server-status/<alt> → /pasienter/admin/server-status/<alt>
+    # /admin/server-status/<alt> → /portal-admin/server-status/<alt>
     re_path(
-        r'^admin/server-status/.*$',
-        views.legacy_root_redirect,
+        r'^admin/server-status/(?P<rest>.*)$',
+        lambda req, rest='': redirect(f'/portal-admin/server-status/{rest}', permanent=True),
         name='legacy_admin_server_status',
-    ),
-    path(
-        'admin/server-status/',
-        views.legacy_root_redirect,
-        name='legacy_admin_server_status_root',
     ),
 ]

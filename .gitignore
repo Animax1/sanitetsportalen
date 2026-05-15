@@ -27,3 +27,7 @@ usb_package_builder/output/
 start_offline.bat
 OFFLINE_PASSWORD.md
 start_offline_deprecated.bat
+
+
+#CLAUDE
+.claude/settings.local.json

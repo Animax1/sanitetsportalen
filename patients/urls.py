@@ -1,5 +1,6 @@
 """URL-konfigurasjon for patients-appen."""
-from django.urls import path
+from django.urls import path, re_path
+from django.shortcuts import redirect
 from . import views, admin_status
 
 urlpatterns = [
@@ -38,14 +39,9 @@ urlpatterns = [
     path('api/innstillinger/arkiv/<int:pk>/', views.arkiv_detalj_view, name='api_arkiv_detalj'),
     path('api/innstillinger/arkiv/<int:pk>/full-stats/', views.arkiv_full_stats_view, name='api_arkiv_full_stats'),
 
-    # Admin server-status (kun admin)
-    path('admin/server-status/',      admin_status.admin_status_view, name='admin_server_status'),
-    path('admin/server-status/json/', admin_status.admin_status_json, name='admin_server_status_json'),
-    path('admin/server-status/flag/', admin_status.admin_set_flag,    name='admin_set_flag'),
-    # Sesjonshåndtering (kun admin)
-    path('admin/server-status/sessions/',          admin_status.admin_sessions_list,     name='admin_sessions_list'),
-    path('admin/server-status/sessions/kill/',     admin_status.admin_session_kill,      name='admin_session_kill'),
-    path('admin/server-status/sessions/kill-all/', admin_status.admin_session_kill_all,  name='admin_session_kill_all'),
+    # Bakover-kompatibel redirect: /pasienter/admin/server-status/... → /portal-admin/server-status/...
+    re_path(r'^admin/server-status/(?P<rest>.*)$',
+            lambda req, rest='': redirect(f'/portal-admin/server-status/{rest}', permanent=True)),
 
     # Backup / Restore (kun admin)
     path('api/backup/',                   views.backup_list_view,       name='api_backup_list'),

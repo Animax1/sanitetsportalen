@@ -34,7 +34,7 @@ PATIENT_COPY_FIELDS = [
     'grovsortering', 'problemstilling', 'arsak',
     'transport', 'inntid', 'pabegynt', 'plassering', 'inn_obspost',
     'ut_obspost', 'utskrevet', 'utskrevet_til', 'journal',
-    'lege', 'medisiner', 'helsepersonell',
+    'lege', 'medisiner',
 ]
 
 
