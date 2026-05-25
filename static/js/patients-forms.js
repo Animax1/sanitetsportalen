@@ -2,7 +2,7 @@
 // NEW PATIENT MODAL
 // ════════════════════════════════════════════════════════
 function openNewModal() {
-  ['n-problemstilling','n-arsak','n-transport','n-plassering','n-behandler'].forEach(id => {
+  ['n-problemstilling','n-arsak','n-transport','n-plassering','n-forstehjelper'].forEach(id => {
     const el = document.getElementById(id);
     if (el) { el.value = ''; el.classList.remove('is-invalid'); }
   });
@@ -57,7 +57,7 @@ async function _saveNewImpl() {
     transport:       document.getElementById('n-transport').value,
     inntid:          document.getElementById('n-inntid').value || nowStr(),
     plassering:      document.getElementById('n-plassering').value,
-    behandler:       parseInt(document.getElementById('n-behandler').value) || null,
+    forstehjelper:       parseInt(document.getElementById('n-forstehjelper').value) || null,
     helsepersonell_ref: parseInt(document.getElementById('n-helsepersonell').value) || null,
   };
   const res = await apiFetch('/pasienter/api/patients/', {
@@ -102,7 +102,7 @@ function openEdit(data) {
   try { _ensurePlasseringOption('e-plassering', data.plassering); }
   catch (e) { console.warn('_ensurePlasseringOption feilet:', e); }
   set('e-plassering',      data.plassering);
-  _populateBehandlerDropdown('e-behandler', data.behandler || null);
+  _populateForstehjelperDropdown('e-forstehjelper', data.forstehjelper || null);
   _populateHelsepersonellDropdown('e-helsepersonell-ref', data.helsepersonell_ref || null);
   set('e-lege',            data.lege);
   set('e-medisiner',       data.medisiner);
@@ -137,7 +137,7 @@ async function _saveEditImpl() {
     inntid:          document.getElementById('e-inntid').value,
     pabegynt:        document.getElementById('e-pabegynt').value,
     plassering:      document.getElementById('e-plassering').value,
-    behandler:       parseInt(document.getElementById('e-behandler').value) || null,
+    forstehjelper:       parseInt(document.getElementById('e-forstehjelper').value) || null,
     helsepersonell_ref: parseInt(document.getElementById('e-helsepersonell-ref').value) || null,
     lege:            document.getElementById('e-lege').value,
     medisiner:       document.getElementById('e-medisiner').value,
@@ -219,16 +219,16 @@ function _ensurePlasseringOption(selectId, value) {
 }
 
 // ════════════════════════════════════════════════════════
-// BEHANDLER & HELSEPERSONELL DROPDOWN HELPERS
+// FØRSTEHJELPER & HELSEPERSONELL DROPDOWN HELPERS
 // ════════════════════════════════════════════════════════
 
-function _populateBehandlerDropdown(selectId, currentBehandler) {
+function _populateForstehjelperDropdown(selectId, currentForstehjelper) {
   const sel = document.getElementById(selectId);
   if (!sel) return;
-  const currentId = currentBehandler ? String(currentBehandler.id) : '';
+  const currentId = currentForstehjelper ? String(currentForstehjelper.id) : '';
   sel.innerHTML = '<option value="">—</option>';
-  behandlere
-    .filter(b => b.is_active || (currentBehandler && String(b.id) === currentId))
+  forstehjelpere
+    .filter(b => b.is_active || (currentForstehjelper && String(b.id) === currentId))
     .forEach(b => {
       const opt = document.createElement('option');
       opt.value = b.id;

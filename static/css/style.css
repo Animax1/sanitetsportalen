@@ -272,6 +272,18 @@
     font-weight: 600 !important;
   }
 
+  .filter-btn.active-mine {
+    background: #cffafe !important;
+    color: #0e7490 !important;
+    border-color: #0e7490 !important;
+  }
+
+  .zone-card.not-mine,
+  .obs-cell.not-mine {
+    opacity: 0.38;
+    filter: saturate(0.4);
+  }
+
   #row-count {
     font-size: 0.78rem;
     color: var(--text-soft);

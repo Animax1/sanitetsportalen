@@ -56,16 +56,16 @@ def link_users_by_name(apps, schema_editor):
         linked_h += 1
 
     # Logg resultatet til migrate-output
-    print(f'  → Koblet {linked_b} Behandler-rad(er) til CustomUser.')
-    print(f'  → Koblet {linked_h} Helsepersonell-rad(er) til CustomUser.')
+    print(f'  ->Koblet {linked_b} Behandler-rad(er) til CustomUser.')
+    print(f'  ->Koblet {linked_h} Helsepersonell-rad(er) til CustomUser.')
     if missing_b:
-        print(f'  → {len(missing_b)} Behandler-rad(er) uten matchende bruker: '
+        print(f'  ->{len(missing_b)} Behandler-rad(er) uten matchende bruker: '
               f'{", ".join(missing_b[:10])}{"..." if len(missing_b) > 10 else ""}')
     if missing_h:
-        print(f'  → {len(missing_h)} Helsepersonell-rad(er) uten matchende bruker: '
+        print(f'  ->{len(missing_h)} Helsepersonell-rad(er) uten matchende bruker: '
               f'{", ".join(missing_h[:10])}{"..." if len(missing_h) > 10 else ""}')
     if conflict_b or conflict_h:
-        print(f'  → {conflict_b + conflict_h} rad(er) hoppet over pga. konflikt '
+        print(f'  ->{conflict_b + conflict_h} rad(er) hoppet over pga. konflikt '
               '(bruker allerede koblet).')
 
 

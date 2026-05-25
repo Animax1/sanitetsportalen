@@ -642,18 +642,18 @@ async function saveSessionTimeout() {
 }
 
 // ════════════════════════════════════════════════════════
-// BEHANDLERE
+// FORSTEHJELPERE
 // ════════════════════════════════════════════════════════
 
-// ETag for behandlere – unngår unyttig dataoverføring når listen er uendret
-let lastBehandlereEtag = null;
+// ETag for forstehjelpere – unngår unyttig dataoverføring når listen er uendret
+let lastForstehjelperEtag = null;
 
-async function loadBehandlere() {
+async function loadForstehjelpere() {
   const headers = { 'Cache-Control': 'no-cache' };
-  if (lastBehandlereEtag) {
-    headers['If-None-Match'] = lastBehandlereEtag;
+  if (lastForstehjelperEtag) {
+    headers['If-None-Match'] = lastForstehjelperEtag;
   }
-  const res = await fetch('/pasienter/api/behandlere/', {
+  const res = await fetch('/pasienter/api/forstehjelpere/', {
     cache: 'no-store',
     headers,
   });
@@ -661,69 +661,69 @@ async function loadBehandlere() {
     return;
   }
   const etag = res.headers.get('ETag');
-  if (etag) lastBehandlereEtag = etag;
-  behandlere = await res.json();
-  _populateBehandlerDropdown('n-behandler', null);
-  const eBeh = document.getElementById('e-behandler');
+  if (etag) lastForstehjelperEtag = etag;
+  forstehjelpere = await res.json();
+  _populateForstehjelperDropdown('n-forstehjelper', null);
+  const eBeh = document.getElementById('e-forstehjelper');
   const currentEditBeh = eBeh && eBeh.value
-    ? behandlere.find(b => String(b.id) === String(eBeh.value)) || null
+    ? forstehjelpere.find(b => String(b.id) === String(eBeh.value)) || null
     : null;
-  _populateBehandlerDropdown('e-behandler', currentEditBeh);
-  renderBehandlereAdmin();
+  _populateForstehjelperDropdown('e-forstehjelper', currentEditBeh);
+  renderForstehjelperAdmin();
 }
 
-function renderBehandlereAdmin() {
-  const container = document.getElementById('behandlere-list');
+function renderForstehjelperAdmin() {
+  const container = document.getElementById('forstehjelpere-list');
   if (!container) return;
-  if (!behandlere.length) {
-    container.innerHTML = '<span class="text-muted small">Ingen behandlere registrert.</span>';
+  if (!forstehjelpere.length) {
+    container.innerHTML = '<span class="text-muted small">Ingen forstehjelpere registrert.</span>';
     return;
   }
-  const rows = behandlere.map(b => `
+  const rows = forstehjelpere.map(b => `
     <div class="d-flex align-items-center gap-2 mb-1" style="font-size:0.85rem;">
       <span class="flex-grow-1 ${b.is_active ? '' : 'text-muted'}">${b.name}${b.is_active ? '' : ' <em>(inaktiv)</em>'}</span>
-      <button class="btn btn-outline-secondary btn-sm py-0 px-1" onclick="toggleBehandler(${b.id})" title="${b.is_active ? 'Deaktiver' : 'Aktiver'}">
+      <button class="btn btn-outline-secondary btn-sm py-0 px-1" onclick="toggleForstehjelper(${b.id})" title="${b.is_active ? 'Deaktiver' : 'Aktiver'}">
         <i class="bi bi-${b.is_active ? 'toggle-on' : 'toggle-off'}"></i>
       </button>
-      <button class="btn btn-outline-danger btn-sm py-0 px-1" onclick="deleteBehandler(${b.id})" title="Slett">
+      <button class="btn btn-outline-danger btn-sm py-0 px-1" onclick="deleteForstehjelper(${b.id})" title="Slett">
         <i class="bi bi-trash"></i>
       </button>
     </div>`).join('');
   container.innerHTML = rows;
 }
 
-async function addBehandler() {
-  const nameEl = document.getElementById('new-behandler-name');
+async function addForstehjelper() {
+  const nameEl = document.getElementById('new-forstehjelper-name');
   const name = (nameEl?.value || '').trim();
   if (!name) { alert('Skriv inn et navn.'); return; }
-  const res = await apiFetch('/pasienter/api/behandlere/', {
+  const res = await apiFetch('/pasienter/api/forstehjelpere/', {
     method: 'POST',
     body: JSON.stringify({ name })
   });
   if (res.ok) {
     nameEl.value = '';
-    await loadBehandlere();
+    await loadForstehjelpere();
   } else {
     const d = await res.json();
-    alert(d.error || 'Feil ved oppretting av behandler.');
+    alert(d.error || 'Feil ved oppretting av førstehjelper.');
   }
 }
 
-async function toggleBehandler(id) {
-  const b = behandlere.find(x => x.id === id);
+async function toggleForstehjelper(id) {
+  const b = forstehjelpere.find(x => x.id === id);
   if (!b) return;
-  const res = await apiFetch(`/pasienter/api/behandlere/${id}/`, {
+  const res = await apiFetch(`/pasienter/api/forstehjelpere/${id}/`, {
     method: 'PUT',
     body: JSON.stringify({ is_active: !b.is_active })
   });
-  if (res.ok) await loadBehandlere();
+  if (res.ok) await loadForstehjelpere();
 }
 
-async function deleteBehandler(id) {
-  if (!confirm('Slett behandler? Hvis behandleren er knyttet til pasienter, vil slettingen blokkeres.')) return;
-  const res = await apiFetch(`/pasienter/api/behandlere/${id}/`, { method: 'DELETE' });
+async function deleteForstehjelper(id) {
+  if (!confirm('Slett førstehjelper? Hvis førstehjelperen er knyttet til pasienter, vil slettingen blokkeres.')) return;
+  const res = await apiFetch(`/pasienter/api/forstehjelpere/${id}/`, { method: 'DELETE' });
   if (res.ok) {
-    await loadBehandlere();
+    await loadForstehjelpere();
   } else {
     const d = await res.json();
     alert(d.error || 'Feil ved sletting.');
@@ -731,7 +731,7 @@ async function deleteBehandler(id) {
 }
 
 // ════════════════════════════════════════════════════════
-// HELSEPERSONELL (samme mønster som behandlere)
+// HELSEPERSONELL (samme mønster som forstehjelpere)
 // ════════════════════════════════════════════════════════
 let lastHelsepersonellEtag = null;
 
@@ -853,7 +853,7 @@ document.querySelectorAll('[data-tab]').forEach(link => link.addEventListener('c
     loadSettings();
     loadArchives();
     loadSessionTimeout();
-    loadBehandlere();
+    loadForstehjelpere();
     loadHelsepersonell();
     loadBackupPanel();
   }
@@ -881,7 +881,7 @@ let refreshId = null;
 
 async function doAutoRefresh() {
   await loadPatients();
-  await loadBehandlere();
+  await loadForstehjelpere();
   await loadHelsepersonell();
   const t = document.querySelector('[data-tab].active')?.dataset.tab;
   if (t === 'tavle')      renderBoard();
@@ -1043,9 +1043,9 @@ document.addEventListener('DOMContentLoaded', () => {
 document.addEventListener('DOMContentLoaded', async () => {
   applyRoleVisibility();
   initTable();
-  const mineToggle = document.getElementById('toggle-mine');
-  if (mineToggle) mineToggle.checked = mineOnly;
-  await loadBehandlere();
+  const mineBtn = document.getElementById('btn-mine');
+  if (mineBtn) mineBtn.classList.toggle('active-mine', mineOnly);
+  await loadForstehjelpere();
   await loadHelsepersonell();
   await loadPatients();
   loadSettings();

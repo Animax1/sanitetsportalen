@@ -2,7 +2,7 @@
 Signals for pasient-app.
 
 - AuditLog: CREATE/UPDATE/DELETE logges for hver pasient-endring.
-- Notification (Fase 5): når ``behandler`` eller ``helsepersonell_ref``
+- Notification (Fase 5): når ``forstehjelper`` eller ``helsepersonell_ref``
   tildeles eller flyttes mellom brukere, varsles berørte parter via
   core.notifications.notify(). Både ny mottaker og forrige eier varsles
   ved flytting, kun ny mottaker ved første tildeling.
@@ -12,7 +12,7 @@ import logging
 from django.db.models.signals import pre_save, post_save, post_delete
 from django.dispatch import receiver
 
-from .models import Patient, Behandler, Helsepersonell
+from .models import Patient, Forstehjelper, Helsepersonell
 from audit.models import AuditLog
 from audit.utils import get_current_request
 from core.notifications import notify
@@ -42,34 +42,34 @@ def patient_pre_save(sender, instance, **kwargs):
     """Logg feltendringer (UPDATE) for eksisterende pasienter.
 
     Lagrer også originale FK-ID-er som transient attributter på ``instance``
-    (``_orig_behandler_id``, ``_orig_helsepersonell_ref_id``) slik at
+    (``_orig_forstehjelper_id``, ``_orig_helsepersonell_ref_id``) slik at
     post_save kan oppdage flyttinger og sende varsler.
     """
     if not instance.pk:
         # Ny pasient – håndteres av post_save. Marker som ny slik at
-        # tildelings-varsel sendes for behandler/helsepersonell som
+        # tildelings-varsel sendes for forstehjelper/helsepersonell som
         # settes ved opprettelsen.
-        instance._orig_behandler_id = None
+        instance._orig_forstehjelper_id = None
         instance._orig_helsepersonell_ref_id = None
         return
 
     try:
         old = Patient.objects.get(pk=instance.pk)
     except Patient.DoesNotExist:
-        instance._orig_behandler_id = None
+        instance._orig_forstehjelper_id = None
         instance._orig_helsepersonell_ref_id = None
         return
 
     # Lagre originalverdier for post_save (varsel-signal)
-    instance._orig_behandler_id = old.behandler_id
+    instance._orig_forstehjelper_id = old.forstehjelper_id
     instance._orig_helsepersonell_ref_id = old.helsepersonell_ref_id
 
     user, ip = _get_user_and_ip()
 
-    # Spor alle endrede felt (behandler_id logges automatisk som FK-endring)
+    # Spor alle endrede felt (forstehjelper_id logges automatisk som FK-endring)
     felt_to_track = [
         'problemstilling', 'arsak', 'transport', 'inntid', 'grovsortering',
-        'pabegynt', 'plassering', 'behandler_id', 'lege',
+        'pabegynt', 'plassering', 'forstehjelper_id', 'lege',
         'medisiner', 'inn_obspost', 'ut_obspost', 'utskrevet',
         'utskrevet_til', 'journal', 'year', 'is_active',
     ]
@@ -125,24 +125,24 @@ def _send_assignment_notifications(patient, created):
     fortsette uten varsel. Varsler skal aldri kunne hindre pasient-lagring.
     """
     try:
-        # ── Behandler-FK ──
-        orig_b_id = getattr(patient, '_orig_behandler_id', None) if not created else None
-        new_b_id = patient.behandler_id
+        # ── Førstehjelper-FK ──
+        orig_b_id = getattr(patient, '_orig_forstehjelper_id', None) if not created else None
+        new_b_id = patient.forstehjelper_id
         if created:
             # Ved CREATE: kun varsle ny mottaker (ingen forrige)
             if new_b_id is not None:
-                _notify_assignment(patient, patient.behandler, role='førstehjelper')
+                _notify_assignment(patient, patient.forstehjelper, role='førstehjelper')
         elif orig_b_id != new_b_id:
             # FK endret seg
             if new_b_id is not None:
-                _notify_assignment(patient, patient.behandler, role='førstehjelper')
+                _notify_assignment(patient, patient.forstehjelper, role='førstehjelper')
             if orig_b_id is not None:
                 try:
-                    prev = Behandler.objects.get(pk=orig_b_id)
-                except Behandler.DoesNotExist:
+                    prev = Forstehjelper.objects.get(pk=orig_b_id)
+                except Forstehjelper.DoesNotExist:
                     prev = None
                 if prev is not None:
-                    _notify_transfer(patient, prev, new_owner=patient.behandler,
+                    _notify_transfer(patient, prev, new_owner=patient.forstehjelper,
                                      role='førstehjelper')
 
         # ── Helsepersonell-FK ──

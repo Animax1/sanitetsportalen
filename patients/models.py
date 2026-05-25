@@ -36,10 +36,10 @@ class AppSetting(models.Model):
         return obj
 
 
-class Behandler(models.Model):
-    """Behandler som kan knyttes til pasienter.
+class Forstehjelper(models.Model):
+    """Førstehjelper som kan knyttes til pasienter.
 
-    Inaktive behandlere vises ikke i dropdown, men beholdes som FK
+    Inaktive forstehjelpere vises ikke i dropdown, men beholdes som FK
     på historiske pasienter for å bevare referanseintegriteten.
 
     Fase 5: ``user`` er en valgfri 1:1-kobling til CustomUser slik at
@@ -54,7 +54,7 @@ class Behandler(models.Model):
         null=True,
         blank=True,
         on_delete=models.SET_NULL,
-        related_name='behandler_profil',
+        related_name='forstehjelper_profil',
         verbose_name='Koblet bruker',
         help_text=(
             'Valgfri kobling til en portalbruker. Hvis satt, kan brukeren '
@@ -65,8 +65,8 @@ class Behandler(models.Model):
     created_at = models.DateTimeField(auto_now_add=True, verbose_name='Opprettet')
 
     class Meta:
-        verbose_name = 'Behandler'
-        verbose_name_plural = 'Behandlere'
+        verbose_name = 'Førstehjelper'
+        verbose_name_plural = 'Forstehjelpere'
         ordering = ['-is_active', 'name']
 
     def __str__(self):
@@ -127,13 +127,13 @@ class Patient(models.Model):
     grovsortering = models.CharField(max_length=50, default='', blank=True, verbose_name='Grovsortering')
     pabegynt = models.TextField(default='', blank=True, verbose_name='Påbegynt')
     plassering = models.CharField(max_length=255, default='', blank=True, verbose_name='Plassering')
-    behandler = models.ForeignKey(
-        Behandler,
+    forstehjelper = models.ForeignKey(
+        Forstehjelper,
         null=True,
         blank=True,
         on_delete=models.PROTECT,
         related_name='patients',
-        verbose_name='Behandler',
+        verbose_name='Førstehjelper',
     )
     helsepersonell_ref = models.ForeignKey(
         Helsepersonell,
@@ -218,7 +218,7 @@ class ArkivertPasient(models.Model):
     ut_obspost = models.TextField(blank=True, default='', verbose_name='Ut obspost')
     utskrevet = models.TextField(blank=True, default='', verbose_name='Utskrevet')
     utskrevet_til = models.CharField(max_length=255, blank=True, default='', verbose_name='Utskrevet til')
-    behandler_navn = models.CharField(max_length=255, blank=True, default='', verbose_name='Behandler (navn)')
+    forstehjelper_navn = models.CharField(max_length=255, blank=True, default='', verbose_name='Førstehjelper (navn)')
     helsepersonell_navn = models.CharField(max_length=255, blank=True, default='', verbose_name='Helsepersonell (navn)')
     lege = models.CharField(max_length=50, blank=True, default='', verbose_name='Lege')
     medisiner = models.CharField(max_length=50, blank=True, default='', verbose_name='Medisiner')

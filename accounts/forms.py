@@ -139,80 +139,60 @@ class AdminUserEditForm(forms.ModelForm):
         return email or None
 
 
-class UserPatientLinkForm(forms.Form):
-    """Skjema for å koble en bruker til Behandler ELLER Helsepersonell.
+class PasientRolleForm(forms.Form):
+    """Enkel radio for å sette brukerens rolle i pasientregistreringen.
 
-    Fase 5: Bruker kan kobles til EN av rollene (ønsket adferd — ikke begge
-    samtidig). Tom verdi i begge feltene tillates (= ingen kobling).
-    Begge feltene fylt ut gir valideringsfeil.
+    Ingen / Førstehjelper / Helsepersonell. Finner eller oppretter en matchende
+    oppføring i Forstehjelper/Helsepersonell-tabellen og oppdaterer
+    kan_redigere_pasienter på brukeren.
     """
-    behandler = forms.ModelChoiceField(
-        queryset=None,  # Settes i __init__ for å unngå sirkulær import
-        required=False,
-        label='Førstehjelper (Behandler)',
-        empty_label='— Ikke koblet —',
-        widget=forms.Select(attrs={'class': 'form-select form-select-sm'}),
-        help_text='Koble brukeren til en oppføring i Behandler-listen.',
-    )
-    helsepersonell = forms.ModelChoiceField(
-        queryset=None,
-        required=False,
-        label='Oppfølgingsansvarlig (Helsepersonell)',
-        empty_label='— Ikke koblet —',
-        widget=forms.Select(attrs={'class': 'form-select form-select-sm'}),
-        help_text='Koble brukeren til en oppføring i Helsepersonell-listen.',
+    CHOICES = [
+        ('ingen',          'Ingen tilgang'),
+        ('forstehjelper',  'Førstehjelper'),
+        ('helsepersonell', 'Helsepersonell'),
+    ]
+    pasient_rolle = forms.ChoiceField(
+        choices=CHOICES,
+        widget=forms.RadioSelect,
+        label='',
     )
 
-    def __init__(self, *args, target_user=None, **kwargs):
+    def __init__(self, user, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        # Lokal import for å unngå sirkulær import på modul-load
-        from patients.models import Behandler, Helsepersonell
-        self._target_user = target_user
-        # Vis behandlere som enten er uten kobling, eller koblet til DENNE brukeren
-        beh_qs = Behandler.objects.filter(user__isnull=True).order_by('name')
-        hp_qs = Helsepersonell.objects.filter(user__isnull=True).order_by('name')
-        if target_user is not None:
-            beh_qs = (Behandler.objects.filter(user=target_user) | beh_qs).distinct().order_by('name')
-            hp_qs = (Helsepersonell.objects.filter(user=target_user) | hp_qs).distinct().order_by('name')
-        self.fields['behandler'].queryset = beh_qs
-        self.fields['helsepersonell'].queryset = hp_qs
-        # Pre-velg gjeldende kobling
-        if target_user is not None:
-            current_beh = Behandler.objects.filter(user=target_user).first()
-            current_hp = Helsepersonell.objects.filter(user=target_user).first()
-            if current_beh:
-                self.fields['behandler'].initial = current_beh.pk
-            if current_hp:
-                self.fields['helsepersonell'].initial = current_hp.pk
-
-    def clean(self):
-        cleaned = super().clean()
-        beh = cleaned.get('behandler')
-        hp = cleaned.get('helsepersonell')
-        if beh and hp:
-            raise forms.ValidationError(
-                'En bruker kan kun kobles til én rolle (enten Førstehjelper '
-                'eller Oppfølgingsansvarlig), ikke begge samtidig.'
-            )
-        return cleaned
+        from patients.models import Forstehjelper, Helsepersonell
+        self.user = user
+        if not args and 'data' not in kwargs:
+            if Forstehjelper.objects.filter(user=user).exists():
+                self.fields['pasient_rolle'].initial = 'forstehjelper'
+            elif Helsepersonell.objects.filter(user=user).exists():
+                self.fields['pasient_rolle'].initial = 'helsepersonell'
+            else:
+                self.fields['pasient_rolle'].initial = 'ingen'
 
     def save(self):
-        """Bytt kobling atomisk: frigjør gammel og sett ny."""
         from django.db import transaction
-        from patients.models import Behandler, Helsepersonell
-        user = self._target_user
-        if user is None:
-            return
-        beh = self.cleaned_data.get('behandler')
-        hp = self.cleaned_data.get('helsepersonell')
+        from patients.models import Forstehjelper, Helsepersonell
+        rolle = self.cleaned_data['pasient_rolle']
+        user = self.user
         with transaction.atomic():
-            # Frigjør alle eksisterende koblinger for denne brukeren
-            Behandler.objects.filter(user=user).exclude(pk=beh.pk if beh else None).update(user=None)
-            Helsepersonell.objects.filter(user=user).exclude(pk=hp.pk if hp else None).update(user=None)
-            # Sett nye koblinger
-            if beh and beh.user_id != user.pk:
-                beh.user = user
-                beh.save(update_fields=['user'])
-            if hp and hp.user_id != user.pk:
-                hp.user = user
-                hp.save(update_fields=['user'])
+            Forstehjelper.objects.filter(user=user).update(user=None)
+            Helsepersonell.objects.filter(user=user).update(user=None)
+            if rolle == 'forstehjelper':
+                f = (
+                    Forstehjelper.objects.filter(name=user.username).first()
+                    or Forstehjelper(name=user.username)
+                )
+                f.user = user
+                f.save()
+                user.kan_redigere_pasienter = True
+            elif rolle == 'helsepersonell':
+                h = (
+                    Helsepersonell.objects.filter(name=user.username).first()
+                    or Helsepersonell(name=user.username)
+                )
+                h.user = user
+                h.save()
+                user.kan_redigere_pasienter = True
+            else:
+                user.kan_redigere_pasienter = False
+            user.save(update_fields=['kan_redigere_pasienter'])

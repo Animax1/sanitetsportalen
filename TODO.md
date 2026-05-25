@@ -7,14 +7,12 @@
 
 ## Ideer / backlog
 
-- [ ] Faktisk kobling mellom brukere og behandler/helsepersonell.
-- [ ] Vurder å endre behandler til førstehjelper?
 - [ ] Vaktliste
 - [ ] KO-tavle.
 - [ ] Fytte sesjons delen til en admin side.
-- [ ] Fjerne sanitetsportal og brukeradministrasjon fra /portal-admin/moduler/
 - [ ] Integrasjon med produksjons database.
-- [ ] ...
+- [ ] Testene er massive, kan vi komprimere den?
+- [ ] Fjerne varsler eldre enn 30 dager.s
 
 ## Ferdig ✓
 
@@ -25,3 +23,7 @@
 - [x] Fjern brukernavn/rolle fra portal-header, vis i dropdown i stedet
 - [x] Legg «Brukere» til i admin-navigasjonen i portalen
 - [x] «Min profil»-lenke lagt til i pasientmodul-dropdown
+- [x] Global dato/klokkeslett i portal-headeren (alle sider, identisk med pasientregistreringen)
+- [x] Faktisk kobling mellom brukere og behandler/helsepersonell.
+- [x] "Mine pasienter" skal være lik de andre filtrene.
+- [x] Vurder å endre behandler til førstehjelper?

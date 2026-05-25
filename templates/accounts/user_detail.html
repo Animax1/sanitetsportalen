@@ -143,34 +143,20 @@
     </div>
   </div>
 
-  <!-- Fase 5: Koble bruker til pasientregistreringsrolle -->
+  <!-- Pasientregistrering: rolle -->
   <div class="card mb-3">
-    <div class="card-header"><strong>Pasientregistrering: rollekobling</strong></div>
+    <div class="card-header"><strong><i class="bi bi-person-badge me-2"></i>Pasientregistrering</strong></div>
     <div class="card-body">
-      <p class="text-muted small mb-3" style="font-size:0.82rem;">
-        Koble brukeren til en oppføring i Førstehjelper- eller Oppfølgingsansvarlig-listen for at de skal kunne filtrere på sine egne pasienter og motta varsel ved tildeling. En bruker kan kun kobles til én rolle om gangen.
-      </p>
       <form method="post">
         {% csrf_token %}
         <input type="hidden" name="action" value="link_patient_role">
-        {% if link_form.non_field_errors %}
-          <div class="alert alert-danger py-2 mb-2" style="font-size:0.85rem;">
-            {{ link_form.non_field_errors }}
-          </div>
-        {% endif %}
-        <div class="row g-2">
-          <div class="col-md-6">
-            <label class="form-label small">{{ link_form.behandler.label }}</label>
-            {{ link_form.behandler }}
-            <div class="form-text" style="font-size:0.75rem;">{{ link_form.behandler.help_text }}</div>
-          </div>
-          <div class="col-md-6">
-            <label class="form-label small">{{ link_form.helsepersonell.label }}</label>
-            {{ link_form.helsepersonell }}
-            <div class="form-text" style="font-size:0.75rem;">{{ link_form.helsepersonell.help_text }}</div>
-          </div>
+        {% for radio in link_form.pasient_rolle %}
+        <div class="form-check mb-2">
+          {{ radio.tag }}
+          <label class="form-check-label" for="{{ radio.id_for_label }}" style="color:#cbd5e1;">{{ radio.choice_label }}</label>
         </div>
-        <button type="submit" class="btn btn-primary btn-sm mt-3">Lagre kobling</button>
+        {% endfor %}
+        <button type="submit" class="btn btn-sm btn-primary mt-2">Lagre</button>
       </form>
     </div>
   </div>

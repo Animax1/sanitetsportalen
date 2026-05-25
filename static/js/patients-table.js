@@ -27,7 +27,7 @@ const COLS = [
   { title:'Inntid',         field:'inntid',          width:135 },
   { title:'Påbegynt',       field:'pabegynt',        width:135 },
   { title:'Plassering',     field:'plassering',      width:125 },
-  { title:'Behandler',      field:'behandler',       width:115, formatter:(c)=>{ const v = c.getValue(); return v ? (v.name || v) : ''; } },
+  { title:'Førstehjelper',  field:'forstehjelper',   width:115, formatter:(c)=>{ const v = c.getValue(); return v ? (v.name || v) : ''; } },
   { title:'Helsepersonell', field:'helsepersonell_ref', width:130, formatter:(c)=>{ const v = c.getValue(); return v ? (v.name || '') : ''; } },
   { title:'Inn-Obs',        field:'inn_obspost',     width:135 },
   { title:'UT-Obs',         field:'ut_obspost',      width:135 },
@@ -76,17 +76,6 @@ async function loadPatients() {
   updateHeader(allPatients);
 }
 
-// Fase 5: Slå "Mine pasienter"-filter av/på. Refetcher fra server fordi
-// filtreringen skjer server-side (Behandler.user / Helsepersonell.user).
-async function toggleMine(checked) {
-  mineOnly = !!checked;
-  try { localStorage.setItem('mineOnly', mineOnly ? '1' : '0'); } catch (_) {}
-  await loadPatients();
-  const tavleTab = document.getElementById('tab-tavle');
-  if (tavleTab && tavleTab.classList.contains('active')) {
-    renderBoard();
-  }
-}
 
 function updateHeader(pts) {
   const act = pts.filter(p => !p.utskrevet);
@@ -111,7 +100,7 @@ function updateHeader(pts) {
 // ════════════════════════════════════════════════════════
 // FILTER
 // ════════════════════════════════════════════════════════
-function setFilter(f) {
+async function setFilter(f) {
   activeFilter = f;
   const map = {
     'alle':       ['btn-alle',      'active-alle'],
@@ -121,6 +110,7 @@ function setFilter(f) {
     'gronn':      ['btn-gronn',     'active-gronn'],
     'aktive':     ['btn-aktive',    'active-aktive'],
     'utskrevet':  ['btn-utskrevet', 'active-utskrevet'],
+    'mine':       ['btn-mine',      'active-mine'],
   };
   Object.entries(map).forEach(([key, [id, cls]]) => {
     const btn = document.getElementById(id);
@@ -128,7 +118,14 @@ function setFilter(f) {
     btn.className = btn.className.replace(/active-\S+/g, '').trim();
     if (key === f) btn.classList.add(cls);
   });
-  applyFilter();
+  const newMineOnly = (f === 'mine');
+  if (newMineOnly !== mineOnly) {
+    mineOnly = newMineOnly;
+    try { localStorage.setItem('mineOnly', mineOnly ? '1' : '0'); } catch (_) {}
+    await loadPatients();
+  } else {
+    applyFilter();
+  }
 }
 
 function applyFilter() {
@@ -195,8 +192,8 @@ function updatePlasseringDropdownState(selectId, excludePatientId) {
 // BOARD HELPERS
 // ════════════════════════════════════════════════════════
 
-function behandlerNavn(p) {
-  if (p.behandler && p.behandler.name) return p.behandler.name;
+function forstehjelperNavn(p) {
+  if (p.forstehjelper && p.forstehjelper.name) return p.forstehjelper.name;
   return '—';
 }
 
@@ -221,8 +218,15 @@ function totalDuration(p) {
 // ════════════════════════════════════════════════════════
 // BOARD (TAVLE)
 // ════════════════════════════════════════════════════════
+async function toggleBoardMine() {
+  boardMineFilter = !boardMineFilter;
+  const btn = document.getElementById('btn-board-mine');
+  if (btn) btn.classList.toggle('active-mine', boardMineFilter);
+  await renderBoard();
+}
+
 async function renderBoard() {
-  const url = '/pasienter/api/patients/' + (mineOnly ? '?mine=1' : '');
+  const url = '/pasienter/api/patients/';
   const res = await fetch(url);
   const pts = await res.json();
   const act = pts.filter(p => !p.utskrevet);
@@ -241,7 +245,7 @@ async function renderBoard() {
       const tCls = p.grovsortering === 'Rød'   ? 'occ-rod'
                  : p.grovsortering === 'Gul'   ? 'occ-gul'
                  : p.grovsortering === 'Grønn' ? 'occ-gronn' : '';
-      card.className = `zone-card ${tCls}`;
+      card.className = `zone-card ${tCls}${boardMineFilter && !isMine(p) ? ' not-mine' : ''}`;
       const hpNavn = helsepersonellNavn(p);
       card.innerHTML = `
         <div class="zc-head">
@@ -249,7 +253,7 @@ async function renderBoard() {
           <span class="zc-prob">${escapeHtml(p.problemstilling || '–')}</span>
         </div>
         <div class="zc-meta">
-          <span class="zc-behandler"><i class="bi bi-person-badge"></i> B: ${escapeHtml(behandlerNavn(p))}</span>
+          <span class="zc-forstehjelper"><i class="bi bi-person-badge"></i> B: ${escapeHtml(forstehjelperNavn(p))}</span>
           <span class="zc-duration"><i class="bi bi-clock"></i> ${totalDuration(p)}</span>
         </div>
         ${hpNavn ? `<div class="zc-meta"><span class="zc-helsepersonell"><i class="bi bi-person"></i> H: ${escapeHtml(hpNavn)}</span></div>` : ''}`;
@@ -270,16 +274,17 @@ async function renderBoard() {
                 : p.grovsortering === 'Gul'   ? 'occ-gul'
                 : p.grovsortering === 'Rød'   ? 'occ-rod' : '';
       if (cls) div.classList.add(cls);
+      if (boardMineFilter && !isMine(p)) div.classList.add('not-mine');
       const hpNavn = helsepersonellNavn(p);
       div.innerHTML = `
         <div class="obs-bed-nr">${label}</div>
         <div class="obs-patient-nr">#${p.patient_nr}</div>
         <div class="obs-problem">${escapeHtml(p.problemstilling || '–')}</div>
         <div class="obs-meta">
-          <span class="obs-behandler-name">B: ${escapeHtml(behandlerNavn(p))}</span>
+          <span class="obs-forstehjelper-name">B: ${escapeHtml(forstehjelperNavn(p))}</span>
           <span class="obs-duration">${totalDuration(p)}</span>
         </div>
-        ${hpNavn ? `<div class="obs-meta"><span class="obs-behandler-name">H: ${escapeHtml(hpNavn)}</span></div>` : ''}`;
+        ${hpNavn ? `<div class="obs-meta"><span class="obs-forstehjelper-name">H: ${escapeHtml(hpNavn)}</span></div>` : ''}`;
       div.onclick = () => openEdit(p);
     } else {
       div.innerHTML = `<div class="obs-bed-nr">${label}</div><div class="obs-empty">Ledig</div>`;

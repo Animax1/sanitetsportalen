@@ -137,13 +137,23 @@ Chart.defaults.font.size = 11;
 let activeFilter = 'alle';
 let allPatients = [];
 let mineOnly = (typeof localStorage !== 'undefined' && localStorage.getItem('mineOnly') === '1');
+let boardMineFilter = false;
+
+function isMine(p) {
+  if (window.MY_FORSTEHJELPER_ID && p.forstehjelper
+      && p.forstehjelper.id === window.MY_FORSTEHJELPER_ID) return true;
+  if (window.MY_HELSEPERSONELL_ID && p.helsepersonell_ref
+      && p.helsepersonell_ref.id === window.MY_HELSEPERSONELL_ID) return true;
+  return false;
+}
+
 let activeStatTab = 'oversikt';
 let fullStats = null;
 
 let arkivStatsMode = false;
 let arkivStatsMeta = null;
 
-let behandlere = [];
+let forstehjelpere = [];
 let helsepersonellListe = [];
 
 const bsNew   = new bootstrap.Modal(document.getElementById('newModal'));

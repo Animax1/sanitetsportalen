@@ -24,7 +24,7 @@ from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.db.models import Q
 
-from .models import Patient, AppSetting, Behandler, Helsepersonell
+from .models import Patient, AppSetting, Forstehjelper, Helsepersonell
 from .services import (
     basic_stats, full_stats, next_patient_nr,
     apply_list_filter, stamp_pabegynt_if_needed,
@@ -91,9 +91,9 @@ def _patient_to_dict(p):
         'grovsortering': p.grovsortering,
         'pabegynt': p.pabegynt,
         'plassering': p.plassering,
-        'behandler': (
-            {'id': p.behandler.id, 'name': p.behandler.name}
-            if p.behandler else None
+        'forstehjelper': (
+            {'id': p.forstehjelper.id, 'name': p.forstehjelper.name}
+            if p.forstehjelper else None
         ),
         'helsepersonell_ref': (
             {'id': p.helsepersonell_ref.id, 'name': p.helsepersonell_ref.name}
@@ -194,7 +194,7 @@ def patients_list_view(request):
 
         if mine_only and request.user.is_authenticated:
             qs = qs.filter(
-                Q(behandler__user=request.user)
+                Q(forstehjelper__user=request.user)
                 | Q(helsepersonell_ref__user=request.user)
             )
 
@@ -228,13 +228,13 @@ def patients_list_view(request):
     now_str = now_local_str()
     data['_now_str'] = now_str  # leses av stamp_*_if_needed
 
-    # Konverter behandler-ID til Behandler-objekt
-    behandler_obj = None
-    behandler_id = data.get('behandler')
-    if behandler_id:
+    # Konverter forstehjelper-ID til Forstehjelper-objekt
+    forstehjelper_obj = None
+    forstehjelper_id = data.get('forstehjelper')
+    if forstehjelper_id:
         try:
-            behandler_obj = Behandler.objects.get(pk=int(behandler_id))
-        except (Behandler.DoesNotExist, ValueError, TypeError):
+            forstehjelper_obj = Forstehjelper.objects.get(pk=int(forstehjelper_id))
+        except (Forstehjelper.DoesNotExist, ValueError, TypeError):
             pass
 
     # Konverter helsepersonell_ref-ID til Helsepersonell-objekt
@@ -265,7 +265,7 @@ def patients_list_view(request):
             grovsortering=data.get('grovsortering', ''),
             pabegynt=data.get('pabegynt', ''),
             plassering=data.get('plassering', ''),
-            behandler=behandler_obj,
+            forstehjelper=forstehjelper_obj,
             helsepersonell_ref=helsepersonell_obj,
             lege=data.get('lege', ''),
             medisiner=data.get('medisiner', ''),
@@ -336,16 +336,16 @@ def patient_detail_view(request, pk):
             if field in allowed_text_fields:
                 setattr(patient, field, value)
 
-        # Behandler: konverter ID til objekt
-        if 'behandler' in data:
-            behandler_id = data['behandler']
-            if behandler_id:
+        # Forstehjelper: konverter ID til objekt
+        if 'forstehjelper' in data:
+            forstehjelper_id = data['forstehjelper']
+            if forstehjelper_id:
                 try:
-                    patient.behandler = Behandler.objects.get(pk=int(behandler_id))
-                except (Behandler.DoesNotExist, ValueError, TypeError):
+                    patient.forstehjelper = Forstehjelper.objects.get(pk=int(forstehjelper_id))
+                except (Forstehjelper.DoesNotExist, ValueError, TypeError):
                     pass
             else:
-                patient.behandler = None
+                patient.forstehjelper = None
 
         # Helsepersonell_ref: konverter ID til objekt
         if 'helsepersonell_ref' in data:
@@ -383,15 +383,15 @@ def patient_detail_view(request, pk):
     return JsonResponse({'ok': True, 'recycled_nr': recycled})
 
 
-# ── Behandlere ────────────────────────────────────────────────────────────────
+# ── Forstehjelpere ────────────────────────────────────────────────────────────
 
 @never_cache
 @login_required
 @require_http_methods(['GET', 'POST'])
-def behandlere_view(request):
-    """Liste alle behandlere (GET), eller opprett ny (POST, kun admin).
+def forstehjelpere_view(request):
+    """Liste alle forstehjelpere (GET), eller opprett ny (POST, kun admin).
 
-    GET returnerer alle behandlere (inkl. inaktive) sortert etter is_active desc, name.
+    GET returnerer alle forstehjelpere (inkl. inaktive) sortert etter is_active desc, name.
     Støtter ETag/304-mønsteret:
       - Beregner ETag basert på innholdet. Hvis klienten sender If-None-Match med
         samme ETag, returneres 304 Not Modified uten kropp.
@@ -399,11 +399,11 @@ def behandlere_view(request):
         og ETag sier "hvis samme, send 304". Kombinasjonen er ideell.
     """
     if request.method == 'GET':
-        behandlere = list(Behandler.objects.all().order_by('-is_active', 'name'))
-        data = [{'id': b.id, 'name': b.name, 'is_active': b.is_active} for b in behandlere]
+        forstehjelpere = list(Forstehjelper.objects.all().order_by('-is_active', 'name'))
+        data = [{'id': b.id, 'name': b.name, 'is_active': b.is_active} for b in forstehjelpere]
 
         # Beregn ETag som SHA-256-hash av (id, name, is_active)-tupler
-        hash_input = str(sorted([(b.id, b.name, b.is_active) for b in behandlere]))
+        hash_input = str(sorted([(b.id, b.name, b.is_active) for b in forstehjelpere]))
         # sha256 brukes kun for ETag-identitet (ikke sikkerhet). Kortes til
         # 16 tegn for å holde header-verdien kompakt.
         etag_value = '"v1:' + hashlib.sha256(hash_input.encode('utf-8')).hexdigest()[:16] + '"'
@@ -426,24 +426,24 @@ def behandlere_view(request):
     if not name:
         return JsonResponse({'error': 'Navn er påkrevd'}, status=400)
 
-    if Behandler.objects.filter(name=name).exists():
-        return JsonResponse({'error': f'Behandler "{name}" finnes allerede'}, status=400)
+    if Forstehjelper.objects.filter(name=name).exists():
+        return JsonResponse({'error': f'Førstehjelper "{name}" finnes allerede'}, status=400)
 
-    b = Behandler.objects.create(name=name, is_active=True)
+    b = Forstehjelper.objects.create(name=name, is_active=True)
     return JsonResponse({'id': b.id, 'name': b.name, 'is_active': b.is_active}, status=201)
 
 
 @login_required
 @require_http_methods(['PUT', 'DELETE'])
-def behandler_detail_view(request, pk):
-    """Oppdater (PUT) eller slett (DELETE) en behandler. Kun admin."""
+def forstehjelper_detail_view(request, pk):
+    """Oppdater (PUT) eller slett (DELETE) en førstehjelper. Kun admin."""
     if request.user.role != 'admin':
         return JsonResponse({'error': 'Ingen tilgang'}, status=403)
 
     try:
-        behandler = Behandler.objects.get(pk=pk)
-    except Behandler.DoesNotExist:
-        return JsonResponse({'error': 'Behandler ikke funnet'}, status=404)
+        forstehjelper = Forstehjelper.objects.get(pk=pk)
+    except Forstehjelper.DoesNotExist:
+        return JsonResponse({'error': 'Førstehjelper ikke funnet'}, status=404)
 
     if request.method == 'PUT':
         data = _json_body(request)
@@ -451,20 +451,20 @@ def behandler_detail_view(request, pk):
             name = (data['name'] or '').strip()
             if not name:
                 return JsonResponse({'error': 'Navn kan ikke være tomt'}, status=400)
-            behandler.name = name
+            forstehjelper.name = name
         if 'is_active' in data:
-            behandler.is_active = bool(data['is_active'])
-        behandler.save()
-        return JsonResponse({'id': behandler.id, 'name': behandler.name, 'is_active': behandler.is_active})
+            forstehjelper.is_active = bool(data['is_active'])
+        forstehjelper.save()
+        return JsonResponse({'id': forstehjelper.id, 'name': forstehjelper.name, 'is_active': forstehjelper.is_active})
 
-    # DELETE – blokkert hvis behandler er i bruk (PROTECT vil kaste IntegrityError)
+    # DELETE – blokkert hvis førstehjelper er i bruk (PROTECT vil kaste IntegrityError)
     from django.db.models.deletion import ProtectedError
     try:
-        behandler.delete()
+        forstehjelper.delete()
         return JsonResponse({'ok': True})
     except ProtectedError:
         return JsonResponse(
-            {'error': 'Behandleren er knyttet til pasienter og kan ikke slettes. Deaktiver i stedet.'},
+            {'error': 'Førstehjelperen er knyttet til pasienter og kan ikke slettes. Deaktiver i stedet.'},
             status=409,
         )
 
@@ -896,7 +896,7 @@ def arkiv_detalj_view(request, pk):
                 'pasientnummer', 'problemstilling', 'arsak', 'transport',
                 'grovsortering', 'plassering', 'inntid', 'pabegynt',
                 'inn_obspost', 'ut_obspost', 'utskrevet', 'utskrevet_til',
-                'behandler_navn', 'helsepersonell_navn', 'lege', 'medisiner', 'journal',
+                'forstehjelper_navn', 'helsepersonell_navn', 'lege', 'medisiner', 'journal',
             )
         )
         sha_now = _compute_sha256_for_arkiv(arkiv, pasienter_dicts)

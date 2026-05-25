@@ -1,12 +1,12 @@
 """Django Admin-registrering for patients-appen."""
 from django.contrib import admin
 
-from .models import Patient, AppSetting, Behandler
+from .models import Patient, AppSetting, Forstehjelper
 
 
-@admin.register(Behandler)
-class BehandlerAdmin(admin.ModelAdmin):
-    """Admin for Behandler-modellen."""
+@admin.register(Forstehjelper)
+class ForstehjelperAdmin(admin.ModelAdmin):
+    """Admin for Forstehjelper-modellen."""
 
     list_display = ['name', 'is_active', 'created_at']
     list_filter = ['is_active']
@@ -19,13 +19,13 @@ class PatientAdmin(admin.ModelAdmin):
 
     list_display = [
         'pasientnummer', 'year', 'problemstilling',
-        'grovsortering', 'behandler', 'is_active', 'created_at',
+        'grovsortering', 'forstehjelper', 'is_active', 'created_at',
     ]
     list_filter = ['year', 'grovsortering', 'is_active']
     search_fields = ['pasientnummer', 'problemstilling']
     readonly_fields = ['created_at', 'updated_at']
     ordering = ['-year', 'pasientnummer']
-    autocomplete_fields = ['behandler']
+    autocomplete_fields = ['forstehjelper']
 
 
 @admin.register(AppSetting)

@@ -8,7 +8,7 @@ from django.test import TestCase, Client, override_settings
 from django.urls import reverse
 
 from accounts.models import CustomUser
-from patients.models import Patient, Behandler, Helsepersonell, AppSetting
+from patients.models import Patient, Forstehjelper, Helsepersonell, AppSetting
 from patients.services import (
     apply_list_filter, stamp_pabegynt_if_needed,
     stamp_obs_times_if_needed, stamp_utskrevet_if_needed,
@@ -89,17 +89,17 @@ class PabegyntTests(TestCase):
 
     def test_behandler_triggers_pabegynt(self):
         """Sett behandler skal utløse påbegynt-stempling."""
-        b = Behandler.objects.create(name='Ola')
+        b = Forstehjelper.objects.create(name='Ola')
         p = Patient(pasientnummer=1, year=2026)
-        result = stamp_pabegynt_if_needed(p, {'behandler': b})
+        result = stamp_pabegynt_if_needed(p, {'forstehjelper': b})
         self.assertTrue(result)
         self.assertTrue(p.pabegynt)
 
-    def test_behandler_id_triggers_pabegynt(self):
+    def test_forstehjelper_id_triggers_pabegynt(self):
         """Sett behandler som ID (integer) skal også utløse stempling."""
-        b = Behandler.objects.create(name='Kari')
+        b = Forstehjelper.objects.create(name='Kari')
         p = Patient(pasientnummer=2, year=2026)
-        result = stamp_pabegynt_if_needed(p, {'behandler': b.id})
+        result = stamp_pabegynt_if_needed(p, {'forstehjelper': b.id})
         self.assertTrue(result)
 
     def test_helsepersonell_ref_triggers_pabegynt(self):
@@ -125,41 +125,41 @@ class PabegyntTests(TestCase):
     def test_none_behandler_does_not_stamp(self):
         """None-behandler skal ikke utløse stempling."""
         p = Patient(pasientnummer=1, year=2026)
-        result = stamp_pabegynt_if_needed(p, {'behandler': None})
+        result = stamp_pabegynt_if_needed(p, {'forstehjelper': None})
         self.assertFalse(result)
 
 
 # ── Behandler-modell ─────────────────────────────────────────────────────────
 
-class BehandlerTests(TestCase):
+class ForstehjelperTests(TestCase):
     """Tester for Behandler-modell og FK-integritet."""
 
     def test_inactive_behandler_preserves_history(self):
         """Inaktivering av behandler skal ikke bryte pasient-referansen."""
-        b = Behandler.objects.create(name='Historisk')
-        p = Patient.objects.create(pasientnummer=1, year=2025, behandler=b)
+        b = Forstehjelper.objects.create(name='Historisk')
+        p = Patient.objects.create(pasientnummer=1, year=2025, forstehjelper=b)
         b.is_active = False
         b.save()
         # Pasienten skal fortsatt ha referansen
         p.refresh_from_db()
-        self.assertEqual(p.behandler, b)
+        self.assertEqual(p.forstehjelper, b)
 
     def test_cannot_delete_behandler_in_use(self):
         """Behandler knyttet til pasient skal ikke kunne slettes (PROTECT)."""
         from django.db.models.deletion import ProtectedError
-        b = Behandler.objects.create(name='Brukes')
-        Patient.objects.create(pasientnummer=1, year=2026, behandler=b)
+        b = Forstehjelper.objects.create(name='Brukes')
+        Patient.objects.create(pasientnummer=1, year=2026, forstehjelper=b)
         with self.assertRaises(ProtectedError):
             b.delete()
 
     def test_str_inactive(self):
         """__str__ skal vise (inaktiv) for inaktive behandlere."""
-        b = Behandler.objects.create(name='Test', is_active=False)
+        b = Forstehjelper.objects.create(name='Test', is_active=False)
         self.assertIn('inaktiv', str(b))
 
     def test_str_active(self):
         """__str__ skal ikke inneholde (inaktiv) for aktive behandlere."""
-        b = Behandler.objects.create(name='Aktiv', is_active=True)
+        b = Forstehjelper.objects.create(name='Aktiv', is_active=True)
         self.assertNotIn('inaktiv', str(b))
 
 
@@ -212,7 +212,7 @@ class AccessControlTests(TestCase):
         """read_only-bruker skal ikke kunne opprette behandler."""
         c = self._login(self.ro)
         import json as _j
-        resp = c.post('/pasienter/api/behandlere/',
+        resp = c.post('/pasienter/api/forstehjelpere/',
                       data=_j.dumps({'name': 'X'}),
                       content_type='application/json')
         self.assertEqual(resp.status_code, 403)
@@ -221,7 +221,7 @@ class AccessControlTests(TestCase):
         """read_write-bruker skal ikke kunne opprette behandler (kun admin)."""
         c = self._login(self.rw)
         import json as _j
-        resp = c.post('/pasienter/api/behandlere/',
+        resp = c.post('/pasienter/api/forstehjelpere/',
                       data=_j.dumps({'name': 'X'}),
                       content_type='application/json')
         self.assertEqual(resp.status_code, 403)
@@ -230,7 +230,7 @@ class AccessControlTests(TestCase):
         """Admin-bruker skal kunne opprette behandler."""
         c = self._login(self.admin)
         import json as _j
-        resp = c.post('/pasienter/api/behandlere/',
+        resp = c.post('/pasienter/api/forstehjelpere/',
                       data=_j.dumps({'name': 'X'}),
                       content_type='application/json')
         self.assertEqual(resp.status_code, 201)
@@ -433,7 +433,7 @@ class ResetTests(TestCase):
 # ── ETag-tester for /api/behandlere/ ──────────────────────────────────────────
 
 @override_settings(SECURE_SSL_REDIRECT=False)
-class BehandlerETagTests(TestCase):
+class ForstehjelperETagTests(TestCase):
     """Tester for ETag/304-funksjonalitet på /api/behandlere/."""
 
     def setUp(self):
@@ -442,11 +442,11 @@ class BehandlerETagTests(TestCase):
             must_change_password=False)
         self.client = Client()
         self.client.force_login(self.user)
-        Behandler.objects.create(name='Behandler A', is_active=True)
+        Forstehjelper.objects.create(name='Behandler A', is_active=True)
 
     def test_behandlere_returns_etag_header(self):
         """GET /api/behandlere/ skal returnere ETag-header."""
-        resp = self.client.get('/pasienter/api/behandlere/')
+        resp = self.client.get('/pasienter/api/forstehjelpere/')
         self.assertEqual(resp.status_code, 200)
         self.assertIn('ETag', resp)
         self.assertTrue(resp['ETag'].startswith('"v1:'))
@@ -454,23 +454,23 @@ class BehandlerETagTests(TestCase):
     def test_behandlere_returns_304_when_etag_matches(self):
         """GET med If-None-Match som matcher ETag skal gi 304."""
         # Hent ETag fra første request
-        resp1 = self.client.get('/pasienter/api/behandlere/')
+        resp1 = self.client.get('/pasienter/api/forstehjelpere/')
         etag = resp1['ETag']
         # Send If-None-Match med samme ETag
         resp2 = self.client.get(
-            '/pasienter/api/behandlere/',
+            '/pasienter/api/forstehjelpere/',
             HTTP_IF_NONE_MATCH=etag,
         )
         self.assertEqual(resp2.status_code, 304)
 
     def test_behandlere_returns_200_with_new_etag_when_behandler_added(self):
         """Ny behandler skal gi ny ETag og 200 selv om klient sender gammel ETag."""
-        resp1 = self.client.get('/pasienter/api/behandlere/')
+        resp1 = self.client.get('/pasienter/api/forstehjelpere/')
         old_etag = resp1['ETag']
         # Legg til ny behandler
-        Behandler.objects.create(name='Behandler B', is_active=True)
+        Forstehjelper.objects.create(name='Behandler B', is_active=True)
         resp2 = self.client.get(
-            '/pasienter/api/behandlere/',
+            '/pasienter/api/forstehjelpere/',
             HTTP_IF_NONE_MATCH=old_etag,
         )
         self.assertEqual(resp2.status_code, 200)
@@ -478,14 +478,14 @@ class BehandlerETagTests(TestCase):
 
     def test_behandlere_returns_200_with_new_etag_when_behandler_renamed(self):
         """Omdøpt behandler skal gi ny ETag og 200."""
-        resp1 = self.client.get('/pasienter/api/behandlere/')
+        resp1 = self.client.get('/pasienter/api/forstehjelpere/')
         old_etag = resp1['ETag']
         # Omdøp behandleren
-        b = Behandler.objects.get(name='Behandler A')
+        b = Forstehjelper.objects.get(name='Behandler A')
         b.name = 'Ny Behandler A'
         b.save()
         resp2 = self.client.get(
-            '/pasienter/api/behandlere/',
+            '/pasienter/api/forstehjelpere/',
             HTTP_IF_NONE_MATCH=old_etag,
         )
         self.assertEqual(resp2.status_code, 200)
@@ -748,7 +748,7 @@ class PlasseringUniqueTests(TestCase):
 
     def test_legge_til_behandler_bevarer_plassering(self):
         """Å legge til behandler på en plassert pasient skal bevare plasseringen."""
-        b = Behandler.objects.create(name='Ola')
+        b = Forstehjelper.objects.create(name='Ola')
         # Opprett pasient med plassering, uten behandler
         r1 = self._post({'problemstilling': 'A', 'inntid': '19.04.2026 14:00',
                          'plassering': 'Akutt 1'})
@@ -759,31 +759,31 @@ class PlasseringUniqueTests(TestCase):
             'problemstilling': 'A',
             'inntid': '19.04.2026 14:00',
             'plassering': 'Akutt 1',
-            'behandler': b.id,
+            'forstehjelper': b.id,
         })
         self.assertEqual(r2.status_code, 200)
         p = Patient.objects.get(pk=pk)
         self.assertEqual(p.plassering, 'Akutt 1')
-        self.assertEqual(p.behandler_id, b.id)
+        self.assertEqual(p.forstehjelper_id, b.id)
 
     def test_endre_behandler_bevarer_plassering(self):
         """Å bytte behandler skal ikke nullstille plasseringen."""
-        b1 = Behandler.objects.create(name='Ola')
-        b2 = Behandler.objects.create(name='Kari')
+        b1 = Forstehjelper.objects.create(name='Ola')
+        b2 = Forstehjelper.objects.create(name='Kari')
         r1 = self._post({'problemstilling': 'A', 'inntid': '19.04.2026 14:00',
-                         'plassering': 'Obs 5', 'behandler': b1.id})
+                         'plassering': 'Obs 5', 'forstehjelper': b1.id})
         pk = r1.json()['id']
         # Bytt behandler – send full payload med uendret plassering
         r2 = self._put(pk, {
             'problemstilling': 'A',
             'inntid': '19.04.2026 14:00',
             'plassering': 'Obs 5',
-            'behandler': b2.id,
+            'forstehjelper': b2.id,
         })
         self.assertEqual(r2.status_code, 200)
         p = Patient.objects.get(pk=pk)
         self.assertEqual(p.plassering, 'Obs 5')
-        self.assertEqual(p.behandler_id, b2.id)
+        self.assertEqual(p.forstehjelper_id, b2.id)
 
     def test_historisk_plassering_bevares_ved_full_put(self):
         """En pasient med 'historisk' plassering (ikke i standard-dropdown) skal
@@ -797,17 +797,17 @@ class PlasseringUniqueTests(TestCase):
             plassering='Akutt 99',  # ikke i hardkodet dropdown
             problemstilling='Historisk',
         )
-        b = Behandler.objects.create(name='Ola')
+        b = Forstehjelper.objects.create(name='Ola')
         # Frontend (med fixen) sender 'Akutt 99' tilbake i payload
         r = self._put(p.pk, {
             'problemstilling': 'Historisk',
             'plassering': 'Akutt 99',
-            'behandler': b.id,
+            'forstehjelper': b.id,
         })
         self.assertEqual(r.status_code, 200)
         p.refresh_from_db()
         self.assertEqual(p.plassering, 'Akutt 99')
-        self.assertEqual(p.behandler_id, b.id)
+        self.assertEqual(p.forstehjelper_id, b.id)
 
     def test_tom_plassering_i_payload_tommer_feltet(self):
         """Sanity-check av motsatt scenario: hvis frontend faktisk sender
@@ -1082,7 +1082,7 @@ class PabegyntNotBeforeInntidTests(TestCase):
         )
         self.client.login(username='testbruker', password='Test1234!')
         set_active_year(2026)
-        self.behandler = Behandler.objects.create(name='Lege Hansen')
+        self.forstehjelper = Forstehjelper.objects.create(name='Lege Hansen')
 
     def test_helper_adjusts_pabegynt_when_before_inntid(self):
         """_ensure_pabegynt_not_before_inntid skal sette pabegynt = inntid."""
@@ -1142,7 +1142,7 @@ class PabegyntNotBeforeInntidTests(TestCase):
                 'inntid': future_inntid,
                 'plassering': 'Båre 1',
                 'grovsortering': 'Grønn',
-                'behandler': self.behandler.pk,  # trigger pabegynt-stempling
+                'forstehjelper': self.forstehjelper.pk,  # trigger pabegynt-stempling
             },
             content_type='application/json',
         )

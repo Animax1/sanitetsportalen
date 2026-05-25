@@ -23,7 +23,7 @@ from django_ratelimit.decorators import ratelimit
 from django_ratelimit.exceptions import Ratelimited
 
 from .decorators import admin_required
-from .forms import LoginForm, ChangePasswordForm, AdminUserCreateForm, AdminUserEditForm, UserPatientLinkForm
+from .forms import LoginForm, ChangePasswordForm, AdminUserCreateForm, AdminUserEditForm, PasientRolleForm
 from .models import CustomUser, LoginEvent
 
 
@@ -495,7 +495,7 @@ def user_detail_view(request, pk):
     """Vis og rediger brukerdetaljer."""
     user = get_object_or_404(CustomUser, pk=pk)
     form = AdminUserEditForm(instance=user)
-    link_form = UserPatientLinkForm(target_user=user)
+    link_form = PasientRolleForm(user)
     temp_password = None
     recent_events = LoginEvent.objects.filter(user=user).order_by('-created_at')[:20]
 
@@ -510,10 +510,10 @@ def user_detail_view(request, pk):
                 return redirect('accounts:user_detail', pk=pk)
 
         elif action == 'link_patient_role':
-            link_form = UserPatientLinkForm(request.POST, target_user=user)
+            link_form = PasientRolleForm(user, request.POST)
             if link_form.is_valid():
                 link_form.save()
-                messages.success(request, 'Pasient-rolle-kobling oppdatert.')
+                messages.success(request, 'Pasient-rolle oppdatert.')
                 return redirect('accounts:user_detail', pk=pk)
 
         elif action == 'unlock':

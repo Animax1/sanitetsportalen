@@ -17,7 +17,7 @@ from django.urls import reverse
 
 from accounts.models import CustomUser
 from core.models import Notification
-from patients.models import Patient, Behandler, Helsepersonell
+from patients.models import Patient, Forstehjelper, Helsepersonell
 
 
 @override_settings(SECURE_SSL_REDIRECT=False, RATELIMIT_ENABLE=False)
@@ -33,22 +33,22 @@ class MineFilterTests(TestCase):
             username='ola', password='pw12345678',
             role='read_write', must_change_password=False,
         )
-        # Kari koblet til Behandler 'Kari Hansen'
-        self.beh_kari = Behandler.objects.create(name='Kari Hansen', user=self.kari)
+        # Kari koblet til Forstehjelper 'Kari Hansen'
+        self.beh_kari = Forstehjelper.objects.create(name='Kari Hansen', user=self.kari)
         # Ola koblet til Helsepersonell 'Ola Olsen'
         self.hp_ola = Helsepersonell.objects.create(name='Ola Olsen', user=self.ola)
-        # En tredje Behandler uten bruker
-        self.beh_andre = Behandler.objects.create(name='Andre', user=None)
+        # En tredje Forstehjelper uten bruker
+        self.beh_andre = Forstehjelper.objects.create(name='Andre', user=None)
 
         # Pasienter
         self.p_kari = Patient.objects.create(
-            pasientnummer=1, year=2026, behandler=self.beh_kari,
+            pasientnummer=1, year=2026, forstehjelper=self.beh_kari,
         )
         self.p_ola = Patient.objects.create(
             pasientnummer=2, year=2026, helsepersonell_ref=self.hp_ola,
         )
         self.p_andre = Patient.objects.create(
-            pasientnummer=3, year=2026, behandler=self.beh_andre,
+            pasientnummer=3, year=2026, forstehjelper=self.beh_andre,
         )
         self.url = '/pasienter/api/patients/'
 
@@ -94,20 +94,20 @@ class AssignmentNotificationSignalTests(TestCase):
         self.ola = CustomUser.objects.create_user(
             username='ola', password='pw', must_change_password=False,
         )
-        self.beh_kari = Behandler.objects.create(name='Kari', user=self.kari)
-        self.beh_ola = Behandler.objects.create(name='Ola', user=self.ola)
-        self.beh_uten_bruker = Behandler.objects.create(name='X', user=None)
+        self.beh_kari = Forstehjelper.objects.create(name='Kari', user=self.kari)
+        self.beh_ola = Forstehjelper.objects.create(name='Ola', user=self.ola)
+        self.beh_uten_bruker = Forstehjelper.objects.create(name='X', user=None)
         self.hp_kari = Helsepersonell.objects.create(name='HP-Kari', user=self.kari)
 
     def test_assignment_on_create_notifies_user(self):
-        Patient.objects.create(pasientnummer=10, year=2026, behandler=self.beh_kari)
+        Patient.objects.create(pasientnummer=10, year=2026, forstehjelper=self.beh_kari)
         self.assertEqual(
             Notification.objects.filter(user=self.kari, kind='patient_assigned').count(),
             1,
         )
 
     def test_assignment_to_behandler_without_user_does_not_notify(self):
-        Patient.objects.create(pasientnummer=11, year=2026, behandler=self.beh_uten_bruker)
+        Patient.objects.create(pasientnummer=11, year=2026, forstehjelper=self.beh_uten_bruker)
         self.assertEqual(Notification.objects.count(), 0)
 
     def test_helsepersonell_assignment_notifies(self):
@@ -117,11 +117,11 @@ class AssignmentNotificationSignalTests(TestCase):
         self.assertIn('oppfølgingsansvarlig', notifs.first().message)
 
     def test_transfer_notifies_both_old_and_new(self):
-        p = Patient.objects.create(pasientnummer=13, year=2026, behandler=self.beh_kari)
+        p = Patient.objects.create(pasientnummer=13, year=2026, forstehjelper=self.beh_kari)
         # Tøm initial assignment-varsel for å isolere transfer
         Notification.objects.all().delete()
         # Flytt fra Kari til Ola
-        p.behandler = self.beh_ola
+        p.forstehjelper = self.beh_ola
         p.save()
         # Ola får 'patient_assigned'
         self.assertTrue(
@@ -137,7 +137,7 @@ class AssignmentNotificationSignalTests(TestCase):
         )
 
     def test_no_notification_if_assignment_unchanged(self):
-        p = Patient.objects.create(pasientnummer=14, year=2026, behandler=self.beh_kari)
+        p = Patient.objects.create(pasientnummer=14, year=2026, forstehjelper=self.beh_kari)
         Notification.objects.all().delete()
         # Endre noe annet — ikke FK
         p.problemstilling = 'Endret'
@@ -146,8 +146,8 @@ class AssignmentNotificationSignalTests(TestCase):
 
     def test_dedup_prevents_double_notifications(self):
         """notify() dedup-vinduet hindrer duplikat ved umiddelbar re-assign."""
-        Patient.objects.create(pasientnummer=15, year=2026, behandler=self.beh_kari)
-        Patient.objects.create(pasientnummer=16, year=2026, behandler=self.beh_kari)
+        Patient.objects.create(pasientnummer=15, year=2026, forstehjelper=self.beh_kari)
+        Patient.objects.create(pasientnummer=16, year=2026, forstehjelper=self.beh_kari)
         # Kari skal kun ha ett varsel fordi message ('Du er satt ... pasient #15')
         # vs #16 har forskjellig pasientnummer i message — så IKKE dedup.
         # Men hvis vi tildeler SAMME pasient to ganger med samme melding, da deduper.
@@ -158,60 +158,55 @@ class AssignmentNotificationSignalTests(TestCase):
 
 
 @override_settings(SECURE_SSL_REDIRECT=False, RATELIMIT_ENABLE=False)
-class UserPatientLinkFormTests(TestCase):
-    """Tester for UserPatientLinkForm i accounts."""
+class PasientRolleFormTests(TestCase):
+    """Tester for PasientRolleForm i accounts."""
 
     def setUp(self):
-        from accounts.forms import UserPatientLinkForm
-        self.FormCls = UserPatientLinkForm
+        from accounts.forms import PasientRolleForm
+        self.FormCls = PasientRolleForm
         self.user = CustomUser.objects.create_user(
             username='kari', password='pw', must_change_password=False,
         )
-        self.beh = Behandler.objects.create(name='B1', user=None)
-        self.hp = Helsepersonell.objects.create(name='H1', user=None)
+        self.fh = Forstehjelper.objects.create(name='kari', user=None)
+        self.hp = Helsepersonell.objects.create(name='kari', user=None)
 
-    def test_cannot_link_to_both_roles(self):
-        form = self.FormCls(
-            data={'behandler': self.beh.pk, 'helsepersonell': self.hp.pk},
-            target_user=self.user,
-        )
-        self.assertFalse(form.is_valid())
-        # Sjekk at non_field_errors inneholder XOR-meldingen
-        self.assertTrue(any('én rolle' in e for e in form.non_field_errors()))
-
-    def test_link_to_behandler_only(self):
-        form = self.FormCls(
-            data={'behandler': self.beh.pk, 'helsepersonell': ''},
-            target_user=self.user,
-        )
+    def test_link_to_forstehjelper(self):
+        form = self.FormCls(self.user, data={'pasient_rolle': 'forstehjelper'})
         self.assertTrue(form.is_valid())
         form.save()
-        self.beh.refresh_from_db()
-        self.assertEqual(self.beh.user, self.user)
+        self.fh.refresh_from_db()
+        self.assertEqual(self.fh.user, self.user)
+        self.user.refresh_from_db()
+        self.assertTrue(self.user.kan_redigere_pasienter)
 
-    def test_unlink_by_submitting_empty(self):
-        self.beh.user = self.user
-        self.beh.save()
-        form = self.FormCls(
-            data={'behandler': '', 'helsepersonell': ''},
-            target_user=self.user,
-        )
+    def test_link_to_helsepersonell(self):
+        form = self.FormCls(self.user, data={'pasient_rolle': 'helsepersonell'})
         self.assertTrue(form.is_valid())
         form.save()
-        self.beh.refresh_from_db()
-        self.assertIsNone(self.beh.user)
-
-    def test_switch_link_releases_old(self):
-        """Bytt fra behandler til helsepersonell — gammel kobling frigjøres."""
-        self.beh.user = self.user
-        self.beh.save()
-        form = self.FormCls(
-            data={'behandler': '', 'helsepersonell': self.hp.pk},
-            target_user=self.user,
-        )
-        self.assertTrue(form.is_valid())
-        form.save()
-        self.beh.refresh_from_db()
         self.hp.refresh_from_db()
-        self.assertIsNone(self.beh.user)
+        self.assertEqual(self.hp.user, self.user)
+        self.user.refresh_from_db()
+        self.assertTrue(self.user.kan_redigere_pasienter)
+
+    def test_ingen_removes_access(self):
+        self.fh.user = self.user
+        self.fh.save()
+        form = self.FormCls(self.user, data={'pasient_rolle': 'ingen'})
+        self.assertTrue(form.is_valid())
+        form.save()
+        self.fh.refresh_from_db()
+        self.assertIsNone(self.fh.user)
+        self.user.refresh_from_db()
+        self.assertFalse(self.user.kan_redigere_pasienter)
+
+    def test_switch_releases_old_link(self):
+        """Bytt fra førstehjelper til helsepersonell — gammel kobling frigjøres."""
+        self.fh.user = self.user
+        self.fh.save()
+        form = self.FormCls(self.user, data={'pasient_rolle': 'helsepersonell'})
+        self.assertTrue(form.is_valid())
+        form.save()
+        self.fh.refresh_from_db()
+        self.hp.refresh_from_db()
+        self.assertIsNone(self.fh.user)
         self.assertEqual(self.hp.user, self.user)

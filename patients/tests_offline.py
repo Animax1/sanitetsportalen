@@ -11,7 +11,7 @@ from django.test import TestCase, override_settings
 
 from accounts.models import CustomUser
 from audit.models import AuditLog
-from patients.models import Patient, Behandler, Helsepersonell
+from patients.models import Patient, Forstehjelper, Helsepersonell
 
 
 # ── Hjelpefunksjon – bygg mini offline-SQLite ────────────────────────────────
@@ -283,9 +283,9 @@ class ImportOfflineDataTests(TestCase):
             path.unlink(missing_ok=True)
 
     def test_import_offline_data_creates_missing_behandlere(self):
-        """Behandler som finnes i offline men ikke i default skal opprettes automatisk."""
-        # Sørg for at behandleren ikke finnes i default-DB
-        self.assertFalse(Behandler.objects.filter(name='Dr. Offline').exists())
+        """Førstehjelper som finnes i offline men ikke i default skal opprettes automatisk."""
+        # Sørg for at forstehjelperen ikke finnes i default-DB
+        self.assertFalse(Forstehjelper.objects.filter(name='Dr. Offline').exists())
 
         tf, path = self._make_sqlite(
             patients=[
@@ -297,14 +297,14 @@ class ImportOfflineDataTests(TestCase):
         )
         try:
             out = _call_import_offline_data(path, year=2026)
-            self.assertTrue(Behandler.objects.filter(name='Dr. Offline').exists())
-            self.assertIn('1 nye behandlere', out)
+            self.assertTrue(Forstehjelper.objects.filter(name='Dr. Offline').exists())
+            self.assertIn('1 nye forstehjelpere', out)
         finally:
             path.unlink(missing_ok=True)
 
     def test_import_offline_data_reuses_existing_behandler(self):
-        """Behandler som allerede finnes i default-DB skal gjenbrukes, ikke dupliseres."""
-        Behandler.objects.create(name='Dr. Eksisterende')
+        """Førstehjelper som allerede finnes i default-DB skal gjenbrukes, ikke dupliseres."""
+        Forstehjelper.objects.create(name='Dr. Eksisterende')
 
         tf, path = self._make_sqlite(
             patients=[
@@ -316,8 +316,8 @@ class ImportOfflineDataTests(TestCase):
         )
         try:
             _call_import_offline_data(path, year=2026)
-            antall = Behandler.objects.filter(name='Dr. Eksisterende').count()
-            self.assertEqual(antall, 1, 'Behandler skal ikke dupliseres')
+            antall = Forstehjelper.objects.filter(name='Dr. Eksisterende').count()
+            self.assertEqual(antall, 1, 'Førstehjelper skal ikke dupliseres')
         finally:
             path.unlink(missing_ok=True)
 

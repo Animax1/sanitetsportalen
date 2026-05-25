@@ -51,7 +51,7 @@ from core.backup import (
 from core.forms import BackupRestoreConfirmForm, ModuleBackupConfigForm
 from core.models import ModuleBackupConfig
 from patients.backup import PatientsBackupHandler, register_handlers
-from patients.models import AppSetting, Backup, Behandler, Helsepersonell, Patient
+from patients.models import AppSetting, Backup, Forstehjelper, Helsepersonell, Patient
 
 
 # Felles testmappe for backup-filer.
@@ -335,16 +335,16 @@ class RestoreBackupTests(TestCase):
             username='admin', password='pwd', role='admin',
             must_change_password=False,
         )
-        # Original data — eksisterende default-Behandler/Helsepersonell
+        # Original data — eksisterende default-Forstehjelper/Helsepersonell
         # fra signaler kan være tilstede; vi bruker get_or_create.
-        beh, _ = Behandler.objects.get_or_create(name='Behandler-Test')
+        beh, _ = Forstehjelper.objects.get_or_create(name='Behandler-Test')
         hp, _ = Helsepersonell.objects.get_or_create(name='HP-Test')
         Patient.objects.create(
             pasientnummer=10, year=2025, problemstilling='Original',
-            behandler=beh, helsepersonell_ref=hp,
+            forstehjelper=beh, helsepersonell_ref=hp,
         )
         self._patient_count_before = Patient.objects.count()
-        self._behandler_count_before = Behandler.objects.count()
+        self._forstehjelper_count_before = Forstehjelper.objects.count()
         self._helsepersonell_count_before = Helsepersonell.objects.count()
 
     def test_pre_restore_snapshot_created_before_destructive_restore(self) -> None:
@@ -371,23 +371,23 @@ class RestoreBackupTests(TestCase):
 
             # Slett alt.
             Patient.objects.all().delete()
-            Behandler.objects.all().delete()
+            Forstehjelper.objects.all().delete()
             Helsepersonell.objects.all().delete()
             self.assertEqual(Patient.objects.count(), 0)
-            self.assertEqual(Behandler.objects.count(), 0)
+            self.assertEqual(Forstehjelper.objects.count(), 0)
 
             restore_backup(backup, user=self.admin)
 
         # Etter restore skal antallene være som før slett.
         self.assertEqual(Patient.objects.count(), self._patient_count_before)
-        self.assertEqual(Behandler.objects.count(), self._behandler_count_before)
+        self.assertEqual(Forstehjelper.objects.count(), self._forstehjelper_count_before)
         self.assertEqual(Helsepersonell.objects.count(),
                          self._helsepersonell_count_before)
         # Original-pasienten skal være intakt med riktige felter.
         p = Patient.objects.get(pasientnummer=10)
         self.assertEqual(p.problemstilling, 'Original')
         # Behandler-Test skal være med på lasta.
-        self.assertTrue(Behandler.objects.filter(name='Behandler-Test').exists())
+        self.assertTrue(Forstehjelper.objects.filter(name='Behandler-Test').exists())
 
     def test_restore_replaces_modified_data(self) -> None:
         """Endre data etter backup, restore → original-data tilbake."""

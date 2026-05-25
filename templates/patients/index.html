@@ -21,6 +21,8 @@
 <script>
   window.USER_ROLE = "{{ request.user.role }}";
   window.USER_NAME = "{{ request.user.username }}";
+  window.MY_FORSTEHJELPER_ID  = {{ request.user.forstehjelper_profil.id|default:'null' }};
+  window.MY_HELSEPERSONELL_ID = {{ request.user.helsepersonell_profil.id|default:'null' }};
 </script>
 
 <!-- ══════════ HEADER ══════════ -->
@@ -116,10 +118,11 @@
     <button id="btn-gronn"      class="btn btn-outline-success   filter-btn"             onclick="setFilter('gronn')">Grønn</button>
     <button id="btn-aktive"     class="btn btn-outline-primary   filter-btn"             onclick="setFilter('aktive')">Aktive</button>
     <button id="btn-utskrevet"  class="btn btn-outline-secondary filter-btn"             onclick="setFilter('utskrevet')">Utskrevet</button>
-    <div class="form-check form-switch ms-2" title="Vis kun pasienter der jeg er førstehjelper eller oppfølgingsansvarlig">
-      <input class="form-check-input" type="checkbox" id="toggle-mine" onchange="toggleMine(this.checked)">
-      <label class="form-check-label small" for="toggle-mine">Mine pasienter</label>
-    </div>
+    <button id="btn-mine" class="btn btn-outline-info filter-btn"
+            onclick="setFilter('mine')"
+            title="Vis kun pasienter der jeg er førstehjelper eller oppfølgingsansvarlig">
+      Mine pasienter
+    </button>
     <span class="ms-auto" id="row-count"></span>
   </div>
   <div id="patient-grid"></div>
@@ -128,9 +131,14 @@
 <!-- ══════════ TAVLE ══════════ -->
 <div id="tab-tavle" class="tab-panel">
 
-  <div style="padding:0.5rem 1rem 0 1rem;">
+  <div style="padding:0.5rem 1rem 0 1rem;" class="mb-3 d-flex gap-2 align-items-center">
     <button class="btn btn-primary btn-sm write-only" onclick="openNewModal()">
       <i class="bi bi-plus-lg me-1"></i>Ny pasient
+    </button>
+    <button id="btn-board-mine" class="btn btn-outline-info btn-sm"
+            onclick="toggleBoardMine()"
+            title="Dim pasienter som ikke er dine">
+      Mine pasienter
     </button>
   </div>
 
@@ -514,12 +522,12 @@
     {% endif %}
 
     <div class="settings-card admin-only">
-      <h6><i class="bi bi-people me-2"></i>Behandlere</h6>
-      <p class="small text-muted mb-2">Legg til, endre eller deaktiver behandlere.</p>
-      <div id="behandlere-list"><span class="text-muted small">Laster...</span></div>
+      <h6><i class="bi bi-people me-2"></i>Forstehjelpere</h6>
+      <p class="small text-muted mb-2">Legg til, endre eller deaktiver forstehjelpere.</p>
+      <div id="forstehjelpere-list"><span class="text-muted small">Laster...</span></div>
       <div class="input-group input-group-sm mt-2">
-        <input type="text" id="new-behandler-name" class="form-control" placeholder="Navn på ny behandler">
-        <button class="btn btn-primary" onclick="addBehandler()">Legg til</button>
+        <input type="text" id="new-forstehjelper-name" class="form-control" placeholder="Navn på ny førstehjelper">
+        <button class="btn btn-primary" onclick="addForstehjelper()">Legg til</button>
       </div>
     </div>
 
@@ -812,8 +820,8 @@
         <div class="form-section-title">Personell</div>
         <div class="row g-2 mb-2">
           <div class="col-md-6">
-            <label class="form-label">Behandler</label>
-            <select id="n-behandler" class="form-select form-select-sm">
+            <label class="form-label">Førstehjelper</label>
+            <select id="n-forstehjelper" class="form-select form-select-sm">
               <option value="">—</option>
             </select>
           </div>
@@ -944,8 +952,8 @@
         <div class="form-section-title">Behandling</div>
         <div class="row g-2 mb-2">
           <div class="col-md-4">
-            <label class="form-label">Behandler</label>
-            <select id="e-behandler" class="form-select form-select-sm">
+            <label class="form-label">Førstehjelper</label>
+            <select id="e-forstehjelper" class="form-select form-select-sm">
               <option value="">—</option>
             </select>
           </div>

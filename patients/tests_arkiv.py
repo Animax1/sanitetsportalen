@@ -22,7 +22,7 @@ import json
 from django.test import TestCase, Client, override_settings
 from django.contrib.auth import get_user_model
 
-from patients.models import Patient, AppSetting, Behandler, VaktArkiv, ArkivertPasient
+from patients.models import Patient, AppSetting, Forstehjelper, VaktArkiv, ArkivertPasient
 from patients.services import (
     arkiver_aktiv_vakt,
     compute_arkiv_stats,
@@ -61,13 +61,13 @@ class ArkivTestMixin:
         AppSetting.set('active_year', 2098)
         AppSetting.set('next_patient_nr', 1)
 
-        # Behandler for denormalisering-test
-        self.behandler = Behandler.objects.create(name='Dr. Hansen', is_active=True)
+        # Førstehjelper for denormalisering-test
+        self.forstehjelper = Forstehjelper.objects.create(name='Dr. Hansen', is_active=True)
 
         self.admin_client = Client()
         self.admin_client.force_login(self.admin)
 
-    def _lag_pasient(self, nr, grovsortering='Grønn', behandler=None):
+    def _lag_pasient(self, nr, grovsortering='Grønn', forstehjelper=None):
         """Opprett pasient direkte i DB."""
         return Patient.objects.create(
             pasientnummer=nr,
@@ -75,7 +75,7 @@ class ArkivTestMixin:
             problemstilling='Test',
             grovsortering=grovsortering,
             is_active=True,
-            behandler=behandler,
+            forstehjelper=forstehjelper,
         )
 
     def _lagre_arkiv_post(self, navn='Testfestival', notat='', client=None):
@@ -118,16 +118,16 @@ class LagreArkivTests(ArkivTestMixin, TestCase):
 
         self.assertEqual(ArkivertPasient.objects.filter(arkiv_id=arkiv_id).count(), 3)
 
-    def test_lagre_arkiv_kopierer_behandler_navn(self):
-        """Behandler-navn kopieres riktig til behandler_navn-feltet."""
-        self._lag_pasient(1, behandler=self.behandler)
+    def test_lagre_arkiv_kopierer_forstehjelper_navn(self):
+        """Førstehjelper-navn kopieres riktig til forstehjelper_navn-feltet."""
+        self._lag_pasient(1, forstehjelper=self.forstehjelper)
 
         resp = self._lagre_arkiv_post()
         self.assertEqual(resp.status_code, 201)
         arkiv_id = resp.json()['id']
 
         ap = ArkivertPasient.objects.get(arkiv_id=arkiv_id, pasientnummer=1)
-        self.assertEqual(ap.behandler_navn, 'Dr. Hansen')
+        self.assertEqual(ap.forstehjelper_navn, 'Dr. Hansen')
 
     def test_lagre_arkiv_setter_sha256(self):
         """SHA-256 skal være populated og ha 64 tegn."""

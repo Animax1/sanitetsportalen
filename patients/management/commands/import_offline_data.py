@@ -24,7 +24,7 @@ from pathlib import Path
 from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
 
-from patients.models import Patient, Behandler, Helsepersonell
+from patients.models import Patient, Forstehjelper, Helsepersonell
 from patients.services import get_active_year
 from audit.models import AuditLog
 
@@ -77,10 +77,10 @@ class Command(BaseCommand):
         self.stdout.write(f'Fant {len(rows)} pasienter i offline-DB (år {year}).')
 
         # Forbered navnemapping
-        behandler_cache = {b.name: b for b in Behandler.objects.all()}
+        forstehjelper_cache = {b.name: b for b in Forstehjelper.objects.all()}
         hp_cache = {h.name: h for h in Helsepersonell.objects.all()}
 
-        new_behandlere = 0
+        new_forstehjelpere = 0
         new_hp = 0
         imported = 0
 
@@ -93,14 +93,14 @@ class Command(BaseCommand):
                 for row in rows:
                     row_keys = list(row.keys())
 
-                    # Behandler-mapping
-                    behandler_obj = None
+                    # Førstehjelper-mapping (SQL leser fra patients_behandler i offline-DB)
+                    forstehjelper_obj = None
                     if row['behandler_name']:
                         name = row['behandler_name']
-                        if name not in behandler_cache:
-                            behandler_cache[name] = Behandler.objects.create(name=name)
-                            new_behandlere += 1
-                        behandler_obj = behandler_cache[name]
+                        if name not in forstehjelper_cache:
+                            forstehjelper_cache[name] = Forstehjelper.objects.create(name=name)
+                            new_forstehjelpere += 1
+                        forstehjelper_obj = forstehjelper_cache[name]
 
                     # Helsepersonell-mapping
                     hp_obj = None
@@ -115,7 +115,7 @@ class Command(BaseCommand):
                     p = Patient(
                         pasientnummer=next_nr,
                         year=year,
-                        behandler=behandler_obj,
+                        forstehjelper=forstehjelper_obj,
                         helsepersonell_ref=hp_obj,
                     )
                     for f in PATIENT_COPY_FIELDS:
@@ -148,7 +148,7 @@ class Command(BaseCommand):
 
         self.stdout.write(self.style.SUCCESS(
             f'Importert {imported} pasienter, '
-            f'{new_behandlere} nye behandlere, {new_hp} nye helsepersonell.'
+            f'{new_forstehjelpere} nye forstehjelpere, {new_hp} nye helsepersonell.'
         ))
 
     def _fetch_offline_patients(self, conn, year):

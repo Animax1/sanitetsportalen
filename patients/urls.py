@@ -17,9 +17,9 @@ urlpatterns = [
     path('api/patients/', views.patients_list_view, name='api_patients_list'),
     path('api/patients/<int:pk>/', views.patient_detail_view, name='api_patient_detail'),
 
-    # Behandlere
-    path('api/behandlere/', views.behandlere_view, name='api_behandlere'),
-    path('api/behandlere/<int:pk>/', views.behandler_detail_view, name='api_behandler_detail'),
+    # Forstehjelpere
+    path('api/forstehjelpere/', views.forstehjelpere_view, name='api_forstehjelpere'),
+    path('api/forstehjelpere/<int:pk>/', views.forstehjelper_detail_view, name='api_forstehjelper_detail'),
     path('api/helsepersonell/', views.helsepersonell_view, name='api_helsepersonell'),
     path('api/helsepersonell/<int:pk>/', views.helsepersonell_detail_view, name='api_helsepersonell_detail'),
 

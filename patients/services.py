@@ -31,7 +31,7 @@ from core.auth_decorators import (  # noqa: F401
     has_role_at_least,
 )
 
-from .models import Patient, AppSetting, Behandler, VaktArkiv, ArkivertPasient
+from .models import Patient, AppSetting, Forstehjelper, VaktArkiv, ArkivertPasient
 
 
 # ── Hjelpefunksjoner ─────────────────────────────────────────────────────────
@@ -167,7 +167,7 @@ def get_event_name_or_legacy(year):
 # ── Automatisk tidsstempel for påbegynt behandling ────────────────────────────
 
 TREATMENT_TRIGGER_FIELDS = (
-    'behandler', 'helsepersonell_ref', 'lege', 'medisiner',
+    'forstehjelper', 'helsepersonell_ref', 'lege', 'medisiner',
     'inn_obspost', 'ut_obspost', 'utskrevet', 'utskrevet_til',
 )
 
@@ -188,7 +188,7 @@ def stamp_pabegynt_if_needed(patient, updates):
         if field in updates:
             value = updates[field]
             # FK-feltene kan komme som id eller objekt
-            if field in ('behandler', 'helsepersonell_ref'):
+            if field in ('forstehjelper', 'helsepersonell_ref'):
                 if value:  # id > 0 eller ikke-None objekt
                     patient.pabegynt = updates.get('_now_str') or now_local_str()
                     return True
@@ -736,7 +736,7 @@ def arkiver_aktiv_vakt(arrangement_navn, notat, user):
         active_year = get_active_year()
         pasienter = list(
             Patient.objects.filter(is_active=True, year=active_year)
-            .select_related('behandler', 'helsepersonell_ref')
+            .select_related('forstehjelper', 'helsepersonell_ref')
         )
         antall = len(pasienter)
 
@@ -769,7 +769,7 @@ def arkiver_aktiv_vakt(arrangement_navn, notat, user):
                 ut_obspost=p.ut_obspost or '',
                 utskrevet=p.utskrevet or '',
                 utskrevet_til=p.utskrevet_til or '',
-                behandler_navn=p.behandler.name if p.behandler else '',
+                forstehjelper_navn=p.forstehjelper.name if p.forstehjelper else '',
                 helsepersonell_navn=p.helsepersonell_ref.name if p.helsepersonell_ref else '',
                 lege=p.lege or '',
                 medisiner=p.medisiner or '',
@@ -784,7 +784,7 @@ def arkiver_aktiv_vakt(arrangement_navn, notat, user):
                 'pasientnummer', 'problemstilling', 'arsak', 'transport',
                 'grovsortering', 'plassering', 'inntid', 'pabegynt',
                 'inn_obspost', 'ut_obspost', 'utskrevet', 'utskrevet_til',
-                'behandler_navn', 'helsepersonell_navn', 'lege', 'medisiner', 'journal',
+                'forstehjelper_navn', 'helsepersonell_navn', 'lege', 'medisiner', 'journal',
             )
         )
         sha = _compute_sha256_for_arkiv(arkiv, pasienter_dicts)
@@ -801,7 +801,7 @@ def _arkiv_pasienter_dicts(arkiv):
             'pasientnummer', 'problemstilling', 'arsak', 'transport',
             'grovsortering', 'plassering', 'inntid', 'pabegynt',
             'inn_obspost', 'ut_obspost', 'utskrevet', 'utskrevet_til',
-            'behandler_navn', 'helsepersonell_navn', 'lege', 'medisiner', 'journal',
+            'forstehjelper_navn', 'helsepersonell_navn', 'lege', 'medisiner', 'journal',
         )
     )
 

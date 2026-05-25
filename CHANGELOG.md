@@ -4,6 +4,35 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-05-25 — Behandler → Førstehjelper + Mine pasienter
+
+### Rename: Behandler → Førstehjelper (Fase 6)
+
+- `Behandler`-modellen omdøpt til `Forstehjelper` i kode, database og UI
+- Django-migrasjon med `RenameModel` + `RenameField` — ingen tap av data
+- API-endepunkt `/api/behandlere/` → `/api/forstehjelpere/`
+- `UserPatientLinkForm` erstattet av `PasientRolleForm` — enkel radio (Ingen / Førstehjelper / Helsepersonell) i brukeradmin
+- Alle JS-moduler, templates, tester og admin oppdatert (~250 forekomster)
+- 475 tester, alle grønne
+
+### «Mine pasienter» — listevisning
+
+- Endret fra checkbox/toggle til filterknapp i rekken med Alle / Rød / Gul / osv.
+- Eksklusivt filter (ikke kombinerbart); klikker man en annen — nullstilles «mine»
+- Server-side filtrering via `?mine=1` bevart; localStorage-persistering fungerer
+
+### «Mine pasienter» — tavle
+
+- Ny knapp ved siden av «Ny pasient» i tavle-visningen
+- Viser alle pasienter, men dimmer (opacity + desaturate) pasienter som ikke er dine
+- Ledige plasser («Ledig») påvirkes ikke
+
+### Diverse UI
+
+- Spacing-fix: «Ny pasient»-knappen har nå riktig avstand ned til sonene i tavlen
+
+---
+
 ## 2026-05-16 — Mørkt tema konsolidert
 
 ### Designstrategi
@@ -22,6 +51,12 @@ Portalen bruker nå et konsistent mørkt tema på alle sider — i harmoni med p
 ### `base_portal.html` `:root` — Bootstrap-tokens
 
 - `--bs-body-bg`, `--bs-body-color`, `--bs-border-color` lagt til — gir Bootstrap-utilities korrekte mørke verdier og synlig kortkant mot mørk sidefarge
+
+### Global dato/klokkeslett
+
+- **`portal-clock.js`**: Ny dedikert fil med `updateClock()` — viser norsk dag, dato og tid (oppdateres hvert sekund)
+- **`base_portal.html`**: `#header-dt`-element lagt til i headeren (mellom varselbjelle og avatar) — klokken vises nå på alle portal-sider
+- **`script.js`**: `DAYS_NO` og `updateClock()` fjernet — dekkes nå globalt av `portal-clock.js`
 
 ### Template-opprydding
 

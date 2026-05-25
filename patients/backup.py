@@ -35,11 +35,11 @@ class PatientsBackupHandler(BaseBackupHandler):
         'patients.VaktArkiv',
     ]
     restore_models = [
-        # Slett-rekkefølge: barn -> foreldre. Patient har FK til Behandler
+        # Slett-rekkefølge: barn -> foreldre. Patient har FK til Forstehjelper
         # og Helsepersonell, så Patient må slettes først.
         # VaktArkiv er IKKE her — den røres aldri av restore (se exclude).
         'patients.Patient',
-        'patients.Behandler',
+        'patients.Forstehjelper',
         'patients.Helsepersonell',
         'patients.AppSetting',
     ]

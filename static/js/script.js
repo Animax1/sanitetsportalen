@@ -193,7 +193,7 @@ let arkivStatsMode = false;
 let arkivStatsMeta = null;  // {id, tittel, arrangement_navn, importert_at, antall_pasienter}
 
 // ── Globale variabler for ny funksjonalitet ───────────────────────────────────
-let behandlere = [];           // liste fra /api/behandlere/
+let forstehjelpere = [];       // liste fra /api/forstehjelpere/
 let helsepersonellListe = [];  // liste fra /api/helsepersonell/
 
 const bsNew   = new bootstrap.Modal(document.getElementById('newModal'));
@@ -201,36 +201,8 @@ const bsEdit  = new bootstrap.Modal(document.getElementById('editModal'));
 // bsReset fjernet – nullstill erstattet av arkiver-år
 
 // ════════════════════════════════════════════════════════
-// CLOCK & HELPERS
+// HELPERS
 // ════════════════════════════════════════════════════════
-const DAYS_NO = ['søndag', 'mandag', 'tirsdag', 'onsdag', 'torsdag', 'fredag', 'lørdag'];
-
-function updateClock() {
-  const now = new Date();
-  const el = document.getElementById('header-dt');
-  if (!el) return;
-
-  const dayStr = DAYS_NO[now.getDay()];
-  const dateStr =
-    String(now.getDate()).padStart(2, '0') + '.' +
-    String(now.getMonth() + 1).padStart(2, '0') + '.' +
-    now.getFullYear();
-
-  const timeStr = now.toLocaleTimeString('no-NO', {
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit'
-  });
-
-  el.innerHTML = `
-    <div style="font-size:0.8rem;opacity:0.85;">${dayStr} ${dateStr}</div>
-    <div style="font-size:1.35rem;font-weight:300;letter-spacing:0.07em;">${timeStr}</div>
-  `;
-}
-
-setInterval(updateClock, 1000);
-updateClock();
-
 function nowStr() {
   const d = new Date();
   return [
@@ -301,7 +273,7 @@ const COLS = [
   { title:'Inntid',         field:'inntid',          width:135 },
   { title:'Påbegynt',       field:'pabegynt',        width:135 },
   { title:'Plassering',     field:'plassering',      width:125 },
-  { title:'Behandler',      field:'behandler',       width:115, formatter:(c)=>{ const v = c.getValue(); return v ? (v.name || v) : ''; } },
+  { title:'Førstehjelper',  field:'forstehjelper',   width:115, formatter:(c)=>{ const v = c.getValue(); return v ? (v.name || v) : ''; } },
   { title:'Helsepersonell', field:'helsepersonell_ref', width:130, formatter:(c)=>{ const v = c.getValue(); return v ? (v.name || '') : ''; } },
   { title:'Inn-Obs',        field:'inn_obspost',     width:135 },
   { title:'UT-Obs',         field:'ut_obspost',      width:135 },
@@ -470,7 +442,7 @@ function updatePlasseringDropdownState(selectId, excludePatientId) {
 }
 
 function openNewModal() {
-  ['n-problemstilling','n-arsak','n-transport','n-plassering','n-behandler'].forEach(id => {
+  ['n-problemstilling','n-arsak','n-transport','n-plassering','n-forstehjelper'].forEach(id => {
     const el = document.getElementById(id);
     if (el) { el.value = ''; el.classList.remove('is-invalid'); }
   });
@@ -527,7 +499,7 @@ async function _saveNewImpl() {
     transport:       document.getElementById('n-transport').value,
     inntid:          document.getElementById('n-inntid').value || nowStr(),
     plassering:      document.getElementById('n-plassering').value,
-    behandler:       parseInt(document.getElementById('n-behandler').value) || null,
+    forstehjelper:       parseInt(document.getElementById('n-forstehjelper').value) || null,
     helsepersonell_ref: parseInt(document.getElementById('n-helsepersonell').value) || null,
   };
   const res = await apiFetch('/pasienter/api/patients/', {
@@ -581,9 +553,9 @@ function openEdit(data) {
   try { _ensurePlasseringOption('e-plassering', data.plassering); }
   catch (e) { console.warn('_ensurePlasseringOption feilet:', e); }
   set('e-plassering',      data.plassering);
-  // Behandler er nå et objekt {id, name} – populer dropdown og sett valgt verdi.
-  // _populateBehandlerDropdown håndterer både aktive behandlere og inaktiv-bevaring.
-  _populateBehandlerDropdown('e-behandler', data.behandler || null);
+  // Førstehjelper er nå et objekt {id, name} – populer dropdown og sett valgt verdi.
+  // _populateForstehjelperDropdown håndterer både aktive og inaktiv-bevaring.
+  _populateForstehjelperDropdown('e-forstehjelper', data.forstehjelper || null);
   _populateHelsepersonellDropdown('e-helsepersonell-ref', data.helsepersonell_ref || null);
   set('e-lege',            data.lege);
   set('e-medisiner',       data.medisiner);
@@ -622,7 +594,7 @@ async function _saveEditImpl() {
     inntid:          document.getElementById('e-inntid').value,
     pabegynt:        document.getElementById('e-pabegynt').value,
     plassering:      document.getElementById('e-plassering').value,
-    behandler:       parseInt(document.getElementById('e-behandler').value) || null,
+    forstehjelper:       parseInt(document.getElementById('e-forstehjelper').value) || null,
     helsepersonell_ref: parseInt(document.getElementById('e-helsepersonell-ref').value) || null,
     lege:            document.getElementById('e-lege').value,
     medisiner:       document.getElementById('e-medisiner').value,
@@ -677,8 +649,8 @@ function escapeHtml(s) {
   }[c]));
 }
 
-function behandlerNavn(p) {
-  if (p.behandler && p.behandler.name) return p.behandler.name;
+function forstehjelperNavn(p) {
+  if (p.forstehjelper && p.forstehjelper.name) return p.forstehjelper.name;
   return '—';
 }
 
@@ -732,7 +704,7 @@ async function renderBoard() {
           <span class="zc-prob">${escapeHtml(p.problemstilling || '–')}</span>
         </div>
         <div class="zc-meta">
-          <span class="zc-behandler"><i class="bi bi-person-badge"></i> B: ${escapeHtml(behandlerNavn(p))}</span>
+          <span class="zc-forstehjelper"><i class="bi bi-person-badge"></i> B: ${escapeHtml(forstehjelperNavn(p))}</span>
           <span class="zc-duration"><i class="bi bi-clock"></i> ${totalDuration(p)}</span>
         </div>
         ${hpNavn ? `<div class="zc-meta"><span class="zc-helsepersonell"><i class="bi bi-person"></i> H: ${escapeHtml(hpNavn)}</span></div>` : ''}`;
@@ -759,10 +731,10 @@ async function renderBoard() {
         <div class="obs-patient-nr">#${p.patient_nr}</div>
         <div class="obs-problem">${escapeHtml(p.problemstilling || '–')}</div>
         <div class="obs-meta">
-          <span class="obs-behandler-name">B: ${escapeHtml(behandlerNavn(p))}</span>
+          <span class="obs-forstehjelper-name">B: ${escapeHtml(forstehjelperNavn(p))}</span>
           <span class="obs-duration">${totalDuration(p)}</span>
         </div>
-        ${hpNavn ? `<div class="obs-meta"><span class="obs-behandler-name">H: ${escapeHtml(hpNavn)}</span></div>` : ''}`;
+        ${hpNavn ? `<div class="obs-meta"><span class="obs-forstehjelper-name">H: ${escapeHtml(hpNavn)}</span></div>` : ''}`;
       div.onclick = () => openEdit(p);
     } else {
       div.innerHTML = `<div class="obs-bed-nr">${label}</div><div class="obs-empty">Ledig</div>`;
@@ -1458,43 +1430,43 @@ async function saveSessionTimeout() {
 }
 
 // ════════════════════════════════════════════════════════
-// BEHANDLERE
+// FORSTEHJELPERE
 // ════════════════════════════════════════════════════════
 
 /**
- * Hent behandlerliste fra API og populer dropdown-menyer.
- * Inaktive behandlere vises ikke i dropdown (men beholdes
+ * Hent førstehjelper-liste fra API og populer dropdown-menyer.
+ * Inaktive forstehjelpere vises ikke i dropdown (men beholdes
  * på pasienter som allerede har dem via openEdit).
  */
-// ETag for behandlere – unngår unyttig dataoverføring når listen er uendret
-let lastBehandlereEtag = null;
+// ETag for forstehjelpere – unngår unyttig dataoverføring når listen er uendret
+let lastForstehjelperEtag = null;
 
-async function loadBehandlere() {
+async function loadForstehjelpere() {
   const headers = { 'Cache-Control': 'no-cache' };
   // Send If-None-Match hvis vi har en lagret ETag fra forrige henting
-  if (lastBehandlereEtag) {
-    headers['If-None-Match'] = lastBehandlereEtag;
+  if (lastForstehjelperEtag) {
+    headers['If-None-Match'] = lastForstehjelperEtag;
   }
-  const res = await fetch('/pasienter/api/behandlere/', {
+  const res = await fetch('/pasienter/api/forstehjelpere/', {
     cache: 'no-store',
     headers,
   });
   if (res.status === 304) {
-    // Ingen endringer – behold eksisterende behandlere-array, oppdater ikke dropdown unyttig
+    // Ingen endringer – behold eksisterende forstehjelpere-array, oppdater ikke dropdown unyttig
     return;
   }
-  // 200: oppdater ETag og behandler-data
+  // 200: oppdater ETag og førstehjelper-data
   const etag = res.headers.get('ETag');
-  if (etag) lastBehandlereEtag = etag;
-  behandlere = await res.json();
-  _populateBehandlerDropdown('n-behandler', null);
-  // Populer også rediger-dropdown. Bevar valgt behandler hvis modalen er åpen.
-  const eBeh = document.getElementById('e-behandler');
+  if (etag) lastForstehjelperEtag = etag;
+  forstehjelpere = await res.json();
+  _populateForstehjelperDropdown('n-forstehjelper', null);
+  // Populer også rediger-dropdown. Bevar valgt førstehjelper hvis modalen er åpen.
+  const eBeh = document.getElementById('e-forstehjelper');
   const currentEditBeh = eBeh && eBeh.value
-    ? behandlere.find(b => String(b.id) === String(eBeh.value)) || null
+    ? forstehjelpere.find(b => String(b.id) === String(eBeh.value)) || null
     : null;
-  _populateBehandlerDropdown('e-behandler', currentEditBeh);
-  renderBehandlereAdmin();
+  _populateForstehjelperDropdown('e-forstehjelper', currentEditBeh);
+  renderForstehjelperAdmin();
 }
 
 /**
@@ -1541,13 +1513,13 @@ function _ensurePlasseringOption(selectId, value) {
   opt.dataset.originalLabel = opt.textContent;
 }
 
-function _populateBehandlerDropdown(selectId, currentBehandler) {
+function _populateForstehjelperDropdown(selectId, currentForstehjelper) {
   const sel = document.getElementById(selectId);
   if (!sel) return;
-  const currentId = currentBehandler ? String(currentBehandler.id) : '';
+  const currentId = currentForstehjelper ? String(currentForstehjelper.id) : '';
   sel.innerHTML = '<option value="">—</option>';
-  behandlere
-    .filter(b => b.is_active || (currentBehandler && String(b.id) === currentId))
+  forstehjelpere
+    .filter(b => b.is_active || (currentForstehjelper && String(b.id) === currentId))
     .forEach(b => {
       const opt = document.createElement('option');
       opt.value = b.id;
@@ -1557,58 +1529,58 @@ function _populateBehandlerDropdown(selectId, currentBehandler) {
   if (currentId) sel.value = currentId;
 }
 
-function renderBehandlereAdmin() {
-  const container = document.getElementById('behandlere-list');
+function renderForstehjelperAdmin() {
+  const container = document.getElementById('forstehjelpere-list');
   if (!container) return;
-  if (!behandlere.length) {
-    container.innerHTML = '<span class="text-muted small">Ingen behandlere registrert.</span>';
+  if (!forstehjelpere.length) {
+    container.innerHTML = '<span class="text-muted small">Ingen forstehjelpere registrert.</span>';
     return;
   }
-  const rows = behandlere.map(b => `
+  const rows = forstehjelpere.map(b => `
     <div class="d-flex align-items-center gap-2 mb-1" style="font-size:0.85rem;">
       <span class="flex-grow-1 ${b.is_active ? '' : 'text-muted'}">${b.name}${b.is_active ? '' : ' <em>(inaktiv)</em>'}</span>
-      <button class="btn btn-outline-secondary btn-sm py-0 px-1" onclick="toggleBehandler(${b.id})" title="${b.is_active ? 'Deaktiver' : 'Aktiver'}">
+      <button class="btn btn-outline-secondary btn-sm py-0 px-1" onclick="toggleForstehjelper(${b.id})" title="${b.is_active ? 'Deaktiver' : 'Aktiver'}">
         <i class="bi bi-${b.is_active ? 'toggle-on' : 'toggle-off'}"></i>
       </button>
-      <button class="btn btn-outline-danger btn-sm py-0 px-1" onclick="deleteBehandler(${b.id})" title="Slett">
+      <button class="btn btn-outline-danger btn-sm py-0 px-1" onclick="deleteForstehjelper(${b.id})" title="Slett">
         <i class="bi bi-trash"></i>
       </button>
     </div>`).join('');
   container.innerHTML = rows;
 }
 
-async function addBehandler() {
-  const nameEl = document.getElementById('new-behandler-name');
+async function addForstehjelper() {
+  const nameEl = document.getElementById('new-forstehjelper-name');
   const name = (nameEl?.value || '').trim();
   if (!name) { alert('Skriv inn et navn.'); return; }
-  const res = await apiFetch('/pasienter/api/behandlere/', {
+  const res = await apiFetch('/pasienter/api/forstehjelpere/', {
     method: 'POST',
     body: JSON.stringify({ name })
   });
   if (res.ok) {
     nameEl.value = '';
-    await loadBehandlere();
+    await loadForstehjelpere();
   } else {
     const d = await res.json();
-    alert(d.error || 'Feil ved oppretting av behandler.');
+    alert(d.error || 'Feil ved oppretting av førstehjelper.');
   }
 }
 
-async function toggleBehandler(id) {
-  const b = behandlere.find(x => x.id === id);
+async function toggleForstehjelper(id) {
+  const b = forstehjelpere.find(x => x.id === id);
   if (!b) return;
-  const res = await apiFetch(`/pasienter/api/behandlere/${id}/`, {
+  const res = await apiFetch(`/pasienter/api/forstehjelpere/${id}/`, {
     method: 'PUT',
     body: JSON.stringify({ is_active: !b.is_active })
   });
-  if (res.ok) await loadBehandlere();
+  if (res.ok) await loadForstehjelpere();
 }
 
-async function deleteBehandler(id) {
-  if (!confirm('Slett behandler? Hvis behandleren er knyttet til pasienter, vil slettingen blokkeres.')) return;
-  const res = await apiFetch(`/pasienter/api/behandlere/${id}/`, { method: 'DELETE' });
+async function deleteForstehjelper(id) {
+  if (!confirm('Slett førstehjelper? Hvis førstehjelperen er knyttet til pasienter, vil slettingen blokkeres.')) return;
+  const res = await apiFetch(`/pasienter/api/forstehjelpere/${id}/`, { method: 'DELETE' });
   if (res.ok) {
-    await loadBehandlere();
+    await loadForstehjelpere();
   } else {
     const d = await res.json();
     alert(d.error || 'Feil ved sletting.');
@@ -1616,7 +1588,7 @@ async function deleteBehandler(id) {
 }
 
 // ════════════════════════════════════════════════════════
-// HELSEPERSONELL (samme mønster som behandlere)
+// HELSEPERSONELL (samme mønster som forstehjelpere)
 // ════════════════════════════════════════════════════════
 let lastHelsepersonellEtag = null;
 
@@ -1757,7 +1729,7 @@ document.querySelectorAll('[data-tab]').forEach(link => link.addEventListener('c
     loadSettings();
     loadArchives();
     loadSessionTimeout();
-    loadBehandlere();
+    loadForstehjelpere();
     loadHelsepersonell();
     loadBackupPanel();  // ← Backup-panel
   }
@@ -1785,7 +1757,7 @@ let refreshId = null; // ID for setInterval – må lagres for å kunne clearInt
 
 async function doAutoRefresh() {
   await loadPatients();
-  await loadBehandlere();
+  await loadForstehjelpere();
   await loadHelsepersonell();
   const t = document.querySelector('[data-tab].active')?.dataset.tab;
   if (t === 'tavle')      renderBoard();
@@ -1957,7 +1929,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Fase 5: Synk "Mine pasienter"-checkbox med persisted state før første load
   const mineToggle = document.getElementById('toggle-mine');
   if (mineToggle) mineToggle.checked = mineOnly;
-  await loadBehandlere();
+  await loadForstehjelpere();
   await loadHelsepersonell();
   await loadPatients();
   loadSettings();
