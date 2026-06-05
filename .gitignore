@@ -14,8 +14,6 @@ arkiv/
 *.lock
 .DS_Store
 
-TEKNISK_DOKUMENTASJON.md
-PERSONVERN_DOKUMENTASJON.md
 
 # Offline-modus
 OFFLINE_PASSORD.md

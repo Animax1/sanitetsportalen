@@ -88,6 +88,7 @@ INSTALLED_APPS = [
 # ── Mellomvare ───────────────────────────────────────────────────────────────
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'core.middleware.MemoryLoggingMiddleware',
     'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -236,6 +237,10 @@ else:
         'default': {
             'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
             'LOCATION': 'pasientregistrering-ratelimit',
+            'OPTIONS': {
+                'MAX_ENTRIES': 200,
+                'CULL_FREQUENCY': 4,
+            },
         }
     }
     CACHE_BACKEND_NAME = 'locmem'
@@ -255,3 +260,21 @@ OTP_TOTP_ISSUER = 'Sanitetsportalen'
 
 # ── Standard primærnøkkeltype ─────────────────────────────────────────────────
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+# ── Logging ──────────────────────────────────────────────────────────────────
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+        },
+    },
+    'loggers': {
+        'memory': {
+            'handlers': ['console'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+    },
+}
