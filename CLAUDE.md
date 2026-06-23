@@ -2,6 +2,12 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Arbeidsflyt ved commit/push
+
+**Før enhver endring som skal commites og pushes: oppdater `CHANGELOG.md` og `TODO.md` i forkant.**
+Legg endringen øverst i CHANGELOG (ny `## YYYY-MM-DD`-seksjon ved behov), og kryss av / flytt
+relevante punkter i TODO. Dette skal gjøres som del av samme commit, ikke etterpå.
+
 ## Commands
 
 ```powershell

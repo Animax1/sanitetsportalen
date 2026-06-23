@@ -4,6 +4,20 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-06-23 — Python 3.13 + arbeidsflyt-regel
+
+### Oppgradering til Python 3.13
+
+- `runtime.txt` satt tilbake til `python-3.13` (var utilsiktet flippet til `3.12` i fase-3a-commit `75258f8`)
+- Matcher miljøet pasientregistrering kjører på Railway — én færre variabel ved kommende repo-bytte på Railway
+- Ingen avhengigheter er pinnet til 3.12; `requirements.txt` uendret
+
+### Ny arbeidsflyt-regel
+
+- `CLAUDE.md`: alle endringer som skal commites/pushes skal oppdatere CHANGELOG og TODO i forkant (samme commit)
+
+---
+
 ## 2026-05-25 — Behandler → Førstehjelper + Mine pasienter
 
 ### Rename: Behandler → Førstehjelper (Fase 6)

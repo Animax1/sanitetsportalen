@@ -16,6 +16,7 @@
 
 ## Ferdig ✓
 
+- [x] Sett `runtime.txt` tilbake til Python 3.13 (var utilsiktet 3.12) før Railway-repo-bytte
 - [x] Rydde opp i CSS filene, det er flere plasser hvor tekst farger er for mørke, det må vi se litt på. Dette krever nok en del arbeid.
 - [x] Del opp `script.js` i separate moduler (patients-utils, patients-table, patients-forms, patients-stats)
 - [x] Visuell konsistens: `accounts/users/` og `admin_status.html` bruker nå `base_portal.html`
