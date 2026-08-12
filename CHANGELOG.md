@@ -4,6 +4,31 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-08-12 — Testsuiten: 500 s → 15 s
+
+Suiten brukte 8 minutter på 501 tester, noe som gjorde det upraktisk å kjøre den
+under utvikling.
+
+**Årsak:** Django-standarden PBKDF2 med 1 000 000 iterasjoner koster ~630 ms per hashing,
+og suiten oppretter brukere og logger inn hundrevis av ganger. Alene stod dette for
+mesteparten av kjøretiden — `accounts` brukte 141 s på 36 tester.
+
+**Fiks:** `PASSWORD_HASHERS` settes til MD5 når — og bare når — `manage.py test` kjører
+(`sys.argv[1] == 'test'`). Verifisert at gunicorn og `runserver` fortsatt bruker PBKDF2.
+
+| | Før | Etter |
+|---|---|---|
+| `accounts` | 141 s | 0,9 s |
+| Hele suiten | 504 s | 15,5 s |
+
+Alle 501 tester fortsatt grønne.
+
+**Dokumentasjonsfeil oppdaget underveis:** README og personvernprotokollen oppga
+passord-hashing som «argon2 / pbkdf2». `argon2-cffi` er ikke i `requirements.txt`, så det
+er PBKDF2 alene. Rettet begge steder. Argon2 kan aktiveres senere ved å legge til pakken.
+
+---
+
 ## 2026-08-12 — GDPR fase 2: kodefikser
 
 ### Serverside-validering av kliniske felt (2.1)

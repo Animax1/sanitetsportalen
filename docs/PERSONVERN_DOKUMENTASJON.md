@@ -295,7 +295,7 @@ Lagringstidene er fastsatt etter GDPR art. 5(1)(e): opplysningene skal ikke oppb
 |---|---|
 | Kryptering i hvile | AES-256 (Railway infrastruktur, PostgreSQL-database) |
 | Kryptering i transitt | TLS tvunget i produksjon (`SECURE_SSL_REDIRECT`); HSTS aktivert med 1 års varighet, subdomener og preload |
-| Passord-hashing | Django passord-hashing via argon2 / pbkdf2; passord lagres aldri i klartekst |
+| Passord-hashing | Djangos standard PBKDF2-HMAC-SHA256 med 1 000 000 iterasjoner; passord lagres aldri i klartekst. Argon2 er ikke installert i dag, men kan aktiveres ved å legge til `argon2-cffi`. Under testkjøring byttes hasheren til MD5 for fart — betingelsen er snever (`manage.py test`) og påvirker ikke drift |
 | Multifaktorautentisering (MFA) | TOTP (tidsbasert engangspassord) med backup-koder (engangs). MFA trust-cookie (30 dager, signert, enhets-bundet). MFA-hendelser logges |
 | Brute-force-lås | Konto låses etter 5 feilede innloggingsforsøk i 15 minutter |
 | Rate-limiting | Dobbel rate-limit: maks 10 forsøk per brukernavn / 50 forsøk per IP i 5 minutter. Nødbryter: `RATELIMIT_ENABLE`-miljøvariabel |

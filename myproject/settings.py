@@ -2,6 +2,7 @@
 Django-innstillinger for pasientregistreringssystemet.
 """
 import os
+import sys
 from pathlib import Path
 
 import dj_database_url
@@ -177,6 +178,21 @@ AUTH_PASSWORD_VALIDATORS = [
     {'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator'},
     {'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator'},
 ]
+
+# ── Passord-hashing under testkjøring ────────────────────────────────────────
+# Produksjon bruker Djangos standard (PBKDF2 med 1 000 000 iterasjoner). Det er
+# riktig for drift, men koster ~600 ms per hashing — og testsuiten oppretter
+# brukere og logger inn hundrevis av ganger. Det alene stod for mesteparten av
+# kjøretiden.
+#
+# Under `manage.py test` byttes hasheren til MD5. Den er kryptografisk verdiløs
+# og skal ALDRI brukes utenfor tester; derfor den snevre betingelsen under.
+# Produksjonsstien er urørt — hverken Gunicorn eller `runserver` har `test`
+# som første argument.
+_RUNNING_TESTS = len(sys.argv) > 1 and sys.argv[1] == 'test'
+
+if _RUNNING_TESTS:
+    PASSWORD_HASHERS = ['django.contrib.auth.hashers.MD5PasswordHasher']
 
 # ── Internasjonalisering ──────────────────────────────────────────────────────
 LANGUAGE_CODE = 'nb'

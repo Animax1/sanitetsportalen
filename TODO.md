@@ -22,7 +22,9 @@
 - [ ] KO-tavle.
 - [ ] Fytte sesjons delen til en admin side.
 - [ ] Integrasjon med produksjons database.
-- [ ] Testene er massive, kan vi komprimere den?
+- [ ] Testene er massive, kan vi komprimere den? (kjøretiden er løst: 500 s → 15 s via
+      PASSWORD_HASHERS under test. Gjenstår evt. å redusere *antall* tester)
+- [ ] Vurder `argon2-cffi` for sterkere passord-hashing i produksjon (i dag PBKDF2)
 - [ ] Fjerne varsler eldre enn 30 dager.s
 - [ ] Lage locus klone, hente sted via enhet gps.
 - [ ] Slå sammen de to backup-flatene. Pasientmodulens egen backup-side og

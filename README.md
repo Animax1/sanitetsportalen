@@ -261,7 +261,7 @@ python manage.py test patients accounts audit -v 2
 
 ### Autentisering
 
-- CustomUser med sterk passord-hashing (argon2/pbkdf2)
+- CustomUser med sterk passord-hashing (PBKDF2-HMAC-SHA256, 1 000 000 iterasjoner)
 - Brute-force-lås: 5 feil → 15 minutter utestengt
 - **Dobbel rate-limit** på innlogging: 10 forsøk per brukernavn / 50 per IP per 5 minutter
 - **Nødbryter:** sett `RATELIMIT_ENABLE=false` for å skru av rate-limiting ved behov
