@@ -810,18 +810,95 @@ def _arkiv_pasienter_dicts(arkiv):
 
 
 def compute_arkiv_stats(arkiv):
-    """Beregn basis-statistikk fra ArkivertPasient (samme nøkler som basic_stats).
+    """Basis-statistikk for et arkiv.
 
-    Brukes for header-chips og enkle visninger.
+    Beregnes fra ArkivertPasient så lenge radene finnes. Er arkivet
+    kollapset, returneres det frosne aggregatet i stedet — tallene er de
+    samme, de ble bare regnet ut den gangen radene fantes.
     """
+    if arkiv.er_kollapset:
+        return (arkiv.aggregat or {}).get('basis', {})
     return _compute_stats_from_dicts(_arkiv_pasienter_dicts(arkiv))
 
 
 def compute_arkiv_full_stats(arkiv):
-    """Beregn full statistikk-dashboard fra ArkivertPasient.
+    """Full statistikk-dashboard for et arkiv.
 
     Returnerer samme struktur som full_stats(): summary, krysstabeller,
     Chi-square og Kruskal-Wallis-tester, tids-statistikk pr. gruppe osv.
-    Gjør at arkiverte vakter kan analyseres med samme verktøy som aktive.
+
+    Som ``compute_arkiv_stats``: leser frosset aggregat hvis arkivet er
+    kollapset.
     """
+    if arkiv.er_kollapset:
+        return (arkiv.aggregat or {}).get('full', {})
     return _compute_full_stats_from_dicts(_arkiv_pasienter_dicts(arkiv))
+
+
+# ── Kollaps til aggregat (GDPR-tiltaksplan fase 3.1) ─────────────────────────
+
+def _compute_sha256_for_aggregat(arkiv, aggregat):
+    """Sjekksum over det frosne aggregatet.
+
+    Overtar integritetssjekken etter kollaps. ``sha256``-feltet er beregnet
+    over pasientrader som ikke lenger finnes, og kan aldri verifiseres igjen.
+    """
+    payload = {
+        'arkiv_id': arkiv.pk,
+        'arrangement_navn': arkiv.arrangement_navn,
+        'year_snapshot': arkiv.year_snapshot,
+        'aggregat': aggregat,
+    }
+    canonical = _json_mod.dumps(payload, ensure_ascii=False, sort_keys=True)
+    return hashlib.sha256(canonical.encode('utf-8')).hexdigest()
+
+
+def bygg_aggregat(arkiv):
+    """Beregn statistikken som skal fryses. Sletter ingenting."""
+    return {
+        'basis': _compute_stats_from_dicts(_arkiv_pasienter_dicts(arkiv)),
+        'full': _compute_full_stats_from_dicts(_arkiv_pasienter_dicts(arkiv)),
+    }
+
+
+def kollaps_arkiv(arkiv):
+    """Frys statistikken og slett pasientradene permanent.
+
+    **Irreversibel.** Etter dette finnes ingen opplysninger om enkeltpasienter
+    i arkivet — kun aggregerte tall som ikke lar seg føre tilbake til en
+    person.
+
+    Idempotent: et allerede kollapset arkiv røres ikke, og funksjonen
+    returnerer 0.
+
+    Returnerer antall slettede pasientrader.
+    """
+    if arkiv.er_kollapset:
+        return 0
+
+    aggregat = bygg_aggregat(arkiv)
+
+    with transaction.atomic():
+        antall = ArkivertPasient.objects.filter(arkiv=arkiv).delete()[0]
+
+        arkiv.aggregat = aggregat
+        arkiv.aggregat_sha256 = _compute_sha256_for_aggregat(arkiv, aggregat)
+        arkiv.kollapset_at = djtz.now()
+        arkiv.save(update_fields=[
+            'aggregat', 'aggregat_sha256', 'kollapset_at',
+        ])
+
+    return antall
+
+
+def har_arkiv_backup_etter(tidspunkt):
+    """Finnes det en arkiv-backup tatt etter ``tidspunkt``?
+
+    Brukes som sperre før kollaps: en backup laget etter at arkivet ble
+    opprettet inneholder arkivet, og gjør slettingen gjenopprettbar.
+    """
+    from .models import Backup
+    return Backup.objects.filter(
+        module_slug='arkiv',
+        created_at__gt=tidspunkt,
+    ).exists()

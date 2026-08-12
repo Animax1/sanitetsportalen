@@ -873,18 +873,28 @@ def arkiv_detalj_view(request, pk):
 
         stats = compute_arkiv_stats(arkiv)
 
-        # SHA-256-verifikasjon
-        from .services import _compute_sha256_for_arkiv
-        pasienter_dicts = list(
-            ArkivertPasient.objects.filter(arkiv=arkiv).values(
-                'pasientnummer', 'problemstilling', 'arsak', 'transport',
-                'grovsortering', 'plassering', 'inntid', 'pabegynt',
-                'inn_obspost', 'ut_obspost', 'utskrevet', 'utskrevet_til',
-                'forstehjelper_navn', 'helsepersonell_navn', 'lege', 'medisiner', 'journal',
+        # SHA-256-verifikasjon. Kilden avhenger av om arkivet er kollapset:
+        # etter kollaps finnes ikke pasientradene lenger, og `sha256` (som er
+        # beregnet over dem) kan aldri verifiseres igjen. Da sjekkes det
+        # frosne aggregatet i stedet.
+        if arkiv.er_kollapset:
+            from .services import _compute_sha256_for_aggregat
+            sha_now = _compute_sha256_for_aggregat(arkiv, arkiv.aggregat or {})
+            tamper_detected = bool(
+                arkiv.aggregat_sha256 and sha_now != arkiv.aggregat_sha256
             )
-        )
-        sha_now = _compute_sha256_for_arkiv(arkiv, pasienter_dicts)
-        tamper_detected = bool(arkiv.sha256 and sha_now != arkiv.sha256)
+        else:
+            from .services import _compute_sha256_for_arkiv
+            pasienter_dicts = list(
+                ArkivertPasient.objects.filter(arkiv=arkiv).values(
+                    'pasientnummer', 'problemstilling', 'arsak', 'transport',
+                    'grovsortering', 'plassering', 'inntid', 'pabegynt',
+                    'inn_obspost', 'ut_obspost', 'utskrevet', 'utskrevet_til',
+                    'forstehjelper_navn', 'helsepersonell_navn', 'lege', 'medisiner', 'journal',
+                )
+            )
+            sha_now = _compute_sha256_for_arkiv(arkiv, pasienter_dicts)
+            tamper_detected = bool(arkiv.sha256 and sha_now != arkiv.sha256)
 
         return JsonResponse({
             'id': arkiv.pk,
@@ -897,6 +907,13 @@ def arkiv_detalj_view(request, pk):
             'notat': arkiv.notat,
             'sha256': arkiv.sha256,
             'tamper_detected': tamper_detected,
+            # Grensesnittet må kunne skille et arkiv med pasientrader fra ett
+            # som kun har frosne tall igjen — ellers ser de like ut, mens
+            # integritetssjekken i praksis dekker to helt ulike ting.
+            'kollapset': arkiv.er_kollapset,
+            'kollapset_at': (
+                arkiv.kollapset_at.isoformat() if arkiv.kollapset_at else None
+            ),
             'stats': stats,
         })
 

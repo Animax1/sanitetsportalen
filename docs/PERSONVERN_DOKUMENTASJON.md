@@ -191,7 +191,13 @@ To forskjeller fra `Patient` er bevisste:
 - Navn på personell lagres som **frossen tekst** (`forstehjelper_navn`, `helsepersonell_navn`), ikke som referanse. Arkivet viser dermed hvem som faktisk sto der den kvelden, selv om personen senere fjernes eller endrer navn i systemet.
 - Radene er **uforanderlige ved design** og beskyttet av SHA-256-sjekksummen på `VaktArkiv`.
 
-Radene er inngangsdata til statistikken som beregnes når et arkiv åpnes. De vises ikke enkeltvis i grensesnittet. Lagringstid: se A.9.
+Radene er inngangsdata til statistikken som beregnes når et arkiv åpnes. De vises ikke enkeltvis i grensesnittet.
+
+**Kollaps etter 24 måneder:** når et arkiv er eldre enn 24 måneder, slettes `ArkivertPasient`-radene permanent og erstattes av den ferdig beregnede statistikken, lagret som `VaktArkiv.aggregat`. Alle tall som vises i arkivvisningen bevares — sammendrag, triagefordeling, tidsstatistikk, krysstabeller og de statistiske testene. Det som forsvinner, er enhver opplysning om enkeltpasienter.
+
+Etter kollaps kan ingen opplysning i arkivet føres tilbake til en person. Operasjonen er irreversibel og kjøres av `kollaps_arkiv` (Railway Cron). Den nekter å kollapse et arkiv med mindre det finnes en backup av modulen `arkiv` tatt etter at arkivet ble opprettet, og hver kollaps loggføres i `AuditLog`.
+
+**Integritetssjekk:** feltet `sha256` er beregnet over pasientradene og kan ikke verifiseres etter kollaps. Ved kollaps beregnes derfor en ny sjekksum over det frosne aggregatet (`aggregat_sha256`), som overtar tuklingsdeteksjonen. Den opprinnelige sjekksummen beholdes som historisk fingeravtrykk av radene som fantes, men er ikke lenger etterprøvbar. Arkivvisningen skiller eksplisitt mellom de to tilstandene via feltet `kollapset`.
 
 ### Varsler (Notification)
 
@@ -271,7 +277,7 @@ Lagringstidene er fastsatt etter GDPR art. 5(1)(e): opplysningene skal ikke oppb
 | Cache-data lavkostnad-modus (LocMemCache i prosess) | Maks 60 sekunder, eller til prosess-omstart | Automatisk (TTL) | Kortvarig drift; per-prosess minne; ingen pasient-PII |
 | Cache-data vakt-modus (Redis) | Maks 10 minutter | Automatisk (`EXPIRE`/TTL) | Kortvarig drift; ingen pasient-PII; Redis kun aktiv under vakt |
 | Pasientdata (aktiv innsamling) | Inneværende år i PostgreSQL | Manuell nullstilling / arkivering | Aktiv bruk under arrangementssesong |
-| Arkiverte pasientrader (`ArkivertPasient`) | **24 måneder**, deretter kollaps til aggregert statistikk | *Planlagt – se tiltaksplan fase 3.1* | Dekker to hele sesonger, slik at årets vakt kan sammenlignes med fjorårets i planleggingen. Deretter er formålet uttømt og radnivået slettes permanent |
+| Arkiverte pasientrader (`ArkivertPasient`) | **24 måneder**, deretter kollaps til aggregert statistikk | Automatisk – `kollaps_arkiv` via Railway Cron | Dekker to hele sesonger, slik at årets vakt kan sammenlignes med fjorårets i planleggingen. Deretter er formålet uttømt og radnivået slettes permanent |
 | Arkiv-metadata og aggregert statistikk (`VaktArkiv`) | Ingen fast grense | Manuell sletting av admin | Aggregater uten radnivå; grunnlag for flerårig erfaringslæring |
 | Backup-filer – modul `patients` (aktiv vaktdata) | Antallsbegrenset: de nyeste **50** beholdes, eldre slettes automatisk | Automatisk (`ModuleBackupConfig.max_backups`) | Teknisk gjenoppretting |
 | Backup-filer – modul `arkiv` (vaktarkivet) | Antallsbegrenset: de nyeste **20** beholdes. Kjøres én gang i døgnet | Automatisk (`ModuleBackupConfig.max_backups`) | Arkivet endres kun ved arkivering av en vakt, og identisk innhold gir ingen ny fil |

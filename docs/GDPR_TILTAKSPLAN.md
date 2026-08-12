@@ -127,7 +127,22 @@ godtatt i dag.
 
 ## Fase 3 — Arkiv
 
-- [ ] **3.1 Radnivå i 24 måneder, så automatisk kollaps til aggregat.**
+- [x] **3.1 Radnivå i 24 måneder, så automatisk kollaps til aggregat.** ✅ FERDIG 12.08.2026.
+
+      Valgt løsning: den ferdig beregnede statistikken fryses som JSON på `VaktArkiv`
+      (både basis og full), radene slettes. Ny sjekksum over aggregatet overtar
+      integritetssjekken. Egen kommando `kollaps_arkiv` med `--dry-run`, kjørt som egen
+      cron-jobb — bevisst ikke som del av `purge_old_logs`, slik at irreversibel sletting
+      av helsedata ikke fyrer som bieffekt av en loggopprydding.
+
+      **Sikkerhetssperre:** kommandoen nekter å kollapse et arkiv med mindre det finnes en
+      `arkiv`-backup tatt etter at arkivet ble opprettet. Fase 3.2 gjorde den sperren mulig.
+
+      Migrasjon `patients.0013`. 20 nye tester. Oppsettsinstruks i
+      `OPPSETT_KOLLAPS_CRON.md` (slettes når cron-jobben er satt opp).
+
+      *Opprinnelig beskrivelse:*
+
       Begrunnelse: dekker to hele sesonger, så årets vakt kan sammenlignes med fjorårets
       under planlegging før radene kollapser. Deretter er formålet uttømt.
 

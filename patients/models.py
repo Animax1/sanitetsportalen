@@ -207,6 +207,42 @@ class VaktArkiv(models.Model):
     notat = models.TextField(blank=True, verbose_name='Notat')
     sha256 = models.CharField(max_length=64, blank=True, verbose_name='SHA-256')
 
+    # ── Kollaps til aggregat (GDPR-tiltaksplan fase 3.1) ──────────────────
+    # Etter 24 måneder slettes de arkiverte pasientradene permanent, og kun
+    # den ferdig beregnede statistikken beholdes. Formålet — evaluering og
+    # planlegging — er da uttømt, og art. 5(1)(e) tillater ikke at
+    # helseopplysninger på radnivå ligger igjen på ubestemt tid.
+    kollapset_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        db_index=True,
+        verbose_name='Kollapset',
+        help_text=(
+            'Tidspunkt da pasientradene ble slettet og erstattet av frosset '
+            'aggregat. Tomt betyr at radnivået fortsatt finnes.'
+        ),
+    )
+    aggregat = models.JSONField(
+        null=True,
+        blank=True,
+        verbose_name='Frosset statistikk',
+        help_text=(
+            'Ferdig beregnet statistikk lagret ved kollaps: '
+            '{"basis": …, "full": …}. Erstatter pasientradene permanent.'
+        ),
+    )
+    aggregat_sha256 = models.CharField(
+        max_length=64,
+        blank=True,
+        default='',
+        verbose_name='SHA-256 (aggregat)',
+        help_text=(
+            'Sjekksum over det frosne aggregatet. Overtar integritetssjekken '
+            'etter kollaps, siden feltet «sha256» er beregnet over rader som '
+            'ikke lenger finnes.'
+        ),
+    )
+
     class Meta:
         verbose_name = 'Vaktarkiv'
         verbose_name_plural = 'Vaktarkiver'
@@ -214,6 +250,11 @@ class VaktArkiv(models.Model):
 
     def __str__(self):
         return self.tittel
+
+    @property
+    def er_kollapset(self) -> bool:
+        """True hvis pasientradene er slettet og kun aggregatet finnes."""
+        return self.kollapset_at is not None
 
     @property
     def importert_av_visning(self) -> str:

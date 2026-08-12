@@ -4,6 +4,48 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-08-12 — GDPR fase 3.1: arkiv kollapser til aggregat etter 24 måneder
+
+Siste fase i GDPR-gjennomgangen. Arkiverte pasientrader slettes permanent etter 24
+måneder og erstattes av den ferdig beregnede statistikken. Formålet — evaluering og
+planlegging — er da uttømt, og art. 5(1)(e) tillater ikke at helseopplysninger på
+radnivå blir liggende på ubestemt tid.
+
+**Alt som vises i arkivvisningen bevares:** sammendrag, triagefordeling, ankomstkurve,
+tidsstatistikk per gruppe, krysstabeller, kji-kvadrat og Kruskal-Wallis. Det som
+forsvinner er enhver opplysning om enkeltpasienter. Etter kollaps kan ingenting i
+arkivet føres tilbake til en person.
+
+- Nye felt på `VaktArkiv`: `kollapset_at`, `aggregat` (JSON), `aggregat_sha256`
+- `compute_arkiv_stats` / `compute_arkiv_full_stats` leser frosset aggregat når radene
+  er borte — samme returstruktur, så grensesnittet er uendret
+- Ny kommando `kollaps_arkiv` med `--dry-run`. Migrasjon `patients.0013`
+
+### Integritetssjekk
+
+`sha256` er beregnet over pasientradene og kan ikke verifiseres etter kollaps. Ved
+kollaps beregnes en ny sjekksum over aggregatet, som overtar tuklingsdeteksjonen. Den
+opprinnelige beholdes som historisk fingeravtrykk, men er ikke lenger etterprøvbar.
+Arkiv-API-et eksponerer `kollapset` slik at grensesnittet kan skille tilstandene — et
+arkiv som melder «ingen tukling» uten at noe faktisk sjekkes ville vært verre enn
+ingen sjekk.
+
+### Sikkerhetssperrer for en irreversibel operasjon
+
+- Kommandoen nekter å kollapse med mindre det finnes en `arkiv`-backup tatt etter at
+  arkivet ble opprettet. Fase 3.2 gjorde denne sperren mulig
+- `--dry-run` viser nøyaktig hva som ville blitt slettet
+- Hver kollaps loggføres i `AuditLog`
+- Egen cron-jobb, ikke del av `purge_old_logs`: irreversibel sletting av helsedata skal
+  ikke fyre som bieffekt av en loggopprydding
+
+20 nye tester. 545 tester totalt, alle grønne.
+
+Oppsettsinstruks for cron-jobben: `docs/OPPSETT_KOLLAPS_CRON.md` (midlertidig, slettes
+når jobben er satt opp).
+
+---
+
 ## 2026-08-12 — GDPR fase 3.2: arkivet som egen backup-modul
 
 Tidligere var `VaktArkiv` ekskludert fra pasient-backupen mens `ArkivertPasient` ble tatt

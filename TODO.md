@@ -11,7 +11,9 @@
 - [x] Fase 2.2: `SECRET_KEY` hard-fail når `DEBUG=False`
 - [x] Fase 2.3: slett varsler eldre enn 30 dager
 - [x] Fase 2.4: fjern død «Arkiv (filer)»-seksjon (`archives_view`)
-- [ ] Fase 3.1: arkiverte pasientrader kollapser til aggregat etter 24 mnd
+- [x] Fase 3.1: arkiverte pasientrader kollapser til aggregat etter 24 mnd
+- [ ] **Sett opp cron-jobb for `kollaps_arkiv`** — se `docs/OPPSETT_KOLLAPS_CRON.md`,
+      slett den fila når jobben er på plass
 - [x] Fase 3.2: arkiv som egen backup-modul
 - [x] Fase 4.1: `VaktArkiv.importert_av` → `SET_NULL` + frosset navn
 
