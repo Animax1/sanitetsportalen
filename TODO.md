@@ -23,6 +23,10 @@
 Kodegjennomgang 12. august 2026. Full liste med begrunnelse og tiltak ligger i dokumentet;
 her er kun de fire som bør tas først (alle små, alle med konkret risiko):
 
+- [ ] **S1** `/django-admin/` omgår rate-limiting, kontosperre, MFA-tvang, passordbytte og
+      `LoginEvent`. Slå den av i prod, eller bruk `OTPAdminSite` — `myproject/urls.py:24`
+- [ ] **S2** Fjern `must_change_password=False` fra `create_superuser` — `accounts/managers.py:29`.
+      Tas sammen med S1, ellers har den ingen effekt for bootstrap-adminen
 - [ ] **N1** Valider `next`-parameteren ved innlogging (åpen redirect) — `accounts/views.py:162`
 - [ ] **N2** Legg `helsepersonell_ref_id` i `felt_to_track` — endringen logges ikke i dag
       (`patients/signals.py:70`)

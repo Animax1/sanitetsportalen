@@ -10,7 +10,8 @@ Full gjennomgang av kodebasen for å finne hva som bør forbedres. **Ingen kode 
 dette er kun kartlegging og dokumentasjon.
 
 Nytt dokument `docs/FORBEDRINGER_2026-08.md` er den aktive backloggen. Den inneholder 13
-nye funn (N1–N13) og de 9 punktene fra mai-runden som fortsatt sto åpne (F1–F9).
+nye funn (N1–N13), 6 funn fra et eget sikkerhetspass (S1–S6) og de 9 punktene fra
+mai-runden som fortsatt sto åpne (F1–F9).
 `docs/FORBEDRINGER.md` er konvertert til et historisk arkiv over det som ble gjennomført,
 med en peker til den nye fila.
 
@@ -35,6 +36,26 @@ To punkter i mai-dokumentet var merket som åpne, men viste seg å være ferdig 
 - **N9** De tre testene som skal beskytte dobbeltklikk-fixen leser `static/js/script.js`,
   som ingen mal laster lenger. De ville vært grønne selv om guarden forsvant fra den
   levende koden
+
+### Sikkerhetspasset
+
+- **S1** `/django-admin/` er en parallell innloggingsflate som omgår samtlige sikringer
+  appen bygger rundt `accounts.views.login_view`: rate-limiting, kontosperre, MFA-tvang,
+  tvungent passordbytte og `LoginEvent`-logging. Bak den ligger `Patient`, `CustomUser`
+  og `AuditLog`. `OTPMiddleware` hjelper ikke — den setter `request.user.otp_device`, den
+  håndhever ingenting
+- **S2** `create_superuser` setter `must_change_password=False`, så bootstrap-adminen kan
+  gå i årevis på deploy-passordet. Henger sammen med S1 og bør tas samtidig
+- **S3** Rate-limiting finnes kun på innlogging — ingen struping på skriveendepunktene
+- **S4** Lagret open redirect i varsel-visningen (`core/views.py:612`). Ikke utnyttbar i
+  dag, men `notify()` er designet som generisk API for framtidige moduler
+- **S5** Utlogging skjer via GET — en tredjepartsside kan tvinge utlogging
+- **S6** MFA trust-cookie settes med `secure=True` i offline-modus, så nettleseren kaster
+  den og «stol på denne enheten» virker ikke i felt
+
+Dokumentet noterer også hva som ble kontrollert og funnet i orden, så det ikke revideres
+på nytt: endepunktdekning, path traversal via backup-filnavn, audit-logging fra Django
+admin, offline-modusens bevisste unntak og invalidering av MFA trust-cookien.
 
 ---
 

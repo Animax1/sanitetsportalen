@@ -34,6 +34,17 @@ Status: ⏳ pending · 🔧 påbegynt · ✅ ferdig · ⚪ ikke aktuell
 | N12 | `GET /api/settings/` eksponerer hele `AppSetting`-tabellen | ⏳ | Lav | 30 min | Dybdeforsvar |
 | N13 | Duplisert kode i `views.py` og `services.py` (ETag-blokk, feltlister) | ⏳ | Lav | 3–4 t | Vedlikehold |
 
+### Sikkerhetsgjennomgang (eget pass)
+
+| # | Tittel | Status | Verdi | Innsats |
+|---|---|---|---|---|
+| S1 | **`/django-admin/` omgår samtlige av appens innloggingssikringer** | ⏳ | Høy | 1–2 t |
+| S2 | **`create_superuser` setter `must_change_password=False`** | ⏳ | Middels–Høy | 15 min |
+| S3 | Rate-limiting finnes kun på innlogging | ⏳ | Middels | 2 t |
+| S4 | Lagret open redirect i varsel-visningen | ⏳ | Lav–Middels | 15 min |
+| S5 | Utlogging skjer via GET | ⏳ | Lav | 30 min |
+| S6 | MFA trust-cookie settes med `secure=True` i offline-modus | ⏳ | Lav | 15 min |
+
 ### Overført fra FORBEDRINGER.md (fortsatt åpne)
 
 | # | Tittel | Opprinnelig nr. | Status | Verdi | Innsats |
@@ -48,8 +59,9 @@ Status: ⏳ pending · 🔧 påbegynt · ✅ ferdig · ⚪ ikke aktuell
 | F8 | PgBouncer / Postgres connection pooler | #10 | ⏳ | Lav | 2–3 t |
 | F9 | Kolonne-kryptering for følsomme felter | #14 | ⏳ | Lav | 8–12 t |
 
-**Anbefalt rekkefølge:** N1 → N2 → N3 → N4 er alle små og har konkret risiko knyttet til
-seg. De bør tas som én runde før F1. N5 bør tas før nyttår (se begrunnelsen).
+**Anbefalt rekkefølge:** **S1 og S2 først** — de henger sammen og undergraver alt det
+andre sikkerhetsarbeidet i appen. Deretter N1 → N2 → N3 → N4, som alle er små og har
+konkret risiko knyttet til seg. N5 bør tas før nyttår (se begrunnelsen).
 
 ---
 
@@ -616,7 +628,271 @@ eksplisitt legger den til i whitelisten.
 
 ---
 
-# Del 2 — Overført fra FORBEDRINGER.md
+# Del 2 — Sikkerhetsgjennomgang
+
+Eget pass over autentisering, autorisasjon, endepunktdekning og de administrative
+flatene. N1 (åpen redirect), N4 (MFA-rate-limit) og N6 (uescapet `innerHTML`) hører
+tematisk hjemme her, men er beskrevet i Del 1.
+
+## S1. `/django-admin/` omgår samtlige av appens innloggingssikringer
+
+**Verdi:** Høy &nbsp;|&nbsp; **Innsats:** 1–2 t
+
+**Bakgrunn:** Appen har bygget et gjennomtenkt forsvar rundt innlogging i
+`accounts/views.py`: rate-limiting per brukernavn og per IP, kontosperre etter 5 feilede
+forsøk, tvungen MFA for brukere med `mfa_required`, tvungen passordbytte, og `LoginEvent`
+for hver eneste hendelse.
+
+**Alt dette sitter på `accounts.views.login_view`.** Ved siden av står en helt egen
+innloggingsflate som ikke har noe av det:
+
+```python
+# myproject/urls.py:24
+path('django-admin/', admin.site.urls),
+```
+
+Dette er Djangos standard `AdminSite`, ikke `django_otp.admin.OTPAdminSite`. Den har sitt
+eget innloggingsskjema på `/django-admin/login/`. Konsekvensene, punkt for punkt:
+
+| Sikring | `/accounts/login/` | `/django-admin/login/` |
+|---|---|---|
+| Rate-limiting (10/5m per bruker, 50/5m per IP) | ✅ | ❌ ubegrenset |
+| Kontosperre (5 forsøk → 15 min låst) | ✅ | ❌ telleren røres ikke |
+| MFA-tvang ved `mfa_required=True` | ✅ | ❌ kun passord |
+| Tvungen passordbytte | ✅ | ❌ eksplisitt unntatt |
+| `LoginEvent`-logging | ✅ | ❌ ingen spor |
+
+At `django_otp.middleware.OTPMiddleware` står i `MIDDLEWARE` hjelper ikke — den setter kun
+`request.user.otp_device`, den håndhever ingenting. `mfa_required` sjekkes utelukkende i
+`login_view:208`.
+
+Unntaket for passordbytte er eksplisitt: `/django-admin/` står i
+`MustChangePasswordMiddleware.ALLOWED_PATHS` (`accounts/middleware.py:17`).
+
+Og bak flaten ligger alt: `Patient` (`patients/admin.py:16`), `CustomUser`
+(`accounts/admin.py:83`), `AuditLog`, `AppSetting`, `ModuleSettings`. En angriper som
+kommer inn her har pasientjournaler og full brukeradministrasjon.
+
+Flaten krever `is_staff`, så den gjelder i praksis bootstrap-adminen — se S2, som gjør
+akkurat den kontoen ekstra utsatt.
+
+**Én ting er i orden:** pasientendringer gjort via Django admin blir audit-logget.
+Signalet i `patients/signals.py` er entry-point-agnostisk og
+`RequestAuditMiddleware` setter thread-local også for admin-requests. Det er
+*innloggingen* som ikke logges, ikke endringene.
+
+**Tiltak — velg én:**
+
+1. **Slå av Django admin i produksjon** (renest). Portalen har allerede egne flater for
+   det admin trenger: `/portal-admin/moduler/`, `/portal-admin/auditlog/`,
+   `/portal-admin/backup/`, `/accounts/users/` og `/portal-admin/server-status/`. Behold
+   `/django-admin/` bak `if DEBUG or OFFLINE_MODE`. Sjekk først om noe i RUNBOOK-en
+   forutsetter den.
+2. **Krev OTP på admin-flaten** (minst inngripende):
+   ```python
+   from django_otp.admin import OTPAdminSite
+   admin.site.__class__ = OTPAdminSite
+   ```
+   Da må superbrukeren ha en bekreftet TOTP-enhet. NB: dette låser deg ute hvis
+   bootstrap-adminen ikke har satt opp MFA ennå — gjør oppsettet via `/accounts/login/`
+   først.
+3. **Som minimum:** legg `@ratelimit` på admin-login og fjern `/django-admin/` fra
+   `ALLOWED_PATHS`.
+
+**Anbefaling:** Alternativ 1. En innloggingsflate som ingen bruker, men som omgår alle
+sikringene, er ren nedside.
+
+**Akseptansekriterium:** Det finnes én vei inn i systemet, og den har rate-limiting,
+kontosperre, MFA-tvang og hendelseslogging.
+
+---
+
+## S2. `create_superuser` setter `must_change_password=False`
+
+**Verdi:** Middels–Høy &nbsp;|&nbsp; **Innsats:** 15 min
+
+**Bakgrunn:**
+
+```python
+# accounts/managers.py:29
+extra_fields.setdefault('must_change_password', False)
+```
+
+Modellens eget default er `True` (`accounts/models.py:41`) — hver vanlig bruker må bytte
+passord ved første innlogging. Superbrukere er unntatt.
+
+`create_admin`-kommandoen kjøres i release-fasen ved **hver deploy**, med passordet fra
+`DJANGO_SUPERUSER_PASSWORD` (se FORBEDRINGER #17 om Custom Start Command). Kommandoen er
+idempotent og hopper over hvis brukeren finnes, så passordet settes kun første gang — men
+det betyr også at kontoen kan gå i årevis på det opprinnelige deploy-passordet, uten at
+noe i systemet ber om noe annet.
+
+Passordet står dessuten som klartekst i miljøvariablene, og siden det ligger på
+kommandolinjen til `create_admin` er det synlig i prosessliste og deploy-logg.
+
+Kombinert med S1: den ene kontoen med mest tilgang har både den svakeste
+innloggingsstien og det passordet som er minst sannsynlig at noen har byttet.
+
+**Tiltak:**
+
+1. Fjern linjen. La superbrukere arve modellens `must_change_password=True`.
+   `create_superuser` brukes kun av `create_admin` og av `manage.py createsuperuser` —
+   begge er bootstrapping der tvungent bytte er nøyaktig riktig oppførsel.
+2. Verifiser at bootstrap-adminen i prod faktisk har byttet passord siden opprettelsen
+   (`last_login_at` og feltet `must_change_password` i Django admin, eller via `shell`).
+3. Vurder å sette `mfa_required=True` på alle admin-kontoer.
+
+**Merk:** Fjernes linjen uten at S1 er løst, får det ingen effekt for den kontoen — den
+kan fortsatt logge inn på `/django-admin/`, som er unntatt fra kravet. Punktene henger
+sammen og bør tas samlet.
+
+**Akseptansekriterium:** En nyopprettet superbruker blir sendt til passordbytte ved
+første innlogging, uansett hvilken flate hen bruker.
+
+---
+
+## S3. Rate-limiting finnes kun på innlogging
+
+**Verdi:** Middels &nbsp;|&nbsp; **Innsats:** 2 t
+
+**Bakgrunn:** `@ratelimit` forekommer nøyaktig to steder i kodebasen, begge på
+`login_view` (`accounts/views.py:141–142`). Ingen andre endepunkter har noen form for
+struping:
+
+- `POST /pasienter/api/patients/` — en innlogget `read_write`-bruker (eller en stjålet
+  sesjonscookie) kan opprette pasienter i en løkke så fort serveren rekker. Uten F3
+  (idempotency) finnes det ingen bremse i det hele tatt.
+- `POST /accounts/change-password/` — ingen struping på gjetting av `old_password`.
+- `GET /pasienter/api/full-stats/` — den dyreste spørringen i appen (scipy-beregninger
+  over hele årets datasett). Cachet 60 s, så en enkelt bruker gjør lite skade, men
+  cache-miss-stien er ubeskyttet.
+- `GET /portal-admin/auditlog/eksport.csv` — 5000 rader per kall, ubegrenset antall kall.
+
+Dette er et lavere prioritert punkt fordi alle endepunktene krever innlogging, og
+brukergruppen er liten og kjent. Men appen har allerede `django-ratelimit` installert og
+en nødbryter (`RATELIMIT_ENABLE`), så kostnaden ved å dekke skriveendepunktene er lav.
+
+**Tiltak:**
+
+- Legg `@ratelimit(key='user', rate='60/m', method='POST', block=True)` på
+  pasient-skriveendepunktene. 60/min er langt over reell bruk under vakt, men stopper en
+  løpsk klient.
+- Strengere grense på `change_password_view` (f.eks. `10/5m` per bruker).
+- Husk at rate-limiting med LocMemCache er per prosess. I lavkostnad-modus (1 worker) er
+  det riktig; i vakt-modus deles telleren via Redis.
+
+**Akseptansekriterium:** Ingen autentisert bruker kan generere ubegrenset skrivelast mot
+databasen.
+
+---
+
+## S4. Lagret open redirect i varsel-visningen
+
+**Verdi:** Lav–Middels &nbsp;|&nbsp; **Innsats:** 15 min
+
+**Bakgrunn:**
+
+```python
+# core/views.py:612–613
+target_url = notif.url or '/varsler/'
+return redirect(target_url)
+```
+
+`notification_mark_read_view` godtar GET (bevisst, så vanlige `<a>`-lenker virker) og
+redirecter til `Notification.url` uten validering. Feltet er `CharField(max_length=500)`
+uten validator (`core/models.py:280`).
+
+I dag er dette **ikke utnyttbart**: `notify()` kalles kun fra `patients/signals.py:184`
+med hardkodede relative URL-er. Men `core.notifications.notify()` er eksplisitt designet
+som et generisk API for framtidige moduler («vakter, utstyr, beredskap»), og docstringen
+inviterer til bruk. Første modul som lar brukerinput påvirke `url` gjør dette til en
+ekte open redirect — med en lenke som ser ut til å komme fra portalen selv.
+
+**Tiltak:** Bruk samme `_safe_next()`-helper som N1 innfører, eller valider enklere: krev
+at `url` starter med `/` og ikke med `//`. Gjør det begge steder — også i
+`notification_mark_read_view` sin JSON-variant hvis den senere begynner å redirecte.
+
+Ta det sammen med N1 — det er samme fix, og da blir det ett mønster i kodebasen.
+
+**Akseptansekriterium:** En `Notification` med `url='https://evil.example/'` sender
+brukeren til `/varsler/`, ikke ut av appen.
+
+---
+
+## S5. Utlogging skjer via GET
+
+**Verdi:** Lav &nbsp;|&nbsp; **Innsats:** 30 min
+
+**Bakgrunn:** `logout_view` (`accounts/views.py:394`) har ingen metode-restriksjon, og
+malene lenker til den med en vanlig `<a href>` (`templates/base.html:64`,
+`templates/patients/index.html:87`). Enhver side på internett kan logge ut brukeren vår
+med `<img src="https://<app>/accounts/logout/">`.
+
+Konsekvensen er irritasjon, ikke datatap — men midt i en vakt er det ikke ingenting, og
+Django 5 fjernet GET-utlogging fra sin egen `LogoutView` nettopp av denne grunn.
+
+**Tiltak:** Gjør `logout_view` til `@require_POST` og bytt lenkene til et lite skjema med
+CSRF-token (Bootstrap-dropdown tåler en `<button type="submit" class="dropdown-item">`
+fint). Sjekk om noen tester treffer utloggings-URL-en med GET.
+
+**Akseptansekriterium:** `GET /accounts/logout/` gir 405. Utloggingsknappen virker som
+før.
+
+---
+
+## S6. MFA trust-cookie settes med `secure=True` i offline-modus
+
+**Verdi:** Lav &nbsp;|&nbsp; **Innsats:** 15 min
+
+**Bakgrunn:**
+
+```python
+# accounts/views.py:376
+is_secure = not getattr(django_settings, 'DEBUG', True)
+```
+
+Offline-modus kjører bevisst `DEBUG=False` uten TLS (`settings.py:49–53`). `is_secure`
+blir da `True`, cookien settes med `Secure`-flagget over ren HTTP, og nettleseren kaster
+den. «Stol på denne enheten» virker altså ikke i felt — brukeren må taste TOTP-kode hver
+gang, uten at noe forteller hvorfor.
+
+Dette er en funksjonell feil med sikkerhetsfortegn, ikke et hull: feilen går i sikker
+retning. Men det er nøyaktig samme feilklasse som `_HTTPS_ENABLED` allerede løser andre
+steder i `settings.py` — offline-modus er unntaket som `not DEBUG` ikke fanger.
+
+**Tiltak:** Bruk `request.is_secure()` (som tar hensyn til `SECURE_PROXY_SSL_HEADER` og
+dermed er riktig både på Railway og offline), eller gjenbruk `_HTTPS_ENABLED`-logikken.
+Samme sjekk bør gjennomgås for andre `set_cookie`-kall.
+
+**Akseptansekriterium:** Trust-cookien lagres og virker i offline-modus, og har fortsatt
+`Secure` i produksjon.
+
+---
+
+## Kontrollert og funnet i orden
+
+Notert her så det ikke revideres på nytt neste gang:
+
+- **Endepunktdekning.** Alle views i `patients`, `core`, `accounts` og `admin_status` har
+  `@login_required` eller en rolledekoratør. Ingen ubeskyttede endepunkter funnet. Den
+  eneste `@csrf_exempt` er `/healthz/`, som er `@require_safe` og ikke rører data.
+- **Path traversal via backup-filnavn er lukket.** `backup_admin_download_view` og
+  `backup_admin_delete_view` bygger stier fra `Backup.filename`, men modellen er eksplisitt
+  ekskludert fra sin egen dump (`patients/backup.py:31`), så en restore kan ikke injisere
+  rader med `../` i filnavnet. Filnavn genereres kun av `_build_filename()`.
+- **Django admin-endringer på pasienter blir audit-logget.** Signalet er
+  entry-point-agnostisk.
+- **Offline-modus** (`ALLOWED_HOSTS=['*']`, CSRF-wildcards for private subnett) er et
+  bevisst dokumentert valg, med hard sperre mot at `OFFLINE_MODE` aktiveres på Railway
+  (`settings.py:58–62`).
+- **MFA trust-cookien invalideres korrekt** når admin nullstiller MFA: `_check_mfa_trust`
+  slår opp TOTP-enheten, og `reset_mfa` sletter den.
+- **`SECRET_KEY`** hard-feiler ved oppstart når `DEBUG=False`, både på tom verdi og på de
+  kjente eksempelverdiene.
+
+---
+
+# Del 3 — Overført fra FORBEDRINGER.md
 
 Disse punktene sto fortsatt åpne i mai-dokumentet og er flyttet hit uendret i innhold.
 Der gjennomgangen i august har avdekket noe nytt om punktet, er det notert som
