@@ -13,6 +13,7 @@
 - [ ] Integrasjon med produksjons database.
 - [ ] Testene er massive, kan vi komprimere den?
 - [ ] Fjerne varsler eldre enn 30 dager.s
+- [ ] Lage locus klone, hente sted via enhet gps.
 
 ## Ferdig ✓
 
