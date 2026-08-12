@@ -4,6 +4,27 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-08-12 — GDPR fase 4.1: brukere kan slettes etter arkivering
+
+`VaktArkiv.importert_av` hadde `on_delete=PROTECT`. En bruker som hadde arkivert en vakt
+kunne dermed ikke slettes — databasen avviste med `ProtectedError`, og sletterett etter
+GDPR art. 17 var blokkert på databasenivå. Med få admin-brukere merkes det ikke, men det
+ville truffet ved første sletteforespørsel når frivillige får egen konto.
+
+- Nytt felt `VaktArkiv.importert_av_navn`: frosset brukernavn som overlever brukersletting.
+  Samme mønster som `ArkivertPasient.forstehjelper_navn` allerede brukte
+- `importert_av` endret til `on_delete=SET_NULL, null=True`
+- Migrasjon `0012` med datamigrasjon som fyller navnet på eksisterende arkiver
+- Ny `VaktArkiv.importert_av_visning` brukes av `arkiv_liste_view` og `arkiv_detalj_view`.
+  Begge leste tidligere `importert_av.username` direkte og ville fått `AttributeError`
+  på `None` etter en sletting
+- 8 nye tester: sletting fungerer, arkiv og pasientrader består, begge API-visningene
+  overlever, og SHA-256-integritetssjekken påvirkes ikke
+
+509 tester, alle grønne.
+
+---
+
 ## 2026-08-12 — Testsuiten: 500 s → 15 s
 
 Suiten brukte 8 minutter på 501 tester, noe som gjorde det upraktisk å kjøre den

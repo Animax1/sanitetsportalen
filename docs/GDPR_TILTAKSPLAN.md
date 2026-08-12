@@ -157,7 +157,14 @@ Planen er å koble portalbrukere til modulroller (førstehjelper/helsepersonell 
 pasientmodulen, tilsvarende i senere moduler). Halve mekanismen finnes:
 `Forstehjelper.user` og `Helsepersonell.user` er `OneToOneField` med `SET_NULL`.
 
-### 4.1 `VaktArkiv.importert_av` blokkerer sletting av brukere — PRIORITERT
+### 4.1 `VaktArkiv.importert_av` blokkerte sletting av brukere ✅ FERDIG
+
+Gjennomført 12.08.2026, migrasjon `0012_vaktarkiv_importert_av_navn`. Datamigrasjonen fyller
+navnet på arkiver som fantes fra før. 8 nye tester dekker sletting av bruker, at arkivet og
+pasientradene består, at begge API-visningene overlever, og at SHA-256 ikke påvirkes.
+
+**Opprinnelig problem:**
+
 
 `on_delete=PROTECT` ([patients/models.py:180-185](../patients/models.py#L180-L185)) gjør at
 en bruker som har arkivert en vakt **ikke kan slettes** — databasen nekter med
@@ -170,11 +177,11 @@ direkte ([patients/views.py:910](../patients/views.py#L910) og `arkiv_liste_view
 
 Full fiks, samme mønster som `forstehjelper_navn`:
 
-- [ ] Nytt felt `importert_av_navn` (CharField) — frosset navn som overlever brukersletting
-- [ ] Datamigrasjon som fyller feltet fra eksisterende `importert_av.username`
-- [ ] `importert_av` → `on_delete=SET_NULL, null=True`
-- [ ] `arkiver_aktiv_vakt()` setter navnet ved arkivering
-- [ ] `arkiv_liste_view` og `arkiv_detalj_view` faller tilbake på snapshot-navnet
+- [x] Nytt felt `importert_av_navn` (CharField) — frosset navn som overlever brukersletting
+- [x] Datamigrasjon som fyller feltet fra eksisterende `importert_av.username`
+- [x] `importert_av` → `on_delete=SET_NULL, null=True`
+- [x] `arkiver_aktiv_vakt()` setter navnet ved arkivering
+- [x] `arkiv_liste_view` og `arkiv_detalj_view` bruker `importert_av_visning`
 
 SHA-256-en påvirkes ikke — `_compute_sha256_for_arkiv` hasher kun arkiv-id,
 arrangementsnavn, år og pasientradene.

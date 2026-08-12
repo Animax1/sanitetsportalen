@@ -339,3 +339,106 @@ class StatsMatcher(ArkivTestMixin, TestCase):
                 arkiv_stats[key],
                 f'Nøkkel «{key}» avviker: live={live[key]}, arkiv={arkiv_stats[key]}',
             )
+
+
+@override_settings(SECURE_SSL_REDIRECT=False, RATELIMIT_ENABLE=False)
+class ArkivBrukerSlettingTests(ArkivTestMixin, TestCase):
+    """Sletting av en bruker som har arkivert en vakt.
+
+    Tidligere hadde ``VaktArkiv.importert_av`` ``on_delete=PROTECT``, slik at
+    databasen nektet å slette brukeren. Det blokkerte sletterett etter GDPR
+    art. 17 på databasenivå. Navnet fryses nå i ``importert_av_navn`` i stedet.
+    """
+
+    def test_navn_fryses_ved_arkivering(self):
+        arkiv, _ = arkiver_aktiv_vakt('Festivalen', '', self.admin)
+        self.assertEqual(arkiv.importert_av_navn, 'admin_arkiv')
+
+    def test_bruker_kan_slettes_etter_arkivering(self):
+        """Kjernescenarioet: kontoen skal faktisk kunne slettes."""
+        arkiv, _ = arkiver_aktiv_vakt('Festivalen', '', self.admin)
+
+        self.admin.delete()
+
+        arkiv.refresh_from_db()
+        self.assertIsNone(arkiv.importert_av, 'FK skal nulles ut, ikke blokkere')
+        self.assertEqual(
+            arkiv.importert_av_navn, 'admin_arkiv',
+            'Det frosne navnet skal overleve slettingen',
+        )
+
+    def test_arkivet_bestaar_etter_brukersletting(self):
+        """Selve arkivet og pasientradene skal ikke røres."""
+        self._lag_pasient(1, 'Grønn')
+        self._lag_pasient(2, 'Rød')
+        arkiv, antall = arkiver_aktiv_vakt('Festivalen', '', self.admin)
+
+        self.admin.delete()
+
+        self.assertTrue(VaktArkiv.objects.filter(pk=arkiv.pk).exists())
+        self.assertEqual(
+            ArkivertPasient.objects.filter(arkiv=arkiv).count(), antall)
+
+    def test_visning_bruker_frosset_navn(self):
+        arkiv, _ = arkiver_aktiv_vakt('Festivalen', '', self.admin)
+        self.admin.delete()
+        arkiv.refresh_from_db()
+        self.assertEqual(arkiv.importert_av_visning, 'admin_arkiv')
+
+    def test_visning_faller_tilbake_naar_navn_mangler(self):
+        """Rader uten snapshot (teoretisk) skal ikke krasje visningen."""
+        arkiv, _ = arkiver_aktiv_vakt('Festivalen', '', self.admin)
+        VaktArkiv.objects.filter(pk=arkiv.pk).update(importert_av_navn='')
+        arkiv.refresh_from_db()
+        self.assertEqual(arkiv.importert_av_visning, 'admin_arkiv')
+
+        self.admin.delete()
+        arkiv.refresh_from_db()
+        self.assertEqual(arkiv.importert_av_visning, 'ukjent bruker')
+
+    def test_arkivliste_krasjer_ikke_etter_brukersletting(self):
+        """API-et leste tidligere importert_av.username direkte → AttributeError."""
+        arkiver_aktiv_vakt('Festivalen', '', self.admin)
+        self.admin.delete()
+
+        annen_admin = User.objects.create_user(
+            username='admin2', password='passord', role='admin',
+            must_change_password=False,
+        )
+        c = Client()
+        c.force_login(annen_admin)
+
+        resp = c.get('/pasienter/api/innstillinger/arkiv/')
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.json()[0]['importert_av'], 'admin_arkiv')
+
+    def test_arkivdetalj_krasjer_ikke_etter_brukersletting(self):
+        arkiv, _ = arkiver_aktiv_vakt('Festivalen', '', self.admin)
+        self.admin.delete()
+
+        annen_admin = User.objects.create_user(
+            username='admin3', password='passord', role='admin',
+            must_change_password=False,
+        )
+        c = Client()
+        c.force_login(annen_admin)
+
+        resp = c.get(f'/pasienter/api/innstillinger/arkiv/{arkiv.pk}/')
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.json()['importert_av'], 'admin_arkiv')
+
+    def test_sha256_paavirkes_ikke_av_brukersletting(self):
+        """Integritetssjekken skal ikke slå ut fordi en konto ble slettet."""
+        self._lag_pasient(1, 'Grønn')
+        arkiv, _ = arkiver_aktiv_vakt('Festivalen', '', self.admin)
+
+        annen_admin = User.objects.create_user(
+            username='admin4', password='passord', role='admin',
+            must_change_password=False,
+        )
+        self.admin.delete()
+
+        c = Client()
+        c.force_login(annen_admin)
+        resp = c.get(f'/pasienter/api/innstillinger/arkiv/{arkiv.pk}/')
+        self.assertFalse(resp.json()['tamper_detected'])

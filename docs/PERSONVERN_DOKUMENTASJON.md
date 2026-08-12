@@ -179,7 +179,8 @@ Når en vakt avsluttes, kan admin lagre den som et **låst arkiv-snapshot**. Ark
 | Felt | Innhold | Kategori |
 |---|---|---|
 | `tittel` / `arrangement_navn` | Navn på arrangementet og arkiveringstidspunkt | Ikke personopplysning |
-| `importert_at` / `importert_av` | Når arkivet ble laget, og av hvilken bruker | Vanlig personopplysning (appbruker) |
+| `importert_at` | Når arkivet ble laget | Ikke personopplysning |
+| `importert_av` / `importert_av_navn` | Hvilken bruker som arkiverte vakten. Navnet lagres frosset som tekst i tillegg til referansen, slik at det består om kontoen slettes | Vanlig personopplysning (appbruker) |
 | `antall_pasienter` / `year_snapshot` / `notat` | Metadata om vakten | Ikke personopplysning |
 | `sha256` | Integritetssjekksum over arkivinnholdet | Ikke personopplysning |
 
@@ -431,7 +432,9 @@ De registrerte (pasienter og appbrukere) har rettigheter etter GDPR kapittel III
 
 > **Praktisk merk:** Ettersom pasienter kun er registrert med løpenummer og ikke med navn eller personnummer, forutsetter utøvelse av rettigheter at den registrerte kan identifisere seg på en annen måte (f.eks. tidspunkt for besøket og arrangementsnavnet).
 
-> **Kjent begrensning ved sletting av brukerkontoer (per v1.5):** En bruker som har arkivert en vakt kan foreløpig ikke slettes — feltet `VaktArkiv.importert_av` har `on_delete=PROTECT`, og databasen avviser slettingen. Inntil dette er endret (se tiltaksplan fase 4.1) må slike kontoer deaktiveres i stedet for å slettes, og behandlingsansvarlig må vurdere om deaktivering er tilstrekkelig i det konkrete tilfellet.
+> **Om sletting av brukerkontoer:** En bruker som har arkivert en vakt kan slettes. Referansen fra `VaktArkiv` nulles ut, mens brukernavnet beholdes frosset i `importert_av_navn`. Arkivet viser dermed fortsatt hvem som arkiverte vakten, uten at kontoen må bevares. Dette er samme mønster som `forstehjelper_navn` på arkiverte pasienter, og er nødvendig for at sletterett etter art. 17 ikke skal være blokkert på databasenivå.
+>
+> Det innebærer at brukernavnet til en frivillig består i arkivet også etter at kontoen er slettet. Opplysningen er nødvendig for at dokumentasjonen av vakten skal være etterrettelig, og de registrerte informeres om det i B.8.
 
 **Alle henvendelser om rettigheter rettes til:**  
 André Eritsland – andre.eritsland@gmail.com
@@ -608,7 +611,7 @@ Innloggings- og endringsloggen føres for å ivareta informasjonssikkerheten: de
 
 ### Én ting du bør være klar over
 
-Når en vakt arkiveres, **fryses navnet ditt** på de pasientene du hadde ansvar for. Det gjøres med vilje: arkivet skal vise hvem som faktisk var på jobb den kvelden, også flere år etterpå. Sletter du brukerkontoen din senere, blir navnet stående i arkivet.
+Når en vakt arkiveres, **fryses navnet ditt** — både på de pasientene du hadde ansvar for, og på selve arkivet dersom det var du som arkiverte vakten. Det gjøres med vilje: arkivet skal vise hvem som faktisk var på jobb den kvelden, også flere år etterpå. Sletter du brukerkontoen din senere, blir navnet stående i arkivet.
 
 Det betyr at retten til sletting ikke omfatter denne opplysningen fullt ut — den er nødvendig for at dokumentasjonen av vakten skal være etterrettelig. Alt annet vi lagrer om deg kan slettes.
 

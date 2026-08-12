@@ -845,7 +845,7 @@ def arkiv_liste_view(request):
         'arrangement_navn': a.arrangement_navn,
         'importert_at': a.importert_at.isoformat(),
         'antall_pasienter': a.antall_pasienter,
-        'importert_av': a.importert_av.username,
+        'importert_av': a.importert_av_visning,
     } for a in arkiver]
     return JsonResponse(data, safe=False)
 
@@ -891,7 +891,7 @@ def arkiv_detalj_view(request, pk):
             'tittel': arkiv.tittel,
             'arrangement_navn': arkiv.arrangement_navn,
             'importert_at': arkiv.importert_at.isoformat(),
-            'importert_av': arkiv.importert_av.username,
+            'importert_av': arkiv.importert_av_visning,
             'antall_pasienter': arkiv.antall_pasienter,
             'year_snapshot': arkiv.year_snapshot,
             'notat': arkiv.notat,

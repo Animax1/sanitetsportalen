@@ -177,11 +177,30 @@ class VaktArkiv(models.Model):
     tittel = models.CharField(max_length=255, verbose_name='Tittel')
     arrangement_navn = models.CharField(max_length=255, verbose_name='Arrangementsnavn')
     importert_at = models.DateTimeField(auto_now_add=True, db_index=True, verbose_name='Importert')
+    # SET_NULL, ikke PROTECT: med PROTECT kunne en bruker som hadde arkivert en
+    # vakt aldri slettes — databasen nektet med ProtectedError, og sletterett
+    # etter GDPR art. 17 var dermed blokkert på databasenivå.
+    #
+    # Navnet fryses i stedet i ``importert_av_navn``, samme mønster som
+    # ``ArkivertPasient.forstehjelper_navn``. Arkivet viser fortsatt hvem som
+    # arkiverte vakten, også etter at kontoen er borte.
     importert_av = models.ForeignKey(
         settings.AUTH_USER_MODEL,
-        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
         related_name='vaktarkiver',
         verbose_name='Importert av',
+    )
+    importert_av_navn = models.CharField(
+        max_length=150,
+        blank=True,
+        default='',
+        verbose_name='Importert av (navn)',
+        help_text=(
+            'Frosset brukernavn på den som arkiverte vakten. Settes ved '
+            'arkivering og overlever sletting av brukerkontoen.'
+        ),
     )
     antall_pasienter = models.IntegerField(verbose_name='Antall pasienter')
     year_snapshot = models.IntegerField(verbose_name='År (snapshot)')
@@ -195,6 +214,20 @@ class VaktArkiv(models.Model):
 
     def __str__(self):
         return self.tittel
+
+    @property
+    def importert_av_visning(self) -> str:
+        """Navn som skal vises for den som arkiverte vakten.
+
+        Bruker det frosne navnet. Faller tilbake på FK-en for rader som
+        skulle mangle snapshot, og til slutt på en nøytral tekst hvis
+        brukeren er slettet og navnet aldri ble satt.
+        """
+        if self.importert_av_navn:
+            return self.importert_av_navn
+        if self.importert_av_id and self.importert_av:
+            return self.importert_av.username
+        return 'ukjent bruker'
 
 
 class ArkivertPasient(models.Model):

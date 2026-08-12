@@ -747,6 +747,9 @@ def arkiver_aktiv_vakt(arrangement_navn, notat, user):
             tittel=tittel,
             arrangement_navn=arrangement_navn,
             importert_av=user,
+            # Frys navnet: FK-en settes til NULL hvis brukeren slettes senere,
+            # men arkivet skal fortsatt vise hvem som arkiverte vakten.
+            importert_av_navn=getattr(user, 'username', '') or '',
             antall_pasienter=antall,
             year_snapshot=active_year,
             notat=notat or '',

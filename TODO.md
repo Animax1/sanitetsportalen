@@ -13,7 +13,7 @@
 - [x] Fase 2.4: fjern død «Arkiv (filer)»-seksjon (`archives_view`)
 - [ ] Fase 3.1: arkiverte pasientrader kollapser til aggregat etter 24 mnd
 - [ ] Fase 3.2: arkiv som egen backup-modul
-- [ ] Fase 4.1: `VaktArkiv.importert_av` → `SET_NULL` + frosset navn (blokkerer sletting av brukere i dag)
+- [x] Fase 4.1: `VaktArkiv.importert_av` → `SET_NULL` + frosset navn
 
 
 ## Ideer / backlog
