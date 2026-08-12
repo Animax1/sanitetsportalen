@@ -18,6 +18,22 @@
 - [x] Fase 4.1: `VaktArkiv.importert_av` → `SET_NULL` + frosset navn
 
 
+### Forbedringsbacklog — se `docs/FORBEDRINGER_2026-08.md`
+
+Kodegjennomgang 12. august 2026. Full liste med begrunnelse og tiltak ligger i dokumentet;
+her er kun de fire som bør tas først (alle små, alle med konkret risiko):
+
+- [ ] **N1** Valider `next`-parameteren ved innlogging (åpen redirect) — `accounts/views.py:162`
+- [ ] **N2** Legg `helsepersonell_ref_id` i `felt_to_track` — endringen logges ikke i dag
+      (`patients/signals.py:70`)
+- [ ] **N3** Gi `LOGGING` en rot-handler — all INFO-logging forsvinner i prod i dag
+      (`myproject/settings.py:310`)
+- [ ] **N4** MFA-steget deler én rate-limit-bøtte for alle brukere — kan gi 429 ved vaktstart
+      (`accounts/views.py:141`)
+
+- [ ] **N5** før nyttår: `get_active_year()` og `Patient.save()` bruker container-tid (UTC),
+      ikke Europe/Oslo — pasienter registrert etter midnatt 1. januar havner i feil år
+
 ## Ideer / backlog
 
 - [ ] Vaktliste
@@ -35,6 +51,9 @@
       Krever migrasjon, derfor egen oppgave.
 - [ ] Slett `static/js/script.js`. Den er den gamle monolitten fra før oppdelingen i
       moduler, lastes ikke av noen mal, og inneholder nå en død kopi av backup-panelet.
+      **NB:** `DoubleClickGuardTests` i `patients/tests.py:965` leser denne fila — pek
+      testene mot `patients-utils.js`/`patients-forms.js` i samme commit, ellers blir
+      suiten rød. Se N9.
 
 ## Ferdig ✓
 

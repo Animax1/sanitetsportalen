@@ -4,6 +4,40 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-08-12 — Kodegjennomgang: ny forbedringsbacklog
+
+Full gjennomgang av kodebasen for å finne hva som bør forbedres. **Ingen kode er endret** —
+dette er kun kartlegging og dokumentasjon.
+
+Nytt dokument `docs/FORBEDRINGER_2026-08.md` er den aktive backloggen. Den inneholder 13
+nye funn (N1–N13) og de 9 punktene fra mai-runden som fortsatt sto åpne (F1–F9).
+`docs/FORBEDRINGER.md` er konvertert til et historisk arkiv over det som ble gjennomført,
+med en peker til den nye fila.
+
+To punkter i mai-dokumentet var merket som åpne, men viste seg å være ferdig implementert
+— hash-skip for identiske auto-backups (`core/backup/service.py`) og `/healthz/`
+(`patients/health.py`). Begge er nå dokumentert som gjennomført.
+
+### De mest konkrete nye funnene
+
+- **N1** `next`-parameteren i innloggingen valideres ikke — åpen redirect til vilkårlig
+  host rett etter vellykket innlogging
+- **N2** `helsepersonell_ref` mangler i `felt_to_track` i audit-signalet. Endring av
+  oppfølgingsansvarlig etterlater ingen spor, i strid med det personvernprotokollen lover
+- **N3** `LOGGING` har ingen rot-handler. All INFO-logging — inkludert hver eneste
+  vellykkede backup — forsvinner i stillhet, selv om RUNBOOK ber deg lete etter den
+- **N4** MFA-skjemaene sender ingen `username`, så `key='post:username'` samler alle
+  MFA-forsøk fra alle brukere i én bøtte: 10 per 5 minutter globalt. Ved vaktstart kan
+  det låse ute folk som ikke har gjort noe galt
+- **N5** `get_active_year()` og `Patient.save()` bruker fortsatt `datetime.now().year`.
+  Samme feilklasse som ble ryddet i #20 — en nyttårsvakt etter midnatt lagrer pasienter i
+  feil år
+- **N9** De tre testene som skal beskytte dobbeltklikk-fixen leser `static/js/script.js`,
+  som ingen mal laster lenger. De ville vært grønne selv om guarden forsvant fra den
+  levende koden
+
+---
+
 ## 2026-08-12 — Backup samlet på én flate
 
 Pasientmodulen hadde sitt eget backup-panel under Innstillinger, med egne
