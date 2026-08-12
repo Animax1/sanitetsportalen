@@ -4,6 +4,39 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-08-12 — GDPR fase 3.2: arkivet som egen backup-modul
+
+Tidligere var `VaktArkiv` ekskludert fra pasient-backupen mens `ArkivertPasient` ble tatt
+med — barna uten forelderen. Det ga to problemer: en restore av pasientdata **feilet** på
+fremmednøkkel dersom arkivet var slettet i mellomtiden, og arkivet kunne uansett ikke
+gjenopprettes fra den backupen siden forelderen manglet. Null gjenopprettingsevne, bare
+nedside.
+
+- Ny `ArkivBackupHandler` (slug `arkiv`) med `VaktArkiv` + `ArkivertPasient` samlet
+- Begge arkivmodellene ekskludert fra `PatientsBackupHandler`
+- Egen `ModuleBackupConfig` via migrasjon `core.0005`: døgnintervall, cap 20.
+  Arkivet endres bare når en vakt arkiveres, og innholds-hashen hindrer duplikater
+- Vises som egen modul i `/portal-admin/backup/` med egen konfigurasjonsside
+
+Motivasjonen er at Railways databasebackup kun er aktiv den måneden abonnementet er
+oppgradert. Resten av året er dette den eneste dekningen arkivet har.
+
+### Fallgruve avdekket underveis
+
+Serialiseringen kjører med `natural_foreign=True`, så `VaktArkiv.importert_av` ble lagret
+som brukernavnet. Var kontoen slettet, feilet **hele** gjenopprettingen med
+`DeserializationError` — altså nøyaktig i scenarioet fase 4.1 nettopp gjorde mulig.
+
+Løst med ny deklarativ `strip_fields` på `BaseBackupHandler`: angitte felter fjernes fra
+dumpen før lagring. Arkiv-handleren utelater `importert_av`, siden brukernavnet uansett
+ligger frosset i `importert_av_navn`. Mekanismen er generell og tilgjengelig for
+framtidige moduler med FK-er som peker ut av eget datasett.
+
+16 nye tester, blant annet at en pasient-restore nå går gjennom selv om et arkiv er
+slettet, og at arkiv-restore virker etter at brukeren er borte. 525 tester, alle grønne.
+
+---
+
 ## 2026-08-12 — GDPR fase 4.1: brukere kan slettes etter arkivering
 
 `VaktArkiv.importert_av` hadde `on_delete=PROTECT`. En bruker som hadde arkivert en vakt

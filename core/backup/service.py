@@ -18,6 +18,7 @@ from __future__ import annotations
 import gzip
 import hashlib
 import io
+import json
 import logging
 import os
 from pathlib import Path
@@ -70,9 +71,32 @@ def _serialize_with_handler(handler: BaseBackupHandler) -> tuple[bytes, str]:
         natural_primary=True,
         stdout=buf,
     )
-    raw = buf.getvalue().encode('utf-8')
+    dump = buf.getvalue()
+
+    strip_fields = handler.get_strip_fields()
+    if strip_fields:
+        dump = _strip_fields_from_dump(dump, strip_fields)
+
+    raw = dump.encode('utf-8')
     content_hash = hashlib.sha256(raw).hexdigest()
     return raw, content_hash
+
+
+def _strip_fields_from_dump(dump: str, strip_fields: dict[str, list[str]]) -> str:
+    """Fjern angitte felter fra en dumpdata-JSON.
+
+    Se ``BaseBackupHandler.strip_fields`` for hvorfor dette trengs.
+    Rekkefølgen på objektene bevares, slik at hash-skip for auto-backups
+    fortsatt gir samme hash for samme data.
+    """
+    objects = json.loads(dump)
+    for obj in objects:
+        fields_to_strip = strip_fields.get(obj.get('model', '').lower())
+        if not fields_to_strip:
+            continue
+        for field in fields_to_strip:
+            obj.get('fields', {}).pop(field, None)
+    return json.dumps(objects, separators=(',', ':'))
 
 
 def _build_filename(slug: str, kind: str) -> str:

@@ -69,8 +69,12 @@ def _prepare_backup_dir() -> Path:
 
 
 def _restore_patients_handler() -> None:
-    """Sørg for at patients-handleren er registrert (test-isolasjon)."""
-    if get_handler('patients') is None:
+    """Sørg for at modulens backup-handlere er registrert (test-isolasjon).
+
+    ``register_handlers()`` registrerer både ``patients`` og ``arkiv``; begge
+    sjekkes slik at et delvis tømt registry også blir gjenopprettet.
+    """
+    if get_handler('patients') is None or get_handler('arkiv') is None:
         register_handlers()
 
 
@@ -543,6 +547,19 @@ class BackupAdminViewTests(TestCase):
         resp = client.get('/portal-admin/backup/')
         self.assertEqual(resp.status_code, 200)
         self.assertContains(resp, 'patients')
+
+    def test_overview_viser_arkiv_modulen(self) -> None:
+        """Arkivet er egen backup-modul og skal ha egen rad i oversikten."""
+        client = Client()
+        client.force_login(self.admin)
+        resp = client.get('/portal-admin/backup/')
+        self.assertContains(resp, 'Vaktarkiv')
+
+    def test_arkiv_modul_har_egen_side(self) -> None:
+        client = Client()
+        client.force_login(self.admin)
+        resp = client.get('/portal-admin/backup/arkiv/')
+        self.assertEqual(resp.status_code, 200)
 
     def test_module_view_renders_form(self) -> None:
         client = Client()

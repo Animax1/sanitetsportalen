@@ -42,6 +42,21 @@ class BaseBackupHandler:
     #: modeller — restore kjører kun loaddata.
     restore_models: ClassVar[list[str]] = []
 
+    #: Felter som skal fjernes fra dumpen før den lagres.
+    #: Format: {'app_label.ModelName': ['feltnavn', ...]}
+    #:
+    #: Brukes for fremmednøkler som peker ut av modulens eget datasett.
+    #: Serialiseringen kjører med ``natural_foreign=True``, så en slik FK
+    #: lagres som en naturlig nøkkel (f.eks. et brukernavn). Finnes ikke det
+    #: objektet ved gjenoppretting, feiler *hele* restoren med
+    #: DeserializationError. Er FK-en ikke nødvendig for å forstå dataene —
+    #: typisk fordi navnet allerede er frosset i et eget tekstfelt — er det
+    #: tryggere å utelate den enn å gjøre backupen ugjenopprettelig.
+    #:
+    #: Feltet utelates fra fixturen og får dermed modellens default ved
+    #: restore. Feltet må derfor tåle å være tomt (``null=True`` e.l.).
+    strip_fields: ClassVar[dict[str, list[str]]] = {}
+
     def collect_apps(self) -> list[str]:
         """Returner apps til dumpdata. Default: self.apps."""
         if not self.apps:
@@ -58,6 +73,17 @@ class BaseBackupHandler:
     def get_restore_models(self) -> list[str]:
         """Returner modeller som skal slettes før loaddata. Default: self.restore_models."""
         return list(self.restore_models)
+
+    def get_strip_fields(self) -> dict[str, list[str]]:
+        """Returner felter som skal fjernes fra dumpen. Default: self.strip_fields.
+
+        Nøklene normaliseres til små bokstaver, siden ``dumpdata`` skriver
+        modellnavn i lowercase (``patients.vaktarkiv``).
+        """
+        return {
+            model.lower(): list(fields)
+            for model, fields in self.strip_fields.items()
+        }
 
     def __str__(self) -> str:
         return f'<BackupHandler slug={self.slug!r}>'

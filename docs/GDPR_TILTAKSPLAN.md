@@ -138,9 +138,17 @@ godtatt i dag.
       Dere har neppe arkiver eldre enn 24 mnd ennå, så regelen biter ikke umiddelbart.
       Bruk tiden til å verifisere at aggregatberegningen er riktig.
 
-- [ ] **3.2 Arkiv som egen backup-modul.** Railway-backup dekker kun ~1 mnd i året, så
-      arkivet trenger egen dekning resten av tiden. Ny handler med `VaktArkiv` + aggregat
-      samlet; `ArkivertPasient` ut av pasient-backupen.
+- [x] **3.2 Arkiv som egen backup-modul.** ✅ FERDIG 12.08.2026.
+      Ny `ArkivBackupHandler` (slug `arkiv`) med `VaktArkiv` + `ArkivertPasient` samlet.
+      Begge er nå ekskludert fra pasient-backupen. Egen `ModuleBackupConfig` via migrasjon
+      `core.0005`: døgnintervall, cap 20. 16 nye tester.
+
+      **Fallgruve som ble avdekket underveis:** serialiseringen kjører med
+      `natural_foreign=True`, så `VaktArkiv.importert_av` ble lagret som brukernavnet.
+      Var kontoen slettet, feilet *hele* gjenopprettingen med `DeserializationError` —
+      altså nøyaktig i det scenarioet fase 4.1 nettopp gjorde mulig. Løst med en ny
+      deklarativ `strip_fields` på `BaseBackupHandler`: FK-en utelates fra dumpen, siden
+      navnet uansett ligger frosset i `importert_av_navn`.
 
       **Bakgrunn:** i dag er `VaktArkiv` ekskludert fra backup mens `ArkivertPasient` er med
       ([patients/backup.py:29-36](../patients/backup.py#L29-L36)) — barna uten forelderen.

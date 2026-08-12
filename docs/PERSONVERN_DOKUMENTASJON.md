@@ -273,7 +273,8 @@ Lagringstidene er fastsatt etter GDPR art. 5(1)(e): opplysningene skal ikke oppb
 | Pasientdata (aktiv innsamling) | Inneværende år i PostgreSQL | Manuell nullstilling / arkivering | Aktiv bruk under arrangementssesong |
 | Arkiverte pasientrader (`ArkivertPasient`) | **24 måneder**, deretter kollaps til aggregert statistikk | *Planlagt – se tiltaksplan fase 3.1* | Dekker to hele sesonger, slik at årets vakt kan sammenlignes med fjorårets i planleggingen. Deretter er formålet uttømt og radnivået slettes permanent |
 | Arkiv-metadata og aggregert statistikk (`VaktArkiv`) | Ingen fast grense | Manuell sletting av admin | Aggregater uten radnivå; grunnlag for flerårig erfaringslæring |
-| Backup-filer (applikasjonens modul-backup) | Antallsbegrenset: de nyeste **50** beholdes per modul, eldre slettes automatisk | Automatisk (`ModuleBackupConfig.max_backups`) | Teknisk gjenoppretting |
+| Backup-filer – modul `patients` (aktiv vaktdata) | Antallsbegrenset: de nyeste **50** beholdes, eldre slettes automatisk | Automatisk (`ModuleBackupConfig.max_backups`) | Teknisk gjenoppretting |
+| Backup-filer – modul `arkiv` (vaktarkivet) | Antallsbegrenset: de nyeste **20** beholdes. Kjøres én gang i døgnet | Automatisk (`ModuleBackupConfig.max_backups`) | Arkivet endres kun ved arkivering av en vakt, og identisk innhold gir ingen ny fil |
 | Railway databasebackup | Styres av Railways plattformvilkår | Railway (databehandler) | Kun aktiv i den perioden abonnementet er oppgradert, ca. én måned i året |
 | Varsler (`Notification`) | 30 dager | Automatisk – `purge_old_logs` via Railway Cron | Rent driftsvarsel uten dokumentasjonsverdi etter vakten |
 | Audit-logger (`AuditLog`, `LoginEvent`) | **2 år (730 dager)** | Automatisk – `purge_old_logs` via Railway Cron | Hendelsesoppklaring og revisjon. Uten journalplikt er lengre oppbevaring ikke hjemlet |
@@ -284,7 +285,16 @@ Lagringstidene er fastsatt etter GDPR art. 5(1)(e): opplysningene skal ikke oppb
 
 > **Merk om backup-retention:** Applikasjonens backup-opprydding er **antallsbasert**, ikke tidsbasert. Konstanten `RETENTION_HOURS = 72` finnes fortsatt i koden, men er ikke i bruk — den er erstattet av `ModuleBackupConfig.max_backups` (standard 50). Tidligere versjoner av dette dokumentet oppga «72 timer, deretter automatisk slettet», noe som ikke stemte med implementasjonen.
 
-> **Merk om backup-innhold:** Applikasjonens modul-backup inneholder **kun `patients`-data**. Passord-hasher, audit-logg, sesjoner og `LoginEvent` inngår ikke, og en restore påvirker dermed ikke brukerkontoer eller logger. Dette gjelder **ikke** Railways databasebackup, som omfatter hele databasen — se A.2.
+> **Merk om backup-innhold:** Applikasjonens backup er delt i to uavhengige moduler:
+>
+> - **`patients`** — aktiv vaktdata (pasienter, førstehjelpere, helsepersonell, innstillinger)
+> - **`arkiv`** — vaktarkivet (`VaktArkiv` + `ArkivertPasient` samlet)
+>
+> En gjenoppretting av den ene rører aldri den andre. Arkivet har egen modul fordi Railways databasebackup kun er aktiv den måneden abonnementet er oppgradert; resten av året er dette den eneste dekningen arkivet har.
+>
+> Ingen av modulene inneholder passord-hasher, audit-logg, sesjoner eller `LoginEvent`. En restore påvirker dermed ikke brukerkontoer eller logger. Dette gjelder **ikke** Railways databasebackup, som omfatter hele databasen — se A.2.
+>
+> I arkiv-backupen utelates referansen `VaktArkiv.importert_av` bevisst. Den peker på en brukerkonto som ikke er del av dumpen, og ville gjort gjenoppretting umulig dersom kontoen var slettet. Brukernavnet er uansett bevart frosset i `importert_av_navn`.
 
 ---
 

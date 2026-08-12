@@ -30,19 +30,60 @@ class PatientsBackupHandler(BaseBackupHandler):
         # Backup og BackupConfig skal ikke være med i sin egen dump.
         'patients.Backup',
         'patients.BackupConfig',
-        # VaktArkiv er bevisst utelatt: arkivet er låst og skal aldri
-        # endres ved restore. Det forblir uavhengig av pasient-restore.
+        # Arkivet håndteres av ArkivBackupHandler og skal aldri endres av en
+        # pasient-restore. Begge modellene må ekskluderes: tidligere var kun
+        # VaktArkiv utelatt mens ArkivertPasient ble med, altså barna uten
+        # forelderen. Var arkivet slettet i mellomtiden, feilet loaddata på
+        # fremmednøkkel og hele gjenopprettingen rullet tilbake.
         'patients.VaktArkiv',
+        'patients.ArkivertPasient',
     ]
     restore_models = [
         # Slett-rekkefølge: barn -> foreldre. Patient har FK til Forstehjelper
         # og Helsepersonell, så Patient må slettes først.
-        # VaktArkiv er IKKE her — den røres aldri av restore (se exclude).
+        # Arkivmodellene er IKKE her — de røres aldri av pasient-restore.
         'patients.Patient',
         'patients.Forstehjelper',
         'patients.Helsepersonell',
         'patients.AppSetting',
     ]
+
+
+class ArkivBackupHandler(BaseBackupHandler):
+    """Backup-handler for vaktarkivet.
+
+    Arkivet er skilt ut som egen modul fordi det har helt andre behov enn
+    den aktive vaktdataen:
+
+    - Det endres sjelden (én gang per arrangement), så det trenger ikke
+      hyppig backup.
+    - Det skal aldri berøres av en pasient-restore, og motsatt.
+    - Railways egen databasebackup er kun aktiv den måneden abonnementet er
+      oppgradert. Resten av året er dette den eneste dekningen arkivet har.
+
+    ``apps`` peker på enkeltmodeller, ikke en app-label: modellene bor i
+    ``patients``-appen, men utgjør en egen backup-enhet. ``dumpdata``
+    aksepterer ``app_label.ModelName``.
+
+    Forelder og barn hører sammen i samme dump — et arkiv uten sine
+    pasientrader, eller rader uten sitt arkiv, er ikke gjenopprettbart.
+    """
+    slug = 'arkiv'
+    display_name = 'Vaktarkiv'
+
+    apps = ['patients.VaktArkiv', 'patients.ArkivertPasient']
+    exclude = []
+    restore_models = [
+        # Barn først: ArkivertPasient har FK til VaktArkiv.
+        'patients.ArkivertPasient',
+        'patients.VaktArkiv',
+    ]
+    # ``importert_av`` peker på CustomUser, som ikke er med i denne dumpen.
+    # Med natural_foreign lagres den som brukernavnet, og er kontoen slettet
+    # feiler HELE gjenopprettingen med DeserializationError — altså akkurat
+    # når man trenger backupen. Brukernavnet ligger uansett frosset i
+    # ``importert_av_navn``, så FK-en utelates.
+    strip_fields = {'patients.VaktArkiv': ['importert_av']}
 
 
 def register_handlers() -> None:
@@ -52,3 +93,4 @@ def register_handlers() -> None:
     ved testkjøring uten å lage duplikater.
     """
     register(PatientsBackupHandler())
+    register(ArkivBackupHandler())
