@@ -60,7 +60,7 @@ class PatientDeleteSetupMixin:
         return Patient.objects.create(
             pasientnummer=nr,
             year=2099,
-            problemstilling='Test',
+            problemstilling='Pustevansker',
         )
 
 
@@ -140,7 +140,7 @@ class RecycleFunctionTests(PatientDeleteSetupMixin, TestCase):
         # Ny pasient opprettet via API skal få nummer 1
         resp2 = self.admin_client.post(
             '/pasienter/api/patients/',
-            data=json.dumps({'problemstilling': 'Ny', 'inntid': '01.01.2099 10:00'}),
+            data=json.dumps({'problemstilling': 'Brannskade', 'inntid': '01.01.2099 10:00'}),
             content_type='application/json',
         )
         self.assertEqual(resp2.status_code, 201)

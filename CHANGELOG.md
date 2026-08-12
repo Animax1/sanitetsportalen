@@ -4,6 +4,85 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-08-12 — GDPR fase 2: kodefikser
+
+### Serverside-validering av kliniske felt (2.1)
+
+- Ny `patients/choices.py` med kanonisk verdimengde for `problemstilling`, `arsak`,
+  `transport`, `grovsortering`, `plassering`, `utskrevet_til`, `lege`, `medisiner` og `journal`
+- `patient_create` og `patient_detail_view` avviser nå verdier utenfor mengden med HTTP 400.
+  Tidligere ble verdiene skrevet rett inn fra request-body, slik at en klient som gikk utenom
+  grensesnittet kunne lagre fritekst — i verste fall navn — i felt som skal være
+  ikke-identifiserende
+- Ny `patients/tests_choices.py` (15 tester), inkludert drift-vakt som leser `index.html` og
+  feiler hvis skjemaet og hvitelisten kommer i utakt
+- Testdata oppdatert: 48 plassholderverdier (`'A'`, `'Test'`, `'Båre 1'`, `'Hjem'`) byttet til
+  reelle verdier. `journal='Oppfølging'` var en rest fra da feltet var en kategori
+
+### Øvrige fikser
+
+- **2.2:** `SECRET_KEY` hard-feiler ved oppstart med `DEBUG=False` hvis nøkkelen mangler eller er
+  en kjent eksempelverdi. Tidligere falt den stilltiende tilbake på en hardkodet utviklingsnøkkel
+- **2.3:** `purge_old_logs` sletter nå også varsler eldre enn 30 dager, med egen
+  `--notification-days`. 5 nye tester
+- **2.4:** Fjernet dødt `GET /api/archives/` med tilhørende UI-seksjon og JS. Endepunktet listet
+  JSON-filer i `arkiv/`, men ingenting skrev slike filer; mappa lå dessuten på containerens
+  flyktige disk på Railway. Rest fra Flask-tiden
+
+### Windows-fiks (nødvendig for å kunne kjøre testene lokalt)
+
+- `core/middleware.py` importerte `resource` ubetinget — en Unix-modul. Siden middlewaren står i
+  `MIDDLEWARE`, feilet **hver eneste HTTP-test** på Windows. Importen er nå betinget, og
+  minnelogging degraderer til ren responstid-logging der modulen mangler. Linux-oppførselen
+  er uendret
+
+Hele suiten: 501 tester, alle grønne.
+
+---
+
+## 2026-08-12 — GDPR-gjennomgang: protokoll v1.5
+
+### Rettslig grunnlag omskrevet
+
+- Avklart at systemet **ikke** er et behandlingsrettet helseregister. Journalføring skjer i eksternt
+  system; feltet `journal` er kun et Ja/Nei-flagg som registrerer om journal er ført der
+- Helsepersonelloven §§ 39–40 og pasientjournalloven fjernet som rettslig grunnlag
+- Art. 6(1)(d) + art. 9(2)(h) står igjen, med taushetspliktvilkåret i art. 9(3) dokumentert
+
+### Lagringstider korrigert som følge av bortfalt journalplikt
+
+- Audit-logg: 10 år → **2 år**. Dokumentet samsvarer nå med det `purge_old_logs` faktisk håndhever
+- Arkiverte pasientrader: **24 måneder**, deretter kollaps til aggregert statistikk *(planlagt)*
+- Varsler: **30 dager** *(planlagt)*
+- Backup: «72 timer» var feil — oppryddingen er antallsbasert (`max_backups`, standard 50).
+  `RETENTION_HOURS` er død kode
+
+### Nye kategorier og behandlinger dokumentert
+
+- `VaktArkiv`, `ArkivertPasient` og `core.Notification` lagt inn i A.6
+- Railway databasebackup lagt inn som egen behandling i A.2, med presisering av at den omfatter
+  hele databasen — i motsetning til modul-backupen
+
+### Vurderinger dokumentert (art. 5(2))
+
+- Fravalg av innsynslogg, med begrunnelse
+- Fravalg av begrenset lesetilgang («Mine pasienter» som tilgangsgrense)
+- DPIA vurdert som ikke påkrevd
+- Korrigert påstanden om at fritekst-risiko er «eliminert» — verdimengden håndheves foreløpig
+  kun i grensesnittet, ikke i API-et
+
+### Øvrig
+
+- Ny **Del B.8**: informasjon til appbrukere (frivillige og helsepersonell), som manglet helt
+- Merknad i A.1 om at behandlingsansvaret ligger hos privatperson
+- Kjent begrensning dokumentert: `VaktArkiv.importert_av` (`PROTECT`) blokkerer sletting av brukere
+- Dokumentasjonen konsolidert: `PERSONVERN_DOKUMENTASJON.md`, `TEKNISK_DOKUMENTASJON.md` og
+  `RUNBOOK_VAKT.md` bor nå kun i `docs/`. Kopiene i rot var nyest og er flyttet dit; de utdaterte
+  `docs/`-versjonene er overskrevet
+- Ny `docs/GDPR_TILTAKSPLAN.md` med gjenstående faser
+
+---
+
 ## 2026-06-23 — Python 3.13 + arbeidsflyt-regel
 
 ### Oppgradering til Python 3.13

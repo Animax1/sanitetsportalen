@@ -31,7 +31,6 @@ urlpatterns = [
     path('api/full-stats/', views.full_stats_view, name='api_full_stats'),
 
     # Arkiver (gammel fil-basert)
-    path('api/archives/', views.archives_view, name='api_archives'),
 
     # VaktArkiv (database-basert arkiv)
     path('api/innstillinger/arkiv/', views.arkiv_liste_view, name='api_arkiv_liste'),

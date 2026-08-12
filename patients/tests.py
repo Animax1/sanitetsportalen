@@ -240,7 +240,7 @@ class AccessControlTests(TestCase):
         c = self._login(self.ro)
         import json as _j
         resp = c.post('/pasienter/api/patients/',
-                      data=_j.dumps({'problemstilling': 'X'}),
+                      data=_j.dumps({'problemstilling': 'Bevisstløs'}),
                       content_type='application/json')
         self.assertEqual(resp.status_code, 403)
 
@@ -316,7 +316,7 @@ class UtskrevetStampTests(TestCase):
 
     def test_utskrevet_til_stempler_utskrevet(self):
         """Sett utskrevet_til stempler utskrevet-tidspunkt."""
-        p = Patient(pasientnummer=1, year=2026, utskrevet_til='Hjem')
+        p = Patient(pasientnummer=1, year=2026, utskrevet_til='Hjem/park')
         changed = self.stamp(p, {})
         self.assertIn('utskrevet', changed)
         self.assertTrue(p.utskrevet)
@@ -324,14 +324,14 @@ class UtskrevetStampTests(TestCase):
     def test_utskrevet_ikke_overskrevet(self):
         """utskrevet allerede satt skal ikke overskrives."""
         p = Patient(pasientnummer=1, year=2026,
-                    utskrevet_til='Hjem', utskrevet='01.01.2026 12:00')
+                    utskrevet_til='Hjem/park', utskrevet='01.01.2026 12:00')
         changed = self.stamp(p, {})
         self.assertNotIn('utskrevet', changed)
         self.assertEqual(p.utskrevet, '01.01.2026 12:00')
 
     def test_utskrevet_fra_obs_lukker_ut_obspost(self):
         """Utskrives fra obs-plass: ut_obspost skal stemples."""
-        p = Patient(pasientnummer=1, year=2026, utskrevet_til='Hjem',
+        p = Patient(pasientnummer=1, year=2026, utskrevet_til='Hjem/park',
                     plassering='Obs 3', inn_obspost='01.01.2026 10:00')
         changed = self.stamp(p, {})
         self.assertIn('utskrevet', changed)
@@ -368,7 +368,7 @@ class LeadViewTests(TestCase):
         """lead_view kan ikke opprette ny pasient."""
         import json as _j
         resp = self.client.post('/pasienter/api/patients/',
-                                data=_j.dumps({'problemstilling': 'Test'}),
+                                data=_j.dumps({'problemstilling': 'Pustevansker'}),
                                 content_type='application/json')
         self.assertEqual(resp.status_code, 403)
 
@@ -565,7 +565,7 @@ class TimeFormatValidationTests(TestCase):
 
     def test_create_patient_rejects_bad_time(self):
         resp = self._post({
-            'problemstilling': 'Test',
+            'problemstilling': 'Pustevansker',
             'inntid': '19/04/2026 14:30',
         })
         self.assertEqual(resp.status_code, 400)
@@ -573,14 +573,14 @@ class TimeFormatValidationTests(TestCase):
 
     def test_create_patient_accepts_correct_time(self):
         resp = self._post({
-            'problemstilling': 'Test',
+            'problemstilling': 'Pustevansker',
             'inntid': '19.04.2026 14:30',
         })
         self.assertEqual(resp.status_code, 201)
 
     def test_update_patient_rejects_bad_utskrevet(self):
         # Opprett først
-        resp = self._post({'problemstilling': 'Test', 'inntid': '19.04.2026 14:30'})
+        resp = self._post({'problemstilling': 'Pustevansker', 'inntid': '19.04.2026 14:30'})
         self.assertEqual(resp.status_code, 201)
         pk = resp.json()['id']
 
@@ -590,14 +590,14 @@ class TimeFormatValidationTests(TestCase):
         self.assertIn('utskrevet', resp.json()['error'])
 
     def test_update_patient_accepts_correct_utskrevet(self):
-        resp = self._post({'problemstilling': 'Test', 'inntid': '19.04.2026 14:30'})
+        resp = self._post({'problemstilling': 'Pustevansker', 'inntid': '19.04.2026 14:30'})
         pk = resp.json()['id']
         resp = self._put(pk, {'utskrevet': '19.04.2026 15:45'})
         self.assertEqual(resp.status_code, 200)
 
     def test_empty_time_is_accepted_on_update(self):
         """Tom streng betyr 'ikke satt' og skal være OK."""
-        resp = self._post({'problemstilling': 'Test', 'inntid': '19.04.2026 14:30'})
+        resp = self._post({'problemstilling': 'Pustevansker', 'inntid': '19.04.2026 14:30'})
         pk = resp.json()['id']
         resp = self._put(pk, {'pabegynt': ''})
         self.assertEqual(resp.status_code, 200)
@@ -634,54 +634,54 @@ class PlasseringUniqueTests(TestCase):
 
     def test_unique_plassering_blokkerer_andre_pasient(self):
         """Akutt 1 kan kun ha én pasient samtidig."""
-        r1 = self._post({'problemstilling': 'A', 'inntid': '19.04.2026 14:00',
+        r1 = self._post({'problemstilling': 'Brystsmerter', 'inntid': '19.04.2026 14:00',
                          'plassering': 'Akutt 1'})
         self.assertEqual(r1.status_code, 201)
-        r2 = self._post({'problemstilling': 'B', 'inntid': '19.04.2026 14:05',
+        r2 = self._post({'problemstilling': 'Magesmerter', 'inntid': '19.04.2026 14:05',
                          'plassering': 'Akutt 1'})
         self.assertEqual(r2.status_code, 400)
         self.assertIn('opptatt', r2.json()['error'].lower())
 
     def test_gronn_sone_tillater_flere(self):
         """Grønn sone er en delt plassering og tillater flere."""
-        r1 = self._post({'problemstilling': 'A', 'inntid': '19.04.2026 14:00',
+        r1 = self._post({'problemstilling': 'Brystsmerter', 'inntid': '19.04.2026 14:00',
                          'plassering': 'Grønn sone'})
         self.assertEqual(r1.status_code, 201)
-        r2 = self._post({'problemstilling': 'B', 'inntid': '19.04.2026 14:05',
+        r2 = self._post({'problemstilling': 'Magesmerter', 'inntid': '19.04.2026 14:05',
                          'plassering': 'Grønn sone'})
         self.assertEqual(r2.status_code, 201)
 
     def test_gul_sone_tillater_flere(self):
         """Gul sone er også delt og tillater flere samtidig."""
-        r1 = self._post({'problemstilling': 'A', 'inntid': '19.04.2026 14:00',
+        r1 = self._post({'problemstilling': 'Brystsmerter', 'inntid': '19.04.2026 14:00',
                          'plassering': 'Gul sone'})
         self.assertEqual(r1.status_code, 201)
-        r2 = self._post({'problemstilling': 'B', 'inntid': '19.04.2026 14:05',
+        r2 = self._post({'problemstilling': 'Magesmerter', 'inntid': '19.04.2026 14:05',
                          'plassering': 'Gul sone'})
         self.assertEqual(r2.status_code, 201)
 
     def test_blank_plassering_blokkerer_ikke(self):
         """Blank plassering skal alltid tillates."""
-        r1 = self._post({'problemstilling': 'A', 'inntid': '19.04.2026 14:00', 'plassering': ''})
+        r1 = self._post({'problemstilling': 'Brystsmerter', 'inntid': '19.04.2026 14:00', 'plassering': ''})
         self.assertEqual(r1.status_code, 201)
-        r2 = self._post({'problemstilling': 'B', 'inntid': '19.04.2026 14:05', 'plassering': ''})
+        r2 = self._post({'problemstilling': 'Magesmerter', 'inntid': '19.04.2026 14:05', 'plassering': ''})
         self.assertEqual(r2.status_code, 201)
 
     def test_slettet_frigir_plassering(self):
         """Hard-slettet pasient skal ikke blokkere plasseringen lenger."""
-        r1 = self._post({'problemstilling': 'A', 'inntid': '19.04.2026 14:00',
+        r1 = self._post({'problemstilling': 'Brystsmerter', 'inntid': '19.04.2026 14:00',
                          'plassering': 'Obs 1'})
         pk = r1.json()['id']
         # Hard-delete via direkte DB (tilsvarer nå API-DELETE)
         Patient.objects.filter(pk=pk).delete()
         # Nå skal en ny pasient kunne legges på Obs 1
-        r2 = self._post({'problemstilling': 'B', 'inntid': '19.04.2026 14:05',
+        r2 = self._post({'problemstilling': 'Magesmerter', 'inntid': '19.04.2026 14:05',
                          'plassering': 'Obs 1'})
         self.assertEqual(r2.status_code, 201)
 
     def test_update_egen_plassering_tillates(self):
         """En pasient skal kunne beholde sin egen plassering ved oppdatering."""
-        r1 = self._post({'problemstilling': 'A', 'inntid': '19.04.2026 14:00',
+        r1 = self._post({'problemstilling': 'Brystsmerter', 'inntid': '19.04.2026 14:00',
                          'plassering': 'Akutt 2'})
         pk = r1.json()['id']
         # Samme plassering skal være OK (pasienten er ikke sin egen konflikt)
@@ -690,9 +690,9 @@ class PlasseringUniqueTests(TestCase):
 
     def test_update_til_opptatt_plassering_blokkeres(self):
         """Flytte en pasient til en annen pasients plassering skal feile."""
-        r1 = self._post({'problemstilling': 'A', 'inntid': '19.04.2026 14:00',
+        r1 = self._post({'problemstilling': 'Brystsmerter', 'inntid': '19.04.2026 14:00',
                          'plassering': 'Akutt 1'})
-        r2 = self._post({'problemstilling': 'B', 'inntid': '19.04.2026 14:05',
+        r2 = self._post({'problemstilling': 'Magesmerter', 'inntid': '19.04.2026 14:05',
                          'plassering': 'Akutt 2'})
         pk2 = r2.json()['id']
         # Prøv å flytte B til Akutt 1 – skal feile
@@ -702,41 +702,41 @@ class PlasseringUniqueTests(TestCase):
 
     def test_update_uten_plassering_paavirker_ikke(self):
         """PUT uten plassering-felt skal ikke kjøre plassering-validering."""
-        r1 = self._post({'problemstilling': 'A', 'inntid': '19.04.2026 14:00',
+        r1 = self._post({'problemstilling': 'Brystsmerter', 'inntid': '19.04.2026 14:00',
                          'plassering': 'Akutt 3'})
         pk = r1.json()['id']
         # Oppdater kun journal – plassering er ikke i payload
-        r2 = self._put(pk, {'journal': 'Oppfølging'})
+        r2 = self._put(pk, {'journal': 'Ja'})
         self.assertEqual(r2.status_code, 200)
 
     def test_utskrevet_pasient_frigir_plassering_ved_post(self):
         """En utskrevet pasient (utskrevet-felt satt) skal ikke blokkere nye pasienter på samme plass."""
-        r1 = self._post({'problemstilling': 'A', 'inntid': '19.04.2026 14:00',
+        r1 = self._post({'problemstilling': 'Brystsmerter', 'inntid': '19.04.2026 14:00',
                          'plassering': 'Obs 1'})
         pk1 = r1.json()['id']
         # Skriv ut første pasient
         r_ut = self._put(pk1, {'utskrevet': '19.04.2026 15:00',
-                               'utskrevet_til': 'Hjem'})
+                               'utskrevet_til': 'Hjem/park'})
         self.assertEqual(r_ut.status_code, 200)
         # Ny pasient skal kunne plasseres på Obs 1
-        r2 = self._post({'problemstilling': 'B', 'inntid': '19.04.2026 15:05',
+        r2 = self._post({'problemstilling': 'Magesmerter', 'inntid': '19.04.2026 15:05',
                          'plassering': 'Obs 1'})
         self.assertEqual(r2.status_code, 201)
 
     def test_utskrive_pasient_med_utskrevet_historikk_paa_samme_plass(self):
         """Skal kunne skrive ut en pasient selv om en tidligere utskrevet pasient står på samme plass."""
         # Pasient 1: utskrevet fra Akutt 2
-        r1 = self._post({'problemstilling': 'A', 'inntid': '19.04.2026 14:00',
+        r1 = self._post({'problemstilling': 'Brystsmerter', 'inntid': '19.04.2026 14:00',
                          'plassering': 'Akutt 2'})
         pk1 = r1.json()['id']
-        self._put(pk1, {'utskrevet': '19.04.2026 14:30', 'utskrevet_til': 'Hjem'})
+        self._put(pk1, {'utskrevet': '19.04.2026 14:30', 'utskrevet_til': 'Hjem/park'})
         # Pasient 2: aktiv på Akutt 2 (siden den nå er fri)
-        r2 = self._post({'problemstilling': 'B', 'inntid': '19.04.2026 14:35',
+        r2 = self._post({'problemstilling': 'Magesmerter', 'inntid': '19.04.2026 14:35',
                          'plassering': 'Akutt 2'})
         pk2 = r2.json()['id']
         # Skriv ut pasient 2 – skal lykkes selv om plassering='Akutt 2' er i payload
         r3 = self._put(pk2, {'utskrevet': '19.04.2026 15:00',
-                             'utskrevet_til': 'Hjem',
+                             'utskrevet_til': 'Hjem/park',
                              'plassering': 'Akutt 2'})
         self.assertEqual(r3.status_code, 200)
 
@@ -750,13 +750,13 @@ class PlasseringUniqueTests(TestCase):
         """Å legge til behandler på en plassert pasient skal bevare plasseringen."""
         b = Forstehjelper.objects.create(name='Ola')
         # Opprett pasient med plassering, uten behandler
-        r1 = self._post({'problemstilling': 'A', 'inntid': '19.04.2026 14:00',
+        r1 = self._post({'problemstilling': 'Brystsmerter', 'inntid': '19.04.2026 14:00',
                          'plassering': 'Akutt 1'})
         pk = r1.json()['id']
         # Simuler frontend: send full payload med behandler lagt til.
         # Plassering er fortsatt 'Akutt 1' (frontend leser .value fra dropdown).
         r2 = self._put(pk, {
-            'problemstilling': 'A',
+            'problemstilling': 'Brystsmerter',
             'inntid': '19.04.2026 14:00',
             'plassering': 'Akutt 1',
             'forstehjelper': b.id,
@@ -770,12 +770,12 @@ class PlasseringUniqueTests(TestCase):
         """Å bytte behandler skal ikke nullstille plasseringen."""
         b1 = Forstehjelper.objects.create(name='Ola')
         b2 = Forstehjelper.objects.create(name='Kari')
-        r1 = self._post({'problemstilling': 'A', 'inntid': '19.04.2026 14:00',
+        r1 = self._post({'problemstilling': 'Brystsmerter', 'inntid': '19.04.2026 14:00',
                          'plassering': 'Obs 5', 'forstehjelper': b1.id})
         pk = r1.json()['id']
         # Bytt behandler – send full payload med uendret plassering
         r2 = self._put(pk, {
-            'problemstilling': 'A',
+            'problemstilling': 'Brystsmerter',
             'inntid': '19.04.2026 14:00',
             'plassering': 'Obs 5',
             'forstehjelper': b2.id,
@@ -794,26 +794,26 @@ class PlasseringUniqueTests(TestCase):
         # Lag pasient direkte i DB med en 'rar' plassering (f.eks. fra CSV-import)
         p = Patient.objects.create(
             pasientnummer=1, year=2026,
-            plassering='Akutt 99',  # ikke i hardkodet dropdown
-            problemstilling='Historisk',
+            plassering='Akutt 4',  # ikke i hardkodet dropdown
+            problemstilling='Kramper',
         )
         b = Forstehjelper.objects.create(name='Ola')
         # Frontend (med fixen) sender 'Akutt 99' tilbake i payload
         r = self._put(p.pk, {
-            'problemstilling': 'Historisk',
-            'plassering': 'Akutt 99',
+            'problemstilling': 'Kramper',
+            'plassering': 'Akutt 4',
             'forstehjelper': b.id,
         })
         self.assertEqual(r.status_code, 200)
         p.refresh_from_db()
-        self.assertEqual(p.plassering, 'Akutt 99')
+        self.assertEqual(p.plassering, 'Akutt 4')
         self.assertEqual(p.forstehjelper_id, b.id)
 
     def test_tom_plassering_i_payload_tommer_feltet(self):
         """Sanity-check av motsatt scenario: hvis frontend faktisk sender
         plassering='' (slik den gamle bugen gjorde), skal backend respektere
         det og tømme feltet. Bekrefter at fixen MÅ være på frontend-siden."""
-        r1 = self._post({'problemstilling': 'A', 'inntid': '19.04.2026 14:00',
+        r1 = self._post({'problemstilling': 'Brystsmerter', 'inntid': '19.04.2026 14:00',
                          'plassering': 'Akutt 3'})
         pk = r1.json()['id']
         r2 = self._put(pk, {'plassering': ''})
@@ -898,7 +898,7 @@ class HelsepersonellTests(TestCase):
         res = self.client.post(
             '/pasienter/api/patients/',
             data=json.dumps({
-                'problemstilling': 'Test',
+                'problemstilling': 'Pustevansker',
                 'inntid': '19.04.2026 14:00',
                 'plassering': 'Akutt 1',
                 'helsepersonell_ref': h.id,
@@ -1026,9 +1026,9 @@ class PatientNumberGapTests(TestCase):
         )
         self.client.login(username='testbruker', password='Test1234!')
         set_active_year(2026)
-        # Eksisterende pasient på unik plassering "Båre 1"
+        # Eksisterende pasient på unik plassering "Behandling 1"
         self.existing = Patient.objects.create(
-            pasientnummer=1, year=2026, plassering='Båre 1',
+            pasientnummer=1, year=2026, plassering='Behandling 1',
             grovsortering='Rød',
         )
         # Synkroniser AppSetting-telleren med den manuelle pasienten over.
@@ -1049,7 +1049,7 @@ class PatientNumberGapTests(TestCase):
     def test_failed_validation_does_not_consume_number(self):
         """En mislykket POST skal ikke øke pasientnummer-telleren."""
         # Forsøk å registrere ny pasient på opptatt plassering
-        resp = self._post_patient('Båre 1')
+        resp = self._post_patient('Behandling 1')
         self.assertEqual(resp.status_code, 400)
 
         # AppSetting-telleren skal fortsatt stå på 2 (ikke konsumert)
@@ -1058,14 +1058,14 @@ class PatientNumberGapTests(TestCase):
             f'Telleren ble inkrementert til {teller} selv om valideringen feilet')
 
         # Neste vellykkede registrering skal få nummer 2, ikke 3
-        resp_ok = self._post_patient('Båre 2')
+        resp_ok = self._post_patient('Behandling 2')
         self.assertEqual(resp_ok.status_code, 201)
         self.assertEqual(resp_ok.json()['pasientnummer'], 2)
 
     def test_successful_creation_increments_normally(self):
         """Vanlig sekvensiell oppretting skal fortsatt fungere."""
-        r1 = self._post_patient('Båre 2')
-        r2 = self._post_patient('Båre 3')
+        r1 = self._post_patient('Behandling 2')
+        r2 = self._post_patient('Behandling 3')
         self.assertEqual(r1.json()['pasientnummer'], 2)
         self.assertEqual(r2.json()['pasientnummer'], 3)
 
@@ -1140,7 +1140,7 @@ class PabegyntNotBeforeInntidTests(TestCase):
             reverse('api_patients_list'),
             data={
                 'inntid': future_inntid,
-                'plassering': 'Båre 1',
+                'plassering': 'Behandling 1',
                 'grovsortering': 'Grønn',
                 'forstehjelper': self.forstehjelper.pk,  # trigger pabegynt-stempling
             },
@@ -1174,7 +1174,7 @@ class BlankInntidFallbackTests(TestCase):
         """Tom inntid-streng skal erstattes av server-now-stempel."""
         resp = self.client.post(
             reverse('api_patients_list'),
-            data={'inntid': '', 'plassering': 'Båre 1', 'grovsortering': 'Grønn'},
+            data={'inntid': '', 'plassering': 'Behandling 1', 'grovsortering': 'Grønn'},
             content_type='application/json',
         )
         self.assertEqual(resp.status_code, 201)

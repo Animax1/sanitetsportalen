@@ -483,13 +483,9 @@ Lager automatisk en `pre_reset`-backup før sletting. Sletter deretter **alle** 
 
 ### 5.8 Arkiver
 
-#### `GET /api/archives/`
+`GET /api/archives/` er **fjernet** (august 2026). Endepunktet listet JSON-filer i `arkiv/`-mappen, men ingenting i applikasjonen skrev slike filer — mappen var alltid tom, og lå dessuten på containerens flyktige disk på Railway, ikke på `/data`-volumet. Det var en rest fra Flask-tiden, før det databasebaserte vaktarkivet overtok.
 
-**Rolle:** Alle innloggede.
-
-Returnerer liste over JSON-filer i `arkiv/`-mappen (relativ til `BASE_DIR`). Hvert element: `{"fil": "2025.json", "arkivert": "...", "antall": 150}`.
-
-**Statuskoder:** 200.
+Arkivering skjer nå utelukkende via `VaktArkiv`/`ArkivertPasient`, se seksjon om vaktarkiv-endepunktene (`/api/innstillinger/arkiv/…`).
 
 ---
 
@@ -1466,13 +1462,17 @@ Pasientdata lagres i klartekst i Postgres. Kryptering i transitt og at-rest-kryp
 
 Det finnes ingen IP-whitelist eller nettverkssegmentering på applikasjonsnivå. Rate-limiting og MFA er de primære tilgangskontrollmekanismene. Railway-nettverksregler kan brukes for å begrense tilgang til spesifikke IP-adresser på plattformnivå.
 
-### 15.5 Audit-purge ikke automatisert i Procfile
+### 15.5 Audit-purge kjøres via ekstern cron, ikke via Procfile
 
-`purge_old_logs`-kommandoen kjøres ikke automatisk. Den må manuelt settes opp som Railway Cron Job (se seksjon 12.7). Risiko: audit-loggen vokser ubegrenset inntil cron er konfigurert.
+`purge_old_logs` er ikke koblet til `Procfile` eller en in-process scheduler. Den kjøres som Railway Cron Job (se seksjon 12.7). Kommandoen håndhever lagringstidene i personvernprotokollen: 730 dager for `AuditLog`/`LoginEvent` og 30 dager for `Notification`. Grensene ligger som defaults i kommandoen, ikke som flagg i cron-jobben, slik at det finnes én sannhet.
 
-### 15.6 Arkivfunksjonalitet er delvis
+Restrisiko: stopper cron-jobben uten at noen oppdager det, vokser loggene ubegrenset. Verifisering er lagt inn i den årlige revisjonssjekklisten (`PERSONVERN_DOKUMENTASJON.md` C.4).
 
-`/api/archives/` lister JSON-filer i `arkiv/`-mappen, men det finnes ingen endepunkt i applikasjonen for å opprette arkivfiler. Arkivering antas å skje manuelt eller via et eksternt verktøy. Mappen lages automatisk ved oppstart av `archives_view` med `os.makedirs`.
+### 15.6 Arkivfunksjonalitet — statistikk beregnes, ikke lagres
+
+Vaktarkivet lagrer radnivå (`ArkivertPasient`) og beregner statistikken på nytt hver gang et arkiv åpnes. Radene vises aldri enkeltvis i grensesnittet.
+
+Planlagt endring: radene kollapser til frosne aggregater etter 24 måneder, se `docs/GDPR_TILTAKSPLAN.md` fase 3.1. Da må også SHA-256-integritetssjekken regnes over aggregatet i stedet for radene.
 
 ---
 

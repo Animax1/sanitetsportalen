@@ -7,7 +7,6 @@ Bruker CSRF-token fra cookie via X-CSRFToken-header (Django-konvensjon).
 import hashlib
 import json
 import logging
-import os
 from datetime import datetime
 
 logger = logging.getLogger(__name__)
@@ -17,13 +16,13 @@ from django.http import JsonResponse, HttpResponseNotModified
 from django.shortcuts import render
 from django.views.decorators.http import require_http_methods
 from django.views.decorators.cache import never_cache
-from django.conf import settings
 
 from django.core.exceptions import ValidationError
 
 from django.db import transaction
 from django.db.models import Q
 
+from .choices import validate_patient_choice_fields
 from .models import Patient, AppSetting, Forstehjelper, Helsepersonell
 from .services import (
     basic_stats, full_stats, next_patient_nr,
@@ -213,6 +212,13 @@ def patients_list_view(request):
     except ValidationError as exc:
         return JsonResponse({'error': '; '.join(exc.messages)}, status=400)
 
+    # Valider kliniske felt mot fast verdimengde. Uten dette kan en klient som
+    # går utenom grensesnittet lagre vilkårlig fritekst i feltene.
+    try:
+        validate_patient_choice_fields(data)
+    except ValidationError as exc:
+        return JsonResponse({'error': '; '.join(exc.messages)}, status=400)
+
     active = get_active_year()
 
     # FORBEDRINGER #19: Valider plassering FØR nummer-tildeling
@@ -308,6 +314,12 @@ def patient_detail_view(request, pk):
         # Valider tidsfelter – kun format dd.mm.åååå tt:mm godtas
         try:
             validate_patient_time_fields(data)
+        except ValidationError as exc:
+            return JsonResponse({'error': '; '.join(exc.messages)}, status=400)
+
+        # Valider kliniske felt mot fast verdimengde (samme regel som ved opprettelse)
+        try:
+            validate_patient_choice_fields(data)
         except ValidationError as exc:
             return JsonResponse({'error': '; '.join(exc.messages)}, status=400)
 
@@ -776,34 +788,6 @@ def full_stats_view(request):
         return full_stats(year=year)
 
     return _inner(request)
-
-
-# ── Arkiv-liste ───────────────────────────────────────────────────────────────
-
-@login_required
-@require_http_methods(['GET'])
-def archives_view(request):
-    """List JSON-arkivfiler."""
-    import json as _json
-    arkiv_dir = os.path.join(settings.BASE_DIR, 'arkiv')
-    os.makedirs(arkiv_dir, exist_ok=True)
-    files = sorted(
-        [f for f in os.listdir(arkiv_dir) if f.endswith('.json')],
-        reverse=True,
-    )
-    result = []
-    for f in files:
-        try:
-            with open(os.path.join(arkiv_dir, f), encoding='utf-8') as fh:
-                d = _json.load(fh)
-            result.append({
-                'fil': f,
-                'arkivert': d.get('arkivert', ''),
-                'antall': d.get('antall_pasienter', 0),
-            })
-        except Exception:
-            result.append({'fil': f, 'arkivert': '', 'antall': '?'})
-    return JsonResponse(result, safe=False)
 
 
 # ════════════════════════════════════════════════════════════════════════

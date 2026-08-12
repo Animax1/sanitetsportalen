@@ -594,25 +594,6 @@ async function saveEventName() {
 }
 
 // ════════════════════════════════════════════════════════
-// ARCHIVES  (GET /api/archives/)
-// ════════════════════════════════════════════════════════
-async function loadArchives() {
-  const archives = await (await fetch('/pasienter/api/archives/')).json();
-  const el = document.getElementById('archive-list');
-  if (!el) return;
-  if (!archives.length) {
-    el.innerHTML = '<span class="text-muted small">Ingen arkiver ennå.</span>';
-    return;
-  }
-  el.innerHTML = archives.map(a => `
-    <div class="archive-row">
-      <span><i class="bi bi-file-earmark-text me-1 text-secondary"></i>${a.fil}</span>
-      <span class="text-muted">${a.antall} pasienter</span>
-      <span class="text-muted">${a.arkivert ? new Date(a.arkivert).toLocaleString('no-NO') : ''}</span>
-    </div>`).join('');
-}
-
-// ════════════════════════════════════════════════════════
 // SESJONSTIMEOUT
 // ════════════════════════════════════════════════════════
 async function loadSessionTimeout() {
@@ -851,7 +832,6 @@ document.querySelectorAll('[data-tab]').forEach(link => link.addEventListener('c
   if (tab === 'statistikk')   loadStats();
   if (tab === 'innstillinger') {
     loadSettings();
-    loadArchives();
     loadSessionTimeout();
     loadForstehjelpere();
     loadHelsepersonell();

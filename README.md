@@ -332,7 +332,6 @@ Innstillingen lagres i `AppSetting` med nøkkelen `session_timeout_hours`.
 | GET      | `/api/stats/`                 | Alle                         | Basis-statistikk (cachet 15s, ETag/304) |
 | GET      | `/api/full-stats/`            | admin + lead + lead_view     | Full statistikk (cachet 60s, ETag/304)  |
 | GET/PUT  | `/api/settings/`              | GET: alle / PUT: admin       | Appinnstillinger                |
-| GET      | `/api/archives/`              | Alle                         | Liste JSON-arkivfiler           |
 | POST     | `/api/reset-active-year/`     | admin                        | Slett all testdata i aktivt år  |
 | GET/PUT  | `/api/session-timeout/`       | GET: alle / PUT: admin       | Sesjonstimeout (timer)          |
 

@@ -13,8 +13,37 @@ load_dotenv()
 # ── Grunnleggende ────────────────────────────────────────────────────────────
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-SECRET_KEY = os.environ.get('SECRET_KEY', 'dev-only-ikke-bruk-i-prod-changeme123!')
 DEBUG = os.environ.get('DEBUG', 'False') == 'True'
+
+# SECRET_KEY signerer sesjonscookies, CSRF-tokens og MFA trust-cookies. Kjører
+# produksjon på en kjent nøkkel, kan sesjoner og MFA-cookies forfalskes.
+# Tidligere hadde variabelen en hardkodet fallback som slo inn stilltiende hvis
+# miljøvariabelen manglet. Nå feiler oppstarten i stedet — høylytt og med én
+# gang — når DEBUG er av. Fallbacken beholdes kun for lokal utvikling.
+#
+# Merk at offline-modus også kjører DEBUG=False; .env.offline.example setter
+# derfor en egen nøkkel som skal byttes ved hvert event.
+_PLACEHOLDER_SECRET_KEYS = {
+    'change-me-in-production',
+    'dev-only-ikke-bruk-i-prod-changeme123!',
+}
+
+SECRET_KEY = os.environ.get('SECRET_KEY', '').strip()
+
+if not DEBUG:
+    if not SECRET_KEY:
+        raise ImproperlyConfigured(
+            'SECRET_KEY mangler. Sett miljøvariabelen SECRET_KEY til en lang '
+            'tilfeldig streng (50+ tegn) før oppstart med DEBUG=False. '
+            'På Railway settes den under Variables.'
+        )
+    if SECRET_KEY in _PLACEHOLDER_SECRET_KEYS:
+        raise ImproperlyConfigured(
+            'SECRET_KEY er satt til en kjent eksempelverdi. Bytt den til en '
+            'lang tilfeldig streng før oppstart med DEBUG=False.'
+        )
+elif not SECRET_KEY:
+    SECRET_KEY = 'dev-only-ikke-bruk-i-prod-changeme123!'
 
 # Offline-modus: kjoeres paa event-laptop uten TLS-terminerende proxy.
 # Skrur av HTTPS-tvang og HSTS, men beholder DEBUG=False slik at stack-traces

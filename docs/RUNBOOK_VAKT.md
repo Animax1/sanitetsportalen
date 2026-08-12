@@ -7,7 +7,7 @@ Konkrete handlingsregler når pasientregistreringssystemet er under belastning.
 
 ## 1. Første ting før vakten starter
 
-1. **Admin-dashbord åpent i egen fane**: [https://\<din-app\>.railway.app/admin/server-status/](#)
+1. **Admin-dashbord åpent i egen fane**: [https://\<din-app\>.railway.app/portal-admin/server-status/](#)
 2. **Railway-dashbord åpent i egen fane**: [https://railway.app](https://railway.app) → ditt prosjekt → Variables
 3. **Denne runbooken tilgjengelig** (skriv ut eller hold på annen skjerm)
 4. Sjekk at dashbordet oppdaterer seg (grønn pulserende prikk, "Oppdaterer hvert 10. sek")
@@ -58,7 +58,7 @@ Hvis Redis-tjenesten ikke finnes:
 
 Når ny deploy er live (sjekk Deployments → siste "Active"):
 
-1. Åpne `https://<din-app>.railway.app/admin/server-status/`
+1. Åpne `https://<din-app>.railway.app/portal-admin/server-status/`
 2. **Cache-backend-kort** skal vise:
    - Backend: `redis`
    - Status: healthy
@@ -173,7 +173,7 @@ Ingen kodeendring eller git-push nødvendig. Verdiene leses av Procfile ved hver
 
 **Det du må være obs på:**
 - **RequestMetrics** i admin er per-prosess. Med 2 workers ser du metrikker fra én worker av gangen, og hvilken varierer mellom polls. RPS og latency kan hoppe litt — dette er normalt og betyr IKKE at appen har problemer.
-- **Memory-bruk øker lineært:** ~60–150 MB per worker. 2 workers ~300 MB peak, 3 workers ~450 MB. Hobby-planen har 8 GB — ikke et problem før 20+ workers.
+- **Memory-bruk øker lineært:** ~100–200 MB per worker ved oppstart; vokser gradvis over tid (reset ved redeploy eller worker-restart). 2 workers ~300–400 MB peak etter lengre drift, 3 workers ~450–600 MB. Hobby-planen har 8 GB — ikke et problem i praksis.
 - **Oppstartstid:** 2 workers ~30 sek, 4 workers ~50 sek.
 
 ### Når skal du øke i løpet av en vakt?
@@ -213,7 +213,7 @@ Total samtidig request-kapasitet: 2 × 6 = 12. RAM ~400–450 MB.
 **Når:** Under høy last og du vil redusere polling-trafikk umiddelbart.
 
 1. Admin-dashbord → "Feature-flagg"-kortet
-2. Send en POST til `/admin/server-status/flag/` med `key=feature.live_stats_enabled`, `value=false` (eller bruk UI-knapp hvis lagt til senere)
+2. Send en POST til `/portal-admin/server-status/flag/` med `key=feature.live_stats_enabled`, `value=false` (eller bruk UI-knapp hvis lagt til senere)
 3. Effekt: live-statistikk-fanen (hvis bygget) skjules for ikke-admin-brukere umiddelbart ved neste request. Ingen redeploy.
 
 **Revert:** samme flagg → `true`.
@@ -359,7 +359,7 @@ Forventet effekt med Redis aktivt: konsistent rate-limiting på tvers av workers
 
 | Ressurs | Lenke/handling |
 |---|---|
-| Admin server-status | `https://<din-app>.railway.app/admin/server-status/` |
+| Admin server-status | `https://<din-app>.railway.app/portal-admin/server-status/` |
 | Railway-dashbord | [https://railway.app](https://railway.app) |
 | Railway Volume backups | Railway → Volumes → Browse |
 | Django Admin | `https://<din-app>.railway.app/django-admin/` |
@@ -379,7 +379,7 @@ skjer via to kilder:
 2. Filtrer på tid eller søkeord (`ERROR`, `Traceback`, `500`)
 3. Stack-traces fra ubehandlede exceptions vises her i full lengde
 
-### Admin-dashbord (/admin/server-status/)
+### Admin-dashbord (/portal-admin/server-status/)
 
 1. **Feilteller** – antall 4xx/5xx siste 5/15/60 min
 2. **Sist sette feil** – endepunkt, tidspunkt og status-kode
@@ -409,9 +409,9 @@ skjer via to kilder:
 - Antall unike pålogginger som ikke har utløpt. Gir deg et pålitelig estimat på samtidige brukere (selv om noen kan ha flere faner).
 
 **Minne (RSS)**
-- 1 worker: normal 60–150 MB
-- 2 workers: ~300 MB total. Over 800 MB totalt per worker = vurder å starte workeren på nytt.
-- 3 workers: ~450 MB total.
+- 1 worker: ~100–200 MB (vokser gradvis; typisk 150–300 MB etter noen dagers drift uten redeploy)
+- 2 workers: ~300–400 MB total. Over 500 MB per worker = vurder redeploy for å frigjøre minne.
+- 3 workers: ~450–600 MB total.
 
 **Cache-backend**
 - `REDIS / OK`: delt cache aktiv, trygt å kjøre med 2+ workers
@@ -427,4 +427,4 @@ skjer via to kilder:
 
 ---
 
-*Sist oppdatert: 26.04.2026*
+*Sist oppdatert: 05.06.2026*

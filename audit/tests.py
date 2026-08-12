@@ -11,6 +11,22 @@ from django.core.management import call_command
 
 from accounts.models import CustomUser, LoginEvent
 from audit.models import AuditLog
+from core.models import Notification
+
+
+def _create_notification(user, days_ago):
+    """Hjelpefunksjon: opprett Notification med kunstig created_at."""
+    n = Notification.objects.create(
+        user=user,
+        module_slug='patients',
+        kind='patient_assigned',
+        title='Ny pasient tildelt',
+        message='Du er satt som førstehjelper for pasient #1.',
+    )
+    Notification.objects.filter(pk=n.pk).update(
+        created_at=timezone.now() - timedelta(days=days_ago)
+    )
+    return n
 
 
 def _create_login_event(user, days_ago):
@@ -126,4 +142,58 @@ class PurgeOldLogsTests(TestCase):
         self.assertTrue(
             AuditLog.objects.filter(pk=recent_log.pk).exists(),
             'Nylig audit-log skal ikke slettes',
+        )
+
+
+class PurgeNotificationsTests(TestCase):
+    """Varsler har egen lagringstid (30 dager), uavhengig av loggene."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.user = CustomUser.objects.create_user(
+            username='varselbruker',
+            password='Passord123!',
+            role='read_only',
+        )
+
+    def test_purge_deletes_old_notifications(self):
+        gammel = _create_notification(self.user, days_ago=31)
+        call_command('purge_old_logs', stdout=StringIO())
+        self.assertFalse(
+            Notification.objects.filter(pk=gammel.pk).exists(),
+            'Varsel eldre enn 30 dager skal slettes',
+        )
+
+    def test_purge_keeps_recent_notifications(self):
+        fersk = _create_notification(self.user, days_ago=5)
+        call_command('purge_old_logs', stdout=StringIO())
+        self.assertTrue(
+            Notification.objects.filter(pk=fersk.pk).exists(),
+            'Varsel nyere enn 30 dager skal beholdes',
+        )
+
+    def test_notification_days_kan_overstyres(self):
+        varsel = _create_notification(self.user, days_ago=10)
+        call_command('purge_old_logs', notification_days=7, stdout=StringIO())
+        self.assertFalse(
+            Notification.objects.filter(pk=varsel.pk).exists(),
+            '10 dager gammelt varsel skal slettes med --notification-days 7',
+        )
+
+    def test_varsler_har_kortere_frist_enn_logger(self):
+        """Et 60 dager gammelt varsel slettes, mens audit-loggen består."""
+        varsel = _create_notification(self.user, days_ago=60)
+        logg = _create_audit_log(self.user, days_ago=60)
+
+        call_command('purge_old_logs', stdout=StringIO())
+
+        self.assertFalse(Notification.objects.filter(pk=varsel.pk).exists())
+        self.assertTrue(AuditLog.objects.filter(pk=logg.pk).exists())
+
+    def test_dry_run_sletter_ingenting(self):
+        varsel = _create_notification(self.user, days_ago=100)
+        call_command('purge_old_logs', dry_run=True, stdout=StringIO())
+        self.assertTrue(
+            Notification.objects.filter(pk=varsel.pk).exists(),
+            'Tørrkjøring skal ikke slette varsler',
         )

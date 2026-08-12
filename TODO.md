@@ -2,7 +2,18 @@
 
 ## Pågående / neste
 
-- [ ] ...
+### GDPR-gjennomgang — se `docs/GDPR_TILTAKSPLAN.md`
+
+- [x] Fase 0: taushetsplikt avklart (signert erklæring via organisasjonen)
+- [x] Fase 1: personvernprotokoll omskrevet til v1.5 — journalplikt ute, lagringstider korrigert
+- [ ] **Fyll inn organisasjonsnavn i A.4** (står som `[fyll inn organisasjonsnavn]`)
+- [x] Fase 2.1: serverside-whitelist på kliniske felt (inkl. `lege`)
+- [x] Fase 2.2: `SECRET_KEY` hard-fail når `DEBUG=False`
+- [x] Fase 2.3: slett varsler eldre enn 30 dager
+- [x] Fase 2.4: fjern død «Arkiv (filer)»-seksjon (`archives_view`)
+- [ ] Fase 3.1: arkiverte pasientrader kollapser til aggregat etter 24 mnd
+- [ ] Fase 3.2: arkiv som egen backup-modul
+- [ ] Fase 4.1: `VaktArkiv.importert_av` → `SET_NULL` + frosset navn (blokkerer sletting av brukere i dag)
 
 
 ## Ideer / backlog
@@ -14,6 +25,10 @@
 - [ ] Testene er massive, kan vi komprimere den?
 - [ ] Fjerne varsler eldre enn 30 dager.s
 - [ ] Lage locus klone, hente sted via enhet gps.
+- [ ] Slå sammen de to backup-flatene. Pasientmodulens egen backup-side og
+      `/portal-admin/backup/` er to UI-er over samme backend (samme `Backup`-tabell,
+      samme filer, samme `core.backup.restore_backup`). Forvirrende at det ser ut som
+      to systemer. Behold kun `/portal-admin/backup/` på overordnet nivå.
 
 ## Ferdig ✓
 
