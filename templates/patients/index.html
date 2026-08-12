@@ -543,35 +543,13 @@
 
     <div class="settings-card admin-only">
       <h6><i class="bi bi-cloud-arrow-up me-2"></i>Backup</h6>
-      <p class="small text-muted mb-2">Automatisk og manuell backup. Sletter automatisk etter 72 timer.</p>
-
-      <div class="mb-2">
-        <label class="form-label small mb-1">
-          Automatisk intervall
-          <span id="backup-interval-status" class="small ms-2"></span>
-        </label>
-        <select id="backup-interval" class="form-select form-select-sm">
-          <option value="0">Av</option>
-          <option value="30">Hver 30. min</option>
-          <option value="60" selected>Hver time</option>
-          <option value="360">Hver 6. time</option>
-          <option value="1440">Hver 24. time</option>
-        </select>
-        <div class="small text-muted mt-1">
-          Endringer lagres automatisk når du velger en verdi.
-        </div>
-        <div class="small text-muted mt-1" id="backup-last-run"></div>
-      </div>
-
-      <div class="d-flex gap-2 mb-2">
-        <input type="text" id="backup-note" class="form-control form-control-sm"
-               placeholder="Notat (valgfritt)" maxlength="200">
-        <button class="btn btn-primary btn-sm" onclick="createBackupNow()">
-          <i class="bi bi-plus-circle"></i> Ta backup nå
-        </button>
-      </div>
-
-      <div id="backup-list" class="small"><span class="text-muted">Laster...</span></div>
+      <p class="small text-muted mb-2">
+        Backup styres samlet for hele portalen, med eget intervall og egen
+        oppbevaring per modul — pasientdata og vaktarkiv hver for seg.
+      </p>
+      <a href="{% url 'core:backup_admin_overview' %}" class="btn btn-outline-primary btn-sm">
+        <i class="bi bi-box-arrow-up-right me-1"></i>Åpne backup-administrasjon
+      </a>
     </div>
 
     <div class="settings-card danger-zone admin-only">

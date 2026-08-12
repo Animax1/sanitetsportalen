@@ -491,16 +491,27 @@ Arkivering skjer nå utelukkende via `VaktArkiv`/`ArkivertPasient`, se seksjon o
 
 ### 5.9 Backup-endepunkter
 
+Backup administreres samlet på `/portal-admin/backup/`, med én rad per registrert
+backup-modul (`patients` og `arkiv`). Hver modul har eget intervall og egen cap i
+`ModuleBackupConfig`.
+
 | Metode | Path | Rolle | Beskrivelse |
 |---|---|---|---|
-| `GET` | `/api/backups/` | `admin` | Liste over alle backup-poster |
-| `POST` | `/api/backups/` | `admin` | Opprett manuell backup |
-| `GET` | `/api/backups/<pk>/download/` | `admin` | Last ned backup-fil |
-| `POST` | `/api/backups/<pk>/restore/` | `admin` | Gjenopprett fra backup |
-| `DELETE` | `/api/backups/<pk>/` | `admin` | Slett backup-post og fil |
-| `GET/PUT` | `/api/backup-config/` | `admin` | Les/oppdater BackupConfig (intervall osv.) |
+| `GET` | `/portal-admin/backup/` | `admin` | Oversikt over alle backup-moduler |
+| `GET/POST` | `/portal-admin/backup/<slug>/` | `admin` | Backup-liste og konfigurasjon for modulen |
+| `POST` | `/portal-admin/backup/<slug>/run/` | `admin` | Opprett manuell backup |
+| `POST` | `/portal-admin/backup/<slug>/restore/<pk>/` | `admin` | Gjenopprett fra backup |
+| `GET` | `/portal-admin/backup/<slug>/last-ned/<pk>/` | `admin` | Last ned backup-fil |
+| `POST` | `/portal-admin/backup/<slug>/slett/<pk>/` | `admin` | Slett backup-post og fil |
 
 Alle backup- og restore-operasjoner logges i `AuditLog`.
+
+> **Fjernet august 2026:** pasientmodulen hadde tidligere sine egne
+> `/pasienter/api/backup/`-endepunkter med et eget UI-panel under Innstillinger. De var
+> to flater over samme backend — samme `Backup`-tabell, samme filer, samme
+> `core.backup.restore_backup`. Verre: panelets intervall-innstilling skrev til den
+> gamle singleton-modellen `patients.BackupConfig`, som scheduleren aldri leser. Den var
+> altså uten virkning. Pasientmodulen lenker nå til `/portal-admin/backup/` i stedet.
 
 ---
 

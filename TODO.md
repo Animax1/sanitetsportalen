@@ -29,10 +29,12 @@
 - [ ] Vurder `argon2-cffi` for sterkere passord-hashing i produksjon (i dag PBKDF2)
 - [ ] Fjerne varsler eldre enn 30 dager.s
 - [ ] Lage locus klone, hente sted via enhet gps.
-- [ ] Slå sammen de to backup-flatene. Pasientmodulens egen backup-side og
-      `/portal-admin/backup/` er to UI-er over samme backend (samme `Backup`-tabell,
-      samme filer, samme `core.backup.restore_backup`). Forvirrende at det ser ut som
-      to systemer. Behold kun `/portal-admin/backup/` på overordnet nivå.
+- [x] Slå sammen de to backup-flatene — kun `/portal-admin/backup/` gjenstår
+- [ ] Rydd bort død backup-legacy: modellen `patients.BackupConfig` (singleton som
+      ingenting leser lenger) og management-kommandoen `db_backup` som gater på den.
+      Krever migrasjon, derfor egen oppgave.
+- [ ] Slett `static/js/script.js`. Den er den gamle monolitten fra før oppdelingen i
+      moduler, lastes ikke av noen mal, og inneholder nå en død kopi av backup-panelet.
 
 ## Ferdig ✓
 

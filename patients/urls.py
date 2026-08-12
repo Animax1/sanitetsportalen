@@ -43,10 +43,6 @@ urlpatterns = [
             lambda req, rest='': redirect(f'/portal-admin/server-status/{rest}', permanent=True)),
 
     # Backup / Restore (kun admin)
-    path('api/backup/',                   views.backup_list_view,       name='api_backup_list'),
-    path('api/backup/config/',            views.backup_config_view,     name='api_backup_config'),
-    path('api/backup/create/',            views.backup_create_now_view, name='api_backup_create'),
-    path('api/backup/<int:pk>/restore/',  views.backup_restore_view,    name='api_backup_restore'),
-    path('api/backup/<int:pk>/download/', views.backup_download_view,   name='api_backup_download'),
-    path('api/backup/<int:pk>/',          views.backup_delete_view,     name='api_backup_delete'),
+    # Backup-endepunktene er fjernet (august 2026). Backup administreres samlet
+    # på /portal-admin/backup/, med eget intervall og egen oppbevaring per modul.
 ]

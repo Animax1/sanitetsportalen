@@ -9,12 +9,11 @@ from pathlib import Path
 from unittest.mock import patch
 
 from django.test import TestCase, Client, override_settings
-from django.utils import timezone
 
 from accounts.models import CustomUser, LoginEvent
 from audit.models import AuditLog
-from patients.models import Patient, AppSetting, Backup, BackupConfig
-from patients.backup_service import create_backup, purge_old_backups, get_backup_dir
+from patients.models import Patient, Backup
+from patients.backup_service import create_backup, purge_old_backups
 from patients.services import set_active_year
 
 
@@ -240,165 +239,6 @@ class BackupServiceTests(TestCase):
         # LoginEvent bevart
         self.assertGreaterEqual(LoginEvent.objects.count(), login_count_before,
                                 'LoginEvent skal ikke slettes av restore')
-
-
-@override_settings(SECURE_SSL_REDIRECT=False, RATELIMIT_ENABLE=False)
-class BackupAPITests(TestCase):
-    """Tester for backup API-endepunkter."""
-
-    def setUp(self):
-        self.admin = CustomUser.objects.create_user(
-            username='admin', password='pwd', role='admin',
-            must_change_password=False,
-        )
-        self.lead = CustomUser.objects.create_user(
-            username='lead', password='pwd', role='lead',
-            must_change_password=False,
-        )
-        self.rw = CustomUser.objects.create_user(
-            username='rw', password='pwd', role='read_write',
-            must_change_password=False,
-        )
-        self.ro = CustomUser.objects.create_user(
-            username='ro', password='pwd', role='read_only',
-            must_change_password=False,
-        )
-        self.backup_dir = Path('/tmp/test-backups-api')
-        self.backup_dir.mkdir(parents=True, exist_ok=True)
-
-    def tearDown(self):
-        # Windows: FileResponse kan holde fil åpen til GC kjører. Kjør GC 
-        # eksplisitt og retry på PermissionError.
-        import gc, time
-        gc.collect()
-        for pattern in ('backup-*.json.gz', '.restore-tmp-*.json'):
-            for f in self.backup_dir.glob(pattern):
-                for attempt in range(5):
-                    try:
-                        f.unlink(missing_ok=True)
-                        break
-                    except PermissionError:
-                        gc.collect()
-                        time.sleep(0.1)
-
-    def _admin_client(self):
-        c = Client()
-        c.force_login(self.admin)
-        return c
-
-    def _client_for(self, user):
-        c = Client()
-        c.force_login(user)
-        return c
-
-    def test_only_admin_can_list_backups(self):
-        """lead, read_write og read_only skal få 403 på backup-listen."""
-        for user in [self.lead, self.rw, self.ro]:
-            c = self._client_for(user)
-            resp = c.get('/pasienter/api/backup/')
-            self.assertEqual(resp.status_code, 403,
-                             f'Bruker med rolle {user.role} skal få 403')
-
-    def test_admin_can_list_backups(self):
-        """Admin kan hente backup-listen med 200."""
-        c = self._admin_client()
-        resp = c.get('/pasienter/api/backup/')
-        self.assertEqual(resp.status_code, 200)
-        body = resp.json()
-        self.assertIn('config', body)
-        self.assertIn('backups', body)
-
-    def test_only_admin_can_create_backup(self):
-        """Ikke-admin brukere skal få 403 ved forsøk på å lage backup."""
-        for user in [self.lead, self.rw, self.ro]:
-            c = self._client_for(user)
-            resp = c.post('/pasienter/api/backup/create/',
-                          data='{}',
-                          content_type='application/json')
-            self.assertEqual(resp.status_code, 403,
-                             f'Bruker med rolle {user.role} skal få 403')
-
-    def test_admin_can_create_backup(self):
-        """Admin kan lage en manuell backup."""
-        with patch.dict(os.environ, {'BACKUP_DIR': str(self.backup_dir)}):
-            c = self._admin_client()
-            resp = c.post('/pasienter/api/backup/create/',
-                          data=json.dumps({'note': 'Testbackup'}),
-                          content_type='application/json')
-        self.assertEqual(resp.status_code, 201)
-        body = resp.json()
-        self.assertTrue(body.get('ok'))
-        self.assertIn('filename', body)
-        self.assertGreater(body['size_bytes'], 0)
-
-    def test_restore_requires_confirm_string(self):
-        """Restore uten riktig confirm-streng skal gi 400."""
-        with patch.dict(os.environ, {'BACKUP_DIR': str(self.backup_dir)}):
-            backup = create_backup(kind='manual', user=self.admin)
-            c = self._admin_client()
-            # Feil confirm-verdi
-            resp = c.post(f'/pasienter/api/backup/{backup.pk}/restore/',
-                          data=json.dumps({'confirm': 'ja'}),
-                          content_type='application/json')
-        self.assertEqual(resp.status_code, 400)
-
-    def test_restore_accepts_correct_confirm(self):
-        """Restore med riktig confirm='GJENOPPRETT' skal lykkes (200)."""
-        with patch.dict(os.environ, {'BACKUP_DIR': str(self.backup_dir)}):
-            backup = create_backup(kind='manual', user=self.admin)
-            c = self._admin_client()
-            resp = c.post(f'/pasienter/api/backup/{backup.pk}/restore/',
-                          data=json.dumps({'confirm': 'GJENOPPRETT'}),
-                          content_type='application/json')
-        self.assertEqual(resp.status_code, 200)
-        self.assertTrue(resp.json().get('ok'))
-
-    def test_download_logged_to_audit(self):
-        """Nedlasting av backup skal logges i AuditLog."""
-        with patch.dict(os.environ, {'BACKUP_DIR': str(self.backup_dir)}):
-            backup = create_backup(kind='manual', user=self.admin)
-            c = self._admin_client()
-            count_before = AuditLog.objects.filter(field_name='backup_downloaded').count()
-            resp = c.get(f'/pasienter/api/backup/{backup.pk}/download/')
-
-        self.assertEqual(resp.status_code, 200)
-        # Les streaming-innholdet og lukk FileResponse eksplisitt – Windows
-        # tillater ikke sletting av en åpen fil i tearDown.
-        b''.join(resp.streaming_content) if getattr(resp, 'streaming', False) else None
-        resp.close()
-        count_after = AuditLog.objects.filter(field_name='backup_downloaded').count()
-        self.assertEqual(count_after, count_before + 1,
-                         'Nedlasting skal logges i AuditLog')
-
-    def test_config_update_rejects_invalid_interval(self):
-        """Backup-konfig med ugyldig intervall skal avvises med 400."""
-        c = self._admin_client()
-        resp = c.post('/pasienter/api/backup/config/',
-                      data=json.dumps({'interval_minutes': 999}),
-                      content_type='application/json')
-        self.assertEqual(resp.status_code, 400)
-
-    def test_config_update_accepts_valid_interval(self):
-        """Gyldig intervall (0, 30, 60, 360, 1440) skal aksepteres med 200."""
-        c = self._admin_client()
-        for interval in [0, 30, 60, 360, 1440]:
-            resp = c.post('/pasienter/api/backup/config/',
-                          data=json.dumps({'interval_minutes': interval}),
-                          content_type='application/json')
-            self.assertEqual(resp.status_code, 200,
-                             f'Intervall {interval} skal aksepteres')
-            cfg = BackupConfig.get()
-            self.assertEqual(cfg.interval_minutes, interval)
-
-    def test_delete_backup(self):
-        """Admin kan slette en backup via DELETE-endepunktet."""
-        with patch.dict(os.environ, {'BACKUP_DIR': str(self.backup_dir)}):
-            backup = create_backup(kind='manual', user=self.admin)
-            c = self._admin_client()
-            resp = c.delete(f'/pasienter/api/backup/{backup.pk}/')
-
-        self.assertEqual(resp.status_code, 200)
-        self.assertFalse(Backup.objects.filter(pk=backup.pk).exists())
 
 
 @override_settings(SECURE_SSL_REDIRECT=False, RATELIMIT_ENABLE=False)

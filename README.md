@@ -337,14 +337,19 @@ Innstillingen lagres i `AppSetting` med nøkkelen `session_timeout_hours`.
 
 ### Backup
 
-| Metode   | URL                              | Tilgang | Beskrivelse                          |
-|----------|----------------------------------|---------|--------------------------------------|
-| GET      | `/api/backup/`                   | admin   | Liste alle backupfiler               |
-| POST     | `/api/backup/create/`            | admin   | Lag ny manuell backup                |
-| POST     | `/api/backup/restore/<pk>/`      | admin   | Gjenopprett fra backup               |
-| GET      | `/api/backup/download/<pk>/`     | admin   | Last ned backup-fil                  |
-| DELETE   | `/api/backup/delete/<pk>/`       | admin   | Slett backup-fil                     |
-| GET/POST | `/api/backup/config/`            | admin   | Les/oppdater backup-konfigurasjon    |
+Backup administreres samlet på `/portal-admin/backup/`, med eget intervall og egen
+oppbevaring per modul (`patients` og `arkiv`).
+
+| Metode   | URL                                            | Tilgang | Beskrivelse                       |
+|----------|------------------------------------------------|---------|-----------------------------------|
+| GET      | `/portal-admin/backup/`                        | admin   | Oversikt over alle backup-moduler |
+| GET/POST | `/portal-admin/backup/<slug>/`                 | admin   | Backup-liste og konfigurasjon     |
+| POST     | `/portal-admin/backup/<slug>/run/`             | admin   | Lag ny manuell backup             |
+| POST     | `/portal-admin/backup/<slug>/restore/<pk>/`    | admin   | Gjenopprett fra backup            |
+| GET      | `/portal-admin/backup/<slug>/last-ned/<pk>/`   | admin   | Last ned backup-fil               |
+| POST     | `/portal-admin/backup/<slug>/slett/<pk>/`      | admin   | Slett backup-fil                  |
+
+De tidligere `/api/backup/`-endepunktene i pasientmodulen er fjernet (august 2026).
 
 ### Admin-verktøy (kun admin-rolle)
 

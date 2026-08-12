@@ -4,6 +4,31 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-08-12 — Backup samlet på én flate
+
+Pasientmodulen hadde sitt eget backup-panel under Innstillinger, med egne
+`/pasienter/api/backup/`-endepunkter. Det var to UI-er over samme backend: samme
+`Backup`-tabell, samme filer på disk, samme `core.backup.restore_backup`.
+
+**Det var ikke bare duplisering.** Panelets intervall-innstilling skrev til
+`patients.BackupConfig` — den gamle singleton-modellen — mens scheduleren utelukkende
+leser `core.ModuleBackupConfig`. Endret du intervallet der, skjedde ingenting. «Siste
+automatiske backup» ble heller aldri oppdatert. Listen viste dessuten backuper fra alle
+moduler blandet, uten å si hvilken modul de tilhørte.
+
+- Fjernet de seks `/pasienter/api/backup/`-endepunktene med tilhørende URL-er
+- Fjernet backup-panelet og ~130 linjer JS fra pasientmodulen
+- Innstillinger lenker nå til `/portal-admin/backup/` i stedet
+- `BackupAPITests` fjernet; portal-admin-flaten har allerede bedre dekning. Lagt til
+  `test_run_view_requires_admin` for full paritet
+
+536 tester, alle grønne.
+
+Gjenstår som egne oppgaver (se TODO): den døde modellen `patients.BackupConfig` med
+kommandoen `db_backup`, og `static/js/script.js` som ingen mal laster.
+
+---
+
 ## 2026-08-12 — GDPR fase 3.1: arkiv kollapser til aggregat etter 24 måneder
 
 Siste fase i GDPR-gjennomgangen. Arkiverte pasientrader slettes permanent etter 24

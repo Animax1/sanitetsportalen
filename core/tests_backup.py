@@ -635,6 +635,13 @@ class BackupAdminViewTests(TestCase):
         self.assertEqual(log.user, self.admin)
         self.assertEqual(log.new_value, backup.filename)
 
+    def test_run_view_requires_admin(self) -> None:
+        """Manuell backup skal være admin-only, som resten av flaten."""
+        client = Client()
+        client.force_login(self.lead)
+        resp = client.post('/portal-admin/backup/patients/run/')
+        self.assertIn(resp.status_code, (302, 403))
+
     def test_restore_view_requires_admin(self) -> None:
         Patient.objects.create(pasientnummer=1, year=2025, problemstilling='X')
         with patch.dict(os.environ, {'BACKUP_DIR': str(self.backup_dir)}):
