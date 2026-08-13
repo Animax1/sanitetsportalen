@@ -56,6 +56,24 @@ nullbar kolonne. `makemigrations` ville tatt med en `AlterField` på `is_superus
 slengen — samme slags kosmetiske opprydding som forårsaket nedetiden, og derfor utelatt.
 Drift-advarselen ved oppstart består, og er ufarlig.
 
+**Andre nedetid samme dag, og hva den lærte oss:** første forsøk på å re-lande feilet med
+`DuplicateColumn: column "current_session_key" already exists`. Årsaken var at
+`accounts/0008` **hadde** blitt anvendt under den opprinnelige deployen — hver migrasjon
+kjører i egen transaksjon, så den commitet før `audit/0004` feilet. Analysen av den første
+loggen konkluderte feilaktig med at ingen av migrasjonene hadde gått gjennom.
+
+Da migrasjonen ble skrevet om for hånd, fikk fila samtidig et nytt, mer beskrivende navn.
+**Django matcher migrasjoner på app + navn, ikke på innhold.** Databasen hadde
+`0008_customuser_current_session_key_and_more` registrert; repoet hadde
+`0008_customuser_current_session_key`. Django så en ukjent migrasjon og prøvde å legge til
+kolonnen på nytt.
+
+Fila heter derfor fortsatt `..._and_more` selv om innholdet ikke lenger inneholder «more».
+Det står som en advarsel øverst i migrasjonens docstring. Fiksen ble verifisert mot en
+lokal database satt i nøyaktig samme tilstand som produksjon — kolonne til stede,
+migrasjon registrert under det gamle navnet — der `migrate` svarer «No migrations to
+apply».
+
 15 nye tester i `patients/tests_ytelse.py`. Full suite: 648 tester, grønn.
 
 ---
