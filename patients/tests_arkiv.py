@@ -442,3 +442,90 @@ class ArkivBrukerSlettingTests(ArkivTestMixin, TestCase):
         c.force_login(annen_admin)
         resp = c.get(f'/pasienter/api/innstillinger/arkiv/{arkiv.pk}/')
         self.assertFalse(resp.json()['tamper_detected'])
+
+
+@override_settings(SECURE_SSL_REDIRECT=False, RATELIMIT_ENABLE=False)
+class ArkivFeltlisteTests(ArkivTestMixin, TestCase):
+    """Vakt over ARKIVERT_PASIENT_FELTER (N13).
+
+    Feltlista var skrevet ut tre steder: ved arkivering, ved statistikk og ved
+    integritetsverifikasjon. Ble ett av stedene glemt når et felt ble lagt til,
+    beregnet verifikasjonen signaturen over et annet feltsett enn arkiveringen
+    gjorde — og arkivet meldte «tukling» uten at noe var rørt.
+    """
+
+    def test_feltlista_dekker_modellen(self):
+        """Modellen og feltlista må ikke komme i utakt uten at noen tar stilling.
+
+        Testen er med vilje streng. Legges et felt til på ArkivertPasient uten
+        at det tas stilling til signaturen, får man beskjed her i stedet for å
+        oppdage det som en falsk tukling-alarm i produksjon.
+        """
+        from patients.services import (
+            ARKIVERT_PASIENT_FELTER, ARKIVERT_PASIENT_FELTER_UNNTATT,
+        )
+        modellfelt = {f.name for f in ArkivertPasient._meta.get_fields()}
+        dekket = set(ARKIVERT_PASIENT_FELTER) | set(ARKIVERT_PASIENT_FELTER_UNNTATT)
+
+        udekket = modellfelt - dekket
+        self.assertEqual(udekket, set(), (
+            f'Nye felt på ArkivertPasient: {sorted(udekket)}.\n'
+            'Ta stilling til om de skal inngå i SHA-256-signaturen.\n'
+            '  - Skal de med: legg dem i ARKIVERT_PASIENT_FELTER. NB: eksisterende '
+            'arkiver får da en signatur som ikke lenger kan reproduseres.\n'
+            '  - Skal de ikke med: legg dem i ARKIVERT_PASIENT_FELTER_UNNTATT.'
+        ))
+
+        ukjent = dekket - modellfelt
+        self.assertEqual(ukjent, set(), (
+            f'Feltnavn som ikke finnes på ArkivertPasient: {sorted(ukjent)}. '
+            'Sannsynligvis en skrivefeil eller et felt som er fjernet fra modellen.'
+        ))
+
+    def test_signaturen_dekker_alle_kliniske_felt(self):
+        """Signaturen skal dekke innholdet, ikke bare lagringsmekanikken.
+
+        Pinner unntakslista, slik at et klinisk felt ikke kan flyttes ut av
+        signaturen uten at det synes i diffen.
+        """
+        from patients.services import ARKIVERT_PASIENT_FELTER_UNNTATT
+        self.assertEqual(set(ARKIVERT_PASIENT_FELTER_UNNTATT), {'id', 'arkiv'})
+
+    def test_arkivering_og_verifikasjon_bruker_samme_feltliste(self):
+        """Signaturen fra arkiveringen skal reproduseres av verifikasjonen.
+
+        Dette er den egentlige regresjonstesten: to kodeveier, én feltliste.
+        """
+        from patients.services import (
+            _arkiv_pasienter_dicts, _compute_sha256_for_arkiv,
+        )
+        self._lag_pasient(1, 'Grønn')
+        self._lag_pasient(2, 'Rød')
+        arkiv, _ = arkiver_aktiv_vakt('Festivalen', '', self.admin)
+
+        sha_ved_verifikasjon = _compute_sha256_for_arkiv(
+            arkiv, _arkiv_pasienter_dicts(arkiv))
+        self.assertEqual(arkiv.sha256, sha_ved_verifikasjon)
+
+        # ...og API-et skal være enig
+        c = Client()
+        c.force_login(self.admin)
+        resp = c.get(f'/pasienter/api/innstillinger/arkiv/{arkiv.pk}/')
+        self.assertFalse(resp.json()['tamper_detected'])
+
+    def test_endring_i_signert_felt_gir_tukling(self):
+        """Kontroll på at signaturen faktisk dekker feltene i lista."""
+        from patients.services import ARKIVERT_PASIENT_FELTER
+        self._lag_pasient(1, 'Grønn')
+        arkiv, _ = arkiver_aktiv_vakt('Festivalen', '', self.admin)
+
+        # Ta et vilkårlig klinisk felt fra lista og endre det direkte i DB
+        self.assertIn('grovsortering', ARKIVERT_PASIENT_FELTER)
+        ap = ArkivertPasient.objects.filter(arkiv=arkiv).first()
+        ap.grovsortering = 'Rød'
+        ap.save(update_fields=['grovsortering'])
+
+        c = Client()
+        c.force_login(self.admin)
+        resp = c.get(f'/pasienter/api/innstillinger/arkiv/{arkiv.pk}/')
+        self.assertTrue(resp.json()['tamper_detected'])

@@ -4,6 +4,40 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-08-13 — N13 delpunkt 1: én feltliste for arkiv-signaturen
+
+De samme 17 feltnavnene var skrevet ut tre steder: ved arkivering
+(`arkiver_aktiv_vakt`), ved statistikk (`_arkiv_pasienter_dicts`) og ved
+integritetsverifikasjon (`arkiv_detalj_view`). Ble ett av stedene glemt når et felt kom
+til, beregnet verifikasjonen SHA-256 over et annet feltsett enn arkiveringen gjorde — og
+arkivet meldte «tukling» uten at noe var rørt. En falsk integritetsalarm på GDPR-arkivet
+er verre enn en ekte feil, fordi den undergraver tilliten til hele mekanismen.
+
+Nå ligger `ARKIVERT_PASIENT_FELTER` i `patients/services.py`, og alle tre stedene går via
+`_arkiv_pasienter_dicts()`.
+
+**Lista er frosset med vilje, ikke utledet fra modellen.** Den nærliggende løsningen — å
+utlede feltene fra `ArkivertPasient._meta`, slik N2 gjorde for audit-lista — ville vært
+aktivt skadelig her: signaturen lagres på `VaktArkiv.sha256` ved arkivering, så et nytt
+felt ville endret signaturen for *alle eksisterende* arkiver samtidig og fått hvert eneste
+av dem til å melde tukling. Nøyaktig den feilmoden punktet skulle forhindre.
+
+I stedet: eksplisitt tuple, `ARKIVERT_PASIENT_FELTER_UNNTATT` for `id`/`arkiv`, og
+`ArkivFeltlisteTests` som feiler hvis modellen og lista kommer i utakt. Testen tvinger
+fram et bevisst valg — «med i signaturen» eller «unntatt» — i stedet for at et nytt felt
+havner utenfor stilltiende. Feilmeldingen sier eksplisitt at gamle arkiver får en signatur
+som ikke lenger kan reproduseres hvis lista utvides.
+
+Fire nye tester, verifisert ved å fjerne `journal` fra konstanten midlertidig og bekrefte
+at vakten peker på riktig felt. Hele suiten: 672 grønne.
+
+Delpunkt 2 (navneliste-fabrikk for de fire førstehjelper/helsepersonell-viewene) og 3
+(splitting av `views.py`) står igjen som ren opprydding.
+
+Ingen databaseendringer, ingen endring i beregnet signatur for eksisterende arkiver.
+
+---
+
 ## 2026-08-13 — N6: escaping i statistikk-tabellene
 
 Statistikkfanen bygde HTML-strenger og satte dem inn med `innerHTML` uten å escape

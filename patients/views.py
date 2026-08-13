@@ -716,7 +716,7 @@ def arkiv_detalj_view(request, pk):
     GET: Returnerer full statistikk + metadata + SHA-256-verifikasjon.
     DELETE: Krever admin og {confirm: true} i body.
     """
-    from .models import VaktArkiv, ArkivertPasient
+    from .models import VaktArkiv
     import hashlib
     import json as _jmod
 
@@ -742,16 +742,10 @@ def arkiv_detalj_view(request, pk):
                 arkiv.aggregat_sha256 and sha_now != arkiv.aggregat_sha256
             )
         else:
-            from .services import _compute_sha256_for_arkiv
-            pasienter_dicts = list(
-                ArkivertPasient.objects.filter(arkiv=arkiv).values(
-                    'pasientnummer', 'problemstilling', 'arsak', 'transport',
-                    'grovsortering', 'plassering', 'inntid', 'pabegynt',
-                    'inn_obspost', 'ut_obspost', 'utskrevet', 'utskrevet_til',
-                    'forstehjelper_navn', 'helsepersonell_navn', 'lege', 'medisiner', 'journal',
-                )
-            )
-            sha_now = _compute_sha256_for_arkiv(arkiv, pasienter_dicts)
+            # Samme helper som arkiveringen brukte — verifikasjonen må lese
+            # nøyaktig de feltene signaturen ble beregnet over.
+            from .services import _compute_sha256_for_arkiv, _arkiv_pasienter_dicts
+            sha_now = _compute_sha256_for_arkiv(arkiv, _arkiv_pasienter_dicts(arkiv))
             tamper_detected = bool(arkiv.sha256 and sha_now != arkiv.sha256)
 
         return JsonResponse({

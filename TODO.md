@@ -52,6 +52,14 @@ dokumentasjon.
 - [x] **N5** `current_local_year()` brukes begge steder — nyttårsvakter havner i riktig år
 - [x] **N7** Delt Redis-klient per prosess (var én TCP-handshake per request)
 - [x] **N8** Audit-signalet skriver med `bulk_create` — konstant antall spørringer
+- [ ] **N13** Duplisert kode i `views.py`/`services.py` — delvis
+  - [x] Feltlista: `ARKIVERT_PASIENT_FELTER` brukes alle tre stedene. Frosset med vilje,
+        *ikke* utledet fra modellen — utledning ville fått alle eksisterende arkiver til å
+        melde falsk «tukling». `ArkivFeltlisteTests` vokter utakt mot modellen.
+  - [ ] Generisk `_navneliste_view(model, label)` for de fire
+        førstehjelper/helsepersonell-viewene
+  - [ ] Vurder å splitte `views.py` (815 linjer) — gjør det når fila neste gang skal
+        endres substansielt
 - [x] **N6** Statistikk-tabellene escaper feltverdier (`escHtmlValue()`), og markup koden
       bygger selv må merkes med `trustedHtml()`. Personell-listene escaper også navn —
       fritekst uten whitelist, ikke nevnt i punktet. `import_offline_data` validerer nå mot

@@ -32,7 +32,7 @@ Status: ⏳ pending · 🔧 påbegynt · ✅ ferdig · ⚪ ikke aktuell
 | N10 | Sesjonsinvalidering dekoder hele sesjonstabellen ved hver innlogging | ✅ | Middels | 2–3 t | Ytelse |
 | N11 | Dokumentasjonsdrift: `CLAUDE.md` beskriver ting koden ikke gjør | ⏳ | Lav–Middels | 30 min | Dokumentasjon |
 | N12 | `GET /api/settings/` eksponerer hele `AppSetting`-tabellen | ⏳ | Lav | 30 min | Dybdeforsvar |
-| N13 | Duplisert kode i `views.py` og `services.py` (ETag-blokk, feltlister) | ⏳ | Lav | 3–4 t | Vedlikehold |
+| N13 | Duplisert kode i `views.py` og `services.py` (ETag-blokk, feltlister) | 🟡 | Lav | 3–4 t | Vedlikehold |
 
 ### Sikkerhetsgjennomgang (eget pass)
 
@@ -755,7 +755,11 @@ eksplisitt legger den til i whitelisten.
 
 ---
 
-## N13. Duplisert kode i `views.py` og `services.py`
+## N13. Duplisert kode i `views.py` og `services.py` &nbsp;—&nbsp; 🟡 DELVIS (13. aug. 2026)
+
+**Status:** Delpunkt 1 (feltlista) er gjennomført — det var det eneste som kunne gi feil
+oppførsel. Delpunkt 2 (navneliste-fabrikk) og 3 (splitting av `views.py`) står igjen som
+ren opprydding, uten hast.
 
 **Verdi:** Lav &nbsp;|&nbsp; **Innsats:** 3–4 t &nbsp;|&nbsp; **Type:** Vedlikehold
 
@@ -778,9 +782,21 @@ eksplisitt legger den til i whitelisten.
 
 **Tiltak:**
 
-1. Trekk feltlista ut som `ARKIVERT_PASIENT_FELTER` i `patients/services.py` og bruk den
-   alle tre stedene. **Dette punktet alene er verdt tiden** — det er det eneste som kan gi
-   feil oppførsel.
+1. ~~Trekk feltlista ut som `ARKIVERT_PASIENT_FELTER` i `patients/services.py` og bruk den
+   alle tre stedene.~~ ✅ **GJENNOMFØRT 13. aug. 2026.** Konstanten ligger i
+   `patients/services.py`, og alle tre stedene går nå via `_arkiv_pasienter_dicts()`.
+
+   **Viktig presisering til tiltaket:** lista må være *frosset*, ikke utledet fra modellen.
+   Den nærliggende løsningen — å utlede feltene fra `ArkivertPasient._meta`, slik N2 gjorde
+   for audit-lista — ville vært aktivt skadelig her. Signaturen beregnes over feltsettet og
+   lagres på `VaktArkiv.sha256` ved arkivering; utledet man lista, ville et nytt felt endret
+   signaturen for *alle eksisterende* arkiver samtidig, og hvert eneste av dem meldt
+   «tukling» uten at noe var rørt. Nøyaktig den feilmoden punktet skulle forhindre.
+
+   Løsningen er derfor en eksplisitt tuple pluss `ARKIVERT_PASIENT_FELTER_UNNTATT` for
+   `id`/`arkiv`, og `ArkivFeltlisteTests` som feiler hvis modellen og lista kommer i utakt.
+   Testen tvinger fram et bevisst valg — «med i signaturen» eller «unntatt» — i stedet for
+   at et nytt felt havner utenfor stilltiende. Samme idé som N2, motsatt mekanikk.
 2. Lag en generisk `_navneliste_view(model, label)`-fabrikk for de fire
    førstehjelper/helsepersonell-viewene.
 3. Vurder å splitte `views.py` i `views_patients.py`, `views_registre.py`, `views_arkiv.py`

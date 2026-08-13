@@ -713,6 +713,35 @@ import hashlib
 import json as _json_mod
 
 
+#: Feltene på ``ArkivertPasient`` som inngår i SHA-256-signaturen, og dermed i
+#: integritetssjekken av et arkiv.
+#:
+#: **Lista er frosset med vilje, og skal ikke utledes fra modellen.** Signaturen
+#: beregnes over nøyaktig disse feltene og lagres på ``VaktArkiv.sha256`` ved
+#: arkivering. Utledet man lista fra modellen, ville et nytt felt på
+#: ``ArkivertPasient`` endre signaturen for *alle eksisterende* arkiver med én
+#: gang — og hvert eneste av dem ville meldt «tukling» uten at noe var rørt.
+#: Det er stikk motsatt av hva integritetssjekken skal gjøre.
+#:
+#: Skal et felt legges til her, må konsekvensen tas bevisst: gamle arkiver får
+#: en signatur som ikke lenger kan reproduseres, og må enten re-baselines eller
+#: aksepteres som uverifiserbare.
+#:
+#: ``ArkivFeltlisteTests`` feiler hvis modellen og denne lista kommer i utakt,
+#: slik at valget må tas eksplisitt i stedet for å skje stilltiende.
+ARKIVERT_PASIENT_FELTER = (
+    'pasientnummer', 'problemstilling', 'arsak', 'transport',
+    'grovsortering', 'plassering', 'inntid', 'pabegynt',
+    'inn_obspost', 'ut_obspost', 'utskrevet', 'utskrevet_til',
+    'forstehjelper_navn', 'helsepersonell_navn', 'lege', 'medisiner', 'journal',
+)
+
+#: Felt på ``ArkivertPasient`` som bevisst står utenfor signaturen.
+#: ``id`` og ``arkiv`` er lagringsmekanikk, ikke arkivinnhold — de sier
+#: ingenting om pasientdataene som er arkivert.
+ARKIVERT_PASIENT_FELTER_UNNTATT = ('id', 'arkiv')
+
+
 def _compute_sha256_for_arkiv(arkiv, pasienter_dicts):
     """Beregn SHA-256 over kanonisk JSON av arkivdata."""
     payload = {
@@ -783,15 +812,7 @@ def arkiver_aktiv_vakt(arrangement_navn, notat, user):
         ArkivertPasient.objects.bulk_create(arkivert_rader)
 
         # Beregn SHA-256 etter at radene er opprettet
-        pasienter_dicts = list(
-            ArkivertPasient.objects.filter(arkiv=arkiv).values(
-                'pasientnummer', 'problemstilling', 'arsak', 'transport',
-                'grovsortering', 'plassering', 'inntid', 'pabegynt',
-                'inn_obspost', 'ut_obspost', 'utskrevet', 'utskrevet_til',
-                'forstehjelper_navn', 'helsepersonell_navn', 'lege', 'medisiner', 'journal',
-            )
-        )
-        sha = _compute_sha256_for_arkiv(arkiv, pasienter_dicts)
+        sha = _compute_sha256_for_arkiv(arkiv, _arkiv_pasienter_dicts(arkiv))
         arkiv.sha256 = sha
         arkiv.save(update_fields=['sha256'])
 
@@ -799,14 +820,14 @@ def arkiver_aktiv_vakt(arrangement_navn, notat, user):
 
 
 def _arkiv_pasienter_dicts(arkiv):
-    """Hent alle arkiverte pasienter som dicts — felles helper for stats-funksjoner."""
+    """Hent alle arkiverte pasienter som dicts.
+
+    Felles kilde for både statistikk og SHA-256-beregning. At de to bruker
+    nøyaktig samme feltliste er hele poenget: signaturen skal dekke det som
+    faktisk arkiveres.
+    """
     return list(
-        ArkivertPasient.objects.filter(arkiv=arkiv).values(
-            'pasientnummer', 'problemstilling', 'arsak', 'transport',
-            'grovsortering', 'plassering', 'inntid', 'pabegynt',
-            'inn_obspost', 'ut_obspost', 'utskrevet', 'utskrevet_til',
-            'forstehjelper_navn', 'helsepersonell_navn', 'lege', 'medisiner', 'journal',
-        )
+        ArkivertPasient.objects.filter(arkiv=arkiv).values(*ARKIVERT_PASIENT_FELTER)
     )
 
 
