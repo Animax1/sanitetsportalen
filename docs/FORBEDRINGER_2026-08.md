@@ -26,10 +26,10 @@ Status: ⏳ pending · 🔧 påbegynt · ✅ ferdig · ⚪ ikke aktuell
 | N4 | **MFA-steget deler én rate-limit-bøtte — kan låse ute hele vakten** | ✅ | Høy | 1–2 t | Drift / sikkerhet |
 | N5 | `get_active_year()` og `Patient.save()` bruker container-tid | ✅ | Middels–Høy | 30 min | Korrekthet |
 | N6 | Statistikk-tabellene setter inn feltverdier uescapet i `innerHTML` | ⏳ | Middels | 2 t | Sikkerhet (dybdeforsvar) |
-| N7 | Redis-klienten bygges på nytt for hver eneste request | ✅ | Middels | 1 t | Ytelse |
-| N8 | Audit-signalet gjør N+1 skrivinger per pasientendring | ✅ | Middels | 1–2 t | Ytelse |
+| N7 | Redis-klienten bygges på nytt for hver eneste request | ⏳ | Middels | 1 t | Ytelse |
+| N8 | Audit-signalet gjør N+1 skrivinger per pasientendring | ⏳ | Middels | 1–2 t | Ytelse |
 | N9 | Tre tester verifiserer dobbeltklikk-fixen i **død** JS-fil | ⏳ | Middels | 30 min | Testkvalitet |
-| N10 | Sesjonsinvalidering dekoder hele sesjonstabellen ved hver innlogging | ✅ | Middels | 2–3 t | Ytelse |
+| N10 | Sesjonsinvalidering dekoder hele sesjonstabellen ved hver innlogging | ⏳ | Middels | 2–3 t | Ytelse |
 | N11 | Dokumentasjonsdrift: `CLAUDE.md` beskriver ting koden ikke gjør | ⏳ | Lav–Middels | 30 min | Dokumentasjon |
 | N12 | `GET /api/settings/` eksponerer hele `AppSetting`-tabellen | ⏳ | Lav | 30 min | Dybdeforsvar |
 | N13 | Duplisert kode i `views.py` og `services.py` (ETag-blokk, feltlister) | ⏳ | Lav | 3–4 t | Vedlikehold |
@@ -438,17 +438,7 @@ lagt inn direkte i databasen vises som tekst i statistikkfanen, ikke som kjøren
 
 ---
 
-## N7. Redis-klienten bygges på nytt for hver eneste request &nbsp;—&nbsp; ✅ GJENNOMFØRT (13. aug. 2026)
-
-**Status:** Løst som foreslått. `_get_shared_redis_client()` med dobbeltsjekket låsing i
-`patients/middleware.py`; `_MetricsStore._get_redis_client()` delegerer dit, slik at de
-eksisterende testene som patcher metoden fortsatt virker uendret. All try/except er beholdt
-— en død Redis degraderer fortsatt til lokal deque.
-
-`_reset_shared_redis_client()` finnes for tester som må tvinge fram en ny klient, siden
-modul-globalen overlever mellom testmetoder.
-
-Testet strukturelt og ikke i sekunder: 50 oppslag gir nøyaktig ett `from_url`-kall.
+## N7. Redis-klienten bygges på nytt for hver eneste request
 
 **Verdi:** Middels &nbsp;|&nbsp; **Innsats:** 1 t &nbsp;|&nbsp; **Type:** Ytelse
 
@@ -503,16 +493,7 @@ last, ikke proporsjonalt med antall requests.
 
 ---
 
-## N8. Audit-signalet gjør N+1 skrivinger per pasientendring &nbsp;—&nbsp; ✅ GJENNOMFØRT (13. aug. 2026)
-
-**Status:** Løst med `bulk_create`. `app_label` settes eksplisitt via
-`audit.signals.utled_app_label()`, siden `bulk_create` hopper over `pre_save`-signalet som
-ellers fyller feltet — uten det ville radene vist seg som «Ukjent» i modulfilteret.
-
-Verifisert med `CaptureQueriesContext`: én PUT som endrer tre felter gir én INSERT mot
-`audit_auditlog`, samme som når den endrer ett. SELECT-en for forrige tilstand er beholdt —
-den kan ikke unngås uten større omskriving, og den er billig; det var skrivingene som var
-problemet.
+## N8. Audit-signalet gjør N+1 skrivinger per pasientendring
 
 **Verdi:** Middels &nbsp;|&nbsp; **Innsats:** 1–2 t &nbsp;|&nbsp; **Type:** Ytelse
 
@@ -582,32 +563,7 @@ rød.
 
 ---
 
-## N10. Sesjonsinvalidering dekoder hele sesjonstabellen &nbsp;—&nbsp; ✅ GJENNOMFØRT (13. aug. 2026)
-
-**Status:** Løst med en variant av alternativ B, ikke A.
-
-**Hvorfor ikke A:** forslaget om å droppe kallet ved ordinær innlogging beskrev det som «en
-policy-avgjørelse, ikke en sikkerhetsnødvendighet». Men policyen er reell og bevisst:
-portalen har én-sesjon-per-bruker, og `SingleSessionTests` i `accounts/tests.py` vokter den
-eksplisitt. Å droppe kallet ville stille endret produktoppførsel — en bruker kunne vært
-innlogget på mobil og laptop samtidig — under dekke av en ytelsesforbedring. Det er ikke
-vår beslutning å ta i en opprydding.
-
-**Hva som ble gjort i stedet:** `CustomUser.current_session_key` (ett nullbart felt, ingen
-ny tabell — som svarer på innvendingen mot B om foreldreløse rader). Ved innlogging slettes
-den registrerte forrige sesjonen med ett indeksert oppslag.
-
-Feltet er en cache av policyen, ikke fasit for hvilke sesjoner som finnes. Derfor beholder
-de **sikkerhetskritiske** stiene den fullstendige gjennomgangen: passordbytte, admin-reset,
-frys og sletting. Der er det å garantere at ingen sesjon overlever hele poenget, og
-operasjonene er sjeldne nok til at kostnaden er irrelevant. En test verifiserer at
-passordbytte fjerner også en sesjon som ikke var registrert.
-
-Verifisert: antall spørringer ved innlogging er identisk med 0 og med 30 fremmede sesjoner
-i tabellen.
-
-`patients/admin_status.py` har fortsatt samme mønster, men det er et admin-verktøy som
-kjøres sjelden — akseptabelt, som opprinnelig vurdert.
+## N10. Sesjonsinvalidering dekoder hele sesjonstabellen
 
 **Verdi:** Middels &nbsp;|&nbsp; **Innsats:** 2–3 t &nbsp;|&nbsp; **Type:** Ytelse
 

@@ -4,52 +4,53 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
-## 2026-08-13 — Ytelse: N7, N8, N10
+## 2026-08-13 — HENDELSE: produksjon nede ~30 min. Ytelses-commiten rullet tilbake
 
-Tre steder der kostnaden lå i requestens kritiske vei.
+**Symptom:** 502 på portalen. Railway crash-loopet release-kommandoen, med nytt forsøk
+hvert par sekund fra 09:42:50 UTC.
 
-**Redis-klienten ble bygget på nytt for hver request (N7).**
-`_MetricsStore._get_redis_client()` kalte `redis.Redis.from_url()` ved hvert kall, og den
-lager en ny `ConnectionPool` hver gang — verken pool eller TCP-forbindelse ble gjenbrukt.
-`_record_to_redis()` kalles for hver eneste request i vakt-modus, så vi betalte en
-TCP-handshake per request for å skrive én metrikk-linje. I koden som finnes for å måle
-ytelse.
+**Rotårsak:**
 
-Nå én delt klient per prosess med dobbeltsjekket låsing. `redis.Redis`-instanser er
-trådtrygge og har egen intern pool, så det er riktig mønster. Metoden er beholdt som
-delegat, slik at de eksisterende testene som patcher den virker uendret.
+```
+django.db.utils.ProgrammingError:
+relation "audit_audit_created_a3c1b8_idx" does not exist
+```
 
-**Audit-signalet gjorde én INSERT per endret felt (N8).** En typisk PUT der behandler
-settes utløser samtidig `pabegynt`-stempling og plasseringsendring — 1 SELECT + 3 INSERT +
-selve UPDATE for én brukerhandling. Nå samles radene og skrives med `bulk_create`.
-`app_label` settes eksplisitt, siden `bulk_create` hopper over `pre_save`-signalet som
-ellers fyller feltet; uten det ville radene vist seg som «Ukjent» i modulfilteret.
-Verifisert med `CaptureQueriesContext`: tre endrede felt gir én INSERT.
+`audit/0004` forsøkte å døpe om en indeks som ikke finnes i produksjonsdatabasen. Django
+trodde den fantes fordi `audit/0002` står registrert som anvendt og er migrasjonen som ga
+indeksen det navnet — men den fysiske indeksen i Postgres heter noe annet. Djangos
+migrasjonshistorikk og databasen har vært ute av takt hele tiden. Advarselen «*models in
+app(s) 'accounts', 'audit' have changes that are not yet reflected*», som står i samtlige
+deploy-logger langt tilbake, var symptomet på nettopp det.
 
-**Sesjonsinvalidering dekodet hele sesjonstabellen ved hver innlogging (N10).**
-`get_decoded()` er signaturverifisering og JSON-parsing per rad, og kallet lå i
-innloggingsstien — de ti minuttene ved vaktstart der alle logger på samtidig.
+Release-kommandoen avbrøt ved første feilende migrasjon, så `accounts/0008` ble aldri
+forsøkt. **Ingen av de to migrasjonene ble anvendt** — databaseskjemaet er uendret.
 
-**Her fulgte vi ikke backloggens anbefaling.** Alternativ A var å droppe kallet ved ordinær
-innlogging, beskrevet som «en policy-avgjørelse, ikke en sikkerhetsnødvendighet». Men
-policyen er reell og bevisst: portalen har én-sesjon-per-bruker, og `SingleSessionTests`
-vokter den eksplisitt. Å droppe kallet ville stille endret produktoppførsel — innlogget på
-mobil og laptop samtidig — under dekke av en ytelsesforbedring.
+**Hvorfor det skjedde:** `audit/0004` var ikke en del av ytelsesarbeidet. Den ble generert
+på eget initiativ som opprydding av et kosmetisk avvik, og lagt inn i samme deploy. Det
+gjorde en uetterspurt skjemaendring til en del av en leveranse — på nettopp den tabellen
+`FORBEDRINGER.md` #1 dokumenterer at har hatt rotete migrasjonshistorikk før. Selve
+ytelsesarbeidet (N7, N8, N10) er ikke det som brakk noe.
 
-I stedet: `CustomUser.current_session_key`, ett nullbart felt (ingen ny tabell, som svarer
-på innvendingen mot alternativ B om foreldreløse rader). Innlogging sletter forrige sesjon
-med ett indeksert oppslag. Feltet er en cache av policyen, ikke fasit for hvilke sesjoner
-som finnes — derfor beholder passordbytte, admin-reset, frys og sletting den fullstendige
-gjennomgangen, der garantien er hele poenget og operasjonen er sjelden. En test verifiserer
-at passordbytte også fjerner en uregistrert sesjon.
+**Tiltak:** Hele ytelses-commiten `48d861c` er revertert, inkludert `audit/0004`. Koden er
+tilbake på `32f417d`, som deploy-loggen viser at kjørte normalt og registrerte en pasient
+(`POST /pasienter/api/patients/ status=201`) kl. 11:16.
 
-Verifisert: antall spørringer ved innlogging er identisk med 0 og med 30 fremmede sesjoner
-i tabellen.
+N7, N8 og N10 er satt tilbake til ⏳ i backloggen og re-landes som egen, verifisert
+leveranse — uten indeks-migrasjonen.
 
-Migrasjonen tar samtidig med et ventende `is_superuser`-avvik fra Django-oppgradering —
-no-op på databasenivå, men rydder modellstatusen.
+**Indeks-avviket i `audit` lar vi stå.** Indeksen fungerer uansett hva den heter; det er
+kun Djangos bokføring som er skjev. Skal det ryddes, må det gjøres ved å lese det faktiske
+indeksnavnet i Postgres først — ikke ved å la `makemigrations` gjette.
 
-15 nye tester i `patients/tests_ytelse.py`. Full suite: 648 tester, grønn.
+**Lærdom:**
+
+1. Ikke bland uetterspurt skjemarydding inn i en funksjonell leveranse.
+2. `makemigrations` genererer mot Djangos *modellstatus*, ikke mot databasen. Der de to har
+   drevet fra hverandre, produserer den migrasjoner som feiler i prod og går grønt lokalt.
+3. Deploy én pulje av gangen og verifiser i prod før neste. Tre uverifiserte deploys på rad
+   gjorde at feilsøkingen måtte starte med å finne ut hvilken av dem som brakk noe — og to
+   av tre var uskyldige.
 
 ---
 

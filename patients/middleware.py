@@ -121,52 +121,6 @@ def _redis_is_available():
     return backend_name == 'redis'
 
 
-# Delt redis-klient for prosessen (N7). Bygges én gang og gjenbrukes — se
-# _MetricsStore._get_redis_client() for begrunnelsen.
-_redis_client = None
-_redis_client_lock = threading.Lock()
-
-
-def _get_shared_redis_client():
-    """Returner prosessens redis-klient, eller None hvis Redis ikke er satt opp.
-
-    Dobbeltsjekket låsing: den vanlige stien (klienten finnes) tar ingen lås.
-    """
-    global _redis_client
-
-    if _redis_client is not None:
-        return _redis_client
-
-    with _redis_client_lock:
-        # Sjekk på nytt — en annen tråd kan ha rukket det mens vi ventet.
-        if _redis_client is not None:
-            return _redis_client
-
-        url = getattr(settings, 'REDIS_URL', '') or ''
-        if not url:
-            return None
-        try:
-            import redis  # noqa: WPS433
-            _redis_client = redis.Redis.from_url(
-                url, socket_timeout=2, socket_connect_timeout=2,
-            )
-        except Exception:
-            return None
-
-    return _redis_client
-
-
-def _reset_shared_redis_client():
-    """Nullstill den delte klienten. Kun for tester.
-
-    Modul-globalen overlever mellom testmetoder, så en test som mocker
-    REDIS_URL må kunne tvinge fram en ny klient.
-    """
-    global _redis_client
-    with _redis_client_lock:
-        _redis_client = None
-
-
 class _MetricsStore:
     """In-memory ringbuffer for request-metrikker, med valgfri Redis-aggregering.
 
@@ -203,17 +157,7 @@ class _MetricsStore:
                 pass
 
     def _get_redis_client(self):
-        """Hent den delte redis-klienten for prosessen (N7).
-
-        Tidligere kalte denne ``redis.Redis.from_url()`` ved hvert kall. Den
-        lager en **ny ConnectionPool** hver gang, så verken pool eller
-        TCP-forbindelse ble gjenbrukt. Siden ``_record_to_redis()`` kalles for
-        hver eneste request i vakt-modus, betalte vi en TCP-handshake per
-        request for å skrive én metrikk-linje — i koden som finnes for å måle
-        ytelse.
-
-        ``redis.Redis``-instanser er trådtrygge og har egen intern pool, så én
-        per prosess er riktig mønster.
+        """Bygg en raw redis-klient mot REDIS_URL fra settings.
 
         Vi bruker `redis`-biblioteket direkte (som allerede er i requirements
         fordi Django >=4.0 sin RedisCache krever det) i stedet for django-redis,
@@ -221,7 +165,15 @@ class _MetricsStore:
 
         Returnerer None hvis Redis ikke er konfigurert eller pakken mangler.
         """
-        return _get_shared_redis_client()
+        redis_url = getattr(settings, 'REDIS_URL', '') or ''
+        if not redis_url:
+            return None
+        try:
+            import redis  # noqa: WPS433
+            return redis.Redis.from_url(redis_url, socket_timeout=2,
+                                        socket_connect_timeout=2)
+        except Exception:
+            return None
 
     def _record_to_redis(self, sample):
         """Push én metrikk-rad til en delt Redis-liste.

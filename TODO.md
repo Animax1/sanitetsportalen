@@ -49,15 +49,11 @@ dokumentasjon.
         framprovosert 500. Uten dem er varslingen inert (skriver til konsoll)
 - [x] **F2** Var allerede på plass — `purge_old_logs` kjører som Railway Cron Job.
       Gjennomgangens premiss var feil; se rettelse i FORBEDRINGER og S7
-- [ ] **N4** MFA-steget deler én rate-limit-bøtte for alle brukere — kan gi 429 ved vaktstart
-      (`accounts/views.py:141`)
-
 - [x] **N5** `current_local_year()` brukes begge steder — nyttårsvakter havner i riktig år
-- [x] **N7** Delt Redis-klient per prosess (var én TCP-handshake per request)
-- [x] **N8** Audit-signalet skriver med `bulk_create` — konstant antall spørringer
-- [x] **N10** `CustomUser.current_session_key` gjør innlogging til ett indeksert oppslag.
-      Sikkerhetsstiene (passordbytte, admin-reset, frys, sletting) beholder full
-      gjennomgang. **NB: krever migrasjon** — `accounts/0008`
+- [ ] **N7 / N8 / N10** re-landes etter rollback 13. aug. Koden er ferdig og testet
+      (648 tester grønne) — det var `audit/0004` som brakk prod, ikke ytelsesarbeidet.
+      Hent fra `git show 48d861c`, **utelat indeks-migrasjonen**, behold `accounts/0008`.
+      Se hendelsesnotatet øverst i CHANGELOG
 
 ## Ideer / backlog
 
