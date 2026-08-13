@@ -194,8 +194,11 @@ class AccessControlTests(TestCase):
     """Tester for rolle-basert tilgangskontroll."""
 
     def setUp(self):
+        # must_change_password=False eksplisitt: superbrukere arver modellens
+        # default True (S2), og MustChangePasswordMiddleware ville ellers
+        # redirecte hver request i denne testen til passordbytte.
         self.admin = CustomUser.objects.create_superuser(
-            username='a', password='x', role='admin')
+            username='a', password='x', role='admin', must_change_password=False)
         self.lead = CustomUser.objects.create_user(
             username='l', password='x', role='lead', must_change_password=False)
         self.rw = CustomUser.objects.create_user(
@@ -387,7 +390,7 @@ class ResetTests(TestCase):
     def setUp(self):
         set_active_year(2026)
         self.admin = CustomUser.objects.create_superuser(
-            username='a', password='x', role='admin')
+            username='a', password='x', role='admin', must_change_password=False)
         self.lead = CustomUser.objects.create_user(
             username='l', password='x', role='lead', must_change_password=False)
         Patient.objects.create(pasientnummer=1, year=2026)

@@ -38,8 +38,8 @@ Status: ⏳ pending · 🔧 påbegynt · ✅ ferdig · ⚪ ikke aktuell
 
 | # | Tittel | Status | Verdi | Innsats |
 |---|---|---|---|---|
-| S1 | **`/django-admin/` omgår samtlige av appens innloggingssikringer** | 🔧 | Høy | 1–2 t + paritet |
-| S2 | **`create_superuser` setter `must_change_password=False`** | ⏳ | Middels–Høy | 15 min |
+| S1 | **`/django-admin/` omgår samtlige av appens innloggingssikringer** | ✅ | Høy | 1–2 t + paritet |
+| S2 | **`create_superuser` setter `must_change_password=False`** | ✅ | Middels–Høy | 15 min |
 | S3 | Rate-limiting finnes kun på innlogging | ⏳ | Middels | 2 t |
 | S4 | Lagret open redirect i varsel-visningen | ⏳ | Lav–Middels | 15 min |
 | S5 | Utlogging skjer via GET | ⏳ | Lav | 30 min |
@@ -64,10 +64,11 @@ Status: ⏳ pending · 🔧 påbegynt · ✅ ferdig · ⚪ ikke aktuell
 andre sikkerhetsarbeidet i appen. Deretter N1 → N2 → N3 → N4, som alle er små og har
 konkret risiko knyttet til seg. N5 bør tas før nyttår (se begrunnelsen).
 
-**Status 13. august 2026:** S1 er påbegynt, men blokkert av et paritetskrav som ikke var
-kjent da lista ble skrevet: portalens egen brukeradministrasjon manglet funksjonalitet som
-kun fantes i Django admin. Opprettelse, MFA-toggle, frys/tø og sletting er nå på plass —
-se avsnittet «Forutsetning: paritet» under S1 for hva som gjenstår.
+**Status 13. august 2026:** **S1 og S2 er gjennomført.** S1 viste seg å ha et paritetskrav
+som ikke var kjent da lista ble skrevet — portalens egen brukeradministrasjon manglet
+funksjonalitet som kun fantes i Django admin, og hadde i tillegg en 500-feil. Alt er nå
+lukket, inkludert URL-konsolideringen. Neste ut er **N1 → S4 → N4 → S6 → S5**, som alle
+ligger i `accounts/views.py`.
 
 ---
 
@@ -640,7 +641,21 @@ Eget pass over autentisering, autorisasjon, endepunktdekning og de administrativ
 flatene. N1 (åpen redirect), N4 (MFA-rate-limit) og N6 (uescapet `innerHTML`) hører
 tematisk hjemme her, men er beskrevet i Del 1.
 
-## S1. `/django-admin/` omgår samtlige av appens innloggingssikringer
+## S1. `/django-admin/` omgår samtlige av appens innloggingssikringer &nbsp;—&nbsp; ✅ GJENNOMFØRT (13. aug. 2026)
+
+**Status:** Løst med alternativ 1. `admin.site.urls` monteres nå kun bak
+`if settings.DEBUG or settings.OFFLINE_MODE` (`myproject/urls.py`), så flaten finnes ikke
+i produksjon. `/django-admin/` er også fjernet fra
+`MustChangePasswordMiddleware.ALLOWED_PATHS` og fra begge nav-malene.
+
+Paritetsarbeidet som måtte til først: brukeradministrasjonen fikk rettet en 500-feil ved
+opprettelse, MFA-toggle, frys/tø med sesjonssletting og permanent sletting (12.–13. aug.),
+og deretter en global `LoginEvent`-visning på `/portal-admin/innloggingslogg/` og
+`manage.py appsetting` for `AppSetting`. Brukeradmin er flyttet til
+`/portal-admin/brukere/` med 301 fra de gamle stiene.
+
+Verifisert i begge retninger: `DEBUG=False` gir 404 på `/django-admin/` og
+`NoReverseMatch` på `admin:index`; `DEBUG=True` monterer den som før.
 
 **Verdi:** Høy &nbsp;|&nbsp; **Innsats:** 1–2 t
 
@@ -767,7 +782,18 @@ sti-prefiks, slik at en prefiks-basert regel dekker hele den administrative flat
 
 ---
 
-## S2. `create_superuser` setter `must_change_password=False`
+## S2. `create_superuser` setter `must_change_password=False` &nbsp;—&nbsp; ✅ GJENNOMFØRT (13. aug. 2026)
+
+**Status:** Løst. Linjen er fjernet fra `accounts/managers.py`, så superbrukere arver
+modellens `must_change_password=True`. Tatt i samme runde som S1, som forutsatt — uten den
+ville bootstrap-adminen fortsatt kommet inn via `/django-admin/`, som var unntatt kravet.
+
+Tre eksisterende tester feilet da endringen ble gjort, alle fordi de opprettet en
+superbruker og deretter forventet å nå vanlige sider. Det var nettopp beviset på at
+sikringen virker; de setter nå `must_change_password=False` eksplisitt.
+
+**Gjenstår som driftsoppgave:** verifiser at bootstrap-adminen i prod faktisk har byttet
+passord siden opprettelsen. Endringen gjelder kun nye superbrukere.
 
 **Verdi:** Middels–Høy &nbsp;|&nbsp; **Innsats:** 15 min
 

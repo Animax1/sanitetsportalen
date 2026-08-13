@@ -362,7 +362,8 @@ Forventet effekt med Redis aktivt: konsistent rate-limiting på tvers av workers
 | Admin server-status | `https://<din-app>.railway.app/portal-admin/server-status/` |
 | Railway-dashbord | [https://railway.app](https://railway.app) |
 | Railway Volume backups | Railway → Volumes → Browse |
-| Django Admin | `https://<din-app>.railway.app/django-admin/` |
+| Brukeradmin | `https://<din-app>.railway.app/portal-admin/brukere/` |
+| Innloggingslogg | `https://<din-app>.railway.app/portal-admin/innloggingslogg/` |
 | Offline-guide | `OFFLINE_GUIDE.md` i repoet |
 | Deploy-guide | `DEPLOY_GUIDE.md` i repoet |
 

@@ -12,6 +12,8 @@ from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.contrib.sessions.models import Session
 from django.core import signing
+from django.core.paginator import Paginator
+from django.db.models import Q
 from django.shortcuts import render, redirect, get_object_or_404
 from django.utils import timezone
 from django.views.decorators.http import require_http_methods
@@ -487,6 +489,60 @@ def user_list_view(request):
 
     users = CustomUser.objects.all().order_by('username')
     return render(request, 'accounts/user_list.html', {'users': users})
+
+
+@admin_required
+@require_http_methods(['GET'])
+def login_event_list_view(request):
+    """Global, paginert visning av LoginEvent.
+
+    Brukerdetaljsiden viser kun siste 20 hendelser for én bruker. Denne flaten
+    svarer på spørsmålene som går på tvers: «hvem har prøvd å logge inn på denne
+    kontoen», «kom det en serie feilede forsøk fra én IP i natt», «hvem fikk
+    MFA nullstilt forrige uke». Det var funksjonalitet som kun fantes i
+    `/django-admin/`, og som måtte på plass før den flaten kunne fjernes (S1).
+
+    Filtre (GET-parametre): ``q`` (brukernavn eller IP), ``event_type``,
+    ``result`` (ok/fail) og ``date_from`` / ``date_to`` (ISO-dato).
+
+    Merk at ``purge_old_logs`` også sletter LoginEvent etter 730 dager (F2), så
+    denne visningen viser aldri mer enn retensjonsvinduet.
+    """
+    qs = LoginEvent.objects.select_related('user')
+
+    filters = {
+        'q': (request.GET.get('q') or '').strip(),
+        'event_type': (request.GET.get('event_type') or '').strip(),
+        'result': (request.GET.get('result') or '').strip(),
+        'date_from': (request.GET.get('date_from') or '').strip(),
+        'date_to': (request.GET.get('date_to') or '').strip(),
+    }
+
+    if filters['q']:
+        qs = qs.filter(
+            Q(username_attempt__icontains=filters['q'])
+            | Q(ip__icontains=filters['q'])
+        )
+    if filters['event_type']:
+        qs = qs.filter(event_type=filters['event_type'])
+    if filters['result'] == 'ok':
+        qs = qs.filter(success=True)
+    elif filters['result'] == 'fail':
+        qs = qs.filter(success=False)
+    if filters['date_from']:
+        qs = qs.filter(created_at__date__gte=filters['date_from'])
+    if filters['date_to']:
+        qs = qs.filter(created_at__date__lte=filters['date_to'])
+
+    paginator = Paginator(qs.order_by('-created_at'), 50)
+    page_obj = paginator.get_page(request.GET.get('page'))
+
+    return render(request, 'accounts/login_event_list.html', {
+        'page_obj': page_obj,
+        'filters': filters,
+        'event_type_choices': LoginEvent.EVENT_TYPE_CHOICES,
+        'total_count': paginator.count,
+    })
 
 
 @admin_required

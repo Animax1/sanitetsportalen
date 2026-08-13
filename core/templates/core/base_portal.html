@@ -213,7 +213,7 @@
     {% endif %}
   {% endfor %}
   {% if request.user.is_authenticated and request.user.role == 'admin' %}
-    <a href="{% url 'accounts:user_list' %}" {% if '/accounts/users' in request.path %}class="active"{% endif %}>
+    <a href="{% url 'accounts:user_list' %}" {% if '/portal-admin/brukere' in request.path %}class="active"{% endif %}>
       <i class="bi bi-people me-1"></i>Brukere
     </a>
     <a href="{% url 'admin_server_status' %}" {% if '/portal-admin/server-status' in request.path %}class="active"{% endif %}>
@@ -225,12 +225,11 @@
     <a href="{% url 'core:audit_log_list' %}" {% if '/portal-admin/auditlog' in request.path %}class="active"{% endif %}>
       <i class="bi bi-journal-text me-1"></i>Revisjonslogg
     </a>
+    <a href="{% url 'accounts:login_event_list' %}" {% if '/portal-admin/innloggingslogg' in request.path %}class="active"{% endif %}>
+      <i class="bi bi-box-arrow-in-right me-1"></i>Innloggingslogg
+    </a>
     <a href="{% url 'core:backup_admin_overview' %}" {% if '/portal-admin/backup' in request.path %}class="active"{% endif %}>
       <i class="bi bi-cloud-arrow-up me-1"></i>Backup
-    </a>
-    <a href="/django-admin/" target="_blank" rel="noopener">
-      <i class="bi bi-gear me-1"></i>Django-admin
-      <i class="bi bi-box-arrow-up-right" style="font-size:0.7rem;"></i>
     </a>
   {% endif %}
 </nav>

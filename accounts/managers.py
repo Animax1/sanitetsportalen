@@ -24,7 +24,12 @@ class CustomUserManager(BaseUserManager):
         extra_fields.setdefault('is_staff', True)
         extra_fields.setdefault('is_superuser', True)
         extra_fields.setdefault('role', 'admin')
-        extra_fields.setdefault('must_change_password', False)
+        # NB: ingen setdefault på must_change_password. Modellens default er
+        # True, og det er riktig også for superbrukere (S2): create_superuser
+        # brukes kun av `create_admin` og `manage.py createsuperuser`, som begge
+        # er bootstrapping der passordet kommer fra en miljøvariabel eller en
+        # kommandolinje. Tvungent bytte ved første innlogging er nøyaktig det
+        # man vil ha der.
 
         if not extra_fields.get('is_staff'):
             raise ValueError('Superbruker må ha is_staff=True.')

@@ -522,10 +522,19 @@ Alle backup- og restore-operasjoner logges i `AuditLog`.
 | GET/POST | `/accounts/login/` | Innlogging (3-steg) | Anonym |
 | GET | `/accounts/logout/` | Logg ut | Innlogget |
 | GET/POST | `/accounts/change-password/` | Bytt passord | Innlogget |
-| GET | `/accounts/users/` | Liste brukere | `admin` |
-| GET/POST | `/accounts/users/ny/` | Opprett bruker | `admin` |
-| GET/POST | `/accounts/users/<pk>/` | Detaljer og handlinger for bruker | `admin` |
-| GET | `/django-admin/` | Django standard admin | `is_staff=True` |
+| GET | `/portal-admin/brukere/` | Liste brukere | `admin` |
+| GET/POST | `/portal-admin/brukere/ny/` | Opprett bruker | `admin` |
+| GET/POST | `/portal-admin/brukere/<pk>/` | Detaljer og handlinger for bruker | `admin` |
+| POST | `/portal-admin/brukere/<pk>/slett/` | Slett bruker permanent | `admin` |
+| GET | `/portal-admin/innloggingslogg/` | Global LoginEvent-visning | `admin` |
+
+De gamle stiene `/accounts/users/*` svarer med permanent redirect (301) til de nye.
+
+`/django-admin/` er **ikke montert i produksjon** (S1). Django sin innebygde admin er en
+parallell innloggingsflate som omgår rate-limiting, kontosperre, MFA-tvang, tvungent
+passordbytte og `LoginEvent`-logging — alle sikringene ligger på
+`accounts.views.login_view`. Flaten monteres kun når `DEBUG=True` eller `OFFLINE_MODE=True`,
+altså som lokalt utviklerverktøy.
 
 ### 5.11 Admin server-status (observability)
 
@@ -1366,7 +1375,7 @@ python manage.py purge_old_logs --dry-run    # Forhåndsvis uten sletting
 
 ### 13.3 Nullstille MFA for bruker som har mistet telefonen
 
-1. Logg inn som `admin` og naviger til `/accounts/users/`.
+1. Logg inn som `admin` og naviger til `/portal-admin/brukere/`.
 2. Finn brukeren og åpne brukerprofilen.
 3. Klikk **"Nullstill MFA"** (knappen vises kun dersom brukeren har MFA aktivt).
 4. Bekreft dialogen.
@@ -1525,7 +1534,7 @@ Planlagt endring: radene kollapser til frosne aggregater etter 24 måneder, se `
 
 **Symptom:** Bruker kan ikke logge inn fordi de har mistet telefonen eller slettet authenticator-appen.
 
-**Løsning:** Følg prosedyren i seksjon 13.3 (admin nullstiller MFA via `/accounts/users/<pk>/`).
+**Løsning:** Følg prosedyren i seksjon 13.3 (admin nullstiller MFA via `/portal-admin/brukere/<pk>/`).
 
 ### 16.5 "CSRF verification failed"
 

@@ -352,21 +352,24 @@ class PortalDashboardViewTests(TestCase):
         self.assertEqual(resp.status_code, 405)
 
     def test_admin_ser_admin_lenker_i_meny(self):
-        """Admin skal se Server-status og Django-admin i portal-meny."""
+        """Admin skal se de administrative flatene i portal-menyen."""
         admin = User.objects.create_superuser(
             username='superadm', password='x', role='admin',
+            must_change_password=False,
         )
         self.client.force_login(admin)
         resp = self.client.get('/')
         self.assertContains(resp, 'Server-status')
-        self.assertContains(resp, 'Django-admin')
+        self.assertContains(resp, 'Innloggingslogg')
+        # Django-admin er fjernet fra menyen (S1) — flaten finnes ikke i prod
+        self.assertNotContains(resp, 'Django-admin')
 
     def test_read_only_ser_ikke_admin_lenker(self):
         """Vanlig bruker skal IKKE se admin-lenker."""
         self.client.force_login(self.user)
         resp = self.client.get('/')
         self.assertNotContains(resp, 'Server-status')
-        self.assertNotContains(resp, 'Django-admin')
+        self.assertNotContains(resp, 'Innloggingslogg')
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -555,7 +558,7 @@ class AdminNavPortalLenkeTests(TestCase):
 
     def test_brukere_har_dashboard_lenke(self):
         """Brukere-siden bruker base_portal.html og har Dashboard-lenke i portal-nav."""
-        resp = self.client.get('/accounts/users/')
+        resp = self.client.get('/portal-admin/brukere/')
         self.assertEqual(resp.status_code, 200)
         self.assertContains(resp, 'Dashboard')
         self.assertNotContains(resp, '>Pasientliste</a>')

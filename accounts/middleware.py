@@ -9,12 +9,14 @@ class MustChangePasswordMiddleware:
     Tillater kun passordbytte-URL, logg-ut og static-filer.
     """
 
+    # NB: /django-admin/ sto her tidligere og gjorde passordbytte-påbudet
+    # valgfritt for alle med is_staff. Flaten er nå av i produksjon (S1), og
+    # unntaket er fjernet — også lokalt, hvor det bare skjulte problemet.
     ALLOWED_PATHS = (
         '/accounts/change-password/',
         '/accounts/logout/',
         '/accounts/login/',
         '/static/',
-        '/django-admin/',
     )
 
     def __init__(self, get_response):

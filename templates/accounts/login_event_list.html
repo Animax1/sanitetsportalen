@@ -1,0 +1,169 @@
+{% extends "core/base_portal.html" %}
+
+{% block title %}Innloggingslogg – Sanitetsportalen{% endblock %}
+
+{% block extra_head %}
+<style>
+  .filter-card {
+    background: var(--portal-surface);
+    border: 1px solid var(--portal-border);
+    border-radius: 8px;
+    padding: 1rem;
+    margin-bottom: 1rem;
+  }
+  .filter-card label {
+    color: var(--portal-text-muted);
+    font-size: 0.82rem;
+    margin-bottom: 0.25rem;
+  }
+  .event-table { font-size: 0.88rem; }
+  .event-table th {
+    font-weight: 600;
+    font-size: 0.78rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  .event-type-badge {
+    background: var(--portal-surface-2);
+    color: var(--portal-text-muted);
+    padding: 0.1rem 0.45rem;
+    border-radius: 4px;
+    font-size: 0.78rem;
+  }
+  .ua-cell {
+    max-width: 260px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 0.78rem;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<section class="mb-3">
+  <h1 class="mb-1">Innloggingslogg</h1>
+  <p class="text-muted mb-0">
+    {{ total_count|default:0 }} hendelse{{ total_count|pluralize:"r" }}
+    {% if filters.q or filters.event_type or filters.result or filters.date_from or filters.date_to %}
+      matcher filteret.
+    {% else %}
+      totalt.
+    {% endif %}
+  </p>
+</section>
+
+<form method="get" class="filter-card">
+  <div class="row g-2">
+    <div class="col-md-3">
+      <label for="filter-q">Brukernavn eller IP</label>
+      <input type="text" id="filter-q" name="q" class="form-control form-control-sm"
+             value="{{ filters.q }}" placeholder="Fritekst">
+    </div>
+    <div class="col-md-3">
+      <label for="filter-type">Hendelsestype</label>
+      <select id="filter-type" name="event_type" class="form-select form-select-sm">
+        <option value="">Alle</option>
+        {% for verdi, tekst in event_type_choices %}
+          <option value="{{ verdi }}" {% if filters.event_type == verdi %}selected{% endif %}>{{ tekst }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-md-2">
+      <label for="filter-result">Resultat</label>
+      <select id="filter-result" name="result" class="form-select form-select-sm">
+        <option value="">Alle</option>
+        <option value="ok" {% if filters.result == 'ok' %}selected{% endif %}>Vellykket</option>
+        <option value="fail" {% if filters.result == 'fail' %}selected{% endif %}>Feilet</option>
+      </select>
+    </div>
+    <div class="col-md-2">
+      <label for="filter-from">Fra dato</label>
+      <input type="date" id="filter-from" name="date_from" class="form-control form-control-sm"
+             value="{{ filters.date_from }}">
+    </div>
+    <div class="col-md-2">
+      <label for="filter-to">Til dato</label>
+      <input type="date" id="filter-to" name="date_to" class="form-control form-control-sm"
+             value="{{ filters.date_to }}">
+    </div>
+  </div>
+  <div class="mt-2 d-flex gap-2">
+    <button type="submit" class="btn btn-primary btn-sm">
+      <i class="bi bi-funnel me-1"></i>Bruk filter
+    </button>
+    <a href="{% url 'accounts:login_event_list' %}" class="btn btn-outline-light btn-sm">
+      <i class="bi bi-x-lg me-1"></i>Nullstill
+    </a>
+  </div>
+</form>
+
+<div class="table-responsive">
+<table class="table table-hover event-table align-middle">
+  <thead>
+    <tr>
+      <th style="white-space:nowrap;">Tidspunkt</th>
+      <th>Brukernavn</th>
+      <th>Konto</th>
+      <th>Resultat</th>
+      <th>Type</th>
+      <th>IP</th>
+      <th>Klient</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for evt in page_obj.object_list %}
+    <tr>
+      <td style="white-space:nowrap;color:var(--portal-text-muted);">{{ evt.created_at|date:"d.m.Y H:i:s" }}</td>
+      <td><code>{{ evt.username_attempt }}</code></td>
+      <td>
+        {% if evt.user %}
+          <a href="{% url 'accounts:user_detail' evt.user.pk %}">{{ evt.user.username }}</a>
+        {% else %}
+          <span class="text-muted" title="Kontoen finnes ikke lenger, eller brukernavnet traff ingen konto">–</span>
+        {% endif %}
+      </td>
+      <td>
+        {% if evt.success %}
+          <span class="badge bg-success">OK</span>
+        {% else %}
+          <span class="badge bg-danger">Feilet</span>
+        {% endif %}
+      </td>
+      <td><span class="event-type-badge">{{ evt.get_event_type_display }}</span></td>
+      <td style="font-size:0.82rem;color:var(--portal-text-muted);">{{ evt.ip|default:"–" }}</td>
+      <td class="ua-cell text-muted" title="{{ evt.user_agent }}">{{ evt.user_agent|default:"–"|truncatechars:60 }}</td>
+    </tr>
+    {% empty %}
+    <tr><td colspan="7" class="text-center text-muted py-4">Ingen treff for det valgte filteret.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+</div>
+
+{% if page_obj.has_other_pages %}
+<nav class="mt-3">
+  <ul class="pagination pagination-sm justify-content-center">
+    {% if page_obj.has_previous %}
+      <li class="page-item">
+        <a class="page-link" href="?{% for k, v in filters.items %}{% if v %}{{ k }}={{ v }}&{% endif %}{% endfor %}page={{ page_obj.previous_page_number }}">Forrige</a>
+      </li>
+    {% else %}
+      <li class="page-item disabled"><span class="page-link">Forrige</span></li>
+    {% endif %}
+
+    <li class="page-item disabled">
+      <span class="page-link">Side {{ page_obj.number }} av {{ page_obj.paginator.num_pages }}</span>
+    </li>
+
+    {% if page_obj.has_next %}
+      <li class="page-item">
+        <a class="page-link" href="?{% for k, v in filters.items %}{% if v %}{{ k }}={{ v }}&{% endif %}{% endfor %}page={{ page_obj.next_page_number }}">Neste</a>
+      </li>
+    {% else %}
+      <li class="page-item disabled"><span class="page-link">Neste</span></li>
+    {% endif %}
+  </ul>
+</nav>
+{% endif %}
+{% endblock %}

@@ -4,10 +4,12 @@ Hoved-URL-konfigurasjon for Sanitetsportalen.
 Struktur (fra Fase 2):
 - /                  → core (portal-dashboard + legacy-redirects)
 - /pasienter/        → patients-appen (alle gamle /api/... og /admin/server-status/...)
-- /accounts/         → innlogging, passord, brukeradministrasjon
+- /accounts/         → innlogging og passordbytte
+- /portal-admin/     → all administrasjon (brukere, moduler, logger, backup, status)
 - /healthz/          → health-check (ingen auth, brukes av Railway)
-- /django-admin/     → Django sin innebygde admin (kun superbrukere)
+- /django-admin/     → kun i DEBUG/offline, se under
 """
+from django.conf import settings
 from django.contrib import admin
 from django.urls import path, include
 
@@ -20,11 +22,10 @@ urlpatterns = [
     # "Health Check Path"-konfigurasjon skal kunne peke direkte hit.
     path('healthz/', healthz, name='healthz'),
 
-    # Django Admin – kun for superbrukere
-    path('django-admin/', admin.site.urls),
-
-    # Brukerkontoer (innlogging, passord, admin-panel brukere)
-    path('accounts/', include('accounts.urls')),
+    # Kontoer og administrasjon. Modulen mountes på root fordi den betjener
+    # både /accounts/ (innlogging) og /portal-admin/ (brukeradmin) — se
+    # docstringen i accounts/urls.py.
+    path('', include('accounts.urls')),
 
     # Server-status admin (global URL, ingen namespace)
     path('portal-admin/server-status/',                    _admin_status.admin_status_view,      name='admin_server_status'),
@@ -43,3 +44,28 @@ urlpatterns = [
     # Mountet på '' så portal-dashboardet ligger på /.
     path('', include('core.urls')),
 ]
+
+# ── Django admin: kun lokalt og i offline-modus (S1) ─────────────────────────
+#
+# Django sin innebygde admin er en parallell innloggingsflate som omgår alt
+# appen ellers gjør ved innlogging: rate-limiting per brukernavn og IP,
+# kontosperre etter 5 feilede forsøk, MFA-tvang for brukere med mfa_required,
+# tvungent passordbytte og LoginEvent-logging. Alt dette sitter på
+# accounts.views.login_view. django_otp sin OTPMiddleware håndhever ingenting —
+# den setter kun request.user.otp_device.
+#
+# I produksjon finnes det derfor kun én vei inn, og den er sikret. Portalen
+# dekker det admin faktisk trenger:
+#   /portal-admin/brukere/           brukeradministrasjon
+#   /portal-admin/innloggingslogg/   LoginEvent
+#   /portal-admin/auditlog/          AuditLog
+#   /portal-admin/moduler/           ModuleSettings
+#   /portal-admin/backup/            Backup
+#   /portal-admin/server-status/     drift
+# AppSetting redigeres med `python manage.py appsetting` (nødoperasjon).
+#
+# Lokalt (DEBUG) og i offline-modus beholdes flaten som utviklerverktøy. Begge
+# er miljøer uten reell eksponering: offline-modus har hard sperre mot å kjøre
+# på Railway (settings.py).
+if settings.DEBUG or getattr(settings, 'OFFLINE_MODE', False):
+    urlpatterns.insert(1, path('django-admin/', admin.site.urls))

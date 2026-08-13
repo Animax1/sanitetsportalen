@@ -4,6 +4,53 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-08-13 — S1 + S2: én innloggingsflate, all administrasjon under /portal-admin/
+
+**`/django-admin/` er slått av i produksjon.** Django sin innebygde admin var en parallell
+innloggingsflate som omgikk samtlige sikringer appen har på innlogging: rate-limiting per
+brukernavn og IP, kontosperre etter 5 feilede forsøk, MFA-tvang for brukere med
+`mfa_required`, tvungent passordbytte og `LoginEvent`-logging. Alt dette ligger på
+`accounts.views.login_view`; `django_otp` sin `OTPMiddleware` håndhever ingenting, den
+setter kun `request.user.otp_device`. Bak flaten lå `Patient`, `CustomUser`, `AuditLog` og
+`AppSetting`.
+
+`admin.site.urls` monteres nå kun bak `if settings.DEBUG or settings.OFFLINE_MODE`, altså
+som lokalt utviklerverktøy. Begge retninger er verifisert: med `DEBUG=False` gir
+`/django-admin/` 404 og `reverse('admin:index')` kaster `NoReverseMatch`; med `DEBUG=True`
+monteres den som før. `/django-admin/` er også fjernet fra
+`MustChangePasswordMiddleware.ALLOWED_PATHS` — unntaket gjorde passordbytte-påbudet
+valgfritt for alle med `is_staff`.
+
+**`create_superuser` arver `must_change_password=True`** (S2). Modellens default er `True`,
+men manageren overstyrte den til `False`, så bootstrap-adminen — kontoen med mest tilgang,
+opprettet med passord fra en miljøvariabel ved hver deploy — aldri ble bedt om å bytte.
+Tre eksisterende tester feilet på endringen fordi de opprettet en superbruker og forventet
+å nå vanlige sider. Det var beviset på at sikringen virker.
+
+**Paritet før fjerning.** To hull måtte lukkes først:
+
+- **`/portal-admin/innloggingslogg/`** — global, paginert `LoginEvent`-visning med filter på
+  brukernavn/IP, hendelsestype, resultat og datoperiode. Brukerdetaljsiden viser kun siste
+  20 for én bruker og svarer ikke på spørsmål som går på tvers («kom det en serie feilede
+  forsøk fra én IP i natt»).
+- **`python manage.py appsetting`** — `--list`, `--get`, `--set`, `--delete`.
+  `PUT /api/settings/` skriver kun `event_name`, så `active_year`, `next_patient_nr` og
+  feature-flagg hadde ingen annen vei inn enn django-admin. Bevisst en CLI og ikke en
+  UI-flate: verdiene endres sjelden og har konsekvenser for nummerserie og årshåndtering.
+
+**Brukeradmin flyttet til `/portal-admin/brukere/`.** `/accounts/users/*` svarer med 301.
+Begrunnelsen er ikke kosmetisk: `MustChangePasswordMiddleware` matcher stier med
+`startswith`, og framtidige regler (rate-limiting, ekstra rollesjekk) vil naturlig skrives
+på samme form. Lå brukeradministrasjonen igjen under `/accounts/`, ville en regel for
+`/portal-admin/*` stille gått utenom nettopp den flaten som oppretter kontoer og deler ut
+admin-rollen. `accounts/urls.py` mountes derfor på root og fordeler selv mellom
+`/accounts/` (innlogging, utlogging, passordbytte) og `/portal-admin/` (administrasjon).
+URL-*navnene* er uendret, så maler og tester var upåvirket av flyttingen.
+
+25 nye tester i `accounts/tests_admin_flate.py`. Full suite: 583 tester, grønn.
+
+---
+
 ## 2026-08-13 — Brukeradministrasjon i portalen: 500-feil, MFA-toggle, frys og sletting
 
 Forarbeid til **S1** (fjerne `/django-admin/`). Portalens egen brukeradministrasjon på

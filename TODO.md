@@ -23,18 +23,18 @@
 Kodegjennomgang 12. august 2026. Full liste med begrunnelse og tiltak ligger i dokumentet;
 her er kun de fire som bør tas først (alle små, alle med konkret risiko):
 
-- [ ] **S1** `/django-admin/` omgår rate-limiting, kontosperre, MFA-tvang, passordbytte og
-      `LoginEvent`. Slå den av i prod, eller bruk `OTPAdminSite` — `myproject/urls.py:24`
-      **Blokkert av paritetskrav** — portalen må dekke alt django-admin gjør først:
+- [x] **S1** `/django-admin/` er slått av i prod (kun bak `DEBUG`/`OFFLINE_MODE`).
+      Paritetsarbeidet som måtte til først:
   - [x] 500-feil ved opprettelse av bruker uten e-post
-  - [x] «Krev MFA» kan slås av og på fra `/accounts/users/`
+  - [x] «Krev MFA» kan slås av og på fra brukeradmin
   - [x] Frys/tø konto med sesjonssletting
   - [x] Permanent sletting av brukerkonto (sperrer: ikke deg selv, ikke siste admin)
-  - [ ] Global `LoginEvent`-visning i portalen (i dag kun siste 20 per bruker)
-  - [ ] `AppSetting`: kun `event_name` kan redigeres — avklar om `active_year` /
-        `next_patient_nr` trenger en flate eller en management command
-  - [ ] Flytt brukeradmin til `/portal-admin/brukere/` (redirect fra `/accounts/users/`)
-        slik at hele admin-flaten dekkes av ett sti-prefiks. Tas i samme runde som S1
+  - [x] Global `LoginEvent`-visning: `/portal-admin/innloggingslogg/`
+  - [x] `AppSetting` redigeres med `python manage.py appsetting --set NØKKEL VERDI`
+  - [x] Brukeradmin flyttet til `/portal-admin/brukere/`, 301 fra `/accounts/users/`
+- [x] **S2** `create_superuser` arver `must_change_password=True`
+  - [ ] **Driftsoppgave:** verifiser at bootstrap-adminen i prod har byttet passord siden
+        opprettelsen — endringen gjelder kun nye superbrukere
 - [ ] **S2** Fjern `must_change_password=False` fra `create_superuser` — `accounts/managers.py:29`.
       Tas sammen med S1, ellers har den ingen effekt for bootstrap-adminen
 - [ ] **N1** Valider `next`-parameteren ved innlogging (åpen redirect) — `accounts/views.py:162`
