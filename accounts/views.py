@@ -40,20 +40,64 @@ def _get_client_ip(request):
     return request.META.get('REMOTE_ADDR')
 
 
+def _registrer_aktiv_sesjon(user, session_key):
+    """Avslutt brukerens forrige sesjon og registrer den nye (N10).
+
+    Portalen har én-sesjon-per-bruker som policy: logger du inn på en ny enhet,
+    ryker den gamle. Det var tidligere implementert ved å iterere **alle**
+    ikke-utløpte sesjoner og kalle ``get_decoded()`` på hver — signaturverifisering
+    og JSON-parsing per rad. Django har ingen indeks fra bruker til sesjon, så
+    mønsteret er i og for seg det vanlige; problemet var hvor det ble kalt.
+    Kostnaden traff innloggingsstien, altså de ti minuttene ved vaktstart der
+    alle logger på samtidig.
+
+    Nå lagrer vi sesjonsnøkkelen på brukeren, og invalidering blir ett indeksert
+    oppslag. Feltet er en cache av policyen, ikke fasit for hvilke sesjoner som
+    finnes: sesjoner opprettet før dette feltet ble innført er ikke registrert,
+    og de lever til de utløper (maks 8 timer). Derfor beholder de
+    sikkerhetskritiske stiene under den grundige gjennomgangen.
+    """
+    forrige = user.current_session_key
+    if forrige and forrige != session_key:
+        Session.objects.filter(session_key=forrige).delete()
+
+    if forrige != session_key:
+        user.current_session_key = session_key
+        user.save(update_fields=['current_session_key'])
+
+
 def _invalidate_other_sessions(user, current_session_key):
-    """Slett alle aktive sesjoner for brukeren, unntatt nåværende sesjon."""
+    """Slett alle aktive sesjoner for brukeren, unntatt nåværende sesjon.
+
+    Grundig variant: itererer og dekoder alle ikke-utløpte sesjoner. Brukes ved
+    passordbytte, der det å garantere at ingen annen sesjon overlever er selve
+    poenget — og hvor kostnaden er irrelevant fordi operasjonen er sjelden.
+    Innloggingsstien bruker ``_registrer_aktiv_sesjon()`` i stedet.
+    """
     for sess in Session.objects.filter(expire_date__gte=timezone.now()):
         data = sess.get_decoded()
         if str(data.get('_auth_user_id')) == str(user.pk) and sess.session_key != current_session_key:
             sess.delete()
 
+    if user.current_session_key != current_session_key:
+        user.current_session_key = current_session_key
+        user.save(update_fields=['current_session_key'])
+
 
 def _invalidate_all_sessions(user):
-    """Slett alle aktive sesjoner for brukeren (brukes ved admin-reset)."""
+    """Slett alle aktive sesjoner for brukeren (admin-reset, frys, sletting).
+
+    Grundig av samme grunn som over: brukes kun i sikkerhetsoperasjoner der en
+    overlevende sesjon er hele feilmodusen man vil unngå.
+    """
     for sess in Session.objects.filter(expire_date__gte=timezone.now()):
         data = sess.get_decoded()
         if str(data.get('_auth_user_id')) == str(user.pk):
             sess.delete()
+
+    if user.current_session_key:
+        user.current_session_key = None
+        user.save(update_fields=['current_session_key'])
 
 
 def _log_user_admin_action(request, target_user, action, field_name=None, old_value=None, new_value=None):
@@ -154,9 +198,9 @@ def _generate_qr_base64(config_url):
 
 
 def _do_complete_login(request, user, next_url='/'):
-    """Fullfør innlogging: kall login(), invalider andre sesjoner, redirect."""
+    """Fullfør innlogging: kall login(), avslutt forrige sesjon, redirect."""
     login(request, user)
-    _invalidate_other_sessions(request.user, request.session.session_key)
+    _registrer_aktiv_sesjon(request.user, request.session.session_key)
     return redirect(next_url)
 
 
@@ -406,7 +450,7 @@ def _handle_mfa_setup(request, next_url):
                        LoginEvent.EVENT_MFA_SETUP_COMPLETED)
             # Logg inn brukeren
             login(request, user)
-            _invalidate_other_sessions(request.user, request.session.session_key)
+            _registrer_aktiv_sesjon(request.user, request.session.session_key)
             return redirect(next_url)
         else:
             error = 'Feil kode. Prøv igjen – kontroller at klokkene er synkronisert.'
@@ -498,7 +542,7 @@ def _handle_mfa_verify(request, next_url):
             request.session.pop('mfa_verify_user_id', None)
             request.session.pop('mfa_next_url', None)
             login(request, user)
-            _invalidate_other_sessions(request.user, request.session.session_key)
+            _registrer_aktiv_sesjon(request.user, request.session.session_key)
             response = redirect(next_url)
             if trust_device and used_device:
                 # S6: request.is_secure() tar hensyn til SECURE_PROXY_SSL_HEADER

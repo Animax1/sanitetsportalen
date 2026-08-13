@@ -14,8 +14,12 @@ from django.dispatch import receiver
 
 from .models import Patient, Forstehjelper, Helsepersonell
 from audit.models import AuditLog
+from audit.signals import utled_app_label
 from audit.utils import get_current_request
 from core.notifications import notify
+
+# Tabellnavnet som brukes i AuditLog for pasientrader.
+TABELLNAVN = 'patients_patient'
 
 logger = logging.getLogger(__name__)
 
@@ -115,21 +119,36 @@ def patient_pre_save(sender, instance, **kwargs):
 
     user, ip = _get_user_and_ip()
 
+    # N8: samle radene og skriv dem i én INSERT. Tidligere ble det én
+    # INSERT per endret felt. En typisk PUT der behandler settes utløser
+    # samtidig pabegynt-stempling og plasseringsendring — altså 1 SELECT +
+    # 3 INSERT + selve UPDATE for én brukerhandling, i requestens kritiske vei.
+    # Dette er den mest skrivetunge stien i appen under en travel vakt.
+    rader = []
     for field in felt_som_spores():
         old_val = _audit_verdi(old, field)
         new_val = _audit_verdi(instance, field)
-        if old_val != new_val:
-            action = 'DELETE' if field == 'is_active' and new_val == 'False' else 'UPDATE'
-            AuditLog.objects.create(
-                table_name='patients_patient',
-                record_id=instance.pk,
-                action=action,
-                field_name=field,
-                old_value=old_val,
-                new_value=new_val,
-                user=user,
-                ip=ip,
-            )
+        if old_val == new_val:
+            continue
+
+        action = 'DELETE' if field == 'is_active' and new_val == 'False' else 'UPDATE'
+        rader.append(AuditLog(
+            table_name=TABELLNAVN,
+            # bulk_create kjører ikke pre_save, så app_label må settes her.
+            # Uten dette ville radene fått tom app_label og vist seg som
+            # «Ukjent» i modulfilteret i revisjonsloggen.
+            app_label=utled_app_label(TABELLNAVN),
+            record_id=instance.pk,
+            action=action,
+            field_name=field,
+            old_value=old_val,
+            new_value=new_val,
+            user=user,
+            ip=ip,
+        ))
+
+    if rader:
+        AuditLog.objects.bulk_create(rader)
 
 
 @receiver(post_save, sender=Patient)

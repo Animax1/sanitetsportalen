@@ -53,6 +53,11 @@ dokumentasjon.
       (`accounts/views.py:141`)
 
 - [x] **N5** `current_local_year()` brukes begge steder — nyttårsvakter havner i riktig år
+- [x] **N7** Delt Redis-klient per prosess (var én TCP-handshake per request)
+- [x] **N8** Audit-signalet skriver med `bulk_create` — konstant antall spørringer
+- [x] **N10** `CustomUser.current_session_key` gjør innlogging til ett indeksert oppslag.
+      Sikkerhetsstiene (passordbytte, admin-reset, frys, sletting) beholder full
+      gjennomgang. **NB: krever migrasjon** — `accounts/0008`
 
 ## Ideer / backlog
 
