@@ -4,6 +4,36 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-08-13 — To feil funnet ved manuell testing av innloggingsflyten
+
+Begge forhåndseksisterende, begge avdekket fordi `?next=` ble testet manuelt i prod.
+
+**`?next=` har aldri virket.** Skjemaet i `login.html` poster til
+`action="{% url 'accounts:login' %}"`, som ikke tar med query-strengen. Verdien gikk
+dermed tapt i det brukeren trykket «Logg inn», og man havnet alltid på forsiden — også når
+`@login_required` hadde sendt en dit fra en bestemt side. Fikset med et skjult `next`-felt,
+og viewet leser nå fra POST først og query-strengen som fallback. Samme mønster som Django
+sin egen `LoginView`.
+
+Verdt å merke: dette betydde at den åpne redirecten i N1 ikke var utnyttbar i praksis via
+skjemaet — verdien nådde aldri fram til `redirect()`. Valideringen fra N1 er like fullt
+riktig, og er nå det som holder når parameteren faktisk virker.
+
+**Innloggingssiden manglet `@never_cache`.** Uten den kan nettleseren servere en lagret
+kopi av skjemaet, og CSRF-tokenet i den kopien er knyttet til en cookie som er rotert
+siden — både `login()` og `logout()` kaller `rotate_token()`. Resultatet er «CSRF-
+verifisering feilet. Forespørsel avbrutt.» ved innsending, observert på iOS. Django sin
+egen `LoginView` er dekorert på samme måte, av samme grunn.
+
+**Testhullet som slapp begge gjennom:** de eksisterende testene poster direkte til
+`/accounts/login/?next=...` og treffer dermed viewet, ikke nettleserflyten. Ny testklasse
+`NextGjennomSkjemaTests` henter siden, leser feltene ut av HTML-en og poster til skjemaets
+faktiske action med `Client(enforce_csrf_checks=True)` — altså det nettleseren gjør.
+
+5 nye tester. Full suite: 611 tester, grønn.
+
+---
+
 ## 2026-08-13 — Herding av innloggingsflyten: N1, S4, N4, S5, S6
 
 Siste pulje på innloggingsflaten. Med denne er alle sikkerhetspunktene rundt innlogging fra

@@ -8,6 +8,7 @@
 
 Kjør med: python manage.py test accounts.tests_innlogging_herding
 """
+import re
 import time
 
 from django.test import TestCase, Client, override_settings
@@ -70,6 +71,72 @@ class NextParameterTests(TestCase):
     def test_javascript_url_avvises(self):
         resp = self._login_med_next('javascript:alert(1)')
         self.assertEqual(resp['Location'], '/')
+
+
+@override_settings(SECURE_SSL_REDIRECT=False, RATELIMIT_ENABLE=False)
+class NextGjennomSkjemaTests(TestCase):
+    """`next` skal overleve selve innsendingen — den ekte nettleserflyten.
+
+    `NextParameterTests` over poster direkte til `...?next=...` og tester
+    viewet. Nettleseren gjør noe annet: skjemaet poster til `{% url %}`, som
+    ikke har query-strengen med. Uten et skjult next-felt gikk verdien tapt i
+    det brukeren trykket «Logg inn», og man havnet alltid på forsiden.
+    Oppdaget ved manuell testing i prod 13. aug. 2026.
+    """
+
+    def setUp(self):
+        self.client = Client(enforce_csrf_checks=True)
+        self.url = reverse('accounts:login')
+        CustomUser.objects.create_user(
+            username='skjemabruker', password='TestPassord123!',
+            role='read_write', must_change_password=False,
+        )
+
+    def _hent_skjult(self, html, navn):
+        m = re.search(rf'name="{navn}" value="([^"]*)"', html)
+        return m.group(1) if m else None
+
+    def _logg_inn_som_nettleser(self, next_verdi=None):
+        """Etterlikn nettleseren: hent siden, les feltene, post til action."""
+        adresse = f'{self.url}?next={next_verdi}' if next_verdi else self.url
+        html = self.client.get(adresse).content.decode()
+
+        data = {
+            'csrfmiddlewaretoken': self._hent_skjult(html, 'csrfmiddlewaretoken'),
+            'username': 'skjemabruker',
+            'password': 'TestPassord123!',
+        }
+        skjult_next = self._hent_skjult(html, 'next')
+        if skjult_next is not None:
+            data['next'] = skjult_next
+
+        # Merk: poster til self.url uten query — nøyaktig som skjemaets action
+        return self.client.post(self.url, data)
+
+    def test_relativ_next_overlever_innsending(self):
+        resp = self._logg_inn_som_nettleser('/pasienter/')
+        self.assertEqual(resp.status_code, 302)
+        self.assertEqual(resp['Location'], '/pasienter/')
+
+    def test_ekstern_next_avvises_ogsaa_via_skjemaet(self):
+        resp = self._logg_inn_som_nettleser('https://evil.example/')
+        self.assertEqual(resp['Location'], '/')
+
+    def test_uten_next_gaar_til_forsiden(self):
+        resp = self._logg_inn_som_nettleser()
+        self.assertEqual(resp['Location'], '/')
+
+    def test_csrf_flyten_virker_med_haandheving(self):
+        """Client(enforce_csrf_checks=True) — fanger ekte CSRF-regresjoner."""
+        resp = self._logg_inn_som_nettleser('/pasienter/')
+        self.assertNotEqual(resp.status_code, 403)
+
+    def test_innloggingssiden_er_ikke_cachebar(self):
+        """Uten no-cache kan nettleseren servere et skjema med utdatert
+        CSRF-token, som gir 403 ved innsending. Observert i prod på iOS."""
+        resp = self.client.get(self.url)
+        cache_control = resp.get('Cache-Control', '')
+        self.assertIn('no-store', cache_control)
 
 
 @override_settings(SECURE_SSL_REDIRECT=False, RATELIMIT_ENABLE=False)

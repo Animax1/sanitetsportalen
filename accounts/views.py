@@ -16,6 +16,7 @@ from django.core.paginator import Paginator
 from django.db.models import Q
 from django.shortcuts import render, redirect, get_object_or_404
 from django.utils import timezone
+from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_http_methods, require_POST
 from datetime import timedelta
 
@@ -203,8 +204,16 @@ def _registrer_mislykket_forsok(user):
     return False
 
 
+@never_cache
 def login_view(request):
     """Innloggingsview med MFA-støtte, lockout-policy og rate-limiting.
+
+    ``@never_cache`` er ikke pynt: uten den kan nettleseren servere en lagret
+    kopi av innloggingssiden, og CSRF-tokenet i det lagrede skjemaet er da
+    knyttet til en cookie som er rotert siden. Både ``login()`` og ``logout()``
+    kaller ``rotate_token()``, så et gammelt skjema gir «CSRF-verifisering
+    feilet» ved neste innlogging. Django sin egen ``LoginView`` er dekorert på
+    samme måte, av samme grunn.
 
     Rate-limit (N4): grensene håndheves med eksplisitte ``is_ratelimited``-kall
     i hvert steg, ikke med dekoratorer på hele viewet. Grunnen er at MFA-stegene
@@ -234,9 +243,17 @@ def login_view(request):
     if request.user.is_authenticated:
         return redirect('/')
 
-    # N1: valider `next` ett sted — her, der den leses. MFA-stegene arver den
+    # `next` leses fra POST først, deretter fra query-strengen. Skjemaet poster
+    # til `{% url %}`, som ikke tar med query-strengen — uten det skjulte
+    # next-feltet i malen gikk verdien tapt i det brukeren trykket «Logg inn»,
+    # og man havnet alltid på forsiden i stedet for der man skulle. Django sin
+    # egen LoginView bruker samme hidden-field-mønster.
+    #
+    # N1: valider ett sted — her, der den leses. MFA-stegene arver den
     # validerte verdien via sesjonen, så det finnes ingen vei rundt sjekken.
-    next_url = safe_redirect_url(request, request.GET.get('next'))
+    next_url = safe_redirect_url(
+        request, request.POST.get('next') or request.GET.get('next'),
+    )
     ip = _get_client_ip(request)
     user_agent = request.META.get('HTTP_USER_AGENT', '')
 
@@ -319,7 +336,11 @@ def login_view(request):
                     ip=ip, user_agent=user_agent, event_type=LoginEvent.EVENT_LOGIN,
                 )
 
-    return render(request, 'accounts/login.html', {'form': form, 'error': error})
+    return render(request, 'accounts/login.html', {
+        'form': form,
+        'error': error,
+        'next_url': next_url,
+    })
 
 
 def _handle_mfa_setup(request, next_url):

@@ -89,6 +89,13 @@ stamme fra en release før sjekken fantes.
 
 `require_https` følger requesten, så en HTTPS-side ikke kan redirecte til `http://`.
 
+**Oppdatering etter manuell testing samme dag:** `?next=` viste seg å aldri ha virket i
+praksis. Skjemaet poster til `{% url %}` uten query-streng, så verdien gikk tapt ved
+innsending — den nådde aldri `redirect()`. Den åpne redirecten var altså ikke utnyttbar via
+skjemaet, men valideringen er like fullt riktig og er nå det som holder når parameteren
+faktisk virker (skjult `next`-felt lagt inn). Samtidig fikk `login_view` `@never_cache`,
+siden en cachet innloggingsside gir «CSRF-verifisering feilet» når tokenet er rotert.
+
 **Verdi:** Høy &nbsp;|&nbsp; **Innsats:** 1 t &nbsp;|&nbsp; **Type:** Sikkerhet
 
 **Bakgrunn:** `login_view` leser `next` rett fra query-strengen og sender den videre til
