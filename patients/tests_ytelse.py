@@ -189,6 +189,43 @@ class SesjonsinvalideringTests(TestCase):
         self.assertFalse(Session.objects.filter(session_key=nokkel1).exists())
         self.assertTrue(Session.objects.filter(session_key=nokkel2).exists())
 
+    def test_uregistrert_sesjon_ryddes_ved_innlogging(self):
+        """Regresjon fra produksjon 13. aug. 2026.
+
+        En sesjon som fantes før `current_session_key` ble innført, er ikke
+        registrert på brukeren. Tom nøkkel betyr ikke «ingen sesjoner» — den
+        betyr at vi ikke vet. Uten fallback til full gjennomgang forble brukeren
+        innlogget på begge enheter.
+        """
+        # Etterlikn en sesjon fra før feltet fantes: den finnes i tabellen,
+        # men er ikke registrert på brukeren.
+        store = SessionStore()
+        store['_auth_user_id'] = str(self.user.pk)
+        store['_auth_user_backend'] = 'django.contrib.auth.backends.ModelBackend'
+        store['_auth_user_hash'] = self.user.get_session_auth_hash()
+        store.save()
+        gammel = store.session_key
+
+        self.user.current_session_key = None
+        self.user.save(update_fields=['current_session_key'])
+
+        self._logg_inn()
+
+        self.assertFalse(
+            Session.objects.filter(session_key=gammel).exists(),
+            'Uregistrert sesjon overlevde innlogging på ny enhet',
+        )
+
+    def test_fallback_gaar_ikke_ut_over_andre_brukere(self):
+        self._lag_fremmede_sesjoner(3)
+        self.user.current_session_key = None
+        self.user.save(update_fields=['current_session_key'])
+        antall_for = Session.objects.count()
+
+        self._logg_inn()
+
+        self.assertEqual(Session.objects.count(), antall_for + 1)
+
     def test_sesjonsnokkelen_lagres_paa_brukeren(self):
         klient = self._logg_inn()
         self.user.refresh_from_db()

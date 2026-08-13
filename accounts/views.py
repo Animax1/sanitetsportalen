@@ -53,15 +53,26 @@ def _registrer_aktiv_sesjon(user, session_key):
 
     Nå lagrer vi sesjonsnøkkelen på brukeren, og invalidering blir ett indeksert
     oppslag. Feltet er en cache av policyen, ikke fasit for hvilke sesjoner som
-    finnes: sesjoner opprettet før dette feltet ble innført er ikke registrert,
-    og de lever til de utløper (maks 8 timer). Derfor beholder de
-    sikkerhetskritiske stiene under den grundige gjennomgangen.
+    finnes. Derfor beholder de sikkerhetskritiske stiene — passordbytte,
+    admin-reset, frys og sletting — den grundige gjennomgangen.
+
+    **Tom `current_session_key` betyr ikke «ingen sesjoner».** Den betyr at vi
+    ikke *vet* om det finnes noen: brukeren kan ha en sesjon opprettet før feltet
+    ble innført. Skjedde i produksjon 13. august 2026 — en bruker som allerede var
+    innlogget på én enhet forble innlogget der etter å ha logget inn på en annen,
+    fordi det ikke sto noen nøkkel å slette. Derfor faller vi tilbake til den
+    grundige gjennomgangen når feltet er tomt. Det koster ett fullt gjennomløp
+    per bruker, første gang de logger inn etter at feltet ble innført; deretter
+    gjelder den raske stien.
     """
     forrige = user.current_session_key
-    if forrige and forrige != session_key:
-        Session.objects.filter(session_key=forrige).delete()
+
+    if not forrige:
+        _invalidate_other_sessions(user, session_key)
+        return
 
     if forrige != session_key:
+        Session.objects.filter(session_key=forrige).delete()
         user.current_session_key = session_key
         user.save(update_fields=['current_session_key'])
 

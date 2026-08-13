@@ -4,6 +4,35 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-08-13 — Fiks: uregistrerte sesjoner overlevde innlogging på ny enhet
+
+Funnet ved manuell testing i prod. Innlogging på enhet 2 kastet ikke ut enhet 1 —
+én-sesjon-per-bruker-policyen var brutt.
+
+**Årsak:** `current_session_key` ble innført tom for alle brukere. En sesjon opprettet før
+feltet fantes er ikke registrert, så innloggingen fant ingen nøkkel å slette.
+`_registrer_aktiv_sesjon` behandlet tom nøkkel som «ingen sesjoner finnes», mens den i
+virkeligheten betyr «vi vet ikke om det finnes noen».
+
+**Fiks:** Er feltet tomt, faller vi tilbake til den fullstendige gjennomgangen av
+sesjonstabellen. Det koster ett fullt gjennomløp per bruker, første gang de logger inn
+etter at feltet ble innført; deretter gjelder den raske stien og ytelsesgevinsten fra N10
+består.
+
+Passordbytte fjernet sesjonen korrekt hele tiden — den stien har alltid hatt den grundige
+gjennomgangen, og skillet fungerte som designet.
+
+Regresjonstesten ble verifisert ved å reversere fiksen midlertidig og bekrefte at den
+feiler med nøyaktig det observerte symptomet.
+
+**Merk:** Fiksen rydder ikke opp i sesjoner som allerede har overlevd. De forsvinner når de
+utløper (maks 8 timer), ved passordbytte, eller ved at admin dreper dem fra
+`/portal-admin/server-status/`.
+
+Full suite: 650 tester, grønn. Ingen migrasjon.
+
+---
+
 ## 2026-08-13 — Ytelse: N7, N8, N10
 
 Tre steder der kostnaden lå i requestens kritiske vei.
