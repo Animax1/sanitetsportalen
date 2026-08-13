@@ -85,6 +85,12 @@ dokumentasjon.
       `invalidate_stats_cache()` er slettet — ingen kalte den, og TTL er hele mekanismen.
 - [x] **N9** `script.js` slettet, dobbeltklikk-vernet testet ved å kjøre guarden i node.
       Tiltakspunkt 3 besvart: grep-i-JS-tester er ikke nok alene.
+- [x] **F7** Betinget lasting av `patients-stats.js`. Bootstrappen måtte flyttes ut
+      først (ny `patients-app.js`) — å laste stats-fila betinget uten det ville tatt ned
+      appen for `read_only` og `read_write`. read_only laster nå 49 % av admin-bundlen.
+      **Ikke målt:** første-paint på mobil 4G.
+- [ ] **F8** PgBouncer — bevisst utsatt. Kun relevant ved 4+ workers; vi kjører 1–2.
+      Tas opp igjen hvis `WEB_WORKERS` økes.
 - [x] **N13** Duplisert kode i `views.py`/`services.py` — alle tre delpunktene
   - [x] Feltlista: `ARKIVERT_PASIENT_FELTER` brukes alle tre stedene. Frosset med vilje,
         *ikke* utledet fra modellen — utledning ville fått alle eksisterende arkiver til å

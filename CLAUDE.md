@@ -99,14 +99,17 @@ Det finnes **ingen** eksplisitt invalidering — cachen utløper på TTL. De kor
 
 ### Frontend
 
-Fire moduler i `static/js/`, lastet ubetinget av `templates/patients/index.html` (ingen bundler):
+Fem moduler i `static/js/` (ingen bundler). Fire lastes alltid, én betinget (F7):
 
-| Modul | Ansvar |
-|-------|--------|
-| `patients-utils.js` | CSRF-fetch (`apiFetch`), `withSubmitGuard`, escaping, delt tilstand |
-| `patients-table.js` | Tabulator-grid og tavle |
-| `patients-forms.js` | Registrerings- og redigeringsskjema |
-| `patients-stats.js` | Statistikkfanen (Chart.js) og arkivvisning |
+| Modul | Lastes | Ansvar |
+|-------|--------|--------|
+| `patients-utils.js` | alltid | CSRF-fetch (`apiFetch`), `withSubmitGuard`, escaping, delt tilstand |
+| `patients-table.js` | alltid | Tabulator-grid og tavle |
+| `patients-forms.js` | alltid | Registrerings- og redigeringsskjema |
+| `patients-app.js` | alltid | Oppstart (`DOMContentLoaded`), faneskift, auto-refresh, lastere for navneregistrene |
+| `patients-stats.js` | **kun admin/lead/lead_view** | Statistikkfanen (Chart.js), arkiv, admin-handlinger |
+
+**Alt en `read_only`- eller `read_write`-bruker kan nå, må ligge i en alltid-lastet modul.** `read_write` har skrivetilgang uten statistikktilgang — derfor bor f.eks. `saveEventName` i `patients-app.js`. Kall fra alltid-lastet kode til `patients-stats.js` må gå gjennom `_kall('navn')`, som sjekker at funksjonen finnes. `JsModulLastingTests` håndhever dette.
 
 CSRF-sikret fetch-wrapper brukes for alle API-kall. Tabulator for pasientgrid, Chart.js for statistikk.
 

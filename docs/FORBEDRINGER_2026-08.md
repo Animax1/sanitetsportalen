@@ -56,8 +56,8 @@ Status: ⏳ pending · 🔧 påbegynt · ✅ ferdig · ⚪ ikke aktuell
 | F4 | Lasttest-script før stor vakt | #7 | ⏳ | Middels | 3–4 t |
 | F5 | CSP-stramming (fjerne `unsafe-inline`) | #8 | ⏳ | Middels | 2 t |
 | F6 | Statistikk-utvidelse (live-dashbord + utvidet analyse) | #12 | ⏳ | Middels–Høy | 25–35 t |
-| F7 | Frontend bundle-størrelse / lazy loading | #9 | ⏳ | Lav | 4–6 t |
-| F8 | PgBouncer / Postgres connection pooler | #10 | ⏳ | Lav | 2–3 t |
+| F7 | Frontend bundle-størrelse / lazy loading | #9 | ✅ | Lav | 4–6 t |
+| F8 | PgBouncer / Postgres connection pooler | #10 | ⏸ | Lav | 2–3 t |
 | F9 | Kolonne-kryptering for følsomme felter | #14 | ⏳ | Lav | 8–12 t |
 
 **Anbefalt rekkefølge:** **S1 og S2 først** — de henger sammen og undergraver alt det
@@ -1630,9 +1630,48 @@ baseline med 20 brukere på fanen. Cache-hit-ratio > 80 % under aktiv vakt.
 
 ---
 
-## F7. Frontend bundle-størrelse / lazy loading
+## F7. Frontend bundle-størrelse / lazy loading &nbsp;—&nbsp; ✅ GJENNOMFØRT (13. aug. 2026)
 
-*Opprinnelig FORBEDRINGER #9*
+**Status:** Løst, men tiltaket slik det var beskrevet ville tatt ned appen.
+
+**Feil premiss i punktet:** «Last `patients-stats.js` kun for roller som har
+statistikktilgang» forutsetter at fila bare inneholder statistikk. Det gjorde den ikke.
+`DOMContentLoaded`-bootstrappen lå der — `initTable()`, `loadPatients()`,
+`startRefreshInterval()` — sammen med faneskiftet, auto-refresh og lasterne for
+navneregistrene, som `patients-forms.js` er avhengig av for nedtrekkslistene. En
+`read_only`-bruker ville fått en side uten tabell, uten data og uten fungerende faner.
+
+**Løsningen:** bootstrappen er flyttet til en ny `patients-app.js` (5,9 kB) som lastes for
+alle roller. `patients-stats.js` beholder statistikk, arkiv og admin-handlinger, og lastes
+kun for `admin`, `lead` og `lead_view`.
+
+**Rollefellen som ikke er åpenbar:** `read_write` har skrivetilgang uten
+statistikktilgang. Lagre-knappen for arrangementsnavn er `write-only` og dermed synlig for
+den rollen, så `saveEventName` måtte til `patients-app.js`. Samme resonnement flyttet
+`renderForstehjelperAdmin`/`renderHelsepersonellAdmin` motsatt vei: de bygger knapper med
+`onclick` mot toggle/delete-funksjoner som bare finnes i statistikkmodulen, så renderingen
+hører hjemme der. Kall fra alltid-lastet kode til den betingede modulen går nå gjennom
+`_kall('navn')`.
+
+`JsModulLastingTests` håndhever skillet: den leser funksjonsnavnene i `patients-stats.js`
+og feiler hvis en alltid-lastet modul kaller noen av dem direkte. Verifisert ved å sette
+inn et direkte `loadStats()`-kall midlertidig.
+
+**Måling:**
+
+| | Bytes |
+|---|---|
+| Alltid lastet (utils + table + forms + app) | 41 161 |
+| `patients-stats.js` | 41 516 |
+| Admin-bundle | 82 677 |
+
+En `read_only`-bruker laster **49 %** av admin-bundlen — akseptansekriteriet var < 50 %.
+
+**Ikke verifisert:** «Første-paint på mobil 4G < 1,5 s». Det krever måling på enhet og er
+ikke gjort. Halvert nedlasting er en forutsetning, ikke et bevis.
+
+**Ikke gjort:** dynamisk `import()`. Betinget lasting per rolle gir mesteparten av
+gevinsten uten å innføre modulsystem i en kodebase uten bundler.
 
 **Verdi:** Lav &nbsp;|&nbsp; **Innsats:** 4–6 timer
 
@@ -1663,9 +1702,22 @@ av admin-bundlen.
 
 ---
 
-## F8. PgBouncer / Postgres connection pooler
+## F8. PgBouncer / Postgres connection pooler &nbsp;—&nbsp; ⏸ BEVISST UTSATT (13. aug. 2026)
 
 *Opprinnelig FORBEDRINGER #10*
+
+**Status:** Vurdert og lagt bort, ikke glemt.
+
+Punktet sier selv «Kun relevant ved 4+ workers. Ikke prioriter før vi faktisk skalerer.»
+Driftsmodusen er 1 worker mellom vakter og 2 under vakt (`docs/RUNBOOK_VAKT.md` §1b),
+altså maks 8 samtidige forbindelser mot Railway Hobby Postgres' ~100. `conn_max_age=600`
+demper det ytterligere.
+
+Selve tiltaket er dessuten i hovedsak en Railway-operasjon — legge til en
+pooler-tjeneste — ikke en kodeendring. Akseptansekriteriet («≤ 4 forbindelser ved 16
+inngående requests») kan heller ikke verifiseres fra kodebasen.
+
+Tas opp igjen hvis `WEB_WORKERS` settes til 4 eller mer.
 
 **Verdi:** Lav &nbsp;|&nbsp; **Innsats:** 2–3 timer
 

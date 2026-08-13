@@ -1180,14 +1180,17 @@ Rekkefølgen i `MIDDLEWARE`-listen i `settings.py` er kritisk. Under vises rekke
 
 Frontend er en SPA-lignende enkeltside-applikasjon i vanlig JavaScript (ingen React, Vue eller Angular). Siden rendres av Django-templaten `templates/patients/index.html`, som laster fire moduler fra `static/js/`:
 
-| Modul | Ansvar |
-|---|---|
-| `patients-utils.js` | CSRF-fetch, `withSubmitGuard`, escaping-hjelpere, delt tilstand |
-| `patients-table.js` | Tabulator-grid og tavlevisning |
-| `patients-forms.js` | Registrerings- og redigeringsskjema |
-| `patients-stats.js` | Statistikkfanen og arkivvisning |
+| Modul | Lastes | Ansvar |
+|---|---|---|
+| `patients-utils.js` | alltid | CSRF-fetch, `withSubmitGuard`, escaping-hjelpere, delt tilstand |
+| `patients-table.js` | alltid | Tabulator-grid og tavlevisning |
+| `patients-forms.js` | alltid | Registrerings- og redigeringsskjema |
+| `patients-app.js` | alltid | Oppstart, faneskift, auto-refresh, lastere for navneregistrene |
+| `patients-stats.js` | admin/lead/lead_view | Statistikkfanen, arkiv, admin-handlinger |
 
-Alle fire lastes ubetinget — det er ingen bundler og ingen betinget lasting. `patients-stats.js` er større enn de tre andre til sammen og brukes kun av roller med statistikktilgang; se F7 i `docs/FORBEDRINGER_2026-08.md`.
+`patients-stats.js` er omtrent like stor som de fire andre til sammen (41,5 kB mot 41,2 kB) og lastes derfor kun for roller med statistikktilgang (F7). En `read_only`-bruker laster 49 % av admin-bundlen.
+
+Bootstrappen lå tidligere i `patients-stats.js`. Betinget lasting av den fila uten å flytte oppstarten først ville tatt ned hele appen for `read_only` og `read_write` — tabellen, faneskiftet og auto-refresh startet derfra. Regelen er nå: alt de to rollene kan nå, ligger i en alltid-lastet modul, og kall den andre veien går via `_kall('navn')`. `JsModulLastingTests` håndhever begge deler.
 
 Monolitten `static/js/script.js` ble delt opp i disse fire i mai 2026 og slettet 13. aug. 2026 (N9). Referanser til den i eldre dokumenter er historiske.
 

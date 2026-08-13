@@ -4,6 +4,48 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-08-13 — F7: betinget lasting av statistikkmodulen. F8 utsatt
+
+**Tiltaket slik det var beskrevet ville tatt ned appen.** F7 sa «last
+`patients-stats.js` kun for roller som har statistikktilgang», og forutsatte at fila bare
+inneholder statistikk. Det gjorde den ikke: `DOMContentLoaded`-bootstrappen lå der —
+`initTable()`, `loadPatients()`, `startRefreshInterval()` — sammen med faneskiftet,
+auto-refresh og lasterne for navneregistrene, som `patients-forms.js` trenger for
+nedtrekkslistene. En `read_only`-bruker ville fått en side uten tabell, uten data og uten
+fungerende faner.
+
+Bootstrappen er derfor flyttet til en ny `patients-app.js` (5,9 kB) som lastes for alle
+roller. `patients-stats.js` beholder statistikk, arkiv og admin-handlinger, og lastes kun
+for `admin`, `lead` og `lead_view`.
+
+**Rollefellen som ikke er åpenbar:** `read_write` har skrivetilgang uten
+statistikktilgang. Lagre-knappen for arrangementsnavn er `write-only` og dermed synlig for
+den rollen, så `saveEventName` måtte til `patients-app.js`. Samme resonnement flyttet
+`renderForstehjelperAdmin`/`renderHelsepersonellAdmin` motsatt vei — de bygger knapper med
+`onclick` mot toggle/delete-funksjoner som bare finnes i statistikkmodulen. Det fant ikke
+jeg; det fant testen, etter at jeg først hadde plassert dem feil.
+
+Kall fra alltid-lastet kode til den betingede modulen går nå gjennom `_kall('navn')`.
+`JsModulLastingTests` leser funksjonsnavnene i `patients-stats.js` og feiler hvis en
+alltid-lastet modul kaller noen av dem direkte. Verifisert ved å sette inn et direkte
+`loadStats()`-kall midlertidig.
+
+**Måling:** alltid lastet 41 161 bytes, statistikkmodulen 41 516 bytes, admin-bundle
+82 677 bytes. En `read_only`-bruker laster **49 %** av admin-bundlen; akseptansekriteriet
+var < 50 %.
+
+**Ikke verifisert:** «Første-paint på mobil 4G < 1,5 s». Det krever måling på enhet.
+Halvert nedlasting er en forutsetning, ikke et bevis.
+
+**F8 (PgBouncer) er bevisst utsatt.** Punktet sier selv «Kun relevant ved 4+ workers».
+Driftsmodusen er 1 worker mellom vakter og 2 under vakt, altså maks 8 forbindelser mot
+~100 tilgjengelige, og `conn_max_age=600` demper det ytterligere. Tiltaket er dessuten i
+hovedsak en Railway-operasjon, ikke en kodeendring. Tas opp igjen hvis `WEB_WORKERS` økes.
+
+721 tester grønne. Ingen databaseendringer.
+
+---
+
 ## 2026-08-13 — N13.2 og N13.3: navneliste-fabrikk, og `views.py` delt i fem
 
 **N13.2.** `forstehjelpere_view`, `forstehjelper_detail_view`, `helsepersonell_view` og

@@ -1028,7 +1028,18 @@
 <script src="{% static 'js/patients-utils.js' %}"></script>
 <script src="{% static 'js/patients-table.js' %}"></script>
 <script src="{% static 'js/patients-forms.js' %}"></script>
+{% comment %}
+  patients-stats.js er større enn de tre andre til sammen og brukes kun av
+  roller med statistikktilgang. Den lastes derfor betinget (F7).
+
+  patients-app.js må lastes FØR den: bootstrappen ligger der, og appen skal
+  starte likt uansett rolle. Rekkefølgen betyr ikke noe funksjonelt — alt
+  kjøres på DOMContentLoaded — men holder lesingen logisk.
+{% endcomment %}
+<script src="{% static 'js/patients-app.js' %}"></script>
+{% if request.user.role == 'admin' or request.user.role == 'lead' or request.user.role == 'lead_view' %}
 <script src="{% static 'js/patients-stats.js' %}"></script>
+{% endif %}
 <script src="{% static 'js/notifications.js' %}"></script>
 </body>
 </html>

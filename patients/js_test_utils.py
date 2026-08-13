@@ -26,6 +26,7 @@ JS_DIR = Path(settings.BASE_DIR) / 'static' / 'js'
 UTILS_JS = JS_DIR / 'patients-utils.js'
 TABLE_JS = JS_DIR / 'patients-table.js'
 FORMS_JS = JS_DIR / 'patients-forms.js'
+APP_JS = JS_DIR / 'patients-app.js'
 STATS_JS = JS_DIR / 'patients-stats.js'
 
 

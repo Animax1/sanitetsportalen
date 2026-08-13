@@ -1,4 +1,15 @@
 // ════════════════════════════════════════════════════════
+// STATISTIKK, ARKIV OG ADMIN-HANDLINGER
+//
+// Denne modulen lastes KUN for roller med statistikktilgang — admin, lead og
+// lead_view (F7). En read_only- eller read_write-bruker får den ikke.
+//
+// Legger du til noe her som en lavere rolle skal kunne bruke, hører det
+// hjemme i patients-app.js i stedet. `JsModulLastingTests` i
+// patients/tests.py håndhever dette.
+// ════════════════════════════════════════════════════════
+
+// ════════════════════════════════════════════════════════
 // STATISTICS – CHART HELPER
 // ════════════════════════════════════════════════════════
 function mkChart(id, type, labels, data, colors, horiz = false) {
@@ -577,39 +588,11 @@ function mkInterpretation(s) {
 // ════════════════════════════════════════════════════════
 // SETTINGS  (GET /api/settings/ , PUT /api/settings/)
 // ════════════════════════════════════════════════════════
-async function loadSettings() {
-  const s = await (await fetch('/pasienter/api/settings/')).json();
-  if (s.event_name) {
-    const inp = document.getElementById('setting-event-name');
-    if (inp) inp.value = s.event_name;
-    const disp = document.getElementById('event-name-display');
-    if (disp) disp.textContent = s.event_name;
-  }
-}
 
-async function saveEventName() {
-  const name = (document.getElementById('setting-event-name')?.value || '').trim();
-  if (!name) return;
-  await apiFetch('/pasienter/api/settings/', {
-    method: 'PUT',
-    body: JSON.stringify({ event_name: name })
-  });
-  const disp = document.getElementById('event-name-display');
-  if (disp) disp.textContent = name;
-}
 
 // ════════════════════════════════════════════════════════
 // SESJONSTIMEOUT
 // ════════════════════════════════════════════════════════
-async function loadSessionTimeout() {
-  const el = document.getElementById('session-timeout-input');
-  if (!el) return;
-  try {
-    const res = await apiFetch('/pasienter/api/session-timeout/');
-    const d = await res.json();
-    el.value = d.hours;
-  } catch (e) {}
-}
 
 async function saveSessionTimeout() {
   const el = document.getElementById('session-timeout-input');
@@ -632,51 +615,7 @@ async function saveSessionTimeout() {
 // ════════════════════════════════════════════════════════
 
 // ETag for forstehjelpere – unngår unyttig dataoverføring når listen er uendret
-let lastForstehjelperEtag = null;
 
-async function loadForstehjelpere() {
-  const headers = { 'Cache-Control': 'no-cache' };
-  if (lastForstehjelperEtag) {
-    headers['If-None-Match'] = lastForstehjelperEtag;
-  }
-  const res = await fetch('/pasienter/api/forstehjelpere/', {
-    cache: 'no-store',
-    headers,
-  });
-  if (res.status === 304) {
-    return;
-  }
-  const etag = res.headers.get('ETag');
-  if (etag) lastForstehjelperEtag = etag;
-  forstehjelpere = await res.json();
-  _populateForstehjelperDropdown('n-forstehjelper', null);
-  const eBeh = document.getElementById('e-forstehjelper');
-  const currentEditBeh = eBeh && eBeh.value
-    ? forstehjelpere.find(b => String(b.id) === String(eBeh.value)) || null
-    : null;
-  _populateForstehjelperDropdown('e-forstehjelper', currentEditBeh);
-  renderForstehjelperAdmin();
-}
-
-function renderForstehjelperAdmin() {
-  const container = document.getElementById('forstehjelpere-list');
-  if (!container) return;
-  if (!forstehjelpere.length) {
-    container.innerHTML = '<span class="text-muted small">Ingen forstehjelpere registrert.</span>';
-    return;
-  }
-  const rows = forstehjelpere.map(b => `
-    <div class="d-flex align-items-center gap-2 mb-1" style="font-size:0.85rem;">
-      <span class="flex-grow-1 ${b.is_active ? '' : 'text-muted'}">${escHtmlValue(b.name)}${b.is_active ? '' : ' <em>(inaktiv)</em>'}</span>
-      <button class="btn btn-outline-secondary btn-sm py-0 px-1" onclick="toggleForstehjelper(${b.id})" title="${b.is_active ? 'Deaktiver' : 'Aktiver'}">
-        <i class="bi bi-${b.is_active ? 'toggle-on' : 'toggle-off'}"></i>
-      </button>
-      <button class="btn btn-outline-danger btn-sm py-0 px-1" onclick="deleteForstehjelper(${b.id})" title="Slett">
-        <i class="bi bi-trash"></i>
-      </button>
-    </div>`).join('');
-  container.innerHTML = rows;
-}
 
 async function addForstehjelper() {
   const nameEl = document.getElementById('new-forstehjelper-name');
@@ -719,51 +658,7 @@ async function deleteForstehjelper(id) {
 // ════════════════════════════════════════════════════════
 // HELSEPERSONELL (samme mønster som forstehjelpere)
 // ════════════════════════════════════════════════════════
-let lastHelsepersonellEtag = null;
 
-async function loadHelsepersonell() {
-  const headers = { 'Cache-Control': 'no-cache' };
-  if (lastHelsepersonellEtag) {
-    headers['If-None-Match'] = lastHelsepersonellEtag;
-  }
-  const res = await fetch('/pasienter/api/helsepersonell/', {
-    cache: 'no-store',
-    headers,
-  });
-  if (res.status === 304) {
-    return;
-  }
-  const etag = res.headers.get('ETag');
-  if (etag) lastHelsepersonellEtag = etag;
-  helsepersonellListe = await res.json();
-  _populateHelsepersonellDropdown('n-helsepersonell', null);
-  const eHp = document.getElementById('e-helsepersonell-ref');
-  const currentEditHp = eHp && eHp.value
-    ? helsepersonellListe.find(h => String(h.id) === String(eHp.value)) || null
-    : null;
-  _populateHelsepersonellDropdown('e-helsepersonell-ref', currentEditHp);
-  renderHelsepersonellAdmin();
-}
-
-function renderHelsepersonellAdmin() {
-  const container = document.getElementById('helsepersonell-list');
-  if (!container) return;
-  if (!helsepersonellListe.length) {
-    container.innerHTML = '<span class="text-muted small">Ingen helsepersonell registrert.</span>';
-    return;
-  }
-  const rows = helsepersonellListe.map(h => `
-    <div class="d-flex align-items-center gap-2 mb-1" style="font-size:0.85rem;">
-      <span class="flex-grow-1 ${h.is_active ? '' : 'text-muted'}">${escHtmlValue(h.name)}${h.is_active ? '' : ' <em>(inaktiv)</em>'}</span>
-      <button class="btn btn-outline-secondary btn-sm py-0 px-1" onclick="toggleHelsepersonell(${h.id})" title="${h.is_active ? 'Deaktiver' : 'Aktiver'}">
-        <i class="bi bi-${h.is_active ? 'toggle-on' : 'toggle-off'}"></i>
-      </button>
-      <button class="btn btn-outline-danger btn-sm py-0 px-1" onclick="deleteHelsepersonell(${h.id})" title="Slett">
-        <i class="bi bi-trash"></i>
-      </button>
-    </div>`).join('');
-  container.innerHTML = rows;
-}
 
 async function addHelsepersonell() {
   const nameEl = document.getElementById('new-helsepersonell-name');
@@ -826,22 +721,6 @@ async function doResetActiveYear() {
 // ════════════════════════════════════════════════════════
 // TAB NAVIGATION
 // ════════════════════════════════════════════════════════
-document.querySelectorAll('[data-tab]').forEach(link => link.addEventListener('click', e => {
-  e.preventDefault();
-  const tab = link.dataset.tab;
-  document.querySelectorAll('[data-tab]').forEach(l => l.classList.remove('active'));
-  link.classList.add('active');
-  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
-  document.getElementById('tab-' + tab)?.classList.add('active');
-  if (tab === 'tavle')        renderBoard();
-  if (tab === 'statistikk')   loadStats();
-  if (tab === 'innstillinger') {
-    loadSettings();
-    loadSessionTimeout();
-    loadForstehjelpere();
-    loadHelsepersonell();
-  }
-}));
 
 // Stats sub-tab navigation
 document.querySelectorAll('.stats-subbtn').forEach(btn => {
@@ -860,54 +739,6 @@ document.querySelectorAll('.stats-subbtn').forEach(btn => {
 // Polling pauses automatisk når fanen er skjult (document.hidden === true).
 // Dette sparer batteri og nettverkstrafikk når brukeren ikke ser på siden.
 // ════════════════════════════════════════════════════════
-
-let refreshId = null;
-
-async function doAutoRefresh() {
-  await loadPatients();
-  await loadForstehjelpere();
-  await loadHelsepersonell();
-  const t = document.querySelector('[data-tab].active')?.dataset.tab;
-  if (t === 'tavle')      renderBoard();
-  if (t === 'statistikk') loadStats();
-}
-
-function startRefreshInterval() {
-  if (refreshId !== null) return;
-  refreshId = setInterval(doAutoRefresh, 30000);
-}
-
-function stopRefreshInterval() {
-  if (refreshId !== null) {
-    clearInterval(refreshId);
-    refreshId = null;
-  }
-}
-
-document.addEventListener('visibilitychange', async () => {
-  if (document.hidden) {
-    stopRefreshInterval();
-  } else {
-    await doAutoRefresh();
-    startRefreshInterval();
-  }
-});
-
-document.addEventListener('DOMContentLoaded', async () => {
-  applyRoleVisibility();
-  initTable();
-  const mineBtn = document.getElementById('btn-mine');
-  if (mineBtn) mineBtn.classList.toggle('active-mine', mineOnly);
-  await loadForstehjelpere();
-  await loadHelsepersonell();
-  await loadPatients();
-  loadSettings();
-  loadSessionTimeout();
-  if (document.getElementById('tab-tavle')?.classList.contains('active')) {
-    renderBoard();
-  }
-  startRefreshInterval();
-});
 
 
 // ════════════════════════════════════════════════════════
@@ -1088,4 +919,48 @@ async function slettArkiv(id) {
   } else {
     alert(d.error || 'Feil ved sletting av arkiv.');
   }
+}
+
+
+// Admin-listene i innstillinger. De bygger knapper med onclick mot
+// toggle/delete-funksjonene under, som bare finnes i denne fila — derfor bor
+// renderingen her og ikke i patients-app.js. Lasterne kaller dem via _kall().
+function renderForstehjelperAdmin() {
+  const container = document.getElementById('forstehjelpere-list');
+  if (!container) return;
+  if (!forstehjelpere.length) {
+    container.innerHTML = '<span class="text-muted small">Ingen forstehjelpere registrert.</span>';
+    return;
+  }
+  const rows = forstehjelpere.map(b => `
+    <div class="d-flex align-items-center gap-2 mb-1" style="font-size:0.85rem;">
+      <span class="flex-grow-1 ${b.is_active ? '' : 'text-muted'}">${escHtmlValue(b.name)}${b.is_active ? '' : ' <em>(inaktiv)</em>'}</span>
+      <button class="btn btn-outline-secondary btn-sm py-0 px-1" onclick="toggleForstehjelper(${b.id})" title="${b.is_active ? 'Deaktiver' : 'Aktiver'}">
+        <i class="bi bi-${b.is_active ? 'toggle-on' : 'toggle-off'}"></i>
+      </button>
+      <button class="btn btn-outline-danger btn-sm py-0 px-1" onclick="deleteForstehjelper(${b.id})" title="Slett">
+        <i class="bi bi-trash"></i>
+      </button>
+    </div>`).join('');
+  container.innerHTML = rows;
+}
+
+function renderHelsepersonellAdmin() {
+  const container = document.getElementById('helsepersonell-list');
+  if (!container) return;
+  if (!helsepersonellListe.length) {
+    container.innerHTML = '<span class="text-muted small">Ingen helsepersonell registrert.</span>';
+    return;
+  }
+  const rows = helsepersonellListe.map(h => `
+    <div class="d-flex align-items-center gap-2 mb-1" style="font-size:0.85rem;">
+      <span class="flex-grow-1 ${h.is_active ? '' : 'text-muted'}">${escHtmlValue(h.name)}${h.is_active ? '' : ' <em>(inaktiv)</em>'}</span>
+      <button class="btn btn-outline-secondary btn-sm py-0 px-1" onclick="toggleHelsepersonell(${h.id})" title="${h.is_active ? 'Deaktiver' : 'Aktiver'}">
+        <i class="bi bi-${h.is_active ? 'toggle-on' : 'toggle-off'}"></i>
+      </button>
+      <button class="btn btn-outline-danger btn-sm py-0 px-1" onclick="deleteHelsepersonell(${h.id})" title="Slett">
+        <i class="bi bi-trash"></i>
+      </button>
+    </div>`).join('');
+  container.innerHTML = rows;
 }

@@ -3,6 +3,7 @@
 Kjør med: python manage.py test patients
 """
 import json
+import re
 import shutil
 import unittest
 from datetime import datetime
@@ -1540,3 +1541,87 @@ class NavneregisterFeilmeldingTests(TestCase):
         self.assertEqual(views.forstehjelpere_view.__name__, 'forstehjelpere_view')
         self.assertEqual(views.helsepersonell_detail_view.__name__,
                          'helsepersonell_detail_view')
+
+
+@override_settings(SECURE_SSL_REDIRECT=False, RATELIMIT_ENABLE=False)
+class JsModulLastingTests(TestCase):
+    """Betinget lasting av patients-stats.js (F7).
+
+    Fila er større enn de tre andre til sammen og brukes kun av roller med
+    statistikktilgang. Den lastes derfor ikke for `read_only` og `read_write`.
+
+    Fellen: bootstrappen — `DOMContentLoaded`, faneskift, auto-refresh og
+    lasterne for navneregistrene — lå i patients-stats.js. Å laste den
+    betinget uten å flytte bootstrappen først ville tatt ned hele appen for
+    de to rollene. Testene her vokter skillet.
+    """
+
+    STATS_ROLLER = ('admin', 'lead', 'lead_view')
+    ANDRE_ROLLER = ('read_only', 'read_write')
+
+    def _hent_som(self, rolle):
+        bruker = CustomUser.objects.create_user(
+            username=f'bruker_{rolle}', password='testpass123',
+            role=rolle, must_change_password=False,
+        )
+        self.client.force_login(bruker)
+        resp = self.client.get('/pasienter/')
+        self.assertEqual(resp.status_code, 200)
+        return resp.content.decode('utf-8')
+
+    def test_app_modulen_lastes_for_alle_roller(self):
+        """Bootstrappen må lastes uansett rolle — ellers starter ikke appen."""
+        for rolle in self.STATS_ROLLER + self.ANDRE_ROLLER:
+            with self.subTest(rolle=rolle):
+                self.assertIn('patients-app.js', self._hent_som(rolle))
+
+    def test_statistikkmodulen_lastes_kun_for_stats_roller(self):
+        for rolle in self.STATS_ROLLER:
+            with self.subTest(rolle=rolle):
+                self.assertIn('patients-stats.js', self._hent_som(rolle))
+
+    def test_statistikkmodulen_lastes_ikke_for_lavere_roller(self):
+        for rolle in self.ANDRE_ROLLER:
+            with self.subTest(rolle=rolle):
+                self.assertNotIn('patients-stats.js', self._hent_som(rolle))
+
+    def test_alltid_lastede_moduler_refererer_ikke_til_statistikkmodulen(self):
+        """Selve vernet: ingen direkte referanse fra alltid-lastet kode.
+
+        En `read_only`-bruker har ikke patients-stats.js. Kaller bootstrappen
+        en funksjon derfra direkte, får hun ReferenceError og appen stopper.
+        Slike kall må gå via `_kall()`, som sjekker at funksjonen finnes.
+        """
+        from patients import js_test_utils as jsu
+
+        stats_navn = set(re.findall(
+            r'^(?:async )?function (\w+)', jsu.read_js(jsu.STATS_JS), re.M))
+        self.assertIn('loadStats', stats_navn, 'testen leser feil fil')
+
+        alltid = [jsu.UTILS_JS, jsu.TABLE_JS, jsu.FORMS_JS, jsu.APP_JS]
+        funn = []
+        for sti in alltid:
+            kilde = jsu.read_js(sti)
+            # `_kall('loadStats')` er den godkjente veien — strengen teller ikke.
+            kilde = re.sub(r"_kall\(\s*'[^']+'", "_kall(", kilde)
+            for navn in stats_navn:
+                if re.search(r'\b' + re.escape(navn) + r'\s*\(', kilde):
+                    funn.append(f'{sti.name}: {navn}()')
+
+        self.assertEqual(sorted(funn), [], (
+            'Alltid-lastet kode kaller funksjoner som bor i patients-stats.js:\n  '
+            + '\n  '.join(sorted(funn))
+            + '\n\npatients-stats.js lastes ikke for read_only/read_write. Flytt '
+              'funksjonen til patients-app.js, eller kall den via _kall().'
+        ))
+
+    def test_write_only_handler_er_alltid_tilgjengelig(self):
+        """`read_write` har skrivetilgang, men ikke statistikktilgang.
+
+        Lagre-knappen for arrangementsnavn er `write-only`, altså synlig for
+        read_write — som ikke laster patients-stats.js. `saveEventName` må
+        derfor ligge i patients-app.js.
+        """
+        from patients import js_test_utils as jsu
+        self.assertIn('function saveEventName(', jsu.read_js(jsu.APP_JS))
+        self.assertNotIn('function saveEventName(', jsu.read_js(jsu.STATS_JS))
