@@ -21,7 +21,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from django.views.decorators.http import require_GET, require_http_methods, require_POST
 
-from accounts.decorators import admin_required
+from core.auth_decorators import admin_required
 from accounts.models import CustomUser, LoginEvent
 from audit.models import AuditLog
 from core.forms import ModuleSettingsForm

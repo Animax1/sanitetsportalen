@@ -278,6 +278,37 @@ class BakoverkompatibilitetTests(TestCase):
         self.assertIs(a_stats, stats_required)
         self.assertIs(a_write, write_required)
 
+    def test_produksjonskode_importerer_ikke_fra_shimen(self):
+        """Regelen i CLAUDE.md skal ikke brytes av kodebasen selv (N11).
+
+        Shimen beholdes for bakoverkompatibilitet — testen over verifiserer at
+        den fortsatt virker — men produksjonskode skal importere direkte fra
+        `core.auth_decorators`. Tre filer gjorde ikke det, og en regel som
+        kodebasen bryter tre steder er verre enn ingen regel.
+        """
+        from pathlib import Path
+        from django.conf import settings
+
+        base = Path(settings.BASE_DIR)
+        unntak = {
+            base / 'accounts' / 'decorators.py',   # selve shimen
+            base / 'core' / 'tests.py',            # tester at shimen virker
+        }
+
+        syndere = []
+        for app in ('accounts', 'audit', 'core', 'patients', 'myproject'):
+            for py in (base / app).rglob('*.py'):
+                if py in unntak or py.name.startswith('test'):
+                    continue
+                if 'from accounts.decorators import' in py.read_text(encoding='utf-8'):
+                    syndere.append(str(py.relative_to(base)))
+
+        self.assertEqual(sorted(syndere), [], (
+            'Disse importerer fra bakoverkompatibilitets-shimen:\n  '
+            + '\n  '.join(sorted(syndere))
+            + '\n\nBytt til `from core.auth_decorators import ...` — samme objekter.'
+        ))
+
     def test_arkiv_konstanter_uendret(self):
         """ARKIV_VIEW_MIN_ROLE og ARKIV_WRITE_ROLE skal være uendret."""
         from patients.services import ARKIV_VIEW_MIN_ROLE, ARKIV_WRITE_ROLE

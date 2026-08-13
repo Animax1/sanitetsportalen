@@ -105,9 +105,16 @@ def cached_stats_response(cache_key: str, ttl: int):
 
 
 def invalidate_stats_cache(*keys: str) -> None:
-    """Fjern spesifikke cache-nøkler. Brukes ved pasient-endringer
-    om man vil tvinge fersk beregning. I praksis er TTL så kort (15s)
-    at eksplisitt invalidering sjelden er nødvendig.
+    """Fjern spesifikke cache-nøkler.
+
+    **Kalles ikke fra produksjonskode i dag — kun fra tester.** CLAUDE.md
+    påsto tidligere at cachen invalideres ved pasientendringer via signal;
+    det har aldri vært koblet opp. Dokumentasjonen er rettet (N11), og den
+    reelle mekanismen er TTL på 15/60 sekunder.
+
+    Funksjonen er beholdt fordi den er triviell og testet, og fordi et
+    live-dashbord (F6) vil trenge den. Skal den fortsatt være ubrukt ved
+    neste gjennomgang, bør den slettes.
     """
     for key in keys:
         # Cache-feil under invalidering skal ikke ta ned skriveoperasjonen

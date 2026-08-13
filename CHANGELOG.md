@@ -4,6 +4,43 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-08-13 — N11: CLAUDE.md i samsvar med koden
+
+Fire påstander i «Arkitektur»-seksjonen stemte ikke. Tre av dem var dokumentet som var
+utdatert, én var koden.
+
+**Statistikk-caching** — dokumentet lovet invalidering ved pasientendringer via signal.
+Det har aldri vært koblet opp; `invalidate_stats_cache()` kalles kun fra tester. Teksten
+beskriver nå den reelle mekanismen: TTL på 15/60 sekunder, og try/except rundt alle
+cache-operasjoner slik at en død cache degraderer til vanlig beregning.
+
+**Backup** — beskrivelsen («kun `patients`-appen», «logikk i `patients/backup_service.py`»)
+var fra før per-modul-omleggingen. Erstattet med en tabell over de to registrerte
+handlerne, `patients` og `arkiv`, og en presisering av at logikken ligger i `core/backup/`
+mens `backup_service.py` er en proxy som beholdes for `db_backup`, `views.py` og eldre
+tester.
+
+**Dekorator-importene** — her var det koden som var feil. `patients/views.py`,
+`core/views.py` og `patients/admin_status.py` importerte fra
+bakoverkompatibilitets-shimen `accounts/decorators.py`, mens CLAUDE.md sa at man alltid
+skal importere fra `core.auth_decorators`. Alle tre er byttet — samme objekter, ren
+søk-og-erstatt. Shimen er beholdt, siden `core/tests.py` verifiserer at den fortsatt
+virker.
+
+Ny test `test_produksjonskode_importerer_ikke_fra_shimen` går gjennom produksjonsfilene i
+alle fem appene og feiler med filnavn hvis noen tar shimen i bruk igjen. Verifisert ved å
+sette `core/views.py` tilbake midlertidig. Uten den vakten driver regelen på nytt så snart
+noen kopierer en importlinje fra en eldre fil — som er nøyaktig slik de tre oppsto.
+
+**Avvik fra tiltaket:** `invalidate_stats_cache()` er beholdt, ikke slettet. Den er
+triviell, testet, og F6 (live-dashbord) vil trenge den. Docstringen sier nå eksplisitt at
+den er ubrukt i dag, og at den bør slettes hvis den fortsatt er det ved neste
+gjennomgang. Å slette den ville ikke gjort noen påstand i CLAUDE.md mer sann.
+
+693 tester grønne. Ingen databaseendringer.
+
+---
+
 ## 2026-08-13 — N9: `script.js` slettet, dobbeltklikk-vernet faktisk testet
 
 `static/js/script.js` (2159 linjer) er borte. Ingen mal lastet den — monolitten ble delt

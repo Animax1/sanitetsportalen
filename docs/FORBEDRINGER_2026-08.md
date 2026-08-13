@@ -30,7 +30,7 @@ Status: ⏳ pending · 🔧 påbegynt · ✅ ferdig · ⚪ ikke aktuell
 | N8 | Audit-signalet gjør N+1 skrivinger per pasientendring | ✅ | Middels | 1–2 t | Ytelse |
 | N9 | Tre tester verifiserer dobbeltklikk-fixen i **død** JS-fil | ✅ | Middels | 30 min | Testkvalitet |
 | N10 | Sesjonsinvalidering dekoder hele sesjonstabellen ved hver innlogging | ✅ | Middels | 2–3 t | Ytelse |
-| N11 | Dokumentasjonsdrift: `CLAUDE.md` beskriver ting koden ikke gjør | ⏳ | Lav–Middels | 30 min | Dokumentasjon |
+| N11 | Dokumentasjonsdrift: `CLAUDE.md` beskriver ting koden ikke gjør | ✅ | Lav–Middels | 30 min | Dokumentasjon |
 | N12 | `GET /api/settings/` eksponerer hele `AppSetting`-tabellen | ⏳ | Lav | 30 min | Dybdeforsvar |
 | N13 | Duplisert kode i `views.py` og `services.py` (ETag-blokk, feltlister) | 🟡 | Lav | 3–4 t | Vedlikehold |
 
@@ -718,7 +718,36 @@ antall aktive sesjoner i systemet.
 
 ---
 
-## N11. Dokumentasjonsdrift i `CLAUDE.md`
+## N11. Dokumentasjonsdrift i `CLAUDE.md` &nbsp;—&nbsp; ✅ GJENNOMFØRT (13. aug. 2026)
+
+**Status:** Alle fire påstander er brakt i samsvar med koden. Tre ved å rette dokumentet,
+én ved å rette koden.
+
+**Statistikk-caching:** dokumentet lovet invalidering via signal. Det har aldri vært
+koblet opp — `invalidate_stats_cache()` kalles kun fra tester. Teksten beskriver nå den
+reelle mekanismen: TTL på 15/60 sekunder, og try/except rundt alle cache-operasjoner slik
+at en død cache degraderer til vanlig beregning.
+
+**Backup:** beskrivelsen var fra før per-modul-omleggingen. Erstattet med en tabell over
+de to registrerte handlerne (`patients` og `arkiv`, begge i `patients/backup.py`), og en
+presisering av at logikken ligger i `core/backup/` mens `patients/backup_service.py` er en
+proxy som beholdes for `db_backup`, `views.py` og eldre tester.
+
+**Dekorator-importene:** her var det koden som var feil, ikke dokumentet. De tre
+produksjonsfilene (`patients/views.py`, `core/views.py`, `patients/admin_status.py`)
+importerer nå fra `core.auth_decorators`. Shimen er beholdt — `core/tests.py` verifiserer
+at den fortsatt virker — men ingen produksjonskode bruker den lenger.
+
+Ny test `test_produksjonskode_importerer_ikke_fra_shimen` går gjennom alle produksjonsfiler
+i de fem appene og feiler med filnavn hvis noen tar shimen i bruk igjen. Verifisert ved å
+sette `core/views.py` tilbake midlertidig. Uten den vakten er dette en regel som driver på
+nytt så snart noen kopierer en importlinje fra en eldre fil.
+
+**Åpent punkt:** `invalidate_stats_cache()` er *beholdt*, ikke slettet, i motsetning til
+det tiltaket antydet. Den er triviell, testet og vil trengs av F6 (live-dashbord).
+Docstringen sier nå eksplisitt at den er ubrukt, og at den bør slettes hvis den fortsatt
+er det ved neste gjennomgang. Å slette den ville ikke gjort noen påstand i `CLAUDE.md`
+mer sann — akseptansekriteriet er oppfylt uansett.
 
 **Verdi:** Lav–Middels &nbsp;|&nbsp; **Innsats:** 30 min &nbsp;|&nbsp; **Type:** Dokumentasjon
 

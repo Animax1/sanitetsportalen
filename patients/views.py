@@ -35,7 +35,7 @@ from .services import (
     has_role_at_least, ARKIV_VIEW_MIN_ROLE, ARKIV_WRITE_ROLE,
     arkiver_aktiv_vakt, compute_arkiv_stats, compute_arkiv_full_stats,
 )
-from accounts.decorators import admin_required, stats_required, write_required
+from core.auth_decorators import admin_required, stats_required, write_required
 
 # Roller med skrivetilgang til pasienter
 WRITE_ROLES = ('admin', 'lead', 'read_write')

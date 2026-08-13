@@ -25,7 +25,7 @@ from django.shortcuts import render
 from django.utils import timezone
 from django.views.decorators.http import require_http_methods
 
-from accounts.decorators import admin_required
+from core.auth_decorators import admin_required
 from audit.models import AuditLog
 
 from .middleware import metrics_store

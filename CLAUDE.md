@@ -48,7 +48,7 @@ En modul vises kun hvis `ModuleSettings.enabled=True` **og** brukeren har rett `
 
 ### Tilgangskontroll
 
-Importér alltid dekoratorer fra `core.auth_decorators` (ikke `accounts.decorators`):
+Importér alltid dekoratorer fra `core.auth_decorators`. `accounts/decorators.py` er en ren re-eksport-shim som beholdes fordi `core/tests.py` verifiserer at den fortsatt virker — ingen produksjonskode importerer fra den lenger (N11).
 
 ```python
 from core.auth_decorators import admin_required, write_required, stats_required, role_required
@@ -68,11 +68,24 @@ Feltendringer logges automatisk via Django-signal i `audit/signals.py`. `Request
 
 ### Backup-system
 
-`BackupSchedulerMiddleware` kjører automatisk backup in-process etter request. Backup-innhold er kun `patients`-appen (ikke brukere eller audit-logger). All backup-logikk ligger i `patients/backup_service.py` og `core/backup/`.
+`BackupSchedulerMiddleware` kjører automatisk backup in-process etter request.
+
+Backup er **per modul**, ikke én samlet dump. Hver modul registrerer en `BaseBackupHandler` i `core.backup`-registryet (fra `apps.ready()`). To handlere finnes i dag, begge i `patients/backup.py`:
+
+| Slug | Innhold |
+|------|---------|
+| `patients` | Pasientdata. Arkivmodellene er eksplisitt ekskludert |
+| `arkiv` | `VaktArkiv` + `ArkivertPasient` — endres sjelden, og skal aldri berøres av en pasient-restore |
+
+Brukere, MFA-hemmeligheter og audit-spor er bevisst utelatt fra begge.
+
+Logikken ligger i `core/backup/`. `patients/backup_service.py` er en tynn proxy som beholder bakoverkompatibelt API for `db_backup`-kommandoen, `views.py` og eldre tester — nye moduler skal registrere en handler og kalle `core.backup.create_backup(slug=...)` direkte.
 
 ### Statistikk-caching (patients/stats_cache.py)
 
-Basic stats caches 15 sek, full stats 60 sek. Støtter ETag/304. Invalideres ved pasientendringer via signal.
+Basic stats caches 15 sek, full stats 60 sek. Støtter ETag/304.
+
+Det finnes **ingen** eksplisitt invalidering — cachen utløper på TTL. De korte TTL-ene er valgt nettopp for å slippe invalideringslogikk, og alle cache-operasjoner er pakket i try/except slik at en død cache degraderer til vanlig beregning i stedet for å ta ned endepunktet.
 
 ### Frontend
 

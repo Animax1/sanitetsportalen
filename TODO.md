@@ -52,6 +52,10 @@ dokumentasjon.
 - [x] **N5** `current_local_year()` brukes begge steder — nyttårsvakter havner i riktig år
 - [x] **N7** Delt Redis-klient per prosess (var én TCP-handshake per request)
 - [x] **N8** Audit-signalet skriver med `bulk_create` — konstant antall spørringer
+- [x] **N11** CLAUDE.md i samsvar med koden. Tre påstander rettet i dokumentet
+      (stats-caching, backup, frontend), én i koden: de tre produksjonsfilene importerer nå
+      fra `core.auth_decorators`, og en test hindrer at shimen tas i bruk igjen.
+      **Åpent:** `invalidate_stats_cache()` er beholdt, ikke slettet — se docstring.
 - [x] **N9** `script.js` slettet, dobbeltklikk-vernet testet ved å kjøre guarden i node.
       Tiltakspunkt 3 besvart: grep-i-JS-tester er ikke nok alene.
 - [ ] **N13** Duplisert kode i `views.py`/`services.py` — delvis
