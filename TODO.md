@@ -20,8 +20,9 @@
 
 ### Forbedringsbacklog — se `docs/FORBEDRINGER_2026-08.md`
 
-Kodegjennomgang 12. august 2026. Full liste med begrunnelse og tiltak ligger i dokumentet;
-her er kun de fire som bør tas først (alle små, alle med konkret risiko):
+Kodegjennomgang 12. august 2026. Full liste med begrunnelse og tiltak ligger i dokumentet.
+Sikkerhetspunktene rundt innlogging er ferdige; det som står igjen er drift, sporbarhet og
+dokumentasjon.
 
 - [x] **S1** `/django-admin/` er slått av i prod (kun bak `DEBUG`/`OFFLINE_MODE`).
       Paritetsarbeidet som måtte til først:
@@ -33,11 +34,12 @@ her er kun de fire som bør tas først (alle små, alle med konkret risiko):
   - [x] `AppSetting` redigeres med `python manage.py appsetting --set NØKKEL VERDI`
   - [x] Brukeradmin flyttet til `/portal-admin/brukere/`, 301 fra `/accounts/users/`
 - [x] **S2** `create_superuser` arver `must_change_password=True`
-  - [ ] **Driftsoppgave:** verifiser at bootstrap-adminen i prod har byttet passord siden
-        opprettelsen — endringen gjelder kun nye superbrukere
-- [ ] **S2** Fjern `must_change_password=False` fra `create_superuser` — `accounts/managers.py:29`.
-      Tas sammen med S1, ellers har den ingen effekt for bootstrap-adminen
-- [ ] **N1** Valider `next`-parameteren ved innlogging (åpen redirect) — `accounts/views.py:162`
+  - [x] Bekreftet 13. aug. 2026: bootstrap-adminen i prod har byttet passord
+- [x] **N1** `next`-parameteren valideres — `core/url_safety.py::safe_redirect_url()`
+- [x] **S4** Samme validering på `Notification.url` i varsel-redirecten
+- [x] **N4** MFA-stegene har egne rate-limit-bøtter, og kontosperren gjelder også der
+- [x] **S5** Utlogging krever POST
+- [x] **S6** MFA trust-cookie følger `request.is_secure()` — virker nå i offline-modus
 - [ ] **S7** Personverndokumentasjonen påstår kontroller som ikke er reelle (audit-dekning,
       lagringstider, escapeHtml-dekning, Argon2). Rett når N2/F2/N6 er lukket, eller rett
       teksten nå — se `docs/FORBEDRINGER_2026-08.md`

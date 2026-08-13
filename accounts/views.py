@@ -16,15 +16,15 @@ from django.core.paginator import Paginator
 from django.db.models import Q
 from django.shortcuts import render, redirect, get_object_or_404
 from django.utils import timezone
-from django.views.decorators.http import require_http_methods
+from django.views.decorators.http import require_http_methods, require_POST
 from datetime import timedelta
 
 from django_otp.plugins.otp_totp.models import TOTPDevice
 from django_otp.plugins.otp_static.models import StaticDevice, StaticToken
-from django_ratelimit.decorators import ratelimit
-from django_ratelimit.exceptions import Ratelimited
+from django_ratelimit.core import is_ratelimited
 
 from audit.models import AuditLog
+from core.url_safety import safe_redirect_url
 
 from .decorators import admin_required
 from .forms import LoginForm, ChangePasswordForm, AdminUserCreateForm, AdminUserEditForm, PasientRolleForm
@@ -164,17 +164,66 @@ def ratelimited_view(request, exception=None):
     return render(request, 'accounts/ratelimited.html', status=429)
 
 
-@ratelimit(key='post:username', rate='10/5m', method='POST', block=True)
-@ratelimit(key='ip', rate='50/5m', method='POST', block=True)
+def _er_rate_limited(request, group, key, rate):
+    """Tell ett forsøk mot en rate-limit-bøtte og si om grensen er passert.
+
+    Tynn innpakning rundt ``django_ratelimit.core.is_ratelimited`` slik at
+    kallstedene blir lesbare. ``increment=True`` betyr at selve kallet teller
+    forsøket — kall den derfor én gang per forsøk, ikke i en betingelse som
+    kan evalueres flere ganger.
+
+    Respekterer ``RATELIMIT_ENABLE`` på samme måte som dekoratoren gjorde.
+    """
+    return is_ratelimited(
+        request=request,
+        group=group,
+        key=key,
+        rate=rate,
+        method='POST',
+        increment=True,
+    )
+
+
+def _registrer_mislykket_forsok(user):
+    """Tell opp feilede forsøk og lås kontoen i 15 min ved femte.
+
+    Delt mellom passord-steget og MFA-steget. Uten dette var MFA-verifiseringen
+    det eneste steget uten kontosperre: man kunne gjette TOTP-koder i det
+    uendelige uten at telleren ble rørt.
+
+    Returnerer True hvis kontoen ble låst av dette forsøket.
+    """
+    user.failed_login_attempts += 1
+    if user.failed_login_attempts >= 5:
+        user.locked_until = timezone.now() + timedelta(minutes=15)
+        user.failed_login_attempts = 0
+        user.save(update_fields=['failed_login_attempts', 'locked_until'])
+        return True
+    user.save(update_fields=['failed_login_attempts', 'locked_until'])
+    return False
+
+
 def login_view(request):
     """Innloggingsview med MFA-støtte, lockout-policy og rate-limiting.
 
-    Rate-limit (dobbel dekorator):
-      - Per brukernavn: 10 POST-forsøk / 5 min (beskytter den enkelte konto mot bruteforce)
-      - Per IP: 50 POST-forsøk / 5 min (beskytter mot IP-baserte angrep; høyt nok til å
-        tåle 10+ enheter bak samme NAT/wifi)
-    Kan deaktiveres helt ved å sette RATELIMIT_ENABLE=False i miljøvariabler (nød-bryter
-    uten deploy). Individuell brukerlåsing: 5 forsøk per bruker = 15 min låst.
+    Rate-limit (N4): grensene håndheves med eksplisitte ``is_ratelimited``-kall
+    i hvert steg, ikke med dekoratorer på hele viewet. Grunnen er at MFA-stegene
+    håndteres inne i dette viewet, men **ikke** sender noe ``username``-felt —
+    de sender bare koden. En dekorator med ``key='post:username'`` slo derfor
+    opp en tom verdi, og alle MFA-forsøk fra alle brukere havnet i samme bøtte:
+    10 MFA-innlogginger per 5 minutter *totalt for hele appen*. Ved vaktstart,
+    når alle logger på samtidig, ville den ellevte fått 429 uten at noe var galt
+    med kontoen.
+
+    Grensene nå:
+      - Steg 1, per brukernavn: 10 POST / 5 min (bruteforce mot én konto)
+      - Steg 1, per IP: 50 POST / 5 min (høyt nok for 10+ enheter bak samme NAT)
+      - Steg 2 og 3, per bruker-ID fra sesjonen: 10 POST / 5 min
+
+    Kan deaktiveres helt med ``RATELIMIT_ENABLE=False`` (nød-bryter uten deploy).
+    Individuell brukerlåsing: 5 feilede forsøk = 15 min låst. Låsingen gjelder
+    nå både passord- og MFA-steget; tidligere kunne man gjette TOTP-koder i det
+    uendelige uten at det skjedde noe med kontoen.
 
     Flyt:
       Stage 1 – username/password-validering
@@ -185,7 +234,9 @@ def login_view(request):
     if request.user.is_authenticated:
         return redirect('/')
 
-    next_url = request.GET.get('next', '/')
+    # N1: valider `next` ett sted — her, der den leses. MFA-stegene arver den
+    # validerte verdien via sesjonen, så det finnes ingen vei rundt sjekken.
+    next_url = safe_redirect_url(request, request.GET.get('next'))
     ip = _get_client_ip(request)
     user_agent = request.META.get('HTTP_USER_AGENT', '')
 
@@ -202,6 +253,10 @@ def login_view(request):
     error = None
 
     if request.method == 'POST':
+        if _er_rate_limited(request, 'login:username', 'post:username', '10/5m') \
+                or _er_rate_limited(request, 'login:ip', 'ip', '50/5m'):
+            return ratelimited_view(request)
+
         form = LoginForm(request.POST)
         username = request.POST.get('username', '').strip()
         password = request.POST.get('password', '')
@@ -257,13 +312,8 @@ def login_view(request):
                     return _do_complete_login(request, user, next_url)
             else:
                 error = 'Feil brukernavn eller passord.'
-                if user_obj:
-                    user_obj.failed_login_attempts += 1
-                    if user_obj.failed_login_attempts >= 5:
-                        user_obj.locked_until = timezone.now() + timedelta(minutes=15)
-                        user_obj.failed_login_attempts = 0
-                        error = 'For mange feil forsøk. Kontoen er låst i 15 minutter.'
-                    user_obj.save(update_fields=['failed_login_attempts', 'locked_until'])
+                if user_obj and _registrer_mislykket_forsok(user_obj):
+                    error = 'For mange feil forsøk. Kontoen er låst i 15 minutter.'
                 LoginEvent.objects.create(
                     user=user_obj, username_attempt=username, success=False,
                     ip=ip, user_agent=user_agent, event_type=LoginEvent.EVENT_LOGIN,
@@ -275,7 +325,9 @@ def login_view(request):
 def _handle_mfa_setup(request, next_url):
     """Håndter MFA-oppsett (Stage 2): QR-kode + backup-koder + bekreftelse."""
     user_id = request.session.get('mfa_setup_user_id')
-    next_url = request.session.get('mfa_next_url', next_url)
+    # Verdien ble validert da den ble lagt i sesjonen, men vi validerer på nytt
+    # ved lesing: en sesjon kan stamme fra en eldre release uten sjekken.
+    next_url = safe_redirect_url(request, request.session.get('mfa_next_url'), next_url)
 
     try:
         user = CustomUser.objects.get(pk=user_id)
@@ -317,6 +369,11 @@ def _handle_mfa_setup(request, next_url):
     error = None
 
     if request.method == 'POST':
+        # N4: nøkkelen er brukerens ID fra sesjonen. Skjemaet sender ingen
+        # `username`, så uten dette ville alle brukeres MFA-oppsett delt bøtte.
+        if _er_rate_limited(request, 'mfa:setup', lambda g, r: f'mfa-setup:{user.pk}', '10/5m'):
+            return ratelimited_view(request)
+
         code = request.POST.get('totp_code', '').strip().replace(' ', '')
         if device.verify_token(code):
             device.confirmed = True
@@ -346,7 +403,9 @@ def _handle_mfa_setup(request, next_url):
 def _handle_mfa_verify(request, next_url):
     """Håndter MFA-verifisering (Stage 3): verifiser TOTP eller backup-kode."""
     user_id = request.session.get('mfa_verify_user_id')
-    next_url = request.session.get('mfa_next_url', next_url)
+    # Verdien ble validert da den ble lagt i sesjonen, men vi validerer på nytt
+    # ved lesing: en sesjon kan stamme fra en eldre release uten sjekken.
+    next_url = safe_redirect_url(request, request.session.get('mfa_next_url'), next_url)
 
     try:
         user = CustomUser.objects.get(pk=user_id)
@@ -355,6 +414,23 @@ def _handle_mfa_verify(request, next_url):
         return redirect('accounts:login')
 
     error = None
+
+    # N4: rate-limit per bruker, ikke per (tomt) brukernavn. Se docstring i
+    # login_view. Sjekken ligger før kontosperren med vilje — en låst konto som
+    # hamres på skal også bremses, ellers er den billige stien den ubegrensede.
+    if request.method == 'POST' and _er_rate_limited(
+        request, 'mfa:verify', lambda g, r: f'mfa-verify:{user.pk}', '10/5m',
+    ):
+        return ratelimited_view(request)
+
+    # Kontosperren fra passord-steget gjelder også her. Uten sjekken kunne en
+    # låst konto fortsatt gjette TOTP-koder, siden sperren bare ble lest i
+    # steg 1.
+    if user.is_locked():
+        remaining = int((user.locked_until - timezone.now()).total_seconds() / 60) + 1
+        return render(request, 'accounts/mfa_verify.html', {
+            'error': f'Kontoen er midlertidig låst. Prøv igjen om {remaining} minutt(er).',
+        })
 
     if request.method == 'POST':
         code = request.POST.get('totp_code', '').strip().replace(' ', '')
@@ -393,19 +469,30 @@ def _handle_mfa_verify(request, next_url):
                        LoginEvent.EVENT_MFA_BACKUP_USED if used_backup
                        else LoginEvent.EVENT_MFA_VERIFY_SUCCESS)
 
+            # Nullstill telleren — brukeren har bevist begge faktorer.
+            if user.failed_login_attempts:
+                user.failed_login_attempts = 0
+                user.save(update_fields=['failed_login_attempts'])
+
             request.session.pop('mfa_verify_user_id', None)
             request.session.pop('mfa_next_url', None)
             login(request, user)
             _invalidate_other_sessions(request.user, request.session.session_key)
             response = redirect(next_url)
             if trust_device and used_device:
-                is_secure = not getattr(django_settings, 'DEBUG', True)
-                _set_mfa_trust_cookie(response, user, used_device, is_secure)
+                # S6: request.is_secure() tar hensyn til SECURE_PROXY_SSL_HEADER
+                # og er derfor riktig både på Railway og i offline-modus. Det
+                # gamle uttrykket `not DEBUG` satte Secure-flagget i
+                # offline-modus, som kjører bevisst uten TLS — nettleseren kastet
+                # da cookien, og «stol på denne enheten» virket ikke i felt.
+                _set_mfa_trust_cookie(response, user, used_device, request.is_secure())
             return response
         else:
             _log_event(user, user.username, False, request,
                        LoginEvent.EVENT_MFA_VERIFY_FAILED)
-            if code:
+            if _registrer_mislykket_forsok(user):
+                error = 'For mange feil forsøk. Kontoen er låst i 15 minutter.'
+            elif code:
                 error = 'Feil kode. Prøv igjen.'
             elif backup_code:
                 error = 'Ugyldig backup-kode.'
@@ -417,8 +504,17 @@ def _handle_mfa_verify(request, next_url):
     })
 
 
+@require_POST
 def logout_view(request):
-    """Logg ut bruker."""
+    """Logg ut bruker. Kun POST (S5).
+
+    Med GET kunne enhver side på internett logge ut brukeren vår med en
+    ``<img src="https://<app>/accounts/logout/">``. Konsekvensen er irritasjon
+    og ikke datatap, men midt i en vakt er det ikke ingenting. Django 5 fjernet
+    GET-utlogging fra sin egen ``LogoutView`` av samme grunn.
+
+    Malene bruker et lite skjema med CSRF-token i stedet for ``<a href>``.
+    """
     logout(request)
     return redirect('accounts:login')
 

@@ -4,6 +4,55 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-08-13 — Herding av innloggingsflyten: N1, S4, N4, S5, S6
+
+Siste pulje på innloggingsflaten. Med denne er alle sikkerhetspunktene rundt innlogging fra
+augustgjennomgangen lukket.
+
+**Åpen redirect (N1 + S4).** `login_view` sendte `?next=` rett til `redirect()`, som godtar
+absolutte URL-er. En lenke som `?next=https://falsk-sanitetsportal.example/` sendte altså
+brukeren til angriperens side *rett etter en vellykket innlogging* — i det øyeblikket de
+har mest tillit til at de er på riktig sted. Ny felles helper
+`core/url_safety.py::safe_redirect_url()` bygger på `url_has_allowed_host_and_scheme` og
+brukes begge steder: `next` valideres ett sted, der den leses, så MFA-stegene arver den
+validerte verdien via sesjonen (og validerer den på nytt ved lesing, i tilfelle sesjonen
+stammer fra en eldre release). Samme helper på `Notification.url` i
+`notification_mark_read_view` (S4) — i dag settes den kun med hardkodede relative stier,
+men `notify()` er designet som et generisk API for framtidige moduler.
+
+**MFA-rate-limiting (N4).** MFA-stegene håndteres inne i `login_view`, men skjemaene sender
+ingen `username` — bare koden. Dekoratoren med `key='post:username'` slo derfor opp en tom
+verdi, og **alle MFA-forsøk fra alle brukere delte én bøtte**: 10 MFA-innlogginger per 5
+minutter totalt for hele appen. Ved vaktstart, når alle logger på samtidig, ville bruker
+nummer 11 fått 429 uten at noe var galt med kontoen.
+
+Løst ved å flytte rate-limitingen fra dekoratorer til eksplisitte `is_ratelimited`-kall per
+steg. Steg 1 beholder sine to bøtter (brukernavn og IP); MFA-stegene får hver sin bøtte
+nøklet på bruker-ID fra sesjonen. Ingen URL-endring, og ingen brukernavn i POST-body.
+
+Kontosperren er utvidet til å gjelde MFA-steget: `_registrer_mislykket_forsok()` deles nå
+av begge steg, og `is_locked()` sjekkes ved inngangen til verifiseringen. Tidligere kunne
+man gjette TOTP-koder i det uendelige uten at telleren ble rørt. Rate-limit-sjekken ligger
+bevisst før sperresjekken, ellers ville den låste kontoen vært den ubegrensede stien.
+
+**Utlogging krever POST (S5).** `logout_view` hadde ingen metode-restriksjon, og malene
+lenket til den med `<a href>`. Enhver side på internett kunne logge ut brukeren vår med en
+`<img src=".../accounts/logout/">`. De tre malene bruker nå skjema med CSRF-token.
+
+**Trust-cookie i offline-modus (S6).** `is_secure = not DEBUG` ga `Secure`-flagget i
+offline-modus, som kjører bevisst uten TLS — nettleseren kastet cookien, og «stol på denne
+enheten» virket aldri i felt. Nå `request.is_secure()`, som tar hensyn til
+`SECURE_PROXY_SSL_HEADER` og er riktig både på Railway og offline.
+
+**Bemerket underveis:** `django_otp` throttler i tillegg selve TOTP-enheten etter feilede
+`verify_token()`-kall (`ThrottlingMixin`, eksponentiell backoff). Et uavhengig lag som
+allerede virket — verdt å kjenne til, siden det gjør at en korrekt kode rett etter flere
+feilforsøk avvises en kort stund.
+
+23 nye tester i `accounts/tests_innlogging_herding.py`. Full suite: 606 tester, grønn.
+
+---
+
 ## 2026-08-13 — S1 + S2: én innloggingsflate, all administrasjon under /portal-admin/
 
 **`/django-admin/` er slått av i produksjon.** Django sin innebygde admin var en parallell

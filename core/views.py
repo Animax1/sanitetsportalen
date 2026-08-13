@@ -27,6 +27,7 @@ from audit.models import AuditLog
 from core.forms import ModuleSettingsForm
 from core.models import ModuleSettings
 from core.modules import get_all_modules, get_dashboard_modules, get_module
+from core.url_safety import safe_redirect_url
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -609,8 +610,12 @@ def notification_mark_read_view(request, pk: int):
         notif.is_read = True
         notif.read_at = timezone.now()
         notif.save(update_fields=['is_read', 'read_at'])
-    target_url = notif.url or '/varsler/'
-    return redirect(target_url)
+    # S4: Notification.url er et CharField uten validator. I dag settes den kun
+    # fra patients/signals.py med hardkodede relative stier, men notify() er
+    # eksplisitt designet som et generisk API for framtidige moduler. Første
+    # modul som lar brukerinput påvirke url-en ville gjort dette til en ekte
+    # lagret open redirect — med en lenke som ser ut til å komme fra portalen.
+    return redirect(safe_redirect_url(request, notif.url, '/varsler/'))
 
 
 @login_required

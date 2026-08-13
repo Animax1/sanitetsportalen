@@ -20,10 +20,10 @@ Status: ⏳ pending · 🔧 påbegynt · ✅ ferdig · ⚪ ikke aktuell
 
 | # | Tittel | Status | Verdi | Innsats | Type |
 |---|---|---|---|---|---|
-| N1 | **Åpen redirect i innloggingsflyten (`next` valideres ikke)** | ⏳ | Høy | 1 t | Sikkerhet |
+| N1 | **Åpen redirect i innloggingsflyten (`next` valideres ikke)** | ✅ | Høy | 1 t | Sikkerhet |
 | N2 | **`helsepersonell_ref` mangler i audit-sporingen** | ⏳ | Høy | 30 min | Personvern / sporbarhet |
 | N3 | **Applikasjonsloggene når aldri fram (LOGGING mangler rot-handler)** | ⏳ | Høy | 30 min | Drift |
-| N4 | **MFA-steget deler én rate-limit-bøtte — kan låse ute hele vakten** | ⏳ | Høy | 1–2 t | Drift / sikkerhet |
+| N4 | **MFA-steget deler én rate-limit-bøtte — kan låse ute hele vakten** | ✅ | Høy | 1–2 t | Drift / sikkerhet |
 | N5 | `get_active_year()` og `Patient.save()` bruker container-tid | ⏳ | Middels–Høy | 30 min | Korrekthet |
 | N6 | Statistikk-tabellene setter inn feltverdier uescapet i `innerHTML` | ⏳ | Middels | 2 t | Sikkerhet (dybdeforsvar) |
 | N7 | Redis-klienten bygges på nytt for hver eneste request | ⏳ | Middels | 1 t | Ytelse |
@@ -41,9 +41,9 @@ Status: ⏳ pending · 🔧 påbegynt · ✅ ferdig · ⚪ ikke aktuell
 | S1 | **`/django-admin/` omgår samtlige av appens innloggingssikringer** | ✅ | Høy | 1–2 t + paritet |
 | S2 | **`create_superuser` setter `must_change_password=False`** | ✅ | Middels–Høy | 15 min |
 | S3 | Rate-limiting finnes kun på innlogging | ⏳ | Middels | 2 t |
-| S4 | Lagret open redirect i varsel-visningen | ⏳ | Lav–Middels | 15 min |
-| S5 | Utlogging skjer via GET | ⏳ | Lav | 30 min |
-| S6 | MFA trust-cookie settes med `secure=True` i offline-modus | ⏳ | Lav | 15 min |
+| S4 | Lagret open redirect i varsel-visningen | ✅ | Lav–Middels | 15 min |
+| S5 | Utlogging skjer via GET | ✅ | Lav | 30 min |
+| S6 | MFA trust-cookie settes med `secure=True` i offline-modus | ✅ | Lav | 15 min |
 | S7 | **Personverndokumentasjonen påstår kontroller som ikke er reelle i dag** | ⏳ | Høy | 1 t |
 
 ### Overført fra FORBEDRINGER.md (fortsatt åpne)
@@ -64,17 +64,30 @@ Status: ⏳ pending · 🔧 påbegynt · ✅ ferdig · ⚪ ikke aktuell
 andre sikkerhetsarbeidet i appen. Deretter N1 → N2 → N3 → N4, som alle er små og har
 konkret risiko knyttet til seg. N5 bør tas før nyttår (se begrunnelsen).
 
-**Status 13. august 2026:** **S1 og S2 er gjennomført.** S1 viste seg å ha et paritetskrav
-som ikke var kjent da lista ble skrevet — portalens egen brukeradministrasjon manglet
-funksjonalitet som kun fantes i Django admin, og hadde i tillegg en 500-feil. Alt er nå
-lukket, inkludert URL-konsolideringen. Neste ut er **N1 → S4 → N4 → S6 → S5**, som alle
-ligger i `accounts/views.py`.
+**Status 13. august 2026:** **Hele innloggingsflaten er ferdig herdet** — S1, S2, N1, S4,
+N4, S5 og S6 er gjennomført. S1 viste seg å ha et paritetskrav som ikke var kjent da lista
+ble skrevet: portalens egen brukeradministrasjon manglet funksjonalitet som kun fantes i
+Django admin, og hadde i tillegg en 500-feil. Alt er nå lukket, inkludert
+URL-konsolideringen under `/portal-admin/`.
+
+Neste anbefalte pulje er **N3 → F1 → F2** (logging og cron): N3 er en forutsetning for F1,
+og F2 lukker samtidig et åpent TODO-punkt om `kollaps_arkiv`-cronen. Deretter N2, N5 og S7,
+som henger sammen med personverndokumentasjonen. **N5 har en reell frist** — den bør inn før
+nyttår.
 
 ---
 
 # Del 1 — Nye funn fra kodegjennomgangen
 
-## N1. Åpen redirect i innloggingsflyten
+## N1. Åpen redirect i innloggingsflyten &nbsp;—&nbsp; ✅ GJENNOMFØRT (13. aug. 2026)
+
+**Status:** Løst. Ny felles helper `core/url_safety.py::safe_redirect_url()` bygger på
+`url_has_allowed_host_and_scheme`, og brukes både her og i S4. `next` valideres ett sted —
+der den leses i `login_view` — så MFA-stegene arver den validerte verdien via sesjonen.
+Verdien valideres i tillegg på nytt når den leses ut av sesjonen, siden en sesjon kan
+stamme fra en release før sjekken fantes.
+
+`require_https` følger requesten, så en HTTPS-side ikke kan redirecte til `http://`.
 
 **Verdi:** Høy &nbsp;|&nbsp; **Innsats:** 1 t &nbsp;|&nbsp; **Type:** Sikkerhet
 
@@ -232,7 +245,23 @@ backup. Dette er også en forutsetning for F1 (e-postvarsel ved kritiske feil).
 
 ---
 
-## N4. MFA-steget deler én rate-limit-bøtte — kan låse ute hele vakten
+## N4. MFA-steget deler én rate-limit-bøtte &nbsp;—&nbsp; ✅ GJENNOMFØRT (13. aug. 2026)
+
+**Status:** Løst, men ikke med noen av de to foreslåtte alternativene. I stedet for egne
+URL-er eller et skjult `username`-felt er rate-limitingen flyttet fra dekoratorer på
+`login_view` til eksplisitte `is_ratelimited`-kall i hvert steg. Da får steg 1 sine to
+bøtter (brukernavn og IP) og MFA-stegene hver sin bøtte nøklet på bruker-ID fra sesjonen.
+Ingen URL-endring, ingen brukernavn i POST-body.
+
+Kontosperren er også utvidet: `_registrer_mislykket_forsok()` deles nå av passord- og
+MFA-steget, og `is_locked()` sjekkes ved inngangen til verifiseringen. Tidligere kunne man
+gjette TOTP-koder i det uendelige uten at telleren ble rørt. Rate-limit-sjekken ligger
+bevisst **før** sperresjekken, slik at en låst konto som hamres på også bremses.
+
+**Detalj funnet under testing:** `django_otp` throttler i tillegg selve TOTP-enheten etter
+feilede `verify_token()`-kall (`ThrottlingMixin`, eksponentiell backoff). Det er et
+uavhengig lag som allerede virket, og som gjør at en korrekt kode rett etter flere
+feilforsøk avvises en kort stund.
 
 **Verdi:** Høy &nbsp;|&nbsp; **Innsats:** 1–2 t &nbsp;|&nbsp; **Type:** Drift / sikkerhet
 
@@ -872,7 +901,12 @@ databasen.
 
 ---
 
-## S4. Lagret open redirect i varsel-visningen
+## S4. Lagret open redirect i varsel-visningen &nbsp;—&nbsp; ✅ GJENNOMFØRT (13. aug. 2026)
+
+**Status:** Løst med samme `safe_redirect_url()` som N1, slik det var foreslått — ett
+mønster i kodebasen. `notification_mark_read_view` sender nå til `/varsler/` hvis
+`Notification.url` peker ut av appen. Varselet markeres som lest uansett; valideringen
+gjelder kun hvor brukeren sendes.
 
 **Verdi:** Lav–Middels &nbsp;|&nbsp; **Innsats:** 15 min
 
@@ -905,7 +939,12 @@ brukeren til `/varsler/`, ikke ut av appen.
 
 ---
 
-## S5. Utlogging skjer via GET
+## S5. Utlogging skjer via GET &nbsp;—&nbsp; ✅ GJENNOMFØRT (13. aug. 2026)
+
+**Status:** Løst. `logout_view` er `@require_POST`, og de tre malene som lenket til den
+(`base.html`, `base_portal.html`, `patients/index.html`) bruker nå et skjema med
+CSRF-token og en `<button class="dropdown-item">`, som Bootstrap-dropdownen håndterer
+identisk med en lenke.
 
 **Verdi:** Lav &nbsp;|&nbsp; **Innsats:** 30 min
 
@@ -926,7 +965,12 @@ før.
 
 ---
 
-## S6. MFA trust-cookie settes med `secure=True` i offline-modus
+## S6. MFA trust-cookie settes med `secure=True` i offline-modus &nbsp;—&nbsp; ✅ GJENNOMFØRT (13. aug. 2026)
+
+**Status:** Løst. `is_secure = not DEBUG` er erstattet med `request.is_secure()`, som tar
+hensyn til `SECURE_PROXY_SSL_HEADER` og derfor er riktig både på Railway og i
+offline-modus. Testet i begge retninger: uten TLS settes cookien uten `Secure` (og virker
+dermed i felt), med TLS settes den med.
 
 **Verdi:** Lav &nbsp;|&nbsp; **Innsats:** 15 min
 

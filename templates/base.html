@@ -61,7 +61,12 @@
         <li><a class="dropdown-item" href="{% url 'accounts:user_list' %}" style="color:var(--text-main)"><i class="bi bi-people me-2"></i>Administrer brukere</a></li>
         {% endif %}
         <li><hr class="dropdown-divider" style="border-color:var(--border-color)"></li>
-        <li><a class="dropdown-item" href="{% url 'accounts:logout' %}" style="color:#f87171"><i class="bi bi-box-arrow-right me-2"></i>Logg ut</a></li>
+        <li>
+          <form method="post" action="{% url 'accounts:logout' %}">
+            {% csrf_token %}
+            <button type="submit" class="dropdown-item" style="color:#f87171"><i class="bi bi-box-arrow-right me-2"></i>Logg ut</button>
+          </form>
+        </li>
       </ul>
     </div>
   </div>
