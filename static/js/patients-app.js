@@ -22,6 +22,52 @@ function _kall(navn, ...args) {
   return undefined;
 }
 
+// ════════════════════════════════════════════════════════
+// HANDLERE VIA data-action (F5)
+//
+// Erstatter inline `onclick=`/`oninput=` i markup. Inline handlere krever
+// `unsafe-inline` i CSP-ens script-src; skal det direktivet strammes, kan
+// ingen handlere ligge i attributter.
+//
+// Delegert fra document, så markup som genereres senere (arkivlista,
+// admin-registrene) virker uten at noe må kobles opp på nytt.
+//
+//   <button data-action="setFilter" data-arg="rod">
+//   <button data-action="visArkivDetalj" data-id="12">
+//
+// `data-arg` sendes som streng, `data-id` som tall. Skillet er nødvendig:
+// toggleForstehjelper() slår opp med `x.id === id`, og en streng ville gitt
+// et stille ikke-treff i stedet for en feil.
+// ════════════════════════════════════════════════════════
+
+function _handlerArgument(el) {
+  if (el.dataset.id !== undefined) return Number(el.dataset.id);
+  return el.dataset.arg;
+}
+
+document.addEventListener('click', (e) => {
+  const el = e.target.closest('[data-action]');
+  if (!el) return;
+
+  // Funksjonen kan bo i patients-stats.js, som ikke lastes for alle roller.
+  const handler = globalThis[el.dataset.action];
+  if (typeof handler !== 'function') return;
+
+  // Kun for lenker — en `type="submit"`-knapp skal fortsatt kunne sende skjema.
+  if (el.tagName === 'A') e.preventDefault();
+
+  handler(_handlerArgument(el));
+});
+
+document.addEventListener('input', (e) => {
+  const el = e.target.closest('[data-input-action]');
+  if (!el) return;
+  const handler = globalThis[el.dataset.inputAction];
+  if (typeof handler === 'function') handler();
+});
+
+
+
 async function loadSettings() {
   const s = await (await fetch('/pasienter/api/settings/')).json();
   if (s.event_name) {

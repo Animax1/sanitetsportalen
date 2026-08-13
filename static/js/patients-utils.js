@@ -229,6 +229,14 @@ function updateTotal() {
   } else { el.textContent = '–'; }
 }
 
+// Utskrevet-tidspunktet påvirker totaltiden, så de to hører sammen. Lå
+// tidligere i markup som `onclick="stamp('e-utskrevet');updateTotal()"` — en
+// sammensatt inline handler som ikke lot seg uttrykke med ett data-action (F5).
+function stampUtskrevet() {
+  stamp('e-utskrevet');
+  updateTotal();
+}
+
 document.getElementById('e-inntid')?.addEventListener('input', updateTotal);
 
 function escapeHtml(s) {

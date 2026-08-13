@@ -793,10 +793,10 @@ async function loadArkivListe() {
       <td class="small text-nowrap">${_escHtml(a.importert_at ? a.importert_at.slice(0,16).replace('T',' ') : '')}</td>
       <td class="small text-center">${a.antall_pasienter}</td>
       <td class="small">
-        <button class="btn btn-outline-primary btn-sm py-0 px-1" onclick="visArkivDetalj(${a.id})">
+        <button class="btn btn-outline-primary btn-sm py-0 px-1" data-action="visArkivDetalj" data-id="${a.id}">
           <i class="bi bi-bar-chart me-1"></i>Statistikk
         </button>
-        <button class="btn btn-outline-danger btn-sm py-0 px-1 ms-1" onclick="slettArkiv(${a.id})">
+        <button class="btn btn-outline-danger btn-sm py-0 px-1 ms-1" data-action="slettArkiv" data-id="${a.id}">
           <i class="bi bi-trash"></i>
         </button>
       </td>
@@ -935,10 +935,10 @@ function renderForstehjelperAdmin() {
   const rows = forstehjelpere.map(b => `
     <div class="d-flex align-items-center gap-2 mb-1" style="font-size:0.85rem;">
       <span class="flex-grow-1 ${b.is_active ? '' : 'text-muted'}">${escHtmlValue(b.name)}${b.is_active ? '' : ' <em>(inaktiv)</em>'}</span>
-      <button class="btn btn-outline-secondary btn-sm py-0 px-1" onclick="toggleForstehjelper(${b.id})" title="${b.is_active ? 'Deaktiver' : 'Aktiver'}">
+      <button class="btn btn-outline-secondary btn-sm py-0 px-1" data-action="toggleForstehjelper" data-id="${b.id}" title="${b.is_active ? 'Deaktiver' : 'Aktiver'}">
         <i class="bi bi-${b.is_active ? 'toggle-on' : 'toggle-off'}"></i>
       </button>
-      <button class="btn btn-outline-danger btn-sm py-0 px-1" onclick="deleteForstehjelper(${b.id})" title="Slett">
+      <button class="btn btn-outline-danger btn-sm py-0 px-1" data-action="deleteForstehjelper" data-id="${b.id}" title="Slett">
         <i class="bi bi-trash"></i>
       </button>
     </div>`).join('');
@@ -955,10 +955,10 @@ function renderHelsepersonellAdmin() {
   const rows = helsepersonellListe.map(h => `
     <div class="d-flex align-items-center gap-2 mb-1" style="font-size:0.85rem;">
       <span class="flex-grow-1 ${h.is_active ? '' : 'text-muted'}">${escHtmlValue(h.name)}${h.is_active ? '' : ' <em>(inaktiv)</em>'}</span>
-      <button class="btn btn-outline-secondary btn-sm py-0 px-1" onclick="toggleHelsepersonell(${h.id})" title="${h.is_active ? 'Deaktiver' : 'Aktiver'}">
+      <button class="btn btn-outline-secondary btn-sm py-0 px-1" data-action="toggleHelsepersonell" data-id="${h.id}" title="${h.is_active ? 'Deaktiver' : 'Aktiver'}">
         <i class="bi bi-${h.is_active ? 'toggle-on' : 'toggle-off'}"></i>
       </button>
-      <button class="btn btn-outline-danger btn-sm py-0 px-1" onclick="deleteHelsepersonell(${h.id})" title="Slett">
+      <button class="btn btn-outline-danger btn-sm py-0 px-1" data-action="deleteHelsepersonell" data-id="${h.id}" title="Slett">
         <i class="bi bi-trash"></i>
       </button>
     </div>`).join('');

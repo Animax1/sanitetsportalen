@@ -8,7 +8,7 @@ import shutil
 import unittest
 from datetime import datetime
 
-from django.test import TestCase, Client, override_settings
+from django.test import TestCase, Client, SimpleTestCase, override_settings
 from django.urls import reverse
 
 from accounts.models import CustomUser
@@ -1602,6 +1602,10 @@ class JsModulLastingTests(TestCase):
         funn = []
         for sti in alltid:
             kilde = jsu.read_js(sti)
+            # Kommentarer skal ikke telle. En kommentar som forklarer hvorfor
+            # `toggleForstehjelper()` trenger et tall, er ikke et kall.
+            kilde = '\n'.join(
+                l for l in kilde.splitlines() if not l.lstrip().startswith('//'))
             # `_kall('loadStats')` er den godkjente veien — strengen teller ikke.
             kilde = re.sub(r"_kall\(\s*'[^']+'", "_kall(", kilde)
             for navn in stats_navn:
@@ -1625,3 +1629,70 @@ class JsModulLastingTests(TestCase):
         from patients import js_test_utils as jsu
         self.assertIn('function saveEventName(', jsu.read_js(jsu.APP_JS))
         self.assertNotIn('function saveEventName(', jsu.read_js(jsu.STATS_JS))
+
+
+class InlineHandlerTests(SimpleTestCase):
+    """Ingen inline event-handlere i markup (F5).
+
+    `onclick=`, `oninput=`, `onsubmit=` osv. krever `unsafe-inline` i CSP-ens
+    script-src. Så lenge de finnes, kan direktivet ikke strammes — og fjernes
+    direktivet mens de står igjen, slutter knappene å virke uten annen
+    beskjed enn en linje i nettleserkonsollen.
+
+    Verst var `onsubmit="return confirm(...)"` på sletting av bruker, frysing
+    av konto og MFA-nullstilling: der ville bekreftelsen forsvunnet stille,
+    ikke handlingen.
+    """
+
+    def test_ingen_inline_handlere_i_maler(self):
+        from pathlib import Path
+        from django.conf import settings
+
+        base = Path(settings.BASE_DIR)
+        mapper = [base / 'templates'] + list(base.glob('*/templates'))
+
+        funn = []
+        for mappe in mapper:
+            for mal in mappe.rglob('*.html'):
+                for nr, linje in enumerate(
+                        mal.read_text(encoding='utf-8').splitlines(), 1):
+                    for treff in re.findall(r'\son([a-z]+)="', linje):
+                        funn.append(f'{mal.relative_to(base)}:{nr} on{treff}=')
+
+        self.assertEqual(sorted(funn), [], (
+            'Inline event-handlere i markup:\n  ' + '\n  '.join(sorted(funn))
+            + '\n\nBruk data-action / data-input-action (håndtert i '
+              'patients-app.js) eller data-confirm (ui-actions.js).'
+        ))
+
+    def test_ingen_inline_handlere_generert_fra_js(self):
+        """Markup bygget i JS teller like mye — CSP ser bare det ferdige DOM-et."""
+        from patients import js_test_utils as jsu
+
+        funn = []
+        for sti in (jsu.UTILS_JS, jsu.TABLE_JS, jsu.FORMS_JS,
+                    jsu.APP_JS, jsu.STATS_JS):
+            for nr, linje in enumerate(
+                    jsu.read_js(sti).splitlines(), 1):
+                for treff in re.findall(r'\son([a-z]+)="', linje):
+                    funn.append(f'{sti.name}:{nr} on{treff}=')
+
+        self.assertEqual(sorted(funn), [], (
+            'JS genererer markup med inline handlere:\n  '
+            + '\n  '.join(sorted(funn))
+            + '\n\nBruk data-action med data-id for numeriske argumenter.'
+        ))
+
+    def test_delegering_skiller_streng_og_tall(self):
+        """`data-id` må bli tall, ikke streng.
+
+        `toggleForstehjelper()` slår opp med `x.id === id`. Kom id-en inn som
+        streng, ville funksjonen returnert uten å gjøre noe — og uten feil.
+        """
+        from patients import js_test_utils as jsu
+        app = jsu.read_js(jsu.APP_JS)
+        self.assertIn('Number(el.dataset.id)', app)
+
+        stats = jsu.read_js(jsu.STATS_JS)
+        self.assertIn('data-id="${b.id}"', stats,
+                      'admin-registrene må sende id som data-id, ikke data-arg')

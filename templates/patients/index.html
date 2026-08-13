@@ -113,23 +113,23 @@
 <!-- ══════════ PASIENTLISTE ══════════ -->
 <div id="tab-liste" class="tab-panel active">
   <div id="grid-toolbar">
-    <button class="btn btn-primary btn-sm write-only" onclick="openNewModal()">
+    <button class="btn btn-primary btn-sm write-only" data-action="openNewModal">
       <i class="bi bi-plus-lg me-1"></i>Ny pasient
     </button>
     <div class="position-relative">
       <i class="bi bi-search position-absolute" style="left:9px;top:50%;transform:translateY(-50%);color:#94a3b8;font-size:0.8rem;pointer-events:none"></i>
-      <input type="search" id="grid-search" placeholder="Søk i alle felt…" oninput="applyFilter()" style="padding-left:28px">
+      <input type="search" id="grid-search" placeholder="Søk i alle felt…" data-input-action="applyFilter" style="padding-left:28px">
     </div>
     <span class="vis-label ms-1">Vis:</span>
-    <button id="btn-alle"       class="btn btn-outline-secondary filter-btn active-alle" onclick="setFilter('alle')">Alle</button>
-    <button id="btn-rod"        class="btn btn-outline-danger    filter-btn"             onclick="setFilter('rod')">Rød</button>
-    <button id="btn-gul"        class="btn btn-outline-warning   filter-btn"             onclick="setFilter('gul')">Gul</button>
-    <button id="btn-rodgul"     class="btn btn-outline-warning   filter-btn"             onclick="setFilter('rodgul')"><span style="color:#dc2626">Rød</span>+<span style="color:#ca8a04">Gul</span></button>
-    <button id="btn-gronn"      class="btn btn-outline-success   filter-btn"             onclick="setFilter('gronn')">Grønn</button>
-    <button id="btn-aktive"     class="btn btn-outline-primary   filter-btn"             onclick="setFilter('aktive')">Aktive</button>
-    <button id="btn-utskrevet"  class="btn btn-outline-secondary filter-btn"             onclick="setFilter('utskrevet')">Utskrevet</button>
+    <button id="btn-alle"       class="btn btn-outline-secondary filter-btn active-alle" data-action="setFilter" data-arg="alle">Alle</button>
+    <button id="btn-rod"        class="btn btn-outline-danger    filter-btn"             data-action="setFilter" data-arg="rod">Rød</button>
+    <button id="btn-gul"        class="btn btn-outline-warning   filter-btn"             data-action="setFilter" data-arg="gul">Gul</button>
+    <button id="btn-rodgul"     class="btn btn-outline-warning   filter-btn"             data-action="setFilter" data-arg="rodgul"><span style="color:#dc2626">Rød</span>+<span style="color:#ca8a04">Gul</span></button>
+    <button id="btn-gronn"      class="btn btn-outline-success   filter-btn"             data-action="setFilter" data-arg="gronn">Grønn</button>
+    <button id="btn-aktive"     class="btn btn-outline-primary   filter-btn"             data-action="setFilter" data-arg="aktive">Aktive</button>
+    <button id="btn-utskrevet"  class="btn btn-outline-secondary filter-btn"             data-action="setFilter" data-arg="utskrevet">Utskrevet</button>
     <button id="btn-mine" class="btn btn-outline-info filter-btn"
-            onclick="setFilter('mine')"
+            data-action="setFilter" data-arg="mine"
             title="Vis kun pasienter der jeg er førstehjelper eller oppfølgingsansvarlig">
       Mine pasienter
     </button>
@@ -142,11 +142,11 @@
 <div id="tab-tavle" class="tab-panel">
 
   <div style="padding:0.5rem 1rem 0 1rem;" class="mb-3 d-flex gap-2 align-items-center">
-    <button class="btn btn-primary btn-sm write-only" onclick="openNewModal()">
+    <button class="btn btn-primary btn-sm write-only" data-action="openNewModal">
       <i class="bi bi-plus-lg me-1"></i>Ny pasient
     </button>
     <button id="btn-board-mine" class="btn btn-outline-info btn-sm"
-            onclick="toggleBoardMine()"
+            data-action="toggleBoardMine"
             title="Dim pasienter som ikke er dine">
       Mine pasienter
     </button>
@@ -207,7 +207,7 @@
       <span id="arkiv-stats-banner-tittel"></span>
       <span class="text-muted small ms-2" id="arkiv-stats-banner-meta"></span>
     </div>
-    <button type="button" class="btn btn-sm btn-outline-secondary" onclick="exitArkivStatsMode()">
+    <button type="button" class="btn btn-sm btn-outline-secondary" data-action="exitArkivStatsMode">
       <i class="bi bi-x-circle me-1"></i>Tilbake til live-statistikk
     </button>
   </div>
@@ -514,7 +514,7 @@
       <label class="form-label mt-2 small">Navn på arrangement</label>
       <div class="input-group input-group-sm">
         <input type="text" id="setting-event-name" class="form-control" value="{{ event_name }}">
-        <button class="btn btn-primary write-only" onclick="saveEventName()">Lagre</button>
+        <button class="btn btn-primary write-only" data-action="saveEventName">Lagre</button>
       </div>
       <div class="form-text">Vises i topplinjen.</div>
     </div>
@@ -526,7 +526,7 @@
         <label class="form-label">Timeout (timer)</label>
         <input type="number" id="session-timeout-input" class="form-control form-control-sm" min="1" max="24" style="max-width:120px;">
         <div class="form-text">1–24 timer. Endringer gjelder fra neste innlogging.</div>
-        <button class="btn btn-sm btn-primary mt-2" onclick="saveSessionTimeout()">Lagre</button>
+        <button class="btn btn-sm btn-primary mt-2" data-action="saveSessionTimeout">Lagre</button>
       </div>
     </div>
     {% endif %}
@@ -537,7 +537,7 @@
       <div id="forstehjelpere-list"><span class="text-muted small">Laster...</span></div>
       <div class="input-group input-group-sm mt-2">
         <input type="text" id="new-forstehjelper-name" class="form-control" placeholder="Navn på ny førstehjelper">
-        <button class="btn btn-primary" onclick="addForstehjelper()">Legg til</button>
+        <button class="btn btn-primary" data-action="addForstehjelper">Legg til</button>
       </div>
     </div>
 
@@ -547,7 +547,7 @@
       <div id="helsepersonell-list"><span class="text-muted small">Laster...</span></div>
       <div class="input-group input-group-sm mt-2">
         <input type="text" id="new-helsepersonell-name" class="form-control" placeholder="Navn på ny helsepersonell">
-        <button class="btn btn-primary" onclick="addHelsepersonell()">Legg til</button>
+        <button class="btn btn-primary" data-action="addHelsepersonell">Legg til</button>
       </div>
     </div>
 
@@ -581,7 +581,7 @@
         <button class="btn btn-success btn-sm" data-bs-toggle="modal" data-bs-target="#arkivLagreModal">
           <i class="bi bi-archive-fill me-1"></i>Lagre nåværende vakt som arkiv
         </button>
-        <button class="btn btn-outline-primary btn-sm" data-bs-toggle="modal" data-bs-target="#arkivListeModal" onclick="loadArkivListe()">
+        <button class="btn btn-outline-primary btn-sm" data-bs-toggle="modal" data-bs-target="#arkivListeModal" data-action="loadArkivListe">
           <i class="bi bi-list-ul me-1"></i>Vis arkiverte vakter
         </button>
       </div>
@@ -609,7 +609,7 @@
       </div>
       <div class="modal-footer">
         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Avbryt</button>
-        <button type="button" class="btn btn-danger" onclick="doResetActiveYear()">Nullstill aktiv vakt</button>
+        <button type="button" class="btn btn-danger" data-action="doResetActiveYear">Nullstill aktiv vakt</button>
       </div>
     </div>
   </div>
@@ -636,7 +636,7 @@
       </div>
       <div class="modal-footer">
         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Avbryt</button>
-        <button type="button" class="btn btn-success" onclick="lagreVaktSomArkiv()">
+        <button type="button" class="btn btn-success" data-action="lagreVaktSomArkiv">
           <i class="bi bi-archive-fill me-1"></i>Lagre arkiv
         </button>
       </div>
@@ -674,12 +674,12 @@
         </div>
         <div id="arkiv-detalj-stats"></div>
         <div class="mt-3 d-flex gap-2 flex-wrap">
-          <button id="arkiv-detalj-fullstats-btn" class="btn btn-sm btn-primary d-none" onclick="visArkivFullStatistikk()">
+          <button id="arkiv-detalj-fullstats-btn" class="btn btn-sm btn-primary d-none" data-action="visArkivFullStatistikk">
             <i class="bi bi-bar-chart-line me-1"></i>Vis full statistikk
           </button>
         </div>
         <div id="arkiv-detalj-slett" class="mt-3 d-none">
-          <button class="btn btn-sm btn-outline-danger" onclick="slettArkivFraDetalj()">
+          <button class="btn btn-sm btn-outline-danger" data-action="slettArkivFraDetalj">
             <i class="bi bi-trash me-1"></i>Slett arkiv
           </button>
         </div>
@@ -771,7 +771,7 @@
             <label class="form-label rlbl">Inntid<span class="req"> *</span></label>
             <div class="input-group input-group-sm">
               <input type="text" id="n-inntid" class="form-control" placeholder="dd.mm.åååå tt:mm">
-              <button class="btn btn-outline-secondary" onclick="document.getElementById('n-inntid').value=nowStr()" title="Nå"><i class="bi bi-clock"></i></button>
+              <button class="btn btn-outline-secondary" data-action="stamp" data-arg="n-inntid" title="Nå"><i class="bi bi-clock"></i></button>
             </div>
           </div>
           <div class="col-md-4">
@@ -822,7 +822,7 @@
       </div>
       <div class="modal-footer py-2">
         <button class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Avbryt</button>
-        <button id="btn-save-new" class="btn btn-primary btn-sm" onclick="saveNew()">
+        <button id="btn-save-new" class="btn btn-primary btn-sm" data-action="saveNew">
           <i class="bi bi-save me-1"></i>Registrer pasient
         </button>
       </div>
@@ -887,7 +887,7 @@
             <label class="form-label">Inntid</label>
             <div class="input-group input-group-sm">
               <input type="text" id="e-inntid" class="form-control" placeholder="dd.mm.åååå tt:mm">
-              <button class="btn btn-outline-secondary" onclick="stamp('e-inntid')" title="Nå"><i class="bi bi-clock"></i></button>
+              <button class="btn btn-outline-secondary" data-action="stamp" data-arg="e-inntid" title="Nå"><i class="bi bi-clock"></i></button>
             </div>
           </div>
           <div class="col-md-6">
@@ -922,7 +922,7 @@
             <label class="form-label">Påbegynt behandling</label>
             <div class="input-group input-group-sm">
               <input type="text" id="e-pabegynt" class="form-control" placeholder="dd.mm.åååå tt:mm">
-              <button class="btn btn-outline-secondary" onclick="stamp('e-pabegynt')" title="Nå"><i class="bi bi-clock"></i></button>
+              <button class="btn btn-outline-secondary" data-action="stamp" data-arg="e-pabegynt" title="Nå"><i class="bi bi-clock"></i></button>
             </div>
           </div>
           <div class="col-md-6">
@@ -973,14 +973,14 @@
             <label class="form-label">Inn-Obspost</label>
             <div class="input-group input-group-sm">
               <input type="text" id="e-inn-obspost" class="form-control" placeholder="dd.mm.åååå tt:mm">
-              <button class="btn btn-outline-secondary" onclick="stamp('e-inn-obspost')" title="Nå"><i class="bi bi-clock"></i></button>
+              <button class="btn btn-outline-secondary" data-action="stamp" data-arg="e-inn-obspost" title="Nå"><i class="bi bi-clock"></i></button>
             </div>
           </div>
           <div class="col-md-6">
             <label class="form-label">UT-Obspost</label>
             <div class="input-group input-group-sm">
               <input type="text" id="e-ut-obspost" class="form-control" placeholder="dd.mm.åååå tt:mm">
-              <button class="btn btn-outline-secondary" onclick="stamp('e-ut-obspost')" title="Nå"><i class="bi bi-clock"></i></button>
+              <button class="btn btn-outline-secondary" data-action="stamp" data-arg="e-ut-obspost" title="Nå"><i class="bi bi-clock"></i></button>
             </div>
           </div>
         </div>
@@ -991,8 +991,8 @@
           <div class="col-md-6">
             <label class="form-label">Utskrevet (tid)</label>
             <div class="input-group input-group-sm">
-              <input type="text" id="e-utskrevet" class="form-control" placeholder="dd.mm.åååå tt:mm" oninput="updateTotal()">
-              <button class="btn btn-outline-secondary" onclick="stamp('e-utskrevet');updateTotal()" title="Nå"><i class="bi bi-clock"></i></button>
+              <input type="text" id="e-utskrevet" class="form-control" placeholder="dd.mm.åååå tt:mm" data-input-action="updateTotal">
+              <button class="btn btn-outline-secondary" data-action="stampUtskrevet" title="Nå"><i class="bi bi-clock"></i></button>
             </div>
           </div>
           <div class="col-md-6">
@@ -1007,11 +1007,11 @@
 
       </div>
       <div class="modal-footer py-2">
-        <button class="btn btn-outline-danger btn-sm me-auto admin-only" onclick="delPatient()">
+        <button class="btn btn-outline-danger btn-sm me-auto admin-only" data-action="delPatient">
           <i class="bi bi-trash me-1"></i>Slett
         </button>
         <button class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Avbryt</button>
-        <button id="btn-save-edit" class="btn btn-primary btn-sm write-only" onclick="saveEdit()">
+        <button id="btn-save-edit" class="btn btn-primary btn-sm write-only" data-action="saveEdit">
           <i class="bi bi-save me-1"></i>Lagre endringer
         </button>
       </div>

@@ -4,6 +4,53 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-08-13 — F5, trinn 1: inline event-handlere ut av markup
+
+Forberedelse til å fjerne `unsafe-inline` fra CSP-ens `script-src`. **CSP-headeren er
+ikke rørt i denne commiten** — den flippes i trinn 2, slik at hvis noe brekker, vet vi
+hvilken halvdel det var.
+
+**Omfanget var større enn punktet beskrev.** F5 nevner «rundt 30 inline `onclick=` i
+`index.html`». Det stemte, men i tillegg fantes:
+
+- 6 `onclick=` som *genereres* av `patients-stats.js` (arkivlista og admin-registrene).
+  CSP ser det ferdige DOM-et, så attributter satt fra JS blokkeres på samme måte.
+- 2 `oninput=` i `index.html`.
+- 7 `onsubmit="return confirm(...)"` fordelt på brukeradministrasjonen og
+  backup-flaten. Disse var de alvorligste: bekreftelsen foran sletting av bruker,
+  frysing av konto og MFA-nullstilling ville forsvunnet stille. Ikke handlingen — bare
+  spørsmålet om man var sikker.
+
+Alt går nå gjennom `data-action` (+ `data-arg`/`data-id`), delegert fra `document` i
+`patients-app.js`, og `data-confirm` i en ny `static/js/ui-actions.js` som lastes fra
+`base_portal.html`.
+
+**Fellen med argumenter:** `toggleForstehjelper(id)` slår opp med `x.id === id`, streng
+likhet. Et data-attributt kommer inn som streng, så `x.id === "3"` er usant og funksjonen
+ville returnert uten å gjøre noe — og uten feilmelding. Derfor skilles `data-arg`
+(streng) fra `data-id` (tall), og delegeringen kjører `Number()` på den siste.
+
+Én sammensatt handler lot seg ikke uttrykke med ett `data-action`:
+`onclick="stamp('e-utskrevet');updateTotal()"` er nå `stampUtskrevet()` i
+`patients-utils.js`. En annen viste seg overflødig —
+`onclick="document.getElementById('n-inntid').value=nowStr()"` er nøyaktig det `stamp()`
+gjør.
+
+`InlineHandlerTests` går gjennom alle maler i alle app-mapper og alle JS-moduler, og
+feiler med fil og linjenummer hvis en inline handler dukker opp igjen.
+
+**Ikke rørt:** `unsafe-inline` for `style-src`. Akseptansekriteriet i F5 gjelder kun
+`script-src`, og markup har 48 inline `style=`-attributter pluss JS-genererte
+stilsettinger i statistikk-tabellene.
+
+**Krever manuell QA.** Alle knapper i pasientmodulen og brukeradministrasjonen går nå
+gjennom ny kode. Testene ser at attributtene er borte og at delegeringen finnes — de
+klikker ikke.
+
+724 tester grønne. Ingen databaseendringer.
+
+---
+
 ## 2026-08-13 — F7: betinget lasting av statistikkmodulen. F8 utsatt
 
 **Tiltaket slik det var beskrevet ville tatt ned appen.** F7 sa «last
