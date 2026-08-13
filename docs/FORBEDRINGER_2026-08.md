@@ -54,7 +54,7 @@ Status: ⏳ pending · 🔧 påbegynt · ✅ ferdig · ⚪ ikke aktuell
 | F2 | Automatisert audit-purge (`purge_old_logs` i scheduler/cron) | ✅ | Middels–Høy | — |
 | F3 | Server-side idempotency for pasient-opprettelse (Fix B) | #18 | ⏳ | Middels–Høy | 2–3 t |
 | F4 | Lasttest-script før stor vakt | #7 | ⏳ | Middels | 3–4 t |
-| F5 | CSP-stramming (fjerne `unsafe-inline`) | #8 | ⏳ | Middels | 2 t |
+| F5 | CSP-stramming (fjerne `unsafe-inline`) | #8 | ✅ | Middels | 2 t |
 | F6 | Statistikk-utvidelse (live-dashbord + utvidet analyse) | #12 | ⏳ | Middels–Høy | 25–35 t |
 | F7 | Frontend bundle-størrelse / lazy loading | #9 | ✅ | Lav | 4–6 t |
 | F8 | PgBouncer / Postgres connection pooler | #10 | ⏸ | Lav | 2–3 t |
@@ -1515,9 +1515,64 @@ uten degradering.
 
 ---
 
-## F5. CSP-stramming
+## F5. CSP-stramming &nbsp;—&nbsp; ✅ GJENNOMFØRT (13. aug. 2026)
 
 *Opprinnelig FORBEDRINGER #8*
+
+**Status:** `script-src` har ikke lenger `unsafe-inline`. Akseptansekriteriet er innfridd.
+
+Gjennomført i to deployer med verifisering imellom, ikke én. Flippes CSP-en samtidig som
+handlerne flyttes, og noe slutter å virke, vet man ikke hvilken halvdel som var skyld i
+det — og symptomet er en knapp som ikke gjør noe, med én linje i nettleserkonsollen som
+eneste spor.
+
+**Trinn 1 — handlerne ut av markup.** Punktet anslo «rundt 30 inline `onclick=` i
+`index.html`». Det stemte, men omfanget var større:
+
+| Sted | Antall |
+|---|---|
+| `onclick=` i `index.html` | 30 |
+| `onclick=` generert av `patients-stats.js` | 6 |
+| `oninput=` i `index.html` | 2 |
+| `onsubmit="return confirm(...)"` i brukeradmin og backup-flaten | 7 |
+
+De JS-genererte var ikke nevnt i punktet. CSP ser det ferdige DOM-et, så et
+`onclick`-attributt satt fra JavaScript blokkeres akkurat som ett i malen.
+
+De sju `onsubmit`-bekreftelsene var de alvorligste. Der ville ikke handlingen blitt borte,
+bare *spørsmålet om man var sikker* — foran sletting av bruker, frysing av konto og
+MFA-nullstilling.
+
+Alt går nå gjennom `data-action` (+ `data-arg` for strenger, `data-id` for tall), delegert
+fra `document` i `patients-app.js`, og `data-confirm` i `static/js/ui-actions.js`.
+Skillet mellom `data-arg` og `data-id` er nødvendig fordi `toggleForstehjelper()` slår opp
+med `x.id === id`: en streng ville gitt et stille ikke-treff.
+
+**Trinn 2 — nonce.** Hver request får et nonce fra `secrets.token_urlsafe(16)`, satt på
+`request.csp_nonce` før viewet kjører og lest i templates via `core.context_processors`.
+
+Det som er verdt å vite om nonce: **så snart CSP inneholder et, ignorerer nettleseren
+`unsafe-inline` for samme direktiv.** Det finnes ingen gradvis overgang — enten har hver
+eneste inline `<script>` riktig nonce, eller så kjører den ikke. Fire blokker fantes, i
+`index.html`, `mfa_verify.html` og `admin_status.html` (to).
+
+**Tiltakspunktet «Sjekk om Tabulator og Chart.js krever `unsafe-inline`»:** nei. De lastes
+fra CDN som eksterne `<script src=...>`, og vertsnavnene i `script-src` gjelder fortsatt —
+nonce slår ikke ut allowlisten slik `strict-dynamic` ville gjort.
+
+**`style-src` beholder `unsafe-inline`.** Akseptansekriteriet gjelder kun `script-src`, og
+markup har rundt 50 inline `style=`-attributter pluss stilsetting bygget i
+statistikk-tabellene. Eget stykke arbeid, ikke påbegynt.
+
+**Tester:** `InlineHandlerTests` går gjennom alle maler i alle app-mapper og alle
+JS-moduler og feiler med fil og linjenummer hvis en inline handler dukker opp igjen.
+`CspNonceTests` sjekker at `script-src` mangler `unsafe-inline`, at nonce er unikt per
+request, at hver inline `<script>` har nonce, og — viktigst — at nonce i markup er
+*identisk* med det i headeren. Den siste fanger et nonce generert på feil sted i
+request-syklusen. Begge verifisert ved å reversere endringen midlertidig.
+
+**Manuell QA gjennomført av Andre etter trinn 1:** filterknapper, registreringsskjema med
+tidsstempler, bekreftelsesdialoger i brukeradministrasjonen, og arkivet.
 
 **Verdi:** Middels &nbsp;|&nbsp; **Innsats:** 2 timer
 
@@ -1526,10 +1581,9 @@ uten degradering.
 med at all brukerdata escapes med `escapeHtml()` før innsetting i DOM.
 
 **Oppdatering august 2026:** Den begrunnelsen holdt ikke fullt ut — statistikk-tabellene
-escapet ikke. **Rettet 13. aug. 2026 (N6):** de escaper nå, så begrunnelsen i koden er
-sann igjen og vi mangler ikke lenger begge lagene samtidig. Det gjør dette punktet mindre
-hastende, men ikke unødvendig: `unsafe-inline` er fortsatt det som ville gjort en
-eventuell fremtidig escaping-glipp utnyttbar.
+escapet ikke. Rettet 13. aug. 2026 (N6), og samme dag ble `unsafe-inline` fjernet fra
+`script-src`. Begge lagene er nå på plass: brukerdata escapes, og en eventuell fremtidig
+escaping-glipp er ikke lenger utnyttbar via inline script.
 
 I tillegg har `templates/patients/index.html` rundt 30 inline `onclick=`-handlere. De må
 flyttes til `addEventListener` før `unsafe-inline` kan fjernes fra `script-src` — det er

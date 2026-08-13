@@ -85,13 +85,15 @@ dokumentasjon.
       `invalidate_stats_cache()` er slettet — ingen kalte den, og TTL er hele mekanismen.
 - [x] **N9** `script.js` slettet, dobbeltklikk-vernet testet ved å kjøre guarden i node.
       Tiltakspunkt 3 besvart: grep-i-JS-tester er ikke nok alene.
-- [ ] **F5** CSP-stramming — trinn 1 av 2
-  - [x] Alle inline event-handlere ute av markup (30 `onclick` i templaten, 6 generert
-        fra JS, 2 `oninput`, 7 `onsubmit`-bekreftelser). `InlineHandlerTests` vokter det.
-  - [ ] **Trinn 2:** nonce på de fire inline `<script>`-blokkene, og fjern
-        `unsafe-inline` fra `script-src`. Gjøres først når trinn 1 er verifisert i prod.
-  - [ ] `unsafe-inline` for `style-src` beholdes — utenfor akseptansekriteriet, og 48
-        inline `style=` i markup pluss JS-genererte stiler i statistikk-tabellene.
+- [x] **F5** CSP-stramming — `script-src` har ikke lenger `unsafe-inline`
+  - [x] Trinn 1: alle inline event-handlere ute av markup (30 `onclick` i templaten,
+        6 generert fra JS, 2 `oninput`, 7 `onsubmit`-bekreftelser). Verifisert manuelt
+        i prod før trinn 2. `InlineHandlerTests` vokter det.
+  - [x] Trinn 2: nonce per request på de fire inline `<script>`-blokkene, og
+        `unsafe-inline` fjernet. `CspNonceTests` vokter at markup og header er i takt.
+- [ ] `unsafe-inline` for `style-src` gjenstår. Utenfor F5s akseptansekriterium, men
+      ~50 inline `style=` i markup pluss JS-genererte stiler i statistikk-tabellene må
+      flyttes til CSS-klasser først. Ikke påbegynt.
 - [x] **F7** Betinget lasting av `patients-stats.js`. Bootstrappen måtte flyttes ut
       først (ny `patients-app.js`) — å laste stats-fila betinget uten det ville tatt ned
       appen for `read_only` og `read_write`. read_only laster nå 49 % av admin-bundlen.

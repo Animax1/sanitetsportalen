@@ -41,3 +41,17 @@ def portal_modules(request):
     if user is None or not user.is_authenticated:
         return {'nav_modules': []}
     return {'nav_modules': get_nav_modules(user)}
+
+
+def csp_nonce(request):
+    """Gjør request-ets CSP-nonce tilgjengelig som {{ csp_nonce }}.
+
+    Settes av ``SecurityHeadersMiddleware``. Enhver inline <script> må ha
+    ``nonce="{{ csp_nonce }}"`` — uten det kjører den ikke, siden script-src
+    ikke lenger tillater 'unsafe-inline' (F5).
+
+    Faller tilbake til tom streng hvis middlewaren ikke har kjørt, slik at
+    templates som rendres utenfor request/response-syklusen (feilsider,
+    management-kommandoer) ikke kaster.
+    """
+    return {'csp_nonce': getattr(request, 'csp_nonce', '')}

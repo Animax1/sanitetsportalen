@@ -151,6 +151,7 @@ TEMPLATES = [
                 'django.contrib.messages.context_processors.messages',
                 'core.context_processors.portal_modules',
                 'core.context_processors.notification_unread_count',
+                'core.context_processors.csp_nonce',
             ],
         },
     },

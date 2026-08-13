@@ -18,7 +18,7 @@
 <div id="csrf-token-holder" style="display:none">{% csrf_token %}</div>
 
 <!-- Brukerrolle for JS -->
-<script>
+<script nonce="{{ csp_nonce }}">
   window.USER_ROLE = "{{ request.user.role }}";
   window.USER_NAME = "{{ request.user.username }}";
   window.MY_FORSTEHJELPER_ID  = {{ request.user.forstehjelper_profil.id|default:'null' }};

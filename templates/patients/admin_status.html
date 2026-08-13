@@ -186,7 +186,7 @@
 {% endblock %}
 
 {% block extra_scripts %}
-<script>
+<script nonce="{{ csp_nonce }}">
 const ADMIN_URLS = {
   json:     "{% url 'admin_server_status_json' %}",
   sessions: "{% url 'admin_sessions_list' %}",
@@ -194,7 +194,7 @@ const ADMIN_URLS = {
   killAll:  "{% url 'admin_session_kill_all' %}",
 };
 </script>
-<script>
+<script nonce="{{ csp_nonce }}">
 (function() {
   'use strict';
 

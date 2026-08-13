@@ -4,6 +4,44 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-08-13 — F5, trinn 2: `unsafe-inline` fjernet fra script-src
+
+Trinn 1 er verifisert manuelt i prod — filterknapper, registreringsskjema med
+tidsstempler, bekreftelsesdialoger i brukeradministrasjonen og arkivet. Da kunne headeren
+flippes.
+
+Hver request får nå et nonce fra `secrets.token_urlsafe(16)`, satt på `request.csp_nonce`
+i `SecurityHeadersMiddleware` *før* viewet kjører, og lest i templates via en ny
+context-prosessor. `script-src` er
+`'self' 'nonce-…' https://cdn.jsdelivr.net https://unpkg.com`.
+
+**Det som er verdt å vite om nonce:** så snart CSP inneholder et, ignorerer nettleseren
+`unsafe-inline` for samme direktiv. Det finnes ingen gradvis overgang — enten har hver
+eneste inline `<script>` riktig nonce, eller så kjører den ikke. Fire blokker fantes, i
+`index.html`, `mfa_verify.html` og `admin_status.html` (to).
+
+CDN-bibliotekene er upåvirket. Tabulator, Chart.js og Bootstrap lastes som eksterne
+`<script src=...>`, og vertsnavnene i direktivet gjelder fortsatt — nonce slår ikke ut
+allowlisten slik `strict-dynamic` ville gjort. Det besvarer tiltakspunktet «Sjekk om
+Tabulator og Chart.js krever `unsafe-inline`»: nei.
+
+**`style-src` beholder `unsafe-inline`.** Akseptansekriteriet for F5 gjelder kun
+`script-src`. Markup har rundt 50 inline `style=`-attributter pluss stilsetting bygget i
+statistikk-tabellene; det er et eget stykke arbeid, lagt inn som eget TODO-punkt.
+
+`CspNonceTests` sjekker at direktivet mangler `unsafe-inline`, at nonce er unikt per
+request, at hver inline `<script>` i alle maler har nonce, og — viktigst — at nonce i
+markup er **identisk** med det i headeren. Den siste er den som ville fanget et nonce
+generert på feil sted i request-syklusen. Verifisert ved å fjerne nonce fra `index.html`
+midlertidig: to tester ble røde, både fil-skanningen og den rendrede siden.
+
+Med dette er `unsafe-inline` og den manglende escapingen i statistikk-tabellene lukket
+samme dag. Fram til i dag manglet vi begge lagene samtidig.
+
+730 tester grønne. Ingen databaseendringer.
+
+---
+
 ## 2026-08-13 — F5, trinn 1: inline event-handlere ut av markup
 
 Forberedelse til å fjerne `unsafe-inline` fra CSP-ens `script-src`. **CSP-headeren er

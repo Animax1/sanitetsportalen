@@ -1,6 +1,7 @@
 """Middleware for pasient-appen."""
 import json
 import os
+import secrets
 import time
 import threading
 from collections import deque
@@ -37,16 +38,31 @@ class BackupSchedulerMiddleware:
 # Tillater:
 #   - 'self' for egen origin
 #   - cdn.jsdelivr.net og unpkg.com for Bootstrap/ikoner/QR-kode
-#   - 'unsafe-inline' for style og script (appen har mye inline HTML/CSS)
 #   - data: for bilder (QR-koder rendres som data-URL)
 #
-# Bemerk: 'unsafe-inline' reduserer effekten mot reflektert XSS, men siden
-# all brukerdata escapes med escapeHtml() før innsetting i DOM, er dette
-# akseptabelt som ekstra lag. CSP her hovedsakelig stopper eksterne
-# ressurser fra ukjente domener.
+# ── script-src: nonce, ikke 'unsafe-inline' (F5) ────────────────────────────
+#
+# Direktivet hadde 'unsafe-inline' fram til 13. aug. 2026, begrunnet med at all
+# brukerdata escapes før innsetting i DOM. Den begrunnelsen holdt ikke helt —
+# statistikk-tabellene escapet ikke (N6) — og med begge deler på plass samtidig
+# manglet vi begge lagene.
+#
+# Nå får hver request sitt eget nonce. Konsekvenser å kjenne til:
+#
+#   1. Når CSP inneholder et nonce, IGNORERER nettleseren 'unsafe-inline' for
+#      samme direktiv. Det er ingen mellomting: hver eneste inline <script>
+#      må ha riktig nonce, ellers kjører den ikke.
+#   2. Inline event-handlere (onclick=) dekkes ikke av nonce i det hele tatt.
+#      De er flyttet til data-action; se F5 trinn 1.
+#   3. Vertsnavnene under er fortsatt i kraft — nonce slår ikke ut
+#      allowlisten slik 'strict-dynamic' ville gjort.
+#
+# style-src beholder 'unsafe-inline' med vilje: markup har ~50 inline
+# style-attributter, og statistikk-tabellene bygger flere. Det er utenfor
+# akseptansekriteriet for F5 og et eget stykke arbeid.
 _CSP_DIRECTIVES = [
     "default-src 'self'",
-    "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://unpkg.com",
+    "script-src 'self' 'nonce-{nonce}' https://cdn.jsdelivr.net https://unpkg.com",
     "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://unpkg.com",
     "img-src 'self' data:",
     "font-src 'self' https://cdn.jsdelivr.net data:",
@@ -56,7 +72,7 @@ _CSP_DIRECTIVES = [
     "form-action 'self'",
     "object-src 'none'",
 ]
-_CSP_HEADER = '; '.join(_CSP_DIRECTIVES)
+_CSP_MAL = '; '.join(_CSP_DIRECTIVES)
 
 
 class SecurityHeadersMiddleware:
@@ -65,14 +81,23 @@ class SecurityHeadersMiddleware:
     - Content-Security-Policy: begrenser hvilke ressurser som kan lastes
     - Referrer-Policy: begrenser hva som sendes til eksterne lenker
     - Permissions-Policy: slår av funksjoner vi ikke bruker
+
+    Nonce settes på ``request.csp_nonce`` *før* viewet kjører, slik at
+    templaten kan lese det via context-prosessoren i ``core.context_processors``.
+    Headeren bygges etterpå med samme verdi.
     """
 
     def __init__(self, get_response):
         self.get_response = get_response
 
     def __call__(self, request):
+        # secrets.token_urlsafe gir 128 bits entropi. Nonce må være
+        # uforutsigbart per request — gjenbruk gjør det verdiløst.
+        request.csp_nonce = secrets.token_urlsafe(16)
+
         response = self.get_response(request)
-        response.setdefault('Content-Security-Policy', _CSP_HEADER)
+        response.setdefault(
+            'Content-Security-Policy', _CSP_MAL.format(nonce=request.csp_nonce))
         response.setdefault('Referrer-Policy', 'same-origin')
         response.setdefault(
             'Permissions-Policy',
