@@ -140,23 +140,13 @@ def index_view(request):
 #:
 #: Skal en ny nøkkel ut til frontend, legg den til her bevisst.
 SETTINGS_READ_WHITELIST = frozenset({
-    'event_name',   # arrangementsnavn (legacy, uten år)
+    'event_name',   # arrangementsnavn
     'active_year',  # aktivt år, styrer hvilke pasienter som vises
 })
 
 #: Nøkler `PUT /api/settings/` godtar å skrive. Bevisst smalere enn lese-lista:
 #: `active_year` settes via egne endepunkter, ikke ved fri skriving hit.
 SETTINGS_WRITE_WHITELIST = frozenset({'event_name'})
-
-
-def _readable_settings_keys():
-    """Lesbare nøkler, inkludert den årsavhengige `event_name_<år>`.
-
-    Arrangementsnavnet lagres per år (`event_name_2026`), så nøkkelen kan
-    ikke stå som en konstant. Kun inneværende års navn eksponeres — tidligere
-    års navn hentes via arkivet.
-    """
-    return SETTINGS_READ_WHITELIST | {f'event_name_{get_active_year()}'}
 
 
 @login_required
@@ -166,7 +156,7 @@ def settings_view(request):
     if request.method == 'GET':
         settings_dict = {
             s.key: s.value
-            for s in AppSetting.objects.filter(key__in=_readable_settings_keys())
+            for s in AppSetting.objects.filter(key__in=SETTINGS_READ_WHITELIST)
         }
         return JsonResponse(settings_dict)
 

@@ -1,19 +1,45 @@
 # TODO – Sanitetsportalen
 
+## ⚠️ Krever Andre — kan ikke gjøres fra kodebasen
+
+Disse tre står ikke i kode. De krever Railway-innlogging eller en avgjørelse
+utenfor prosjektet, og blir liggende til du gjør dem. Ingen av dem oppdages av
+testsuiten, og ingen av dem gir feilmelding — de er bare stille inaktive.
+
+- [ ] **Sett `ADMINS` og `EMAIL_*` i Railway.** Uten dem er e-postvarslingen ved
+      uhåndterte feil (F1) helt inert — den skriver til konsoll, og du får aldri
+      beskjed når noe kræsjer i prod.
+      - `ADMINS` har formatet `Navn:epost`, komma-separert
+      - `EMAIL_HOST`, `EMAIL_PORT`, `EMAIL_HOST_USER`, `EMAIL_HOST_PASSWORD`,
+        `EMAIL_USE_TLS`
+      - **Verifiser med en framprovosert 500**, ellers vet du ikke om det virker
+      - Se `docs/FORBEDRINGER_2026-08.md` → F1
+
+- [ ] **Sett opp cron-jobb for `kollaps_arkiv` på Railway.** Uten den kollapser
+      ikke arkiverte pasientrader til aggregat etter 24 måneder, og lagringstiden
+      i personvernprotokollen (del A, punkt A.9) håndheves ikke i praksis. Det er
+      en slettepraksis vi har beskrevet overfor både de registrerte og
+      tilsynsmyndighet.
+      - Framgangsmåte: `docs/OPPSETT_KOLLAPS_CRON.md`
+      - **Slett den fila når jobben er på plass**
+
+- [ ] **Fyll inn organisasjonsnavn i A.4** i `docs/PERSONVERN_DOKUMENTASJON.md`.
+      Står fortsatt som `[fyll inn organisasjonsnavn]`. Dokumentet er
+      behandlingsprotokollen overfor tilsynsmyndighet.
+
 ## Pågående / neste
 
 ### GDPR-gjennomgang — se `docs/GDPR_TILTAKSPLAN.md`
 
 - [x] Fase 0: taushetsplikt avklart (signert erklæring via organisasjonen)
 - [x] Fase 1: personvernprotokoll omskrevet til v1.5 — journalplikt ute, lagringstider korrigert
-- [ ] **Fyll inn organisasjonsnavn i A.4** (står som `[fyll inn organisasjonsnavn]`)
+- [ ] Fyll inn organisasjonsnavn i A.4 — se «Krever Andre» øverst
 - [x] Fase 2.1: serverside-whitelist på kliniske felt (inkl. `lege`)
 - [x] Fase 2.2: `SECRET_KEY` hard-fail når `DEBUG=False`
 - [x] Fase 2.3: slett varsler eldre enn 30 dager
 - [x] Fase 2.4: fjern død «Arkiv (filer)»-seksjon (`archives_view`)
 - [x] Fase 3.1: arkiverte pasientrader kollapser til aggregat etter 24 mnd
-- [ ] **Sett opp cron-jobb for `kollaps_arkiv`** — se `docs/OPPSETT_KOLLAPS_CRON.md`,
-      slett den fila når jobben er på plass
+- [ ] Sett opp cron-jobb for `kollaps_arkiv` — se «Krever Andre» øverst
 - [x] Fase 3.2: arkiv som egen backup-modul
 - [x] Fase 4.1: `VaktArkiv.importert_av` → `SET_NULL` + frosset navn
 
@@ -45,8 +71,7 @@ dokumentasjon.
 - [x] **N2** Audit-feltlista utledes nå fra modellen — et nytt felt kan ikke falle utenfor
 - [x] **N3** `LOGGING` har rot-handler med formatering + `LOG_LEVEL`-variabel
 - [x] **F1** E-postvarsel ved uhåndterte feil, med demping per feiltype
-  - [ ] **Driftsoppgave:** sett `ADMINS` og `EMAIL_*` i Railway, og verifiser med en
-        framprovosert 500. Uten dem er varslingen inert (skriver til konsoll)
+  - [ ] Driftsoppgave: sett `ADMINS` og `EMAIL_*` i Railway — se «Krever Andre» øverst
 - [x] **F2** Var allerede på plass — `purge_old_logs` kjører som Railway Cron Job.
       Gjennomgangens premiss var feil; se rettelse i FORBEDRINGER og S7
 - [x] **N5** `current_local_year()` brukes begge steder — nyttårsvakter havner i riktig år
@@ -74,7 +99,7 @@ dokumentasjon.
       `choices.py` med `--force` som utvei. Vaktpost mot nye uescapede tabeller i
       `patients/tests_xss_stats.py`.
       **NB:** F5 (CSP `unsafe-inline`) ble ikke tatt med, tross anbefalingen i dokumentet.
-      **Gjenstår:** backup-restore via `loaddata` er den siste uvaliderte veien inn i basen.
+      Backup-restore er også dekket nå — se punktet under.
 - [x] **N10** `CustomUser.current_session_key` gjør innlogging til ett indeksert oppslag.
       Sikkerhetsstiene (passordbytte, admin-reset, frys, sletting) beholder full
       gjennomgang. **NB: krever migrasjon** — `accounts/0008_customuser_current_session_key`
@@ -92,18 +117,15 @@ dokumentasjon.
 - [ ] Fjerne varsler eldre enn 30 dager.s
 - [ ] Lage locus klone, hente sted via enhet gps.
 - [x] Slå sammen de to backup-flatene — kun `/portal-admin/backup/` gjenstår
-- [ ] Rydd bort det ubrukte per-år-arrangementsnavnet. `set_event_name()`,
-      `get_event_name()` og `get_event_name_or_legacy()` i `patients/services.py` kalles
-      ikke fra noe sted — hele mekanismen med `event_name_<år>` er aldri tatt i bruk, og
-      `event_name` uten år er det eneste som faktisk skrives og leses. Enten fullfør
-      overgangen til per-år-lagring (arkivet trenger det strengt tatt ikke, det fryser
-      `arrangement_navn` selv), eller slett de tre funksjonene og whitelist-oppføringen
-      `event_name_<år>` i `SETTINGS_READ_WHITELIST`.
-- [ ] Valider kliniske felt ved backup-restore. Restore kjører `loaddata`, som går utenom
-      `validate_patient_choice_fields`. Etter N6 er dette den siste veien inn i databasen
-      der en verdi utenfor whitelisten i `patients/choices.py` kan lande. Lavere risiko enn
-      import-veien var, siden innholdet kommer fra våre egne backup-filer — men det er den
-      som står igjen.
+- [x] Ryddet bort det ubrukte per-år-arrangementsnavnet — `set_event_name()`,
+      `get_event_name()` og `get_event_name_or_legacy()` er slettet, sammen med
+      `event_name_<år>` i `SETTINGS_READ_WHITELIST`. Ingen kalte dem.
+- [x] Kliniske felt kontrolleres ved backup-restore. `BaseBackupHandler.inspect_restore_payload()`
+      ser over fixturen før `loaddata`, og `PatientsBackupHandler` sjekker mot
+      `patients/choices.py`. **Kontrollen advarer, den blokkerer ikke** — restore er
+      nødstien og skal aldri kunne stoppes av en verdi som var lovlig da den ble lagret.
+      Motsatt av `import_offline_data`, som avbryter og krever `--force`; forskjellen er
+      tilsiktet og begrunnet i docstringen.
 - [ ] Rydd bort død backup-legacy: modellen `patients.BackupConfig` (singleton som
       ingenting leser lenger) og management-kommandoen `db_backup` som gater på den.
       Krever migrasjon, derfor egen oppgave.

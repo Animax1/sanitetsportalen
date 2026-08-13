@@ -776,3 +776,119 @@ class BackupConstantsTests(TestCase):
             path = get_backup_dir()
         self.assertTrue(path.exists())
         self.assertTrue(path.is_dir())
+
+
+class RestorePayloadInspectionTests(TestCase):
+    """Kontroll av fixturen før loaddata (siste uvaliderte vei inn i basen).
+
+    `loaddata` går utenom all applikasjonsvalidering. API-et validerer mot
+    whitelisten i `patients/choices.py`, og `import_offline_data` fikk samme
+    kontroll i N6 — restore var det siste hullet.
+
+    Kontrollen *advarer*, den blokkerer ikke. Restore er nødstien, og skal
+    aldri kunne stoppes av en verdi som var lovlig da den ble lagret.
+    """
+
+    def setUp(self) -> None:
+        _restore_patients_handler()
+        self.backup_dir = _prepare_backup_dir()
+        self.admin = CustomUser.objects.create_user(
+            username='admin_inspect', password='pwd', role='admin',
+            must_change_password=False,
+        )
+
+    def _handler(self):
+        from patients.backup import PatientsBackupHandler
+        return PatientsBackupHandler()
+
+    def _pasient(self, **felter):
+        return {'model': 'patients.patient', 'pk': 1, 'fields': felter}
+
+    def test_gyldige_verdier_gir_ingen_advarsel(self):
+        advarsler = self._handler().inspect_restore_payload([
+            self._pasient(problemstilling='Brystsmerter', grovsortering='Rød'),
+        ])
+        self.assertEqual(advarsler, [])
+
+    def test_tomme_felt_er_greit(self):
+        """Et tomt felt betyr «ikke utfylt ennå», ikke et avvik."""
+        advarsler = self._handler().inspect_restore_payload([
+            self._pasient(problemstilling='', grovsortering=None),
+        ])
+        self.assertEqual(advarsler, [])
+
+    def test_verdi_utenfor_whitelisten_gir_advarsel(self):
+        advarsler = self._handler().inspect_restore_payload([
+            self._pasient(problemstilling='<img src=x onerror=alert(1)>'),
+        ])
+        self.assertEqual(len(advarsler), 1)
+        self.assertIn('problemstilling', advarsler[0])
+        self.assertIn('onerror', advarsler[0])
+
+    def test_like_avvik_slaas_sammen_med_antall(self):
+        """Rapporten er per felt og verdi, ikke én linje per pasient."""
+        advarsler = self._handler().inspect_restore_payload([
+            self._pasient(problemstilling='Utgått verdi'),
+            self._pasient(problemstilling='Utgått verdi'),
+            self._pasient(problemstilling='Utgått verdi'),
+        ])
+        self.assertEqual(len(advarsler), 1)
+        self.assertIn('3 rad(er)', advarsler[0])
+
+    def test_lange_verdier_forkortes(self):
+        """Feltet kan i prinsippet være vilkårlig lang fritekst."""
+        advarsler = self._handler().inspect_restore_payload([
+            self._pasient(problemstilling='A' * 500),
+        ])
+        self.assertEqual(len(advarsler), 1)
+        self.assertIn('...', advarsler[0])
+        self.assertLess(len(advarsler[0]), 250)
+
+    def test_andre_modeller_ignoreres(self):
+        """Kun Patient har kliniske felt."""
+        advarsler = self._handler().inspect_restore_payload([
+            {'model': 'patients.forstehjelper', 'pk': 1,
+             'fields': {'name': 'Hvem som helst', 'is_active': True}},
+        ])
+        self.assertEqual(advarsler, [])
+
+    def test_restore_blokkeres_ikke_av_ugyldig_verdi(self):
+        """Selve poenget: nødstien skal alltid gå gjennom.
+
+        En pasient med en verdi utenfor whitelisten legges inn direkte i
+        databasen, backupes, og gjenopprettes. Restoren skal fullføre, og
+        raden skal komme tilbake uendret.
+        """
+        Patient.objects.create(
+            pasientnummer=77, year=2025, problemstilling='Verdi fra gammel versjon',
+        )
+        with patch.dict(os.environ, {'BACKUP_DIR': str(self.backup_dir)}):
+            backup = create_backup(slug='patients', kind=KIND_MANUAL, user=self.admin)
+            Patient.objects.all().delete()
+
+            with self.assertLogs('core.backup', level='WARNING') as logg:
+                restore_backup(backup, user=self.admin)
+
+        self.assertTrue(
+            any('problemstilling' in linje for linje in logg.output),
+            f'Forventet advarsel om problemstilling, fikk: {logg.output}')
+        gjenopprettet = Patient.objects.get(pasientnummer=77)
+        self.assertEqual(gjenopprettet.problemstilling, 'Verdi fra gammel versjon')
+
+    def test_oedelagt_fixture_stopper_ikke_restore(self):
+        """Kontrollen skal aldri være grunnen til at en gjenoppretting feiler."""
+        from core.backup.service import _inspect_payload
+
+        self.assertEqual(_inspect_payload(self._handler(), b'ikke json', 'x.gz'), [])
+        self.assertEqual(_inspect_payload(self._handler(), b'{"ikke": "liste"}', 'x.gz'), [])
+
+    def test_handler_som_kaster_stopper_ikke_restore(self):
+        from core.backup.service import _inspect_payload
+
+        class Sprengt(BaseBackupHandler):
+            slug = 'sprengt'
+
+            def inspect_restore_payload(self, objects):
+                raise RuntimeError('noe gikk galt')
+
+        self.assertEqual(_inspect_payload(Sprengt(), b'[]', 'x.gz'), [])

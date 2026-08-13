@@ -74,6 +74,24 @@ class BaseBackupHandler:
         """Returner modeller som skal slettes før loaddata. Default: self.restore_models."""
         return list(self.restore_models)
 
+    def inspect_restore_payload(self, objects: list[dict]) -> list[str]:
+        """Se over fixturen før den lastes. Returner en liste med advarsler.
+
+        Kalles av ``restore_backup()`` med de deserialiserte objektene fra
+        backup-fila. Default: ingen kontroll.
+
+        **Advarsler stopper ikke gjenopprettingen.** Det er et bevisst valg:
+        restore er nødstien, og skal aldri kunne blokkeres av en verdi som
+        var lovlig den gangen den ble lagret. Kontrollen finnes for å gi
+        beskjed om hva som kom inn, ikke for å nekte.
+
+        Sammenlign med ``import_offline_data``, som *avbryter* på ugyldige
+        verdier og krever ``--force``. Forskjellen er tilsiktet: importen tar
+        inn fremmed data i en rolig stund, mens restore henter tilbake våre
+        egne data i en stresset situasjon.
+        """
+        return []
+
     def get_strip_fields(self) -> dict[str, list[str]]:
         """Returner felter som skal fjernes fra dumpen. Default: self.strip_fields.
 

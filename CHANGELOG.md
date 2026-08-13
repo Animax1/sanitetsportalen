@@ -4,6 +4,44 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-08-13 — Restore-kontroll, dødt per-år-navn fjernet, driftsoppgaver løftet i TODO
+
+**Kliniske felt kontrolleres ved backup-restore.** `loaddata` går utenom all
+applikasjonsvalidering, og var etter N6 den siste veien inn i databasen der en verdi
+utenfor whitelisten kunne lande usett. Ny hook `BaseBackupHandler.inspect_restore_payload()`
+kalles fra `restore_backup()` med de deserialiserte objektene;
+`PatientsBackupHandler` sjekker mot `patients/choices.py` og rapporterer per felt og verdi,
+med antall rader.
+
+**Kontrollen advarer, den blokkerer ikke.** Det er et bevisst valg og motsatt av
+`import_offline_data`, som avbryter og krever `--force`. Forskjellen: importen tar inn
+fremmed data i en rolig stund, mens restore henter tilbake våre egne data i en stresset
+situasjon. En backup fra før whitelisten ble innført må kunne gjenopprettes — å nekte det
+ville gjort verktøyet ubrukelig akkurat når man trenger det. `_inspect_payload()` svelger
+dessuten alle feil, slik at ødelagt JSON eller en handler som kaster aldri kan bli grunnen
+til at en gjenoppretting feiler.
+
+Ni tester, inkludert at en restore med ugyldig verdi fullfører, logger advarsel, og gir
+raden tilbake uendret.
+
+**Dødt per-år-arrangementsnavn fjernet.** `set_event_name()`, `get_event_name()` og
+`get_event_name_or_legacy()` ble aldri kalt fra noe sted — mekanismen med `event_name_<år>`
+er aldri tatt i bruk. Slettet, sammen med whitelist-oppføringen i
+`SETTINGS_READ_WHITELIST` fra N12, som dermed beskyttet en nøkkel ingenting skriver.
+
+En test avslørte underveis at den passerte på en bivirkning: `_readable_settings_keys()`
+kalte `get_active_year()`, som *oppretter* `active_year`-raden. Uten det kallet fantes ikke
+raden i testen. Testen oppretter den nå eksplisitt.
+
+**TODO-en er omstrukturert.** De tre oppgavene som krever Railway-tilgang eller en
+avgjørelse utenfor prosjektet ligger nå i en egen seksjon øverst, med konsekvens beskrevet
+for hver. Felles for dem: ingen oppdages av testsuiten, ingen gir feilmelding — de er bare
+stille inaktive, som er nettopp derfor de har blitt liggende.
+
+712 tester grønne. Ingen databaseendringer.
+
+---
+
 ## 2026-08-13 — Fiks: template-kommentar rendret som synlig tekst
 
 Kommentaren som ble lagt inn i forrige commit sto synlig i headeren for brukerne.

@@ -210,6 +210,25 @@ def enforce_cap(slug: str, max_backups: int) -> int:
     return deleted
 
 
+def _inspect_payload(handler, raw: bytes, filename: str) -> list[str]:
+    """Kjør handlerens kontroll av fixturen. Skal aldri kaste.
+
+    En feil her — ødelagt JSON, en handler som kaster — må ikke hindre en
+    gjenoppretting. Kontrollen er opplysning, ikke en portvokter.
+    """
+    try:
+        objects = json.loads(raw.decode('utf-8'))
+        if not isinstance(objects, list):
+            return []
+        return handler.inspect_restore_payload(objects)
+    except Exception as exc:  # noqa: BLE001 — se docstring
+        logger.warning(
+            'core.backup: kunne ikke se over %s før gjenoppretting: %s',
+            filename, exc,
+        )
+        return []
+
+
 def restore_backup(backup, user=None) -> None:
     """Gjenopprett en backup for modulen den tilhører.
 
@@ -244,6 +263,13 @@ def restore_backup(backup, user=None) -> None:
 
     with gzip.open(path, 'rb') as f:
         raw = f.read()
+
+    # Se over innholdet før det lastes. loaddata går utenom all
+    # applikasjonsvalidering, så dette er eneste stedet vi får sjekket hva
+    # som faktisk kommer inn. Advarsler logges — de stopper ikke restoren,
+    # se BaseBackupHandler.inspect_restore_payload().
+    for advarsel in _inspect_payload(handler, raw, backup.filename):
+        logger.warning('core.backup: %s', advarsel)
 
     # Slett-rekkefølge bestemt av handler.
     restore_models = handler.get_restore_models()

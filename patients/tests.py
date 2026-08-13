@@ -1348,10 +1348,12 @@ class SettingsWhitelistTests(TestCase):
         AppSetting.set('next_patient_nr', 42)
         AppSetting.set('session_timeout_hours', 8)
         AppSetting.set('feature.live_stats_enabled', 'false')
+        # Per-år-navn ble aldri tatt i bruk; mekanismen er slettet.
+        AppSetting.set('event_name_2026', 'Skulle ikke vært her')
 
         data = self._get()
         for key in ('next_patient_nr', 'session_timeout_hours',
-                    'feature.live_stats_enabled'):
+                    'feature.live_stats_enabled', 'event_name_2026'):
             self.assertNotIn(key, data, f'{key} lekker via GET /api/settings/')
 
     def test_event_name_er_med(self):
@@ -1359,27 +1361,18 @@ class SettingsWhitelistTests(TestCase):
         AppSetting.set('event_name', 'Festivalen 2026')
         self.assertEqual(self._get().get('event_name'), 'Festivalen 2026')
 
-    def test_event_name_for_aktivt_aar_er_med(self):
-        """Arrangementsnavnet lagres per år, så nøkkelen er dynamisk."""
+    def test_active_year_er_med(self):
+        """Aktivt år styrer hvilke pasienter klienten viser.
+
+        `get_active_year()` oppretter raden første gang den kalles, så den må
+        kalles eksplisitt her. Endepunktet oppretter den ikke selv — det leser
+        bare `AppSetting`.
+        """
         from patients.services import get_active_year
         aar = get_active_year()
-        AppSetting.set(f'event_name_{aar}', f'Festivalen {aar}')
 
         data = self._get()
-        self.assertEqual(data.get(f'event_name_{aar}'), f'Festivalen {aar}')
-
-    def test_event_name_for_andre_aar_er_ikke_med(self):
-        """Kun inneværende års navn — tidligere år hentes via arkivet."""
-        from patients.services import get_active_year
-        annet_aar = get_active_year() - 1
-        AppSetting.set(f'event_name_{annet_aar}', 'Fjorårets festival')
-
-        self.assertNotIn(f'event_name_{annet_aar}', self._get())
-
-    def test_active_year_er_med(self):
-        """Aktivt år styrer hvilke pasienter klienten viser."""
-        data = self._get()
-        self.assertIn('active_year', data)
+        self.assertEqual(data.get('active_year'), str(aar))
 
     def test_put_kan_ikke_skrive_utenfor_sin_egen_whitelist(self):
         """PUT-lista er smalere enn lese-lista og skal forbli det."""

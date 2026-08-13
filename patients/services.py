@@ -145,24 +145,14 @@ def set_active_year(year):
     AppSetting.set('active_year', int(year))
 
 
-# ── Arrangementsnavn per år ────────────────────────────────────────────────────
-
-def get_event_name(year):
-    """Returner arrangementsnavn for et år, eller tom streng."""
-    return AppSetting.get(f'event_name_{year}', '') or ''
-
-
-def set_event_name(year, name):
-    """Sett arrangementsnavn for et år."""
-    AppSetting.set(f'event_name_{year}', (name or '').strip())
-
-
-def get_event_name_or_legacy(year):
-    """Prøv først event_name_<year>, fall tilbake til gammel 'event_name'."""
-    per_year = get_event_name(year)
-    if per_year:
-        return per_year
-    return AppSetting.get('event_name', '') or ''
+# ── Arrangementsnavn ──────────────────────────────────────────────────────────
+# Navnet ligger på AppSetting-nøkkelen `event_name`, skrives av
+# PUT /api/settings/ og leses av index_view og loadSettings().
+#
+# En mekanisme for navn per år (`event_name_<år>`) fantes her tidligere med
+# get_event_name/set_event_name/get_event_name_or_legacy, men ingen av dem ble
+# noen gang kalt. Arkivet trenger den ikke — VaktArkiv fryser
+# `arrangement_navn` på seg selv ved arkivering. Slettet 13. aug. 2026.
 
 
 # ── Automatisk tidsstempel for påbegynt behandling ────────────────────────────

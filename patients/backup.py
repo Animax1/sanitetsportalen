@@ -48,6 +48,47 @@ class PatientsBackupHandler(BaseBackupHandler):
         'patients.AppSetting',
     ]
 
+    def inspect_restore_payload(self, objects):
+        """Se over kliniske felt i fixturen mot whitelisten i choices.py.
+
+        `loaddata` går utenom all applikasjonsvalidering, så dette var den
+        siste veien inn i databasen der en verdi utenfor whitelisten kunne
+        lande usett. API-et validerer, og `import_offline_data` fikk samme
+        kontroll i N6.
+
+        Rapporten er per felt og verdi, ikke per rad — er en backup fra før
+        whitelisten ble innført, er poenget å se *hva* som avviker, ikke å få
+        én linje per pasient. Verdiene forkortes: de kan i prinsippet være
+        vilkårlig lang fritekst, og loggen skal fortsatt være lesbar.
+
+        Advarslene stopper ikke gjenopprettingen — se base-klassen.
+        """
+        from collections import Counter
+
+        from .choices import CHOICE_FIELDS
+
+        avvik = Counter()
+        for obj in objects:
+            if not isinstance(obj, dict) or obj.get('model') != 'patients.patient':
+                continue
+            felter = obj.get('fields') or {}
+            for felt, tillatte in CHOICE_FIELDS.items():
+                verdi = felter.get(felt)
+                if verdi in (None, ''):
+                    continue
+                if str(verdi).strip() not in tillatte:
+                    avvik[(felt, str(verdi))] += 1
+
+        advarsler = []
+        for (felt, verdi), antall in sorted(avvik.items()):
+            vist = verdi if len(verdi) <= 60 else verdi[:57] + '...'
+            advarsler.append(
+                f'gjenoppretting: {felt}={vist!r} er ikke en gyldig verdi '
+                f'({antall} rad(er)). Backupen er eldre enn whitelisten, '
+                f'eller dataene er endret utenfor API-et.'
+            )
+        return advarsler
+
 
 class ArkivBackupHandler(BaseBackupHandler):
     """Backup-handler for vaktarkivet.
