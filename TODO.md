@@ -45,8 +45,12 @@ dokumentasjon.
       teksten nå — se `docs/FORBEDRINGER_2026-08.md`
 - [ ] **N2** Legg `helsepersonell_ref_id` i `felt_to_track` — endringen logges ikke i dag
       (`patients/signals.py:70`)
-- [ ] **N3** Gi `LOGGING` en rot-handler — all INFO-logging forsvinner i prod i dag
-      (`myproject/settings.py:310`)
+- [x] **N3** `LOGGING` har rot-handler med formatering + `LOG_LEVEL`-variabel
+- [x] **F1** E-postvarsel ved uhåndterte feil, med demping per feiltype
+  - [ ] **Driftsoppgave:** sett `ADMINS` og `EMAIL_*` i Railway, og verifiser med en
+        framprovosert 500. Uten dem er varslingen inert (skriver til konsoll)
+- [x] **F2** Var allerede på plass — `purge_old_logs` kjører som Railway Cron Job.
+      Gjennomgangens premiss var feil; se rettelse i FORBEDRINGER og S7
 - [ ] **N4** MFA-steget deler én rate-limit-bøtte for alle brukere — kan gi 429 ved vaktstart
       (`accounts/views.py:141`)
 

@@ -22,7 +22,7 @@ Status: ⏳ pending · 🔧 påbegynt · ✅ ferdig · ⚪ ikke aktuell
 |---|---|---|---|---|---|
 | N1 | **Åpen redirect i innloggingsflyten (`next` valideres ikke)** | ✅ | Høy | 1 t | Sikkerhet |
 | N2 | **`helsepersonell_ref` mangler i audit-sporingen** | ⏳ | Høy | 30 min | Personvern / sporbarhet |
-| N3 | **Applikasjonsloggene når aldri fram (LOGGING mangler rot-handler)** | ⏳ | Høy | 30 min | Drift |
+| N3 | **Applikasjonsloggene når aldri fram (LOGGING mangler rot-handler)** | ✅ | Høy | 30 min | Drift |
 | N4 | **MFA-steget deler én rate-limit-bøtte — kan låse ute hele vakten** | ✅ | Høy | 1–2 t | Drift / sikkerhet |
 | N5 | `get_active_year()` og `Patient.save()` bruker container-tid | ⏳ | Middels–Høy | 30 min | Korrekthet |
 | N6 | Statistikk-tabellene setter inn feltverdier uescapet i `innerHTML` | ⏳ | Middels | 2 t | Sikkerhet (dybdeforsvar) |
@@ -50,8 +50,8 @@ Status: ⏳ pending · 🔧 påbegynt · ✅ ferdig · ⚪ ikke aktuell
 
 | # | Tittel | Opprinnelig nr. | Status | Verdi | Innsats |
 |---|---|---|---|---|---|
-| F1 | E-postvarsel ved kritiske feil (uten Sentry) | #3 | ⏳ | Høy | 2–3 t |
-| F2 | Automatisert audit-purge (`purge_old_logs` i scheduler/cron) | #13 | ⏳ | Middels–Høy | 1–2 t |
+| F1 | E-postvarsel ved kritiske feil (uten Sentry) | #3 | ✅ | Høy | 2–3 t |
+| F2 | Automatisert audit-purge (`purge_old_logs` i scheduler/cron) | ✅ | Middels–Høy | — |
 | F3 | Server-side idempotency for pasient-opprettelse (Fix B) | #18 | ⏳ | Middels–Høy | 2–3 t |
 | F4 | Lasttest-script før stor vakt | #7 | ⏳ | Middels | 3–4 t |
 | F5 | CSP-stramming (fjerne `unsafe-inline`) | #8 | ⏳ | Middels | 2 t |
@@ -191,7 +191,12 @@ som itererer modellens felter og feiler hvis noen mangler i `felt_to_track`.
 
 ---
 
-## N3. Applikasjonsloggene når aldri fram
+## N3. Applikasjonsloggene når aldri fram &nbsp;—&nbsp; ✅ GJENNOMFØRT (13. aug. 2026)
+
+**Status:** Løst. `LOGGING` har nå rot-logger med handler, en `standard`-formatter med
+tidsstempel, loggernavn og nivå, og `LOG_LEVEL` som miljøvariabel (default INFO) slik at
+man kan skru til DEBUG på Railway uten deploy. Verifisert at INFO fra `patients`, `core` og
+`accounts` faktisk når stdout formatert.
 
 **Verdi:** Høy &nbsp;|&nbsp; **Innsats:** 30 min &nbsp;|&nbsp; **Type:** Drift
 
@@ -1018,19 +1023,29 @@ dokumentet stemmer ikke med koden slik den er i dag:
 | Påstand | Hvor | Faktisk tilstand |
 |---|---|---|
 | «Alle pasient-endringer logges på felt-nivå» (A.10) | `patient_pre_save` | `helsepersonell_ref_id` mangler i `felt_to_track` — se N2. Endring av oppfølgingsansvarlig etterlater ingen spor |
-| Lagringstid 730 dager (logger) / 30 dager (varsler) (A.9) | `purge_old_logs` | Kommandoen finnes og er komplett, men er aldri satt opp som cron-jobb — se F2. De dokumenterte fristene håndheves ikke |
+| ~~Lagringstid 730 dager (logger) / 30 dager (varsler) (A.9)~~ | `purge_old_logs` | ✅ **Ikke et avvik.** Kommandoen kjører som aktiv Railway Cron Job — se F2. Gjennomgangen antok feilaktig at den ikke var satt opp, fordi jobben ikke er synlig i repoet |
 | «manuell `escapeHtml()` i JavaScript» (A.10, §7.9) | statistikk-tabellene | `mkStatsTable`/`mkCrosstab`/`mkObsTable` setter feltverdier uescapet i `innerHTML` — se N6. Referansen i dokumentet stemmer for arkiv-visningen, ikke for statistikkfanen |
 | «Passord-hashing (argon2 / PBKDF2)» (§7.1) | `settings.py` / `requirements.txt` | Argon2 er ikke installert. A.10 sier dette riktig («Argon2 er ikke installert i dag»), §7.1 i teknisk dokumentasjon sier det feil |
 
-Det mest alvorlige er lagringstidene. Dokumentet beskriver overfor de registrerte (del B)
-og overfor tilsynsmyndighet (del A) en slettepraksis som ikke finner sted i produksjon.
-Det er forskjellen mellom en dokumentert kontroll og en reell kontroll — og det er
-nøyaktig den forskjellen art. 5(2) ber oss unngå.
+**Rettelse 13. august 2026:** punktet om lagringstider var det som ble beskrevet som mest
+alvorlig her, siden det gjaldt en slettepraksis dokumentert overfor både de registrerte
+(del B) og tilsynsmyndighet (del A). **Det stemte ikke.** `purge_old_logs` kjører som
+aktiv Railway Cron Job, og fristene håndheves. Feilen oppsto fordi cron-jobben lever i
+Railway-dashbordet og ikke er synlig i koden — gjennomgangen leste fravær i repoet som
+fravær i drift.
+
+Det er verdt å merke seg hva slags feil dette er: en gjennomgang som *påstår* et
+GDPR-avvik som ikke finnes, er ikke ufarlig. Den kunne utløst unødvendig arbeid, og i verste
+fall en unødvendig avviksmelding. Infrastruktur utenfor repoet må verifiseres med den som
+eier driften før den skrives ned som funn.
+
+De tre gjenstående punktene i tabellen står ved lag.
 
 **Tiltak:**
 
-1. **Rett koden, ikke dokumentet, for N2 og F2** — de er reelle mangler (se egne punkter).
-   Når de er lukket, blir påstandene sanne igjen uten at teksten må endres.
+1. **Rett koden, ikke dokumentet, for N2** — det er en reell mangel (se eget punkt). Når
+   den er lukket, blir påstanden sann igjen uten at teksten må endres. F2 viste seg å ikke
+   være et avvik i det hele tatt.
 2. **Rett dokumentet for de to andre:** presiser i A.10/§7.9 at `escapeHtml()`/`_escHtml`
    dekker arkiv-visningen og pasientskjemaet, ikke (ennå) statistikk-tabellene — inntil N6
    er lukket. Rett §7.1 til å matche A.10s mer presise formulering om Argon2.
@@ -1039,8 +1054,8 @@ nøyaktig den forskjellen art. 5(2) ber oss unngå.
    Ingen slik kobling finnes i dag — det er sånn disse fire oppsto.
 
 **Akseptansekriterium:** Hver påstand i A.9, A.10 og kapittel 7 i teknisk dokumentasjon
-kan verifiseres direkte mot kjørende kode. Ingen krysser N2 eller F2 av som løst uten å
-sjekke om personverndokumentasjonen fortsatt er korrekt.
+kan verifiseres direkte mot kjørende kode **eller mot dokumentert drift**. Ingen krysser N2
+av som løst uten å sjekke om personverndokumentasjonen fortsatt er korrekt.
 
 ---
 
@@ -1075,7 +1090,28 @@ Der gjennomgangen i august har avdekket noe nytt om punktet, er det notert som
 
 ---
 
-## F1. E-postvarsel ved kritiske feil (uten Sentry)
+## F1. E-postvarsel ved kritiske feil &nbsp;—&nbsp; ✅ GJENNOMFØRT (13. aug. 2026)
+
+**Status:** Løst, og tatt i samme runde som N3 slik oppdateringen anbefalte — `LOGGING`
+måtte uansett bygges om, og `AdminEmailHandler` hektet naturlig på der.
+
+`django.request` logger nå til både konsoll og `mail_admins`. Dempingen ligger i
+`core/log_filters.py::ThrottleByMessageFilter`: maks én mail per feiltype per 15 minutter,
+der «feiltype» er (logger, nivå, fil, linje) og ikke meldingsteksten. Grunnen er at samme
+kodefeil ofte gir varierende tekst — ulike pasient-ID-er, ulike verdier — og en tekstbasert
+nøkkel ville sluppet gjennom hver variant som om den var ny.
+
+Filterets state er per prosess. Med to arbeidere kan man i verste fall få to mailer per
+vindu. Det er et bevisst valg: alternativet er delt state i Redis, som ville gjort
+varslingsstien avhengig av at Redis er oppe — nøyaktig det man ikke vil når man varsler om
+at noe er galt.
+
+**Uten SMTP-variabler er alt inert.** `EMAIL_BACKEND` faller tilbake til konsoll, så
+ingenting feiler før `EMAIL_HOST` og `ADMINS` faktisk settes i Railway. Variablene er
+dokumentert i `.env.example`.
+
+**Gjenstår som driftsoppgave:** sett `ADMINS` og SMTP-variablene i Railway, og verifiser med
+en framprovosert 500.
 
 *Opprinnelig FORBEDRINGER #2 → senere #3*
 
@@ -1104,7 +1140,28 @@ stacktrace innen 1 minutt. Maks 1 mail per 15 min for samme feiltype.
 
 ---
 
-## F2. Automatisert audit-purge i scheduler/cron
+## F2. Automatisert audit-purge &nbsp;—&nbsp; ✅ ALLEREDE PÅ PLASS
+
+**Status 13. august 2026: premisset i dette punktet var feil.** `purge_old_logs` **kjører**
+som aktiv Railway Cron Job — bekreftet av brukeren. Kommandoens docstring sa det hele tiden
+(«Kjøres av Railway Cron»); det var gjennomgangen i august som feilaktig antok at den ikke
+var satt opp, fordi jobben ikke er synlig i repoet.
+
+Lagringstidene i `PERSONVERN_DOKUMENTASJON.md` A.9 håndheves altså i praksis. **Det retter
+samtidig ett av de fire avvikene i S7** — det som ble beskrevet som mest alvorlig, siden det
+gjaldt en slettepraksis dokumentert overfor både de registrerte og tilsynsmyndighet.
+
+En in-process scheduler (`RetentionSchedulerMiddleware`) ble bygget og deretter rullet
+tilbake da dette kom fram. To mekanismer som sletter de samme radene, hvorav den ene er
+usynlig inne i web-prosessen, er verre enn én eksplisitt cron-jobb.
+
+**Lærdom for framtidige gjennomganger:** infrastruktur som lever i Railway-dashbordet er
+ikke synlig i koden. «Finnes ikke i repoet» er ikke det samme som «er ikke satt opp», og
+slike antakelser må verifiseres med den som eier driften før de skrives ned som funn.
+
+**Gjenstår:** cron-jobb for `kollaps_arkiv` (`docs/OPPSETT_KOLLAPS_CRON.md`). Brukeren
+setter opp den. Den holdes bevisst adskilt fra `purge_old_logs` fordi den sletter
+helseopplysninger permanent.
 
 *Opprinnelig FORBEDRINGER #13*
 

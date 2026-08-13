@@ -4,6 +4,52 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-08-13 — Drift: logging som når fram (N3) og e-postvarsel ved feil (F1)
+
+**Applikasjonsloggene har aldri nådd fram (N3).** `LOGGING` hadde én logger (`memory`) og
+ingen rot-logger. Alt `patients`, `core` og `accounts` logget propagerte opp til en rot uten
+handler, og havnet i Pythons `lastResort` — som skriver til stderr først fra WARNING. All
+INFO-logging var altså slått av i produksjon, inkludert nettopp de linjene RUNBOOK-en ber
+deg lete etter for å verifisere at backup kjører.
+
+Nå: rot-logger med handler, `standard`-formatter med tidsstempel, loggernavn og nivå, og
+`LOG_LEVEL` som miljøvariabel (default `INFO`) slik at man kan skru til DEBUG på Railway
+uten deploy. Verifisert at INFO fra alle tre appene faktisk når stdout formatert.
+
+**E-postvarsel ved kritiske feil (F1).** Tatt i samme runde som N3, slik backloggen
+anbefalte — `LOGGING` måtte uansett bygges om. `django.request` logger nå til både konsoll
+og `mail_admins`. Dempingen ligger i `core/log_filters.py::ThrottleByMessageFilter`: maks
+én mail per feiltype per 15 minutter, der feiltype er (logger, nivå, fil, linje) og ikke
+meldingsteksten — samme kodefeil gir ofte varierende tekst (ulike pasient-ID-er), og en
+tekstbasert nøkkel ville sluppet gjennom hver variant som om den var ny.
+
+Filterets state er per prosess, så med to arbeidere kan man i verste fall få to mailer per
+vindu. Bevisst valg: delt state i Redis ville gjort varslingsstien avhengig av at Redis er
+oppe, nøyaktig det man ikke vil når man varsler om at noe er galt.
+
+Uten SMTP-variabler er alt inert — `EMAIL_BACKEND` faller tilbake til konsoll. Variablene
+er dokumentert i `.env.example` og `CLAUDE.md`.
+
+**Rettelse av F2 og S7 — et funn som ikke var et funn.** Augustgjennomgangen skrev at
+`purge_old_logs` aldri var satt opp som cron-jobb, og at lagringstidene på 730/30 dager i
+`PERSONVERN_DOKUMENTASJON.md` A.9 dermed var en dokumentert, men ikke reell kontroll. S7
+beskrev dette som det mest alvorlige av fire dokumentasjonsavvik, siden det gjaldt en
+slettepraksis oppgitt overfor både de registrerte og tilsynsmyndighet.
+
+**Det stemte ikke.** Jobben kjører som aktiv Railway Cron Job. Feilen oppsto fordi
+cron-jobber lever i Railway-dashbordet og ikke er synlige i repoet — gjennomgangen leste
+fravær i koden som fravær i drift. En in-process scheduler ble bygget og deretter rullet
+tilbake da dette kom fram; to mekanismer som sletter de samme radene, hvorav den ene er
+usynlig inne i web-prosessen, er verre enn én eksplisitt cron-jobb.
+
+F2 og den ene raden i S7 er rettet i backloggen, med lærdommen notert: infrastruktur
+utenfor repoet må verifiseres med den som eier driften før den skrives ned som funn. En
+gjennomgang som påstår et GDPR-avvik som ikke finnes, er ikke ufarlig.
+
+10 nye tester i `core/tests_drift.py`. Full suite: 621 tester, grønn.
+
+---
+
 ## 2026-08-13 — To feil funnet ved manuell testing av innloggingsflyten
 
 Begge forhåndseksisterende, begge avdekket fordi `?next=` ble testet manuelt i prod.

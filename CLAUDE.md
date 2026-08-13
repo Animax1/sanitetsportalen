@@ -90,6 +90,9 @@ Settes i `.env` lokalt. Nøkler å kjenne til:
 | `RATELIMIT_ENABLE` | Nød-bryter for rate-limiting |
 | `REDIS_URL` | Aktiverer Redis-cache (ellers LocMemCache) |
 | `BACKUP_DIR` | Sti til backup-mappe (Railway: `/data/backups`) |
+| `LOG_LEVEL` | Loggnivå for rot-loggeren (default `INFO`) |
+| `ADMINS` | Mottakere av feilvarsel, format `Navn:epost`, komma-separert |
+| `EMAIL_HOST` m.fl. | SMTP for feilvarsel. Uten den skrives mail til konsoll |
 
 ## Deployment
 

@@ -306,19 +306,87 @@ OTP_TOTP_ISSUER = 'Sanitetsportalen'
 # ── Standard primærnøkkeltype ─────────────────────────────────────────────────
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-# ── Logging ──────────────────────────────────────────────────────────────────
+# ── E-postvarsel ved kritiske feil (F1) ──────────────────────────────────────
+#
+# Sentry er bevisst fjernet fra prosjektet. I stedet bruker vi Djangos
+# innebygde AdminEmailHandler, som sender stacktrace på e-post ved uhåndterte
+# exceptions. Uten SMTP-variabler er alt dette inert: EMAIL_BACKEND faller
+# tilbake til konsoll, og handleren logger i stedet for å sende.
+ADMINS_RAW = os.environ.get('ADMINS', '')
+ADMINS = [
+    (n.strip(), e.strip())
+    for n, _, e in (p.partition(':') for p in ADMINS_RAW.split(',') if p.strip())
+    if e.strip()
+]
+MANAGERS = ADMINS
+
+EMAIL_HOST = os.environ.get('EMAIL_HOST', '')
+EMAIL_PORT = int(os.environ.get('EMAIL_PORT', '587'))
+EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER', '')
+EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD', '')
+EMAIL_USE_TLS = os.environ.get('EMAIL_USE_TLS', 'True') == 'True'
+DEFAULT_FROM_EMAIL = os.environ.get(
+    'DEFAULT_FROM_EMAIL', 'sanitetsportalen@example.invalid',
+)
+SERVER_EMAIL = DEFAULT_FROM_EMAIL
+
+if EMAIL_HOST:
+    EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+else:
+    # Ingen SMTP konfigurert: skriv e-posten til stdout i stedet for å feile.
+    EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
+
+# ── Logging (N3) ─────────────────────────────────────────────────────────────
+#
+# Tidligere fantes kun én logger ('memory') og ingen rot-logger. Alt `patients`,
+# `core` og `accounts` logget propagerte opp til en rot uten handler, og havnet
+# i Pythons lastResort-handler — som skriver til stderr først fra WARNING.
+# INFO-logging var dermed i praksis slått av i produksjon, inkludert linjene
+# RUNBOOK-en ber deg lete etter for å verifisere at backup kjører.
+#
+# LOG_LEVEL som miljøvariabel gjør at man kan skru til DEBUG under feilsøking
+# på Railway uten å deploye.
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
+    'formatters': {
+        'standard': {
+            'format': '%(asctime)s %(levelname)s %(name)s: %(message)s',
+        },
+    },
+    'filters': {
+        # Demper e-post-stormer: maks én mail per feiltype per 15 min.
+        'error_throttle': {
+            '()': 'core.log_filters.ThrottleByMessageFilter',
+            'window_seconds': 15 * 60,
+        },
+    },
     'handlers': {
         'console': {
             'class': 'logging.StreamHandler',
+            'formatter': 'standard',
         },
+        'mail_admins': {
+            'level': 'ERROR',
+            'class': 'django.utils.log.AdminEmailHandler',
+            'filters': ['error_throttle'],
+            'include_html': False,
+        },
+    },
+    'root': {
+        'handlers': ['console'],
+        'level': os.environ.get('LOG_LEVEL', 'INFO'),
     },
     'loggers': {
         'memory': {
             'handlers': ['console'],
             'level': 'INFO',
+            'propagate': False,
+        },
+        # Uhåndterte exceptions i views. Django logger disse på ERROR.
+        'django.request': {
+            'handlers': ['console', 'mail_admins'],
+            'level': 'ERROR',
             'propagate': False,
         },
     },
