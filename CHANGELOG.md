@@ -4,6 +4,43 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-08-13 — N13.2 og N13.3: navneliste-fabrikk, og `views.py` delt i fem
+
+**N13.2.** `forstehjelpere_view`, `forstehjelper_detail_view`, `helsepersonell_view` og
+`helsepersonell_detail_view` var ord for ord like bortsett fra modellnavnet og ordlyden i
+feilmeldingene — inkludert hele ETag-blokken og `ProtectedError`-håndteringen.
+`_navneliste_views(model, etikett, etikett_bestemt)` bygger nå begge par.
+
+Hele testsuiten passerte uendret etter sammenslåingen, uten at én test måtte røres. Det er
+den beste indikasjonen på at oppførselen er bevart. Feilmeldingene vises direkte i
+grensesnittet og var det eneste ingen test dekket, så de er pinnet i
+`NavneregisterFeilmeldingTests` — inkludert skillet mellom ubestemt og bestemt form
+(«Førstehjelper ikke funnet» vs. «Førstehjelperen er knyttet til pasienter»).
+
+**N13.3.** `views.py` (797 linjer) er delt i fem moduler og slettet:
+
+| Modul | Linjer | Ansvar |
+|---|---|---|
+| `views_common.py` | 82 | `_json_body`, `_patient_to_dict`, `_ensure_pabegynt_not_before_inntid` |
+| `views_patients.py` | 382 | Hoved-side, innstillinger, sesjonstimeout, pasient-CRUD, nullstilling |
+| `views_registre.py` | 136 | Navneregistrene |
+| `views_stats.py` | 47 | `/api/stats/` og `/api/full-stats/` |
+| `views_arkiv.py` | 198 | Vaktarkivet |
+
+**Ingen shim.** `urls.py` og de fire testimportene peker direkte på de nye modulene. Å
+legge igjen en `views.py` som re-eksporterte alt ville vært å innføre nøyaktig den typen
+bakoverkompatibilitets-lag N11 nettopp ryddet bort — og som viste seg å drive fra hverandre.
+
+Testene fanget den ene reelle feilen underveis: `Forstehjelper` og `Helsepersonell` ble
+ikke importert i `views_patients.py`, og fem tester på FK-tilordning feilet med `NameError`
+på `/api/patients/`. Det er en feil som ville nådd prod uten testdekning på de stiene.
+
+`CLAUDE.md` og teknisk dokumentasjon er oppdatert — begge pekte på `patients/views.py`.
+
+716 tester grønne. Ingen databaseendringer, ingen endring i API-oppførsel.
+
+---
+
 ## 2026-08-13 — Restore-kontroll, dødt per-år-navn fjernet, driftsoppgaver løftet i TODO
 
 **Kliniske felt kontrolleres ved backup-restore.** `loaddata` går utenom all

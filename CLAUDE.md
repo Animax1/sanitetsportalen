@@ -58,7 +58,17 @@ Rollehierarki (lavest → høyest): `read_only → read_write → lead_view → 
 
 `has_role_at_least(user, 'lead')` sjekker hierarkisk. Dekoratorer gir 403 hvis rollen mangler.
 
-### API-mønster (patients/views.py)
+### API-mønster (patients/views_*.py)
+
+Viewene er delt i fem moduler (N13.3) — `views.py` finnes ikke lenger:
+
+| Modul | Ansvar |
+|-------|--------|
+| `views_common.py` | `_json_body`, `_patient_to_dict`, `WRITE_ROLES` — delt av de andre |
+| `views_patients.py` | Hoved-side, innstillinger, sesjonstimeout, pasient-CRUD, nullstilling |
+| `views_registre.py` | Førstehjelper- og helsepersonellregisteret (én fabrikk bygger begge) |
+| `views_stats.py` | `/api/stats/` og `/api/full-stats/` |
+| `views_arkiv.py` | Vaktarkivet |
 
 Alle endepunkter er JSON-API-er beskyttet med `@login_required` + rollesjekk. Responser følger mønsteret `{'status': 'ok', 'data': ...}` eller `{'status': 'error', 'message': ...}`.
 
@@ -79,7 +89,7 @@ Backup er **per modul**, ikke én samlet dump. Hver modul registrerer en `BaseBa
 
 Brukere, MFA-hemmeligheter og audit-spor er bevisst utelatt fra begge.
 
-Logikken ligger i `core/backup/`. `patients/backup_service.py` er en tynn proxy som beholder bakoverkompatibelt API for `db_backup`-kommandoen, `views.py` og eldre tester — nye moduler skal registrere en handler og kalle `core.backup.create_backup(slug=...)` direkte.
+Logikken ligger i `core/backup/`. `patients/backup_service.py` er en tynn proxy som beholder bakoverkompatibelt API for `db_backup`-kommandoen, `views_patients.py` og eldre tester — nye moduler skal registrere en handler og kalle `core.backup.create_backup(slug=...)` direkte.
 
 ### Statistikk-caching (patients/stats_cache.py)
 

@@ -1189,7 +1189,7 @@ class PabegyntNotBeforeInntidTests(TestCase):
 
     def test_helper_adjusts_pabegynt_when_before_inntid(self):
         """_ensure_pabegynt_not_before_inntid skal sette pabegynt = inntid."""
-        from patients.views import _ensure_pabegynt_not_before_inntid
+        from patients.views_common import _ensure_pabegynt_not_before_inntid
         p = Patient(
             pasientnummer=99, year=2026,
             inntid='01.05.2026 17:32',
@@ -1201,7 +1201,7 @@ class PabegyntNotBeforeInntidTests(TestCase):
 
     def test_helper_leaves_pabegynt_alone_when_after_inntid(self):
         """Hvis pabegynt > inntid, skal verdien beholdes."""
-        from patients.views import _ensure_pabegynt_not_before_inntid
+        from patients.views_common import _ensure_pabegynt_not_before_inntid
         p = Patient(
             pasientnummer=99, year=2026,
             inntid='01.05.2026 17:00',
@@ -1213,7 +1213,7 @@ class PabegyntNotBeforeInntidTests(TestCase):
 
     def test_helper_handles_blank_fields(self):
         """Hvis et av feltene er tomt, skal helperen ikke gjøre noe."""
-        from patients.views import _ensure_pabegynt_not_before_inntid
+        from patients.views_common import _ensure_pabegynt_not_before_inntid
         p1 = Patient(pasientnummer=99, year=2026, inntid='', pabegynt='01.05.2026 17:00')
         p2 = Patient(pasientnummer=99, year=2026, inntid='01.05.2026 17:00', pabegynt='')
         self.assertFalse(_ensure_pabegynt_not_before_inntid(p1))
@@ -1221,7 +1221,7 @@ class PabegyntNotBeforeInntidTests(TestCase):
 
     def test_helper_handles_invalid_format_gracefully(self):
         """Ugyldig format skal ikke kaste exception."""
-        from patients.views import _ensure_pabegynt_not_before_inntid
+        from patients.views_common import _ensure_pabegynt_not_before_inntid
         p = Patient(
             pasientnummer=99, year=2026,
             inntid='ikke-en-dato',
@@ -1466,3 +1466,77 @@ class HeaderArrangementNavnTests(TestCase):
         resp = self.client.get('/pasienter/')
         self.assertContains(resp, 'Nytt navn')
         self.assertNotContains(resp, 'Gammelt navn')
+
+
+@override_settings(SECURE_SSL_REDIRECT=False, RATELIMIT_ENABLE=False)
+class NavneregisterFeilmeldingTests(TestCase):
+    """Ordlyden i feilmeldingene fra navneregistrene (N13.2).
+
+    De fire viewene ble slått sammen til én fabrikk. Feilmeldingene vises
+    direkte i grensesnittet og er det eneste som skiller de to registrene fra
+    hverandre, så de pinnes her — ingen andre tester leser dem.
+    """
+
+    def setUp(self):
+        self.admin = CustomUser.objects.create_user(
+            username='admin_navn', password='testpass123',
+            role='admin', must_change_password=False,
+        )
+        self.client.force_login(self.admin)
+
+    def _post(self, sti, navn):
+        return self.client.post(sti, data=json.dumps({'name': navn}),
+                                content_type='application/json')
+
+    def test_duplikat_gir_riktig_ordlyd(self):
+        Forstehjelper.objects.create(name='Kari')
+        Helsepersonell.objects.create(name='Ola')
+
+        resp = self._post('/pasienter/api/forstehjelpere/', 'Kari')
+        self.assertEqual(resp.status_code, 400)
+        self.assertEqual(resp.json()['error'], 'Førstehjelper "Kari" finnes allerede')
+
+        resp = self._post('/pasienter/api/helsepersonell/', 'Ola')
+        self.assertEqual(resp.status_code, 400)
+        self.assertEqual(resp.json()['error'], 'Helsepersonell "Ola" finnes allerede')
+
+    def test_ukjent_id_gir_riktig_ordlyd(self):
+        resp = self.client.put('/pasienter/api/forstehjelpere/99999/',
+                               data=json.dumps({'name': 'X'}),
+                               content_type='application/json')
+        self.assertEqual(resp.status_code, 404)
+        self.assertEqual(resp.json()['error'], 'Førstehjelper ikke funnet')
+
+        resp = self.client.put('/pasienter/api/helsepersonell/99999/',
+                               data=json.dumps({'name': 'X'}),
+                               content_type='application/json')
+        self.assertEqual(resp.status_code, 404)
+        self.assertEqual(resp.json()['error'], 'Helsepersonell ikke funnet')
+
+    def test_sletting_av_rad_i_bruk_gir_riktig_ordlyd(self):
+        """PROTECT-stien — bestemt form av etiketten."""
+        beh = Forstehjelper.objects.create(name='I bruk')
+        hp = Helsepersonell.objects.create(name='Også i bruk')
+        Patient.objects.create(pasientnummer=1, year=2026,
+                               forstehjelper=beh, helsepersonell_ref=hp)
+
+        resp = self.client.delete(f'/pasienter/api/forstehjelpere/{beh.pk}/')
+        self.assertEqual(resp.status_code, 409)
+        self.assertEqual(
+            resp.json()['error'],
+            'Førstehjelperen er knyttet til pasienter og kan ikke slettes. '
+            'Deaktiver i stedet.')
+
+        resp = self.client.delete(f'/pasienter/api/helsepersonell/{hp.pk}/')
+        self.assertEqual(resp.status_code, 409)
+        self.assertEqual(
+            resp.json()['error'],
+            'Helsepersonellet er knyttet til pasienter og kan ikke slettes. '
+            'Deaktiver i stedet.')
+
+    def test_viewene_beholder_navnene_sine(self):
+        """Fabrikk-genererte views skal ikke hete `liste_view` i tracebacks."""
+        from patients import views_registre as views
+        self.assertEqual(views.forstehjelpere_view.__name__, 'forstehjelpere_view')
+        self.assertEqual(views.helsepersonell_detail_view.__name__,
+                         'helsepersonell_detail_view')

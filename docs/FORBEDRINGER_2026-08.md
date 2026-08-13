@@ -32,7 +32,7 @@ Status: ⏳ pending · 🔧 påbegynt · ✅ ferdig · ⚪ ikke aktuell
 | N10 | Sesjonsinvalidering dekoder hele sesjonstabellen ved hver innlogging | ✅ | Middels | 2–3 t | Ytelse |
 | N11 | Dokumentasjonsdrift: `CLAUDE.md` beskriver ting koden ikke gjør | ✅ | Lav–Middels | 30 min | Dokumentasjon |
 | N12 | `GET /api/settings/` eksponerer hele `AppSetting`-tabellen | ✅ | Lav | 30 min | Dybdeforsvar |
-| N13 | Duplisert kode i `views.py` og `services.py` (ETag-blokk, feltlister) | 🟡 | Lav | 3–4 t | Vedlikehold |
+| N13 | Duplisert kode i `views.py` og `services.py` (ETag-blokk, feltlister) | ✅ | Lav | 3–4 t | Vedlikehold |
 
 ### Sikkerhetsgjennomgang (eget pass)
 
@@ -831,11 +831,33 @@ eksplisitt legger den til i whitelisten.
 
 ---
 
-## N13. Duplisert kode i `views.py` og `services.py` &nbsp;—&nbsp; 🟡 DELVIS (13. aug. 2026)
+## N13. Duplisert kode i `views.py` og `services.py` &nbsp;—&nbsp; ✅ GJENNOMFØRT (13. aug. 2026)
 
-**Status:** Delpunkt 1 (feltlista) er gjennomført — det var det eneste som kunne gi feil
-oppførsel. Delpunkt 2 (navneliste-fabrikk) og 3 (splitting av `views.py`) står igjen som
-ren opprydding, uten hast.
+**Status:** Alle tre delpunktene er gjennomført.
+
+*Delpunkt 2 — navneliste-fabrikk.* `_navneliste_views(model, etikett, etikett_bestemt)` i
+`patients/views_registre.py` bygger begge par. De fire viewene var ord for ord like
+bortsett fra modellnavnet og ordlyden i feilmeldingene, inkludert ETag-blokken og
+`ProtectedError`-håndteringen. Hele testsuiten passerte uendret etter sammenslåingen — god
+indikasjon på at oppførselen er bevart. Feilmeldingene vises direkte i grensesnittet og var
+det eneste ingen test dekket, så de er nå pinnet i `NavneregisterFeilmeldingTests`.
+
+*Delpunkt 3 — splitting.* `views.py` (797 linjer) er delt i fem moduler og slettet:
+
+| Modul | Linjer | Ansvar |
+|---|---|---|
+| `views_common.py` | 82 | `_json_body`, `_patient_to_dict`, `_ensure_pabegynt_not_before_inntid`, `WRITE_ROLES` |
+| `views_patients.py` | 382 | Hoved-side, innstillinger, sesjonstimeout, pasient-CRUD, nullstilling |
+| `views_registre.py` | 136 | Navneregistrene |
+| `views_stats.py` | 47 | `/api/stats/` og `/api/full-stats/` |
+| `views_arkiv.py` | 198 | Vaktarkivet |
+
+Ingen shim: `urls.py` og de fire testimportene peker direkte på de nye modulene. Å legge
+igjen en `views.py` som re-eksporterte alt ville vært å innføre nøyaktig den typen
+bakoverkompatibilitets-lag N11 nettopp ryddet bort.
+
+Testene fanget den ene reelle feilen underveis — `Forstehjelper` og `Helsepersonell` ble
+ikke importert i `views_patients.py`, og fem tester på FK-tilordning feilet med `NameError`.
 
 **Verdi:** Lav &nbsp;|&nbsp; **Innsats:** 3–4 t &nbsp;|&nbsp; **Type:** Vedlikehold
 

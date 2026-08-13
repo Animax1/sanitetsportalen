@@ -85,14 +85,15 @@ dokumentasjon.
       `invalidate_stats_cache()` er slettet — ingen kalte den, og TTL er hele mekanismen.
 - [x] **N9** `script.js` slettet, dobbeltklikk-vernet testet ved å kjøre guarden i node.
       Tiltakspunkt 3 besvart: grep-i-JS-tester er ikke nok alene.
-- [ ] **N13** Duplisert kode i `views.py`/`services.py` — delvis
+- [x] **N13** Duplisert kode i `views.py`/`services.py` — alle tre delpunktene
   - [x] Feltlista: `ARKIVERT_PASIENT_FELTER` brukes alle tre stedene. Frosset med vilje,
         *ikke* utledet fra modellen — utledning ville fått alle eksisterende arkiver til å
         melde falsk «tukling». `ArkivFeltlisteTests` vokter utakt mot modellen.
-  - [ ] Generisk `_navneliste_view(model, label)` for de fire
-        førstehjelper/helsepersonell-viewene
-  - [ ] Vurder å splitte `views.py` (815 linjer) — gjør det når fila neste gang skal
-        endres substansielt
+  - [x] `_navneliste_views()` bygger begge navneregistrene. Feilmeldingene er pinnet i
+        `NavneregisterFeilmeldingTests` — de var det eneste ingen test dekket.
+  - [x] `views.py` (797 linjer) delt i fem moduler og slettet. Ingen shim; `urls.py` og
+        testene peker direkte på `views_patients`, `views_registre`, `views_stats`,
+        `views_arkiv` og `views_common`.
 - [x] **N6** Statistikk-tabellene escaper feltverdier (`escHtmlValue()`), og markup koden
       bygger selv må merkes med `trustedHtml()`. Personell-listene escaper også navn —
       fritekst uten whitelist, ikke nevnt i punktet. `import_offline_data` validerer nå mot

@@ -363,7 +363,7 @@ Utfører soft-delete: setter `is_active=False`. Pasienten forsvinner fra standar
 
 **Rolle:** Alle innloggede brukere.
 
-**ETag-støtte:** Endepunktet beregner en SHA-256-hash av førstehjelper-listen og sender `ETag`-headeren. Klienten lagrer ETag og sender `If-None-Match` ved neste kall. Hvis listen er uendret, returneres 304 Not Modified uten kropp. Kombinert med `Cache-Control: private, must-revalidate` og `@never_cache` gir dette effektiv validering uten unødvendig dataoverføring. Implementert i `patients/views.py` og `patients-stats.js`.
+**ETag-støtte:** Endepunktet beregner en SHA-256-hash av førstehjelper-listen og sender `ETag`-headeren. Klienten lagrer ETag og sender `If-None-Match` ved neste kall. Hvis listen er uendret, returneres 304 Not Modified uten kropp. Kombinert med `Cache-Control: private, must-revalidate` og `@never_cache` gir dette effektiv validering uten unødvendig dataoverføring. Implementert i `patients/views_registre.py` og `patients-stats.js`.
 
 **Respons:** JSON-array: `[{"id": 1, "name": "Ola Nordmann", "is_active": true}, ...]`. Sortert: aktive først, deretter alfabetisk.
 
@@ -441,7 +441,7 @@ Returnerer alle `AppSetting`-nøkler som et flatt JSON-objekt: `{"event_name": "
 
 **Rolle:** `admin`, `lead`, `read_write`.
 
-Kun `event_name` kan oppdateres via dette endepunktet (tillat-liste i `views.py`).
+Kun `event_name` kan oppdateres via dette endepunktet (`SETTINGS_WRITE_WHITELIST` i `patients/views_patients.py`). GET har sin egen, litt videre liste — `SETTINGS_READ_WHITELIST`.
 
 **Request-body:** `{"event_name": "Arrangement 2026"}`
 
