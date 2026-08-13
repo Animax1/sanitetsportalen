@@ -46,6 +46,18 @@ class CustomUser(AbstractBaseUser, PermissionsMixin):
         verbose_name='Krev MFA',
         help_text='Krev to-faktor-autentisering ved pålogging',
     )
+    # Nøkkelen til brukerens aktive sesjon (N10). Portalen har
+    # én-sesjon-per-bruker som policy; feltet gjør invalidering ved innlogging
+    # til ett indeksert oppslag i stedet for en full gjennomgang av
+    # sesjonstabellen. Det er en cache av policyen, ikke fasit for hvilke
+    # sesjoner som finnes — sikkerhetsoperasjoner (passordbytte, admin-reset,
+    # frys, sletting) gjør fortsatt full gjennomgang.
+    current_session_key = models.CharField(
+        max_length=40,
+        null=True,
+        blank=True,
+        verbose_name='Aktiv sesjonsnøkkel',
+    )
     failed_login_attempts = models.IntegerField(default=0, verbose_name='Mislykkede innloggingsforsøk')
     locked_until = models.DateTimeField(null=True, blank=True, verbose_name='Låst til')
     created_at = models.DateTimeField(auto_now_add=True, verbose_name='Opprettet')

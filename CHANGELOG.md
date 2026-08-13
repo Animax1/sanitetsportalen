@@ -4,6 +4,62 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-08-13 — Ytelse: N7, N8, N10
+
+Tre steder der kostnaden lå i requestens kritiske vei.
+
+**Redis-klienten ble bygget på nytt for hver request (N7).**
+`_MetricsStore._get_redis_client()` kalte `redis.Redis.from_url()` ved hvert kall, og den
+lager en ny `ConnectionPool` hver gang — verken pool eller TCP-forbindelse ble gjenbrukt.
+`_record_to_redis()` kalles for hver eneste request i vakt-modus, så vi betalte en
+TCP-handshake per request for å skrive én metrikk-linje. I koden som finnes for å måle
+ytelse.
+
+Nå én delt klient per prosess med dobbeltsjekket låsing. `redis.Redis`-instanser er
+trådtrygge og har egen intern pool, så det er riktig mønster. Metoden er beholdt som
+delegat, slik at de eksisterende testene som patcher den virker uendret.
+
+**Audit-signalet gjorde én INSERT per endret felt (N8).** En typisk PUT der behandler
+settes utløser samtidig `pabegynt`-stempling og plasseringsendring — 1 SELECT + 3 INSERT +
+selve UPDATE for én brukerhandling. Nå samles radene og skrives med `bulk_create`.
+`app_label` settes eksplisitt, siden `bulk_create` hopper over `pre_save`-signalet som
+ellers fyller feltet; uten det ville radene vist seg som «Ukjent» i modulfilteret.
+Verifisert med `CaptureQueriesContext`: tre endrede felt gir én INSERT.
+
+**Sesjonsinvalidering dekodet hele sesjonstabellen ved hver innlogging (N10).**
+`get_decoded()` er signaturverifisering og JSON-parsing per rad, og kallet lå i
+innloggingsstien — de ti minuttene ved vaktstart der alle logger på samtidig.
+
+**Her fulgte vi ikke backloggens anbefaling.** Alternativ A var å droppe kallet ved ordinær
+innlogging, beskrevet som «en policy-avgjørelse, ikke en sikkerhetsnødvendighet». Men
+policyen er reell og bevisst: portalen har én-sesjon-per-bruker, og `SingleSessionTests`
+vokter den eksplisitt. Å droppe kallet ville stille endret produktoppførsel — innlogget på
+mobil og laptop samtidig — under dekke av en ytelsesforbedring.
+
+I stedet: `CustomUser.current_session_key`, ett nullbart felt (ingen ny tabell, som svarer
+på innvendingen mot alternativ B om foreldreløse rader). Innlogging sletter forrige sesjon
+med ett indeksert oppslag. Feltet er en cache av policyen, ikke fasit for hvilke sesjoner
+som finnes — derfor beholder passordbytte, admin-reset, frys og sletting den fullstendige
+gjennomgangen, der garantien er hele poenget og operasjonen er sjelden. En test verifiserer
+at passordbytte også fjerner en uregistrert sesjon.
+
+Verifisert: antall spørringer ved innlogging er identisk med 0 og med 30 fremmede sesjoner
+i tabellen.
+
+**Re-landet etter rollback.** Første forsøk (`48d861c`) tok ned produksjon — men ikke på
+grunn av ytelsesarbeidet. Den commiten inneholdt også `audit/0004`, en uetterspurt
+indeks-omdøping som viste seg umulig å kjøre mot den faktiske databasen. Se hendelsesnotatet
+under.
+
+Denne gangen følger kun `accounts/0008`, håndskrevet til å gjøre én ting: legge til én
+nullbar kolonne. `makemigrations` ville tatt med en `AlterField` på `is_superuser` i samme
+slengen — samme slags kosmetiske opprydding som forårsaket nedetiden, og derfor utelatt.
+Drift-advarselen ved oppstart består, og er ufarlig.
+
+15 nye tester i `patients/tests_ytelse.py`. Full suite: 648 tester, grønn.
+
+---
+
 ## 2026-08-13 — HENDELSE: produksjon nede ~30 min. Ytelses-commiten rullet tilbake
 
 **Symptom:** 502 på portalen. Railway crash-loopet release-kommandoen, med nytt forsøk
