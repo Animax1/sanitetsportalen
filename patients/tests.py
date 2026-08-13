@@ -1437,6 +1437,19 @@ class HeaderArrangementNavnTests(TestCase):
         self.assertEqual(resp.status_code, 200)
         self.assertNotContains(resp, 'LS26')
 
+    def test_ingen_uparsede_template_kommentarer_lekker_ut(self):
+        """En flerlinjes `{# #}` rendres som synlig tekst i Django.
+
+        Nettopp det skjedde: kommentaren som forklarte server-renderingen ble
+        stående midt i headeren for brukerne. `{# #}` er enlinjes — flerlinjes
+        kommentarer må bruke `{% comment %}`.
+        """
+        resp = self.client.get('/pasienter/')
+        innhold = resp.content.decode('utf-8')
+        for markor in ('{#', '#}', '{% comment %}', 'Rendres server-side'):
+            self.assertNotIn(markor, innhold,
+                             f'Uparset template-syntaks i responsen: {markor}')
+
     def test_innstillingsfeltet_er_forhaandsutfylt(self):
         """Feltet i innstillinger skal ha samme verdi som headeren."""
         AppSetting.set('event_name', 'Festivalen 2026')

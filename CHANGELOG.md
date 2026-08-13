@@ -4,6 +4,24 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-08-13 — Fiks: template-kommentar rendret som synlig tekst
+
+Kommentaren som ble lagt inn i forrige commit sto synlig i headeren for brukerne.
+
+**Årsak:** `{# ... #}` er **enlinjes** i Djangos template-språk. En kommentar over to
+linjer parses ikke som kommentar — den rendres som ren tekst. Flerlinjes kommentarer må
+bruke `{% comment %}`/`{% endcomment %}`.
+
+Testene fanget det ikke: de sjekket at `LS26` var borte og at arrangementsnavnet kom med,
+ikke at responsen var fri for uparset template-syntaks. Ny test
+`test_ingen_uparsede_template_kommentarer_lekker_ut` ser etter `{#`, `#}`,
+`{% comment %}` og kommentarteksten i den ferdige responsen. Verifisert mot forrige
+versjon av templaten, der teksten faktisk lå i utdataen.
+
+705 tester grønne.
+
+---
+
 ## 2026-08-13 — Fiks: gammelt arrangementsnavn sto synlig i headeren ved sidelasting
 
 Meldt fra manuell testing: går man fra portalforsiden inn i `/pasienter/`, vises `LS26` et

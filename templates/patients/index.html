@@ -31,8 +31,11 @@
     <i class="bi bi-grid-3x3-gap-fill"></i>
     <span class="portal-back-label">Portal</span>
   </a>
-  {# Rendres server-side: headeren skal aldri vise et annet arrangementsnavn
-     enn det som gjelder, heller ikke i millisekundene før JS-en rekker fram. #}
+  {% comment %}
+    Rendres server-side: headeren skal aldri vise et annet arrangementsnavn enn
+    det som gjelder, heller ikke i millisekundene før JS-en rekker fram.
+    NB: {# #} er enlinjes i Django — en flerlinjes variant rendres som tekst.
+  {% endcomment %}
   <div class="brand">Pasientregistrering <span id="event-name-display">{{ event_name }}</span></div>
 
   <div class="stat-chip rod">
