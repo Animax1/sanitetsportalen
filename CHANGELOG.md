@@ -4,6 +4,60 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-08-13 — N6: escaping i statistikk-tabellene
+
+Statistikkfanen bygde HTML-strenger og satte dem inn med `innerHTML` uten å escape
+verdiene. Rad- og kolonnenøklene i krysstabellene *er* pasientdata (`problemstilling`,
+`transport`, `grovsortering`, `utskrevet_til`), og CSP-en tillater fortsatt
+`unsafe-inline` for `script-src`, så et injisert `<img onerror=...>` ville kjørt.
+
+**Escaping.** Ny hjelper `escHtmlValue()` i `patients-utils.js`, brukt i `mkStatsTable`,
+`mkCrosstab`, `mkObsTable` og `mkInterpretation`. Den finnes ved siden av `escapeHtml()`
+og `_escHtml()` fordi de to eldre returnerer tom streng for alt falsy — `escapeHtml(0)`
+gir `''`. I tabellceller er det feil: 0 er en gyldig verdi som skal vises.
+
+**Klarert markup.** Å escape alle celler blindt var ikke mulig. `renderTester` sender
+bevisst `<span style="color:#22c55e">&#10004; Ja</span>` inn i `mkStatsTable`, og
+`sigCol`-logikken leter etter `&#10004;` i strengen. `trustedHtml()` markerer markup koden
+har bygget selv, `cellHtml()` slipper den gjennom og escaper alt annet. Unntaket er dermed
+et bevisst valg per celle, ikke en generell åpning — to celler bruker det i dag.
+
+**Funn utenfor punktet:** `renderForstehjelperAdmin` og `renderHelsepersonellAdmin` satte
+også navnene uescapet i `innerHTML`. Det er verre enn N6 selv, siden
+`Forstehjelper.name`/`Helsepersonell.name` er fritekst uten `choices` — whitelisten som
+demper resten gjelder ikke der i det hele tatt. Rettet i samme runde.
+
+**Import-validering.** `import_offline_data` bygde `Patient`-objekter direkte og gikk
+utenom whitelisten. Den kaller nå `validate_patient_choice_fields` per rad, før noe
+skrives. Ugyldige verdier avbryter importen med en rapport som dekker alle radene på én
+gang; nytt `--force` importerer dem likevel, for bevisst import av gamle data.
+
+**Tester.** `patients/tests_xss_stats.py`, to lag:
+
+- Node kjører tabell-byggerne mot HTML-holdige feltverdier og verifiserer
+  akseptansekriteriet direkte. Hoppes over hvis `node` ikke finnes.
+- En statisk vaktpost krever at hver `${...}` i byggerne er escapet eller står i
+  `REVIEWED_INTERPOLATIONS` med begrunnelse. Verifisert ved å fjerne escapingen
+  midlertidig og bekrefte at testen peker på riktig uttrykk. Det er dette laget som
+  betyr noe for F6 senere: de sju nye krysstabellene der kan ikke gli inn uescapet.
+
+Fire nye tester i `patients/tests_offline.py` dekker import-valideringen. Hele suiten:
+668 tester grønne.
+
+**Ikke gjort:** F5 (CSP-stramming) ble *ikke* tatt i samme runde, slik
+FORBEDRINGER-dokumentet foreslo. Den krever at ~30 inline `onclick=`-handlere i
+`index.html` flyttes til `addEventListener`, som er mesteparten av arbeidet der.
+`unsafe-inline` står fortsatt. Escapingen er på plass uavhengig av det, så vi mangler ikke
+lenger begge lagene samtidig.
+
+**Gjenstår som uvalidert vei inn i basen:** backup-restore via `loaddata`. Den går utenom
+all validering, og er nå den eneste igjen. `static/js/script.js` har samme uescapede kode
+i den døde kopien sin, men fila skal slettes (N9) og ble derfor stående.
+
+Ingen databaseendringer.
+
+---
+
 ## 2026-08-13 — Fiks: uregistrerte sesjoner overlevde innlogging på ny enhet
 
 Funnet ved manuell testing i prod. Innlogging på enhet 2 kastet ikke ut enhet 1 —

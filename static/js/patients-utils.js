@@ -245,3 +245,31 @@ function _escHtml(str) {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;');
 }
+
+// escapeHtml() og _escHtml() returnerer tom streng for alt falsy, slik at
+// tomme felt blir borte i stedet for å vises som "null". I tabellceller er
+// det feil: tallet 0 er en helt gyldig verdi som skal vises. escHtmlValue()
+// skiller derfor på «ikke satt» (null/undefined) og «falsy, men en verdi».
+function escHtmlValue(v) {
+  if (v === null || v === undefined) return '';
+  return String(v).replace(/[&<>"']/g, c => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+  }[c]));
+}
+
+// Marker for HTML vi har bygget selv og som derfor skal settes inn uendret.
+// Tabell-byggerne escaper alt de får inn; formatering som `<span>Ja</span>`
+// må pakkes her for å slippe gjennom. Poenget er at det blir et bevisst valg
+// per celle i stedet for en generell åpning for markup.
+function trustedHtml(html) {
+  return { __trustedHtml: String(html) };
+}
+
+// Gjør én celleverdi klar for innsetting: klarert markup slipper gjennom,
+// alt annet escapes.
+function cellHtml(v) {
+  if (v && typeof v === 'object' && typeof v.__trustedHtml === 'string') {
+    return v.__trustedHtml;
+  }
+  return escHtmlValue(v);
+}

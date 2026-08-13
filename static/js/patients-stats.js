@@ -107,15 +107,16 @@ function mkStatsTable(headers, rows, opts={}) {
   if (!rows.length) return '<p class="text-muted small p-2 mb-0">Ingen data</p>';
   const sigCol = opts.sigCol ?? -1;
   let html = '<table class="stats-table"><thead><tr>';
-  headers.forEach(h => { html += `<th>${h}</th>`; });
+  headers.forEach(h => { html += `<th>${escHtmlValue(h)}</th>`; });
   html += '</tr></thead><tbody>';
   rows.forEach(row => {
     html += '<tr>';
     row.forEach((cell, i) => {
-      const s = String(cell);
+      // cellHtml() escaper feltverdier og slipper gjennom trustedHtml()-celler.
+      const s = cellHtml(cell);
       let cls = '';
       if (i === sigCol) cls = s.includes('✓') || s.includes('&#10004;') ? 'sig-yes' : 'sig-no';
-      html += `<td class="${cls}">${cell}</td>`;
+      html += `<td class="${cls}">${s}</td>`;
     });
     html += '</tr>';
   });
@@ -126,14 +127,17 @@ function mkStatsTable(headers, rows, opts={}) {
 function mkCrosstab(ctData) {
   const { counts, rows, cols } = ctData;
   if (!rows || !rows.length) return '<p class="text-muted small p-2 mb-0">Ingen data</p>';
+  // Rad- og kolonnenøklene er pasientdata (problemstilling, transport,
+  // grovsortering, utskrevet_til). De escapes ved utskrift, men brukes rå
+  // som oppslagsnøkler i `counts`.
   let html = '<table class="stats-table"><thead><tr><th></th>';
-  cols.forEach(c => { html += `<th>${c}</th>`; });
+  cols.forEach(c => { html += `<th>${escHtmlValue(c)}</th>`; });
   html += '<th>Total</th></tr></thead><tbody>';
   rows.forEach(r => {
     const rowData = counts[r] || {};
     const rowTotal = cols.reduce((s, c) => s + (rowData[c] || 0), 0);
     if (rowTotal === 0) return;
-    html += `<tr><td>${r}</td>`;
+    html += `<tr><td>${escHtmlValue(r)}</td>`;
     cols.forEach(c => {
       const val = rowData[c] || 0;
       const pct = rowTotal > 0 ? val / rowTotal * 100 : 0;
@@ -143,7 +147,7 @@ function mkCrosstab(ctData) {
       else if (pct >= 25) cls = 'heat-mid';
       else cls = 'heat-lo';
       const pctStr = rowTotal > 0 ? `<br><small style="font-weight:400;opacity:0.75">${Math.round(pct)}%</small>` : '';
-      html += `<td class="${cls}">${val}${pctStr}</td>`;
+      html += `<td class="${cls}">${escHtmlValue(val)}${pctStr}</td>`;
     });
     html += `<td style="font-weight:700;color:#1e293b">${rowTotal}</td></tr>`;
   });
@@ -155,12 +159,13 @@ function mkObsTable(rowData) {
   if (!rowData.length) return '<p class="text-muted small p-2 mb-0">Ingen data</p>';
   let html = '<table class="stats-table"><thead><tr><th>Gruppe</th><th>N</th><th>Med obs</th><th>Andel</th><th>Snitt obs-tid</th></tr></thead><tbody>';
   rowData.forEach(row => {
-    const pct = row.pct || 0;
+    // Number() fordi pct går inn i et style-attributt lenger ned.
+    const pct = Number(row.pct) || 0;
     let barColor = pct >= 70 ? '#ef4444' : pct >= 30 ? '#eab308' : '#22c55e';
     html += `<tr>
-      <td>${row.name}</td>
-      <td>${row.n}</td>
-      <td>${row.med_obs}</td>
+      <td>${escHtmlValue(row.name)}</td>
+      <td>${escHtmlValue(row.n)}</td>
+      <td>${escHtmlValue(row.med_obs)}</td>
       <td>
         <strong>${pct.toFixed(1)}%</strong>
         <div class="obs-pct-bar"><div class="obs-pct-fill" style="width:${Math.min(100,pct)}%;background:${barColor}"></div></div>
@@ -472,9 +477,9 @@ function renderTester(s) {
     if (!r) return [row.test, '–', '–', '–', '–'];
     const pStr = r.p < 0.001 ? '<0,001' : r.p.toFixed(4).replace('.',',');
     return [row.test, r.chi2.toFixed(2), r.dof, pStr,
-      r.sig
+      trustedHtml(r.sig
         ? '<span style="color:#22c55e;font-weight:700;">&#10004; Ja</span>'
-        : '<span style="color:#94a3b8;">&#10007; Nei</span>'
+        : '<span style="color:#94a3b8;">&#10007; Nei</span>')
     ];
   });
   document.getElementById('tbl-chi2').innerHTML = mkStatsTable(
@@ -490,9 +495,9 @@ function renderTester(s) {
     if (!r) return [name, '–', '–', '–'];
     const pStr = r.p < 0.001 ? '<0,001' : r.p.toFixed(4).replace('.',',');
     return [name, r.H.toFixed(2), pStr,
-      r.sig
+      trustedHtml(r.sig
         ? '<span style="color:#22c55e;font-weight:700;">&#10004; Ja</span>'
-        : '<span style="color:#94a3b8;">&#10007; Nei</span>'
+        : '<span style="color:#94a3b8;">&#10007; Nei</span>')
     ];
   });
   document.getElementById('tbl-kw').innerHTML = mkStatsTable(
@@ -512,8 +517,8 @@ function mkInterpretation(s) {
   const obsPct = sum.total > 0 ? (sum.total_obs_count / sum.total * 100).toFixed(1) : 0;
   const tt = sum.total_time, ot = sum.obs_time;
 
-  const sigTests = (s.chi2_table || []).filter(t => t.result?.sig).map(t => t.test);
-  const nsTests  = (s.chi2_table || []).filter(t => t.result && !t.result.sig).map(t => t.test);
+  const sigTests = (s.chi2_table || []).filter(t => t.result?.sig).map(t => escHtmlValue(t.test));
+  const nsTests  = (s.chi2_table || []).filter(t => t.result && !t.result.sig).map(t => escHtmlValue(t.test));
 
   const kwSig = [
     s.kw_triage?.sig    ? 'Tid etter triage'      : null,
@@ -525,20 +530,20 @@ function mkInterpretation(s) {
 
   html += `<p class="mb-1 small" style="line-height:1.5; color:#e2e8f0;">
     <strong style="color:#ffffff;">Datagrunnlag:</strong>
-    ${sum.total} pasienter registrert, ${sum.utskrevet} utskrevet.
+    ${escHtmlValue(sum.total)} pasienter registrert, ${escHtmlValue(sum.utskrevet)} utskrevet.
   </p>`;
 
   if (tt && tt.n > 0) {
     html += `<p class="mb-1 small" style="line-height:1.5; color:#e2e8f0;">
       <strong style="color:#ffffff;">Total tid:</strong>
-      Gjennomsnitt ${fmtMin(tt.mean)}, median ${fmtMin(tt.median)} (n=${tt.n}).
+      Gjennomsnitt ${fmtMin(tt.mean)}, median ${fmtMin(tt.median)} (n=${escHtmlValue(tt.n)}).
     </p>`;
   }
 
   if (ot && ot.n > 0) {
     html += `<p class="mb-1 small" style="line-height:1.5; color:#e2e8f0;">
       <strong style="color:#ffffff;">Obspost:</strong>
-      ${sum.total_obs_count} pasienter (${obsPct}%) på obspost. Snitt ${fmtMin(ot.mean)}, median ${fmtMin(ot.median)}.
+      ${escHtmlValue(sum.total_obs_count)} pasienter (${escHtmlValue(obsPct)}%) på obspost. Snitt ${fmtMin(ot.mean)}, median ${fmtMin(ot.median)}.
     </p>`;
   }
 
@@ -662,7 +667,7 @@ function renderForstehjelperAdmin() {
   }
   const rows = forstehjelpere.map(b => `
     <div class="d-flex align-items-center gap-2 mb-1" style="font-size:0.85rem;">
-      <span class="flex-grow-1 ${b.is_active ? '' : 'text-muted'}">${b.name}${b.is_active ? '' : ' <em>(inaktiv)</em>'}</span>
+      <span class="flex-grow-1 ${b.is_active ? '' : 'text-muted'}">${escHtmlValue(b.name)}${b.is_active ? '' : ' <em>(inaktiv)</em>'}</span>
       <button class="btn btn-outline-secondary btn-sm py-0 px-1" onclick="toggleForstehjelper(${b.id})" title="${b.is_active ? 'Deaktiver' : 'Aktiver'}">
         <i class="bi bi-${b.is_active ? 'toggle-on' : 'toggle-off'}"></i>
       </button>
@@ -749,7 +754,7 @@ function renderHelsepersonellAdmin() {
   }
   const rows = helsepersonellListe.map(h => `
     <div class="d-flex align-items-center gap-2 mb-1" style="font-size:0.85rem;">
-      <span class="flex-grow-1 ${h.is_active ? '' : 'text-muted'}">${h.name}${h.is_active ? '' : ' <em>(inaktiv)</em>'}</span>
+      <span class="flex-grow-1 ${h.is_active ? '' : 'text-muted'}">${escHtmlValue(h.name)}${h.is_active ? '' : ' <em>(inaktiv)</em>'}</span>
       <button class="btn btn-outline-secondary btn-sm py-0 px-1" onclick="toggleHelsepersonell(${h.id})" title="${h.is_active ? 'Deaktiver' : 'Aktiver'}">
         <i class="bi bi-${h.is_active ? 'toggle-on' : 'toggle-off'}"></i>
       </button>

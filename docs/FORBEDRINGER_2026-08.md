@@ -25,7 +25,7 @@ Status: ⏳ pending · 🔧 påbegynt · ✅ ferdig · ⚪ ikke aktuell
 | N3 | **Applikasjonsloggene når aldri fram (LOGGING mangler rot-handler)** | ✅ | Høy | 30 min | Drift |
 | N4 | **MFA-steget deler én rate-limit-bøtte — kan låse ute hele vakten** | ✅ | Høy | 1–2 t | Drift / sikkerhet |
 | N5 | `get_active_year()` og `Patient.save()` bruker container-tid | ✅ | Middels–Høy | 30 min | Korrekthet |
-| N6 | Statistikk-tabellene setter inn feltverdier uescapet i `innerHTML` | ⏳ | Middels | 2 t | Sikkerhet (dybdeforsvar) |
+| N6 | Statistikk-tabellene setter inn feltverdier uescapet i `innerHTML` | ✅ | Middels | 2 t | Sikkerhet (dybdeforsvar) |
 | N7 | Redis-klienten bygges på nytt for hver eneste request | ✅ | Middels | 1 t | Ytelse |
 | N8 | Audit-signalet gjør N+1 skrivinger per pasientendring | ✅ | Middels | 1–2 t | Ytelse |
 | N9 | Tre tester verifiserer dobbeltklikk-fixen i **død** JS-fil | ⏳ | Middels | 30 min | Testkvalitet |
@@ -388,7 +388,50 @@ Et grep etter `datetime.now()` i `patients/` og `core/` skal komme tomt tilbake.
 
 ---
 
-## N6. Statistikk-tabellene setter inn feltverdier uescapet i `innerHTML`
+## N6. Statistikk-tabellene setter inn feltverdier uescapet i `innerHTML` &nbsp;—&nbsp; ✅ GJENNOMFØRT (13. aug. 2026)
+
+**Status:** Løst, med to avvik fra forslaget under.
+
+*Escaping.* `escHtmlValue()` i `patients-utils.js` gjør jobben i `mkStatsTable`,
+`mkCrosstab`, `mkObsTable` og `mkInterpretation`. Den finnes ved siden av `escapeHtml()`
+og `_escHtml()` fordi de to eldre returnerer tom streng for *alt* falsy: `escapeHtml(0)`
+gir `''`. I tabellceller er det feil — 0 er en gyldig verdi som skal vises. `escHtmlValue()`
+skiller derfor `null`/`undefined` fra «falsy, men en verdi».
+
+*Klarert markup.* Blank escaping av alle celler var ikke mulig: `renderTester` sender
+bevisst `<span style="color:#22c55e">&#10004; Ja</span>` inn i `mkStatsTable`, og
+`sigCol`-logikken leter etter `&#10004;` i strengen. Løsningen er `trustedHtml()`, en
+markør for markup koden har bygget selv, og `cellHtml()` som slipper klarerte celler
+gjennom og escaper alt annet. Unntaket blir dermed et bevisst valg per celle i stedet for
+en generell åpning. Bare de to signifikans-kolonnene bruker det i dag.
+
+*Avvik 1 — et funn utenfor punktet.* `renderForstehjelperAdmin` og
+`renderHelsepersonellAdmin` satte også `${b.name}`/`${h.name}` uescapet i `innerHTML`.
+Det er strengt tatt verre enn punktet selv: `Forstehjelper.name` er
+`CharField(max_length=120)` uten `choices`, altså fritekst brukere med skrivetilgang
+skriver inn. Whitelisten som demper resten gjelder ikke her i det hele tatt. Rettet i
+samme runde.
+
+*Avvik 2 — F5 er ikke tatt med.* Forslaget ba om å ta N6 og F5 (CSP-stramming) i samme
+runde. Det ble ikke gjort: F5 krever at ~30 inline `onclick=`-handlere i `index.html`
+flyttes til `addEventListener`, som er mesteparten av arbeidet der. `unsafe-inline` står
+altså fortsatt for `script-src`. Escapingen er nå på plass uavhengig av det, så lagene
+er ikke lenger begge borte samtidig — se rettelsen i F5.
+
+*Import-validering.* `import_offline_data` kaller nå `validate_patient_choice_fields` per
+rad, før noe skrives. Ugyldige verdier avbryter hele importen med en rapport som dekker
+alle radene på én gang; `--force` importerer dem likevel, for bevisst import av gamle
+data. `loaddata`-veien via backup-restore er *ikke* dekket — den går fortsatt utenom all
+validering, og er nå den gjenstående uvaliderte veien inn.
+
+*Tester.* `patients/tests_xss_stats.py` har to lag. Det ene kjører tabell-byggerne i node
+mot HTML-holdige feltverdier og verifiserer akseptansekriteriet direkte (hoppes over hvis
+node mangler). Det andre er en statisk vaktpost: hver `${...}` i byggerne må være escapet
+eller stå i `REVIEWED_INTERPOLATIONS` med begrunnelse. Det er lag to som betyr noe for
+F6 — de sju nye krysstabellene der kan ikke gli inn uescapet uten at testen blir rød.
+
+**Ikke rørt:** `static/js/script.js` har den samme uescapede koden i den døde kopien sin.
+Fila skal slettes (N9), og ble derfor stående.
 
 **Verdi:** Middels &nbsp;|&nbsp; **Innsats:** 2 t &nbsp;|&nbsp; **Type:** Sikkerhet (dybdeforsvar)
 
@@ -750,7 +793,7 @@ eksplisitt legger den til i whitelisten.
 # Del 2 — Sikkerhetsgjennomgang
 
 Eget pass over autentisering, autorisasjon, endepunktdekning og de administrative
-flatene. N1 (åpen redirect), N4 (MFA-rate-limit) og N6 (uescapet `innerHTML`) hører
+flatene. N1 (åpen redirect), N4 (MFA-rate-limit) og N6 (uescapet `innerHTML`, nå lukket) hører
 tematisk hjemme her, men er beskrevet i Del 1.
 
 ## S1. `/django-admin/` omgår samtlige av appens innloggingssikringer &nbsp;—&nbsp; ✅ GJENNOMFØRT (13. aug. 2026)
@@ -1091,10 +1134,11 @@ punktet:
    endres, og er styrket med en merknad om at feltlista utledes fra modellen.
 2. **Lagringstider:** var aldri et avvik. `purge_old_logs` kjører som Railway Cron Job — se
    rettelsen under F2.
-3. **`escapeHtml()`-dekningen:** rettet i dokumentet, siden N6 fortsatt står åpen. A.10 og
-   teknisk dokumentasjon §7.9 sier nå eksplisitt at dekningen gjelder pasientskjemaet og
-   arkivvisningen, ikke statistikk-tabellene, med henvisning til N6 og en merknad om at
-   serverside-whitelisten demper risikoen.
+3. **`escapeHtml()`-dekningen:** først rettet i dokumentet, siden N6 da sto åpen.
+   **Oppdatert 13. aug. 2026:** N6 er nå lukket i koden, og forbeholdet er derfor fjernet
+   fra både A.10 og teknisk dokumentasjon §7.9. Begge beskriver i stedet dagens
+   virkemåte — `escHtmlValue()` i tabellene, `trustedHtml()` for markup koden bygger selv,
+   og testdekningen i `patients/tests_xss_stats.py`.
 4. **Argon2:** rettet i teknisk dokumentasjon §7.1 og kapittel 4, som nå matcher A.10s
    presise formulering om at Argon2 ikke er installert.
 
@@ -1112,7 +1156,7 @@ dokumentet stemmer ikke med koden slik den er i dag:
 |---|---|---|
 | «Alle pasient-endringer logges på felt-nivå» (A.10) | `patient_pre_save` | `helsepersonell_ref_id` mangler i `felt_to_track` — se N2. Endring av oppfølgingsansvarlig etterlater ingen spor |
 | ~~Lagringstid 730 dager (logger) / 30 dager (varsler) (A.9)~~ | `purge_old_logs` | ✅ **Ikke et avvik.** Kommandoen kjører som aktiv Railway Cron Job — se F2. Gjennomgangen antok feilaktig at den ikke var satt opp, fordi jobben ikke er synlig i repoet |
-| «manuell `escapeHtml()` i JavaScript» (A.10, §7.9) | statistikk-tabellene | `mkStatsTable`/`mkCrosstab`/`mkObsTable` setter feltverdier uescapet i `innerHTML` — se N6. Referansen i dokumentet stemmer for arkiv-visningen, ikke for statistikkfanen |
+| ~~«manuell `escapeHtml()` i JavaScript» (A.10, §7.9)~~ | statistikk-tabellene | ✅ **Lukket 13. aug. 2026 (N6).** `mkStatsTable`/`mkCrosstab`/`mkObsTable` satte feltverdier uescapet i `innerHTML`; de escaper nå med `escHtmlValue()`. Påstanden i dokumentet er sann for hele frontend igjen |
 | «Passord-hashing (argon2 / PBKDF2)» (§7.1) | `settings.py` / `requirements.txt` | Argon2 er ikke installert. A.10 sier dette riktig («Argon2 er ikke installert i dag»), §7.1 i teknisk dokumentasjon sier det feil |
 
 **Rettelse 13. august 2026:** punktet om lagringstider var det som ble beskrevet som mest
@@ -1367,9 +1411,11 @@ uten degradering.
 `'unsafe-inline'` for både `script-src` og `style-src`. Kommentaren i koden begrunner det
 med at all brukerdata escapes med `escapeHtml()` før innsetting i DOM.
 
-**Oppdatering august 2026:** Den begrunnelsen holder ikke fullt ut — se N6.
-Statistikk-tabellene escaper ikke. Så lenge begge deler står, mangler vi begge lagene
-samtidig.
+**Oppdatering august 2026:** Den begrunnelsen holdt ikke fullt ut — statistikk-tabellene
+escapet ikke. **Rettet 13. aug. 2026 (N6):** de escaper nå, så begrunnelsen i koden er
+sann igjen og vi mangler ikke lenger begge lagene samtidig. Det gjør dette punktet mindre
+hastende, men ikke unødvendig: `unsafe-inline` er fortsatt det som ville gjort en
+eventuell fremtidig escaping-glipp utnyttbar.
 
 I tillegg har `templates/patients/index.html` rundt 30 inline `onclick=`-handlere. De må
 flyttes til `addEventListener` før `unsafe-inline` kan fjernes fra `script-src` — det er
@@ -1381,7 +1427,7 @@ mesteparten av arbeidet i dette punktet.
 - Innfør nonce for de gjenværende inline-scriptene via en template tag.
 - Flytt `onclick="..."` til `addEventListener` i JS-modulene.
 - Test i alle nettlesere brukerne benytter (Chrome, Edge, Safari iOS).
-- Ta N6 i samme runde.
+- ~~Ta N6 i samme runde.~~ N6 er tatt for seg selv (13. aug. 2026).
 
 **Akseptansekriterium:** CSP-headeren inneholder ikke `unsafe-inline` for `script-src`.
 Manuell QA på alle hovedflyt.

@@ -717,7 +717,10 @@ Fire validatorer er aktivert i `settings.py`:
 ### 7.9 Input/output-sikkerhet
 
 - CSRF-beskyttelse på alle mutasjoner.
-- XSS-beskyttelse via auto-escape i templates + manuell `escapeHtml()`/`_escHtml` i pasientskjemaet (`patients-forms.js`) og arkivvisningen (`patients-stats.js`). Statistikk-tabellene er ennå ikke dekket — se N6 i `docs/FORBEDRINGER_2026-08.md`.
+- XSS-beskyttelse via auto-escape i templates + manuell escaping i JavaScript: `escapeHtml()`/`_escHtml` i pasientskjemaet (`patients-forms.js`) og arkivvisningen (`patients-stats.js`), og `escHtmlValue()` i statistikk-tabellene.
+  - `escHtmlValue()` skiller «ikke satt» (`null`/`undefined`) fra falsy verdier, slik at tallet 0 vises i tabellceller i stedet for å bli tom streng. Det er grunnen til at den finnes ved siden av de to eldre hjelperne.
+  - `trustedHtml()` markerer markup koden bygger selv (signifikans-merker i `renderTester`, prosentbjelker i `mkObsTable`). `cellHtml()` slipper klarerte celler gjennom og escaper alt annet, så unntaket blir et bevisst valg per celle.
+  - `patients/tests_xss_stats.py` kjører byggerne i node mot HTML-holdige feltverdier, og har i tillegg en statisk vaktpost som krever at hver `${...}` i byggerne er escapet eller står på en gjennomgått unntaksliste med begrunnelse.
 - SQL-injection-beskyttelse via Django ORM (ingen raw SQL).
 - Ingen path traversal i backup-filnavn – filnavn genereres server-side.
 - Generisk feilmelding ved backup-restore (lekker ikke interne detaljer).

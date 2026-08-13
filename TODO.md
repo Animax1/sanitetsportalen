@@ -52,6 +52,13 @@ dokumentasjon.
 - [x] **N5** `current_local_year()` brukes begge steder — nyttårsvakter havner i riktig år
 - [x] **N7** Delt Redis-klient per prosess (var én TCP-handshake per request)
 - [x] **N8** Audit-signalet skriver med `bulk_create` — konstant antall spørringer
+- [x] **N6** Statistikk-tabellene escaper feltverdier (`escHtmlValue()`), og markup koden
+      bygger selv må merkes med `trustedHtml()`. Personell-listene escaper også navn —
+      fritekst uten whitelist, ikke nevnt i punktet. `import_offline_data` validerer nå mot
+      `choices.py` med `--force` som utvei. Vaktpost mot nye uescapede tabeller i
+      `patients/tests_xss_stats.py`.
+      **NB:** F5 (CSP `unsafe-inline`) ble ikke tatt med, tross anbefalingen i dokumentet.
+      **Gjenstår:** backup-restore via `loaddata` er den siste uvaliderte veien inn i basen.
 - [x] **N10** `CustomUser.current_session_key` gjør innlogging til ett indeksert oppslag.
       Sikkerhetsstiene (passordbytte, admin-reset, frys, sletting) beholder full
       gjennomgang. **NB: krever migrasjon** — `accounts/0008_customuser_current_session_key`
@@ -69,6 +76,11 @@ dokumentasjon.
 - [ ] Fjerne varsler eldre enn 30 dager.s
 - [ ] Lage locus klone, hente sted via enhet gps.
 - [x] Slå sammen de to backup-flatene — kun `/portal-admin/backup/` gjenstår
+- [ ] Valider kliniske felt ved backup-restore. Restore kjører `loaddata`, som går utenom
+      `validate_patient_choice_fields`. Etter N6 er dette den siste veien inn i databasen
+      der en verdi utenfor whitelisten i `patients/choices.py` kan lande. Lavere risiko enn
+      import-veien var, siden innholdet kommer fra våre egne backup-filer — men det er den
+      som står igjen.
 - [ ] Rydd bort død backup-legacy: modellen `patients.BackupConfig` (singleton som
       ingenting leser lenger) og management-kommandoen `db_backup` som gater på den.
       Krever migrasjon, derfor egen oppgave.

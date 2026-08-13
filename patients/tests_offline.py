@@ -7,6 +7,7 @@ import tempfile
 from io import StringIO
 from pathlib import Path
 
+from django.core.management.base import CommandError
 from django.test import TestCase, override_settings
 
 from accounts.models import CustomUser
@@ -343,6 +344,82 @@ class ImportOfflineDataTests(TestCase):
             out = _call_import_offline_data(path, year=2026)
             self.assertIn('Ingen pasienter', out)
             self.assertEqual(Patient.objects.filter(year=2026).count(), 0)
+        finally:
+            path.unlink(missing_ok=True)
+
+    # ── Whitelist-validering (N6) ────────────────────────────────────────────
+
+    def test_import_avviser_verdi_utenfor_whitelisten(self):
+        """Import bygger Patient direkte, så whitelisten må håndheves her også.
+
+        Uten dette var kommandoen en av veiene inn i databasen der en verdi
+        utenfor `patients/choices.py` kunne lande – og senere bli satt inn i
+        statistikkfanen.
+        """
+        tf, path = self._make_sqlite(
+            patients=[
+                {'pasientnummer': 1, 'year': 2026,
+                 'problemstilling': '<img src=x onerror=alert(1)>'},
+            ]
+        )
+        try:
+            with self.assertRaises(CommandError) as ctx:
+                _call_import_offline_data(path, year=2026)
+            self.assertIn('problemstilling', str(ctx.exception))
+            self.assertIn('--force', str(ctx.exception),
+                          'Feilmeldingen må peke på utveien for bevisst import')
+            self.assertEqual(Patient.objects.filter(year=2026).count(), 0,
+                             'Ingenting skal være skrevet når importen avbrytes')
+        finally:
+            path.unlink(missing_ok=True)
+
+    def test_import_rapporterer_alle_ugyldige_rader_samtidig(self):
+        """Rapporten skal dekke alle radene, ikke stoppe på den første."""
+        tf, path = self._make_sqlite(
+            patients=[
+                {'pasientnummer': 1, 'year': 2026, 'problemstilling': 'Tull'},
+                {'pasientnummer': 2, 'year': 2026, 'transport': 'Teleport'},
+            ]
+        )
+        try:
+            with self.assertRaises(CommandError) as ctx:
+                _call_import_offline_data(path, year=2026)
+            melding = str(ctx.exception)
+            self.assertIn('offline #1', melding)
+            self.assertIn('offline #2', melding)
+        finally:
+            path.unlink(missing_ok=True)
+
+    def test_import_med_force_tar_inn_ugyldig_verdi_og_advarer(self):
+        """--force finnes for bevisst import av gamle, uvaliderte data."""
+        tf, path = self._make_sqlite(
+            patients=[
+                {'pasientnummer': 1, 'year': 2026, 'problemstilling': 'Gammel verdi'},
+            ]
+        )
+        try:
+            out = _call_import_offline_data(path, year=2026, force=True)
+            self.assertEqual(Patient.objects.filter(year=2026).count(), 1)
+            self.assertEqual(
+                Patient.objects.get(year=2026).problemstilling, 'Gammel verdi')
+            self.assertIn('--force', out, 'Importen skal si tydelig fra i loggen')
+            self.assertIn('problemstilling', out)
+        finally:
+            path.unlink(missing_ok=True)
+
+    def test_import_normaliserer_whitespace_i_gyldige_felt(self):
+        """Valideringen trimmer, på samme måte som API-veien gjør."""
+        tf, path = self._make_sqlite(
+            patients=[
+                {'pasientnummer': 1, 'year': 2026,
+                 'problemstilling': '  Brystsmerter  ', 'grovsortering': 'Rød'},
+            ]
+        )
+        try:
+            _call_import_offline_data(path, year=2026)
+            p = Patient.objects.get(year=2026)
+            self.assertEqual(p.problemstilling, 'Brystsmerter')
+            self.assertEqual(p.grovsortering, 'Rød')
         finally:
             path.unlink(missing_ok=True)
 

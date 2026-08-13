@@ -4,16 +4,20 @@ Bruk:
   python manage.py import_offline_data /sti/til/offline.sqlite3
   python manage.py import_offline_data /sti/til/offline.sqlite3 --year 2026
   python manage.py import_offline_data /sti/til/offline.sqlite3 --dry-run
+  python manage.py import_offline_data /sti/til/offline.sqlite3 --force
 
 Forventet flyt:
   1. Åpne offline.sqlite3 som read-only via sqlite3-modulen.
   2. Hent alle pasienter fra offline (filtrert på --year hvis oppgitt, ellers aktivt år).
-  3. For hver pasient: skap ny Patient i default-databasen. Pasientnummer re-tilordnes
+  3. Valider de kliniske dropdown-feltene mot whitelisten i patients/choices.py.
+     Ugyldige verdier avbryter hele importen, med rapport per rad. --force
+     importerer dem likevel, for bevisst import av gamle data.
+  4. For hver pasient: skap ny Patient i default-databasen. Pasientnummer re-tilordnes
      som max(eksisterende_nr globalt) + 1, 2, 3... for å unngå kollisjon.
-  4. Behandler/Helsepersonell-FK matches på NAVN i default-DB. Hvis ikke funnet,
+  5. Behandler/Helsepersonell-FK matches på NAVN i default-DB. Hvis ikke funnet,
      opprettes nye med samme navn og is_active=True.
-  5. Alle operasjoner i én atomic-blokk. --dry-run ruller tilbake etterpå.
-  6. Rapport: antall importert, antall behandlere/helsepersonell opprettet.
+  6. Alle operasjoner i én atomic-blokk. --dry-run ruller tilbake etterpå.
+  7. Rapport: antall importert, antall behandlere/helsepersonell opprettet.
 
 Audit-loggføring: hver importert pasient får en AuditLog-oppføring med
 action='imported_offline' og object_repr i new_value-feltet.
@@ -21,9 +25,11 @@ action='imported_offline' og object_repr i new_value-feltet.
 import sqlite3
 from pathlib import Path
 
+from django.core.exceptions import ValidationError
 from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
 
+from patients.choices import validate_patient_choice_fields
 from patients.models import Patient, Forstehjelper, Helsepersonell
 from patients.services import get_active_year
 from audit.models import AuditLog
@@ -50,6 +56,10 @@ class Command(BaseCommand):
         parser.add_argument('sqlite_path', type=str)
         parser.add_argument('--year', type=int, default=None)
         parser.add_argument('--dry-run', action='store_true')
+        parser.add_argument(
+            '--force', action='store_true',
+            help='Importer selv om kliniske felt bryter whitelisten i choices.py.',
+        )
 
     def handle(self, *args, **opts):
         path = Path(opts['sqlite_path'])
@@ -76,6 +86,9 @@ class Command(BaseCommand):
 
         self.stdout.write(f'Fant {len(rows)} pasienter i offline-DB (år {year}).')
 
+        # Valider før noe skrives, slik at rapporten dekker alle radene
+        normalized = self._validate_choice_fields(rows, opts['force'])
+
         # Forbered navnemapping
         forstehjelper_cache = {b.name: b for b in Forstehjelper.objects.all()}
         hp_cache = {h.name: h for h in Helsepersonell.objects.all()}
@@ -90,9 +103,7 @@ class Command(BaseCommand):
 
         try:
             with transaction.atomic():
-                for row in rows:
-                    row_keys = list(row.keys())
-
+                for row, values in zip(rows, normalized):
                     # Førstehjelper-mapping (SQL leser fra patients_behandler i offline-DB)
                     forstehjelper_obj = None
                     if row['behandler_name']:
@@ -118,9 +129,8 @@ class Command(BaseCommand):
                         forstehjelper=forstehjelper_obj,
                         helsepersonell_ref=hp_obj,
                     )
-                    for f in PATIENT_COPY_FIELDS:
-                        if f in row_keys:
-                            setattr(p, f, row[f] or '')
+                    for f, v in values.items():
+                        setattr(p, f, v)
                     p.save()
 
                     # Audit-logg: bruker faktiske felter på AuditLog-modellen
@@ -150,6 +160,48 @@ class Command(BaseCommand):
             f'Importert {imported} pasienter, '
             f'{new_forstehjelpere} nye forstehjelpere, {new_hp} nye helsepersonell.'
         ))
+
+    def _validate_choice_fields(self, rows, force):
+        """Kjør de kliniske dropdown-feltene gjennom whitelisten i choices.py.
+
+        Importen bygger ``Patient``-objekter direkte og går dermed utenom
+        API-valideringen. Det gjorde den til en av veiene inn i databasen der
+        en verdi utenfor whitelisten – i verste fall HTML – kunne lande uten
+        å bli sett, og bli satt inn uescapet i statistikkfanen senere (N6).
+
+        Returnerer én dict per rad med normaliserte (trimmede) verdier, i
+        samme rekkefølge som ``rows``. Feltene som ikke finnes i offline-fila
+        utelates, slik at eldre skjemaversjoner fortsatt kan importeres.
+        """
+        normalized = []
+        feil = []
+
+        for row in rows:
+            row_keys = list(row.keys())
+            data = {f: (row[f] or '') for f in PATIENT_COPY_FIELDS if f in row_keys}
+            try:
+                validate_patient_choice_fields(data)
+            except ValidationError as exc:
+                for msg in exc.messages:
+                    feil.append(f'offline #{row["pasientnummer"]}: {msg}')
+            # validate_patient_choice_fields muterer in-place, så `data` er
+            # normalisert så langt det lot seg gjøre – også ved feil.
+            normalized.append(data)
+
+        if feil:
+            if not force:
+                raise CommandError(
+                    f'Avbrutt: {len(feil)} feltverdi(er) er ikke gyldige:\n  '
+                    + '\n  '.join(feil)
+                    + '\n\nRett kilden, eller kjør på nytt med --force for å '
+                      'importere verdiene som de er.'
+                )
+            self.stdout.write(self.style.WARNING(
+                f'--force: importerer {len(feil)} ugyldig(e) feltverdi(er):'))
+            for msg in feil:
+                self.stdout.write(self.style.WARNING(f'  {msg}'))
+
+        return normalized
 
     def _fetch_offline_patients(self, conn, year):
         """Hent pasienter med joinede navn for behandler og helsepersonell_ref."""
