@@ -4,6 +4,30 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-08-13 — Sikkerhetsvurdering: dokumentasjonsavvik (S7)
+
+Etter en samlet sikkerhetsvurdering av kodebasen mot `TEKNISK_DOKUMENTASJON.md` og
+`PERSONVERN_DOKUMENTASJON.md` er fire punkter der dokumentasjonen påstår kontroller som
+ikke er reelle i dag lagt til som **S7** i `docs/FORBEDRINGER_2026-08.md`. Fortsatt ingen
+kodeendringer.
+
+`PERSONVERN_DOKUMENTASJON.md` er behandlingsprotokollen etter GDPR art. 30 — et avvik der
+er ikke bare unøyaktighet, det er dokumentasjon som ikke stemmer med behandlingen:
+
+- A.10 sier «alle pasient-endringer logges på felt-nivå» — `helsepersonell_ref_id`
+  mangler i sporingen (N2)
+- A.9 sier lagringstid 730/30 dager — `purge_old_logs` er aldri satt opp som cron, så
+  fristene håndheves ikke i praksis (F2)
+- A.10/§7.9 viser til `escapeHtml()` som generell XSS-beskyttelse — statistikk-tabellene
+  er ikke dekket (N6)
+- §7.1 i teknisk dokumentasjon sier Argon2 er i bruk; A.10 sier korrekt at den ikke er
+  installert — de to dokumentene motsier hverandre
+
+Mest alvorlig er lagringstidene, siden det er en slettepraksis beskrevet overfor både de
+registrerte (del B) og tilsynsmyndighet (del A) som ikke finner sted.
+
+---
+
 ## 2026-08-12 — Kodegjennomgang: ny forbedringsbacklog
 
 Full gjennomgang av kodebasen for å finne hva som bør forbedres. **Ingen kode er endret** —

@@ -44,6 +44,7 @@ Status: ⏳ pending · 🔧 påbegynt · ✅ ferdig · ⚪ ikke aktuell
 | S4 | Lagret open redirect i varsel-visningen | ⏳ | Lav–Middels | 15 min |
 | S5 | Utlogging skjer via GET | ⏳ | Lav | 30 min |
 | S6 | MFA trust-cookie settes med `secure=True` i offline-modus | ⏳ | Lav | 15 min |
+| S7 | **Personverndokumentasjonen påstår kontroller som ikke er reelle i dag** | ⏳ | Høy | 1 t |
 
 ### Overført fra FORBEDRINGER.md (fortsatt åpne)
 
@@ -866,6 +867,44 @@ Samme sjekk bør gjennomgås for andre `set_cookie`-kall.
 
 **Akseptansekriterium:** Trust-cookien lagres og virker i offline-modus, og har fortsatt
 `Secure` i produksjon.
+
+---
+
+## S7. Personverndokumentasjonen påstår kontroller som ikke er reelle i dag
+
+**Verdi:** Høy &nbsp;|&nbsp; **Innsats:** 1 t
+
+**Bakgrunn:** `PERSONVERN_DOKUMENTASJON.md` er ikke bare intern prosa — A.10 er
+behandlingsprotokollen etter GDPR art. 30, og ansvarlighetsprinsippet i art. 5(2) krever
+at vi kan *demonstrere* at tiltakene vi lister faktisk er på plass. Fire punkter i
+dokumentet stemmer ikke med koden slik den er i dag:
+
+| Påstand | Hvor | Faktisk tilstand |
+|---|---|---|
+| «Alle pasient-endringer logges på felt-nivå» (A.10) | `patient_pre_save` | `helsepersonell_ref_id` mangler i `felt_to_track` — se N2. Endring av oppfølgingsansvarlig etterlater ingen spor |
+| Lagringstid 730 dager (logger) / 30 dager (varsler) (A.9) | `purge_old_logs` | Kommandoen finnes og er komplett, men er aldri satt opp som cron-jobb — se F2. De dokumenterte fristene håndheves ikke |
+| «manuell `escapeHtml()` i JavaScript» (A.10, §7.9) | statistikk-tabellene | `mkStatsTable`/`mkCrosstab`/`mkObsTable` setter feltverdier uescapet i `innerHTML` — se N6. Referansen i dokumentet stemmer for arkiv-visningen, ikke for statistikkfanen |
+| «Passord-hashing (argon2 / PBKDF2)» (§7.1) | `settings.py` / `requirements.txt` | Argon2 er ikke installert. A.10 sier dette riktig («Argon2 er ikke installert i dag»), §7.1 i teknisk dokumentasjon sier det feil |
+
+Det mest alvorlige er lagringstidene. Dokumentet beskriver overfor de registrerte (del B)
+og overfor tilsynsmyndighet (del A) en slettepraksis som ikke finner sted i produksjon.
+Det er forskjellen mellom en dokumentert kontroll og en reell kontroll — og det er
+nøyaktig den forskjellen art. 5(2) ber oss unngå.
+
+**Tiltak:**
+
+1. **Rett koden, ikke dokumentet, for N2 og F2** — de er reelle mangler (se egne punkter).
+   Når de er lukket, blir påstandene sanne igjen uten at teksten må endres.
+2. **Rett dokumentet for de to andre:** presiser i A.10/§7.9 at `escapeHtml()`/`_escHtml`
+   dekker arkiv-visningen og pasientskjemaet, ikke (ennå) statistikk-tabellene — inntil N6
+   er lukket. Rett §7.1 til å matche A.10s mer presise formulering om Argon2.
+3. Legg inn en enkel rutine: hver gang et FORBEDRINGER-punkt lukkes som direkte motsier en
+   påstand i personverndokumentasjonen, sjekk om dokumentet må oppdateres i samme runde.
+   Ingen slik kobling finnes i dag — det er sånn disse fire oppsto.
+
+**Akseptansekriterium:** Hver påstand i A.9, A.10 og kapittel 7 i teknisk dokumentasjon
+kan verifiseres direkte mot kjørende kode. Ingen krysser N2 eller F2 av som løst uten å
+sjekke om personverndokumentasjonen fortsatt er korrekt.
 
 ---
 

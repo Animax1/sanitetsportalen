@@ -28,6 +28,9 @@ her er kun de fire som bør tas først (alle små, alle med konkret risiko):
 - [ ] **S2** Fjern `must_change_password=False` fra `create_superuser` — `accounts/managers.py:29`.
       Tas sammen med S1, ellers har den ingen effekt for bootstrap-adminen
 - [ ] **N1** Valider `next`-parameteren ved innlogging (åpen redirect) — `accounts/views.py:162`
+- [ ] **S7** Personverndokumentasjonen påstår kontroller som ikke er reelle (audit-dekning,
+      lagringstider, escapeHtml-dekning, Argon2). Rett når N2/F2/N6 er lukket, eller rett
+      teksten nå — se `docs/FORBEDRINGER_2026-08.md`
 - [ ] **N2** Legg `helsepersonell_ref_id` i `felt_to_track` — endringen logges ikke i dag
       (`patients/signals.py:70`)
 - [ ] **N3** Gi `LOGGING` en rot-handler — all INFO-logging forsvinner i prod i dag
