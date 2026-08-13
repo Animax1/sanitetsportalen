@@ -40,11 +40,9 @@ dokumentasjon.
 - [x] **N4** MFA-stegene har egne rate-limit-bøtter, og kontosperren gjelder også der
 - [x] **S5** Utlogging krever POST
 - [x] **S6** MFA trust-cookie følger `request.is_secure()` — virker nå i offline-modus
-- [ ] **S7** Personverndokumentasjonen påstår kontroller som ikke er reelle (audit-dekning,
-      lagringstider, escapeHtml-dekning, Argon2). Rett når N2/F2/N6 er lukket, eller rett
-      teksten nå — se `docs/FORBEDRINGER_2026-08.md`
-- [ ] **N2** Legg `helsepersonell_ref_id` i `felt_to_track` — endringen logges ikke i dag
-      (`patients/signals.py:70`)
+- [x] **S7** Alle fire dokumentasjonspunkter lukket (audit-dekning via N2, lagringstider var
+      ikke et avvik, escapeHtml-dekning og Argon2 rettet i teksten)
+- [x] **N2** Audit-feltlista utledes nå fra modellen — et nytt felt kan ikke falle utenfor
 - [x] **N3** `LOGGING` har rot-handler med formatering + `LOG_LEVEL`-variabel
 - [x] **F1** E-postvarsel ved uhåndterte feil, med demping per feiltype
   - [ ] **Driftsoppgave:** sett `ADMINS` og `EMAIL_*` i Railway, og verifiser med en
@@ -54,8 +52,7 @@ dokumentasjon.
 - [ ] **N4** MFA-steget deler én rate-limit-bøtte for alle brukere — kan gi 429 ved vaktstart
       (`accounts/views.py:141`)
 
-- [ ] **N5** før nyttår: `get_active_year()` og `Patient.save()` bruker container-tid (UTC),
-      ikke Europe/Oslo — pasienter registrert etter midnatt 1. januar havner i feil år
+- [x] **N5** `current_local_year()` brukes begge steder — nyttårsvakter havner i riktig år
 
 ## Ideer / backlog
 

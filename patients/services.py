@@ -21,6 +21,7 @@ from core.validators import (  # noqa: F401
     TIME_FIELDS,
     TIME_FORMAT,
     TIME_FORMAT_HUMAN,
+    current_local_year,
     now_local_str,
     parse_minutes,
     validate_patient_time_fields,
@@ -127,7 +128,7 @@ def apply_list_filter(queryset, filter_name='alle', year=None):
 
 def get_active_year():
     """Returnerer aktivt år. Default og ved årsskifte: inneværende år."""
-    current = datetime.now().year
+    current = current_local_year()
     stored = AppSetting.get('active_year', None)
     if stored is None:
         AppSetting.set('active_year', current)

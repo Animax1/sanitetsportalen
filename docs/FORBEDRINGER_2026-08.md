@@ -21,10 +21,10 @@ Status: ⏳ pending · 🔧 påbegynt · ✅ ferdig · ⚪ ikke aktuell
 | # | Tittel | Status | Verdi | Innsats | Type |
 |---|---|---|---|---|---|
 | N1 | **Åpen redirect i innloggingsflyten (`next` valideres ikke)** | ✅ | Høy | 1 t | Sikkerhet |
-| N2 | **`helsepersonell_ref` mangler i audit-sporingen** | ⏳ | Høy | 30 min | Personvern / sporbarhet |
+| N2 | **`helsepersonell_ref` mangler i audit-sporingen** | ✅ | Høy | 30 min | Personvern / sporbarhet |
 | N3 | **Applikasjonsloggene når aldri fram (LOGGING mangler rot-handler)** | ✅ | Høy | 30 min | Drift |
 | N4 | **MFA-steget deler én rate-limit-bøtte — kan låse ute hele vakten** | ✅ | Høy | 1–2 t | Drift / sikkerhet |
-| N5 | `get_active_year()` og `Patient.save()` bruker container-tid | ⏳ | Middels–Høy | 30 min | Korrekthet |
+| N5 | `get_active_year()` og `Patient.save()` bruker container-tid | ✅ | Middels–Høy | 30 min | Korrekthet |
 | N6 | Statistikk-tabellene setter inn feltverdier uescapet i `innerHTML` | ⏳ | Middels | 2 t | Sikkerhet (dybdeforsvar) |
 | N7 | Redis-klienten bygges på nytt for hver eneste request | ⏳ | Middels | 1 t | Ytelse |
 | N8 | Audit-signalet gjør N+1 skrivinger per pasientendring | ⏳ | Middels | 1–2 t | Ytelse |
@@ -44,7 +44,7 @@ Status: ⏳ pending · 🔧 påbegynt · ✅ ferdig · ⚪ ikke aktuell
 | S4 | Lagret open redirect i varsel-visningen | ✅ | Lav–Middels | 15 min |
 | S5 | Utlogging skjer via GET | ✅ | Lav | 30 min |
 | S6 | MFA trust-cookie settes med `secure=True` i offline-modus | ✅ | Lav | 15 min |
-| S7 | **Personverndokumentasjonen påstår kontroller som ikke er reelle i dag** | ⏳ | Høy | 1 t |
+| S7 | **Personverndokumentasjonen påstår kontroller som ikke er reelle i dag** | ✅ | Høy | 1 t |
 
 ### Overført fra FORBEDRINGER.md (fortsatt åpne)
 
@@ -147,7 +147,24 @@ host enn appen selv.
 
 ---
 
-## N2. `helsepersonell_ref` mangler i audit-sporingen
+## N2. `helsepersonell_ref` mangler i audit-sporingen &nbsp;—&nbsp; ✅ GJENNOMFØRT (13. aug. 2026)
+
+**Status:** Løst med det grundige alternativet fra tiltakspunkt 2 — feltlista utledes nå fra
+modellen i stedet for å håndholdes. `patients/signals.py` har en `FELT_UTEN_AUDIT`-frozenset
+med de fire feltene som bevisst ikke logges (`id`, `pasientnummer`, `created_at`,
+`updated_at`), og `felt_som_spores()` returnerer alt annet. Vendingen er poenget: glemsomhet
+gir nå for mye logging i stedet for for lite, og et nytt felt kan ikke falle ut stilltiende.
+
+En test itererer modellens felter og feiler hvis noe verken spores eller er eksplisitt
+unntatt.
+
+**Sidefunn:** `str(getattr(obj, felt, '') or '')` kollapset alle falsy verdier til tom
+streng — også `False`. Deaktivering av en pasient ble derfor logget med `new_value=''` i
+stedet for `'False'`, og DELETE-grenen (som sammenlikner mot `'False'`) kunne aldri slå til.
+Alle deaktiveringer har stått som UPDATE i loggen. Rettet i samme runde med `_audit_verdi()`,
+som kun gjør `None` til tom streng.
+
+**Merk fortsatt:** fixen virker kun fremover. Historiske endringer av helsepersonell er tapt.
 
 **Verdi:** Høy &nbsp;|&nbsp; **Innsats:** 30 min &nbsp;|&nbsp; **Type:** Personvern / sporbarhet
 
@@ -318,7 +335,17 @@ vindu. Én bruker som gjetter koder blir låst etter 5 forsøk.
 
 ---
 
-## N5. `get_active_year()` og `Patient.save()` bruker container-tid
+## N5. `get_active_year()` og `Patient.save()` bruker container-tid &nbsp;—&nbsp; ✅ GJENNOMFØRT (13. aug. 2026)
+
+**Status:** Løst. Ny `core.validators.current_local_year()` ved siden av `now_local_str()`,
+brukt begge steder — ett sted å endre, slik tiltakspunkt 2 ba om.
+
+Akseptansekriteriet er innfridd og automatisert: en test parser `patients/` og `core/` med
+AST og feiler hvis noe kaller `datetime.now()`. AST og ikke tekstsøk, slik at omtale i
+docstrings ikke gir falske treff. Eneste gjenværende forekomst er i migrasjon 0002, som er
+frosset historikk.
+
+Testet med frosset tid 31.12 kl. 23:30 UTC → gir 2027, og kl. 22:00 UTC → gir fortsatt 2026.
 
 **Verdi:** Middels–Høy &nbsp;|&nbsp; **Innsats:** 30 min &nbsp;|&nbsp; **Type:** Korrekthet
 
@@ -1011,7 +1038,24 @@ Samme sjekk bør gjennomgås for andre `set_cookie`-kall.
 
 ---
 
-## S7. Personverndokumentasjonen påstår kontroller som ikke er reelle i dag
+## S7. Personverndokumentasjonen påstår kontroller som ikke er reelle &nbsp;—&nbsp; ✅ GJENNOMFØRT (13. aug. 2026)
+
+**Status:** Alle fire punkter lukket, men på tre ulike måter — som er hele poenget med
+punktet:
+
+1. **Audit-dekning:** rettet i koden (N2). Påstanden i A.10 er nå sann uten at teksten måtte
+   endres, og er styrket med en merknad om at feltlista utledes fra modellen.
+2. **Lagringstider:** var aldri et avvik. `purge_old_logs` kjører som Railway Cron Job — se
+   rettelsen under F2.
+3. **`escapeHtml()`-dekningen:** rettet i dokumentet, siden N6 fortsatt står åpen. A.10 og
+   teknisk dokumentasjon §7.9 sier nå eksplisitt at dekningen gjelder pasientskjemaet og
+   arkivvisningen, ikke statistikk-tabellene, med henvisning til N6 og en merknad om at
+   serverside-whitelisten demper risikoen.
+4. **Argon2:** rettet i teknisk dokumentasjon §7.1 og kapittel 4, som nå matcher A.10s
+   presise formulering om at Argon2 ikke er installert.
+
+Tiltakspunkt 3 — rutinen om å sjekke personverndokumentasjonen når et FORBEDRINGER-punkt
+lukkes — er fulgt i denne runden og bør fortsette.
 
 **Verdi:** Høy &nbsp;|&nbsp; **Innsats:** 1 t
 

@@ -4,6 +4,56 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-08-13 — Sporbarhet og korrekthet: N2, N5, S7
+
+**Audit-loggen var ufullstendig (N2).** `felt_to_track` var en håndholdt liste, og
+`helsepersonell_ref_id` hadde falt ut av den. Endret man hvem som var oppfølgingsansvarlig
+for en pasient, ble det ikke skrevet noen `AuditLog`-rad — samtidig som
+`PERSONVERN_DOKUMENTASJON.md` A.10 lover at alle pasientendringer logges på feltnivå.
+
+Løst med det grundige alternativet: lista utledes nå fra modellen. `FELT_UTEN_AUDIT`
+inneholder de fire feltene som bevisst ikke logges (`id`, `pasientnummer`, `created_at`,
+`updated_at`), og `felt_som_spores()` returnerer alt annet. Vendingen er poenget —
+glemsomhet gir nå for mye logging i stedet for for lite. En test itererer modellens felter
+og feiler hvis noe verken spores eller er eksplisitt unntatt.
+
+**Sidefunn i samme funksjon:** `str(getattr(obj, felt, '') or '')` kollapset alle falsy
+verdier til tom streng, også `False`. Deaktivering av en pasient ble derfor logget med
+`new_value=''`, og DELETE-grenen — som sammenlikner mot `'False'` — kunne aldri slå til.
+Alle deaktiveringer har stått som UPDATE i loggen. Rettet med `_audit_verdi()`, som kun
+gjør `None` til tom streng.
+
+Begge fixene virker kun fremover. Historiske endringer av helsepersonell er tapt.
+
+**Container-tid (N5).** `get_active_year()` og `Patient.save()` brukte
+`datetime.now().year`, som gir naiv container-lokaltid — UTC på Railway, uavhengig av
+`TIME_ZONE='Europe/Oslo'`. Mellom midnatt og kl. 01:00 norsk vintertid er UTC-året fortsatt
+det forrige, så en nyttårsvakt ville lagret pasienter på året som nettopp gikk.
+Listevisningen filtrerer på samme funksjon og ville vært konsistent med seg selv — feilen
+ville ikke blitt sett før noen så på statistikken i ettertid.
+
+Ny `core.validators.current_local_year()` ved siden av `now_local_str()`, brukt begge
+steder. Akseptansekriteriet er automatisert: en test parser `patients/` og `core/` med AST
+og feiler hvis noe kaller `datetime.now()`. AST og ikke tekstsøk, så omtale i docstrings
+ikke gir falske treff. Testet med frosset tid 31.12 kl. 23:30 UTC → 2027, kl. 22:00 UTC →
+2026.
+
+**Personverndokumentasjonen (S7).** Fire punkter, lukket på tre ulike måter:
+
+1. **Audit-dekning** — rettet i koden (N2). Påstanden i A.10 er sann igjen uten tekstendring.
+2. **Lagringstider** — var aldri et avvik; `purge_old_logs` kjører som cron. Se gårsdagens
+   rettelse.
+3. **`escapeHtml()`-dekning** — rettet i dokumentet, siden N6 fortsatt står åpen. A.10 og
+   teknisk dokumentasjon sier nå eksplisitt at dekningen gjelder pasientskjemaet og
+   arkivvisningen, ikke statistikk-tabellene, med henvisning til N6 og en merknad om at
+   serverside-whitelisten demper risikoen.
+4. **Argon2** — rettet i teknisk dokumentasjon, som sa at Argon2 var i bruk. Den er ikke
+   installert. A.10 hadde det riktig hele tiden; de to dokumentene motsa hverandre.
+
+12 nye tester i `patients/tests_audit_og_tid.py`. Full suite: 633 tester, grønn.
+
+---
+
 ## 2026-08-13 — Drift: logging som når fram (N3) og e-postvarsel ved feil (F1)
 
 **Applikasjonsloggene har aldri nådd fram (N3).** `LOGGING` hadde én logger (`memory`) og

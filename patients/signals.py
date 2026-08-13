@@ -37,6 +37,55 @@ def _get_user_and_ip():
     return user, ip
 
 
+# Felter som bevisst ikke audit-logges (N2).
+#
+# Lista er over *unntakene*, ikke over det som spores. Det er en bevisst
+# vending: tidligere sto den håndholdte lista over sporede felt her, og
+# `helsepersonell_ref_id` hadde falt ut av den uten at noe fanget det opp.
+# Endring av oppfølgingsansvarlig etterlot dermed ingen spor — samtidig som
+# PERSONVERN_DOKUMENTASJON A.10 lovet at alle pasientendringer logges på
+# feltnivå. Med unntakslista må et nytt felt aktivt legges til her for å slippe
+# unna loggen; glemsomhet gir nå for mye logging, ikke for lite.
+FELT_UTEN_AUDIT = frozenset({
+    'id',             # intern PK, endres aldri
+    'pasientnummer',  # settes ved opprettelse, endres aldri
+    'created_at',     # auto_now_add
+    'updated_at',     # auto_now — ville gitt en audit-rad ved hver lagring
+})
+
+
+def felt_som_spores():
+    """Utled hvilke feltnavn som skal audit-logges, fra modellen selv.
+
+    Returnerer ``attname``, ikke ``name``: for en ForeignKey gir det
+    ``forstehjelper_id`` og ``helsepersonell_ref_id``, altså ID-en som faktisk
+    lagres — som er det vi vil ha i loggen, og som ikke utløser en ekstra
+    spørring når vi leser den av objektet.
+    """
+    return [
+        f.attname
+        for f in Patient._meta.concrete_fields
+        if f.name not in FELT_UTEN_AUDIT and f.attname not in FELT_UTEN_AUDIT
+    ]
+
+
+def _audit_verdi(obj, felt):
+    """Formater en feltverdi for audit-loggen.
+
+    Tidligere sto det ``str(getattr(obj, felt, '') or '')``. Den varianten
+    kollapser alle falsy verdier til tom streng — også ``False``. Konsekvensen
+    var at deaktivering av en pasient ble logget med ``new_value=''`` i stedet
+    for ``'False'``, og at DELETE-grenen under (som sammenlikner mot
+    ``'False'``) aldri kunne slå til. Deaktiveringer har derfor alltid stått
+    som UPDATE i loggen.
+
+    Kun ``None`` blir tom streng nå — det er den verdien som faktisk betyr
+    «ikke satt», typisk en FK uten referanse.
+    """
+    verdi = getattr(obj, felt, None)
+    return '' if verdi is None else str(verdi)
+
+
 @receiver(pre_save, sender=Patient)
 def patient_pre_save(sender, instance, **kwargs):
     """Logg feltendringer (UPDATE) for eksisterende pasienter.
@@ -66,17 +115,9 @@ def patient_pre_save(sender, instance, **kwargs):
 
     user, ip = _get_user_and_ip()
 
-    # Spor alle endrede felt (forstehjelper_id logges automatisk som FK-endring)
-    felt_to_track = [
-        'problemstilling', 'arsak', 'transport', 'inntid', 'grovsortering',
-        'pabegynt', 'plassering', 'forstehjelper_id', 'lege',
-        'medisiner', 'inn_obspost', 'ut_obspost', 'utskrevet',
-        'utskrevet_til', 'journal', 'year', 'is_active',
-    ]
-
-    for field in felt_to_track:
-        old_val = str(getattr(old, field, '') or '')
-        new_val = str(getattr(instance, field, '') or '')
+    for field in felt_som_spores():
+        old_val = _audit_verdi(old, field)
+        new_val = _audit_verdi(instance, field)
         if old_val != new_val:
             action = 'DELETE' if field == 'is_active' and new_val == 'False' else 'UPDATE'
             AuditLog.objects.create(

@@ -1,6 +1,4 @@
 """Modeller for pasientregistrering."""
-from datetime import datetime
-
 from django.conf import settings
 from django.db import models, transaction
 
@@ -167,7 +165,9 @@ class Patient(models.Model):
     def save(self, *args, **kwargs):
         """Sett year automatisk til inneværende år hvis det ikke er satt."""
         if self.year is None:
-            self.year = datetime.now().year
+            # N5: må være lokaltid, ikke container-tid. Se current_local_year().
+            from core.validators import current_local_year
+            self.year = current_local_year()
         super().save(*args, **kwargs)
 
 

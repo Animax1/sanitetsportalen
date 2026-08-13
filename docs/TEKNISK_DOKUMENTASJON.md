@@ -137,7 +137,7 @@ Basert på `AbstractBaseUser` + `PermissionsMixin`. Definert i `accounts/models.
 | `updated_at` | DateTimeField | Sist oppdatert | Auto, `auto_now` |
 | `last_login_at` | DateTimeField | Tidspunkt for siste vellykkede innlogging | `NULL` tillatt |
 
-`USERNAME_FIELD = 'username'`. Passordet lagres som en Django-hash (argon2 eller PBKDF2 med SHA-256).
+`USERNAME_FIELD = 'username'`. Passordet lagres som en Django-hash — i dag PBKDF2-HMAC-SHA256. Argon2 er **ikke** installert; det krever `argon2-cffi` i `requirements.txt`.
 
 ### 4.2 `accounts.LoginEvent`
 
@@ -643,7 +643,7 @@ Sesjon-invalidering skjer også automatisk ved MFA-bytte og passordbytte.
 
 ### 7.1 Autentisering og brute-force-beskyttelse
 
-- CustomUser med passord-hashing (argon2 / PBKDF2).
+- CustomUser med passord-hashing (PBKDF2-HMAC-SHA256; Argon2 er ikke installert i dag).
 - Brute-force-lås: 5 feil passord → konto låst i 15 minutter (`locked_until`).
 - Dobbel rate-limit: 10 forsøk per brukernavn / 50 forsøk per IP per 5 minutter.
 - Nødbryter `RATELIMIT_ENABLE` (env-variabel) for å skru av rate-limiting i nødsituasjoner.
@@ -717,7 +717,7 @@ Fire validatorer er aktivert i `settings.py`:
 ### 7.9 Input/output-sikkerhet
 
 - CSRF-beskyttelse på alle mutasjoner.
-- XSS-beskyttelse via auto-escape i templates + manuell `escapeHtml()` i `script.js`.
+- XSS-beskyttelse via auto-escape i templates + manuell `escapeHtml()`/`_escHtml` i pasientskjemaet (`patients-forms.js`) og arkivvisningen (`patients-stats.js`). Statistikk-tabellene er ennå ikke dekket — se N6 i `docs/FORBEDRINGER_2026-08.md`.
 - SQL-injection-beskyttelse via Django ORM (ingen raw SQL).
 - Ingen path traversal i backup-filnavn – filnavn genereres server-side.
 - Generisk feilmelding ved backup-restore (lekker ikke interne detaljer).

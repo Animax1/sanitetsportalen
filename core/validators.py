@@ -43,6 +43,24 @@ def now_local_str():
     return djtz.localtime(djtz.now()).strftime(TIME_FORMAT)
 
 
+def current_local_year():
+    """Returner inneværende år i Djangos TIME_ZONE (Europe/Oslo).
+
+    Samme feilklasse som ``now_local_str()`` løser, men for år (N5).
+    ``datetime.now().year`` gir naiv container-lokaltid — på Railway er det UTC,
+    uavhengig av ``TIME_ZONE``. Mellom midnatt og kl. 01:00 norsk vintertid
+    (02:00 sommertid) er UTC-året fortsatt det forrige.
+
+    Praktisk utslag: en nyttårsvakt som registrerer pasienter etter midnatt
+    1. januar ville lagret dem på året som nettopp gikk. Listevisningen filtrerer
+    på samme funksjon og ville vært konsistent med seg selv, så feilen ville
+    ikke blitt oppdaget før noen så på statistikken i ettertid.
+
+    Sanitetsvakter på nyttårsaften er ikke et hypotetisk scenario.
+    """
+    return djtz.localtime(djtz.now()).year
+
+
 # ── Validatorer ──────────────────────────────────────────────────────────────
 
 def validate_time_string(value, field_name=''):
