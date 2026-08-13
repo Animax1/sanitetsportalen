@@ -44,9 +44,16 @@
               <label class="form-label">Rolle</label>
               {{ form.role }}
             </div>
-            <div class="mb-3 form-check">
+            <div class="mb-2 form-check">
               {{ form.is_active }}
               <label class="form-check-label" for="{{ form.is_active.id_for_label }}" style="color:#cbd5e1;">Aktiv konto</label>
+            </div>
+            <div class="mb-3 form-check">
+              {{ form.mfa_required }}
+              <label class="form-check-label" for="{{ form.mfa_required.id_for_label }}" style="color:#cbd5e1;">Krev to-faktor (MFA)</label>
+              <div class="text-muted" style="font-size:0.78rem;">
+                Slås dette på må brukeren sette opp autentiseringsapp ved neste pålogging.
+              </div>
             </div>
 
             <hr style="border-color:#334155;">
@@ -109,6 +116,26 @@
               <i class="bi bi-key me-1"></i>Generer nytt midlertidig passord
             </button>
           </form>
+
+          {% if target_user.is_active %}
+            {% if target_user.pk != request.user.pk %}
+            <form method="post" onsubmit="return confirm('Fryse kontoen til {{ target_user.username }}? Brukeren logges ut umiddelbart og kan ikke logge inn igjen før kontoen tøs.')">
+              {% csrf_token %}
+              <input type="hidden" name="action" value="freeze">
+              <button type="submit" class="btn btn-outline-secondary btn-sm w-100">
+                <i class="bi bi-snow me-1"></i>Frys konto (logg ut nå)
+              </button>
+            </form>
+            {% endif %}
+          {% else %}
+          <form method="post">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="thaw">
+            <button type="submit" class="btn btn-outline-success btn-sm w-100">
+              <i class="bi bi-sun me-1"></i>Tø konto
+            </button>
+          </form>
+          {% endif %}
 
           {% if target_user.mfa_required or has_totp_device %}
           <form method="post" onsubmit="return confirm('Er du sikker? Dette nullstiller MFA for brukeren og de m\u00e5 sette opp p\u00e5 nytt ved neste p\u00e5logging.')">
@@ -187,6 +214,41 @@
           {% endfor %}
         </tbody>
       </table>
+    </div>
+  </div>
+
+  <!-- Faresone: permanent sletting -->
+  <div class="card mt-3" style="border-color:#7f1d1d;">
+    <div class="card-header" style="background:#450a0a;">
+      <strong class="text-danger"><i class="bi bi-exclamation-triangle me-2"></i>Slett bruker permanent</strong>
+    </div>
+    <div class="card-body">
+      {% if kan_slettes %}
+      <p class="small text-muted mb-3">
+        Kontoen fjernes for godt og kan ikke gjenopprettes. Navnet beholdes på historiske
+        pasienter og i vaktarkivet, og handlingen føres i revisjonsloggen. Skal tilgangen kun
+        stanses midlertidig, bruk <strong>Frys konto</strong> i stedet.
+      </p>
+      <form method="post" action="{% url 'accounts:user_delete' target_user.pk %}"
+            onsubmit="return confirm('Slette {{ target_user.username }} permanent? Dette kan ikke angres.')">
+        {% csrf_token %}
+        <label class="form-label small">
+          Skriv <code>{{ target_user.username }}</code> for å bekrefte:
+        </label>
+        <div class="d-flex gap-2 flex-wrap">
+          <input type="text" name="confirm_username" class="form-control form-control-sm"
+                 style="max-width:240px;" autocomplete="off" required
+                 placeholder="{{ target_user.username }}">
+          <button type="submit" class="btn btn-danger btn-sm">
+            <i class="bi bi-trash me-1"></i>Slett permanent
+          </button>
+        </div>
+      </form>
+      {% else %}
+      <p class="small text-muted mb-0">
+        <i class="bi bi-lock me-1"></i>{{ slette_sperre }}
+      </p>
+      {% endif %}
     </div>
   </div>
 

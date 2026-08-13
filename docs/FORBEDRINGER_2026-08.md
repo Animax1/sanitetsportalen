@@ -38,7 +38,7 @@ Status: ⏳ pending · 🔧 påbegynt · ✅ ferdig · ⚪ ikke aktuell
 
 | # | Tittel | Status | Verdi | Innsats |
 |---|---|---|---|---|
-| S1 | **`/django-admin/` omgår samtlige av appens innloggingssikringer** | ⏳ | Høy | 1–2 t |
+| S1 | **`/django-admin/` omgår samtlige av appens innloggingssikringer** | 🔧 | Høy | 1–2 t + paritet |
 | S2 | **`create_superuser` setter `must_change_password=False`** | ⏳ | Middels–Høy | 15 min |
 | S3 | Rate-limiting finnes kun på innlogging | ⏳ | Middels | 2 t |
 | S4 | Lagret open redirect i varsel-visningen | ⏳ | Lav–Middels | 15 min |
@@ -63,6 +63,11 @@ Status: ⏳ pending · 🔧 påbegynt · ✅ ferdig · ⚪ ikke aktuell
 **Anbefalt rekkefølge:** **S1 og S2 først** — de henger sammen og undergraver alt det
 andre sikkerhetsarbeidet i appen. Deretter N1 → N2 → N3 → N4, som alle er små og har
 konkret risiko knyttet til seg. N5 bør tas før nyttår (se begrunnelsen).
+
+**Status 13. august 2026:** S1 er påbegynt, men blokkert av et paritetskrav som ikke var
+kjent da lista ble skrevet: portalens egen brukeradministrasjon manglet funksjonalitet som
+kun fantes i Django admin. Opprettelse, MFA-toggle, frys/tø og sletting er nå på plass —
+se avsnittet «Forutsetning: paritet» under S1 for hva som gjenstår.
 
 ---
 
@@ -703,8 +708,62 @@ Signalet i `patients/signals.py` er entry-point-agnostisk og
 **Anbefaling:** Alternativ 1. En innloggingsflate som ingen bruker, men som omgår alle
 sikringene, er ren nedside.
 
+### Forutsetning: paritet med det django-admin faktisk brukes til
+
+**Oppdatering 13. august 2026.** Premisset over — «portalen har allerede egne flater for
+det admin trenger» — viste seg å ikke holde ved nærmere prøving. Brukeradministrasjonen på
+`/accounts/users/` hadde en 500-feil ved opprettelse av bruker uten e-post, ingen måte å
+slå av `mfa_required` på, og ingen sletting i det hele tatt. Alternativ 1 ville altså
+fjernet den eneste fungerende veien til å opprette og slette kontoer i produksjon.
+
+Django admin registrerer sju modeller. Status per i dag:
+
+| Modell | Portal-flate | Status |
+|---|---|---|
+| `Patient` | pasientmodulen | ✅ |
+| `Forstehjelper` (+ `Helsepersonell`) | navneregistrene | ✅ |
+| `ModuleSettings` | `/portal-admin/moduler/` | ✅ |
+| `AuditLog` | `/portal-admin/auditlog/` | ✅ |
+| `CustomUser` | `/accounts/users/` | ✅ siden 13. aug. — opprettelse, MFA-toggle, frys/tø og sletting |
+| `LoginEvent` | kun siste 20 per bruker på detaljsiden | ⏳ ingen global, søkbar visning |
+| `AppSetting` | `/api/settings/` skriver kun `event_name` | ⏳ `active_year` / `next_patient_nr` kan ikke korrigeres |
+
+De to gjenstående er små, men må avklares før flaten fjernes — ikke etterpå:
+
+1. **`LoginEvent` globalt.** Enten en enkel liste under `/portal-admin/`, eller en bevisst
+   beslutning om at per-bruker-visningen holder. Merk at dette henger sammen med F2:
+   `purge_old_logs` sletter også `LoginEvent`, så en visning må tåle at historikken kuttes.
+2. **`AppSetting`.** Enten en smal admin-flate, eller en management command for de få
+   verdiene som noen gang må korrigeres manuelt. En command er antagelig riktig — det er
+   en nødoperasjon, ikke en daglig oppgave.
+
+### Ta URL-konsolideringen i samme runde
+
+Brukeradministrasjonen ligger på `/accounts/users/`, mens all annen administrasjon ligger
+under `/portal-admin/`. I dag har det ingen praktisk konsekvens — «Brukere» ligger i
+admin-navigasjonen, så flaten er lett å finne.
+
+Det blir en felle **etter** at dette punktet er gjennomført. Da er `/portal-admin/` den
+administrative flaten, og enhver framtidig regel som gjelder «admin-flaten» vil naturlig
+skrives som et sti-prefiks. Mønsteret finnes allerede i kodebasen:
+`MustChangePasswordMiddleware.ALLOWED_PATHS` (`accounts/middleware.py:12–18`) matcher med
+`startswith`. Legger noen senere på rate-limiting (jf. S3) eller en ekstra rollesjekk for
+`/portal-admin/*`, faller brukeradministrasjonen stilltiende utenfor — og det er nettopp
+den flaten som oppretter kontoer og deler ut admin-rollen.
+
+Det er samme feilklasse som S1 selv: en sikring som dekker alt unntatt det som betyr mest.
+
+**Tiltak:** Monter `user_list_view`, `user_create_view`, `user_detail_view` og
+`user_delete_view` under `/portal-admin/brukere/`, og la `/accounts/users/*` bli en
+permanent redirect. Innlogging, utlogging og passordbytte blir liggende under `/accounts/`
+— de er ikke admin-flater. Anslag 30 min inkludert maler og tester.
+
+**Hvorfor sammen med S1 og ikke nå:** det er først når `/django-admin/` fjernes at
+`/portal-admin/` blir enerådende. Samlet gir det én deploy å QA-e i stedet for to.
+
 **Akseptansekriterium:** Det finnes én vei inn i systemet, og den har rate-limiting,
-kontosperre, MFA-tvang og hendelseslogging.
+kontosperre, MFA-tvang og hendelseslogging. All administrasjon ligger under ett
+sti-prefiks, slik at en prefiks-basert regel dekker hele den administrative flaten.
 
 ---
 

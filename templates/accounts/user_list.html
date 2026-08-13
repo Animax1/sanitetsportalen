@@ -32,6 +32,7 @@
           <th>Brukernavn</th>
           <th>E-post</th>
           <th>Rolle</th>
+          <th>MFA</th>
           <th>Status</th>
           <th>Siste innlogging</th>
           <th></th>
@@ -57,6 +58,13 @@
             {% endif %}
           </td>
           <td>
+            {% if user.mfa_required %}
+              <span class="badge bg-info text-dark" title="To-faktor er påkrevd">Påkrevd</span>
+            {% else %}
+              <span class="text-muted" style="font-size:0.82rem;">–</span>
+            {% endif %}
+          </td>
+          <td>
             {% if user.is_active %}
               {% if user.is_locked %}
                 <span class="badge bg-warning">Låst</span>
@@ -77,7 +85,7 @@
           </td>
         </tr>
         {% empty %}
-        <tr><td colspan="6" class="text-center text-muted py-3">Ingen brukere funnet.</td></tr>
+        <tr><td colspan="7" class="text-center text-muted py-3">Ingen brukere funnet.</td></tr>
         {% endfor %}
       </tbody>
     </table>

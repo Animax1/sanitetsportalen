@@ -4,6 +4,52 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-08-13 — Brukeradministrasjon i portalen: 500-feil, MFA-toggle, frys og sletting
+
+Forarbeid til **S1** (fjerne `/django-admin/`). Portalens egen brukeradministrasjon på
+`/accounts/users/` manglet funksjonalitet som kun fantes i Django admin — den kan ikke
+fjernes før paritet er på plass.
+
+**Rettet 500-feil ved opprettelse av bruker.** `AdminUserCreateForm.clean_email` kalte
+`.strip()` på `None`. Modellfeltet er `null=True`, så ModelForm setter `empty_value=None`
+på skjemafeltet: lot man e-post stå tom ble `cleaned_data['email']` `None`, ikke `''`, og
+defaultverdien i `.get('email', '')` slo aldri inn. Feilen traff kun brukere uten e-post,
+som er grunnen til at den så tilfeldig ut. `AdminUserEditForm` hadde allerede riktig
+mønster.
+
+**«Krev MFA» kan nå styres fra portalen.** `mfa_required` var ikke med i
+`AdminUserEditForm.Meta.fields` og hadde ingen avkrysning i malen. Eneste vei til feltet
+var «Nullstill MFA», som tvinger det til `True` — altså kunne MFA slås på, men aldri av
+igjen uten Django admin. Feltet vises nå både i redigeringsskjemaet og som kolonne i
+brukerlista.
+
+**Frys/tø konto** (paritet med bulk-aksjonen i `CustomUserAdmin`): deaktiverer kontoen og
+sletter aktive sesjoner i samme operasjon, slik at en allerede innlogget bruker ikke kan
+fortsette til cookien utløper. Sperre mot å fryse egen konto.
+
+**Permanent sletting av brukerkonto** — `POST /accounts/users/<pk>/slett/`. Sletting er
+trygt fordi alle referanser til brukeren er `SET_NULL` (`LoginEvent`, `AuditLog`,
+`Forstehjelper.user`, `Helsepersonell.user`, `Backup.created_by`,
+`ModuleSettings.updated_by`, og `VaktArkiv.importert_av` siden GDPR fase 4.1, som fryser
+navnet i `importert_av_navn`). Navn bevares altså på historiske pasienter og i arkivet.
+`core.Notification` er `CASCADE` — varsler til en slettet bruker skal bort.
+
+To sperrer: man kan ikke slette sin egen konto, og ikke den siste aktive administratoren.
+Den siste blir kritisk når `/django-admin/` fjernes, siden det da ikke finnes noen
+nødutgang tilbake inn i brukeradministrasjonen. I tillegg må admin skrive brukernavnet
+ordrett som bekreftelse.
+
+Frys og sletting skrives til `AuditLog` (`table_name='accounts_customuser'`) og er dermed
+synlige i `/portal-admin/auditlog/`. Revisjonsraden har ingen FK til brukeren og overlever
+derfor slettingen.
+
+22 nye tester i `accounts/tests_user_admin.py`. Full suite: 558 tester, grønn.
+
+**Gjenstår før S1 kan lukkes:** `LoginEvent` har ingen global visning i portalen (kun
+siste 20 per bruker), og `AppSetting` kan ikke redigeres utenom `event_name`.
+
+---
+
 ## 2026-08-13 — Sikkerhetsvurdering: dokumentasjonsavvik (S7)
 
 Etter en samlet sikkerhetsvurdering av kodebasen mot `TEKNISK_DOKUMENTASJON.md` og

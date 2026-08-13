@@ -22,6 +22,8 @@ from django_otp.plugins.otp_static.models import StaticDevice, StaticToken
 from django_ratelimit.decorators import ratelimit
 from django_ratelimit.exceptions import Ratelimited
 
+from audit.models import AuditLog
+
 from .decorators import admin_required
 from .forms import LoginForm, ChangePasswordForm, AdminUserCreateForm, AdminUserEditForm, PasientRolleForm
 from .models import CustomUser, LoginEvent
@@ -49,6 +51,28 @@ def _invalidate_all_sessions(user):
         data = sess.get_decoded()
         if str(data.get('_auth_user_id')) == str(user.pk):
             sess.delete()
+
+
+def _log_user_admin_action(request, target_user, action, field_name=None, old_value=None, new_value=None):
+    """Skriv en AuditLog-rad for en administrativ handling på en brukerkonto.
+
+    Frysing og sletting av kontoer er ikke pasientdata, så ``patients.signals``
+    fanger dem ikke opp. Vi skriver raden eksplisitt her slik at handlingen blir
+    synlig i ``/portal-admin/auditlog/``.
+
+    ``record_id`` er en ren integer uten FK, så raden overlever at brukeren
+    slettes — hvilket er hele poenget for DELETE-tilfellet.
+    """
+    AuditLog.objects.create(
+        table_name='accounts_customuser',
+        record_id=target_user.pk,
+        action=action,
+        field_name=field_name,
+        old_value=old_value,
+        new_value=new_value,
+        user=request.user if request.user.is_authenticated else None,
+        ip=_get_client_ip(request),
+    )
 
 
 def _log_event(user, username_attempt, success, request, event_type=LoginEvent.EVENT_LOGIN):
@@ -516,6 +540,41 @@ def user_detail_view(request, pk):
                 messages.success(request, 'Pasient-rolle oppdatert.')
                 return redirect('accounts:user_detail', pk=pk)
 
+        elif action == 'freeze':
+            # Frys = deaktiver kontoen OG slett aktive sesjoner i samme
+            # operasjon. Uten sesjonsslettingen kan en allerede innlogget
+            # bruker fortsette å jobbe til cookien utløper.
+            if user.pk == request.user.pk:
+                messages.error(request, 'Du kan ikke fryse din egen konto.')
+                return redirect('accounts:user_detail', pk=pk)
+
+            user.is_active = False
+            user.save(update_fields=['is_active'])
+            _invalidate_all_sessions(user)
+            _log_user_admin_action(
+                request, user, 'UPDATE',
+                field_name='is_active', old_value='True', new_value='False',
+            )
+            messages.success(
+                request,
+                f'Kontoen til «{user.username}» er frosset og aktive sesjoner er avsluttet. '
+                f'Bruk «Tø konto» for å reversere.',
+            )
+            return redirect('accounts:user_detail', pk=pk)
+
+        elif action == 'thaw':
+            user.is_active = True
+            user.save(update_fields=['is_active'])
+            _log_user_admin_action(
+                request, user, 'UPDATE',
+                field_name='is_active', old_value='False', new_value='True',
+            )
+            messages.success(
+                request,
+                f'Kontoen til «{user.username}» er tødd. Brukeren kan logge inn med samme passord.',
+            )
+            return redirect('accounts:user_detail', pk=pk)
+
         elif action == 'unlock':
             user.failed_login_attempts = 0
             user.locked_until = None
@@ -555,6 +614,7 @@ def user_detail_view(request, pk):
 
     # Sjekk om brukeren har MFA-enheter (for å vise/skjule nullstill-knapp)
     has_totp_device = TOTPDevice.objects.filter(user=user, confirmed=True).exists()
+    kan_slettes, slette_sperre = _kan_slettes(user, request.user)
 
     return render(request, 'accounts/user_detail.html', {
         'target_user': user,
@@ -563,4 +623,85 @@ def user_detail_view(request, pk):
         'temp_password': temp_password,
         'recent_events': recent_events,
         'has_totp_device': has_totp_device,
+        'kan_slettes': kan_slettes,
+        'slette_sperre': slette_sperre,
     })
+
+
+def _kan_slettes(target, actor):
+    """Avgjør om ``actor`` har lov til å slette ``target``.
+
+    Returnerer ``(bool, begrunnelse)``. Begrunnelsen vises i UI-et når
+    sletting er sperret, slik at admin skjønner hvorfor knappen mangler.
+
+    To sperrer:
+
+    1. **Ikke deg selv.** Å slette egen konto midt i en sesjon etterlater et
+       system uten den som skulle rydde opp.
+    2. **Ikke siste admin.** Sletter man den eneste administratoren, finnes det
+       ingen vei tilbake inn i brukeradministrasjonen — og etter at
+       ``/django-admin/`` fjernes (S1) heller ingen nødutgang.
+    """
+    if target.pk == actor.pk:
+        return False, 'Du kan ikke slette din egen konto.'
+
+    if target.role == 'admin':
+        andre_admins = CustomUser.objects.filter(
+            role='admin', is_active=True,
+        ).exclude(pk=target.pk).count()
+        if andre_admins == 0:
+            return False, 'Dette er den siste aktive administratoren og kan ikke slettes.'
+
+    return True, ''
+
+
+@admin_required
+@require_http_methods(['POST'])
+def user_delete_view(request, pk):
+    """Slett en brukerkonto permanent.
+
+    Sletting er trygt fordi alle referanser til brukeren er ``SET_NULL``:
+    ``LoginEvent``, ``AuditLog``, ``Forstehjelper.user``, ``Helsepersonell.user``,
+    ``Backup.created_by``, ``ModuleSettings.updated_by`` og — siden GDPR fase 4.1
+    — ``VaktArkiv.importert_av``, som fryser navnet i ``importert_av_navn``.
+    Historiske pasienter og arkivet beholder altså navnet på den som utførte
+    arbeidet. ``core.Notification`` er ``CASCADE``: varsler til en slettet bruker
+    har ingen mottaker og skal bort.
+
+    Krever at admin skriver brukernavnet ordrett som bekreftelse. Det er en
+    bevisst friksjon — sletting kan ikke angres, og knappen står vegg i vegg med
+    «Frys konto», som er den reversible varianten.
+    """
+    user = get_object_or_404(CustomUser, pk=pk)
+
+    tillatt, begrunnelse = _kan_slettes(user, request.user)
+    if not tillatt:
+        messages.error(request, begrunnelse)
+        return redirect('accounts:user_detail', pk=pk)
+
+    bekreftelse = (request.POST.get('confirm_username') or '').strip()
+    if bekreftelse != user.username:
+        messages.error(
+            request,
+            'Brukernavnet du skrev stemmer ikke. Kontoen er ikke slettet.',
+        )
+        return redirect('accounts:user_detail', pk=pk)
+
+    username = user.username
+
+    # Sesjonene må bort før raden slettes — _invalidate_all_sessions slår opp
+    # på bruker-ID i sesjonsdataene, og etter delete() finnes ingen kobling å
+    # slå opp på. Sesjonsradene ville da blitt liggende til de utløp.
+    _invalidate_all_sessions(user)
+
+    # Revisjonsraden skrives før slettingen slik at record_id og navnet er
+    # kjent. Raden har ingen FK til brukeren og overlever derfor slettingen.
+    _log_user_admin_action(
+        request, user, 'DELETE',
+        field_name='username', old_value=username, new_value=None,
+    )
+
+    user.delete()
+
+    messages.success(request, f'Brukeren «{username}» er slettet permanent.')
+    return redirect('accounts:user_list')

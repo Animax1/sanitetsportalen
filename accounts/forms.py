@@ -81,7 +81,10 @@ class AdminUserCreateForm(forms.ModelForm):
 
     def clean_email(self):
         # Normaliser tom streng til None slik at NULL lagres i databasen.
-        email = self.cleaned_data.get('email', '').strip()
+        # NB: modellfeltet er null=True, så ModelForm setter empty_value=None på
+        # skjemafeltet. Tom e-post gir da None — ikke '' — og en default i .get()
+        # slår aldri inn. Derfor `or ''` og ikke `.get('email', '')`.
+        email = (self.cleaned_data.get('email') or '').strip()
         return email or None
 
 
@@ -97,7 +100,7 @@ class AdminUserEditForm(forms.ModelForm):
     class Meta:
         model = CustomUser
         fields = [
-            'email', 'role', 'is_active',
+            'email', 'role', 'is_active', 'mfa_required',
             'kan_redigere_pasienter',
             'kan_redigere_vakter',
             'kan_redigere_utstyr',
@@ -110,6 +113,7 @@ class AdminUserEditForm(forms.ModelForm):
                 'placeholder': 'Valgfritt',
             }),
             'role': forms.Select(attrs={'class': 'form-select'}),
+            'mfa_required': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
             'kan_redigere_pasienter': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
             'kan_redigere_vakter': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
             'kan_redigere_utstyr': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
@@ -120,6 +124,7 @@ class AdminUserEditForm(forms.ModelForm):
             'email': 'E-post (valgfritt)',
             'role': 'Rolle',
             'is_active': 'Aktiv konto',
+            'mfa_required': 'Krev to-faktor (MFA)',
             'kan_redigere_pasienter': 'Pasientregistrering',
             'kan_redigere_vakter': 'Vakter',
             'kan_redigere_utstyr': 'Utstyr',
