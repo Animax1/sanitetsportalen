@@ -92,6 +92,13 @@ dokumentasjon.
 - [ ] Fjerne varsler eldre enn 30 dager.s
 - [ ] Lage locus klone, hente sted via enhet gps.
 - [x] Slå sammen de to backup-flatene — kun `/portal-admin/backup/` gjenstår
+- [ ] Rydd bort det ubrukte per-år-arrangementsnavnet. `set_event_name()`,
+      `get_event_name()` og `get_event_name_or_legacy()` i `patients/services.py` kalles
+      ikke fra noe sted — hele mekanismen med `event_name_<år>` er aldri tatt i bruk, og
+      `event_name` uten år er det eneste som faktisk skrives og leses. Enten fullfør
+      overgangen til per-år-lagring (arkivet trenger det strengt tatt ikke, det fryser
+      `arrangement_navn` selv), eller slett de tre funksjonene og whitelist-oppføringen
+      `event_name_<år>` i `SETTINGS_READ_WHITELIST`.
 - [ ] Valider kliniske felt ved backup-restore. Restore kjører `loaddata`, som går utenom
       `validate_patient_choice_fields`. Etter N6 er dette den siste veien inn i databasen
       der en verdi utenfor whitelisten i `patients/choices.py` kan lande. Lavere risiko enn

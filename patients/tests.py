@@ -1399,3 +1399,64 @@ class SettingsWhitelistTests(TestCase):
         self.assertEqual(AppSetting.get('active_year', None), foer,
                          'active_year skal ikke kunne settes via PUT /api/settings/')
         self.assertEqual(AppSetting.get('event_name', None), 'Nytt navn')
+
+
+@override_settings(SECURE_SSL_REDIRECT=False, RATELIMIT_ENABLE=False)
+class HeaderArrangementNavnTests(TestCase):
+    """Headeren skal vise riktig arrangementsnavn med én gang.
+
+    Templaten hadde `LS26` hardkodet i `#event-name-display`. `loadSettings()`
+    byttet det ut, men kjøres i `DOMContentLoaded` etter tre awaitede fetch-er
+    (forstehjelpere, helsepersonell, pasienter). I mellomtiden sto et gammelt
+    arrangementsnavn synlig i headeren.
+    """
+
+    def setUp(self):
+        self.bruker = CustomUser.objects.create_user(
+            username='vaktbruker', password='testpass123',
+            role='read_write', must_change_password=False,
+        )
+        self.client.login(username='vaktbruker', password='testpass123')
+
+    def test_arrangementsnavn_rendres_server_side(self):
+        AppSetting.set('event_name', 'Festivalen 2026')
+        resp = self.client.get('/pasienter/')
+        self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, 'Festivalen 2026')
+
+    def test_ingen_hardkodet_plassholder_i_templaten(self):
+        """Uten arrangementsnavn skal feltene være tomme, ikke vise et gammelt navn.
+
+        Dette er selve regresjonsvernet. Et hardkodet navn sto to steder:
+        i headeren og i innstillingsfeltet. Det siste var verst — sto feltet
+        med `LS26` mens `event_name` var tomt, ville et lagre skrevet
+        plassholderen inn som arrangementsnavn.
+        """
+        AppSetting.objects.filter(key='event_name').delete()
+        resp = self.client.get('/pasienter/')
+        self.assertEqual(resp.status_code, 200)
+        self.assertNotContains(resp, 'LS26')
+
+    def test_innstillingsfeltet_er_forhaandsutfylt(self):
+        """Feltet i innstillinger skal ha samme verdi som headeren."""
+        AppSetting.set('event_name', 'Festivalen 2026')
+        resp = self.client.get('/pasienter/')
+        self.assertContains(resp, 'id="setting-event-name" class="form-control" '
+                                  'value="Festivalen 2026"')
+
+    def test_navnet_escapes_i_templaten(self):
+        """Arrangementsnavnet er fritekst fra innstillingene."""
+        AppSetting.set('event_name', '<script>alert(1)</script>')
+        resp = self.client.get('/pasienter/')
+        self.assertNotContains(resp, '<script>alert(1)</script>')
+        self.assertContains(resp, '&lt;script&gt;')
+
+    def test_endret_navn_slaar_gjennom_ved_ny_lasting(self):
+        """Server-renderingen skal lese verdien på nytt, ikke cache den."""
+        AppSetting.set('event_name', 'Gammelt navn')
+        self.assertContains(self.client.get('/pasienter/'), 'Gammelt navn')
+
+        AppSetting.set('event_name', 'Nytt navn')
+        resp = self.client.get('/pasienter/')
+        self.assertContains(resp, 'Nytt navn')
+        self.assertNotContains(resp, 'Gammelt navn')

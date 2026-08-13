@@ -114,8 +114,18 @@ def _patient_to_dict(p):
 
 @login_required
 def index_view(request):
-    """Render hoved-siden."""
-    return render(request, 'patients/index.html')
+    """Render hoved-siden.
+
+    Arrangementsnavnet sendes med i konteksten slik at headeren er riktig
+    allerede i første render. Templaten hadde tidligere `LS26` hardkodet som
+    innhold, og `loadSettings()` byttet det ut — men først etter tre awaitede
+    fetch-er, så et gammelt arrangementsnavn sto synlig i mellomtiden.
+    """
+    return render(request, 'patients/index.html', {
+        # Samme nøkkel som PUT /api/settings/ skriver og loadSettings() leser,
+        # slik at server og klient ikke kan vise hver sin verdi.
+        'event_name': AppSetting.get('event_name', '') or '',
+    })
 
 
 # ── Innstillinger ─────────────────────────────────────────────────────────────

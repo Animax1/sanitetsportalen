@@ -4,6 +4,34 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-08-13 — Fiks: gammelt arrangementsnavn sto synlig i headeren ved sidelasting
+
+Meldt fra manuell testing: går man fra portalforsiden inn i `/pasienter/`, vises `LS26` et
+kort øyeblikk før det riktige arrangementsnavnet kommer.
+
+**Årsak:** `LS26` var hardkodet som innhold i `#event-name-display` i templaten.
+`loadSettings()` byttet det ut, men kalles i `DOMContentLoaded` *etter* tre awaitede
+fetch-er — førstehjelpere, helsepersonell og pasienter. Et gammelt arrangementsnavn sto
+altså synlig så lenge de tre rundturene tok.
+
+**Fiks:** arrangementsnavnet sendes med i konteksten fra `index_view` og rendres
+server-side. Da er headeren riktig i første render, og det finnes ingenting å bytte ut.
+`loadSettings()` er beholdt — den henter samme nøkkel, så den kan ikke lenger vise noe
+annet, og den fanger fortsatt opp at en annen admin har endret navnet.
+
+**Funnet underveis, og verre enn det som ble meldt:** samme `LS26` var hardkodet i
+`value`-attributtet på innstillingsfeltet (`#setting-event-name`). Var `event_name` tom i
+databasen, sto plassholderen i feltet uten at noe overskrev den — og et lagre ville skrevet
+`LS26` inn som arrangementsnavn. Rettet på samme måte.
+
+Fem tester, hvorav den viktigste sjekker at `LS26` ikke finnes noe sted i responsen når
+`event_name` er tom. Et hardkodet navn vises for alle brukere uansett hvilket arrangement
+som faktisk er registrert, så det er verdt en vakt.
+
+704 tester grønne. Ingen databaseendringer.
+
+---
+
 ## 2026-08-13 — N12: whitelist på GET /api/settings/, og `invalidate_stats_cache` slettet
 
 **N12.** Endepunktet returnerte hele `AppSetting`-tabellen til enhver innlogget bruker,

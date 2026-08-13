@@ -31,7 +31,9 @@
     <i class="bi bi-grid-3x3-gap-fill"></i>
     <span class="portal-back-label">Portal</span>
   </a>
-  <div class="brand">Pasientregistrering <span id="event-name-display">LS26</span></div>
+  {# Rendres server-side: headeren skal aldri vise et annet arrangementsnavn
+     enn det som gjelder, heller ikke i millisekundene før JS-en rekker fram. #}
+  <div class="brand">Pasientregistrering <span id="event-name-display">{{ event_name }}</span></div>
 
   <div class="stat-chip rod">
     <span class="num" id="hdr-rod">0</span><span>Rød</span>
@@ -508,7 +510,7 @@
       <h6><i class="bi bi-calendar-event me-2"></i>Arrangement</h6>
       <label class="form-label mt-2 small">Navn på arrangement</label>
       <div class="input-group input-group-sm">
-        <input type="text" id="setting-event-name" class="form-control" value="LS26">
+        <input type="text" id="setting-event-name" class="form-control" value="{{ event_name }}">
         <button class="btn btn-primary write-only" onclick="saveEventName()">Lagre</button>
       </div>
       <div class="form-text">Vises i topplinjen.</div>
