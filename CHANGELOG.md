@@ -4,6 +4,85 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-08-13 — Sikkerhetsvurdering: dokumentasjonsavvik (S7)
+
+Etter en samlet sikkerhetsvurdering av kodebasen mot `TEKNISK_DOKUMENTASJON.md` og
+`PERSONVERN_DOKUMENTASJON.md` er fire punkter der dokumentasjonen påstår kontroller som
+ikke er reelle i dag lagt til som **S7** i `docs/FORBEDRINGER_2026-08.md`. Fortsatt ingen
+kodeendringer.
+
+`PERSONVERN_DOKUMENTASJON.md` er behandlingsprotokollen etter GDPR art. 30 — et avvik der
+er ikke bare unøyaktighet, det er dokumentasjon som ikke stemmer med behandlingen:
+
+- A.10 sier «alle pasient-endringer logges på felt-nivå» — `helsepersonell_ref_id`
+  mangler i sporingen (N2)
+- A.9 sier lagringstid 730/30 dager — `purge_old_logs` er aldri satt opp som cron, så
+  fristene håndheves ikke i praksis (F2)
+- A.10/§7.9 viser til `escapeHtml()` som generell XSS-beskyttelse — statistikk-tabellene
+  er ikke dekket (N6)
+- §7.1 i teknisk dokumentasjon sier Argon2 er i bruk; A.10 sier korrekt at den ikke er
+  installert — de to dokumentene motsier hverandre
+
+Mest alvorlig er lagringstidene, siden det er en slettepraksis beskrevet overfor både de
+registrerte (del B) og tilsynsmyndighet (del A) som ikke finner sted.
+
+---
+
+## 2026-08-12 — Kodegjennomgang: ny forbedringsbacklog
+
+Full gjennomgang av kodebasen for å finne hva som bør forbedres. **Ingen kode er endret** —
+dette er kun kartlegging og dokumentasjon.
+
+Nytt dokument `docs/FORBEDRINGER_2026-08.md` er den aktive backloggen. Den inneholder 13
+nye funn (N1–N13), 6 funn fra et eget sikkerhetspass (S1–S6) og de 9 punktene fra
+mai-runden som fortsatt sto åpne (F1–F9).
+`docs/FORBEDRINGER.md` er konvertert til et historisk arkiv over det som ble gjennomført,
+med en peker til den nye fila.
+
+To punkter i mai-dokumentet var merket som åpne, men viste seg å være ferdig implementert
+— hash-skip for identiske auto-backups (`core/backup/service.py`) og `/healthz/`
+(`patients/health.py`). Begge er nå dokumentert som gjennomført.
+
+### De mest konkrete nye funnene
+
+- **N1** `next`-parameteren i innloggingen valideres ikke — åpen redirect til vilkårlig
+  host rett etter vellykket innlogging
+- **N2** `helsepersonell_ref` mangler i `felt_to_track` i audit-signalet. Endring av
+  oppfølgingsansvarlig etterlater ingen spor, i strid med det personvernprotokollen lover
+- **N3** `LOGGING` har ingen rot-handler. All INFO-logging — inkludert hver eneste
+  vellykkede backup — forsvinner i stillhet, selv om RUNBOOK ber deg lete etter den
+- **N4** MFA-skjemaene sender ingen `username`, så `key='post:username'` samler alle
+  MFA-forsøk fra alle brukere i én bøtte: 10 per 5 minutter globalt. Ved vaktstart kan
+  det låse ute folk som ikke har gjort noe galt
+- **N5** `get_active_year()` og `Patient.save()` bruker fortsatt `datetime.now().year`.
+  Samme feilklasse som ble ryddet i #20 — en nyttårsvakt etter midnatt lagrer pasienter i
+  feil år
+- **N9** De tre testene som skal beskytte dobbeltklikk-fixen leser `static/js/script.js`,
+  som ingen mal laster lenger. De ville vært grønne selv om guarden forsvant fra den
+  levende koden
+
+### Sikkerhetspasset
+
+- **S1** `/django-admin/` er en parallell innloggingsflate som omgår samtlige sikringer
+  appen bygger rundt `accounts.views.login_view`: rate-limiting, kontosperre, MFA-tvang,
+  tvungent passordbytte og `LoginEvent`-logging. Bak den ligger `Patient`, `CustomUser`
+  og `AuditLog`. `OTPMiddleware` hjelper ikke — den setter `request.user.otp_device`, den
+  håndhever ingenting
+- **S2** `create_superuser` setter `must_change_password=False`, så bootstrap-adminen kan
+  gå i årevis på deploy-passordet. Henger sammen med S1 og bør tas samtidig
+- **S3** Rate-limiting finnes kun på innlogging — ingen struping på skriveendepunktene
+- **S4** Lagret open redirect i varsel-visningen (`core/views.py:612`). Ikke utnyttbar i
+  dag, men `notify()` er designet som generisk API for framtidige moduler
+- **S5** Utlogging skjer via GET — en tredjepartsside kan tvinge utlogging
+- **S6** MFA trust-cookie settes med `secure=True` i offline-modus, så nettleseren kaster
+  den og «stol på denne enheten» virker ikke i felt
+
+Dokumentet noterer også hva som ble kontrollert og funnet i orden, så det ikke revideres
+på nytt: endepunktdekning, path traversal via backup-filnavn, audit-logging fra Django
+admin, offline-modusens bevisste unntak og invalidering av MFA trust-cookien.
+
+---
+
 ## 2026-08-12 — Backup samlet på én flate
 
 Pasientmodulen hadde sitt eget backup-panel under Innstillinger, med egne
