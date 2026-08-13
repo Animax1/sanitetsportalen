@@ -66,9 +66,33 @@ function initTable() {
 // ════════════════════════════════════════════════════════
 // DATA LOADING
 // ════════════════════════════════════════════════════════
+// ETag for pasientlista. Hver klient poller hvert 30. sekund, og lista er
+// det største svaret i appen — 454 kB ved 1000 pasienter. Endrer ingenting
+// seg mellom to pollinger, svarer serveren 304 uten kropp.
+let lastPatientsEtag = null;
+
 async function loadPatients() {
   const url = '/pasienter/api/patients/' + (mineOnly ? '?mine=1' : '');
-  const res  = await fetch(url);
+  const headers = {};
+  if (lastPatientsEtag) headers['If-None-Match'] = lastPatientsEtag;
+
+  const res = await fetch(url, { headers });
+
+  // 304: ingenting er endret, og svaret har ingen kropp. Behold dataene vi
+  // allerede har — å kalle res.json() her ville kastet.
+  //
+  // Men filteret må fortsatt anvendes: setFilter() kaller hit nettopp for å
+  // bytte visning når «Mine pasienter» slås av eller på, og stoler på at vi
+  // kjører applyFilter(). Returnerer vi rått her, blir griden stående med
+  // forrige filter selv om knappen har byttet utseende.
+  if (res.status === 304) {
+    if (table) applyFilter();
+    return;
+  }
+
+  const etag = res.headers.get('ETag');
+  if (etag) lastPatientsEtag = etag;
+
   allPatients = await res.json();
   if (!table) return;
   await table.setData(allPatients);
@@ -225,10 +249,30 @@ async function toggleBoardMine() {
   await renderBoard();
 }
 
+// Egen ETag for tavla. Den henter den ufiltrerte lista, altså en annen URL
+// enn loadPatients() når «Mine pasienter» er på — og dermed en annen ETag.
+// Uten dette hentet tavlefanen hele lista på nytt ved hver auto-refresh,
+// i tillegg til loadPatients(). Det doblet trafikken for de som står på tavla.
+let lastBoardEtag = null;
+let lastBoardPatients = [];
+
 async function renderBoard() {
   const url = '/pasienter/api/patients/';
-  const res = await fetch(url);
-  const pts = await res.json();
+  const headers = {};
+  if (lastBoardEtag) headers['If-None-Match'] = lastBoardEtag;
+
+  const res = await fetch(url, { headers });
+
+  let pts;
+  if (res.status === 304) {
+    pts = lastBoardPatients;
+  } else {
+    const etag = res.headers.get('ETag');
+    if (etag) lastBoardEtag = etag;
+    pts = await res.json();
+    lastBoardPatients = pts;
+  }
+
   const act = pts.filter(p => !p.utskrevet);
 
   function renderZone(elId, zoneName) {

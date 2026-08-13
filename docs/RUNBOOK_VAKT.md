@@ -124,6 +124,44 @@ Ingen redeploy trengs.
 
 ---
 
+## 3c. Hva koster én request? (målt 13. aug. 2026)
+
+Tersklene i seksjon 2 er reaktive — de sier hva du skal gjøre når P95 stiger, ikke hva
+som ryker først. Disse tallene er målt, ikke anslått:
+
+| Endepunkt | Spørringer | Svar |
+|---|---|---|
+| `GET /api/patients/` (1000 pasienter) | 15 | 454 kB, eller **304 uten kropp** hvis uendret |
+| `GET /api/forstehjelpere/` | 1 | 304 hvis uendret |
+| `GET /api/helsepersonell/` | 1 | 304 hvis uendret |
+
+Alle tre er ETag-sikret. Klienten poller hvert 30. sekund, men får bare data når noe
+faktisk har endret seg — under en rolig time er trafikken nær null selv med mange
+pålogget.
+
+**Hvem poller egentlig?** Bare de som leser. Lag i park registrerer via lenke uten å lese
+noe, og poller ikke. Ambulanser poller sitt eget, lille oppdragssett. Den tunge lesingen
+er sykestua og 113, altså 15–25 klienter — ikke antallet pålogget totalt.
+
+Regn derfor kapasitet på *pollende lesere*, ikke på brukertall. Tommelfingerregelen
+«5–8 brukere per worker» i seksjon 4 ble kalibrert før ETag og `select_related`, og er
+etter det for pessimistisk.
+
+**Postgres-forbindelser:** appen bruker `workers × threads`, holdt åpne i 10 minutter av
+`conn_max_age=600`. Ved 4 workers × 4 threads er det 16 mot grensen på 100. Sjekk faktisk
+bruk under vakt med:
+
+```sql
+SHOW max_connections;
+SELECT count(*), state FROM pg_stat_activity
+ WHERE datname = current_database() GROUP BY state;
+```
+
+En connection pooler (PgBouncer) er vurdert og **ikke nødvendig** på denne skalaen — se
+F8 i `docs/FORBEDRINGER_2026-08.md`.
+
+---
+
 ## 4. Workers og threads — styring og tuning
 
 ### Hva er det?

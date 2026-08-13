@@ -4,6 +4,56 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-08-13 — Ytelse: pasientlista tåler 1000 pasienter og 100 brukere
+
+Foranlediget av en skaleringsgjennomgang: portalen skal ta 10–20 brukere døgnkontinuerlig
+med peak rundt 100, og rundt 1000 pasienter per arrangement.
+
+**N+1 på det mest pollede endepunktet.** `_patient_to_dict()` leser navnet på både
+førstehjelper og helsepersonell, men `patients_list_view` hadde ikke `select_related`.
+Målt på 1000 pasienter (250 med full data fra samleplass, 750 enklere fra park):
+
+| | Før | Etter |
+|---|---|---|
+| Spørringer per kall | **515** | **15** |
+| Ved 25 pollende lesere | ~430/sek | ~12/sek |
+
+Konstant, ikke lineært med radantallet. `PasientlisteYtelseTests` sammenligner
+spørringsantallet ved 5 og 60 pasienter i stedet for å låse et absolutt tall — da tåler
+testen at annen middleware endrer grunnkostnaden, men fanger fortsatt at kostnaden
+begynner å følge radantallet. Verifisert ved å fjerne `select_related` midlertidig.
+
+**ETag på `/api/patients/`.** Svaret er 454 kB ved 1000 pasienter, hentet av hver klient
+hvert 30. sekund. Nå returneres 304 uten kropp når ingenting er endret. Kroppen
+serialiseres én gang og hashes, i stedet for å hashe feltverdier separat — da kan ETag-en
+per definisjon ikke komme i utakt med det som sendes, og den varierer riktig med
+`?filter`, `?mine` og `?include_archived` uten at de må håndteres eksplisitt.
+
+Merk hva det sparer: båndbredden, ikke databasearbeidet. Spørringen og serialiseringen
+kjører uansett for å regne ut hashen.
+
+**To feller underveis:**
+
+`setFilter()` stoler på at `loadPatients()` kaller `applyFilter()`. En rå tidlig retur på
+304 ville latt griden stå med forrige filter når «Mine pasienter» slås av — knappen ville
+byttet utseende, men innholdet ikke. 304-grenen kjører derfor `applyFilter()` før den
+returnerer.
+
+`renderBoard()` hentet hele lista på nytt ved hver auto-refresh, i tillegg til
+`loadPatients()`. Tavlefanen doblet altså trafikken. Den har nå sin egen ETag — den
+henter en annen URL (alltid ufiltrert), så den kan ikke dele etag med lista.
+
+**Bakgrunn som ikke ble til kode:** F8 (PgBouncer) er avklart som ikke aktuell. Ved 4
+workers × 4 threads bruker appen 16 forbindelser mot grensen på 100, og flaskehalsen var
+spørringer og båndbredde — ikke forbindelser. Railways edge-grenser (10 000 samtidige
+forbindelser, 11 000 req/s) er heller ikke i nærheten. Målte tall og
+`pg_stat_activity`-spørringen er lagt inn i `docs/RUNBOOK_VAKT.md` §3c, siden §2-tersklene
+sier hva man skal gjøre når P95 stiger, men ikke hva som ryker først.
+
+735 tester grønne. Ingen databaseendringer.
+
+---
+
 ## 2026-08-13 — F5, trinn 2: `unsafe-inline` fjernet fra script-src
 
 Trinn 1 er verifisert manuelt i prod — filterknapper, registreringsskjema med

@@ -98,8 +98,9 @@ dokumentasjon.
       først (ny `patients-app.js`) — å laste stats-fila betinget uten det ville tatt ned
       appen for `read_only` og `read_write`. read_only laster nå 49 % av admin-bundlen.
       **Ikke målt:** første-paint på mobil 4G.
-- [ ] **F8** PgBouncer — bevisst utsatt. Kun relevant ved 4+ workers; vi kjører 1–2.
-      Tas opp igjen hvis `WEB_WORKERS` økes.
+- [x] **F8** PgBouncer — avklart som ikke aktuell. Ved 4 workers × 4 threads bruker
+      appen 16 forbindelser mot grensen på 100, og flaskehalsen var spørringer og
+      båndbredde, ikke forbindelser. Målte tall i `docs/RUNBOOK_VAKT.md` §3c.
 - [x] **N13** Duplisert kode i `views.py`/`services.py` — alle tre delpunktene
   - [x] Feltlista: `ARKIVERT_PASIENT_FELTER` brukes alle tre stedene. Frosset med vilje,
         *ikke* utledet fra modellen — utledning ville fått alle eksisterende arkiver til å
@@ -122,6 +123,34 @@ dokumentasjon.
       (kun AddField; se hendelsesnotatet i CHANGELOG for hvorfor den er håndskrevet)
 
 ## Ideer / backlog
+
+### Skalering mot 2027 — se `docs/RUNBOOK_VAKT.md` §3c
+
+Gjennomgang 13. aug. 2026, med 1000 pasienter og peak 100 brukere som premiss.
+
+- [x] `select_related` + ETag på `/api/patients/` — 515 → 15 spørringer, og 304 uten
+      kropp når ingenting er endret
+- [ ] **Generaliser arkivmønsteret** før modul nummer to bygges. `VaktArkiv` med frysing,
+      SHA-256 og 24-måneders kollaps er i dag spesifikt for pasientmodulen. Park-,
+      oppdrags- og rapportmodulen trenger samme livsløp — det bør flyttes til `core` én
+      gang, ikke kopieres tre ganger.
+- [ ] Park-registreringer blir **egen modell**, ikke rader i `Patient`. Holder sykestuas
+      liste på ~250 rader i stedet for 1000, og matcher at dataene er enklere.
+- [ ] Park-appen er et skriveendepunkt **uten innlogging**: signert lenke via
+      `django.core.signing` (ikke gjettbar URL, kan tilbakekalles), rate-limit per token,
+      og responsen returnerer kvittering — aldri data.
+- [ ] **Oppdragsmodulen: unnta fritekstfeltet fra audit-verdilogging.** `AuditLog.old_value`
+      og `new_value` er `TextField` med 730 dagers lagring, og feltlista utledes fra
+      modellen (N2) — et nytt fritekstfelt havner der automatisk. Skriver en 113-operatør
+      noe sensitivt og retter det, ligger begge versjonene i loggen i to år.
+- [ ] Oppdragets «fjernes fra bilen etter 1–2 timer» er et **server-side visningsfilter**,
+      ikke sletting. 113 og statistikken skal beholde raden.
+- [ ] Protokollen må presiseres når fritekst innføres: A.6/A.12 begrunner i dag whitelisten
+      med at kliniske felt ikke kan inneholde navn. Oppdragsdata («kvinne, pustevansker,
+      sted, tidspunkt») er dessuten mer identifiserende enn pasientraden den knytter seg til.
+- [ ] Vurder `cached_db`-sesjoner. `SESSION_SAVE_EVERY_REQUEST=True` med DB-sesjoner gir
+      én UPDATE per request. Krever Redis, altså vakt-modus.
+
 
 - [ ] Vaktliste
 - [ ] KO-tavle.

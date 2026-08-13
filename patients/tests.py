@@ -8,7 +8,9 @@ import shutil
 import unittest
 from datetime import datetime
 
+from django.db import connection
 from django.test import TestCase, Client, SimpleTestCase, override_settings
+from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 
 from accounts.models import CustomUser
@@ -1696,3 +1698,108 @@ class InlineHandlerTests(SimpleTestCase):
         stats = jsu.read_js(jsu.STATS_JS)
         self.assertIn('data-id="${b.id}"', stats,
                       'admin-registrene må sende id som data-id, ikke data-arg')
+
+
+@override_settings(SECURE_SSL_REDIRECT=False, RATELIMIT_ENABLE=False)
+class PasientlisteYtelseTests(TestCase):
+    """Spørringsantall og ETag på `/api/patients/`.
+
+    Endepunktet pollet hvert 30. sekund av hver klient, og var det dyreste i
+    appen: `_patient_to_dict()` leser navnet på førstehjelper og
+    helsepersonell, uten `select_related`. Målt til 515 spørringer og 454 kB
+    ved 1000 pasienter.
+    """
+
+    def setUp(self):
+        self.bruker = CustomUser.objects.create_user(
+            username='poller', password='testpass123',
+            role='read_write', must_change_password=False,
+        )
+        self.client.force_login(self.bruker)
+
+    def _lag_pasienter(self, antall):
+        for i in range(1, antall + 1):
+            Patient.objects.create(
+                pasientnummer=i, year=2026, grovsortering='Grønn',
+                forstehjelper=Forstehjelper.objects.create(name=f'F{i}'),
+                helsepersonell_ref=Helsepersonell.objects.create(name=f'H{i}'),
+            )
+
+    def test_spoerringsantall_vokser_ikke_med_antall_pasienter(self):
+        """Selve N+1-vernet.
+
+        Testen sammenligner to størrelser i stedet for å låse et absolutt
+        tall: da tåler den at annen middleware endrer grunnkostnaden, men
+        fanger fortsatt at kostnaden begynner å følge radantallet.
+        """
+        self._lag_pasienter(5)
+        with CaptureQueriesContext(connection) as faa:
+            self.client.get('/pasienter/api/patients/')
+
+        # Pasientene først — FK-ene er PROTECT.
+        Patient.objects.all().delete()
+        Forstehjelper.objects.all().delete()
+        Helsepersonell.objects.all().delete()
+        self._lag_pasienter(60)
+        with CaptureQueriesContext(connection) as mange:
+            self.client.get('/pasienter/api/patients/')
+
+        self.assertLessEqual(
+            len(mange.captured_queries), len(faa.captured_queries) + 2,
+            f'Spørringene vokser med radantallet: {len(faa.captured_queries)} '
+            f'ved 5 pasienter, {len(mange.captured_queries)} ved 60. '
+            'Mangler select_related på forstehjelper/helsepersonell_ref?'
+        )
+
+    def test_etag_settes_og_gir_304(self):
+        self._lag_pasienter(3)
+        resp = self.client.get('/pasienter/api/patients/')
+        self.assertEqual(resp.status_code, 200)
+        etag = resp.headers.get('ETag')
+        self.assertTrue(etag, 'ETag mangler på pasientlista')
+
+        igjen = self.client.get('/pasienter/api/patients/',
+                                HTTP_IF_NONE_MATCH=etag)
+        self.assertEqual(igjen.status_code, 304)
+        self.assertEqual(igjen.content, b'', '304 skal ikke ha kropp')
+
+    def test_etag_endrer_seg_naar_data_endres(self):
+        self._lag_pasienter(3)
+        etag = self.client.get('/pasienter/api/patients/').headers['ETag']
+
+        p = Patient.objects.first()
+        p.grovsortering = 'Rød'
+        p.save(update_fields=['grovsortering'])
+
+        resp = self.client.get('/pasienter/api/patients/',
+                               HTTP_IF_NONE_MATCH=etag)
+        self.assertEqual(resp.status_code, 200,
+                         'Endret data må gi 200, ikke 304')
+        self.assertNotEqual(resp.headers['ETag'], etag)
+
+    def test_etag_skiller_mellom_filtrerte_svar(self):
+        """?mine=1 gir et annet svar, og må gi en annen ETag.
+
+        Ellers ville en klient som bytter filter fått 304 og blitt stående
+        med feil datasett.
+        """
+        self._lag_pasienter(3)
+        alle = self.client.get('/pasienter/api/patients/')
+        mine = self.client.get('/pasienter/api/patients/?mine=1')
+
+        self.assertNotEqual(alle.headers['ETag'], mine.headers['ETag'])
+        self.assertEqual(
+            self.client.get('/pasienter/api/patients/?mine=1',
+                            HTTP_IF_NONE_MATCH=alle.headers['ETag']).status_code,
+            200, 'ETag fra det ufiltrerte svaret må ikke gi 304 på ?mine=1')
+
+    def test_responsen_er_uendret_json(self):
+        """Overgangen fra JsonResponse til HttpResponse skal ikke synes."""
+        import json as _json
+        self._lag_pasienter(2)
+        resp = self.client.get('/pasienter/api/patients/')
+        self.assertEqual(resp.headers['Content-Type'], 'application/json')
+        data = _json.loads(resp.content)
+        self.assertEqual(len(data), 2)
+        self.assertEqual(data[0]['pasientnummer'], 1)
+        self.assertIn('forstehjelper', data[0])
