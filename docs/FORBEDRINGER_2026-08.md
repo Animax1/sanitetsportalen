@@ -31,7 +31,7 @@ Status: ⏳ pending · 🔧 påbegynt · ✅ ferdig · ⚪ ikke aktuell
 | N9 | Tre tester verifiserer dobbeltklikk-fixen i **død** JS-fil | ✅ | Middels | 30 min | Testkvalitet |
 | N10 | Sesjonsinvalidering dekoder hele sesjonstabellen ved hver innlogging | ✅ | Middels | 2–3 t | Ytelse |
 | N11 | Dokumentasjonsdrift: `CLAUDE.md` beskriver ting koden ikke gjør | ✅ | Lav–Middels | 30 min | Dokumentasjon |
-| N12 | `GET /api/settings/` eksponerer hele `AppSetting`-tabellen | ⏳ | Lav | 30 min | Dybdeforsvar |
+| N12 | `GET /api/settings/` eksponerer hele `AppSetting`-tabellen | ✅ | Lav | 30 min | Dybdeforsvar |
 | N13 | Duplisert kode i `views.py` og `services.py` (ETag-blokk, feltlister) | 🟡 | Lav | 3–4 t | Vedlikehold |
 
 ### Sikkerhetsgjennomgang (eget pass)
@@ -743,11 +743,14 @@ i de fem appene og feiler med filnavn hvis noen tar shimen i bruk igjen. Verifis
 sette `core/views.py` tilbake midlertidig. Uten den vakten er dette en regel som driver på
 nytt så snart noen kopierer en importlinje fra en eldre fil.
 
-**Åpent punkt:** `invalidate_stats_cache()` er *beholdt*, ikke slettet, i motsetning til
-det tiltaket antydet. Den er triviell, testet og vil trengs av F6 (live-dashbord).
-Docstringen sier nå eksplisitt at den er ubrukt, og at den bør slettes hvis den fortsatt
-er det ved neste gjennomgang. Å slette den ville ikke gjort noen påstand i `CLAUDE.md`
-mer sann — akseptansekriteriet er oppfylt uansett.
+**`invalidate_stats_cache()` er slettet.** Den ble først beholdt med en docstring om at
+den var ubrukt, med F6 som begrunnelse. Beslutningen ble omgjort samme dag: en funksjon
+ingen kaller er dødkode uansett hvor godt den er dokumentert, og `cache.delete()` er tre
+linjer å skrive på nytt den dagen F6 faktisk trenger den. De to testene som dekket den er
+fjernet med. Failsafe-dekningen for cache-utfall er urørt — den ligger på lese-stien
+(`test_stats_cache_overlever_redis_feil`), ikke på invalideringen.
+
+Tiltakspunkt 3 er dermed besvart med «fjern funksjonen», slik det opprinnelig foreslo.
 
 **Verdi:** Lav–Middels &nbsp;|&nbsp; **Innsats:** 30 min &nbsp;|&nbsp; **Type:** Dokumentasjon
 
@@ -777,7 +780,27 @@ verifiseres i koden.
 
 ---
 
-## N12. `GET /api/settings/` eksponerer hele `AppSetting`-tabellen
+## N12. `GET /api/settings/` eksponerer hele `AppSetting`-tabellen &nbsp;—&nbsp; ✅ GJENNOMFØRT (13. aug. 2026)
+
+**Status:** Løst som foreslått. `SETTINGS_READ_WHITELIST` i `patients/views.py` speiler
+PUT-ens liste, og `SETTINGS_WRITE_WHITELIST` gjør PUT-siden til en navngitt konstant i
+stedet for en lokal variabel — asymmetrien mellom de to er nå synlig på samme sted.
+
+Lese-lista er `event_name` og `active_year`, pluss `event_name_<aktivt år>` som beregnes i
+`_readable_settings_keys()`. Kun inneværende års arrangementsnavn eksponeres; tidligere år
+hentes via arkivet. Skrive-lista er fortsatt bare `event_name`.
+
+Spørringen er samtidig blitt et `filter(key__in=...)` i stedet for `objects.all()`, så
+responsen bygges ikke lenger av hele tabellen.
+
+**Merk:** frontend leser i dag kun `event_name` (`loadSettings()` i `patients-stats.js`).
+`active_year` og `event_name_<år>` er tatt med fordi tiltaket ba om det og fordi den
+årsbaserte nøkkelen er den moderne formen — `event_name` uten år er legacy. Skal lista
+strammes ytterligere, er det de to som kan ryke.
+
+Sju tester dekker dette, inkludert akseptansekriteriet direkte: en ny `AppSetting`-nøkkel
+er usynlig via API-et til noen legger den til i whitelisten.
+
 
 **Verdi:** Lav &nbsp;|&nbsp; **Innsats:** 30 min &nbsp;|&nbsp; **Type:** Dybdeforsvar
 

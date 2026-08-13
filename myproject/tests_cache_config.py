@@ -145,18 +145,6 @@ class CacheHealthHelperTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertIn(b'"ok": true', response.content)
 
-    def test_invalidate_cache_overlever_feil(self):
-        """invalidate_stats_cache skal ikke kaste selv om backend er nede."""
-        from patients import stats_cache as stats_cache_module
-        from patients.stats_cache import invalidate_stats_cache
-
-        with mock.patch.object(
-            stats_cache_module.cache, 'delete',
-            side_effect=ConnectionError('redis nede')
-        ):
-            # Må ikke kaste
-            invalidate_stats_cache('noen_key', 'annen_key')
-
     def test_health_helper_fanger_exception(self):
         """Hvis cache.set kaster, skal helperen returnere healthy=False uten å re-raise."""
         from patients import admin_status as admin_status_module

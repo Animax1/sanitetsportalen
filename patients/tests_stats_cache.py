@@ -7,7 +7,6 @@ from accounts.models import CustomUser
 
 from .stats_cache import (
     cached_stats_response,
-    invalidate_stats_cache,
     _make_etag,
     CACHE_PREFIX,
 )
@@ -125,15 +124,6 @@ class StatsCacheViewTests(TestCase):
         resp = self.client.get(reverse('api_full_stats'))
         # @stats_required blokkerer read_only
         self.assertIn(resp.status_code, (302, 403))
-
-    def test_invalidate_fjerner_cache(self):
-        """invalidate_stats_cache skal fjerne nøkkelen."""
-        # Sett en dummy-verdi direkte i cache
-        cache.set(f'{CACHE_PREFIX}:test', ({'x': 1}, 'W/"abc"'), 60)
-        self.assertIsNotNone(cache.get(f'{CACHE_PREFIX}:test'))
-
-        invalidate_stats_cache('test')
-        self.assertIsNone(cache.get(f'{CACHE_PREFIX}:test'))
 
 
 @override_settings(SECURE_SSL_REDIRECT=False)

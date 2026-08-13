@@ -4,6 +4,36 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-08-13 — N12: whitelist på GET /api/settings/, og `invalidate_stats_cache` slettet
+
+**N12.** Endepunktet returnerte hele `AppSetting`-tabellen til enhver innlogget bruker,
+også `read_only`. Ingenting der er sensitivt i dag — `event_name`, `active_year`,
+`next_patient_nr`, `session_timeout_hours`, `feature.live_stats_enabled` — men tabellen er
+generisk nøkkel/verdi-lagring. Neste driftsverdi noen lagret der ville havnet i responsen
+automatisk. PUT hadde whitelist fra før; GET hadde ikke, og den asymmetrien er den typen
+som blir et problem lenge etter at den ble innført.
+
+`SETTINGS_READ_WHITELIST` speiler nå PUT-lista, og `SETTINGS_WRITE_WHITELIST` gjør
+PUT-siden til en navngitt konstant i stedet for en lokal variabel — begge listene ligger
+ved siden av hverandre, med kommentar om at utvidelse skal være et bevisst valg.
+`event_name_<aktivt år>` beregnes i `_readable_settings_keys()`, siden nøkkelen er
+årsavhengig. Spørringen er samtidig blitt `filter(key__in=...)` i stedet for
+`objects.all()`.
+
+Sju tester, inkludert akseptansekriteriet: en ny nøkkel er usynlig via API-et til noen
+legger den til bevisst.
+
+**Oppfølging fra N11:** `invalidate_stats_cache()` er slettet. Den ble beholdt tidligere i
+dag med en docstring om at den var ubrukt; beslutningen er omgjort. En funksjon ingen
+kaller er dødkode uansett hvor godt den er dokumentert, og `cache.delete()` er tre linjer
+å skrive på nytt den dagen F6 trenger den. De to testene som dekket den er fjernet.
+Failsafe-dekningen for cache-utfall er urørt — den ligger på lese-stien
+(`test_stats_cache_overlever_redis_feil`), ikke på invalideringen.
+
+699 tester grønne. Ingen databaseendringer.
+
+---
+
 ## 2026-08-13 — N11: CLAUDE.md i samsvar med koden
 
 Fire påstander i «Arkitektur»-seksjonen stemte ikke. Tre av dem var dokumentet som var

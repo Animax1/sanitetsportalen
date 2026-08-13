@@ -2,6 +2,7 @@
 
 Kjør med: python manage.py test patients
 """
+import json
 import shutil
 import unittest
 from datetime import datetime
@@ -1310,3 +1311,91 @@ class NowLocalStrTests(TestCase):
         # Sammenlign med direkte localtime-kall – skal være samme minutt
         expected = djtz.localtime(djtz.now()).strftime('%d.%m.%Y %H:%M')
         self.assertEqual(now_local_str(), expected)
+
+
+# ── N12: whitelist på GET /api/settings/ ─────────────────────────────────────
+
+@override_settings(SECURE_SSL_REDIRECT=False, RATELIMIT_ENABLE=False)
+class SettingsWhitelistTests(TestCase):
+    """GET /api/settings/ skal kun returnere nøkler som er sluppet ut bevisst.
+
+    Bakgrunn: endepunktet returnerte hele `AppSetting`-tabellen til enhver
+    innlogget bruker, også `read_only`. Ingenting der var sensitivt i dag, men
+    tabellen er en generisk nøkkel/verdi-lagring — neste driftsverdi noen
+    lagret der ville havnet i responsen automatisk. PUT hadde whitelist fra
+    før; GET hadde ikke.
+    """
+
+    def setUp(self):
+        self.bruker = CustomUser.objects.create_user(
+            username='lesebruker', password='testpass123',
+            role='read_only', must_change_password=False,
+        )
+        self.client.login(username='lesebruker', password='testpass123')
+
+    def _get(self):
+        resp = self.client.get('/pasienter/api/settings/')
+        self.assertEqual(resp.status_code, 200)
+        return resp.json()
+
+    def test_ny_noekkel_lekker_ikke_ut(self):
+        """Akseptansekriteriet: en ny nøkkel er usynlig til noen legger den til."""
+        AppSetting.set('intern.driftsverdi', 'hemmelig')
+        self.assertNotIn('intern.driftsverdi', self._get())
+
+    def test_kjente_interne_noekler_er_ikke_med(self):
+        """Nøkler frontend ikke bruker skal ikke eksponeres."""
+        AppSetting.set('next_patient_nr', 42)
+        AppSetting.set('session_timeout_hours', 8)
+        AppSetting.set('feature.live_stats_enabled', 'false')
+
+        data = self._get()
+        for key in ('next_patient_nr', 'session_timeout_hours',
+                    'feature.live_stats_enabled'):
+            self.assertNotIn(key, data, f'{key} lekker via GET /api/settings/')
+
+    def test_event_name_er_med(self):
+        """Det frontend faktisk leser må fortsatt komme ut."""
+        AppSetting.set('event_name', 'Festivalen 2026')
+        self.assertEqual(self._get().get('event_name'), 'Festivalen 2026')
+
+    def test_event_name_for_aktivt_aar_er_med(self):
+        """Arrangementsnavnet lagres per år, så nøkkelen er dynamisk."""
+        from patients.services import get_active_year
+        aar = get_active_year()
+        AppSetting.set(f'event_name_{aar}', f'Festivalen {aar}')
+
+        data = self._get()
+        self.assertEqual(data.get(f'event_name_{aar}'), f'Festivalen {aar}')
+
+    def test_event_name_for_andre_aar_er_ikke_med(self):
+        """Kun inneværende års navn — tidligere år hentes via arkivet."""
+        from patients.services import get_active_year
+        annet_aar = get_active_year() - 1
+        AppSetting.set(f'event_name_{annet_aar}', 'Fjorårets festival')
+
+        self.assertNotIn(f'event_name_{annet_aar}', self._get())
+
+    def test_active_year_er_med(self):
+        """Aktivt år styrer hvilke pasienter klienten viser."""
+        data = self._get()
+        self.assertIn('active_year', data)
+
+    def test_put_kan_ikke_skrive_utenfor_sin_egen_whitelist(self):
+        """PUT-lista er smalere enn lese-lista og skal forbli det."""
+        skriver = CustomUser.objects.create_user(
+            username='skriver', password='testpass123',
+            role='read_write', must_change_password=False,
+        )
+        self.client.force_login(skriver)
+
+        foer = AppSetting.get('active_year', None)
+        resp = self.client.put(
+            '/pasienter/api/settings/',
+            data=json.dumps({'active_year': 1999, 'event_name': 'Nytt navn'}),
+            content_type='application/json',
+        )
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(AppSetting.get('active_year', None), foer,
+                         'active_year skal ikke kunne settes via PUT /api/settings/')
+        self.assertEqual(AppSetting.get('event_name', None), 'Nytt navn')
