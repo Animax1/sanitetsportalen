@@ -20,17 +20,13 @@ Kjør med: python manage.py test patients.tests_xss_stats
 """
 import re
 import shutil
-import subprocess
-import tempfile
 import unittest
-from pathlib import Path
 
-from django.conf import settings
 from django.test import SimpleTestCase
 
-JS_DIR = Path(settings.BASE_DIR) / 'static' / 'js'
-UTILS_JS = JS_DIR / 'patients-utils.js'
-STATS_JS = JS_DIR / 'patients-stats.js'
+from patients.js_test_utils import (
+    UTILS_JS, STATS_JS, build_harness, extract_function, read_js, run_node,
+)
 
 # Funksjonene som bygger HTML fra pasientdata. Endres denne lista, må
 # gjennomgangen under (REVIEWED_INTERPOLATIONS) oppdateres i samme runde.
@@ -88,40 +84,14 @@ REVIEWED_INTERPOLATIONS = {
 }
 
 
-def _read(path):
-    return path.read_text(encoding='utf-8')
-
-
-def _extract_function(source, name):
-    """Klipp ut kildekoden til én toppnivåfunksjon.
-
-    Modulene bruker toppnivåfunksjoner som lukkes med ``}`` i kolonne 0, så
-    vi leser fra signaturen til første slike linje. Enklere og mer forutsigbart
-    enn å telle klammer gjennom template-literaler.
-    """
-    lines = source.splitlines()
-    start = None
-    signature = re.compile(r'^(?:async )?function ' + re.escape(name) + r'\s*\(')
-    for i, line in enumerate(lines):
-        if signature.match(line):
-            start = i
-            break
-    if start is None:
-        raise AssertionError(f'Fant ikke funksjonen {name}() i JS-kilden')
-    for j in range(start + 1, len(lines)):
-        if lines[j] == '}':
-            return '\n'.join(lines[start:j + 1])
-    raise AssertionError(f'Fant ikke slutten på {name}()')
-
-
 class StatsEscapingSourceGuardTests(SimpleTestCase):
     """Statisk gjennomgang av interpolasjonene i HTML-byggerne."""
 
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
-        cls.stats_src = _read(STATS_JS)
-        cls.utils_src = _read(UTILS_JS)
+        cls.stats_src = read_js(STATS_JS)
+        cls.utils_src = read_js(UTILS_JS)
 
     def test_escape_hjelperne_finnes_i_utils(self):
         """Byggerne er avhengige av hjelperne i patients-utils.js."""
@@ -138,7 +108,7 @@ class StatsEscapingSourceGuardTests(SimpleTestCase):
         """
         uescapet = []
         for name in HTML_BUILDERS:
-            body = _extract_function(self.stats_src, name)
+            body = extract_function(self.stats_src, name)
             for expr in re.findall(r'\$\{([^}]*)\}', body):
                 expr = expr.strip()
                 if expr.startswith(ESCAPING_CALLS):
@@ -161,7 +131,7 @@ class StatsEscapingSourceGuardTests(SimpleTestCase):
         Fjernes escHtmlValue() fra map-kallene, forsvinner escapingen uten at
         interpolasjonstesten over merker det. Derfor sjekkes det eksplisitt.
         """
-        body = _extract_function(self.stats_src, 'mkInterpretation')
+        body = extract_function(self.stats_src, 'mkInterpretation')
         self.assertIn('.map(t => escHtmlValue(t.test))', body,
                       'sigTests/nsTests må escapes der de bygges')
         self.assertEqual(body.count('.map(t => escHtmlValue(t.test))'), 2,
@@ -169,7 +139,7 @@ class StatsEscapingSourceGuardTests(SimpleTestCase):
 
     def test_signifikans_markup_er_merket_som_klarert(self):
         """De bevisste <span>-ene i renderTester må gå via trustedHtml()."""
-        body = _extract_function(self.stats_src, 'renderTester')
+        body = extract_function(self.stats_src, 'renderTester')
         self.assertEqual(body.count('trustedHtml('), 2,
                          'Både khi-kvadrat- og Kruskal-Wallis-tabellen må '
                          'merke signifikans-markupen som klarert')
@@ -178,7 +148,7 @@ class StatsEscapingSourceGuardTests(SimpleTestCase):
         """Førstehjelper- og helsepersonellnavn er fritekst uten whitelist."""
         for name, felt in (('renderForstehjelperAdmin', 'b.name'),
                            ('renderHelsepersonellAdmin', 'h.name')):
-            body = _extract_function(self.stats_src, name)
+            body = extract_function(self.stats_src, name)
             self.assertIn(f'escHtmlValue({felt})', body,
                           f'{felt} settes inn uescapet i {name}()')
 
@@ -198,32 +168,11 @@ class StatsEscapingBehaviourTests(SimpleTestCase):
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
-        deler = []
-        for path, names in cls.HARNESS_FUNCTIONS:
-            src = _read(path)
-            deler.extend(_extract_function(src, n) for n in names)
-        cls.harness = '\n\n'.join(deler)
+        cls.harness = build_harness(cls.HARNESS_FUNCTIONS)
 
     def _run_js(self, snippet):
         """Kjør snippet med byggerne i scope. Returnerer stdout."""
-        script = (
-            self.harness
-            + '\n\nfunction assert(cond, msg) {'
-              '\n  if (!cond) { console.error("ASSERT: " + msg); process.exit(1); }'
-              '\n}\n\n'
-            + snippet
-            + '\nconsole.log("OK");\n'
-        )
-        with tempfile.TemporaryDirectory() as tmp:
-            js_file = Path(tmp) / 'harness.mjs'
-            js_file.write_text(script, encoding='utf-8')
-            res = subprocess.run(
-                ['node', str(js_file)],
-                capture_output=True, text=True, timeout=30,
-            )
-        self.assertEqual(res.returncode, 0,
-                         f'node feilet:\n{res.stdout}\n{res.stderr}')
-        return res.stdout
+        return run_node(self.harness, snippet)
 
     def test_escHtmlValue_beholder_tallet_null(self):
         """0 er en gyldig celleverdi og skal vises, ikke bli tom streng.

@@ -52,6 +52,8 @@ dokumentasjon.
 - [x] **N5** `current_local_year()` brukes begge steder — nyttårsvakter havner i riktig år
 - [x] **N7** Delt Redis-klient per prosess (var én TCP-handshake per request)
 - [x] **N8** Audit-signalet skriver med `bulk_create` — konstant antall spørringer
+- [x] **N9** `script.js` slettet, dobbeltklikk-vernet testet ved å kjøre guarden i node.
+      Tiltakspunkt 3 besvart: grep-i-JS-tester er ikke nok alene.
 - [ ] **N13** Duplisert kode i `views.py`/`services.py` — delvis
   - [x] Feltlista: `ARKIVERT_PASIENT_FELTER` brukes alle tre stedene. Frosset med vilje,
         *ikke* utledet fra modellen — utledning ville fått alle eksisterende arkiver til å
@@ -92,11 +94,9 @@ dokumentasjon.
 - [ ] Rydd bort død backup-legacy: modellen `patients.BackupConfig` (singleton som
       ingenting leser lenger) og management-kommandoen `db_backup` som gater på den.
       Krever migrasjon, derfor egen oppgave.
-- [ ] Slett `static/js/script.js`. Den er den gamle monolitten fra før oppdelingen i
-      moduler, lastes ikke av noen mal, og inneholder nå en død kopi av backup-panelet.
-      **NB:** `DoubleClickGuardTests` i `patients/tests.py:965` leser denne fila — pek
-      testene mot `patients-utils.js`/`patients-forms.js` i samme commit, ellers blir
-      suiten rød. Se N9.
+- [x] Slett `static/js/script.js` (N9). Testene er pekt om, og dobbeltklikk-vernet kjøres
+      nå faktisk i node i stedet for å bli grep-et etter. `patients/js_test_utils.py` er
+      felles plumbing for JS-tester.
 
 ## Ferdig ✓
 

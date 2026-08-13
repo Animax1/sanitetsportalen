@@ -39,7 +39,7 @@ Pasientregistreringssystemet er en nettbasert applikasjon for sanntids registrer
 | Frontend-diagram | Chart.js | (CDN) | Statistikk-diagrammer |
 | Frontend-UI | Bootstrap 5 | (CDN) | Responsivt grensesnitt, modaler |
 | Frontend-ikoner | Bootstrap Icons | (CDN) | UI-ikoner |
-| Frontend-logikk | Vanlig JavaScript | – | Ingen rammeverk; én enkelt `script.js` |
+| Frontend-logikk | Vanlig JavaScript | – | Ingen rammeverk, ingen bundler; fire moduler i `static/js/` |
 
 ---
 
@@ -48,7 +48,7 @@ Pasientregistreringssystemet er en nettbasert applikasjon for sanntids registrer
 ### 3.1 Komponentdiagram
 
 ```
-  Nettleser (Bootstrap 5 + Tabulator + Chart.js + script.js)
+  Nettleser (Bootstrap 5 + Tabulator + Chart.js + patients-*.js)
        |
        | HTTPS (TLS 1.2+)
        v
@@ -363,7 +363,7 @@ Utfører soft-delete: setter `is_active=False`. Pasienten forsvinner fra standar
 
 **Rolle:** Alle innloggede brukere.
 
-**ETag-støtte:** Endepunktet beregner en SHA-256-hash av førstehjelper-listen og sender `ETag`-headeren. Klienten lagrer ETag og sender `If-None-Match` ved neste kall. Hvis listen er uendret, returneres 304 Not Modified uten kropp. Kombinert med `Cache-Control: private, must-revalidate` og `@never_cache` gir dette effektiv validering uten unødvendig dataoverføring. Implementert i `patients/views.py` og `script.js`.
+**ETag-støtte:** Endepunktet beregner en SHA-256-hash av førstehjelper-listen og sender `ETag`-headeren. Klienten lagrer ETag og sender `If-None-Match` ved neste kall. Hvis listen er uendret, returneres 304 Not Modified uten kropp. Kombinert med `Cache-Control: private, must-revalidate` og `@never_cache` gir dette effektiv validering uten unødvendig dataoverføring. Implementert i `patients/views.py` og `patients-stats.js`.
 
 **Respons:** JSON-array: `[{"id": 1, "name": "Ola Nordmann", "is_active": true}, ...]`. Sortert: aktive først, deretter alfabetisk.
 
@@ -604,7 +604,7 @@ Rollehierarkiet er definert i `accounts/models.py` (`UserRole`) og håndhevet vi
 
 Dekoratorene `admin_required`, `write_required` og `stats_required` er snarveier i `accounts/decorators.py`. API-views håndhever rolle inline (f.eks. `if request.user.role not in WRITE_ROLES`).
 
-Frontend bruker `window.USER_ROLE` (satt av templaten) til å skjule elementer med CSS-klasser `.write-only`, `.stats-only` og `.admin-only` via `applyRoleVisibility()` i `script.js`.
+Frontend bruker `window.USER_ROLE` (satt av templaten) til å skjule elementer med CSS-klasser `.write-only`, `.stats-only` og `.admin-only` via `applyRoleVisibility()` i `patients-utils.js`.
 
 ### 6.4 Rate-limiting
 
@@ -1178,7 +1178,20 @@ Rekkefølgen i `MIDDLEWARE`-listen i `settings.py` er kritisk. Under vises rekke
 
 ### 10.1 Arkitektur
 
-Frontend er en SPA-lignende enkeltside-applikasjon i vanlig JavaScript (ingen React, Vue eller Angular). All logikk ligger i én fil: `static/js/script.js`. Siden rendres av Django-templaten `templates/patients/index.html`.
+Frontend er en SPA-lignende enkeltside-applikasjon i vanlig JavaScript (ingen React, Vue eller Angular). Siden rendres av Django-templaten `templates/patients/index.html`, som laster fire moduler fra `static/js/`:
+
+| Modul | Ansvar |
+|---|---|
+| `patients-utils.js` | CSRF-fetch, `withSubmitGuard`, escaping-hjelpere, delt tilstand |
+| `patients-table.js` | Tabulator-grid og tavlevisning |
+| `patients-forms.js` | Registrerings- og redigeringsskjema |
+| `patients-stats.js` | Statistikkfanen og arkivvisning |
+
+Alle fire lastes ubetinget — det er ingen bundler og ingen betinget lasting. `patients-stats.js` er større enn de tre andre til sammen og brukes kun av roller med statistikktilgang; se F7 i `docs/FORBEDRINGER_2026-08.md`.
+
+Monolitten `static/js/script.js` ble delt opp i disse fire i mai 2026 og slettet 13. aug. 2026 (N9). Referanser til den i eldre dokumenter er historiske.
+
+**JS-testing:** det finnes ingen JS-testrunner. `patients/js_test_utils.py` klipper ut enkeltfunksjoner og kjører dem i node med stubbet miljø. Brukes av `patients/tests_xss_stats.py` (escaping) og `DoubleClickGuardTests` (dobbeltklikk-vernet). Testene hoppes over hvis node ikke finnes.
 
 Brukerens rolle (`window.USER_ROLE`) injiseres i templaten og leses av JavaScript for å styre elementsynlighet via CSS-klasser.
 
@@ -1209,11 +1222,11 @@ Siden polls automatisk hvert 30. sekund for å holde pasientlisten og behandlerl
 
 ### 10.4 ETag-støtte for førstehjelper-listen
 
-`loadForstehjelpere()` i `script.js` bruker `If-None-Match`-headeren med en lagret ETag. Serveren beregner ETag som SHA-256-hash av førstehjelper-listens innhold og returnerer 304 Not Modified hvis listen er uendret. Dette reduserer unødvendig nettverkstrafikk ved polling.
+`loadForstehjelpere()` i `patients-stats.js` bruker `If-None-Match`-headeren med en lagret ETag. Serveren beregner ETag som SHA-256-hash av førstehjelper-listens innhold og returnerer 304 Not Modified hvis listen er uendret. Dette reduserer unødvendig nettverkstrafikk ved polling.
 
 ### 10.5 CSRF i API-kall
 
-`apiFetch(url, options)` i `script.js` er en wrapper rundt `fetch()` som automatisk legger til `X-CSRFToken`-header for `POST`, `PUT`, `PATCH` og `DELETE`. Token leses fra `csrftoken`-cookie, med fallback til et skjult `{% csrf_token %}`-input.
+`apiFetch(url, options)` i `patients-utils.js` er en wrapper rundt `fetch()` som automatisk legger til `X-CSRFToken`-header for `POST`, `PUT`, `PATCH` og `DELETE`. Token leses fra `csrftoken`-cookie, med fallback til et skjult `{% csrf_token %}`-input.
 
 ### 10.6 Datahåndtering
 

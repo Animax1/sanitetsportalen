@@ -76,7 +76,20 @@ Basic stats caches 15 sek, full stats 60 sek. Støtter ETag/304. Invalideres ved
 
 ### Frontend
 
-Én stor `static/js/script.js` (ingen bundler). CSRF-sikret fetch-wrapper brukes for alle API-kall. Tabulator for pasientgrid, Chart.js for statistikk.
+Fire moduler i `static/js/`, lastet ubetinget av `templates/patients/index.html` (ingen bundler):
+
+| Modul | Ansvar |
+|-------|--------|
+| `patients-utils.js` | CSRF-fetch (`apiFetch`), `withSubmitGuard`, escaping, delt tilstand |
+| `patients-table.js` | Tabulator-grid og tavle |
+| `patients-forms.js` | Registrerings- og redigeringsskjema |
+| `patients-stats.js` | Statistikkfanen (Chart.js) og arkivvisning |
+
+CSRF-sikret fetch-wrapper brukes for alle API-kall. Tabulator for pasientgrid, Chart.js for statistikk.
+
+Brukerdata som settes inn med `innerHTML` **skal** escapes — `escHtmlValue()` i tabeller (tallsikker), `escapeHtml()`/`_escHtml()` ellers. Markup koden bygger selv merkes med `trustedHtml()`. `patients/tests_xss_stats.py` håndhever dette.
+
+JS-oppførsel testes ved å kjøre funksjonene i node, se `patients/js_test_utils.py`. Ikke skriv nye tester som bare grep-er etter kodelinjer i JS-filer.
 
 ## Miljøvariabler
 

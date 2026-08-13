@@ -2,6 +2,8 @@
 
 Kjør med: python manage.py test patients
 """
+import shutil
+import unittest
 from datetime import datetime
 
 from django.test import TestCase, Client, override_settings
@@ -951,50 +953,147 @@ class DoubleClickGuardTests(TestCase):
     fortsatt prosesserte første request. På delte soner (Grønn/Gul/blank) finnes
     ingen unik-sjekk, så begge requests gikk gjennom og skapte to pasienter.
 
-    Fixen er implementert frontend-side via `withSubmitGuard()` i script.js, som
-    disabler knappen umiddelbart, viser spinner og holder lock i minst 250 ms.
-    Server-side idempotency er sporet som FORBEDRINGER #18 for senere hårdere
-    beskyttelse mot API-klienter (Postman/curl) som omgår UI.
+    Fixen er implementert frontend-side via `withSubmitGuard()` i
+    `patients-utils.js`, som disabler knappen umiddelbart, viser spinner og
+    holder lock i minst 250 ms. Server-side idempotency er sporet som
+    FORBEDRINGER #18 for senere hårdere beskyttelse mot API-klienter
+    (Postman/curl) som omgår UI.
 
-    Disse testene verifiserer at fixen er installert i frontend-koden:
+    **N9 (13. aug. 2026):** Testene leste tidligere `static/js/script.js`, som
+    ingen mal lastet. De var grønne, og ville vært grønne også om guarden
+    forsvant fra den levende koden. Nå gjør de to ting:
 
-    1. withSubmitGuard-helperen finnes i script.js
-    2. saveNew() og saveEdit() er begge wrappet med guarden
-    3. Lagre-knappene har stabile id-er som guarden refererer til
+    1. Kjører guarden i node og verifiserer at den faktisk blokkerer det andre
+       kallet — det er selve vernet, ikke bare at koden finnes.
+    2. Sjekker koblingen: at `saveNew`/`saveEdit` bruker guarden, og at malen
+       har knappe-id-ene den refererer til. Det er fortsatt tekstsøk, men nå i
+       filer som faktisk lastes.
     """
 
-    # ── Frontend-koblings-tester (verifiserer at fixen er installert) ──
+    # ── Oppførselstester (kjører guarden) ────────────────────────────────
 
-    def test_script_js_has_submit_guard_helper(self):
-        """withSubmitGuard-helperen må være definert i script.js."""
-        from pathlib import Path
-        from django.conf import settings
-        js_path = Path(settings.BASE_DIR) / 'static' / 'js' / 'script.js'
-        self.assertTrue(js_path.exists(), 'script.js mangler')
-        content = js_path.read_text(encoding='utf-8')
+    # Stubber akkurat det withSubmitGuard rører: én knapp i DOM-en.
+    BTN_STUB = '''
+const btn = { dataset: {}, disabled: false, innerHTML: 'Registrer pasient' };
+global.document = {
+  getElementById: (id) => (id === 'btn-save-new' ? btn : null),
+};
+'''
+
+    def _run_guard(self, snippet):
+        from patients import js_test_utils as jsu
+        harness = jsu.build_harness([(jsu.UTILS_JS, ('withSubmitGuard',))])
+        return jsu.run_node(harness, snippet, preamble=self.BTN_STUB)
+
+    @unittest.skipUnless(shutil.which('node'), 'node er ikke tilgjengelig')
+    def test_guard_blokkerer_andre_kall_mens_forste_paagaar(self):
+        """Selve vernet: to raske klikk skal gi én registrering.
+
+        Dette er hendelsen fra 30. april, gjenskapt: knappen klikkes igjen
+        mens serveren fortsatt prosesserer det første kallet.
+        """
+        self._run_guard('''
+let kall = 0;
+const treg = () => new Promise(r => setTimeout(() => { kall++; r(); }, 50));
+
+const forste = withSubmitGuard('btn-save-new', treg);
+const andre  = withSubmitGuard('btn-save-new', treg);
+await Promise.all([forste, andre]);
+
+assert(kall === 1, 'forventet 1 registrering, fikk ' + kall);
+''')
+
+    @unittest.skipUnless(shutil.which('node'), 'node er ikke tilgjengelig')
+    def test_guard_disabler_knappen_umiddelbart(self):
+        """Knappen skal være låst mens kallet pågår, ikke først etterpå."""
+        self._run_guard('''
+let disabletUnderveis = null;
+const p = withSubmitGuard('btn-save-new', async () => {
+  disabletUnderveis = btn.disabled;
+});
+await p;
+assert(disabletUnderveis === true, 'knappen var ikke disablet under kallet');
+assert(btn.dataset.submitting === undefined, 'låsen ble ikke frigitt etterpaa');
+assert(btn.disabled === false, 'knappen ble ikke aktivert igjen');
+''')
+
+    @unittest.skipUnless(shutil.which('node'), 'node er ikke tilgjengelig')
+    def test_guard_holder_laasen_i_minst_250ms(self):
+        """Et raskt svar skal likevel holde knappen låst minimumstiden.
+
+        Uten dette rekker et dobbeltklikk å treffe mellom to raske kall.
+        """
+        self._run_guard('''
+const start = Date.now();
+await withSubmitGuard('btn-save-new', async () => {});
+const brukt = Date.now() - start;
+assert(brukt >= 245, 'laasen ble holdt i bare ' + brukt + ' ms');
+''')
+
+    @unittest.skipUnless(shutil.which('node'), 'node er ikke tilgjengelig')
+    def test_guard_frigir_laasen_naar_lagring_feiler(self):
+        """En mislykket lagring skal ikke låse knappen for godt.
+
+        Feilen skal fortsatt boble opp — guarden svelger den ikke.
+        """
+        self._run_guard('''
+let kastet = false;
+try {
+  await withSubmitGuard('btn-save-new', async () => { throw new Error('500'); });
+} catch (e) {
+  kastet = true;
+}
+assert(kastet, 'feilen naadde ikke kalleren');
+assert(btn.disabled === false, 'knappen ble staaende disablet etter feil');
+assert(btn.dataset.submitting === undefined, 'laasen ble staaende etter feil');
+assert(btn.innerHTML === 'Registrer pasient', 'knappeteksten ble ikke gjenopprettet');
+
+// ...og et nytt forsoek skal gaa gjennom
+let kall = 0;
+await withSubmitGuard('btn-save-new', async () => { kall++; });
+assert(kall === 1, 'knappen var fortsatt laast etter en feilet lagring');
+''')
+
+    # ── Koblings-tester (verifiserer at guarden er tatt i bruk) ──────────
+
+    def test_submit_guard_helper_finnes_i_utils(self):
+        """withSubmitGuard må være definert i modulen malen faktisk laster."""
+        from patients import js_test_utils as jsu
+        content = jsu.read_js(jsu.UTILS_JS)
         self.assertIn('async function withSubmitGuard(', content,
-                      'withSubmitGuard-helperen mangler i script.js')
+                      'withSubmitGuard-helperen mangler i patients-utils.js')
         self.assertIn('dataset.submitting', content,
                       'In-flight lock-mekanismen mangler i withSubmitGuard')
 
     def test_save_new_uses_submit_guard(self):
         """saveNew() må wrappes med withSubmitGuard for å hindre dobbeltklikk."""
-        from pathlib import Path
-        from django.conf import settings
-        js_path = Path(settings.BASE_DIR) / 'static' / 'js' / 'script.js'
-        content = js_path.read_text(encoding='utf-8')
-        # saveNew skal kalle withSubmitGuard med btn-save-new
+        from patients import js_test_utils as jsu
+        content = jsu.read_js(jsu.FORMS_JS)
         self.assertIn("withSubmitGuard('btn-save-new'", content,
                       'saveNew() er ikke beskyttet av withSubmitGuard')
 
     def test_save_edit_uses_submit_guard(self):
         """saveEdit() må også wrappes for å hindre dobbeltlagring av endringer."""
-        from pathlib import Path
-        from django.conf import settings
-        js_path = Path(settings.BASE_DIR) / 'static' / 'js' / 'script.js'
-        content = js_path.read_text(encoding='utf-8')
+        from patients import js_test_utils as jsu
+        content = jsu.read_js(jsu.FORMS_JS)
         self.assertIn("withSubmitGuard('btn-save-edit'", content,
                       'saveEdit() er ikke beskyttet av withSubmitGuard')
+
+    def test_js_modulene_lastes_av_malen(self):
+        """Testene over er verdiløse hvis malen ikke laster filene de leser.
+
+        Det var nettopp det som var galt før N9: testene pekte på en fil ingen
+        mal lastet.
+        """
+        from pathlib import Path
+        from django.conf import settings
+        tpl = Path(settings.BASE_DIR) / 'templates' / 'patients' / 'index.html'
+        content = tpl.read_text(encoding='utf-8')
+        for modul in ('patients-utils.js', 'patients-forms.js'):
+            self.assertIn(modul, content,
+                          f'{modul} lastes ikke av index.html')
+        self.assertNotIn("js/script.js", content,
+                         'index.html laster den slettede monolitten')
 
     def test_save_buttons_have_stable_ids_in_template(self):
         """Lagre-knappene må ha id-ene som withSubmitGuard refererer til."""

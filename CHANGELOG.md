@@ -4,6 +4,49 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-08-13 — N9: `script.js` slettet, dobbeltklikk-vernet faktisk testet
+
+`static/js/script.js` (2159 linjer) er borte. Ingen mal lastet den — monolitten ble delt
+i fire moduler i mai, og fila har ligget død siden. Den bar også en kopi av den uescapede
+statistikk-koden fra N6, som dermed forsvinner helt.
+
+Det som gjorde punktet verdt mer enn en sletting: `DoubleClickGuardTests` leste nettopp
+den døde fila. Testene var grønne, og ville vært grønne også om `withSubmitGuard`
+forsvant fra den levende koden. Vernet mot dobbel pasientregistrering — innført etter en
+reell hendelse 30. april — var i praksis utestet.
+
+**Tiltakspunkt 3 i N9 spurte om «grep i JS-fil» i det hele tatt er riktig verktøy.
+Svaret er nei, ikke alene.** Testene kjører nå guarden i node i stedet for å lete etter
+den. Fire nye oppførselstester dekker det vernet skal gjøre:
+
+- to raske klikk gir én registrering
+- knappen låses umiddelbart, ikke først når svaret kommer
+- låsen holdes i minst 250 ms selv om serveren svarer raskt
+- en mislykket lagring frigir låsen, og feilen når fortsatt kalleren
+
+Verdien er målt, ikke antatt: deaktiverer man in-flight-sjekken i `withSubmitGuard`,
+feiler den nye testen med `forventet 1 registrering, fikk 2`. Hendelsen fra 30. april,
+gjenskapt. De gamle testene var grønne gjennom nøyaktig den endringen.
+
+Tekstsøkene er beholdt der de fortsatt gir mening — at `saveNew`/`saveEdit` bruker
+guarden, og at malen har knappe-id-ene — men supplert med en test på at malen faktisk
+laster modulene testene leser. Det var den manglende koblingen som gjorde hele problemet
+mulig.
+
+Node-plumbingen er trukket ut i `patients/js_test_utils.py` og delt med
+`tests_xss_stats.py` fra N6. Modulen heter bevisst ikke `tests_*`, så den ikke plukkes
+opp av testoppdagelsen.
+
+**Dokumentasjon:** `CLAUDE.md` og teknisk dokumentasjon beskrev fortsatt frontend som «én
+stor `script.js`». Begge er rettet til de fire modulene, med escaping-reglene fra N6 og
+en merknad om at nye JS-tester skal kjøre koden, ikke grep-e etter den. Historiske
+referanser i eldre dokumenter er latt stå.
+
+677 tester grønne. Ingen databaseendringer. `staticfiles/` er gitignorert og regenereres
+av `collectstatic` ved deploy.
+
+---
+
 ## 2026-08-13 — N13 delpunkt 1: én feltliste for arkiv-signaturen
 
 De samme 17 feltnavnene var skrevet ut tre steder: ved arkivering

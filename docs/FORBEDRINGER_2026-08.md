@@ -28,7 +28,7 @@ Status: ⏳ pending · 🔧 påbegynt · ✅ ferdig · ⚪ ikke aktuell
 | N6 | Statistikk-tabellene setter inn feltverdier uescapet i `innerHTML` | ✅ | Middels | 2 t | Sikkerhet (dybdeforsvar) |
 | N7 | Redis-klienten bygges på nytt for hver eneste request | ✅ | Middels | 1 t | Ytelse |
 | N8 | Audit-signalet gjør N+1 skrivinger per pasientendring | ✅ | Middels | 1–2 t | Ytelse |
-| N9 | Tre tester verifiserer dobbeltklikk-fixen i **død** JS-fil | ⏳ | Middels | 30 min | Testkvalitet |
+| N9 | Tre tester verifiserer dobbeltklikk-fixen i **død** JS-fil | ✅ | Middels | 30 min | Testkvalitet |
 | N10 | Sesjonsinvalidering dekoder hele sesjonstabellen ved hver innlogging | ✅ | Middels | 2–3 t | Ytelse |
 | N11 | Dokumentasjonsdrift: `CLAUDE.md` beskriver ting koden ikke gjør | ⏳ | Lav–Middels | 30 min | Dokumentasjon |
 | N12 | `GET /api/settings/` eksponerer hele `AppSetting`-tabellen | ⏳ | Lav | 30 min | Dybdeforsvar |
@@ -586,7 +586,31 @@ av hvor mange felter som endres.
 
 ---
 
-## N9. Tre tester verifiserer dobbeltklikk-fixen i en død JS-fil
+## N9. Tre tester verifiserer dobbeltklikk-fixen i en død JS-fil &nbsp;—&nbsp; ✅ GJENNOMFØRT (13. aug. 2026)
+
+**Status:** Løst, og tiltakspunkt 3 ble besvart med «nei».
+
+`static/js/script.js` (2159 linjer) er slettet. Testene er pekt om til
+`patients-utils.js` og `patients-forms.js` i samme commit, som punktet krevde.
+
+**Tiltakspunkt 3 — er «grep i JS-fil» riktig verktøy?** Nei, ikke alene. Testene ble derfor
+skrevet om til å *kjøre* guarden i node, ikke bare lete etter den. Fire nye
+oppførselstester dekker det vernet faktisk skal gjøre: at to raske klikk gir én
+registrering, at knappen låses umiddelbart og ikke først etterpå, at låsen holdes i minst
+250 ms, og at en mislykket lagring frigir låsen i stedet for å låse knappen for godt.
+
+Verdien ble målt: deaktiverer man in-flight-sjekken i `withSubmitGuard`, feiler den nye
+testen med `forventet 1 registrering, fikk 2` — altså hendelsen fra 30. april, gjenskapt.
+De gamle grep-testene var grønne gjennom nøyaktig den endringen.
+
+Tekstsøkene er beholdt der de fortsatt gir mening — at `saveNew`/`saveEdit` bruker guarden,
+og at malen har knappe-id-ene — men supplert med en test på at malen faktisk laster
+modulene testene leser. Det var den manglende koblingen som gjorde hele problemet mulig.
+
+Plumbingen ligger i `patients/js_test_utils.py`, delt med `tests_xss_stats.py` fra N6.
+
+**Andre tester som leste fila (tiltakspunkt 2):** ingen. `DoubleClickGuardTests` var de
+eneste.
 
 **Verdi:** Middels &nbsp;|&nbsp; **Innsats:** 30 min &nbsp;|&nbsp; **Type:** Testkvalitet
 
