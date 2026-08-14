@@ -4,6 +4,55 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-08-14 — Beslutningsnotater: brukere/e-post og dataimport fra gammel prod
+
+Kun dokumentasjon. Ingen kodeendring.
+
+**`docs/BESLUTNING_BRUKERE_OG_EPOST.md`** — hvordan e-post fungerer i dag (kort: den gjør
+det ikke, `EMAIL_HOST` er ikke satt så alt går til Railway-loggen), hva som kreves for at
+SMTP skal virke inkludert SPF/DKIM, tre konkrete leverandøralternativer med
+miljøvariabler, og de sju beslutningene rundt passord-reset.
+
+Besluttet: invitasjon med signert lenke som registreringsvei, ikke invitasjonskode — koden
+er den eneste av alternativene som kan misbrukes, og bulk-onboarding er ikke vist å være et
+reelt problem ennå.
+
+To modellendringer spesifisert men ikke kjørt: `fullt_navn` (ett fritekstfelt, ikke
+for-/etternavn) og `er_delt_konto` for bil-innlogginger. `CustomUser` arver
+`AbstractBaseUser`, så `first_name`/`last_name` finnes ikke i dag.
+
+To ting notatet fremhever som ellers oppdages sent: en e-postleverandør blir
+**databehandler** og må inn i personvernprotokollen med avtale, og
+**leveringsevne avgjør om funksjonen er brukbar** — en reset-lenke i spam midt i en vakt
+betyr at brukeren ringer admin likevel, men nå i tro på at selvbetjening finnes.
+
+**`docs/DATAIMPORT_FRA_GAMMEL_PROD.md`** — årets pasientdata skal fra den gamle
+Pasientregistreringsappen inn i portalen.
+
+Funnet ved gjennomgang av `C:\Programmering\pasientregistrering`: **verktøyet finnes
+allerede.** `import_offline_data` leser nøyaktig det gamle skjemaet — kolonne for kolonne,
+inkludert `behandler_id` og `journal` — fordi kommandoen ble skrevet for
+offline-SQLite-filer, og de filene *er* den gamle appen. Ingen ny kode trengs.
+
+Prosedyren er tre standardoperasjoner: `dumpdata` fra prod (read-only), bygg en lokal
+SQLite med gammelt skjema, importer med `--dry-run` først.
+
+Tre forbehold dokumentert: `created_at` blir importdatoen (statistikken påvirkes ikke, den
+regner på tekstfeltene), det gamle `helsepersonell`-tekstfeltet importeres ikke siden
+portalen fjernet det i migrasjon 0010, og whitelisten kan avvise verdier fra før
+`choices.py` ble innført.
+
+**Arkiverte vakter importeres ikke, og bør ikke.** SHA-256-signaturen er beregnet over
+`arkiv_id`, altså primærnøkkelen — får arkivet ny pk i portalen, melder det tukling. Å
+skrive om signaturen for å passe ville undergravd hele poenget. Anbefalingen er å importere
+pasientradene og arkivere vakten på nytt fra portalen.
+
+**Rollemodellen er lagt inn som eget TODO-punkt.** Dagens ene globale `role` pluss fem
+`kan_redigere_*`-flagg holder ikke med fire moduler til. Flaggene er dessuten feilnavngitt
+— `help_text` sier de styrer synlighet i nav-menyen, ikke redigering.
+
+---
+
 ## 2026-08-13 — Arkivmønsteret generalisert til `core/arkiv/`
 
 Forberedelse til park-, oppdrags- og rapportmodulen. Frysing, integritetssjekk og kollaps

@@ -124,6 +124,45 @@ dokumentasjon.
 
 ## Ideer / backlog
 
+### Brukere, e-post og roller — se `docs/BESLUTNING_BRUKERE_OG_EPOST.md`
+
+Besluttet 14. aug. 2026: invitasjon som registreringsvei, selvbetjent passord-reset for
+personlige kontoer, admin-reset beholdt for alle. Ingenting bygget ennå.
+
+- [ ] **Blokkerer alt annet:** SMTP verifisert, inkludert SPF/DKIM og at mailen lander i
+      innboksen. Uten det er reset-funksjonen inert og verre enn ingen funksjon.
+      Se «Krever Andre» øverst.
+- [ ] Databehandleravtale med e-postleverandør + oppføring i personvernprotokollen
+- [ ] Migrasjon: `fullt_navn` og `er_delt_konto` på `CustomUser`. **Kun AddField, alene.**
+      `CustomUser` arver `AbstractBaseUser`, så `first_name`/`last_name` finnes ikke.
+- [ ] Invitasjonsflyt med signert lenke — brukeren setter sitt eget passord, admin
+      formidler ingenting
+- [ ] Passord-reset, med de sju punktene i notatet (delte kontoer utelatt, MFA ikke
+      omgåelig, sesjoner drepes, `must_change_password` nullstilles, egen rate-limit-bøtte,
+      kortere token-levetid, ingen kontoenumerering)
+
+### Rollemodellen — trenger beslutning
+
+Dagens modell er ett globalt `role`-felt pluss fem `kan_redigere_*`-flagg. Flaggene er
+feilnavngitt: `help_text` sier at de styrer *synlighet* i dashboard og nav-meny, ikke
+redigering. Med fire moduler til holder ikke modellen — en bruker kan trenge les/skriv i én
+modul og les i en annen.
+
+- [ ] Skill **tilgangsnivå per modul** (autorisasjon) fra **funksjon i felt**
+      (førstehjelper/helsepersonell/bil). Det siste er domenedata og finnes allerede som
+      FK fra `Forstehjelper.user`/`Helsepersonell.user` — det er ikke en rettighet.
+- [ ] Vurder gjennomgangsmodell `ModulTilgang(bruker, modul_slug, nivå)` som erstatter de
+      fem boolske flaggene. `admin` forblir global, ikke per modul.
+- [ ] **Migrasjonen må deles i to deployer:** legg til tabellen og fyll den fra flaggene i
+      én, fjern flaggene i en senere. Slås de sammen, mister en rollback dataene.
+
+### Dataimport fra gammel prod — se `docs/DATAIMPORT_FRA_GAMMEL_PROD.md`
+
+- [ ] Importer årets pasientdata fra den gamle Pasientregistreringsappen.
+      `import_offline_data` leser den gamle appens skjema direkte — ingen ny kode trengs.
+      Tre steg: `dumpdata` fra prod (read-only), bygg SQLite lokalt, importer med
+      `--dry-run` først. Kjør mot staging før prod.
+
 ### Pasientmodulen — småting
 
 - [ ] «Mine pasienter» er tydelig markert i pasientlista, men ikke i tavla.
