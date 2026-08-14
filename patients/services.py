@@ -732,16 +732,25 @@ ARKIVERT_PASIENT_FELTER = (
 ARKIVERT_PASIENT_FELTER_UNNTATT = ('id', 'arkiv')
 
 
+def _arkiv_handler():
+    """Modulens arkiv-handler fra ``core.arkiv``-registryet."""
+    from core.arkiv import get_handler
+    handler = get_handler('patients')
+    if handler is None:  # pragma: no cover — apps.ready() registrerer den
+        raise RuntimeError('Arkiv-handleren for patients er ikke registrert.')
+    return handler
+
+
 def _compute_sha256_for_arkiv(arkiv, pasienter_dicts):
-    """Beregn SHA-256 over kanonisk JSON av arkivdata."""
-    payload = {
-        'arkiv_id': arkiv.pk,
-        'arrangement_navn': arkiv.arrangement_navn,
-        'year_snapshot': arkiv.year_snapshot,
-        'pasienter': sorted(pasienter_dicts, key=lambda p: p['pasientnummer']),
-    }
-    canonical = _json_mod.dumps(payload, ensure_ascii=False, sort_keys=True)
-    return hashlib.sha256(canonical.encode('utf-8')).hexdigest()
+    """Beregn SHA-256 over kanonisk JSON av arkivdata.
+
+    Kanonisering og hashing ligger i ``core.arkiv``; payloadens form eies av
+    ``patients/arkiv.py`` og er uendret. Funksjonen beholdes som navn fordi
+    ``views_arkiv.py``, ``kollaps_arkiv``-kommandoen og flere tester bruker
+    den direkte.
+    """
+    from core.arkiv import beregn_sha256
+    return beregn_sha256(_arkiv_handler(), arkiv, pasienter_dicts)
 
 
 def arkiver_aktiv_vakt(arrangement_navn, notat, user):
@@ -855,14 +864,8 @@ def _compute_sha256_for_aggregat(arkiv, aggregat):
     Overtar integritetssjekken etter kollaps. ``sha256``-feltet er beregnet
     over pasientrader som ikke lenger finnes, og kan aldri verifiseres igjen.
     """
-    payload = {
-        'arkiv_id': arkiv.pk,
-        'arrangement_navn': arkiv.arrangement_navn,
-        'year_snapshot': arkiv.year_snapshot,
-        'aggregat': aggregat,
-    }
-    canonical = _json_mod.dumps(payload, ensure_ascii=False, sort_keys=True)
-    return hashlib.sha256(canonical.encode('utf-8')).hexdigest()
+    from core.arkiv import beregn_aggregat_sha256
+    return beregn_aggregat_sha256(_arkiv_handler(), arkiv, aggregat)
 
 
 def bygg_aggregat(arkiv):
@@ -885,22 +888,8 @@ def kollaps_arkiv(arkiv):
 
     Returnerer antall slettede pasientrader.
     """
-    if arkiv.er_kollapset:
-        return 0
-
-    aggregat = bygg_aggregat(arkiv)
-
-    with transaction.atomic():
-        antall = ArkivertPasient.objects.filter(arkiv=arkiv).delete()[0]
-
-        arkiv.aggregat = aggregat
-        arkiv.aggregat_sha256 = _compute_sha256_for_aggregat(arkiv, aggregat)
-        arkiv.kollapset_at = djtz.now()
-        arkiv.save(update_fields=[
-            'aggregat', 'aggregat_sha256', 'kollapset_at',
-        ])
-
-    return antall
+    from core.arkiv import kollaps
+    return kollaps(_arkiv_handler(), arkiv)
 
 
 def har_arkiv_backup_etter(tidspunkt):
@@ -909,8 +898,5 @@ def har_arkiv_backup_etter(tidspunkt):
     Brukes som sperre før kollaps: en backup laget etter at arkivet ble
     opprettet inneholder arkivet, og gjør slettingen gjenopprettbar.
     """
-    from .models import Backup
-    return Backup.objects.filter(
-        module_slug='arkiv',
-        created_at__gt=tidspunkt,
-    ).exists()
+    from core.arkiv import har_backup_etter
+    return har_backup_etter(_arkiv_handler(), tidspunkt)

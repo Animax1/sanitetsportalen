@@ -124,16 +124,33 @@ dokumentasjon.
 
 ## Ideer / backlog
 
+### Pasientmodulen — småting
+
+- [ ] «Mine pasienter» er tydelig markert i pasientlista, men ikke i tavla.
+      **Årsak funnet:** CSS-regelen er `.filter-btn.active-mine`
+      (`static/css/style.css:275`), men `#btn-board-mine` har klassene
+      `btn btn-outline-info btn-sm` — uten `filter-btn`. `toggleBoardMine()`
+      legger på `active-mine`, men regelen matcher aldri.
+      Fiks: legg `filter-btn` på knappen i `index.html:148`, og sjekk at den
+      ikke arver uønsket bredde/marg fra klassen. Vurder samtidig om tavla og
+      lista skal dele filtertilstand — i dag er `mineOnly` og `boardMineFilter`
+      to uavhengige variabler, så filteret følger deg ikke mellom fanene.
+
 ### Skalering mot 2027 — se `docs/RUNBOOK_VAKT.md` §3c
 
 Gjennomgang 13. aug. 2026, med 1000 pasienter og peak 100 brukere som premiss.
 
 - [x] `select_related` + ETag på `/api/patients/` — 515 → 15 spørringer, og 304 uten
       kropp når ingenting er endret
-- [ ] **Generaliser arkivmønsteret** før modul nummer to bygges. `VaktArkiv` med frysing,
-      SHA-256 og 24-måneders kollaps er i dag spesifikt for pasientmodulen. Park-,
-      oppdrags- og rapportmodulen trenger samme livsløp — det bør flyttes til `core` én
-      gang, ikke kopieres tre ganger.
+- [x] **Generaliser arkivmønsteret** — `core/arkiv/` med `BaseArkivHandler` og registry,
+      samme idiom som `core/backup/`. Core eier kanonisering, hashing og kollaps-
+      orkestrering; handleren eier payloadens form. Signaturene er bit-identiske,
+      låst av `ArkivSignaturLaastTests`. Ingen migrasjon.
+  - [ ] **Gjenstår:** `AbstractArkiv`-basemodell for nye moduler. `VaktArkiv` har
+        feltene i dag (`sha256`, `kollapset_at`, `aggregat`, `aggregat_sha256`,
+        frosset `importert_av_navn`); park og oppdrag må ellers gjenta dem. Bevisst
+        utsatt til modell nummer to faktisk skrives — da ser man hva som er felles,
+        i stedet for å gjette. `VaktArkiv` skal *ikke* migreres til basemodellen.
 - [ ] Park-registreringer blir **egen modell**, ikke rader i `Patient`. Holder sykestuas
       liste på ~250 rader i stedet for 1000, og matcher at dataene er enklere.
 - [ ] Park-appen er et skriveendepunkt **uten innlogging**: signert lenke via

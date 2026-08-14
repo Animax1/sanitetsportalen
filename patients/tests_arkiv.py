@@ -529,3 +529,60 @@ class ArkivFeltlisteTests(ArkivTestMixin, TestCase):
         c.force_login(self.admin)
         resp = c.get(f'/pasienter/api/innstillinger/arkiv/{arkiv.pk}/')
         self.assertTrue(resp.json()['tamper_detected'])
+
+
+class ArkivSignaturLaastTests(TestCase):
+    """Låser SHA-256-beregningen til kjente verdier.
+
+    Signaturen lagres på `VaktArkiv.sha256` ved arkivering og verifiseres ved
+    hver visning. Endres beregningen — feltrekkefølge, nøkkelnavn,
+    JSON-flagg, sorteringen — vil hvert eksisterende arkiv i produksjon melde
+    «tukling» uten at noe faktisk er rørt.
+
+    Derfor er den pinnet til to literaler i stedet for å reberegnes. En test
+    som regner ut fasit på nytt fanger ikke denne feilen, siden begge sider
+    ville endret seg samtidig.
+
+    Verdiene er tatt fra koden 13. aug. 2026, før arkivmønsteret ble flyttet
+    til `core.arkiv`. Feiler denne testen etter en refaktorering, er det
+    refaktoreringen som er feil — ikke testen.
+    """
+
+    class _FakeArkiv:
+        """Fast input. Bruker ikke databasen, så pk er forutsigbar."""
+        pk = 1
+        arrangement_navn = 'Testfestivalen'
+        year_snapshot = 2026
+
+    RADER = [
+        {'pasientnummer': 2, 'problemstilling': 'Brystsmerter', 'grovsortering': 'Rød',
+         'forstehjelper_navn': 'Kari Nordmann', 'journal': 'Ja'},
+        {'pasientnummer': 1, 'problemstilling': 'Kramper', 'grovsortering': 'Gul',
+         'forstehjelper_navn': 'Ola Nordmann', 'journal': 'Nei'},
+    ]
+
+    RAD_SHA = '01ea3ee330246b15a63255b580f27bb2fef3ec99679f4cc64769bad206f9ce98'
+    AGGREGAT_SHA = '2449821751a9dd58ff3e96e18719e5ceadc48208da10d3252cffd214752f55e8'
+
+    def test_radsignaturen_er_uendret(self):
+        from patients.services import _compute_sha256_for_arkiv
+        self.assertEqual(
+            _compute_sha256_for_arkiv(self._FakeArkiv(), self.RADER),
+            self.RAD_SHA)
+
+    def test_radsignaturen_er_uavhengig_av_radrekkefoelge(self):
+        """Rader sorteres på pasientnummer før hashing.
+
+        Uten det ville en restore som gir radene i annen rekkefølge sett ut
+        som tukling.
+        """
+        from patients.services import _compute_sha256_for_arkiv
+        self.assertEqual(
+            _compute_sha256_for_arkiv(self._FakeArkiv(), list(reversed(self.RADER))),
+            self.RAD_SHA)
+
+    def test_aggregatsignaturen_er_uendret(self):
+        from patients.services import _compute_sha256_for_aggregat
+        self.assertEqual(
+            _compute_sha256_for_aggregat(self._FakeArkiv(), {'basis': {'total': 2}}),
+            self.AGGREGAT_SHA)

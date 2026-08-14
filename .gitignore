@@ -10,7 +10,11 @@ build/
 db.sqlite3
 staticfiles/
 backups/
-arkiv/
+# Anker på rot: uten skråstreken foran matchet mønsteret «arkiv/» på alle
+# nivåer, og gjorde Python-pakken core/arkiv/ usynlig for git. Denne linja
+# gjelder den tomme filmappa i rota, som ble stående igjen etter at den
+# fil-baserte arkivseksjonen ble fjernet (GDPR fase 2.4).
+/arkiv/
 *.lock
 .DS_Store
 

@@ -91,6 +91,21 @@ Brukere, MFA-hemmeligheter og audit-spor er bevisst utelatt fra begge.
 
 Logikken ligger i `core/backup/`. `patients/backup_service.py` er en tynn proxy som beholder bakoverkompatibelt API for `db_backup`-kommandoen, `views_patients.py` og eldre tester — nye moduler skal registrere en handler og kalle `core.backup.create_backup(slug=...)` direkte.
 
+### Arkivmønster (core/arkiv/)
+
+Frysing, integritetssjekk og kollaps er modul-agnostisk. Hver modul som arkiverer data registrerer en `BaseArkivHandler` (fra `apps.ready()`), på samme måte som backup-handlerne.
+
+**Arbeidsdelingen er bevisst:** `core.arkiv` eier kanonisering, hashing og orkestrering av kollaps. Handleren eier *hva* som går inn i SHA-payloaden. Grunnen er at payloadens form er del av signaturen som ligger lagret på hvert arkiv i prod — bestemte core formen, ville hvert eksisterende arkiv meldt tukling.
+
+| Funksjon | Ansvar |
+|---|---|
+| `beregn_sha256(handler, arkiv)` | Signatur over radnivået |
+| `verifiser(handler, arkiv)` | True hvis signaturen ikke stemmer. Velger aggregat-signatur etter kollaps |
+| `kollaps(handler, arkiv)` | **Irreversibel.** Frys aggregat, slett rader. Idempotent |
+| `har_backup_etter(handler, tid)` | Sperre før kollaps — slettingen må være gjenopprettbar |
+
+`patients/arkiv.py` er referanseeksempelet. `ArkivSignaturLaastTests` låser signaturene til literale hex-verdier — feiler den etter en refaktorering, er det refaktoreringen som er feil.
+
 ### Statistikk-caching (patients/stats_cache.py)
 
 Basic stats caches 15 sek, full stats 60 sek. Støtter ETag/304.

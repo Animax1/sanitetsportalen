@@ -4,6 +4,66 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-08-13 — Arkivmønsteret generalisert til `core/arkiv/`
+
+Forberedelse til park-, oppdrags- og rapportmodulen. Frysing, integritetssjekk og kollaps
+lå i `patients/services.py` og måtte ellers kopieres tre ganger.
+
+`core/arkiv/` følger samme idiom som `core/backup/`: `BaseArkivHandler` med registry,
+registrert fra `apps.ready()`. Core eier kanonisering (`sort_keys=True`,
+`ensure_ascii=False`), hashing, valg av signatur ut fra kollaps-tilstand, og
+orkestreringen av kollaps. Handleren eier *hva* som går inn i payloaden.
+
+**Den arbeidsdelingen er hele poenget.** SHA-256-signaturen ligger lagret på hvert
+`VaktArkiv` i produksjon, og payloadens form er del av den — nøkkelen `'pasienter'`,
+sorteringen på `pasientnummer`, feltutvalget. Hadde core bestemt formen, ville samtlige
+eksisterende arkiver meldt tukling ved neste visning. `patients/arkiv.py` bygger derfor
+payloaden ordrett som før.
+
+**Rekkefølgen var viktig:** signaturene ble først låst til to literale hex-verdier
+(`ArkivSignaturLaastTests`), *før* koden ble flyttet. En test som regner ut fasit på nytt
+ville ikke fanget dette, siden begge sider endret seg samtidig. Testene passerte etter
+flyttingen, altså er hashene bit-identiske.
+
+Nytt i det generiske laget, som pasientmodulen ikke hadde eksplisitt:
+
+- `verifiser()` returnerer `False` for arkiver uten lagret signatur. Det gjelder arkiver
+  fra før signaturen ble innført, og å melde tukling på dem ville vært misvisende.
+- `har_backup_etter()` returnerer `False` når handleren mangler `backup_slug` — ingen
+  sperre betyr at kollaps må tvinges bevisst, ikke at den er fri.
+- Aggregatet beregnes *før* transaksjonen åpnes, slik at en feilende beregning ikke
+  etterlater slettede rader. Egen test verifiserer rekkefølgen ved å sjekke at aggregatet
+  inneholder radantallet fra før slettingen.
+
+19 nye tester i `core/tests_arkiv.py`, med en dummy-handler slik at det generiske laget
+dekkes uavhengig av pasientmodulen.
+
+**Ingen migrasjon, ingen modellendring.** `makemigrations --check` rapporterer fortsatt
+indeks-omdøpingen i `audit` — det er det kjente avviket som tok prod ned 13. august, og
+det skal stå i fred. Det har ingen sammenheng med denne endringen.
+
+**Nesten-ulykke verdt å notere:** `.gitignore` hadde `arkiv/` uten anker. Mønsteret
+matcher på alle nivåer, så hele `core/arkiv/`-pakken var usynlig for git. Ble den pushet
+slik, ville `patients/apps.py` importert en modul som ikke fantes i repoet — `ready()`
+kaster ved oppstart, containeren crash-looper, 502. Samme feilmodus som
+migrasjonshendelsen samme dag, med en helt annen årsak.
+
+Linja er endret til `/arkiv/`, som fortsatt dekker den tomme filmappa i rota (rest etter
+GDPR fase 2.4). De øvrige uankrede mønstrene er gjennomgått: bare `__pycache__/`, som
+skal være uankret, og `vendor/` inne i den allerede ignorerte `staticfiles/`.
+
+Lærdommen er at `git status` må sjekkes for nye *pakker*, ikke bare nye filer. En fil som
+mangler gir en importfeil i test; en hel pakke som mangler gir grønne tester lokalt, fordi
+fila ligger på disk.
+
+**Utsatt med vilje:** `AbstractArkiv`-basemodell for felt (`sha256`, `kollapset_at`,
+`aggregat`, frosset `importert_av_navn`). Den bør skrives når modell nummer to faktisk
+finnes, ikke gjettes fram nå — og `VaktArkiv` skal ikke migreres til den.
+
+757 tester grønne.
+
+---
+
 ## 2026-08-13 — Ytelse: pasientlista tåler 1000 pasienter og 100 brukere
 
 Foranlediget av en skaleringsgjennomgang: portalen skal ta 10–20 brukere døgnkontinuerlig
