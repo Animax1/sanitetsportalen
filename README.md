@@ -18,7 +18,7 @@ Bygget med Django 5.1, Bootstrap 5, Chart.js og Tabulator. Drift på Railway
 - **AuditLog.app_label** — auto-fylles fra `table_name` via pre_save-signal,
   filtrerbart i Django-admin per modul.
 
-Se [`SANITETSPORTAL_FASE_3A.md`](../SANITETSPORTAL_FASE_3A.md) for full beskrivelse.
+Se [`docs/archived/SANITETSPORTAL_FASE_3A.md`](docs/archived/SANITETSPORTAL_FASE_3A.md) for full beskrivelse.
 
 ---
 

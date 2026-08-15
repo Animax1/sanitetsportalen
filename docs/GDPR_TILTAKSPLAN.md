@@ -1,12 +1,28 @@
 # GDPR – tiltaksplan
 
 **Opprettet:** 12. august 2026
-**Status:** under arbeid
+**Status:** fase 0–5 gjennomført. Tre punkter gjenstår, se under.
 **Eier:** André Eritsland (behandlingsansvarlig)
+
+> **Om kodehenvisningene:** dokumentet peker flere steder på `patients/views.py` med
+> linjenummer. Den fila ble delt i fem moduler og slettet 13. aug. 2026 (N13.3) —
+> henvisningene beskriver koden slik den var da tiltaket ble skrevet, og er beholdt av
+> den grunn. Dagens plassering finner du i `CLAUDE.md` → API-mønster.
 
 Arbeidsdokument for GDPR-gjennomgangen av Sanitetsportalen. Krysses av etter hvert.
 Når alle faser er ferdige, har dokumentet gjort jobben sin og kan slettes — de varige
 beslutningene lever i `PERSONVERN_DOKUMENTASJON.md`.
+
+### Hva som fortsatt står åpent
+
+Alt annet i dokumentet er levert. Disse tre følges i [`../TODO.md`](../TODO.md), som er
+arbeidslista — dette dokumentet er begrunnelsen bak dem.
+
+| Punkt | Hvor | Hvorfor det henger |
+|---|---|---|
+| Organisasjonsnavn i A.4 | Fase 0 / Fase 1 | Krever en avklaring utenfor kodebasen. Står som `[fyll inn organisasjonsnavn]` i protokollen |
+| Cron-jobb for `kollaps_arkiv` | Fase 3.1 | Krever Railway-innlogging. Uten den håndheves ikke 24-månedersgrensen i praksis. Framgangsmåte i [`OPPSETT_KOLLAPS_CRON.md`](./OPPSETT_KOLLAPS_CRON.md) |
+| Skriftlig DPIA-vurdering | Fase 5 | Ikke påbegynt. Det billige er en kort begrunnelse for at art. 35 ikke er utløst — ikke en full DPIA |
 
 ---
 
@@ -78,19 +94,19 @@ som står som `[fyll inn organisasjonsnavn]` i A.4.
 - [x] **A.4 grunnlag omskrives.** Helsepersonelloven §§ 39–40 og pasientjournalloven ut.
       Inn: art. 6(1)(d) vitale interesser + art. 9(2)(h), som uttrykkelig dekker
       *«administrasjon av helse- og omsorgstjenester»*. Art. 9(3)-betingelsen dokumenteres
-- [ ] **A.9 audit-logg:** 10 år → **2 år** (koden er riktig, dokumentet var feil)
-- [ ] **A.9 backup:** «72 timer» → **antallsbasert cap** (`max_backups`, default 50).
+- [x] **A.9 audit-logg:** 10 år → **2 år** (koden er riktig, dokumentet var feil)
+- [x] **A.9 backup:** «72 timer» → **antallsbasert cap** (`max_backups`, default 50).
       `RETENTION_HOURS = 72` er død kode, se [patients/backup_service.py:35-38](../patients/backup_service.py#L35-L38)
-- [ ] **A.9 arkiv:** «JSON-filer ved årsskifte» → databasebasert `VaktArkiv`, 24 mnd radnivå
-- [ ] **A.2 + A.9 Railway-backup** inn som egen behandling. Merk: inneholder **hele**
+- [x] **A.9 arkiv:** «JSON-filer ved årsskifte» → databasebasert `VaktArkiv`, 24 mnd radnivå
+- [x] **A.2 + A.9 Railway-backup** inn som egen behandling. Merk: inneholder **hele**
       databasen (brukere, audit, arkiv), i motsetning til modul-backupen som kun har `patients`.
       Aktiv kun ~1 mnd i året, under arrangement
-- [ ] **A.6:** nye rader for `VaktArkiv`, `ArkivertPasient` og `core.Notification`
-- [ ] **A.6:** korriger `journal`-beskrivelsen — Ja/Nei-flagg, ikke journalkategori
-- [ ] **A.12:** «fritekst-risiko eliminert» → beskriv den faktiske kontrollen etter fase 2
-- [ ] **A.12:** dokumenter fravalg av innsynslogg, med begrunnelse
-- [ ] **A.12:** dokumenter beslutning om full lesetilgang, med begrunnelse
-- [ ] **Del B:** ny del for appbrukere/frivillige — de er egen kategori registrerte i A.5,
+- [x] **A.6:** nye rader for `VaktArkiv`, `ArkivertPasient` og `core.Notification`
+- [x] **A.6:** korriger `journal`-beskrivelsen — Ja/Nei-flagg, ikke journalkategori
+- [x] **A.12:** «fritekst-risiko eliminert» → beskriv den faktiske kontrollen etter fase 2
+- [x] **A.12:** dokumenter fravalg av innsynslogg, med begrunnelse
+- [x] **A.12:** dokumenter beslutning om full lesetilgang, med begrunnelse
+- [x] **Del B:** ny del for appbrukere/frivillige — de er egen kategori registrerte i A.5,
       men får ingen informasjon i dag
 
 ---
@@ -108,18 +124,18 @@ Django-admin går utenom den, så en gammel backup kan bringe tilbake verdier so
 godtatt i dag.
 
 - [x] **2.1 Whitelist på kliniske felt.** Serverside-validering i `patient_create`
-      ([patients/views.py:261-276](../patients/views.py#L261-L276)) og `patient_detail_view`
-      ([patients/views.py:335-337](../patients/views.py#L335-L337)). I dag skrives verdiene
+      (`patients/views.py:261-276`) og `patient_detail_view`
+      (`patients/views.py:335-337`). I dag skrives verdiene
       rett inn fra request-body — kun tidsfelt valideres. Verdimengdene ligger kun i HTML-en
       og må ut i én kilde begge sider leser. Tar med `lege`, som er fritekst og etter alt å
       dømme inneholder et legenavn
-- [ ] **2.2 `SECRET_KEY` hard-fail** når `DEBUG=False` og nøkkel mangler
+- [x] **2.2 `SECRET_KEY` hard-fail** når `DEBUG=False` og nøkkel mangler
       ([myproject/settings.py:16](../myproject/settings.py#L16)). Sjekk først at
       `.env.offline.example` har nøkkel — offline-modus kjører også `DEBUG=False`
-- [ ] **2.3 Varsler slettes etter 30 dager.** Legges i `purge_old_logs` sammen med øvrige
+- [x] **2.3 Varsler slettes etter 30 dager.** Legges i `purge_old_logs` sammen med øvrige
       grenser, så cron-jobben plukker det opp uten endring
-- [ ] **2.4 Fjern «Arkiv (filer)».** `archives_view`
-      ([patients/views.py:785-806](../patients/views.py#L785-L806)) + URL + UI-seksjon.
+- [x] **2.4 Fjern «Arkiv (filer)».** `archives_view`
+      (`patients/views.py:785-806`) + URL + UI-seksjon.
       Død kode fra Flask-tiden; mappa `arkiv/` er alltid tom og ligger dessuten på
       containerens flyktige disk på Railway
 
@@ -195,7 +211,7 @@ en bruker som har arkivert en vakt **ikke kan slettes** — databasen nekter med
 første sletteforespørsel når alle får konto.
 
 Ren bytte til `SET_NULL` er ikke nok: to visninger leser `arkiv.importert_av.username`
-direkte ([patients/views.py:910](../patients/views.py#L910) og `arkiv_liste_view`) og får
+direkte (`patients/views.py:910` og `arkiv_liste_view`) og får
 `AttributeError` på `None`.
 
 Full fiks, samme mønster som `forstehjelper_navn`:
@@ -221,10 +237,10 @@ vaktens art. Beslutningen dokumenteres i A.12.
 - [x] **Doc-konsolidering.** `docs/`-kopiene var eldre (personvern v1.3 med gamle
       `Behandler`/`deleted_at`-navn). Rot-versjonene er kopiert over og duplikatene i rot
       slettet. Alle tre bor nå kun i `docs/`
-- [ ] **Slå sammen backup-flatene** til `/portal-admin/backup/`. Pasientmodulens egen
-      backup-side og portal-admin er to UI-er over **samme backend** — samme `Backup`-tabell,
-      samme filer, samme `core.backup.restore_backup`. Forvirrende at det ser ut som to
-      systemer. Ligger i `TODO.md`
+- [x] **Slå sammen backup-flatene** til `/portal-admin/backup/`. ✅ FERDIG 12.08.2026.
+      Pasientmodulens egen backup-side og portal-admin var to UI-er over **samme backend** —
+      samme `Backup`-tabell, samme filer, samme `core.backup.restore_backup`. Kun
+      `/portal-admin/backup/` gjenstår
 - [ ] **DPIA — nedgradert.** Uten journalplikt, med pseudonymiserte data og begrenset
       omfang er art. 35 trolig ikke utløst. Det billige er en kort skriftlig vurdering av at
       den ikke er nødvendig — ikke en full DPIA

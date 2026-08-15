@@ -1,6 +1,6 @@
 """Legger til 5 modul-permission-flagg på CustomUser (Fase 3a).
 
-Pre-registrerer alle flagg som planen i SANITETSPORTAL_PLAN.md §3 spesifiserer,
+Pre-registrerer alle flagg som planen i docs/archived/SANITETSPORTAL_PLAN.md §3 spesifiserer,
 i én migrasjon, slik at vi slipper fragmenterte migrasjoner når framtidige
 moduler aktiveres.
 

@@ -4,6 +4,64 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-08-15 — Dokumentasjonsopprydding: `docs/archived/`, og TODO som eneste arbeidsliste
+
+Kun dokumentasjon. Ingen kodeendring. Suiten kjørt for sikkerhets skyld: **742 tester, alle
+grønne.**
+
+Planleggingen hadde spredt seg over ti dokumenter i `docs/`, uten at det gikk an å se hvilke
+som fortsatt gjaldt. Ti av dem beskrev arbeid som var ferdig for flere måneder siden, og et
+par av de aktive hadde avkryssinger som ikke stemte med koden lenger. Ingenting er slettet.
+
+**Ny mappe `docs/archived/`** — ti dokumenter flyttet dit med `git mv`, historikken intakt:
+
+| Fil | Hvorfor |
+|---|---|
+| `SANITETSPORTAL_PLAN.md` | Høynivå-skisse v0.1 fra 6. mai. Alle fem faser er levert |
+| `SANITETSPORTAL_FASE_1..5.md` (6 filer) | Leveransenotater for faser som er i prod |
+| `DEPLOY_FASE_3A.md` | Engangsprosedyre for å pakke en zip oppå en frisk clone |
+| `ENDRINGSLOGG_2026-05-15.md` | Duplikat — innholdet står ordrett i CHANGELOG under `2026-05-15 (sesjon 1)` |
+| `FORBEDRINGER.md` | Erklærte seg selv som historisk arkiv allerede i toppteksten |
+
+De ni resterende dokumentene i `docs/` er beholdt uendret i innhold. `docs/README.md` skiller
+dem i **levende dokumenter** (teknisk, personvern, runbook, deploy — skal holdes oppdatert)
+og **aktive planer** (har et sluttpunkt, arkiveres eller slettes når jobben er gjort), med
+en tabell over hvor ny dokumentasjon hører hjemme. `docs/archived/README.md` forklarer hva
+hver arkiverte fil etterlot seg i koden, og advarer om de to tingene som går igjen der:
+`patients/views.py` finnes ikke lenger, og `Behandler` heter `Forstehjelper`.
+
+**`TODO.md` er nå eneste arbeidsliste.** Ny topptekst med kart over hvor ting hører hjemme.
+Fem punkter fra forbedringsbacklogen sto åpne uten å være løftet hit — **S3** (rate-limiting
+kun på innlogging), **F3** (server-side idempotency), **F4** (lasttest), **F6**
+(statistikk-utvidelse) og **F9** (kolonne-kryptering, nedprioritert) — de står nå i TODO med
+begrunnelse. Det samme gjelder DPIA-vurderingen fra GDPR fase 5.
+
+De løse punktene nederst er gruppert i «Framtidige moduler» og «Løse punkter». De tre
+ubesvarte spørsmålene fra §7 i den arkiverte skissen er tatt vare på under framtidige
+moduler — de må avklares før modul nummer to skrives. Med en merknad om at skissens
+modulliste (`vakter`/`utstyr`/`rapport`/`beredskap`) er utdatert, mens arkitekturvalgene
+står seg. «Fjerne varsler eldre enn 30 dager» var oppført som åpent, men ble gjort som GDPR
+fase 2.3 — krysset av.
+
+**Rettelser i aktive dokumenter:**
+
+- `GDPR_TILTAKSPLAN.md`: fase 1 og 2 var merket ✅ FERDIG i overskriften mens samtlige
+  underpunkter sto uavkrysset. Avkryssingene stemmer nå med koden. Ny statustabell øverst
+  viser de tre punktene som faktisk gjenstår. Fire døde lenker til `patients/views.py`
+  (delt i fem moduler ved N13.3) er avlenket — linjenumrene beholdt som historisk kontekst,
+  med en merknad om hvorfor
+- `FORBEDRINGER_2026-08.md`: vedlikeholdsnotisen ba om at ferdige punkter flyttes til
+  `FORBEDRINGER.md`, som nå er arkivert og ikke skal endres. Rutinen er skrevet om.
+  F6 viser til to statistikkdokumenter som aldri har ligget i dette repoet — de er fra den
+  gamle Pasientregistreringsappen, og det står nå i seksjonen
+- `README.md` pekte på `../SANITETSPORTAL_FASE_3A.md`, en sti som aldri traff noe fra
+  rotmappa. Rettet til den arkiverte plasseringen
+- `accounts/migrations/0007_module_permission_flags.py`: docstringen viser til
+  `SANITETSPORTAL_PLAN.md` — stien er oppdatert. Eneste endring utenfor dokumentasjon,
+  og den er en kommentar
+
+Alle relative markdown-lenker i repoet er verifisert til å peke på noe som finnes.
+
 ## 2026-08-14 — Beslutningsnotater: brukere/e-post og dataimport fra gammel prod
 
 Kun dokumentasjon. Ingen kodeendring.

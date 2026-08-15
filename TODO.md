@@ -1,5 +1,22 @@
 # TODO – Sanitetsportalen
 
+**Dette er arbeidslista.** Skal noe gjøres, står det her. Dokumentene i `docs/` er
+underlaget — de forklarer bakgrunn, vurderinger og framgangsmåte, men de er ikke lista over
+hva som står for tur. Er et punkt i et docs-dokument ikke representert her, blir det ikke
+gjort.
+
+| Hvor | Hva |
+|---|---|
+| `TODO.md` (denne) | Hva som skal gjøres |
+| [`CHANGELOG.md`](./CHANGELOG.md) | Hva som er gjort |
+| [`docs/README.md`](./docs/README.md) | Kart over all dokumentasjon, aktiv og arkivert |
+| [`CLAUDE.md`](./CLAUDE.md) | Kort arkitekturoversikt for utvikling |
+
+Ferdige punkter krysses av her og beskrives i CHANGELOG — i samme commit som endringen,
+jf. arbeidsflyten i `CLAUDE.md`.
+
+---
+
 ## ⚠️ Krever Andre — kan ikke gjøres fra kodebasen
 
 Disse tre står ikke i kode. De krever Railway-innlogging eller en avgjørelse
@@ -42,6 +59,13 @@ testsuiten, og ingen av dem gir feilmelding — de er bare stille inaktive.
 - [ ] Sett opp cron-jobb for `kollaps_arkiv` — se «Krever Andre» øverst
 - [x] Fase 3.2: arkiv som egen backup-modul
 - [x] Fase 4.1: `VaktArkiv.importert_av` → `SET_NULL` + frosset navn
+- [x] Fase 5: doc-konsolidering og sammenslåing av backup-flatene
+- [ ] Fase 5: **skriftlig DPIA-vurdering.** Uten journalplikt, med pseudonymiserte data og
+      begrenset omfang er art. 35 trolig ikke utløst. Det som trengs er en kort skriftlig
+      begrunnelse for *at* den ikke er nødvendig — ikke en full DPIA. Ikke påbegynt
+
+Når disse tre er lukket, har `GDPR_TILTAKSPLAN.md` gjort jobben sin og kan slettes.
+De varige beslutningene ligger allerede i `PERSONVERN_DOKUMENTASJON.md`.
 
 
 ### Forbedringsbacklog — se `docs/FORBEDRINGER_2026-08.md`
@@ -121,6 +145,34 @@ dokumentasjon.
       Sikkerhetsstiene (passordbytte, admin-reset, frys, sletting) beholder full
       gjennomgang. **NB: krever migrasjon** — `accounts/0008_customuser_current_session_key`
       (kun AddField; se hendelsesnotatet i CHANGELOG for hvorfor den er håndskrevet)
+
+#### Fortsatt åpne i FORBEDRINGER_2026-08
+
+Disse sto i backloggen uten å være løftet hit. Rekkefølgen er dokumentets egen rangering.
+
+- [ ] **S3** Rate-limiting finnes kun på innlogging. `@ratelimit` står to steder, begge på
+      `login_view`. Ubeskyttet: `POST /pasienter/api/patients/` (en løpsk klient eller
+      stjålet sesjon kan opprette i løkke), `POST /accounts/change-password/` (ingen
+      struping på gjetting av gammelt passord), cache-miss-stien til `/api/full-stats/`, og
+      `auditlog/eksport.csv` med 5000 rader per kall. Alt krever innlogging, derfor lavere
+      prioritet — men `django-ratelimit` og nødbryteren `RATELIMIT_ENABLE` finnes allerede,
+      så kostnaden er lav. ~2 t
+- [ ] **F3** Server-side idempotency ved pasient-opprettelse. `withSubmitGuard()` (Fix A) er
+      på plass, men beskytter ikke API-klienter, to faner med samme skjema eller automatisk
+      nettverks-retry. Fix B: `idempotency_key` fra `crypto.randomUUID()` i POST-body, slått
+      opp i cache før opprettelse. Utløst av en reell dobbeltregistrering 30. april 2026. ~2–3 t
+- [ ] **F4** Lasttest-script før stor vakt. 20 samtidige brukere mot staging, verifiser at
+      Redis + 2 workers × 4 tråder holder. **Ta N4 med i testplanen** — den delte
+      MFA-rate-limit-bøtta er nettopp den feiltypen en lasttest fanger, og som ellers først
+      merkes ved en reell vaktstart. ~3–4 t
+- [ ] **F6** Statistikk-utvidelse: live-dashbord for alle innloggede + utvidet
+      evalueringsstatistikk for admin/lead, som to uavhengige leveranser med ulik
+      personvernprofil. Største enkeltpunkt i backloggen. **Underlaget mangler** — de to
+      dokumentene seksjonen bygger på ligger i den gamle Pasientregistreringsappen, ikke
+      her. ~25–35 t
+- [ ] **F9** Kolonne-kryptering av følsomme felter. **Nedprioritert, ikke planlagt.** Verdien
+      falt da GDPR fase 3.1 kom — kollaps til aggregat etter 24 mnd er det som bærer
+      dataminimeringen nå, ikke kryptering. Tas kun ved skjerpet trusselbilde
 
 ## Ideer / backlog
 
@@ -207,16 +259,46 @@ Gjennomgang 13. aug. 2026, med 1000 pasienter og peak 100 brukere som premiss.
 - [ ] Vurder `cached_db`-sesjoner. `SESSION_SAVE_EVERY_REQUEST=True` med DB-sesjoner gir
       én UPDATE per request. Krever Redis, altså vakt-modus.
 
+### Framtidige moduler
+
+Portalrammeverket er bygget for flere moduler enn `patients` — modulregistry, per-modul
+backup, per-modul arkiv og permission-flagg står allerede klare. De fem opprinnelige
+faseleveransene som la det på plass er beskrevet i
+[`docs/archived/`](./docs/archived/README.md).
+
+De fem `kan_redigere_*`-flaggene på `CustomUser` ble pre-registrert i én migrasjon nettopp
+for å slippe én migrasjon per ny modul. Se også «Rollemodellen» over — den beslutningen bør
+tas før modul nummer to skrives, ikke etterpå.
 
 - [ ] Vaktliste
-- [ ] KO-tavle.
-- [ ] Fytte sesjons delen til en admin side.
-- [ ] Integrasjon med produksjons database.
-- [ ] Testene er massive, kan vi komprimere den? (kjøretiden er løst: 500 s → 15 s via
+- [ ] KO-tavle
+- [ ] Integrasjon med produksjonsdatabase
+- [ ] Lage Locus-klone, hente sted via enhetens GPS
+
+**Uavklart før noen av dem bygges** (spørsmålene sto ubesvart i den opprinnelige
+høynivå-skissen, `docs/archived/SANITETSPORTAL_PLAN.md` §7):
+
+- [ ] Skal en «vakt» være ett enkelt arrangement, eller også dekke faste
+      beredskapsperioder som ukentlig lagvakt? Avgjør feltene på modellen
+- [ ] Skal en beredskaps-/oppdragsmodul brukes underveis i felt (mobilt, dårlig nett) eller
+      i etterkant? Avgjør om offline-strategi og synk må bygges
+- [ ] Skal rapportmodulen kun være intern (admin/lead), eller også gi tilgang til
+      styre/oppdragsgivere? Avgjør rolle-flagg og eksportformat
+
+> **Merk:** skissen antok modulene `vakter`, `utstyr`, `rapport` og `beredskap`. Retningen
+> siden er blitt park og oppdrag (se «Skalering mot 2027» over). Arkitekturvalgene i
+> skissen står seg — modullista gjør det ikke.
+
+### Løse punkter
+
+- [ ] Rydd bort død backup-legacy: modellen `patients.BackupConfig` (singleton som
+      ingenting leser lenger) og management-kommandoen `db_backup` som gater på den.
+      Krever migrasjon, derfor egen oppgave.
+- [ ] Flytte sesjonsdelen til en admin-side
+- [ ] Testene er massive, kan vi komprimere dem? (kjøretiden er løst: 500 s → 15 s via
       PASSWORD_HASHERS under test. Gjenstår evt. å redusere *antall* tester)
 - [ ] Vurder `argon2-cffi` for sterkere passord-hashing i produksjon (i dag PBKDF2)
-- [ ] Fjerne varsler eldre enn 30 dager.s
-- [ ] Lage locus klone, hente sted via enhet gps.
+- [x] Fjerne varsler eldre enn 30 dager — gjort som GDPR fase 2.3, lagt i `purge_old_logs`
 - [x] Slå sammen de to backup-flatene — kun `/portal-admin/backup/` gjenstår
 - [x] Ryddet bort det ubrukte per-år-arrangementsnavnet — `set_event_name()`,
       `get_event_name()` og `get_event_name_or_legacy()` er slettet, sammen med
@@ -227,9 +309,6 @@ Gjennomgang 13. aug. 2026, med 1000 pasienter og peak 100 brukere som premiss.
       nødstien og skal aldri kunne stoppes av en verdi som var lovlig da den ble lagret.
       Motsatt av `import_offline_data`, som avbryter og krever `--force`; forskjellen er
       tilsiktet og begrunnet i docstringen.
-- [ ] Rydd bort død backup-legacy: modellen `patients.BackupConfig` (singleton som
-      ingenting leser lenger) og management-kommandoen `db_backup` som gater på den.
-      Krever migrasjon, derfor egen oppgave.
 - [x] Slett `static/js/script.js` (N9). Testene er pekt om, og dobbeltklikk-vernet kjøres
       nå faktisk i node i stedet for å bli grep-et etter. `patients/js_test_utils.py` er
       felles plumbing for JS-tester.

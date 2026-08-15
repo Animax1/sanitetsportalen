@@ -3,7 +3,7 @@
 > **Versjon:** August 2026 (etter full gjennomgang av kodebasen)
 > **Formål:** Aktiv utviklings-backlog. Inneholder (1) nye funn fra kodegjennomgangen og
 > (2) de fortsatt åpne punktene som er flyttet hit fra `FORBEDRINGER.md`.
-> **Forholdet til [`FORBEDRINGER.md`](./FORBEDRINGER.md):** Den fila er nå et **historisk
+> **Forholdet til [`FORBEDRINGER.md`](./archived/FORBEDRINGER.md):** Den fila er nå et **historisk
 > arkiv** over gjennomførte tiltak fra mai-runden. Alt som fortsatt står åpent er flyttet
 > hit. Nye forslag skal legges til her, ikke der.
 > **Bruk:** Plukk fra topp og ned. Høy verdi / lav innsats er listet først.
@@ -1611,6 +1611,10 @@ Manuell QA på alle hovedflyt.
 Dette er den største enkeltforbedringen i backloggen. Den er forankret i to tidligere
 dokumenter: `STATISTIKK_ANALYSE_FORSLAG.md` og `STATISTIKK_IMPLEMENTERINGSPLAN.md`.
 
+> **Merk:** de to dokumentene finnes ikke i dette repoet, og har aldri gjort det — de
+> stammer fra den gamle Pasientregistreringsappen. Skal F6 bygges, må underlaget enten
+> hentes derfra eller skrives på nytt. Seksjonen under står på egne ben i mellomtiden.
+
 Forbedringen deles i to leveranser med ulik personvernprofil, som kan deployes uavhengig:
 **(a) live-statistikk for alle innloggede** og **(b) utvidet evalueringsstatistikk for
 admin/lead**.
@@ -1822,7 +1826,11 @@ dataminimeringen nå — ikke kryptering.
 
 ---
 
-> **Vedlikehold av dette dokumentet:** Når et punkt er gjennomført, flytt det til
-> «Avsluttede»-tabellen nederst i [`FORBEDRINGER.md`](./FORBEDRINGER.md) med en kort
-> statusnotis, og stryk raden i matrisen her. Nye forslag legges til her med rangering.
-> Hold lista kort — kun det som faktisk vurderes.
+> **Vedlikehold av dette dokumentet:** Når et punkt er gjennomført, marker det ✅ i matrisen
+> og skriv statusnotisen inn i punktets egen seksjon — det er begrunnelsen som har verdi
+> senere, ikke statusen. Hva som faktisk ble gjort hører hjemme i
+> [`../CHANGELOG.md`](../CHANGELOG.md), og avkryssingen i [`../TODO.md`](../TODO.md).
+> Nye forslag legges til her med rangering. Hold lista kort — kun det som faktisk vurderes.
+>
+> Den gamle rutinen var å flytte ferdige punkter over i `FORBEDRINGER.md`. Den fila er nå
+> arkivert ([`archived/FORBEDRINGER.md`](./archived/FORBEDRINGER.md)) og skal ikke endres.
