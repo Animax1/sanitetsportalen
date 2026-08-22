@@ -81,6 +81,7 @@ class SecurityHeadersMiddleware:
     - Content-Security-Policy: begrenser hvilke ressurser som kan lastes
     - Referrer-Policy: begrenser hva som sendes til eksterne lenker
     - Permissions-Policy: slår av funksjoner vi ikke bruker
+    - X-Robots-Tag: holder portalen ute av søkeresultater og AI-crawlere
 
     Nonce settes på ``request.csp_nonce`` *før* viewet kjører, slik at
     templaten kan lese det via context-prosessoren i ``core.context_processors``.
@@ -102,6 +103,18 @@ class SecurityHeadersMiddleware:
         response.setdefault(
             'Permissions-Policy',
             'camera=(), microphone=(), geolocation=(), payment=()',
+        )
+        # Portalen er en intern fagapplikasjon og skal aldri dukke opp i et
+        # søkeresultat. Headeren settes på *alle* responser, ikke bare de to
+        # offentlige sidene, slik at et endepunkt som en gang blir gjort
+        # åpent ikke stilltiende blir indekserbart.
+        #
+        # Sterkere enn robots.txt alene: den ber crawleren la være å hente
+        # siden, mens denne ber om at siden ikke vises — noe som også dekker
+        # sider som havner i indeksen via en ekstern lenke. Se core/robots.py.
+        response.setdefault(
+            'X-Robots-Tag',
+            'noindex, nofollow, noarchive, nosnippet, noimageindex',
         )
         return response
 

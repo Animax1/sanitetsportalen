@@ -7,12 +7,14 @@ Struktur (fra Fase 2):
 - /accounts/         → innlogging og passordbytte
 - /portal-admin/     → all administrasjon (brukere, moduler, logger, backup, status)
 - /healthz/          → health-check (ingen auth, brukes av Railway)
+- /robots.txt        → crawler-sperre (ingen auth)
 - /django-admin/     → kun i DEBUG/offline, se under
 """
 from django.conf import settings
 from django.contrib import admin
 from django.urls import path, include
 
+from core.robots import robots_txt
 from patients.health import healthz
 from patients import admin_status as _admin_status
 
@@ -21,6 +23,11 @@ urlpatterns = [
     # og eksterne monitorer. Plassert på root for at Railway sin
     # "Health Check Path"-konfigurasjon skal kunne peke direkte hit.
     path('healthz/', healthz, name='healthz'),
+
+    # robots.txt — INGEN auth (må være lesbar for å ha effekt). Holder
+    # portalen ute av søkemotorer og AI-crawlere. Se core/robots.py for
+    # hvorfor denne og X-Robots-Tag-headeren begge trengs.
+    path('robots.txt', robots_txt, name='robots_txt'),
 
     # Kontoer og administrasjon. Modulen mountes på root fordi den betjener
     # både /accounts/ (innlogging) og /portal-admin/ (brukeradmin) — se

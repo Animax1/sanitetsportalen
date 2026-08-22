@@ -4,6 +4,47 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-08-15 — Crawler-sperre: robots.txt og X-Robots-Tag
+
+Portalen får eget domene (`portal.sanitet.net`), og skal ikke kunne finnes via
+søk eller havne i et treningsdatasett. **750 tester, alle grønne** (8 nye).
+
+**Utgangspunktet er bedre enn antatt.** En gjennomgang av hele URL-treet uten
+innlogging viser at kun to endepunkter svarer 200: `/accounts/login/` og
+`/healthz/`. Alt annet — dashboard, pasient-API, statistikk, admin — redirecter
+til innlogging. En crawler kan altså aldri nå pasientdata, uavhengig av
+tiltakene under. Det som faktisk sto på spill var at innloggingssiden kunne bli
+indeksert, ikke at data kunne høstes.
+
+**`core/robots.py`** serverer `/robots.txt` med `Disallow: /` for alle, pluss 22
+navngitte AI-crawlere (GPTBot, ClaudeBot, CCBot, Google-Extended, PerplexityBot,
+Bytespider m.fl.). Botene navngis eksplisitt fordi flere av dem kun leser regler
+adressert til sitt eget agent-navn, og dermed går rett forbi `User-agent: *`.
+Endepunktet er bevisst uten auth — en regel ingen får lese, virker ikke.
+
+**`X-Robots-Tag: noindex, nofollow, noarchive, nosnippet, noimageindex`** settes
+nå i `SecurityHeadersMiddleware` på *alle* responser, ikke bare de to offentlige
+sidene. Grunnen er at et endepunkt som en gang gjøres åpent ellers ville blitt
+indekserbart uten at noen la merke til det.
+
+De to mekanismene løser ulike problemer og trengs begge: robots.txt ber
+crawleren la være å *hente* siden, headeren ber om at den ikke *vises*. Det
+siste dekker også sider som havner i indeksen via en ekstern lenke. Rekkefølgen
+mellom dem har en felle som er dokumentert i `core/robots.py`: en URL blokkert i
+robots.txt kan ikke leses, så headeren ses aldri — skal noe allerede indeksert
+*ut*, må det midlertidig tillates i robots.txt. Ikke et problem for et nytt
+domene, men verdt å vite før noen feilsøker det senere.
+
+`core/tests_robots.py` vokter begge: at robots.txt er offentlig og `text/plain`,
+at hver `User-agent`-linje faktisk følges av `Disallow: /` (en User-agent uten
+Disallow under seg blokkerer ingenting), at alle navngitte boter er med, og at
+headeren står på både offentlige og innloggede sider.
+
+**Grensen for hva dette er verdt:** robots.txt er frivillig, og headeren
+respekteres kun av crawlere som velger å respektere den. Mot en scraper som
+ignorerer begge, er innloggingskravet den eneste reelle beskyttelsen — og det er
+også det som faktisk beskytter pasientdataene.
+
 ## 2026-08-15 — Dokumentasjonsopprydding: `docs/archived/`, og TODO som eneste arbeidsliste
 
 Kun dokumentasjon. Ingen kodeendring. Suiten kjørt for sikkerhets skyld: **742 tester, alle

@@ -289,6 +289,20 @@ høynivå-skissen, `docs/archived/SANITETSPORTAL_PLAN.md` §7):
 > siden er blitt park og oppdrag (se «Skalering mot 2027» over). Arkitekturvalgene i
 > skissen står seg — modullista gjør det ikke.
 
+### Eget domene — portal.sanitet.net
+
+- [x] Crawler-sperre på plass: `/robots.txt` + `X-Robots-Tag` på alle responser.
+      Kun `/accounts/login/` og `/healthz/` er offentlige; alt annet krever innlogging
+- [ ] **Koble domenet i Railway** og legg inn DNS-oppføringen. Krever Andre
+- [ ] Sett `ALLOWED_HOSTS=portal.sanitet.net,<dagens>.railway.app` og
+      `CSRF_TRUSTED_ORIGINS=https://portal.sanitet.net,https://<dagens>.railway.app`.
+      Uten den første svarer appen 400 på det nye domenet, uten den andre feiler
+      **hver POST**, innlogging inkludert. Merk formatet: `ALLOWED_HOSTS` uten
+      `https://`, `CSRF_TRUSTED_ORIGINS` med
+- [ ] Fjern det genererte `.up.railway.app`-domenet når portal-domenet er verifisert,
+      så appen kun svarer på én adresse
+- [ ] Rydd Railway-domenet ut av `ALLOWED_HOSTS`/`CSRF_TRUSTED_ORIGINS` etterpå
+
 ### Løse punkter
 
 - [ ] Rydd bort død backup-legacy: modellen `patients.BackupConfig` (singleton som
