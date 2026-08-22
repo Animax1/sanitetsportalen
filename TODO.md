@@ -37,8 +37,9 @@ testsuiten, og ingen av dem gir feilmelding — de er bare stille inaktive.
       i personvernprotokollen (del A, punkt A.9) håndheves ikke i praksis. Det er
       en slettepraksis vi har beskrevet overfor både de registrerte og
       tilsynsmyndighet.
-      - Framgangsmåte: `docs/OPPSETT_KOLLAPS_CRON.md`
-      - **Slett den fila når jobben er på plass**
+      - Framgangsmåte: `docs/OPPSETT_KOLLAPS_CRON.md`. **Dokumentet er ditt** — det
+        beskriver en oppgave bare du kan utføre, og du sletter det selv når jobben står.
+        Det skal ikke foldes inn i TODO eller ryddes bort av en opprydding
 
 - [ ] **Fyll inn organisasjonsnavn i A.4** i `docs/PERSONVERN_DOKUMENTASJON.md`.
       Står fortsatt som `[fyll inn organisasjonsnavn]`. Dokumentet er
@@ -302,6 +303,49 @@ høynivå-skissen, `docs/archived/SANITETSPORTAL_PLAN.md` §7):
 - [ ] Fjern det genererte `.up.railway.app`-domenet når portal-domenet er verifisert,
       så appen kun svarer på én adresse
 - [ ] Rydd Railway-domenet ut av `ALLOWED_HOSTS`/`CSRF_TRUSTED_ORIGINS` etterpå
+
+### Dokumentgjennomgang — når funksjonaliteten nærmer seg ferdig
+
+Fire dokumenter beholdes fordi de ikke er arbeidslister: de er referanse, formelle
+dokumenter eller prosedyrer man følger under press. Nettopp derfor koster det å la dem
+drive fra koden. Gjennomgangen tas **når funksjonaliteten vi bygger nå er på plass** —
+ikke før, for da ville den bare måttet gjøres om igjen.
+
+Funnene under er allerede kartlagt, så jobben er avgrenset når den skal gjøres.
+
+- [ ] **`docs/TEKNISK_DOKUMENTASJON.md`** (1776 linjer) — merket «April 2026», og har ikke
+      fulgt med på fire måneders refaktorering. Målgruppen er en teknisk etterfølger som
+      overtar drift, så feil her koster mest når den koster.
+      - Heter fortsatt «Pasientregistreringssystemet», ikke Sanitetsportalen
+      - `patients/views.py` er delt i fem moduler (N13.3) — alle henvisninger dit er døde
+      - `core/backup/` med handler-registry og `core/arkiv/` er ikke beskrevet
+      - Modulregistryet (`core/modules.py`, `ModuleSettings`) mangler
+      - **Alternativet er å merke den ærlig** som «beskriver systemet per april 2026» og
+        la CLAUDE.md være den levende oversikten. Å la den stå som oppdatert uten å være
+        det er det dårligste valget
+
+- [ ] **`docs/RUNBOOK_VAKT.md`** (469 linjer) — leses under vakt, på papir eller egen
+      skjerm. En feil URL her oppdages i verste øyeblikk.
+      - Seks forekomster av `https://<din-app>.railway.app/...` (linje 10, 61, 400, 403,
+        404) må bli `portal.sanitet.net` når domenet står
+      - Sjekk at tersklene i §3 stemmer med ytelsesarbeidet fra 13. aug. (1000 pasienter,
+        100 brukere)
+
+- [ ] **`docs/DEPLOY_GUIDE.md`** (205 linjer) — prosedyre for nytt miljø.
+      - `ALLOWED_HOSTS`/`CSRF_TRUSTED_ORIGINS`-eksemplene (linje 43–44, 81) viser
+        `.up.railway.app`. Oppdater til portal-domenet
+      - Legg inn `EMAIL_*`-variablene for AHASend i variabeltabellen — de mangler helt
+
+- [ ] **`docs/PERSONVERN_DOKUMENTASJON.md`** (809 linjer) — formelt art. 30-dokument som
+      kan fremlegges for Datatilsynet. **Skal ikke slankes eller foldes inn i TODO.**
+      Gjennomgangen her er en annen øvelse enn for de tre andre: verifiser at hver
+      påstådte kontroll faktisk er reell i koden.
+      - Organisasjonsnavn i A.4 — se «Krever Andre» øverst
+      - A.9 lagringstider forutsetter at `purge_old_logs` og `kollaps_arkiv` faktisk
+        kjører som cron. Står de ikke, beskriver dokumentet en slettepraksis som ikke
+        finner sted — se S7 i CHANGELOG for hvorfor det er det alvorligste avviket
+      - Nye behandlinger siden v1.5? E-post via AHASend er en databehandler som skal inn
+      - Bump versjonsnummer og dato når noe endres
 
 ### Løse punkter
 

@@ -4,7 +4,7 @@ Portal for sanitetsvakt og beredskap. Pasientregistrering er den første
 brukervendte modulen; system er bygget for å utvides med vakt-, utstyrs-,
 rapport- og beredskapsmoduler i framtidige faser.
 
-Bygget med Django 5.1, Bootstrap 5, Chart.js og Tabulator. Drift på Railway
+Bygget med Django 5.2, Bootstrap 5, Chart.js og Tabulator. Drift på Railway
 (prod) eller PowerShell-lokalt.
 
 ## Arkitektur på høyt nivå (Fase 3a)

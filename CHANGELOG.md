@@ -4,7 +4,44 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
-## 2026-08-15 — Crawler-sperre: robots.txt og X-Robots-Tag
+## 2026-08-22 — Dokumentstrukturen strammet: TODO som arbeidsliste, docs som referanse
+
+Kun dokumentasjon. **750 tester, alle grønne** — ingen kodeendring.
+
+**Skillelinjen er skjerpet.** Den forrige oppryddingen delte `docs/` i «levende» og
+«aktive planer». Det holdt ikke som kriterium — det sa noe om alder, ikke om funksjon. Den
+nye regelen er: *en prosedyre du utfører beholdes som fil, en arbeidsliste foldes inn i
+`TODO.md`.* Runbooken leses under vakt, deploy-guiden følges steg for steg, dataimporten
+kjøres én gang med tre forbehold om datakvalitet — ingen av dem tåler å ligge spredt i en
+liste man scroller i. Backlog-dokumenter gjør det motsatte: de duplisere TODO og drifter.
+
+**To arkiverte filer slettet i stedet.** `DEPLOY_FASE_3A.md` beskrev hvordan man pakket en
+zip oppå en frisk clone — indeksen sa selv at den etterlot seg «ingenting» i koden.
+`ENDRINGSLOGG_2026-05-15.md` var et endringsnotat fra før CHANGELOG fantes, og innholdet
+står her under `2026-05-15 (sesjon 1)`. Begge fikk en indekslinje som forklarte at de var
+tomme; nå er de borte i stedet. Poenget med å arkivere er å bevare *begrunnelser* — et
+dokument uten begrunnelse å bevare skal slettes. Historikken ligger i git.
+
+**Dokumentgjennomgang lagt inn i TODO**, med funnene ferdig kartlagt så jobben er avgrenset
+når den skal gjøres. Den tas når funksjonaliteten vi bygger nå er på plass, ikke før:
+
+- `TEKNISK_DOKUMENTASJON.md` er merket «April 2026» og har ikke fulgt med på fire måneders
+  refaktorering — `views.py` delt i fem, `core/backup/`, `core/arkiv/` og modulregistryet
+  mangler. Alternativet til å oppdatere den er å merke den ærlig som et øyeblikksbilde
+- `RUNBOOK_VAKT.md` og `DEPLOY_GUIDE.md` har `<din-app>.railway.app` seks steder til sammen
+- `PERSONVERN_DOKUMENTASJON.md` er en annen øvelse: den er art. 30-protokollen og skal
+  verifiseres mot koden, ikke slankes. AHASend er en ny databehandler som skal inn
+
+**`OPPSETT_KOLLAPS_CRON.md` er Andres.** Den beskriver en oppgave bare han kan utføre, og
+han sletter den selv når jobben står i Railway. Merket i både TODO og `docs/README.md` slik
+at en senere opprydding ikke rydder den bort.
+
+**Rettelser:** den arkiverte `FORBEDRINGER.md` ba fortsatt om å bli oppdatert når et punkt
+ble ferdig — stikk i strid med at arkivet ikke skal endres. `README.md` oppga Django 5.1
+der `requirements.txt` krever `>=5.2.1`. Crawler-seksjonen under var datert 15. august og
+skrevet den 22.
+
+## 2026-08-22 — Crawler-sperre: robots.txt og X-Robots-Tag
 
 Portalen får eget domene (`portal.sanitet.net`), og skal ikke kunne finnes via
 søk eller havne i et treningsdatasett. **750 tester, alle grønne** (8 nye).

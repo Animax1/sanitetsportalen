@@ -8,7 +8,8 @@
 >
 > Alle punkter som fortsatt sto åpne er flyttet dit, sammen med nye funn fra
 > kodegjennomgangen i august. **Nye forslag skal legges til der, ikke her.** Denne fila
-> oppdateres kun når et punkt fra den aktive backloggen er gjennomført og skal arkiveres.
+> er arkiv og skal ikke oppdateres — heller ikke når et punkt fra den aktive backloggen
+> blir ferdig. Da hører beskrivelsen hjemme i [`../../CHANGELOG.md`](../../CHANGELOG.md).
 
 ---
 

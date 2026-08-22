@@ -32,7 +32,7 @@ gjort — TODO peker på dem så lenge de er i bruk.
 | [`GDPR_TILTAKSPLAN.md`](./GDPR_TILTAKSPLAN.md) | Under arbeid | Organisasjonsnavn i A.4, cron for `kollaps_arkiv`, DPIA-vurdering. Slettes når alt er lukket — de varige beslutningene lever i personverndokumentasjonen |
 | [`BESLUTNING_BRUKERE_OG_EPOST.md`](./BESLUTNING_BRUKERE_OG_EPOST.md) | Besluttet, ikke bygget | Invitasjonsflyt og passord-reset. Blokkert av at SMTP ikke er verifisert |
 | [`DATAIMPORT_FRA_GAMMEL_PROD.md`](./DATAIMPORT_FRA_GAMMEL_PROD.md) | Klar til utførelse | Framgangsmåte for å hente årets pasientdata fra den gamle Pasientregistreringsappen. Ingen ny kode trengs |
-| [`OPPSETT_KOLLAPS_CRON.md`](./OPPSETT_KOLLAPS_CRON.md) | Midlertidig | **Slett fila** når cron-jobben for `kollaps_arkiv` står i Railway |
+| [`OPPSETT_KOLLAPS_CRON.md`](./OPPSETT_KOLLAPS_CRON.md) | Andres | Framgangsmåte for en oppgave bare Andre kan utføre. **Han sletter den selv** når cron-jobben står — ikke rydd den bort |
 
 ## Arkiv
 

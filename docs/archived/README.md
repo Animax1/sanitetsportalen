@@ -27,14 +27,26 @@ hvorfor.
 | [`SANITETSPORTAL_FASE_3B.md`](./SANITETSPORTAL_FASE_3B.md) | 3b — admin-UI | `/portal-admin/moduler/`, `/portal-admin/auditlog/`, `/min-profil/` |
 | [`SANITETSPORTAL_FASE_4.md`](./SANITETSPORTAL_FASE_4.md) | 4 — backup per modul | `core/backup/` med handler-registry, `ModuleBackupConfig`, `/portal-admin/backup/` |
 | [`SANITETSPORTAL_FASE_5.md`](./SANITETSPORTAL_FASE_5.md) | 5 — brukerkobling og varsler | `Forstehjelper.user`/`Helsepersonell.user`, `core.Notification`, «Mine pasienter» |
-| [`DEPLOY_FASE_3A.md`](./DEPLOY_FASE_3A.md) | 3a — engangsprosedyre | Ingenting. Beskrev hvordan man pakket en zip oppå en frisk clone. Erstattet av vanlig git-arbeidsflyt |
 
 ## Avsluttede gjennomganger
 
 | Dokument | Hva det er |
 |---|---|
 | [`FORBEDRINGER.md`](./FORBEDRINGER.md) | Forbedringsrunden fra mai 2026. Punktene som fortsatt sto åpne er flyttet til [`../FORBEDRINGER_2026-08.md`](../FORBEDRINGER_2026-08.md) del 3 — den fila er den aktive backloggen |
-| [`ENDRINGSLOGG_2026-05-15.md`](./ENDRINGSLOGG_2026-05-15.md) | Endringsnotat for én dag, fra før `CHANGELOG.md` ble tatt i bruk. Innholdet står ordrett i CHANGELOG under `2026-05-15 (sesjon 1)` |
+
+---
+
+## To dokumenter ble slettet, ikke arkivert
+
+`DEPLOY_FASE_3A.md` og `ENDRINGSLOGG_2026-05-15.md` lå her et øyeblikk, men er fjernet
+22. aug. 2026. Den første beskrev hvordan man pakket en zip oppå en frisk clone — en
+prosedyre som ikke etterlot seg noe i koden, og som er erstattet av vanlig git-arbeidsflyt.
+Den andre var et endringsnotat for én dag fra før `CHANGELOG.md` fantes; innholdet står
+i CHANGELOG under `2026-05-15 (sesjon 1)`, forkortet, men uten at noe av betydning mangler.
+
+Begge er i git-historikken om noen skulle savne dem. Poenget med å arkivere er å ta vare
+på *begrunnelser* — et dokument uten begrunnelse å ta vare på skal slettes, ikke få en
+indekslinje som forklarer at det er tomt.
 
 ---
 
