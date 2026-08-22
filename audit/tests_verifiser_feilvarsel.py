@@ -198,3 +198,40 @@ class TransportvalgTests(TestCase):
         # Skal lede mot de faktiske årsakene, ikke bare si «feil».
         self.assertIn('scope', melding)
         self.assertIn('AHASEND_ACCOUNT_ID', melding)
+
+
+class KontekstTests(TestCase):
+    """Kommandoen må si hvor den kjører — svaret gjelder bare der.
+
+    22. aug. 2026 så e-postoppsettet grønt ut både lokalt og via `railway run`,
+    mens containeren ikke fikk pakkene ut i det hele tatt. Tre ganger samme dag
+    traff en test eller en variabel feil miljø. Utskriften skal gjøre det
+    umulig å lese et lokalt svar som om det gjaldt produksjon.
+    """
+
+    @override_settings(ADMINS=[('Drift', 'drift@example.invalid')],
+                       EMAIL_BACKEND=LOCMEM)
+    def test_lokal_kjoring_advarer(self):
+        import os
+        from unittest.mock import patch
+        ut = StringIO()
+        with patch.dict(os.environ, {}, clear=False):
+            os.environ.pop('RAILWAY_ENVIRONMENT_NAME', None)
+            call_command('verifiser_feilvarsel', stdout=ut)
+        tekst = ut.getvalue()
+        self.assertIn('lokalt', tekst.lower())
+        self.assertIn('IKKE produksjon', tekst)
+
+    @override_settings(ADMINS=[('Drift', 'drift@example.invalid')],
+                       EMAIL_BACKEND=LOCMEM)
+    def test_container_viser_miljonavn(self):
+        import os
+        from unittest.mock import patch
+        ut = StringIO()
+        with patch.dict(os.environ, {'RAILWAY_ENVIRONMENT_NAME': 'staging',
+                                     'RAILWAY_SERVICE_NAME': 'web'}):
+            call_command('verifiser_feilvarsel', stdout=ut)
+        tekst = ut.getvalue()
+        self.assertIn('staging', tekst)
+        # Navnene er invertert — utskriften må si det, ellers feilleses den.
+        self.assertIn('production', tekst)

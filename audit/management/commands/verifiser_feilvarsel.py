@@ -61,7 +61,9 @@ class Command(BaseCommand):
         torrkjor = valg['dry_run']
 
         # ── 1. Oppsettet ────────────────────────────────────────────────────
-        self.stdout.write(self.style.MIGRATE_HEADING('1. Oppsett'))
+        self._hvor_kjorer_vi()
+
+        self.stdout.write(self.style.MIGRATE_HEADING('\n1. Oppsett'))
 
         backend = settings.EMAIL_BACKEND
         er_smtp = backend.endswith('smtp.EmailBackend')
@@ -162,6 +164,42 @@ class Command(BaseCommand):
             forbindelse.close()
 
         self._varslingskjede(mottakere, sendte_testmelding=False)
+
+    # ── Kontekst ─────────────────────────────────────────────────────────────
+
+    def _hvor_kjorer_vi(self):
+        """Sier hvor kommandoen kjører, fordi svaret bare gjelder der.
+
+        Kjørt lokalt leser den `.env`; kjørt via `railway run` leser den
+        Railways variabler, men fra utviklingsmaskinens nettverk; kjørt i
+        containeren gjelder svaret faktisk produksjon. Forskjellen er ikke
+        akademisk: 22. aug. 2026 så e-postoppsettet grønt ut i to av de tre
+        tilfellene, mens containeren ikke fikk pakkene ut i det hele tatt.
+        """
+        import os
+        import platform
+
+        miljo = os.environ.get('RAILWAY_ENVIRONMENT_NAME')
+        if miljo:
+            tjeneste = os.environ.get('RAILWAY_SERVICE_NAME', '?')
+            self.stdout.write(self.style.MIGRATE_HEADING(
+                f'Kjorer i Railway: miljo "{miljo}", tjeneste "{tjeneste}", '
+                f'vert {platform.node()}'
+            ))
+            self.stdout.write(
+                '   Svaret under gjelder dette miljoet. Merk at miljonavnene er '
+                'arvet:\n   portalen kjorer i "staging", mens "production" er den '
+                'gamle appen.'
+            )
+        else:
+            self.stdout.write(self.style.WARNING(
+                f'Kjorer lokalt paa {platform.node()} og leser .env.'
+            ))
+            self.stdout.write(self.style.WARNING(
+                '   Svaret gjelder IKKE produksjon. Nettverket er et annet, og\n'
+                '   utgaaende SMTP er sperret i containeren men ikke her.\n'
+                '   For a teste produksjon: railway ssh, og kjor kommandoen der.'
+            ))
 
     # ── Steg 2, HTTP-varianten ───────────────────────────────────────────────
 

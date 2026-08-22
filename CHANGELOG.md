@@ -4,6 +4,33 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-08-22 — `verifiser_feilvarsel` sier hvor den kjører
+
+**796 tester, alle grønne** (2 nye).
+
+Tre ganger på én dag traff en variabel eller en test feil miljø: API-nøklene ble satt i
+`production` (den gamle appen) i stedet for `staging` (portalen), to ganger, og
+verifiseringen ble til slutt kjørt lokalt i PowerShell i stedet for i containeren — fordi
+SSH-økta var avsluttet uten at det var synlig i utskriften.
+
+Ingen av gangene var det uoppmerksomhet. Miljønavnene er arvet og inverterte, og
+kommandoens utskrift så helt lik ut uansett hvor den kjørte. Et lokalt «grønt» og et
+container-«grønt» betyr helt forskjellige ting: lokalt er utgående SMTP åpent, i containeren
+er det sperret.
+
+Kommandoen begynner nå med å si hvor den er:
+
+```
+Kjorer i Railway: miljo "staging", tjeneste "web", vert 57329c3660a9
+   Svaret under gjelder dette miljoet. Merk at miljonavnene er arvet:
+   portalen kjorer i "staging", mens "production" er den gamle appen.
+```
+
+Kjørt lokalt sier den i stedet, med advarselsfarge, at svaret **ikke** gjelder produksjon,
+og hvordan man kjører den riktig. Testene krever begge deler — inkludert at
+container-varianten nevner inverteringen, siden en utskrift som bare sier «staging» like
+gjerne kan feilleses som «ikke produksjon».
+
 ## 2026-08-22 — Railway sperrer SMTP: e-post går nå over HTTPS
 
 **794 tester, alle grønne** (21 nye).
