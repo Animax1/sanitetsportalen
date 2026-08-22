@@ -4,6 +4,80 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-08-22 — Railway sperrer SMTP: e-post går nå over HTTPS
+
+**794 tester, alle grønne** (21 nye).
+
+Feilvarslingen så ferdig ut, men virket ikke i produksjon. Den ble testet med
+`railway run`, som henter Railways miljøvariabler og kjører koden **på utviklingsmaskinen**.
+Først da kommandoen ble kjørt inne i containeren, via `railway ssh`, kom sannheten fram:
+den hang i `sock.connect()`.
+
+**Målt fra containeren:**
+
+| Port | |
+|---|---|
+| 587, 2525, 465, 25 | **alle stengt** |
+| 443 mot `send.ahasend.com` | åpen |
+| 443 mot `1.1.1.1` (kontroll) | åpen |
+
+Utgående trafikk virker. Railway sperrer SMTP spesifikt — en vanlig plattformpolicy mot
+spam-misbruk. **Å bytte SMTP-leverandør ville truffet samme vegg.**
+
+**`core/mail_backends.py`** sender derfor over AHASends HTTP-API i stedet:
+`POST https://api.ahasend.com/v2/accounts/{konto}/messages`. Backenden bytter kun
+*transporten* — `mail_admins()`, `AdminEmailHandler`, `send_mail()` og den slanke
+feilrapporten fungerer uendret.
+
+Valg som er tatt bevisst:
+
+- **`urllib` fra standardbiblioteket, ikke `requests`.** Én HTTP-POST rettferdiggjør ikke en
+  ny avhengighet, og dette er stien som skal virke når alt annet feiler
+- **`fail_silently` respekteres strengt** — `AdminEmailHandler` kaller alltid slik. Men
+  feilen logges alltid: en stille feil uten loggspor er umulig å feilsøke
+- **`Idempotency-Key` per melding**, siden dempingsfilteret er per prosess og to
+  Gunicorn-arbeidere kan sende samme varsel
+- **Ikke støttet:** vedlegg, egendefinerte headere, `cc`/`bcc` som egne felter. Portalen
+  sender kun til `ADMINS`. Et bevisst utvidelsespunkt, ikke en glemt detalj
+
+Backend velges etter hva som er konfigurert: HTTP-API-et først fordi det er det eneste som
+kommer ut av containeren, så SMTP (som virker lokalt og i offline-modus), så konsoll.
+
+### `EMAIL_TIMEOUT` — den viktigste enkeltendringen
+
+Hendelsen avslørte noe verre enn manglende tilkobling. `EMAIL_TIMEOUT` var ikke satt, og
+Djangos standard er `None`. Da arver `smtplib` Pythons globale socket-timeout, som også er
+`None`. Tracebacken fra containeren viste det presist:
+
+```
+smtplib.py:320   socket.create_connection((host, port), timeout, ...)
+socket.py:853    sock.connect(sa)      <- sto her til Ctrl+C
+```
+
+`AdminEmailHandler` sender **synkront, i requestens egen tråd**. Gunicorn kjører med fire
+tråder per worker. Fire uhåndterte feil mens SMTP henger, og hele worker-poolen er låst —
+appen slutter å svare for alle, også de som ikke opplevde noen feil. En feil som skulle gitt
+én e-post ville i stedet tatt ned portalen, og det ville skjedd under vakt.
+
+`EMAIL_TIMEOUT = 10` er nå satt, og en test krever at den er ≤ 30. Dempingsfilteret
+begrenser skaden ytterligere, men det er tidsgrensen som gjør varslingen ufarlig for driften.
+
+### `verifiser_feilvarsel` ga nesten falsk grønt
+
+Steg 2 åpnet en SMTP-forbindelse. For HTTP-backenden er `open()` en arvet no-op fra
+`BaseEmailBackend` — kommandoen ville meldt «Åpnet og autentisert» uten å ha kontaktet noe.
+Falsk grønt på nøyaktig det spørsmålet kommandoen finnes for å svare på.
+
+Steg 2 prøver nå den transporten som faktisk er i bruk: SMTP-forbindelse for SMTP, en ekte
+sendt melding for HTTP-API-et — det eneste som prøver DNS, TLS, autentisering og om
+avsenderdomenet er godkjent. Backender uten transport (konsoll, locmem) hopper over steget
+og sier fra at de gjør det, i stedet for å rapportere suksess.
+
+Kommandoen har også fått `--timeout` (standard 15 s) og en feilmelding som skiller
+**droppet** fra **avvist** — det er den forskjellen som leder deg mot brannmur i stedet for
+at du bruker en time på å sjekke passordet. En test krever at `EMAIL_HOST_PASSWORD` ikke
+nevnes i tidsavbrudds-meldingen.
+
 ## 2026-08-22 — Feilvarselet slanket: 14 810 → 673 tegn
 
 **769 tester, alle grønne** (14 nye).

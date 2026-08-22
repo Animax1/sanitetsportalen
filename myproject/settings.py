@@ -326,15 +326,38 @@ EMAIL_PORT = int(os.environ.get('EMAIL_PORT', '587'))
 EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER', '')
 EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD', '')
 EMAIL_USE_TLS = os.environ.get('EMAIL_USE_TLS', 'True') == 'True'
+
+# Uten denne arver smtplib Pythons globale socket-timeout, som er None —
+# altså uendelig. AdminEmailHandler sender *synkront, i requestens egen tråd*.
+# En SMTP-vert som svelger pakkene i stedet for å avvise dem, ville dermed låst
+# tråden for godt: en feil som skulle gitt én e-post, tar i stedet ned appen for
+# alle. Gunicorn kjører med 4 tråder per worker, så det skal ikke mange til.
+#
+# Oppdaget 22. aug. 2026: Railway-containeren når ikke send.ahasend.com:587
+# utgående, og `verifiser_feilvarsel` hang i connect() til den ble avbrutt.
+# Dempingsfilteret begrenser skaden — maks én e-post per feiltype per 15 min —
+# men det er timeouten som gjør varslingen ufarlig for driften.
+EMAIL_TIMEOUT = int(os.environ.get('EMAIL_TIMEOUT', '10'))
 DEFAULT_FROM_EMAIL = os.environ.get(
     'DEFAULT_FROM_EMAIL', 'sanitetsportalen@example.invalid',
 )
 SERVER_EMAIL = DEFAULT_FROM_EMAIL
 
-if EMAIL_HOST:
+# AHASends HTTP-API, brukt i stedet for SMTP fordi Railway sperrer utgående
+# SMTP. Målt fra containeren 22. aug. 2026: portene 587, 2525, 465 og 25 er alle
+# stengt, mens 443 mot samme vert er åpen. Se core/mail_backends.py.
+AHASEND_API_KEY = os.environ.get('AHASEND_API_KEY', '')
+AHASEND_ACCOUNT_ID = os.environ.get('AHASEND_ACCOUNT_ID', '')
+
+# Rekkefølgen er en prioritering, ikke en tilfeldighet: HTTP-API-et først fordi
+# det er det eneste som faktisk kommer ut av containeren. SMTP beholdes fordi
+# det virker i offline-modus og lokalt, der ingen brannmur står i veien.
+if AHASEND_API_KEY and AHASEND_ACCOUNT_ID:
+    EMAIL_BACKEND = 'core.mail_backends.AhaSendApiBackend'
+elif EMAIL_HOST:
     EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
 else:
-    # Ingen SMTP konfigurert: skriv e-posten til stdout i stedet for å feile.
+    # Ingen transport konfigurert: skriv e-posten til stdout i stedet for å feile.
     EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
 
 # ── Logging (N3) ─────────────────────────────────────────────────────────────

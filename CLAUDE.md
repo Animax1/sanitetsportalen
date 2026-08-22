@@ -146,7 +146,9 @@ Settes i `.env` lokalt. Nøkler å kjenne til:
 | `BACKUP_DIR` | Sti til backup-mappe (Railway: `/data/backups`) |
 | `LOG_LEVEL` | Loggnivå for rot-loggeren (default `INFO`) |
 | `ADMINS` | Mottakere av feilvarsel, format `Navn:epost`, komma-separert |
-| `EMAIL_HOST` m.fl. | SMTP for feilvarsel. Uten den skrives mail til konsoll |
+| `AHASEND_API_KEY` + `AHASEND_ACCOUNT_ID` | AHASends HTTP-API. **Dette er transporten i prod** — Railway sperrer utgående SMTP |
+| `EMAIL_HOST` m.fl. | SMTP for feilvarsel. Brukes kun lokalt og i offline-modus |
+| `EMAIL_TIMEOUT` | Tidsgrense for utsending, default 10 s. Må aldri være `None` |
 
 ## Deployment
 

@@ -29,6 +29,8 @@ Derfor kjøres begge: steg 2 utelukker at steg 3 feiler stille.
 Kommandoen skriver ingenting til databasen.
 """
 import logging
+import socket
+import time
 
 from django.conf import settings
 from django.core.mail import get_connection
@@ -50,6 +52,10 @@ class Command(BaseCommand):
             '--dry-run', action='store_true',
             help='Kontroller oppsettet uten å sende e-post',
         )
+        parser.add_argument(
+            '--timeout', type=int, default=15, metavar='SEK',
+            help='Tidsgrense for SMTP-tilkoblingen i sekunder (standard 15)',
+        )
 
     def handle(self, *args, **valg):
         torrkjor = valg['dry_run']
@@ -59,11 +65,13 @@ class Command(BaseCommand):
 
         backend = settings.EMAIL_BACKEND
         er_smtp = backend.endswith('smtp.EmailBackend')
+        er_sendende = er_smtp or 'AhaSend' in backend
         self.stdout.write(f'   EMAIL_BACKEND      {backend}')
-        if not er_smtp:
+        if not er_sendende:
             self.stdout.write(self.style.WARNING(
-                '   ↳ Ikke SMTP. Uten EMAIL_HOST faller Django tilbake til konsoll,\n'
-                '     og varselet skrives til loggen i stedet for å sendes.'
+                '   -> Denne backenden sender ingenting ut av systemet. Uten\n'
+                '      AHASEND_API_KEY/AHASEND_ACCOUNT_ID eller EMAIL_HOST faller\n'
+                '      Django tilbake til konsoll, og varselet havner i loggen.'
             ))
 
         mottakere = [e for _, e in settings.ADMINS]
@@ -90,10 +98,56 @@ class Command(BaseCommand):
             return
 
         # ── 2. SMTP-forbindelsen ────────────────────────────────────────────
-        self.stdout.write(self.style.MIGRATE_HEADING('\n2. SMTP-forbindelse'))
-        forbindelse = get_connection(fail_silently=False)
+        self.stdout.write(self.style.MIGRATE_HEADING('\n2. Transport'))
+        # HTTP-backenden har ingen forbindelse å åpne — BaseEmailBackend.open()
+        # er en no-op. Å kalle den ville gitt «Åpnet og autentisert» uten at noe
+        # var kontaktet, altså falsk grønt på nøyaktig det spørsmålet denne
+        # kommandoen finnes for å svare på. Vi sender en ekte melding i stedet:
+        # det er det eneste som prøver DNS, TLS, autentisering og om
+        # avsenderdomenet er godkjent.
+        if not er_sendende:
+            self.stdout.write(self.style.WARNING(
+                '   Hoppet over: denne backenden har ingen transport a prove. '
+                'Alt "sendes" lokalt.'
+            ))
+            self._varslingskjede(mottakere, sendte_testmelding=False)
+            return
+
+        if not er_smtp:
+            self._verifiser_http(mottakere)
+            self._varslingskjede(mottakere, sendte_testmelding=True)
+            return
+
+        # Egen tidsgrense her, uavhengig av EMAIL_TIMEOUT, slik at kommandoen
+        # rapporterer i stedet for å stå i ro. Uten en grense arver smtplib
+        # Pythons globale socket-timeout (None), og en vert som svelger pakkene
+        # i stedet for å avvise dem henger for alltid — se hendelsen 22. aug.
+        # 2026 i CHANGELOG.
+        tidsgrense = valg['timeout']
+        self.stdout.write(
+            f'   Prøver {settings.EMAIL_HOST}:{settings.EMAIL_PORT} '
+            f'med {tidsgrense} s tidsgrense …'
+        )
+        forbindelse = get_connection(fail_silently=False, timeout=tidsgrense)
+        start = time.monotonic()
         try:
             forbindelse.open()
+        except (socket.timeout, TimeoutError) as exc:
+            raise CommandError(
+                f'Tidsavbrudd etter {time.monotonic() - start:.1f} s. Ingenting '
+                f'svarte på {settings.EMAIL_HOST}:{settings.EMAIL_PORT}.\n'
+                'Pakkene blir droppet, ikke avvist — det peker på en brannmur '
+                'eller sperret utgående trafikk, ikke på feil legitimasjon.\n'
+                'Kjører du i en container: verifiser at plattformen tillater '
+                'utgående SMTP. Mange skyleverandører sperrer port 25, og noen '
+                'sperrer også 587.'
+            ) from exc
+        except OSError as exc:
+            raise CommandError(
+                f'Fikk ikke kontakt: {type(exc).__name__}: {exc}\n'
+                f'Sjekk at {settings.EMAIL_HOST} lar seg slå opp i DNS, og at '
+                'porten er åpen utgående.'
+            ) from exc
         except Exception as exc:
             raise CommandError(
                 f'Kunne ikke åpne forbindelsen: {type(exc).__name__}: {exc}\n'
@@ -102,10 +156,64 @@ class Command(BaseCommand):
                 'DEFAULT_FROM_EMAIL på et domene leverandøren ikke er autorisert for.'
             ) from exc
         else:
-            self.stdout.write(self.style.SUCCESS('   Åpnet og autentisert.'))
+            self.stdout.write(self.style.SUCCESS(
+                f'   Åpnet og autentisert på {time.monotonic() - start:.1f} s.'
+            ))
             forbindelse.close()
 
-        # ── 3. Varslingskjeden ──────────────────────────────────────────────
+        self._varslingskjede(mottakere, sendte_testmelding=False)
+
+    # ── Steg 2, HTTP-varianten ───────────────────────────────────────────────
+
+    def _verifiser_http(self, mottakere):
+        """Sender en ekte melding, fordi det er det eneste som beviser noe.
+
+        For SMTP kan vi åpne forbindelsen og se at den svarer. HTTP-backenden
+        har ingen slik tilstand — den bygger og sender i ett. En melding med
+        ``fail_silently=False`` er derfor den eneste måten å få en høylytt feil
+        på, og den prøver hele kjeden: DNS, TLS, autentisering og om
+        avsenderdomenet er godkjent hos leverandøren.
+        """
+        from django.core.mail import EmailMessage
+
+        self.stdout.write(f'   Backend: {settings.EMAIL_BACKEND}')
+        self.stdout.write('   Sender en ekte melding for å prøve hele kjeden …')
+
+        start = time.monotonic()
+        try:
+            sendt = EmailMessage(
+                subject='Verifisering av e-postoppsettet',
+                body=(
+                    'Sendt av «manage.py verifiser_feilvarsel».\n'
+                    'Dette er ikke en reell feil — kommandoen bekrefter kun at '
+                    'utsending virker.'
+                ),
+                to=list(mottakere),
+                connection=get_connection(fail_silently=False),
+            ).send()
+        except Exception as exc:
+            raise CommandError(
+                f'Utsending feilet etter {time.monotonic() - start:.1f} s:\n'
+                f'{type(exc).__name__}: {exc}\n\n'
+                'Vanlige årsaker:\n'
+                '  · 401/403 — nøkkelen mangler «messages:send»-scope for domenet\n'
+                '  · 404     — feil AHASEND_ACCOUNT_ID\n'
+                '  · domenet i DEFAULT_FROM_EMAIL er ikke verifisert hos leverandøren\n'
+                '  · tidsavbrudd — utgående 443 er sperret'
+            ) from exc
+
+        if not sendt:
+            raise CommandError(
+                'Backenden rapporterte 0 sendte meldinger uten å kaste. '
+                'Se loggen for årsaken.'
+            )
+        self.stdout.write(self.style.SUCCESS(
+            f'   Sendt og godtatt på {time.monotonic() - start:.1f} s.'
+        ))
+
+    # ── Steg 3 ───────────────────────────────────────────────────────────────
+
+    def _varslingskjede(self, mottakere, sendte_testmelding):
         self.stdout.write(self.style.MIGRATE_HEADING('\n3. Varslingskjede'))
 
         logger = logging.getLogger('django.request')
@@ -113,8 +221,8 @@ class Command(BaseCommand):
         self.stdout.write(f'   Handlere på django.request: {handlere}')
         if not any(h == 'AdminEmailHandler' for h in handlere):
             self.stdout.write(self.style.WARNING(
-                '   ↳ AdminEmailHandler mangler. Varselet ville aldri blitt sendt, '
-                'uansett hvor riktig SMTP-oppsettet er.'
+                '   -> AdminEmailHandler mangler. Varselet ville aldri blitt sendt, '
+                'uansett hvor riktig transporten er satt opp.'
             ))
 
         request = RequestFactory().get('/verifiser-feilvarsel/')
@@ -136,10 +244,19 @@ class Command(BaseCommand):
         self.stdout.write(
             '   Merk: AdminEmailHandler bruker fail_silently=True, så den kan\n'
             '   ikke rapportere om utsendingen lyktes. Steg 2 er det som viser\n'
-            '   at forbindelsen virker.'
+            '   at transporten virker.'
         )
-        self.stdout.write(self.style.SUCCESS(
-            f'\nFerdig. Se etter to e-poster til {", ".join(mottakere)}:\n'
-            f'  · én fra dempingsfilteret/handleren med emne som starter på "[Django] ERROR"\n'
-            f'  · tracebacken skal nevne {FeilvarselTest.__name__}'
-        ))
+        til = ', '.join(mottakere)
+        if sendte_testmelding:
+            self.stdout.write(self.style.SUCCESS(
+                f'\nFerdig. Se etter to e-poster til {til}:\n'
+                f'  - "Verifisering av e-postoppsettet" fra steg 2\n'
+                f'  - ett feilvarsel med emne som starter pa "[Django] ERROR",\n'
+                f'    der tracebacken nevner {FeilvarselTest.__name__}'
+            ))
+        else:
+            self.stdout.write(self.style.SUCCESS(
+                f'\nFerdig. Se etter ett feilvarsel til {til}, med emne som\n'
+                f'starter pa "[Django] ERROR" og en traceback som nevner\n'
+                f'{FeilvarselTest.__name__}.'
+            ))

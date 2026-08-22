@@ -77,3 +77,124 @@ class VarslingskjedeTests(TestCase):
         self.assertTrue(mail.outbox, 'Ingen e-post å kontrollere')
         tekst = mail.outbox[0].subject + mail.outbox[0].body
         self.assertIn('ikke en reell feil', tekst.lower())
+
+
+class TidsgrenseTests(TestCase):
+    """En SMTP-vert som svelger pakkene skal gi rapport, ikke stillhet.
+
+    Hendelsen 22. aug. 2026: Railway-containeren nådde ikke `send.ahasend.com`
+    utgående, og kommandoen sto i `sock.connect()` til den ble avbrutt manuelt.
+    Uten tidsgrense arver `smtplib` Pythons globale socket-timeout, som er None.
+    """
+
+    @override_settings(
+        ADMINS=[('Drift', 'drift@example.invalid')],
+        EMAIL_BACKEND='django.core.mail.backends.smtp.EmailBackend',
+    )
+    def test_tidsavbrudd_gir_forstaaelig_feilmelding(self):
+        from unittest.mock import patch
+
+        with patch('django.core.mail.backends.smtp.EmailBackend.open',
+                   side_effect=TimeoutError('timed out')):
+            with self.assertRaises(CommandError) as ctx:
+                call_command('verifiser_feilvarsel', '--timeout', '1',
+                             stdout=StringIO())
+
+        melding = str(ctx.exception)
+        self.assertIn('Tidsavbrudd', melding)
+        # Den som leser feilen kl. 03 skal ledes mot brannmur, ikke passord.
+        self.assertIn('droppet', melding)
+        self.assertNotIn('EMAIL_HOST_PASSWORD', melding)
+
+    @override_settings(
+        ADMINS=[('Drift', 'drift@example.invalid')],
+        EMAIL_BACKEND='django.core.mail.backends.smtp.EmailBackend',
+    )
+    def test_tidsgrensen_sendes_til_backenden(self):
+        from unittest.mock import patch
+
+        with patch('audit.management.commands.verifiser_feilvarsel.get_connection') as gc:
+            gc.return_value.open.side_effect = TimeoutError()
+            with self.assertRaises(CommandError):
+                call_command('verifiser_feilvarsel', '--timeout', '7',
+                             stdout=StringIO())
+        self.assertEqual(gc.call_args.kwargs.get('timeout'), 7)
+
+
+class EmailTimeoutInnstillingTests(TestCase):
+    """EMAIL_TIMEOUT verner driften, ikke bare denne kommandoen.
+
+    AdminEmailHandler sender synkront i requestens egen tråd. Uten tidsgrense
+    ville en hengende SMTP-vert låst tråden for godt — og med fire tråder per
+    worker skal det ikke mange feil til før appen slutter å svare for alle.
+    """
+
+    def test_email_timeout_er_satt(self):
+        from django.conf import settings as s
+        self.assertIsNotNone(
+            getattr(s, 'EMAIL_TIMEOUT', None),
+            'EMAIL_TIMEOUT mangler — da arver smtplib en uendelig timeout',
+        )
+
+    def test_email_timeout_er_kort_nok_til_aa_verne_traaden(self):
+        from django.conf import settings as s
+        self.assertLessEqual(
+            s.EMAIL_TIMEOUT, 30,
+            'En request-tråd skal ikke blokkeres i mer enn 30 sekunder på e-post',
+        )
+
+
+AHASEND = 'core.mail_backends.AhaSendApiBackend'
+
+
+class TransportvalgTests(TestCase):
+    """Steg 2 må prøve den transporten som faktisk er i bruk.
+
+    HTTP-backenden arver `open()` fra BaseEmailBackend, som er en no-op. Kalte
+    kommandoen den, ville den meldt «Åpnet og autentisert» uten å ha kontaktet
+    noe — falsk grønt på nøyaktig det spørsmålet kommandoen finnes for.
+    """
+
+    @override_settings(ADMINS=[('Drift', 'drift@example.invalid')],
+                       EMAIL_BACKEND=LOCMEM)
+    def test_backend_uten_transport_hopper_over_steg_2(self):
+        ut = StringIO()
+        call_command('verifiser_feilvarsel', stdout=ut)
+        tekst = ut.getvalue()
+        self.assertIn('Hoppet over', tekst)
+        # Skal ikke love en testmelding den ikke sendte.
+        self.assertNotIn('Verifisering av e-postoppsettet', tekst)
+
+    @override_settings(ADMINS=[('Drift', 'drift@example.invalid')],
+                       EMAIL_BACKEND=AHASEND,
+                       AHASEND_API_KEY='aha-sk-test',
+                       AHASEND_ACCOUNT_ID='konto-1')
+    def test_http_backend_sender_ekte_melding(self):
+        from unittest.mock import MagicMock, patch
+        svar = MagicMock()
+        svar.status = 202
+        svar.__enter__ = lambda s: s
+        svar.__exit__ = lambda s, *a: False
+
+        ut = StringIO()
+        with patch('core.mail_backends.request.urlopen', return_value=svar) as u:
+            call_command('verifiser_feilvarsel', stdout=ut)
+
+        self.assertIn('Sendt og godtatt', ut.getvalue())
+        self.assertTrue(u.called, 'Ingen HTTP-kall — steg 2 prøvde ingenting')
+
+    @override_settings(ADMINS=[('Drift', 'drift@example.invalid')],
+                       EMAIL_BACKEND=AHASEND,
+                       AHASEND_API_KEY='aha-sk-test',
+                       AHASEND_ACCOUNT_ID='konto-1')
+    def test_http_feil_gir_handlingsrettet_melding(self):
+        from unittest.mock import patch
+        with patch('core.mail_backends.request.urlopen',
+                   side_effect=TimeoutError('tidsavbrudd')):
+            with self.assertRaises(CommandError) as ctx:
+                call_command('verifiser_feilvarsel', stdout=StringIO())
+        melding = str(ctx.exception)
+        self.assertIn('Utsending feilet', melding)
+        # Skal lede mot de faktiske årsakene, ikke bare si «feil».
+        self.assertIn('scope', melding)
+        self.assertIn('AHASEND_ACCOUNT_ID', melding)

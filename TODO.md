@@ -29,10 +29,15 @@ ingen av dem gir feilmelding — de er bare stille inaktive.
       `AdminEmailHandler` er koblet på `django.request`, og en ekte exception gikk gjennom
       hele kjeden.
       - [ ] **Variablene må flyttes med når portalen bytter miljø.** De ligger nå i
-            `staging`. De fem nøklene er `ADMINS`, `EMAIL_HOST`, `EMAIL_HOST_USER`,
-            `EMAIL_HOST_PASSWORD` og `DEFAULT_FROM_EMAIL` — `EMAIL_PORT` og
-            `EMAIL_USE_TLS` har brukbare defaults (587/True). Kjør
+            `staging`. Nøklene som betyr noe i prod er `ADMINS`,
+            `DEFAULT_FROM_EMAIL`, `AHASEND_API_KEY` og `AHASEND_ACCOUNT_ID`.
+            `EMAIL_HOST*` brukes ikke i containeren — se punktet under. Kjør
             `verifiser_feilvarsel` på nytt etter flyttingen
+      - [x] **Railway sperrer utgående SMTP.** Målt fra containeren 22. aug. 2026:
+            portene 587, 2525, 465 og 25 er alle stengt, 443 er åpen. Løst med en
+            egen backend mot AHASends HTTP-API (`core/mail_backends.py`). Å bytte
+            SMTP-leverandør ville truffet samme vegg — det er en plattformpolicy,
+            ikke noe ved AHASend
 
 - [ ] **Sett opp cron-jobb for `kollaps_arkiv` på Railway.** Dette er steg 3 i
       migrasjonspunktet under, og bør ikke gjøres før portalen står i riktig miljø —
