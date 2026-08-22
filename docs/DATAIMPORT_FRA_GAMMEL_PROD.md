@@ -47,12 +47,20 @@ Tre steg. Hvert steg er en standardoperasjon; ingen av dem endrer prod.
 Fra `C:\Programmering\pasientregistrering`, med prod-databasen som mål:
 
 ```powershell
-$env:DATABASE_URL = "<prod DATABASE_URL fra Railway>"
+# MERK: bruk DATABASE_PUBLIC_URL, ikke DATABASE_URL. Sistnevnte peker på
+# postgres.railway.internal, som kun er nåbar innenfra Railways nettverk.
+$env:PYTHONUTF8 = "1"
+$env:DATABASE_URL = "<DATABASE_PUBLIC_URL fra Railway, Postgres-tjenesten>"
 python manage.py dumpdata patients.Patient patients.Behandler patients.Helsepersonell `
     --natural-foreign --indent 2 -o arsdata-2026.json
 ```
 
 `dumpdata` leser bare. Prod røres ikke.
+
+**`PYTHONUTF8=1` er ikke valgfritt.** Uten den skriver `dumpdata -o` fila i Windows'
+lokale kodesett (cp1252), ikke UTF-8. Neste steg feiler da med
+`UnicodeDecodeError: 'utf-8' codec can't decode byte 0xf8` — `0xf8` er `ø`. Sett den på
+begge stegene, og kontroller etterpå at fila lar seg dekode som UTF-8.
 
 **Sjekk størrelsen på fila etterpå.** Er den mistenkelig liten, har du sannsynligvis
 truffet en tom lokal database i stedet for prod — `DATABASE_URL` er lett å sette i feil
@@ -74,7 +82,13 @@ portalens importkommando forventer.
 
 ### Steg 3 — Importer inn i portalen
 
-Fra `C:\Programmering\sanitetsportalen`, mot **staging** først:
+Fra `C:\Programmering\sanitetsportalen`.
+
+> **Det finnes ikke lenger et miljø å øve mot.** Dette dokumentet ble skrevet da portalen
+> sto i staging og produksjon var den gamle appen. Etter 22. aug. 2026 betjener
+> staging-miljøet `portal.sanitet.net` — det *er* produksjon. `--dry-run` er dermed hele
+> sikkerhetsnettet. Kjør den, les rapporten, og ta en manuell backup i portalen før du
+> kjører uten.
 
 ```powershell
 python manage.py import_offline_data ..\pasientregistrering\import-kilde.sqlite3 `
@@ -98,7 +112,7 @@ Så uten `--dry-run` når rapporten ser riktig ut.
 - **Validerer kliniske felt** mot whitelisten i `patients/choices.py` (N6). Finnes verdier
   som ikke er gyldige, avbrytes hele importen med rapport per rad. `--force` importerer dem
   likevel.
-- **Loggfører** hver importert pasient i `AuditLog` med `action='imported_offline'`.
+- **Loggfører** hver importert pasient i `AuditLog` med `action='IMPORT'`.
 - **Kjører alt i én transaksjon.** Feiler noe, er ingenting skrevet.
 
 ---
@@ -166,7 +180,7 @@ og det er en egen jobb med egne avveininger.
 1. **Sjekk antallet** mot det gamle systemet: `Patient.objects.filter(year=2026).count()`.
 2. **Åpne statistikkfanen** og sammenlign nøkkeltall med den gamle appen. Statistikken er
    beregnet, så avvik betyr at data mangler eller er endret.
-3. **Se over `AuditLog`** — det skal ligge én `imported_offline`-rad per pasient.
+3. **Se over `AuditLog`** — det skal ligge én `IMPORT`-rad per pasient.
 4. **Ta en manuell backup** i portalen før noe annet skrives, slik at importen har et eget
    gjenopprettingspunkt.
 

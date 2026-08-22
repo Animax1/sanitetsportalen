@@ -4,6 +4,93 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-08-22 — Dataimport fra gammel prod: 273 pasienter inn i portalen
+
+Årets pasientdata er hentet fra den gamle Pasientregistreringsappen og ligger nå i
+portalen. **797 tester, alle grønne** (1 ny).
+
+**Resultatet, verifisert mot kilden felt for felt:**
+
+| Kontroll | Portal | Gammel prod |
+|---|---|---|
+| Pasienter 2026 | 273 | 273 |
+| Med førstehjelper | 216 | 216 |
+| Med helsepersonell | 108 | 108 |
+| Grønn / Gul / Rød | 163 / 91 / 19 | 163 / 91 / 19 |
+| `journal=Ja` | 48 | 48 |
+| `utskrevet` utfylt | 270 | 270 |
+| `lege` utfylt | 29 | 29 |
+
+Triage-fordelingen er den som betyr noe: statistikken er beregnet, ikke importert, så like
+tall der betyr at grunnlaget faktisk er identisk. 273 `IMPORT`-rader i auditloggen, én per
+pasient. `enja` og `morten` fantes allerede i førstehjelperregisteret og ble gjenbrukt, ikke
+duplisert — registrene endte på 15 og 9.
+
+### `import_offline_data` var ødelagt mot Postgres
+
+Tørrkjøringen stoppet med `DataError: value too long for type character varying(10)`.
+Kommandoen skrev `action='imported_offline'` til `AuditLog.action`, som er `max_length=10`.
+Verdien er 16 tegn.
+
+**Hele testsuiten var grønn.** Testene kjører på SQLite, som ikke håndhever varchar-lengde;
+Postgres gjør det. `patients/tests_offline.py` filtrerte til og med på
+`action='imported_offline'` og bekreftet dermed feilen som riktig oppførsel.
+
+Verdien er nå `IMPORT` — seks tegn, som får plass i kolonnen som den er.
+
+**Den står bevisst ikke i `AuditLog.ACTION_CHOICES`.** Å legge den til krever en migrasjon i
+`audit`-appen, og `makemigrations` viser hvorfor det ikke er greit:
+
+```
+~ Rename index audit_audit_created_a3c1b8_idx on auditlog
+                        to audit_audit_created_2c1626_idx
+~ Alter field action on auditlog
+```
+
+Indeks-omdøpingen er den som tok ned produksjon i 30 minutter 13. august, og indeksen finnes
+ikke i Postgres under det navnet. Enhver migrasjon i `audit` drar den med seg. Choices
+håndheves ikke av databasen og `objects.create()` validerer ikke mot dem, så `IMPORT`
+virker. Den kan normaliseres den dagen noen tar indeks-avviket bevisst — det er en egen jobb
+med egne avveininger.
+
+**Ny test, backend-uavhengig:** `test_import_offline_data_audit_action_passer_i_kolonnen`
+leser `max_length` fra modellen og sammenligner med verdiene som faktisk skrives. Verifisert
+ved å gjeninnføre feilen med vilje:
+
+```
+AssertionError: 16 not less than or equal to 10 : action='imported_offline'
+er 16 tegn, men kolonnen tar 10. Dette feiler mot Postgres, ikke mot SQLite.
+```
+
+Det var hullet som lot feilen leve: en grense definert i modellen, håndhevet av én database
+og ignorert av den andre.
+
+### Fire feil i prosedyredokumentet
+
+`docs/DATAIMPORT_FRA_GAMMEL_PROD.md` ble skrevet 14. august og hadde drevet:
+
+- **`DATABASE_URL` når ikke fram utenfra.** Den peker på `postgres.railway.internal`, som
+  kun er nåbar innenfra Railways nettverk. Begge miljøene har en `DATABASE_PUBLIC_URL` over
+  TCP-proxy, men det sto ingen steder
+- **`PYTHONUTF8=1` mangler.** Uten den skriver `dumpdata -o` fila i Windows' lokale kodesett,
+  ikke UTF-8, og neste steg feiler med `UnicodeDecodeError ... byte 0xf8` — som er `ø`.
+  Fanget på første forsøk; 468 norske tegn ville blitt ødelagt
+- **Rådet om å øve mot staging er tomt.** Dokumentet ble skrevet da portalen sto i staging og
+  produksjon var den gamle appen. Nå betjener staging-miljøet `portal.sanitet.net`.
+  `--dry-run` er hele sikkerhetsnettet
+- **`action`-verdien** var oppgitt som `imported_offline` to steder
+
+### Verdt å vite for neste import
+
+Den gamle appens `migrate` sår ti generiske `Behandler 1`–`Behandler 10`-rader, så
+SQLite-fila får 25 behandlere der prod har 15. Ingen pasient peker på dem, og importen leser
+gjennom en join — derfor kom kun de 14 faktisk brukte navnene med. Verdt å vite hvis noen
+teller rader og lurer.
+
+Importen matcher navn **case-sensitivt**, mens `0009_link_behandlere_to_users` matchet
+`iexact`. Her var alt små bokstaver, men et avvik i store/små bokstaver ville gitt to rader
+med pasientene fordelt mellom seg — uten feilmelding.
+
 ## 2026-08-22 — `verifiser_feilvarsel` sier hvor den kjører
 
 **796 tester, alle grønne** (2 nye).

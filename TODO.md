@@ -195,10 +195,16 @@ modul og les i en annen.
 
 ### Dataimport fra gammel prod — se `docs/DATAIMPORT_FRA_GAMMEL_PROD.md`
 
-- [ ] Importer årets pasientdata fra den gamle Pasientregistreringsappen.
-      `import_offline_data` leser den gamle appens skjema direkte — ingen ny kode trengs.
-      Tre steg: `dumpdata` fra prod (read-only), bygg SQLite lokalt, importer med
-      `--dry-run` først. Kjør mot staging før prod.
+- [x] **Importert 22. aug. 2026: 273 pasienter, 12 nye førstehjelpere, 6 nye
+      helsepersonell.** Alle kontroller grønne — antall, triage-fordeling, koblinger,
+      `journal`, `lege` og tegnsett stemmer mot gammel prod. 273 `IMPORT`-rader i
+      auditloggen. `enja` og `morten` ble gjenbrukt, ikke duplisert.
+      - [ ] **Ta en manuell backup i portalen** (`/portal-admin/backup/`) som
+            gjenopprettingspunkt for importen. Må gjøres fra containeren eller
+            nettsiden — `BACKUP_DIR` er Railways volum, så en lokal `db_backup`
+            skriver til feil sted
+      - [ ] Åpne statistikkfanen og se over nøkkeltallene med egne øyne. Tallene er
+            verifisert mot kilden programmatisk, men ikke sett i grensesnittet
 
 ### Pasientmodulen — småting
 

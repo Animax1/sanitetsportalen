@@ -323,7 +323,7 @@ class ImportOfflineDataTests(TestCase):
             path.unlink(missing_ok=True)
 
     def test_import_offline_data_audit_log_created(self):
-        """Hver importert pasient skal få en AuditLog-rad med action=imported_offline."""
+        """Hver importert pasient skal få en AuditLog-rad med action=IMPORT."""
         tf, path = self._make_sqlite(
             patients=[
                 {'pasientnummer': 1, 'year': 2026},
@@ -332,8 +332,31 @@ class ImportOfflineDataTests(TestCase):
         )
         try:
             _call_import_offline_data(path, year=2026)
-            antall_logger = AuditLog.objects.filter(action='imported_offline').count()
+            antall_logger = AuditLog.objects.filter(action='IMPORT').count()
             self.assertEqual(antall_logger, 2)
+        finally:
+            path.unlink(missing_ok=True)
+
+    def test_import_offline_data_audit_action_passer_i_kolonnen(self):
+        """Verdien må få plass i `AuditLog.action`, uansett database.
+
+        Testene kjører på SQLite, som ikke håndhever varchar-lengde. Postgres
+        gjør det. 22. aug. 2026 stoppet importen mot produksjon med
+        `DataError: value too long for type character varying(10)` fordi
+        verdien var `imported_offline` — 16 tegn mot en grense på 10 — mens hele
+        testsuiten var grønn. Denne testen leser grensen fra modellen og er
+        derfor uavhengig av hvilken backend som kjører.
+        """
+        tf, path = self._make_sqlite(patients=[{'pasientnummer': 1, 'year': 2026}])
+        try:
+            _call_import_offline_data(path, year=2026)
+            grense = AuditLog._meta.get_field('action').max_length
+            for verdi in AuditLog.objects.values_list('action', flat=True):
+                self.assertLessEqual(
+                    len(verdi), grense,
+                    f'action={verdi!r} er {len(verdi)} tegn, men kolonnen tar '
+                    f'{grense}. Dette feiler mot Postgres, ikke mot SQLite.',
+                )
         finally:
             path.unlink(missing_ok=True)
 

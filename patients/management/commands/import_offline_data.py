@@ -20,7 +20,8 @@ Forventet flyt:
   7. Rapport: antall importert, antall behandlere/helsepersonell opprettet.
 
 Audit-loggføring: hver importert pasient får en AuditLog-oppføring med
-action='imported_offline' og object_repr i new_value-feltet.
+``action='IMPORT'`` og en beskrivelse i ``new_value``-feltet. Se kommentaren
+ved selve kallet for hvorfor verdien er kort og ikke står i ``ACTION_CHOICES``.
 """
 import sqlite3
 from pathlib import Path
@@ -133,10 +134,26 @@ class Command(BaseCommand):
                         setattr(p, f, v)
                     p.save()
 
-                    # Audit-logg: bruker faktiske felter på AuditLog-modellen
+                    # Audit-logg: bruker faktiske felter på AuditLog-modellen.
+                    #
+                    # Verdien er 'IMPORT', ikke 'imported_offline'. Grunnen er at
+                    # `AuditLog.action` er `max_length=10`, og den gamle verdien
+                    # på 16 tegn ga `DataError: value too long for type character
+                    # varying(10)` mot Postgres. Testene fanget det aldri fordi de
+                    # kjører på SQLite, som ikke håndhever varchar-lengde —
+                    # `AuditActionLengdeTests` vokter det nå backend-uavhengig.
+                    #
+                    # 'IMPORT' står bevisst *ikke* i `AuditLog.ACTION_CHOICES`. Å
+                    # legge den til ville krevd en migrasjon i `audit`-appen, og
+                    # enhver slik migrasjon drar med seg en ventende omdøping av
+                    # `audit_audit_created_a3c1b8_idx` — indeksen som tok ned
+                    # produksjon 13. aug. 2026. Choices håndheves ikke av
+                    # databasen, og `objects.create()` validerer ikke mot dem, så
+                    # verdien virker. Den kan normaliseres den dagen noen tar
+                    # indeks-avviket bevisst.
                     AuditLog.objects.create(
                         user=None,
-                        action='imported_offline',
+                        action='IMPORT',
                         table_name='patients_patient',
                         record_id=p.pk,
                         field_name=None,
