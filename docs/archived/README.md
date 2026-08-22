@@ -5,7 +5,8 @@ erstattet av virkeligheten.
 
 **Ingenting her skal oppdateres.** Er en påstand i et av disse dokumentene i utakt med
 koden, er det riktig — dokumentet beskriver kodebasen slik den var da leveransen ble gjort.
-Aktiv dokumentasjon ligger ett nivå opp; se [`../README.md`](../README.md).
+Aktiv dokumentasjon ligger ett nivå opp i [`docs/`](../); arbeidslista er
+[`TODO.md`](../../TODO.md) i rotmappa.
 
 Filene er beholdt fordi de forklarer *hvorfor* arkitekturen ble som den ble. Det er den
 begrunnelsen som er verdifull, ikke statusen.
@@ -32,7 +33,7 @@ hvorfor.
 
 | Dokument | Hva det er |
 |---|---|
-| [`FORBEDRINGER.md`](./FORBEDRINGER.md) | Forbedringsrunden fra mai 2026. Punktene som fortsatt sto åpne er flyttet til [`../FORBEDRINGER_2026-08.md`](../FORBEDRINGER_2026-08.md) del 3 — den fila er den aktive backloggen |
+| [`FORBEDRINGER.md`](./FORBEDRINGER.md) | Forbedringsrunden fra mai 2026. Punktene som fortsatt sto åpne gikk videre til august-gjennomgangen, og derfra til [`../../TODO.md`](../../TODO.md) — som er den aktive arbeidslista |
 
 ---
 

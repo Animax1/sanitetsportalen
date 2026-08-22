@@ -320,7 +320,7 @@ Lagringstidene er fastsatt etter GDPR art. 5(1)(e): opplysningene skal ikke oppb
 | Sesjonstimeout | Standard 8 timer, admin-justerbar mellom 1 og 24 timer |
 | Rollebasert tilgangskontroll (RBAC) | 5 roller med granulerte rettigheter: `read_only`, `read_write`, `lead_view`, `lead`, `admin` (se tabell nedenfor) |
 | CSRF-beskyttelse | Django CSRF-middleware aktivert på alle tilstandsendrende forespørsler |
-| Content-Security-Policy | Aktiv via `SecurityHeadersMiddleware`; begrenser hvilke ressurser nettleseren kan laste. `script-src` bruker nonce per request og tillater ikke `unsafe-inline` — inline skript kan dermed ikke injiseres og kjøres. `style-src` tillater fortsatt `unsafe-inline` (kjent avvik, se F5 i `docs/FORBEDRINGER_2026-08.md`) |
+| Content-Security-Policy | Aktiv via `SecurityHeadersMiddleware`; begrenser hvilke ressurser nettleseren kan laste. `script-src` bruker nonce per request og tillater ikke `unsafe-inline` — inline skript kan dermed ikke injiseres og kjøres. `style-src` tillater fortsatt `unsafe-inline` (kjent avvik, står som åpent punkt i `TODO.md`) |
 | Sikre informasjonskapsler | Cookies satt med `Secure`, `HttpOnly` og `SameSite=Lax`-flagg |
 | Clickjacking-beskyttelse | `X-Frame-Options: DENY` på alle svar |
 | Innholdstype-beskyttelse | `X-Content-Type-Options: nosniff` |

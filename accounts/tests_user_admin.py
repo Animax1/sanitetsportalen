@@ -1,7 +1,7 @@
 """Tester for portalens brukeradministrasjon (/accounts/users/).
 
 Disse dekker funksjonaliteten som må være på plass før `/django-admin/` kan
-fjernes (S1 i docs/FORBEDRINGER_2026-08.md): opprettelse, MFA-toggle, frys/tø
+fjernes (S1 i kodegjennomgangen aug. 2026): opprettelse, MFA-toggle, frys/tø
 og permanent sletting.
 
 Kjør med: python manage.py test accounts.tests_user_admin

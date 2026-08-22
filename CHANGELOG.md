@@ -4,6 +4,87 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-08-22 — `docs/` konsolidert: TODO er arbeidslista, tre dokumenter slettet
+
+Kun dokumentasjon. **750 tester, alle grønne.** Ingen brutte relative lenker i repoet.
+
+`docs/` er nede fra ti aktive dokumenter til åtte — tre slettet, ett nytt.
+`FORBEDRINGER_2026-08.md` (1836 linjer),
+`GDPR_TILTAKSPLAN.md` (260) og `docs/README.md` (56) er slettet. Alt som fortsatt er åpent
+står nå i `TODO.md`, med begrunnelsen med seg — ikke som peker til et dokument.
+
+**Hvorfor sletting og ikke arkivering.** Backlog-dokumentet var 23 av 28 punkter ferdige.
+De 23 er allerede fortalt i denne fila under 13.–22. august, med mer detalj enn matrisen
+hadde. Å beholde dokumentet ville gitt to steder å lese status fra, og de ville drevet fra
+hverandre. GDPR-tiltaksplanen sa det samme om seg selv i toppteksten: «Når alle faser er
+ferdige, har dokumentet gjort jobben sin og kan slettes.» Den hadde ett åpent punkt igjen.
+`docs/README.md` var en indeks som kun fantes fordi det var mange filer.
+
+**Statistikk-utvidelsen (F6) ble reddet ut, ikke komprimert.** 96 linjer med tilgangsmodell,
+faseinndeling, statistiske metoder (Dunn post-hoc, Wilson-KI, Cramér's V) og fem ubesvarte
+spørsmål lar seg ikke koke ned til en kulepunkt-linje uten at det som gjør den brukbar
+forsvinner. Den ligger nå som `docs/BESLUTNING_STATISTIKK.md`, etter samme mønster som de
+to andre beslutningsnotatene. Den er en plan som venter på avgjørelser, ikke et punkt på
+en liste — samme skille som avgjorde at runbook, deploy-guide og dataimport beholdes.
+
+**F8 (PgBouncer) står ikke lenger som oppgave.** Den var markert «bevisst utsatt», ikke
+åpen. Begrunnelsen — 16 forbindelser mot en grense på ~100, og `conn_max_age=600` som
+demper ytterligere — er beholdt i TODO som en note om *hvorfor det ikke er en oppgave*, med
+terskelen for å ta den opp igjen (`WEB_WORKERS` ≥ 4).
+
+**En løs tråd ble funnet under flyttingen:** F7 er merket ferdig, men første-paint på mobil
+4G ble aldri målt. `read_only` laster 49 % av admin-bundlen, og gevinsten i faktisk
+oppstartstid er udokumentert. Den står nå som eget punkt i stedet for som en parentes under
+et avkrysset punkt.
+
+**Migrasjonssekvensen skrevet ned.** Railway-prosjektet har to miljøer, og navnene er
+arvet fra forgjengeren: `production` er den *gamle* Pasientregistreringsappen
+(`pasientregistrering.up.railway.app`), mens `staging` er Sanitetsportalen — det er den
+som betjener `portal.sanitet.net`. Portalen skal over på `production` når dataimporten er
+kjørt, og `purge_old_logs`- og `kollaps_arkiv`-jobbene kobles på der. Rekkefølgen står nå
+i TODO fordi den ikke kan tas i vilkårlig orden: `production` må stå urørt til importen er
+ferdig, siden det er der årets pasientdata ligger.
+
+Konsekvensen i mellomtiden er notert samme sted: portalens miljø har ingen cron-tjeneste,
+så verken audit-logger, innloggingshendelser eller varsler slettes ennå.
+`PERSONVERN_DOKUMENTASJON.md` A.9 oppgir 730/30 dager med «`purge_old_logs` via Railway
+Cron» som mekanisme — den påstanden blir sann etter migrasjonen, ikke før, og
+sjekklistepunktet i samme dokument kan krysses av da. Backloggens F2 ble avkrysset som
+«allerede på plass»; det stemte for den gamle appen, ikke for portalen.
+
+**Ni referanser til de slettede filene rettet** i `accounts/tests_user_admin.py`,
+`patients/js_test_utils.py`, `PERSONVERN_DOKUMENTASJON.md`, `RUNBOOK_VAKT.md`,
+`TEKNISK_DOKUMENTASJON.md` og de to arkivindeksene. To av dem avslørte utdaterte påstander:
+den tekniske dokumentasjonen omtalte arkiv-kollaps som «planlagt endring» selv om GDPR
+fase 3.1 leverte den i august, og personverndokumentasjonen pekte på et dokument som ikke
+lenger fantes for et avvik som fortsatt er reelt.
+
+**`.env.example` pekte på SendGrid** og `sanitetsportalen@dittdomene.no`. Prod bruker
+AHASend med `mail.sanitet.net` som avsenderdomene. Kommentaren forklarer nå hvorfor
+`DEFAULT_FROM_EMAIL` må ligge på et autorisert domene: gjør den ikke det, avvises
+feilvarselet ved innsending, og da får man aldri vite at noe kræsjet.
+
+### Kontrollert og funnet i orden (fra gjennomgangen i august)
+
+Bevart her fordi det er verdt å slippe å revidere på nytt neste gang:
+
+- **Endepunktdekning.** Alle views i `patients`, `core`, `accounts` og `admin_status` har
+  `@login_required` eller en rolledekoratør. Ingen ubeskyttede endepunkter funnet. Den
+  eneste `@csrf_exempt` er `/healthz/`, som er `@require_safe` og ikke rører data.
+- **Path traversal via backup-filnavn er lukket.** `backup_admin_download_view` og
+  `backup_admin_delete_view` bygger stier fra `Backup.filename`, men modellen er eksplisitt
+  ekskludert fra sin egen dump (`patients/backup.py:31`), så en restore kan ikke injisere
+  rader med `../` i filnavnet. Filnavn genereres kun av `_build_filename()`.
+- **Django admin-endringer på pasienter blir audit-logget.** Signalet er
+  entry-point-agnostisk.
+- **Offline-modus** (`ALLOWED_HOSTS=['*']`, CSRF-wildcards for private subnett) er et
+  bevisst dokumentert valg, med hard sperre mot at `OFFLINE_MODE` aktiveres på Railway
+  (`settings.py:58–62`).
+- **MFA trust-cookien invalideres korrekt** når admin nullstiller MFA: `_check_mfa_trust`
+  slår opp TOTP-enheten, og `reset_mfa` sletter den.
+- **`SECRET_KEY`** hard-feiler ved oppstart når `DEBUG=False`, både på tom verdi og på de
+  kjente eksempelverdiene.
+
 ## 2026-08-22 — Dokumentstrukturen strammet: TODO som arbeidsliste, docs som referanse
 
 Kun dokumentasjon. **750 tester, alle grønne** — ingen kodeendring.

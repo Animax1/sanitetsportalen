@@ -7,7 +7,7 @@ Bakgrunn: frontend har ingen bundler og ingen JS-testrunner. To testmoduler
 trenger likevel å verifisere JS-oppførsel (`tests_xss_stats.py` for escaping,
 `tests.py` for dobbeltklikk-vernet). Alternativet til dette var å lese filene
 som tekst og grep-e etter kodelinjer, som gir en påminnelse snarere enn en
-test — se N9 i ``docs/FORBEDRINGER_2026-08.md``.
+test — se N9 i CHANGELOG (13. aug. 2026).
 
 Funksjonene her klipper ut enkeltfunksjoner fra JS-modulene og kjører dem i
 node med et minimalt stubbet miljø. Det unngår å måtte laste hele modulen,

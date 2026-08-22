@@ -9,7 +9,7 @@ gjort.
 |---|---|
 | `TODO.md` (denne) | Hva som skal gjøres |
 | [`CHANGELOG.md`](./CHANGELOG.md) | Hva som er gjort |
-| [`docs/README.md`](./docs/README.md) | Kart over all dokumentasjon, aktiv og arkivert |
+| [`docs/`](./docs/) | Referansedokumenter og prosedyrer — ikke arbeidsliste |
 | [`CLAUDE.md`](./CLAUDE.md) | Kort arkitekturoversikt for utvikling |
 
 Ferdige punkter krysses av her og beskrives i CHANGELOG — i samme commit som endringen,
@@ -19,9 +19,9 @@ jf. arbeidsflyten i `CLAUDE.md`.
 
 ## ⚠️ Krever Andre — kan ikke gjøres fra kodebasen
 
-Disse tre står ikke i kode. De krever Railway-innlogging eller en avgjørelse
-utenfor prosjektet, og blir liggende til du gjør dem. Ingen av dem oppdages av
-testsuiten, og ingen av dem gir feilmelding — de er bare stille inaktive.
+Disse står ikke i kode. De krever Railway-innlogging eller en avgjørelse utenfor
+prosjektet, og blir liggende til du gjør dem. Ingen av dem oppdages av testsuiten, og
+ingen av dem gir feilmelding — de er bare stille inaktive.
 
 - [ ] **Sett `ADMINS` og `EMAIL_*` i Railway.** Uten dem er e-postvarslingen ved
       uhåndterte feil (F1) helt inert — den skriver til konsoll, og du får aldri
@@ -29,10 +29,15 @@ testsuiten, og ingen av dem gir feilmelding — de er bare stille inaktive.
       - `ADMINS` har formatet `Navn:epost`, komma-separert
       - `EMAIL_HOST`, `EMAIL_PORT`, `EMAIL_HOST_USER`, `EMAIL_HOST_PASSWORD`,
         `EMAIL_USE_TLS`
+      - **Riktig miljø er det portalen faktisk kjører i.** I dag er det `staging`
+        (`portal.sanitet.net`), ikke `production` — se migrasjonspunktet under. Variablene
+        må flyttes med når portalen bytter miljø
       - **Verifiser med en framprovosert 500**, ellers vet du ikke om det virker
-      - Se `docs/FORBEDRINGER_2026-08.md` → F1
+      - Bakgrunn: CHANGELOG 13. aug. 2026, «Drift: logging som naar fram (N3) og e-postvarsel»
 
-- [ ] **Sett opp cron-jobb for `kollaps_arkiv` på Railway.** Uten den kollapser
+- [ ] **Sett opp cron-jobb for `kollaps_arkiv` på Railway.** Dette er steg 3 i
+      migrasjonspunktet under, og bør ikke gjøres før portalen står i riktig miljø —
+      ellers må jobben settes opp på nytt. Uten den kollapser
       ikke arkiverte pasientrader til aggregat etter 24 måneder, og lagringstiden
       i personvernprotokollen (del A, punkt A.9) håndheves ikke i praksis. Det er
       en slettepraksis vi har beskrevet overfor både de registrerte og
@@ -41,139 +46,114 @@ testsuiten, og ingen av dem gir feilmelding — de er bare stille inaktive.
         beskriver en oppgave bare du kan utføre, og du sletter det selv når jobben står.
         Det skal ikke foldes inn i TODO eller ryddes bort av en opprydding
 
+- [ ] **Flytt Sanitetsportalen til `production`-miljøet.** Rekkefølgen er bestemt og
+      henger sammen — punktene under kan ikke tas i vilkårlig orden:
+  1. Kjør dataimporten fra den gamle appen — se `docs/DATAIMPORT_FRA_GAMMEL_PROD.md`.
+     `production` må stå urørt til dette er gjort; det er der årets pasientdata ligger
+  2. Flytt portalen over på `production`-miljøet
+  3. Koble `purge_old_logs`-cron (tjenesten finnes allerede der) og sett opp
+     `kollaps_arkiv` — se `docs/OPPSETT_KOLLAPS_CRON.md`
+
+      **Mens dette står på vent:** portalen kjører i `staging`, som ikke har noen
+      cron-tjeneste. Verken `purge_old_logs` eller `kollaps_arkiv` kjører mot portalens
+      database, så audit-logger, innloggingshendelser og varsler samler seg opp.
+      `PERSONVERN_DOKUMENTASJON.md` A.9 oppgir 730/30 dager med «`purge_old_logs` via
+      Railway Cron» som mekanisme — den påstanden blir sann først etter steg 3. Sjekkliste-
+      punktet på linje 724 i samme dokument kan krysses av da, ikke før.
+
+      Merk at backloggens F2 ble avkrysset som «allerede på plass». Det stemmer for den
+      gamle appen i `production`, ikke for portalen. Det er riktig igjen etter steg 2.
+
 - [ ] **Fyll inn organisasjonsnavn i A.4** i `docs/PERSONVERN_DOKUMENTASJON.md`.
       Står fortsatt som `[fyll inn organisasjonsnavn]`. Dokumentet er
       behandlingsprotokollen overfor tilsynsmyndighet.
 
 ## Pågående / neste
 
-### GDPR-gjennomgang — se `docs/GDPR_TILTAKSPLAN.md`
+### GDPR-gjennomgang
 
-- [x] Fase 0: taushetsplikt avklart (signert erklæring via organisasjonen)
-- [x] Fase 1: personvernprotokoll omskrevet til v1.5 — journalplikt ute, lagringstider korrigert
+Fase 0–5 er gjennomført. Begrunnelsene og de varige beslutningene ligger i
+[`docs/PERSONVERN_DOKUMENTASJON.md`](./docs/PERSONVERN_DOKUMENTASJON.md); hva som ble gjort
+står i [`CHANGELOG.md`](./CHANGELOG.md). Tre punkter gjenstår:
+
 - [ ] Fyll inn organisasjonsnavn i A.4 — se «Krever Andre» øverst
-- [x] Fase 2.1: serverside-whitelist på kliniske felt (inkl. `lege`)
-- [x] Fase 2.2: `SECRET_KEY` hard-fail når `DEBUG=False`
-- [x] Fase 2.3: slett varsler eldre enn 30 dager
-- [x] Fase 2.4: fjern død «Arkiv (filer)»-seksjon (`archives_view`)
-- [x] Fase 3.1: arkiverte pasientrader kollapser til aggregat etter 24 mnd
 - [ ] Sett opp cron-jobb for `kollaps_arkiv` — se «Krever Andre» øverst
-- [x] Fase 3.2: arkiv som egen backup-modul
-- [x] Fase 4.1: `VaktArkiv.importert_av` → `SET_NULL` + frosset navn
-- [x] Fase 5: doc-konsolidering og sammenslåing av backup-flatene
-- [ ] Fase 5: **skriftlig DPIA-vurdering.** Uten journalplikt, med pseudonymiserte data og
+- [ ] **Skriftlig DPIA-vurdering.** Uten journalplikt, med pseudonymiserte data og
       begrenset omfang er art. 35 trolig ikke utløst. Det som trengs er en kort skriftlig
-      begrunnelse for *at* den ikke er nødvendig — ikke en full DPIA. Ikke påbegynt
+      begrunnelse for *at* en DPIA ikke er nødvendig — ikke en full DPIA. Vurderingen hører
+      hjemme i personverndokumentasjonen når den er skrevet. Ikke påbegynt
 
-Når disse tre er lukket, har `GDPR_TILTAKSPLAN.md` gjort jobben sin og kan slettes.
-De varige beslutningene ligger allerede i `PERSONVERN_DOKUMENTASJON.md`.
+### Forbedringsbacklog
 
+Kodegjennomgangen fra 12.–13. august 2026 fant 28 punkter (N1–N13, S1–S7, F1–F9).
+**23 er gjennomført** — hva som ble gjort og hvorfor står i `CHANGELOG.md` under
+13.–22. august. Det som står igjen er listet under, i dokumentets egen rangering.
 
-### Forbedringsbacklog — se `docs/FORBEDRINGER_2026-08.md`
+- [ ] **S3 — Rate-limiting finnes kun på innlogging.** ~2 t. `@ratelimit` forekommer
+      nøyaktig to steder i kodebasen, begge på `login_view`. Ubeskyttet i dag:
+  - `POST /pasienter/api/patients/` — en `read_write`-bruker eller en stjålet sesjonscookie
+    kan opprette pasienter i løkke så fort serveren rekker. Uten F3 finnes ingen bremse
+  - `POST /accounts/change-password/` — ingen struping på gjetting av `old_password`
+  - `GET /pasienter/api/full-stats/` — appens dyreste spørring. Cachet 60 s, men
+    cache-miss-stien er ubeskyttet
+  - `GET /portal-admin/auditlog/eksport.csv` — 5000 rader per kall, ubegrenset antall kall
 
-Kodegjennomgang 12. august 2026. Full liste med begrunnelse og tiltak ligger i dokumentet.
-Sikkerhetspunktene rundt innlogging er ferdige; det som står igjen er drift, sporbarhet og
-dokumentasjon.
+      Lavere prioritet fordi alt krever innlogging og brukergruppen er liten og kjent. Men
+      `django-ratelimit` og nødbryteren `RATELIMIT_ENABLE` finnes allerede, så kostnaden er
+      lav. Foreslått: `@ratelimit(key='user', rate='60/m', method='POST', block=True)` på
+      skriveendepunktene, strengere (`10/5m`) på passordbytte. **Merk:** rate-limiting med
+      LocMemCache er per prosess — i lavkostnad-modus (1 worker) er det riktig, i vakt-modus
+      deles telleren via Redis.
+      *Akseptanse:* ingen autentisert bruker kan generere ubegrenset skrivelast mot databasen.
 
-- [x] **S1** `/django-admin/` er slått av i prod (kun bak `DEBUG`/`OFFLINE_MODE`).
-      Paritetsarbeidet som måtte til først:
-  - [x] 500-feil ved opprettelse av bruker uten e-post
-  - [x] «Krev MFA» kan slås av og på fra brukeradmin
-  - [x] Frys/tø konto med sesjonssletting
-  - [x] Permanent sletting av brukerkonto (sperrer: ikke deg selv, ikke siste admin)
-  - [x] Global `LoginEvent`-visning: `/portal-admin/innloggingslogg/`
-  - [x] `AppSetting` redigeres med `python manage.py appsetting --set NØKKEL VERDI`
-  - [x] Brukeradmin flyttet til `/portal-admin/brukere/`, 301 fra `/accounts/users/`
-- [x] **S2** `create_superuser` arver `must_change_password=True`
-  - [x] Bekreftet 13. aug. 2026: bootstrap-adminen i prod har byttet passord
-- [x] **N1** `next`-parameteren valideres — `core/url_safety.py::safe_redirect_url()`
-- [x] **S4** Samme validering på `Notification.url` i varsel-redirecten
-- [x] **N4** MFA-stegene har egne rate-limit-bøtter, og kontosperren gjelder også der
-- [x] **S5** Utlogging krever POST
-- [x] **S6** MFA trust-cookie følger `request.is_secure()` — virker nå i offline-modus
-- [x] **S7** Alle fire dokumentasjonspunkter lukket (audit-dekning via N2, lagringstider var
-      ikke et avvik, escapeHtml-dekning og Argon2 rettet i teksten)
-- [x] **N2** Audit-feltlista utledes nå fra modellen — et nytt felt kan ikke falle utenfor
-- [x] **N3** `LOGGING` har rot-handler med formatering + `LOG_LEVEL`-variabel
-- [x] **F1** E-postvarsel ved uhåndterte feil, med demping per feiltype
-  - [ ] Driftsoppgave: sett `ADMINS` og `EMAIL_*` i Railway — se «Krever Andre» øverst
-- [x] **F2** Var allerede på plass — `purge_old_logs` kjører som Railway Cron Job.
-      Gjennomgangens premiss var feil; se rettelse i FORBEDRINGER og S7
-- [x] **N5** `current_local_year()` brukes begge steder — nyttårsvakter havner i riktig år
-- [x] **N7** Delt Redis-klient per prosess (var én TCP-handshake per request)
-- [x] **N8** Audit-signalet skriver med `bulk_create` — konstant antall spørringer
-- [x] **N12** `GET /api/settings/` har whitelist som speiler PUT-ens. En ny
-      `AppSetting`-nøkkel lekker ikke ut før noen legger den til bevisst.
-- [x] **N11** CLAUDE.md i samsvar med koden. Tre påstander rettet i dokumentet
-      (stats-caching, backup, frontend), én i koden: de tre produksjonsfilene importerer nå
-      fra `core.auth_decorators`, og en test hindrer at shimen tas i bruk igjen.
-      `invalidate_stats_cache()` er slettet — ingen kalte den, og TTL er hele mekanismen.
-- [x] **N9** `script.js` slettet, dobbeltklikk-vernet testet ved å kjøre guarden i node.
-      Tiltakspunkt 3 besvart: grep-i-JS-tester er ikke nok alene.
-- [x] **F5** CSP-stramming — `script-src` har ikke lenger `unsafe-inline`
-  - [x] Trinn 1: alle inline event-handlere ute av markup (30 `onclick` i templaten,
-        6 generert fra JS, 2 `oninput`, 7 `onsubmit`-bekreftelser). Verifisert manuelt
-        i prod før trinn 2. `InlineHandlerTests` vokter det.
-  - [x] Trinn 2: nonce per request på de fire inline `<script>`-blokkene, og
-        `unsafe-inline` fjernet. `CspNonceTests` vokter at markup og header er i takt.
-- [ ] `unsafe-inline` for `style-src` gjenstår. Utenfor F5s akseptansekriterium, men
-      ~50 inline `style=` i markup pluss JS-genererte stiler i statistikk-tabellene må
-      flyttes til CSS-klasser først. Ikke påbegynt.
-- [x] **F7** Betinget lasting av `patients-stats.js`. Bootstrappen måtte flyttes ut
-      først (ny `patients-app.js`) — å laste stats-fila betinget uten det ville tatt ned
-      appen for `read_only` og `read_write`. read_only laster nå 49 % av admin-bundlen.
-      **Ikke målt:** første-paint på mobil 4G.
-- [x] **F8** PgBouncer — avklart som ikke aktuell. Ved 4 workers × 4 threads bruker
-      appen 16 forbindelser mot grensen på 100, og flaskehalsen var spørringer og
-      båndbredde, ikke forbindelser. Målte tall i `docs/RUNBOOK_VAKT.md` §3c.
-- [x] **N13** Duplisert kode i `views.py`/`services.py` — alle tre delpunktene
-  - [x] Feltlista: `ARKIVERT_PASIENT_FELTER` brukes alle tre stedene. Frosset med vilje,
-        *ikke* utledet fra modellen — utledning ville fått alle eksisterende arkiver til å
-        melde falsk «tukling». `ArkivFeltlisteTests` vokter utakt mot modellen.
-  - [x] `_navneliste_views()` bygger begge navneregistrene. Feilmeldingene er pinnet i
-        `NavneregisterFeilmeldingTests` — de var det eneste ingen test dekket.
-  - [x] `views.py` (797 linjer) delt i fem moduler og slettet. Ingen shim; `urls.py` og
-        testene peker direkte på `views_patients`, `views_registre`, `views_stats`,
-        `views_arkiv` og `views_common`.
-- [x] **N6** Statistikk-tabellene escaper feltverdier (`escHtmlValue()`), og markup koden
-      bygger selv må merkes med `trustedHtml()`. Personell-listene escaper også navn —
-      fritekst uten whitelist, ikke nevnt i punktet. `import_offline_data` validerer nå mot
-      `choices.py` med `--force` som utvei. Vaktpost mot nye uescapede tabeller i
-      `patients/tests_xss_stats.py`.
-      **NB:** F5 (CSP `unsafe-inline`) ble ikke tatt med, tross anbefalingen i dokumentet.
-      Backup-restore er også dekket nå — se punktet under.
-- [x] **N10** `CustomUser.current_session_key` gjør innlogging til ett indeksert oppslag.
-      Sikkerhetsstiene (passordbytte, admin-reset, frys, sletting) beholder full
-      gjennomgang. **NB: krever migrasjon** — `accounts/0008_customuser_current_session_key`
-      (kun AddField; se hendelsesnotatet i CHANGELOG for hvorfor den er håndskrevet)
+- [ ] **F3 — Server-side idempotency ved pasient-opprettelse.** ~2–3 t. Utløst av en reell
+      hendelse: 30. april 2026 ble en pasient registrert dobbelt på Grønn sone i prod fordi
+      brukeren dobbeltklikket før serveren rakk å svare. På delte soner finnes ingen
+      unik-sjekk, så begge requests gikk gjennom.
+      Fix A (`withSubmitGuard()` i `patients-utils.js:41`) er på plass, men beskytter ikke
+      API-klienter, to faner med samme skjema, eller automatisk nettverks-retry.
+      Fix B: frontend genererer `crypto.randomUUID()` når skjemaet åpnes og sender den som
+      `idempotency_key`. Backend slår opp `patient_create:{user.id}:{key}` før opprettelse;
+      treff gir samme respons som første gang (status 200, ikke 201), lagret i 5 min.
+      **Bruk `cache.add()`, ikke `get()`+`set()`** — sistnevnte er ikke atomisk.
+      **Risiko:** krever Redis. I lavkostnad-modus er cachen per prosess, så beskyttelsen
+      gjelder kun innen én worker. Cache-feil må falle tilbake til «opprett uansett» —
+      bedre dobbel registrering enn ingen registrering.
+      *Akseptanse:* to raske POST-er med samme nøkkel gir én pasient.
 
-#### Fortsatt åpne i FORBEDRINGER_2026-08
+- [ ] **F4 — Lasttest før stor vakt.** ~3–4 t. `locust` eller enklere script: 20 samtidige
+      innloggede brukere, polling av pasientlista hvert 30. sek, 5 brukere oppretter pasient
+      hvert 2. min, 2 endrer en eksisterende hvert min. Kjør mot staging.
+      Sjekk: gj.snitt responstid < 500 ms, ingen 5xx, cache-hit-ratio i admin-dashbordet,
+      minne og CPU i Railway-metrics.
+      **Ta MFA-rate-limit med i testplanen** — den delte bøtta (N4) var nettopp den
+      feiltypen en lasttest fanger, og som ellers først merkes ved en reell vaktstart.
+      *Akseptanse:* rapport som viser at konfigurasjonen tåler 25 samtidige uten degradering.
 
-Disse sto i backloggen uten å være løftet hit. Rekkefølgen er dokumentets egen rangering.
+- [ ] **`style-src`-delen av CSP-strammingen.** Utenfor F5s akseptansekriterium, men
+      `unsafe-inline` står fortsatt for stiler. ~50 inline `style=` i markup pluss
+      JS-genererte stiler i statistikk-tabellene må flyttes til CSS-klasser først.
+      Ikke påbegynt. Nevnt som kjent avvik i personverndokumentasjonen (§ sikkerhetstiltak).
 
-- [ ] **S3** Rate-limiting finnes kun på innlogging. `@ratelimit` står to steder, begge på
-      `login_view`. Ubeskyttet: `POST /pasienter/api/patients/` (en løpsk klient eller
-      stjålet sesjon kan opprette i løkke), `POST /accounts/change-password/` (ingen
-      struping på gjetting av gammelt passord), cache-miss-stien til `/api/full-stats/`, og
-      `auditlog/eksport.csv` med 5000 rader per kall. Alt krever innlogging, derfor lavere
-      prioritet — men `django-ratelimit` og nødbryteren `RATELIMIT_ENABLE` finnes allerede,
-      så kostnaden er lav. ~2 t
-- [ ] **F3** Server-side idempotency ved pasient-opprettelse. `withSubmitGuard()` (Fix A) er
-      på plass, men beskytter ikke API-klienter, to faner med samme skjema eller automatisk
-      nettverks-retry. Fix B: `idempotency_key` fra `crypto.randomUUID()` i POST-body, slått
-      opp i cache før opprettelse. Utløst av en reell dobbeltregistrering 30. april 2026. ~2–3 t
-- [ ] **F4** Lasttest-script før stor vakt. 20 samtidige brukere mot staging, verifiser at
-      Redis + 2 workers × 4 tråder holder. **Ta N4 med i testplanen** — den delte
-      MFA-rate-limit-bøtta er nettopp den feiltypen en lasttest fanger, og som ellers først
-      merkes ved en reell vaktstart. ~3–4 t
-- [ ] **F6** Statistikk-utvidelse: live-dashbord for alle innloggede + utvidet
-      evalueringsstatistikk for admin/lead, som to uavhengige leveranser med ulik
-      personvernprofil. Største enkeltpunkt i backloggen. **Underlaget mangler** — de to
-      dokumentene seksjonen bygger på ligger i den gamle Pasientregistreringsappen, ikke
-      her. ~25–35 t
-- [ ] **F9** Kolonne-kryptering av følsomme felter. **Nedprioritert, ikke planlagt.** Verdien
-      falt da GDPR fase 3.1 kom — kollaps til aggregat etter 24 mnd er det som bærer
-      dataminimeringen nå, ikke kryptering. Tas kun ved skjerpet trusselbilde
+- [ ] **Statistikk-utvidelse (tidligere F6).** ~25–35 t, faseinndelt. Flyttet ut som eget
+      beslutningsnotat: [`docs/BESLUTNING_STATISTIKK.md`](./docs/BESLUTNING_STATISTIKK.md).
+      **Fem spørsmål må besvares før noen skriver kode** — de står nederst i notatet.
+      Underlaget mangler i dette repoet; det ligger i den gamle Pasientregistreringsappen.
+
+- [ ] **F9 — Kolonne-kryptering av følsomme felter.** **Nedprioritert, ikke planlagt.**
+      Verdien falt da GDPR fase 3.1 kom: arkiverte rader kollapser til aggregat etter 24
+      måneder, så mengden helsedata som faktisk ligger lagret over tid er kraftig redusert.
+      Det er den mekanismen som bærer dataminimeringen nå, ikke kryptering. Feltnivå-
+      kryptering kompliserer spørringer, indekser og nøkkelrotasjon. Tas kun ved skjerpet
+      trusselbilde eller eksplisitt krav.
+
+- [ ] **Løs tråd fra F7:** første-paint på mobil 4G ble aldri målt. `read_only` laster nå
+      49 % av admin-bundlen, men gevinsten i faktisk oppstartstid er udokumentert.
+
+**F8 (PgBouncer) er avklart som ikke aktuell** og står ikke som oppgave: ved 4 workers ×
+4 tråder bruker appen 16 forbindelser mot Railway Postgres' grense på ~100, og
+`conn_max_age=600` demper ytterligere. Flaskehalsen var spørringer og båndbredde, ikke
+forbindelser. Tas opp igjen kun hvis `WEB_WORKERS` settes til 4 eller mer.
 
 ## Ideer / backlog
 

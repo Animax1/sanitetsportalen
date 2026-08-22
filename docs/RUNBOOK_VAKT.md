@@ -158,7 +158,7 @@ SELECT count(*), state FROM pg_stat_activity
 ```
 
 En connection pooler (PgBouncer) er vurdert og **ikke nødvendig** på denne skalaen — se
-F8 i `docs/FORBEDRINGER_2026-08.md`.
+avklaringen av F8 i `TODO.md` og CHANGELOG.
 
 ---
 

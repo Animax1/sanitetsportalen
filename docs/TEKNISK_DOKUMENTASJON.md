@@ -1511,7 +1511,7 @@ Restrisiko: stopper cron-jobben uten at noen oppdager det, vokser loggene ubegre
 
 Vaktarkivet lagrer radnivå (`ArkivertPasient`) og beregner statistikken på nytt hver gang et arkiv åpnes. Radene vises aldri enkeltvis i grensesnittet.
 
-Planlagt endring: radene kollapser til frosne aggregater etter 24 måneder, se `docs/GDPR_TILTAKSPLAN.md` fase 3.1. Da må også SHA-256-integritetssjekken regnes over aggregatet i stedet for radene.
+Implementert (GDPR fase 3.1, aug. 2026): radene kollapser til frosne aggregater etter 24 måneder, og SHA-256-integritetssjekken regnes da over aggregatet i stedet for radene. Se `core/arkiv/` og CHANGELOG.
 
 ---
 

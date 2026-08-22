@@ -4,7 +4,7 @@
 > **Status:** Dette dokumentet er nå et **historisk arkiv** over forbedringsrunden fra mai
 > 2026. Det beskriver hva som ble identifisert, hva som ble gjort og hvorfor.
 >
-> ### ➜ Aktiv backlog ligger i [`FORBEDRINGER_2026-08.md`](../FORBEDRINGER_2026-08.md)
+> ### ➜ Aktiv backlog ligger i [`TODO.md`](../../TODO.md)
 >
 > Alle punkter som fortsatt sto åpne er flyttet dit, sammen med nye funn fra
 > kodegjennomgangen i august. **Nye forslag skal legges til der, ikke her.** Denne fila
