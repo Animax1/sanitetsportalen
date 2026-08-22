@@ -371,7 +371,18 @@ LOGGING = {
             'level': 'ERROR',
             'class': 'django.utils.log.AdminEmailHandler',
             'filters': ['error_throttle'],
+            # include_html=False er et sikkerhetsvalg, ikke en formateringssak.
+            # HTML-malen (technical_500.html) tar med *lokale variabler* for hver
+            # stackramme. En feil i en pasientvisning ville da sendt kliniske
+            # opplysninger ut av systemet på e-post. Tekstmalen har dem ikke.
+            # Skal denne noen gang settes til True, må personvernkonsekvensen
+            # vurderes på nytt først.
             'include_html': False,
+            # Slank rapport: traceback og forespørselskontekst, ikke hele
+            # Settings- og META-dumpen Django ellers legger ved. Se
+            # core/error_reporting.py for hva som er utelatt og hvorfor.
+            # Settes kun her, så feilsiden i DEBUG beholder full detalj.
+            'reporter_class': 'core.error_reporting.SlankExceptionReporter',
         },
     },
     'root': {

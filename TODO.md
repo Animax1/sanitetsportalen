@@ -323,7 +323,14 @@ Funnene under er allerede kartlagt, så jobben er avgrenset når den skal gjøre
       - A.9 lagringstider forutsetter at `purge_old_logs` og `kollaps_arkiv` faktisk
         kjører som cron. Står de ikke, beskriver dokumentet en slettepraksis som ikke
         finner sted — se S7 i CHANGELOG for hvorfor det er det alvorligste avviket
-      - Nye behandlinger siden v1.5? E-post via AHASend er en databehandler som skal inn
+      - **E-postvarsling ved feil er ikke omtalt i dokumentet i det hele tatt.** Det er
+        en dataflyt ut av systemet til to tredjeparter — AHASend (utsending) og Google
+        (mottakerens innboks) — og begge er databehandlere som hører hjemme i A.2.
+        Varselet inneholder, etter slankingen 22. aug.: brukernavn og rolle på den som
+        opplevde feilen, klient-IP, forespurt URL og traceback. **Ingen kliniske
+        opplysninger** — skjemadata, cookies, settings og lokale variabler er utelatt,
+        og `core/tests_error_reporting.py` vokter det. Lagringstid styres av Gmail,
+        ikke av applikasjonen, på samme måte som Railway-backupen i A.2
       - Bump versjonsnummer og dato når noe endres
 
 ### Løse punkter

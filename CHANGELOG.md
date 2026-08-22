@@ -4,6 +4,49 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-08-22 — Feilvarselet slanket: 14 810 → 673 tegn
+
+**769 tester, alle grønne** (14 nye).
+
+Spørsmålet som utløste dette: *er det nødvendig å sende settings?* Nei. Django gjenbruker
+feilsidens mal (`technical_500.txt`) til varslings-e-posten, og den malen er skrevet for en
+utvikler med DEBUG på som trenger å se alt. Den dumper hele `Settings:`-tabellen og hele
+`META:`-tabellen. I en e-post er det rundt 13 av 14 KB støy — og et ganske detaljert bilde
+av systemet som forlot serveren hver gang noe kræsjet.
+
+`core/error_reporting.py` erstatter den med det varselet faktisk trenger: hva som skjedde,
+hvor, hvem det traff, og når. Målt på samme feil: **14 810 → 673 tegn, altså 4 %.**
+
+**Fravalgene er sikkerhetsegenskapen**, og testene vokter dem — innhold er lett å se at
+stemmer, mens en gjeninnført Settings-dump ville gått upåaktet hen:
+
+| Utelatt | Hvorfor |
+|---|---|
+| `Settings:` | Hemmelighetene var maskert, men resten er en konfigurasjonsoversikt varselet ikke trenger |
+| `META:` | Hele WSGI-miljøet. Vi plukker ut IP, nettleser og referer |
+| `GET`/`POST`/`COOKIES` | **Det viktigste.** En POST mot pasient-API-et har kliniske opplysninger i kroppen |
+| Lokale variabler | Var aldri med i tekstmalen, og legges ikke til. En stackramme i en pasientvisning har pasientdata i minnet |
+
+Rapportøren settes via `reporter_class` på selve handleren, ikke via
+`DEFAULT_EXCEPTION_REPORTER`. Feilsiden i DEBUG beholder dermed full detalj — det er kun
+e-posten som slankes. Ved enhver feil i rapportøren selv faller den tilbake til Djangos
+egen: en loggehandler som kaster, tar med seg varslingen den skulle levere.
+
+**`include_html=False` har fått en kommentar som sier hvorfor den står der.** Det er ikke
+en formateringssak: `technical_500.html` tar med lokale variabler for hver stackramme.
+Skal den noen gang settes til `True`, må personvernkonsekvensen vurderes på nytt først.
+
+**Verifisert med ekte produksjonsverdier** at ingenting lekker: `SECRET_KEY`,
+`EMAIL_HOST_PASSWORD`, databasepassord, databasevert, POST-data og sesjonscookie er alle
+fraværende i rapporten. Djangos egen maskering (`API|AUTH|TOKEN|KEY|SECRET|PASS|SIGNATURE|HTTP_COOKIE`)
+dekket hemmelighetene allerede, men databaseverten slapp gjennom fordi `DATABASES` og
+`HOST` ikke matcher mønsteret. Nå er hele seksjonen borte, så spørsmålet er uaktuelt.
+
+**Et hull notert i TODO:** personverndokumentasjonen omtaler ikke e-postvarsling i det hele
+tatt. Det er en dataflyt til to tredjeparter — AHASend og Google — som hører hjemme i A.2.
+Varselet inneholder brukernavn, rolle, klient-IP, URL og traceback; ingen kliniske
+opplysninger.
+
 ## 2026-08-22 — E-postvarsling verifisert, og en kommando som gjør det etterprøvbart
 
 **755 tester, alle grønne** (5 nye).
