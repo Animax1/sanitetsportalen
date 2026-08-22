@@ -4,6 +4,49 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-08-22 — E-postvarsling verifisert, og en kommando som gjør det etterprøvbart
+
+**755 tester, alle grønne** (5 nye).
+
+E-postvarslingen ved uhåndterte feil (F1) har stått ferdig i koden siden 13. august, men
+aldri vært bekreftet mot en faktisk SMTP-tjener. Nå er den det: AHASend via
+`send.ahasend.com:587`, med `noreply@mail.sanitet.net` som avsender.
+
+**`python manage.py verifiser_feilvarsel`** er lagt til fordi denne stien er stille når
+den er ødelagt. Djangos `AdminEmailHandler` kaller `mail_admins(..., fail_silently=True)`,
+og en loggehandler som feiler river aldri ned requesten som utløste den. Det er riktig
+oppførsel — men konsekvensen er at feil SMTP-oppsett ser nøyaktig ut som et system uten
+feil. Tom `ADMINS` er verre: da har varselet null mottakere, og ingenting protesterer.
+
+Kommandoen skiller de tre tingene som kan svikte, og sier hvilken det er:
+
+1. **Oppsettet** — backend, mottakere, avsender. Tom `ADMINS` gir `CommandError`, ikke et
+   grønt svar på et spørsmål ingen stilte
+2. **SMTP-forbindelsen** — åpnes eksplisitt med `fail_silently=False`, så feil legitimasjon
+   eller avvist avsenderadresse gir et unntak i stedet for stillhet
+3. **Varslingskjeden** — en ekte exception logges til `django.request` med `exc_info` og et
+   syntetisk request-objekt, altså slik Django selv gjør det ved en uhåndtert feil. Den går
+   gjennom dempingsfilteret og `AdminEmailHandler`
+
+Steg 2 er det som roper. Steg 3 beviser at kjeden er koblet, men kan ikke rapportere
+leveranse — handleren svelger sine egne feil. Derfor kjøres begge: steg 2 utelukker at
+steg 3 feilet stille. `--dry-run` kontrollerer oppsettet uten å sende.
+
+Verifisert mot Railway-variablene: SMTP åpnet og autentisert, og
+`django.request` har `['StreamHandler', 'AdminEmailHandler']`.
+
+`audit/tests_verifiser_feilvarsel.py` vokter at kommandoen selv ikke er stille når noe er
+galt — en verifiseringskommando som feiler stille er verre enn ingen kommando. Fila heter
+`verifiser_feilvarsel.py`, ikke `test_*`, nettopp for at testoppdageren ikke skal plukke
+opp en management-kommando som testmodul.
+
+**Et lokalt funn underveis, uten betydning for drift:** første forsøk feilet med
+`CERTIFICATE_VERIFY_FAILED: certificate has expired`. Sertifikatet til AHASend er gyldig
+(Let's Encrypt, 1. aug → 30. okt 2026, `openssl` verifiserer kjeden med kode 0). Det er
+Windows-sertifikatlageret på utviklingsmaskinen som har et utløpt sertifikat i
+Let's Encrypt-stien — `letsencrypt.org` feiler også, mens `pypi.org` går fint.
+Railway-containeren har sin egen, oppdaterte `ca-certificates` og er ikke berørt.
+
 ## 2026-08-22 — `docs/` konsolidert: TODO er arbeidslista, tre dokumenter slettet
 
 Kun dokumentasjon. **750 tester, alle grønne.** Ingen brutte relative lenker i repoet.

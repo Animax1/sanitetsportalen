@@ -23,17 +23,16 @@ Disse står ikke i kode. De krever Railway-innlogging eller en avgjørelse utenf
 prosjektet, og blir liggende til du gjør dem. Ingen av dem oppdages av testsuiten, og
 ingen av dem gir feilmelding — de er bare stille inaktive.
 
-- [ ] **Sett `ADMINS` og `EMAIL_*` i Railway.** Uten dem er e-postvarslingen ved
-      uhåndterte feil (F1) helt inert — den skriver til konsoll, og du får aldri
-      beskjed når noe kræsjer i prod.
-      - `ADMINS` har formatet `Navn:epost`, komma-separert
-      - `EMAIL_HOST`, `EMAIL_PORT`, `EMAIL_HOST_USER`, `EMAIL_HOST_PASSWORD`,
-        `EMAIL_USE_TLS`
-      - **Riktig miljø er det portalen faktisk kjører i.** I dag er det `staging`
-        (`portal.sanitet.net`), ikke `production` — se migrasjonspunktet under. Variablene
-        må flyttes med når portalen bytter miljø
-      - **Verifiser med en framprovosert 500**, ellers vet du ikke om det virker
-      - Bakgrunn: CHANGELOG 13. aug. 2026, «Drift: logging som naar fram (N3) og e-postvarsel»
+- [x] **`ADMINS` og `EMAIL_*` satt i Railway, og verifisert.** AHASend via
+      `send.ahasend.com:587`, avsender `noreply@mail.sanitet.net`. Bekreftet 22. aug. 2026
+      med `python manage.py verifiser_feilvarsel`: SMTP åpnet og autentisert,
+      `AdminEmailHandler` er koblet på `django.request`, og en ekte exception gikk gjennom
+      hele kjeden.
+      - [ ] **Variablene må flyttes med når portalen bytter miljø.** De ligger nå i
+            `staging`. De fem nøklene er `ADMINS`, `EMAIL_HOST`, `EMAIL_HOST_USER`,
+            `EMAIL_HOST_PASSWORD` og `DEFAULT_FROM_EMAIL` — `EMAIL_PORT` og
+            `EMAIL_USE_TLS` har brukbare defaults (587/True). Kjør
+            `verifiser_feilvarsel` på nytt etter flyttingen
 
 - [ ] **Sett opp cron-jobb for `kollaps_arkiv` på Railway.** Dette er steg 3 i
       migrasjonspunktet under, og bør ikke gjøres før portalen står i riktig miljø —
