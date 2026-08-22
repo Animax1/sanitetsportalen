@@ -25,48 +25,61 @@ ingen av dem gir feilmelding — de er bare stille inaktive.
 
 - [x] **`ADMINS` og `EMAIL_*` satt i Railway, og verifisert.** AHASend via
       `send.ahasend.com:587`, avsender `noreply@mail.sanitet.net`. Bekreftet 22. aug. 2026
-      med `python manage.py verifiser_feilvarsel`: SMTP åpnet og autentisert,
-      `AdminEmailHandler` er koblet på `django.request`, og en ekte exception gikk gjennom
-      hele kjeden.
-      - [ ] **Variablene må flyttes med når portalen bytter miljø.** De ligger nå i
-            `staging`. Nøklene som betyr noe i prod er `ADMINS`,
-            `DEFAULT_FROM_EMAIL`, `AHASEND_API_KEY` og `AHASEND_ACCOUNT_ID`.
-            `EMAIL_HOST*` brukes ikke i containeren — se punktet under. Kjør
-            `verifiser_feilvarsel` på nytt etter flyttingen
+      med `python manage.py verifiser_feilvarsel` kjørt i containeren: melding sendt og
+      godtatt over AHASends HTTP-API v2, `AdminEmailHandler` koblet på `django.request`,
+      og en ekte exception gjennom hele kjeden. Begge e-postene bekreftet i innboksen.
+      - [x] **Variablene står i `production`.** Miljøet ble ikke flyttet — det gamle
+            `production` (den gamle appen) ble slettet, og portalens miljø døpt om.
+            Variablene fulgte dermed med av seg selv. Nøklene som betyr noe er `ADMINS`,
+            `DEFAULT_FROM_EMAIL`, `AHASEND_API_KEY` og `AHASEND_ACCOUNT_ID`
       - [x] **Railway sperrer utgående SMTP.** Målt fra containeren 22. aug. 2026:
             portene 587, 2525, 465 og 25 er alle stengt, 443 er åpen. Løst med en
             egen backend mot AHASends HTTP-API (`core/mail_backends.py`). Å bytte
             SMTP-leverandør ville truffet samme vegg — det er en plattformpolicy,
             ikke noe ved AHASend
 
-- [ ] **Sett opp cron-jobb for `kollaps_arkiv` på Railway.** Dette er steg 3 i
-      migrasjonspunktet under, og bør ikke gjøres før portalen står i riktig miljø —
-      ellers må jobben settes opp på nytt. Uten den kollapser
-      ikke arkiverte pasientrader til aggregat etter 24 måneder, og lagringstiden
-      i personvernprotokollen (del A, punkt A.9) håndheves ikke i praksis. Det er
-      en slettepraksis vi har beskrevet overfor både de registrerte og
-      tilsynsmyndighet.
-      - Framgangsmåte: `docs/OPPSETT_KOLLAPS_CRON.md`. **Dokumentet er ditt** — det
-        beskriver en oppgave bare du kan utføre, og du sletter det selv når jobben står.
-        Det skal ikke foldes inn i TODO eller ryddes bort av en opprydding
+- [x] **Cron-jobbene står i Railway (22. aug. 2026).** Begge i `production`-miljøet,
+      bygget fra portal-repoet, med `restartPolicy: NEVER`:
+      | Tjeneste | Start Command | Plan |
+      |---|---|---|
+      | `purge_old_logs` | `python manage.py purge_old_logs` | `0 0 * * SUN` |
+      | `kollaps_arkiv` | `python manage.py kollaps_arkiv` | `0 4 1 * *` |
 
-- [ ] **Flytt Sanitetsportalen til `production`-miljøet.** Rekkefølgen er bestemt og
-      henger sammen — punktene under kan ikke tas i vilkårlig orden:
-  1. Kjør dataimporten fra den gamle appen — se `docs/DATAIMPORT_FRA_GAMMEL_PROD.md`.
-     `production` må stå urørt til dette er gjort; det er der årets pasientdata ligger
-  2. Flytt portalen over på `production`-miljøet
-  3. Koble `purge_old_logs`-cron (tjenesten finnes allerede der) og sett opp
-     `kollaps_arkiv` — se `docs/OPPSETT_KOLLAPS_CRON.md`
+      Begge tørrkjørt mot produksjonsdatabasen: `kollaps_arkiv` har ingenting å kollapse
+      (arkivene er fra 2026, grensen er 730 dager), `purge_old_logs` fant 3 varsler eldre
+      enn 30 dager.
+      - **`startCommand` må settes eksplisitt.** Uten den arver tjenesten `Procfile`-ens
+        `web:`-linje og starter gunicorn i stedet for kommandoen — jobben gjør da ingenting
+        og feiler ikke. Begge manglet den i første oppsett
+      - **`OFFLINE_MODE` må ikke stå på en cron-tjeneste.** `settings.py` kaster
+        `ImproperlyConfigured` ved oppstart på Railway, med vilje. `kollaps_arkiv` hadde
+        den, og ville krasjet stille én gang i måneden
+      - [ ] **Kjør `kollaps_arkiv --dry-run` manuelt før første skarpe kjøring 1. sept.**
+            Den sletter helseopplysninger permanent. `docs/OPPSETT_KOLLAPS_CRON.md`
+            beskriver framgangsmåten. **Dokumentet er ditt** — du sletter det selv når du
+            er trygg på jobben
 
-      **Mens dette står på vent:** portalen kjører i `staging`, som ikke har noen
-      cron-tjeneste. Verken `purge_old_logs` eller `kollaps_arkiv` kjører mot portalens
-      database, så audit-logger, innloggingshendelser og varsler samler seg opp.
-      `PERSONVERN_DOKUMENTASJON.md` A.9 oppgir 730/30 dager med «`purge_old_logs` via
-      Railway Cron» som mekanisme — den påstanden blir sann først etter steg 3. Sjekkliste-
-      punktet på linje 724 i samme dokument kan krysses av da, ikke før.
+- [x] **Portalen står i `production` (22. aug. 2026).** Gjennomført i denne rekkefølgen:
+  1. Dataimporten fra den gamle appen — 273 pasienter, se CHANGELOG
+  2. Det gamle `production`-miljøet (den gamle Pasientregistreringsappen) slettet, og
+     portalens miljø døpt om fra `staging` til `production`. **Ingenting ble flyttet** —
+     alternativet var å migrere hele produksjonsdatabasen mellom to Postgres-instanser,
+     for å vinne et navn
+  3. `purge_old_logs` og `kollaps_arkiv` satt opp som cron — se «Krever Andre» øverst
 
-      Merk at backloggens F2 ble avkrysset som «allerede på plass». Det stemmer for den
-      gamle appen i `production`, ikke for portalen. Det er riktig igjen etter steg 2.
+      Miljøet har nå tre tjenester som alle bygger fra `Animax1/sanitetsportalen`.
+      Navneforvirringen som traff oss tre ganger 22. august er dermed borte.
+
+      **Den gamle appens database er slettet.** Din manuelle backup i portalen er eneste
+      gjenopprettingspunkt for de 273 importerte pasientene.
+
+      - [ ] **Verifiser at cron faktisk kjører.** `purge_old_logs` fyrer førstkommende
+            søndag 00:00 og skal slette 3 varsler fra 12. mai (`id` 1, 2, 3 — totalt 4
+            varsler før kjøring). Er de borte etterpå, er mekanismen bevist ende-til-ende.
+            **Først da** kan sjekklistepunktet på linje 724 i
+            `PERSONVERN_DOKUMENTASJON.md` krysses av, og backloggens F2 regnes som reell
+            for portalen. En tørrkjøring er ikke bevis — det er nettopp forskjellen S7
+            handlet om
 
 - [ ] **Fyll inn organisasjonsnavn i A.4** i `docs/PERSONVERN_DOKUMENTASJON.md`.
       Står fortsatt som `[fyll inn organisasjonsnavn]`. Dokumentet er
@@ -81,7 +94,7 @@ Fase 0–5 er gjennomført. Begrunnelsene og de varige beslutningene ligger i
 står i [`CHANGELOG.md`](./CHANGELOG.md). Tre punkter gjenstår:
 
 - [ ] Fyll inn organisasjonsnavn i A.4 — se «Krever Andre» øverst
-- [ ] Sett opp cron-jobb for `kollaps_arkiv` — se «Krever Andre» øverst
+- [x] Cron-jobb for `kollaps_arkiv` satt opp — se «Krever Andre» øverst
 - [ ] **Skriftlig DPIA-vurdering.** Uten journalplikt, med pseudonymiserte data og
       begrenset omfang er art. 35 trolig ikke utløst. Det som trengs er en kort skriftlig
       begrunnelse for *at* en DPIA ikke er nødvendig — ikke en full DPIA. Vurderingen hører
@@ -166,9 +179,12 @@ forbindelser. Tas opp igjen kun hvis `WEB_WORKERS` settes til 4 eller mer.
 Besluttet 14. aug. 2026: invitasjon som registreringsvei, selvbetjent passord-reset for
 personlige kontoer, admin-reset beholdt for alle. Ingenting bygget ennå.
 
-- [ ] **Blokkerer alt annet:** SMTP verifisert, inkludert SPF/DKIM og at mailen lander i
-      innboksen. Uten det er reset-funksjonen inert og verre enn ingen funksjon.
-      Se «Krever Andre» øverst.
+- [x] **Blokkeringen er opphevet.** Utsending verifisert 22. aug. 2026 via AHASends
+      HTTP-API v2, med SPF/DKIM på plass og testmeldinger bekreftet i innboksen.
+      Reset-funksjonen er ikke lenger inert av mangel på e-post.
+- [ ] **Databehandleravtale med AHASend**, og AHASend + Google inn i
+      `PERSONVERN_DOKUMENTASJON.md` A.2. **Forfalt** — leverandøren er allerede i bruk for
+      feilvarsling, ikke bare planlagt. Se `docs/BESLUTNING_BRUKERE_OG_EPOST.md` §4.
 - [ ] Databehandleravtale med e-postleverandør + oppføring i personvernprotokollen
 - [ ] Migrasjon: `fullt_navn` og `er_delt_konto` på `CustomUser`. **Kun AddField, alene.**
       `CustomUser` arver `AbstractBaseUser`, så `first_name`/`last_name` finnes ikke.

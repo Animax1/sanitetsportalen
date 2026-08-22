@@ -4,6 +4,64 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-08-22 — Portalen står i `production`, med cron. Dokumentasjonen i takt
+
+Kun dokumentasjon og Railway-oppsett. **797 tester, alle grønne.** Ingen kodeendring.
+
+**Portalen ble ikke flyttet.** Det opprinnelige `production`-miljøet — den gamle
+Pasientregistreringsappen — er slettet, og portalens miljø døpt om fra `staging` til
+`production`. Alternativet, å faktisk flytte portalen, ville betydd å migrere hele
+produksjonsdatabasen mellom to Postgres-instanser: 273 pasienter, brukerkontoer,
+MFA-hemmeligheter, auditspor og arkiver. Samme klasse operasjon som dataimporten, men uten
+`--dry-run` som sikkerhetsnett — for å vinne et navn.
+
+Miljøet har nå tre tjenester som alle bygger fra `Animax1/sanitetsportalen`:
+
+| Tjeneste | Start Command | Plan |
+|---|---|---|
+| `web` | (Procfile) | — |
+| `purge_old_logs` | `python manage.py purge_old_logs` | `0 0 * * SUN` |
+| `kollaps_arkiv` | `python manage.py kollaps_arkiv` | `0 4 1 * *` |
+
+**To feil i cron-oppsettet, begge stille:**
+
+- **`startCommand` manglet på begge.** Uten den arver tjenesten `Procfile`-ens `web:`-linje
+  og starter gunicorn i stedet for kommandoen. Jobben ville gjort ingenting, uten å feile —
+  og med `restartPolicy: NEVER` bare stått til Railway rev den ned
+- **`kollaps_arkiv` hadde `OFFLINE_MODE=True`.** `settings.py` kaster `ImproperlyConfigured`
+  ved oppstart når den står på Railway, med vilje. Tjenesten ville krasjet før Django lastet,
+  én gang i måneden, uten at noen merket det
+
+Sperren mot `OFFLINE_MODE` ble skrevet for web-tjenesten, men fanget dette like godt.
+
+Begge kommandoene tørrkjørt mot produksjonsdatabasen: `kollaps_arkiv` har ingenting å
+kollapse (arkivene er fra 2026, grensen er 730 dager), `purge_old_logs` fant 3 varsler eldre
+enn 30 dager.
+
+**Verifiseringen er ikke ferdig, og det står som eget punkt.** En tørrkjøring beviser at
+kommandoen kjører, ikke at cron utløser den. `purge_old_logs` fyrer førstkommende søndag og
+skal slette varsel `id` 1, 2 og 3 fra 12. mai. Er de borte etterpå, er mekanismen bevist —
+og **først da** kan sjekklistepunktet i `PERSONVERN_DOKUMENTASJON.md` linje 724 krysses av.
+Å krysse av på grunnlag av en tørrkjøring ville vært nøyaktig den dokumenterte-men-ikke-reelle
+kontrollen S7 handlet om.
+
+**Dokumentasjonen sier nå at e-post går over HTTP-API, ikke SMTP.**
+`BESLUTNING_BRUKERE_OG_EPOST.md` var bygget rundt SMTP fra ende til annen: den påsto at
+`EMAIL_HOST` ikke var satt i produksjon, at all e-post havnet i Railway-loggen, og listet
+fire SMTP-leverandører å velge mellom. Seksjon 1–3 er skrevet om — transporten er AHASends
+HTTP-API v2, leverandørvalget er tatt, og kravet til en framtidig erstatter er at den har et
+HTTP-API, ikke bare SMTP.
+
+**Databehandleren er nå en forfalt mangel, ikke et framtidig valg.** Notatet behandlet
+e-postleverandøren som noe som skulle avklares før invitasjonsflyten bygges. Men AHASend er
+i bruk *allerede*, til feilvarsling, og er dermed databehandler i dag. Varselet inneholder
+brukernavn, rolle, klient-IP, URL og traceback — ingen kliniske opplysninger, men
+personopplysninger — og de går gjennom to tredjeparter: AHASend ved utsending og Google som
+mottakerens innboks. Begge skal inn i A.2.
+
+**Den gamle appens database er slettet.** Den manuelle backupen i portalen er eneste
+gjenopprettingspunkt for de 273 importerte pasientene.
+
 ## 2026-08-22 — Dataimport fra gammel prod: 273 pasienter inn i portalen
 
 Årets pasientdata er hentet fra den gamle Pasientregistreringsappen og ligger nå i

@@ -9,120 +9,111 @@ Skrevet 14. aug. 2026.
 
 ## 1. Hvordan e-post fungerer i dag
 
-Én bryter styrer alt, i `myproject/settings.py`:
+**Oppdatert 22. aug. 2026. E-post virker nå i produksjon** — dette avsnittet beskrev
+tidligere en tilstand der ingenting ble sendt.
+
+Transporten er **AHASends HTTP-API v2**, ikke SMTP:
+
+```
+POST https://api.ahasend.com/v2/accounts/{account_id}/messages
+Authorization: Bearer aha-sk-...
+```
+
+Implementert i `core/mail_backends.py`. Backend velges etter hva som er satt
+(`myproject/settings.py`):
 
 ```python
-if EMAIL_HOST:
+if AHASEND_API_KEY and AHASEND_ACCOUNT_ID:
+    EMAIL_BACKEND = 'core.mail_backends.AhaSendApiBackend'
+elif EMAIL_HOST:
     EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
 else:
     EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
 ```
 
-`EMAIL_HOST` er **ikke satt i produksjon**. All e-post skrives derfor til Railway-loggen
-i stedet for å sendes. Ingenting feiler — det forsvinner bare.
+**SMTP er ikke et alternativ på Railway.** Målt fra containeren 22. aug. 2026 er portene
+587, 2525, 465 og 25 alle stengt, mens 443 mot samme vert er åpen. Det er en
+plattformpolicy mot spam-misbruk — å bytte SMTP-leverandør ville truffet samme vegg.
+SMTP-grenen beholdes fordi den virker lokalt og i offline-modus.
 
-Den eneste avsenderen er Djangos `AdminEmailHandler`, koblet inn som `mail_admins`-handler
-i `LOGGING`. Den sender stacktrace til `ADMINS` ved uhåndterte 500-feil (F1). Det finnes
-ingen brukerrettet e-post og ingen passord-reset.
+Avsender er `Sanitetsportalen <noreply@mail.sanitet.net>`, og verifisert helt fram til
+innboks. Den eneste avsenderen er fortsatt Djangos `AdminEmailHandler` ved uhåndterte
+500-feil (F1); det finnes ingen brukerrettet e-post og ingen passord-reset ennå.
 
-To detaljer som betyr noe:
+To detaljer som fortsatt betyr noe:
 
-- `DEFAULT_FROM_EMAIL` har default `sanitetsportalen@example.invalid` — et bevisst ugyldig
-  domene, slik at ingenting sendes fra et domene vi ikke eier hvis SMTP skrus på uten å
-  sette avsender.
+- `DEFAULT_FROM_EMAIL` må ligge på et domene leverandøren er autorisert for. Gjør den ikke
+  det, avvises meldingen ved innsending — og varselet du skulle fått, uteblir stille.
 - `CustomUser.email` er **valgfri**, med `help_text` «Brukes kun som kontaktinformasjon for
   admin». Unik hvis satt, via betinget constraint. Gjøres den til reset-kanal, endrer
   feltet rolle fra kontaktinfo til **gjenopprettingsvei for legitimasjon**.
 
 ---
 
-## 2. Hva som kreves for at SMTP skal virke
+## 2. Forutsetningene som allerede er på plass
 
-Fire deler. Den tredje er den folk hopper over, og grunnen til at «SMTP virker» men ingen
-får mailen.
+Fire deler måtte til. Alle er dekket — nevnt her fordi den tredje er den folk hopper over,
+og fordi de må vurderes på nytt hvis leverandør noen gang byttes.
 
-### 2.1 En server som vil sende for oss
+### 2.1 En tjeneste som vil sende for oss ✅
 
-Vert, port, brukernavn, passord.
+AHASend, med API-nøkkel og konto-ID i Railway-variablene `AHASEND_API_KEY` og
+`AHASEND_ACCOUNT_ID`. Nøkkelen bør ha det domenebegrensede scopet
+`messages:send:mail.sanitet.net`, ikke `messages:send:all`.
 
-### 2.2 En avsenderadresse på et domene vi kontrollerer
+### 2.2 En avsenderadresse på et domene vi kontrollerer ✅
 
-`DEFAULT_FROM_EMAIL`, f.eks. `Sanitetsportalen <ingen-svar@dittdomene.no>`.
+`noreply@mail.sanitet.net`.
 
-### 2.3 DNS-oppføringer på det domenet
+### 2.3 DNS-oppføringer på det domenet ✅
 
-Mottakeren sjekker om serveren som sender har lov til å sende for domenet vårt. Uten
-**SPF** og **DKIM** havner mailen i spam eller avvises. Leverandørene under gir 2–3
-DNS-oppføringer å lime inn hos domeneleverandøren, og håndterer DKIM-signeringen selv.
+Mottakeren sjekker om avsenderen har lov til å sende for domenet vårt. Uten **SPF** og
+**DKIM** havner mailen i spam eller avvises. Bekreftet i praksis: testmeldingene landet i
+innboksen, ikke i spam.
 
-### 2.4 Miljøvariablene i Railway
+### 2.4 Miljøvariablene i Railway ✅
 
-Se eksemplene under.
+`ADMINS`, `DEFAULT_FROM_EMAIL`, `AHASEND_API_KEY` og `AHASEND_ACCOUNT_ID` på `web`-tjenesten.
+Verifiser med `python manage.py verifiser_feilvarsel` — **kjørt inne i containeren**, ikke
+via `railway run`, som kjører koden på utviklingsmaskinen med et annet nettverk.
 
 ---
 
-## 3. Alternativer for SMTP
+## 3. Leverandørvalget er tatt
 
-### Brevo (fransk, innenfor EØS) — anbefalt
+AHASend er valgt og i drift. Dette avsnittet listet tidligere SMTP-alternativer (Brevo,
+Resend, Gmail, egen server) — de er uaktuelle så lenge portalen kjører på Railway, siden
+utgående SMTP er sperret uansett leverandør.
 
-```
-EMAIL_HOST=smtp-relay.brevo.com
-EMAIL_PORT=587
-EMAIL_HOST_USER=<brevo-innlogging>
-EMAIL_HOST_PASSWORD=<smtp-nøkkel fra Brevo>
-EMAIL_USE_TLS=True
-DEFAULT_FROM_EMAIL=Sanitetsportalen <ingen-svar@dittdomene.no>
-```
+Skal leverandør byttes, er kravet at tjenesten har et **HTTP-API**, ikke bare SMTP. Da må
+`core/mail_backends.py` skrives om for det nye API-et, og seksjon 2 gjennomgås på nytt —
+særlig DNS-oppføringene, som er leverandørspesifikke.
 
-### Resend (enkelt oppsett, god dokumentasjon)
-
-```
-EMAIL_HOST=smtp.resend.com
-EMAIL_PORT=587
-EMAIL_HOST_USER=resend
-EMAIL_HOST_PASSWORD=<api-nøkkel>
-EMAIL_USE_TLS=True
-DEFAULT_FROM_EMAIL=Sanitetsportalen <ingen-svar@dittdomene.no>
-```
-
-### Gmail / Google Workspace (raskest i gang)
-
-```
-EMAIL_HOST=smtp.gmail.com
-EMAIL_PORT=587
-EMAIL_HOST_USER=dinkonto@gmail.com
-EMAIL_HOST_PASSWORD=<app-passord, ikke kontopassordet>
-EMAIL_USE_TLS=True
-```
-
-App-passord krever 2FA på kontoen. Har sendegrenser, og avsender må matche kontoen — altså
-kan vi ikke sende fra organisasjonens domene med mindre kontoen ligger der.
-
-### Organisasjonens egen e-postserver
-
-Mest kontroll, men avhenger av at IT vil åpne for relay fra Railway.
-
-### Gratisnivåene
-
-Alle de kommersielle ligger på flere hundre til noen tusen e-poster i måneden. Dette
-prosjektet trenger langt mindre — noen titalls invitasjoner før en vakt, pluss reset ved
-behov.
+Volum er ikke en begrensning: prosjektet trenger noen titalls invitasjoner før en vakt,
+pluss reset ved behov.
 
 ---
 
 ## 4. Databehandler: må avklares før valg
 
-En e-postleverandør blir **databehandler**. Reset- og invitasjonsmail inneholder
-brukernavn og e-postadresse, altså personopplysninger som går gjennom tredjepart.
+**Dette er nå en åpen mangel, ikke et framtidig valg.** AHASend er tatt i bruk og er
+dermed databehandler allerede — også før invitasjons- og reset-flyten bygges.
+
+Feilvarselet som sendes i dag inneholder brukernavn og rolle på den som opplevde feilen,
+klient-IP, forespurt URL og traceback. Ingen kliniske opplysninger — skjemadata, cookies,
+settings og lokale variabler er bevisst utelatt, og `core/tests_error_reporting.py` vokter
+det. Men det er personopplysninger, og de går gjennom to tredjeparter: AHASend ved
+utsending, og Google som mottakerens innboks.
 
 Det krever:
 
-- en databehandleravtale med leverandøren
-- at leverandøren føres opp i `docs/PERSONVERN_DOKUMENTASJON.md` sammen med Railway
+- en databehandleravtale med AHASend
+- at både AHASend og Google føres opp i `docs/PERSONVERN_DOKUMENTASJON.md` A.2, sammen med
+  Railway. Lagringstiden i mottakerens innboks styres av Google, ikke av applikasjonen —
+  samme forbehold som allerede står om Railways databasebackup
 
-Velges en leverandør innenfor EØS, er det en kort avtale og en linje i protokollen. Velges
-en amerikansk, må overføringsgrunnlaget beskrives. Ikke et hinder — men mye enklere å gjøre
-nå enn å oppdage ved neste gjennomgang.
+Bygges invitasjon og reset senere, utvides innholdet med e-postadresser, men
+databehandlerforholdet er det samme. Står i TODO under dokumentgjennomgangen.
 
 ---
 
@@ -243,15 +234,16 @@ Før den pushes: sett opp en lokal database i den tilstanden prod faktisk er i, 
 
 ## 8. Rekkefølge
 
-1. **SMTP verifisert.** Sett `EMAIL_HOST`, `DEFAULT_FROM_EMAIL` og resten, legg inn
-   SPF/DKIM, og verifiser med en framprovosert 500 slik TODO sier. Sjekk at mailen lander i
-   **innboksen**, ikke spam — og på de klientene folk faktisk bruker.
-2. **Databehandleravtale** og oppføring i personvernprotokollen.
+1. ~~**Utsending verifisert.**~~ ✅ Gjort 22. aug. 2026: AHASends HTTP-API, SPF/DKIM på
+   plass, og testmeldinger bekreftet i innboksen — ikke spam. Verifiseres på nytt med
+   `verifiser_feilvarsel` etter enhver endring i oppsettet.
+2. **Databehandleravtale** med AHASend og oppføring i personvernprotokollen. **Denne er nå
+   forfalt** — leverandøren er i bruk, se seksjon 4.
 3. **Migrasjonen** for `fullt_navn` og `er_delt_konto`, alene.
 4. **Invitasjonsflyten.**
 5. **Passord-reset**, med de syv punktene i seksjon 6.
 
-Punkt 1 er ikke en formalitet. Uten SMTP er hele funksjonen inert: brukeren ber om reset,
+Punkt 1 var ikke en formalitet. Uten fungerende utsending er hele funksjonen inert: brukeren ber om reset,
 får «vi har sendt en lenke», og ingenting kommer. Det er verre enn ingen funksjon, fordi de
 slutter å ringe deg mens de venter.
 
