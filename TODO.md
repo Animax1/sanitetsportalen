@@ -122,7 +122,7 @@ Kodegjennomgangen fra 12.–13. august 2026 fant 28 punkter (N1–N13, S1–S7, 
       | `POST /pasienter/api/patients/` | POST | 60/min |
       | `PUT`/`DELETE /pasienter/api/patients/<pk>/` | PUT, DELETE | 120/min |
       | `GET /pasienter/api/full-stats/` | GET | 30/min |
-      | `POST /accounts/change-password/` | POST | 10/5 min |
+      | `POST /accounts/change-password/` | POST | 10/5 min, kun feilede gjett |
       | `GET /portal-admin/auditlog/eksport.csv` | GET | 10/min |
 
       Pasient-redigering sto ikke i den opprinnelige lista, men er tatt med: akseptansen
@@ -140,7 +140,13 @@ Kodegjennomgangen fra 12.–13. august 2026 fant 28 punkter (N1–N13, S1–S7, 
       - Rate-limiting deler ikke teller mellom workers uten Redis. I dag kjører appen
         1 worker × 4 tråder, så telleren er felles. Avviket ved flere workers gjør bremsen
         mildere, aldri strengere — dokumentert i modulens docstring
-      *Akseptanse innfridd:* 15 nye tester, 812 totalt, alle grønne.
+      - **Rettet samme dag:** passordbytte hadde dekoratøren på hele viewet, som telte
+        hver avvist skjemainnsending. `MustChangePasswordMiddleware` sperrer alt annet,
+        så en ny bruker som fomlet med passordreglene ved vaktstart ville blitt stengt
+        ute av hele portalen i fem minutter — og bøtta beskyttet ingenting, siden
+        `old_password` ikke sjekkes i den stien. Telles nå kun ved feilet gjett på
+        nåværende passord, i bøtta `password:old-guess`
+      *Akseptanse innfridd:* 17 nye tester, 829 totalt, alle grønne.
 
 - [ ] **F3 — Server-side idempotency ved pasient-opprettelse.** ~2–3 t. Utløst av en reell
       hendelse: 30. april 2026 ble en pasient registrert dobbelt på Grønn sone i prod fordi
@@ -383,6 +389,11 @@ Funnene under er allerede kartlagt, så jobben er avgrenset når den skal gjøre
 
 ### Løse punkter
 
+- [ ] **Rate-limit arkivstatistikken.** `/pasienter/api/innstillinger/arkiv/<pk>/full-stats/`
+      (`views_arkiv.arkiv_full_stats_view`) kjører samme tunge beregning som
+      `/api/full-stats/` — chi², Kruskal-Wallis, krysstabeller — men fikk ingen bøtte i S3.
+      Mindre eksponert: admin-only, ingen auto-refresh, og den leser arkiverte rader som
+      ikke endres. Én linje når noen er i filen uansett.
 - [ ] Rydd bort død backup-legacy: modellen `patients.BackupConfig` (singleton som
       ingenting leser lenger) og management-kommandoen `db_backup` som gater på den.
       Krever migrasjon, derfor egen oppgave.

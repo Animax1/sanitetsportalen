@@ -22,7 +22,7 @@ from datetime import timedelta
 
 from django_otp.plugins.otp_totp.models import TOTPDevice
 from django_otp.plugins.otp_static.models import StaticDevice, StaticToken
-from core.ratelimit import er_rate_limited as core_er_rate_limited, rate_limit
+from core.ratelimit import er_rate_limited as core_er_rate_limited
 
 from audit.models import AuditLog
 from core.url_safety import safe_redirect_url
@@ -595,14 +595,25 @@ def logout_view(request):
 
 
 @login_required
-# S3: `old_password` kunne gjettes uten struping. 10 forsøk per 5 min er
-# samme grense som steg 1 av innlogging, og av samme grunn — men i egen
-# bøtte, slik at et passordbytte aldri spiser av innloggingskvoten.
-# Svarer HTML fordi dette er en vanlig side, ikke et API-endepunkt.
-@rate_limit(group='accounts:change-password', rate='10/5m',
-            method='POST', on_limit='html')
 def change_password_view(request):
-    """Endre passord – påkrevd ved must_change_password."""
+    """Endre passord – påkrevd ved must_change_password.
+
+    Rate-limit (S3): bøtta teller **kun feilede gjett på nåværende passord**,
+    ikke POST-er mot dette viewet.
+
+    Skillet er ikke kosmetisk. `MustChangePasswordMiddleware` sperrer hver
+    URL unntatt denne, utlogging, innlogging og static — en bruker med
+    `must_change_password=True` kommer ikke inn i portalen før byttet lykkes.
+    En dekoratør på hele viewet ville telt hver avvist skjemainnsending også:
+    for kort passord, passord som ligner brukernavnet, bekreftelse som ikke
+    stemmer. En ny frivillig som fomler ved vaktstart ville da blitt stengt
+    ute av *hele* portalen i fem minutter.
+
+    Og i den tilstanden beskytter bøtta ingenting: `old_password` sjekkes kun
+    når `must_change_password` er False, så i tvungen-bytte-stien finnes det
+    ikke noe gammelt passord å gjette. Samme feil som N4 — telleren telte feil
+    hendelse.
+    """
     form = ChangePasswordForm()
     error = None
 
@@ -612,6 +623,12 @@ def change_password_view(request):
             if not request.user.must_change_password:
                 old = form.cleaned_data.get('old_password', '')
                 if not request.user.check_password(old):
+                    # Telles her, etter at gjettet er slått fast som feil:
+                    # et riktig passord skal aldri koste brukeren kvote.
+                    if _er_rate_limited(
+                        request, 'password:old-guess', 'user', '10/5m',
+                    ):
+                        return ratelimited_view(request)
                     error = 'Nåværende passord er feil.'
                     return render(request, 'accounts/change_password.html', {'form': form, 'error': error})
 

@@ -74,6 +74,11 @@ aldri dele teller. Sett dekoratoren under tilgangssjekken; `key='user'` forutset
 innlogget bruker. `on_limit='json'` (default) gir `{'error': ...}` med 429, `'html'` gir
 429-siden.
 
+**Tell riktig hendelse, ikke bare riktig endepunkt.** En dekoratør teller alle forespørsler
+mot viewet. Er det bare én av dem som er verdt å bremse — et feilet gjett, ikke en avvist
+skjemainnsending — hører tellingen hjemme inne i viewet, ved siden av den sjekken. Se
+`change_password_view`; N4 og S3 gikk begge i den fella.
+
 Bremsen faller åpen ved cache-feil, med vilje. Både `RATELIMIT_FAIL_OPEN=True` og
 try/except i `er_rate_limited` trengs — se modulens docstring. Nød-bryter:
 `RATELIMIT_ENABLE=False`.

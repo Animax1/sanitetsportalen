@@ -193,6 +193,7 @@ class RateLimitEndepunktTests(TestCase):
         self.assertIn(429, statuser)
 
     def test_passordbytte_strupes_og_svarer_html(self):
+        """Feilede gjett på nåværende passord skal fortsatt strupes."""
         c = self._klient(self.admin)
 
         svar = [
@@ -207,6 +208,64 @@ class RateLimitEndepunktTests(TestCase):
 
         strupt = next(s for s in svar if s.status_code == 429)
         self.assertIn('text/html', strupt['Content-Type'])
+
+    def test_tvungent_passordbytte_strupes_aldri(self):
+        """En ny bruker skal ikke kunne låse seg ute av portalen.
+
+        `MustChangePasswordMiddleware` sperrer hver URL unntatt denne, så en
+        429 her stenger brukeren ute av *hele* portalen. Og det er ikke noe
+        å beskytte: `old_password` sjekkes ikke i denne stien, så det finnes
+        ikke noe gammelt passord å gjette.
+
+        Scenariet er en frivillig som fomler med passordreglene ved
+        vaktstart — for kort, for likt brukernavnet, bekreftelsen skrevet
+        feil.
+        """
+        ny = CustomUser.objects.create_user(
+            username='rl-ny', password='MidlertidigPass1!', role='read_write',
+            must_change_password=True,
+        )
+        c = self._klient(ny)
+
+        statuser = _statuser(lambda: c.post('/accounts/change-password/', {
+            'old_password': '',
+            'new_password1': 'kort',
+            'new_password2': 'kort',
+        }), 25)
+        self.assertNotIn(429, statuser)
+
+        # ...og et gyldig forsøk skal fortsatt gå gjennom etterpå.
+        ok = c.post('/accounts/change-password/', {
+            'old_password': '',
+            'new_password1': 'EndeligEtGodtPass1!',
+            'new_password2': 'EndeligEtGodtPass1!',
+        })
+        self.assertEqual(ok.status_code, 302)
+        ny.refresh_from_db()
+        self.assertFalse(ny.must_change_password)
+
+    def test_ugyldig_skjema_koster_ikke_kvote(self):
+        """Bøtta teller gjett, ikke innsendinger.
+
+        Uten dette skillet kunne en bruker som skrev bekreftelsen feil noen
+        ganger, bruke opp kvoten sin uten å ha gjettet på passordet én gang.
+        """
+        c = self._klient(self.admin)
+
+        avvist = _statuser(lambda: c.post('/accounts/change-password/', {
+            'old_password': 'feil-passord',
+            'new_password1': 'NyttPassord123!',
+            'new_password2': 'StemmerIkke456!',
+        }), 25)
+        self.assertNotIn(429, avvist)
+
+        # Kvoten skal være urørt: første ekte gjett gir «feil passord», ikke 429.
+        gjett = c.post('/accounts/change-password/', {
+            'old_password': 'feil-passord',
+            'new_password1': 'NyttPassord123!',
+            'new_password2': 'NyttPassord123!',
+        })
+        self.assertEqual(gjett.status_code, 200)
 
     def test_auditlog_eksport_strupes(self):
         c = self._klient(self.admin)

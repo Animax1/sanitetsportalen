@@ -4,6 +4,56 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-08-23 — Passordbytte kunne stenge en ny bruker ute av portalen
+
+**829 tester, alle grønne** (2 nye). Rettelse av S3, samme dag som den ble deployet.
+
+En gjennomgang av om takene var realistisk satt fant at fire av fem var det, og at ett var
+satt på feil hendelse.
+
+`accounts:change-password` lå som dekoratør på hele viewet med `10/5m`, og telte dermed
+**hver** POST — også de som ble avvist av skjemavalidering. Django avviser for kort passord,
+passord som ligner brukernavnet, vanlige passord og rene tall, i tillegg til bekreftelse som
+ikke stemmer.
+
+Det som gjorde dette alvorlig er hva som ligger rundt endepunktet.
+`MustChangePasswordMiddleware` sperrer hver eneste URL unntatt passordbytte, utlogging,
+innlogging og static. En bruker med `must_change_password=True` kommer altså ikke inn i
+portalen i det hele tatt før byttet lykkes. En ny frivillig som fomlet med passordreglene
+på mobiltastatur ved vaktstart kunne bruke opp ti forsøk på fem minutter, og var da stengt
+ute av **hele portalen** til vinduet løp ut.
+
+Og bøtta beskyttet ingenting i den tilstanden: `old_password` sjekkes kun når
+`must_change_password` er `False`. I tvungen-bytte-stien finnes det ikke noe gammelt passord
+å gjette.
+
+Det er samme feil som N4, i ny drakt — **telleren telte feil hendelse.** Der var det MFA-
+forsøk som havnet i samme bøtte fordi nøkkelen slo opp et felt skjemaet ikke sendte. Her var
+det skjemafeil som ble talt som om de var angrep.
+
+**Fiksen:** tellingen er flyttet fra dekoratøren inn i viewet, til punktet der gjettet
+allerede er slått fast som feil. Bøtta heter nå `password:old-guess` — navnet sier hvilken
+hendelse den teller, ikke hvilket endepunkt den henger på. Konsekvensene:
+
+- Tvungent passordbytte rører aldri bøtta. En ny bruker kan ikke låse seg ute
+- Et **riktig** nåværende passord koster ikke kvote
+- Avviste skjemaer koster ikke kvote
+- Ti feilede gjett på nåværende passord gir fortsatt 429, som før
+
+To nye tester dekker nettopp de to første punktene, siden det er dem en refaktorering vil
+miste først.
+
+**De fire andre takene ble stående.** Målt mot hva appen faktisk gjør: `doAutoRefresh`
+kaller `loadStats` kun mens statistikkfanen er aktiv, altså rundt 2/min mot en grense på 30.
+`PUT`/`DELETE` mot en pasient har to kallsteder, begge modal-lagringer bak
+`withSubmitGuard`. Pasientregistrering krever fem utfylte felt, så 1–3/min er realistisk
+peak mot en grense på 60. Marginene er store med vilje: takene skal skille et menneske fra
+en løkke, ikke bremse noen.
+
+**Én luke notert, ikke lukket:** `/api/innstillinger/arkiv/<pk>/full-stats/` kjører samme
+tunge beregning som `/api/full-stats/`, men fikk ingen bøtte. Admin-only og uten
+auto-refresh, så eksponeringen er lav. Ligger i TODO.
+
 ## 2026-08-23 — S3: rate-limiting utover innlogging, og en kommentar som løy
 
 **812 tester, alle grønne** (15 nye).
@@ -21,6 +71,9 @@ antall kall.
 | `PUT`/`DELETE /pasienter/api/patients/<pk>/` | PUT, DELETE | 120/min | `patients:detail-write` |
 | `GET /pasienter/api/full-stats/` | GET | 30/min | `patients:full-stats` |
 | `POST /accounts/change-password/` | POST | 10/5 min | `accounts:change-password` |
+
+> Bøtta over ble omdøpt til `password:old-guess` samme dag, og teller nå kun feilede
+> gjett — se rettelsen øverst i denne fila.
 | `GET /portal-admin/auditlog/eksport.csv` | GET | 10/min | `audit:csv-export` |
 
 Nøkkelen er per bruker, og gruppen oppgis eksplisitt på hvert kallsted. Det er lærdommen
