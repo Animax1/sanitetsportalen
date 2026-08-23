@@ -875,10 +875,26 @@ def user_detail_view(request, pk):
         action = request.POST.get('action', '')
 
         if action == 'edit':
+            mfa_for = user.mfa_required
             form = AdminUserEditForm(request.POST, instance=user)
             if form.is_valid():
                 form.save()
-                messages.success(request, 'Bruker oppdatert.')
+
+                # Slås «Krev MFA» på mens brukeren har en levende sesjon,
+                # gjelder kravet ikke for dem før cookien dør — de kan ha
+                # timer igjen. Sesjonene avsluttes derfor med det samme, slik
+                # at neste pålogging faktisk går gjennom MFA-oppsettet.
+                # Dette er en sikkerhetsinnstilling; å la den vente på en
+                # cookie ville gjort den valgfri i praksis.
+                if user.mfa_required and not mfa_for:
+                    _invalidate_all_sessions(user)
+                    messages.success(
+                        request,
+                        f'Bruker oppdatert. «{user.username}» er logget ut, '
+                        f'slik at MFA settes opp ved neste pålogging.',
+                    )
+                else:
+                    messages.success(request, 'Bruker oppdatert.')
                 return redirect('accounts:user_detail', pk=pk)
 
         elif action == 'link_patient_role':
@@ -908,6 +924,33 @@ def user_detail_view(request, pk):
                     'Invitasjonen kunne ikke sendes. Sjekk e-postoppsettet, '
                     'eller sett et passord manuelt.',
                 )
+            return redirect('accounts:user_detail', pk=pk)
+
+        elif action == 'logg_ut':
+            # Avslutt sesjonene uten å røre kontoen. Til forskjell fra «frys»
+            # kan brukeren logge inn igjen med det samme — poenget er at de
+            # må *gjennom* innloggingen på nytt.
+            #
+            # Utløst av et konkret behov: slår admin på «Krev MFA» mens
+            # brukeren har sju timer igjen av sesjonen, gjelder ikke MFA for
+            # den personen før cookien dør av seg selv.
+            if user.pk == request.user.pk:
+                messages.error(
+                    request,
+                    'Du kan ikke logge ut deg selv herfra — bruk Logg ut i menyen.',
+                )
+                return redirect('accounts:user_detail', pk=pk)
+
+            _invalidate_all_sessions(user)
+            _log_user_admin_action(
+                request, user, 'UPDATE',
+                field_name='sessions', old_value='active', new_value='cleared',
+            )
+            messages.success(
+                request,
+                f'«{user.username}» er logget ut. Neste pålogging går gjennom '
+                f'hele innloggingen på nytt.',
+            )
             return redirect('accounts:user_detail', pk=pk)
 
         elif action == 'freeze':

@@ -4,6 +4,33 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-08-23 — Tvungen utlogging, og MFA som gjelder med det samme
+
+**886 tester, alle grønne** (7 nye).
+
+**«Logg ut brukeren» på brukersiden.** Avslutter sesjonene uten å røre kontoen. Til
+forskjell fra «frys» kan brukeren logge inn igjen med det samme — poenget er at de må
+*gjennom* innloggingen på nytt. `_invalidate_all_sessions()` fantes allerede fra frys og
+admin-reset, så jobben var å koble den til en knapp.
+
+**Og det som faktisk løser problemet: å slå på «Krev MFA» avslutter sesjonene automatisk.**
+
+Behovet kom fra en reell situasjon: glemmer admin å sette MFA ved oppretting og retter det
+etterpå, har brukeren kanskje sju timer igjen av sesjonen sin. Kravet gjelder da ikke for
+den personen før cookien dør av seg selv. **En sikkerhetsinnstilling som venter på en cookie
+er valgfri i praksis** — og den som slo den på tror den gjelder.
+
+Kun overgangen av→på utløser det. En ren navneendring på brukersiden skal ikke kaste noen ut
+midt i en vakt, og egen test vokter det.
+
+**«Krev MFA» mangler ikke lenger i opprettingsskjemaet.** Den lå bare i redigeringsskjemaet,
+så MFA måtte settes i to steg — akkurat det som skapte behovet over. Samme regel som ellers:
+kan ikke kombineres med delt konto, håndhevet i valideringen.
+
+Admin kan ikke logge ut seg selv herfra. Ikke fordi det er farlig, men fordi knappen står
+blant handlinger man utfører *på noen andre*, og en admin som mister sin egen sesjon midt i
+en vaktstart har et større problem enn den som skulle vært logget ut.
+
 ## 2026-08-23 — Placeholder-teksten, og en mal ingen brukte
 
 **879 tester, alle grønne** (1 ny). Meldt inn fra mobil etter at invitasjonsflyten ble

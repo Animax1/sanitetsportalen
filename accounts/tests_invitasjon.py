@@ -323,3 +323,150 @@ class EksisterendeKontoerTests(TestCase):
 
         bil.refresh_from_db()
         self.assertFalse(bil.mfa_required)
+
+@override_settings(SECURE_SSL_REDIRECT=False, RATELIMIT_ENABLE=False)
+class TvungenUtloggingTests(TestCase):
+    """Admin kan avslutte en brukers sesjoner uten å fryse kontoen.
+
+    Utløst av et konkret behov: slås «Krev MFA» på mens brukeren har sju timer
+    igjen av sesjonen, gjelder ikke kravet for den personen før cookien dør av
+    seg selv. En sikkerhetsinnstilling som venter på en cookie er valgfri i
+    praksis.
+    """
+
+    def setUp(self):
+        self.admin = CustomUser.objects.create_user(
+            username='sjef2', password='AdminPass123!', role='admin',
+            must_change_password=False,
+        )
+        self.bruker = CustomUser.objects.create_user(
+            username='frivillig', password='BrukerPass123!', role='read_write',
+            must_change_password=False,
+        )
+        self.adminklient = Client()
+        self.adminklient.force_login(self.admin)
+
+    def _bruker_er_innlogget(self, klient):
+        return klient.get(reverse('accounts:user_list')).status_code != 200
+
+    def test_utlogging_avslutter_sesjonen_men_beholder_kontoen(self):
+        brukerklient = Client()
+        self.assertTrue(brukerklient.login(
+            username='frivillig', password='BrukerPass123!',
+        ))
+
+        svar = self.adminklient.post(
+            reverse('accounts:user_detail', args=[self.bruker.pk]),
+            {'action': 'logg_ut'},
+        )
+        self.assertEqual(svar.status_code, 302)
+
+        self.bruker.refresh_from_db()
+        self.assertTrue(self.bruker.is_active,
+                        'utlogging skal ikke fryse kontoen — det er «frys»')
+
+        # Sesjonen skal være borte: en forespørsel havner på innlogging.
+        etter = brukerklient.get('/pasienter/')
+        self.assertEqual(etter.status_code, 302)
+        self.assertIn('/accounts/login/', etter['Location'])
+
+    def test_kan_logge_inn_igjen_med_en_gang(self):
+        """Forskjellen fra «frys»: kontoen er urørt."""
+        self.adminklient.post(
+            reverse('accounts:user_detail', args=[self.bruker.pk]),
+            {'action': 'logg_ut'},
+        )
+        paa_nytt = Client()
+        self.assertTrue(paa_nytt.login(
+            username='frivillig', password='BrukerPass123!',
+        ))
+
+    def test_admin_kan_ikke_logge_ut_seg_selv_herfra(self):
+        svar = self.adminklient.post(
+            reverse('accounts:user_detail', args=[self.admin.pk]),
+            {'action': 'logg_ut'},
+        )
+        self.assertEqual(svar.status_code, 302)
+        self.assertEqual(
+            self.adminklient.get(reverse('accounts:user_list')).status_code, 200,
+            'admin ble logget ut av sin egen handling',
+        )
+
+    def test_aa_slaa_paa_mfa_avslutter_sesjonen(self):
+        """Kjernen i behovet: kravet skal gjelde med en gang, ikke om sju timer."""
+        brukerklient = Client()
+        brukerklient.login(username='frivillig', password='BrukerPass123!')
+
+        self.adminklient.post(
+            reverse('accounts:user_detail', args=[self.bruker.pk]),
+            {
+                'action': 'edit', 'fullt_navn': '', 'email': '',
+                'role': 'read_write', 'is_active': 'on', 'mfa_required': 'on',
+            },
+        )
+
+        self.bruker.refresh_from_db()
+        self.assertTrue(self.bruker.mfa_required)
+
+        etter = brukerklient.get('/pasienter/')
+        self.assertEqual(etter.status_code, 302)
+        self.assertIn('/accounts/login/', etter['Location'])
+
+    def test_annen_endring_logger_ikke_ut(self):
+        """Kun overgangen av→på for MFA skal avslutte sesjoner.
+
+        Ellers ville hver eneste lagring av brukersiden kastet folk ut midt i
+        en vakt.
+        """
+        brukerklient = Client()
+        brukerklient.login(username='frivillig', password='BrukerPass123!')
+
+        self.adminklient.post(
+            reverse('accounts:user_detail', args=[self.bruker.pk]),
+            {
+                'action': 'edit', 'fullt_navn': 'Ny Navnesen', 'email': '',
+                'role': 'read_write', 'is_active': 'on',
+            },
+        )
+
+        self.assertEqual(brukerklient.get('/pasienter/').status_code, 200,
+                         'brukeren ble logget ut av en ren navneendring')
+
+
+@override_settings(SECURE_SSL_REDIRECT=False, RATELIMIT_ENABLE=False)
+class MfaVedOpprettingTests(TestCase):
+    """«Krev MFA» skal kunne settes allerede når kontoen opprettes."""
+
+    def setUp(self):
+        self.admin = CustomUser.objects.create_user(
+            username='sjef3', password='AdminPass123!', role='admin',
+            must_change_password=False,
+        )
+        self.klient = Client()
+        self.klient.force_login(self.admin)
+
+    def test_mfa_kan_settes_ved_oppretting(self):
+        self.klient.post(reverse('accounts:user_create'), {
+            'username': 'med.mfa',
+            'fullt_navn': 'Med Mfa',
+            'email': 'medmfa@eksempel.no',
+            'role': 'read_write',
+            'mfa_required': 'on',
+            'metode': 'invitasjon',
+        })
+        self.assertTrue(
+            CustomUser.objects.get(username='med.mfa').mfa_required
+        )
+
+    def test_mfa_kan_ikke_kreves_paa_delt_konto_ved_oppretting(self):
+        svar = self.klient.post(reverse('accounts:user_create'), {
+            'username': 'bil10',
+            'fullt_navn': '',
+            'email': '',
+            'role': 'read_write',
+            'mfa_required': 'on',
+            'er_delt_konto': 'on',
+            'metode': 'passord',
+        })
+        self.assertEqual(svar.status_code, 200)
+        self.assertFalse(CustomUser.objects.filter(username='bil10').exists())

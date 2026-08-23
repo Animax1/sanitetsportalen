@@ -51,6 +51,15 @@
         </div>
 
         <div class="mb-3 form-check">
+          {{ form.mfa_required }}
+          <label class="form-check-label" for="{{ form.mfa_required.id_for_label }}">
+            Krev to-faktor (MFA)
+          </label>
+          <div class="form-text">{{ form.mfa_required.help_text }}</div>
+          {% if form.mfa_required.errors %}<div class="text-danger small mt-1">{{ form.mfa_required.errors.0 }}</div>{% endif %}
+        </div>
+
+        <div class="mb-3 form-check">
           {{ form.er_delt_konto }}
           <label class="form-check-label" for="{{ form.er_delt_konto.id_for_label }}">
             Delt konto (bil e.l.)

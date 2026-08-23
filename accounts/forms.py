@@ -102,7 +102,8 @@ class AdminUserCreateForm(forms.ModelForm):
 
     class Meta:
         model = CustomUser
-        fields = ['username', 'fullt_navn', 'email', 'role', 'er_delt_konto']
+        fields = ['username', 'fullt_navn', 'email', 'role',
+                  'mfa_required', 'er_delt_konto']
         widgets = {
             'username': forms.TextInput(attrs={'class': 'form-control'}),
             'fullt_navn': forms.TextInput(attrs={
@@ -114,6 +115,9 @@ class AdminUserCreateForm(forms.ModelForm):
                 'placeholder': 'Kreves for invitasjon',
             }),
             'role': forms.Select(attrs={'class': 'form-select'}),
+            'mfa_required': forms.CheckboxInput(attrs={
+                'class': 'form-check-input',
+            }),
             'er_delt_konto': forms.CheckboxInput(attrs={
                 'class': 'form-check-input',
             }),
@@ -123,11 +127,16 @@ class AdminUserCreateForm(forms.ModelForm):
             'fullt_navn': 'Fullt navn',
             'email': 'E-post',
             'role': 'Rolle',
+            'mfa_required': 'Krev to-faktor (MFA)',
             'er_delt_konto': 'Delt konto (bil e.l.)',
         }
         help_texts = {
             'email': 'Invitasjonslenken sendes hit. Kan stå tom for delt konto.',
             'fullt_navn': 'Så du kjenner igjen hvem kontoen tilhører.',
+            'mfa_required': (
+                'Brukeren må sette opp autentiseringsapp ved første '
+                'pålogging. Kan ikke kombineres med delt konto.'
+            ),
             'er_delt_konto': (
                 'Ikke-personlig konto. Får ikke e-post, navn eller '
                 'selvbetjent passord-reset — admin setter passordet.'
@@ -158,6 +167,14 @@ class AdminUserCreateForm(forms.ModelForm):
                 self.add_error(
                     'fullt_navn',
                     'En delt konto har ingen personlig eier. La feltet stå tomt.',
+                )
+            if data.get('mfa_required'):
+                # Samme regel som ved redigering: en bil-konto deler enhet
+                # mellom folk som kommer og går, så MFA ville betydd én delt
+                # TOTP-enhet eller ingen vei inn.
+                self.add_error(
+                    'mfa_required',
+                    'MFA kan ikke kreves på en delt konto — enheten deles av flere.',
                 )
         return data
 
