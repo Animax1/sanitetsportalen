@@ -256,8 +256,18 @@ personlige kontoer, admin-reset beholdt for alle. Ingenting bygget ennå.
       plass (over), men dataflyten er fortsatt ikke dokumentert. Tas i
       dokumentgjennomgangen. Merk at C.3 linje 711 sier «Ingen andre databehandlere er
       for øyeblikket i bruk» — det er direkte feil i dag.
+- [x] **Migrasjonsavvikene ryddet (23. aug. 2026).** `makemigrations --check` er nå ren,
+      og `myproject/tests_migrations.py` håndhever det. Prod-tilstanden ble lest, ikke
+      antatt: indeksen het `audit_audit_created_2c1626_idx` i databasen hele tiden —
+      altså det modellen genererer — mens Djangos tilstand sto på `a3c1b8`. Rettet med
+      `audit/0004` (`SeparateDatabaseAndState`, ingen SQL) og `accounts/0009`
+      (`help_text` er en `non_db_attr`, `sqlmigrate` sier `-- (no-op)`).
+      **Dette var en forutsetning for `fullt_navn`-migrasjonen**, som ville fått samme
+      nummer som `is_superuser`-forslaget og dratt det med seg.
 - [ ] Migrasjon: `fullt_navn` og `er_delt_konto` på `CustomUser`. **Kun AddField, alene.**
       `CustomUser` arver `AbstractBaseUser`, så `first_name`/`last_name` finnes ikke.
+      Nå trygg å generere: `makemigrations --check` er ren, så forslaget vil kun
+      inneholde de to feltene.
 - [ ] Invitasjonsflyt med signert lenke — brukeren setter sitt eget passord, admin
       formidler ingenting
 - [ ] Passord-reset, med de sju punktene i notatet (delte kontoer utelatt, MFA ikke
@@ -292,10 +302,9 @@ modul og les i en annen.
             ikke i noen backup tatt etter 23. aug. Det er greit — de var duds — men
             270 er det tallet en framtidig restore skal gi. Ser du 273, er du på en
             eldre backup
-      - [ ] Åpne statistikkfanen og se over nøkkeltallene med egne øyne. Tallene er
-            verifisert mot kilden programmatisk, men ikke sett i grensesnittet.
-            Merk at de nå gjelder 270 pasienter — triage-fordelingen 163/91/19
-            stemte mot 273 og vil avvike med opptil tre
+      - [x] **Statistikkfanen sett over 23. aug. 2026 — viser 270.** Stemmer med
+            backupen og med de tre slettede testpasientene. Tallene er dermed
+            verifisert både mot kilden programmatisk og i grensesnittet
 
 ### Pasientmodulen — småting
 

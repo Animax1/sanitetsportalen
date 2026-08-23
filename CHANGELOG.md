@@ -4,6 +4,59 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-08-23 — Migrasjonsavvikene var ikke det vi trodde. Begge er ryddet
+
+**849 tester, alle grønne** (1 ny). To no-op-migrasjoner, ingen SQL mot databasen.
+
+Siden Django 5-oppgraderingen har `makemigrations` foreslått to migrasjoner ved hver
+kjøring. Begge ble latt ligge, og disiplinen «husk å strippe det Django foreslår» bodde i
+en docstring og i hodet til den som deployet. Etter et spørsmål om vi egentlig var sikre på
+årsaken, ble prod-tilstanden lest i stedet for antatt.
+
+**Indeksen: databasen hadde rett hele tiden.**
+
+| | Navn |
+|---|---|
+| Prod (`pg_indexes`) | `audit_audit_created_2c1626_idx` |
+| Djangos tilstand etter `0002` | `audit_audit_created_a3c1b8_idx` |
+| Modellen | `audit_audit_created_2c1626_idx` |
+
+Databasen og modellen var enige. Kun bokføringen avvek. Og `a3c1b8` er ikke et navn Django
+genererer for den indeksen — verken for `['created_at']` (`2c1626`) eller `['-created_at']`
+(`6e540c`). De to andre navnene `0002` satte er eksakt riktige. `0002` skrev altså ett navn
+som aldri har hatt dekning i modellen.
+
+**Det forklarer nedetiden 13. august presist.** Den gamle `0004` prøvde
+`ALTER INDEX audit_audit_created_a3c1b8_idx RENAME TO ...`, og den indeksen fantes ikke —
+databasen sto allerede på målnavnet. Migrasjonen var ikke farlig fordi den gjorde noe
+drastisk; den var umulig fordi den beskrev en fortid som ikke hadde skjedd.
+
+Rettet med `audit/0004`, en `SeparateDatabaseAndState` med tom `database_operations`.
+Release-fasen er det siste stedet man vil ha en betinget kodesti, så den retter bokføringen
+og rører ingenting.
+
+**`is_superuser` var aldri farlig.** Eneste forskjell mot `0001_initial` er `help_text`,
+som står i Djangos `Field.non_db_attrs`. Da returnerer `_field_should_be_altered()` False
+og `alter_field()` returnerer før den rører databasen — uansett backend. `sqlmigrate`
+bekrefter: `-- (no-op)`. Den ble strippet ut av `0008` i august fordi indeks-omdøpingen
+crash-loopet samme dag. Riktig forsiktighet under en hendelse, men de to var ikke i samme
+klasse.
+
+**Å la dem ligge hadde en pris som var i ferd med å forfalle.** Forslaget for `is_superuser`
+fikk nummer `0009` — samme nummer som neste ekte migrasjon. Migrasjonen for `fullt_navn` og
+`er_delt_konto`, som står som neste oppgave, ville fått nøyaktig det nummeret. Den som kjørte
+`makemigrations accounts && git add -A` uten å lese resultatet, ville fått
+indeks-omdøpingens tvillingsøster med på lasset i en helt annen leveranse.
+
+**Disiplinen er flyttet fra hukommelse til testsuite.** `MigrasjonerErISyncTests` kjører
+`makemigrations --check`. Er det avvik mellom modellene og migrasjonene, feiler den der —
+ikke i release-fasen. Verifisert ved å fjerne `audit/0004`: da feiler den, med Djangos eget
+forslag i meldingen.
+
+Testens docstring sier eksplisitt at man **ikke** skal kjøre `makemigrations` for å gjøre
+den grønn, men lese forslaget og verifisere med `sqlmigrate` først. Det er den vanen som
+manglet.
+
 ## 2026-08-23 — «Mine pasienter» så mer påslått ut når den var av
 
 **848 tester, alle grønne.** Kun CSS.
