@@ -279,15 +279,12 @@ personlige kontoer, admin-reset beholdt for alle. Ingenting bygget ennå.
             Samme kontotype-regler håndheves ved redigering: en personlig konto kan
             ikke gjøres delt med e-posten i behold, og MFA kan ikke slås på samtidig
             som «delt konto».
-      - [ ] **Gi admin-kontoen en e-post.** `create_admin` har `--email` som valgfritt,
-            og oppsettet i CLAUDE.md kaller den uten. Det spiller ingen rolle i dag,
-            men når passord-reset bygges blir admin den ene kontoen som ikke kan bruke
-            den — og det finnes ingen annen admin til å nullstille den. Eneste vei inn
-            ville vært `create_admin` eller `changepassword` i containeren.
-            Kan gjøres nå fra brukersiden. **Krever Andre**
-      - [ ] **Sjekk om noen eksisterende konto egentlig er delt.** Migrasjonen ga alle
-            `er_delt_konto=False`. Er en bil-innlogging feilmerket som personlig, får
-            den selvbetjent reset den dagen den bygges. Billig å rette nå
+      - [x] **Admin-kontoen har e-post (23. aug. 2026).** Forutsetningen for at
+            passord-reset skal virke for den ene kontoen ingen annen admin kan
+            nullstille.
+      - [x] **Ingen eksisterende konto er en delt bil-innlogging (bekreftet 23. aug.
+            2026).** Migrasjonens `er_delt_konto=False` er dermed korrekt for alle
+            eksisterende kontoer, og ingen av dem vil feilaktig få selvbetjent reset.
 - [ ] Passord-reset, med de sju punktene i notatet (delte kontoer utelatt, MFA ikke
       omgåelig, sesjoner drepes, `must_change_password` nullstilles, egen rate-limit-bøtte,
       kortere token-levetid, ingen kontoenumerering)
