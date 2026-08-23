@@ -268,8 +268,15 @@ personlige kontoer, admin-reset beholdt for alle. Ingenting bygget ennå.
       `accounts/0010`, nøyaktig to `AddField` og ingenting mer — gevinsten fra
       opprydningen rett før. Ingen håndhevingslogikk for `er_delt_konto` i denne
       leveransen; de fire reglene hører til invitasjons- og reset-arbeidet.
-- [ ] Invitasjonsflyt med signert lenke — brukeren setter sitt eget passord, admin
-      formidler ingenting
+- [x] **Invitasjonsflyt med signert lenke (23. aug. 2026).** `accounts/invitasjon.py`.
+      Enbruks uten tabell: tokenet bærer et avtrykk av passord-hashen, så lenken dør i
+      det passordet settes. Levetid 3 døgn, brukeren sendes til innlogging etterpå, og
+      midlertidig passord beholdes som reserve for delte kontoer og for når e-post
+      feiler. `er_delt_konto` fikk sine to første regler: valideringen nekter e-post og
+      navn, og MFA kan ikke kreves.
+      - [ ] `fullt_navn` og `er_delt_konto` mangler i `AdminUserEditForm`. En konto
+            opprettet med feil type kan derfor ikke rettes — kun slettes og lages på
+            nytt. Liten jobb, men den hører til rolle-/brukeradmin, ikke invitasjonen
 - [ ] Passord-reset, med de sju punktene i notatet (delte kontoer utelatt, MFA ikke
       omgåelig, sesjoner drepes, `must_change_password` nullstilles, egen rate-limit-bøtte,
       kortere token-levetid, ingen kontoenumerering)

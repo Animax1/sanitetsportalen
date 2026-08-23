@@ -28,7 +28,11 @@ from audit.models import AuditLog
 from core.url_safety import safe_redirect_url
 
 from .decorators import admin_required
-from .forms import LoginForm, ChangePasswordForm, AdminUserCreateForm, AdminUserEditForm, PasientRolleForm
+from .forms import (
+    LoginForm, ChangePasswordForm, AdminUserCreateForm, AdminUserEditForm,
+    PasientRolleForm, SettPassordForm,
+)
+from .invitasjon import kan_inviteres, les_token, send_invitasjon
 from .models import CustomUser, LoginEvent
 
 
@@ -741,16 +745,58 @@ def login_event_list_view(request):
 
 @admin_required
 def user_create_view(request):
-    """Opprett ny bruker og vis midlertidig passord."""
+    """Opprett ny bruker — med invitasjon, eller med midlertidig passord.
+
+    Invitasjon er hovedveien: kontoen får ingen brukbar passord-hash, og
+    brukeren setter sitt eget via en signert lenke. Da finnes det **ingenting
+    å formidle** — i motsetning til det midlertidige passordet, som må sendes
+    videre over en kanal man sjelden vil ha passord i.
+
+    Midlertidig passord beholdes som reserve for to tilfeller som begge er
+    reelle: en delt konto har ingen innboks å invitere til, og e-post kan
+    feile midt i en vaktstart. Admin velger med `metode` i skjemaet.
+
+    `must_change_password` settes kun på den midlertidige stien. Ved
+    invitasjon velger brukeren passordet selv, og da ville flagget tvunget
+    dem til å velge to passord på rad uten forklaring.
+    """
     form = AdminUserCreateForm()
     temp_password = None
 
     if request.method == 'POST':
         form = AdminUserCreateForm(request.POST)
         if form.is_valid():
+            user = form.save(commit=False)
+            vil_invitere = (
+                request.POST.get('metode', 'invitasjon') == 'invitasjon'
+                and not user.er_delt_konto
+                and bool(user.email)
+            )
+
+            if vil_invitere:
+                # Ingen brukbar hash: kontoen kan ikke logges inn på før
+                # brukeren har vært innom lenken.
+                user.set_unusable_password()
+                user.must_change_password = False
+                user.save()
+
+                if send_invitasjon(user, request):
+                    messages.success(
+                        request,
+                        f'Bruker «{user.username}» er opprettet, og '
+                        f'invitasjonen er sendt til {user.email}.',
+                    )
+                else:
+                    messages.warning(
+                        request,
+                        f'Bruker «{user.username}» er opprettet, men '
+                        f'invitasjonen kunne ikke sendes. Send den på nytt '
+                        f'fra brukersiden, eller sett et passord manuelt.',
+                    )
+                return redirect('accounts:user_detail', pk=user.pk)
+
             alphabet = string.ascii_letters + string.digits
             temp_password = ''.join(secrets.choice(alphabet) for _ in range(12))
-            user = form.save(commit=False)
             user.set_password(temp_password)
             user.must_change_password = True
             user.save()
@@ -762,6 +808,44 @@ def user_create_view(request):
             })
 
     return render(request, 'accounts/user_form.html', {'form': form, 'temp_password': temp_password})
+
+
+def invitasjon_view(request, token):
+    """Landingssiden for en invitasjonslenke: brukeren setter sitt eget passord.
+
+    Åpen uten innlogging — det er hele poenget. Sikkerheten ligger i at
+    tokenet er signert, tidsbegrenset og dør i det passordet settes.
+
+    Alle avvisningsgrunner gir samme side og samme melding: ugyldig signatur,
+    utløpt lenke, brukt lenke, frosset konto. Å skille dem ville fortalt en
+    tilfeldig besøkende om en konto finnes — samme resonnement som ligger bak
+    at innlogging sier «feil brukernavn eller passord», aldri hvilken.
+
+    Etter at passordet er satt sendes brukeren til innlogging, ikke rett inn.
+    Da møter de MFA-oppsettet på vanlig måte hvis rollen krever det, og de får
+    bekreftet at innloggingen faktisk virker mens de fortsatt har oss på tråden.
+    """
+    user = les_token(token)
+    if user is None:
+        return render(request, 'accounts/invitasjon_ugyldig.html', status=400)
+
+    form = SettPassordForm()
+    if request.method == 'POST':
+        form = SettPassordForm(request.POST)
+        if form.is_valid():
+            user.set_password(form.cleaned_data['new_password1'])
+            user.must_change_password = False
+            user.save(update_fields=['password', 'must_change_password'])
+            messages.success(
+                request,
+                'Passordet er satt. Logg inn for å komme i gang.',
+            )
+            return redirect('accounts:login')
+
+    return render(request, 'accounts/invitasjon.html', {
+        'form': form,
+        'invitert': user,
+    })
 
 
 @admin_required
@@ -789,6 +873,28 @@ def user_detail_view(request, pk):
                 link_form.save()
                 messages.success(request, 'Pasient-rolle oppdatert.')
                 return redirect('accounts:user_detail', pk=pk)
+
+        elif action == 'send_invitasjon':
+            # Ny lenke på forespørsel. Den gamle dør ikke av at en ny lages —
+            # begge peker på samme passord-avtrykk — men begge utløper etter
+            # tre døgn, og den første som brukes dreper resten.
+            if not kan_inviteres(user):
+                messages.error(
+                    request,
+                    'Kontoen kan ikke inviteres: den mangler e-post, eller '
+                    'den er en delt konto.',
+                )
+            elif send_invitasjon(user, request):
+                messages.success(
+                    request, f'Ny invitasjon er sendt til {user.email}.',
+                )
+            else:
+                messages.error(
+                    request,
+                    'Invitasjonen kunne ikke sendes. Sjekk e-postoppsettet, '
+                    'eller sett et passord manuelt.',
+                )
+            return redirect('accounts:user_detail', pk=pk)
 
         elif action == 'freeze':
             # Frys = deaktiver kontoen OG slett aktive sesjoner i samme

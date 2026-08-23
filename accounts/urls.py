@@ -29,6 +29,10 @@ urlpatterns = [
     path('accounts/login/', views.login_view, name='login'),
     path('accounts/logout/', views.logout_view, name='logout'),
     path('accounts/change-password/', views.change_password_view, name='change_password'),
+    # Invitasjonslenke. Åpen uten innlogging — sikkerheten ligger i at
+    # tokenet er signert, utløper etter 3 døgn og dør når passordet settes.
+    path('accounts/invitasjon/<str:token>/', views.invitasjon_view,
+         name='invitasjon'),
 
     # ── Administrasjon (admin) ───────────────────────────────────────────
     path('portal-admin/brukere/', views.user_list_view, name='user_list'),

@@ -4,6 +4,56 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-08-23 — Invitasjonsflyt: det midlertidige passordet finnes ikke lenger
+
+**864 tester, alle grønne** (15 nye). Punkt 4 i `BESLUTNING_BRUKERE_OG_EPOST.md` §8.
+
+Admin oppretter kontoen, systemet sender en signert lenke, brukeren setter sitt eget
+passord. Gevinsten er ikke bekvemmelighet: **det finnes ingenting å formidle.** Fram til nå
+genererte `user_create_view` et 12-tegns passord som ble vist på skjermen én gang og måtte
+sendes videre — typisk over en kanal man ikke vil ha passord i.
+
+**Enbruks uten tabell.** Tokenet inneholder et avtrykk av brukerens passord-hash. Setter
+brukeren et passord, endres hashen, og avtrykket i lenken slutter å stemme. Ingen tabell å
+rydde, ingen jobb som må huske å utløpe noe. Samme mekanisme Djangos egen
+`PasswordResetTokenGenerator` bygger på, uttrykt med den `TimestampSigner` kodebasen
+allerede bruker til MFA-trust-cookies — med egen salt, så et token herfra aldri kan
+gjenbrukes der.
+
+Kontoen opprettes med `set_unusable_password()`. Den kan altså ikke logges inn på før
+lenken er brukt, og `must_change_password` settes **ikke** — brukeren velger passordet selv,
+og flagget ville tvunget dem gjennom et nytt passordbytte rett etterpå.
+
+**Tre valg avklart 23. aug. 2026:**
+
+| Valg | Avgjørelse | Begrunnelse |
+|---|---|---|
+| Levetid | 3 døgn | Er den ikke brukt innen da, blir den sannsynligvis ikke det. Admin sender heller en ny |
+| Etter passordsetting | Til innloggingssiden | Brukeren møter MFA-oppsettet på vanlig måte, og får bekreftet at innloggingen virker mens de fortsatt har hjelp tilgjengelig |
+| Midlertidig passord | Beholdes som reserve | Delte kontoer har ingen innboks, og e-post kan feile midt i en vaktstart |
+
+**Én melding for alle avvisningsgrunner.** Utløpt, brukt, ugyldig signatur eller frosset
+konto gir samme side. Å skille dem ville fortalt en tilfeldig besøkende at en konto finnes —
+samme resonnement som ligger bak at innlogging sier «feil brukernavn eller passord», aldri
+hvilken. For en frivillig organisasjon er medlemskap en personopplysning i seg selv.
+
+**`er_delt_konto` fikk sine to første regler.** Valideringen *nekter* e-post og navn på en
+delt konto i stedet for å la dem stå tomme, og MFA kan ikke kreves — en bil-konto deler
+enhet mellom folk som kommer og går, så MFA ville betydd én delt TOTP-enhet eller ingen vei
+inn. Begge håndheves i skjemaet, ikke bare i grensesnittet, så de ikke kan omgås ved å poste
+direkte.
+
+Utelukkelsen skjer på **flagget**, aldri på «har e-post». Utledningen ville slått feil den
+dagen noen la inn en kontakt-e-post på en bil-konto, og da er reset-lenken en lateral vei
+inn i systemet.
+
+**Feiler utsendingen, blir kontoen stående.** Admin får en advarsel og en «send på nytt»-knapp
+på brukersiden, i stedet for en 500-side og tvil om brukeren i det hele tatt ble opprettet.
+
+En eksisterende test måtte endres: oppretting med e-post gir nå 302 i stedet for 200, fordi
+personlige kontoer går invitasjonsveien. Testens egentlige poeng — at adressen trimmes — er
+uendret, og den sjekker nå i tillegg at invitasjonen faktisk gikk ut.
+
 ## 2026-08-23 — `fullt_navn` og `er_delt_konto` på `CustomUser`
 
 **849 tester, alle grønne.** Punkt 3 i `BESLUTNING_BRUKERE_OG_EPOST.md` §8. Kun `AddField`.

@@ -22,21 +22,70 @@
 
   <div class="card">
     <div class="card-body p-4">
-      <form method="post">
+      <form method="post" novalidate>
         {% csrf_token %}
+        {% if form.non_field_errors %}
+          <div class="alert alert-danger">{{ form.non_field_errors }}</div>
+        {% endif %}
+
         <div class="mb-3">
-          <label class="form-label">Brukernavn</label>
+          <label class="form-label" for="{{ form.username.id_for_label }}">Brukernavn</label>
           {{ form.username }}
+          {% if form.username.errors %}<div class="text-danger small mt-1">{{ form.username.errors.0 }}</div>{% endif %}
         </div>
         <div class="mb-3">
-          <label class="form-label">E-post (valgfri)</label>
+          <label class="form-label" for="{{ form.fullt_navn.id_for_label }}">Fullt navn</label>
+          {{ form.fullt_navn }}
+          <div class="form-text">{{ form.fullt_navn.help_text }}</div>
+          {% if form.fullt_navn.errors %}<div class="text-danger small mt-1">{{ form.fullt_navn.errors.0 }}</div>{% endif %}
+        </div>
+        <div class="mb-3">
+          <label class="form-label" for="{{ form.email.id_for_label }}">E-post</label>
           {{ form.email }}
+          <div class="form-text">{{ form.email.help_text }}</div>
+          {% if form.email.errors %}<div class="text-danger small mt-1">{{ form.email.errors.0 }}</div>{% endif %}
         </div>
         <div class="mb-3">
-          <label class="form-label">Rolle</label>
+          <label class="form-label" for="{{ form.role.id_for_label }}">Rolle</label>
           {{ form.role }}
         </div>
-        <button type="submit" class="btn btn-primary w-100">
+
+        <div class="mb-3 form-check">
+          {{ form.er_delt_konto }}
+          <label class="form-check-label" for="{{ form.er_delt_konto.id_for_label }}">
+            Delt konto (bil e.l.)
+          </label>
+          <div class="form-text">{{ form.er_delt_konto.help_text }}</div>
+          {% if form.er_delt_konto.errors %}<div class="text-danger small mt-1">{{ form.er_delt_konto.errors.0 }}</div>{% endif %}
+        </div>
+
+        <hr class="my-3">
+
+        {# Invitasjon er hovedveien. Midlertidig passord beholdes som reserve  #}
+        {# for delte kontoer og for de gangene e-post ikke går ut.            #}
+        <div class="mb-2">
+          <div class="form-check">
+            <input class="form-check-input" type="radio" name="metode"
+                   id="metode-invitasjon" value="invitasjon" checked>
+            <label class="form-check-label" for="metode-invitasjon">
+              Send invitasjon — brukeren velger passord selv
+            </label>
+            <div class="form-text">Krever e-post. Lenken er gyldig i 3 døgn.</div>
+          </div>
+          <div class="form-check mt-2">
+            <input class="form-check-input" type="radio" name="metode"
+                   id="metode-passord" value="passord">
+            <label class="form-check-label" for="metode-passord">
+              Sett midlertidig passord
+            </label>
+            <div class="form-text">
+              For delte kontoer, eller hvis e-post ikke virker. Passordet vises
+              én gang og må formidles av deg.
+            </div>
+          </div>
+        </div>
+
+        <button type="submit" class="btn btn-primary w-100 mt-3">
           <i class="bi bi-person-plus me-1"></i>Opprett bruker
         </button>
       </form>

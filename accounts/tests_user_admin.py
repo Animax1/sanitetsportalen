@@ -53,14 +53,25 @@ class AdminUserCreateEmailTests(TestCase):
         self.assertTrue(ny.must_change_password)
 
     def test_oppretting_med_epost(self):
+        """E-post trimmes ved oppretting, og utløser en invitasjon.
+
+        Statuskoden er 302 og ikke 200 fordi personlige kontoer med e-post nå
+        går invitasjonsveien og sendes videre til brukersiden. Selve poenget
+        med testen — at adressen normaliseres — er uendret.
+        """
+        from django.core import mail
+
         resp = self.client.post(reverse('accounts:user_create'), {
             'username': 'medepost',
             'email': '  post@eksempel.no  ',
             'role': 'read_write',
         })
-        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.status_code, 302)
         ny = CustomUser.objects.get(username='medepost')
         self.assertEqual(ny.email, 'post@eksempel.no')
+
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertEqual(mail.outbox[0].to, ['post@eksempel.no'])
 
     def test_to_brukere_uten_epost_kolliderer_ikke(self):
         """unique_email_if_set skal tillate flere NULL samtidig."""
