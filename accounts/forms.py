@@ -60,6 +60,30 @@ class ChangePasswordForm(forms.Form):
         return p2
 
 
+class GlemtPassordForm(forms.Form):
+    """Be om en reset-lenke.
+
+    Feltet er e-post og ikke brukernavn, av to grunner: brukernavnet er valgt
+    av admin og er nettopp det man kan ha glemt, og en adresse er noe man
+    uansett må ha tilgang til for å fullføre.
+
+    Ingen validering av om adressen finnes — §6.7. Skjemaet skal ikke kunne
+    skille en adresse med konto fra en uten.
+    """
+    email = forms.EmailField(
+        label='E-postadressen din',
+        widget=forms.EmailInput(attrs={
+            'class': 'form-control',
+            'autofocus': True,
+            'placeholder': 'navn@eksempel.no',
+            'autocapitalize': 'none',
+            'autocorrect': 'off',
+            'autocomplete': 'email',
+            'spellcheck': 'false',
+        }),
+    )
+
+
 class SettPassordForm(forms.Form):
     """Brukeren setter sitt eget passord fra en invitasjonslenke.
 

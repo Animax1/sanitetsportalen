@@ -4,6 +4,45 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-08-23 — Passord-reset: de sju beslutningene, bygget
+
+**907 tester, alle grønne** (21 nye). Punkt 5 og siste i `BESLUTNING_BRUKERE_OG_EPOST.md` §8.
+
+| § | Beslutning | Hvordan |
+|---|---|---|
+| 6.1 | Delte kontoer utelates | På `er_delt_konto`, aldri utledet fra «har e-post» |
+| 6.2 | MFA kan ikke omgås | Flyten logger ingen inn — den ender på innloggingssiden |
+| 6.3 | Sesjoner drepes | `_invalidate_all_sessions()` ved fullført reset |
+| 6.4 | `must_change_password` nullstilles | Brukeren velger selv; flagget ville krevd to passord på rad |
+| 6.5 | Egen rate-limit-bøtte | `reset:epost` 3/10 min og `reset:ip` 20/10 min |
+| 6.6 | Kortere token-levetid | **1 time** |
+| 6.7 | Ingen kontoenumerering | Identisk svar, verifisert ved sammenligning |
+
+**Token-maskineriet er generalisert, ikke duplisert.** `accounts/signert_lenke.py` er ny og
+eier den delte kjernen; `invitasjon.py` og `passord_reset.py` er tynne lag over den. De 27
+invitasjonstestene passerte uendret gjennom refaktoreringen — det var hele poenget med å
+gjøre den slik.
+
+**Hver bruk har sin egen salt**, og det er testet begge veier: et invitasjonstoken kan ikke
+leses som reset, og omvendt. Uten det ville en invitasjon med tre døgns levetid kunnet
+brukes der reset har én time.
+
+**§6.7 kan ikke testes på én respons.** «Ingen kontoenumerering» er en påstand om at to
+tilfeller ser like ut, så testene sammenligner faktisk `response.content` mellom en adresse
+som finnes og en som ikke gjør det. Tre varianter dekkes: ukjent adresse, delt konto, og en
+utsending som feilet — den siste fordi en feilmelding også ville vært et svar.
+
+Rate-limit-svaret er med i samme resonnement. Strupes kun eksisterende adresser, er
+strupingen i seg selv et signal. Derfor telles forsøket **før** oppslaget.
+
+**`PASSWORD_RESET_TIMEOUT` er fortsatt ikke satt, og det er riktig.** Notatets §6.6 pekte på
+den, men innstillingen leses kun av Djangos egen `PasswordResetTokenGenerator`, som vi ikke
+bruker. Å sette den ville antydet en kontroll som ikke er i spill.
+
+**E-posten sier eksplisitt at to-faktor fortsatt gjelder**, og at et passord er uendret hvis
+man ikke ba om noe. Begge deler for å unngå at en frivillig som får en uventet e-post tror
+kontoen er kompromittert eller at MFA er borte.
+
 ## 2026-08-23 — Tvungen utlogging, og MFA som gjelder med det samme
 
 **886 tester, alle grønne** (7 nye).

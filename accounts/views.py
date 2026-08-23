@@ -30,9 +30,13 @@ from core.url_safety import safe_redirect_url
 from .decorators import admin_required
 from .forms import (
     LoginForm, ChangePasswordForm, AdminUserCreateForm, AdminUserEditForm,
+    GlemtPassordForm,
     PasientRolleForm, SettPassordForm,
 )
 from .invitasjon import kan_inviteres, les_token, send_invitasjon
+from .passord_reset import (
+    finn_bruker, les_token as les_reset_token, send_reset,
+)
 from .models import CustomUser, LoginEvent
 
 
@@ -222,6 +226,16 @@ def _do_complete_login(request, user, next_url='/'):
 def ratelimited_view(request, exception=None):
     """Vises når rate-limit overskrides på innlogging."""
     return render(request, 'accounts/ratelimited.html', status=429)
+
+
+def _epost_nokkel(group, request):
+    """Rate-limit-nøkkel for reset, normalisert som oppslaget.
+
+    Oppslaget er ufølsomt for store bokstaver, så telleren må være det
+    også — ellers gir «Kari@…» og «kari@…» hver sin bøtte mot samme
+    innboks.
+    """
+    return (request.POST.get('email') or '').strip().lower()
 
 
 def _brukernavn_nokkel(group, request):
@@ -822,6 +836,74 @@ def user_create_view(request):
             })
 
     return render(request, 'accounts/user_form.html', {'form': form, 'temp_password': temp_password})
+
+
+def glemt_passord_view(request):
+    """Be om en reset-lenke. Åpen uten innlogging.
+
+    §6.7: svaret er identisk enten adressen finnes eller ikke — samme side,
+    samme tekst, samme statuskode. For en frivillig organisasjon avslører «har
+    konto» hvem som er medlem og har vakter.
+
+    §6.5: egen rate-limit-bøtte, med to nøkler. Per adresse hindrer at noen
+    spammer én innboks ved å be om reset i løkke. Per IP hindrer at noen feier
+    gjennom en liste med adresser. Begge telles **før** oppslaget, slik at
+    strupingen ikke i seg selv røper om adressen finnes.
+    """
+    form = GlemtPassordForm()
+
+    if request.method == 'POST':
+        if _er_rate_limited(request, 'reset:epost', _epost_nokkel, '3/10m') \
+                or _er_rate_limited(request, 'reset:ip', 'ip', '20/10m'):
+            return ratelimited_view(request)
+
+        form = GlemtPassordForm(request.POST)
+        if form.is_valid():
+            bruker = finn_bruker(form.cleaned_data['email'])
+            if bruker is not None:
+                send_reset(bruker, request)
+            # Ingen else. Utfallet er det samme uansett — også hvis
+            # utsendingen feilet, for en feilmelding ville vært et svar.
+            return render(request, 'accounts/glemt_passord_sendt.html')
+
+    return render(request, 'accounts/glemt_passord.html', {'form': form})
+
+
+def passord_reset_view(request, token):
+    """Landingssiden for en reset-lenke: brukeren velger nytt passord.
+
+    §6.3: alle sesjoner avsluttes. Uten det overlever en stjålet sesjon
+    passordbyttet, og resetten har ikke gjort det den skulle.
+
+    §6.4: `must_change_password` nullstilles. Flagget er riktig når admin har
+    generert et midlertidig passord, men her velger brukeren selv — står det
+    igjen, må de velge to passord på rad uten forklaring.
+
+    §6.2: ingen innlogging skjer her. Brukeren sendes til innloggingssiden, og
+    møter MFA-steget der hvis rollen krever det.
+    """
+    user = les_reset_token(token)
+    if user is None:
+        return render(request, 'accounts/reset_ugyldig.html', status=400)
+
+    form = SettPassordForm()
+    if request.method == 'POST':
+        form = SettPassordForm(request.POST)
+        if form.is_valid():
+            user.set_password(form.cleaned_data['new_password1'])
+            user.must_change_password = False
+            user.save(update_fields=['password', 'must_change_password'])
+            _invalidate_all_sessions(user)
+            messages.success(
+                request,
+                'Passordet er endret. Logg inn med det nye passordet.',
+            )
+            return redirect('accounts:login')
+
+    return render(request, 'accounts/passord_reset.html', {
+        'form': form,
+        'bruker': user,
+    })
 
 
 def invitasjon_view(request, token):

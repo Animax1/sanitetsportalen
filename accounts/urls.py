@@ -31,6 +31,13 @@ urlpatterns = [
     path('accounts/change-password/', views.change_password_view, name='change_password'),
     # Invitasjonslenke. Åpen uten innlogging — sikkerheten ligger i at
     # tokenet er signert, utløper etter 3 døgn og dør når passordet settes.
+    # Passord-reset. Begge er aapne uten innlogging; sikkerheten ligger i
+    # at tokenet er signert, utloeper etter 1 time og doer naar passordet
+    # settes. Se accounts/passord_reset.py.
+    path('accounts/glemt-passord/', views.glemt_passord_view,
+         name='glemt_passord'),
+    path('accounts/reset/<str:token>/', views.passord_reset_view,
+         name='passord_reset'),
     path('accounts/invitasjon/<str:token>/', views.invitasjon_view,
          name='invitasjon'),
 

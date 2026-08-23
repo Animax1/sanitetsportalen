@@ -21,16 +21,13 @@ ny på forespørsel enn å la en gyldig lenke ligge i en innboks i ukevis.
 en trunkert SHA-256 av passord-*hashen* (som allerede er en PBKDF2-avledning).
 Signaturen er det som gjør tokenet uforfalskbart; avtrykket gjør det enbruks.
 """
-import hashlib
 import logging
 
-from django.core import signing
-from django.utils.crypto import constant_time_compare
+from . import signert_lenke
 
 logger = logging.getLogger(__name__)
 
-# Egen salt slik at et token herfra aldri kan gjenbrukes i en annen
-# signeringssammenheng — f.eks. MFA-trust-cookien, som bruker samme signer.
+# Egen salt slik at et invitasjonstoken aldri kan leses som et reset-token.
 SALT = 'accounts.invitasjon'
 
 LEVETID_SEKUNDER = 3 * 24 * 60 * 60
@@ -40,40 +37,14 @@ LEVETID_SEKUNDER = 3 * 24 * 60 * 60
 SUPPORT_EPOST = 'support@sanitet.net'
 
 
-def _passordavtrykk(user):
-    """Kort avtrykk av passord-hashen. Endres i det brukeren setter passord."""
-    return hashlib.sha256(user.password.encode('utf-8')).hexdigest()[:16]
-
-
 def lag_token(user):
     """Signert token for én invitasjon."""
-    signer = signing.TimestampSigner(salt=SALT)
-    return signer.sign(f'{user.pk}:{_passordavtrykk(user)}')
+    return signert_lenke.lag(user, salt=SALT)
 
 
 def les_token(token):
-    """Returner brukeren tokenet gjelder, eller ``None``.
-
-    ``None`` dekker alle feiltilfeller med vilje — ugyldig signatur, utløpt
-    lenke, slettet eller frosset konto, og lenke som allerede er brukt. Siden
-    kallstedet uansett skal vise samme melding uansett årsak, er det ingen
-    grunn til å skille dem her. Det er samme resonnement som ligger bak at
-    innloggingsskjemaet sier «feil brukernavn eller passord», aldri hvilken.
-    """
-    from .models import CustomUser
-
-    signer = signing.TimestampSigner(salt=SALT)
-    try:
-        verdi = signer.unsign(token, max_age=LEVETID_SEKUNDER)
-        pk_str, avtrykk = verdi.split(':', 1)
-        user = CustomUser.objects.get(pk=int(pk_str), is_active=True)
-    except (signing.BadSignature, signing.SignatureExpired, ValueError,
-            TypeError, CustomUser.DoesNotExist):
-        return None
-
-    if not constant_time_compare(avtrykk, _passordavtrykk(user)):
-        return None
-    return user
+    """Returner brukeren tokenet gjelder, eller None."""
+    return signert_lenke.les(token, salt=SALT, levetid=LEVETID_SEKUNDER)
 
 
 def kan_inviteres(user):

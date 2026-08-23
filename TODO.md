@@ -285,9 +285,14 @@ personlige kontoer, admin-reset beholdt for alle. Ingenting bygget ennå.
       - [x] **Ingen eksisterende konto er en delt bil-innlogging (bekreftet 23. aug.
             2026).** Migrasjonens `er_delt_konto=False` er dermed korrekt for alle
             eksisterende kontoer, og ingen av dem vil feilaktig få selvbetjent reset.
-- [ ] Passord-reset, med de sju punktene i notatet (delte kontoer utelatt, MFA ikke
-      omgåelig, sesjoner drepes, `must_change_password` nullstilles, egen rate-limit-bøtte,
-      kortere token-levetid, ingen kontoenumerering)
+- [x] **Passord-reset med alle sju punktene (23. aug. 2026).**
+      `accounts/passord_reset.py`. Levetid 1 time, egen salt, egen rate-limit-bøtte
+      (3/10 min per adresse, 20/10 min per IP). Sesjoner avsluttes, MFA gjelder fortsatt
+      fordi flyten ikke logger noen inn, og svaret er identisk enten adressen finnes
+      eller ikke — verifisert ved å sammenligne `response.content`.
+      Token-maskineriet er generalisert til `accounts/signert_lenke.py`, delt med
+      invitasjonen. `PASSWORD_RESET_TIMEOUT` er bevisst ikke satt: den leses kun av
+      Djangos egen generator, som ikke er i bruk.
 
 ### Rollemodellen — trenger beslutning
 
