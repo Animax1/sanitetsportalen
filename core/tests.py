@@ -571,7 +571,12 @@ class PasientAppPaaNyURLTests(TestCase):
 
 @override_settings(SECURE_SSL_REDIRECT=False)
 class AdminNavPortalLenkeTests(TestCase):
-    """Verifiserer at admin-nav (base.html) viser 'Portal' i stedet for 'Pasientliste'."""
+    """Verifiserer at admin-nav viser 'Portal' i stedet for 'Pasientliste'.
+
+    Docstringen pekte tidligere på `base.html`. Den malen ble slettet 23. aug.
+    2026 — ingenting arvet fra den lenger, og sidene testene her treffer
+    bruker `core/templates/core/base_portal.html`.
+    """
 
     def setUp(self):
         self.admin = User.objects.create_user(

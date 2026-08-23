@@ -36,6 +36,18 @@
   box-shadow: 0 0 0 0.2rem rgba(59, 130, 246, 0.2) !important;
   border-color: var(--portal-accent) !important;
 }
+
+/* Bootstraps ::placeholder er laget for lys bakgrunn, og ble nesten usynlig
+   mot det mørke feltet — «Fornavn Etternavn» og «Valgfritt» i brukerskjemaet
+   sto praktisk talt i samme farge som bakgrunnen.
+
+   `style.css` har hatt denne regelen hele tiden, så pasientmodulen var
+   upåvirket. Nok en gang gjaldt fiksen kun den halvparten av portalen som
+   laster den fila. Egen tone, dimmere enn --portal-text-muted: en placeholder
+   skal ikke kunne forveksles med utfylt innhold. */
+.form-control::placeholder {
+  color: #64748b !important;
+}
 .form-label { color: #cbd5e1; font-size: 0.85rem; font-weight: 600; }
 
 /* ──── Tabeller ──── */

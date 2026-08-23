@@ -1959,6 +1959,10 @@ class MorkTekstPaaMorkBakgrunnTests(TestCase):
 
     DEMPEDE_KLASSER = ('form-text', 'text-muted', 'text-secondary')
 
+    # Pseudo-elementer Bootstrap farger for lys bakgrunn, og som må overstyres
+    # der `.form-control` er overstyrt.
+    PSEUDO_KRAV = {'.form-control': '::placeholder'}
+
     def _rot(self):
         from pathlib import Path
         from django.conf import settings
@@ -2036,6 +2040,50 @@ class MorkTekstPaaMorkBakgrunnTests(TestCase):
             'Bootstraps lyse standardfarge slår gjennom på mørk bakgrunn:\n  '
             + '\n  '.join(mangler),
         )
+
+    def test_placeholder_er_overstyrt_der_feltet_er_det(self):
+        """Farger man `.form-control` mørkt, må `::placeholder` følge med.
+
+        Ellers arver hjelpeteksten inne i feltet Bootstraps
+        lyse-bakgrunn-farge og blir stående nesten usynlig — mens selve feltet
+        ser riktig ut. Regelen er lettere å glemme enn å oppdage.
+
+        `portal.css` manglet den 23. aug. 2026, så «Fornavn Etternavn» og
+        «Valgfritt» sto praktisk talt i bakgrunnsfargen i brukerskjemaet.
+        `style.css` hadde regelen hele tiden, så pasientmodulen var upåvirket
+        — nok en gang gjaldt en fiks kun den halvparten av portalen som laster
+        den fila.
+        """
+        import re
+        rot = self._rot()
+        mangler = []
+
+        for mal in self._maler():
+            ark, inline = self._stilark_og_inline(mal)
+            css = inline
+            for navn in ark:
+                fil = rot / 'static' / 'css' / navn
+                if fil.exists():
+                    css += '\n' + fil.read_text(encoding='utf-8')
+            if not css:
+                continue
+
+            for selektor, pseudo in self.PSEUDO_KRAV.items():
+                # Kun relevant hvis malen faktisk overstyrer selektoren.
+                if not re.search(re.escape(selektor) + r'[\s,:{]', css):
+                    continue
+                if pseudo not in css:
+                    mangler.append(
+                        f'{mal.relative_to(rot)} overstyrer {selektor}, '
+                        f'men ikke {selektor}{pseudo}'
+                    )
+
+        self.assertEqual(
+            sorted(set(mangler)), [],
+            'Feltet er mørkt, men teksten inni er Bootstraps lyse standard:\n  '
+            + '\n  '.join(sorted(set(mangler))),
+        )
+
 
 class AktivMineMarkeringTests(TestCase):
     """`.active-mine` må matche begge knappene som får klassen satt.

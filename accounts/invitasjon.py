@@ -35,6 +35,10 @@ SALT = 'accounts.invitasjon'
 
 LEVETID_SEKUNDER = 3 * 24 * 60 * 60
 
+# Svaradresse på invitasjoner. Avsenderen er en no-reply, så uten denne har
+# mottakeren ingen vei tilbake.
+SUPPORT_EPOST = 'support@sanitet.net'
+
 
 def _passordavtrykk(user):
     """Kort avtrykk av passord-hashen. Endres i det brukeren setter passord."""
@@ -120,6 +124,11 @@ def send_invitasjon(user, request):
             body=kropp,
             from_email=settings.DEFAULT_FROM_EMAIL,
             to=[user.email],
+            # Avsenderadressen er en no-reply på et domene som ikke tar imot
+            # post. Uten Reply-To ville et svar fra en frivillig som lurer på
+            # noe forsvunnet i stillhet — og det er nettopp de som trenger å
+            # nå fram, siden de akkurat har fått en lenke de ikke ba om.
+            reply_to=[SUPPORT_EPOST],
         ).send(fail_silently=False)
         return True
     except Exception:

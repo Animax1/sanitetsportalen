@@ -4,6 +4,39 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-08-23 — Placeholder-teksten, og en mal ingen brukte
+
+**879 tester, alle grønne** (1 ny). Meldt inn fra mobil etter at invitasjonsflyten ble
+testet ende-til-ende: e-posten kom fram, stor forbokstav i brukernavnet ble håndtert,
+og passordet ble satt. To ting igjen.
+
+**`::placeholder` var aldri overstyrt i `portal.css`.** «Fornavn Etternavn» og «Valgfritt» i
+brukerskjemaet sto praktisk talt i bakgrunnsfargen. `style.css` har hatt regelen hele tiden,
+så pasientmodulen var upåvirket — **nok en gang gjaldt en fiks kun den halvparten av
+portalen som laster den fila.** Det er tredje gang i dag den delingen biter.
+
+Regelen er lagt i `portal.css` og i de fire frittstående mørke sidene. Egen tone, dimmere
+enn `--portal-text-muted`: en placeholder skal ikke kunne forveksles med utfylt innhold.
+
+Passordsiden i invitasjonen var **ikke** rammet — `SettPassordForm` setter ingen
+placeholder. Sjekket fordi det var det naturlige neste spørsmålet, ikke fordi det var meldt.
+
+**Testen er utvidet til å dekke pseudo-elementet, ikke bare klassene.** Regelen den
+håndhever nå: farger en mal `.form-control` mørkt, må den også overstyre
+`.form-control::placeholder`. Feltet ser riktig ut uten den, og bare innholdet forsvinner —
+lettere å glemme enn å oppdage.
+
+**Og den fant `templates/base.html`.** 102 linjer som overstyrte `.form-control` uten
+placeholder — men ingenting arver fra den, ingenting rendrer den, og eneste henvisning var
+en utdatert docstring i `core/tests.py`. Slettet, jf. prosjektets egen regel om at død kode
+skal vekk og ikke få en merknad om at den er ubrukt. Docstringen er rettet til å peke på
+`base_portal.html`, som er malen testene faktisk treffer.
+
+**Invitasjons-e-posten har fått `Reply-To: support@sanitet.net`.** Avsenderen er en no-reply
+på et domene som ikke tar imot post. Uten dette ville et svar fra en frivillig som lurer på
+noe forsvunnet i stillhet — og det er nettopp de som trenger å nå fram, siden de akkurat har
+fått en lenke de ikke ba om.
+
 ## 2026-08-23 — Innlogging bryr seg ikke lenger om store bokstaver
 
 **878 tester, alle grønne** (9 nye). Utløst av en observasjon fra felt: mobiltastatur setter
