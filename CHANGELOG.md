@@ -4,6 +4,41 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-08-23 — AHASend-avtalen var aldri en mangel
+
+Kun dokumentasjon. Ingen kodeendring.
+
+TODO har ført «Databehandleravtale med AHASend» som **forfalt** siden 22. august, med den
+begrunnelsen at leverandøren er i bruk i produksjon uten avtale på plass. Den premissen
+var feil.
+
+AHASends DPA (https://ahasend.com/dpa) krever ingen signatur. Den er inkorporert i Terms
+of Use, og teksten er utvetydig: *«By using the Services, Controller accepts this DPA.»*
+Avtalen har dermed vært i kraft siden portalen sendte sin første melding. En motsignert
+utgave kan bes om, men endrer ikke rettsvirkningen.
+
+Det som faktisk mangler er derfor mindre enn antatt, men ikke ingenting: **dataflyten er
+fremdeles ikke dokumentert i A.2**, og C.3 påstår fortsatt «Ingen andre databehandlere er
+for øyeblikket i bruk». Det står som eget punkt til dokumentgjennomgangen.
+
+Nøkkelpunktene er notert i TODO for den gjennomgangen. To ting er verdt å trekke fram:
+
+**Underbehandlerne er alle i EØS som standard** — Hetzner (Tyskland/Finland), DA
+International Group (Bulgaria) og Blix Solutions (Norge) — og behandlingen skjer
+*«primarily within the European Economic Area»*. US-infrastruktur hos Hetzner er
+tilgjengelig «upon request». Er den valgt, utløses SCC-sporet og A.2 må beskrive en
+tredjelandsoverføring. Det er ett blikk i konsollen, og står som eget punkt.
+
+**Avtalen forbyr sensitive data:** *«Controller agrees not to use the Services to send or
+store Sensitive Data.»* Feilvarselet vårt inneholder brukernavn, rolle, klient-IP, URL og
+traceback — personopplysninger, men ingen helseopplysninger. Slankingen 22. august fjernet
+skjemadata, cookies, settings og lokale variabler, og `core/tests_error_reporting.py`
+vokter det.
+
+Den testen er dermed ikke lenger bare en personvernfinesse. Den holder oss innenfor en
+kontraktsforpliktelse overfor databehandleren, og bør leses som det neste gang noen
+vurderer å utvide varselet.
+
 ## 2026-08-23 — To synlige feil: umarkert filter og uleselig hjelpetekst
 
 **846 tester, alle grønne** (3 nye). Ingen backend-endring.

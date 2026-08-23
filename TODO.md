@@ -224,10 +224,38 @@ personlige kontoer, admin-reset beholdt for alle. Ingenting bygget ennå.
 - [x] **Blokkeringen er opphevet.** Utsending verifisert 22. aug. 2026 via AHASends
       HTTP-API v2, med SPF/DKIM på plass og testmeldinger bekreftet i innboksen.
       Reset-funksjonen er ikke lenger inert av mangel på e-post.
-- [ ] **Databehandleravtale med AHASend**, og AHASend + Google inn i
-      `PERSONVERN_DOKUMENTASJON.md` A.2. **Forfalt** — leverandøren er allerede i bruk for
-      feilvarsling, ikke bare planlagt. Se `docs/BESLUTNING_BRUKERE_OG_EPOST.md` §4.
-- [ ] Databehandleravtale med e-postleverandør + oppføring i personvernprotokollen
+- [x] **Databehandleravtalen med AHASend er allerede inngått (avklart 23. aug. 2026).**
+      https://ahasend.com/dpa. Den krever **ingen signatur**: avtalen er inkorporert i
+      Terms of Use, og «By using the Services, Controller accepts this DPA.» Den har altså
+      vært i kraft siden portalen begynte å sende. Enterprise-kunder kan be om en
+      motsignert utgave, men det endrer ikke rettsvirkningen.
+      Nøkkelpunktene, til bruk i A.2:
+      | Punkt | Innhold |
+      |---|---|
+      | Underbehandlere | Hetzner Online GmbH (DE/FI, US kun på forespørsel), DA International Group (BG), Blix Solutions AS (NO) |
+      | Databehandling | «primarily within the European Economic Area» som standard |
+      | Tredjelandsoverføring | Kun hvis kunden aktivt velger US-infrastruktur. SCC modul 2, nederlandsk rett |
+      | Sletting | Innen 90 dager etter oppsigelse |
+      | Revisjon | Innsyn og inspeksjon, evt. dekket av ISO 27001 / SOC 2-rapport |
+      | Brudd | Varsling «without undue delay», med innhold som dekker art. 33(3) |
+      | Datakategorier | E-postadresser, navn hvis oppgitt, innhold hvis lagring er på, leveringslogg, IP og user agent ved sporing |
+      - [ ] **Bekreft at kontoen ikke står på US-infrastruktur.** Standard er EØS, men
+            Hetzner US er tilgjengelig «upon request». Er den valgt, utløses SCC-sporet
+            og A.2 må beskrive en tredjelandsoverføring. Krever Andre — ett blikk i
+            AHASend-konsollen
+      - [ ] **Vurder å slå av lagring av e-postinnhold** hos AHASend. Avtalen sier det
+            kan deaktiveres. Feilvarslene våre inneholder brukernavn, rolle, klient-IP,
+            URL og traceback — mindre som ligger lagret hos databehandleren, jo bedre
+      - **Merk til A.12:** avtalen sier «Controller agrees not to use the Services to
+        send or store Sensitive Data». Feilvarselet inneholder personopplysninger, men
+        ingen helseopplysninger — skjemadata, cookies og lokale variabler ble slanket
+        bort 22. aug., og `core/tests_error_reporting.py` vokter det. Den testen er
+        dermed ikke bare en personvernfinesse lenger; den holder oss innenfor en
+        kontraktsforpliktelse
+- [ ] **AHASend og Google inn i `PERSONVERN_DOKUMENTASJON.md` A.2.** Selve avtalen er på
+      plass (over), men dataflyten er fortsatt ikke dokumentert. Tas i
+      dokumentgjennomgangen. Merk at C.3 linje 711 sier «Ingen andre databehandlere er
+      for øyeblikket i bruk» — det er direkte feil i dag.
 - [ ] Migrasjon: `fullt_navn` og `er_delt_konto` på `CustomUser`. **Kun AddField, alene.**
       `CustomUser` arver `AbstractBaseUser`, så `first_name`/`last_name` finnes ikke.
 - [ ] Invitasjonsflyt med signert lenke — brukeren setter sitt eget passord, admin
