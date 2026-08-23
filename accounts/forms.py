@@ -14,6 +14,14 @@ class LoginForm(forms.Form):
             'class': 'form-control',
             'autofocus': True,
             'placeholder': 'Brukernavn',
+            # Mobiltastatur setter stor forbokstav og autokorrigerer i vanlige
+            # tekstfelt. Innlogging er ikke prosa. Backenden slår opp uten
+            # hensyn til store bokstaver uansett, men her stoppes problemet
+            # før det oppstår — og brukeren ser det de faktisk skrev.
+            'autocapitalize': 'none',
+            'autocorrect': 'off',
+            'autocomplete': 'username',
+            'spellcheck': 'false',
         }),
     )
     password = forms.CharField(
@@ -130,6 +138,16 @@ class AdminUserCreateForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
         self.fields['email'].required = False
         self.fields['fullt_navn'].required = False
+
+    def clean_username(self):
+        """Konvensjon: `fornavn.etternavn`, alltid små bokstaver.
+
+        Innlogging er ufølsom for store bokstaver uansett, men å lagre én
+        skrivemåte holder auditloggen konsistent — og sikrer at to kontoer
+        aldri kan skille seg kun på store bokstaver, som er det ene tilfellet
+        backenden må falle tilbake til nøyaktig treff for.
+        """
+        return (self.cleaned_data.get('username') or '').strip().lower()
 
     def clean(self):
         data = super().clean()

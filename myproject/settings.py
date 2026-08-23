@@ -173,6 +173,14 @@ LOGIN_URL = '/accounts/login/'
 LOGIN_REDIRECT_URL = '/'
 LOGOUT_REDIRECT_URL = '/accounts/login/'
 
+# Brukernavn slås opp uten hensyn til store bokstaver. Mobiltastatur setter
+# automatisk stor forbokstav i tekstfelt, så en konto som heter
+# `kari.nordmann` blir `Kari.nordmann` ved innlogging — og Postgres skiller
+# på det. Se accounts/backends.py for hvordan tvetydighet håndteres.
+AUTHENTICATION_BACKENDS = [
+    'accounts.backends.CaseInsensitiveModelBackend',
+]
+
 AUTH_PASSWORD_VALIDATORS = [
     {'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator'},
     {'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator'},
@@ -194,6 +202,21 @@ _RUNNING_TESTS = len(sys.argv) > 1 and sys.argv[1] == 'test'
 
 if _RUNNING_TESTS:
     PASSWORD_HASHERS = ['django.contrib.auth.hashers.MD5PasswordHasher']
+
+    # Backup-planleggeren ut av middleware-stacken under test.
+    #
+    # `_should_run_now()` returnerer True når `last_run_at` er null, og i en
+    # fersk testdatabase er den alltid det. Første request i enhver test som
+    # går gjennom stacken utløste derfor en ekte backup — som skriver filer og
+    # rader, og på SQLite låser tabellen av og til. Resultatet var en
+    # testsuite som feilet tilfeldig, med feilmeldinger som pekte på
+    # backup_scheduler i tester som ikke har noe med backup å gjøre.
+    #
+    # En flaky suite er verre enn ingen suite: den lærer deg å kjøre om igjen
+    # i stedet for å lese. Planleggeren testes direkte i patients-testene, så
+    # ingenting mistes ved å ta den ut her.
+    MIDDLEWARE = [m for m in MIDDLEWARE
+                  if m != 'patients.middleware.BackupSchedulerMiddleware']
 
 # ── Internasjonalisering ──────────────────────────────────────────────────────
 LANGUAGE_CODE = 'nb'

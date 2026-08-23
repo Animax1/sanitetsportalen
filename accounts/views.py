@@ -224,6 +224,16 @@ def ratelimited_view(request, exception=None):
     return render(request, 'accounts/ratelimited.html', status=429)
 
 
+def _brukernavn_nokkel(group, request):
+    """Rate-limit-nøkkel for innlogging, normalisert som oppslaget.
+
+    Innlogging slår opp brukernavnet uten hensyn til store bokstaver (se
+    `accounts/backends.py`). Teller vi på den rå verdien, får «kari» og
+    «Kari» hver sin bøtte mot én og samme konto.
+    """
+    return (request.POST.get('username') or '').strip().lower()
+
+
 def _er_rate_limited(request, group, key, rate):
     """Tell ett forsøk mot en rate-limit-bøtte og si om grensen er passert.
 
@@ -328,7 +338,11 @@ def login_view(request):
     error = None
 
     if request.method == 'POST':
-        if _er_rate_limited(request, 'login:username', 'post:username', '10/5m') \
+        # Nøkkelen normaliseres på samme måte som oppslaget. Med
+        # `post:username` ville «Kari» og «kari» vært to bøtter mot én og
+        # samme konto, og en angriper kunne mangedoblet forsøksbudsjettet
+        # sitt ved å variere store bokstaver.
+        if _er_rate_limited(request, 'login:username', _brukernavn_nokkel, '10/5m') \
                 or _er_rate_limited(request, 'login:ip', 'ip', '50/5m'):
             return ratelimited_view(request)
 

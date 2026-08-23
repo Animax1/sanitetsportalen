@@ -4,6 +4,62 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-08-23 — Innlogging bryr seg ikke lenger om store bokstaver
+
+**878 tester, alle grønne** (9 nye). Utløst av en observasjon fra felt: mobiltastatur setter
+automatisk stor forbokstav i tekstfelt.
+
+En konto som heter `kari.nordmann` blir `Kari.nordmann` når den skrives på telefon, og
+Postgres skiller på det. Brukeren får «feil brukernavn eller passord» — uten noen antydning
+om hva som er galt, fordi meldingen med vilje ikke røper hvilket av de to som feilet.
+
+Det rammer nettopp de som **ikke valgte brukernavnet sitt selv**. Brukernavnet velges av
+admin, fordi det er nøkkelen i auditloggen og i koblingen til førstehjelper- og
+helsepersonellregisteret — en fast konvensjon er det som gjør loggen lesbar. Prisen er at
+brukeren må gjette skrivemåten, og den prisen skal ikke betales ved vaktstart.
+
+Tre lag, som alle trengs:
+
+| Lag | Hva |
+|---|---|
+| `accounts/backends.py` | Oppslag med `iexact` ved innlogging |
+| Innloggingsskjemaet | `autocapitalize="none"`, `autocorrect="off"`, `spellcheck="false"` |
+| Oppretting | Brukernavn normaliseres til små bokstaver |
+
+Skjema-attributtene er ikke pynt: de stopper problemet før det oppstår, slik at brukeren
+ser det de faktisk skrev.
+
+**Tvetydighet slår aldri ut i feil konto.** Finnes det flere kontoer som kun skiller seg på
+store bokstaver — mulig i data som er eldre enn normaliseringen — faller oppslaget tilbake
+til nøyaktig treff. En bruker som må skrive navnet sitt nøyaktig er et irritasjonsmoment;
+feil konto er et sikkerhetsbrudd.
+
+**En følgefeil måtte lukkes i samme slengen.** Rate-limit-bøtta for innlogging brukte
+`post:username` på den rå verdien. Med ufølsom innlogging ville «kari», «Kari» og «KARI»
+fått hver sin teller mot én og samme konto, og en angriper kunne mangedoblet
+forsøksbudsjettet sitt ved å variere store bokstaver. Nøkkelen normaliseres nå på samme måte
+som oppslaget. Egen test som feiler hvis den slutter å gjøre det.
+
+## 2026-08-23 — Testsuiten var flaky, og årsaken var en ekte backup per test
+
+Oppdaget mens brukernavn-testene ble skrevet: samme suite ga syv `ERROR` i én kjøring og
+null i den neste, med `sqlite3.OperationalError: database table is locked` fra
+`backup_scheduler` — i tester som ikke har noe med backup å gjøre.
+
+`_should_run_now()` returnerer True når `last_run_at` er null, og i en fersk testdatabase er
+den alltid det. **Første request i enhver test som gikk gjennom middleware-stacken utløste
+derfor en ekte backup**, som skrev filer og rader og av og til låste SQLite-tabellen.
+
+Planleggeren tas nå ut av stacken under test, ved siden av den eksisterende
+`_RUNNING_TESTS`-bryteren for passord-hashing. Den testes fortsatt direkte i
+patients-testene, så ingen dekning går tapt.
+
+Verifisert med tre kjøringer på rad: 878 grønne hver gang, og låsemeldingene borte fra
+tester som ikke er backup-tester.
+
+Dette er verdt mer enn de ni nye testene. En flaky suite lærer deg å kjøre om igjen i stedet
+for å lese — og hele dagens arbeidsmåte har hvilt på at «alle grønne» faktisk betyr noe.
+
 ## 2026-08-23 — Invitasjonsflyt: det midlertidige passordet finnes ikke lenger
 
 **864 tester, alle grønne** (15 nye). Punkt 4 i `BESLUTNING_BRUKERE_OG_EPOST.md` §8.
