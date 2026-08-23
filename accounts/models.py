@@ -29,6 +29,29 @@ class CustomUser(AbstractBaseUser, PermissionsMixin):
         verbose_name='E-post',
         help_text='Valgfritt. Brukes kun som kontaktinformasjon for admin.',
     )
+    # Ett fritekstfelt, ikke for- og etternavn. Formålet er å kjenne igjen
+    # personen bak et brukernavn som `superman64`, og ett felt håndterer
+    # mellomnavn, doble etternavn og folk som skriver navnet sitt annerledes
+    # enn en skjemadesigner forventer.
+    fullt_navn = models.CharField(
+        max_length=150,
+        blank=True,
+        default='',
+        verbose_name='Fullt navn',
+        help_text='Valgfritt. Vises til admin for å kjenne igjen brukeren.',
+    )
+    # Kontotype, ikke bare et flagg. En delt konto (bil-innlogging og
+    # liknende) skal aldri ha e-post, aldri kreves MFA, og aldri kunne be om
+    # selvbetjent passord-reset. Håndhevingen kommer med invitasjons- og
+    # reset-arbeidet; feltet legges til først slik at migrasjonen gjør én ting.
+    er_delt_konto = models.BooleanField(
+        default=False,
+        verbose_name='Delt konto',
+        help_text=(
+            'Ikke-personlig konto, f.eks. en bil. Utelukkes fra selvbetjent '
+            'passord-reset.'
+        ),
+    )
     role = models.CharField(
         max_length=20,
         choices=UserRole.choices,

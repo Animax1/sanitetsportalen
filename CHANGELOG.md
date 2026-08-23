@@ -4,6 +4,37 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-08-23 — `fullt_navn` og `er_delt_konto` på `CustomUser`
+
+**849 tester, alle grønne.** Punkt 3 i `BESLUTNING_BRUKERE_OG_EPOST.md` §8. Kun `AddField`.
+
+| Felt | Type | Formål |
+|---|---|---|
+| `fullt_navn` | `CharField(max_length=150, blank=True, default='')` | Kjenne igjen personen bak et brukernavn som `superman64` |
+| `er_delt_konto` | `BooleanField(default=False)` | Bil-innlogginger og andre ikke-personlige kontoer |
+
+Ett fritekstfelt for navnet, ikke for- og etternavn: det håndterer mellomnavn, doble
+etternavn og folk som skriver navnet sitt annerledes enn en skjemadesigner forventer.
+`CustomUser` arver `AbstractBaseUser`, så `first_name`/`last_name` finnes ikke å arve.
+
+**Ingen håndhevingslogikk i denne leveransen.** `er_delt_konto` er en kontotype med fire
+regler — nekter e-post og navn, MFA kan ikke kreves, selvbetjent reset avvises, passord
+settes direkte av admin — men de hører til invitasjons- og reset-arbeidet. Migrasjonen
+legger til to kolonner. Det er alt den gjør.
+
+Migrasjonen fikk nummer `0010` og inneholder nøyaktig to `AddField`. Det er gevinsten fra
+oppryddingen rett før: uten den ville forslaget fått nummer `0009` og dratt
+`is_superuser`-endringen med seg.
+
+**Hva som er verifisert, og hva som ikke er det.** `sqlmigrate` lokalt kjører mot SQLite,
+som bygger hele tabellen på nytt for en `AddField` — det er en SQLite-egenskap og sier
+ingenting om Postgres. Den utskriften er derfor ikke lagt til grunn.
+
+Grunnlaget for at dette regnes som trygt er i stedet formen på endringen: to kolonner med
+default, ingen indekser, ingen constraints, ingen datamigrering, og en brukertabell med en
+håndfull rader. På Postgres 11+ er `ADD COLUMN` med default en ren metadataoperasjon.
+Skulle databasen være eldre, koster en omskriving av den tabellen uansett millisekunder.
+
 ## 2026-08-23 — Migrasjonsavvikene var ikke det vi trodde. Begge er ryddet
 
 **849 tester, alle grønne** (1 ny). To no-op-migrasjoner, ingen SQL mot databasen.

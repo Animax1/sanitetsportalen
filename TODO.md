@@ -264,10 +264,10 @@ personlige kontoer, admin-reset beholdt for alle. Ingenting bygget ennå.
       (`help_text` er en `non_db_attr`, `sqlmigrate` sier `-- (no-op)`).
       **Dette var en forutsetning for `fullt_navn`-migrasjonen**, som ville fått samme
       nummer som `is_superuser`-forslaget og dratt det med seg.
-- [ ] Migrasjon: `fullt_navn` og `er_delt_konto` på `CustomUser`. **Kun AddField, alene.**
-      `CustomUser` arver `AbstractBaseUser`, så `first_name`/`last_name` finnes ikke.
-      Nå trygg å generere: `makemigrations --check` er ren, så forslaget vil kun
-      inneholde de to feltene.
+- [x] **Migrasjon: `fullt_navn` og `er_delt_konto` lagt til (23. aug. 2026).**
+      `accounts/0010`, nøyaktig to `AddField` og ingenting mer — gevinsten fra
+      opprydningen rett før. Ingen håndhevingslogikk for `er_delt_konto` i denne
+      leveransen; de fire reglene hører til invitasjons- og reset-arbeidet.
 - [ ] Invitasjonsflyt med signert lenke — brukeren setter sitt eget passord, admin
       formidler ingenting
 - [ ] Passord-reset, med de sju punktene i notatet (delte kontoer utelatt, MFA ikke
