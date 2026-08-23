@@ -274,9 +274,20 @@ personlige kontoer, admin-reset beholdt for alle. Ingenting bygget ennå.
       midlertidig passord beholdes som reserve for delte kontoer og for når e-post
       feiler. `er_delt_konto` fikk sine to første regler: valideringen nekter e-post og
       navn, og MFA kan ikke kreves.
-      - [ ] `fullt_navn` og `er_delt_konto` mangler i `AdminUserEditForm`. En konto
-            opprettet med feil type kan derfor ikke rettes — kun slettes og lages på
-            nytt. Liten jobb, men den hører til rolle-/brukeradmin, ikke invitasjonen
+      - [x] **Begge feltene lagt til i `AdminUserEditForm` også.** Uten dem kunne
+            eksisterende kontoer aldri få navn — og alle kontoer er eksisterende.
+            Samme kontotype-regler håndheves ved redigering: en personlig konto kan
+            ikke gjøres delt med e-posten i behold, og MFA kan ikke slås på samtidig
+            som «delt konto».
+      - [ ] **Gi admin-kontoen en e-post.** `create_admin` har `--email` som valgfritt,
+            og oppsettet i CLAUDE.md kaller den uten. Det spiller ingen rolle i dag,
+            men når passord-reset bygges blir admin den ene kontoen som ikke kan bruke
+            den — og det finnes ingen annen admin til å nullstille den. Eneste vei inn
+            ville vært `create_admin` eller `changepassword` i containeren.
+            Kan gjøres nå fra brukersiden. **Krever Andre**
+      - [ ] **Sjekk om noen eksisterende konto egentlig er delt.** Migrasjonen ga alle
+            `er_delt_konto=False`. Er en bil-innlogging feilmerket som personlig, får
+            den selvbetjent reset den dagen den bygges. Billig å rette nå
 - [ ] Passord-reset, med de sju punktene i notatet (delte kontoer utelatt, MFA ikke
       omgåelig, sesjoner drepes, `must_change_password` nullstilles, egen rate-limit-bøtte,
       kortere token-levetid, ingen kontoenumerering)

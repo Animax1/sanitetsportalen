@@ -36,9 +36,18 @@
           <form method="post">
             {% csrf_token %}
             <input type="hidden" name="action" value="edit">
+            {% if form.non_field_errors %}
+              <div class="alert alert-danger py-2">{{ form.non_field_errors }}</div>
+            {% endif %}
+            <div class="mb-2">
+              <label class="form-label">Fullt navn</label>
+              {{ form.fullt_navn }}
+              {% if form.fullt_navn.errors %}<div class="text-danger small mt-1">{{ form.fullt_navn.errors.0 }}</div>{% endif %}
+            </div>
             <div class="mb-2">
               <label class="form-label">E-post</label>
               {{ form.email }}
+              {% if form.email.errors %}<div class="text-danger small mt-1">{{ form.email.errors.0 }}</div>{% endif %}
             </div>
             <div class="mb-2">
               <label class="form-label">Rolle</label>
@@ -54,6 +63,16 @@
               <div class="text-muted" style="font-size:0.78rem;">
                 Slås dette på må brukeren sette opp autentiseringsapp ved neste pålogging.
               </div>
+              {% if form.mfa_required.errors %}<div class="text-danger small mt-1">{{ form.mfa_required.errors.0 }}</div>{% endif %}
+            </div>
+            <div class="mb-3 form-check">
+              {{ form.er_delt_konto }}
+              <label class="form-check-label" for="{{ form.er_delt_konto.id_for_label }}" style="color:#cbd5e1;">Delt konto (bil e.l.)</label>
+              <div class="text-muted" style="font-size:0.78rem;">
+                Ikke-personlig konto. Får ikke e-post, navn, MFA eller selvbetjent
+                passord-reset — admin setter passordet.
+              </div>
+              {% if form.er_delt_konto.errors %}<div class="text-danger small mt-1">{{ form.er_delt_konto.errors.0 }}</div>{% endif %}
             </div>
 
             <hr style="border-color:#334155;">

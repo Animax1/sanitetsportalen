@@ -222,3 +222,104 @@ class InvitasjonFlytTests(TestCase):
         )
         self.assertEqual(svar.status_code, 302)
         self.assertEqual(len(mail.outbox), 1)
+
+@override_settings(SECURE_SSL_REDIRECT=False, RATELIMIT_ENABLE=False)
+class EksisterendeKontoerTests(TestCase):
+    """Kontoene som fantes før feltene ble lagt til.
+
+    Migrasjonen ga alle `fullt_navn=''` og `er_delt_konto=False`. Spørsmålet
+    som utløste disse testene: hva skjer med dem — særlig admin-kontoen, som
+    `create_admin` oppretter uten e-post?
+
+    Svaret skal være «ingenting», og det er verdt å låse: en konto uten
+    e-post og navn skal fortsatt kunne logge inn, redigeres og få rolle
+    endret, helt uavhengig av invitasjonsflyten.
+    """
+
+    def setUp(self):
+        self.admin = CustomUser.objects.create_user(
+            username='gammeladmin', password='AdminPass123!', role='admin',
+            must_change_password=False,
+        )
+        self.klient = Client()
+        self.klient.force_login(self.admin)
+
+    def test_konto_uten_epost_og_navn_er_gyldig(self):
+        self.assertEqual(self.admin.fullt_navn, '')
+        self.assertFalse(self.admin.er_delt_konto)
+        self.assertIsNone(self.admin.email)
+
+    def test_konto_uten_epost_kan_ikke_inviteres(self):
+        """Ikke en feil — bare ingen adresse å sende til.
+
+        Kontoen fungerer som før: den logges inn på med passordet sitt.
+        """
+        self.assertFalse(kan_inviteres(self.admin))
+
+    def test_admin_kan_fylle_inn_navn_og_epost_etterpaa(self):
+        """Uten dette ville alle eksisterende kontoer stått navnløse for godt.
+
+        Feltene manglet i redigeringsskjemaet i første utgave av
+        invitasjonsflyten, og funksjonen var dermed halvferdig for alle som
+        allerede fantes — altså alle.
+        """
+        svar = self.klient.post(
+            reverse('accounts:user_detail', args=[self.admin.pk]),
+            {
+                'action': 'edit',
+                'fullt_navn': 'Andre Eritsland',
+                'email': 'andre@eksempel.no',
+                'role': 'admin',
+                'is_active': 'on',
+            },
+        )
+        self.assertEqual(svar.status_code, 302)
+
+        self.admin.refresh_from_db()
+        self.assertEqual(self.admin.fullt_navn, 'Andre Eritsland')
+        self.assertEqual(self.admin.email, 'andre@eksempel.no')
+        self.assertTrue(kan_inviteres(self.admin))
+
+    def test_kan_ikke_gjore_konto_delt_og_beholde_epost(self):
+        """Ellers ville flagget vært verdiløst i etterkant.
+
+        En konto kunne blitt opprettet som personlig og gjort delt senere med
+        e-posten i behold — og da har reset-lenken en vei til en delt innboks
+        likevel.
+        """
+        self.admin.email = 'andre@eksempel.no'
+        self.admin.save()
+
+        svar = self.klient.post(
+            reverse('accounts:user_detail', args=[self.admin.pk]),
+            {
+                'action': 'edit',
+                'fullt_navn': '',
+                'email': 'andre@eksempel.no',
+                'role': 'admin',
+                'is_active': 'on',
+                'er_delt_konto': 'on',
+            },
+        )
+        self.assertEqual(svar.status_code, 200)
+
+        self.admin.refresh_from_db()
+        self.assertFalse(self.admin.er_delt_konto)
+
+    def test_mfa_kan_ikke_kreves_paa_delt_konto(self):
+        bil = CustomUser.objects.create_user(
+            username='bil9', password='pass', role='read_write',
+            er_delt_konto=True,
+        )
+        svar = self.klient.post(
+            reverse('accounts:user_detail', args=[bil.pk]),
+            {
+                'action': 'edit', 'fullt_navn': '', 'email': '',
+                'role': 'read_write', 'is_active': 'on',
+                'mfa_required': 'on', 'er_delt_konto': 'on',
+            },
+        )
+        self.assertEqual(svar.status_code, 200)
+
+        bil.refresh_from_db()
+        self.assertFalse(bil.mfa_required)

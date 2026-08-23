@@ -54,6 +54,21 @@ En eksisterende test måtte endres: oppretting med e-post gir nå 302 i stedet f
 personlige kontoer går invitasjonsveien. Testens egentlige poeng — at adressen trimmes — er
 uendret, og den sjekker nå i tillegg at invitasjonen faktisk gikk ut.
 
+**Feltene måtte også inn i redigeringsskjemaet.** Første utgave la dem kun i
+opprettingsskjemaet, og da var funksjonen halvferdig for alle kontoer som allerede fantes —
+altså alle. De kunne ikke få navn i det hele tatt. Begge felter er nå redigerbare, med de
+samme kontotype-reglene: en personlig konto kan ikke gjøres delt med e-posten i behold, og
+MFA kan ikke slås på i samme lagring som «delt konto».
+
+**Kontoer uten e-post og navn er upåvirket.** Migrasjonen ga alle eksisterende
+`fullt_navn=''` og `er_delt_konto=False`, som begge er gyldige. De logger inn med passordet
+sitt som før; invitasjon gjelder kun nye kontoer. `EksisterendeKontoerTests` låser det.
+
+**Men admin-kontoen bør få en e-post.** `create_admin` har `--email` som valgfritt, og
+oppsettet i CLAUDE.md kaller den uten. Det er uproblematisk i dag, men når passord-reset
+bygges blir admin den ene kontoen som ikke kan bruke den — og det finnes ingen annen admin
+til å nullstille den. Ført i TODO.
+
 ## 2026-08-23 — `fullt_navn` og `er_delt_konto` på `CustomUser`
 
 **849 tester, alle grønne.** Punkt 3 i `BESLUTNING_BRUKERE_OG_EPOST.md` §8. Kun `AddField`.

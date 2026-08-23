@@ -164,7 +164,8 @@ class AdminUserEditForm(forms.ModelForm):
     class Meta:
         model = CustomUser
         fields = [
-            'email', 'role', 'is_active', 'mfa_required',
+            'fullt_navn', 'email', 'role', 'is_active', 'mfa_required',
+            'er_delt_konto',
             'kan_redigere_pasienter',
             'kan_redigere_vakter',
             'kan_redigere_utstyr',
@@ -172,12 +173,17 @@ class AdminUserEditForm(forms.ModelForm):
             'kan_redigere_beredskap',
         ]
         widgets = {
+            'fullt_navn': forms.TextInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'Fornavn Etternavn',
+            }),
             'email': forms.EmailInput(attrs={
                 'class': 'form-control',
                 'placeholder': 'Valgfritt',
             }),
             'role': forms.Select(attrs={'class': 'form-select'}),
             'mfa_required': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+            'er_delt_konto': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
             'kan_redigere_pasienter': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
             'kan_redigere_vakter': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
             'kan_redigere_utstyr': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
@@ -185,9 +191,11 @@ class AdminUserEditForm(forms.ModelForm):
             'kan_redigere_beredskap': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
         }
         labels = {
+            'fullt_navn': 'Fullt navn',
             'email': 'E-post (valgfritt)',
             'role': 'Rolle',
             'is_active': 'Aktiv konto',
+            'er_delt_konto': 'Delt konto (bil e.l.)',
             'mfa_required': 'Krev to-faktor (MFA)',
             'kan_redigere_pasienter': 'Pasientregistrering',
             'kan_redigere_vakter': 'Vakter',
@@ -202,10 +210,29 @@ class AdminUserEditForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields['email'].required = False
+        self.fields['fullt_navn'].required = False
 
     def clean_email(self):
         email = (self.cleaned_data.get('email') or '').strip()
         return email or None
+
+    def clean(self):
+        """Samme kontotype-regler som ved oppretting.
+
+        Uten dette kunne en konto opprettes som personlig og gjøres delt i
+        etterkant — med e-post og navn i behold. Da ville reset-lenken hatt en
+        vei til en delt innboks likevel, og hele poenget med flagget falt bort.
+        """
+        data = super().clean()
+        if data.get('er_delt_konto'):
+            if data.get('email'):
+                self.add_error('email', 'En delt konto skal ikke ha e-post.')
+            if data.get('fullt_navn'):
+                self.add_error(
+                    'fullt_navn',
+                    'En delt konto har ingen personlig eier. La feltet stå tomt.',
+                )
+        return data
 
     def clean_mfa_required(self):
         """MFA kan ikke kreves på en delt konto.
@@ -216,7 +243,12 @@ class AdminUserEditForm(forms.ModelForm):
         ved å poste skjemaet direkte.
         """
         paakrevd = self.cleaned_data.get('mfa_required')
-        if paakrevd and self.instance and self.instance.er_delt_konto:
+        # `self.data` og ikke `cleaned_data`: `er_delt_konto` er ikke
+        # nødvendigvis renset ennå når feltvalideringen kjører, og admin kan
+        # sette begge i samme lagring.
+        blir_delt = bool(self.data.get('er_delt_konto'))
+        er_delt = blir_delt or (self.instance and self.instance.er_delt_konto)
+        if paakrevd and er_delt:
             raise forms.ValidationError(
                 'MFA kan ikke kreves på en delt konto — enheten deles av flere.'
             )
