@@ -205,7 +205,27 @@ USE_TZ = True
 STATIC_URL = '/static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 STATICFILES_DIRS = [BASE_DIR / 'static']
-STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
+# STORAGES, ikke STATICFILES_STORAGE. Den gamle innstillingen ble FJERNET i
+# Django 5.1, og prosjektet kjører 5.2 — den sto igjen som død konfigurasjon og
+# ble ignorert uten et eneste varsel. Følgene var reelle:
+#
+#   - Ingen hashing av filnavn, altså ingen cache-busting
+#   - WhiteNoise serverte `/static/css/portal.css` med `max-age=14400`
+#   - Enhver CSS- eller JS-endring var dermed usynlig for en bruker som hadde
+#     besøkt siden, i inntil fire timer etter deploy
+#
+# Oppdaget 23. aug. 2026 etter to runder med «fargen har ikke endret seg» —
+# der begge fiksene faktisk lå ute i prod. `collectstatic` avslørte det i
+# loggen: «138 static files copied» uten det etterfølgende «post-processed»,
+# som er manifest-steget som ikke kjørte.
+STORAGES = {
+    'default': {
+        'BACKEND': 'django.core.files.storage.FileSystemStorage',
+    },
+    'staticfiles': {
+        'BACKEND': 'whitenoise.storage.CompressedManifestStaticFilesStorage',
+    },
+}
 
 # ── Sikkerhet ────────────────────────────────────────────────────────────────
 # HTTPS er kun aktuelt i produksjon (Railway). I offline-modus eller under

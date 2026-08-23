@@ -1680,6 +1680,20 @@ class JsModulLastingTests(TestCase):
     STATS_ROLLER = ('admin', 'lead', 'lead_view')
     ANDRE_ROLLER = ('read_only', 'read_write')
 
+    @staticmethod
+    def _monster(modul):
+        """Regex som treffer modulen med eller uten innholdshash i navnet.
+
+        `ManifestStaticFilesStorage` gir `patients-app.a1b2c3d4.js`, ikke
+        `patients-app.js`. En ordrett `assertIn('patients-app.js', ...)`
+        feiler da — men verre: den ordrette `assertNotIn` ville **bestått
+        uansett**, også om modulen faktisk ble lastet. Den negative testen er
+        hele F7-vernet, så den måtte gjøres hash-tolerant, ikke bare den
+        positive.
+        """
+        import re
+        return re.compile(re.escape(modul) + r'(\.[0-9a-f]{8,})?\.js')
+
     def _hent_som(self, rolle):
         bruker = CustomUser.objects.create_user(
             username=f'bruker_{rolle}', password='testpass123',
@@ -1694,17 +1708,20 @@ class JsModulLastingTests(TestCase):
         """Bootstrappen må lastes uansett rolle — ellers starter ikke appen."""
         for rolle in self.STATS_ROLLER + self.ANDRE_ROLLER:
             with self.subTest(rolle=rolle):
-                self.assertIn('patients-app.js', self._hent_som(rolle))
+                self.assertRegex(self._hent_som(rolle),
+                                 self._monster('patients-app'))
 
     def test_statistikkmodulen_lastes_kun_for_stats_roller(self):
         for rolle in self.STATS_ROLLER:
             with self.subTest(rolle=rolle):
-                self.assertIn('patients-stats.js', self._hent_som(rolle))
+                self.assertRegex(self._hent_som(rolle),
+                                 self._monster('patients-stats'))
 
     def test_statistikkmodulen_lastes_ikke_for_lavere_roller(self):
         for rolle in self.ANDRE_ROLLER:
             with self.subTest(rolle=rolle):
-                self.assertNotIn('patients-stats.js', self._hent_som(rolle))
+                self.assertNotRegex(self._hent_som(rolle),
+                                    self._monster('patients-stats'))
 
     def test_alltid_lastede_moduler_refererer_ikke_til_statistikkmodulen(self):
         """Selve vernet: ingen direkte referanse fra alltid-lastet kode.

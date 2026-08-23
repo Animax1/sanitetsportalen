@@ -4,6 +4,48 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-08-23 — Fargen var riktig i prod hele tiden. Nettleseren fikk den bare aldri
+
+**848 tester, alle grønne** (2 nye). Årsaken til to runder med «ingenting har endret seg».
+
+Begge CSS-fiksene lå ute i produksjon. `curl` mot `/static/css/portal.css` ga det nye
+innholdet. Likevel så André den gamle fargen.
+
+`STATICFILES_STORAGE` **ble fjernet i Django 5.1.** Prosjektet kjører 5.2, så linja sto
+igjen som død konfigurasjon og ble ignorert — uten sjekk, advarsel eller feilmelding.
+Django falt tilbake til `StaticFilesStorage`:
+
+* ingen hashing av filnavn, altså **ingen cache-busting**
+* WhiteNoise serverte fila under samme navn med `Cache-Control: public, max-age=14400`
+* enhver CSS- eller JS-endring var dermed usynlig for en bruker som hadde besøkt siden,
+  i inntil **fire timer** etter deploy
+
+Sporet lå i release-loggen hele tiden: «138 static files copied to '/app/staticfiles'» —
+uten det etterfølgende «post-processed», som er manifest-steget. Etter fiksen sier den
+«414 post-processed».
+
+Rettet ved å flytte til `STORAGES`-innstillingen, som er den Django 5 faktisk leser.
+
+**Dette har gjeldt hver frontend-endring siden oppgraderingen til Django 5.1.** Ingen av
+dem var feil; de nådde bare ikke fram til en nettleser som allerede hadde vært innom.
+CSS-arbeidet i sommer, F7-oppdelingen av JS-modulene, dagens tekstfarger — alle har hatt
+opptil fire timers forsinkelse ut til brukeren, uten at noe sa fra.
+
+**Testen sjekker oppførsel, ikke innstillingsnavn.** En test på
+`settings.STORAGES['staticfiles']['BACKEND']` ville gått god for nøyaktig samme feil neste
+gang Django flytter en innstilling: navnet ville stått der, og ingenting ville brukt det.
+`StatiskLagringTests` slår i stedet opp lagringen som faktisk er i bruk og krever at den
+hasher.
+
+**En stille testsvekkelse fulgte med.** `JsModulLastingTests` sjekket `assertIn` og
+`assertNotIn` på `'patients-stats.js'` ordrett. Med hashing heter fila
+`patients-stats.<hash>.js`, så den positive testen feilet — synlig og greit. Men den
+negative ville **bestått uansett**, også om `read_only` faktisk lastet statistikkbundlen.
+Det er hele F7-vernet. Begge er gjort hash-tolerante.
+
+**Fellesnevneren med resten av dagen:** verifiseringen ble gjort på feil sted. `curl` mot
+serveren svarte riktig, men beviset som trengtes var hva nettleseren faktisk lastet.
+
 ## 2026-08-23 — Hjelpeteksten var fortsatt uleselig: fiksen lå i feil fil
 
 **846 tester, alle grønne.** Rettelse av forrige punkt.
