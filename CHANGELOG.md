@@ -4,6 +4,35 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-08-23 — `/accounts/glemt-passord/` var en blank side i produksjon
+
+**910 tester, alle grønne** (3 nye). Rettelse av forrige punkt, meldt av André minutter
+etter deploy.
+
+Alle fire reset-malene ble satt sammen ved å ta `head -22` av `invitasjon.html` som felles
+hode. Det linjetallet stemte da jeg først så på fila — men jeg hadde selv lagt til
+`::placeholder`-regelen der tidligere samme dag, og linjene hadde flyttet seg. `head -22`
+kuttet dermed **midt i `<style>`-blokken**: ingen `</style>`, ingen `</head>`, ingen
+`<body>`. Nettleseren leste resten av dokumentet som CSS og viste ingenting.
+
+Rettet ved å klippe til og med `<body>` i stedet for til et gjettet linjetall.
+
+**Testene fanget det ikke, og grunnen er verdt å skrive ned.** De sjekket at responsen var
+`200`, og at innholdet var **identisk** mellom en adresse som finnes og en som ikke gjør
+det. Begge var like ødelagte, så likhetstesten passerte med glans.
+
+En test på at to ting er like sier ingenting om at noen av dem er riktige. Det er en
+annen feilmodus enn den vanlige — testen var ikke for svak i seg selv, den var svar på et
+annet spørsmål enn det som avgjorde om siden virket.
+
+`SidestrukturTests` sjekker nå at hvert åpnet `<style>`, `<head>` og `<html>` også lukkes,
+at `<body>` finnes, og at skjemaet faktisk har et e-postfelt og en submit-knapp. Verifisert
+ved å gjenskape feilen: da feiler den, med en melding som forklarer at resten av dokumentet
+tolkes som innholdet i det uavsluttede elementet.
+
+Det er tredje gang i dag en test måtte skrives om fordi den bekreftet antakelsen min i
+stedet for oppførselen.
+
 ## 2026-08-23 — Passord-reset: de sju beslutningene, bygget
 
 **907 tester, alle grønne** (21 nye). Punkt 5 og siste i `BESLUTNING_BRUKERE_OG_EPOST.md` §8.

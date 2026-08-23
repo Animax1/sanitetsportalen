@@ -247,3 +247,74 @@ class ResetRateLimitTests(TestCase):
             for i in range(8)
         ]
         self.assertIn(429, statuser)
+
+@override_settings(SECURE_SSL_REDIRECT=False, RATELIMIT_ENABLE=False)
+class SidestrukturTests(TestCase):
+    """Sidene må faktisk rendre som HTML, ikke bare svare 200.
+
+    Skrevet etter at `/accounts/glemt-passord/` gikk i produksjon som en blank
+    side. Malene ble satt sammen med `head -22` av en annen mal, og det
+    linjetallet kuttet midt i `<style>`-blokken — ingen `</style>`, ingen
+    `<body>`. Nettleseren leste resten av dokumentet som CSS og viste
+    ingenting.
+
+    **Testene fanget det ikke fordi de spurte om feil ting.** De sjekket at
+    responsen var 200, og at innholdet var *identisk* mellom en adresse som
+    finnes og en som ikke gjør det — og begge var like ødelagte. En test på at
+    to ting er like sier ingenting om at noen av dem er riktige.
+    """
+
+    SIDER = [
+        ('accounts:glemt_passord', ()),
+        ('accounts:login', ()),
+    ]
+
+    def _sjekk_struktur(self, html, hvor):
+        for aapen, lukk in (('<style>', '</style>'),
+                            ('<head>', '</head>'),
+                            ('<html', '</html>')):
+            if aapen in html:
+                self.assertIn(
+                    lukk, html,
+                    f'{hvor}: {aapen} uten {lukk} — resten av dokumentet '
+                    f'tolkes som innholdet i det uavsluttede elementet',
+                )
+        self.assertIn('<body', html, f'{hvor}: mangler <body>')
+
+    def test_offentlige_sider_rendrer_komplett_html(self):
+        klient = Client()
+        for navn, args in self.SIDER:
+            with self.subTest(side=navn):
+                resp = klient.get(reverse(navn, args=args))
+                self.assertEqual(resp.status_code, 200)
+                self._sjekk_struktur(resp.content.decode('utf-8'), navn)
+
+    def test_svarsidene_i_resetflyten_rendrer_komplett_html(self):
+        """Sidene man havner på etter en POST, som er de som brakk."""
+        bruker = CustomUser.objects.create_user(
+            username='struktur.test', password='Pass123!', role='read_write',
+            email='struktur@eksempel.no', must_change_password=False,
+        )
+        klient = Client()
+
+        sendt = klient.post(reverse('accounts:glemt_passord'),
+                            {'email': 'struktur@eksempel.no'})
+        self._sjekk_struktur(sendt.content.decode('utf-8'), 'glemt_passord_sendt')
+
+        reset = klient.get(
+            reverse('accounts:passord_reset', args=[lag_token(bruker)])
+        )
+        self._sjekk_struktur(reset.content.decode('utf-8'), 'passord_reset')
+
+        ugyldig = klient.get(reverse('accounts:passord_reset', args=['tull']))
+        self._sjekk_struktur(ugyldig.content.decode('utf-8'), 'reset_ugyldig')
+
+    def test_skjemaet_finnes_faktisk_paa_sida(self):
+        """En blank side svarer også 200. Innholdet må sjekkes.
+
+        `glemt-passord` uten et e-postfelt er en side som ser ut til å virke
+        og ikke gjør noen ting.
+        """
+        resp = Client().get(reverse('accounts:glemt_passord'))
+        self.assertContains(resp, 'name="email"')
+        self.assertContains(resp, 'type="submit"')
