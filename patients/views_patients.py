@@ -294,7 +294,16 @@ def patients_list_view(request):
 @rate_limit(group='patients:detail-write', rate='120/m',
             method=['PUT', 'DELETE'])
 def patient_detail_view(request, pk):
-    """Oppdater eller slett (soft-delete) en pasient."""
+    """Oppdater eller slett en pasient.
+
+    **DELETE er en hard-delete**, ikke en soft-delete som docstringen tidligere
+    påsto. Raden fjernes fra databasen og pasientnummeret resirkuleres hvis den
+    var den siste. Eneste vei tilbake er en backup tatt før slettingen.
+
+    `Patient.is_active` finnes på modellen og leses av `?include_archived`, men
+    ingen produksjonskode setter den til False — feltet kan bare endres via
+    Django-admin. Det er derfor ikke slettemekanismen appen faktisk bruker.
+    """
     try:
         patient = Patient.objects.get(pk=pk)
     except Patient.DoesNotExist:

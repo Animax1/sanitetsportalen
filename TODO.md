@@ -54,10 +54,12 @@ ingen av dem gir feilmelding — de er bare stille inaktive.
       - **`OFFLINE_MODE` må ikke stå på en cron-tjeneste.** `settings.py` kaster
         `ImproperlyConfigured` ved oppstart på Railway, med vilje. `kollaps_arkiv` hadde
         den, og ville krasjet stille én gang i måneden
-      - [ ] **Kjør `kollaps_arkiv --dry-run` manuelt før første skarpe kjøring 1. sept.**
-            Den sletter helseopplysninger permanent. `docs/OPPSETT_KOLLAPS_CRON.md`
-            beskriver framgangsmåten. **Dokumentet er ditt** — du sletter det selv når du
-            er trygg på jobben
+      - [x] **`kollaps_arkiv --dry-run` kjørt manuelt i containeren 23. aug. 2026.**
+            Svar: «Ingen arkiv eldre enn 730 dager som ikke allerede er kollapset.»
+            Ventet — arkivene er fra 2026. Første skarpe kjøring 1. sept. har dermed
+            ingenting å slette, og tørrkjøringen har bekreftet at kommandoen starter
+            og leser databasen riktig. `docs/OPPSETT_KOLLAPS_CRON.md` **er ditt** — du
+            sletter det selv når du er trygg på jobben
 
 - [x] **Portalen står i `production` (22. aug. 2026).** Gjennomført i denne rekkefølgen:
   1. Dataimporten fra den gamle appen — 273 pasienter, se CHANGELOG
@@ -240,12 +242,17 @@ modul og les i en annen.
       helsepersonell.** Alle kontroller grønne — antall, triage-fordeling, koblinger,
       `journal`, `lege` og tegnsett stemmer mot gammel prod. 273 `IMPORT`-rader i
       auditloggen. `enja` og `morten` ble gjenbrukt, ikke duplisert.
-      - [ ] **Ta en manuell backup i portalen** (`/portal-admin/backup/`) som
-            gjenopprettingspunkt for importen. Må gjøres fra containeren eller
-            nettsiden — `BACKUP_DIR` er Railways volum, så en lokal `db_backup`
-            skriver til feil sted
+      - [x] **Manuell backup tatt 23. aug. 2026 — 270 pasienter, ikke 273.**
+            Tre av de importerte var testpasienter og ble slettet før backupen.
+            **Slettingen er permanent:** `DELETE /api/patients/<pk>/` er en hard-delete
+            som fjerner raden og resirkulerer pasientnummeret. De tre finnes altså
+            ikke i noen backup tatt etter 23. aug. Det er greit — de var duds — men
+            270 er det tallet en framtidig restore skal gi. Ser du 273, er du på en
+            eldre backup
       - [ ] Åpne statistikkfanen og se over nøkkeltallene med egne øyne. Tallene er
-            verifisert mot kilden programmatisk, men ikke sett i grensesnittet
+            verifisert mot kilden programmatisk, men ikke sett i grensesnittet.
+            Merk at de nå gjelder 270 pasienter — triage-fordelingen 163/91/19
+            stemte mot 273 og vil avvike med opptil tre
 
 ### Pasientmodulen — småting
 
@@ -377,6 +384,17 @@ Funnene under er allerede kartlagt, så jobben er avgrenset når den skal gjøre
         ikke hatt noe å kollapse, så påstanden om 24-måneders-grensen er foreløpig
         udekket av en faktisk kjøring. Se S7 i CHANGELOG for hvorfor en dokumentert,
         men ikke-reell kontroll er det alvorligste avviket
+      - **Soft-delete av pasientdata er beskrevet, men finnes ikke.** A.6 (linje 142)
+        beskriver `is_active=False` som «logisk slettet / soft-delete», og A-delens
+        rettighetstabell (linje 445) sier «Pasientdata soft-slettes; permanent sletting
+        på forespørsel». **Ingen produksjonskode setter `Patient.is_active = False`.**
+        `DELETE /api/patients/<pk>/` er en hard-delete: raden fjernes og
+        pasientnummeret resirkuleres. Feltet leses av `?include_archived`, men kan bare
+        settes via Django-admin — og den flaten er av i produksjon (S1).
+        Avviket går i registrertes favør: sletting er *mer* endelig enn dokumentert,
+        ikke mindre. Men dokumentet er art. 30-protokollen, og skal beskrive det som
+        faktisk skjer. Funnet 23. aug. 2026 da tre testpasienter ble slettet.
+        Docstringen i `views_patients.py` som påsto det samme er allerede rettet
       - **E-postvarsling ved feil er ikke omtalt i dokumentet i det hele tatt.** Det er
         en dataflyt ut av systemet til to tredjeparter — AHASend (utsending) og Google
         (mottakerens innboks) — og begge er databehandlere som hører hjemme i A.2.

@@ -4,6 +4,46 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-08-23 — Verifisert i prod: cron, backup og passordbytte. Og en slettemekanisme som ikke finnes
+
+**829 tester, alle grønne.** Én docstring rettet, ellers bokføring.
+
+Tre punkter bekreftet i produksjon, alle tre kjørt av André der de faktisk hører hjemme:
+
+- **`kollaps_arkiv --dry-run` i containeren:** «Ingen arkiv eldre enn 730 dager som ikke
+  allerede er kollapset.» Ventet — arkivene er fra 2026. Første skarpe kjøring 1. september
+  har dermed ingenting å slette
+- **Manuell backup tatt:** 270 pasienter
+- **Passordbytte:** feil nåværende passord gir «Nåværende passord er feil», ikke 429.
+  Rettelsen tidligere i dag virker i prod
+
+**270, ikke 273.** Tre av de importerte var testpasienter og ble slettet før backupen.
+Det er tallet en framtidig restore skal gi — ser man 273, er man på en eldre backup.
+
+**Og der dukket et dokumentasjonsavvik opp.** For å si hva «270» betyr for backupen måtte
+jeg vite om de tre var soft-slettet eller borte. Svaret: borte.
+`DELETE /api/patients/<pk>/` er en hard-delete som fjerner raden og resirkulerer
+pasientnummeret.
+
+Docstringen på viewet påsto det motsatte — «Oppdater eller slett (soft-delete) en pasient».
+Den er rettet, og sier nå eksplisitt at eneste vei tilbake er en backup tatt før slettingen.
+Det er ikke en detalj å ta feil av i en docstring over en destruktiv operasjon.
+
+Mer alvorlig: **ingen produksjonskode setter noen gang `Patient.is_active = False`.** Feltet
+finnes på modellen og leses av `?include_archived`, men kan bare settes via Django-admin —
+og den flaten er av i produksjon siden S1. Soft-delete av pasientdata er altså en mekanisme
+som er beskrevet, men som ingenting utløser.
+
+`PERSONVERN_DOKUMENTASJON.md` beskriver den likevel to steder: A.6 kaller `is_active=False`
+«logisk slettet / soft-delete», og rettighetstabellen sier «Pasientdata soft-slettes;
+permanent sletting på forespørsel». Avviket går i registrertes favør — sletting er *mer*
+endelig enn dokumentert, ikke mindre — men dokumentet er art. 30-protokollen og skal
+beskrive det som faktisk skjer. **Ikke rettet her**, fordi en endring i det formelle
+dokumentet hører sammen med de andre punktene som venter på gjennomgang. Lagt i TODO.
+
+Det er samme sjekk som S7 handlet om, med motsatt fortegn: forrige gang beskrev dokumentet
+en sletting som ikke fant sted. Denne gangen beskriver det en bevaring som ikke finner sted.
+
 ## 2026-08-23 — Passordbytte kunne stenge en ny bruker ute av portalen
 
 **829 tester, alle grønne** (2 nye). Rettelse av S3, samme dag som den ble deployet.
