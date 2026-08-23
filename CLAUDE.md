@@ -156,6 +156,21 @@ Det finnes **ingen** eksplisitt invalidering — cachen utløper på TTL. De kor
 
 ### Frontend
 
+**To stilark, og de dekker hver sine sider.** Å legge en regel i feil fil ser ut som en
+virkningsløs endring, ikke som en feil:
+
+| Fil | Lastes av | Variabler |
+|-----|-----------|-----------|
+| `static/css/style.css` | **kun** `templates/patients/index.html` | `--text-muted` m.fl. |
+| `static/css/portal.css` | alt som arver `core/templates/core/base_portal.html` | `--portal-text-muted` m.fl. |
+
+Noen frittstående sider (`403.html`, `mfa_setup.html`, `mfa_verify.html`, innlogging)
+laster ingen av dem — de har egen `<style>`-blokk og må overstyre selv.
+
+Begge temaene er mørke, så **enhver Bootstrap-klasse for dempet tekst må overstyres** der
+malen kan se den. `MorkTekstPaaMorkBakgrunnTests` løser `{% extends %}` og `{% static %}`
+og håndhever det.
+
 Fem moduler i `static/js/` (ingen bundler). Fire lastes alltid, én betinget (F7):
 
 | Modul | Lastes | Ansvar |
