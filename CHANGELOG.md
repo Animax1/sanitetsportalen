@@ -4,6 +4,45 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-08-23 — Cron er bevist i drift: 3 varsler faktisk slettet
+
+Kun dokumentasjon. Ingen kodeendring.
+
+`purge_old_logs` fyrte som Railway Cron natt til søndag 23. august, og slettet de 3
+varslene fra 12. mai. Cron-tjenestens logg:
+
+```
+Starting Container
+Slettet 0 login-events eldre enn 730 dager.
+Slettet 0 audit-logger eldre enn 730 dager.
+Slettet 3 varsler eldre enn 30 dager.
+```
+
+**Hvorfor dette er beviset og tørrkjøringen ikke var det.** Teksten er den skarpe
+varianten — en tørrkjøring hadde skrevet «Ville slettet», med `[Tørrkjøring]` foran.
+Tallet 3 er nøyaktig det tørrkjøringen dagen før identifiserte. Og den kjørte i
+containeren, mot produksjonsdatabasen, utløst av cron. Alle tre leddene som kunne
+sviktet stille — at cron fyrer, at `startCommand` treffer riktig kommando i stedet for
+gunicorn, og at slettingen rammer de riktige radene — er dermed dekket av samme
+observasjon.
+
+Det er forskjellen S7 handlet om: en kontroll som står dokumentert er ikke det samme som
+en kontroll som finner sted.
+
+**`PERSONVERN_DOKUMENTASJON.md` v1.6.** Ny datert merknad under retensjonstabellen i A.9.
+Ingen lagringstid er endret — det som er endret er grunnlaget for å påstå at de
+etterleves.
+
+**Sjekklistepunktet i C.4 er bevisst ikke krysset av.** TODO pekte på det, men C.4 er
+malen for *årlig* revisjon. Krysses den av nå, står avkryssingen der i 2027 også og
+påstår en verifisering som ikke er gjort det året. En datert merknad ved A.9, der
+lagringstidene faktisk står, sier det samme uten å råtne.
+
+**`kollaps_arkiv` er ikke verifisert på samme måte**, og skal ikke regnes som det. Den
+har ennå ingenting å kollapse — arkivene er fra 2026, grensen er 24 måneder — så en
+kjøring beviser foreløpig bare at kommandoen starter. Første skarpe kjøring er 1.
+september, og `--dry-run` bør kjøres manuelt før den.
+
 ## 2026-08-22 — Portalen står i `production`, med cron. Dokumentasjonen i takt
 
 Kun dokumentasjon og Railway-oppsett. **797 tester, alle grønne.** Ingen kodeendring.

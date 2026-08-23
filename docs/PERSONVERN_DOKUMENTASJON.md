@@ -1,7 +1,7 @@
 # Personvern­dokumentasjon – Pasientregistrering (sanitetsvakt)
 
-**Siste oppdatering:** 12. august 2026  
-**Versjon:** 1.5  
+**Siste oppdatering:** 23. august 2026  
+**Versjon:** 1.6  
 **Behandlingsansvarlig:** André Eritsland
 
 ---
@@ -288,6 +288,8 @@ Lagringstidene er fastsatt etter GDPR art. 5(1)(e): opplysningene skal ikke oppb
 | Brukerkontoer | Slettes manuelt når tilgang ikke lenger er nødvendig | Manuell | Lagringsbegrensning, art. 5(1)(e) |
 
 > **Merk om audit-logg-retention:** Perioden var tidligere oppgitt som 10 år, begrunnet i journalrettslige hensyn. Da journalplikten ikke gjelder for dette systemet (se A.4), er den begrunnelsen bortfalt, og perioden er satt til 2 år i tråd med det `purge_old_logs` faktisk håndhever. Kommandoen kjøres av Railway Cron.
+
+> **Merk – verifisert i drift 23. august 2026:** `purge_old_logs` kjøres av Railway Cron (`0 0 * * SUN`) i miljøet `production`. Ved første skarpe kjøring, natt til søndag 23. august 2026, slettet jobben 3 varsler eldre enn 30 dager — nøyaktig de tre en tørrkjøring dagen før hadde identifisert. Cron-tjenestens logg viser `Slettet 3 varsler eldre enn 30 dager`, altså den skarpe varianten, ikke tørrkjøringens `Ville slettet`. Lagringstidene i tabellen over er dermed dokumentert **håndhevet i produksjon**, ikke bare konfigurert. Tilsvarende bekreftelse for `kollaps_arkiv` (`0 4 1 * *`) står igjen: jobben har ennå ingenting å kollapse, siden arkivene er fra 2026 og grensen er 24 måneder.
 
 > **Merk om backup-retention:** Applikasjonens backup-opprydding er **antallsbasert**, ikke tidsbasert. Konstanten `RETENTION_HOURS = 72` finnes fortsatt i koden, men er ikke i bruk — den er erstattet av `ModuleBackupConfig.max_backups` (standard 50). Tidligere versjoner av dette dokumentet oppga «72 timer, deretter automatisk slettet», noe som ikke stemte med implementasjonen.
 
@@ -781,10 +783,11 @@ Dette dokumentet er utarbeidet og godkjent av behandlingsansvarlig.
 
 ---
 
-*Dokument: PERSONVERN_DOKUMENTASJON.md – versjon 1.5 – sist oppdatert 12. august 2026*
+*Dokument: PERSONVERN_DOKUMENTASJON.md – versjon 1.6 – sist oppdatert 23. august 2026*
 
 **Endringslogg:**
 
+- **v1.6 (23.08.2026):** **A.9:** lagringstidene er ikke lenger bare konfigurert, men verifisert håndhevet i produksjon. `purge_old_logs` kjørte som Railway Cron natt til søndag 23. august og slettet 3 varsler eldre enn 30 dager. Ny merknad under retensjonstabellen dokumenterer beviset og skiller det fra tørrkjøringen dagen før. Ingen lagringstid er endret — kun grunnlaget for påstanden om at de etterleves. Merknaden noterer også at tilsvarende bekreftelse for `kollaps_arkiv` fortsatt står igjen.
 - **v1.5 (12.08.2026):** Gjennomgang mot faktisk kode. **Rettslig grunnlag omskrevet:** systemet er ikke et behandlingsrettet helseregister — journalføring skjer i eksternt system, og feltet `journal` er kun et Ja/Nei-flagg. Helsepersonelloven §§ 39–40 og pasientjournalloven fjernet som grunnlag; art. 6(1)(d) og 9(2)(h) står igjen, med taushetspliktvilkåret i art. 9(3) dokumentert. **Lagringstider forkortet** som følge av bortfalt journalplikt: audit-logg 10 år → 2 år (samsvarer nå med `purge_old_logs`), arkiverte pasientrader 24 mnd med påfølgende kollaps til aggregat, varsler 30 dager. **Backup-retention korrigert:** oppryddingen er antallsbasert (`max_backups`, standard 50), ikke 72 timer — `RETENTION_HOURS` er død kode. **Nye datakategorier dokumentert:** `VaktArkiv`, `ArkivertPasient` og `core.Notification`. **Railway databasebackup** lagt inn som egen behandling i A.2, med presisering av at den omfatter hele databasen. **A.12:** påstanden om at fritekst-risiko er eliminert er korrigert — verdimengden håndheves foreløpig kun i grensesnittet; nytt underkapittel dokumenterer fravalg av innsynslogg, fravalg av begrenset lesetilgang og vurderingen av DPIA. **Del B:** ny B.8 med informasjon til appbrukere (frivillige og helsepersonell), som tidligere manglet helt; Kontakt flyttet til B.9. **A.1:** merknad om at behandlingsansvaret ligger hos privatperson. Sjekklistene i C.1, C.2 og C.4 oppdatert tilsvarende.
 - **v1.4 (05.06.2026):** A.6: `behandler`-felt omdøpt til `forstehjelper` (FK til Førstehjelper-tabell); `helsepersonell` omdøpt til `helsepersonell_ref` (FK); `deleted_at` erstattet med `is_active` (BooleanField, False = soft-delete). B.2: oppdatert feltbeskrivelse til «førstehjelper». Dato- og versjonsinkonsekvens rettet.
 - **v1.3 (30.04.2026):** Revidert utgave. Lagt til beskrivelse av `RequestMetricsMiddleware` som ren driftslogger (teknisk telemetri uten persondata), `AppSetting` som feature-flag-store uten persondata, og tilgangsbegrensninger på admin server-status (admin-rolle + CSRF for flag-endringer). Skillet mellom `AuditLog` (persondatalogg) og driftsloggen tydeliggjort. Kolonne for Server-status lagt til i rollematrisen. A.13 oppdatert med tilsvarende sikkerhetsfikser.

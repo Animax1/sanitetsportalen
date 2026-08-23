@@ -73,13 +73,21 @@ ingen av dem gir feilmelding — de er bare stille inaktive.
       **Den gamle appens database er slettet.** Din manuelle backup i portalen er eneste
       gjenopprettingspunkt for de 273 importerte pasientene.
 
-      - [ ] **Verifiser at cron faktisk kjører.** `purge_old_logs` fyrer førstkommende
-            søndag 00:00 og skal slette 3 varsler fra 12. mai (`id` 1, 2, 3 — totalt 4
-            varsler før kjøring). Er de borte etterpå, er mekanismen bevist ende-til-ende.
-            **Først da** kan sjekklistepunktet på linje 724 i
-            `PERSONVERN_DOKUMENTASJON.md` krysses av, og backloggens F2 regnes som reell
-            for portalen. En tørrkjøring er ikke bevis — det er nettopp forskjellen S7
-            handlet om
+      - [x] **Cron er verifisert i drift (23. aug. 2026).** `purge_old_logs` fyrte natt til
+            søndag 23. august og slettet de 3 varslene fra 12. mai. Cron-tjenestens logg
+            viser `Slettet 3 varsler eldre enn 30 dager` — den skarpe varianten, ikke
+            tørrkjøringens `Ville slettet`. Mekanismen er dermed bevist ende-til-ende: cron
+            utløser, `startCommand` treffer riktig kommando, og slettingen rammer de
+            riktige radene. Ført inn i `PERSONVERN_DOKUMENTASJON.md` A.9 (v1.6), og
+            backloggens F2 regnes nå som reell for portalen.
+            **Sjekklistepunktet i C.4 er bevisst ikke krysset av** — C.4 er malen for
+            *årlig* revisjon og skal stå tom, ellers ville avkryssingen stått der i 2027
+            også og påstått noe den ikke har dekning for. Verifiseringen hører hjemme som
+            datert merknad ved A.9, der lagringstidene faktisk står.
+            - [ ] Bekreft gjerne radnivået med egne øyne ved anledning:
+                  `railway ssh --service web -- python manage.py shell -c "from core.models import Notification; print(Notification.objects.count())"`
+                  → forventet `1`. Ikke et krav for avkryssingen over; loggen fra
+                  containeren er beviset
 
 - [ ] **Fyll inn organisasjonsnavn i A.4** i `docs/PERSONVERN_DOKUMENTASJON.md`.
       Står fortsatt som `[fyll inn organisasjonsnavn]`. Dokumentet er
@@ -347,9 +355,11 @@ Funnene under er allerede kartlagt, så jobben er avgrenset når den skal gjøre
       Gjennomgangen her er en annen øvelse enn for de tre andre: verifiser at hver
       påstådte kontroll faktisk er reell i koden.
       - Organisasjonsnavn i A.4 — se «Krever Andre» øverst
-      - A.9 lagringstider forutsetter at `purge_old_logs` og `kollaps_arkiv` faktisk
-        kjører som cron. Står de ikke, beskriver dokumentet en slettepraksis som ikke
-        finner sted — se S7 i CHANGELOG for hvorfor det er det alvorligste avviket
+      - A.9 lagringstider: `purge_old_logs` er **verifisert i drift 23. aug. 2026** og
+        dokumentert med datert merknad (v1.6). `kollaps_arkiv` gjenstår — den har ennå
+        ikke hatt noe å kollapse, så påstanden om 24-måneders-grensen er foreløpig
+        udekket av en faktisk kjøring. Se S7 i CHANGELOG for hvorfor en dokumentert,
+        men ikke-reell kontroll er det alvorligste avviket
       - **E-postvarsling ved feil er ikke omtalt i dokumentet i det hele tatt.** Det er
         en dataflyt ut av systemet til to tredjeparter — AHASend (utsending) og Google
         (mottakerens innboks) — og begge er databehandlere som hører hjemme i A.2.
