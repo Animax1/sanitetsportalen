@@ -111,25 +111,36 @@ står i [`CHANGELOG.md`](./CHANGELOG.md). Tre punkter gjenstår:
 ### Forbedringsbacklog
 
 Kodegjennomgangen fra 12.–13. august 2026 fant 28 punkter (N1–N13, S1–S7, F1–F9).
-**23 er gjennomført** — hva som ble gjort og hvorfor står i `CHANGELOG.md` under
-13.–22. august. Det som står igjen er listet under, i dokumentets egen rangering.
+**24 er gjennomført** — hva som ble gjort og hvorfor står i `CHANGELOG.md` under
+13.–23. august. Det som står igjen er listet under, i dokumentets egen rangering.
 
-- [ ] **S3 — Rate-limiting finnes kun på innlogging.** ~2 t. `@ratelimit` forekommer
-      nøyaktig to steder i kodebasen, begge på `login_view`. Ubeskyttet i dag:
-  - `POST /pasienter/api/patients/` — en `read_write`-bruker eller en stjålet sesjonscookie
-    kan opprette pasienter i løkke så fort serveren rekker. Uten F3 finnes ingen bremse
-  - `POST /accounts/change-password/` — ingen struping på gjetting av `old_password`
-  - `GET /pasienter/api/full-stats/` — appens dyreste spørring. Cachet 60 s, men
-    cache-miss-stien er ubeskyttet
-  - `GET /portal-admin/auditlog/eksport.csv` — 5000 rader per kall, ubegrenset antall kall
+- [x] **S3 — Rate-limiting utover innlogging (23. aug. 2026).** `core/ratelimit.py` med
+      `rate_limit`-dekorator og `er_rate_limited`. Én bøtte per endepunkt, nøkkel per
+      bruker:
+      | Endepunkt | Metode | Grense |
+      |---|---|---|
+      | `POST /pasienter/api/patients/` | POST | 60/min |
+      | `PUT`/`DELETE /pasienter/api/patients/<pk>/` | PUT, DELETE | 120/min |
+      | `GET /pasienter/api/full-stats/` | GET | 30/min |
+      | `POST /accounts/change-password/` | POST | 10/5 min |
+      | `GET /portal-admin/auditlog/eksport.csv` | GET | 10/min |
 
-      Lavere prioritet fordi alt krever innlogging og brukergruppen er liten og kjent. Men
-      `django-ratelimit` og nødbryteren `RATELIMIT_ENABLE` finnes allerede, så kostnaden er
-      lav. Foreslått: `@ratelimit(key='user', rate='60/m', method='POST', block=True)` på
-      skriveendepunktene, strengere (`10/5m`) på passordbytte. **Merk:** rate-limiting med
-      LocMemCache er per prosess — i lavkostnad-modus (1 worker) er det riktig, i vakt-modus
-      deles telleren via Redis.
-      *Akseptanse:* ingen autentisert bruker kan generere ubegrenset skrivelast mot databasen.
+      Pasient-redigering sto ikke i den opprinnelige lista, men er tatt med: akseptansen
+      handler om skrivelast mot databasen, og `PUT` er skrivelast.
+      `accounts/views.py::_er_rate_limited` delegerer nå til kjernen, så innlogging får
+      samme feilhåndtering.
+      - **Funn underveis:** kommentaren i `settings.py` påsto at django-ratelimit «faller
+        åpen av seg selv ved cache-feil». Det stemte ikke i noen av de to retningene —
+        `RATELIMIT_FAIL_OPEN` er `False` som default (429 på alt når cachen svarer uten
+        verdi), og `cache.add()` mot en død Redis kaster `ConnectionError` som pakken
+        ikke fanger (500). Begge er nå håndtert, og kommentaren er rettet
+      - **Frontend:** skjemaet håndterte kun 400, så en strupet registrering ville sett ut
+        som ingenting — modalen åpen, ingen melding, pasienten ikke lagret. 429 vises nå,
+        og statistikkfanen lar forrige visning stå i stedet for å rendre feilkroppen
+      - Rate-limiting deler ikke teller mellom workers uten Redis. I dag kjører appen
+        1 worker × 4 tråder, så telleren er felles. Avviket ved flere workers gjør bremsen
+        mildere, aldri strengere — dokumentert i modulens docstring
+      *Akseptanse innfridd:* 15 nye tester, 812 totalt, alle grønne.
 
 - [ ] **F3 — Server-side idempotency ved pasient-opprettelse.** ~2–3 t. Utløst av en reell
       hendelse: 30. april 2026 ble en pasient registrert dobbelt på Grønn sone i prod fordi

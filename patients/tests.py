@@ -1112,6 +1112,85 @@ assert(kall === 1, 'knappen var fortsatt laast etter en feilet lagring');
                       'btn-save-edit-id mangler på "Lagre endringer"-knappen')
 
 
+class RegistreringsskjemaFeilvisningTests(TestCase):
+    """S3: en 429 fra serveren må bli synlig i skjemaet.
+
+    Da rate-limiting kom på `POST /api/patients/`, håndterte skjemaet kun 400.
+    En strupet registrering ville dermed sett ut som ingenting: modalen ble
+    stående åpen, uten feilmelding, mens pasienten ikke var lagret. Det er en
+    farligere feilmodus enn selve strupingen.
+
+    Testene kjører `_saveNewImpl()` i node med et stubbet DOM, jf. N9 — ikke
+    grep etter kodelinjer.
+    """
+
+    DOM_STUB = '''
+let skjult = false;
+let lastet = 0;
+
+function lagFelt(value) {
+  return { value: value, classList: { toggle: () => {} }, style: {}, textContent: '' };
+}
+const felter = {
+  'n-problemstilling':  lagFelt('Pustevansker'),
+  'n-arsak':            lagFelt('Sykdom'),
+  'n-transport':        lagFelt('Til fots'),
+  'n-inntid':           lagFelt('19.04.2026 14:30'),
+  'n-plassering':       lagFelt('Gronn 1'),
+  'n-forstehjelper':    lagFelt(''),
+  'n-helsepersonell':   lagFelt(''),
+  'n-triage-warn':      lagFelt(''),
+  'new-form-error':     lagFelt(''),
+  'new-form-error-text': lagFelt(''),
+};
+global.document = {
+  getElementById: (id) => felter[id] || null,
+  querySelector: (sel) => (sel.indexOf('n-triage') !== -1 ? { value: 'Gronn' } : null),
+};
+global.nowStr = () => '19.04.2026 14:30';
+global.bsNew = { hide: () => { skjult = true; } };
+global.loadPatients = async () => { lastet++; };
+global.renderBoard = () => {};
+global.updatePlasseringDropdownState = () => {};
+'''
+
+    def _kjor(self, snippet):
+        from patients import js_test_utils as jsu
+        harness = jsu.build_harness([(jsu.FORMS_JS, ('_saveNewImpl',))])
+        return jsu.run_node(harness, snippet, preamble=self.DOM_STUB)
+
+    @unittest.skipUnless(shutil.which('node'), 'node er ikke tilgjengelig')
+    def test_429_vises_som_feilmelding_i_skjemaet(self):
+        self._kjor('''
+global.apiFetch = async () => ({
+  ok: false,
+  status: 429,
+  json: async () => ({ error: 'For mange forespørsler på kort tid.' }),
+});
+
+await _saveNewImpl();
+
+assert(felter['new-form-error'].style.display === 'block',
+       'feilfeltet ble ikke vist ved 429');
+assert(felter['new-form-error-text'].textContent === 'For mange forespørsler på kort tid.',
+       'serverens tekst ble ikke vist, fikk: ' + felter['new-form-error-text'].textContent);
+assert(skjult === false,
+       'modalen ble lukket selv om pasienten ikke ble lagret');
+''')
+
+    @unittest.skipUnless(shutil.which('node'), 'node er ikke tilgjengelig')
+    def test_vellykket_lagring_lukker_modalen(self):
+        self._kjor('''
+global.apiFetch = async () => ({ ok: true, status: 201, json: async () => ({ id: 1 }) });
+
+await _saveNewImpl();
+
+assert(skjult === true, 'modalen ble ikke lukket etter vellykket lagring');
+assert(lastet === 1, 'pasientlista ble ikke lastet paa nytt');
+assert(felter['new-form-error'].style.display === 'none',
+       'feilfeltet ble staaende synlig etter vellykket lagring');
+''')
+
 
 # ── FORBEDRINGER #19 + klokkedrift-fix ───────────────────────────────────────
 

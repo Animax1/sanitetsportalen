@@ -27,6 +27,7 @@ from audit.models import AuditLog
 from core.forms import ModuleSettingsForm
 from core.models import ModuleSettings
 from core.modules import get_all_modules, get_dashboard_modules, get_module
+from core.ratelimit import rate_limit
 from core.url_safety import safe_redirect_url
 
 
@@ -262,6 +263,11 @@ def audit_log_list_view(request):
 
 @admin_required
 @require_GET
+# S3: 5000 rader per kall, uten grense på antall kall. En admin som
+# eksporterer manuelt trenger noen få i minuttet; alt over det er en
+# klient i løkke som drar hele auditloggen ut av databasen.
+@rate_limit(group='audit:csv-export', rate='10/m', method='GET',
+            on_limit='html')
 def audit_log_csv_export_view(request):
     """CSV-eksport av filtrert AuditLog.
 

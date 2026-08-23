@@ -15,6 +15,7 @@ from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_http_methods
 
 from core.auth_decorators import admin_required
+from core.ratelimit import rate_limit
 
 from .choices import validate_patient_choice_fields
 from .models import Patient, AppSetting, Forstehjelper, Helsepersonell
@@ -125,6 +126,10 @@ def session_timeout_view(request):
 @never_cache
 @login_required
 @require_http_methods(['GET', 'POST'])
+# S3: kun POST telles — GET er pollet hvert 30. sekund av hver klient og
+# svarer 304 uten kropp når ingenting er endret. 60/min er langt over det
+# et menneske rekker, og godt under det en løpsk klient produserer.
+@rate_limit(group='patients:create', rate='60/m', method='POST')
 def patients_list_view(request):
     """Liste pasienter for aktivt år, eller opprett ny.
 
@@ -283,6 +288,11 @@ def patients_list_view(request):
 
 @login_required
 @require_http_methods(['PUT', 'DELETE'])
+# S3: redigering skjer oftere enn opprettelse — obs-tider stemples, sonen
+# endres, pasienten skrives ut — så bøtta er romsligere enn ved
+# opprettelse. Den stopper en løpsk klient, ikke en travel sykestue.
+@rate_limit(group='patients:detail-write', rate='120/m',
+            method=['PUT', 'DELETE'])
 def patient_detail_view(request, pk):
     """Oppdater eller slett (soft-delete) en pasient."""
     try:

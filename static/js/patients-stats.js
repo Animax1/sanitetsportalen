@@ -226,8 +226,11 @@ async function loadStats() {
   }
   try {
     const res = await fetch('/pasienter/api/full-stats/');
-    if (res.status === 403) {
-      console.warn('Ingen tilgang til statistikk');
+    if (!res.ok) {
+      // 403 = ingen statistikktilgang. 429 = hentet for ofte (S3).
+      // Begge skal la forrige visning bli stående: alternativet er å
+      // legge feilkroppen i `fullStats` og rendre tomme grafer over den.
+      console.warn('Statistikk ikke hentet, status', res.status);
       return;
     }
     fullStats = await res.json();

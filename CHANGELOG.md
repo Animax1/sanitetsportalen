@@ -4,6 +4,72 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-08-23 — S3: rate-limiting utover innlogging, og en kommentar som løy
+
+**812 tester, alle grønne** (15 nye).
+
+Innlogging har hatt rate-limiting siden N4. Alt annet var ubeskyttet: en
+`read_write`-bruker — eller en stjålet sesjonscookie — kunne opprette pasienter i løkke så
+fort serveren rakk å svare, og en admin kunne hente 5000 auditrader per kall uten grense på
+antall kall.
+
+`core/ratelimit.py` er ny og eier mønsteret. Grensene:
+
+| Endepunkt | Metode | Grense | Bøtte |
+|---|---|---|---|
+| `POST /pasienter/api/patients/` | POST | 60/min | `patients:create` |
+| `PUT`/`DELETE /pasienter/api/patients/<pk>/` | PUT, DELETE | 120/min | `patients:detail-write` |
+| `GET /pasienter/api/full-stats/` | GET | 30/min | `patients:full-stats` |
+| `POST /accounts/change-password/` | POST | 10/5 min | `accounts:change-password` |
+| `GET /portal-admin/auditlog/eksport.csv` | GET | 10/min | `audit:csv-export` |
+
+Nøkkelen er per bruker, og gruppen oppgis eksplisitt på hvert kallsted. Det er lærdommen
+fra N4 gjort til regel: der havnet alle MFA-forsøk fra alle brukere i samme bøtte, og ved
+vaktstart fikk bruker nummer elleve 429 uten at noe var galt med kontoen. Utledes gruppen
+av funksjonsnavnet, kan en flytting mellom moduler slå to bøtter sammen igjen — stille.
+
+Pasient-redigering sto ikke i S3s opprinnelige liste. Den er tatt med fordi akseptansen
+handler om skrivelast mot databasen, og `PUT` er skrivelast. Bøtta er romsligere enn ved
+opprettelse: obs-tider stemples, sonen endres, pasienten skrives ut — redigering skjer
+oftere enn registrering.
+
+**Kommentaren i `settings.py` løy, og det betydde noe.** Den påsto at django-ratelimit
+«failopener av seg selv ved cache-feil». Pakken gjør det motsatte, i begge retninger:
+
+- `RATELIMIT_FAIL_OPEN` er `False` som default. Svarer cachen uten verdi, settes
+  `should_limit=True` — altså 429 på **alt**.
+- Kaster cachen i stedet — som `cache.add()` gjør mot en død Redis — fanges det ikke.
+  `socket.gaierror` er eneste unntak pakken tar. Endepunktet ville svart 500.
+
+Uten S3 gjaldt dette bare innlogging, der det er ubehagelig. Med S3 ville det gjeldt
+pasientregistrering under vakt, der det er uakseptabelt. Begge stier er nå lukket: flagget
+settes `True`, og `er_rate_limited` fanger exceptions og slipper forespørselen gjennom med
+en `WARNING` i loggen.
+
+Prioriteringen er den samme som F3 formulerer for idempotens, og som `stats_cache.py`
+allerede gjør for statistikken: **bedre en manglende bremse enn en pasient som ikke kan
+registreres.** Innlogging mister ikke noe reelt på dette — kontolåsingen (5 feilede forsøk
+= 15 min) ligger i databasen og er uavhengig av cachen. `accounts/views.py::_er_rate_limited`
+delegerer nå til kjernen, så den stien får samme håndtering.
+
+**429 måtte bli synlig, ellers var strupingen farligere enn problemet.** Skjemaet i
+`patients-forms.js` håndterte kun 400. En strupet registrering ville derfor sett ut som
+ingenting: modalen ble stående åpen, uten feilmelding, mens pasienten ikke var lagret.
+Både registrerings- og redigeringsskjemaet viser nå serverens tekst ved 429.
+Statistikkfanen leste tidligere svarkroppen uansett status utenom 403; den lar nå forrige
+visning stå i stedet for å rendre tomme grafer over en feilmelding. To nye node-tester
+kjører `_saveNewImpl()` med stubbet DOM og verifiserer begge deler — ingen grep etter
+kodelinjer, jf. N9.
+
+**Grensene er bare så delte som cachen er.** Appen kjører i dag én gunicorn-worker med
+fire tråder mot LocMemCache, så telleren er felles for all trafikk. Settes `WEB_WORKERS`
+høyere uten `REDIS_URL`, får hver worker sin egen teller og den reelle grensen blir
+grensen ganger antall workers; `--max-requests 1000` resirkulerer i tillegg workeren
+jevnlig og nullstiller tellerne. Begge avvikene går samme vei — bremsen blir mildere enn
+konfigurert, aldri strengere. Det er den ufarlige retningen.
+
+Nød-bryteren `RATELIMIT_ENABLE=False` slår av alt uten deploy, som før.
+
 ## 2026-08-23 — Cron er bevist i drift: 3 varsler faktisk slettet
 
 Kun dokumentasjon. Ingen kodeendring.

@@ -3,6 +3,7 @@ from django.contrib.auth.decorators import login_required
 from django.views.decorators.http import require_http_methods
 
 from core.auth_decorators import stats_required
+from core.ratelimit import rate_limit
 
 from .services import basic_stats, full_stats, get_active_year
 
@@ -29,6 +30,11 @@ def stats_view(request):
 
 @stats_required
 @require_http_methods(['GET'])
+# S3: appens dyreste spørring. Cachen tar 60 sekunder av gangen, men
+# cache-miss-stien var helt ubeskyttet — og det er nettopp den en klient
+# i løkke treffer gang på gang. Statistikkfanen lastes ved åpning og ved
+# auto-refresh hvert 30. sekund, altså rundt 2/min i normal bruk.
+@rate_limit(group='patients:full-stats', rate='30/m', method='GET')
 def full_stats_view(request):
     """Full statistikk for statistikk-dashboard. Kun admin, lead og lead_view.
 

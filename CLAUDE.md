@@ -58,6 +58,26 @@ Rollehierarki (lavest → høyest): `read_only → read_write → lead_view → 
 
 `has_role_at_least(user, 'lead')` sjekker hierarkisk. Dekoratorer gir 403 hvis rollen mangler.
 
+### Rate-limiting (core/ratelimit.py)
+
+Innlogging og MFA håndheves med eksplisitte `is_ratelimited`-kall i `accounts/views.py`
+(N4). Alt annet bruker `@rate_limit(...)` fra `core.ratelimit` (S3).
+
+```python
+from core.ratelimit import rate_limit
+
+@rate_limit(group='patients:create', rate='60/m', method='POST')
+```
+
+**Gruppen skal alltid oppgis eksplisitt** — den er cache-nøkkelen, og to endepunkter må
+aldri dele teller. Sett dekoratoren under tilgangssjekken; `key='user'` forutsetter
+innlogget bruker. `on_limit='json'` (default) gir `{'error': ...}` med 429, `'html'` gir
+429-siden.
+
+Bremsen faller åpen ved cache-feil, med vilje. Både `RATELIMIT_FAIL_OPEN=True` og
+try/except i `er_rate_limited` trengs — se modulens docstring. Nød-bryter:
+`RATELIMIT_ENABLE=False`.
+
 ### API-mønster (patients/views_*.py)
 
 Viewene er delt i fem moduler (N13.3) — `views.py` finnes ikke lenger:

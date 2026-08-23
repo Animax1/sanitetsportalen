@@ -69,7 +69,7 @@ async function _saveNewImpl() {
     await loadPatients();
     const activeTab = document.querySelector('[data-tab].active')?.dataset.tab;
     if (activeTab === 'tavle') renderBoard();
-  } else if (res.status === 400) {
+  } else if (res.status === 400 || res.status === 429) {
     let msg = 'Kunne ikke lagre pasient.';
     try { const d = await res.json(); if (d.error) msg = d.error; } catch (e) {}
     const errEl = document.getElementById('new-form-error');
@@ -156,7 +156,7 @@ async function _saveEditImpl() {
     await loadPatients();
     const activeTab = document.querySelector('[data-tab].active')?.dataset.tab;
     if (activeTab === 'tavle') renderBoard();
-  } else if (res.status === 400) {
+  } else if (res.status === 400 || res.status === 429) {
     let msg = 'Kunne ikke lagre endringene.';
     try { const d = await res.json(); if (d.error) msg = d.error; } catch (e) {}
     const errEl = document.getElementById('edit-form-error');

@@ -272,7 +272,11 @@ if REDIS_URL:
             # 'IGNORE_EXCEPTIONS'-option slik tredjepartspakken django-redis har.
             # Failsafe ved Redis-utfall er håndtert i koden:
             #   - patients/stats_cache.py: try/except rundt cache.get/set/delete
-            #   - django-ratelimit failopener av seg selv ved cache-feil
+            #   - django-ratelimit: se core/ratelimit.py. Pakken faller IKKE
+            #     åpen av seg selv — cache.add() mot en død Redis kaster
+            #     ConnectionError, og RATELIMIT_FAIL_OPEN er False som default.
+            #     Begge er håndtert: flagget settes True nedenfor, og
+            #     core.ratelimit.er_rate_limited fanger exceptions
             #   - patients/admin_status.py _get_cache_health: try/except rundt probe
         }
     }
@@ -292,11 +296,22 @@ else:
     CACHE_BACKEND_NAME = 'locmem'
 
 # ── Rate-limiting ────────────────────────────────────────────────────────────
-# Bruk django-ratelimit med LocMemCache. Se accounts/views.py for grenser.
+# Bruk django-ratelimit. Grensene ligger to steder: innlogging og MFA i
+# accounts/views.py (N4), alle andre endepunkter i core/ratelimit.py (S3).
 RATELIMIT_VIEW = 'accounts.views.ratelimited_view'
 # Nød-bryter: sett RATELIMIT_ENABLE=False i miljøvariabler for å slå av rate-limiting
 # uten å deploye (f.eks. ved event der mange kobler seg på samme wifi).
 RATELIMIT_ENABLE = os.environ.get('RATELIMIT_ENABLE', 'True') == 'True'
+
+# Fall åpent hvis cachen ikke svarer. Pakkens default er å svare 429 på alt i
+# den situasjonen; her ville det stanset pasientregistrering under vakt fordi
+# en cache er nede. Bremsen er et vern mot løpske klienter, ikke systemets
+# eneste forsvar — innlogging har i tillegg kontolåsing i databasen (5 feilede
+# forsøk = 15 min), som er uavhengig av cachen.
+#
+# Merk at flagget alene ikke er nok: det dekker bare stien der cachen svarer
+# uten verdi. Kaster den, må kallstedet fange det — se core/ratelimit.py.
+RATELIMIT_FAIL_OPEN = True
 
 # ── MFA-innstillinger ────────────────────────────────────────────────────────
 # Antall dager en enhet kan stoles på uten ny TOTP-kode

@@ -22,7 +22,7 @@ from datetime import timedelta
 
 from django_otp.plugins.otp_totp.models import TOTPDevice
 from django_otp.plugins.otp_static.models import StaticDevice, StaticToken
-from django_ratelimit.core import is_ratelimited
+from core.ratelimit import er_rate_limited as core_er_rate_limited, rate_limit
 
 from audit.models import AuditLog
 from core.url_safety import safe_redirect_url
@@ -223,20 +223,19 @@ def ratelimited_view(request, exception=None):
 def _er_rate_limited(request, group, key, rate):
     """Tell ett forsøk mot en rate-limit-bøtte og si om grensen er passert.
 
-    Tynn innpakning rundt ``django_ratelimit.core.is_ratelimited`` slik at
-    kallstedene blir lesbare. ``increment=True`` betyr at selve kallet teller
-    forsøket — kall den derfor én gang per forsøk, ikke i en betingelse som
-    kan evalueres flere ganger.
+    Innpakning rundt ``core.ratelimit.er_rate_limited`` slik at kallstedene
+    under blir lesbare. ``increment=True`` skjer inne i den — kall derfor
+    denne én gang per forsøk, ikke i en betingelse som kan evalueres flere
+    ganger.
 
-    Respekterer ``RATELIMIT_ENABLE`` på samme måte som dekoratoren gjorde.
+    Delegeringen kom med S3: kjernen fanger nå feil i cache-laget og faller
+    åpen i stedet for å svare 500 eller 429 på alt. For innloggingsstien
+    betyr det at en død Redis ikke låser alle ute — kontolåsingen i databasen
+    (5 feilede forsøk = 15 min) står uansett, og er den som faktisk stopper
+    gjetting mot én konto.
     """
-    return is_ratelimited(
-        request=request,
-        group=group,
-        key=key,
-        rate=rate,
-        method='POST',
-        increment=True,
+    return core_er_rate_limited(
+        request, group=group, key=key, rate=rate, method='POST',
     )
 
 
@@ -596,6 +595,12 @@ def logout_view(request):
 
 
 @login_required
+# S3: `old_password` kunne gjettes uten struping. 10 forsøk per 5 min er
+# samme grense som steg 1 av innlogging, og av samme grunn — men i egen
+# bøtte, slik at et passordbytte aldri spiser av innloggingskvoten.
+# Svarer HTML fordi dette er en vanlig side, ikke et API-endepunkt.
+@rate_limit(group='accounts:change-password', rate='10/5m',
+            method='POST', on_limit='html')
 def change_password_view(request):
     """Endre passord – påkrevd ved must_change_password."""
     form = ChangePasswordForm()
