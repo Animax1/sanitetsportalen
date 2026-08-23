@@ -272,7 +272,16 @@
     font-weight: 600 !important;
   }
 
-  .filter-btn.active-mine {
+  /* To knapper, samme tilstand. `toggleBoardMine()` setter .active-mine på
+     #btn-board-mine, men den knappen har ikke .filter-btn — den står ved siden
+     av «Ny pasient» i tavle-verktøylinja, ikke i filterraden. Regelen matchet
+     derfor aldri, og markeringen var usynlig på tavla.
+
+     Fikset ved å utvide selektoren, ikke ved å legge .filter-btn på knappen:
+     den klassen gir pille-form og mindre skrift, som ville gjort knappen
+     visuelt ulik `btn-sm`-knappen den står ved siden av. */
+  .filter-btn.active-mine,
+  #btn-board-mine.active-mine {
     background: #cffafe !important;
     color: #0e7490 !important;
     border-color: #0e7490 !important;
@@ -1000,6 +1009,15 @@
   }
 
   .text-muted {
+    color: var(--text-muted) !important;
+  }
+
+  /* Bootstraps .form-text er #6c757d, laget for lys bakgrunn. Mot --app-bg
+     (#0f172a) blir hjelpeteksten under skjemafelter tilnærmet uleselig.
+     Rammet passordreglene på /accounts/change-password/ og begge
+     hjelpetekstene på /portal-admin/backup/<modul>/. Samme verdi som
+     .text-muted, så all sekundærtekst i portalen har én farge. */
+  .form-text {
     color: var(--text-muted) !important;
   }
 

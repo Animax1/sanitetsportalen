@@ -4,6 +4,41 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-08-23 — To synlige feil: umarkert filter og uleselig hjelpetekst
+
+**846 tester, alle grønne** (3 nye). Ingen backend-endring.
+
+**Hjelpetekst forsvant i bakgrunnen.** Bootstraps `.form-text` er `#6c757d` — laget for
+lys bakgrunn — og var aldri overstyrt for portalens mørke tema (`--app-bg: #0f172a`).
+`.text-muted` og `.text-secondary` var overstyrt for lenge siden; `.form-text` ble aldri
+med. Rammet passordreglene på `/accounts/change-password/` og begge hjelpetekstene på
+`/portal-admin/backup/patients/` og `/arkiv/`.
+
+Én regel med samme verdi som `.text-muted`, så all sekundærtekst i portalen har én farge.
+
+Testen er skrevet bredere enn de tre tilfellene: den finner hvilke Bootstrap-klasser for
+dempet tekst som faktisk brukes i malene, og krever en overstyring for hver. Neste gang
+noen tar i bruk en ny slik klasse, sier suiten fra — i stedet for at noen må lese teksten
+for å oppdage det.
+
+**«Mine pasienter» var umarkert på tavla.** `toggleBoardMine()` satte `.active-mine` på
+`#btn-board-mine`, men eneste regel var `.filter-btn.active-mine`, og den knappen har
+ikke `filter-btn`. Klassen ble satt hver gang og traff aldri noe. Filteret virket —
+markeringen var usynlig.
+
+TODO foreslo å legge `filter-btn` på knappen. **Det ble ikke gjort.** Klassen gir
+pille-form og 0.78rem skrift, og tavleknappen står ved siden av «Ny pasient» i
+verktøylinja, ikke i filterraden. Den ville blitt visuelt ulik naboen — én visuell feil
+byttet mot en annen. Selektoren er utvidet i stedet.
+
+**Testen bestod først uten at fiksen var der.** `re.findall` på CSS-en matchet prosaen i
+kommentaren jeg nettopp hadde skrevet over regelen, med tom prefiks-gruppe, og
+`treffer`-sjekken godtok den. Testen ble rettet til å stripe kommentarer først, og
+deretter verifisert ved å reversere fiksen: da feiler den, slik den skal.
+
+Det er verdt å notere som mønster, ikke bare som en rettelse. En test som bare kjøres
+etter at fiksen er på plass, forteller ingenting om at den ville fanget feilen.
+
 ## 2026-08-23 — F3: dobbeltregistreringen fra 30. april kan ikke skje igjen
 
 **843 tester, alle grønne** (14 nye).

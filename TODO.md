@@ -271,15 +271,27 @@ modul og les i en annen.
 
 ### Pasientmodulen — småting
 
-- [ ] «Mine pasienter» er tydelig markert i pasientlista, men ikke i tavla.
-      **Årsak funnet:** CSS-regelen er `.filter-btn.active-mine`
-      (`static/css/style.css:275`), men `#btn-board-mine` har klassene
-      `btn btn-outline-info btn-sm` — uten `filter-btn`. `toggleBoardMine()`
-      legger på `active-mine`, men regelen matcher aldri.
-      Fiks: legg `filter-btn` på knappen i `index.html:148`, og sjekk at den
-      ikke arver uønsket bredde/marg fra klassen. Vurder samtidig om tavla og
-      lista skal dele filtertilstand — i dag er `mineOnly` og `boardMineFilter`
-      to uavhengige variabler, så filteret følger deg ikke mellom fanene.
+- [x] **«Mine pasienter» markeres nå på tavla (23. aug. 2026).** Regelen var
+      `.filter-btn.active-mine`, men `#btn-board-mine` har ikke `filter-btn` — så
+      `toggleBoardMine()` satte en klasse ingen regel matchet.
+      **Fikset ved å utvide selektoren, ikke ved å legge `filter-btn` på knappen**, som
+      TODO opprinnelig foreslo: den klassen gir pille-form og 0.78rem skrift, og knappen
+      står ved siden av en `btn-sm` i tavle-verktøylinja — ikke i filterraden. Å arve
+      pille-stilen der ville byttet én visuell feil mot en annen.
+      `AktivMineMarkeringTests` låser koblingen mellom de tre filene. Verifisert ved å
+      reversere fiksen: da feiler den.
+- [ ] **Skal tavla og lista dele «mine»-tilstand?** `mineOnly` og `boardMineFilter` er
+      to uavhengige variabler, så valget følger deg ikke mellom fanene. Merk at de gjør
+      forskjellige ting: lista *filtrerer bort* andre, tavla *dimmer* dem. Det taler for
+      å la dem være uavhengige. Krever en avgjørelse, ikke en fiks.
+- [x] **Uleselig hjelpetekst på mørk bakgrunn rettet (23. aug. 2026).** Bootstraps
+      `.form-text` er `#6c757d`, laget for lys bakgrunn, og var aldri overstyrt. Traff
+      passordreglene på `/accounts/change-password/` og begge hjelpetekstene på
+      `/portal-admin/backup/patients/` og `/arkiv/`. Én regel i `style.css` med samme
+      verdi som `.text-muted`, så all sekundærtekst har én farge.
+      `MorkTekstPaaMorkBakgrunnTests` krever nå at enhver Bootstrap-klasse for dempet
+      tekst som brukes i en mal, har en overstyring — den fanger neste forekomst, ikke
+      bare disse tre.
 
 ### Skalering mot 2027 — se `docs/RUNBOOK_VAKT.md` §3c
 

@@ -1922,3 +1922,99 @@ class PasientlisteYtelseTests(TestCase):
         self.assertEqual(len(data), 2)
         self.assertEqual(data[0]['pasientnummer'], 1)
         self.assertIn('forstehjelper', data[0])
+
+class MorkTekstPaaMorkBakgrunnTests(TestCase):
+    """Bootstrap-klasser for sekundærtekst må overstyres for mørkt tema.
+
+    Portalen kjører mørkt (`--app-bg: #0f172a`). Bootstraps egne farger for
+    dempet tekst er laget for lys bakgrunn — `.form-text` er `#6c757d` — og
+    blir tilnærmet uleselige. Klassene ser riktige ut i markup, så feilen
+    oppdages først når noen prøver å lese teksten.
+
+    Denne testen låser regelen: brukes en slik klasse i en mal, skal den ha en
+    overstyring i `style.css`. Den fanger neste forekomst, ikke bare de tre
+    som ble meldt inn 23. aug. 2026 (passordreglene og de to hjelpetekstene
+    på backup-sidene).
+    """
+
+    DEMPEDE_KLASSER = ('form-text', 'text-muted', 'text-secondary')
+
+    def _css(self):
+        from pathlib import Path
+        from django.conf import settings
+        return (Path(settings.BASE_DIR) / 'static' / 'css' / 'style.css').read_text(
+            encoding='utf-8')
+
+    def _maler(self):
+        from pathlib import Path
+        from django.conf import settings
+        rot = Path(settings.BASE_DIR)
+        return list((rot / 'templates').rglob('*.html')) + \
+               list((rot / 'core' / 'templates').rglob('*.html'))
+
+    def test_dempede_klasser_i_bruk_er_overstyrt(self):
+        import re
+        css = self._css()
+        markup = '\n'.join(p.read_text(encoding='utf-8') for p in self._maler())
+
+        for klasse in self.DEMPEDE_KLASSER:
+            if not re.search(r'\b' + klasse + r'\b', markup):
+                continue
+            self.assertRegex(
+                css, r'\.' + klasse + r'\s*[,{]',
+                f'.{klasse} brukes i malene, men har ingen overstyring i '
+                f'style.css — Bootstraps lyse standardfarge slår gjennom på '
+                f'den mørke bakgrunnen',
+            )
+
+
+class AktivMineMarkeringTests(TestCase):
+    """`.active-mine` må matche begge knappene som får klassen satt.
+
+    `toggleBoardMine()` setter `.active-mine` på `#btn-board-mine`, men CSS-en
+    hadde kun `.filter-btn.active-mine` — og tavleknappen har ikke den klassen.
+    Regelen matchet derfor aldri, og «Mine pasienter» var umarkert på tavla
+    selv om filteret virket.
+
+    Testen sjekker koblingen mellom de tre filene, som er der feilen lå: JS
+    setter klassen, malen bestemmer hvilke selektorer som kan treffe, CSS-en
+    definerer dem.
+    """
+
+    def _les(self, *deler):
+        from pathlib import Path
+        from django.conf import settings
+        return (Path(settings.BASE_DIR).joinpath(*deler)).read_text(encoding='utf-8')
+
+    def test_selektoren_treffer_tavleknappen(self):
+        import re
+        markup = self._les('templates', 'patients', 'index.html')
+        css = self._les('static', 'css', 'style.css')
+
+        knapp = re.search(r'<button[^>]*id="btn-board-mine"[^>]*>', markup)
+        self.assertIsNotNone(knapp, '#btn-board-mine finnes ikke i index.html')
+        klasser = set(
+            re.search(r'class="([^"]*)"', knapp.group(0)).group(1).split()
+        )
+
+        # Kommentarer må vekk før selektorene leses. Uten dette matchet
+        # regexen prosaen i CSS-kommentaren rett over regelen, med tom
+        # prefiks-gruppe — og testen bestod uten at noen selektor faktisk
+        # traff knappen. Verifisert ved å reversere fiksen: da skal den feile.
+        css = re.sub(r'/\*.*?\*/', '', css, flags=re.S)
+        selektorer = re.findall(r'([^\s,{}]*)\.active-mine', css)
+        treffer = any(
+            s == '#btn-board-mine' or s.lstrip('.') in klasser or s == ''
+            for s in selektorer
+        )
+        self.assertTrue(
+            treffer,
+            'Ingen .active-mine-selektor matcher #btn-board-mine '
+            f'(klasser: {sorted(klasser)}, selektorer: {selektorer}). '
+            'toggleBoardMine() setter klassen, men den vises aldri.',
+        )
+
+    def test_js_setter_klassen_paa_den_knappen(self):
+        js = self._les('static', 'js', 'patients-table.js')
+        self.assertIn("getElementById('btn-board-mine')", js)
+        self.assertIn("classList.toggle('active-mine'", js)
