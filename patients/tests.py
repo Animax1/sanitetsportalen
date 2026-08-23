@@ -1924,49 +1924,101 @@ class PasientlisteYtelseTests(TestCase):
         self.assertIn('forstehjelper', data[0])
 
 class MorkTekstPaaMorkBakgrunnTests(TestCase):
-    """Bootstrap-klasser for sekundærtekst må overstyres for mørkt tema.
+    """Bootstrap-klasser for sekundærtekst må overstyres i det stilarket malen laster.
 
-    Portalen kjører mørkt (`--app-bg: #0f172a`). Bootstraps egne farger for
-    dempet tekst er laget for lys bakgrunn — `.form-text` er `#6c757d` — og
-    blir tilnærmet uleselige. Klassene ser riktige ut i markup, så feilen
-    oppdages først når noen prøver å lese teksten.
+    Portalen kjører mørkt. Bootstraps egne farger for dempet tekst er laget
+    for lys bakgrunn — `.form-text` er `#6c757d` — og blir tilnærmet uleselige.
+    Klassene ser riktige ut i markup, så feilen oppdages først når noen
+    faktisk prøver å lese teksten.
 
-    Denne testen låser regelen: brukes en slik klasse i en mal, skal den ha en
-    overstyring i `style.css`. Den fanger neste forekomst, ikke bare de tre
-    som ble meldt inn 23. aug. 2026 (passordreglene og de to hjelpetekstene
-    på backup-sidene).
+    **Testen må følge lastekjeden, ikke bare lete i én fil.** Første utgave av
+    denne testen sjekket alle maler mot `style.css` alene, og bestod mens de
+    tre meldte sidene var like uleselige som før: `style.css` lastes kun av
+    pasientmodulens `index.html`, mens alt som arver `base_portal.html` får
+    `portal.css`. To mørke temaer, to filer. Testen løser derfor `{% extends %}`
+    og `{% static %}` for hver mal og krever overstyringen der malen faktisk
+    kan se den.
     """
 
     DEMPEDE_KLASSER = ('form-text', 'text-muted', 'text-secondary')
 
-    def _css(self):
+    def _rot(self):
         from pathlib import Path
         from django.conf import settings
-        return (Path(settings.BASE_DIR) / 'static' / 'css' / 'style.css').read_text(
-            encoding='utf-8')
+        return Path(settings.BASE_DIR)
 
     def _maler(self):
-        from pathlib import Path
-        from django.conf import settings
-        rot = Path(settings.BASE_DIR)
-        return list((rot / 'templates').rglob('*.html')) + \
-               list((rot / 'core' / 'templates').rglob('*.html'))
+        rot = self._rot()
+        maler = list((rot / 'templates').rglob('*.html'))
+        for app_maler in rot.glob('*/templates'):
+            maler.extend(app_maler.rglob('*.html'))
+        return maler
 
-    def test_dempede_klasser_i_bruk_er_overstyrt(self):
+    def _finn_mal(self, navn):
+        """Slå opp en mal på navnet `{% extends %}` bruker."""
+        rot = self._rot()
+        kandidater = [rot / 'templates' / navn]
+        kandidater += [d / navn for d in rot.glob('*/templates')]
+        for k in kandidater:
+            if k.exists():
+                return k
+        return None
+
+    def _stilark_og_inline(self, sti, sett=None):
+        """CSS-en malen faktisk har tilgang til, inkludert arvet fra base."""
         import re
-        css = self._css()
-        markup = '\n'.join(p.read_text(encoding='utf-8') for p in self._maler())
+        sett = sett or set()
+        if sti in sett:
+            return set(), ''
+        sett.add(sti)
 
-        for klasse in self.DEMPEDE_KLASSER:
-            if not re.search(r'\b' + klasse + r'\b', markup):
+        markup = sti.read_text(encoding='utf-8')
+        ark = set(re.findall(r"\{%\s*static\s*['\"]css/([\w.-]+)['\"]", markup))
+        inline = '\n'.join(re.findall(r'<style[^>]*>(.*?)</style>', markup, re.S))
+
+        forelder = re.search(r'\{%\s*extends\s*["\']([^"\']+)["\']', markup)
+        if forelder:
+            sti_forelder = self._finn_mal(forelder.group(1))
+            if sti_forelder:
+                arvet_ark, arvet_inline = self._stilark_og_inline(sti_forelder, sett)
+                ark |= arvet_ark
+                inline += '\n' + arvet_inline
+        return ark, inline
+
+    def test_dempede_klasser_er_overstyrt_der_malen_ser_dem(self):
+        import re
+        rot = self._rot()
+        mangler = []
+
+        for mal in self._maler():
+            markup = mal.read_text(encoding='utf-8')
+            brukte = [k for k in self.DEMPEDE_KLASSER
+                      if re.search(r'class="[^"]*\b' + k + r'\b', markup)]
+            if not brukte:
                 continue
-            self.assertRegex(
-                css, r'\.' + klasse + r'\s*[,{]',
-                f'.{klasse} brukes i malene, men har ingen overstyring i '
-                f'style.css — Bootstraps lyse standardfarge slår gjennom på '
-                f'den mørke bakgrunnen',
-            )
 
+            ark, inline = self._stilark_og_inline(mal)
+            if not ark and not inline:
+                continue  # partial/include uten egen lastekjede
+
+            css = inline
+            for navn in ark:
+                fil = rot / 'static' / 'css' / navn
+                if fil.exists():
+                    css += '\n' + fil.read_text(encoding='utf-8')
+
+            for klasse in brukte:
+                if not re.search(r'\.' + klasse + r'\s*[,{]', css):
+                    mangler.append(
+                        f'{mal.relative_to(rot)} bruker .{klasse}, men verken '
+                        f'{sorted(ark) or "inline <style>"} overstyrer den'
+                    )
+
+        self.assertEqual(
+            mangler, [],
+            'Bootstraps lyse standardfarge slår gjennom på mørk bakgrunn:\n  '
+            + '\n  '.join(mangler),
+        )
 
 class AktivMineMarkeringTests(TestCase):
     """`.active-mine` må matche begge knappene som får klassen satt.

@@ -317,9 +317,13 @@ modul og les i en annen.
       passordreglene på `/accounts/change-password/` og begge hjelpetekstene på
       `/portal-admin/backup/patients/` og `/arkiv/`. Én regel i `style.css` med samme
       verdi som `.text-muted`, så all sekundærtekst har én farge.
-      `MorkTekstPaaMorkBakgrunnTests` krever nå at enhver Bootstrap-klasse for dempet
-      tekst som brukes i en mal, har en overstyring — den fanger neste forekomst, ikke
-      bare disse tre.
+      **Første forsøk traff feil fil:** regelen ble lagt i `style.css`, som ingen av de
+      tre sidene laster. `portal.css` er den som gjelder for alt som arver
+      `base_portal.html`. Begge har regelen nå — `index.html` bruker `.form-text` selv.
+      `MorkTekstPaaMorkBakgrunnTests` løser nå `{% extends %}` og `{% static %}` og
+      krever overstyringen i det stilarket malen faktisk ser. Den avdekket fire
+      uleselige tekster til, på `403.html`, `mfa_setup.html`, `mfa_verify.html` og
+      `backup_admin_restore.html` — alle rettet.
 
 ### Skalering mot 2027 — se `docs/RUNBOOK_VAKT.md` §3c
 

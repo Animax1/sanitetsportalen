@@ -12,6 +12,18 @@
   color: var(--portal-text-muted) !important;
 }
 
+/* Bootstraps .form-text er #6c757d, laget for lys bakgrunn. Portalsidene er
+   mørke, så hjelpeteksten under skjemafelter ble tilnærmet uleselig.
+   Rammet passordreglene på /accounts/change-password/ og hjelpetekstene på
+   /portal-admin/backup/<modul>/ og .../restore/.
+
+   NB: den samme regelen i style.css dekker IKKE disse sidene. style.css
+   lastes kun av pasientmodulens index.html; alt som arver base_portal.html
+   får portal.css. To mørke temaer, to filer. */
+.form-text {
+  color: var(--portal-text-muted) !important;
+}
+
 /* ──── Skjema (mørk bakgrunn på portal-sider) ──── */
 
 .form-control, .form-select {

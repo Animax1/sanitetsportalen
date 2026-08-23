@@ -4,6 +4,46 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-08-23 — Hjelpeteksten var fortsatt uleselig: fiksen lå i feil fil
+
+**846 tester, alle grønne.** Rettelse av forrige punkt.
+
+Regelen for `.form-text` ble lagt i `style.css`. **Ingen av de tre meldte sidene laster den
+fila.** `style.css` lastes kun av pasientmodulens `index.html`; alt som arver
+`base_portal.html` — passordbytte, begge backup-sidene — får `portal.css`. To mørke temaer,
+to filer. Regelen er nå lagt i `portal.css` også.
+
+Den i `style.css` blir stående: `index.html` bruker `.form-text` to steder selv.
+
+**Testen hadde samme blindsone som fiksen.** Den hentet markup fra begge malkatalogene, men
+sjekket kun `style.css` — og bestod dermed mens sidene var like uleselige som før. At jeg
+verifiserte at den feilet uten fiksen hjalp ikke: den fulgte endringen min trofast, den
+fulgte bare ikke lastekjeden.
+
+Testen løser nå `{% extends %}` og `{% static %}` for hver mal, og krever overstyringen i
+det stilarket malen faktisk kan se — inkludert arvede `<style>`-blokker.
+
+**Da dukket fire til opp**, ingen av dem meldt inn:
+
+| Mal | Klasse |
+|---|---|
+| `templates/403.html` | `.text-muted` |
+| `templates/accounts/mfa_setup.html` | `.text-muted` |
+| `templates/accounts/mfa_verify.html` | `.text-muted`, `.form-text` |
+| `core/templates/core/backup_admin_restore.html` | `.form-text` |
+
+De tre første er frittstående sider med egen `<style>`-blokk og `background: #0f172a`, uten
+noen overstyring. De har vært like uleselige hele tiden — bare på sider man sjelden er på.
+Alle er rettet med samme verdi, `#94a3b8`.
+
+**Lærdommen er ikke «skriv en test».** Det gjorde jeg. Den var like avgrenset som fiksen,
+fordi jeg utledet den fra endringen i stedet for fra kravet. En test som speiler antakelsen
+din bekrefter antakelsen, ikke oppførselen.
+
+Caching var forresten aldri involvert: `CompressedManifestStaticFilesStorage` hasher
+filnavnene, så den nye `style.css` ble servert med det samme. Den var bare aldri lastet av
+de sidene det gjaldt.
+
 ## 2026-08-23 — AHASend-avtalen var aldri en mangel
 
 Kun dokumentasjon. Ingen kodeendring.
