@@ -4,6 +4,37 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-08-23 — «Mine pasienter» så mer påslått ut når den var av
+
+**848 tester, alle grønne.** Kun CSS.
+
+Knappen hadde tre tilstander som ikke rangerte riktig:
+
+| Tilstand | Utseende | Kilde |
+|---|---|---|
+| Av | Lyseblå ramme, lyseblå tekst | Bootstrap `.btn-outline-info` |
+| På | Blek blå fyll, mørk turkis tekst | `.active-mine` |
+| Av, med markør/fokus på knappen | **Full cyan fyll, svart tekst** | Bootstrap `:hover` |
+
+Den siste er kraftigst av de tre, og den betyr «av». Etter et klikk blir markøren stående
+på knappen, så det er nettopp den tilstanden man ser rett etter å ha slått filteret av.
+
+**På touch er det verre.** `:hover` henger igjen etter et trykk til man treffer noe annet,
+så på iPhone ble knappen stående fylt — ikke bare et øyeblikk.
+
+Det fantes ingen hover-regel for knappen i det hele tatt; Bootstraps egen tok over.
+På-tilstanden trengte ingen fiks — `#btn-board-mine.active-mine` har ID-spesifisitet og
+`!important`, og slår Bootstraps hover allerede. Det var kun av-tilstanden som måtte
+dempes, til et svakt hint i stedet for en fylling. `:focus` er med i selektoren fordi
+fokus blir liggende igjen etter et trykk.
+
+**Filterknappene i lista er urørt.** Der er den sist trykkede alltid den aktive, så den
+etterslepende hover-tilstanden treffer en knapp som uansett har sin egen farge fra en
+`!important`-regel. Problemet er spesifikt for en av/på-bryter.
+
+Ingen test på dette. En regel-eksisterer-test ville gitt samme falske trygghet som den
+gjorde tidligere i dag — invarianten er visuell, og bekreftes i grensesnittet.
+
 ## 2026-08-23 — Fargen var riktig i prod hele tiden. Nettleseren fikk den bare aldri
 
 **848 tester, alle grønne** (2 nye). Årsaken til to runder med «ingenting har endret seg».

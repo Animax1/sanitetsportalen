@@ -287,6 +287,27 @@
     border-color: #0e7490 !important;
   }
 
+  /* Av-tilstanden så mer påslått ut enn på-tilstanden.
+
+     Bootstrap fyller `.btn-outline-info:hover` med full cyan og svart tekst.
+     Ingen hover-regel fantes her, så etter et klikk — der markøren blir
+     stående på knappen — ble «av» kraftigere enn «på». På touch er det verre:
+     `:hover` henger igjen etter et trykk til man treffer noe annet, så
+     knappen ble stående fylt på iPhone.
+
+     På-tilstanden trengte ingen fiks; regelen over har ID-spesifisitet og
+     `!important`, og slår Bootstraps hover allerede. Det er kun av-tilstanden
+     som skal dempes, og `:focus` er med fordi fokus blir liggende igjen etter
+     et trykk. Filterknappene i lista er urørt: der er den sist trykkede alltid
+     den aktive, så den stjålne hover-tilstanden treffer en knapp som uansett
+     har sin egen farge. */
+  #btn-board-mine:not(.active-mine):hover,
+  #btn-board-mine:not(.active-mine):focus {
+    background: rgba(103, 232, 249, 0.14) !important;
+    color: #67e8f9 !important;
+    border-color: #67e8f9 !important;
+  }
+
   .zone-card.not-mine,
   .obs-cell.not-mine {
     opacity: 0.38;

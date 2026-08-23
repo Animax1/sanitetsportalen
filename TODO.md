@@ -308,6 +308,10 @@ modul og les i en annen.
       pille-stilen der ville byttet én visuell feil mot en annen.
       `AktivMineMarkeringTests` låser koblingen mellom de tre filene. Verifisert ved å
       reversere fiksen: da feiler den.
+      **Etterspill:** av-tilstanden så mer påslått ut enn på-tilstanden, fordi Bootstraps
+      `:hover` fyller knappen med full cyan og svart tekst og ingen hover-regel fantes.
+      På touch henger `:hover` igjen etter et trykk, så den ble stående fylt. Av-tilstanden
+      er nå dempet til et hint; på-tilstanden trengte ingen fiks.
 - [ ] **Skal tavla og lista dele «mine»-tilstand?** `mineOnly` og `boardMineFilter` er
       to uavhengige variabler, så valget følger deg ikke mellom fanene. Merk at de gjør
       forskjellige ting: lista *filtrerer bort* andre, tavla *dimmer* dem. Det taler for
