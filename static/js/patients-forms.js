@@ -14,6 +14,10 @@ function openNewModal() {
   const warnEl = document.getElementById('n-triage-warn');
   if (warnEl) warnEl.style.display = 'none';
   updatePlasseringDropdownState('n-plassering', null);
+  // F3: én nøkkel per åpning av skjemaet. Alle innsendinger fra denne
+  // åpningen deler den, så en retry blir én pasient — mens neste åpning er
+  // en ny registrering med ny nøkkel.
+  nyPasientNokkel = nyIdempotensNokkel();
   bsNew.show();
 }
 
@@ -59,12 +63,21 @@ async function _saveNewImpl() {
     plassering:      document.getElementById('n-plassering').value,
     forstehjelper:       parseInt(document.getElementById('n-forstehjelper').value) || null,
     helsepersonell_ref: parseInt(document.getElementById('n-helsepersonell').value) || null,
+    idempotency_key:    nyPasientNokkel,
   };
   const res = await apiFetch('/pasienter/api/patients/', {
     method: 'POST',
     body: JSON.stringify(body)
   });
   if (res.ok) {
+    bsNew.hide();
+    await loadPatients();
+    const activeTab = document.querySelector('[data-tab].active')?.dataset.tab;
+    if (activeTab === 'tavle') renderBoard();
+  } else if (res.status === 409) {
+    // F3: samme skjema sendt inn to ganger, og den første er fortsatt
+    // underveis. Pasienten blir opprettet — å vise en feil her ville bedt
+    // brukeren rette noe som ikke er galt. Samme utfall som suksess.
     bsNew.hide();
     await loadPatients();
     const activeTab = document.querySelector('[data-tab].active')?.dataset.tab;

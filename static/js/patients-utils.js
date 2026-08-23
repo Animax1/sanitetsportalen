@@ -35,6 +35,34 @@ async function apiFetch(url, options = {}) {
 }
 
 // ════════════════════════════════════════════════════════
+// IDEMPOTENS-NØKKEL (F3)
+// ════════════════════════════════════════════════════════
+
+// Lages når registreringsskjemaet åpnes og følger hver innsending fra det
+// skjemaet. Serveren oppretter kun én pasient per nøkkel, så en automatisk
+// nettverks-retry eller en dobbeltinnsending guarden ikke fanget gir ikke to
+// rader. To faner får hver sin nøkkel — det er to reelle registreringer.
+function nyIdempotensNokkel() {
+  // crypto.randomUUID() finnes kun i «secure context», altså ikke over ren
+  // HTTP. OFFLINE_MODE kjører nettopp uten TLS, så fallbacken er ikke
+  // teoretisk — uten den ville feltbruk kastet TypeError ved hver
+  // registrering. getRandomValues er tilgjengelig også uten TLS.
+  try {
+    if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+      return crypto.randomUUID();
+    }
+    if (typeof crypto !== 'undefined' && crypto.getRandomValues) {
+      const a = new Uint8Array(16);
+      crypto.getRandomValues(a);
+      return Array.from(a, b => b.toString(16).padStart(2, '0')).join('');
+    }
+  } catch (e) {
+    // faller gjennom til siste utvei
+  }
+  return 'k' + Date.now().toString(36) + Math.random().toString(36).slice(2, 12);
+}
+
+// ════════════════════════════════════════════════════════
 // SUBMIT GUARD (forhindrer dobbeltklikk-registrering)
 // ════════════════════════════════════════════════════════
 
@@ -120,6 +148,7 @@ function applyRoleVisibility() {
 let table = null;
 let charts = {};
 let currentEditId = null;
+let nyPasientNokkel = null;   // F3: settes av openNewModal()
 const chartDarkText = '#f8fafc';
 const chartMainText = '#e5e7eb';
 const chartMutedText = '#cbd5e1';

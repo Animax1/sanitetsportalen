@@ -113,7 +113,7 @@ står i [`CHANGELOG.md`](./CHANGELOG.md). Tre punkter gjenstår:
 ### Forbedringsbacklog
 
 Kodegjennomgangen fra 12.–13. august 2026 fant 28 punkter (N1–N13, S1–S7, F1–F9).
-**24 er gjennomført** — hva som ble gjort og hvorfor står i `CHANGELOG.md` under
+**25 er gjennomført** — hva som ble gjort og hvorfor står i `CHANGELOG.md` under
 13.–23. august. Det som står igjen er listet under, i dokumentets egen rangering.
 
 - [x] **S3 — Rate-limiting utover innlogging (23. aug. 2026).** `core/ratelimit.py` med
@@ -150,20 +150,35 @@ Kodegjennomgangen fra 12.–13. august 2026 fant 28 punkter (N1–N13, S1–S7, 
         nåværende passord, i bøtta `password:old-guess`
       *Akseptanse innfridd:* 17 nye tester, 829 totalt, alle grønne.
 
-- [ ] **F3 — Server-side idempotency ved pasient-opprettelse.** ~2–3 t. Utløst av en reell
-      hendelse: 30. april 2026 ble en pasient registrert dobbelt på Grønn sone i prod fordi
-      brukeren dobbeltklikket før serveren rakk å svare. På delte soner finnes ingen
-      unik-sjekk, så begge requests gikk gjennom.
-      Fix A (`withSubmitGuard()` i `patients-utils.js:41`) er på plass, men beskytter ikke
-      API-klienter, to faner med samme skjema, eller automatisk nettverks-retry.
-      Fix B: frontend genererer `crypto.randomUUID()` når skjemaet åpnes og sender den som
-      `idempotency_key`. Backend slår opp `patient_create:{user.id}:{key}` før opprettelse;
-      treff gir samme respons som første gang (status 200, ikke 201), lagret i 5 min.
-      **Bruk `cache.add()`, ikke `get()`+`set()`** — sistnevnte er ikke atomisk.
-      **Risiko:** krever Redis. I lavkostnad-modus er cachen per prosess, så beskyttelsen
-      gjelder kun innen én worker. Cache-feil må falle tilbake til «opprett uansett» —
-      bedre dobbel registrering enn ingen registrering.
-      *Akseptanse:* to raske POST-er med samme nøkkel gir én pasient.
+- [x] **F3 — Server-side idempotens ved pasient-opprettelse (23. aug. 2026).**
+      `core/idempotency.py`. Klienten lager en nøkkel når registreringsskjemaet åpnes
+      (`nyIdempotensNokkel()`) og sender den som `idempotency_key`. Serveren reserverer
+      nøkkelen med `cache.add()` — atomisk, ikke `get()`+`set()` — rett før opprettelsen.
+      | Tilstand | Svar |
+      |---|---|
+      | Nøkkelen ledig | Oppretter, `201` |
+      | Første forespørsel pågår | `409` med `duplikat: true` |
+      | Nøkkelen brukt opp | Samme pasient, `200` (ikke `201`) |
+      | Ingen/ugyldig nøkkel | Som før F3, `201` |
+
+      **Reservasjonen skjer etter all validering.** Ellers ville en avvist innsending
+      brent nøkkelen, og brukeren som rettet feilen fått «allerede sendt inn» på det
+      korrigerte forsøket. Feiler `save()`, frigis nøkkelen med `forkast()`.
+      - **`crypto.randomUUID()` kunne ikke brukes alene.** Den finnes kun i «secure
+        context», altså ikke over ren HTTP — og `OFFLINE_MODE` kjører nettopp uten TLS.
+        Uten fallback ville feltbruk kastet `TypeError` ved hver registrering.
+        `crypto.getRandomValues` er tilgjengelig også uten TLS og brukes der
+      - **To faner er ikke dekket, med vilje.** Nøkkelen lages når skjemaet åpnes, så to
+        faner har hver sin — det er to reelle registreringer. Dekket er
+        dobbeltinnsending fra samme skjema, automatisk nettverks-retry og API-klienter
+        som prøver på nytt
+      - **409 vises ikke som feil i grensesnittet.** Pasienten blir opprettet, så
+        modalen lukkes og lista lastes — samme utfall som suksess. En rød boks ville
+        bedt brukeren rette noe som ikke er galt
+      - Beskyttelsen er per prosess uten Redis, som rate-limiting. I dag én worker, så
+        den er reell nå
+      *Akseptanse innfridd:* to raske POST-er med samme nøkkel gir én pasient.
+      14 nye tester, 843 totalt, alle grønne.
 
 - [ ] **F4 — Lasttest før stor vakt.** ~3–4 t. `locust` eller enklere script: 20 samtidige
       innloggede brukere, polling av pasientlista hvert 30. sek, 5 brukere oppretter pasient

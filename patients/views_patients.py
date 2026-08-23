@@ -15,6 +15,7 @@ from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_http_methods
 
 from core.auth_decorators import admin_required
+from core.idempotency import bygg_nokkel, forkast, fullfor, reserver
 from core.ratelimit import rate_limit
 
 from .choices import validate_patient_choice_fields
@@ -246,6 +247,35 @@ def patients_list_view(request):
     # Tidligere: data.get('inntid', now) – returnerte '' hvis nøkkelen fantes med tom verdi.
     inntid_value = (data.get('inntid') or '').strip() or now_str
 
+    # F3: idempotens. Reserveres FØRST her — etter all validering, rett før
+    # noe opprettes. Reserverte vi tidligere, ville en avvist innsending brent
+    # nøkkelen, og brukeren som rettet feilen fått «allerede sendt inn» på det
+    # korrigerte forsøket.
+    idem = bygg_nokkel('patient_create', request.user.pk,
+                       data.get('idempotency_key'))
+    if idem:
+        status, verdi = reserver(idem)
+        if status == 'ferdig':
+            # Retry etter at den første forespørselen var ferdig: svar med
+            # pasienten den opprettet, og 200 i stedet for 201 — ingenting ble
+            # opprettet nå.
+            try:
+                return JsonResponse(
+                    _patient_to_dict(Patient.objects.get(pk=verdi)),
+                )
+            except Patient.DoesNotExist:
+                # Pasienten er slettet i mellomtiden. Nøkkelen beskytter ikke
+                # lenger noe, så la forespørselen gå videre og opprette.
+                forkast(idem)
+        elif status == 'pagar':
+            # Dobbeltinnsending mens den første fortsatt kjører. Raden er på
+            # vei; klienten skal laste lista på nytt, ikke sende igjen.
+            return JsonResponse(
+                {'error': 'Registreringen er allerede sendt inn.',
+                 'duplikat': True},
+                status=409,
+            )
+
     # FORBEDRINGER #19: Atomisk transaksjon – alt eller ingenting.
     # next_patient_nr() kalles inne i blokken slik at en eventuell IntegrityError
     # ved save() ruller tilbake nummer-allokeringen.
@@ -282,7 +312,17 @@ def patients_list_view(request):
         # justeres pabegynt opp til inntid.
         _ensure_pabegynt_not_before_inntid(patient)
 
-        patient.save()
+        try:
+            patient.save()
+        except Exception:
+            # Frigi nøkkelen, ellers står brukeren igjen med en reservasjon
+            # for en pasient som aldri ble opprettet, og kan ikke prøve igjen.
+            if idem:
+                forkast(idem)
+            raise
+
+    if idem:
+        fullfor(idem, patient.pk)
     return JsonResponse(_patient_to_dict(patient), status=201)
 
 

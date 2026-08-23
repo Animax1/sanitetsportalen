@@ -83,6 +83,23 @@ Bremsen faller åpen ved cache-feil, med vilje. Både `RATELIMIT_FAIL_OPEN=True`
 try/except i `er_rate_limited` trengs — se modulens docstring. Nød-bryter:
 `RATELIMIT_ENABLE=False`.
 
+### Idempotens (core/idempotency.py)
+
+Skriveendepunkter som kan treffes to ganger med samme intensjon — dobbeltinnsending,
+nettverks-retry — reserverer en klientgenerert nøkkel før de oppretter noe.
+
+```python
+idem = bygg_nokkel('patient_create', request.user.pk, data.get('idempotency_key'))
+if idem:
+    status, verdi = reserver(idem)   # 'ny' | 'pagar' | 'ferdig'
+...
+fullfor(idem, patient.pk)            # eller forkast(idem) hvis noe feilet
+```
+
+**Reserver etter all validering, aldri før** — ellers brenner en avvist innsending
+nøkkelen. Frigi med `forkast()` når opprettelsen feiler. Cache-feil betyr «opprett
+uansett»; se modulens docstring.
+
 ### API-mønster (patients/views_*.py)
 
 Viewene er delt i fem moduler (N13.3) — `views.py` finnes ikke lenger:

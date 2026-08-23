@@ -1152,6 +1152,8 @@ global.bsNew = { hide: () => { skjult = true; } };
 global.loadPatients = async () => { lastet++; };
 global.renderBoard = () => {};
 global.updatePlasseringDropdownState = () => {};
+let nyPasientNokkel = 'test-noekkel-abc123';
+let sendtBody = null;
 '''
 
     def _kjor(self, snippet):
@@ -1189,6 +1191,44 @@ assert(skjult === true, 'modalen ble ikke lukket etter vellykket lagring');
 assert(lastet === 1, 'pasientlista ble ikke lastet paa nytt');
 assert(felter['new-form-error'].style.display === 'none',
        'feilfeltet ble staaende synlig etter vellykket lagring');
+''')
+    @unittest.skipUnless(shutil.which('node'), 'node er ikke tilgjengelig')
+    def test_idempotensnokkelen_sendes_med(self):
+        """F3: uten nøkkelen i kroppen er hele server-vernet dødt."""
+        self._kjor('''
+global.apiFetch = async (url, opts) => {
+  sendtBody = JSON.parse(opts.body);
+  return { ok: true, status: 201, json: async () => ({ id: 1 }) };
+};
+
+await _saveNewImpl();
+
+assert(sendtBody.idempotency_key === 'test-noekkel-abc123',
+       'idempotency_key manglet i kroppen, fikk: ' + sendtBody.idempotency_key);
+''')
+
+    @unittest.skipUnless(shutil.which('node'), 'node er ikke tilgjengelig')
+    def test_409_lukker_modalen_uten_feilmelding(self):
+        """En dobbeltinnsending er ikke en feil brukeren kan rette.
+
+        Serveren svarer 409 når den første forespørselen med samme nøkkel
+        fortsatt kjører. Pasienten blir opprettet, så utfallet for brukeren
+        skal være det samme som ved suksess — ikke en rød boks som ber dem
+        prøve igjen.
+        """
+        self._kjor('''
+global.apiFetch = async () => ({
+  ok: false,
+  status: 409,
+  json: async () => ({ error: 'Registreringen er allerede sendt inn.', duplikat: true }),
+});
+
+await _saveNewImpl();
+
+assert(skjult === true, 'modalen ble ikke lukket ved 409');
+assert(lastet === 1, 'pasientlista ble ikke lastet paa nytt');
+assert(felter['new-form-error'].style.display === 'none',
+       'det ble vist en feilmelding for en registrering som faktisk gikk gjennom');
 ''')
 
 

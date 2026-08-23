@@ -4,6 +4,50 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-08-23 — F3: dobbeltregistreringen fra 30. april kan ikke skje igjen
+
+**843 tester, alle grønne** (14 nye).
+
+30. april 2026 ble en pasient registrert dobbelt på Grønn sone i prod fordi brukeren
+dobbeltklikket før serveren rakk å svare. Delte soner har ingen unik-sjekk, så begge
+forespørslene gikk gjennom. `withSubmitGuard()` kom som svar på klikket. F3 dekker
+tilfellene guarden ikke ser, fordi de skjer utenfor knappen.
+
+`core/idempotency.py` er ny. Klienten lager en nøkkel når registreringsskjemaet åpnes og
+sender den som `idempotency_key`. Serveren reserverer den med `cache.add()` — atomisk;
+`get()` etterfulgt av `set()` ville sluppet begge gjennom i nettopp det vinduet mekanismen
+finnes for å lukke.
+
+| Tilstand | Svar |
+|---|---|
+| Nøkkelen ledig | Oppretter, `201` |
+| Første forespørsel pågår fortsatt | `409` med `duplikat: true` |
+| Nøkkelen brukt opp | Samme pasient, `200` — ikke `201`, for ingenting ble opprettet nå |
+| Ingen eller ugyldig nøkkel | Nøyaktig som før F3 |
+
+**Rekkefølgen er hele poenget: reserver etter all validering, aldri før.** Brenner en
+avvist innsending nøkkelen, får brukeren som retter feilen «allerede sendt inn» på det
+korrigerte forsøket — og kommer ikke videre uten å lukke og åpne skjemaet på nytt. Feiler
+`save()` etter reservasjonen, frigis nøkkelen. Begge stiene har egen test.
+
+**`crypto.randomUUID()` alene ville brukket feltbruk.** Den finnes kun i «secure context»,
+altså ikke over ren HTTP — og `OFFLINE_MODE` kjører nettopp uten TLS, med vilje. Uten
+fallback ville hver registrering i felt kastet `TypeError` på en linje som ser triviell ut.
+`crypto.getRandomValues` er tilgjengelig også uten TLS og bærer fallbacken.
+
+**To faner er ikke dekket, og skal ikke være det.** Nøkkelen lages når skjemaet åpnes, så
+to faner har hver sin. Det kan være to reelle pasienter, og å slå dem sammen ville vært en
+verre feil enn den vi retter. Dekket er dobbeltinnsending fra samme skjema, automatisk
+nettverks-retry, og API-klienter som prøver på nytt etter tidsavbrudd.
+
+**409 vises ikke som en feil.** Pasienten blir opprettet uansett, så modalen lukkes og
+lista lastes — samme utfall som suksess. En rød boks ville bedt brukeren rette noe som
+ikke er galt, og er den typen melding som fører til at noen registrerer på nytt.
+
+Cache-feil betyr «opprett uansett», som i `core/ratelimit.py`. Under vakt er en
+dobbeltregistrering et irritasjonsmoment; en pasient som ikke lar seg registrere fordi en
+cache er nede er det ikke.
+
 ## 2026-08-23 — Verifisert i prod: cron, backup og passordbytte. Og en slettemekanisme som ikke finnes
 
 **829 tester, alle grønne.** Én docstring rettet, ellers bokføring.
