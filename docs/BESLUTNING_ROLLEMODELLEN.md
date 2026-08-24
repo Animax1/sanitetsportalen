@@ -311,6 +311,17 @@ oppstår; de blir bare synlige.
 2. Skal `handling`-nivået innføres allerede i deploy 1, eller først når oppdragsmodulen
    skrives? Anbefaling: definer nivået nå (så `ModulTilgang` ikke trenger ny migrasjon),
    men ta ikke i bruk før det finnes et `handling`-endepunkt å bruke det på.
+3. **Skal matrisen ligge på opprettingsskjemaet?** `AdminUserCreateForm` har `role`, men
+   ikke modulflaggene — de finnes kun på redigeringsskjemaet. I dag er det udramatisk
+   siden flaggene ikke gjør noe. Med håndhevelse lander den nyinviterte i en tom portal
+   og må redigeres etterpå. Anbefaling: legg matrisen på opprettingsskjemaet.
+4. **Varsler til brukere uten modultilgang.** `_notify_assignment`
+   (`patients/signals.py:234`) fyrer på at `role_obj.user` er satt, og sjekker ikke
+   modultilgang. Før splitten i §7.3 var tilstanden umulig — `PasientRolleForm` satte
+   koblingen og flagget samtidig. Etterpå kan man være koblet som helsepersonell uten
+   `ModulTilgang('patients')`, og få et varsel med lenke til en 403. Varselet inneholder
+   dessuten et pasientnummer. Anbefaling: `notify()` hopper over brukere som mangler
+   tilgang til `module_slug`.
 
 **Akseptansekriterium:** ingen endepunkt i en modul er nåbart uten `ModulTilgang`-rad;
 URL-gjennomgangstesten er grønn; `ModuleSettings.enabled=False` gir 403 for ikke-admin;

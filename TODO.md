@@ -343,6 +343,14 @@ personlige kontoer, admin-reset beholdt for alle. Ingenting bygget ennå.
       pasientmodulens JS — se F7-regelen i `CLAUDE.md`.
 - [ ] **`PasientRolleForm` splittes.** Radioen setter kun førstehjelper/helsepersonell-
       koblingen (domenedata); tilgang settes i matrisen modul × nivå. To steg, bevisst.
+- [ ] **Matrisen bør ligge på opprettingsskjemaet.** `AdminUserCreateForm` har `role`,
+      men ikke modulflaggene — de finnes kun på redigeringsskjemaet. Med håndhevelse
+      lander den nyinviterte i en tom portal og må redigeres etterpå.
+- [ ] **`notify()` må sjekke modultilgang.** `_notify_assignment`
+      (`patients/signals.py:234`) fyrer på at `role_obj.user` er satt. Etter splitten av
+      `PasientRolleForm` kan man være koblet som helsepersonell uten
+      `ModulTilgang('patients')` — og da få et varsel med pasientnummer og lenke til en
+      403. Tilstanden var umulig før splitten.
 - [ ] **Opprydding som følger med:** fjern `accounts/mixins.py` (død kode, og feil —
       `dispatch()` kjører viewet *før* rollesjekken) og `dataset_scope_all` (aldri brukt).
       Rett `docs/TEKNISK_DOKUMENTASJON.md` §6.3: peker på shimen, og kaller hard-deleten
