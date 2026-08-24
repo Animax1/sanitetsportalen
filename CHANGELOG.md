@@ -4,6 +4,75 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-08-24 — Rollemodellen besluttet: modultilgang som faktisk håndheves
+
+Ingen kodeendring. `docs/BESLUTNING_ROLLEMODELLEN.md` erstatter TODO-punktet
+«Rollemodellen — trenger beslutning», som sto ubesvart siden 22. aug. Beslutningen måtte
+tas før modul nummer to skrives.
+
+**Flaggene var aldri tilgangskontroll.** Verifisert ved å kjøre koden: en `read_write`-bruker
+med `kan_redigere_pasienter=False` får 200 på `/pasienter/`, 200 på `GET /api/patients/`
+og **201 på POST** — altså full skrivetilgang til en modul hun ikke ser i menyen.
+`permission_flag` leses kun av `Module.is_visible_for()`, som bare kalles fra dashboard og
+nav. Fire endepunkt-grupper i `patients` er i dag beskyttet av `@login_required` alene.
+
+**`ModuleSettings.enabled=False` stenger heller ikke URL-en** — `GET /pasienter/` gir 200
+med modulen deaktivert. Toggelen er en menybryter, ikke nødbryteren navnet lover. Begge
+deler rettes: modultilgang håndheves server-side med `@modul_kreves(...)`, og deaktivert
+modul gir 403 for alle utenom global admin.
+
+**Hierarkiet var ikke et hierarki av rettigheter.** `lead_view` ligger over `read_write`
+(2 mot 1), men har ikke skrivetilgang — så `has_role_at_least(user, 'read_write')` er
+`True` for en bruker som ikke står i `WRITE_ROLES`. Ingen live-bug: den hierarkiske
+hjelperen brukes kun med `'admin'`, i `views_arkiv.py`. Men den er en felle for neste
+modul, og forsvinner med den nye modellen.
+
+**Modellen blir: global admin, pluss ett nivå per modul.** Utgangspunktet var to akser
+(les × skriv), fordi dagens fem roller er nettopp det. Den ene aksen kollapset da
+statistikk ble besluttet skilt ut som egen modul: `lead_view` gir nemlig *bare*
+statistikk — `stats_required` beskytter to endepunkter, `.stats-only` dekker ett nav-punkt
+og én fane, og `dataset_scope_all` er død kode som aldri har vært brukt. «Større leserett»
+var «tilgang til statistikkmodulen» hele tiden. Igjen står
+`ingen → les → skriv:handling → skriv:full`.
+
+**`skriv: handling` finnes fordi en bil-konto skal kunne stemple, men ikke skrive fritekst.**
+Det lar seg ikke løse med en rollesjekk: `stamp_pabegynt_if_needed()` og de to andre kalles
+fra innsiden av den generelle `PUT`-en, med hele request-kroppen som argument — et
+tidsstempel er i dag en bivirkning av en redigering. En feltwhitelist inne i viewet ville
+sviktet stille første gang noen la til et felt. Regelen er derfor at en innskrenket aktør
+får et *smalt endepunkt*, ikke et filtrert bredt et, og at et `handling`-endepunkt ikke
+leser request-kroppen. Det siste er en invariant en test kan håndheve.
+
+**Sletting åpnes forsiktig.** Hard-delete er admin-only i dag, ikke tilgjengelig for
+skrivetilgang som antatt. Den åpnes for `skriv: full`, men bare på pasienter brukeren selv
+opprettet siste 30 minutter — nok til å rydde en feilregistrering, ikke nok til å bli et
+hverdagsverktøy. «Egen pasient» avgjøres fra `AuditLog`s CREATE-rad, som allerede har
+bruker og er indeksert på `(table_name, record_id)`; ingen ny kolonne trengs. Forbeholdet
+som følger med: DELETE-loggingen lagrer bare pasientnummeret, ikke innholdet — åpnes
+sletting bredere senere, må den utvides først.
+
+**Statistikkmodulen komponerer tilgang, den eier den ikke.** Den skal kun vise kilder
+brukeren har minst `les` på i kildemodulen. Ellers er den en bakvei rundt modultilgangen.
+Rekkefølgen følger av det: statistikk skilles ut før eller sammen med rollemodellen, ellers
+bygges en les-akse som umiddelbart rives ned igjen.
+
+**Tre deployer, ikke to.** TODO sa minimum to. Rollekrympingen (`role` → `admin`/`bruker`)
+er destruktiv og må ligge mellom «legg til og fyll `ModulTilgang`» og «fjern flaggene».
+Defaulten utledes fra `role` alene, ikke fra flagget: en migrasjon som stille trekker
+tilbake tilgang oppdager du midt i en vakt.
+
+Ryddes med på veien: `accounts/mixins.py` (død kode, og feil — `dispatch()` kjører viewet
+*før* rollesjekken, så en POST ville blitt utført og deretter fått 403), `dataset_scope_all`,
+og §6.3 i den tekniske dokumentasjonen, som peker på shimen og kaller hard-deleten «soft».
+`session_timeout` og `event_name` flytter til portal-admin — de er portalinnstillinger som
+tilfeldigvis bor under `/pasienter/`.
+
+**Én forutsetning gjenstår, og den må kontrolleres i prod:** hvor mange kontoer har `role`
+≥ `read_write` men `kan_redigere_pasienter=False`? Det er kontoene som i dag har en tilgang
+de ikke var ment å ha, og tallet avgjør hvor stor oppryddingen blir etter deploy 1.
+
+---
+
 ## 2026-08-23 — `/accounts/glemt-passord/` var en blank side i produksjon
 
 **910 tester, alle grønne** (3 nye). Rettelse av forrige punkt, meldt av André minutter
