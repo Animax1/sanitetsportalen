@@ -29,6 +29,7 @@ from patients.services import (
     basic_stats,
     _compute_stats_from_dicts,
 )
+from accounts.test_helpers import gi_standardtilgang
 
 User = get_user_model()
 
@@ -41,22 +42,27 @@ class ArkivTestMixin:
             username='admin_arkiv', password='passord', role='admin',
             must_change_password=False,
         )
+        gi_standardtilgang(self.admin)
         self.read_write = User.objects.create_user(
             username='rw_arkiv', password='passord', role='read_write',
             must_change_password=False,
         )
+        gi_standardtilgang(self.read_write)
         self.lead = User.objects.create_user(
             username='lead_arkiv', password='passord', role='lead',
             must_change_password=False,
         )
+        gi_standardtilgang(self.lead)
         self.lead_view = User.objects.create_user(
             username='lv_arkiv', password='passord', role='lead_view',
             must_change_password=False,
         )
+        gi_standardtilgang(self.lead_view)
         self.read_only = User.objects.create_user(
             username='ro_arkiv', password='passord', role='read_only',
             must_change_password=False,
         )
+        gi_standardtilgang(self.read_only)
 
         AppSetting.set('active_year', 2098)
         AppSetting.set('next_patient_nr', 1)
@@ -405,6 +411,7 @@ class ArkivBrukerSlettingTests(ArkivTestMixin, TestCase):
             username='admin2', password='passord', role='admin',
             must_change_password=False,
         )
+        gi_standardtilgang(annen_admin)
         c = Client()
         c.force_login(annen_admin)
 
@@ -420,6 +427,7 @@ class ArkivBrukerSlettingTests(ArkivTestMixin, TestCase):
             username='admin3', password='passord', role='admin',
             must_change_password=False,
         )
+        gi_standardtilgang(annen_admin)
         c = Client()
         c.force_login(annen_admin)
 
@@ -436,6 +444,7 @@ class ArkivBrukerSlettingTests(ArkivTestMixin, TestCase):
             username='admin4', password='passord', role='admin',
             must_change_password=False,
         )
+        gi_standardtilgang(annen_admin)
         self.admin.delete()
 
         c = Client()

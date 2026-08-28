@@ -15,6 +15,7 @@ from audit.models import AuditLog
 from patients.models import Patient, Backup
 from patients.backup_service import create_backup, purge_old_backups
 from patients.services import set_active_year
+from accounts.test_helpers import gi_standardtilgang
 
 
 # Hjelpefunksjon for å sette backup-mappe til temp-dir under testing
@@ -33,6 +34,7 @@ class BackupServiceTests(TestCase):
             username='admin', password='pwd', role='admin',
             must_change_password=False,
         )
+        gi_standardtilgang(self.admin)
         # Bruk en unik testmappe for backupfiler
         self.backup_dir = Path(os.environ.get('BACKUP_DIR', '/tmp/test-backups-backup'))
         self.backup_dir.mkdir(parents=True, exist_ok=True)
@@ -203,6 +205,7 @@ class BackupServiceTests(TestCase):
             username='annen', password='pwd', role='lead',
             must_change_password=False,
         )
+        gi_standardtilgang(other_user)
         AuditLog.objects.create(
             table_name='Patient', record_id=1, action='create',
             field_name='n/a', new_value='før-restore-spor',
@@ -250,6 +253,7 @@ class BackupResetIntegrationTests(TestCase):
             username='admin', password='pwd', role='admin',
             must_change_password=False,
         )
+        gi_standardtilgang(self.admin)
         self.backup_dir = Path('/tmp/test-backups-reset')
         self.backup_dir.mkdir(parents=True, exist_ok=True)
         set_active_year(2026)
@@ -287,6 +291,7 @@ class BackupContentHashSkipTests(TestCase):
             username='admin', password='pwd', role='admin',
             must_change_password=False,
         )
+        gi_standardtilgang(self.admin)
         self.backup_dir = Path(os.environ.get('BACKUP_DIR', '/tmp/test-backups-hash'))
         self.backup_dir.mkdir(parents=True, exist_ok=True)
 

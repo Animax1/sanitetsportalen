@@ -25,6 +25,7 @@ from core.models import ModuleBackupConfig
 from patients import backup_scheduler
 from patients.backup import register_handlers
 from patients.models import Backup, Patient
+from accounts.test_helpers import gi_standardtilgang
 
 
 def _ensure_handler() -> None:
@@ -83,6 +84,7 @@ class SchedulerRunBackupTests(TestCase):
             username='admin', password='pwd', role='admin',
             must_change_password=False,
         )
+        gi_standardtilgang(self.admin)
         self.backup_dir = Path('/tmp/test-backups-scheduler')
         self.backup_dir.mkdir(parents=True, exist_ok=True)
         # Rydd opp gamle filer.

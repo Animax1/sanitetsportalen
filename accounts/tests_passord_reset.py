@@ -15,6 +15,7 @@ from accounts.models import CustomUser
 from accounts.passord_reset import (
     LEVETID_SEKUNDER, finn_bruker, kan_resettes, lag_token, les_token,
 )
+from accounts.test_helpers import gi_standardtilgang
 
 
 @override_settings(SECURE_SSL_REDIRECT=False, RATELIMIT_ENABLE=False)
@@ -27,6 +28,7 @@ class ResetTokenTests(TestCase):
             role='read_write', email='kari@eksempel.no',
             must_change_password=False,
         )
+        gi_standardtilgang(self.bruker)
 
     def test_levetiden_er_en_time(self):
         """Låst mot beslutningen 23. aug. 2026."""
@@ -115,6 +117,7 @@ class ResetFlytTests(TestCase):
             role='read_write', email='kari@eksempel.no',
             must_change_password=False,
         )
+        gi_standardtilgang(self.bruker)
 
     def _be_om(self, epost='kari@eksempel.no'):
         return Client().post(reverse('accounts:glemt_passord'), {'email': epost})
@@ -295,6 +298,7 @@ class SidestrukturTests(TestCase):
             username='struktur.test', password='Pass123!', role='read_write',
             email='struktur@eksempel.no', must_change_password=False,
         )
+        gi_standardtilgang(bruker)
         klient = Client()
 
         sendt = klient.post(reverse('accounts:glemt_passord'),

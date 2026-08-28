@@ -9,6 +9,7 @@ from django.urls import reverse
 from django.utils import timezone
 
 from accounts.models import CustomUser, ModulTilgang
+from accounts.test_helpers import gi_standardtilgang
 
 
 def _create_session_for_user(user):
@@ -32,6 +33,7 @@ class SessionInvalidationOnPasswordChangeTests(TestCase):
             password='GammeltPassord123!',
             role='read_write',
         )
+        gi_standardtilgang(self.user)
 
     def test_other_sessions_invalidated_on_password_change(self):
         """Andre aktive sesjoner for brukeren skal slettes ved passordbytte."""
@@ -92,6 +94,7 @@ class SingleSessionTests(TestCase):
             password='Passord123!',
             role='read_write',
         )
+        gi_standardtilgang(self.user)
 
     def test_new_login_invalidates_previous_session(self):
         """Når bruker logger inn på enhet 2, skal sesjon fra enhet 1 slettes."""
@@ -139,6 +142,7 @@ class RateLimitTests(TestCase):
             username='bruker1', password='riktigpass123', role='read_write',
             must_change_password=False,
         )
+        gi_standardtilgang(self.user)
 
     def _clear_cache(self):
         """Nullstill rate-limit-cache mellom testene."""
@@ -176,6 +180,7 @@ class RateLimitTests(TestCase):
                 username=f'user{i}', password='rett123', role='read_write',
                 must_change_password=False,
             )
+            gi_standardtilgang(u)
             r = self.client.post('/accounts/login/', {
                 'username': f'user{i}', 'password': 'rett123',
             })
@@ -240,14 +245,17 @@ class FreezeThawAdminActionTests(TestCase):
             username='superadmin', password='Test1234!', role='admin',
             is_staff=True, is_superuser=True, must_change_password=False,
         )
+        gi_standardtilgang(self.superuser)
         self.user1 = CustomUser.objects.create_user(
             username='alice', password='Test1234!', role='vakt',
             must_change_password=False,
         )
+        gi_standardtilgang(self.user1)
         self.user2 = CustomUser.objects.create_user(
             username='bob', password='Test1234!', role='vakt',
             must_change_password=False,
         )
+        gi_standardtilgang(self.user2)
 
     def _request(self):
         """Lager mock-request med superadmin innlogget."""
@@ -359,21 +367,25 @@ class BulkPermissionActionsTests(TestCase):
             username='bulk_admin', password='x', role='admin',
             must_change_password=False, is_staff=True,
         )
+        gi_standardtilgang(self.admin)
         self.lead = CustomUser.objects.create_user(
             username='bulk_lead', password='x', role='lead',
             must_change_password=False,
             kan_redigere_pasienter=False,
         )
+        gi_standardtilgang(self.lead)
         self.lead_view = CustomUser.objects.create_user(
             username='bulk_lead_view', password='x', role='lead_view',
             must_change_password=False,
             kan_redigere_pasienter=False,
         )
+        gi_standardtilgang(self.lead_view)
         self.read_only = CustomUser.objects.create_user(
             username='bulk_ro', password='x', role='read_only',
             must_change_password=False,
             kan_redigere_pasienter=True,
         )
+        gi_standardtilgang(self.read_only)
         self.client.force_login(self.admin)
 
     def test_grant_pasienter_to_leads_setter_flag_paa_alle_leder(self):
@@ -566,4 +578,23 @@ class ModulTilgangMatriseTests(TestCase):
             list(ModulTilgang.objects.filter(bruker=ny)
                  .values_list('modul_slug', 'nivaa')),
             [('patients', 'skriv_full')],
+        )
+
+    def test_utelatt_felt_lar_tilgangen_staa(self):
+        """Fravær av nøkkel er ikke «velg ingen».
+
+        Nettleseren sender alltid alle select-ene, så den vanlige veien er
+        upåvirket. Men uten denne regelen ville enhver innsending som utelater
+        matrisen — et delvis skjema, et skript, en integrasjon — stille
+        fjernet all modultilgang. Å trekke tilbake tilgang skal være et valg
+        noen tar, ikke noe som skjer fordi et felt manglet.
+        """
+        ModulTilgang.objects.create(
+            bruker=self.target, modul_slug='patients', nivaa='skriv_full')
+        self.client.post(self._detalj(), {
+            'action': 'edit', 'role': 'read_only', 'is_active': 'on',
+        })
+        self.assertEqual(
+            ModulTilgang.objects.get(bruker=self.target, modul_slug='patients').nivaa,
+            'skriv_full',
         )

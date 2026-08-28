@@ -13,6 +13,7 @@ from django.urls import reverse
 
 from accounts.models import CustomUser
 from audit.models import AuditLog
+from accounts.test_helpers import gi_standardtilgang
 
 
 def _create_session_for_user(user):
@@ -39,6 +40,7 @@ class AdminUserCreateEmailTests(TestCase):
             username='create_admin', password='x', role='admin',
             must_change_password=False, is_staff=True,
         )
+        gi_standardtilgang(self.admin)
         self.client.force_login(self.admin)
 
     def test_oppretting_uten_epost(self):
@@ -94,10 +96,12 @@ class MfaRequiredEditTests(TestCase):
             username='mfa_admin', password='x', role='admin',
             must_change_password=False, is_staff=True,
         )
+        gi_standardtilgang(self.admin)
         self.target = CustomUser.objects.create_user(
             username='mfa_target', password='x', role='read_only',
             must_change_password=False, mfa_required=False,
         )
+        gi_standardtilgang(self.target)
         self.client.force_login(self.admin)
 
     def test_form_inneholder_mfa_required(self):
@@ -143,10 +147,12 @@ class FreezeThawPortalTests(TestCase):
             username='fz_admin', password='x', role='admin',
             must_change_password=False, is_staff=True,
         )
+        gi_standardtilgang(self.admin)
         self.target = CustomUser.objects.create_user(
             username='fz_target', password='x', role='read_write',
             must_change_password=False,
         )
+        gi_standardtilgang(self.target)
         self.client.force_login(self.admin)
 
     def _post(self, action, pk=None):
@@ -201,15 +207,18 @@ class UserDeleteTests(TestCase):
             username='del_admin', password='x', role='admin',
             must_change_password=False, is_staff=True,
         )
+        gi_standardtilgang(self.admin)
         # En admin til, slik at «siste admin»-sperren ikke slår inn utilsiktet
         self.admin2 = CustomUser.objects.create_user(
             username='del_admin2', password='x', role='admin',
             must_change_password=False,
         )
+        gi_standardtilgang(self.admin2)
         self.target = CustomUser.objects.create_user(
             username='del_target', password='x', role='read_write',
             must_change_password=False,
         )
+        gi_standardtilgang(self.target)
         self.client.force_login(self.admin)
 
     def _slett(self, pk, bekreftelse):
@@ -280,6 +289,7 @@ class UserDeleteTests(TestCase):
             username='vanlig', password='x', role='read_write',
             must_change_password=False,
         )
+        gi_standardtilgang(vanlig)
         self.client.force_login(vanlig)
         self._slett(self.target.pk, 'del_target')
         self.assertTrue(CustomUser.objects.filter(pk=self.target.pk).exists())

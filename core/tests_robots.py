@@ -7,6 +7,7 @@ from django.test import TestCase, override_settings
 
 from accounts.models import CustomUser
 from core.robots import AI_CRAWLERS
+from accounts.test_helpers import gi_standardtilgang
 
 
 @override_settings(SECURE_SSL_REDIRECT=False, RATELIMIT_ENABLE=False)
@@ -56,6 +57,7 @@ class XRobotsTagTests(TestCase):
             username='admin', password='pwd', role='admin',
             must_change_password=False,
         )
+        gi_standardtilgang(self.user)
 
     def test_header_paa_offentlig_side(self):
         resp = self.client.get('/accounts/login/')

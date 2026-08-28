@@ -377,8 +377,17 @@ class ModulTilgangForm(forms.Form):
         """
         ut = []
         for modul in self.moduler():
+            navn = self.PREFIKS + modul.slug
+            # **Fravær av nøkkel er ikke «velg ingen».** Et felt som ikke ble
+            # sendt inn i det hele tatt skal la tilgangen stå. Uten dette
+            # ville enhver innsending som utelater matrisen — et delvis
+            # skjema, et skript, en test — stille fjernet all modultilgang.
+            # Nettleseren sender alltid alle select-ene, så den vanlige veien
+            # er upåvirket.
+            if navn not in self.data:
+                continue
             fra = self._naavaerende.get(modul.slug, self.INGEN)
-            til = self.cleaned_data.get(self.PREFIKS + modul.slug, self.INGEN)
+            til = self.cleaned_data.get(navn, self.INGEN)
             if fra != til:
                 ut.append((modul.slug, fra, til))
         return ut

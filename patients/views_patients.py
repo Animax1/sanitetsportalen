@@ -5,7 +5,6 @@ Skilt ut fra ``views.py`` i N13.3.
 import hashlib
 import json
 
-from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.db.models import Q
@@ -14,7 +13,7 @@ from django.shortcuts import render
 from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_http_methods
 
-from core.auth_decorators import admin_required
+from core.auth_decorators import admin_required, har_tilgang, modul_kreves
 from core.idempotency import bygg_nokkel, forkast, fullfor, reserver
 from core.ratelimit import rate_limit
 
@@ -37,7 +36,7 @@ from .views_common import (
 
 # ── Hoved-side ────────────────────────────────────────────────────────────────
 
-@login_required
+@modul_kreves('patients', 'les')
 def index_view(request):
     """Render hoved-siden.
 
@@ -74,7 +73,7 @@ SETTINGS_READ_WHITELIST = frozenset({
 SETTINGS_WRITE_WHITELIST = frozenset({'event_name'})
 
 
-@login_required
+@modul_kreves('patients', 'les', svar='json')
 @require_http_methods(['GET', 'PUT'])
 def settings_view(request):
     """Hent eller oppdater appinnstillinger."""
@@ -86,7 +85,7 @@ def settings_view(request):
         return JsonResponse(settings_dict)
 
     # PUT – oppdater event_name (krever skrivetilgang)
-    if request.user.role not in WRITE_ROLES:
+    if not har_tilgang(request.user, 'patients', 'skriv_full'):
         return JsonResponse({'error': 'Ingen tilgang'}, status=403)
 
     data = _json_body(request)
@@ -98,7 +97,7 @@ def settings_view(request):
 
 # ── Sesjonstimeout ────────────────────────────────────────────────────────────
 
-@login_required
+@modul_kreves('patients', 'les', svar='json')
 @require_http_methods(['GET', 'PUT'])
 def session_timeout_view(request):
     """Hent eller sett sesjonstimeout i timer. Kun admin kan sette."""
@@ -125,7 +124,7 @@ def session_timeout_view(request):
 # ── Pasienter ─────────────────────────────────────────────────────────────────
 
 @never_cache
-@login_required
+@modul_kreves('patients', 'les', svar='json')
 @require_http_methods(['GET', 'POST'])
 # S3: kun POST telles — GET er pollet hvert 30. sekund av hver klient og
 # svarer 304 uten kropp når ingenting er endret. 60/min er langt over det
@@ -192,7 +191,7 @@ def patients_list_view(request):
         return response
 
     # POST – opprett ny pasient i aktivt år (krever skrivetilgang)
-    if request.user.role not in WRITE_ROLES:
+    if not har_tilgang(request.user, 'patients', 'skriv_full'):
         return JsonResponse({'error': 'Ingen tilgang'}, status=403)
 
     data = _json_body(request)
@@ -326,7 +325,7 @@ def patients_list_view(request):
     return JsonResponse(_patient_to_dict(patient), status=201)
 
 
-@login_required
+@modul_kreves('patients', 'les', svar='json')
 @require_http_methods(['PUT', 'DELETE'])
 # S3: redigering skjer oftere enn opprettelse — obs-tider stemples, sonen
 # endres, pasienten skrives ut — så bøtta er romsligere enn ved
@@ -350,7 +349,7 @@ def patient_detail_view(request, pk):
         return JsonResponse({'error': 'Pasient ikke funnet'}, status=404)
 
     if request.method == 'PUT':
-        if request.user.role not in WRITE_ROLES:
+        if not har_tilgang(request.user, 'patients', 'skriv_full'):
             return JsonResponse({'error': 'Ingen tilgang'}, status=403)
 
         data = _json_body(request)
@@ -441,7 +440,7 @@ def patient_detail_view(request, pk):
 
 # ── Reset testdata ─────────────────────────────────────────────────────────────
 
-@login_required
+@modul_kreves('patients', 'les', svar='json')
 @admin_required
 @require_http_methods(['POST'])
 def reset_active_year_view(request):

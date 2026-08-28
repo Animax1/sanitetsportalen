@@ -14,15 +14,16 @@ slettes, avgjøres i rollemodell-arbeidet; se «Rollemodellen» i TODO.md.
 ``basic_stats()`` som *funksjon* blir uansett stående — den deler
 aggregeringen med ``compute_arkiv_stats``.
 """
-from django.contrib.auth.decorators import login_required
 from django.views.decorators.http import require_http_methods
+
+from core.auth_decorators import modul_kreves
 
 from core.stats_cache import cached_stats_response
 
 from .services import basic_stats, get_active_year
 
 
-@login_required
+@modul_kreves('patients', 'les', svar='json')
 @require_http_methods(['GET'])
 def stats_view(request):
     """Basis-statistikk for aktivt år. Ingen kjent konsument, se modul-docstring.

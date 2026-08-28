@@ -12,6 +12,7 @@ from django.core.management import call_command
 from accounts.models import CustomUser, LoginEvent
 from audit.models import AuditLog
 from core.models import Notification
+from accounts.test_helpers import gi_standardtilgang
 
 
 def _create_notification(user, days_ago):
@@ -68,6 +69,7 @@ class PurgeOldLogsTests(TestCase):
             password='Passord123!',
             role='read_only',
         )
+        gi_standardtilgang(cls.user)
 
     def test_purge_deletes_old_login_events(self):
         """Eldre login-events (> 730 dager) skal slettes."""
@@ -155,6 +157,7 @@ class PurgeNotificationsTests(TestCase):
             password='Passord123!',
             role='read_only',
         )
+        gi_standardtilgang(cls.user)
 
     def test_purge_deletes_old_notifications(self):
         gammel = _create_notification(self.user, days_ago=31)

@@ -4,6 +4,56 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-08-28 — Deploy 1, del 3: hullet fra §2.1 er lukket
+
+**958 tester grønne** (9 nye). Ingen migrasjon. Meldt fra staging: en konto uten
+modultilgang kom fortsatt inn ved å skrive `/pasienter/` i adressefeltet.
+
+Riktig observert. Synligheten var strammet i del 1, men døra sto åpen — og det er den
+kombinasjonen §2.1 beskriver som verst: menyen sier nei, endepunktet sier ja.
+
+**`@modul_kreves` står nå på alle ruter under `/pasienter/` og `/statistikk/`.**
+Skrivesjekkene inne i viewene har byttet fra `WRITE_ROLES` til
+`har_tilgang(user, 'patients', 'skriv_full')` — rollelista var én av fem kopier (§2.6).
+
+Målt før og etter, med de samme tre kallene notatet brukte:
+
+| | Før | Nå |
+|---|---|---|
+| `GET /pasienter/` | 200 | **403** |
+| `GET /pasienter/api/patients/` | 200 | **403** |
+| `POST /pasienter/api/patients/` | 201 (pasient opprettet) | **403**, ingenting opprettet |
+
+Verifisert i nettleser, ikke bare i testklienten.
+
+**URL-gjennomgangstesten er vernet §6 etterlyste.** Den går gjennom `urlpatterns` for
+modulens prefiks og krever at hvert view bærer markøren dekoratøren setter — den gjetter
+ikke, for en gjetning som tar feil den ene veien slipper et udekorert endepunkt gjennom.
+To ruter står i en unntaksliste med begrunnelse; begge er rene videresendinger til
+endepunkter som har sin egen gate. Testen sjekker også at unntakene fortsatt finnes, og at
+den i det hele tatt finner ruter — en URL-gjennomgang som ikke finner noe passerer
+trivielt, og det skjedde i denne kodebasen samme dag med en annen test.
+
+Den fant to hull med en gang: en navnløs legacy-videresending, og statistikkmodulen, som
+fortsatt gikk på `stats_required`.
+
+**§5-komposisjonen er på plass.** Statistikkmodulen viser kun kilder brukeren har minst
+`les` på i kildemodulen. Uten den er statistikk en bakvei rundt modultilgangen — aggregater
+gir avledet innsyn i data man ikke har tilgang til. I dag er `patients` eneste kilde, så
+sjekken er én linje; når kilde nummer to kommer, blir det en løkke over registeret.
+
+**Én reell svakhet funnet underveis:** en POST som utelot matrisefeltene fjernet all
+modultilgang. Nettleseren sender alltid alle `<select>`-ene, men et delvis skjema, et
+skript eller en integrasjon ville stille tilbakekalt tilgang. Fravær av nøkkel er nå ikke
+det samme som «velg ingen». Å trekke tilbake tilgang skal være et valg noen tar.
+
+**~90 testbrukere fikk radene backfillen ville gitt dem**, via `gi_standardtilgang()` i
+`accounts/test_helpers.py`. En bruker uten rader er en kanttilstand i produksjon, ikke
+normalen — de som fantes fikk rader av migrasjonen, nye får dem av matrisen. Testene som
+handler om *fravær* av tilgang har bevisst ikke kallet, og sier det i en kommentar.
+
+---
+
 ## 2026-08-28 — Deploy 1, del 2: matrisen som faktisk setter tilgang
 
 **946 tester grønne.** Ingen migrasjon. Meldt fra staging: en ny testkonto fikk

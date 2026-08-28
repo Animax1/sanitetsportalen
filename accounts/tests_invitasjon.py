@@ -18,6 +18,7 @@ from accounts.invitasjon import (
     LEVETID_SEKUNDER, kan_inviteres, lag_token, les_token,
 )
 from accounts.models import CustomUser
+from accounts.test_helpers import gi_standardtilgang
 
 
 @override_settings(SECURE_SSL_REDIRECT=False, RATELIMIT_ENABLE=False)
@@ -29,6 +30,7 @@ class InvitasjonTokenTests(TestCase):
             username='invitert', password='MidlertidigPass1!',
             role='read_write', email='invitert@eksempel.no',
         )
+        gi_standardtilgang(self.bruker)
 
     def test_token_peker_paa_riktig_bruker(self):
         self.assertEqual(les_token(lag_token(self.bruker)), self.bruker)
@@ -80,6 +82,7 @@ class InvitasjonTokenTests(TestCase):
             username='bil3', password='pass', role='read_write',
             er_delt_konto=True,
         )
+        gi_standardtilgang(bil)
         self.assertFalse(kan_inviteres(bil))
 
         bil.email = 'vakt@eksempel.no'
@@ -100,6 +103,7 @@ class InvitasjonFlytTests(TestCase):
             username='sjef', password='AdminPass123!', role='admin',
             must_change_password=False,
         )
+        gi_standardtilgang(self.admin)
         self.client = Client()
         self.client.force_login(self.admin)
         mail.outbox.clear()
@@ -241,6 +245,7 @@ class EksisterendeKontoerTests(TestCase):
             username='gammeladmin', password='AdminPass123!', role='admin',
             must_change_password=False,
         )
+        gi_standardtilgang(self.admin)
         self.klient = Client()
         self.klient.force_login(self.admin)
 
@@ -311,6 +316,7 @@ class EksisterendeKontoerTests(TestCase):
             username='bil9', password='pass', role='read_write',
             er_delt_konto=True,
         )
+        gi_standardtilgang(bil)
         svar = self.klient.post(
             reverse('accounts:user_detail', args=[bil.pk]),
             {
@@ -339,10 +345,12 @@ class TvungenUtloggingTests(TestCase):
             username='sjef2', password='AdminPass123!', role='admin',
             must_change_password=False,
         )
+        gi_standardtilgang(self.admin)
         self.bruker = CustomUser.objects.create_user(
             username='frivillig', password='BrukerPass123!', role='read_write',
             must_change_password=False,
         )
+        gi_standardtilgang(self.bruker)
         self.adminklient = Client()
         self.adminklient.force_login(self.admin)
 
@@ -442,6 +450,7 @@ class MfaVedOpprettingTests(TestCase):
             username='sjef3', password='AdminPass123!', role='admin',
             must_change_password=False,
         )
+        gi_standardtilgang(self.admin)
         self.klient = Client()
         self.klient.force_login(self.admin)
 

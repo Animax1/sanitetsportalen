@@ -336,17 +336,18 @@ skal ligge der.
       dag har en tilgang de ikke var ment å ha. Tallet avgjør hvor stor oppryddingen blir
       etter deploy 1.
 
-- [ ] **Statistikkmodulen skilles ut først eller samtidig.** Gjøres rollemodellen først,
-      bygges en les-akse som umiddelbart rives ned igjen. Modulen skal kun vise kilder
-      brukeren har minst `les` på — ellers er den en bakvei rundt modultilgangen.
-      Tilgangstabellen i `docs/BESLUTNING_STATISTIKK.md` må skrives om til modulnivåer.
+- [x] **Statistikkmodulen skilt ut, og komponerer tilgang (28. aug. 2026).**
+      - [ ] Tilgangstabellen i `docs/BESLUTNING_STATISTIKK.md` må fortsatt skrives om
+            til modulnivåer.
 
 - [ ] **Deploy 1** — under arbeid:
       - [x] `ModulTilgang` lagt til og fylt fra `role` alene (28. aug. 2026).
             Synlighet og håndhevelse leser nå samme kilde. `ModuleSettings.enabled=False`
             stenger URL-en. `@modul_kreves` finnes, med markør URL-testen kan lese.
-      - [ ] `@modul_kreves(...)` settes på alle endepunkter, med en test som går gjennom
-            `urlpatterns` og krever at hvert view er dekorert
+      - [x] `@modul_kreves(...)` satt på alle endepunkter (28. aug. 2026), med
+            URL-gjennomgangstest og unntaksliste med begrunnelse. Hullet fra §2.1 er
+            lukket og målt: `POST /api/patients/` uten modultilgang gir 403, ikke 201.
+      - [x] §5-komposisjonen: statistikk viser kun kilder brukeren har `les` på
 - [ ] **Deploy 2:** `role` krymper til `admin`/`bruker`. Maler og JS legges om
       (`window.USER_ROLE` → `window.MODUL_TILGANG`). Kan ikke komme før matrisen er
       verifisert i prod — `lead_view` → `bruker` er ikke rullbar uten `ModulTilgang`.

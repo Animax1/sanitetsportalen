@@ -14,6 +14,7 @@ from django.test import Client, TestCase, override_settings
 from django.urls import reverse
 
 from accounts.models import CustomUser
+from accounts.test_helpers import gi_standardtilgang
 
 
 @override_settings(SECURE_SSL_REDIRECT=False, RATELIMIT_ENABLE=False)
@@ -25,6 +26,7 @@ class UfolsomInnloggingTests(TestCase):
             username='kari.nordmann', password='RiktigPass123!',
             role='read_write', must_change_password=False,
         )
+        gi_standardtilgang(self.bruker)
 
     def test_stor_forbokstav_slipper_inn(self):
         """Selve tilfellet fra mobiltastaturet."""
@@ -69,6 +71,7 @@ class UfolsomInnloggingTests(TestCase):
             username='Kari.Nordmann', password='AnnetPass123!',
             role='read_only', must_change_password=False,
         )
+        gi_standardtilgang(dublett)
 
         self.assertEqual(
             authenticate(username='Kari.Nordmann', password='AnnetPass123!'),
@@ -136,6 +139,7 @@ class BrukernavnNormaliseringTests(TestCase):
             username='sjef', password='AdminPass123!', role='admin',
             must_change_password=False,
         )
+        gi_standardtilgang(self.admin)
         self.klient = Client()
         self.klient.force_login(self.admin)
 

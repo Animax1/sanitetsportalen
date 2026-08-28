@@ -19,6 +19,7 @@ from django.utils import timezone
 from accounts.models import CustomUser
 from core.models import Notification
 from core.notifications import notify, DEDUP_WINDOW
+from accounts.test_helpers import gi_standardtilgang
 
 
 @override_settings(SECURE_SSL_REDIRECT=False, RATELIMIT_ENABLE=False)
@@ -29,9 +30,11 @@ class NotifyApiTests(TestCase):
         self.user = CustomUser.objects.create_user(
             username='kari', password='pw12345678', must_change_password=False,
         )
+        gi_standardtilgang(self.user)
         self.other = CustomUser.objects.create_user(
             username='ola', password='pw12345678', must_change_password=False,
         )
+        gi_standardtilgang(self.other)
 
     def test_notify_creates_notification(self):
         n = notify(
@@ -103,6 +106,7 @@ class UnreadCountEndpointTests(TestCase):
         self.user = CustomUser.objects.create_user(
             username='kari', password='pw12345678', must_change_password=False,
         )
+        gi_standardtilgang(self.user)
         self.url = reverse('core:notification_unread_count')
 
     def test_requires_login(self):
@@ -129,6 +133,7 @@ class UnreadCountEndpointTests(TestCase):
         other = CustomUser.objects.create_user(
             username='ola', password='pw12345678', must_change_password=False,
         )
+        gi_standardtilgang(other)
         notify(other, module_slug='p', kind='k', message='for ola')
         self.client.force_login(self.user)
         res = self.client.get(self.url)
@@ -143,6 +148,7 @@ class NotificationListViewTests(TestCase):
         self.user = CustomUser.objects.create_user(
             username='kari', password='pw12345678', must_change_password=False,
         )
+        gi_standardtilgang(self.user)
         self.url = reverse('core:notification_list')
 
     def test_requires_login(self):
@@ -159,6 +165,7 @@ class NotificationListViewTests(TestCase):
         other = CustomUser.objects.create_user(
             username='ola', password='pw12345678', must_change_password=False,
         )
+        gi_standardtilgang(other)
         notify(self.user, module_slug='p', kind='k', title='Mitt', message='m1')
         notify(other, module_slug='p', kind='k', title='Hans', message='m2')
         self.client.force_login(self.user)
@@ -175,9 +182,11 @@ class MarkReadTests(TestCase):
         self.user = CustomUser.objects.create_user(
             username='kari', password='pw12345678', must_change_password=False,
         )
+        gi_standardtilgang(self.user)
         self.other = CustomUser.objects.create_user(
             username='ola', password='pw12345678', must_change_password=False,
         )
+        gi_standardtilgang(self.other)
 
     def test_mark_read_sets_is_read_and_redirects_to_url(self):
         n = notify(self.user, module_slug='p', kind='k', message='m',
@@ -236,6 +245,7 @@ class ContextProcessorTests(TestCase):
         self.user = CustomUser.objects.create_user(
             username='kari', password='pw12345678', must_change_password=False,
         )
+        gi_standardtilgang(self.user)
 
     def test_authenticated_sees_count_in_context(self):
         notify(self.user, module_slug='p', kind='k', message='m')

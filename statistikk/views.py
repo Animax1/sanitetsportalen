@@ -16,12 +16,14 @@ importen ut med et registry etter samme idiom som ``core.backup`` og
 mater header-chipsene — de regnes ut i nettleseren fra pasientlista. Endepunktet
 står uten kjent konsument; se docstringen i ``patients/views_stats.py``.
 """
-from django.contrib.auth.decorators import login_required
+from django.core.exceptions import PermissionDenied
 from django.http import JsonResponse
 from django.shortcuts import render
 from django.views.decorators.http import require_http_methods
 
-from core.auth_decorators import has_role_at_least, stats_required
+from core.auth_decorators import (
+    har_tilgang, has_role_at_least, modul_kreves,
+)
 from core.ratelimit import rate_limit
 from core.stats_cache import cached_stats_response
 
@@ -33,14 +35,35 @@ from patients.services import (
 )
 
 
-@stats_required
+# §5: **modulen komponerer tilgang, den eier den ikke.** Den viser kun kilder
+# brukeren har minst `les` på i kildemodulen. Uten den regelen er statistikk en
+# bakvei rundt modultilgangen: en person uten oppdragstilgang ville fått
+# avledet innsyn i oppdragsdata gjennom aggregatene.
+#
+# I dag er `patients` eneste kilde, så sjekken er én linje. Når kilde nummer to
+# kommer, blir den en løkke over registeret — og da er det registeret som
+# avgjør, ikke en liste her.
+KILDER = ('patients',)
+
+
+def _manglende_kilde(user):
+    """Første kilde brukeren ikke har lesetilgang til, eller None."""
+    for slug in KILDER:
+        if not har_tilgang(user, slug, 'les'):
+            return slug
+    return None
+
+
+@modul_kreves('statistikk', 'les')
 @require_http_methods(['GET'])
 def statistikk_view(request):
     """Statistikksiden. Samme tilgang som tallene den viser."""
+    if _manglende_kilde(request.user) is not None:
+        raise PermissionDenied
     return render(request, 'statistikk/index.html')
 
 
-@stats_required
+@modul_kreves('statistikk', 'les', svar='json')
 @require_http_methods(['GET'])
 # S3: appens dyreste spørring. Cachen tar 60 sekunder av gangen, men
 # cache-miss-stien var helt ubeskyttet — og det er nettopp den en klient
@@ -57,6 +80,11 @@ def full_stats_view(request):
     Cachet 60s med ETag/304. Dyre aggregater (percentiler, gruppetellinger)
     regnes kun én gang per minutt per år.
     """
+    mangler = _manglende_kilde(request.user)
+    if mangler is not None:
+        return JsonResponse(
+            {'error': f'Mangler lesetilgang til modulen «{mangler}»'}, status=403)
+
     year = get_active_year()
 
     @cached_stats_response(cache_key=f'full:{year}', ttl=60)
@@ -66,7 +94,7 @@ def full_stats_view(request):
     return _inner(request)
 
 
-@login_required
+@modul_kreves('statistikk', 'les', svar='json')
 @require_http_methods(['GET'])
 def arkiv_full_stats_view(request, pk):
     """Full statistikk for én arkivert vakt.
@@ -82,6 +110,8 @@ def arkiv_full_stats_view(request, pk):
     noen bestemte det.
     """
     if not has_role_at_least(request.user, ARKIV_VIEW_MIN_ROLE):
+        return JsonResponse({'error': 'Ingen tilgang'}, status=403)
+    if _manglende_kilde(request.user) is not None:
         return JsonResponse({'error': 'Ingen tilgang'}, status=403)
 
     from patients.models import VaktArkiv

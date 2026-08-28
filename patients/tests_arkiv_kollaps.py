@@ -23,6 +23,7 @@ from patients.services import (
     compute_arkiv_stats,
     kollaps_arkiv,
 )
+from accounts.test_helpers import gi_standardtilgang
 
 User = get_user_model()
 
@@ -40,6 +41,7 @@ class KollapsTestMixin:
             username='arkivar', password='passord', role='admin',
             must_change_password=False,
         )
+        gi_standardtilgang(self.admin)
 
     def _lag_pasienter(self):
         """Tre pasienter med tidsdata, så statistikken blir ikke-triviell."""

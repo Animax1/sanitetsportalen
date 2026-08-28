@@ -20,6 +20,7 @@ from patients.services import (
     stamp_obs_times_if_needed, stamp_utskrevet_if_needed,
     get_active_year, set_active_year,
 )
+from accounts.test_helpers import gi_standardtilgang
 
 
 # ── Filtertester ──────────────────────────────────────────────────────────────
@@ -207,10 +208,13 @@ class AccessControlTests(TestCase):
             username='a', password='x', role='admin', must_change_password=False)
         self.lead = CustomUser.objects.create_user(
             username='l', password='x', role='lead', must_change_password=False)
+        gi_standardtilgang(self.lead)
         self.rw = CustomUser.objects.create_user(
             username='w', password='x', role='read_write', must_change_password=False)
+        gi_standardtilgang(self.rw)
         self.ro = CustomUser.objects.create_user(
             username='r', password='x', role='read_only', must_change_password=False)
+        gi_standardtilgang(self.ro)
 
     def _login(self, user):
         c = Client()
@@ -364,6 +368,7 @@ class LeadViewTests(TestCase):
         set_active_year(2026)
         self.lead_view = CustomUser.objects.create_user(
             username='lv', password='x', role='lead_view', must_change_password=False)
+        gi_standardtilgang(self.lead_view)
         self.client = Client()
         self.client.force_login(self.lead_view)
         Patient.objects.create(pasientnummer=1, year=2026)
@@ -399,6 +404,7 @@ class ResetTests(TestCase):
             username='a', password='x', role='admin', must_change_password=False)
         self.lead = CustomUser.objects.create_user(
             username='l', password='x', role='lead', must_change_password=False)
+        gi_standardtilgang(self.lead)
         Patient.objects.create(pasientnummer=1, year=2026)
         Patient.objects.create(pasientnummer=2, year=2026)
         Patient.objects.create(pasientnummer=3, year=2025)  # annet år
@@ -449,6 +455,7 @@ class ForstehjelperETagTests(TestCase):
         self.user = CustomUser.objects.create_user(
             username='etagtester', password='x', role='read_only',
             must_change_password=False)
+        gi_standardtilgang(self.user)
         self.client = Client()
         self.client.force_login(self.user)
         Forstehjelper.objects.create(name='Behandler A', is_active=True)
@@ -513,6 +520,7 @@ class TimeFormatValidationTests(TestCase):
             username='skriver', password='pass', role='read_write',
             must_change_password=False,
         )
+        gi_standardtilgang(self.user)
         self.client = Client()
         self.client.force_login(self.user)
 
@@ -622,6 +630,7 @@ class PlasseringUniqueTests(TestCase):
             username='skriver', password='pass', role='read_write',
             must_change_password=False,
         )
+        gi_standardtilgang(self.user)
         self.client = Client()
         self.client.force_login(self.user)
 
@@ -841,6 +850,7 @@ class HelsepersonellTests(TestCase):
         self.admin = CustomUser.objects.create_user(
             username='admin', password='pwd', role='admin', must_change_password=False
         )
+        gi_standardtilgang(self.admin)
         self.client = Client()
         self.client.force_login(self.admin)
 
@@ -939,6 +949,7 @@ class HelsepersonellTests(TestCase):
         """Read-write-rolle skal ikke kunne opprette helsepersonell."""
         self.client.logout()
         rw = CustomUser.objects.create_user(username='rw', password='pwd', role='read_write', must_change_password=False)
+        gi_standardtilgang(rw)
         self.client.force_login(rw)
         res = self.client.post(
             '/pasienter/api/helsepersonell/',
@@ -1249,6 +1260,7 @@ class PatientNumberGapTests(TestCase):
             username='testbruker', password='Test1234!', role='admin',
             must_change_password=False,
         )
+        gi_standardtilgang(self.user)
         self.client.login(username='testbruker', password='Test1234!')
         set_active_year(2026)
         # Eksisterende pasient på unik plassering "Behandling 1"
@@ -1305,6 +1317,7 @@ class PabegyntNotBeforeInntidTests(TestCase):
             username='testbruker', password='Test1234!', role='admin',
             must_change_password=False,
         )
+        gi_standardtilgang(self.user)
         self.client.login(username='testbruker', password='Test1234!')
         set_active_year(2026)
         self.forstehjelper = Forstehjelper.objects.create(name='Lege Hansen')
@@ -1392,6 +1405,7 @@ class BlankInntidFallbackTests(TestCase):
             username='testbruker', password='Test1234!', role='admin',
             must_change_password=False,
         )
+        gi_standardtilgang(self.user)
         self.client.login(username='testbruker', password='Test1234!')
         set_active_year(2026)
 
@@ -1453,6 +1467,7 @@ class SettingsWhitelistTests(TestCase):
             username='lesebruker', password='testpass123',
             role='read_only', must_change_password=False,
         )
+        gi_standardtilgang(self.bruker)
         self.client.login(username='lesebruker', password='testpass123')
 
     def _get(self):
@@ -1502,6 +1517,7 @@ class SettingsWhitelistTests(TestCase):
             username='skriver', password='testpass123',
             role='read_write', must_change_password=False,
         )
+        gi_standardtilgang(skriver)
         self.client.force_login(skriver)
 
         foer = AppSetting.get('active_year', None)
@@ -1531,6 +1547,7 @@ class HeaderArrangementNavnTests(TestCase):
             username='vaktbruker', password='testpass123',
             role='read_write', must_change_password=False,
         )
+        gi_standardtilgang(self.bruker)
         self.client.login(username='vaktbruker', password='testpass123')
 
     def test_arrangementsnavn_rendres_server_side(self):
@@ -1604,6 +1621,7 @@ class NavneregisterFeilmeldingTests(TestCase):
             username='admin_navn', password='testpass123',
             role='admin', must_change_password=False,
         )
+        gi_standardtilgang(self.admin)
         self.client.force_login(self.admin)
 
     def _post(self, sti, navn):
@@ -1703,6 +1721,7 @@ class JsModulLastingTests(TestCase):
             username=f'bruker_{rolle}', password='testpass123',
             role=rolle, must_change_password=False,
         )
+        gi_standardtilgang(bruker)
         self.client.force_login(bruker)
         resp = self.client.get('/pasienter/')
         self.assertEqual(resp.status_code, 200)
@@ -2051,6 +2070,7 @@ class PasientlisteYtelseTests(TestCase):
             username='poller', password='testpass123',
             role='read_write', must_change_password=False,
         )
+        gi_standardtilgang(self.bruker)
         self.client.force_login(self.bruker)
 
     def _lag_pasienter(self, antall):

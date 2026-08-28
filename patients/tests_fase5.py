@@ -18,6 +18,7 @@ from django.urls import reverse
 from accounts.models import CustomUser
 from core.models import Notification
 from patients.models import Patient, Forstehjelper, Helsepersonell
+from accounts.test_helpers import gi_standardtilgang
 
 
 @override_settings(SECURE_SSL_REDIRECT=False, RATELIMIT_ENABLE=False)
@@ -29,10 +30,12 @@ class MineFilterTests(TestCase):
             username='kari', password='pw12345678',
             role='read_write', must_change_password=False,
         )
+        gi_standardtilgang(self.kari)
         self.ola = CustomUser.objects.create_user(
             username='ola', password='pw12345678',
             role='read_write', must_change_password=False,
         )
+        gi_standardtilgang(self.ola)
         # Kari koblet til Forstehjelper 'Kari Hansen'
         self.beh_kari = Forstehjelper.objects.create(name='Kari Hansen', user=self.kari)
         # Ola koblet til Helsepersonell 'Ola Olsen'
@@ -78,6 +81,7 @@ class MineFilterTests(TestCase):
             username='ulink', password='pw12345678',
             role='read_only', must_change_password=False,
         )
+        gi_standardtilgang(unlinked)
         self.client.force_login(unlinked)
         res = self.client.get(self.url + '?mine=1')
         self.assertEqual(res.json(), [])
@@ -91,9 +95,11 @@ class AssignmentNotificationSignalTests(TestCase):
         self.kari = CustomUser.objects.create_user(
             username='kari', password='pw', must_change_password=False,
         )
+        gi_standardtilgang(self.kari)
         self.ola = CustomUser.objects.create_user(
             username='ola', password='pw', must_change_password=False,
         )
+        gi_standardtilgang(self.ola)
         self.beh_kari = Forstehjelper.objects.create(name='Kari', user=self.kari)
         self.beh_ola = Forstehjelper.objects.create(name='Ola', user=self.ola)
         self.beh_uten_bruker = Forstehjelper.objects.create(name='X', user=None)
@@ -167,6 +173,7 @@ class PasientRolleFormTests(TestCase):
         self.user = CustomUser.objects.create_user(
             username='kari', password='pw', must_change_password=False,
         )
+        gi_standardtilgang(self.user)
         self.fh = Forstehjelper.objects.create(name='kari', user=None)
         self.hp = Helsepersonell.objects.create(name='kari', user=None)
 
@@ -192,12 +199,13 @@ class PasientRolleFormTests(TestCase):
         og omvendt. Tilgang settes nå i matrisen modul × nivå.
         """
         from accounts.models import ModulTilgang
+        antall_for = ModulTilgang.objects.filter(bruker=self.user).count()
         form = self.FormCls(self.user, data={'pasient_rolle': 'forstehjelper'})
         self.assertTrue(form.is_valid())
         form.save()
-        self.assertFalse(
-            ModulTilgang.objects.filter(bruker=self.user).exists(),
-            'koblingen skal ikke opprette en tilgangsrad',
+        self.assertEqual(
+            ModulTilgang.objects.filter(bruker=self.user).count(), antall_for,
+            'koblingen skal ikke endre tilgangsradene',
         )
 
     def test_ingen_removes_link(self):

@@ -25,6 +25,7 @@ from accounts.models import CustomUser
 from patients.models import Patient, AppSetting
 from patients import choices
 from patients.choices import validate_patient_choice_fields
+from accounts.test_helpers import gi_standardtilgang
 
 
 def _template_source():
@@ -152,6 +153,7 @@ class ChoiceValidationAPITests(TestCase):
             username='skriver', password='pass', role='read_write',
             must_change_password=False,
         )
+        gi_standardtilgang(self.user)
         self.client = Client()
         self.client.force_login(self.user)
 

@@ -33,6 +33,7 @@ from patients.models import (
     AppSetting, ArkivertPasient, Patient, VaktArkiv,
 )
 from patients.services import arkiver_aktiv_vakt
+from accounts.test_helpers import gi_standardtilgang
 
 User = get_user_model()
 
@@ -63,6 +64,7 @@ class ArkivBackupTestMixin:
             username='arkivar', password='passord', role='admin',
             must_change_password=False,
         )
+        gi_standardtilgang(self.admin)
 
     def _lag_pasient(self, nr, triage='Grønn'):
         return Patient.objects.create(

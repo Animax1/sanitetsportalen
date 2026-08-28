@@ -10,6 +10,7 @@ from .stats_cache import (
     _make_etag,
     CACHE_PREFIX,
 )
+from accounts.test_helpers import gi_standardtilgang
 
 
 @override_settings(SECURE_SSL_REDIRECT=False)
@@ -49,6 +50,7 @@ class StatsCacheViewTests(TestCase):
             username='admin1', password='testpass123',
             role='admin', must_change_password=False,
         )
+        gi_standardtilgang(self.admin)
         # Rens cache mellom tester
         cache.clear()
 

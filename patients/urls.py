@@ -53,7 +53,8 @@ urlpatterns = [
 
     # Bakover-kompatibel redirect: /pasienter/admin/server-status/... → /portal-admin/server-status/...
     re_path(r'^admin/server-status/(?P<rest>.*)$',
-            lambda req, rest='': redirect(f'/portal-admin/server-status/{rest}', permanent=True)),
+            lambda req, rest='': redirect(f'/portal-admin/server-status/{rest}', permanent=True),
+            name='legacy_server_status_redirect'),
 
     # Backup / Restore (kun admin)
     # Backup-endepunktene er fjernet (august 2026). Backup administreres samlet

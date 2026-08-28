@@ -5,10 +5,11 @@ se N13.2.
 """
 import hashlib
 
-from django.contrib.auth.decorators import login_required
 from django.http import JsonResponse, HttpResponseNotModified
 from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_http_methods
+
+from core.auth_decorators import modul_kreves
 
 from .models import Forstehjelper, Helsepersonell
 from .views_common import _json_body
@@ -34,7 +35,7 @@ def _navneliste_views(model, etikett, etikett_bestemt):
     """
 
     @never_cache
-    @login_required
+    @modul_kreves('patients', 'les', svar='json')
     @require_http_methods(['GET', 'POST'])
     def liste_view(request):
         """Liste alle (GET), eller opprett ny (POST, kun admin).
@@ -81,7 +82,7 @@ def _navneliste_views(model, etikett, etikett_bestemt):
         return JsonResponse(
             {'id': rad.id, 'name': rad.name, 'is_active': rad.is_active}, status=201)
 
-    @login_required
+    @modul_kreves('patients', 'les', svar='json')
     @require_http_methods(['PUT', 'DELETE'])
     def detalj_view(request, pk):
         """Oppdater (PUT) eller slett (DELETE). Kun admin."""

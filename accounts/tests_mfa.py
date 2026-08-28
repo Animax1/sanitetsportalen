@@ -17,6 +17,7 @@ from django_otp.plugins.otp_static.models import StaticDevice, StaticToken
 
 from accounts.models import CustomUser, LoginEvent
 from accounts.views import _check_mfa_trust
+from accounts.test_helpers import gi_standardtilgang
 
 
 def _make_totp_code(device):
@@ -145,6 +146,7 @@ class MFAVerifyFlowTests(TestCase):
             must_change_password=False,
             mfa_required=True,
         )
+        gi_standardtilgang(self.user)
         # Opprett bekreftet TOTP-enhet
         self.device = TOTPDevice.objects.create(
             user=self.user,
@@ -232,6 +234,7 @@ class MFATrustCookieTests(TestCase):
             must_change_password=False,
             mfa_required=True,
         )
+        gi_standardtilgang(self.user)
         self.device = TOTPDevice.objects.create(
             user=self.user,
             name='Test enhet',
@@ -312,6 +315,7 @@ class MFAAdminResetTests(TestCase):
             must_change_password=False,
             mfa_required=True,
         )
+        gi_standardtilgang(self.target)
         self.device = TOTPDevice.objects.create(
             user=self.target,
             name='Test enhet',

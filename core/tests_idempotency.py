@@ -14,6 +14,7 @@ from django.test import Client, TestCase, override_settings
 from accounts.models import CustomUser
 from core.idempotency import bygg_nokkel, forkast, fullfor, reserver
 from patients.models import AppSetting, Patient
+from accounts.test_helpers import gi_standardtilgang
 
 
 NY_PASIENT = {
@@ -88,6 +89,7 @@ class IdempotensEndepunktTests(TestCase):
             username='idem-skriver', password='pass', role='read_write',
             must_change_password=False,
         )
+        gi_standardtilgang(self.user)
         self.client = Client()
         self.client.force_login(self.user)
 
@@ -179,6 +181,7 @@ class IdempotensEndepunktTests(TestCase):
             username='idem-annen', password='pass', role='read_write',
             must_change_password=False,
         )
+        gi_standardtilgang(annen)
         c = Client()
         c.force_login(annen)
         svar = c.post(
