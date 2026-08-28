@@ -102,11 +102,13 @@ class FlyttedeEndepunkterTests(TestCase):
         self.assertEqual(resp.status_code, 302)
 
     def test_basic_stats_ble_ikke_flyttet(self):
-        """Header-chipsene er for alle innloggede og ble bevisst værende.
+        """`/pasienter/api/stats/` står igjen, og er fortsatt åpen for alle.
 
-        Flyttet ville de gitt statistikkmodulen et endepunkt uten
-        statistikkgate — og pasientsiden en avhengighet til en modul
-        brukeren kanskje ikke har tilgang til.
+        Testen låser dagens tilstand, ikke en anbefaling. Endepunktet har
+        ingen kjent konsument — header-chipsene regnes ut i nettleseren fra
+        pasientlista, ikke herfra — og om det skal gates på pasientmodulen
+        eller slettes, avgjøres i rollemodell-arbeidet. Da skal denne testen
+        endres bevisst, ikke oppdages.
         """
         c = Client()
         c.force_login(_bruker('read_only'))

@@ -43,9 +43,19 @@ forenkling.
 | ~370 linjer admin i `patients-stats.js` | `static/js/patients-admin.js` |
 | primitivene i `patients-utils.js` | `static/js/portal-utils.js` |
 
-`/pasienter/api/stats/` ble **ikke** flyttet. Header-chipsene er for alle innloggede og
-hører til siden de står på; flyttet ville de gitt statistikkmodulen et endepunkt uten
-statistikkgate.
+`/pasienter/api/stats/` ble **ikke** flyttet.
+
+**Rettelse, samme dag:** begrunnelsen som først sto her — «header-chipsene er for alle
+innloggede og hører til siden de står på» — var feil. Chipsene regnes ut i nettleseren, i
+`patients-table.js`, fra pasientlista `/api/patients/` allerede har hentet. Ingen JS-fil i
+dette repoet har noen gang kalt `/api/stats/`; endepunktet er en rest fra Flask-porten, og
+`basic_stats`-docstringen sa det hele tiden. Feilen var å gjøre en foreldet docstring til
+bærende begrunnelse uten å sjekke hvem som faktisk kaller endepunktet.
+
+Konsekvensen for denne leveransen er ingen — endepunktet ble uansett stående urørt. Men det
+står nå uten kjent konsument, og valget mellom å gate det på pasientmodulen og å slette det
+er lagt til rollemodell-arbeidet. `basic_stats()` som *funksjon* blir uansett stående: den
+deler aggregeringen med `compute_arkiv_stats`.
 
 ### Fire ting som ikke var åpenbare
 

@@ -109,7 +109,7 @@ Viewene er delt i fem moduler (N13.3) — `views.py` finnes ikke lenger:
 | `views_common.py` | `_json_body`, `_patient_to_dict`, `WRITE_ROLES` — delt av de andre |
 | `views_patients.py` | Hoved-side, innstillinger, sesjonstimeout, pasient-CRUD, nullstilling |
 | `views_registre.py` | Førstehjelper- og helsepersonellregisteret (én fabrikk bygger begge) |
-| `views_stats.py` | `/api/stats/` — header-chipsene. Full statistikk ligger i `statistikk/` |
+| `views_stats.py` | `/api/stats/` — uten kjent konsument. Full statistikk ligger i `statistikk/` |
 | `views_arkiv.py` | Vaktarkivet |
 
 Alle endepunkter er JSON-API-er beskyttet med `@login_required` + rollesjekk. Responser følger mønsteret `{'status': 'ok', 'data': ...}` eller `{'status': 'error', 'message': ...}`.
@@ -152,8 +152,9 @@ Frysing, integritetssjekk og kollaps er modul-agnostisk. Hver modul som arkivere
 
 Egen app siden august 2026. Eier `/statistikk/`-siden og full statistikk
 (`/statistikk/api/full-stats/` og `/statistikk/api/arkiv/<pk>/full-stats/`).
-`/pasienter/api/stats/` — header-chipsene — ble bevisst **ikke** flyttet: den er åpen for
-alle innloggede og hører til siden den står på.
+`/pasienter/api/stats/` ble ikke flyttet. **Det er ikke det som mater header-chipsene** —
+de regnes ut i `patients-table.js` fra pasientlista. Endepunktet har ingen kjent konsument
+og er en rest fra Flask-porten.
 
 **Avhengighetsretningen er statistikk → patients, aldri motsatt.** Tallene beregnes
 fortsatt av `patients.services`; statistikk-appen henter, cacher og viser. Når modul

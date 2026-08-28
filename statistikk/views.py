@@ -12,8 +12,9 @@ viser dem fram. Når modul nummer to skal levere tall, byttes den direkte
 importen ut med et registry etter samme idiom som ``core.backup`` og
 ``core.arkiv``.
 
-``/pasienter/api/stats/`` (header-chipsene) ble bevisst *ikke* flyttet: de er
-for alle innloggede og hører til pasientsiden de står på.
+``/pasienter/api/stats/`` ble ikke flyttet. Merk at det *ikke* er fordi det
+mater header-chipsene — de regnes ut i nettleseren fra pasientlista. Endepunktet
+står uten kjent konsument; se docstringen i ``patients/views_stats.py``.
 """
 from django.contrib.auth.decorators import login_required
 from django.http import JsonResponse

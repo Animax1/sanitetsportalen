@@ -350,6 +350,14 @@ Gjenstår:
 - [ ] **Leveranse 3: opprydding.** `RemoveField` × 5, fallback og dobbeltskriving fjernes,
       `Module.permission_flag` og `Module.min_rolle` utgår, og `/pasienter/` stenges
       faktisk for brukere uten modultilgang.
+      - [ ] **Avgjør `/pasienter/api/stats/`: gate eller slett.** Endepunktet har ingen kjent
+            konsument — header-chipsene regnes ut i `patients-table.js` fra pasientlista, og
+            ingen JS-fil har noen gang kalt det. Det er en rest fra Flask-porten. Gates
+            prefikset `/pasienter/` samlet, dekkes det automatisk; sletting er en egen
+            beslutning som må sjekkes mot eventuelle eksterne konsumenter.
+            **Merk at `docs/BESLUTNING_STATISTIKK.md` forutsetter at stien finnes** og
+            åpen for alle innloggede — den planlagte `/api/stats/live/` legger seg ved siden
+            av den. Slettes stien, må notatet oppdateres i samme runde.
 - [ ] **De to migrasjonene må ligge i hver sin deploy.** Slås de sammen, mister en rollback
       dataene.
 - [x] **Skillet mot funksjon i felt er avklart (28. aug. 2026):** tilgangsnivå per modul er
