@@ -41,7 +41,7 @@ class KollapsTestMixin:
             username='arkivar', password='passord', role='admin',
             must_change_password=False,
         )
-        gi_standardtilgang(self.admin)
+        gi_standardtilgang(self.admin, 'admin')
 
     def _lag_pasienter(self):
         """Tre pasienter med tidsdata, så statistikken blir ikke-triviell."""

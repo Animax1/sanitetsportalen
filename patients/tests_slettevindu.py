@@ -20,7 +20,7 @@ from patients.models import Patient
 from patients.services import SLETTEVINDU, kan_slette_selv
 
 
-def _bruker(navn, nivaa='skriv_full', rolle='read_write'):
+def _bruker(navn, nivaa='skriv_full', rolle='bruker'):
     b = CustomUser.objects.create_user(
         username=navn, password='x', role=rolle, must_change_password=False)
     if nivaa:

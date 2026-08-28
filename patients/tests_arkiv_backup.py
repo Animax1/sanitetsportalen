@@ -64,7 +64,7 @@ class ArkivBackupTestMixin:
             username='arkivar', password='passord', role='admin',
             must_change_password=False,
         )
-        gi_standardtilgang(self.admin)
+        gi_standardtilgang(self.admin, 'admin')
 
     def _lag_pasient(self, nr, triage='Grønn'):
         return Patient.objects.create(

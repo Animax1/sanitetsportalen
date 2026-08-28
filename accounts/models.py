@@ -10,11 +10,21 @@ from .managers import CustomUserManager
 
 
 class UserRole(models.TextChoices):
+    """Kontotype, ikke tilgangsnivå.
+
+    Feltet hadde fem verdier fram til deploy 2. Fire av dem — ``lead``,
+    ``lead_view``, ``read_write`` og ``read_only`` — beskrev *hva brukeren
+    fikk lov til*, men ingen view leste dem etter at ``@modul_kreves`` ble
+    håndhevet. En verdi som ser ut som tilgangskontroll uten å være det er
+    verre enn ingen verdi: den inviterer neste utvikler til å gate på den.
+
+    Det som er igjen er den ene forskjellen som faktisk står utenfor
+    modulaksen: global admin mot alle andre. Tilgang til moduler ligger i
+    ``ModulTilgang``-rader, og fravær av rad er ingen tilgang.
+    """
+
     ADMIN = 'admin', 'Administrator'
-    LEAD = 'lead', 'Leder'
-    LEAD_VIEW = 'lead_view', 'Leder (kun lesing)'
-    READ_WRITE = 'read_write', 'Les/skriv'
-    READ_ONLY = 'read_only', 'Kun lesing'
+    BRUKER = 'bruker', 'Bruker'
 
 
 class CustomUser(AbstractBaseUser, PermissionsMixin):
@@ -55,10 +65,14 @@ class CustomUser(AbstractBaseUser, PermissionsMixin):
             'passord-reset.'
         ),
     )
+    # Default er `bruker` og ikke noe mer: en ny konto skal ikke ha tilgang
+    # til noe før noen har gitt den en ModulTilgang-rad. Før deploy 2 var
+    # default `read_only`, som *lignet* på det samme — men den verdien ga
+    # lesetilgang i menyen fordi `is_visible_for` leste rollen.
     role = models.CharField(
         max_length=20,
         choices=UserRole.choices,
-        default=UserRole.READ_ONLY,
+        default=UserRole.BRUKER,
         verbose_name='Rolle',
     )
     is_active = models.BooleanField(default=True, verbose_name='Aktiv')
@@ -90,15 +104,17 @@ class CustomUser(AbstractBaseUser, PermissionsMixin):
     updated_at = models.DateTimeField(auto_now=True, verbose_name='Oppdatert')
     last_login_at = models.DateTimeField(null=True, blank=True, verbose_name='Siste innlogging')
 
-    # ── Modul-permissions (Fase 3a) ────────────────────────────────────────
-    # Boolske flag som bestemmer om brukeren ser/redigerer hver portal-modul.
-    # Roller (admin/lead/lead_view/read_write/read_only) styrer fortsatt
-    # overordnet tilgang innenfor hver app, mens disse flaggene styrer hvilke
-    # moduler som vises i dashboard og nav-meny.
+    # ── Modul-permissions (Fase 3a) — DØDE FELTER, fjernes i deploy 3 ──────
+    # De fem flaggene styrer ingenting. Menyen leser `ModulTilgang` (via
+    # `Module.is_visible_for`), og endepunktene leser den samme tabellen via
+    # `@modul_kreves`. Ingen av dem har lest et flagg siden deploy 1.
     #
-    # Admin (role='admin') ser alle moduler uavhengig av flagg.
-    # Vi pre-registrerer alle 5 flagg i samme migrasjon for å unngå
-    # fragmenterte migrasjoner når framtidige moduler aktiveres.
+    # De står igjen av én grunn: en rollback av deploy 1 må ha noe å bygge
+    # radene fra på nytt, og backfillen leser `role`. Etter deploy 2 er ikke
+    # `role` lenger fasit for annet enn admin, så vinduet der en rollback kan
+    # gjenskape matrisen er over — derfor kan deploy 3 slette dem.
+    #
+    # Sett dem ikke. Les dem ikke. Gate ikke på dem.
     kan_redigere_pasienter = models.BooleanField(
         default=False,
         verbose_name='Kan se pasientregistrering',

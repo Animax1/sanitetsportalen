@@ -34,7 +34,7 @@ class BackupServiceTests(TestCase):
             username='admin', password='pwd', role='admin',
             must_change_password=False,
         )
-        gi_standardtilgang(self.admin)
+        gi_standardtilgang(self.admin, 'admin')
         # Bruk en unik testmappe for backupfiler
         self.backup_dir = Path(os.environ.get('BACKUP_DIR', '/tmp/test-backups-backup'))
         self.backup_dir.mkdir(parents=True, exist_ok=True)
@@ -149,7 +149,7 @@ class BackupServiceTests(TestCase):
         # Lag noen sensitive data som ikke skal havne i backupen
         CustomUser.objects.create_user(
             username='hemmelig', password='super-hemmelig-passord',
-            role='read_write', must_change_password=False,
+            role='bruker', must_change_password=False,
         )
         AuditLog.objects.create(
             table_name='Patient', record_id=1, action='update',
@@ -202,10 +202,10 @@ class BackupServiceTests(TestCase):
         set_active_year(2026)
         # Opprett testdata som IKKE skal røres av restore
         other_user = CustomUser.objects.create_user(
-            username='annen', password='pwd', role='lead',
+            username='annen', password='pwd', role='bruker',
             must_change_password=False,
         )
-        gi_standardtilgang(other_user)
+        gi_standardtilgang(other_user, 'leder')
         AuditLog.objects.create(
             table_name='Patient', record_id=1, action='create',
             field_name='n/a', new_value='før-restore-spor',
@@ -253,7 +253,7 @@ class BackupResetIntegrationTests(TestCase):
             username='admin', password='pwd', role='admin',
             must_change_password=False,
         )
-        gi_standardtilgang(self.admin)
+        gi_standardtilgang(self.admin, 'admin')
         self.backup_dir = Path('/tmp/test-backups-reset')
         self.backup_dir.mkdir(parents=True, exist_ok=True)
         set_active_year(2026)
@@ -291,7 +291,7 @@ class BackupContentHashSkipTests(TestCase):
             username='admin', password='pwd', role='admin',
             must_change_password=False,
         )
-        gi_standardtilgang(self.admin)
+        gi_standardtilgang(self.admin, 'admin')
         self.backup_dir = Path(os.environ.get('BACKUP_DIR', '/tmp/test-backups-hash'))
         self.backup_dir.mkdir(parents=True, exist_ok=True)
 

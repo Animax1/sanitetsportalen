@@ -50,7 +50,7 @@ class StatsCacheViewTests(TestCase):
             username='admin1', password='testpass123',
             role='admin', must_change_password=False,
         )
-        gi_standardtilgang(self.admin)
+        gi_standardtilgang(self.admin, 'admin')
         # Rens cache mellom tester
         cache.clear()
 
@@ -116,15 +116,15 @@ class StatsCacheViewTests(TestCase):
         # @login_required redirecter til login-siden
         self.assertIn(resp.status_code, (302, 401, 403))
 
-    def test_full_stats_krever_stats_rolle(self):
-        """Lag read_only-bruker som ikke har stats-tilgang."""
+    def test_full_stats_krever_statistikktilgang(self):
+        """Konto uten en ModulTilgang-rad på statistikk skal stenges ute."""
         CustomUser.objects.create_user(
             username='ro1', password='testpass123',
-            role='read_only', must_change_password=False,
+            role='bruker', must_change_password=False,
         )
         self.client.login(username='ro1', password='testpass123')
         resp = self.client.get(reverse('api_full_stats'))
-        # @stats_required blokkerer read_only
+        # @modul_kreves('statistikk', 'les') stenger — fravær av rad er ingen tilgang
         self.assertIn(resp.status_code, (302, 403))
 
 

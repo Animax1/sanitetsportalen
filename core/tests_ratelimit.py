@@ -47,15 +47,15 @@ class RateLimitKjerneTests(TestCase):
         cache.clear()
         self.factory = RequestFactory()
         self.en = CustomUser.objects.create_user(
-            username='rl-en', password='pass', role='read_write',
+            username='rl-en', password='pass', role='bruker',
             must_change_password=False,
         )
-        gi_standardtilgang(self.en)
+        gi_standardtilgang(self.en, 'skriver')
         self.to = CustomUser.objects.create_user(
-            username='rl-to', password='pass', role='read_write',
+            username='rl-to', password='pass', role='bruker',
             must_change_password=False,
         )
-        gi_standardtilgang(self.to)
+        gi_standardtilgang(self.to, 'skriver')
 
     def _view(self, **kwargs):
         @rate_limit(**kwargs)
@@ -155,12 +155,12 @@ class RateLimitEndepunktTests(TestCase):
             username='rl-admin', password='pass', role='admin',
             must_change_password=False,
         )
-        gi_standardtilgang(self.admin)
+        gi_standardtilgang(self.admin, 'admin')
         self.skriver = CustomUser.objects.create_user(
-            username='rl-skriver', password='pass', role='read_write',
+            username='rl-skriver', password='pass', role='bruker',
             must_change_password=False,
         )
-        gi_standardtilgang(self.skriver)
+        gi_standardtilgang(self.skriver, 'skriver')
 
     def _klient(self, user):
         c = Client()
@@ -227,10 +227,10 @@ class RateLimitEndepunktTests(TestCase):
         feil.
         """
         ny = CustomUser.objects.create_user(
-            username='rl-ny', password='MidlertidigPass1!', role='read_write',
+            username='rl-ny', password='MidlertidigPass1!', role='bruker',
             must_change_password=True,
         )
-        gi_standardtilgang(ny)
+        gi_standardtilgang(ny, 'skriver')
         c = self._klient(ny)
 
         statuser = _statuser(lambda: c.post('/accounts/change-password/', {

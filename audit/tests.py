@@ -67,9 +67,9 @@ class PurgeOldLogsTests(TestCase):
         cls.user = CustomUser.objects.create_user(
             username='purgebruker',
             password='Passord123!',
-            role='read_only',
+            role='bruker',
         )
-        gi_standardtilgang(cls.user)
+        gi_standardtilgang(cls.user, 'leser')
 
     def test_purge_deletes_old_login_events(self):
         """Eldre login-events (> 730 dager) skal slettes."""
@@ -155,9 +155,9 @@ class PurgeNotificationsTests(TestCase):
         cls.user = CustomUser.objects.create_user(
             username='varselbruker',
             password='Passord123!',
-            role='read_only',
+            role='bruker',
         )
-        gi_standardtilgang(cls.user)
+        gi_standardtilgang(cls.user, 'leser')
 
     def test_purge_deletes_old_notifications(self):
         gammel = _create_notification(self.user, days_ago=31)

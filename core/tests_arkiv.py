@@ -106,7 +106,7 @@ class ArkivTjenesteTests(TestCase):
             username='arkivadmin', password='pwd', role='admin',
             must_change_password=False,
         )
-        gi_standardtilgang(self.admin)
+        gi_standardtilgang(self.admin, 'admin')
         self.arkiv = VaktArkiv.objects.create(
             tittel='Dummy-arkiv', arrangement_navn='Test',
             antall_pasienter=2, year_snapshot=2026,

@@ -7,81 +7,76 @@ og at ingen fikk mer tilgang enn før flyttingen.
 from django.test import Client, TestCase, override_settings
 
 from accounts.models import CustomUser, ModulTilgang
+from accounts.test_helpers import PROFILER
 from core.auth_decorators import har_tilgang, nivaa_for
 from core.models import ModuleSettings
 from core.modules import get_module, get_visible_modules
 
 
-ALLE_ROLLER = ('read_only', 'read_write', 'lead_view', 'lead', 'admin')
+ALLE_PROFILER = ('leser', 'skriver', 'leder_les', 'leder', 'admin')
 
-# Rollene som så statistikkfanen før utskillingen. Lista er med vilje skrevet
-# ut i stedet for utledet: den er fasiten flyttingen skal måles mot, og en
-# utledet liste ville fulgt med på et utilsiktet skift.
-STATS_ROLLER = ('lead_view', 'lead', 'admin')
-UTEN_STATS = ('read_only', 'read_write')
-
-
-# Kartleggingen datamigrasjonen bruker (§8.1). Gjentatt her fordi testene må
-# lage brukere som ligner på dem migrasjonen produserte — nye brukere får
-# ingen rader av seg selv.
-BACKFILL = {
-    'read_only':  [('patients', 'les')],
-    'read_write': [('patients', 'skriv_full')],
-    'lead_view':  [('patients', 'les'),        ('statistikk', 'les')],
-    'lead':       [('patients', 'skriv_full'), ('statistikk', 'les')],
-    'admin':      [],
-}
+# Profilene som så statistikkfanen før utskillingen. Lista er med vilje
+# skrevet ut i stedet for utledet: den er fasiten flyttingen skal måles mot,
+# og en utledet liste ville fulgt med på et utilsiktet skift.
+#
+# Navnene var rollenavn fram til deploy 2 — `lead_view`, `read_write` og
+# resten. Da `role` krympet til admin/bruker, ble de erstattet av profilene i
+# `accounts.test_helpers`, som beskriver tilgang i stedet for tittel. Det er
+# de samme kombinasjonene: `leder_les` er «leser pasienter, leser statistikk».
+STATS_PROFILER = ('leder_les', 'leder', 'admin')
+UTEN_STATS = ('leser', 'skriver')
 
 
-def _bruker(rolle, *, tilganger=None):
-    """Bruker med rollen, og med radene backfillen ville gitt den.
+def _bruker(profil, *, tilganger=None):
+    """Bruker med radene profilen beskriver.
 
     `tilganger` overstyrer for tester som trenger en annen kombinasjon enn
-    den dagens roller kartlegges til.
+    profilene dekker.
     """
     bruker = CustomUser.objects.create_user(
-        username=f'bruker_{rolle}', password='testpass123',
-        role=rolle, must_change_password=False,
+        username=f'bruker_{profil}', password='testpass123',
+        role='admin' if profil == 'admin' else 'bruker',
+        must_change_password=False,
     )
-    for slug, nivaa in (BACKFILL[rolle] if tilganger is None else tilganger):
+    for slug, nivaa in (PROFILER[profil] if tilganger is None else tilganger):
         ModulTilgang.objects.create(bruker=bruker, modul_slug=slug, nivaa=nivaa)
     return bruker
 
 
 @override_settings(SECURE_SSL_REDIRECT=False, RATELIMIT_ENABLE=False)
 class StatistikkTilgangTests(TestCase):
-    """Samme roller slipper inn etter flyttingen som før den.
+    """Samme kontoer slipper inn etter flyttingen som før den.
 
     Dette er hele akseptansekriteriet for utskillingen: den skulle flytte
     kode, ikke åpne eller lukke noe. Testene sammenligner derfor mot
-    STATS_ROLLER, som er rollene `stats_required` slapp inn i pasientmodulen.
+    STATS_PROFILER, som er kontoene `stats_required` slapp inn i pasientmodulen.
     """
 
-    def _hent(self, rolle, sti):
+    def _hent(self, profil, sti):
         c = Client()
-        c.force_login(_bruker(rolle))
+        c.force_login(_bruker(profil))
         return c.get(sti)
 
     def test_siden_krever_statistikktilgang(self):
-        for rolle in UTEN_STATS:
-            with self.subTest(rolle=rolle):
-                self.assertEqual(self._hent(rolle, '/statistikk/').status_code, 403)
+        for profil in UTEN_STATS:
+            with self.subTest(profil=profil):
+                self.assertEqual(self._hent(profil, '/statistikk/').status_code, 403)
 
-    def test_siden_er_apen_for_stats_roller(self):
-        for rolle in STATS_ROLLER:
-            with self.subTest(rolle=rolle):
-                self.assertEqual(self._hent(rolle, '/statistikk/').status_code, 200)
+    def test_siden_er_apen_for_stats_profiler(self):
+        for profil in STATS_PROFILER:
+            with self.subTest(profil=profil):
+                self.assertEqual(self._hent(profil, '/statistikk/').status_code, 200)
 
     def test_full_stats_krever_statistikktilgang(self):
-        for rolle in UTEN_STATS:
-            with self.subTest(rolle=rolle):
-                resp = self._hent(rolle, '/statistikk/api/full-stats/')
+        for profil in UTEN_STATS:
+            with self.subTest(profil=profil):
+                resp = self._hent(profil, '/statistikk/api/full-stats/')
                 self.assertEqual(resp.status_code, 403)
 
-    def test_full_stats_er_apen_for_stats_roller(self):
-        for rolle in STATS_ROLLER:
-            with self.subTest(rolle=rolle):
-                resp = self._hent(rolle, '/statistikk/api/full-stats/')
+    def test_full_stats_er_apen_for_stats_profiler(self):
+        for profil in STATS_PROFILER:
+            with self.subTest(profil=profil):
+                resp = self._hent(profil, '/statistikk/api/full-stats/')
                 self.assertEqual(resp.status_code, 200)
 
     def test_uautentisert_far_redirect_ikke_403(self):
@@ -133,28 +128,28 @@ class FlyttedeEndepunkterTests(TestCase):
         endres bevisst, ikke oppdages.
         """
         c = Client()
-        c.force_login(_bruker('read_only'))
+        c.force_login(_bruker('leser'))
         self.assertEqual(c.get('/pasienter/api/stats/').status_code, 200)
 
 
 class StatistikkModulRegistreringTests(TestCase):
-    """Modulen er registrert, og synligheten følger rollen."""
+    """Modulen er registrert, og synligheten følger modultilgangen."""
 
     def test_modulen_finnes_i_registeret(self):
         modul = get_module('statistikk')
         self.assertIsNotNone(modul, 'statistikk mangler i core.modules')
         self.assertEqual(modul.url, '/statistikk/')
 
-    def test_synlig_for_stats_roller(self):
-        for rolle in STATS_ROLLER:
-            with self.subTest(rolle=rolle):
-                slugs = [m.slug for m in get_visible_modules(_bruker(rolle))]
+    def test_synlig_for_stats_profiler(self):
+        for profil in STATS_PROFILER:
+            with self.subTest(profil=profil):
+                slugs = [m.slug for m in get_visible_modules(_bruker(profil))]
                 self.assertIn('statistikk', slugs)
 
-    def test_usynlig_for_lavere_roller(self):
-        for rolle in UTEN_STATS:
-            with self.subTest(rolle=rolle):
-                slugs = [m.slug for m in get_visible_modules(_bruker(rolle))]
+    def test_usynlig_uten_statistikktilgang(self):
+        for profil in UTEN_STATS:
+            with self.subTest(profil=profil):
+                slugs = [m.slug for m in get_visible_modules(_bruker(profil))]
                 self.assertNotIn('statistikk', slugs)
 
 
@@ -166,12 +161,12 @@ class ModulTilgangSynlighetTests(TestCase):
     """
 
     def test_ingen_rad_er_ingen_tilgang(self):
-        uten = _bruker('read_only', tilganger=[])
+        uten = _bruker('leser', tilganger=[])
         self.assertIsNone(nivaa_for(uten, 'statistikk'))
         self.assertNotIn('statistikk', [m.slug for m in get_visible_modules(uten)])
 
     def test_rad_gir_tilgang(self):
-        med = _bruker('read_only', tilganger=[('statistikk', 'les')])
+        med = _bruker('leser', tilganger=[('statistikk', 'les')])
         self.assertTrue(har_tilgang(med, 'statistikk', 'les'))
 
     def test_admin_ser_modulen_uten_rad(self):
@@ -189,7 +184,7 @@ class ModulTilgangSynlighetTests(TestCase):
         ModuleSettings.objects.update_or_create(
             slug='statistikk', defaults={'enabled': False},
         )
-        lead = _bruker('lead')
+        lead = _bruker('leder')
         self.assertFalse(har_tilgang(lead, 'statistikk', 'les'))
 
         # Admin slipper fortsatt inn — ellers kan man deaktivere seg selv ut

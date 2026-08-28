@@ -157,7 +157,7 @@ class CreateOfflineUsersTests(TestCase):
         vakt = CustomUser.objects.get(username='vakt-offline')
 
         self.assertEqual(admin.role, 'admin')
-        self.assertEqual(vakt.role, 'read_write')
+        self.assertEqual(vakt.role, 'bruker')
         self.assertFalse(admin.must_change_password)
         self.assertFalse(admin.mfa_required)
         self.assertFalse(vakt.must_change_password)

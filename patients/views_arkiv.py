@@ -9,12 +9,9 @@ import logging
 from django.http import JsonResponse
 from django.views.decorators.http import require_http_methods
 
-from core.auth_decorators import modul_kreves
+from core.auth_decorators import er_global_admin, modul_kreves
 
-from .services import (
-    has_role_at_least, ARKIV_VIEW_MIN_ROLE, ARKIV_WRITE_ROLE,
-    arkiver_aktiv_vakt, compute_arkiv_stats,
-)
+from .services import arkiver_aktiv_vakt, compute_arkiv_stats
 from .views_common import _json_body
 
 logger = logging.getLogger(__name__)
@@ -50,7 +47,7 @@ def arkiv_lagre_view(request):
     Body: {arrangement_navn: str, notat: str (valgfri)}
     Returnerer: {ok: true, id, tittel, antall_pasienter}
     """
-    if not has_role_at_least(request.user, ARKIV_WRITE_ROLE):
+    if not er_global_admin(request.user):
         return JsonResponse({'error': 'Ingen tilgang'}, status=403)
 
     data = _json_body(request)
@@ -78,11 +75,11 @@ def arkiv_lagre_view(request):
 @modul_kreves('patients', 'les', svar='json')
 @require_http_methods(['GET'])
 def arkiv_liste_view(request):
-    """Liste alle arkiver. Krever ARKIV_VIEW_MIN_ROLE (standard: admin).
+    """Liste alle arkiver. Global admin.
 
     Returnerer: [{id, tittel, arrangement_navn, importert_at, antall_pasienter, importert_av}]
     """
-    if not has_role_at_least(request.user, ARKIV_VIEW_MIN_ROLE):
+    if not er_global_admin(request.user):
         return JsonResponse({'error': 'Ingen tilgang'}, status=403)
 
     from .models import VaktArkiv
@@ -116,7 +113,7 @@ def arkiv_detalj_view(request, pk):
         return JsonResponse({'error': 'Arkiv ikke funnet'}, status=404)
 
     if request.method == 'GET':
-        if not has_role_at_least(request.user, ARKIV_VIEW_MIN_ROLE):
+        if not er_global_admin(request.user):
             return JsonResponse({'error': 'Ingen tilgang'}, status=403)
 
         stats = compute_arkiv_stats(arkiv)
@@ -160,7 +157,7 @@ def arkiv_detalj_view(request, pk):
         })
 
     # DELETE
-    if not has_role_at_least(request.user, ARKIV_WRITE_ROLE):
+    if not er_global_admin(request.user):
         return JsonResponse({'error': 'Ingen tilgang'}, status=403)
 
     data = _json_body(request)

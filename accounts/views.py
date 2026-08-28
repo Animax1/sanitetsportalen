@@ -692,34 +692,19 @@ def change_password_view(request):
 
 @admin_required
 def user_list_view(request):
-    """Liste over alle brukere med valgfri bulk-aksjon.
+    """Liste over alle brukere.
 
-    Bulk-aksjoner (Fase 3b) lar admin slå på ett permission-flagg på en gruppe
-    brukere i én operasjon — typisk «gi alle leads tilgang til
-    pasientregistrering». Aksjonene skal være idempotente og lesbare.
+    **Bulk-aksjonene er borte (deploy 2).** To knapper skrev til
+    ``kan_redigere_pasienter`` på en gruppe kontoer om gangen: «gi ledere
+    pasienttilgang» og «fjern pasienttilgang fra alle». Begge sluttet å bety
+    noe da ``@modul_kreves`` og ``Module.is_visible_for`` gikk over til å lese
+    ``ModulTilgang`` — flagget de skrev til ble ikke lest av noe.
+
+    En knapp som melder «Fjernet pasientregistrering fra 7 brukere» uten at
+    noen mistet noe er verre enn ingen knapp: neste gang tilgang faktisk skal
+    trekkes tilbake, tror admin at jobben er gjort. Tilgang settes per konto i
+    matrisen på ``user_detail``, som skriver til tabellen håndhevelsen leser.
     """
-    if request.method == 'POST':
-        action = request.POST.get('action', '')
-
-        if action == 'grant_pasienter_to_leads':
-            qs = CustomUser.objects.filter(role__in=['lead', 'lead_view'])
-            updated = qs.update(kan_redigere_pasienter=True)
-            messages.success(
-                request,
-                f'Aktivert pasientregistrering for {updated} lead-bruker(e).',
-            )
-            return redirect('accounts:user_list')
-
-        elif action == 'revoke_pasienter_from_all':
-            # Trygg "reset" — fjerner kun pasient-flagget, beholder andre
-            qs = CustomUser.objects.exclude(role='admin')
-            updated = qs.update(kan_redigere_pasienter=False)
-            messages.success(
-                request,
-                f'Fjernet pasientregistrering fra {updated} ikke-admin-bruker(e).',
-            )
-            return redirect('accounts:user_list')
-
     users = CustomUser.objects.all().order_by('username')
     return render(request, 'accounts/user_list.html', {'users': users})
 

@@ -84,7 +84,7 @@ class SchedulerRunBackupTests(TestCase):
             username='admin', password='pwd', role='admin',
             must_change_password=False,
         )
-        gi_standardtilgang(self.admin)
+        gi_standardtilgang(self.admin, 'admin')
         self.backup_dir = Path('/tmp/test-backups-scheduler')
         self.backup_dir.mkdir(parents=True, exist_ok=True)
         # Rydd opp gamle filer.

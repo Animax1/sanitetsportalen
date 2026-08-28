@@ -19,7 +19,7 @@ from core.auth_decorators import (
 from core.models import ModuleSettings
 
 
-def _bruker(navn, rolle='read_only', **kwargs):
+def _bruker(navn, rolle='bruker', **kwargs):
     return CustomUser.objects.create_user(
         username=navn, password='testpass123', role=rolle,
         must_change_password=False, **kwargs,
@@ -27,7 +27,15 @@ def _bruker(navn, rolle='read_only', **kwargs):
 
 
 class BackfillTests(TestCase):
-    """§8.1 — utledes fra `role` alene, aldri fra flagget."""
+    """§8.1 — utledes fra `role` alene, aldri fra flagget.
+
+    **Testene skriver rolleverdier feltet ikke lenger har.** `read_write` og
+    `lead` forsvant i deploy 2, men migrasjon 0012 kjørte mot en database der
+    de fantes, og det er den kjøringen som avgjorde hva kontoene i prod fikk.
+    Skrev testene `bruker`, ville de bekreftet at backfillen ikke gjør noe —
+    som er sant i dag og irrelevant. Django validerer ikke `choices` ved
+    `save()`, så verdiene går inn slik de sto den gangen.
+    """
 
     FASIT = {
         'read_only':  {('patients', 'les')},
@@ -256,7 +264,7 @@ class ModulKrevesDekoratorTests(TestCase):
 
 
 class OfflineBrukerTilgangTests(TestCase):
-    """`vakt-offline` hadde `role='read_write'` og ingen rader.
+    """`vakt-offline` hadde `role='bruker'` og ingen rader.
 
     Udramatisk mens flaggene ikke gjorde noe. Med håndhevelse ser
     feltmaskinen en tom portal — og det oppdages i det den skal brukes, altså
@@ -283,11 +291,13 @@ class OfflineBrukerTilgangTests(TestCase):
 
 
 class VerifiserKommandoTests(TestCase):
-    """`verifiser_modultilgang` — kontrollen som kjøres mot prod før deploy 2.
+    """`verifiser_modultilgang` — les-only kontroll av matrisen.
 
-    Den skal aldri skrive. Deploy 2 krymper `role`, og etter det er
-    `ModulTilgang` eneste fasit — så feil i denne kontrollen oppdages først
-    når det ikke lenger går an å regne seg tilbake.
+    Kommandoen mistet halvparten i deploy 2: sammenligningen mot `role` og
+    §10.1-tellingen ble fjernet fordi begge ville svart grønt uansett når
+    rolleverdiene de leste ikke lenger finnes. Det som testes her er det som
+    er igjen, og det som er igjen skal aldri kunne bli grønt av seg selv —
+    hver test har et motstykke som viser at funnet faktisk kan utebli.
     """
 
     def _kjor(self, **opts):
@@ -298,7 +308,7 @@ class VerifiserKommandoTests(TestCase):
         return ut.getvalue()
 
     def test_kommandoen_skriver_ingenting(self):
-        bruker = _bruker('vk_uroert', 'read_write')
+        bruker = _bruker('vk_uroert')
         ModulTilgang.objects.create(
             bruker=bruker, modul_slug='patients', nivaa='les')
         foer = set(ModulTilgang.objects.values_list('bruker_id', 'modul_slug', 'nivaa'))
@@ -307,98 +317,57 @@ class VerifiserKommandoTests(TestCase):
             set(ModulTilgang.objects.values_list('bruker_id', 'modul_slug', 'nivaa')),
             foer, 'kontrollen skal være les-only')
 
-    def test_admin_telles_ikke_i_10_1(self):
-        """Admin hadde bypass, så flagget var aldri en begrensning for dem.
-
-        Notatet skriver «role >= read_write», men formålet er «kontoer som
-        hadde en tilgang de ikke var ment å ha». Admin var ment å ha den.
-        """
-        _bruker('vk_admin', 'admin', kan_redigere_pasienter=False)
-        ut = self._kjor()
-        self.assertIn('Antall: 0', ut)
-        self.assertNotIn('vk_admin', ut.split('Kontoer uten')[0])
-
-    def test_skriverolle_uten_flagg_telles(self):
-        _bruker('vk_uten_flagg', 'read_write', kan_redigere_pasienter=False)
-        ut = self._kjor()
-        self.assertIn('Antall: 1', ut)
-        self.assertIn('vk_uten_flagg', ut)
-
     def test_konto_uten_rader_meldes(self):
-        _bruker('vk_tom', 'read_write')
-        self.assertIn('vk_tom', self._kjor().split('Avvik fra')[0])
+        _bruker('vk_tom')
+        self.assertIn('vk_tom', self._kjor())
 
-    def test_avvik_fra_backfillen_meldes(self):
-        bruker = _bruker('vk_avvik', 'read_write')
+    def test_admin_uten_rader_meldes_ikke(self):
+        """Global admin trenger ingen rader — den er ikke et funn."""
+        _bruker('vk_admin', 'admin')
+        ut = self._kjor()
+        self.assertIn('Kontoer uten en eneste ModulTilgang-rad', ut)
+        self.assertNotIn('vk_admin', ut)
+
+    def test_rad_paa_ukjent_modul_meldes(self):
+        """En slug ingen modul har gir ingen tilgang, men ser ut som tilgang."""
+        bruker = _bruker('vk_slug')
+        ModulTilgang.objects.create(
+            bruker=bruker, modul_slug='pasienter', nivaa='les')
+        ut = self._kjor()
+        self.assertIn('vk_slug: pasienter:les', ut)
+
+    def test_kjent_modul_meldes_ikke(self):
+        """Vern mot at slug-testen passerer fordi alt meldes."""
+        bruker = _bruker('vk_ok')
         ModulTilgang.objects.create(
             bruker=bruker, modul_slug='patients', nivaa='les')
         ut = self._kjor()
-        self.assertIn('backfill ville gitt: patients:skriv_full', ut)
-        self.assertIn('har nå:              patients:les', ut)
+        self.assertIn('Rader på en modul som ikke finnes i registeret\n  Ingen.', ut)
 
-    def test_ingen_avvik_naar_matrisen_er_uroert(self):
-        """Vern mot at avvik-testen passerer fordi alt meldes som avvik."""
-        from accounts.test_helpers import gi_standardtilgang
-        gi_standardtilgang(_bruker('vk_ren', 'lead'))
-        self.assertIn('Matrisen er urørt siden backfillen', self._kjor())
+    def test_ukjent_nivaa_meldes(self):
+        """Et nivå stigen ikke kjenner stenger døra — stille, uten denne."""
+        bruker = _bruker('vk_nivaa')
+        ModulTilgang.objects.create(
+            bruker=bruker, modul_slug='patients', nivaa='skriv')
+        self.assertIn('vk_nivaa: patients:skriv', self._kjor())
 
+    def test_ukjent_rolle_meldes(self):
+        """En rad deploy 2 ikke fikk tak i."""
+        bruker = _bruker('vk_rolle')
+        CustomUser.objects.filter(pk=bruker.pk).update(role='lead')
+        self.assertIn('vk_rolle (lead)', self._kjor())
 
-class ForhandsvisningTests(TestCase):
-    """`--forhandsvis` kjøres mot prod FØR deploy 1.
-
-    Den må derfor ikke røre `ModulTilgang` — tabellen finnes ikke der ennå, og
-    hele poenget er å se resultatet før man deployer.
-    """
-
-    def _kjor(self):
-        from io import StringIO
-        from django.core.management import call_command
-        ut = StringIO()
-        call_command('verifiser_modultilgang', '--forhandsvis', stdout=ut)
-        return ut.getvalue()
-
-    def test_leser_ikke_modultilgang(self):
-        """Kjøres før migrasjonen, så tabellen kan ikke antas å finnes.
-
-        Testes ved å telle spørringer mot tabellen: går det én, ville
-        kommandoen krasjet i prod før deploy 1.
-        """
-        from django.db import connection
-        from django.test.utils import CaptureQueriesContext
-
-        _bruker('fv_en', 'read_write')
-        with CaptureQueriesContext(connection) as spor:
-            self._kjor()
-        traff = [q['sql'] for q in spor.captured_queries
-                 if 'modultilgang' in q['sql'].lower()]
-        self.assertEqual(traff, [], 'forhåndsvisningen må ikke lese ModulTilgang')
-
-    def test_viser_hva_rollen_gir(self):
-        _bruker('fv_lead', 'lead')
+    def test_krympet_rolle_meldes_ikke(self):
+        """Vern mot at rolletesten passerer fordi alle meldes."""
+        _bruker('vk_bruker')
         ut = self._kjor()
-        self.assertIn('patients:skriv_full', ut)
-        self.assertIn('statistikk:les', ut)
+        self.assertIn('rolleverdi feltet ikke kjenner\n  Ingen.', ut)
 
-    def test_admin_vises_uten_rader(self):
-        _bruker('fv_admin', 'admin')
-        self.assertIn('(global admin — ingen rader)', self._kjor())
-
-    def test_advarer_naar_flagget_er_av_men_rollen_gir_skriv(self):
-        """Fella: å «redusere» en konto ved å fjerne flagget gjør ingenting.
-
-        Flagget stengte aldri et endepunkt (§2.1), og backfillen utleder fra
-        `role` alene (§8.1). Uten advarselen ville noen tro de hadde tatt bort
-        skrivetilgang, og oppdaget det motsatte etter deploy.
-        """
-        _bruker('fv_felle', 'read_write', kan_redigere_pasienter=False)
-        ut = self._kjor()
-        self.assertIn('får SKRIVETILGANG selv om flagget er av', ut)
-        self.assertIn('fv_felle', ut.split('får SKRIVETILGANG')[1])
-
-    def test_ingen_advarsel_naar_rollen_er_lesende(self):
-        """Vern mot at advarselen alltid vises."""
-        _bruker('fv_leser', 'read_only', kan_redigere_pasienter=False)
-        self.assertNotIn('får SKRIVETILGANG', self._kjor())
+    def test_vis_alle_lister_radene(self):
+        bruker = _bruker('vk_liste')
+        ModulTilgang.objects.create(
+            bruker=bruker, modul_slug='patients', nivaa='skriv_full')
+        self.assertIn('patients:skriv_full', self._kjor(**{'vis_alle': True}))
 
 
 class UkjentRolleTests(TestCase):

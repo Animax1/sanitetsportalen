@@ -150,10 +150,10 @@ class ChoiceValidationAPITests(TestCase):
         AppSetting.objects.update_or_create(
             key='active_year', defaults={'value': '2026'})
         self.user = CustomUser.objects.create_user(
-            username='skriver', password='pass', role='read_write',
+            username='skriver', password='pass', role='bruker',
             must_change_password=False,
         )
-        gi_standardtilgang(self.user)
+        gi_standardtilgang(self.user, 'skriver')
         self.client = Client()
         self.client.force_login(self.user)
 

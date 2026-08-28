@@ -157,9 +157,9 @@ class SesjonsinvalideringTests(TestCase):
         self.client = Client()
         self.user = CustomUser.objects.create_user(
             username='sesjonsbruker', password='TestPassord123!',
-            role='read_write', must_change_password=False,
+            role='bruker', must_change_password=False,
         )
-        gi_standardtilgang(self.user)
+        gi_standardtilgang(self.user, 'skriver')
 
     def _logg_inn(self, client=None):
         c = client or Client()
@@ -174,7 +174,7 @@ class SesjonsinvalideringTests(TestCase):
             annen = CustomUser.objects.create_user(
                 username=f'annen{i}', password='x', must_change_password=False,
             )
-            gi_standardtilgang(annen)
+            gi_standardtilgang(annen, 'leser')
             store = SessionStore()
             store['_auth_user_id'] = str(annen.pk)
             store['_auth_user_backend'] = 'django.contrib.auth.backends.ModelBackend'

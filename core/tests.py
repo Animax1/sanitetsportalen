@@ -3,7 +3,7 @@
 Dekker:
 1.  Tids-validatorer (validate_time_string, validate_patient_time_fields, parse_minutes)
 2.  Lokal-tid-helper (now_local_str)
-3.  Rolle-hierarki (has_role_at_least)
+3.  Global admin (er_global_admin)
 4.  Bakoverkompatibilitet: at re-eksporter fra patients.services og
     accounts.decorators fortsatt fungerer slik at eksisterende kode
     ikke brekker.
@@ -19,14 +19,7 @@ from django.test import Client, TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone as djtz
 
-from core.auth_decorators import (
-    ROLE_HIERARKI,
-    admin_required,
-    has_role_at_least,
-    role_required,
-    stats_required,
-    write_required,
-)
+from core.auth_decorators import admin_required, er_global_admin
 from core.validators import (
     TIME_FIELDS,
     TIME_FORMAT,
@@ -170,7 +163,12 @@ class NowLocalStrTests(TestCase):
 
 
 # ════════════════════════════════════════════════════════════════════════════
-# Rolle-hierarki og has_role_at_least
+# Global admin
+#
+# `ROLE_HIERARKI` og `has_role_at_least()` ble fjernet i deploy 2. Hierarkiet
+# var aldri et hierarki av rettigheter — `lead_view` lå over `read_write` uten
+# å ha skrivetilgang — og med `role` krympet til admin/bruker er det ingenting
+# å rangere.
 # ════════════════════════════════════════════════════════════════════════════
 
 
@@ -181,57 +179,40 @@ class _FakeUser:
         self.is_authenticated = authenticated
 
 
-class HasRoleAtLeastTests(TestCase):
-    """Verifiserer at rolle-hierarkiet brukes konsistent."""
+class ErGlobalAdminTests(TestCase):
+    """Den ene rollesjekken som står igjen."""
 
-    def test_admin_har_alle_niveaer(self):
-        admin = _FakeUser(role='admin')
-        for nivå in ROLE_HIERARKI:
-            self.assertTrue(
-                has_role_at_least(admin, nivå),
-                f'admin skal ha tilgang til {nivå}',
-            )
+    def test_admin_er_admin(self):
+        self.assertTrue(er_global_admin(_FakeUser(role='admin')))
 
-    def test_read_only_har_kun_eget_nivaa(self):
-        ro = _FakeUser(role='read_only')
-        self.assertTrue(has_role_at_least(ro, 'read_only'))
-        self.assertFalse(has_role_at_least(ro, 'read_write'))
-        self.assertFalse(has_role_at_least(ro, 'lead_view'))
-        self.assertFalse(has_role_at_least(ro, 'lead'))
-        self.assertFalse(has_role_at_least(ro, 'admin'))
+    def test_bruker_er_ikke_admin(self):
+        self.assertFalse(er_global_admin(_FakeUser(role='bruker')))
 
-    def test_lead_view_har_lavere_men_ikke_lead(self):
-        lv = _FakeUser(role='lead_view')
-        self.assertTrue(has_role_at_least(lv, 'read_only'))
-        self.assertTrue(has_role_at_least(lv, 'read_write'))
-        self.assertTrue(has_role_at_least(lv, 'lead_view'))
-        self.assertFalse(has_role_at_least(lv, 'lead'))
-        self.assertFalse(has_role_at_least(lv, 'admin'))
+    def test_uautentisert_er_ikke_admin(self):
+        self.assertFalse(er_global_admin(_FakeUser(role='admin', authenticated=False)))
 
-    def test_uautentisert_returnerer_false(self):
-        anon = _FakeUser(role=None, authenticated=False)
-        self.assertFalse(has_role_at_least(anon, 'read_only'))
+    def test_ukjent_rolle_er_ikke_admin(self):
+        """Fail-closed. En rolle vi ikke kjenner skal ikke gi admin."""
+        self.assertFalse(er_global_admin(_FakeUser(role='superduperadmin')))
 
-    def test_ukjent_rolle_returnerer_false(self):
-        ukjent = _FakeUser(role='superduperadmin')
-        self.assertFalse(has_role_at_least(ukjent, 'read_only'))
+    def test_bruker_uten_rollefelt_er_ikke_admin(self):
+        class Uten:
+            is_authenticated = True
+        self.assertFalse(er_global_admin(Uten()))
 
-    def test_hierarki_har_5_niveaer(self):
-        self.assertEqual(len(ROLE_HIERARKI), 5)
-        forventede = {'read_only', 'read_write', 'lead_view', 'lead', 'admin'}
-        self.assertEqual(set(ROLE_HIERARKI), forventede)
+    def test_hierarkiet_er_borte(self):
+        """De fem rolleverdiene skal ikke kunne snike seg inn igjen.
 
-
-class RoleRequiredDecoratorTests(TestCase):
-    """Verifiserer at role_required-dekoratoren krever riktig rolle."""
-
-    def test_admin_required_er_role_required_admin(self):
-        # admin_required skal være ekvivalent med role_required('admin')
-        # Vi kan ikke sammenligne lukninger direkte, men vi kan sjekke
-        # at den finnes og er kallbar.
-        self.assertTrue(callable(admin_required))
-        self.assertTrue(callable(write_required))
-        self.assertTrue(callable(stats_required))
+        Kommer `has_role_at_least` tilbake, kommer også fella den bar med
+        seg: `has_role_at_least(user, 'read_write')` ga `lead_view`
+        skrivetilgang uten at noen merket det.
+        """
+        import core.auth_decorators as ad
+        for navn in ('ROLE_HIERARKI', 'has_role_at_least', 'role_required',
+                     'write_required', 'stats_required', 'dataset_scope_all'):
+            with self.subTest(navn=navn):
+                self.assertFalse(hasattr(ad, navn),
+                                 f'{navn} skal være fjernet i deploy 2')
 
 
 # ════════════════════════════════════════════════════════════════════════════
@@ -259,25 +240,14 @@ class BakoverkompatibilitetTests(TestCase):
         self.assertIs(p_val, validate_patient_time_fields)
         self.assertIs(p_str, validate_time_string)
 
-    def test_patients_services_re_eksporterer_rolle(self):
-        from patients.services import (  # noqa: F401
-            ROLE_HIERARKI as p_hierarki,
-            has_role_at_least as p_has,
-        )
-        self.assertIs(p_hierarki, ROLE_HIERARKI)
-        self.assertIs(p_has, has_role_at_least)
-
     def test_accounts_decorators_re_eksporterer(self):
-        from accounts.decorators import (  # noqa: F401
-            admin_required as a_admin,
-            role_required as a_role,
-            stats_required as a_stats,
-            write_required as a_write,
-        )
+        """Shimen krympet i deploy 2, men `admin_required` skal virke.
+
+        Det er den eneste rollebaserte dekoratøren som står igjen; resten tok
+        rolleverdier som ikke finnes lenger.
+        """
+        from accounts.decorators import admin_required as a_admin  # noqa: F401
         self.assertIs(a_admin, admin_required)
-        self.assertIs(a_role, role_required)
-        self.assertIs(a_stats, stats_required)
-        self.assertIs(a_write, write_required)
 
     def test_produksjonskode_importerer_ikke_fra_shimen(self):
         """Regelen i CLAUDE.md skal ikke brytes av kodebasen selv (N11).
@@ -310,11 +280,18 @@ class BakoverkompatibilitetTests(TestCase):
             + '\n\nBytt til `from core.auth_decorators import ...` — samme objekter.'
         ))
 
-    def test_arkiv_konstanter_uendret(self):
-        """ARKIV_VIEW_MIN_ROLE og ARKIV_WRITE_ROLE skal være uendret."""
-        from patients.services import ARKIV_VIEW_MIN_ROLE, ARKIV_WRITE_ROLE
-        self.assertEqual(ARKIV_VIEW_MIN_ROLE, 'admin')
-        self.assertEqual(ARKIV_WRITE_ROLE, 'admin')
+    def test_arkiv_konstantene_er_fjernet(self):
+        """ARKIV_VIEW_MIN_ROLE og ARKIV_WRITE_ROLE falt med rollene.
+
+        De var «konfigurerbare» — kommentaren foreslo `lead_view` eller `lead`
+        for å åpne arkivet — men de verdiene finnes ikke etter deploy 2. En
+        knapp som ikke lar seg skru på er verre enn ingen knapp: den ser ut
+        som et valg. Arkivet er global admin, per §3.3.
+        """
+        import patients.services as svc
+        for navn in ('ARKIV_VIEW_MIN_ROLE', 'ARKIV_WRITE_ROLE'):
+            with self.subTest(navn=navn):
+                self.assertFalse(hasattr(svc, navn))
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -335,7 +312,7 @@ class PortalDashboardViewTests(TestCase):
         # Modulkortet vises kun med en ModulTilgang-rad. Flagget som sto her
         # før styrer ingenting lenger — se ModuleVisibilityTests.
         self.user = User.objects.create_user(
-            username='dashbruker', password='x', role='read_only',
+            username='dashbruker', password='x', role='bruker',
             must_change_password=False,
         )
         ModulTilgang.objects.create(
@@ -525,10 +502,10 @@ class PasientAppPaaNyURLTests(TestCase):
 
     def setUp(self):
         self.user = User.objects.create_user(
-            username='paspruker', password='x', role='read_only',
+            username='paspruker', password='x', role='bruker',
             must_change_password=False,
         )
-        gi_standardtilgang(self.user)
+        gi_standardtilgang(self.user, 'leser')
         self.client.force_login(self.user)
 
     def test_pasient_index_paa_ny_url(self):
@@ -588,7 +565,7 @@ class AdminNavPortalLenkeTests(TestCase):
             username='nav_admin', password='x', role='admin',
             must_change_password=False,
         )
-        gi_standardtilgang(self.admin)
+        gi_standardtilgang(self.admin, 'admin')
         self.client.force_login(self.admin)
 
     def test_endre_passord_har_dashboard_lenke(self):
@@ -690,7 +667,7 @@ class ModuleVisibilityTests(TestCase):
 
     def test_bruker_uten_modultilgang_ser_ikke_patients(self):
         bruker = User.objects.create_user(
-            username='no_pas', password='x', role='read_only',
+            username='no_pas', password='x', role='bruker',
             must_change_password=False,
         )
         # Ingen ModulTilgang-rad = ingen tilgang. Det finnes ingen
@@ -700,7 +677,7 @@ class ModuleVisibilityTests(TestCase):
 
     def test_bruker_med_modultilgang_ser_patients(self):
         bruker = User.objects.create_user(
-            username='ja_pas', password='x', role='read_only',
+            username='ja_pas', password='x', role='bruker',
             must_change_password=False,
         )
         ModulTilgang.objects.create(bruker=bruker, modul_slug='patients', nivaa='les')
@@ -715,7 +692,7 @@ class ModuleVisibilityTests(TestCase):
         med flagget, men uten rad, skal ikke se modulen.
         """
         bruker = User.objects.create_user(
-            username='bare_flagg', password='x', role='read_write',
+            username='bare_flagg', password='x', role='bruker',
             must_change_password=False, kan_redigere_pasienter=True,
         )
         slugs = {m.slug for m in get_dashboard_modules(bruker)}
@@ -723,7 +700,7 @@ class ModuleVisibilityTests(TestCase):
 
     def test_deaktivert_modul_skjules_for_ikke_admin(self):
         bruker = User.objects.create_user(
-            username='ja_pas2', password='x', role='read_only',
+            username='ja_pas2', password='x', role='bruker',
             must_change_password=False,
         )
         ModulTilgang.objects.create(bruker=bruker, modul_slug='patients', nivaa='les')
@@ -805,7 +782,7 @@ class DashboardRendringTests(TestCase):
             username='dash_admin', password='x', role='admin',
             must_change_password=False,
         )
-        gi_standardtilgang(admin)
+        gi_standardtilgang(admin, 'admin')
         self.client.force_login(admin)
         resp = self.client.get('/')
         self.assertEqual(resp.status_code, 200)
@@ -815,7 +792,7 @@ class DashboardRendringTests(TestCase):
     def test_bruker_uten_modultilgang_ser_ikke_pasient_kort(self):
         # Ingen `gi_standardtilgang` her: fraværet av rader er hele poenget.
         bruker = User.objects.create_user(
-            username='dash_no', password='x', role='read_only',
+            username='dash_no', password='x', role='bruker',
             must_change_password=False,
         )
         self.client.force_login(bruker)
@@ -829,11 +806,11 @@ class DashboardRendringTests(TestCase):
 
     def test_deaktivert_pasient_skjules_for_ikke_admin(self):
         bruker = User.objects.create_user(
-            username='dash_dis', password='x', role='read_only',
+            username='dash_dis', password='x', role='bruker',
             must_change_password=False,
             kan_redigere_pasienter=True,
         )
-        gi_standardtilgang(bruker)
+        gi_standardtilgang(bruker, 'leser')
         ModuleSettings.objects.filter(slug='patients').update(enabled=False)
         self.client.force_login(bruker)
         resp = self.client.get('/')
@@ -853,7 +830,7 @@ class NavMenuTests(TestCase):
             username='nav_a', password='x', role='admin',
             must_change_password=False,
         )
-        gi_standardtilgang(admin)
+        gi_standardtilgang(admin, 'admin')
         self.client.force_login(admin)
         resp = self.client.get('/')
         # Sjekker at nav-baren har patients-lenken (i tillegg til dashboard-kortet).
@@ -864,7 +841,7 @@ class NavMenuTests(TestCase):
     def test_bruker_uten_modultilgang_ser_ikke_pasient_i_nav(self):
         # Ingen `gi_standardtilgang` her: fraværet av rader er hele poenget.
         bruker = User.objects.create_user(
-            username='nav_no', password='x', role='read_only',
+            username='nav_no', password='x', role='bruker',
             must_change_password=False,
         )
         self.client.force_login(bruker)
@@ -928,10 +905,10 @@ class CustomUserPermissionFlagsTests(TestCase):
 
     def test_alle_fem_flagg_eksisterer(self):
         bruker = User.objects.create_user(
-            username='flag_test', password='x', role='read_only',
+            username='flag_test', password='x', role='bruker',
             must_change_password=False,
         )
-        gi_standardtilgang(bruker)
+        gi_standardtilgang(bruker, 'leser')
         for felt in [
             'kan_redigere_pasienter',
             'kan_redigere_vakter',
@@ -965,12 +942,12 @@ class ModuleAdminUITests(TestCase):
             username='3b_admin', password='x', role='admin',
             must_change_password=False, is_staff=True,
         )
-        gi_standardtilgang(self.admin)
+        gi_standardtilgang(self.admin, 'admin')
         self.read_only = User.objects.create_user(
-            username='3b_ro', password='x', role='read_only',
+            username='3b_ro', password='x', role='bruker',
             must_change_password=False,
         )
-        gi_standardtilgang(self.read_only)
+        gi_standardtilgang(self.read_only, 'leser')
         self.client = Client()
 
     def test_modulliste_kun_admin(self):
@@ -1072,12 +1049,12 @@ class AuditLogListViewTests(TestCase):
             username='3b_audit_admin', password='x', role='admin',
             must_change_password=False, is_staff=True,
         )
-        gi_standardtilgang(self.admin)
+        gi_standardtilgang(self.admin, 'admin')
         self.read_only = User.objects.create_user(
-            username='3b_audit_ro', password='x', role='read_only',
+            username='3b_audit_ro', password='x', role='bruker',
             must_change_password=False,
         )
-        gi_standardtilgang(self.read_only)
+        gi_standardtilgang(self.read_only, 'leser')
         # Lag noen AuditLog-rader vi kan filtrere på
         AuditLog.objects.create(
             table_name='patients_patient', record_id=1,
@@ -1200,12 +1177,12 @@ class ProfileViewTests(TestCase):
 
     def setUp(self):
         self.user = User.objects.create_user(
-            username='profilbruker', password='x', role='read_only',
+            username='profilbruker', password='x', role='bruker',
             must_change_password=False,
             kan_redigere_pasienter=True,
             kan_se_rapport=False,
         )
-        gi_standardtilgang(self.user)
+        gi_standardtilgang(self.user, 'leser')
         self.client = Client()
 
     def test_profil_url_loeses(self):
@@ -1252,7 +1229,7 @@ class ProfileViewTests(TestCase):
             username='profil_admin', password='x', role='admin',
             must_change_password=False,
         )
-        gi_standardtilgang(admin)
+        gi_standardtilgang(admin, 'admin')
         self.client.force_login(admin)
         resp = self.client.get('/min-profil/')
         # Admin har bypass — info-meldingen skal vises
@@ -1269,13 +1246,13 @@ class NavMenuFase3bTests(TestCase):
             must_change_password=False, is_staff=True,
             kan_redigere_pasienter=True,
         )
-        gi_standardtilgang(self.admin)
+        gi_standardtilgang(self.admin, 'admin')
         self.read_only = User.objects.create_user(
-            username='nav_ro', password='x', role='read_only',
+            username='nav_ro', password='x', role='bruker',
             must_change_password=False,
             kan_redigere_pasienter=True,
         )
-        gi_standardtilgang(self.read_only)
+        gi_standardtilgang(self.read_only, 'leser')
         self.client = Client()
 
     def test_min_profil_lenke_i_dropdown_for_alle(self):

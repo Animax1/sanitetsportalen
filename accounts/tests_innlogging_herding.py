@@ -38,9 +38,9 @@ class NextParameterTests(TestCase):
         self.url = reverse('accounts:login')
         self.user = CustomUser.objects.create_user(
             username='nextbruker', password='TestPassord123!',
-            role='read_write', must_change_password=False,
+            role='bruker', must_change_password=False,
         )
-        gi_standardtilgang(self.user)
+        gi_standardtilgang(self.user, 'skriver')
 
     def _login_med_next(self, next_verdi):
         return self.client.post(
@@ -91,7 +91,7 @@ class NextGjennomSkjemaTests(TestCase):
         self.url = reverse('accounts:login')
         CustomUser.objects.create_user(
             username='skjemabruker', password='TestPassord123!',
-            role='read_write', must_change_password=False,
+            role='bruker', must_change_password=False,
         )
 
     def _hent_skjult(self, html, navn):
@@ -152,7 +152,7 @@ class MfaNextParameterTests(TestCase):
             username='mfanext', password='TestPassord123!',
             role='admin', must_change_password=False, mfa_required=True,
         )
-        gi_standardtilgang(self.user)
+        gi_standardtilgang(self.user, 'admin')
         self.device = TOTPDevice.objects.create(
             user=self.user, name='Test', confirmed=True,
         )
@@ -195,9 +195,9 @@ class NotificationRedirectTests(TestCase):
         self.client = Client()
         self.user = CustomUser.objects.create_user(
             username='varselbruker', password='x',
-            role='read_write', must_change_password=False,
+            role='bruker', must_change_password=False,
         )
-        gi_standardtilgang(self.user)
+        gi_standardtilgang(self.user, 'skriver')
         self.client.force_login(self.user)
 
     def _varsel(self, url):
@@ -247,7 +247,7 @@ class MfaRateLimitTests(TestCase):
             username=navn, password='TestPassord123!',
             role='admin', must_change_password=False, mfa_required=True,
         )
-        gi_standardtilgang(bruker)
+        gi_standardtilgang(bruker, 'admin')
         TOTPDevice.objects.create(user=bruker, name='Test', confirmed=True)
         return bruker
 
@@ -292,7 +292,7 @@ class MfaKontosperreTests(TestCase):
             username='mfalaas', password='TestPassord123!',
             role='admin', must_change_password=False, mfa_required=True,
         )
-        gi_standardtilgang(self.user)
+        gi_standardtilgang(self.user, 'admin')
         self.device = TOTPDevice.objects.create(
             user=self.user, name='Test', confirmed=True,
         )
@@ -349,9 +349,9 @@ class LogoutMetodeTests(TestCase):
         self.client = Client()
         self.user = CustomUser.objects.create_user(
             username='utlogg', password='x',
-            role='read_write', must_change_password=False,
+            role='bruker', must_change_password=False,
         )
-        gi_standardtilgang(self.user)
+        gi_standardtilgang(self.user, 'skriver')
         self.client.force_login(self.user)
 
     def test_get_gir_405(self):
@@ -379,7 +379,7 @@ class TrustCookieSecureTests(TestCase):
             username='trustbruker', password='TestPassord123!',
             role='admin', must_change_password=False, mfa_required=True,
         )
-        gi_standardtilgang(self.user)
+        gi_standardtilgang(self.user, 'admin')
         self.device = TOTPDevice.objects.create(
             user=self.user, name='Test', confirmed=True,
         )

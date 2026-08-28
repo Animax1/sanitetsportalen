@@ -30,11 +30,11 @@ class NotifyApiTests(TestCase):
         self.user = CustomUser.objects.create_user(
             username='kari', password='pw12345678', must_change_password=False,
         )
-        gi_standardtilgang(self.user)
+        gi_standardtilgang(self.user, 'leser')
         self.other = CustomUser.objects.create_user(
             username='ola', password='pw12345678', must_change_password=False,
         )
-        gi_standardtilgang(self.other)
+        gi_standardtilgang(self.other, 'leser')
 
     def test_notify_creates_notification(self):
         n = notify(
@@ -106,7 +106,7 @@ class UnreadCountEndpointTests(TestCase):
         self.user = CustomUser.objects.create_user(
             username='kari', password='pw12345678', must_change_password=False,
         )
-        gi_standardtilgang(self.user)
+        gi_standardtilgang(self.user, 'leser')
         self.url = reverse('core:notification_unread_count')
 
     def test_requires_login(self):
@@ -133,7 +133,7 @@ class UnreadCountEndpointTests(TestCase):
         other = CustomUser.objects.create_user(
             username='ola', password='pw12345678', must_change_password=False,
         )
-        gi_standardtilgang(other)
+        gi_standardtilgang(other, 'leser')
         notify(other, module_slug='patients', kind='k', message='for ola')
         self.client.force_login(self.user)
         res = self.client.get(self.url)
@@ -148,7 +148,7 @@ class NotificationListViewTests(TestCase):
         self.user = CustomUser.objects.create_user(
             username='kari', password='pw12345678', must_change_password=False,
         )
-        gi_standardtilgang(self.user)
+        gi_standardtilgang(self.user, 'leser')
         self.url = reverse('core:notification_list')
 
     def test_requires_login(self):
@@ -165,7 +165,7 @@ class NotificationListViewTests(TestCase):
         other = CustomUser.objects.create_user(
             username='ola', password='pw12345678', must_change_password=False,
         )
-        gi_standardtilgang(other)
+        gi_standardtilgang(other, 'leser')
         notify(self.user, module_slug='patients', kind='k', title='Mitt', message='m1')
         notify(other, module_slug='patients', kind='k', title='Hans', message='m2')
         self.client.force_login(self.user)
@@ -182,11 +182,11 @@ class MarkReadTests(TestCase):
         self.user = CustomUser.objects.create_user(
             username='kari', password='pw12345678', must_change_password=False,
         )
-        gi_standardtilgang(self.user)
+        gi_standardtilgang(self.user, 'leser')
         self.other = CustomUser.objects.create_user(
             username='ola', password='pw12345678', must_change_password=False,
         )
-        gi_standardtilgang(self.other)
+        gi_standardtilgang(self.other, 'leser')
 
     def test_mark_read_sets_is_read_and_redirects_to_url(self):
         n = notify(self.user, module_slug='patients', kind='k', message='m',
@@ -245,7 +245,7 @@ class ContextProcessorTests(TestCase):
         self.user = CustomUser.objects.create_user(
             username='kari', password='pw12345678', must_change_password=False,
         )
-        gi_standardtilgang(self.user)
+        gi_standardtilgang(self.user, 'leser')
 
     def test_authenticated_sees_count_in_context(self):
         notify(self.user, module_slug='patients', kind='k', message='m')
@@ -282,7 +282,7 @@ class VarselKreverModultilgangTests(TestCase):
     def setUp(self):
         self.bruker = CustomUser.objects.create_user(
             username='uten_tilgang', password='pw12345678',
-            role='read_write', must_change_password=False,
+            role='bruker', must_change_password=False,
         )
 
     def test_uten_modultilgang_opprettes_ingen_varsel(self):
@@ -292,7 +292,7 @@ class VarselKreverModultilgangTests(TestCase):
 
     def test_med_modultilgang_opprettes_varselet(self):
         """Vern mot at testen over passerer fordi varsler er slått av."""
-        gi_standardtilgang(self.bruker)
+        gi_standardtilgang(self.bruker, 'skriver')
         n = notify(self.bruker, module_slug='patients', kind='k', message='m')
         self.assertIsNotNone(n)
 
@@ -310,7 +310,7 @@ class VarselKreverModultilgangTests(TestCase):
         Begge ender i «ingen varsel», men den ene er en feil ingen ville
         oppdaget uten en logglinje.
         """
-        gi_standardtilgang(self.bruker)
+        gi_standardtilgang(self.bruker, 'skriver')
         with self.assertLogs('core.notifications', level='WARNING') as logg:
             self.assertIsNone(
                 notify(self.bruker, module_slug='patient', kind='k', message='m'))

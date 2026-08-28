@@ -9,7 +9,7 @@ from django.http import JsonResponse, HttpResponseNotModified
 from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_http_methods
 
-from core.auth_decorators import modul_kreves
+from core.auth_decorators import er_global_admin, modul_kreves
 
 from .models import Forstehjelper, Helsepersonell
 from .views_common import _json_body
@@ -66,7 +66,7 @@ def _navneliste_views(model, etikett, etikett_bestemt):
             return response
 
         # POST – kun admin
-        if request.user.role != 'admin':
+        if not er_global_admin(request.user):
             return JsonResponse({'error': 'Ingen tilgang'}, status=403)
 
         data = _json_body(request)
@@ -86,7 +86,7 @@ def _navneliste_views(model, etikett, etikett_bestemt):
     @require_http_methods(['PUT', 'DELETE'])
     def detalj_view(request, pk):
         """Oppdater (PUT) eller slett (DELETE). Kun admin."""
-        if request.user.role != 'admin':
+        if not er_global_admin(request.user):
             return JsonResponse({'error': 'Ingen tilgang'}, status=403)
 
         try:

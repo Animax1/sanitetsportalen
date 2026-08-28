@@ -40,14 +40,14 @@ class AdminUserCreateEmailTests(TestCase):
             username='create_admin', password='x', role='admin',
             must_change_password=False, is_staff=True,
         )
-        gi_standardtilgang(self.admin)
+        gi_standardtilgang(self.admin, 'admin')
         self.client.force_login(self.admin)
 
     def test_oppretting_uten_epost(self):
         resp = self.client.post(reverse('accounts:user_create'), {
             'username': 'utenepost',
             'email': '',
-            'role': 'read_only',
+            'role': 'bruker',
         })
         self.assertEqual(resp.status_code, 200)
         ny = CustomUser.objects.get(username='utenepost')
@@ -66,7 +66,7 @@ class AdminUserCreateEmailTests(TestCase):
         resp = self.client.post(reverse('accounts:user_create'), {
             'username': 'medepost',
             'email': '  post@eksempel.no  ',
-            'role': 'read_write',
+            'role': 'bruker',
         })
         self.assertEqual(resp.status_code, 302)
         ny = CustomUser.objects.get(username='medepost')
@@ -79,7 +79,7 @@ class AdminUserCreateEmailTests(TestCase):
         """unique_email_if_set skal tillate flere NULL samtidig."""
         for navn in ['tom1', 'tom2']:
             resp = self.client.post(reverse('accounts:user_create'), {
-                'username': navn, 'email': '', 'role': 'read_only',
+                'username': navn, 'email': '', 'role': 'bruker',
             })
             self.assertEqual(resp.status_code, 200)
         # tom1, tom2 og create_admin har alle NULL e-post
@@ -96,12 +96,12 @@ class MfaRequiredEditTests(TestCase):
             username='mfa_admin', password='x', role='admin',
             must_change_password=False, is_staff=True,
         )
-        gi_standardtilgang(self.admin)
+        gi_standardtilgang(self.admin, 'admin')
         self.target = CustomUser.objects.create_user(
-            username='mfa_target', password='x', role='read_only',
+            username='mfa_target', password='x', role='bruker',
             must_change_password=False, mfa_required=False,
         )
-        gi_standardtilgang(self.target)
+        gi_standardtilgang(self.target, 'leser')
         self.client.force_login(self.admin)
 
     def test_form_inneholder_mfa_required(self):
@@ -111,7 +111,7 @@ class MfaRequiredEditTests(TestCase):
     def test_kan_sla_paa_mfa(self):
         url = reverse('accounts:user_detail', kwargs={'pk': self.target.pk})
         resp = self.client.post(url, {
-            'action': 'edit', 'role': 'read_only',
+            'action': 'edit', 'role': 'bruker',
             'is_active': 'on', 'mfa_required': 'on',
         })
         self.assertEqual(resp.status_code, 302)
@@ -125,7 +125,7 @@ class MfaRequiredEditTests(TestCase):
 
         url = reverse('accounts:user_detail', kwargs={'pk': self.target.pk})
         resp = self.client.post(url, {
-            'action': 'edit', 'role': 'read_only', 'is_active': 'on',
+            'action': 'edit', 'role': 'bruker', 'is_active': 'on',
         })
         self.assertEqual(resp.status_code, 302)
         self.target.refresh_from_db()
@@ -147,12 +147,12 @@ class FreezeThawPortalTests(TestCase):
             username='fz_admin', password='x', role='admin',
             must_change_password=False, is_staff=True,
         )
-        gi_standardtilgang(self.admin)
+        gi_standardtilgang(self.admin, 'admin')
         self.target = CustomUser.objects.create_user(
-            username='fz_target', password='x', role='read_write',
+            username='fz_target', password='x', role='bruker',
             must_change_password=False,
         )
-        gi_standardtilgang(self.target)
+        gi_standardtilgang(self.target, 'skriver')
         self.client.force_login(self.admin)
 
     def _post(self, action, pk=None):
@@ -207,18 +207,18 @@ class UserDeleteTests(TestCase):
             username='del_admin', password='x', role='admin',
             must_change_password=False, is_staff=True,
         )
-        gi_standardtilgang(self.admin)
+        gi_standardtilgang(self.admin, 'admin')
         # En admin til, slik at «siste admin»-sperren ikke slår inn utilsiktet
         self.admin2 = CustomUser.objects.create_user(
             username='del_admin2', password='x', role='admin',
             must_change_password=False,
         )
-        gi_standardtilgang(self.admin2)
+        gi_standardtilgang(self.admin2, 'admin')
         self.target = CustomUser.objects.create_user(
-            username='del_target', password='x', role='read_write',
+            username='del_target', password='x', role='bruker',
             must_change_password=False,
         )
-        gi_standardtilgang(self.target)
+        gi_standardtilgang(self.target, 'skriver')
         self.client.force_login(self.admin)
 
     def _slett(self, pk, bekreftelse):
@@ -286,10 +286,10 @@ class UserDeleteTests(TestCase):
 
     def test_ikke_admin_far_ikke_slette(self):
         vanlig = CustomUser.objects.create_user(
-            username='vanlig', password='x', role='read_write',
+            username='vanlig', password='x', role='bruker',
             must_change_password=False,
         )
-        gi_standardtilgang(vanlig)
+        gi_standardtilgang(vanlig, 'skriver')
         self.client.force_login(vanlig)
         self._slett(self.target.pk, 'del_target')
         self.assertTrue(CustomUser.objects.filter(pk=self.target.pk).exists())

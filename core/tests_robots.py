@@ -57,7 +57,7 @@ class XRobotsTagTests(TestCase):
             username='admin', password='pwd', role='admin',
             must_change_password=False,
         )
-        gi_standardtilgang(self.user)
+        gi_standardtilgang(self.user, 'admin')
 
     def test_header_paa_offentlig_side(self):
         resp = self.client.get('/accounts/login/')

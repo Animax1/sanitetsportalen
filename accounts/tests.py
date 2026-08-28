@@ -31,9 +31,9 @@ class SessionInvalidationOnPasswordChangeTests(TestCase):
         self.user = CustomUser.objects.create_user(
             username='testbruker',
             password='GammeltPassord123!',
-            role='read_write',
+            role='bruker',
         )
-        gi_standardtilgang(self.user)
+        gi_standardtilgang(self.user, 'skriver')
 
     def test_other_sessions_invalidated_on_password_change(self):
         """Andre aktive sesjoner for brukeren skal slettes ved passordbytte."""
@@ -92,9 +92,9 @@ class SingleSessionTests(TestCase):
         self.user = CustomUser.objects.create_user(
             username='testbruker',
             password='Passord123!',
-            role='read_write',
+            role='bruker',
         )
-        gi_standardtilgang(self.user)
+        gi_standardtilgang(self.user, 'skriver')
 
     def test_new_login_invalidates_previous_session(self):
         """Når bruker logger inn på enhet 2, skal sesjon fra enhet 1 slettes."""
@@ -139,10 +139,10 @@ class RateLimitTests(TestCase):
     def setUp(self):
         self.client = Client()
         self.user = CustomUser.objects.create_user(
-            username='bruker1', password='riktigpass123', role='read_write',
+            username='bruker1', password='riktigpass123', role='bruker',
             must_change_password=False,
         )
-        gi_standardtilgang(self.user)
+        gi_standardtilgang(self.user, 'skriver')
 
     def _clear_cache(self):
         """Nullstill rate-limit-cache mellom testene."""
@@ -177,10 +177,10 @@ class RateLimitTests(TestCase):
         self._clear_cache()
         for i in range(12):
             u = CustomUser.objects.create_user(
-                username=f'user{i}', password='rett123', role='read_write',
+                username=f'user{i}', password='rett123', role='bruker',
                 must_change_password=False,
             )
-            gi_standardtilgang(u)
+            gi_standardtilgang(u, 'skriver')
             r = self.client.post('/accounts/login/', {
                 'username': f'user{i}', 'password': 'rett123',
             })
@@ -194,7 +194,7 @@ class RateLimitTests(TestCase):
         # Skap 60 unike brukernavn (under per-bruker-grensen på 10 hver)
         for i in range(60):
             CustomUser.objects.create_user(
-                username=f'spray{i}', password='x', role='read_write',
+                username=f'spray{i}', password='x', role='bruker',
                 must_change_password=False,
             )
         # 50 første skal gå igjennom
@@ -219,7 +219,7 @@ class RateLimitDisabledTests(TestCase):
         from django.core.cache import cache
         cache.clear()
         CustomUser.objects.create_user(
-            username='nolimit', password='x', role='read_write',
+            username='nolimit', password='x', role='bruker',
             must_change_password=False,
         )
         client = Client()
@@ -245,17 +245,17 @@ class FreezeThawAdminActionTests(TestCase):
             username='superadmin', password='Test1234!', role='admin',
             is_staff=True, is_superuser=True, must_change_password=False,
         )
-        gi_standardtilgang(self.superuser)
+        gi_standardtilgang(self.superuser, 'admin')
         self.user1 = CustomUser.objects.create_user(
-            username='alice', password='Test1234!', role='vakt',
+            username='alice', password='Test1234!', role='bruker',
             must_change_password=False,
         )
-        gi_standardtilgang(self.user1)
+        gi_standardtilgang(self.user1, 'leser')
         self.user2 = CustomUser.objects.create_user(
-            username='bob', password='Test1234!', role='vakt',
+            username='bob', password='Test1234!', role='bruker',
             must_change_password=False,
         )
-        gi_standardtilgang(self.user2)
+        gi_standardtilgang(self.user2, 'leser')
 
     def _request(self):
         """Lager mock-request med superadmin innlogget."""
@@ -358,8 +358,19 @@ class FreezeThawAdminActionTests(TestCase):
 
 
 @override_settings(SECURE_SSL_REDIRECT=False)
-class BulkPermissionActionsTests(TestCase):
-    """Tester bulk-aksjoner for pasient-permissions på user_list_view."""
+class BulkAksjoneneErFjernetTests(TestCase):
+    """De to bulk-knappene på brukerlista er borte (deploy 2).
+
+    De skrev `kan_redigere_pasienter` på en gruppe kontoer om gangen. Flagget
+    ble sluttet å leses da håndhevelsen gikk over til `ModulTilgang`, så
+    knappene meldte «Fjernet pasientregistrering fra 7 bruker(e)» uten at noen
+    mistet noe. Den meldingen er farligere enn ingen knapp: neste gang tilgang
+    faktisk skal trekkes tilbake, tror admin at jobben er gjort.
+
+    Testen står igjen etter at aksjonene ble slettet fordi et POST-endepunkt
+    er lett å legge tilbake ved et uhell — og fordi den skiller «knappen er
+    borte fra malen» fra «aksjonen gjør ingenting», som er to ulike feil.
+    """
 
     def setUp(self):
         self.client = Client()
@@ -367,86 +378,30 @@ class BulkPermissionActionsTests(TestCase):
             username='bulk_admin', password='x', role='admin',
             must_change_password=False, is_staff=True,
         )
-        gi_standardtilgang(self.admin)
-        self.lead = CustomUser.objects.create_user(
-            username='bulk_lead', password='x', role='lead',
+        gi_standardtilgang(self.admin, 'admin')
+        self.bruker = CustomUser.objects.create_user(
+            username='bulk_bruker', password='x', role='bruker',
             must_change_password=False,
-            kan_redigere_pasienter=False,
         )
-        gi_standardtilgang(self.lead)
-        self.lead_view = CustomUser.objects.create_user(
-            username='bulk_lead_view', password='x', role='lead_view',
-            must_change_password=False,
-            kan_redigere_pasienter=False,
-        )
-        gi_standardtilgang(self.lead_view)
-        self.read_only = CustomUser.objects.create_user(
-            username='bulk_ro', password='x', role='read_only',
-            must_change_password=False,
-            kan_redigere_pasienter=True,
-        )
-        gi_standardtilgang(self.read_only)
+        gi_standardtilgang(self.bruker, 'leser')
         self.client.force_login(self.admin)
 
-    def test_grant_pasienter_to_leads_setter_flag_paa_alle_leder(self):
-        resp = self.client.post(
-            reverse('accounts:user_list'),
-            {'action': 'grant_pasienter_to_leads'},
-        )
-        self.assertEqual(resp.status_code, 302)
-        self.lead.refresh_from_db()
-        self.lead_view.refresh_from_db()
-        self.read_only.refresh_from_db()
-        self.assertTrue(self.lead.kan_redigere_pasienter)
-        self.assertTrue(self.lead_view.kan_redigere_pasienter)
-        # Read-only-brukere skal IKKE påvirkes av grant-aksjonen
-        self.assertTrue(self.read_only.kan_redigere_pasienter)
-
-    def test_revoke_pasienter_from_all_skipper_admin(self):
-        # Sett admin-flagget for å bekrefte at den ikke endres
-        self.admin.kan_redigere_pasienter = True
-        self.admin.save(update_fields=['kan_redigere_pasienter'])
-
-        resp = self.client.post(
-            reverse('accounts:user_list'),
-            {'action': 'revoke_pasienter_from_all'},
-        )
-        self.assertEqual(resp.status_code, 302)
-        self.admin.refresh_from_db()
-        self.read_only.refresh_from_db()
-        self.assertTrue(self.admin.kan_redigere_pasienter,
-                        'Admin skal ikke få fjernet flagget')
-        self.assertFalse(self.read_only.kan_redigere_pasienter,
-                         'Read-only skal få fjernet flagget')
-
-    def test_grant_er_idempotent(self):
-        """Kjøres aksjonen to ganger skal resultatet være det samme."""
-        for _ in range(2):
-            self.client.post(
-                reverse('accounts:user_list'),
-                {'action': 'grant_pasienter_to_leads'},
-            )
-        self.lead.refresh_from_db()
-        self.assertTrue(self.lead.kan_redigere_pasienter)
-
-    def test_bulk_aksjon_kun_admin(self):
-        """Read-only skal ikke kunne kjøre bulk-aksjon."""
-        self.client.force_login(self.read_only)
-        resp = self.client.post(
-            reverse('accounts:user_list'),
-            {'action': 'grant_pasienter_to_leads'},
-        )
-        # Ikke 302 til user_list — admin_required skal blokkere
-        # (typisk 302 til /-redirect eller 403)
-        self.assertIn(resp.status_code, (302, 403))
-        self.lead.refresh_from_db()
-        self.assertFalse(self.lead.kan_redigere_pasienter)
-
-    def test_bulk_knapper_synlige_paa_user_list(self):
+    def test_knappene_er_borte_fra_brukerlista(self):
         resp = self.client.get(reverse('accounts:user_list'))
         self.assertEqual(resp.status_code, 200)
-        self.assertContains(resp, 'grant_pasienter_to_leads')
-        self.assertContains(resp, 'revoke_pasienter_from_all')
+        self.assertNotContains(resp, 'grant_pasienter_to_leads')
+        self.assertNotContains(resp, 'revoke_pasienter_from_all')
+
+    def test_aksjonene_endrer_ingenting_om_de_postes(self):
+        """En gammel bokmerket POST skal ikke rive ned matrisen."""
+        foer = set(ModulTilgang.objects.values_list('bruker_id', 'modul_slug', 'nivaa'))
+        for action in ('grant_pasienter_to_leads', 'revoke_pasienter_from_all'):
+            with self.subTest(action=action):
+                self.client.post(reverse('accounts:user_list'), {'action': action})
+        self.assertEqual(
+            set(ModulTilgang.objects.values_list('bruker_id', 'modul_slug', 'nivaa')),
+            foer,
+        )
 
 
 @override_settings(SECURE_SSL_REDIRECT=False)
@@ -465,7 +420,7 @@ class ModulTilgangMatriseTests(TestCase):
             must_change_password=False, is_staff=True,
         )
         self.target = CustomUser.objects.create_user(
-            username='edit_target', password='x', role='read_only',
+            username='edit_target', password='x', role='bruker',
             must_change_password=False,
         )
         self.client.force_login(self.admin)
@@ -503,7 +458,7 @@ class ModulTilgangMatriseTests(TestCase):
 
     def test_redigering_skriver_radene(self):
         resp = self.client.post(self._detalj(), {
-            'action': 'edit', 'role': 'read_only', 'is_active': 'on',
+            'action': 'edit', 'role': 'bruker', 'is_active': 'on',
             'modul_patients': 'skriv_full', 'modul_statistikk': 'les',
         })
         self.assertEqual(resp.status_code, 302)
@@ -516,7 +471,7 @@ class ModulTilgangMatriseTests(TestCase):
         ModulTilgang.objects.create(
             bruker=self.target, modul_slug='patients', nivaa='les')
         self.client.post(self._detalj(), {
-            'action': 'edit', 'role': 'read_only', 'is_active': 'on',
+            'action': 'edit', 'role': 'bruker', 'is_active': 'on',
             'modul_patients': '', 'modul_statistikk': '',
         })
         self.assertFalse(ModulTilgang.objects.filter(bruker=self.target).exists())
@@ -524,7 +479,7 @@ class ModulTilgangMatriseTests(TestCase):
     def test_endring_auditeres_per_modul(self):
         from audit.models import AuditLog
         self.client.post(self._detalj(), {
-            'action': 'edit', 'role': 'read_only', 'is_active': 'on',
+            'action': 'edit', 'role': 'bruker', 'is_active': 'on',
             'modul_patients': 'skriv_full',
         })
         rader = AuditLog.objects.filter(table_name='accounts_modultilgang')
@@ -544,7 +499,7 @@ class ModulTilgangMatriseTests(TestCase):
         rad = AuditLog.objects.filter(
             table_name='accounts_customuser', field_name='role').first()
         self.assertIsNotNone(rad, 'rolleendring skal loggfoeres')
-        self.assertEqual(rad.old_value, 'read_only')
+        self.assertEqual(rad.old_value, 'bruker')
         self.assertEqual(rad.new_value, 'admin')
 
     def test_uendret_matrise_gir_ingen_auditrader(self):
@@ -552,7 +507,7 @@ class ModulTilgangMatriseTests(TestCase):
         ModulTilgang.objects.create(
             bruker=self.target, modul_slug='patients', nivaa='les')
         self.client.post(self._detalj(), {
-            'action': 'edit', 'role': 'read_only', 'is_active': 'on',
+            'action': 'edit', 'role': 'bruker', 'is_active': 'on',
             'modul_patients': 'les', 'modul_statistikk': '',
         })
         self.assertEqual(
@@ -570,7 +525,7 @@ class ModulTilgangMatriseTests(TestCase):
 
     def test_ny_bruker_far_tilgangen_med_en_gang(self):
         self.client.post(reverse('accounts:user_create'), {
-            'username': 'ny_med_tilgang', 'role': 'read_write',
+            'username': 'ny_med_tilgang', 'role': 'bruker',
             'metode': 'midlertidig', 'modul_patients': 'skriv_full',
         })
         ny = CustomUser.objects.get(username='ny_med_tilgang')
@@ -592,7 +547,7 @@ class ModulTilgangMatriseTests(TestCase):
         ModulTilgang.objects.create(
             bruker=self.target, modul_slug='patients', nivaa='skriv_full')
         self.client.post(self._detalj(), {
-            'action': 'edit', 'role': 'read_only', 'is_active': 'on',
+            'action': 'edit', 'role': 'bruker', 'is_active': 'on',
         })
         self.assertEqual(
             ModulTilgang.objects.get(bruker=self.target, modul_slug='patients').nivaa,

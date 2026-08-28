@@ -102,7 +102,7 @@ class HulletFraParagraf21Tests(TestCase):
     """Akseptansekriteriet: hullet §2.1 dokumenterte er lukket.
 
     Notatet målte dette ved å kjøre koden, ikke ved å lese den. En
-    `read_write`-bruker uten modultilgang fikk:
+    En bruker med skriverolle, men uten modultilgang, fikk:
 
         GET  /pasienter/                 -> 200
         GET  /pasienter/api/patients/    -> 200
@@ -116,7 +116,7 @@ class HulletFraParagraf21Tests(TestCase):
         from accounts.models import CustomUser
         # Bevisst UTEN gi_standardtilgang: fraværet av rader er hele poenget.
         self.uten = CustomUser.objects.create_user(
-            username='hull', password='x', role='read_write',
+            username='hull', password='x', role='bruker',
             must_change_password=False,
         )
         self.client = Client()
@@ -149,7 +149,7 @@ class HulletFraParagraf21Tests(TestCase):
     def test_med_tilgang_slipper_inn_igjen(self):
         """Vern mot at testen over passerer fordi alt er stengt for alle."""
         from accounts.test_helpers import gi_standardtilgang
-        gi_standardtilgang(self.uten)
+        gi_standardtilgang(self.uten, 'skriver')
         self.assertEqual(self.client.get('/pasienter/').status_code, 200)
         self.assertEqual(
             self.client.get('/pasienter/api/patients/').status_code, 200)
