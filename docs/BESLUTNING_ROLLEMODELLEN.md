@@ -4,7 +4,8 @@ Status: **besluttet 24. aug. 2026. §5 levert 28. aug.; resten ikke bygget.** É
 forutsetning må kontrolleres i prod før migrasjonen skrives — den står i «Åpne
 avklaringer» nederst.
 
-Endret 28. aug. 2026: **stigen har fått et femte trinn, `leder`** (§3.1). Alt annet står.
+Endret 28. aug. 2026: stigen sto kort med et femte trinn, `leder`. **Det er reversert** —
+begrunnelsen holdt ikke, se §3.1. Stigen er som opprinnelig besluttet.
 
 Erstatter TODO-punktet «Rollemodellen — trenger beslutning». Beslutningen måtte tas før
 modul nummer to skrives, ikke etterpå.
@@ -102,7 +103,7 @@ Utgangspunktet var to akser (`les: basis|utvidet` × `skriv: ja|nei`), fordi dag
 roller er nettopp det. Statistikkmodulen (§5) kollapser `les`-aksen, og igjen står:
 
 ```
-ingen  →  les  →  skriv: handling  →  skriv: full  →  leder
+ingen  →  les  →  skriv: handling  →  skriv: full
 ```
 
 | Nivå | Betyr |
@@ -111,21 +112,33 @@ ingen  →  les  →  skriv: handling  →  skriv: full  →  leder
 | `les` | Kan se modulens data |
 | `skriv: handling` | Kan utløse modulens navngitte overganger (stemplinger). **Leser ikke request-kroppen** |
 | `skriv: full` | Kan redigere felter |
-| `leder` | Utvidet tilgang på modulen. **Står tomt inntil videre** |
 
-**`leder` ble lagt til 28. aug. 2026**, etter at nivået var utelatt i første utgave.
-Begrunnelsen for utelatelsen var §3.3: det destruktive skal ikke desentraliseres. Den
-grunnen står fortsatt — `leder` tar *ikke* over noe fra global admin i denne omgangen, og
-gir i praksis ingenting utover `skriv: full` på `patients` i dag.
+### `leder` — lagt til 28. aug., reversert samme dag
 
-Nivået defineres nå likevel, av én grunn: `ModulTilgang.nivaa` skal ikke trenge en ny
-migrasjon den dagen en modul faktisk får noe å legge der. Det koster en verdi i et
-choices-felt nå, mot en migrasjon på en tabell med produksjonsdata senere.
+Et femte trinn `leder` («utvidet tilgang på modulen du er på») ble kort besluttet, og så
+tatt ut igjen. Begge deler er verdt å notere, for argumentet kommer tilbake.
 
-**Følgen er at nivået er lett å dele ut i god tro.** En admin som ser «leder» i matrisen
-og gir det til en vaktleder, gir i dag ingenting — men gir automatisk mer den dagen nivået
-fylles, uten at noen tar den beslutningen på nytt. Matrisen må derfor merke nivået som
-tomt, og backfillen skal **ikke** dele det ut (§8.1).
+Begrunnelsen for å definere det med én gang var at `ModulTilgang.nivaa` ellers ville
+trengt en ny migrasjon den dagen nivået fikk innhold. **Den begrunnelsen er feil.**
+`choices` ligger i Djangos `Field.non_db_attrs`; å legge til en verdi senere gir en
+tilstandsmigrasjon uten SQL. Kontrollert:
+
+```
+-- Alter field role on customuser
+-- (no-op)
+```
+
+Samme kategori som `help_text` i `accounts/0009`. Kostnaden argumentet hvilte på finnes
+ikke.
+
+Uten den står bare ulempene igjen. `skriv: handling` er også tomt i dag, men har en
+navngitt bruker, et konkret endepunkt og en testbar invariant (§3.2) — vi vet hva det er
+når det fylles. `leder` har ingen definert bruk, og det den mest nærliggende ville
+inneholdt, argumenterer §3.3 mot å desentralisere. Et tomt nivå i matrisen er dessuten
+lett å gi bort i god tro: det gir ingenting i dag, og gir automatisk mer den dagen noen
+fyller det, uten at beslutningen tas på nytt.
+
+**Innføres når noe faktisk skal ligge der, ikke før.**
 
 ### 3.2 Hvorfor `handling` er et eget nivå
 
@@ -313,11 +326,10 @@ Alle beholder nøyaktig den tilgangen de har i dag; ingen mister noe under deplo
 | `lead` | `skriv: full` + `statistikk: les` |
 | `admin` | global admin — ingen rad nødvendig |
 
-**Ingen får `leder`, heller ikke `lead`.** Nivået står tomt (§3.1), så det ville ikke gitt
-noen ekstra rettighet i dag — men det ville gitt den automatisk den dagen nivået fylles,
-uten at noen tok beslutningen. `lead` sin faktiske forskjell fra `read_write` er
-statistikk, og den bevares som en `statistikk`-rad. Kartleggingen er dermed tapsfri etter
-*rettigheter*; merkelappen «leder» bevares bevisst ikke.
+**Merk at `lead` ikke får noen egen merkelapp.** Rollens faktiske forskjell fra
+`read_write` er statistikk, og den bevares som en `statistikk`-rad. Kartleggingen er
+dermed tapsfri etter *rettigheter*; «leder» som betegnelse bevares bevisst ikke — se
+§3.1 om hvorfor nivået ikke finnes.
 
 **Grunnen til å ignorere flagget:** en migrasjon som stille trekker tilbake tilgang
 oppdager du midt i en vakt. Innstrammingen gjøres etterpå, for hånd, i matrisen — synlig

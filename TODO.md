@@ -309,12 +309,11 @@ personlige kontoer, admin-reset beholdt for alle. Ingenting bygget ennå.
         `lead_view` gir bare statistikk, og `dataset_scope_all` er død kode.
 
 
-**Endring 28. aug. 2026: `leder` legges til øverst i stigen.**
-`ingen → les → skriv:handling → skriv:full → leder`. `leder` er «utvidet tilgang på
-modulen du er på». Nivået **står tomt på `patients`** — ingenting flyttes ned fra global
-admin i denne omgangen, så §3.3 i notatet gjelder fortsatt for det destruktive
-(hard-delete utenfor vinduet, nullstill år, navneregistrene, arkiv og kollaps).
-Definer nivået i deploy 1 slik at `ModulTilgang` ikke trenger ny migrasjon når det fylles.
+**Stigen står som opprinnelig besluttet:** `ingen → les → skriv:handling → skriv:full`.
+Et femte trinn `leder` ble lagt til 28. aug. og reversert samme dag — begrunnelsen var at
+et nytt nivå senere ville koste en migrasjon, og det stemmer ikke (`choices` er en
+`non_db_attr`, migrasjonen er `-- (no-op)`). Se §3.1 i notatet. Innføres når noe faktisk
+skal ligge der.
 
 **Leveranse 1 er levert (28. aug. 2026):**
 

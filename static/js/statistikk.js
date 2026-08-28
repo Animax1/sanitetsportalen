@@ -241,17 +241,18 @@ function fmtChi2Inline(chi2) {
 // STATISTICS – MAIN LOADER  (calls /api/full-stats/)
 // ════════════════════════════════════════════════════════
 async function loadStats() {
-  const role = (window.USER_ROLE || 'read_only').toLowerCase();
-  if (role !== 'admin' && role !== 'lead' && role !== 'lead_view') {
-    return;
-  }
+  // Ingen rollesjekk her. Den lå i den gamle fila og leste `window.USER_ROLE`,
+  // som settes av pasientmalen — ikke av denne siden. Kopiert hit falt den til
+  // 'read_only' og returnerte før første hent: statistikken var permanent tom,
+  // uten en eneste feilmelding. Tilgangen håndheves av @stats_required på både
+  // siden og endepunktet; en kopi i nettleseren er uansett ikke en gate.
   if (arkivStatsMode) {
     renderStatTab(activeStatTab);
     _oppdaterArkivBanner();
     return;
   }
   try {
-    const res = await fetch('/pasienter/api/full-stats/');
+    const res = await apiFetch('/statistikk/api/full-stats/');
     if (!res.ok) {
       // 403 = ingen statistikktilgang. 429 = hentet for ofte (S3).
       // Begge skal la forrige visning bli stående: alternativet er å
@@ -572,11 +573,11 @@ function mkInterpretation(s) {
 document.querySelectorAll('.stats-subbtn').forEach(btn => {
   btn.addEventListener('click', () => {
     activeStatTab = btn.dataset.stab;
-    if (fullStats) {
-      renderStatTab(activeStatTab);
-    } else {
-      loadStats();
-    }
+    // Bytt panel FØRST, og hent etterpå om vi mangler tall. Rekkefølgen er
+    // ikke kosmetisk: loadStats() returnerer uten å rendre hvis hentingen
+    // feiler (403, 429), og da ble fanen brukeren trykket på aldri åpnet.
+    renderStatTab(activeStatTab);
+    if (!fullStats) loadStats();
   });
 });
 

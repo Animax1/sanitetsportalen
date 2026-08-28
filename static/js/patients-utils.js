@@ -68,23 +68,11 @@ function applyRoleVisibility() {
 // ════════════════════════════════════════════════════════
 // STATE & MODALS
 // ════════════════════════════════════════════════════════
+// Chart.js-temaet og statistikktilstanden lå her fram til statistikk ble egen
+// modul. De hører til statistikk.js nå — pasientsiden laster ikke Chart.js.
 let table = null;
-let charts = {};
 let currentEditId = null;
 let nyPasientNokkel = null;   // F3: settes av openNewModal()
-const chartDarkText = '#f8fafc';
-const chartMainText = '#e5e7eb';
-const chartMutedText = '#cbd5e1';
-const chartSoftText = '#94a3b8';
-const chartGrid = 'rgba(148, 163, 184, 0.18)';
-const chartGridStrong = 'rgba(148, 163, 184, 0.28)';
-const chartTooltipBg = '#0b1220';
-const chartCanvasBorder = '#111827';
-
-Chart.defaults.color = chartMutedText;
-Chart.defaults.borderColor = chartGrid;
-Chart.defaults.font.family = '"Segoe UI", system-ui, sans-serif';
-Chart.defaults.font.size = 11;
 
 let activeFilter = 'alle';
 let allPatients = [];
@@ -98,12 +86,6 @@ function isMine(p) {
       && p.helsepersonell_ref.id === window.MY_HELSEPERSONELL_ID) return true;
   return false;
 }
-
-let activeStatTab = 'oversikt';
-let fullStats = null;
-
-let arkivStatsMode = false;
-let arkivStatsMeta = null;
 
 let forstehjelpere = [];
 let helsepersonellListe = [];

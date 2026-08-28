@@ -4,6 +4,59 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-08-28 — To feil på staging, og testene som ikke fanget dem
+
+**913 tester grønne** (2 nye). Begge feilene ble meldt fra staging, og begge var samme
+klasse: **kode flyttet til en side som ikke gir den det den trenger.** Ingen av dem ga
+syntaksfeil, og ingen ble fanget av testsuiten — som er serverside, eller som
+sammenligner navn og ikke oppslag.
+
+**«Ny pasient» sluttet å virke.** `patients-utils.js` hadde fortsatt `Chart.defaults` på
+toppnivå. Blokken ble kopiert til `statistikk.js`, men aldri fjernet her — og pasientsiden
+laster ikke lenger Chart.js. `ReferenceError` drepte resten av fila, så `allPatients`,
+klokka og `bsNew`/`bsEdit` aldri ble opprettet. Alt under den linja var borte.
+`patients-admin.js` erklærte i tillegg `forstehjelpere` og `helsepersonellListe` på nytt;
+to `let` med samme navn i global scope er en `SyntaxError` som drepte hele den fila.
+
+**Statistikkfanene byttet ikke.** `loadStats()` begynte med en rollesjekk på
+`window.USER_ROLE` — en global bare pasientmalen setter. På `/statistikk/` falt den til
+`'read_only'` og returnerte før første hent. Statistikken var permanent tom, uten én
+feilmelding. Kommentaren jeg selv skrev i toppen av fila sa at sjekken var fjernet; den
+var ikke det. Endepunktet den kalte var dessuten den gamle stien.
+
+Begge er funnet ved å kjøre sidene i headless Chromium og lese konsollen, ikke ved å lese
+koden. Klikkbanen er verifisert samme vei.
+
+**Fanen bytter nå før hentingen, ikke etter.** `loadStats()` returnerer uten å rendre hvis
+hentingen feiler (403, 429) — så en bruker som trykket på «Tidsanalyse» ble stående på
+forrige fane uten forklaring, også når koden ellers virket.
+
+### To nye tester, begge verifisert ved å gjeninnføre feilen
+
+- **`window.X` må settes av malen** som laster fila. En global malen ikke setter er
+  `undefined`, ikke en feil — og det er nettopp derfor den er farlig: koden tar en stille
+  default og gjør noe annet enn den skal.
+- **`Chart`/`Tabulator`/`bootstrap` må lastes av siden** som laster fila.
+
+**Første utgave av den andre testen var falsk grønn, to ganger.** Den leste rå malmarkup,
+og `{% comment %}`-blokken som forklarer at Chart.js *ikke* lastes lenger inneholder
+strengen «Chart.js». Rettet til å lese `<script>`-tagger — hvorpå
+`src=["\']([^"\']+)["\']` stoppet på den første fnutten inne i
+`src="{% static 'js/x.js' %}"`, JS-lista ble tom, og **begge** testene passerte uten å
+sammenligne noe. Begge gangene ble det oppdaget ved å gjeninnføre feilen og se at testen
+ikke merket det. En test som ikke er sett rød er ikke en test.
+
+### `leder`-nivået reversert
+
+Lagt til tidligere samme dag, tatt ut igjen. Begrunnelsen var at et nytt nivå senere ville
+koste en migrasjon på en tabell med produksjonsdata. Det stemmer ikke: `choices` ligger i
+Djangos `Field.non_db_attrs`, og `sqlmigrate` sier `-- (no-op)`. Uten den kostnaden står
+bare ulempene igjen — nivået har ingen definert bruk, og et tomt nivå i matrisen er lett å
+gi bort i god tro. `skriv: handling` beholdes: det er også tomt i dag, men har en navngitt
+bruker og en testbar invariant. Se §3.1 i beslutningsnotatet.
+
+---
+
 ## 2026-08-28 — Statistikk er sin egen modul
 
 **Etterord samme dag:** denne leveransen ble planlagt uten at

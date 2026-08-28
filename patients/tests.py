@@ -1811,6 +1811,149 @@ class JsModulLastingTests(TestCase):
               'portal-utils.js.'
         ))
 
+    # ── Avhengigheter en side faktisk leverer ───────────────────────────
+    #
+    # Begge feilene som traff staging 28. aug. var samme klasse: kode flyttet
+    # til en side som ikke gir den det den trenger. Ingen av dem ga
+    # syntaksfeil, og ingen av dem ble fanget av testene over — som
+    # sammenligner bare navn, ikke `window.`-oppslag eller CDN-globaler.
+    #
+    #   1. `Chart.defaults` sto igjen på toppnivå i patients-utils.js etter at
+    #      pasientsiden sluttet å laste Chart.js. ReferenceError drepte resten
+    #      av fila, og «Ny pasient» sluttet å virke.
+    #   2. `loadStats()` leste `window.USER_ROLE`, som bare pasientmalen
+    #      setter. På /statistikk/ falt den til 'read_only' og returnerte før
+    #      første hent — statistikken var permanent tom, uten én feilmelding.
+
+    # Globaler nettleseren selv eier. Alt annet på `window.` må settes av malen.
+    NETTLESER_GLOBALER = frozenset({
+        'location', 'history', 'localStorage', 'sessionStorage', 'navigator',
+        'document', 'confirm', 'alert', 'prompt', 'open', 'print', 'crypto',
+        'innerWidth', 'innerHeight', 'matchMedia', 'scrollTo', 'setTimeout',
+        'setInterval', 'clearTimeout', 'clearInterval', 'addEventListener',
+        'removeEventListener', 'fetch', 'getComputedStyle', 'requestAnimationFrame',
+    })
+
+    BIBLIOTEK_GLOBALER = ('Chart', 'Tabulator', 'bootstrap')
+
+    # Sidene med egen JS-lastekjede. Verdien utledes fra malen, ikke herfra —
+    # lista sier bare hvilke maler som er sider.
+    SIDEMALER = ('patients/index.html', 'statistikk/index.html')
+
+    @staticmethod
+    def _uten_kommentarer(kilde):
+        """Strip `//`-linjer. En kommentar som nevner Chart er ikke en bruk."""
+        return '\n'.join(l for l in kilde.splitlines()
+                          if not l.lstrip().startswith('//'))
+
+    def _mal(self, navn):
+        from pathlib import Path
+        from django.conf import settings
+        rot = Path(settings.BASE_DIR)
+        for kandidat in [rot / 'templates' / navn] + [d / navn for d in rot.glob('*/templates')]:
+            if kandidat.exists():
+                return kandidat
+        self.fail(f'Fant ikke malen {navn}')
+
+    def _lastekjede(self, navn, sett=None):
+        """(JS-filer, CDN-biblioteker, malmarkup) malen har, arv inkludert."""
+        from django.conf import settings
+        from pathlib import Path
+        sett = sett if sett is not None else set()
+        sti = self._mal(navn)
+        if sti in sett:
+            return set(), set(), ''
+        sett.add(sti)
+
+        markup = sti.read_text(encoding='utf-8')
+
+        # Bare faktiske <script>-tagger, ikke rå markup: en {% comment %}
+        # som forklarer at Chart.js IKKE lastes lenger, inneholder strengen
+        # «Chart.js» — og en tekstsøk-variant av denne testen leste den som
+        # bevis på det motsatte.
+        #
+        # Hele taggen matches, ikke `src`-verdien. `src="{% static 'js/x.js' %}"`
+        # har enkeltfnutter inne i doble, og et `src=["\']([^"\']+)["\']`
+        # stopper på den første indre fnutten. Da blir lista tom og testen
+        # grønn uten å sammenligne noe — verre enn å mangle.
+        skript = re.findall(r'<script\b[^>]*>', markup, re.I)
+        js = {m.group(1) for tag in skript
+              for m in [re.search(r"\{%\s*static\s*['\"]js/([\w.-]+)['\"]", tag)] if m}
+        cdn = {lib for lib, monster in (
+            ('Chart', r'chart\.umd|chart\.js'),
+            ('Tabulator', r'tabulator'),
+            ('bootstrap', r'bootstrap[.@][\w.]*bundle|bootstrap\.bundle'),
+        ) if any(re.search(monster, tag, re.I) for tag in skript)}
+
+        forelder = re.search(r'\{%\s*extends\s*["\']([^"\']+)["\']', markup)
+        if forelder:
+            aj, ac, am = self._lastekjede(forelder.group(1), sett)
+            js |= aj
+            cdn |= ac
+            markup += '\n' + am
+        return js, cdn, markup
+
+    def test_js_leser_bare_window_globaler_malen_setter(self):
+        """En `window.X` som malen ikke setter er `undefined`, ikke en feil.
+
+        Det er nettopp derfor den er farlig: koden tar en stille default og
+        gjør noe annet enn den skal, uten at noe kaster.
+        """
+        from pathlib import Path
+        from django.conf import settings
+        js_dir = Path(settings.BASE_DIR) / 'static' / 'js'
+        funn = []
+
+        for malnavn in self.SIDEMALER:
+            js_filer, _, markup = self._lastekjede(malnavn)
+            satt = set(re.findall(r'window\.(\w+)\s*=', markup))
+            for navn in sorted(js_filer):
+                fil = js_dir / navn
+                if not fil.exists():
+                    continue
+                lest = set(re.findall(r'window\.(\w+)',
+                                      self._uten_kommentarer(fil.read_text(encoding='utf-8'))))
+                for g in sorted(lest - satt - self.NETTLESER_GLOBALER):
+                    funn.append(f'{malnavn} laster {navn}, som leser window.{g} — '
+                                f'men malen setter den ikke')
+
+        self.assertEqual(funn, [], (
+            'JS leser globaler malen ikke setter:\n  ' + '\n  '.join(funn)
+            + '\n\nSett globalen i malen, eller flytt koden til en side som har den.'
+        ))
+
+    def test_js_bruker_bare_biblioteker_siden_faktisk_laster(self):
+        """Bruk av `Chart`/`Tabulator`/`bootstrap` krever at siden laster dem.
+
+        Toppnivåbruk kaster ved lasting og tar med seg resten av fila — alt
+        som er erklært under, finnes ikke etterpå. Testen skiller ikke på
+        toppnivå og inne i en funksjon: en funksjon som trenger Chart er
+        uansett ubrukelig på en side uten Chart.
+        """
+        from pathlib import Path
+        from django.conf import settings
+        js_dir = Path(settings.BASE_DIR) / 'static' / 'js'
+        funn = []
+
+        for malnavn in self.SIDEMALER:
+            js_filer, cdn, _ = self._lastekjede(malnavn)
+            for navn in sorted(js_filer):
+                fil = js_dir / navn
+                if not fil.exists():
+                    continue
+                kode = self._uten_kommentarer(fil.read_text(encoding='utf-8'))
+                for lib in self.BIBLIOTEK_GLOBALER:
+                    if lib in cdn:
+                        continue
+                    if re.search(r'(?<![.\w$])' + lib + r'\s*[.(]', kode):
+                        funn.append(f'{malnavn} laster {navn}, som bruker {lib} — '
+                                    f'men siden laster ikke {lib}')
+
+        self.assertEqual(funn, [], (
+            'JS bruker biblioteker siden ikke laster:\n  ' + '\n  '.join(funn)
+            + '\n\nLast biblioteket i malen, eller flytt koden dit det finnes.'
+        ))
+
     def test_write_only_handler_er_alltid_tilgjengelig(self):
         """`read_write` har skrivetilgang, men ikke admin-tilgang.
 

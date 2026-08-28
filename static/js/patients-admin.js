@@ -15,8 +15,9 @@
 // håndhever dette.
 // ════════════════════════════════════════════════════════
 
-let forstehjelpere = [];
-let helsepersonellListe = [];
+// `forstehjelpere` og `helsepersonellListe` er DELT tilstand og bor i
+// patients-utils.js. De ble ved et uhell erklært her også ved delingen, og to
+// `let` med samme navn i global scope er en SyntaxError som drepte hele fila.
 
 
 // ════════════════════════════════════════════════════════
@@ -309,9 +310,6 @@ async function visArkivDetalj(id) {
     </div>
   `;
 
-  window._sisteArkivArrangement = d.arrangement_navn || '';
-  window._sisteArkivImportertAt = d.importert_at || '';
-  window._sisteArkivAntall = d.antall_pasienter ?? 0;
 
   const fullBtn = document.getElementById('arkiv-detalj-fullstats-btn');
   if (fullBtn) fullBtn.classList.remove('d-none');
