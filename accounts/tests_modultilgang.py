@@ -399,3 +399,47 @@ class ForhandsvisningTests(TestCase):
         """Vern mot at advarselen alltid vises."""
         _bruker('fv_leser', 'read_only', kan_redigere_pasienter=False)
         self.assertNotIn('får SKRIVETILGANG', self._kjor())
+
+
+class UkjentRolleTests(TestCase):
+    """En ukjent rolle skal ikke låse noen ute i stillhet.
+
+    Fail-closed er riktig — vi gjetter ikke på hva rollen skulle betydd — men
+    utfallet er en konto uten en eneste modul, og det eneste sporet ville vært
+    en bruker som ringer. Advarselen havner i deploy-loggen.
+    """
+
+    def _kjor_backfill(self):
+        from importlib import import_module
+        from django.apps import apps as django_apps
+        import_module('accounts.migrations.0012_fyll_modultilgang').fyll(
+            django_apps, None)
+
+    def test_ukjent_rolle_gir_ingen_rader_og_en_advarsel(self):
+        import io
+        import contextlib
+
+        bruker = _bruker('ur_rar')
+        CustomUser.objects.filter(pk=bruker.pk).update(role='vaktleder_2019')
+        ModulTilgang.objects.all().delete()
+
+        ut = io.StringIO()
+        with contextlib.redirect_stdout(ut):
+            self._kjor_backfill()
+
+        self.assertEqual(ModulTilgang.objects.filter(bruker=bruker).count(), 0)
+        self.assertIn('ADVARSEL', ut.getvalue())
+        self.assertIn('ur_rar', ut.getvalue())
+        self.assertIn('vaktleder_2019', ut.getvalue())
+
+    def test_kjent_rolle_gir_ingen_advarsel(self):
+        """Vern mot at advarselen alltid skrives."""
+        import io
+        import contextlib
+
+        _bruker('ur_vanlig', 'read_write')
+        ModulTilgang.objects.all().delete()
+        ut = io.StringIO()
+        with contextlib.redirect_stdout(ut):
+            self._kjor_backfill()
+        self.assertNotIn('ADVARSEL', ut.getvalue())

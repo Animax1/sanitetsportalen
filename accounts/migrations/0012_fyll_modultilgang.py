@@ -42,11 +42,30 @@ def fyll(apps, schema_editor):
     ModulTilgang = apps.get_model('accounts', 'ModulTilgang')
 
     rader = []
+    ukjente = []
     for bruker in CustomUser.objects.all().iterator():
-        for slug, nivaa in KARTLEGGING.get(bruker.role, []):
+        if bruker.role not in KARTLEGGING:
+            # Fail-closed er riktig — vi gjetter ikke på hva en ukjent rolle
+            # skulle betydd — men det skal ikke skje stille. Uten denne
+            # linja ville kontoen fått null rader og vært stengt ute av alle
+            # moduler, og det eneste sporet ville vært en bruker som ringer.
+            # Utskriften havner i deploy-loggen, som er stedet noen faktisk
+            # leser rett etter en migrasjon.
+            ukjente.append((bruker.username, bruker.role))
+            continue
+        for slug, nivaa in KARTLEGGING[bruker.role]:
             rader.append(ModulTilgang(
                 bruker_id=bruker.pk, modul_slug=slug, nivaa=nivaa,
             ))
+
+    if ukjente:
+        print()
+        print('!! ADVARSEL: kontoer med ukjent rolle fikk INGEN modultilgang.')
+        print('   De er stengt ute av alle moduler til nivaa settes i matrisen')
+        print('   paa /portal-admin/brukere/.')
+        for navn, rolle in ukjente:
+            print(f'     {navn} (role={rolle!r})')
+        print()
 
     # ignore_conflicts gjør migrasjonen trygg å kjøre om igjen — f.eks. etter
     # en rollback og ny fram. Uten den ville unique-constraint-en stoppet
