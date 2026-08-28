@@ -48,6 +48,12 @@ class Module:
             om brukeren ser modulen. ``None`` = synlig for alle innloggede.
             Hvis flagget ikke finnes på modellen behandles modulen som
             usynlig for alle (defensivt).
+        min_rolle: Minste rolle i ``ROLE_HIERARKI`` som ser modulen. ``None``
+            = ingen rollekrav. **Midlertidig.** Feltet finnes fordi
+            statistikkmodulen ble skilt ut før ``ModulTilgang`` var på plass,
+            og alternativet var et ``kan_se_statistikk``-flagg med migrasjon
+            som uansett skulle kastes. Fjernes sammen med ``permission_flag``.
+            Kombineres med AND: settes begge, må begge være oppfylt.
         admin_only: Hvis ``True`` vises modulen kun for brukere med
             ``role='admin'``. Permission-flagget ignoreres da.
         is_core: Kjernemodul som ikke kan deaktiveres via UI. Dashboard-toggle
@@ -65,6 +71,7 @@ class Module:
     url: Optional[str]
     icon: str
     permission_flag: Optional[str] = None
+    min_rolle: Optional[str] = None
     admin_only: bool = False
     is_core: bool = False
     order: int = 100
@@ -87,6 +94,13 @@ class Module:
 
         if self.admin_only:
             return False
+
+        # Rollekrav og permission-flagg kombineres med AND. Rekkefølgen er
+        # vilkårlig; begge må uansett være oppfylt.
+        if self.min_rolle is not None:
+            from core.auth_decorators import has_role_at_least  # noqa: WPS433
+            if not has_role_at_least(user, self.min_rolle):
+                return False
 
         if self.permission_flag is None:
             return True
@@ -114,11 +128,13 @@ def _build_registry() -> tuple[Module, ...]:
     from accounts.module import AccountsModule  # noqa: WPS433
     from core.module import CoreModule  # noqa: WPS433
     from patients.module import PatientsModule  # noqa: WPS433
+    from statistikk.module import StatistikkModule  # noqa: WPS433
 
     return (
         CoreModule,
         AccountsModule,
         PatientsModule,
+        StatistikkModule,
     )
 
 

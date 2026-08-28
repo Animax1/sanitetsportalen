@@ -1,0 +1,347 @@
+{% extends "core/base_portal.html" %}
+{% load static %}
+
+{% block title %}Statistikk – Sanitetsportalen{% endblock %}
+
+{% comment %}
+  Statistikksiden. Innholdet lå som en fane i templates/patients/index.html
+  fram til statistikk ble skilt ut som egen modul (august 2026).
+
+  Reglene som styler dette lå i style.css, som KUN lastes av
+  patients/index.html. De er flyttet til statistikk.css og lastes her — se
+  CLAUDE.md om de to stilarkene.
+{% endcomment %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="{% static 'css/statistikk.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-3 px-md-4 py-3">
+
+  <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
+    <h1 class="h4 mb-0">
+      <i class="bi bi-bar-chart-line me-2"></i>Statistikk
+    </h1>
+    <a href="/pasienter/" class="btn btn-sm btn-outline-secondary">
+      <i class="bi bi-clipboard-pulse me-1"></i>Til pasientregistrering
+    </a>
+  </div>
+
+
+  <!-- Arkiv-modus-banner (vises kun når statistikk er fra et arkiv) -->
+  <div id="arkiv-stats-banner" class="alert alert-info d-none d-flex justify-content-between align-items-center py-2 mb-2">
+    <div>
+      <i class="bi bi-archive me-2"></i>
+      <strong>Arkiv-modus:</strong>
+      <span id="arkiv-stats-banner-tittel"></span>
+      <span class="text-muted small ms-2" id="arkiv-stats-banner-meta"></span>
+    </div>
+    <button type="button" class="btn btn-sm btn-outline-secondary" data-action="exitArkivStatsMode">
+      <i class="bi bi-x-circle me-1"></i>Tilbake til live-statistikk
+    </button>
+  </div>
+
+  <!-- Sub-nav -->
+  <div class="stats-subnav">
+    <button class="stats-subbtn active" data-stab="oversikt">
+      <i class="bi bi-speedometer2 me-1"></i>Oversikt
+    </button>
+    <button class="stats-subbtn" data-stab="tidsanalyse">
+      <i class="bi bi-stopwatch me-1"></i>Tidsanalyse
+    </button>
+    <button class="stats-subbtn" data-stab="krysstabeller">
+      <i class="bi bi-table me-1"></i>Krysstabeller
+    </button>
+    <button class="stats-subbtn" data-stab="obspost">
+      <i class="bi bi-clipboard2-pulse me-1"></i>Obspost
+    </button>
+    <button class="stats-subbtn" data-stab="tester">
+      <i class="bi bi-calculator me-1"></i>Statistiske tester
+    </button>
+  </div>
+
+  <!-- ── Oversikt ────────────────────────────── -->
+  <div class="stab-panel active" id="stab-oversikt">
+    <!-- KPI row 1 -->
+    <div class="row g-2 mb-2">
+      <div class="col-6 col-sm-4 col-md-2">
+        <div class="kpi-card kpi-blue">
+          <div class="kpi-label">Totalt</div>
+          <div class="kpi-value" id="kpi-total">0</div>
+          <div class="kpi-sub">alle pasienter</div>
+        </div>
+      </div>
+      <div class="col-6 col-sm-4 col-md-2">
+        <div class="kpi-card">
+          <div class="kpi-label">Tilstede nå</div>
+          <div class="kpi-value" id="kpi-tilstede">0</div>
+          <div class="kpi-sub">ikke utskrevet</div>
+        </div>
+      </div>
+      <div class="col-6 col-sm-4 col-md-2">
+        <div class="kpi-card kpi-red">
+          <div class="kpi-label">Rød</div>
+          <div class="kpi-value" id="kpi-rod">0</div>
+          <div class="kpi-sub">kritisk</div>
+        </div>
+      </div>
+      <div class="col-6 col-sm-4 col-md-2">
+        <div class="kpi-card kpi-yellow">
+          <div class="kpi-label">Gul</div>
+          <div class="kpi-value" id="kpi-gul">0</div>
+          <div class="kpi-sub">haster</div>
+        </div>
+      </div>
+      <div class="col-6 col-sm-4 col-md-2">
+        <div class="kpi-card kpi-green">
+          <div class="kpi-label">Grønn</div>
+          <div class="kpi-value" id="kpi-gronn">0</div>
+          <div class="kpi-sub">ikke haster</div>
+        </div>
+      </div>
+      <div class="col-6 col-sm-4 col-md-2">
+        <div class="kpi-card kpi-gray">
+          <div class="kpi-label">Utskrevet</div>
+          <div class="kpi-value" id="kpi-utskrevet">0</div>
+          <div class="kpi-sub">ferdigbehandlet</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- KPI row 2: time -->
+    <div class="row g-2 mb-2">
+      <div class="col-md-3">
+        <div class="kpi-card d-flex gap-3 align-items-center">
+          <i class="bi bi-stopwatch text-primary" style="font-size:1.7rem;flex-shrink:0"></i>
+          <div>
+            <div class="kpi-label">Ventetid behandlingsstart</div>
+            <div style="font-size:1.15rem;font-weight:700;color:#1e293b" id="kpi-wait-both">–</div>
+            <div class="kpi-sub">snitt / median</div>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="kpi-card d-flex gap-3 align-items-center">
+          <i class="bi bi-hospital text-info" style="font-size:1.7rem;flex-shrink:0"></i>
+          <div>
+            <div class="kpi-label">Tid på obspost</div>
+            <div style="font-size:1.15rem;font-weight:700;color:#1e293b" id="kpi-obs-both">–</div>
+            <div class="kpi-sub">snitt / median</div>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="kpi-card d-flex gap-3 align-items-center">
+          <i class="bi bi-clock-history text-success" style="font-size:1.7rem;flex-shrink:0"></i>
+          <div>
+            <div class="kpi-label">Total behandlingstid</div>
+            <div style="font-size:1.15rem;font-weight:700;color:#1e293b" id="kpi-total-both">–</div>
+            <div class="kpi-sub">snitt / median</div>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="kpi-card kpi-teal">
+          <div class="kpi-label">Obspost-andel</div>
+          <div class="kpi-value" id="kpi-obs-pct">–</div>
+          <div class="kpi-sub" id="kpi-obs-sub">av alle pasienter</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Charts row 1 -->
+    <div class="row g-2 mb-2">
+      <div class="col-md-3">
+        <div class="chart-card">
+          <div class="chart-title">Triage-fordeling</div>
+          <canvas id="chart-triage" height="180"></canvas>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="chart-card">
+          <div class="chart-title">Transport</div>
+          <canvas id="chart-transport" height="180"></canvas>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="chart-card">
+          <div class="chart-title">Utfall (utskrevet til)</div>
+          <canvas id="chart-utfall" height="180"></canvas>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="chart-card">
+          <div class="chart-title">Topp problemstillinger</div>
+          <canvas id="chart-problems" height="180"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <!-- Arrivals -->
+    <div class="row g-2">
+      <div class="col-12">
+        <div class="chart-card">
+          <div class="chart-title">Ankomster per time</div>
+          <canvas id="chart-arrivals" height="90"></canvas>
+        </div>
+      </div>
+    </div>
+  </div><!-- /stab-oversikt -->
+
+  <!-- ── Tidsanalyse ──────────────────────────── -->
+  <div class="stab-panel" id="stab-tidsanalyse">
+    <div class="row g-3 mb-3">
+      <div class="col-md-5">
+        <div class="chart-card h-100">
+          <div class="chart-title">Tid per grovsortering</div>
+          <canvas id="chart-time-triage" height="130"></canvas>
+          <div class="mt-3" id="tbl-time-triage"></div>
+        </div>
+      </div>
+      <div class="col-md-7">
+        <div class="chart-card h-100">
+          <div class="chart-title">Tid per transportmåte</div>
+          <canvas id="chart-time-transport" height="130"></canvas>
+          <div class="mt-3" id="tbl-time-transport"></div>
+        </div>
+      </div>
+    </div>
+    <div class="row g-3">
+      <div class="col-12">
+        <div class="chart-card">
+          <div class="chart-title">Total tid per problemstilling (sortert etter gjennomsnitt)</div>
+          <canvas id="chart-time-problem" height="100"></canvas>
+          <div class="mt-3" id="tbl-time-problem"></div>
+        </div>
+      </div>
+    </div>
+  </div><!-- /stab-tidsanalyse -->
+
+  <!-- ── Krysstabeller ────────────────────────── -->
+  <div class="stab-panel" id="stab-krysstabeller">
+    <div class="row g-3 mb-3">
+      <div class="col-md-6">
+        <div class="chart-card">
+          <div class="chart-title">
+            <span>Problemstilling × Grovsortering</span>
+            <span id="chi2-badge-prob-triage" class="chi2-badge chi2-nd">Ingen data</span>
+          </div>
+          <div class="small text-muted mb-2" style="font-size:0.72rem">Antall (rad %)</div>
+          <div style="overflow-x:auto" id="xt-prob-triage"></div>
+        </div>
+      </div>
+      <div class="col-md-6">
+        <div class="chart-card">
+          <div class="chart-title">
+            <span>Grovsortering × Transport</span>
+            <span id="chi2-badge-triage-transport" class="chi2-badge chi2-nd">Ingen data</span>
+          </div>
+          <div class="small text-muted mb-2" style="font-size:0.72rem">Antall (rad %)</div>
+          <div style="overflow-x:auto" id="xt-triage-transport"></div>
+        </div>
+      </div>
+    </div>
+    <div class="row g-3">
+      <div class="col-12">
+        <div class="chart-card">
+          <div class="chart-title">
+            <span>Problemstilling × Utfall</span>
+            <span id="chi2-badge-prob-utfall" class="chi2-badge chi2-nd">Ingen data</span>
+          </div>
+          <div class="small text-muted mb-2" style="font-size:0.72rem">Antall (rad %)</div>
+          <div style="overflow-x:auto" id="xt-prob-utfall"></div>
+        </div>
+      </div>
+    </div>
+  </div><!-- /stab-krysstabeller -->
+
+  <!-- ── Obspost ──────────────────────────────── -->
+  <div class="stab-panel" id="stab-obspost">
+    <!-- KPI row -->
+    <div class="row g-2 mb-3">
+      <div class="col-6 col-md-3">
+        <div class="kpi-card kpi-blue">
+          <div class="kpi-label">Totalt på obspost</div>
+          <div class="kpi-value" id="obs-total-n">–</div>
+          <div class="kpi-sub" id="obs-total-pct-text">av alle pasienter</div>
+        </div>
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="kpi-card">
+          <div class="kpi-label">Snitt obspost-tid</div>
+          <div class="kpi-value" id="obs-avg-time">–</div>
+          <div class="kpi-sub">gjennomsnitt</div>
+        </div>
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="kpi-card">
+          <div class="kpi-label">Median obspost-tid</div>
+          <div class="kpi-value" id="obs-med-time">–</div>
+          <div class="kpi-sub">median</div>
+        </div>
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="kpi-card">
+          <div class="kpi-label">Obs-bruk × Triage</div>
+          <div style="margin-top:6px" id="obs-chi2-display"></div>
+          <div class="kpi-sub">chi-square test</div>
+        </div>
+      </div>
+    </div>
+    <!-- Tables -->
+    <div class="row g-3">
+      <div class="col-md-4">
+        <div class="chart-card">
+          <div class="chart-title">Obspost-bruk per grovsortering</div>
+          <div id="tbl-obs-triage" class="mt-2"></div>
+        </div>
+      </div>
+      <div class="col-md-8">
+        <div class="chart-card">
+          <div class="chart-title">Obspost-bruk per problemstilling</div>
+          <div id="tbl-obs-problem" class="mt-2"></div>
+        </div>
+      </div>
+    </div>
+  </div><!-- /stab-obspost -->
+
+  <!-- ── Statistiske tester ───────────────────── -->
+  <div class="stab-panel" id="stab-tester">
+    <div class="row g-3 mb-3">
+      <div class="col-12">
+        <div class="chart-card">
+          <div class="chart-title">Chi-square tester (uavhengighetstest)</div>
+          <div id="tbl-chi2" class="mt-2"></div>
+        </div>
+      </div>
+    </div>
+    <div class="row g-3">
+      <div class="col-md-6">
+        <div class="chart-card">
+          <div class="chart-title">Kruskal-Wallis tester (tid)</div>
+          <div id="tbl-kw" class="mt-2"></div>
+        </div>
+      </div>
+      <div class="col-md-6">
+        <div class="chart-card">
+          <div class="chart-title">Automatisk tolkning</div>
+          <div id="tbl-interpretation" class="mt-2"></div>
+        </div>
+      </div>
+    </div>
+  </div><!-- /stab-tester -->
+
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+{% comment %}
+  portal-utils.js, ikke patients-utils.js: sistnevnte gjør arbeid på toppnivå
+  (Chart.defaults, `new bootstrap.Modal(...#newModal)`) og kaster på en side
+  uten pasientskjemaene. Primitivene begge trenger ligger i portal-utils.js.
+{% endcomment %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+<script src="{% static 'js/portal-utils.js' %}"></script>
+<script src="{% static 'js/statistikk.js' %}"></script>
+{% endblock %}

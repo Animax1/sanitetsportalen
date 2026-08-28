@@ -4,6 +4,94 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-08-28 — Statistikk er sin egen modul
+
+**911 tester, alle grønne** (17 nye i `statistikk/tests.py`, 3 nye i
+`JsModulLastingTests`). Ingen migrasjon, ingen modellendring, ingen tilgangsendring.
+
+Første av tre leveranser mot rollemodellen. Rekkefølgen ble snudd underveis, og grunnen er
+verdt å skrive ned: **statistikk måtte ut av pasientmodulen før `ModulTilgang` kunne
+utformes.**
+
+Så lenge «ser statistikk» og «kan skrive» var to akser i samme modul, trengte et
+tilgangsnivå per modul fire trinn — det er nettopp derfor `lead_view` (2) står over
+`read_write` (1) i `ROLE_HIERARKI` uten å ha skrivetilgang, og derfor `write_required` er
+en eksplisitt liste og ikke et `has_role_at_least`-kall. Med statistikk som egen modul blir
+den aksen en rad til i tilgangstabellen, og stigen per modul blir `les < skriv < leder`:
+en ekte stige. Bygget vi rollemodellen først, ville vi migrert inn en firetrinns kolonne og
+måttet migrere den om igjen.
+
+Backfillen hadde fått samme problem. `lead_view` skal ha en `statistikk`-rad, og finnes
+ikke slug-en i `get_all_modules()`, er raden foreldreløs: admin-matrisen genereres fra
+registeret, så ingen kunne sett eller rettet den.
+
+**`lead_view` sin eneste forskjell fra `read_only` var statistikk.** Tre steder, alle tre
+statistikk: `full_stats_view`, nav-elementet `.stats-only` og lastingen av
+`patients-stats.js`. Sammenslåingen i den kommende backfillen er derfor tapsfri, ikke en
+forenkling.
+
+### Hva som flyttet
+
+| Fra | Til |
+|---|---|
+| `patients/views_stats.py: full_stats_view` | `statistikk/views.py` |
+| `patients/views_arkiv.py: arkiv_full_stats_view` | `statistikk/views.py` |
+| `patients/stats_cache.py` | `core/stats_cache.py` |
+| statistikkfanen i `templates/patients/index.html` | `templates/statistikk/index.html` |
+| statistikkreglene i `static/css/style.css` | `static/css/statistikk.css` |
+| ~600 linjer rendering i `patients-stats.js` | `static/js/statistikk.js` |
+| ~370 linjer admin i `patients-stats.js` | `static/js/patients-admin.js` |
+| primitivene i `patients-utils.js` | `static/js/portal-utils.js` |
+
+`/pasienter/api/stats/` ble **ikke** flyttet. Header-chipsene er for alle innloggede og
+hører til siden de står på; flyttet ville de gitt statistikkmodulen et endepunkt uten
+statistikkgate.
+
+### Fire ting som ikke var åpenbare
+
+**Stilarket måtte deles.** `style.css` lastes kun av `patients/index.html`, så hver eneste
+statistikkregel ville vært virkningsløs på den nye siden — en endring som ser ut som
+ingenting, ikke som en feil. Verre: fire av variablene reglene bruker
+(`--text-muted`, `--text-soft`, `--surface-3`, `--header-bg`) er definert i `style.css` og
+er *ikke* blant aliasene `base_portal.html` setter. En udefinert custom property gjør ikke
+regelen ugyldig — den gjør fargen arvet. Tabelltekst ville altså blitt lesbar eller
+uleselig tilfeldig, uten at noe feilet. De fire er derfor definert i `statistikk.css` med
+verdiene de hadde; de fire portalen faktisk aliaser er ikke gjentatt, så temaene ikke kan
+komme i utakt.
+
+**`patients-utils.js` kunne ikke bare lastes av den nye siden.** Den gjør arbeid på
+toppnivå: setter `Chart.defaults` og kaller
+`new bootstrap.Modal(document.getElementById('newModal'))`. Uten `#newModal` kaster fila
+ved lasting. Primitivene begge sidene trenger — CSRF-fetch, escaping, submit-guard,
+`data-action`-delegeringen og `fmtMin` — ligger nå i `portal-utils.js`, som ikke rører
+DOM-en før den kalles. `fmtMin` ble faktisk glemt i første forsøk, og statistikksiden ville
+kastet `ReferenceError` på hver varighet. `JsModulLastingTests` har fått en test som
+sammenligner hva `statistikk.js` kaller mot hva den faktisk laster.
+
+**Arkivstatistikken arvet nesten feil gate.** Endepunktet fulgte med til statistikk-appen,
+men tilgangen skulle ikke: arkivet er strengere beskyttet enn live-statistikken
+(`ARKIV_VIEW_MIN_ROLE`, i dag `admin`). Hadde det arvet statistikkmodulens gate, ville
+`lead_view` fått innsyn i arkiverte vakter uten at noen bestemte det. Viewet har derfor to
+gates, og `test_arkiv_full_stats_krever_riktig_rolle` dekker `lead_view` og `lead`.
+
+**De gamle stiene videresender (302).** En deploy midt i en vakt treffer klienter med
+gammel JS i cache, og `loadStats()` feiler stille: den logger en advarsel og lar forrige
+visning bli stående. Brukeren ville sett gamle tall uten beskjed. 302 og ikke 301, så en
+nettleser ikke sitter fast på videresendingen for godt.
+
+### Tilgang: uendret, men strammere JS-lasting
+
+`stats_required` gjelder fortsatt, nå på både siden og endepunktet. Modulsynligheten går
+gjennom et nytt, **midlertidig** `min_rolle`-felt på `Module` — alternativet var et
+`kan_se_statistikk`-flagg med migrasjon som uansett skulle kastes når `ModulTilgang` kommer.
+Feltet fjernes sammen med `permission_flag`.
+
+`patients-admin.js` lastes nå kun for `admin`, ikke for `lead`/`lead_view` som før. Alt som
+ble igjen i fila krever `role='admin'` server-side, så de to rollene lastet ~370 linjer de
+aldri kunne bruke — hvert endepunkt avviste dem.
+
+---
+
 ## 2026-08-23 — `/accounts/glemt-passord/` var en blank side i produksjon
 
 **910 tester, alle grønne** (3 nye). Rettelse av forrige punkt, meldt av André minutter

@@ -188,7 +188,7 @@ class RateLimitEndepunktTests(TestCase):
 
     def test_full_stats_strupes(self):
         c = self._klient(self.admin)
-        statuser = _statuser(lambda: c.get('/pasienter/api/full-stats/'), 35)
+        statuser = _statuser(lambda: c.get('/statistikk/api/full-stats/'), 35)
         self.assertEqual(statuser[0], 200)
         self.assertIn(429, statuser)
 
@@ -278,5 +278,5 @@ class RateLimitEndepunktTests(TestCase):
     def test_statistikk_og_pasientoppretting_deler_ikke_botte(self):
         """Ende-til-ende-utgaven av ``test_hver_gruppe_har_egen_botte``."""
         c = self._klient(self.admin)
-        _statuser(lambda: c.get('/pasienter/api/full-stats/'), 35)
+        _statuser(lambda: c.get('/statistikk/api/full-stats/'), 35)
         self.assertEqual(self._opprett(c).status_code, 201)

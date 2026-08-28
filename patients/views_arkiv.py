@@ -12,7 +12,7 @@ from django.views.decorators.http import require_http_methods
 
 from .services import (
     has_role_at_least, ARKIV_VIEW_MIN_ROLE, ARKIV_WRITE_ROLE,
-    arkiver_aktiv_vakt, compute_arkiv_stats, compute_arkiv_full_stats,
+    arkiver_aktiv_vakt, compute_arkiv_stats,
 )
 from .views_common import _json_body
 
@@ -173,26 +173,3 @@ def arkiv_detalj_view(request, pk):
     arkiv.delete()  # CASCADE sletter ArkivertPasient-rader
     _log_audit(request, 'arkiv_slettet', f'arkiv_id={pk}, tittel={tittel}')
     return JsonResponse({'ok': True})
-
-
-@login_required
-@require_http_methods(['GET'])
-def arkiv_full_stats_view(request, pk):
-    """Returner full statistikk for et arkivert vakt.
-
-    Samme struktur som /api/full-stats/ (chi2, Kruskal-Wallis,
-    krysstabeller, tids-statistikk pr. gruppe, ankomster, obs-stats).
-    Tilgang: ARKIV_VIEW_MIN_ROLE (default admin).
-    """
-    from .models import VaktArkiv
-
-    if not has_role_at_least(request.user, ARKIV_VIEW_MIN_ROLE):
-        return JsonResponse({'error': 'Ingen tilgang'}, status=403)
-
-    try:
-        arkiv = VaktArkiv.objects.get(pk=pk)
-    except VaktArkiv.DoesNotExist:
-        return JsonResponse({'error': 'Arkiv ikke funnet'}, status=404)
-
-    stats = compute_arkiv_full_stats(arkiv)
-    return JsonResponse(stats)

@@ -217,13 +217,13 @@ class ArkivDetaljTests(ArkivTestMixin, TestCase):
         self.assertTrue(resp.json()['tamper_detected'])
 
     def test_arkiv_full_stats_endpoint_returnerer_full_struktur(self):
-        """GET full-stats skal returnere samme struktur som /api/full-stats/.
+        """GET full-stats skal returnere samme struktur som /statistikk/api/full-stats/.
 
         Sjekker at alle hovednøkler finnes (summary, arrivals, transport_counts,
         time_per_triage, crosstab_*, chi2_table, kw_*).
         """
         resp = self.admin_client.get(
-            f'/pasienter/api/innstillinger/arkiv/{self.arkiv.pk}/full-stats/'
+            f'/statistikk/api/arkiv/{self.arkiv.pk}/full-stats/'
         )
         self.assertEqual(resp.status_code, 200)
         data = resp.json()
@@ -253,7 +253,7 @@ class ArkivDetaljTests(ArkivTestMixin, TestCase):
         for role_user in [self.read_only, self.read_write, self.lead_view, self.lead]:
             c = Client()
             c.force_login(role_user)
-            resp = c.get(f'/pasienter/api/innstillinger/arkiv/{self.arkiv.pk}/full-stats/')
+            resp = c.get(f'/statistikk/api/arkiv/{self.arkiv.pk}/full-stats/')
             self.assertEqual(
                 resp.status_code, 403,
                 f'Forventet 403 for rolle {role_user.role}',
@@ -261,7 +261,7 @@ class ArkivDetaljTests(ArkivTestMixin, TestCase):
 
     def test_arkiv_full_stats_404_for_ukjent_id(self):
         """Ukjent arkiv-ID skal gi 404."""
-        resp = self.admin_client.get('/pasienter/api/innstillinger/arkiv/999999/full-stats/')
+        resp = self.admin_client.get('/statistikk/api/arkiv/999999/full-stats/')
         self.assertEqual(resp.status_code, 404)
 
 

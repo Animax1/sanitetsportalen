@@ -109,6 +109,7 @@ INSTALLED_APPS = [
     'core',         # Sanitetsportal-fellesprimitiver (BaseTimeStampedModel, validatorer, RBAC)
     'accounts',
     'patients',
+    'statistikk',
     'audit',
     'django_otp',
     'django_otp.plugins.otp_totp',

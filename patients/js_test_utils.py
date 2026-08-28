@@ -23,11 +23,13 @@ from django.conf import settings
 
 JS_DIR = Path(settings.BASE_DIR) / 'static' / 'js'
 
+PORTAL_UTILS_JS = JS_DIR / 'portal-utils.js'
 UTILS_JS = JS_DIR / 'patients-utils.js'
 TABLE_JS = JS_DIR / 'patients-table.js'
 FORMS_JS = JS_DIR / 'patients-forms.js'
 APP_JS = JS_DIR / 'patients-app.js'
-STATS_JS = JS_DIR / 'patients-stats.js'
+ADMIN_JS = JS_DIR / 'patients-admin.js'
+STATISTIKK_JS = JS_DIR / 'statistikk.js'
 
 
 def node_available():

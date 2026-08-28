@@ -27,9 +27,19 @@ urlpatterns = [
     # Reset testdata (kun admin)
     path('api/reset-active-year/', views_patients.reset_active_year_view, name='api_reset_active_year'),
 
-    # Statistikk
+    # Statistikk. Kun header-chipsene ligger igjen her; full statistikk
+    # flyttet til statistikk-appen (/statistikk/api/full-stats/).
     path('api/stats/', views_stats.stats_view, name='api_stats'),
-    path('api/full-stats/', views_stats.full_stats_view, name='api_full_stats'),
+
+    # Videresending for klienter med gammel JS i cache. Uten den slutter
+    # statistikken å oppdatere seg for alle som har siden åpen når deployen
+    # treffer — og den feiler stille: loadStats() logger en advarsel og lar
+    # forrige visning bli stående, så brukeren ser gamle tall uten beskjed.
+    # 302, ikke 301: en 301 caches av nettleseren for godt, og stien bør
+    # kunne tas i bruk igjen uten at gamle klienter sitter fast.
+    path('api/full-stats/',
+         lambda req: redirect('/statistikk/api/full-stats/'),
+         name='api_full_stats_flyttet'),
 
     # Arkiver (gammel fil-basert)
 
@@ -37,7 +47,9 @@ urlpatterns = [
     path('api/innstillinger/arkiv/', views_arkiv.arkiv_liste_view, name='api_arkiv_liste'),
     path('api/innstillinger/arkiv/lagre/', views_arkiv.arkiv_lagre_view, name='api_arkiv_lagre'),
     path('api/innstillinger/arkiv/<int:pk>/', views_arkiv.arkiv_detalj_view, name='api_arkiv_detalj'),
-    path('api/innstillinger/arkiv/<int:pk>/full-stats/', views_arkiv.arkiv_full_stats_view, name='api_arkiv_full_stats'),
+    path('api/innstillinger/arkiv/<int:pk>/full-stats/',
+         lambda req, pk: redirect(f'/statistikk/api/arkiv/{pk}/full-stats/'),
+         name='api_arkiv_full_stats_flyttet'),
 
     # Bakover-kompatibel redirect: /pasienter/admin/server-status/... → /portal-admin/server-status/...
     re_path(r'^admin/server-status/(?P<rest>.*)$',

@@ -1,14 +1,17 @@
-"""Statistikk-endepunktene. Skilt ut fra ``views.py`` i N13.3."""
+"""Statistikk-endepunktet som ble igjen i pasientmodulen.
+
+Full statistikk flyttet til ``statistikk``-appen august 2026.
+``/api/stats/`` ble bevisst *ikke* med: den mater header-chipsene øverst på
+pasientsiden, er åpen for alle innloggede, og hører til siden den står på.
+Flyttet ville den gitt statistikkmodulen et endepunkt uten statistikkgate.
+"""
 from django.contrib.auth.decorators import login_required
 from django.views.decorators.http import require_http_methods
 
-from core.auth_decorators import stats_required
-from core.ratelimit import rate_limit
+from core.stats_cache import cached_stats_response
 
-from .services import basic_stats, full_stats, get_active_year
+from .services import basic_stats, get_active_year
 
-
-# ── Statistikk ────────────────────────────────────────────────────────────────
 
 @login_required
 @require_http_methods(['GET'])
@@ -18,7 +21,6 @@ def stats_view(request):
     Cachet 15s med ETag/304 for å redusere last ved gjentatt polling.
     Cache-nøkkel inkluderer aktivt år slik at bytte av år gir ny cache.
     """
-    from .stats_cache import cached_stats_response
     year = get_active_year()
 
     @cached_stats_response(cache_key=f'basic:{year}', ttl=15)
@@ -26,28 +28,3 @@ def stats_view(request):
         return basic_stats(year=year)
 
     return _inner(request)
-
-
-@stats_required
-@require_http_methods(['GET'])
-# S3: appens dyreste spørring. Cachen tar 60 sekunder av gangen, men
-# cache-miss-stien var helt ubeskyttet — og det er nettopp den en klient
-# i løkke treffer gang på gang. Statistikkfanen lastes ved åpning og ved
-# auto-refresh hvert 30. sekund, altså rundt 2/min i normal bruk.
-@rate_limit(group='patients:full-stats', rate='30/m', method='GET')
-def full_stats_view(request):
-    """Full statistikk for statistikk-dashboard. Kun admin, lead og lead_view.
-
-    Cachet 60s med ETag/304. Dyre aggregater (percentiler, gruppetellinger)
-    regnes kun én gang per minutt per år.
-    """
-    from .stats_cache import cached_stats_response
-    year = get_active_year()
-
-    @cached_stats_response(cache_key=f'full:{year}', ttl=60)
-    def _inner(req):
-        return full_stats(year=year)
-
-    return _inner(request)
-
-

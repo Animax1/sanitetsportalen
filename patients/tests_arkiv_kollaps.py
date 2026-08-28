@@ -221,7 +221,7 @@ class KollapsIntegritetTests(KollapsTestMixin, TestCase):
 
         c = Client()
         c.force_login(self.admin)
-        resp = c.get(f'/pasienter/api/innstillinger/arkiv/{arkiv.pk}/full-stats/')
+        resp = c.get(f'/statistikk/api/arkiv/{arkiv.pk}/full-stats/')
 
         self.assertEqual(resp.status_code, 200)
         self.assertEqual(resp.json()['summary']['total'], 3)

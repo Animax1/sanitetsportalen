@@ -23,7 +23,7 @@ python manage.py create_admin --username admin --password "bytt-meg"
 python manage.py runserver           # http://127.0.0.1:8000/
 
 # Tester – hele suiten
-python manage.py test patients accounts audit core -v 2
+python manage.py test patients accounts audit core statistikk -v 2
 
 # Én enkelt test
 python manage.py test patients.tests.PatientAPITest.test_create_patient -v 2
@@ -109,7 +109,7 @@ Viewene er delt i fem moduler (N13.3) — `views.py` finnes ikke lenger:
 | `views_common.py` | `_json_body`, `_patient_to_dict`, `WRITE_ROLES` — delt av de andre |
 | `views_patients.py` | Hoved-side, innstillinger, sesjonstimeout, pasient-CRUD, nullstilling |
 | `views_registre.py` | Førstehjelper- og helsepersonellregisteret (én fabrikk bygger begge) |
-| `views_stats.py` | `/api/stats/` og `/api/full-stats/` |
+| `views_stats.py` | `/api/stats/` — header-chipsene. Full statistikk ligger i `statistikk/` |
 | `views_arkiv.py` | Vaktarkivet |
 
 Alle endepunkter er JSON-API-er beskyttet med `@login_required` + rollesjekk. Responser følger mønsteret `{'status': 'ok', 'data': ...}` eller `{'status': 'error', 'message': ...}`.
@@ -148,44 +148,88 @@ Frysing, integritetssjekk og kollaps er modul-agnostisk. Hver modul som arkivere
 
 `patients/arkiv.py` er referanseeksempelet. `ArkivSignaturLaastTests` låser signaturene til literale hex-verdier — feiler den etter en refaktorering, er det refaktoreringen som er feil.
 
-### Statistikk-caching (patients/stats_cache.py)
+### Statistikk-modulen (statistikk/)
 
-Basic stats caches 15 sek, full stats 60 sek. Støtter ETag/304.
+Egen app siden august 2026. Eier `/statistikk/`-siden og full statistikk
+(`/statistikk/api/full-stats/` og `/statistikk/api/arkiv/<pk>/full-stats/`).
+`/pasienter/api/stats/` — header-chipsene — ble bevisst **ikke** flyttet: den er åpen for
+alle innloggede og hører til siden den står på.
+
+**Avhengighetsretningen er statistikk → patients, aldri motsatt.** Tallene beregnes
+fortsatt av `patients.services`; statistikk-appen henter, cacher og viser. Når modul
+nummer to skal levere tall, erstattes den direkte importen av et registry etter samme
+idiom som `core.backup` og `core.arkiv`.
+
+Arkiv-endepunktet har **to gates**: statistikkgaten *og* `ARKIV_VIEW_MIN_ROLE`. Arkivet er
+strengere beskyttet enn live-statistikken, og hadde det arvet modulens gate ved flyttingen,
+ville `lead_view` fått innsyn i arkiverte vakter uten at noen bestemte det.
+
+`Module.min_rolle` er midlertidig og gater kun synligheten av denne modulen. Den finnes
+fordi statistikk ble skilt ut før `ModulTilgang`, og alternativet var et
+`kan_se_statistikk`-flagg med migrasjon som uansett skulle kastes. Fjernes sammen med
+`permission_flag`.
+
+### Statistikk-caching (core/stats_cache.py)
+
+Ligger i `core` fordi to apper bruker den: `patients` for header-chipsene og `statistikk`
+for full statistikk. Basic stats caches 15 sek, full stats 60 sek. Støtter ETag/304.
 
 Det finnes **ingen** eksplisitt invalidering — cachen utløper på TTL. De korte TTL-ene er valgt nettopp for å slippe invalideringslogikk, og alle cache-operasjoner er pakket i try/except slik at en død cache degraderer til vanlig beregning i stedet for å ta ned endepunktet.
 
 ### Frontend
 
-**To stilark, og de dekker hver sine sider.** Å legge en regel i feil fil ser ut som en
+**Tre stilark, og de dekker hver sine sider.** Å legge en regel i feil fil ser ut som en
 virkningsløs endring, ikke som en feil:
 
 | Fil | Lastes av | Variabler |
 |-----|-----------|-----------|
 | `static/css/style.css` | **kun** `templates/patients/index.html` | `--text-muted` m.fl. |
 | `static/css/portal.css` | alt som arver `core/templates/core/base_portal.html` | `--portal-text-muted` m.fl. |
+| `static/css/statistikk.css` | **kun** `templates/statistikk/index.html` | definerer selv de fire `base_portal` mangler |
 
 Noen frittstående sider (`403.html`, `mfa_setup.html`, `mfa_verify.html`, innlogging)
 laster ingen av dem — de har egen `<style>`-blokk og må overstyre selv.
 
-Begge temaene er mørke, så **enhver Bootstrap-klasse for dempet tekst må overstyres** der
+**`base_portal.html` aliaser ikke alle variablene `style.css` definerer.** Den setter
+`--surface-1`, `--surface-2`, `--border-color` og `--text-main`, men *ikke* `--text-muted`,
+`--text-soft`, `--surface-3` eller `--header-bg`. En udefinert custom property gjør ikke
+regelen ugyldig — den gjør fargen arvet, så teksten blir lesbar eller uleselig tilfeldig
+uten at noe feiler. Et nytt modulstilark må derfor definere de fire selv, og *ikke* gjenta
+de fire portalen faktisk aliaser (da kan temaene komme i utakt). `statistikk.css` er
+mønsteret.
+
+Alle temaene er mørke, så **enhver Bootstrap-klasse for dempet tekst må overstyres** der
 malen kan se den. `MorkTekstPaaMorkBakgrunnTests` løser `{% extends %}` og `{% static %}`
 og håndhever det.
 
-Fem moduler i `static/js/` (ingen bundler). Fire lastes alltid, én betinget (F7):
+Syv moduler i `static/js/` (ingen bundler), fordelt på to sider:
 
 | Modul | Lastes | Ansvar |
 |-------|--------|--------|
-| `patients-utils.js` | alltid | CSRF-fetch (`apiFetch`), `withSubmitGuard`, escaping, delt tilstand |
-| `patients-table.js` | alltid | Tabulator-grid og tavle |
-| `patients-forms.js` | alltid | Registrerings- og redigeringsskjema |
-| `patients-app.js` | alltid | Oppstart (`DOMContentLoaded`), faneskift, auto-refresh, lastere for navneregistrene |
-| `patients-stats.js` | **kun admin/lead/lead_view** | Statistikkfanen (Chart.js), arkiv, admin-handlinger |
+| `portal-utils.js` | **begge sider** | CSRF-fetch (`apiFetch`), `withSubmitGuard`, escaping, `fmtMin`, `data-action`-delegeringen |
+| `patients-utils.js` | pasientsiden, alltid | Rollesynlighet, delt tilstand, klokke, skjemahjelpere |
+| `patients-table.js` | pasientsiden, alltid | Tabulator-grid og tavle |
+| `patients-forms.js` | pasientsiden, alltid | Registrerings- og redigeringsskjema |
+| `patients-app.js` | pasientsiden, alltid | Oppstart (`DOMContentLoaded`), faneskift, auto-refresh, lastere for navneregistrene |
+| `patients-admin.js` | pasientsiden, **kun admin** | Registeradmin, sesjonstimeout, nullstilling, vaktarkiv |
+| `statistikk.js` | **kun** `/statistikk/` | All statistikkrendering (Chart.js), arkivmodus |
 
-**Alt en `read_only`- eller `read_write`-bruker kan nå, må ligge i en alltid-lastet modul.** `read_write` har skrivetilgang uten statistikktilgang — derfor bor f.eks. `saveEventName` i `patients-app.js`. Kall fra alltid-lastet kode til `patients-stats.js` må gå gjennom `_kall('navn')`, som sjekker at funksjonen finnes. `JsModulLastingTests` håndhever dette.
+**`patients-utils.js` kan ikke lastes utenfor pasientsiden.** Den gjør arbeid på toppnivå
+— `Chart.defaults` og `new bootstrap.Modal(document.getElementById('newModal'))` — og
+kaster på en side uten pasientskjemaene. Trenger en ny modulside en helper derfra, skal
+helperen flyttes til `portal-utils.js`, ikke kopieres. `JsModulLastingTests` håndhever det
+ved å sammenligne hva `statistikk.js` kaller mot hva den faktisk laster.
 
-CSRF-sikret fetch-wrapper brukes for alle API-kall. Tabulator for pasientgrid, Chart.js for statistikk.
+**Alt en ikke-admin kan nå på pasientsiden, må ligge i en alltid-lastet modul.**
+`read_write` har skrivetilgang uten admin-tilgang — derfor bor f.eks. `saveEventName` i
+`patients-app.js`. Kall fra alltid-lastet kode til `patients-admin.js` må gå gjennom
+`_kall('navn')`, som sjekker at funksjonen finnes. `JsModulLastingTests` håndhever dette.
 
-Brukerdata som settes inn med `innerHTML` **skal** escapes — `escHtmlValue()` i tabeller (tallsikker), `escapeHtml()`/`_escHtml()` ellers. Markup koden bygger selv merkes med `trustedHtml()`. `patients/tests_xss_stats.py` håndhever dette.
+CSRF-sikret fetch-wrapper brukes for alle API-kall. Tabulator for pasientgrid, Chart.js for
+statistikk — og Chart.js lastes **kun** på `/statistikk/`.
+
+Brukerdata som settes inn med `innerHTML` **skal** escapes — `escHtmlValue()` i tabeller (tallsikker), `escapeHtml()`/`_escHtml()` ellers. Markup koden bygger selv merkes med `trustedHtml()`. `patients/tests_xss_stats.py` håndhever dette,
+og leser både `statistikk.js` og `patients-admin.js` — byggerne ble delt mellom de to.
 
 JS-oppførsel testes ved å kjøre funksjonene i node, se `patients/js_test_utils.py`. Ikke skriv nye tester som bare grep-er etter kodelinjer i JS-filer.
 

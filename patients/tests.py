@@ -383,7 +383,7 @@ class LeadViewTests(TestCase):
 
     def test_lead_view_kan_lese_full_stats(self):
         """lead_view kan hente full statistikk."""
-        resp = self.client.get('/pasienter/api/full-stats/')
+        resp = self.client.get('/statistikk/api/full-stats/')
         self.assertIn(resp.status_code, [200, 500])  # 500 OK hvis scipy mangler
 
 
@@ -986,7 +986,7 @@ global.document = {
 
     def _run_guard(self, snippet):
         from patients import js_test_utils as jsu
-        harness = jsu.build_harness([(jsu.UTILS_JS, ('withSubmitGuard',))])
+        harness = jsu.build_harness([(jsu.PORTAL_UTILS_JS, ('withSubmitGuard',))])
         return jsu.run_node(harness, snippet, preamble=self.BTN_STUB)
 
     @unittest.skipUnless(shutil.which('node'), 'node er ikke tilgjengelig')
@@ -1063,9 +1063,9 @@ assert(kall === 1, 'knappen var fortsatt laast etter en feilet lagring');
     def test_submit_guard_helper_finnes_i_utils(self):
         """withSubmitGuard må være definert i modulen malen faktisk laster."""
         from patients import js_test_utils as jsu
-        content = jsu.read_js(jsu.UTILS_JS)
+        content = jsu.read_js(jsu.PORTAL_UTILS_JS)
         self.assertIn('async function withSubmitGuard(', content,
-                      'withSubmitGuard-helperen mangler i patients-utils.js')
+                      'withSubmitGuard-helperen mangler i portal-utils.js')
         self.assertIn('dataset.submitting', content,
                       'In-flight lock-mekanismen mangler i withSubmitGuard')
 
@@ -1666,19 +1666,23 @@ class NavneregisterFeilmeldingTests(TestCase):
 
 @override_settings(SECURE_SSL_REDIRECT=False, RATELIMIT_ENABLE=False)
 class JsModulLastingTests(TestCase):
-    """Betinget lasting av patients-stats.js (F7).
+    """Betinget lasting av patients-admin.js (F7).
 
-    Fila er større enn de tre andre til sammen og brukes kun av roller med
-    statistikktilgang. Den lastes derfor ikke for `read_only` og `read_write`.
+    Fila het patients-stats.js og ble lastet for admin, lead og lead_view.
+    Da statistikk ble egen modul, ble renderingen flyttet til statistikk.js
+    og det som ble igjen er utelukkende admin-handlinger: registeradmin,
+    sesjonstimeout, nullstilling og vaktarkivet. Hvert av de endepunktene
+    krever `role='admin'` server-side, så lead og lead_view lastet ~370
+    linjer de aldri kunne bruke. Fila lastes derfor kun for admin nå.
 
-    Fellen: bootstrappen — `DOMContentLoaded`, faneskift, auto-refresh og
-    lasterne for navneregistrene — lå i patients-stats.js. Å laste den
-    betinget uten å flytte bootstrappen først ville tatt ned hele appen for
-    de to rollene. Testene her vokter skillet.
+    Fellen er den samme som før: bootstrappen — `DOMContentLoaded`,
+    faneskift, auto-refresh og lasterne for navneregistrene — lå opprinnelig
+    i den betinget lastede modulen. Å laste den betinget uten å flytte
+    bootstrappen ville tatt ned hele appen for alle andre enn admin.
     """
 
-    STATS_ROLLER = ('admin', 'lead', 'lead_view')
-    ANDRE_ROLLER = ('read_only', 'read_write')
+    ADMIN_ROLLER = ('admin',)
+    ANDRE_ROLLER = ('read_only', 'read_write', 'lead_view', 'lead')
 
     @staticmethod
     def _monster(modul):
@@ -1706,37 +1710,50 @@ class JsModulLastingTests(TestCase):
 
     def test_app_modulen_lastes_for_alle_roller(self):
         """Bootstrappen må lastes uansett rolle — ellers starter ikke appen."""
-        for rolle in self.STATS_ROLLER + self.ANDRE_ROLLER:
+        for rolle in self.ADMIN_ROLLER + self.ANDRE_ROLLER:
             with self.subTest(rolle=rolle):
                 self.assertRegex(self._hent_som(rolle),
                                  self._monster('patients-app'))
 
-    def test_statistikkmodulen_lastes_kun_for_stats_roller(self):
-        for rolle in self.STATS_ROLLER:
+    def test_portal_utils_lastes_for_alle_roller(self):
+        """Primitivene må ligge under alt annet, for alle roller.
+
+        patients-utils.js kaller fmtMin() og escapeHtml() derfra. Lastes de
+        ikke, feiler pasientsiden for alle — ikke bare for én rolle.
+        """
+        for rolle in self.ADMIN_ROLLER + self.ANDRE_ROLLER:
             with self.subTest(rolle=rolle):
                 self.assertRegex(self._hent_som(rolle),
-                                 self._monster('patients-stats'))
+                                 self._monster('portal-utils'))
 
-    def test_statistikkmodulen_lastes_ikke_for_lavere_roller(self):
+    def test_adminmodulen_lastes_kun_for_admin(self):
+        for rolle in self.ADMIN_ROLLER:
+            with self.subTest(rolle=rolle):
+                self.assertRegex(self._hent_som(rolle),
+                                 self._monster('patients-admin'))
+
+    def test_adminmodulen_lastes_ikke_for_lavere_roller(self):
+        """Også lead og lead_view: de mistet fila da statistikken flyttet."""
         for rolle in self.ANDRE_ROLLER:
             with self.subTest(rolle=rolle):
                 self.assertNotRegex(self._hent_som(rolle),
-                                    self._monster('patients-stats'))
+                                    self._monster('patients-admin'))
 
-    def test_alltid_lastede_moduler_refererer_ikke_til_statistikkmodulen(self):
+    def test_alltid_lastede_moduler_refererer_ikke_til_adminmodulen(self):
         """Selve vernet: ingen direkte referanse fra alltid-lastet kode.
 
-        En `read_only`-bruker har ikke patients-stats.js. Kaller bootstrappen
+        En `read_only`-bruker har ikke patients-admin.js. Kaller bootstrappen
         en funksjon derfra direkte, får hun ReferenceError og appen stopper.
         Slike kall må gå via `_kall()`, som sjekker at funksjonen finnes.
         """
         from patients import js_test_utils as jsu
 
-        stats_navn = set(re.findall(
-            r'^(?:async )?function (\w+)', jsu.read_js(jsu.STATS_JS), re.M))
-        self.assertIn('loadStats', stats_navn, 'testen leser feil fil')
+        admin_navn = set(re.findall(
+            r'^(?:async )?function (\w+)', jsu.read_js(jsu.ADMIN_JS), re.M))
+        self.assertIn('lagreVaktSomArkiv', admin_navn, 'testen leser feil fil')
 
-        alltid = [jsu.UTILS_JS, jsu.TABLE_JS, jsu.FORMS_JS, jsu.APP_JS]
+        alltid = [jsu.PORTAL_UTILS_JS, jsu.UTILS_JS, jsu.TABLE_JS,
+                  jsu.FORMS_JS, jsu.APP_JS]
         funn = []
         for sti in alltid:
             kilde = jsu.read_js(sti)
@@ -1744,29 +1761,66 @@ class JsModulLastingTests(TestCase):
             # `toggleForstehjelper()` trenger et tall, er ikke et kall.
             kilde = '\n'.join(
                 l for l in kilde.splitlines() if not l.lstrip().startswith('//'))
-            # `_kall('loadStats')` er den godkjente veien — strengen teller ikke.
+            # `_kall('renderForstehjelperAdmin')` er den godkjente veien —
+            # strengen teller ikke.
             kilde = re.sub(r"_kall\(\s*'[^']+'", "_kall(", kilde)
-            for navn in stats_navn:
+            for navn in admin_navn:
                 if re.search(r'\b' + re.escape(navn) + r'\s*\(', kilde):
                     funn.append(f'{sti.name}: {navn}()')
 
         self.assertEqual(sorted(funn), [], (
-            'Alltid-lastet kode kaller funksjoner som bor i patients-stats.js:\n  '
+            'Alltid-lastet kode kaller funksjoner som bor i patients-admin.js:\n  '
             + '\n  '.join(sorted(funn))
-            + '\n\npatients-stats.js lastes ikke for read_only/read_write. Flytt '
-              'funksjonen til patients-app.js, eller kall den via _kall().'
+            + '\n\npatients-admin.js lastes kun for admin. Flytt funksjonen til '
+              'patients-app.js, eller kall den via _kall().'
+        ))
+
+    def test_statistikksiden_bruker_bare_primitiver_den_faktisk_laster(self):
+        """statistikk.js laster IKKE patients-utils.js — og kan ikke.
+
+        patients-utils.js gjør arbeid på toppnivå: den setter Chart.defaults
+        og kaller `new bootstrap.Modal(document.getElementById('newModal'))`.
+        På statistikksiden finnes ikke #newModal, så fila ville kastet ved
+        lasting. Derfor må alt statistikk.js kaller ligge i portal-utils.js
+        eller i statistikk.js selv.
+
+        Dette er ikke hypotetisk: `fmtMin()` lå igjen i patients-utils.js ved
+        delingen, og statistikksiden ville kastet ReferenceError på hver
+        varighet den skulle vise.
+        """
+        from patients import js_test_utils as jsu
+
+        def definerte(sti):
+            kilde = jsu.read_js(sti)
+            return (set(re.findall(r'^(?:async )?function (\w+)', kilde, re.M))
+                    | set(re.findall(r'^(?:let|const|var) (\w+)', kilde, re.M)))
+
+        tilgjengelig = definerte(jsu.PORTAL_UTILS_JS) | definerte(jsu.STATISTIKK_JS)
+        kun_i_patients = definerte(jsu.UTILS_JS) - tilgjengelig
+
+        statistikk_src = jsu.read_js(jsu.STATISTIKK_JS)
+        # Ordet må stå som et kall eller et oppslag, ikke inne i en streng
+        # som `<table class="stats-table">` — der er `table` bare markup.
+        funn = [navn for navn in sorted(kun_i_patients)
+                if re.search(r'\b' + re.escape(navn) + r'\s*\(', statistikk_src)]
+
+        self.assertEqual(funn, [], (
+            'statistikk.js kaller funksjoner som kun finnes i '
+            'patients-utils.js:\n  ' + '\n  '.join(funn)
+            + '\n\nDen fila lastes ikke på /statistikk/. Flytt helperen til '
+              'portal-utils.js.'
         ))
 
     def test_write_only_handler_er_alltid_tilgjengelig(self):
-        """`read_write` har skrivetilgang, men ikke statistikktilgang.
+        """`read_write` har skrivetilgang, men ikke admin-tilgang.
 
         Lagre-knappen for arrangementsnavn er `write-only`, altså synlig for
-        read_write — som ikke laster patients-stats.js. `saveEventName` må
+        read_write — som ikke laster patients-admin.js. `saveEventName` må
         derfor ligge i patients-app.js.
         """
         from patients import js_test_utils as jsu
         self.assertIn('function saveEventName(', jsu.read_js(jsu.APP_JS))
-        self.assertNotIn('function saveEventName(', jsu.read_js(jsu.STATS_JS))
+        self.assertNotIn('function saveEventName(', jsu.read_js(jsu.ADMIN_JS))
 
 
 class InlineHandlerTests(SimpleTestCase):
@@ -1808,8 +1862,9 @@ class InlineHandlerTests(SimpleTestCase):
         from patients import js_test_utils as jsu
 
         funn = []
-        for sti in (jsu.UTILS_JS, jsu.TABLE_JS, jsu.FORMS_JS,
-                    jsu.APP_JS, jsu.STATS_JS):
+        for sti in (jsu.PORTAL_UTILS_JS, jsu.UTILS_JS, jsu.TABLE_JS,
+                    jsu.FORMS_JS, jsu.APP_JS, jsu.ADMIN_JS,
+                    jsu.STATISTIKK_JS):
             for nr, linje in enumerate(
                     jsu.read_js(sti).splitlines(), 1):
                 for treff in re.findall(r'\son([a-z]+)="', linje):
@@ -1828,11 +1883,13 @@ class InlineHandlerTests(SimpleTestCase):
         streng, ville funksjonen returnert uten å gjøre noe — og uten feil.
         """
         from patients import js_test_utils as jsu
-        app = jsu.read_js(jsu.APP_JS)
-        self.assertIn('Number(el.dataset.id)', app)
+        # Delegeringen flyttet til portal-utils.js da statistikksiden fikk
+        # behov for den samme mekanismen («tilbake til live-statistikk»).
+        portal = jsu.read_js(jsu.PORTAL_UTILS_JS)
+        self.assertIn('Number(el.dataset.id)', portal)
 
-        stats = jsu.read_js(jsu.STATS_JS)
-        self.assertIn('data-id="${b.id}"', stats,
+        admin = jsu.read_js(jsu.ADMIN_JS)
+        self.assertIn('data-id="${b.id}"', admin,
                       'admin-registrene må sende id som data-id, ikke data-arg')
 
 
