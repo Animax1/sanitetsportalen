@@ -9,13 +9,9 @@ får gjøre i modulen.
 En knapp som fører til en vegg er verre enn ingen knapp: brukeren rekker å
 gjøre arbeidet før hen får vite at det ikke gikk.
 """
-import shutil
-import unittest
-
 from django.test import Client, TestCase, override_settings
 
 from accounts.models import CustomUser, ModulTilgang
-from patients import js_test_utils as jsu
 
 
 def _bruker(navn, nivaa):
@@ -58,66 +54,63 @@ class ModulTilgangIMalenTests(TestCase):
         self.assertIn('admin: true', html)
 
 
-@unittest.skipUnless(shutil.which('node'), 'node er ikke tilgjengelig')
-class ApplyRoleVisibilityTests(TestCase):
-    """Kjører funksjonen i node, med et stubbet DOM.
+@override_settings(SECURE_SSL_REDIRECT=False, RATELIMIT_ENABLE=False)
+class ServerSideSynlighetTests(TestCase):
+    """Markupen rendres ikke i det hele tatt for den som ikke skal ha den.
 
-    Ikke en grep etter kodelinjer: det er oppførselen som betyr noe, og
-    `patients/js_test_utils.py` finnes nettopp for dette.
+    Erstatter `ApplyRoleVisibilityTests`, som kjørte `applyRoleVisibility()` i
+    node. Den funksjonen skjulte `.write-only`, `.admin-only` og `.list-only`
+    med `display:none` — markupen lå i HTML-en uansett, inkludert URL-ene til
+    admin-sidene. Endepunktene var gatet, så det var ingen tilgangsgrense, men
+    det er ingen grunn til å sende noe vi vet mottakeren ikke skal ha.
+
+    Testene her er derfor strengere enn de gamle: de krever **fravær fra
+    HTML-en**, ikke at noe er skjult.
     """
 
-    HARNESS = ((jsu.UTILS_JS, ('modulNivaa', 'erAdmin', 'applyRoleVisibility')),)
+    def _html(self, navn, nivaa, rolle='read_write'):
+        bruker = CustomUser.objects.create_user(
+            username=navn, password='x', role=rolle, must_change_password=False)
+        if nivaa:
+            ModulTilgang.objects.create(
+                bruker=bruker, modul_slug='patients', nivaa=nivaa)
+        c = Client()
+        c.force_login(bruker)
+        resp = c.get('/pasienter/')
+        self.assertEqual(resp.status_code, 200)
+        return resp.content.decode('utf-8')
 
-    # Minimalt DOM: registrerer hvilke selektorer som ble skjult.
-    PREAMBLE = '''
-    globalThis.skjult = [];
-    function lagEl() {
-      return { style: {}, classList: { add(){}, remove(){}, toggle(){} } };
-    }
-    globalThis.document = {
-      querySelectorAll(sel) {
-        const el = lagEl();
-        el.style = new Proxy({}, {
-          set(o, k, v) { if (k === 'display' && v === 'none') skjult.push(sel); o[k] = v; return true; }
-        });
-        return [el];
-      },
-      querySelector() { return lagEl(); },
-      getElementById() { return lagEl(); },
-    };
-    '''
+    def test_les_far_ingen_skriveknapper(self):
+        """Selve feilen fra staging, nå på riktig lag."""
+        html = self._html('ss_les', 'les')
+        self.assertNotIn('openNewModal', html)
+        self.assertNotIn('id="btn-save-edit"', html)
 
-    def _kjor(self, tilgang):
-        snippet = (
-            f'globalThis.window = {{ MODUL_TILGANG: {tilgang} }};\n'
-            'applyRoleVisibility();\n'
-            'console.log(JSON.stringify(skjult));'
-        )
-        ut = jsu.run_node(jsu.build_harness(self.HARNESS), snippet, self.PREAMBLE)
-        import json
-        return set(json.loads(ut.splitlines()[0]))
+    def test_skriv_full_far_dem(self):
+        """Vern mot at testen over passerer fordi alt er borte for alle."""
+        html = self._html('ss_skriv', 'skriv_full')
+        self.assertIn('openNewModal', html)
+        self.assertIn('id="btn-save-edit"', html)
 
-    def test_les_skjuler_skrivehandlingene(self):
-        """Selve feilen fra staging: «Ny pasient» sto der for en `les`-bruker."""
-        self.assertIn('.write-only', self._kjor('{patients: "les"}'))
+    def test_ikke_admin_far_ingen_adminkort(self):
+        html = self._html('ss_ikke_admin', 'skriv_full')
+        for markor in ('doResetActiveYear', 'lagreVaktSomArkiv',
+                       'addForstehjelper', '/portal-admin/innstillinger/'):
+            with self.subTest(markor=markor):
+                self.assertNotIn(markor, html)
 
-    def test_skriv_full_beholder_dem(self):
-        """Vern mot at testen over passerer fordi alt skjules for alle."""
-        self.assertNotIn('.write-only', self._kjor('{patients: "skriv_full"}'))
+    def test_admin_far_adminkortene(self):
+        html = self._html('ss_admin', None, rolle='admin')
+        for markor in ('doResetActiveYear', 'lagreVaktSomArkiv',
+                       'addForstehjelper', '/portal-admin/innstillinger/'):
+            with self.subTest(markor=markor):
+                self.assertIn(markor, html)
 
-    def test_manglende_global_skjuler_alt(self):
-        """Standarden er ingen tilgang.
+    def test_admin_url_er_ikke_i_html_for_ikke_admin(self):
+        """Poenget med flyttingen: URL-strukturen røpes ikke lenger.
 
-        Feiler malen, skal knappene forsvinne — ikke dukke opp.
+        `.admin-only` skjulte kortene, men lenkene lå der for enhver med
+        utviklerverktøy.
         """
-        skjult = self._kjor('{}')
-        self.assertIn('.write-only', skjult)
-        self.assertIn('.admin-only', skjult)
-
-    def test_admin_beholder_adminhandlingene(self):
-        skjult = self._kjor('{patients: "skriv_full", admin: true}')
-        self.assertNotIn('.admin-only', skjult)
-
-    def test_skriv_full_uten_admin_skjuler_adminhandlingene(self):
-        skjult = self._kjor('{patients: "skriv_full"}')
-        self.assertIn('.admin-only', skjult)
+        html = self._html('ss_url', 'skriv_full')
+        self.assertNotIn('/portal-admin/', html)

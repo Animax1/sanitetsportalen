@@ -4,6 +4,39 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-08-28 — `.admin-only` og `.write-only` rendres server-side
+
+**997 tester grønne.** Ingen migrasjon, ingen endring i hvem som har tilgang.
+
+Klassene skjulte markup i nettleseren med `display:none`. Elementene lå i HTML-en uansett
+rolle — inkludert URL-ene til alle admin-sidene. Endepunktene var gatet, så det var ingen
+tilgangsgrense, men det er ingen grunn til å sende noe vi vet mottakeren ikke skal ha.
+
+Seks admin-kort og tre skriveknapper rendres nå bak `{% if er_global_admin %}` og
+`{% if kan_skrive %}`. Målt i nettleser:
+
+| Konto | «Ny pasient» | Admin-kort | `/portal-admin/` i HTML |
+|---|---|---|---|
+| `les` | nei | nei | nei |
+| `skriv_full` | ja | nei | nei |
+| admin | ja | ja | ja |
+
+**`applyRoleVisibility()` er borte.** Den gatet nøyaktig disse tre klassene, og hadde
+ingenting igjen å gjøre. `.list-only` var dessuten allerede dødt: `les` er terskelen for å
+nå siden i det hele tatt, så betingelsen var alltid sann.
+
+**`er_global_admin` er en context processor** i stedet for noe hvert view sender.
+Malene gatet på `request.user.role == 'admin'` direkte — det virker fortsatt, siden `admin`
+overlever krympingen i deploy 2, men det er rollefeltet, og hele poenget med rollemodellen
+er at maler ikke skal spørre om rollen. Én kilde, med samme navn som helperen i
+`core.auth_decorators`.
+
+Testene som kjørte `applyRoleVisibility()` i node er erstattet av tester på riktig lag, og
+de er **strengere**: de krever fravær fra HTML-en, ikke at noe er skjult. Verifisert ved å
+bytte begge gatene til `{% if True %}` og se seks tester bli røde.
+
+---
+
 ## 2026-08-28 — Kontrollkommandoen før deploy 2, og dokumentasjonen ajour
 
 **997 tester grønne** (6 nye). Ingen migrasjon, ingen atferdsendring.

@@ -32,60 +32,19 @@ function nyIdempotensNokkel() {
 // ROLE-BASED VISIBILITY
 // ════════════════════════════════════════════════════════
 
-// Gates på MODULTILGANG, ikke på rolle (§7.4). Rollen sier ikke lenger noe om
-// hva du får gjøre i denne modulen.
+// Modulnivået, lest fra globalen malen setter (§7.4). Rollen sier ikke noe om
+// hva du får gjøre i en modul.
 //
-// Fellen dette lukker: en `read_write`-konto med bare `les` på pasientmodulen
-// fikk `canWrite = true` her, så «Ny pasient» sto der, skjemaet åpnet seg —
-// og lagringen møtte 403. Serveren var riktig hele tiden; grensesnittet
-// gatet på feil kilde.
+// **Standarden er ingen tilgang.** Mangler globalen, oppfører koden seg som om
+// brukeren ikke har noe.
 //
-// **Standarden er ingen tilgang.** Mangler globalen, skjules alt som krever
-// noe. Feiler malen, skal knappene forsvinne — ikke dukke opp.
+// `applyRoleVisibility()` sto her og skjulte `.write-only`, `.admin-only` og
+// `.list-only` i nettleseren. Alle tre rendres nå server-side i stedet:
+// markupen — inkludert URL-ene til admin-sidene — lå i HTML-en for enhver som
+// kunne lese modulen. Endepunktene var gatet, så det var ingen tilgangsgrense,
+// men det er ingen grunn til å sende noe vi vet mottakeren ikke skal ha.
 function modulNivaa() {
   return ((window.MODUL_TILGANG || {}).patients || '').toLowerCase();
-}
-
-function erAdmin() {
-  return !!(window.MODUL_TILGANG || {}).admin;
-}
-
-function applyRoleVisibility() {
-  const nivaa = modulNivaa();
-
-  const canWrite = nivaa === 'skriv_full';
-  const isAdmin  = erAdmin();
-  // `les` dekker både gamle `read_only` og `lead_view`, som var uenige om
-  // lista: den ene fikk den, den andre ikke. Skillet lå aldri i dataene —
-  // `/api/patients/` returnerer det samme til begge, og tavla viser de samme
-  // pasientene. Lista gis derfor til alle som kan lese, og forskjellen
-  // forsvinner med rollene i deploy 2.
-  const canList  = nivaa !== '';
-
-  if (!canWrite) {
-    document.querySelectorAll('.write-only').forEach(el => {
-      el.style.display = 'none';
-    });
-  }
-
-  if (!canList) {
-    document.querySelectorAll('.list-only').forEach(el => {
-      el.style.display = 'none';
-    });
-    document.querySelectorAll('[data-tab="liste"]').forEach(el => el.classList.remove('active'));
-    const listePanel = document.getElementById('tab-liste');
-    if (listePanel) listePanel.classList.remove('active');
-    const tavleLink = document.querySelector('[data-tab="tavle"]');
-    if (tavleLink) tavleLink.classList.add('active');
-    const tavlePanel = document.getElementById('tab-tavle');
-    if (tavlePanel) tavlePanel.classList.add('active');
-  }
-
-  if (!isAdmin) {
-    document.querySelectorAll('.admin-only').forEach(el => {
-      el.style.display = 'none';
-    });
-  }
 }
 
 // ════════════════════════════════════════════════════════

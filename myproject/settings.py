@@ -153,6 +153,7 @@ TEMPLATES = [
                 'core.context_processors.portal_modules',
                 'core.context_processors.notification_unread_count',
                 'core.context_processors.csp_nonce',
+                'core.context_processors.tilgang',
             ],
         },
     },

@@ -91,7 +91,7 @@
         <li><hr class="dropdown-divider" style="border-color:#334155;margin:0;"></li>
         <li><a class="dropdown-item" href="{% url 'core:profile' %}" style="color:#e5e7eb;"><i class="bi bi-person-circle me-2"></i>Min profil</a></li>
         <li><a class="dropdown-item" href="{% url 'accounts:change_password' %}" style="color:#e5e7eb;"><i class="bi bi-key me-2"></i>Endre passord</a></li>
-        {% if request.user.role == 'admin' %}
+        {% if er_global_admin %}
         <li><a class="dropdown-item" href="{% url 'accounts:user_list' %}" style="color:#e5e7eb;"><i class="bi bi-people me-2"></i>Administrer brukere</a></li>
         {% endif %}
         <li><hr class="dropdown-divider" style="border-color:#334155;margin:0;"></li>
@@ -109,7 +109,7 @@
 <!-- ══════════ TABS ══════════ -->
 <nav id="nav-tabs">
   <ul class="nav" role="tablist">
-    <li class="list-only"><a class="nav-link active" data-tab="liste"        href="#"><i class="bi bi-table me-1"></i>Pasientliste</a></li>
+    <li><a class="nav-link active" data-tab="liste"        href="#"><i class="bi bi-table me-1"></i>Pasientliste</a></li>
     <li><a class="nav-link"        data-tab="tavle"        href="#"><i class="bi bi-grid me-1"></i>Tavle</a></li>
     <li><a class="nav-link"        data-tab="innstillinger" href="#"><i class="bi bi-gear me-1"></i>Innstillinger</a></li>
   </ul>
@@ -118,9 +118,11 @@
 <!-- ══════════ PASIENTLISTE ══════════ -->
 <div id="tab-liste" class="tab-panel active">
   <div id="grid-toolbar">
-    <button class="btn btn-primary btn-sm write-only" data-action="openNewModal">
+    {% if kan_skrive %}
+    <button class="btn btn-primary btn-sm" data-action="openNewModal">
       <i class="bi bi-plus-lg me-1"></i>Ny pasient
     </button>
+    {% endif %}
     <div class="position-relative">
       <i class="bi bi-search position-absolute" style="left:9px;top:50%;transform:translateY(-50%);color:#94a3b8;font-size:0.8rem;pointer-events:none"></i>
       <input type="search" id="grid-search" placeholder="Søk i alle felt…" data-input-action="applyFilter" style="padding-left:28px">
@@ -147,9 +149,11 @@
 <div id="tab-tavle" class="tab-panel">
 
   <div style="padding:0.5rem 1rem 0 1rem;" class="mb-3 d-flex gap-2 align-items-center">
-    <button class="btn btn-primary btn-sm write-only" data-action="openNewModal">
+    {% if kan_skrive %}
+    <button class="btn btn-primary btn-sm" data-action="openNewModal">
       <i class="bi bi-plus-lg me-1"></i>Ny pasient
     </button>
+    {% endif %}
     <button id="btn-board-mine" class="btn btn-outline-info btn-sm"
             data-action="toggleBoardMine"
             title="Dim pasienter som ikke er dine">
@@ -208,12 +212,20 @@
   <div class="d-flex flex-column gap-3" style="max-width:580px">
 
     {% comment %}
+      Server-side, ikke `.admin-only`. Klassen skjulte kortene i nettleseren,
+      så markupen — inkludert URL-ene til admin-sidene — lå i HTML-en for
+      enhver som kunne lese modulen. Endepunktene var gatet, så det var ingen
+      tilgangsgrense, men det er ingen grunn til å sende noe vi vet
+      mottakeren ikke skal ha.
+    {% endcomment %}
+    {% if er_global_admin %}
+    {% comment %}
       Arrangementsnavn og sesjonstimeout lå her fram til §4.1. Ingen av dem er
       pasientinnstillinger: navnet gjelder vakten, timeouten gjelder
       innloggingen. Begge krevde dessuten global admin, og et admin-endepunkt
       inne i en modul sier at modulgrensen ikke betyr noe.
     {% endcomment %}
-    <div class="settings-card admin-only">
+    <div class="settings-card">
       <h6><i class="bi bi-sliders me-2"></i>Portalinnstillinger</h6>
       <p class="small text-muted mb-2">
         Arrangementsnavn og sesjonstimeout gjelder hele portalen og settes
@@ -224,7 +236,7 @@
       </a>
     </div>
 
-    <div class="settings-card admin-only">
+    <div class="settings-card">
       <h6><i class="bi bi-people me-2"></i>Forstehjelpere</h6>
       <p class="small text-muted mb-2">Legg til, endre eller deaktiver forstehjelpere.</p>
       <div id="forstehjelpere-list"><span class="text-muted small">Laster...</span></div>
@@ -234,7 +246,7 @@
       </div>
     </div>
 
-    <div class="settings-card admin-only">
+    <div class="settings-card">
       <h6><i class="bi bi-person-badge me-2"></i>Helsepersonell</h6>
       <p class="small text-muted mb-2">Legg til, endre eller deaktiver helsepersonell.</p>
       <div id="helsepersonell-list"><span class="text-muted small">Laster...</span></div>
@@ -244,7 +256,7 @@
       </div>
     </div>
 
-    <div class="settings-card admin-only">
+    <div class="settings-card">
       <h6><i class="bi bi-cloud-arrow-up me-2"></i>Backup</h6>
       <p class="small text-muted mb-2">
         Backup styres samlet for hele portalen, med eget intervall og egen
@@ -255,7 +267,7 @@
       </a>
     </div>
 
-    <div class="settings-card danger-zone admin-only">
+    <div class="settings-card danger-zone">
       <h6 class="text-danger"><i class="bi bi-trash me-2"></i>Nullstill aktiv vakt</h6>
       <p class="small">
         Sletter permanent alle pasienter i aktiv vakt. Brukes kun for å tømme testdata.
@@ -267,7 +279,7 @@
       </button>
     </div>
 
-    <div class="settings-card admin-only">
+    <div class="settings-card">
       <h6><i class="bi bi-archive me-2"></i>Vaktarkiv</h6>
       <p class="small text-muted mb-2">Lagre et låst arkiv-snapshot av nåværende aktive vakt.</p>
       <div class="d-flex gap-2 flex-wrap mb-2">
@@ -279,6 +291,7 @@
         </button>
       </div>
     </div>
+    {% endif %}
 
   </div>
 </div>
@@ -287,7 +300,7 @@
 <!-- ══════════════════════════════════════════════════
      RESET MODAL (Kun admin)
 ══════════════════════════════════════════════════ -->
-{% if request.user.role == 'admin' %}
+{% if er_global_admin %}
 <div class="modal fade" id="resetModal" tabindex="-1">
   <div class="modal-dialog">
     <div class="modal-content">
@@ -711,9 +724,11 @@
           <i class="bi bi-trash me-1"></i>Slett
         </button>
         <button class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Avbryt</button>
-        <button id="btn-save-edit" class="btn btn-primary btn-sm write-only" data-action="saveEdit">
+        {% if kan_skrive %}
+        <button id="btn-save-edit" class="btn btn-primary btn-sm" data-action="saveEdit">
           <i class="bi bi-save me-1"></i>Lagre endringer
         </button>
+        {% endif %}
       </div>
     </div>
   </div>
@@ -747,7 +762,7 @@
   kjøres på DOMContentLoaded — men holder lesingen logisk.
 {% endcomment %}
 <script src="{% static 'js/patients-app.js' %}"></script>
-{% if request.user.role == 'admin' %}
+{% if er_global_admin %}
 <script src="{% static 'js/patients-admin.js' %}"></script>
 {% endif %}
 <script src="{% static 'js/notifications.js' %}"></script>

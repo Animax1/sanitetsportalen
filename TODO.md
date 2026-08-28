@@ -503,12 +503,9 @@ Gjennomgang 13. aug. 2026, med 1000 pasienter og peak 100 brukere som premiss.
 
 ### Frontend — småting
 
-- [ ] **`.admin-only` og `.write-only` skjules i nettleseren, ikke på serveren.**
-      Markupen ligger i HTML-en uansett rolle; `applyRoleVisibility()` setter
-      `display:none`. Endepunktene er gatet, så det er ikke en tilgangsgrense — men det
-      røper URL-strukturen for admin-sidene, og en bruker med utviklerverktøy ser
-      knapper hen ikke kan bruke. Bør bli `{% if %}` server-side, slik nav-blokka i
-      `base_portal.html` allerede er. `PortalAdminNavTests` beskriver skillet.
+- [x] **`.admin-only` og `.write-only` rendres server-side (28. aug. 2026).**
+      `applyRoleVisibility()` er fjernet, og `er_global_admin` er en context processor.
+      `ServerSideSynlighetTests` krever fravær fra HTML-en, ikke at noe er skjult.
 
 ### Framtidige moduler
 

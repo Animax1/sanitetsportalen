@@ -1596,7 +1596,15 @@ class HeaderArrangementNavnTests(TestCase):
         """
         resp = self.client.get('/pasienter/')
         self.assertNotContains(resp, 'id="setting-event-name"')
-        self.assertContains(resp, '/portal-admin/innstillinger/')
+        # Lenken rendres kun for global admin — kortet er server-side gatet.
+        self.assertNotContains(resp, '/portal-admin/innstillinger/')
+
+        admin = CustomUser.objects.create_user(
+            username='arr_admin', password='x', role='admin',
+            must_change_password=False)
+        c = Client()
+        c.force_login(admin)
+        self.assertContains(c.get('/pasienter/'), '/portal-admin/innstillinger/')
 
     def test_navnet_escapes_i_templaten(self):
         """Arrangementsnavnet er fritekst fra innstillingene."""

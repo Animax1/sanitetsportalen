@@ -57,7 +57,9 @@ def index_view(request):
         # `les` — hen fikk opp skjemaet, fylte det ut, og møtte 403 på lagre.
         # En knapp som fører til en vegg er verre enn ingen knapp.
         'modul_nivaa': nivaa_for(request.user, 'patients') or '',
-        'er_global_admin': er_global_admin(request.user),
+        'kan_skrive': har_tilgang(request.user, 'patients', 'skriv_full'),
+        # `er_global_admin` kommer fra context processoren, ikke herfra: den
+        # trengs i base_portal.html og profilsiden også.
     })
 
 

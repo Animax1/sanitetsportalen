@@ -143,7 +143,6 @@ document.addEventListener('visibilitychange', async () => {
 });
 
 document.addEventListener('DOMContentLoaded', async () => {
-  applyRoleVisibility();
   initTable();
   const mineBtn = document.getElementById('btn-mine');
   if (mineBtn) mineBtn.classList.toggle('active-mine', mineOnly);
