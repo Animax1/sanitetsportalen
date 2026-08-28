@@ -93,8 +93,10 @@ vi knapper som fører til 403 — og en knapp som fører til en vegg er verre en
 Ordet «bruker» i grensesnittet betyr *ikke* «vanlig tilgang» — kontoen ser ingenting før
 den har en `ModulTilgang`-rad.
 
-De fem `kan_redigere_*`-flaggene styrer ingenting i det hele tatt, og står kun til deploy 3.
-Sett dem ikke, les dem ikke.
+De fem `kan_redigere_*`-flaggene er **borte** (deploy 3). Skal en ny modul gates, trengs
+ingen kolonne på `CustomUser` — en `ModulTilgang`-rad er hele mekanismen. Det var nettopp
+det flaggene gjorde galt: de la tilgang i skjemaet i stedet for i data, og en modul som
+ikke hadde noe flagg kunne ikke gates i det hele tatt.
 
 **Tester lager brukere med `accounts.test_helpers.gi_standardtilgang(bruker, profil)`.**
 Profilen oppgis eksplisitt — `leser`, `skriver`, `leder_les`, `leder`, `admin` — fordi

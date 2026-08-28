@@ -35,6 +35,14 @@ class BackfillTests(TestCase):
     Skrev testene `bruker`, ville de bekreftet at backfillen ikke gjør noe —
     som er sant i dag og irrelevant. Django validerer ikke `choices` ved
     `save()`, så verdiene går inn slik de sto den gangen.
+
+    **`test_flagget_paavirker_ingenting` sto her fram til deploy 3.** Den lagde
+    to brukere med samme rolle og ulikt `kan_redigere_pasienter`, og krevde
+    identiske rader — vernet mot at backfillen skulle utlede fra flagget og
+    stille trekke tilbake tilgang. Feltet er fjernet, så de to brukerne ville
+    vært identiske og testen kunne ikke lenger feilet. En test som ikke kan
+    feile er verre enn ingen test: den ser ut som et vern. Regelen den
+    beskyttet står fortsatt i §8.1, og kartleggingen låses av testen under.
     """
 
     FASIT = {
@@ -60,20 +68,6 @@ class BackfillTests(TestCase):
         for rolle, fasit in self.FASIT.items():
             with self.subTest(rolle=rolle):
                 self.assertEqual(self._rader(brukere[rolle]), fasit)
-
-    def test_flagget_paavirker_ingenting(self):
-        """To brukere med samme rolle og ulikt flagg skal få identiske rader.
-
-        Utledet vi fra flagget, ville brukere som i dag *kan* nå modulen via
-        URL-en mistet tilgangen i det håndhevelsen slås på — og en migrasjon
-        som stille trekker tilbake tilgang oppdager du midt i en vakt.
-        """
-        med = _bruker('flagg_ja', 'read_write', kan_redigere_pasienter=True)
-        uten = _bruker('flagg_nei', 'read_write', kan_redigere_pasienter=False)
-        ModulTilgang.objects.all().delete()
-        self._kjor_backfill()
-        self.assertEqual(self._rader(med), self._rader(uten))
-        self.assertEqual(self._rader(uten), {('patients', 'skriv_full')})
 
     def test_backfillen_kan_kjores_om_igjen(self):
         """Etter en rollback og ny fram skal andre forsøk ikke krasje."""

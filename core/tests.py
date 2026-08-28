@@ -684,16 +684,17 @@ class ModuleVisibilityTests(TestCase):
         slugs = {m.slug for m in get_dashboard_modules(bruker)}
         self.assertIn('patients', slugs)
 
-    def test_flagget_gir_ikke_lenger_synlighet(self):
-        """De fem `kan_redigere_*`-flaggene styrer ingenting nå.
+    def test_uten_rad_ingen_synlighet(self):
+        """Fravær av rad er ingen tilgang — også i menyen.
 
-        De står til deploy 3, slik at en rollback har noe å bygge radene fra.
-        Fram til da må de ikke ved et uhell begynne å gjelde igjen: en bruker
-        med flagget, men uten rad, skal ikke se modulen.
+        Testen satte tidligere `kan_redigere_pasienter=True` for å vise at
+        flagget ikke lenger ga synlighet. Feltet er borte etter deploy 3, så
+        det som står igjen er selve invarianten: en konto uten rad ser ikke
+        modulen, uansett hva annet som er satt på den.
         """
         bruker = User.objects.create_user(
-            username='bare_flagg', password='x', role='bruker',
-            must_change_password=False, kan_redigere_pasienter=True,
+            username='uten_rad', password='x', role='bruker',
+            must_change_password=False,
         )
         slugs = {m.slug for m in get_dashboard_modules(bruker)}
         self.assertNotIn('patients', slugs)
@@ -808,7 +809,6 @@ class DashboardRendringTests(TestCase):
         bruker = User.objects.create_user(
             username='dash_dis', password='x', role='bruker',
             must_change_password=False,
-            kan_redigere_pasienter=True,
         )
         gi_standardtilgang(bruker, 'leser')
         ModuleSettings.objects.filter(slug='patients').update(enabled=False)
@@ -901,25 +901,35 @@ class AuditLogAppLabelTests(TestCase):
 
 @override_settings(SECURE_SSL_REDIRECT=False)
 class CustomUserPermissionFlagsTests(TestCase):
-    """Verifiserer at de 5 permission-flaggene finnes på CustomUser."""
+    """De fem `kan_redigere_*`-flaggene er fjernet (deploy 3).
 
-    def test_alle_fem_flagg_eksisterer(self):
-        bruker = User.objects.create_user(
-            username='flag_test', password='x', role='bruker',
-            must_change_password=False,
-        )
-        gi_standardtilgang(bruker, 'leser')
-        for felt in [
-            'kan_redigere_pasienter',
-            'kan_redigere_vakter',
-            'kan_redigere_utstyr',
-            'kan_se_rapport',
-            'kan_redigere_beredskap',
-        ]:
-            self.assertTrue(hasattr(bruker, felt), f'CustomUser mangler {felt}')
-            # Default skal være False for nye brukere.
-            self.assertFalse(getattr(bruker, felt),
-                             f'{felt} skal default være False')
+    Testen sto tidligere og krevde at feltene *fantes*. Den er snudd, ikke
+    slettet: flaggene så ut som tilgangskontroll uten å være det i to år, og
+    et felt som kommer tilbake ved en modell-refaktorering ville invitert
+    neste utvikler til å gate på det igjen.
+    """
+
+    FJERNEDE = (
+        'kan_redigere_pasienter',
+        'kan_redigere_vakter',
+        'kan_redigere_utstyr',
+        'kan_se_rapport',
+        'kan_redigere_beredskap',
+    )
+
+    def test_ingen_av_flaggene_finnes_paa_modellen(self):
+        felter = {f.name for f in User._meta.get_fields()}
+        for felt in self.FJERNEDE:
+            with self.subTest(felt=felt):
+                self.assertNotIn(felt, felter)
+
+    def test_flaggene_kan_ikke_settes_ved_oppretting(self):
+        """Et kall som prøver skal feile høylytt, ikke lagre stille."""
+        with self.assertRaises(TypeError):
+            User.objects.create_user(
+                username='flag_test', password='x', role='bruker',
+                must_change_password=False, kan_redigere_pasienter=True,
+            )
 
 
 # ════════════════════════════════════════════════════════════════════════════
@@ -1179,8 +1189,6 @@ class ProfileViewTests(TestCase):
         self.user = User.objects.create_user(
             username='profilbruker', password='x', role='bruker',
             must_change_password=False,
-            kan_redigere_pasienter=True,
-            kan_se_rapport=False,
         )
         gi_standardtilgang(self.user, 'leser')
         self.client = Client()
@@ -1200,15 +1208,21 @@ class ProfileViewTests(TestCase):
         self.assertContains(resp, 'profilbruker')
         self.assertContains(resp, 'Min profil')
 
-    def test_profil_viser_permissions(self):
-        """Permissions-kortet skal vise alle 5 flagg."""
+    def test_profil_viser_modulene_fra_registeret(self):
+        """Kortet følger modulregisteret, ikke en hardkodet liste.
+
+        Testen krevde tidligere «Vakter», «Utstyr», «Rapport» og «Beredskap» —
+        etikettene til de fem flaggene. Ingen av dem er moduler; de var
+        plassholdere for apper som aldri ble skrevet, og kortet lovet brukeren
+        tilganger til noe som ikke finnes.
+        """
         self.client.force_login(self.user)
         resp = self.client.get('/min-profil/')
         self.assertContains(resp, 'Pasientregistrering')
-        self.assertContains(resp, 'Vakter')
-        self.assertContains(resp, 'Utstyr')
-        self.assertContains(resp, 'Rapport')
-        self.assertContains(resp, 'Beredskap')
+        self.assertContains(resp, 'Statistikk')
+        for spoekelse in ('Vakter', 'Utstyr', 'Beredskap'):
+            with self.subTest(modul=spoekelse):
+                self.assertNotContains(resp, spoekelse)
 
     def test_profil_kun_GET(self):
         self.client.force_login(self.user)
@@ -1237,6 +1251,83 @@ class ProfileViewTests(TestCase):
 
 
 @override_settings(SECURE_SSL_REDIRECT=False)
+class ProfilModulTilgangKortetTests(TestCase):
+    """Kortet «Modul-tilganger» leser `ModulTilgang`, ikke de døde flaggene.
+
+    Feilen den erstatter var brukervendt og stille: kortet bygde på de fem
+    `kan_redigere_*`-flaggene, og backfillen i deploy 1 rørte dem ikke med
+    vilje (§8.1). En konto med `patients: skriv_full` fikk derfor «Nei» på
+    pasientregistrering, over teksten «Ta kontakt om du trenger flere
+    tilganger». Siden ba brukeren melde fra om noe hen allerede hadde.
+
+    Ingen test fanget det, fordi den som fantes bare krevde at de fem
+    etikettene sto i HTML-en.
+    """
+
+    def setUp(self):
+        reset_registry_cache()
+        ModuleSettings.ensure_defaults_exist()
+        self.client = Client()
+
+    def _kort(self, bruker):
+        self.client.force_login(bruker)
+        html = self.client.get('/min-profil/').content.decode()
+        return html.split('Modul-tilganger')[1].split('Ta kontakt')[0]
+
+    def _bruker(self, navn, tilganger=(), rolle='bruker'):
+        b = User.objects.create_user(
+            username=navn, password='x', role=rolle, must_change_password=False)
+        for slug, nivaa in tilganger:
+            ModulTilgang.objects.create(bruker=b, modul_slug=slug, nivaa=nivaa)
+        return b
+
+    def test_nivaaet_vises_ikke_bare_ja(self):
+        """Kollegaens matrise, slik den står i prod."""
+        kort = self._kort(self._bruker('kort_kollega', [
+            ('patients', 'skriv_full'), ('statistikk', 'les')]))
+        self.assertIn('Skrive: full', kort)
+        self.assertIn('Lese', kort)
+
+    def test_skrivetilgang_meldes_ikke_som_ingen(self):
+        """Selve feilen: skriv_full ga «Nei» fordi flagget var av."""
+        kort = self._kort(self._bruker(
+            'kort_skriver', [('patients', 'skriv_full')]))
+        pasientrad = kort.split('Pasientregistrering')[1].split('perm-')[1]
+        self.assertTrue(pasientrad.startswith('yes'),
+                        'skriv_full skal ikke vises som «ingen tilgang»')
+
+    def test_uten_rad_staar_ingen_tilgang(self):
+        """Vern mot at kortet alltid sier ja."""
+        kort = self._kort(self._bruker('kort_tom'))
+        self.assertIn('Ingen tilgang', kort)
+        self.assertNotIn('Skrive: full', kort)
+
+    def test_admin_har_alt_uten_rader(self):
+        kort = self._kort(self._bruker('kort_admin', rolle='admin'))
+        self.assertNotIn('Ingen tilgang', kort)
+
+    def test_deaktivert_modul_merkes_som_av_ikke_som_manglende_tilgang(self):
+        """To ulike ting: «du har ikke fått» og «den er slått av».
+
+        Slås de sammen, leser brukeren et driftsvalg som et tilgangsvalg og
+        ber om noe hen allerede har.
+        """
+        bruker = self._bruker('kort_av', [('patients', 'les')])
+        ModuleSettings.objects.filter(slug='patients').update(enabled=False)
+        kort = self._kort(bruker)
+        pasientrad = kort.split('Pasientregistrering')[1].split('</div>')[0]
+        self.assertIn('Av', pasientrad)
+        self.assertIn('Lese', kort)
+
+    def test_aktiv_modul_merkes_ikke_som_av(self):
+        """Vern mot at «Av»-merket alltid vises."""
+        bruker = self._bruker('kort_paa', [('patients', 'les')])
+        kort = self._kort(bruker)
+        pasientrad = kort.split('Pasientregistrering')[1].split('</div>')[0]
+        self.assertNotIn('>Av<', pasientrad)
+
+
+@override_settings(SECURE_SSL_REDIRECT=False)
 class NavMenuFase3bTests(TestCase):
     """Verifiserer at Min profil og admin-lenker er i nav-meny + dropdown."""
 
@@ -1244,13 +1335,11 @@ class NavMenuFase3bTests(TestCase):
         self.admin = User.objects.create_user(
             username='nav_admin', password='x', role='admin',
             must_change_password=False, is_staff=True,
-            kan_redigere_pasienter=True,
         )
         gi_standardtilgang(self.admin, 'admin')
         self.read_only = User.objects.create_user(
             username='nav_ro', password='x', role='bruker',
             must_change_password=False,
-            kan_redigere_pasienter=True,
         )
         gi_standardtilgang(self.read_only, 'leser')
         self.client = Client()

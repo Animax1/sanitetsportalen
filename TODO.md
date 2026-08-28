@@ -417,9 +417,17 @@ skal ligge der.
             `ModulTilgang` eneste fasit: en rollback av deploy 1 kan ikke lenger bygge
             matrisen på nytt fra `role`.
 
-- [ ] **Deploy 3:** de fem `kan_redigere_*`-flaggene fjernes. Slås 1 og 3 sammen, mister
-      en rollback dataene. Kan tas når deploy 2 har stått en stund i prod — etter deploy 2
-      er vinduet der en rollback kan gjenskape matrisen fra `role` uansett over.
+- [x] **Deploy 3 — kodet 28. aug. 2026, ikke deployet.** De fem `kan_redigere_*`-flaggene
+      er fjernet (`accounts.0014_fjern_modulflagg`).
+      - [x] **Kortet «Modul-tilganger» på `/min-profil/` skrevet om.** Det leste flaggene og
+            viste «Nei» til brukere som faktisk hadde tilgang — backfillen rørte flagget med
+            vilje (§8.1). Kortet leser nå `ModulTilgang`, følger modulregisteret i stedet
+            for fem hardkodede etiketter, viser nivånavn i stedet for Ja/Nei, og skiller
+            «modulen er slått av» fra «du har ikke tilgang».
+      - [x] `test_flagget_paavirker_ingenting` fjernet: uten feltet kunne den ikke feile.
+            `CustomUserPermissionFlagsTests` snudd til å kreve at feltene er borte.
+      - [ ] **Deploy til prod.** Kan gå rett etter deploy 2 — de to rører ikke samme kolonne,
+            og flaggene er tomme uansett.
 
 - [x] **Sletting åpnet for `skriv: full` (28. aug. 2026)**, kun på pasienter brukeren selv opprettet
       siste 30 min. «Egen pasient» avgjøres fra `AuditLog`s CREATE-rad — indeksert på

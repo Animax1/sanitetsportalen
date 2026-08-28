@@ -104,45 +104,16 @@ class CustomUser(AbstractBaseUser, PermissionsMixin):
     updated_at = models.DateTimeField(auto_now=True, verbose_name='Oppdatert')
     last_login_at = models.DateTimeField(null=True, blank=True, verbose_name='Siste innlogging')
 
-    # ── Modul-permissions (Fase 3a) — DØDE FELTER, fjernes i deploy 3 ──────
-    # De fem flaggene styrer ingenting. Menyen leser `ModulTilgang` (via
-    # `Module.is_visible_for`), og endepunktene leser den samme tabellen via
-    # `@modul_kreves`. Ingen av dem har lest et flagg siden deploy 1.
+    # Her lå de fem `kan_redigere_*`-flaggene fra Fase 3a fram til deploy 3.
+    # De var boolske felter som skulle styre hvilke moduler brukeren så, men
+    # ingen view leste dem — og etter at `Module.is_visible_for` gikk over til
+    # `ModulTilgang` gjorde de ingenting i det hele tatt. De ble stående
+    # gjennom deploy 1 og 2 av én grunn: en rollback av deploy 1 måtte ha noe
+    # å bygge radene fra. Etter at `role` krympet er ikke det vinduet der
+    # lenger, og feltene er fjernet i `accounts.0014_fjern_modulflagg`.
     #
-    # De står igjen av én grunn: en rollback av deploy 1 må ha noe å bygge
-    # radene fra på nytt, og backfillen leser `role`. Etter deploy 2 er ikke
-    # `role` lenger fasit for annet enn admin, så vinduet der en rollback kan
-    # gjenskape matrisen er over — derfor kan deploy 3 slette dem.
-    #
-    # Sett dem ikke. Les dem ikke. Gate ikke på dem.
-    kan_redigere_pasienter = models.BooleanField(
-        default=False,
-        verbose_name='Kan se pasientregistrering',
-        help_text='Gir tilgang til /pasienter/-modulen i dashboard og nav-meny.',
-    )
-    kan_redigere_vakter = models.BooleanField(
-        default=False,
-        verbose_name='Kan se vakt-modulen',
-        help_text='Reservert for fremtidig vakt-administrasjon (planlagt).',
-    )
-    kan_redigere_utstyr = models.BooleanField(
-        default=False,
-        verbose_name='Kan se utstyr-modulen',
-        help_text='Reservert for fremtidig utstyrs-/lager-modul (planlagt).',
-    )
-    kan_se_rapport = models.BooleanField(
-        default=False,
-        verbose_name='Kan se rapport-modulen',
-        help_text='Reservert for fremtidig rapport-/statistikk-modul (planlagt).',
-    )
-    kan_redigere_beredskap = models.BooleanField(
-        default=False,
-        verbose_name='Kan se beredskap-modulen',
-        help_text=(
-            'Reservert for fremtidig beredskap-/ambulanse-modul (planlagt). '
-            'Krever egen GDPR-vurdering før aktivering.'
-        ),
-    )
+    # Tilgang til en modul er en rad i `ModulTilgang`. Skal en ny modul gates,
+    # trengs ingen kolonne her — det var nettopp problemet flaggene skapte.
 
     objects = CustomUserManager()
 
