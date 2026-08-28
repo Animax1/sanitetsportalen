@@ -366,11 +366,12 @@ skal ligge der.
 - [ ] **`session_timeout` og `event_name` flyttes til portal-admin.** Portalinnstillinger
       som tilfeldigvis bor under `/pasienter/`. Merk at `saveEventName` da flytter ut av
       pasientmodulens JS — se F7-regelen i `CLAUDE.md`.
-- [ ] **`PasientRolleForm` splittes.** Radioen setter kun førstehjelper/helsepersonell-
-      koblingen (domenedata); tilgang settes i matrisen modul × nivå. To steg, bevisst.
-- [ ] **Matrisen bør ligge på opprettingsskjemaet.** `AdminUserCreateForm` har `role`,
-      men ikke modulflaggene — de finnes kun på redigeringsskjemaet. Med håndhevelse
-      lander den nyinviterte i en tom portal og må redigeres etterpå.
+- [x] **`PasientRolleForm` splittet (28. aug. 2026).** Radioen setter kun
+      førstehjelper/helsepersonell-koblingen; tilgang settes i matrisen.
+- [x] **Matrisen ligger på opprettingsskjemaet (28. aug. 2026).** Meldt fra staging: en
+      ny konto med «Pasientregistrering» avkrysset så ingen modul på dashboardet. Boksene
+      er erstattet av en matrise modul × nivå, generert fra `get_all_modules()`, på både
+      opprettings- og redigeringsskjemaet.
 - [ ] **`notify()` må sjekke modultilgang.** `_notify_assignment`
       (`patients/signals.py:234`) fyrer på at `role_obj.user` er satt. Etter splitten av
       `PasientRolleForm` kan man være koblet som helsepersonell uten
@@ -380,12 +381,10 @@ skal ligge der.
       `dispatch()` kjører viewet *før* rollesjekken) og `dataset_scope_all` (aldri brukt).
       Rett `docs/TEKNISK_DOKUMENTASJON.md` §6.3: peker på shimen, og kaller hard-deleten
       «soft».
-- [ ] **Rolleendring auditeres ikke.** `action == 'edit'` i `accounts/views.py` kaller
-      `form.save()` uten `_log_user_admin_action`. Frys og sletting logges; det å gi noen
-      admin gjør det ikke. Tilgangsendringer i matrisen må logges fra dag én.
-- [ ] **`create_offline_users` og `create_admin` må sette modultilgang.** `vakt-offline`
-      har `role='read_write'` og ingen flagg i dag — med håndhevelse lander den i en tom
-      portal.
+- [x] **Rolle- og tilgangsendringer auditeres (28. aug. 2026).** Én rad per modul som
+      endres, med `table_name='accounts_modultilgang'`.
+- [x] **`create_offline_users` setter modultilgang (28. aug. 2026).** `create_admin`
+      trenger ingenting: global admin bruker ikke `ModulTilgang`.
 - [ ] **Verifiseringskommando som teller `ModulTilgang`-rader mot `role`.** Staging har
       egen, tom database, så backfillen kan **ikke** verifiseres mot ekte rollefordeling
       der. Kommandoen kjøres read-only mot prod mellom deploy 1 og 2 — det er den samme

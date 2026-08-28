@@ -253,3 +253,30 @@ class ModulKrevesDekoratorTests(TestCase):
         def view(request):
             return None
         self.assertEqual(view._modul_kreves, ('patients', 'skriv_full'))
+
+
+class OfflineBrukerTilgangTests(TestCase):
+    """`vakt-offline` hadde `role='read_write'` og ingen rader.
+
+    Udramatisk mens flaggene ikke gjorde noe. Med håndhevelse ser
+    feltmaskinen en tom portal — og det oppdages i det den skal brukes, altså
+    på en vakt uten nett.
+    """
+
+    def test_offline_brukerne_far_modultilgang(self):
+        from django.core.management import call_command
+        from io import StringIO
+        call_command('create_offline_users', stdout=StringIO())
+
+        vakt = CustomUser.objects.get(username='vakt-offline')
+        self.assertTrue(har_tilgang(vakt, 'patients', 'skriv_full'))
+
+    def test_admin_offline_trenger_ingen_rader(self):
+        """Global admin bruker ikke ModulTilgang. Tom liste er et valg."""
+        from django.core.management import call_command
+        from io import StringIO
+        call_command('create_offline_users', stdout=StringIO())
+
+        admin = CustomUser.objects.get(username='admin-offline')
+        self.assertEqual(ModulTilgang.objects.filter(bruker=admin).count(), 0)
+        self.assertTrue(har_tilgang(admin, 'patients', 'skriv_full'))

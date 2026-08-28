@@ -176,8 +176,6 @@ class PasientRolleFormTests(TestCase):
         form.save()
         self.fh.refresh_from_db()
         self.assertEqual(self.fh.user, self.user)
-        self.user.refresh_from_db()
-        self.assertTrue(self.user.kan_redigere_pasienter)
 
     def test_link_to_helsepersonell(self):
         form = self.FormCls(self.user, data={'pasient_rolle': 'helsepersonell'})
@@ -185,10 +183,24 @@ class PasientRolleFormTests(TestCase):
         form.save()
         self.hp.refresh_from_db()
         self.assertEqual(self.hp.user, self.user)
-        self.user.refresh_from_db()
-        self.assertTrue(self.user.kan_redigere_pasienter)
 
-    def test_ingen_removes_access(self):
+    def test_koblingen_gir_ikke_tilgang(self):
+        """§7.3: radioen setter funksjon i felt, ikke autorisasjon.
+
+        Den satte tidligere `kan_redigere_pasienter` også. Sammenblandingen
+        gjorde det umulig å være koblet som førstehjelper uten å ha tilgang —
+        og omvendt. Tilgang settes nå i matrisen modul × nivå.
+        """
+        from accounts.models import ModulTilgang
+        form = self.FormCls(self.user, data={'pasient_rolle': 'forstehjelper'})
+        self.assertTrue(form.is_valid())
+        form.save()
+        self.assertFalse(
+            ModulTilgang.objects.filter(bruker=self.user).exists(),
+            'koblingen skal ikke opprette en tilgangsrad',
+        )
+
+    def test_ingen_removes_link(self):
         self.fh.user = self.user
         self.fh.save()
         form = self.FormCls(self.user, data={'pasient_rolle': 'ingen'})
@@ -196,8 +208,6 @@ class PasientRolleFormTests(TestCase):
         form.save()
         self.fh.refresh_from_db()
         self.assertIsNone(self.fh.user)
-        self.user.refresh_from_db()
-        self.assertFalse(self.user.kan_redigere_pasienter)
 
     def test_switch_releases_old_link(self):
         """Bytt fra førstehjelper til helsepersonell — gammel kobling frigjøres."""

@@ -94,6 +94,23 @@
           </div>
         </div>
 
+        <hr style="border-color:#334155;">
+        <div class="mb-2">
+          <label class="form-label mb-2">Modul-tilgang</label>
+          <div class="form-text mb-2">
+            Settes her, ikke etterpå: uten tilgang lander den nyopprettede
+            brukeren i en tom portal. Administratorer har alltid full tilgang
+            og påvirkes ikke av valgene under.
+          </div>
+          {% for felt in tilgang_form.rader %}
+            <div class="mb-2">
+              <label class="form-label small mb-1" for="{{ felt.id_for_label }}">{{ felt.label }}</label>
+              {{ felt }}
+              {% if felt.errors %}<div class="text-danger small mt-1">{{ felt.errors.0 }}</div>{% endif %}
+            </div>
+          {% endfor %}
+        </div>
+
         <button type="submit" class="btn btn-primary w-100 mt-3">
           <i class="bi bi-person-plus me-1"></i>Opprett bruker
         </button>

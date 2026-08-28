@@ -8,7 +8,7 @@ from django.test import TestCase, Client, override_settings
 from django.urls import reverse
 from django.utils import timezone
 
-from accounts.models import CustomUser
+from accounts.models import CustomUser, ModulTilgang
 
 
 def _create_session_for_user(user):
@@ -438,8 +438,13 @@ class BulkPermissionActionsTests(TestCase):
 
 
 @override_settings(SECURE_SSL_REDIRECT=False)
-class AdminUserEditFormPermissionTests(TestCase):
-    """Tester at AdminUserEditForm aksepterer og lagrer alle 5 permission-flagg."""
+class ModulTilgangMatriseTests(TestCase):
+    """Matrisen modul x nivaa erstattet de fem avkrysningsboksene.
+
+    Boksene styrte kun meny og dashboard, aldri et endepunkt. Etter at
+    synligheten begynte aa lese `ModulTilgang`, gjorde de ingenting i det hele
+    tatt - og en boks som ikke gjoer noe er verre enn ingen boks.
+    """
 
     def setUp(self):
         self.client = Client()
@@ -450,53 +455,115 @@ class AdminUserEditFormPermissionTests(TestCase):
         self.target = CustomUser.objects.create_user(
             username='edit_target', password='x', role='read_only',
             must_change_password=False,
-            kan_redigere_pasienter=False,
-            kan_redigere_vakter=False,
-            kan_redigere_utstyr=False,
-            kan_se_rapport=False,
-            kan_redigere_beredskap=False,
         )
         self.client.force_login(self.admin)
 
-    def test_form_inneholder_alle_fem_flagg(self):
-        from accounts.forms import AdminUserEditForm
-        form = AdminUserEditForm(instance=self.target)
-        for felt in [
-            'kan_redigere_pasienter',
-            'kan_redigere_vakter',
-            'kan_redigere_utstyr',
-            'kan_se_rapport',
-            'kan_redigere_beredskap',
-        ]:
-            self.assertIn(felt, form.fields, f'Form mangler {felt}')
+    def _detalj(self):
+        return reverse('accounts:user_detail', kwargs={'pk': self.target.pk})
 
-    def test_redigering_lagrer_alle_fem_flagg(self):
-        url = reverse('accounts:user_detail', kwargs={'pk': self.target.pk})
-        resp = self.client.post(url, {
-            'action': 'edit',
-            'role': 'read_only',
-            'is_active': 'on',
-            'kan_redigere_pasienter': 'on',
-            'kan_redigere_vakter': 'on',
-            'kan_redigere_utstyr': 'on',
-            'kan_se_rapport': 'on',
-            'kan_redigere_beredskap': 'on',
+    def test_matrisen_genereres_fra_registeret(self):
+        """Ikke en hardkodet liste: nye moduler skal dukke opp av seg selv."""
+        from accounts.forms import ModulTilgangForm
+        from core.modules import get_all_modules
+
+        felter = set(ModulTilgangForm().fields)
+        forventet = {f'modul_{m.slug}' for m in get_all_modules() if not m.admin_only}
+        self.assertEqual(felter, forventet)
+
+    def test_admin_only_moduler_er_utelatt(self):
+        from accounts.forms import ModulTilgangForm
+        felter = ModulTilgangForm().fields
+        self.assertNotIn('modul_accounts', felter)
+        self.assertNotIn('modul_core', felter)
+
+    def test_tomt_nivaa_tilbys_ikke_i_grensesnittet(self):
+        """`skriv_handling` finnes i modellen, men gir ingenting ennaa.
+
+        Et nivaa som ikke gjoer noe er lett aa dele ut i god tro, og gir
+        automatisk mer den dagen det fylles. Tilbys naar en modul har et
+        handling-endepunkt aa bruke det paa (par. 3.2).
+        """
+        from accounts.forms import ModulTilgangForm
+        valg = dict(ModulTilgangForm().fields['modul_patients'].choices)
+        self.assertNotIn('skriv_handling', valg)
+        self.assertIn('les', valg)
+        self.assertIn('skriv_full', valg)
+
+    def test_redigering_skriver_radene(self):
+        resp = self.client.post(self._detalj(), {
+            'action': 'edit', 'role': 'read_only', 'is_active': 'on',
+            'modul_patients': 'skriv_full', 'modul_statistikk': 'les',
         })
         self.assertEqual(resp.status_code, 302)
-        self.target.refresh_from_db()
-        self.assertTrue(self.target.kan_redigere_pasienter)
-        self.assertTrue(self.target.kan_redigere_vakter)
-        self.assertTrue(self.target.kan_redigere_utstyr)
-        self.assertTrue(self.target.kan_se_rapport)
-        self.assertTrue(self.target.kan_redigere_beredskap)
+        rader = dict(ModulTilgang.objects.filter(bruker=self.target)
+                     .values_list('modul_slug', 'nivaa'))
+        self.assertEqual(rader, {'patients': 'skriv_full', 'statistikk': 'les'})
 
-    def test_user_detail_template_viser_permission_felt(self):
-        url = reverse('accounts:user_detail', kwargs={'pk': self.target.pk})
-        resp = self.client.get(url)
-        self.assertEqual(resp.status_code, 200)
-        # Sjekkboksene (form-feltene) skal være med
-        self.assertContains(resp, 'name="kan_redigere_pasienter"')
-        self.assertContains(resp, 'name="kan_redigere_vakter"')
-        self.assertContains(resp, 'name="kan_redigere_utstyr"')
-        self.assertContains(resp, 'name="kan_se_rapport"')
-        self.assertContains(resp, 'name="kan_redigere_beredskap"')
+    def test_ingen_tilgang_sletter_raden(self):
+        """Fravaer av rad *er* ingen tilgang - ingen 'ingen'-verdi lagres."""
+        ModulTilgang.objects.create(
+            bruker=self.target, modul_slug='patients', nivaa='les')
+        self.client.post(self._detalj(), {
+            'action': 'edit', 'role': 'read_only', 'is_active': 'on',
+            'modul_patients': '', 'modul_statistikk': '',
+        })
+        self.assertFalse(ModulTilgang.objects.filter(bruker=self.target).exists())
+
+    def test_endring_auditeres_per_modul(self):
+        from audit.models import AuditLog
+        self.client.post(self._detalj(), {
+            'action': 'edit', 'role': 'read_only', 'is_active': 'on',
+            'modul_patients': 'skriv_full',
+        })
+        rader = AuditLog.objects.filter(table_name='accounts_modultilgang')
+        self.assertEqual(rader.count(), 1)
+        rad = rader.first()
+        self.assertEqual(rad.field_name, 'patients')
+        self.assertEqual(rad.old_value, 'ingen')
+        self.assertEqual(rad.new_value, 'skriv_full')
+        self.assertEqual(rad.app_label, 'accounts')
+
+    def test_rolleendring_auditeres(self):
+        """Frysing og sletting ble logget; det aa gi noen admin ble ikke."""
+        from audit.models import AuditLog
+        self.client.post(self._detalj(), {
+            'action': 'edit', 'role': 'admin', 'is_active': 'on',
+        })
+        rad = AuditLog.objects.filter(
+            table_name='accounts_customuser', field_name='role').first()
+        self.assertIsNotNone(rad, 'rolleendring skal loggfoeres')
+        self.assertEqual(rad.old_value, 'read_only')
+        self.assertEqual(rad.new_value, 'admin')
+
+    def test_uendret_matrise_gir_ingen_auditrader(self):
+        from audit.models import AuditLog
+        ModulTilgang.objects.create(
+            bruker=self.target, modul_slug='patients', nivaa='les')
+        self.client.post(self._detalj(), {
+            'action': 'edit', 'role': 'read_only', 'is_active': 'on',
+            'modul_patients': 'les', 'modul_statistikk': '',
+        })
+        self.assertEqual(
+            AuditLog.objects.filter(table_name='accounts_modultilgang').count(), 0)
+
+    def test_matrisen_vises_paa_detaljsiden(self):
+        resp = self.client.get(self._detalj())
+        self.assertContains(resp, 'name="modul_patients"')
+        self.assertContains(resp, 'name="modul_statistikk"')
+
+    def test_matrisen_vises_paa_opprettingsskjemaet(self):
+        """Par. 10.3: uten den lander den nyinviterte i en tom portal."""
+        resp = self.client.get(reverse('accounts:user_create'))
+        self.assertContains(resp, 'name="modul_patients"')
+
+    def test_ny_bruker_far_tilgangen_med_en_gang(self):
+        self.client.post(reverse('accounts:user_create'), {
+            'username': 'ny_med_tilgang', 'role': 'read_write',
+            'metode': 'midlertidig', 'modul_patients': 'skriv_full',
+        })
+        ny = CustomUser.objects.get(username='ny_med_tilgang')
+        self.assertEqual(
+            list(ModulTilgang.objects.filter(bruker=ny)
+                 .values_list('modul_slug', 'nivaa')),
+            [('patients', 'skriv_full')],
+        )

@@ -4,6 +4,51 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-08-28 — Deploy 1, del 2: matrisen som faktisk setter tilgang
+
+**946 tester grønne.** Ingen migrasjon. Meldt fra staging: en ny testkonto fikk
+«Pasientregistrering» og «Førstehjelper» satt, men så ingen modul på dashboardet.
+
+Det var forutsigbart og forutsagt — §10.3 i beslutningsnotatet — men det gjorde
+grensesnittet direkte villedende: avkrysningsboksen «Pasientregistrering» satte
+`kan_redigere_pasienter`, og synligheten sluttet å lese det flagget i forrige commit.
+Boksen lovet noe den ikke gjorde.
+
+**De fem boksene er erstattet av en matrise modul × nivå**, generert fra
+`get_all_modules()`. Boksene var hardkodet i malen, så hver ny modul krevde en redigering
+der i tillegg til et nytt felt på `CustomUser`. `admin_only`-moduler er utelatt: de gates
+av global admin og bruker ikke `ModulTilgang`, og å vise dem ville antydet at nivået betyr
+noe for dem.
+
+**Matrisen ligger på opprettingsskjemaet også** (§10.3), ikke bare på redigering. Uten det
+lander den nyopprettede i en tom portal og må redigeres etterpå — og den som oppretter
+kontoen er den som vet hva den skal ha.
+
+**`skriv_handling` tilbys ikke i grensesnittet ennå.** Nivået finnes i modellen, og det er
+nettopp derfor det ikke trengs en migrasjon den dagen det tas i bruk. Men det er tomt
+inntil en modul har et handling-endepunkt, og et nivå som ikke gir noe er lett å dele ut i
+god tro. Samme resonnement som `leder` ble tatt ut på. Har en bruker likevel nivået, står
+det i lista — ellers ville et lagre-trykk stille fjernet det.
+
+**`PasientRolleForm` er splittet** (§7.3). Radioen satte både FK-en og
+`kan_redigere_pasienter`; det er funksjon i felt og autorisasjon i samme kontroll.
+Sammenblandingen gjorde det umulig å være koblet som førstehjelper uten å ha tilgang, og
+omvendt. To steg i stedet for ett, bevisst.
+
+**Tilgangsendringer auditeres nå**, én rad per modul som endres, med
+`table_name='accounts_modultilgang'` slik at de ikke ser ut som endringer på selve kontoen.
+**Rolleendring auditeres også** — frysing og sletting skrev auditrad, men det å gi noen
+admin gjorde det ikke. Et lagre-trykk uten endring skriver ingenting.
+
+`create_offline_users` gir `vakt-offline` sin rad. Den hadde `role='read_write'` og ingen
+tilgang; med håndhevelse ville feltmaskinen møtt en tom portal, og det oppdages i det den
+skal brukes — på en vakt uten nett.
+
+En egen test sjekker at matrisen ligger **inne i** riktig `<form>`. POST-testene hadde
+bestått uansett hvor i malen feltene havnet.
+
+---
+
 ## 2026-08-28 — Deploy 1, del 1: `ModulTilgang` og håndhevelsen
 
 **937 tester grønne** (23 nye). To migrasjoner, begge rullbare. Første del av deploy 1 i
