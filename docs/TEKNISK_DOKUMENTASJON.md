@@ -407,16 +407,6 @@ Blokkeres med 409 Conflict hvis førstehjelperen er knyttet til én eller flere 
 
 ### 5.4 Statistikk
 
-#### `GET /api/stats/`
-
-**Rolle:** Alle innloggede brukere.
-
-Returnerer basis-statistikk for aktivt år: totaltall, tilstede, utskrevet, triagefordeling, transportfordeling, topp-problemstillinger, ankomster per time, gjennomsnittlige ventetider.
-
-**Statuskoder:** 200.
-
----
-
 #### `GET /api/full-stats/`
 
 **Rolle:** `admin`, `lead`, `lead_view`. Returnerer 403 for andre.
@@ -927,7 +917,6 @@ etag = f'W/"{digest}"'
 
 | View | TTL | Begrunnelse |
 |---|---|---|
-| `stats_view` (`/api/stats/`) | 15 sekunder | Basisstatistikk endrer seg hyppig under aktiv vakt; 15 s gir god ferskhet og fanger likevel polling-bursten fra 10–20 samtidige brukere |
 | `full_stats_view` (`/api/full-stats/`) | 60 sekunder | Full statistikk (scipy-tester) er vesentlig tyngre; 60 s er et akseptabelt kompromiss mellom ferskhet og CPU-kostnad |
 
 ### 8B.5 If-None-Match → 304-flyt

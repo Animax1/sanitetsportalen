@@ -311,11 +311,14 @@ personlige kontoer, admin-reset beholdt for alle. Ingenting bygget ennå.
 
 **Stigen står som opprinnelig besluttet:** `ingen → les → skriv:handling → skriv:full`.
 
-- [ ] **`leder`-nivå («admin light») — bruken finnes, behovet haster ikke.** En vaktleder
-      som skal kunne arkivere en vakt, se arkivet og redigere navneregistrene, uten å være
-      global admin. Det irreversible (nullstilling, kollaps, brukeradmin, backup) forblir
-      admin per §3.3. Se §3.1 i notatet. Å legge til verdien er en `-- (no-op)`-migrasjon;
-      kostnaden ligger i å bestemme innholdet.
+- [ ] **VURDER: `leder`-nivå («admin light»).** Utsatt 28. aug. 2026 — bruken finnes,
+      behovet gjør ikke. En vaktleder som skal kunne arkivere en vakt, se arkivet og
+      redigere navneregistrene, uten å være global admin. Det irreversible (nullstilling,
+      kollaps, brukeradmin, backup) forblir admin per §3.3. Se §3.1 i notatet.
+
+      Å legge til verdien er en `-- (no-op)`-migrasjon; kostnaden ligger i å bestemme
+      innholdet. **Tas opp igjen når noen faktisk skal ha nivået** — et tomt nivå er lett
+      å dele ut i god tro, og gir automatisk mer den dagen det fylles.
 Et femte trinn `leder` ble lagt til 28. aug. og reversert samme dag — begrunnelsen var at
 et nytt nivå senere ville koste en migrasjon, og det stemmer ikke (`choices` er en
 `non_db_attr`, migrasjonen er `-- (no-op)`). Se §3.1 i notatet. Innføres når noe faktisk
@@ -381,16 +384,12 @@ skal ligge der.
       - [x] **Kollegaens nivå satt (28. aug. 2026):** `patients: skriv_full`,
             `statistikk: les`, og Helsepersonell-koblingen på plass.
 
-- [ ] **Testkontoen i prod må vekk før neste vakt.** André opprettet den 28. aug. 2026 for
-      å kontrollere de samme nivåene selv, og den står fortsatt med `skriv_full` på
-      pasienter. Den er ikke et testmiljø — den kan opprette og redigere ekte pasienter,
-      og gjør det under et navn som ikke tilhører noen på vakt.
-      - [ ] Slett den, eller sett `is_active=False` hvis sporet i auditloggen skal være
-            lett å lese. Sletting fjerner `ModulTilgang`-radene (CASCADE) og nuller
-            `Helsepersonell.user` (SET_NULL); auditradene består, men `AuditLog.user`
-            blir NULL.
-      - [ ] Ikke bland den med kollegaens konto ved opprydding — de har samme nivåer, og
-            det er navnet som skiller dem.
+- [x] **Testkontoen i prod — avklart 28. aug. 2026.** Den er Andrés egen konto uten
+      admin, ikke en anonym testbruker, og André håndterer den selv. Bekymringen i
+      forrige punkt var at et ukjent navn kunne skrive i pasientlista under vakt; det
+      premisset holdt ikke. Kontoen kan slettes eller settes `is_active=False` fra
+      brukeradmin — sletting fjerner `ModulTilgang`-radene (CASCADE) og nuller
+      `Helsepersonell.user` (SET_NULL), auditradene består, men `AuditLog.user` blir NULL.
       - [x] **Kontrollen kjørt mot prod etter deploy 1 (28. aug. 2026).** §10.1: «Antall: 0
             av 2». Ingen kontoer uten rader, ingen avvik fra backfillen. Det var siste
             gang det tallet kunne tas — deploy 2 fjerner grunnlaget.
@@ -460,12 +459,16 @@ skal ligge der.
 - [x] **Verifiseringskommando (28. aug. 2026):** `python manage.py verifiser_modultilgang`.
       Les-only. Kjøres mot prod mellom deploy 1 og 2 — staging har egen, tom database, så
       backfillen kan ikke verifiseres mot ekte rollefordeling der.
-- [ ] **Avgjør `/pasienter/api/stats/`: gate eller slett.** Endepunktet har ingen kjent
-      konsument — header-chipsene regnes ut i `patients-table.js` fra pasientlista, og
-      ingen JS-fil har noen gang kalt det. Rest fra Flask-porten. Gates `/pasienter/`
-      samlet i deploy 1, dekkes det automatisk. **Merk at
-      `docs/BESLUTNING_STATISTIKK.md` forutsetter at stien finnes og er åpen for alle
-      innloggede** — den planlagte `/api/stats/live/` legger seg ved siden av den.
+- [x] **`/pasienter/api/stats/` slettet (28. aug. 2026).** Avgjørelsen var «gate eller
+      slett»; det ble slett. Ingen kjent konsument — header-chipsene regnes ut i
+      `patients-table.js` fra pasientlista, og ingen JS-fil har noen gang kalt det. Rest
+      fra Flask-porten. `basic_stats()` i services står igjen: den er live-siden av
+      invarianten `StatsMatcher` måler.
+      - Ingen redirect satt opp. En videresending finnes for klienter som *pleide* å
+        kalle noe; her fantes ingen.
+      - `docs/BESLUTNING_STATISTIKK.md` forutsatte at stien fantes. Den planlagte
+        `/pasienter/api/stats/live/` er upåvirket — den er et nytt endepunkt med et
+        faktisk formål, ikke en videreføring av det slettede.
 
 ### Dataimport fra gammel prod — se `docs/DATAIMPORT_FRA_GAMMEL_PROD.md`
 

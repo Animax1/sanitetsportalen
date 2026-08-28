@@ -2,7 +2,7 @@
 from django.urls import path, re_path
 from django.shortcuts import redirect
 from . import admin_status
-from . import views_arkiv, views_patients, views_registre, views_stats
+from . import views_arkiv, views_patients, views_registre
 
 urlpatterns = [
     # Hoved-siden
@@ -25,9 +25,15 @@ urlpatterns = [
     # Reset testdata (kun admin)
     path('api/reset-active-year/', views_patients.reset_active_year_view, name='api_reset_active_year'),
 
-    # Statistikk. Kun header-chipsene ligger igjen her; full statistikk
-    # flyttet til statistikk-appen (/statistikk/api/full-stats/).
-    path('api/stats/', views_stats.stats_view, name='api_stats'),
+    # Statistikk. Ingenting ligger igjen her.
+    #
+    # `api/stats/` ble slettet 28. aug. 2026. Det var en rest fra
+    # Flask-porten, der header-chipsene ble hentet fra serveren; i dag regnes
+    # de ut i `patients-table.js` fra pasientlista. Ingen JS-fil i repoet har
+    # noen gang kalt det. Ingen redirect settes opp: en videresending finnes
+    # for klienter som *pleide* å kalle noe, og her fantes ingen.
+    # `basic_stats()` i services står igjen: den er live-siden av invarianten
+    # `StatsMatcher` måler, at arkivering ikke endrer tallene.
 
     # Videresending for klienter med gammel JS i cache. Uten den slutter
     # statistikken å oppdatere seg for alle som har siden åpen når deployen

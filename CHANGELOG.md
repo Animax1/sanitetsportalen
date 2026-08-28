@@ -4,6 +4,65 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-08-28 — `/pasienter/api/stats/` er slettet
+
+**1002 tester grønne.** Ingen migrasjon.
+
+Endepunktet var en rest fra Flask-porten, der header-chipsene ble hentet fra serveren. I dag
+regnes de ut i `patients-table.js` fra pasientlista `/api/patients/` allerede har hentet, og
+ingen JS-fil i repoet har noen gang kalt stien. Det var gatet på `patients: les` siden
+deploy 1, så dette er opprydding, ikke en tetting.
+
+**Det hadde allerede kostet noe.** Da statistikken ble skilt ut, ble det først skrevet at
+endepunktet mater chipsene. Det stemte ikke, og forklaringen sto i docstringen til den ble
+funnet. Et endepunkt uten konsument tiltrekker seg forklaringer ingen kan falsifisere.
+
+Borte: `patients/views_stats.py` og URL-en. **Ingen redirect satt opp** — en videresending
+finnes for klienter som *pleide* å kalle noe, og her fantes ingen.
+
+**`basic_stats()` står igjen**, i motsetning til det jeg først la opp til. Den så ut til å
+ha én kaller, endepunktet, men har to: `StatsMatcher` i `patients/tests_arkiv.py` arkiverer
+en vakt og krever at `compute_arkiv_stats` gir nøyaktig samme tall. Skulle testen bygget
+spørringen selv, ville den speilet produksjonskoden i stedet for å måle den — og sluttet å
+fange en endring i hvilke pasienter som teller. Funksjonen er live-siden av den invarianten,
+og det står nå i docstringen dens.
+
+Testene i `core/tests_stats_cache.py` brukte endepunktet som prøveklut for
+cache-dekoratoren, og kjører nå mot full statistikk. Kontrasten mellom 15 s og 60 s forsvant
+med det — den var det eneste stedet 15-sekunders-TTL-en ble brukt — men at dekoratoren
+respekterer den TTL-en den får, dekkes av lavnivåtestene som setter den eksplisitt.
+
+Grensetesten i `statistikk/tests.py` er **snudd, ikke slettet**: den låste før at
+endepunktet sto igjen, med et notat om at den skulle endres bevisst når rollemodell-arbeidet
+avgjorde saken. Nå krever den 404. Neste som lurer på hvor stien ble av finner svaret i en
+test i stedet for i git-historikken. Sett rød: la jeg URL-en tilbake, feilet den.
+
+Fulgt opp i dokumentasjonen: `README.md`, `CLAUDE.md`, `core/stats_cache.py`,
+`statistikk/views.py`, `docs/TEKNISK_DOKUMENTASJON.md` og `docs/BESLUTNING_STATISTIKK.md`.
+Sistnevnte forutsatte at stien fantes og lot spørsmålet stå åpent til
+`/pasienter/api/stats/live/` skulle bygges; svaret er nå gitt, og live-endepunktet er
+upåvirket — det er et nytt endepunkt med et faktisk formål, og stien er ledig.
+
+---
+
+## 2026-08-28 — To avklaringer: testkontoen og `leder`-nivået
+
+Kun dokumentasjon. Ingen kodeendring.
+
+**Testkontoen i prod er Andrés egen konto uten admin.** Forrige oppføring førte den opp som
+en åpen oppgave med den begrunnelsen at «den kan opprette og redigere ekte pasienter under
+et navn som ikke tilhører noen på vakt». Det premisset holdt ikke — navnet tilhører noen, og
+André håndterer kontoen selv. Punktet er lukket, med mekanikken (CASCADE på `ModulTilgang`,
+SET_NULL på `Helsepersonell.user`, `AuditLog.user` blir NULL) beholdt for den dagen den
+faktisk slettes.
+
+**`leder`-nivået er merket «VURDER», ikke «skal gjøres».** Bruken er skrevet ned og
+begrunnelsen står i §3.1, men behovet er ikke aktuelt. Det tas opp igjen når noen faktisk
+skal ha nivået — et tomt nivå er lett å dele ut i god tro, og gir automatisk mer den dagen
+det fylles.
+
+---
+
 ## 2026-08-28 — Deploy 3: de fem flaggene er borte, og profilkortet sluttet å lyve
 
 **1003 tester grønne** (6 nye). Migrasjon `accounts.0014_fjern_modulflagg`.

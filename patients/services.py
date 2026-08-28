@@ -411,10 +411,17 @@ def _compute_stats_from_dicts(pts):
 
 
 def basic_stats(year=None):
-    """
-    Beregn basis-statistikk for header-chips.
-    Tilsvarer Flask /api/stats-endepunktet.
-    Filtrerer på aktivt år hvis year ikke er oppgitt.
+    """Basis-statistikk for aktive pasienter i året.
+
+    **Uten endepunkt siden 28. aug. 2026.** `/pasienter/api/stats/` var eneste
+    HTTP-kaller og er slettet — det var en rest fra Flask-porten, og
+    header-chipsene regnes ut i nettleseren fra pasientlista.
+
+    Funksjonen står likevel, fordi den er *live-siden* av en invariant:
+    `StatsMatcher` i `patients/tests_arkiv.py` arkiverer en vakt og krever at
+    `compute_arkiv_stats` gir nøyaktig samme tall. Skulle testen i stedet
+    bygget spørringen selv, ville den speilet produksjonskoden i stedet for å
+    måle den — og sluttet å fange en endring i hvilke pasienter som teller.
     """
     if year is None:
         year = get_active_year()

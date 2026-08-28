@@ -118,18 +118,22 @@ class FlyttedeEndepunkterTests(TestCase):
         resp = self.client.get('/pasienter/api/full-stats/')
         self.assertEqual(resp.status_code, 302)
 
-    def test_basic_stats_ble_ikke_flyttet(self):
-        """`/pasienter/api/stats/` står igjen, og er fortsatt åpen for alle.
+    def test_basic_stats_er_slettet(self):
+        """`/pasienter/api/stats/` finnes ikke lenger.
 
-        Testen låser dagens tilstand, ikke en anbefaling. Endepunktet har
-        ingen kjent konsument — header-chipsene regnes ut i nettleseren fra
-        pasientlista, ikke herfra — og om det skal gates på pasientmodulen
-        eller slettes, avgjøres i rollemodell-arbeidet. Da skal denne testen
-        endres bevisst, ikke oppdages.
+        Testen låste tidligere at endepunktet *sto igjen*, med et notat om at
+        den skulle endres bevisst når rollemodell-arbeidet avgjorde om det
+        skulle gates eller slettes. Avgjørelsen ble sletting: det var en rest
+        fra Flask-porten, header-chipsene regnes ut i nettleseren fra
+        pasientlista, og ingen JS-fil i repoet kalte det.
+
+        Den står igjen snudd, ikke slettet — 404 her betyr «bevisst borte», og
+        neste som lurer på hvor endepunktet ble av finner svaret i en test i
+        stedet for i git-historikken.
         """
         c = Client()
         c.force_login(_bruker('leser'))
-        self.assertEqual(c.get('/pasienter/api/stats/').status_code, 200)
+        self.assertEqual(c.get('/pasienter/api/stats/').status_code, 404)
 
 
 class StatistikkModulRegistreringTests(TestCase):
