@@ -294,76 +294,107 @@ personlige kontoer, admin-reset beholdt for alle. Ingenting bygget ennå.
       invitasjonen. `PASSWORD_RESET_TIMEOUT` er bevisst ikke satt: den leses kun av
       Djangos egen generator, som ikke er i bruk.
 
-### Rollemodellen — besluttet, under arbeid
+### Rollemodellen — se `docs/BESLUTNING_ROLLEMODELLEN.md`
 
-Dagens modell er ett globalt `role`-felt pluss fem `kan_redigere_*`-flagg. Flaggene er
-feilnavngitt: `help_text` sier at de styrer *synlighet* i dashboard og nav-meny, ikke
-redigering. Med fire moduler til holder ikke modellen — en bruker kan trenge les/skriv i én
-modul og les i en annen.
+- [x] **Besluttet 24. aug. 2026.** Global admin, pluss ett nivå per modul:
+      `ingen → les → skriv:handling → skriv:full`. `ModulTilgang(bruker, modul_slug, nivå)`
+      erstatter de fem `kan_redigere_*`-flaggene, og `role` krymper til `admin`/`bruker`.
+      Alle valg er tatt; dokumentet er fasit.
+      - **Flaggene var aldri tilgangskontroll (verifisert).** `read_write` med
+        `kan_redigere_pasienter=False` får 200 på `/pasienter/` og **201 på
+        `POST /api/patients/`**. `permission_flag` leses kun av dashboard og nav.
+      - **`ModuleSettings.enabled=False` stenger ikke URL-en (verifisert)** — 200 med
+        modulen deaktivert.
+      - **To-akse-modellen kollapset til én** da statistikk ble besluttet skilt ut:
+        `lead_view` gir bare statistikk, og `dataset_scope_all` er død kode.
 
-**Verre enn feilnavngitt: flaggene er ikke en tilgangsgrense i det hele tatt.**
-`views_patients.index_view` er `@login_required` og ingenting mer, så en bruker uten
-`kan_redigere_pasienter` kan skrive `/pasienter/` i adressefeltet og komme inn. Flagget
-leses kun av `Module.is_visible_for`.
 
-Besluttet 28. aug. 2026:
+**Endring 28. aug. 2026: `leder` legges til øverst i stigen.**
+`ingen → les → skriv:handling → skriv:full → leder`. `leder` er «utvidet tilgang på
+modulen du er på». Nivået **står tomt på `patients`** — ingenting flyttes ned fra global
+admin i denne omgangen, så §3.3 i notatet gjelder fortsatt for det destruktive
+(hard-delete utenfor vinduet, nullstill år, navneregistrene, arkiv og kollaps).
+Definer nivået i deploy 1 slik at `ModulTilgang` ikke trenger ny migrasjon når det fylles.
 
-- `ModulTilgang(bruker, modul_slug, nivaa)` erstatter de fem flaggene. Ingen rad = ingen
-  tilgang; det finnes ingen `'ingen'`-verdi å lagre.
-- Én kolonne, tre nivåer: **`les < skriv < leder`** — en ekte stige. Det forutsatte at
-  statistikk ble egen modul først, se leveranse 1 under.
-- `leder` gir «utvidet tilgang på modulen du er på». Nivået **står tomt på `patients`
-  inntil videre** — ingenting flyttes ned fra admin i denne omgangen.
-- `role` beholdes som kolonne, men bare `admin` er meningsbærende på sikt. Admin forblir
-  global, ikke per modul.
-- Backfillen er **tapsfri etter faktiske rettigheter, ikke etter merkelapp**:
-  `read_only → patients:les`, `read_write → patients:skriv`,
-  `lead_view → patients:les + statistikk:les`, `lead → patients:skriv + statistikk:les`.
-  Ingen får `leder`; ingen får rettigheter de ikke har i dag.
+**Leveranse 1 er levert (28. aug. 2026):**
 
-Leveranse 1 av 3 — **ferdig**:
+- [x] **Statistikk skilt ut som egen modul.** `statistikk/`-appen, `/statistikk/`-siden,
+      `full_stats_view` og `arkiv_full_stats_view` flyttet, `stats_cache` til `core/`,
+      `patients-stats.js` delt i `statistikk.js` og `patients-admin.js`, primitivene ut i
+      `portal-utils.js`, statistikkreglene i eget stilark. Ingen migrasjon, ingen
+      tilgangsendring. 911 tester grønne.
+      - [ ] **Gjenstår fra §5: modulen komponerer ikke tilgang ennå.** Den gates på
+            `stats_required` alene, så den viser pasienttall til alle med
+            statistikktilgang — også en bruker som senere ikke har `patients: les`.
+            Kravet «viser kun kilder brukeren har minst `les` på i kildemodulen» kan
+            først innføres når `ModulTilgang` finnes. **Gjøres i deploy 1**, ellers er
+            statistikkmodulen en bakvei rundt modultilgangen.
+      - [ ] Tilgangstabellen i `docs/BESLUTNING_STATISTIKK.md` må skrives om til
+            modulnivåer.
 
-- [x] **Statistikk skilt ut som egen modul (28. aug. 2026).** `statistikk/`-appen,
-      `/statistikk/`-siden, `full_stats_view` og `arkiv_full_stats_view` flyttet,
-      `stats_cache` til `core/`, `patients-stats.js` delt i `statistikk.js` og
-      `patients-admin.js`, primitivene ut i `portal-utils.js`, statistikkreglene i eget
-      stilark. Ingen migrasjon, ingen tilgangsendring. Se CHANGELOG for hvorfor denne
-      måtte komme først.
+- [ ] **Forutsetning før migrasjonen skrives — kontrolleres i prod:** hvor mange kontoer
+      har `role` ≥ `read_write` men `kan_redigere_pasienter=False`? Det er kontoene som i
+      dag har en tilgang de ikke var ment å ha. Tallet avgjør hvor stor oppryddingen blir
+      etter deploy 1.
 
-Gjenstår:
+- [ ] **Statistikkmodulen skilles ut først eller samtidig.** Gjøres rollemodellen først,
+      bygges en les-akse som umiddelbart rives ned igjen. Modulen skal kun vise kilder
+      brukeren har minst `les` på — ellers er den en bakvei rundt modultilgangen.
+      Tilgangstabellen i `docs/BESLUTNING_STATISTIKK.md` må skrives om til modulnivåer.
 
-- [ ] **Leveranse 2: `ModulTilgang`.** Modellen, datamigrasjonen som fyller fra `role` +
-      de fem flaggene, `har_tilgang()`/`modul_tilgang_pakrevd()` i `core.auth_decorators`,
-      admin-matrise generert fra `get_all_modules()` (ikke fem hardkodede avkrysningsbokser),
-      og audit på tilgangsendringer. **`stats_required` og `Module.min_rolle` erstattes her.**
-      - [ ] **Skrivestien må skrive til både tabellen og flaggene.** Det er dobbeltskrivingen
-            som gjør en rollback trygg — uten den taper en rollback endringene som ble gjort
-            etter deployen, ikke bare de nye radene.
-      - [ ] `create_offline_users` og `create_admin` må sette modultilgang. `vakt-offline`
-            har `role='read_write'` og ingen flagg i dag, altså ingen moduler på dashboardet.
-      - [ ] Rolleendring auditeres ikke i dag: `action == 'edit'` i `accounts/views.py`
-            kaller `form.save()` uten `_log_user_admin_action`. Frys og sletting logges;
-            det å gi noen admin gjør det ikke.
-      - [ ] Verifiseringskommando som teller rader mot flaggene. Staging har egen, tom
-            database, så backfillen kan **ikke** verifiseres mot ekte rollefordeling der —
-            kommandoen kjøres read-only mot prod før leveranse 3.
-- [ ] **Leveranse 3: opprydding.** `RemoveField` × 5, fallback og dobbeltskriving fjernes,
-      `Module.permission_flag` og `Module.min_rolle` utgår, og `/pasienter/` stenges
-      faktisk for brukere uten modultilgang.
-      - [ ] **Avgjør `/pasienter/api/stats/`: gate eller slett.** Endepunktet har ingen kjent
-            konsument — header-chipsene regnes ut i `patients-table.js` fra pasientlista, og
-            ingen JS-fil har noen gang kalt det. Det er en rest fra Flask-porten. Gates
-            prefikset `/pasienter/` samlet, dekkes det automatisk; sletting er en egen
-            beslutning som må sjekkes mot eventuelle eksterne konsumenter.
-            **Merk at `docs/BESLUTNING_STATISTIKK.md` forutsetter at stien finnes** og
-            åpen for alle innloggede — den planlagte `/api/stats/live/` legger seg ved siden
-            av den. Slettes stien, må notatet oppdateres i samme runde.
-- [ ] **De to migrasjonene må ligge i hver sin deploy.** Slås de sammen, mister en rollback
-      dataene.
-- [x] **Skillet mot funksjon i felt er avklart (28. aug. 2026):** tilgangsnivå per modul er
-      autorisasjon, mens førstehjelper/helsepersonell/bil er domenedata. Det siste finnes
-      allerede som FK fra `Forstehjelper.user`/`Helsepersonell.user`, og `er_delt_konto`
-      dekker bil-kontoen. Ingen `funksjon`-felt skal innføres.
+- [ ] **Deploy 1:** `ModulTilgang` legges til og fylles fra `role` alene (ikke fra
+      flagget — ingen skal miste tilgang under deploy). `@modul_kreves(...)` innføres på
+      alle endepunkter, med en test som går gjennom `urlpatterns` og krever at hvert view
+      er dekorert. `ModuleSettings.enabled=False` gir 403 for ikke-admin.
+- [ ] **Deploy 2:** `role` krymper til `admin`/`bruker`. Maler og JS legges om
+      (`window.USER_ROLE` → `window.MODUL_TILGANG`). Kan ikke komme før matrisen er
+      verifisert i prod — `lead_view` → `bruker` er ikke rullbar uten `ModulTilgang`.
+- [ ] **Deploy 3:** de fem `kan_redigere_*`-flaggene fjernes. Slås 1 og 3 sammen, mister
+      en rollback dataene.
+
+- [ ] **Sletting åpnes for `skriv: full`**, men kun på pasienter brukeren selv opprettet
+      siste 30 min. «Egen pasient» avgjøres fra `AuditLog`s CREATE-rad — indeksert på
+      `(table_name, record_id)`, ingen ny kolonne. Mangler raden, nektes slettingen.
+      **Merk:** DELETE-loggingen lagrer bare pasientnummeret, ikke innholdet
+      (`patients/signals.py:266`). Åpnes sletting bredere senere, må den utvides først.
+- [ ] **`skriv: handling` for bil-/ambulansekontoer.** Smalt endepunkt som stempler
+      server-tid og **ikke leser request-kroppen** — ikke en feltwhitelist inne i den
+      generelle `PUT`-en, der stemplingen i dag er en bivirkning av en redigering.
+      Invarianten håndheves med test. Definer nivået i deploy 1, ta det i bruk når
+      oppdragsmodulen skrives.
+- [ ] **`session_timeout` og `event_name` flyttes til portal-admin.** Portalinnstillinger
+      som tilfeldigvis bor under `/pasienter/`. Merk at `saveEventName` da flytter ut av
+      pasientmodulens JS — se F7-regelen i `CLAUDE.md`.
+- [ ] **`PasientRolleForm` splittes.** Radioen setter kun førstehjelper/helsepersonell-
+      koblingen (domenedata); tilgang settes i matrisen modul × nivå. To steg, bevisst.
+- [ ] **Matrisen bør ligge på opprettingsskjemaet.** `AdminUserCreateForm` har `role`,
+      men ikke modulflaggene — de finnes kun på redigeringsskjemaet. Med håndhevelse
+      lander den nyinviterte i en tom portal og må redigeres etterpå.
+- [ ] **`notify()` må sjekke modultilgang.** `_notify_assignment`
+      (`patients/signals.py:234`) fyrer på at `role_obj.user` er satt. Etter splitten av
+      `PasientRolleForm` kan man være koblet som helsepersonell uten
+      `ModulTilgang('patients')` — og da få et varsel med pasientnummer og lenke til en
+      403. Tilstanden var umulig før splitten.
+- [ ] **Opprydding som følger med:** fjern `accounts/mixins.py` (død kode, og feil —
+      `dispatch()` kjører viewet *før* rollesjekken) og `dataset_scope_all` (aldri brukt).
+      Rett `docs/TEKNISK_DOKUMENTASJON.md` §6.3: peker på shimen, og kaller hard-deleten
+      «soft».
+- [ ] **Rolleendring auditeres ikke.** `action == 'edit'` i `accounts/views.py` kaller
+      `form.save()` uten `_log_user_admin_action`. Frys og sletting logges; det å gi noen
+      admin gjør det ikke. Tilgangsendringer i matrisen må logges fra dag én.
+- [ ] **`create_offline_users` og `create_admin` må sette modultilgang.** `vakt-offline`
+      har `role='read_write'` og ingen flagg i dag — med håndhevelse lander den i en tom
+      portal.
+- [ ] **Verifiseringskommando som teller `ModulTilgang`-rader mot `role`.** Staging har
+      egen, tom database, så backfillen kan **ikke** verifiseres mot ekte rollefordeling
+      der. Kommandoen kjøres read-only mot prod mellom deploy 1 og 2 — det er den samme
+      kontrollen som «Forutsetning før migrasjonen skrives» over.
+- [ ] **Avgjør `/pasienter/api/stats/`: gate eller slett.** Endepunktet har ingen kjent
+      konsument — header-chipsene regnes ut i `patients-table.js` fra pasientlista, og
+      ingen JS-fil har noen gang kalt det. Rest fra Flask-porten. Gates `/pasienter/`
+      samlet i deploy 1, dekkes det automatisk. **Merk at
+      `docs/BESLUTNING_STATISTIKK.md` forutsetter at stien finnes og er åpen for alle
+      innloggede** — den planlagte `/api/stats/live/` legger seg ved siden av den.
 
 ### Dataimport fra gammel prod — se `docs/DATAIMPORT_FRA_GAMMEL_PROD.md`
 
@@ -461,8 +492,10 @@ variablene dens finnes ikke i `base_portal.html`) og **JS-primitivene**
 og et stilark per modul — men de var usynlige til noen faktisk skrev modul nummer to.
 
 De fem `kan_redigere_*`-flaggene på `CustomUser` ble pre-registrert i én migrasjon nettopp
-for å slippe én migrasjon per ny modul. `statistikk` bruker ingen av dem: den gates
-midlertidig på `Module.min_rolle` inntil `ModulTilgang` finnes. Se «Rollemodellen» over.
+for å slippe én migrasjon per ny modul. **De fjernes nå** — se «Rollemodellen» over;
+beslutningen ble tatt 24. aug. 2026, og `ModulTilgang` erstatter dem. `statistikk` bruker
+derfor ingen av dem: den gates midlertidig på `Module.min_rolle` inntil `ModulTilgang`
+finnes.
 
 - [ ] Vaktliste
 - [ ] KO-tavle
@@ -476,8 +509,10 @@ høynivå-skissen, `docs/archived/SANITETSPORTAL_PLAN.md` §7):
       beredskapsperioder som ukentlig lagvakt? Avgjør feltene på modellen
 - [ ] Skal en beredskaps-/oppdragsmodul brukes underveis i felt (mobilt, dårlig nett) eller
       i etterkant? Avgjør om offline-strategi og synk må bygges
-- [ ] Skal rapportmodulen kun være intern (admin/lead), eller også gi tilgang til
-      styre/oppdragsgivere? Avgjør rolle-flagg og eksportformat
+- [ ] Skal rapportmodulen kun være intern, eller også gi tilgang til
+      styre/oppdragsgivere? Tilgangssiden er nå `ModulTilgang` (se «Rollemodellen»);
+      det som gjenstår er eksportformat, og om eksterne mottakere skal ha konto i det
+      hele tatt
 
 > **Merk:** skissen antok modulene `vakter`, `utstyr`, `rapport` og `beredskap`. Retningen
 > siden er blitt park og oppdrag (se «Skalering mot 2027» over). Arkitekturvalgene i
