@@ -51,9 +51,12 @@ Andre avgjørelser verdt å notere:
   Kostnaden er at den `Ledig`-meldingen er avledet, ikke målt — derfor lagres et
   `automatisk`-flagg på raden, selv om ingenting viser det. Skillet kan ikke gjenskapes i
   ettertid, og en boolean koster ingenting.
-- **«Ledig» er enhetens tilstand, ikke oppdragets.** Å lagre tilgjengelighet også på `Enhet`
-  ville gitt to kilder til samme sannhet. En enhet er ledig når den ikke har et påbegynt
-  oppdrag — utledes, lagres ikke.
+- **«Ledig» er enhetens tilstand, ikke oppdragets, og den lagres ikke.** Ved vaktstart står
+  alle enheter som `Ledig` — ikke fordi noe setter verdien, men fordi det er hva «ingen
+  påbegynte oppdrag» ser ut som. En lagret status måtte nullstilles ved vaktstart og holdes
+  i takt med oppdragsradene resten av vakta; to kilder til samme sannhet går i utakt første
+  gang noe feiler halvveis, og da er det den lagrede som lyver. Sentralbordet viser
+  `Ledig (2 venter)` — utledet av oppdragene.
 - **Enhetsbytte er egen modell**, ikke en radtype i `Statusmelding`. Et bytte er ikke en
   status, og statistikken måler statusene — blandes de, må hver spørring huske å filtrere.
   Statusen står når et oppdrag flyttes: meldingene den første enheten rakk å sende skjedde.

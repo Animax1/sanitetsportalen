@@ -77,6 +77,17 @@ class Enhet(BaseTimeStampedModel):
 `SET_NULL`, ikke `CASCADE`: slettes kontoen, skal enheten og dens oppdragshistorikk bestå.
 Samme valg som `Forstehjelper.user`, og av samme grunn.
 
+**Enheten har ingen statuskolonne.** Ved vaktstart står alle enheter som `Ledig`, og det er
+ikke en verdi noen setter — det er hva «ingen påbegynte oppdrag» ser ut som. Lagret status
+ville krevd at noe nullstilte den ved vaktstart, og at den holdt seg i takt med
+oppdragsradene resten av vakta. To kilder til samme sannhet går i utakt første gang noe
+feiler halvveis, og da er det den lagrede som lyver — den ser autoritativ ut.
+
+Sentralbordet viser derfor en **enhetsliste med utledet status**: enhetens påbegynte
+oppdrag hvis det finnes, ellers `Ledig`, med antall ventende ved siden av. En enhet med to
+tildelte, men ingen påbegynte oppdrag er `Ledig (2 venter)` — den har ikke rykket ut ennå,
+og det er den distinksjonen 113 trenger for å vite hvem som kan sendes.
+
 ### 3.2 `Lokasjon`
 
 Admin vedlikeholder lista; oppdraget peker på en rad.
@@ -372,7 +383,7 @@ statusknappen som det eneste elementet som ikke krever presisjon.
 |---|---|---|
 | 1 | App, modulregistrering, fire modeller, `choices.py`, lokasjonsadmin, admin-matrise | 5–7 t |
 | 2 | Audit-unntak for fritekst + protokolltillegg. **Før fase 3** | 1–2 t |
-| 3 | Sentralbordet: opprett, tildel, flytt, liste, rediger. Polling med ETag | 6–8 t |
+| 3 | Sentralbordet: enhetsliste med utledet status, opprett, tildel, flytt, rediger. Polling med ETag | 7–9 t |
 | 4 | Enhetsskjermen: statusmaskin, smale endepunkter, objektsjekk, de to skjulereglene | 6–8 t |
 | 5 | Offline-kø med idempotens | 4–6 t |
 | 6 | Statistikkregisteret + oppdragsfanen | 5–7 t |

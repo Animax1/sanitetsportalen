@@ -543,7 +543,7 @@ Gjennomgang 13. aug. 2026, med 1000 pasienter og peak 100 brukere som premiss.
       og responsen returnerer kvittering — aldri data.
 - [ ] **Oppdragsmodulen — se `docs/BESLUTNING_OPPDRAGSMODULEN.md`.** Besluttet 28. aug.
       2026, ikke bygget. Modulen er den første som tar `skriv: handling` i bruk. Sju
-      faser, 31–44 t. Punktene under lå her løst fra før og er nå plassert i planen:
+      faser, 32–45 t. Punktene under lå her løst fra før og er nå plassert i planen:
       - [ ] **Fase 1** (5–7 t): app, modulregistrering, `Enhet`/`Lokasjon`/`Oppdrag`/
             `Statusmelding`/`Enhetsbytte`, `choices.py`, lokasjonsadmin, admin-matrise.
             Ingen UI.
@@ -554,7 +554,10 @@ Gjennomgang 13. aug. 2026, med 1000 pasienter og peak 100 brukere som premiss.
             på, og de radene kan ikke fjernes uten å røre auditsporet. Halvert fordi
             lokasjon ble nedtrekksliste: da holder A.6/A.12 for det feltet, og fritekst
             står alene igjen.
-      - [ ] **Fase 3** (6–8 t): sentralbordet — opprett, tildel, flytt, liste, rediger.
+      - [ ] **Fase 3** (7–9 t): sentralbordet — enhetsliste med **utledet** status
+            (`Ledig (2 venter)`), opprett, tildel, flytt, rediger. Enheten har ingen
+            statuskolonne: lagret status ville krevd nullstilling ved vaktstart og gått i
+            utakt med oppdragsradene.
       - [ ] **Fase 4** (6–8 t): enhetsskjermen — statusmaskin med `Venter` som
             startstatus, to knapper mot seks navngitte endepunkter, lukket kroppsskjema,
             objektsjekk på eierskap, og de to skjulereglene (fritekst ved `Ledig`, hele
