@@ -1,8 +1,9 @@
 """Modul-deklarasjon for patients-appen.
 
 Pasientregistrering er den første brukervendte modulen i Sanitetsportalen.
-Vises som modul-kort på dashboardet og som lenke i nav-menyen for brukere
-som har ``kan_redigere_pasienter=True`` (admins ser den uansett).
+Vises som modul-kort på dashboardet og som lenke i nav-menyen for brukere som
+har en ``ModulTilgang``-rad på ``patients`` (global admin ser den uansett).
+Synligheten leser samme kilde som håndhevelsen — se ``Module.is_visible_for``.
 """
 from core.modules import Module
 

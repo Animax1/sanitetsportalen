@@ -138,19 +138,24 @@
         <i class="bi bi-key me-2"></i>Modul-tilganger
       </div>
       <div class="card-body">
-        {% if request.user.role == 'admin' %}
+        {% if er_global_admin %}
           <div class="alert alert-info mb-2 py-2 px-3" style="font-size:0.88rem;">
             <i class="bi bi-info-circle me-1"></i>
-            Som administrator har du tilgang til alle moduler uavhengig av flaggene under.
+            Som administrator har du tilgang til alle moduler, også de som er slått av.
           </div>
         {% endif %}
-        {% for label, value in permissions %}
+        {% for rad in permissions %}
           <div class="perm-row">
-            <span>{{ label }}</span>
-            {% if value %}
-              <span class="perm-yes"><i class="bi bi-check-circle me-1"></i>Ja</span>
+            <span>
+              {{ rad.navn }}
+              {% if rad.deaktivert %}
+                <span class="badge bg-secondary ms-1" title="Modulen er slått av for alle">Av</span>
+              {% endif %}
+            </span>
+            {% if rad.nivaa %}
+              <span class="perm-yes"><i class="bi bi-check-circle me-1"></i>{{ rad.nivaa }}</span>
             {% else %}
-              <span class="perm-no"><i class="bi bi-x-circle me-1"></i>Nei</span>
+              <span class="perm-no"><i class="bi bi-x-circle me-1"></i>Ingen tilgang</span>
             {% endif %}
           </div>
         {% endfor %}

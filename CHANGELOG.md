@@ -4,6 +4,64 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-08-28 — Deploy 3: de fem flaggene er borte, og profilkortet sluttet å lyve
+
+**1003 tester grønne** (6 nye). Migrasjon `accounts.0014_fjern_modulflagg`.
+
+Siste steg av de tre i §8. `kan_redigere_pasienter`, `kan_redigere_vakter`,
+`kan_redigere_utstyr`, `kan_se_rapport` og `kan_redigere_beredskap` er slettet fra
+`CustomUser`. De sto igjen gjennom deploy 1 og 2 fordi en rollback måtte kunne bygge
+matrisen fra `role`; da deploy 2 krympet feltet, lukket det vinduet uansett.
+
+**Én ting leste dem fortsatt, og den viste feil svar til brukeren.** Kortet «Modul-tilganger»
+på `/min-profil/` bygde på de fem flaggene. Backfillen i deploy 1 utledet fra `role` og rørte
+flagget med vilje (§8.1), så en konto med `patients: skriv_full` fikk «Nei» på
+pasientregistrering — over teksten «Ta kontakt om du trenger flere tilganger». Siden ba altså
+brukeren melde fra om noe hen allerede hadde. Målt før endringen, med kollegaens matrise:
+
+```
+  Pasientregistrering    Nei
+  Vakter                 Nei
+  Utstyr                 Nei
+  Rapport                Nei
+  Beredskap              Nei
+```
+
+Etterpå:
+
+```
+  Pasientregistrering    Skrive: full
+  Statistikk             Lese
+```
+
+To ting endret seg. Kortet **leser `ModulTilgang`** — samme kilde som håndhevelsen — og det
+**følger modulregisteret** i stedet for fem hardkodede etiketter. «Vakter», «Utstyr» og
+«Beredskap» er ikke moduler; de var plassholdere for apper som aldri ble skrevet, og kortet
+lovet tilgang til noe som ikke finnes. Statistikk sto ikke i lista i det hele tatt.
+
+Nivået vises nå med navn (`Lese`, `Skrive: full`) i stedet for Ja/Nei — kortet kan ikke si
+«Ja» til en stige med tre trinn uten å skjule hvilket trinn du står på.
+
+**«Slått av» og «ingen tilgang» holdes fra hverandre.** En deaktivert modul får merket «Av»
+ved siden av nivået. Slås de sammen, leser brukeren et driftsvalg som et tilgangsvalg og ber
+om noe hen allerede har fått.
+
+Testen som fantes krevde bare at de fem etikettene sto i HTML-en, og var grønn hele veien
+gjennom feilen. Den er erstattet av seks som måler innholdet, hver med et motstykke som
+viser at funnet kan utebli. Alle tre er sett røde: jeg gjeninnførte flagg-oppførselen og
+fjernet «Av»-skillet, og fikk henholdsvis tre og én feil.
+
+`test_flagget_paavirker_ingenting` i `BackfillTests` er fjernet, ikke omskrevet. Den lagde to
+brukere med samme rolle og ulikt flagg og krevde identiske rader. Uten feltet er de to
+brukerne identiske, og testen kunne ikke lenger feile — en test som ikke kan feile er verre
+enn ingen test, fordi den ser ut som et vern. Regelen står fortsatt i §8.1, og kartleggingen
+låses av testen ved siden av.
+
+`CustomUserPermissionFlagsTests` er snudd i stedet for slettet: den krevde før at de fem
+feltene *fantes*, og krever nå at de er borte og at et forsøk på å sette dem feiler høylytt.
+
+---
+
 ## 2026-08-28 — Kollegaens nivå satt i prod, og en testkonto som må vekk
 
 Kun dokumentasjon. Ingen kodeendring.

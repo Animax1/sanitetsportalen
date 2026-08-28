@@ -59,13 +59,57 @@ def portal_dashboard_view(request):
 # ─────────────────────────────────────────────────────────────────────────────
 
 
+def modultilganger_for_visning(user):
+    """Radene «Modul-tilganger» på min profil, med nivå og status.
+
+    **Kortet leste tidligere de fem ``kan_redigere_*``-flaggene**, og de var
+    ikke bare døde — de var feil. Backfillen i deploy 1 utledet fra ``role``
+    og rørte flagget med vilje (§8.1), så en konto med
+    ``patients: skriv_full`` fikk «Nei» på pasientregistrering. Under sto det
+    «Ta kontakt om du trenger flere tilganger», så siden ba brukeren melde fra
+    om noe hen allerede hadde. En flate som viser noe annet enn den som
+    håndhever, er den samme fella som §2.1.
+
+    Modullista er den ``ModulTilgangForm`` bygger matrisen av, slik at det
+    admin setter er det brukeren ser. ``admin_only``-moduler er utelatt: de
+    gates av global admin og bruker ikke ``ModulTilgang``.
+
+    **Nivået og «modulen er av» holdes fra hverandre**, og det er grunnen til at
+    radene leses fra ``_tilganger`` og ikke fra ``nivaa_for``. Sistnevnte
+    svarer på «hva slipper du inn på nå», og gir derfor ``None`` for en
+    deaktivert modul. Kortet svarer på «hva har du fått», og hadde det vist en
+    avslått modul som «ingen tilgang», ville brukeren lest et driftsvalg som et
+    tilgangsvalg — og bedt om noe hen allerede har fått.
+    """
+    from accounts.forms import ModulTilgangForm
+    from accounts.models import TilgangsNivaa
+    # `_tilganger` framfor `nivaa_for`: se avsnittet over. Samme private
+    # helper som `Module.is_visible_for` bruker.
+    from core.auth_decorators import _tilganger, er_global_admin
+
+    etiketter = dict(TilgangsNivaa.choices)
+    aktive = ModuleSettings.get_enabled_slugs()
+    admin = er_global_admin(user)
+    tilganger = {} if admin else _tilganger(user)
+
+    rader = []
+    for modul in ModulTilgangForm.moduler():
+        nivaa = 'skriv_full' if admin else tilganger.get(modul.slug)
+        rader.append({
+            'navn': modul.name,
+            'nivaa': etiketter.get(nivaa) if nivaa else None,
+            'deaktivert': not (modul.is_core or modul.slug in aktive),
+        })
+    return rader
+
+
 @login_required
 @require_GET
 def profile_view(request):
     """Min profil-side med permissions, moduler og aktivitetslogg.
 
     Viser:
-    - Brukerens rolle og 5 modul-permissions
+    - Brukerens modultilganger, med nivå
     - Modulene brukeren har tilgang til
     - Siste 10 innloggingshendelser (LoginEvent)
     - Sikkerhetsstatus (MFA, sist endret passord)
@@ -74,14 +118,7 @@ def profile_view(request):
     """
     user = request.user
 
-    # Hent permissions som liste av (label, value) for visning
-    permissions = [
-        ('Pasientregistrering', getattr(user, 'kan_redigere_pasienter', False)),
-        ('Vakter', getattr(user, 'kan_redigere_vakter', False)),
-        ('Utstyr', getattr(user, 'kan_redigere_utstyr', False)),
-        ('Rapport', getattr(user, 'kan_se_rapport', False)),
-        ('Beredskap', getattr(user, 'kan_redigere_beredskap', False)),
-    ]
+    permissions = modultilganger_for_visning(user)
 
     # Moduler brukeren har tilgang til (skjul kjernemoduler uten dashboard)
     visible_modules = get_dashboard_modules(user)

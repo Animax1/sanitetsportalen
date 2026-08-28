@@ -312,6 +312,24 @@ Et eget `er_admin`-felt ville gitt en migrasjon til og etterlatt `role` som død
 Erstattes helt av `ModulTilgang`. Navnene var uansett feil: de gjorde verken redigering
 eller tilgang.
 
+> **Gjennomført 28. aug. 2026** — `accounts.0014_fjern_modulflagg`. Ikke deployet til prod
+> ennå.
+>
+> **Én flate leste dem fortsatt, og §2.1-gjennomgangen fant den ikke.** Kortet
+> «Modul-tilganger» på `/min-profil/` bygde på flaggene, og viste «Nei» til en konto med
+> `patients: skriv_full` — fordi backfillen rørte flagget med vilje (§8.1). Under sto
+> «Ta kontakt om du trenger flere tilganger», så siden ba brukeren melde fra om noe hen
+> allerede hadde.
+>
+> Grunnen til at gjennomgangen ikke fanget den: §2.1 lette etter steder som *gater* på
+> flagget, altså der en feil gir uautorisert tilgang. Dette stedet *viste* det. En flate
+> som forteller brukeren noe annet enn den som håndhever er samme feilklasse med motsatt
+> fortegn — den nekter ikke noen noe, den får dem til å be om det de har.
+>
+> Kortet leser nå `ModulTilgang` og går over modulregisteret. Det gjorde samtidig slutt på
+> en eldre løgn: «Vakter», «Utstyr» og «Beredskap» sto i lista som moduler man kunne få
+> tilgang til, og har aldri eksistert.
+
 ### 7.3 `PasientRolleForm` splittes
 
 Radioen setter i dag **både** FK-en (`Forstehjelper.user` / `Helsepersonell.user`) og
@@ -338,7 +356,7 @@ TODO sa minimum to. Det blir tre, fordi rollekrympingen er destruktiv.
 | **2** | Krymp `role` til `admin`/`bruker`. Bytt maler og JS | Kun med `ModulTilgang` som fasit |
 | **3** | Fjern de fem flaggene | Ja |
 
-Status: **1 er i prod** (28. aug. 2026), **2 er kodet, ikke deployet**, 3 gjenstår.
+Status: **1 og 2 er i prod** (28. aug. 2026), **3 er kodet, ikke deployet**.
 
 Slås 1 og 3 sammen, mister en rollback dataene. Deploy 2 kan ikke komme før matrisen er
 verifisert i prod: `lead_view` → `bruker` kan ikke rulles tilbake uten `ModulTilgang`.
