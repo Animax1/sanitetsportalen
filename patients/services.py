@@ -9,7 +9,7 @@ re-eksporterer de samme navnene slik at all eksisterende kode (i views.py,
 tester m.m.) fortsetter å fungere uten endring.
 """
 import statistics as smod
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from django.core.exceptions import ValidationError
 from django.db import transaction
@@ -900,3 +900,54 @@ def har_arkiv_backup_etter(tidspunkt):
     """
     from core.arkiv import har_backup_etter
     return har_backup_etter(_arkiv_handler(), tidspunkt)
+
+
+# ── Slettevindu (§4.2) ────────────────────────────────────────────────────────
+
+#: Hvor lenge etter opprettelsen `skriv_full` kan hard-slette egen pasient.
+#:
+#: Treffer feilregistrering — en duplikat eller et feiltrykk som blokkerer et
+#: pasientnummer og forstyrrer statistikken — uten å gjøre sletting til et
+#: hverdagsverktøy. Den som oppdager feilen er den som registrerte, ikke en
+#: admin som kanskje ikke er på vakt.
+SLETTEVINDU = timedelta(minutes=30)
+
+
+def kan_slette_selv(user, patient):
+    """True hvis `user` kan hard-slette `patient` uten å være global admin.
+
+    **«Egen pasient» avgjøres fra auditloggen, ikke fra et nytt felt.**
+    `Patient` har `created_at`, men ingen `opprettet_av`. `AuditLog` har
+    CREATE-raden med `user`, og `(table_name, record_id)` er indeksert — så
+    oppslaget er billig og krever ingen migrasjon.
+
+    **Fail-closed:** mangler CREATE-raden, nektes slettingen. Raden kan mangle
+    for pasienter opprettet før auditloggen, eller for importerte rader, og
+    «vet ikke hvem som opprettet den» skal ikke bety «hvem som helst».
+
+    Forbehold som følger med (§4.2): auditloggen lagrer i dag bare
+    pasientnummeret ved DELETE, ikke innholdet i raden. Etter en sletting vet
+    man *at* pasient #14 ble slettet av Kari 14:32, ikke hva som sto der.
+    Innenfor et 30-minutters vindu på egne rader er det akseptabelt. Åpnes
+    sletting bredere senere, må DELETE-loggingen utvides først.
+    """
+    from django.utils import timezone
+
+    from audit.models import AuditLog
+    from core.auth_decorators import har_tilgang
+
+    if not har_tilgang(user, 'patients', 'skriv_full'):
+        return False
+
+    opprettet = (
+        AuditLog.objects
+        .filter(table_name='patients_patient', record_id=patient.pk,
+                action='CREATE')
+        .order_by('created_at')
+        .first()
+    )
+    if opprettet is None or opprettet.user_id is None:
+        return False
+    if opprettet.user_id != user.pk:
+        return False
+    return timezone.now() - opprettet.created_at <= SLETTEVINDU

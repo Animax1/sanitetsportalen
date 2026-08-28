@@ -29,21 +29,6 @@
 // SESJONSTIMEOUT
 // ════════════════════════════════════════════════════════
 
-async function saveSessionTimeout() {
-  const el = document.getElementById('session-timeout-input');
-  if (!el) return;
-  const hours = parseInt(el.value, 10);
-  if (isNaN(hours) || hours < 1 || hours > 24) {
-    alert('Oppgi et tall mellom 1 og 24');
-    return;
-  }
-  try {
-    await apiFetch('/pasienter/api/session-timeout/', {method:'PUT', body: JSON.stringify({hours})});
-    alert('Sesjonstimeout oppdatert.');
-  } catch (e) {
-    alert('Kunne ikke lagre: ' + e.message);
-  }
-}
 
 // ════════════════════════════════════════════════════════
 // FORSTEHJELPERE

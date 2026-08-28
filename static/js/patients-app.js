@@ -8,9 +8,8 @@
 // slik F7 opprinnelig foreslo, ville tatt ned hele appen for read_only og
 // read_write: tabellen, faneskiftet og auto-refresh startet derfra.
 //
-// Regel: alt en read_only- eller read_write-bruker kan nå, skal ligge her.
-// `saveEventName` er med nettopp derfor — knappen er `write-only`, og
-// read_write har skrivetilgang uten admin-tilgang.
+// Regel: alt en ikke-admin kan nå, skal ligge her. Kall til
+// patients-admin.js må gå gjennom `_kall()`.
 // ════════════════════════════════════════════════════════
 
 // Kall en funksjon som bor i patients-admin.js, hvis modulen er lastet.
@@ -31,36 +30,17 @@ document.addEventListener('input', (e) => {
 
 
 
+// Leser kun. Skrivingen flyttet til /portal-admin/innstillinger/ (§4.1),
+// og redigeringsfeltet som lå i innstillingsfanen fulgte med.
 async function loadSettings() {
   const s = await (await fetch('/pasienter/api/settings/')).json();
   if (s.event_name) {
-    const inp = document.getElementById('setting-event-name');
-    if (inp) inp.value = s.event_name;
     const disp = document.getElementById('event-name-display');
     if (disp) disp.textContent = s.event_name;
   }
 }
 
-async function saveEventName() {
-  const name = (document.getElementById('setting-event-name')?.value || '').trim();
-  if (!name) return;
-  await apiFetch('/pasienter/api/settings/', {
-    method: 'PUT',
-    body: JSON.stringify({ event_name: name })
-  });
-  const disp = document.getElementById('event-name-display');
-  if (disp) disp.textContent = name;
-}
 
-async function loadSessionTimeout() {
-  const el = document.getElementById('session-timeout-input');
-  if (!el) return;
-  try {
-    const res = await apiFetch('/pasienter/api/session-timeout/');
-    const d = await res.json();
-    el.value = d.hours;
-  } catch (e) {}
-}
 
 let lastForstehjelperEtag = null;
 
@@ -126,7 +106,6 @@ document.querySelectorAll('[data-tab]').forEach(link => link.addEventListener('c
   if (tab === 'tavle')        renderBoard();
   if (tab === 'innstillinger') {
     loadSettings();
-    loadSessionTimeout();
     loadForstehjelpere();
     loadHelsepersonell();
   }
@@ -172,7 +151,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   await loadHelsepersonell();
   await loadPatients();
   loadSettings();
-  loadSessionTimeout();
   if (document.getElementById('tab-tavle')?.classList.contains('active')) {
     renderBoard();
   }

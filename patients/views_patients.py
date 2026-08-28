@@ -22,6 +22,7 @@ from core.ratelimit import rate_limit
 from .choices import validate_patient_choice_fields
 from .models import Patient, AppSetting, Forstehjelper, Helsepersonell
 from .services import (
+    kan_slette_selv,
     next_patient_nr,
     apply_list_filter, stamp_pabegynt_if_needed,
     get_active_year,
@@ -76,58 +77,24 @@ SETTINGS_READ_WHITELIST = frozenset({
     'active_year',  # aktivt år, styrer hvilke pasienter som vises
 })
 
-#: Nøkler `PUT /api/settings/` godtar å skrive. Bevisst smalere enn lese-lista:
-#: `active_year` settes via egne endepunkter, ikke ved fri skriving hit.
-SETTINGS_WRITE_WHITELIST = frozenset({'event_name'})
-
 
 @modul_kreves('patients', 'les', svar='json')
-@require_http_methods(['GET', 'PUT'])
+@require_http_methods(['GET'])
 def settings_view(request):
-    """Hent eller oppdater appinnstillinger."""
-    if request.method == 'GET':
-        settings_dict = {
-            s.key: s.value
-            for s in AppSetting.objects.filter(key__in=SETTINGS_READ_WHITELIST)
-        }
-        return JsonResponse(settings_dict)
+    """Les appinnstillingene pasientsiden trenger.
 
-    # PUT – oppdater event_name (krever skrivetilgang)
-    if not har_tilgang(request.user, 'patients', 'skriv_full'):
-        return JsonResponse({'error': 'Ingen tilgang'}, status=403)
+    **Kun GET.** Skrivingen flyttet til `/portal-admin/innstillinger/` (§4.1):
+    `event_name` er en portalinnstilling, ikke en pasientinnstilling, og et
+    endepunkt under `/pasienter/` som krever global admin sier at
+    modulgrensen ikke betyr noe.
 
-    data = _json_body(request)
-    for k, v in data.items():
-        if k in SETTINGS_WRITE_WHITELIST:
-            AppSetting.set(k, v)
-    return JsonResponse({'ok': True})
-
-
-# ── Sesjonstimeout ────────────────────────────────────────────────────────────
-
-@modul_kreves('patients', 'les', svar='json')
-@require_http_methods(['GET', 'PUT'])
-def session_timeout_view(request):
-    """Hent eller sett sesjonstimeout i timer. Kun admin kan sette."""
-    if request.method == 'GET':
-        try:
-            hours = int(AppSetting.get('session_timeout_hours', 8))
-        except (ValueError, TypeError):
-            hours = 8
-        return JsonResponse({'hours': hours})
-    # PUT
-    if request.user.role != 'admin':
-        return JsonResponse({'error': 'Ingen tilgang'}, status=403)
-    data = _json_body(request)
-    try:
-        hours = int(data.get('hours', 8))
-    except (ValueError, TypeError):
-        return JsonResponse({'error': 'Ugyldig verdi'}, status=400)
-    if hours < 1 or hours > 24:
-        return JsonResponse({'error': 'Må være mellom 1 og 24'}, status=400)
-    AppSetting.set('session_timeout_hours', hours)
-    return JsonResponse({'ok': True, 'hours': hours})
-
+    Lesingen blir igjen fordi headeren og årsfiltreringen trenger verdiene, og
+    fordi de er ufarlige for alle som allerede kan lese modulen.
+    """
+    return JsonResponse({
+        s.key: s.value
+        for s in AppSetting.objects.filter(key__in=SETTINGS_READ_WHITELIST)
+    })
 
 # ── Pasienter ─────────────────────────────────────────────────────────────────
 
@@ -435,8 +402,18 @@ def patient_detail_view(request, pk):
         patient.save()
         return JsonResponse(_patient_to_dict(patient))
 
-    # DELETE – hard-delete med recycle av pasientnummer (krever admin)
-    if request.user.role != 'admin':
+    # DELETE – hard-delete med recycle av pasientnummer.
+    #
+    # §4.2: `skriv_full` kan slette **egne** pasienter de siste 30 minuttene.
+    # Eldre sletting, og andres, forblir global admin. Vinduet treffer
+    # feilregistrering — en duplikat eller et feiltrykk som blokkerer et
+    # pasientnummer — uten å gjøre sletting til et hverdagsverktøy.
+    #
+    # Merk at dette er en **hard-delete som resirkulerer pasientnummeret**.
+    # Det er nettopp derfor vinduet er smalt: raden finnes ikke i noen backup
+    # tatt etterpå.
+    if not (er_global_admin(request.user)
+            or kan_slette_selv(request.user, patient)):
         return JsonResponse({'error': 'Ingen tilgang'}, status=403)
 
     pasientnummer = patient.pasientnummer

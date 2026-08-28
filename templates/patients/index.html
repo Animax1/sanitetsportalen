@@ -207,27 +207,22 @@
 <div id="tab-innstillinger" class="tab-panel">
   <div class="d-flex flex-column gap-3" style="max-width:580px">
 
-    <div class="settings-card">
-      <h6><i class="bi bi-calendar-event me-2"></i>Arrangement</h6>
-      <label class="form-label mt-2 small">Navn på arrangement</label>
-      <div class="input-group input-group-sm">
-        <input type="text" id="setting-event-name" class="form-control" value="{{ event_name }}">
-        <button class="btn btn-primary write-only" data-action="saveEventName">Lagre</button>
-      </div>
-      <div class="form-text">Vises i topplinjen.</div>
+    {% comment %}
+      Arrangementsnavn og sesjonstimeout lå her fram til §4.1. Ingen av dem er
+      pasientinnstillinger: navnet gjelder vakten, timeouten gjelder
+      innloggingen. Begge krevde dessuten global admin, og et admin-endepunkt
+      inne i en modul sier at modulgrensen ikke betyr noe.
+    {% endcomment %}
+    <div class="settings-card admin-only">
+      <h6><i class="bi bi-sliders me-2"></i>Portalinnstillinger</h6>
+      <p class="small text-muted mb-2">
+        Arrangementsnavn og sesjonstimeout gjelder hele portalen og settes
+        samlet ett sted.
+      </p>
+      <a href="{% url 'core:portal_settings' %}" class="btn btn-outline-primary btn-sm">
+        <i class="bi bi-box-arrow-up-right me-1"></i>Åpne portalinnstillinger
+      </a>
     </div>
-
-    {% if user.role == 'admin' %}
-    <div class="card mb-3">
-      <div class="card-header"><strong>Sesjon</strong></div>
-      <div class="card-body">
-        <label class="form-label">Timeout (timer)</label>
-        <input type="number" id="session-timeout-input" class="form-control form-control-sm" min="1" max="24" style="max-width:120px;">
-        <div class="form-text">1–24 timer. Endringer gjelder fra neste innlogging.</div>
-        <button class="btn btn-sm btn-primary mt-2" data-action="saveSessionTimeout">Lagre</button>
-      </div>
-    </div>
-    {% endif %}
 
     <div class="settings-card admin-only">
       <h6><i class="bi bi-people me-2"></i>Forstehjelpere</h6>

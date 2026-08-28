@@ -8,11 +8,9 @@ urlpatterns = [
     # Hoved-siden
     path('', views_patients.index_view, name='index'),
 
-    # Innstillinger
+    # Innstillinger — kun lesing. Skriving flyttet til
+    # /portal-admin/innstillinger/ (§4.1).
     path('api/settings/', views_patients.settings_view, name='api_settings'),
-
-    # Sesjonstimeout
-    path('api/session-timeout/', views_patients.session_timeout_view, name='api_session_timeout'),
 
     # Pasienter
     path('api/patients/', views_patients.patients_list_view, name='api_patients_list'),

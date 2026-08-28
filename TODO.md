@@ -340,7 +340,7 @@ skal ligge der.
       - [ ] Tilgangstabellen i `docs/BESLUTNING_STATISTIKK.md` må fortsatt skrives om
             til modulnivåer.
 
-- [ ] **Deploy 1** — under arbeid:
+- [x] **Deploy 1 — ferdig 28. aug. 2026.**
       - [x] `ModulTilgang` lagt til og fylt fra `role` alene (28. aug. 2026).
             Synlighet og håndhevelse leser nå samme kilde. `ModuleSettings.enabled=False`
             stenger URL-en. `@modul_kreves` finnes, med markør URL-testen kan lese.
@@ -357,7 +357,7 @@ skal ligge der.
 - [ ] **Deploy 3:** de fem `kan_redigere_*`-flaggene fjernes. Slås 1 og 3 sammen, mister
       en rollback dataene.
 
-- [ ] **Sletting åpnes for `skriv: full`**, men kun på pasienter brukeren selv opprettet
+- [x] **Sletting åpnet for `skriv: full` (28. aug. 2026)**, kun på pasienter brukeren selv opprettet
       siste 30 min. «Egen pasient» avgjøres fra `AuditLog`s CREATE-rad — indeksert på
       `(table_name, record_id)`, ingen ny kolonne. Mangler raden, nektes slettingen.
       **Merk:** DELETE-loggingen lagrer bare pasientnummeret, ikke innholdet
@@ -367,9 +367,8 @@ skal ligge der.
       generelle `PUT`-en, der stemplingen i dag er en bivirkning av en redigering.
       Invarianten håndheves med test. Definer nivået i deploy 1, ta det i bruk når
       oppdragsmodulen skrives.
-- [ ] **`session_timeout` og `event_name` flyttes til portal-admin.** Portalinnstillinger
-      som tilfeldigvis bor under `/pasienter/`. Merk at `saveEventName` da flytter ut av
-      pasientmodulens JS — se F7-regelen i `CLAUDE.md`.
+- [x] **`session_timeout` og `event_name` flyttet til `/portal-admin/innstillinger/`
+      (28. aug. 2026).** `saveEventName` er ute av pasientmodulens JS.
 - [x] **`PasientRolleForm` splittet (28. aug. 2026).** Radioen setter kun
       førstehjelper/helsepersonell-koblingen; tilgang settes i matrisen.
 - [x] **Matrisen ligger på opprettingsskjemaet (28. aug. 2026).** Meldt fra staging: en

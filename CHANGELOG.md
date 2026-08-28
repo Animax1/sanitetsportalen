@@ -4,6 +4,59 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-08-28 — Deploy 1 ferdig: §4.1 og §4.2
+
+**989 tester grønne** (18 nye). Ingen migrasjon. Deploy 1 er dermed komplett.
+
+### §4.1 — portalinnstillingene flyttet
+
+Arrangementsnavn og sesjonstimeout lå under `/pasienter/` fordi pasientmodulen var den
+eneste som fantes. Ingen av dem hører til der: navnet gjelder vakten, som med flere moduler
+dekker mer enn pasientregistreringen, og timeouten gjelder innloggingen. Begge krevde
+dessuten global admin — og **et admin-endepunkt inne i en modul sier at modulgrensen ikke
+betyr noe**, som er nettopp den sammenblandingen `ModulTilgang` skal fjerne.
+
+Begge ligger nå på `/portal-admin/innstillinger/`. `PUT /pasienter/api/settings/` og hele
+`api/session-timeout/` er borte; `GET /api/settings/` blir igjen, fordi headeren og
+årsfiltreringen trenger verdiene og de er ufarlige for alle som kan lese modulen.
+Innstillingsfanen har en lenke i stedet for feltene, og `saveEventName` er ute av
+pasientmodulens JS — som F7-notatet i §4.1 forutså.
+
+Validering flyttet med: `AppSetting` er en generisk nøkkel/verdi-tabell uten den, og en
+timeout på 0 timer ville logget ut alle umiddelbart. Arrangementsnavnet skrives **etter** at
+timeouten er validert, så en avvist innsending ikke lagrer halve skjemaet — det har egen
+test.
+
+### §4.2 — slettevindu på 30 minutter
+
+`skriv_full` kan hard-slette **egne** pasienter opprettet siste 30 minutter. Eldre
+sletting, og andres, forblir global admin.
+
+Treffer feilregistrering — en duplikat eller et feiltrykk som blokkerer et pasientnummer og
+forstyrrer statistikken — uten å gjøre sletting til et hverdagsverktøy. Den som oppdager
+feilen er den som registrerte, ikke en admin som kanskje ikke er på vakt.
+
+**«Egen pasient» avgjøres fra auditloggen, ikke fra et nytt felt.** `Patient` har
+`created_at`, men ingen `opprettet_av`. `AuditLog` har CREATE-raden med `user`, og
+`(table_name, record_id)` er indeksert — billig oppslag, ingen migrasjon.
+
+**Fail-closed:** mangler CREATE-raden, eller har den ingen `user` (importerte rader),
+nektes slettingen. «Vet ikke hvem som opprettet den» skal ikke bety «hvem som helst».
+
+Forbeholdet fra §4.2 følger med: DELETE-loggingen lagrer bare pasientnummeret, ikke
+innholdet. Etter en sletting vet man *at* pasient #14 ble slettet av Kari 14:32, ikke hva
+som sto der. Innenfor et 30-minutters vindu på egne rader er det akseptabelt. Åpnes
+sletting bredere senere, må DELETE-loggingen utvides først.
+
+### Verifisert i nettleser
+
+Hele innstillingsflyten: lagring i portal-admin slår gjennom i pasientmodulens header.
+Underveis så det ut som lagring logget admin ut — det var probens egen selektor som traff
+utloggingsknappen i headeren, ikke skjemaets. Verdt å notere fordi konklusjonen «lagring
+dreper sesjonen» ville vært en alvorlig feilmelding å sende videre.
+
+---
+
 ## 2026-08-28 — Deploy 1, del 5: varsler, og §9-oppryddingen
 
 **971 tester grønne** (5 nye). Ingen migrasjon. Siste del av deploy 1 utenom §4.1 og §4.2.

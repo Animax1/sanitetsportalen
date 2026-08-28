@@ -1511,8 +1511,16 @@ class SettingsWhitelistTests(TestCase):
         data = self._get()
         self.assertEqual(data.get('active_year'), str(aar))
 
-    def test_put_kan_ikke_skrive_utenfor_sin_egen_whitelist(self):
-        """PUT-lista er smalere enn lese-lista og skal forbli det."""
+    def test_put_finnes_ikke_lenger(self):
+        """Skrivingen flyttet til /portal-admin/innstillinger/ (§4.1).
+
+        Whitelisten for PUT er borte sammen med metoden. Lese-whitelisten står
+        igjen og er fortsatt vernet av testene over — den er den som avgjør hva
+        en `les`-bruker får se.
+
+        Endepunktet svarer 405, ikke 403: metoden finnes ikke, tilgangen er i
+        orden. Den forskjellen er verdt å beholde i svaret.
+        """
         skriver = CustomUser.objects.create_user(
             username='skriver', password='testpass123',
             role='read_write', must_change_password=False,
@@ -1520,19 +1528,15 @@ class SettingsWhitelistTests(TestCase):
         gi_standardtilgang(skriver)
         self.client.force_login(skriver)
 
-        foer = AppSetting.get('active_year', None)
+        foer = AppSetting.get('event_name', None)
         resp = self.client.put(
             '/pasienter/api/settings/',
-            data=json.dumps({'active_year': 1999, 'event_name': 'Nytt navn'}),
+            data=json.dumps({'event_name': 'Nytt navn'}),
             content_type='application/json',
         )
-        self.assertEqual(resp.status_code, 200)
-        self.assertEqual(AppSetting.get('active_year', None), foer,
-                         'active_year skal ikke kunne settes via PUT /api/settings/')
-        self.assertEqual(AppSetting.get('event_name', None), 'Nytt navn')
+        self.assertEqual(resp.status_code, 405)
+        self.assertEqual(AppSetting.get('event_name', None), foer)
 
-
-@override_settings(SECURE_SSL_REDIRECT=False, RATELIMIT_ENABLE=False)
 class HeaderArrangementNavnTests(TestCase):
     """Headeren skal vise riktig arrangementsnavn med én gang.
 
@@ -1582,12 +1586,17 @@ class HeaderArrangementNavnTests(TestCase):
             self.assertNotIn(markor, innhold,
                              f'Uparset template-syntaks i responsen: {markor}')
 
-    def test_innstillingsfeltet_er_forhaandsutfylt(self):
-        """Feltet i innstillinger skal ha samme verdi som headeren."""
-        AppSetting.set('event_name', 'Festivalen 2026')
+    def test_innstillingsfeltet_ligger_i_portal_admin(self):
+        """Redigeringsfeltet flyttet ut av pasientmodulen (§4.1).
+
+        Arrangementsnavnet er en portalinnstilling: det gjelder vakten, som
+        med flere moduler dekker mer enn pasientregistreringen. Feltet krevde
+        dessuten global admin, og et admin-endepunkt inne i en modul sier at
+        modulgrensen ikke betyr noe.
+        """
         resp = self.client.get('/pasienter/')
-        self.assertContains(resp, 'id="setting-event-name" class="form-control" '
-                                  'value="Festivalen 2026"')
+        self.assertNotContains(resp, 'id="setting-event-name"')
+        self.assertContains(resp, '/portal-admin/innstillinger/')
 
     def test_navnet_escapes_i_templaten(self):
         """Arrangementsnavnet er fritekst fra innstillingene."""
@@ -1973,16 +1982,21 @@ class JsModulLastingTests(TestCase):
             + '\n\nLast biblioteket i malen, eller flytt koden dit det finnes.'
         ))
 
-    def test_write_only_handler_er_alltid_tilgjengelig(self):
-        """`read_write` har skrivetilgang, men ikke admin-tilgang.
+    def test_lasterne_ligger_i_alltid_lastet_modul(self):
+        """Alt en ikke-admin kan nå må ligge i en alltid-lastet fil.
 
-        Lagre-knappen for arrangementsnavn er `write-only`, altså synlig for
-        read_write — som ikke laster patients-admin.js. `saveEventName` må
-        derfor ligge i patients-app.js.
+        `saveEventName` var eksempelet her fram til §4.1 flyttet
+        arrangementsnavnet til portal-admin. Lasterne for pasientlista og
+        navneregistrene er den samme regelen: de kjøres for alle roller, og
+        ligger derfor i patients-app.js, ikke i patients-admin.js.
         """
         from patients import js_test_utils as jsu
-        self.assertIn('function saveEventName(', jsu.read_js(jsu.APP_JS))
-        self.assertNotIn('function saveEventName(', jsu.read_js(jsu.ADMIN_JS))
+        app = jsu.read_js(jsu.APP_JS)
+        admin = jsu.read_js(jsu.ADMIN_JS)
+        for navn in ('loadSettings', 'loadForstehjelpere', 'loadHelsepersonell'):
+            with self.subTest(funksjon=navn):
+                self.assertIn(f'function {navn}(', app)
+                self.assertNotIn(f'function {navn}(', admin)
 
 
 class InlineHandlerTests(SimpleTestCase):

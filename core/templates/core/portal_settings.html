@@ -1,0 +1,47 @@
+{% extends "core/base_portal.html" %}
+
+{% block title %}Portalinnstillinger – Sanitetsportalen{% endblock %}
+
+{% block content %}
+<section class="mb-4">
+  <h1 class="mb-2">Portalinnstillinger</h1>
+  <p class="text-muted mb-0">
+    Innstillinger som gjelder hele portalen, ikke én modul. De lå tidligere
+    under <a href="/pasienter/">Pasientregistrering</a> fordi det var den
+    eneste modulen som fantes.
+  </p>
+</section>
+
+<form method="post" style="max-width:560px">
+  {% csrf_token %}
+
+  <div class="card mb-3">
+    <div class="card-header"><strong>Arrangement</strong></div>
+    <div class="card-body">
+      <label class="form-label" for="event_name">Navn på arrangement</label>
+      <input type="text" id="event_name" name="event_name"
+             class="form-control" value="{{ event_name }}"
+             placeholder="F.eks. Landsskytterstevnet 2026">
+      <div class="form-text">
+        Vises i topplinjen på modulsidene.
+      </div>
+    </div>
+  </div>
+
+  <div class="card mb-3">
+    <div class="card-header"><strong>Sesjon</strong></div>
+    <div class="card-body">
+      <label class="form-label" for="session_timeout_hours">Timeout (timer)</label>
+      <input type="number" id="session_timeout_hours" name="session_timeout_hours"
+             class="form-control" style="max-width:140px;"
+             min="1" max="24" value="{{ session_timeout_hours }}">
+      <div class="form-text">
+        1–24 timer. Endringen gjelder fra neste innlogging — den forkorter
+        ikke sesjoner som allerede er i gang.
+      </div>
+    </div>
+  </div>
+
+  <button type="submit" class="btn btn-primary">Lagre innstillinger</button>
+</form>
+{% endblock %}
