@@ -51,7 +51,22 @@ modulen uten en `ModulTilgang`-rad, og en konto med raden ser den. Koblingen er 
 som `Forstehjelper.user` — §7.3 delte `PasientRolleForm` nettopp for å holde kobling og
 autorisasjon fra hverandre.
 
-Gjenstår i fase 1: lokasjonsadmin, så admin kan fylle nedtrekkslista før fase 3.
+**Lokasjonene vedlikeholdes med `python manage.py lokasjon` inntil fase 3**, ikke med en
+admin-side. Planen sa admin-side i fase 1, og den beslutningen ble snudd av en grunn som
+først ble tydelig da siden skulle plasseres: modulen har ingen URL ennå, med vilje. En
+admin-side uten vei inn er den samme feilen som et modulkort som fører til 404, med et
+ekstra steg — og portalen har allerede hatt én slik, oppdaget ved at noen måtte skrive
+URL-en for hånd.
+
+Å gi modulen en URL bare for å ha et sted å henge siden ville løst plasseringen ved å
+innføre problemet. Kommandoen følger `appsetting`-presedensen — samme rolle, samme
+begrunnelse — og gjør staging mulig å fylle med testdata før fase 3 skrives. Den permanente
+flaten kommer i modulens eget admin-område, sammen med sentralbordet.
+
+`--deaktiver` framfor sletting: FK-en fra `Oppdrag` er `PROTECT`, så en lokasjon i bruk kan
+ikke forsvinne uten å ta historikken med seg. En test sjekker begge deler.
+
+Med det er fase 1 ferdig.
 
 ---
 

@@ -548,8 +548,12 @@ Gjennomgang 13. aug. 2026, med 1000 pasienter og peak 100 brukere som premiss.
             fem modeller, `choices.py`, statusmaskin, utledet enhetsstatus,
             korreksjonsregel og audit med skjult fritekst. 46 tester. Modulen står med
             `url=None` og begge `show_*`-flagg av til fase 3.
-            - [ ] **Gjenstår i fase 1:** lokasjonsadmin, så admin kan fylle
-                  nedtrekkslista før fase 3 trenger den.
+            - [x] Lokasjoner vedlikeholdes med `python manage.py lokasjon` inntil
+                  fase 3. Admin-siden ble utsatt fordi modulen ikke har en URL ennå —
+                  en admin-side uten vei inn er samme feil som et modulkort som fører
+                  til 404. Følger `appsetting`-presedensen. **Fase 1 er ferdig.**
+            - [ ] **Fase 3 arver:** lokasjonsadmin som side, i modulens eget
+                  admin-område.
       - [x] **Fase 2, kodedelen (28. aug. 2026):** fritekst er unntatt
             verdilogging fra første lagring — `oppdrag/signals.py` er ny kode, ikke en
             retrofit av `audit/`, så vinduet planen advarte mot oppsto aldri.

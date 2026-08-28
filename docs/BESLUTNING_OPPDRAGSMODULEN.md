@@ -436,9 +436,9 @@ statusknappen som det eneste elementet som ikke krever presisjon.
 
 | Fase | Innhold | Estimat |
 |---|---|---|
-| 1 | App, modulregistrering, fire modeller, `choices.py`, lokasjonsadmin, admin-matrise | 5–7 t |
+| 1 | ✅ App, modulregistrering, fem modeller, `choices.py`, regler, `lokasjon`-kommando | levert |
 | 2 | Audit-unntak for fritekst + protokolltillegg. **Før fase 3** | 1–2 t |
-| 3 | Sentralbordet: enhetsliste med utledet status, opprett, tildel, flytt, rediger. Polling med ETag | 7–9 t |
+| 3 | Sentralbordet: enhetsliste med utledet status, opprett, tildel, flytt, rediger, **lokasjonsadmin som side**. Polling med ETag | 8–10 t |
 | 4 | Enhetsskjermen: statusmaskin, smale endepunkter, objektsjekk, de to skjulereglene, visning av `automatisk` | 6–8 t |
 | 4b | Korreksjoner: ny rad som overstyrer, `gjeldende()`-manager | 2–3 t |
 | 5 | Offline-kø med idempotens | 4–6 t |

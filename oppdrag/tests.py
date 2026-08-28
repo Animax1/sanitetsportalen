@@ -394,6 +394,73 @@ class ChoicesTests(TestCase):
         self.assertIsNot(choices.PROBLEMSTILLING, pasient_choices.PROBLEMSTILLING)
 
 
+class LokasjonKommandoTests(TestCase):
+    """`python manage.py lokasjon` — flaten fram til fase 3.
+
+    Modulen har ingen URL ennå, med vilje. En admin-side uten vei inn er den
+    samme feilen som et modulkort som fører til 404, med et ekstra steg — og
+    portalen har allerede hatt én slik. Kommandoen følger
+    `appsetting`-presedensen.
+    """
+
+    def _kjor(self, *args):
+        from io import StringIO
+        from django.core.management import call_command
+        ut = StringIO()
+        call_command('lokasjon', *args, stdout=ut)
+        return ut.getvalue()
+
+    def test_legg_til_og_list(self):
+        self._kjor('--legg-til', 'Hovedscene')
+        self.assertIn('Hovedscene', self._kjor('--list'))
+
+    def test_tom_liste_sier_ifra(self):
+        self.assertIn('Ingen lokasjoner', self._kjor('--list'))
+
+    def test_dublett_avvises(self):
+        from django.core.management.base import CommandError
+        self._kjor('--legg-til', 'Hovedscene')
+        with self.assertRaises(CommandError):
+            self._kjor('--legg-til', 'Hovedscene')
+
+    def test_deaktivering_sletter_ikke(self):
+        """En lokasjon i bruk kan ikke forsvinne — FK-en er PROTECT."""
+        self._kjor('--legg-til', 'Hovedscene')
+        self._kjor('--deaktiver', 'Hovedscene')
+        lok = Lokasjon.objects.get(navn='Hovedscene')
+        self.assertFalse(lok.er_aktiv)
+
+    def test_aktivering_igjen(self):
+        self._kjor('--legg-til', 'Hovedscene')
+        self._kjor('--deaktiver', 'Hovedscene')
+        self._kjor('--aktiver', 'Hovedscene')
+        self.assertTrue(Lokasjon.objects.get(navn='Hovedscene').er_aktiv)
+
+    def test_nytt_navn_folger_med_paa_oppdragene(self):
+        """Et sted som skifter navn er fortsatt samme sted."""
+        self._kjor('--legg-til', 'Hovedscene')
+        lok = Lokasjon.objects.get(navn='Hovedscene')
+        oppdrag = _oppdrag(_enhet('E9'), lokasjon=lok)
+
+        self._kjor('--gi-nytt-navn', 'Hovedscene', 'Scene 1')
+
+        oppdrag.refresh_from_db()
+        self.assertEqual(oppdrag.lokasjon.navn, 'Scene 1')
+
+    def test_ukjent_navn_gir_feil(self):
+        from django.core.management.base import CommandError
+        with self.assertRaises(CommandError):
+            self._kjor('--deaktiver', 'Finnes ikke')
+
+    def test_lokasjon_i_bruk_kan_ikke_slettes(self):
+        """PROTECT: historikken skal ikke forsvinne under oppdraget."""
+        from django.db.models import ProtectedError
+        lok = _lokasjon('Sanitetstelt')
+        _oppdrag(_enhet('E10'), lokasjon=lok)
+        with self.assertRaises(ProtectedError):
+            lok.delete()
+
+
 class ModulRegistreringTests(TestCase):
     """Modulen er registrert, men skjult inntil den har en side."""
 
