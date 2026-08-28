@@ -951,3 +951,32 @@ def kan_slette_selv(user, patient):
     if opprettet.user_id != user.pk:
         return False
     return timezone.now() - opprettet.created_at <= SLETTEVINDU
+
+
+def slettbare_pasient_ider(user):
+    """Pasient-pk-ene ``user`` kan hard-slette akkurat nå.
+
+    Returnerer ``None`` for global admin — «alle», uten å måtte liste dem.
+
+    **Én spørring, ikke én per pasient.** Den er filtrert på både bruker og
+    tidsvindu, så resultatet er lite uansett hvor mange pasienter lista har.
+    Et oppslag per rad ville gitt N+1 på det endepunktet som pollet hvert 30.
+    sekund av hver klient — nettopp det `select_related` ble innført for å
+    fjerne.
+    """
+    from django.utils import timezone
+
+    from audit.models import AuditLog
+    from core.auth_decorators import er_global_admin, har_tilgang
+
+    if er_global_admin(user):
+        return None
+    if not har_tilgang(user, 'patients', 'skriv_full'):
+        return set()
+
+    return set(
+        AuditLog.objects
+        .filter(table_name='patients_patient', action='CREATE',
+                user=user, created_at__gte=timezone.now() - SLETTEVINDU)
+        .values_list('record_id', flat=True)
+    )

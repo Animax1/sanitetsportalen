@@ -348,6 +348,31 @@ skal ligge der.
             URL-gjennomgangstest og unntaksliste med begrunnelse. Hullet fra §2.1 er
             lukket og målt: `POST /api/patients/` uten modultilgang gir 403, ikke 201.
       - [x] §5-komposisjonen: statistikk viser kun kilder brukeren har `les` på
+### ⚠️ Kontoopprydding i prod — MÅ gjøres før deploy til prod
+
+- [ ] **Slett alle kontoer unntatt admin-kontoen(e) og én les/skriv-konto.**
+      Bestemt av André 28. aug. 2026. Kollegaen som skal bruke les/skriv-kontoen videre
+      beholder den; resten er testkontoer og gamle kontoer som ikke skal med over.
+      - [ ] **Noter hvilken konto som beholdes, og hvilket nivå den skal ha**, før noe
+            slettes. Etter slettingen finnes ikke fasiten noe sted.
+      - [ ] **Ta backup først.** `CustomUser` er bevisst utelatt fra begge
+            backup-handlerne (se CLAUDE.md), så en slettet konto er *ikke* i noen
+            portal-backup. Ta en `dumpdata accounts` manuelt, eller aksepter at
+            slettingen er endelig.
+      - [ ] **Sletting av en bruker fjerner `ModulTilgang`-radene** (CASCADE) og setter
+            `Forstehjelper.user`/`Helsepersonell.user` til NULL (SET_NULL). Navnene
+            beholdes på historiske pasienter — det er meningen — men koblingen må settes
+            opp på nytt for kontoen som beholdes.
+      - [ ] **Auditloggen beholder radene.** `AuditLog.record_id` er en ren integer uten
+            FK nettopp for at sporet skal overleve slettingen. `AuditLog.user` blir NULL,
+            så «hvem gjorde dette» går tapt for de slettede — det er en bevisst
+            avveining, men verdt å vite før man sletter.
+      - [ ] **Kontroller etterpå at minst én admin står igjen og kan logge inn.**
+            Sletter du deg selv ut, finnes det ingen vei inn utenom `create_admin` på
+            Railway-konsollen.
+      - [ ] Kjør tellingen under (§10.1) **før** oppryddingen — etterpå er tallet
+            meningsløst.
+
 - [ ] **Deploy 2:** `role` krymper til `admin`/`bruker`. Kan ikke komme før matrisen er
       verifisert i prod — `lead_view` → `bruker` er ikke rullbar uten `ModulTilgang`.
       - [x] **JS-delen er framskyndet (28. aug. 2026):** `window.USER_ROLE` →
@@ -476,6 +501,15 @@ Gjennomgang 13. aug. 2026, med 1000 pasienter og peak 100 brukere som premiss.
       sted, tidspunkt») er dessuten mer identifiserende enn pasientraden den knytter seg til.
 - [ ] Vurder `cached_db`-sesjoner. `SESSION_SAVE_EVERY_REQUEST=True` med DB-sesjoner gir
       én UPDATE per request. Krever Redis, altså vakt-modus.
+
+### Frontend — småting
+
+- [ ] **`.admin-only` og `.write-only` skjules i nettleseren, ikke på serveren.**
+      Markupen ligger i HTML-en uansett rolle; `applyRoleVisibility()` setter
+      `display:none`. Endepunktene er gatet, så det er ikke en tilgangsgrense — men det
+      røper URL-strukturen for admin-sidene, og en bruker med utviklerverktøy ser
+      knapper hen ikke kan bruke. Bør bli `{% if %}` server-side, slik nav-blokka i
+      `base_portal.html` allerede er. `PortalAdminNavTests` beskriver skillet.
 
 ### Framtidige moduler
 

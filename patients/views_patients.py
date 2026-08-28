@@ -22,7 +22,7 @@ from core.ratelimit import rate_limit
 from .choices import validate_patient_choice_fields
 from .models import Patient, AppSetting, Forstehjelper, Helsepersonell
 from .services import (
-    kan_slette_selv,
+    kan_slette_selv, slettbare_pasient_ider,
     next_patient_nr,
     apply_list_filter, stamp_pabegynt_if_needed,
     get_active_year,
@@ -152,7 +152,9 @@ def patients_list_view(request):
         # Merk hva dette sparer: båndbredden (454 kB per kall ved 1000
         # pasienter), ikke databasearbeidet. Spørringen og serialiseringen
         # kjører uansett for å regne ut hashen.
-        kropp = json.dumps([_patient_to_dict(p) for p in qs], default=str)
+        slettbare = slettbare_pasient_ider(request.user)
+        kropp = json.dumps([_patient_to_dict(p, slettbare) for p in qs],
+                           default=str)
         etag_value = ('"v1:'
                       + hashlib.sha256(kropp.encode('utf-8')).hexdigest()[:16]
                       + '"')
@@ -235,7 +237,8 @@ def patients_list_view(request):
             # opprettet nå.
             try:
                 return JsonResponse(
-                    _patient_to_dict(Patient.objects.get(pk=verdi)),
+                    _patient_to_dict(Patient.objects.get(pk=verdi),
+                                     slettbare_pasient_ider(request.user)),
                 )
             except Patient.DoesNotExist:
                 # Pasienten er slettet i mellomtiden. Nøkkelen beskytter ikke
@@ -297,7 +300,9 @@ def patients_list_view(request):
 
     if idem:
         fullfor(idem, patient.pk)
-    return JsonResponse(_patient_to_dict(patient), status=201)
+    return JsonResponse(
+        _patient_to_dict(patient, slettbare_pasient_ider(request.user)),
+        status=201)
 
 
 @modul_kreves('patients', 'les', svar='json')
@@ -400,7 +405,8 @@ def patient_detail_view(request, pk):
         _ensure_pabegynt_not_before_inntid(patient)
 
         patient.save()
-        return JsonResponse(_patient_to_dict(patient))
+        return JsonResponse(
+            _patient_to_dict(patient, slettbare_pasient_ider(request.user)))
 
     # DELETE – hard-delete med recycle av pasientnummer.
     #

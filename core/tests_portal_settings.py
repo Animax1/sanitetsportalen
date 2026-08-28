@@ -87,3 +87,53 @@ class FlyttedeInnstillingsendepunkterTests(TestCase):
         resp = self.client.get('/pasienter/api/settings/')
         self.assertEqual(resp.status_code, 200)
         self.assertEqual(resp.json().get('event_name'), 'Vakt')
+
+
+@override_settings(SECURE_SSL_REDIRECT=False, RATELIMIT_ENABLE=False)
+class PortalAdminNavTests(TestCase):
+    """Hver portal-admin-side må være nåbar uten å skrive URL-en.
+
+    Portalinnstillingene ble levert uten lenke og var kun tilgjengelig ved å
+    skrive stien. En side ingen finner er i praksis ikke levert — og testen
+    her går gjennom hele nav-blokka, ikke bare den ene siden, slik at neste
+    admin-side ikke kan få samme mangel.
+    """
+
+    #: Navngitte ruter som skal ha en lenke i admin-navigasjonen.
+    ADMIN_SIDER = (
+        'accounts:user_list',
+        'admin_server_status',
+        'core:module_admin_list',
+        'core:portal_settings',
+        'core:audit_log_list',
+        'accounts:login_event_list',
+        'core:backup_admin_overview',
+    )
+
+    def setUp(self):
+        self.client = Client()
+        self.client.force_login(_bruker('nav_admin', rolle='admin', nivaa=None))
+
+    def test_alle_admin_sider_har_nav_lenke(self):
+        html = self.client.get(reverse('core:portal_settings')).content.decode('utf-8')
+        mangler = [n for n in self.ADMIN_SIDER if f'href="{reverse(n)}"' not in html]
+        self.assertEqual(mangler, [], (
+            'Admin-sider uten lenke i navigasjonen:\n  ' + '\n  '.join(mangler)
+            + '\n\nEn side ingen finner er i praksis ikke levert.'
+        ))
+
+    def test_nav_blokka_er_tom_for_ikke_admin(self):
+        """Nav-blokka gates server-side, og det er den som er garantien.
+
+        Merk hva denne testen *ikke* dekker: pasientsidens innstillingsfane
+        har `.admin-only`-kort som skjules i nettleseren, så lenkene deres
+        ligger i HTML-en også for en ikke-admin. Det er husets etablerte
+        mønster og ikke en tilgangsgrense — endepunktene er gatet uansett —
+        men det betyr at `.admin-only` røper URL-strukturen. Se TODO.
+        """
+        c = Client()
+        c.force_login(_bruker('nav_skriver'))
+        html = c.get(reverse('core:portal_dashboard')).content.decode('utf-8')
+        for navn in self.ADMIN_SIDER:
+            with self.subTest(side=navn):
+                self.assertNotIn(f'href="{reverse(navn)}"', html)

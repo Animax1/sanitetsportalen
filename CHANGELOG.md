@@ -4,6 +4,40 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-08-28 — To mangler i deploy 1, meldt fra staging
+
+**991 tester grønne** (4 nye). Ingen migrasjon. Begge var funksjonalitet som var *bygget*
+men ikke *nåbar* — endepunktet var riktig, veien dit fantes ikke.
+
+**Portalinnstillingene hadde ingen lenke.** `/portal-admin/innstillinger/` var kun
+tilgjengelig ved å skrive stien. En side ingen finner er i praksis ikke levert. Lenken
+ligger nå i admin-navigasjonen, og `PortalAdminNavTests` går gjennom **hele** nav-blokka —
+ikke bare den nye siden — så neste admin-side ikke kan få samme mangel.
+
+**Sletteknappen manglet for `skriv_full`.** Endepunktet var riktig fra §4.2, men knappen i
+redigeringsskjemaet var `.admin-only`, så bare admin så den. Rollemodellen var ny; knappen
+var gammel.
+
+Den kunne ikke bare bytte klasse: **om en pasient kan slettes avhenger av hvem som
+opprettet den og når**, og ingen av delene finnes i klienten. Serveren sender derfor
+`kan_slettes` per pasient, og knappen følger det feltet. Standarden er skjult — mangler
+feltet, forsvinner knappen.
+
+Flagget koster **én spørring for hele lista**, ikke én per pasient: oppslaget er filtrert på
+både bruker og 30-minutters-vinduet, så resultatet er lite uansett listestørrelse. Et
+oppslag per rad ville gitt N+1 på endepunktet som pollet hvert 30. sekund av hver klient —
+nettopp det `select_related` ble innført for å fjerne.
+
+### Notert, ikke fikset
+
+`.admin-only` og `.write-only` skjules i nettleseren, ikke på serveren — markupen ligger i
+HTML-en uansett rolle. Endepunktene er gatet, så det er ikke en tilgangsgrense, men det
+røper URL-strukturen for admin-sidene. Husets etablerte mønster, og eldre enn dette
+arbeidet. Lagt i TODO; `PortalAdminNavTests` beskriver skillet mellom nav-blokka (gatet
+server-side, og testet) og resten.
+
+---
+
 ## 2026-08-28 — Deploy 1 ferdig: §4.1 og §4.2
 
 **989 tester grønne** (18 nye). Ingen migrasjon. Deploy 1 er dermed komplett.

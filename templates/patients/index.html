@@ -700,7 +700,14 @@
 
       </div>
       <div class="modal-footer py-2">
-        <button class="btn btn-outline-danger btn-sm me-auto admin-only" data-action="delPatient">
+        {% comment %}
+          Ikke `.admin-only`: synligheten avgjøres per pasient av serverens
+          `kan_slettes`, satt i openEdit(). `skriv_full` kan slette egne
+          pasienter de siste 30 minuttene (§4.2), og hvem som opprettet raden
+          finnes ikke i klienten.
+        {% endcomment %}
+        <button id="btn-del-patient" class="btn btn-outline-danger btn-sm me-auto d-none"
+                data-action="delPatient">
           <i class="bi bi-trash me-1"></i>Slett
         </button>
         <button class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Avbryt</button>
