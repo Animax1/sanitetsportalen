@@ -376,15 +376,12 @@ skal ligge der.
       ny konto med «Pasientregistrering» avkrysset så ingen modul på dashboardet. Boksene
       er erstattet av en matrise modul × nivå, generert fra `get_all_modules()`, på både
       opprettings- og redigeringsskjemaet.
-- [ ] **`notify()` må sjekke modultilgang.** `_notify_assignment`
-      (`patients/signals.py:234`) fyrer på at `role_obj.user` er satt. Etter splitten av
-      `PasientRolleForm` kan man være koblet som helsepersonell uten
-      `ModulTilgang('patients')` — og da få et varsel med pasientnummer og lenke til en
-      403. Tilstanden var umulig før splitten.
-- [ ] **Opprydding som følger med:** fjern `accounts/mixins.py` (død kode, og feil —
-      `dispatch()` kjører viewet *før* rollesjekken) og `dataset_scope_all` (aldri brukt).
-      Rett `docs/TEKNISK_DOKUMENTASJON.md` §6.3: peker på shimen, og kaller hard-deleten
-      «soft».
+- [x] **`notify()` sjekker modultilgang (28. aug. 2026).** Sjekken ligger i `notify()`,
+      ikke hos hver kaller. En ukjent `module_slug` logges høyt, så en skrivefeil ikke gir
+      samme stille utfall som manglende tilgang.
+- [x] **§9-oppryddingen er gjort (28. aug. 2026):** `accounts/mixins.py` og
+      `dataset_scope_all` fjernet, `docs/TEKNISK_DOKUMENTASJON.md` §6.3 skrevet om til
+      tilgangsmodellen.
 - [x] **Rolle- og tilgangsendringer auditeres (28. aug. 2026).** Én rad per modul som
       endres, med `table_name='accounts_modultilgang'`.
 - [x] **`create_offline_users` setter modultilgang (28. aug. 2026).** `create_admin`

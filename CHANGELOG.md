@@ -4,6 +4,43 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-08-28 — Deploy 1, del 5: varsler, og §9-oppryddingen
+
+**971 tester grønne** (5 nye). Ingen migrasjon. Siste del av deploy 1 utenom §4.1 og §4.2.
+
+**`notify()` sjekker modultilgang** (§10.4). Tilstanden var umulig før `PasientRolleForm`
+ble splittet: radioen satte koblingen og tilgangsflagget samtidig, så den som var koblet
+hadde per definisjon tilgang. Etter splitten er de uavhengige — og da kunne
+`_notify_assignment` sendt et varsel som inneholder et **pasientnummer** og lenker til en
+side brukeren får 403 på. Både en lekkasje og en blindvei.
+
+Sjekken ligger i `notify()`, ikke hos hver kaller: en kaller som glemmer den feiler stille,
+og `notify()` er den ene porten alle varsler går gjennom.
+
+**En ukjent `module_slug` logges høyt.** Uten det skillet ville en skrivefeil («patient» for
+«patients») fått alle varsler til å forsvinne — samme utfall som manglende tilgang, men en
+helt annen årsak, og den ene er en feil ingen ville oppdaget. Testene brukte selv
+`module_slug='p'`, som ikke er en registrert modul; det ble funnet av nettopp denne sjekken.
+
+### §9-oppryddingen
+
+**`accounts/mixins.py` er fjernet.** Ingenting importerte den, og den var feil:
+`RoleRequiredMixin.dispatch()` kalte `super().dispatch()` *først* — altså kjørte viewet —
+og reiste `PermissionDenied` etterpå. En POST ville blitt utført og deretter fått 403.
+Første klassebaserte view som grep etter `WriteRequiredMixin` ville arvet det.
+
+**`dataset_scope_all` er fjernet.** Definert, re-eksportert i shimen og testet, men sto
+aldri på et view.
+
+`accounts/decorators.py` beholdes som shim så lenge `core/tests.py` verifiserer den (N11).
+
+**`docs/TEKNISK_DOKUMENTASJON.md` §6.3 er skrevet om.** Den beskrev et rollehierarki
+håndhevet via shimen, med en rollematrise som ikke lenger stemmer og en rad som kalte
+hard-deleten «soft». Seksjonen beskriver nå de tre kategoriene, nivåstigen, og at
+`CustomUser.role` er under avvikling.
+
+---
+
 ## 2026-08-28 — Deploy 1, del 4: grensesnittet gater på det samme som døra
 
 **966 tester grønne** (8 nye). Ingen migrasjon. Meldt fra staging: en konto ble satt ned

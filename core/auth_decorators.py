@@ -75,8 +75,9 @@ write_required = role_required('admin', 'lead', 'read_write')
 # Statistikk-dashboard og full oversikt: admin, lead, lead_view.
 stats_required = role_required('admin', 'lead', 'lead_view')
 
-# Kan se andre år/datasett: admin, lead, lead_view.
-dataset_scope_all = role_required('admin', 'lead', 'lead_view')
+# `dataset_scope_all` sto her fram til 28. aug. 2026. Den var definert,
+# re-eksportert i shimen og testet — men sto aldri på et view. Fjernet
+# sammen med resten av §9-oppryddingen.
 
 
 # ═════════════════════════════════════════════════════════════════════════════
