@@ -110,6 +110,7 @@ INSTALLED_APPS = [
     'accounts',
     'patients',
     'statistikk',
+    'oppdrag',
     'audit',
     'django_otp',
     'django_otp.plugins.otp_totp',

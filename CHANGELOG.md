@@ -4,6 +4,57 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-08-28 — Oppdragsmodulen fase 1: modeller og regler
+
+**1048 tester grønne** (46 nye). Migrasjon `oppdrag.0001_initial`. Ingen brukervendte
+flater — modulen er registrert, men står med `url=None` og begge `show_*`-flagg av.
+
+Fem modeller: `Enhet`, `Lokasjon`, `Oppdrag`, `Statusmelding`, `Enhetsbytte`. Ingen av dem
+rører `patients`.
+
+**Fase 2 ble delvis overflødig, og det er en god nyhet.** Planen forutsatte at
+audit-logging var noe man måtte melde seg *av*, siden feltlista utledes fra modellen (N2).
+Det stemmer per modell: `patients/signals.py` kobler seg på `sender=Patient`, og en ny app
+får ingenting automatisk. Audit-signalet for oppdrag er derfor nyskrevet kode, og
+skjulingen av `fritekst` er bygget inn fra første lagring i stedet for ettermontert. Det
+fjerner vinduet der feltet kunne stått i prod med verdilogging på — og de radene kan ikke
+fjernes uten å røre auditsporet.
+
+Skjulingen er en **tredje kategori**, ikke bare et unntak til: `FELT_UTEN_AUDIT` gir ingen
+rad i det hele tatt, mens `FELT_UTEN_VERDILOGGING` gir en rad som sier at feltet ble
+endret, av hvem og når — men ikke hva som sto der. Sammenligningen gjøres på råverdien;
+ellers ville `(skjult) == (skjult)` gjort enhver endring i fritekst usynlig.
+
+Fire invarianter er kodet og testet, alle sett røde først:
+
+- **Statusmaskinen er data**, ikke `if`-er i views. Ukjent status gir `False`, ikke `True` —
+  samme regel som ukjent nivånavn i `har_tilgang`.
+- **Enhetens status utledes.** Én test krever at `Enhet` *ikke* har en `status`-kolonne, som
+  vern mot at noen legger den til «for enkelhets skyld». Et ventende oppdrag gjør ikke
+  enheten opptatt: den har ikke rykket ut, og kan fortsatt sendes.
+- **Korreksjoner er nye rader** som peker på den gamle, og kan kjedes. Regelen «nyeste
+  ikke-korrigerte rad per status vinner» bor i en manager-metode, ikke i en `if` per
+  spørring.
+- **Fritekst logges uten verdier.** Testen leser den faktiske auditraden og krever at
+  teksten ikke er i den.
+
+Å starte et oppdrag mens et annet er i gang lukker det pågående med samme tidsstempel og
+`automatisk=True`. En test krever at en manuelt meldt `Ledig` *ikke* får flagget — ellers
+ville skillet vært verdiløst.
+
+**Modulen er registrert, men skjult.** En test binder `url`, `show_in_nav` og
+`show_in_dashboard` sammen: slås flaggene på uten at URL-en settes, feiler den. Da kan ikke
+fase 3 glemme halve jobben.
+
+To tester holder rollemodellen på plass: en konto knyttet til en `Enhet` ser **ikke**
+modulen uten en `ModulTilgang`-rad, og en konto med raden ser den. Koblingen er domenedata,
+som `Forstehjelper.user` — §7.3 delte `PasientRolleForm` nettopp for å holde kobling og
+autorisasjon fra hverandre.
+
+Gjenstår i fase 1: lokasjonsadmin, så admin kan fylle nedtrekkslista før fase 3.
+
+---
+
 ## 2026-08-28 — Oppdragsmodulen er planlagt
 
 Kun dokumentasjon. Ingen kodeendring. `docs/BESLUTNING_OPPDRAGSMODULEN.md`.

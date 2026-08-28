@@ -23,7 +23,7 @@ python manage.py create_admin --username admin --password "bytt-meg"
 python manage.py runserver           # http://127.0.0.1:8000/
 
 # Tester – hele suiten
-python manage.py test patients accounts audit core statistikk -v 2
+python manage.py test patients accounts audit core statistikk oppdrag -v 2
 
 # Én enkelt test
 python manage.py test patients.tests.PatientAPITest.test_create_patient -v 2
@@ -191,6 +191,27 @@ Frysing, integritetssjekk og kollaps er modul-agnostisk. Hver modul som arkivere
 | `har_backup_etter(handler, tid)` | Sperre før kollaps — slettingen må være gjenopprettbar |
 
 `patients/arkiv.py` er referanseeksempelet. `ArkivSignaturLaastTests` låser signaturene til literale hex-verdier — feiler den etter en refaktorering, er det refaktoreringen som er feil.
+
+### Oppdragsmodulen (oppdrag/)
+
+Egen app siden august 2026, **under bygging** — se `docs/BESLUTNING_OPPDRAGSMODULEN.md`.
+Fase 1 (modeller og regler) er levert; ingen brukervendte flater ennå. Modulen er
+registrert i `core/modules.py`, men står med `url=None` og begge `show_*`-flagg av inntil
+sidene finnes. Et modulkort som fører til 404 er en knapp som fører til en vegg.
+
+Fire ting det er verdt å kjenne før man rører modulen:
+
+| Regel | Hvor |
+|---|---|
+| Statusmaskinen er **data**, ikke `if`-er i views | `services.OVERGANGER` |
+| Enhetens status **utledes**, den lagres ikke | `services.enhet_status()` |
+| Korreksjoner er **nye rader** som peker på den gamle | `Statusmelding.objects.gjeldende()` |
+| `fritekst` logges som endret, men **uten verdier** | `signals.FELT_UTEN_VERDILOGGING` |
+
+Den er den første modulen som tar `skriv_handling` i bruk: bilen får smale, navngitte
+stemplingsendepunkter, ikke en feltwhitelist inne i en generell `PUT`. Og skillet mellom de
+to grensesnittene er **ikke nivået** — det er om kontoen er knyttet til en `Enhet`. Å knytte
+en konto til en enhet gir ingen tilgang; det er domenedata, som `Forstehjelper.user`.
 
 ### Statistikk-modulen (statistikk/)
 

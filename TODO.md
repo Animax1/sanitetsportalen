@@ -544,10 +544,16 @@ Gjennomgang 13. aug. 2026, med 1000 pasienter og peak 100 brukere som premiss.
 - [ ] **Oppdragsmodulen — se `docs/BESLUTNING_OPPDRAGSMODULEN.md`.** Besluttet 28. aug.
       2026, ikke bygget. Modulen er den første som tar `skriv: handling` i bruk. Sju
       faser, 35–50 t. Punktene under lå her løst fra før og er nå plassert i planen:
-      - [ ] **Fase 1** (5–7 t): app, modulregistrering, `Enhet`/`Lokasjon`/`Oppdrag`/
-            `Statusmelding`/`Enhetsbytte`, `choices.py`, lokasjonsadmin, admin-matrise.
-            Ingen UI.
-      - [ ] **Fase 2** (1–2 t): unnta fritekst fra audit-verdilogging, og presiser
+      - [x] **Fase 1 — modeller og regler (28. aug. 2026).** App, modulregistrering,
+            fem modeller, `choices.py`, statusmaskin, utledet enhetsstatus,
+            korreksjonsregel og audit med skjult fritekst. 46 tester. Modulen står med
+            `url=None` og begge `show_*`-flagg av til fase 3.
+            - [ ] **Gjenstår i fase 1:** lokasjonsadmin, så admin kan fylle
+                  nedtrekkslista før fase 3 trenger den.
+      - [x] **Fase 2, kodedelen (28. aug. 2026):** fritekst er unntatt
+            verdilogging fra første lagring — `oppdrag/signals.py` er ny kode, ikke en
+            retrofit av `audit/`, så vinduet planen advarte mot oppsto aldri.
+      - [ ] **Fase 2, resten** (~1 t): presiser
             protokollen. `AuditLog.old_value`/`new_value` er `TextField` med 730 dagers
             lagring, og feltlista utledes fra modellen (N2) — et nytt fritekstfelt havner
             der av seg selv. **Må stå før fase 3** — ellers er feltet i prod med logging
