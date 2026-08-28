@@ -4,6 +4,57 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-08-28 — Oppdragsmodulen er planlagt
+
+Kun dokumentasjon. Ingen kodeendring. `docs/BESLUTNING_OPPDRAGSMODULEN.md`.
+
+Modulen blir den første som tar `skriv: handling` i bruk. Nivået ble definert i deploy 1 med
+akkurat denne bruken i tankene (§3.2 i rollemodellnotatet) og har stått tomt siden.
+
+**Det André kalte kinkig — to grensesnitt avhengig av tilgang — er ikke et tilgangsproblem.**
+Fristelsen er å la nivået velge skjerm: «har du `skriv_handling`, får du bilskjermen». Det er
+samme feil som §2.3 beskrev, å bruke et *ordnet* nivå som en *identitet*. Stigen sier at
+`skriv_full` dekker `skriv_handling`, og et oppslag på «er nivået nøyaktig `skriv_handling`»
+bryter den regelen stille.
+
+Skillet er i stedet rolle i felt: **er kontoen knyttet til en `Enhet`?** Da får den
+enhetsskjermen. Ellers sentralbordet, redigerbart med `skriv_full` og skrivebeskyttet med
+`les`. Mønsteret finnes allerede — `Forstehjelper.user` er domenedata, ikke autorisasjon, og
+§7.3 delte `PasientRolleForm` nettopp for å holde de to fra hverandre. Samme regel her: å
+knytte en konto til en enhet gir ingen tilgang.
+
+**Én invariant måtte skjerpes for å overleve offline-kravet.** §3.2 slo fast at et
+handling-endepunkt ikke skal lese request-kroppen. En stempling utført uten dekning må kunne
+fortelle når den skjedde, ellers viser statistikken når nettet kom tilbake. Regelen er derfor
+skrevet om strengere, ikke svakere: kroppen har et lukket skjema på to nøkler — `klienttid`
+og `idempotency_key` — og alt annet gir 400. Det er testbart ved uttømming, i motsetning til
+en feltwhitelist inne i en generell PUT, der settet av felter vokser med modellen.
+
+Andre avgjørelser verdt å notere:
+
+- **Offline gjelder kun enhetens stemplinger.** Skulle begge sider virke frakoblet, kunne to
+  klienter endret samme oppdrag uten å vite om hverandre. Med kun stemplinger finnes ikke den
+  konflikten: hver melding er en ny rad.
+- **«Ledig» er enhetens tilstand, ikke oppdragets.** Å lagre tilgjengelighet også på `Enhet`
+  ville gitt to kilder til samme sannhet. En enhet er ledig når den ikke har et oppdrag i en
+  ikke-terminal status — utledes, lagres ikke.
+- **Statusmeldinger er en egen tabell**, ikke fem tidsstempelkolonner. Kolonner ville låst
+  modellen til akkurat disse fem statusene, og en korreksjon fra 113 ville overskrevet
+  historikken i stedet for å legge seg ved siden av den.
+- **Ingen kobling til `patients`.** «Leveranse oppretter pasient» er notert som noe å vurdere
+  senere; i dag ville det latt en `skriv_handling`-konto skrive indirekte inn i
+  pasientmodulen.
+- **Fase 6 er stedet `AbstractArkiv` bygges.** TODO har utsatt den til modell nummer to
+  faktisk skrives — dette er modell nummer to.
+
+Fase 2 (audit-unntak for fritekst, og protokolltillegg) står **før** fritekstfeltet ships.
+Ellers er feltet i prod med verdilogging på, og de radene kan ikke fjernes uten å røre
+auditsporet.
+
+Fire avklaringer står åpne nederst i notatet. Ingen av dem blokkerer fase 1.
+
+---
+
 ## 2026-08-28 — `/pasienter/api/stats/` er slettet
 
 **1002 tester grønne.** Ingen migrasjon.

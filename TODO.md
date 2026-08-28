@@ -433,11 +433,11 @@ skal ligge der.
       `(table_name, record_id)`, ingen ny kolonne. Mangler raden, nektes slettingen.
       **Merk:** DELETE-loggingen lagrer bare pasientnummeret, ikke innholdet
       (`patients/signals.py:266`). Åpnes sletting bredere senere, må den utvides først.
-- [ ] **`skriv: handling` for bil-/ambulansekontoer.** Smalt endepunkt som stempler
-      server-tid og **ikke leser request-kroppen** — ikke en feltwhitelist inne i den
-      generelle `PUT`-en, der stemplingen i dag er en bivirkning av en redigering.
-      Invarianten håndheves med test. Definer nivået i deploy 1, ta det i bruk når
-      oppdragsmodulen skrives.
+- [ ] **`skriv: handling` for bil-/ambulansekontoer.** Nivået er definert; bruken er
+      planlagt i `docs/BESLUTNING_OPPDRAGSMODULEN.md` §5.1. Invarianten fra §3.2 er
+      **skjerpet, ikke slakket**, for å tåle offline: kroppen har et lukket skjema på to
+      nøkler (`klienttid`, `idempotency_key`), og alt annet gir 400. Det er testbart ved
+      uttømming, i motsetning til «husk å utelate fritekst».
 - [x] **`session_timeout` og `event_name` flyttet til `/portal-admin/innstillinger/`
       (28. aug. 2026).** `saveEventName` er ute av pasientmodulens JS.
 - [x] **`PasientRolleForm` splittet (28. aug. 2026).** Radioen setter kun
@@ -533,21 +533,33 @@ Gjennomgang 13. aug. 2026, med 1000 pasienter og peak 100 brukere som premiss.
         feltene i dag (`sha256`, `kollapset_at`, `aggregat`, `aggregat_sha256`,
         frosset `importert_av_navn`); park og oppdrag må ellers gjenta dem. Bevisst
         utsatt til modell nummer to faktisk skrives — da ser man hva som er felles,
-        i stedet for å gjette. `VaktArkiv` skal *ikke* migreres til basemodellen.
+        i stedet for å gjette. `VaktArkiv` skal *ikke* migreres til basemodellen:
+        SHA-signaturene er låst til dagens payload-form, og hvert arkiv i prod ville
+        meldt tukling. **Bygges i fase 6 av oppdragsmodulen** — den er modell nummer to.
 - [ ] Park-registreringer blir **egen modell**, ikke rader i `Patient`. Holder sykestuas
       liste på ~250 rader i stedet for 1000, og matcher at dataene er enklere.
 - [ ] Park-appen er et skriveendepunkt **uten innlogging**: signert lenke via
       `django.core.signing` (ikke gjettbar URL, kan tilbakekalles), rate-limit per token,
       og responsen returnerer kvittering — aldri data.
-- [ ] **Oppdragsmodulen: unnta fritekstfeltet fra audit-verdilogging.** `AuditLog.old_value`
-      og `new_value` er `TextField` med 730 dagers lagring, og feltlista utledes fra
-      modellen (N2) — et nytt fritekstfelt havner der automatisk. Skriver en 113-operatør
-      noe sensitivt og retter det, ligger begge versjonene i loggen i to år.
-- [ ] Oppdragets «fjernes fra bilen etter 1–2 timer» er et **server-side visningsfilter**,
-      ikke sletting. 113 og statistikken skal beholde raden.
-- [ ] Protokollen må presiseres når fritekst innføres: A.6/A.12 begrunner i dag whitelisten
-      med at kliniske felt ikke kan inneholde navn. Oppdragsdata («kvinne, pustevansker,
-      sted, tidspunkt») er dessuten mer identifiserende enn pasientraden den knytter seg til.
+- [ ] **Oppdragsmodulen — se `docs/BESLUTNING_OPPDRAGSMODULEN.md`.** Besluttet 28. aug.
+      2026, ikke bygget. Modulen er den første som tar `skriv: handling` i bruk. Seks
+      faser, 25–36 t. Punktene under lå her løst fra før og er nå plassert i planen:
+      - [ ] **Fase 1** (4–6 t): app, modulregistrering, `Enhet`/`Oppdrag`/`Statusmelding`,
+            `choices.py`, admin-matrise. Ingen UI.
+      - [ ] **Fase 2** (2–3 t): unnta fritekst fra audit-verdilogging, og presiser
+            protokollen. `AuditLog.old_value`/`new_value` er `TextField` med 730 dagers
+            lagring, og feltlista utledes fra modellen (N2) — et nytt fritekstfelt havner
+            der av seg selv. A.6/A.12 begrunner whitelisten med at kliniske felt ikke kan
+            inneholde navn; det argumentet bærer ikke for «kvinne, pustevansker, Storgata
+            5, 22:40». **Må stå før fase 3** — ellers er feltet i prod med logging på, og
+            de radene kan ikke fjernes uten å røre auditsporet.
+      - [ ] **Fase 3** (6–8 t): sentralbordet — opprett, tildel, liste, rediger.
+      - [ ] **Fase 4** (5–7 t): enhetsskjermen — statusmaskin, smale stemplingsendepunkter
+            med lukket kroppsskjema, objektsjekk på eierskap, og «forsvinner 30 min etter
+            Ledig» som **server-side visningsfilter**, aldri sletting.
+      - [ ] **Fase 5** (4–6 t): offline-kø for stemplinger, med `core.idempotency`.
+      - [ ] **Fase 6** (4–6 t): arkivering. **Her bygges `AbstractArkiv`** — dette er
+            modell nummer to, som punktet under har ventet på.
 - [ ] Vurder `cached_db`-sesjoner. `SESSION_SAVE_EVERY_REQUEST=True` med DB-sesjoner gir
       én UPDATE per request. Krever Redis, altså vakt-modus.
 
@@ -587,8 +599,10 @@ høynivå-skissen, `docs/archived/SANITETSPORTAL_PLAN.md` §7):
 
 - [ ] Skal en «vakt» være ett enkelt arrangement, eller også dekke faste
       beredskapsperioder som ukentlig lagvakt? Avgjør feltene på modellen
-- [ ] Skal en beredskaps-/oppdragsmodul brukes underveis i felt (mobilt, dårlig nett) eller
-      i etterkant? Avgjør om offline-strategi og synk må bygges
+- [x] ~~Skal en beredskaps-/oppdragsmodul brukes underveis i felt (mobilt, dårlig nett)
+      eller i etterkant?~~ **Besvart 28. aug. 2026: underveis, og den må tåle dårlig
+      dekning.** Avgrenset til enhetens stemplinger — sykestua krever nett. Se
+      `docs/BESLUTNING_OPPDRAGSMODULEN.md` §6.
 - [ ] Skal rapportmodulen kun være intern, eller også gi tilgang til
       styre/oppdragsgivere? Tilgangssiden er nå `ModulTilgang` (se «Rollemodellen»);
       det som gjenstår er eksportformat, og om eksterne mottakere skal ha konto i det
