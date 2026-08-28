@@ -459,12 +459,16 @@ skal ligge der.
 - [x] **Verifiseringskommando (28. aug. 2026):** `python manage.py verifiser_modultilgang`.
       Les-only. Kjøres mot prod mellom deploy 1 og 2 — staging har egen, tom database, så
       backfillen kan ikke verifiseres mot ekte rollefordeling der.
-- [ ] **Avgjør `/pasienter/api/stats/`: gate eller slett.** Endepunktet har ingen kjent
-      konsument — header-chipsene regnes ut i `patients-table.js` fra pasientlista, og
-      ingen JS-fil har noen gang kalt det. Rest fra Flask-porten. Gates `/pasienter/`
-      samlet i deploy 1, dekkes det automatisk. **Merk at
-      `docs/BESLUTNING_STATISTIKK.md` forutsetter at stien finnes og er åpen for alle
-      innloggede** — den planlagte `/api/stats/live/` legger seg ved siden av den.
+- [x] **`/pasienter/api/stats/` slettet (28. aug. 2026).** Avgjørelsen var «gate eller
+      slett»; det ble slett. Ingen kjent konsument — header-chipsene regnes ut i
+      `patients-table.js` fra pasientlista, og ingen JS-fil har noen gang kalt det. Rest
+      fra Flask-porten. `basic_stats()` i services står igjen: den er live-siden av
+      invarianten `StatsMatcher` måler.
+      - Ingen redirect satt opp. En videresending finnes for klienter som *pleide* å
+        kalle noe; her fantes ingen.
+      - `docs/BESLUTNING_STATISTIKK.md` forutsatte at stien fantes. Den planlagte
+        `/pasienter/api/stats/live/` er upåvirket — den er et nytt endepunkt med et
+        faktisk formål, ikke en videreføring av det slettede.
 
 ### Dataimport fra gammel prod — se `docs/DATAIMPORT_FRA_GAMMEL_PROD.md`
 

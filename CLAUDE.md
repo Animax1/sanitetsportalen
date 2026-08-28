@@ -154,7 +154,6 @@ Viewene er delt i fem moduler (N13.3) — `views.py` finnes ikke lenger:
 | `views_common.py` | `_json_body`, `_patient_to_dict` — delt av de andre |
 | `views_patients.py` | Hoved-side, innstillinger, sesjonstimeout, pasient-CRUD, nullstilling |
 | `views_registre.py` | Førstehjelper- og helsepersonellregisteret (én fabrikk bygger begge) |
-| `views_stats.py` | `/api/stats/` — uten kjent konsument. Full statistikk ligger i `statistikk/` |
 | `views_arkiv.py` | Vaktarkivet |
 
 Alle endepunkter er JSON-API-er beskyttet med `@login_required` + rollesjekk. Responser følger mønsteret `{'status': 'ok', 'data': ...}` eller `{'status': 'error', 'message': ...}`.
@@ -197,9 +196,11 @@ Frysing, integritetssjekk og kollaps er modul-agnostisk. Hver modul som arkivere
 
 Egen app siden august 2026. Eier `/statistikk/`-siden og full statistikk
 (`/statistikk/api/full-stats/` og `/statistikk/api/arkiv/<pk>/full-stats/`).
-`/pasienter/api/stats/` ble ikke flyttet. **Det er ikke det som mater header-chipsene** —
-de regnes ut i `patients-table.js` fra pasientlista. Endepunktet har ingen kjent konsument
-og er en rest fra Flask-porten.
+`/pasienter/api/stats/` ble ikke flyttet — det ble **slettet** (28. aug. 2026). Det matet
+aldri header-chipsene; de regnes ut i `patients-table.js` fra pasientlista. Endepunktet var
+en rest fra Flask-porten uten kjent konsument. `basic_stats()` i `patients.services` står
+igjen: den er live-siden av invarianten `StatsMatcher` måler, at arkivering ikke endrer
+tallene.
 
 **Avhengighetsretningen er statistikk → patients, aldri motsatt.** Tallene beregnes
 fortsatt av `patients.services`; statistikk-appen henter, cacher og viser. Når modul
@@ -218,7 +219,7 @@ med kilde nummer to blir den en løkke over registeret.
 ### Statistikk-caching (core/stats_cache.py)
 
 Ligger i `core` fordi to apper bruker den: `patients` for header-chipsene og `statistikk`
-for full statistikk. Basic stats caches 15 sek, full stats 60 sek. Støtter ETag/304.
+for full statistikk. Full stats caches 60 sek. Støtter ETag/304.
 
 Det finnes **ingen** eksplisitt invalidering — cachen utløper på TTL. De korte TTL-ene er valgt nettopp for å slippe invalideringslogikk, og alle cache-operasjoner er pakket i try/except slik at en død cache degraderer til vanlig beregning i stedet for å ta ned endepunktet.
 

@@ -34,7 +34,6 @@ admin/lead**.
 
 | Endepunkt | Tilgang | Innhold | Polling |
 |---|---|---|---|
-| `/pasienter/api/stats/` | `patients: les` | Ingen kjent konsument — se under | 30 s |
 | **`/pasienter/api/stats/live/`** (NY) | `patients: les` | A1–A4 (operativ sanntid) | 30–60 s |
 | `/statistikk/api/full-stats/` | `statistikk: les` **og** `patients: les` | B1–B6, C1–C2, D1–D5 | 60–120 s |
 
@@ -46,10 +45,13 @@ personvernfølsomme krysstabeller og evalueringsdata som krever fagansvar.
 eier den ikke (§5 i rollemodellnotatet). Uten kravet om `patients: les` ville aggregatene
 gitt avledet innsyn i pasientdata til noen som ikke har tilgang til dem.
 
-**Merk om `/api/stats/`:** det er ikke det som mater header-chipsene — de regnes ut i
-`patients-table.js` fra pasientlista. Endepunktet har ingen kjent konsument og er en rest
-fra Flask-porten. Skal `/api/stats/live/` bygges, er det verdt å avgjøre om den gamle
-stien skal beholdes eller slettes i samme runde; se TODO.
+**`/api/stats/` er slettet (28. aug. 2026).** Notatet forutsatte at stien fantes, og lot
+spørsmålet om å beholde eller slette den stå åpent til `/api/stats/live/` skulle bygges.
+Svaret ble sletting, og det ble tatt før: endepunktet matet aldri header-chipsene — de
+regnes ut i `patients-table.js` fra pasientlista — og hadde ingen kjent konsument.
+
+Det påvirker ikke `/pasienter/api/stats/live/`. Den er et nytt endepunkt med et faktisk
+formål, ikke en videreføring av det slettede, og stien er ledig.
 
 ### (a) Live-dashbord — A-nivå
 

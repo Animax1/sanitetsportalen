@@ -1,6 +1,6 @@
 """Delte hjelpere for view-modulene i patients-appen.
 
-``views.py`` ble delt opp i views_patients, views_registre, views_stats og
+``views.py`` ble delt opp i views_patients, views_registre og
 views_arkiv (N13.3). Det som brukes på tvers ligger her, slik at modulene
 ikke trenger å importere fra hverandre.
 """

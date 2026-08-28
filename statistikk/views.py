@@ -12,9 +12,9 @@ viser dem fram. Når modul nummer to skal levere tall, byttes den direkte
 importen ut med et registry etter samme idiom som ``core.backup`` og
 ``core.arkiv``.
 
-``/pasienter/api/stats/`` ble ikke flyttet. Merk at det *ikke* er fordi det
-mater header-chipsene — de regnes ut i nettleseren fra pasientlista. Endepunktet
-står uten kjent konsument; se docstringen i ``patients/views_stats.py``.
+``/pasienter/api/stats/`` ble ikke flyttet hit — det ble slettet 28. aug. 2026.
+Det matet aldri header-chipsene; de regnes ut i nettleseren fra pasientlista.
+Endepunktet var en rest fra Flask-porten uten kjent konsument.
 """
 from django.core.exceptions import PermissionDenied
 from django.http import JsonResponse

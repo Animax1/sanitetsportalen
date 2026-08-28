@@ -427,7 +427,7 @@ class MetricsMiddlewareIntegrationTests(TestCase):
     def test_request_registreres_i_metrics(self):
         self.client.force_login(self.admin)
         # Kall et vanlig API-endepunkt (ikke selve status)
-        self.client.get('/pasienter/api/stats/')
+        self.client.get('/pasienter/api/patients/')
 
         snap = metrics_store.snapshot(window_seconds=60)
         self.assertGreaterEqual(snap['count'], 1)

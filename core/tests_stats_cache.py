@@ -42,7 +42,15 @@ class ETagHelperTests(TestCase):
 
 @override_settings(SECURE_SSL_REDIRECT=False)
 class StatsCacheViewTests(TestCase):
-    """Integrasjonstester mot /api/stats/ og /api/full-stats/."""
+    """Integrasjonstester mot /statistikk/api/full-stats/.
+
+    Testene kjørte mot `/pasienter/api/stats/` fram til 28. aug. 2026 — det var
+    det raskeste endepunktet med dekoratoren på. Endepunktet er slettet (ingen
+    konsument), så de kjører nå mot full statistikk. Kontrasten mellom to
+    TTL-er forsvant med det; at dekoratoren respekterer den TTL-en den får,
+    dekkes av `CachedStatsResponseDecoratorTests` under, som setter den
+    eksplisitt.
+    """
 
     def setUp(self):
         self.client = Client()
@@ -54,31 +62,24 @@ class StatsCacheViewTests(TestCase):
         # Rens cache mellom tester
         cache.clear()
 
-    def test_basic_stats_returnerer_etag(self):
-        self.client.login(username='admin1', password='testpass123')
-        resp = self.client.get(reverse('api_stats'))
-        self.assertEqual(resp.status_code, 200)
-        self.assertIn('ETag', resp)
-        self.assertIn('Cache-Control', resp)
-        self.assertIn('max-age=15', resp['Cache-Control'])
-
-    def test_full_stats_returnerer_etag_med_lengre_ttl(self):
+    def test_full_stats_returnerer_etag_og_ttl(self):
         self.client.login(username='admin1', password='testpass123')
         resp = self.client.get(reverse('api_full_stats'))
         self.assertEqual(resp.status_code, 200)
         self.assertIn('ETag', resp)
+        self.assertIn('Cache-Control', resp)
         self.assertIn('max-age=60', resp['Cache-Control'])
 
     def test_matching_etag_gir_304(self):
         self.client.login(username='admin1', password='testpass123')
 
         # Første request: 200 med ETag
-        resp1 = self.client.get(reverse('api_stats'))
+        resp1 = self.client.get(reverse('api_full_stats'))
         self.assertEqual(resp1.status_code, 200)
         etag = resp1['ETag']
 
         # Andre request med samme ETag: 304
-        resp2 = self.client.get(reverse('api_stats'), HTTP_IF_NONE_MATCH=etag)
+        resp2 = self.client.get(reverse('api_full_stats'), HTTP_IF_NONE_MATCH=etag)
         self.assertEqual(resp2.status_code, 304)
         # 304-response har tom body (Django HttpResponseNotModified)
         self.assertEqual(resp2.content, b'')
@@ -88,7 +89,7 @@ class StatsCacheViewTests(TestCase):
     def test_ikke_matching_etag_gir_200(self):
         self.client.login(username='admin1', password='testpass123')
         resp = self.client.get(
-            reverse('api_stats'),
+            reverse('api_full_stats'),
             HTTP_IF_NONE_MATCH='W/"feilverdi"'
         )
         self.assertEqual(resp.status_code, 200)
@@ -98,7 +99,7 @@ class StatsCacheViewTests(TestCase):
         self.client.login(username='admin1', password='testpass123')
 
         # Første request: fyller cache
-        resp1 = self.client.get(reverse('api_stats'))
+        resp1 = self.client.get(reverse('api_full_stats'))
         self.assertEqual(resp1.status_code, 200)
 
         # Verifiser at noe faktisk ligger i cache-laget
@@ -107,12 +108,12 @@ class StatsCacheViewTests(TestCase):
         from django.core.cache import cache as dcache
         # LocMemCache eksponerer ikke keys(), så vi tester indirekte:
         # andre request skal returnere samme ETag uten at data endres.
-        resp2 = self.client.get(reverse('api_stats'))
+        resp2 = self.client.get(reverse('api_full_stats'))
         self.assertEqual(resp1['ETag'], resp2['ETag'])
 
     def test_uautentisert_far_redirect(self):
         """Stats-endepunkter krever login."""
-        resp = self.client.get(reverse('api_stats'))
+        resp = self.client.get(reverse('api_full_stats'))
         # @login_required redirecter til login-siden
         self.assertIn(resp.status_code, (302, 401, 403))
 
