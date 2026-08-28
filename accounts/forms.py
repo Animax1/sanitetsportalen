@@ -2,7 +2,7 @@
 from django import forms
 from django.contrib.auth import password_validation
 
-from .models import CustomUser, UserRole
+from .models import CustomUser, ModulTilgang, TilgangsNivaa, UserRole
 
 
 class LoginForm(forms.Form):
@@ -214,10 +214,12 @@ class AdminUserCreateForm(forms.ModelForm):
 class AdminUserEditForm(forms.ModelForm):
     """Skjema for admin til å redigere eksisterende bruker.
 
-    Fra Fase 3b inkluderer skjemaet også de 5 modul-permission-flaggene som
-    bestemmer hvilke moduler brukeren ser i dashboard og nav-meny. Admin har
-    bypass i ``Module.is_visible_for``, så disse flaggene gjelder kun for
-    ikke-admin-brukere.
+    Modul-tilgang settes **ikke** her, men i ``ModulTilgangForm``. De fem
+    ``kan_redigere_*``-boksene lå tidligere på dette skjemaet; de styrte kun
+    meny og dashboard, aldri et endepunkt, og etter at synligheten begynte å
+    lese ``ModulTilgang`` gjorde de ingenting i det hele tatt. Feltene står
+    på modellen til deploy 3 av rollback-hensyn, men de vises ikke lenger —
+    en boks som ikke gjør noe er verre enn ingen boks.
     """
 
     class Meta:
@@ -225,11 +227,6 @@ class AdminUserEditForm(forms.ModelForm):
         fields = [
             'fullt_navn', 'email', 'role', 'is_active', 'mfa_required',
             'er_delt_konto',
-            'kan_redigere_pasienter',
-            'kan_redigere_vakter',
-            'kan_redigere_utstyr',
-            'kan_se_rapport',
-            'kan_redigere_beredskap',
         ]
         widgets = {
             'fullt_navn': forms.TextInput(attrs={
@@ -243,11 +240,6 @@ class AdminUserEditForm(forms.ModelForm):
             'role': forms.Select(attrs={'class': 'form-select'}),
             'mfa_required': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
             'er_delt_konto': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
-            'kan_redigere_pasienter': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
-            'kan_redigere_vakter': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
-            'kan_redigere_utstyr': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
-            'kan_se_rapport': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
-            'kan_redigere_beredskap': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
         }
         labels = {
             'fullt_navn': 'Fullt navn',
@@ -256,11 +248,6 @@ class AdminUserEditForm(forms.ModelForm):
             'is_active': 'Aktiv konto',
             'er_delt_konto': 'Delt konto (bil e.l.)',
             'mfa_required': 'Krev to-faktor (MFA)',
-            'kan_redigere_pasienter': 'Pasientregistrering',
-            'kan_redigere_vakter': 'Vakter',
-            'kan_redigere_utstyr': 'Utstyr',
-            'kan_se_rapport': 'Rapport',
-            'kan_redigere_beredskap': 'Beredskap',
         }
         help_texts = {
             'email': 'Brukes kun som kontaktinformasjon. Kan stå tom.',
@@ -314,15 +301,141 @@ class AdminUserEditForm(forms.ModelForm):
         return paakrevd
 
 
+class ModulTilgangForm(forms.Form):
+    """Matrise modul × nivå. Erstatter de fem avkrysningsboksene.
+
+    **Feltene genereres fra ``get_all_modules()``.** De fem boksene var
+    hardkodet i malen, så hver ny modul krevde en redigering der i tillegg til
+    et nytt felt på ``CustomUser``. Nå følger matrisen registeret av seg selv.
+
+    ``admin_only``-moduler er utelatt: de gates av global admin og bruker ikke
+    ``ModulTilgang`` i det hele tatt. Å vise dem ville antydet at nivået betyr
+    noe for dem.
+
+    ``skriv_handling`` tilbys **ikke** i grensesnittet ennå. Nivået finnes i
+    modellen — det er derfor det ikke trengs en migrasjon den dagen det tas i
+    bruk — men det er tomt inntil en modul har et handling-endepunkt å bruke
+    det på (§3.2/§10.2). Et nivå som ikke gir noe er lett å dele ut i god tro,
+    og gir automatisk mer den dagen det fylles.
+    """
+
+    PREFIKS = 'modul_'
+    INGEN = ''
+
+    # Nivåene admin kan velge i dag. Rekkefølgen er stigens.
+    VALGBARE = ('les', 'skriv_full')
+
+    def __init__(self, *args, bruker=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.bruker = bruker
+        self._naavaerende = self._les_naavaerende(bruker)
+
+        for modul in self.moduler():
+            navn = self.PREFIKS + modul.slug
+            har = self._naavaerende.get(modul.slug, self.INGEN)
+            valg = [(self.INGEN, 'Ingen tilgang')]
+            valg += [(v, l) for v, l in TilgangsNivaa.choices if v in self.VALGBARE]
+            # Et nivå brukeren allerede har, men som ikke tilbys, må stå i
+            # lista — ellers ville et lagre-trykk stille fjernet det.
+            if har and har not in [v for v, _ in valg]:
+                valg.append((har, dict(TilgangsNivaa.choices).get(har, har)))
+            self.fields[navn] = forms.ChoiceField(
+                choices=valg,
+                required=False,
+                initial=har,
+                label=modul.name,
+                help_text=modul.description,
+                widget=forms.Select(attrs={'class': 'form-select form-select-sm'}),
+            )
+
+    @staticmethod
+    def moduler():
+        """Modulene matrisen dekker, i registerets rekkefølge."""
+        from core.modules import get_all_modules
+        return [m for m in get_all_modules() if not m.admin_only]
+
+    @staticmethod
+    def _les_naavaerende(bruker):
+        if bruker is None or bruker.pk is None:
+            return {}
+        return dict(
+            ModulTilgang.objects.filter(bruker=bruker)
+            .values_list('modul_slug', 'nivaa')
+        )
+
+    def rader(self):
+        """(felt, nåværende nivå) for malen, så den slipper å slå opp navn."""
+        for modul in self.moduler():
+            yield self[self.PREFIKS + modul.slug]
+
+    def endringer(self):
+        """[(modul_slug, fra, til)] for det som faktisk endres.
+
+        Returneres slik at kalleren kan skrive én auditrad per endring. Uten
+        den er en tilgangsendring usporbar — og det å gi noen skrivetilgang
+        er nettopp det man vil kunne se i ettertid.
+        """
+        ut = []
+        for modul in self.moduler():
+            navn = self.PREFIKS + modul.slug
+            # **Fravær av nøkkel er ikke «velg ingen».** Et felt som ikke ble
+            # sendt inn i det hele tatt skal la tilgangen stå. Uten dette
+            # ville enhver innsending som utelater matrisen — et delvis
+            # skjema, et skript, en test — stille fjernet all modultilgang.
+            # Nettleseren sender alltid alle select-ene, så den vanlige veien
+            # er upåvirket.
+            if navn not in self.data:
+                continue
+            fra = self._naavaerende.get(modul.slug, self.INGEN)
+            til = self.cleaned_data.get(navn, self.INGEN)
+            if fra != til:
+                ut.append((modul.slug, fra, til))
+        return ut
+
+    def save(self, bruker=None):
+        """Skriv matrisen. Returnerer endringene, for audit.
+
+        Sletter raden i stedet for å lagre en tom verdi: fravær av rad *er*
+        ingen tilgang, og en 'ingen'-verdi ville vært en andre måte å si det
+        samme på.
+        """
+        from django.db import transaction
+        from core.auth_decorators import tom_tilgangscache
+
+        bruker = bruker or self.bruker
+        endringer = self.endringer()
+
+        with transaction.atomic():
+            for slug, _fra, til in endringer:
+                if til == self.INGEN:
+                    ModulTilgang.objects.filter(
+                        bruker=bruker, modul_slug=slug).delete()
+                else:
+                    ModulTilgang.objects.update_or_create(
+                        bruker=bruker, modul_slug=slug,
+                        defaults={'nivaa': til},
+                    )
+
+        # Uten dette ville en visning i samme request lest det gamle svaret.
+        tom_tilgangscache(bruker)
+        return endringer
+
+
 class PasientRolleForm(forms.Form):
-    """Enkel radio for å sette brukerens rolle i pasientregistreringen.
+    """Brukerens **funksjon i felt** — ikke tilgangen hens.
 
     Ingen / Førstehjelper / Helsepersonell. Finner eller oppretter en matchende
-    oppføring i Forstehjelper/Helsepersonell-tabellen og oppdaterer
-    kan_redigere_pasienter på brukeren.
+    oppføring i Forstehjelper/Helsepersonell-tabellen og kobler brukeren til
+    den.
+
+    **Radioen satte tidligere også `kan_redigere_pasienter`** (§7.3). Det er to
+    forskjellige ting: funksjon i felt er domenedata, tilgang er autorisasjon.
+    Sammenblandingen gjorde det umulig å være koblet som førstehjelper uten å
+    ha tilgang — og omvendt. Tilgang settes nå i matrisen modul × nivå. To steg
+    i stedet for ett, bevisst.
     """
     CHOICES = [
-        ('ingen',          'Ingen tilgang'),
+        ('ingen',          'Ingen funksjon'),
         ('forstehjelper',  'Førstehjelper'),
         ('helsepersonell', 'Helsepersonell'),
     ]
@@ -359,7 +472,6 @@ class PasientRolleForm(forms.Form):
                 )
                 f.user = user
                 f.save()
-                user.kan_redigere_pasienter = True
             elif rolle == 'helsepersonell':
                 h = (
                     Helsepersonell.objects.filter(name=user.username).first()
@@ -367,7 +479,3 @@ class PasientRolleForm(forms.Form):
                 )
                 h.user = user
                 h.save()
-                user.kan_redigere_pasienter = True
-            else:
-                user.kan_redigere_pasienter = False
-            user.save(update_fields=['kan_redigere_pasienter'])

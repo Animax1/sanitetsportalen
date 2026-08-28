@@ -590,21 +590,38 @@ Innloggingen er delt i tre faser håndtert av én view (`accounts/views.py`, `lo
 - **Trust-cookie:** Signert token med `django.core.signing.TimestampSigner`. Cookie-navn: `mfa_trusted_<user_pk>`. Verdi: `<user_pk>:<device_pk>` signert med `SECRET_KEY`. Max-age: 30 dager (`MFA_TRUST_DEVICE_DAYS = 30`). `httponly=True`, `secure=True` i produksjon, `samesite='Lax'`. Validering sjekker at signaturen er gyldig, ikke er utløpt, og at `TOTPDevice` fortsatt eksisterer og er bekreftet.
 - **Nullstilling av MFA (admin):** `accounts/views.py`. Sletter alle `TOTPDevice`- og `StaticDevice`-objekter, setter `mfa_required=True`, invaliderer alle sesjoner og logger `mfa_reset_by_admin`.
 
-### 6.3 Roller og tilganger
+### 6.3 Tilgangsmodellen
 
-Rollehierarkiet er definert i `accounts/models.py` (`UserRole`) og håndhevet via `accounts/decorators.py`.
+Tre kategorier, ikke én. Se `docs/BESLUTNING_ROLLEMODELLEN.md` for begrunnelsene.
 
-| Rolle | Lese pasienter | Opprette/redigere pasienter | Slette pasient (soft) | Full statistikk | Brukeradmin | Nullstill år |
-|---|---|---|---|---|---|---|
-| `read_only` | Ja | Nei | Nei | Nei | Nei | Nei |
-| `read_write` | Ja | Ja | Nei | Nei | Nei | Nei |
-| `lead_view` | Ja | Nei | Nei | Ja | Nei | Nei |
-| `lead` | Ja | Ja | Nei | Ja | Nei | Nei |
-| `admin` | Ja | Ja | Ja | Ja | Ja | Ja |
+1. **Global admin** (`CustomUser.role == 'admin'`) — brukeradmin, backup, moduloppsett, audit, arkiv, og alt irreversibelt. Står utenfor modulaksen og trenger ingen `ModulTilgang`-rader.
+2. **Modulbasert** — `accounts.ModulTilgang(bruker, modul_slug, nivaa)`. **Fravær av rad er ingen tilgang**; det finnes ingen `'ingen'`-verdi å lagre.
+3. **Globalt uten admin** — innlogging, min profil, passordbytte, MFA. Krever bare innlogging.
 
-Dekoratorene `admin_required`, `write_required` og `stats_required` er snarveier i `accounts/decorators.py`. API-views håndhever rolle inline (f.eks. `if request.user.role not in WRITE_ROLES`).
+Nivåene er en ordnet stige:
 
-Frontend bruker `window.USER_ROLE` (satt av templaten) til å skjule elementer med CSS-klasser `.write-only`, `.stats-only` og `.admin-only` via `applyRoleVisibility()` i `patients-utils.js`.
+| Nivå | Betyr |
+|---|---|
+| *(ingen rad)* | Modulen er usynlig, og URL-en gir 403 |
+| `les` | Kan se modulens data |
+| `skriv_handling` | Kan utløse navngitte overganger (stemplinger) uten å lese request-kroppen. **Tomt i dag** — tas i bruk med oppdragsmodulen |
+| `skriv_full` | Kan redigere felter |
+
+Håndhevet med `@modul_kreves('patients', 'skriv_full')` fra `core/auth_decorators.py`.
+`patients/tests_modul_dekorator.py` går gjennom `urlpatterns` og krever at hvert view under
+en modul er dekorert — risikoen ved dekoratør framfor middleware er en glemt dekoratør, og
+den lukkes ikke av en manuell gjennomgang.
+
+`ModuleSettings.enabled=False` gir 403 for alle andre enn global admin.
+
+**`CustomUser.role` er under avvikling.** De fem verdiene har ingen virkning på
+modultilgang lenger; feltet krymper til `admin`/`bruker` i deploy 2. De fem
+`kan_redigere_*`-flaggene har ingen virkning i det hele tatt, og står kun til deploy 3 slik
+at en rollback har noe å bygge radene fra.
+
+Frontend gater på `window.MODUL_TILGANG` (satt av malen), ikke på rollen, og skjuler
+`.write-only` og `.admin-only` via `applyRoleVisibility()` i `patients-utils.js`.
+**Standarden er ingen tilgang:** mangler globalen, skjules alt som krever noe.
 
 ### 6.4 Rate-limiting
 

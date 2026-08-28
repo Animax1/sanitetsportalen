@@ -25,7 +25,8 @@ import unittest
 from django.test import SimpleTestCase
 
 from patients.js_test_utils import (
-    UTILS_JS, STATS_JS, build_harness, extract_function, read_js, run_node,
+    ADMIN_JS, PORTAL_UTILS_JS, STATISTIKK_JS,
+    build_harness, extract_function, read_js, run_node,
 )
 
 # Funksjonene som bygger HTML fra pasientdata. Endres denne lista, må
@@ -90,15 +91,26 @@ class StatsEscapingSourceGuardTests(SimpleTestCase):
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
-        cls.stats_src = read_js(STATS_JS)
-        cls.utils_src = read_js(UTILS_JS)
+        # Byggerne ligger i to filer etter at statistikk ble egen modul:
+        # tabellene og tolkningen i statistikk.js, personellregistrene i
+        # patients-admin.js. Begge setter markup med innerHTML, så
+        # gjennomgangen må dekke begge — leste vi bare den ene, ville
+        # halve vernet forsvunnet uten at noen test ble rød.
+        cls.stats_src = read_js(STATISTIKK_JS) + '\n' + read_js(ADMIN_JS)
+        cls.utils_src = read_js(PORTAL_UTILS_JS)
 
     def test_escape_hjelperne_finnes_i_utils(self):
-        """Byggerne er avhengige av hjelperne i patients-utils.js."""
+        """Byggerne er avhengige av hjelperne i portal-utils.js.
+
+        Hjelperne lå i patients-utils.js fram til statistikk ble egen modul.
+        Statistikksiden laster ikke den fila, så escapingen måtte flytte med
+        — ellers ville byggerne kalt noe som ikke fantes, og innsettingen
+        skjedd uten escaping.
+        """
         for helper in ('function escHtmlValue(', 'function trustedHtml(',
                        'function cellHtml('):
             self.assertIn(helper, self.utils_src,
-                          f'{helper} mangler i patients-utils.js')
+                          f'{helper} mangler i portal-utils.js')
 
     def test_alle_interpolasjoner_er_escapet_eller_gjennomgatt(self):
         """Hver ${...} i byggerne må escapes eller stå på den gjennomgåtte lista.
@@ -159,8 +171,9 @@ class StatsEscapingBehaviourTests(SimpleTestCase):
 
     # Funksjonene som trengs for å kjøre byggerne isolert, uten DOM.
     HARNESS_FUNCTIONS = (
-        (UTILS_JS, ('escHtmlValue', 'trustedHtml', 'cellHtml', 'fmtMin')),
-        (STATS_JS, ('mkStatsTable', 'mkCrosstab', 'mkObsTable', 'mkInterpretation')),
+        (PORTAL_UTILS_JS, ('escHtmlValue', 'trustedHtml', 'cellHtml', 'fmtMin')),
+        (STATISTIKK_JS, ('mkStatsTable', 'mkCrosstab', 'mkObsTable',
+                         'mkInterpretation')),
     )
 
     XSS = '<img src=x onerror=alert(1)>'

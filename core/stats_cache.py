@@ -1,5 +1,10 @@
 """Cache- og ETag-hjelpere for stats-endepunkter.
 
+Ligger i ``core`` fordi to apper bruker den: ``patients`` for header-chipsene
+(``/pasienter/api/stats/``, 15 s) og ``statistikk`` for full statistikk
+(``/statistikk/api/full-stats/``, 60 s). Den kjenner ingen av dem — den ser
+bare en dict som skal caches og ETag-es.
+
 Gir kortvarig caching (15s/60s) med ETag/304-støtte for å redusere
 serverlast ved gjentatte requests fra samme klient. Designet for å
 være trygt å aktivere uten live-polling: cachen fylles først når

@@ -20,6 +20,7 @@ from django_otp.oath import TOTP
 from django_otp.plugins.otp_totp.models import TOTPDevice
 
 from accounts.models import CustomUser
+from accounts.test_helpers import gi_standardtilgang
 
 
 def _make_totp_code(device):
@@ -39,6 +40,7 @@ class NextParameterTests(TestCase):
             username='nextbruker', password='TestPassord123!',
             role='read_write', must_change_password=False,
         )
+        gi_standardtilgang(self.user)
 
     def _login_med_next(self, next_verdi):
         return self.client.post(
@@ -150,6 +152,7 @@ class MfaNextParameterTests(TestCase):
             username='mfanext', password='TestPassord123!',
             role='admin', must_change_password=False, mfa_required=True,
         )
+        gi_standardtilgang(self.user)
         self.device = TOTPDevice.objects.create(
             user=self.user, name='Test', confirmed=True,
         )
@@ -194,6 +197,7 @@ class NotificationRedirectTests(TestCase):
             username='varselbruker', password='x',
             role='read_write', must_change_password=False,
         )
+        gi_standardtilgang(self.user)
         self.client.force_login(self.user)
 
     def _varsel(self, url):
@@ -243,6 +247,7 @@ class MfaRateLimitTests(TestCase):
             username=navn, password='TestPassord123!',
             role='admin', must_change_password=False, mfa_required=True,
         )
+        gi_standardtilgang(bruker)
         TOTPDevice.objects.create(user=bruker, name='Test', confirmed=True)
         return bruker
 
@@ -287,6 +292,7 @@ class MfaKontosperreTests(TestCase):
             username='mfalaas', password='TestPassord123!',
             role='admin', must_change_password=False, mfa_required=True,
         )
+        gi_standardtilgang(self.user)
         self.device = TOTPDevice.objects.create(
             user=self.user, name='Test', confirmed=True,
         )
@@ -345,6 +351,7 @@ class LogoutMetodeTests(TestCase):
             username='utlogg', password='x',
             role='read_write', must_change_password=False,
         )
+        gi_standardtilgang(self.user)
         self.client.force_login(self.user)
 
     def test_get_gir_405(self):
@@ -372,6 +379,7 @@ class TrustCookieSecureTests(TestCase):
             username='trustbruker', password='TestPassord123!',
             role='admin', must_change_password=False, mfa_required=True,
         )
+        gi_standardtilgang(self.user)
         self.device = TOTPDevice.objects.create(
             user=self.user, name='Test', confirmed=True,
         )

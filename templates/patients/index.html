@@ -19,7 +19,13 @@
 
 <!-- Brukerrolle for JS -->
 <script nonce="{{ csp_nonce }}">
-  window.USER_ROLE = "{{ request.user.role }}";
+  // Modultilgang, ikke rolle (§7.4). Rollen sier ikke lenger noe om hva du
+  // får gjøre i denne modulen — det gjør nivået. `admin` er global og står
+  // utenfor modulaksen, derfor eget felt.
+  window.MODUL_TILGANG = {
+    patients: "{{ modul_nivaa }}",
+    admin: {{ er_global_admin|yesno:"true,false" }}
+  };
   window.USER_NAME = "{{ request.user.username }}";
   window.MY_FORSTEHJELPER_ID  = {{ request.user.forstehjelper_profil.id|default:'null' }};
   window.MY_HELSEPERSONELL_ID = {{ request.user.helsepersonell_profil.id|default:'null' }};
@@ -85,7 +91,7 @@
         <li><hr class="dropdown-divider" style="border-color:#334155;margin:0;"></li>
         <li><a class="dropdown-item" href="{% url 'core:profile' %}" style="color:#e5e7eb;"><i class="bi bi-person-circle me-2"></i>Min profil</a></li>
         <li><a class="dropdown-item" href="{% url 'accounts:change_password' %}" style="color:#e5e7eb;"><i class="bi bi-key me-2"></i>Endre passord</a></li>
-        {% if request.user.role == 'admin' %}
+        {% if er_global_admin %}
         <li><a class="dropdown-item" href="{% url 'accounts:user_list' %}" style="color:#e5e7eb;"><i class="bi bi-people me-2"></i>Administrer brukere</a></li>
         {% endif %}
         <li><hr class="dropdown-divider" style="border-color:#334155;margin:0;"></li>
@@ -103,9 +109,8 @@
 <!-- ══════════ TABS ══════════ -->
 <nav id="nav-tabs">
   <ul class="nav" role="tablist">
-    <li class="list-only"><a class="nav-link active" data-tab="liste"        href="#"><i class="bi bi-table me-1"></i>Pasientliste</a></li>
+    <li><a class="nav-link active" data-tab="liste"        href="#"><i class="bi bi-table me-1"></i>Pasientliste</a></li>
     <li><a class="nav-link"        data-tab="tavle"        href="#"><i class="bi bi-grid me-1"></i>Tavle</a></li>
-    <li class="stats-only"><a class="nav-link"        data-tab="statistikk"   href="#"><i class="bi bi-bar-chart-line me-1"></i>Statistikk</a></li>
     <li><a class="nav-link"        data-tab="innstillinger" href="#"><i class="bi bi-gear me-1"></i>Innstillinger</a></li>
   </ul>
 </nav>
@@ -113,9 +118,11 @@
 <!-- ══════════ PASIENTLISTE ══════════ -->
 <div id="tab-liste" class="tab-panel active">
   <div id="grid-toolbar">
-    <button class="btn btn-primary btn-sm write-only" data-action="openNewModal">
+    {% if kan_skrive %}
+    <button class="btn btn-primary btn-sm" data-action="openNewModal">
       <i class="bi bi-plus-lg me-1"></i>Ny pasient
     </button>
+    {% endif %}
     <div class="position-relative">
       <i class="bi bi-search position-absolute" style="left:9px;top:50%;transform:translateY(-50%);color:#94a3b8;font-size:0.8rem;pointer-events:none"></i>
       <input type="search" id="grid-search" placeholder="Søk i alle felt…" data-input-action="applyFilter" style="padding-left:28px">
@@ -142,9 +149,11 @@
 <div id="tab-tavle" class="tab-panel">
 
   <div style="padding:0.5rem 1rem 0 1rem;" class="mb-3 d-flex gap-2 align-items-center">
-    <button class="btn btn-primary btn-sm write-only" data-action="openNewModal">
+    {% if kan_skrive %}
+    <button class="btn btn-primary btn-sm" data-action="openNewModal">
       <i class="bi bi-plus-lg me-1"></i>Ny pasient
     </button>
+    {% endif %}
     <button id="btn-board-mine" class="btn btn-outline-info btn-sm"
             data-action="toggleBoardMine"
             title="Dim pasienter som ikke er dine">
@@ -196,342 +205,38 @@
 
 </div>
 
-<!-- ══════════ STATISTIKK ══════════ -->
-<div id="tab-statistikk" class="tab-panel stats-only">
-
-  <!-- Arkiv-modus-banner (vises kun når statistikk er fra et arkiv) -->
-  <div id="arkiv-stats-banner" class="alert alert-info d-none d-flex justify-content-between align-items-center py-2 mb-2">
-    <div>
-      <i class="bi bi-archive me-2"></i>
-      <strong>Arkiv-modus:</strong>
-      <span id="arkiv-stats-banner-tittel"></span>
-      <span class="text-muted small ms-2" id="arkiv-stats-banner-meta"></span>
-    </div>
-    <button type="button" class="btn btn-sm btn-outline-secondary" data-action="exitArkivStatsMode">
-      <i class="bi bi-x-circle me-1"></i>Tilbake til live-statistikk
-    </button>
-  </div>
-
-  <!-- Sub-nav -->
-  <div class="stats-subnav">
-    <button class="stats-subbtn active" data-stab="oversikt">
-      <i class="bi bi-speedometer2 me-1"></i>Oversikt
-    </button>
-    <button class="stats-subbtn" data-stab="tidsanalyse">
-      <i class="bi bi-stopwatch me-1"></i>Tidsanalyse
-    </button>
-    <button class="stats-subbtn" data-stab="krysstabeller">
-      <i class="bi bi-table me-1"></i>Krysstabeller
-    </button>
-    <button class="stats-subbtn" data-stab="obspost">
-      <i class="bi bi-clipboard2-pulse me-1"></i>Obspost
-    </button>
-    <button class="stats-subbtn" data-stab="tester">
-      <i class="bi bi-calculator me-1"></i>Statistiske tester
-    </button>
-  </div>
-
-  <!-- ── Oversikt ────────────────────────────── -->
-  <div class="stab-panel active" id="stab-oversikt">
-    <!-- KPI row 1 -->
-    <div class="row g-2 mb-2">
-      <div class="col-6 col-sm-4 col-md-2">
-        <div class="kpi-card kpi-blue">
-          <div class="kpi-label">Totalt</div>
-          <div class="kpi-value" id="kpi-total">0</div>
-          <div class="kpi-sub">alle pasienter</div>
-        </div>
-      </div>
-      <div class="col-6 col-sm-4 col-md-2">
-        <div class="kpi-card">
-          <div class="kpi-label">Tilstede nå</div>
-          <div class="kpi-value" id="kpi-tilstede">0</div>
-          <div class="kpi-sub">ikke utskrevet</div>
-        </div>
-      </div>
-      <div class="col-6 col-sm-4 col-md-2">
-        <div class="kpi-card kpi-red">
-          <div class="kpi-label">Rød</div>
-          <div class="kpi-value" id="kpi-rod">0</div>
-          <div class="kpi-sub">kritisk</div>
-        </div>
-      </div>
-      <div class="col-6 col-sm-4 col-md-2">
-        <div class="kpi-card kpi-yellow">
-          <div class="kpi-label">Gul</div>
-          <div class="kpi-value" id="kpi-gul">0</div>
-          <div class="kpi-sub">haster</div>
-        </div>
-      </div>
-      <div class="col-6 col-sm-4 col-md-2">
-        <div class="kpi-card kpi-green">
-          <div class="kpi-label">Grønn</div>
-          <div class="kpi-value" id="kpi-gronn">0</div>
-          <div class="kpi-sub">ikke haster</div>
-        </div>
-      </div>
-      <div class="col-6 col-sm-4 col-md-2">
-        <div class="kpi-card kpi-gray">
-          <div class="kpi-label">Utskrevet</div>
-          <div class="kpi-value" id="kpi-utskrevet">0</div>
-          <div class="kpi-sub">ferdigbehandlet</div>
-        </div>
-      </div>
-    </div>
-
-    <!-- KPI row 2: time -->
-    <div class="row g-2 mb-2">
-      <div class="col-md-3">
-        <div class="kpi-card d-flex gap-3 align-items-center">
-          <i class="bi bi-stopwatch text-primary" style="font-size:1.7rem;flex-shrink:0"></i>
-          <div>
-            <div class="kpi-label">Ventetid behandlingsstart</div>
-            <div style="font-size:1.15rem;font-weight:700;color:#1e293b" id="kpi-wait-both">–</div>
-            <div class="kpi-sub">snitt / median</div>
-          </div>
-        </div>
-      </div>
-      <div class="col-md-3">
-        <div class="kpi-card d-flex gap-3 align-items-center">
-          <i class="bi bi-hospital text-info" style="font-size:1.7rem;flex-shrink:0"></i>
-          <div>
-            <div class="kpi-label">Tid på obspost</div>
-            <div style="font-size:1.15rem;font-weight:700;color:#1e293b" id="kpi-obs-both">–</div>
-            <div class="kpi-sub">snitt / median</div>
-          </div>
-        </div>
-      </div>
-      <div class="col-md-3">
-        <div class="kpi-card d-flex gap-3 align-items-center">
-          <i class="bi bi-clock-history text-success" style="font-size:1.7rem;flex-shrink:0"></i>
-          <div>
-            <div class="kpi-label">Total behandlingstid</div>
-            <div style="font-size:1.15rem;font-weight:700;color:#1e293b" id="kpi-total-both">–</div>
-            <div class="kpi-sub">snitt / median</div>
-          </div>
-        </div>
-      </div>
-      <div class="col-md-3">
-        <div class="kpi-card kpi-teal">
-          <div class="kpi-label">Obspost-andel</div>
-          <div class="kpi-value" id="kpi-obs-pct">–</div>
-          <div class="kpi-sub" id="kpi-obs-sub">av alle pasienter</div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Charts row 1 -->
-    <div class="row g-2 mb-2">
-      <div class="col-md-3">
-        <div class="chart-card">
-          <div class="chart-title">Triage-fordeling</div>
-          <canvas id="chart-triage" height="180"></canvas>
-        </div>
-      </div>
-      <div class="col-md-3">
-        <div class="chart-card">
-          <div class="chart-title">Transport</div>
-          <canvas id="chart-transport" height="180"></canvas>
-        </div>
-      </div>
-      <div class="col-md-3">
-        <div class="chart-card">
-          <div class="chart-title">Utfall (utskrevet til)</div>
-          <canvas id="chart-utfall" height="180"></canvas>
-        </div>
-      </div>
-      <div class="col-md-3">
-        <div class="chart-card">
-          <div class="chart-title">Topp problemstillinger</div>
-          <canvas id="chart-problems" height="180"></canvas>
-        </div>
-      </div>
-    </div>
-
-    <!-- Arrivals -->
-    <div class="row g-2">
-      <div class="col-12">
-        <div class="chart-card">
-          <div class="chart-title">Ankomster per time</div>
-          <canvas id="chart-arrivals" height="90"></canvas>
-        </div>
-      </div>
-    </div>
-  </div><!-- /stab-oversikt -->
-
-  <!-- ── Tidsanalyse ──────────────────────────── -->
-  <div class="stab-panel" id="stab-tidsanalyse">
-    <div class="row g-3 mb-3">
-      <div class="col-md-5">
-        <div class="chart-card h-100">
-          <div class="chart-title">Tid per grovsortering</div>
-          <canvas id="chart-time-triage" height="130"></canvas>
-          <div class="mt-3" id="tbl-time-triage"></div>
-        </div>
-      </div>
-      <div class="col-md-7">
-        <div class="chart-card h-100">
-          <div class="chart-title">Tid per transportmåte</div>
-          <canvas id="chart-time-transport" height="130"></canvas>
-          <div class="mt-3" id="tbl-time-transport"></div>
-        </div>
-      </div>
-    </div>
-    <div class="row g-3">
-      <div class="col-12">
-        <div class="chart-card">
-          <div class="chart-title">Total tid per problemstilling (sortert etter gjennomsnitt)</div>
-          <canvas id="chart-time-problem" height="100"></canvas>
-          <div class="mt-3" id="tbl-time-problem"></div>
-        </div>
-      </div>
-    </div>
-  </div><!-- /stab-tidsanalyse -->
-
-  <!-- ── Krysstabeller ────────────────────────── -->
-  <div class="stab-panel" id="stab-krysstabeller">
-    <div class="row g-3 mb-3">
-      <div class="col-md-6">
-        <div class="chart-card">
-          <div class="chart-title">
-            <span>Problemstilling × Grovsortering</span>
-            <span id="chi2-badge-prob-triage" class="chi2-badge chi2-nd">Ingen data</span>
-          </div>
-          <div class="small text-muted mb-2" style="font-size:0.72rem">Antall (rad %)</div>
-          <div style="overflow-x:auto" id="xt-prob-triage"></div>
-        </div>
-      </div>
-      <div class="col-md-6">
-        <div class="chart-card">
-          <div class="chart-title">
-            <span>Grovsortering × Transport</span>
-            <span id="chi2-badge-triage-transport" class="chi2-badge chi2-nd">Ingen data</span>
-          </div>
-          <div class="small text-muted mb-2" style="font-size:0.72rem">Antall (rad %)</div>
-          <div style="overflow-x:auto" id="xt-triage-transport"></div>
-        </div>
-      </div>
-    </div>
-    <div class="row g-3">
-      <div class="col-12">
-        <div class="chart-card">
-          <div class="chart-title">
-            <span>Problemstilling × Utfall</span>
-            <span id="chi2-badge-prob-utfall" class="chi2-badge chi2-nd">Ingen data</span>
-          </div>
-          <div class="small text-muted mb-2" style="font-size:0.72rem">Antall (rad %)</div>
-          <div style="overflow-x:auto" id="xt-prob-utfall"></div>
-        </div>
-      </div>
-    </div>
-  </div><!-- /stab-krysstabeller -->
-
-  <!-- ── Obspost ──────────────────────────────── -->
-  <div class="stab-panel" id="stab-obspost">
-    <!-- KPI row -->
-    <div class="row g-2 mb-3">
-      <div class="col-6 col-md-3">
-        <div class="kpi-card kpi-blue">
-          <div class="kpi-label">Totalt på obspost</div>
-          <div class="kpi-value" id="obs-total-n">–</div>
-          <div class="kpi-sub" id="obs-total-pct-text">av alle pasienter</div>
-        </div>
-      </div>
-      <div class="col-6 col-md-3">
-        <div class="kpi-card">
-          <div class="kpi-label">Snitt obspost-tid</div>
-          <div class="kpi-value" id="obs-avg-time">–</div>
-          <div class="kpi-sub">gjennomsnitt</div>
-        </div>
-      </div>
-      <div class="col-6 col-md-3">
-        <div class="kpi-card">
-          <div class="kpi-label">Median obspost-tid</div>
-          <div class="kpi-value" id="obs-med-time">–</div>
-          <div class="kpi-sub">median</div>
-        </div>
-      </div>
-      <div class="col-6 col-md-3">
-        <div class="kpi-card">
-          <div class="kpi-label">Obs-bruk × Triage</div>
-          <div style="margin-top:6px" id="obs-chi2-display"></div>
-          <div class="kpi-sub">chi-square test</div>
-        </div>
-      </div>
-    </div>
-    <!-- Tables -->
-    <div class="row g-3">
-      <div class="col-md-4">
-        <div class="chart-card">
-          <div class="chart-title">Obspost-bruk per grovsortering</div>
-          <div id="tbl-obs-triage" class="mt-2"></div>
-        </div>
-      </div>
-      <div class="col-md-8">
-        <div class="chart-card">
-          <div class="chart-title">Obspost-bruk per problemstilling</div>
-          <div id="tbl-obs-problem" class="mt-2"></div>
-        </div>
-      </div>
-    </div>
-  </div><!-- /stab-obspost -->
-
-  <!-- ── Statistiske tester ───────────────────── -->
-  <div class="stab-panel" id="stab-tester">
-    <div class="row g-3 mb-3">
-      <div class="col-12">
-        <div class="chart-card">
-          <div class="chart-title">Chi-square tester (uavhengighetstest)</div>
-          <div id="tbl-chi2" class="mt-2"></div>
-        </div>
-      </div>
-    </div>
-    <div class="row g-3">
-      <div class="col-md-6">
-        <div class="chart-card">
-          <div class="chart-title">Kruskal-Wallis tester (tid)</div>
-          <div id="tbl-kw" class="mt-2"></div>
-        </div>
-      </div>
-      <div class="col-md-6">
-        <div class="chart-card">
-          <div class="chart-title">Automatisk tolkning</div>
-          <div id="tbl-interpretation" class="mt-2"></div>
-        </div>
-      </div>
-    </div>
-  </div><!-- /stab-tester -->
-
-</div><!-- /tab-statistikk -->
 
 
 <!-- INNSTILLINGER -->
 <div id="tab-innstillinger" class="tab-panel">
   <div class="d-flex flex-column gap-3" style="max-width:580px">
 
+    {% comment %}
+      Server-side, ikke `.admin-only`. Klassen skjulte kortene i nettleseren,
+      så markupen — inkludert URL-ene til admin-sidene — lå i HTML-en for
+      enhver som kunne lese modulen. Endepunktene var gatet, så det var ingen
+      tilgangsgrense, men det er ingen grunn til å sende noe vi vet
+      mottakeren ikke skal ha.
+    {% endcomment %}
+    {% if er_global_admin %}
+    {% comment %}
+      Arrangementsnavn og sesjonstimeout lå her fram til §4.1. Ingen av dem er
+      pasientinnstillinger: navnet gjelder vakten, timeouten gjelder
+      innloggingen. Begge krevde dessuten global admin, og et admin-endepunkt
+      inne i en modul sier at modulgrensen ikke betyr noe.
+    {% endcomment %}
     <div class="settings-card">
-      <h6><i class="bi bi-calendar-event me-2"></i>Arrangement</h6>
-      <label class="form-label mt-2 small">Navn på arrangement</label>
-      <div class="input-group input-group-sm">
-        <input type="text" id="setting-event-name" class="form-control" value="{{ event_name }}">
-        <button class="btn btn-primary write-only" data-action="saveEventName">Lagre</button>
-      </div>
-      <div class="form-text">Vises i topplinjen.</div>
+      <h6><i class="bi bi-sliders me-2"></i>Portalinnstillinger</h6>
+      <p class="small text-muted mb-2">
+        Arrangementsnavn og sesjonstimeout gjelder hele portalen og settes
+        samlet ett sted.
+      </p>
+      <a href="{% url 'core:portal_settings' %}" class="btn btn-outline-primary btn-sm">
+        <i class="bi bi-box-arrow-up-right me-1"></i>Åpne portalinnstillinger
+      </a>
     </div>
 
-    {% if user.role == 'admin' %}
-    <div class="card mb-3">
-      <div class="card-header"><strong>Sesjon</strong></div>
-      <div class="card-body">
-        <label class="form-label">Timeout (timer)</label>
-        <input type="number" id="session-timeout-input" class="form-control form-control-sm" min="1" max="24" style="max-width:120px;">
-        <div class="form-text">1–24 timer. Endringer gjelder fra neste innlogging.</div>
-        <button class="btn btn-sm btn-primary mt-2" data-action="saveSessionTimeout">Lagre</button>
-      </div>
-    </div>
-    {% endif %}
-
-    <div class="settings-card admin-only">
+    <div class="settings-card">
       <h6><i class="bi bi-people me-2"></i>Forstehjelpere</h6>
       <p class="small text-muted mb-2">Legg til, endre eller deaktiver forstehjelpere.</p>
       <div id="forstehjelpere-list"><span class="text-muted small">Laster...</span></div>
@@ -541,7 +246,7 @@
       </div>
     </div>
 
-    <div class="settings-card admin-only">
+    <div class="settings-card">
       <h6><i class="bi bi-person-badge me-2"></i>Helsepersonell</h6>
       <p class="small text-muted mb-2">Legg til, endre eller deaktiver helsepersonell.</p>
       <div id="helsepersonell-list"><span class="text-muted small">Laster...</span></div>
@@ -551,7 +256,7 @@
       </div>
     </div>
 
-    <div class="settings-card admin-only">
+    <div class="settings-card">
       <h6><i class="bi bi-cloud-arrow-up me-2"></i>Backup</h6>
       <p class="small text-muted mb-2">
         Backup styres samlet for hele portalen, med eget intervall og egen
@@ -562,7 +267,7 @@
       </a>
     </div>
 
-    <div class="settings-card danger-zone admin-only">
+    <div class="settings-card danger-zone">
       <h6 class="text-danger"><i class="bi bi-trash me-2"></i>Nullstill aktiv vakt</h6>
       <p class="small">
         Sletter permanent alle pasienter i aktiv vakt. Brukes kun for å tømme testdata.
@@ -574,7 +279,7 @@
       </button>
     </div>
 
-    <div class="settings-card admin-only">
+    <div class="settings-card">
       <h6><i class="bi bi-archive me-2"></i>Vaktarkiv</h6>
       <p class="small text-muted mb-2">Lagre et låst arkiv-snapshot av nåværende aktive vakt.</p>
       <div class="d-flex gap-2 flex-wrap mb-2">
@@ -586,6 +291,7 @@
         </button>
       </div>
     </div>
+    {% endif %}
 
   </div>
 </div>
@@ -594,7 +300,7 @@
 <!-- ══════════════════════════════════════════════════
      RESET MODAL (Kun admin)
 ══════════════════════════════════════════════════ -->
-{% if request.user.role == 'admin' %}
+{% if er_global_admin %}
 <div class="modal fade" id="resetModal" tabindex="-1">
   <div class="modal-dialog">
     <div class="modal-content">
@@ -1007,13 +713,22 @@
 
       </div>
       <div class="modal-footer py-2">
-        <button class="btn btn-outline-danger btn-sm me-auto admin-only" data-action="delPatient">
+        {% comment %}
+          Ikke `.admin-only`: synligheten avgjøres per pasient av serverens
+          `kan_slettes`, satt i openEdit(). `skriv_full` kan slette egne
+          pasienter de siste 30 minuttene (§4.2), og hvem som opprettet raden
+          finnes ikke i klienten.
+        {% endcomment %}
+        <button id="btn-del-patient" class="btn btn-outline-danger btn-sm me-auto d-none"
+                data-action="delPatient">
           <i class="bi bi-trash me-1"></i>Slett
         </button>
         <button class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Avbryt</button>
-        <button id="btn-save-edit" class="btn btn-primary btn-sm write-only" data-action="saveEdit">
+        {% if kan_skrive %}
+        <button id="btn-save-edit" class="btn btn-primary btn-sm" data-action="saveEdit">
           <i class="bi bi-save me-1"></i>Lagre endringer
         </button>
+        {% endif %}
       </div>
     </div>
   </div>
@@ -1024,21 +739,31 @@
 <!-- ══════════ SCRIPTS ══════════ -->
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 <script src="https://unpkg.com/tabulator-tables@6.2.5/dist/js/tabulator.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+{% comment %}
+  Chart.js lastes ikke lenger her. Den ble kun brukt av statistikkfanen, som
+  flyttet til /statistikk/ — og statistikk.js setter Chart.defaults selv.
+
+  portal-utils.js må stå FØRST: patients-utils.js kaller fmtMin() og de andre
+  primitivene derfra.
+{% endcomment %}
+<script src="{% static 'js/portal-utils.js' %}"></script>
 <script src="{% static 'js/patients-utils.js' %}"></script>
 <script src="{% static 'js/patients-table.js' %}"></script>
 <script src="{% static 'js/patients-forms.js' %}"></script>
 {% comment %}
-  patients-stats.js er større enn de tre andre til sammen og brukes kun av
-  roller med statistikktilgang. Den lastes derfor betinget (F7).
+  patients-admin.js (tidligere patients-stats.js) inneholder kun handlinger
+  som API-et uansett krever admin for: registeradministrasjon,
+  sesjonstimeout, nullstilling og vaktarkivet. Den lastes derfor kun for
+  admin. Tidligere fikk lead og lead_view den også — de kunne aldri bruke
+  noe av den, fordi hvert endepunkt avviste dem.
 
   patients-app.js må lastes FØR den: bootstrappen ligger der, og appen skal
   starte likt uansett rolle. Rekkefølgen betyr ikke noe funksjonelt — alt
   kjøres på DOMContentLoaded — men holder lesingen logisk.
 {% endcomment %}
 <script src="{% static 'js/patients-app.js' %}"></script>
-{% if request.user.role == 'admin' or request.user.role == 'lead' or request.user.role == 'lead_view' %}
-<script src="{% static 'js/patients-stats.js' %}"></script>
+{% if er_global_admin %}
+<script src="{% static 'js/patients-admin.js' %}"></script>
 {% endif %}
 <script src="{% static 'js/notifications.js' %}"></script>
 </body>

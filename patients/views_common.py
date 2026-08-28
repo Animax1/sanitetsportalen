@@ -8,7 +8,10 @@ import json
 from datetime import datetime
 
 # Roller med skrivetilgang til pasienter
-WRITE_ROLES = ('admin', 'lead', 'read_write')
+# `WRITE_ROLES` sto her fram til 28. aug. 2026. Den var én av fem kopier av
+# rollelista (§2.6 i beslutningsnotatet), og skrivetilgang avgjøres nå av
+# `har_tilgang(user, 'patients', 'skriv_full')` — ikke av hvilken rolle
+# brukeren har.
 
 
 def _json_body(request):
@@ -46,9 +49,17 @@ def _ensure_pabegynt_not_before_inntid(patient):
     return False
 
 
-def _patient_to_dict(p):
-    """Konverter Patient-objekt til dict for JSON-respons."""
+def _patient_to_dict(p, slettbare=None):
+    """Konverter Patient-objekt til dict for JSON-respons.
+
+    ``slettbare`` er pk-ene mottakeren kan hard-slette, ``None`` for «alle»
+    (global admin). Flagget må komme fra serveren: om en pasient kan slettes
+    avhenger av *hvem som opprettet den* og *når*, og ingen av delene finnes
+    i klienten. Uten det kunne grensesnittet bare gjette — og en sletteknapp
+    som gir 403 er samme feil som «Ny pasient» for en `les`-bruker.
+    """
     return {
+        'kan_slettes': slettbare is None or p.id in slettbare,
         'id': p.id,
         'patient_nr': p.pasientnummer,
         'pasientnummer': p.pasientnummer,

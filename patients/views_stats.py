@@ -1,24 +1,36 @@
-"""Statistikk-endepunktene. Skilt ut fra ``views.py`` i N13.3."""
-from django.contrib.auth.decorators import login_required
+"""Statistikk-endepunktet som ble igjen i pasientmodulen.
+
+Full statistikk flyttet til ``statistikk``-appen august 2026. ``/api/stats/``
+ble ikke med, men begrunnelsen som først ble skrevet her var feil: den sa at
+endepunktet mater header-chipsene øverst på pasientsiden.
+
+**Det gjør det ikke.** Chipsene regnes ut i nettleseren, i
+``patients-table.js``, fra pasientlista ``/api/patients/`` allerede har hentet.
+Ingen JS-fil i dette repoet har noen gang kalt ``/api/stats/`` — endepunktet er
+en rest fra Flask-porten, og ``basic_stats``-docstringen sier det selv.
+
+Det står altså uten kjent konsument. Om det skal gates på pasientmodulen eller
+slettes, avgjøres i rollemodell-arbeidet; se «Rollemodellen» i TODO.md.
+``basic_stats()`` som *funksjon* blir uansett stående — den deler
+aggregeringen med ``compute_arkiv_stats``.
+"""
 from django.views.decorators.http import require_http_methods
 
-from core.auth_decorators import stats_required
-from core.ratelimit import rate_limit
+from core.auth_decorators import modul_kreves
 
-from .services import basic_stats, full_stats, get_active_year
+from core.stats_cache import cached_stats_response
+
+from .services import basic_stats, get_active_year
 
 
-# ── Statistikk ────────────────────────────────────────────────────────────────
-
-@login_required
+@modul_kreves('patients', 'les', svar='json')
 @require_http_methods(['GET'])
 def stats_view(request):
-    """Basis-statistikk for header-chips. Filtrerer alltid på aktivt år.
+    """Basis-statistikk for aktivt år. Ingen kjent konsument, se modul-docstring.
 
     Cachet 15s med ETag/304 for å redusere last ved gjentatt polling.
     Cache-nøkkel inkluderer aktivt år slik at bytte av år gir ny cache.
     """
-    from .stats_cache import cached_stats_response
     year = get_active_year()
 
     @cached_stats_response(cache_key=f'basic:{year}', ttl=15)
@@ -26,28 +38,3 @@ def stats_view(request):
         return basic_stats(year=year)
 
     return _inner(request)
-
-
-@stats_required
-@require_http_methods(['GET'])
-# S3: appens dyreste spørring. Cachen tar 60 sekunder av gangen, men
-# cache-miss-stien var helt ubeskyttet — og det er nettopp den en klient
-# i løkke treffer gang på gang. Statistikkfanen lastes ved åpning og ved
-# auto-refresh hvert 30. sekund, altså rundt 2/min i normal bruk.
-@rate_limit(group='patients:full-stats', rate='30/m', method='GET')
-def full_stats_view(request):
-    """Full statistikk for statistikk-dashboard. Kun admin, lead og lead_view.
-
-    Cachet 60s med ETag/304. Dyre aggregater (percentiler, gruppetellinger)
-    regnes kun én gang per minutt per år.
-    """
-    from .stats_cache import cached_stats_response
-    year = get_active_year()
-
-    @cached_stats_response(cache_key=f'full:{year}', ttl=60)
-    def _inner(req):
-        return full_stats(year=year)
-
-    return _inner(request)
-
-

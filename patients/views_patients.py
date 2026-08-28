@@ -5,7 +5,6 @@ Skilt ut fra ``views.py`` i N13.3.
 import hashlib
 import json
 
-from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.db.models import Q
@@ -14,13 +13,16 @@ from django.shortcuts import render
 from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_http_methods
 
-from core.auth_decorators import admin_required
+from core.auth_decorators import (
+    admin_required, er_global_admin, har_tilgang, modul_kreves, nivaa_for,
+)
 from core.idempotency import bygg_nokkel, forkast, fullfor, reserver
 from core.ratelimit import rate_limit
 
 from .choices import validate_patient_choice_fields
 from .models import Patient, AppSetting, Forstehjelper, Helsepersonell
 from .services import (
+    kan_slette_selv, slettbare_pasient_ider,
     next_patient_nr,
     apply_list_filter, stamp_pabegynt_if_needed,
     get_active_year,
@@ -30,14 +32,14 @@ from .services import (
     recycle_patient_nr_if_last,
 )
 from .views_common import (
-    WRITE_ROLES, _json_body, _ensure_pabegynt_not_before_inntid,
+    _json_body, _ensure_pabegynt_not_before_inntid,
     _patient_to_dict,
 )
 
 
 # ── Hoved-side ────────────────────────────────────────────────────────────────
 
-@login_required
+@modul_kreves('patients', 'les')
 def index_view(request):
     """Render hoved-siden.
 
@@ -50,6 +52,14 @@ def index_view(request):
         # Samme nøkkel som PUT /api/settings/ skriver og loadSettings() leser,
         # slik at server og klient ikke kan vise hver sin verdi.
         'event_name': AppSetting.get('event_name', '') or '',
+        # §7.4: grensesnittet må gate på det samme som endepunktene gjør.
+        # Gjorde det ikke det, viste vi «Ny pasient» til en bruker med bare
+        # `les` — hen fikk opp skjemaet, fylte det ut, og møtte 403 på lagre.
+        # En knapp som fører til en vegg er verre enn ingen knapp.
+        'modul_nivaa': nivaa_for(request.user, 'patients') or '',
+        'kan_skrive': har_tilgang(request.user, 'patients', 'skriv_full'),
+        # `er_global_admin` kommer fra context processoren, ikke herfra: den
+        # trengs i base_portal.html og profilsiden også.
     })
 
 
@@ -69,63 +79,29 @@ SETTINGS_READ_WHITELIST = frozenset({
     'active_year',  # aktivt år, styrer hvilke pasienter som vises
 })
 
-#: Nøkler `PUT /api/settings/` godtar å skrive. Bevisst smalere enn lese-lista:
-#: `active_year` settes via egne endepunkter, ikke ved fri skriving hit.
-SETTINGS_WRITE_WHITELIST = frozenset({'event_name'})
 
-
-@login_required
-@require_http_methods(['GET', 'PUT'])
+@modul_kreves('patients', 'les', svar='json')
+@require_http_methods(['GET'])
 def settings_view(request):
-    """Hent eller oppdater appinnstillinger."""
-    if request.method == 'GET':
-        settings_dict = {
-            s.key: s.value
-            for s in AppSetting.objects.filter(key__in=SETTINGS_READ_WHITELIST)
-        }
-        return JsonResponse(settings_dict)
+    """Les appinnstillingene pasientsiden trenger.
 
-    # PUT – oppdater event_name (krever skrivetilgang)
-    if request.user.role not in WRITE_ROLES:
-        return JsonResponse({'error': 'Ingen tilgang'}, status=403)
+    **Kun GET.** Skrivingen flyttet til `/portal-admin/innstillinger/` (§4.1):
+    `event_name` er en portalinnstilling, ikke en pasientinnstilling, og et
+    endepunkt under `/pasienter/` som krever global admin sier at
+    modulgrensen ikke betyr noe.
 
-    data = _json_body(request)
-    for k, v in data.items():
-        if k in SETTINGS_WRITE_WHITELIST:
-            AppSetting.set(k, v)
-    return JsonResponse({'ok': True})
-
-
-# ── Sesjonstimeout ────────────────────────────────────────────────────────────
-
-@login_required
-@require_http_methods(['GET', 'PUT'])
-def session_timeout_view(request):
-    """Hent eller sett sesjonstimeout i timer. Kun admin kan sette."""
-    if request.method == 'GET':
-        try:
-            hours = int(AppSetting.get('session_timeout_hours', 8))
-        except (ValueError, TypeError):
-            hours = 8
-        return JsonResponse({'hours': hours})
-    # PUT
-    if request.user.role != 'admin':
-        return JsonResponse({'error': 'Ingen tilgang'}, status=403)
-    data = _json_body(request)
-    try:
-        hours = int(data.get('hours', 8))
-    except (ValueError, TypeError):
-        return JsonResponse({'error': 'Ugyldig verdi'}, status=400)
-    if hours < 1 or hours > 24:
-        return JsonResponse({'error': 'Må være mellom 1 og 24'}, status=400)
-    AppSetting.set('session_timeout_hours', hours)
-    return JsonResponse({'ok': True, 'hours': hours})
-
+    Lesingen blir igjen fordi headeren og årsfiltreringen trenger verdiene, og
+    fordi de er ufarlige for alle som allerede kan lese modulen.
+    """
+    return JsonResponse({
+        s.key: s.value
+        for s in AppSetting.objects.filter(key__in=SETTINGS_READ_WHITELIST)
+    })
 
 # ── Pasienter ─────────────────────────────────────────────────────────────────
 
 @never_cache
-@login_required
+@modul_kreves('patients', 'les', svar='json')
 @require_http_methods(['GET', 'POST'])
 # S3: kun POST telles — GET er pollet hvert 30. sekund av hver klient og
 # svarer 304 uten kropp når ingenting er endret. 60/min er langt over det
@@ -178,7 +154,9 @@ def patients_list_view(request):
         # Merk hva dette sparer: båndbredden (454 kB per kall ved 1000
         # pasienter), ikke databasearbeidet. Spørringen og serialiseringen
         # kjører uansett for å regne ut hashen.
-        kropp = json.dumps([_patient_to_dict(p) for p in qs], default=str)
+        slettbare = slettbare_pasient_ider(request.user)
+        kropp = json.dumps([_patient_to_dict(p, slettbare) for p in qs],
+                           default=str)
         etag_value = ('"v1:'
                       + hashlib.sha256(kropp.encode('utf-8')).hexdigest()[:16]
                       + '"')
@@ -192,7 +170,7 @@ def patients_list_view(request):
         return response
 
     # POST – opprett ny pasient i aktivt år (krever skrivetilgang)
-    if request.user.role not in WRITE_ROLES:
+    if not har_tilgang(request.user, 'patients', 'skriv_full'):
         return JsonResponse({'error': 'Ingen tilgang'}, status=403)
 
     data = _json_body(request)
@@ -261,7 +239,8 @@ def patients_list_view(request):
             # opprettet nå.
             try:
                 return JsonResponse(
-                    _patient_to_dict(Patient.objects.get(pk=verdi)),
+                    _patient_to_dict(Patient.objects.get(pk=verdi),
+                                     slettbare_pasient_ider(request.user)),
                 )
             except Patient.DoesNotExist:
                 # Pasienten er slettet i mellomtiden. Nøkkelen beskytter ikke
@@ -323,10 +302,12 @@ def patients_list_view(request):
 
     if idem:
         fullfor(idem, patient.pk)
-    return JsonResponse(_patient_to_dict(patient), status=201)
+    return JsonResponse(
+        _patient_to_dict(patient, slettbare_pasient_ider(request.user)),
+        status=201)
 
 
-@login_required
+@modul_kreves('patients', 'les', svar='json')
 @require_http_methods(['PUT', 'DELETE'])
 # S3: redigering skjer oftere enn opprettelse — obs-tider stemples, sonen
 # endres, pasienten skrives ut — så bøtta er romsligere enn ved
@@ -350,7 +331,7 @@ def patient_detail_view(request, pk):
         return JsonResponse({'error': 'Pasient ikke funnet'}, status=404)
 
     if request.method == 'PUT':
-        if request.user.role not in WRITE_ROLES:
+        if not har_tilgang(request.user, 'patients', 'skriv_full'):
             return JsonResponse({'error': 'Ingen tilgang'}, status=403)
 
         data = _json_body(request)
@@ -426,10 +407,21 @@ def patient_detail_view(request, pk):
         _ensure_pabegynt_not_before_inntid(patient)
 
         patient.save()
-        return JsonResponse(_patient_to_dict(patient))
+        return JsonResponse(
+            _patient_to_dict(patient, slettbare_pasient_ider(request.user)))
 
-    # DELETE – hard-delete med recycle av pasientnummer (krever admin)
-    if request.user.role != 'admin':
+    # DELETE – hard-delete med recycle av pasientnummer.
+    #
+    # §4.2: `skriv_full` kan slette **egne** pasienter de siste 30 minuttene.
+    # Eldre sletting, og andres, forblir global admin. Vinduet treffer
+    # feilregistrering — en duplikat eller et feiltrykk som blokkerer et
+    # pasientnummer — uten å gjøre sletting til et hverdagsverktøy.
+    #
+    # Merk at dette er en **hard-delete som resirkulerer pasientnummeret**.
+    # Det er nettopp derfor vinduet er smalt: raden finnes ikke i noen backup
+    # tatt etterpå.
+    if not (er_global_admin(request.user)
+            or kan_slette_selv(request.user, patient)):
         return JsonResponse({'error': 'Ingen tilgang'}, status=403)
 
     pasientnummer = patient.pasientnummer
@@ -441,7 +433,7 @@ def patient_detail_view(request, pk):
 
 # ── Reset testdata ─────────────────────────────────────────────────────────────
 
-@login_required
+@modul_kreves('patients', 'les', svar='json')
 @admin_required
 @require_http_methods(['POST'])
 def reset_active_year_view(request):

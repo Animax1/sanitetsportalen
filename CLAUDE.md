@@ -23,7 +23,7 @@ python manage.py create_admin --username admin --password "bytt-meg"
 python manage.py runserver           # http://127.0.0.1:8000/
 
 # Tester – hele suiten
-python manage.py test patients accounts audit core -v 2
+python manage.py test patients accounts audit core statistikk -v 2
 
 # Én enkelt test
 python manage.py test patients.tests.PatientAPITest.test_create_patient -v 2
@@ -44,19 +44,52 @@ Portalens rammeverk. Hver app deklarerer sin modul i `<app>/module.py`, og regis
 2. Importer den i `_REGISTERED_MODULES` i `core/modules.py`
 3. Legg til permission-flagg på `CustomUser` (via migrasjon) om nødvendig
 
-En modul vises kun hvis `ModuleSettings.enabled=True` **og** brukeren har rett `permission_flag`.
+En modul vises kun hvis `ModuleSettings.enabled=True` **og** brukeren har en
+`ModulTilgang`-rad på modulen. Global admin ser alt.
 
 ### Tilgangskontroll
 
-Importér alltid dekoratorer fra `core.auth_decorators`. `accounts/decorators.py` er en ren re-eksport-shim som beholdes fordi `core/tests.py` verifiserer at den fortsatt virker — ingen produksjonskode importerer fra den lenger (N11).
+Importér alltid fra `core.auth_decorators`. `accounts/decorators.py` er en ren
+re-eksport-shim som beholdes fordi `core/tests.py` verifiserer at den fortsatt virker —
+ingen produksjonskode importerer fra den lenger (N11).
+
+**Tre kategorier, ikke én.** Se `docs/BESLUTNING_ROLLEMODELLEN.md`:
+
+1. **Global admin** (`role == 'admin'`) — brukeradmin, backup, moduloppsett, audit, arkiv,
+   og alt irreversibelt. Står utenfor modulaksen og trenger ingen rader.
+2. **Modulbasert** — `accounts.ModulTilgang(bruker, modul_slug, nivaa)`.
+3. **Globalt uten admin** — innlogging, min profil, passordbytte, MFA.
 
 ```python
-from core.auth_decorators import admin_required, write_required, stats_required, role_required
+from core.auth_decorators import admin_required, har_tilgang, modul_kreves
+
+@modul_kreves('patients', 'skriv_full', svar='json')
 ```
 
-Rollehierarki (lavest → høyest): `read_only → read_write → lead_view → lead → admin`
+Nivåene er en ordnet stige. **Fravær av rad er ingen tilgang** — det finnes ingen
+`'ingen'`-verdi å lagre:
 
-`has_role_at_least(user, 'lead')` sjekker hierarkisk. Dekoratorer gir 403 hvis rollen mangler.
+| Nivå | Betyr |
+|---|---|
+| `les` | Kan se modulens data |
+| `skriv_handling` | Navngitte overganger (stemplinger), leser ikke request-kroppen. **Tomt i dag** |
+| `skriv_full` | Kan redigere felter |
+
+Ukjent nivånavn gir **False**, ikke True — en skrivefeil i en dekoratør skal stenge døra.
+`ModuleSettings.enabled=False` gir 403 for alle andre enn global admin.
+
+**Hvert view under en modul må være dekorert.** `patients/tests_modul_dekorator.py` går
+gjennom `urlpatterns` og håndhever det — risikoen ved dekoratør framfor middleware er en
+glemt dekoratør, og en manuell gjennomgang holder bare til neste endepunkt. Unntak må stå
+i lista der, med begrunnelse.
+
+**Grensesnittet gater på `window.MODUL_TILGANG`, ikke på rollen.** Gjør det ikke det, viser
+vi knapper som fører til 403 — og en knapp som fører til en vegg er verre enn ingen knapp.
+
+**`CustomUser.role` er under avvikling.** De fem verdiene styrer ingenting utenom `admin`;
+feltet krymper i deploy 2. De fem `kan_redigere_*`-flaggene styrer ingenting i det hele
+tatt, og står kun til deploy 3 slik at en rollback har noe å bygge radene fra.
+`has_role_at_least` brukes fortsatt for `ARKIV_VIEW_MIN_ROLE`.
 
 ### Rate-limiting (core/ratelimit.py)
 
@@ -106,10 +139,10 @@ Viewene er delt i fem moduler (N13.3) — `views.py` finnes ikke lenger:
 
 | Modul | Ansvar |
 |-------|--------|
-| `views_common.py` | `_json_body`, `_patient_to_dict`, `WRITE_ROLES` — delt av de andre |
+| `views_common.py` | `_json_body`, `_patient_to_dict` — delt av de andre |
 | `views_patients.py` | Hoved-side, innstillinger, sesjonstimeout, pasient-CRUD, nullstilling |
 | `views_registre.py` | Førstehjelper- og helsepersonellregisteret (én fabrikk bygger begge) |
-| `views_stats.py` | `/api/stats/` og `/api/full-stats/` |
+| `views_stats.py` | `/api/stats/` — uten kjent konsument. Full statistikk ligger i `statistikk/` |
 | `views_arkiv.py` | Vaktarkivet |
 
 Alle endepunkter er JSON-API-er beskyttet med `@login_required` + rollesjekk. Responser følger mønsteret `{'status': 'ok', 'data': ...}` eller `{'status': 'error', 'message': ...}`.
@@ -148,44 +181,89 @@ Frysing, integritetssjekk og kollaps er modul-agnostisk. Hver modul som arkivere
 
 `patients/arkiv.py` er referanseeksempelet. `ArkivSignaturLaastTests` låser signaturene til literale hex-verdier — feiler den etter en refaktorering, er det refaktoreringen som er feil.
 
-### Statistikk-caching (patients/stats_cache.py)
+### Statistikk-modulen (statistikk/)
 
-Basic stats caches 15 sek, full stats 60 sek. Støtter ETag/304.
+Egen app siden august 2026. Eier `/statistikk/`-siden og full statistikk
+(`/statistikk/api/full-stats/` og `/statistikk/api/arkiv/<pk>/full-stats/`).
+`/pasienter/api/stats/` ble ikke flyttet. **Det er ikke det som mater header-chipsene** —
+de regnes ut i `patients-table.js` fra pasientlista. Endepunktet har ingen kjent konsument
+og er en rest fra Flask-porten.
+
+**Avhengighetsretningen er statistikk → patients, aldri motsatt.** Tallene beregnes
+fortsatt av `patients.services`; statistikk-appen henter, cacher og viser. Når modul
+nummer to skal levere tall, erstattes den direkte importen av et registry etter samme
+idiom som `core.backup` og `core.arkiv`.
+
+Arkiv-endepunktet har **to gates**: statistikkgaten *og* `ARKIV_VIEW_MIN_ROLE`. Arkivet er
+strengere beskyttet enn live-statistikken, og hadde det arvet modulens gate ved flyttingen,
+ville `lead_view` fått innsyn i arkiverte vakter uten at noen bestemte det.
+
+**Modulen komponerer tilgang, den eier den ikke** (§5). Den viser kun kilder brukeren har
+minst `les` på i kildemodulen — ellers ville aggregatene gitt avledet innsyn i data
+brukeren ikke har tilgang til. I dag er `patients` eneste kilde, så sjekken er én linje;
+med kilde nummer to blir den en løkke over registeret.
+
+### Statistikk-caching (core/stats_cache.py)
+
+Ligger i `core` fordi to apper bruker den: `patients` for header-chipsene og `statistikk`
+for full statistikk. Basic stats caches 15 sek, full stats 60 sek. Støtter ETag/304.
 
 Det finnes **ingen** eksplisitt invalidering — cachen utløper på TTL. De korte TTL-ene er valgt nettopp for å slippe invalideringslogikk, og alle cache-operasjoner er pakket i try/except slik at en død cache degraderer til vanlig beregning i stedet for å ta ned endepunktet.
 
 ### Frontend
 
-**To stilark, og de dekker hver sine sider.** Å legge en regel i feil fil ser ut som en
+**Tre stilark, og de dekker hver sine sider.** Å legge en regel i feil fil ser ut som en
 virkningsløs endring, ikke som en feil:
 
 | Fil | Lastes av | Variabler |
 |-----|-----------|-----------|
 | `static/css/style.css` | **kun** `templates/patients/index.html` | `--text-muted` m.fl. |
 | `static/css/portal.css` | alt som arver `core/templates/core/base_portal.html` | `--portal-text-muted` m.fl. |
+| `static/css/statistikk.css` | **kun** `templates/statistikk/index.html` | definerer selv de fire `base_portal` mangler |
 
 Noen frittstående sider (`403.html`, `mfa_setup.html`, `mfa_verify.html`, innlogging)
 laster ingen av dem — de har egen `<style>`-blokk og må overstyre selv.
 
-Begge temaene er mørke, så **enhver Bootstrap-klasse for dempet tekst må overstyres** der
+**`base_portal.html` aliaser ikke alle variablene `style.css` definerer.** Den setter
+`--surface-1`, `--surface-2`, `--border-color` og `--text-main`, men *ikke* `--text-muted`,
+`--text-soft`, `--surface-3` eller `--header-bg`. En udefinert custom property gjør ikke
+regelen ugyldig — den gjør fargen arvet, så teksten blir lesbar eller uleselig tilfeldig
+uten at noe feiler. Et nytt modulstilark må derfor definere de fire selv, og *ikke* gjenta
+de fire portalen faktisk aliaser (da kan temaene komme i utakt). `statistikk.css` er
+mønsteret.
+
+Alle temaene er mørke, så **enhver Bootstrap-klasse for dempet tekst må overstyres** der
 malen kan se den. `MorkTekstPaaMorkBakgrunnTests` løser `{% extends %}` og `{% static %}`
 og håndhever det.
 
-Fem moduler i `static/js/` (ingen bundler). Fire lastes alltid, én betinget (F7):
+Syv moduler i `static/js/` (ingen bundler), fordelt på to sider:
 
 | Modul | Lastes | Ansvar |
 |-------|--------|--------|
-| `patients-utils.js` | alltid | CSRF-fetch (`apiFetch`), `withSubmitGuard`, escaping, delt tilstand |
-| `patients-table.js` | alltid | Tabulator-grid og tavle |
-| `patients-forms.js` | alltid | Registrerings- og redigeringsskjema |
-| `patients-app.js` | alltid | Oppstart (`DOMContentLoaded`), faneskift, auto-refresh, lastere for navneregistrene |
-| `patients-stats.js` | **kun admin/lead/lead_view** | Statistikkfanen (Chart.js), arkiv, admin-handlinger |
+| `portal-utils.js` | **begge sider** | CSRF-fetch (`apiFetch`), `withSubmitGuard`, escaping, `fmtMin`, `data-action`-delegeringen |
+| `patients-utils.js` | pasientsiden, alltid | Rollesynlighet, delt tilstand, klokke, skjemahjelpere |
+| `patients-table.js` | pasientsiden, alltid | Tabulator-grid og tavle |
+| `patients-forms.js` | pasientsiden, alltid | Registrerings- og redigeringsskjema |
+| `patients-app.js` | pasientsiden, alltid | Oppstart (`DOMContentLoaded`), faneskift, auto-refresh, lastere for navneregistrene |
+| `patients-admin.js` | pasientsiden, **kun admin** | Registeradmin, sesjonstimeout, nullstilling, vaktarkiv |
+| `statistikk.js` | **kun** `/statistikk/` | All statistikkrendering (Chart.js), arkivmodus |
 
-**Alt en `read_only`- eller `read_write`-bruker kan nå, må ligge i en alltid-lastet modul.** `read_write` har skrivetilgang uten statistikktilgang — derfor bor f.eks. `saveEventName` i `patients-app.js`. Kall fra alltid-lastet kode til `patients-stats.js` må gå gjennom `_kall('navn')`, som sjekker at funksjonen finnes. `JsModulLastingTests` håndhever dette.
+**`patients-utils.js` kan ikke lastes utenfor pasientsiden.** Den gjør arbeid på toppnivå
+— `Chart.defaults` og `new bootstrap.Modal(document.getElementById('newModal'))` — og
+kaster på en side uten pasientskjemaene. Trenger en ny modulside en helper derfra, skal
+helperen flyttes til `portal-utils.js`, ikke kopieres. `JsModulLastingTests` håndhever det
+ved å sammenligne hva `statistikk.js` kaller mot hva den faktisk laster.
 
-CSRF-sikret fetch-wrapper brukes for alle API-kall. Tabulator for pasientgrid, Chart.js for statistikk.
+**Alt en ikke-admin kan nå på pasientsiden, må ligge i en alltid-lastet modul.**
+`read_write` har skrivetilgang uten admin-tilgang — derfor bor f.eks. `saveEventName` i
+`patients-app.js`. Kall fra alltid-lastet kode til `patients-admin.js` må gå gjennom
+`_kall('navn')`, som sjekker at funksjonen finnes. `JsModulLastingTests` håndhever dette.
 
-Brukerdata som settes inn med `innerHTML` **skal** escapes — `escHtmlValue()` i tabeller (tallsikker), `escapeHtml()`/`_escHtml()` ellers. Markup koden bygger selv merkes med `trustedHtml()`. `patients/tests_xss_stats.py` håndhever dette.
+CSRF-sikret fetch-wrapper brukes for alle API-kall. Tabulator for pasientgrid, Chart.js for
+statistikk — og Chart.js lastes **kun** på `/statistikk/`.
+
+Brukerdata som settes inn med `innerHTML` **skal** escapes — `escHtmlValue()` i tabeller (tallsikker), `escapeHtml()`/`_escHtml()` ellers. Markup koden bygger selv merkes med `trustedHtml()`. `patients/tests_xss_stats.py` håndhever dette,
+og leser både `statistikk.js` og `patients-admin.js` — byggerne ble delt mellom de to.
 
 JS-oppførsel testes ved å kjøre funksjonene i node, se `patients/js_test_utils.py`. Ikke skriv nye tester som bare grep-er etter kodelinjer i JS-filer.
 

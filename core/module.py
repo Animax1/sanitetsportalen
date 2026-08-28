@@ -13,7 +13,6 @@ CoreModule = Module(
     description='Felles primitiver, validatorer og auth-helpers.',
     url=None,
     icon='shield-plus-fill',
-    permission_flag=None,
     admin_only=True,
     is_core=True,
     order=0,

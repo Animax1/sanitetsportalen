@@ -16,6 +16,7 @@ from django.urls import reverse
 from accounts.models import CustomUser
 from audit.models import AuditLog
 from patients.models import Patient, Forstehjelper
+from accounts.test_helpers import gi_standardtilgang
 
 
 class DeltRedisKlientTests(TestCase):
@@ -158,6 +159,7 @@ class SesjonsinvalideringTests(TestCase):
             username='sesjonsbruker', password='TestPassord123!',
             role='read_write', must_change_password=False,
         )
+        gi_standardtilgang(self.user)
 
     def _logg_inn(self, client=None):
         c = client or Client()
@@ -172,6 +174,7 @@ class SesjonsinvalideringTests(TestCase):
             annen = CustomUser.objects.create_user(
                 username=f'annen{i}', password='x', must_change_password=False,
             )
+            gi_standardtilgang(annen)
             store = SessionStore()
             store['_auth_user_id'] = str(annen.pk)
             store['_auth_user_backend'] = 'django.contrib.auth.backends.ModelBackend'

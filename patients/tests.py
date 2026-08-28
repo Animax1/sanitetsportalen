@@ -20,6 +20,7 @@ from patients.services import (
     stamp_obs_times_if_needed, stamp_utskrevet_if_needed,
     get_active_year, set_active_year,
 )
+from accounts.test_helpers import gi_standardtilgang
 
 
 # ── Filtertester ──────────────────────────────────────────────────────────────
@@ -207,10 +208,13 @@ class AccessControlTests(TestCase):
             username='a', password='x', role='admin', must_change_password=False)
         self.lead = CustomUser.objects.create_user(
             username='l', password='x', role='lead', must_change_password=False)
+        gi_standardtilgang(self.lead)
         self.rw = CustomUser.objects.create_user(
             username='w', password='x', role='read_write', must_change_password=False)
+        gi_standardtilgang(self.rw)
         self.ro = CustomUser.objects.create_user(
             username='r', password='x', role='read_only', must_change_password=False)
+        gi_standardtilgang(self.ro)
 
     def _login(self, user):
         c = Client()
@@ -364,6 +368,7 @@ class LeadViewTests(TestCase):
         set_active_year(2026)
         self.lead_view = CustomUser.objects.create_user(
             username='lv', password='x', role='lead_view', must_change_password=False)
+        gi_standardtilgang(self.lead_view)
         self.client = Client()
         self.client.force_login(self.lead_view)
         Patient.objects.create(pasientnummer=1, year=2026)
@@ -383,7 +388,7 @@ class LeadViewTests(TestCase):
 
     def test_lead_view_kan_lese_full_stats(self):
         """lead_view kan hente full statistikk."""
-        resp = self.client.get('/pasienter/api/full-stats/')
+        resp = self.client.get('/statistikk/api/full-stats/')
         self.assertIn(resp.status_code, [200, 500])  # 500 OK hvis scipy mangler
 
 
@@ -399,6 +404,7 @@ class ResetTests(TestCase):
             username='a', password='x', role='admin', must_change_password=False)
         self.lead = CustomUser.objects.create_user(
             username='l', password='x', role='lead', must_change_password=False)
+        gi_standardtilgang(self.lead)
         Patient.objects.create(pasientnummer=1, year=2026)
         Patient.objects.create(pasientnummer=2, year=2026)
         Patient.objects.create(pasientnummer=3, year=2025)  # annet år
@@ -449,6 +455,7 @@ class ForstehjelperETagTests(TestCase):
         self.user = CustomUser.objects.create_user(
             username='etagtester', password='x', role='read_only',
             must_change_password=False)
+        gi_standardtilgang(self.user)
         self.client = Client()
         self.client.force_login(self.user)
         Forstehjelper.objects.create(name='Behandler A', is_active=True)
@@ -513,6 +520,7 @@ class TimeFormatValidationTests(TestCase):
             username='skriver', password='pass', role='read_write',
             must_change_password=False,
         )
+        gi_standardtilgang(self.user)
         self.client = Client()
         self.client.force_login(self.user)
 
@@ -622,6 +630,7 @@ class PlasseringUniqueTests(TestCase):
             username='skriver', password='pass', role='read_write',
             must_change_password=False,
         )
+        gi_standardtilgang(self.user)
         self.client = Client()
         self.client.force_login(self.user)
 
@@ -841,6 +850,7 @@ class HelsepersonellTests(TestCase):
         self.admin = CustomUser.objects.create_user(
             username='admin', password='pwd', role='admin', must_change_password=False
         )
+        gi_standardtilgang(self.admin)
         self.client = Client()
         self.client.force_login(self.admin)
 
@@ -939,6 +949,7 @@ class HelsepersonellTests(TestCase):
         """Read-write-rolle skal ikke kunne opprette helsepersonell."""
         self.client.logout()
         rw = CustomUser.objects.create_user(username='rw', password='pwd', role='read_write', must_change_password=False)
+        gi_standardtilgang(rw)
         self.client.force_login(rw)
         res = self.client.post(
             '/pasienter/api/helsepersonell/',
@@ -986,7 +997,7 @@ global.document = {
 
     def _run_guard(self, snippet):
         from patients import js_test_utils as jsu
-        harness = jsu.build_harness([(jsu.UTILS_JS, ('withSubmitGuard',))])
+        harness = jsu.build_harness([(jsu.PORTAL_UTILS_JS, ('withSubmitGuard',))])
         return jsu.run_node(harness, snippet, preamble=self.BTN_STUB)
 
     @unittest.skipUnless(shutil.which('node'), 'node er ikke tilgjengelig')
@@ -1063,9 +1074,9 @@ assert(kall === 1, 'knappen var fortsatt laast etter en feilet lagring');
     def test_submit_guard_helper_finnes_i_utils(self):
         """withSubmitGuard må være definert i modulen malen faktisk laster."""
         from patients import js_test_utils as jsu
-        content = jsu.read_js(jsu.UTILS_JS)
+        content = jsu.read_js(jsu.PORTAL_UTILS_JS)
         self.assertIn('async function withSubmitGuard(', content,
-                      'withSubmitGuard-helperen mangler i patients-utils.js')
+                      'withSubmitGuard-helperen mangler i portal-utils.js')
         self.assertIn('dataset.submitting', content,
                       'In-flight lock-mekanismen mangler i withSubmitGuard')
 
@@ -1249,6 +1260,7 @@ class PatientNumberGapTests(TestCase):
             username='testbruker', password='Test1234!', role='admin',
             must_change_password=False,
         )
+        gi_standardtilgang(self.user)
         self.client.login(username='testbruker', password='Test1234!')
         set_active_year(2026)
         # Eksisterende pasient på unik plassering "Behandling 1"
@@ -1305,6 +1317,7 @@ class PabegyntNotBeforeInntidTests(TestCase):
             username='testbruker', password='Test1234!', role='admin',
             must_change_password=False,
         )
+        gi_standardtilgang(self.user)
         self.client.login(username='testbruker', password='Test1234!')
         set_active_year(2026)
         self.forstehjelper = Forstehjelper.objects.create(name='Lege Hansen')
@@ -1392,6 +1405,7 @@ class BlankInntidFallbackTests(TestCase):
             username='testbruker', password='Test1234!', role='admin',
             must_change_password=False,
         )
+        gi_standardtilgang(self.user)
         self.client.login(username='testbruker', password='Test1234!')
         set_active_year(2026)
 
@@ -1453,6 +1467,7 @@ class SettingsWhitelistTests(TestCase):
             username='lesebruker', password='testpass123',
             role='read_only', must_change_password=False,
         )
+        gi_standardtilgang(self.bruker)
         self.client.login(username='lesebruker', password='testpass123')
 
     def _get(self):
@@ -1496,27 +1511,32 @@ class SettingsWhitelistTests(TestCase):
         data = self._get()
         self.assertEqual(data.get('active_year'), str(aar))
 
-    def test_put_kan_ikke_skrive_utenfor_sin_egen_whitelist(self):
-        """PUT-lista er smalere enn lese-lista og skal forbli det."""
+    def test_put_finnes_ikke_lenger(self):
+        """Skrivingen flyttet til /portal-admin/innstillinger/ (§4.1).
+
+        Whitelisten for PUT er borte sammen med metoden. Lese-whitelisten står
+        igjen og er fortsatt vernet av testene over — den er den som avgjør hva
+        en `les`-bruker får se.
+
+        Endepunktet svarer 405, ikke 403: metoden finnes ikke, tilgangen er i
+        orden. Den forskjellen er verdt å beholde i svaret.
+        """
         skriver = CustomUser.objects.create_user(
             username='skriver', password='testpass123',
             role='read_write', must_change_password=False,
         )
+        gi_standardtilgang(skriver)
         self.client.force_login(skriver)
 
-        foer = AppSetting.get('active_year', None)
+        foer = AppSetting.get('event_name', None)
         resp = self.client.put(
             '/pasienter/api/settings/',
-            data=json.dumps({'active_year': 1999, 'event_name': 'Nytt navn'}),
+            data=json.dumps({'event_name': 'Nytt navn'}),
             content_type='application/json',
         )
-        self.assertEqual(resp.status_code, 200)
-        self.assertEqual(AppSetting.get('active_year', None), foer,
-                         'active_year skal ikke kunne settes via PUT /api/settings/')
-        self.assertEqual(AppSetting.get('event_name', None), 'Nytt navn')
+        self.assertEqual(resp.status_code, 405)
+        self.assertEqual(AppSetting.get('event_name', None), foer)
 
-
-@override_settings(SECURE_SSL_REDIRECT=False, RATELIMIT_ENABLE=False)
 class HeaderArrangementNavnTests(TestCase):
     """Headeren skal vise riktig arrangementsnavn med én gang.
 
@@ -1531,6 +1551,7 @@ class HeaderArrangementNavnTests(TestCase):
             username='vaktbruker', password='testpass123',
             role='read_write', must_change_password=False,
         )
+        gi_standardtilgang(self.bruker)
         self.client.login(username='vaktbruker', password='testpass123')
 
     def test_arrangementsnavn_rendres_server_side(self):
@@ -1565,12 +1586,25 @@ class HeaderArrangementNavnTests(TestCase):
             self.assertNotIn(markor, innhold,
                              f'Uparset template-syntaks i responsen: {markor}')
 
-    def test_innstillingsfeltet_er_forhaandsutfylt(self):
-        """Feltet i innstillinger skal ha samme verdi som headeren."""
-        AppSetting.set('event_name', 'Festivalen 2026')
+    def test_innstillingsfeltet_ligger_i_portal_admin(self):
+        """Redigeringsfeltet flyttet ut av pasientmodulen (§4.1).
+
+        Arrangementsnavnet er en portalinnstilling: det gjelder vakten, som
+        med flere moduler dekker mer enn pasientregistreringen. Feltet krevde
+        dessuten global admin, og et admin-endepunkt inne i en modul sier at
+        modulgrensen ikke betyr noe.
+        """
         resp = self.client.get('/pasienter/')
-        self.assertContains(resp, 'id="setting-event-name" class="form-control" '
-                                  'value="Festivalen 2026"')
+        self.assertNotContains(resp, 'id="setting-event-name"')
+        # Lenken rendres kun for global admin — kortet er server-side gatet.
+        self.assertNotContains(resp, '/portal-admin/innstillinger/')
+
+        admin = CustomUser.objects.create_user(
+            username='arr_admin', password='x', role='admin',
+            must_change_password=False)
+        c = Client()
+        c.force_login(admin)
+        self.assertContains(c.get('/pasienter/'), '/portal-admin/innstillinger/')
 
     def test_navnet_escapes_i_templaten(self):
         """Arrangementsnavnet er fritekst fra innstillingene."""
@@ -1604,6 +1638,7 @@ class NavneregisterFeilmeldingTests(TestCase):
             username='admin_navn', password='testpass123',
             role='admin', must_change_password=False,
         )
+        gi_standardtilgang(self.admin)
         self.client.force_login(self.admin)
 
     def _post(self, sti, navn):
@@ -1666,19 +1701,23 @@ class NavneregisterFeilmeldingTests(TestCase):
 
 @override_settings(SECURE_SSL_REDIRECT=False, RATELIMIT_ENABLE=False)
 class JsModulLastingTests(TestCase):
-    """Betinget lasting av patients-stats.js (F7).
+    """Betinget lasting av patients-admin.js (F7).
 
-    Fila er større enn de tre andre til sammen og brukes kun av roller med
-    statistikktilgang. Den lastes derfor ikke for `read_only` og `read_write`.
+    Fila het patients-stats.js og ble lastet for admin, lead og lead_view.
+    Da statistikk ble egen modul, ble renderingen flyttet til statistikk.js
+    og det som ble igjen er utelukkende admin-handlinger: registeradmin,
+    sesjonstimeout, nullstilling og vaktarkivet. Hvert av de endepunktene
+    krever `role='admin'` server-side, så lead og lead_view lastet ~370
+    linjer de aldri kunne bruke. Fila lastes derfor kun for admin nå.
 
-    Fellen: bootstrappen — `DOMContentLoaded`, faneskift, auto-refresh og
-    lasterne for navneregistrene — lå i patients-stats.js. Å laste den
-    betinget uten å flytte bootstrappen først ville tatt ned hele appen for
-    de to rollene. Testene her vokter skillet.
+    Fellen er den samme som før: bootstrappen — `DOMContentLoaded`,
+    faneskift, auto-refresh og lasterne for navneregistrene — lå opprinnelig
+    i den betinget lastede modulen. Å laste den betinget uten å flytte
+    bootstrappen ville tatt ned hele appen for alle andre enn admin.
     """
 
-    STATS_ROLLER = ('admin', 'lead', 'lead_view')
-    ANDRE_ROLLER = ('read_only', 'read_write')
+    ADMIN_ROLLER = ('admin',)
+    ANDRE_ROLLER = ('read_only', 'read_write', 'lead_view', 'lead')
 
     @staticmethod
     def _monster(modul):
@@ -1699,6 +1738,7 @@ class JsModulLastingTests(TestCase):
             username=f'bruker_{rolle}', password='testpass123',
             role=rolle, must_change_password=False,
         )
+        gi_standardtilgang(bruker)
         self.client.force_login(bruker)
         resp = self.client.get('/pasienter/')
         self.assertEqual(resp.status_code, 200)
@@ -1706,37 +1746,50 @@ class JsModulLastingTests(TestCase):
 
     def test_app_modulen_lastes_for_alle_roller(self):
         """Bootstrappen må lastes uansett rolle — ellers starter ikke appen."""
-        for rolle in self.STATS_ROLLER + self.ANDRE_ROLLER:
+        for rolle in self.ADMIN_ROLLER + self.ANDRE_ROLLER:
             with self.subTest(rolle=rolle):
                 self.assertRegex(self._hent_som(rolle),
                                  self._monster('patients-app'))
 
-    def test_statistikkmodulen_lastes_kun_for_stats_roller(self):
-        for rolle in self.STATS_ROLLER:
+    def test_portal_utils_lastes_for_alle_roller(self):
+        """Primitivene må ligge under alt annet, for alle roller.
+
+        patients-utils.js kaller fmtMin() og escapeHtml() derfra. Lastes de
+        ikke, feiler pasientsiden for alle — ikke bare for én rolle.
+        """
+        for rolle in self.ADMIN_ROLLER + self.ANDRE_ROLLER:
             with self.subTest(rolle=rolle):
                 self.assertRegex(self._hent_som(rolle),
-                                 self._monster('patients-stats'))
+                                 self._monster('portal-utils'))
 
-    def test_statistikkmodulen_lastes_ikke_for_lavere_roller(self):
+    def test_adminmodulen_lastes_kun_for_admin(self):
+        for rolle in self.ADMIN_ROLLER:
+            with self.subTest(rolle=rolle):
+                self.assertRegex(self._hent_som(rolle),
+                                 self._monster('patients-admin'))
+
+    def test_adminmodulen_lastes_ikke_for_lavere_roller(self):
+        """Også lead og lead_view: de mistet fila da statistikken flyttet."""
         for rolle in self.ANDRE_ROLLER:
             with self.subTest(rolle=rolle):
                 self.assertNotRegex(self._hent_som(rolle),
-                                    self._monster('patients-stats'))
+                                    self._monster('patients-admin'))
 
-    def test_alltid_lastede_moduler_refererer_ikke_til_statistikkmodulen(self):
+    def test_alltid_lastede_moduler_refererer_ikke_til_adminmodulen(self):
         """Selve vernet: ingen direkte referanse fra alltid-lastet kode.
 
-        En `read_only`-bruker har ikke patients-stats.js. Kaller bootstrappen
+        En `read_only`-bruker har ikke patients-admin.js. Kaller bootstrappen
         en funksjon derfra direkte, får hun ReferenceError og appen stopper.
         Slike kall må gå via `_kall()`, som sjekker at funksjonen finnes.
         """
         from patients import js_test_utils as jsu
 
-        stats_navn = set(re.findall(
-            r'^(?:async )?function (\w+)', jsu.read_js(jsu.STATS_JS), re.M))
-        self.assertIn('loadStats', stats_navn, 'testen leser feil fil')
+        admin_navn = set(re.findall(
+            r'^(?:async )?function (\w+)', jsu.read_js(jsu.ADMIN_JS), re.M))
+        self.assertIn('lagreVaktSomArkiv', admin_navn, 'testen leser feil fil')
 
-        alltid = [jsu.UTILS_JS, jsu.TABLE_JS, jsu.FORMS_JS, jsu.APP_JS]
+        alltid = [jsu.PORTAL_UTILS_JS, jsu.UTILS_JS, jsu.TABLE_JS,
+                  jsu.FORMS_JS, jsu.APP_JS]
         funn = []
         for sti in alltid:
             kilde = jsu.read_js(sti)
@@ -1744,29 +1797,214 @@ class JsModulLastingTests(TestCase):
             # `toggleForstehjelper()` trenger et tall, er ikke et kall.
             kilde = '\n'.join(
                 l for l in kilde.splitlines() if not l.lstrip().startswith('//'))
-            # `_kall('loadStats')` er den godkjente veien — strengen teller ikke.
+            # `_kall('renderForstehjelperAdmin')` er den godkjente veien —
+            # strengen teller ikke.
             kilde = re.sub(r"_kall\(\s*'[^']+'", "_kall(", kilde)
-            for navn in stats_navn:
+            for navn in admin_navn:
                 if re.search(r'\b' + re.escape(navn) + r'\s*\(', kilde):
                     funn.append(f'{sti.name}: {navn}()')
 
         self.assertEqual(sorted(funn), [], (
-            'Alltid-lastet kode kaller funksjoner som bor i patients-stats.js:\n  '
+            'Alltid-lastet kode kaller funksjoner som bor i patients-admin.js:\n  '
             + '\n  '.join(sorted(funn))
-            + '\n\npatients-stats.js lastes ikke for read_only/read_write. Flytt '
-              'funksjonen til patients-app.js, eller kall den via _kall().'
+            + '\n\npatients-admin.js lastes kun for admin. Flytt funksjonen til '
+              'patients-app.js, eller kall den via _kall().'
         ))
 
-    def test_write_only_handler_er_alltid_tilgjengelig(self):
-        """`read_write` har skrivetilgang, men ikke statistikktilgang.
+    def test_statistikksiden_bruker_bare_primitiver_den_faktisk_laster(self):
+        """statistikk.js laster IKKE patients-utils.js — og kan ikke.
 
-        Lagre-knappen for arrangementsnavn er `write-only`, altså synlig for
-        read_write — som ikke laster patients-stats.js. `saveEventName` må
-        derfor ligge i patients-app.js.
+        patients-utils.js gjør arbeid på toppnivå: den setter Chart.defaults
+        og kaller `new bootstrap.Modal(document.getElementById('newModal'))`.
+        På statistikksiden finnes ikke #newModal, så fila ville kastet ved
+        lasting. Derfor må alt statistikk.js kaller ligge i portal-utils.js
+        eller i statistikk.js selv.
+
+        Dette er ikke hypotetisk: `fmtMin()` lå igjen i patients-utils.js ved
+        delingen, og statistikksiden ville kastet ReferenceError på hver
+        varighet den skulle vise.
         """
         from patients import js_test_utils as jsu
-        self.assertIn('function saveEventName(', jsu.read_js(jsu.APP_JS))
-        self.assertNotIn('function saveEventName(', jsu.read_js(jsu.STATS_JS))
+
+        def definerte(sti):
+            kilde = jsu.read_js(sti)
+            return (set(re.findall(r'^(?:async )?function (\w+)', kilde, re.M))
+                    | set(re.findall(r'^(?:let|const|var) (\w+)', kilde, re.M)))
+
+        tilgjengelig = definerte(jsu.PORTAL_UTILS_JS) | definerte(jsu.STATISTIKK_JS)
+        kun_i_patients = definerte(jsu.UTILS_JS) - tilgjengelig
+
+        statistikk_src = jsu.read_js(jsu.STATISTIKK_JS)
+        # Ordet må stå som et kall eller et oppslag, ikke inne i en streng
+        # som `<table class="stats-table">` — der er `table` bare markup.
+        funn = [navn for navn in sorted(kun_i_patients)
+                if re.search(r'\b' + re.escape(navn) + r'\s*\(', statistikk_src)]
+
+        self.assertEqual(funn, [], (
+            'statistikk.js kaller funksjoner som kun finnes i '
+            'patients-utils.js:\n  ' + '\n  '.join(funn)
+            + '\n\nDen fila lastes ikke på /statistikk/. Flytt helperen til '
+              'portal-utils.js.'
+        ))
+
+    # ── Avhengigheter en side faktisk leverer ───────────────────────────
+    #
+    # Begge feilene som traff staging 28. aug. var samme klasse: kode flyttet
+    # til en side som ikke gir den det den trenger. Ingen av dem ga
+    # syntaksfeil, og ingen av dem ble fanget av testene over — som
+    # sammenligner bare navn, ikke `window.`-oppslag eller CDN-globaler.
+    #
+    #   1. `Chart.defaults` sto igjen på toppnivå i patients-utils.js etter at
+    #      pasientsiden sluttet å laste Chart.js. ReferenceError drepte resten
+    #      av fila, og «Ny pasient» sluttet å virke.
+    #   2. `loadStats()` leste `window.USER_ROLE`, som bare pasientmalen
+    #      setter. På /statistikk/ falt den til 'read_only' og returnerte før
+    #      første hent — statistikken var permanent tom, uten én feilmelding.
+
+    # Globaler nettleseren selv eier. Alt annet på `window.` må settes av malen.
+    NETTLESER_GLOBALER = frozenset({
+        'location', 'history', 'localStorage', 'sessionStorage', 'navigator',
+        'document', 'confirm', 'alert', 'prompt', 'open', 'print', 'crypto',
+        'innerWidth', 'innerHeight', 'matchMedia', 'scrollTo', 'setTimeout',
+        'setInterval', 'clearTimeout', 'clearInterval', 'addEventListener',
+        'removeEventListener', 'fetch', 'getComputedStyle', 'requestAnimationFrame',
+    })
+
+    BIBLIOTEK_GLOBALER = ('Chart', 'Tabulator', 'bootstrap')
+
+    # Sidene med egen JS-lastekjede. Verdien utledes fra malen, ikke herfra —
+    # lista sier bare hvilke maler som er sider.
+    SIDEMALER = ('patients/index.html', 'statistikk/index.html')
+
+    @staticmethod
+    def _uten_kommentarer(kilde):
+        """Strip `//`-linjer. En kommentar som nevner Chart er ikke en bruk."""
+        return '\n'.join(l for l in kilde.splitlines()
+                          if not l.lstrip().startswith('//'))
+
+    def _mal(self, navn):
+        from pathlib import Path
+        from django.conf import settings
+        rot = Path(settings.BASE_DIR)
+        for kandidat in [rot / 'templates' / navn] + [d / navn for d in rot.glob('*/templates')]:
+            if kandidat.exists():
+                return kandidat
+        self.fail(f'Fant ikke malen {navn}')
+
+    def _lastekjede(self, navn, sett=None):
+        """(JS-filer, CDN-biblioteker, malmarkup) malen har, arv inkludert."""
+        from django.conf import settings
+        from pathlib import Path
+        sett = sett if sett is not None else set()
+        sti = self._mal(navn)
+        if sti in sett:
+            return set(), set(), ''
+        sett.add(sti)
+
+        markup = sti.read_text(encoding='utf-8')
+
+        # Bare faktiske <script>-tagger, ikke rå markup: en {% comment %}
+        # som forklarer at Chart.js IKKE lastes lenger, inneholder strengen
+        # «Chart.js» — og en tekstsøk-variant av denne testen leste den som
+        # bevis på det motsatte.
+        #
+        # Hele taggen matches, ikke `src`-verdien. `src="{% static 'js/x.js' %}"`
+        # har enkeltfnutter inne i doble, og et `src=["\']([^"\']+)["\']`
+        # stopper på den første indre fnutten. Da blir lista tom og testen
+        # grønn uten å sammenligne noe — verre enn å mangle.
+        skript = re.findall(r'<script\b[^>]*>', markup, re.I)
+        js = {m.group(1) for tag in skript
+              for m in [re.search(r"\{%\s*static\s*['\"]js/([\w.-]+)['\"]", tag)] if m}
+        cdn = {lib for lib, monster in (
+            ('Chart', r'chart\.umd|chart\.js'),
+            ('Tabulator', r'tabulator'),
+            ('bootstrap', r'bootstrap[.@][\w.]*bundle|bootstrap\.bundle'),
+        ) if any(re.search(monster, tag, re.I) for tag in skript)}
+
+        forelder = re.search(r'\{%\s*extends\s*["\']([^"\']+)["\']', markup)
+        if forelder:
+            aj, ac, am = self._lastekjede(forelder.group(1), sett)
+            js |= aj
+            cdn |= ac
+            markup += '\n' + am
+        return js, cdn, markup
+
+    def test_js_leser_bare_window_globaler_malen_setter(self):
+        """En `window.X` som malen ikke setter er `undefined`, ikke en feil.
+
+        Det er nettopp derfor den er farlig: koden tar en stille default og
+        gjør noe annet enn den skal, uten at noe kaster.
+        """
+        from pathlib import Path
+        from django.conf import settings
+        js_dir = Path(settings.BASE_DIR) / 'static' / 'js'
+        funn = []
+
+        for malnavn in self.SIDEMALER:
+            js_filer, _, markup = self._lastekjede(malnavn)
+            satt = set(re.findall(r'window\.(\w+)\s*=', markup))
+            for navn in sorted(js_filer):
+                fil = js_dir / navn
+                if not fil.exists():
+                    continue
+                lest = set(re.findall(r'window\.(\w+)',
+                                      self._uten_kommentarer(fil.read_text(encoding='utf-8'))))
+                for g in sorted(lest - satt - self.NETTLESER_GLOBALER):
+                    funn.append(f'{malnavn} laster {navn}, som leser window.{g} — '
+                                f'men malen setter den ikke')
+
+        self.assertEqual(funn, [], (
+            'JS leser globaler malen ikke setter:\n  ' + '\n  '.join(funn)
+            + '\n\nSett globalen i malen, eller flytt koden til en side som har den.'
+        ))
+
+    def test_js_bruker_bare_biblioteker_siden_faktisk_laster(self):
+        """Bruk av `Chart`/`Tabulator`/`bootstrap` krever at siden laster dem.
+
+        Toppnivåbruk kaster ved lasting og tar med seg resten av fila — alt
+        som er erklært under, finnes ikke etterpå. Testen skiller ikke på
+        toppnivå og inne i en funksjon: en funksjon som trenger Chart er
+        uansett ubrukelig på en side uten Chart.
+        """
+        from pathlib import Path
+        from django.conf import settings
+        js_dir = Path(settings.BASE_DIR) / 'static' / 'js'
+        funn = []
+
+        for malnavn in self.SIDEMALER:
+            js_filer, cdn, _ = self._lastekjede(malnavn)
+            for navn in sorted(js_filer):
+                fil = js_dir / navn
+                if not fil.exists():
+                    continue
+                kode = self._uten_kommentarer(fil.read_text(encoding='utf-8'))
+                for lib in self.BIBLIOTEK_GLOBALER:
+                    if lib in cdn:
+                        continue
+                    if re.search(r'(?<![.\w$])' + lib + r'\s*[.(]', kode):
+                        funn.append(f'{malnavn} laster {navn}, som bruker {lib} — '
+                                    f'men siden laster ikke {lib}')
+
+        self.assertEqual(funn, [], (
+            'JS bruker biblioteker siden ikke laster:\n  ' + '\n  '.join(funn)
+            + '\n\nLast biblioteket i malen, eller flytt koden dit det finnes.'
+        ))
+
+    def test_lasterne_ligger_i_alltid_lastet_modul(self):
+        """Alt en ikke-admin kan nå må ligge i en alltid-lastet fil.
+
+        `saveEventName` var eksempelet her fram til §4.1 flyttet
+        arrangementsnavnet til portal-admin. Lasterne for pasientlista og
+        navneregistrene er den samme regelen: de kjøres for alle roller, og
+        ligger derfor i patients-app.js, ikke i patients-admin.js.
+        """
+        from patients import js_test_utils as jsu
+        app = jsu.read_js(jsu.APP_JS)
+        admin = jsu.read_js(jsu.ADMIN_JS)
+        for navn in ('loadSettings', 'loadForstehjelpere', 'loadHelsepersonell'):
+            with self.subTest(funksjon=navn):
+                self.assertIn(f'function {navn}(', app)
+                self.assertNotIn(f'function {navn}(', admin)
 
 
 class InlineHandlerTests(SimpleTestCase):
@@ -1808,8 +2046,9 @@ class InlineHandlerTests(SimpleTestCase):
         from patients import js_test_utils as jsu
 
         funn = []
-        for sti in (jsu.UTILS_JS, jsu.TABLE_JS, jsu.FORMS_JS,
-                    jsu.APP_JS, jsu.STATS_JS):
+        for sti in (jsu.PORTAL_UTILS_JS, jsu.UTILS_JS, jsu.TABLE_JS,
+                    jsu.FORMS_JS, jsu.APP_JS, jsu.ADMIN_JS,
+                    jsu.STATISTIKK_JS):
             for nr, linje in enumerate(
                     jsu.read_js(sti).splitlines(), 1):
                 for treff in re.findall(r'\son([a-z]+)="', linje):
@@ -1828,11 +2067,13 @@ class InlineHandlerTests(SimpleTestCase):
         streng, ville funksjonen returnert uten å gjøre noe — og uten feil.
         """
         from patients import js_test_utils as jsu
-        app = jsu.read_js(jsu.APP_JS)
-        self.assertIn('Number(el.dataset.id)', app)
+        # Delegeringen flyttet til portal-utils.js da statistikksiden fikk
+        # behov for den samme mekanismen («tilbake til live-statistikk»).
+        portal = jsu.read_js(jsu.PORTAL_UTILS_JS)
+        self.assertIn('Number(el.dataset.id)', portal)
 
-        stats = jsu.read_js(jsu.STATS_JS)
-        self.assertIn('data-id="${b.id}"', stats,
+        admin = jsu.read_js(jsu.ADMIN_JS)
+        self.assertIn('data-id="${b.id}"', admin,
                       'admin-registrene må sende id som data-id, ikke data-arg')
 
 
@@ -1851,6 +2092,7 @@ class PasientlisteYtelseTests(TestCase):
             username='poller', password='testpass123',
             role='read_write', must_change_password=False,
         )
+        gi_standardtilgang(self.bruker)
         self.client.force_login(self.bruker)
 
     def _lag_pasienter(self, antall):

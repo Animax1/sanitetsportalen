@@ -4,6 +4,7 @@ Hoved-URL-konfigurasjon for Sanitetsportalen.
 Struktur (fra Fase 2):
 - /                  → core (portal-dashboard + legacy-redirects)
 - /pasienter/        → patients-appen (alle gamle /api/... og /admin/server-status/...)
+- /statistikk/       → statistikk-appen (samlet statistikk på tvers av moduler)
 - /accounts/         → innlogging og passordbytte
 - /portal-admin/     → all administrasjon (brukere, moduler, logger, backup, status)
 - /healthz/          → health-check (ingen auth, brukes av Railway)
@@ -46,6 +47,10 @@ urlpatterns = [
     # OBS: må stå FØR core fordi core inneholder legacy-redirects som ellers
     # ville fanget /api/... og /admin/server-status/... under root.
     path('pasienter/', include('patients.urls')),
+
+    # Statistikk (skilt ut fra pasientmodulen august 2026). Må stå FØR core
+    # av samme grunn som patients: core sine legacy-redirects fanger /api/...
+    path('statistikk/', include('statistikk.urls')),
 
     # Sanitetsportal-skall (dashboard + legacy-redirects)
     # Mountet på '' så portal-dashboardet ligger på /.

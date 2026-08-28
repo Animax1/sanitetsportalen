@@ -23,6 +23,7 @@ from patients.services import (
     compute_arkiv_stats,
     kollaps_arkiv,
 )
+from accounts.test_helpers import gi_standardtilgang
 
 User = get_user_model()
 
@@ -40,6 +41,7 @@ class KollapsTestMixin:
             username='arkivar', password='passord', role='admin',
             must_change_password=False,
         )
+        gi_standardtilgang(self.admin)
 
     def _lag_pasienter(self):
         """Tre pasienter med tidsdata, så statistikken blir ikke-triviell."""
@@ -221,7 +223,7 @@ class KollapsIntegritetTests(KollapsTestMixin, TestCase):
 
         c = Client()
         c.force_login(self.admin)
-        resp = c.get(f'/pasienter/api/innstillinger/arkiv/{arkiv.pk}/full-stats/')
+        resp = c.get(f'/statistikk/api/arkiv/{arkiv.pk}/full-stats/')
 
         self.assertEqual(resp.status_code, 200)
         self.assertEqual(resp.json()['summary']['total'], 3)

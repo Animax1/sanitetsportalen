@@ -6,13 +6,14 @@ import hashlib
 import json as _jmod
 import logging
 
-from django.contrib.auth.decorators import login_required
 from django.http import JsonResponse
 from django.views.decorators.http import require_http_methods
 
+from core.auth_decorators import modul_kreves
+
 from .services import (
     has_role_at_least, ARKIV_VIEW_MIN_ROLE, ARKIV_WRITE_ROLE,
-    arkiver_aktiv_vakt, compute_arkiv_stats, compute_arkiv_full_stats,
+    arkiver_aktiv_vakt, compute_arkiv_stats,
 )
 from .views_common import _json_body
 
@@ -41,7 +42,7 @@ def _log_audit(request, action, detail):
 # VAKTARKIV – database-basert arkiv av vakter
 # ════════════════════════════════════════════════════════════════════════
 
-@login_required
+@modul_kreves('patients', 'les', svar='json')
 @require_http_methods(['POST'])
 def arkiv_lagre_view(request):
     """Lagre aktiv vakt som arkiv-snapshot. Kun admin.
@@ -74,7 +75,7 @@ def arkiv_lagre_view(request):
     }, status=201)
 
 
-@login_required
+@modul_kreves('patients', 'les', svar='json')
 @require_http_methods(['GET'])
 def arkiv_liste_view(request):
     """Liste alle arkiver. Krever ARKIV_VIEW_MIN_ROLE (standard: admin).
@@ -97,7 +98,7 @@ def arkiv_liste_view(request):
     return JsonResponse(data, safe=False)
 
 
-@login_required
+@modul_kreves('patients', 'les', svar='json')
 @require_http_methods(['GET', 'DELETE'])
 def arkiv_detalj_view(request, pk):
     """Vis (GET) eller slett (DELETE) et arkiv.
@@ -173,26 +174,3 @@ def arkiv_detalj_view(request, pk):
     arkiv.delete()  # CASCADE sletter ArkivertPasient-rader
     _log_audit(request, 'arkiv_slettet', f'arkiv_id={pk}, tittel={tittel}')
     return JsonResponse({'ok': True})
-
-
-@login_required
-@require_http_methods(['GET'])
-def arkiv_full_stats_view(request, pk):
-    """Returner full statistikk for et arkivert vakt.
-
-    Samme struktur som /api/full-stats/ (chi2, Kruskal-Wallis,
-    krysstabeller, tids-statistikk pr. gruppe, ankomster, obs-stats).
-    Tilgang: ARKIV_VIEW_MIN_ROLE (default admin).
-    """
-    from .models import VaktArkiv
-
-    if not has_role_at_least(request.user, ARKIV_VIEW_MIN_ROLE):
-        return JsonResponse({'error': 'Ingen tilgang'}, status=403)
-
-    try:
-        arkiv = VaktArkiv.objects.get(pk=pk)
-    except VaktArkiv.DoesNotExist:
-        return JsonResponse({'error': 'Arkiv ikke funnet'}, status=404)
-
-    stats = compute_arkiv_full_stats(arkiv)
-    return JsonResponse(stats)

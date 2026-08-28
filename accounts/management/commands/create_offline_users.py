@@ -13,13 +13,22 @@ from pathlib import Path
 from django.conf import settings
 from django.core.management.base import BaseCommand
 
-from accounts.models import CustomUser
+from accounts.models import CustomUser, ModulTilgang
 
 
 OFFLINE_USERS = [
     ('admin-offline', 'admin'),
     ('vakt-offline',  'read_write'),
 ]
+
+# Modultilgang per bruker. `admin-offline` staar oppfoert med tom liste fordi
+# global admin ikke bruker ModulTilgang i det hele tatt — ikke fordi den er
+# glemt. `vakt-offline` trenger raden: uten den ser feltmaskinen en tom portal,
+# og det oppdages i det den skal brukes.
+OFFLINE_TILGANG = {
+    'admin-offline': [],
+    'vakt-offline':  [('patients', 'skriv_full')],
+}
 
 PASSWORD_FILE = Path(settings.BASE_DIR) / 'OFFLINE_PASSORD.md'
 
@@ -53,6 +62,11 @@ class Command(BaseCommand):
                 username=username,
                 defaults={'role': role, 'must_change_password': False, 'mfa_required': False},
             )
+            for slug, nivaa in OFFLINE_TILGANG.get(username, []):
+                ModulTilgang.objects.update_or_create(
+                    bruker=user, modul_slug=slug, defaults={'nivaa': nivaa},
+                )
+
             if created or rotate:
                 pw = _generate_password()
                 user.set_password(pw)

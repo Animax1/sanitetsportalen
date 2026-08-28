@@ -37,7 +37,8 @@ django_project/
 │   ├── middleware.py        – BackupSchedulerMiddleware + SecurityHeadersMiddleware
 │   ├── signals.py  – Audit-logging av feltendringer
 │   └── tests*.py   – Kjernetester, backuptester, schedulertester, offline-tester
-├── static/         – CSS og JavaScript (script.js)
+├── statistikk/     – Statistikkmodulen (/statistikk/), skilt ut fra patients aug. 2026
+├── static/         – CSS og JavaScript
 └── templates/      – HTML-maler
 ```
 
@@ -77,6 +78,12 @@ django_project/
 | lead_view  | ✓             | –      | ✓          | –     | –                        |
 | lead       | ✓             | ✓      | ✓          | –     | –                        |
 | admin      | ✓             | ✓      | ✓          | ✓     | ✓                        |
+
+«Statistikk» er egen modul på `/statistikk/` siden august 2026. Rettighetene i tabellen er
+uendret — kolonnen peker nå på en modul i stedet for en fane i pasientmodulen.
+
+Modellen er under omlegging til tilgangsnivå per modul (`ModulTilgang`, nivåene
+`les < skriv < leder`), se «Rollemodellen» i [`TODO.md`](./TODO.md).
 
 ---
 
@@ -254,6 +261,7 @@ python manage.py test patients accounts audit -v 2
 | offline                | 34     | SQLite-isolasjon, import av offline-data        |
 | admin server-status    | 19     | Metrics-ringbuffer, dashbord, feature-flags     |
 | stats-cache + ETag     | 14     | Cache-TTL, ETag/304, invalidering               |
+| statistikk             | 17     | Modultilgang, flyttede endepunkt, videresending  |
 
 ---
 

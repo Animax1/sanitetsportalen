@@ -1,38 +1,3 @@
-// ════════════════════════════════════════════════════════
-// CSRF & API HELPERS  (Django-specific)
-// ════════════════════════════════════════════════════════
-
-function getCsrfToken() {
-  const name = 'csrftoken';
-  const cookies = document.cookie.split(';');
-  for (let c of cookies) {
-    const trimmed = c.trim();
-    if (trimmed.startsWith(name + '=')) {
-      return decodeURIComponent(trimmed.slice(name.length + 1));
-    }
-  }
-  const holder = document.getElementById('csrf-token-holder');
-  if (holder) {
-    const input = holder.querySelector('input[name="csrfmiddlewaretoken"]');
-    if (input) return input.value;
-  }
-  return '';
-}
-
-async function apiFetch(url, options = {}) {
-  const method = (options.method || 'GET').toUpperCase();
-  const headers = { ...(options.headers || {}) };
-
-  if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(method)) {
-    headers['X-CSRFToken'] = getCsrfToken();
-  }
-
-  if (options.body && !(options.body instanceof FormData) && !headers['Content-Type']) {
-    headers['Content-Type'] = 'application/json';
-  }
-
-  return fetch(url, { ...options, headers });
-}
 
 // ════════════════════════════════════════════════════════
 // IDEMPOTENS-NØKKEL (F3)
@@ -62,106 +27,34 @@ function nyIdempotensNokkel() {
   return 'k' + Date.now().toString(36) + Math.random().toString(36).slice(2, 12);
 }
 
-// ════════════════════════════════════════════════════════
-// SUBMIT GUARD (forhindrer dobbeltklikk-registrering)
-// ════════════════════════════════════════════════════════
-
-async function withSubmitGuard(buttonId, fn, opts = {}) {
-  const minLockMs = opts.minLockMs ?? 250;
-  const btn = document.getElementById(buttonId);
-
-  if (btn && btn.dataset.submitting === '1') {
-    return;
-  }
-
-  let originalHtml = null;
-  if (btn) {
-    btn.dataset.submitting = '1';
-    btn.disabled = true;
-    originalHtml = btn.innerHTML;
-    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>Lagrer…';
-  }
-
-  const startedAt = Date.now();
-  try {
-    return await fn();
-  } finally {
-    const elapsed = Date.now() - startedAt;
-    if (elapsed < minLockMs) {
-      await new Promise(r => setTimeout(r, minLockMs - elapsed));
-    }
-    if (btn) {
-      btn.disabled = false;
-      delete btn.dataset.submitting;
-      if (originalHtml !== null) btn.innerHTML = originalHtml;
-    }
-  }
-}
 
 // ════════════════════════════════════════════════════════
 // ROLE-BASED VISIBILITY
 // ════════════════════════════════════════════════════════
 
-function applyRoleVisibility() {
-  const role = (window.USER_ROLE || 'read_only').toLowerCase();
-
-  const canWrite = role === 'admin' || role === 'lead' || role === 'read_write';
-  const canStats = role === 'admin' || role === 'lead' || role === 'lead_view';
-  const canList  = role !== 'read_only';
-  const isAdmin  = role === 'admin';
-
-  if (!canWrite) {
-    document.querySelectorAll('.write-only').forEach(el => {
-      el.style.display = 'none';
-    });
-  }
-
-  if (!canStats) {
-    document.querySelectorAll('.stats-only').forEach(el => {
-      el.style.display = 'none';
-    });
-  }
-
-  if (!canList) {
-    document.querySelectorAll('.list-only').forEach(el => {
-      el.style.display = 'none';
-    });
-    document.querySelectorAll('[data-tab="liste"]').forEach(el => el.classList.remove('active'));
-    const listePanel = document.getElementById('tab-liste');
-    if (listePanel) listePanel.classList.remove('active');
-    const tavleLink = document.querySelector('[data-tab="tavle"]');
-    if (tavleLink) tavleLink.classList.add('active');
-    const tavlePanel = document.getElementById('tab-tavle');
-    if (tavlePanel) tavlePanel.classList.add('active');
-  }
-
-  if (!isAdmin) {
-    document.querySelectorAll('.admin-only').forEach(el => {
-      el.style.display = 'none';
-    });
-  }
+// Modulnivået, lest fra globalen malen setter (§7.4). Rollen sier ikke noe om
+// hva du får gjøre i en modul.
+//
+// **Standarden er ingen tilgang.** Mangler globalen, oppfører koden seg som om
+// brukeren ikke har noe.
+//
+// `applyRoleVisibility()` sto her og skjulte `.write-only`, `.admin-only` og
+// `.list-only` i nettleseren. Alle tre rendres nå server-side i stedet:
+// markupen — inkludert URL-ene til admin-sidene — lå i HTML-en for enhver som
+// kunne lese modulen. Endepunktene var gatet, så det var ingen tilgangsgrense,
+// men det er ingen grunn til å sende noe vi vet mottakeren ikke skal ha.
+function modulNivaa() {
+  return ((window.MODUL_TILGANG || {}).patients || '').toLowerCase();
 }
 
 // ════════════════════════════════════════════════════════
 // STATE & MODALS
 // ════════════════════════════════════════════════════════
+// Chart.js-temaet og statistikktilstanden lå her fram til statistikk ble egen
+// modul. De hører til statistikk.js nå — pasientsiden laster ikke Chart.js.
 let table = null;
-let charts = {};
 let currentEditId = null;
 let nyPasientNokkel = null;   // F3: settes av openNewModal()
-const chartDarkText = '#f8fafc';
-const chartMainText = '#e5e7eb';
-const chartMutedText = '#cbd5e1';
-const chartSoftText = '#94a3b8';
-const chartGrid = 'rgba(148, 163, 184, 0.18)';
-const chartGridStrong = 'rgba(148, 163, 184, 0.28)';
-const chartTooltipBg = '#0b1220';
-const chartCanvasBorder = '#111827';
-
-Chart.defaults.color = chartMutedText;
-Chart.defaults.borderColor = chartGrid;
-Chart.defaults.font.family = '"Segoe UI", system-ui, sans-serif';
-Chart.defaults.font.size = 11;
 
 let activeFilter = 'alle';
 let allPatients = [];
@@ -175,12 +68,6 @@ function isMine(p) {
       && p.helsepersonell_ref.id === window.MY_HELSEPERSONELL_ID) return true;
   return false;
 }
-
-let activeStatTab = 'oversikt';
-let fullStats = null;
-
-let arkivStatsMode = false;
-let arkivStatsMeta = null;
 
 let forstehjelpere = [];
 let helsepersonellListe = [];
@@ -241,12 +128,6 @@ function parseDt(s) {
   return null;
 }
 
-function fmtMin(m) {
-  if (m == null || m < 0) return '–';
-  const h = Math.floor(m / 60), min = Math.round(m % 60);
-  return h > 0 ? `${h}t ${min}m` : `${min}m`;
-}
-
 function updateTotal() {
   const t1 = parseDt(document.getElementById('e-inntid')?.value);
   const t2 = parseDt(document.getElementById('e-utskrevet')?.value);
@@ -268,45 +149,3 @@ function stampUtskrevet() {
 
 document.getElementById('e-inntid')?.addEventListener('input', updateTotal);
 
-function escapeHtml(s) {
-  return String(s || '').replace(/[&<>"']/g, c => ({
-    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
-  }[c]));
-}
-
-function _escHtml(str) {
-  if (!str) return '';
-  return String(str)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
-}
-
-// escapeHtml() og _escHtml() returnerer tom streng for alt falsy, slik at
-// tomme felt blir borte i stedet for å vises som "null". I tabellceller er
-// det feil: tallet 0 er en helt gyldig verdi som skal vises. escHtmlValue()
-// skiller derfor på «ikke satt» (null/undefined) og «falsy, men en verdi».
-function escHtmlValue(v) {
-  if (v === null || v === undefined) return '';
-  return String(v).replace(/[&<>"']/g, c => ({
-    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
-  }[c]));
-}
-
-// Marker for HTML vi har bygget selv og som derfor skal settes inn uendret.
-// Tabell-byggerne escaper alt de får inn; formatering som `<span>Ja</span>`
-// må pakkes her for å slippe gjennom. Poenget er at det blir et bevisst valg
-// per celle i stedet for en generell åpning for markup.
-function trustedHtml(html) {
-  return { __trustedHtml: String(html) };
-}
-
-// Gjør én celleverdi klar for innsetting: klarert markup slipper gjennom,
-// alt annet escapes.
-function cellHtml(v) {
-  if (v && typeof v === 'object' && typeof v.__trustedHtml === 'string') {
-    return v.__trustedHtml;
-  }
-  return escHtmlValue(v);
-}

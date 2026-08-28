@@ -2,6 +2,7 @@
 from django.test import TestCase, Client, override_settings
 
 from accounts.models import CustomUser
+from accounts.test_helpers import gi_standardtilgang
 
 
 @override_settings(SECURE_SSL_REDIRECT=False, RATELIMIT_ENABLE=False)
@@ -13,6 +14,7 @@ class SecurityHeadersTests(TestCase):
             username='admin', password='pwd', role='admin',
             must_change_password=False,
         )
+        gi_standardtilgang(self.user)
 
     def test_csp_header_er_satt(self):
         resp = self.client.get('/accounts/login/')
@@ -69,6 +71,7 @@ class CspNonceTests(TestCase):
             username='admin_csp', password='pwd', role='admin',
             must_change_password=False,
         )
+        gi_standardtilgang(self.admin)
 
     def _direktiver(self, resp):
         csp = resp.headers['Content-Security-Policy']

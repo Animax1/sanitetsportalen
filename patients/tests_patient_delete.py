@@ -16,6 +16,7 @@ from django.contrib.auth import get_user_model
 
 from patients.models import Patient, AppSetting
 from patients.services import recycle_patient_nr_if_last
+from accounts.test_helpers import gi_standardtilgang
 
 User = get_user_model()
 
@@ -31,6 +32,7 @@ class PatientDeleteSetupMixin:
             role='admin',
             must_change_password=False,
         )
+        gi_standardtilgang(self.admin)
         # Read-write-bruker uten sletterett
         self.rw_user = User.objects.create_user(
             username='rw_delete',
@@ -38,6 +40,7 @@ class PatientDeleteSetupMixin:
             role='read_write',
             must_change_password=False,
         )
+        gi_standardtilgang(self.rw_user)
         # Sett aktivt år
         AppSetting.set('active_year', 2099)
 

@@ -55,3 +55,16 @@ def csp_nonce(request):
     management-kommandoer) ikke kaster.
     """
     return {'csp_nonce': getattr(request, 'csp_nonce', '')}
+
+
+def tilgang(request):
+    """Legg til ``er_global_admin`` i template-context.
+
+    Malene gatet tidligere på ``request.user.role == 'admin'`` direkte. Det
+    virker fortsatt — ``admin`` overlever krympingen av ``role`` i deploy 2 —
+    men det er rollefeltet, og hele poenget med rollemodellen er at maler ikke
+    skal spørre om rollen. Én kilde, og den heter det samme som helperen i
+    ``core.auth_decorators``.
+    """
+    from core.auth_decorators import er_global_admin
+    return {'er_global_admin': er_global_admin(getattr(request, 'user', None))}

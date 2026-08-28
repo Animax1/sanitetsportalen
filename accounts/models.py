@@ -1,7 +1,10 @@
-"""Modeller for brukerkontoer og innloggingshendelser."""
+"""Modeller for brukerkontoer, modultilgang og innloggingshendelser."""
+from django.conf import settings
 from django.contrib.auth.models import AbstractBaseUser, PermissionsMixin
 from django.db import models
 from django.utils import timezone
+
+from core.models import BaseTimeStampedModel
 
 from .managers import CustomUserManager
 
@@ -152,6 +155,83 @@ class CustomUser(AbstractBaseUser, PermissionsMixin):
         if self.locked_until and self.locked_until > timezone.now():
             return True
         return False
+
+
+class TilgangsNivaa(models.TextChoices):
+    """Nivåene i ``ModulTilgang``. Stigen er ordnet, se ``NIVAA_HIERARKI``.
+
+    ``ingen`` finnes ikke som verdi — fravær av rad *er* ingen tilgang. To
+    måter å uttrykke det samme på ville før eller siden kommet i utakt.
+
+    ``SKRIV_HANDLING`` er tomt i dag. Det finnes fordi en bil-/ambulansekonto
+    skal kunne utløse en navngitt overgang (et tidsstempel) uten å kunne
+    redigere fritekst, og fordi det ikke lar seg løse med en feltwhitelist
+    inne i den generelle PUT-en — der er stemplingen en bivirkning av en
+    redigering. Regelen er at en innskrenket aktør får et *smalt endepunkt*
+    som ikke leser request-kroppen. Tas i bruk når oppdragsmodulen skrives.
+    Se §3.2 i docs/BESLUTNING_ROLLEMODELLEN.md.
+    """
+
+    LES = 'les', 'Lese'
+    SKRIV_HANDLING = 'skriv_handling', 'Skrive: handling'
+    SKRIV_FULL = 'skriv_full', 'Skrive: full'
+
+
+class ModulTilgang(BaseTimeStampedModel):
+    """Én brukers tilgangsnivå på én modul.
+
+    Erstatter de fem ``kan_redigere_*``-flaggene på ``CustomUser``. Flaggene
+    var både feilnavngitt og virkningsløse: de leses kun av
+    ``Module.is_visible_for()``, altså dashboard og nav-meny. En
+    ``read_write``-bruker med ``kan_redigere_pasienter=False`` fikk **201 på
+    ``POST /api/patients/``**. Denne tabellen er tilgangskontroll, og
+    ``@modul_kreves`` håndhever den.
+
+    **Global admin står utenfor.** ``role='admin'`` gir alt, uten rader.
+    Grunnen er at de irreversible handlingene — hard-delete utenfor
+    slettevinduet, nullstilling, arkiv-kollaps — ikke skal desentraliseres,
+    og at en modul-admin ville vært et sted til å gi dem bort fra.
+
+    ``modul_slug`` er ikke en FK. Modulregisteret ligger i kode
+    (``core.modules``), ikke i basen, og en rad for en modul som er fjernet
+    fra registeret skal bli liggende ubrukt i stedet for å blokkere
+    slettingen — eller forsvinne stille med en CASCADE.
+    """
+
+    bruker = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='modultilganger',
+        verbose_name='Bruker',
+    )
+    modul_slug = models.CharField(
+        max_length=64,
+        verbose_name='Modul',
+        help_text='Matcher Module.slug i core.modules.',
+    )
+    nivaa = models.CharField(
+        max_length=20,
+        choices=TilgangsNivaa.choices,
+        verbose_name='Nivå',
+    )
+
+    class Meta:
+        verbose_name = 'Modultilgang'
+        verbose_name_plural = 'Modultilganger'
+        ordering = ['bruker__username', 'modul_slug']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['bruker', 'modul_slug'],
+                name='unik_modultilgang_per_bruker',
+            ),
+        ]
+        # Ingen eksplisitt indeks på `bruker`: ForeignKey lager sin egen, og
+        # den dekker oppslaget som skjer på hver request (alle radene for én
+        # bruker). En Meta.indexes i tillegg ville gitt to identiske indekser
+        # på samme kolonne — dobbel skrivekostnad, null gevinst.
+
+    def __str__(self):
+        return f'{self.bruker_id}:{self.modul_slug}={self.nivaa}'
 
 
 class LoginEvent(models.Model):

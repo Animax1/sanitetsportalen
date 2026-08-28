@@ -12,7 +12,6 @@ Nye apps SKAL importere fra core.auth_decorators direkte:
 # Re-eksport fra core. Holder alle eksisterende imports i drift.
 from core.auth_decorators import (  # noqa: F401
     admin_required,
-    dataset_scope_all,
     role_required,
     stats_required,
     write_required,

@@ -28,6 +28,11 @@ urlpatterns = [
     # ── Admin-UI (Fase 3b) ──────────────────────────────────────────────────
     # Plasseres under /portal-admin/ for å skille tydelig fra /django-admin/.
     path(
+        'portal-admin/innstillinger/',
+        views.portal_settings_view,
+        name='portal_settings',
+    ),
+    path(
         'portal-admin/moduler/',
         views.module_admin_list_view,
         name='module_admin_list',

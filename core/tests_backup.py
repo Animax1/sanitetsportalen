@@ -52,6 +52,7 @@ from core.forms import BackupRestoreConfirmForm, ModuleBackupConfigForm
 from core.models import ModuleBackupConfig
 from patients.backup import PatientsBackupHandler, register_handlers
 from patients.models import AppSetting, Backup, Forstehjelper, Helsepersonell, Patient
+from accounts.test_helpers import gi_standardtilgang
 
 
 # Felles testmappe for backup-filer.
@@ -142,6 +143,7 @@ class CreateBackupTests(TestCase):
             username='admin', password='pwd', role='admin',
             must_change_password=False,
         )
+        gi_standardtilgang(self.admin)
         # Litt patient-data så dumpdata ikke er tom.
         Patient.objects.create(pasientnummer=1, year=2025, problemstilling='Test')
 
@@ -339,6 +341,7 @@ class RestoreBackupTests(TestCase):
             username='admin', password='pwd', role='admin',
             must_change_password=False,
         )
+        gi_standardtilgang(self.admin)
         # Original data — eksisterende default-Forstehjelper/Helsepersonell
         # fra signaler kan være tilstede; vi bruker get_or_create.
         beh, _ = Forstehjelper.objects.get_or_create(name='Behandler-Test')
@@ -529,10 +532,12 @@ class BackupAdminViewTests(TestCase):
             username='admin', password='pwd', role='admin',
             must_change_password=False,
         )
+        gi_standardtilgang(self.admin)
         self.lead = CustomUser.objects.create_user(
             username='lead', password='pwd', role='lead',
             must_change_password=False,
         )
+        gi_standardtilgang(self.lead)
 
     def test_overview_requires_admin(self) -> None:
         client = Client()
@@ -796,6 +801,7 @@ class RestorePayloadInspectionTests(TestCase):
             username='admin_inspect', password='pwd', role='admin',
             must_change_password=False,
         )
+        gi_standardtilgang(self.admin)
 
     def _handler(self):
         from patients.backup import PatientsBackupHandler

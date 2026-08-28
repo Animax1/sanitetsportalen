@@ -29,6 +29,7 @@ from patients.services import (
     basic_stats,
     _compute_stats_from_dicts,
 )
+from accounts.test_helpers import gi_standardtilgang
 
 User = get_user_model()
 
@@ -41,22 +42,27 @@ class ArkivTestMixin:
             username='admin_arkiv', password='passord', role='admin',
             must_change_password=False,
         )
+        gi_standardtilgang(self.admin)
         self.read_write = User.objects.create_user(
             username='rw_arkiv', password='passord', role='read_write',
             must_change_password=False,
         )
+        gi_standardtilgang(self.read_write)
         self.lead = User.objects.create_user(
             username='lead_arkiv', password='passord', role='lead',
             must_change_password=False,
         )
+        gi_standardtilgang(self.lead)
         self.lead_view = User.objects.create_user(
             username='lv_arkiv', password='passord', role='lead_view',
             must_change_password=False,
         )
+        gi_standardtilgang(self.lead_view)
         self.read_only = User.objects.create_user(
             username='ro_arkiv', password='passord', role='read_only',
             must_change_password=False,
         )
+        gi_standardtilgang(self.read_only)
 
         AppSetting.set('active_year', 2098)
         AppSetting.set('next_patient_nr', 1)
@@ -217,13 +223,13 @@ class ArkivDetaljTests(ArkivTestMixin, TestCase):
         self.assertTrue(resp.json()['tamper_detected'])
 
     def test_arkiv_full_stats_endpoint_returnerer_full_struktur(self):
-        """GET full-stats skal returnere samme struktur som /api/full-stats/.
+        """GET full-stats skal returnere samme struktur som /statistikk/api/full-stats/.
 
         Sjekker at alle hovednøkler finnes (summary, arrivals, transport_counts,
         time_per_triage, crosstab_*, chi2_table, kw_*).
         """
         resp = self.admin_client.get(
-            f'/pasienter/api/innstillinger/arkiv/{self.arkiv.pk}/full-stats/'
+            f'/statistikk/api/arkiv/{self.arkiv.pk}/full-stats/'
         )
         self.assertEqual(resp.status_code, 200)
         data = resp.json()
@@ -253,7 +259,7 @@ class ArkivDetaljTests(ArkivTestMixin, TestCase):
         for role_user in [self.read_only, self.read_write, self.lead_view, self.lead]:
             c = Client()
             c.force_login(role_user)
-            resp = c.get(f'/pasienter/api/innstillinger/arkiv/{self.arkiv.pk}/full-stats/')
+            resp = c.get(f'/statistikk/api/arkiv/{self.arkiv.pk}/full-stats/')
             self.assertEqual(
                 resp.status_code, 403,
                 f'Forventet 403 for rolle {role_user.role}',
@@ -261,7 +267,7 @@ class ArkivDetaljTests(ArkivTestMixin, TestCase):
 
     def test_arkiv_full_stats_404_for_ukjent_id(self):
         """Ukjent arkiv-ID skal gi 404."""
-        resp = self.admin_client.get('/pasienter/api/innstillinger/arkiv/999999/full-stats/')
+        resp = self.admin_client.get('/statistikk/api/arkiv/999999/full-stats/')
         self.assertEqual(resp.status_code, 404)
 
 
@@ -405,6 +411,7 @@ class ArkivBrukerSlettingTests(ArkivTestMixin, TestCase):
             username='admin2', password='passord', role='admin',
             must_change_password=False,
         )
+        gi_standardtilgang(annen_admin)
         c = Client()
         c.force_login(annen_admin)
 
@@ -420,6 +427,7 @@ class ArkivBrukerSlettingTests(ArkivTestMixin, TestCase):
             username='admin3', password='passord', role='admin',
             must_change_password=False,
         )
+        gi_standardtilgang(annen_admin)
         c = Client()
         c.force_login(annen_admin)
 
@@ -436,6 +444,7 @@ class ArkivBrukerSlettingTests(ArkivTestMixin, TestCase):
             username='admin4', password='passord', role='admin',
             must_change_password=False,
         )
+        gi_standardtilgang(annen_admin)
         self.admin.delete()
 
         c = Client()

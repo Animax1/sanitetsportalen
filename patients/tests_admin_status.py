@@ -8,6 +8,7 @@ from accounts.models import CustomUser
 
 from .middleware import metrics_store, _MetricsStore
 from .models import AppSetting
+from accounts.test_helpers import gi_standardtilgang
 
 
 class MetricsStoreTests(TestCase):
@@ -232,12 +233,15 @@ class AdminStatusTilgangTests(TestCase):
         self.admin = CustomUser.objects.create_user(
             username='admin1', password='testpass123', role='admin', must_change_password=False,
         )
+        gi_standardtilgang(self.admin)
         self.lead = CustomUser.objects.create_user(
             username='lead1', password='testpass123', role='lead', must_change_password=False,
         )
+        gi_standardtilgang(self.lead)
         self.read_only = CustomUser.objects.create_user(
             username='ro1', password='testpass123', role='read_only', must_change_password=False,
         )
+        gi_standardtilgang(self.read_only)
 
     def test_uinnlogget_omdirigeres_til_login(self):
         resp = self.client.get('/portal-admin/server-status/')
@@ -281,9 +285,11 @@ class FeatureFlagTests(TestCase):
         self.admin = CustomUser.objects.create_user(
             username='admin1', password='testpass123', role='admin', must_change_password=False,
         )
+        gi_standardtilgang(self.admin)
         self.lead = CustomUser.objects.create_user(
             username='lead1', password='testpass123', role='lead', must_change_password=False,
         )
+        gi_standardtilgang(self.lead)
 
     def test_flagg_default_er_false(self):
         # Live-statistikk er ikke implementert, så default skal være 'false'
@@ -360,6 +366,7 @@ class LastBackupInfoTests(TestCase):
         self.admin = CustomUser.objects.create_user(
             username='admin1', password='testpass123', role='admin', must_change_password=False,
         )
+        gi_standardtilgang(self.admin)
 
     def test_uten_backups_returnerer_found_false(self):
         from .admin_status import _get_last_backup_info
@@ -414,6 +421,7 @@ class MetricsMiddlewareIntegrationTests(TestCase):
         self.admin = CustomUser.objects.create_user(
             username='admin1', password='testpass123', role='admin', must_change_password=False,
         )
+        gi_standardtilgang(self.admin)
         metrics_store.reset()
 
     def test_request_registreres_i_metrics(self):
@@ -451,12 +459,15 @@ class AdminSessionsListTests(TestCase):
         self.admin = CustomUser.objects.create_user(
             username='adm', password='testpass123', role='admin', must_change_password=False,
         )
+        gi_standardtilgang(self.admin)
         self.lead = CustomUser.objects.create_user(
             username='lederen', password='testpass123', role='lead', must_change_password=False,
         )
+        gi_standardtilgang(self.lead)
         self.read_only = CustomUser.objects.create_user(
             username='leser', password='testpass123', role='read_only', must_change_password=False,
         )
+        gi_standardtilgang(self.read_only)
 
     def test_uinnlogget_nektes(self):
         resp = self.client.get('/portal-admin/server-status/sessions/')
@@ -524,9 +535,11 @@ class AdminSessionKillTests(TestCase):
         self.admin = CustomUser.objects.create_user(
             username='adm', password='testpass123', role='admin', must_change_password=False,
         )
+        gi_standardtilgang(self.admin)
         self.lead = CustomUser.objects.create_user(
             username='lederen', password='testpass123', role='lead', must_change_password=False,
         )
+        gi_standardtilgang(self.lead)
 
     def _get_session_key(self, username, password):
         """Logg inn og returner session_key."""
@@ -611,12 +624,15 @@ class AdminSessionKillAllTests(TestCase):
         self.admin = CustomUser.objects.create_user(
             username='adm', password='testpass123', role='admin', must_change_password=False,
         )
+        gi_standardtilgang(self.admin)
         self.lead = CustomUser.objects.create_user(
             username='lederen', password='testpass123', role='lead', must_change_password=False,
         )
+        gi_standardtilgang(self.lead)
         self.ro = CustomUser.objects.create_user(
             username='leser', password='testpass123', role='read_only', must_change_password=False,
         )
+        gi_standardtilgang(self.ro)
 
     def test_lead_nektes(self):
         self.client.force_login(self.lead)

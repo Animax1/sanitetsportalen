@@ -10,6 +10,7 @@ from django.test import TestCase, Client, override_settings
 from django.urls import NoReverseMatch, reverse
 
 from accounts.models import CustomUser, LoginEvent
+from accounts.test_helpers import gi_standardtilgang
 
 
 @override_settings(SECURE_SSL_REDIRECT=False)
@@ -78,6 +79,7 @@ class BrukeradminUrlFlyttingTests(TestCase):
             username='url_admin', password='x', role='admin',
             must_change_password=False, is_staff=True,
         )
+        gi_standardtilgang(self.admin)
         self.client.force_login(self.admin)
 
     def test_ny_sti_svarer(self):
@@ -129,10 +131,12 @@ class LoginEventListTests(TestCase):
             username='log_admin', password='x', role='admin',
             must_change_password=False, is_staff=True,
         )
+        gi_standardtilgang(self.admin)
         self.annen = CustomUser.objects.create_user(
             username='log_bruker', password='x', role='read_write',
             must_change_password=False,
         )
+        gi_standardtilgang(self.annen)
         LoginEvent.objects.create(
             user=self.annen, username_attempt='log_bruker',
             success=True, ip='10.0.0.1',

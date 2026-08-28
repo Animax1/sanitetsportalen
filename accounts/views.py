@@ -30,7 +30,7 @@ from core.url_safety import safe_redirect_url
 from .decorators import admin_required
 from .forms import (
     LoginForm, ChangePasswordForm, AdminUserCreateForm, AdminUserEditForm,
-    GlemtPassordForm,
+    GlemtPassordForm, ModulTilgangForm,
     PasientRolleForm, SettPassordForm,
 )
 from .invitasjon import kan_inviteres, les_token, send_invitasjon
@@ -119,7 +119,9 @@ def _invalidate_all_sessions(user):
         user.save(update_fields=['current_session_key'])
 
 
-def _log_user_admin_action(request, target_user, action, field_name=None, old_value=None, new_value=None):
+def _log_user_admin_action(request, target_user, action, field_name=None,
+                           old_value=None, new_value=None,
+                           table_name='accounts_customuser'):
     """Skriv en AuditLog-rad for en administrativ handling på en brukerkonto.
 
     Frysing og sletting av kontoer er ikke pasientdata, så ``patients.signals``
@@ -128,9 +130,14 @@ def _log_user_admin_action(request, target_user, action, field_name=None, old_va
 
     ``record_id`` er en ren integer uten FK, så raden overlever at brukeren
     slettes — hvilket er hele poenget for DELETE-tilfellet.
+
+    ``table_name`` styrer hvilken modul raden havner under i admin-filteret:
+    ``audit.signals.utled_app_label`` leser prefikset. Modultilgang skrives med
+    ``accounts_modultilgang`` slik at en tilgangsendring ikke ser ut som en
+    endring på selve kontoen.
     """
     AuditLog.objects.create(
-        table_name='accounts_customuser',
+        table_name=table_name,
         record_id=target_user.pk,
         action=action,
         field_name=field_name,
@@ -771,6 +778,20 @@ def login_event_list_view(request):
     })
 
 
+def _lagre_ny_modultilgang(request, user, tilgang_form):
+    """Skriv matrisen for en nyopprettet bruker, og loggfør den.
+
+    Skjemaet ble bygget uten `bruker`, så det kjenner ingen nåværende rader —
+    alt som er satt er en endring fra «ingen».
+    """
+    for slug, fra, til in tilgang_form.save(user):
+        _log_user_admin_action(
+            request, user, 'CREATE', field_name=slug,
+            old_value=fra or 'ingen', new_value=til or 'ingen',
+            table_name='accounts_modultilgang',
+        )
+
+
 @admin_required
 def user_create_view(request):
     """Opprett ny bruker — med invitasjon, eller med midlertidig passord.
@@ -789,11 +810,16 @@ def user_create_view(request):
     dem til å velge to passord på rad uten forklaring.
     """
     form = AdminUserCreateForm()
+    # §10.3: matrisen hører hjemme her, ikke bare på redigeringsskjemaet.
+    # Uten den lander den nyinviterte i en tom portal og må redigeres etterpå
+    # — og den som oppretter kontoen er den som vet hva den skal ha.
+    tilgang_form = ModulTilgangForm()
     temp_password = None
 
     if request.method == 'POST':
         form = AdminUserCreateForm(request.POST)
-        if form.is_valid():
+        tilgang_form = ModulTilgangForm(request.POST)
+        if form.is_valid() and tilgang_form.is_valid():
             user = form.save(commit=False)
             vil_invitere = (
                 request.POST.get('metode', 'invitasjon') == 'invitasjon'
@@ -807,6 +833,7 @@ def user_create_view(request):
                 user.set_unusable_password()
                 user.must_change_password = False
                 user.save()
+                _lagre_ny_modultilgang(request, user, tilgang_form)
 
                 if send_invitasjon(user, request):
                     messages.success(
@@ -828,14 +855,20 @@ def user_create_view(request):
             user.set_password(temp_password)
             user.must_change_password = True
             user.save()
+            _lagre_ny_modultilgang(request, user, tilgang_form)
             messages.success(request, f'Bruker «{user.username}» er opprettet.')
             return render(request, 'accounts/user_form.html', {
                 'form': AdminUserCreateForm(),
+                'tilgang_form': ModulTilgangForm(),
                 'temp_password': temp_password,
                 'created_user': user,
             })
 
-    return render(request, 'accounts/user_form.html', {'form': form, 'temp_password': temp_password})
+    return render(request, 'accounts/user_form.html', {
+        'form': form,
+        'tilgang_form': tilgang_form,
+        'temp_password': temp_password,
+    })
 
 
 def glemt_passord_view(request):
@@ -949,6 +982,7 @@ def user_detail_view(request, pk):
     """Vis og rediger brukerdetaljer."""
     user = get_object_or_404(CustomUser, pk=pk)
     form = AdminUserEditForm(instance=user)
+    tilgang_form = ModulTilgangForm(bruker=user)
     link_form = PasientRolleForm(user)
     temp_password = None
     recent_events = LoginEvent.objects.filter(user=user).order_by('-created_at')[:20]
@@ -958,9 +992,26 @@ def user_detail_view(request, pk):
 
         if action == 'edit':
             mfa_for = user.mfa_required
+            rolle_for = user.role
             form = AdminUserEditForm(request.POST, instance=user)
-            if form.is_valid():
+            tilgang_form = ModulTilgangForm(request.POST, bruker=user)
+            if form.is_valid() and tilgang_form.is_valid():
                 form.save()
+
+                # Rolleendring ble ikke loggført i det hele tatt: frysing og
+                # sletting skrev auditrad, men det å gi noen admin gjorde det
+                # ikke. Modultilgang loggføres per modul som endres.
+                if user.role != rolle_for:
+                    _log_user_admin_action(
+                        request, user, 'UPDATE', field_name='role',
+                        old_value=rolle_for, new_value=user.role,
+                    )
+                for slug, fra, til in tilgang_form.save(user):
+                    _log_user_admin_action(
+                        request, user, 'UPDATE', field_name=slug,
+                        old_value=fra or 'ingen', new_value=til or 'ingen',
+                        table_name='accounts_modultilgang',
+                    )
 
                 # Slås «Krev MFA» på mens brukeren har en levende sesjon,
                 # gjelder kravet ikke for dem før cookien dør — de kan ha
@@ -1114,6 +1165,7 @@ def user_detail_view(request, pk):
     return render(request, 'accounts/user_detail.html', {
         'target_user': user,
         'form': form,
+        'tilgang_form': tilgang_form,
         'link_form': link_form,
         'temp_password': temp_password,
         'recent_events': recent_events,

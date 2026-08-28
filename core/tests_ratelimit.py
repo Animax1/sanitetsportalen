@@ -25,6 +25,7 @@ from django.test import Client, RequestFactory, TestCase, override_settings
 from accounts.models import CustomUser
 from core.ratelimit import er_rate_limited, rate_limit
 from patients.models import AppSetting
+from accounts.test_helpers import gi_standardtilgang
 
 
 NY_PASIENT = {
@@ -49,10 +50,12 @@ class RateLimitKjerneTests(TestCase):
             username='rl-en', password='pass', role='read_write',
             must_change_password=False,
         )
+        gi_standardtilgang(self.en)
         self.to = CustomUser.objects.create_user(
             username='rl-to', password='pass', role='read_write',
             must_change_password=False,
         )
+        gi_standardtilgang(self.to)
 
     def _view(self, **kwargs):
         @rate_limit(**kwargs)
@@ -152,10 +155,12 @@ class RateLimitEndepunktTests(TestCase):
             username='rl-admin', password='pass', role='admin',
             must_change_password=False,
         )
+        gi_standardtilgang(self.admin)
         self.skriver = CustomUser.objects.create_user(
             username='rl-skriver', password='pass', role='read_write',
             must_change_password=False,
         )
+        gi_standardtilgang(self.skriver)
 
     def _klient(self, user):
         c = Client()
@@ -188,7 +193,7 @@ class RateLimitEndepunktTests(TestCase):
 
     def test_full_stats_strupes(self):
         c = self._klient(self.admin)
-        statuser = _statuser(lambda: c.get('/pasienter/api/full-stats/'), 35)
+        statuser = _statuser(lambda: c.get('/statistikk/api/full-stats/'), 35)
         self.assertEqual(statuser[0], 200)
         self.assertIn(429, statuser)
 
@@ -225,6 +230,7 @@ class RateLimitEndepunktTests(TestCase):
             username='rl-ny', password='MidlertidigPass1!', role='read_write',
             must_change_password=True,
         )
+        gi_standardtilgang(ny)
         c = self._klient(ny)
 
         statuser = _statuser(lambda: c.post('/accounts/change-password/', {
@@ -278,5 +284,5 @@ class RateLimitEndepunktTests(TestCase):
     def test_statistikk_og_pasientoppretting_deler_ikke_botte(self):
         """Ende-til-ende-utgaven av ``test_hver_gruppe_har_egen_botte``."""
         c = self._klient(self.admin)
-        _statuser(lambda: c.get('/pasienter/api/full-stats/'), 35)
+        _statuser(lambda: c.get('/statistikk/api/full-stats/'), 35)
         self.assertEqual(self._opprett(c).status_code, 201)

@@ -36,6 +36,7 @@ from core.validators import (
     validate_patient_time_fields,
     validate_time_string,
 )
+from accounts.test_helpers import gi_standardtilgang
 
 
 # ════════════════════════════════════════════════════════════════════════════
@@ -321,6 +322,8 @@ class BakoverkompatibilitetTests(TestCase):
 # ═══════════════════════════════════════════════════════════════════════════
 
 
+from accounts.models import ModulTilgang  # noqa: E402
+
 User = get_user_model()
 
 
@@ -329,13 +332,14 @@ class PortalDashboardViewTests(TestCase):
     """Verifiserer at portal-dashboardet ligger på / og krever innlogging."""
 
     def setUp(self):
-        # Bruker med kan_redigere_pasienter=True slik at pasient-modulen vises.
-        # (Fase 3a la til permission-flagg som default er False; tester som
-        # forventer modulen synlig må sette flagget eksplisitt.)
+        # Modulkortet vises kun med en ModulTilgang-rad. Flagget som sto her
+        # før styrer ingenting lenger — se ModuleVisibilityTests.
         self.user = User.objects.create_user(
             username='dashbruker', password='x', role='read_only',
             must_change_password=False,
-            kan_redigere_pasienter=True,
+        )
+        ModulTilgang.objects.create(
+            bruker=self.user, modul_slug='patients', nivaa='les',
         )
         self.client = Client()
 
@@ -524,6 +528,7 @@ class PasientAppPaaNyURLTests(TestCase):
             username='paspruker', password='x', role='read_only',
             must_change_password=False,
         )
+        gi_standardtilgang(self.user)
         self.client.force_login(self.user)
 
     def test_pasient_index_paa_ny_url(self):
@@ -583,6 +588,7 @@ class AdminNavPortalLenkeTests(TestCase):
             username='nav_admin', password='x', role='admin',
             must_change_password=False,
         )
+        gi_standardtilgang(self.admin)
         self.client.force_login(self.admin)
 
     def test_endre_passord_har_dashboard_lenke(self):
@@ -640,7 +646,6 @@ class ModuleRegistryTests(TestCase):
         modul = get_module('patients')
         self.assertIsNotNone(modul)
         self.assertEqual(modul.slug, 'patients')
-        self.assertEqual(modul.permission_flag, 'kan_redigere_pasienter')
         self.assertFalse(modul.is_core)
         self.assertTrue(modul.show_in_dashboard)
 
@@ -683,32 +688,45 @@ class ModuleVisibilityTests(TestCase):
         # Admin skal i hvert fall se patients-modulen.
         self.assertIn('patients', slugs)
 
-    def test_bruker_uten_kan_redigere_pasienter_ser_ikke_patients(self):
+    def test_bruker_uten_modultilgang_ser_ikke_patients(self):
         bruker = User.objects.create_user(
             username='no_pas', password='x', role='read_only',
             must_change_password=False,
         )
-        # Default for nye brukere er kan_redigere_pasienter=False.
-        self.assertFalse(bruker.kan_redigere_pasienter)
+        # Ingen ModulTilgang-rad = ingen tilgang. Det finnes ingen
+        # 'ingen'-verdi å lagre; fraværet er svaret.
         slugs = {m.slug for m in get_dashboard_modules(bruker)}
         self.assertNotIn('patients', slugs)
 
-    def test_bruker_med_kan_redigere_pasienter_ser_patients(self):
+    def test_bruker_med_modultilgang_ser_patients(self):
         bruker = User.objects.create_user(
             username='ja_pas', password='x', role='read_only',
             must_change_password=False,
         )
-        bruker.kan_redigere_pasienter = True
-        bruker.save(update_fields=['kan_redigere_pasienter'])
+        ModulTilgang.objects.create(bruker=bruker, modul_slug='patients', nivaa='les')
         slugs = {m.slug for m in get_dashboard_modules(bruker)}
         self.assertIn('patients', slugs)
+
+    def test_flagget_gir_ikke_lenger_synlighet(self):
+        """De fem `kan_redigere_*`-flaggene styrer ingenting nå.
+
+        De står til deploy 3, slik at en rollback har noe å bygge radene fra.
+        Fram til da må de ikke ved et uhell begynne å gjelde igjen: en bruker
+        med flagget, men uten rad, skal ikke se modulen.
+        """
+        bruker = User.objects.create_user(
+            username='bare_flagg', password='x', role='read_write',
+            must_change_password=False, kan_redigere_pasienter=True,
+        )
+        slugs = {m.slug for m in get_dashboard_modules(bruker)}
+        self.assertNotIn('patients', slugs)
 
     def test_deaktivert_modul_skjules_for_ikke_admin(self):
         bruker = User.objects.create_user(
             username='ja_pas2', password='x', role='read_only',
             must_change_password=False,
-            kan_redigere_pasienter=True,
         )
+        ModulTilgang.objects.create(bruker=bruker, modul_slug='patients', nivaa='les')
         # Deaktiver patients i ModuleSettings.
         ms, _ = ModuleSettings.objects.get_or_create(slug='patients')
         ms.enabled = False
@@ -787,13 +805,15 @@ class DashboardRendringTests(TestCase):
             username='dash_admin', password='x', role='admin',
             must_change_password=False,
         )
+        gi_standardtilgang(admin)
         self.client.force_login(admin)
         resp = self.client.get('/')
         self.assertEqual(resp.status_code, 200)
         self.assertContains(resp, 'Pasientregistrering')
         self.assertContains(resp, 'href="/pasienter/"')
 
-    def test_bruker_uten_pasient_flagg_ser_ikke_pasient_kort(self):
+    def test_bruker_uten_modultilgang_ser_ikke_pasient_kort(self):
+        # Ingen `gi_standardtilgang` her: fraværet av rader er hele poenget.
         bruker = User.objects.create_user(
             username='dash_no', password='x', role='read_only',
             must_change_password=False,
@@ -813,6 +833,7 @@ class DashboardRendringTests(TestCase):
             must_change_password=False,
             kan_redigere_pasienter=True,
         )
+        gi_standardtilgang(bruker)
         ModuleSettings.objects.filter(slug='patients').update(enabled=False)
         self.client.force_login(bruker)
         resp = self.client.get('/')
@@ -832,6 +853,7 @@ class NavMenuTests(TestCase):
             username='nav_a', password='x', role='admin',
             must_change_password=False,
         )
+        gi_standardtilgang(admin)
         self.client.force_login(admin)
         resp = self.client.get('/')
         # Sjekker at nav-baren har patients-lenken (i tillegg til dashboard-kortet).
@@ -839,7 +861,8 @@ class NavMenuTests(TestCase):
         # vi forventer minst 2 forekomster.
         self.assertGreaterEqual(resp.content.decode().count('href="/pasienter/"'), 2)
 
-    def test_bruker_uten_flagg_ser_ikke_pasient_i_nav(self):
+    def test_bruker_uten_modultilgang_ser_ikke_pasient_i_nav(self):
+        # Ingen `gi_standardtilgang` her: fraværet av rader er hele poenget.
         bruker = User.objects.create_user(
             username='nav_no', password='x', role='read_only',
             must_change_password=False,
@@ -908,6 +931,7 @@ class CustomUserPermissionFlagsTests(TestCase):
             username='flag_test', password='x', role='read_only',
             must_change_password=False,
         )
+        gi_standardtilgang(bruker)
         for felt in [
             'kan_redigere_pasienter',
             'kan_redigere_vakter',
@@ -941,10 +965,12 @@ class ModuleAdminUITests(TestCase):
             username='3b_admin', password='x', role='admin',
             must_change_password=False, is_staff=True,
         )
+        gi_standardtilgang(self.admin)
         self.read_only = User.objects.create_user(
             username='3b_ro', password='x', role='read_only',
             must_change_password=False,
         )
+        gi_standardtilgang(self.read_only)
         self.client = Client()
 
     def test_modulliste_kun_admin(self):
@@ -1046,10 +1072,12 @@ class AuditLogListViewTests(TestCase):
             username='3b_audit_admin', password='x', role='admin',
             must_change_password=False, is_staff=True,
         )
+        gi_standardtilgang(self.admin)
         self.read_only = User.objects.create_user(
             username='3b_audit_ro', password='x', role='read_only',
             must_change_password=False,
         )
+        gi_standardtilgang(self.read_only)
         # Lag noen AuditLog-rader vi kan filtrere på
         AuditLog.objects.create(
             table_name='patients_patient', record_id=1,
@@ -1177,6 +1205,7 @@ class ProfileViewTests(TestCase):
             kan_redigere_pasienter=True,
             kan_se_rapport=False,
         )
+        gi_standardtilgang(self.user)
         self.client = Client()
 
     def test_profil_url_loeses(self):
@@ -1223,6 +1252,7 @@ class ProfileViewTests(TestCase):
             username='profil_admin', password='x', role='admin',
             must_change_password=False,
         )
+        gi_standardtilgang(admin)
         self.client.force_login(admin)
         resp = self.client.get('/min-profil/')
         # Admin har bypass — info-meldingen skal vises
@@ -1239,11 +1269,13 @@ class NavMenuFase3bTests(TestCase):
             must_change_password=False, is_staff=True,
             kan_redigere_pasienter=True,
         )
+        gi_standardtilgang(self.admin)
         self.read_only = User.objects.create_user(
             username='nav_ro', password='x', role='read_only',
             must_change_password=False,
             kan_redigere_pasienter=True,
         )
+        gi_standardtilgang(self.read_only)
         self.client = Client()
 
     def test_min_profil_lenke_i_dropdown_for_alle(self):

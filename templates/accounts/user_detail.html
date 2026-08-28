@@ -76,31 +76,21 @@
             </div>
 
             <hr style="border-color:#334155;">
-            <div class="mb-2">
-              <label class="form-label mb-2">Modul-tilganger</label>
+            <div class="mb-3">
+              <label class="form-label mb-2">Modul-tilgang</label>
               <div class="text-muted small mb-2" style="font-size:0.78rem;">
-                Administratorer ser alltid alle moduler — flaggene gjelder kun for andre roller.
+                Administratorer har alltid full tilgang til alle moduler og
+                påvirkes ikke av valgene under. «Ingen tilgang» betyr at modulen
+                verken vises i menyen eller kan nås via adressefeltet.
               </div>
-              <div class="form-check mb-1">
-                {{ form.kan_redigere_pasienter }}
-                <label class="form-check-label" for="{{ form.kan_redigere_pasienter.id_for_label }}" style="color:#cbd5e1;">Pasientregistrering</label>
-              </div>
-              <div class="form-check mb-1">
-                {{ form.kan_redigere_vakter }}
-                <label class="form-check-label" for="{{ form.kan_redigere_vakter.id_for_label }}" style="color:#cbd5e1;">Vakter</label>
-              </div>
-              <div class="form-check mb-1">
-                {{ form.kan_redigere_utstyr }}
-                <label class="form-check-label" for="{{ form.kan_redigere_utstyr.id_for_label }}" style="color:#cbd5e1;">Utstyr</label>
-              </div>
-              <div class="form-check mb-1">
-                {{ form.kan_se_rapport }}
-                <label class="form-check-label" for="{{ form.kan_se_rapport.id_for_label }}" style="color:#cbd5e1;">Rapport</label>
-              </div>
-              <div class="form-check mb-3">
-                {{ form.kan_redigere_beredskap }}
-                <label class="form-check-label" for="{{ form.kan_redigere_beredskap.id_for_label }}" style="color:#cbd5e1;">Beredskap</label>
-              </div>
+              {% for felt in tilgang_form.rader %}
+                <div class="mb-2">
+                  <label class="form-label small mb-1" for="{{ felt.id_for_label }}"
+                         style="color:#cbd5e1;">{{ felt.label }}</label>
+                  {{ felt }}
+                  {% if felt.errors %}<div class="text-danger small mt-1">{{ felt.errors.0 }}</div>{% endif %}
+                </div>
+              {% endfor %}
             </div>
 
             <button type="submit" class="btn btn-primary btn-sm w-100">Lagre endringer</button>

@@ -97,10 +97,20 @@ async function _saveNewImpl() {
 // EDIT PATIENT
 // ════════════════════════════════════════════════════════
 function openEdit(data) {
-  const role = (window.USER_ROLE || 'read_only').toLowerCase();
-  if (role === 'read_only') return;
+  // Kun `skriv_full` får åpne redigeringsskjemaet. `les` kunne tidligere
+  // åpne det (rollen var read_write) og møtte 403 først på lagre.
+  if (modulNivaa() !== 'skriv_full') return;
   currentEditId = data.id;
   document.getElementById('edit-title').textContent = `Pasient #${data.patient_nr}`;
+
+  // Sletteknappen er per pasient, ikke per rolle: `skriv_full` kan slette
+  // egne pasienter de siste 30 minuttene (§4.2), og hverken «hvem opprettet
+  // den» eller «når» finnes i klienten. Serveren svarer `kan_slettes`.
+  //
+  // Standarden er skjult. Mangler feltet — gammel klient, uventet svar —
+  // forsvinner knappen, den dukker ikke opp.
+  const slettKnapp = document.getElementById('btn-del-patient');
+  if (slettKnapp) slettKnapp.classList.toggle('d-none', data.kan_slettes !== true);
 
   const set = (id, val) => {
     const el = document.getElementById(id);

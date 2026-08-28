@@ -227,6 +227,9 @@
     <a href="{% url 'core:module_admin_list' %}" {% if '/portal-admin/moduler' in request.path %}class="active"{% endif %}>
       <i class="bi bi-toggles me-1"></i>Moduler
     </a>
+    <a href="{% url 'core:portal_settings' %}" {% if '/portal-admin/innstillinger' in request.path %}class="active"{% endif %}>
+      <i class="bi bi-sliders me-1"></i>Innstillinger
+    </a>
     <a href="{% url 'core:audit_log_list' %}" {% if '/portal-admin/auditlog' in request.path %}class="active"{% endif %}>
       <i class="bi bi-journal-text me-1"></i>Revisjonslogg
     </a>

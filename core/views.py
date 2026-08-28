@@ -47,7 +47,7 @@ def portal_dashboard_view(request):
 
     Modul-kortene leses fra ``core.modules``-registret og filtreres på:
     - ``ModuleSettings.enabled`` (admin kan toggle moduler i sanntid)
-    - Brukerens ``permission_flag`` på CustomUser (admin ser alt)
+    - Brukerens ``ModulTilgang``-rad på modulen (global admin ser alt)
     - ``Module.show_in_dashboard``
     """
     modules = get_dashboard_modules(request.user)
@@ -107,6 +107,63 @@ def profile_view(request):
         'visible_modules': visible_modules,
         'recent_events': recent_events,
         'weekly_login_count': weekly_login_count,
+    })
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Admin: portalinnstillinger (§4.1)
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+@admin_required
+@require_http_methods(['GET', 'POST'])
+def portal_settings_view(request):
+    """Arrangementsnavn og sesjonstimeout.
+
+    Begge lå under ``/pasienter/`` fordi pasientmodulen var den eneste som
+    fantes. Ingen av dem hører til der: arrangementsnavnet gjelder vakten, som
+    med flere moduler dekker mer enn pasientregistreringen, og
+    sesjonstimeouten gjelder innloggingen.
+
+    Flyttingen ble gjort sammen med rollemodellen fordi tilgangssjekkene deres
+    uansett skulle skrives om — og fordi «admin-only-endepunkt inne i en
+    modul» er nettopp den sammenblandingen ``ModulTilgang`` skal fjerne. Et
+    endepunkt under ``/pasienter/`` som krever global admin sier at
+    modulgrensen ikke betyr noe.
+
+    ``AppSetting`` er en generisk nøkkel/verdi-tabell uten validering, så den
+    ligger her: en timeout på 0 timer ville logget ut alle umiddelbart.
+    """
+    from patients.models import AppSetting
+
+    if request.method == 'POST':
+        raa = (request.POST.get('session_timeout_hours') or '').strip()
+        try:
+            timer = int(raa)
+        except (TypeError, ValueError):
+            messages.error(request, 'Sesjonstimeout må være et helt tall.')
+        else:
+            if not 1 <= timer <= 24:
+                messages.error(
+                    request, 'Sesjonstimeout må være mellom 1 og 24 timer.')
+            else:
+                # Arrangementsnavnet skrives først etter at timeouten er
+                # validert, slik at en avvist innsending ikke lagrer halve
+                # skjemaet.
+                AppSetting.set('event_name',
+                               (request.POST.get('event_name') or '').strip())
+                AppSetting.set('session_timeout_hours', timer)
+                messages.success(request, 'Portalinnstillingene er lagret.')
+                return redirect('core:portal_settings')
+
+    try:
+        timer = int(AppSetting.get('session_timeout_hours', 8))
+    except (TypeError, ValueError):
+        timer = 8
+
+    return render(request, 'core/portal_settings.html', {
+        'event_name': AppSetting.get('event_name', '') or '',
+        'session_timeout_hours': timer,
     })
 
 
