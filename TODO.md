@@ -378,6 +378,19 @@ skal ligge der.
             Railway-konsollen.
       - [x] **Oppryddingen er gjort (28. aug. 2026).** Prod har nå én ikke-admin-konto
             (kollegaens, midlertidig redusert til lesing) pluss admin.
+      - [x] **Kollegaens nivå satt (28. aug. 2026):** `patients: skriv_full`,
+            `statistikk: les`, og Helsepersonell-koblingen på plass.
+
+- [ ] **Testkontoen i prod må vekk før neste vakt.** André opprettet den 28. aug. 2026 for
+      å kontrollere de samme nivåene selv, og den står fortsatt med `skriv_full` på
+      pasienter. Den er ikke et testmiljø — den kan opprette og redigere ekte pasienter,
+      og gjør det under et navn som ikke tilhører noen på vakt.
+      - [ ] Slett den, eller sett `is_active=False` hvis sporet i auditloggen skal være
+            lett å lese. Sletting fjerner `ModulTilgang`-radene (CASCADE) og nuller
+            `Helsepersonell.user` (SET_NULL); auditradene består, men `AuditLog.user`
+            blir NULL.
+      - [ ] Ikke bland den med kollegaens konto ved opprydding — de har samme nivåer, og
+            det er navnet som skiller dem.
       - [x] **Kontrollen kjørt mot prod etter deploy 1 (28. aug. 2026).** §10.1: «Antall: 0
             av 2». Ingen kontoer uten rader, ingen avvik fra backfillen. Det var siste
             gang det tallet kunne tas — deploy 2 fjerner grunnlaget.

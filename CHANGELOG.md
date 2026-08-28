@@ -4,6 +4,23 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-08-28 — Kollegaens nivå satt i prod, og en testkonto som må vekk
+
+Kun dokumentasjon. Ingen kodeendring.
+
+Kollegaens konto står nå på `patients: skriv_full` + `statistikk: les`, med
+Helsepersonell-koblingen på plass. Det er den kombinasjonen backfillen ville gitt en `lead`,
+satt for hånd i matrisen etter §7.3-splitten — koblingen og tilgangen er to steg nå, med
+vilje.
+
+André opprettet i tillegg en testkonto i prod for å kontrollere de samme nivåene selv.
+**Den står oppført som en oppgave, ikke som en ferdig ting.** En konto med `skriv_full` i
+prod er ikke et testmiljø: den kan opprette og redigere ekte pasienter, og gjør det under et
+navn som ikke tilhører noen på vakt. Den må slettes eller deaktiveres før neste vakt, og den
+har nøyaktig samme nivåer som kollegaens — det er navnet som skiller dem.
+
+---
+
 ## 2026-08-28 — Deploy 2: `role` krympet til `admin`/`bruker`
 
 **997 tester grønne.** Migrasjon `accounts.0013_krymp_role`. **Ikke deployet til prod** —
