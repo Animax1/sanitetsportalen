@@ -4,6 +4,32 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-08-28 — `leder`-nivået har fått en begrunnelse, men bygges ikke
+
+Kun dokumentasjon. Ingen kodeendring.
+
+Da `leder` ble tatt ut igjen tidligere samme dag, var argumentet at nivået **ikke hadde
+noen definert bruk**, og at et tomt nivå er lett å dele ut i god tro. Det premisset holder
+ikke lenger: André har navngitt bruken — **«admin light»**, en vaktleder som skal kunne mer
+enn `skriv: full` uten å være global admin.
+
+Sannsynlig innhold, ut fra hva som i dag er admin og som *ikke* er irreversibelt:
+arkivere en vakt, se arkivet, redigere navneregistrene. §3.3 gjelder fortsatt for resten —
+nullstilling, kollaps, brukeradmin og backup er irreversible eller konto-nære og skal ikke
+desentraliseres. «Admin light» er ikke «admin med færre klikk».
+
+**Nivået bygges ikke nå**, fordi behovet ikke er aktuelt. Men begrunnelsen er skrevet ned
+så neste runde slipper å utlede den på nytt — og fordi den motsier argumentet som ble brukt
+for å ta nivået ut. Å legge til verdien er en `-- (no-op)`-migrasjon; kostnaden ligger i å
+bestemme innholdet.
+
+**Kontoen i prod beholdes.** Spørsmålet var om den skulle slettes. Den er den eneste
+ikke-admin-kontoen i produksjon, og admin har bypass på hele den nye tilgangsmodellen — uten
+den er modulsynlighet, `les` mot `skriv_full` og den server-side gatingen av knapper
+utestet i prod til noen får en konto. Da oppdages en feil av en som skal jobbe.
+
+---
+
 ## 2026-08-28 — Forhåndsvisning av backfillen, før den kjøres
 
 **1002 tester grønne** (5 nye). Ingen migrasjon.

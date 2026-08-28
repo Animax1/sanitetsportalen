@@ -310,6 +310,12 @@ personlige kontoer, admin-reset beholdt for alle. Ingenting bygget ennå.
 
 
 **Stigen står som opprinnelig besluttet:** `ingen → les → skriv:handling → skriv:full`.
+
+- [ ] **`leder`-nivå («admin light») — bruken finnes, behovet haster ikke.** En vaktleder
+      som skal kunne arkivere en vakt, se arkivet og redigere navneregistrene, uten å være
+      global admin. Det irreversible (nullstilling, kollaps, brukeradmin, backup) forblir
+      admin per §3.3. Se §3.1 i notatet. Å legge til verdien er en `-- (no-op)`-migrasjon;
+      kostnaden ligger i å bestemme innholdet.
 Et femte trinn `leder` ble lagt til 28. aug. og reversert samme dag — begrunnelsen var at
 et nytt nivå senere ville koste en migrasjon, og det stemmer ikke (`choices` er en
 `non_db_attr`, migrasjonen er `-- (no-op)`). Se §3.1 i notatet. Innføres når noe faktisk

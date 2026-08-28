@@ -133,12 +133,33 @@ ikke.
 
 Uten den står bare ulempene igjen. `skriv: handling` er også tomt i dag, men har en
 navngitt bruker, et konkret endepunkt og en testbar invariant (§3.2) — vi vet hva det er
-når det fylles. `leder` har ingen definert bruk, og det den mest nærliggende ville
-inneholdt, argumenterer §3.3 mot å desentralisere. Et tomt nivå i matrisen er dessuten
-lett å gi bort i god tro: det gir ingenting i dag, og gir automatisk mer den dagen noen
-fyller det, uten at beslutningen tas på nytt.
+når det fylles. Et tomt nivå i matrisen er dessuten lett å gi bort i god tro: det gir
+ingenting i dag, og gir automatisk mer den dagen noen fyller det, uten at beslutningen tas
+på nytt.
 
 **Innføres når noe faktisk skal ligge der, ikke før.**
+
+#### Bruken finnes nå — men den haster ikke (28. aug. 2026)
+
+Argumentet over var at `leder` ikke hadde noen definert bruk. Det stemmer ikke lenger.
+André har navngitt den: **«admin light»** — en vaktleder som skal kunne mer enn `skriv:
+full`, uten å være global admin.
+
+Sannsynlig innhold, ut fra hva som i dag er admin og som ikke er irreversibelt:
+
+- arkivere en vakt (`arkiv_lagre_view`)
+- se arkivlista og arkivdetaljer (`ARKIV_VIEW_MIN_ROLE`)
+- redigere førstehjelper- og helsepersonellregisteret
+
+**§3.3 gjelder fortsatt for resten.** Nullstilling av år, hard-delete utenfor
+slettevinduet, arkiv-kollaps, brukeradministrasjon og backup er irreversible eller
+konto-nære, og skal ikke desentraliseres. «Admin light» er ikke «admin med færre klikk» —
+det er de reversible tingene en vaktleder trenger.
+
+Behovet er ikke aktuelt ennå, så nivået bygges ikke nå. Men når det gjøres: begynn med
+lista over, ikke med å flytte alt som i dag er admin. Og merk at det å legge til verdien i
+`TilgangsNivaa` er en `-- (no-op)`-migrasjon — kostnaden ligger i å bestemme innholdet, ikke
+i skjemaet.
 
 ### 3.2 Hvorfor `handling` er et eget nivå
 
