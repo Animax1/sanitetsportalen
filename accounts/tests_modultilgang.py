@@ -280,3 +280,64 @@ class OfflineBrukerTilgangTests(TestCase):
         admin = CustomUser.objects.get(username='admin-offline')
         self.assertEqual(ModulTilgang.objects.filter(bruker=admin).count(), 0)
         self.assertTrue(har_tilgang(admin, 'patients', 'skriv_full'))
+
+
+class VerifiserKommandoTests(TestCase):
+    """`verifiser_modultilgang` — kontrollen som kjøres mot prod før deploy 2.
+
+    Den skal aldri skrive. Deploy 2 krymper `role`, og etter det er
+    `ModulTilgang` eneste fasit — så feil i denne kontrollen oppdages først
+    når det ikke lenger går an å regne seg tilbake.
+    """
+
+    def _kjor(self, **opts):
+        from io import StringIO
+        from django.core.management import call_command
+        ut = StringIO()
+        call_command('verifiser_modultilgang', stdout=ut, **opts)
+        return ut.getvalue()
+
+    def test_kommandoen_skriver_ingenting(self):
+        bruker = _bruker('vk_uroert', 'read_write')
+        ModulTilgang.objects.create(
+            bruker=bruker, modul_slug='patients', nivaa='les')
+        foer = set(ModulTilgang.objects.values_list('bruker_id', 'modul_slug', 'nivaa'))
+        self._kjor()
+        self.assertEqual(
+            set(ModulTilgang.objects.values_list('bruker_id', 'modul_slug', 'nivaa')),
+            foer, 'kontrollen skal være les-only')
+
+    def test_admin_telles_ikke_i_10_1(self):
+        """Admin hadde bypass, så flagget var aldri en begrensning for dem.
+
+        Notatet skriver «role >= read_write», men formålet er «kontoer som
+        hadde en tilgang de ikke var ment å ha». Admin var ment å ha den.
+        """
+        _bruker('vk_admin', 'admin', kan_redigere_pasienter=False)
+        ut = self._kjor()
+        self.assertIn('Antall: 0', ut)
+        self.assertNotIn('vk_admin', ut.split('Kontoer uten')[0])
+
+    def test_skriverolle_uten_flagg_telles(self):
+        _bruker('vk_uten_flagg', 'read_write', kan_redigere_pasienter=False)
+        ut = self._kjor()
+        self.assertIn('Antall: 1', ut)
+        self.assertIn('vk_uten_flagg', ut)
+
+    def test_konto_uten_rader_meldes(self):
+        _bruker('vk_tom', 'read_write')
+        self.assertIn('vk_tom', self._kjor().split('Avvik fra')[0])
+
+    def test_avvik_fra_backfillen_meldes(self):
+        bruker = _bruker('vk_avvik', 'read_write')
+        ModulTilgang.objects.create(
+            bruker=bruker, modul_slug='patients', nivaa='les')
+        ut = self._kjor()
+        self.assertIn('backfill ville gitt: patients:skriv_full', ut)
+        self.assertIn('har nå:              patients:les', ut)
+
+    def test_ingen_avvik_naar_matrisen_er_uroert(self):
+        """Vern mot at avvik-testen passerer fordi alt meldes som avvik."""
+        from accounts.test_helpers import gi_standardtilgang
+        gi_standardtilgang(_bruker('vk_ren', 'lead'))
+        self.assertIn('Matrisen er urørt siden backfillen', self._kjor())

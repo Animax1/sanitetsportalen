@@ -28,15 +28,28 @@ admin/lead**.
 
 ### Tilgangsmodell
 
+**Oppdatert 28. aug. 2026:** tabellen er skrevet om til modulnivåer. Rollene
+`admin/lead/lead_view` styrer ikke lenger tilgang — se
+`docs/BESLUTNING_ROLLEMODELLEN.md`.
+
 | Endepunkt | Tilgang | Innhold | Polling |
 |---|---|---|---|
-| `/api/stats/` | Alle innloggede | Header-chips (eksisterende) | 30 s |
-| **`/api/stats/live/`** (NY) | Alle innloggede | A1–A4 (operativ sanntid) | 30–60 s |
-| `/api/full-stats/` | admin/lead/lead_view | B1–B6, C1–C2, D1–D5 | 60–120 s |
+| `/pasienter/api/stats/` | `patients: les` | Ingen kjent konsument — se under | 30 s |
+| **`/pasienter/api/stats/live/`** (NY) | `patients: les` | A1–A4 (operativ sanntid) | 30–60 s |
+| `/statistikk/api/full-stats/` | `statistikk: les` **og** `patients: les` | B1–B6, C1–C2, D1–D5 | 60–120 s |
 
-**Rasjonale:** Live-data er aggregert og operativt — alle på vakt har nytte av
-kø-situasjonen. Full-stats inneholder personvernfølsomme krysstabeller og evalueringsdata
-som krever fagansvar.
+**Rasjonale:** Live-data er aggregert og operativt — alle som kan lese modulen har nytte av
+kø-situasjonen, og de ser uansett de samme pasientene i lista. Full-stats inneholder
+personvernfølsomme krysstabeller og evalueringsdata som krever fagansvar.
+
+**Full-stats krever begge**, ikke bare statistikkmodulen: modulen komponerer tilgang, den
+eier den ikke (§5 i rollemodellnotatet). Uten kravet om `patients: les` ville aggregatene
+gitt avledet innsyn i pasientdata til noen som ikke har tilgang til dem.
+
+**Merk om `/api/stats/`:** det er ikke det som mater header-chipsene — de regnes ut i
+`patients-table.js` fra pasientlista. Endepunktet har ingen kjent konsument og er en rest
+fra Flask-porten. Skal `/api/stats/live/` bygges, er det verdt å avgjøre om den gamle
+stien skal beholdes eller slettes i samme runde; se TODO.
 
 ### (a) Live-dashbord — A-nivå
 

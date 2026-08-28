@@ -4,6 +4,34 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-08-28 — Kontrollkommandoen før deploy 2, og dokumentasjonen ajour
+
+**997 tester grønne** (6 nye). Ingen migrasjon, ingen atferdsendring.
+
+**`python manage.py verifiser_modultilgang`** svarer på §10.1, som deploy 2 ikke kan
+kjøres uten. Den skriver ingenting, og har en test som håndhever det: deploy 2 krymper
+`role`, og etter det er `ModulTilgang` eneste fasit — feil i denne kontrollen oppdages
+først når det ikke lenger går an å regne seg tilbake.
+
+Tre spørsmål den svarer på: hvor mange kontoer hadde skrivetilgang uten flagget (altså en
+tilgang de ikke var ment å ha), hvem har ingen rader i det hele tatt (ser en tom portal),
+og hvor avviker matrisen fra det backfillen ga.
+
+**Admin er utelatt fra §10.1-tallet**, selv om notatet skriver «role >= read_write».
+Formålet er «kontoer som hadde en tilgang de ikke var ment å ha», og global admin var ment
+å ha den — de har alltid hatt bypass. Tas de med, teller tallet kontoer som aldri var et
+problem, og signalet drukner. På staging var forskjellen 6 mot 4.
+
+**`WRITE_ROLES` er fjernet.** Den var én av de fem kopiene av rollelista (§2.6), og sto
+igjen som en ubrukt import etter at skrivesjekkene byttet til `har_tilgang`.
+
+**Dokumentasjonen er ajour:** `CLAUDE.md` beskrev fortsatt rollehierarkiet og
+`permission_flag` som gjeldende, og `docs/BESLUTNING_STATISTIKK.md` hadde en tilgangstabell
+med `admin/lead/lead_view`. Den siste sier nå eksplisitt at full-stats krever **både**
+`statistikk: les` og `patients: les` — modulen komponerer tilgang, den eier den ikke.
+
+---
+
 ## 2026-08-28 — To mangler i deploy 1, meldt fra staging
 
 **991 tester grønne** (4 nye). Ingen migrasjon. Begge var funksjonalitet som var *bygget*

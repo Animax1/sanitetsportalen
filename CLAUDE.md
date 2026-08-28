@@ -44,19 +44,52 @@ Portalens rammeverk. Hver app deklarerer sin modul i `<app>/module.py`, og regis
 2. Importer den i `_REGISTERED_MODULES` i `core/modules.py`
 3. Legg til permission-flagg på `CustomUser` (via migrasjon) om nødvendig
 
-En modul vises kun hvis `ModuleSettings.enabled=True` **og** brukeren har rett `permission_flag`.
+En modul vises kun hvis `ModuleSettings.enabled=True` **og** brukeren har en
+`ModulTilgang`-rad på modulen. Global admin ser alt.
 
 ### Tilgangskontroll
 
-Importér alltid dekoratorer fra `core.auth_decorators`. `accounts/decorators.py` er en ren re-eksport-shim som beholdes fordi `core/tests.py` verifiserer at den fortsatt virker — ingen produksjonskode importerer fra den lenger (N11).
+Importér alltid fra `core.auth_decorators`. `accounts/decorators.py` er en ren
+re-eksport-shim som beholdes fordi `core/tests.py` verifiserer at den fortsatt virker —
+ingen produksjonskode importerer fra den lenger (N11).
+
+**Tre kategorier, ikke én.** Se `docs/BESLUTNING_ROLLEMODELLEN.md`:
+
+1. **Global admin** (`role == 'admin'`) — brukeradmin, backup, moduloppsett, audit, arkiv,
+   og alt irreversibelt. Står utenfor modulaksen og trenger ingen rader.
+2. **Modulbasert** — `accounts.ModulTilgang(bruker, modul_slug, nivaa)`.
+3. **Globalt uten admin** — innlogging, min profil, passordbytte, MFA.
 
 ```python
-from core.auth_decorators import admin_required, write_required, stats_required, role_required
+from core.auth_decorators import admin_required, har_tilgang, modul_kreves
+
+@modul_kreves('patients', 'skriv_full', svar='json')
 ```
 
-Rollehierarki (lavest → høyest): `read_only → read_write → lead_view → lead → admin`
+Nivåene er en ordnet stige. **Fravær av rad er ingen tilgang** — det finnes ingen
+`'ingen'`-verdi å lagre:
 
-`has_role_at_least(user, 'lead')` sjekker hierarkisk. Dekoratorer gir 403 hvis rollen mangler.
+| Nivå | Betyr |
+|---|---|
+| `les` | Kan se modulens data |
+| `skriv_handling` | Navngitte overganger (stemplinger), leser ikke request-kroppen. **Tomt i dag** |
+| `skriv_full` | Kan redigere felter |
+
+Ukjent nivånavn gir **False**, ikke True — en skrivefeil i en dekoratør skal stenge døra.
+`ModuleSettings.enabled=False` gir 403 for alle andre enn global admin.
+
+**Hvert view under en modul må være dekorert.** `patients/tests_modul_dekorator.py` går
+gjennom `urlpatterns` og håndhever det — risikoen ved dekoratør framfor middleware er en
+glemt dekoratør, og en manuell gjennomgang holder bare til neste endepunkt. Unntak må stå
+i lista der, med begrunnelse.
+
+**Grensesnittet gater på `window.MODUL_TILGANG`, ikke på rollen.** Gjør det ikke det, viser
+vi knapper som fører til 403 — og en knapp som fører til en vegg er verre enn ingen knapp.
+
+**`CustomUser.role` er under avvikling.** De fem verdiene styrer ingenting utenom `admin`;
+feltet krymper i deploy 2. De fem `kan_redigere_*`-flaggene styrer ingenting i det hele
+tatt, og står kun til deploy 3 slik at en rollback har noe å bygge radene fra.
+`has_role_at_least` brukes fortsatt for `ARKIV_VIEW_MIN_ROLE`.
 
 ### Rate-limiting (core/ratelimit.py)
 
@@ -106,7 +139,7 @@ Viewene er delt i fem moduler (N13.3) — `views.py` finnes ikke lenger:
 
 | Modul | Ansvar |
 |-------|--------|
-| `views_common.py` | `_json_body`, `_patient_to_dict`, `WRITE_ROLES` — delt av de andre |
+| `views_common.py` | `_json_body`, `_patient_to_dict` — delt av de andre |
 | `views_patients.py` | Hoved-side, innstillinger, sesjonstimeout, pasient-CRUD, nullstilling |
 | `views_registre.py` | Førstehjelper- og helsepersonellregisteret (én fabrikk bygger begge) |
 | `views_stats.py` | `/api/stats/` — uten kjent konsument. Full statistikk ligger i `statistikk/` |
@@ -165,10 +198,10 @@ Arkiv-endepunktet har **to gates**: statistikkgaten *og* `ARKIV_VIEW_MIN_ROLE`. 
 strengere beskyttet enn live-statistikken, og hadde det arvet modulens gate ved flyttingen,
 ville `lead_view` fått innsyn i arkiverte vakter uten at noen bestemte det.
 
-`Module.min_rolle` er midlertidig og gater kun synligheten av denne modulen. Den finnes
-fordi statistikk ble skilt ut før `ModulTilgang`, og alternativet var et
-`kan_se_statistikk`-flagg med migrasjon som uansett skulle kastes. Fjernes sammen med
-`permission_flag`.
+**Modulen komponerer tilgang, den eier den ikke** (§5). Den viser kun kilder brukeren har
+minst `les` på i kildemodulen — ellers ville aggregatene gitt avledet innsyn i data
+brukeren ikke har tilgang til. I dag er `patients` eneste kilde, så sjekken er én linje;
+med kilde nummer to blir den en løkke over registeret.
 
 ### Statistikk-caching (core/stats_cache.py)
 

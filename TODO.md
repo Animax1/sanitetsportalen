@@ -337,8 +337,8 @@ skal ligge der.
       etter deploy 1.
 
 - [x] **Statistikkmodulen skilt ut, og komponerer tilgang (28. aug. 2026).**
-      - [ ] Tilgangstabellen i `docs/BESLUTNING_STATISTIKK.md` må fortsatt skrives om
-            til modulnivåer.
+      - [x] Tilgangstabellen i `docs/BESLUTNING_STATISTIKK.md` skrevet om til
+            modulnivåer (28. aug. 2026).
 
 - [x] **Deploy 1 — ferdig 28. aug. 2026.**
       - [x] `ModulTilgang` lagt til og fylt fra `role` alene (28. aug. 2026).
@@ -370,8 +370,8 @@ skal ligge der.
       - [ ] **Kontroller etterpå at minst én admin står igjen og kan logge inn.**
             Sletter du deg selv ut, finnes det ingen vei inn utenom `create_admin` på
             Railway-konsollen.
-      - [ ] Kjør tellingen under (§10.1) **før** oppryddingen — etterpå er tallet
-            meningsløst.
+      - [ ] Kjør `python manage.py verifiser_modultilgang` **før** oppryddingen —
+            etterpå er §10.1-tallet meningsløst. Kommandoen skriver ingenting.
 
 - [ ] **Deploy 2:** `role` krymper til `admin`/`bruker`. Kan ikke komme før matrisen er
       verifisert i prod — `lead_view` → `bruker` er ikke rullbar uten `ModulTilgang`.
@@ -410,10 +410,9 @@ skal ligge der.
       endres, med `table_name='accounts_modultilgang'`.
 - [x] **`create_offline_users` setter modultilgang (28. aug. 2026).** `create_admin`
       trenger ingenting: global admin bruker ikke `ModulTilgang`.
-- [ ] **Verifiseringskommando som teller `ModulTilgang`-rader mot `role`.** Staging har
-      egen, tom database, så backfillen kan **ikke** verifiseres mot ekte rollefordeling
-      der. Kommandoen kjøres read-only mot prod mellom deploy 1 og 2 — det er den samme
-      kontrollen som «Forutsetning før migrasjonen skrives» over.
+- [x] **Verifiseringskommando (28. aug. 2026):** `python manage.py verifiser_modultilgang`.
+      Les-only. Kjøres mot prod mellom deploy 1 og 2 — staging har egen, tom database, så
+      backfillen kan ikke verifiseres mot ekte rollefordeling der.
 - [ ] **Avgjør `/pasienter/api/stats/`: gate eller slett.** Endepunktet har ingen kjent
       konsument — header-chipsene regnes ut i `patients-table.js` fra pasientlista, og
       ingen JS-fil har noen gang kalt det. Rest fra Flask-porten. Gates `/pasienter/`

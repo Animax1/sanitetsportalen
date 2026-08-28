@@ -32,7 +32,7 @@ from .services import (
     recycle_patient_nr_if_last,
 )
 from .views_common import (
-    WRITE_ROLES, _json_body, _ensure_pabegynt_not_before_inntid,
+    _json_body, _ensure_pabegynt_not_before_inntid,
     _patient_to_dict,
 )
 

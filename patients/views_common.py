@@ -8,7 +8,10 @@ import json
 from datetime import datetime
 
 # Roller med skrivetilgang til pasienter
-WRITE_ROLES = ('admin', 'lead', 'read_write')
+# `WRITE_ROLES` sto her fram til 28. aug. 2026. Den var én av fem kopier av
+# rollelista (§2.6 i beslutningsnotatet), og skrivetilgang avgjøres nå av
+# `har_tilgang(user, 'patients', 'skriv_full')` — ikke av hvilken rolle
+# brukeren har.
 
 
 def _json_body(request):
