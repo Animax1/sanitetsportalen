@@ -6,10 +6,9 @@ Statistikk er samlestedet for tall på tvers av portalens moduler. I dag er
 den direkte importen av et registry etter samme idiom som ``core.backup`` og
 ``core.arkiv`` — se TODO.md.
 
-``min_rolle`` er midlertidig. Den styrer synligheten fram til ``ModulTilgang``
-finnes, slik at denne modulen kunne leveres uten å innføre et
-``kan_se_statistikk``-flagg vi ville kastet igjen to uker senere. Feltet
-fjernes i samme leveranse som tar bort ``permission_flag``.
+Tilgang styres av ``ModulTilgang('statistikk', ...)``. Modulen ble kort gatet
+på et midlertidig ``Module.min_rolle``-felt mens den ventet på tabellen; det
+feltet er borte nå.
 """
 from core.modules import Module
 
@@ -23,8 +22,6 @@ StatistikkModule = Module(
     ),
     url='/statistikk/',
     icon='bar-chart-line',
-    permission_flag=None,
-    min_rolle='lead_view',
     admin_only=False,
     is_core=False,
     order=110,

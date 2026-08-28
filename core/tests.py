@@ -321,6 +321,8 @@ class BakoverkompatibilitetTests(TestCase):
 # ═══════════════════════════════════════════════════════════════════════════
 
 
+from accounts.models import ModulTilgang  # noqa: E402
+
 User = get_user_model()
 
 
@@ -329,13 +331,14 @@ class PortalDashboardViewTests(TestCase):
     """Verifiserer at portal-dashboardet ligger på / og krever innlogging."""
 
     def setUp(self):
-        # Bruker med kan_redigere_pasienter=True slik at pasient-modulen vises.
-        # (Fase 3a la til permission-flagg som default er False; tester som
-        # forventer modulen synlig må sette flagget eksplisitt.)
+        # Modulkortet vises kun med en ModulTilgang-rad. Flagget som sto her
+        # før styrer ingenting lenger — se ModuleVisibilityTests.
         self.user = User.objects.create_user(
             username='dashbruker', password='x', role='read_only',
             must_change_password=False,
-            kan_redigere_pasienter=True,
+        )
+        ModulTilgang.objects.create(
+            bruker=self.user, modul_slug='patients', nivaa='les',
         )
         self.client = Client()
 
@@ -640,7 +643,6 @@ class ModuleRegistryTests(TestCase):
         modul = get_module('patients')
         self.assertIsNotNone(modul)
         self.assertEqual(modul.slug, 'patients')
-        self.assertEqual(modul.permission_flag, 'kan_redigere_pasienter')
         self.assertFalse(modul.is_core)
         self.assertTrue(modul.show_in_dashboard)
 
@@ -683,32 +685,45 @@ class ModuleVisibilityTests(TestCase):
         # Admin skal i hvert fall se patients-modulen.
         self.assertIn('patients', slugs)
 
-    def test_bruker_uten_kan_redigere_pasienter_ser_ikke_patients(self):
+    def test_bruker_uten_modultilgang_ser_ikke_patients(self):
         bruker = User.objects.create_user(
             username='no_pas', password='x', role='read_only',
             must_change_password=False,
         )
-        # Default for nye brukere er kan_redigere_pasienter=False.
-        self.assertFalse(bruker.kan_redigere_pasienter)
+        # Ingen ModulTilgang-rad = ingen tilgang. Det finnes ingen
+        # 'ingen'-verdi å lagre; fraværet er svaret.
         slugs = {m.slug for m in get_dashboard_modules(bruker)}
         self.assertNotIn('patients', slugs)
 
-    def test_bruker_med_kan_redigere_pasienter_ser_patients(self):
+    def test_bruker_med_modultilgang_ser_patients(self):
         bruker = User.objects.create_user(
             username='ja_pas', password='x', role='read_only',
             must_change_password=False,
         )
-        bruker.kan_redigere_pasienter = True
-        bruker.save(update_fields=['kan_redigere_pasienter'])
+        ModulTilgang.objects.create(bruker=bruker, modul_slug='patients', nivaa='les')
         slugs = {m.slug for m in get_dashboard_modules(bruker)}
         self.assertIn('patients', slugs)
+
+    def test_flagget_gir_ikke_lenger_synlighet(self):
+        """De fem `kan_redigere_*`-flaggene styrer ingenting nå.
+
+        De står til deploy 3, slik at en rollback har noe å bygge radene fra.
+        Fram til da må de ikke ved et uhell begynne å gjelde igjen: en bruker
+        med flagget, men uten rad, skal ikke se modulen.
+        """
+        bruker = User.objects.create_user(
+            username='bare_flagg', password='x', role='read_write',
+            must_change_password=False, kan_redigere_pasienter=True,
+        )
+        slugs = {m.slug for m in get_dashboard_modules(bruker)}
+        self.assertNotIn('patients', slugs)
 
     def test_deaktivert_modul_skjules_for_ikke_admin(self):
         bruker = User.objects.create_user(
             username='ja_pas2', password='x', role='read_only',
             must_change_password=False,
-            kan_redigere_pasienter=True,
         )
+        ModulTilgang.objects.create(bruker=bruker, modul_slug='patients', nivaa='les')
         # Deaktiver patients i ModuleSettings.
         ms, _ = ModuleSettings.objects.get_or_create(slug='patients')
         ms.enabled = False

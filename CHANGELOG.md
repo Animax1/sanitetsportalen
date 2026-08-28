@@ -4,6 +4,51 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-08-28 — Deploy 1, del 1: `ModulTilgang` og håndhevelsen
+
+**937 tester grønne** (23 nye). To migrasjoner, begge rullbare. Første del av deploy 1 i
+`docs/BESLUTNING_ROLLEMODELLEN.md`; håndhevelsen på endepunktene kommer i neste commit.
+
+`accounts.ModulTilgang(bruker, modul_slug, nivaa)` erstatter de fem
+`kan_redigere_*`-flaggene. Nivåene er `les < skriv_handling < skriv_full`; **ingen rad er
+ingen tilgang**, og det finnes ingen `'ingen'`-verdi å lagre — to måter å uttrykke det
+samme på kommer før eller siden i utakt.
+
+`modul_slug` er bevisst ikke en FK: modulregisteret ligger i kode, ikke i basen, og en rad
+for en modul som fjernes fra registeret skal bli liggende ubrukt i stedet for å forsvinne
+stille med en CASCADE.
+
+**Backfillen utleder fra `role` alene, ikke fra flagget** (§8.1). Flagget har aldri stengt
+et endepunkt, så en bruker som i dag *kan* nå modulen via URL-en ville mistet den i det
+håndhevelsen slås på — og en migrasjon som stille trekker tilbake tilgang oppdager du
+midt i en vakt. Radene som oppstår bekrefter tilgang folk allerede hadde; ingen
+privilegier oppstår, de blir bare synlige. Innstrammingen gjøres etterpå, for hånd.
+
+**Synligheten leser nå samme kilde som håndhevelsen.** `Module.is_visible_for()` leste de
+fem flaggene, som ingen view sjekket — menyen og døra var uenige, og det var døra som sto
+åpen. `Module.permission_flag` og det midlertidige `min_rolle` er fjernet fra dataklassen;
+modellfeltene på `CustomUser` står til deploy 3, ellers har en rollback ingenting å bygge
+radene fra.
+
+**`ModuleSettings.enabled=False` stenger nå URL-en** (§2.2). Toggelen var en menybryter —
+`GET /pasienter/` ga 200 med modulen deaktivert. Global admin slipper fortsatt inn, ellers
+kan man deaktivere seg selv ut av å kunne reaktivere.
+
+`@modul_kreves('patients', 'skriv_full')` er dekoratør, ikke middleware (§6): middleware er
+ett sted å glemme, men også ett sted å ta feil av `/pasienter/api/...`. Ukjent nivånavn gir
+**False**, ikke True — en skrivefeil i en dekoratør skal stenge døra. Dekoratøren setter en
+markør URL-gjennomgangstesten leser, slik at testen ikke trenger å gjette på om et view er
+dekorert.
+
+Radene caches per brukerobjekt: nav-menyen kaller `is_visible_for` én gang per modul, og
+uten cachen ble det én spørring per modul per sidevisning.
+
+**Backfillen testes ved å kalle migrasjonens egen funksjon**, ikke ved å gjenta
+kartleggingen — en test som gjentar logikken består selv om migrasjonen gjør noe annet.
+Verifisert ved å forfalske kartleggingen og se testen bli rød.
+
+---
+
 ## 2026-08-28 — To feil på staging, og testene som ikke fanget dem
 
 **913 tester grønne** (2 nye). Begge feilene ble meldt fra staging, og begge var samme

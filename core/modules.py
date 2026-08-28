@@ -12,13 +12,13 @@ Designvalg (Fase 3a, Beslutning 1B):
 Hvordan legge til en ny modul:
 1. Lag ``<app>/module.py`` med en klasse som arver fra ``Module``.
 2. Importer klassen i ``_REGISTERED_MODULES`` nederst i denne fila.
-3. Hvis modulen krever et nytt permission-flagg på ``CustomUser``, legg til
-   feltet via migrasjon i ``accounts``.
+3. Ingen migrasjon trengs. Tilgang styres av ``accounts.ModulTilgang``, som
+   er rader og ikke kolonner — det var nettopp derfor de fem
+   ``kan_redigere_*``-flaggene ble erstattet.
 
 Modulen vises på dashboardet og i nav-menyen kun hvis:
 - modulen er ``enabled=True`` i ``ModuleSettings``, og
-- brukeren har permission-flagget angitt av ``permission_flag`` (eller flagget
-  er ``None`` for moduler som er åpne for alle innloggede brukere).
+- brukeren har en ``ModulTilgang``-rad på modulen (global admin ser alt).
 """
 from __future__ import annotations
 
@@ -44,18 +44,8 @@ class Module:
             tjenester som logger til AuditLog uten UI).
         icon: Bootstrap-ikon-klasse uten ``bi-``-prefiks
             (f.eks. ``'clipboard-pulse'``).
-        permission_flag: Navnet på BooleanField på ``CustomUser`` som styrer
-            om brukeren ser modulen. ``None`` = synlig for alle innloggede.
-            Hvis flagget ikke finnes på modellen behandles modulen som
-            usynlig for alle (defensivt).
-        min_rolle: Minste rolle i ``ROLE_HIERARKI`` som ser modulen. ``None``
-            = ingen rollekrav. **Midlertidig.** Feltet finnes fordi
-            statistikkmodulen ble skilt ut før ``ModulTilgang`` var på plass,
-            og alternativet var et ``kan_se_statistikk``-flagg med migrasjon
-            som uansett skulle kastes. Fjernes sammen med ``permission_flag``.
-            Kombineres med AND: settes begge, må begge være oppfylt.
-        admin_only: Hvis ``True`` vises modulen kun for brukere med
-            ``role='admin'``. Permission-flagget ignoreres da.
+        admin_only: Hvis ``True`` vises modulen kun for global admin.
+            Modultilgang sjekkes ikke da.
         is_core: Kjernemodul som ikke kan deaktiveres via UI. Dashboard-toggle
             i ``ModuleSettings``-admin er disabled for slike moduler.
         order: Sorteringsnøkkel — lavere kommer først i meny og dashboard.
@@ -70,8 +60,6 @@ class Module:
     description: str
     url: Optional[str]
     icon: str
-    permission_flag: Optional[str] = None
-    min_rolle: Optional[str] = None
     admin_only: bool = False
     is_core: bool = False
     order: int = 100
@@ -81,6 +69,11 @@ class Module:
     def is_visible_for(self, user) -> bool:
         """Avgjør om modulen skal vises for gitt bruker.
 
+        Synligheten leser nå ``ModulTilgang``, samme kilde som håndhevelsen på
+        endepunktene. Tidligere leste den de fem ``kan_redigere_*``-flaggene,
+        som ingen view sjekket — menyen og døra var uenige, og det var døra
+        som sto åpen.
+
         Tar IKKE hensyn til ``ModuleSettings.enabled`` — det sjekkes separat i
         ``get_visible_modules`` slik at admin alltid kan se hvilke moduler som
         er deaktivert (f.eks. som overvåkings-info i ``ModuleSettings``-admin).
@@ -88,26 +81,19 @@ class Module:
         if user is None or not getattr(user, 'is_authenticated', False):
             return False
 
-        # Admin ser alltid alt — uavhengig av flagg.
-        if getattr(user, 'role', None) == 'admin':
+        from core.auth_decorators import er_global_admin  # noqa: WPS433
+
+        # Global admin ser alltid alt.
+        if er_global_admin(user):
             return True
 
         if self.admin_only:
             return False
 
-        # Rollekrav og permission-flagg kombineres med AND. Rekkefølgen er
-        # vilkårlig; begge må uansett være oppfylt.
-        if self.min_rolle is not None:
-            from core.auth_decorators import has_role_at_least  # noqa: WPS433
-            if not has_role_at_least(user, self.min_rolle):
-                return False
-
-        if self.permission_flag is None:
-            return True
-
-        # Defensivt: hvis flagget ikke er definert på brukermodellen,
-        # behandler vi modulen som usynlig i stedet for å feile.
-        return bool(getattr(user, self.permission_flag, False))
+        # Lesetilgang er terskelen for å *se* modulen. Skrivenivåene ligger
+        # over `les` i stigen, så de dekkes av samme sjekk.
+        from core.auth_decorators import _tilganger  # noqa: WPS433
+        return self.slug in _tilganger(user)
 
 
 # ─────────────────────────────────────────────────────────────────────────────

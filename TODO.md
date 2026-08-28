@@ -341,10 +341,12 @@ skal ligge der.
       brukeren har minst `les` på — ellers er den en bakvei rundt modultilgangen.
       Tilgangstabellen i `docs/BESLUTNING_STATISTIKK.md` må skrives om til modulnivåer.
 
-- [ ] **Deploy 1:** `ModulTilgang` legges til og fylles fra `role` alene (ikke fra
-      flagget — ingen skal miste tilgang under deploy). `@modul_kreves(...)` innføres på
-      alle endepunkter, med en test som går gjennom `urlpatterns` og krever at hvert view
-      er dekorert. `ModuleSettings.enabled=False` gir 403 for ikke-admin.
+- [ ] **Deploy 1** — under arbeid:
+      - [x] `ModulTilgang` lagt til og fylt fra `role` alene (28. aug. 2026).
+            Synlighet og håndhevelse leser nå samme kilde. `ModuleSettings.enabled=False`
+            stenger URL-en. `@modul_kreves` finnes, med markør URL-testen kan lese.
+      - [ ] `@modul_kreves(...)` settes på alle endepunkter, med en test som går gjennom
+            `urlpatterns` og krever at hvert view er dekorert
 - [ ] **Deploy 2:** `role` krymper til `admin`/`bruker`. Maler og JS legges om
       (`window.USER_ROLE` → `window.MODUL_TILGANG`). Kan ikke komme før matrisen er
       verifisert i prod — `lead_view` → `bruker` er ikke rullbar uten `ModulTilgang`.

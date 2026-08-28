@@ -14,7 +14,6 @@ AccountsModule = Module(
     description='Brukere, roller, MFA og passord.',
     url='/accounts/users/',
     icon='people-fill',
-    permission_flag=None,
     admin_only=True,
     is_core=True,
     order=10,

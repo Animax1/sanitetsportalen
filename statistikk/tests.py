@@ -6,8 +6,10 @@ og at ingen fikk mer tilgang enn før flyttingen.
 """
 from django.test import Client, TestCase, override_settings
 
-from accounts.models import CustomUser
-from core.modules import Module, get_module, get_visible_modules
+from accounts.models import CustomUser, ModulTilgang
+from core.auth_decorators import har_tilgang, nivaa_for
+from core.models import ModuleSettings
+from core.modules import get_module, get_visible_modules
 
 
 ALLE_ROLLER = ('read_only', 'read_write', 'lead_view', 'lead', 'admin')
@@ -19,11 +21,31 @@ STATS_ROLLER = ('lead_view', 'lead', 'admin')
 UTEN_STATS = ('read_only', 'read_write')
 
 
-def _bruker(rolle):
-    return CustomUser.objects.create_user(
+# Kartleggingen datamigrasjonen bruker (§8.1). Gjentatt her fordi testene må
+# lage brukere som ligner på dem migrasjonen produserte — nye brukere får
+# ingen rader av seg selv.
+BACKFILL = {
+    'read_only':  [('patients', 'les')],
+    'read_write': [('patients', 'skriv_full')],
+    'lead_view':  [('patients', 'les'),        ('statistikk', 'les')],
+    'lead':       [('patients', 'skriv_full'), ('statistikk', 'les')],
+    'admin':      [],
+}
+
+
+def _bruker(rolle, *, tilganger=None):
+    """Bruker med rollen, og med radene backfillen ville gitt den.
+
+    `tilganger` overstyrer for tester som trenger en annen kombinasjon enn
+    den dagens roller kartlegges til.
+    """
+    bruker = CustomUser.objects.create_user(
         username=f'bruker_{rolle}', password='testpass123',
         role=rolle, must_change_password=False,
     )
+    for slug, nivaa in (BACKFILL[rolle] if tilganger is None else tilganger):
+        ModulTilgang.objects.create(bruker=bruker, modul_slug=slug, nivaa=nivaa)
+    return bruker
 
 
 @override_settings(SECURE_SSL_REDIRECT=False, RATELIMIT_ENABLE=False)
@@ -136,49 +158,45 @@ class StatistikkModulRegistreringTests(TestCase):
                 self.assertNotIn('statistikk', slugs)
 
 
-class MinRolleTests(TestCase):
-    """`Module.min_rolle` — midlertidig felt, men det må virke mens det finnes.
+class ModulTilgangSynlighetTests(TestCase):
+    """Synlighet leser `ModulTilgang` — samme kilde som håndhevelsen.
 
-    Feltet erstattes av ModulTilgang. Fram til da er det den eneste gaten på
-    modulsynligheten for statistikk, så oppførselen låses her.
+    Erstatter `MinRolleTests`. Det midlertidige `Module.min_rolle`-feltet er
+    borte; modulen gates av en rad, som alle andre.
     """
 
-    def _modul(self, **kwargs):
-        grunn = dict(slug='t', name='T', description='', url='/t/', icon='x')
-        return Module(**{**grunn, **kwargs})
+    def test_ingen_rad_er_ingen_tilgang(self):
+        uten = _bruker('read_only', tilganger=[])
+        self.assertIsNone(nivaa_for(uten, 'statistikk'))
+        self.assertNotIn('statistikk', [m.slug for m in get_visible_modules(uten)])
 
-    def test_uten_min_rolle_ser_alle_innloggede_modulen(self):
-        modul = self._modul()
-        self.assertTrue(modul.is_visible_for(_bruker('read_only')))
+    def test_rad_gir_tilgang(self):
+        med = _bruker('read_only', tilganger=[('statistikk', 'les')])
+        self.assertTrue(har_tilgang(med, 'statistikk', 'les'))
 
-    def test_min_rolle_stenger_lavere_roller(self):
-        modul = self._modul(min_rolle='lead_view')
-        self.assertFalse(modul.is_visible_for(_bruker('read_write')))
-        self.assertTrue(modul.is_visible_for(_bruker('lead_view')))
+    def test_admin_ser_modulen_uten_rad(self):
+        """Global admin står utenfor modulaksen og trenger ingen rader."""
+        admin = _bruker('admin')
+        self.assertEqual(ModulTilgang.objects.filter(bruker=admin).count(), 0)
+        self.assertIn('statistikk', [m.slug for m in get_visible_modules(admin)])
 
-    def test_admin_ser_modulen_uansett(self):
-        """Admin har bypass før både flagg og rollekrav sjekkes."""
-        modul = self._modul(min_rolle='lead')
-        self.assertTrue(modul.is_visible_for(_bruker('admin')))
+    def test_deaktivert_modul_stenger_for_alle_andre_enn_admin(self):
+        """Toggelen var en menybryter (§2.2). Nå er den en dør.
 
-    def test_min_rolle_og_permission_flag_kombineres_med_and(self):
-        """Begge må være oppfylt — ikke én av dem.
-
-        Kombineres de med OR, ville et rollekrav åpnet en modul som
-        flagget stenger, og omvendt. Ingen modul bruker begge i dag; testen
-        låser semantikken før noen gjør det.
+        `GET /pasienter/` ga 200 med modulen deaktivert. Verdt å vite *før*
+        noen prøver å stenge en modul under en hendelse.
         """
-        modul = self._modul(min_rolle='lead_view',
-                            permission_flag='kan_redigere_pasienter')
-        lead_view = _bruker('lead_view')
-        self.assertFalse(modul.is_visible_for(lead_view),
-                         'rollen holder, men flagget er False')
+        ModuleSettings.objects.update_or_create(
+            slug='statistikk', defaults={'enabled': False},
+        )
+        lead = _bruker('lead')
+        self.assertFalse(har_tilgang(lead, 'statistikk', 'les'))
 
-        lead_view.kan_redigere_pasienter = True
-        lead_view.save(update_fields=['kan_redigere_pasienter'])
-        self.assertTrue(modul.is_visible_for(lead_view))
+        # Admin slipper fortsatt inn — ellers kan man deaktivere seg selv ut
+        # av å kunne reaktivere.
+        self.assertTrue(har_tilgang(_bruker('admin'), 'statistikk', 'les'))
 
-    def test_anonym_bruker_ser_ingenting(self):
+    def test_anonym_bruker_har_ingenting(self):
         from django.contrib.auth.models import AnonymousUser
-        self.assertFalse(self._modul(min_rolle='read_only')
-                         .is_visible_for(AnonymousUser()))
+        self.assertFalse(har_tilgang(AnonymousUser(), 'statistikk', 'les'))
+        self.assertIsNone(nivaa_for(AnonymousUser(), 'statistikk'))

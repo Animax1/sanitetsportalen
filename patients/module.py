@@ -16,7 +16,6 @@ PatientsModule = Module(
     ),
     url='/pasienter/',
     icon='clipboard-pulse',
-    permission_flag='kan_redigere_pasienter',
     admin_only=False,
     is_core=False,
     order=100,

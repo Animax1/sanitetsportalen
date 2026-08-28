@@ -47,7 +47,7 @@ def portal_dashboard_view(request):
 
     Modul-kortene leses fra ``core.modules``-registret og filtreres på:
     - ``ModuleSettings.enabled`` (admin kan toggle moduler i sanntid)
-    - Brukerens ``permission_flag`` på CustomUser (admin ser alt)
+    - Brukerens ``ModulTilgang``-rad på modulen (global admin ser alt)
     - ``Module.show_in_dashboard``
     """
     modules = get_dashboard_modules(request.user)
