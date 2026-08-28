@@ -4,6 +4,24 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-08-28 — To avklaringer: testkontoen og `leder`-nivået
+
+Kun dokumentasjon. Ingen kodeendring.
+
+**Testkontoen i prod er Andrés egen konto uten admin.** Forrige oppføring førte den opp som
+en åpen oppgave med den begrunnelsen at «den kan opprette og redigere ekte pasienter under
+et navn som ikke tilhører noen på vakt». Det premisset holdt ikke — navnet tilhører noen, og
+André håndterer kontoen selv. Punktet er lukket, med mekanikken (CASCADE på `ModulTilgang`,
+SET_NULL på `Helsepersonell.user`, `AuditLog.user` blir NULL) beholdt for den dagen den
+faktisk slettes.
+
+**`leder`-nivået er merket «VURDER», ikke «skal gjøres».** Bruken er skrevet ned og
+begrunnelsen står i §3.1, men behovet er ikke aktuelt. Det tas opp igjen når noen faktisk
+skal ha nivået — et tomt nivå er lett å dele ut i god tro, og gir automatisk mer den dagen
+det fylles.
+
+---
+
 ## 2026-08-28 — Deploy 3: de fem flaggene er borte, og profilkortet sluttet å lyve
 
 **1003 tester grønne** (6 nye). Migrasjon `accounts.0014_fjern_modulflagg`.
