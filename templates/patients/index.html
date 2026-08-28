@@ -19,7 +19,13 @@
 
 <!-- Brukerrolle for JS -->
 <script nonce="{{ csp_nonce }}">
-  window.USER_ROLE = "{{ request.user.role }}";
+  // Modultilgang, ikke rolle (§7.4). Rollen sier ikke lenger noe om hva du
+  // får gjøre i denne modulen — det gjør nivået. `admin` er global og står
+  // utenfor modulaksen, derfor eget felt.
+  window.MODUL_TILGANG = {
+    patients: "{{ modul_nivaa }}",
+    admin: {{ er_global_admin|yesno:"true,false" }}
+  };
   window.USER_NAME = "{{ request.user.username }}";
   window.MY_FORSTEHJELPER_ID  = {{ request.user.forstehjelper_profil.id|default:'null' }};
   window.MY_HELSEPERSONELL_ID = {{ request.user.helsepersonell_profil.id|default:'null' }};

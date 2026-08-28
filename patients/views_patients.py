@@ -13,7 +13,9 @@ from django.shortcuts import render
 from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_http_methods
 
-from core.auth_decorators import admin_required, har_tilgang, modul_kreves
+from core.auth_decorators import (
+    admin_required, er_global_admin, har_tilgang, modul_kreves, nivaa_for,
+)
 from core.idempotency import bygg_nokkel, forkast, fullfor, reserver
 from core.ratelimit import rate_limit
 
@@ -49,6 +51,12 @@ def index_view(request):
         # Samme nøkkel som PUT /api/settings/ skriver og loadSettings() leser,
         # slik at server og klient ikke kan vise hver sin verdi.
         'event_name': AppSetting.get('event_name', '') or '',
+        # §7.4: grensesnittet må gate på det samme som endepunktene gjør.
+        # Gjorde det ikke det, viste vi «Ny pasient» til en bruker med bare
+        # `les` — hen fikk opp skjemaet, fylte det ut, og møtte 403 på lagre.
+        # En knapp som fører til en vegg er verre enn ingen knapp.
+        'modul_nivaa': nivaa_for(request.user, 'patients') or '',
+        'er_global_admin': er_global_admin(request.user),
     })
 
 

@@ -4,6 +4,37 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-08-28 — Deploy 1, del 4: grensesnittet gater på det samme som døra
+
+**966 tester grønne** (8 nye). Ingen migrasjon. Meldt fra staging: en konto ble satt ned
+fra `skriv_full` til `les`, og «Ny pasient» ble stående. Brukeren fikk opp
+registreringsskjemaet, fylte det ut, og møtte 403 på lagre.
+
+Serveren var riktig hele tiden. `applyRoleVisibility()` gatet på `window.USER_ROLE` — og
+rollen sier ikke lenger noe om hva du får gjøre i en modul. En `read_write`-konto med bare
+`les` fikk `canWrite = true` i nettleseren.
+
+**En knapp som fører til en vegg er verre enn ingen knapp:** brukeren rekker å gjøre
+arbeidet før hen får vite at det ikke gikk.
+
+§7.4 er dermed framskyndet fra deploy 2. `window.USER_ROLE` er borte; malen sender
+`window.MODUL_TILGANG = {patients: <nivå>, admin: <bool>}`. `admin` er eget felt fordi
+global admin står utenfor modulaksen. Redigeringsskjemaet gates på samme kilde — det kunne
+også åpnes av en `les`-bruker, med 403 først på lagre.
+
+**Standarden er ingen tilgang.** Mangler globalen, skjules alt som krever noe. Feiler
+malen, skal knappene forsvinne — ikke dukke opp.
+
+**Ett skille forsvant med rollene.** `les` dekker både gamle `read_only` og `lead_view`,
+som var uenige om pasientlista: den ene fikk den, den andre ikke. Skillet lå aldri i
+dataene — `/api/patients/` returnerer det samme til begge, og tavla viser de samme
+pasientene. Lista gis derfor til alle som kan lese.
+
+Testene kjører `applyRoleVisibility()` i node med et stubbet DOM, ikke som grep etter
+kodelinjer. Verifisert ved å sette `canWrite = true` og se dem bli røde.
+
+---
+
 ## 2026-08-28 — Deploy 1, del 3: hullet fra §2.1 er lukket
 
 **958 tester grønne** (9 nye). Ingen migrasjon. Meldt fra staging: en konto uten

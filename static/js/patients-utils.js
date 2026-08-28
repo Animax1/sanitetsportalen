@@ -32,12 +32,35 @@ function nyIdempotensNokkel() {
 // ROLE-BASED VISIBILITY
 // ════════════════════════════════════════════════════════
 
-function applyRoleVisibility() {
-  const role = (window.USER_ROLE || 'read_only').toLowerCase();
+// Gates på MODULTILGANG, ikke på rolle (§7.4). Rollen sier ikke lenger noe om
+// hva du får gjøre i denne modulen.
+//
+// Fellen dette lukker: en `read_write`-konto med bare `les` på pasientmodulen
+// fikk `canWrite = true` her, så «Ny pasient» sto der, skjemaet åpnet seg —
+// og lagringen møtte 403. Serveren var riktig hele tiden; grensesnittet
+// gatet på feil kilde.
+//
+// **Standarden er ingen tilgang.** Mangler globalen, skjules alt som krever
+// noe. Feiler malen, skal knappene forsvinne — ikke dukke opp.
+function modulNivaa() {
+  return ((window.MODUL_TILGANG || {}).patients || '').toLowerCase();
+}
 
-  const canWrite = role === 'admin' || role === 'lead' || role === 'read_write';
-  const canList  = role !== 'read_only';
-  const isAdmin  = role === 'admin';
+function erAdmin() {
+  return !!(window.MODUL_TILGANG || {}).admin;
+}
+
+function applyRoleVisibility() {
+  const nivaa = modulNivaa();
+
+  const canWrite = nivaa === 'skriv_full';
+  const isAdmin  = erAdmin();
+  // `les` dekker både gamle `read_only` og `lead_view`, som var uenige om
+  // lista: den ene fikk den, den andre ikke. Skillet lå aldri i dataene —
+  // `/api/patients/` returnerer det samme til begge, og tavla viser de samme
+  // pasientene. Lista gis derfor til alle som kan lese, og forskjellen
+  // forsvinner med rollene i deploy 2.
+  const canList  = nivaa !== '';
 
   if (!canWrite) {
     document.querySelectorAll('.write-only').forEach(el => {

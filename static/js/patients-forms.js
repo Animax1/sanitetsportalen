@@ -97,8 +97,9 @@ async function _saveNewImpl() {
 // EDIT PATIENT
 // ════════════════════════════════════════════════════════
 function openEdit(data) {
-  const role = (window.USER_ROLE || 'read_only').toLowerCase();
-  if (role === 'read_only') return;
+  // Kun `skriv_full` får åpne redigeringsskjemaet. `les` kunne tidligere
+  // åpne det (rollen var read_write) og møtte 403 først på lagre.
+  if (modulNivaa() !== 'skriv_full') return;
   currentEditId = data.id;
   document.getElementById('edit-title').textContent = `Pasient #${data.patient_nr}`;
 

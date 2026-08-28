@@ -348,9 +348,12 @@ skal ligge der.
             URL-gjennomgangstest og unntaksliste med begrunnelse. Hullet fra §2.1 er
             lukket og målt: `POST /api/patients/` uten modultilgang gir 403, ikke 201.
       - [x] §5-komposisjonen: statistikk viser kun kilder brukeren har `les` på
-- [ ] **Deploy 2:** `role` krymper til `admin`/`bruker`. Maler og JS legges om
-      (`window.USER_ROLE` → `window.MODUL_TILGANG`). Kan ikke komme før matrisen er
+- [ ] **Deploy 2:** `role` krymper til `admin`/`bruker`. Kan ikke komme før matrisen er
       verifisert i prod — `lead_view` → `bruker` er ikke rullbar uten `ModulTilgang`.
+      - [x] **JS-delen er framskyndet (28. aug. 2026):** `window.USER_ROLE` →
+            `window.MODUL_TILGANG`. Måtte fram tidlig fordi grensesnittet ellers viste
+            «Ny pasient» til en bruker med bare `les`, som så møtte 403 på lagre.
+      - [ ] Malene bruker fortsatt `{% if request.user.role == ... %}` enkelte steder
 - [ ] **Deploy 3:** de fem `kan_redigere_*`-flaggene fjernes. Slås 1 og 3 sammen, mister
       en rollback dataene.
 
