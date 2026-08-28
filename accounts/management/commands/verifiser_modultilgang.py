@@ -49,8 +49,67 @@ class Command(BaseCommand):
             '--vis-alle', action='store_true',
             help='List hver konto, ikke bare avvikene.',
         )
+        parser.add_argument(
+            '--forhandsvis', action='store_true',
+            help=('Vis hva backfillen VIL gi, uten å lese ModulTilgang. '
+                  'Kjøres FØR deploy 1, når tabellen ikke finnes ennå.'),
+        )
+
+    def _forhandsvis(self):
+        """Hva backfillen vil produsere, lest fra `role` alene.
+
+        Rører ikke ``ModulTilgang`` — tabellen finnes ikke før migrasjonen har
+        kjørt, og hele poenget er å kunne se resultatet *før* man deployer.
+
+        **Merk hva den viser om flagget.** Backfillen utleder fra `role` og
+        ignorerer `kan_redigere_pasienter` med vilje (§8.1). Har noen redusert
+        en konto ved å fjerne flagget i stedet for å endre rollen, har det
+        ikke hatt noen virkning — flagget stengte aldri et endepunkt — og
+        backfillen vil gi kontoen det rollen tilsier. Kolonnen under gjør den
+        forskjellen synlig før den blir en overraskelse.
+        """
+        brukere = list(CustomUser.objects.all().order_by('username'))
+        self.stdout.write(self.style.MIGRATE_HEADING(
+            'Forhåndsvisning — hva backfillen vil gi hver konto'))
+        self.stdout.write('')
+        self.stdout.write(
+            f'  {"konto":24} {"rolle":11} {"flagg":6} → modultilgang')
+        self.stdout.write('  ' + '─' * 70)
+
+        overraskelser = []
+        for b in brukere:
+            rader = BACKFILL.get(b.role, set())
+            vist = ', '.join(f'{s}:{n}' for s, n in sorted(rader))
+            if b.role == 'admin':
+                vist = '(global admin — ingen rader)'
+            flagg = 'ja' if b.kan_redigere_pasienter else 'nei'
+            self.stdout.write(f'  {b.username:24} {b.role:11} {flagg:6} → {vist}')
+
+            skriver = any(n.startswith('skriv') for _, n in rader)
+            if skriver and not b.kan_redigere_pasienter:
+                overraskelser.append(b)
+
+        if overraskelser:
+            self.stdout.write('')
+            self.stdout.write(self.style.WARNING(
+                'Kontoer som får SKRIVETILGANG selv om flagget er av:'))
+            for b in overraskelser:
+                self.stdout.write(self.style.WARNING(
+                    f'  {b.username} ({b.role})'))
+            self.stdout.write(
+                '  Flagget har aldri stengt noe (§2.1), så disse har skrivetilgang\n'
+                '  i prod allerede — backfillen bekrefter den, den gir den ikke.\n'
+                '  Skal de ha mindre, endre `role` FØR deploy, eller sett nivået i\n'
+                '  matrisen ETTER. Ikke fjern flagget: det gjør ingenting.')
+
+        self.stdout.write('')
+        self.stdout.write(
+            'Ingenting er skrevet. Kjør uten --forhandsvis etter deploy 1 for å\n'
+            'kontrollere at resultatet ble som vist over.')
 
     def handle(self, *args, **opts):
+        if opts['forhandsvis']:
+            return self._forhandsvis()
         brukere = list(
             CustomUser.objects.all().order_by('username').prefetch_related('modultilganger')
         )

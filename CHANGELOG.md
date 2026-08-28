@@ -4,6 +4,26 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-08-28 — Forhåndsvisning av backfillen, før den kjøres
+
+**1002 tester grønne** (5 nye). Ingen migrasjon.
+
+`verifiser_modultilgang` kunne bare kjøres *etter* deploy 1 — den leser `ModulTilgang`, og
+tabellen finnes ikke i prod før migrasjonen har kjørt. `--forhandsvis` viser hva backfillen
+**vil** gi hver konto, lest fra `role` alene, uten å røre tabellen. En test teller
+spørringer mot den for å håndheve det: går det én, ville kommandoen krasjet i prod.
+
+Den advarer særskilt om én felle: **å «redusere» en konto ved å fjerne
+`kan_redigere_pasienter` gjør ingenting.** Flagget stengte aldri et endepunkt (§2.1), og
+backfillen utleder fra `role` alene (§8.1) — så kontoen får `skriv_full` likevel. Uten
+advarselen ville noen tro de hadde tatt bort skrivetilgang, og oppdaget det motsatte etter
+deploy.
+
+Skal en konto ha mindre: endre `role` **før** deploy, eller sett nivået i matrisen
+**etter**.
+
+---
+
 ## 2026-08-28 — `.admin-only` og `.write-only` rendres server-side
 
 **997 tester grønne.** Ingen migrasjon, ingen endring i hvem som har tilgang.

@@ -341,3 +341,61 @@ class VerifiserKommandoTests(TestCase):
         from accounts.test_helpers import gi_standardtilgang
         gi_standardtilgang(_bruker('vk_ren', 'lead'))
         self.assertIn('Matrisen er urørt siden backfillen', self._kjor())
+
+
+class ForhandsvisningTests(TestCase):
+    """`--forhandsvis` kjøres mot prod FØR deploy 1.
+
+    Den må derfor ikke røre `ModulTilgang` — tabellen finnes ikke der ennå, og
+    hele poenget er å se resultatet før man deployer.
+    """
+
+    def _kjor(self):
+        from io import StringIO
+        from django.core.management import call_command
+        ut = StringIO()
+        call_command('verifiser_modultilgang', '--forhandsvis', stdout=ut)
+        return ut.getvalue()
+
+    def test_leser_ikke_modultilgang(self):
+        """Kjøres før migrasjonen, så tabellen kan ikke antas å finnes.
+
+        Testes ved å telle spørringer mot tabellen: går det én, ville
+        kommandoen krasjet i prod før deploy 1.
+        """
+        from django.db import connection
+        from django.test.utils import CaptureQueriesContext
+
+        _bruker('fv_en', 'read_write')
+        with CaptureQueriesContext(connection) as spor:
+            self._kjor()
+        traff = [q['sql'] for q in spor.captured_queries
+                 if 'modultilgang' in q['sql'].lower()]
+        self.assertEqual(traff, [], 'forhåndsvisningen må ikke lese ModulTilgang')
+
+    def test_viser_hva_rollen_gir(self):
+        _bruker('fv_lead', 'lead')
+        ut = self._kjor()
+        self.assertIn('patients:skriv_full', ut)
+        self.assertIn('statistikk:les', ut)
+
+    def test_admin_vises_uten_rader(self):
+        _bruker('fv_admin', 'admin')
+        self.assertIn('(global admin — ingen rader)', self._kjor())
+
+    def test_advarer_naar_flagget_er_av_men_rollen_gir_skriv(self):
+        """Fella: å «redusere» en konto ved å fjerne flagget gjør ingenting.
+
+        Flagget stengte aldri et endepunkt (§2.1), og backfillen utleder fra
+        `role` alene (§8.1). Uten advarselen ville noen tro de hadde tatt bort
+        skrivetilgang, og oppdaget det motsatte etter deploy.
+        """
+        _bruker('fv_felle', 'read_write', kan_redigere_pasienter=False)
+        ut = self._kjor()
+        self.assertIn('får SKRIVETILGANG selv om flagget er av', ut)
+        self.assertIn('fv_felle', ut.split('får SKRIVETILGANG')[1])
+
+    def test_ingen_advarsel_naar_rollen_er_lesende(self):
+        """Vern mot at advarselen alltid vises."""
+        _bruker('fv_leser', 'read_only', kan_redigere_pasienter=False)
+        self.assertNotIn('får SKRIVETILGANG', self._kjor())

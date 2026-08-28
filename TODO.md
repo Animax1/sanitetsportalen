@@ -370,8 +370,14 @@ skal ligge der.
       - [ ] **Kontroller etterpå at minst én admin står igjen og kan logge inn.**
             Sletter du deg selv ut, finnes det ingen vei inn utenom `create_admin` på
             Railway-konsollen.
-      - [ ] Kjør `python manage.py verifiser_modultilgang` **før** oppryddingen —
-            etterpå er §10.1-tallet meningsløst. Kommandoen skriver ingenting.
+      - [x] **Oppryddingen er gjort (28. aug. 2026).** Prod har nå én ikke-admin-konto
+            (kollegaens, midlertidig redusert til lesing) pluss admin.
+      - [ ] **Kjør `python manage.py verifiser_modultilgang --forhandsvis` mot prod før
+            merge til `main`.** Den leser ikke `ModulTilgang` og virker derfor før
+            migrasjonen. Kontroller særlig at kollegaens konto står oppført med det
+            nivået hån faktisk skal ha: **backfillen leser `role`, ikke flagget** — er
+            kontoen redusert ved å fjerne `kan_redigere_pasienter`, har det ikke hatt
+            noen virkning, og backfillen gir `skriv_full` likevel.
 
 - [ ] **Deploy 2:** `role` krymper til `admin`/`bruker`. Kan ikke komme før matrisen er
       verifisert i prod — `lead_view` → `bruker` er ikke rullbar uten `ModulTilgang`.
