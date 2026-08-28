@@ -9,30 +9,47 @@ kanttilstand, ikke normalen: brukerne som fantes fikk rader av migrasjonen, og
 nye får dem av matrisen på opprettingsskjemaet. En test som lager en bruker
 uten rader modellerer altså noe som knapt finnes.
 
-``gi_standardtilgang`` gir brukeren nøyaktig radene backfillen ville gitt den,
-ut fra rollen. Kartleggingen er den samme som i
-``accounts/migrations/0012_fyll_modultilgang.py`` — den er gjentatt her fordi
-en test som importerer migrasjonen ville bundet seg til et filnavn som endrer
-seg, men avviket er verdt å kjenne til: endres §8.1, må begge steder følge.
-``BackfillTests`` leser migrasjonen direkte og er fasiten.
+**Profilen oppgis eksplisitt.** Fram til deploy 2 leste hjelperen ``bruker.role``
+og slo opp radene backfillen ville gitt. Det gikk så lenge rollen *var* en
+tilgangsverdi. Nå er `role` krympet til ``admin``/``bruker``, og en oppslag på
+rollen ville gitt alle testbrukere det samme — nemlig ingenting. Testene sier
+derfor hva kontoen skal kunne, ikke hva den het:
+
+    gi_standardtilgang(bruker, 'skriver')
+
+Navnene beskriver tilgang, ikke de gamle rollene. `leder_les` er ikke «en
+lead_view» — det er «leser pasienter, leser statistikk», som er den eneste
+forskjellen den rollen noen gang gjorde.
 """
 from accounts.models import ModulTilgang
 
-STANDARDTILGANG = {
-    'read_only':  [('patients', 'les')],
-    'read_write': [('patients', 'skriv_full')],
-    'lead_view':  [('patients', 'les'),        ('statistikk', 'les')],
-    'lead':       [('patients', 'skriv_full'), ('statistikk', 'les')],
-    'admin':      [],   # global admin trenger ingen rader
+#: Profil → radene profilen gir. Verdiene er de samme kombinasjonene
+#: ``accounts/migrations/0012_fyll_modultilgang.py`` fylte tabellen med, slik at
+#: testene fortsatt modellerer kontoer som faktisk finnes i prod.
+PROFILER = {
+    'leser':     [('patients', 'les')],
+    'skriver':   [('patients', 'skriv_full')],
+    'leder_les': [('patients', 'les'),        ('statistikk', 'les')],
+    'leder':     [('patients', 'skriv_full'), ('statistikk', 'les')],
+    'admin':     [],   # global admin trenger ingen rader
 }
 
 
-def gi_standardtilgang(bruker):
-    """Gi brukeren radene backfillen ville gitt den. Returnerer brukeren.
+def gi_standardtilgang(bruker, profil):
+    """Gi brukeren radene profilen beskriver. Returnerer brukeren.
 
     Idempotent, så den kan kalles om igjen uten å duplisere.
+
+    Et ukjent profilnavn er en skrivefeil, ikke «ingen tilgang». Stille
+    returnering hadde gjort testen grønn på feil grunnlag: brukeren ville
+    manglet tilgang, endepunktet svart 403, og en test som *forventer* 403
+    hadde bestått uten å teste noe.
     """
-    for slug, nivaa in STANDARDTILGANG.get(getattr(bruker, 'role', ''), []):
+    if profil not in PROFILER:
+        raise ValueError(
+            f'Ukjent profil {profil!r}. Gyldige: {", ".join(sorted(PROFILER))}'
+        )
+    for slug, nivaa in PROFILER[profil]:
         ModulTilgang.objects.update_or_create(
             bruker=bruker, modul_slug=slug, defaults={'nivaa': nivaa},
         )

@@ -12,7 +12,7 @@ from accounts.models import CustomUser, ModulTilgang
 from patients.models import AppSetting
 
 
-def _bruker(navn, rolle='read_write', nivaa='skriv_full'):
+def _bruker(navn, rolle='bruker', nivaa='skriv_full'):
     b = CustomUser.objects.create_user(
         username=navn, password='x', role=rolle, must_change_password=False)
     if nivaa:

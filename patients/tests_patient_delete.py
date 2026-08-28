@@ -32,15 +32,15 @@ class PatientDeleteSetupMixin:
             role='admin',
             must_change_password=False,
         )
-        gi_standardtilgang(self.admin)
+        gi_standardtilgang(self.admin, 'admin')
         # Read-write-bruker uten sletterett
         self.rw_user = User.objects.create_user(
             username='rw_delete',
             password='passord123',
-            role='read_write',
+            role='bruker',
             must_change_password=False,
         )
-        gi_standardtilgang(self.rw_user)
+        gi_standardtilgang(self.rw_user, 'skriver')
         # Sett aktivt år
         AppSetting.set('active_year', 2099)
 
@@ -150,7 +150,7 @@ class RecycleFunctionTests(PatientDeleteSetupMixin, TestCase):
         self.assertEqual(resp2.json()['pasientnummer'], 1)
 
     def test_ikke_admin_kan_ikke_slette(self):
-        """Ikke-admin (read_write) kan ikke slette pasient (403)."""
+        """Ikke-admin med skrivetilgang kan ikke slette pasient (403)."""
         p = self._opprett(7)
         resp = self._slett(p.pk, client=self.rw_client)
         self.assertEqual(resp.status_code, 403)

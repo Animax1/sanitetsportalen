@@ -301,6 +301,12 @@ inn — ellers kan man deaktivere seg selv ut av å kunne reaktivere.
 
 Et eget `er_admin`-felt ville gitt en migrasjon til og etterlatt `role` som dødt felt.
 
+> **Gjennomført 28. aug. 2026** — `accounts.0013_krymp_role`. Ikke deployet til prod ennå.
+> Rekkefølgen innad i deployen var poenget: først ble koden gjort uavhengig av de fire
+> verdiene, så krympet feltet. Motsatt vei ville gitt et vindu der
+> `has_role_at_least(user, 'read_write')` sammenlignet mot en verdi som ikke fantes — og
+> den sammenligningen feiler ikke, den svarer bare feil.
+
 ### 7.2 De fem `kan_redigere_*`-flaggene fjernes
 
 Erstattes helt av `ModulTilgang`. Navnene var uansett feil: de gjorde verken redigering
@@ -331,6 +337,8 @@ TODO sa minimum to. Det blir tre, fordi rollekrympingen er destruktiv.
 | **1** | Legg til `ModulTilgang`, fyll den fra `role`, innfør `@modul_kreves` + håndhevelse. `role` og de fem flaggene står urørt | Ja |
 | **2** | Krymp `role` til `admin`/`bruker`. Bytt maler og JS | Kun med `ModulTilgang` som fasit |
 | **3** | Fjern de fem flaggene | Ja |
+
+Status: **1 er i prod** (28. aug. 2026), **2 er kodet, ikke deployet**, 3 gjenstår.
 
 Slås 1 og 3 sammen, mister en rollback dataene. Deploy 2 kan ikke komme før matrisen er
 verifisert i prod: `lead_view` → `bruker` kan ikke rulles tilbake uten `ModulTilgang`.
@@ -367,14 +375,30 @@ oppstår; de blir bare synlige.
 - `docs/TEKNISK_DOKUMENTASJON.md` §6.3 rettes: shimen, hard-delete, ny tilgangstabell
 - `lead_view`-badgen i `user_list.html` / `user_detail.html` — bortfaller med rollekrympingen
 
+**Lagt til i deploy 2, ikke planlagt her:**
+
+- **De to bulk-knappene på brukerlista.** «Gi ledere pasienttilgang» og «fjern
+  pasienttilgang fra alle» skrev `kan_redigere_pasienter` på en gruppe kontoer og meldte
+  suksess uten at noen fikk eller mistet noe. De ble ikke fanget av §2.1-gjennomgangen
+  fordi de skriver et flagg, ikke leser det — men konsekvensen er den samme fella:
+  neste gang tilgang skal trekkes tilbake, tror admin at jobben er gjort.
+- **`ARKIV_VIEW_MIN_ROLE` og `ARKIV_WRITE_ROLE`** i `patients/services.py`. De var
+  «konfigurerbare» til `lead_view` og `lead` — verdier som ikke finnes etter §7.1.
+  Arkivet er global admin, og sier det nå rett ut.
+- **Halve `verifiser_modultilgang`.** §10.1-tellingen og sammenligningen mot `role` er
+  fjernet, ikke gjemt bak en versjonssjekk: begge ville svart «ingen avvik» og «Antall: 0»
+  om hver eneste database etter krympingen. Et svar som alltid er grønt er verre enn ingen
+  kontroll.
+
 `accounts/decorators.py` beholdes som shim så lenge `core/tests.py` verifiserer den (N11).
 
 ## 10. Åpne avklaringer
 
-1. **Kontroller i prod før migrasjonen skrives:** hvor mange kontoer har `role` ≥
-   `read_write` men `kan_redigere_pasienter=False`? Det er kontoene som i dag har en
-   tilgang de ikke var ment å ha (§2.1). Tallet avgjør hvor stor oppryddingen blir etter
-   deploy 1.
+1. ~~**Kontroller i prod før migrasjonen skrives:** hvor mange kontoer har `role` ≥
+   `read_write` men `kan_redigere_pasienter=False`?~~ **Besvart 28. aug. 2026: 0 av 2.**
+   Ingen kontoer uten rader, ingen avvik fra backfillen. Kontrollen ble kjørt mot prod
+   mellom deploy 1 og 2, og kan ikke tas om igjen — deploy 2 fjerner grunnlaget, og en
+   rollback gir alle den samme rollen.
 2. Skal `handling`-nivået innføres allerede i deploy 1, eller først når oppdragsmodulen
    skrives? Anbefaling: definer nivået nå (så `ModulTilgang` ikke trenger ny migrasjon),
    men ta ikke i bruk før det finnes et `handling`-endepunkt å bruke det på.

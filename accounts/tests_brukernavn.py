@@ -24,9 +24,9 @@ class UfolsomInnloggingTests(TestCase):
         cache.clear()
         self.bruker = CustomUser.objects.create_user(
             username='kari.nordmann', password='RiktigPass123!',
-            role='read_write', must_change_password=False,
+            role='bruker', must_change_password=False,
         )
-        gi_standardtilgang(self.bruker)
+        gi_standardtilgang(self.bruker, 'skriver')
 
     def test_stor_forbokstav_slipper_inn(self):
         """Selve tilfellet fra mobiltastaturet."""
@@ -69,9 +69,9 @@ class UfolsomInnloggingTests(TestCase):
         """
         dublett = CustomUser.objects.create_user(
             username='Kari.Nordmann', password='AnnetPass123!',
-            role='read_only', must_change_password=False,
+            role='bruker', must_change_password=False,
         )
-        gi_standardtilgang(dublett)
+        gi_standardtilgang(dublett, 'leser')
 
         self.assertEqual(
             authenticate(username='Kari.Nordmann', password='AnnetPass123!'),
@@ -108,7 +108,7 @@ class RateLimitNokkelTests(TestCase):
         cache.clear()
         CustomUser.objects.create_user(
             username='kari.nordmann', password='RiktigPass123!',
-            role='read_write', must_change_password=False,
+            role='bruker', must_change_password=False,
         )
 
     def test_store_bokstaver_deler_botte_med_smaa(self):
@@ -139,7 +139,7 @@ class BrukernavnNormaliseringTests(TestCase):
             username='sjef', password='AdminPass123!', role='admin',
             must_change_password=False,
         )
-        gi_standardtilgang(self.admin)
+        gi_standardtilgang(self.admin, 'admin')
         self.klient = Client()
         self.klient.force_login(self.admin)
 
@@ -148,7 +148,7 @@ class BrukernavnNormaliseringTests(TestCase):
             'username': '  Kari.Nordmann  ',
             'fullt_navn': 'Kari Nordmann',
             'email': 'kari@eksempel.no',
-            'role': 'read_write',
+            'role': 'bruker',
             'metode': 'invitasjon',
         })
         self.assertTrue(

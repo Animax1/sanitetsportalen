@@ -378,21 +378,48 @@ skal ligge der.
             Railway-konsollen.
       - [x] **Oppryddingen er gjort (28. aug. 2026).** Prod har nå én ikke-admin-konto
             (kollegaens, midlertidig redusert til lesing) pluss admin.
-      - [ ] **Kjør `python manage.py verifiser_modultilgang --forhandsvis` mot prod før
-            merge til `main`.** Den leser ikke `ModulTilgang` og virker derfor før
-            migrasjonen. Kontroller særlig at kollegaens konto står oppført med det
-            nivået hån faktisk skal ha: **backfillen leser `role`, ikke flagget** — er
-            kontoen redusert ved å fjerne `kan_redigere_pasienter`, har det ikke hatt
-            noen virkning, og backfillen gir `skriv_full` likevel.
+      - [x] **Kollegaens nivå satt (28. aug. 2026):** `patients: skriv_full`,
+            `statistikk: les`, og Helsepersonell-koblingen på plass.
 
-- [ ] **Deploy 2:** `role` krymper til `admin`/`bruker`. Kan ikke komme før matrisen er
-      verifisert i prod — `lead_view` → `bruker` er ikke rullbar uten `ModulTilgang`.
-      - [x] **JS-delen er framskyndet (28. aug. 2026):** `window.USER_ROLE` →
+- [ ] **Testkontoen i prod må vekk før neste vakt.** André opprettet den 28. aug. 2026 for
+      å kontrollere de samme nivåene selv, og den står fortsatt med `skriv_full` på
+      pasienter. Den er ikke et testmiljø — den kan opprette og redigere ekte pasienter,
+      og gjør det under et navn som ikke tilhører noen på vakt.
+      - [ ] Slett den, eller sett `is_active=False` hvis sporet i auditloggen skal være
+            lett å lese. Sletting fjerner `ModulTilgang`-radene (CASCADE) og nuller
+            `Helsepersonell.user` (SET_NULL); auditradene består, men `AuditLog.user`
+            blir NULL.
+      - [ ] Ikke bland den med kollegaens konto ved opprydding — de har samme nivåer, og
+            det er navnet som skiller dem.
+      - [x] **Kontrollen kjørt mot prod etter deploy 1 (28. aug. 2026).** §10.1: «Antall: 0
+            av 2». Ingen kontoer uten rader, ingen avvik fra backfillen. Det var siste
+            gang det tallet kunne tas — deploy 2 fjerner grunnlaget.
+
+- [x] **Deploy 2 — kodet 28. aug. 2026, ikke deployet.** `role` krympet til
+      `admin`/`bruker` (migrasjon `0013_krymp_role`), og all kode som leste de fire andre
+      verdiene er borte.
+      - [x] **JS-delen ble framskyndet (28. aug. 2026):** `window.USER_ROLE` →
             `window.MODUL_TILGANG`. Måtte fram tidlig fordi grensesnittet ellers viste
             «Ny pasient» til en bruker med bare `les`, som så møtte 403 på lagre.
-      - [ ] Malene bruker fortsatt `{% if request.user.role == ... %}` enkelte steder
+      - [x] `has_role_at_least`, `role_required`, `write_required`, `stats_required` og
+            `dataset_scope_all` fjernet fra `core.auth_decorators`. `ARKIV_VIEW_MIN_ROLE`
+            og `ARKIV_WRITE_ROLE` fjernet fra `patients.services` — de var
+            «konfigurerbare» til verdier som ikke finnes lenger.
+      - [x] Rollebadgene i `user_list.html`/`user_detail.html` viser admin mot bruker.
+            Rollefeltet har fått hjelpetekst: «Bruker» betyr ikke «vanlig tilgang».
+      - [x] De to bulk-knappene på brukerlista er fjernet. De skrev til
+            `kan_redigere_pasienter` og meldte suksess uten at noen mistet noe.
+      - [x] `verifiser_modultilgang` krympet til det den fortsatt kan svare på:
+            kontoer uten rader, rader på ukjent modul eller nivå, ukjente rolleverdier.
+            §10.1-tellingen og sammenligningen mot `role` er fjernet, ikke deaktivert —
+            begge ville svart grønt uansett database.
+      - [ ] **Deploy til prod. Krever avgjørelse fra André.** Etter migrasjonen er
+            `ModulTilgang` eneste fasit: en rollback av deploy 1 kan ikke lenger bygge
+            matrisen på nytt fra `role`.
+
 - [ ] **Deploy 3:** de fem `kan_redigere_*`-flaggene fjernes. Slås 1 og 3 sammen, mister
-      en rollback dataene.
+      en rollback dataene. Kan tas når deploy 2 har stått en stund i prod — etter deploy 2
+      er vinduet der en rollback kan gjenskape matrisen fra `role` uansett over.
 
 - [x] **Sletting åpnet for `skriv: full` (28. aug. 2026)**, kun på pasienter brukeren selv opprettet
       siste 30 min. «Egen pasient» avgjøres fra `AuditLog`s CREATE-rad — indeksert på

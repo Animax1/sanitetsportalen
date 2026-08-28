@@ -2,7 +2,7 @@
 Tester for VaktArkiv-funksjonalitet.
 
 Dekker:
-  1.  test_lagre_arkiv_kun_admin — read_write/lead/lead_view får 403
+  1.  test_lagre_arkiv_kun_admin — alle ikke-admin-profiler får 403
   2.  test_lagre_arkiv_krever_arrangement_navn — tom navn → 400
   3.  test_lagre_arkiv_lager_arkivertpasient_rader — N pasienter → N rader
   4.  test_lagre_arkiv_kopierer_behandler_navn — denormalisert riktig
@@ -42,27 +42,27 @@ class ArkivTestMixin:
             username='admin_arkiv', password='passord', role='admin',
             must_change_password=False,
         )
-        gi_standardtilgang(self.admin)
+        gi_standardtilgang(self.admin, 'admin')
         self.read_write = User.objects.create_user(
-            username='rw_arkiv', password='passord', role='read_write',
+            username='rw_arkiv', password='passord', role='bruker',
             must_change_password=False,
         )
-        gi_standardtilgang(self.read_write)
+        gi_standardtilgang(self.read_write, 'skriver')
         self.lead = User.objects.create_user(
-            username='lead_arkiv', password='passord', role='lead',
+            username='lead_arkiv', password='passord', role='bruker',
             must_change_password=False,
         )
-        gi_standardtilgang(self.lead)
+        gi_standardtilgang(self.lead, 'leder')
         self.lead_view = User.objects.create_user(
-            username='lv_arkiv', password='passord', role='lead_view',
+            username='lv_arkiv', password='passord', role='bruker',
             must_change_password=False,
         )
-        gi_standardtilgang(self.lead_view)
+        gi_standardtilgang(self.lead_view, 'leder_les')
         self.read_only = User.objects.create_user(
-            username='ro_arkiv', password='passord', role='read_only',
+            username='ro_arkiv', password='passord', role='bruker',
             must_change_password=False,
         )
-        gi_standardtilgang(self.read_only)
+        gi_standardtilgang(self.read_only, 'leser')
 
         AppSetting.set('active_year', 2098)
         AppSetting.set('next_patient_nr', 1)
@@ -97,7 +97,7 @@ class ArkivTestMixin:
 class LagreArkivTests(ArkivTestMixin, TestCase):
 
     def test_lagre_arkiv_kun_admin(self):
-        """read_write, lead og lead_view skal få 403 ved lagring."""
+        """Alle ikke-admin-profiler skal få 403 ved lagring."""
         for role_user in [self.read_write, self.lead, self.lead_view]:
             c = Client()
             c.force_login(role_user)
@@ -178,7 +178,7 @@ class ArkivListeTests(ArkivTestMixin, TestCase):
         self.assertIn(arkiv_b.pk, ids)
 
     def test_arkiv_liste_kun_admin(self):
-        """Standard ARKIV_VIEW_MIN_ROLE='admin' → andre roller får 403."""
+        """Arkivlista er global admin → alle andre profiler får 403."""
         for role_user in [self.read_write, self.lead, self.lead_view, self.read_only]:
             c = Client()
             c.force_login(role_user)
@@ -255,7 +255,7 @@ class ArkivDetaljTests(ArkivTestMixin, TestCase):
         self.assertEqual(data['summary']['rod'], 2)
 
     def test_arkiv_full_stats_krever_riktig_rolle(self):
-        """Roller under ARKIV_VIEW_MIN_ROLE (default admin) skal få 403."""
+        """Alle andre enn global admin skal få 403."""
         for role_user in [self.read_only, self.read_write, self.lead_view, self.lead]:
             c = Client()
             c.force_login(role_user)
@@ -411,7 +411,7 @@ class ArkivBrukerSlettingTests(ArkivTestMixin, TestCase):
             username='admin2', password='passord', role='admin',
             must_change_password=False,
         )
-        gi_standardtilgang(annen_admin)
+        gi_standardtilgang(annen_admin, 'admin')
         c = Client()
         c.force_login(annen_admin)
 
@@ -427,7 +427,7 @@ class ArkivBrukerSlettingTests(ArkivTestMixin, TestCase):
             username='admin3', password='passord', role='admin',
             must_change_password=False,
         )
-        gi_standardtilgang(annen_admin)
+        gi_standardtilgang(annen_admin, 'admin')
         c = Client()
         c.force_login(annen_admin)
 
@@ -444,7 +444,7 @@ class ArkivBrukerSlettingTests(ArkivTestMixin, TestCase):
             username='admin4', password='passord', role='admin',
             must_change_password=False,
         )
-        gi_standardtilgang(annen_admin)
+        gi_standardtilgang(annen_admin, 'admin')
         self.admin.delete()
 
         c = Client()

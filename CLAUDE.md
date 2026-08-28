@@ -86,10 +86,20 @@ i lista der, med begrunnelse.
 **Grensesnittet gater på `window.MODUL_TILGANG`, ikke på rollen.** Gjør det ikke det, viser
 vi knapper som fører til 403 — og en knapp som fører til en vegg er verre enn ingen knapp.
 
-**`CustomUser.role` er under avvikling.** De fem verdiene styrer ingenting utenom `admin`;
-feltet krymper i deploy 2. De fem `kan_redigere_*`-flaggene styrer ingenting i det hele
-tatt, og står kun til deploy 3 slik at en rollback har noe å bygge radene fra.
-`has_role_at_least` brukes fortsatt for `ARKIV_VIEW_MIN_ROLE`.
+**`CustomUser.role` er kontotype, ikke tilgangsnivå.** Feltet krympet i deploy 2 til
+`admin` og `bruker`; de fire verdiene som beskrev tilgang er borte, sammen med
+`has_role_at_least`, `role_required`, `write_required` og `stats_required`. Gate på
+`er_global_admin(user)` for admin, og på `@modul_kreves`/`har_tilgang` for alt annet.
+Ordet «bruker» i grensesnittet betyr *ikke* «vanlig tilgang» — kontoen ser ingenting før
+den har en `ModulTilgang`-rad.
+
+De fem `kan_redigere_*`-flaggene styrer ingenting i det hele tatt, og står kun til deploy 3.
+Sett dem ikke, les dem ikke.
+
+**Tester lager brukere med `accounts.test_helpers.gi_standardtilgang(bruker, profil)`.**
+Profilen oppgis eksplisitt — `leser`, `skriver`, `leder_les`, `leder`, `admin` — fordi
+rollen ikke lenger sier noe om tilgang. En bruker uten rader er stengt ute av modulen, så
+en test som glemmer kallet tester 403-stien uten å vite det.
 
 ### Rate-limiting (core/ratelimit.py)
 
@@ -194,9 +204,9 @@ fortsatt av `patients.services`; statistikk-appen henter, cacher og viser. Når 
 nummer to skal levere tall, erstattes den direkte importen av et registry etter samme
 idiom som `core.backup` og `core.arkiv`.
 
-Arkiv-endepunktet har **to gates**: statistikkgaten *og* `ARKIV_VIEW_MIN_ROLE`. Arkivet er
+Arkiv-endepunktet har **to gates**: statistikkgaten *og* `er_global_admin`. Arkivet er
 strengere beskyttet enn live-statistikken, og hadde det arvet modulens gate ved flyttingen,
-ville `lead_view` fått innsyn i arkiverte vakter uten at noen bestemte det.
+ville alle med `les` på statistikk fått innsyn i arkiverte vakter uten at noen bestemte det.
 
 **Modulen komponerer tilgang, den eier den ikke** (§5). Den viser kun kilder brukeren har
 minst `les` på i kildemodulen — ellers ville aggregatene gitt avledet innsyn i data

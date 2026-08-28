@@ -4,6 +4,83 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-08-28 — Kollegaens nivå satt i prod, og en testkonto som må vekk
+
+Kun dokumentasjon. Ingen kodeendring.
+
+Kollegaens konto står nå på `patients: skriv_full` + `statistikk: les`, med
+Helsepersonell-koblingen på plass. Det er den kombinasjonen backfillen ville gitt en `lead`,
+satt for hånd i matrisen etter §7.3-splitten — koblingen og tilgangen er to steg nå, med
+vilje.
+
+André opprettet i tillegg en testkonto i prod for å kontrollere de samme nivåene selv.
+**Den står oppført som en oppgave, ikke som en ferdig ting.** En konto med `skriv_full` i
+prod er ikke et testmiljø: den kan opprette og redigere ekte pasienter, og gjør det under et
+navn som ikke tilhører noen på vakt. Den må slettes eller deaktiveres før neste vakt, og den
+har nøyaktig samme nivåer som kollegaens — det er navnet som skiller dem.
+
+---
+
+## 2026-08-28 — Deploy 2: `role` krympet til `admin`/`bruker`
+
+**997 tester grønne.** Migrasjon `accounts.0013_krymp_role`. **Ikke deployet til prod** —
+det krever en egen avgjørelse, se under.
+
+`role` hadde fem verdier. Fire av dem — `lead`, `lead_view`, `read_write`, `read_only` —
+beskrev *hva brukeren fikk lov til*, og ingen view leste dem etter at `@modul_kreves` ble
+håndhevet i deploy 1. En verdi som ser ut som tilgangskontroll uten å være det er verre enn
+ingen verdi: den inviterer neste utvikler til å gate på den. De er nå `bruker`.
+
+**Rekkefølgen var poenget.** Først ble koden gjort uavhengig av de fire verdiene, så krympet
+feltet. Motsatt vei ville gitt et vindu der en `has_role_at_least(user, 'read_write')`
+sammenlignet mot en verdi som ikke lenger fantes — og den sammenligningen feiler ikke, den
+svarer bare feil.
+
+Det som forsvant med koden:
+
+- `has_role_at_least`, `role_required`, `write_required`, `stats_required` og
+  `dataset_scope_all` fra `core.auth_decorators`. Igjen står `er_global_admin`,
+  `admin_required`, `har_tilgang` og `modul_kreves`.
+- `ARKIV_VIEW_MIN_ROLE` og `ARKIV_WRITE_ROLE` fra `patients.services`. De var
+  «konfigurerbare» — kommentaren foreslo `lead_view` eller `lead` — til verdier som ikke
+  finnes lenger. Arkivet er global admin, og sier det nå rett ut.
+- **De to bulk-knappene på brukerlista.** De skrev `kan_redigere_pasienter` på en gruppe
+  kontoer og meldte «Fjernet pasientregistrering fra N bruker(e)» uten at noen mistet noe.
+  Den meldingen er farligere enn ingen knapp: neste gang tilgang faktisk skal trekkes
+  tilbake, tror admin at jobben er gjort.
+- **Halve `verifiser_modultilgang`.** Sammenligningen mot `role` og §10.1-tellingen er
+  fjernet, ikke gjemt bak en sjekk. Begge krevde at de fire verdiene fantes; etter
+  krympingen ville de svart «ingen avvik» og «Antall: 0» om hver eneste database. Et svar
+  som alltid er grønt er verre enn ingen kontroll. Igjen står kontroller som holder seg
+  like sanne om ti moduler: kontoer uten rader, rader på en modul som ikke finnes, rader
+  med et nivå stigen ikke kjenner, og rolleverdier feltet ikke lenger har.
+
+Grensesnittet: rollebadgene i `user_list.html` og `user_detail.html` viser admin mot bruker,
+og rollefeltet har fått hjelpetekst. «Bruker» skal ikke leses som «vanlig tilgang» — kontoen
+ser ingenting før matrisen sier noe annet.
+
+**Testene sier nå hva kontoen kan, ikke hva den het.** `gi_standardtilgang(bruker)` leste
+`bruker.role` og slo opp radene backfillen ville gitt. Det gikk så lenge rollen *var* en
+tilgangsverdi; nå ville oppslaget gitt alle testbrukere det samme, nemlig ingenting.
+Hjelperen tar en profil eksplisitt — `leser`, `skriver`, `leder_les`, `leder`, `admin` — og
+et ukjent profilnavn kaster i stedet for å gi tom tilgang. Det siste er ikke pedanteri: en
+test som forventer 403 ville bestått uten å teste noe.
+
+`BackfillTests` skriver fortsatt `read_write` og `lead` med vilje. Migrasjon 0012 kjørte mot
+en database der de verdiene fantes, og det er den kjøringen som avgjorde hva kontoene i prod
+fikk. Skrev testen `bruker`, ville den bekreftet at backfillen ikke gjør noe.
+
+**Migrasjonen er reverserbar, men vinduet er ikke.** `bruker` → `read_only` ved reversering:
+den laveste av de gamle verdiene, fordi reverseringen ikke kan vite hvem som var `lead`.
+Matrisen står urørt begge veier — verifisert ved å kjøre migrasjonen fram og tilbake mot en
+prod-lignende database. Men etter deploy 2 kan **ikke** en rollback av deploy 1 bygge
+matrisen på nytt fra `role`. `ModulTilgang` er eneste fasit fra da av.
+
+På PostgreSQL kjører `AlterField` ingen SQL: `choices` er ikke et databaseattributt. SQLite
+bygger tabellen om uansett, men det gjelder bare lokalt og i offline-modus.
+
+---
+
 ## 2026-08-28 — `leder`-nivået har fått en begrunnelse, men bygges ikke
 
 Kun dokumentasjon. Ingen kodeendring.

@@ -4,6 +4,16 @@ from django.contrib.auth import password_validation
 
 from .models import CustomUser, ModulTilgang, TilgangsNivaa, UserRole
 
+#: Hjelpetekst på rollefeltet, delt av opprettings- og redigeringsskjemaet.
+#: Rollen er kontotype, ikke tilgangsnivå. Feltet hadde fem verdier fram til
+#: deploy 2; de fire som beskrev tilgang ble til `bruker`, og tilgangen ligger
+#: nå i modulmatrisen. Uten denne teksten leser en admin «Bruker» som «har
+#: vanlig tilgang» — og det har kontoen ikke før matrisen sier noe annet.
+ROLLE_HJELP = (
+    'Administrator har tilgang til alt og står utenfor modulmatrisen. '
+    'Bruker får kun det matrisen gir — uten en rad der ser kontoen ingen moduler.'
+)
+
 
 class LoginForm(forms.Form):
     """Innloggingsskjema."""
@@ -155,6 +165,7 @@ class AdminUserCreateForm(forms.ModelForm):
             'er_delt_konto': 'Delt konto (bil e.l.)',
         }
         help_texts = {
+            'role': ROLLE_HJELP,
             'email': 'Invitasjonslenken sendes hit. Kan stå tom for delt konto.',
             'fullt_navn': 'Så du kjenner igjen hvem kontoen tilhører.',
             'mfa_required': (
@@ -250,6 +261,7 @@ class AdminUserEditForm(forms.ModelForm):
             'mfa_required': 'Krev to-faktor (MFA)',
         }
         help_texts = {
+            'role': ROLLE_HJELP,
             'email': 'Brukes kun som kontaktinformasjon. Kan stå tom.',
         }
 

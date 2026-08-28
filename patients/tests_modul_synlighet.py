@@ -16,7 +16,7 @@ from accounts.models import CustomUser, ModulTilgang
 
 def _bruker(navn, nivaa):
     bruker = CustomUser.objects.create_user(
-        username=navn, password='x', role='read_write', must_change_password=False,
+        username=navn, password='x', role='bruker', must_change_password=False,
     )
     if nivaa:
         ModulTilgang.objects.create(
@@ -68,7 +68,7 @@ class ServerSideSynlighetTests(TestCase):
     HTML-en**, ikke at noe er skjult.
     """
 
-    def _html(self, navn, nivaa, rolle='read_write'):
+    def _html(self, navn, nivaa, rolle='bruker'):
         bruker = CustomUser.objects.create_user(
             username=navn, password='x', role=rolle, must_change_password=False)
         if nivaa:

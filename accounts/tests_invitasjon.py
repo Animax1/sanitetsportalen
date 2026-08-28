@@ -28,9 +28,9 @@ class InvitasjonTokenTests(TestCase):
     def setUp(self):
         self.bruker = CustomUser.objects.create_user(
             username='invitert', password='MidlertidigPass1!',
-            role='read_write', email='invitert@eksempel.no',
+            role='bruker', email='invitert@eksempel.no',
         )
-        gi_standardtilgang(self.bruker)
+        gi_standardtilgang(self.bruker, 'skriver')
 
     def test_token_peker_paa_riktig_bruker(self):
         self.assertEqual(les_token(lag_token(self.bruker)), self.bruker)
@@ -79,10 +79,10 @@ class InvitasjonTokenTests(TestCase):
         bil-konto — og da er lenken en lateral vei inn i systemet.
         """
         bil = CustomUser.objects.create_user(
-            username='bil3', password='pass', role='read_write',
+            username='bil3', password='pass', role='bruker',
             er_delt_konto=True,
         )
-        gi_standardtilgang(bil)
+        gi_standardtilgang(bil, 'skriver')
         self.assertFalse(kan_inviteres(bil))
 
         bil.email = 'vakt@eksempel.no'
@@ -103,7 +103,7 @@ class InvitasjonFlytTests(TestCase):
             username='sjef', password='AdminPass123!', role='admin',
             must_change_password=False,
         )
-        gi_standardtilgang(self.admin)
+        gi_standardtilgang(self.admin, 'admin')
         self.client = Client()
         self.client.force_login(self.admin)
         mail.outbox.clear()
@@ -113,7 +113,7 @@ class InvitasjonFlytTests(TestCase):
             'username': 'nyfrivillig',
             'fullt_navn': 'Kari Nordmann',
             'email': 'kari@eksempel.no',
-            'role': 'read_write',
+            'role': 'bruker',
             'metode': 'invitasjon',
         }
         data.update(felt)
@@ -245,7 +245,7 @@ class EksisterendeKontoerTests(TestCase):
             username='gammeladmin', password='AdminPass123!', role='admin',
             must_change_password=False,
         )
-        gi_standardtilgang(self.admin)
+        gi_standardtilgang(self.admin, 'admin')
         self.klient = Client()
         self.klient.force_login(self.admin)
 
@@ -313,15 +313,15 @@ class EksisterendeKontoerTests(TestCase):
 
     def test_mfa_kan_ikke_kreves_paa_delt_konto(self):
         bil = CustomUser.objects.create_user(
-            username='bil9', password='pass', role='read_write',
+            username='bil9', password='pass', role='bruker',
             er_delt_konto=True,
         )
-        gi_standardtilgang(bil)
+        gi_standardtilgang(bil, 'skriver')
         svar = self.klient.post(
             reverse('accounts:user_detail', args=[bil.pk]),
             {
                 'action': 'edit', 'fullt_navn': '', 'email': '',
-                'role': 'read_write', 'is_active': 'on',
+                'role': 'bruker', 'is_active': 'on',
                 'mfa_required': 'on', 'er_delt_konto': 'on',
             },
         )
@@ -345,12 +345,12 @@ class TvungenUtloggingTests(TestCase):
             username='sjef2', password='AdminPass123!', role='admin',
             must_change_password=False,
         )
-        gi_standardtilgang(self.admin)
+        gi_standardtilgang(self.admin, 'admin')
         self.bruker = CustomUser.objects.create_user(
-            username='frivillig', password='BrukerPass123!', role='read_write',
+            username='frivillig', password='BrukerPass123!', role='bruker',
             must_change_password=False,
         )
-        gi_standardtilgang(self.bruker)
+        gi_standardtilgang(self.bruker, 'skriver')
         self.adminklient = Client()
         self.adminklient.force_login(self.admin)
 
@@ -409,7 +409,7 @@ class TvungenUtloggingTests(TestCase):
             reverse('accounts:user_detail', args=[self.bruker.pk]),
             {
                 'action': 'edit', 'fullt_navn': '', 'email': '',
-                'role': 'read_write', 'is_active': 'on', 'mfa_required': 'on',
+                'role': 'bruker', 'is_active': 'on', 'mfa_required': 'on',
             },
         )
 
@@ -433,7 +433,7 @@ class TvungenUtloggingTests(TestCase):
             reverse('accounts:user_detail', args=[self.bruker.pk]),
             {
                 'action': 'edit', 'fullt_navn': 'Ny Navnesen', 'email': '',
-                'role': 'read_write', 'is_active': 'on',
+                'role': 'bruker', 'is_active': 'on',
             },
         )
 
@@ -450,7 +450,7 @@ class MfaVedOpprettingTests(TestCase):
             username='sjef3', password='AdminPass123!', role='admin',
             must_change_password=False,
         )
-        gi_standardtilgang(self.admin)
+        gi_standardtilgang(self.admin, 'admin')
         self.klient = Client()
         self.klient.force_login(self.admin)
 
@@ -459,7 +459,7 @@ class MfaVedOpprettingTests(TestCase):
             'username': 'med.mfa',
             'fullt_navn': 'Med Mfa',
             'email': 'medmfa@eksempel.no',
-            'role': 'read_write',
+            'role': 'bruker',
             'mfa_required': 'on',
             'metode': 'invitasjon',
         })
@@ -472,7 +472,7 @@ class MfaVedOpprettingTests(TestCase):
             'username': 'bil10',
             'fullt_navn': '',
             'email': '',
-            'role': 'read_write',
+            'role': 'bruker',
             'mfa_required': 'on',
             'er_delt_konto': 'on',
             'metode': 'passord',

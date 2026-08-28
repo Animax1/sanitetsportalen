@@ -207,22 +207,22 @@ class AccessControlTests(TestCase):
         self.admin = CustomUser.objects.create_superuser(
             username='a', password='x', role='admin', must_change_password=False)
         self.lead = CustomUser.objects.create_user(
-            username='l', password='x', role='lead', must_change_password=False)
-        gi_standardtilgang(self.lead)
+            username='l', password='x', role='bruker', must_change_password=False)
+        gi_standardtilgang(self.lead, 'leder')
         self.rw = CustomUser.objects.create_user(
-            username='w', password='x', role='read_write', must_change_password=False)
-        gi_standardtilgang(self.rw)
+            username='w', password='x', role='bruker', must_change_password=False)
+        gi_standardtilgang(self.rw, 'skriver')
         self.ro = CustomUser.objects.create_user(
-            username='r', password='x', role='read_only', must_change_password=False)
-        gi_standardtilgang(self.ro)
+            username='r', password='x', role='bruker', must_change_password=False)
+        gi_standardtilgang(self.ro, 'leser')
 
     def _login(self, user):
         c = Client()
         c.force_login(user)
         return c
 
-    def test_read_only_cannot_add_behandler(self):
-        """read_only-bruker skal ikke kunne opprette behandler."""
+    def test_leser_kan_ikke_legge_til_behandler(self):
+        """Konto med kun lesetilgang skal ikke kunne opprette behandler."""
         c = self._login(self.ro)
         import json as _j
         resp = c.post('/pasienter/api/forstehjelpere/',
@@ -230,8 +230,8 @@ class AccessControlTests(TestCase):
                       content_type='application/json')
         self.assertEqual(resp.status_code, 403)
 
-    def test_read_write_cannot_add_behandler(self):
-        """read_write-bruker skal ikke kunne opprette behandler (kun admin)."""
+    def test_skriver_kan_ikke_legge_til_behandler(self):
+        """Skrivetilgang på pasienter er ikke nok — registeret er admin (kun admin)."""
         c = self._login(self.rw)
         import json as _j
         resp = c.post('/pasienter/api/forstehjelpere/',
@@ -248,8 +248,8 @@ class AccessControlTests(TestCase):
                       content_type='application/json')
         self.assertEqual(resp.status_code, 201)
 
-    def test_read_only_cannot_create_patient(self):
-        """read_only-bruker skal ikke kunne opprette pasient."""
+    def test_leser_kan_ikke_opprette_pasient(self):
+        """Konto med kun lesetilgang skal ikke kunne opprette pasient."""
         c = self._login(self.ro)
         import json as _j
         resp = c.post('/pasienter/api/patients/',
@@ -362,32 +362,32 @@ class UtskrevetStampTests(TestCase):
 
 @override_settings(SECURE_SSL_REDIRECT=False)
 class LeadViewTests(TestCase):
-    """Tester for lead_view-rollen – tilgangskontroll i API."""
+    """Konto som leser pasienter og leser statistikk — tilgangskontroll i API."""
 
     def setUp(self):
         set_active_year(2026)
         self.lead_view = CustomUser.objects.create_user(
-            username='lv', password='x', role='lead_view', must_change_password=False)
-        gi_standardtilgang(self.lead_view)
+            username='lv', password='x', role='bruker', must_change_password=False)
+        gi_standardtilgang(self.lead_view, 'leder_les')
         self.client = Client()
         self.client.force_login(self.lead_view)
         Patient.objects.create(pasientnummer=1, year=2026)
 
-    def test_lead_view_kan_lese_pasienter(self):
-        """lead_view kan hente pasientliste for aktivt år."""
+    def test_leder_les_kan_lese_pasienter(self):
+        """Profilen kan hente pasientliste for aktivt år."""
         resp = self.client.get('/pasienter/api/patients/')
         self.assertEqual(resp.status_code, 200)
 
-    def test_lead_view_kan_ikke_opprette_pasient(self):
-        """lead_view kan ikke opprette ny pasient."""
+    def test_leder_les_kan_ikke_opprette_pasient(self):
+        """Profilen har kun `les` på pasienter, og kan ikke opprette."""
         import json as _j
         resp = self.client.post('/pasienter/api/patients/',
                                 data=_j.dumps({'problemstilling': 'Pustevansker'}),
                                 content_type='application/json')
         self.assertEqual(resp.status_code, 403)
 
-    def test_lead_view_kan_lese_full_stats(self):
-        """lead_view kan hente full statistikk."""
+    def test_leder_les_kan_lese_full_stats(self):
+        """Profilen har `les` på statistikk, og kan hente full statistikk."""
         resp = self.client.get('/statistikk/api/full-stats/')
         self.assertIn(resp.status_code, [200, 500])  # 500 OK hvis scipy mangler
 
@@ -403,8 +403,8 @@ class ResetTests(TestCase):
         self.admin = CustomUser.objects.create_superuser(
             username='a', password='x', role='admin', must_change_password=False)
         self.lead = CustomUser.objects.create_user(
-            username='l', password='x', role='lead', must_change_password=False)
-        gi_standardtilgang(self.lead)
+            username='l', password='x', role='bruker', must_change_password=False)
+        gi_standardtilgang(self.lead, 'leder')
         Patient.objects.create(pasientnummer=1, year=2026)
         Patient.objects.create(pasientnummer=2, year=2026)
         Patient.objects.create(pasientnummer=3, year=2025)  # annet år
@@ -453,9 +453,9 @@ class ForstehjelperETagTests(TestCase):
 
     def setUp(self):
         self.user = CustomUser.objects.create_user(
-            username='etagtester', password='x', role='read_only',
+            username='etagtester', password='x', role='bruker',
             must_change_password=False)
-        gi_standardtilgang(self.user)
+        gi_standardtilgang(self.user, 'leser')
         self.client = Client()
         self.client.force_login(self.user)
         Forstehjelper.objects.create(name='Behandler A', is_active=True)
@@ -517,10 +517,10 @@ class TimeFormatValidationTests(TestCase):
     def setUp(self):
         AppSetting.objects.update_or_create(key='active_year', defaults={'value': '2026'})
         self.user = CustomUser.objects.create_user(
-            username='skriver', password='pass', role='read_write',
+            username='skriver', password='pass', role='bruker',
             must_change_password=False,
         )
-        gi_standardtilgang(self.user)
+        gi_standardtilgang(self.user, 'skriver')
         self.client = Client()
         self.client.force_login(self.user)
 
@@ -627,10 +627,10 @@ class PlasseringUniqueTests(TestCase):
     def setUp(self):
         AppSetting.objects.update_or_create(key='active_year', defaults={'value': '2026'})
         self.user = CustomUser.objects.create_user(
-            username='skriver', password='pass', role='read_write',
+            username='skriver', password='pass', role='bruker',
             must_change_password=False,
         )
-        gi_standardtilgang(self.user)
+        gi_standardtilgang(self.user, 'skriver')
         self.client = Client()
         self.client.force_login(self.user)
 
@@ -850,7 +850,7 @@ class HelsepersonellTests(TestCase):
         self.admin = CustomUser.objects.create_user(
             username='admin', password='pwd', role='admin', must_change_password=False
         )
-        gi_standardtilgang(self.admin)
+        gi_standardtilgang(self.admin, 'admin')
         self.client = Client()
         self.client.force_login(self.admin)
 
@@ -948,8 +948,8 @@ class HelsepersonellTests(TestCase):
     def test_non_admin_cannot_create(self):
         """Read-write-rolle skal ikke kunne opprette helsepersonell."""
         self.client.logout()
-        rw = CustomUser.objects.create_user(username='rw', password='pwd', role='read_write', must_change_password=False)
-        gi_standardtilgang(rw)
+        rw = CustomUser.objects.create_user(username='rw', password='pwd', role='bruker', must_change_password=False)
+        gi_standardtilgang(rw, 'skriver')
         self.client.force_login(rw)
         res = self.client.post(
             '/pasienter/api/helsepersonell/',
@@ -1260,7 +1260,7 @@ class PatientNumberGapTests(TestCase):
             username='testbruker', password='Test1234!', role='admin',
             must_change_password=False,
         )
-        gi_standardtilgang(self.user)
+        gi_standardtilgang(self.user, 'admin')
         self.client.login(username='testbruker', password='Test1234!')
         set_active_year(2026)
         # Eksisterende pasient på unik plassering "Behandling 1"
@@ -1317,7 +1317,7 @@ class PabegyntNotBeforeInntidTests(TestCase):
             username='testbruker', password='Test1234!', role='admin',
             must_change_password=False,
         )
-        gi_standardtilgang(self.user)
+        gi_standardtilgang(self.user, 'admin')
         self.client.login(username='testbruker', password='Test1234!')
         set_active_year(2026)
         self.forstehjelper = Forstehjelper.objects.create(name='Lege Hansen')
@@ -1405,7 +1405,7 @@ class BlankInntidFallbackTests(TestCase):
             username='testbruker', password='Test1234!', role='admin',
             must_change_password=False,
         )
-        gi_standardtilgang(self.user)
+        gi_standardtilgang(self.user, 'admin')
         self.client.login(username='testbruker', password='Test1234!')
         set_active_year(2026)
 
@@ -1456,7 +1456,7 @@ class SettingsWhitelistTests(TestCase):
     """GET /api/settings/ skal kun returnere nøkler som er sluppet ut bevisst.
 
     Bakgrunn: endepunktet returnerte hele `AppSetting`-tabellen til enhver
-    innlogget bruker, også `read_only`. Ingenting der var sensitivt i dag, men
+    innlogget bruker, også rene lesere. Ingenting der var sensitivt i dag, men
     tabellen er en generisk nøkkel/verdi-lagring — neste driftsverdi noen
     lagret der ville havnet i responsen automatisk. PUT hadde whitelist fra
     før; GET hadde ikke.
@@ -1465,9 +1465,9 @@ class SettingsWhitelistTests(TestCase):
     def setUp(self):
         self.bruker = CustomUser.objects.create_user(
             username='lesebruker', password='testpass123',
-            role='read_only', must_change_password=False,
+            role='bruker', must_change_password=False,
         )
-        gi_standardtilgang(self.bruker)
+        gi_standardtilgang(self.bruker, 'leser')
         self.client.login(username='lesebruker', password='testpass123')
 
     def _get(self):
@@ -1523,9 +1523,9 @@ class SettingsWhitelistTests(TestCase):
         """
         skriver = CustomUser.objects.create_user(
             username='skriver', password='testpass123',
-            role='read_write', must_change_password=False,
+            role='bruker', must_change_password=False,
         )
-        gi_standardtilgang(skriver)
+        gi_standardtilgang(skriver, 'skriver')
         self.client.force_login(skriver)
 
         foer = AppSetting.get('event_name', None)
@@ -1549,9 +1549,9 @@ class HeaderArrangementNavnTests(TestCase):
     def setUp(self):
         self.bruker = CustomUser.objects.create_user(
             username='vaktbruker', password='testpass123',
-            role='read_write', must_change_password=False,
+            role='bruker', must_change_password=False,
         )
-        gi_standardtilgang(self.bruker)
+        gi_standardtilgang(self.bruker, 'skriver')
         self.client.login(username='vaktbruker', password='testpass123')
 
     def test_arrangementsnavn_rendres_server_side(self):
@@ -1638,7 +1638,7 @@ class NavneregisterFeilmeldingTests(TestCase):
             username='admin_navn', password='testpass123',
             role='admin', must_change_password=False,
         )
-        gi_standardtilgang(self.admin)
+        gi_standardtilgang(self.admin, 'admin')
         self.client.force_login(self.admin)
 
     def _post(self, sti, navn):
@@ -1703,12 +1703,12 @@ class NavneregisterFeilmeldingTests(TestCase):
 class JsModulLastingTests(TestCase):
     """Betinget lasting av patients-admin.js (F7).
 
-    Fila het patients-stats.js og ble lastet for admin, lead og lead_view.
+    Fila het patients-stats.js og ble lastet for alle med statistikktilgang.
     Da statistikk ble egen modul, ble renderingen flyttet til statistikk.js
     og det som ble igjen er utelukkende admin-handlinger: registeradmin,
     sesjonstimeout, nullstilling og vaktarkivet. Hvert av de endepunktene
-    krever `role='admin'` server-side, så lead og lead_view lastet ~370
-    linjer de aldri kunne bruke. Fila lastes derfor kun for admin nå.
+    krever global admin server-side, så alle andre lastet ~370 linjer de
+    aldri kunne bruke. Fila lastes derfor kun for admin nå.
 
     Fellen er den samme som før: bootstrappen — `DOMContentLoaded`,
     faneskift, auto-refresh og lasterne for navneregistrene — lå opprinnelig
@@ -1716,8 +1716,11 @@ class JsModulLastingTests(TestCase):
     bootstrappen ville tatt ned hele appen for alle andre enn admin.
     """
 
-    ADMIN_ROLLER = ('admin',)
-    ANDRE_ROLLER = ('read_only', 'read_write', 'lead_view', 'lead')
+    # Profiler, ikke roller: etter deploy 2 er `role` bare admin/bruker, og
+    # det som avgjør hva siden viser er ModulTilgang-radene. Lista dekker
+    # fortsatt de samme fire kombinasjonene kontoene i prod har.
+    ADMIN_PROFILER = ('admin',)
+    ANDRE_PROFILER = ('leser', 'skriver', 'leder_les', 'leder')
 
     @staticmethod
     def _monster(modul):
@@ -1733,52 +1736,53 @@ class JsModulLastingTests(TestCase):
         import re
         return re.compile(re.escape(modul) + r'(\.[0-9a-f]{8,})?\.js')
 
-    def _hent_som(self, rolle):
+    def _hent_som(self, profil):
         bruker = CustomUser.objects.create_user(
-            username=f'bruker_{rolle}', password='testpass123',
-            role=rolle, must_change_password=False,
+            username=f'bruker_{profil}', password='testpass123',
+            role='admin' if profil == 'admin' else 'bruker',
+            must_change_password=False,
         )
-        gi_standardtilgang(bruker)
+        gi_standardtilgang(bruker, profil)
         self.client.force_login(bruker)
         resp = self.client.get('/pasienter/')
         self.assertEqual(resp.status_code, 200)
         return resp.content.decode('utf-8')
 
-    def test_app_modulen_lastes_for_alle_roller(self):
-        """Bootstrappen må lastes uansett rolle — ellers starter ikke appen."""
-        for rolle in self.ADMIN_ROLLER + self.ANDRE_ROLLER:
-            with self.subTest(rolle=rolle):
-                self.assertRegex(self._hent_som(rolle),
+    def test_app_modulen_lastes_for_alle_profiler(self):
+        """Bootstrappen må lastes uansett tilgang — ellers starter ikke appen."""
+        for profil in self.ADMIN_PROFILER + self.ANDRE_PROFILER:
+            with self.subTest(profil=profil):
+                self.assertRegex(self._hent_som(profil),
                                  self._monster('patients-app'))
 
-    def test_portal_utils_lastes_for_alle_roller(self):
-        """Primitivene må ligge under alt annet, for alle roller.
+    def test_portal_utils_lastes_for_alle_profiler(self):
+        """Primitivene må ligge under alt annet, uansett tilgang.
 
         patients-utils.js kaller fmtMin() og escapeHtml() derfra. Lastes de
-        ikke, feiler pasientsiden for alle — ikke bare for én rolle.
+        ikke, feiler pasientsiden for alle — ikke bare for én konto.
         """
-        for rolle in self.ADMIN_ROLLER + self.ANDRE_ROLLER:
-            with self.subTest(rolle=rolle):
-                self.assertRegex(self._hent_som(rolle),
+        for profil in self.ADMIN_PROFILER + self.ANDRE_PROFILER:
+            with self.subTest(profil=profil):
+                self.assertRegex(self._hent_som(profil),
                                  self._monster('portal-utils'))
 
     def test_adminmodulen_lastes_kun_for_admin(self):
-        for rolle in self.ADMIN_ROLLER:
-            with self.subTest(rolle=rolle):
-                self.assertRegex(self._hent_som(rolle),
+        for profil in self.ADMIN_PROFILER:
+            with self.subTest(profil=profil):
+                self.assertRegex(self._hent_som(profil),
                                  self._monster('patients-admin'))
 
-    def test_adminmodulen_lastes_ikke_for_lavere_roller(self):
-        """Også lead og lead_view: de mistet fila da statistikken flyttet."""
-        for rolle in self.ANDRE_ROLLER:
-            with self.subTest(rolle=rolle):
-                self.assertNotRegex(self._hent_som(rolle),
+    def test_adminmodulen_lastes_ikke_for_andre(self):
+        """Også de med statistikktilgang: de mistet fila da statistikken flyttet."""
+        for profil in self.ANDRE_PROFILER:
+            with self.subTest(profil=profil):
+                self.assertNotRegex(self._hent_som(profil),
                                     self._monster('patients-admin'))
 
     def test_alltid_lastede_moduler_refererer_ikke_til_adminmodulen(self):
         """Selve vernet: ingen direkte referanse fra alltid-lastet kode.
 
-        En `read_only`-bruker har ikke patients-admin.js. Kaller bootstrappen
+        En ikke-admin har ikke patients-admin.js. Kaller bootstrappen
         en funksjon derfra direkte, får hun ReferenceError og appen stopper.
         Slike kall må gå via `_kall()`, som sjekker at funksjonen finnes.
         """
@@ -2090,9 +2094,9 @@ class PasientlisteYtelseTests(TestCase):
     def setUp(self):
         self.bruker = CustomUser.objects.create_user(
             username='poller', password='testpass123',
-            role='read_write', must_change_password=False,
+            role='bruker', must_change_password=False,
         )
-        gi_standardtilgang(self.bruker)
+        gi_standardtilgang(self.bruker, 'skriver')
         self.client.force_login(self.bruker)
 
     def _lag_pasienter(self, antall):

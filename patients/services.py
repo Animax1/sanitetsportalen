@@ -27,11 +27,6 @@ from core.validators import (  # noqa: F401
     validate_patient_time_fields,
     validate_time_string,
 )
-from core.auth_decorators import (  # noqa: F401
-    ROLE_HIERARKI,
-    has_role_at_least,
-)
-
 from .models import Patient, AppSetting, Forstehjelper, VaktArkiv, ArkivertPasient
 
 
@@ -59,14 +54,20 @@ def next_patient_nr():
 
 # ── Arkiv-tilgang (modul-spesifikk konfig) ───────────────────────────────────
 
-# Konfigurerbar min-rolle for å SE arkiv. Endre til 'lead_view' eller 'lead' for å åpne for leads.
-ARKIV_VIEW_MIN_ROLE = 'admin'
+# ARKIV_VIEW_MIN_ROLE og ARKIV_WRITE_ROLE sto her fram til deploy 2. De var
+# «konfigurerbare» — kommentaren foreslo 'lead_view' eller 'lead' for å åpne
+# arkivet for leads — men de verdiene finnes ikke lenger etter at `role`
+# krympet til admin/bruker. En knapp som ikke lar seg skru på er verre enn
+# ingen knapp: den ser ut som et valg.
+#
+# Arkivet er global admin, i tråd med §3.3: frysing og kollaps er
+# irreversibelt og skal ikke desentraliseres. Skal en vaktleder få innsyn,
+# hører det til `leder`-nivået (§3.1), ikke til en konstant her.
 
-# Skriving/sletting holdes ALLTID på admin
-ARKIV_WRITE_ROLE = 'admin'
-
-# ROLE_HIERARKI og has_role_at_least er flyttet til core.auth_decorators
-# og re-eksporteres øverst i denne filen.
+# ROLE_HIERARKI og has_role_at_least ble re-eksportert herfra fram til
+# deploy 2. Begge er borte: hierarkiet rangerte fem rolleverdier som ikke
+# finnes lenger. Bruk `er_global_admin()` eller `har_tilgang()` fra
+# `core.auth_decorators`.
 
 
 # ── Recycle av pasientnummer ved slett ────────────────────────────────────────

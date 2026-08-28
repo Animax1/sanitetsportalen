@@ -9,10 +9,6 @@
     <h4 class="mb-0"><i class="bi bi-person me-2"></i>{{ target_user.username }}</h4>
     {% if target_user.role == 'admin' %}
       <span class="badge bg-danger ms-2">{{ target_user.get_role_display }}</span>
-    {% elif target_user.role == 'lead' %}
-      <span class="badge ms-2" style="background:#a855f7;">{{ target_user.get_role_display }}</span>
-    {% elif target_user.role == 'read_write' %}
-      <span class="badge bg-primary ms-2">{{ target_user.get_role_display }}</span>
     {% else %}
       <span class="badge bg-secondary ms-2">{{ target_user.get_role_display }}</span>
     {% endif %}
@@ -52,6 +48,7 @@
             <div class="mb-2">
               <label class="form-label">Rolle</label>
               {{ form.role }}
+              <div class="text-muted" style="font-size:0.78rem;">{{ form.role.help_text }}</div>
             </div>
             <div class="mb-2 form-check">
               {{ form.is_active }}

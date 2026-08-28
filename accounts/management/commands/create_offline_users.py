@@ -16,9 +16,11 @@ from django.core.management.base import BaseCommand
 from accounts.models import CustomUser, ModulTilgang
 
 
+# Kontotype, ikke tilgangsnivå — `vakt-offline` sto som `read_write` fram til
+# deploy 2. Det den kontoen faktisk får lov til står i OFFLINE_TILGANG under.
 OFFLINE_USERS = [
     ('admin-offline', 'admin'),
-    ('vakt-offline',  'read_write'),
+    ('vakt-offline',  'bruker'),
 ]
 
 # Modultilgang per bruker. `admin-offline` staar oppfoert med tom liste fordi

@@ -69,7 +69,7 @@ def index_view(request):
 #:
 #: `AppSetting` er en generisk nøkkel/verdi-tabell. Uten denne lista havnet
 #: enhver ny driftsverdi automatisk i responsen til *alle* innloggede, også
-#: `read_only` — inkludert verdier som ikke er ment for klienten. PUT har
+#: rene lesere — inkludert verdier som ikke er ment for klienten. PUT har
 #: alltid hatt en whitelist; at GET ikke hadde det var en asymmetri som
 #: ville blitt et problem lenge etter at den ble innført (N12).
 #:
@@ -121,7 +121,7 @@ def patients_list_view(request):
         include_archived = request.GET.get('include_archived') == '1'
         # Fase 5: "mine"-filter — default AV, slås på via ?mine=1.
         # Filtrerer på Behandler.user ELLER Helsepersonell.user lik innlogget bruker.
-        # Tilgjengelig for alle innloggede roller, også read_only.
+        # Tilgjengelig for alle med lesetilgang til modulen.
         mine_only = request.GET.get('mine') == '1'
 
         # select_related: `_patient_to_dict()` leser navnet på både

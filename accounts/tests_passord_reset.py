@@ -25,10 +25,10 @@ class ResetTokenTests(TestCase):
         cache.clear()
         self.bruker = CustomUser.objects.create_user(
             username='kari.nordmann', password='GammeltPass123!',
-            role='read_write', email='kari@eksempel.no',
+            role='bruker', email='kari@eksempel.no',
             must_change_password=False,
         )
-        gi_standardtilgang(self.bruker)
+        gi_standardtilgang(self.bruker, 'skriver')
 
     def test_levetiden_er_en_time(self):
         """Låst mot beslutningen 23. aug. 2026."""
@@ -67,7 +67,7 @@ class HvemKanResettesTests(TestCase):
     def _lag(self, **felt):
         data = {
             'username': 'noen', 'password': 'Pass123!',
-            'role': 'read_write', 'email': 'noen@eksempel.no',
+            'role': 'bruker', 'email': 'noen@eksempel.no',
         }
         data.update(felt)
         return CustomUser.objects.create_user(**data)
@@ -114,10 +114,10 @@ class ResetFlytTests(TestCase):
         mail.outbox.clear()
         self.bruker = CustomUser.objects.create_user(
             username='kari.nordmann', password='GammeltPass123!',
-            role='read_write', email='kari@eksempel.no',
+            role='bruker', email='kari@eksempel.no',
             must_change_password=False,
         )
-        gi_standardtilgang(self.bruker)
+        gi_standardtilgang(self.bruker, 'skriver')
 
     def _be_om(self, epost='kari@eksempel.no'):
         return Client().post(reverse('accounts:glemt_passord'), {'email': epost})
@@ -141,7 +141,7 @@ class ResetFlytTests(TestCase):
 
     def test_delt_konto_gir_ogsaa_identisk_svar(self):
         CustomUser.objects.create_user(
-            username='bil3', password='Pass123!', role='read_write',
+            username='bil3', password='Pass123!', role='bruker',
             email='bil@eksempel.no', er_delt_konto=True,
         )
         vanlig = self._be_om('kari@eksempel.no')
@@ -228,7 +228,7 @@ class ResetRateLimitTests(TestCase):
         cache.clear()
         CustomUser.objects.create_user(
             username='kari.nordmann', password='GammeltPass123!',
-            role='read_write', email='kari@eksempel.no',
+            role='bruker', email='kari@eksempel.no',
         )
 
     def test_gjentatte_forespoersler_strupes(self):
@@ -295,10 +295,10 @@ class SidestrukturTests(TestCase):
     def test_svarsidene_i_resetflyten_rendrer_komplett_html(self):
         """Sidene man havner på etter en POST, som er de som brakk."""
         bruker = CustomUser.objects.create_user(
-            username='struktur.test', password='Pass123!', role='read_write',
+            username='struktur.test', password='Pass123!', role='bruker',
             email='struktur@eksempel.no', must_change_password=False,
         )
-        gi_standardtilgang(bruker)
+        gi_standardtilgang(bruker, 'skriver')
         klient = Client()
 
         sendt = klient.post(reverse('accounts:glemt_passord'),

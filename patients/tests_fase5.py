@@ -28,14 +28,14 @@ class MineFilterTests(TestCase):
     def setUp(self):
         self.kari = CustomUser.objects.create_user(
             username='kari', password='pw12345678',
-            role='read_write', must_change_password=False,
+            role='bruker', must_change_password=False,
         )
-        gi_standardtilgang(self.kari)
+        gi_standardtilgang(self.kari, 'skriver')
         self.ola = CustomUser.objects.create_user(
             username='ola', password='pw12345678',
-            role='read_write', must_change_password=False,
+            role='bruker', must_change_password=False,
         )
-        gi_standardtilgang(self.ola)
+        gi_standardtilgang(self.ola, 'skriver')
         # Kari koblet til Forstehjelper 'Kari Hansen'
         self.beh_kari = Forstehjelper.objects.create(name='Kari Hansen', user=self.kari)
         # Ola koblet til Helsepersonell 'Ola Olsen'
@@ -79,9 +79,9 @@ class MineFilterTests(TestCase):
     def test_mine_filter_for_user_without_link_returns_empty(self):
         unlinked = CustomUser.objects.create_user(
             username='ulink', password='pw12345678',
-            role='read_only', must_change_password=False,
+            role='bruker', must_change_password=False,
         )
-        gi_standardtilgang(unlinked)
+        gi_standardtilgang(unlinked, 'leser')
         self.client.force_login(unlinked)
         res = self.client.get(self.url + '?mine=1')
         self.assertEqual(res.json(), [])
@@ -95,11 +95,11 @@ class AssignmentNotificationSignalTests(TestCase):
         self.kari = CustomUser.objects.create_user(
             username='kari', password='pw', must_change_password=False,
         )
-        gi_standardtilgang(self.kari)
+        gi_standardtilgang(self.kari, 'leser')
         self.ola = CustomUser.objects.create_user(
             username='ola', password='pw', must_change_password=False,
         )
-        gi_standardtilgang(self.ola)
+        gi_standardtilgang(self.ola, 'leser')
         self.beh_kari = Forstehjelper.objects.create(name='Kari', user=self.kari)
         self.beh_ola = Forstehjelper.objects.create(name='Ola', user=self.ola)
         self.beh_uten_bruker = Forstehjelper.objects.create(name='X', user=None)
@@ -173,7 +173,7 @@ class PasientRolleFormTests(TestCase):
         self.user = CustomUser.objects.create_user(
             username='kari', password='pw', must_change_password=False,
         )
-        gi_standardtilgang(self.user)
+        gi_standardtilgang(self.user, 'leser')
         self.fh = Forstehjelper.objects.create(name='kari', user=None)
         self.hp = Helsepersonell.objects.create(name='kari', user=None)
 

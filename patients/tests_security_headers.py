@@ -14,7 +14,7 @@ class SecurityHeadersTests(TestCase):
             username='admin', password='pwd', role='admin',
             must_change_password=False,
         )
-        gi_standardtilgang(self.user)
+        gi_standardtilgang(self.user, 'admin')
 
     def test_csp_header_er_satt(self):
         resp = self.client.get('/accounts/login/')
@@ -71,7 +71,7 @@ class CspNonceTests(TestCase):
             username='admin_csp', password='pwd', role='admin',
             must_change_password=False,
         )
-        gi_standardtilgang(self.admin)
+        gi_standardtilgang(self.admin, 'admin')
 
     def _direktiver(self, resp):
         csp = resp.headers['Content-Security-Policy']

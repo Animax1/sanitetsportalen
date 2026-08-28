@@ -58,7 +58,7 @@ class MFASetupFlowTests(TestCase):
 
     def test_lead_user_forced_to_mfa_setup_on_first_login(self):
         """Lead-bruker uten TOTP-enhet skal omdirigeres til MFA-oppsett."""
-        user = self._create_user('lead')
+        user = self._create_user('bruker')
         resp = self.client.post(self.url, {
             'username': user.username, 'password': 'TestPassord123!',
         })
@@ -66,9 +66,9 @@ class MFASetupFlowTests(TestCase):
         resp2 = self.client.get(self.url)
         self.assertContains(resp2, 'Sett opp to-faktor')
 
-    def test_read_write_user_not_forced_to_mfa(self):
-        """read_write-bruker uten MFA-krav skal gå rett inn."""
-        user = self._create_user('read_write', mfa_required=False)
+    def test_vanlig_bruker_uten_mfa_krav_gaar_rett_inn(self):
+        """Konto uten MFA-krav skal gå rett inn."""
+        user = self._create_user('bruker', mfa_required=False)
         resp = self.client.post(self.url, {
             'username': user.username, 'password': 'TestPassord123!',
         }, follow=True)
@@ -146,7 +146,7 @@ class MFAVerifyFlowTests(TestCase):
             must_change_password=False,
             mfa_required=True,
         )
-        gi_standardtilgang(self.user)
+        gi_standardtilgang(self.user, 'admin')
         # Opprett bekreftet TOTP-enhet
         self.device = TOTPDevice.objects.create(
             user=self.user,
@@ -234,7 +234,7 @@ class MFATrustCookieTests(TestCase):
             must_change_password=False,
             mfa_required=True,
         )
-        gi_standardtilgang(self.user)
+        gi_standardtilgang(self.user, 'admin')
         self.device = TOTPDevice.objects.create(
             user=self.user,
             name='Test enhet',
@@ -311,11 +311,11 @@ class MFAAdminResetTests(TestCase):
         self.target = CustomUser.objects.create_user(
             username='målbruker',
             password='TestPassord123!',
-            role='lead',
+            role='bruker',
             must_change_password=False,
             mfa_required=True,
         )
-        gi_standardtilgang(self.target)
+        gi_standardtilgang(self.target, 'leder')
         self.device = TOTPDevice.objects.create(
             user=self.target,
             name='Test enhet',

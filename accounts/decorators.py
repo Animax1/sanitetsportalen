@@ -1,18 +1,18 @@
 """Tilgangskontroll-dekoratorer (SHIM for bakoverkompatibilitet).
 
-Selve implementasjonen er flyttet til core/auth_decorators.py i fase 1
-av sanitetsportal-migreringen. Denne filen re-eksporterer de samme
-navnene slik at all eksisterende kode (`from accounts.decorators import
-admin_required` osv.) fortsetter å fungere uten endring.
+Selve implementasjonen ligger i ``core/auth_decorators.py``. Denne fila
+re-eksporterer navnet slik at gammel kode
+(``from accounts.decorators import admin_required``) fortsetter å virke.
 
-Nye apps SKAL importere fra core.auth_decorators direkte:
+Ny kode SKAL importere fra ``core.auth_decorators`` direkte:
 
-    from core.auth_decorators import admin_required, has_role_at_least
+    from core.auth_decorators import admin_required, har_tilgang, modul_kreves
+
+**Lista krympet i deploy 2.** ``role_required``, ``write_required``,
+``stats_required``, ``dataset_scope_all`` og ``has_role_at_least`` er borte:
+de tok rolleverdier som ikke finnes lenger etter at ``role`` ble redusert til
+``admin``/``bruker``. Ingen av dem sto på et view da de ble fjernet —
+modultilgang hadde overtatt hver enkelt.
 """
-# Re-eksport fra core. Holder alle eksisterende imports i drift.
-from core.auth_decorators import (  # noqa: F401
-    admin_required,
-    role_required,
-    stats_required,
-    write_required,
-)
+# Re-eksport fra core. Holder eksisterende imports i drift.
+from core.auth_decorators import admin_required  # noqa: F401

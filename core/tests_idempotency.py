@@ -86,10 +86,10 @@ class IdempotensEndepunktTests(TestCase):
             key='active_year', defaults={'value': '2026'},
         )
         self.user = CustomUser.objects.create_user(
-            username='idem-skriver', password='pass', role='read_write',
+            username='idem-skriver', password='pass', role='bruker',
             must_change_password=False,
         )
-        gi_standardtilgang(self.user)
+        gi_standardtilgang(self.user, 'skriver')
         self.client = Client()
         self.client.force_login(self.user)
 
@@ -178,10 +178,10 @@ class IdempotensEndepunktTests(TestCase):
         self.assertEqual(self._post(idempotency_key=self.NOKKEL).status_code, 201)
 
         annen = CustomUser.objects.create_user(
-            username='idem-annen', password='pass', role='read_write',
+            username='idem-annen', password='pass', role='bruker',
             must_change_password=False,
         )
-        gi_standardtilgang(annen)
+        gi_standardtilgang(annen, 'skriver')
         c = Client()
         c.force_login(annen)
         svar = c.post(

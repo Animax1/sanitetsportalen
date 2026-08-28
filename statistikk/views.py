@@ -21,14 +21,11 @@ from django.http import JsonResponse
 from django.shortcuts import render
 from django.views.decorators.http import require_http_methods
 
-from core.auth_decorators import (
-    har_tilgang, has_role_at_least, modul_kreves,
-)
+from core.auth_decorators import er_global_admin, har_tilgang, modul_kreves
 from core.ratelimit import rate_limit
 from core.stats_cache import cached_stats_response
 
 from patients.services import (
-    ARKIV_VIEW_MIN_ROLE,
     compute_arkiv_full_stats,
     full_stats,
     get_active_year,
@@ -75,7 +72,7 @@ def statistikk_view(request):
 # som var midt i et vindu i det deployen traff.
 @rate_limit(group='patients:full-stats', rate='30/m', method='GET')
 def full_stats_view(request):
-    """Full statistikk. Kun admin, lead og lead_view.
+    """Full statistikk. Krever `les` på statistikk-modulen.
 
     Cachet 60s med ETag/304. Dyre aggregater (percentiler, gruppetellinger)
     regnes kun én gang per minutt per år.
@@ -104,12 +101,12 @@ def arkiv_full_stats_view(request, pk):
 
     **To gates, ikke én.** Visningen flyttet hit sammen med resten av
     statistikkrenderingen, men tilgangen fulgte ikke med: arkivet er
-    strengere beskyttet enn live-statistikken (``ARKIV_VIEW_MIN_ROLE``,
-    i dag ``admin``). Hadde endepunktet arvet statistikkmodulens gate ved
-    flyttingen, ville ``lead_view`` fått innsyn i arkiverte vakter uten at
-    noen bestemte det.
+    strengere beskyttet enn live-statistikken: det er global admin. Hadde
+    endepunktet arvet statistikkmodulens gate ved flyttingen, ville enhver med
+    statistikktilgang fått innsyn i arkiverte vakter uten at noen bestemte
+    det.
     """
-    if not has_role_at_least(request.user, ARKIV_VIEW_MIN_ROLE):
+    if not er_global_admin(request.user):
         return JsonResponse({'error': 'Ingen tilgang'}, status=403)
     if _manglende_kilde(request.user) is not None:
         return JsonResponse({'error': 'Ingen tilgang'}, status=403)
