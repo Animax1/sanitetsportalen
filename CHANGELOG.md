@@ -30,28 +30,55 @@ skrevet om strengere, ikke svakere: kroppen har et lukket skjema på to nøkler 
 og `idempotency_key` — og alt annet gir 400. Det er testbart ved uttømming, i motsetning til
 en feltwhitelist inne i en generell PUT, der settet av felter vokser med modellen.
 
+**To ting fulgte av kravene uten å være bestilt.** At en enhet skal kunne ha ventende
+oppdrag betyr at et oppdrag må kunne være tildelt uten å være påbegynt — altså en status
+`Venter` før `Rykker ut`, og at det er enheten som setter `Rykker ut`, ikke 113 ved
+oppretting. Gjorde 113 det, ville responstiden løpe fra et tidspunkt ingen i bilen hadde sett
+oppdraget. Og at lokasjon ble en admin-vedlikeholdt nedtrekksliste flyttet personvernrisikoen:
+feltet er ikke lenger fritekst, A.6/A.12 holder for det, og **fritekst står alene igjen** som
+det som må unntas verdilogging. Det halverte fase 2.
+
 Andre avgjørelser verdt å notere:
 
 - **Offline gjelder kun enhetens stemplinger.** Skulle begge sider virke frakoblet, kunne to
   klienter endret samme oppdrag uten å vite om hverandre. Med kun stemplinger finnes ikke den
   konflikten: hver melding er en ny rad.
+- **To knapper i grensesnittet, seks navngitte endepunkter på serveren.** Én «neste»-knapp og
+  én «Ledig» er nok i en bil i bevegelse; fem knapper der fire alltid er ulovlige er fire
+  måter å trykke feil på. Men `POST .../status/neste/` ville latt serveren utlede handlingen
+  av gjeldende tilstand, med det kappløpet som følger når to trykk kommer tett.
+- **Å starte neste oppdrag lukker det pågående automatisk.** Valgt for farten i felt.
+  Kostnaden er at den `Ledig`-meldingen er avledet, ikke målt — derfor lagres et
+  `automatisk`-flagg på raden, selv om ingenting viser det. Skillet kan ikke gjenskapes i
+  ettertid, og en boolean koster ingenting.
 - **«Ledig» er enhetens tilstand, ikke oppdragets.** Å lagre tilgjengelighet også på `Enhet`
-  ville gitt to kilder til samme sannhet. En enhet er ledig når den ikke har et oppdrag i en
-  ikke-terminal status — utledes, lagres ikke.
-- **Statusmeldinger er en egen tabell**, ikke fem tidsstempelkolonner. Kolonner ville låst
-  modellen til akkurat disse fem statusene, og en korreksjon fra 113 ville overskrevet
-  historikken i stedet for å legge seg ved siden av den.
+  ville gitt to kilder til samme sannhet. En enhet er ledig når den ikke har et påbegynt
+  oppdrag — utledes, lagres ikke.
+- **Enhetsbytte er egen modell**, ikke en radtype i `Statusmelding`. Et bytte er ikke en
+  status, og statistikken måler statusene — blandes de, må hver spørring huske å filtrere.
+  Statusen står når et oppdrag flyttes: meldingene den første enheten rakk å sende skjedde.
+- **To skjuleregler for enheten, begge server-side.** Fritekst utelates fra svaret straks
+  status blir `Ledig`; hele oppdraget utelates 30 minutter etter. Skjules fritekst i JS,
+  ligger teksten fortsatt i responsen — og en bil som blir stående ulåst er nettopp
+  scenarioet regelen finnes for.
+- **`Leverer` registrerer ikke hvor det leveres.** Bevisst, for å holde helseopplysninger og
+  posisjon fra hverandre.
 - **Ingen kobling til `patients`.** «Leveranse oppretter pasient» er notert som noe å vurdere
   senere; i dag ville det latt en `skriv_handling`-konto skrive indirekte inn i
   pasientmodulen.
-- **Fase 6 er stedet `AbstractArkiv` bygges.** TODO har utsatt den til modell nummer to
-  faktisk skrives — dette er modell nummer to.
 
-Fase 2 (audit-unntak for fritekst, og protokolltillegg) står **før** fritekstfeltet ships.
-Ellers er feltet i prod med verdilogging på, og de radene kan ikke fjernes uten å røre
-auditsporet.
+**Fase 6 utløser registeret CLAUDE.md har varslet.** `/statistikk/` skal få én fane per
+kildemodul — pasienter fra samleplass/skadestue, oppdrag fra bil/ambulanse, senere lag. I dag
+importerer statistikkappen `patients.services` direkte, og CLAUDE.md sier hva som skjer når
+modul nummer to skal levere tall: importen erstattes av et registry etter samme idiom som
+`core.backup` og `core.arkiv`. Dette er modul nummer to. §5 gjelder uendret — en fane vises
+kun hvis brukeren har `les` på kildemodulen, ellers gir aggregatene avledet innsyn.
 
-Fire avklaringer står åpne nederst i notatet. Ingen av dem blokkerer fase 1.
+Fase 2 står før fase 3: ellers er fritekstfeltet i prod med verdilogging på, og de radene kan
+ikke fjernes uten å røre auditsporet. Fase 7 er stedet `AbstractArkiv` bygges — TODO har
+utsatt den til modell nummer to faktisk skrives.
+
+Sju faser, 31–44 t. To avklaringer står åpne nederst i notatet; ingen blokkerer fase 1.
 
 ---
 

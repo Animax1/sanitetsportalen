@@ -535,30 +535,37 @@ Gjennomgang 13. aug. 2026, med 1000 pasienter og peak 100 brukere som premiss.
         utsatt til modell nummer to faktisk skrives — da ser man hva som er felles,
         i stedet for å gjette. `VaktArkiv` skal *ikke* migreres til basemodellen:
         SHA-signaturene er låst til dagens payload-form, og hvert arkiv i prod ville
-        meldt tukling. **Bygges i fase 6 av oppdragsmodulen** — den er modell nummer to.
+        meldt tukling. **Bygges i fase 7 av oppdragsmodulen** — den er modell nummer to.
 - [ ] Park-registreringer blir **egen modell**, ikke rader i `Patient`. Holder sykestuas
       liste på ~250 rader i stedet for 1000, og matcher at dataene er enklere.
 - [ ] Park-appen er et skriveendepunkt **uten innlogging**: signert lenke via
       `django.core.signing` (ikke gjettbar URL, kan tilbakekalles), rate-limit per token,
       og responsen returnerer kvittering — aldri data.
 - [ ] **Oppdragsmodulen — se `docs/BESLUTNING_OPPDRAGSMODULEN.md`.** Besluttet 28. aug.
-      2026, ikke bygget. Modulen er den første som tar `skriv: handling` i bruk. Seks
-      faser, 25–36 t. Punktene under lå her løst fra før og er nå plassert i planen:
-      - [ ] **Fase 1** (4–6 t): app, modulregistrering, `Enhet`/`Oppdrag`/`Statusmelding`,
-            `choices.py`, admin-matrise. Ingen UI.
-      - [ ] **Fase 2** (2–3 t): unnta fritekst fra audit-verdilogging, og presiser
+      2026, ikke bygget. Modulen er den første som tar `skriv: handling` i bruk. Sju
+      faser, 31–44 t. Punktene under lå her løst fra før og er nå plassert i planen:
+      - [ ] **Fase 1** (5–7 t): app, modulregistrering, `Enhet`/`Lokasjon`/`Oppdrag`/
+            `Statusmelding`/`Enhetsbytte`, `choices.py`, lokasjonsadmin, admin-matrise.
+            Ingen UI.
+      - [ ] **Fase 2** (1–2 t): unnta fritekst fra audit-verdilogging, og presiser
             protokollen. `AuditLog.old_value`/`new_value` er `TextField` med 730 dagers
             lagring, og feltlista utledes fra modellen (N2) — et nytt fritekstfelt havner
-            der av seg selv. A.6/A.12 begrunner whitelisten med at kliniske felt ikke kan
-            inneholde navn; det argumentet bærer ikke for «kvinne, pustevansker, Storgata
-            5, 22:40». **Må stå før fase 3** — ellers er feltet i prod med logging på, og
-            de radene kan ikke fjernes uten å røre auditsporet.
-      - [ ] **Fase 3** (6–8 t): sentralbordet — opprett, tildel, liste, rediger.
-      - [ ] **Fase 4** (5–7 t): enhetsskjermen — statusmaskin, smale stemplingsendepunkter
-            med lukket kroppsskjema, objektsjekk på eierskap, og «forsvinner 30 min etter
-            Ledig» som **server-side visningsfilter**, aldri sletting.
+            der av seg selv. **Må stå før fase 3** — ellers er feltet i prod med logging
+            på, og de radene kan ikke fjernes uten å røre auditsporet. Halvert fordi
+            lokasjon ble nedtrekksliste: da holder A.6/A.12 for det feltet, og fritekst
+            står alene igjen.
+      - [ ] **Fase 3** (6–8 t): sentralbordet — opprett, tildel, flytt, liste, rediger.
+      - [ ] **Fase 4** (6–8 t): enhetsskjermen — statusmaskin med `Venter` som
+            startstatus, to knapper mot seks navngitte endepunkter, lukket kroppsskjema,
+            objektsjekk på eierskap, og de to skjulereglene (fritekst ved `Ledig`, hele
+            oppdraget 30 min etter) som **server-side filter**, aldri sletting.
       - [ ] **Fase 5** (4–6 t): offline-kø for stemplinger, med `core.idempotency`.
-      - [ ] **Fase 6** (4–6 t): arkivering. **Her bygges `AbstractArkiv`** — dette er
+      - [ ] **Fase 6** (5–7 t): **statistikkregisteret** + oppdragsfanen. Her rives den
+            direkte importen fra `statistikk` til `patients.services` ut, og erstattes av
+            et registry etter samme idiom som `core.backup` og `core.arkiv` — det CLAUDE.md
+            har varslet siden statistikkmodulen ble skilt ut. Pasientfanen skal se lik ut
+            etterpå.
+      - [ ] **Fase 7** (4–6 t): arkivering. **Her bygges `AbstractArkiv`** — dette er
             modell nummer to, som punktet under har ventet på.
 - [ ] Vurder `cached_db`-sesjoner. `SESSION_SAVE_EVERY_REQUEST=True` med DB-sesjoner gir
       én UPDATE per request. Krever Redis, altså vakt-modus.

@@ -1,12 +1,15 @@
 # Beslutningsnotat: oppdragsmodulen
 
-Status: **besluttet 28. aug. 2026, ikke bygget.** Fire åpne avklaringer nederst; ingen av
+Status: **besluttet 28. aug. 2026, ikke bygget.** To åpne avklaringer nederst; ingen av
 dem blokkerer fase 1.
 
 Modulen er den første som tar `skriv: handling` i bruk. Nivået ble definert i deploy 1 av
 rollemodellen nettopp med denne bruken i tankene (§3.2 i
 `docs/BESLUTNING_ROLLEMODELLEN.md`), og har stått tomt siden — «tomt i dag» i CLAUDE.md
 peker hit.
+
+Den er også den første modulen som skal **levere tall til `/statistikk/`**. Det utløser
+registeret CLAUDE.md har varslet siden statistikkmodulen ble skilt ut.
 
 **Slettes** når modulen er levert. Da er begrunnelsen CHANGELOG sin.
 
@@ -18,8 +21,8 @@ Oppdragshåndtering for bil og beredskapsambulanse under vakt. En operatør på 
 rollen som tilsvarer 113 — oppretter et oppdrag, tildeler det en enhet, og følger enhetens
 statusmeldinger. Enheten melder status fra bilen.
 
-Bilen kjører hovedsakelig transportoppdrag; beredskapsambulansen rykker ut. Begge er
-samme modell, og forskjellen viser seg i hvilke statuser som faktisk brukes.
+Bilen kjører hovedsakelig transportoppdrag; beredskapsambulansen rykker ut. Begge er samme
+modell, og forskjellen viser seg i hvilke statuser som faktisk brukes.
 
 ## 2. Det som gjør modulen «kinkig», og hvorfor den likevel ikke er det
 
@@ -57,7 +60,7 @@ Enhetskontoer skal opprettes med det flagget, og valideringen som allerede ligge
 
 ## 3. Datamodellen
 
-Tre modeller. Ingen av dem rører `patients`.
+Fire modeller. Ingen av dem rører `patients`.
 
 ### 3.1 `Enhet`
 
@@ -74,33 +77,56 @@ class Enhet(BaseTimeStampedModel):
 `SET_NULL`, ikke `CASCADE`: slettes kontoen, skal enheten og dens oppdragshistorikk bestå.
 Samme valg som `Forstehjelper.user`, og av samme grunn.
 
-### 3.2 `Oppdrag`
+### 3.2 `Lokasjon`
+
+Admin vedlikeholder lista; oppdraget peker på en rad.
+
+```python
+class Lokasjon(BaseTimeStampedModel):
+    navn = models.CharField(max_length=120, unique=True)
+    er_aktiv = models.BooleanField(default=True)
+    rekkefolge = models.IntegerField(default=100)
+```
+
+**Egen tabell, ikke en tuple i `choices.py`.** Problemstilling og hastegrad er faglige
+verdimengder som endres sjelden og bør ligge i kode, der en endring blir en commit. Lokasjon
+er stedene på *dette* arrangementet — de skifter fra vakt til vakt, og skal kunne endres av
+admin uten deploy. Det er samme skille som mellom `PROBLEMSTILLING` og navneregistrene i
+pasientmodulen, og administrasjonen følger `views_registre.py`-mønsteret.
+
+`er_aktiv` framfor sletting: en lokasjon som er brukt på et oppdrag kan ikke forsvinne uten
+å ta historikken med seg. Deaktivering fjerner den fra nedtrekkslista og lar radene bestå.
+
+**Dette flytter personvernrisikoen, til det bedre.** Med en nedtrekksliste er lokasjon ikke
+fritekst, og argumentet i A.6/A.12 — at feltet ikke kan inneholde navn — holder igjen. Da
+står `fritekst` alene som feltet som må unntas verdilogging (§8).
+
+### 3.3 `Oppdrag`
 
 ```python
 class Oppdrag(BaseTimeStampedModel):
     year = models.IntegerField(db_index=True)         # aktiv vakt, som Patient.year
-    enhet = models.ForeignKey(Enhet, on_delete=models.PROTECT)
+    enhet = models.ForeignKey(Enhet, on_delete=models.PROTECT, related_name='oppdrag')
     problemstilling = models.CharField(max_length=255)   # fra oppdrag/choices.py
     hastegrad = models.CharField(max_length=16)          # Akutt | Haster | Vanlig
-    lokasjon = models.CharField(max_length=255)
+    lokasjon = models.ForeignKey(Lokasjon, on_delete=models.PROTECT)
     fritekst = models.TextField(blank=True, default='')
-    status = models.CharField(max_length=16, default='rykker_ut')
+    status = models.CharField(max_length=16, default='venter')
     opprettet_av = models.ForeignKey(CustomUser, null=True, on_delete=models.SET_NULL)
 ```
 
-`PROTECT` på enheten: et oppdrag uten enhet gir ingen mening, og en enhet med historikk
-skal ikke kunne forsvinne under den.
+`PROTECT` på begge FK-ene: et oppdrag uten enhet eller lokasjon gir ingen mening, og
+historikken skal ikke kunne forsvinne under den.
 
-**Verdimengdene håndheves server-side**, i `oppdrag/choices.py`, etter mønsteret fra
-`patients/choices.py`. Problemstillingene tar utgangspunkt i pasientmodulens liste. De to
-listene skal *ikke* dele modul: et oppdrag er ikke en pasient, og den dagen den ene listen
-skal endres uten den andre, er en delt konstant det som står i veien.
+Verdimengdene for problemstilling og hastegrad håndheves server-side i `oppdrag/choices.py`,
+etter mønsteret fra `patients/choices.py`. Problemstillingene tar utgangspunkt i
+pasientmodulens liste. **De to listene skal ikke dele modul:** et oppdrag er ikke en pasient,
+og den dagen den ene skal endres uten den andre, er en delt konstant det som står i veien.
 
-Hastegradene er AMK-inndelingen — `Akutt`, `Haster`, `Vanlig` — og ikke fargenavn.
-Fargekoding i grensesnittet er en presentasjonsdetalj; navnet skal være det personellet
-faktisk sier.
+Hastegradene er AMK-inndelingen — `Akutt`, `Haster`, `Vanlig` — ikke fargenavn. Fargekoding
+i grensesnittet er presentasjon; navnet skal være det personellet faktisk sier.
 
-### 3.3 `Statusmelding`
+### 3.4 `Statusmelding`
 
 Én rad per overgang. Oppdraget bærer gjeldende status som et felt for raske oppslag;
 sannheten om *når* noe skjedde ligger her.
@@ -109,44 +135,97 @@ sannheten om *når* noe skjedde ligger her.
 class Statusmelding(BaseTimeStampedModel):
     oppdrag = models.ForeignKey(Oppdrag, related_name='statusmeldinger', on_delete=models.CASCADE)
     status = models.CharField(max_length=16)
-    tidspunkt = models.DateTimeField()          # hendelsestid, ikke lagringstid
+    tidspunkt = models.DateTimeField()               # hendelsestid, ikke lagringstid
     meldt_av = models.ForeignKey(CustomUser, null=True, on_delete=models.SET_NULL)
-    forsinket = models.BooleanField(default=False)   # satt når klienten var frakoblet
+    forsinket = models.BooleanField(default=False)   # klienten var frakoblet
+    automatisk = models.BooleanField(default=False)  # lukket av systemet, ikke meldt
 ```
 
 Egen tabell framfor fem tidsstempelkolonner på `Oppdrag`. Kolonner ville låst modellen til
-akkurat disse fem statusene, og en korreksjon fra 113 ville overskrevet historikken i
-stedet for å legge seg ved siden av den.
+akkurat disse statusene, og en korreksjon fra 113 ville overskrevet historikken i stedet for
+å legge seg ved siden av den.
+
+`automatisk` settes når et pågående oppdrag lukkes fordi enheten startet det neste (§4.2).
+**Ingenting viser flagget i dag** — det er lagret fordi skillet mellom «meldt ledig» og
+«lukket av systemet» ikke kan gjenskapes i ettertid, og fordi statistikken kan komme til å
+trenge det. En boolean koster ingenting; tapt informasjon koster en omskriving.
+
+### 3.5 `Enhetsbytte`
+
+113 kan flytte et oppdrag til en annen enhet. Det skal stå i oppdragets egen logg, ikke
+bare i `AuditLog` — auditsporet er admin-flate, og den som leser oppdraget skal se det der.
+
+```python
+class Enhetsbytte(BaseTimeStampedModel):
+    oppdrag = models.ForeignKey(Oppdrag, related_name='enhetsbytter', on_delete=models.CASCADE)
+    fra_enhet = models.ForeignKey(Enhet, on_delete=models.PROTECT, related_name='+')
+    til_enhet = models.ForeignKey(Enhet, on_delete=models.PROTECT, related_name='+')
+    tidspunkt = models.DateTimeField(auto_now_add=True)
+    byttet_av = models.ForeignKey(CustomUser, null=True, on_delete=models.SET_NULL)
+```
+
+Egen modell framfor en radtype i `Statusmelding`. Et enhetsbytte er ikke en status, og
+statistikken måler statusene — blandes de, må hver eneste spørring huske å filtrere bort
+den ene typen. Tidslinjen i grensesnittet er unionen av de to, og det er en visningsjobb.
+
+**Statusen står når et oppdrag flyttes.** Meldingene den første enheten rakk å sende blir
+stående, med `meldt_av` intakt: de skjedde. Et oppdrag som var `Fremme` er fortsatt
+`Fremme` når den nye enheten overtar — å nullstille til `Venter` ville slettet en
+responstid som faktisk ble målt.
 
 ## 4. Statusmaskinen
 
 ```
-                    ┌──────────────────────────────────────┐
-                    │                                      │
-(opprettet) → Rykker ut ──→ Fremme ──→ Avreist ──→ Leverer ──→ Ledig
-                    │           │                              ▲
-                    └───────────┴──────────────────────────────┘
-                         avbrutt / ingen transport
+Venter ──→ Rykker ut ──→ Fremme ──→ Avreist ──→ Leverer ──→ Ledig
+  │            │            │           │           │          ▲
+  └────────────┴────────────┴───────────┴───────────┴──────────┘
+                    Ledig er utgang fra enhver status
 ```
 
 | Fra | Til |
 |---|---|
-| *(oppretting)* | `Rykker ut` |
+| *(oppretting)* | `Venter` |
+| `Venter` | `Rykker ut`, `Ledig` |
 | `Rykker ut` | `Fremme`, `Ledig` |
 | `Fremme` | `Avreist`, `Ledig` |
-| `Avreist` | `Leverer` |
+| `Avreist` | `Leverer`, `Ledig` |
 | `Leverer` | `Ledig` |
 | `Ledig` | *(ingen — terminal)* |
 
 Overgangstabellen ligger i `oppdrag/services.py` som data, ikke som `if`-er spredt i
-viewene, og håndheves server-side. Grensesnittet viser kun de knappene som er lovlige, men
-det er ikke der regelen bor: en knapp som ikke vises er ikke en knapp som ikke kan trykkes.
+viewene, og håndheves server-side. Grensesnittet viser kun lovlige knapper, men det er ikke
+der regelen bor: en knapp som ikke vises er ikke en knapp som ikke kan trykkes.
 
-**«Ledig» er enhetens tilstand, ikke oppdragets — og det er verdt å være bevisst på.**
-Statusen betyr «denne enheten er fri igjen», og den avslutter oppdraget. Å lagre
-tilgjengelighet *også* på `Enhet` ville gitt to kilder til samme sannhet, og de ville gått
-i utakt første gang noe feilet halvveis. En enhet er ledig når den ikke har et oppdrag i
-en ikke-terminal status. Utledes, lagres ikke.
+### 4.1 `Venter` er en konsekvens av køen, ikke en ekstra status noen ba om
+
+Skal en enhet kunne ha ventende oppdrag, må et oppdrag kunne være tildelt uten å være
+påbegynt. Da kan ikke 113 sette `Rykker ut` ved oppretting — det er enhetens første trykk.
+Gjorde 113 det, ville responstiden løpe fra et tidspunkt ingen i bilen hadde sett oppdraget.
+
+### 4.2 To knapper, seks endepunkter
+
+Enhetsskjermen har **én «neste»-knapp** som går ett ledd fram i kjeden, og **én
+«Ledig»-knapp** som alltid er tilgjengelig. Fem knapper der fire alltid er ulovlige er fire
+måter å trykke feil på i en bil i bevegelse.
+
+Serveren har likevel **ett navngitt endepunkt per overgang**. `POST .../status/neste/`
+ville latt serveren utlede handlingen av gjeldende tilstand, og da er det ikke lenger en
+navngitt handling — det er en tilstandsmaskin styrt utenfra, med det kappløpet som følger
+når to trykk kommer tett. Knappen vet hvilken overgang den utfører og poster til den.
+
+### 4.3 Å starte neste oppdrag lukker det pågående
+
+En enhet kan ha flere tildelte oppdrag, men bare ett påbegynt. Trykker mannskapet
+`Rykker ut` på et ventende oppdrag mens et annet er i gang, settes det pågående til `Ledig`
+med samme tidsstempel, og statusmeldingen merkes `automatisk=True`.
+
+Hvilket ventende oppdrag som startes velger mannskapet selv. De ser hastegrad og lokasjon,
+og vet hva som er nærmest — en FIFO-kø ville tatt den avgjørelsen fra dem uten å vite noe
+de ikke vet.
+
+**Kostnaden er notert:** den automatiske `Ledig`-meldingen er avledet, ikke målt. Sluttiden
+for det forrige oppdraget blir starttiden for det neste. Det er en bevisst avveining for
+farten i felt, og `automatisk`-flagget gjør at statistikken kan skille dem senere.
 
 ## 5. Endepunktene
 
@@ -161,13 +240,15 @@ oppå hverandre.
 | `GET /oppdrag/api/oppdrag/` | `les` | Samme filter |
 | `POST /oppdrag/api/oppdrag/` | `skriv_full` | — |
 | `PUT /oppdrag/api/oppdrag/<pk>/` | `skriv_full` | — |
+| `POST /oppdrag/api/oppdrag/<pk>/flytt/` | `skriv_full` | — |
 | `POST /oppdrag/api/oppdrag/<pk>/status/<overgang>/` | `skriv_handling` | Enhet må eie oppdraget |
+| `GET/POST/PUT/DELETE /oppdrag/api/lokasjoner/` | admin | — |
 
 ### 5.1 Stemplingsendepunktet leser (nesten) ingenting
 
 §3.2 slo fast at et `handling`-endepunkt ikke skal lese request-kroppen, og at invarianten
-er testbar. Offline-kravet bryter den bokstavelig: en stempling som ble utført uten nett må
-kunne fortelle *når* den skjedde, ellers viser statistikken når dekningen kom tilbake.
+er testbar. Offline-kravet bryter den bokstavelig: en stempling utført uten nett må kunne
+fortelle *når* den skjedde, ellers viser statistikken når dekningen kom tilbake.
 
 Invarianten skrives derfor om, strengere formulert i stedet for svakere:
 
@@ -182,10 +263,6 @@ felt som ikke står i settet, og krev 400. En feltwhitelist inne i en generell `
 ikke mer enn ett døgn gammel. Utenfor vinduet brukes servertid, og `forsinket=True` settes
 uansett når klienttid avviker merkbart fra ankomsttid. Da vet den som leser statistikken at
 tallet kommer fra en bil som var uten dekning.
-
-**Overgangen ligger i URL-en, ikke i kroppen.** `POST .../status/fremme/` er en navngitt
-handling; `POST .../status/` med `{"status": "fremme"}` ville gjort den til en redigering
-med ett felt.
 
 ### 5.2 Idempotens
 
@@ -216,26 +293,60 @@ har det, er verre enn en som feiler synlig.
 Egne oppdrag, ingenting annet. Filteret er server-side — enheten får aldri andre rader
 levert, den skjuler dem ikke i nettleseren.
 
-Et avsluttet oppdrag forsvinner **30 minutter etter `Ledig`**. Det er et visningsfilter,
-aldri sletting: sentralbordet og statistikken beholder raden. Vinduet er kort med vilje —
-en bil kan stå ulåst — og feil kan korrigeres av 113 i etterkant, over nødnett eller
-ansikt til ansikt.
+To regler, ikke én, og begge håndheves i serverens svar:
 
-## 8. Personvern
+| Når | Hva |
+|---|---|
+| Straks status blir `Ledig` | **`fritekst` utelates fra svaret.** Feltet sendes ikke lenger |
+| 30 minutter etter `Ledig` | **Hele oppdraget utelates.** Raden består for sentralbord og statistikk |
 
-To punkter fra TODO faller inn her, og begge må være på plass **før fritekstfeltet ships**:
+Vinduet er kort med vilje — en bil kan stå ulåst — og feil kan korrigeres av 113 i
+etterkant, over nødnett eller ansikt til ansikt.
 
-1. **Fritekst skal unntas verdilogging i audit.** `AuditLog.old_value`/`new_value` er
-   `TextField` med 730 dagers lagring, og feltlista utledes fra modellen (N2) — et nytt
-   fritekstfelt havner der av seg selv. Skriver en operatør noe sensitivt og retter det,
-   ligger begge versjonene i loggen i to år. Signalet trenger en opt-out per felt: at
-   *feltet ble endret* logges, verdiene gjør det ikke.
-2. **Protokollen må presiseres.** A.6/A.12 i `docs/PERSONVERN_DOKUMENTASJON.md` begrunner
-   whitelisten med at kliniske felt ikke kan inneholde navn. Det argumentet bærer ikke her:
-   «kvinne, pustevansker, Storgata 5, 22:40» er mer identifiserende enn pasientraden det
-   knytter seg til, og lokasjon er et nytt felt uten fortilfelle i protokollen.
+At dette er server-side er poenget. Skjules fritekst i JS, ligger teksten fortsatt i
+responsen, og en bil som blir stående ulåst er nettopp scenarioet regelen finnes for.
 
-## 9. Frontend
+**Ingen varsling.** Et nytt oppdrag dukker opp i lista ved neste poll, tydelig markert som
+ventende. Mannskapet får uansett beskjed over nødnett; en lyd i en nettleser som kanskje er
+blokkert er ikke noe å bygge en operativ rutine på.
+
+## 8. Statistikk: registeret CLAUDE.md har varslet
+
+`/statistikk/` skal få **én fane per kildemodul** — pasientmodulen (samleplass/skadestue),
+oppdragsmodulen (bil/ambulanse), og senere lagmodulen.
+
+I dag importerer statistikkappen `patients.services` direkte. CLAUDE.md sier hva som skjer
+når modul nummer to skal levere tall: den direkte importen erstattes av et registry etter
+samme idiom som `core.backup` og `core.arkiv`. **Dette er modul nummer to.**
+
+Formen er kjent fra de to andre registrene: hver modul registrerer en handler fra
+`apps.ready()`, og statistikkappen spør registeret i stedet for å kjenne modulene.
+
+**§5 i rollemodellnotatet gjelder uendret: modulen komponerer tilgang, den eier den ikke.**
+En fane vises kun hvis brukeren har minst `les` på kildemodulen. Uten det ville aggregatene
+gitt avledet innsyn i data brukeren ikke har tilgang til. Sjekken er én linje i dag fordi
+`patients` er eneste kilde; med to blir den løkka §5 forutså.
+
+Merk konsekvensen for enhetskontoene: en bil med `skriv_handling` på `oppdrag`, men ingen
+rad på `statistikk`, ser ingen statistikk i det hele tatt. Det er riktig.
+
+## 9. Personvern
+
+**Ett punkt, ikke to** — lokasjon ble en nedtrekksliste (§3.2), og da holder A.6/A.12 for
+det feltet.
+
+**Fritekst skal unntas verdilogging i audit**, og det må være på plass før feltet ships.
+`AuditLog.old_value`/`new_value` er `TextField` med 730 dagers lagring, og feltlista utledes
+fra modellen (N2) — et nytt fritekstfelt havner der av seg selv. Skriver en operatør noe
+sensitivt og retter det, ligger begge versjonene i loggen i to år. Signalet trenger en
+opt-out per felt: at *feltet ble endret* logges, verdiene gjør det ikke.
+
+Protokollen trenger fortsatt et tillegg, men et mindre et enn planlagt: oppdragsdata er
+strukturert (problemstilling, hastegrad, lokasjon fra faste lister), og det eneste frie
+feltet er unntatt logging. `Leverer` registrerer ikke hvor det leveres — bevisst, for å
+holde helseopplysninger og posisjon fra hverandre.
+
+## 10. Frontend
 
 Egen side, egne filer. Reglene i CLAUDE.md gjelder og håndheves av eksisterende tester:
 
@@ -245,43 +356,45 @@ Egen side, egne filer. Reglene i CLAUDE.md gjelder og håndheves av eksisterende
 - **Eget stilark** som definerer de fire variablene `base_portal` ikke aliaser
   (`--text-muted`, `--text-soft`, `--surface-3`, `--header-bg`), og ikke gjentar de fire
   den faktisk setter. `statistikk.css` er mønsteret.
-- **Brukerdata som settes inn med `innerHTML` escapes.** Fritekst og lokasjon er
-  fritekstfelt fra en operatør — første virkelige XSS-flate i portalen som ikke er en
-  nedtrekksliste.
+- **Brukerdata som settes inn med `innerHTML` escapes.** Fritekst er portalens første
+  virkelige XSS-flate som ikke er en nedtrekksliste.
 
 To maler, ikke én med `{% if %}` gjennom hele: `oppdrag/enhet.html` og
 `oppdrag/sentral.html`. De deler nesten ingen markup, og en sammenslått mal ville vært to
 layouter i én fil for å spare en `render`-linje.
 
-## 10. Faser
+Enhetsskjermen bygges for en telefon i en bil: store trykkflater, høy kontrast, og
+statusknappen som det eneste elementet som ikke krever presisjon.
+
+## 11. Faser
 
 | Fase | Innhold | Estimat |
 |---|---|---|
-| 1 | App, modulregistrering, tre modeller, `choices.py`, admin-matrise. Ingen UI | 4–6 t |
-| 2 | Audit-unntak for fritekst + protokolltillegg. **Før fase 3** | 2–3 t |
-| 3 | Sentralbordet: opprett, tildel, liste, rediger. Polling med ETag | 6–8 t |
-| 4 | Enhetsskjermen: statusmaskin, smale endepunkter, objektsjekk, 30-min-filter | 5–7 t |
+| 1 | App, modulregistrering, fire modeller, `choices.py`, lokasjonsadmin, admin-matrise | 5–7 t |
+| 2 | Audit-unntak for fritekst + protokolltillegg. **Før fase 3** | 1–2 t |
+| 3 | Sentralbordet: opprett, tildel, flytt, liste, rediger. Polling med ETag | 6–8 t |
+| 4 | Enhetsskjermen: statusmaskin, smale endepunkter, objektsjekk, de to skjulereglene | 6–8 t |
 | 5 | Offline-kø med idempotens | 4–6 t |
-| 6 | Arkivering: `AbstractArkiv` + handler for oppdrag | 4–6 t |
+| 6 | Statistikkregisteret + oppdragsfanen | 5–7 t |
+| 7 | Arkivering: `AbstractArkiv` + handler for oppdrag | 4–6 t |
 
 Fase 2 står før fase 3 fordi fritekstfeltet ellers ville vært i produksjon med
 verdilogging på, og de radene kan ikke fjernes i ettertid uten å røre auditsporet.
 
-**Fase 6 er stedet `AbstractArkiv` endelig skal bygges.** TODO har utsatt den til «modell
-nummer to faktisk skrives» — dette er modell nummer to. `VaktArkiv` skal *ikke* migreres
-til basemodellen: SHA-signaturene er låst til dagens payload-form, og hvert eksisterende
-arkiv i prod ville meldt tukling.
+**Fase 6 river ut den direkte importen** fra statistikkappen til `patients.services`.
+Pasientfanen skal se lik ut etterpå — det er en refaktorering med en ny modul som
+akseptansekriterium, ikke en ny visning.
 
-## 11. Åpne avklaringer
+**Fase 7 er stedet `AbstractArkiv` endelig skal bygges.** TODO har utsatt den til «modell
+nummer to faktisk skrives» — dette er modell nummer to. `VaktArkiv` skal *ikke* migreres til
+basemodellen: SHA-signaturene er låst til dagens payload-form, og hvert eksisterende arkiv i
+prod ville meldt tukling.
 
-1. **Kan 113 flytte et pågående oppdrag til en annen enhet?** Antatt ja, med auditrad. Da
-   må det avgjøres hva som skjer med statusmeldingene den første enheten rakk å sende —
-   forslag: de blir stående, fordi de faktisk skjedde.
-2. **Skal en enhet kunne ha to oppdrag samtidig?** Antatt nei i v1. Sier vi ja, må
-   enhetsskjermen kunne vise flere og «ledig» blir tvetydig.
-3. **Arkiveres oppdrag sammen med vakta, eller for seg?** `core.arkiv` er per modul, så
+## 12. Åpne avklaringer
+
+1. **Arkiveres oppdrag sammen med vakta, eller for seg?** `core.arkiv` er per modul, så
    teknisk hver for seg. Om admin skal ha én knapp som arkiverer begge, er et
-   grensesnittspørsmål som kan tas i fase 6.
-4. **Skal `Leverer` registrere hvor det leveres?** I dag et fritekstfelt. Blir det en
-   nedtrekksliste (sykestua, legevakt, sykehus), er det statistikk verdt å ha — og et felt
-   til i personvernvurderingen.
+   grensesnittspørsmål som kan tas i fase 7.
+2. **Skal `automatisk`-flagget vises noe sted?** Det lagres fra fase 4, men ingenting leser
+   det. Spørsmålet er om statistikken i fase 6 skal skille meldt og avledet `Ledig` — og det
+   svaret er lettere å gi når man ser tallene.
