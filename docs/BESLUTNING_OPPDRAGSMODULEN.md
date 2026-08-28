@@ -150,16 +150,17 @@ class Statusmelding(BaseTimeStampedModel):
     meldt_av = models.ForeignKey(CustomUser, null=True, on_delete=models.SET_NULL)
     forsinket = models.BooleanField(default=False)   # klienten var frakoblet
     automatisk = models.BooleanField(default=False)  # lukket av systemet, ikke meldt
+    korrigerer = models.ForeignKey('self', null=True, blank=True,
+                                   on_delete=models.PROTECT, related_name='korreksjoner')
 ```
 
 Egen tabell framfor fem tidsstempelkolonner på `Oppdrag`. Kolonner ville låst modellen til
 akkurat disse statusene, og en korreksjon fra 113 ville overskrevet historikken i stedet for
 å legge seg ved siden av den.
 
-`automatisk` settes når et pågående oppdrag lukkes fordi enheten startet det neste (§4.2).
-**Ingenting viser flagget i dag** — det er lagret fordi skillet mellom «meldt ledig» og
-«lukket av systemet» ikke kan gjenskapes i ettertid, og fordi statistikken kan komme til å
-trenge det. En boolean koster ingenting; tapt informasjon koster en omskriving.
+`automatisk` settes når et pågående oppdrag lukkes fordi enheten startet det neste (§4.3).
+Flagget **vises** — se §4.5 for hvordan, og hvorfor markøren sitter på klokkeslettet og
+ikke på statusordet.
 
 ### 3.5 `Enhetsbytte`
 
@@ -238,6 +239,50 @@ de ikke vet.
 for det forrige oppdraget blir starttiden for det neste. Det er en bevisst avveining for
 farten i felt, og `automatisk`-flagget gjør at statistikken kan skille dem senere.
 
+### 4.4 Korreksjoner er nye rader, ikke redigeringer
+
+113 kan rette tidspunktet på en statusmelding — typisk en `Ledig` som ble satt automatisk,
+eller en stempling som kom inn med feil klienttid etter et nettbrudd.
+
+**Rettingen er en ny rad som peker på den gamle**, ikke en endring av den. Begge blir
+stående i tidslinjen. Grunnen er at `Statusmelding` er et spor av hva som faktisk ble meldt:
+redigerer man raden, forsvinner det sporet, og «hva sa bilen egentlig?» kan bare besvares
+ved å lese `AuditLog` — en admin-flate som ikke er der oppdraget vises.
+
+Regelen er **nyeste ikke-korrigerte rad per status vinner**. Den finnes ett sted:
+
+```python
+Statusmelding.objects.gjeldende(oppdrag)   # manager-metode, ikke en if i hvert view
+```
+
+**Kostnaden er reell og ligger i statistikken.** Hver spørring som måler tid mellom
+statuser må bruke gjeldende rader, ikke alle rader. Glemmes det ett sted, teller det
+korrigerte tidspunktet dobbelt eller det gamle med. Derfor bor regelen i en manager-metode,
+og derfor skal en test skrive en korreksjon og kreve at tallene endrer seg — en test som
+bare sjekker at raden ble opprettet ville bestått uten at statistikken så den.
+
+Omfanget er **tidspunkt, ikke status**. Å rette *hvilken* status som skjedde er noe annet:
+det ville flyttet oppdraget i kjeden, og da er det en ny hendelse, ikke en korreksjon.
+Kun `skriv_full` kan korrigere; en enhet stempler, den retter ikke.
+
+### 4.5 Hvordan `automatisk` vises
+
+Det er **tidspunktet** som er avledet, ikke at oppdraget ble ledig. Markøren sitter derfor
+på klokkeslettet, ikke på statusordet.
+
+| Flate | Visning |
+|---|---|
+| Tidslinjen, begge sider | `Ledig 22:41 · avsluttet automatisk` — dempet tekst |
+| Sentralbordet, tett liste | Klokkeslettet med stiplet understrek og `title`-forklaring |
+| Enhetsskjermen | Samme dempede linje. Bilen kan ikke rette den uansett |
+
+Ingen badge: den ville konkurrert visuelt med statusen og blitt lest som «en annen slags
+Ledig». Ingen egen farge heller — **markøren må stå i gråtoner** (WCAG 1.4.1), og en ny
+statusfarge ville gjort metadata om til en tilstand.
+
+En korrigert rad merkes etter samme prinsipp: `Ledig 22:35 · rettet av sentralen`, med den
+opprinnelige verdien synlig under i tidslinjen.
+
 ## 5. Endepunktene
 
 `@modul_kreves` gater modulen. Det er ikke nok her: en enhet skal bare kunne stemple på
@@ -253,6 +298,7 @@ oppå hverandre.
 | `PUT /oppdrag/api/oppdrag/<pk>/` | `skriv_full` | — |
 | `POST /oppdrag/api/oppdrag/<pk>/flytt/` | `skriv_full` | — |
 | `POST /oppdrag/api/oppdrag/<pk>/status/<overgang>/` | `skriv_handling` | Enhet må eie oppdraget |
+| `POST /oppdrag/api/statusmelding/<pk>/korriger/` | `skriv_full` | — |
 | `GET/POST/PUT/DELETE /oppdrag/api/lokasjoner/` | admin | — |
 
 ### 5.1 Stemplingsendepunktet leser (nesten) ingenting
@@ -274,6 +320,10 @@ felt som ikke står i settet, og krev 400. En feltwhitelist inne i en generell `
 ikke mer enn ett døgn gammel. Utenfor vinduet brukes servertid, og `forsinket=True` settes
 uansett når klienttid avviker merkbart fra ankomsttid. Da vet den som leser statistikken at
 tallet kommer fra en bil som var uten dekning.
+
+**Korreksjonsendepunktet er ikke et handling-endepunkt.** Det tar et tidspunkt, altså en
+feltverdi, og ligger derfor på `skriv_full` med vanlig kroppsvalidering. Å presse det inn
+under `skriv_handling` ville uthult det lukkede skjemaet i 5.1 med én gang.
 
 ### 5.2 Idempotens
 
@@ -341,6 +391,11 @@ gitt avledet innsyn i data brukeren ikke har tilgang til. Sjekken er én linje i
 Merk konsekvensen for enhetskontoene: en bil med `skriv_handling` på `oppdrag`, men ingen
 rad på `statistikk`, ser ingen statistikk i det hele tatt. Det er riktig.
 
+**Oppdragshandleren må regne på gjeldende statusmeldinger** (§4.4), ikke på alle rader. En
+korreksjon som ikke slår gjennom i tallene er verre enn ingen korreksjon: operatøren ser at
+rettingen står i tidslinjen og tror den er tatt hensyn til. Testen som håndhever det skriver
+en korreksjon og krever at responstiden endrer seg.
+
 ## 9. Personvern
 
 **Ett punkt, ikke to** — lokasjon ble en nedtrekksliste (§3.2), og da holder A.6/A.12 for
@@ -384,10 +439,11 @@ statusknappen som det eneste elementet som ikke krever presisjon.
 | 1 | App, modulregistrering, fire modeller, `choices.py`, lokasjonsadmin, admin-matrise | 5–7 t |
 | 2 | Audit-unntak for fritekst + protokolltillegg. **Før fase 3** | 1–2 t |
 | 3 | Sentralbordet: enhetsliste med utledet status, opprett, tildel, flytt, rediger. Polling med ETag | 7–9 t |
-| 4 | Enhetsskjermen: statusmaskin, smale endepunkter, objektsjekk, de to skjulereglene | 6–8 t |
+| 4 | Enhetsskjermen: statusmaskin, smale endepunkter, objektsjekk, de to skjulereglene, visning av `automatisk` | 6–8 t |
+| 4b | Korreksjoner: ny rad som overstyrer, `gjeldende()`-manager | 2–3 t |
 | 5 | Offline-kø med idempotens | 4–6 t |
 | 6 | Statistikkregisteret + oppdragsfanen | 5–7 t |
-| 7 | Arkivering: `AbstractArkiv` + handler for oppdrag | 4–6 t |
+| 7 | Arkivering: `AbstractArkiv` + handler og egen arkivknapp under `/oppdrag/` | 5–7 t |
 
 Fase 2 står før fase 3 fordi fritekstfeltet ellers ville vært i produksjon med
 verdilogging på, og de radene kan ikke fjernes i ettertid uten å røre auditsporet.
@@ -401,11 +457,42 @@ nummer to faktisk skrives» — dette er modell nummer to. `VaktArkiv` skal *ikk
 basemodellen: SHA-signaturene er låst til dagens payload-form, og hvert eksisterende arkiv i
 prod ville meldt tukling.
 
+**Arkiveringen slås ikke sammen i denne runden.** Oppdrag får sin egen knapp under
+`/oppdrag/`, og pasientarkivet beholder sin under `/pasienter/`. Det er en bevisst
+utsettelse, ikke en forglemmelse — og prisen står i §12.1.
+
 ## 12. Åpne avklaringer
 
-1. **Arkiveres oppdrag sammen med vakta, eller for seg?** `core.arkiv` er per modul, så
-   teknisk hver for seg. Om admin skal ha én knapp som arkiverer begge, er et
-   grensesnittspørsmål som kan tas i fase 7.
-2. **Skal `automatisk`-flagget vises noe sted?** Det lagres fra fase 4, men ingenting leser
-   det. Spørsmålet er om statistikken i fase 6 skal skille meldt og avledet `Ledig` — og det
-   svaret er lettere å gi når man ser tallene.
+### 12.1 Arkiveringen ligger to steder inntil videre — og det har en pris
+
+`core/arkiv/` er modul-agnostisk for frysing, verifisering og kollaps, men to ting ble
+aldri flyttet ut av pasientmodulen: **opprettelsen** (`arkiver_aktiv_vakt()` i
+`patients/services.py`; handler-kontrakten har ingen `opprett_arkiv`) og **knappen**, som
+ligger i admin-kortene på `/pasienter/`.
+
+En vakt er ikke en pasientting. Knappen hører hjemme i `/portal-admin/`, ved siden av
+innstillingene som flyttet dit i §4.1. Men én knapp som lager to *urelaterte* arkivrader er
+verre enn to knapper — da tror man de hører sammen. Sammenslåingen krever derfor en rad i
+`core` som grupperer dem:
+
+```python
+class Vaktarkivering(BaseTimeStampedModel):   # core
+    arrangement_navn, tidspunkt, utfort_av, utfort_av_navn
+```
+
+Hver moduls arkiv får en nullbar FK dit. **Signaturene overlever**, og det er ikke flaks:
+`patients/arkiv.py` bestemmer selv hva som går inn i `sha_payload()`, så et felt handleren
+ikke nevner endrer ingenting. `ArkivSignaturLaastTests` beviser det. Eksisterende arkiver
+får `NULL` — de er fra før grupperingen fantes.
+
+**Besluttet 28. aug. 2026: utsettes.** Oppdrag får sin egen knapp i fase 7, og
+sammenslåingen tas som egen sak når begge arkivene finnes. Prisen er at portalen i en
+periode har to steder å arkivere fra, og at **noen kan arkivere pasienter og glemme
+oppdrag**. Det er en operativ risiko, ikke en teknisk: den håndteres med et punkt i
+`docs/RUNBOOK_VAKT.md`, som faktisk leses ved vaktslutt.
+
+### 12.2 Skal `automatisk`-flagget påvirke statistikken, ikke bare vises?
+
+Fra fase 4 lagres flagget, og fra fase 4 vises det (§4.5). Om responstider skal *regnes*
+annerledes når sluttiden er avledet — utelates, merkes, eller telles som alle andre — er
+lettere å svare på når tallene finnes. Tas i fase 6.

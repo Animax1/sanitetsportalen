@@ -543,7 +543,7 @@ Gjennomgang 13. aug. 2026, med 1000 pasienter og peak 100 brukere som premiss.
       og responsen returnerer kvittering — aldri data.
 - [ ] **Oppdragsmodulen — se `docs/BESLUTNING_OPPDRAGSMODULEN.md`.** Besluttet 28. aug.
       2026, ikke bygget. Modulen er den første som tar `skriv: handling` i bruk. Sju
-      faser, 32–45 t. Punktene under lå her løst fra før og er nå plassert i planen:
+      faser, 35–50 t. Punktene under lå her løst fra før og er nå plassert i planen:
       - [ ] **Fase 1** (5–7 t): app, modulregistrering, `Enhet`/`Lokasjon`/`Oppdrag`/
             `Statusmelding`/`Enhetsbytte`, `choices.py`, lokasjonsadmin, admin-matrise.
             Ingen UI.
@@ -562,14 +562,39 @@ Gjennomgang 13. aug. 2026, med 1000 pasienter og peak 100 brukere som premiss.
             startstatus, to knapper mot seks navngitte endepunkter, lukket kroppsskjema,
             objektsjekk på eierskap, og de to skjulereglene (fritekst ved `Ledig`, hele
             oppdraget 30 min etter) som **server-side filter**, aldri sletting.
+            Inkluderer visning av `automatisk` (§4.5): markøren sitter på klokkeslettet,
+            ikke på statusordet — det er tidspunktet som er avledet. Ingen badge, ingen ny
+            farge, må stå i gråtoner (WCAG 1.4.1).
+      - [ ] **Fase 4b** (2–3 t): korreksjoner. 113 retter tidspunkt ved å skrive en **ny
+            rad som peker på den gamle**, ikke ved å endre den — `Statusmelding` er et spor
+            av hva som ble meldt. «Nyeste ikke-korrigerte rad per status vinner» bor i en
+            manager-metode, ikke i en `if` per view. Kun tidspunkt, ikke status. Kun
+            `skriv_full`.
       - [ ] **Fase 5** (4–6 t): offline-kø for stemplinger, med `core.idempotency`.
       - [ ] **Fase 6** (5–7 t): **statistikkregisteret** + oppdragsfanen. Her rives den
             direkte importen fra `statistikk` til `patients.services` ut, og erstattes av
             et registry etter samme idiom som `core.backup` og `core.arkiv` — det CLAUDE.md
             har varslet siden statistikkmodulen ble skilt ut. Pasientfanen skal se lik ut
             etterpå.
-      - [ ] **Fase 7** (4–6 t): arkivering. **Her bygges `AbstractArkiv`** — dette er
-            modell nummer to, som punktet under har ventet på.
+      - [ ] **Fase 7** (5–7 t): arkivering. **Her bygges `AbstractArkiv`** — dette er
+            modell nummer to, som punktet under har ventet på. Oppdrag får **egen
+            arkivknapp** under `/oppdrag/`; sammenslåingen med pasientarkivet er utsatt,
+            se punktet under.
+
+- [ ] **Flytt arkiveringen til `/portal-admin/` og grupper den.** Utsatt 28. aug. 2026 —
+      se §12.1 i `docs/BESLUTNING_OPPDRAGSMODULEN.md`. `core/arkiv/` er modul-agnostisk
+      for frysing, verifisering og kollaps, men **opprettelsen** (`arkiver_aktiv_vakt()` i
+      `patients/services.py` — handler-kontrakten har ingen `opprett_arkiv`) og **knappen**
+      ligger fortsatt i pasientmodulen. En vakt er ikke en pasientting.
+      - [ ] Krever en `Vaktarkivering`-rad i `core` som grupperer modulenes arkiver. Én
+            knapp som lager to urelaterte arkivrader er verre enn to knapper — da tror man
+            de hører sammen.
+      - [ ] Signaturene overlever: handleren bestemmer selv hva som går inn i
+            `sha_payload()`, så en nullbar FK den ikke nevner endrer ingenting.
+            `ArkivSignaturLaastTests` beviser det. Eksisterende arkiver får `NULL`.
+      - [ ] **I mellomtiden kan noen arkivere pasienter og glemme oppdrag.** Det er en
+            operativ risiko, ikke en teknisk. Legg et punkt i `docs/RUNBOOK_VAKT.md`, som
+            faktisk leses ved vaktslutt — gjøres samtidig med fase 7.
 - [ ] Vurder `cached_db`-sesjoner. `SESSION_SAVE_EVERY_REQUEST=True` med DB-sesjoner gir
       én UPDATE per request. Krever Redis, altså vakt-modus.
 
