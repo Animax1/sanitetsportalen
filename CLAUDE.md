@@ -287,6 +287,14 @@ fase 3–7 gjenstår — se `docs/BESLUTNING_VAKTLISTE.md`, som er besluttet i s
   er fasit for duplikater, men en `IntegrityError` som fanges uten savepoint etterlater
   transaksjonen ubrukelig: sesjonslagringen feiler på vei ut, og brukeren får en naken
   400-side i stedet for feilmeldingen viewet formulerte.
+- **Registrene administreres på `/vaktliste/registre/`, ikke i Django-admin.** Den
+  flaten er kun rutet under `DEBUG`/`OFFLINE_MODE` (S1), så `vaktliste/admin.py` er et
+  utviklerverktøy — et register som *bare* finnes der, finnes ikke for brukeren.
+  `SjekkAtIngenPekerPaaDjangoAdminTests` skanner alle maler for lenker dit.
+- **ID-er fra klienten går gjennom `views._int()`.** Et nedtrekk med «Ingen valgt»
+  sender `''`, ikke `null`, og den strengen i et FK-filter gir `ValueError` — altså 500
+  der brukeren skulle fått «velg korps». `or None` dekker den tomme strengen, men ikke
+  en ikke-numerisk.
 
 ### Statistikk-modulen (statistikk/)
 
@@ -365,8 +373,8 @@ Alle temaene er mørke, så **enhver Bootstrap-klasse for dempet tekst må overs
 malen kan se den. `MorkTekstPaaMorkBakgrunnTests` løser `{% extends %}` og `{% static %}`
 og håndhever det.
 
-Ti moduler i `static/js/` (ingen bundler), fordelt på fem sider — pasientsiden,
-`/statistikk/`, `/vaktliste/` og de to grensesnittene under `/oppdrag/`:
+Elleve moduler i `static/js/` (ingen bundler), fordelt på seks sider — pasientsiden,
+`/statistikk/`, de to under `/vaktliste/` og de to grensesnittene under `/oppdrag/`:
 
 | Modul | Lastes | Ansvar |
 |-------|--------|--------|
@@ -381,6 +389,7 @@ Ti moduler i `static/js/` (ingen bundler), fordelt på fem sider — pasientside
 | `oppdrag-sentral.js` | `/oppdrag/`, kontoer uten enhet | Sentralbordet: enhetsliste, oppdragsliste, tidslinje, lokasjonsadmin |
 | `oppdrag-enhet.js` | `/oppdrag/`, enhetskontoer | Enhetsskjermen: to knapper mot de navngitte stemplingsendepunktene, og offline-køen i `localStorage`. Serveren sender `neste_overgang` per rad; kjeden følger med som data kun for å projisere neste steg mens noe ligger usendt |
 | `vaktliste.js` | **kun** `/vaktliste/` | Planleggingssiden: fanene bygges av ressursene, «Oversikt» grupperer på korps, «Ikke plassert» fanger dem ingen satte opp |
+| `vaktliste-registre.js` | **kun** `/vaktliste/registre/` | Mannskapsregisteret og de tre verdimengdene. Egen fil fordi skjemahjelperne er sidespesifikke — de to vaktlistefilene kan ikke lastes i samme node-harness |
 
 **`patients-utils.js` kan ikke lastes utenfor pasientsiden.** Den gjør arbeid på toppnivå
 — `Chart.defaults` og `new bootstrap.Modal(document.getElementById('newModal'))` — og

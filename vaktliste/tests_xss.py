@@ -13,8 +13,8 @@ import re
 from django.test import SimpleTestCase
 
 from patients.js_test_utils import (
-    PORTAL_UTILS_JS, VAKTLISTE_JS, build_harness, extract_function,
-    node_available, read_js, run_node,
+    PORTAL_UTILS_JS, VAKTLISTE_JS, VAKTLISTE_REGISTRE_JS, build_harness,
+    extract_function, node_available, read_js, run_node,
 )
 
 HTML_BUILDERS = (
@@ -234,3 +234,133 @@ class VaktlisteLogikkTests(SimpleTestCase):
                    'kun ressurs 1 sine poster');
             assert(_posterFor(3).length === 0, 'ukjent ressurs gir tom liste');
         ''')
+
+
+# ── Registersiden ────────────────────────────────────────────────────────────
+#
+# Egen bygger-liste og eget harness: `_visFeil`, `_lukkModal` og vennene deres
+# finnes i begge filene (bevisst — de er sidespesifikke), så de to kan ikke
+# lastes i samme harness.
+
+REGISTER_BUILDERS = ('mkMannskap', 'mkVerdier')
+
+REGISTER_REVIEWED = {
+    'inaktiv': 'hardkodet CSS-klasse fra en ternær',
+    'inaktivMerke': 'markup bygget lokalt, ingen data i seg',
+    'merker': 'markup bygget lokalt, kompetansenavnene escapet inni',
+    'konto': 'markup bygget lokalt, brukernavnet escapet inni',
+    'tlf': 'markup bygget lokalt, telefonnummeret escapet inni',
+    'kort': 'markup bygget lokalt, kortnavnet escapet inni',
+    'bruk': 'markup bygget lokalt, tallet escapet inni',
+    'rader': 'markup bygget lokalt i samme funksjon',
+    'innhold': 'markup bygget lokalt i samme funksjon',
+    "deler.join('')": 'markup bygget lokalt i samme funksjon',
+}
+
+
+class RegistersidenEscapingKildeTests(SimpleTestCase):
+    def test_byggerne_finnes(self):
+        src = read_js(VAKTLISTE_REGISTRE_JS)
+        for navn in REGISTER_BUILDERS:
+            with self.subTest(navn=navn):
+                self.assertIn(f'function {navn}(', src)
+
+    def test_siden_laster_ikke_patients_utils(self):
+        from pathlib import Path
+        from django.conf import settings
+        mal = (Path(settings.BASE_DIR) / 'templates' / 'vaktliste'
+               / 'registre.html').read_text(encoding='utf-8')
+        lastet = re.findall(r"<script\b[^>]*js/([A-Za-z0-9_.-]+\.js)", mal)
+        self.assertNotIn('patients-utils.js', lastet)
+        self.assertIn('portal-utils.js', lastet)
+        self.assertIn('vaktliste-registre.js', lastet)
+
+    def test_alle_interpolasjoner_er_escapet_eller_gjennomgatt(self):
+        src = read_js(VAKTLISTE_REGISTRE_JS)
+        uescapet = []
+        for navn in REGISTER_BUILDERS:
+            body = _uten_kommentarer(extract_function(src, navn))
+            for uttrykk in re.findall(r'\$\{([^}]*)\}', body):
+                uttrykk = uttrykk.strip()
+                if uttrykk.startswith(ESCAPING_CALLS):
+                    continue
+                if uttrykk in REGISTER_REVIEWED:
+                    continue
+                uescapet.append(f'{navn}(): ${{{uttrykk}}}')
+
+        self.assertEqual(uescapet, [], (
+            'Uescapede interpolasjoner i vaktliste-registre.js:\n  '
+            + '\n  '.join(uescapet)))
+
+
+class RegistersidenEscapingOppforselTests(SimpleTestCase):
+    """Registersiden er den eneste flaten der notatfeltet skrives.
+
+    Feltet er unntatt verdilogging i audit nettopp fordi det er helt fritt —
+    og et helt fritt felt er også det farligste å sette inn i DOM-en.
+    """
+
+    HARNESS = (
+        (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue', 'trustedHtml', '_escHtml')),
+        (VAKTLISTE_REGISTRE_JS, ('mkMannskap', 'mkVerdier')),
+    )
+
+    def setUp(self):
+        if not node_available():
+            self.skipTest('node er ikke tilgjengelig')
+        self.harness = build_harness(self.HARNESS)
+
+    def test_personnavn_og_kompetanse_escapes(self):
+        ut = run_node(self.harness, """
+            globalThis.data = { mannskap: [{
+              id: 1, navn: '<img src=x onerror=alert(1)>',
+              korps_navn: 'HGSD', korps_kort: 'HGSD',
+              kompetanser: [{id: 1, navn: '<b>Sykepleier</b>'}],
+              telefon: '', brukernavn: '', er_aktiv: true, i_bruk: 0
+            }]};
+            console.log(mkMannskap());
+        """)
+        self.assertNotIn('<img src=x', ut)
+        self.assertNotIn('<b>Sykepleier</b>', ut)
+        self.assertIn('&lt;img', ut)
+
+    def test_brukernavn_og_telefon_escapes(self):
+        ut = run_node(self.harness, """
+            globalThis.data = { mannskap: [{
+              id: 1, navn: 'Kari', korps_navn: 'HGSD', korps_kort: 'HGSD',
+              kompetanser: [], telefon: '<i>90</i>',
+              brukernavn: '<script>x</script>', er_aktiv: true, i_bruk: 0
+            }]};
+            console.log(mkMannskap());
+        """)
+        self.assertNotIn('<script>x', ut)
+        self.assertNotIn('<i>90</i>', ut)
+
+    def test_verdinavn_og_kortnavn_escapes(self):
+        ut = run_node(self.harness, """
+            globalThis.aktivRegisterFane = 'korps';
+            globalThis.REGISTRE = { korps: {sti:'korps', ental:'korps',
+                                            tittel:'Korps', kortnavn:true} };
+            globalThis.data = { korps: [{
+              id: 1, navn: '<b>Haugesund</b>', kortnavn: '<i>HGSD</i>',
+              er_aktiv: true, rekkefolge: 100, i_bruk: 0
+            }]};
+            console.log(mkVerdier('korps'));
+        """)
+        self.assertNotIn('<b>Haugesund</b>', ut)
+        self.assertNotIn('<i>HGSD</i>', ut)
+        self.assertIn('&lt;b&gt;', ut)
+
+    def test_inaktiv_rad_merkes(self):
+        """Pensjonering er den normale veien ut — raden skal fortsatt vises,
+        men tydelig nedtonet."""
+        ut = run_node(self.harness, """
+            globalThis.data = { mannskap: [{
+              id: 1, navn: 'Kari', korps_navn: 'HGSD', korps_kort: 'HGSD',
+              kompetanser: [], telefon: '', brukernavn: '',
+              er_aktiv: false, i_bruk: 0
+            }]};
+            const ut = mkMannskap();
+            assert(ut.includes('vl-inaktiv'), 'inaktiv rad skal merkes');
+            assert(ut.includes('Kari'), 'og fortsatt vises');
+        """)

@@ -1,9 +1,14 @@
-"""Django-admin for vaktlistemodulen.
+"""Django-admin for vaktlistemodulen — **utviklerverktøy, ikke portalens flate.**
 
-Fase 1 leverer registrene og mannskapet med admin her; portalens egen side
-kommer i fase 2. Django-admin er uansett riktig hjem for `Korps`,
-`Kompetanse` og `VaktRolle` — de er organisasjonsoppsett som endres sjelden,
-av global admin.
+Fase 1 la registrene her og skrev at Django-admin var «riktig hjem» for dem.
+Det var feil: `/django-admin/` er kun rutet når `DEBUG` eller `OFFLINE_MODE`
+er på (S1 — den omgår rate-limiting, kontosperre, MFA-tvang og `LoginEvent`).
+I produksjon fantes det dermed ingen vei til å opprette et korps eller et
+mannskap i det hele tatt.
+
+Portalens flate er `/vaktliste/registre/`, bygget i `views_registre.py`. Denne
+fila blir stående fordi den er nyttig lokalt — men et register som *bare*
+finnes her, finnes ikke for brukeren.
 """
 from django.contrib import admin
 

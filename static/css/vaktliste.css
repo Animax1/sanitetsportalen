@@ -174,3 +174,30 @@
   padding-bottom: 0.3rem;
   margin-bottom: 0.4rem;
 }
+
+/* ── Registersiden ────────────────────────────────────────────────────── */
+/*
+   En inaktiv rad skal være tydelig nedtonet uten å bli uleselig: pensjonering
+   er den normale veien ut av registeret, ikke en feiltilstand, og raden må
+   fortsatt kunne leses av den som skal aktivere den igjen.
+*/
+.vl-rad.vl-inaktiv .vl-navn {
+  color: var(--text-muted);
+  text-decoration: line-through;
+  text-decoration-thickness: 1px;
+}
+
+.vl-rad.vl-inaktiv {
+  opacity: 0.7;
+}
+
+/* Kompetansemerkene kan bli mange på én person — la dem brytes, ikke
+   presse knappene ut av kortet. */
+#vlr-panel .vl-rad {
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+#vlr-panel .vl-merkelapp {
+  font-size: 0.72rem;
+}

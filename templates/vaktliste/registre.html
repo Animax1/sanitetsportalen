@@ -1,0 +1,168 @@
+{% extends "core/base_portal.html" %}
+{% load static %}
+
+{% block title %}Mannskap og registre – Sanitetsportalen{% endblock %}
+
+{% comment %}
+  Registersiden. Erstatter Django-admin, som er av i produksjon (S1) — se
+  vaktliste/views_registre.py.
+
+  Mannskapslista er gruppert på korps med kompetansene synlige, fordi det er
+  slik bestillingen beskrev den: en personelloversikt, ikke et admin-skjema.
+{% endcomment %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="{% static 'css/vaktliste.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-3 px-md-4 py-3">
+
+  <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
+    <h1 class="h4 mb-0"><i class="bi bi-person-vcard me-2"></i>Mannskap og registre</h1>
+    <div class="d-flex gap-2 align-items-center flex-wrap">
+      <a href="/vaktliste/" class="btn btn-outline-secondary btn-sm">
+        <i class="bi bi-calendar-week me-1"></i>Til planleggingen
+      </a>
+      <button type="button" class="btn btn-primary btn-sm"
+              data-action="apneNyPerson">
+        <i class="bi bi-person-plus me-1"></i>Nytt mannskap
+      </button>
+    </div>
+  </div>
+
+  <div class="vl-faner" id="vlr-faner">
+    <button class="vl-fane active" data-action="visRegisterFane" data-arg="mannskap">
+      <i class="bi bi-people me-1"></i>Mannskap<span class="vl-antall" id="vlr-antall">0</span>
+    </button>
+    <button class="vl-fane" data-action="visRegisterFane" data-arg="korps">
+      <i class="bi bi-flag me-1"></i>Korps
+    </button>
+    <button class="vl-fane" data-action="visRegisterFane" data-arg="kompetanser">
+      <i class="bi bi-award me-1"></i>Kompetanser
+    </button>
+    <button class="vl-fane" data-action="visRegisterFane" data-arg="roller">
+      <i class="bi bi-person-badge me-1"></i>Vaktroller
+    </button>
+  </div>
+
+  <div id="vlr-mangler-korps" class="alert alert-warning d-none">
+    <strong>Ingen korps ennå.</strong>
+    Et mannskap må høre til et korps — korpset er badgen tilgangsmodellen
+    hviler på. Legg inn minst ett under <em>Korps</em> først.
+  </div>
+
+  <div id="vlr-panel"></div>
+
+</div>
+
+<div class="modal fade" id="personModal" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="person-tittel">Nytt mannskap</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Lukk"></button>
+      </div>
+      <div class="modal-body">
+        <div class="row g-2 mb-3">
+          <div class="col-md-7">
+            <label class="form-label" for="person-navn">Navn</label>
+            <input type="text" id="person-navn" class="form-control" maxlength="150">
+            <div class="form-text">Unikt innenfor korpset. To like navn i samme
+              korps er umulige å skille i lista.</div>
+          </div>
+          <div class="col-md-5">
+            <label class="form-label" for="person-korps">Korps</label>
+            <select id="person-korps" class="form-select"></select>
+          </div>
+        </div>
+        <div class="mb-3">
+          <label class="form-label" for="person-kompetanser">Kompetanser</label>
+          <select id="person-kompetanser" class="form-select" multiple size="5"></select>
+          <div class="form-text">Hold <kbd>Ctrl</kbd> (<kbd>Cmd</kbd> på Mac) for å
+            velge flere. Kompetansen følger personen; rollen settes per vakt.</div>
+        </div>
+        <div class="row g-2 mb-3">
+          <div class="col-md-6">
+            <label class="form-label" for="person-telefon">Telefon</label>
+            <input type="text" id="person-telefon" class="form-control" maxlength="20">
+            <div class="form-text">Brukes av KO og vaktleder under vakt. Valgfritt.</div>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label" for="person-konto">Koblet konto</label>
+            <select id="person-konto" class="form-select"></select>
+            <div class="form-text">Valgfritt. Gir i seg selv ingen tilgang — den
+              sier bare hvem kontoen er, og hvilket korps den arver.</div>
+          </div>
+        </div>
+        <div class="mb-3">
+          <label class="form-label" for="person-notat">Notat</label>
+          <textarea id="person-notat" class="form-control" rows="2"></textarea>
+          <div class="form-text text-warning">
+            <i class="bi bi-exclamation-triangle me-1"></i>Verdiene logges ikke i
+            revisjonsloggen. <strong>Ikke skriv helseopplysninger her</strong> —
+            kostbehov og allergier skal ikke inn i portalen.
+          </div>
+        </div>
+        <div class="form-check mb-2" id="person-aktiv-rad">
+          <input class="form-check-input" type="checkbox" id="person-aktiv" checked>
+          <label class="form-check-label" for="person-aktiv">
+            Aktiv — vises i nedtrekkslistene når vakter bemannes
+          </label>
+        </div>
+        <div id="person-feil" class="text-danger small d-none"></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Avbryt</button>
+        <button type="button" class="btn btn-primary" id="person-knapp"
+                data-action="lagrePerson">Lagre</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="verdiModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="verdi-tittel">Ny verdi</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Lukk"></button>
+      </div>
+      <div class="modal-body">
+        <div class="mb-3">
+          <label class="form-label" for="verdi-navn">Navn</label>
+          <input type="text" id="verdi-navn" class="form-control" maxlength="120">
+        </div>
+        <div class="mb-3 d-none" id="verdi-kortnavn-rad">
+          <label class="form-label" for="verdi-kortnavn">Kortnavn</label>
+          <input type="text" id="verdi-kortnavn" class="form-control" maxlength="20">
+          <div class="form-text">Vises i trange kolonner, f.eks. «HGSD». Valgfritt.</div>
+        </div>
+        <div class="mb-3">
+          <label class="form-label" for="verdi-rekkefolge">Rekkefølge</label>
+          <input type="number" id="verdi-rekkefolge" class="form-control" value="100">
+          <div class="form-text">Lavere kommer først i lister.</div>
+        </div>
+        <div class="form-check mb-2" id="verdi-aktiv-rad">
+          <input class="form-check-input" type="checkbox" id="verdi-aktiv" checked>
+          <label class="form-check-label" for="verdi-aktiv">Aktiv</label>
+        </div>
+        <div id="verdi-feil" class="text-danger small d-none"></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Avbryt</button>
+        <button type="button" class="btn btn-primary" id="verdi-knapp"
+                data-action="lagreVerdi">Lagre</button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+{% comment %}
+  portal-utils.js, ikke patients-utils.js — se CLAUDE.md.
+{% endcomment %}
+<script src="{% static 'js/portal-utils.js' %}"></script>
+<script src="{% static 'js/vaktliste-registre.js' %}"></script>
+{% endblock %}

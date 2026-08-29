@@ -60,6 +60,23 @@ def _nektet():
     return _feil('Ingen tilgang', status=403)
 
 
+def _int(raa):
+    """Klientverdi → int, eller ``None`` hvis den ikke er et tall.
+
+    Tom streng er det vanlige tilfellet: et HTML-nedtrekk med «Ingen valgt»
+    sender ``''``, ikke ``null``. Sendes den rett inn i et FK-filter, kaster
+    Django `ValueError` og brukeren får en 500 der hun skulle fått «velg
+    korps». `or None` alene dekker ikke søsteren — en ikke-numerisk streng —
+    så begge fanges her, ett sted.
+    """
+    if raa in (None, '', False):
+        return None
+    try:
+        return int(raa)
+    except (TypeError, ValueError):
+        return None
+
+
 def _tid(raa):
     """ISO-streng → aware datetime, eller ``None`` hvis den ikke lar seg lese."""
     if not raa:
@@ -170,7 +187,7 @@ def vaktlister_view(request):
         return _feil(str(feil))
 
     kopiert = 0
-    kopier_fra = data.get('kopier_fra')
+    kopier_fra = _int(data.get('kopier_fra'))
     if kopier_fra:
         kilde = Vaktliste.objects.filter(pk=kopier_fra).first()
         if kilde is not None:
@@ -282,9 +299,9 @@ def ressurser_view(request, pk):
                 vaktliste=vl,
                 navn=navn,
                 type=type_,
-                korps_id=data.get('korps_id') or None,
-                enhet_id=data.get('enhet_id') or None,
-                rekkefolge=data.get('rekkefolge') or 100,
+                korps_id=_int(data.get('korps_id')),
+                enhet_id=_int(data.get('enhet_id')),
+                rekkefolge=_int(data.get('rekkefolge')) or 100,
             )
     except IntegrityError:
         return _feil(f'«{navn}» finnes allerede på denne vaktlista.')
@@ -323,11 +340,11 @@ def ressurs_detalj_view(request, pk):
             return _feil(f'Ukjent ressurstype: {data["type"]!r}')
         ressurs.type = data['type']
     if 'korps_id' in data:
-        ressurs.korps_id = data['korps_id'] or None
+        ressurs.korps_id = _int(data['korps_id'])
     if 'enhet_id' in data:
-        ressurs.enhet_id = data['enhet_id'] or None
+        ressurs.enhet_id = _int(data['enhet_id'])
     if 'rekkefolge' in data:
-        ressurs.rekkefolge = data['rekkefolge'] or 100
+        ressurs.rekkefolge = _int(data['rekkefolge']) or 100
 
     try:
         with transaction.atomic():
@@ -357,7 +374,7 @@ def vaktposter_view(request, pk):
     data = _json_body(request)
     try:
         mannskap = Mannskap.objects.select_related('korps').get(
-            pk=data.get('mannskap_id'))
+            pk=_int(data.get('mannskap_id')))
     except (Mannskap.DoesNotExist, TypeError, ValueError):
         return _feil('Ukjent mannskap.')
 
@@ -380,7 +397,7 @@ def vaktposter_view(request, pk):
             vaktpost = Vaktpost.objects.create(
                 ressurs=ressurs,
                 mannskap=mannskap,
-                rolle_id=data.get('rolle_id') or None,
+                rolle_id=_int(data.get('rolle_id')),
                 fra_tid=fra_tid,
                 til_tid=til_tid,
                 merknad=(data.get('merknad') or '').strip(),
@@ -420,7 +437,7 @@ def vaktpost_detalj_view(request, pk):
 
     data = _json_body(request)
     if 'rolle_id' in data:
-        vaktpost.rolle_id = data['rolle_id'] or None
+        vaktpost.rolle_id = _int(data['rolle_id'])
     if 'merknad' in data:
         vaktpost.merknad = (data.get('merknad') or '').strip()
 

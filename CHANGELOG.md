@@ -4,6 +4,55 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-08-29 — Registersiden: portalen får tilbake det Django-admin gjorde
+
+**1534 tester grønne** (43 nye). Ingen migrasjon. Ny side på `/vaktliste/registre/`.
+
+**Funnet av André, og det er et hull fase 1 og 2 begge gikk forbi.** Registrene
+kunne bare fylles fra Django-admin, og den flaten er kun rutet under `DEBUG` og
+`OFFLINE_MODE` (S1). I produksjon fantes det altså ingen vei til å opprette et
+korps eller et mannskap i det hele tatt — planleggingssiden hadde en
+nedtrekksliste som aldri kunne fylles, og banneret på den pekte brukeren mot en
+dør som ikke finnes. Fase 1 skrev til og med i `admin.py` at Django-admin var
+«riktig hjem» for registrene.
+
+**Ingen test var rød.** Alle testene laget radene sine med ORM-en, så ingen av
+dem gikk den veien en bruker må gå. Testene på registersiden går derfor gjennom
+HTTP hele veien — fra tom base til bemannet vakt — og
+`SjekkAtIngenPekerPaaDjangoAdminTests` skanner alle maler for at det ikke skal
+skje igjen.
+
+- **Mannskapslista er gruppert på korps med kompetansene synlige**, ikke en flat
+  admin-tabell: det var slik bestillingen beskrev den. Inaktive rader vises
+  nedtonet framfor å forsvinne — pensjonering er den normale veien ut, ikke en
+  feiltilstand, og raden må kunne leses av den som skal aktivere den igjen.
+- **Egen side, ikke en fane på planleggingssiden.** Registrene er globale;
+  fanene på `/vaktliste/` er ressursene i én vakt. To omfang i samme faneliste
+  ville sagt at «Mannskap» hører til oktobervakta.
+- **De tre verdimengdene deler fabrikk** (`_register_views`), som
+  `patients/views_registre.py` gjør for navneregistrene. Korps har ett felt til,
+  og fabrikken tar derfor en liste over valgfrie tekstfelter framfor å bli to
+  fabrikker.
+- **Sletting er ikke veien ut av et register.** `Korps`, `VaktRolle` og
+  `Mannskap` er PROTECT-et, og `Kompetanse` blokkeres eksplisitt selv om M2M-en
+  ikke ville protestert — å slette den ville stilltiende strippet kompetansen fra
+  alle som har den. Antall bruk vises i lista, ikke bare i feilmeldingen: en
+  verdimengde man kan slette uten å vite hva som henger i den, sletter man for
+  lett.
+- **Funn underveis, fanget av en av de nye testene:** et HTML-nedtrekk med «Ingen
+  valgt» sender `''`, ikke `null`. Sendt rett inn i et FK-filter kaster Django
+  `ValueError`, og brukeren fikk 500 der hun skulle fått «velg korps». Alle
+  ID-er fra klienten går nå gjennom `_int()` — også i planleggingsviewene, der
+  `or None` dekket den tomme strengen, men ikke en ikke-numerisk.
+- Mutasjonstestet seks veier. Fem bet med én gang; den sjette — korps som teller
+  bare mannskap og ikke reserverte ressurser — gjorde det **ikke**, fordi
+  `ProtectedError`-fallbacken ga 409 uansett. Testen sjekket bare statuskoden.
+  Den leser nå `i_bruk`-tallet, som er det eneste telle-sjekken faktisk styrer:
+  uten den står et korps som eier et lag oppført som «ubrukt», og da trykker man
+  slett i god tro.
+
+---
+
 ## 2026-08-29 — Vaktlistemodulen fase 2: oppsettet og planleggingssiden
 
 **1491 tester grønne** (68 nye). Migrasjon `vaktliste.0002`. Siden ligger på

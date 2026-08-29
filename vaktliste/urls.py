@@ -9,10 +9,14 @@ URL-navnene har `vaktliste_`-prefiks fordi navnerommet er globalt (ingen
 """
 from django.urls import path
 
-from . import views
+from . import views, views_registre
 
 urlpatterns = [
     path('', views.index_view, name='vaktliste_index'),
+
+    # Registersiden. Egen side, ikke en fane på planleggingssiden: registrene
+    # er globale, fanene der er ressursene i én vakt.
+    path('registre/', views_registre.registre_view, name='vaktliste_registre'),
 
     # Vaktlistene. POST her planlegger en ny vakt — den lager både
     # `core.Vakt` og lista, og rører ikke portalens aktive vakt.
@@ -31,4 +35,21 @@ urlpatterns = [
          name='vaktliste_api_vaktposter'),
     path('api/vaktposter/<int:pk>/', views.vaktpost_detalj_view,
          name='vaktliste_api_vaktpost_detalj'),
+
+    # Registrene. Mannskapet er hovedlista; de tre verdimengdene bygges av
+    # samme fabrikk — se views_registre.py.
+    path('api/mannskap/', views_registre.mannskap_view,
+         name='vaktliste_api_mannskap'),
+    path('api/mannskap/<int:pk>/', views_registre.mannskap_detalj_view,
+         name='vaktliste_api_mannskap_detalj'),
+    path('api/korps/', views_registre.korps_view, name='vaktliste_api_korps'),
+    path('api/korps/<int:pk>/', views_registre.korps_detalj_view,
+         name='vaktliste_api_korps_detalj'),
+    path('api/kompetanser/', views_registre.kompetanser_view,
+         name='vaktliste_api_kompetanser'),
+    path('api/kompetanser/<int:pk>/', views_registre.kompetanse_detalj_view,
+         name='vaktliste_api_kompetanse_detalj'),
+    path('api/roller/', views_registre.roller_view, name='vaktliste_api_roller'),
+    path('api/roller/<int:pk>/', views_registre.rolle_detalj_view,
+         name='vaktliste_api_rolle_detalj'),
 ]

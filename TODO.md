@@ -844,6 +844,19 @@ Gjennomgang 13. aug. 2026, med 1000 pasienter og peak 100 brukere som premiss.
             ressursene, aldri personene. Den doble tilgangsregelen står i
             `services.kan_sette_vaktpost()` som én funksjon. Admin-only til
             fase 3. 68 nye tester, åtte mutasjoner prøvd og alle røde.
+      - [x] **Registersiden `/vaktliste/registre/` (29. aug. 2026).** Funnet av
+            André: registrene kunne bare fylles fra Django-admin, og den flaten
+            er av i produksjon (S1) — modulen var i praksis ubrukelig i prod
+            uten at én test var rød, fordi alle testene laget radene sine med
+            ORM-en. Mannskapsoversikt gruppert på korps med kompetanser, og
+            admin for `Korps`/`Kompetanse`/`VaktRolle` gjennom én fabrikk.
+            Sletting blokkeres når raden er i bruk (også for `Kompetanse`, der
+            M2M-en ikke ville protestert); antall bruk vises i lista.
+            `SjekkAtIngenPekerPaaDjangoAdminTests` skanner alle maler for at
+            det ikke skal gjenta seg. 43 nye tester.
+            - **Lærdom å ta med til neste modul:** en modul er ikke ferdig før
+              dataene den trenger kan opprettes *gjennom portalen*. Django-admin
+              teller ikke, og en testsuite som bare bruker ORM-en ser det ikke.
       - [x] **Alle ti avklaringene besvart 29. aug. 2026** (§11 i notatet er fasit).
             De som endret utformingen: korps er en badge og ikke en ny akse; ressurser
             reserveres til korps og korpsene bemanner sine egne, med tider; drift er en

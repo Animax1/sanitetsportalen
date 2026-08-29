@@ -24,6 +24,9 @@
       <select id="vaktliste-velger" class="form-select form-select-sm"
               style="min-width: 14rem;" data-action="byttVaktliste"></select>
       <span id="vaktliste-status" class="vl-status"></span>
+      <a href="/vaktliste/registre/" class="btn btn-outline-secondary btn-sm">
+        <i class="bi bi-person-vcard me-1"></i>Mannskap
+      </a>
       <button type="button" class="btn btn-primary btn-sm"
               data-bs-toggle="modal" data-bs-target="#nyVaktlisteModal">
         <i class="bi bi-plus-lg me-1"></i>Ny vaktliste
@@ -43,8 +46,8 @@
 
   <div id="vl-mangler-mannskap" class="alert alert-warning d-none">
     <strong>Mannskapsregisteret er tomt.</strong>
-    Legg inn korps og mannskap i Django-admin først — vaktlista bemannes fra
-    det registeret.
+    Vaktlista bemannes fra det registeret — legg inn korps og mannskap under
+    <a href="/vaktliste/registre/">Mannskap</a> først.
   </div>
 
   <!-- Ressursfaner. Bygges av data; «Oversikt» og «Ikke plassert» er faste. -->
