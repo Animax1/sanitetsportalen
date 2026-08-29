@@ -4,6 +4,37 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-08-29 — Beslutningsnotat: vaktlistemodulen
+
+Ingen kode. `docs/BESLUTNING_VAKTLISTE.md` er skrevet for å gjøre de seks
+avklaringene i §11 mulige å svare på, og for å få de to tunge tingene på bordet før
+første linje kode — slik oppdragsnotatet gjorde.
+
+**Den ene er tilgangsmodellen.** Bestillingen innfører portalens andre akse: en bruker
+fra korps Z skal kunne redigere korps Z og ingen andre. Rollemodellen har hittil hatt
+én akse — en ordnet stige per modul — og statistikk ble i sin tid skilt ut som egen
+modul nettopp for å slippe to akser i én. Notatet anbefaler å utlede scopet fra
+`Mannskap.korps`, altså fra domenedata, framfor å legge det i en tildelingstabell:
+da betyr `skriv_korps` noe alene, og det finnes ingen ekstra rad å glemme. Idiomet er
+det samme som `Enhet.user` i oppdragsmodulen, der koblingen avgjør hvilket
+grensesnitt kontoen får uten selv å gi tilgang.
+
+**Den andre er kostbehov.** Matallergi er en helseopplysning, altså en særlig
+kategori etter GDPR art. 9, og dette er første gang portalen ville lagret slikt om
+*egne frivillige* framfor om pasienter. Notatet foreslår fem tiltak som må stå før
+feltet tas i bruk — smal verdimengde, samtykke som grunnlag, snevrere synlighet enn
+resten av lista, unntak fra verdilogging, og ingen arkivering — og legger dem i en
+egen fase 2 som står **før** feltet ships. Samme rekkefølgekrav som audit-unntaket i
+oppdragsmodulen, av samme grunn: rader skrevet feil kan ikke fjernes i ettertid uten
+å røre sporet.
+
+Notatet dekker ellers ordboken (fire ord som ligner: vakt, vaktliste, ressurs,
+vaktpost), modellene, livsløpet planlegging → drift, koblingen til `/oppdrag` — som
+går én vei, `vaktliste` → `oppdrag`, med panelet hentet i nettleseren slik
+statistikkappen gjør — og forholdet til de to personregistrene som finnes fra før.
+
+---
+
 ## 2026-08-29 — Oppdragsmodulen fase 7: vaktarkiv for oppdrag
 
 **1383 tester grønne** (41 nye). Migrasjon `oppdrag.0008`. Med denne er alle sju fasene

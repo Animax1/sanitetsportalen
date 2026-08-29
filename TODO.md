@@ -814,6 +814,29 @@ Gjennomgang 13. aug. 2026, med 1000 pasienter og peak 100 brukere som premiss.
             - Mutasjonstestet: fjernes automatisk-flagget fra arkivet, admin-gaten fra
               endepunktene eller backup-sperren foran kollaps, blir testene røde.
 
+- [ ] **Vaktlistemodulen — se `docs/BESLUTNING_VAKTLISTE.md`.** Bestilt av André
+      29. aug. 2026, notat skrevet samme dag, **ikke besluttet**. Personelloversikt
+      sortert på korps, med kompetanse, rolle og kostbehov; bemanning av vaktas
+      ressurser (samleplass, biler, lag, KO) i faner; planlegging som settes i drift og
+      da brukes til møtt/av vakt; og et besetningspanel på enheten i `/oppdrag`.
+      Sju faser, 33–45 t.
+      - [ ] **De seks avklaringene i §11 må besvares før fase 1.** Alle har en
+            anbefaling i notatet.
+      - [ ] **Modulen innfører portalens andre tilgangsakse.** Stigen sier *hva* du kan
+            gjøre; korpset ditt sier *hvem* du kan gjøre det med. Anbefalingen utleder
+            scopet fra `Mannskap.korps` framfor en tildelingstabell, slik at nivået
+            betyr noe alene — samme idiom som `Enhet.user` i oppdragsmodulen.
+            `skriv_korps` må inn i `NIVAA_HIERARKI`.
+      - [ ] **Kostbehov er en helseopplysning (GDPR art. 9).** Personverntillegget er
+            fase 2 og står **før** feltet ships, som audit-unntaket gjorde i
+            oppdragsmodulen: smal verdimengde, samtykke som grunnlag, snevrere
+            synlighet enn resten av lista, unntatt verdilogging, og ikke arkivert.
+      - [ ] **Registeret blir portalens tredje personregister.** `Forstehjelper` og
+            `Helsepersonell` finnes fra før. Sammenslåingen utsettes bevisst (§9) —
+            `Forstehjelper` er referert av 273 pasienter i prod — men `Mannskap` får en
+            nullbar kobling dit, slik at den er mulig senere. Prisen inntil da: navn
+            vedlikeholdes to steder.
+
 - [ ] **Flytt `hent_aktiv_vakt` ut av pasientmodulen.** Funksjonen er portalens scope —
       `Vakt` bor i `core`, og både oppdrag og statistikk importerer den fra
       `patients.services`. Den ble liggende fordi `AppSetting` (pekeren `aktiv_vakt_id`)
