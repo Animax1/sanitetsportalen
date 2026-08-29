@@ -351,23 +351,15 @@ function renderEnhetsadmin() {
     return;
   }
 
-  // Kontokoblingen vises, men redigeres ikke. Nye biler får kobling ved
-  // oppretting av kontoen, så nedtrekket her var en tredje vei til noe som
-  // allerede er gjort — og den veien inviterte til å tro at koblingen er
-  // tilgangen. Mangler koblingen, er det en ekte feiltilstand, og da (og kun
-  // da) tilbys en reparasjon.
+  // Kontokoblingen vises, men redigeres ikke: enheten får den ved oppretting
+  // av kontoen, og mister den når kontoen slettes. Står det «Ingen konto
+  // knyttet», er det en ekte feiltilstand og verdt å se.
   el.innerHTML = (enhetsadmin.map((e) => {
     const vaktKlasse = e.pa_vakt ? 'btn-outline-secondary' : 'btn-outline-success';
     const vaktHandling = e.pa_vakt ? 'taAvVakt' : 'settPaaVakt';
     const vaktTekst = e.pa_vakt ? 'Av vakt' : 'På vakt';
     const vaktKnapp = e.er_aktiv
       ? `<button class="btn btn-sm ${vaktKlasse}" data-action="${vaktHandling}" data-id="${escHtmlValue(e.id)}">${vaktTekst}</button>`
-      : '';
-
-    const adminKnapp = OPPDRAG_TILGANG.erAdmin
-      ? (e.er_aktiv
-        ? `<button class="btn btn-sm btn-outline-danger" data-action="pensjonerEnhet" data-id="${escHtmlValue(e.id)}">Pensjoner</button>`
-        : `<button class="btn btn-sm btn-outline-success" data-action="gjenopprettEnhet" data-id="${escHtmlValue(e.id)}">Gjenopprett</button>`)
       : '';
 
     const koblingTekst = e.username
@@ -388,34 +380,15 @@ function renderEnhetsadmin() {
         <div class="${koblingKlasse}">${escapeHtml(koblingTekst)}</div>
       </div>
       ${vaktKnapp}
-      ${adminKnapp}
     </div>`;
   }).join(''));
 }
 
 
-async function _settAktiv(id, aktiv) {
-  const res = await apiFetch(`/oppdrag/api/enheter/${id}/`, {
-    method: 'PUT',
-    body: JSON.stringify({ er_aktiv: aktiv }),
-  });
-  const d = await res.json();
-  if (!res.ok || d.status !== 'ok') {
-    alert(d.message || 'Kunne ikke endre enheten.');
-    return;
-  }
-  etagEnheter = null;
-  await lastEnhetsadmin();
-  await lastAlt();
-}
-
-async function pensjonerEnhet(id) { await _settAktiv(id, false); }
-async function gjenopprettEnhet(id) { await _settAktiv(id, true); }
-
-
 async function lastEnhetsadmin() {
-  // `?alle=1` tar med pensjonerte enheter. Ressursoversikten på tavla skal
-  // ikke se dem; denne lista er stedet man gjenoppretter dem fra.
+  // `?alle=1` tar med pensjonerte enheter. Tavla skal ikke se dem, men lista
+  // skal: en pensjonert bil er ikke borte, den venter på at kontoen sin
+  // opprettes igjen.
   const res = await apiFetch('/oppdrag/api/enheter/?alle=1');
   if (res.ok) enhetsadmin = (await res.json()).data || [];
   renderEnhetsadmin();

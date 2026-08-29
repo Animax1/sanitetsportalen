@@ -277,50 +277,42 @@ class LokasjonsadminTests(OppdragBasis):
 
 
 class EnhetsadminTests(OppdragBasis):
-    """Enheter fødes med kontoen, og har ingen egen opprettingsvei.
+    """Enheten har ingen egen livssyklus — den følger kontoen sin.
 
-    Det fantes én en kort stund — `POST /oppdrag/api/enheter/ny/`, laget da
-    enheter bare kunne lages fra `manage.py shell`. Kontoskjemaet løste det
-    samme problemet bedre, og to veier inn til samme rad er én for mye:
-    André meldte at knappen bare forvirret. Endepunktet er borte 29. aug. 2026.
+    Modulen hadde en kort periode tre admin-flater for enheter: oppretting,
+    pensjonering og kontokobling, alle inne i oppdragsmodulen. Alle tre er
+    borte 29. aug. 2026. En bil opprettes ved at kontoen opprettes, og
+    pensjoneres ved at kontoen slettes; se
+    `accounts.tests_user_admin.EnhetFolgerKontoenTests`, som eier reglene nå.
+
+    Det som står igjen her, er lista og vaktbryteren.
     """
 
-    def test_ingen_opprettingsvei_finnes(self):
-        """Det gamle endepunktet skal være borte, ikke bare skjult."""
-        c = _klient(_bruker('adm20', 'skriv_full', admin=True))
-        resp = c.post('/oppdrag/api/enheter/ny/', content_type='application/json',
-                      data={'navn': 'Karmøy 13'})
-        self.assertEqual(resp.status_code, 404)
-        self.assertFalse(Enhet.objects.filter(navn='Karmøy 13').exists())
+    DODE_ENDEPUNKT = (
+        ('post', '/oppdrag/api/enheter/ny/'),
+        ('get', '/oppdrag/api/kontoer/'),
+    )
 
-    def test_skriv_full_kan_ikke_pensjonere_enhet(self):
-        """Enheter-panelet ble åpnet for `skriv_full` 29. aug. 2026.
+    def test_admin_flatene_er_borte_ikke_bare_skjult(self):
+        """Knappene ble fjernet fra tegningen; endepunktene skal følge med.
 
-        Panelet viser da også Pensjoner-knappen sitt endepunkt. Knappen
-        tegnes bare for global admin, men en knapp som ikke tegnes er ingen
-        sperre — sperra er denne.
+        Ellers ville de blitt liggende som en skrivevei ingen ser og ingen
+        vedlikeholder — nettopp den slags rad `pensjonerEnhet` kunne skrevet
+        til uten at noe i grensesnittet viste det.
         """
-        c = _klient(_bruker('sentral23', 'skriv_full'))
-        resp = c.put(f'/oppdrag/api/enheter/{self.enhet.pk}/',
-                     content_type='application/json', data={'er_aktiv': False})
-        self.assertEqual(resp.status_code, 403)
+        c = _klient(_bruker('adm20', 'skriv_full', admin=True))
+        for metode, url in self.DODE_ENDEPUNKT:
+            with self.subTest(url=url):
+                self.assertEqual(
+                    getattr(c, metode)(url, content_type='application/json',
+                                       data={}).status_code, 404)
+
+        self.assertEqual(
+            c.put(f'/oppdrag/api/enheter/{self.enhet.pk}/',
+                  content_type='application/json',
+                  data={'er_aktiv': False}).status_code, 404)
         self.enhet.refresh_from_db()
         self.assertTrue(self.enhet.er_aktiv)
-
-    def test_skriv_full_kan_ikke_lese_enhetsdetaljer(self):
-        c = _klient(_bruker('sentral24', 'skriv_full'))
-        self.assertEqual(
-            c.get(f'/oppdrag/api/enheter/{self.enhet.pk}/').status_code, 403)
-
-    def test_admin_kan_knytte_konto(self):
-        bil = _bruker('haugesund56', 'les', delt=True)
-        c = _klient(_bruker('adm11', 'skriv_full', admin=True))
-        resp = c.put(f'/oppdrag/api/enheter/{self.enhet.pk}/',
-                     content_type='application/json',
-                     data={'user_id': bil.pk})
-        self.assertEqual(resp.status_code, 200)
-        self.enhet.refresh_from_db()
-        self.assertEqual(self.enhet.user, bil)
 
     def test_koblingen_gir_ingen_tilgang(self):
         """§7.3-regelen, håndhevet på den nye flaten.
@@ -332,28 +324,12 @@ class EnhetsadminTests(OppdragBasis):
         Enhet.objects.filter(pk=self.enhet.pk).update(user=bil)
         self.assertEqual(_klient(bil).get('/oppdrag/').status_code, 403)
 
-    def test_konto_kan_ikke_knyttes_til_to_enheter(self):
-        """OneToOne ville gitt en 500; her får admin en setning å lese."""
-        bil = _bruker('bil_dobbel', 'les', delt=True)
-        Enhet.objects.filter(pk=self.enhet.pk).update(user=bil)
-        c = _klient(_bruker('adm12', 'skriv_full', admin=True))
-        resp = c.put(f'/oppdrag/api/enheter/{self.annen_enhet.pk}/',
-                     content_type='application/json', data={'user_id': bil.pk})
-        self.assertEqual(resp.status_code, 400)
-        self.assertIn('allerede knyttet', resp.json()['message'])
-
-    def test_kobling_kan_fjernes(self):
-        bil = _bruker('bil_los', 'les', delt=True)
-        Enhet.objects.filter(pk=self.enhet.pk).update(user=bil)
-        c = _klient(_bruker('adm13', 'skriv_full', admin=True))
-        resp = c.put(f'/oppdrag/api/enheter/{self.enhet.pk}/',
-                     content_type='application/json', data={'user_id': None})
-        self.assertEqual(resp.status_code, 200)
-        self.enhet.refresh_from_db()
-        self.assertIsNone(self.enhet.user)
-
     def test_alle_gir_pensjonerte_enheter(self):
-        """Panelet er stedet man gjenoppretter en pensjonert enhet fra."""
+        """Pensjonerte vises i panelet, men ikke på tavla.
+
+        En pensjonert bil er ikke borte — den venter på at kontoen sin
+        opprettes igjen, og tar da historikken sin med seg.
+        """
         Enhet.objects.filter(pk=self.enhet.pk).update(er_aktiv=False)
         c = _klient(_bruker('sentral40', 'skriv_full'))
 
@@ -372,23 +348,9 @@ class EnhetsadminTests(OppdragBasis):
         rad = next(r for r in data if r['id'] == self.enhet.pk)
         self.assertEqual(rad['username'], 'bil_vist')
 
-    def test_kontolista_krever_admin(self):
-        c = _klient(_bruker('sentral21', 'skriv_full'))
-        self.assertEqual(c.get('/oppdrag/api/kontoer/').status_code, 403)
-
-    def test_kontolista_merker_opptatte(self):
-        bil = _bruker('bil_opptatt', 'les', delt=True)
-        Enhet.objects.filter(pk=self.enhet.pk).update(user=bil)
-        c = _klient(_bruker('adm14', 'skriv_full', admin=True))
-        data = c.get('/oppdrag/api/kontoer/').json()['data']
-        rad = next(r for r in data if r['username'] == 'bil_opptatt')
-        self.assertTrue(rad['opptatt'])
-        self.assertTrue(rad['er_delt_konto'])
-
-    def test_deaktivert_enhet_kan_ikke_faa_oppdrag(self):
+    def test_pensjonert_enhet_kan_ikke_faa_oppdrag(self):
+        Enhet.objects.filter(pk=self.enhet.pk).update(er_aktiv=False)
         c = _klient(_bruker('adm15', 'skriv_full', admin=True))
-        c.put(f'/oppdrag/api/enheter/{self.enhet.pk}/',
-              content_type='application/json', data={'er_aktiv': False})
         resp = c.post('/oppdrag/api/oppdrag/', content_type='application/json', data={
             'enhet_id': self.enhet.pk, 'lokasjon_id': self.lokasjon.pk,
             'problemstilling': 'Pustevansker', 'hastegrad': 'Akutt',

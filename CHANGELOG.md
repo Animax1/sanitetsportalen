@@ -4,6 +4,36 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-08-29 — «Pensjoner» er borte, og et pensjonert navn er ledig igjen
+
+**1137 tester grønne** (2 nye, 7 fjernet). Ingen migrasjon.
+
+Målt på staging: `Enheter uten konto: 0 av 2`. Dermed hadde Pensjoner-knappen ingen jobb
+igjen — alle enheter har en konto, og kontoen er veien inn og ut. Knappen, Gjenopprett,
+`_settAktiv`, `PUT /oppdrag/api/enheter/<pk>/`, `GET /oppdrag/api/kontoer/` og
+`_enhet_admin_dict` er slettet. Det samme er `OPPDRAG_TILGANG.erAdmin`, som ikke hadde noen
+leser igjen.
+
+**Men å fjerne knappen alene ville satt en felle.** Sletter du kontoen til en bil som har
+kjørt, pensjoneres enheten i stedet for å slettes — historikken er `PROTECT`. `Enhet.navn`
+er `unique`, så «Haugesund 56» ville vært brent for godt: skjemaet ville sagt «finnes
+allerede», og uten Pensjoner-knappen fantes ingen vei tilbake utenom `manage.py shell`.
+
+Et pensjonert, ukoblet navn regnes derfor som ledig. Oppretter du kontoen på nytt, tas den
+gamle raden i tjeneste igjen i stedet for at det lages en ny — bilen kommer tilbake med
+oppdragene sine. En ny rad ville gitt to «Haugesund 56» i statistikken, én med historikk og
+én uten. Navn som holdes av en enhet i tjeneste, eller av en med konto, er fortsatt opptatt.
+
+Enhetens livssyklus har dermed én kilde: kontoen. Opprett den, og bilen finnes; slett den,
+og bilen forsvinner eller pensjoneres; opprett den igjen, og bilen er tilbake.
+
+**Under arbeidet slettet jeg `enheter_view` ved et uhell** — den lå mellom to funksjoner som
+skulle vekk, og utsnittet tok den med. Fanget med en gang fordi skriptet skrev ut hvilke
+funksjoner det faktisk fjernet; gjenopprettet fra `git show HEAD`. Verdt å merke seg som
+argument for å la slike skript rapportere, ikke bare gjøre.
+
+---
+
 ## 2026-08-29 — Enheten følger kontoen, også ut
 
 **1142 tester grønne** (5 nye, 1 fjernet). Ingen migrasjon.

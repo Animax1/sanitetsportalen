@@ -544,6 +544,46 @@ class EnhetFolgerKontoenTests(TestCase):
 
         self.assertTrue(Enhet.objects.filter(pk=self.enhet.pk).exists())
 
+    def test_pensjonert_navn_kan_brukes_om_igjen(self):
+        """Ellers ville navnet vært brent for godt.
+
+        Bilen kjørte, kontoen ble slettet, enheten pensjonert. Skal bilen inn
+        igjen til neste arrangement, må «Haugesund 56» være ledig — og etter at
+        Pensjoner-knappen ble fjernet finnes ingen manuell vei tilbake.
+        """
+        from oppdrag.models import Enhet
+
+        self._gi_oppdrag()
+        self._slett(self.bil)
+
+        resp = self.client.post(reverse('accounts:user_create'), {
+            'username': 'haugesund56', 'fullt_navn': '', 'email': '',
+            'role': 'bruker', 'kontotype': 'enhet',
+            'enhetsnavn': 'Haugesund 56', 'metode': 'passord',
+        })
+        self.assertNotContains(resp, 'finnes allerede')
+
+        # Samme rad, ikke en ny: oppdragene peker på den gamle pk-en, og to
+        # «Haugesund 56» i statistikken ville vært én for mye.
+        self.assertEqual(Enhet.objects.filter(navn='Haugesund 56').count(), 1)
+        enhet = Enhet.objects.get(navn='Haugesund 56')
+        self.assertEqual(enhet.pk, self.enhet.pk)
+        self.assertTrue(enhet.er_aktiv)
+        self.assertTrue(enhet.pa_vakt)
+        self.assertEqual(enhet.user.username, 'haugesund56')
+        self.assertEqual(enhet.oppdrag.count(), 1)
+
+    def test_navn_pa_enhet_i_tjeneste_er_fortsatt_opptatt(self):
+        """Gjenbruken gjelder kun pensjonerte, ukoblede rader."""
+        resp = self.client.post(reverse('accounts:user_create'), {
+            'username': 'ny_bil', 'fullt_navn': '', 'email': '',
+            'role': 'bruker', 'kontotype': 'enhet',
+            'enhetsnavn': 'Haugesund 56', 'metode': 'passord',
+        })
+        self.assertContains(resp, 'finnes allerede')
+        self.assertFalse(
+            CustomUser.objects.filter(username='ny_bil').exists())
+
     def test_frysing_tar_enheten_av_vakt(self):
         """En frosset konto kan ikke logge inn, så bilen kan ikke melde."""
         self.client.post(

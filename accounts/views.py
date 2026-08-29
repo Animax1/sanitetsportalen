@@ -790,11 +790,27 @@ def _lag_enhet_om_bedt_om(form, user):
     Navnet er allerede validert som ledig i `AdminUserCreateForm.clean()`, så
     en unik-feil her ville betydd et kappløp — og da er det riktig at den
     kaster i stedet for å etterlate en konto uten enhet.
+
+    **En pensjonert enhet med samme navn tas i tjeneste igjen** framfor at det
+    lages en ny rad. Bilen har kjørt oppdrag som peker på den gamle raden, og
+    en ny rad ville gitt to «Haugesund 56» i statistikken — én med historikk og
+    én uten. Skjemaet regner derfor et pensjonert, ukoblet navn som ledig, og
+    dette er stedet raden hentes fram igjen.
     """
     navn = form.skal_lage_enhet()
     if not navn:
         return None
     from oppdrag.models import Enhet  # noqa: WPS433
+
+    pensjonert = Enhet.objects.filter(
+        navn=navn, er_aktiv=False, user__isnull=True).first()
+    if pensjonert is not None:
+        pensjonert.user = user
+        pensjonert.er_aktiv = True
+        pensjonert.pa_vakt = True
+        pensjonert.save(update_fields=['user', 'er_aktiv', 'pa_vakt', 'updated_at'])
+        return pensjonert
+
     return Enhet.objects.create(navn=navn, user=user)
 
 

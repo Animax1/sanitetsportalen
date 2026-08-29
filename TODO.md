@@ -576,10 +576,12 @@ Gjennomgang 13. aug. 2026, med 1000 pasienter og peak 100 brukere som premiss.
             fjernet med endepunkt og URL — enheter fødes med kontoen. Sletting av
             kontoen sletter enheten, eller pensjonerer den hvis den har oppdrag
             (`Oppdrag.enhet` er PROTECT). Frysing tar den av vakt.
-      - [ ] **Vurder: fjerne «Pensjoner» helt.** Etter koblingen over har knappen
-            bare én jobb igjen — enheter uten konto, altså rader fra før
-            kontoskjemaet fantes eller fra `manage.py shell`. Er det ingen slike i
-            prod, kan knappen gå. Krever en opptelling først.
+      - [x] **«Pensjoner» fjernet (29. aug. 2026).** Opptellingen på staging ga
+            `Enheter uten konto: 0 av 2`, så knappen hadde ingen jobb igjen. Fjernet
+            sammen med Gjenopprett, `PUT /api/enheter/<pk>/`, `/api/kontoer/` og
+            `OPPDRAG_TILGANG.erAdmin`. Et pensjonert, ukoblet enhetsnavn regnes nå
+            som ledig, og raden gjenbrukes når kontoen opprettes på nytt — ellers
+            ville navnet vært brent for godt.
       - [x] **Modaler i portalgrenen er mørke (29. aug. 2026).** `portal.css` hadde
             ingen modalregler, så modalen arvet sidebakgrunnen og det svarte
             lukkekrysset forsvant i den. Rettet i `portal.css`, ikke `oppdrag.css` —

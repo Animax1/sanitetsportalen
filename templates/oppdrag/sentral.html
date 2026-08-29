@@ -160,7 +160,8 @@
         <div id="enhetsadminliste"><div class="tom-melding">Laster…</div></div>
 
         <p class="form-text mb-0 mt-3">
-          Enheter opprettes når kontoen opprettes — velg «Bil eller ambulanse».
+          Enheter opprettes og fjernes med kontoen sin. Har bilen kjørt oppdrag,
+          blir den stående som pensjonert til kontoen opprettes igjen.
         </p>
       </div>
     </div>
@@ -184,8 +185,7 @@
 {% block extra_scripts %}
 <script nonce="{{ csp_nonce }}">
   window.OPPDRAG_TILGANG = {
-    kanSkrive: {% if kan_skrive %}true{% else %}false{% endif %},
-    erAdmin: {% if er_global_admin %}true{% else %}false{% endif %}
+    kanSkrive: {% if kan_skrive %}true{% else %}false{% endif %}
   };
 </script>
 <script src="{% static 'js/portal-utils.js' %}"></script>

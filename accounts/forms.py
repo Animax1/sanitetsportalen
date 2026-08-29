@@ -286,8 +286,17 @@ class AdminUserCreateForm(forms.ModelForm):
                 # Sjekkes her, ikke i viewet: en unik-feil fra databasen ville
                 # kommet etter at kontoen var opprettet, og etterlatt en konto
                 # uten enhet.
+                #
+                # **Et pensjonert navn er ledig.** Sletter man bilkontoen til
+                # en bil som har kjørt, blir enheten pensjonert i stedet for
+                # slettet — historikken er `PROTECT`. Uten unntaket her ville
+                # navnet vært brent for godt, og bilen umulig å sette inn
+                # igjen. Raden gjenbrukes i stedet; se
+                # `accounts.views._lag_enhet_om_bedt_om`.
                 from oppdrag.models import Enhet  # noqa: WPS433
-                if Enhet.objects.filter(navn=navn).exists():
+                opptatt = Enhet.objects.filter(navn=navn).exclude(
+                    er_aktiv=False, user__isnull=True)
+                if opptatt.exists():
                     self.add_error(
                         'enhetsnavn', f'Enheten «{navn}» finnes allerede.')
         elif navn:
