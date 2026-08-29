@@ -167,3 +167,50 @@
   padding: 1.25rem 0;
   text-align: center;
 }
+
+/* ── Enhetsskjermen ──────────────────────────────────────────────────────── */
+/* Bygget for en telefon i en bil: store trykkflater, høy kontrast, og
+ * statusknappen som det eneste elementet som ikke krever presisjon. */
+
+.enhet-skjerm {
+  max-width: 640px;
+  margin: 0 auto;
+}
+
+/* WCAG 2.5.5 anbefaler 44px; her er det en tommel i en bil i bevegelse. */
+.stor-knapp {
+  min-height: 64px;
+  font-size: 1.15rem;
+  font-weight: 600;
+}
+
+.aktivt-kort {
+  background: var(--surface-1);
+  border: 2px solid var(--header-bg);
+  border-radius: 12px;
+  padding: 1rem;
+}
+
+.oppdrag-status-naa {
+  font-weight: 700;
+  color: var(--text-main);
+}
+
+.enhet-ledig-kort {
+  background: var(--surface-1);
+  border: 1px dashed var(--border-color);
+  border-radius: 12px;
+  padding: 1.1rem;
+  text-align: center;
+  color: var(--text-muted);
+}
+
+/* Avsluttede dempes, men fargen bærer ikke informasjonen alene — raden står
+ * under overskriften «Nylig avsluttet», og tiden står i teksten. */
+.oppdrag-avsluttet { opacity: 0.7; }
+
+/* Feil skal kunne leses fra førersetet. */
+.enhet-feil {
+  font-size: 1.05rem;
+  font-weight: 600;
+}

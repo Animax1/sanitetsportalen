@@ -14,18 +14,27 @@ import re
 from django.test import SimpleTestCase
 
 from patients.js_test_utils import (
-    OPPDRAG_SENTRAL_JS, PORTAL_UTILS_JS, build_harness, extract_function,
-    node_available, read_js, run_node,
+    OPPDRAG_ENHET_JS, OPPDRAG_SENTRAL_JS, PORTAL_UTILS_JS, build_harness,
+    extract_function, node_available, read_js, run_node,
 )
 
-# Funksjonene som bygger HTML av data fra API-et.
-HTML_BUILDERS = (
-    'renderEnheter',
-    'renderOppdrag',
-    'tidslinjeHtml',
-    'renderLokasjonsadmin',
-    'renderEnhetsadmin',
-)
+# Funksjonene som bygger HTML av data fra API-et, per fil. Den som legger til
+# en bygger, legger den til her — ellers skanner testen forbi den.
+HTML_BUILDERS_PER_FIL = {
+    OPPDRAG_SENTRAL_JS: (
+        'renderEnheter',
+        'renderOppdrag',
+        'tidslinjeHtml',
+        'renderLokasjonsadmin',
+        'renderEnhetsadmin',
+    ),
+    OPPDRAG_ENHET_JS: (
+        'tidslinjeEnhetHtml',
+        'renderAktivt',
+        'renderVentende',
+        'renderAvsluttet',
+    ),
+}
 
 ESCAPING_CALLS = ('escHtmlValue(', 'cellHtml(', '_escHtml(', 'escapeHtml(')
 
@@ -56,6 +65,11 @@ REVIEWED_INTERPOLATIONS = {
     'radKlasse': 'hardkodet CSS-klasse fra en ternær',
     'koblingKlasse': 'hardkodet CSS-klasse fra en ternær',
     'valgt': 'hardkodet selected-attributt fra en ternær',
+    # Enhetsskjermens byggere (oppdrag-enhet.js):
+    'nesteKnapp': 'markup bygget lokalt, navn og id escapet inni',
+    'ledigKnapp': 'markup bygget lokalt, id escapet inni',
+    'startKnapp': 'markup bygget lokalt, navn og id escapet inni',
+    'tidslinjeEnhetHtml(o)': 'markup fra en bygger som selv skannes her',
 }
 
 
@@ -74,40 +88,41 @@ def _uten_kommentarer(kilde: str) -> str:
 class OppdragEscapingKildeTests(SimpleTestCase):
     """Statisk gjennomgang: hver `${...}` escapes, eller står oppført her."""
 
-    @classmethod
-    def setUpClass(cls):
-        super().setUpClass()
-        cls.src = read_js(OPPDRAG_SENTRAL_JS)
-
     def test_byggerne_finnes(self):
         """Vern mot at testen blir tom fordi en funksjon er omdøpt."""
-        for navn in HTML_BUILDERS:
-            with self.subTest(navn=navn):
-                self.assertIn(f'function {navn}(', self.src)
+        for fil, byggere in HTML_BUILDERS_PER_FIL.items():
+            src = read_js(fil)
+            for navn in byggere:
+                with self.subTest(fil=fil.name, navn=navn):
+                    self.assertIn(f'function {navn}(', src)
 
-    def test_sida_laster_ikke_patients_utils(self):
+    def test_sidene_laster_ikke_patients_utils(self):
         """`patients-utils.js` gjør arbeid på toppnivå og kaster her.
 
         Regelen står i CLAUDE.md. Den håndheves for pasientsiden og
-        statistikksiden av `JsModulLastingTests`; denne dekker malen vår.
+        statistikksiden av `JsModulLastingTests`; denne dekker malene våre.
         """
         from pathlib import Path
         from django.conf import settings
-        mal = (Path(settings.BASE_DIR) / 'templates' / 'oppdrag' / 'sentral.html').read_text()
-        self.assertNotIn('patients-utils.js', mal)
-        self.assertIn('portal-utils.js', mal)
+        for malnavn in ('sentral.html', 'enhet.html'):
+            with self.subTest(mal=malnavn):
+                mal = (Path(settings.BASE_DIR) / 'templates' / 'oppdrag' / malnavn).read_text()
+                self.assertNotIn('patients-utils.js', mal)
+                self.assertIn('portal-utils.js', mal)
 
     def test_alle_interpolasjoner_er_escapet_eller_gjennomgatt(self):
         uescapet = []
-        for navn in HTML_BUILDERS:
-            body = _uten_kommentarer(extract_function(self.src, navn))
-            for uttrykk in re.findall(r'\$\{([^}]*)\}', body):
-                uttrykk = uttrykk.strip()
-                if uttrykk.startswith(ESCAPING_CALLS):
-                    continue
-                if uttrykk in REVIEWED_INTERPOLATIONS:
-                    continue
-                uescapet.append(f'{navn}(): ${{{uttrykk}}}')
+        for fil, byggere in HTML_BUILDERS_PER_FIL.items():
+            src = read_js(fil)
+            for navn in byggere:
+                body = _uten_kommentarer(extract_function(src, navn))
+                for uttrykk in re.findall(r'\$\{([^}]*)\}', body):
+                    uttrykk = uttrykk.strip()
+                    if uttrykk.startswith(ESCAPING_CALLS):
+                        continue
+                    if uttrykk in REVIEWED_INTERPOLATIONS:
+                        continue
+                    uescapet.append(f'{fil.name} {navn}(): ${{{uttrykk}}}')
 
         self.assertEqual(uescapet, [], (
             'Uescapede interpolasjoner i oppdrag-byggerne:\n  '
@@ -121,10 +136,12 @@ class OppdragEscapingKildeTests(SimpleTestCase):
 class OppdragEscapingOppforselTests(SimpleTestCase):
     """Kjør byggerne i node og se at markup i data kommer ut som tekst."""
 
+    # `klokke` bor i portal-utils.js nå — begge oppdragssidene bruker den.
     HARNESS = (
-        (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue', 'trustedHtml', '_escHtml')),
+        (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue', 'trustedHtml', '_escHtml',
+                           'klokke')),
         (OPPDRAG_SENTRAL_JS, ('renderOppdrag', 'renderEnheter', 'tidslinjeHtml',
-                              'hastegradKlasse', 'klokke')),
+                              'hastegradKlasse')),
     )
 
     def setUp(self):
@@ -188,5 +205,72 @@ class OppdragEscapingOppforselTests(SimpleTestCase):
                 byttet_av: '<script>x</script>'
               }]
             }));
+        ''')
+        self.assertNotIn('<script>x', ut)
+
+
+class EnhetEscapingOppforselTests(SimpleTestCase):
+    """Kjør enhetsskjermens byggere i node — samme mekanikk som over.
+
+    Eget harness: `hastegradKlasse` finnes i begge JS-filene (bevisst — den er
+    domene, ikke primitiv), så de to filene kan ikke lastes i samme harness.
+    """
+
+    HARNESS = (
+        (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue', 'trustedHtml', '_escHtml',
+                           'klokke')),
+        (OPPDRAG_ENHET_JS, ('renderAktivt', 'renderVentende', 'renderAvsluttet',
+                            'tidslinjeEnhetHtml', 'hastegradKlasse')),
+    )
+
+    def setUp(self):
+        if not node_available():
+            self.skipTest('node er ikke tilgjengelig')
+        self.harness = build_harness(self.HARNESS)
+
+    def test_fritekst_paa_aktivt_kort_kommer_ut_som_tekst(self):
+        """Kortet bilen stirrer på — med feltet en operatør skriver fritt i."""
+        ut = run_node(self.harness, '''
+            globalThis.mineOppdrag = [{
+              id: 1, status: 'fremme', status_navn: 'Fremme',
+              problemstilling: 'Pustevansker', hastegrad: 'Akutt',
+              lokasjon_navn: 'Scene', opprettet: '2026-08-29T20:00:00Z',
+              fritekst: '<img src=x onerror=alert(1)>',
+              neste_overgang: 'avreist', neste_navn: 'Avreist',
+              statusmeldinger: []
+            }];
+            const el = { innerHTML: '' };
+            globalThis.document = { getElementById: () => el };
+            renderAktivt();
+            console.log(el.innerHTML);
+        ''')
+        self.assertNotIn('<img src=x', ut)
+        self.assertIn('&lt;img', ut)
+
+    def test_neste_navn_i_knappen_escapes(self):
+        """Knappeteksten kommer fra serverens payload — den skal også escapes."""
+        ut = run_node(self.harness, '''
+            globalThis.mineOppdrag = [{
+              id: 1, status: 'venter', status_navn: 'Venter',
+              problemstilling: 'Transport', hastegrad: 'Vanlig',
+              lokasjon_navn: 'Scene', opprettet: '2026-08-29T20:00:00Z',
+              fritekst: '', neste_overgang: 'rykker_ut',
+              neste_navn: '<b>Rykker ut</b>', statusmeldinger: []
+            }];
+            const el = { innerHTML: '' };
+            globalThis.document = { getElementById: () => el };
+            renderVentende();
+            console.log(el.innerHTML);
+        ''')
+        self.assertNotIn('<b>Rykker ut</b>', ut)
+        self.assertIn('&lt;b&gt;', ut)
+
+    def test_statusnavn_i_tidslinjen_escapes(self):
+        ut = run_node(self.harness, '''
+            console.log(tidslinjeEnhetHtml({ statusmeldinger: [{
+              id: 1, status: 'fremme', status_navn: '<script>x</script>',
+              tidspunkt: '2026-08-29T20:00:00Z',
+              forsinket: false, automatisk: false
+            }]}));
         ''')
         self.assertNotIn('<script>x', ut)

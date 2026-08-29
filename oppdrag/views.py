@@ -1,7 +1,7 @@
-"""Sentralbordet og oppdrags-API-et.
+"""Sentralbordet, enhetsskjermen og oppdrags-API-et.
 
-Fase 3 av `docs/BESLUTNING_OPPDRAGSMODULEN.md`. Enhetsskjermen og de smale
-stemplingsendepunktene kommer i fase 4; alt her er sentralbordets side.
+Fase 3 og 4 av `docs/BESLUTNING_OPPDRAGSMODULEN.md`. Stemplingsendepunktet er
+det første som faktisk bruker `skriv_handling` — se §3.2 i rollemodellnotatet.
 
 **Hvert view er dekorert.** `patients/tests_modul_dekorator.py` går gjennom
 `urlpatterns` og håndhever det — risikoen ved dekoratør framfor middleware er
@@ -9,7 +9,11 @@ en glemt dekoratør, og en manuell gjennomgang holder bare til neste endepunkt.
 """
 from __future__ import annotations
 
+import json
+
 from django.core.exceptions import ValidationError
+from django.utils import timezone
+from django.utils.dateparse import parse_datetime
 from django.http import HttpResponseNotModified, JsonResponse
 from django.shortcuts import render
 from django.views.decorators.cache import never_cache
@@ -21,7 +25,7 @@ from patients.services import get_active_year
 
 from . import choices, services
 from .choices import validate_oppdrag_choice_fields
-from .models import Enhet, Lokasjon, Oppdrag
+from .models import Enhet, Lokasjon, Oppdrag, Statusmelding
 from .views_common import (
     bytte_til_dict, er_enhetskonto, etag_for, json_body, melding_til_dict,
     oppdrag_til_dict,
@@ -36,14 +40,11 @@ def index_view(request):
     """Én URL, to grensesnitt.
 
     **Skjermen velges av om kontoen er knyttet til en `Enhet`, ikke av
-    nivået.** Se `views_common.er_enhetskonto` for hvorfor.
-
-    Enhetsskjermen finnes ikke ennå (fase 4). Fram til da får en enhetskonto
-    en mellomtilstand som sier det rett ut, i stedet for sentralbordet — det
-    ville vist henne alle oppdrag i vakta, som er nettopp det hun ikke skal se.
+    nivået.** Se `views_common.er_enhetskonto` for hvorfor. Sentralbordet
+    ville vist enheten alle oppdrag i vakta — nettopp det den ikke skal se.
     """
     if er_enhetskonto(request.user):
-        return render(request, 'oppdrag/enhet_kommer.html', {
+        return render(request, 'oppdrag/enhet.html', {
             'enhet': request.user.enhet,
         })
 
@@ -259,14 +260,32 @@ def oppdrag_liste_view(request):
 
     if request.method == 'GET':
         if er_enhetskonto(request.user):
-            oppdrag = services.synlige_for_enhet(request.user.enhet, year)
-            data = [oppdrag_til_dict(o, for_enhet=True) for o in oppdrag]
+            # Statusmeldingene følger med: skjermen viser tidslinjen på det
+            # aktive oppdraget («Fremme 21:20») og automatisk-markøren på de
+            # avsluttede, uten et kall per rad. Få rader — egne, i vakta,
+            # innenfor 30-minuttersvinduet — så N+1 her er N liten.
+            data = []
+            for o in services.synlige_for_enhet(request.user.enhet, year):
+                rad = oppdrag_til_dict(o, for_enhet=True)
+                rad['statusmeldinger'] = [
+                    melding_til_dict(m)
+                    for m in Statusmelding.objects.gjeldende(o)
+                ]
+                data.append(rad)
+            # Meldings-ID-ene må inn i ETag-en: en korreksjon endrer tidslinjen
+            # uten å røre oppdragets status, og skal ikke drukne i en 304.
+            etag_rader = [
+                (r['id'], r['status'], r['enhet_id'],
+                 tuple(m['id'] for m in r['statusmeldinger']))
+                for r in data
+            ]
         else:
             qs = (Oppdrag.objects.filter(year=year)
                   .select_related('enhet', 'lokasjon').order_by('-created_at'))
             data = [oppdrag_til_dict(o) for o in qs]
+            etag_rader = [(r['id'], r['status'], r['enhet_id']) for r in data]
 
-        etag = etag_for([(r['id'], r['status'], r['enhet_id']) for r in data])
+        etag = etag_for(etag_rader)
         if request.META.get('HTTP_IF_NONE_MATCH') == etag:
             svar = HttpResponseNotModified()
             svar['ETag'] = etag
@@ -336,7 +355,6 @@ def oppdrag_detalj_view(request, pk):
         return JsonResponse({'status': 'error', 'message': 'Ingen tilgang'}, status=403)
 
     if request.method == 'GET':
-        from .models import Statusmelding
         gjeldende = Statusmelding.objects.gjeldende(oppdrag)
         alle = Statusmelding.objects.filter(oppdrag=oppdrag).order_by('created_at')
         return JsonResponse({'status': 'ok', 'data': {
@@ -401,3 +419,123 @@ def flytt_view(request, pk):
             {'status': 'error', 'message': 'Oppdraget står allerede på denne enheten.'},
             status=400)
     return JsonResponse({'status': 'ok', 'data': bytte_til_dict(bytte)})
+
+
+# ── Stempling ────────────────────────────────────────────────────────────────
+
+#: Det lukkede kroppsskjemaet fra §5.1. To nøkler, og settet er hele
+#: kontrakten: en test kan uttømme det ved å sende en nøkkel til og kreve 400.
+#: En feltwhitelist inne i en generell PUT kan ikke testes slik — settet av
+#: felter der vokser med modellen.
+STEMPLING_TILLATTE_NOKLER = frozenset({'klienttid', 'idempotency_key'})
+
+
+def _stempling_kropp(request):
+    """Parse stemplingskroppen mot det lukkede skjemaet.
+
+    Returnerer ``(data, feilmelding)``. Tom kropp er gyldig — en stempling
+    trenger strengt tatt ingenting; klienttid finnes for offline-køen. Alt som
+    ikke står i skjemaet gir feil, også gyldig JSON: her skal ingen domenefelt
+    noensinne kunne komme inn.
+    """
+    if not request.body:
+        return {}, None
+    try:
+        data = json.loads(request.body)
+    except (json.JSONDecodeError, ValueError):
+        return None, 'Ugyldig JSON i kroppen.'
+    if not isinstance(data, dict):
+        return None, 'Kroppen må være et JSON-objekt.'
+    ukjente = set(data) - STEMPLING_TILLATTE_NOKLER
+    if ukjente:
+        return None, (
+            'Ukjente felt i stemplingen: ' + ', '.join(sorted(ukjente))
+            + '. Tillatt: ' + ', '.join(sorted(STEMPLING_TILLATTE_NOKLER)) + '.')
+    return data, None
+
+
+@modul_kreves('oppdrag', 'skriv_handling', svar='json')
+@require_http_methods(['POST'])
+@rate_limit(group='oppdrag:stempling', rate='60/m', method='POST')
+def stempling_view(request, pk, overgang):
+    """Ett navngitt endepunkt per overgang — bilens eneste skriveflate.
+
+    Første faktiske bruk av `skriv_handling` (§3.2 i rollemodellnotatet): en
+    innskrenket aktør får et smalt endepunkt, ikke en feltwhitelist inne i en
+    generell PUT. Serveren utleder ingenting av gjeldende tilstand — knappen
+    vet hvilken overgang den utfører og poster til den. `POST .../neste/`
+    ville gitt kappløpet §4.2 beskriver når to trykk kommer tett.
+
+    To porter: modulgaten over, og objektsjekken her — enheten må eie
+    oppdraget. Sentralbordet stempler ikke; det korrigerer (fase 4b), og en
+    konto uten enhet får 403 uansett nivå.
+
+    `idempotency_key` godtas i skjemaet, men leses ikke ennå: statusmaskinen
+    gjør en ren avspilling ufarlig (samme overgang to ganger er ulovlig andre
+    gang og gir 409 uten ny rad). Nøkkelen kobles til `core.idempotency` i
+    fase 5, når offline-køen som skal eie den finnes.
+    """
+    if overgang not in services.STEMPLBARE:
+        return JsonResponse(
+            {'status': 'error', 'message': f'Ukjent overgang «{overgang}».'},
+            status=404)
+
+    if not er_enhetskonto(request.user):
+        return JsonResponse(
+            {'status': 'error', 'message': 'Bare enhetskontoer stempler.'},
+            status=403)
+
+    try:
+        oppdrag = (Oppdrag.objects.select_related('enhet', 'lokasjon')
+                   .get(pk=pk, year=get_active_year()))
+    except Oppdrag.DoesNotExist:
+        return JsonResponse(
+            {'status': 'error', 'message': 'Oppdrag ikke funnet'}, status=404)
+
+    if oppdrag.enhet_id != request.user.enhet.pk:
+        return JsonResponse(
+            {'status': 'error', 'message': 'Oppdraget tilhører en annen enhet.'},
+            status=403)
+
+    data, feil = _stempling_kropp(request)
+    if feil:
+        return JsonResponse({'status': 'error', 'message': feil}, status=400)
+
+    klienttid = None
+    if data.get('klienttid') is not None:
+        klienttid = parse_datetime(str(data['klienttid']))
+        if klienttid is None:
+            # Uleselig klienttid er en klientfeil, ikke et gammelt stempel —
+            # den skal feile høyt, ikke stille bli servertid.
+            return JsonResponse(
+                {'status': 'error', 'message': 'Ugyldig klienttid.'}, status=400)
+        if timezone.is_naive(klienttid):
+            klienttid = timezone.make_aware(klienttid)
+
+    tidspunkt, forsinket = services.vurder_klienttid(klienttid, oppdrag)
+
+    try:
+        if overgang == choices.RYKKER_UT:
+            # Lukker et eventuelt pågående oppdrag automatisk (§4.3).
+            melding = services.start_oppdrag(
+                oppdrag, bruker=request.user,
+                tidspunkt=tidspunkt, forsinket=forsinket)
+        else:
+            melding = services.sett_status(
+                oppdrag, overgang, bruker=request.user,
+                tidspunkt=tidspunkt, forsinket=forsinket)
+    except services.UlovligOvergang:
+        # Typisk et dobbelttrykk der det første vant, eller en skjerm som har
+        # sakket akterut. 409, ikke 400: forespørselen var velformet, det er
+        # tilstanden som har flyttet seg. Klienten svarer med å hente på nytt.
+        return JsonResponse({
+            'status': 'error',
+            'message': (
+                f'Oppdraget står i {oppdrag.get_status_display()} — '
+                'skjermen er oppdatert.'),
+        }, status=409)
+
+    return JsonResponse({'status': 'ok', 'data': {
+        'oppdrag': oppdrag_til_dict(oppdrag, for_enhet=True),
+        'melding': melding_til_dict(melding),
+    }})

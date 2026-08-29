@@ -486,7 +486,7 @@ statusknappen som det eneste elementet som ikke krever presisjon.
 | 1 | ✅ App, modulregistrering, fem modeller, `choices.py`, regler, `lokasjon`-kommando | levert |
 | 2 | ✅ Audit-unntak for fritekst + protokolltillegg. **Før fase 3** | levert |
 | 3 | ✅ Sentralbordet: enhetsliste med utledet status, opprett, tildel, flytt, rediger, **lokasjonsadmin som side**. Polling med ETag | levert |
-| 4 | Enhetsskjermen: statusmaskin, smale endepunkter, objektsjekk, de to skjulereglene, visning av `automatisk` | 6–8 t |
+| 4 | ✅ Enhetsskjermen: statusmaskin, smale endepunkter, objektsjekk, de to skjulereglene, visning av `automatisk` | levert |
 | 4b | Korreksjoner: ny rad som overstyrer, `gjeldende()`-manager | 2–3 t |
 | 5 | Offline-kø med idempotens | 4–6 t |
 | 6 | Statistikkregisteret + oppdragsfanen | 5–7 t |

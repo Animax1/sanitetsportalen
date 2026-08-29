@@ -157,6 +157,16 @@ function fmtMin(m) {
 }
 
 
+// ISO-tidsstempel → «21:14». Bodde i oppdrag-sentral.js til enhetsskjermen
+// også trengte den — og helpere begge sidene bruker flyttes hit, de kopieres
+// ikke. Samme regel som for fmtMin.
+function klokke(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  return d.toLocaleTimeString('nb-NO', { hour: '2-digit', minute: '2-digit' });
+}
+
+
 // ════════════════════════════════════════════════════════
 // HANDLERE VIA data-action (F5)
 //

@@ -27,6 +27,13 @@ OVERGANGER: dict[str, frozenset[str]] = {
 }
 
 
+#: Målstatusene et stemplingsendepunkt kan hete. Utledet fra tabellen, ikke
+#: skrevet ned på nytt: står ikke navnet som mål i noen rad, finnes ikke
+#: endepunktet. `venter` settes ved oppretting og stemples aldri — derfor er
+#: settet fem, ikke seks, selv om statusene er seks.
+STEMPLBARE: frozenset[str] = frozenset().union(*OVERGANGER.values())
+
+
 def kan_gaa_til(fra: str, til: str) -> bool:
     """True hvis overgangen er lovlig.
 
@@ -51,6 +58,48 @@ def neste_i_kjeden(fra: str) -> str | None:
     if i + 1 >= len(choices.KJEDEN):
         return None
     return choices.KJEDEN[i + 1]
+
+
+# ── Klienttid ────────────────────────────────────────────────────────────────
+#
+# Offline-kravet (§5.1) bryter «leser ikke kroppen» bokstavelig: en stempling
+# utført uten dekning må kunne fortelle når den skjedde, ellers viser
+# statistikken når nettet kom tilbake. Kroppen har derfor et lukket skjema på
+# to nøkler, og `klienttid` er den ene.
+
+#: Avviker klienttid mer enn dette fra ankomsttid, merkes meldingen
+#: `forsinket=True` — da vet den som leser statistikken at tallet kommer fra
+#: en bil som var uten dekning. To minutter skiller nettbrudd fra klokkeslark.
+FORSINKET_TERSKEL_SEK = 120
+
+#: Eldre klienttid enn dette forkastes til fordel for servertid. En kø som
+#: har ligget over et døgn er ikke lenger en måling, det er arkeologi.
+KLIENTTID_MAKS_ALDER_SEK = 24 * 3600
+
+
+def vurder_klienttid(klienttid, oppdrag, naa=None):
+    """Avgjør tidsstempel og forsinket-flagg for en stempling.
+
+    Returnerer ``(tidspunkt, forsinket)``. Reglene fra beslutningsnotatet
+    §5.1: klienttid brukes ikke hvis den ligger i framtiden, før oppdraget ble
+    opprettet, eller er mer enn et døgn gammel — da brukes servertid.
+    ``forsinket`` settes uansett når den *oppgitte* klienttiden avviker
+    merkbart fra ankomsttid, også når den ble forkastet: avviket er
+    informasjonen, ikke hvilket stempel som vant.
+    """
+    naa = naa or timezone.now()
+    if klienttid is None:
+        return naa, False
+
+    avvik = abs((naa - klienttid).total_seconds())
+    forsinket = avvik > FORSINKET_TERSKEL_SEK
+
+    utenfor_vindu = (
+        klienttid > naa
+        or klienttid < oppdrag.created_at
+        or (naa - klienttid).total_seconds() > KLIENTTID_MAKS_ALDER_SEK
+    )
+    return (naa if utenfor_vindu else klienttid), forsinket
 
 
 # ── Enhetens tilstand ────────────────────────────────────────────────────────

@@ -21,4 +21,9 @@ urlpatterns = [
     path('api/oppdrag/', views.oppdrag_liste_view, name='oppdrag_api_liste'),
     path('api/oppdrag/<int:pk>/', views.oppdrag_detalj_view, name='oppdrag_api_detalj'),
     path('api/oppdrag/<int:pk>/flytt/', views.flytt_view, name='oppdrag_api_flytt'),
+    # Ett navngitt endepunkt per overgang. Navnene er statusverdiene selv,
+    # og settet håndheves i viewet mot `services.STEMPLBARE` — utledet fra
+    # overgangstabellen, ikke skrevet ned på nytt her.
+    path('api/oppdrag/<int:pk>/status/<str:overgang>/', views.stempling_view,
+         name='oppdrag_api_stempling'),
 ]

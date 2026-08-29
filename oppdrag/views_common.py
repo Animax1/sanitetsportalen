@@ -6,7 +6,7 @@ import json
 
 from django.utils import timezone
 
-from . import choices
+from . import choices, services
 
 
 def json_body(request):
@@ -64,6 +64,12 @@ def oppdrag_til_dict(oppdrag, *, for_enhet: bool = False) -> dict:
     }
     skjul_fritekst = for_enhet and oppdrag.status == choices.TERMINAL
     data['fritekst'] = '' if skjul_fritekst else oppdrag.fritekst
+    if for_enhet:
+        # «Neste»-knappen vet hvilken overgang den utfører fordi serveren sier
+        # det her — JS-en har ingen egen kopi av kjeden å komme i utakt med.
+        neste = services.neste_i_kjeden(oppdrag.status)
+        data['neste_overgang'] = neste
+        data['neste_navn'] = choices.STATUS_NAVN.get(neste) if neste else None
     return data
 
 

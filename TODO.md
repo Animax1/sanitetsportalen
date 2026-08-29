@@ -596,22 +596,32 @@ Gjennomgang 13. aug. 2026, med 1000 pasienter og peak 100 brukere som premiss.
             admin hele tiden, men bare `enheter/ny/` hadde en 403-test. Da panelet ble
             åpnet for `skriv_full`, ble den luka verdt å lukke: to tester krever nå 403
             på både lesing og pensjonering for `skriv_full` uten admin.
-      - [ ] **Fase 3 arver til fase 4:** enhetskontoer får i dag en mellomtilstand som
-            sier at skjermen ikke er bygget. Å sende dem til sentralbordet ville vist
-            dem alle oppdrag i vakta.
-      - [ ] **Fase 4** (6–8 t): enhetsskjermen — statusmaskin med `Venter` som
-            startstatus, to knapper mot seks navngitte endepunkter, lukket kroppsskjema,
-            objektsjekk på eierskap, og de to skjulereglene (fritekst ved `Ledig`, hele
-            oppdraget 30 min etter) som **server-side filter**, aldri sletting.
-            Inkluderer visning av `automatisk` (§4.5): markøren sitter på klokkeslettet,
-            ikke på statusordet — det er tidspunktet som er avledet. Ingen badge, ingen ny
-            farge, må stå i gråtoner (WCAG 1.4.1).
+      - [x] **Fase 4 — enhetsskjermen (29. aug. 2026).** Mellomtilstanden fra fase 3
+            er borte; `enhet.html` + `oppdrag-enhet.js` viser egne oppdrag med to
+            knapper — «neste» og «Ledig» — mot **fem** navngitte stemplingsendepunkter
+            (`status/<overgang>/`, første faktiske bruk av `skriv_handling`). Planen sa
+            seks, men talte statusene: `venter` settes ved oppretting og stemples aldri,
+            og settet utledes nå av `services.STEMPLBARE` fra overgangstabellen.
+            - Lukket kroppsskjema (`klienttid`, `idempotency_key`) testet ved
+              uttømming; klienttid valideres per §5.1 med `forsinket`-flagg;
+              `idempotency_key` godtas men kobles først i fase 5 — statusmaskinen gjør
+              en ren avspilling ufarlig (409 uten ny rad).
+            - To porter: `skriv_handling` + eierskaps-objektsjekk. `skriv_full` uten
+              enhetskobling får 403 — stemplingen er en måling fra bilen, og en
+              operatør som stempler «for» en enhet ville forfalsket den.
+            - JS-en kjenner ikke kjeden: serveren sender `neste_overgang`/`neste_navn`
+              per rad. Dobbelttrykk gir 409, og skjermen svarer med å hente ferskt.
+            - `automatisk` vises per §4.5: markør på klokkeslettet, gråtoner, ingen
+              badge. Skjulereglene var server-side fra fase 3 og står urørt.
       - [ ] **Fase 4b** (2–3 t): korreksjoner. 113 retter tidspunkt ved å skrive en **ny
             rad som peker på den gamle**, ikke ved å endre den — `Statusmelding` er et spor
             av hva som ble meldt. «Nyeste ikke-korrigerte rad per status vinner» bor i en
             manager-metode, ikke i en `if` per view. Kun tidspunkt, ikke status. Kun
             `skriv_full`.
       - [ ] **Fase 5** (4–6 t): offline-kø for stemplinger, med `core.idempotency`.
+            Endepunktet godtar allerede `idempotency_key` i det lukkede skjemaet —
+            fase 5 kobler nøkkelen til `reserver()`/`fullfor()` og bygger køen i
+            `localStorage`, med synlig «usendt»-markering på skjermen.
       - [ ] **Fase 6** (5–7 t): **statistikkregisteret** + oppdragsfanen. Her rives den
             direkte importen fra `statistikk` til `patients.services` ut, og erstattes av
             et registry etter samme idiom som `core.backup` og `core.arkiv` — det CLAUDE.md

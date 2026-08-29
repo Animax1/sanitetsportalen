@@ -462,3 +462,279 @@ class PaaVaktTests(OppdragBasis):
                content_type='application/json', data={'pa_vakt': False})
         self.assertEqual(
             c.get('/oppdrag/api/enheter/', HTTP_IF_NONE_MATCH=etag).status_code, 200)
+
+
+class StemplingBasis(OppdragBasis):
+    """Felles oppsett: en enhetskonto koblet til `self.enhet`."""
+
+    def setUp(self):
+        super().setUp()
+        self.bilbruker = _bruker('haugesund56', 'skriv_handling', delt=True)
+        Enhet.objects.filter(pk=self.enhet.pk).update(user=self.bilbruker)
+        self.bil = _klient(self.bilbruker)
+
+    def _stemple(self, oppdrag, overgang, body=None, klient=None):
+        return (klient or self.bil).post(
+            f'/oppdrag/api/oppdrag/{oppdrag.pk}/status/{overgang}/',
+            data=body if body is not None else {},
+            content_type='application/json')
+
+
+class StemplingTests(StemplingBasis):
+    """De navngitte overgangene — første faktiske bruk av `skriv_handling`."""
+
+    def test_hele_kjeden_kan_stemples(self):
+        o = self._oppdrag()
+        for overgang in ('rykker_ut', 'fremme', 'avreist', 'leverer', 'ledig'):
+            with self.subTest(overgang=overgang):
+                resp = self._stemple(o, overgang)
+                self.assertEqual(resp.status_code, 200)
+                o.refresh_from_db()
+                self.assertEqual(o.status, overgang)
+        self.assertEqual(Statusmelding.objects.filter(oppdrag=o).count(), 5)
+
+    def test_ledig_er_utgang_fra_enhver_status(self):
+        o = self._oppdrag()
+        self._stemple(o, 'rykker_ut')
+        resp = self._stemple(o, 'ledig')
+        self.assertEqual(resp.status_code, 200)
+        o.refresh_from_db()
+        self.assertEqual(o.status, choices.LEDIG)
+
+    def test_ulovlig_overgang_gir_409_og_ingen_rad(self):
+        """Dobbelttrykket: det første vant, det andre skal ikke lage noe."""
+        o = self._oppdrag()
+        self._stemple(o, 'rykker_ut')
+        foer = Statusmelding.objects.filter(oppdrag=o).count()
+        resp = self._stemple(o, 'rykker_ut')
+        self.assertEqual(resp.status_code, 409)
+        self.assertEqual(Statusmelding.objects.filter(oppdrag=o).count(), foer)
+
+    def test_ukjent_overgangsnavn_gir_404(self):
+        """`venter` stemples aldri — den settes ved oppretting."""
+        o = self._oppdrag()
+        for navn in ('venter', 'neste', 'tull'):
+            with self.subTest(navn=navn):
+                self.assertEqual(self._stemple(o, navn).status_code, 404)
+
+    def test_rykk_ut_lukker_pagaende_automatisk(self):
+        """§4.3: samme tidsstempel, og bare den avledede raden flagges."""
+        forste = self._oppdrag()
+        andre = self._oppdrag()
+        self._stemple(forste, 'rykker_ut')
+        resp = self._stemple(andre, 'rykker_ut')
+        self.assertEqual(resp.status_code, 200)
+
+        forste.refresh_from_db()
+        andre.refresh_from_db()
+        self.assertEqual(forste.status, choices.LEDIG)
+        self.assertEqual(andre.status, choices.RYKKER_UT)
+
+        ledig = Statusmelding.objects.get(oppdrag=forste, status=choices.LEDIG)
+        start = Statusmelding.objects.get(oppdrag=andre, status=choices.RYKKER_UT)
+        self.assertTrue(ledig.automatisk)
+        self.assertFalse(start.automatisk)
+        self.assertEqual(ledig.tidspunkt, start.tidspunkt)
+
+    def test_svar_inneholder_neste_overgang(self):
+        """Knappen vet hvilken overgang den utfører fordi serveren sier det."""
+        o = self._oppdrag()
+        data = self._stemple(o, 'rykker_ut').json()['data']
+        self.assertEqual(data['oppdrag']['neste_overgang'], 'fremme')
+        self.assertEqual(data['oppdrag']['status'], 'rykker_ut')
+
+
+class StemplingSkjemaTests(StemplingBasis):
+    """Det lukkede kroppsskjemaet fra §5.1 — testbart ved uttømming."""
+
+    def test_tom_kropp_er_gyldig(self):
+        o = self._oppdrag()
+        resp = self.bil.post(
+            f'/oppdrag/api/oppdrag/{o.pk}/status/rykker_ut/',
+            data='', content_type='application/json')
+        self.assertEqual(resp.status_code, 200)
+
+    def test_domenefelt_i_kroppen_gir_400_og_ingen_endring(self):
+        """Selve invarianten: ingen feltverdi kan noensinne komme inn her."""
+        o = self._oppdrag(fritekst='original')
+        resp = self._stemple(o, 'rykker_ut', body={
+            'klienttid': timezone.now().isoformat(),
+            'fritekst': 'smuglet inn',
+        })
+        self.assertEqual(resp.status_code, 400)
+        o.refresh_from_db()
+        self.assertEqual(o.fritekst, 'original')
+        self.assertEqual(o.status, choices.VENTER)
+        self.assertIn('fritekst', resp.json()['message'])
+
+    def test_hver_nokkel_utenfor_skjemaet_avvises(self):
+        o = self._oppdrag()
+        for felt in ('status', 'problemstilling', 'hastegrad', 'enhet_id', 'x'):
+            with self.subTest(felt=felt):
+                resp = self._stemple(o, 'rykker_ut', body={felt: '1'})
+                self.assertEqual(resp.status_code, 400)
+
+    def test_idempotency_key_godtas(self):
+        """Den andre nøkkelen i skjemaet. Kobles til core.idempotency i fase 5."""
+        o = self._oppdrag()
+        resp = self._stemple(o, 'rykker_ut', body={'idempotency_key': 'abc123'})
+        self.assertEqual(resp.status_code, 200)
+
+    def test_ugyldig_json_gir_400(self):
+        o = self._oppdrag()
+        resp = self.bil.post(
+            f'/oppdrag/api/oppdrag/{o.pk}/status/rykker_ut/',
+            data='ikke json', content_type='application/json')
+        self.assertEqual(resp.status_code, 400)
+
+    def test_uleselig_klienttid_gir_400(self):
+        """En klientfeil skal feile høyt, ikke stille bli servertid."""
+        o = self._oppdrag()
+        resp = self._stemple(o, 'rykker_ut', body={'klienttid': 'i går'})
+        self.assertEqual(resp.status_code, 400)
+
+
+class StemplingObjektsjekkTests(StemplingBasis):
+    """To porter: modulgaten, og eierskapet dekoratoren ikke ser."""
+
+    def test_annen_enhets_oppdrag_gir_403(self):
+        o = self._oppdrag(enhet=self.annen_enhet)
+        resp = self._stemple(o, 'rykker_ut')
+        self.assertEqual(resp.status_code, 403)
+        o.refresh_from_db()
+        self.assertEqual(o.status, choices.VENTER)
+
+    def test_sentral_uten_enhet_kan_ikke_stemple(self):
+        """Nivået holder ikke: `skriv_full` uten enhetskobling får 403.
+
+        Sentralbordet stempler ikke — det korrigerer (fase 4b). Stemplingen
+        er en måling fra bilen, og en operatør som «stempler for» en enhet
+        ville forfalsket den målingen.
+        """
+        sentral = _klient(_bruker('sentralops', 'skriv_full'))
+        o = self._oppdrag()
+        resp = self._stemple(o, 'rykker_ut', klient=sentral)
+        self.assertEqual(resp.status_code, 403)
+
+    def test_uten_modultilgang_gir_403(self):
+        """Enhetskobling uten ModulTilgang-rad slipper heller ikke inn.
+
+        Koblingen er domenedata og gir ingen tilgang — samme regel som
+        `Forstehjelper.user` i pasientmodulen.
+        """
+        naken = _bruker('bil_uten_rad', delt=True)
+        Enhet.objects.filter(pk=self.annen_enhet.pk).update(user=naken)
+        o = self._oppdrag(enhet=self.annen_enhet)
+        resp = self._stemple(o, 'rykker_ut', klient=_klient(naken))
+        self.assertEqual(resp.status_code, 403)
+
+    def test_les_nivaa_kan_ikke_stemple(self):
+        lesebruker = _bruker('bil_les', 'les', delt=True)
+        Enhet.objects.filter(pk=self.annen_enhet.pk).update(user=lesebruker)
+        o = self._oppdrag(enhet=self.annen_enhet)
+        resp = self._stemple(o, 'rykker_ut', klient=_klient(lesebruker))
+        self.assertEqual(resp.status_code, 403)
+
+    def test_oppdrag_utenfor_aktiv_vakt_gir_404(self):
+        o = Oppdrag.objects.create(
+            year=AAR - 1, enhet=self.enhet, problemstilling='Transport',
+            hastegrad='Vanlig', lokasjon=self.lokasjon)
+        self.assertEqual(self._stemple(o, 'rykker_ut').status_code, 404)
+
+
+class KlienttidTests(StemplingBasis):
+    """§5.1: klienttid brukes i vinduet, servertid utenfor, forsinket flagges."""
+
+    def _siste_melding(self, oppdrag):
+        return (Statusmelding.objects.filter(oppdrag=oppdrag)
+                .order_by('-created_at').first())
+
+    def test_gyldig_klienttid_brukes(self):
+        # Oppdraget må være eldre enn klienttiden — en klienttid før
+        # `created_at` forkastes med rette (den er utenfor vinduet).
+        o = self._oppdrag()
+        Oppdrag.objects.filter(pk=o.pk).update(
+            created_at=timezone.now() - timedelta(hours=1))
+        o.refresh_from_db()
+        tid = timezone.now() - timedelta(minutes=10)
+        resp = self._stemple(o, 'rykker_ut', body={'klienttid': tid.isoformat()})
+        self.assertEqual(resp.status_code, 200)
+        melding = self._siste_melding(o)
+        self.assertEqual(melding.tidspunkt, tid)
+        self.assertTrue(melding.forsinket)
+
+    def test_fersk_klienttid_er_ikke_forsinket(self):
+        o = self._oppdrag()
+        self._stemple(o, 'rykker_ut',
+                      body={'klienttid': timezone.now().isoformat()})
+        self.assertFalse(self._siste_melding(o).forsinket)
+
+    def test_framtidig_klienttid_erstattes_med_servertid(self):
+        o = self._oppdrag()
+        tid = timezone.now() + timedelta(hours=2)
+        foer = timezone.now()
+        self._stemple(o, 'rykker_ut', body={'klienttid': tid.isoformat()})
+        melding = self._siste_melding(o)
+        self.assertLess(melding.tidspunkt, tid)
+        self.assertGreaterEqual(melding.tidspunkt, foer)
+        # Avviket er informasjonen, ikke hvilket stempel som vant.
+        self.assertTrue(melding.forsinket)
+
+    def test_klienttid_foer_oppdraget_erstattes_med_servertid(self):
+        o = self._oppdrag()
+        tid = o.created_at - timedelta(hours=1)
+        self._stemple(o, 'rykker_ut', body={'klienttid': tid.isoformat()})
+        melding = self._siste_melding(o)
+        self.assertGreater(melding.tidspunkt, o.created_at)
+        self.assertTrue(melding.forsinket)
+
+    def test_eldgammel_klienttid_erstattes_med_servertid(self):
+        o = self._oppdrag()
+        Oppdrag.objects.filter(pk=o.pk).update(
+            created_at=timezone.now() - timedelta(days=3))
+        o.refresh_from_db()
+        tid = timezone.now() - timedelta(days=2)
+        self._stemple(o, 'rykker_ut', body={'klienttid': tid.isoformat()})
+        melding = self._siste_melding(o)
+        self.assertGreater(melding.tidspunkt, tid + timedelta(days=1))
+        self.assertTrue(melding.forsinket)
+
+
+class EnhetSkjermTests(StemplingBasis):
+    """Enhetsskjermen erstatter mellomtilstanden fra fase 3."""
+
+    def test_enhetskonto_faar_skjermen_med_knappene(self):
+        html = self.bil.get('/oppdrag/').content.decode()
+        self.assertIn('Haugesund 56', html)
+        self.assertIn('id="aktivt-oppdrag"', html)
+        self.assertIn('oppdrag-enhet', html)
+        self.assertNotIn('Enhetsskjermen er ikke bygget ennå', html)
+        self.assertNotIn('id="oppdragsliste"', html)
+
+    def test_lista_baerer_neste_overgang_og_statusmeldinger(self):
+        o = self._oppdrag()
+        self._stemple(o, 'rykker_ut')
+        data = self.bil.get('/oppdrag/api/oppdrag/').json()['data']
+        self.assertEqual(len(data), 1)
+        self.assertEqual(data[0]['neste_overgang'], 'fremme')
+        self.assertEqual(
+            [m['status'] for m in data[0]['statusmeldinger']], ['rykker_ut'])
+
+    def test_sentralens_liste_har_ikke_enhetsfeltene(self):
+        """Feltene finnes for skjermen som trenger dem, ikke overalt."""
+        self._oppdrag()
+        c = _klient(_bruker('sentral_liste', 'les'))
+        rad = c.get('/oppdrag/api/oppdrag/').json()['data'][0]
+        self.assertNotIn('neste_overgang', rad)
+        self.assertNotIn('statusmeldinger', rad)
+
+    def test_stempling_endrer_etag(self):
+        """Pollingen skal se sin egen stempling uten å vente på statusskifte."""
+        o = self._oppdrag()
+        resp1 = self.bil.get('/oppdrag/api/oppdrag/')
+        etag1 = resp1['ETag']
+        self._stemple(o, 'rykker_ut')
+        resp2 = self.bil.get('/oppdrag/api/oppdrag/',
+                             HTTP_IF_NONE_MATCH=etag1)
+        self.assertEqual(resp2.status_code, 200)
+        self.assertNotEqual(resp2['ETag'], etag1)

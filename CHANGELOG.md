@@ -4,6 +4,57 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-08-29 — Fase 4: enhetsskjermen, og første faktiske bruk av `skriv_handling`
+
+**1166 tester grønne** (29 nye). Ingen migrasjon. Mellomtilstanden fra fase 3
+(`enhet_kommer.html`) er slettet — enhetskontoer får nå en ekte skjerm.
+
+**Stemplingsendepunktene: fem, ikke seks.** Planen sa «seks navngitte endepunkter», men
+talte statusene: `venter` settes ved oppretting og stemples aldri. Settet skrives ikke ned
+noe sted — `services.STEMPLBARE` utledes av overgangstabellen (`frozenset().union(*OVERGANGER.values())`),
+så et endepunkt finnes hvis og bare hvis en rad peker på det. URL-en er
+`POST /oppdrag/api/oppdrag/<pk>/status/<overgang>/` med statusverdien som navn; ukjent navn
+gir 404, ulovlig overgang 409.
+
+**Det lukkede kroppsskjemaet fra §5.1 er testbart ved uttømming, og testes slik.** To
+nøkler — `klienttid` og `idempotency_key` — og alt annet gir 400 uten sideeffekt; testen
+sender domenefelt og krever at ingenting endret seg. `klienttid` valideres etter §5.1:
+framtid, før oppdragets opprettelse eller eldre enn et døgn gir servertid, og avvik over to
+minutter fra ankomsttid setter `forsinket=True` uansett hvilket stempel som vant — avviket
+er informasjonen. Uleselig klienttid gir 400, ikke stille servertid: det er en klientfeil,
+ikke et gammelt stempel.
+
+**`idempotency_key` godtas, men kobles først i fase 5.** Statusmaskinen gjør en ren
+avspilling ufarlig allerede: samme overgang to ganger er ulovlig andre gang og gir 409 uten
+ny rad. Verdien av `core.idempotency` her er å svare «ok» på en replay i stedet for 409, og
+det svaret hører til offline-køen som skal tolke det.
+
+**To porter, og nivå er ikke nok.** `skriv_handling` i dekoratøren, eierskap i viewet — og
+`skriv_full` *uten* enhetskobling får 403. Sentralbordet stempler ikke; det korrigerer
+(fase 4b). Stemplingen er en måling fra bilen, og en operatør som stempler «for» en enhet
+ville forfalsket den. Testene dekker også kombinasjonen enhetskobling uten
+`ModulTilgang`-rad: koblingen gir ingen tilgang, samme regel som `Forstehjelper.user`.
+
+**Skjermen kjenner ikke statuskjeden.** Serveren sender `neste_overgang` og `neste_navn`
+på hver rad (kun i enhetens payload), og «neste»-knappen poster dit den blir fortalt. En
+kopi av kjeden i JS ville vært enda et sted å komme i utakt — §2.6 i rollemodellnotatet i
+miniatyr. Dobbelttrykk møter 409 og besvares med å hente ferskt, uten feilbanner.
+
+Resten av skjermen: to knapper med 64px trykkflater (en tommel i en bil i bevegelse, ikke
+en musepeker), ventende sortert på hastegrad men valgt av mannskapet, tidslinje på det
+aktive kortet, `automatisk`-markøren i gråtoner på klokkeslettet (§4.5), og et feilbanner
+som blir stående til noe lykkes — med beskjed om å melde over nødnett, som er det ærlige
+svaret til offline-køen finnes (fase 5). Polling hvert 15. sekund med ETag; enhetens ETag
+inkluderer meldings-ID-ene, slik at en korreksjon (fase 4b) ikke drukner i en 304.
+
+**`klokke()` flyttet til `portal-utils.js`** — begge oppdragssidene bruker den, og helpere
+flyttes, de kopieres ikke. `hastegradKlasse()` er duplisert med vilje: den er domene, ikke
+primitiv, og de to filene lastes aldri sammen. XSS-vernet i `tests_xss.py` skanner nå
+byggerne i begge filene, og kjører enhetsskjermens byggere i node med markup i fritekst,
+knappenavn og statusnavn.
+
+---
+
 ## 2026-08-29 — Fase 2 lukket: protokollen dekker oppdragsmodulen
 
 Kun dokumentasjon — `PERSONVERN_DOKUMENTASJON.md` går fra v1.6 til v1.7. Ingen kodeendring,
