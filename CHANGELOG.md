@@ -55,7 +55,28 @@ statistikkappen gjør — og forholdet til de to personregistrene som finnes fra
   navn kan stå to steder, og den er akseptert — en nullbar FK er en additiv migrasjon
   den dagen behovet melder seg.
 
-Tre avklaringer står igjen (§11.7–11.10), alle med anbefaling.
+**Andre runde samme dag besvarte resten, og notatet står som besluttet:**
+
+- **Ressurser reserveres til korps.** `skriv_full`/admin tildeler lag, mannskapsbiler
+  og ambulanser til korpsene; korps-brukeren bemanner bare ressurser med sin egen
+  badge, med skifttider. KO og samleplass står typisk ureservert og er
+  `skriv_full`/admins bord. Regelen er dobbel og håndheves per objekt: personen må ha
+  badgen, ressursen må være reservert korpset.
+- **Drift er kun en innsjekk-port, og den er reversibel.** «Sett i drift» åpner
+  møtt/av vakt, «ut av drift» stenger den igjen; stemplene består. Ingen kobling til
+  portalens aktive vakt — spørsmålet fra utkastet falt bort med svaret.
+- **To bruksområder kom til:** planleggingstall (timer per person, hviletid mellom
+  skift, skiftlengder, bemanningskurve, admin-styrte varselgrenser — varsler, ikke
+  sperrer) og en tilstedeoversikt som brukes av brannsikkerhetshensyn ved overnatting.
+  Den siste er modulens mest alvorlige flate: definisjonen er «møtt og ikke gått av»,
+  utledet av stemplene, med telling øverst og en ren utskriftsvisning — papir er
+  reserven når strøm og nett ryker.
+- **Kopiering fra forrige vakt:** oppsettet (ressurser, reservasjoner, roller), aldri
+  personene.
+
+Et skift er en `Vaktpost` med `fra_tid`/`til_tid`; `mott_at`/`av_vakt_at` er hva som
+skjedde. Plan og faktisk holdes atskilt fordi avviket mellom dem er selve
+informasjonen. Sju faser, 37–49 timer. Ingen kode er skrevet.
 
 ---
 

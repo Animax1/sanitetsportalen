@@ -815,18 +815,20 @@ Gjennomgang 13. aug. 2026, med 1000 pasienter og peak 100 brukere som premiss.
               endepunktene eller backup-sperren foran kollaps, blir testene røde.
 
 - [ ] **Vaktlistemodulen — se `docs/BESLUTNING_VAKTLISTE.md`.** Bestilt av André
-      29. aug. 2026, notat skrevet samme dag, **ikke besluttet**. Personelloversikt
-      sortert på korps, med kompetanse, rolle og kostbehov; bemanning av vaktas
-      ressurser (samleplass, biler, lag, KO) i faner; planlegging som settes i drift og
-      da brukes til møtt/av vakt; og et besetningspanel på enheten i `/oppdrag`.
-      Sju faser, 33–45 t.
-      - [x] **Seks avklaringer besvart 29. aug. 2026** (§11 i notatet). Tre av dem
-            endret utformingen: korps ble en badge og ikke en ny tilgangsakse,
-            kostbehov utgikk helt, og pasientmodulens personregistre forblir urørt.
-      - [ ] **Tre avklaringer står igjen før fase 2** (§11.7–11.10): om «Sett i drift»
-            skal bytte portalens aktive vakt, hvor langt korps-brukeren rekker inn i
-            selve oppsettet, og om lista skal kunne kopieres fra forrige vakt. Alle har
-            en anbefaling.
+      29. aug. 2026, **besluttet samme dag** i to avklaringsrunder — alle ti
+      avklaringene er besvart, kun små restpunkter avgjøres underveis (§11).
+      Personelloversikt sortert på korps med kompetanse og rolle; ressurser
+      (samleplass, biler, lag, KO) som reserveres til korps og bemannes av korpsene
+      selv, med skifttider; drift som reversibel innsjekk-port med møtt/av vakt;
+      «Tilstede nå» med utskrift (brukes av brannsikkerhetshensyn ved overnatting);
+      planleggingstall (timer, hviletid, bemanningskurve, varsler); besetningspanel i
+      `/oppdrag`. Sju faser, 37–49 t. **Ikke påbegynt.**
+      - [x] **Alle ti avklaringene besvart 29. aug. 2026** (§11 i notatet er fasit).
+            De som endret utformingen: korps er en badge og ikke en ny akse; ressurser
+            reserveres til korps og korpsene bemanner sine egne, med tider; drift er en
+            reversibel innsjekk-port uten kobling til aktiv vakt; kostbehov utgikk;
+            personregistrene i pasientmodulen forblir urørt; kopiering tar oppsettet,
+            aldri personene.
       - [ ] **Korps er en badge, ikke en akse.** `skriv_handling` = fører sitt eget
             korps, `skriv_full` = alle korps **og** den eneste som stempler møtt/av
             vakt. Korpset arves fra `Mannskap.korps` via `Mannskap.user`, som
