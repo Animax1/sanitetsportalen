@@ -25,6 +25,7 @@ from core.models import ModuleBackupConfig
 from patients import backup_scheduler
 from patients.backup import register_handlers
 from patients.models import Backup, Patient
+from patients.services import vakt_for_year
 from accounts.test_helpers import gi_standardtilgang
 
 
@@ -75,6 +76,74 @@ class SchedulerShouldRunTests(TestCase):
 
 
 @override_settings(SECURE_SSL_REDIRECT=False, RATELIMIT_ENABLE=False)
+class SchedulerFinnerModulerTests(TestCase):
+    """Registeret er fasit for hvilke moduler som finnes, ikke konfigtabellen.
+
+    Scheduleren leste tidligere `ModuleBackupConfig`-radene direkte. Radene
+    ble opprettet først når en admin åpnet `/portal-admin/backup/`, så en
+    nyregistrert modul hadde ingen automatisk backup før noen tilfeldigvis
+    besøkte den siden — og for et arkiv betyr manglende backup at kollapsen
+    nekter å kjøre, altså en feil som først viser seg to år senere.
+    """
+
+    def setUp(self):
+        from core.backup import registrer_alle_moduler
+        registrer_alle_moduler()
+
+    def test_alle_registrerte_moduler_er_med(self):
+        from core.backup import all_handlers
+
+        slugs = {slug for slug, _ in backup_scheduler._konfigurasjoner()}
+        self.assertEqual(slugs, {h.slug for h in all_handlers()})
+        # Konkret: oppdragsmodulen kom til i fase 7 og skal være dekket.
+        self.assertIn('oppdrag', slugs)
+        self.assertIn('oppdrag_arkiv', slugs)
+
+    def test_modul_uten_konfigrad_faar_en(self):
+        """Selve hullet: uten rad var modulen usynlig for scheduleren."""
+        ModuleBackupConfig.objects.all().delete()
+
+        konfig = dict(backup_scheduler._konfigurasjoner())
+
+        self.assertIn('oppdrag_arkiv', konfig)
+        self.assertTrue(
+            ModuleBackupConfig.objects.filter(module_slug='oppdrag_arkiv').exists())
+        # Standardverdiene gjelder — modulen er påslått fra første stund.
+        self.assertTrue(konfig['oppdrag_arkiv'].enabled)
+
+    def test_ny_modul_er_klar_for_backup_med_en_gang(self):
+        """`last_run_at` er tom på en fersk rad, altså forfaller den straks."""
+        ModuleBackupConfig.objects.all().delete()
+
+        konfig = dict(backup_scheduler._konfigurasjoner())
+        self.assertTrue(backup_scheduler._should_run_now(konfig['oppdrag']))
+
+    def test_opprettelsen_er_idempotent(self):
+        ModuleBackupConfig.objects.all().delete()
+        backup_scheduler._konfigurasjoner()
+        backup_scheduler._konfigurasjoner()
+
+        self.assertEqual(
+            ModuleBackupConfig.objects.filter(module_slug='oppdrag').count(), 1)
+
+    def test_konfig_uten_handler_hoppes_over(self):
+        """En rest etter en modul som er fjernet fra koden skal ikke telle."""
+        ModuleBackupConfig.objects.create(module_slug='fjernet_modul')
+
+        slugs = {slug for slug, _ in backup_scheduler._konfigurasjoner()}
+        self.assertNotIn('fjernet_modul', slugs)
+
+    def test_deaktivert_modul_kjorer_ikke(self):
+        """Raden opprettes, men admin bestemmer fortsatt om den er på."""
+        cfg = ModuleBackupConfig.get_or_default('oppdrag')
+        cfg.enabled = False
+        cfg.save(update_fields=['enabled'])
+
+        konfig = dict(backup_scheduler._konfigurasjoner())
+        self.assertFalse(backup_scheduler._should_run_now(konfig['oppdrag']))
+
+
+@override_settings(SECURE_SSL_REDIRECT=False, RATELIMIT_ENABLE=False)
 class SchedulerRunBackupTests(TestCase):
     """Tester for _run_backup_for_module – den faktiske utførelsen."""
 
@@ -96,7 +165,7 @@ class SchedulerRunBackupTests(TestCase):
         with backup_scheduler._running_lock:
             backup_scheduler._is_running = False
         # Patient-data slik at dumpdata ikke er tom.
-        Patient.objects.create(pasientnummer=1, year=2025, problemstilling='X')
+        Patient.objects.create(pasientnummer=1, vakt=vakt_for_year(2025), problemstilling='X')
 
     def tearDown(self):
         import gc

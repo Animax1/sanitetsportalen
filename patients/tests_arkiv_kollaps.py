@@ -21,9 +21,10 @@ from patients.services import (
     arkiver_aktiv_vakt,
     compute_arkiv_full_stats,
     compute_arkiv_stats,
-    kollaps_arkiv,
+    kollaps_arkiv, vakt_for_year,
 )
 from accounts.test_helpers import gi_standardtilgang
+from patients.test_helpers import sett_aktiv_vakt
 
 User = get_user_model()
 
@@ -35,8 +36,7 @@ class KollapsTestMixin:
             from patients.backup import register_handlers
             register_handlers()
 
-        AppSetting.set('active_year', 2098)
-        AppSetting.set('next_patient_nr', 1)
+        self.vakt = sett_aktiv_vakt(2098)
         self.admin = User.objects.create_user(
             username='arkivar', password='passord', role='admin',
             must_change_password=False,
@@ -46,19 +46,19 @@ class KollapsTestMixin:
     def _lag_pasienter(self):
         """Tre pasienter med tidsdata, så statistikken blir ikke-triviell."""
         Patient.objects.create(
-            pasientnummer=1, year=2098, grovsortering='Grønn',
+            pasientnummer=1, vakt=vakt_for_year(2098), grovsortering='Grønn',
             problemstilling='Kramper', transport='Gående',
             inntid='01.06.2098 10:00', pabegynt='01.06.2098 10:05',
             utskrevet='01.06.2098 10:45', utskrevet_til='Hjem/park',
         )
         Patient.objects.create(
-            pasientnummer=2, year=2098, grovsortering='Rød',
+            pasientnummer=2, vakt=vakt_for_year(2098), grovsortering='Rød',
             problemstilling='Brystsmerter', transport='Beredskapsambulanse',
             inntid='01.06.2098 11:00', pabegynt='01.06.2098 11:02',
             utskrevet='01.06.2098 11:50', utskrevet_til='Sykehus',
         )
         Patient.objects.create(
-            pasientnummer=3, year=2098, grovsortering='Gul',
+            pasientnummer=3, vakt=vakt_for_year(2098), grovsortering='Gul',
             problemstilling='Magesmerter', transport='Lag',
             inntid='01.06.2098 12:00', pabegynt='01.06.2098 12:10',
         )
@@ -223,7 +223,7 @@ class KollapsIntegritetTests(KollapsTestMixin, TestCase):
 
         c = Client()
         c.force_login(self.admin)
-        resp = c.get(f'/statistikk/api/arkiv/{arkiv.pk}/full-stats/')
+        resp = c.get(f'/statistikk/api/kilde/patients/arkiv/{arkiv.pk}/full-stats/')
 
         self.assertEqual(resp.status_code, 200)
         self.assertEqual(resp.json()['summary']['total'], 3)
@@ -329,4 +329,6 @@ class KollapsKommandoTests(KollapsTestMixin, TestCase):
 
         ut = self._kjor()
 
-        self.assertIn('Ingen arkiv eldre enn', ut)
+        # Meldingen er per modul etter fase 7 — kommandoen går gjennom
+        # registeret, og navnet foran sier hvilket arkiv den snakker om.
+        self.assertIn('ingen arkiv eldre enn', ut)

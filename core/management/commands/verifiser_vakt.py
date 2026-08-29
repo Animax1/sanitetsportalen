@@ -1,9 +1,12 @@
-"""Kontroller vakt-koblingen — kjøres mot prod mellom deploy 1 og 2.
+"""Kontroller vakt-koblingen.
 
-Samme rolle som `verifiser_modultilgang` hadde i rollemodellen: deploy 2 gjør
-`Vakt` til eneste fasit, og DENNE kommandoen er beviset på at fasiten stemmer
-med `year` mens begge finnes. Etter deploy 2 kan sammenligningen ikke tas om
-igjen — da er `year` borte fra radene.
+Skrevet for vinduet mellom deploy 1 og 2, der den sammenlignet `year` på
+radene mot vaktas år. Den kontrollen er **fjernet, ikke gjemt**: `year` finnes
+ikke på radene etter deploy 2, og en sammenligning som alltid svarer grønt er
+verre enn ingen kontroll — samme grep som §10.1-tellingen i rollemodellen.
+
+Det som står igjen er det kommandoen fortsatt kan svare på: pekeren, arkivets
+frosne år mot vaktas, og oversikten per vakt.
 
 Les-only. Endrer ingenting.
 
@@ -32,37 +35,23 @@ class Command(BaseCommand):
 
         self.funn = 0
 
-        # ── Rader uten vakt ──────────────────────────────────────────────
-        # Arkiver telles ikke som feil: NULL der betyr «fra før grupperingen».
-        for navn, qs in (
-            ('pasienter', Patient.objects.filter(vakt__isnull=True)),
-            ('oppdrag', Oppdrag.objects.filter(vakt__isnull=True)),
-        ):
-            antall = qs.count()
-            if antall:
-                self._feil(f'{antall} {navn} uten vakt. Deploy 2 setter '
-                           f'NOT NULL og vil feile på disse.')
+        # Skjemaet garanterer NOT NULL på Patient/Oppdrag siden deploy 2.
+        # Arkivets FK er nullbar for godt: NULL betyr «fra før grupperingen».
         arkiv_uten = VaktArkiv.objects.filter(vakt__isnull=True).count()
         if arkiv_uten:
             self.stdout.write(
                 f'  Info: {arkiv_uten} arkiv uten vakt (fra før grupperingen '
                 f'— i orden).')
 
-        # ── year må stemme med vakta ─────────────────────────────────────
-        # Selve kontrakten i deploy 1: FK-en skrives, `year` leses, og de to
-        # skal aldri være uenige. Er de det, har en skrivesti glemt vakta.
+        # Arkivets frosne år mot vaktas — eneste year-sammenligning som
+        # fortsatt har to kilder å sammenligne.
         from django.db.models import F
-        for navn, Modell, aarfelt in (
-            ('pasienter', Patient, 'year'),
-            ('oppdrag', Oppdrag, 'year'),
-            ('arkiv', VaktArkiv, 'year_snapshot'),
-        ):
-            avvik = (Modell.objects.filter(vakt__isnull=False)
-                     .exclude(**{aarfelt: F('vakt__year')})
-                     .count())
-            if avvik:
-                self._feil(f'{avvik} {navn} der {aarfelt} ikke stemmer med '
-                           f'vaktas år.')
+        avvik = (VaktArkiv.objects.filter(vakt__isnull=False)
+                 .exclude(year_snapshot=F('vakt__year'))
+                 .count())
+        if avvik:
+            self._feil(f'{avvik} arkiv der year_snapshot ikke stemmer med '
+                       f'vaktas år.')
 
         # ── Pekeren ──────────────────────────────────────────────────────
         raa = AppSetting.objects.filter(key='aktiv_vakt_id').first()
@@ -84,20 +73,9 @@ class Command(BaseCommand):
                 self._feil(f'aktiv_vakt_id={raa.value!r} peker på en vakt '
                            f'som ikke finnes.')
 
-        # ── Forhåndssjekk for deploy 2-sperrene ──────────────────────────
-        # (vakt, pasientnummer) og (vakt, oppdragsnummer) blir unike. Finnes
-        # kollisjoner nå, feiler den migrasjonen — bedre å vite det her.
-        from django.db.models import Count
-        for navn, Modell, felt in (
-            ('pasientnummer', Patient, 'pasientnummer'),
-            ('oppdragsnummer', Oppdrag, 'oppdragsnummer'),
-        ):
-            dubletter = (Modell.objects.filter(vakt__isnull=False)
-                         .values('vakt', felt)
-                         .annotate(n=Count('id')).filter(n__gt=1).count())
-            if dubletter:
-                self._feil(f'{dubletter} {navn}-kollisjoner innenfor samme '
-                           f'vakt. Deploy 2-sperren vil feile.')
+        # Forhåndssjekken for (vakt, nummer)-kollisjoner er fjernet:
+        # sperrene er databasekrav siden deploy 2, og en sjekk som aldri kan
+        # finne noe er verre enn ingen.
 
         # ── Oppsummering ─────────────────────────────────────────────────
         self.stdout.write(f'\n  Vakter i basen: {Vakt.objects.count()}')
@@ -111,8 +89,6 @@ class Command(BaseCommand):
                 f'{pas} pasienter, {opp} oppdrag, {ark} arkiv')
 
         if self.funn:
-            self.stdout.write(self.style.ERROR(
-                f'\n{self.funn} funn. Deploy 2 skal IKKE kjøres før disse '
-                f'er rettet.'))
+            self.stdout.write(self.style.ERROR(f'\n{self.funn} funn.'))
             raise SystemExit(1)
-        self.stdout.write(self.style.SUCCESS('\nIngen funn. Klart for deploy 2.'))
+        self.stdout.write(self.style.SUCCESS('\nIngen funn.'))

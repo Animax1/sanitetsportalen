@@ -32,7 +32,7 @@ from django.db import transaction
 
 from patients.choices import validate_patient_choice_fields
 from patients.models import Patient, Forstehjelper, Helsepersonell
-from patients.services import get_active_year, vakt_for_year
+from patients.services import hent_aktiv_vakt, vakt_for_year
 from audit.models import AuditLog
 
 
@@ -67,7 +67,7 @@ class Command(BaseCommand):
         if not path.exists():
             raise CommandError(f'Finner ikke filen: {path}')
 
-        year = opts['year'] or get_active_year()
+        year = opts['year'] or hent_aktiv_vakt().year
         dry = opts['dry_run']
 
         # Åpne offline-SQLite som read-only
@@ -98,8 +98,11 @@ class Command(BaseCommand):
         new_hp = 0
         imported = 0
 
-        # Start maks pasientnummer globalt i default-DB (pasientnummer er globalt unikt)
-        existing_max = Patient.objects.order_by('-pasientnummer').first()
+        # Renummerer fra vaktas eget maks — pasientnummer er unikt per vakt
+        # siden deploy 2, ikke globalt.
+        vakt = vakt_for_year(year)
+        existing_max = (Patient.objects.filter(vakt=vakt)
+                        .order_by('-pasientnummer').first())
         next_nr = (existing_max.pasientnummer if existing_max else 0) + 1
 
         try:
@@ -126,7 +129,6 @@ class Command(BaseCommand):
                     # Bygg ny Patient (re-nummerert for å unngå kollisjon)
                     p = Patient(
                         pasientnummer=next_nr,
-                        year=year,
                         # Vakta for radens eget år, ikke den aktive: en
                         # offline-import kan i prinsippet bære et annet år,
                         # og da skal koblingen følge året.
@@ -171,6 +173,13 @@ class Command(BaseCommand):
 
                     imported += 1
                     next_nr += 1
+
+                from patients.services import _pasientnr_nokkel
+                from patients.models import AppSetting
+                nokkel = _pasientnr_nokkel(vakt)
+                gjeldende = AppSetting.get(nokkel, None)
+                if gjeldende is None or int(gjeldende) < next_nr:
+                    AppSetting.set(nokkel, next_nr)
 
                 if dry:
                     raise _DryRun()

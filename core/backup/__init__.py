@@ -15,6 +15,7 @@ from .handlers import (
     all_handlers,
     clear_registry,
     get_handler,
+    registrer_alle_moduler,
     register,
 )
 from .service import (
@@ -44,6 +45,7 @@ __all__ = [
     'enforce_cap',
     'get_backup_dir',
     'get_handler',
+    'registrer_alle_moduler',
     'register',
     'restore_backup',
 ]

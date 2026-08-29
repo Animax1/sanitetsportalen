@@ -193,7 +193,8 @@ class RateLimitEndepunktTests(TestCase):
 
     def test_full_stats_strupes(self):
         c = self._klient(self.admin)
-        statuser = _statuser(lambda: c.get('/statistikk/api/full-stats/'), 35)
+        statuser = _statuser(
+            lambda: c.get('/statistikk/api/kilde/patients/full-stats/'), 35)
         self.assertEqual(statuser[0], 200)
         self.assertIn(429, statuser)
 

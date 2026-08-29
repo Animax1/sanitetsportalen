@@ -157,7 +157,7 @@ Viewene er delt i fem moduler (N13.3) — `views.py` finnes ikke lenger:
 | Modul | Ansvar |
 |-------|--------|
 | `views_common.py` | `_json_body`, `_patient_to_dict` — delt av de andre |
-| `views_patients.py` | Hoved-side, innstillinger, sesjonstimeout, pasient-CRUD, nullstilling |
+| `views_patients.py` | Hoved-side, innstillinger, sesjonstimeout, pasient-CRUD, vaktavslutning/-gjenåpning |
 | `views_registre.py` | Førstehjelper- og helsepersonellregisteret (én fabrikk bygger begge) |
 | `views_arkiv.py` | Vaktarkivet |
 
@@ -171,14 +171,31 @@ Feltendringer logges automatisk via Django-signal i `audit/signals.py`. `Request
 
 `BackupSchedulerMiddleware` kjører automatisk backup in-process etter request.
 
-Backup er **per modul**, ikke én samlet dump. Hver modul registrerer en `BaseBackupHandler` i `core.backup`-registryet (fra `apps.ready()`). To handlere finnes i dag, begge i `patients/backup.py`:
+Backup er **per modul**, ikke én samlet dump. Hver modul registrerer en `BaseBackupHandler` i `core.backup`-registryet (fra `apps.ready()`). Fire handlere finnes i dag:
 
-| Slug | Innhold |
-|------|---------|
-| `patients` | Pasientdata. Arkivmodellene er eksplisitt ekskludert |
-| `arkiv` | `VaktArkiv` + `ArkivertPasient` — endres sjelden, og skal aldri berøres av en pasient-restore |
+| Slug | Fil | Innhold |
+|------|-----|---------|
+| `patients` | `patients/backup.py` | Pasientdata. Arkivmodellene er eksplisitt ekskludert |
+| `arkiv` | `patients/backup.py` | `VaktArkiv` + `ArkivertPasient` — endres sjelden, og skal aldri berøres av en pasient-restore |
+| `oppdrag` | `oppdrag/backup.py` | Oppdrag, statusmeldinger, enhetsbytter, enheter og lokasjoner |
+| `oppdrag_arkiv` | `oppdrag/backup.py` | `OppdragArkiv` + `ArkivertOppdrag`. Er også **sperren** foran kollaps |
 
-Brukere, MFA-hemmeligheter og audit-spor er bevisst utelatt fra begge.
+Brukere, MFA-hemmeligheter og audit-spor er bevisst utelatt fra alle fire. FK-er ut av
+modulens eget datasett strippes (`strip_fields`): med `natural_foreign` lagres de som
+brukernavn, og er kontoen slettet feiler hele gjenopprettingen — altså akkurat når man
+trenger backupen.
+
+**Scheduleren finner moduler gjennom registeret**, ikke gjennom
+`ModuleBackupConfig`-tabellen: en modul uten konfigrad får en med standardverdier
+første gang scheduleren ser den. Leste den tabellen direkte — slik den gjorde fram til
+fase 7 — var en nyregistrert modul uten backup til noen tilfeldigvis åpnet
+`/portal-admin/backup/`, og for et arkiv betyr manglende backup at kollapsen nekter å
+kjøre, altså en feil som først viser seg to år senere.
+
+En test som kaller `clear_registry()` må rydde opp med
+`core.backup.registrer_alle_moduler()`, ikke med én moduls `register_handlers()`. Gjør den
+det siste, mister resten av testkjøringen de andre modulenes handlere, og feilen dukker
+opp i en helt annen fil.
 
 Logikken ligger i `core/backup/`. `patients/backup_service.py` er en tynn proxy som beholder bakoverkompatibelt API for `db_backup`-kommandoen, `views_patients.py` og eldre tester — nye moduler skal registrere en handler og kalle `core.backup.create_backup(slug=...)` direkte.
 
@@ -195,16 +212,27 @@ Frysing, integritetssjekk og kollaps er modul-agnostisk. Hver modul som arkivere
 | `kollaps(handler, arkiv)` | **Irreversibel.** Frys aggregat, slett rader. Idempotent |
 | `har_backup_etter(handler, tid)` | Sperre før kollaps — slettingen må være gjenopprettbar |
 
-`patients/arkiv.py` er referanseeksempelet. `ArkivSignaturLaastTests` låser signaturene til literale hex-verdier — feiler den etter en refaktorering, er det refaktoreringen som er feil.
+**`AbstractArkiv` (core/arkiv/models.py) bærer feltene**, slik at modul nummer tre slipper
+å skrive dem på nytt: `tittel`, `vakt`/`vakt_navn`, `antall_rader`, `importert_av` med
+frosset navn, `sha256`, `kollapset_at`, `aggregat` og `aggregat_sha256`.
+`OppdragArkiv` arver den. **`VaktArkiv` gjør det ikke, og skal ikke gjøre det:** feltene
+`year_snapshot` og `arrangement_navn` inngår i SHA-payloaden til hvert arkiv i prod, og
+et arkiv som byttet feltnavn ville meldt tukling. Duplikatet er prisen for at
+signaturene fortsatt verifiserer.
+
+Handleren setter `arkiv_model`, og `kollaps_arkiv`-kommandoen finner kandidater gjennom
+registeret — den kjenner ingen modul ved navn, og `--modul <slug>` avgrenser.
+
+To arkiver i dag: `patients/arkiv.py` (referanseeksempelet) og `oppdrag/arkiv.py`.
+`ArkivSignaturLaastTests` i begge moduler låser signaturene til literale hex-verdier —
+feiler de etter en refaktorering, er det refaktoreringen som er feil.
 
 ### Oppdragsmodulen (oppdrag/)
 
-Egen app siden august 2026, **under bygging** — se `docs/BESLUTNING_OPPDRAGSMODULEN.md`.
-Fase 1 (modeller og regler) er levert; ingen brukervendte flater ennå. Modulen er
-registrert i `core/modules.py`, men står med `url=None` og begge `show_*`-flagg av inntil
-sidene finnes. Et modulkort som fører til 404 er en knapp som fører til en vegg.
+Egen app siden august 2026 — se `docs/BESLUTNING_OPPDRAGSMODULEN.md`. Alle sju fasene er
+levert: sentralbord, enhetsskjerm, korreksjoner, offline-kø, statistikkfane og vaktarkiv.
 
-Fire ting det er verdt å kjenne før man rører modulen:
+Fem ting det er verdt å kjenne før man rører modulen:
 
 | Regel | Hvor |
 |---|---|
@@ -212,6 +240,13 @@ Fire ting det er verdt å kjenne før man rører modulen:
 | Enhetens status **utledes**, den lagres ikke | `services.enhet_status()` |
 | Korreksjoner er **nye rader** som peker på den gamle | `Statusmelding.objects.gjeldende()` |
 | `fritekst` logges som endret, men **uten verdier** | `signals.FELT_UTEN_VERDILOGGING` |
+| «Historikk» rydder tavla, **arkivet fryser vakta** | `Oppdrag.historikk_fra` vs. `oppdrag/arkiv.py` |
+
+**Historikk og arkiv er to helt ulike handlinger**, og har derfor hver sin knapp.
+Historikk flytter ett oppdrag ut av den aktive tavla og er fullt reversibel; arkivering
+fryser hele vakta med signatur og starter klokka mot en kollaps som sletter radnivået
+etter 24 måneder. `fritekst` arkiveres **ikke** — feltet er unntatt verdilogging i audit,
+og å fryse det i 24 måneder ville uthult unntaket.
 
 Den er den første modulen som tar `skriv_handling` i bruk: bilen får smale, navngitte
 stemplingsendepunkter, ikke en feltwhitelist inne i en generell `PUT`. Og skillet mellom de
@@ -221,17 +256,29 @@ en konto til en enhet gir ingen tilgang; det er domenedata, som `Forstehjelper.u
 ### Statistikk-modulen (statistikk/)
 
 Egen app siden august 2026. Eier `/statistikk/`-siden og full statistikk
-(`/statistikk/api/full-stats/` og `/statistikk/api/arkiv/<pk>/full-stats/`).
+(`/statistikk/api/kilde/<slug>/full-stats/` og
+`/statistikk/api/kilde/<slug>/arkiv/<pk>/full-stats/`; de gamle én-kilde-stiene
+videresender).
 `/pasienter/api/stats/` ble ikke flyttet — det ble **slettet** (28. aug. 2026). Det matet
 aldri header-chipsene; de regnes ut i `patients-table.js` fra pasientlista. Endepunktet var
 en rest fra Flask-porten uten kjent konsument. `basic_stats()` i `patients.services` står
 igjen: den er live-siden av invarianten `StatsMatcher` måler, at arkivering ikke endrer
 tallene.
 
-**Avhengighetsretningen er statistikk → patients, aldri motsatt.** Tallene beregnes
-fortsatt av `patients.services`; statistikk-appen henter, cacher og viser. Når modul
-nummer to skal levere tall, erstattes den direkte importen av et registry etter samme
-idiom som `core.backup` og `core.arkiv`.
+**Avhengighetsretningen er statistikk → moduler, aldri motsatt.** Modulen som eier
+dataene regner ut tallene; statistikk-appen henter, cacher og viser — og navngir ingen
+kildemodul. Registeret er `core/stats.py`, samme idiom som `core.backup` og `core.arkiv`:
+hver modul melder inn en `BaseStatistikkHandler` fra `apps.ready()`. To kilder i dag,
+`patients/statistikk.py` og `oppdrag/statistikk.py`.
+
+`hent_aktiv_vakt` er den ene importen fra en modul som står igjen, og den handler ikke om
+tall: den er portalens scope, delt av alle moduler, og ble liggende i pasientmodulen fordi
+`AppSetting`-pekeren gjør det. `StatistikkappenNavngirIngenKilde` leser importene med AST
+og håndhever resten.
+
+Ett endepunkt **per kilde**, ikke ett samlet: en fane som ikke er åpnet skal ikke koste
+noe, og cache-nøkkelen bærer både slug og vakt-ID. Delte de nøkkel, ville kilde nummer to
+servert kilde éns tall i 60 sekunder.
 
 Arkiv-endepunktet har **to gates**: statistikkgaten *og* `er_global_admin`. Arkivet er
 strengere beskyttet enn live-statistikken, og hadde det arvet modulens gate ved flyttingen,
@@ -239,8 +286,15 @@ ville alle med `les` på statistikk fått innsyn i arkiverte vakter uten at noen
 
 **Modulen komponerer tilgang, den eier den ikke** (§5). Den viser kun kilder brukeren har
 minst `les` på i kildemodulen — ellers ville aggregatene gitt avledet innsyn i data
-brukeren ikke har tilgang til. I dag er `patients` eneste kilde, så sjekken er én linje;
-med kilde nummer to blir den en løkke over registeret.
+brukeren ikke har tilgang til. Regelen er **«vis det du har tilgang til»**, ikke «alt eller
+ingenting»: med to kilder ville det siste tatt statistikken fra alle som leser pasienter
+uten å ha oppdrag. Ingen lesbare kilder gir 403 på siden — en statistikkside uten tall er
+en side som later som den virker.
+
+**Oppdragstallene utelater varigheter som slutter i en automatisk stempling** (§12.2 i
+oppdragsnotatet). Sluttiden er da avledet, ikke målt. Oppdraget telles i alle antall og
+fordelinger, og både det og negative varigheter rapporteres i `summary['utelatt']` og vises
+på siden.
 
 ### Statistikk-caching (core/stats_cache.py)
 
@@ -285,8 +339,9 @@ Ni moduler i `static/js/` (ingen bundler), fordelt på fire sider — pasientsid
 | `patients-table.js` | pasientsiden, alltid | Tabulator-grid og tavle |
 | `patients-forms.js` | pasientsiden, alltid | Registrerings- og redigeringsskjema |
 | `patients-app.js` | pasientsiden, alltid | Oppstart (`DOMContentLoaded`), faneskift, auto-refresh, lastere for navneregistrene |
-| `patients-admin.js` | pasientsiden, **kun admin** | Registeradmin, sesjonstimeout, nullstilling, vaktarkiv |
-| `statistikk.js` | **kun** `/statistikk/` | All statistikkrendering (Chart.js), arkivmodus |
+| `patients-admin.js` | pasientsiden, **kun admin** | Registeradmin, sesjonstimeout, vaktavslutning/-gjenåpning, vaktarkiv |
+| `statistikk.js` | **kun** `/statistikk/` | Pasientstatistikk (Chart.js), arkivmodus, kildefanene |
+| `statistikk-oppdrag.js` | `/statistikk/`, **kun** med oppdragstilgang | Oppdragsfanen. Kall hit fra `statistikk.js` går gjennom `_kallOppdrag('navn')` |
 | `oppdrag-sentral.js` | `/oppdrag/`, kontoer uten enhet | Sentralbordet: enhetsliste, oppdragsliste, tidslinje, lokasjonsadmin |
 | `oppdrag-enhet.js` | `/oppdrag/`, enhetskontoer | Enhetsskjermen: to knapper mot de navngitte stemplingsendepunktene, og offline-køen i `localStorage`. Serveren sender `neste_overgang` per rad; kjeden følger med som data kun for å projisere neste steg mens noe ligger usendt |
 
@@ -305,7 +360,8 @@ CSRF-sikret fetch-wrapper brukes for alle API-kall. Tabulator for pasientgrid, C
 statistikk — og Chart.js lastes **kun** på `/statistikk/`.
 
 Brukerdata som settes inn med `innerHTML` **skal** escapes — `escHtmlValue()` i tabeller (tallsikker), `escapeHtml()`/`_escHtml()` ellers. Markup koden bygger selv merkes med `trustedHtml()`. `patients/tests_xss_stats.py` håndhever dette,
-og leser både `statistikk.js` og `patients-admin.js` — byggerne ble delt mellom de to.
+og leser `statistikk.js`, `patients-admin.js` og `statistikk-oppdrag.js` — byggerne er
+fordelt på de tre.
 
 JS-oppførsel testes ved å kjøre funksjonene i node, se `patients/js_test_utils.py`. Ikke skriv nye tester som bare grep-er etter kodelinjer i JS-filer.
 

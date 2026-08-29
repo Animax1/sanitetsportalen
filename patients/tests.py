@@ -10,6 +10,7 @@ from datetime import datetime
 
 from django.db import connection
 from django.test import TestCase, Client, SimpleTestCase, override_settings
+from patients.test_helpers import sett_aktiv_vakt
 from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 
@@ -18,7 +19,7 @@ from patients.models import Patient, Forstehjelper, Helsepersonell, AppSetting
 from patients.services import (
     apply_list_filter, stamp_pabegynt_if_needed,
     stamp_obs_times_if_needed, stamp_utskrevet_if_needed,
-    get_active_year, set_active_year,
+    hent_aktiv_vakt, vakt_for_year,
 )
 from accounts.test_helpers import gi_standardtilgang
 
@@ -31,45 +32,46 @@ class FilterTests(TestCase):
     @classmethod
     def setUpTestData(cls):
         cls.year = 2026
+        vakt = vakt_for_year(cls.year)
         cls.p_rod_aktiv = Patient.objects.create(
-            pasientnummer=1, year=cls.year, grovsortering='Rød')
+            pasientnummer=1, vakt=vakt, grovsortering='Rød')
         cls.p_gul_aktiv = Patient.objects.create(
-            pasientnummer=2, year=cls.year, grovsortering='Gul')
+            pasientnummer=2, vakt=vakt, grovsortering='Gul')
         cls.p_gronn_aktiv = Patient.objects.create(
-            pasientnummer=3, year=cls.year, grovsortering='Grønn')
+            pasientnummer=3, vakt=vakt, grovsortering='Grønn')
         cls.p_rod_utskrevet = Patient.objects.create(
-            pasientnummer=4, year=cls.year, grovsortering='Rød',
+            pasientnummer=4, vakt=vakt, grovsortering='Rød',
             utskrevet='01.01.2026 10:00')
         cls.p_gul_utskrevet = Patient.objects.create(
-            pasientnummer=5, year=cls.year, grovsortering='Gul',
+            pasientnummer=5, vakt=vakt, grovsortering='Gul',
             utskrevet='01.01.2026 10:00')
         cls.p_gronn_utskrevet = Patient.objects.create(
-            pasientnummer=6, year=cls.year, grovsortering='Grønn',
+            pasientnummer=6, vakt=vakt, grovsortering='Grønn',
             utskrevet='01.01.2026 10:00')
 
     def test_rod_filter_excludes_utskrevet(self):
         """Rødt-filter skal bare vise aktive (ikke utskrevne) røde pasienter."""
-        qs = apply_list_filter(Patient.objects.all(), 'rod', year=self.year)
+        qs = apply_list_filter(Patient.objects.all(), 'rod', vakt=vakt_for_year(self.year))
         self.assertEqual(list(qs), [self.p_rod_aktiv])
 
     def test_gul_filter_excludes_utskrevet(self):
         """Gult-filter skal bare vise aktive gule pasienter."""
-        qs = apply_list_filter(Patient.objects.all(), 'gul', year=self.year)
+        qs = apply_list_filter(Patient.objects.all(), 'gul', vakt=vakt_for_year(self.year))
         self.assertEqual(list(qs), [self.p_gul_aktiv])
 
     def test_gronn_filter_excludes_utskrevet(self):
         """Grønt-filter skal bare vise aktive grønne pasienter."""
-        qs = apply_list_filter(Patient.objects.all(), 'gronn', year=self.year)
+        qs = apply_list_filter(Patient.objects.all(), 'gronn', vakt=vakt_for_year(self.year))
         self.assertEqual(list(qs), [self.p_gronn_aktiv])
 
     def test_rodgul_filter_excludes_utskrevet(self):
         """Rød+Gul-filter skal bare vise aktive røde og gule pasienter."""
-        qs = apply_list_filter(Patient.objects.all(), 'rodgul', year=self.year)
+        qs = apply_list_filter(Patient.objects.all(), 'rodgul', vakt=vakt_for_year(self.year))
         self.assertCountEqual(list(qs), [self.p_rod_aktiv, self.p_gul_aktiv])
 
     def test_utskrevet_filter(self):
         """Utskrevet-filter skal bare vise utskrevne pasienter."""
-        qs = apply_list_filter(Patient.objects.all(), 'utskrevet', year=self.year)
+        qs = apply_list_filter(Patient.objects.all(), 'utskrevet', vakt=vakt_for_year(self.year))
         self.assertCountEqual(
             list(qs),
             [self.p_rod_utskrevet, self.p_gul_utskrevet, self.p_gronn_utskrevet],
@@ -77,13 +79,13 @@ class FilterTests(TestCase):
 
     def test_alle_filter_returns_all(self):
         """Alle-filter skal returnere alle pasienter for valgt år."""
-        qs = apply_list_filter(Patient.objects.all(), 'alle', year=self.year)
+        qs = apply_list_filter(Patient.objects.all(), 'alle', vakt=vakt_for_year(self.year))
         self.assertEqual(qs.count(), 6)
 
     def test_year_filter(self):
         """Year-parameter skal filtrere på år."""
-        Patient.objects.create(pasientnummer=99, year=2025, grovsortering='Rød')
-        qs = apply_list_filter(Patient.objects.all(), 'rod', year=self.year)
+        Patient.objects.create(pasientnummer=99, vakt=vakt_for_year(2025), grovsortering='Rød')
+        qs = apply_list_filter(Patient.objects.all(), 'rod', vakt=vakt_for_year(self.year))
         # Pasient fra 2025 skal ikke inkluderes
         pns = list(qs.values_list('pasientnummer', flat=True))
         self.assertNotIn(99, pns)
@@ -97,7 +99,7 @@ class PabegyntTests(TestCase):
     def test_behandler_triggers_pabegynt(self):
         """Sett behandler skal utløse påbegynt-stempling."""
         b = Forstehjelper.objects.create(name='Ola')
-        p = Patient(pasientnummer=1, year=2026)
+        p = Patient(pasientnummer=1, vakt=vakt_for_year(2026))
         result = stamp_pabegynt_if_needed(p, {'forstehjelper': b})
         self.assertTrue(result)
         self.assertTrue(p.pabegynt)
@@ -105,33 +107,33 @@ class PabegyntTests(TestCase):
     def test_forstehjelper_id_triggers_pabegynt(self):
         """Sett behandler som ID (integer) skal også utløse stempling."""
         b = Forstehjelper.objects.create(name='Kari')
-        p = Patient(pasientnummer=2, year=2026)
+        p = Patient(pasientnummer=2, vakt=vakt_for_year(2026))
         result = stamp_pabegynt_if_needed(p, {'forstehjelper': b.id})
         self.assertTrue(result)
 
     def test_helsepersonell_ref_triggers_pabegynt(self):
         """helsepersonell_ref-felt skal utløse påbegynt-stempling."""
-        p = Patient(pasientnummer=1, year=2026)
+        p = Patient(pasientnummer=1, vakt=vakt_for_year(2026))
         result = stamp_pabegynt_if_needed(p, {'helsepersonell_ref': 2})
         self.assertTrue(result)
 
     def test_pabegynt_not_overwritten(self):
         """Påbegynt skal ikke overskrives hvis det allerede er satt."""
-        p = Patient(pasientnummer=1, year=2026, pabegynt='15.04.2026 10:00')
+        p = Patient(pasientnummer=1, vakt=vakt_for_year(2026), pabegynt='15.04.2026 10:00')
         result = stamp_pabegynt_if_needed(p, {'helsepersonell_ref': 2})
         self.assertFalse(result)
         self.assertEqual(p.pabegynt, '15.04.2026 10:00')
 
     def test_empty_trigger_does_not_stamp(self):
         """Tom trigger-verdi skal ikke utløse stempling."""
-        p = Patient(pasientnummer=1, year=2026)
+        p = Patient(pasientnummer=1, vakt=vakt_for_year(2026))
         result = stamp_pabegynt_if_needed(p, {'helsepersonell_ref': None})
         self.assertFalse(result)
         self.assertFalse(p.pabegynt)
 
     def test_none_behandler_does_not_stamp(self):
         """None-behandler skal ikke utløse stempling."""
-        p = Patient(pasientnummer=1, year=2026)
+        p = Patient(pasientnummer=1, vakt=vakt_for_year(2026))
         result = stamp_pabegynt_if_needed(p, {'forstehjelper': None})
         self.assertFalse(result)
 
@@ -144,7 +146,7 @@ class ForstehjelperTests(TestCase):
     def test_inactive_behandler_preserves_history(self):
         """Inaktivering av behandler skal ikke bryte pasient-referansen."""
         b = Forstehjelper.objects.create(name='Historisk')
-        p = Patient.objects.create(pasientnummer=1, year=2025, forstehjelper=b)
+        p = Patient.objects.create(pasientnummer=1, vakt=vakt_for_year(2025), forstehjelper=b)
         b.is_active = False
         b.save()
         # Pasienten skal fortsatt ha referansen
@@ -155,7 +157,7 @@ class ForstehjelperTests(TestCase):
         """Behandler knyttet til pasient skal ikke kunne slettes (PROTECT)."""
         from django.db.models.deletion import ProtectedError
         b = Forstehjelper.objects.create(name='Brukes')
-        Patient.objects.create(pasientnummer=1, year=2026, forstehjelper=b)
+        Patient.objects.create(pasientnummer=1, vakt=vakt_for_year(2026), forstehjelper=b)
         with self.assertRaises(ProtectedError):
             b.delete()
 
@@ -177,20 +179,20 @@ class YearArchiveTests(TestCase):
 
     def test_archive_year_sets_inactive(self):
         """Arkivering av et år skal sette is_active=False på alle pasienter det året."""
-        Patient.objects.create(pasientnummer=1, year=2025)
-        Patient.objects.create(pasientnummer=2, year=2025)
-        Patient.objects.create(pasientnummer=3, year=2026)
-        Patient.objects.filter(year=2025).update(is_active=False)
+        Patient.objects.create(pasientnummer=1, vakt=vakt_for_year(2025))
+        Patient.objects.create(pasientnummer=2, vakt=vakt_for_year(2025))
+        Patient.objects.create(pasientnummer=3, vakt=vakt_for_year(2026))
+        Patient.objects.filter(vakt=vakt_for_year(2025)).update(is_active=False)
         self.assertEqual(Patient.objects.filter(is_active=True).count(), 1)
 
     def test_restore_year(self):
         """Gjenoppretting av et år skal sette is_active=True igjen."""
-        Patient.objects.create(pasientnummer=1, year=2025)
-        Patient.objects.create(pasientnummer=2, year=2025)
-        Patient.objects.create(pasientnummer=3, year=2026)
-        Patient.objects.filter(year=2025).update(is_active=False)
+        Patient.objects.create(pasientnummer=1, vakt=vakt_for_year(2025))
+        Patient.objects.create(pasientnummer=2, vakt=vakt_for_year(2025))
+        Patient.objects.create(pasientnummer=3, vakt=vakt_for_year(2026))
+        Patient.objects.filter(vakt=vakt_for_year(2025)).update(is_active=False)
         # Gjenopprett
-        Patient.objects.filter(year=2025).update(is_active=True)
+        Patient.objects.filter(vakt=vakt_for_year(2025)).update(is_active=True)
         self.assertEqual(Patient.objects.filter(is_active=True).count(), 3)
 
 
@@ -273,14 +275,14 @@ class ObsStampTests(TestCase):
 
     def test_obs_plassering_stempler_inn_obspost(self):
         """Plassering til Obs-plass stempler inn_obspost hvis den er tom."""
-        p = Patient(pasientnummer=1, year=2026, plassering='Obs 1')
+        p = Patient(pasientnummer=1, vakt=vakt_for_year(2026), plassering='Obs 1')
         changed = self.stamp(p, '', {})
         self.assertIn('inn_obspost', changed)
         self.assertTrue(p.inn_obspost)
 
     def test_inn_obspost_ikke_overskrevet(self):
         """inn_obspost som allerede er satt skal ikke overskrives."""
-        p = Patient(pasientnummer=1, year=2026, plassering='Obs 1',
+        p = Patient(pasientnummer=1, vakt=vakt_for_year(2026), plassering='Obs 1',
                     inn_obspost='01.01.2026 10:00')
         changed = self.stamp(p, '', {})
         self.assertNotIn('inn_obspost', changed)
@@ -288,7 +290,7 @@ class ObsStampTests(TestCase):
 
     def test_fra_obs_til_annen_stempler_ut_obspost(self):
         """Bytte fra obs-plass til annen plass stempler ut_obspost."""
-        p = Patient(pasientnummer=1, year=2026, plassering='Grønn sone',
+        p = Patient(pasientnummer=1, vakt=vakt_for_year(2026), plassering='Grønn sone',
                     inn_obspost='01.01.2026 10:00')
         changed = self.stamp(p, 'Obs 1', {})
         self.assertIn('ut_obspost', changed)
@@ -296,7 +298,7 @@ class ObsStampTests(TestCase):
 
     def test_ut_obspost_ikke_overskrevet(self):
         """ut_obspost som allerede er satt skal ikke overskrives."""
-        p = Patient(pasientnummer=1, year=2026, plassering='Grønn sone',
+        p = Patient(pasientnummer=1, vakt=vakt_for_year(2026), plassering='Grønn sone',
                     inn_obspost='01.01.2026 10:00',
                     ut_obspost='01.01.2026 11:00')
         changed = self.stamp(p, 'Obs 1', {})
@@ -305,7 +307,7 @@ class ObsStampTests(TestCase):
 
     def test_forblir_obs_stempler_ikke_ut(self):
         """Forblir i obs uten overgang: ut_obspost skal ikke settes."""
-        p = Patient(pasientnummer=1, year=2026, plassering='Obs 2',
+        p = Patient(pasientnummer=1, vakt=vakt_for_year(2026), plassering='Obs 2',
                     inn_obspost='01.01.2026 10:00')
         changed = self.stamp(p, 'Obs 1', {})
         self.assertNotIn('ut_obspost', changed)
@@ -329,14 +331,14 @@ class UtskrevetStampTests(TestCase):
 
     def test_utskrevet_til_stempler_utskrevet(self):
         """Sett utskrevet_til stempler utskrevet-tidspunkt."""
-        p = Patient(pasientnummer=1, year=2026, utskrevet_til='Hjem/park')
+        p = Patient(pasientnummer=1, vakt=vakt_for_year(2026), utskrevet_til='Hjem/park')
         changed = self.stamp(p, {})
         self.assertIn('utskrevet', changed)
         self.assertTrue(p.utskrevet)
 
     def test_utskrevet_ikke_overskrevet(self):
         """utskrevet allerede satt skal ikke overskrives."""
-        p = Patient(pasientnummer=1, year=2026,
+        p = Patient(pasientnummer=1, vakt=vakt_for_year(2026),
                     utskrevet_til='Hjem/park', utskrevet='01.01.2026 12:00')
         changed = self.stamp(p, {})
         self.assertNotIn('utskrevet', changed)
@@ -344,7 +346,7 @@ class UtskrevetStampTests(TestCase):
 
     def test_utskrevet_fra_obs_lukker_ut_obspost(self):
         """Utskrives fra obs-plass: ut_obspost skal stemples."""
-        p = Patient(pasientnummer=1, year=2026, utskrevet_til='Hjem/park',
+        p = Patient(pasientnummer=1, vakt=vakt_for_year(2026), utskrevet_til='Hjem/park',
                     plassering='Obs 3', inn_obspost='01.01.2026 10:00')
         changed = self.stamp(p, {})
         self.assertIn('utskrevet', changed)
@@ -352,7 +354,7 @@ class UtskrevetStampTests(TestCase):
 
     def test_ingen_utskrevet_til_ingen_stempling(self):
         """Tom utskrevet_til skal ikke utløse stempling."""
-        p = Patient(pasientnummer=1, year=2026, utskrevet_til='')
+        p = Patient(pasientnummer=1, vakt=vakt_for_year(2026), utskrevet_til='')
         changed = self.stamp(p, {})
         self.assertEqual(changed, [])
         self.assertFalse(p.utskrevet)
@@ -365,13 +367,13 @@ class LeadViewTests(TestCase):
     """Konto som leser pasienter og leser statistikk — tilgangskontroll i API."""
 
     def setUp(self):
-        set_active_year(2026)
+        sett_aktiv_vakt(2026)
         self.lead_view = CustomUser.objects.create_user(
             username='lv', password='x', role='bruker', must_change_password=False)
         gi_standardtilgang(self.lead_view, 'leder_les')
         self.client = Client()
         self.client.force_login(self.lead_view)
-        Patient.objects.create(pasientnummer=1, year=2026)
+        Patient.objects.create(pasientnummer=1, vakt=vakt_for_year(2026))
 
     def test_leder_les_kan_lese_pasienter(self):
         """Profilen kan hente pasientliste for aktivt år."""
@@ -388,7 +390,7 @@ class LeadViewTests(TestCase):
 
     def test_leder_les_kan_lese_full_stats(self):
         """Profilen har `les` på statistikk, og kan hente full statistikk."""
-        resp = self.client.get('/statistikk/api/full-stats/')
+        resp = self.client.get('/statistikk/api/kilde/patients/full-stats/')
         self.assertIn(resp.status_code, [200, 500])  # 500 OK hvis scipy mangler
 
 
@@ -396,53 +398,147 @@ class LeadViewTests(TestCase):
 
 @override_settings(SECURE_SSL_REDIRECT=False)
 class ResetTests(TestCase):
-    """Tester for reset_active_year_view."""
+    """Tester for avslutt_vakt_view — nullstillingens arvtaker."""
 
     def setUp(self):
-        set_active_year(2026)
+        self.vakt = sett_aktiv_vakt(2026)
         self.admin = CustomUser.objects.create_superuser(
             username='a', password='x', role='admin', must_change_password=False)
         self.lead = CustomUser.objects.create_user(
             username='l', password='x', role='bruker', must_change_password=False)
         gi_standardtilgang(self.lead, 'leder')
-        Patient.objects.create(pasientnummer=1, year=2026)
-        Patient.objects.create(pasientnummer=2, year=2026)
-        Patient.objects.create(pasientnummer=3, year=2025)  # annet år
+        Patient.objects.create(pasientnummer=1, vakt=vakt_for_year(2026))
+        Patient.objects.create(pasientnummer=2, vakt=vakt_for_year(2026))
+        Patient.objects.create(pasientnummer=3, vakt=vakt_for_year(2025))  # annen vakt
 
     def _client(self, user):
         c = Client()
         c.force_login(user)
         return c
 
-    def test_reset_krever_confirm(self):
-        """Reset uten confirm=true skal gi 400."""
+    def _avslutt(self, client, **kropp):
         import json as _j
+        return client.post('/pasienter/api/avslutt-vakt/',
+                           data=_j.dumps(kropp),
+                           content_type='application/json')
+
+    def test_reset_krever_confirm(self):
+        """Avslutning uten confirm=true skal gi 400."""
         c = self._client(self.admin)
-        resp = c.post('/pasienter/api/reset-active-year/',
-                      data=_j.dumps({}),
-                      content_type='application/json')
+        resp = self._avslutt(c, ny_vakt_navn='Vinterfestivalen')
         self.assertEqual(resp.status_code, 400)
 
-    def test_reset_sletter_kun_aktivt_aar(self):
-        """Reset sletter kun pasienter i aktivt år."""
-        import json as _j
+    def test_avslutning_krever_navn_paa_ny_vakt(self):
+        """Navnet settes ved vaktstart — uten navn, ingen ny vakt."""
         c = self._client(self.admin)
-        resp = c.post('/pasienter/api/reset-active-year/',
-                      data=_j.dumps({'confirm': True}),
-                      content_type='application/json')
+        resp = self._avslutt(c, confirm=True)
+        self.assertEqual(resp.status_code, 400)
+        resp = self._avslutt(c, confirm=True, ny_vakt_navn='   ')
+        self.assertEqual(resp.status_code, 400)
+
+    def test_navnet_maa_vaere_unikt(self):
+        """To vakter med samme navn lar seg ikke skille i statistikken."""
+        c = self._client(self.admin)
+        resp = self._avslutt(c, confirm=True, ny_vakt_navn=self.vakt.navn)
+        self.assertEqual(resp.status_code, 400)
+        # Ingenting slettet av det avviste forsøket
+        self.assertEqual(Patient.objects.filter(vakt=self.vakt).count(), 2)
+
+    def test_reset_sletter_kun_aktivt_aar(self):
+        """Avslutning sletter kun den aktive vaktas pasienter."""
+        c = self._client(self.admin)
+        resp = self._avslutt(c, confirm=True, ny_vakt_navn='Vinterfestivalen')
         self.assertEqual(resp.status_code, 200)
-        # 2026-pasienter slettet, 2025 intakt
-        self.assertEqual(Patient.objects.filter(year=2026).count(), 0)
-        self.assertEqual(Patient.objects.filter(year=2025).count(), 1)
+        # Aktiv vakts pasienter slettet, den andre vaktas intakt
+        self.assertEqual(Patient.objects.filter(vakt=self.vakt).count(), 0)
+        self.assertEqual(Patient.objects.filter(vakt=vakt_for_year(2025)).count(), 1)
+        # Pekeren flyttet til en ny, aktiv vakt med det oppgitte navnet
+        ny = hent_aktiv_vakt()
+        self.assertNotEqual(ny.pk, self.vakt.pk)
+        self.assertEqual(ny.navn, 'Vinterfestivalen')
+        self.vakt.refresh_from_db()
+        self.assertFalse(self.vakt.er_aktiv)
+        self.assertIsNotNone(self.vakt.avsluttet)
 
     def test_lead_kan_ikke_resette(self):
-        """lead kan ikke kalle reset-endepunktet."""
-        import json as _j
+        """lead kan ikke avslutte vakta."""
         c = self._client(self.lead)
-        resp = c.post('/pasienter/api/reset-active-year/',
-                      data=_j.dumps({'confirm': True}),
-                      content_type='application/json')
+        resp = self._avslutt(c, confirm=True, ny_vakt_navn='Vinterfestivalen')
         self.assertEqual(resp.status_code, 403)
+
+
+@override_settings(SECURE_SSL_REDIRECT=False)
+class GjenaapneVaktTests(TestCase):
+    """Gjenåpning av avsluttet vakt (§7.2) — og døra som er låst av kollaps."""
+
+    def setUp(self):
+        self.gammel = vakt_for_year(2025)
+        self.gammel.er_aktiv = False
+        self.gammel.save(update_fields=['er_aktiv'])
+        self.aktiv = sett_aktiv_vakt(2026)
+        self.admin = CustomUser.objects.create_superuser(
+            username='ga', password='x', role='admin', must_change_password=False)
+        self.lead = CustomUser.objects.create_user(
+            username='gl', password='x', role='bruker', must_change_password=False)
+        gi_standardtilgang(self.lead, 'leder')
+        self.c = Client()
+        self.c.force_login(self.admin)
+
+    def _gjenaapne(self, vakt_id, client=None):
+        import json as _j
+        return (client or self.c).post(
+            '/pasienter/api/gjenaapne-vakt/',
+            data=_j.dumps({'vakt_id': vakt_id}),
+            content_type='application/json')
+
+    def test_gjenaapning_bytter_aktiv_vakt(self):
+        resp = self._gjenaapne(self.gammel.pk)
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(hent_aktiv_vakt().pk, self.gammel.pk)
+        self.gammel.refresh_from_db()
+        self.aktiv.refresh_from_db()
+        self.assertTrue(self.gammel.er_aktiv)
+        self.assertIsNone(self.gammel.avsluttet)
+        self.assertFalse(self.aktiv.er_aktiv)
+
+    def test_gjenaapning_henter_ikke_pasienter_tilbake(self):
+        """Radene ligger i pre-reset-backupen — gjenåpning rører dem ikke."""
+        self._gjenaapne(self.gammel.pk)
+        self.assertEqual(Patient.objects.filter(vakt=self.gammel).count(), 0)
+
+    def test_kollapset_arkiv_laaser_doera(self):
+        """Uten radnivå ville en «aktiv» vakt løyet — serveren avviser."""
+        from django.utils import timezone as djtz
+
+        from patients.models import VaktArkiv
+        VaktArkiv.objects.create(
+            tittel='LS25', arrangement_navn='LS25', importert_av_navn='a',
+            antall_pasienter=0, year_snapshot=2025, sha256='x',
+            vakt=self.gammel, kollapset_at=djtz.now())
+        resp = self._gjenaapne(self.gammel.pk)
+        self.assertEqual(resp.status_code, 400)
+        self.assertEqual(hent_aktiv_vakt().pk, self.aktiv.pk)
+
+    def test_ukjent_vakt_gir_400(self):
+        self.assertEqual(self._gjenaapne(99999).status_code, 400)
+
+    def test_lead_kan_ikke_gjenaapne(self):
+        c = Client()
+        c.force_login(self.lead)
+        self.assertEqual(self._gjenaapne(self.gammel.pk, client=c).status_code, 403)
+
+    def test_vaktlista_er_kun_for_admin(self):
+        c = Client()
+        c.force_login(self.lead)
+        self.assertEqual(c.get('/pasienter/api/vakter/').status_code, 403)
+
+    def test_vaktlista_viser_kollaps_og_aktiv(self):
+        resp = self.c.get('/pasienter/api/vakter/')
+        self.assertEqual(resp.status_code, 200)
+        vakter = {v['id']: v for v in resp.json()['vakter']}
+        self.assertTrue(vakter[self.aktiv.pk]['er_aktiv'])
+        self.assertFalse(vakter[self.gammel.pk]['er_aktiv'])
+        self.assertFalse(vakter[self.gammel.pk]['kollapset'])
 
 
 # ── ETag-tester for /api/behandlere/ ──────────────────────────────────────────
@@ -811,7 +907,7 @@ class PlasseringUniqueTests(TestCase):
         skal backend lagre den uendret."""
         # Lag pasient direkte i DB med en 'rar' plassering (f.eks. fra CSV-import)
         p = Patient.objects.create(
-            pasientnummer=1, year=2026,
+            pasientnummer=1, vakt=vakt_for_year(2026),
             plassering='Akutt 4',  # ikke i hardkodet dropdown
             problemstilling='Kramper',
         )
@@ -889,14 +985,14 @@ class HelsepersonellTests(TestCase):
         """Helsepersonell brukt av pasient kan ikke slettes (PROTECT)."""
         from django.db.models.deletion import ProtectedError
         h = Helsepersonell.objects.create(name='Bruk')
-        Patient.objects.create(pasientnummer=1, year=2026, helsepersonell_ref=h)
+        Patient.objects.create(pasientnummer=1, vakt=vakt_for_year(2026), helsepersonell_ref=h)
         with self.assertRaises(ProtectedError):
             h.delete()
 
     def test_inactive_helsepersonell_preserves_history(self):
         """Deaktivering bryter ikke pasient-FK."""
         h = Helsepersonell.objects.create(name='Historisk')
-        p = Patient.objects.create(pasientnummer=1, year=2025, helsepersonell_ref=h)
+        p = Patient.objects.create(pasientnummer=1, vakt=vakt_for_year(2025), helsepersonell_ref=h)
         h.is_active = False
         h.save()
         p.refresh_from_db()
@@ -905,7 +1001,7 @@ class HelsepersonellTests(TestCase):
     def test_pabegynt_triggered_by_helsepersonell_ref(self):
         """stamp_pabegynt_if_needed skal sette påbegynt når helsepersonell_ref settes."""
         h = Helsepersonell.objects.create(name='Kari')
-        p = Patient(pasientnummer=1, year=2026)
+        p = Patient(pasientnummer=1, vakt=vakt_for_year(2026))
         result = stamp_pabegynt_if_needed(p, {'helsepersonell_ref': h.id})
         self.assertTrue(result)
         self.assertTrue(p.pabegynt)
@@ -933,7 +1029,7 @@ class HelsepersonellTests(TestCase):
     def test_patient_put_clears_helsepersonell_ref(self):
         """PUT med helsepersonell_ref=null skal nullstille FK."""
         h = Helsepersonell.objects.create(name='Kari')
-        p = Patient.objects.create(pasientnummer=1, year=2026, helsepersonell_ref=h,
+        p = Patient.objects.create(pasientnummer=1, vakt=vakt_for_year(2026), helsepersonell_ref=h,
                                     inntid='19.04.2026 14:00')
         import json
         res = self.client.put(
@@ -1262,10 +1358,10 @@ class PatientNumberGapTests(TestCase):
         )
         gi_standardtilgang(self.user, 'admin')
         self.client.login(username='testbruker', password='Test1234!')
-        set_active_year(2026)
+        sett_aktiv_vakt(2026)
         # Eksisterende pasient på unik plassering "Behandling 1"
         self.existing = Patient.objects.create(
-            pasientnummer=1, year=2026, plassering='Behandling 1',
+            pasientnummer=1, vakt=vakt_for_year(2026), plassering='Behandling 1',
             grovsortering='Rød',
         )
         # Synkroniser AppSetting-telleren med den manuelle pasienten over.
@@ -1319,14 +1415,14 @@ class PabegyntNotBeforeInntidTests(TestCase):
         )
         gi_standardtilgang(self.user, 'admin')
         self.client.login(username='testbruker', password='Test1234!')
-        set_active_year(2026)
+        sett_aktiv_vakt(2026)
         self.forstehjelper = Forstehjelper.objects.create(name='Lege Hansen')
 
     def test_helper_adjusts_pabegynt_when_before_inntid(self):
         """_ensure_pabegynt_not_before_inntid skal sette pabegynt = inntid."""
         from patients.views_common import _ensure_pabegynt_not_before_inntid
         p = Patient(
-            pasientnummer=99, year=2026,
+            pasientnummer=99, vakt=vakt_for_year(2026),
             inntid='01.05.2026 17:32',
             pabegynt='01.05.2026 17:29',  # 3 min før inntid (klokkedrift)
         )
@@ -1338,7 +1434,7 @@ class PabegyntNotBeforeInntidTests(TestCase):
         """Hvis pabegynt > inntid, skal verdien beholdes."""
         from patients.views_common import _ensure_pabegynt_not_before_inntid
         p = Patient(
-            pasientnummer=99, year=2026,
+            pasientnummer=99, vakt=vakt_for_year(2026),
             inntid='01.05.2026 17:00',
             pabegynt='01.05.2026 17:15',
         )
@@ -1349,8 +1445,8 @@ class PabegyntNotBeforeInntidTests(TestCase):
     def test_helper_handles_blank_fields(self):
         """Hvis et av feltene er tomt, skal helperen ikke gjøre noe."""
         from patients.views_common import _ensure_pabegynt_not_before_inntid
-        p1 = Patient(pasientnummer=99, year=2026, inntid='', pabegynt='01.05.2026 17:00')
-        p2 = Patient(pasientnummer=99, year=2026, inntid='01.05.2026 17:00', pabegynt='')
+        p1 = Patient(pasientnummer=99, vakt=vakt_for_year(2026), inntid='', pabegynt='01.05.2026 17:00')
+        p2 = Patient(pasientnummer=99, vakt=vakt_for_year(2026), inntid='01.05.2026 17:00', pabegynt='')
         self.assertFalse(_ensure_pabegynt_not_before_inntid(p1))
         self.assertFalse(_ensure_pabegynt_not_before_inntid(p2))
 
@@ -1358,7 +1454,7 @@ class PabegyntNotBeforeInntidTests(TestCase):
         """Ugyldig format skal ikke kaste exception."""
         from patients.views_common import _ensure_pabegynt_not_before_inntid
         p = Patient(
-            pasientnummer=99, year=2026,
+            pasientnummer=99, vakt=vakt_for_year(2026),
             inntid='ikke-en-dato',
             pabegynt='01.05.2026 17:00',
         )
@@ -1407,7 +1503,7 @@ class BlankInntidFallbackTests(TestCase):
         )
         gi_standardtilgang(self.user, 'admin')
         self.client.login(username='testbruker', password='Test1234!')
-        set_active_year(2026)
+        sett_aktiv_vakt(2026)
 
     def test_blank_inntid_uses_server_now(self):
         """Tom inntid-streng skal erstattes av server-now-stempel."""
@@ -1494,22 +1590,21 @@ class SettingsWhitelistTests(TestCase):
             self.assertNotIn(key, data, f'{key} lekker via GET /api/settings/')
 
     def test_event_name_er_med(self):
-        """Det frontend faktisk leser må fortsatt komme ut."""
-        AppSetting.set('event_name', 'Festivalen 2026')
+        """Det frontend faktisk leser må fortsatt komme ut.
+
+        Etter deploy 2 er `event_name` i responsen vaktas navn — nøkkelen i
+        `AppSetting` er slettet, men JS-kontrakten består.
+        """
+        vakt = hent_aktiv_vakt()
+        vakt.navn = 'Festivalen 2026'
+        vakt.save(update_fields=['navn'])
         self.assertEqual(self._get().get('event_name'), 'Festivalen 2026')
 
     def test_active_year_er_med(self):
-        """Aktivt år styrer hvilke pasienter klienten viser.
-
-        `get_active_year()` oppretter raden første gang den kalles, så den må
-        kalles eksplisitt her. Endepunktet oppretter den ikke selv — det leser
-        bare `AppSetting`.
-        """
-        from patients.services import get_active_year
-        aar = get_active_year()
-
+        """`active_year` i responsen er vaktas år — samme JS-kontrakt som før
+        deploy 2, ny kilde."""
         data = self._get()
-        self.assertEqual(data.get('active_year'), str(aar))
+        self.assertEqual(data.get('active_year'), str(hent_aktiv_vakt().year))
 
     def test_put_finnes_ikke_lenger(self):
         """Skrivingen flyttet til /portal-admin/innstillinger/ (§4.1).
@@ -1528,14 +1623,14 @@ class SettingsWhitelistTests(TestCase):
         gi_standardtilgang(skriver, 'skriver')
         self.client.force_login(skriver)
 
-        foer = AppSetting.get('event_name', None)
+        foer = hent_aktiv_vakt().navn
         resp = self.client.put(
             '/pasienter/api/settings/',
             data=json.dumps({'event_name': 'Nytt navn'}),
             content_type='application/json',
         )
         self.assertEqual(resp.status_code, 405)
-        self.assertEqual(AppSetting.get('event_name', None), foer)
+        self.assertEqual(hent_aktiv_vakt().navn, foer)
 
 class HeaderArrangementNavnTests(TestCase):
     """Headeren skal vise riktig arrangementsnavn med én gang.
@@ -1554,24 +1649,29 @@ class HeaderArrangementNavnTests(TestCase):
         gi_standardtilgang(self.bruker, 'skriver')
         self.client.login(username='vaktbruker', password='testpass123')
 
+    def _sett_vaktnavn(self, navn):
+        """Navnet bor på vakta etter deploy 2 — `event_name`-nøkkelen er borte."""
+        vakt = hent_aktiv_vakt()
+        vakt.navn = navn
+        vakt.save(update_fields=['navn'])
+
     def test_arrangementsnavn_rendres_server_side(self):
-        AppSetting.set('event_name', 'Festivalen 2026')
+        self._sett_vaktnavn('Festivalen 2026')
         resp = self.client.get('/pasienter/')
         self.assertEqual(resp.status_code, 200)
         self.assertContains(resp, 'Festivalen 2026')
 
     def test_ingen_hardkodet_plassholder_i_templaten(self):
-        """Uten arrangementsnavn skal feltene være tomme, ikke vise et gammelt navn.
+        """Headeren viser vaktas navn, aldri et hardkodet gammelt navn.
 
-        Dette er selve regresjonsvernet. Et hardkodet navn sto to steder:
-        i headeren og i innstillingsfeltet. Det siste var verst — sto feltet
-        med `LS26` mens `event_name` var tomt, ville et lagre skrevet
-        plassholderen inn som arrangementsnavn.
+        Dette er selve regresjonsvernet: `LS26` sto en gang hardkodet i
+        templaten. Etter deploy 2 finnes det alltid en vakt med navn, så
+        testen sjekker at det er *det* navnet som vises.
         """
-        AppSetting.objects.filter(key='event_name').delete()
         resp = self.client.get('/pasienter/')
         self.assertEqual(resp.status_code, 200)
         self.assertNotContains(resp, 'LS26')
+        self.assertContains(resp, hent_aktiv_vakt().navn)
 
     def test_ingen_uparsede_template_kommentarer_lekker_ut(self):
         """En flerlinjes `{# #}` rendres som synlig tekst i Django.
@@ -1607,18 +1707,18 @@ class HeaderArrangementNavnTests(TestCase):
         self.assertContains(c.get('/pasienter/'), '/portal-admin/innstillinger/')
 
     def test_navnet_escapes_i_templaten(self):
-        """Arrangementsnavnet er fritekst fra innstillingene."""
-        AppSetting.set('event_name', '<script>alert(1)</script>')
+        """Vaktnavnet er fritekst fra vaktstart-skjemaet."""
+        self._sett_vaktnavn('<script>alert(1)</script>')
         resp = self.client.get('/pasienter/')
         self.assertNotContains(resp, '<script>alert(1)</script>')
         self.assertContains(resp, '&lt;script&gt;')
 
     def test_endret_navn_slaar_gjennom_ved_ny_lasting(self):
         """Server-renderingen skal lese verdien på nytt, ikke cache den."""
-        AppSetting.set('event_name', 'Gammelt navn')
+        self._sett_vaktnavn('Gammelt navn')
         self.assertContains(self.client.get('/pasienter/'), 'Gammelt navn')
 
-        AppSetting.set('event_name', 'Nytt navn')
+        self._sett_vaktnavn('Nytt navn')
         resp = self.client.get('/pasienter/')
         self.assertContains(resp, 'Nytt navn')
         self.assertNotContains(resp, 'Gammelt navn')
@@ -1674,7 +1774,7 @@ class NavneregisterFeilmeldingTests(TestCase):
         """PROTECT-stien — bestemt form av etiketten."""
         beh = Forstehjelper.objects.create(name='I bruk')
         hp = Helsepersonell.objects.create(name='Også i bruk')
-        Patient.objects.create(pasientnummer=1, year=2026,
+        Patient.objects.create(pasientnummer=1, vakt=vakt_for_year(2026),
                                forstehjelper=beh, helsepersonell_ref=hp)
 
         resp = self.client.delete(f'/pasienter/api/forstehjelpere/{beh.pk}/')
@@ -2010,6 +2110,89 @@ class JsModulLastingTests(TestCase):
                 self.assertIn(f'function {navn}(', app)
                 self.assertNotIn(f'function {navn}(', admin)
 
+    # ── Oppdragsfanen på statistikksiden (fase 6) ───────────────────────
+    #
+    # Samme mønster som patients-admin.js: fila lastes betinget, og alt som
+    # kaller inn i den fra alltid-lastet kode må gå gjennom en sjekk. Uten
+    # den ville et faneklikk gitt ReferenceError for kontoer uten
+    # oppdragstilgang — riktignok har de ingen fane å klikke på, men vernet
+    # skal ligge i koden, ikke i at markupen tilfeldigvis mangler.
+
+    def _statistikk_html(self, tilganger):
+        from accounts.models import ModulTilgang
+        bruker = CustomUser.objects.create_user(
+            username='js_' + '_'.join(s for s, _ in tilganger),
+            password='x', role='bruker', must_change_password=False)
+        for slug, nivaa in tilganger:
+            ModulTilgang.objects.create(
+                bruker=bruker, modul_slug=slug, nivaa=nivaa)
+        self.client.force_login(bruker)
+        resp = self.client.get('/statistikk/')
+        self.assertEqual(resp.status_code, 200)
+        return resp.content.decode('utf-8')
+
+    def test_oppdragsfila_lastes_kun_med_oppdragstilgang(self):
+        html = self._statistikk_html(
+            [('statistikk', 'les'), ('patients', 'les'), ('oppdrag', 'les')])
+        self.assertRegex(html, self._monster('statistikk-oppdrag'))
+
+    def test_oppdragsfila_lastes_ikke_uten_oppdragstilgang(self):
+        html = self._statistikk_html([('statistikk', 'les'), ('patients', 'les')])
+        self.assertNotRegex(html, self._monster('statistikk-oppdrag'))
+        # Vern mot at testen består fordi siden er tom for alle.
+        self.assertRegex(html, self._monster('statistikk'))
+
+    def test_statistikk_js_kaller_ikke_oppdragsfila_direkte(self):
+        """Kall fra alltid-lastet kode må gå gjennom `_kallOppdrag()`."""
+        from patients import js_test_utils as jsu
+
+        oppdragsnavn = set(re.findall(
+            r'^(?:async )?function (\w+)',
+            jsu.read_js(jsu.STATISTIKK_OPPDRAG_JS), re.M))
+        self.assertIn('loadOppdragStats', oppdragsnavn, 'testen leser feil fil')
+
+        kilde = '\n'.join(
+            l for l in jsu.read_js(jsu.STATISTIKK_JS).splitlines()
+            if not l.lstrip().startswith('//'))
+        kilde = re.sub(r"_kallOppdrag\(\s*'[^']+'", '_kallOppdrag(', kilde)
+
+        funn = [navn for navn in sorted(oppdragsnavn)
+                if re.search(r'\b' + re.escape(navn) + r'\s*\(', kilde)]
+        self.assertEqual(funn, [], (
+            'statistikk.js kaller funksjoner som bor i statistikk-oppdrag.js:\n  '
+            + '\n  '.join(funn)
+            + '\n\nDen fila lastes kun for kontoer med oppdragstilgang. Kall '
+              'den via _kallOppdrag().'
+        ))
+
+    def test_oppdragsfila_bruker_bare_det_siden_laster(self):
+        """statistikk-oppdrag.js har samme begrensning som statistikk.js.
+
+        patients-utils.js lastes ikke på /statistikk/ og kan ikke lastes —
+        den gjør arbeid på toppnivå som kaster uten pasientskjemaene.
+        """
+        from patients import js_test_utils as jsu
+
+        def definerte(sti):
+            kilde = jsu.read_js(sti)
+            return (set(re.findall(r'^(?:async )?function (\w+)', kilde, re.M))
+                    | set(re.findall(r'^(?:let|const|var) (\w+)', kilde, re.M)))
+
+        tilgjengelig = (definerte(jsu.PORTAL_UTILS_JS)
+                        | definerte(jsu.STATISTIKK_JS)
+                        | definerte(jsu.STATISTIKK_OPPDRAG_JS))
+        kun_i_patients = definerte(jsu.UTILS_JS) - tilgjengelig
+
+        kilde = jsu.read_js(jsu.STATISTIKK_OPPDRAG_JS)
+        funn = [navn for navn in sorted(kun_i_patients)
+                if re.search(r'\b' + re.escape(navn) + r'\s*\(', kilde)]
+        self.assertEqual(funn, [], (
+            'statistikk-oppdrag.js kaller funksjoner som kun finnes i '
+            'patients-utils.js:\n  ' + '\n  '.join(funn)
+            + '\n\nDen fila lastes ikke på /statistikk/. Flytt helperen til '
+              'portal-utils.js.'
+        ))
+
 
 class InlineHandlerTests(SimpleTestCase):
     """Ingen inline event-handlere i markup (F5).
@@ -2102,7 +2285,7 @@ class PasientlisteYtelseTests(TestCase):
     def _lag_pasienter(self, antall):
         for i in range(1, antall + 1):
             Patient.objects.create(
-                pasientnummer=i, year=2026, grovsortering='Grønn',
+                pasientnummer=i, vakt=vakt_for_year(2026), grovsortering='Grønn',
                 forstehjelper=Forstehjelper.objects.create(name=f'F{i}'),
                 helsepersonell_ref=Helsepersonell.objects.create(name=f'H{i}'),
             )

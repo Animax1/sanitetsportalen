@@ -270,13 +270,20 @@
     <div class="settings-card danger-zone">
       <h6 class="text-danger"><i class="bi bi-trash me-2"></i>Nullstill aktiv vakt</h6>
       <p class="small">
-        Sletter permanent alle pasienter i aktiv vakt. Brukes kun for å tømme testdata.
-        <strong>Denne handlingen kan ikke angres.</strong>
+        Avslutter vakta, sletter pasientene dens permanent, og starter en ny.
+        Det tas en backup automatisk først.
+        <strong>Pasientslettingen kan ikke angres uten backupen.</strong>
       </p>
-      <div id="reset-year-label" class="small text-muted mb-2">Aktiv vakt: laster...</div>
+      <div class="small text-muted mb-2">Aktiv vakt: {{ event_name }}</div>
       <button class="btn btn-danger btn-sm" data-bs-toggle="modal" data-bs-target="#resetModal">
-        <i class="bi bi-trash me-1"></i>Nullstill aktiv vakt
+        <i class="bi bi-stop-circle me-1"></i>Avslutt vakt
       </button>
+      <div class="mt-2">
+        <button class="btn btn-outline-secondary btn-sm" data-action="visVakter">
+          <i class="bi bi-clock-history me-1"></i>Tidligere vakter
+        </button>
+      </div>
+      <div id="vaktliste" class="small mt-2"></div>
     </div>
 
     <div class="settings-card">
@@ -305,17 +312,25 @@
   <div class="modal-dialog">
     <div class="modal-content">
       <div class="modal-header" style="background:#7f1d1d;color:#fff;padding:0.65rem 1rem">
-        <h5 class="modal-title fw-bold"><i class="bi bi-trash me-2"></i>Bekreft nullstilling</h5>
+        <h5 class="modal-title fw-bold"><i class="bi bi-stop-circle me-2"></i>Avslutt vakt</h5>
         <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
       </div>
       <div class="modal-body">
-        <p>Er du sikker på at du vil nullstille <strong>aktiv vakt</strong>?</p>
-        <p class="text-danger small"><strong>Denne handlingen kan ikke angres.</strong></p>
-        <div id="reset-modal-year" class="fw-bold mb-2"></div>
+        <p>Avslutte vakta <strong>«{{ event_name }}»</strong>? Alle pasientene
+        dens slettes permanent — de finnes etterpå kun i backupen som tas nå,
+        og i et eventuelt vaktarkiv.</p>
+        <div class="mb-2">
+          <label class="form-label" for="avslutt-nytt-navn">Navnet på den nye vakta</label>
+          <input type="text" id="avslutt-nytt-navn" class="form-control"
+                 placeholder="F.eks. «Landsskytterstevnet 2026»">
+          <div class="form-text">Settes ved vaktstart. Må være unikt.</div>
+        </div>
+        <div id="avslutt-feil" class="text-danger small d-none"></div>
       </div>
       <div class="modal-footer">
         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Avbryt</button>
-        <button type="button" class="btn btn-danger" data-action="doResetActiveYear">Nullstill aktiv vakt</button>
+        <button type="button" class="btn btn-danger" id="avslutt-vakt-knapp"
+                data-action="doAvsluttVakt">Avslutt vakt og start ny</button>
       </div>
     </div>
   </div>

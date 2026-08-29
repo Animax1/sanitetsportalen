@@ -12,6 +12,8 @@ import json
 from datetime import timedelta
 
 from django.test import Client, TestCase, override_settings
+
+from patients.services import vakt_for_year
 from django.utils import timezone
 
 from accounts.models import CustomUser, ModulTilgang
@@ -30,7 +32,7 @@ def _bruker(navn, nivaa='skriv_full', rolle='bruker'):
 
 def _pasient(nr, oppretter, *, alder=timedelta(0)):
     """Pasient med en CREATE-rad i auditloggen, slik viewet lager den."""
-    p = Patient.objects.create(pasientnummer=nr, year=2026)
+    p = Patient.objects.create(pasientnummer=nr, vakt=vakt_for_year(2026))
     AuditLog.objects.filter(table_name='patients_patient', record_id=p.pk).delete()
     rad = AuditLog.objects.create(
         table_name='patients_patient', record_id=p.pk, action='CREATE',
@@ -71,13 +73,13 @@ class KanSletteSelvTests(TestCase):
         importerte rader. «Vet ikke hvem som opprettet den» skal ikke bety
         «hvem som helst».
         """
-        p = Patient.objects.create(pasientnummer=5, year=2026)
+        p = Patient.objects.create(pasientnummer=5, vakt=vakt_for_year(2026))
         AuditLog.objects.filter(table_name='patients_patient', record_id=p.pk).delete()
         self.assertFalse(kan_slette_selv(self.bruker, p))
 
     def test_create_rad_uten_bruker_nektes(self):
         """Importerte rader har CREATE-rad, men ingen `user`."""
-        p = Patient.objects.create(pasientnummer=6, year=2026)
+        p = Patient.objects.create(pasientnummer=6, vakt=vakt_for_year(2026))
         AuditLog.objects.filter(table_name='patients_patient', record_id=p.pk).delete()
         AuditLog.objects.create(
             table_name='patients_patient', record_id=p.pk, action='CREATE',

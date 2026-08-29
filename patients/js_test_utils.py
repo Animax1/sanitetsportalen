@@ -30,6 +30,7 @@ FORMS_JS = JS_DIR / 'patients-forms.js'
 APP_JS = JS_DIR / 'patients-app.js'
 ADMIN_JS = JS_DIR / 'patients-admin.js'
 STATISTIKK_JS = JS_DIR / 'statistikk.js'
+STATISTIKK_OPPDRAG_JS = JS_DIR / 'statistikk-oppdrag.js'
 OPPDRAG_SENTRAL_JS = JS_DIR / 'oppdrag-sentral.js'
 OPPDRAG_ENHET_JS = JS_DIR / 'oppdrag-enhet.js'
 

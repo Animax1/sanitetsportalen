@@ -18,6 +18,7 @@ from django.urls import reverse
 from accounts.models import CustomUser
 from core.models import Notification
 from patients.models import Patient, Forstehjelper, Helsepersonell
+from patients.services import vakt_for_year
 from accounts.test_helpers import gi_standardtilgang
 
 
@@ -45,13 +46,13 @@ class MineFilterTests(TestCase):
 
         # Pasienter
         self.p_kari = Patient.objects.create(
-            pasientnummer=1, year=2026, forstehjelper=self.beh_kari,
+            pasientnummer=1, vakt=vakt_for_year(2026), forstehjelper=self.beh_kari,
         )
         self.p_ola = Patient.objects.create(
-            pasientnummer=2, year=2026, helsepersonell_ref=self.hp_ola,
+            pasientnummer=2, vakt=vakt_for_year(2026), helsepersonell_ref=self.hp_ola,
         )
         self.p_andre = Patient.objects.create(
-            pasientnummer=3, year=2026, forstehjelper=self.beh_andre,
+            pasientnummer=3, vakt=vakt_for_year(2026), forstehjelper=self.beh_andre,
         )
         self.url = '/pasienter/api/patients/'
 
@@ -106,24 +107,24 @@ class AssignmentNotificationSignalTests(TestCase):
         self.hp_kari = Helsepersonell.objects.create(name='HP-Kari', user=self.kari)
 
     def test_assignment_on_create_notifies_user(self):
-        Patient.objects.create(pasientnummer=10, year=2026, forstehjelper=self.beh_kari)
+        Patient.objects.create(pasientnummer=10, vakt=vakt_for_year(2026), forstehjelper=self.beh_kari)
         self.assertEqual(
             Notification.objects.filter(user=self.kari, kind='patient_assigned').count(),
             1,
         )
 
     def test_assignment_to_behandler_without_user_does_not_notify(self):
-        Patient.objects.create(pasientnummer=11, year=2026, forstehjelper=self.beh_uten_bruker)
+        Patient.objects.create(pasientnummer=11, vakt=vakt_for_year(2026), forstehjelper=self.beh_uten_bruker)
         self.assertEqual(Notification.objects.count(), 0)
 
     def test_helsepersonell_assignment_notifies(self):
-        Patient.objects.create(pasientnummer=12, year=2026, helsepersonell_ref=self.hp_kari)
+        Patient.objects.create(pasientnummer=12, vakt=vakt_for_year(2026), helsepersonell_ref=self.hp_kari)
         notifs = Notification.objects.filter(user=self.kari)
         self.assertEqual(notifs.count(), 1)
         self.assertIn('oppfølgingsansvarlig', notifs.first().message)
 
     def test_transfer_notifies_both_old_and_new(self):
-        p = Patient.objects.create(pasientnummer=13, year=2026, forstehjelper=self.beh_kari)
+        p = Patient.objects.create(pasientnummer=13, vakt=vakt_for_year(2026), forstehjelper=self.beh_kari)
         # Tøm initial assignment-varsel for å isolere transfer
         Notification.objects.all().delete()
         # Flytt fra Kari til Ola
@@ -143,7 +144,7 @@ class AssignmentNotificationSignalTests(TestCase):
         )
 
     def test_no_notification_if_assignment_unchanged(self):
-        p = Patient.objects.create(pasientnummer=14, year=2026, forstehjelper=self.beh_kari)
+        p = Patient.objects.create(pasientnummer=14, vakt=vakt_for_year(2026), forstehjelper=self.beh_kari)
         Notification.objects.all().delete()
         # Endre noe annet — ikke FK
         p.problemstilling = 'Endret'
@@ -152,8 +153,8 @@ class AssignmentNotificationSignalTests(TestCase):
 
     def test_dedup_prevents_double_notifications(self):
         """notify() dedup-vinduet hindrer duplikat ved umiddelbar re-assign."""
-        Patient.objects.create(pasientnummer=15, year=2026, forstehjelper=self.beh_kari)
-        Patient.objects.create(pasientnummer=16, year=2026, forstehjelper=self.beh_kari)
+        Patient.objects.create(pasientnummer=15, vakt=vakt_for_year(2026), forstehjelper=self.beh_kari)
+        Patient.objects.create(pasientnummer=16, vakt=vakt_for_year(2026), forstehjelper=self.beh_kari)
         # Kari skal kun ha ett varsel fordi message ('Du er satt ... pasient #15')
         # vs #16 har forskjellig pasientnummer i message — så IKKE dedup.
         # Men hvis vi tildeler SAMME pasient to ganger med samme melding, da deduper.

@@ -57,6 +57,38 @@ class BaseArkivHandler:
     #: fjorårets under planleggingen.
     retention_dager: ClassVar[int] = 730
 
+    #: Arkivmodellen modulen bruker. Settes av subklassen, og lar
+    #: `kollaps_arkiv`-kommandoen finne kandidater uten å kjenne modulen.
+    #: Modellen må ha `kollapset_at` og `importert_at` — `AbstractArkiv` har
+    #: begge, og `VaktArkiv` har dem fra før basemodellen fantes.
+    arkiv_model: ClassVar[type | None] = None
+
+    def kandidater(self, grense):
+        """Arkiver som er eldre enn ``grense`` og ikke alt er kollapset.
+
+        Default holder for begge dagens modeller. Overstyres av en modul som
+        trenger et annet utvalg — men da skal den fortsatt aldri levere et
+        kollapset arkiv: `kollaps()` er idempotent, men kommandoen ville
+        rapportert arbeid som ikke ble gjort.
+        """
+        if self.arkiv_model is None:
+            raise NotImplementedError(
+                f'{self.__class__.__name__} må sette `arkiv_model` eller '
+                f'overstyre kandidater().'
+            )
+        return (self.arkiv_model.objects
+                .filter(kollapset_at__isnull=True, importert_at__lt=grense)
+                .order_by('importert_at'))
+
+    def antall_rader(self, arkiv) -> int:
+        """Rader som ville blitt slettet ved kollaps.
+
+        Kun til rapportering — tørrkjøringen skal kunne si hvor mye som står
+        på spill uten å telle det på nytt i kommandoen. Default går veien om
+        `rad_dicts()`; en modul med mange rader bør overstyre med en `count()`.
+        """
+        return len(self.rad_dicts(arkiv))
+
     def sha_payload(self, arkiv, rader: list[dict]) -> dict:
         """Bygg dicten som hashes for radnivå-signaturen.
 

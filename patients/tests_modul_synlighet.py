@@ -94,14 +94,14 @@ class ServerSideSynlighetTests(TestCase):
 
     def test_ikke_admin_far_ingen_adminkort(self):
         html = self._html('ss_ikke_admin', 'skriv_full')
-        for markor in ('doResetActiveYear', 'lagreVaktSomArkiv',
+        for markor in ('doAvsluttVakt', 'lagreVaktSomArkiv',
                        'addForstehjelper', '/portal-admin/innstillinger/'):
             with self.subTest(markor=markor):
                 self.assertNotIn(markor, html)
 
     def test_admin_far_adminkortene(self):
         html = self._html('ss_admin', None, rolle='admin')
-        for markor in ('doResetActiveYear', 'lagreVaktSomArkiv',
+        for markor in ('doAvsluttVakt', 'lagreVaktSomArkiv',
                        'addForstehjelper', '/portal-admin/innstillinger/'):
             with self.subTest(markor=markor):
                 self.assertIn(markor, html)

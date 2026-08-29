@@ -16,6 +16,7 @@ from unittest import mock
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 from django.test import Client, TestCase, override_settings
+from patients.test_helpers import sett_aktiv_vakt
 from django.urls import reverse
 from django.utils import timezone as djtz
 
@@ -516,8 +517,7 @@ class PasientAppPaaNyURLTests(TestCase):
 
     def test_pasient_api_paa_ny_url(self):
         """GET /pasienter/api/patients/ skal returnere JSON-liste."""
-        from patients.services import set_active_year
-        set_active_year(2026)
+        sett_aktiv_vakt(2026)
         resp = self.client.get('/pasienter/api/patients/')
         self.assertEqual(resp.status_code, 200)
 

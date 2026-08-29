@@ -1,8 +1,8 @@
 # Beslutningsnotat: vakt som scope, ikke år
 
-Status: **besluttet 29. aug. 2026.** De fem avklaringene i §7 er besvart av André
-samme dag — alle med notatets anbefaling. Deploy 1 er under bygging; deploy 2 venter på
-prod-verifisering (§6).
+Status: **besluttet og levert.** De fem avklaringene i §7 er besvart av André
+29. aug. 2026 — alle med notatets anbefaling. Deploy 1 er verifisert i prod
+(`verifiser_vakt`: «Ingen funn»), og deploy 2 er kodet samme dag (§6).
 
 Erstatter TODO-punktet «Vakt som scope, ikke år». Notatet må ligge før fase 6 og 7 av
 oppdragsmodulen — begge bygger på scopet, og bygges de først, bygges de to ganger.
@@ -202,7 +202,7 @@ til hva en vakt er.
 | Deploy | Innhold | Rullbar? |
 |---|---|---|
 | **1** | ✅ Kodet 29. aug. 2026. Legg til `Vakt`, backfill fra `year`, legg til nullbare `vakt`-FK-er og fyll dem. `year` og `active_year` står urørt og leses fortsatt | Ja — bevist: backfill + full rollback + ny kjøring mot base med data |
-| **2** | Bytt all lesing til `vakt`, gjør FK-ene `NOT NULL`, fjern `year` fra radene og `active_year` fra `AppSetting` | Kun med `Vakt` som fasit |
+| **2** | ✅ Kodet 29. aug. 2026, etter «Ingen funn» fra `verifiser_vakt` i prod. All lesing på `vakt`, FK-ene `NOT NULL`, `(vakt, pasientnummer)`- og `(vakt, oppdragsnummer)`-sperrer i basen, `year` fjernet fra radene, tellere og driftsnøkler per vakt, «Avslutt vakt»/«Gjenåpne» | Kun via backup — migrasjonen nekter revers med vilje |
 
 Skillet er det samme som i rollemodellen: legg til og fyll først, bytt lesing etterpå.
 Slås de sammen, mister en rollback koblingen mellom rad og vakt, og den kan ikke bygges

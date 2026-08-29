@@ -63,7 +63,10 @@ def _patient_to_dict(p, slettbare=None):
         'id': p.id,
         'patient_nr': p.pasientnummer,
         'pasientnummer': p.pasientnummer,
-        'year': p.year,
+        # Nøkkelen heter fortsatt `year` utad. Verdien kommer fra vakta —
+        # kallere må select_related('vakt'), ellers koster lista én spørring
+        # per rad.
+        'year': p.vakt.year,
         'problemstilling': p.problemstilling,
         'arsak': p.arsak,
         'transport': p.transport,

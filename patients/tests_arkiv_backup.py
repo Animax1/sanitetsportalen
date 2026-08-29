@@ -32,8 +32,9 @@ from core.backup import (
 from patients.models import (
     AppSetting, ArkivertPasient, Patient, VaktArkiv,
 )
-from patients.services import arkiver_aktiv_vakt
+from patients.services import arkiver_aktiv_vakt, vakt_for_year
 from accounts.test_helpers import gi_standardtilgang
+from patients.test_helpers import sett_aktiv_vakt
 
 User = get_user_model()
 
@@ -58,8 +59,7 @@ class ArkivBackupTestMixin:
             from patients.backup import register_handlers
             register_handlers()
 
-        AppSetting.set('active_year', 2098)
-        AppSetting.set('next_patient_nr', 1)
+        self.vakt = sett_aktiv_vakt(2098)
         self.admin = User.objects.create_user(
             username='arkivar', password='passord', role='admin',
             must_change_password=False,
@@ -68,7 +68,7 @@ class ArkivBackupTestMixin:
 
     def _lag_pasient(self, nr, triage='Grønn'):
         return Patient.objects.create(
-            pasientnummer=nr, year=2098, grovsortering=triage,
+            pasientnummer=nr, vakt=vakt_for_year(2098), grovsortering=triage,
             problemstilling='Kramper', is_active=True,
         )
 

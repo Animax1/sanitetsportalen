@@ -12,6 +12,7 @@ from __future__ import annotations
 
 from datetime import timedelta
 
+from patients.services import vakt_for_year
 from django.test import TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
@@ -320,7 +321,7 @@ class VarselKreverModultilgangTests(TestCase):
         """Hele veien gjennom: signalet i patients skal ikke slippe noe ut."""
         from patients.models import Forstehjelper, Patient
         fh = Forstehjelper.objects.create(name='uten_tilgang', user=self.bruker)
-        Patient.objects.create(pasientnummer=1, year=2026, forstehjelper=fh)
+        Patient.objects.create(pasientnummer=1, vakt=vakt_for_year(2026), forstehjelper=fh)
         self.assertEqual(
             Notification.objects.filter(user=self.bruker).count(), 0,
             'et varsel med pasientnummer skal ikke gaa til en bruker uten tilgang',

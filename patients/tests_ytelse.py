@@ -16,6 +16,7 @@ from django.urls import reverse
 from accounts.models import CustomUser
 from audit.models import AuditLog
 from patients.models import Patient, Forstehjelper
+from patients.services import vakt_for_year
 from accounts.test_helpers import gi_standardtilgang
 
 
@@ -79,7 +80,7 @@ class AuditBulkCreateTests(TestCase):
     """N8: antall spørringer per lagring skal ikke vokse med antall felt."""
 
     def setUp(self):
-        self.pasient = Patient.objects.create(pasientnummer=801, year=2026)
+        self.pasient = Patient.objects.create(pasientnummer=801, vakt=vakt_for_year(2026))
         AuditLog.objects.all().delete()
 
     def _tell_insert_spørringer(self, endre):

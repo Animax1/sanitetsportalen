@@ -9,12 +9,13 @@ from pathlib import Path
 from unittest.mock import patch
 
 from django.test import TestCase, Client, override_settings
+from patients.test_helpers import sett_aktiv_vakt
 
 from accounts.models import CustomUser, LoginEvent
 from audit.models import AuditLog
 from patients.models import Patient, Backup
 from patients.backup_service import create_backup, purge_old_backups
-from patients.services import set_active_year
+from patients.services import vakt_for_year
 from accounts.test_helpers import gi_standardtilgang
 
 
@@ -90,15 +91,15 @@ class BackupServiceTests(TestCase):
 
     def test_restore_replaces_data(self):
         """Gjenoppretting skal erstatte data: pasient A bevares, pasient B forsvinner."""
-        set_active_year(2026)
+        sett_aktiv_vakt(2026)
         with patch.dict(os.environ, {'BACKUP_DIR': str(self.backup_dir)}):
             # Opprett pasient A og ta backup
-            Patient.objects.create(pasientnummer=101, year=2026, problemstilling='Pasient A')
+            Patient.objects.create(pasientnummer=101, vakt=vakt_for_year(2026), problemstilling='Pasient A')
             backup = create_backup(kind='manual', user=self.admin, note='Med A')
 
             # Slett A, opprett B
             Patient.objects.all().delete()
-            Patient.objects.create(pasientnummer=102, year=2026, problemstilling='Pasient B')
+            Patient.objects.create(pasientnummer=102, vakt=vakt_for_year(2026), problemstilling='Pasient B')
 
             # Gjenopprett
             from patients.backup_service import restore_backup
@@ -158,7 +159,7 @@ class BackupServiceTests(TestCase):
         LoginEvent.objects.create(username_attempt='hemmelig', success=True, ip='127.0.0.1')
 
         # Lag en pasient slik at backup har noe pasientdata
-        Patient.objects.create(pasientnummer=1, year=2026, problemstilling='test')
+        Patient.objects.create(pasientnummer=1, vakt=vakt_for_year(2026), problemstilling='test')
 
         with patch.dict(os.environ, {'BACKUP_DIR': str(self.backup_dir)}):
             backup = create_backup(kind='manual', user=self.admin)
@@ -199,7 +200,7 @@ class BackupServiceTests(TestCase):
         """SIKKERHET: Restore skal ikke slette brukere, revisjonslogg eller
         LoginEvent. Disse skal bevares på tvers av restore.
         """
-        set_active_year(2026)
+        sett_aktiv_vakt(2026)
         # Opprett testdata som IKKE skal røres av restore
         other_user = CustomUser.objects.create_user(
             username='annen', password='pwd', role='bruker',
@@ -217,7 +218,7 @@ class BackupServiceTests(TestCase):
         login_count_before = LoginEvent.objects.count()
 
         with patch.dict(os.environ, {'BACKUP_DIR': str(self.backup_dir)}):
-            Patient.objects.create(pasientnummer=201, year=2026, problemstilling='A')
+            Patient.objects.create(pasientnummer=201, vakt=vakt_for_year(2026), problemstilling='A')
             backup = create_backup(kind='manual', user=self.admin)
 
             from patients.backup_service import restore_backup
@@ -246,7 +247,7 @@ class BackupServiceTests(TestCase):
 
 @override_settings(SECURE_SSL_REDIRECT=False, RATELIMIT_ENABLE=False)
 class BackupResetIntegrationTests(TestCase):
-    """Test at reset_active_year lager pre_reset backup automatisk."""
+    """Test at avslutt-vakt lager pre_reset backup automatisk."""
 
     def setUp(self):
         self.admin = CustomUser.objects.create_user(
@@ -256,26 +257,28 @@ class BackupResetIntegrationTests(TestCase):
         gi_standardtilgang(self.admin, 'admin')
         self.backup_dir = Path('/tmp/test-backups-reset')
         self.backup_dir.mkdir(parents=True, exist_ok=True)
-        set_active_year(2026)
-        Patient.objects.create(pasientnummer=1, year=2026)
+        sett_aktiv_vakt(2026)
+        Patient.objects.create(pasientnummer=1, vakt=vakt_for_year(2026))
 
     def tearDown(self):
         for f in self.backup_dir.glob('backup-*.json.gz'):
             f.unlink(missing_ok=True)
 
     def test_reset_active_year_creates_pre_reset_backup(self):
-        """reset_active_year_view skal automatisk lage en pre_reset backup."""
+        """avslutt_vakt_view skal automatisk lage en pre_reset backup."""
         with patch.dict(os.environ, {'BACKUP_DIR': str(self.backup_dir)}):
             c = Client()
             c.force_login(self.admin)
-            resp = c.post('/pasienter/api/reset-active-year/',
-                          data=json.dumps({'confirm': True}),
+            resp = c.post('/pasienter/api/avslutt-vakt/',
+                          data=json.dumps({'confirm': True,
+                                           'ny_vakt_navn': 'Neste vakt'}),
                           content_type='application/json')
 
         self.assertEqual(resp.status_code, 200)
         pre_reset = Backup.objects.filter(kind='pre_reset')
         self.assertTrue(pre_reset.exists(),
-                        'Det skal finnes en pre_reset backup etter reset')
+                        'Det skal finnes en pre_reset backup etter avslutning')
+        # Notatet bærer den avsluttede vaktas navn ('2026' fra hjelperen)
         self.assertIn('2026', pre_reset.first().note)
 
 
@@ -331,7 +334,7 @@ class BackupContentHashSkipTests(TestCase):
             self.assertIsNotNone(first)
 
             # Gjør en pasient-endring slik at JSON-innholdet endres
-            Patient.objects.create(pasientnummer=42, year=2026,
+            Patient.objects.create(pasientnummer=42, vakt=vakt_for_year(2026),
                                     problemstilling='Ny pasient for hash-test')
 
             # Sov 1.1 s slik at filnavn-tidsstemplet (med sekund-uppløsning)

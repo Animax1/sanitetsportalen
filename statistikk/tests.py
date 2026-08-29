@@ -15,6 +15,10 @@ from core.modules import get_module, get_visible_modules
 
 ALLE_PROFILER = ('leser', 'skriver', 'leder_les', 'leder', 'admin')
 
+#: Stien til pasienttallene etter fase 6. Kilden står i stien, og hvilke
+#: slugs som svarer avgjøres av `core.stats`-registeret.
+PASIENTKILDEN = '/statistikk/api/kilde/patients/full-stats/'
+
 # Profilene som så statistikkfanen før utskillingen. Lista er med vilje
 # skrevet ut i stedet for utledet: den er fasiten flyttingen skal måles mot,
 # og en utledet liste ville fulgt med på et utilsiktet skift.
@@ -70,13 +74,13 @@ class StatistikkTilgangTests(TestCase):
     def test_full_stats_krever_statistikktilgang(self):
         for profil in UTEN_STATS:
             with self.subTest(profil=profil):
-                resp = self._hent(profil, '/statistikk/api/full-stats/')
+                resp = self._hent(profil, PASIENTKILDEN)
                 self.assertEqual(resp.status_code, 403)
 
     def test_full_stats_er_apen_for_stats_profiler(self):
         for profil in STATS_PROFILER:
             with self.subTest(profil=profil):
-                resp = self._hent(profil, '/statistikk/api/full-stats/')
+                resp = self._hent(profil, PASIENTKILDEN)
                 self.assertEqual(resp.status_code, 200)
 
     def test_uautentisert_far_redirect_ikke_403(self):
@@ -102,12 +106,30 @@ class FlyttedeEndepunkterTests(TestCase):
     def test_gammel_full_stats_url_videresender(self):
         resp = self.client.get('/pasienter/api/full-stats/')
         self.assertEqual(resp.status_code, 302)
-        self.assertEqual(resp['Location'], '/statistikk/api/full-stats/')
+        self.assertEqual(resp['Location'], PASIENTKILDEN)
 
     def test_gammel_arkiv_full_stats_url_videresender(self):
         resp = self.client.get('/pasienter/api/innstillinger/arkiv/7/full-stats/')
         self.assertEqual(resp.status_code, 302)
-        self.assertEqual(resp['Location'], '/statistikk/api/arkiv/7/full-stats/')
+        self.assertEqual(
+            resp['Location'],
+            '/statistikk/api/kilde/patients/arkiv/7/full-stats/')
+
+    def test_en_kilde_stiene_videresender_ogsaa(self):
+        """Fase 6 flyttet stiene en gang til — samme grunn, samme svar.
+
+        En fane som sto åpen da deployen traff har den gamle JS-fila i minnet
+        og spør fortsatt etter `/statistikk/api/full-stats/`.
+        """
+        resp = self.client.get('/statistikk/api/full-stats/')
+        self.assertEqual(resp.status_code, 302)
+        self.assertEqual(resp['Location'], PASIENTKILDEN)
+
+        resp = self.client.get('/statistikk/api/arkiv/7/full-stats/')
+        self.assertEqual(resp.status_code, 302)
+        self.assertEqual(
+            resp['Location'],
+            '/statistikk/api/kilde/patients/arkiv/7/full-stats/')
 
     def test_videresendingen_er_midlertidig_ikke_permanent(self):
         """302, ikke 301.
@@ -134,6 +156,99 @@ class FlyttedeEndepunkterTests(TestCase):
         c = Client()
         c.force_login(_bruker('leser'))
         self.assertEqual(c.get('/pasienter/api/stats/').status_code, 404)
+
+
+@override_settings(SECURE_SSL_REDIRECT=False, RATELIMIT_ENABLE=False)
+class KildekomposisjonTests(TestCase):
+    """§5: modulen komponerer tilgang, den eier den ikke.
+
+    Med kilde nummer to ble regelen «vis det du har tilgang til», ikke «alt
+    eller ingenting». Det siste var det samme så lenge det fantes én kilde,
+    men ville tatt statistikken fra alle som leser pasienter uten å ha
+    oppdrag, i det øyeblikket oppdragsmodulen meldte seg inn i registeret.
+    """
+
+    OPPDRAGSKILDEN = '/statistikk/api/kilde/oppdrag/full-stats/'
+
+    def _med(self, navn, tilganger):
+        c = Client()
+        c.force_login(_bruker(navn, tilganger=tilganger))
+        return c
+
+    def test_uten_oppdragstilgang_ingen_oppdragsfane(self):
+        c = self._med('kun_pasient', [('statistikk', 'les'), ('patients', 'les')])
+        html = c.get('/statistikk/').content.decode('utf-8')
+        self.assertIn('kilde-patients', html)
+        self.assertNotIn('kilde-oppdrag', html)
+
+    def test_uten_oppdragstilgang_stenges_oppdragstallene(self):
+        """Ellers er statistikk en bakvei rundt modultilgangen."""
+        c = self._med('kun_pasient2', [('statistikk', 'les'), ('patients', 'les')])
+        self.assertEqual(c.get(self.OPPDRAGSKILDEN).status_code, 403)
+
+    def test_med_oppdragstilgang_kommer_bade_fane_og_tall(self):
+        c = self._med('begge', [('statistikk', 'les'), ('patients', 'les'),
+                                ('oppdrag', 'les')])
+        html = c.get('/statistikk/').content.decode('utf-8')
+        self.assertIn('kilde-patients', html)
+        self.assertIn('kilde-oppdrag', html)
+        self.assertEqual(c.get(self.OPPDRAGSKILDEN).status_code, 200)
+
+    def test_uten_pasienttilgang_faar_man_fortsatt_oppdragstallene(self):
+        """Selve endringen: én manglende kilde stenger ikke hele siden."""
+        c = self._med('kun_oppdrag', [('statistikk', 'les'), ('oppdrag', 'les')])
+        resp = c.get('/statistikk/')
+        self.assertEqual(resp.status_code, 200)
+        html = resp.content.decode('utf-8')
+        self.assertIn('kilde-oppdrag', html)
+        self.assertNotIn('kilde-patients', html)
+        self.assertEqual(c.get(PASIENTKILDEN).status_code, 403)
+        self.assertEqual(c.get(self.OPPDRAGSKILDEN).status_code, 200)
+
+    def test_ingen_kilder_gir_403_paa_siden(self):
+        """En statistikkside uten tall er en side som later som den virker."""
+        c = self._med('ingen_kilder', [('statistikk', 'les')])
+        self.assertEqual(c.get('/statistikk/').status_code, 403)
+
+    def test_ukjent_kilde_gir_403_ikke_500(self):
+        c = self._med('ukjent', [('statistikk', 'les'), ('patients', 'les')])
+        self.assertEqual(
+            c.get('/statistikk/api/kilde/finnesikke/full-stats/').status_code, 403)
+
+    def test_kildene_deler_ikke_cache(self):
+        """Slug-en må stå i cache-nøkkelen — ellers server kilde to kilde éns
+        tall i 60 sekunder."""
+        from django.core.cache import cache
+        cache.clear()
+        c = self._med('cachetest', [('statistikk', 'les'), ('patients', 'les'),
+                                    ('oppdrag', 'les')])
+        pasient = c.get(PASIENTKILDEN).json()
+        oppdrag = c.get(self.OPPDRAGSKILDEN).json()
+        self.assertIn('crosstab_prob_triage', pasient)
+        self.assertIn('per_hastegrad', oppdrag)
+
+    def test_fanerad_skjules_ved_en_kilde(self):
+        """En fanerad med ett valg er en knapp som ikke gjør noe."""
+        c = self._med('en_kilde', [('statistikk', 'les'), ('patients', 'les')])
+        self.assertNotIn('id="kilde-nav"',
+                         c.get('/statistikk/').content.decode('utf-8'))
+
+    def test_deaktivert_kildemodul_forsvinner_fra_fanene(self):
+        """En modul som er slått av skal ikke lyse gjennom statistikken."""
+        ModuleSettings.objects.update_or_create(
+            slug='oppdrag', defaults={'enabled': False})
+        c = self._med('deaktivert', [('statistikk', 'les'), ('patients', 'les'),
+                                     ('oppdrag', 'les')])
+        html = c.get('/statistikk/').content.decode('utf-8')
+        self.assertNotIn('kilde-oppdrag', html)
+        self.assertEqual(c.get(self.OPPDRAGSKILDEN).status_code, 403)
+
+    def test_arkivstatistikk_finnes_ikke_for_oppdrag_enda(self):
+        """Oppdrag arkiveres i fase 7. Fram til da: 404, ikke et tomt svar."""
+        c = Client()
+        c.force_login(_bruker('admin'))
+        resp = c.get('/statistikk/api/kilde/oppdrag/arkiv/1/full-stats/')
+        self.assertEqual(resp.status_code, 404)
 
 
 class StatistikkModulRegistreringTests(TestCase):

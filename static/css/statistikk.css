@@ -130,6 +130,46 @@
     color: #fff !important;
   }
 
+  /* Kildefaner (fase 6) — én per modul som leverer tall.
+   *
+   * Tydeligere enn sub-fanene under: de to radene ligger over hverandre, og
+   * uten forskjell i vekt ville det sett ut som ti likestilte faner i stedet
+   * for to nivåer. */
+  .kilde-nav {
+    display: flex;
+    gap: 0.35rem;
+    flex-wrap: wrap;
+    margin-bottom: 0.7rem;
+    border-bottom: 2px solid var(--border-color);
+    padding-bottom: 0.45rem;
+  }
+
+  .kilde-btn {
+    border: 1px solid var(--border-color);
+    background: var(--surface-1);
+    border-radius: 8px;
+    padding: 0.4rem 1.15rem;
+    font-size: 0.92rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: all 0.12s;
+  }
+
+  .kilde-btn:hover {
+    background: var(--surface-3);
+    color: var(--text-main);
+  }
+
+  .kilde-btn.active {
+    background: var(--header-bg) !important;
+    color: #fff !important;
+    border-color: var(--header-bg) !important;
+  }
+
+  .kilde-panel { display: none; }
+  .kilde-panel.active { display: block; }
+
   /* Statistics sub-tabs */
   .stats-subnav {
     display: flex;

@@ -13,6 +13,7 @@ from django.test import TestCase, override_settings
 from accounts.models import CustomUser
 from audit.models import AuditLog
 from patients.models import Patient, Forstehjelper, Helsepersonell
+from patients.services import vakt_for_year
 
 
 # ── Hjelpefunksjon – bygg mini offline-SQLite ────────────────────────────────
@@ -236,7 +237,7 @@ class ImportOfflineDataTests(TestCase):
         )
         try:
             _call_import_offline_data(path, year=2026)
-            self.assertEqual(Patient.objects.filter(year=2026).count(), 2)
+            self.assertEqual(Patient.objects.filter(vakt=vakt_for_year(2026)).count(), 2)
         finally:
             path.unlink(missing_ok=True)
 
@@ -249,7 +250,7 @@ class ImportOfflineDataTests(TestCase):
         )
         try:
             out = _call_import_offline_data(path, year=2026, dry_run=True)
-            self.assertEqual(Patient.objects.filter(year=2026).count(), 0)
+            self.assertEqual(Patient.objects.filter(vakt=vakt_for_year(2026)).count(), 0)
             self.assertIn('DRY RUN', out)
         finally:
             path.unlink(missing_ok=True)
@@ -257,7 +258,7 @@ class ImportOfflineDataTests(TestCase):
     def test_import_offline_data_renumbers_patient_nr(self):
         """Pasienter i default-DB og offline-DB med overlappende nr skal få nye unike nr."""
         # Opprett en eksisterende pasient med pasientnummer 1000 i default-DB
-        Patient.objects.create(pasientnummer=1000, year=2026)
+        Patient.objects.create(pasientnummer=1000, vakt=vakt_for_year(2026))
 
         tf, path = self._make_sqlite(
             patients=[
@@ -269,7 +270,7 @@ class ImportOfflineDataTests(TestCase):
         try:
             _call_import_offline_data(path, year=2026)
             alle_nr = list(
-                Patient.objects.filter(year=2026)
+                Patient.objects.filter(vakt=vakt_for_year(2026))
                 .order_by('pasientnummer')
                 .values_list('pasientnummer', flat=True)
             )
@@ -278,7 +279,7 @@ class ImportOfflineDataTests(TestCase):
                              f'Duplikate pasientnummer funnet: {alle_nr}')
             # To nye pasienter skal ha fått nr > 1000
             self.assertEqual(
-                Patient.objects.filter(year=2026, pasientnummer__gt=1000).count(), 2
+                Patient.objects.filter(vakt=vakt_for_year(2026), pasientnummer__gt=1000).count(), 2
             )
         finally:
             path.unlink(missing_ok=True)
@@ -366,7 +367,7 @@ class ImportOfflineDataTests(TestCase):
         try:
             out = _call_import_offline_data(path, year=2026)
             self.assertIn('Ingen pasienter', out)
-            self.assertEqual(Patient.objects.filter(year=2026).count(), 0)
+            self.assertEqual(Patient.objects.filter(vakt=vakt_for_year(2026)).count(), 0)
         finally:
             path.unlink(missing_ok=True)
 
@@ -391,7 +392,7 @@ class ImportOfflineDataTests(TestCase):
             self.assertIn('problemstilling', str(ctx.exception))
             self.assertIn('--force', str(ctx.exception),
                           'Feilmeldingen må peke på utveien for bevisst import')
-            self.assertEqual(Patient.objects.filter(year=2026).count(), 0,
+            self.assertEqual(Patient.objects.filter(vakt=vakt_for_year(2026)).count(), 0,
                              'Ingenting skal være skrevet når importen avbrytes')
         finally:
             path.unlink(missing_ok=True)
@@ -422,9 +423,9 @@ class ImportOfflineDataTests(TestCase):
         )
         try:
             out = _call_import_offline_data(path, year=2026, force=True)
-            self.assertEqual(Patient.objects.filter(year=2026).count(), 1)
+            self.assertEqual(Patient.objects.filter(vakt=vakt_for_year(2026)).count(), 1)
             self.assertEqual(
-                Patient.objects.get(year=2026).problemstilling, 'Gammel verdi')
+                Patient.objects.get(vakt=vakt_for_year(2026)).problemstilling, 'Gammel verdi')
             self.assertIn('--force', out, 'Importen skal si tydelig fra i loggen')
             self.assertIn('problemstilling', out)
         finally:
@@ -440,7 +441,7 @@ class ImportOfflineDataTests(TestCase):
         )
         try:
             _call_import_offline_data(path, year=2026)
-            p = Patient.objects.get(year=2026)
+            p = Patient.objects.get(vakt=vakt_for_year(2026))
             self.assertEqual(p.problemstilling, 'Brystsmerter')
             self.assertEqual(p.grovsortering, 'Rød')
         finally:

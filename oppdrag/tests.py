@@ -31,16 +31,20 @@ def _lokasjon(navn='Hovedscene'):
     return Lokasjon.objects.get_or_create(navn=navn)[0]
 
 
-def _oppdrag(enhet, *, status=choices.VENTER, lokasjon=None, fritekst='', year=AAR):
+def _oppdrag(enhet, *, status=choices.VENTER, lokasjon=None, fritekst='', vakt=None):
     """Lag et oppdrag med neste ledige nummer.
 
     Nummeret hentes fra samme teller som viewet bruker, slik at testene ikke
-    kan komme i utakt med unikhetskravet (year, oppdragsnummer).
+    kan komme i utakt med unikhetskravet (vakt, oppdragsnummer).
     """
     from oppdrag.services import neste_oppdragsnummer
+    from patients.test_helpers import sett_aktiv_vakt
+    from patients.services import hent_aktiv_vakt
+    if vakt is None:
+        vakt = hent_aktiv_vakt()
     return Oppdrag.objects.create(
-        year=year,
-        oppdragsnummer=neste_oppdragsnummer(year),
+        vakt=vakt,
+        oppdragsnummer=neste_oppdragsnummer(vakt),
         enhet=enhet,
         problemstilling='Pustevansker',
         hastegrad='Akutt',

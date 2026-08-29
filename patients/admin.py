@@ -18,13 +18,13 @@ class PatientAdmin(admin.ModelAdmin):
     """Admin for Patient-modellen."""
 
     list_display = [
-        'pasientnummer', 'year', 'problemstilling',
+        'pasientnummer', 'vakt', 'problemstilling',
         'grovsortering', 'forstehjelper', 'is_active', 'created_at',
     ]
-    list_filter = ['year', 'grovsortering', 'is_active']
+    list_filter = ['vakt', 'grovsortering', 'is_active']
     search_fields = ['pasientnummer', 'problemstilling']
     readonly_fields = ['created_at', 'updated_at']
-    ordering = ['-year', 'pasientnummer']
+    ordering = ['-vakt__startet', 'pasientnummer']
     autocomplete_fields = ['forstehjelper']
 
 

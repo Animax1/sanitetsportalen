@@ -95,6 +95,19 @@ ingen av dem gir feilmelding — de er bare stille inaktive.
       Står fortsatt som `[fyll inn organisasjonsnavn]`. Dokumentet er
       behandlingsprotokollen overfor tilsynsmyndighet.
 
+- [ ] **Merge `rollemodell` til `main`.** Staging ligger fire commits foran prod:
+      vakt-scopingens deploy 2, oppdragsmodulens fase 6 og 7, og
+      backup-scheduler-fiksen. Migrasjonene `patients.0016` og `oppdrag.0007` er
+      **enveis** — de nekter revers med vilje, og rollback er gjenoppretting fra
+      backup. Ta derfor en manuell backup av `patients` og `arkiv` i prod før merge,
+      og test i staging først. Railway kjører migrasjonene selv i release-fasen.
+
+- [ ] **Første skarpe vakt med oppdragsmodulen.** Modulen er ferdig og testet, men
+      aldri brukt under en reell vakt — og det er den prøven som finner det ingen
+      testsuite gjør: samband, dekning i felt, og om knappene sitter der hendene
+      forventer dem. Ha `docs/RUNBOOK_VAKT.md` framme; §10a har nå **to**
+      arkivknapper å krysse av ved vaktslutt.
+
 ## Pågående / neste
 
 ### GDPR-gjennomgang
@@ -366,14 +379,17 @@ personlige kontoer, admin-reset beholdt for alle. Ingenting bygget ennå.
             opprettelse og pekerreparasjon, og `verifiser_vakt` som også
             forhåndssjekker deploy 2-sperrene. Backfill, full rollback og ny
             kjøring bevist mot en base med data i tre år.
-      - [ ] **Deploy 1 til staging/prod, så `verifiser_vakt` mot prod.**
-            Krever Andre. Deretter **deploy 2**:
-            all lesing over på vakt, tellere per vakt, «Avslutt vakt»,
-            `(vakt, pasientnummer)`-sperren, `year` bort fra radene.
-      - **Fase 4b og 5 er upåvirket** og kan gjøres i mellomtiden. **Fase 6 og 7 må
-        vente:** statistikken grupperer på scopet, og fase 7 arkiverer *en vakt* —
-        den ville lagt inn `Vaktarkivering` fra §12.1, som notatet foreslår å erstatte
-        med `Vakt` (de er samme entitet sett fra hver sin ende).
+      - [x] **Deploy 1 verifisert i prod 29. aug. 2026** — `verifiser_vakt`: «Ingen funn».
+      - [x] **Deploy 2 — kodet 29. aug. 2026.** All lesing på vakt, FK-ene
+            `NOT NULL`, `(vakt, pasientnummer)`- og `(vakt, oppdragsnummer)`-sperrer
+            i basen, `year` fjernet fra radene, tellere per vakt
+            (`next_patient_nr_vakt_<id>`), `event_name`/`active_year`/`next_patient_nr`
+            flyttet fra `AppSetting` til vakta, «Avslutt vakt» erstatter «Nullstill år»,
+            «Gjenåpne» fram til kollaps, «Tidligere vakter»-liste. Migrasjonene
+            (`patients.0016`, `oppdrag.0007`) har sperre mot rader uten vakt og
+            nekter revers — rollback er gjenoppretting fra backup.
+      - **Fase 6 og 7 er ikke lenger blokkert** — scopet er levert; de grupperer
+        og arkiverer på `Vakt`.
 
 ### Rollemodellen — se `docs/BESLUTNING_ROLLEMODELLEN.md`
 
@@ -610,21 +626,23 @@ Gjennomgang 13. aug. 2026, med 1000 pasienter og peak 100 brukere som premiss.
       samme idiom som `core/backup/`. Core eier kanonisering, hashing og kollaps-
       orkestrering; handleren eier payloadens form. Signaturene er bit-identiske,
       låst av `ArkivSignaturLaastTests`. Ingen migrasjon.
-  - [ ] **Gjenstår:** `AbstractArkiv`-basemodell for nye moduler. `VaktArkiv` har
-        feltene i dag (`sha256`, `kollapset_at`, `aggregat`, `aggregat_sha256`,
-        frosset `importert_av_navn`); park og oppdrag må ellers gjenta dem. Bevisst
-        utsatt til modell nummer to faktisk skrives — da ser man hva som er felles,
-        i stedet for å gjette. `VaktArkiv` skal *ikke* migreres til basemodellen:
-        SHA-signaturene er låst til dagens payload-form, og hvert arkiv i prod ville
-        meldt tukling. **Bygges i fase 7 av oppdragsmodulen** — den er modell nummer to.
+  - [x] **`AbstractArkiv`-basemodell (29. aug. 2026).** Bygget i fase 7 av
+        oppdragsmodulen, som lovet — `OppdragArkiv` var modell nummer to, og da var
+        det ikke lenger gjetning hva som er felles. Basemodellen bærer `tittel`,
+        `vakt`/`vakt_navn`, `antall_rader`, `importert_av` med frosset navn, `sha256`,
+        `kollapset_at`, `aggregat` og `aggregat_sha256`. `VaktArkiv` er som planlagt
+        *ikke* migrert: `year_snapshot` og `arrangement_navn` inngår i SHA-payloaden
+        til hvert arkiv i prod. Park arver basemodellen når den skrives.
 - [ ] Park-registreringer blir **egen modell**, ikke rader i `Patient`. Holder sykestuas
       liste på ~250 rader i stedet for 1000, og matcher at dataene er enklere.
 - [ ] Park-appen er et skriveendepunkt **uten innlogging**: signert lenke via
       `django.core.signing` (ikke gjettbar URL, kan tilbakekalles), rate-limit per token,
       og responsen returnerer kvittering — aldri data.
-- [ ] **Oppdragsmodulen — se `docs/BESLUTNING_OPPDRAGSMODULEN.md`.** Besluttet 28. aug.
-      2026, ikke bygget. Modulen er den første som tar `skriv: handling` i bruk. Sju
-      faser, 35–50 t. Punktene under lå her løst fra før og er nå plassert i planen:
+- [x] **Oppdragsmodulen — se `docs/BESLUTNING_OPPDRAGSMODULEN.md`.** Besluttet 28. aug.
+      2026, **alle sju fasene levert 29. aug. 2026.** Modulen er den første som tar
+      `skriv_handling` i bruk. Den står i staging og venter på merge til prod og på
+      første skarpe vakt; §12.1 (sammenslåing av arkiveringen) er utsatt som egen sak,
+      se punktet lenger ned. Punktene under lå her løst fra før og ble plassert i planen:
       - [x] **Fase 1 — modeller og regler (28. aug. 2026).** App, modulregistrering,
             fem modeller, `choices.py`, statusmaskin, utledet enhetsstatus,
             korreksjonsregel og audit med skjult fritekst. 46 tester. Modulen står med
@@ -753,15 +771,91 @@ Gjennomgang 13. aug. 2026, med 1000 pasienter og peak 100 brukere som premiss.
               *serveren* som utleder handlingen av tilstanden.
             - Usendte stemplinger vises i et eget banner — §6: en knapp som ser ut til
               å ha virket, men ikke har det, er verre enn en som feiler synlig.
-      - [ ] **Fase 6** (5–7 t): **statistikkregisteret** + oppdragsfanen. Her rives den
-            direkte importen fra `statistikk` til `patients.services` ut, og erstattes av
-            et registry etter samme idiom som `core.backup` og `core.arkiv` — det CLAUDE.md
-            har varslet siden statistikkmodulen ble skilt ut. Pasientfanen skal se lik ut
-            etterpå.
-      - [ ] **Fase 7** (5–7 t): arkivering. **Her bygges `AbstractArkiv`** — dette er
-            modell nummer to, som punktet under har ventet på. Oppdrag får **egen
-            arkivknapp** under `/oppdrag/`; sammenslåingen med pasientarkivet er utsatt,
-            se punktet under.
+      - [x] **Fase 6 — statistikkregisteret + oppdragsfanen (29. aug. 2026).**
+            `core/stats.py` med `BaseStatistikkHandler`; `patients/statistikk.py` og
+            `oppdrag/statistikk.py` melder seg inn fra `apps.ready()`. Statistikkappen
+            navngir ingen kildemodul lenger — endepunktene bærer slug-en
+            (`/statistikk/api/kilde/<slug>/full-stats/`), de gamle stiene videresender,
+            og cache-nøkkelen bærer både slug og vakt-ID. Pasientfanen ser lik ut.
+            - **Tilgangsregelen måtte endres i samme slengen.** §5 sa «vis kun kilder
+              brukeren kan lese», men koden ga 403 på hele siden om én kilde manglet.
+              Med kilde nummer to ville det tatt statistikken fra alle som leser
+              pasienter uten å ha oppdrag. Nå vises de kildene kontoen har, og 403 er
+              forbeholdt «ingen kilder i det hele tatt».
+            - **§12.2 besvart:** en varighet som slutter i en automatisk stempling
+              telles ikke — sluttiden er avledet, ikke målt. Oppdraget telles i antall
+              og fordelinger, og både automatiske og negative utelatelser vises på
+              siden. Mutasjonstestet: fjernes sperren, blir testene røde.
+            - `Statusmelding.objects.gjeldende_bulk()` kom til fordi statistikken går
+              gjennom hele vaktas oppdrag. Regelen «nyeste ikke-korrigerte rad vinner»
+              står fortsatt bare i manageren; `gjeldende()` er nå ett oppslag i
+              bulk-resultatet.
+            - **`hent_aktiv_vakt` står igjen som eneste import fra en modul.** Den er
+              portalens scope, ikke en kildes tall, og hører til ryddejobben under.
+      - [x] **Fase 7 — arkivering (29. aug. 2026).** `AbstractArkiv` i
+            `core/arkiv/models.py`, `OppdragArkiv` + `ArkivertOppdrag`, handler,
+            egen arkivknapp under `/oppdrag/` og fire endepunkter bak global admin.
+            Statistikkendepunktet fra fase 6 virker nå uten at statistikkappen ble
+            rørt, akkurat som lovet.
+            - **Tidspunktene fryses i flate kolonner**, én per status, og hvilke
+              stemplinger som var automatiske ligger som data (`automatiske_statuser`).
+              Da gjelder §12.2-regelen i arkivet også — uten flagget ville en avledet
+              sluttid blitt telt som målt så snart vakta var arkivert.
+            - **`fritekst` arkiveres ikke.** Feltet er unntatt verdilogging i audit
+              nettopp fordi det kan inneholde noe en operatør skrev og angret på; å
+              fryse det i 24 måneder ville gjort unntaket meningsløst.
+            - **Én utregning, to kilder.** `_stats_fra_rader()` regner på nøytrale
+              dicter, og både vakta og arkivet bygger slike. En egen arkiv-utregning
+              ville drevet fra live-tallene, og forskjellen ville dukket opp først når
+              noen sammenlignet i fjor med i år.
+            - **To mangler kom for en dag:** modulen hadde ingen backup i det hele
+              tatt (nå `oppdrag` + `oppdrag_arkiv`), og `kollaps_arkiv` kjente bare
+              pasientarkivet (går nå gjennom registeret, `--modul` avgrenser).
+            - Mutasjonstestet: fjernes automatisk-flagget fra arkivet, admin-gaten fra
+              endepunktene eller backup-sperren foran kollaps, blir testene røde.
+
+- [ ] **Vaktlistemodulen — se `docs/BESLUTNING_VAKTLISTE.md`.** Bestilt av André
+      29. aug. 2026, **besluttet samme dag** i to avklaringsrunder — alle ti
+      avklaringene er besvart, kun små restpunkter avgjøres underveis (§11).
+      Personelloversikt sortert på korps med kompetanse og rolle; ressurser
+      (samleplass, biler, lag, KO) som reserveres til korps og bemannes av korpsene
+      selv, med skifttider; drift som reversibel innsjekk-port med møtt/av vakt;
+      «Tilstede nå» med utskrift (brukes av brannsikkerhetshensyn ved overnatting);
+      planleggingstall (timer, hviletid, bemanningskurve, varsler); besetningspanel i
+      `/oppdrag`. Sju faser, 37–49 t. **Ikke påbegynt.**
+      - [x] **Alle ti avklaringene besvart 29. aug. 2026** (§11 i notatet er fasit).
+            De som endret utformingen: korps er en badge og ikke en ny akse; ressurser
+            reserveres til korps og korpsene bemanner sine egne, med tider; drift er en
+            reversibel innsjekk-port uten kobling til aktiv vakt; kostbehov utgikk;
+            personregistrene i pasientmodulen forblir urørt; kopiering tar oppsettet,
+            aldri personene.
+      - [ ] **Korps er en badge, ikke en akse.** `skriv_handling` = fører sitt eget
+            korps, `skriv_full` = alle korps **og** den eneste som stempler møtt/av
+            vakt. Korpset arves fra `Mannskap.korps` via `Mannskap.user`, som
+            `Enhet.user` i oppdragsmodulen. Ingen ny verdi i `NIVAA_HIERARKI`.
+            - [ ] **Prisen: nivånavnet betyr noe annet her enn i oppdrag.** Matrisen
+                  viser en global etikett («Skrive: handling») fra `TilgangsNivaa`.
+                  Trengs en valgfri etikett per modul per nivå, ellers deles nivået ut
+                  i god tro med feil forventning — nøyaktig feilen rollemodellnotatet
+                  alt har kalt ut én gang.
+      - [ ] **Matallergi lagres ikke i portalen.** Besluttet fordi det er en
+            helseopplysning (art. 9) og ville krevd fem mekanismer for én kolonne.
+            Samles inn utenfor. Konsekvensen er ærlig: lista kan ikke brukes til
+            matbestilling.
+      - [ ] **`notat` på `Mannskap` er fritekst**, og fritekst er der
+            helseopplysninger havner når det ikke finnes et felt for dem. Unntas
+            verdilogging i audit, som `Oppdrag.fritekst`.
+      - [ ] **Registeret blir portalens tredje personregister**, uten kobling til de
+            to i pasientmodulen (§9). De svarer på «hvem behandlet pasienten», ikke
+            «hvem er på vakt». Prisen: et navn kan stå to steder. En nullbar FK er en
+            additiv migrasjon den dagen behovet melder seg.
+
+- [ ] **Flytt `hent_aktiv_vakt` ut av pasientmodulen.** Funksjonen er portalens scope —
+      `Vakt` bor i `core`, og både oppdrag og statistikk importerer den fra
+      `patients.services`. Den ble liggende fordi `AppSetting` (pekeren `aktiv_vakt_id`)
+      gjør det, så flyttingen henger sammen med hvor `AppSetting` hører hjemme. Ikke
+      hastverk: én import fra én modul, og `StatistikkappenNavngirIngenKilde` har den
+      oppført som det ene tillatte unntaket, så den kan ikke gli i glemmeboka.
 
 - [ ] **Flytt arkiveringen til `/portal-admin/` og grupper den.** Utsatt 28. aug. 2026 —
       se §12.1 i `docs/BESLUTNING_OPPDRAGSMODULEN.md`. `core/arkiv/` er modul-agnostisk
@@ -774,9 +868,10 @@ Gjennomgang 13. aug. 2026, med 1000 pasienter og peak 100 brukere som premiss.
       - [ ] Signaturene overlever: handleren bestemmer selv hva som går inn i
             `sha_payload()`, så en nullbar FK den ikke nevner endrer ingenting.
             `ArkivSignaturLaastTests` beviser det. Eksisterende arkiver får `NULL`.
-      - [ ] **I mellomtiden kan noen arkivere pasienter og glemme oppdrag.** Det er en
-            operativ risiko, ikke en teknisk. Legg et punkt i `docs/RUNBOOK_VAKT.md`, som
-            faktisk leses ved vaktslutt — gjøres samtidig med fase 7.
+      - [x] **Punkt i runbooken (29. aug. 2026).** §10a navngir begge knappene og
+            krever at begge er krysset av før vakta veksles tilbake til
+            lavkostnad-modus. Risikoen består til arkiveringene slås sammen, men den
+            står nå der den leses.
 - [ ] Vurder `cached_db`-sesjoner. `SESSION_SAVE_EVERY_REQUEST=True` med DB-sesjoner gir
       én UPDATE per request. Krever Redis, altså vakt-modus.
 
@@ -908,11 +1003,13 @@ Funnene under er allerede kartlagt, så jobben er avgrenset når den skal gjøre
 
 ### Løse punkter
 
-- [ ] **Rate-limit arkivstatistikken.** `/pasienter/api/innstillinger/arkiv/<pk>/full-stats/`
-      (`views_arkiv.arkiv_full_stats_view`) kjører samme tunge beregning som
-      `/api/full-stats/` — chi², Kruskal-Wallis, krysstabeller — men fikk ingen bøtte i S3.
-      Mindre eksponert: admin-only, ingen auto-refresh, og den leser arkiverte rader som
-      ikke endres. Én linje når noen er i filen uansett.
+- [ ] **Rate-limit arkivstatistikken.** Tre endepunkter kjører nå samme tunge beregning
+      som live-statistikken uten å ha fått en bøtte i S3:
+      `/statistikk/api/kilde/<slug>/arkiv/<pk>/full-stats/` (flyttet dit i fase 6),
+      `/pasienter/api/innstillinger/arkiv/<pk>/` og — fra fase 7 —
+      `/oppdrag/api/arkiv/<pk>/`. Alle er admin-only, uten auto-refresh, og leser rader
+      som ikke endres, så eksponeringen er lav. Én linje per view når noen er i filene
+      uansett.
 - [ ] Rydd bort død backup-legacy: modellen `patients.BackupConfig` (singleton som
       ingenting leser lenger) og management-kommandoen `db_backup` som gater på den.
       Krever migrasjon, derfor egen oppgave.

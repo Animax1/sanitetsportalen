@@ -41,6 +41,7 @@ from core.backup import (
     VALID_KINDS,
     all_handlers,
     clear_registry,
+    registrer_alle_moduler,
     create_backup,
     enforce_cap,
     get_backup_dir,
@@ -52,6 +53,7 @@ from core.forms import BackupRestoreConfirmForm, ModuleBackupConfigForm
 from core.models import ModuleBackupConfig
 from patients.backup import PatientsBackupHandler, register_handlers
 from patients.models import AppSetting, Backup, Forstehjelper, Helsepersonell, Patient
+from patients.services import vakt_for_year
 from accounts.test_helpers import gi_standardtilgang
 
 
@@ -88,9 +90,12 @@ class HandlerRegistryTests(TestCase):
     """Tester for register/get_handler/all_handlers/clear_registry."""
 
     def tearDown(self) -> None:
-        # Gjenopprett patients-handleren etter at vi har klottet i registry.
+        # Gjenopprett ALLE modulenes handlere etter at vi har klottet i
+        # registryet. Sto det `register_handlers()` her — pasientmodulens —
+        # ble oppdragsmodulens borte for resten av kjøringen, og feilen
+        # dukket opp i en helt annen testfil.
         clear_registry()
-        register_handlers()
+        registrer_alle_moduler()
 
     def test_register_and_get_roundtrip(self) -> None:
         clear_registry()
@@ -145,7 +150,7 @@ class CreateBackupTests(TestCase):
         )
         gi_standardtilgang(self.admin, 'admin')
         # Litt patient-data så dumpdata ikke er tom.
-        Patient.objects.create(pasientnummer=1, year=2025, problemstilling='Test')
+        Patient.objects.create(pasientnummer=1, vakt=vakt_for_year(2025), problemstilling='Test')
 
     def test_invalid_kind_raises(self) -> None:
         with self.assertRaises(ValueError):
@@ -193,7 +198,7 @@ class CreateBackupTests(TestCase):
             first = create_backup(slug='patients', kind=KIND_AUTO)
 
             # Endre data — innhold er nå ulikt forrige.
-            Patient.objects.create(pasientnummer=2, year=2025, problemstilling='Ny')
+            Patient.objects.create(pasientnummer=2, vakt=vakt_for_year(2025), problemstilling='Ny')
 
             second = create_backup(slug='patients', kind=KIND_AUTO)
 
@@ -347,7 +352,7 @@ class RestoreBackupTests(TestCase):
         beh, _ = Forstehjelper.objects.get_or_create(name='Behandler-Test')
         hp, _ = Helsepersonell.objects.get_or_create(name='HP-Test')
         Patient.objects.create(
-            pasientnummer=10, year=2025, problemstilling='Original',
+            pasientnummer=10, vakt=vakt_for_year(2025), problemstilling='Original',
             forstehjelper=beh, helsepersonell_ref=hp,
         )
         self._patient_count_before = Patient.objects.count()
@@ -405,7 +410,7 @@ class RestoreBackupTests(TestCase):
             p.problemstilling = 'ENDRET ETTER BACKUP'
             p.save()
             Patient.objects.create(
-                pasientnummer=99, year=2025, problemstilling='Etter-backup',
+                pasientnummer=99, vakt=vakt_for_year(2025), problemstilling='Etter-backup',
             )
 
             restore_backup(backup, user=self.admin)
@@ -588,7 +593,7 @@ class BackupAdminViewTests(TestCase):
         self.assertEqual(cfg.max_backups, 25)
 
     def test_run_view_creates_manual_backup(self) -> None:
-        Patient.objects.create(pasientnummer=1, year=2025, problemstilling='X')
+        Patient.objects.create(pasientnummer=1, vakt=vakt_for_year(2025), problemstilling='X')
         client = Client()
         client.force_login(self.admin)
         with patch.dict(os.environ, {'BACKUP_DIR': str(self.backup_dir)}):
@@ -599,7 +604,7 @@ class BackupAdminViewTests(TestCase):
         )
 
     def test_restore_requires_correct_slug(self) -> None:
-        Patient.objects.create(pasientnummer=1, year=2025, problemstilling='X')
+        Patient.objects.create(pasientnummer=1, vakt=vakt_for_year(2025), problemstilling='X')
         client = Client()
         client.force_login(self.admin)
         with patch.dict(os.environ, {'BACKUP_DIR': str(self.backup_dir)}):
@@ -621,7 +626,7 @@ class BackupAdminViewTests(TestCase):
         self.assertEqual(resp_ok.status_code, 302)
 
     def test_restore_creates_audit_log_entry(self) -> None:
-        Patient.objects.create(pasientnummer=1, year=2025, problemstilling='X')
+        Patient.objects.create(pasientnummer=1, vakt=vakt_for_year(2025), problemstilling='X')
         client = Client()
         client.force_login(self.admin)
         with patch.dict(os.environ, {'BACKUP_DIR': str(self.backup_dir)}):
@@ -648,7 +653,7 @@ class BackupAdminViewTests(TestCase):
         self.assertIn(resp.status_code, (302, 403))
 
     def test_restore_view_requires_admin(self) -> None:
-        Patient.objects.create(pasientnummer=1, year=2025, problemstilling='X')
+        Patient.objects.create(pasientnummer=1, vakt=vakt_for_year(2025), problemstilling='X')
         with patch.dict(os.environ, {'BACKUP_DIR': str(self.backup_dir)}):
             backup = create_backup(slug='patients', kind=KIND_MANUAL)
         client = Client()
@@ -660,7 +665,7 @@ class BackupAdminViewTests(TestCase):
         self.assertIn(resp.status_code, (302, 403))
 
     def test_download_view_returns_gzip(self) -> None:
-        Patient.objects.create(pasientnummer=1, year=2025, problemstilling='X')
+        Patient.objects.create(pasientnummer=1, vakt=vakt_for_year(2025), problemstilling='X')
         client = Client()
         client.force_login(self.admin)
         with patch.dict(os.environ, {'BACKUP_DIR': str(self.backup_dir)}):
@@ -671,7 +676,7 @@ class BackupAdminViewTests(TestCase):
         self.assertIn(backup.filename, resp['Content-Disposition'])
 
     def test_delete_view_removes_backup(self) -> None:
-        Patient.objects.create(pasientnummer=1, year=2025, problemstilling='X')
+        Patient.objects.create(pasientnummer=1, vakt=vakt_for_year(2025), problemstilling='X')
         client = Client()
         client.force_login(self.admin)
         with patch.dict(os.environ, {'BACKUP_DIR': str(self.backup_dir)}):
@@ -866,7 +871,7 @@ class RestorePayloadInspectionTests(TestCase):
         raden skal komme tilbake uendret.
         """
         Patient.objects.create(
-            pasientnummer=77, year=2025, problemstilling='Verdi fra gammel versjon',
+            pasientnummer=77, vakt=vakt_for_year(2025), problemstilling='Verdi fra gammel versjon',
         )
         with patch.dict(os.environ, {'BACKUP_DIR': str(self.backup_dir)}):
             backup = create_backup(slug='patients', kind=KIND_MANUAL, user=self.admin)

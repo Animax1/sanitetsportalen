@@ -1,21 +1,23 @@
 """Les og skriv AppSetting-verdier fra kommandolinjen.
 
 Erstatter den ene tingen `/django-admin/` kunne som portalen ikke dekket:
-å korrigere en driftsverdi manuelt. `PUT /api/settings/` skriver kun
-``event_name``, og resten av nøklene — ``active_year``, ``next_patient_nr``,
-``session_timeout_hours``, feature-flagg — hadde ingen annen vei inn.
+å korrigere en driftsverdi manuelt. Nøklene som bor her etter deploy 2 av
+vakt-scopingen er ``aktiv_vakt_id``, tellerne per vakt
+(``next_patient_nr_vakt_<id>``, ``next_oppdrag_nr_vakt_<id>``),
+``session_timeout_hours`` og feature-flagg. ``active_year`` og ``event_name``
+er borte — vakta bærer begge (`core.Vakt`).
 
 Dette er bevisst en nødoperasjon og ikke en UI-flate. Verdiene endres sjelden,
-og de som finnes har konsekvenser: ``active_year`` styrer hvilket år nye
-pasienter havner i, og ``next_patient_nr`` styrer nummerserien. En feiltasting
-i et webskjema midt i en vakt er en verre feilmodus enn at man må ha
+og de som finnes har konsekvenser: ``aktiv_vakt_id`` styrer hvilken vakt nye
+pasienter havner i, og tellerne styrer nummerseriene. En feiltasting i et
+webskjema midt i en vakt er en verre feilmodus enn at man må ha
 railway-tilgang for å gjøre endringen.
 
 Bruk::
 
     python manage.py appsetting --list
-    python manage.py appsetting --get active_year
-    python manage.py appsetting --set active_year 2027
+    python manage.py appsetting --get aktiv_vakt_id
+    python manage.py appsetting --set next_patient_nr_vakt_1 42
     python manage.py appsetting --delete feature.gammelt_flagg
 """
 from django.core.management.base import BaseCommand, CommandError

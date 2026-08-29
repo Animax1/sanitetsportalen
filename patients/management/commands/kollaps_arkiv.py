@@ -1,21 +1,32 @@
 """Kollaps gamle vaktarkiv til aggregert statistikk.
 
-Etter 24 måneder slettes de arkiverte pasientradene permanent og erstattes av
-den ferdig beregnede statistikken. Formålet — evaluering og planlegging av
+Etter 24 måneder slettes de arkiverte radene permanent og erstattes av den
+ferdig beregnede statistikken. Formålet — evaluering og planlegging av
 kommende arrangementer — er da uttømt, og GDPR art. 5(1)(e) tillater ikke at
 helseopplysninger på radnivå blir liggende på ubestemt tid.
 
 Kjøres som:
-  python manage.py kollaps_arkiv --dry-run     # se hva som ville skjedd
-  python manage.py kollaps_arkiv               # utfør
-  python manage.py kollaps_arkiv --days 900    # annen grense
+  python manage.py kollaps_arkiv --dry-run           # se hva som ville skjedd
+  python manage.py kollaps_arkiv                     # utfør, alle moduler
+  python manage.py kollaps_arkiv --modul oppdrag     # kun én modul
+  python manage.py kollaps_arkiv --days 900          # annen grense
+
+**Kommandoen går gjennom `core.arkiv`-registeret**, ikke gjennom
+pasientmodulen. Den ble skrevet for `VaktArkiv` alene; fra fase 7 av
+oppdragsmodulen finnes to arkiver, og en kommando som bare kjente det ene
+ville latt oppdragsarkivet ligge til noen oppdaget det. Grensen kan settes per
+modul via `BaseArkivHandler.retention_dager` — `--days` overstyrer alle.
+
+Fila ligger fortsatt i pasientmodulen fordi cron-jobben peker hit
+(`docs/OPPSETT_KOLLAPS_CRON.md`); å bytte kommandonavn ville stoppet en
+planlagt sletting uten at noen fikk beskjed.
 
 **Operasjonen er irreversibel.** Etter kollaps finnes ingen opplysninger om
-enkeltpasienter i arkivet. Derfor:
+enkeltpersoner i arkivet. Derfor:
 
-- Kommandoen nekter å kollapse et arkiv med mindre det finnes en
-  ``arkiv``-backup tatt etter at arkivet ble opprettet. Da er slettingen
-  gjenopprettbar fra backup hvis noe skulle vise seg å være galt.
+- Kommandoen nekter å kollapse et arkiv med mindre det finnes en backup av
+  modulens arkiv tatt etter at arkivet ble opprettet. Da er slettingen
+  gjenopprettbar hvis noe skulle vise seg å være galt.
 - ``--dry-run`` viser nøyaktig hva som ville blitt slettet.
 - Hver kollaps loggføres i AuditLog.
 
@@ -27,16 +38,11 @@ Lagringstiden er begrunnet i docs/PERSONVERN_DOKUMENTASJON.md A.9.
 """
 from datetime import timedelta
 
-from django.core.management.base import BaseCommand
+from django.core.management.base import BaseCommand, CommandError
 from django.utils import timezone
 
 from audit.models import AuditLog
-from patients.models import ArkivertPasient, VaktArkiv
-from patients.services import har_arkiv_backup_etter, kollaps_arkiv
-
-# 24 måneder. Dekker to hele sesonger, slik at årets vakt kan sammenlignes
-# med fjorårets under planleggingen før radnivået forsvinner.
-DEFAULT_DAGER = 730
+from core.arkiv import all_handlers, get_handler, har_backup_etter, kollaps
 
 
 class Command(BaseCommand):
@@ -46,8 +52,16 @@ class Command(BaseCommand):
         parser.add_argument(
             '--days',
             type=int,
-            default=DEFAULT_DAGER,
-            help=f'Kollaps arkiv eldre enn N dager (standard: {DEFAULT_DAGER} = 24 mnd)',
+            default=None,
+            help=(
+                'Kollaps arkiv eldre enn N dager. Uten flagget bruker hver '
+                'modul sin egen `retention_dager` (standard 730 = 24 mnd).'
+            ),
+        )
+        parser.add_argument(
+            '--modul',
+            default=None,
+            help='Kjør kun for én modul (arkiv-handlerens slug).',
         )
         parser.add_argument(
             '--dry-run',
@@ -60,45 +74,79 @@ class Command(BaseCommand):
             action='store_true',
             default=False,
             help=(
-                'Kollaps selv om det ikke finnes en arkiv-backup. '
-                'Bruk kun hvis du vet hva du gjør — slettingen er irreversibel.'
+                'Kollaps selv om det ikke finnes en backup. Bruk kun hvis du '
+                'vet hva du gjør — slettingen er irreversibel.'
             ),
         )
 
     def handle(self, *args, **options):
-        dager = options['days']
         dry_run = options['dry_run']
         ignorer_sperre = options['ignorer_backup_sperre']
 
-        grense = timezone.now() - timedelta(days=dager)
+        if options['modul']:
+            handler = get_handler(options['modul'])
+            if handler is None:
+                kjente = ', '.join(sorted(h.slug for h in all_handlers())) or 'ingen'
+                raise CommandError(
+                    f'Ukjent modul «{options["modul"]}». Registrerte: {kjente}.')
+            handlere = [handler]
+        else:
+            handlere = sorted(all_handlers(), key=lambda h: h.slug)
 
-        kandidater = VaktArkiv.objects.filter(
-            kollapset_at__isnull=True,
-            importert_at__lt=grense,
-        ).order_by('importert_at')
-
-        if not kandidater.exists():
-            self.stdout.write(
-                f'Ingen arkiv eldre enn {dager} dager som ikke allerede er kollapset.'
-            )
+        if not handlere:
+            self.stdout.write('Ingen arkiv-handlere er registrert.')
             return
 
+        totalt_kollapset = 0
+        totalt_hoppet = 0
+        for handler in handlere:
+            kollapset, hoppet = self._kjor_modul(
+                handler, options['days'], dry_run, ignorer_sperre)
+            totalt_kollapset += kollapset
+            totalt_hoppet += hoppet
+
+        self.stdout.write('')
         if dry_run:
+            self.stdout.write(self.style.WARNING(
+                f'[Tørrkjøring fullført] {totalt_kollapset} arkiv ville blitt '
+                f'kollapset, {totalt_hoppet} hoppet over. Ingen data ble slettet.'
+            ))
+        else:
+            self.stdout.write(self.style.SUCCESS(
+                f'Ferdig: {totalt_kollapset} arkiv kollapset, '
+                f'{totalt_hoppet} hoppet over.'
+            ))
+
+    def _kjor_modul(self, handler, days, dry_run, ignorer_sperre):
+        dager = days if days is not None else handler.retention_dager
+        grense = timezone.now() - timedelta(days=dager)
+        navn = handler.display_name or handler.slug
+
+        kandidater = list(handler.kandidater(grense))
+        if not kandidater:
             self.stdout.write(
-                f'[Tørrkjøring] Arkiv eldre enn {dager} dager:'
+                f'{navn}: ingen arkiv eldre enn {dager} dager som ikke '
+                f'allerede er kollapset.'
             )
+            return 0, 0
+
+        if dry_run:
+            self.stdout.write(f'[Tørrkjøring] {navn} — eldre enn {dager} dager:')
+        else:
+            self.stdout.write(f'{navn} — eldre enn {dager} dager:')
 
         kollapset = 0
         hoppet_over = 0
 
         for arkiv in kandidater:
-            antall_rader = ArkivertPasient.objects.filter(arkiv=arkiv).count()
+            antall_rader = handler.antall_rader(arkiv)
 
-            if not ignorer_sperre and not har_arkiv_backup_etter(arkiv.importert_at):
+            if not ignorer_sperre and not har_backup_etter(
+                    handler, arkiv.importert_at):
                 self.stdout.write(self.style.WARNING(
-                    f'  HOPPET OVER «{arkiv.tittel}» ({antall_rader} pasientrader): '
-                    f'ingen arkiv-backup tatt etter at arkivet ble opprettet. '
-                    f'Kjør en backup av modulen «arkiv» først.'
+                    f'  HOPPET OVER «{arkiv.tittel}» ({antall_rader} rader): '
+                    f'ingen backup av modulen «{handler.backup_slug}» tatt '
+                    f'etter at arkivet ble opprettet. Kjør en backup først.'
                 ))
                 hoppet_over += 1
                 continue
@@ -107,36 +155,25 @@ class Command(BaseCommand):
                 self.stdout.write(
                     f'  Ville kollapset «{arkiv.tittel}» '
                     f'(arkivert {arkiv.importert_at:%d.%m.%Y}, '
-                    f'{antall_rader} pasientrader slettes)'
+                    f'{antall_rader} rader slettes)'
                 )
                 kollapset += 1
                 continue
 
-            slettet = kollaps_arkiv(arkiv)
+            slettet = kollaps(handler, arkiv)
 
             AuditLog.objects.create(
-                table_name='patients_vaktarkiv',
+                table_name=arkiv._meta.db_table,
                 record_id=arkiv.pk,
                 action='UPDATE',
                 field_name='kollapset_at',
                 old_value='',
-                new_value=(
-                    f'{slettet} pasientrader slettet, erstattet av aggregat'
-                ),
+                new_value=f'{slettet} rader slettet, erstattet av aggregat',
             )
 
             self.stdout.write(self.style.SUCCESS(
-                f'  Kollapset «{arkiv.tittel}»: {slettet} pasientrader slettet.'
+                f'  Kollapset «{arkiv.tittel}»: {slettet} rader slettet.'
             ))
             kollapset += 1
 
-        self.stdout.write('')
-        if dry_run:
-            self.stdout.write(self.style.WARNING(
-                f'[Tørrkjøring fullført] {kollapset} arkiv ville blitt kollapset, '
-                f'{hoppet_over} hoppet over. Ingen data ble slettet.'
-            ))
-        else:
-            self.stdout.write(self.style.SUCCESS(
-                f'Ferdig: {kollapset} arkiv kollapset, {hoppet_over} hoppet over.'
-            ))
+        return kollapset, hoppet_over

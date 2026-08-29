@@ -11,9 +11,17 @@ at to prosesser/tråder lager samme backup samtidig når Gunicorn kjører med
 flere arbeidere.
 
 **Per-modul (Fase 4):** Tidligere var det én singleton ``BackupConfig`` for
-patients. Nå itererer vi alle ``ModuleBackupConfig``-rader hvor
-``enabled=True`` og en backup-handler er registrert, og kjører backup
-uavhengig per modul (med eget intervall + cap).
+patients. Nå itererer vi modulene som har en registrert backup-handler, og
+kjører backup uavhengig per modul (med eget intervall + cap).
+
+**Registeret er fasit for hvilke moduler som finnes, ikke konfigtabellen.**
+Scheduleren leste tidligere ``ModuleBackupConfig``-radene direkte, og en modul
+uten rad var dermed usynlig for den. Radene ble opprettet først når en admin
+åpnet ``/portal-admin/backup/`` — så da oppdragsmodulen fikk backup i fase 7,
+hadde den ingen automatisk dekning før noen tilfeldigvis besøkte den siden.
+Verre: uten en ``oppdrag_arkiv``-backup nekter ``kollaps_arkiv`` å kjøre, så
+mangelen ville dukket opp som en blokkert sletting to år senere. Nå lages raden
+med standardverdier første gang scheduleren ser en handler uten en.
 """
 from __future__ import annotations
 
@@ -52,6 +60,27 @@ def _should_run_now(cfg) -> bool:
         return True
     elapsed = timezone.now() - cfg.last_run_at
     return elapsed >= timedelta(minutes=cfg.interval_minutes)
+
+
+def _konfigurasjoner():
+    """``(slug, cfg)`` for hver registrert handler, rad opprettet ved behov.
+
+    Én spørring i normaltilfellet: radene finnes, og bare en helt ny modul
+    koster en ekstra ``get_or_create``. Konfigrader uten handler hoppes over —
+    det er rester etter en modul som er fjernet fra koden, og de skal ikke
+    holde liv i en backup ingen kan gjenopprette.
+    """
+    from core.backup import all_handlers
+    from core.models import ModuleBackupConfig
+
+    kjente = {c.module_slug: c for c in ModuleBackupConfig.objects.all()}
+    ut = []
+    for handler in all_handlers():
+        cfg = kjente.get(handler.slug)
+        if cfg is None:
+            cfg = ModuleBackupConfig.get_or_default(handler.slug)
+        ut.append((handler.slug, cfg))
+    return ut
 
 
 def _run_backup_for_module(slug: str) -> None:
@@ -125,16 +154,9 @@ def _run_all_modules() -> None:
     """
     global _is_running
     try:
-        from core.backup import get_handler
-        from core.models import ModuleBackupConfig
-
-        active_configs = ModuleBackupConfig.objects.filter(enabled=True)
-        for cfg in active_configs:
-            if get_handler(cfg.module_slug) is None:
-                continue
-            if not _should_run_now(cfg):
-                continue
-            _run_backup_for_module(cfg.module_slug)
+        for slug, cfg in _konfigurasjoner():
+            if _should_run_now(cfg):
+                _run_backup_for_module(slug)
     finally:
         with _running_lock:
             _is_running = False
@@ -164,18 +186,7 @@ def maybe_run_backup() -> None:
     # Rask sjekk om det finnes minst \xe9n aktiv konfig som faktisk trenger backup.
     # (Sparer oss for en bakgrunnstr\xe5d hvis ingenting er due.)
     try:
-        from core.backup import get_handler
-        from core.models import ModuleBackupConfig
-
-        any_due = False
-        for cfg in ModuleBackupConfig.objects.filter(enabled=True):
-            if get_handler(cfg.module_slug) is None:
-                continue
-            if _should_run_now(cfg):
-                any_due = True
-                break
-
-        if not any_due:
+        if not any(_should_run_now(cfg) for _, cfg in _konfigurasjoner()):
             with _running_lock:
                 _is_running = False
             return

@@ -48,6 +48,17 @@
               data-action="lastLokasjonsadmin">
         <i class="bi bi-geo-alt me-1"></i>Lokasjoner
       </button>
+      {% comment %}
+        Vaktarkivet (fase 7). Egen knapp, ikke en variant av «Historikk»:
+        historikken rydder tavla og er reversibel, arkivet fryser vakta med
+        signatur og en kollaps som sletter radnivået etter 24 måneder. To
+        handlinger som ser like ut i en meny, blir før eller siden forvekslet.
+      {% endcomment %}
+      <button type="button" class="btn btn-outline-secondary btn-sm"
+              data-bs-toggle="modal" data-bs-target="#arkivModal"
+              data-action="lastArkiv">
+        <i class="bi bi-archive me-1"></i>Vaktarkiv
+      </button>
       {% endif %}
     </div>
   </div>
@@ -201,6 +212,37 @@
     </div>
   </div>
 </div>
+
+{% if er_global_admin %}
+<div class="modal fade" id="arkivModal" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Vaktarkiv</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Lukk"></button>
+      </div>
+      <div class="modal-body">
+        <div class="border rounded p-3 mb-3">
+          <label class="form-label" for="arkiv-notat">Arkiver vakta som går nå</label>
+          <input type="text" id="arkiv-notat" class="form-control mb-2"
+                 placeholder="Notat (valgfritt)" maxlength="500">
+          <button class="btn btn-primary" type="button" id="arkiv-knapp"
+                  data-action="arkiverVakt">
+            <i class="bi bi-archive me-1"></i>Arkiver oppdragene
+          </button>
+          <p class="form-text mb-0 mt-2">
+            Oppdragene fryses med signatur. De blir stående på tavla og i
+            historikken — arkivering fjerner ingenting. Pasientene arkiveres
+            for seg, under Pasientregistrering.
+          </p>
+          <div id="arkiv-feil" class="text-danger small mt-2 d-none"></div>
+        </div>
+        <div id="arkivliste"><div class="tom-melding">Laster…</div></div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}
 
 <div class="modal fade" id="oppdragDetaljModal" tabindex="-1">
   <div class="modal-dialog modal-lg">

@@ -42,7 +42,7 @@ class ETagHelperTests(TestCase):
 
 @override_settings(SECURE_SSL_REDIRECT=False)
 class StatsCacheViewTests(TestCase):
-    """Integrasjonstester mot /statistikk/api/full-stats/.
+    """Integrasjonstester mot /statistikk/api/kilde/patients/full-stats/.
 
     Testene kjørte mot `/pasienter/api/stats/` fram til 28. aug. 2026 — det var
     det raskeste endepunktet med dekoratoren på. Endepunktet er slettet (ingen
@@ -64,7 +64,7 @@ class StatsCacheViewTests(TestCase):
 
     def test_full_stats_returnerer_etag_og_ttl(self):
         self.client.login(username='admin1', password='testpass123')
-        resp = self.client.get(reverse('api_full_stats'))
+        resp = self.client.get(reverse('api_kilde_full_stats', kwargs={'slug': 'patients'}))
         self.assertEqual(resp.status_code, 200)
         self.assertIn('ETag', resp)
         self.assertIn('Cache-Control', resp)
@@ -74,12 +74,12 @@ class StatsCacheViewTests(TestCase):
         self.client.login(username='admin1', password='testpass123')
 
         # Første request: 200 med ETag
-        resp1 = self.client.get(reverse('api_full_stats'))
+        resp1 = self.client.get(reverse('api_kilde_full_stats', kwargs={'slug': 'patients'}))
         self.assertEqual(resp1.status_code, 200)
         etag = resp1['ETag']
 
         # Andre request med samme ETag: 304
-        resp2 = self.client.get(reverse('api_full_stats'), HTTP_IF_NONE_MATCH=etag)
+        resp2 = self.client.get(reverse('api_kilde_full_stats', kwargs={'slug': 'patients'}), HTTP_IF_NONE_MATCH=etag)
         self.assertEqual(resp2.status_code, 304)
         # 304-response har tom body (Django HttpResponseNotModified)
         self.assertEqual(resp2.content, b'')
@@ -89,7 +89,7 @@ class StatsCacheViewTests(TestCase):
     def test_ikke_matching_etag_gir_200(self):
         self.client.login(username='admin1', password='testpass123')
         resp = self.client.get(
-            reverse('api_full_stats'),
+            reverse('api_kilde_full_stats', kwargs={'slug': 'patients'}),
             HTTP_IF_NONE_MATCH='W/"feilverdi"'
         )
         self.assertEqual(resp.status_code, 200)
@@ -99,7 +99,7 @@ class StatsCacheViewTests(TestCase):
         self.client.login(username='admin1', password='testpass123')
 
         # Første request: fyller cache
-        resp1 = self.client.get(reverse('api_full_stats'))
+        resp1 = self.client.get(reverse('api_kilde_full_stats', kwargs={'slug': 'patients'}))
         self.assertEqual(resp1.status_code, 200)
 
         # Verifiser at noe faktisk ligger i cache-laget
@@ -108,12 +108,12 @@ class StatsCacheViewTests(TestCase):
         from django.core.cache import cache as dcache
         # LocMemCache eksponerer ikke keys(), så vi tester indirekte:
         # andre request skal returnere samme ETag uten at data endres.
-        resp2 = self.client.get(reverse('api_full_stats'))
+        resp2 = self.client.get(reverse('api_kilde_full_stats', kwargs={'slug': 'patients'}))
         self.assertEqual(resp1['ETag'], resp2['ETag'])
 
     def test_uautentisert_far_redirect(self):
         """Stats-endepunkter krever login."""
-        resp = self.client.get(reverse('api_full_stats'))
+        resp = self.client.get(reverse('api_kilde_full_stats', kwargs={'slug': 'patients'}))
         # @login_required redirecter til login-siden
         self.assertIn(resp.status_code, (302, 401, 403))
 
@@ -124,7 +124,7 @@ class StatsCacheViewTests(TestCase):
             role='bruker', must_change_password=False,
         )
         self.client.login(username='ro1', password='testpass123')
-        resp = self.client.get(reverse('api_full_stats'))
+        resp = self.client.get(reverse('api_kilde_full_stats', kwargs={'slug': 'patients'}))
         # @modul_kreves('statistikk', 'les') stenger — fravær av rad er ingen tilgang
         self.assertIn(resp.status_code, (302, 403))
 
