@@ -294,6 +294,41 @@ personlige kontoer, admin-reset beholdt for alle. Ingenting bygget ennå.
       invitasjonen. `PASSWORD_RESET_TIMEOUT` er bevisst ikke satt: den leses kun av
       Djangos egen generator, som ikke er i bruk.
 
+### Vakt som scope, ikke år — TRENGER BESLUTNING
+
+- [ ] **Premiss fastslått av André 29. aug. 2026: portalen tenker i *vakter*, ikke i år.**
+      Den skal brukes på forskjellige arrangementer, ikke på det samme én gang i året.
+      Ingenting er bygget på dette ennå — punktet står her for at premisset ikke skal
+      gå tapt, og fordi et docs-punkt som ikke står i TODO ikke blir gjort.
+
+      **Dagens scope er `year`, og det stikker dypt.** Kartlagt 29. aug.:
+      `Patient.year`, `Oppdrag.year`, `VaktArkiv.year_snapshot`, 73 kallesteder på
+      `get_active_year`/`active_year` i 8 filer, tellerne `next_patient_nr` og
+      `next_oppdrag_nr_<år>`, og statistikkens gruppering.
+
+      **Konsekvensen er allerede synlig i kode som nettopp ble skrevet.**
+      `oppdragsnummer` restarter per *år*. Kjøres tre vakter i 2026, teller numrene
+      1–40 tvers gjennom alle tre — «oppdrag 14» blir da tvetydig neste gang, som er
+      nettopp det nummeret skulle løse. Under vakt-scoping skal det restarte per vakt.
+
+      **Vaktnavnet finnes allerede halvveis:** `AppSetting['event_name']`, og
+      `VaktArkiv` fryser `arrangement_navn` på seg selv. `patients/services.py` noterer
+      dessuten at en `event_name_<år>`-mekanisme fantes og ble slettet 13. aug. som
+      ubrukt — den ble skrevet for et behov som nå har meldt seg på ordentlig.
+
+      **Spørsmål som må avgjøres før kode:**
+      - Blir `Vakt` en modell, eller er det `event_name` som får bære det?
+      - Hva skjer med data som allerede er scopet på år? Prod har 273 importerte
+        pasienter på 2026, og staging har oppdrag.
+      - Kan to vakter være åpne samtidig, eller er det én aktiv om gangen som i dag?
+      - Har en vakt start og slutt, eller lukkes den ved arkivering?
+      - Hvordan spiller det mot fase 7, som allerede fryser `arrangement_navn`?
+      - Skal statistikken sammenligne vakter i stedet for år?
+
+      Skrives som `docs/BESLUTNING_VAKT_SOM_SCOPE.md` etter samme mønster som
+      rollemodellen og oppdragsmodulen — beslutning før kode, siden dette treffer to
+      moduler, en migrasjon med produksjonsdata, og et arkiv som allerede er signert.
+
 ### Rollemodellen — se `docs/BESLUTNING_ROLLEMODELLEN.md`
 
 - [x] **Besluttet 24. aug. 2026.** Global admin, pluss ett nivå per modul:
