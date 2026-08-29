@@ -4,6 +4,23 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-08-29 — Sperra på Pensjoner er testet, ikke bare tegnet
+
+**1138 tester grønne** (2 nye). Ingen migrasjon.
+
+André spurte hvem som når Pensjoner-knappen. Svaret var riktig — global admin, både i
+tegningen og på serveren — men bare halvparten av det var testet.
+
+Da Enheter-panelet ble åpnet for `skriv_full` i forrige økt, fikk den gruppa et panel som
+også nevner `PUT /oppdrag/api/enheter/<pk>/`. Endepunktet krevde global admin hele veien;
+testene dekket bare `enheter/ny/`. En knapp som ikke tegnes er ingen sperre — sperra er
+serveren, og den skal ha en test som går rød når noen fjerner den.
+
+To tester lagt til: `skriv_full` uten admin får 403 på både lesing og pensjonering av en
+enhet, og enheten er fortsatt aktiv etterpå.
+
+---
+
 ## 2026-08-29 — Tavla viser ressurser og oppdrag, resten ligger bak knappen
 
 **1136 tester grønne** (2 nye). Ingen migrasjon.

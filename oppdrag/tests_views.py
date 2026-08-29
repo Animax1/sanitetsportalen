@@ -290,6 +290,25 @@ class EnhetsadminTests(OppdragBasis):
                       data={'navn': 'Karmøy 13'})
         self.assertEqual(resp.status_code, 403)
 
+    def test_skriv_full_kan_ikke_pensjonere_enhet(self):
+        """Enheter-panelet ble åpnet for `skriv_full` 29. aug. 2026.
+
+        Panelet viser da også Pensjoner-knappen sitt endepunkt. Knappen
+        tegnes bare for global admin, men en knapp som ikke tegnes er ingen
+        sperre — sperra er denne.
+        """
+        c = _klient(_bruker('sentral23', 'skriv_full'))
+        resp = c.put(f'/oppdrag/api/enheter/{self.enhet.pk}/',
+                     content_type='application/json', data={'er_aktiv': False})
+        self.assertEqual(resp.status_code, 403)
+        self.enhet.refresh_from_db()
+        self.assertTrue(self.enhet.er_aktiv)
+
+    def test_skriv_full_kan_ikke_lese_enhetsdetaljer(self):
+        c = _klient(_bruker('sentral24', 'skriv_full'))
+        self.assertEqual(
+            c.get(f'/oppdrag/api/enheter/{self.enhet.pk}/').status_code, 403)
+
     def test_admin_kan_opprette_enhet(self):
         c = _klient(_bruker('adm10', 'skriv_full', admin=True))
         resp = c.post('/oppdrag/api/enheter/ny/', content_type='application/json',

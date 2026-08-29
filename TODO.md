@@ -572,6 +572,11 @@ Gjennomgang 13. aug. 2026, med 1000 pasienter og peak 100 brukere som premiss.
             `manage.py shell` — en glipp, ikke en avgrensning. Opprettelse, aktivering og
             kontokobling ligger i sentralbordets admin-panel nå, med regelen skrevet rett
             i panelet: koblingen gir ingen tilgang.
+      - [x] **Sperra på enhetsadmin er testet (29. aug. 2026).** `PUT
+            /oppdrag/api/enheter/<pk>/` (navn, pensjonering, kobling) krevde global
+            admin hele tiden, men bare `enheter/ny/` hadde en 403-test. Da panelet ble
+            åpnet for `skriv_full`, ble den luka verdt å lukke: to tester krever nå 403
+            på både lesing og pensjonering for `skriv_full` uten admin.
       - [ ] **Fase 3 arver til fase 4:** enhetskontoer får i dag en mellomtilstand som
             sier at skjermen ikke er bygget. Å sende dem til sentralbordet ville vist
             dem alle oppdrag i vakta.
