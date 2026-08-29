@@ -4,6 +4,46 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-08-29 — `ø` var ikke feilen, og verktøyet sier nå hva som er det
+
+**1232 tester grønne** (6 nye). Ingen migrasjon.
+
+Kontoen som ikke kom inn heter `karmøy56`. Utskriften fra `sjekk_brukernavn` viste den
+lagret **helt rent** — `karm[ø U+00F8]y56`, riktig prekomponert, ingen lookalike, ingen
+NFD, ingen mellomrom. **Brukernavnet var altså ikke feilen**, og hypotesen forrige
+oppføring bygget på traff ikke dette tilfellet.
+
+Da sto man uten neste steg, og det var mangelen: verktøyet svarte på ett spørsmål og
+stoppet der. Det viser nå kontoens tilstand når navnet stemmer, og navngir det som
+faktisk blokkerer:
+
+| Tilstand | Hvorfor den stopper innlogging |
+|---|---|
+| `is_active=False` | Kontoen er deaktivert |
+| Ingen brukbar passord-hash | Opprettet med invitasjon, lenken aldri brukt. **Ingen** passord virker |
+| `locked_until` i framtiden | Fem feilede forsøk låser i 15 min |
+| `mfa_required` uten bekreftet TOTP-enhet | Innlogging går til MFA-oppsett, ikke til portalen |
+
+Den midterste er den lumske: feilmeldingen ved innlogging er identisk med «feil passord»,
+med vilje, så utenfra er de to umulige å skille. En utløpt `locked_until` regnes ikke som
+blokkering — det er en gammel hendelse, ikke en sperre. Egen test.
+
+**Verdt å kjenne for enhetskontoer:** invitasjonsflyten krever `not er_delt_konto` *og* en
+e-postadresse. En bilkonto er en delt konto uten e-post, så den får alltid et **generert
+12-tegns midlertidig passord** og `must_change_password=True` — ikke et passord man velger
+selv ved opprettelsen. Skriver man inn passordet man *trodde* man satte, feiler det, og
+brukernavnet med `ø` i er en nærliggende, men uskyldig, mistenkt.
+
+**Et funn til, som ikke forklarer dette tilfellet men er ekte:** `set_password` kaller
+`make_password` rett på råstrengen — **Django normaliserer ikke passord**. Et passord med
+`å` satt i én Unicode-normalform og skrevet i en annen gir ulik hash, uten at noe kan ses.
+`æ` og `ø` dekomponerer ikke og rammes ikke, så det forklarer ikke `karmøy56`. Verktøyet
+sier fra om det når ingenting annet blokkerer. **Ikke rettet** — en fallback som også
+prøver den normaliserte formen ville utvidet hva som godtas som passord, og det er en
+avgjørelse som fortjener å tas bevisst, ikke i forbifarten.
+
+---
+
 ## 2026-08-29 — Innlogging med æøå, og en grønn prikk for ledig
 
 **1220 tester grønne** (7 nye). Ingen migrasjon.

@@ -294,6 +294,20 @@ personlige kontoer, admin-reset beholdt for alle. Ingenting bygget ennå.
       invitasjonen. `PASSWORD_RESET_TIMEOUT` er bevisst ikke satt: den leses kun av
       Djangos egen generator, som ikke er i bruk.
 
+- [ ] **VURDER: skal innlogging normalisere passordet?** Funnet 29. aug. 2026.
+      `set_password` kaller `make_password` rett på råstrengen, så Django normaliserer
+      ikke passord. Et passord med `å` satt i én Unicode-normalform og skrevet i en
+      annen gir ulik hash — usynlig for både bruker og admin. (`æ` og `ø` dekomponerer
+      ikke og rammes ikke.)
+
+      En fallback som prøver den NFC-normaliserte formen i tillegg til råstrengen ville
+      rettet det uten å bryte eksisterende passord. Men den utvider hva som godtas som
+      gyldig passord, og bør derfor besluttes bevisst. **NFC, ikke NFKC** om det gjøres:
+      NFKC folder også kompatibilitetstegn, slik at «ﬁsk» ville åpnet en konto med
+      passordet «fisk».
+
+      `sjekk_brukernavn` nevner muligheten når ingenting annet blokkerer innlogging.
+
 ### Vakt som scope, ikke år — se `docs/BESLUTNING_VAKT_SOM_SCOPE.md`
 
 - [ ] **Premiss fastslått av André 29. aug. 2026: portalen tenker i *vakter*, ikke i år.**

@@ -26,6 +26,7 @@ import re
 import unicodedata
 
 from django.core.management.base import BaseCommand
+from django.utils import timezone
 
 from accounts.brukernavn import normaliser, oppslagsnokkel
 from accounts.models import CustomUser
@@ -78,6 +79,38 @@ def _tegnvis(tekst):
     return ' '.join(biter)
 
 
+#: Tilstander som hver for seg stopper innlogging, med forklaringen på
+#: hvorfor. Rekkefølgen er den brukeren møter dem i.
+def _blokkeringer(bruker):
+    from django_otp.plugins.otp_totp.models import TOTPDevice
+
+    funn = []
+    if not bruker.is_active:
+        funn.append(('Kontoen er deaktivert (is_active=False)',
+                     'Aktiver den fra brukeradmin.'))
+    if not bruker.has_usable_password():
+        funn.append((
+            'Kontoen har INGEN brukbar passord-hash',
+            'Den er opprettet med invitasjon og lenken er ikke brukt ennå. '
+            'Ingen passord vil virke. Sett et passord fra brukeradmin, eller '
+            'send invitasjonen på nytt.'))
+    if bruker.locked_until and bruker.locked_until > timezone.now():
+        minutter = int(
+            (bruker.locked_until - timezone.now()).total_seconds() / 60) + 1
+        funn.append((f'Kontoen er LÅST i {minutter} minutt(er) til',
+                     'Fem feilede forsøk låser i 15 min. Vent, eller lås opp '
+                     'fra brukeradmin.'))
+    if bruker.mfa_required:
+        har_enhet = TOTPDevice.objects.filter(
+            user=bruker, confirmed=True).exists()
+        if not har_enhet:
+            funn.append((
+                'MFA er påkrevd, men kontoen har ingen bekreftet TOTP-enhet',
+                'Innlogging går da til MFA-oppsett i stedet for til portalen — '
+                'det kan se ut som at den «ikke slipper inn».'))
+    return funn
+
+
 class Command(BaseCommand):
     help = 'Vis brukernavn tegn for tegn, og test om et oppslag ville truffet'
 
@@ -86,6 +119,34 @@ class Command(BaseCommand):
             'brukernavn', nargs='?',
             help=('Valgfritt: test om denne strengen ville funnet en konto. '
                   'Godtar \\uXXXX-rømming for kanaler uten norske tegn.'))
+
+    def _skriv_tilstand(self, bruker):
+        """Kontoens tilstand — det som stopper innlogging når navnet stemmer."""
+        self.stdout.write('\n  Kontotilstand:')
+        self.stdout.write(f'    aktiv:                 {bruker.is_active}')
+        self.stdout.write(f'    brukbart passord:      {bruker.has_usable_password()}')
+        self.stdout.write(f'    må bytte passord:      {bruker.must_change_password}')
+        self.stdout.write(f'    MFA påkrevd:           {bruker.mfa_required}')
+        self.stdout.write(f'    delt konto:            {bruker.er_delt_konto}')
+        self.stdout.write(f'    feilede forsøk:        {bruker.failed_login_attempts}')
+        self.stdout.write(f'    låst til:              {bruker.locked_until or "—"}')
+        self.stdout.write(f'    sist innlogget:        {bruker.last_login_at or "aldri"}')
+
+        blokkeringer = _blokkeringer(bruker)
+        if not blokkeringer:
+            self.stdout.write(self.style.SUCCESS(
+                '\n  Ingenting i kontotilstanden stopper innlogging.'))
+            self.stdout.write(
+                '  Da står passordet igjen. Merk at et passord med «å» kan '
+                'feile\n  om det ble satt i én Unicode-normalform og skrives i '
+                'en annen —\n  Django normaliserer ikke passord. «æ» og «ø» '
+                'rammes ikke.')
+            return
+
+        self.stdout.write(self.style.ERROR('\n  Dette stopper innlogging:'))
+        for hva, hvorfor in blokkeringer:
+            self.stdout.write(self.style.ERROR(f'    * {hva}'))
+            self.stdout.write(f'      {hvorfor}')
 
     def handle(self, *args, **options):
         self.stdout.write('Kontoer i basen:\n')
@@ -123,10 +184,9 @@ class Command(BaseCommand):
 
         if len(treff) == 1:
             self.stdout.write(self.style.SUCCESS(
-                f'  -> Treffer kontoen {treff[0].username!r}.'))
-            self.stdout.write(
-                '     Feiler innlogging likevel, er det passordet eller '
-                'kontolåsen (5 feil = 15 min), ikke brukernavnet.')
+                f'  -> Treffer kontoen {treff[0].username!r}. '
+                'Brukernavnet er altså ikke feilen.'))
+            self._skriv_tilstand(treff[0])
         elif len(treff) > 1:
             self.stdout.write(self.style.WARNING(
                 f'  -> Flere kontoer matcher ({", ".join(t.username for t in treff)}). '

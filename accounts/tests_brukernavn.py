@@ -8,11 +8,13 @@ fordi meldingen med vilje ikke røper hvilket av de to som feilet.
 
 Det rammer nettopp de som ikke valgte brukernavnet sitt selv.
 """
+from datetime import timedelta
 import unicodedata
 from io import StringIO
 
 from django.contrib.auth import authenticate
 from django.core.management import call_command
+from django.utils import timezone
 from django.core.cache import cache
 from django.test import Client, TestCase, override_settings
 from django.urls import reverse
@@ -300,3 +302,66 @@ class SjekkBrukernavnKommandoTests(TestCase):
         self._kjor('bjørn.rød')
         self.assertEqual(
             list(CustomUser.objects.values_list('username', flat=True)), foer)
+
+
+class KontotilstandDiagnoseTests(TestCase):
+    """Når brukernavnet stemmer, skal verktøyet si hva som ellers stopper.
+
+    Utløst av et konkret tilfelle: kontoen `karmøy56` kom ikke inn, og `ø` var
+    den åpenbare mistenkte. Brukernavnet viste seg å være lagret helt rent, og
+    da sto man uten neste steg. Disse tilstandene er det som faktisk stopper en
+    innlogging når navnet er riktig.
+    """
+
+    def _kjor(self, navn):
+        ut = StringIO()
+        call_command('sjekk_brukernavn', navn, stdout=ut, stderr=ut)
+        return ut.getvalue()
+
+    def test_frisk_konto_melder_ingen_blokkering(self):
+        CustomUser.objects.create_user(
+            username='karmøy56', password='Abc123xyz789', er_delt_konto=True)
+        ut = self._kjor('karmøy56')
+        self.assertIn('Brukernavnet er altså ikke feilen', ut)
+        self.assertIn('Ingenting i kontotilstanden stopper innlogging', ut)
+
+    def test_ubrukbart_passord_navngis(self):
+        """En invitert konto som aldri brukte lenken har ingen hash.
+
+        Da virker *ingen* passord, og feilmeldingen ved innlogging er den
+        samme som ved feil passord — umulig å skille utenfra.
+        """
+        bruker = CustomUser.objects.create(username='invitert56')
+        bruker.set_unusable_password()
+        bruker.save()
+        ut = self._kjor('invitert56')
+        self.assertIn('INGEN brukbar passord-hash', ut)
+
+    def test_laast_konto_navngis_med_gjenstaaende_tid(self):
+        bruker = CustomUser.objects.create_user(username='laast56', password='x')
+        bruker.locked_until = timezone.now() + timedelta(minutes=12)
+        bruker.save()
+        ut = self._kjor('laast56')
+        self.assertIn('LÅST', ut)
+        self.assertIn('minutt', ut)
+
+    def test_utgaatt_laas_regnes_ikke_som_blokkering(self):
+        """`locked_until` i fortiden er en gammel hendelse, ikke en sperre."""
+        bruker = CustomUser.objects.create_user(username='utgaatt56', password='x')
+        bruker.locked_until = timezone.now() - timedelta(minutes=1)
+        bruker.save()
+        self.assertIn('Ingenting i kontotilstanden stopper innlogging',
+                      self._kjor('utgaatt56'))
+
+    def test_deaktivert_konto_navngis(self):
+        CustomUser.objects.create_user(
+            username='av56', password='x', is_active=False)
+        self.assertIn('deaktivert', self._kjor('av56'))
+
+    def test_mfa_uten_enhet_navngis(self):
+        """Innlogging går da til MFA-oppsett — det ser ut som «slipper ikke inn»."""
+        CustomUser.objects.create_user(
+            username='mfa56', password='x', mfa_required=True)
+        ut = self._kjor('mfa56')
+        self.assertIn('MFA', ut)
+        self.assertIn('TOTP', ut)
