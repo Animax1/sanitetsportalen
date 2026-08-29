@@ -438,8 +438,10 @@ class ModulTilgangForm(forms.Form):
     PREFIKS = 'modul_'
     INGEN = ''
 
-    # Nivåene admin kan velge i dag. Rekkefølgen er stigens.
-    VALGBARE = ('les', 'skriv_full')
+    # Nivåene tilbys per modul, ikke globalt — se `Module.nivaaer`. En global
+    # liste hadde begge feil samtidig: den skjulte `skriv_handling` for
+    # oppdragsmodulen, som er den nivået ble laget for, og tilbød `skriv_full`
+    # på statistikk, der skriving ikke finnes.
 
     def __init__(self, *args, bruker=None, **kwargs):
         super().__init__(*args, **kwargs)
@@ -450,7 +452,7 @@ class ModulTilgangForm(forms.Form):
             navn = self.PREFIKS + modul.slug
             har = self._naavaerende.get(modul.slug, self.INGEN)
             valg = [(self.INGEN, 'Ingen tilgang')]
-            valg += [(v, l) for v, l in TilgangsNivaa.choices if v in self.VALGBARE]
+            valg += [(v, l) for v, l in TilgangsNivaa.choices if v in modul.nivaaer]
             # Et nivå brukeren allerede har, men som ikke tilbys, må stå i
             # lista — ellers ville et lagre-trykk stille fjernet det.
             if har and har not in [v for v, _ in valg]:

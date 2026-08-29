@@ -419,3 +419,60 @@ class KontotypeBilTests(TestCase):
         self.assertEqual(Enhet.objects.count(), 0)
         self.assertTrue(
             CustomUser.objects.get(username='sykestua').er_delt_konto)
+
+
+@override_settings(SECURE_SSL_REDIRECT=False, RATELIMIT_ENABLE=False)
+class MatriseNivaaerTests(TestCase):
+    """Matrisen tilbyr nivåene modulen faktisk bruker.
+
+    Fram til 29. aug. 2026 var lista global, og hadde begge feil samtidig:
+    `skriv_handling` sto ikke i den — med den begrunnelsen at ingen modul
+    brukte nivået — mens oppdragsmodulen var bygget for akkurat det nivået og
+    ikke kunne få det. Samtidig tilbød den `skriv_full` på statistikk, der
+    skriving ikke finnes.
+    """
+
+    def setUp(self):
+        self.client = Client()
+        admin = CustomUser.objects.create_user(
+            username='matriseadmin', password='AdminPass123!', role='admin',
+            must_change_password=False, is_staff=True)
+        gi_standardtilgang(admin, 'admin')
+        self.client.force_login(admin)
+
+    def _valg(self, slug):
+        from accounts.forms import ModulTilgangForm
+        felt = ModulTilgangForm().fields[ModulTilgangForm.PREFIKS + slug]
+        return [v for v, _ in felt.choices]
+
+    def test_oppdrag_tilbyr_skriv_handling(self):
+        self.assertIn('skriv_handling', self._valg('oppdrag'))
+
+    def test_patients_tilbyr_ikke_skriv_handling(self):
+        """Pasientmodulen har ingen stemplingsendepunkter."""
+        self.assertNotIn('skriv_handling', self._valg('patients'))
+
+    def test_statistikk_tilbyr_ikke_skriving(self):
+        valg = self._valg('statistikk')
+        self.assertIn('les', valg)
+        self.assertNotIn('skriv_full', valg)
+        self.assertNotIn('skriv_handling', valg)
+
+    def test_skjemaet_viser_skriv_handling_for_oppdrag(self):
+        html = self.client.get(reverse('accounts:user_create')).content.decode()
+        self.assertIn('skriv_handling', html)
+
+    def test_nivaa_brukeren_har_staar_i_lista_selv_om_det_ikke_tilbys(self):
+        """Ellers ville et lagre-trykk stille fjernet det."""
+        from accounts.forms import ModulTilgangForm
+        from accounts.models import ModulTilgang
+
+        bruker = CustomUser.objects.create_user(
+            username='arvet', password='x', role='bruker',
+            must_change_password=False)
+        ModulTilgang.objects.create(
+            bruker=bruker, modul_slug='statistikk', nivaa='skriv_full')
+
+        felt = ModulTilgangForm(bruker=bruker).fields[
+            ModulTilgangForm.PREFIKS + 'statistikk']
+        self.assertIn('skriv_full', [v for v, _ in felt.choices])

@@ -27,4 +27,7 @@ StatistikkModule = Module(
     order=110,
     show_in_nav=True,
     show_in_dashboard=True,
+    # Statistikk har ingen skriveendepunkter. `skriv_full` her ville vært et
+    # nivå som ikke gir noe — lett å dele ut i god tro.
+    nivaaer=('les',),
 )

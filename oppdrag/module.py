@@ -28,4 +28,7 @@ OppdragModule = Module(
     order=120,
     show_in_nav=True,
     show_in_dashboard=True,
+    # Den første modulen som tar `skriv_handling` i bruk: bilen stempler
+    # status uten å kunne redigere felter. Se §3.2 i rollemodellnotatet.
+    nivaaer=('les', 'skriv_handling', 'skriv_full'),
 )

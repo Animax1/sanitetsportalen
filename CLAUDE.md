@@ -72,8 +72,13 @@ Nivåene er en ordnet stige. **Fravær av rad er ingen tilgang** — det finnes 
 | Nivå | Betyr |
 |---|---|
 | `les` | Kan se modulens data |
-| `skriv_handling` | Navngitte overganger (stemplinger), leser ikke request-kroppen. **Tomt i dag** |
+| `skriv_handling` | Navngitte overganger (stemplinger), leser ikke request-kroppen |
 | `skriv_full` | Kan redigere felter |
+
+**Hver modul deklarerer hvilke nivåer som betyr noe for den** — `Module.nivaaer`. Matrisen
+tilbyr de nivåene og ingen andre. En global liste hadde begge feil samtidig: den skjulte
+`skriv_handling` for oppdragsmodulen, som er den nivået ble laget for, og tilbød
+`skriv_full` på statistikk, der skriving ikke finnes.
 
 Ukjent nivånavn gir **False**, ikke True — en skrivefeil i en dekoratør skal stenge døra.
 `ModuleSettings.enabled=False` gir 403 for alle andre enn global admin.

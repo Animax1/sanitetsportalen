@@ -53,6 +53,18 @@ class Module:
             den øverste nav-baren. Nyttig for sjeldent brukte moduler.
         show_in_dashboard: Hvis ``False`` vises modulen kun i nav-baren.
             Nyttig for tjenester uten egen landingsside (f.eks. innstillinger).
+        nivaaer: Tilgangsnivåene som betyr noe for **denne** modulen, i
+            stigens rekkefølge. Matrisen tilbyr disse og ingen andre.
+
+            Fram til 29. aug. 2026 hadde `ModulTilgangForm` én global liste
+            over valgbare nivåer, og `skriv_handling` sto ikke i den — med den
+            begrunnelsen at ingen modul brukte nivået ennå. Da oppdragsmodulen
+            kom, var begrunnelsen feil uten at noe fanget det opp: nivået var
+            bygget for akkurat den, og admin kunne ikke velge det.
+
+            Den globale lista hadde dessuten motsatt feil samtidig: den tilbød
+            `skriv_full` på `statistikk`, der skriving ikke finnes. Et nivå som
+            ikke gir noe er lett å dele ut i god tro.
     """
 
     slug: str
@@ -65,6 +77,7 @@ class Module:
     order: int = 100
     show_in_nav: bool = True
     show_in_dashboard: bool = True
+    nivaaer: tuple[str, ...] = ('les', 'skriv_full')
 
     def is_visible_for(self, user) -> bool:
         """Avgjør om modulen skal vises for gitt bruker.

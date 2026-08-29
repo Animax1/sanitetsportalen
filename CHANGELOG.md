@@ -4,6 +4,40 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-08-29 — Nivåene tilbys per modul, og bilnivået forhåndsvelges
+
+**1125 tester grønne** (5 nye). Ingen migrasjon.
+
+André: «det står ingenting på oppdrag om skrive:handling. Bare lese eller skrive: full.»
+
+`ModulTilgangForm` hadde én global liste over valgbare nivåer, og `skriv_handling` sto ikke
+i den. Begrunnelsen var at ingen modul brukte nivået ennå, og at et nivå som ikke gir noe er
+lett å dele ut i god tro. **Den begrunnelsen sluttet å gjelde da oppdragsmodulen ble
+skrevet** — nivået var bygget for akkurat den — og ingenting fanget det opp, fordi lista lå
+i skjemaet og modulen ikke hadde noe å si om saken.
+
+Samme liste hadde motsatt feil samtidig: den tilbød `skriv_full` på `statistikk`, som ikke
+har et eneste skriveendepunkt.
+
+**Hver modul deklarerer nå sine egne nivåer** i `Module.nivaaer`. Patients: `les`,
+`skriv_full`. Oppdrag: hele stigen. Statistikk: bare `les`. Et nivå brukeren allerede har
+står fortsatt i lista selv om modulen ikke tilbyr det — ellers ville et lagre-trykk stille
+fjernet det.
+
+### «Hvorfor settes ikke tilgangen automatisk?»
+
+Fordi en usynlig tilgangsendring er nøyaktig fella §7.3 delte `PasientRolleForm` for å
+unngå: der satte én radio både funksjonen i felt og tilgangen, så en domenehandling endret
+autorisasjon uten at noen så det.
+
+Men innvendingen har et poeng — en bil uten `skriv_handling` kan ikke gjøre det biler gjør.
+Løsningen er **forhåndsvalgt, ikke satt i bakgrunnen**: velger man «Bil eller ambulanse»,
+settes Oppdrag-raden i matrisen til «Skrive: handling», med en forklaring ved siden av.
+Admin ser verdien i det samme skjemaet hun sender inn, og kan endre den. Valget forblir
+hennes, og auditraden viser hva som faktisk ble sendt.
+
+---
+
 ## 2026-08-29 — Kontotypen velges, og bilen opprettes i ett steg
 
 **1120 tester grønne** (9 nye). Ingen migrasjon.
