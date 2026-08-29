@@ -1,0 +1,254 @@
+/* Stilark for oppdragsmodulen (/oppdrag/).
+ *
+ * Samme forutsetning som statistikk.css: `style.css` lastes KUN av
+ * templates/patients/index.html, så ingen av reglene der gjelder her. Se
+ * CLAUDE.md om de tre stilarkene.
+ *
+ * De fire variablene base_portal.html IKKE aliaser defineres her, med samme
+ * verdier som i style.css. En udefinert custom property gjør ikke regelen
+ * ugyldig — den gjør fargen arvet, så teksten blir lesbar eller uleselig
+ * tilfeldig uten at noe feiler.
+ *
+ * De fire portalen faktisk aliaser (--surface-1, --surface-2,
+ * --border-color, --text-main) gjentas ikke: da kunne temaene kommet i utakt.
+ */
+
+:root {
+  --text-muted: #94a3b8;
+  --text-soft: #64748b;
+  --surface-3: #0b1220;
+  --header-bg: #0f3460;
+}
+
+/* ── Enhetsliste ─────────────────────────────────────────────────────────── */
+
+.enhet-kort {
+  background: var(--surface-1);
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  padding: 0.7rem 0.9rem;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.enhet-navn {
+  font-weight: 600;
+  color: var(--text-main);
+}
+
+.enhet-meta {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
+/* Statusprikken bærer ikke informasjon alene — statusteksten står ved siden
+ * av. Farge alene ville brutt WCAG 1.4.1. */
+.status-prikk {
+  width: 0.7rem;
+  height: 0.7rem;
+  border-radius: 50%;
+  flex: 0 0 auto;
+  display: inline-block;
+}
+
+/* Ledig er gode nyheter — enheten kan sendes. Grått leste som «av», og
+ * 113 skal se hvem som er klar uten å lese teksten først. Fargen bærer
+ * fortsatt ikke informasjonen alene: statusteksten står ved siden av. */
+.status-ledig      { background: #22c55e; }
+.status-av_vakt    { background: #334155; }
+/* Venter beholder grått: oppdraget er tildelt, men ingen har rykket ut, og
+ * det er nettopp forskjellen fra Ledig som skal være synlig. */
+.status-venter     { background: #64748b; }
+.status-rykker_ut  { background: #f59e0b; }
+.status-fremme     { background: #3b82f6; }
+.status-avreist    { background: #8b5cf6; }
+.status-leverer    { background: #06b6d4; }
+
+/* Enheter som ikke er på vakt dempes, men skjules ikke. Fargen bærer ikke
+ * informasjonen alene — teksten «Ikke på vakt» står i kortet. */
+.enhet-av-vakt { opacity: 0.62; }
+
+.enhet-gruppe {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+  margin-top: 0.75rem;
+}
+
+/* ── Hastegrad ───────────────────────────────────────────────────────────── */
+/* Fargen er sekundær: teksten står alltid. */
+
+.hastegrad {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 0.1rem 0.45rem;
+  border-radius: 4px;
+}
+
+.hastegrad-akutt  { background: #7f1d1d; color: #fecaca; }
+.hastegrad-haster { background: #78350f; color: #fde68a; }
+.hastegrad-vanlig { background: #1e3a5f; color: #bfdbfe; }
+
+/* ── Oppdragsliste ───────────────────────────────────────────────────────── */
+
+.oppdrag-rad {
+  background: var(--surface-1);
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  padding: 0.75rem 0.9rem;
+}
+
+.oppdrag-rad + .oppdrag-rad {
+  margin-top: 0.5rem;
+}
+
+.oppdrag-problem {
+  font-weight: 600;
+  color: var(--text-main);
+}
+
+.oppdrag-meta {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.oppdrag-fritekst {
+  font-size: 0.85rem;
+  color: var(--text-main);
+  margin-top: 0.35rem;
+  white-space: pre-wrap;
+}
+
+/* ── Tidslinje ───────────────────────────────────────────────────────────── */
+
+.tidslinje-rad {
+  display: flex;
+  gap: 0.6rem;
+  padding: 0.3rem 0;
+  font-size: 0.86rem;
+  color: var(--text-main);
+}
+
+.tidslinje-tid {
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+  flex: 0 0 auto;
+}
+
+/* Markøren for et avledet tidspunkt sitter på KLOKKESLETTET, ikke på
+ * statusordet: det er tidspunktet som er utledet, ikke at oppdraget ble
+ * ledig. Stiplet understrek, ingen farge — den må stå i gråtoner. */
+.tid-avledet {
+  border-bottom: 1px dotted var(--text-muted);
+  cursor: help;
+}
+
+.tidslinje-notat {
+  color: var(--text-muted);
+  font-size: 0.8rem;
+}
+
+.tidslinje-erstattet {
+  color: var(--text-soft);
+  text-decoration: line-through;
+}
+
+/* ── Bootstrap-overstyringer ─────────────────────────────────────────────── */
+/* Alle temaene er mørke, så enhver Bootstrap-klasse for dempet tekst må
+ * overstyres der malen kan se den. MorkTekstPaaMorkBakgrunnTests håndhever
+ * dette ved å løse {% extends %} og {% static %}. */
+
+.text-muted { color: var(--text-muted) !important; }
+.text-secondary { color: var(--text-muted) !important; }
+.form-text { color: var(--text-muted); }
+
+.tom-melding {
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  padding: 1.25rem 0;
+  text-align: center;
+}
+
+/* ── Enhetsskjermen ──────────────────────────────────────────────────────── */
+/* Bygget for en telefon i en bil: store trykkflater, høy kontrast, og
+ * statusknappen som det eneste elementet som ikke krever presisjon. */
+
+.enhet-skjerm {
+  max-width: 640px;
+  margin: 0 auto;
+}
+
+/* WCAG 2.5.5 anbefaler 44px; her er det en tommel i en bil i bevegelse. */
+.stor-knapp {
+  min-height: 64px;
+  font-size: 1.15rem;
+  font-weight: 600;
+}
+
+.aktivt-kort {
+  background: var(--surface-1);
+  border: 2px solid var(--header-bg);
+  border-radius: 12px;
+  padding: 1rem;
+}
+
+.oppdrag-status-naa {
+  font-weight: 700;
+  color: var(--text-main);
+}
+
+.enhet-ledig-kort {
+  background: var(--surface-1);
+  border: 1px dashed var(--border-color);
+  border-radius: 12px;
+  padding: 1.1rem;
+  text-align: center;
+  color: var(--text-muted);
+}
+
+/* Avsluttede dempes, men fargen bærer ikke informasjonen alene — raden står
+ * under overskriften «Nylig avsluttet», og tiden står i teksten. */
+.oppdrag-avsluttet { opacity: 0.7; }
+
+/* Feil skal kunne leses fra førersetet. */
+.enhet-feil {
+  font-size: 1.05rem;
+  font-weight: 600;
+}
+
+/* Oppdragsnummeret man sier på samband. Tabularnums så kolonnen står stille
+ * når lista oppdateres under polling. */
+.oppdrag-nr {
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  color: var(--text-muted);
+  flex: 0 0 auto;
+}
+
+/* «Rett tid» i tidslinjen. Dempet: rettingen er en sjelden handling, og
+ * knappen skal ikke konkurrere med klokkeslettet den står ved siden av. */
+.tidslinje-rett {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  text-decoration: none;
+}
+
+.tidslinje-rett:hover {
+  color: var(--text-main);
+  text-decoration: underline;
+}
+
+/* En overstyrt rad har ingen knapp, så raden under skal ikke få luft den
+ * ikke trenger. */
+.rett-tid-skjema { font-size: 0.85rem; }
+
+/* Usendte stemplinger. Dempet mot feilbanneret: dette er en ventetilstand,
+ * ikke en feil — men den må leses fra førersetet, som resten av skjermen. */
+.enhet-usendt {
+  font-size: 1rem;
+  font-weight: 600;
+}

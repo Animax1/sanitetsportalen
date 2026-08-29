@@ -321,3 +321,59 @@ class Notification(models.Model):
     def __str__(self) -> str:
         status = 'lest' if self.is_read else 'ulest'
         return f'[{self.module_slug}] {self.title} ({status})'
+
+
+class Vakt(models.Model):
+    """Én vakt — scopet pasienter, oppdrag og statistikk henger på.
+
+    Erstatter `year` som avgrensning (`docs/BESLUTNING_VAKT_SOM_SCOPE.md`).
+    Portalen brukes på forskjellige arrangementer, ikke på det samme én gang i
+    året — og `year` var allerede et vakt-id i forkledning for pasienter:
+    arkiver → nullstill *er* vaktgrensen, dokumentert i personvernprotokollens
+    C.2 som «nullstilles for neste event».
+
+    Ligger i `core` fordi begge modulene scopes på den. I `patients` ville den
+    gitt `oppdrag → patients` for noe som ikke er pasientdata — samme
+    begrunnelse som `core.stats_cache` og `core.arkiv`.
+
+    **Én aktiv vakt om gangen** — pekt på av `AppSetting['aktiv_vakt_id']`,
+    ikke av `er_aktiv` alene. Flere samtidige vakter ville krevd et vaktvalg i
+    hver eneste visning, og en feil i det valget er en pasient registrert på
+    feil vakt. Modellen sperrer det ikke for framtiden; grensesnittet
+    forutsetter én.
+
+    Bærer ingen personopplysninger: navn på arrangementet og tidspunkter.
+    """
+
+    navn = models.CharField(
+        max_length=255,
+        unique=True,
+        verbose_name='Vaktnavn',
+        help_text='Fritekst, satt ved vaktstart: «Landsskytterstevnet 2026». '
+                  'Unikt — to vakter med samme navn lar seg ikke skille i '
+                  'statistikken. Trengs navnet igjen, legg på en dato.',
+    )
+    # Utledet, men lagret: sesongstatistikken grupperer på år, og å regne det
+    # ut fra `startet` i hver spørring ville gjort en billig gruppering dyr.
+    year = models.IntegerField(db_index=True, verbose_name='År')
+    startet = models.DateTimeField(verbose_name='Startet')
+    avsluttet = models.DateTimeField(
+        null=True, blank=True, verbose_name='Avsluttet',
+        help_text='Settes av «Avslutt vakt». En avsluttet vakt kan gjenåpnes '
+                  'fram til arkivet er kollapset — etter det finnes ikke '
+                  'radnivået lenger.',
+    )
+    er_aktiv = models.BooleanField(default=True, verbose_name='Aktiv')
+
+    # Bevisst ikke BaseTimeStampedModel: `startet` er vaktas egen tid og skal
+    # kunne settes og rettes; en auto_now_add ved siden av ville vært en
+    # kilde til å blande dem. created_at ville dessuten løyet for
+    # backfillede vakter, som er eldre enn raden sin.
+
+    class Meta:
+        verbose_name = 'Vakt'
+        verbose_name_plural = 'Vakter'
+        ordering = ['-startet']
+
+    def __str__(self):
+        return self.navn

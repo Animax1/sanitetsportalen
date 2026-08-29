@@ -1,0 +1,68 @@
+{% extends "core/base_portal.html" %}
+{% load static %}
+
+{% block title %}{{ enhet.navn }} – Oppdrag – Sanitetsportalen{% endblock %}
+
+{% comment %}
+  Enhetsskjermen (fase 4): bygget for en telefon i en bil. Store trykkflater,
+  høy kontrast, og statusknappen som det eneste elementet som ikke krever
+  presisjon.
+
+  Skjermen viser kun det serveren leverer: egne oppdrag, fritekst skjult ved
+  Ledig, hele oppdraget borte 30 minutter etter. Ingen filtrering skjer her —
+  en bil som blir stående ulåst er scenarioet skjulereglene finnes for, og da
+  hjelper det ikke at JS lot være å vise det som ligger i responsen.
+
+  Egen mal, ikke sentral.html med {% if %}: de to deler nesten ingen markup,
+  og én sammenslått fil ville vært to layouter for å spare en render-linje.
+{% endcomment %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="{% static 'css/oppdrag.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-3 py-3 enhet-skjerm">
+
+  <div class="d-flex align-items-center justify-content-between mb-3">
+    <h1 class="h5 mb-0"><i class="bi bi-truck-front me-2"></i>{{ enhet.navn }}</h1>
+    <span id="enhet-oppdatert" class="enhet-meta"></span>
+  </div>
+
+  {# Feil skal synes fra førersetet — banneret er stort og blir stående til #}
+  {# neste vellykkede handling. En knapp som ser ut til å ha virket, men #}
+  {# ikke har det, er verre enn en som feiler synlig. #}
+  <div id="enhet-feil" class="alert alert-danger enhet-feil d-none" role="alert"></div>
+
+  {# Usendte stemplinger. Roligere tone enn feilbanneret — dette er ikke en #}
+  {# feil, men det MÅ synes: en knapp som ser ut til å ha virket, men ikke #}
+  {# har det, er verre enn en som feiler synlig (§6). #}
+  <div id="enhet-usendt" class="alert alert-warning enhet-usendt d-none" role="status"></div>
+
+  <div id="aktivt-oppdrag"></div>
+
+  <div id="ventende-seksjon">
+    <h2 class="h6 text-muted mt-3 mb-2">Ventende oppdrag</h2>
+    <div id="ventende-liste"><div class="tom-melding">Laster…</div></div>
+  </div>
+
+  <div id="avsluttet-seksjon" class="d-none">
+    <h2 class="h6 text-muted mt-4 mb-2">Nylig avsluttet</h2>
+    <div id="avsluttet-liste"></div>
+  </div>
+
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script nonce="{{ csp_nonce }}">
+  // Statuskjeden som data. Skjermen bruker den KUN til å regne ut hva neste
+  // knapp skal hete mens en stempling ligger usendt — uten den ville knappen
+  // dødd ved første trykk uten dekning. Når nettet er der, gjelder fortsatt
+  // serverens `neste_overgang` per rad.
+  window.OPPDRAG_NESTE = {{ neste_kjede|safe }};
+  window.OPPDRAG_STATUSNAVN = {{ status_navn|safe }};
+</script>
+<script src="{% static 'js/portal-utils.js' %}"></script>
+<script src="{% static 'js/oppdrag-enhet.js' %}"></script>
+{% endblock %}

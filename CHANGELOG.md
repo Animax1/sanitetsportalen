@@ -4,6 +4,1125 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-08-29 — Vakt som scope: besluttet, og deploy 1 kodet
+
+**1288 tester grønne** (16 nye). Migrasjoner `core.0006`, `patients.0014–0015`,
+`oppdrag.0005–0006`.
+
+**Beslutningen er tatt.** André besvarte de fem avklaringene i §7 — alle med notatets
+anbefaling: fritekst-vaktnavn (unikt), gjenåpning fram til kollaps, pasientnummer per
+vakt (sperren flyttes i deploy 2), manuell sletting av tomme vakter, ingen gruppering nå.
+`docs/BESLUTNING_VAKT_SOM_SCOPE.md` står som besluttet.
+
+**Deploy 1 er den additive halvdelen, og den er bevisst kjedelig:** `Vakt` finnes,
+FK-ene skrives — og *ingenting* leser dem ennå. All lesing går fortsatt fra `year`.
+Kontrakten i mellomtiden er at `year` og vakta aldri er uenige, og den kontrolleres av
+`verifiser_vakt` — som også forhåndssjekker deploy 2-sperrene `(vakt, pasientnummer)` og
+`(vakt, oppdragsnummer)`, slik at den migrasjonen ikke kan overraske.
+
+Det som ligger i deployen:
+
+- **`core.Vakt`**: navn (unikt, fritekst), `year` (utledet, men lagret — sesongstatistikk
+  skal slippe å regne det ut per spørring), `startet`/`avsluttet`, `er_aktiv`. Bevisst
+  ikke `BaseTimeStampedModel`: `startet` er vaktas egen tid, og `created_at` ville løyet
+  for backfillede vakter. Bærer ingen personopplysninger.
+- **Backfill i to migrasjoner som følger kodens avhengighetsretning**: `patients.0015`
+  lager vaktene og kobler pasienter + arkiv, `oppdrag.0006` kobler oppdragene og avhenger
+  av den — oppdrag avhenger av patients i kode, og migrasjonsgrafen går samme vei. Navnet
+  blir årstallet, ikke `event_name`: den er én global verdi som beskriver vakta som var
+  aktiv da noen sist skrev den, og å fryse den inn på historiske vakter ville påstått noe
+  vi ikke vet. `startet`/`avsluttet` er estimater fra radenes tidsstempler, redigerbare.
+- **Reverseringen nuller FK-ene før vaktene slettes** — `PROTECT` nekter ellers, også i
+  en rollback. Bevist mot en base med data i tre år (ett av dem kun som arkiv): backfill,
+  full rollback med alle rader intakt, og ny kjøring.
+- **Fire skrivestier setter vakta**: pasientoppretting, offline-import (vakta for radens
+  *eget* år, ikke den aktive — en import kan bære et annet år), arkivering og
+  oppdragsoppretting. Mutasjonstestet: fjernes tildelingen, blir testene røde.
+- **`hent_aktiv_vakt()`** i `patients.services`, ved siden av `get_active_year` — flyttes
+  til core i deploy 2. Lat opprettelse på fersk base (samme mønster som `get_active_year`
+  sin egen AppSetting-rad), og en død `aktiv_vakt_id`-peker repareres i stedet for å
+  stoppe registrering: en pasient som ikke lar seg registrere fordi en peker er borte, er
+  verre enn en peker som må repareres.
+- **`verifiser_vakt`** slår opp modellene via `apps.get_model` i stedet for å importere
+  `patients` og `oppdrag` fra `core` — en driftskommando skal ikke snu
+  avhengighetsretningen for hele appen. Arkiver uten vakt er info, ikke feil: NULL der
+  betyr «fra før grupperingen fantes».
+
+Kjøreplanen står i notatet: deploy 1 ut, `verifiser_vakt` mot prod, og først da deploy 2
+— der lesingen bytter kilde, tellerne blir per vakt, «Nullstill år» blir «Avslutt vakt»,
+og `year` forsvinner fra radene.
+
+---
+
+## 2026-08-29 — Fase 5: stemplingen overlever at dekningen ryker
+
+**1272 tester grønne** (23 nye). Ingen migrasjon.
+
+Ved knappetrykk skrives stemplingen til `localStorage` **først**, skjermen oppdaterer seg
+med en gang, og synkingen skjer i bakgrunnen. Feiler den, blir raden liggende og forsøkes
+på nytt — ved neste trykk, ved neste poll, og ved `online`-hendelsen.
+
+**Nøkkelen er det som gjør avspilling trygg.** Den lages ved trykket og beholdes gjennom
+hvert forsøk. Serveren kobler den nå til `core.idempotency`, og svarer en avspilling med
+`ok` og den **opprinnelige** meldingen i stedet for 409. Uten det kunne køen ikke skille
+«allerede levert» fra «avvist fordi skjermen har sakket akterut» — den ville enten hengt
+fast, eller kastet en stempling som faktisk kom fram.
+
+**Reservert etter all validering**, aldri før. Et avvist forsøk skal ikke brenne nøkkelen:
+køen som retter seg og prøver igjen ville ellers fått «allerede levert» på noe som aldri
+kom fram. `forkast()` frigir den når statusmaskinen avviser overgangen. Egen test som
+sender en ulovlig overgang først og krever at den lovlige etterpå går gjennom.
+
+**Synkingen er seriell og stopper på første feil.** To parallelle sendinger kunne landet
+«Avreist» før «Fremme», og `Statusmelding` er et spor av hva som faktisk skjedde. En 4xx
+som ikke er `duplikat` stryker raden og melder fra — serveren vil avvise den igjen, og å
+beholde den ville låst køen for alt bak.
+
+**Klienttiden fryses ved trykket**, ikke ved sendingen. Uten det ville statistikken vist
+når dekningen kom tilbake i stedet for når mannskapet meldte. `forsinket`-flagget fra
+§5.1 gjør at tallet kan leses for det det er.
+
+**Skjermen viser hva som ligger usendt** — §6: en knapp som ser ut til å ha virket, men
+ikke har det, er verre enn en som feiler synlig. Eget banner, roligere tone enn
+feilbanneret: dette er en ventetilstand, ikke en feil.
+
+### Kjeden måtte til klienten, og det er verdt å si hvorfor
+
+Skjermen kjente ikke statuskjeden — serveren sendte `neste_overgang` per rad. Det holder
+online, men ikke i en bil uten dekning: første trykk ville drept knappen, og køen vært
+halvveis. Kjeden følger nå med siden som data, og brukes **kun** til å regne ut hva neste
+knapp skal hete mens noe ligger usendt.
+
+§4.2-invarianten er urørt. Den handler om at *serveren* ikke skal utlede handlingen av
+tilstanden — `POST .../status/neste/` ville gitt kappløpet når to trykk kommer tett.
+Klienten måtte uansett vite hvilket navngitt endepunkt den poster til. En test låser
+kjeden som sendes mot `services.neste_i_kjeden`, så de to ikke kan komme i utakt: sendes
+en annen kjede enn serveren håndhever, viser knappen ett steg og endepunktet godtar et
+annet. Sentralbordet får den ikke — det har ingen kø.
+
+### To feller i testoppsettet, begge verdt å notere
+
+`build_harness` klipper ut **funksjoner og ingenting annet**, så `const KO_NOKKEL` var
+udefinert i node — og `koLes()` sin try/catch svelget `ReferenceError` og meldte «tom kø».
+Alle tolv testene bestod i den forstand at de ikke krasjet, men målte ingenting. Nøkkelen
+er nå `koNokkel()`, altså en funksjon harnesset kan se, og det står i koden hvorfor.
+
+Og `crypto` er skrivebeskyttet global fra node 19 — stubben kastet. Node har
+`randomUUID` innebygd, så den er droppet; testene sammenligner aldri nøkler mot faste
+verdier.
+
+Seks av kø-testene er sett røde ved å slå av projeksjonen.
+
+---
+
+## 2026-08-29 — Oppklart: innloggingen feilet i feil miljø
+
+**Ingen kodeendring.** Kontoen `karmøy56` kom ikke inn fordi innloggingsforsøkene gikk mot
+**prod**, mens kontoen ligger på **staging**. André fant det selv.
+
+Det forklarer alt som ikke stemte: `last_login_at` sto stille fordi forespørslene aldri
+nådde den databasen diagnosen leste, og `sjekk_brukernavn` — som bare finnes i koden på
+`rollemodell` — beskrev hele tiden en annen base enn den innloggingen traff.
+
+**De tre foregående oppføringene står, men ikke som løsningen på dette.** Ingen av
+funnene var årsaken; alle er ekte feil som lå der uansett, og som ble funnet fordi noen
+lette:
+
+| Funn | Står på egne bein fordi |
+|---|---|
+| Hullet i kontolåsen | `login_view` slo opp kontoen eksakt mens `authenticate` var tolerant. Passordgjetting kunne kjøres i det uendelige ved å variere store bokstaver. Reell sårbarhet, uavhengig av denne saken |
+| Unicode-normalisering | `å` limt inn i NFD-form fant ingen konto. `Ø` mot `ø` bommet på SQLite, altså i offline-modus |
+| Forvekslingstegn i midlertidig passord | `0`/`O` og `1`/`l`/`I` i et passord som leses av en skjerm og tastes på en telefon |
+
+**Lærdommen er operativ, ikke teknisk.** To miljøer som ser helt like ut i nettleseren, og
+ingenting på siden sier hvilket man står i. Det kostet en arbeidsøkt her, og vil koste mer
+under en vakt — der forskjellen er om en pasient registreres i ekte journal eller i en
+testbase. Ført opp i TODO.
+
+---
+
+## 2026-08-29 — En vei inn når passordet ikke lar seg gjette
+
+**1249 tester grønne** (12 nye). Ingen migrasjon.
+
+Kontoen kom fortsatt ikke inn med det midlertidige passordet. Diagnosen sto klar:
+brukernavnet lagret rent, ingenting i kontotilstanden blokkerte, ingen lås — og
+**`last_login_at` sto stille på 07:07**. Siden feltet settes ved *hver* vellykket
+innlogging, betyr det at forsøkene ikke lyktes. Passordet traff ikke hashen.
+
+**En sannsynlig grunn lå i genereringen.** Det midlertidige passordet ble trukket fra
+`string.ascii_letters + string.digits` — tolv tegn som kan inneholde `0` mot `O`, og `1`
+mot `l` mot `I`. Det leses av en skjerm og tastes inn et annet sted, ofte på en telefon.
+Feiltastingen er umulig å skille fra «feil passord», og etter fem forsøk låses kontoen
+mens brukeren tror hen skriver riktig.
+
+Alfabetet utelater nå `0 O 1 l I`. Kostnaden er 69,7 bit i stedet for 71,4 over tolv tegn
+— uvesentlig for et passord som uansett skal byttes. Genereringen lå duplisert to steder,
+ved opprettelse og ved «tilbakestill passord»; den er nå én funksjon i `accounts/passord.py`.
+
+**Og en vei inn:** `python manage.py sett_passord <navn>`. Den slår opp brukernavnet med
+samme tolerante regel som innlogging, godtar `\uXXXX`-rømming for kanaler uten norske
+tegn, validerer det nye passordet mot de samme reglene som skjemaet, nullstiller
+kontolåsen, og **fjerner kravet om passordbytte som standard** — det er som regel hele
+poenget med å kjøre den. Uten `--passord` genereres ett og skrives ut én gang.
+
+At låsen nullstilles er ikke en detalj: har noen prøvd seg fram på den gamle verdien,
+skal ikke den nye møte en sperre satt av de forsøkene. Egen test.
+
+### En blindvei, notert fordi den kostet tid
+
+Første reproduksjon viste `GET /accounts/change-password/` med **400**, og det så ut som
+selve forklaringen. Det var **testoppsettet mitt**: backup-planleggeren kjørte mot en
+in-memory SQLite og feilet med «database table is locked». Med planleggeren av svarer
+siden 200. Feilen lå aldri i appen, og påstanden ble trukket tilbake med en gang den lot
+seg etterprøve.
+
+---
+
+## 2026-08-29 — Kontolåsen hadde et hull, funnet mens vi lette etter noe annet
+
+**1237 tester grønne** (5 nye). Ingen migrasjon.
+
+Utskriften fra `sjekk_brukernavn` mot prod viste `karmøy56` med **`feilede forsøk: 0`** og
+**`sist innlogget: 07:07 i dag`**. Kontoen hadde altså logget inn, og telleren sto på null.
+Det siste tallet viste seg å ikke bety noe.
+
+**`login_view` slo opp kontoen med nøyaktig treff:**
+
+```python
+user_obj = CustomUser.objects.get(username=username)
+```
+
+mens `authenticate()` bruker det tolerante oppslaget. To ulike svar på «hvilken konto er
+dette», og konsekvensen er en **hullete kontolås**: skriver man `Karmøy56` med stor K, blir
+`user_obj` `None`, `_registrer_mislykket_forsok` hoppes over, telleren står stille — og
+kontoen låses aldri. Riktig passord slipper fortsatt gjennom, siden `authenticate` finner
+kontoen. Gjettingen kan altså kjøres i det uendelige ved å variere store bokstaver.
+
+Ironien er at kommentaren fem linjer over forklarer hvorfor *rate-limit-nøkkelen* er
+normalisert, med nøyaktig samme argument. Oppslaget under fikk ikke samme behandling.
+
+Oppslaget er nå løftet ut som `backends.finn_kandidater` / `finn_konto`, og både viewet og
+`authenticate` kaller den. Én regel for «hvilken konto er dette». Tre av de fem nye testene
+er sett røde mot det gamle oppslaget.
+
+**Rate-limit-taket sto uansett** (10 forsøk / 5 min per brukernavn, 50 per IP, begge på
+normalisert nøkkel), så hullet var i den per-konto låsen, ikke i bremsen foran den.
+
+**Et første testforsøk målte feil ting.** Det krevde `failed_login_attempts == 5` etter fem
+forsøk og feilet med `0 != 5`. Koden hadde rett: `_registrer_mislykket_forsok` nullstiller
+telleren når den setter `locked_until`. `is_locked()` er invarianten, ikke tallet — det står
+nå i testen.
+
+**For kontoen som utløste dette:** ingenting i tilstanden blokkerer innlogging, men
+`må bytte passord: True` står fortsatt etter innloggingen 07:07. `MustChangePasswordMiddleware`
+sender da hver forespørsel til `/accounts/change-password/` i stedet for til portalen — og
+utenfra ser det ut som at man «ikke kommer inn». Verktøyet sier nå fra om nettopp den
+kombinasjonen, med tidspunktet for siste innlogging som bevis på at byttet ikke ble fullført.
+
+---
+
+## 2026-08-29 — `ø` var ikke feilen, og verktøyet sier nå hva som er det
+
+**1232 tester grønne** (6 nye). Ingen migrasjon.
+
+Kontoen som ikke kom inn heter `karmøy56`. Utskriften fra `sjekk_brukernavn` viste den
+lagret **helt rent** — `karm[ø U+00F8]y56`, riktig prekomponert, ingen lookalike, ingen
+NFD, ingen mellomrom. **Brukernavnet var altså ikke feilen**, og hypotesen forrige
+oppføring bygget på traff ikke dette tilfellet.
+
+Da sto man uten neste steg, og det var mangelen: verktøyet svarte på ett spørsmål og
+stoppet der. Det viser nå kontoens tilstand når navnet stemmer, og navngir det som
+faktisk blokkerer:
+
+| Tilstand | Hvorfor den stopper innlogging |
+|---|---|
+| `is_active=False` | Kontoen er deaktivert |
+| Ingen brukbar passord-hash | Opprettet med invitasjon, lenken aldri brukt. **Ingen** passord virker |
+| `locked_until` i framtiden | Fem feilede forsøk låser i 15 min |
+| `mfa_required` uten bekreftet TOTP-enhet | Innlogging går til MFA-oppsett, ikke til portalen |
+
+Den midterste er den lumske: feilmeldingen ved innlogging er identisk med «feil passord»,
+med vilje, så utenfra er de to umulige å skille. En utløpt `locked_until` regnes ikke som
+blokkering — det er en gammel hendelse, ikke en sperre. Egen test.
+
+**Verdt å kjenne for enhetskontoer:** invitasjonsflyten krever `not er_delt_konto` *og* en
+e-postadresse. En bilkonto er en delt konto uten e-post, så den får alltid et **generert
+12-tegns midlertidig passord** og `must_change_password=True` — ikke et passord man velger
+selv ved opprettelsen. Skriver man inn passordet man *trodde* man satte, feiler det, og
+brukernavnet med `ø` i er en nærliggende, men uskyldig, mistenkt.
+
+**Et funn til, som ikke forklarer dette tilfellet men er ekte:** `set_password` kaller
+`make_password` rett på råstrengen — **Django normaliserer ikke passord**. Et passord med
+`å` satt i én Unicode-normalform og skrevet i en annen gir ulik hash, uten at noe kan ses.
+`æ` og `ø` dekomponerer ikke og rammes ikke, så det forklarer ikke `karmøy56`. Verktøyet
+sier fra om det når ingenting annet blokkerer. **Ikke rettet** — en fallback som også
+prøver den normaliserte formen ville utvidet hva som godtas som passord, og det er en
+avgjørelse som fortjener å tas bevisst, ikke i forbifarten.
+
+---
+
+## 2026-08-29 — Innlogging med æøå, og en grønn prikk for ledig
+
+**1220 tester grønne** (7 nye). Ingen migrasjon.
+
+### Brukernavn med norske tegn
+
+Meldt fra prod: en konto med `ø` i navnet kom ikke inn, selv med brukernavn og passord
+limt inn. **Det tilfellet lot seg ikke reprodusere** — `bjørn.rød` logger inn på første
+forsøk her. Men to ekte feil i samme mekanikk ble funnet på veien, og begge er rettet.
+
+**1. Unicode-normalform.** `å` finnes som ett tegn (U+00E5, NFC) og som `a` pluss
+kombinerende ring (U+0061 U+030A, NFD). macOS produserer NFD i flere sammenhenger, så
+«kopier brukernavnet og lim det inn» er nok til å bomme — de to strengene er pikselidentiske
+på skjermen og forskjellige for databasen. Verken oppretting eller innlogging normaliserte.
+
+Målt underveis, og verdt å vite: **`æ` og `ø` dekomponerer ikke.** De er egne bokstaver,
+ikke bokstav pluss aksent. `å` og `Å` gjør. Feilen rammer altså navn med `å` — noe som
+svekker normalisering som forklaring på nettopp `ø`-tilfellet, og det står i koden.
+
+**2. `iexact` case-folder ikke unicode på SQLite.** `Ø` mot lagret `ø` gir null treff.
+På PostgreSQL virker det, fordi `UPPER()` der håndterer unicode. **Offline-modus kjører
+SQLite**, så det er ikke en teoretisk forskjell — det er feltbruk uten nett.
+
+Oppslaget går nå i tre stadig bredere steg, billigst først: `iexact` som før, deretter
+nøyaktig treff på en NFKC-normalisert og casefoldet nøkkel, og først om begge bommer en
+Python-side sammenligning som tåler at *lagret* verdi selv er unormalisert. Det siste
+steget kjører kun på et forsøk som ellers ville feilet, og har et tak på 500 kontoer med
+logglinje om det passeres — det skal ikke stille bli dyrt om tallet vokser.
+`clean_username` normaliserer også ved oppretting, så nye kontoer har én form.
+
+**Tvetydighet slår fortsatt aldri ut i feil konto:** matcher flere kontoer, kreves
+nøyaktig treff. De fire nye testene er sett røde mot den gamle backenden.
+
+**For `ø`-tilfellet i prod finnes nå et verktøy:** `python manage.py sjekk_brukernavn
+[navn]`. Les-only. Den skriver hvert brukernavn tegn for tegn med kodepunkt og
+Unicode-navn, flagger unormaliserte og kontoer med mellomrom i enden, og sier om et gitt
+oppslag ville truffet. Den finnes fordi «brukernavnet ser riktig ut» ikke lar seg
+feilsøke ved å se på det — en kyrillisk `е` ser ut som en latinsk `e`, og den fella traff
+dette prosjektet i et dokument tidligere samme dag.
+
+**Og kanalen selv var en felle.** Railways `ssh` bærer ikke `ø` inn på kommandolinja, så
+verktøyet var i praksis ubrukelig for nettopp det tegnet det skulle undersøke. To ting
+retter det: **uten argument lister kommandoen alle kontoer** — man trenger ikke skrive
+navnet i det hele tatt — og argumentet godtar `\uXXXX`-rømming, mens utskriften viser
+hvert navn i samme form. Første forsøk skrev ascii-formen med Pythons egen
+`backslashreplace`, som gir `\xf8` for tegn under U+0100; den formen tolkes ikke tilbake,
+så rundturen var brutt og utskriften ubrukelig i den kanalen den var laget for. Nå skrives
+alltid `\uXXXX`, og en test limer hver form tilbake og krever samme streng.
+
+### Grønn prikk for ledig enhet
+
+`.status-ledig` var grå, som `.status-venter`. Grått leste som «av», og 113 skal se hvem
+som kan sendes uten å lese teksten først. Nå grønn (`#22c55e`). `Venter` beholder grått —
+det er nettopp forskjellen mellom «tildelt, men ikke rykket ut» og «klar» som skal være
+synlig. Fargen bærer fortsatt ikke informasjonen alene; statusteksten står ved siden av
+(WCAG 1.4.1).
+
+---
+
+## 2026-08-29 — Fase 4b: 113 kan rette et tidspunkt, uten å viske ut det som ble meldt
+
+**1213 tester grønne** (18 nye). Ingen migrasjon.
+
+Maskineriet kom i fase 1 og var ubrukt: `services.korriger_tidspunkt` og
+`Statusmelding.objects.gjeldende()` har ligget der siden 28. aug. Det som manglet var
+endepunktet, reglene og en vei inn fra grensesnittet.
+
+**Rettingen er en ny rad som peker på den gamle.** Originalen røres ikke, og begge står i
+tidslinjen — den erstattede gjennomstreket, rettingen merket «rettet av sentralen».
+`Statusmelding` er et spor av hva som *ble meldt*; redigerte man raden, kunne «hva sa
+bilen egentlig?» bare besvares fra `AuditLog`, en admin-flate som ikke er der oppdraget
+vises. Testen som holder det ærlig setter `melding.tidspunkt` direkte i tillegg til å
+skrive den nye raden — og blir rød.
+
+**Fire regler, alle fail-closed:**
+
+1. **Raden må være gjeldende.** Retter man en allerede overstyrt rad, finnes to
+   korreksjoner av samme original og «hvilken gjelder» har ikke lenger noe entydig svar.
+   Korreksjoner *kan* kjedes — man retter den nyeste.
+2. **Ikke i framtiden.** Et tidspunkt som ikke har inntruffet er ikke en observasjon.
+3. **Ikke før oppdraget ble opprettet.**
+4. **Rekkefølgen må holde.** Dette er den som betyr noe. Settes `Fremme` før
+   `Rykker ut`, blir responstiden negativ — og fase 6 ville regnet på den uten å vite at
+   tallet er umulig. Sjekken måler mot de *gjeldende* naboene, ikke mot alle rader: en
+   overstyrt rad beskriver ikke lenger noe som gjelder, og å måle mot den ville låst
+   rettingen til verdien man retter bort. Feilmeldingen navngir naboen som er i veien
+   («`Fremme` kan ikke være før `Rykker ut` (14:36)»), så operatøren vet om hun må rette
+   en annen rad først.
+
+**Endepunktet er bevisst ikke et handling-endepunkt.** Det tar et tidspunkt, altså en
+feltverdi, og ligger derfor på `skriv_full` med vanlig kroppsvalidering. Å presse det inn
+under `skriv_handling` ville uthult det lukkede skjemaet i §5.1 med én gang — da hadde
+stemplingskroppen fått et domenefelt. Enhetskontoer får 403 uansett nivå: en bil som kunne
+rette sine egne tidspunkt ville gjort stemplingen til en påstand i stedet for en måling.
+Bilen *ser* rettingen (§4.5), den gjør den ikke.
+
+**To fikstur som målte feil regel.** Begge ble funnet ved at testene feilet, ikke ved
+gjennomlesing. Det første stemplet oppdraget i samme millisekund som det ble opprettet, så
+enhver retting bakover traff «før oppdraget ble opprettet» — fiksturet har nå realistisk
+tidsspenn. Det andre stemplet `Avreist` med servertid og rettet `Fremme` til fem minutter
+etter; det havnet i framtiden, så framtidsregelen svarte først og testen ville bestått også
+uten rekkefølgesjekken. Begge er notert i koden, siden mønsteret kommer tilbake.
+
+**Én feil verdt å notere:** `@transaction.atomic` sto over `korriger_tidspunkt`, og den nye
+`KorreksjonUgyldig`-klassen ble satt inn *under* dekoratoren. Da var ikke unntaket lenger
+en klasse, og `except` kastet `TypeError: catching classes that do not inherit from
+BaseException`. Fanget av testene med en gang. Verdt å huske når noe settes inn rett foran
+en dekorert funksjon.
+
+---
+
+## 2026-08-29 — «Arkiv» heter Historikk i oppdragsmodulen
+
+**1195 tester grønne** (ingen nye). Migrasjon `oppdrag.0004_historikk_ikke_arkiv` —
+ren `RenameField`, ingen data endres.
+
+Knappen het «Ferdigstilte» og handlingen «Arkiver». Begge er borte: flaten heter
+**Historikk**.
+
+**Grunnen er en navnekollisjon som ville blitt verre, ikke bedre.** `core.arkiv` fryser,
+signerer og kollapser hele vakter, og oppdragsmodulen får sin *egen* `BaseArkivHandler` i
+fase 7. Hadde begge hett «arkiv», ville `arkiver_view` og `ArkivHandler` stått i samme app
+og betydd hver sin ting — den ene rydder en liste, den andre skriver en SHA-256-signatur
+som ikke kan angres. Den som leste feil av de to ville trodd raden var fryst.
+
+Derfor er omdøpingen ført hele veien inn, ikke bare på knappen:
+
+| Før | Nå |
+|---|---|
+| `arkivert_at` / `arkivert_av` | `historikk_fra` / `historikk_av` |
+| `bruker.arkiverte_oppdrag` | `bruker.oppdrag_lagt_i_historikk` |
+| `arkiver_oppdrag()` | `flytt_til_historikk()` |
+| `KanIkkeArkiveres` | `KanIkkeFlyttes` |
+| `POST /api/oppdrag/<pk>/arkiver/` | `POST /api/oppdrag/<pk>/historikk/` |
+| `GET /api/arkiv/` | `GET /api/historikk/` |
+| `arkivert` i JSON-svaret | `historikk_fra` |
+
+`related_name` er den som betyr mest i kode: `bruker.arkiverte_oppdrag` ville fortsatt
+lovet arkivering fra et helt annet sted i kodebasen. Testklassene og testnavnene er også
+byttet — det er der neste utvikler leter etter hva ordene betyr.
+
+De to gjenværende treffene på «arkiv» i modulens tester er selve forklaringen på hvorfor
+navnet ble byttet, og skal stå.
+
+---
+
+## 2026-08-29 — Ferdigstilte oppdrag rydder seg selv bort
+
+**1195 tester grønne** (7 nye). Ingen migrasjon. Oppfølging samme dag: den manuelle
+arkivknappen løste ikke problemet den var laget for.
+
+**Innvendingen var god.** Krever ryddingen et trykk per oppdrag under en travel vakt, blir
+den ikke gjort — og da fylles tavla opp likevel, med en knapp ingen rakk å bruke. Et
+oppdrag arkiveres nå i det øyeblikket det blir `Ledig`.
+
+**Regelen ligger i `sett_status`, ikke i stemplingsviewet**, og det er ikke en
+smaksdetalj: ikke alle `Ledig`-overganger kommer fra et knappetrykk. Starter en enhet
+neste oppdrag, lukkes det pågående automatisk (§4.3) gjennom samme funksjon. Lå regelen i
+viewet, ville tavla beholdt nettopp de oppdragene ingen trykket på — de som ble lukket av
+seg selv. Testen som dekker det er sett rød ved å unnta `automatisk=True` fra regelen.
+
+**`arkivert_av` står som NULL ved automatisk arkivering, og det er informasjon.** NULL
+betyr «ryddet bort av seg selv», satt betyr «noen trykket». Samme skille som
+`Statusmelding.automatisk`. Å føre opp bilens konto der ville dessuten motsagt regelen om
+at enheter ikke arkiverer — den stempler, systemet rydder.
+
+**Arkiveringen henger på overgangen, ikke på statusen.** Forskjellen merkes i «Hent
+tilbake»: et oppdrag hentet fram igjen blir *stående* på tavla, fordi det ikke finnes noen
+ny overgang til `Ledig` som kunne fjernet det. Var arkiveringen i stedet et statusfilter,
+ville raden forsvunnet igjen ved neste poll, og knappen vært uten virkning. Egen test.
+
+**Bilens 30-minuttersvindu er urørt**, og det er verdt å gjenta fordi de to nå ser enda
+likere ut. Mannskapet ser fortsatt oppdraget sitt i en halvtime etter at de meldte seg
+ledige; det er sentralbordets tavle som ryddes. Koblet dem, ville oppdraget forsvunnet fra
+skjermen i bilen i samme øyeblikk knappen ble trykket — mens de fortsatt sto og så på det.
+Egen test som krever begge deler samtidig.
+
+Den manuelle knappen står igjen for hånd-tilfellene: hent tilbake til tavla, og rydd bort
+igjen etterpå. Hjelpeteksten i «Ferdigstilte» sier nå at oppdrag havner der av seg selv —
+den beskrev en knapp som i praksis ikke lenger er hovedveien inn.
+
+---
+
+## 2026-08-29 — Oppdragsnummer, og en arkivknapp som rydder tavla
+
+**1188 tester grønne** (22 nye). Migrasjon `oppdrag.0003_oppdragsnummer_og_arkivering`.
+Bestilt under uttesting av fase 4, utenom faseplanen.
+
+**Nummeret er per år, ikke globalt.** `pasientnummer` er globalt unikt fordi
+nullstillingen der sletter radene; oppdrag har ingen slik nullstilling, så uniktheten
+bæres av `(year, oppdragsnummer)` med en databasesperre. Nummeret restarter på 1 hver
+sesong — «oppdrag 14» skal være kort nok til å leses opp på samband, og i år tre ville en
+global teller gitt tresifrede numre uten grunn. Telleren står i `AppSetting` per år og
+låses med `select_for_update`, som `next_patient_nr`, og gjenskapes fra dataene hvis raden
+mangler, slik at en slettet innstilling ikke gir kollisjon.
+
+**Migrasjonen backfiller før den strammer inn.** Tre steg i rekkefølge: nullbar kolonne,
+backfill per år i `created_at`-rekkefølge, deretter `NOT NULL` og unikhetskravet. Legges
+kolonnen til med en default i ett steg, får alle eksisterende rader samme nummer og
+sperren feiler. Backfillen setter også `AppSetting`-telleren for hvert år den fant — uten
+det ville neste opprettelse startet på 1 og kollidert med rad nummer 1. Kjørt mot en
+testbase med rader i to år og blandet innsettingsrekkefølge: nummereringen følger
+`created_at`, ikke innsettingen.
+
+**«Arkiver» rydder tavla. Den fryser ingenting.** Dette er *ikke* vaktarkivet i
+`core.arkiv`-forstand — ingen SHA-signatur, ingen kollaps, ingen backup-sperre. Et
+ferdigstilt oppdrag flyttes ut av den aktive lista og inn i en «Ferdigstilte»-visning som
+kan søkes på nummer, problemstilling, lokasjon eller enhet. Raden er urørt og kan hentes
+tilbake. Fase 7 bygger fortsatt det ekte vaktarkivet; de to er ikke i veien for hverandre
+— den ene er drift under vakt, den andre dokumentasjon etter vakt.
+
+Fordi handlingen er reversibel ligger den på `skriv_full`, ikke på global admin: §3.3
+reserverer admin for det irreversible, og en knapp som bare rydder en liste hører til
+drift. Enhetskontoer stenges ute selv med `skriv_full` — rydding er sentralbordets jobb.
+
+**Kun ferdigstilte kan arkiveres.** Å rydde bort et pågående oppdrag ville skjult noe som
+fortsatt skjer, og det er samme feilklasse som å ta en enhet av vakt midt i et oppdrag —
+allerede stengt i `enhet_vakt_view`. Knappen vises bare når den kan brukes.
+
+**Arkivering rører ikke enhetens 30-minuttersvindu**, og det er verdt å si eksplisitt
+fordi de to reglene ser like ut. Vinduet er personvern — en bil kan bli stående ulåst.
+Arkiveringen er sentralbordets rydding av sin egen tavle. Koblet dem, kunne sentralbordet
+fjernet et oppdrag fra skjermen til et mannskap som fortsatt sto og så på det.
+
+**Et fikstur som påsto mer enn det viste.** Søket på nummer treffer eksakt, ikke som
+delstreng — søker man «1» skal man ikke få 1, 10 og 11. Testen sa nettopp det, men
+fiksturet hadde bare numrene 1, 2 og 3, så den bestod også da søket ble byttet til
+`__icontains`. Numrene er nå 1, 10 og 11, og mutasjonen gjør testen rød. De øvrige nye
+vernene er også sett røde: sperra mot å arkivere pågående (5 feil) og ekskluderingen fra
+den aktive lista (1 feil).
+
+Personvernprotokollen er ført til v1.8: begge feltene inn i A.6-tabellen, med presisering
+av at `oppdragsnummer` identifiserer *oppdraget* og ikke personen, og en merknad i A.9 om
+at arkivflagget ikke påvirker noen lagringstid.
+
+---
+
+## 2026-08-29 — Fase 4: enhetsskjermen, og første faktiske bruk av `skriv_handling`
+
+**1166 tester grønne** (29 nye). Ingen migrasjon. Mellomtilstanden fra fase 3
+(`enhet_kommer.html`) er slettet — enhetskontoer får nå en ekte skjerm.
+
+**Stemplingsendepunktene: fem, ikke seks.** Planen sa «seks navngitte endepunkter», men
+talte statusene: `venter` settes ved oppretting og stemples aldri. Settet skrives ikke ned
+noe sted — `services.STEMPLBARE` utledes av overgangstabellen (`frozenset().union(*OVERGANGER.values())`),
+så et endepunkt finnes hvis og bare hvis en rad peker på det. URL-en er
+`POST /oppdrag/api/oppdrag/<pk>/status/<overgang>/` med statusverdien som navn; ukjent navn
+gir 404, ulovlig overgang 409.
+
+**Det lukkede kroppsskjemaet fra §5.1 er testbart ved uttømming, og testes slik.** To
+nøkler — `klienttid` og `idempotency_key` — og alt annet gir 400 uten sideeffekt; testen
+sender domenefelt og krever at ingenting endret seg. `klienttid` valideres etter §5.1:
+framtid, før oppdragets opprettelse eller eldre enn et døgn gir servertid, og avvik over to
+minutter fra ankomsttid setter `forsinket=True` uansett hvilket stempel som vant — avviket
+er informasjonen. Uleselig klienttid gir 400, ikke stille servertid: det er en klientfeil,
+ikke et gammelt stempel.
+
+**`idempotency_key` godtas, men kobles først i fase 5.** Statusmaskinen gjør en ren
+avspilling ufarlig allerede: samme overgang to ganger er ulovlig andre gang og gir 409 uten
+ny rad. Verdien av `core.idempotency` her er å svare «ok» på en replay i stedet for 409, og
+det svaret hører til offline-køen som skal tolke det.
+
+**To porter, og nivå er ikke nok.** `skriv_handling` i dekoratøren, eierskap i viewet — og
+`skriv_full` *uten* enhetskobling får 403. Sentralbordet stempler ikke; det korrigerer
+(fase 4b). Stemplingen er en måling fra bilen, og en operatør som stempler «for» en enhet
+ville forfalsket den. Testene dekker også kombinasjonen enhetskobling uten
+`ModulTilgang`-rad: koblingen gir ingen tilgang, samme regel som `Forstehjelper.user`.
+
+**Skjermen kjenner ikke statuskjeden.** Serveren sender `neste_overgang` og `neste_navn`
+på hver rad (kun i enhetens payload), og «neste»-knappen poster dit den blir fortalt. En
+kopi av kjeden i JS ville vært enda et sted å komme i utakt — §2.6 i rollemodellnotatet i
+miniatyr. Dobbelttrykk møter 409 og besvares med å hente ferskt, uten feilbanner.
+
+Resten av skjermen: to knapper med 64px trykkflater (en tommel i en bil i bevegelse, ikke
+en musepeker), ventende sortert på hastegrad men valgt av mannskapet, tidslinje på det
+aktive kortet, `automatisk`-markøren i gråtoner på klokkeslettet (§4.5), og et feilbanner
+som blir stående til noe lykkes — med beskjed om å melde over nødnett, som er det ærlige
+svaret til offline-køen finnes (fase 5). Polling hvert 15. sekund med ETag; enhetens ETag
+inkluderer meldings-ID-ene, slik at en korreksjon (fase 4b) ikke drukner i en 304.
+
+**`klokke()` flyttet til `portal-utils.js`** — begge oppdragssidene bruker den, og helpere
+flyttes, de kopieres ikke. `hastegradKlasse()` er duplisert med vilje: den er domene, ikke
+primitiv, og de to filene lastes aldri sammen. XSS-vernet i `tests_xss.py` skanner nå
+byggerne i begge filene, og kjører enhetsskjermens byggere i node med markup i fritekst,
+knappenavn og statusnavn.
+
+---
+
+## 2026-08-29 — Fase 2 lukket: protokollen dekker oppdragsmodulen
+
+Kun dokumentasjon — `PERSONVERN_DOKUMENTASJON.md` går fra v1.6 til v1.7. Ingen kodeendring,
+ingen migrasjon. **1137 tester grønne.**
+
+Dette var resten av fase 2 i `docs/BESLUTNING_OPPDRAGSMODULEN.md`. Kodedelen — at fritekst
+logges som *endret* i audit, men aldri med verdier — har vært på plass fra feltets første
+lagring (28. aug.); det som sto igjen var at behandlingsprotokollen faktisk beskriver
+behandlingen. Rekkefølgekravet var «før feltet er i prod med logging på», og det holdt:
+modulen finnes kun på staging, så verdilogging av fritekst har aldri vært aktiv noe sted.
+
+Hva som kom inn, og hvorfor det ligger der det ligger:
+
+- **A.6, ny seksjon «Oppdragsdata».** Feltene med kategori og hjemmel, etter samme lest som
+  pasienttabellen. Det bærende poenget står først: personen oppdraget gjelder registreres
+  **uten noen identifikator** — ikke pasientnummer, ikke navn, ingen kobling til
+  pasientmodulen. Fritekst-tiltakene er samlet her som nummerert liste: audit-unntaket,
+  de to server-side skjulereglene mot enhetskontoer, hjelpeteksten i skjemaet, og at
+  oppdragsdata ikke caches. `Leverer`-uten-leveringssted er ført som det bevisste valget
+  det er.
+- **A.6, audit-tabellen.** Raden som lover «gammel verdi, ny verdi» på feltnivå har fått
+  unntaket ført inn. Uten den linja motsier protokollen seg selv fra to seksjoner.
+- **A.9, rad + merknad.** Ærlig svar på lagringstid: **ingen automatisk sletting ennå.**
+  Radene er årsscopet som pasientdata, men blir stående til fase 7 leverer arkivering med
+  24-måneders kollaps. Merknaden sier eksplisitt at raden skal revideres da — samme grep
+  som kollaps-verifiseringsmerknaden fra v1.6: dokumentet skal si hva som er bevist, ikke
+  hva som er planlagt.
+- **A.12, ny sårbarhet.** Fritekst er portalens første frie tekstfelt, og en operatør *kan*
+  skrive identifikatorer der. Tiltakene henvises, og restrisikoen står: selve feltverdien
+  ligger i oppdragstabellen til oppdraget slettes eller arkiveres.
+- **B.2, merknad.** Personvernerklæringen henvender seg til pasienten, og en utrykning
+  gjelder samme person — da skal erklæringen også dekke den. Kort avsnitt: oppdraget
+  registreres uten identifikator, og fritekst skjules for enheten ved avslutning.
+
+**Funn underveis, ført inn i A.9 og TODO:** oppdragsdata står utenfor applikasjonens
+modulbackup. Ingen handler er registrert i `core.backup`-registryet, så fram til fase 7 er
+Railways databasebackup — aktiv omtrent én måned i året — eneste dekning. Ikke akutt så
+lenge modulen er på staging, men det må få en handler senest sammen med arkiveringen.
+
+Fasetabellen i beslutningsnotatet er samtidig ført ajour: fase 2 og fase 3 står nå som
+levert (fase 3 ble levert 29. aug. uten at tabellen ble oppdatert), og §9 har fått en
+gjennomført-note etter samme mønster som rollemodellnotatets §7.
+
+---
+
+## 2026-08-29 — «Pensjoner» er borte, og et pensjonert navn er ledig igjen
+
+**1137 tester grønne** (2 nye, 7 fjernet). Ingen migrasjon.
+
+Målt på staging: `Enheter uten konto: 0 av 2`. Dermed hadde Pensjoner-knappen ingen jobb
+igjen — alle enheter har en konto, og kontoen er veien inn og ut. Knappen, Gjenopprett,
+`_settAktiv`, `PUT /oppdrag/api/enheter/<pk>/`, `GET /oppdrag/api/kontoer/` og
+`_enhet_admin_dict` er slettet. Det samme er `OPPDRAG_TILGANG.erAdmin`, som ikke hadde noen
+leser igjen.
+
+**Men å fjerne knappen alene ville satt en felle.** Sletter du kontoen til en bil som har
+kjørt, pensjoneres enheten i stedet for å slettes — historikken er `PROTECT`. `Enhet.navn`
+er `unique`, så «Haugesund 56» ville vært brent for godt: skjemaet ville sagt «finnes
+allerede», og uten Pensjoner-knappen fantes ingen vei tilbake utenom `manage.py shell`.
+
+Et pensjonert, ukoblet navn regnes derfor som ledig. Oppretter du kontoen på nytt, tas den
+gamle raden i tjeneste igjen i stedet for at det lages en ny — bilen kommer tilbake med
+oppdragene sine. En ny rad ville gitt to «Haugesund 56» i statistikken, én med historikk og
+én uten. Navn som holdes av en enhet i tjeneste, eller av en med konto, er fortsatt opptatt.
+
+Enhetens livssyklus har dermed én kilde: kontoen. Opprett den, og bilen finnes; slett den,
+og bilen forsvinner eller pensjoneres; opprett den igjen, og bilen er tilbake.
+
+**Under arbeidet slettet jeg `enheter_view` ved et uhell** — den lå mellom to funksjoner som
+skulle vekk, og utsnittet tok den med. Fanget med en gang fordi skriptet skrev ut hvilke
+funksjoner det faktisk fjernet; gjenopprettet fra `git show HEAD`. Verdt å merke seg som
+argument for å la slike skript rapportere, ikke bare gjøre.
+
+---
+
+## 2026-08-29 — Enheten følger kontoen, også ut
+
+**1142 tester grønne** (5 nye, 1 fjernet). Ingen migrasjon.
+
+André: «Fjern legg til enhet-knappen i enheter-vinduet. Den skal ikke brukes av noen og er
+bare forvirrende. Vi trenger heller ikke pensjoner? Jeg kan jo bare slette brukeren?»
+
+**«Legg til enhet» er borte** — knappen, JS-funksjonen, `POST /oppdrag/api/enheter/ny/` og
+URL-en. Enheter fødes med kontoen («Bil eller ambulanse» i kontoskjemaet), og to veier inn
+til samme rad er én for mye. Malen sa det selv med «vanligvis trengs ikke denne», som er en
+knapp som ber om unnskyldning for å finnes. Testen som krevde at endepunktet fantes er
+snudd: nå kreves 404.
+
+**Premisset om sletting stemte ikke — nå gjør det det.** `Enhet.user` er `SET_NULL`, så å
+slette bilkontoen etterlot enheten som en rad uten kobling: fortsatt på ressursoversikten,
+merket rødt, og hvis den hadde kjørt oppdrag, umulig å bli kvitt — `Oppdrag.enhet` er
+`PROTECT`. Sletting av kontoen tar nå enheten med seg, og pensjonerer den i stedet når den
+har oppdrag i historikken. Samme skille som ellers i portalen: data uten spor slettes, data
+med spor fryses.
+
+**Frysing tar enheten av vakt.** En frosset konto kan ikke logge inn, så bilen kan ikke
+melde. Å la den stå som ledig ville sendt 113 etter en bil ingen kan kvittere for. Frysing
+er reversibel, så enheten pensjoneres ikke — den settes inn igjen manuelt ved opptining.
+
+**«Pensjoner» blir stående.** Den er nå nødutgangen for enheter uten konto — rader som ble
+til før koblingen fantes, eller fra `manage.py shell`. De kan ikke fjernes ved å slette en
+konto, for det finnes ingen. Etter denne endringen er det den eneste jobben knappen har.
+
+---
+
+## 2026-08-29 — Lukkekrysset var svart på mørk modal
+
+**1139 tester grønne** (1 ny). Ingen migrasjon.
+
+André meldte at X-en i Nytt oppdrag, Enheter og Lokasjoner er svart og ikke passer vinduet.
+
+`portal.css` hadde **ingen** modalregler. Bootstraps `--bs-modal-bg` arver `--bs-body-bg`,
+som `base_portal` setter til sidebakgrunnen — så modalen fikk nøyaktig samme farge som siden
+bak seg, og `.btn-close`, som er en svart SVG, forsvant i den. Ingenting feilet; det så bare
+ut som en tom flate med et kryss som ikke var der.
+
+Pasientsiden har aldri hatt problemet: den er frittstående, laster `style.css`, og hver
+knapp der har `btn-close-white`. Feilen bodde kun i portalgrenen, og derfor hører fiksen
+hjemme i `portal.css` — ikke i `oppdrag.css`. Alle modulsider som kommer etter, arver den.
+
+Modalen får nå `--portal-surface` og en kant, så den løfter seg fra siden bak, og krysset
+inverteres.
+
+Testen fant et sted til jeg ikke hadde sett etter: **`base_portal.html` har selv en
+`.btn-close`** — lukkeknappen på Django-meldingene. Den sto svart på `.alert-danger`s
+mørkerøde bakgrunn på hver eneste portalside. Samme linje løser begge.
+
+Guarden ligger i `MorkTekstPaaMorkBakgrunnTests`, som allerede løser `{% extends %}` og
+`{% static %}`: en mal med `.btn-close` må ha overstyringen i et stilark den faktisk laster.
+Samme feilklasse som dempet tekst — en Bootstrap-standard laget for lys bakgrunn, som er
+usynlig i stedet for å feile.
+
+---
+
+## 2026-08-29 — Sperra på Pensjoner er testet, ikke bare tegnet
+
+**1138 tester grønne** (2 nye). Ingen migrasjon.
+
+André spurte hvem som når Pensjoner-knappen. Svaret var riktig — global admin, både i
+tegningen og på serveren — men bare halvparten av det var testet.
+
+Da Enheter-panelet ble åpnet for `skriv_full` i forrige økt, fikk den gruppa et panel som
+også nevner `PUT /oppdrag/api/enheter/<pk>/`. Endepunktet krevde global admin hele veien;
+testene dekket bare `enheter/ny/`. En knapp som ikke tegnes er ingen sperre — sperra er
+serveren, og den skal ha en test som går rød når noen fjerner den.
+
+To tester lagt til: `skriv_full` uten admin får 403 på både lesing og pensjonering av en
+enhet, og enheten er fortsatt aktiv etterpå.
+
+---
+
+## 2026-08-29 — Tavla viser ressurser og oppdrag, resten ligger bak knappen
+
+**1136 tester grønne** (2 nye). Ingen migrasjon.
+
+André: «for nå så er det dårlig UI med på vakt, av vakt og oppdragslisten nederst. De to
+viktigste er, hvilke ressurser er tilgjengelige og oppdrag.»
+
+Tavla har derfor to ting: **Ressurser** — enhetene som er på vakt, med status — og
+**Oppdrag**. Enheter av vakt vises ikke der lenger; tavla svarer på ett spørsmål, og det er
+«hvem kan sendes nå».
+
+Antallet av vakt står på Enheter-knappen («Enheter (1 av vakt)»), der hele lista ligger.
+
+Første utgave hadde *to* signaler om det samme — også en linje under ressurslista. André tok
+det bort: «jeg gir jo folk opplæring, de som skal bruke det er godt informerte. Nå dummer vi
+det veldig ned.» Han har rett. Vernet mot at en bil forsvinner ubemerket er ett tall, ikke
+to plasseringer av det, og et grensesnitt som gjentar seg for brukere som er lært opp er
+støy — ikke omtanke.
+
+**Enheter-knappen er ikke lenger et koblingspanel.** Den viser hele lista: på vakt, av vakt
+og pensjonerte, med vaktbryteren der. Kontokoblingen vises som tekst, men redigeres ikke —
+nye biler får den ved oppretting av kontoen, så nedtrekket var en tredje vei til noe som
+allerede var gjort. Verre: det inviterte til å tro at koblingen *er* tilgangen. Mangler
+koblingen, står det med rød tekst; det er en ekte feiltilstand og verdt å se.
+
+`?alle=1` på enhetsendepunktet tar med pensjonerte. Ressursoversikten skal ikke se dem —
+de er borte for godt — men panelet er stedet man gjenoppretter dem fra, og da må de være
+synlige et sted. En probe som droppet filteret gjorde begge testene røde.
+
+Panelet er åpnet for `skriv_full`: å ta biler på og av vakt er drift. Oppretting og
+pensjonering står fortsatt på global admin.
+
+Verifisert i nettleser, ikke bare i tester: ressurslista viser én enhet, notisen og
+knappetelleren viser den andre, nedtrekket i «Nytt oppdrag» har bare den som er på vakt, og
+panelet lister begge med riktig bryter.
+
+---
+
+## 2026-08-29 — Biler tas på og av vakt
+
+**1134 tester grønne** (9 nye). Migrasjon `oppdrag.0002_enhet_pa_vakt`.
+
+André ville at `skriv_full` skal kunne ta biler ut av tilgjengelige enheter — «det er jo en
+ressursoversikt».
+
+**Det ble et nytt felt, ikke gjenbruk av `er_aktiv`.** De to svarer på forskjellige
+spørsmål, og forskjellen er hvem som endrer dem og hvor ofte. `er_aktiv` er oppsett: admin
+pensjonerer en bil, og da skal den bort for godt. `pa_vakt` er drift: 113 tar biler på og av
+gjennom vakta. Ett felt for begge ville gjort «pensjonert» og «hjemme i kveld» til samme
+tilstand, og den som skulle skru bilen på igjen ville ikke funnet den. Det er den samme
+sammenblandingen deploy 1–3 brukte tre runder på å rydde bort.
+
+To regler holder oversikten ærlig, begge testet:
+
+- **En enhet av vakt skjules ikke** — den vises i en egen gruppe på sentralbordet. En bil
+  som forsvinner fra tavla er en bil ingen husker å sette inn igjen, og da mangler den neste
+  vakt uten at noen vet hvorfor. En probe som filtrerte dem bort i API-et gjorde testen rød.
+- **En enhet med påbegynt oppdrag kan ikke tas av vakt.** Den er ute akkurat nå. Et ventende
+  oppdrag hindrer derimot ikke — bilen har ikke rykket ut, og motstykket er testet så
+  sperren ikke kan bli en som alltid slår til.
+
+Flytting er ingen bakvei: et oppdrag kan ikke flyttes til en enhet som er av vakt.
+
+Endepunktet er skilt fra `enhet_detalj_view`, som er admin-flaten for navn, kobling og
+pensjonering. Drift og oppsett har ulike brukere og ulik frekvens, og bør ikke dele dør.
+
+---
+
+## 2026-08-29 — Nivåene tilbys per modul, og bilnivået forhåndsvelges
+
+**1125 tester grønne** (5 nye). Ingen migrasjon.
+
+André: «det står ingenting på oppdrag om skrive:handling. Bare lese eller skrive: full.»
+
+`ModulTilgangForm` hadde én global liste over valgbare nivåer, og `skriv_handling` sto ikke
+i den. Begrunnelsen var at ingen modul brukte nivået ennå, og at et nivå som ikke gir noe er
+lett å dele ut i god tro. **Den begrunnelsen sluttet å gjelde da oppdragsmodulen ble
+skrevet** — nivået var bygget for akkurat den — og ingenting fanget det opp, fordi lista lå
+i skjemaet og modulen ikke hadde noe å si om saken.
+
+Samme liste hadde motsatt feil samtidig: den tilbød `skriv_full` på `statistikk`, som ikke
+har et eneste skriveendepunkt.
+
+**Hver modul deklarerer nå sine egne nivåer** i `Module.nivaaer`. Patients: `les`,
+`skriv_full`. Oppdrag: hele stigen. Statistikk: bare `les`. Et nivå brukeren allerede har
+står fortsatt i lista selv om modulen ikke tilbyr det — ellers ville et lagre-trykk stille
+fjernet det.
+
+### «Hvorfor settes ikke tilgangen automatisk?»
+
+Fordi en usynlig tilgangsendring er nøyaktig fella §7.3 delte `PasientRolleForm` for å
+unngå: der satte én radio både funksjonen i felt og tilgangen, så en domenehandling endret
+autorisasjon uten at noen så det.
+
+Men innvendingen har et poeng — en bil uten `skriv_handling` kan ikke gjøre det biler gjør.
+Løsningen er **forhåndsvalgt, ikke satt i bakgrunnen**: velger man «Bil eller ambulanse»,
+settes Oppdrag-raden i matrisen til «Skrive: handling», med en forklaring ved siden av.
+Admin ser verdien i det samme skjemaet hun sender inn, og kan endre den. Valget forblir
+hennes, og auditraden viser hva som faktisk ble sendt.
+
+---
+
+## 2026-08-29 — Kontotypen velges, og bilen opprettes i ett steg
+
+**1120 tester grønne** (9 nye). Ingen migrasjon.
+
+André: «jeg er sterkt kritisk til å måtte koble en delt konto. Å koble slikt er tullete.»
+Han har rett. Å sette opp én bil krevde tre handlinger — opprett konto, opprett `Enhet`
+inne i oppdragsmodulen, koble dem — med to av dem på en helt annen side enn den første, og
+ingenting som forklarte hvorfor de hang sammen.
+
+`AdminUserCreateForm` har nå ett valg med tre verdier: **Person**, **Delt konto**, **Bil
+eller ambulanse**. Velger man den siste, blir enheten opprettet og knyttet til kontoen i
+samme innsending.
+
+**Ett valg, ikke avkrysningsboks pluss navnefelt.** `er_delt_konto` er ikke lenger en boks
+på opprettingsskjemaet — den utledes av valget. To kontroller som overlapper er nettopp det
+som gjorde `role` til et rot: man kunne krysse av for delt konto og *likevel* skrive et
+enhetsnavn, eller la være, og skjemaet måtte gjette hva som var ment. Redigeringsskjemaet
+beholder boksen; der endrer man en konto som finnes, og det er noe annet enn å bestemme hva
+som skal lages.
+
+**Det som ble slått sammen er to opprettelser — ikke tilgang og domenedata.** §7.3-skillet
+står uendret, og en test holder det: en bil opprettet slik får 403 på `/oppdrag/` helt til
+noen gir den en `ModulTilgang`-rad. Prøvd motsatt vei også — en probe som lot
+enhetsopprettingen dele ut `skriv_handling` gjorde testen rød.
+
+Enhetsnavnet sjekkes som ledig i `clean()`, ikke i viewet. En unik-feil fra databasen ville
+kommet etter at kontoen var lagret, og etterlatt en konto uten enhet.
+
+Retningen `accounts` → `oppdrag` er verdt å merke seg. Importen er lokal i funksjonen, som
+`core.views` gjør mot `patients.models`. Skal en modul nummer to også kunne opprettes fra
+brukerskjemaet, er det der et registry hører hjemme — etter samme idiom som `core.backup`
+og `core.arkiv`. Med én modul ville registeret vært mer maskineri enn nytte.
+
+---
+
+## 2026-08-29 — CSRF: hver skriving fra en modulside var brutt
+
+**1111 tester grønne** (8 nye). Ingen migrasjon. `static/js/portal-utils.js` og
+`core/tests_csrf_flater.py`.
+
+André meldte at han ikke fikk opprettet et oppdrag som **admin**. Første diagnose var feil —
+jeg antok at kontoen manglet `skriv_full`, fordi det forklarte symptomet og passet med
+oppsettet han beskrev. Det gjorde det ikke: han var admin hele tiden. Sida ble derfor kjørt
+i en ekte nettleser, og da kom svaret på ett forsøk:
+
+```
+Forbidden (CSRF token from the 'X-Csrftoken' HTTP header has incorrect length.)
+POST /oppdrag/api/oppdrag/ 403
+```
+
+**`CSRF_COOKIE_HTTPONLY = True`, så JS kan aldri lese `csrftoken`-cookien.**
+`getCsrfToken()` prøvde cookien først og falt tilbake på `#csrf-token-holder` — et element
+bare pasientsiden har. Oppdragssiden hadde ingen av delene, så tokenet ble tom streng, hver
+POST/PUT/DELETE fikk en HTML-403, og `res.json()` kastet på `<!DOCTYPE` *før*
+feilmeldingsboksen ble fylt. Brukeren så at ingenting skjedde.
+
+`base_portal.html` har hatt `<meta name="csrf-token">` på hver eneste side hele tiden — lagt
+inn for akkurat dette formålet, og aldri lest. **Fiksen er å lese den**, ikke å legge en
+holder i hver mal: da ville neste modul gjort samme feil.
+
+### Hvorfor 37 view-tester ikke så det
+
+`Client()` settes opp med `enforce_csrf_checks=False`. Hele API-et var testet og grønt mens
+hver eneste skriving fra nettleseren var brutt. Det er en feilklasse vanlige view-tester er
+blinde for, og den må testes eksplisitt.
+
+### Første testforsøk var også grønt på feil grunnlag
+
+Testen jeg skrev lette etter `csrf_token` hvor som helst i malens arvekjede. Den passerte
+med feilen intakt, fordi `base_portal.html` har en utloggingsknapp med `{% csrf_token %}`
+inne i et skjema: tokenet *var* på sida, bare ikke et sted `getCsrfToken()` så etter. Testen
+måler nå kildene hjelperen faktisk leser — meta-taggen eller holderen — og cookien står
+uttrykkelig ikke i lista.
+
+Tre vern, alle sett røde: hjelperen kjørt i node mot en stubbet DOM, et strukturelt vern
+over alle maler som laster skrivende JS, og et oppførselsvern med `enforce_csrf_checks=True`
+som henter tokenet fra meta-taggen slik nettleseren gjør.
+
+---
+
+## 2026-08-29 — Enhetsadmin, og et oppsett som sier fra før det feiler
+
+**1103 tester grønne** (11 nye). Ingen migrasjon.
+
+André prøvde å ta modulen i bruk på staging og meldte at det var «litt knotete». Det var
+det, og det var to feil i fase 3 — ikke i oppsettet hans.
+
+**Enheter kunne bare lages fra `manage.py shell`.** Det var ikke en bevisst avgrensning som
+`lokasjon`-kommandoen, det var en glipp: sentralbordet fikk lokasjonsadmin, men enheter ble
+aldri gitt en flate. En modul som ikke kan tas i bruk uten Railway-konsollen er ikke ferdig.
+Enheter opprettes, aktiveres og knyttes til kontoer i et eget admin-panel nå.
+
+Koblingspanelet sier det rett ut, fordi det er stedet feilen ville blitt gjort: **å knytte en
+konto til en enhet gir ingen tilgang.** Koblingen avgjør hvilket grensesnitt kontoen får;
+hva den har lov til står i modulmatrisen. En test setter en enhet på en konto uten
+`ModulTilgang`-rad og krever 403.
+
+At en konto ikke kan være to biler samtidig håndheves nå med en setning admin kan lese.
+`OneToOneField` ville avvist det uansett — med en 500.
+
+**Skjemaet lot deg fylle ut alt og feilet ved lagring.** Uten enheter eller lokasjoner ga
+«Nytt oppdrag» en «Ukjent eller inaktiv enhet» først etter at du hadde valgt problemstilling,
+hastegrad og skrevet fritekst. Det er den verste rekkefølgen: arbeidet gjøres først,
+beskjeden kommer etterpå. Siden viser nå hva som mangler, og knappen er avslått til det er
+på plass.
+
+### Det som *ikke* var feil
+
+Brukernavn lagres med små bokstaver — `clean_username()` gjør `.strip().lower()`, og
+`test_brukernavn_lagres_med_smaa_bokstaver` låser det. `Enhet.navn` er et visningsnavn uten
+noen kobling til brukernavnet; «Haugesund 56» og `haugesund56` er to uavhengige strenger.
+At de ligner er en felle verdt å kjenne, ikke en sammenheng.
+
+Det som stoppet André var at kontoen hadde **`les`**, og at oppretting krever `skriv_full`.
+Siden gjorde akkurat det den skulle — den viste ingen «Nytt oppdrag»-knapp — men den sa ikke
+hvorfor. Reprodusert i en diagnose før noe ble endret, så fiksen traff riktig sted.
+
+---
+
+## 2026-08-29 — Oppdragsmodulen fase 3: sentralbordet
+
+**1092 tester grønne** (33 nye). Ingen migrasjon. Modulen er synlig i meny og
+dashboard nå som den har en side.
+
+Sentralbordet: enhetsliste med utledet status, oppdragslista for vakta, oppretting,
+flytting mellom enheter, tidslinje per oppdrag, og lokasjonsadmin. Polling hvert 30. sekund
+med ETag, så et poll uten endring koster en 304 uten kropp.
+
+**To grensesnitt bak én URL.** `/oppdrag/` velger skjerm på om kontoen er knyttet til en
+`Enhet` — ikke på nivået. En test setter `skriv_full` på en enhetskonto og krever at den
+*fortsatt* får enhetsskjermen: hadde valget stått på «er nivået nøyaktig `skriv_handling`»,
+ville den testen vært rød, og feilen §2.3 beskriver ville vært tilbake.
+
+Enhetsskjermen kommer i fase 4. Fram til da får en enhetskonto en mellomtilstand som sier
+det rett ut. Alternativet — å sende henne til sentralbordet — ville vist henne alle oppdrag
+i vakta, altså nettopp det hun ikke skal se.
+
+**Skjulereglene håndheves i serverens svar.** Testene leser den rå responskroppen, ikke det
+serialiserte objektet: `assertNotIn('sensitivt notat', raa)`. Det er den eneste formen som
+faktisk beviser at teksten ikke ble sendt. To motstykker holder dem ærlige — fritekst
+*vises* mens oppdraget pågår, og sentralbordet beholder den etter `Ledig`.
+
+### To feil testene fant
+
+**`trustedHtml()` ble brukt feil, og hele rendringen var ødelagt.** Funksjonen returnerer en
+markør-*objekt* for `cellHtml()`, ikke en streng. `el.innerHTML = trustedHtml(...)` gir
+`[object Object]`. Det så riktig ut i koden, og ville vist en tom side i nettleseren. Fanget
+av node-testen som kjører byggerne og leser resultatet.
+
+**XSS-gjennomgangen kunne ikke lese sin egen kode.** Regexen som finner `${...}` stopper på
+første `}`, så en nøstet mal-streng inne i en interpolasjon ble usynlig — og en uescapet
+verdi der ville passert stille. Fragmentene er derfor hoistet ut til variabler over
+mal-strengen. Det er bedre kode uansett, men her er det også det som gjør vernet virksomt.
+
+Gjennomgangen leste dessuten sine egne kommentarer: en kommentar som *nevner* `${...}` for å
+forklare regelen ble rapportert som et funn. Den stripper `//`-linjer nå, samme grep som
+`JsModulLastingTests` gjør for kall.
+
+### Verifisert ved å bryte
+
+Alle vernene er sett røde: radfilteret fjernet (3 feil), fritekstregelen slått av (1),
+`@modul_kreves` tatt av flytt-endepunktet (URL-gjennomgangen fanget det og navnga ruta).
+
+Første forsøk på den siste proben **matchet ikke teksten** — `@rate_limit` sto mellom
+dekoratørene — så testen «bestod» uten at noe var endret. Verdt å merke seg: en probe som
+ikke treffer ser ut som et vern som virker.
+
+Én test til fortjener plassen sin: `test_url_en_svarer` henter modulens URL og krever 200.
+Den fanget en 500 som bare oppstår med `ManifestStaticFilesStorage` — altså i prod — fordi
+et nytt stilark ikke lå i manifestet.
+
+---
+
+## 2026-08-28 — Oppdragsmodulen fase 1: modeller og regler
+
+**1048 tester grønne** (46 nye). Migrasjon `oppdrag.0001_initial`. Ingen brukervendte
+flater — modulen er registrert, men står med `url=None` og begge `show_*`-flagg av.
+
+Fem modeller: `Enhet`, `Lokasjon`, `Oppdrag`, `Statusmelding`, `Enhetsbytte`. Ingen av dem
+rører `patients`.
+
+**Fase 2 ble delvis overflødig, og det er en god nyhet.** Planen forutsatte at
+audit-logging var noe man måtte melde seg *av*, siden feltlista utledes fra modellen (N2).
+Det stemmer per modell: `patients/signals.py` kobler seg på `sender=Patient`, og en ny app
+får ingenting automatisk. Audit-signalet for oppdrag er derfor nyskrevet kode, og
+skjulingen av `fritekst` er bygget inn fra første lagring i stedet for ettermontert. Det
+fjerner vinduet der feltet kunne stått i prod med verdilogging på — og de radene kan ikke
+fjernes uten å røre auditsporet.
+
+Skjulingen er en **tredje kategori**, ikke bare et unntak til: `FELT_UTEN_AUDIT` gir ingen
+rad i det hele tatt, mens `FELT_UTEN_VERDILOGGING` gir en rad som sier at feltet ble
+endret, av hvem og når — men ikke hva som sto der. Sammenligningen gjøres på råverdien;
+ellers ville `(skjult) == (skjult)` gjort enhver endring i fritekst usynlig.
+
+Fire invarianter er kodet og testet, alle sett røde først:
+
+- **Statusmaskinen er data**, ikke `if`-er i views. Ukjent status gir `False`, ikke `True` —
+  samme regel som ukjent nivånavn i `har_tilgang`.
+- **Enhetens status utledes.** Én test krever at `Enhet` *ikke* har en `status`-kolonne, som
+  vern mot at noen legger den til «for enkelhets skyld». Et ventende oppdrag gjør ikke
+  enheten opptatt: den har ikke rykket ut, og kan fortsatt sendes.
+- **Korreksjoner er nye rader** som peker på den gamle, og kan kjedes. Regelen «nyeste
+  ikke-korrigerte rad per status vinner» bor i en manager-metode, ikke i en `if` per
+  spørring.
+- **Fritekst logges uten verdier.** Testen leser den faktiske auditraden og krever at
+  teksten ikke er i den.
+
+Å starte et oppdrag mens et annet er i gang lukker det pågående med samme tidsstempel og
+`automatisk=True`. En test krever at en manuelt meldt `Ledig` *ikke* får flagget — ellers
+ville skillet vært verdiløst.
+
+**Modulen er registrert, men skjult.** En test binder `url`, `show_in_nav` og
+`show_in_dashboard` sammen: slås flaggene på uten at URL-en settes, feiler den. Da kan ikke
+fase 3 glemme halve jobben.
+
+To tester holder rollemodellen på plass: en konto knyttet til en `Enhet` ser **ikke**
+modulen uten en `ModulTilgang`-rad, og en konto med raden ser den. Koblingen er domenedata,
+som `Forstehjelper.user` — §7.3 delte `PasientRolleForm` nettopp for å holde kobling og
+autorisasjon fra hverandre.
+
+**Lokasjonene vedlikeholdes med `python manage.py lokasjon` inntil fase 3**, ikke med en
+admin-side. Planen sa admin-side i fase 1, og den beslutningen ble snudd av en grunn som
+først ble tydelig da siden skulle plasseres: modulen har ingen URL ennå, med vilje. En
+admin-side uten vei inn er den samme feilen som et modulkort som fører til 404, med et
+ekstra steg — og portalen har allerede hatt én slik, oppdaget ved at noen måtte skrive
+URL-en for hånd.
+
+Å gi modulen en URL bare for å ha et sted å henge siden ville løst plasseringen ved å
+innføre problemet. Kommandoen følger `appsetting`-presedensen — samme rolle, samme
+begrunnelse — og gjør staging mulig å fylle med testdata før fase 3 skrives. Den permanente
+flaten kommer i modulens eget admin-område, sammen med sentralbordet.
+
+`--deaktiver` framfor sletting: FK-en fra `Oppdrag` er `PROTECT`, så en lokasjon i bruk kan
+ikke forsvinne uten å ta historikken med seg. En test sjekker begge deler.
+
+Med det er fase 1 ferdig.
+
+---
+
+## 2026-08-28 — Oppdragsmodulen er planlagt
+
+Kun dokumentasjon. Ingen kodeendring. `docs/BESLUTNING_OPPDRAGSMODULEN.md`.
+
+Modulen blir den første som tar `skriv: handling` i bruk. Nivået ble definert i deploy 1 med
+akkurat denne bruken i tankene (§3.2 i rollemodellnotatet) og har stått tomt siden.
+
+**Det André kalte kinkig — to grensesnitt avhengig av tilgang — er ikke et tilgangsproblem.**
+Fristelsen er å la nivået velge skjerm: «har du `skriv_handling`, får du bilskjermen». Det er
+samme feil som §2.3 beskrev, å bruke et *ordnet* nivå som en *identitet*. Stigen sier at
+`skriv_full` dekker `skriv_handling`, og et oppslag på «er nivået nøyaktig `skriv_handling`»
+bryter den regelen stille.
+
+Skillet er i stedet rolle i felt: **er kontoen knyttet til en `Enhet`?** Da får den
+enhetsskjermen. Ellers sentralbordet, redigerbart med `skriv_full` og skrivebeskyttet med
+`les`. Mønsteret finnes allerede — `Forstehjelper.user` er domenedata, ikke autorisasjon, og
+§7.3 delte `PasientRolleForm` nettopp for å holde de to fra hverandre. Samme regel her: å
+knytte en konto til en enhet gir ingen tilgang.
+
+**Én invariant måtte skjerpes for å overleve offline-kravet.** §3.2 slo fast at et
+handling-endepunkt ikke skal lese request-kroppen. En stempling utført uten dekning må kunne
+fortelle når den skjedde, ellers viser statistikken når nettet kom tilbake. Regelen er derfor
+skrevet om strengere, ikke svakere: kroppen har et lukket skjema på to nøkler — `klienttid`
+og `idempotency_key` — og alt annet gir 400. Det er testbart ved uttømming, i motsetning til
+en feltwhitelist inne i en generell PUT, der settet av felter vokser med modellen.
+
+**To ting fulgte av kravene uten å være bestilt.** At en enhet skal kunne ha ventende
+oppdrag betyr at et oppdrag må kunne være tildelt uten å være påbegynt — altså en status
+`Venter` før `Rykker ut`, og at det er enheten som setter `Rykker ut`, ikke 113 ved
+oppretting. Gjorde 113 det, ville responstiden løpe fra et tidspunkt ingen i bilen hadde sett
+oppdraget. Og at lokasjon ble en admin-vedlikeholdt nedtrekksliste flyttet personvernrisikoen:
+feltet er ikke lenger fritekst, A.6/A.12 holder for det, og **fritekst står alene igjen** som
+det som må unntas verdilogging. Det halverte fase 2.
+
+Andre avgjørelser verdt å notere:
+
+- **Offline gjelder kun enhetens stemplinger.** Skulle begge sider virke frakoblet, kunne to
+  klienter endret samme oppdrag uten å vite om hverandre. Med kun stemplinger finnes ikke den
+  konflikten: hver melding er en ny rad.
+- **To knapper i grensesnittet, seks navngitte endepunkter på serveren.** Én «neste»-knapp og
+  én «Ledig» er nok i en bil i bevegelse; fem knapper der fire alltid er ulovlige er fire
+  måter å trykke feil på. Men `POST .../status/neste/` ville latt serveren utlede handlingen
+  av gjeldende tilstand, med det kappløpet som følger når to trykk kommer tett.
+- **Å starte neste oppdrag lukker det pågående automatisk.** Valgt for farten i felt.
+  Kostnaden er at den `Ledig`-meldingen er avledet, ikke målt — derfor lagres et
+  `automatisk`-flagg på raden, selv om ingenting viser det. Skillet kan ikke gjenskapes i
+  ettertid, og en boolean koster ingenting.
+- **«Ledig» er enhetens tilstand, ikke oppdragets, og den lagres ikke.** Ved vaktstart står
+  alle enheter som `Ledig` — ikke fordi noe setter verdien, men fordi det er hva «ingen
+  påbegynte oppdrag» ser ut som. En lagret status måtte nullstilles ved vaktstart og holdes
+  i takt med oppdragsradene resten av vakta; to kilder til samme sannhet går i utakt første
+  gang noe feiler halvveis, og da er det den lagrede som lyver. Sentralbordet viser
+  `Ledig (2 venter)` — utledet av oppdragene.
+- **Enhetsbytte er egen modell**, ikke en radtype i `Statusmelding`. Et bytte er ikke en
+  status, og statistikken måler statusene — blandes de, må hver spørring huske å filtrere.
+  Statusen står når et oppdrag flyttes: meldingene den første enheten rakk å sende skjedde.
+- **To skjuleregler for enheten, begge server-side.** Fritekst utelates fra svaret straks
+  status blir `Ledig`; hele oppdraget utelates 30 minutter etter. Skjules fritekst i JS,
+  ligger teksten fortsatt i responsen — og en bil som blir stående ulåst er nettopp
+  scenarioet regelen finnes for.
+- **`Leverer` registrerer ikke hvor det leveres.** Bevisst, for å holde helseopplysninger og
+  posisjon fra hverandre.
+- **Ingen kobling til `patients`.** «Leveranse oppretter pasient» er notert som noe å vurdere
+  senere; i dag ville det latt en `skriv_handling`-konto skrive indirekte inn i
+  pasientmodulen.
+
+**Fase 6 utløser registeret CLAUDE.md har varslet.** `/statistikk/` skal få én fane per
+kildemodul — pasienter fra samleplass/skadestue, oppdrag fra bil/ambulanse, senere lag. I dag
+importerer statistikkappen `patients.services` direkte, og CLAUDE.md sier hva som skjer når
+modul nummer to skal levere tall: importen erstattes av et registry etter samme idiom som
+`core.backup` og `core.arkiv`. Dette er modul nummer to. §5 gjelder uendret — en fane vises
+kun hvis brukeren har `les` på kildemodulen, ellers gir aggregatene avledet innsyn.
+
+Fase 2 står før fase 3: ellers er fritekstfeltet i prod med verdilogging på, og de radene kan
+ikke fjernes uten å røre auditsporet. Fase 7 er stedet `AbstractArkiv` bygges — TODO har
+utsatt den til modell nummer to faktisk skrives.
+
+Sju faser, 31–44 t. To avklaringer står åpne nederst i notatet; ingen blokkerer fase 1.
+
+---
+
 ## 2026-08-28 — `/pasienter/api/stats/` er slettet
 
 **1002 tester grønne.** Ingen migrasjon.

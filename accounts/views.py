@@ -37,6 +37,8 @@ from .invitasjon import kan_inviteres, les_token, send_invitasjon
 from .passord_reset import (
     finn_bruker, les_token as les_reset_token, send_reset,
 )
+from .passord import lag_midlertidig_passord
+from .backends import finn_konto
 from .models import CustomUser, LoginEvent
 
 
@@ -371,10 +373,14 @@ def login_view(request):
         username = request.POST.get('username', '').strip()
         password = request.POST.get('password', '')
 
-        try:
-            user_obj = CustomUser.objects.get(username=username)
-        except CustomUser.DoesNotExist:
-            user_obj = None
+        # Samme oppslag som `authenticate` bruker. Sto tidligere som et
+        # nøyaktig treff, og da var kontolåsen hullete: skrev man
+        # brukernavnet med annen skrivemåte enn det lagrede, ble `user_obj`
+        # None, telleren for feilede forsøk sto stille, og kontoen ble aldri
+        # låst — mens riktig passord fortsatt slapp gjennom. Rate-limit-
+        # nøkkelen rett over var normalisert av nettopp denne grunnen;
+        # dette oppslaget var ikke det.
+        user_obj = finn_konto(username)
 
         if user_obj and user_obj.is_locked():
             remaining = int((user_obj.locked_until - timezone.now()).total_seconds() / 60) + 1
@@ -777,6 +783,85 @@ def _lagre_ny_modultilgang(request, user, tilgang_form):
         )
 
 
+def _lag_enhet_om_bedt_om(form, user):
+    """Opprett `Enhet` når kontotypen er bil eller ambulanse.
+
+    **Retningen er `accounts` → `oppdrag`, og det er verdt å merke seg.**
+    Importen er lokal i funksjonen, som `core.views` gjør mot
+    `patients.models`. Skal en modul nummer to også kunne opprettes fra
+    brukerskjemaet, er det her et registry hører hjemme — etter samme idiom
+    som `core.backup` og `core.arkiv`. Med én modul ville registeret vært mer
+    maskineri enn nytte.
+
+    Navnet er allerede validert som ledig i `AdminUserCreateForm.clean()`, så
+    en unik-feil her ville betydd et kappløp — og da er det riktig at den
+    kaster i stedet for å etterlate en konto uten enhet.
+
+    **En pensjonert enhet med samme navn tas i tjeneste igjen** framfor at det
+    lages en ny rad. Bilen har kjørt oppdrag som peker på den gamle raden, og
+    en ny rad ville gitt to «Haugesund 56» i statistikken — én med historikk og
+    én uten. Skjemaet regner derfor et pensjonert, ukoblet navn som ledig, og
+    dette er stedet raden hentes fram igjen.
+    """
+    navn = form.skal_lage_enhet()
+    if not navn:
+        return None
+    from oppdrag.models import Enhet  # noqa: WPS433
+
+    pensjonert = Enhet.objects.filter(
+        navn=navn, er_aktiv=False, user__isnull=True).first()
+    if pensjonert is not None:
+        pensjonert.user = user
+        pensjonert.er_aktiv = True
+        pensjonert.pa_vakt = True
+        pensjonert.save(update_fields=['user', 'er_aktiv', 'pa_vakt', 'updated_at'])
+        return pensjonert
+
+    return Enhet.objects.create(navn=navn, user=user)
+
+
+def _rydd_enhet_ved_sletting(user):
+    """Ta enheten ut av tjeneste når kontoen som *er* enheten slettes.
+
+    **Enhet.user er SET_NULL.** Uten dette overlevde bilen kontoen sin som en
+    rad uten kobling — synlig på ressursoversikten, merket rødt, og umulig å
+    bli kvitt for den som nettopp trodde han hadde slettet den. André regnet
+    med at sletting av kontoen holdt. Nå gjør den det.
+
+    Raden slettes bare når ingen oppdrag peker på den. `Oppdrag.enhet` er
+    `PROTECT`, så en bil som har kjørt kan ikke forsvinne uten å ta historikken
+    med seg — den pensjoneres i stedet. Det er samme skille som ellers i
+    portalen: data uten spor kan slettes, data med spor fryses.
+
+    Returnerer `'slettet'`, `'pensjonert'` eller `None`.
+    """
+    enhet = getattr(user, 'enhet', None)
+    if enhet is None:
+        return None
+    if not enhet.oppdrag.exists():
+        enhet.delete()
+        return 'slettet'
+    enhet.er_aktiv = False
+    enhet.pa_vakt = False
+    enhet.save(update_fields=['er_aktiv', 'pa_vakt', 'updated_at'])
+    return 'pensjonert'
+
+
+def _ta_enhet_av_vakt(user):
+    """En frosset konto kan ikke logge inn, og bilen kan derfor ikke melde.
+
+    Å la den stå på ressursoversikten som ledig ville sendt 113 etter en bil
+    ingen kan kvittere for. Frysing er reversibel, så enheten pensjoneres
+    ikke — den tas bare av vakt, og settes inn igjen manuelt ved opptining.
+    """
+    enhet = getattr(user, 'enhet', None)
+    if enhet is None or not enhet.pa_vakt:
+        return False
+    enhet.pa_vakt = False
+    enhet.save(update_fields=['pa_vakt', 'updated_at'])
+    return True
+
+
 @admin_required
 def user_create_view(request):
     """Opprett ny bruker — med invitasjon, eller med midlertidig passord.
@@ -819,6 +904,7 @@ def user_create_view(request):
                 user.must_change_password = False
                 user.save()
                 _lagre_ny_modultilgang(request, user, tilgang_form)
+                _lag_enhet_om_bedt_om(form, user)
 
                 if send_invitasjon(user, request):
                     messages.success(
@@ -835,14 +921,20 @@ def user_create_view(request):
                     )
                 return redirect('accounts:user_detail', pk=user.pk)
 
-            alphabet = string.ascii_letters + string.digits
-            temp_password = ''.join(secrets.choice(alphabet) for _ in range(12))
+            temp_password = lag_midlertidig_passord()
             user.set_password(temp_password)
             user.must_change_password = True
             user.save()
             _lagre_ny_modultilgang(request, user, tilgang_form)
-            messages.success(request, f'Bruker «{user.username}» er opprettet.')
-            return render(request, 'accounts/user_form.html', {
+            enhet = _lag_enhet_om_bedt_om(form, user)
+            if enhet is not None:
+                messages.success(
+                    request,
+                    f'Bruker «{user.username}» er opprettet, og knyttet til '
+                    f'enheten «{enhet.navn}».',
+                )
+            else:
+                return render(request, 'accounts/user_form.html', {
                 'form': AdminUserCreateForm(),
                 'tilgang_form': ModulTilgangForm(),
                 'temp_password': temp_password,
@@ -1086,10 +1178,12 @@ def user_detail_view(request, pk):
                 request, user, 'UPDATE',
                 field_name='is_active', old_value='True', new_value='False',
             )
+            tatt_av_vakt = _ta_enhet_av_vakt(user)
             messages.success(
                 request,
                 f'Kontoen til «{user.username}» er frosset og aktive sesjoner er avsluttet. '
-                f'Bruk «Tø konto» for å reversere.',
+                + ('Enheten er tatt av vakt. ' if tatt_av_vakt else '')
+                + 'Bruk «Tø konto» for å reversere.',
             )
             return redirect('accounts:user_detail', pk=pk)
 
@@ -1114,8 +1208,7 @@ def user_detail_view(request, pk):
             return redirect('accounts:user_detail', pk=pk)
 
         elif action == 'reset_password':
-            alphabet = string.ascii_letters + string.digits
-            temp_password = ''.join(secrets.choice(alphabet) for _ in range(12))
+            temp_password = lag_midlertidig_passord()
             user.set_password(temp_password)
             user.must_change_password = True
             user.save(update_fields=['password', 'must_change_password'])
@@ -1200,6 +1293,10 @@ def user_delete_view(request, pk):
     arbeidet. ``core.Notification`` er ``CASCADE``: varsler til en slettet bruker
     har ingen mottaker og skal bort.
 
+    ``oppdrag.Enhet.user`` er også ``SET_NULL``, men her er det ikke nok: en bil
+    *er* kontoen sin, og en enhet uten kobling er en feiltilstand, ikke et
+    historisk spor. `_rydd_enhet_ved_sletting` tar den med.
+
     Krever at admin skriver brukernavnet ordrett som bekreftelse. Det er en
     bevisst friksjon — sletting kan ikke angres, og knappen står vegg i vegg med
     «Frys konto», som er den reversible varianten.
@@ -1233,7 +1330,17 @@ def user_delete_view(request, pk):
         field_name='username', old_value=username, new_value=None,
     )
 
+    # Må skje før slettingen: `Enhet.user` er SET_NULL, så etterpå finnes
+    # ingen kobling å slå opp på.
+    enhet_utfall = _rydd_enhet_ved_sletting(user)
+
     user.delete()
 
-    messages.success(request, f'Brukeren «{username}» er slettet permanent.')
+    halen = {
+        'slettet': ' Enheten er slettet med den.',
+        'pensjonert': ' Enheten er pensjonert — den har oppdrag i historikken '
+                      'og kan ikke slettes.',
+    }.get(enhet_utfall, '')
+    messages.success(
+        request, f'Brukeren «{username}» er slettet permanent.{halen}')
     return redirect('accounts:user_list')

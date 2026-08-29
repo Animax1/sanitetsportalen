@@ -25,7 +25,7 @@ from .services import (
     kan_slette_selv, slettbare_pasient_ider,
     next_patient_nr,
     apply_list_filter, stamp_pabegynt_if_needed,
-    get_active_year,
+    get_active_year, hent_aktiv_vakt,
     stamp_obs_times_if_needed, stamp_utskrevet_if_needed,
     validate_patient_time_fields, validate_plassering_unique,
     SHARED_PLASSERINGER, now_local_str,
@@ -263,6 +263,10 @@ def patients_list_view(request):
         patient = Patient(
             pasientnummer=nr,
             year=active,  # alltid i aktivt år
+            # Deploy 1 av vakt-scopingen: FK-en skrives, `year` leses. Blir
+            # `year` og vakta uenige, er det `verifiser_vakt` sin jobb å si
+            # fra — før deploy 2 gjør vakta til fasit.
+            vakt=hent_aktiv_vakt(),
             problemstilling=data.get('problemstilling', ''),
             arsak=data.get('arsak', ''),
             transport=data.get('transport', ''),

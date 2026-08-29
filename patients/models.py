@@ -117,6 +117,20 @@ class Patient(models.Model):
     # År pasienten tilhører (indeksert for filtrering)
     year = models.IntegerField(db_index=True, verbose_name='År')
 
+    # Vakta pasienten tilhører. Nullbar i deploy 1 av vakt-scopingen: all
+    # lesing skjer fortsatt fra `year`, og FK-en fylles av backfillen og av
+    # skrivestiene. Blir NOT NULL i deploy 2, der `year` forsvinner fra raden.
+    # PROTECT: en vakt med pasienter skal ikke kunne slettes og ta
+    # historikken med seg — samme valg som Oppdrag.enhet.
+    vakt = models.ForeignKey(
+        'core.Vakt',
+        null=True,
+        blank=True,
+        on_delete=models.PROTECT,
+        related_name='pasienter',
+        verbose_name='Vakt',
+    )
+
     # Kliniske felt (alle som tekst, matcher Flask-appen nøyaktig)
     problemstilling = models.CharField(max_length=255, default='', blank=True, verbose_name='Problemstilling')
     arsak = models.CharField(max_length=255, default='', blank=True, verbose_name='Årsak')
@@ -191,6 +205,19 @@ class VaktArkiv(models.Model):
         on_delete=models.SET_NULL,
         related_name='vaktarkiver',
         verbose_name='Importert av',
+    )
+    # Vakta arkivet fryser. Nullbar for godt: arkiver fra før grupperingen
+    # fantes har ingen vakt å peke på, og SET_NULL — ikke PROTECT — fordi
+    # arkivet skal overleve at vaktraden slettes: alt det trenger er frosset
+    # på det selv (`arrangement_navn`, `year_snapshot`). Samme mønster som
+    # `importert_av`/`importert_av_navn` rett under.
+    vakt = models.ForeignKey(
+        'core.Vakt',
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name='vaktarkiver',
+        verbose_name='Vakt',
     )
     importert_av_navn = models.CharField(
         max_length=150,

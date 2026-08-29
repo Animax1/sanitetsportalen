@@ -294,6 +294,87 @@ personlige kontoer, admin-reset beholdt for alle. Ingenting bygget ennå.
       invitasjonen. `PASSWORD_RESET_TIMEOUT` er bevisst ikke satt: den leses kun av
       Djangos egen generator, som ikke er i bruk.
 
+- [ ] **Vis hvilket miljø portalen kjører i.** Utløst 29. aug. 2026: en arbeidsøkt gikk
+      med til å feilsøke en innlogging som feilet fordi forsøkene gikk mot prod mens
+      kontoen lå på staging. Ingenting i grensesnittet skiller de to.
+
+      Under en vakt er innsatsen høyere enn en tapt time: forskjellen er om en pasient
+      registreres i den ekte basen eller i en testbase. En liten, tydelig markør på
+      **ikke-prod** (miljønavnet i toppen, gjerne farget) koster lite. Prod skal være den
+      nøytrale tilstanden — en markør der ville blitt visuell støy man slutter å se.
+
+      Miljønavnet finnes allerede som Railway-variabel; det trengs ingen ny innstilling.
+
+- [ ] **VURDER: skal innlogging normalisere passordet?** Funnet 29. aug. 2026.
+      `set_password` kaller `make_password` rett på råstrengen, så Django normaliserer
+      ikke passord. Et passord med `å` satt i én Unicode-normalform og skrevet i en
+      annen gir ulik hash — usynlig for både bruker og admin. (`æ` og `ø` dekomponerer
+      ikke og rammes ikke.)
+
+      En fallback som prøver den NFC-normaliserte formen i tillegg til råstrengen ville
+      rettet det uten å bryte eksisterende passord. Men den utvider hva som godtas som
+      gyldig passord, og bør derfor besluttes bevisst. **NFC, ikke NFKC** om det gjøres:
+      NFKC folder også kompatibilitetstegn, slik at «ﬁsk» ville åpnet en konto med
+      passordet «fisk».
+
+      `sjekk_brukernavn` nevner muligheten når ingenting annet blokkerer innlogging.
+
+### Vakt som scope, ikke år — se `docs/BESLUTNING_VAKT_SOM_SCOPE.md`
+
+- [ ] **Premiss fastslått av André 29. aug. 2026: portalen tenker i *vakter*, ikke i år.**
+      Den skal brukes på forskjellige arrangementer, ikke på det samme én gang i året.
+      Ingenting er bygget på dette ennå — punktet står her for at premisset ikke skal
+      gå tapt, og fordi et docs-punkt som ikke står i TODO ikke blir gjort.
+
+      **Dagens scope er `year`, og det stikker dypt.** Kartlagt 29. aug.:
+      `Patient.year`, `Oppdrag.year`, `VaktArkiv.year_snapshot`, 73 kallesteder på
+      `get_active_year`/`active_year` i 8 filer, tellerne `next_patient_nr` og
+      `next_oppdrag_nr_<år>`, og statistikkens gruppering.
+
+      **Konsekvensen er allerede synlig i kode som nettopp ble skrevet.**
+      `oppdragsnummer` restarter per *år*. Kjøres tre vakter i 2026, teller numrene
+      1–40 tvers gjennom alle tre — «oppdrag 14» blir da tvetydig neste gang, som er
+      nettopp det nummeret skulle løse. Under vakt-scoping skal det restarte per vakt.
+
+      **Vaktnavnet finnes allerede halvveis:** `AppSetting['event_name']`, og
+      `VaktArkiv` fryser `arrangement_navn` på seg selv. `patients/services.py` noterer
+      dessuten at en `event_name_<år>`-mekanisme fantes og ble slettet 13. aug. som
+      ubrukt — den ble skrevet for et behov som nå har meldt seg på ordentlig.
+
+      **Spørsmål som må avgjøres før kode:**
+      - Blir `Vakt` en modell, eller er det `event_name` som får bære det?
+      - Hva skjer med data som allerede er scopet på år? Prod har 273 importerte
+        pasienter på 2026, og staging har oppdrag.
+      - Kan to vakter være åpne samtidig, eller er det én aktiv om gangen som i dag?
+      - Har en vakt start og slutt, eller lukkes den ved arkivering?
+      - Hvordan spiller det mot fase 7, som allerede fryser `arrangement_navn`?
+      - Skal statistikken sammenligne vakter i stedet for år?
+
+      - [x] **Notatet er skrevet (29. aug. 2026):**
+            `docs/BESLUTNING_VAKT_SOM_SCOPE.md`. Foreslår `Vakt` som modell i `core`,
+            to deployer, og backfill fra `year`. **Ikke besluttet** — fem åpne
+            avklaringer står nederst i notatet og trenger svar fra André før
+            migrasjonen skrives.
+      - [x] **De fem avklaringene besvart, forslaget vedtatt (29. aug. 2026).**
+            Fritekst-navn (unikt), gjenåpning til kollaps, pasientnummer per vakt
+            (sperren flyttes i deploy 2), manuell sletting av tomme vakter, ingen
+            gruppering nå. Alle med notatets anbefaling.
+      - [x] **Deploy 1 — kodet 29. aug. 2026.** `core.Vakt`, backfill per år
+            (navn = årstallet; `event_name` er global og ville påstått noe vi
+            ikke vet), nullbare FK-er på `Patient`/`Oppdrag`/`VaktArkiv`, alle
+            fire skrivestiene setter vakta, `hent_aktiv_vakt()` med lat
+            opprettelse og pekerreparasjon, og `verifiser_vakt` som også
+            forhåndssjekker deploy 2-sperrene. Backfill, full rollback og ny
+            kjøring bevist mot en base med data i tre år.
+      - [ ] **Deploy 1 til staging/prod, så `verifiser_vakt` mot prod.**
+            Krever Andre. Deretter **deploy 2**:
+            all lesing over på vakt, tellere per vakt, «Avslutt vakt»,
+            `(vakt, pasientnummer)`-sperren, `year` bort fra radene.
+      - **Fase 4b og 5 er upåvirket** og kan gjøres i mellomtiden. **Fase 6 og 7 må
+        vente:** statistikken grupperer på scopet, og fase 7 arkiverer *en vakt* —
+        den ville lagt inn `Vaktarkivering` fra §12.1, som notatet foreslår å erstatte
+        med `Vakt` (de er samme entitet sett fra hver sin ende).
+
 ### Rollemodellen — se `docs/BESLUTNING_ROLLEMODELLEN.md`
 
 - [x] **Besluttet 24. aug. 2026.** Global admin, pluss ett nivå per modul:
@@ -433,11 +514,11 @@ skal ligge der.
       `(table_name, record_id)`, ingen ny kolonne. Mangler raden, nektes slettingen.
       **Merk:** DELETE-loggingen lagrer bare pasientnummeret, ikke innholdet
       (`patients/signals.py:266`). Åpnes sletting bredere senere, må den utvides først.
-- [ ] **`skriv: handling` for bil-/ambulansekontoer.** Smalt endepunkt som stempler
-      server-tid og **ikke leser request-kroppen** — ikke en feltwhitelist inne i den
-      generelle `PUT`-en, der stemplingen i dag er en bivirkning av en redigering.
-      Invarianten håndheves med test. Definer nivået i deploy 1, ta det i bruk når
-      oppdragsmodulen skrives.
+- [ ] **`skriv: handling` for bil-/ambulansekontoer.** Nivået er definert; bruken er
+      planlagt i `docs/BESLUTNING_OPPDRAGSMODULEN.md` §5.1. Invarianten fra §3.2 er
+      **skjerpet, ikke slakket**, for å tåle offline: kroppen har et lukket skjema på to
+      nøkler (`klienttid`, `idempotency_key`), og alt annet gir 400. Det er testbart ved
+      uttømming, i motsetning til «husk å utelate fritekst».
 - [x] **`session_timeout` og `event_name` flyttet til `/portal-admin/innstillinger/`
       (28. aug. 2026).** `saveEventName` er ute av pasientmodulens JS.
 - [x] **`PasientRolleForm` splittet (28. aug. 2026).** Radioen setter kun
@@ -533,21 +614,169 @@ Gjennomgang 13. aug. 2026, med 1000 pasienter og peak 100 brukere som premiss.
         feltene i dag (`sha256`, `kollapset_at`, `aggregat`, `aggregat_sha256`,
         frosset `importert_av_navn`); park og oppdrag må ellers gjenta dem. Bevisst
         utsatt til modell nummer to faktisk skrives — da ser man hva som er felles,
-        i stedet for å gjette. `VaktArkiv` skal *ikke* migreres til basemodellen.
+        i stedet for å gjette. `VaktArkiv` skal *ikke* migreres til basemodellen:
+        SHA-signaturene er låst til dagens payload-form, og hvert arkiv i prod ville
+        meldt tukling. **Bygges i fase 7 av oppdragsmodulen** — den er modell nummer to.
 - [ ] Park-registreringer blir **egen modell**, ikke rader i `Patient`. Holder sykestuas
       liste på ~250 rader i stedet for 1000, og matcher at dataene er enklere.
 - [ ] Park-appen er et skriveendepunkt **uten innlogging**: signert lenke via
       `django.core.signing` (ikke gjettbar URL, kan tilbakekalles), rate-limit per token,
       og responsen returnerer kvittering — aldri data.
-- [ ] **Oppdragsmodulen: unnta fritekstfeltet fra audit-verdilogging.** `AuditLog.old_value`
-      og `new_value` er `TextField` med 730 dagers lagring, og feltlista utledes fra
-      modellen (N2) — et nytt fritekstfelt havner der automatisk. Skriver en 113-operatør
-      noe sensitivt og retter det, ligger begge versjonene i loggen i to år.
-- [ ] Oppdragets «fjernes fra bilen etter 1–2 timer» er et **server-side visningsfilter**,
-      ikke sletting. 113 og statistikken skal beholde raden.
-- [ ] Protokollen må presiseres når fritekst innføres: A.6/A.12 begrunner i dag whitelisten
-      med at kliniske felt ikke kan inneholde navn. Oppdragsdata («kvinne, pustevansker,
-      sted, tidspunkt») er dessuten mer identifiserende enn pasientraden den knytter seg til.
+- [ ] **Oppdragsmodulen — se `docs/BESLUTNING_OPPDRAGSMODULEN.md`.** Besluttet 28. aug.
+      2026, ikke bygget. Modulen er den første som tar `skriv: handling` i bruk. Sju
+      faser, 35–50 t. Punktene under lå her løst fra før og er nå plassert i planen:
+      - [x] **Fase 1 — modeller og regler (28. aug. 2026).** App, modulregistrering,
+            fem modeller, `choices.py`, statusmaskin, utledet enhetsstatus,
+            korreksjonsregel og audit med skjult fritekst. 46 tester. Modulen står med
+            `url=None` og begge `show_*`-flagg av til fase 3.
+            - [x] Lokasjoner vedlikeholdes med `python manage.py lokasjon` inntil
+                  fase 3. Admin-siden ble utsatt fordi modulen ikke har en URL ennå —
+                  en admin-side uten vei inn er samme feil som et modulkort som fører
+                  til 404. Følger `appsetting`-presedensen. **Fase 1 er ferdig.**
+      
+      - [x] **Fase 2, kodedelen (28. aug. 2026):** fritekst er unntatt
+            verdilogging fra første lagring — `oppdrag/signals.py` er ny kode, ikke en
+            retrofit av `audit/`, så vinduet planen advarte mot oppsto aldri.
+      - [x] **Fase 2, resten — protokollen presisert (29. aug. 2026).**
+            `PERSONVERN_DOKUMENTASJON.md` v1.7: oppdragsmodulens datakategorier og
+            hjemler i A.6 med fritekst-tiltakene samlet, lagringsrad og merknad i A.9,
+            sårbarhet med restrisiko i A.12, unntaket ført inn i audit-tabellen, og
+            B.2-merknad om at utrykningsoppdrag registreres uten identifikator.
+            Rekkefølgekravet («før feltet er i prod med logging på») holdt: modulen
+            finnes kun på staging, og verdilogging av fritekst har aldri vært aktiv.
+            - **Funn underveis, ført inn i A.9:** oppdragsdata står utenfor
+              applikasjonens modulbackup — ingen handler er registrert, så Railways
+              databasebackup (aktiv ca. én måned i året) er eneste dekning fram til
+              fase 7. Bør få en handler senest sammen med arkiveringen.
+      - [x] **Fase 3 — sentralbordet (29. aug. 2026).** Enhetsliste med utledet
+            status (`Ledig (2 venter)`), oppdragsliste, oppretting, flytting, tidslinje
+            og lokasjonsadmin. ETag på pollingen. Modulen er synlig nå som den har en
+            side. To grensesnitt bak én URL, valgt på enhetskoblingen — en test setter
+            `skriv_full` på en enhetskonto og krever at den fortsatt får enhetsskjermen.
+      - [x] **Enhetsadmin (29. aug. 2026).** Enheter kunne bare lages fra
+            `manage.py shell` — en glipp, ikke en avgrensning. Opprettelse, aktivering og
+            kontokobling ligger i sentralbordets admin-panel nå, med regelen skrevet rett
+            i panelet: koblingen gir ingen tilgang.
+      - [x] **Enheten følger kontoen, også ut (29. aug. 2026).** «Legg til enhet»
+            fjernet med endepunkt og URL — enheter fødes med kontoen. Sletting av
+            kontoen sletter enheten, eller pensjonerer den hvis den har oppdrag
+            (`Oppdrag.enhet` er PROTECT). Frysing tar den av vakt.
+      - [x] **«Pensjoner» fjernet (29. aug. 2026).** Opptellingen på staging ga
+            `Enheter uten konto: 0 av 2`, så knappen hadde ingen jobb igjen. Fjernet
+            sammen med Gjenopprett, `PUT /api/enheter/<pk>/`, `/api/kontoer/` og
+            `OPPDRAG_TILGANG.erAdmin`. Et pensjonert, ukoblet enhetsnavn regnes nå
+            som ledig, og raden gjenbrukes når kontoen opprettes på nytt — ellers
+            ville navnet vært brent for godt.
+      - [x] **Modaler i portalgrenen er mørke (29. aug. 2026).** `portal.css` hadde
+            ingen modalregler, så modalen arvet sidebakgrunnen og det svarte
+            lukkekrysset forsvant i den. Rettet i `portal.css`, ikke `oppdrag.css` —
+            det gjelder hele grenen, og `base_portal` hadde selv et svart kryss på
+            meldingsalertene. Guard i `MorkTekstPaaMorkBakgrunnTests`.
+      - [x] **Sperra på enhetsadmin er testet (29. aug. 2026).** `PUT
+            /oppdrag/api/enheter/<pk>/` (navn, pensjonering, kobling) krevde global
+            admin hele tiden, men bare `enheter/ny/` hadde en 403-test. Da panelet ble
+            åpnet for `skriv_full`, ble den luka verdt å lukke: to tester krever nå 403
+            på både lesing og pensjonering for `skriv_full` uten admin.
+      - [x] **Fase 4 — enhetsskjermen (29. aug. 2026).** Mellomtilstanden fra fase 3
+            er borte; `enhet.html` + `oppdrag-enhet.js` viser egne oppdrag med to
+            knapper — «neste» og «Ledig» — mot **fem** navngitte stemplingsendepunkter
+            (`status/<overgang>/`, første faktiske bruk av `skriv_handling`). Planen sa
+            seks, men talte statusene: `venter` settes ved oppretting og stemples aldri,
+            og settet utledes nå av `services.STEMPLBARE` fra overgangstabellen.
+            - Lukket kroppsskjema (`klienttid`, `idempotency_key`) testet ved
+              uttømming; klienttid valideres per §5.1 med `forsinket`-flagg;
+              `idempotency_key` godtas men kobles først i fase 5 — statusmaskinen gjør
+              en ren avspilling ufarlig (409 uten ny rad).
+            - To porter: `skriv_handling` + eierskaps-objektsjekk. `skriv_full` uten
+              enhetskobling får 403 — stemplingen er en måling fra bilen, og en
+              operatør som stempler «for» en enhet ville forfalsket den.
+            - JS-en kjenner ikke kjeden: serveren sender `neste_overgang`/`neste_navn`
+              per rad. Dobbelttrykk gir 409, og skjermen svarer med å hente ferskt.
+            - `automatisk` vises per §4.5: markør på klokkeslettet, gråtoner, ingen
+              badge. Skjulereglene var server-side fra fase 3 og står urørt.
+      - [x] **Fase 4b — korreksjoner (29. aug. 2026).** `POST
+            /oppdrag/api/statusmelding/<pk>/korriger/` skriver en **ny rad som peker på
+            den gamle**; originalen er uendret, og begge står i tidslinjen. Maskineriet
+            kom i fase 1 (`korriger_tidspunkt`, `gjeldende()`) — det som manglet var
+            endepunktet, reglene og grensesnittet.
+            - **Fire regler, alle fail-closed:** raden må være gjeldende (ellers fantes
+              to korreksjoner av samme original), ikke i framtiden, ikke før oppdraget
+              ble opprettet, og **rekkefølgen må holde**. Den siste er den som betyr
+              noe for fase 6: `Fremme` før `Rykker ut` gir negativ responstid, og
+              statistikken ville regnet på den uten å vite at tallet er umulig.
+              Feilmeldingen navngir naboen som er i veien, så operatøren vet om hun må
+              rette en annen rad først.
+            - **Ikke et handling-endepunkt.** Det tar en feltverdi, så det ligger på
+              `skriv_full` med vanlig kroppsvalidering — å presse det under
+              `skriv_handling` ville uthult det lukkede skjemaet i §5.1 med én gang.
+              Enheter får 403 uansett nivå: en bil som kunne rette sine egne tidspunkt
+              ville gjort stemplingen til en påstand i stedet for en måling.
+            - Bilen *ser* rettingen («rettet av sentralen», §4.5), men kan ikke gjøre
+              den.
+      - [x] **Oppdragsnummer og arkivknapp (29. aug. 2026)** — bestilt av André
+            under uttesting av fase 4, utenom faseplanen. Løpenummer per år
+            (`unikt_oppdragsnummer_per_aar`, migrasjon `0003` med backfill), og en
+            «Arkiver»-knapp som rydder ferdigstilte oppdrag ut av tavla og inn i en
+            søkbar «Ferdigstilte»-visning.
+            - **Arkiveringen er rydding, ikke frysing.** Raden er urørt, handlingen
+              reversibel, og den ligger derfor på `skriv_full` — §3.3 reserverer admin
+              for det irreversible. Vaktarkivet i fase 7 er fortsatt uendret på planen,
+              og de to kan leve side om side: drift under vakt mot dokumentasjon etter.
+            - [x] **Arkiveringen er automatisk ved `Ledig` (29. aug. 2026).** Den
+                  manuelle knappen løste ikke problemet: krever ryddingen et trykk per
+                  oppdrag under vakt, blir den ikke gjort. Regelen ligger i
+                  `sett_status`, ikke i viewet, slik at også den automatiske lukkingen
+                  i `start_oppdrag` treffes — ellers beholdt tavla nettopp de
+                  oppdragene ingen trykket på. `arkivert_av` er NULL ved automatikk.
+                  Knappen står igjen for «hent tilbake» og «rydd bort igjen».
+            - Kun ferdigstilte kan arkiveres. Å rydde bort et pågående oppdrag er samme
+              feilklasse som å ta en enhet av vakt midt i et oppdrag.
+            - **Arkivering rører ikke enhetens 30-minuttersvindu.** De to reglene ser
+              like ut, men vinduet er personvern og arkiveringen er tavlerydding;
+              koblet ville sentralbordet kunnet fjerne et oppdrag fra en skjerm noen
+              fortsatt så på.
+      - [x] **Fase 5 — offline-kø (29. aug. 2026).** Stemplingen skrives til
+            `localStorage` først, skjermen oppdaterer seg med en gang, og synkingen
+            skjer i bakgrunnen. Utløsere: neste trykk, neste poll, og `online`.
+            - **Nøkkelen lages ved trykket og beholdes gjennom hvert forsøk.** Det er
+              den som gjør avspilling trygg: serveren svarer `ok` med den opprinnelige
+              meldingen i stedet for 409, og køen kan stryke raden. Uten den kunne
+              køen ikke skille «allerede levert» fra «avvist fordi skjermen har
+              sakket akterut».
+            - **Reservert etter all validering** — et avvist forsøk brenner ikke
+              nøkkelen, og `forkast()` frigir den når overgangen avvises.
+            - **Serielt og i rekkefølge.** To parallelle sendinger kunne landet
+              «Avreist» før «Fremme», og `Statusmelding` er et spor av hva som skjedde.
+            - **Kjeden sendes til skjermen som data**, kun for å regne ut hva neste
+              knapp skal hete mens noe ligger usendt. Uten den dør knappen ved første
+              trykk uten dekning. §4.2-invarianten er urørt: det er fortsatt ikke
+              *serveren* som utleder handlingen av tilstanden.
+            - Usendte stemplinger vises i et eget banner — §6: en knapp som ser ut til
+              å ha virket, men ikke har det, er verre enn en som feiler synlig.
+      - [ ] **Fase 6** (5–7 t): **statistikkregisteret** + oppdragsfanen. Her rives den
+            direkte importen fra `statistikk` til `patients.services` ut, og erstattes av
+            et registry etter samme idiom som `core.backup` og `core.arkiv` — det CLAUDE.md
+            har varslet siden statistikkmodulen ble skilt ut. Pasientfanen skal se lik ut
+            etterpå.
+      - [ ] **Fase 7** (5–7 t): arkivering. **Her bygges `AbstractArkiv`** — dette er
+            modell nummer to, som punktet under har ventet på. Oppdrag får **egen
+            arkivknapp** under `/oppdrag/`; sammenslåingen med pasientarkivet er utsatt,
+            se punktet under.
+
+- [ ] **Flytt arkiveringen til `/portal-admin/` og grupper den.** Utsatt 28. aug. 2026 —
+      se §12.1 i `docs/BESLUTNING_OPPDRAGSMODULEN.md`. `core/arkiv/` er modul-agnostisk
+      for frysing, verifisering og kollaps, men **opprettelsen** (`arkiver_aktiv_vakt()` i
+      `patients/services.py` — handler-kontrakten har ingen `opprett_arkiv`) og **knappen**
+      ligger fortsatt i pasientmodulen. En vakt er ikke en pasientting.
+      - [ ] Krever en `Vaktarkivering`-rad i `core` som grupperer modulenes arkiver. Én
+            knapp som lager to urelaterte arkivrader er verre enn to knapper — da tror man
+            de hører sammen.
+      - [ ] Signaturene overlever: handleren bestemmer selv hva som går inn i
+            `sha_payload()`, så en nullbar FK den ikke nevner endrer ingenting.
+            `ArkivSignaturLaastTests` beviser det. Eksisterende arkiver får `NULL`.
+      - [ ] **I mellomtiden kan noen arkivere pasienter og glemme oppdrag.** Det er en
+            operativ risiko, ikke en teknisk. Legg et punkt i `docs/RUNBOOK_VAKT.md`, som
+            faktisk leses ved vaktslutt — gjøres samtidig med fase 7.
 - [ ] Vurder `cached_db`-sesjoner. `SESSION_SAVE_EVERY_REQUEST=True` med DB-sesjoner gir
       én UPDATE per request. Krever Redis, altså vakt-modus.
 
@@ -587,8 +816,10 @@ høynivå-skissen, `docs/archived/SANITETSPORTAL_PLAN.md` §7):
 
 - [ ] Skal en «vakt» være ett enkelt arrangement, eller også dekke faste
       beredskapsperioder som ukentlig lagvakt? Avgjør feltene på modellen
-- [ ] Skal en beredskaps-/oppdragsmodul brukes underveis i felt (mobilt, dårlig nett) eller
-      i etterkant? Avgjør om offline-strategi og synk må bygges
+- [x] ~~Skal en beredskaps-/oppdragsmodul brukes underveis i felt (mobilt, dårlig nett)
+      eller i etterkant?~~ **Besvart 28. aug. 2026: underveis, og den må tåle dårlig
+      dekning.** Avgrenset til enhetens stemplinger — sykestua krever nett. Se
+      `docs/BESLUTNING_OPPDRAGSMODULEN.md` §6.
 - [ ] Skal rapportmodulen kun være intern, eller også gi tilgang til
       styre/oppdragsgivere? Tilgangssiden er nå `ModulTilgang` (se «Rollemodellen»);
       det som gjenstår er eksportformat, og om eksterne mottakere skal ha konto i det

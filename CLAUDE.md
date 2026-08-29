@@ -23,7 +23,7 @@ python manage.py create_admin --username admin --password "bytt-meg"
 python manage.py runserver           # http://127.0.0.1:8000/
 
 # Tester – hele suiten
-python manage.py test patients accounts audit core statistikk -v 2
+python manage.py test patients accounts audit core statistikk oppdrag -v 2
 
 # Én enkelt test
 python manage.py test patients.tests.PatientAPITest.test_create_patient -v 2
@@ -72,8 +72,13 @@ Nivåene er en ordnet stige. **Fravær av rad er ingen tilgang** — det finnes 
 | Nivå | Betyr |
 |---|---|
 | `les` | Kan se modulens data |
-| `skriv_handling` | Navngitte overganger (stemplinger), leser ikke request-kroppen. **Tomt i dag** |
+| `skriv_handling` | Navngitte overganger (stemplinger), leser ikke request-kroppen |
 | `skriv_full` | Kan redigere felter |
+
+**Hver modul deklarerer hvilke nivåer som betyr noe for den** — `Module.nivaaer`. Matrisen
+tilbyr de nivåene og ingen andre. En global liste hadde begge feil samtidig: den skjulte
+`skriv_handling` for oppdragsmodulen, som er den nivået ble laget for, og tilbød
+`skriv_full` på statistikk, der skriving ikke finnes.
 
 Ukjent nivånavn gir **False**, ikke True — en skrivefeil i en dekoratør skal stenge døra.
 `ModuleSettings.enabled=False` gir 403 for alle andre enn global admin.
@@ -192,6 +197,27 @@ Frysing, integritetssjekk og kollaps er modul-agnostisk. Hver modul som arkivere
 
 `patients/arkiv.py` er referanseeksempelet. `ArkivSignaturLaastTests` låser signaturene til literale hex-verdier — feiler den etter en refaktorering, er det refaktoreringen som er feil.
 
+### Oppdragsmodulen (oppdrag/)
+
+Egen app siden august 2026, **under bygging** — se `docs/BESLUTNING_OPPDRAGSMODULEN.md`.
+Fase 1 (modeller og regler) er levert; ingen brukervendte flater ennå. Modulen er
+registrert i `core/modules.py`, men står med `url=None` og begge `show_*`-flagg av inntil
+sidene finnes. Et modulkort som fører til 404 er en knapp som fører til en vegg.
+
+Fire ting det er verdt å kjenne før man rører modulen:
+
+| Regel | Hvor |
+|---|---|
+| Statusmaskinen er **data**, ikke `if`-er i views | `services.OVERGANGER` |
+| Enhetens status **utledes**, den lagres ikke | `services.enhet_status()` |
+| Korreksjoner er **nye rader** som peker på den gamle | `Statusmelding.objects.gjeldende()` |
+| `fritekst` logges som endret, men **uten verdier** | `signals.FELT_UTEN_VERDILOGGING` |
+
+Den er den første modulen som tar `skriv_handling` i bruk: bilen får smale, navngitte
+stemplingsendepunkter, ikke en feltwhitelist inne i en generell `PUT`. Og skillet mellom de
+to grensesnittene er **ikke nivået** — det er om kontoen er knyttet til en `Enhet`. Å knytte
+en konto til en enhet gir ingen tilgang; det er domenedata, som `Forstehjelper.user`.
+
 ### Statistikk-modulen (statistikk/)
 
 Egen app siden august 2026. Eier `/statistikk/`-siden og full statistikk
@@ -249,17 +275,20 @@ Alle temaene er mørke, så **enhver Bootstrap-klasse for dempet tekst må overs
 malen kan se den. `MorkTekstPaaMorkBakgrunnTests` løser `{% extends %}` og `{% static %}`
 og håndhever det.
 
-Syv moduler i `static/js/` (ingen bundler), fordelt på to sider:
+Ni moduler i `static/js/` (ingen bundler), fordelt på fire sider — pasientsiden,
+`/statistikk/` og de to grensesnittene under `/oppdrag/`:
 
 | Modul | Lastes | Ansvar |
 |-------|--------|--------|
-| `portal-utils.js` | **begge sider** | CSRF-fetch (`apiFetch`), `withSubmitGuard`, escaping, `fmtMin`, `data-action`-delegeringen |
+| `portal-utils.js` | **alle sider** | CSRF-fetch (`apiFetch`), `withSubmitGuard`, escaping, `fmtMin`, `klokke`, `data-action`-delegeringen |
 | `patients-utils.js` | pasientsiden, alltid | Rollesynlighet, delt tilstand, klokke, skjemahjelpere |
 | `patients-table.js` | pasientsiden, alltid | Tabulator-grid og tavle |
 | `patients-forms.js` | pasientsiden, alltid | Registrerings- og redigeringsskjema |
 | `patients-app.js` | pasientsiden, alltid | Oppstart (`DOMContentLoaded`), faneskift, auto-refresh, lastere for navneregistrene |
 | `patients-admin.js` | pasientsiden, **kun admin** | Registeradmin, sesjonstimeout, nullstilling, vaktarkiv |
 | `statistikk.js` | **kun** `/statistikk/` | All statistikkrendering (Chart.js), arkivmodus |
+| `oppdrag-sentral.js` | `/oppdrag/`, kontoer uten enhet | Sentralbordet: enhetsliste, oppdragsliste, tidslinje, lokasjonsadmin |
+| `oppdrag-enhet.js` | `/oppdrag/`, enhetskontoer | Enhetsskjermen: to knapper mot de navngitte stemplingsendepunktene, og offline-køen i `localStorage`. Serveren sender `neste_overgang` per rad; kjeden følger med som data kun for å projisere neste steg mens noe ligger usendt |
 
 **`patients-utils.js` kan ikke lastes utenfor pasientsiden.** Den gjør arbeid på toppnivå
 — `Chart.defaults` og `new bootstrap.Modal(document.getElementById('newModal'))` — og

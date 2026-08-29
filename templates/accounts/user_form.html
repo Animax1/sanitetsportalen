@@ -60,13 +60,29 @@
           {% if form.mfa_required.errors %}<div class="text-danger small mt-1">{{ form.mfa_required.errors.0 }}</div>{% endif %}
         </div>
 
-        <div class="mb-3 form-check">
-          {{ form.er_delt_konto }}
-          <label class="form-check-label" for="{{ form.er_delt_konto.id_for_label }}">
-            Delt konto (bil e.l.)
-          </label>
-          <div class="form-text">{{ form.er_delt_konto.help_text }}</div>
-          {% if form.er_delt_konto.errors %}<div class="text-danger small mt-1">{{ form.er_delt_konto.errors.0 }}</div>{% endif %}
+        <div class="mb-3">
+          <label class="form-label" for="{{ form.kontotype.id_for_label }}">Kontotype</label>
+          {{ form.kontotype }}
+          <div class="form-text">{{ form.kontotype.help_text }}</div>
+          {% if form.kontotype.errors %}<div class="text-danger small mt-1">{{ form.kontotype.errors.0 }}</div>{% endif %}
+        </div>
+
+        {# Vises kun for bil/ambulanse. JS skjuler den ellers; serveren
+           avviser et enhetsnavn på de andre typene uansett, så skjulingen er
+           en bekvemmelighet og ikke regelen. #}
+        <div class="mb-3" id="enhetsnavn-rad">
+          <label class="form-label" for="{{ form.enhetsnavn.id_for_label }}">Enhetsnavn</label>
+          {{ form.enhetsnavn }}
+          <div class="form-text">{{ form.enhetsnavn.help_text }}</div>
+          {% if form.enhetsnavn.errors %}<div class="text-danger small mt-1">{{ form.enhetsnavn.errors.0 }}</div>{% endif %}
+        </div>
+
+        <div class="alert alert-info py-2 px-3" id="bil-tilgang-hint" hidden>
+          <span class="small">
+            «Skrive: handling» er forhåndsvalgt på Oppdrag under. Det er nivået
+            en bil trenger: den stempler status, men redigerer ikke felter.
+            Endre det gjerne — tilgangen settes av matrisen, ikke av kontotypen.
+          </span>
         </div>
 
         <hr class="my-3">
@@ -119,4 +135,44 @@
     </div>
   </div>
 </div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script nonce="{{ csp_nonce }}">
+  // Enhetsnavn gjelder kun bil/ambulanse. Serveren avviser det på de andre
+  // typene uansett — dette skjuler bare et felt som ikke angår valget, så
+  // skjemaet ikke spør om noe det ikke skal ha.
+  (function () {
+    var valg = document.getElementById('{{ form.kontotype.auto_id }}');
+    var rad = document.getElementById('enhetsnavn-rad');
+    if (!valg || !rad) return;
+
+    function oppdater() {
+      rad.hidden = valg.value !== 'enhet';
+    }
+
+    // Når kontotypen settes til bil, forhåndsvelges «Skrive: handling» på
+    // oppdrag — nivået en bil trenger og det eneste den skal ha.
+    //
+    // **Forhåndsvalgt, ikke satt i bakgrunnen.** Å skrive tilgangsraden
+    // automatisk ville gjort en domenehandling («dette er en bil») til en
+    // usynlig autorisasjonsendring, og det er nøyaktig fella §7.3 delte
+    // `PasientRolleForm` for å unngå. Her ser admin verdien i den samme
+    // matrisen hun sender inn, og kan endre den. Valget forblir hennes.
+    var oppdragValg = document.getElementById('id_modul_oppdrag');
+    var hint = document.getElementById('bil-tilgang-hint');
+    function forhandsvelg() {
+      if (valg.value !== 'enhet' || !oppdragValg) return;
+      var harHandling = Array.prototype.some.call(
+        oppdragValg.options, function (o) { return o.value === 'skriv_handling'; });
+      if (harHandling && !oppdragValg.value) {
+        oppdragValg.value = 'skriv_handling';
+      }
+      if (hint) hint.hidden = false;
+    }
+
+    valg.addEventListener('change', function () { oppdater(); forhandsvelg(); });
+    oppdater();
+  })();
+</script>
 {% endblock %}

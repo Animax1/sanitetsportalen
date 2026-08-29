@@ -8,7 +8,13 @@ fordi meldingen med vilje ikke røper hvilket av de to som feilet.
 
 Det rammer nettopp de som ikke valgte brukernavnet sitt selv.
 """
+from datetime import timedelta
+import unicodedata
+from io import StringIO
+
 from django.contrib.auth import authenticate
+from django.core.management import call_command
+from django.utils import timezone
 from django.core.cache import cache
 from django.test import Client, TestCase, override_settings
 from django.urls import reverse
@@ -149,9 +155,270 @@ class BrukernavnNormaliseringTests(TestCase):
             'fullt_navn': 'Kari Nordmann',
             'email': 'kari@eksempel.no',
             'role': 'bruker',
+            'kontotype': 'person',
             'metode': 'invitasjon',
         })
         self.assertTrue(
             CustomUser.objects.filter(username='kari.nordmann').exists(),
             'brukernavnet ble ikke normalisert til små bokstaver',
         )
+
+
+@override_settings(SECURE_SSL_REDIRECT=False, RATELIMIT_ENABLE=False)
+class BrukernavnMedNorskeTegnTests(TestCase):
+    """Innlogging skal tåle æ, ø og å — også limt inn fra et annet system.
+
+    Bakgrunn: en konto med `ø` i navnet fikk ikke logget inn i prod. Feilen lot
+    seg ikke reprodusere for `ø` alene, men to ekte feil i samme mekanikk ble
+    funnet på veien, og begge er dekket her.
+    """
+
+    PASSORD = 'ForSvartHemmelig123'
+
+    def _lag(self, navn):
+        return CustomUser.objects.create_user(
+            username=navn, password=self.PASSORD, must_change_password=False)
+
+    def _logg_inn(self, navn):
+        c = Client()
+        c.post('/accounts/login/', {'username': navn, 'password': self.PASSORD})
+        return '_auth_user_id' in c.session
+
+    def test_alle_norske_tegn_kan_logge_inn(self):
+        for navn in ('bjørn.rød', 'kåre.aas', 'næss.øye', 'ævind.åsmund'):
+            with self.subTest(navn=navn):
+                self._lag(navn)
+                self.assertTrue(self._logg_inn(navn))
+
+    def test_nfd_variant_kommer_inn(self):
+        """`å` limt inn fra macOS er `a` + kombinerende ring, ikke ett tegn.
+
+        Strengene ser identiske ut på skjermen. Uten normalisering finner
+        databasen ingenting, og brukeren får «feil brukernavn eller passord»
+        på et navn hun har kopiert ordrett.
+        """
+        self._lag('kåre.aas')
+        nfd = unicodedata.normalize('NFD', 'kåre.aas')
+        self.assertNotEqual(nfd, 'kåre.aas')      # vern: testen måler noe
+        self.assertTrue(self._logg_inn(nfd))
+
+    def test_nfc_variant_mot_nfd_lagret(self):
+        """Motsatt vei: kontoen ble opprettet med en unormalisert streng."""
+        CustomUser.objects.create_user(
+            username=unicodedata.normalize('NFD', 'såre.øye'),
+            password=self.PASSORD, must_change_password=False)
+        self.assertTrue(self._logg_inn(unicodedata.normalize('NFC', 'såre.øye')))
+
+    def test_store_norske_bokstaver_kommer_inn(self):
+        """`iexact` case-folder ikke unicode på SQLite — og offline-modus er SQLite."""
+        self._lag('bjørn.rød')
+        for variant in ('BJØRN.RØD', 'Bjørn.Rød', 'bjØrn.rød'):
+            with self.subTest(variant=variant):
+                self.assertTrue(self._logg_inn(variant))
+
+    def test_feil_passord_slipper_fortsatt_ikke_inn(self):
+        """Vern: toleransen gjelder brukernavnet, ikke passordet."""
+        self._lag('bjørn.rød')
+        c = Client()
+        c.post('/accounts/login/',
+               {'username': 'BJØRN.RØD', 'password': 'feil-passord'})
+        self.assertNotIn('_auth_user_id', c.session)
+
+    def test_ukjent_brukernavn_slipper_ikke_inn(self):
+        self._lag('bjørn.rød')
+        self.assertFalse(self._logg_inn('bjørn.grønn'))
+
+    def test_skjemaet_normaliserer_ved_oppretting(self):
+        """Lagres én form, slipper oppslaget å lete etter flere."""
+        from accounts.forms import AdminUserCreateForm
+        felt = AdminUserCreateForm().fields
+        self.assertIn('username', felt)
+
+        from accounts.brukernavn import oppslagsnokkel
+        self.assertEqual(
+            oppslagsnokkel(unicodedata.normalize('NFD', 'KÅRE.Aas')),
+            'kåre.aas')
+
+
+class SjekkBrukernavnKommandoTests(TestCase):
+    """Diagnoseverktøyet for «brukernavnet ser riktig ut, men virker ikke».
+
+    Kommandoen finnes fordi feilen ikke lar seg se: to strenger kan være
+    pikselidentiske og likevel ulike. Testene her holder den ærlig — særlig
+    at ascii-formen den skriver ut faktisk kan limes tilbake inn i den.
+    """
+
+    def _kjor(self, *args):
+        ut = StringIO()
+        call_command('sjekk_brukernavn', *args, stdout=ut, stderr=ut)
+        return ut.getvalue()
+
+    def test_lister_kontoer_uten_argument(self):
+        """Uten argument trengs ingen norske tegn på kommandolinja.
+
+        Det er poenget: Railways `ssh` bærer ikke `ø` inn.
+        """
+        CustomUser.objects.create_user(username='bjørn.rød', password='x')
+        ut = self._kjor()
+        self.assertIn('bjørn.rød', ut)
+        self.assertIn('U+00F8', ut)
+
+    def test_ascii_formen_kan_limes_tilbake(self):
+        """Rundturen må være hel, ellers er utskriften ubrukelig i kanalen.
+
+        Pythons `backslashreplace` gir `\\xf8` for tegn under U+0100, og den
+        formen tolker kommandoen ikke. Den skriver derfor `\\uXXXX` selv.
+        """
+        from accounts.management.commands.sjekk_brukernavn import (
+            _ascii_form, _tolk_rommet,
+        )
+        for navn in ('bjørn.rød', 'kåre.aas', 'næss.øye', 'karе.aas'):
+            with self.subTest(navn=navn):
+                ascii_form = _ascii_form(navn)
+                self.assertTrue(ascii_form.isascii(), ascii_form)
+                self.assertEqual(_tolk_rommet(ascii_form), navn)
+
+    def test_roemmet_argument_finner_kontoen(self):
+        CustomUser.objects.create_user(username='bjørn.rød', password='x')
+        ut = self._kjor(r'bjørn.rød')
+        self.assertIn('Treffer kontoen', ut)
+
+    def test_lookalike_avsloeres(self):
+        """En kyrillisk «е» ser ut som en latinsk «e». Den skal navngis."""
+        CustomUser.objects.create_user(username='karе.aas', password='x')
+        ut = self._kjor('kare.aas')
+        self.assertIn('CYRILLIC', ut)
+        self.assertIn('INGEN konto matcher', ut)
+
+    def test_unormalisert_konto_flagges(self):
+        CustomUser.objects.create_user(
+            username=unicodedata.normalize('NFD', 'håkon.lie'), password='x')
+        self.assertIn('IKKE NFKC-normalisert', self._kjor())
+
+    def test_kommandoen_endrer_ingenting(self):
+        """Les-only. Den kjøres mot prod under feilsøking."""
+        CustomUser.objects.create_user(username='bjørn.rød', password='x')
+        foer = list(CustomUser.objects.values_list('username', flat=True))
+        self._kjor('bjørn.rød')
+        self.assertEqual(
+            list(CustomUser.objects.values_list('username', flat=True)), foer)
+
+
+class KontotilstandDiagnoseTests(TestCase):
+    """Når brukernavnet stemmer, skal verktøyet si hva som ellers stopper.
+
+    Utløst av et konkret tilfelle: kontoen `karmøy56` kom ikke inn, og `ø` var
+    den åpenbare mistenkte. Brukernavnet viste seg å være lagret helt rent, og
+    da sto man uten neste steg. Disse tilstandene er det som faktisk stopper en
+    innlogging når navnet er riktig.
+    """
+
+    def _kjor(self, navn):
+        ut = StringIO()
+        call_command('sjekk_brukernavn', navn, stdout=ut, stderr=ut)
+        return ut.getvalue()
+
+    def test_frisk_konto_melder_ingen_blokkering(self):
+        CustomUser.objects.create_user(
+            username='karmøy56', password='Abc123xyz789', er_delt_konto=True)
+        ut = self._kjor('karmøy56')
+        self.assertIn('Brukernavnet er altså ikke feilen', ut)
+        self.assertIn('Ingenting i kontotilstanden stopper innlogging', ut)
+
+    def test_ubrukbart_passord_navngis(self):
+        """En invitert konto som aldri brukte lenken har ingen hash.
+
+        Da virker *ingen* passord, og feilmeldingen ved innlogging er den
+        samme som ved feil passord — umulig å skille utenfra.
+        """
+        bruker = CustomUser.objects.create(username='invitert56')
+        bruker.set_unusable_password()
+        bruker.save()
+        ut = self._kjor('invitert56')
+        self.assertIn('INGEN brukbar passord-hash', ut)
+
+    def test_laast_konto_navngis_med_gjenstaaende_tid(self):
+        bruker = CustomUser.objects.create_user(username='laast56', password='x')
+        bruker.locked_until = timezone.now() + timedelta(minutes=12)
+        bruker.save()
+        ut = self._kjor('laast56')
+        self.assertIn('LÅST', ut)
+        self.assertIn('minutt', ut)
+
+    def test_utgaatt_laas_regnes_ikke_som_blokkering(self):
+        """`locked_until` i fortiden er en gammel hendelse, ikke en sperre."""
+        bruker = CustomUser.objects.create_user(username='utgaatt56', password='x')
+        bruker.locked_until = timezone.now() - timedelta(minutes=1)
+        bruker.save()
+        self.assertIn('Ingenting i kontotilstanden stopper innlogging',
+                      self._kjor('utgaatt56'))
+
+    def test_deaktivert_konto_navngis(self):
+        CustomUser.objects.create_user(
+            username='av56', password='x', is_active=False)
+        self.assertIn('deaktivert', self._kjor('av56'))
+
+    def test_mfa_uten_enhet_navngis(self):
+        """Innlogging går da til MFA-oppsett — det ser ut som «slipper ikke inn»."""
+        CustomUser.objects.create_user(
+            username='mfa56', password='x', mfa_required=True)
+        ut = self._kjor('mfa56')
+        self.assertIn('MFA', ut)
+        self.assertIn('TOTP', ut)
+
+
+@override_settings(SECURE_SSL_REDIRECT=False, RATELIMIT_ENABLE=False)
+class KontolaasUansettSkrivemaateTests(TestCase):
+    """Kontolåsen må gjelde uansett hvordan brukernavnet skrives.
+
+    Funnet 29. aug. 2026 under feilsøking av en konto som ikke kom inn:
+    `login_view` slo opp kontoen med nøyaktig treff for å avgjøre lås og telle
+    feilede forsøk, mens `authenticate` brukte det tolerante oppslaget. Skrev
+    man brukernavnet med annen skrivemåte, sto telleren stille og kontoen ble
+    aldri låst — mens riktig passord fortsatt gikk gjennom. Rate-limit-nøkkelen
+    var normalisert av nettopp denne grunnen; dette oppslaget var ikke det.
+    """
+
+    PASSORD = 'ForSvartHemmelig123'
+
+    def setUp(self):
+        self.bruker = CustomUser.objects.create_user(
+            username='karmøy56', password=self.PASSORD, must_change_password=False)
+
+    def _feil_forsok(self, skrivemaate):
+        Client().post('/accounts/login/',
+                      {'username': skrivemaate, 'password': 'feil'})
+        self.bruker.refresh_from_db()
+        return self.bruker.failed_login_attempts
+
+    def test_teller_opp_ved_noeyaktig_skrivemaate(self):
+        self.assertEqual(self._feil_forsok('karmøy56'), 1)
+
+    def test_teller_opp_ogsaa_ved_stor_forbokstav(self):
+        """Mobiltastatur setter stor forbokstav. Telleren må se det som samme konto."""
+        self.assertEqual(self._feil_forsok('Karmøy56'), 1)
+
+    def test_teller_opp_ved_stor_norsk_bokstav(self):
+        self.assertEqual(self._feil_forsok('KARMØY56'), 1)
+
+    def test_fem_forsoek_med_blandet_skrivemaate_laaser_kontoen(self):
+        """Selve hullet: uten fellesoppslaget låste ingen kombinasjon kontoen.
+
+        Merk at telleren *nullstilles* når låsen slår inn — `is_locked()` er
+        derfor invarianten, ikke tallet 5. Et første forsøk på denne testen
+        målte telleren og feilet med `0 != 5`; koden hadde rett.
+        """
+        for skrivemaate in ('karmøy56', 'Karmøy56', 'KARMØY56',
+                            'karmØy56', 'kArmøy56'):
+            Client().post('/accounts/login/',
+                          {'username': skrivemaate, 'password': 'feil'})
+        self.bruker.refresh_from_db()
+        self.assertTrue(self.bruker.is_locked())
+
+    def test_riktig_passord_nullstiller_telleren(self):
+        self._feil_forsok('Karmøy56')
+        c = Client()
+        c.post('/accounts/login/',
+               {'username': 'karmøy56', 'password': self.PASSORD})
+        self.bruker.refresh_from_db()
+        self.assertEqual(self.bruker.failed_login_attempts, 0)
