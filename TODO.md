@@ -556,13 +556,17 @@ Gjennomgang 13. aug. 2026, med 1000 pasienter og peak 100 brukere som premiss.
       - [x] **Fase 2, kodedelen (28. aug. 2026):** fritekst er unntatt
             verdilogging fra første lagring — `oppdrag/signals.py` er ny kode, ikke en
             retrofit av `audit/`, så vinduet planen advarte mot oppsto aldri.
-      - [ ] **Fase 2, resten** (~1 t): presiser
-            protokollen. `AuditLog.old_value`/`new_value` er `TextField` med 730 dagers
-            lagring, og feltlista utledes fra modellen (N2) — et nytt fritekstfelt havner
-            der av seg selv. **Må stå før fase 3** — ellers er feltet i prod med logging
-            på, og de radene kan ikke fjernes uten å røre auditsporet. Halvert fordi
-            lokasjon ble nedtrekksliste: da holder A.6/A.12 for det feltet, og fritekst
-            står alene igjen.
+      - [x] **Fase 2, resten — protokollen presisert (29. aug. 2026).**
+            `PERSONVERN_DOKUMENTASJON.md` v1.7: oppdragsmodulens datakategorier og
+            hjemler i A.6 med fritekst-tiltakene samlet, lagringsrad og merknad i A.9,
+            sårbarhet med restrisiko i A.12, unntaket ført inn i audit-tabellen, og
+            B.2-merknad om at utrykningsoppdrag registreres uten identifikator.
+            Rekkefølgekravet («før feltet er i prod med logging på») holdt: modulen
+            finnes kun på staging, og verdilogging av fritekst har aldri vært aktiv.
+            - **Funn underveis, ført inn i A.9:** oppdragsdata står utenfor
+              applikasjonens modulbackup — ingen handler er registrert, så Railways
+              databasebackup (aktiv ca. én måned i året) er eneste dekning fram til
+              fase 7. Bør få en handler senest sammen med arkiveringen.
       - [x] **Fase 3 — sentralbordet (29. aug. 2026).** Enhetsliste med utledet
             status (`Ledig (2 venter)`), oppdragsliste, oppretting, flytting, tidslinje
             og lokasjonsadmin. ETag på pollingen. Modulen er synlig nå som den har en

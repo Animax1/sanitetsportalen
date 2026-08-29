@@ -453,6 +453,12 @@ strukturert (problemstilling, hastegrad, lokasjon fra faste lister), og det enes
 feltet er unntatt logging. `Leverer` registrerer ikke hvor det leveres — bevisst, for å
 holde helseopplysninger og posisjon fra hverandre.
 
+> **Gjennomført.** Audit-unntaket har vært aktivt fra feltets første lagring
+> (`oppdrag/signals.py`, låst av `AuditFritekstTests`; 28. aug. 2026), og
+> protokolltillegget er levert 29. aug. 2026 som `PERSONVERN_DOKUMENTASJON.md`
+> v1.7: ny seksjon i A.6, rad og merknad i A.9, sårbarhet i A.12, merknad i
+> B.2. Rekkefølgekravet holdt — begge deler står før modulen når produksjon.
+
 ## 10. Frontend
 
 Egen side, egne filer. Reglene i CLAUDE.md gjelder og håndheves av eksisterende tester:
@@ -478,8 +484,8 @@ statusknappen som det eneste elementet som ikke krever presisjon.
 | Fase | Innhold | Estimat |
 |---|---|---|
 | 1 | ✅ App, modulregistrering, fem modeller, `choices.py`, regler, `lokasjon`-kommando | levert |
-| 2 | Audit-unntak for fritekst + protokolltillegg. **Før fase 3** | 1–2 t |
-| 3 | Sentralbordet: enhetsliste med utledet status, opprett, tildel, flytt, rediger, **lokasjonsadmin som side**. Polling med ETag | 8–10 t |
+| 2 | ✅ Audit-unntak for fritekst + protokolltillegg. **Før fase 3** | levert |
+| 3 | ✅ Sentralbordet: enhetsliste med utledet status, opprett, tildel, flytt, rediger, **lokasjonsadmin som side**. Polling med ETag | levert |
 | 4 | Enhetsskjermen: statusmaskin, smale endepunkter, objektsjekk, de to skjulereglene, visning av `automatisk` | 6–8 t |
 | 4b | Korreksjoner: ny rad som overstyrer, `gjeldende()`-manager | 2–3 t |
 | 5 | Offline-kø med idempotens | 4–6 t |

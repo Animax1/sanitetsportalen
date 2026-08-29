@@ -1,7 +1,7 @@
 # Personvern­dokumentasjon – Pasientregistrering (sanitetsvakt)
 
-**Siste oppdatering:** 23. august 2026  
-**Versjon:** 1.6  
+**Siste oppdatering:** 29. august 2026  
+**Versjon:** 1.7  
 **Behandlingsansvarlig:** André Eritsland
 
 ---
@@ -199,6 +199,70 @@ Etter kollaps kan ingen opplysning i arkivet føres tilbake til en person. Opera
 
 **Integritetssjekk:** feltet `sha256` er beregnet over pasientradene og kan ikke verifiseres etter kollaps. Ved kollaps beregnes derfor en ny sjekksum over det frosne aggregatet (`aggregat_sha256`), som overtar tuklingsdeteksjonen. Den opprinnelige sjekksummen beholdes som historisk fingeravtrykk av radene som fantes, men er ikke lenger etterprøvbar. Arkivvisningen skiller eksplisitt mellom de to tilstandene via feltet `kollapset`.
 
+### Oppdragsdata (oppdragsmodulen – bil og beredskapsambulanse)
+
+Oppdragsmodulen (`oppdrag/`) registrerer utrykningsoppdrag som tildeles bil- og
+beredskapsambulanseenheter under vakt: hva slags hendelse, hvor på arrangementet, og
+tidspunktene for enhetens statusmeldinger («Rykker ut», «Fremme», «Avreist», «Leverer»,
+«Ledig»). Denne seksjonen er skrevet **før modulen settes i produksjon**, slik at
+protokollen dekker behandlingen fra første dag.
+
+**Personen oppdraget gjelder registreres uten noen identifikator.** Et oppdrag lagrer
+verken pasientnummer, navn eller annen kobling til en person — heller ikke referanse til
+pasientmodulen; det er et bevisst arkitekturvalg. Den registrerte er samme kategori som
+«Pasienter» i A.5, men med enda sterkere dataminimering enn pasienttavlen: der pasienten
+har et løpenummer, har oppdraget ingenting. Re-identifisering krever kunnskap utenfra
+(hvem som var hvor når), på samme måte som for pasientnummer — se A.12.
+
+Felter i `Oppdrag` (fra `oppdrag/models.py`):
+
+| Felt (teknisk navn) | Beskrivelse | Datatype | Kategori | Hjemmel |
+|---|---|---|---|---|
+| `problemstilling` | Kategorisk angivelse av hendelsen (samme type liste som pasienttavlen, inkl. sensitive verdier som «Psykiatri» og «Mistanke overgrep») | Tekst (dropdown – fast verdimengde, håndhevet server-side i `oppdrag/choices.py`) | **Sensitiv – helseopplysning (art. 9)** | GDPR art. 9(2)(h) |
+| `hastegrad` | AMK-inndelingen Akutt / Haster / Vanlig | Tekst (dropdown – fast verdimengde, håndhevet server-side) | **Sensitiv – helseopplysning (art. 9)** | GDPR art. 9(2)(h) |
+| `lokasjon` | Sted på arrangementet (referanse til admin-vedlikeholdt liste, `Lokasjon`-tabellen) | Referanse (dropdown) | Vanlig personopplysning (oppholdssted på arrangementet, ikke bosted) | GDPR art. 6(1)(d) |
+| `fritekst` | Fritt tekstfelt for operativ tilleggsinformasjon til enheten | Fritekst | **Kan inneholde helseopplysninger (art. 9) og i verste fall identifikatorer** – se tiltakene under | GDPR art. 9(2)(h) |
+| `status` | Gjeldende status (fast verdimengde) | Tekst (fast verdimengde) | Vanlig personopplysning | GDPR art. 6(1)(d) |
+| `year` / `created_at` / `updated_at` | Årsscoping og systemtidsstempler | Heltall / tidsstempel | Vanlig personopplysning | GDPR art. 6(1)(d) |
+| `opprettet_av` | Appbrukeren som opprettet oppdraget | Referanse | Vanlig personopplysning (appbruker) | GDPR art. 6(1)(d) |
+| `enhet` | Enheten oppdraget er tildelt | Referanse | Ikke personopplysning i seg selv (se `Enhet` under) | – |
+
+Øvrige modeller i modulen:
+
+- **`Statusmelding`** – én rad per statusovergang: status, hendelsestidspunkt, hvem som
+  meldte (`meldt_av`, appbruker), og tekniske flagg (`forsinket`, `automatisk`,
+  `korrigerer`). Korreksjoner lagres som nye rader som peker på den gamle — sporet av hva
+  som faktisk ble meldt bevares.
+- **`Enhetsbytte`** – flytting av et oppdrag mellom enheter: fra/til-enhet, tidspunkt og
+  hvem som flyttet (`byttet_av`, appbruker).
+- **`Enhet`** – bilen/ambulansen: sambandsnavn (f.eks. «Haugesund 56») og kobling til
+  kontoen enheten logger inn med (appbrukerdata; kontoen bør være en delt enhetskonto,
+  ikke en personlig). Navnet er ikke en personopplysning.
+- **`Lokasjon`** – stedsnavn på arrangementet. Ikke personopplysninger.
+
+**`Leverer` registrerer ikke hvor det leveres.** Det er et bevisst valg for å holde
+helseopplysning (at noen ble levert) og posisjon (hvor) fra hverandre.
+
+**Tiltak rundt fritekstfeltet** — modulens eneste frie felt, og portalens første frie
+tekstfelt som kan ses av flere enn den som skrev det:
+
+1. **Unntatt verdilogging i audit-loggen.** `AuditLog` lagrer *at* feltet ble endret, av
+   hvem og når, men verdien skrives som `(skjult)` — aldri innholdet. Uten unntaket ville
+   hver versjon av teksten ligget i en tabell med 730 dagers lagring (A.9), også
+   versjoner operatøren rettet nettopp fordi de var for detaljerte. Sletting av et
+   oppdrag logger kun ID-en, uten innhold. Regelen har vært aktiv fra feltets første
+   lagring og er låst med automatiske tester (`oppdrag/tests.py::AuditFritekstTests`).
+2. **Server-side skjuling mot enhetskontoer.** Fritekst utelates fra serverens svar til
+   enheten straks oppdraget er avsluttet, og hele oppdraget utelates 30 minutter etter.
+   Skjulingen er et visningsfilter i API-svaret, ikke sletting — sentralbord og
+   statistikk beholder raden — men en bil som blir stående ulåst eksponerer ikke gamle
+   oppdragstekster.
+3. **Veiledning i skjemaet.** Feltet har hjelpeteksten «Vises i bilen til oppdraget
+   avsluttes. Innholdet lagres ikke i auditloggen», slik at operatøren vet hvem som ser
+   teksten.
+4. **Ingen mellomlagring.** Oppdragsdata caches ikke i Redis; avsnittet om cache-data
+   under gjelder uendret.
+
 ### Varsler (Notification)
 
 `core.Notification` gir beskjed i portalen når en bruker tildeles eller fratas ansvar for en pasient.
@@ -221,7 +285,7 @@ Varslene inneholder ikke kliniske opplysninger — kun pasientnummer, rolle og p
 |---|---|
 | Hendelsestype | Hva skjedde (opprett, endre, slette, innlogging, MFA-hendelse m.m.) |
 | Berørt post-ID / tabell | Hvilken post og hvilken tabell som ble berørt |
-| Berørt felt | Feltnavn, gammel verdi, ny verdi (felt-nivå granularitet) |
+| Berørt felt | Feltnavn, gammel verdi, ny verdi (felt-nivå granularitet). **Unntak:** `Oppdrag.fritekst` logges uten verdier — raden viser `(skjult)`, se «Oppdragsdata» over |
 | Bruker | Hvem utførte handlingen |
 | IP-adresse | Klientens IP-adresse |
 | Brukeragent | Nettleser/klient-streng |
@@ -277,6 +341,7 @@ Lagringstidene er fastsatt etter GDPR art. 5(1)(e): opplysningene skal ikke oppb
 | Cache-data lavkostnad-modus (LocMemCache i prosess) | Maks 60 sekunder, eller til prosess-omstart | Automatisk (TTL) | Kortvarig drift; per-prosess minne; ingen pasient-PII |
 | Cache-data vakt-modus (Redis) | Maks 10 minutter | Automatisk (`EXPIRE`/TTL) | Kortvarig drift; ingen pasient-PII; Redis kun aktiv under vakt |
 | Pasientdata (aktiv innsamling) | Inneværende år i PostgreSQL | Manuell nullstilling / arkivering | Aktiv bruk under arrangementssesong |
+| Oppdragsdata (`Oppdrag`, `Statusmelding`, `Enhetsbytte`) | Inneværende år i PostgreSQL. **Ingen automatisk sletting ennå** — se merknad under | Manuell inntil videre; arkivering med 24-mnd kollaps er planlagt (modulens fase 7) | Aktiv bruk under vakt; statistikk og erfaringslæring etterpå |
 | Arkiverte pasientrader (`ArkivertPasient`) | **24 måneder**, deretter kollaps til aggregert statistikk | Automatisk – `kollaps_arkiv` via Railway Cron | Dekker to hele sesonger, slik at årets vakt kan sammenlignes med fjorårets i planleggingen. Deretter er formålet uttømt og radnivået slettes permanent |
 | Arkiv-metadata og aggregert statistikk (`VaktArkiv`) | Ingen fast grense | Manuell sletting av admin | Aggregater uten radnivå; grunnlag for flerårig erfaringslæring |
 | Backup-filer – modul `patients` (aktiv vaktdata) | Antallsbegrenset: de nyeste **50** beholdes, eldre slettes automatisk | Automatisk (`ModuleBackupConfig.max_backups`) | Teknisk gjenoppretting |
@@ -290,6 +355,18 @@ Lagringstidene er fastsatt etter GDPR art. 5(1)(e): opplysningene skal ikke oppb
 > **Merk om audit-logg-retention:** Perioden var tidligere oppgitt som 10 år, begrunnet i journalrettslige hensyn. Da journalplikten ikke gjelder for dette systemet (se A.4), er den begrunnelsen bortfalt, og perioden er satt til 2 år i tråd med det `purge_old_logs` faktisk håndhever. Kommandoen kjøres av Railway Cron.
 
 > **Merk – verifisert i drift 23. august 2026:** `purge_old_logs` kjøres av Railway Cron (`0 0 * * SUN`) i miljøet `production`. Ved første skarpe kjøring, natt til søndag 23. august 2026, slettet jobben 3 varsler eldre enn 30 dager — nøyaktig de tre en tørrkjøring dagen før hadde identifisert. Cron-tjenestens logg viser `Slettet 3 varsler eldre enn 30 dager`, altså den skarpe varianten, ikke tørrkjøringens `Ville slettet`. Lagringstidene i tabellen over er dermed dokumentert **håndhevet i produksjon**, ikke bare konfigurert. Tilsvarende bekreftelse for `kollaps_arkiv` (`0 4 1 * *`) står igjen: jobben har ennå ingenting å kollapse, siden arkivene er fra 2026 og grensen er 24 måneder.
+
+> **Merk om oppdragsdata (skrevet før modulen settes i produksjon):** Oppdragsmodulen
+> har foreløpig ingen egen arkiverings- eller slettemekanisme. Radene er årsscopet på
+> samme måte som pasientdata — et årsskifte tar dem ut av alle visninger — men de blir
+> stående i databasen til modulens arkiveringsfase (fase 7 i
+> `docs/BESLUTNING_OPPDRAGSMODULEN.md`) leverer samme mønster som pasientarkivet:
+> frysing, 24 måneders radnivå, deretter kollaps til aggregat. Denne raden i tabellen
+> skal revideres når den fasen er levert. Audit-rader for oppdrag følger den
+> eksisterende 2-årsregelen — `purge_old_logs` sletter på alder, uavhengig av tabell.
+> Merk også at oppdragsdata **ikke inngår i applikasjonens modulbackup** (den dekker
+> modulene `patients` og `arkiv`, se under); frem til en backup-handler registreres er
+> Railways databasebackup eneste dekning, og den er kun aktiv i oppgraderingsperioden.
 
 > **Merk om backup-retention:** Applikasjonens backup-opprydding er **antallsbasert**, ikke tidsbasert. Konstanten `RETENTION_HOURS = 72` finnes fortsatt i koden, men er ikke i bruk — den er erstattet av `ModuleBackupConfig.max_backups` (standard 50). Tidligere versjoner av dette dokumentet oppga «72 timer, deretter automatisk slettet», noe som ikke stemte med implementasjonen.
 
@@ -391,6 +468,12 @@ Systemet støtter en **offline-modus** for bruk under nettverksutfall. Dette inn
 
 - Systemet er avhengig av at brukere opptrer i henhold til tildelt rolle. Misbruk av gyldige brukerkontoer kan ikke utelukkes.
 - Verdimengden i de kliniske feltene håndheves serverside fra august 2026 (se A.6). Restrisiko: valideringen ligger i API-laget, så gjenoppretting av en backup tatt før innføringen kan bringe tilbake verdier som ikke ville blitt godtatt i dag.
+- Fritekstfeltet i oppdragsmodulen er portalens første frie tekstfelt. En operatør *kan*
+  skrive personopplysninger der, også direkte identifikatorer — feltet finnes fordi
+  enheten trenger operativ kontekst som ikke lar seg uttrykke i faste lister. Tiltakene
+  (unntak fra verdilogging i audit, server-side skjuling mot enhetskontoer etter
+  avslutning, veiledning i skjemaet) er beskrevet i A.6. Restrisiko: selve feltverdien
+  står i oppdragstabellen til oppdraget slettes eller arkiveres.
 - Pasientnummer brukes som pseudonym, men kan i prinsippet kobles til person dersom annen informasjon fra arrangementsstedet foreligger (re-identifikasjonsrisiko er vurdert som lav). Personell som var på vakt vil normalt kunne knytte nummer til person i minnet.
 - Offline-modus innebærer at personopplysninger lagres lokalt på en enhet utenfor den kontrollerte skyinfrastrukturen – dette øker risikoen for uautorisert tilgang ved tap av enhet.
 - Behandlingsansvaret ligger hos en privatperson, ikke hos organisasjonen som gjennomfører vaktene. Se merknad i A.1.
@@ -535,6 +618,13 @@ Du registreres kun med et sanitets-pasientnummer (løpenummer) som tildeles unde
 - Kliniske observasjoner og problemstilling etter fast verdimengde
 - Tidspunkter: ankomst, behandlingsstart, utskrivning (format `dd.mm.åååå tt:mm`)
 - Om det er skrevet journal på deg i helsetjenestens ordinære journalsystem (kun «ja» eller «nei»)
+
+> **Om utrykning med bil eller beredskapsambulanse:** Sendes en enhet ut til deg,
+> registreres selve oppdraget — hendelsestype fra fast liste, hastegrad, sted på
+> arrangementet og tidspunktene for enhetens statusmeldinger. Oppdraget registreres
+> **helt uten identifikator**: ikke noe pasientnummer, ikke noe navn, og ingen kobling
+> til pasienttavlen. Et eventuelt fritekstfelt med beskjed til mannskapet skjules for
+> enheten når oppdraget er avsluttet, og innholdet lagres aldri i endringsloggen.
 
 > **Merk:** Denne appen er en arbeidstavle for sanitetsvakten under arrangementet — den er ikke din pasientjournal. Får du helsehjelp som journalføres, skjer det i helsetjenestens eget journalsystem. Her lagres bare oversikten vakten trenger for å holde styr på hvem som er hvor og hvem som har ansvaret.
 
@@ -783,10 +873,20 @@ Dette dokumentet er utarbeidet og godkjent av behandlingsansvarlig.
 
 ---
 
-*Dokument: PERSONVERN_DOKUMENTASJON.md – versjon 1.6 – sist oppdatert 23. august 2026*
+*Dokument: PERSONVERN_DOKUMENTASJON.md – versjon 1.7 – sist oppdatert 29. august 2026*
 
 **Endringslogg:**
 
+- **v1.7 (29.08.2026):** **Oppdragsmodulen dokumentert, før produksjonssetting.** Ny
+  seksjon i A.6 (kategorier, hjemler og fritekst-tiltakene: unntak fra verdilogging i
+  audit, server-side skjuling mot enhetskontoer, veiledning i skjemaet), ny rad og
+  merknad i A.9 (ingen automatisk sletting ennå — arkiveringsfasen skal revidere raden;
+  oppdragsdata står utenfor applikasjonens modulbackup inntil en handler registreres),
+  ny sårbarhet i A.12 (fritekst som portalens første frie tekstfelt, med restrisiko),
+  unntaket ført inn i A.6s audit-tabell, og en merknad i B.2 om at utrykningsoppdrag
+  registreres uten identifikator. Dokumentet er oppdatert som del av modulens fase 2 —
+  gjennomført **før** fritekstfeltet når produksjon, slik at verdilogging aldri har
+  vært aktiv for det.
 - **v1.6 (23.08.2026):** **A.9:** lagringstidene er ikke lenger bare konfigurert, men verifisert håndhevet i produksjon. `purge_old_logs` kjørte som Railway Cron natt til søndag 23. august og slettet 3 varsler eldre enn 30 dager. Ny merknad under retensjonstabellen dokumenterer beviset og skiller det fra tørrkjøringen dagen før. Ingen lagringstid er endret — kun grunnlaget for påstanden om at de etterleves. Merknaden noterer også at tilsvarende bekreftelse for `kollaps_arkiv` fortsatt står igjen.
 - **v1.5 (12.08.2026):** Gjennomgang mot faktisk kode. **Rettslig grunnlag omskrevet:** systemet er ikke et behandlingsrettet helseregister — journalføring skjer i eksternt system, og feltet `journal` er kun et Ja/Nei-flagg. Helsepersonelloven §§ 39–40 og pasientjournalloven fjernet som grunnlag; art. 6(1)(d) og 9(2)(h) står igjen, med taushetspliktvilkåret i art. 9(3) dokumentert. **Lagringstider forkortet** som følge av bortfalt journalplikt: audit-logg 10 år → 2 år (samsvarer nå med `purge_old_logs`), arkiverte pasientrader 24 mnd med påfølgende kollaps til aggregat, varsler 30 dager. **Backup-retention korrigert:** oppryddingen er antallsbasert (`max_backups`, standard 50), ikke 72 timer — `RETENTION_HOURS` er død kode. **Nye datakategorier dokumentert:** `VaktArkiv`, `ArkivertPasient` og `core.Notification`. **Railway databasebackup** lagt inn som egen behandling i A.2, med presisering av at den omfatter hele databasen. **A.12:** påstanden om at fritekst-risiko er eliminert er korrigert — verdimengden håndheves foreløpig kun i grensesnittet; nytt underkapittel dokumenterer fravalg av innsynslogg, fravalg av begrenset lesetilgang og vurderingen av DPIA. **Del B:** ny B.8 med informasjon til appbrukere (frivillige og helsepersonell), som tidligere manglet helt; Kontakt flyttet til B.9. **A.1:** merknad om at behandlingsansvaret ligger hos privatperson. Sjekklistene i C.1, C.2 og C.4 oppdatert tilsvarende.
 - **v1.4 (05.06.2026):** A.6: `behandler`-felt omdøpt til `forstehjelper` (FK til Førstehjelper-tabell); `helsepersonell` omdøpt til `helsepersonell_ref` (FK); `deleted_at` erstattet med `is_active` (BooleanField, False = soft-delete). B.2: oppdatert feltbeskrivelse til «førstehjelper». Dato- og versjonsinkonsekvens rettet.

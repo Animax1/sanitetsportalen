@@ -4,6 +4,51 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-08-29 — Fase 2 lukket: protokollen dekker oppdragsmodulen
+
+Kun dokumentasjon — `PERSONVERN_DOKUMENTASJON.md` går fra v1.6 til v1.7. Ingen kodeendring,
+ingen migrasjon. **1137 tester grønne.**
+
+Dette var resten av fase 2 i `docs/BESLUTNING_OPPDRAGSMODULEN.md`. Kodedelen — at fritekst
+logges som *endret* i audit, men aldri med verdier — har vært på plass fra feltets første
+lagring (28. aug.); det som sto igjen var at behandlingsprotokollen faktisk beskriver
+behandlingen. Rekkefølgekravet var «før feltet er i prod med logging på», og det holdt:
+modulen finnes kun på staging, så verdilogging av fritekst har aldri vært aktiv noe sted.
+
+Hva som kom inn, og hvorfor det ligger der det ligger:
+
+- **A.6, ny seksjon «Oppdragsdata».** Feltene med kategori og hjemmel, etter samme lest som
+  pasienttabellen. Det bærende poenget står først: personen oppdraget gjelder registreres
+  **uten noen identifikator** — ikke pasientnummer, ikke navn, ingen kobling til
+  pasientmodulen. Fritekst-tiltakene er samlet her som nummerert liste: audit-unntaket,
+  de to server-side skjulereglene mot enhetskontoer, hjelpeteksten i skjemaet, og at
+  oppdragsdata ikke caches. `Leverer`-uten-leveringssted er ført som det bevisste valget
+  det er.
+- **A.6, audit-tabellen.** Raden som lover «gammel verdi, ny verdi» på feltnivå har fått
+  unntaket ført inn. Uten den linja motsier protokollen seg selv fra to seksjoner.
+- **A.9, rad + merknad.** Ærlig svar på lagringstid: **ingen automatisk sletting ennå.**
+  Radene er årsscopet som pasientdata, men blir stående til fase 7 leverer arkivering med
+  24-måneders kollaps. Merknaden sier eksplisitt at raden skal revideres da — samme grep
+  som kollaps-verifiseringsmerknaden fra v1.6: dokumentet skal si hva som er bevist, ikke
+  hva som er planlagt.
+- **A.12, ny sårbarhet.** Fritekst er portalens første frie tekstfelt, og en operatør *kan*
+  skrive identifikatorer der. Tiltakene henvises, og restrisikoen står: selve feltverdien
+  ligger i oppdragstabellen til oppdraget slettes eller arkiveres.
+- **B.2, merknad.** Personvernerklæringen henvender seg til pasienten, og en utrykning
+  gjelder samme person — da skal erklæringen også dekke den. Kort avsnitt: oppdraget
+  registreres uten identifikator, og fritekst skjules for enheten ved avslutning.
+
+**Funn underveis, ført inn i A.9 og TODO:** oppdragsdata står utenfor applikasjonens
+modulbackup. Ingen handler er registrert i `core.backup`-registryet, så fram til fase 7 er
+Railways databasebackup — aktiv omtrent én måned i året — eneste dekning. Ikke akutt så
+lenge modulen er på staging, men det må få en handler senest sammen med arkiveringen.
+
+Fasetabellen i beslutningsnotatet er samtidig ført ajour: fase 2 og fase 3 står nå som
+levert (fase 3 ble levert 29. aug. uten at tabellen ble oppdatert), og §9 har fått en
+gjennomført-note etter samme mønster som rollemodellnotatets §7.
+
+---
+
 ## 2026-08-29 — «Pensjoner» er borte, og et pensjonert navn er ledig igjen
 
 **1137 tester grønne** (2 nye, 7 fjernet). Ingen migrasjon.
