@@ -365,3 +365,60 @@ class KontotilstandDiagnoseTests(TestCase):
         ut = self._kjor('mfa56')
         self.assertIn('MFA', ut)
         self.assertIn('TOTP', ut)
+
+
+@override_settings(SECURE_SSL_REDIRECT=False, RATELIMIT_ENABLE=False)
+class KontolaasUansettSkrivemaateTests(TestCase):
+    """Kontolåsen må gjelde uansett hvordan brukernavnet skrives.
+
+    Funnet 29. aug. 2026 under feilsøking av en konto som ikke kom inn:
+    `login_view` slo opp kontoen med nøyaktig treff for å avgjøre lås og telle
+    feilede forsøk, mens `authenticate` brukte det tolerante oppslaget. Skrev
+    man brukernavnet med annen skrivemåte, sto telleren stille og kontoen ble
+    aldri låst — mens riktig passord fortsatt gikk gjennom. Rate-limit-nøkkelen
+    var normalisert av nettopp denne grunnen; dette oppslaget var ikke det.
+    """
+
+    PASSORD = 'ForSvartHemmelig123'
+
+    def setUp(self):
+        self.bruker = CustomUser.objects.create_user(
+            username='karmøy56', password=self.PASSORD, must_change_password=False)
+
+    def _feil_forsok(self, skrivemaate):
+        Client().post('/accounts/login/',
+                      {'username': skrivemaate, 'password': 'feil'})
+        self.bruker.refresh_from_db()
+        return self.bruker.failed_login_attempts
+
+    def test_teller_opp_ved_noeyaktig_skrivemaate(self):
+        self.assertEqual(self._feil_forsok('karmøy56'), 1)
+
+    def test_teller_opp_ogsaa_ved_stor_forbokstav(self):
+        """Mobiltastatur setter stor forbokstav. Telleren må se det som samme konto."""
+        self.assertEqual(self._feil_forsok('Karmøy56'), 1)
+
+    def test_teller_opp_ved_stor_norsk_bokstav(self):
+        self.assertEqual(self._feil_forsok('KARMØY56'), 1)
+
+    def test_fem_forsoek_med_blandet_skrivemaate_laaser_kontoen(self):
+        """Selve hullet: uten fellesoppslaget låste ingen kombinasjon kontoen.
+
+        Merk at telleren *nullstilles* når låsen slår inn — `is_locked()` er
+        derfor invarianten, ikke tallet 5. Et første forsøk på denne testen
+        målte telleren og feilet med `0 != 5`; koden hadde rett.
+        """
+        for skrivemaate in ('karmøy56', 'Karmøy56', 'KARMØY56',
+                            'karmØy56', 'kArmøy56'):
+            Client().post('/accounts/login/',
+                          {'username': skrivemaate, 'password': 'feil'})
+        self.bruker.refresh_from_db()
+        self.assertTrue(self.bruker.is_locked())
+
+    def test_riktig_passord_nullstiller_telleren(self):
+        self._feil_forsok('Karmøy56')
+        c = Client()
+        c.post('/accounts/login/',
+               {'username': 'karmøy56', 'password': self.PASSORD})
+        self.bruker.refresh_from_db()
+        self.assertEqual(self.bruker.failed_login_attempts, 0)

@@ -39,43 +39,62 @@ logger = logging.getLogger(__name__)
 SKANN_TAK = 500
 
 
+def finn_kandidater(username):
+    """Kontoer som matcher brukernavnet, i tre stadig bredere steg.
+
+    Rekkefølgen er billigst først: to indekserte oppslag, og først om begge
+    bommer et Python-side sammenligning som tåler at *lagret* verdi har en
+    annen normalform.
+
+    **Modulfunksjon, ikke metode, fordi `login_view` må bruke den samme.**
+    Viewet slo tidligere opp kontoen med nøyaktig treff for å avgjøre
+    kontolås og telle feilede forsøk, mens `authenticate` brukte dette
+    oppslaget. To regler for «hvilken konto er dette» ga en hullete lås:
+    skrev man brukernavnet med annen skrivemåte, fant viewet ingen konto,
+    telleren sto stille, og kontoen ble aldri låst — mens innlogging med
+    riktig passord fortsatt gikk gjennom.
+    """
+    norm = normaliser(username)
+    nokkel = oppslagsnokkel(username)
+
+    # 1. Som før: databasens egen ufølsomhet. Dekker unicode på Postgres.
+    treff = list(CustomUser.objects.filter(username__iexact=norm)[:2])
+    if treff:
+        return treff
+
+    # 2. Nøyaktig treff på oppslagsformen. Dekker SQLite + unicode, og
+    #    NFD-inndata mot NFC-lagret verdi, siden begge er normalisert her.
+    treff = list(CustomUser.objects.filter(username=nokkel)[:2])
+    if treff:
+        return treff
+
+    # 3. Siste utvei: lagret verdi kan selv være unormalisert, og da hjelper
+    #    ingen spørring — normaliseringen må skje på begge sider. Kontoer
+    #    opprettet før normaliseringen ble innført er nettopp det.
+    antall = CustomUser.objects.count()
+    if antall > SKANN_TAK:
+        logger.warning(
+            'Innlogging: hopper over normaliseringsskann, %s kontoer '
+            'overstiger taket på %s.', antall, SKANN_TAK)
+        return []
+    return [
+        bruker for bruker in CustomUser.objects.all()
+        if oppslagsnokkel(bruker.username) == nokkel
+    ][:2]
+
+
+def finn_konto(username):
+    """Den ene kontoen brukernavnet peker på, eller ``None``.
+
+    Brukes av `login_view` til kontolås og telling av feilede forsøk. Er den
+    tvetydig, returneres ``None`` — samme forsiktighet som i `authenticate`.
+    """
+    treff = finn_kandidater(username)
+    return treff[0] if len(treff) == 1 else None
+
+
 class CaseInsensitiveModelBackend(ModelBackend):
     """``ModelBackend``, men brukernavnet slås opp tolerant for skrivemåte."""
-
-    def _finn_kandidater(self, username):
-        """Kontoer som matcher brukernavnet, i tre stadig bredere steg.
-
-        Rekkefølgen er billigst først: to indekserte oppslag, og først om
-        begge bommer et Python-side sammenligning som tåler at *lagret* verdi
-        har en annen normalform.
-        """
-        norm = normaliser(username)
-        nokkel = oppslagsnokkel(username)
-
-        # 1. Som før: databasens egen ufølsomhet. Dekker unicode på Postgres.
-        treff = list(CustomUser.objects.filter(username__iexact=norm)[:2])
-        if treff:
-            return treff
-
-        # 2. Nøyaktig treff på oppslagsformen. Dekker SQLite + unicode, og
-        #    NFD-inndata mot NFC-lagret verdi, siden begge er normalisert her.
-        treff = list(CustomUser.objects.filter(username=nokkel)[:2])
-        if treff:
-            return treff
-
-        # 3. Siste utvei: lagret verdi kan selv være unormalisert, og da
-        #    hjelper ingen spørring — normaliseringen må skje på begge sider.
-        #    Kontoer opprettet før normaliseringen ble innført er nettopp det.
-        antall = CustomUser.objects.count()
-        if antall > SKANN_TAK:
-            logger.warning(
-                'Innlogging: hopper over normaliseringsskann, %s kontoer '
-                'overstiger taket på %s.', antall, SKANN_TAK)
-            return []
-        return [
-            bruker for bruker in CustomUser.objects.all()
-            if oppslagsnokkel(bruker.username) == nokkel
-        ][:2]
 
     def authenticate(self, request, username=None, password=None, **kwargs):
         if username is None:
@@ -83,7 +102,7 @@ class CaseInsensitiveModelBackend(ModelBackend):
         if username is None or password is None:
             return None
 
-        treff = self._finn_kandidater(username)
+        treff = finn_kandidater(username)
 
         if len(treff) == 1:
             user = treff[0]

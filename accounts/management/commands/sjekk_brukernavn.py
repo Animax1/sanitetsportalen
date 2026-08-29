@@ -132,6 +132,19 @@ class Command(BaseCommand):
         self.stdout.write(f'    låst til:              {bruker.locked_until or "—"}')
         self.stdout.write(f'    sist innlogget:        {bruker.last_login_at or "aldri"}')
 
+        if bruker.must_change_password:
+            self.stdout.write(self.style.WARNING(
+                '\n  MERK: kontoen må bytte passord.'))
+            self.stdout.write(
+                '  Innlogging lykkes, men middlewaren sender deg rett til\n'
+                '  /accounts/change-password/ i stedet for til portalen. Utenfra\n'
+                '  kan det se ut som at du «ikke kommer inn». Fullfør byttet, så\n'
+                '  forsvinner omdirigeringen.')
+            if bruker.last_login_at:
+                self.stdout.write(
+                    f'  Kontoen logget sist inn {bruker.last_login_at} og har\n'
+                    '  fortsatt flagget satt — byttet ble altså ikke fullført.')
+
         blokkeringer = _blokkeringer(bruker)
         if not blokkeringer:
             self.stdout.write(self.style.SUCCESS(
@@ -179,8 +192,8 @@ class Command(BaseCommand):
         self.stdout.write(f'  normalisert:   {normaliser(sok)!r}')
         self.stdout.write(f'  oppslagsnøkkel: {oppslagsnokkel(sok)!r}')
 
-        from accounts.backends import CaseInsensitiveModelBackend
-        treff = CaseInsensitiveModelBackend()._finn_kandidater(sok)
+        from accounts.backends import finn_kandidater
+        treff = finn_kandidater(sok)
 
         if len(treff) == 1:
             self.stdout.write(self.style.SUCCESS(

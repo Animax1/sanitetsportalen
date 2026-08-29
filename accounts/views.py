@@ -37,6 +37,7 @@ from .invitasjon import kan_inviteres, les_token, send_invitasjon
 from .passord_reset import (
     finn_bruker, les_token as les_reset_token, send_reset,
 )
+from .backends import finn_konto
 from .models import CustomUser, LoginEvent
 
 
@@ -371,10 +372,14 @@ def login_view(request):
         username = request.POST.get('username', '').strip()
         password = request.POST.get('password', '')
 
-        try:
-            user_obj = CustomUser.objects.get(username=username)
-        except CustomUser.DoesNotExist:
-            user_obj = None
+        # Samme oppslag som `authenticate` bruker. Sto tidligere som et
+        # nøyaktig treff, og da var kontolåsen hullete: skrev man
+        # brukernavnet med annen skrivemåte enn det lagrede, ble `user_obj`
+        # None, telleren for feilede forsøk sto stille, og kontoen ble aldri
+        # låst — mens riktig passord fortsatt slapp gjennom. Rate-limit-
+        # nøkkelen rett over var normalisert av nettopp denne grunnen;
+        # dette oppslaget var ikke det.
+        user_obj = finn_konto(username)
 
         if user_obj and user_obj.is_locked():
             remaining = int((user_obj.locked_until - timezone.now()).total_seconds() / 60) + 1

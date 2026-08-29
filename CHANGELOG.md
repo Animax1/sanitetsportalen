@@ -4,6 +4,49 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-08-29 — Kontolåsen hadde et hull, funnet mens vi lette etter noe annet
+
+**1237 tester grønne** (5 nye). Ingen migrasjon.
+
+Utskriften fra `sjekk_brukernavn` mot prod viste `karmøy56` med **`feilede forsøk: 0`** og
+**`sist innlogget: 07:07 i dag`**. Kontoen hadde altså logget inn, og telleren sto på null.
+Det siste tallet viste seg å ikke bety noe.
+
+**`login_view` slo opp kontoen med nøyaktig treff:**
+
+```python
+user_obj = CustomUser.objects.get(username=username)
+```
+
+mens `authenticate()` bruker det tolerante oppslaget. To ulike svar på «hvilken konto er
+dette», og konsekvensen er en **hullete kontolås**: skriver man `Karmøy56` med stor K, blir
+`user_obj` `None`, `_registrer_mislykket_forsok` hoppes over, telleren står stille — og
+kontoen låses aldri. Riktig passord slipper fortsatt gjennom, siden `authenticate` finner
+kontoen. Gjettingen kan altså kjøres i det uendelige ved å variere store bokstaver.
+
+Ironien er at kommentaren fem linjer over forklarer hvorfor *rate-limit-nøkkelen* er
+normalisert, med nøyaktig samme argument. Oppslaget under fikk ikke samme behandling.
+
+Oppslaget er nå løftet ut som `backends.finn_kandidater` / `finn_konto`, og både viewet og
+`authenticate` kaller den. Én regel for «hvilken konto er dette». Tre av de fem nye testene
+er sett røde mot det gamle oppslaget.
+
+**Rate-limit-taket sto uansett** (10 forsøk / 5 min per brukernavn, 50 per IP, begge på
+normalisert nøkkel), så hullet var i den per-konto låsen, ikke i bremsen foran den.
+
+**Et første testforsøk målte feil ting.** Det krevde `failed_login_attempts == 5` etter fem
+forsøk og feilet med `0 != 5`. Koden hadde rett: `_registrer_mislykket_forsok` nullstiller
+telleren når den setter `locked_until`. `is_locked()` er invarianten, ikke tallet — det står
+nå i testen.
+
+**For kontoen som utløste dette:** ingenting i tilstanden blokkerer innlogging, men
+`må bytte passord: True` står fortsatt etter innloggingen 07:07. `MustChangePasswordMiddleware`
+sender da hver forespørsel til `/accounts/change-password/` i stedet for til portalen — og
+utenfra ser det ut som at man «ikke kommer inn». Verktøyet sier nå fra om nettopp den
+kombinasjonen, med tidspunktet for siste innlogging som bevis på at byttet ikke ble fullført.
+
+---
+
 ## 2026-08-29 — `ø` var ikke feilen, og verktøyet sier nå hva som er det
 
 **1232 tester grønne** (6 nye). Ingen migrasjon.
