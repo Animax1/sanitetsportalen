@@ -4,6 +4,44 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-08-29 — En vei inn når passordet ikke lar seg gjette
+
+**1249 tester grønne** (12 nye). Ingen migrasjon.
+
+Kontoen kom fortsatt ikke inn med det midlertidige passordet. Diagnosen sto klar:
+brukernavnet lagret rent, ingenting i kontotilstanden blokkerte, ingen lås — og
+**`last_login_at` sto stille på 07:07**. Siden feltet settes ved *hver* vellykket
+innlogging, betyr det at forsøkene ikke lyktes. Passordet traff ikke hashen.
+
+**En sannsynlig grunn lå i genereringen.** Det midlertidige passordet ble trukket fra
+`string.ascii_letters + string.digits` — tolv tegn som kan inneholde `0` mot `O`, og `1`
+mot `l` mot `I`. Det leses av en skjerm og tastes inn et annet sted, ofte på en telefon.
+Feiltastingen er umulig å skille fra «feil passord», og etter fem forsøk låses kontoen
+mens brukeren tror hen skriver riktig.
+
+Alfabetet utelater nå `0 O 1 l I`. Kostnaden er 69,7 bit i stedet for 71,4 over tolv tegn
+— uvesentlig for et passord som uansett skal byttes. Genereringen lå duplisert to steder,
+ved opprettelse og ved «tilbakestill passord»; den er nå én funksjon i `accounts/passord.py`.
+
+**Og en vei inn:** `python manage.py sett_passord <navn>`. Den slår opp brukernavnet med
+samme tolerante regel som innlogging, godtar `\uXXXX`-rømming for kanaler uten norske
+tegn, validerer det nye passordet mot de samme reglene som skjemaet, nullstiller
+kontolåsen, og **fjerner kravet om passordbytte som standard** — det er som regel hele
+poenget med å kjøre den. Uten `--passord` genereres ett og skrives ut én gang.
+
+At låsen nullstilles er ikke en detalj: har noen prøvd seg fram på den gamle verdien,
+skal ikke den nye møte en sperre satt av de forsøkene. Egen test.
+
+### En blindvei, notert fordi den kostet tid
+
+Første reproduksjon viste `GET /accounts/change-password/` med **400**, og det så ut som
+selve forklaringen. Det var **testoppsettet mitt**: backup-planleggeren kjørte mot en
+in-memory SQLite og feilet med «database table is locked». Med planleggeren av svarer
+siden 200. Feilen lå aldri i appen, og påstanden ble trukket tilbake med en gang den lot
+seg etterprøve.
+
+---
+
 ## 2026-08-29 — Kontolåsen hadde et hull, funnet mens vi lette etter noe annet
 
 **1237 tester grønne** (5 nye). Ingen migrasjon.

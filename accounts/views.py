@@ -37,6 +37,7 @@ from .invitasjon import kan_inviteres, les_token, send_invitasjon
 from .passord_reset import (
     finn_bruker, les_token as les_reset_token, send_reset,
 )
+from .passord import lag_midlertidig_passord
 from .backends import finn_konto
 from .models import CustomUser, LoginEvent
 
@@ -920,8 +921,7 @@ def user_create_view(request):
                     )
                 return redirect('accounts:user_detail', pk=user.pk)
 
-            alphabet = string.ascii_letters + string.digits
-            temp_password = ''.join(secrets.choice(alphabet) for _ in range(12))
+            temp_password = lag_midlertidig_passord()
             user.set_password(temp_password)
             user.must_change_password = True
             user.save()
@@ -1208,8 +1208,7 @@ def user_detail_view(request, pk):
             return redirect('accounts:user_detail', pk=pk)
 
         elif action == 'reset_password':
-            alphabet = string.ascii_letters + string.digits
-            temp_password = ''.join(secrets.choice(alphabet) for _ in range(12))
+            temp_password = lag_midlertidig_passord()
             user.set_password(temp_password)
             user.must_change_password = True
             user.save(update_fields=['password', 'must_change_password'])
