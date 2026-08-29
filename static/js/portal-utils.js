@@ -18,6 +18,17 @@
 // CSRF & API HELPERS  (Django-specific)
 // ════════════════════════════════════════════════════════
 
+// Rekkefølgen er ikke tilfeldig, og cookie-grenen er i praksis død:
+// `CSRF_COOKIE_HTTPONLY = True` gjør at JS aldri får se cookien på dette
+// nettstedet. Den beholdes for miljøer uten det flagget, men den som leser
+// koden bør vite at den ikke er veien tokenet kommer.
+//
+// `<meta name="csrf-token">` settes av `base_portal.html` på HVER side som
+// arver den. Den ble lagt inn for akkurat dette formålet, men ble aldri lest
+// — så en ny modulside uten `#csrf-token-holder` fikk tom token, og hver
+// skriving derfra ble avvist med en HTML-403 som `res.json()` kastet på.
+// Brukeren så at ingenting skjedde. Det er fikset ved å lese den, ikke ved å
+// legge en holder i hver mal: da ville neste modul gjort samme feil.
 function getCsrfToken() {
   const name = 'csrftoken';
   const cookies = document.cookie.split(';');
@@ -27,6 +38,10 @@ function getCsrfToken() {
       return decodeURIComponent(trimmed.slice(name.length + 1));
     }
   }
+
+  const meta = document.querySelector('meta[name="csrf-token"]');
+  if (meta && meta.content) return meta.content;
+
   const holder = document.getElementById('csrf-token-holder');
   if (holder) {
     const input = holder.querySelector('input[name="csrfmiddlewaretoken"]');

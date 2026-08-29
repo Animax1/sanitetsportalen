@@ -4,6 +4,51 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-08-29 — CSRF: hver skriving fra en modulside var brutt
+
+**1111 tester grønne** (8 nye). Ingen migrasjon. `static/js/portal-utils.js` og
+`core/tests_csrf_flater.py`.
+
+André meldte at han ikke fikk opprettet et oppdrag som **admin**. Første diagnose var feil —
+jeg antok at kontoen manglet `skriv_full`, fordi det forklarte symptomet og passet med
+oppsettet han beskrev. Det gjorde det ikke: han var admin hele tiden. Sida ble derfor kjørt
+i en ekte nettleser, og da kom svaret på ett forsøk:
+
+```
+Forbidden (CSRF token from the 'X-Csrftoken' HTTP header has incorrect length.)
+POST /oppdrag/api/oppdrag/ 403
+```
+
+**`CSRF_COOKIE_HTTPONLY = True`, så JS kan aldri lese `csrftoken`-cookien.**
+`getCsrfToken()` prøvde cookien først og falt tilbake på `#csrf-token-holder` — et element
+bare pasientsiden har. Oppdragssiden hadde ingen av delene, så tokenet ble tom streng, hver
+POST/PUT/DELETE fikk en HTML-403, og `res.json()` kastet på `<!DOCTYPE` *før*
+feilmeldingsboksen ble fylt. Brukeren så at ingenting skjedde.
+
+`base_portal.html` har hatt `<meta name="csrf-token">` på hver eneste side hele tiden — lagt
+inn for akkurat dette formålet, og aldri lest. **Fiksen er å lese den**, ikke å legge en
+holder i hver mal: da ville neste modul gjort samme feil.
+
+### Hvorfor 37 view-tester ikke så det
+
+`Client()` settes opp med `enforce_csrf_checks=False`. Hele API-et var testet og grønt mens
+hver eneste skriving fra nettleseren var brutt. Det er en feilklasse vanlige view-tester er
+blinde for, og den må testes eksplisitt.
+
+### Første testforsøk var også grønt på feil grunnlag
+
+Testen jeg skrev lette etter `csrf_token` hvor som helst i malens arvekjede. Den passerte
+med feilen intakt, fordi `base_portal.html` har en utloggingsknapp med `{% csrf_token %}`
+inne i et skjema: tokenet *var* på sida, bare ikke et sted `getCsrfToken()` så etter. Testen
+måler nå kildene hjelperen faktisk leser — meta-taggen eller holderen — og cookien står
+uttrykkelig ikke i lista.
+
+Tre vern, alle sett røde: hjelperen kjørt i node mot en stubbet DOM, et strukturelt vern
+over alle maler som laster skrivende JS, og et oppførselsvern med `enforce_csrf_checks=True`
+som henter tokenet fra meta-taggen slik nettleseren gjør.
+
+---
+
 ## 2026-08-29 — Enhetsadmin, og et oppsett som sier fra før det feiler
 
 **1103 tester grønne** (11 nye). Ingen migrasjon.
