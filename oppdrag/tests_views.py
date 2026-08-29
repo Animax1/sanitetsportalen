@@ -277,18 +277,21 @@ class LokasjonsadminTests(OppdragBasis):
 
 
 class EnhetsadminTests(OppdragBasis):
-    """Enheter kunne bare lages fra `manage.py shell` fram til 29. aug. 2026.
+    """Enheter fødes med kontoen, og har ingen egen opprettingsvei.
 
-    Det var ikke en bevisst avgrensning, det var en glipp i fase 3: modulen
-    kunne ikke tas i bruk uten Railway-konsollen. André meldte fra ved å
-    prøve.
+    Det fantes én en kort stund — `POST /oppdrag/api/enheter/ny/`, laget da
+    enheter bare kunne lages fra `manage.py shell`. Kontoskjemaet løste det
+    samme problemet bedre, og to veier inn til samme rad er én for mye:
+    André meldte at knappen bare forvirret. Endepunktet er borte 29. aug. 2026.
     """
 
-    def test_kun_admin_kan_opprette_enhet(self):
-        c = _klient(_bruker('sentral20', 'skriv_full'))
+    def test_ingen_opprettingsvei_finnes(self):
+        """Det gamle endepunktet skal være borte, ikke bare skjult."""
+        c = _klient(_bruker('adm20', 'skriv_full', admin=True))
         resp = c.post('/oppdrag/api/enheter/ny/', content_type='application/json',
                       data={'navn': 'Karmøy 13'})
-        self.assertEqual(resp.status_code, 403)
+        self.assertEqual(resp.status_code, 404)
+        self.assertFalse(Enhet.objects.filter(navn='Karmøy 13').exists())
 
     def test_skriv_full_kan_ikke_pensjonere_enhet(self):
         """Enheter-panelet ble åpnet for `skriv_full` 29. aug. 2026.
@@ -308,13 +311,6 @@ class EnhetsadminTests(OppdragBasis):
         c = _klient(_bruker('sentral24', 'skriv_full'))
         self.assertEqual(
             c.get(f'/oppdrag/api/enheter/{self.enhet.pk}/').status_code, 403)
-
-    def test_admin_kan_opprette_enhet(self):
-        c = _klient(_bruker('adm10', 'skriv_full', admin=True))
-        resp = c.post('/oppdrag/api/enheter/ny/', content_type='application/json',
-                      data={'navn': 'Karmøy 13'})
-        self.assertEqual(resp.status_code, 200)
-        self.assertTrue(Enhet.objects.filter(navn='Karmøy 13').exists())
 
     def test_admin_kan_knytte_konto(self):
         bil = _bruker('haugesund56', 'les', delt=True)

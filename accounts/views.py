@@ -798,6 +798,47 @@ def _lag_enhet_om_bedt_om(form, user):
     return Enhet.objects.create(navn=navn, user=user)
 
 
+def _rydd_enhet_ved_sletting(user):
+    """Ta enheten ut av tjeneste når kontoen som *er* enheten slettes.
+
+    **Enhet.user er SET_NULL.** Uten dette overlevde bilen kontoen sin som en
+    rad uten kobling — synlig på ressursoversikten, merket rødt, og umulig å
+    bli kvitt for den som nettopp trodde han hadde slettet den. André regnet
+    med at sletting av kontoen holdt. Nå gjør den det.
+
+    Raden slettes bare når ingen oppdrag peker på den. `Oppdrag.enhet` er
+    `PROTECT`, så en bil som har kjørt kan ikke forsvinne uten å ta historikken
+    med seg — den pensjoneres i stedet. Det er samme skille som ellers i
+    portalen: data uten spor kan slettes, data med spor fryses.
+
+    Returnerer `'slettet'`, `'pensjonert'` eller `None`.
+    """
+    enhet = getattr(user, 'enhet', None)
+    if enhet is None:
+        return None
+    if not enhet.oppdrag.exists():
+        enhet.delete()
+        return 'slettet'
+    enhet.er_aktiv = False
+    enhet.pa_vakt = False
+    enhet.save(update_fields=['er_aktiv', 'pa_vakt', 'updated_at'])
+    return 'pensjonert'
+
+
+def _ta_enhet_av_vakt(user):
+    """En frosset konto kan ikke logge inn, og bilen kan derfor ikke melde.
+
+    Å la den stå på ressursoversikten som ledig ville sendt 113 etter en bil
+    ingen kan kvittere for. Frysing er reversibel, så enheten pensjoneres
+    ikke — den tas bare av vakt, og settes inn igjen manuelt ved opptining.
+    """
+    enhet = getattr(user, 'enhet', None)
+    if enhet is None or not enhet.pa_vakt:
+        return False
+    enhet.pa_vakt = False
+    enhet.save(update_fields=['pa_vakt', 'updated_at'])
+    return True
+
 
 @admin_required
 def user_create_view(request):
@@ -1116,10 +1157,12 @@ def user_detail_view(request, pk):
                 request, user, 'UPDATE',
                 field_name='is_active', old_value='True', new_value='False',
             )
+            tatt_av_vakt = _ta_enhet_av_vakt(user)
             messages.success(
                 request,
                 f'Kontoen til «{user.username}» er frosset og aktive sesjoner er avsluttet. '
-                f'Bruk «Tø konto» for å reversere.',
+                + ('Enheten er tatt av vakt. ' if tatt_av_vakt else '')
+                + 'Bruk «Tø konto» for å reversere.',
             )
             return redirect('accounts:user_detail', pk=pk)
 
@@ -1230,6 +1273,10 @@ def user_delete_view(request, pk):
     arbeidet. ``core.Notification`` er ``CASCADE``: varsler til en slettet bruker
     har ingen mottaker og skal bort.
 
+    ``oppdrag.Enhet.user`` er også ``SET_NULL``, men her er det ikke nok: en bil
+    *er* kontoen sin, og en enhet uten kobling er en feiltilstand, ikke et
+    historisk spor. `_rydd_enhet_ved_sletting` tar den med.
+
     Krever at admin skriver brukernavnet ordrett som bekreftelse. Det er en
     bevisst friksjon — sletting kan ikke angres, og knappen står vegg i vegg med
     «Frys konto», som er den reversible varianten.
@@ -1263,7 +1310,17 @@ def user_delete_view(request, pk):
         field_name='username', old_value=username, new_value=None,
     )
 
+    # Må skje før slettingen: `Enhet.user` er SET_NULL, så etterpå finnes
+    # ingen kobling å slå opp på.
+    enhet_utfall = _rydd_enhet_ved_sletting(user)
+
     user.delete()
 
-    messages.success(request, f'Brukeren «{username}» er slettet permanent.')
+    halen = {
+        'slettet': ' Enheten er slettet med den.',
+        'pensjonert': ' Enheten er pensjonert — den har oppdrag i historikken '
+                      'og kan ikke slettes.',
+    }.get(enhet_utfall, '')
+    messages.success(
+        request, f'Brukeren «{username}» er slettet permanent.{halen}')
     return redirect('accounts:user_list')

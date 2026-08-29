@@ -476,3 +476,80 @@ class MatriseNivaaerTests(TestCase):
         felt = ModulTilgangForm(bruker=bruker).fields[
             ModulTilgangForm.PREFIKS + 'statistikk']
         self.assertIn('skriv_full', [v for v, _ in felt.choices])
+
+
+@override_settings(SECURE_SSL_REDIRECT=False, RATELIMIT_ENABLE=False)
+class EnhetFolgerKontoenTests(TestCase):
+    """Enheten skal forsvinne med kontoen sin, ikke overleve den.
+
+    `Enhet.user` er SET_NULL, så sletting av kontoen etterlot bilen som en rad
+    uten kobling: synlig på ressursoversikten, merket rødt, og — når den hadde
+    kjørt oppdrag — umulig å bli kvitt, fordi `Oppdrag.enhet` er PROTECT.
+    André spurte «jeg kan jo bare slette brukeren?», og hadde rett i at det var
+    slik det burde virke.
+    """
+
+    def setUp(self):
+        self.client = Client()
+        self.admin = CustomUser.objects.create_user(
+            username='sjefen', password='AdminPass123!', role='admin',
+            must_change_password=False, is_staff=True)
+        gi_standardtilgang(self.admin, 'admin')
+        self.client.force_login(self.admin)
+
+        self.bil = CustomUser.objects.create_user(
+            username='haugesund56', password='x', role='bruker',
+            must_change_password=False, er_delt_konto=True)
+
+        from oppdrag.models import Enhet
+        self.enhet = Enhet.objects.create(navn='Haugesund 56', user=self.bil)
+
+    def _slett(self, bruker):
+        return self.client.post(
+            reverse('accounts:user_delete', kwargs={'pk': bruker.pk}),
+            {'confirm_username': bruker.username})
+
+    def _gi_oppdrag(self):
+        from oppdrag.models import Lokasjon, Oppdrag
+        return Oppdrag.objects.create(
+            year=2098, enhet=self.enhet, problemstilling='Pustevansker',
+            hastegrad='Akutt',
+            lokasjon=Lokasjon.objects.create(navn='Hovedscene'))
+
+    def test_sletting_av_kontoen_sletter_enheten(self):
+        from oppdrag.models import Enhet
+
+        self._slett(self.bil)
+
+        self.assertFalse(Enhet.objects.filter(pk=self.enhet.pk).exists())
+
+    def test_enhet_med_oppdrag_pensjoneres_i_stedet(self):
+        """`Oppdrag.enhet` er PROTECT — historikken skal ikke kunne rives bort."""
+        self._gi_oppdrag()
+
+        self._slett(self.bil)
+
+        self.enhet.refresh_from_db()
+        self.assertFalse(self.enhet.er_aktiv)
+        self.assertFalse(self.enhet.pa_vakt)
+        self.assertIsNone(self.enhet.user)
+
+    def test_sletting_av_vanlig_konto_rorer_ingen_enhet(self):
+        from oppdrag.models import Enhet
+
+        kari = CustomUser.objects.create_user(
+            username='kari', password='x', role='bruker',
+            must_change_password=False)
+        self._slett(kari)
+
+        self.assertTrue(Enhet.objects.filter(pk=self.enhet.pk).exists())
+
+    def test_frysing_tar_enheten_av_vakt(self):
+        """En frosset konto kan ikke logge inn, så bilen kan ikke melde."""
+        self.client.post(
+            reverse('accounts:user_detail', kwargs={'pk': self.bil.pk}),
+            {'action': 'freeze'})
+
+        self.enhet.refresh_from_db()
+        self.assertFalse(self.enhet.pa_vakt)
+        self.assertTrue(self.enhet.er_aktiv)   # frysing er reversibel

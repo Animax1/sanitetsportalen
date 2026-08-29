@@ -4,6 +4,36 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-08-29 — Enheten følger kontoen, også ut
+
+**1142 tester grønne** (5 nye, 1 fjernet). Ingen migrasjon.
+
+André: «Fjern legg til enhet-knappen i enheter-vinduet. Den skal ikke brukes av noen og er
+bare forvirrende. Vi trenger heller ikke pensjoner? Jeg kan jo bare slette brukeren?»
+
+**«Legg til enhet» er borte** — knappen, JS-funksjonen, `POST /oppdrag/api/enheter/ny/` og
+URL-en. Enheter fødes med kontoen («Bil eller ambulanse» i kontoskjemaet), og to veier inn
+til samme rad er én for mye. Malen sa det selv med «vanligvis trengs ikke denne», som er en
+knapp som ber om unnskyldning for å finnes. Testen som krevde at endepunktet fantes er
+snudd: nå kreves 404.
+
+**Premisset om sletting stemte ikke — nå gjør det det.** `Enhet.user` er `SET_NULL`, så å
+slette bilkontoen etterlot enheten som en rad uten kobling: fortsatt på ressursoversikten,
+merket rødt, og hvis den hadde kjørt oppdrag, umulig å bli kvitt — `Oppdrag.enhet` er
+`PROTECT`. Sletting av kontoen tar nå enheten med seg, og pensjonerer den i stedet når den
+har oppdrag i historikken. Samme skille som ellers i portalen: data uten spor slettes, data
+med spor fryses.
+
+**Frysing tar enheten av vakt.** En frosset konto kan ikke logge inn, så bilen kan ikke
+melde. Å la den stå som ledig ville sendt 113 etter en bil ingen kan kvittere for. Frysing
+er reversibel, så enheten pensjoneres ikke — den settes inn igjen manuelt ved opptining.
+
+**«Pensjoner» blir stående.** Den er nå nødutgangen for enheter uten konto — rader som ble
+til før koblingen fantes, eller fra `manage.py shell`. De kan ikke fjernes ved å slette en
+konto, for det finnes ingen. Etter denne endringen er det den eneste jobben knappen har.
+
+---
+
 ## 2026-08-29 — Lukkekrysset var svart på mørk modal
 
 **1139 tester grønne** (1 ny). Ingen migrasjon.

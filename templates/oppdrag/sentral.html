@@ -157,29 +157,10 @@
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Lukk"></button>
       </div>
       <div class="modal-body">
-        {% if er_global_admin %}
-        <div class="input-group mb-3">
-          <input type="text" id="ny-enhet" class="form-control"
-                 placeholder="Enhetsnavn, f.eks. «Haugesund 56»">
-          <button class="btn btn-outline-primary" type="button" data-action="leggTilEnhet">
-            Legg til
-          </button>
-        </div>
-        <p class="form-text mt-0">
-          Vanligvis trengs ikke denne: velg «Bil eller ambulanse» når du oppretter
-          kontoen, så lages enheten og koblingen i samme steg.
-        </p>
-        {% endif %}
-
         <div id="enhetsadminliste"><div class="tom-melding">Laster…</div></div>
 
-        <hr>
-        <p class="form-text mb-0">
-          «Av vakt» tar enheten ut av ressursoversikten og hindrer nye oppdrag.
-          Den slettes ikke, og en enhet med et pågående oppdrag kan ikke tas av.
-          {% if er_global_admin %}
-          «Pensjoner» fjerner enheten for godt fra alle lister.
-          {% endif %}
+        <p class="form-text mb-0 mt-3">
+          Enheter opprettes når kontoen opprettes — velg «Bil eller ambulanse».
         </p>
       </div>
     </div>

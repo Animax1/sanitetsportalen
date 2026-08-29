@@ -422,22 +422,6 @@ async function lastEnhetsadmin() {
 }
 
 
-async function leggTilEnhet() {
-  const felt = document.getElementById('ny-enhet');
-  const navn = (felt.value || '').trim();
-  if (!navn) return;
-  const res = await apiFetch('/oppdrag/api/enheter/ny/', {
-    method: 'POST',
-    body: JSON.stringify({ navn }),
-  });
-  if (res.ok) {
-    felt.value = '';
-    await lastEnhetsadmin();
-    await lastAlt();
-  }
-}
-
-
 // ── Lasting ─────────────────────────────────────────────
 
 async function lastEnheter() {

@@ -572,6 +572,14 @@ Gjennomgang 13. aug. 2026, med 1000 pasienter og peak 100 brukere som premiss.
             `manage.py shell` — en glipp, ikke en avgrensning. Opprettelse, aktivering og
             kontokobling ligger i sentralbordets admin-panel nå, med regelen skrevet rett
             i panelet: koblingen gir ingen tilgang.
+      - [x] **Enheten følger kontoen, også ut (29. aug. 2026).** «Legg til enhet»
+            fjernet med endepunkt og URL — enheter fødes med kontoen. Sletting av
+            kontoen sletter enheten, eller pensjonerer den hvis den har oppdrag
+            (`Oppdrag.enhet` er PROTECT). Frysing tar den av vakt.
+      - [ ] **Vurder: fjerne «Pensjoner» helt.** Etter koblingen over har knappen
+            bare én jobb igjen — enheter uten konto, altså rader fra før
+            kontoskjemaet fantes eller fra `manage.py shell`. Er det ingen slike i
+            prod, kan knappen gå. Krever en opptelling først.
       - [x] **Modaler i portalgrenen er mørke (29. aug. 2026).** `portal.css` hadde
             ingen modalregler, så modalen arvet sidebakgrunnen og det svarte
             lukkekrysset forsvant i den. Rettet i `portal.css`, ikke `oppdrag.css` —

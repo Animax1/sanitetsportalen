@@ -122,30 +122,6 @@ def enheter_view(request):
 
 
 @modul_kreves('oppdrag', 'les', svar='json')
-@require_http_methods(['POST'])
-def enhet_opprett_view(request):
-    """Opprett en enhet. Kun global admin.
-
-    Fram til nå fantes ingen vei inn utenom `manage.py shell`, og det var
-    unødig knotete: André måtte skrive en enlinjes ORM-kommando for å komme i
-    gang. En modul man ikke kan ta i bruk uten Railway-konsollen er ikke ferdig.
-    """
-    if not er_global_admin(request.user):
-        return JsonResponse({'status': 'error', 'message': 'Ingen tilgang'}, status=403)
-
-    navn = (json_body(request).get('navn') or '').strip()
-    if not navn:
-        return JsonResponse(
-            {'status': 'error', 'message': 'Navn kan ikke være tomt.'}, status=400)
-    if Enhet.objects.filter(navn=navn).exists():
-        return JsonResponse(
-            {'status': 'error', 'message': f'«{navn}» finnes allerede.'}, status=400)
-
-    enhet = Enhet.objects.create(navn=navn)
-    return JsonResponse({'status': 'ok', 'data': _enhet_admin_dict(enhet)})
-
-
-@modul_kreves('oppdrag', 'les', svar='json')
 @require_http_methods(['GET', 'PUT'])
 def enhet_detalj_view(request, pk):
     """Enhetens administrasjon: navn, aktiv, og koblingen til en konto.
