@@ -8,6 +8,8 @@ fordi meldingen med vilje ikke røper hvilket av de to som feilet.
 
 Det rammer nettopp de som ikke valgte brukernavnet sitt selv.
 """
+import unicodedata
+
 from django.contrib.auth import authenticate
 from django.core.cache import cache
 from django.test import Client, TestCase, override_settings
@@ -156,3 +158,79 @@ class BrukernavnNormaliseringTests(TestCase):
             CustomUser.objects.filter(username='kari.nordmann').exists(),
             'brukernavnet ble ikke normalisert til små bokstaver',
         )
+
+
+@override_settings(SECURE_SSL_REDIRECT=False, RATELIMIT_ENABLE=False)
+class BrukernavnMedNorskeTegnTests(TestCase):
+    """Innlogging skal tåle æ, ø og å — også limt inn fra et annet system.
+
+    Bakgrunn: en konto med `ø` i navnet fikk ikke logget inn i prod. Feilen lot
+    seg ikke reprodusere for `ø` alene, men to ekte feil i samme mekanikk ble
+    funnet på veien, og begge er dekket her.
+    """
+
+    PASSORD = 'ForSvartHemmelig123'
+
+    def _lag(self, navn):
+        return CustomUser.objects.create_user(
+            username=navn, password=self.PASSORD, must_change_password=False)
+
+    def _logg_inn(self, navn):
+        c = Client()
+        c.post('/accounts/login/', {'username': navn, 'password': self.PASSORD})
+        return '_auth_user_id' in c.session
+
+    def test_alle_norske_tegn_kan_logge_inn(self):
+        for navn in ('bjørn.rød', 'kåre.aas', 'næss.øye', 'ævind.åsmund'):
+            with self.subTest(navn=navn):
+                self._lag(navn)
+                self.assertTrue(self._logg_inn(navn))
+
+    def test_nfd_variant_kommer_inn(self):
+        """`å` limt inn fra macOS er `a` + kombinerende ring, ikke ett tegn.
+
+        Strengene ser identiske ut på skjermen. Uten normalisering finner
+        databasen ingenting, og brukeren får «feil brukernavn eller passord»
+        på et navn hun har kopiert ordrett.
+        """
+        self._lag('kåre.aas')
+        nfd = unicodedata.normalize('NFD', 'kåre.aas')
+        self.assertNotEqual(nfd, 'kåre.aas')      # vern: testen måler noe
+        self.assertTrue(self._logg_inn(nfd))
+
+    def test_nfc_variant_mot_nfd_lagret(self):
+        """Motsatt vei: kontoen ble opprettet med en unormalisert streng."""
+        CustomUser.objects.create_user(
+            username=unicodedata.normalize('NFD', 'såre.øye'),
+            password=self.PASSORD, must_change_password=False)
+        self.assertTrue(self._logg_inn(unicodedata.normalize('NFC', 'såre.øye')))
+
+    def test_store_norske_bokstaver_kommer_inn(self):
+        """`iexact` case-folder ikke unicode på SQLite — og offline-modus er SQLite."""
+        self._lag('bjørn.rød')
+        for variant in ('BJØRN.RØD', 'Bjørn.Rød', 'bjØrn.rød'):
+            with self.subTest(variant=variant):
+                self.assertTrue(self._logg_inn(variant))
+
+    def test_feil_passord_slipper_fortsatt_ikke_inn(self):
+        """Vern: toleransen gjelder brukernavnet, ikke passordet."""
+        self._lag('bjørn.rød')
+        c = Client()
+        c.post('/accounts/login/',
+               {'username': 'BJØRN.RØD', 'password': 'feil-passord'})
+        self.assertNotIn('_auth_user_id', c.session)
+
+    def test_ukjent_brukernavn_slipper_ikke_inn(self):
+        self._lag('bjørn.rød')
+        self.assertFalse(self._logg_inn('bjørn.grønn'))
+
+    def test_skjemaet_normaliserer_ved_oppretting(self):
+        """Lagres én form, slipper oppslaget å lete etter flere."""
+        from accounts.forms import AdminUserCreateForm
+        felt = AdminUserCreateForm().fields
+        self.assertIn('username', felt)
+
+        from accounts.brukernavn import oppslagsnokkel
+        self.assertEqual(
+            oppslagsnokkel(unicodedata.normalize('NFD', 'KÅRE.Aas')),
+            'kåre.aas')

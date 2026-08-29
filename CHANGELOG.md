@@ -4,6 +4,56 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-08-29 — Innlogging med æøå, og en grønn prikk for ledig
+
+**1220 tester grønne** (7 nye). Ingen migrasjon.
+
+### Brukernavn med norske tegn
+
+Meldt fra prod: en konto med `ø` i navnet kom ikke inn, selv med brukernavn og passord
+limt inn. **Det tilfellet lot seg ikke reprodusere** — `bjørn.rød` logger inn på første
+forsøk her. Men to ekte feil i samme mekanikk ble funnet på veien, og begge er rettet.
+
+**1. Unicode-normalform.** `å` finnes som ett tegn (U+00E5, NFC) og som `a` pluss
+kombinerende ring (U+0061 U+030A, NFD). macOS produserer NFD i flere sammenhenger, så
+«kopier brukernavnet og lim det inn» er nok til å bomme — de to strengene er pikselidentiske
+på skjermen og forskjellige for databasen. Verken oppretting eller innlogging normaliserte.
+
+Målt underveis, og verdt å vite: **`æ` og `ø` dekomponerer ikke.** De er egne bokstaver,
+ikke bokstav pluss aksent. `å` og `Å` gjør. Feilen rammer altså navn med `å` — noe som
+svekker normalisering som forklaring på nettopp `ø`-tilfellet, og det står i koden.
+
+**2. `iexact` case-folder ikke unicode på SQLite.** `Ø` mot lagret `ø` gir null treff.
+På PostgreSQL virker det, fordi `UPPER()` der håndterer unicode. **Offline-modus kjører
+SQLite**, så det er ikke en teoretisk forskjell — det er feltbruk uten nett.
+
+Oppslaget går nå i tre stadig bredere steg, billigst først: `iexact` som før, deretter
+nøyaktig treff på en NFKC-normalisert og casefoldet nøkkel, og først om begge bommer en
+Python-side sammenligning som tåler at *lagret* verdi selv er unormalisert. Det siste
+steget kjører kun på et forsøk som ellers ville feilet, og har et tak på 500 kontoer med
+logglinje om det passeres — det skal ikke stille bli dyrt om tallet vokser.
+`clean_username` normaliserer også ved oppretting, så nye kontoer har én form.
+
+**Tvetydighet slår fortsatt aldri ut i feil konto:** matcher flere kontoer, kreves
+nøyaktig treff. De fire nye testene er sett røde mot den gamle backenden.
+
+**For `ø`-tilfellet i prod finnes nå et verktøy:** `python manage.py sjekk_brukernavn
+<navn>`. Les-only. Den skriver hvert brukernavn tegn for tegn med kodepunkt og
+Unicode-navn, flagger unormaliserte og kontoer med mellomrom i enden, og sier om et gitt
+oppslag ville truffet. Den finnes fordi «brukernavnet ser riktig ut» ikke lar seg
+feilsøke ved å se på det — en kyrillisk `е` ser ut som en latinsk `e`, og den fella traff
+dette prosjektet i et dokument tidligere samme dag.
+
+### Grønn prikk for ledig enhet
+
+`.status-ledig` var grå, som `.status-venter`. Grått leste som «av», og 113 skal se hvem
+som kan sendes uten å lese teksten først. Nå grønn (`#22c55e`). `Venter` beholder grått —
+det er nettopp forskjellen mellom «tildelt, men ikke rykket ut» og «klar» som skal være
+synlig. Fargen bærer fortsatt ikke informasjonen alene; statusteksten står ved siden av
+(WCAG 1.4.1).
+
+---
+
 ## 2026-08-29 — Fase 4b: 113 kan rette et tidspunkt, uten å viske ut det som ble meldt
 
 **1213 tester grønne** (18 nye). Ingen migrasjon.

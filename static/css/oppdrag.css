@@ -52,8 +52,13 @@
   display: inline-block;
 }
 
-.status-ledig      { background: #64748b; }
+/* Ledig er gode nyheter — enheten kan sendes. Grått leste som «av», og
+ * 113 skal se hvem som er klar uten å lese teksten først. Fargen bærer
+ * fortsatt ikke informasjonen alene: statusteksten står ved siden av. */
+.status-ledig      { background: #22c55e; }
 .status-av_vakt    { background: #334155; }
+/* Venter beholder grått: oppdraget er tildelt, men ingen har rykket ut, og
+ * det er nettopp forskjellen fra Ledig som skal være synlig. */
 .status-venter     { background: #64748b; }
 .status-rykker_ut  { background: #f59e0b; }
 .status-fremme     { background: #3b82f6; }

@@ -2,6 +2,7 @@
 from django import forms
 from django.contrib.auth import password_validation
 
+from .brukernavn import oppslagsnokkel
 from .models import CustomUser, ModulTilgang, TilgangsNivaa, UserRole
 
 #: Hjelpetekst på rollefeltet, delt av opprettings- og redigeringsskjemaet.
@@ -243,8 +244,12 @@ class AdminUserCreateForm(forms.ModelForm):
         skrivemåte holder auditloggen konsistent — og sikrer at to kontoer
         aldri kan skille seg kun på store bokstaver, som er det ene tilfellet
         backenden må falle tilbake til nøyaktig treff for.
+
+        **Normaliseres også som Unicode.** Uten det kunne `kåre` lagres i én
+        normalform og skrives inn i en annen ved innlogging — to strenger som
+        ser identiske ut, men ikke er det. Se `accounts/brukernavn.py`.
         """
-        return (self.cleaned_data.get('username') or '').strip().lower()
+        return oppslagsnokkel(self.cleaned_data.get('username'))
 
     def clean(self):
         data = super().clean()
