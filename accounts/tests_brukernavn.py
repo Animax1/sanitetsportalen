@@ -9,8 +9,10 @@ fordi meldingen med vilje ikke røper hvilket av de to som feilet.
 Det rammer nettopp de som ikke valgte brukernavnet sitt selv.
 """
 import unicodedata
+from io import StringIO
 
 from django.contrib.auth import authenticate
+from django.core.management import call_command
 from django.core.cache import cache
 from django.test import Client, TestCase, override_settings
 from django.urls import reverse
@@ -234,3 +236,67 @@ class BrukernavnMedNorskeTegnTests(TestCase):
         self.assertEqual(
             oppslagsnokkel(unicodedata.normalize('NFD', 'KÅRE.Aas')),
             'kåre.aas')
+
+
+class SjekkBrukernavnKommandoTests(TestCase):
+    """Diagnoseverktøyet for «brukernavnet ser riktig ut, men virker ikke».
+
+    Kommandoen finnes fordi feilen ikke lar seg se: to strenger kan være
+    pikselidentiske og likevel ulike. Testene her holder den ærlig — særlig
+    at ascii-formen den skriver ut faktisk kan limes tilbake inn i den.
+    """
+
+    def _kjor(self, *args):
+        ut = StringIO()
+        call_command('sjekk_brukernavn', *args, stdout=ut, stderr=ut)
+        return ut.getvalue()
+
+    def test_lister_kontoer_uten_argument(self):
+        """Uten argument trengs ingen norske tegn på kommandolinja.
+
+        Det er poenget: Railways `ssh` bærer ikke `ø` inn.
+        """
+        CustomUser.objects.create_user(username='bjørn.rød', password='x')
+        ut = self._kjor()
+        self.assertIn('bjørn.rød', ut)
+        self.assertIn('U+00F8', ut)
+
+    def test_ascii_formen_kan_limes_tilbake(self):
+        """Rundturen må være hel, ellers er utskriften ubrukelig i kanalen.
+
+        Pythons `backslashreplace` gir `\\xf8` for tegn under U+0100, og den
+        formen tolker kommandoen ikke. Den skriver derfor `\\uXXXX` selv.
+        """
+        from accounts.management.commands.sjekk_brukernavn import (
+            _ascii_form, _tolk_rommet,
+        )
+        for navn in ('bjørn.rød', 'kåre.aas', 'næss.øye', 'karе.aas'):
+            with self.subTest(navn=navn):
+                ascii_form = _ascii_form(navn)
+                self.assertTrue(ascii_form.isascii(), ascii_form)
+                self.assertEqual(_tolk_rommet(ascii_form), navn)
+
+    def test_roemmet_argument_finner_kontoen(self):
+        CustomUser.objects.create_user(username='bjørn.rød', password='x')
+        ut = self._kjor(r'bjørn.rød')
+        self.assertIn('Treffer kontoen', ut)
+
+    def test_lookalike_avsloeres(self):
+        """En kyrillisk «е» ser ut som en latinsk «e». Den skal navngis."""
+        CustomUser.objects.create_user(username='karе.aas', password='x')
+        ut = self._kjor('kare.aas')
+        self.assertIn('CYRILLIC', ut)
+        self.assertIn('INGEN konto matcher', ut)
+
+    def test_unormalisert_konto_flagges(self):
+        CustomUser.objects.create_user(
+            username=unicodedata.normalize('NFD', 'håkon.lie'), password='x')
+        self.assertIn('IKKE NFKC-normalisert', self._kjor())
+
+    def test_kommandoen_endrer_ingenting(self):
+        """Les-only. Den kjøres mot prod under feilsøking."""
+        CustomUser.objects.create_user(username='bjørn.rød', password='x')
+        foer = list(CustomUser.objects.values_list('username', flat=True))
+        self._kjor('bjørn.rød')
+        self.assertEqual(
+            list(CustomUser.objects.values_list('username', flat=True)), foer)

@@ -38,11 +38,20 @@ logglinje om det passeres — det skal ikke stille bli dyrt om tallet vokser.
 nøyaktig treff. De fire nye testene er sett røde mot den gamle backenden.
 
 **For `ø`-tilfellet i prod finnes nå et verktøy:** `python manage.py sjekk_brukernavn
-<navn>`. Les-only. Den skriver hvert brukernavn tegn for tegn med kodepunkt og
+[navn]`. Les-only. Den skriver hvert brukernavn tegn for tegn med kodepunkt og
 Unicode-navn, flagger unormaliserte og kontoer med mellomrom i enden, og sier om et gitt
 oppslag ville truffet. Den finnes fordi «brukernavnet ser riktig ut» ikke lar seg
 feilsøke ved å se på det — en kyrillisk `е` ser ut som en latinsk `e`, og den fella traff
 dette prosjektet i et dokument tidligere samme dag.
+
+**Og kanalen selv var en felle.** Railways `ssh` bærer ikke `ø` inn på kommandolinja, så
+verktøyet var i praksis ubrukelig for nettopp det tegnet det skulle undersøke. To ting
+retter det: **uten argument lister kommandoen alle kontoer** — man trenger ikke skrive
+navnet i det hele tatt — og argumentet godtar `\uXXXX`-rømming, mens utskriften viser
+hvert navn i samme form. Første forsøk skrev ascii-formen med Pythons egen
+`backslashreplace`, som gir `\xf8` for tegn under U+0100; den formen tolkes ikke tilbake,
+så rundturen var brutt og utskriften ubrukelig i den kanalen den var laget for. Nå skrives
+alltid `\uXXXX`, og en test limer hver form tilbake og krever samme streng.
 
 ### Grønn prikk for ledig enhet
 
