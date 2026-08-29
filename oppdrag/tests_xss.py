@@ -68,6 +68,7 @@ REVIEWED_INTERPOLATIONS = {
     'valgt': 'hardkodet selected-attributt fra en ternær',
     # Enhetsskjermens byggere (oppdrag-enhet.js):
     'historikkKnapp': 'markup bygget lokalt, id escapet inni',
+    'rettKnapp': 'markup bygget lokalt, meldings-id escapet inni',
     'nesteKnapp': 'markup bygget lokalt, navn og id escapet inni',
     'ledigKnapp': 'markup bygget lokalt, id escapet inni',
     'startKnapp': 'markup bygget lokalt, navn og id escapet inni',

@@ -4,6 +4,58 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-08-29 — Fase 4b: 113 kan rette et tidspunkt, uten å viske ut det som ble meldt
+
+**1213 tester grønne** (18 nye). Ingen migrasjon.
+
+Maskineriet kom i fase 1 og var ubrukt: `services.korriger_tidspunkt` og
+`Statusmelding.objects.gjeldende()` har ligget der siden 28. aug. Det som manglet var
+endepunktet, reglene og en vei inn fra grensesnittet.
+
+**Rettingen er en ny rad som peker på den gamle.** Originalen røres ikke, og begge står i
+tidslinjen — den erstattede gjennomstreket, rettingen merket «rettet av sentralen».
+`Statusmelding` er et spor av hva som *ble meldt*; redigerte man raden, kunne «hva sa
+bilen egentlig?» bare besvares fra `AuditLog`, en admin-flate som ikke er der oppdraget
+vises. Testen som holder det ærlig setter `melding.tidspunkt` direkte i tillegg til å
+skrive den nye raden — og blir rød.
+
+**Fire regler, alle fail-closed:**
+
+1. **Raden må være gjeldende.** Retter man en allerede overstyrt rad, finnes to
+   korreksjoner av samme original og «hvilken gjelder» har ikke lenger noe entydig svar.
+   Korreksjoner *kan* kjedes — man retter den nyeste.
+2. **Ikke i framtiden.** Et tidspunkt som ikke har inntruffet er ikke en observasjon.
+3. **Ikke før oppdraget ble opprettet.**
+4. **Rekkefølgen må holde.** Dette er den som betyr noe. Settes `Fremme` før
+   `Rykker ut`, blir responstiden negativ — og fase 6 ville regnet på den uten å vite at
+   tallet er umulig. Sjekken måler mot de *gjeldende* naboene, ikke mot alle rader: en
+   overstyrt rad beskriver ikke lenger noe som gjelder, og å måle mot den ville låst
+   rettingen til verdien man retter bort. Feilmeldingen navngir naboen som er i veien
+   («`Fremme` kan ikke være før `Rykker ut` (14:36)»), så operatøren vet om hun må rette
+   en annen rad først.
+
+**Endepunktet er bevisst ikke et handling-endepunkt.** Det tar et tidspunkt, altså en
+feltverdi, og ligger derfor på `skriv_full` med vanlig kroppsvalidering. Å presse det inn
+under `skriv_handling` ville uthult det lukkede skjemaet i §5.1 med én gang — da hadde
+stemplingskroppen fått et domenefelt. Enhetskontoer får 403 uansett nivå: en bil som kunne
+rette sine egne tidspunkt ville gjort stemplingen til en påstand i stedet for en måling.
+Bilen *ser* rettingen (§4.5), den gjør den ikke.
+
+**To fikstur som målte feil regel.** Begge ble funnet ved at testene feilet, ikke ved
+gjennomlesing. Det første stemplet oppdraget i samme millisekund som det ble opprettet, så
+enhver retting bakover traff «før oppdraget ble opprettet» — fiksturet har nå realistisk
+tidsspenn. Det andre stemplet `Avreist` med servertid og rettet `Fremme` til fem minutter
+etter; det havnet i framtiden, så framtidsregelen svarte først og testen ville bestått også
+uten rekkefølgesjekken. Begge er notert i koden, siden mønsteret kommer tilbake.
+
+**Én feil verdt å notere:** `@transaction.atomic` sto over `korriger_tidspunkt`, og den nye
+`KorreksjonUgyldig`-klassen ble satt inn *under* dekoratoren. Da var ikke unntaket lenger
+en klasse, og `except` kastet `TypeError: catching classes that do not inherit from
+BaseException`. Fanget av testene med en gang. Verdt å huske når noe settes inn rett foran
+en dekorert funksjon.
+
+---
+
 ## 2026-08-29 — «Arkiv» heter Historikk i oppdragsmodulen
 
 **1195 tester grønne** (ingen nye). Migrasjon `oppdrag.0004_historikk_ikke_arkiv` —

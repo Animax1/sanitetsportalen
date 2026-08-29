@@ -62,6 +62,9 @@ function tidslinjeEnhetHtml(o) {
     const notat = [];
     if (m.automatisk) notat.push('avsluttet automatisk');
     if (m.forsinket) notat.push('meldt forsinket');
+    // §4.5: bilen ser at sentralen har rettet tidspunktet, men kan ikke
+    // rette det selv. Samme dempede linje som på sentralbordet.
+    if (m.korrigerer) notat.push('rettet av sentralen');
     const notatBlokk = notat.length
       ? `<span class="tidslinje-notat">· ${escapeHtml(notat.join(', '))}</span>`
       : '';

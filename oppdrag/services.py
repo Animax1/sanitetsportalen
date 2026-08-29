@@ -328,6 +328,85 @@ def start_oppdrag(oppdrag, *, bruker=None, tidspunkt=None,
                        tidspunkt=naa, forsinket=forsinket)
 
 
+class KorreksjonUgyldig(Exception):
+    """Tidspunktet lar seg ikke rette til den oppgitte verdien."""
+
+
+#: Full rekkefølge for statusene, inkludert terminal. `KJEDEN` stopper før
+#: `ledig` fordi den er utgang fra enhver status, ikke et ledd — men når vi
+#: sjekker at tidspunktene står i rekkefølge, er den sist.
+_REKKEFOLGE = {status: i for i, status in enumerate(choices.KJEDEN)}
+_REKKEFOLGE[choices.LEDIG] = len(choices.KJEDEN)
+
+
+def _naboer(melding):
+    """Gjeldende meldinger rett før og rett etter denne i statusrekkefølgen.
+
+    Returnerer ``(forrige, neste)``, der hver kan være ``None``. Kun
+    *gjeldende* rader teller: en overstyrt rad beskriver ikke lenger noe som
+    gjelder, og å måle mot den ville låst rettingen til verdien man retter bort.
+    """
+    egen = _REKKEFOLGE.get(melding.status)
+    if egen is None:
+        return None, None
+
+    forrige = neste = None
+    for annen in Statusmelding.objects.gjeldende(melding.oppdrag):
+        if annen.pk == melding.pk:
+            continue
+        plass = _REKKEFOLGE.get(annen.status)
+        if plass is None:
+            continue
+        if plass < egen and (forrige is None or annen.tidspunkt > forrige.tidspunkt):
+            forrige = annen
+        elif plass > egen and (neste is None or annen.tidspunkt < neste.tidspunkt):
+            neste = annen
+    return forrige, neste
+
+
+def valider_korreksjon(melding, nytt_tidspunkt, naa=None):
+    """Kast ``KorreksjonUgyldig`` hvis rettingen ikke lar seg gjøre.
+
+    Fire regler, og alle er fail-closed:
+
+    1. **Raden må være gjeldende.** Å rette en rad som allerede er overstyrt
+       ville gitt to korreksjoner av samme original, og «hvilken gjelder»
+       hadde ikke lenger noe entydig svar.
+    2. **Ikke i framtiden.** Et tidspunkt som ikke har inntruffet er ikke en
+       observasjon.
+    3. **Ikke før oppdraget ble opprettet.** Enheten kan ikke ha meldt noe om
+       et oppdrag som ikke fantes.
+    4. **Rekkefølgen må holde.** Settes `Fremme` før `Rykker ut`, blir
+       responstiden negativ — og fase 6 ville regnet på den uten å vite at
+       tallet er umulig. Skal begge rettes, rettes de én om gangen; feilmeldingen
+       navngir hvilken nabo som er i veien.
+    """
+    naa = naa or timezone.now()
+
+    if Statusmelding.objects.filter(korrigerer=melding).exists():
+        raise KorreksjonUgyldig(
+            'Denne meldingen er allerede rettet. Rett den nyeste i stedet.')
+
+    if nytt_tidspunkt > naa:
+        raise KorreksjonUgyldig('Tidspunktet kan ikke ligge i framtiden.')
+
+    if nytt_tidspunkt < melding.oppdrag.created_at:
+        raise KorreksjonUgyldig(
+            'Tidspunktet er før oppdraget ble opprettet.')
+
+    forrige, neste = _naboer(melding)
+    if forrige is not None and nytt_tidspunkt < forrige.tidspunkt:
+        raise KorreksjonUgyldig(
+            f'«{melding.get_status_display()}» kan ikke være før '
+            f'«{forrige.get_status_display()}» '
+            f'({timezone.localtime(forrige.tidspunkt).strftime("%H:%M")}).')
+    if neste is not None and nytt_tidspunkt > neste.tidspunkt:
+        raise KorreksjonUgyldig(
+            f'«{melding.get_status_display()}» kan ikke være etter '
+            f'«{neste.get_status_display()}» '
+            f'({timezone.localtime(neste.tidspunkt).strftime("%H:%M")}).')
+
+
 @transaction.atomic
 def korriger_tidspunkt(melding, nytt_tidspunkt, *, bruker) -> Statusmelding:
     """Rett tidspunktet på en statusmelding ved å skrive en **ny rad**.
@@ -339,6 +418,10 @@ def korriger_tidspunkt(melding, nytt_tidspunkt, *, bruker) -> Statusmelding:
 
     Omfanget er **tidspunkt, ikke status**. Å rette hvilken status som skjedde
     ville flyttet oppdraget i kjeden, og da er det en ny hendelse.
+
+    **Validerer ikke selv** — kall ``valider_korreksjon`` først. Skillet er
+    med vilje: importflyten fra en offline-enhet (fase 5) kan ha grunner til
+    å skrive rader utenfor reglene, og da skal den velge det eksplisitt.
     """
     return Statusmelding.objects.create(
         oppdrag=melding.oppdrag,

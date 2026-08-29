@@ -631,3 +631,58 @@ def historikk_liste_view(request):
 
     return JsonResponse({'status': 'ok', 'data': [
         oppdrag_til_dict(o) for o in qs]})
+
+
+# ── Korreksjoner ─────────────────────────────────────────────────────────────
+
+@modul_kreves('oppdrag', 'skriv_full', svar='json')
+@require_http_methods(['POST'])
+@rate_limit(group='oppdrag:korriger', rate='60/m', method='POST')
+def korriger_view(request, pk):
+    """Rett tidspunktet på en statusmelding — som en **ny rad**, ikke en endring.
+
+    **Dette er ikke et handling-endepunkt.** Det tar et tidspunkt, altså en
+    feltverdi, og ligger derfor på `skriv_full` med vanlig kroppsvalidering.
+    Å presse det inn under `skriv_handling` ville uthult det lukkede skjemaet
+    i §5.1 med én gang — da hadde stemplingskroppen fått et domenefelt.
+
+    Enhetskontoer stenges ute uansett nivå: en enhet stempler, den retter
+    ikke. Rettingen er sentralbordets korrigering av det bilen meldte, og en
+    bil som kunne rette sine egne tidspunkter ville gjort stemplingen til en
+    påstand i stedet for en måling.
+    """
+    if er_enhetskonto(request.user):
+        return JsonResponse(
+            {'status': 'error', 'message': 'Enheter retter ikke tidspunkt.'},
+            status=403)
+
+    try:
+        melding = (Statusmelding.objects
+                   .select_related('oppdrag', 'oppdrag__enhet', 'oppdrag__lokasjon')
+                   .get(pk=pk, oppdrag__year=get_active_year()))
+    except Statusmelding.DoesNotExist:
+        return JsonResponse(
+            {'status': 'error', 'message': 'Statusmelding ikke funnet'}, status=404)
+
+    raa = json_body(request).get('tidspunkt')
+    if not raa:
+        return JsonResponse(
+            {'status': 'error', 'message': 'Mangler tidspunkt.'}, status=400)
+
+    nytt = parse_datetime(str(raa))
+    if nytt is None:
+        return JsonResponse(
+            {'status': 'error', 'message': 'Ugyldig tidspunkt.'}, status=400)
+    if timezone.is_naive(nytt):
+        nytt = timezone.make_aware(nytt)
+
+    try:
+        services.valider_korreksjon(melding, nytt)
+    except services.KorreksjonUgyldig as feil:
+        # 400 og ikke 409: forespørselen er velformet, men verdien er ikke
+        # lovlig — og meldingen sier hvilken regel som stanset den, slik at
+        # operatøren vet om hun skal rette en annen rad først.
+        return JsonResponse({'status': 'error', 'message': str(feil)}, status=400)
+
+    ny_melding = services.korriger_tidspunkt(melding, nytt, bruker=request.user)
+    return JsonResponse({'status': 'ok', 'data': melding_til_dict(ny_melding)})

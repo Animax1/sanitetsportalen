@@ -1047,3 +1047,190 @@ class AutoHistorikkTests(StemplingBasis):
         mine = self.bil.get('/oppdrag/api/oppdrag/').json()['data']
         self.assertIn(o.pk, [r['id'] for r in mine])
         self.assertNotIn(o.pk, self._aktiv_liste())
+
+
+class KorreksjonTests(StemplingBasis):
+    """§4.4: rettingen er en ny rad som peker på den gamle, ikke en endring."""
+
+    #: Et oppdrag stemplet i samme millisekund som det ble opprettet gir ikke
+    #: rom for å rette noe bakover — valideringen ville stanset enhver retting
+    #: på «før oppdraget ble opprettet», og testene hadde målt den regelen i
+    #: stedet for mekanikken de er skrevet for. Fiksturet får derfor et
+    #: realistisk tidsspenn: opprettet for en time siden, stemplet underveis.
+    def setUp(self):
+        super().setUp()
+        self.sentral = _klient(_bruker('korrops', 'skriv_full'))
+        self.oppdrag = self._oppdrag()
+        self._stemple(self.oppdrag, 'rykker_ut')
+        self._stemple(self.oppdrag, 'fremme')
+
+        naa = timezone.now()
+        Oppdrag.objects.filter(pk=self.oppdrag.pk).update(
+            created_at=naa - timedelta(minutes=60))
+        self.oppdrag.refresh_from_db()
+        for status, minutter in ((choices.RYKKER_UT, 40), (choices.FREMME, 30)):
+            Statusmelding.objects.filter(
+                oppdrag=self.oppdrag, status=status).update(
+                    tidspunkt=naa - timedelta(minutes=minutter))
+
+        self.fremme = Statusmelding.objects.get(
+            oppdrag=self.oppdrag, status=choices.FREMME)
+
+    def _korriger(self, melding, tidspunkt, klient=None):
+        return (klient or self.sentral).post(
+            f'/oppdrag/api/statusmelding/{melding.pk}/korriger/',
+            data={'tidspunkt': tidspunkt.isoformat()},
+            content_type='application/json')
+
+    # ── Mekanikken ──────────────────────────────────────────────────────────
+
+    def test_rettingen_er_en_ny_rad(self):
+        ny_tid = self.fremme.tidspunkt - timedelta(minutes=2)
+        self.assertEqual(self._korriger(self.fremme, ny_tid).status_code, 200)
+
+        self.fremme.refresh_from_db()
+        self.assertEqual(
+            Statusmelding.objects.filter(
+                oppdrag=self.oppdrag, status=choices.FREMME).count(), 2)
+
+    def test_originalen_er_uendret(self):
+        """`Statusmelding` er et spor av hva som ble meldt."""
+        original = self.fremme.tidspunkt
+        self._korriger(self.fremme, original - timedelta(minutes=2))
+        self.fremme.refresh_from_db()
+        self.assertEqual(self.fremme.tidspunkt, original)
+
+    def test_den_nye_raden_peker_paa_den_gamle(self):
+        self._korriger(self.fremme, self.fremme.tidspunkt - timedelta(minutes=2))
+        ny = Statusmelding.objects.get(korrigerer=self.fremme)
+        self.assertEqual(ny.status, choices.FREMME)
+        self.assertEqual(ny.meldt_av.username, 'korrops')
+        self.assertFalse(ny.automatisk)
+        self.assertFalse(ny.forsinket)
+
+    def test_gjeldende_er_rettingen(self):
+        ny_tid = self.fremme.tidspunkt - timedelta(minutes=2)
+        self._korriger(self.fremme, ny_tid)
+        gjeldende = Statusmelding.objects.gjeldende_for_status(
+            self.oppdrag, choices.FREMME)
+        self.assertEqual(gjeldende.tidspunkt, ny_tid)
+        self.assertIsNotNone(gjeldende.korrigerer_id)
+
+    def test_korreksjoner_kan_kjedes(self):
+        """Retter man en retting, er det den siste som står."""
+        forste = self.fremme.tidspunkt - timedelta(minutes=2)
+        self._korriger(self.fremme, forste)
+        rettelse = Statusmelding.objects.get(korrigerer=self.fremme)
+
+        andre = self.fremme.tidspunkt - timedelta(minutes=1)
+        self.assertEqual(self._korriger(rettelse, andre).status_code, 200)
+
+        gjeldende = Statusmelding.objects.gjeldende_for_status(
+            self.oppdrag, choices.FREMME)
+        self.assertEqual(gjeldende.tidspunkt, andre)
+
+    def test_begge_staar_i_historikken(self):
+        """Tidslinjen viser rettingen ved siden av det som ble meldt."""
+        self._korriger(self.fremme, self.fremme.tidspunkt - timedelta(minutes=2))
+        data = self.sentral.get(
+            f'/oppdrag/api/oppdrag/{self.oppdrag.pk}/').json()['data']
+        fremmerader = [m for m in data['historikk'] if m['status'] == 'fremme']
+        self.assertEqual(len(fremmerader), 2)
+        self.assertEqual(
+            len([m for m in data['statusmeldinger'] if m['status'] == 'fremme']), 1)
+
+    # ── Reglene ─────────────────────────────────────────────────────────────
+
+    def test_framtidig_tidspunkt_avvises(self):
+        resp = self._korriger(self.fremme, timezone.now() + timedelta(hours=1))
+        self.assertEqual(resp.status_code, 400)
+        self.assertEqual(Statusmelding.objects.filter(
+            korrigerer=self.fremme).count(), 0)
+
+    def test_tidspunkt_foer_oppdraget_avvises(self):
+        resp = self._korriger(
+            self.fremme, self.oppdrag.created_at - timedelta(hours=1))
+        self.assertEqual(resp.status_code, 400)
+
+    def test_kan_ikke_settes_foer_forrige_status(self):
+        """Fremme før Rykker ut ville gitt negativ responstid i fase 6."""
+        rykker_ut = Statusmelding.objects.get(
+            oppdrag=self.oppdrag, status=choices.RYKKER_UT)
+        resp = self._korriger(
+            self.fremme, rykker_ut.tidspunkt - timedelta(minutes=5))
+        self.assertEqual(resp.status_code, 400)
+        self.assertIn('Rykker ut', resp.json()['message'])
+
+    def test_kan_ikke_settes_etter_neste_status(self):
+        # `avreist` stemples med servertid. Uten å flytte den bakover ville
+        # «5 minutter etter» havnet i framtiden, og framtidsregelen svart
+        # først — testen hadde da målt feil regel og bestått uansett om
+        # rekkefølgesjekken fantes.
+        self._stemple(self.oppdrag, 'avreist')
+        Statusmelding.objects.filter(
+            oppdrag=self.oppdrag, status=choices.AVREIST).update(
+                tidspunkt=timezone.now() - timedelta(minutes=20))
+        avreist = Statusmelding.objects.get(
+            oppdrag=self.oppdrag, status=choices.AVREIST)
+
+        resp = self._korriger(self.fremme, avreist.tidspunkt + timedelta(minutes=5))
+        self.assertEqual(resp.status_code, 400)
+        self.assertIn('Avreist', resp.json()['message'])
+
+    def test_overstyrt_rad_kan_ikke_rettes(self):
+        """Ellers fantes to korreksjoner av samme original, uten entydig svar."""
+        self._korriger(self.fremme, self.fremme.tidspunkt - timedelta(minutes=2))
+        resp = self._korriger(self.fremme, self.fremme.tidspunkt - timedelta(minutes=3))
+        self.assertEqual(resp.status_code, 400)
+        self.assertIn('allerede rettet', resp.json()['message'])
+
+    def test_manglende_tidspunkt_gir_400(self):
+        resp = self.sentral.post(
+            f'/oppdrag/api/statusmelding/{self.fremme.pk}/korriger/',
+            data={}, content_type='application/json')
+        self.assertEqual(resp.status_code, 400)
+
+    def test_ugyldig_tidspunkt_gir_400(self):
+        resp = self.sentral.post(
+            f'/oppdrag/api/statusmelding/{self.fremme.pk}/korriger/',
+            data={'tidspunkt': 'i går'}, content_type='application/json')
+        self.assertEqual(resp.status_code, 400)
+
+    # ── Tilgang ─────────────────────────────────────────────────────────────
+
+    def test_enhet_kan_ikke_rette(self):
+        """En enhet stempler, den retter ikke — ellers blir målingen en påstand."""
+        resp = self._korriger(
+            self.fremme, self.fremme.tidspunkt - timedelta(minutes=2),
+            klient=self.bil)
+        self.assertEqual(resp.status_code, 403)
+
+    def test_skriv_handling_uten_enhet_kan_ikke_rette(self):
+        """Korreksjon er ikke et handling-endepunkt: den tar en feltverdi."""
+        resp = self._korriger(
+            self.fremme, self.fremme.tidspunkt - timedelta(minutes=2),
+            klient=_klient(_bruker('handling_uten_bil', 'skriv_handling')))
+        self.assertEqual(resp.status_code, 403)
+
+    def test_les_kan_ikke_rette(self):
+        resp = self._korriger(
+            self.fremme, self.fremme.tidspunkt - timedelta(minutes=2),
+            klient=_klient(_bruker('korrleser', 'les')))
+        self.assertEqual(resp.status_code, 403)
+
+    def test_melding_utenfor_aktiv_vakt_gir_404(self):
+        gammelt = self._oppdrag(year=AAR - 1, status=choices.FREMME)
+        melding = Statusmelding.objects.create(
+            oppdrag=gammelt, status=choices.FREMME, tidspunkt=timezone.now())
+        resp = self._korriger(melding, timezone.now() - timedelta(minutes=1))
+        self.assertEqual(resp.status_code, 404)
+
+    def test_korreksjon_gir_auditrad_uten_aa_roere_oppdraget(self):
+        """Rettingen endrer en statusmelding, ikke oppdragets felter."""
+        from audit.models import AuditLog
+        AuditLog.objects.all().delete()
+        self._korriger(self.fremme, self.fremme.tidspunkt - timedelta(minutes=2))
+        self.oppdrag.refresh_from_db()
+        self.assertEqual(self.oppdrag.status, choices.FREMME)
+        self.assertFalse(AuditLog.objects.filter(
+            table_name='oppdrag_oppdrag', field_name='status').exists())

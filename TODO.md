@@ -655,11 +655,25 @@ Gjennomgang 13. aug. 2026, med 1000 pasienter og peak 100 brukere som premiss.
               per rad. Dobbelttrykk gir 409, og skjermen svarer med å hente ferskt.
             - `automatisk` vises per §4.5: markør på klokkeslettet, gråtoner, ingen
               badge. Skjulereglene var server-side fra fase 3 og står urørt.
-      - [ ] **Fase 4b** (2–3 t): korreksjoner. 113 retter tidspunkt ved å skrive en **ny
-            rad som peker på den gamle**, ikke ved å endre den — `Statusmelding` er et spor
-            av hva som ble meldt. «Nyeste ikke-korrigerte rad per status vinner» bor i en
-            manager-metode, ikke i en `if` per view. Kun tidspunkt, ikke status. Kun
-            `skriv_full`.
+      - [x] **Fase 4b — korreksjoner (29. aug. 2026).** `POST
+            /oppdrag/api/statusmelding/<pk>/korriger/` skriver en **ny rad som peker på
+            den gamle**; originalen er uendret, og begge står i tidslinjen. Maskineriet
+            kom i fase 1 (`korriger_tidspunkt`, `gjeldende()`) — det som manglet var
+            endepunktet, reglene og grensesnittet.
+            - **Fire regler, alle fail-closed:** raden må være gjeldende (ellers fantes
+              to korreksjoner av samme original), ikke i framtiden, ikke før oppdraget
+              ble opprettet, og **rekkefølgen må holde**. Den siste er den som betyr
+              noe for fase 6: `Fremme` før `Rykker ut` gir negativ responstid, og
+              statistikken ville regnet på den uten å vite at tallet er umulig.
+              Feilmeldingen navngir naboen som er i veien, så operatøren vet om hun må
+              rette en annen rad først.
+            - **Ikke et handling-endepunkt.** Det tar en feltverdi, så det ligger på
+              `skriv_full` med vanlig kroppsvalidering — å presse det under
+              `skriv_handling` ville uthult det lukkede skjemaet i §5.1 med én gang.
+              Enheter får 403 uansett nivå: en bil som kunne rette sine egne tidspunkt
+              ville gjort stemplingen til en påstand i stedet for en måling.
+            - Bilen *ser* rettingen («rettet av sentralen», §4.5), men kan ikke gjøre
+              den.
       - [x] **Oppdragsnummer og arkivknapp (29. aug. 2026)** — bestilt av André
             under uttesting av fase 4, utenom faseplanen. Løpenummer per år
             (`unikt_oppdragsnummer_per_aar`, migrasjon `0003` med backfill), og en

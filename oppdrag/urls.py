@@ -31,4 +31,8 @@ urlpatterns = [
     path('api/oppdrag/<int:pk>/historikk/', views.historikk_view,
          name='oppdrag_api_historikker'),
     path('api/historikk/', views.historikk_liste_view, name='oppdrag_api_historikk'),
+    # Korreksjon av tidspunkt. Ligger på statusmeldingen og ikke på oppdraget:
+    # det er én rad som rettes, og rettingen blir en ny rad ved siden av den.
+    path('api/statusmelding/<int:pk>/korriger/', views.korriger_view,
+         name='oppdrag_api_korriger'),
 ]

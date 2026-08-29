@@ -223,3 +223,20 @@
   color: var(--text-muted);
   flex: 0 0 auto;
 }
+
+/* «Rett tid» i tidslinjen. Dempet: rettingen er en sjelden handling, og
+ * knappen skal ikke konkurrere med klokkeslettet den står ved siden av. */
+.tidslinje-rett {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  text-decoration: none;
+}
+
+.tidslinje-rett:hover {
+  color: var(--text-main);
+  text-decoration: underline;
+}
+
+/* En overstyrt rad har ingen knapp, så raden under skal ikke få luft den
+ * ikke trenger. */
+.rett-tid-skjema { font-size: 0.85rem; }

@@ -155,17 +155,26 @@ function tidslinjeHtml(data) {
     if (m.automatisk) notat.push('avsluttet automatisk');
     if (m.forsinket) notat.push('meldt forsinket');
     if (m.korrigerer) notat.push('rettet av sentralen');
-    const klasse = erstattet.has(m.id) ? 'tidslinje-rad tidslinje-erstattet' : 'tidslinje-rad';
+    const erErstattet = erstattet.has(m.id);
+    const klasse = erErstattet ? 'tidslinje-rad tidslinje-erstattet' : 'tidslinje-rad';
     const notatBlokk = notat.length
       ? `<span class="tidslinje-notat">· ${escapeHtml(notat.join(', '))}</span>`
+      : '';
+    // Kun gjeldende rader kan rettes. En overstyrt rad beskriver ikke lenger
+    // noe som gjelder, og serveren avviser den uansett — knappen skal ikke
+    // tilby noe som er stengt.
+    const rettKnapp = (OPPDRAG_TILGANG.kanSkrive && !erErstattet)
+      ? `<button type="button" class="btn btn-link btn-sm tidslinje-rett p-0 ms-2"
+                 data-action="visRettTid" data-id="${escHtmlValue(m.id)}">Rett tid</button>`
       : '';
     rader.push({
       tid: m.tidspunkt,
       html: `
-        <div class="${klasse}">
+        <div class="${klasse}" id="tidslinje-rad-${escHtmlValue(m.id)}">
           <span class="${tidKlasse}"${tittel}>${escapeHtml(klokke(m.tidspunkt))}</span>
           <span>${escapeHtml(m.status_navn)}</span>
           ${notatBlokk}
+          ${rettKnapp}
         </div>`,
     });
   });
@@ -189,6 +198,7 @@ function tidslinjeHtml(data) {
 
 
 async function visOppdrag(id) {
+  apentOppdragId = id;
   const modalEl = document.getElementById('oppdragDetaljModal');
   const innhold = document.getElementById('detalj-innhold');
   innhold.innerHTML = ('<div class="tom-melding">Laster…</div>');
@@ -245,6 +255,74 @@ async function visOppdrag(id) {
     ${tidslinjeHtml(o)}
     ${historikkKnapp ? `<div class="mt-3">${historikkKnapp}</div>` : ''}
     ${flyttValg}`);
+}
+
+
+// ── Korreksjon av tidspunkt ─────────────────────────────
+// Rettingen skriver en NY rad som peker på den gamle; begge blir stående i
+// tidslinjen. Se §4.4 i beslutningsnotatet — `Statusmelding` er et spor av
+// hva som ble meldt, ikke en tilstand som overskrives.
+
+//: Oppdraget som står åpent i detaljmodalen. Trengs fordi tidslinjen må
+//: tegnes på nytt etter en retting, og rettingen kjenner bare meldings-ID-en.
+let apentOppdragId = null;
+
+
+function visRettTid(meldingId) {
+  const rad = document.getElementById(`tidslinje-rad-${meldingId}`);
+  if (!rad || rad.querySelector('.rett-tid-skjema')) return;
+
+  // `datetime-local` vil ha lokal tid uten sone. Klokkeslettet som allerede
+  // står i raden er utgangspunktet — operatøren retter et minutt eller to,
+  // hun skriver ikke inn datoen på nytt.
+  const naa = new Date();
+  const lokal = new Date(naa.getTime() - naa.getTimezoneOffset() * 60000)
+    .toISOString().slice(0, 16);
+
+  const skjema = document.createElement('div');
+  skjema.className = 'rett-tid-skjema mt-1 d-flex gap-2 align-items-center flex-wrap';
+  skjema.innerHTML = trustedHtml(`
+    <input type="datetime-local" class="form-control form-control-sm w-auto"
+           id="rett-tid-verdi" value="${lokal}">
+    <button type="button" class="btn btn-sm btn-primary"
+            id="rett-tid-lagre" data-action="lagreRettTid" data-id="${meldingId}">Lagre</button>
+    <button type="button" class="btn btn-sm btn-outline-secondary"
+            data-action="avbrytRettTid">Avbryt</button>
+    <span id="rett-tid-feil" class="text-danger small"></span>`);
+  rad.appendChild(skjema);
+  document.getElementById('rett-tid-verdi').focus();
+}
+
+
+function avbrytRettTid() {
+  document.querySelectorAll('.rett-tid-skjema').forEach((el) => el.remove());
+}
+
+
+async function lagreRettTid(meldingId) {
+  const felt = document.getElementById('rett-tid-verdi');
+  const feil = document.getElementById('rett-tid-feil');
+  if (!felt || !felt.value) return;
+
+  await withSubmitGuard('rett-tid-lagre', async () => {
+    const res = await apiFetch(`/oppdrag/api/statusmelding/${meldingId}/korriger/`, {
+      method: 'POST',
+      // Ingen sone på `datetime-local`; serveren tolker den som lokal tid.
+      body: JSON.stringify({ tidspunkt: felt.value }),
+    });
+    const d = await res.json();
+    if (!res.ok || d.status !== 'ok') {
+      // Feilen navngir hvilken nabo som er i veien, så den skal stå i
+      // skjemaet der operatøren kan handle på den — ikke i en alert.
+      feil.textContent = d.message || 'Kunne ikke rette tidspunktet.';
+      return;
+    }
+    // Tegn detaljvisningen på nytt: både tidslinjen og den gjeldende raden
+    // har endret seg, og å flikke på DOM-en her ville duplisert regelen om
+    // hvilken rad som vinner.
+    if (apentOppdragId !== null) await visOppdrag(apentOppdragId);
+    await lastAlt();
+  });
 }
 
 
