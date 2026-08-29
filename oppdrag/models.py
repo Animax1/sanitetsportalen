@@ -20,6 +20,7 @@ from __future__ import annotations
 from django.conf import settings
 from django.db import models
 
+from core.arkiv import AbstractArkiv
 from core.models import BaseTimeStampedModel
 
 from . import choices
@@ -336,3 +337,97 @@ class Enhetsbytte(BaseTimeStampedModel):
 
     def __str__(self) -> str:
         return f'{self.fra_enhet} → {self.til_enhet}'
+
+
+# ── Arkiv (fase 7) ───────────────────────────────────────────────────────────
+#
+# Egne modeller, ikke rader i `Oppdrag` med et flagg. Et arkivert oppdrag er
+# et *frosset* oppdrag: enheten kan pensjoneres, lokasjonen fjernes og vakta
+# slettes uten at arkivet skal endre seg. Derfor er alt som beskriver raden
+# kopiert inn som tekst, på samme måte som `ArkivertPasient` fryser
+# behandlernavnet.
+#
+# Merk skillet mot `Oppdrag.historikk_fra`: den er *rydding av tavla* og fullt
+# reversibel. Dette er frysing, med signatur og kollaps — det er to helt ulike
+# handlinger, og de ligger derfor på hver sin knapp.
+
+
+class OppdragArkiv(AbstractArkiv):
+    """Låst arkiv-snapshot av oppdragene i én vakt.
+
+    Feltene ligger i `core.arkiv.AbstractArkiv` — dette er modell nummer to,
+    og den som gjorde basemodellen mulig å skrive uten å gjette.
+    """
+
+    class Meta(AbstractArkiv.Meta):
+        verbose_name = 'Oppdragsarkiv'
+        verbose_name_plural = 'Oppdragsarkiver'
+
+
+class ArkivertOppdrag(models.Model):
+    """Ett frosset oppdrag. Read-only via design.
+
+    **Tidspunktene er flate kolonner, ikke en kopi av statusmeldingene.**
+    Statusene er en lukket verdimengde (`choices.STATUS_VALG`), og flate
+    kolonner gjør arkivet lesbart både for et menneske og for
+    statistikk-koden. `ArkivOppdragsstatusKolonnerTests` sjekker at hver
+    status i kjeden har en kolonne — legges en status til, må arkivet følge
+    med, og da skal testen si fra i stedet for at tallene stille mister et
+    ledd.
+
+    Rettinger er allerede regnet inn: radene bygges fra `gjeldende()`, så det
+    er det korrigerte tidspunktet som fryses. Originalen ligger igjen i
+    `Statusmelding` fram til vakta slettes, og i auditsporet etterpå.
+    """
+
+    arkiv = models.ForeignKey(
+        OppdragArkiv, on_delete=models.CASCADE, related_name='oppdrag',
+        verbose_name='Arkiv')
+    oppdragsnummer = models.IntegerField(verbose_name='Oppdragsnummer')
+
+    # Frosne tekster. FK-ene ville ikke overlevd at en enhet pensjoneres og
+    # slettes, eller at en lokasjon fjernes fra lista.
+    enhet_navn = models.CharField(max_length=64, blank=True, default='',
+                                  verbose_name='Enhet (navn)')
+    lokasjon_navn = models.CharField(max_length=120, blank=True, default='',
+                                     verbose_name='Lokasjon (navn)')
+    problemstilling = models.CharField(max_length=255, blank=True, default='',
+                                       verbose_name='Problemstilling')
+    hastegrad = models.CharField(max_length=16, blank=True, default='',
+                                 verbose_name='Hastegrad')
+    sluttstatus = models.CharField(
+        max_length=16, blank=True, default='', verbose_name='Status ved arkivering',
+        help_text='Statusen oppdraget sto i da vakta ble arkivert.')
+
+    # `fritekst` arkiveres IKKE. Feltet er unntatt verdilogging i audit
+    # (§9 i beslutningsnotatet) nettopp fordi det kan inneholde noe en
+    # operatør skrev og angret på — å fryse det i et arkiv med 24 måneders
+    # lagringstid ville gjort unntaket meningsløst.
+
+    opprettet_at = models.DateTimeField(verbose_name='Opprettet')
+    rykker_ut_at = models.DateTimeField(null=True, blank=True, verbose_name='Rykker ut')
+    fremme_at = models.DateTimeField(null=True, blank=True, verbose_name='Fremme')
+    avreist_at = models.DateTimeField(null=True, blank=True, verbose_name='Avreist')
+    leverer_at = models.DateTimeField(null=True, blank=True, verbose_name='Leverer')
+    ledig_at = models.DateTimeField(null=True, blank=True, verbose_name='Ledig')
+
+    #: Statusene som ble stemplet automatisk, som liste med statusnavn.
+    #: §12.2: en varighet som slutter i en slik stempling er avledet, ikke
+    #: målt, og telles ikke. Lagres som data framfor én bool per status: i dag
+    #: er det bare `ledig` som kan settes automatisk, men det er en egenskap
+    #: ved `start_oppdrag` — ikke ved arkivet — og et arkiv som antok det ville
+    #: løyet den dagen antakelsen ikke holdt.
+    automatiske_statuser = models.JSONField(
+        default=list, blank=True, verbose_name='Automatiske stemplinger')
+    antall_forsinket = models.IntegerField(
+        default=0, verbose_name='Forsinket meldte stemplinger',
+        help_text='Stemplinger sendt fra en enhet som var uten dekning.')
+
+    class Meta:
+        unique_together = [['arkiv', 'oppdragsnummer']]
+        ordering = ['oppdragsnummer']
+        verbose_name = 'Arkivert oppdrag'
+        verbose_name_plural = 'Arkiverte oppdrag'
+
+    def __str__(self) -> str:
+        return f'#{self.oppdragsnummer} {self.problemstilling}'

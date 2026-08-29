@@ -2,6 +2,7 @@
 
 Offentlig API:
 
+- ``AbstractArkiv`` — basemodell med feltene et arkiv trenger
 - ``BaseArkivHandler`` — subklasses per modul
 - ``register(handler)`` / ``get_handler(slug)`` / ``all_handlers()``
 - ``beregn_sha256(handler, arkiv)`` — signatur over radnivået
@@ -13,6 +14,7 @@ Offentlig API:
 Se ``core/arkiv/handlers.py`` for arbeidsdelingen mellom core og handler, og
 ``patients/arkiv.py`` for et ferdig eksempel.
 """
+from .models import AbstractArkiv  # noqa: F401
 from .handlers import (  # noqa: F401
     BaseArkivHandler,
     all_handlers,
@@ -28,6 +30,7 @@ from .service import (  # noqa: F401
 )
 
 __all__ = [
+    'AbstractArkiv',
     'BaseArkivHandler',
     'all_handlers',
     'get_handler',

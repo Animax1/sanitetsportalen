@@ -6,7 +6,7 @@ ville fanget ``/api/...``.
 """
 from django.urls import path
 
-from . import views
+from . import views, views_arkiv
 
 urlpatterns = [
     # Én URL, to grensesnitt. Hvilket avgjøres av om kontoen er knyttet til en
@@ -31,6 +31,11 @@ urlpatterns = [
     path('api/oppdrag/<int:pk>/historikk/', views.historikk_view,
          name='oppdrag_api_historikker'),
     path('api/historikk/', views.historikk_liste_view, name='oppdrag_api_historikk'),
+    # Vaktarkivet (fase 7). Merk forskjellen fra `api/historikk/` rett over:
+    # den er rydding av tavla og reversibel, dette er frysing med signatur.
+    path('api/arkiv/', views_arkiv.arkiv_liste_view, name='oppdrag_api_arkiv_liste'),
+    path('api/arkiv/<int:pk>/', views_arkiv.arkiv_detalj_view,
+         name='oppdrag_api_arkiv_detalj'),
     # Korreksjon av tidspunkt. Ligger på statusmeldingen og ikke på oppdraget:
     # det er én rad som rettes, og rettingen blir en ny rad ved siden av den.
     path('api/statusmelding/<int:pk>/korriger/', views.korriger_view,

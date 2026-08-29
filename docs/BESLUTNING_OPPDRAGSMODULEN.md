@@ -490,7 +490,7 @@ statusknappen som det eneste elementet som ikke krever presisjon.
 | 4b | ✅ Korreksjoner: ny rad som overstyrer, `gjeldende()`-manager | levert |
 | 5 | ✅ Offline-kø med idempotens | levert |
 | 6 | ✅ Statistikkregisteret (`core/stats.py`) + oppdragsfanen | levert |
-| 7 | Arkivering: `AbstractArkiv` + handler og egen arkivknapp under `/oppdrag/` | 5–7 t |
+| 7 | ✅ Arkivering: `AbstractArkiv`, handler, backup og egen arkivknapp under `/oppdrag/` | levert |
 
 Fase 2 står før fase 3 fordi fritekstfeltet ellers ville vært i produksjon med
 verdilogging på, og de radene kan ikke fjernes i ettertid uten å røre auditsporet.
@@ -505,10 +505,21 @@ Tilgangsregelen måtte endres i samme slengen: §5 sa «vis kun kilder brukeren 
 men implementasjonen ga 403 på hele siden hvis én kilde manglet. Med kilde nummer to ville
 det tatt statistikken fra alle som leser pasienter uten å ha oppdrag.
 
-**Fase 7 er stedet `AbstractArkiv` endelig skal bygges.** TODO har utsatt den til «modell
-nummer to faktisk skrives» — dette er modell nummer to. `VaktArkiv` skal *ikke* migreres til
-basemodellen: SHA-signaturene er låst til dagens payload-form, og hvert eksisterende arkiv i
-prod ville meldt tukling.
+**Fase 7 var stedet `AbstractArkiv` endelig ble bygget** (levert 29. aug. 2026). TODO
+hadde utsatt den til «modell nummer to faktisk skrives» — `OppdragArkiv` er modell nummer
+to. `VaktArkiv` ble som planlagt *ikke* migrert til basemodellen: SHA-signaturene er låst
+til dagens payload-form, og hvert eksisterende arkiv i prod ville meldt tukling.
+
+To ting kom til underveis, som begge var mangler heller enn utvidelser:
+
+- **Oppdragsmodulen hadde ingen backup i det hele tatt.** Arkivet gjorde det synlig —
+  sperren foran kollaps krever en backup av modulens arkiv — men mangelen gjaldt hele
+  modulen: en vakts oppdrag lå utenfor all dekning utenom Railways databasebackup, som
+  bare er aktiv én måned i året. Modulen har nå `oppdrag` og `oppdrag_arkiv`.
+- **`kollaps_arkiv` kjente bare pasientarkivet.** Kommandoen går nå gjennom
+  `core.arkiv`-registeret og dekker begge arkivene i samme kjøring, med sperren håndhevet
+  per modul. En kommando som bare kjente det ene ville latt oppdragsarkivet ligge til
+  noen oppdaget det.
 
 **Arkiveringen slås ikke sammen i denne runden.** Oppdrag får sin egen knapp under
 `/oppdrag/`, og pasientarkivet beholder sin under `/pasienter/`. Det er en bevisst
@@ -538,11 +549,15 @@ Hver moduls arkiv får en nullbar FK dit. **Signaturene overlever**, og det er i
 ikke nevner endrer ingenting. `ArkivSignaturLaastTests` beviser det. Eksisterende arkiver
 får `NULL` — de er fra før grupperingen fantes.
 
-**Besluttet 28. aug. 2026: utsettes.** Oppdrag får sin egen knapp i fase 7, og
-sammenslåingen tas som egen sak når begge arkivene finnes. Prisen er at portalen i en
-periode har to steder å arkivere fra, og at **noen kan arkivere pasienter og glemme
-oppdrag**. Det er en operativ risiko, ikke en teknisk: den håndteres med et punkt i
-`docs/RUNBOOK_VAKT.md`, som faktisk leses ved vaktslutt.
+**Besluttet 28. aug. 2026: utsettes.** Oppdrag fikk sin egen knapp i fase 7, og
+sammenslåingen tas som egen sak nå som begge arkivene finnes. Prisen er at portalen har
+to steder å arkivere fra, og at **noen kan arkivere pasienter og glemme oppdrag**. Det er
+en operativ risiko, ikke en teknisk.
+
+> **Håndtert 29. aug. 2026:** `docs/RUNBOOK_VAKT.md` §10a har fått et punkt som navngir
+> begge knappene og sier at begge skal krysses av før vakta veksles tilbake til
+> lavkostnad-modus. Runbooken leses ved vaktslutt; et notat i et beslutningsnotat gjør
+> det ikke.
 
 ### 12.2 Skal `automatisk`-flagget påvirke statistikken, ikke bare vises?
 

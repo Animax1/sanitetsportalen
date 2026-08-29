@@ -171,14 +171,24 @@ Feltendringer logges automatisk via Django-signal i `audit/signals.py`. `Request
 
 `BackupSchedulerMiddleware` kjører automatisk backup in-process etter request.
 
-Backup er **per modul**, ikke én samlet dump. Hver modul registrerer en `BaseBackupHandler` i `core.backup`-registryet (fra `apps.ready()`). To handlere finnes i dag, begge i `patients/backup.py`:
+Backup er **per modul**, ikke én samlet dump. Hver modul registrerer en `BaseBackupHandler` i `core.backup`-registryet (fra `apps.ready()`). Fire handlere finnes i dag:
 
-| Slug | Innhold |
-|------|---------|
-| `patients` | Pasientdata. Arkivmodellene er eksplisitt ekskludert |
-| `arkiv` | `VaktArkiv` + `ArkivertPasient` — endres sjelden, og skal aldri berøres av en pasient-restore |
+| Slug | Fil | Innhold |
+|------|-----|---------|
+| `patients` | `patients/backup.py` | Pasientdata. Arkivmodellene er eksplisitt ekskludert |
+| `arkiv` | `patients/backup.py` | `VaktArkiv` + `ArkivertPasient` — endres sjelden, og skal aldri berøres av en pasient-restore |
+| `oppdrag` | `oppdrag/backup.py` | Oppdrag, statusmeldinger, enhetsbytter, enheter og lokasjoner |
+| `oppdrag_arkiv` | `oppdrag/backup.py` | `OppdragArkiv` + `ArkivertOppdrag`. Er også **sperren** foran kollaps |
 
-Brukere, MFA-hemmeligheter og audit-spor er bevisst utelatt fra begge.
+Brukere, MFA-hemmeligheter og audit-spor er bevisst utelatt fra alle fire. FK-er ut av
+modulens eget datasett strippes (`strip_fields`): med `natural_foreign` lagres de som
+brukernavn, og er kontoen slettet feiler hele gjenopprettingen — altså akkurat når man
+trenger backupen.
+
+En test som kaller `clear_registry()` må rydde opp med
+`core.backup.registrer_alle_moduler()`, ikke med én moduls `register_handlers()`. Gjør den
+det siste, mister resten av testkjøringen de andre modulenes handlere, og feilen dukker
+opp i en helt annen fil.
 
 Logikken ligger i `core/backup/`. `patients/backup_service.py` er en tynn proxy som beholder bakoverkompatibelt API for `db_backup`-kommandoen, `views_patients.py` og eldre tester — nye moduler skal registrere en handler og kalle `core.backup.create_backup(slug=...)` direkte.
 
@@ -195,16 +205,27 @@ Frysing, integritetssjekk og kollaps er modul-agnostisk. Hver modul som arkivere
 | `kollaps(handler, arkiv)` | **Irreversibel.** Frys aggregat, slett rader. Idempotent |
 | `har_backup_etter(handler, tid)` | Sperre før kollaps — slettingen må være gjenopprettbar |
 
-`patients/arkiv.py` er referanseeksempelet. `ArkivSignaturLaastTests` låser signaturene til literale hex-verdier — feiler den etter en refaktorering, er det refaktoreringen som er feil.
+**`AbstractArkiv` (core/arkiv/models.py) bærer feltene**, slik at modul nummer tre slipper
+å skrive dem på nytt: `tittel`, `vakt`/`vakt_navn`, `antall_rader`, `importert_av` med
+frosset navn, `sha256`, `kollapset_at`, `aggregat` og `aggregat_sha256`.
+`OppdragArkiv` arver den. **`VaktArkiv` gjør det ikke, og skal ikke gjøre det:** feltene
+`year_snapshot` og `arrangement_navn` inngår i SHA-payloaden til hvert arkiv i prod, og
+et arkiv som byttet feltnavn ville meldt tukling. Duplikatet er prisen for at
+signaturene fortsatt verifiserer.
+
+Handleren setter `arkiv_model`, og `kollaps_arkiv`-kommandoen finner kandidater gjennom
+registeret — den kjenner ingen modul ved navn, og `--modul <slug>` avgrenser.
+
+To arkiver i dag: `patients/arkiv.py` (referanseeksempelet) og `oppdrag/arkiv.py`.
+`ArkivSignaturLaastTests` i begge moduler låser signaturene til literale hex-verdier —
+feiler de etter en refaktorering, er det refaktoreringen som er feil.
 
 ### Oppdragsmodulen (oppdrag/)
 
-Egen app siden august 2026, **under bygging** — se `docs/BESLUTNING_OPPDRAGSMODULEN.md`.
-Fase 1 (modeller og regler) er levert; ingen brukervendte flater ennå. Modulen er
-registrert i `core/modules.py`, men står med `url=None` og begge `show_*`-flagg av inntil
-sidene finnes. Et modulkort som fører til 404 er en knapp som fører til en vegg.
+Egen app siden august 2026 — se `docs/BESLUTNING_OPPDRAGSMODULEN.md`. Alle sju fasene er
+levert: sentralbord, enhetsskjerm, korreksjoner, offline-kø, statistikkfane og vaktarkiv.
 
-Fire ting det er verdt å kjenne før man rører modulen:
+Fem ting det er verdt å kjenne før man rører modulen:
 
 | Regel | Hvor |
 |---|---|
@@ -212,6 +233,13 @@ Fire ting det er verdt å kjenne før man rører modulen:
 | Enhetens status **utledes**, den lagres ikke | `services.enhet_status()` |
 | Korreksjoner er **nye rader** som peker på den gamle | `Statusmelding.objects.gjeldende()` |
 | `fritekst` logges som endret, men **uten verdier** | `signals.FELT_UTEN_VERDILOGGING` |
+| «Historikk» rydder tavla, **arkivet fryser vakta** | `Oppdrag.historikk_fra` vs. `oppdrag/arkiv.py` |
+
+**Historikk og arkiv er to helt ulike handlinger**, og har derfor hver sin knapp.
+Historikk flytter ett oppdrag ut av den aktive tavla og er fullt reversibel; arkivering
+fryser hele vakta med signatur og starter klokka mot en kollaps som sletter radnivået
+etter 24 måneder. `fritekst` arkiveres **ikke** — feltet er unntatt verdilogging i audit,
+og å fryse det i 24 måneder ville uthult unntaket.
 
 Den er den første modulen som tar `skriv_handling` i bruk: bilen får smale, navngitte
 stemplingsendepunkter, ikke en feltwhitelist inne i en generell `PUT`. Og skillet mellom de

@@ -91,6 +91,12 @@ Ser du derimot:
 ```
   HOPPET OVER «...» (47 pasientrader): ingen arkiv-backup tatt etter at
   arkivet ble opprettet. Kjør en backup av modulen «arkiv» først.
+
+> **Fra fase 7 av oppdragsmodulen dekker kommandoen begge arkivene.** Den går gjennom
+> `core.arkiv`-registeret, ikke gjennom pasientmodulen, og kjører sperren per modul:
+> pasientarkivet krever en backup av modulen `arkiv`, oppdragsarkivet en av
+> `oppdrag_arkiv`. Meldingen navngir modulen som mangler backup. Cron-jobben trenger
+> ingen endring — samme kommando, uten `--modul`, tar alt.
 ```
 
 …så virker sperren som den skal. Gå til `/portal-admin/backup/arkiv/`, lag en manuell
@@ -103,9 +109,10 @@ backup, og la jobben gå igjen ved neste kjøring.
 Via Railway Shell på web-tjenesten:
 
 ```bash
-python manage.py kollaps_arkiv --dry-run    # se hva som ville skjedd
-python manage.py kollaps_arkiv              # utfør
-python manage.py kollaps_arkiv --days 900   # annen grense
+python manage.py kollaps_arkiv --dry-run          # se hva som ville skjedd
+python manage.py kollaps_arkiv                    # utfør, alle moduler
+python manage.py kollaps_arkiv --modul oppdrag    # kun én modul
+python manage.py kollaps_arkiv --days 900         # annen grense
 ```
 
 Flagget `--ignorer-backup-sperre` finnes, men bør ikke brukes. Det slår av den eneste

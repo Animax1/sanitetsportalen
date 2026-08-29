@@ -4,6 +4,63 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-08-29 — Oppdragsmodulen fase 7: vaktarkiv for oppdrag
+
+**1383 tester grønne** (41 nye). Migrasjon `oppdrag.0008`. Med denne er alle sju fasene
+i `docs/BESLUTNING_OPPDRAGSMODULEN.md` levert.
+
+**`AbstractArkiv` er endelig bygget.** TODO har utsatt basemodellen til «modell nummer
+to faktisk skrives» — `OppdragArkiv` er modell nummer to, og da var det ikke lenger
+gjetning hva som er felles: tittel, vakt med frosset navn, antall rader, hvem som
+arkiverte med frosset brukernavn, signatur, kollapstidspunkt og aggregat med egen
+signatur. `VaktArkiv` er som planlagt **ikke** migrert dit: `year_snapshot` og
+`arrangement_navn` inngår i SHA-payloaden til hvert arkiv i prod, og et arkiv som byttet
+feltnavn ville meldt tukling. Duplikatet mellom de to modellene er prisen for at
+signaturene fortsatt verifiserer.
+
+- **Arkivet fryser vakta, historikken rydder tavla.** To knapper, fordi det er to
+  handlinger: historikk flytter ett oppdrag ut av den aktive lista og er reversibel,
+  arkivering fryser hele vakta med signatur og starter klokka mot en kollaps som sletter
+  radnivået etter 24 måneder. Oppdrag som ligger i historikken arkiveres selvsagt med —
+  de er en del av vakta.
+- **Tidspunktene fryses i flate kolonner**, én per status, og hvilke stemplinger som var
+  automatiske ligger som data ved siden av. Da gjelder §12.2-regelen også i arkivet:
+  uten flagget ville en avledet sluttid blitt telt som målt straks vakta var arkivert.
+  En test går gjennom statuskjeden og krever en kolonne for hver — legges en status til,
+  må arkivet følge med.
+- **`fritekst` arkiveres ikke.** Feltet er unntatt verdilogging i audit nettopp fordi det
+  kan inneholde noe en operatør skrev og angret på. Å fryse det i et arkiv med 24
+  måneders lagringstid ville gjort unntaket meningsløst.
+- **Én utregning, to kilder.** `_stats_fra_rader()` regner på nøytrale dicter, og både
+  den aktive vakta og arkivet bygger slike — samme grep som pasientmodulens
+  `_compute_full_stats_from_dicts`. En test sammenligner arkivets tall mot live rad for
+  rad: arkivering skal ikke endre et eneste tall.
+- **Statistikkendepunktet fra fase 6 virker nå**, uten at statistikkappen ble rørt.
+  Kollapset arkiv leverer det frosne aggregatet — å regne på ingenting ville gitt nuller
+  som så ut som målinger.
+- **To mangler kom for en dag underveis**, begge reelle:
+  - **Modulen hadde ingen backup i det hele tatt.** Arkivet gjorde det synlig (sperren
+    foran kollaps krever en backup av modulens arkiv), men mangelen gjaldt hele modulen:
+    en vakts oppdrag lå utenfor all dekning utenom Railways databasebackup, som er aktiv
+    én måned i året. Nå finnes `oppdrag` og `oppdrag_arkiv`.
+  - **`kollaps_arkiv` kjente bare pasientarkivet.** Kommandoen går nå gjennom
+    `core.arkiv`-registeret, kjører sperren per modul og navngir modulen som mangler
+    backup. `--modul <slug>` avgrenser. Cron-jobben trenger ingen endring.
+- **En testisolasjonsfeil ble avdekket av de nye testene:** `clear_registry()` i
+  backup-testene ble ryddet opp med pasientmodulens `register_handlers()`, så
+  oppdragsmodulens handlere forsvant for resten av kjøringen — og feilen dukket opp i en
+  helt annen fil. `core.backup.registrer_alle_moduler()` går veien om app-registeret, så
+  modul nummer tre ikke må huskes.
+- **Dokumentasjonen fulgte med:** personvernnotatet er hevet til v1.9 med reviderte
+  A.9-rader (merknaden ba selv om revisjon når fasen var levert), og runbookens §10a har
+  fått et punkt som navngir begge arkivknappene. Risikoen for å arkivere det ene og
+  glemme det andre står nå der den leses, ikke bare i et beslutningsnotat.
+- **Verifisert i nettleser:** arkivering, liste, tallene og signaturen, uten JS-feil.
+  Mutasjonstestet: fjernes automatisk-flagget fra arkivet, admin-gaten fra endepunktene
+  eller backup-sperren foran kollaps, blir testene røde.
+
+---
+
 ## 2026-08-29 — Oppdragsmodulen fase 6: statistikkregisteret og oppdragsfanen
 
 **1342 tester grønne** (46 nye). Ingen migrasjoner.

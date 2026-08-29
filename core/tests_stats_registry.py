@@ -48,6 +48,12 @@ class RegisterInnholdTests(TestCase):
             [h.slug for h in sorted(handlere, key=lambda h: (h.order, h.slug))])
         self.assertEqual(handlere[0].slug, 'patients')
 
+    def test_ukjent_arkiv_pk_gir_ingenting_fra_begge_kildene(self):
+        """Samme svar fra begge: «det er ikke noe arkiv der»."""
+        for slug in ('patients', 'oppdrag'):
+            with self.subTest(slug=slug):
+                self.assertIsNone(get_handler(slug).arkiv_full_stats(999999))
+
     def test_alle_handlere_har_visningsnavn(self):
         for handler in all_handlers():
             with self.subTest(slug=handler.slug):
@@ -73,10 +79,13 @@ class RegisterKontraktTests(SimpleTestCase):
         with self.assertRaises(NotImplementedError):
             BaseStatistikkHandler().full_stats(vakt=None)
 
-    def test_arkiv_stats_er_valgfri_og_svarer_ingenting(self):
-        """Oppdrag arkiverer først i fase 7 — fram til da er svaret «finnes ikke»."""
+    def test_arkiv_stats_er_valgfri(self):
+        """En modul uten arkiv svarer «finnes ikke», den krasjer ikke.
+
+        Sto ubesvart for oppdrag fram til fase 7. Nå svarer begge kildene, og
+        det er basisklassens default som testes her — den gjelder neste modul.
+        """
         self.assertIsNone(BaseStatistikkHandler().arkiv_full_stats(1))
-        self.assertIsNone(get_handler('oppdrag').arkiv_full_stats(1))
 
 
 class StatistikkappenNavngirIngenKilde(SimpleTestCase):

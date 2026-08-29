@@ -633,6 +633,120 @@ async function lastAlt() {
 }
 
 
+// ── Vaktarkiv (fase 7) ───────────────────────────────────────────────────
+//
+// Kun global admin ser knappen, og serveren gater alle fire endepunktene på
+// nytt. Arkivering fryser vakta med signatur; historikken over rydder tavla
+// og er reversibel. To handlinger, to knapper.
+
+let arkivliste = [];
+
+function renderArkiv() {
+  const el = document.getElementById('arkivliste');
+  if (!el) return;
+  if (!arkivliste.length) {
+    el.innerHTML = '<div class="tom-melding">Ingen arkiverte vakter ennå.</div>';
+    return;
+  }
+  el.innerHTML = arkivliste.map((a) => {
+    const kollaps = a.kollapset
+      ? '<span class="oppdrag-meta">· radene er slettet, kun tall igjen</span>'
+      : '';
+    return `
+    <div class="oppdrag-rad">
+      <div class="d-flex align-items-center gap-2 flex-wrap">
+        <span class="oppdrag-problem">${escapeHtml(a.tittel)}</span>
+        <span class="oppdrag-nr">${escHtmlValue(a.antall_oppdrag)} oppdrag</span>
+      </div>
+      <div class="oppdrag-meta mt-1">
+        ${escapeHtml(a.vakt_navn)} · arkivert av ${escapeHtml(a.importert_av)}
+        ${kollaps}
+      </div>
+      <div class="mt-2 d-flex gap-2">
+        <button class="btn btn-sm btn-outline-secondary" type="button"
+                data-action="visArkiv" data-id="${escHtmlValue(a.id)}">Vis tall</button>
+        <button class="btn btn-sm btn-outline-danger" type="button"
+                data-action="slettArkiv" data-id="${escHtmlValue(a.id)}">Slett</button>
+      </div>
+      <div id="arkiv-detalj-${escHtmlValue(a.id)}" class="mt-2"></div>
+    </div>`;
+  }).join('');
+}
+
+
+async function lastArkiv() {
+  const res = await apiFetch('/oppdrag/api/arkiv/');
+  if (!res.ok) return;
+  arkivliste = (await res.json()).data || [];
+  renderArkiv();
+}
+
+
+async function arkiverVakt() {
+  const feil = document.getElementById('arkiv-feil');
+  feil?.classList.add('d-none');
+  await withSubmitGuard('arkiv-knapp', async () => {
+    const notat = (document.getElementById('arkiv-notat')?.value || '').trim();
+    const res = await apiFetch('/oppdrag/api/arkiv/', {
+      method: 'POST',
+      body: JSON.stringify({ notat }),
+    });
+    const d = await res.json().catch(() => ({}));
+    if (!res.ok || d.status !== 'ok') {
+      // Inline, ikke alert(): meldingen hører hjemme ved knappen som
+      // feilet, og en alert forsvinner før man rekker å lese den.
+      if (feil) {
+        feil.textContent = d.message || 'Arkivering feilet.';
+        feil.classList.remove('d-none');
+      }
+      return;
+    }
+    const notatfelt = document.getElementById('arkiv-notat');
+    if (notatfelt) notatfelt.value = '';
+    await lastArkiv();
+  });
+}
+
+
+async function visArkiv(id) {
+  const boks = document.getElementById(`arkiv-detalj-${id}`);
+  if (!boks) return;
+  if (boks.innerHTML) { boks.innerHTML = ''; return; }   // klikk igjen = lukk
+
+  const res = await apiFetch(`/oppdrag/api/arkiv/${id}/`);
+  if (!res.ok) return;
+  const a = (await res.json()).data || {};
+  const s = a.stats && a.stats.summary ? a.stats.summary : null;
+  if (!s) { boks.innerHTML = '<div class="tom-melding">Ingen tall.</div>'; return; }
+
+  // Signaturen er hele poenget med et arkiv: stemmer den ikke, skal det stå
+  // først og tydelig, ikke som en detalj under tallene.
+  const tukling = a.tamper_detected
+    ? '<div class="text-danger fw-bold mb-1">Signaturen stemmer ikke — arkivet kan være endret.</div>'
+    : '';
+  boks.innerHTML = `
+    ${tukling}
+    <div class="oppdrag-meta">
+      ${escHtmlValue(s.total)} oppdrag · ${escHtmlValue(s.fullforte)} fullført ·
+      median responstid ${escHtmlValue(fmtMin(s.responstid.median))} ·
+      median oppdragstid ${escHtmlValue(fmtMin(s.oppdragstid.median))}
+    </div>
+    <div class="oppdrag-meta">SHA-256: ${escapeHtml((a.sha256 || '').slice(0, 16))}…</div>`;
+}
+
+
+async function slettArkiv(id) {
+  if (!confirm('Slette arkivet? Det kan ikke angres, og arkivet er det '
+             + 'eneste som står igjen etter at vakta er avsluttet.')) return;
+  const res = await apiFetch(`/oppdrag/api/arkiv/${id}/`, {
+    method: 'DELETE',
+    body: JSON.stringify({ confirm: true }),
+  });
+  if (!res.ok) return;
+  await lastArkiv();
+}
+
+
 document.addEventListener('DOMContentLoaded', async () => {
   await lastLokasjoner();
   await lastAlt();

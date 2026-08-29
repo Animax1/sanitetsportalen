@@ -41,6 +41,7 @@ from core.backup import (
     VALID_KINDS,
     all_handlers,
     clear_registry,
+    registrer_alle_moduler,
     create_backup,
     enforce_cap,
     get_backup_dir,
@@ -89,9 +90,12 @@ class HandlerRegistryTests(TestCase):
     """Tester for register/get_handler/all_handlers/clear_registry."""
 
     def tearDown(self) -> None:
-        # Gjenopprett patients-handleren etter at vi har klottet i registry.
+        # Gjenopprett ALLE modulenes handlere etter at vi har klottet i
+        # registryet. Sto det `register_handlers()` her — pasientmodulens —
+        # ble oppdragsmodulens borte for resten av kjøringen, og feilen
+        # dukket opp i en helt annen testfil.
         clear_registry()
-        register_handlers()
+        registrer_alle_moduler()
 
     def test_register_and_get_roundtrip(self) -> None:
         clear_registry()

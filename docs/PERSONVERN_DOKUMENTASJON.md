@@ -1,7 +1,7 @@
 # Personvern­dokumentasjon – Pasientregistrering (sanitetsvakt)
 
 **Siste oppdatering:** 29. august 2026  
-**Versjon:** 1.8  
+**Versjon:** 1.9  
 **Behandlingsansvarlig:** André Eritsland
 
 ---
@@ -344,11 +344,15 @@ Lagringstidene er fastsatt etter GDPR art. 5(1)(e): opplysningene skal ikke oppb
 | Cache-data lavkostnad-modus (LocMemCache i prosess) | Maks 60 sekunder, eller til prosess-omstart | Automatisk (TTL) | Kortvarig drift; per-prosess minne; ingen pasient-PII |
 | Cache-data vakt-modus (Redis) | Maks 10 minutter | Automatisk (`EXPIRE`/TTL) | Kortvarig drift; ingen pasient-PII; Redis kun aktiv under vakt |
 | Pasientdata (aktiv innsamling) | Inneværende år i PostgreSQL | Manuell nullstilling / arkivering | Aktiv bruk under arrangementssesong |
-| Oppdragsdata (`Oppdrag`, `Statusmelding`, `Enhetsbytte`) | Inneværende år i PostgreSQL. **Ingen automatisk sletting ennå** — se merknad under | Manuell inntil videre; arkivering med 24-mnd kollaps er planlagt (modulens fase 7) | Aktiv bruk under vakt; statistikk og erfaringslæring etterpå |
+| Oppdragsdata (`Oppdrag`, `Statusmelding`, `Enhetsbytte`) | Inneværende vakt i PostgreSQL, til vakta arkiveres | Manuell arkivering av admin | Aktiv bruk under vakt; statistikk og erfaringslæring etterpå |
+| Arkiverte oppdrag (`ArkivertOppdrag`) | **24 måneder**, deretter kollaps til aggregert statistikk | Automatisk – `kollaps_arkiv` via Railway Cron | Samme begrunnelse som for arkiverte pasientrader: to hele sesonger til sammenligning, deretter er formålet uttømt og radnivået slettes permanent |
+| Arkiv-metadata og aggregert statistikk (`OppdragArkiv`) | Ingen fast grense | Manuell sletting av admin | Aggregater uten radnivå; grunnlag for flerårig erfaringslæring |
 | Arkiverte pasientrader (`ArkivertPasient`) | **24 måneder**, deretter kollaps til aggregert statistikk | Automatisk – `kollaps_arkiv` via Railway Cron | Dekker to hele sesonger, slik at årets vakt kan sammenlignes med fjorårets i planleggingen. Deretter er formålet uttømt og radnivået slettes permanent |
 | Arkiv-metadata og aggregert statistikk (`VaktArkiv`) | Ingen fast grense | Manuell sletting av admin | Aggregater uten radnivå; grunnlag for flerårig erfaringslæring |
 | Backup-filer – modul `patients` (aktiv vaktdata) | Antallsbegrenset: de nyeste **50** beholdes, eldre slettes automatisk | Automatisk (`ModuleBackupConfig.max_backups`) | Teknisk gjenoppretting |
 | Backup-filer – modul `arkiv` (vaktarkivet) | Antallsbegrenset: de nyeste **20** beholdes. Kjøres én gang i døgnet | Automatisk (`ModuleBackupConfig.max_backups`) | Arkivet endres kun ved arkivering av en vakt, og identisk innhold gir ingen ny fil |
+| Backup-filer – modul `oppdrag` (aktiv oppdragsdata) | Antallsbegrenset, standard **50** | Automatisk (`ModuleBackupConfig.max_backups`) | Teknisk gjenoppretting; samme regime som `patients` |
+| Backup-filer – modul `oppdrag_arkiv` (oppdragsarkivet) | Antallsbegrenset, standard **50** | Automatisk (`ModuleBackupConfig.max_backups`) | Dekningen kollapsen krever: sletting av radnivå skal være gjenopprettbar |
 | Railway databasebackup | Styres av Railways plattformvilkår | Railway (databehandler) | Kun aktiv i den perioden abonnementet er oppgradert, ca. én måned i året |
 | Varsler (`Notification`) | 30 dager | Automatisk – `purge_old_logs` via Railway Cron | Rent driftsvarsel uten dokumentasjonsverdi etter vakten |
 | Audit-logger (`AuditLog`, `LoginEvent`) | **2 år (730 dager)** | Automatisk – `purge_old_logs` via Railway Cron | Hendelsesoppklaring og revisjon. Uten journalplikt er lengre oppbevaring ikke hjemlet |
@@ -359,33 +363,48 @@ Lagringstidene er fastsatt etter GDPR art. 5(1)(e): opplysningene skal ikke oppb
 
 > **Merk – verifisert i drift 23. august 2026:** `purge_old_logs` kjøres av Railway Cron (`0 0 * * SUN`) i miljøet `production`. Ved første skarpe kjøring, natt til søndag 23. august 2026, slettet jobben 3 varsler eldre enn 30 dager — nøyaktig de tre en tørrkjøring dagen før hadde identifisert. Cron-tjenestens logg viser `Slettet 3 varsler eldre enn 30 dager`, altså den skarpe varianten, ikke tørrkjøringens `Ville slettet`. Lagringstidene i tabellen over er dermed dokumentert **håndhevet i produksjon**, ikke bare konfigurert. Tilsvarende bekreftelse for `kollaps_arkiv` (`0 4 1 * *`) står igjen: jobben har ennå ingenting å kollapse, siden arkivene er fra 2026 og grensen er 24 måneder.
 
-> **Merk om oppdragsdata (skrevet før modulen settes i produksjon):** Oppdragsmodulen
-> har foreløpig ingen egen frysings- eller slettemekanisme. «Historikk» på sentralbordet
-> rydder bare den aktive tavla: raden beholdes uendret og kan hentes tilbake, så den
-> påvirker ingen lagringstid. Flaten het opprinnelig «Arkiver» og er omdøpt nettopp for
-> ikke å forveksles med arkiveringen dette avsnittet ellers beskriver. Radene er årsscopet på
-> samme måte som pasientdata — et årsskifte tar dem ut av alle visninger — men de blir
-> stående i databasen til modulens arkiveringsfase (fase 7 i
-> `docs/BESLUTNING_OPPDRAGSMODULEN.md`) leverer samme mønster som pasientarkivet:
-> frysing, 24 måneders radnivå, deretter kollaps til aggregat. Denne raden i tabellen
-> skal revideres når den fasen er levert. Audit-rader for oppdrag følger den
-> eksisterende 2-årsregelen — `purge_old_logs` sletter på alder, uavhengig av tabell.
-> Merk også at oppdragsdata **ikke inngår i applikasjonens modulbackup** (den dekker
-> modulene `patients` og `arkiv`, se under); frem til en backup-handler registreres er
-> Railways databasebackup eneste dekning, og den er kun aktiv i oppgraderingsperioden.
+> **Merk om oppdragsdata (revidert 29. august 2026, fase 7 levert):** Oppdragsmodulen
+> har nå samme livsløp som pasientmodulen: frysing med signatur, 24 måneders radnivå,
+> deretter kollaps til aggregat. `kollaps_arkiv` går gjennom `core.arkiv`-registeret og
+> dekker begge arkivene i samme kjøring, med samme sperre foran den irreversible
+> slettingen: den nekter med mindre det finnes en backup av modulens arkiv tatt etter at
+> arkivet ble opprettet.
+>
+> To ting er verdt å holde fra hverandre. «Historikk» på sentralbordet rydder bare den
+> aktive tavla: raden beholdes uendret og kan hentes tilbake, så den påvirker ingen
+> lagringstid. Flaten het opprinnelig «Arkiver» og er omdøpt nettopp for ikke å
+> forveksles med arkiveringen dette avsnittet beskriver.
+>
+> **`Oppdrag.fritekst` arkiveres ikke.** Feltet er unntatt verdilogging i audit (A.6),
+> og å fryse det i et arkiv med 24 måneders lagringstid ville gjort unntaket
+> meningsløst. Arkivet inneholder ellers de samme kategoriene som den aktive raden:
+> problemstilling, hastegrad, lokasjon, enhetsnavn og tidspunkter.
+>
+> Oppdragsdata **inngår nå i applikasjonens modulbackup** — modulene `oppdrag` (aktiv
+> data) og `oppdrag_arkiv` (arkivet). Fram til fase 7 var Railways databasebackup eneste
+> dekning, og den er kun aktiv i oppgraderingsperioden. Audit-rader for oppdrag følger
+> den eksisterende 2-årsregelen — `purge_old_logs` sletter på alder, uavhengig av tabell.
+>
+> **Arkiveringen ligger to steder** inntil videre: pasientene arkiveres under
+> `/pasienter/`, oppdragene under `/oppdrag/`. Sammenslåingen er utsatt (§12.1 i
+> beslutningsnotatet), og prisen er en operativ risiko: noen kan arkivere det ene og
+> glemme det andre. Den håndteres med et punkt i `docs/RUNBOOK_VAKT.md` §10a, som leses
+> ved vaktslutt.
 
 > **Merk om backup-retention:** Applikasjonens backup-opprydding er **antallsbasert**, ikke tidsbasert. Konstanten `RETENTION_HOURS = 72` finnes fortsatt i koden, men er ikke i bruk — den er erstattet av `ModuleBackupConfig.max_backups` (standard 50). Tidligere versjoner av dette dokumentet oppga «72 timer, deretter automatisk slettet», noe som ikke stemte med implementasjonen.
 
-> **Merk om backup-innhold:** Applikasjonens backup er delt i to uavhengige moduler:
+> **Merk om backup-innhold:** Applikasjonens backup er delt i fire uavhengige moduler:
 >
 > - **`patients`** — aktiv vaktdata (pasienter, førstehjelpere, helsepersonell, innstillinger)
 > - **`arkiv`** — vaktarkivet (`VaktArkiv` + `ArkivertPasient` samlet)
+> - **`oppdrag`** — aktiv oppdragsdata (oppdrag, statusmeldinger, enhetsbytter, enheter, lokasjoner)
+> - **`oppdrag_arkiv`** — oppdragsarkivet (`OppdragArkiv` + `ArkivertOppdrag` samlet)
 >
 > En gjenoppretting av den ene rører aldri den andre. Arkivet har egen modul fordi Railways databasebackup kun er aktiv den måneden abonnementet er oppgradert; resten av året er dette den eneste dekningen arkivet har.
 >
 > Ingen av modulene inneholder passord-hasher, audit-logg, sesjoner eller `LoginEvent`. En restore påvirker dermed ikke brukerkontoer eller logger. Dette gjelder **ikke** Railways databasebackup, som omfatter hele databasen — se A.2.
 >
-> I arkiv-backupen utelates referansen `VaktArkiv.importert_av` bevisst. Den peker på en brukerkonto som ikke er del av dumpen, og ville gjort gjenoppretting umulig dersom kontoen var slettet. Brukernavnet er uansett bevart frosset i `importert_av_navn`.
+> I arkiv-backupene utelates referansene `VaktArkiv.importert_av` og `OppdragArkiv.importert_av` bevisst. De peker på en brukerkonto som ikke er del av dumpen, og ville gjort gjenoppretting umulig dersom kontoen var slettet. Brukernavnet er uansett bevart frosset i `importert_av_navn`. Av samme grunn utelates `meldt_av`, `opprettet_av`, `historikk_av` og `byttet_av` i oppdragsbackupen.
 
 ---
 
@@ -883,6 +902,14 @@ Dette dokumentet er utarbeidet og godkjent av behandlingsansvarlig.
 
 **Endringslogg:**
 
+- **v1.9 (29.08.2026):** **A.9:** oppdragsmodulens arkivering er levert (fase 7), og
+  raden merknaden ba om å revidere er revidert. Nye rader for `ArkivertOppdrag` (24
+  måneder, deretter kollaps), `OppdragArkiv` (aggregat uten radnivå) og
+  backup-modulene `oppdrag` og `oppdrag_arkiv` — modulen var uten applikasjonsbackup
+  fram til nå. Presisert at `Oppdrag.fritekst` **ikke** arkiveres: feltet er unntatt
+  verdilogging i audit, og et arkiv med 24 måneders lagringstid ville uthult unntaket.
+  Notert at arkiveringen fortsatt ligger to steder, og at den operative risikoen
+  håndteres i runbooken §10a.
 - **v1.8 (29.08.2026):** **A.6:** to nye felt i oppdragstabellen — `oppdragsnummer`
   (løpenummer per år for gjenfinning; identifiserer oppdraget, ikke personen, og lar seg
   ikke koble til pasientnummer) og `arkivert_at`/`arkivert_av`. **A.9:** presisert at

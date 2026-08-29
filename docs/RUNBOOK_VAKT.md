@@ -297,6 +297,15 @@ Som absolutt siste utvei hvis systemet er utilgjengelig:
 1. Gå gjennom admin-dashbord – noter peak P95, peak RPS, peak memory og antall samtidige sesjoner
 2. Last ned siste backup fra Railway Volume (`/data/backups/`) som ekstern kopi
 3. Verifiser at ingen 5xx-feil ligger uten forklaring (admin-dashbord → Metrikk-kort → errors_5xx)
+4. **Arkiver vakta — begge modulene.** Arkiveringen ligger to steder inntil de slås
+   sammen, og det er lett å ta den ene og tro man er ferdig:
+   - **Pasienter:** `/pasienter/` → Vaktarkiv → «Lagre vakt som arkiv»
+   - **Oppdrag:** `/oppdrag/` → Vaktarkiv → «Arkiver oppdragene»
+
+   Begge krever global admin. Arkivering fjerner ingenting — den fryser en kopi med
+   signatur, og pasientene slettes først når du senere velger «Avslutt vakt».
+   Kryss av begge før du går videre til 10b: gjør du det ikke, står oppdragene igjen
+   uten frosset kopi, og statistikken for vakta finnes bare så lenge radene gjør det.
 
 ### 10b. Veksle tilbake til lavkostnad-modus
 

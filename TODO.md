@@ -613,13 +613,13 @@ Gjennomgang 13. aug. 2026, med 1000 pasienter og peak 100 brukere som premiss.
       samme idiom som `core/backup/`. Core eier kanonisering, hashing og kollaps-
       orkestrering; handleren eier payloadens form. Signaturene er bit-identiske,
       låst av `ArkivSignaturLaastTests`. Ingen migrasjon.
-  - [ ] **Gjenstår:** `AbstractArkiv`-basemodell for nye moduler. `VaktArkiv` har
-        feltene i dag (`sha256`, `kollapset_at`, `aggregat`, `aggregat_sha256`,
-        frosset `importert_av_navn`); park og oppdrag må ellers gjenta dem. Bevisst
-        utsatt til modell nummer to faktisk skrives — da ser man hva som er felles,
-        i stedet for å gjette. `VaktArkiv` skal *ikke* migreres til basemodellen:
-        SHA-signaturene er låst til dagens payload-form, og hvert arkiv i prod ville
-        meldt tukling. **Bygges i fase 7 av oppdragsmodulen** — den er modell nummer to.
+  - [x] **`AbstractArkiv`-basemodell (29. aug. 2026).** Bygget i fase 7 av
+        oppdragsmodulen, som lovet — `OppdragArkiv` var modell nummer to, og da var
+        det ikke lenger gjetning hva som er felles. Basemodellen bærer `tittel`,
+        `vakt`/`vakt_navn`, `antall_rader`, `importert_av` med frosset navn, `sha256`,
+        `kollapset_at`, `aggregat` og `aggregat_sha256`. `VaktArkiv` er som planlagt
+        *ikke* migrert: `year_snapshot` og `arrangement_navn` inngår i SHA-payloaden
+        til hvert arkiv i prod. Park arver basemodellen når den skrives.
 - [ ] Park-registreringer blir **egen modell**, ikke rader i `Patient`. Holder sykestuas
       liste på ~250 rader i stedet for 1000, og matcher at dataene er enklere.
 - [ ] Park-appen er et skriveendepunkt **uten innlogging**: signert lenke via
@@ -777,14 +777,27 @@ Gjennomgang 13. aug. 2026, med 1000 pasienter og peak 100 brukere som premiss.
               bulk-resultatet.
             - **`hent_aktiv_vakt` står igjen som eneste import fra en modul.** Den er
               portalens scope, ikke en kildes tall, og hører til ryddejobben under.
-      - [ ] **Fase 7** (5–7 t): arkivering. **Her bygges `AbstractArkiv`** — dette er
-            modell nummer to, som punktet under har ventet på. Oppdrag får **egen
-            arkivknapp** under `/oppdrag/`; sammenslåingen med pasientarkivet er utsatt,
-            se punktet under.
-            - Statistikkhandleren er klar: `OppdragStatistikkHandler.arkiv_full_stats`
-              arver basisklassens `None` (404) fram til arkivet finnes. Implementeres
-              den, virker `/statistikk/api/kilde/oppdrag/arkiv/<pk>/full-stats/` uten at
-              statistikkappen må røres.
+      - [x] **Fase 7 — arkivering (29. aug. 2026).** `AbstractArkiv` i
+            `core/arkiv/models.py`, `OppdragArkiv` + `ArkivertOppdrag`, handler,
+            egen arkivknapp under `/oppdrag/` og fire endepunkter bak global admin.
+            Statistikkendepunktet fra fase 6 virker nå uten at statistikkappen ble
+            rørt, akkurat som lovet.
+            - **Tidspunktene fryses i flate kolonner**, én per status, og hvilke
+              stemplinger som var automatiske ligger som data (`automatiske_statuser`).
+              Da gjelder §12.2-regelen i arkivet også — uten flagget ville en avledet
+              sluttid blitt telt som målt så snart vakta var arkivert.
+            - **`fritekst` arkiveres ikke.** Feltet er unntatt verdilogging i audit
+              nettopp fordi det kan inneholde noe en operatør skrev og angret på; å
+              fryse det i 24 måneder ville gjort unntaket meningsløst.
+            - **Én utregning, to kilder.** `_stats_fra_rader()` regner på nøytrale
+              dicter, og både vakta og arkivet bygger slike. En egen arkiv-utregning
+              ville drevet fra live-tallene, og forskjellen ville dukket opp først når
+              noen sammenlignet i fjor med i år.
+            - **To mangler kom for en dag:** modulen hadde ingen backup i det hele
+              tatt (nå `oppdrag` + `oppdrag_arkiv`), og `kollaps_arkiv` kjente bare
+              pasientarkivet (går nå gjennom registeret, `--modul` avgrenser).
+            - Mutasjonstestet: fjernes automatisk-flagget fra arkivet, admin-gaten fra
+              endepunktene eller backup-sperren foran kollaps, blir testene røde.
 
 - [ ] **Flytt `hent_aktiv_vakt` ut av pasientmodulen.** Funksjonen er portalens scope —
       `Vakt` bor i `core`, og både oppdrag og statistikk importerer den fra
@@ -804,9 +817,10 @@ Gjennomgang 13. aug. 2026, med 1000 pasienter og peak 100 brukere som premiss.
       - [ ] Signaturene overlever: handleren bestemmer selv hva som går inn i
             `sha_payload()`, så en nullbar FK den ikke nevner endrer ingenting.
             `ArkivSignaturLaastTests` beviser det. Eksisterende arkiver får `NULL`.
-      - [ ] **I mellomtiden kan noen arkivere pasienter og glemme oppdrag.** Det er en
-            operativ risiko, ikke en teknisk. Legg et punkt i `docs/RUNBOOK_VAKT.md`, som
-            faktisk leses ved vaktslutt — gjøres samtidig med fase 7.
+      - [x] **Punkt i runbooken (29. aug. 2026).** §10a navngir begge knappene og
+            krever at begge er krysset av før vakta veksles tilbake til
+            lavkostnad-modus. Risikoen består til arkiveringene slås sammen, men den
+            står nå der den leses.
 - [ ] Vurder `cached_db`-sesjoner. `SESSION_SAVE_EVERY_REQUEST=True` med DB-sesjoner gir
       én UPDATE per request. Krever Redis, altså vakt-modus.
 

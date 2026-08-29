@@ -329,4 +329,6 @@ class KollapsKommandoTests(KollapsTestMixin, TestCase):
 
         ut = self._kjor()
 
-        self.assertIn('Ingen arkiv eldre enn', ut)
+        # Meldingen er per modul etter fase 7 — kommandoen går gjennom
+        # registeret, og navnet foran sier hvilket arkiv den snakker om.
+        self.assertIn('ingen arkiv eldre enn', ut)

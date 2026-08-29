@@ -154,3 +154,29 @@ def all_handlers() -> list[BaseBackupHandler]:
 def clear_registry() -> None:
     """Bare ment for testbruk — nullstill registry."""
     _registry.clear()
+
+
+def registrer_alle_moduler() -> None:
+    """Registrer handlerne til alle installerte moduler på nytt.
+
+    Også bare ment for testbruk: en test som kaller ``clear_registry()`` må
+    kunne sette registeret tilbake slik det var. Å liste modulene for hånd i
+    en tearDown virket så lenge det fantes én — da oppdragsmodulen fikk
+    backup, ble alle testene som kjørte etterpå stående uten den, og feilen
+    dukket opp et helt annet sted i suiten.
+
+    Går veien om app-registeret framfor en liste, slik at modul nummer tre
+    ikke må huskes her.
+    """
+    from importlib import import_module
+
+    from django.apps import apps as django_apps
+
+    for config in django_apps.get_app_configs():
+        try:
+            modul = import_module(f'{config.name}.backup')
+        except ModuleNotFoundError:
+            continue
+        registrer = getattr(modul, 'register_handlers', None)
+        if callable(registrer):
+            registrer()

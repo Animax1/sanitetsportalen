@@ -3,6 +3,13 @@
 Fase 6 av oppdragsmodulen. Utregningen ligger i modulen som eier dataene —
 statistikkappen henter, cacher og viser (se ``core/stats.py``).
 
+**Én utregning, to kilder.** ``_stats_fra_rader()`` regner på nøytrale dicter,
+og både den aktive vakta og et arkiv bygger slike dicter. Det er samme grep som
+``_compute_full_stats_from_dicts`` i pasientmodulen, og grunnen er den samme:
+en arkivert vakt skal vise de samme tallene som den viste live. To utregninger
+ville drevet fra hverandre, og forskjellen ville dukket opp først når noen
+sammenlignet i fjor med i år.
+
 **Tre ting er verdt å kjenne før man rører fila:**
 
 1. **Varigheter regnes fra gjeldende statusmeldinger**, ikke fra rådataene.
@@ -42,6 +49,18 @@ from core.stats import BaseStatistikkHandler, register
 from . import choices
 from .models import Enhet, Oppdrag, Statusmelding
 
+#: Status → kolonnenavn på `ArkivertOppdrag`. Kartet er det ene stedet de to
+#: er koblet: `ArkivOppdragsstatusKolonnerTests` går gjennom statusene og
+#: krever et felt for hver, slik at en ny status ikke kan legges til uten at
+#: arkivet følger med.
+_STATUSFELT = {
+    choices.RYKKER_UT: 'rykker_ut_at',
+    choices.FREMME: 'fremme_at',
+    choices.AVREIST: 'avreist_at',
+    choices.LEVERER: 'leverer_at',
+    choices.LEDIG: 'ledig_at',
+}
+
 
 def _sd(verdier):
     """Sammendrag av en liste varigheter i minutter."""
@@ -77,21 +96,24 @@ class _Varigheter:
         self.automatisk = 0
         self.negativ = 0
 
-    def minutter(self, start, slutt_melding):
-        """Minutter fra ``start`` til meldingens tidspunkt, eller ``None``.
+    def minutter(self, start, slutt):
+        """Minutter fra ``start`` til ``slutt``, eller ``None``.
 
-        ``start`` kan være et tidspunkt eller en melding; ``slutt_melding`` må
-        være en melding, siden det er *sluttstemplingen* som avgjør om
-        varigheten er målt eller avledet.
+        Begge er enten ``None``, et tidspunkt, eller en ``(tidspunkt,
+        automatisk)``-tuppel. Det er *sluttstemplingen* som avgjør om
+        varigheten er målt eller avledet — starten kan gjerne være avledet
+        uten at sluttiden blir det.
         """
-        if start is None or slutt_melding is None:
+        if start is None or slutt is None:
             return None
-        if slutt_melding.automatisk:
+
+        slutt_tid, slutt_automatisk = slutt
+        if slutt_automatisk:
             self.automatisk += 1
             return None
 
-        fra = getattr(start, 'tidspunkt', start)
-        minutter = (slutt_melding.tidspunkt - fra).total_seconds() / 60
+        fra = start[0] if isinstance(start, tuple) else start
+        minutter = (slutt_tid - fra).total_seconds() / 60
         if minutter < 0:
             self.negativ += 1
             return None
@@ -101,8 +123,8 @@ class _Varigheter:
         return {'automatisk': self.automatisk, 'negativ': self.negativ}
 
 
-def oppdrag_stats(vakt):
-    """Full statistikk for oppdragene i én vakt.
+def rader_for_vakt(vakt):
+    """Nøytrale rader for oppdragene i én vakt.
 
     Én spørring for oppdragene og én for statusmeldingene. Antall oppdrag i
     en vakt er lite, men endepunktet caches i 60 sekunder og pollet fra en
@@ -117,6 +139,67 @@ def oppdrag_stats(vakt):
     )
     meldinger = Statusmelding.objects.gjeldende_bulk([o.pk for o in oppdragene])
 
+    rader = []
+    for oppdrag in oppdragene:
+        gjeldende = meldinger[oppdrag.pk]
+        rader.append({
+            'oppdragsnummer': oppdrag.oppdragsnummer,
+            'hastegrad': oppdrag.hastegrad,
+            'problemstilling': oppdrag.problemstilling,
+            'enhet': oppdrag.enhet.navn,
+            'lokasjon': oppdrag.lokasjon.navn if oppdrag.lokasjon else '(ingen)',
+            'status': oppdrag.status,
+            'opprettet': oppdrag.created_at,
+            # Gjeldende melding per status: en korreksjon overstyrer raden den
+            # peker på, og regelen bor i manageren.
+            'tider': {m.status: (m.tidspunkt, m.automatisk) for m in gjeldende},
+            'forsinket': sum(1 for m in gjeldende if m.forsinket),
+        })
+    return rader
+
+
+def rader_for_arkiv(arkiv):
+    """Nøytrale rader fra et arkiv — samme form som `rader_for_vakt`."""
+    rader = []
+    for rad in arkiv.oppdrag.all():
+        automatiske = set(rad.automatiske_statuser or [])
+        tider = {}
+        for status, felt in _STATUSFELT.items():
+            tidspunkt = getattr(rad, felt)
+            if tidspunkt is not None:
+                tider[status] = (tidspunkt, status in automatiske)
+        rader.append({
+            'oppdragsnummer': rad.oppdragsnummer,
+            'hastegrad': rad.hastegrad,
+            'problemstilling': rad.problemstilling,
+            'enhet': rad.enhet_navn,
+            'lokasjon': rad.lokasjon_navn or '(ingen)',
+            'status': rad.sluttstatus,
+            'opprettet': rad.opprettet_at,
+            'tider': tider,
+            'forsinket': rad.antall_forsinket,
+        })
+    return rader
+
+
+def oppdrag_stats(vakt):
+    """Full statistikk for oppdragene i én vakt."""
+    return _stats_fra_rader(
+        rader_for_vakt(vakt),
+        # Enhetene er ikke scopet på vakt — de er oppsett, ikke vaktdata.
+        # Tallet beskriver beredskapen akkurat nå, og finnes derfor bare for
+        # den aktive vakta.
+        enheter_pa_vakt=Enhet.objects.filter(er_aktiv=True, pa_vakt=True).count(),
+    )
+
+
+def arkiv_stats(arkiv):
+    """Full statistikk for et arkiv, regnet fra de frosne radene."""
+    return _stats_fra_rader(rader_for_arkiv(arkiv))
+
+
+def _stats_fra_rader(rader, *, enheter_pa_vakt=None):
+    """Tallene, regnet på nøytrale rader fra vakta eller fra et arkiv."""
     var = _Varigheter()
 
     responstider, ventetider, utrykningstider = [], [], []
@@ -129,15 +212,15 @@ def oppdrag_stats(vakt):
     ankomster = {time: 0 for time in range(24)}
     forsinket_meldt = 0
 
-    for oppdrag in oppdragene:
-        per_status = {m.status: m for m in meldinger[oppdrag.pk]}
-        forsinket_meldt += sum(1 for m in meldinger[oppdrag.pk] if m.forsinket)
+    for rad in rader:
+        tider = rad['tider']
+        forsinket_meldt += rad['forsinket']
 
-        opprettet = oppdrag.created_at
-        rykker_ut = per_status.get(choices.RYKKER_UT)
-        fremme = per_status.get(choices.FREMME)
-        avreist = per_status.get(choices.AVREIST)
-        ledig = per_status.get(choices.LEDIG)
+        opprettet = rad['opprettet']
+        rykker_ut = tider.get(choices.RYKKER_UT)
+        fremme = tider.get(choices.FREMME)
+        avreist = tider.get(choices.AVREIST)
+        ledig = tider.get(choices.LEDIG)
 
         respons = var.minutter(opprettet, fremme)
         vente = var.minutter(opprettet, rykker_ut)
@@ -155,37 +238,37 @@ def oppdrag_stats(vakt):
             if verdi is not None:
                 samling.append(verdi)
 
-        enhetsnavn = oppdrag.enhet.navn
-        lokasjonsnavn = oppdrag.lokasjon.navn if oppdrag.lokasjon else '(ingen)'
+        enhetsnavn = rad['enhet']
+        lokasjonsnavn = rad['lokasjon']
+        hastegrad = rad['hastegrad']
+        problemstilling = rad['problemstilling']
 
-        per_hastegrad[oppdrag.hastegrad] = per_hastegrad.get(oppdrag.hastegrad, 0) + 1
-        per_problemstilling[oppdrag.problemstilling] = (
-            per_problemstilling.get(oppdrag.problemstilling, 0) + 1)
+        per_hastegrad[hastegrad] = per_hastegrad.get(hastegrad, 0) + 1
+        per_problemstilling[problemstilling] = (
+            per_problemstilling.get(problemstilling, 0) + 1)
         per_lokasjon[lokasjonsnavn] = per_lokasjon.get(lokasjonsnavn, 0) + 1
         per_enhet[enhetsnavn] = per_enhet.get(enhetsnavn, 0) + 1
 
         if respons is not None:
-            resp_per_hastegrad.setdefault(oppdrag.hastegrad, []).append(respons)
+            resp_per_hastegrad.setdefault(hastegrad, []).append(respons)
             resp_per_enhet.setdefault(enhetsnavn, []).append(respons)
         if oppdragstid is not None:
             oppdragstid_per_problem.setdefault(
-                oppdrag.problemstilling, []).append(oppdragstid)
+                problemstilling, []).append(oppdragstid)
 
-        status_naa[oppdrag.status] = status_naa.get(oppdrag.status, 0) + 1
+        status_naa[rad['status']] = status_naa.get(rad['status'], 0) + 1
         ankomster[timezone.localtime(opprettet).hour] += 1
 
     fullforte = status_naa.get(choices.TERMINAL, 0)
 
     return {
         'summary': {
-            'total': len(oppdragene),
-            'aktive': len(oppdragene) - fullforte,
+            'total': len(rader),
+            'aktive': len(rader) - fullforte,
             'fullforte': fullforte,
-            # Enhetene er ikke scopet på vakt — de er oppsett, ikke
-            # vaktdata. Tallet beskriver beredskapen akkurat nå, og står
-            # derfor sammen med de andre «nå»-tallene, ikke med varighetene.
-            'enheter_pa_vakt': Enhet.objects.filter(
-                er_aktiv=True, pa_vakt=True).count(),
+            # `None` for et arkiv: beredskapen «akkurat nå» finnes ikke for en
+            # vakt som er over, og et tall der ville vært oppdiktet.
+            'enheter_pa_vakt': enheter_pa_vakt,
             'responstid': _sd(responstider),
             'ventetid': _sd(ventetider),
             'utrykningstid': _sd(utrykningstider),
@@ -224,9 +307,22 @@ class OppdragStatistikkHandler(BaseStatistikkHandler):
     def full_stats(self, vakt):
         return oppdrag_stats(vakt)
 
-    # `arkiv_full_stats` er ikke implementert: oppdrag arkiveres først i
-    # fase 7. Basisklassens `None` gir 404 fram til den finnes — og det er
-    # riktig svar så lenge det ikke finnes noe arkiv å vise.
+    def arkiv_full_stats(self, pk):
+        """Tallene for ett oppdragsarkiv, eller ``None`` (fase 7).
+
+        Kollapset arkiv leverer det frosne aggregatet: radene finnes ikke
+        lenger, og å regne på ingenting ville gitt nuller som så ut som
+        målinger.
+        """
+        from .models import OppdragArkiv
+
+        try:
+            arkiv = OppdragArkiv.objects.get(pk=pk)
+        except OppdragArkiv.DoesNotExist:
+            return None
+        if arkiv.er_kollapset:
+            return (arkiv.aggregat or {}).get('full')
+        return arkiv_stats(arkiv)
 
 
 def register_handlers() -> None:
