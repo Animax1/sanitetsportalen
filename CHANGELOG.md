@@ -4,6 +4,32 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-08-29 — Oppklart: innloggingen feilet i feil miljø
+
+**Ingen kodeendring.** Kontoen `karmøy56` kom ikke inn fordi innloggingsforsøkene gikk mot
+**prod**, mens kontoen ligger på **staging**. André fant det selv.
+
+Det forklarer alt som ikke stemte: `last_login_at` sto stille fordi forespørslene aldri
+nådde den databasen diagnosen leste, og `sjekk_brukernavn` — som bare finnes i koden på
+`rollemodell` — beskrev hele tiden en annen base enn den innloggingen traff.
+
+**De tre foregående oppføringene står, men ikke som løsningen på dette.** Ingen av
+funnene var årsaken; alle er ekte feil som lå der uansett, og som ble funnet fordi noen
+lette:
+
+| Funn | Står på egne bein fordi |
+|---|---|
+| Hullet i kontolåsen | `login_view` slo opp kontoen eksakt mens `authenticate` var tolerant. Passordgjetting kunne kjøres i det uendelige ved å variere store bokstaver. Reell sårbarhet, uavhengig av denne saken |
+| Unicode-normalisering | `å` limt inn i NFD-form fant ingen konto. `Ø` mot `ø` bommet på SQLite, altså i offline-modus |
+| Forvekslingstegn i midlertidig passord | `0`/`O` og `1`/`l`/`I` i et passord som leses av en skjerm og tastes på en telefon |
+
+**Lærdommen er operativ, ikke teknisk.** To miljøer som ser helt like ut i nettleseren, og
+ingenting på siden sier hvilket man står i. Det kostet en arbeidsøkt her, og vil koste mer
+under en vakt — der forskjellen er om en pasient registreres i ekte journal eller i en
+testbase. Ført opp i TODO.
+
+---
+
 ## 2026-08-29 — En vei inn når passordet ikke lar seg gjette
 
 **1249 tester grønne** (12 nye). Ingen migrasjon.

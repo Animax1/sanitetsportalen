@@ -294,6 +294,17 @@ personlige kontoer, admin-reset beholdt for alle. Ingenting bygget ennå.
       invitasjonen. `PASSWORD_RESET_TIMEOUT` er bevisst ikke satt: den leses kun av
       Djangos egen generator, som ikke er i bruk.
 
+- [ ] **Vis hvilket miljø portalen kjører i.** Utløst 29. aug. 2026: en arbeidsøkt gikk
+      med til å feilsøke en innlogging som feilet fordi forsøkene gikk mot prod mens
+      kontoen lå på staging. Ingenting i grensesnittet skiller de to.
+
+      Under en vakt er innsatsen høyere enn en tapt time: forskjellen er om en pasient
+      registreres i den ekte basen eller i en testbase. En liten, tydelig markør på
+      **ikke-prod** (miljønavnet i toppen, gjerne farget) koster lite. Prod skal være den
+      nøytrale tilstanden — en markør der ville blitt visuell støy man slutter å se.
+
+      Miljønavnet finnes allerede som Railway-variabel; det trengs ingen ny innstilling.
+
 - [ ] **VURDER: skal innlogging normalisere passordet?** Funnet 29. aug. 2026.
       `set_password` kaller `make_password` rett på råstrengen, så Django normaliserer
       ikke passord. Et passord med `å` satt i én Unicode-normalform og skrevet i en
