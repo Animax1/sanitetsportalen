@@ -294,7 +294,7 @@ personlige kontoer, admin-reset beholdt for alle. Ingenting bygget ennå.
       invitasjonen. `PASSWORD_RESET_TIMEOUT` er bevisst ikke satt: den leses kun av
       Djangos egen generator, som ikke er i bruk.
 
-### Vakt som scope, ikke år — TRENGER BESLUTNING
+### Vakt som scope, ikke år — se `docs/BESLUTNING_VAKT_SOM_SCOPE.md`
 
 - [ ] **Premiss fastslått av André 29. aug. 2026: portalen tenker i *vakter*, ikke i år.**
       Den skal brukes på forskjellige arrangementer, ikke på det samme én gang i året.
@@ -325,9 +325,16 @@ personlige kontoer, admin-reset beholdt for alle. Ingenting bygget ennå.
       - Hvordan spiller det mot fase 7, som allerede fryser `arrangement_navn`?
       - Skal statistikken sammenligne vakter i stedet for år?
 
-      Skrives som `docs/BESLUTNING_VAKT_SOM_SCOPE.md` etter samme mønster som
-      rollemodellen og oppdragsmodulen — beslutning før kode, siden dette treffer to
-      moduler, en migrasjon med produksjonsdata, og et arkiv som allerede er signert.
+      - [x] **Notatet er skrevet (29. aug. 2026):**
+            `docs/BESLUTNING_VAKT_SOM_SCOPE.md`. Foreslår `Vakt` som modell i `core`,
+            to deployer, og backfill fra `year`. **Ikke besluttet** — fem åpne
+            avklaringer står nederst i notatet og trenger svar fra André før
+            migrasjonen skrives.
+      - [ ] **Besvar de fem åpne avklaringene**, og ta stilling til forslaget.
+      - **Fase 4b og 5 er upåvirket** og kan gjøres i mellomtiden. **Fase 6 og 7 må
+        vente:** statistikken grupperer på scopet, og fase 7 arkiverer *en vakt* —
+        den ville lagt inn `Vaktarkivering` fra §12.1, som notatet foreslår å erstatte
+        med `Vakt` (de er samme entitet sett fra hver sin ende).
 
 ### Rollemodellen — se `docs/BESLUTNING_ROLLEMODELLEN.md`
 
