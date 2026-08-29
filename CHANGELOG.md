@@ -4,6 +4,34 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-08-29 — Vaktlistemodulen fase 1: registrene og mannskapet
+
+**1404 tester grønne** (15 nye). Migrasjon `vaktliste.0001`.
+
+Ny app `vaktliste/` med fire modeller: `Korps`, `Kompetanse` og `VaktRolle` som
+admin-styrte tabeller — motsatt av oppdragsmodulens `choices.py`, fordi dette er
+organisasjonsdata, ikke faglige verdimengder — og `Mannskap`, portalens tredje
+personregister og det første over **egne frivillige**.
+
+- **`Mannskap.korps` er badgen** tilgangsmodellen hviler på fra fase 3. PROTECT:
+  korpset skal ikke kunne rives bort under folkene. Navn er unikt per korps, ikke
+  globalt — to korps kan ha hver sin Ola Hansen. Kontokoblingen er SET_NULL og gir i
+  seg selv ingen tilgang, som `Enhet.user`.
+- **`notat` er unntatt verdilogging i audit fra første lagring**, etter mønster av
+  `Oppdrag.fritekst` og med samme rekkefølgekrav: kostbehov skal ikke inn i portalen
+  (§7 i notatet), og fritekst er der helseopplysninger havner når det ikke finnes et
+  felt for dem. Mutasjonstestet begge veier: fjernes unntaket, lekker verdiene til
+  loggen og en test blir rød; fjernes rå-sammenligningen, gir hver lagring en falsk
+  «notat endret»-rad og en annen test blir rød.
+- **Personvernprotokollen hevet til v1.10**: ny A.6-seksjon for mannskapsdata
+  (berettiget interesse, art. 6(1)(f) — en annen registrertgruppe enn pasientene) og
+  A.9-rader med pensjonering som normal vei ut av registeret.
+- **Modulen er registrert, men usynlig**: `url=None` og begge `show_*`-flagg av, som
+  oppdragsmodulen i sin fase 1 — den får side i fase 2. Nivåene er deklarert som
+  besluttet, med merknad om at `skriv_handling` her betyr «fører sitt eget korps».
+
+---
+
 ## 2026-08-29 — Beslutningsnotat: vaktlistemodulen
 
 Ingen kode. `docs/BESLUTNING_VAKTLISTE.md` er skrevet for å gjøre de seks

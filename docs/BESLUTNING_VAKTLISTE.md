@@ -383,7 +383,7 @@ utformingen her stenger for det.
 
 | Fase | Innhold | Estimat |
 |---|---|---|
-| 1 | App, modulregistrering, `Korps`/`Kompetanse`/`VaktRolle`, `Mannskap` med admin. Personvernrader i A.6/A.9, audit-unntak for `notat` | 7–9 t |
+| 1 | ✅ App, modulregistrering, `Korps`/`Kompetanse`/`VaktRolle`, `Mannskap` med admin. Personvernrader i A.6/A.9, audit-unntak for `notat` | levert |
 | 2 | `Vaktliste`, `Ressurs` med reservasjon, `Vaktpost` med tider, planlegging med faner. «Ny planlagt vakt», kopiering av oppsett | 9–11 t |
 | 3 | Tilgangsmodellen: badge- og reservasjonssjekk på objektnivå, per-modul-etikett i matrisen (§4.5) | 5–6 t |
 | 4 | Drift: i/ut av drift, møtt/av vakt (kun `skriv_full`), «Tilstede nå» med utskrift | 5–7 t |

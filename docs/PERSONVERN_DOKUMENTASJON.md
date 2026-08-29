@@ -1,7 +1,7 @@
 # Personvern­dokumentasjon – Pasientregistrering (sanitetsvakt)
 
 **Siste oppdatering:** 29. august 2026  
-**Versjon:** 1.9  
+**Versjon:** 1.10  
 **Behandlingsansvarlig:** André Eritsland
 
 ---
@@ -266,6 +266,40 @@ tekstfelt som kan ses av flere enn den som skrev det:
 4. **Ingen mellomlagring.** Oppdragsdata caches ikke i Redis; avsnittet om cache-data
    under gjelder uendret.
 
+### Mannskapsdata (vaktlistemodulen)
+
+Vaktlistemodulen (fase 1 levert; se `docs/BESLUTNING_VAKTLISTE.md`) fører et
+**globalt mannskapsregister**: de frivillige organisasjonen har, som hver vakt
+bemanner fra. Dette er personopplysninger om **egne frivillige**, ikke om
+pasienter — en annen registrertgruppe enn resten av protokollen, med berettiget
+interesse (art. 6(1)(f)) som grunnlag: organisasjonen må vite hvem den kan
+bemanne med, og hvordan de nås under vakt.
+
+Følgende lagres om **mannskap** (basert på `Mannskap`-modellen i
+`vaktliste/models.py`):
+
+| Felt (teknisk navn) | Beskrivelse | Datatype | Kategori | Hjemmel |
+|---|---|---|---|---|
+| `navn` | Fullt navn | Tekst | Vanlig personopplysning | GDPR art. 6(1)(f) |
+| `korps` | Korpset personen tilhører (FK til Korps-register) | Referanse | Vanlig personopplysning (organisasjonstilhørighet) | GDPR art. 6(1)(f) |
+| `kompetanser` | Kompetanser (M2M mot admin-styrt register) | Referanser | Vanlig personopplysning | GDPR art. 6(1)(f) |
+| `telefon` | Telefonnummer, brukes av KO/vaktleder under vakt | Tekst, valgfritt | Vanlig personopplysning | GDPR art. 6(1)(f) |
+| `user` | Valgfri kobling til portalkonto | Referanse | Vanlig personopplysning | GDPR art. 6(1)(f) |
+| `er_aktiv` | Aktiv-flagg; pensjonering er den normale veien ut av registeret | Boolsk | Vanlig personopplysning | GDPR art. 6(1)(f) |
+| `notat` | Fritekst. **Unntatt verdilogging i audit** (som `Oppdrag.fritekst`) | Tekst, valgfritt | Vanlig personopplysning | GDPR art. 6(1)(f) |
+
+**Kostbehov/matallergi lagres bevisst ikke.** Det er en helseopplysning
+(særlig kategori, art. 9), og beslutningen ble å holde den utenfor portalen i
+sin helhet — den samles inn utenfor systemet av den som bestiller mat.
+Notatfeltet er unntatt verdilogging nettopp fordi fritekst er der slike
+opplysninger havner når det ikke finnes et felt for dem: skriver noen det der
+likevel og retter det, ligger ikke begge versjonene i revisjonsloggen i to år.
+Feltets hjelpetekst sier eksplisitt at helseopplysninger ikke skal skrives der.
+
+Registrene `Korps`, `Kompetanse` og `VaktRolle` er organisasjonsoppsett uten
+personopplysninger. Vaktposter (hvem som var på vakt hvor, med tider) kommer i
+modulens fase 2 og føres inn her da.
+
 ### Varsler (Notification)
 
 `core.Notification` gir beskjed i portalen når en bruker tildeles eller fratas ansvar for en pasient.
@@ -354,6 +388,8 @@ Lagringstidene er fastsatt etter GDPR art. 5(1)(e): opplysningene skal ikke oppb
 | Backup-filer – modul `oppdrag` (aktiv oppdragsdata) | Antallsbegrenset, standard **50** | Automatisk (`ModuleBackupConfig.max_backups`) | Teknisk gjenoppretting; samme regime som `patients` |
 | Backup-filer – modul `oppdrag_arkiv` (oppdragsarkivet) | Antallsbegrenset, standard **50** | Automatisk (`ModuleBackupConfig.max_backups`) | Dekningen kollapsen krever: sletting av radnivå skal være gjenopprettbar |
 | Railway databasebackup | Styres av Railways plattformvilkår | Railway (databehandler) | Kun aktiv i den perioden abonnementet er oppgradert, ca. én måned i året |
+| Mannskapsregister (`Mannskap`) | Så lenge personen er aktiv frivillig; pensjoneres (`er_aktiv=False`) ved avgang og slettes manuelt når ingen vaktposter refererer | Manuell (admin) | Berettiget interesse opphører når personen slutter; historiske vaktposter (fase 2) krever PROTECT inntil arkivering |
+| Korps/kompetanse/rolle-registre (vaktliste) | Ingen fast grense | Manuell | Organisasjonsoppsett uten personopplysninger |
 | Varsler (`Notification`) | 30 dager | Automatisk – `purge_old_logs` via Railway Cron | Rent driftsvarsel uten dokumentasjonsverdi etter vakten |
 | Audit-logger (`AuditLog`, `LoginEvent`) | **2 år (730 dager)** | Automatisk – `purge_old_logs` via Railway Cron | Hendelsesoppklaring og revisjon. Uten journalplikt er lengre oppbevaring ikke hjemlet |
 | Sesjondata | 8 timer (justerbart 1–24) | Automatisk | Begrenses til nødvendig varighet per vakt |
@@ -902,6 +938,13 @@ Dette dokumentet er utarbeidet og godkjent av behandlingsansvarlig.
 
 **Endringslogg:**
 
+- **v1.10 (29.08.2026):** **A.6:** ny seksjon for mannskapsdata — vaktlistemodulens
+  fase 1 fører et globalt register over egne frivillige (navn, korps, kompetanser,
+  telefon, valgfri kontokobling), med berettiget interesse som grunnlag. Kostbehov/
+  matallergi lagres **bevisst ikke** (art. 9 — besluttet holdt utenfor portalen), og
+  `notat` er unntatt verdilogging i audit fra første lagring, etter mønster av
+  `Oppdrag.fritekst`. **A.9:** rader for mannskapsregisteret (manuell rydding,
+  pensjonering som normal vei ut) og registrene.
 - **v1.9 (29.08.2026):** **A.9:** oppdragsmodulens arkivering er levert (fase 7), og
   raden merknaden ba om å revidere er revidert. Nye rader for `ArkivertOppdrag` (24
   måneder, deretter kollaps), `OppdragArkiv` (aggregat uten radnivå) og

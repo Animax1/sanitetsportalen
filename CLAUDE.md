@@ -23,7 +23,7 @@ python manage.py create_admin --username admin --password "bytt-meg"
 python manage.py runserver           # http://127.0.0.1:8000/
 
 # Tester – hele suiten
-python manage.py test patients accounts audit core statistikk oppdrag -v 2
+python manage.py test patients accounts audit core statistikk oppdrag vaktliste -v 2
 
 # Én enkelt test
 python manage.py test patients.tests.PatientAPITest.test_create_patient -v 2
@@ -252,6 +252,20 @@ Den er den første modulen som tar `skriv_handling` i bruk: bilen får smale, na
 stemplingsendepunkter, ikke en feltwhitelist inne i en generell `PUT`. Og skillet mellom de
 to grensesnittene er **ikke nivået** — det er om kontoen er knyttet til en `Enhet`. Å knytte
 en konto til en enhet gir ingen tilgang; det er domenedata, som `Forstehjelper.user`.
+
+### Vaktlistemodulen (vaktliste/)
+
+Fase 1 levert (registre + mannskap); side og resten kommer i fase 2–7 — se
+`docs/BESLUTNING_VAKTLISTE.md`, som er besluttet i sin helhet. Tre ting å vite:
+
+- **`Mannskap.korps` er badgen** tilgangsmodellen hviler på fra fase 3:
+  `skriv_handling` betyr her «fører sitt eget korps» (avgrenset av badgen, ingen
+  innsjekk), ikke stempling som i oppdrag. Matrisen trenger derfor en etikett per
+  modul per nivå (§4.5) før nivået deles ut.
+- **Kostbehov/matallergi lagres ikke** (art. 9 — besluttet holdt utenfor portalen), og
+  `Mannskap.notat` er unntatt verdilogging i audit (`signals.FELT_UTEN_VERDILOGGING`).
+- Modulen står med `url=None` og `show_*`-flaggene av til fase 2 — samme regel som
+  oppdragsmodulen fulgte: et modulkort som fører til 404 er en knapp mot en vegg.
 
 ### Statistikk-modulen (statistikk/)
 

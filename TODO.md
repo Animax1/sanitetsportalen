@@ -100,10 +100,8 @@ ingen av dem gir feilmelding — de er bare stille inaktive.
       vaktlistenotatet. Backup av prod tatt av André før pushen — migrasjonene
       `patients.0016` og `oppdrag.0007` er enveis, og gjenoppretting fra backup er
       eneste vei tilbake.
-      - [ ] **Etter deploy: kjør `verifiser_vakt` i prod på nytt.** Nå er den
-            krympet til arkivets frosne år, pekeren og en per-vakt-oppsummering —
-            de tre tingene som fortsatt kan være galt etter at `year` forsvant fra
-            radene. Grønn her er kvitteringen på at deploy 2 landet rent.
+      - [x] **`verifiser_vakt` kjørt i prod etter deployen: «Ingen funn»**
+            (André, 29. aug. 2026). Deploy 2 landet rent — vakta er fasit i prod.
 
 - [ ] **Første skarpe vakt med oppdragsmodulen.** Modulen er ferdig og testet, men
       aldri brukt under en reell vakt — og det er den prøven som finner det ingen
@@ -825,7 +823,16 @@ Gjennomgang 13. aug. 2026, med 1000 pasienter og peak 100 brukere som premiss.
       selv, med skifttider; drift som reversibel innsjekk-port med møtt/av vakt;
       «Tilstede nå» med utskrift (brukes av brannsikkerhetshensyn ved overnatting);
       planleggingstall (timer, hviletid, bemanningskurve, varsler); besetningspanel i
-      `/oppdrag`. Sju faser, 37–49 t. **Ikke påbegynt.**
+      `/oppdrag`. Sju faser, 37–49 t.
+      - [x] **Fase 1 — registre og mannskap (29. aug. 2026).** App, `Korps`/
+            `Kompetanse`/`VaktRolle` som admin-styrte tabeller, `Mannskap` med
+            badge (`korps`, PROTECT), kompetanser, valgfri kontokobling
+            (SET_NULL) og navn unikt per korps. Django-admin for alle fire.
+            Audit for `Mannskap` med `notat` unntatt verdilogging —
+            mutasjonstestet begge veier (lekkasje og falske rader).
+            Personvernprotokollen hevet til v1.10 med A.6-seksjon og
+            A.9-rader. Modulen registrert med `url=None` og flaggene av til
+            fase 2. 15 tester.
       - [x] **Alle ti avklaringene besvart 29. aug. 2026** (§11 i notatet er fasit).
             De som endret utformingen: korps er en badge og ikke en ny akse; ressurser
             reserveres til korps og korpsene bemanner sine egne, med tider; drift er en
