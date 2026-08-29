@@ -45,6 +45,10 @@ REVIEWED_INTERPOLATIONS = {
     'notatBlokk': 'markup bygget lokalt, notatene escapet inni',
     'knapp': 'markup bygget lokalt, id escapet inni',
     'valg': 'options bygget lokalt, brukernavn escapet inni',
+    'knappKlasse': 'hardkodet CSS-klasse fra en ternær',
+    'knappHandling': 'hardkodet handlingsnavn fra en ternær',
+    'knappTekst': 'hardkodet knappetekst fra en ternær',
+    'kortKlasse': 'hardkodet CSS-klasse fra en ternær',
     'valgt': 'hardkodet selected-attributt fra en ternær',
 }
 
@@ -143,7 +147,7 @@ class OppdragEscapingOppforselTests(SimpleTestCase):
     def test_enhetsnavn_escapes(self):
         ut = run_node(self.harness, '''
             globalThis.enheter = [{
-              id: 1, navn: '<b>56</b>', status: 'ledig',
+              id: 1, navn: '<b>56</b>', status: 'ledig', pa_vakt: true,
               status_navn: 'Ledig', antall_ventende: 0
             }];
             const el = { innerHTML: '' };
@@ -158,7 +162,7 @@ class OppdragEscapingOppforselTests(SimpleTestCase):
         """Statusen brukes i et class-attributt — et bruddpunkt for attributt-XSS."""
         ut = run_node(self.harness, '''
             globalThis.enheter = [{
-              id: 1, navn: 'E1', status: '" onload="alert(1)',
+              id: 1, navn: 'E1', status: '" onload="alert(1)', pa_vakt: true,
               status_navn: 'Rar', antall_ventende: 0
             }];
             const el = { innerHTML: '' };

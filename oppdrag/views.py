@@ -61,6 +61,7 @@ def _enhet_admin_dict(enhet):
         'id': enhet.pk,
         'navn': enhet.navn,
         'er_aktiv': enhet.er_aktiv,
+        'pa_vakt': enhet.pa_vakt,
         'user_id': enhet.user_id,
         'username': getattr(enhet.user, 'username', '') or '',
     }
@@ -82,6 +83,7 @@ def enheter_view(request):
         {
             'id': e.pk,
             'navn': e.navn,
+            'pa_vakt': e.pa_vakt,
             'status': info['status'],
             'status_navn': info['status_navn'],
             'antall_ventende': info['antall_ventende'],
@@ -91,8 +93,12 @@ def enheter_view(request):
         for e, info in ((e, services.enhet_status(e, year)) for e in enheter)
     ]
 
+    # Enheter som ikke er på vakt sendes med, de filtreres ikke bort.
+    # Sentralbordet viser dem i en egen gruppe: en bil som forsvinner fra
+    # tavla er en bil ingen husker å sette inn igjen.
     etag = etag_for([
-        (r['id'], r['status'], r['antall_ventende'], r['aktivt_oppdrag_id'])
+        (r['id'], r['status'], r['antall_ventende'], r['aktivt_oppdrag_id'],
+         r['pa_vakt'])
         for r in data
     ])
     if request.META.get('HTTP_IF_NONE_MATCH') == etag:
@@ -208,6 +214,44 @@ def kontoer_view(request):
          'opptatt': k.pk in tatt}
         for k in kontoer
     ]})
+
+
+@modul_kreves('oppdrag', 'skriv_full', svar='json')
+@require_http_methods(['POST'])
+@rate_limit(group='oppdrag:vakt', rate='60/m', method='POST')
+def enhet_vakt_view(request, pk):
+    """Ta en enhet på eller av vakt. Ressursoversikt, ikke oppsett.
+
+    Skilt fra `enhet_detalj_view`, som er admin-flaten for navn, aktiv og
+    kontokobling. Dette er drift: 113 tar biler på og av gjennom vakta, og
+    skal ikke måtte være global admin for det.
+
+    **En enhet med et påbegynt oppdrag kan ikke tas av vakt.** Den er ute
+    akkurat nå; å fjerne den fra tavla ville skjult et pågående oppdrag for
+    den som har ansvaret for det. Avslutt oppdraget først.
+    """
+    try:
+        enhet = Enhet.objects.get(pk=pk, er_aktiv=True)
+    except Enhet.DoesNotExist:
+        return JsonResponse(
+            {'status': 'error', 'message': 'Enhet ikke funnet'}, status=404)
+
+    pa_vakt = bool(json_body(request).get('pa_vakt'))
+
+    if not pa_vakt:
+        aktivt = services.aktivt_oppdrag(enhet, get_active_year())
+        if aktivt is not None:
+            return JsonResponse({
+                'status': 'error',
+                'message': (
+                    f'«{enhet.navn}» har et pågående oppdrag '
+                    f'({aktivt.get_status_display()}). Avslutt det først.'),
+            }, status=400)
+
+    enhet.pa_vakt = pa_vakt
+    enhet.save(update_fields=['pa_vakt', 'updated_at'])
+    return JsonResponse({'status': 'ok', 'data': {
+        'id': enhet.pk, 'navn': enhet.navn, 'pa_vakt': enhet.pa_vakt}})
 
 
 # ── Lokasjoner ───────────────────────────────────────────────────────────────
@@ -349,10 +393,12 @@ def oppdrag_liste_view(request):
             {'status': 'error', 'message': '; '.join(feil.messages)}, status=400)
 
     try:
-        enhet = Enhet.objects.get(pk=data.get('enhet_id'), er_aktiv=True)
+        enhet = Enhet.objects.get(
+            pk=data.get('enhet_id'), er_aktiv=True, pa_vakt=True)
     except (Enhet.DoesNotExist, ValueError, TypeError):
         return JsonResponse(
-            {'status': 'error', 'message': 'Ukjent eller inaktiv enhet.'}, status=400)
+            {'status': 'error',
+             'message': 'Ukjent enhet, eller enheten er ikke på vakt.'}, status=400)
     try:
         lokasjon = Lokasjon.objects.get(pk=data.get('lokasjon_id'), er_aktiv=True)
     except (Lokasjon.DoesNotExist, ValueError, TypeError):
@@ -448,10 +494,12 @@ def flytt_view(request, pk):
             {'status': 'error', 'message': 'Oppdrag ikke funnet'}, status=404)
 
     try:
-        ny_enhet = Enhet.objects.get(pk=json_body(request).get('enhet_id'), er_aktiv=True)
+        ny_enhet = Enhet.objects.get(
+            pk=json_body(request).get('enhet_id'), er_aktiv=True, pa_vakt=True)
     except (Enhet.DoesNotExist, ValueError, TypeError):
         return JsonResponse(
-            {'status': 'error', 'message': 'Ukjent eller inaktiv enhet.'}, status=400)
+            {'status': 'error',
+             'message': 'Ukjent enhet, eller enheten er ikke på vakt.'}, status=400)
 
     bytte = services.flytt_til_enhet(oppdrag, ny_enhet, bruker=request.user)
     if bytte is None:

@@ -53,11 +53,24 @@
 }
 
 .status-ledig      { background: #64748b; }
+.status-av_vakt    { background: #334155; }
 .status-venter     { background: #64748b; }
 .status-rykker_ut  { background: #f59e0b; }
 .status-fremme     { background: #3b82f6; }
 .status-avreist    { background: #8b5cf6; }
 .status-leverer    { background: #06b6d4; }
+
+/* Enheter som ikke er på vakt dempes, men skjules ikke. Fargen bærer ikke
+ * informasjonen alene — teksten «Ikke på vakt» står i kortet. */
+.enhet-av-vakt { opacity: 0.62; }
+
+.enhet-gruppe {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+  margin-top: 0.75rem;
+}
 
 /* ── Hastegrad ───────────────────────────────────────────────────────────── */
 /* Fargen er sekundær: teksten står alltid. */

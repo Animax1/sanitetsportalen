@@ -380,3 +380,88 @@ class ManglendeOppsettTests(OppdragBasis):
         data = _klient(_bruker('sentral23', 'les')).get(
             '/oppdrag/api/enheter/').json()['data']
         self.assertEqual(data, [])
+
+
+class PaaVaktTests(OppdragBasis):
+    """Ressursoversikt: 113 tar biler på og av vakt gjennom vakta.
+
+    `pa_vakt` er ikke `er_aktiv`. Den første er drift og endres flere ganger
+    per vakt; den andre er oppsett og settes av admin når en bil pensjoneres.
+    Slås de sammen, ser «pensjonert» likt ut som «hjemme i kveld», og den som
+    skulle skru bilen på igjen finner den ikke.
+    """
+
+    def test_skriv_full_kan_ta_av_vakt(self):
+        c = _klient(_bruker('sentral30', 'skriv_full'))
+        resp = c.post(f'/oppdrag/api/enheter/{self.enhet.pk}/vakt/',
+                      content_type='application/json', data={'pa_vakt': False})
+        self.assertEqual(resp.status_code, 200)
+        self.enhet.refresh_from_db()
+        self.assertFalse(self.enhet.pa_vakt)
+
+    def test_les_kan_ikke(self):
+        c = _klient(_bruker('leser30', 'les'))
+        resp = c.post(f'/oppdrag/api/enheter/{self.enhet.pk}/vakt/',
+                      content_type='application/json', data={'pa_vakt': False})
+        self.assertEqual(resp.status_code, 403)
+
+    def test_enhet_av_vakt_kan_ikke_faa_oppdrag(self):
+        Enhet.objects.filter(pk=self.enhet.pk).update(pa_vakt=False)
+        c = _klient(_bruker('sentral31', 'skriv_full'))
+        resp = c.post('/oppdrag/api/oppdrag/', content_type='application/json', data={
+            'enhet_id': self.enhet.pk, 'lokasjon_id': self.lokasjon.pk,
+            'problemstilling': 'Pustevansker', 'hastegrad': 'Akutt',
+        })
+        self.assertEqual(resp.status_code, 400)
+
+    def test_enhet_av_vakt_kan_ikke_faa_flyttet_oppdrag(self):
+        """Ellers ville flytting vært en bakvei rundt vaktstatusen."""
+        oppdrag = self._oppdrag(self.enhet)
+        Enhet.objects.filter(pk=self.annen_enhet.pk).update(pa_vakt=False)
+        c = _klient(_bruker('sentral32', 'skriv_full'))
+        resp = c.post(f'/oppdrag/api/oppdrag/{oppdrag.pk}/flytt/',
+                      content_type='application/json',
+                      data={'enhet_id': self.annen_enhet.pk})
+        self.assertEqual(resp.status_code, 400)
+
+    def test_kan_ikke_tas_av_vakt_med_pagaende_oppdrag(self):
+        """Bilen er ute akkurat nå — å fjerne den fra tavla skjuler oppdraget."""
+        self._oppdrag(self.enhet, status=choices.FREMME)
+        c = _klient(_bruker('sentral33', 'skriv_full'))
+        resp = c.post(f'/oppdrag/api/enheter/{self.enhet.pk}/vakt/',
+                      content_type='application/json', data={'pa_vakt': False})
+        self.assertEqual(resp.status_code, 400)
+        self.assertIn('pågående oppdrag', resp.json()['message'])
+        self.enhet.refresh_from_db()
+        self.assertTrue(self.enhet.pa_vakt)
+
+    def test_ventende_oppdrag_hindrer_ikke(self):
+        """Vern mot at sperren alltid slår til. Bilen har ikke rykket ut."""
+        self._oppdrag(self.enhet, status=choices.VENTER)
+        c = _klient(_bruker('sentral34', 'skriv_full'))
+        resp = c.post(f'/oppdrag/api/enheter/{self.enhet.pk}/vakt/',
+                      content_type='application/json', data={'pa_vakt': False})
+        self.assertEqual(resp.status_code, 200)
+
+    def test_enhet_av_vakt_vises_fortsatt_i_lista(self):
+        """Skjules den, er den en bil ingen husker å sette inn igjen."""
+        Enhet.objects.filter(pk=self.enhet.pk).update(pa_vakt=False)
+        data = _klient(_bruker('sentral35', 'les')).get(
+            '/oppdrag/api/enheter/').json()['data']
+        rad = next(r for r in data if r['id'] == self.enhet.pk)
+        self.assertFalse(rad['pa_vakt'])
+
+    def test_pensjonert_enhet_vises_ikke(self):
+        """`er_aktiv=False` er noe annet: den skal bort for godt."""
+        Enhet.objects.filter(pk=self.enhet.pk).update(er_aktiv=False)
+        data = _klient(_bruker('sentral36', 'les')).get(
+            '/oppdrag/api/enheter/').json()['data']
+        self.assertNotIn(self.enhet.pk, [r['id'] for r in data])
+
+    def test_etag_endres_naar_vaktstatus_endres(self):
+        c = _klient(_bruker('sentral37', 'skriv_full'))
+        etag = c.get('/oppdrag/api/enheter/')['ETag']
+        c.post(f'/oppdrag/api/enheter/{self.enhet.pk}/vakt/',
+               content_type='application/json', data={'pa_vakt': False})
+        self.assertEqual(
+            c.get('/oppdrag/api/enheter/', HTTP_IF_NONE_MATCH=etag).status_code, 200)

@@ -4,6 +4,36 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-08-29 — Biler tas på og av vakt
+
+**1134 tester grønne** (9 nye). Migrasjon `oppdrag.0002_enhet_pa_vakt`.
+
+André ville at `skriv_full` skal kunne ta biler ut av tilgjengelige enheter — «det er jo en
+ressursoversikt».
+
+**Det ble et nytt felt, ikke gjenbruk av `er_aktiv`.** De to svarer på forskjellige
+spørsmål, og forskjellen er hvem som endrer dem og hvor ofte. `er_aktiv` er oppsett: admin
+pensjonerer en bil, og da skal den bort for godt. `pa_vakt` er drift: 113 tar biler på og av
+gjennom vakta. Ett felt for begge ville gjort «pensjonert» og «hjemme i kveld» til samme
+tilstand, og den som skulle skru bilen på igjen ville ikke funnet den. Det er den samme
+sammenblandingen deploy 1–3 brukte tre runder på å rydde bort.
+
+To regler holder oversikten ærlig, begge testet:
+
+- **En enhet av vakt skjules ikke** — den vises i en egen gruppe på sentralbordet. En bil
+  som forsvinner fra tavla er en bil ingen husker å sette inn igjen, og da mangler den neste
+  vakt uten at noen vet hvorfor. En probe som filtrerte dem bort i API-et gjorde testen rød.
+- **En enhet med påbegynt oppdrag kan ikke tas av vakt.** Den er ute akkurat nå. Et ventende
+  oppdrag hindrer derimot ikke — bilen har ikke rykket ut, og motstykket er testet så
+  sperren ikke kan bli en som alltid slår til.
+
+Flytting er ingen bakvei: et oppdrag kan ikke flyttes til en enhet som er av vakt.
+
+Endepunktet er skilt fra `enhet_detalj_view`, som er admin-flaten for navn, kobling og
+pensjonering. Drift og oppsett har ulike brukere og ulik frekvens, og bør ikke dele dør.
+
+---
+
 ## 2026-08-29 — Nivåene tilbys per modul, og bilnivået forhåndsvelges
 
 **1125 tester grønne** (5 nye). Ingen migrasjon.

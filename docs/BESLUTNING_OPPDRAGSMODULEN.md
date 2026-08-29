@@ -94,8 +94,26 @@ fordi et brukernavn er en innloggingsdetalj og et enhetsnavn er noe man sier på
 class Enhet(BaseTimeStampedModel):
     navn = models.CharField(max_length=64, unique=True)      # «Haugesund 56»
     user = models.OneToOneField(CustomUser, null=True, on_delete=models.SET_NULL)
-    er_aktiv = models.BooleanField(default=True)
+    er_aktiv = models.BooleanField(default=True)   # oppsett: finnes enheten
+    pa_vakt = models.BooleanField(default=True)    # drift: er den i tjeneste nå
 ```
+
+**To felter, ikke ett, og forskjellen er hvem som endrer dem og hvor ofte.**
+`er_aktiv` er oppsett: admin pensjonerer en bil, og da skal den bort fra alle lister for
+godt. `pa_vakt` er ressursoversikten: 113 tar biler på og av gjennom vakta, og trenger ikke
+være global admin for det.
+
+Slås de sammen, ser «pensjonert» likt ut som «hjemme i kveld» — og den som skulle skru
+bilen på igjen finner den ikke.
+
+To regler holder oversikten ærlig:
+
+* **En enhet som ikke er på vakt skjules ikke.** Sentralbordet viser den i en egen gruppe.
+  En bil som forsvinner fra tavla er en bil ingen husker å sette inn igjen, og da mangler
+  den neste vakt uten at noen vet hvorfor.
+* **En enhet med et påbegynt oppdrag kan ikke tas av vakt.** Den er ute akkurat nå; å
+  fjerne den fra tavla ville skjult et pågående oppdrag for den som har ansvaret. Flytting
+  er heller ingen bakvei: et oppdrag kan ikke flyttes til en enhet som er av vakt.
 
 `SET_NULL`, ikke `CASCADE`: slettes kontoen, skal enheten og dens oppdragshistorikk bestå.
 Samme valg som `Forstehjelper.user`, og av samme grunn.

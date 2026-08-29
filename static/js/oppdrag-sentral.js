@@ -49,22 +49,69 @@ function renderEnheter() {
     return;
   }
 
-  el.innerHTML = (enheter.map((e) => {
+  // Enheter som ikke er på vakt skjules ikke — de vises i en egen gruppe
+  // under. En bil som forsvinner fra tavla er en bil ingen husker å sette
+  // inn igjen, og da mangler den neste vakt uten at noen vet hvorfor.
+  const paVakt = enheter.filter((e) => e.pa_vakt);
+  const av = enheter.filter((e) => !e.pa_vakt);
+
+  const kort = (e) => {
     // «Ledig (2 venter)» er distinksjonen 113 trenger: enheten har fått
     // oppdrag, men ikke rykket ut, og kan fortsatt sendes.
     const meta = e.antall_ventende
       ? `${e.status_navn} · ${e.antall_ventende} venter`
       : String(e.status_navn);
+    // Fragmentene bygges før mal-strengen. En nøstet mal-streng inne i en
+    // interpolasjon er usynlig for XSS-gjennomgangen i tests_xss.py, så en
+    // uescapet verdi der ville passert stille.
+    const knappKlasse = e.pa_vakt ? 'btn-outline-secondary' : 'btn-outline-success';
+    const knappHandling = e.pa_vakt ? 'taAvVakt' : 'settPaaVakt';
+    const knappTekst = e.pa_vakt ? 'Av vakt' : 'På vakt';
+    const knapp = (globalThis.OPPDRAG_TILGANG || {}).kanSkrive
+      ? `<button class="btn btn-sm ${knappKlasse}" data-action="${knappHandling}" data-id="${escHtmlValue(e.id)}">${knappTekst}</button>`
+      : '';
+    const kortKlasse = e.pa_vakt ? 'enhet-kort' : 'enhet-kort enhet-av-vakt';
+    const prikk = e.pa_vakt ? e.status : 'av_vakt';
+    const metatekst = e.pa_vakt ? meta : 'Ikke på vakt';
     return `
-      <div class="enhet-kort">
-        <span class="status-prikk status-${escHtmlValue(e.status)}"></span>
+      <div class="${kortKlasse}">
+        <span class="status-prikk status-${escHtmlValue(prikk)}"></span>
         <div class="flex-grow-1">
           <div class="enhet-navn">${escapeHtml(e.navn)}</div>
-          <div class="enhet-meta">${escapeHtml(meta)}</div>
+          <div class="enhet-meta">${escapeHtml(metatekst)}</div>
         </div>
+        ${knapp}
       </div>`;
-  }).join(''));
+  };
+
+  const deler = [];
+  deler.push(paVakt.length
+    ? paVakt.map(kort).join('')
+    : '<div class="tom-melding">Ingen enheter på vakt.</div>');
+  if (av.length) {
+    deler.push(`<div class="enhet-gruppe">Ikke på vakt (${escHtmlValue(av.length)})</div>`);
+    deler.push(av.map(kort).join(''));
+  }
+  el.innerHTML = (deler.join(''));
 }
+
+
+async function _settVakt(id, paVakt) {
+  const res = await apiFetch(`/oppdrag/api/enheter/${id}/vakt/`, {
+    method: 'POST',
+    body: JSON.stringify({ pa_vakt: paVakt }),
+  });
+  const d = await res.json();
+  if (!res.ok || d.status !== 'ok') {
+    alert(d.message || 'Kunne ikke endre vaktstatus.');
+    return;
+  }
+  etagEnheter = null;   // tving ny henting, ellers svarer serveren 304
+  await lastAlt();
+}
+
+async function taAvVakt(id) { await _settVakt(id, false); }
+async function settPaaVakt(id) { await _settVakt(id, true); }
 
 
 // ── Oppdragsliste ───────────────────────────────────────
@@ -455,7 +502,7 @@ async function lastLokasjoner() {
 function fyllNedtrekk() {
   const enhetsvalg = document.getElementById('nytt-enhet');
   if (enhetsvalg) {
-    enhetsvalg.innerHTML = (enheter.map(
+    enhetsvalg.innerHTML = (enheter.filter((e) => e.pa_vakt).map(
       (e) => `<option value="${escHtmlValue(e.id)}">${escapeHtml(e.navn)}</option>`).join(''));
   }
   const lokvalg = document.getElementById('nytt-lokasjon');
@@ -473,7 +520,7 @@ function visManglendeOppsett() {
   const boks = document.getElementById('mangler-oppsett');
   if (!boks) return;
   const mangler = [];
-  if (!enheter.length) mangler.push('ingen enheter');
+  if (!enheter.filter((e) => e.pa_vakt).length) mangler.push('ingen enheter på vakt');
   if (!lokasjoner.filter((l) => l.er_aktiv).length) mangler.push('ingen aktive lokasjoner');
 
   const knapp = document.querySelector('[data-bs-target="#nyttOppdragModal"]');

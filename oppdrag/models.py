@@ -55,10 +55,23 @@ class Enhet(BaseTimeStampedModel):
         verbose_name='Innlogget som',
         help_text='Kontoen enheten logger inn med. Bør være en delt konto.',
     )
+    # To felter, ikke ett, og forskjellen er hvem som endrer dem og hvor ofte.
+    #
+    # `er_aktiv` er oppsett: finnes enheten i det hele tatt. Admin pensjonerer
+    # en bil, og da skal den bort fra alle lister for godt.
+    #
+    # `pa_vakt` er drift: er den i tjeneste akkurat nå. 113 tar biler på og av
+    # gjennom vakta. Slås de sammen, ser «pensjonert» likt ut som «hjemme i
+    # kveld» — og den som skulle skru den på igjen finner den ikke.
     er_aktiv = models.BooleanField(
         default=True,
         verbose_name='Aktiv',
-        help_text='Inaktive enheter kan ikke tildeles nye oppdrag.',
+        help_text='Pensjonerte enheter skjules overalt. Settes av admin.',
+    )
+    pa_vakt = models.BooleanField(
+        default=True,
+        verbose_name='På vakt',
+        help_text='Enheter som ikke er på vakt kan ikke få nye oppdrag.',
     )
 
     class Meta:
