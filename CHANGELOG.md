@@ -33,6 +33,30 @@ vaktpost), modellene, livsløpet planlegging → drift, koblingen til `/oppdrag`
 går én vei, `vaktliste` → `oppdrag`, med panelet hentet i nettleseren slik
 statistikkappen gjør — og forholdet til de to personregistrene som finnes fra før.
 
+**Seks avklaringer besvart samme dag, og tre av dem endret utformingen:**
+
+- **Korps er en badge, ikke en ny akse.** Forslaget om nivået `skriv_korps` er
+  forkastet: stigen portalen har holder. `skriv_handling` betyr «fører sitt eget
+  korps», `skriv_full` «alle korps» — og `skriv_full` er dessuten den eneste som
+  stempler møtt og av vakt. Skillet mellom de to skrivenivåene er ikke bredde, men
+  art: å føre inn sine egne folk er planlegging, å stemple noen inn er et utsagn om
+  hva som faktisk skjedde. Ingen ny verdi i `NIVAA_HIERARKI`, ingen migrasjon.
+  Prisen er notert: nivånavnet betyr noe annet her enn i oppdragsmodulen, og matrisen
+  viser en global etikett — så det trengs en valgfri etikett per modul per nivå,
+  ellers deles nivået ut i god tro med feil forventning.
+- **Matallergi lagres ikke i portalen.** Grunnen til at utkastet trengte fem tiltak
+  rundt feltet, er også grunnen til at det ble tatt ut: det er en helseopplysning
+  etter art. 9, og fem mekanismer for én kolonne som skal brukes til å bestille mat er
+  feil pris. Samles inn utenfor portalen. Konsekvensen står i notatet: lista kan ikke
+  brukes til matbestilling. Utkastets fase 2 utgår, og personvernarbeidet som blir
+  igjen — rader i protokollen, audit-unntak for `notat` — flyttes inn i fase 1.
+- **Pasientmodulens to personregistre forblir urørt.** Heller ingen valgfri kobling:
+  de svarer på «hvem behandlet pasienten», ikke «hvem er på vakt». Prisen er at et
+  navn kan stå to steder, og den er akseptert — en nullbar FK er en additiv migrasjon
+  den dagen behovet melder seg.
+
+Tre avklaringer står igjen (§11.7–11.10), alle med anbefaling.
+
 ---
 
 ## 2026-08-29 — Oppdragsmodulen fase 7: vaktarkiv for oppdrag

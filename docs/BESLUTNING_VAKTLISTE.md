@@ -1,7 +1,13 @@
 # Beslutningsnotat: vaktlistemodulen
 
-Status: **utkast 29. aug. 2026.** Bestilt av André samme dag. Avklaringene i §11 er
-ikke besvart ennå — notatet er skrevet for å gjøre dem mulige å svare på.
+Status: **utkast 29. aug. 2026, fire avklaringer besvart samme dag.** Bestilt av André.
+Svarene er ført inn der de hører hjemme; §11 viser hva som står igjen.
+
+Tre av svarene endret notatet mer enn de bekreftet det:
+
+1. **Korps er en badge, ikke en akse.** Den eksisterende stigen holder — se §4.
+2. **Kostbehov lagres ikke i portalen i det hele tatt.** Hele §7 ble en annen tekst.
+3. **Ingen kobling til pasientmodulens personregistre.** Se §9.
 
 Modulen er den mest sentrale som er foreslått så langt: den beskriver *hvem som er på
 vakt*, og både pasientmodulen og oppdragsmodulen har hittil måttet gjette på det.
@@ -14,9 +20,9 @@ tilgangsmodellen og personvernet er ikke ting man setter på etterpå.
 
 Fire ting, slik de ble bestilt:
 
-1. **Oversikt over personellet** — sortert på korps, med kompetanse, rolle under vakt
-   og kostbehov. Korps, kompetanse, rolle og kostbehov skal vedlikeholdes av admin,
-   ikke ligge i kode.
+1. **Oversikt over personellet** — sortert på korps, med kompetanse og rolle under
+   vakt. Korps, kompetanse og rolle vedlikeholdes av admin, ikke i kode.
+   *Matallergi sto i bestillingen, men er tatt ut — se §7.*
 2. **Bemanning av vaktas ressurser** — samleplass (sykestua), mannskapsbil,
    ambulanse, lag, KO, og det vakta ellers måtte kreve. Faner i grensesnittet.
 3. **Planlegging som blir drift** — lista settes opp på forhånd, settes i drift når
@@ -29,7 +35,9 @@ Og én ting til, som er den som styrer mest av utformingen:
 
 5. **To skiller i skrivetilgangen.** En bruker fra korps Z skal kunne redigere korps
    Z og legge til folk der, men ikke røre andre korps. En bruker med universell
-   skrivetilgang redigerer alle. Global admin har alt.
+   skrivetilgang redigerer alle. Global admin har alt. Og — presisert i svaret —
+   **den som bare fører sitt eget korps skal ikke kunne sjekke folk inn og ut av
+   vakta.**
 
 ---
 
@@ -60,9 +68,8 @@ ressursen er *noe som bemannes*. Koblingen mellom dem er §6.
 Korps            navn, kortnavn, er_aktiv, rekkefolge
 Kompetanse       navn, er_aktiv, rekkefolge          # «Sanitetsvakt», «Ambulansearbeider», «Sykepleier», «Lege», «Sjåfør kode 160» …
 VaktRolle        navn, er_aktiv, rekkefolge          # «Lagleder», «Fagleder helse», «KO-operatør», «Sjåfør» …
-Kostbehov        navn, er_aktiv                      # se §7 — dette feltet er ikke som de andre
 
-Mannskap         navn, korps→Korps, kompetanser M2M, kostbehov M2M,
+Mannskap         navn, korps→Korps, kompetanser M2M,
                  telefon, user→CustomUser (valgfri), er_aktiv, notat
 
 Vaktliste        vakt→core.Vakt (1:1), status, satt_i_drift_at/av
@@ -74,7 +81,7 @@ Vaktpost         ressurs→Ressurs, mannskap→Mannskap, rolle→VaktRolle,
 
 Fire ting er verdt å begrunne:
 
-**`Korps`, `Kompetanse`, `VaktRolle` og `Kostbehov` er tabeller, ikke `choices.py`.**
+**`Korps`, `Kompetanse` og `VaktRolle` er tabeller, ikke `choices.py`.**
 Motsatt av oppdragsmodulen, der problemstilling og hastegrad ligger i kode. Skillet
 er det samme som mellom `PROBLEMSTILLING` og `Lokasjon`: faglige verdimengder som
 endres sjelden hører i kode, arrangements- og organisasjonsdata i basen. Korpsene og
@@ -82,7 +89,11 @@ kompetansenivåene er organisasjonens, ikke portalens — og bestillingen sier e
 at admin skal styre dem.
 
 **`Mannskap` er et personregister, og det er nytt for portalen.** Se §9 om forholdet
-til `Forstehjelper` og `Helsepersonell`.
+til `Forstehjelper` og `Helsepersonell` — de forblir urørt.
+
+**`Mannskap.korps` er badgen hele tilgangsmodellen hviler på.** Feltet har ingen annen
+funksjon enn å si hvor personen hører hjemme — men fordi en konto kan knyttes til et
+mannskap, er det også det som avgjør hvilke rader kontoen får redigere (§4).
 
 **`Vaktliste` er 1:1 med `Vakt`.** Én vakt, én liste. Alternativet — flere lister per
 vakt — løser ingenting bestillingen beskriver, og gjør «hvem er på vakt nå» til et
@@ -93,61 +104,68 @@ Legges de på personen, kan hun bare være på vakt ett sted, én gang.
 
 ---
 
-## 4. Tilgangsmodellen — den ene virkelig nye mekanismen
+## 4. Tilgangsmodellen — korps som badge, ikke som ny akse
 
-Portalens rollemodell har **én akse**: en ordnet stige per modul
-(`les < skriv_handling < skriv_full`). Bestillingen her introduserer en **andre akse**:
-*hvilke rader* du får skrive til, ikke bare *hva* du får gjøre.
+Utkastet foreslo et nytt nivå `skriv_korps` i den delte stigen. **Det er forkastet.**
+Svaret var at korps skal være *en badge på personen og ingenting annet*, og at det ikke
+skal påvirke stort utenfor vaktlista — og da holder stigen portalen allerede har.
 
-Det er nettopp den sammenblandingen `docs/BESLUTNING_ROLLEMODELLEN.md` advarte mot —
-statistikk ble skilt ut som egen modul for å slippe å ha to akser i én. Så dette må
-gjøres bevisst, ikke ved å presse et scope inn i et nivånavn.
+### 4.1 Nivåene
 
-### 4.1 Anbefalt: scopet utledes av hvem du er
-
-Stigen for denne modulen blir:
-
-| Nivå | Betyr |
+| Nivå | Betyr i denne modulen |
 |---|---|
 | `les` | Ser hele lista, alle korps |
-| `skriv_korps` | Kan redigere mannskap og vaktposter **i sitt eget korps** |
-| `skriv_full` | Kan redigere alle korps |
+| `skriv_handling` | Fører **sitt eget korps**: legger til og redigerer mannskap med samme korps som seg selv, og setter dem på lista. **Kan ikke** stemple møtt/av vakt |
+| `skriv_full` | Alle korps, og **den eneste** som stempler møtt/av vakt og setter lista i drift |
 
-Korpset kommer fra brukerens egen `Mannskap.korps` — altså fra domenedata, ikke fra
-en tilgangsrad. Det er **samme idiom som oppdragsmodulen allerede bruker**: der
-avgjøres det av `Enhet.user` om kontoen får enhetsskjermen eller sentralbordet, og den
-koblingen gir i seg selv ingen tilgang.
+Korpset kommer fra brukerens egen `Mannskap.korps` — badgen. En konto blir knyttet til
+et mannskap (`Mannskap.user`), og arver korpset derfra. Koblingen gir i seg selv ingen
+tilgang; den sier bare *hvem du er*. Det er samme idiom som `Enhet.user` i
+oppdragsmodulen, der koblingen avgjør hvilket grensesnitt kontoen får uten å være
+autorisasjon i seg selv.
 
-Fordelen er at nivået betyr noe alene. `skriv_korps` er en fullstendig setning: «du kan
-redigere ditt eget korps». Ingen ekstra tabell å glemme å fylle ut.
+**Skillet mellom de to skrivenivåene er ikke bredde, det er art.** Å føre inn sine egne
+folk er planlegging — noe hvert korps gjør for seg. Å stemple noen inn på vakt er en
+observasjon om hva som faktisk skjedde, og den hører til den som står med lista på
+vakta. At `skriv_handling` ikke rekker over innsjekk er derfor ikke en begrensning i
+mengde, men i hva slags utsagn nivået får lov å avgi.
 
-Prisen er to kanter som må stå i koden, begge fail-closed:
+### 4.2 Hvorfor `skriv_handling` og ikke et nytt nivå
 
-- En konto med `skriv_korps` som **ikke** er koblet til et mannskap har intet korps, og
-  kan dermed ikke skrive noe. Samme form som en enhetskonto uten enhet.
-- Skal noen administrere **to** korps, holder ikke modellen. Da er svaret `skriv_full`,
-  eller et eksplisitt tillegg senere (§11.3).
+Stigen er ordnet, og `skriv_full` inneholder `skriv_handling`. Det betyr at en
+universell skriver automatisk kan alt korps-føreren kan, uten at noe må listes to
+steder. Ingen ny verdi i `NIVAA_HIERARKI`, ingen migrasjon, og ingenting endres for de
+to modulene som bruker stigen fra før.
+
+Prisen står i §4.4.
+
+### 4.3 To kanter, begge fail-closed
+
+- **Konto med `skriv_handling` uten mannskapsrad** har ingen badge, altså intet korps,
+  og kan dermed ikke skrive noe. Samme form som en enhetskonto uten enhet.
+- **Én person hører til ett korps.** Skal noen føre to korps, er svaret `skriv_full`.
+  Å legge inn flere korps per person nå ville vært å bygge for et tilfelle som ikke
+  finnes — og bestillingen var eksplisitt på å ikke overkomplisere korpsbegrepet.
 
 `les` gjelder hele lista med vilje: poenget med en vaktliste er samordning på tvers av
 korps. Den som ikke skal se andre korps, skal ikke ha modulen.
 
-### 4.2 Alternativet: en egen tildelingstabell
+### 4.4 Prisen: nivånavnet betyr noe annet her enn i oppdrag
 
-`Skrivetilgang(bruker, korps)` der en rad uten korps betyr «alle». Mer fleksibel — den
-løser to-korps-tilfellet gratis — men den innfører et nivå (`skriv_full`) som ikke gir
-noe uten en rad ved siden av. Modulnotatet for rollemodellen kaller nettopp det ut:
-*«et nivå som ikke gir noe er lett å dele ut i god tro»*.
+I oppdragsmodulen betyr `skriv_handling` «navngitte stemplinger, leser ikke
+request-kroppen». Her betyr det nesten det motsatte: *redigering, men bare eget korps,
+og ingen stempling*. Nivåets navn er generisk nok til å bære begge, men
+**tilgangsmatrisen viser i dag en global etikett** — «Skrive: handling» — hentet fra
+`TilgangsNivaa.choices`. En admin som deler ut nivået på vaktlista vil ikke se hva det
+betyr der.
 
-**Anbefaling: 4.1.** Den er enklere å forklare, og to-korps-tilfellet kan løses den
-dagen det faktisk finnes.
+Det må derfor følge med en liten utvidelse: **en valgfri etikett per modul per nivå**,
+f.eks. `Module.nivaa_navn = {'skriv_handling': 'Skrive: eget korps'}`, som matrisen
+bruker når den finnes. Uten den deles nivået ut i god tro med feil forventning — og det
+er nøyaktig feilen rollemodellnotatet allerede har kalt ut én gang.
 
-### 4.3 Ny verdi i den delte stigen
-
-`skriv_korps` må inn i `NIVAA_HIERARKI` i `core/auth_decorators.py`, mellom `les` og
-`skriv_full`. Det er en delt konstant, men `Module.nivaaer` styrer hva som *tilbys* per
-modul, så ingen annen modul påvirkes. Samme grep som da `skriv_handling` kom.
-
----
+Det er én liten endring i `accounts/forms.py` og `core/modules.py`, og den hører til
+fase 4.
 
 ## 5. Livsløp: planlegging → drift
 
@@ -191,47 +209,44 @@ vaktlistetilgang, vises panelet ikke i det hele tatt — samme komposisjonsregel
 statistikksiden bruker (§5 i rollemodellen): en modul viser bare kilder brukeren har
 tilgang til, framfor å gi avledet innsyn.
 
-Svaret inneholder navn, rolle og innsjekkstatus. **Ikke kostbehov** — operatøren
-trenger ikke vite hva sjåføren tåler for å tildele et oppdrag.
+Svaret inneholder navn, rolle og innsjekkstatus — det operatøren trenger for å vite
+om bilen er bemannet. Ikke telefonnummer, ikke kompetanseliste, ikke `notat`:
+sentralbordet skal se om ressursen er klar, ikke lese personalmapper.
 
 ---
 
-## 7. Personvern — kostbehov er ikke som de andre feltene
+## 7. Personvern — matallergi lagres ikke i portalen
 
-**Matallergi er en helseopplysning.** Det er ikke en detalj: helseopplysninger er en
-særlig kategori etter GDPR art. 9, og alminnelig behandlingsgrunnlag etter art. 6
-holder ikke alene. Portalen behandler allerede helseopplysninger om *pasienter*, med
-et dokumentert grunnlag. Dette er noe annet: helseopplysninger om **egne
-frivillige**, lagret i et register de ikke selv kontrollerer.
+Utkastet foreslo et `kostbehov`-felt med fem tiltak rundt seg. **Beslutningen ble å
+ikke lagre det i portalen i det hele tatt.**
 
-Fem tiltak, som til sammen gjør feltet forsvarlig — og som må være på plass **før
-feltet tas i bruk**, ikke etterpå. Samme rekkefølgekrav som fase 2 i oppdragsmodulen,
-og av samme grunn: rader som er skrevet feil kan ikke fjernes i ettertid uten å røre
-sporet.
+Grunnen tiltakene var nødvendige, er også grunnen til at det er et godt valg: en
+matallergi er en **helseopplysning**, altså en særlig kategori etter GDPR art. 9. Det
+ville vært første gang portalen lagret slikt om *egne frivillige* framfor om pasienter,
+og det krever eget behandlingsgrunnlag, egen synlighetsregel, eget unntak fra
+verdilogging og egen lagringstid. Fem mekanismer, for én kolonne som bare skal brukes
+til å bestille mat.
 
-1. **Feltet heter `kostbehov`, ikke `allergi`.** Verdimengden er admin-styrt
-   («Vegetar», «Glutenfri», «Nøtteallergi», «Laktose» …). Det matbestillingen trenger
-   er hva personen skal ha, ikke en diagnose. Datamengden blir minimal, og formålet
-   står i navnet.
-2. **Grunnlaget er samtykke** (art. 9(2)(a)), innhentet ved påmelding til vakt, og
-   dokumentert i protokollen. Feltet må derfor kunne stå tomt uten at noe klager —
-   et påkrevd samtykke er ikke et samtykke.
-3. **Synligheten er smalere enn resten av lista.** Kostbehov vises for `skriv_korps`,
-   `skriv_full` og admin — de som faktisk bestiller mat. `les` ser lista uten den
-   kolonnen, og `/oppdrag`-panelet ser den aldri.
-4. **Unntatt verdilogging i audit**, som `Oppdrag.fritekst`. At feltet ble endret
-   logges; hva det ble endret fra og til gjør det ikke.
-5. **Kortere lagringstid enn resten.** Arkivet skal dokumentere *hvem som var på
-   vakt* — det er verdifullt ved skade- og avvikssak. Det skal ikke dokumentere hva de
-   tålte. Kostbehov arkiveres derfor ikke, og slettes med lista.
+**Kostbehov samles derfor inn utenfor portalen** — påmeldingsskjema, eller lista til
+den som bestiller maten. Konsekvensen er ærlig og verdt å vite: vaktlista kan ikke
+brukes til matbestilling, og den som lager mat må ha sin egen kilde.
 
-Resten av registeret — navn, telefon, korps, kompetanse — er alminnelige
-personopplysninger om frivillige, med berettiget interesse eller avtale som grunnlag.
-De trenger likevel en egen rad i `PERSONVERN_DOKUMENTASJON.md` A.6 og A.9, og en
-lagringstid: et mannskapsregister som aldri ryddes er et arkiv over folks
-organisasjonstilhørighet.
+Det som *blir* liggende i modulen — navn, telefon, korps, kompetanse, og hvem som var
+på vakt når — er alminnelige personopplysninger om frivillige. De trenger likevel sitt:
 
----
+- **En egen rad i `PERSONVERN_DOKUMENTASJON.md` A.6** (hva som lagres og hvorfor) og
+  **A.9** (hvor lenge). Et mannskapsregister uten lagringstid er et arkiv over folks
+  organisasjonstilhørighet, og det blir bare mer bevaringsverdig jo lenger det står.
+- **En ryddeplikt.** Registeret er globalt (§11.1) og lever mellom vakter. Inaktive
+  mannskaper skal kunne pensjoneres, og pensjonerte skal kunne slettes når ingen
+  vaktposter peker på dem.
+- **Ingen sensitive felter smugler seg inn.** `notat` på `Mannskap` er fritekst, og
+  fritekst er der helseopplysninger havner når det ikke finnes et felt for dem.
+  Feltet unntas verdilogging i audit, som `Oppdrag.fritekst` — at det ble endret
+  logges, hva som sto der gjør det ikke.
+
+Dette er en langt mindre jobb enn utkastets fase 2, og den forsvinner ikke: den er nå
+en del av fase 1.
 
 ## 8. Frontend
 
@@ -254,106 +269,97 @@ KO står med en telefon i hånda og skal treffe riktig rad første gang.
 
 ## 9. Forholdet til `Forstehjelper` og `Helsepersonell`
 
-Portalen har allerede to personregistre, begge i pasientmodulen, begge med valgfri
-kobling til en konto. `Mannskap` blir det tredje.
+Portalen har allerede to personregistre, begge i pasientmodulen. `Mannskap` blir det
+tredje. Utkastet foreslo en valgfri kobling mellom dem, slik at en sammenslåing senere
+skulle bli lettere.
 
-**Det er én for mye, og det vet vi allerede nå.** Den som er førstehjelper på
-samleplassen skal skrives inn to steder, og et navn som staves ulikt de to stedene er
-to personer i statistikken.
+**Beslutningen ble å la dem være helt i fred.** De to registrene finnes for dem som
+bruker `/pasienter` — de svarer på «hvem behandlet denne pasienten», ikke «hvem er på
+vakt». Vaktlista trenger dem ikke, og en kobling som ingen bruker er et felt som må
+vedlikeholdes uten å gi noe.
 
-Likevel: **ikke slå dem sammen i denne runden.** `Forstehjelper` er referert av 273
-pasienter i produksjon og av arkivrader med frosne navn, og en sammenslåing er en
-migrasjon med reell risiko — midt i en modul som ellers er ny og isolert. Samme
-avveining som §12.1 i oppdragsnotatet.
+Prisen er kjent og akseptert: **et navn kan stå to steder.** Den som er førstehjelper
+på samleplassen kan finnes både som `Mannskap` og som `Forstehjelper`, og de to vet
+ikke om hverandre. Det er ikke en feil så lenge de svarer på hvert sitt spørsmål.
 
-Det som *skal* gjøres nå, er å gjøre sammenslåingen mulig senere:
-
-- `Mannskap.forstehjelper` — nullbar OneToOne til `patients.Forstehjelper`, satt av
-  admin når det er samme person. Da kan «mine pasienter» og vaktlista snakke sammen
-  uten at noe må skrives to ganger.
-- Ingen kopiering av navn mellom registrene automatisk. Magi som holder to registre i
-  synk er verre enn to registre.
-
-Sammenslåingen føres opp som eget punkt i TODO, med prisen notert: to steder å
-vedlikeholde navn til den er gjort.
-
----
+Skulle behovet melde seg — «vis meg pasientene mannskapet mitt behandlet» — er en
+nullbar FK en additiv migrasjon som kan legges til når som helst. Ingenting i
+utformingen her stenger for det.
 
 ## 10. Faser
 
 | Fase | Innhold | Estimat |
 |---|---|---|
-| 1 | App, modulregistrering, `Korps`/`Kompetanse`/`VaktRolle`, `Mannskap` med admin. **Uten kostbehov** | 6–8 t |
-| 2 | Personverntillegget for kostbehov (§7) + feltet. **Før fase 3** | 3–4 t |
-| 3 | `Vaktliste`, `Ressurs`, `Vaktpost`, planlegging med faner. «Ny planlagt vakt» | 8–10 t |
-| 4 | Tilgangsmodellen: `skriv_korps`, objektsjekk per korps, matrisen | 4–6 t |
-| 5 | Drift: sett i drift, møtt/av vakt, endring under drift | 5–7 t |
-| 6 | Kobling til `/oppdrag`: besetningspanel på enheten | 3–4 t |
-| 7 | Arkiv + statistikk via `core.arkiv` og `core.stats` | 4–6 t |
+| 1 | App, modulregistrering, `Korps`/`Kompetanse`/`VaktRolle`, `Mannskap` med admin. Personvernrader i A.6/A.9, audit-unntak for `notat` | 7–9 t |
+| 2 | `Vaktliste`, `Ressurs`, `Vaktpost`, planlegging med faner. «Ny planlagt vakt» | 8–10 t |
+| 3 | Tilgangsmodellen: korps-sjekk på objektnivå, per-modul-etikett i matrisen (§4.4) | 4–6 t |
+| 4 | Drift: sett i drift, møtt/av vakt (kun `skriv_full`), endring under drift | 5–7 t |
+| 5 | Kobling til `/oppdrag`: besetningspanel på enheten | 3–4 t |
+| 6 | Arkiv + statistikk via `core.arkiv` og `core.stats` | 4–6 t |
 
-**Fase 2 står før fase 3** av samme grunn som i oppdragsmodulen: feltet skal ikke være
-i produksjon med full verdilogging én eneste dag.
+Utkastets fase 2 — personverntillegget for kostbehov — **utgår** med beslutningen i §7.
+Det som blir igjen av personvernarbeid (rader i protokollen, audit-unntak for `notat`)
+er lite nok til å ligge i fase 1, og har ikke lenger et rekkefølgekrav foran seg: uten
+helseopplysninger er det ingen rader som ikke kan ryddes i ettertid.
 
-**Fase 4 kunne ligget først**, men gjør det ikke: tilgangsreglene er lettere å skrive
-riktig når det finnes rader å skrive dem om. Fram til fase 4 er modulen admin-only —
-det er fail-closed, og ingen andre slipper inn i mellomtiden.
+**Fram til fase 3 er modulen admin-only.** Det er fail-closed, og ingen andre slipper
+inn i mellomtiden. Tilgangsreglene er lettere å skrive riktig når det finnes rader å
+skrive dem om.
 
-**Fase 7 blir tredje modul i begge registrene.** Det er den beste prøven `core.arkiv`
+**Fase 6 blir tredje modul i begge registrene.** Det er den beste prøven `core.arkiv`
 og `core.stats` kan få: mønstrene ble skrevet for to moduler, og en tredje viser om de
 faktisk generaliserer eller bare ble beskrevet som om de gjorde det.
 
-Totalt 33–45 timer.
+Totalt 31–42 timer.
 
----
+## 11. Avklaringer
 
-## 11. Åpne avklaringer
+### Besvart 29. aug. 2026
 
-Disse må besvares før fase 1. Anbefalingene står, men valget er ditt.
+| # | Spørsmål | Svar |
+|---|---|---|
+| 11.1 | Globalt mannskapsregister eller per vakt? | **Globalt.** Følger av at korps-brukeren «legger til korps Z-medlemmer» én gang, ikke per vakt |
+| 11.2 | Hvordan skal korps-skillet utformes? | **Badge på personen, eksisterende stige.** `skriv_handling` = eget korps, `skriv_full` = alle. Ingen ny akse, ingen ny verdi i stigen — §4 |
+| 11.3 | Kan korps-brukeren sjekke folk inn og ut? | **Nei.** Innsjekk og avregistrering krever `skriv_full`. Korps-brukeren fører inn sine folk, men avgir ikke utsagn om hva som skjedde på vakta |
+| 11.4 | Kostbehov/matallergi i portalen? | **Nei.** Samles inn utenfor — §7 |
+| 11.5 | Kobling til `Forstehjelper`/`Helsepersonell`? | **Nei.** De hører til `/pasienter` og forblir urørt — §9 |
+| 11.6 | Flere korps per bruker? | **Nei nå.** Svaret er `skriv_full` inntil behovet er reelt |
 
-### 11.1 Skal mannskapsregisteret være globalt eller per vakt?
+### Står igjen
 
-Et **globalt** register (anbefalt) er personellet organisasjonen har, og hver vakt
-plukker fra det. Et **per vakt**-register ville betydd å skrive inn alle på nytt hver
-gang.
+**11.7 Skal «Sett i drift» også bytte portalens aktive vakt?**
 
-Konsekvensen av globalt: registeret er personopplysninger som lever mellom vakter, og
-trenger en ryddeplikt (§7 siste avsnitt). Anbefalt likevel — alternativet er at ingen
-gidder å vedlikeholde det.
+Å sette lista i drift og å gjøre vakta til portalens aktive vakt er to ting i dag. Ved
+vaktstart skjer de samtidig.
 
-### 11.2 Skal «Sett i drift» også gjøre vakta aktiv i portalen?
+*Anbefaling: hold dem atskilt, men la «Sett i drift» tilby byttet i samme dialog* — med
+en avkryssing som sier hva den gjør. Å slå dem sammen ville gjort en vaktlistehandling
+til noe som flytter scopet for pasienter og oppdrag, og det er en bieffekt ingen
+oppdager før tallene ser rare ut.
 
-Å sette lista i drift og å gjøre vakta til portalens aktive vakt er to ting i dag.
-Ved vaktstart skjer de samtidig.
+**11.8 Hvor langt rekker korps-brukeren inn i selve oppsettet?**
 
-**Anbefaling: hold dem atskilt, men la «Sett i drift» tilby byttet i samme dialog** —
-med en avkryssing som sier hva den gjør. Å slå dem sammen ville gjort en
-vaktlistehandling til noe som flytter scopet for pasienter og oppdrag, og det er en
-bieffekt ingen vil oppdage før tallene ser rare ut.
+At hun fører inn sine egne folk er avklart. Uklart er om hun også plasserer dem på
+ressursene — altså setter Per på ambulansen og Kari på samleplassen.
 
-### 11.3 Kan én bruker administrere flere korps?
+*Anbefaling: ja, hun plasserer sine egne folk fritt.* Alternativet er at hvert korps
+melder inn en haug med navn som noen andre må fordele, og da er «Ikke plassert»-fanen
+hele jobben til én person. Vaktleder med `skriv_full` kan uansett flytte alle.
 
-Modellen i §4.1 gir én korpstilhørighet per person. **Anbefaling: nei nå.** Trengs det,
-er svaret `skriv_full` inntil videre, og et eksplisitt tillegg den dagen behovet er
-reelt — ikke et felt som gjetter på det.
+Det motsatte er også forsvarlig — at plassering er vaktleders jobb alene — men da bør
+det sies nå, for det endrer hva korps-brukeren ser når hun logger inn.
 
-### 11.4 Hvem registrerer møtt og av vakt?
+**11.9 Skal vaktlista kunne kopieres fra forrige vakt?**
 
-**Anbefaling: den som fører lista** (`skriv_korps`/`skriv_full`/admin). De fleste
-frivillige har ikke portalkonto, og en innsjekk som krever innlogging blir ikke brukt.
+Samme korps, samme biler, ofte mye av det samme mannskapet.
 
-Har mannskapet en konto, kan selvinnsjekk komme senere som et tillegg — men da med
-det samme skillet som oppdragsmodulen bruker: å stemple for seg selv er noe annet enn
-å stemple for andre.
+*Anbefaling: ja, men først i fase 2 som «kopier oppsett fra …»* — ressursene og rollene,
+ikke personene. Å kopiere personer ville satt folk opp på en vakt de ikke har sagt ja
+til.
 
-### 11.5 Skal vaktlista kunne kopieres fra forrige vakt?
+**11.10 Hva skjer med en vaktpost når mannskapet slettes?**
 
-Samme korps, samme biler, ofte mye av det samme mannskapet. **Anbefaling: ja, men
-først i fase 3 som «kopier oppsett fra …»** — ressursene og rollene, ikke personene.
-Å kopiere personer ville satt folk opp på en vakt de ikke har sagt ja til.
-
-### 11.6 Hva skjer med en vaktpost når mannskapet slettes?
-
-**Anbefaling: `PROTECT` på `Mannskap`, med «pensjonering» (`er_aktiv=False`) som den
-normale veien ut** — samme mønster som `Enhet` i oppdragsmodulen. Historikken om hvem
+*Anbefaling: `PROTECT` på `Mannskap`, med pensjonering (`er_aktiv=False`) som den
+normale veien ut* — samme mønster som `Enhet` i oppdragsmodulen. Historikken om hvem
 som var på vakt skal ikke kunne rives bort under en sletting. Sletterett etter art. 17
-løses ved at arkivet fryser *navn*, ikke FK-en (§10, fase 7).
+løses ved at arkivet fryser *navn*, ikke FK-en (fase 6).

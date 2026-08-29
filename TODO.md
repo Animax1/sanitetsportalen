@@ -820,22 +820,33 @@ Gjennomgang 13. aug. 2026, med 1000 pasienter og peak 100 brukere som premiss.
       ressurser (samleplass, biler, lag, KO) i faner; planlegging som settes i drift og
       da brukes til møtt/av vakt; og et besetningspanel på enheten i `/oppdrag`.
       Sju faser, 33–45 t.
-      - [ ] **De seks avklaringene i §11 må besvares før fase 1.** Alle har en
-            anbefaling i notatet.
-      - [ ] **Modulen innfører portalens andre tilgangsakse.** Stigen sier *hva* du kan
-            gjøre; korpset ditt sier *hvem* du kan gjøre det med. Anbefalingen utleder
-            scopet fra `Mannskap.korps` framfor en tildelingstabell, slik at nivået
-            betyr noe alene — samme idiom som `Enhet.user` i oppdragsmodulen.
-            `skriv_korps` må inn i `NIVAA_HIERARKI`.
-      - [ ] **Kostbehov er en helseopplysning (GDPR art. 9).** Personverntillegget er
-            fase 2 og står **før** feltet ships, som audit-unntaket gjorde i
-            oppdragsmodulen: smal verdimengde, samtykke som grunnlag, snevrere
-            synlighet enn resten av lista, unntatt verdilogging, og ikke arkivert.
-      - [ ] **Registeret blir portalens tredje personregister.** `Forstehjelper` og
-            `Helsepersonell` finnes fra før. Sammenslåingen utsettes bevisst (§9) —
-            `Forstehjelper` er referert av 273 pasienter i prod — men `Mannskap` får en
-            nullbar kobling dit, slik at den er mulig senere. Prisen inntil da: navn
-            vedlikeholdes to steder.
+      - [x] **Seks avklaringer besvart 29. aug. 2026** (§11 i notatet). Tre av dem
+            endret utformingen: korps ble en badge og ikke en ny tilgangsakse,
+            kostbehov utgikk helt, og pasientmodulens personregistre forblir urørt.
+      - [ ] **Tre avklaringer står igjen før fase 2** (§11.7–11.10): om «Sett i drift»
+            skal bytte portalens aktive vakt, hvor langt korps-brukeren rekker inn i
+            selve oppsettet, og om lista skal kunne kopieres fra forrige vakt. Alle har
+            en anbefaling.
+      - [ ] **Korps er en badge, ikke en akse.** `skriv_handling` = fører sitt eget
+            korps, `skriv_full` = alle korps **og** den eneste som stempler møtt/av
+            vakt. Korpset arves fra `Mannskap.korps` via `Mannskap.user`, som
+            `Enhet.user` i oppdragsmodulen. Ingen ny verdi i `NIVAA_HIERARKI`.
+            - [ ] **Prisen: nivånavnet betyr noe annet her enn i oppdrag.** Matrisen
+                  viser en global etikett («Skrive: handling») fra `TilgangsNivaa`.
+                  Trengs en valgfri etikett per modul per nivå, ellers deles nivået ut
+                  i god tro med feil forventning — nøyaktig feilen rollemodellnotatet
+                  alt har kalt ut én gang.
+      - [ ] **Matallergi lagres ikke i portalen.** Besluttet fordi det er en
+            helseopplysning (art. 9) og ville krevd fem mekanismer for én kolonne.
+            Samles inn utenfor. Konsekvensen er ærlig: lista kan ikke brukes til
+            matbestilling.
+      - [ ] **`notat` på `Mannskap` er fritekst**, og fritekst er der
+            helseopplysninger havner når det ikke finnes et felt for dem. Unntas
+            verdilogging i audit, som `Oppdrag.fritekst`.
+      - [ ] **Registeret blir portalens tredje personregister**, uten kobling til de
+            to i pasientmodulen (§9). De svarer på «hvem behandlet pasienten», ikke
+            «hvem er på vakt». Prisen: et navn kan stå to steder. En nullbar FK er en
+            additiv migrasjon den dagen behovet melder seg.
 
 - [ ] **Flytt `hent_aktiv_vakt` ut av pasientmodulen.** Funksjonen er portalens scope —
       `Vakt` bor i `core`, og både oppdrag og statistikk importerer den fra
