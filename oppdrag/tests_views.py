@@ -947,3 +947,100 @@ class ArkivlisteTests(OppdragBasis):
         self.assertEqual(
             _klient(_bruker('utenfor_arkiv')).get('/oppdrag/api/arkiv/').status_code,
             403)
+
+
+class AutoArkiveringTests(StemplingBasis):
+    """Et oppdrag som blir `Ledig` rydder seg selv bort fra tavla.
+
+    Regelen bor i `sett_status`, ikke i stemplingsviewet — se docstringen
+    der. Testene under dekker begge veiene inn i `Ledig`.
+    """
+
+    def setUp(self):
+        super().setUp()
+        self.sentral = _klient(_bruker('auto_sentral', 'skriv_full'))
+
+    def _aktiv_liste(self):
+        return [r['id'] for r in
+                self.sentral.get('/oppdrag/api/oppdrag/').json()['data']]
+
+    def test_ledig_arkiverer_med_en_gang(self):
+        o = self._oppdrag()
+        self._stemple(o, 'rykker_ut')
+        self.assertIn(o.pk, self._aktiv_liste())
+
+        self._stemple(o, 'ledig')
+        o.refresh_from_db()
+        self.assertIsNotNone(o.arkivert_at)
+        self.assertNotIn(o.pk, self._aktiv_liste())
+
+    def test_automatisk_lukking_arkiverer_ogsaa(self):
+        """§4.3: startes neste oppdrag, lukkes det pågående — og ryddes bort.
+
+        Dette er grunnen til at regelen ligger i `sett_status` og ikke i
+        viewet: ingen trykket `Ledig` på dette oppdraget.
+        """
+        forste = self._oppdrag()
+        andre = self._oppdrag()
+        self._stemple(forste, 'rykker_ut')
+        self._stemple(andre, 'rykker_ut')
+
+        forste.refresh_from_db()
+        self.assertEqual(forste.status, choices.LEDIG)
+        self.assertIsNotNone(forste.arkivert_at)
+        self.assertNotIn(forste.pk, self._aktiv_liste())
+        self.assertIn(andre.pk, self._aktiv_liste())
+
+    def test_automatisk_arkivering_har_ingen_arkivert_av(self):
+        """NULL betyr «ryddet bort av seg selv», satt betyr «noen trykket»."""
+        o = self._oppdrag()
+        self._stemple(o, 'rykker_ut')
+        self._stemple(o, 'ledig')
+        o.refresh_from_db()
+        self.assertIsNone(o.arkivert_av)
+
+    def test_manuell_arkivering_setter_arkivert_av(self):
+        o = self._oppdrag(status=choices.LEDIG)
+        self.sentral.post(f'/oppdrag/api/oppdrag/{o.pk}/arkiver/')
+        o.refresh_from_db()
+        self.assertEqual(o.arkivert_av.username, 'auto_sentral')
+
+    def test_arkivert_havner_i_ferdigstilte(self):
+        o = self._oppdrag()
+        self._stemple(o, 'rykker_ut')
+        self._stemple(o, 'ledig')
+        arkiv = self.sentral.get('/oppdrag/api/arkiv/').json()['data']
+        self.assertEqual([r['id'] for r in arkiv], [o.pk])
+
+    def test_hentet_tilbake_blir_staaende(self):
+        """Arkiveringen henger på overgangen, ikke på statusen.
+
+        Var den en filtrering på status, ville oppdraget forsvunnet igjen ved
+        neste poll og «Hent tilbake» vært en knapp uten virkning.
+        """
+        o = self._oppdrag()
+        self._stemple(o, 'rykker_ut')
+        self._stemple(o, 'ledig')
+        self.sentral.delete(f'/oppdrag/api/oppdrag/{o.pk}/arkiver/')
+
+        o.refresh_from_db()
+        self.assertEqual(o.status, choices.LEDIG)
+        self.assertIsNone(o.arkivert_at)
+        self.assertIn(o.pk, self._aktiv_liste())
+        # Og den blir stående over flere hentinger.
+        self.assertIn(o.pk, self._aktiv_liste())
+
+    def test_bilen_ser_det_fortsatt_i_tretti_minutter(self):
+        """Den viktige frakoblingen: tavla ryddes, bilens vindu er urørt.
+
+        30-minuttersvinduet er personvern, arkiveringen er tavlerydding.
+        Koblet dem, ville mannskapet mistet oppdraget fra skjermen i samme
+        øyeblikk de meldte seg ledige — mens de fortsatt sto og så på det.
+        """
+        o = self._oppdrag()
+        self._stemple(o, 'rykker_ut')
+        self._stemple(o, 'ledig')
+
+        mine = self.bil.get('/oppdrag/api/oppdrag/').json()['data']
+        self.assertIn(o.pk, [r['id'] for r in mine])
+        self.assertNotIn(o.pk, self._aktiv_liste())

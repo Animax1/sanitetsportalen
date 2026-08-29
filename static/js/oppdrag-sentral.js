@@ -206,9 +206,10 @@ async function visOppdrag(id) {
   document.getElementById('detalj-tittel').textContent =
     `#${o.nummer} ${o.problemstilling} – ${o.enhet_navn}`;
 
-  // Arkivering rydder tavla og er reversibel. Knappen vises bare når den
-  // kan brukes: et pågående oppdrag skal ikke kunne ryddes bort, og en knapp
-  // som alltid feiler er verre enn ingen knapp.
+  // Ferdigstilte oppdrag arkiveres av seg selv i `sett_status`, så knappen
+  // her er for hånd-tilfellene: hent tilbake til tavla, og rydd bort igjen
+  // etterpå. Vises bare når den kan brukes — et pågående oppdrag skal ikke
+  // kunne ryddes bort, og en knapp som alltid feiler er verre enn ingen.
   const arkivKnapp = (OPPDRAG_TILGANG.kanSkrive && o.status === 'ledig')
     ? (o.arkivert
       ? `<button class="btn btn-outline-secondary btn-sm" type="button"

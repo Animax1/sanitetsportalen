@@ -111,6 +111,13 @@ def neste_oppdragsnummer(year: int) -> int:
 # Derfor ligger den på `skriv_full`, ikke på global admin: §3.3 reserverer
 # admin for det irreversible, og en knapp som bare rydder tavla hører til
 # drift. Vaktarkivet i fase 7 er det som skal være admin.
+#
+# **Arkiveringen skjer normalt av seg selv**, i `sett_status` når oppdraget
+# blir `Ledig`. Funksjonene under er for hånd-tilfellene: `hent_tilbake` når
+# noe må fram på tavla igjen, og `arkiver_oppdrag` for å rydde det bort på
+# nytt etterpå. Et oppdrag som er hentet tilbake blir *stående* — arkiveringen
+# henger på overgangen, ikke på statusen, så det finnes ingen ny overgang til
+# `Ledig` som kunne fjernet det igjen.
 
 class KanIkkeArkiveres(Exception):
     """Oppdraget er ikke ferdigstilt."""
@@ -126,6 +133,9 @@ def arkiver_oppdrag(oppdrag, *, bruker):
     Idempotent: et allerede arkivert oppdrag beholder sitt opprinnelige
     tidspunkt, slik at «når ble den ryddet bort» ikke flyttes av et
     dobbelttrykk.
+
+    Brukes i praksis til å rydde bort igjen et oppdrag som er hentet tilbake
+    — den vanlige veien inn i arkivet går gjennom `sett_status`.
     """
     if oppdrag.status != choices.TERMINAL:
         raise KanIkkeArkiveres(
@@ -253,6 +263,13 @@ def sett_status(oppdrag, ny_status: str, *, bruker=None, tidspunkt=None,
     Kaster ``UlovligOvergang`` hvis overgangen ikke står i tabellen. Sjekken
     ligger her og ikke i viewet, slik at også management-kommandoer og
     framtidige endepunkter går gjennom den.
+
+    **En overgang til `Ledig` arkiverer oppdraget.** Regelen bor her og ikke i
+    stemplingsviewet fordi ikke alle `Ledig`-overganger kommer derfra: den
+    automatiske lukkingen i `start_oppdrag` (§4.3) går også gjennom denne
+    funksjonen, og et oppdrag lukket av at enheten startet neste er like
+    ferdig som ett noen trykket `Ledig` på. Lå regelen i viewet, ville tavla
+    beholdt nettopp de oppdragene ingen trykket på.
     """
     if not kan_gaa_til(oppdrag.status, ny_status):
         raise UlovligOvergang(
@@ -268,7 +285,18 @@ def sett_status(oppdrag, ny_status: str, *, bruker=None, tidspunkt=None,
         automatisk=automatisk,
     )
     oppdrag.status = ny_status
-    oppdrag.save(update_fields=['status', 'updated_at'])
+    felter = ['status', 'updated_at']
+
+    if ny_status == choices.TERMINAL and oppdrag.arkivert_at is None:
+        # `arkivert_av` står igjen som NULL, og det er informasjon, ikke en
+        # mangel: NULL betyr «ryddet bort av seg selv», satt betyr «noen
+        # trykket». Samme skille som `Statusmelding.automatisk`. Å føre opp
+        # bilens konto her ville dessuten motsagt regelen om at enheter ikke
+        # arkiverer — den stempler, systemet rydder.
+        oppdrag.arkivert_at = timezone.now()
+        felter += ['arkivert_at']
+
+    oppdrag.save(update_fields=felter)
     return melding
 
 

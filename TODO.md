@@ -627,6 +627,13 @@ Gjennomgang 13. aug. 2026, med 1000 pasienter og peak 100 brukere som premiss.
               reversibel, og den ligger derfor på `skriv_full` — §3.3 reserverer admin
               for det irreversible. Vaktarkivet i fase 7 er fortsatt uendret på planen,
               og de to kan leve side om side: drift under vakt mot dokumentasjon etter.
+            - [x] **Arkiveringen er automatisk ved `Ledig` (29. aug. 2026).** Den
+                  manuelle knappen løste ikke problemet: krever ryddingen et trykk per
+                  oppdrag under vakt, blir den ikke gjort. Regelen ligger i
+                  `sett_status`, ikke i viewet, slik at også den automatiske lukkingen
+                  i `start_oppdrag` treffes — ellers beholdt tavla nettopp de
+                  oppdragene ingen trykket på. `arkivert_av` er NULL ved automatikk.
+                  Knappen står igjen for «hent tilbake» og «rydd bort igjen».
             - Kun ferdigstilte kan arkiveres. Å rydde bort et pågående oppdrag er samme
               feilklasse som å ta en enhet av vakt midt i et oppdrag.
             - **Arkivering rører ikke enhetens 30-minuttersvindu.** De to reglene ser

@@ -4,6 +4,43 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-08-29 — Ferdigstilte oppdrag rydder seg selv bort
+
+**1195 tester grønne** (7 nye). Ingen migrasjon. Oppfølging samme dag: den manuelle
+arkivknappen løste ikke problemet den var laget for.
+
+**Innvendingen var god.** Krever ryddingen et trykk per oppdrag under en travel vakt, blir
+den ikke gjort — og da fylles tavla opp likevel, med en knapp ingen rakk å bruke. Et
+oppdrag arkiveres nå i det øyeblikket det blir `Ledig`.
+
+**Regelen ligger i `sett_status`, ikke i stemplingsviewet**, og det er ikke en
+smaksdetalj: ikke alle `Ledig`-overganger kommer fra et knappetrykk. Starter en enhet
+neste oppdrag, lukkes det pågående automatisk (§4.3) gjennom samme funksjon. Lå regelen i
+viewet, ville tavla beholdt nettopp de oppdragene ingen trykket på — de som ble lukket av
+seg selv. Testen som dekker det er sett rød ved å unnta `automatisk=True` fra regelen.
+
+**`arkivert_av` står som NULL ved automatisk arkivering, og det er informasjon.** NULL
+betyr «ryddet bort av seg selv», satt betyr «noen trykket». Samme skille som
+`Statusmelding.automatisk`. Å føre opp bilens konto der ville dessuten motsagt regelen om
+at enheter ikke arkiverer — den stempler, systemet rydder.
+
+**Arkiveringen henger på overgangen, ikke på statusen.** Forskjellen merkes i «Hent
+tilbake»: et oppdrag hentet fram igjen blir *stående* på tavla, fordi det ikke finnes noen
+ny overgang til `Ledig` som kunne fjernet det. Var arkiveringen i stedet et statusfilter,
+ville raden forsvunnet igjen ved neste poll, og knappen vært uten virkning. Egen test.
+
+**Bilens 30-minuttersvindu er urørt**, og det er verdt å gjenta fordi de to nå ser enda
+likere ut. Mannskapet ser fortsatt oppdraget sitt i en halvtime etter at de meldte seg
+ledige; det er sentralbordets tavle som ryddes. Koblet dem, ville oppdraget forsvunnet fra
+skjermen i bilen i samme øyeblikk knappen ble trykket — mens de fortsatt sto og så på det.
+Egen test som krever begge deler samtidig.
+
+Den manuelle knappen står igjen for hånd-tilfellene: hent tilbake til tavla, og rydd bort
+igjen etterpå. Hjelpeteksten i «Ferdigstilte» sier nå at oppdrag havner der av seg selv —
+den beskrev en knapp som i praksis ikke lenger er hovedveien inn.
+
+---
+
 ## 2026-08-29 — Oppdragsnummer, og en arkivknapp som rydder tavla
 
 **1188 tester grønne** (22 nye). Migrasjon `oppdrag.0003_oppdragsnummer_og_arkivering`.
