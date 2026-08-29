@@ -95,6 +95,19 @@ ingen av dem gir feilmelding — de er bare stille inaktive.
       Står fortsatt som `[fyll inn organisasjonsnavn]`. Dokumentet er
       behandlingsprotokollen overfor tilsynsmyndighet.
 
+- [ ] **Merge `rollemodell` til `main`.** Staging ligger fire commits foran prod:
+      vakt-scopingens deploy 2, oppdragsmodulens fase 6 og 7, og
+      backup-scheduler-fiksen. Migrasjonene `patients.0016` og `oppdrag.0007` er
+      **enveis** — de nekter revers med vilje, og rollback er gjenoppretting fra
+      backup. Ta derfor en manuell backup av `patients` og `arkiv` i prod før merge,
+      og test i staging først. Railway kjører migrasjonene selv i release-fasen.
+
+- [ ] **Første skarpe vakt med oppdragsmodulen.** Modulen er ferdig og testet, men
+      aldri brukt under en reell vakt — og det er den prøven som finner det ingen
+      testsuite gjør: samband, dekning i felt, og om knappene sitter der hendene
+      forventer dem. Ha `docs/RUNBOOK_VAKT.md` framme; §10a har nå **to**
+      arkivknapper å krysse av ved vaktslutt.
+
 ## Pågående / neste
 
 ### GDPR-gjennomgang
