@@ -206,18 +206,18 @@ async function visOppdrag(id) {
   document.getElementById('detalj-tittel').textContent =
     `#${o.nummer} ${o.problemstilling} – ${o.enhet_navn}`;
 
-  // Ferdigstilte oppdrag arkiveres av seg selv i `sett_status`, så knappen
-  // her er for hånd-tilfellene: hent tilbake til tavla, og rydd bort igjen
-  // etterpå. Vises bare når den kan brukes — et pågående oppdrag skal ikke
-  // kunne ryddes bort, og en knapp som alltid feiler er verre enn ingen.
-  const arkivKnapp = (OPPDRAG_TILGANG.kanSkrive && o.status === 'ledig')
-    ? (o.arkivert
+  // Ferdigstilte oppdrag går til historikken av seg selv i `sett_status`, så
+  // knappen her er for hånd-tilfellene: hent tilbake til tavla, og rydd bort
+  // igjen etterpå. Vises bare når den kan brukes — et pågående oppdrag skal
+  // ikke kunne ryddes bort, og en knapp som alltid feiler er verre enn ingen.
+  const historikkKnapp = (OPPDRAG_TILGANG.kanSkrive && o.status === 'ledig')
+    ? (o.historikk_fra
       ? `<button class="btn btn-outline-secondary btn-sm" type="button"
                  data-action="hentTilbakeOppdrag" data-id="${escHtmlValue(o.id)}">
            Hent tilbake til tavla</button>`
       : `<button class="btn btn-outline-secondary btn-sm" type="button"
-                 data-action="arkiverOppdrag" data-id="${escHtmlValue(o.id)}">
-           <i class="bi bi-archive me-1"></i>Arkiver</button>`)
+                 data-action="flyttTilHistorikk" data-id="${escHtmlValue(o.id)}">
+           <i class="bi bi-clock-history me-1"></i>Legg i historikk</button>`)
     : '';
 
   const flyttValg = OPPDRAG_TILGANG.kanSkrive
@@ -243,7 +243,7 @@ async function visOppdrag(id) {
     ${o.fritekst ? `<div class="oppdrag-fritekst mb-3">${escapeHtml(o.fritekst)}</div>` : ''}
     <h6 class="text-muted">Tidslinje</h6>
     ${tidslinjeHtml(o)}
-    ${arkivKnapp ? `<div class="mt-3">${arkivKnapp}</div>` : ''}
+    ${historikkKnapp ? `<div class="mt-3">${historikkKnapp}</div>` : ''}
     ${flyttValg}`);
 }
 
@@ -266,21 +266,22 @@ async function flyttOppdrag(id) {
 }
 
 
-// ── Arkiv (ferdigstilte oppdrag) ────────────────────────
+// ── Historikk (ferdigstilte oppdrag) ────────────────────
 // Rydding av tavla, ikke vaktarkivet: radene er urørt, og «Hent tilbake»
-// angrer. Se kommentaren i oppdrag/services.py.
+// angrer. Ordet «arkiv» er reservert core.arkiv, som fryser hele vakter —
+// se kommentaren i oppdrag/services.py.
 
-let arkivliste = [];
+let historikkliste = [];
 
 
-function renderArkiv() {
-  const el = document.getElementById('arkivliste');
+function renderHistorikk() {
+  const el = document.getElementById('historikkliste');
   if (!el) return;
-  if (!arkivliste.length) {
-    el.innerHTML = '<div class="tom-melding">Ingen arkiverte oppdrag.</div>';
+  if (!historikkliste.length) {
+    el.innerHTML = '<div class="tom-melding">Ingen ferdigstilte oppdrag.</div>';
     return;
   }
-  el.innerHTML = (arkivliste.map((o) => {
+  el.innerHTML = (historikkliste.map((o) => {
     const fritekstBlokk = o.fritekst
       ? `<div class="oppdrag-fritekst">${escapeHtml(o.fritekst)}</div>`
       : '';
@@ -293,7 +294,7 @@ function renderArkiv() {
         <span class="oppdrag-problem">${escapeHtml(o.problemstilling)}</span>
       </div>
       <div class="oppdrag-meta mt-1">
-        ${escapeHtml(o.enhet_navn)} · ${escapeHtml(o.lokasjon_navn)} · arkivert ${escapeHtml(klokke(o.arkivert))}
+        ${escapeHtml(o.enhet_navn)} · ${escapeHtml(o.lokasjon_navn)} · ferdig ${escapeHtml(klokke(o.historikk_fra))}
       </div>
       ${fritekstBlokk}
     </div>`;
@@ -301,40 +302,40 @@ function renderArkiv() {
 }
 
 
-async function lastArkiv() {
-  const felt = document.getElementById('arkiv-sok');
+async function lastHistorikk() {
+  const felt = document.getElementById('historikk-sok');
   const sok = felt ? (felt.value || '').trim() : '';
   const url = sok
-    ? `/oppdrag/api/arkiv/?sok=${encodeURIComponent(sok)}`
-    : '/oppdrag/api/arkiv/';
+    ? `/oppdrag/api/historikk/?sok=${encodeURIComponent(sok)}`
+    : '/oppdrag/api/historikk/';
   const res = await apiFetch(url);
   if (!res.ok) return;
-  arkivliste = (await res.json()).data || [];
-  renderArkiv();
+  historikkliste = (await res.json()).data || [];
+  renderHistorikk();
 }
 
 
-async function arkiverOppdrag(id) {
-  const res = await apiFetch(`/oppdrag/api/oppdrag/${id}/arkiver/`, { method: 'POST' });
+async function flyttTilHistorikk(id) {
+  const res = await apiFetch(`/oppdrag/api/oppdrag/${id}/historikk/`, { method: 'POST' });
   const d = await res.json();
   if (!res.ok || d.status !== 'ok') {
-    alert(d.message || 'Kunne ikke arkivere oppdraget.');
+    alert(d.message || 'Kunne ikke legge oppdraget i historikken.');
     return;
   }
   bootstrap.Modal.getInstance(document.getElementById('oppdragDetaljModal'))?.hide();
   etagOppdrag = null;   // raden forsvinner fra den aktive lista
   await lastAlt();
-  if (document.getElementById('arkivliste')) await lastArkiv();
+  if (document.getElementById('historikkliste')) await lastHistorikk();
 }
 
 
 async function hentTilbakeOppdrag(id) {
-  const res = await apiFetch(`/oppdrag/api/oppdrag/${id}/arkiver/`, { method: 'DELETE' });
+  const res = await apiFetch(`/oppdrag/api/oppdrag/${id}/historikk/`, { method: 'DELETE' });
   if (!res.ok) return;
   bootstrap.Modal.getInstance(document.getElementById('oppdragDetaljModal'))?.hide();
   etagOppdrag = null;
   await lastAlt();
-  if (document.getElementById('arkivliste')) await lastArkiv();
+  if (document.getElementById('historikkliste')) await lastHistorikk();
 }
 
 

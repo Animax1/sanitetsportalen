@@ -102,60 +102,64 @@ def neste_oppdragsnummer(year: int) -> int:
         return nr
 
 
-# ── Arkivering (rydding, ikke frysing) ───────────────────────────────────────
+# ── Historikk (rydding, ikke frysing) ────────────────────────────────────────
 #
-# **Dette er ikke vaktarkivet.** `core.arkiv` fryser, signerer og kollapser;
-# her flyttes et ferdigstilt oppdrag ut av den aktive lista og inn i en søkbar
-# «Ferdigstilte»-visning. Raden er urørt, og handlingen er reversibel.
+# **Ordet «arkiv» er bevisst unngått.** `core.arkiv` fryser, signerer og
+# kollapser hele vakter, og oppdragsmodulen får sin egen `BaseArkivHandler` i
+# fase 7. Her flyttes ett ferdigstilt oppdrag ut av den aktive tavla og inn i
+# en søkbar historikk. Raden er urørt, og handlingen er reversibel.
 #
 # Derfor ligger den på `skriv_full`, ikke på global admin: §3.3 reserverer
 # admin for det irreversible, og en knapp som bare rydder tavla hører til
 # drift. Vaktarkivet i fase 7 er det som skal være admin.
 #
-# **Arkiveringen skjer normalt av seg selv**, i `sett_status` når oppdraget
-# blir `Ledig`. Funksjonene under er for hånd-tilfellene: `hent_tilbake` når
-# noe må fram på tavla igjen, og `arkiver_oppdrag` for å rydde det bort på
-# nytt etterpå. Et oppdrag som er hentet tilbake blir *stående* — arkiveringen
-# henger på overgangen, ikke på statusen, så det finnes ingen ny overgang til
-# `Ledig` som kunne fjernet det igjen.
+# **Flyttingen skjer normalt av seg selv**, i `sett_status` når oppdraget blir
+# `Ledig`. Funksjonene under er for hånd-tilfellene: `hent_tilbake` når noe må
+# fram på tavla igjen, og `flytt_til_historikk` for å rydde det bort på nytt
+# etterpå. Et oppdrag som er hentet tilbake blir *stående* — flyttingen henger
+# på overgangen, ikke på statusen, så det finnes ingen ny overgang til `Ledig`
+# som kunne fjernet det igjen.
 
-class KanIkkeArkiveres(Exception):
-    """Oppdraget er ikke ferdigstilt."""
+class KanIkkeFlyttes(Exception):
+    """Oppdraget er ikke ferdigstilt og kan ikke ryddes bort fra tavla."""
 
 
-def arkiver_oppdrag(oppdrag, *, bruker):
+def flytt_til_historikk(oppdrag, *, bruker):
     """Flytt et ferdigstilt oppdrag ut av den aktive lista.
 
-    **Kun `Ledig` kan arkiveres.** Å rydde bort et pågående oppdrag ville
+    **Kun `Ledig` kan flyttes.** Å rydde bort et pågående oppdrag ville
     skjult noe som fortsatt skjer — samme feilklasse som å ta en enhet av
     vakt midt i et oppdrag, og den er allerede stengt i `enhet_vakt_view`.
 
-    Idempotent: et allerede arkivert oppdrag beholder sitt opprinnelige
-    tidspunkt, slik at «når ble den ryddet bort» ikke flyttes av et
-    dobbelttrykk.
+    Idempotent: et oppdrag som allerede ligger i historikken beholder sitt
+    opprinnelige tidspunkt, slik at «når gikk den ut av tavla» ikke flyttes
+    av et dobbelttrykk.
 
     Brukes i praksis til å rydde bort igjen et oppdrag som er hentet tilbake
-    — den vanlige veien inn i arkivet går gjennom `sett_status`.
+    — den vanlige veien inn i historikken går gjennom `sett_status`.
     """
     if oppdrag.status != choices.TERMINAL:
-        raise KanIkkeArkiveres(
+        raise KanIkkeFlyttes(
             f'Oppdraget står i {oppdrag.get_status_display()} og er ikke ferdigstilt.')
-    if oppdrag.arkivert_at is not None:
+    if oppdrag.historikk_fra is not None:
         return oppdrag
 
-    oppdrag.arkivert_at = timezone.now()
-    oppdrag.arkivert_av = bruker
-    oppdrag.save(update_fields=['arkivert_at', 'arkivert_av', 'updated_at'])
+    oppdrag.historikk_fra = timezone.now()
+    oppdrag.historikk_av = bruker
+    oppdrag.save(update_fields=['historikk_fra', 'historikk_av', 'updated_at'])
     return oppdrag
 
 
 def hent_tilbake(oppdrag):
-    """Angre arkiveringen. Ingenting ble fryst, så det er bare å nulle feltet."""
-    if oppdrag.arkivert_at is None:
+    """Hent oppdraget tilbake til tavla.
+
+    Ingenting ble fryst, så det er bare å nulle feltet.
+    """
+    if oppdrag.historikk_fra is None:
         return oppdrag
-    oppdrag.arkivert_at = None
-    oppdrag.arkivert_av = None
-    oppdrag.save(update_fields=['arkivert_at', 'arkivert_av', 'updated_at'])
+    oppdrag.historikk_fra = None
+    oppdrag.historikk_av = None
+    oppdrag.save(update_fields=['historikk_fra', 'historikk_av', 'updated_at'])
     return oppdrag
 
 
@@ -264,7 +268,7 @@ def sett_status(oppdrag, ny_status: str, *, bruker=None, tidspunkt=None,
     ligger her og ikke i viewet, slik at også management-kommandoer og
     framtidige endepunkter går gjennom den.
 
-    **En overgang til `Ledig` arkiverer oppdraget.** Regelen bor her og ikke i
+    **En overgang til `Ledig` flytter oppdraget til historikken.** Regelen bor her og ikke i
     stemplingsviewet fordi ikke alle `Ledig`-overganger kommer derfra: den
     automatiske lukkingen i `start_oppdrag` (§4.3) går også gjennom denne
     funksjonen, og et oppdrag lukket av at enheten startet neste er like
@@ -287,14 +291,14 @@ def sett_status(oppdrag, ny_status: str, *, bruker=None, tidspunkt=None,
     oppdrag.status = ny_status
     felter = ['status', 'updated_at']
 
-    if ny_status == choices.TERMINAL and oppdrag.arkivert_at is None:
-        # `arkivert_av` står igjen som NULL, og det er informasjon, ikke en
+    if ny_status == choices.TERMINAL and oppdrag.historikk_fra is None:
+        # `historikk_av` står igjen som NULL, og det er informasjon, ikke en
         # mangel: NULL betyr «ryddet bort av seg selv», satt betyr «noen
         # trykket». Samme skille som `Statusmelding.automatisk`. Å føre opp
         # bilens konto her ville dessuten motsagt regelen om at enheter ikke
-        # arkiverer — den stempler, systemet rydder.
-        oppdrag.arkivert_at = timezone.now()
-        felter += ['arkivert_at']
+        # rydder tavla — den stempler, systemet rydder.
+        oppdrag.historikk_fra = timezone.now()
+        felter += ['historikk_fra']
 
     oppdrag.save(update_fields=felter)
     return melding
@@ -395,9 +399,9 @@ def synlige_for_enhet(enhet, year: int | None = None):
     Grensen måles mot den gjeldende `Ledig`-meldingens ``tidspunkt``, ikke mot
     ``updated_at``: en korreksjon skal ikke forlenge vinduet.
 
-    **Arkivering påvirker ikke dette filteret.** De to reglene ser like ut,
-    men tjener ulike formål: 30-minuttersvinduet er personvern (en bil kan bli
-    stående ulåst), arkivering er sentralbordets rydding av sin egen tavle.
+    **Historikk-flyttingen påvirker ikke dette filteret.** De to reglene ser
+    like ut, men tjener ulike formål: 30-minuttersvinduet er personvern (en bil
+    kan bli stående ulåst), historikken er sentralbordets rydding av tavla si.
     Koblet man dem, kunne sentralbordet fjernet et oppdrag fra skjermen til et
     mannskap som fortsatt sto og så på det.
     """

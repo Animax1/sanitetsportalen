@@ -282,9 +282,9 @@ def oppdrag_liste_view(request):
                 for r in data
             ]
         else:
-            # Arkiverte er ute av den aktive lista. De er ikke borte — de
-            # ligger i `arkiv_liste_view`, søkbare på nummer.
-            qs = (Oppdrag.objects.filter(year=year, arkivert_at__isnull=True)
+            # Ferdigstilte er ute av den aktive lista. De er ikke borte —
+            # de ligger i `historikk_liste_view`, søkbare på nummer.
+            qs = (Oppdrag.objects.filter(year=year, historikk_fra__isnull=True)
                   .select_related('enhet', 'lokasjon').order_by('-created_at'))
             data = [oppdrag_til_dict(o) for o in qs]
             etag_rader = [(r['id'], r['status'], r['enhet_id']) for r in data]
@@ -549,18 +549,20 @@ def stempling_view(request, pk, overgang):
     }})
 
 
-# ── Arkivering (rydding av tavla) ────────────────────────────────────────────
+# ── Historikk (rydding av tavla) ─────────────────────────────────────────────
 #
-# **Ikke vaktarkivet.** `core.arkiv` fryser, signerer og kollapser; her flyttes
-# et ferdigstilt oppdrag ut av den aktive lista og inn i en søkbar visning.
+# **Ikke vaktarkivet.** `core.arkiv` fryser, signerer og kollapser hele vakter,
+# og denne appen får sin egen `BaseArkivHandler` i fase 7. Her flyttes ett
+# ferdigstilt oppdrag ut av den aktive lista og inn i en søkbar historikk.
 # Raden er urørt og handlingen reversibel — derfor `skriv_full` og ikke admin:
 # §3.3 reserverer admin for det irreversible.
 
 @modul_kreves('oppdrag', 'skriv_full', svar='json')
 @require_http_methods(['POST', 'DELETE'])
-@rate_limit(group='oppdrag:arkiver', rate='60/m', method='POST')
-def arkiver_view(request, pk):
-    """Arkiver et ferdigstilt oppdrag (POST), eller hent det tilbake (DELETE).
+@rate_limit(group='oppdrag:historikk', rate='60/m', method='POST')
+def historikk_view(request, pk):
+    """Flytt et ferdigstilt oppdrag til historikken (POST), eller hent det
+    tilbake til tavla (DELETE).
 
     Enhetskontoer stenges ute selv om de skulle ha `skriv_full`: rydding av
     tavla er sentralbordets jobb, og bilen ser uansett bare sine egne rader.
@@ -568,7 +570,7 @@ def arkiver_view(request, pk):
     """
     if er_enhetskonto(request.user):
         return JsonResponse(
-            {'status': 'error', 'message': 'Enheter arkiverer ikke oppdrag.'},
+            {'status': 'error', 'message': 'Enheter rydder ikke tavla.'},
             status=403)
 
     try:
@@ -583,8 +585,8 @@ def arkiver_view(request, pk):
         return JsonResponse({'status': 'ok', 'data': oppdrag_til_dict(oppdrag)})
 
     try:
-        services.arkiver_oppdrag(oppdrag, bruker=request.user)
-    except services.KanIkkeArkiveres as feil:
+        services.flytt_til_historikk(oppdrag, bruker=request.user)
+    except services.KanIkkeFlyttes as feil:
         # Å rydde bort et pågående oppdrag ville skjult noe som fortsatt
         # skjer. 400: forespørselen er velformet, men tilstanden tillater den
         # ikke — og meldingen sier hvilken status som står i veien.
@@ -596,8 +598,8 @@ def arkiver_view(request, pk):
 @never_cache
 @modul_kreves('oppdrag', 'les', svar='json')
 @require_http_methods(['GET'])
-def arkiv_liste_view(request):
-    """De arkiverte oppdragene i aktiv vakt, nyest først.
+def historikk_liste_view(request):
+    """Historikken for aktiv vakt — de ferdigstilte oppdragene, nyest først.
 
     `?sok=` filtrerer. Nummer er hovedveien inn — det er det man har notert
     eller hørt på samband — så et rent tall treffer nummeret eksakt i stedet
@@ -605,7 +607,7 @@ def arkiv_liste_view(request):
     Tekstsøk mot problemstilling, lokasjon og enhet er tilleggsveien for den
     som husker hva oppdraget gjaldt, men ikke nummeret.
 
-    Enhetskontoer får 403: arkivet er sentralbordets oversikt over hele
+    Enhetskontoer får 403: historikken er sentralbordets oversikt over hele
     vakta, og bilen skal se sine egne oppdrag, ikke andres.
     """
     if er_enhetskonto(request.user):
@@ -613,9 +615,9 @@ def arkiv_liste_view(request):
             {'status': 'error', 'message': 'Ingen tilgang'}, status=403)
 
     qs = (Oppdrag.objects
-          .filter(year=get_active_year(), arkivert_at__isnull=False)
+          .filter(year=get_active_year(), historikk_fra__isnull=False)
           .select_related('enhet', 'lokasjon')
-          .order_by('-arkivert_at'))
+          .order_by('-historikk_fra'))
 
     sok = (request.GET.get('sok') or '').strip()
     if sok:

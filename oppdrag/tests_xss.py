@@ -27,7 +27,7 @@ HTML_BUILDERS_PER_FIL = {
         'tidslinjeHtml',
         'renderLokasjonsadmin',
         'renderEnhetsadmin',
-        'renderArkiv',
+        'renderHistorikk',
     ),
     OPPDRAG_ENHET_JS: (
         'tidslinjeEnhetHtml',
@@ -67,7 +67,7 @@ REVIEWED_INTERPOLATIONS = {
     'koblingKlasse': 'hardkodet CSS-klasse fra en ternær',
     'valgt': 'hardkodet selected-attributt fra en ternær',
     # Enhetsskjermens byggere (oppdrag-enhet.js):
-    'arkivKnapp': 'markup bygget lokalt, id escapet inni',
+    'historikkKnapp': 'markup bygget lokalt, id escapet inni',
     'nesteKnapp': 'markup bygget lokalt, navn og id escapet inni',
     'ledigKnapp': 'markup bygget lokalt, id escapet inni',
     'startKnapp': 'markup bygget lokalt, navn og id escapet inni',

@@ -38,9 +38,9 @@
       </button>
       {% endif %}
       <button type="button" class="btn btn-outline-secondary btn-sm"
-              data-bs-toggle="modal" data-bs-target="#arkivModal"
-              data-action="lastArkiv">
-        <i class="bi bi-archive me-1"></i>Ferdigstilte
+              data-bs-toggle="modal" data-bs-target="#historikkModal"
+              data-action="lastHistorikk">
+        <i class="bi bi-clock-history me-1"></i>Historikk
       </button>
       {% if er_global_admin %}
       <button type="button" class="btn btn-outline-secondary btn-sm"
@@ -174,27 +174,28 @@
 </div>
 {% endif %}
 
-<div class="modal fade" id="arkivModal" tabindex="-1">
+<div class="modal fade" id="historikkModal" tabindex="-1">
   <div class="modal-dialog modal-lg">
     <div class="modal-content">
       <div class="modal-header">
-        <h5 class="modal-title">Ferdigstilte oppdrag</h5>
+        <h5 class="modal-title">Historikk</h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Lukk"></button>
       </div>
       <div class="modal-body">
         <div class="input-group mb-3">
           <span class="input-group-text"><i class="bi bi-search"></i></span>
-          <input type="text" id="arkiv-sok" class="form-control"
+          <input type="text" id="historikk-sok" class="form-control"
                  placeholder="Oppdragsnummer, problemstilling, lokasjon eller enhet">
-          <button class="btn btn-outline-primary" type="button" data-action="lastArkiv">
+          <button class="btn btn-outline-primary" type="button" data-action="lastHistorikk">
             Søk
           </button>
         </div>
-        <div id="arkivliste"><div class="tom-melding">Laster…</div></div>
+        <div id="historikkliste"><div class="tom-melding">Laster…</div></div>
         <p class="form-text mb-0 mt-3">
           Oppdrag havner her av seg selv når de blir ledige. Ingenting er
           slettet eller fryst — åpne et oppdrag for å hente det tilbake til
-          tavla.
+          tavla. Arkivering av hele vakter er noe annet, og gjøres et annet
+          sted.
         </p>
       </div>
     </div>

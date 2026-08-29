@@ -64,8 +64,8 @@ def oppdrag_til_dict(oppdrag, *, for_enhet: bool = False) -> dict:
         'status': oppdrag.status,
         'status_navn': oppdrag.get_status_display(),
         'opprettet': oppdrag.created_at.isoformat(),
-        'arkivert': (oppdrag.arkivert_at.isoformat()
-                     if oppdrag.arkivert_at else None),
+        'historikk_fra': (oppdrag.historikk_fra.isoformat()
+                          if oppdrag.historikk_fra else None),
     }
     skjul_fritekst = for_enhet and oppdrag.status == choices.TERMINAL
     data['fritekst'] = '' if skjul_fritekst else oppdrag.fritekst

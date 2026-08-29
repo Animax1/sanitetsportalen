@@ -159,23 +159,24 @@ class Oppdrag(BaseTimeStampedModel):
         on_delete=models.SET_NULL, related_name='opprettede_oppdrag',
         verbose_name='Opprettet av')
 
-    # ── Arkivering ───────────────────────────────────────────────────────────
+    # ── Historikk ────────────────────────────────────────────────────────────
     #
-    # **Dette er ikke vaktarkivet.** `core.arkiv` fryser, signerer og kollapser;
-    # dette flagget rydder bare tavla. Raden forblir levende og redigerbar, og
-    # ingenting slettes. Vaktarkivet for oppdrag bygges i fase 7, og de to kan
-    # leve side om side: den ene er drift under vakt, den andre dokumentasjon
-    # etter vakt.
+    # **Ordet «arkiv» er bevisst unngått her.** `core.arkiv` fryser, signerer
+    # og kollapser hele vakter; dette flagget flytter ett oppdrag ut av den
+    # aktive tavla og inn i historikken. Raden forblir levende og redigerbar,
+    # og ingenting slettes. Vaktarkivet for oppdrag bygges i fase 7 og får en
+    # ekte `BaseArkivHandler` i denne appen — bruker vi «arkiv» om begge, står
+    # de to med samme navn i samme modul og betyr helt ulike ting.
     #
-    # Nullbar dato framfor en boolean: «når ble den ryddet bort» er verdt å
+    # Nullbar dato framfor en boolean: «når gikk den ut av tavla» er verdt å
     # vite når noen leter etter et oppdrag som forsvant fra lista, og en
-    # boolean kan ikke svare på det.
-    arkivert_at = models.DateTimeField(
-        null=True, blank=True, db_index=True, verbose_name='Arkivert')
-    arkivert_av = models.ForeignKey(
+    # boolean kan ikke svare på det. NULL = står på tavla.
+    historikk_fra = models.DateTimeField(
+        null=True, blank=True, db_index=True, verbose_name='I historikk fra')
+    historikk_av = models.ForeignKey(
         settings.AUTH_USER_MODEL, null=True, blank=True,
-        on_delete=models.SET_NULL, related_name='arkiverte_oppdrag',
-        verbose_name='Arkivert av')
+        on_delete=models.SET_NULL, related_name='oppdrag_lagt_i_historikk',
+        verbose_name='Flyttet av')
 
     class Meta:
         verbose_name = 'Oppdrag'
@@ -203,8 +204,8 @@ class Oppdrag(BaseTimeStampedModel):
         return self.status == choices.TERMINAL
 
     @property
-    def er_arkivert(self) -> bool:
-        return self.arkivert_at is not None
+    def i_historikk(self) -> bool:
+        return self.historikk_fra is not None
 
 
 class StatusmeldingManager(models.Manager):

@@ -28,7 +28,7 @@ urlpatterns = [
          name='oppdrag_api_stempling'),
     # Arkivering = rydding av tavla, ikke vaktarkivet. POST arkiverer,
     # DELETE henter tilbake — den er reversibel, og URL-en sier det.
-    path('api/oppdrag/<int:pk>/arkiver/', views.arkiver_view,
-         name='oppdrag_api_arkiver'),
-    path('api/arkiv/', views.arkiv_liste_view, name='oppdrag_api_arkiv'),
+    path('api/oppdrag/<int:pk>/historikk/', views.historikk_view,
+         name='oppdrag_api_historikker'),
+    path('api/historikk/', views.historikk_liste_view, name='oppdrag_api_historikk'),
 ]

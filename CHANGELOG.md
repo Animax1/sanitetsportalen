@@ -4,6 +4,41 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-08-29 — «Arkiv» heter Historikk i oppdragsmodulen
+
+**1195 tester grønne** (ingen nye). Migrasjon `oppdrag.0004_historikk_ikke_arkiv` —
+ren `RenameField`, ingen data endres.
+
+Knappen het «Ferdigstilte» og handlingen «Arkiver». Begge er borte: flaten heter
+**Historikk**.
+
+**Grunnen er en navnekollisjon som ville blitt verre, ikke bedre.** `core.arkiv` fryser,
+signerer og kollapser hele vakter, og oppdragsmodulen får sin *egen* `BaseArkivHandler` i
+fase 7. Hadde begge hett «arkiv», ville `arkiver_view` og `ArkivHandler` stått i samme app
+og betydd hver sin ting — den ene rydder en liste, den andre skriver en SHA-256-signatur
+som ikke kan angres. Den som leste feil av de to ville trodd raden var fryst.
+
+Derfor er omdøpingen ført hele veien inn, ikke bare på knappen:
+
+| Før | Nå |
+|---|---|
+| `arkivert_at` / `arkivert_av` | `historikk_fra` / `historikk_av` |
+| `bruker.arkiverte_oppdrag` | `bruker.oppdrag_lagt_i_historikk` |
+| `arkiver_oppdrag()` | `flytt_til_historikk()` |
+| `KanIkkeArkiveres` | `KanIkkeFlyttes` |
+| `POST /api/oppdrag/<pk>/arkiver/` | `POST /api/oppdrag/<pk>/historikk/` |
+| `GET /api/arkiv/` | `GET /api/historikk/` |
+| `arkivert` i JSON-svaret | `historikk_fra` |
+
+`related_name` er den som betyr mest i kode: `bruker.arkiverte_oppdrag` ville fortsatt
+lovet arkivering fra et helt annet sted i kodebasen. Testklassene og testnavnene er også
+byttet — det er der neste utvikler leter etter hva ordene betyr.
+
+De to gjenværende treffene på «arkiv» i modulens tester er selve forklaringen på hvorfor
+navnet ble byttet, og skal stå.
+
+---
+
 ## 2026-08-29 — Ferdigstilte oppdrag rydder seg selv bort
 
 **1195 tester grønne** (7 nye). Ingen migrasjon. Oppfølging samme dag: den manuelle

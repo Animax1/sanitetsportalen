@@ -792,93 +792,96 @@ class OppdragsnummerTests(OppdragBasis):
             self._opprett().json()['data']['nummer'], o.oppdragsnummer + 1)
 
 
-class ArkiveringTests(OppdragBasis):
-    """Rydding av tavla — ikke vaktarkivet. Reversibel, ingenting fryses."""
+class HistorikkTests(OppdragBasis):
+    """Rydding av tavla — ikke vaktarkivet. Reversibel, ingenting fryses.
+
+    Ordet «arkiv» er reservert `core.arkiv`, som fryser hele vakter.
+    """
 
     def setUp(self):
         super().setUp()
-        self.c = _klient(_bruker('arkivops', 'skriv_full'))
+        self.c = _klient(_bruker('historikkops', 'skriv_full'))
 
-    def _arkiver(self, oppdrag, klient=None):
+    def _til_historikk(self, oppdrag, klient=None):
         return (klient or self.c).post(
-            f'/oppdrag/api/oppdrag/{oppdrag.pk}/arkiver/')
+            f'/oppdrag/api/oppdrag/{oppdrag.pk}/historikk/')
 
     def _hent_tilbake(self, oppdrag):
-        return self.c.delete(f'/oppdrag/api/oppdrag/{oppdrag.pk}/arkiver/')
+        return self.c.delete(f'/oppdrag/api/oppdrag/{oppdrag.pk}/historikk/')
 
-    def test_ferdigstilt_kan_arkiveres(self):
+    def test_ferdigstilt_kan_flyttes(self):
         o = self._oppdrag(status=choices.LEDIG)
-        self.assertEqual(self._arkiver(o).status_code, 200)
+        self.assertEqual(self._til_historikk(o).status_code, 200)
         o.refresh_from_db()
-        self.assertIsNotNone(o.arkivert_at)
+        self.assertIsNotNone(o.historikk_fra)
 
-    def test_paagaende_kan_ikke_arkiveres(self):
+    def test_paagaende_kan_ikke_flyttes(self):
         """Å rydde bort noe som fortsatt skjer ville skjult det."""
         for status in (choices.VENTER, choices.RYKKER_UT, choices.FREMME,
                        choices.AVREIST, choices.LEVERER):
             with self.subTest(status=status):
                 o = self._oppdrag(status=status)
-                resp = self._arkiver(o)
+                resp = self._til_historikk(o)
                 self.assertEqual(resp.status_code, 400)
                 o.refresh_from_db()
-                self.assertIsNone(o.arkivert_at)
+                self.assertIsNone(o.historikk_fra)
 
-    def test_arkivert_forsvinner_fra_aktiv_liste(self):
+    def test_flyttet_forsvinner_fra_aktiv_liste(self):
         beholdt = self._oppdrag(status=choices.LEDIG)
         ryddet = self._oppdrag(status=choices.LEDIG)
-        self._arkiver(ryddet)
+        self._til_historikk(ryddet)
         ider = [r['id'] for r in self.c.get('/oppdrag/api/oppdrag/').json()['data']]
         self.assertIn(beholdt.pk, ider)
         self.assertNotIn(ryddet.pk, ider)
 
     def test_raden_slettes_ikke(self):
-        """Arkivering er et visningsvalg. Statistikken beholder raden."""
+        """Flyttingen er et visningsvalg. Statistikken beholder raden."""
         o = self._oppdrag(status=choices.LEDIG)
-        self._arkiver(o)
+        self._til_historikk(o)
         self.assertTrue(Oppdrag.objects.filter(pk=o.pk).exists())
 
     def test_hent_tilbake_angrer(self):
         o = self._oppdrag(status=choices.LEDIG)
-        self._arkiver(o)
+        self._til_historikk(o)
         self.assertEqual(self._hent_tilbake(o).status_code, 200)
         o.refresh_from_db()
-        self.assertIsNone(o.arkivert_at)
+        self.assertIsNone(o.historikk_fra)
         ider = [r['id'] for r in self.c.get('/oppdrag/api/oppdrag/').json()['data']]
         self.assertIn(o.pk, ider)
 
-    def test_dobbel_arkivering_flytter_ikke_tidspunktet(self):
+    def test_dobbel_flytting_endrer_ikke_tidspunktet(self):
         o = self._oppdrag(status=choices.LEDIG)
-        self._arkiver(o)
+        self._til_historikk(o)
         o.refresh_from_db()
-        forste = o.arkivert_at
-        self._arkiver(o)
+        forste = o.historikk_fra
+        self._til_historikk(o)
         o.refresh_from_db()
-        self.assertEqual(o.arkivert_at, forste)
+        self.assertEqual(o.historikk_fra, forste)
 
-    def test_les_kan_ikke_arkivere(self):
+    def test_les_kan_ikke_flytte(self):
         o = self._oppdrag(status=choices.LEDIG)
-        resp = self._arkiver(o, klient=_klient(_bruker('arkivleser', 'les')))
+        resp = self._til_historikk(o, klient=_klient(_bruker('historikkleser', 'les')))
         self.assertEqual(resp.status_code, 403)
 
-    def test_enhetskonto_kan_ikke_arkivere(self):
+    def test_enhetskonto_kan_ikke_flytte(self):
         """Rydding av tavla er sentralbordets jobb, også med skriv_full."""
-        bil = _bruker('bil_arkiv', 'skriv_full', delt=True)
+        bil = _bruker('bil_historikk', 'skriv_full', delt=True)
         Enhet.objects.filter(pk=self.enhet.pk).update(user=bil)
         o = self._oppdrag(status=choices.LEDIG)
-        self.assertEqual(self._arkiver(o, klient=_klient(bil)).status_code, 403)
+        self.assertEqual(self._til_historikk(o, klient=_klient(bil)).status_code, 403)
 
-    def test_arkivering_gir_auditrad(self):
+    def test_flytting_gir_auditrad(self):
         """Feltlista utledes fra modellen, så det nye feltet spores av seg selv."""
         from audit.models import AuditLog
         o = self._oppdrag(status=choices.LEDIG)
         AuditLog.objects.all().delete()
-        self._arkiver(o)
+        self._til_historikk(o)
         self.assertTrue(AuditLog.objects.filter(
-            table_name='oppdrag_oppdrag', field_name='arkivert_at').exists())
+            table_name='oppdrag_oppdrag', field_name='historikk_fra').exists())
 
 
-class ArkivlisteTests(OppdragBasis):
-    """«Ferdigstilte»-visningen, og søket som finner tilbake til oppdraget."""
+class HistorikklisteTests(OppdragBasis):
+    """Historikk-visningen, og søket som finner tilbake til oppdraget."""
 
     #: Numrene er valgt slik at delstreng-søk ville tatt feil: «1» er både
     #: et helt nummer og et prefiks av 10 og 11. Uten den kollisjonen i
@@ -888,23 +891,23 @@ class ArkivlisteTests(OppdragBasis):
 
     def setUp(self):
         super().setUp()
-        self.c = _klient(_bruker('arkivliste', 'skriv_full'))
-        self.arkiverte = []
+        self.c = _klient(_bruker('historikkliste', 'skriv_full'))
+        self.ferdigstilte = []
         for nummer, problem in zip(
                 self.NUMRE, ('Pustevansker', 'Brannskade', 'Transport')):
             o = self._oppdrag(status=choices.LEDIG, oppdragsnummer=nummer)
             o.problemstilling = problem
             o.save(update_fields=['problemstilling'])
-            self.c.post(f'/oppdrag/api/oppdrag/{o.pk}/arkiver/')
-            self.arkiverte.append(o)
+            self.c.post(f'/oppdrag/api/oppdrag/{o.pk}/historikk/')
+            self.ferdigstilte.append(o)
 
     def _sok(self, term=None):
-        url = '/oppdrag/api/arkiv/'
+        url = '/oppdrag/api/historikk/'
         if term is not None:
             url += f'?sok={term}'
         return self.c.get(url).json()['data']
 
-    def test_lista_viser_kun_arkiverte(self):
+    def test_lista_viser_kun_ferdigstilte(self):
         aktiv = self._oppdrag(status=choices.LEDIG)
         ider = [r['id'] for r in self._sok()]
         self.assertEqual(len(ider), 3)
@@ -916,13 +919,13 @@ class ArkivlisteTests(OppdragBasis):
         Fiksturet har nettopp de tre numrene, så et delstreng-søk ville
         returnert alle tre og feilet her.
         """
-        maal = self.arkiverte[0]          # nummer 1
+        maal = self.ferdigstilte[0]          # nummer 1
         treff = self._sok('1')
         self.assertEqual([r['id'] for r in treff], [maal.pk])
         self.assertEqual(treff[0]['nummer'], 1)
 
     def test_soek_paa_nummer_med_havelaag(self):
-        maal = self.arkiverte[1]
+        maal = self.ferdigstilte[1]
         treff = self._sok(f'%23{maal.oppdragsnummer}')
         self.assertEqual([r['id'] for r in treff], [maal.pk])
 
@@ -937,19 +940,19 @@ class ArkivlisteTests(OppdragBasis):
         self.assertEqual(self._sok('finnesikke'), [])
 
     def test_enhetskonto_far_403(self):
-        """Arkivet er sentralbordets oversikt over hele vakta."""
-        bil = _bruker('bil_arkivliste', 'skriv_handling', delt=True)
+        """Historikken er sentralbordets oversikt over hele vakta."""
+        bil = _bruker('bil_historikkliste', 'skriv_handling', delt=True)
         Enhet.objects.filter(pk=self.enhet.pk).update(user=bil)
         self.assertEqual(
-            _klient(bil).get('/oppdrag/api/arkiv/').status_code, 403)
+            _klient(bil).get('/oppdrag/api/historikk/').status_code, 403)
 
     def test_uten_modultilgang_gir_403(self):
         self.assertEqual(
-            _klient(_bruker('utenfor_arkiv')).get('/oppdrag/api/arkiv/').status_code,
+            _klient(_bruker('utenfor_historikk')).get('/oppdrag/api/historikk/').status_code,
             403)
 
 
-class AutoArkiveringTests(StemplingBasis):
+class AutoHistorikkTests(StemplingBasis):
     """Et oppdrag som blir `Ledig` rydder seg selv bort fra tavla.
 
     Regelen bor i `sett_status`, ikke i stemplingsviewet — se docstringen
@@ -964,17 +967,17 @@ class AutoArkiveringTests(StemplingBasis):
         return [r['id'] for r in
                 self.sentral.get('/oppdrag/api/oppdrag/').json()['data']]
 
-    def test_ledig_arkiverer_med_en_gang(self):
+    def test_ledig_gaar_i_historikk_med_en_gang(self):
         o = self._oppdrag()
         self._stemple(o, 'rykker_ut')
         self.assertIn(o.pk, self._aktiv_liste())
 
         self._stemple(o, 'ledig')
         o.refresh_from_db()
-        self.assertIsNotNone(o.arkivert_at)
+        self.assertIsNotNone(o.historikk_fra)
         self.assertNotIn(o.pk, self._aktiv_liste())
 
-    def test_automatisk_lukking_arkiverer_ogsaa(self):
+    def test_automatisk_lukking_gaar_ogsaa_i_historikk(self):
         """§4.3: startes neste oppdrag, lukkes det pågående — og ryddes bort.
 
         Dette er grunnen til at regelen ligger i `sett_status` og ikke i
@@ -987,33 +990,33 @@ class AutoArkiveringTests(StemplingBasis):
 
         forste.refresh_from_db()
         self.assertEqual(forste.status, choices.LEDIG)
-        self.assertIsNotNone(forste.arkivert_at)
+        self.assertIsNotNone(forste.historikk_fra)
         self.assertNotIn(forste.pk, self._aktiv_liste())
         self.assertIn(andre.pk, self._aktiv_liste())
 
-    def test_automatisk_arkivering_har_ingen_arkivert_av(self):
+    def test_automatisk_flytting_har_ingen_historikk_av(self):
         """NULL betyr «ryddet bort av seg selv», satt betyr «noen trykket»."""
         o = self._oppdrag()
         self._stemple(o, 'rykker_ut')
         self._stemple(o, 'ledig')
         o.refresh_from_db()
-        self.assertIsNone(o.arkivert_av)
+        self.assertIsNone(o.historikk_av)
 
-    def test_manuell_arkivering_setter_arkivert_av(self):
+    def test_manuell_flytting_setter_historikk_av(self):
         o = self._oppdrag(status=choices.LEDIG)
-        self.sentral.post(f'/oppdrag/api/oppdrag/{o.pk}/arkiver/')
+        self.sentral.post(f'/oppdrag/api/oppdrag/{o.pk}/historikk/')
         o.refresh_from_db()
-        self.assertEqual(o.arkivert_av.username, 'auto_sentral')
+        self.assertEqual(o.historikk_av.username, 'auto_sentral')
 
-    def test_arkivert_havner_i_ferdigstilte(self):
+    def test_ferdigstilt_havner_i_historikken(self):
         o = self._oppdrag()
         self._stemple(o, 'rykker_ut')
         self._stemple(o, 'ledig')
-        arkiv = self.sentral.get('/oppdrag/api/arkiv/').json()['data']
-        self.assertEqual([r['id'] for r in arkiv], [o.pk])
+        historikk = self.sentral.get('/oppdrag/api/historikk/').json()['data']
+        self.assertEqual([r['id'] for r in historikk], [o.pk])
 
     def test_hentet_tilbake_blir_staaende(self):
-        """Arkiveringen henger på overgangen, ikke på statusen.
+        """Flyttingen henger på overgangen, ikke på statusen.
 
         Var den en filtrering på status, ville oppdraget forsvunnet igjen ved
         neste poll og «Hent tilbake» vært en knapp uten virkning.
@@ -1021,11 +1024,11 @@ class AutoArkiveringTests(StemplingBasis):
         o = self._oppdrag()
         self._stemple(o, 'rykker_ut')
         self._stemple(o, 'ledig')
-        self.sentral.delete(f'/oppdrag/api/oppdrag/{o.pk}/arkiver/')
+        self.sentral.delete(f'/oppdrag/api/oppdrag/{o.pk}/historikk/')
 
         o.refresh_from_db()
         self.assertEqual(o.status, choices.LEDIG)
-        self.assertIsNone(o.arkivert_at)
+        self.assertIsNone(o.historikk_fra)
         self.assertIn(o.pk, self._aktiv_liste())
         # Og den blir stående over flere hentinger.
         self.assertIn(o.pk, self._aktiv_liste())
@@ -1033,7 +1036,7 @@ class AutoArkiveringTests(StemplingBasis):
     def test_bilen_ser_det_fortsatt_i_tretti_minutter(self):
         """Den viktige frakoblingen: tavla ryddes, bilens vindu er urørt.
 
-        30-minuttersvinduet er personvern, arkiveringen er tavlerydding.
+        30-minuttersvinduet er personvern, historikken er tavlerydding.
         Koblet dem, ville mannskapet mistet oppdraget fra skjermen i samme
         øyeblikk de meldte seg ledige — mens de fortsatt sto og så på det.
         """

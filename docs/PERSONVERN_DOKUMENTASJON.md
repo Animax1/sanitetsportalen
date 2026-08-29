@@ -225,7 +225,7 @@ Felter i `Oppdrag` (fra `oppdrag/models.py`):
 | `fritekst` | Fritt tekstfelt for operativ tilleggsinformasjon til enheten | Fritekst | **Kan inneholde helseopplysninger (art. 9) og i verste fall identifikatorer** – se tiltakene under | GDPR art. 9(2)(h) |
 | `status` | Gjeldende status (fast verdimengde) | Tekst (fast verdimengde) | Vanlig personopplysning | GDPR art. 6(1)(d) |
 | `oppdragsnummer` | Løpenummer for oppdraget innen året, brukt på samband og for gjenfinning. **Ikke koblet til pasientnummer** og ikke en identifikator for personen | Heltall, unikt per år | Vanlig personopplysning | GDPR art. 6(1)(d) |
-| `arkivert_at` / `arkivert_av` | Når oppdraget ble ryddet bort fra den aktive tavla, og av hvem. **Ikke arkivering i `core.arkiv`-forstand** — ingenting fryses eller slettes, og handlingen er reversibel | Tidsstempel / referanse | Vanlig personopplysning (appbruker) | GDPR art. 6(1)(d) |
+| `historikk_fra` / `historikk_av` | Når oppdraget ble ryddet bort fra den aktive tavla og over i historikken, og av hvem (NULL = flyttet automatisk da oppdraget ble ledig). **Ikke arkivering i `core.arkiv`-forstand** — ingenting fryses eller slettes, og handlingen er reversibel | Tidsstempel / referanse | Vanlig personopplysning (appbruker) | GDPR art. 6(1)(d) |
 | `year` / `created_at` / `updated_at` | Årsscoping og systemtidsstempler | Heltall / tidsstempel | Vanlig personopplysning | GDPR art. 6(1)(d) |
 | `opprettet_av` | Appbrukeren som opprettet oppdraget | Referanse | Vanlig personopplysning (appbruker) | GDPR art. 6(1)(d) |
 | `enhet` | Enheten oppdraget er tildelt | Referanse | Ikke personopplysning i seg selv (se `Enhet` under) | – |
@@ -360,9 +360,10 @@ Lagringstidene er fastsatt etter GDPR art. 5(1)(e): opplysningene skal ikke oppb
 > **Merk – verifisert i drift 23. august 2026:** `purge_old_logs` kjøres av Railway Cron (`0 0 * * SUN`) i miljøet `production`. Ved første skarpe kjøring, natt til søndag 23. august 2026, slettet jobben 3 varsler eldre enn 30 dager — nøyaktig de tre en tørrkjøring dagen før hadde identifisert. Cron-tjenestens logg viser `Slettet 3 varsler eldre enn 30 dager`, altså den skarpe varianten, ikke tørrkjøringens `Ville slettet`. Lagringstidene i tabellen over er dermed dokumentert **håndhevet i produksjon**, ikke bare konfigurert. Tilsvarende bekreftelse for `kollaps_arkiv` (`0 4 1 * *`) står igjen: jobben har ennå ingenting å kollapse, siden arkivene er fra 2026 og grensen er 24 måneder.
 
 > **Merk om oppdragsdata (skrevet før modulen settes i produksjon):** Oppdragsmodulen
-> har foreløpig ingen egen frysings- eller slettemekanisme. Knappen «Arkiver» på
-> sentralbordet rydder bare den aktive tavla: raden beholdes uendret og kan hentes
-> tilbake, så den påvirker ingen lagringstid. Radene er årsscopet på
+> har foreløpig ingen egen frysings- eller slettemekanisme. «Historikk» på sentralbordet
+> rydder bare den aktive tavla: raden beholdes uendret og kan hentes tilbake, så den
+> påvirker ingen lagringstid. Flaten het opprinnelig «Arkiver» og er omdøpt nettopp for
+> ikke å forveksles med arkiveringen dette avsnittet ellers beskriver. Radene er årsscopet på
 > samme måte som pasientdata — et årsskifte tar dem ut av alle visninger — men de blir
 > stående i databasen til modulens arkiveringsfase (fase 7 i
 > `docs/BESLUTNING_OPPDRAGSMODULEN.md`) leverer samme mønster som pasientarkivet:
