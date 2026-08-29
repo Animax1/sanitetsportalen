@@ -43,11 +43,8 @@ function renderEnheter() {
   const el = document.getElementById('enhetsliste');
   if (!el) return;
 
-  // Tavla svarer på ett spørsmål: hvem kan sendes nå. Enheter som ikke er på
-  // vakt hører ikke hjemme her — men de forsvinner ikke i stillhet. Antallet
-  // står på Enheter-knappen og under lista, og hele oversikten ligger bak
-  // knappen. En bil som forsvinner uten spor er en bil ingen husker å sette
-  // inn igjen, og da mangler den neste vakt uten at noen vet hvorfor.
+  // Tavla viser hvem som kan sendes nå. Antallet av vakt står på
+  // Enheter-knappen, der hele lista ligger.
   const paVakt = enheter.filter((e) => e.pa_vakt);
   const antallAv = enheter.length - paVakt.length;
 
@@ -71,13 +68,6 @@ function renderEnheter() {
     }).join(''));
   }
 
-  const notis = document.getElementById('av-vakt-notis');
-  if (notis) {
-    notis.textContent = antallAv
-      ? `${antallAv} ${antallAv === 1 ? 'enhet' : 'enheter'} ikke på vakt`
-      : '';
-    notis.hidden = !antallAv;
-  }
   const teller = document.getElementById('av-vakt-teller');
   if (teller) teller.textContent = antallAv ? ` (${antallAv} av vakt)` : '';
 }

@@ -15,10 +15,13 @@ Tavla har derfor to ting: **Ressurser** — enhetene som er på vakt, med status
 **Oppdrag**. Enheter av vakt vises ikke der lenger; tavla svarer på ett spørsmål, og det er
 «hvem kan sendes nå».
 
-**Men de forsvinner ikke i stillhet.** Antallet står to steder: under ressurslista («1 enhet
-ikke på vakt») og på Enheter-knappen («Enheter (1 av vakt)»). Innvendingen fra i går står —
-en bil som forsvinner uten spor er en bil ingen husker å sette inn igjen — og et tall er nok
-til å hindre det uten å ta plass på tavla.
+Antallet av vakt står på Enheter-knappen («Enheter (1 av vakt)»), der hele lista ligger.
+
+Første utgave hadde *to* signaler om det samme — også en linje under ressurslista. André tok
+det bort: «jeg gir jo folk opplæring, de som skal bruke det er godt informerte. Nå dummer vi
+det veldig ned.» Han har rett. Vernet mot at en bil forsvinner ubemerket er ett tall, ikke
+to plasseringer av det, og et grensesnitt som gjentar seg for brukere som er lært opp er
+støy — ikke omtanke.
 
 **Enheter-knappen er ikke lenger et koblingspanel.** Den viser hele lista: på vakt, av vakt
 og pensjonerte, med vaktbryteren der. Kontokoblingen vises som tekst, men redigeres ikke —

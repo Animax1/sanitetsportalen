@@ -39,10 +39,8 @@ REVIEWED_INTERPOLATIONS = {
     'e.status_navn': 'bygger ren tekst i `meta`, som escapes ved innsetting',
     'e.antall_ventende': 'tall, i samme rene tekst som escapes ved innsetting',
     'e.username': 'bygger ren tekst i `koblingTekst`, som escapes ved innsetting',
-    # Disse havner i `textContent`, ikke i markup. Der finnes ingen parsing å
-    # bryte ut av — escaping ville vist `&amp;` til brukeren.
+    # Havner i `textContent`, ikke i markup — ingen parsing å bryte ut av.
     'antallAv': 'tall, settes med textContent',
-    "antallAv === 1 ? 'enhet' : 'enheter'": 'hardkodet ord, settes med textContent',
     # Fragmentene bygges to linjer over interpolasjonen, med escapet innhold.
     # De er hoistet ut av mal-strengen nettopp for at denne testen skal kunne
     # lese dem: en nøstet mal-streng inne i en ${...} er usynlig for regexen.
