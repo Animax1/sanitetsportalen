@@ -4,6 +4,22 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-08-29 — `.venv/` ignoreres
+
+Kun `.gitignore`. Ingen kodeendring, ingen migrasjon. **1002 tester grønne.**
+
+`CLAUDE.md` dokumenterer `python -m venv .venv` som første oppsettssteg, men mappa sto ikke
+i `.gitignore`. Alle som følger oppskriften fikk dermed et par tusen utrackede filer i
+`git status` — nok til å skjule en ekte endring i støyen. `venv/` er tatt med i samme slengen
+siden det er det andre vanlige navnet.
+
+**Verdt å vite ved kjøring av testsuiten i et ferskt klon:** `collectstatic` må kjøres først.
+`STORAGES['staticfiles']` er `CompressedManifestStaticFilesStorage` uavhengig av `DEBUG`, så
+uten manifest feiler hver test som renderer en mal med `{% static %}` — 131 av dem — med
+`ValueError: Missing staticfiles manifest entry`. Det ser ut som en kodefeil og er det ikke.
+
+---
+
 ## 2026-08-28 — `/pasienter/api/stats/` er slettet
 
 **1002 tester grønne.** Ingen migrasjon.

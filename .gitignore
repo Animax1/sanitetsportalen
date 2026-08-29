@@ -3,6 +3,10 @@ __pycache__/
 *.pyo
 *.pyd
 .Python
+# Virtuelt miljø. CLAUDE.md dokumenterer `python -m venv .venv` som
+# oppsettssteget, så mappa oppstår hos alle som følger oppskriften.
+.venv/
+venv/
 *.egg-info/
 dist/
 build/
