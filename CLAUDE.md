@@ -185,6 +185,13 @@ modulens eget datasett strippes (`strip_fields`): med `natural_foreign` lagres d
 brukernavn, og er kontoen slettet feiler hele gjenopprettingen — altså akkurat når man
 trenger backupen.
 
+**Scheduleren finner moduler gjennom registeret**, ikke gjennom
+`ModuleBackupConfig`-tabellen: en modul uten konfigrad får en med standardverdier
+første gang scheduleren ser den. Leste den tabellen direkte — slik den gjorde fram til
+fase 7 — var en nyregistrert modul uten backup til noen tilfeldigvis åpnet
+`/portal-admin/backup/`, og for et arkiv betyr manglende backup at kollapsen nekter å
+kjøre, altså en feil som først viser seg to år senere.
+
 En test som kaller `clear_registry()` må rydde opp med
 `core.backup.registrer_alle_moduler()`, ikke med én moduls `register_handlers()`. Gjør den
 det siste, mister resten av testkjøringen de andre modulenes handlere, og feilen dukker

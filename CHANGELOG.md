@@ -46,6 +46,14 @@ signaturene fortsatt verifiserer.
   - **`kollaps_arkiv` kjente bare pasientarkivet.** Kommandoen går nå gjennom
     `core.arkiv`-registeret, kjører sperren per modul og navngir modulen som mangler
     backup. `--modul <slug>` avgrenser. Cron-jobben trenger ingen endring.
+- **Scheduleren finner moduler gjennom registeret nå.** Den leste
+  `ModuleBackupConfig`-radene direkte, og radene ble opprettet først når en admin åpnet
+  `/portal-admin/backup/` — så de to nye modulene hadde ingen automatisk backup før noen
+  tilfeldigvis besøkte den siden. For `oppdrag_arkiv` var det verre enn en manglende
+  fil: uten backup nekter `kollaps_arkiv` å kjøre, så mangelen ville vist seg som en
+  blokkert sletting to år senere. Registeret er fasit for hvilke moduler som finnes;
+  konfigraden lages med standardverdier første gang scheduleren ser en handler uten en,
+  og admin bestemmer fortsatt intervall og av/på. Mutasjonstestet.
 - **En testisolasjonsfeil ble avdekket av de nye testene:** `clear_registry()` i
   backup-testene ble ryddet opp med pasientmodulens `register_handlers()`, så
   oppdragsmodulens handlere forsvant for resten av kjøringen — og feilen dukket opp i en
