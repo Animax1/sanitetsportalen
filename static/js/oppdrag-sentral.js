@@ -115,6 +115,7 @@ function renderOppdrag() {
     <div class="oppdrag-rad" data-action="visOppdrag" data-id="${escHtmlValue(o.id)}"
          role="button" tabindex="0">
       <div class="d-flex align-items-center gap-2 flex-wrap">
+        <span class="oppdrag-nr">#${escHtmlValue(o.nummer)}</span>
         <span class="hastegrad ${escHtmlValue(hastegradKlasse(o.hastegrad))}">${escapeHtml(o.hastegrad)}</span>
         <span class="oppdrag-problem">${escapeHtml(o.problemstilling)}</span>
         <span class="ms-auto d-flex align-items-center gap-1">
@@ -203,7 +204,20 @@ async function visOppdrag(id) {
 
   const o = d.data;
   document.getElementById('detalj-tittel').textContent =
-    `${o.problemstilling} – ${o.enhet_navn}`;
+    `#${o.nummer} ${o.problemstilling} – ${o.enhet_navn}`;
+
+  // Arkivering rydder tavla og er reversibel. Knappen vises bare når den
+  // kan brukes: et pågående oppdrag skal ikke kunne ryddes bort, og en knapp
+  // som alltid feiler er verre enn ingen knapp.
+  const arkivKnapp = (OPPDRAG_TILGANG.kanSkrive && o.status === 'ledig')
+    ? (o.arkivert
+      ? `<button class="btn btn-outline-secondary btn-sm" type="button"
+                 data-action="hentTilbakeOppdrag" data-id="${escHtmlValue(o.id)}">
+           Hent tilbake til tavla</button>`
+      : `<button class="btn btn-outline-secondary btn-sm" type="button"
+                 data-action="arkiverOppdrag" data-id="${escHtmlValue(o.id)}">
+           <i class="bi bi-archive me-1"></i>Arkiver</button>`)
+    : '';
 
   const flyttValg = OPPDRAG_TILGANG.kanSkrive
     ? `
@@ -228,6 +242,7 @@ async function visOppdrag(id) {
     ${o.fritekst ? `<div class="oppdrag-fritekst mb-3">${escapeHtml(o.fritekst)}</div>` : ''}
     <h6 class="text-muted">Tidslinje</h6>
     ${tidslinjeHtml(o)}
+    ${arkivKnapp ? `<div class="mt-3">${arkivKnapp}</div>` : ''}
     ${flyttValg}`);
 }
 
@@ -247,6 +262,78 @@ async function flyttOppdrag(id) {
   }
   bootstrap.Modal.getInstance(document.getElementById('oppdragDetaljModal'))?.hide();
   await lastAlt();
+}
+
+
+// ── Arkiv (ferdigstilte oppdrag) ────────────────────────
+// Rydding av tavla, ikke vaktarkivet: radene er urørt, og «Hent tilbake»
+// angrer. Se kommentaren i oppdrag/services.py.
+
+let arkivliste = [];
+
+
+function renderArkiv() {
+  const el = document.getElementById('arkivliste');
+  if (!el) return;
+  if (!arkivliste.length) {
+    el.innerHTML = '<div class="tom-melding">Ingen arkiverte oppdrag.</div>';
+    return;
+  }
+  el.innerHTML = (arkivliste.map((o) => {
+    const fritekstBlokk = o.fritekst
+      ? `<div class="oppdrag-fritekst">${escapeHtml(o.fritekst)}</div>`
+      : '';
+    return `
+    <div class="oppdrag-rad" data-action="visOppdrag" data-id="${escHtmlValue(o.id)}"
+         role="button" tabindex="0">
+      <div class="d-flex align-items-center gap-2 flex-wrap">
+        <span class="oppdrag-nr">#${escHtmlValue(o.nummer)}</span>
+        <span class="hastegrad ${escHtmlValue(hastegradKlasse(o.hastegrad))}">${escapeHtml(o.hastegrad)}</span>
+        <span class="oppdrag-problem">${escapeHtml(o.problemstilling)}</span>
+      </div>
+      <div class="oppdrag-meta mt-1">
+        ${escapeHtml(o.enhet_navn)} · ${escapeHtml(o.lokasjon_navn)} · arkivert ${escapeHtml(klokke(o.arkivert))}
+      </div>
+      ${fritekstBlokk}
+    </div>`;
+  }).join(''));
+}
+
+
+async function lastArkiv() {
+  const felt = document.getElementById('arkiv-sok');
+  const sok = felt ? (felt.value || '').trim() : '';
+  const url = sok
+    ? `/oppdrag/api/arkiv/?sok=${encodeURIComponent(sok)}`
+    : '/oppdrag/api/arkiv/';
+  const res = await apiFetch(url);
+  if (!res.ok) return;
+  arkivliste = (await res.json()).data || [];
+  renderArkiv();
+}
+
+
+async function arkiverOppdrag(id) {
+  const res = await apiFetch(`/oppdrag/api/oppdrag/${id}/arkiver/`, { method: 'POST' });
+  const d = await res.json();
+  if (!res.ok || d.status !== 'ok') {
+    alert(d.message || 'Kunne ikke arkivere oppdraget.');
+    return;
+  }
+  bootstrap.Modal.getInstance(document.getElementById('oppdragDetaljModal'))?.hide();
+  etagOppdrag = null;   // raden forsvinner fra den aktive lista
+  await lastAlt();
+  if (document.getElementById('arkivliste')) await lastArkiv();
+}
+
+
+async function hentTilbakeOppdrag(id) {
+  const res = await apiFetch(`/oppdrag/api/oppdrag/${id}/arkiver/`, { method: 'DELETE' });
+  if (!res.ok) return;
+  bootstrap.Modal.getInstance(document.getElementById('oppdragDetaljModal'))?.hide();
+  etagOppdrag = null;
+  await lastAlt();
+  if (document.getElementById('arkivliste')) await lastArkiv();
 }
 
 

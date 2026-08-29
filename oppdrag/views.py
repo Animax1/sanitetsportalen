@@ -12,6 +12,8 @@ from __future__ import annotations
 import json
 
 from django.core.exceptions import ValidationError
+from django.db import transaction
+from django.db.models import Q
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
 from django.http import HttpResponseNotModified, JsonResponse
@@ -280,7 +282,9 @@ def oppdrag_liste_view(request):
                 for r in data
             ]
         else:
-            qs = (Oppdrag.objects.filter(year=year)
+            # Arkiverte er ute av den aktive lista. De er ikke borte — de
+            # ligger i `arkiv_liste_view`, søkbare på nummer.
+            qs = (Oppdrag.objects.filter(year=year, arkivert_at__isnull=True)
                   .select_related('enhet', 'lokasjon').order_by('-created_at'))
             data = [oppdrag_til_dict(o) for o in qs]
             etag_rader = [(r['id'], r['status'], r['enhet_id']) for r in data]
@@ -318,15 +322,19 @@ def oppdrag_liste_view(request):
         return JsonResponse(
             {'status': 'error', 'message': 'Ukjent eller inaktiv lokasjon.'}, status=400)
 
-    oppdrag = Oppdrag.objects.create(
-        year=year,
-        enhet=enhet,
-        problemstilling=data['problemstilling'],
-        hastegrad=data['hastegrad'],
-        lokasjon=lokasjon,
-        fritekst=(data.get('fritekst') or '').strip(),
-        opprettet_av=request.user,
-    )
+    # Nummeret tildeles inne i transaksjonen: feiler opprettelsen, rulles
+    # også telleren tilbake, og nummeret brennes ikke.
+    with transaction.atomic():
+        oppdrag = Oppdrag.objects.create(
+            year=year,
+            oppdragsnummer=services.neste_oppdragsnummer(year),
+            enhet=enhet,
+            problemstilling=data['problemstilling'],
+            hastegrad=data['hastegrad'],
+            lokasjon=lokasjon,
+            fritekst=(data.get('fritekst') or '').strip(),
+            opprettet_av=request.user,
+        )
     return JsonResponse({'status': 'ok', 'data': oppdrag_til_dict(oppdrag)})
 
 
@@ -539,3 +547,85 @@ def stempling_view(request, pk, overgang):
         'oppdrag': oppdrag_til_dict(oppdrag, for_enhet=True),
         'melding': melding_til_dict(melding),
     }})
+
+
+# ── Arkivering (rydding av tavla) ────────────────────────────────────────────
+#
+# **Ikke vaktarkivet.** `core.arkiv` fryser, signerer og kollapser; her flyttes
+# et ferdigstilt oppdrag ut av den aktive lista og inn i en søkbar visning.
+# Raden er urørt og handlingen reversibel — derfor `skriv_full` og ikke admin:
+# §3.3 reserverer admin for det irreversible.
+
+@modul_kreves('oppdrag', 'skriv_full', svar='json')
+@require_http_methods(['POST', 'DELETE'])
+@rate_limit(group='oppdrag:arkiver', rate='60/m', method='POST')
+def arkiver_view(request, pk):
+    """Arkiver et ferdigstilt oppdrag (POST), eller hent det tilbake (DELETE).
+
+    Enhetskontoer stenges ute selv om de skulle ha `skriv_full`: rydding av
+    tavla er sentralbordets jobb, og bilen ser uansett bare sine egne rader.
+    Samme objektsjekk-mønster som stemplingen, motsatt vei.
+    """
+    if er_enhetskonto(request.user):
+        return JsonResponse(
+            {'status': 'error', 'message': 'Enheter arkiverer ikke oppdrag.'},
+            status=403)
+
+    try:
+        oppdrag = (Oppdrag.objects.select_related('enhet', 'lokasjon')
+                   .get(pk=pk, year=get_active_year()))
+    except Oppdrag.DoesNotExist:
+        return JsonResponse(
+            {'status': 'error', 'message': 'Oppdrag ikke funnet'}, status=404)
+
+    if request.method == 'DELETE':
+        services.hent_tilbake(oppdrag)
+        return JsonResponse({'status': 'ok', 'data': oppdrag_til_dict(oppdrag)})
+
+    try:
+        services.arkiver_oppdrag(oppdrag, bruker=request.user)
+    except services.KanIkkeArkiveres as feil:
+        # Å rydde bort et pågående oppdrag ville skjult noe som fortsatt
+        # skjer. 400: forespørselen er velformet, men tilstanden tillater den
+        # ikke — og meldingen sier hvilken status som står i veien.
+        return JsonResponse({'status': 'error', 'message': str(feil)}, status=400)
+
+    return JsonResponse({'status': 'ok', 'data': oppdrag_til_dict(oppdrag)})
+
+
+@never_cache
+@modul_kreves('oppdrag', 'les', svar='json')
+@require_http_methods(['GET'])
+def arkiv_liste_view(request):
+    """De arkiverte oppdragene i aktiv vakt, nyest først.
+
+    `?sok=` filtrerer. Nummer er hovedveien inn — det er det man har notert
+    eller hørt på samband — så et rent tall treffer nummeret eksakt i stedet
+    for som delstreng: søker man «1», skal man ikke få 1, 10, 11 og 21.
+    Tekstsøk mot problemstilling, lokasjon og enhet er tilleggsveien for den
+    som husker hva oppdraget gjaldt, men ikke nummeret.
+
+    Enhetskontoer får 403: arkivet er sentralbordets oversikt over hele
+    vakta, og bilen skal se sine egne oppdrag, ikke andres.
+    """
+    if er_enhetskonto(request.user):
+        return JsonResponse(
+            {'status': 'error', 'message': 'Ingen tilgang'}, status=403)
+
+    qs = (Oppdrag.objects
+          .filter(year=get_active_year(), arkivert_at__isnull=False)
+          .select_related('enhet', 'lokasjon')
+          .order_by('-arkivert_at'))
+
+    sok = (request.GET.get('sok') or '').strip()
+    if sok:
+        if sok.lstrip('#').isdigit():
+            qs = qs.filter(oppdragsnummer=int(sok.lstrip('#')))
+        else:
+            qs = qs.filter(
+                Q(problemstilling__icontains=sok)
+                | Q(lokasjon__navn__icontains=sok)
+                | Q(enhet__navn__icontains=sok))
+
+    return JsonResponse({'status': 'ok', 'data': [
+        oppdrag_til_dict(o) for o in qs]})

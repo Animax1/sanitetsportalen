@@ -52,6 +52,9 @@ def oppdrag_til_dict(oppdrag, *, for_enhet: bool = False) -> dict:
     """
     data = {
         'id': oppdrag.pk,
+        # Nummeret man sier på samband. `id` er databasenøkkelen og skal ikke
+        # vises — den er global og hopper mellom år.
+        'nummer': oppdrag.oppdragsnummer,
         'enhet_id': oppdrag.enhet_id,
         'enhet_navn': oppdrag.enhet.navn,
         'problemstilling': oppdrag.problemstilling,
@@ -61,6 +64,8 @@ def oppdrag_til_dict(oppdrag, *, for_enhet: bool = False) -> dict:
         'status': oppdrag.status,
         'status_navn': oppdrag.get_status_display(),
         'opprettet': oppdrag.created_at.isoformat(),
+        'arkivert': (oppdrag.arkivert_at.isoformat()
+                     if oppdrag.arkivert_at else None),
     }
     skjul_fritekst = for_enhet and oppdrag.status == choices.TERMINAL
     data['fritekst'] = '' if skjul_fritekst else oppdrag.fritekst

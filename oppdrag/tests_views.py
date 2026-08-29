@@ -6,6 +6,7 @@ svar og ikke i nettleseren.
 """
 from datetime import timedelta
 
+from django.db import IntegrityError, transaction
 from django.test import Client, TestCase, override_settings
 from django.utils import timezone
 
@@ -42,9 +43,11 @@ class OppdragBasis(TestCase):
         self.enhet = Enhet.objects.create(navn='Haugesund 56')
         self.annen_enhet = Enhet.objects.create(navn='Karmøy 12')
 
-    def _oppdrag(self, enhet=None, **kwargs):
+    def _oppdrag(self, enhet=None, year=AAR, **kwargs):
+        from oppdrag.services import neste_oppdragsnummer
+        kwargs.setdefault('oppdragsnummer', neste_oppdragsnummer(year))
         return Oppdrag.objects.create(
-            year=AAR, enhet=enhet or self.enhet,
+            year=year, enhet=enhet or self.enhet,
             problemstilling='Pustevansker', hastegrad='Akutt',
             lokasjon=self.lokasjon, **kwargs)
 
@@ -636,9 +639,7 @@ class StemplingObjektsjekkTests(StemplingBasis):
         self.assertEqual(resp.status_code, 403)
 
     def test_oppdrag_utenfor_aktiv_vakt_gir_404(self):
-        o = Oppdrag.objects.create(
-            year=AAR - 1, enhet=self.enhet, problemstilling='Transport',
-            hastegrad='Vanlig', lokasjon=self.lokasjon)
+        o = self._oppdrag(year=AAR - 1)
         self.assertEqual(self._stemple(o, 'rykker_ut').status_code, 404)
 
 
@@ -738,3 +739,211 @@ class EnhetSkjermTests(StemplingBasis):
                              HTTP_IF_NONE_MATCH=etag1)
         self.assertEqual(resp2.status_code, 200)
         self.assertNotEqual(resp2['ETag'], etag1)
+
+
+class OppdragsnummerTests(OppdragBasis):
+    """Løpenummeret man sier på samband: «oppdrag 14»."""
+
+    def setUp(self):
+        super().setUp()
+        self.c = _klient(_bruker('nummerops', 'skriv_full'))
+
+    def _opprett(self):
+        return self.c.post('/oppdrag/api/oppdrag/', content_type='application/json',
+                           data={'enhet_id': self.enhet.pk,
+                                 'lokasjon_id': self.lokasjon.pk,
+                                 'problemstilling': 'Pustevansker',
+                                 'hastegrad': 'Akutt'})
+
+    def test_numrene_teller_oppover_fra_en(self):
+        for ventet in (1, 2, 3):
+            with self.subTest(ventet=ventet):
+                self.assertEqual(self._opprett().json()['data']['nummer'], ventet)
+
+    def test_nummeret_er_med_i_lista(self):
+        self._opprett()
+        rad = self.c.get('/oppdrag/api/oppdrag/').json()['data'][0]
+        self.assertEqual(rad['nummer'], 1)
+
+    def test_nummeret_restarter_per_aar(self):
+        """Per år, ikke globalt — ellers blir det for langt å lese opp."""
+        self._opprett()
+        AppSetting.objects.update_or_create(
+            key='active_year', defaults={'value': str(AAR + 1)})
+        self.assertEqual(self._opprett().json()['data']['nummer'], 1)
+        self.assertEqual(
+            Oppdrag.objects.filter(year=AAR + 1, oppdragsnummer=1).count(), 1)
+
+    def test_samme_nummer_to_ganger_i_samme_aar_avvises(self):
+        """Unikhetskravet er i databasen, ikke bare i telleren."""
+        o = self._oppdrag()
+        with self.assertRaises(IntegrityError):
+            with transaction.atomic():
+                Oppdrag.objects.create(
+                    year=AAR, oppdragsnummer=o.oppdragsnummer,
+                    enhet=self.enhet, problemstilling='Transport',
+                    hastegrad='Vanlig', lokasjon=self.lokasjon)
+
+    def test_telleren_gjenskapes_om_raden_mangler(self):
+        """En slettet AppSetting-rad skal ikke gi kollisjon med eksisterende."""
+        o = self._oppdrag()
+        AppSetting.objects.filter(key=f'next_oppdrag_nr_{AAR}').delete()
+        self.assertEqual(
+            self._opprett().json()['data']['nummer'], o.oppdragsnummer + 1)
+
+
+class ArkiveringTests(OppdragBasis):
+    """Rydding av tavla — ikke vaktarkivet. Reversibel, ingenting fryses."""
+
+    def setUp(self):
+        super().setUp()
+        self.c = _klient(_bruker('arkivops', 'skriv_full'))
+
+    def _arkiver(self, oppdrag, klient=None):
+        return (klient or self.c).post(
+            f'/oppdrag/api/oppdrag/{oppdrag.pk}/arkiver/')
+
+    def _hent_tilbake(self, oppdrag):
+        return self.c.delete(f'/oppdrag/api/oppdrag/{oppdrag.pk}/arkiver/')
+
+    def test_ferdigstilt_kan_arkiveres(self):
+        o = self._oppdrag(status=choices.LEDIG)
+        self.assertEqual(self._arkiver(o).status_code, 200)
+        o.refresh_from_db()
+        self.assertIsNotNone(o.arkivert_at)
+
+    def test_paagaende_kan_ikke_arkiveres(self):
+        """Å rydde bort noe som fortsatt skjer ville skjult det."""
+        for status in (choices.VENTER, choices.RYKKER_UT, choices.FREMME,
+                       choices.AVREIST, choices.LEVERER):
+            with self.subTest(status=status):
+                o = self._oppdrag(status=status)
+                resp = self._arkiver(o)
+                self.assertEqual(resp.status_code, 400)
+                o.refresh_from_db()
+                self.assertIsNone(o.arkivert_at)
+
+    def test_arkivert_forsvinner_fra_aktiv_liste(self):
+        beholdt = self._oppdrag(status=choices.LEDIG)
+        ryddet = self._oppdrag(status=choices.LEDIG)
+        self._arkiver(ryddet)
+        ider = [r['id'] for r in self.c.get('/oppdrag/api/oppdrag/').json()['data']]
+        self.assertIn(beholdt.pk, ider)
+        self.assertNotIn(ryddet.pk, ider)
+
+    def test_raden_slettes_ikke(self):
+        """Arkivering er et visningsvalg. Statistikken beholder raden."""
+        o = self._oppdrag(status=choices.LEDIG)
+        self._arkiver(o)
+        self.assertTrue(Oppdrag.objects.filter(pk=o.pk).exists())
+
+    def test_hent_tilbake_angrer(self):
+        o = self._oppdrag(status=choices.LEDIG)
+        self._arkiver(o)
+        self.assertEqual(self._hent_tilbake(o).status_code, 200)
+        o.refresh_from_db()
+        self.assertIsNone(o.arkivert_at)
+        ider = [r['id'] for r in self.c.get('/oppdrag/api/oppdrag/').json()['data']]
+        self.assertIn(o.pk, ider)
+
+    def test_dobbel_arkivering_flytter_ikke_tidspunktet(self):
+        o = self._oppdrag(status=choices.LEDIG)
+        self._arkiver(o)
+        o.refresh_from_db()
+        forste = o.arkivert_at
+        self._arkiver(o)
+        o.refresh_from_db()
+        self.assertEqual(o.arkivert_at, forste)
+
+    def test_les_kan_ikke_arkivere(self):
+        o = self._oppdrag(status=choices.LEDIG)
+        resp = self._arkiver(o, klient=_klient(_bruker('arkivleser', 'les')))
+        self.assertEqual(resp.status_code, 403)
+
+    def test_enhetskonto_kan_ikke_arkivere(self):
+        """Rydding av tavla er sentralbordets jobb, også med skriv_full."""
+        bil = _bruker('bil_arkiv', 'skriv_full', delt=True)
+        Enhet.objects.filter(pk=self.enhet.pk).update(user=bil)
+        o = self._oppdrag(status=choices.LEDIG)
+        self.assertEqual(self._arkiver(o, klient=_klient(bil)).status_code, 403)
+
+    def test_arkivering_gir_auditrad(self):
+        """Feltlista utledes fra modellen, så det nye feltet spores av seg selv."""
+        from audit.models import AuditLog
+        o = self._oppdrag(status=choices.LEDIG)
+        AuditLog.objects.all().delete()
+        self._arkiver(o)
+        self.assertTrue(AuditLog.objects.filter(
+            table_name='oppdrag_oppdrag', field_name='arkivert_at').exists())
+
+
+class ArkivlisteTests(OppdragBasis):
+    """«Ferdigstilte»-visningen, og søket som finner tilbake til oppdraget."""
+
+    #: Numrene er valgt slik at delstreng-søk ville tatt feil: «1» er både
+    #: et helt nummer og et prefiks av 10 og 11. Uten den kollisjonen i
+    #: dataene ville `test_soek_paa_nummer_treffer_eksakt` bestått også med
+    #: `__icontains` — den ville påstått mer enn fiksturet kunne vise.
+    NUMRE = (1, 10, 11)
+
+    def setUp(self):
+        super().setUp()
+        self.c = _klient(_bruker('arkivliste', 'skriv_full'))
+        self.arkiverte = []
+        for nummer, problem in zip(
+                self.NUMRE, ('Pustevansker', 'Brannskade', 'Transport')):
+            o = self._oppdrag(status=choices.LEDIG, oppdragsnummer=nummer)
+            o.problemstilling = problem
+            o.save(update_fields=['problemstilling'])
+            self.c.post(f'/oppdrag/api/oppdrag/{o.pk}/arkiver/')
+            self.arkiverte.append(o)
+
+    def _sok(self, term=None):
+        url = '/oppdrag/api/arkiv/'
+        if term is not None:
+            url += f'?sok={term}'
+        return self.c.get(url).json()['data']
+
+    def test_lista_viser_kun_arkiverte(self):
+        aktiv = self._oppdrag(status=choices.LEDIG)
+        ider = [r['id'] for r in self._sok()]
+        self.assertEqual(len(ider), 3)
+        self.assertNotIn(aktiv.pk, ider)
+
+    def test_soek_paa_nummer_treffer_eksakt(self):
+        """Søker man «1», skal man ikke få 1, 10 og 11.
+
+        Fiksturet har nettopp de tre numrene, så et delstreng-søk ville
+        returnert alle tre og feilet her.
+        """
+        maal = self.arkiverte[0]          # nummer 1
+        treff = self._sok('1')
+        self.assertEqual([r['id'] for r in treff], [maal.pk])
+        self.assertEqual(treff[0]['nummer'], 1)
+
+    def test_soek_paa_nummer_med_havelaag(self):
+        maal = self.arkiverte[1]
+        treff = self._sok(f'%23{maal.oppdragsnummer}')
+        self.assertEqual([r['id'] for r in treff], [maal.pk])
+
+    def test_soek_paa_problemstilling(self):
+        treff = self._sok('brann')
+        self.assertEqual([r['problemstilling'] for r in treff], ['Brannskade'])
+
+    def test_soek_paa_enhet(self):
+        self.assertEqual(len(self._sok('Haugesund')), 3)
+
+    def test_ukjent_soek_gir_tom_liste(self):
+        self.assertEqual(self._sok('finnesikke'), [])
+
+    def test_enhetskonto_far_403(self):
+        """Arkivet er sentralbordets oversikt over hele vakta."""
+        bil = _bruker('bil_arkivliste', 'skriv_handling', delt=True)
+        Enhet.objects.filter(pk=self.enhet.pk).update(user=bil)
+        self.assertEqual(
+            _klient(bil).get('/oppdrag/api/arkiv/').status_code, 403)
+
+    def test_uten_modultilgang_gir_403(self):
+        self.assertEqual(
+            _klient(_bruker('utenfor_arkiv')).get('/oppdrag/api/arkiv/').status_code,
+            403)

@@ -214,3 +214,12 @@
   font-size: 1.05rem;
   font-weight: 600;
 }
+
+/* Oppdragsnummeret man sier på samband. Tabularnums så kolonnen står stille
+ * når lista oppdateres under polling. */
+.oppdrag-nr {
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  color: var(--text-muted);
+  flex: 0 0 auto;
+}

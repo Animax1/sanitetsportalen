@@ -4,6 +4,60 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-08-29 — Oppdragsnummer, og en arkivknapp som rydder tavla
+
+**1188 tester grønne** (22 nye). Migrasjon `oppdrag.0003_oppdragsnummer_og_arkivering`.
+Bestilt under uttesting av fase 4, utenom faseplanen.
+
+**Nummeret er per år, ikke globalt.** `pasientnummer` er globalt unikt fordi
+nullstillingen der sletter radene; oppdrag har ingen slik nullstilling, så uniktheten
+bæres av `(year, oppdragsnummer)` med en databasesperre. Nummeret restarter på 1 hver
+sesong — «oppdrag 14» skal være kort nok til å leses opp på samband, og i år tre ville en
+global teller gitt tresifrede numre uten grunn. Telleren står i `AppSetting` per år og
+låses med `select_for_update`, som `next_patient_nr`, og gjenskapes fra dataene hvis raden
+mangler, slik at en slettet innstilling ikke gir kollisjon.
+
+**Migrasjonen backfiller før den strammer inn.** Tre steg i rekkefølge: nullbar kolonne,
+backfill per år i `created_at`-rekkefølge, deretter `NOT NULL` og unikhetskravet. Legges
+kolonnen til med en default i ett steg, får alle eksisterende rader samme nummer og
+sperren feiler. Backfillen setter også `AppSetting`-telleren for hvert år den fant — uten
+det ville neste opprettelse startet på 1 og kollidert med rad nummer 1. Kjørt mot en
+testbase med rader i to år og blandet innsettingsrekkefølge: nummereringen følger
+`created_at`, ikke innsettingen.
+
+**«Arkiver» rydder tavla. Den fryser ingenting.** Dette er *ikke* vaktarkivet i
+`core.arkiv`-forstand — ingen SHA-signatur, ingen kollaps, ingen backup-sperre. Et
+ferdigstilt oppdrag flyttes ut av den aktive lista og inn i en «Ferdigstilte»-visning som
+kan søkes på nummer, problemstilling, lokasjon eller enhet. Raden er urørt og kan hentes
+tilbake. Fase 7 bygger fortsatt det ekte vaktarkivet; de to er ikke i veien for hverandre
+— den ene er drift under vakt, den andre dokumentasjon etter vakt.
+
+Fordi handlingen er reversibel ligger den på `skriv_full`, ikke på global admin: §3.3
+reserverer admin for det irreversible, og en knapp som bare rydder en liste hører til
+drift. Enhetskontoer stenges ute selv med `skriv_full` — rydding er sentralbordets jobb.
+
+**Kun ferdigstilte kan arkiveres.** Å rydde bort et pågående oppdrag ville skjult noe som
+fortsatt skjer, og det er samme feilklasse som å ta en enhet av vakt midt i et oppdrag —
+allerede stengt i `enhet_vakt_view`. Knappen vises bare når den kan brukes.
+
+**Arkivering rører ikke enhetens 30-minuttersvindu**, og det er verdt å si eksplisitt
+fordi de to reglene ser like ut. Vinduet er personvern — en bil kan bli stående ulåst.
+Arkiveringen er sentralbordets rydding av sin egen tavle. Koblet dem, kunne sentralbordet
+fjernet et oppdrag fra skjermen til et mannskap som fortsatt sto og så på det.
+
+**Et fikstur som påsto mer enn det viste.** Søket på nummer treffer eksakt, ikke som
+delstreng — søker man «1» skal man ikke få 1, 10 og 11. Testen sa nettopp det, men
+fiksturet hadde bare numrene 1, 2 og 3, så den bestod også da søket ble byttet til
+`__icontains`. Numrene er nå 1, 10 og 11, og mutasjonen gjør testen rød. De øvrige nye
+vernene er også sett røde: sperra mot å arkivere pågående (5 feil) og ekskluderingen fra
+den aktive lista (1 feil).
+
+Personvernprotokollen er ført til v1.8: begge feltene inn i A.6-tabellen, med presisering
+av at `oppdragsnummer` identifiserer *oppdraget* og ikke personen, og en merknad i A.9 om
+at arkivflagget ikke påvirker noen lagringstid.
+
+---
+
 ## 2026-08-29 — Fase 4: enhetsskjermen, og første faktiske bruk av `skriv_handling`
 
 **1166 tester grønne** (29 nye). Ingen migrasjon. Mellomtilstanden fra fase 3

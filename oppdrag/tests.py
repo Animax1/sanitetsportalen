@@ -31,9 +31,16 @@ def _lokasjon(navn='Hovedscene'):
     return Lokasjon.objects.get_or_create(navn=navn)[0]
 
 
-def _oppdrag(enhet, *, status=choices.VENTER, lokasjon=None, fritekst=''):
+def _oppdrag(enhet, *, status=choices.VENTER, lokasjon=None, fritekst='', year=AAR):
+    """Lag et oppdrag med neste ledige nummer.
+
+    Nummeret hentes fra samme teller som viewet bruker, slik at testene ikke
+    kan komme i utakt med unikhetskravet (year, oppdragsnummer).
+    """
+    from oppdrag.services import neste_oppdragsnummer
     return Oppdrag.objects.create(
-        year=AAR,
+        year=year,
+        oppdragsnummer=neste_oppdragsnummer(year),
         enhet=enhet,
         problemstilling='Pustevansker',
         hastegrad='Akutt',

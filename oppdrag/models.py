@@ -129,6 +129,12 @@ class Oppdrag(BaseTimeStampedModel):
 
     # Samme årsscoping som Patient.year: aktiv vakt styres av AppSetting.
     year = models.IntegerField(db_index=True, verbose_name='År')
+    # Løpenummeret man sier på samband: «oppdrag 14». Unikt per år, ikke
+    # globalt — nummeret restarter på 1 hver sesong, slik at det holder seg
+    # kort nok til å leses opp. `pasientnummer` er globalt unikt fordi
+    # nullstillingen der sletter radene; oppdrag har ingen slik nullstilling,
+    # så uniktheten må bæres av (year, oppdragsnummer).
+    oppdragsnummer = models.IntegerField(verbose_name='Oppdragsnummer')
     # PROTECT: et oppdrag uten enhet eller lokasjon gir ingen mening, og
     # historikken skal ikke kunne forsvinne under den.
     enhet = models.ForeignKey(
@@ -153,10 +159,34 @@ class Oppdrag(BaseTimeStampedModel):
         on_delete=models.SET_NULL, related_name='opprettede_oppdrag',
         verbose_name='Opprettet av')
 
+    # ── Arkivering ───────────────────────────────────────────────────────────
+    #
+    # **Dette er ikke vaktarkivet.** `core.arkiv` fryser, signerer og kollapser;
+    # dette flagget rydder bare tavla. Raden forblir levende og redigerbar, og
+    # ingenting slettes. Vaktarkivet for oppdrag bygges i fase 7, og de to kan
+    # leve side om side: den ene er drift under vakt, den andre dokumentasjon
+    # etter vakt.
+    #
+    # Nullbar dato framfor en boolean: «når ble den ryddet bort» er verdt å
+    # vite når noen leter etter et oppdrag som forsvant fra lista, og en
+    # boolean kan ikke svare på det.
+    arkivert_at = models.DateTimeField(
+        null=True, blank=True, db_index=True, verbose_name='Arkivert')
+    arkivert_av = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True,
+        on_delete=models.SET_NULL, related_name='arkiverte_oppdrag',
+        verbose_name='Arkivert av')
+
     class Meta:
         verbose_name = 'Oppdrag'
         verbose_name_plural = 'Oppdrag'
         ordering = ['-created_at']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['year', 'oppdragsnummer'],
+                name='unikt_oppdragsnummer_per_aar',
+            ),
+        ]
         indexes = [
             # Enhetsskjermen henter «mine oppdrag» ved hver poll, og
             # sentralbordet filtrerer på år + status. Begge går på dette.
@@ -165,11 +195,16 @@ class Oppdrag(BaseTimeStampedModel):
         ]
 
     def __str__(self) -> str:
-        return f'Oppdrag #{self.pk} – {self.problemstilling} ({self.get_status_display()})'
+        return (f'Oppdrag #{self.oppdragsnummer} – {self.problemstilling} '
+                f'({self.get_status_display()})')
 
     @property
     def er_avsluttet(self) -> bool:
         return self.status == choices.TERMINAL
+
+    @property
+    def er_arkivert(self) -> bool:
+        return self.arkivert_at is not None
 
 
 class StatusmeldingManager(models.Manager):

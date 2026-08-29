@@ -618,6 +618,21 @@ Gjennomgang 13. aug. 2026, med 1000 pasienter og peak 100 brukere som premiss.
             av hva som ble meldt. «Nyeste ikke-korrigerte rad per status vinner» bor i en
             manager-metode, ikke i en `if` per view. Kun tidspunkt, ikke status. Kun
             `skriv_full`.
+      - [x] **Oppdragsnummer og arkivknapp (29. aug. 2026)** — bestilt av André
+            under uttesting av fase 4, utenom faseplanen. Løpenummer per år
+            (`unikt_oppdragsnummer_per_aar`, migrasjon `0003` med backfill), og en
+            «Arkiver»-knapp som rydder ferdigstilte oppdrag ut av tavla og inn i en
+            søkbar «Ferdigstilte»-visning.
+            - **Arkiveringen er rydding, ikke frysing.** Raden er urørt, handlingen
+              reversibel, og den ligger derfor på `skriv_full` — §3.3 reserverer admin
+              for det irreversible. Vaktarkivet i fase 7 er fortsatt uendret på planen,
+              og de to kan leve side om side: drift under vakt mot dokumentasjon etter.
+            - Kun ferdigstilte kan arkiveres. Å rydde bort et pågående oppdrag er samme
+              feilklasse som å ta en enhet av vakt midt i et oppdrag.
+            - **Arkivering rører ikke enhetens 30-minuttersvindu.** De to reglene ser
+              like ut, men vinduet er personvern og arkiveringen er tavlerydding;
+              koblet ville sentralbordet kunnet fjerne et oppdrag fra en skjerm noen
+              fortsatt så på.
       - [ ] **Fase 5** (4–6 t): offline-kø for stemplinger, med `core.idempotency`.
             Endepunktet godtar allerede `idempotency_key` i det lukkede skjemaet —
             fase 5 kobler nøkkelen til `reserver()`/`fullfor()` og bygger køen i

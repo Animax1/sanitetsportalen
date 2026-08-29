@@ -511,8 +511,10 @@ class EnhetFolgerKontoenTests(TestCase):
 
     def _gi_oppdrag(self):
         from oppdrag.models import Lokasjon, Oppdrag
+        from oppdrag.services import neste_oppdragsnummer
         return Oppdrag.objects.create(
-            year=2098, enhet=self.enhet, problemstilling='Pustevansker',
+            year=2098, oppdragsnummer=neste_oppdragsnummer(2098),
+            enhet=self.enhet, problemstilling='Pustevansker',
             hastegrad='Akutt',
             lokasjon=Lokasjon.objects.create(navn='Hovedscene'))
 

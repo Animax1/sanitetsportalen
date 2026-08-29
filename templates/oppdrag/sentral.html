@@ -37,6 +37,11 @@
         <i class="bi bi-truck me-1"></i>Enheter<span id="av-vakt-teller"></span>
       </button>
       {% endif %}
+      <button type="button" class="btn btn-outline-secondary btn-sm"
+              data-bs-toggle="modal" data-bs-target="#arkivModal"
+              data-action="lastArkiv">
+        <i class="bi bi-archive me-1"></i>Ferdigstilte
+      </button>
       {% if er_global_admin %}
       <button type="button" class="btn btn-outline-secondary btn-sm"
               data-bs-toggle="modal" data-bs-target="#lokasjonerModal"
@@ -168,6 +173,32 @@
   </div>
 </div>
 {% endif %}
+
+<div class="modal fade" id="arkivModal" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Ferdigstilte oppdrag</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Lukk"></button>
+      </div>
+      <div class="modal-body">
+        <div class="input-group mb-3">
+          <span class="input-group-text"><i class="bi bi-search"></i></span>
+          <input type="text" id="arkiv-sok" class="form-control"
+                 placeholder="Oppdragsnummer, problemstilling, lokasjon eller enhet">
+          <button class="btn btn-outline-primary" type="button" data-action="lastArkiv">
+            Søk
+          </button>
+        </div>
+        <div id="arkivliste"><div class="tom-melding">Laster…</div></div>
+        <p class="form-text mb-0 mt-3">
+          Arkivering rydder tavla — oppdraget er ikke slettet eller fryst, og
+          kan hentes tilbake fra detaljvisningen.
+        </p>
+      </div>
+    </div>
+  </div>
+</div>
 
 <div class="modal fade" id="oppdragDetaljModal" tabindex="-1">
   <div class="modal-dialog modal-lg">

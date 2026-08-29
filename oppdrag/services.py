@@ -6,7 +6,7 @@ knapp som ikke vises er ikke en knapp som ikke kan trykkes.
 """
 from __future__ import annotations
 
-from django.db import transaction
+from django.db import models, transaction
 from django.utils import timezone
 
 from . import choices
@@ -58,6 +58,95 @@ def neste_i_kjeden(fra: str) -> str | None:
     if i + 1 >= len(choices.KJEDEN):
         return None
     return choices.KJEDEN[i + 1]
+
+
+# ── Oppdragsnummer ───────────────────────────────────────────────────────────
+
+#: Nøkkelen i `AppSetting` som holder neste ledige nummer for ett år.
+#: Per år, ikke global: nummeret restarter på 1 hver sesong slik at det holder
+#: seg kort nok til å leses opp på samband.
+def _nummer_nokkel(year: int) -> str:
+    return f'next_oppdrag_nr_{year}'
+
+
+def neste_oppdragsnummer(year: int) -> int:
+    """Hent og inkrementer neste oppdragsnummer for året, atomisk.
+
+    Samme mønster som `patients.services.next_patient_nr`: telleren står i
+    `AppSetting` og låses med `select_for_update`, slik at to samtidige
+    opprettelser ikke får samme nummer. Kalles inne i viewets transaksjon —
+    feiler opprettelsen etterpå, rulles også telleren tilbake.
+
+    Telleren gjenskapes fra dataene hvis raden mangler. Det gjør at en modul
+    som får oppdrag før telleren finnes ikke starter på 1 og kolliderer med
+    en eksisterende rad — og at en slettet AppSetting-rad ikke er en
+    permanent feil.
+    """
+    from patients.models import AppSetting  # noqa: WPS433
+
+    with transaction.atomic():
+        nokkel = _nummer_nokkel(year)
+        rad = AppSetting.objects.select_for_update().filter(key=nokkel).first()
+        if rad is None:
+            hoyeste = (Oppdrag.objects.filter(year=year)
+                       .aggregate(models.Max('oppdragsnummer'))['oppdragsnummer__max'])
+            start = (hoyeste or 0) + 1
+            rad = AppSetting.objects.create(key=nokkel, value=str(start))
+            # Les raden på nytt med lås: create() låser ikke, og to samtidige
+            # kall kunne ellers passert hverandre her.
+            rad = AppSetting.objects.select_for_update().get(key=nokkel)
+
+        nr = int(rad.value)
+        rad.value = str(nr + 1)
+        rad.save(update_fields=['value'])
+        return nr
+
+
+# ── Arkivering (rydding, ikke frysing) ───────────────────────────────────────
+#
+# **Dette er ikke vaktarkivet.** `core.arkiv` fryser, signerer og kollapser;
+# her flyttes et ferdigstilt oppdrag ut av den aktive lista og inn i en søkbar
+# «Ferdigstilte»-visning. Raden er urørt, og handlingen er reversibel.
+#
+# Derfor ligger den på `skriv_full`, ikke på global admin: §3.3 reserverer
+# admin for det irreversible, og en knapp som bare rydder tavla hører til
+# drift. Vaktarkivet i fase 7 er det som skal være admin.
+
+class KanIkkeArkiveres(Exception):
+    """Oppdraget er ikke ferdigstilt."""
+
+
+def arkiver_oppdrag(oppdrag, *, bruker):
+    """Flytt et ferdigstilt oppdrag ut av den aktive lista.
+
+    **Kun `Ledig` kan arkiveres.** Å rydde bort et pågående oppdrag ville
+    skjult noe som fortsatt skjer — samme feilklasse som å ta en enhet av
+    vakt midt i et oppdrag, og den er allerede stengt i `enhet_vakt_view`.
+
+    Idempotent: et allerede arkivert oppdrag beholder sitt opprinnelige
+    tidspunkt, slik at «når ble den ryddet bort» ikke flyttes av et
+    dobbelttrykk.
+    """
+    if oppdrag.status != choices.TERMINAL:
+        raise KanIkkeArkiveres(
+            f'Oppdraget står i {oppdrag.get_status_display()} og er ikke ferdigstilt.')
+    if oppdrag.arkivert_at is not None:
+        return oppdrag
+
+    oppdrag.arkivert_at = timezone.now()
+    oppdrag.arkivert_av = bruker
+    oppdrag.save(update_fields=['arkivert_at', 'arkivert_av', 'updated_at'])
+    return oppdrag
+
+
+def hent_tilbake(oppdrag):
+    """Angre arkiveringen. Ingenting ble fryst, så det er bare å nulle feltet."""
+    if oppdrag.arkivert_at is None:
+        return oppdrag
+    oppdrag.arkivert_at = None
+    oppdrag.arkivert_av = None
+    oppdrag.save(update_fields=['arkivert_at', 'arkivert_av', 'updated_at'])
+    return oppdrag
 
 
 # ── Klienttid ────────────────────────────────────────────────────────────────
@@ -277,6 +366,12 @@ def synlige_for_enhet(enhet, year: int | None = None):
 
     Grensen måles mot den gjeldende `Ledig`-meldingens ``tidspunkt``, ikke mot
     ``updated_at``: en korreksjon skal ikke forlenge vinduet.
+
+    **Arkivering påvirker ikke dette filteret.** De to reglene ser like ut,
+    men tjener ulike formål: 30-minuttersvinduet er personvern (en bil kan bli
+    stående ulåst), arkivering er sentralbordets rydding av sin egen tavle.
+    Koblet man dem, kunne sentralbordet fjernet et oppdrag fra skjermen til et
+    mannskap som fortsatt sto og så på det.
     """
     from datetime import timedelta
 
