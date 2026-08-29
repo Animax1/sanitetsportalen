@@ -1,0 +1,156 @@
+{% extends "core/base_portal.html" %}
+{% load static %}
+
+{% block title %}Oppdrag – Sanitetsportalen{% endblock %}
+
+{% comment %}
+  Sentralbordet: enhetsliste med utledet status, og oppdragslista for vakta.
+
+  Skrivekontroller rendres server-side med {% if kan_skrive %}. De skjules
+  ikke i nettleseren — markup som ikke skal brukes, sendes ikke. Se
+  ServerSideSynlighetTests, som krever fravær fra HTML-en.
+
+  Enhetsskjermen er en egen mal (fase 4). De to deler nesten ingen markup, og
+  én sammenslått fil ville vært to layouter for å spare en render-linje.
+{% endcomment %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="{% static 'css/oppdrag.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-3 px-md-4 py-3">
+
+  <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
+    <h1 class="h4 mb-0"><i class="bi bi-truck-front me-2"></i>Oppdrag</h1>
+    <div class="d-flex gap-2">
+      {% if kan_skrive %}
+      <button type="button" class="btn btn-primary btn-sm"
+              data-bs-toggle="modal" data-bs-target="#nyttOppdragModal">
+        <i class="bi bi-plus-lg me-1"></i>Nytt oppdrag
+      </button>
+      {% endif %}
+      {% if er_global_admin %}
+      <button type="button" class="btn btn-outline-secondary btn-sm"
+              data-bs-toggle="modal" data-bs-target="#lokasjonerModal"
+              data-action="lastLokasjonsadmin">
+        <i class="bi bi-geo-alt me-1"></i>Lokasjoner
+      </button>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="row g-3">
+    <div class="col-lg-4">
+      <h2 class="h6 text-muted mb-2">Enheter</h2>
+      <div id="enhetsliste" class="d-grid gap-2">
+        <div class="tom-melding">Laster…</div>
+      </div>
+    </div>
+
+    <div class="col-lg-8">
+      <h2 class="h6 text-muted mb-2">Oppdrag i vakta</h2>
+      <div id="oppdragsliste">
+        <div class="tom-melding">Laster…</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% if kan_skrive %}
+<div class="modal fade" id="nyttOppdragModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Nytt oppdrag</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Lukk"></button>
+      </div>
+      <div class="modal-body">
+        <div class="mb-3">
+          <label class="form-label" for="nytt-enhet">Enhet</label>
+          <select id="nytt-enhet" class="form-select"></select>
+        </div>
+        <div class="mb-3">
+          <label class="form-label" for="nytt-problemstilling">Problemstilling</label>
+          <select id="nytt-problemstilling" class="form-select">
+            {% for p in problemstillinger %}<option>{{ p }}</option>{% endfor %}
+          </select>
+        </div>
+        <div class="mb-3">
+          <label class="form-label" for="nytt-hastegrad">Hastegrad</label>
+          <select id="nytt-hastegrad" class="form-select">
+            {% for h in hastegrader %}<option>{{ h }}</option>{% endfor %}
+          </select>
+        </div>
+        <div class="mb-3">
+          <label class="form-label" for="nytt-lokasjon">Lokasjon</label>
+          <select id="nytt-lokasjon" class="form-select"></select>
+          <div class="form-text">Lista vedlikeholdes av admin.</div>
+        </div>
+        <div class="mb-3">
+          <label class="form-label" for="nytt-fritekst">Fritekst</label>
+          <textarea id="nytt-fritekst" class="form-control" rows="3"></textarea>
+          <div class="form-text">
+            Vises i bilen til oppdraget avsluttes. Innholdet lagres ikke i auditloggen.
+          </div>
+        </div>
+        <div id="nytt-feil" class="text-danger small d-none"></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Avbryt</button>
+        <button type="button" class="btn btn-primary" data-action="opprettOppdrag">Opprett</button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+{% if er_global_admin %}
+<div class="modal fade" id="lokasjonerModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Lokasjoner</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Lukk"></button>
+      </div>
+      <div class="modal-body">
+        <div class="input-group mb-3">
+          <input type="text" id="ny-lokasjon" class="form-control" placeholder="Ny lokasjon">
+          <button class="btn btn-outline-primary" type="button" data-action="leggTilLokasjon">
+            Legg til
+          </button>
+        </div>
+        <div id="lokasjonsliste"><div class="tom-melding">Laster…</div></div>
+        <p class="form-text mb-0">
+          Deaktivering skjuler lokasjonen i nedtrekkslista. Den slettes ikke —
+          oppdrag som bruker den skal beholde stedet sitt.
+        </p>
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<div class="modal fade" id="oppdragDetaljModal" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="detalj-tittel">Oppdrag</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Lukk"></button>
+      </div>
+      <div class="modal-body" id="detalj-innhold"></div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script nonce="{{ csp_nonce }}">
+  window.OPPDRAG_TILGANG = {
+    kanSkrive: {% if kan_skrive %}true{% else %}false{% endif %},
+    erAdmin: {% if er_global_admin %}true{% else %}false{% endif %}
+  };
+</script>
+<script src="{% static 'js/portal-utils.js' %}"></script>
+<script src="{% static 'js/oppdrag-sentral.js' %}"></script>
+{% endblock %}

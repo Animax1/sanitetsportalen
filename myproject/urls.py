@@ -52,6 +52,10 @@ urlpatterns = [
     # av samme grunn som patients: core sine legacy-redirects fanger /api/...
     path('statistikk/', include('statistikk.urls')),
 
+    # Oppdrag (bil og beredskapsambulanse, august 2026). Samme grunn til å stå
+    # før core.
+    path('oppdrag/', include('oppdrag.urls')),
+
     # Sanitetsportal-skall (dashboard + legacy-redirects)
     # Mountet på '' så portal-dashboardet ligger på /.
     path('', include('core.urls')),

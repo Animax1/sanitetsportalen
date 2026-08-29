@@ -552,8 +552,7 @@ Gjennomgang 13. aug. 2026, med 1000 pasienter og peak 100 brukere som premiss.
                   fase 3. Admin-siden ble utsatt fordi modulen ikke har en URL ennå —
                   en admin-side uten vei inn er samme feil som et modulkort som fører
                   til 404. Følger `appsetting`-presedensen. **Fase 1 er ferdig.**
-            - [ ] **Fase 3 arver:** lokasjonsadmin som side, i modulens eget
-                  admin-område.
+      
       - [x] **Fase 2, kodedelen (28. aug. 2026):** fritekst er unntatt
             verdilogging fra første lagring — `oppdrag/signals.py` er ny kode, ikke en
             retrofit av `audit/`, så vinduet planen advarte mot oppsto aldri.
@@ -564,10 +563,14 @@ Gjennomgang 13. aug. 2026, med 1000 pasienter og peak 100 brukere som premiss.
             på, og de radene kan ikke fjernes uten å røre auditsporet. Halvert fordi
             lokasjon ble nedtrekksliste: da holder A.6/A.12 for det feltet, og fritekst
             står alene igjen.
-      - [ ] **Fase 3** (7–9 t): sentralbordet — enhetsliste med **utledet** status
-            (`Ledig (2 venter)`), opprett, tildel, flytt, rediger. Enheten har ingen
-            statuskolonne: lagret status ville krevd nullstilling ved vaktstart og gått i
-            utakt med oppdragsradene.
+      - [x] **Fase 3 — sentralbordet (29. aug. 2026).** Enhetsliste med utledet
+            status (`Ledig (2 venter)`), oppdragsliste, oppretting, flytting, tidslinje
+            og lokasjonsadmin. ETag på pollingen. Modulen er synlig nå som den har en
+            side. To grensesnitt bak én URL, valgt på enhetskoblingen — en test setter
+            `skriv_full` på en enhetskonto og krever at den fortsatt får enhetsskjermen.
+      - [ ] **Fase 3 arver til fase 4:** enhetskontoer får i dag en mellomtilstand som
+            sier at skjermen ikke er bygget. Å sende dem til sentralbordet ville vist
+            dem alle oppdrag i vakta.
       - [ ] **Fase 4** (6–8 t): enhetsskjermen — statusmaskin med `Venter` som
             startstatus, to knapper mot seks navngitte endepunkter, lukket kroppsskjema,
             objektsjekk på eierskap, og de to skjulereglene (fritekst ved `Ledig`, hele

@@ -4,6 +4,60 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-08-29 — Oppdragsmodulen fase 3: sentralbordet
+
+**1092 tester grønne** (33 nye). Ingen migrasjon. Modulen er synlig i meny og
+dashboard nå som den har en side.
+
+Sentralbordet: enhetsliste med utledet status, oppdragslista for vakta, oppretting,
+flytting mellom enheter, tidslinje per oppdrag, og lokasjonsadmin. Polling hvert 30. sekund
+med ETag, så et poll uten endring koster en 304 uten kropp.
+
+**To grensesnitt bak én URL.** `/oppdrag/` velger skjerm på om kontoen er knyttet til en
+`Enhet` — ikke på nivået. En test setter `skriv_full` på en enhetskonto og krever at den
+*fortsatt* får enhetsskjermen: hadde valget stått på «er nivået nøyaktig `skriv_handling`»,
+ville den testen vært rød, og feilen §2.3 beskriver ville vært tilbake.
+
+Enhetsskjermen kommer i fase 4. Fram til da får en enhetskonto en mellomtilstand som sier
+det rett ut. Alternativet — å sende henne til sentralbordet — ville vist henne alle oppdrag
+i vakta, altså nettopp det hun ikke skal se.
+
+**Skjulereglene håndheves i serverens svar.** Testene leser den rå responskroppen, ikke det
+serialiserte objektet: `assertNotIn('sensitivt notat', raa)`. Det er den eneste formen som
+faktisk beviser at teksten ikke ble sendt. To motstykker holder dem ærlige — fritekst
+*vises* mens oppdraget pågår, og sentralbordet beholder den etter `Ledig`.
+
+### To feil testene fant
+
+**`trustedHtml()` ble brukt feil, og hele rendringen var ødelagt.** Funksjonen returnerer en
+markør-*objekt* for `cellHtml()`, ikke en streng. `el.innerHTML = trustedHtml(...)` gir
+`[object Object]`. Det så riktig ut i koden, og ville vist en tom side i nettleseren. Fanget
+av node-testen som kjører byggerne og leser resultatet.
+
+**XSS-gjennomgangen kunne ikke lese sin egen kode.** Regexen som finner `${...}` stopper på
+første `}`, så en nøstet mal-streng inne i en interpolasjon ble usynlig — og en uescapet
+verdi der ville passert stille. Fragmentene er derfor hoistet ut til variabler over
+mal-strengen. Det er bedre kode uansett, men her er det også det som gjør vernet virksomt.
+
+Gjennomgangen leste dessuten sine egne kommentarer: en kommentar som *nevner* `${...}` for å
+forklare regelen ble rapportert som et funn. Den stripper `//`-linjer nå, samme grep som
+`JsModulLastingTests` gjør for kall.
+
+### Verifisert ved å bryte
+
+Alle vernene er sett røde: radfilteret fjernet (3 feil), fritekstregelen slått av (1),
+`@modul_kreves` tatt av flytt-endepunktet (URL-gjennomgangen fanget det og navnga ruta).
+
+Første forsøk på den siste proben **matchet ikke teksten** — `@rate_limit` sto mellom
+dekoratørene — så testen «bestod» uten at noe var endret. Verdt å merke seg: en probe som
+ikke treffer ser ut som et vern som virker.
+
+Én test til fortjener plassen sin: `test_url_en_svarer` henter modulens URL og krever 200.
+Den fanget en 500 som bare oppstår med `ManifestStaticFilesStorage` — altså i prod — fordi
+et nytt stilark ikke lå i manifestet.
+
+---
+
 ## 2026-08-28 — Oppdragsmodulen fase 1: modeller og regler
 
 **1048 tester grønne** (46 nye). Migrasjon `oppdrag.0001_initial`. Ingen brukervendte

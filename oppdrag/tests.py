@@ -470,11 +470,12 @@ class ModulRegistreringTests(TestCase):
     def test_modulen_finnes_i_registeret(self):
         self.assertIsNotNone(get_module('oppdrag'))
 
-    def test_modulen_er_skjult_uten_url(self):
+    def test_url_og_synlighet_folger_hverandre(self):
         """Et modulkort som fører til 404 er en knapp som fører til en vegg.
 
-        Testen binder de tre feltene sammen: slås `show_*` på uten at `url`
-        settes, feiler den. Da kan ikke fase 3 glemme halve jobben.
+        Testen binder de tre feltene sammen. Den sto grønn gjennom fase 1 og 2
+        med `url=None` og begge flagg av; fra fase 3 er URL-en satt og
+        flaggene på. Poenget er at ingen av delene kan endres alene.
         """
         modul = get_module('oppdrag')
         if modul.url is None:
@@ -482,6 +483,27 @@ class ModulRegistreringTests(TestCase):
             self.assertFalse(modul.show_in_dashboard)
         else:
             self.assertTrue(modul.url.startswith('/'))
+            self.assertTrue(modul.show_in_nav)
+            self.assertTrue(modul.show_in_dashboard)
+
+    def test_url_en_svarer(self):
+        """Vern mot at flagget slås på før siden finnes.
+
+        Selve feilen testen over beskriver er at kortet fører til 404. Det
+        eneste som beviser at det ikke gjør det, er å hente URL-en.
+        """
+        from django.test import Client
+        bruker = CustomUser.objects.create_user(
+            username='sjekk_url', password='x', role='bruker',
+            must_change_password=False)
+        ModulTilgang.objects.create(
+            bruker=bruker, modul_slug='oppdrag', nivaa='les')
+        modul = get_module('oppdrag')
+        if modul.url is None:
+            self.skipTest('Modulen har ingen URL ennå')
+        c = Client()
+        c.force_login(bruker)
+        self.assertEqual(c.get(modul.url).status_code, 200)
 
     def test_tilgang_kreves_selv_med_enhetskobling(self):
         """Å knytte en konto til en `Enhet` gir ingen tilgang.
@@ -509,11 +531,18 @@ class ModulRegistreringTests(TestCase):
         slugs = {m.slug for m in get_visible_modules(bruker, only_enabled=False)}
         self.assertIn('oppdrag', slugs)
 
-    def test_skjult_modul_havner_ikke_i_nav(self):
+    def test_modulen_er_i_nav_for_den_som_har_tilgang(self):
         bruker = CustomUser.objects.create_user(
             username='sentral4', password='x', role='bruker',
             must_change_password=False)
         ModulTilgang.objects.create(
             bruker=bruker, modul_slug='oppdrag', nivaa='skriv_full')
 
+        self.assertIn('oppdrag', {m.slug for m in get_nav_modules(bruker)})
+
+    def test_modulen_er_ikke_i_nav_uten_tilgang(self):
+        """Vern mot at nav-testen passerer fordi alt vises."""
+        bruker = CustomUser.objects.create_user(
+            username='sentral5', password='x', role='bruker',
+            must_change_password=False)
         self.assertNotIn('oppdrag', {m.slug for m in get_nav_modules(bruker)})
