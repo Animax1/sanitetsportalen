@@ -4,6 +4,51 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-08-29 — Vaktlistemodulen fase 2: oppsettet og planleggingssiden
+
+**1491 tester grønne** (68 nye). Migrasjon `vaktliste.0002`. Siden ligger på
+`/vaktliste/`, og modulen er synlig for global admin.
+
+Tre modeller til: `Vaktliste` (1:1 med `core.Vakt`), `Ressurs` og `Vaktpost`.
+
+- **Reservasjonen er `Ressurs.korps`** (§4.2 i notatet). `skriv_full`/admin deler ut
+  et lag eller en bil til et korps; korps-brukeren bemanner bare det som bærer hennes
+  egen badge. **Tom er ikke fritt fram** — det er vaktlederens bord, typisk KO og
+  samleplass. Motsatt tolkning ville gitt enhver korps-bruker de to ressursene ingen
+  hadde tenkt å dele ut.
+- **Den doble regelen er én funksjon.** `services.kan_sette_vaktpost()` sjekker både
+  badgen på personen og reservasjonen på ressursen, slik at et endepunkt ikke kan huske
+  den ene og glemme den andre. Reglene håndheves først i fase 3 — modulen er admin-only
+  til da, fordi et nivå som slipper inn uten korps-regelen ville gitt korps-brukeren
+  *alle* korps.
+- **«Ny planlagt vakt» rører ikke portalens peker.** `opprett_planlagt_vakt` lager en
+  `core.Vakt` med `er_aktiv=False` og lar `aktiv_vakt_id` stå: oktobervakta skal kunne
+  planlegges i august uten at pasienter og oppdrag registrert i dag scopes til den.
+  Dette er portalens andre sted som lager `Vakt`-rader, og det er notert i TODO sammen
+  med `hent_aktiv_vakt`.
+- **Kopiering tar oppsettet, aldri personene.** En liste ingen har sagt ja til er verre
+  enn en tom liste — den ser ferdig ut.
+- **Plan og faktisk er fire felter, ikke to.** `fra_tid`/`til_tid` er planen,
+  `mott_at`/`av_vakt_at` hva som skjedde. Avviket mellom dem er selve informasjonen.
+  Feltene finnes fra denne fasen, men ingen sti setter dem før fase 4.
+- **Et skift er én rad.** Går Per to skift på bilen, er det to `Vaktpost`-rader. Det er
+  det som gjør timer, hviletid og skiftlengde (§8b) til spørringer i stedet for tolkning.
+  Overlapp *på tvers av* ressurser stoppes bevisst ikke — planleggingstallene flagger det.
+- **Funn underveis: `IntegrityError` må fanges rundt et savepoint.** Uten
+  `transaction.atomic()` rundt skrivingen er transaksjonen ubrukelig etter at skranken
+  slår til, og sesjonslagringen på vei ut av forespørselen river feilmeldingen bort og
+  etterlater en naken 400-side. Feilen var usynlig for en test som bare leste
+  statuskoden; testene leser nå `message`.
+- **Ryddet en stale import**: `myproject/tests_cache_config.py` importerte fortsatt
+  `patients.stats_cache`, som flyttet til `core` da statistikk ble sin egen app. Testen
+  hadde vært rød siden da, men ligger utenfor den daglige testkommandoen.
+- Mutasjonstestet åtte veier, alle røde: ureservert ressurs som fristed, `and` → `or` i
+  den doble regelen, kopiering som tar personene, planlagt vakt som blir aktiv,
+  opprettelse som flytter pekeren, `<=` → `<` på skifttidene, savepointet fjernet, og
+  admin-gaten fjernet fra ett endepunkt.
+
+---
+
 ## 2026-08-29 — Vaktlistemodulen fase 1: registrene og mannskapet
 
 **1404 tester grønne** (15 nye). Migrasjon `vaktliste.0001`.

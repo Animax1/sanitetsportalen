@@ -33,6 +33,7 @@ STATISTIKK_JS = JS_DIR / 'statistikk.js'
 STATISTIKK_OPPDRAG_JS = JS_DIR / 'statistikk-oppdrag.js'
 OPPDRAG_SENTRAL_JS = JS_DIR / 'oppdrag-sentral.js'
 OPPDRAG_ENHET_JS = JS_DIR / 'oppdrag-enhet.js'
+VAKTLISTE_JS = JS_DIR / 'vaktliste.js'
 
 
 def node_available():

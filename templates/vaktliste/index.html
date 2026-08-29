@@ -1,0 +1,184 @@
+{% extends "core/base_portal.html" %}
+{% load static %}
+
+{% block title %}Vaktliste – Sanitetsportalen{% endblock %}
+
+{% comment %}
+  Planleggingssiden (fase 2). Fanene bygges av ressursene i nettleseren —
+  de er data, ikke kode, og tilpasser seg vaktas art av seg selv.
+
+  Modulen er admin-only i fase 2: nivåene er deklarert, men badge- og
+  reservasjonssjekkene kommer i fase 3. Se vaktliste/views.py.
+{% endcomment %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="{% static 'css/vaktliste.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-3 px-md-4 py-3">
+
+  <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
+    <h1 class="h4 mb-0"><i class="bi bi-people me-2"></i>Vaktliste</h1>
+    <div class="d-flex gap-2 align-items-center flex-wrap">
+      <select id="vaktliste-velger" class="form-select form-select-sm"
+              style="min-width: 14rem;" data-action="byttVaktliste"></select>
+      <span id="vaktliste-status" class="vl-status"></span>
+      <button type="button" class="btn btn-primary btn-sm"
+              data-bs-toggle="modal" data-bs-target="#nyVaktlisteModal">
+        <i class="bi bi-plus-lg me-1"></i>Ny vaktliste
+      </button>
+      <button type="button" class="btn btn-outline-secondary btn-sm"
+              data-bs-toggle="modal" data-bs-target="#nyRessursModal">
+        <i class="bi bi-diagram-3 me-1"></i>Ny ressurs
+      </button>
+    </div>
+  </div>
+
+  <div id="vl-tom" class="alert alert-info d-none">
+    Ingen vaktlister ennå. Trykk <strong>Ny vaktliste</strong> for å planlegge
+    en vakt. Vakta opprettes som planlagt og rører ikke den aktive vakta i
+    portalen.
+  </div>
+
+  <div id="vl-mangler-mannskap" class="alert alert-warning d-none">
+    <strong>Mannskapsregisteret er tomt.</strong>
+    Legg inn korps og mannskap i Django-admin først — vaktlista bemannes fra
+    det registeret.
+  </div>
+
+  <!-- Ressursfaner. Bygges av data; «Oversikt» og «Ikke plassert» er faste. -->
+  <div class="vl-faner" id="vl-faner"></div>
+
+  <div id="vl-panel"></div>
+
+</div>
+
+<div class="modal fade" id="nyVaktlisteModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Ny vaktliste</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Lukk"></button>
+      </div>
+      <div class="modal-body">
+        <div class="mb-3">
+          <label class="form-label" for="ny-vakt-navn">Vaktnavn</label>
+          <input type="text" id="ny-vakt-navn" class="form-control" maxlength="255"
+                 placeholder="f.eks. «Landsskytterstevnet 2027»">
+          <div class="form-text">Navnet må være unikt. Det er dette vakta heter i hele portalen.</div>
+        </div>
+        <div class="mb-3">
+          <label class="form-label" for="ny-vakt-start">Starter</label>
+          <input type="datetime-local" id="ny-vakt-start" class="form-control">
+        </div>
+        <div class="mb-3">
+          <label class="form-label" for="ny-vakt-kopier">Kopier oppsett fra</label>
+          <select id="ny-vakt-kopier" class="form-select"></select>
+          <div class="form-text">
+            Kopierer ressursene med type, reservasjon og rekkefølge —
+            <strong>aldri personene</strong>.
+          </div>
+        </div>
+        <div id="ny-vakt-feil" class="text-danger small d-none"></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Avbryt</button>
+        <button type="button" class="btn btn-primary" id="ny-vakt-knapp"
+                data-action="opprettVaktliste">Opprett</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="nyRessursModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Ny ressurs</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Lukk"></button>
+      </div>
+      <div class="modal-body">
+        <div class="mb-3">
+          <label class="form-label" for="ny-ressurs-navn">Navn</label>
+          <input type="text" id="ny-ressurs-navn" class="form-control" maxlength="120"
+                 placeholder="f.eks. «Mannskapsbil 1»">
+        </div>
+        <div class="mb-3">
+          <label class="form-label" for="ny-ressurs-type">Type</label>
+          <select id="ny-ressurs-type" class="form-select">
+            {% for t in ressurstyper %}
+            <option value="{{ t.verdi }}">{{ t.navn }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="mb-3">
+          <label class="form-label" for="ny-ressurs-korps">Reservert korps</label>
+          <select id="ny-ressurs-korps" class="form-select"></select>
+          <div class="form-text">
+            Korpset som har fått ressursen og bemanner den selv. Tom = ureservert,
+            og bemannes av vaktleder — typisk KO og samleplass.
+          </div>
+        </div>
+        <div class="mb-3">
+          <label class="form-label" for="ny-ressurs-enhet">Enhet i oppdragsmodulen</label>
+          <select id="ny-ressurs-enhet" class="form-select"></select>
+          <div class="form-text">Kobles for biler og ambulanser.</div>
+        </div>
+        <div id="ny-ressurs-feil" class="text-danger small d-none"></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Avbryt</button>
+        <button type="button" class="btn btn-primary" id="ny-ressurs-knapp"
+                data-action="opprettRessurs">Legg til</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="nyVaktpostModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="ny-vaktpost-tittel">Sett på vakt</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Lukk"></button>
+      </div>
+      <div class="modal-body">
+        <div class="mb-3">
+          <label class="form-label" for="ny-vaktpost-mannskap">Mannskap</label>
+          <select id="ny-vaktpost-mannskap" class="form-select"></select>
+        </div>
+        <div class="mb-3">
+          <label class="form-label" for="ny-vaktpost-rolle">Rolle</label>
+          <select id="ny-vaktpost-rolle" class="form-select"></select>
+        </div>
+        <div class="row g-2 mb-3">
+          <div class="col">
+            <label class="form-label" for="ny-vaktpost-fra">Fra</label>
+            <input type="datetime-local" id="ny-vaktpost-fra" class="form-control">
+          </div>
+          <div class="col">
+            <label class="form-label" for="ny-vaktpost-til">Til</label>
+            <input type="datetime-local" id="ny-vaktpost-til" class="form-control">
+          </div>
+        </div>
+        <div id="ny-vaktpost-feil" class="text-danger small d-none"></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Avbryt</button>
+        <button type="button" class="btn btn-primary" id="ny-vaktpost-knapp"
+                data-action="opprettVaktpost">Sett på vakt</button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+{% comment %}
+  portal-utils.js, ikke patients-utils.js: sistnevnte gjør arbeid på toppnivå
+  og kaster på en side uten pasientskjemaene. Se CLAUDE.md.
+{% endcomment %}
+<script src="{% static 'js/portal-utils.js' %}"></script>
+<script src="{% static 'js/vaktliste.js' %}"></script>
+{% endblock %}

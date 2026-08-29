@@ -255,17 +255,38 @@ en konto til en enhet gir ingen tilgang; det er domenedata, som `Forstehjelper.u
 
 ### Vaktlistemodulen (vaktliste/)
 
-Fase 1 levert (registre + mannskap); side og resten kommer i fase 2–7 — se
-`docs/BESLUTNING_VAKTLISTE.md`, som er besluttet i sin helhet. Tre ting å vite:
+Fase 1–2 levert (registre, mannskap, oppsett og planleggingsside på `/vaktliste/`);
+fase 3–7 gjenstår — se `docs/BESLUTNING_VAKTLISTE.md`, som er besluttet i sin helhet.
+
+| Regel | Hvor |
+|---|---|
+| Badgen på personen | `Mannskap.korps`, arvet av kontoen via `Mannskap.user` |
+| Reservasjonen på ressursen | `Ressurs.korps` — tom betyr **vaktlederens bord**, ikke fritt fram |
+| Begge halvdelene sjekkes samlet | `services.kan_sette_vaktpost()` |
+| Ett skift er én rad | `Vaktpost`, med plan og faktisk i hvert sitt feltpar |
+| Planlagt vakt rører ikke pekeren | `services.opprett_planlagt_vakt()` |
 
 - **`Mannskap.korps` er badgen** tilgangsmodellen hviler på fra fase 3:
   `skriv_handling` betyr her «fører sitt eget korps» (avgrenset av badgen, ingen
   innsjekk), ikke stempling som i oppdrag. Matrisen trenger derfor en etikett per
   modul per nivå (§4.5) før nivået deles ut.
+- **Den doble regelen er skrevet som én funksjon**, `kan_sette_vaktpost()`, nettopp for
+  at et endepunkt ikke skal kunne huske badgen og glemme reservasjonen. Modulen er
+  `admin_only` til fase 3: et nivå som slipper inn før objektsjekkene finnes, ville gitt
+  korps-brukeren *alle* korps.
 - **Kostbehov/matallergi lagres ikke** (art. 9 — besluttet holdt utenfor portalen), og
   `Mannskap.notat` er unntatt verdilogging i audit (`signals.FELT_UTEN_VERDILOGGING`).
-- Modulen står med `url=None` og `show_*`-flaggene av til fase 2 — samme regel som
-  oppdragsmodulen fulgte: et modulkort som fører til 404 er en knapp mot en vegg.
+- **Plan og faktisk er fire felter, ikke to.** `fra_tid`/`til_tid` er planen,
+  `mott_at`/`av_vakt_at` hva som skjedde. Avviket er informasjonen. Stemplene settes
+  først i fase 4, og da bak `skriv_full`.
+- **«Ny planlagt vakt» lager en `core.Vakt` med `er_aktiv=False` og lar `aktiv_vakt_id`
+  stå.** Oktobervakta skal kunne planlegges i august uten at pasienter og oppdrag
+  registrert i dag scopes til den. Kopiering av oppsett tar ressursene, **aldri**
+  personene — en liste ingen har sagt ja til ser ferdig ut.
+- **Skrivinger som kan bryte en unik-skranke står i `transaction.atomic()`.** Databasen
+  er fasit for duplikater, men en `IntegrityError` som fanges uten savepoint etterlater
+  transaksjonen ubrukelig: sesjonslagringen feiler på vei ut, og brukeren får en naken
+  400-side i stedet for feilmeldingen viewet formulerte.
 
 ### Statistikk-modulen (statistikk/)
 
@@ -327,6 +348,7 @@ virkningsløs endring, ikke som en feil:
 | `static/css/style.css` | **kun** `templates/patients/index.html` | `--text-muted` m.fl. |
 | `static/css/portal.css` | alt som arver `core/templates/core/base_portal.html` | `--portal-text-muted` m.fl. |
 | `static/css/statistikk.css` | **kun** `templates/statistikk/index.html` | definerer selv de fire `base_portal` mangler |
+| `static/css/vaktliste.css` | **kun** `templates/vaktliste/index.html` | samme — `statistikk.css` er mønsteret |
 
 Noen frittstående sider (`403.html`, `mfa_setup.html`, `mfa_verify.html`, innlogging)
 laster ingen av dem — de har egen `<style>`-blokk og må overstyre selv.
@@ -343,8 +365,8 @@ Alle temaene er mørke, så **enhver Bootstrap-klasse for dempet tekst må overs
 malen kan se den. `MorkTekstPaaMorkBakgrunnTests` løser `{% extends %}` og `{% static %}`
 og håndhever det.
 
-Ni moduler i `static/js/` (ingen bundler), fordelt på fire sider — pasientsiden,
-`/statistikk/` og de to grensesnittene under `/oppdrag/`:
+Ti moduler i `static/js/` (ingen bundler), fordelt på fem sider — pasientsiden,
+`/statistikk/`, `/vaktliste/` og de to grensesnittene under `/oppdrag/`:
 
 | Modul | Lastes | Ansvar |
 |-------|--------|--------|
@@ -358,6 +380,7 @@ Ni moduler i `static/js/` (ingen bundler), fordelt på fire sider — pasientsid
 | `statistikk-oppdrag.js` | `/statistikk/`, **kun** med oppdragstilgang | Oppdragsfanen. Kall hit fra `statistikk.js` går gjennom `_kallOppdrag('navn')` |
 | `oppdrag-sentral.js` | `/oppdrag/`, kontoer uten enhet | Sentralbordet: enhetsliste, oppdragsliste, tidslinje, lokasjonsadmin |
 | `oppdrag-enhet.js` | `/oppdrag/`, enhetskontoer | Enhetsskjermen: to knapper mot de navngitte stemplingsendepunktene, og offline-køen i `localStorage`. Serveren sender `neste_overgang` per rad; kjeden følger med som data kun for å projisere neste steg mens noe ligger usendt |
+| `vaktliste.js` | **kun** `/vaktliste/` | Planleggingssiden: fanene bygges av ressursene, «Oversikt» grupperer på korps, «Ikke plassert» fanger dem ingen satte opp |
 
 **`patients-utils.js` kan ikke lastes utenfor pasientsiden.** Den gjør arbeid på toppnivå
 — `Chart.defaults` og `new bootstrap.Modal(document.getElementById('newModal'))` — og

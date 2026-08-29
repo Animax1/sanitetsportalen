@@ -833,6 +833,17 @@ Gjennomgang 13. aug. 2026, med 1000 pasienter og peak 100 brukere som premiss.
             Personvernprotokollen hevet til v1.10 med A.6-seksjon og
             A.9-rader. Modulen registrert med `url=None` og flaggene av til
             fase 2. 15 tester.
+      - [x] **Fase 2 — oppsettet og planleggingssiden (29. aug. 2026).**
+            `Vaktliste` (1:1 med `core.Vakt`), `Ressurs` med reservasjon
+            (`korps`, tom = vaktlederens bord) og kobling til `oppdrag.Enhet`,
+            `Vaktpost` som **ett skift** med plan (`fra_tid`/`til_tid`) og
+            faktisk (`mott_at`/`av_vakt_at`) atskilt. Side på `/vaktliste/`
+            med faner bygget av ressursene, «Oversikt» gruppert på korps og
+            «Ikke plassert». «Ny planlagt vakt» lager en `core.Vakt` med
+            `er_aktiv=False` og **rører ikke** `aktiv_vakt_id`; kopiering tar
+            ressursene, aldri personene. Den doble tilgangsregelen står i
+            `services.kan_sette_vaktpost()` som én funksjon. Admin-only til
+            fase 3. 68 nye tester, åtte mutasjoner prøvd og alle røde.
       - [x] **Alle ti avklaringene besvart 29. aug. 2026** (§11 i notatet er fasit).
             De som endret utformingen: korps er en badge og ikke en ny akse; ressurser
             reserveres til korps og korpsene bemanner sine egne, med tider; drift er en

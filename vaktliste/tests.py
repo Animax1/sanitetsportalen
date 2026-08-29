@@ -141,14 +141,20 @@ class AuditTests(TestCase):
 
 
 class ModulRegistreringTests(TestCase):
-    """Registrert, men usynlig — fase 1 har ingen side å vise fram."""
+    """Fra fase 2 finnes siden, og modulen er synlig — for global admin.
 
-    def test_modulen_finnes_i_registeret(self):
+    Gjennom fase 1 sto modulen med `url=None` og begge `show_*`-flagg av:
+    et modulkort som fører til 404 er en knapp som fører til en vegg. Nå
+    finnes siden, og `admin_only` er det som holder de andre ute til
+    objektsjekkene kommer i fase 3.
+    """
+
+    def test_modulen_peker_paa_siden_sin(self):
         modul = get_module('vaktliste')
         self.assertIsNotNone(modul, 'vaktliste mangler i core.modules')
-        self.assertIsNone(modul.url, 'url settes først i fase 2')
-        self.assertFalse(modul.show_in_nav)
-        self.assertFalse(modul.show_in_dashboard)
+        self.assertEqual(modul.url, '/vaktliste/')
+        self.assertTrue(modul.show_in_nav)
+        self.assertTrue(modul.show_in_dashboard)
 
     def test_nivaaene_er_deklarert(self):
         """Del av beslutningen (§4) — men merk at `skriv_handling` her betyr
@@ -158,10 +164,20 @@ class ModulRegistreringTests(TestCase):
             get_module('vaktliste').nivaaer,
             ('les', 'skriv_handling', 'skriv_full'))
 
-    def test_ingen_ser_modulen_i_nav_ennaa(self):
+    def test_admin_ser_modulen(self):
         admin = User.objects.create_user(
             username='vl_admin', password='x', role='admin',
             must_change_password=False)
-        synlige = [m.slug for m in get_visible_modules(admin)
-                   if m.show_in_nav or m.show_in_dashboard]
-        self.assertNotIn('vaktliste', synlige)
+        self.assertIn('vaktliste',
+                      [m.slug for m in get_visible_modules(admin)])
+
+    def test_andre_ser_den_ikke_i_fase_2(self):
+        """`admin_only=True` til fase 3 — se `vaktliste/module.py`. Et kort
+        som fører til 403 er samme feil som et kort som fører til 404."""
+        from accounts.models import ModulTilgang
+        bruker = User.objects.create_user(
+            username='vl_skriver', password='x', must_change_password=False)
+        ModulTilgang.objects.create(
+            bruker=bruker, modul_slug='vaktliste', nivaa='skriv_full')
+        self.assertNotIn('vaktliste',
+                         [m.slug for m in get_visible_modules(bruker)])

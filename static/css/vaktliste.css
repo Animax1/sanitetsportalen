@@ -1,0 +1,176 @@
+/* Stilark for vaktlistemodulen (/vaktliste/).
+ *
+ * Egen fil, som statistikk.css: style.css lastes KUN av
+ * templates/patients/index.html, så en regel lagt der ville vært
+ * virkningsløs her — en endring som ser ut som ingenting, ikke som en feil.
+ * Se CLAUDE.md om de tre stilarkene.
+ *
+ * Fire av variablene reglene bruker finnes IKKE i base_portal.html:
+ * --text-muted, --text-soft, --surface-3 og --header-bg. En udefinert custom
+ * property gjør ikke regelen ugyldig — den gjør fargen arvet — så teksten
+ * ville blitt lesbar eller uleselig tilfeldig, uten at noe feilet. De
+ * defineres derfor her, med nøyaktig de verdiene de har i style.css.
+ *
+ * De fire som base_portal FAKTISK aliaser (--surface-1, --surface-2,
+ * --border-color, --text-main) gjentas ikke: da ville portalens tema og
+ * dette stilarket kunne komme i utakt.
+ */
+
+:root {
+  --text-muted: #94a3b8;
+  --text-soft: #64748b;
+  --surface-3: #0b1220;
+  --header-bg: #0f3460;
+}
+
+/* ── Statusmerke på vaktlista ─────────────────────────────────────────── */
+.vl-status {
+  font-size: 0.78rem;
+  font-weight: 600;
+  padding: 0.2rem 0.6rem;
+  border-radius: 999px;
+  border: 1px solid var(--border-color);
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.vl-status.vl-drift {
+  background: #14532d;
+  border-color: #14532d;
+  color: #bbf7d0;
+}
+
+/* ── Ressursfaner ─────────────────────────────────────────────────────── */
+.vl-faner {
+  display: flex;
+  gap: 0.3rem;
+  flex-wrap: wrap;
+  background: var(--surface-1);
+  padding: 0.4rem 0.5rem;
+  border-radius: 10px;
+  border: 1px solid var(--border-color);
+  margin-bottom: 0.9rem;
+}
+
+.vl-fane {
+  border: 1px solid var(--border-color);
+  background: var(--surface-2);
+  border-radius: 6px;
+  padding: 0.32rem 0.9rem;
+  font-size: 0.82rem;
+  font-weight: 500;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.12s;
+  line-height: 1.5;
+}
+
+.vl-fane:hover {
+  background: var(--surface-3);
+  color: var(--text-main);
+}
+
+.vl-fane.active {
+  background: var(--header-bg) !important;
+  color: #fff !important;
+  border-color: var(--header-bg) !important;
+}
+
+/* Antallet på fanen. Dempet, men lesbart — det er et tall man skanner
+   etter, ikke leser. */
+.vl-fane .vl-antall {
+  opacity: 0.75;
+  font-variant-numeric: tabular-nums;
+  margin-left: 0.35rem;
+}
+
+/* ── Kort per ressurs ─────────────────────────────────────────────────── */
+.vl-kort {
+  background: var(--surface-1);
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  padding: 0.9rem 1rem;
+  margin-bottom: 0.9rem;
+}
+
+.vl-kort-topp {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 0.6rem;
+}
+
+.vl-kort-tittel {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-main);
+}
+
+.vl-merkelapp {
+  font-size: 0.72rem;
+  padding: 0.12rem 0.5rem;
+  border-radius: 999px;
+  border: 1px solid var(--border-color);
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+/* Reservasjonen er den viktigste opplysningen på et ressurskort: den sier
+   hvem som skal bemanne den. Derfor tydeligere enn de andre merkelappene. */
+.vl-merkelapp.vl-korps {
+  background: var(--header-bg);
+  border-color: var(--header-bg);
+  color: #fff;
+}
+
+.vl-merkelapp.vl-ureservert {
+  border-style: dashed;
+  color: var(--text-soft);
+}
+
+/* ── Rader ────────────────────────────────────────────────────────────── */
+.vl-rad {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  padding: 0.45rem 0.2rem;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.vl-rad:last-child { border-bottom: none; }
+
+.vl-navn {
+  font-weight: 500;
+  color: var(--text-main);
+}
+
+.vl-meta {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.vl-tom {
+  color: var(--text-soft);
+  font-size: 0.85rem;
+  padding: 0.5rem 0.2rem;
+}
+
+/* ── Oversiktsfanen ───────────────────────────────────────────────────── */
+.vl-korpsgruppe {
+  margin-bottom: 1.1rem;
+}
+
+.vl-korpsgruppe h3 {
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+  border-bottom: 2px solid var(--border-color);
+  padding-bottom: 0.3rem;
+  margin-bottom: 0.4rem;
+}
