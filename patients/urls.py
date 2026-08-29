@@ -22,8 +22,12 @@ urlpatterns = [
     path('api/helsepersonell/', views_registre.helsepersonell_view, name='api_helsepersonell'),
     path('api/helsepersonell/<int:pk>/', views_registre.helsepersonell_detail_view, name='api_helsepersonell_detail'),
 
-    # Reset testdata (kun admin)
-    path('api/reset-active-year/', views_patients.reset_active_year_view, name='api_reset_active_year'),
+    # «Nullstill år» ble «Avslutt vakt» i deploy 2 av vakt-scopingen:
+    # operasjonen gjelder én vakt, og navnet sier det. Ingen redirect fra den
+    # gamle stien — eneste konsument var admin-JS-en, som følger med.
+    path('api/vakter/', views_patients.vakter_view, name='api_vakter'),
+    path('api/avslutt-vakt/', views_patients.avslutt_vakt_view, name='api_avslutt_vakt'),
+    path('api/gjenaapne-vakt/', views_patients.gjenaapne_vakt_view, name='api_gjenaapne_vakt'),
 
     # Statistikk. Ingenting ligger igjen her.
     #

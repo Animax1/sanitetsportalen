@@ -1,4 +1,4 @@
-"""Hoved-side, innstillinger, sesjonstimeout, pasient-CRUD og nullstilling.
+"""Hoved-side, innstillinger, sesjonstimeout, pasient-CRUD og vaktavslutning.
 
 Skilt ut fra ``views.py`` i N13.3.
 """
@@ -10,6 +10,7 @@ from django.db import transaction
 from django.db.models import Q
 from django.http import HttpResponse, HttpResponseNotModified, JsonResponse
 from django.shortcuts import render
+from django.utils import timezone
 from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_http_methods
 
@@ -25,7 +26,7 @@ from .services import (
     kan_slette_selv, slettbare_pasient_ider,
     next_patient_nr,
     apply_list_filter, stamp_pabegynt_if_needed,
-    get_active_year, hent_aktiv_vakt,
+    hent_aktiv_vakt, vakt_for_year,
     stamp_obs_times_if_needed, stamp_utskrevet_if_needed,
     validate_patient_time_fields, validate_plassering_unique,
     SHARED_PLASSERINGER, now_local_str,
@@ -49,9 +50,10 @@ def index_view(request):
     fetch-er, så et gammelt arrangementsnavn sto synlig i mellomtiden.
     """
     return render(request, 'patients/index.html', {
-        # Samme nøkkel som PUT /api/settings/ skriver og loadSettings() leser,
-        # slik at server og klient ikke kan vise hver sin verdi.
-        'event_name': AppSetting.get('event_name', '') or '',
+        # Arrangementsnavnet ER vaktnavnet siden deploy 2 — én kilde.
+        # Nøkkelen heter fortsatt event_name utad; malen og loadSettings()
+        # leser den, og de skal ikke bry seg om hvor verdien bor.
+        'event_name': hent_aktiv_vakt().navn,
         # §7.4: grensesnittet må gate på det samme som endepunktene gjør.
         # Gjorde det ikke det, viste vi «Ny pasient» til en bruker med bare
         # `les` — hen fikk opp skjemaet, fylte det ut, og møtte 403 på lagre.
@@ -75,8 +77,9 @@ def index_view(request):
 #:
 #: Skal en ny nøkkel ut til frontend, legg den til her bevisst.
 SETTINGS_READ_WHITELIST = frozenset({
-    'event_name',   # arrangementsnavn
-    'active_year',  # aktivt år, styrer hvilke pasienter som vises
+    # `event_name` og `active_year` sto her fram til deploy 2. Begge bor på
+    # vakta nå, og svaret bygges i viewet — lista står igjen for neste
+    # driftsverdi som faktisk skal ut til klienten.
 })
 
 
@@ -93,10 +96,16 @@ def settings_view(request):
     Lesingen blir igjen fordi headeren og årsfiltreringen trenger verdiene, og
     fordi de er ufarlige for alle som allerede kan lese modulen.
     """
-    return JsonResponse({
+    vakt = hent_aktiv_vakt()
+    svar = {
         s.key: s.value
         for s in AppSetting.objects.filter(key__in=SETTINGS_READ_WHITELIST)
-    })
+    }
+    # Nøklene beholder de gamle navnene utad: loadSettings() leser
+    # `event_name`, og klienten skal ikke vite at kilden byttet.
+    svar['event_name'] = vakt.navn
+    svar['active_year'] = str(vakt.year)
+    return JsonResponse(svar)
 
 # ── Pasienter ─────────────────────────────────────────────────────────────────
 
@@ -115,7 +124,7 @@ def patients_list_view(request):
       ?include_archived=1   – Inkluder inaktive pasienter
     """
     if request.method == 'GET':
-        year = get_active_year()
+        vakt = hent_aktiv_vakt()
 
         filter_name = request.GET.get('filter', 'alle')
         include_archived = request.GET.get('include_archived') == '1'
@@ -129,8 +138,9 @@ def patients_list_view(request):
         # spørring per pasient per felt — målt til 515 spørringer ved 1000
         # pasienter, mot 8 med. Endepunktet pollet hvert 30. sekund av hver
         # klient, så det var den dyreste stien i appen.
+        # select_related('vakt'): serialiseringen leser vakt.year per rad.
         qs = (Patient.objects
-              .select_related('forstehjelper', 'helsepersonell_ref')
+              .select_related('forstehjelper', 'helsepersonell_ref', 'vakt')
               .order_by('pasientnummer'))
         if not include_archived:
             qs = qs.filter(is_active=True)
@@ -141,7 +151,7 @@ def patients_list_view(request):
                 | Q(helsepersonell_ref__user=request.user)
             )
 
-        qs = apply_list_filter(qs, filter_name=filter_name, year=year)
+        qs = apply_list_filter(qs, filter_name=filter_name, vakt=vakt)
 
         # ETag/304 — samme mønster som navneregistrene.
         #
@@ -188,12 +198,12 @@ def patients_list_view(request):
     except ValidationError as exc:
         return JsonResponse({'error': '; '.join(exc.messages)}, status=400)
 
-    active = get_active_year()
+    vakt = hent_aktiv_vakt()
 
     # FORBEDRINGER #19: Valider plassering FØR nummer-tildeling
     # – hindrer hopp i pasientnummer hvis valideringen feiler.
     try:
-        validate_plassering_unique(data.get('plassering', ''), active)
+        validate_plassering_unique(data.get('plassering', ''), vakt)
     except ValidationError as exc:
         return JsonResponse({'error': '; '.join(exc.messages)}, status=400)
 
@@ -259,14 +269,10 @@ def patients_list_view(request):
     # next_patient_nr() kalles inne i blokken slik at en eventuell IntegrityError
     # ved save() ruller tilbake nummer-allokeringen.
     with transaction.atomic():
-        nr = next_patient_nr()
+        nr = next_patient_nr(vakt)
         patient = Patient(
             pasientnummer=nr,
-            year=active,  # alltid i aktivt år
-            # Deploy 1 av vakt-scopingen: FK-en skrives, `year` leses. Blir
-            # `year` og vakta uenige, er det `verifiser_vakt` sin jobb å si
-            # fra — før deploy 2 gjør vakta til fasit.
-            vakt=hent_aktiv_vakt(),
+            vakt=vakt,   # alltid i aktiv vakt
             problemstilling=data.get('problemstilling', ''),
             arsak=data.get('arsak', ''),
             transport=data.get('transport', ''),
@@ -357,7 +363,7 @@ def patient_detail_view(request, pk):
             try:
                 validate_plassering_unique(
                     data.get('plassering', ''),
-                    patient.year,
+                    patient.vakt,
                     exclude_pk=patient.pk,
                 )
             except ValidationError as exc:
@@ -429,9 +435,10 @@ def patient_detail_view(request, pk):
         return JsonResponse({'error': 'Ingen tilgang'}, status=403)
 
     pasientnummer = patient.pasientnummer
+    vakt = patient.vakt
     with transaction.atomic():
         patient.delete()
-        recycled = recycle_patient_nr_if_last(pasientnummer)
+        recycled = recycle_patient_nr_if_last(vakt, pasientnummer)
     return JsonResponse({'ok': True, 'recycled_nr': recycled})
 
 
@@ -440,32 +447,150 @@ def patient_detail_view(request, pk):
 @modul_kreves('patients', 'les', svar='json')
 @admin_required
 @require_http_methods(['POST'])
-def reset_active_year_view(request):
-    """Slett alle pasienter i aktivt år. Kun admin.
+def avslutt_vakt_view(request):
+    """Avslutt aktiv vakt og start en ny. Kun admin.
 
-    Krever at request-body inneholder {"confirm": true} for å unngå feilklikk.
+    Operasjonen er nullstillingens arvtaker (§3.4 i vakt-notatet): backup,
+    slett vaktas pasienter, merk vakta avsluttet — men den gjelder ÉN vakt,
+    og navnet sier det. «Nullstill år» ville slettet for mye den dagen et år
+    rommer flere vakter.
+
+    Den nye vakta opprettes i samme flyt, slik at portalen aldri står tømt
+    uten aktiv vakt. Navnet er påkrevd og fritekst — det var beslutningen —
+    og unikt: to vakter med samme navn lar seg ikke skille i statistikken.
+
+    Oppdragene til den avsluttede vakta røres ikke. De er scopet bort fra
+    alle visninger i samme øyeblikk som pekeren flytter, og livssyklusen
+    deres (arkivering, kollaps) er fase 7 sitt ansvar.
+
+    Krever {"confirm": true} for å unngå feilklikk. Pasientslettingen kan
+    ikke angres uten backupen — gjenåpning av vakta (egen knapp) setter den
+    aktiv igjen, men henter ikke rader tilbake.
     """
+    from core.models import Vakt
+
     data = _json_body(request)
     if not data.get('confirm'):
         return JsonResponse(
             {'error': 'Bekreftelse mangler. Send {"confirm": true} for å slette.'},
             status=400,
         )
+    nytt_navn = (data.get('ny_vakt_navn') or '').strip()
+    if not nytt_navn:
+        return JsonResponse(
+            {'error': 'Den nye vakta må ha et navn — det settes ved vaktstart.'},
+            status=400,
+        )
+    if Vakt.objects.filter(navn=nytt_navn).exists():
+        return JsonResponse(
+            {'error': f'En vakt med navnet «{nytt_navn}» finnes allerede. '
+                      f'Legg på en dato eller velg et annet navn.'},
+            status=400,
+        )
 
-    active = get_active_year()
+    vakt = hent_aktiv_vakt()
     # Lag pre-reset backup før sletting
     from .backup_service import create_backup
     create_backup(kind='pre_reset', user=request.user,
-                  note=f'Før nullstilling av år {active}')
-    # Hard delete – testdata skal bort. Tidligere år berøres ikke.
-    deleted, _ = Patient.objects.filter(year=active).delete()
-    # Nullstill next_patient_nr til 1
-    AppSetting.set('next_patient_nr', 1)
+                  note=f'Før avslutning av vakta «{vakt.navn}»')
+
+    with transaction.atomic():
+        deleted, _ = Patient.objects.filter(vakt=vakt).delete()
+        vakt.er_aktiv = False
+        vakt.avsluttet = timezone.now()
+        vakt.save(update_fields=['er_aktiv', 'avsluttet'])
+
+        from core.validators import current_local_year
+        ny = Vakt.objects.create(
+            navn=nytt_navn, year=current_local_year(), startet=timezone.now())
+        AppSetting.set('aktiv_vakt_id', ny.pk)
+        # Ny vakt har ingen tellernøkkel — next_patient_nr starter på 1 av
+        # seg selv. Den gamle vaktas nøkkel blir liggende: gjenåpnes vakta,
+        # fortsetter serien der den slapp.
+
     return JsonResponse({
         'ok': True,
-        'year': active,
+        'avsluttet_vakt': vakt.navn,
+        'ny_vakt': ny.navn,
         'antall_slettet': deleted,
-        'melding': f'{deleted} pasienter i år {active} slettet. next_patient_nr nullstilt til 1.',
+        'melding': f'{deleted} pasienter slettet. Vakta «{vakt.navn}» er '
+                   f'avsluttet, og «{ny.navn}» er aktiv.',
+    })
+
+
+@modul_kreves('patients', 'les', svar='json')
+@admin_required
+@require_http_methods(['GET'])
+def vakter_view(request):
+    """Vaktene, nyest først — grunnlaget for «Tidligere vakter»-lista.
+
+    Kun admin: lista finnes for gjenåpning, som er en admin-handling, og
+    vaktnavn fra tidligere arrangementer er ikke noe enhver leser trenger.
+    `kollapset` sendes med slik at grensesnittet kan la være å tilby en
+    gjenåpning serveren uansett ville avvist.
+    """
+    from core.models import Vakt
+
+    return JsonResponse({'vakter': [
+        {
+            'id': v.pk,
+            'navn': v.navn,
+            'year': v.year,
+            'er_aktiv': v.er_aktiv,
+            'startet': v.startet.isoformat(),
+            'avsluttet': v.avsluttet.isoformat() if v.avsluttet else None,
+            'kollapset': v.vaktarkiver.filter(
+                kollapset_at__isnull=False).exists(),
+        }
+        for v in Vakt.objects.order_by('-startet')
+    ]})
+
+
+@modul_kreves('patients', 'les', svar='json')
+@admin_required
+@require_http_methods(['POST'])
+def gjenaapne_vakt_view(request):
+    """Gjenåpne en avsluttet vakt. Kun admin.
+
+    En feilklikk-avslutning midt i en vakt skal ikke være en katastrofe uten
+    vei tilbake — det var beslutningen (§7.2). Gjenåpningen bytter aktiv
+    vakt; den henter IKKE slettede pasientrader tilbake. De ligger i
+    pre-reset-backupen, og gjenoppretting derfra er en egen, bevisst handling
+    i backup-panelet.
+
+    Døra er låst når vaktas arkiv er kollapset: da finnes ikke radnivået
+    lenger, og en «aktiv» vakt uten mulighet for rådata ville løyet.
+    """
+    from core.models import Vakt
+
+    data = _json_body(request)
+    try:
+        vakt = Vakt.objects.get(pk=int(data.get('vakt_id')))
+    except (Vakt.DoesNotExist, TypeError, ValueError):
+        return JsonResponse({'error': 'Ukjent vakt.'}, status=400)
+
+    if vakt.vaktarkiver.filter(kollapset_at__isnull=False).exists():
+        return JsonResponse(
+            {'error': f'Arkivet for «{vakt.navn}» er kollapset — radnivået '
+                      f'finnes ikke lenger, og vakta kan ikke gjenåpnes.'},
+            status=400,
+        )
+
+    forrige = hent_aktiv_vakt()
+    with transaction.atomic():
+        if forrige.pk != vakt.pk:
+            forrige.er_aktiv = False
+            forrige.avsluttet = timezone.now()
+            forrige.save(update_fields=['er_aktiv', 'avsluttet'])
+        vakt.er_aktiv = True
+        vakt.avsluttet = None
+        vakt.save(update_fields=['er_aktiv', 'avsluttet'])
+        AppSetting.set('aktiv_vakt_id', vakt.pk)
+
+    return JsonResponse({
+        'ok': True,
+        'aktiv_vakt': vakt.navn,
+        'melding': f'Vakta «{vakt.navn}» er aktiv igjen.',
     })
 
 

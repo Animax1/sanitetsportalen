@@ -15,7 +15,8 @@ from django.test import TestCase, Client, override_settings
 from django.contrib.auth import get_user_model
 
 from patients.models import Patient, AppSetting
-from patients.services import recycle_patient_nr_if_last
+from patients.services import _pasientnr_nokkel, recycle_patient_nr_if_last
+from patients.test_helpers import sett_aktiv_vakt
 from accounts.test_helpers import gi_standardtilgang
 
 User = get_user_model()
@@ -41,8 +42,8 @@ class PatientDeleteSetupMixin:
             must_change_password=False,
         )
         gi_standardtilgang(self.rw_user, 'skriver')
-        # Sett aktivt år
-        AppSetting.set('active_year', 2099)
+        # Telleren er per vakt etter deploy 2 — nøkkelen bærer vaktas pk
+        self.vakt = sett_aktiv_vakt(2099)
 
         self.admin_client = Client()
         self.admin_client.force_login(self.admin)
@@ -59,12 +60,15 @@ class PatientDeleteSetupMixin:
 
     def _opprett(self, nr):
         """Opprett pasient med gitt pasientnummer direkte i DB."""
-        AppSetting.set('next_patient_nr', nr + 1)
+        AppSetting.set(_pasientnr_nokkel(self.vakt), nr + 1)
         return Patient.objects.create(
             pasientnummer=nr,
-            year=2099,
+            vakt=self.vakt,
             problemstilling='Pustevansker',
         )
+
+    def _teller(self):
+        return int(AppSetting.get(_pasientnr_nokkel(self.vakt)))
 
 
 @override_settings(SECURE_SSL_REDIRECT=False)
@@ -75,7 +79,7 @@ class RecycleFunctionTests(PatientDeleteSetupMixin, TestCase):
         """Slett siste pasient → next_patient_nr rulles tilbake."""
         p = self._opprett(5)
         # next_patient_nr er nå 6
-        self.assertEqual(int(AppSetting.get('next_patient_nr')), 6)
+        self.assertEqual(self._teller(), 6)
 
         resp = self._slett(p.pk)
         self.assertEqual(resp.status_code, 200)
@@ -84,14 +88,14 @@ class RecycleFunctionTests(PatientDeleteSetupMixin, TestCase):
         self.assertTrue(data['recycled_nr'])
 
         # Telleren skal ha gått tilbake til 5
-        self.assertEqual(int(AppSetting.get('next_patient_nr')), 5)
+        self.assertEqual(self._teller(), 5)
 
     def test_slett_ikke_siste_teller_uendret(self):
         """Slett ikke-siste pasient → telleren uendret."""
         p1 = self._opprett(5)
         p2 = self._opprett(6)
         # next_patient_nr er nå 7
-        self.assertEqual(int(AppSetting.get('next_patient_nr')), 7)
+        self.assertEqual(self._teller(), 7)
 
         # Slett første (nr 5) – det er ikke den siste
         resp = self._slett(p1.pk)
@@ -100,7 +104,7 @@ class RecycleFunctionTests(PatientDeleteSetupMixin, TestCase):
         self.assertFalse(data['recycled_nr'])
 
         # Telleren skal fremdeles være 7
-        self.assertEqual(int(AppSetting.get('next_patient_nr')), 7)
+        self.assertEqual(self._teller(), 7)
 
         # Rydd opp
         p2.delete()
@@ -116,13 +120,13 @@ class RecycleFunctionTests(PatientDeleteSetupMixin, TestCase):
         resp = self._slett(p3.pk)
         self.assertEqual(resp.status_code, 200)
         self.assertTrue(resp.json()['recycled_nr'])
-        self.assertEqual(int(AppSetting.get('next_patient_nr')), 5)
+        self.assertEqual(self._teller(), 5)
 
         # Slett p2 (nr 4 – ny siste)
         resp = self._slett(p2.pk)
         self.assertEqual(resp.status_code, 200)
         self.assertTrue(resp.json()['recycled_nr'])
-        self.assertEqual(int(AppSetting.get('next_patient_nr')), 4)
+        self.assertEqual(self._teller(), 4)
 
         # Rydd opp
         p1.delete()
@@ -131,14 +135,14 @@ class RecycleFunctionTests(PatientDeleteSetupMixin, TestCase):
         """Tom database edge case: slett eneste pasient, neste pasient skal få nummer 1."""
         p = self._opprett(1)
         # next_patient_nr er nå 2
-        self.assertEqual(int(AppSetting.get('next_patient_nr')), 2)
+        self.assertEqual(self._teller(), 2)
 
         resp = self._slett(p.pk)
         self.assertEqual(resp.status_code, 200)
         self.assertTrue(resp.json()['recycled_nr'])
 
         # Telleren skal ha gått tilbake til 1
-        self.assertEqual(int(AppSetting.get('next_patient_nr')), 1)
+        self.assertEqual(self._teller(), 1)
 
         # Ny pasient opprettet via API skal få nummer 1
         resp2 = self.admin_client.post(

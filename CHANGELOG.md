@@ -4,6 +4,48 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-08-29 — Vakt som scope, deploy 2: vakta er fasit
+
+**1296 tester grønne** (13 nye/omskrevne rundt vakt-semantikken). Migrasjoner
+`patients.0016` og `oppdrag.0007`. Forutsetter «Ingen funn» fra `verifiser_vakt` i prod
+— det kom samme dag, og deployen er den lesende halvdelen deploy 1 forberedte.
+
+**Migrasjonene er enveis, med vilje.** Begge starter med en sperre som teller rader uten
+vakt og stopper med henvisning til `verifiser_vakt` — kjøres deploy 2 mot en base deploy
+1 ikke har fylt, skal den nekte, ikke gjette. Revers rammer `RuntimeError`: etter at
+`year` er borte fra radene kan koblingen ikke bygges opp igjen når flere vakter deler år.
+Rollback er gjenoppretting fra backup, og det står i feilmeldingen.
+
+- **All lesing går på vakta.** `get_active_year`/`set_active_year` er slettet;
+  `hent_aktiv_vakt()` er eneste scope-kilde. Pasientliste, statistikk (cache-nøkkel
+  bærer vakt-ID), oppdragsvisninger, arkivering og offline-import filtrerer på
+  `vakt`-FK-en.
+- **`year` er fjernet fra `Patient` og `Oppdrag`.** `VaktArkiv.year_snapshot` står —
+  frosset, fordi den inngår i SHA-payloaden til eksisterende arkiver i prod.
+  `verifiser_vakt` er krympet tilsvarende: year-sammenligningene mistet grunnlaget og er
+  fjernet (ikke gjemt); igjen står arkiv-mot-vakt, pekersjekken og per-vakt-oppsummering.
+- **Sperrene bor i basen:** `UniqueConstraint (vakt, pasientnummer)` og
+  `(vakt, oppdragsnummer)` erstatter global `unique=True` og per-år-sperren. Numrene
+  restarter per vakt; tellerne heter `next_patient_nr_vakt_<id>` /
+  `next_oppdrag_nr_vakt_<id>` og selvrepareres fra `Max()` om nøkkelen mangler.
+  Migrasjonene flytter driftsverdiene og sletter `active_year`, `next_patient_nr` og
+  `event_name` — arrangementsnavnet ER vaktas navn nå, og skrives via
+  portalinnstillingene (som validerer unikhet ved omdøping).
+- **«Avslutt vakt» erstatter «Nullstill år»** (`/api/avslutt-vakt/`): pre-reset-backup,
+  slett vaktas pasienter, merk avsluttet — og ny vakt med påkrevd, unikt fritekstnavn i
+  samme flyt, så portalen aldri står uten aktiv vakt. Oppdragene røres ikke (fase 7 sitt
+  ansvar). **«Gjenåpne»** (`/api/gjenaapne-vakt/`) bytter aktiv vakt fram til vaktas
+  arkiv er kollapset — da finnes ikke radnivået, og døra er låst (mutasjonstestet).
+  Gjenåpning henter ikke slettede rader tilbake; de bor i backupen. «Tidligere
+  vakter»-lista (`/api/vakter/`, kun admin) viser status og kollaps per vakt.
+- **JS-kontrakten består:** `GET /api/settings/` svarer fortsatt `event_name` og
+  `active_year`, nå beregnet fra vakta — klienten skal ikke vite at kilden byttet.
+- **Testkulturen fulgte med:** `patients.test_helpers.sett_aktiv_vakt(år)` er den ene
+  måten tester setter scope på; `year=`-fixturer og `AppSetting['active_year']`-oppsett
+  er skrevet om i alle appene.
+
+---
+
 ## 2026-08-29 — Vakt som scope: besluttet, og deploy 1 kodet
 
 **1288 tester grønne** (16 nye). Migrasjoner `core.0006`, `patients.0014–0015`,

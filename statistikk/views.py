@@ -28,7 +28,7 @@ from core.stats_cache import cached_stats_response
 from patients.services import (
     compute_arkiv_full_stats,
     full_stats,
-    get_active_year,
+    hent_aktiv_vakt,
 )
 
 
@@ -82,11 +82,12 @@ def full_stats_view(request):
         return JsonResponse(
             {'error': f'Mangler lesetilgang til modulen «{mangler}»'}, status=403)
 
-    year = get_active_year()
+    vakt = hent_aktiv_vakt()
 
-    @cached_stats_response(cache_key=f'full:{year}', ttl=60)
+    # Vakt-ID i nøkkelen, ikke år: to vakter samme år skal ikke dele cache.
+    @cached_stats_response(cache_key=f'full:vakt:{vakt.pk}', ttl=60)
     def _inner(req):
-        return full_stats(year=year)
+        return full_stats(vakt=vakt)
 
     return _inner(request)
 

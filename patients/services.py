@@ -36,19 +36,33 @@ from .models import Patient, AppSetting, Forstehjelper, VaktArkiv, ArkivertPasie
 #  og re-eksporteres øverst i denne filen.)
 
 
-def next_patient_nr():
+def _pasientnr_nokkel(vakt):
+    return f'next_patient_nr_vakt_{vakt.pk}'
+
+
+def next_patient_nr(vakt):
+    """Hent og inkrementer neste pasientnummer for vakta, atomisk.
+
+    Per vakt siden deploy 2 — pasient #1 på hver vakt, slik nullstillingen
+    alltid har virket i praksis. `select_for_update` mot kappkjøring, som før.
+
+    Mangler telleren, gjenskapes den fra radene — samme selvreparasjon som
+    `neste_oppdragsnummer`: en slettet AppSetting-rad skal ikke gi kollisjon
+    med `(vakt, pasientnummer)`-sperren.
     """
-    Hent og inkrementer neste pasientnummer atomisk.
-    Bruker select_for_update for å unngå race conditions.
-    """
+    from django.db.models import Max
+
     with transaction.atomic():
-        setting = AppSetting.objects.select_for_update().get_or_create(
-            key='next_patient_nr',
-            defaults={'value': '1'},
-        )[0]
-        nr = int(setting.value)
-        setting.value = str(nr + 1)
-        setting.save(update_fields=['value'])
+        nokkel = _pasientnr_nokkel(vakt)
+        rad = AppSetting.objects.select_for_update().filter(key=nokkel).first()
+        if rad is None:
+            hoyeste = (Patient.objects.filter(vakt=vakt)
+                       .aggregate(Max('pasientnummer'))['pasientnummer__max'])
+            AppSetting.objects.create(key=nokkel, value=str((hoyeste or 0) + 1))
+            rad = AppSetting.objects.select_for_update().get(key=nokkel)
+        nr = int(rad.value)
+        rad.value = str(nr + 1)
+        rad.save(update_fields=['value'])
         return nr
 
 
@@ -72,15 +86,15 @@ def next_patient_nr():
 
 # ── Recycle av pasientnummer ved slett ────────────────────────────────────────
 
-def recycle_patient_nr_if_last(pasientnummer):
-    """Rull tilbake next_patient_nr hvis pasientnummer == current_next - 1.
+def recycle_patient_nr_if_last(vakt, pasientnummer):
+    """Rull tilbake vaktas teller hvis pasientnummer == current_next - 1.
 
     MÅ kalles inni en eksisterende transaction.atomic-blokk (ikke inni egne).
     Bruker select_for_update() for låsing mot kappkjøring.
     Returnerer True hvis telleren ble rullet tilbake, ellers False.
     """
     setting = AppSetting.objects.select_for_update().filter(
-        key='next_patient_nr'
+        key=_pasientnr_nokkel(vakt)
     ).first()
     if setting is None:
         return False
@@ -97,15 +111,15 @@ def recycle_patient_nr_if_last(pasientnummer):
 FILTER_CHOICES = {'alle', 'rod', 'gul', 'gronn', 'rodgul', 'aktive', 'utskrevet'}
 
 
-def apply_list_filter(queryset, filter_name='alle', year=None):
+def apply_list_filter(queryset, filter_name='alle', vakt=None):
     """Anvend filter på et Patient-queryset.
 
     Filtrene 'rod', 'gul', 'gronn' og 'rodgul' gjelder KUN aktive pasienter
     (de som ikke er utskrevet). Dette matcher referanselogikken for 'rodgul'.
     """
     qs = queryset
-    if year is not None:
-        qs = qs.filter(year=year)
+    if vakt is not None:
+        qs = qs.filter(vakt=vakt)
 
     not_utskrevet = Q(utskrevet='') | Q(utskrevet__isnull=True)
 
@@ -125,41 +139,25 @@ def apply_list_filter(queryset, filter_name='alle', year=None):
     return qs
 
 
-# ── Aktivt år (AppSetting) ────────────────────────────────────────────────────
-
-def get_active_year():
-    """Returnerer aktivt år. Default og ved årsskifte: inneværende år."""
-    current = current_local_year()
-    stored = AppSetting.get('active_year', None)
-    if stored is None:
-        AppSetting.set('active_year', current)
-        return current
-    try:
-        return int(stored)
-    except (ValueError, TypeError):
-        AppSetting.set('active_year', current)
-        return current
-
-
-def set_active_year(year):
-    """Behold funksjonen for potensiell fremtidig bruk via Django-admin."""
-    AppSetting.set('active_year', int(year))
+# `get_active_year`/`set_active_year` sto her fram til deploy 2.
+# `AppSetting['active_year']` er slettet: vakta bærer året (`Vakt.year`), og
+# scoping skjer på vakt, ikke på årstall. Trengs året, er det
+# `hent_aktiv_vakt().year`.
 
 
 # ── Aktiv vakt ───────────────────────────────────────────────────────────────
 #
-# Deploy 1 av vakt-scopingen (docs/BESLUTNING_VAKT_SOM_SCOPE.md): `Vakt`
-# finnes og skrivestiene setter FK-en, men all LESING skjer fortsatt fra
-# `year`. Funksjonene bor her, ved siden av `get_active_year`, fordi de leser
-# `AppSetting` — og fordi begge kallerne (denne modulen og oppdrag) allerede
-# importerer herfra. Flyttes til core i deploy 2, sammen med resten.
+# Vakt-scopingen (docs/BESLUTNING_VAKT_SOM_SCOPE.md): fra deploy 2 er vakta
+# fasit for all scoping. Funksjonene bor her og ikke i core, fordi de leser
+# `AppSetting` — som ligger i patients — og core skal ikke importere oppover.
+# Begge kallerne (denne modulen og oppdrag) importerer allerede herfra.
 
 def vakt_for_year(year):
     """Vakta for et år — finn den, eller lag den.
 
-    Lat opprettelse, samme mønster som `get_active_year` bruker for sin
-    AppSetting-rad: en fersk installasjon skal ikke trenge et oppsettsteg for
-    at registrering skal virke. Navnet blir årstallet — samme ærlighet som
+    Lat opprettelse — en fersk installasjon skal ikke trenge et oppsettsteg
+    for at registrering skal virke. (Samme mønster som `get_active_year`
+    brukte for sin AppSetting-rad, før vakta tok over.) Navnet blir årstallet — samme ærlighet som
     backfillen: vi vet ikke hva vakta heter, og påstår det ikke. Admin endrer
     navnet når hun vet det.
 
@@ -194,7 +192,7 @@ def hent_aktiv_vakt():
         except (Vakt.DoesNotExist, TypeError, ValueError):
             pass
 
-    vakt = vakt_for_year(get_active_year())
+    vakt = vakt_for_year(current_local_year())
     AppSetting.set('aktiv_vakt_id', vakt.pk)
     return vakt
 
@@ -270,7 +268,7 @@ def is_shared_plassering(plassering):
     return (plassering or '').strip() in SHARED_PLASSERINGER
 
 
-def find_plassering_conflict(plassering, year, exclude_pk=None):
+def find_plassering_conflict(plassering, vakt, exclude_pk=None):
     """Returner en konkurrerende aktiv pasient i samme plassering, eller None.
 
     Delte soner (Grønn/Gul sone) gir aldri konflikt.
@@ -284,7 +282,7 @@ def find_plassering_conflict(plassering, year, exclude_pk=None):
         return None
     qs = Patient.objects.filter(
         is_active=True,
-        year=year,
+        vakt=vakt,
         plassering=p,
         utskrevet='',  # Kun ikke-utskrevne pasienter blokkerer plasseringen
     )
@@ -293,14 +291,14 @@ def find_plassering_conflict(plassering, year, exclude_pk=None):
     return qs.first()
 
 
-def validate_plassering_unique(plassering, year, exclude_pk=None):
+def validate_plassering_unique(plassering, vakt, exclude_pk=None):
     """Hev ValidationError hvis plasseringen er opptatt av en annen aktiv pasient.
 
     Delte soner (Grønn/Gul sone) og blank plassering tillates alltid.
     Kalles før Patient.save() både ved opprettelse og oppdatering.
     """
     from django.core.exceptions import ValidationError
-    conflict = find_plassering_conflict(plassering, year, exclude_pk=exclude_pk)
+    conflict = find_plassering_conflict(plassering, vakt, exclude_pk=exclude_pk)
     if conflict is not None:
         raise ValidationError(
             f"Plasseringen '{plassering}' er allerede opptatt av pasient #"
@@ -463,8 +461,8 @@ def _compute_stats_from_dicts(pts):
     }
 
 
-def basic_stats(year=None):
-    """Basis-statistikk for aktive pasienter i året.
+def basic_stats(vakt=None):
+    """Basis-statistikk for aktive pasienter i vakta.
 
     **Uten endepunkt siden 28. aug. 2026.** `/pasienter/api/stats/` var eneste
     HTTP-kaller og er slettet — det var en rest fra Flask-porten, og
@@ -476,24 +474,24 @@ def basic_stats(year=None):
     bygget spørringen selv, ville den speilet produksjonskoden i stedet for å
     måle den — og sluttet å fange en endring i hvilke pasienter som teller.
     """
-    if year is None:
-        year = get_active_year()
-    pts = list(Patient.objects.filter(is_active=True, year=year).values())
+    if vakt is None:
+        vakt = hent_aktiv_vakt()
+    pts = list(Patient.objects.filter(is_active=True, vakt=vakt).values())
     return _compute_stats_from_dicts(pts)
 
 
 # ── Full statistikk (tilsvarer /api/full-stats) ───────────────────────────────
 
-def full_stats(year=None):
+def full_stats(vakt=None):
     """
-    Beregn fullstendig statistikk-dashboard for aktivt år.
+    Beregn fullstendig statistikk-dashboard for aktiv vakt.
     Tilsvarer Flask /api/full-stats-endepunktet.
     Inkluderer Chi-square og Kruskal-Wallis tester via scipy.
-    Filtrerer på aktivt år hvis year ikke er oppgitt.
+    Filtrerer på aktiv vakt hvis vakt ikke er oppgitt.
     """
-    if year is None:
-        year = get_active_year()
-    pts = list(Patient.objects.filter(is_active=True, year=year).values())
+    if vakt is None:
+        vakt = hent_aktiv_vakt()
+    pts = list(Patient.objects.filter(is_active=True, vakt=vakt).values())
     return _compute_full_stats_from_dicts(pts)
 
 
@@ -823,9 +821,9 @@ def arkiver_aktiv_vakt(arrangement_navn, notat, user):
     from django.utils import timezone as djtz
 
     with transaction.atomic():
-        active_year = get_active_year()
+        vakt = hent_aktiv_vakt()
         pasienter = list(
-            Patient.objects.filter(is_active=True, year=active_year)
+            Patient.objects.filter(is_active=True, vakt=vakt)
             .select_related('forstehjelper', 'helsepersonell_ref')
         )
         antall = len(pasienter)
@@ -836,15 +834,17 @@ def arkiver_aktiv_vakt(arrangement_navn, notat, user):
         arkiv = VaktArkiv.objects.create(
             tittel=tittel,
             arrangement_navn=arrangement_navn,
-            # Deploy 1: arkivet peker på vakta det fryser. Eldre arkiver har
-            # NULL — de er fra før grupperingen fantes.
-            vakt=hent_aktiv_vakt(),
+            # Arkivet peker på vakta det fryser. Eldre arkiver har NULL —
+            # de er fra før grupperingen fantes.
+            vakt=vakt,
             importert_av=user,
             # Frys navnet: FK-en settes til NULL hvis brukeren slettes senere,
             # men arkivet skal fortsatt vise hvem som arkiverte vakten.
             importert_av_navn=getattr(user, 'username', '') or '',
             antall_pasienter=antall,
-            year_snapshot=active_year,
+            # Frosset — del av SHA-payloaden på hvert arkiv, og den formen
+            # er signaturen i prod. Kolonnen overlever derfor vakt-scopingen.
+            year_snapshot=vakt.year,
             notat=notat or '',
             sha256='',  # settes etter bulk_create
         )

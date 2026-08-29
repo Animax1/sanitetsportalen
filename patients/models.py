@@ -111,21 +111,19 @@ class Helsepersonell(models.Model):
 class Patient(models.Model):
     """Pasientmodell med alle kliniske feltnavn fra Flask-appen."""
 
-    # Pasientnummer (separat fra intern PK)
-    pasientnummer = models.IntegerField(unique=True, verbose_name='Pasientnummer')
+    # Pasientnummer — unikt per VAKT, ikke globalt (deploy 2). Restart per
+    # vakt er slik nullstillingen alltid har virket i praksis: telleren ble
+    # satt til 1, og den globale sperren holdt bare fordi radene ble slettet
+    # først. Nå sier skjemaet det samme som livssyklusen.
+    pasientnummer = models.IntegerField(verbose_name='Pasientnummer')
 
-    # År pasienten tilhører (indeksert for filtrering)
-    year = models.IntegerField(db_index=True, verbose_name='År')
-
-    # Vakta pasienten tilhører. Nullbar i deploy 1 av vakt-scopingen: all
-    # lesing skjer fortsatt fra `year`, og FK-en fylles av backfillen og av
-    # skrivestiene. Blir NOT NULL i deploy 2, der `year` forsvinner fra raden.
+    # Vakta pasienten tilhører — scopet, etter deploy 2 av vakt-scopingen.
+    # `year` som sto her er borte: vakta bærer året (`Vakt.year`), og to
+    # kilder til samme sannhet går i utakt første gang noe feiler halvveis.
     # PROTECT: en vakt med pasienter skal ikke kunne slettes og ta
     # historikken med seg — samme valg som Oppdrag.enhet.
     vakt = models.ForeignKey(
         'core.Vakt',
-        null=True,
-        blank=True,
         on_delete=models.PROTECT,
         related_name='pasienter',
         verbose_name='Vakt',
@@ -172,16 +170,26 @@ class Patient(models.Model):
         verbose_name = 'Pasient'
         verbose_name_plural = 'Pasienter'
         ordering = ['pasientnummer']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['vakt', 'pasientnummer'],
+                name='unikt_pasientnummer_per_vakt',
+            ),
+        ]
 
     def __str__(self):
         return f'Pasient #{self.pasientnummer} – {self.problemstilling or "ukjent"}'
 
     def save(self, *args, **kwargs):
-        """Sett year automatisk til inneværende år hvis det ikke er satt."""
-        if self.year is None:
-            # N5: må være lokaltid, ikke container-tid. Se current_local_year().
-            from core.validators import current_local_year
-            self.year = current_local_year()
+        """Sett vakta til den aktive hvis den ikke er satt.
+
+        Samme idiom som `year`-defaulten feltet hadde før deploy 2:
+        skrivestiene setter vakta eksplisitt, og denne fanger resten — først
+        og fremst tester og shell-bruk, som ellers måtte kjenne scopet.
+        """
+        if self.vakt_id is None:
+            from .services import hent_aktiv_vakt  # noqa: WPS433 — sykel ved modul-last
+            self.vakt = hent_aktiv_vakt()
         super().save(*args, **kwargs)
 
 

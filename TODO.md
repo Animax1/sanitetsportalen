@@ -366,14 +366,17 @@ personlige kontoer, admin-reset beholdt for alle. Ingenting bygget ennå.
             opprettelse og pekerreparasjon, og `verifiser_vakt` som også
             forhåndssjekker deploy 2-sperrene. Backfill, full rollback og ny
             kjøring bevist mot en base med data i tre år.
-      - [ ] **Deploy 1 til staging/prod, så `verifiser_vakt` mot prod.**
-            Krever Andre. Deretter **deploy 2**:
-            all lesing over på vakt, tellere per vakt, «Avslutt vakt»,
-            `(vakt, pasientnummer)`-sperren, `year` bort fra radene.
-      - **Fase 4b og 5 er upåvirket** og kan gjøres i mellomtiden. **Fase 6 og 7 må
-        vente:** statistikken grupperer på scopet, og fase 7 arkiverer *en vakt* —
-        den ville lagt inn `Vaktarkivering` fra §12.1, som notatet foreslår å erstatte
-        med `Vakt` (de er samme entitet sett fra hver sin ende).
+      - [x] **Deploy 1 verifisert i prod 29. aug. 2026** — `verifiser_vakt`: «Ingen funn».
+      - [x] **Deploy 2 — kodet 29. aug. 2026.** All lesing på vakt, FK-ene
+            `NOT NULL`, `(vakt, pasientnummer)`- og `(vakt, oppdragsnummer)`-sperrer
+            i basen, `year` fjernet fra radene, tellere per vakt
+            (`next_patient_nr_vakt_<id>`), `event_name`/`active_year`/`next_patient_nr`
+            flyttet fra `AppSetting` til vakta, «Avslutt vakt» erstatter «Nullstill år»,
+            «Gjenåpne» fram til kollaps, «Tidligere vakter»-liste. Migrasjonene
+            (`patients.0016`, `oppdrag.0007`) har sperre mot rader uten vakt og
+            nekter revers — rollback er gjenoppretting fra backup.
+      - **Fase 6 og 7 er ikke lenger blokkert** — scopet er levert; de grupperer
+        og arkiverer på `Vakt`.
 
 ### Rollemodellen — se `docs/BESLUTNING_ROLLEMODELLEN.md`
 

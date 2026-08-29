@@ -25,6 +25,7 @@ from core.models import ModuleBackupConfig
 from patients import backup_scheduler
 from patients.backup import register_handlers
 from patients.models import Backup, Patient
+from patients.services import vakt_for_year
 from accounts.test_helpers import gi_standardtilgang
 
 
@@ -96,7 +97,7 @@ class SchedulerRunBackupTests(TestCase):
         with backup_scheduler._running_lock:
             backup_scheduler._is_running = False
         # Patient-data slik at dumpdata ikke er tom.
-        Patient.objects.create(pasientnummer=1, year=2025, problemstilling='X')
+        Patient.objects.create(pasientnummer=1, vakt=vakt_for_year(2025), problemstilling='X')
 
     def tearDown(self):
         import gc

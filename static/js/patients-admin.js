@@ -122,20 +122,74 @@ async function deleteHelsepersonell(id) {
 // NULLSTILL AKTIV VAKT
 // ════════════════════════════════════════════════════════
 
-async function doResetActiveYear() {
-  const res = await apiFetch('/pasienter/api/reset-active-year/', {
+async function doAvsluttVakt() {
+  const feil = document.getElementById('avslutt-feil');
+  feil.classList.add('d-none');
+  const navn = (document.getElementById('avslutt-nytt-navn').value || '').trim();
+  if (!navn) {
+    feil.textContent = 'Den nye vakta må ha et navn.';
+    feil.classList.remove('d-none');
+    return;
+  }
+
+  await withSubmitGuard('avslutt-vakt-knapp', async () => {
+    const res = await apiFetch('/pasienter/api/avslutt-vakt/', {
+      method: 'POST',
+      body: JSON.stringify({ confirm: true, ny_vakt_navn: navn })
+    });
+    const d = await res.json();
+    if (!res.ok) {
+      // Feilen (typisk navnekollisjon) skal stå der operatøren kan rette
+      // den — ikke i en alert som lukker seg over skjemaet.
+      feil.textContent = d.error || 'Feil ved avslutning av vakta.';
+      feil.classList.remove('d-none');
+      return;
+    }
+    bootstrap.Modal.getInstance(document.getElementById('resetModal'))?.hide();
+    alert(d.melding);
+    // Vaktnavnet i headeren og lista er begge utdatert nå — full
+    // innlasting er enklere enn å flikke på begge.
+    window.location.reload();
+  });
+}
+
+
+// ── Tidligere vakter: liste med gjenåpning ──────────────
+
+async function visVakter() {
+  const el = document.getElementById('vaktliste');
+  if (!el) return;
+  const res = await apiFetch('/pasienter/api/vakter/');
+  if (!res.ok) return;
+  const vakter = (await res.json()).vakter || [];
+  el.innerHTML = vakter.map((v) => {
+    const status = v.er_aktiv ? 'aktiv'
+      : (v.kollapset ? 'avsluttet · arkiv kollapset' : 'avsluttet');
+    // Gjenåpning bytter aktiv vakt — den henter ikke slettede pasienter
+    // tilbake. Det står i bekreftelsen, ikke bare i dokumentasjonen.
+    const knapp = (!v.er_aktiv && !v.kollapset)
+      ? `<button class="btn btn-link btn-sm p-0 ms-2" data-action="gjenaapneVakt"
+                 data-id="${escHtmlValue(v.id)}">Gjenåpne</button>`
+      : '';
+    return `<div>${escapeHtml(v.navn)} <span class="text-muted">· ${escapeHtml(status)}</span>${knapp}</div>`;
+  }).join('') || '<div class="text-muted">Ingen vakter.</div>';
+}
+
+
+async function gjenaapneVakt(id) {
+  if (!confirm('Gjenåpne vakta? Den blir aktiv igjen — slettede pasienter '
+    + 'hentes IKKE tilbake (de ligger i backupen).')) return;
+  const res = await apiFetch('/pasienter/api/gjenaapne-vakt/', {
     method: 'POST',
-    body: JSON.stringify({ confirm: true })
+    body: JSON.stringify({ vakt_id: id })
   });
   const d = await res.json();
-  bootstrap.Modal.getInstance(document.getElementById('resetModal'))?.hide();
-  if (res.ok) {
-    const melding = `${d.antall_slettet} pasienter slettet. Aktiv vakt er nullstilt.`;
-    alert(melding);
-    await loadPatients();
-  } else {
-    alert(d.error || 'Feil ved nullstilling.');
+  if (!res.ok) {
+    alert(d.error || 'Kunne ikke gjenåpne vakta.');
+    return;
   }
+  alert(d.melding);
+  window.location.reload();
 }
 
 // ════════════════════════════════════════════════════════

@@ -6,6 +6,7 @@ og permanent sletting.
 
 Kjør med: python manage.py test accounts.tests_user_admin
 """
+from patients.services import vakt_for_year
 from django.contrib.sessions.backends.db import SessionStore
 from django.contrib.sessions.models import Session
 from django.test import TestCase, Client, override_settings
@@ -512,8 +513,9 @@ class EnhetFolgerKontoenTests(TestCase):
     def _gi_oppdrag(self):
         from oppdrag.models import Lokasjon, Oppdrag
         from oppdrag.services import neste_oppdragsnummer
+        vakt = vakt_for_year(2098)
         return Oppdrag.objects.create(
-            year=2098, oppdragsnummer=neste_oppdragsnummer(2098),
+            vakt=vakt, oppdragsnummer=neste_oppdragsnummer(vakt),
             enhet=self.enhet, problemstilling='Pustevansker',
             hastegrad='Akutt',
             lokasjon=Lokasjon.objects.create(navn='Hovedscene'))

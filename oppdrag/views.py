@@ -24,7 +24,7 @@ from django.views.decorators.http import require_http_methods
 from core.auth_decorators import er_global_admin, har_tilgang, modul_kreves
 from core.idempotency import bygg_nokkel, forkast, fullfor, reserver
 from core.ratelimit import rate_limit
-from patients.services import get_active_year, hent_aktiv_vakt
+from patients.services import hent_aktiv_vakt
 
 from . import choices, services
 from .choices import validate_oppdrag_choice_fields
@@ -82,7 +82,7 @@ def enheter_view(request):
     oppdragene hver gang — se `services.enhet_status` for hvorfor det ikke
     lagres.
     """
-    year = get_active_year()
+    vakt = hent_aktiv_vakt()
 
     # `?alle=1` tar med pensjonerte enheter. Ressursoversikten på tavla skal
     # ikke se dem — de er borte for godt — men enhetspanelet er stedet man
@@ -105,7 +105,7 @@ def enheter_view(request):
             'aktivt_oppdrag_id': (
                 info['aktivt_oppdrag'].pk if info['aktivt_oppdrag'] else None),
         }
-        for e, info in ((e, services.enhet_status(e, year)) for e in enheter)
+        for e, info in ((e, services.enhet_status(e, vakt)) for e in enheter)
     ]
 
     # Enheter som ikke er på vakt sendes med, de filtreres ikke bort.
@@ -149,7 +149,7 @@ def enhet_vakt_view(request, pk):
     pa_vakt = bool(json_body(request).get('pa_vakt'))
 
     if not pa_vakt:
-        aktivt = services.aktivt_oppdrag(enhet, get_active_year())
+        aktivt = services.aktivt_oppdrag(enhet, hent_aktiv_vakt())
         if aktivt is not None:
             return JsonResponse({
                 'status': 'error',
@@ -271,7 +271,7 @@ def oppdrag_liste_view(request):
     modulen; hvilke *rader* den kan lese er en objektsjekk dekoratoren ikke
     gjør, og den ligger her.
     """
-    year = get_active_year()
+    vakt = hent_aktiv_vakt()
 
     if request.method == 'GET':
         if er_enhetskonto(request.user):
@@ -280,7 +280,7 @@ def oppdrag_liste_view(request):
             # avsluttede, uten et kall per rad. Få rader — egne, i vakta,
             # innenfor 30-minuttersvinduet — så N+1 her er N liten.
             data = []
-            for o in services.synlige_for_enhet(request.user.enhet, year):
+            for o in services.synlige_for_enhet(request.user.enhet, vakt):
                 rad = oppdrag_til_dict(o, for_enhet=True)
                 rad['statusmeldinger'] = [
                     melding_til_dict(m)
@@ -297,7 +297,7 @@ def oppdrag_liste_view(request):
         else:
             # Ferdigstilte er ute av den aktive lista. De er ikke borte —
             # de ligger i `historikk_liste_view`, søkbare på nummer.
-            qs = (Oppdrag.objects.filter(year=year, historikk_fra__isnull=True)
+            qs = (Oppdrag.objects.filter(vakt=vakt, historikk_fra__isnull=True)
                   .select_related('enhet', 'lokasjon').order_by('-created_at'))
             data = [oppdrag_til_dict(o) for o in qs]
             etag_rader = [(r['id'], r['status'], r['enhet_id']) for r in data]
@@ -339,10 +339,8 @@ def oppdrag_liste_view(request):
     # også telleren tilbake, og nummeret brennes ikke.
     with transaction.atomic():
         oppdrag = Oppdrag.objects.create(
-            year=year,
-            # Deploy 1 av vakt-scopingen: FK-en skrives, `year` leses.
-            vakt=hent_aktiv_vakt(),
-            oppdragsnummer=services.neste_oppdragsnummer(year),
+            vakt=vakt,
+            oppdragsnummer=services.neste_oppdragsnummer(vakt),
             enhet=enhet,
             problemstilling=data['problemstilling'],
             hastegrad=data['hastegrad'],
@@ -369,7 +367,7 @@ def oppdrag_detalj_view(request, pk):
     """
     try:
         oppdrag = (Oppdrag.objects.select_related('enhet', 'lokasjon')
-                   .get(pk=pk, year=get_active_year()))
+                   .get(pk=pk, vakt=hent_aktiv_vakt()))
     except Oppdrag.DoesNotExist:
         return JsonResponse(
             {'status': 'error', 'message': 'Oppdrag ikke funnet'}, status=404)
@@ -423,7 +421,7 @@ def flytt_view(request, pk):
     `meldt_av` intakt: de skjedde.
     """
     try:
-        oppdrag = Oppdrag.objects.get(pk=pk, year=get_active_year())
+        oppdrag = Oppdrag.objects.get(pk=pk, vakt=hent_aktiv_vakt())
     except Oppdrag.DoesNotExist:
         return JsonResponse(
             {'status': 'error', 'message': 'Oppdrag ikke funnet'}, status=404)
@@ -513,7 +511,7 @@ def stempling_view(request, pk, overgang):
 
     try:
         oppdrag = (Oppdrag.objects.select_related('enhet', 'lokasjon')
-                   .get(pk=pk, year=get_active_year()))
+                   .get(pk=pk, vakt=hent_aktiv_vakt()))
     except Oppdrag.DoesNotExist:
         return JsonResponse(
             {'status': 'error', 'message': 'Oppdrag ikke funnet'}, status=404)
@@ -630,7 +628,7 @@ def historikk_view(request, pk):
 
     try:
         oppdrag = (Oppdrag.objects.select_related('enhet', 'lokasjon')
-                   .get(pk=pk, year=get_active_year()))
+                   .get(pk=pk, vakt=hent_aktiv_vakt()))
     except Oppdrag.DoesNotExist:
         return JsonResponse(
             {'status': 'error', 'message': 'Oppdrag ikke funnet'}, status=404)
@@ -670,7 +668,7 @@ def historikk_liste_view(request):
             {'status': 'error', 'message': 'Ingen tilgang'}, status=403)
 
     qs = (Oppdrag.objects
-          .filter(year=get_active_year(), historikk_fra__isnull=False)
+          .filter(vakt=hent_aktiv_vakt(), historikk_fra__isnull=False)
           .select_related('enhet', 'lokasjon')
           .order_by('-historikk_fra'))
 
@@ -714,7 +712,7 @@ def korriger_view(request, pk):
     try:
         melding = (Statusmelding.objects
                    .select_related('oppdrag', 'oppdrag__enhet', 'oppdrag__lokasjon')
-                   .get(pk=pk, oppdrag__year=get_active_year()))
+                   .get(pk=pk, oppdrag__vakt=hent_aktiv_vakt()))
     except Statusmelding.DoesNotExist:
         return JsonResponse(
             {'status': 'error', 'message': 'Statusmelding ikke funnet'}, status=404)

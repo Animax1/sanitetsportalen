@@ -62,15 +62,16 @@ def neste_i_kjeden(fra: str) -> str | None:
 
 # ── Oppdragsnummer ───────────────────────────────────────────────────────────
 
-#: Nøkkelen i `AppSetting` som holder neste ledige nummer for ett år.
-#: Per år, ikke global: nummeret restarter på 1 hver sesong slik at det holder
-#: seg kort nok til å leses opp på samband.
-def _nummer_nokkel(year: int) -> str:
-    return f'next_oppdrag_nr_{year}'
+#: Nøkkelen i `AppSetting` som holder neste ledige nummer for én vakt.
+#: Per vakt siden deploy 2: nummeret restarter på 1 hver vakt slik at det
+#: holder seg kort nok til å leses opp på samband, og «oppdrag 14» aldri er
+#: tvetydig innenfor vakta.
+def _nummer_nokkel(vakt) -> str:
+    return f'next_oppdrag_nr_vakt_{vakt.pk}'
 
 
-def neste_oppdragsnummer(year: int) -> int:
-    """Hent og inkrementer neste oppdragsnummer for året, atomisk.
+def neste_oppdragsnummer(vakt) -> int:
+    """Hent og inkrementer neste oppdragsnummer for vakta, atomisk.
 
     Samme mønster som `patients.services.next_patient_nr`: telleren står i
     `AppSetting` og låses med `select_for_update`, slik at to samtidige
@@ -85,10 +86,10 @@ def neste_oppdragsnummer(year: int) -> int:
     from patients.models import AppSetting  # noqa: WPS433
 
     with transaction.atomic():
-        nokkel = _nummer_nokkel(year)
+        nokkel = _nummer_nokkel(vakt)
         rad = AppSetting.objects.select_for_update().filter(key=nokkel).first()
         if rad is None:
-            hoyeste = (Oppdrag.objects.filter(year=year)
+            hoyeste = (Oppdrag.objects.filter(vakt=vakt)
                        .aggregate(models.Max('oppdragsnummer'))['oppdragsnummer__max'])
             start = (hoyeste or 0) + 1
             rad = AppSetting.objects.create(key=nokkel, value=str(start))
@@ -207,7 +208,7 @@ def vurder_klienttid(klienttid, oppdrag, naa=None):
 
 # ── Enhetens tilstand ────────────────────────────────────────────────────────
 
-def aktivt_oppdrag(enhet, year: int | None = None):
+def aktivt_oppdrag(enhet, vakt=None):
     """Enhetens påbegynte oppdrag, eller ``None``.
 
     Påbegynt betyr «har passert `venter` og er ikke avsluttet». Et oppdrag som
@@ -215,20 +216,20 @@ def aktivt_oppdrag(enhet, year: int | None = None):
     sendes et annet sted.
     """
     qs = enhet.oppdrag.exclude(status__in=(choices.VENTER, choices.LEDIG))
-    if year is not None:
-        qs = qs.filter(year=year)
+    if vakt is not None:
+        qs = qs.filter(vakt=vakt)
     return qs.order_by('-created_at').first()
 
 
-def ventende_oppdrag(enhet, year: int | None = None):
+def ventende_oppdrag(enhet, vakt=None):
     """Oppdrag som er tildelt, men ikke påbegynt."""
     qs = enhet.oppdrag.filter(status=choices.VENTER)
-    if year is not None:
-        qs = qs.filter(year=year)
+    if vakt is not None:
+        qs = qs.filter(vakt=vakt)
     return qs.order_by('created_at')
 
 
-def enhet_status(enhet, year: int | None = None) -> dict:
+def enhet_status(enhet, vakt=None) -> dict:
     """Enhetens status til sentralbordet — **utledet, aldri lagret**.
 
     Ved vaktstart står alle enheter som `Ledig`, og det er ikke en verdi noen
@@ -240,8 +241,8 @@ def enhet_status(enhet, year: int | None = None) -> dict:
     ``Ledig (2 venter)`` er distinksjonen 113 trenger for å vite hvem som kan
     sendes: enheten har fått to oppdrag, men ikke rykket ut på noen av dem.
     """
-    aktivt = aktivt_oppdrag(enhet, year)
-    antall_ventende = ventende_oppdrag(enhet, year).count()
+    aktivt = aktivt_oppdrag(enhet, vakt)
+    antall_ventende = ventende_oppdrag(enhet, vakt).count()
     return {
         'enhet': enhet,
         'status': aktivt.status if aktivt else choices.LEDIG,
@@ -319,7 +320,7 @@ def start_oppdrag(oppdrag, *, bruker=None, tidspunkt=None,
     """
     naa = tidspunkt or timezone.now()
 
-    pagaende = aktivt_oppdrag(oppdrag.enhet, oppdrag.year)
+    pagaende = aktivt_oppdrag(oppdrag.enhet, oppdrag.vakt)
     if pagaende is not None and pagaende.pk != oppdrag.pk:
         sett_status(pagaende, choices.LEDIG, bruker=bruker,
                     tidspunkt=naa, automatisk=True)
@@ -466,7 +467,7 @@ def flytt_til_enhet(oppdrag, ny_enhet, *, bruker) -> Enhetsbytte | None:
 SKJUL_ETTER_LEDIG = 30 * 60   # sekunder
 
 
-def synlige_for_enhet(enhet, year: int | None = None):
+def synlige_for_enhet(enhet, vakt=None):
     """Oppdragene enhetsskjermen skal få levert.
 
     To regler, og **begge håndheves i serverens svar**:
@@ -491,8 +492,8 @@ def synlige_for_enhet(enhet, year: int | None = None):
     from datetime import timedelta
 
     qs = enhet.oppdrag.select_related('lokasjon', 'enhet')
-    if year is not None:
-        qs = qs.filter(year=year)
+    if vakt is not None:
+        qs = qs.filter(vakt=vakt)
 
     grense = timezone.now() - timedelta(seconds=SKJUL_ETTER_LEDIG)
     ut = []

@@ -7,6 +7,8 @@ from unittest.mock import patch
 
 from django.test import TestCase, override_settings
 
+from patients.services import vakt_for_year
+
 from audit.models import AuditLog
 from core.validators import current_local_year
 from patients.models import Patient, Forstehjelper, Helsepersonell
@@ -42,7 +44,7 @@ class AuditDekningTests(TestCase):
         """Selve funnet i N2 — dette ga ingen audit-rad før."""
         hp1 = Helsepersonell.objects.create(name='Sykepleier A')
         hp2 = Helsepersonell.objects.create(name='Sykepleier B')
-        pasient = Patient.objects.create(pasientnummer=901, year=2026, helsepersonell_ref=hp1)
+        pasient = Patient.objects.create(pasientnummer=901, vakt=vakt_for_year(2026), helsepersonell_ref=hp1)
 
         AuditLog.objects.all().delete()
         pasient.helsepersonell_ref = hp2
@@ -57,7 +59,7 @@ class AuditDekningTests(TestCase):
         """Regresjonsvakt: det som virket før, skal fortsatt virke."""
         fh1 = Forstehjelper.objects.create(name='Hjelper A')
         fh2 = Forstehjelper.objects.create(name='Hjelper B')
-        pasient = Patient.objects.create(pasientnummer=902, year=2026, forstehjelper=fh1)
+        pasient = Patient.objects.create(pasientnummer=902, vakt=vakt_for_year(2026), forstehjelper=fh1)
 
         AuditLog.objects.all().delete()
         pasient.forstehjelper = fh2
@@ -66,7 +68,7 @@ class AuditDekningTests(TestCase):
         self.assertTrue(AuditLog.objects.filter(field_name='forstehjelper_id').exists())
 
     def test_kliniske_felt_logges(self):
-        pasient = Patient.objects.create(pasientnummer=903, year=2026)
+        pasient = Patient.objects.create(pasientnummer=903, vakt=vakt_for_year(2026))
         AuditLog.objects.all().delete()
 
         pasient.problemstilling = 'Skade'
@@ -78,7 +80,7 @@ class AuditDekningTests(TestCase):
 
     def test_updated_at_gir_ikke_auditrad(self):
         """auto_now-feltet ville ellers gitt en rad ved hver eneste lagring."""
-        pasient = Patient.objects.create(pasientnummer=904, year=2026)
+        pasient = Patient.objects.create(pasientnummer=904, vakt=vakt_for_year(2026))
         AuditLog.objects.all().delete()
 
         pasient.problemstilling = 'Noe'
@@ -87,7 +89,7 @@ class AuditDekningTests(TestCase):
         self.assertFalse(AuditLog.objects.filter(field_name='updated_at').exists())
 
     def test_deaktivering_logges_som_delete(self):
-        pasient = Patient.objects.create(pasientnummer=905, year=2026)
+        pasient = Patient.objects.create(pasientnummer=905, vakt=vakt_for_year(2026))
         AuditLog.objects.all().delete()
 
         pasient.is_active = False
@@ -126,17 +128,20 @@ class LokaltAarTests(TestCase):
             self.assertEqual(current_local_year(), 2026)
 
     def test_patient_save_bruker_lokalt_aar(self):
+        """`Patient.save` uten vakt faller tilbake til aktiv vakt, som på
+        fersk base opprettes for *lokalt* år — samme N5-poeng, ny mekanisme
+        (year-kolonnen forsvant i deploy 2)."""
         with self._frys('2026-12-31T23:30:00'):
-            pasient = Patient.objects.create(pasientnummer=906, year=None)
-        self.assertEqual(pasient.year, 2027)
+            pasient = Patient.objects.create(pasientnummer=906)
+        self.assertEqual(pasient.vakt.year, 2027)
 
-    def test_get_active_year_bruker_lokalt_aar(self):
-        from patients.models import AppSetting
-        from patients.services import get_active_year
+    def test_hent_aktiv_vakt_bruker_lokalt_aar(self):
+        """Fallbacken i `hent_aktiv_vakt` (ingen peker, ingen vakter) skal
+        lage vakta for lokalt år, ikke containerens UTC-år."""
+        from patients.services import hent_aktiv_vakt
 
-        AppSetting.objects.filter(key='active_year').delete()
         with self._frys('2026-12-31T23:30:00'):
-            self.assertEqual(get_active_year(), 2027)
+            self.assertEqual(hent_aktiv_vakt().year, 2027)
 
 
 class IngenNaivDatetimeTests(TestCase):

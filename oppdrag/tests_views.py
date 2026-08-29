@@ -38,17 +38,21 @@ def _klient(bruker):
 @override_settings(SECURE_SSL_REDIRECT=False, RATELIMIT_ENABLE=False)
 class OppdragBasis(TestCase):
     def setUp(self):
-        AppSetting.objects.update_or_create(
-            key='active_year', defaults={'value': str(AAR)})
+        from patients.test_helpers import sett_aktiv_vakt
+        self.vakt = sett_aktiv_vakt(AAR)
         self.lokasjon = Lokasjon.objects.create(navn='Hovedscene')
         self.enhet = Enhet.objects.create(navn='Haugesund 56')
         self.annen_enhet = Enhet.objects.create(navn='Karmøy 12')
 
-    def _oppdrag(self, enhet=None, year=AAR, **kwargs):
+    def _oppdrag(self, enhet=None, vakt=None, **kwargs):
         from oppdrag.services import neste_oppdragsnummer
-        kwargs.setdefault('oppdragsnummer', neste_oppdragsnummer(year))
+        from patients.services import vakt_for_year
+        if isinstance(vakt, int):
+            vakt = vakt_for_year(vakt)
+        vakt = vakt or self.vakt
+        kwargs.setdefault('oppdragsnummer', neste_oppdragsnummer(vakt))
         return Oppdrag.objects.create(
-            year=year, enhet=enhet or self.enhet,
+            vakt=vakt, enhet=enhet or self.enhet,
             problemstilling='Pustevansker', hastegrad='Akutt',
             lokasjon=self.lokasjon, **kwargs)
 
@@ -640,7 +644,7 @@ class StemplingObjektsjekkTests(StemplingBasis):
         self.assertEqual(resp.status_code, 403)
 
     def test_oppdrag_utenfor_aktiv_vakt_gir_404(self):
-        o = self._oppdrag(year=AAR - 1)
+        o = self._oppdrag(vakt=AAR - 1)
         self.assertEqual(self._stemple(o, 'rykker_ut').status_code, 404)
 
 
@@ -766,29 +770,30 @@ class OppdragsnummerTests(OppdragBasis):
         rad = self.c.get('/oppdrag/api/oppdrag/').json()['data'][0]
         self.assertEqual(rad['nummer'], 1)
 
-    def test_nummeret_restarter_per_aar(self):
-        """Per år, ikke globalt — ellers blir det for langt å lese opp."""
+    def test_nummeret_restarter_per_vakt(self):
+        """Per vakt — «oppdrag 14» skal aldri være tvetydig innenfor vakta."""
         self._opprett()
-        AppSetting.objects.update_or_create(
-            key='active_year', defaults={'value': str(AAR + 1)})
+        from patients.test_helpers import sett_aktiv_vakt
+        ny_vakt = sett_aktiv_vakt(AAR + 1)
         self.assertEqual(self._opprett().json()['data']['nummer'], 1)
         self.assertEqual(
-            Oppdrag.objects.filter(year=AAR + 1, oppdragsnummer=1).count(), 1)
+            Oppdrag.objects.filter(vakt=ny_vakt, oppdragsnummer=1).count(), 1)
 
-    def test_samme_nummer_to_ganger_i_samme_aar_avvises(self):
+    def test_samme_nummer_to_ganger_i_samme_vakt_avvises(self):
         """Unikhetskravet er i databasen, ikke bare i telleren."""
         o = self._oppdrag()
         with self.assertRaises(IntegrityError):
             with transaction.atomic():
                 Oppdrag.objects.create(
-                    year=AAR, oppdragsnummer=o.oppdragsnummer,
+                    vakt=self.vakt, oppdragsnummer=o.oppdragsnummer,
                     enhet=self.enhet, problemstilling='Transport',
                     hastegrad='Vanlig', lokasjon=self.lokasjon)
 
     def test_telleren_gjenskapes_om_raden_mangler(self):
         """En slettet AppSetting-rad skal ikke gi kollisjon med eksisterende."""
         o = self._oppdrag()
-        AppSetting.objects.filter(key=f'next_oppdrag_nr_{AAR}').delete()
+        AppSetting.objects.filter(
+            key=f'next_oppdrag_nr_vakt_{self.vakt.pk}').delete()
         self.assertEqual(
             self._opprett().json()['data']['nummer'], o.oppdragsnummer + 1)
 
@@ -1220,7 +1225,7 @@ class KorreksjonTests(StemplingBasis):
         self.assertEqual(resp.status_code, 403)
 
     def test_melding_utenfor_aktiv_vakt_gir_404(self):
-        gammelt = self._oppdrag(year=AAR - 1, status=choices.FREMME)
+        gammelt = self._oppdrag(vakt=AAR - 1, status=choices.FREMME)
         melding = Statusmelding.objects.create(
             oppdrag=gammelt, status=choices.FREMME, tidspunkt=timezone.now())
         resp = self._korriger(melding, timezone.now() - timedelta(minutes=1))

@@ -1,8 +1,9 @@
-"""Deploy 1 av vakt-scopingen: FK-en skrives, `year` leses.
+"""Vakt-scopingen etter deploy 2: vakta er fasit.
 
-Kontrakten disse testene låser er nettopp den `verifiser_vakt` kontrollerer i
-prod: hver ny rad får en vakt, og vakta og `year` er aldri uenige. Deploy 2
-gjør vakta til fasit — disse testene er grunnen til at den kan stole på den.
+Skrevet for deploy 1 (FK-en skrives, `year` leses) og omskrevet da deploy 2
+fjernet `year` fra radene. Testene som sammenlignet de to kildene er borte
+med grunnlaget sitt — det som står igjen er det som fortsatt kan være galt:
+skrivestiene, pekeren, og arkivets frosne år mot vaktas.
 """
 from io import StringIO
 
@@ -12,27 +13,26 @@ from django.utils import timezone
 
 from accounts.models import CustomUser, ModulTilgang
 from core.models import Vakt
+from core.validators import current_local_year
 from patients.models import AppSetting, Patient, VaktArkiv
-from patients.services import get_active_year, hent_aktiv_vakt, vakt_for_year
+from patients.services import hent_aktiv_vakt, vakt_for_year
+from patients.test_helpers import sett_aktiv_vakt
 
 AAR = 2098
 
 
-def _sett_aar(year=AAR):
-    AppSetting.objects.update_or_create(
-        key='active_year', defaults={'value': str(year)})
-
-
 class HentAktivVaktTests(TestCase):
-    def setUp(self):
-        _sett_aar()
-
     def test_lat_opprettelse_paa_fersk_base(self):
-        """En fersk installasjon skal ikke trenge et oppsettsteg."""
+        """En fersk installasjon skal ikke trenge et oppsettsteg.
+
+        Uten peker og uten vakter faller `hent_aktiv_vakt` tilbake til
+        inneværende år — `active_year`-nøkkelen den falt tilbake til før
+        deploy 2 finnes ikke lenger.
+        """
         self.assertEqual(Vakt.objects.count(), 0)
         vakt = hent_aktiv_vakt()
-        self.assertEqual(vakt.year, AAR)
-        self.assertEqual(vakt.navn, str(AAR))
+        self.assertEqual(vakt.year, current_local_year())
+        self.assertEqual(vakt.navn, str(current_local_year()))
         self.assertTrue(vakt.er_aktiv)
         self.assertEqual(AppSetting.get('aktiv_vakt_id'), str(vakt.pk))
 
@@ -47,7 +47,7 @@ class HentAktivVaktTests(TestCase):
         """En rollback som tok vaktene skal ikke stoppe registrering."""
         AppSetting.set('aktiv_vakt_id', 99999)
         vakt = hent_aktiv_vakt()
-        self.assertEqual(vakt.year, AAR)
+        self.assertEqual(vakt.year, current_local_year())
         self.assertEqual(AppSetting.get('aktiv_vakt_id'), str(vakt.pk))
 
     def test_to_kall_gir_samme_vakt(self):
@@ -67,7 +67,7 @@ class SkrivestierTests(TestCase):
     `verifiser_vakt` fra i prod — men helst skal den aldri få sjansen."""
 
     def setUp(self):
-        _sett_aar()
+        sett_aktiv_vakt(AAR)
         self.bruker = CustomUser.objects.create_user(
             username='skriver', password='x', must_change_password=False)
         ModulTilgang.objects.create(
@@ -83,8 +83,7 @@ class SkrivestierTests(TestCase):
             data={'problemstilling': 'Pustevansker'})
         self.assertEqual(resp.status_code, 201)
         pasient = Patient.objects.get()
-        self.assertIsNotNone(pasient.vakt)
-        self.assertEqual(pasient.vakt.year, pasient.year)
+        self.assertEqual(pasient.vakt_id, hent_aktiv_vakt().pk)
 
     def test_nytt_oppdrag_faar_aktiv_vakt(self):
         from oppdrag.models import Enhet, Lokasjon, Oppdrag
@@ -96,8 +95,7 @@ class SkrivestierTests(TestCase):
                   'problemstilling': 'Pustevansker', 'hastegrad': 'Akutt'})
         self.assertEqual(resp.status_code, 200)
         oppdrag = Oppdrag.objects.get()
-        self.assertIsNotNone(oppdrag.vakt)
-        self.assertEqual(oppdrag.vakt.year, oppdrag.year)
+        self.assertEqual(oppdrag.vakt_id, hent_aktiv_vakt().pk)
 
     def test_pasient_og_oppdrag_deler_vakt(self):
         """Én vakt, to moduler — det er hele poenget med scopet."""
@@ -110,17 +108,17 @@ class SkrivestierTests(TestCase):
 
     def test_arkivering_setter_vakt(self):
         from patients.services import arkiver_aktiv_vakt
-        Patient.objects.create(pasientnummer=1, year=AAR,
-                               vakt=hent_aktiv_vakt())
+        Patient.objects.create(pasientnummer=1, vakt=hent_aktiv_vakt())
         arkiv, antall = arkiver_aktiv_vakt('LS98', '', self.bruker)
         self.assertEqual(arkiv.vakt_id, hent_aktiv_vakt().pk)
+        self.assertEqual(arkiv.year_snapshot, hent_aktiv_vakt().year)
 
 
 class VerifiserVaktTests(TestCase):
-    """Kommandoen som står mellom deploy 1 og 2."""
+    """Kommandoen som sto mellom deploy 1 og 2 — og fortsatt vokter arkivet."""
 
     def setUp(self):
-        _sett_aar()
+        sett_aktiv_vakt(AAR)
 
     def _kjor(self):
         ut = StringIO()
@@ -137,25 +135,22 @@ class VerifiserVaktTests(TestCase):
         self.assertIn('Ingen funn', ut)
 
     def test_groenn_naar_alt_er_koblet(self):
-        Patient.objects.create(pasientnummer=1, year=AAR,
-                               vakt=hent_aktiv_vakt())
+        # Testene som sammenlignet `year` på raden mot vaktas år er fjernet
+        # med deploy 2 — grunnlaget (year-kolonnen) finnes ikke, og en test
+        # som ikke kan feile er verre enn ingen.
+        Patient.objects.create(pasientnummer=1, vakt=hent_aktiv_vakt())
         kode, ut = self._kjor()
         self.assertEqual(kode, 0)
 
-    def test_roed_paa_pasient_uten_vakt(self):
-        Patient.objects.create(pasientnummer=1, year=AAR)
+    def test_roed_naar_arkivets_aar_ikke_stemmer(self):
+        """Arkivets frosne år mot vaktas — eneste year-sammenligning igjen."""
+        VaktArkiv.objects.create(
+            tittel='LS', arrangement_navn='LS', importert_av_navn='a',
+            antall_pasienter=0, year_snapshot=2050,
+            vakt=hent_aktiv_vakt(), sha256='x')
         kode, ut = self._kjor()
         self.assertEqual(kode, 1)
-        self.assertIn('uten vakt', ut)
-
-    def test_roed_naar_year_og_vakt_er_uenige(self):
-        """Selve kontrakten: en skrivesti som glemmer vakta skal bli sett."""
-        feil_vakt = Vakt.objects.create(
-            navn='2097', year=2097, startet=timezone.now())
-        Patient.objects.create(pasientnummer=1, year=AAR, vakt=feil_vakt)
-        kode, ut = self._kjor()
-        self.assertEqual(kode, 1)
-        self.assertIn('ikke stemmer med', ut)
+        self.assertIn('year_snapshot', ut)
 
     def test_arkiv_uten_vakt_er_info_ikke_feil(self):
         """NULL på gamle arkiver betyr «fra før grupperingen» — i orden."""
@@ -172,17 +167,24 @@ class VerifiserVaktTests(TestCase):
         self.assertEqual(kode, 1)
         self.assertIn('finnes', ut)
 
-    def test_roed_paa_nummerkollisjon_i_vakta(self):
-        """Forhåndssjekken for deploy 2-sperren (vakt, oppdragsnummer)."""
+    def test_nummerkollisjon_stoppes_av_skjemaet(self):
+        """Kollisjonssjekken i kommandoen er fjernet — sperren bor i basen nå.
+
+        Testen står igjen som beviset på at fjerningen var trygg: databasen
+        nekter selv, så en kommando-sjekk kunne aldri funnet noe.
+        """
+        from django.db import IntegrityError, transaction
+
         from oppdrag.models import Enhet, Lokasjon, Oppdrag
         enhet = Enhet.objects.create(navn='H56')
         lokasjon = Lokasjon.objects.create(navn='Scene')
         vakt = hent_aktiv_vakt()
-        for year in (2097, AAR):
-            Oppdrag.objects.create(
-                year=year, oppdragsnummer=1, enhet=enhet,
-                problemstilling='Transport', hastegrad='Vanlig',
-                lokasjon=lokasjon, vakt=vakt)
-        kode, ut = self._kjor()
-        self.assertEqual(kode, 1)
-        self.assertIn('kollisjon', ut)
+        Oppdrag.objects.create(
+            vakt=vakt, oppdragsnummer=1, enhet=enhet,
+            problemstilling='Transport', hastegrad='Vanlig', lokasjon=lokasjon)
+        with self.assertRaises(IntegrityError):
+            with transaction.atomic():
+                Oppdrag.objects.create(
+                    vakt=vakt, oppdragsnummer=1, enhet=enhet,
+                    problemstilling='Transport', hastegrad='Vanlig',
+                    lokasjon=lokasjon)

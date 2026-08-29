@@ -10,6 +10,7 @@ from django.urls import reverse
 
 from accounts.models import CustomUser, ModulTilgang
 from patients.models import AppSetting
+from patients.services import hent_aktiv_vakt
 
 
 def _bruker(navn, rolle='bruker', nivaa='skriv_full'):
@@ -45,7 +46,8 @@ class PortalInnstillingerTests(TestCase):
         resp = self.client.post(self.url, {
             'event_name': 'Festivalen 2026', 'session_timeout_hours': '12'})
         self.assertEqual(resp.status_code, 302)
-        self.assertEqual(AppSetting.get('event_name', ''), 'Festivalen 2026')
+        # Arrangementsnavnet ER vaktas navn siden deploy 2
+        self.assertEqual(hent_aktiv_vakt().navn, 'Festivalen 2026')
         self.assertEqual(int(AppSetting.get('session_timeout_hours', 0)), 12)
 
     def test_ugyldig_timeout_avvises(self):
@@ -60,13 +62,16 @@ class PortalInnstillingerTests(TestCase):
     def test_avvist_innsending_lagrer_ikke_halve_skjemaet(self):
         """En timeout på 0 skal ikke ha rukket å skrive arrangementsnavnet.
 
-        `AppSetting` er en generisk nøkkel/verdi-tabell uten transaksjon rundt
-        seg, så rekkefølgen i viewet er det eneste som hindrer det.
+        Navnet skrives på vakta og timeouten i `AppSetting` — ingen
+        transaksjon binder dem, så rekkefølgen i viewet er det eneste som
+        hindrer halv lagring.
         """
-        AppSetting.set('event_name', 'Uendret')
+        vakt = hent_aktiv_vakt()
+        vakt.navn = 'Uendret'
+        vakt.save(update_fields=['navn'])
         self.client.post(self.url, {
             'event_name': 'Skulle ikke lagres', 'session_timeout_hours': '0'})
-        self.assertEqual(AppSetting.get('event_name', ''), 'Uendret')
+        self.assertEqual(hent_aktiv_vakt().navn, 'Uendret')
 
 
 @override_settings(SECURE_SSL_REDIRECT=False, RATELIMIT_ENABLE=False)
@@ -82,11 +87,13 @@ class FlyttedeInnstillingsendepunkterTests(TestCase):
             self.client.get('/pasienter/api/session-timeout/').status_code, 404)
 
     def test_settings_kan_fortsatt_leses(self):
-        """Headeren og årsfiltreringen trenger verdiene."""
-        AppSetting.set('event_name', 'Vakt')
+        """Headeren trenger verdiene — navnet kommer fra vakta nå."""
+        vakt = hent_aktiv_vakt()
+        vakt.navn = 'Sommervakta'
+        vakt.save(update_fields=['navn'])
         resp = self.client.get('/pasienter/api/settings/')
         self.assertEqual(resp.status_code, 200)
-        self.assertEqual(resp.json().get('event_name'), 'Vakt')
+        self.assertEqual(resp.json().get('event_name'), 'Sommervakta')
 
 
 @override_settings(SECURE_SSL_REDIRECT=False, RATELIMIT_ENABLE=False)

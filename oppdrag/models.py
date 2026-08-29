@@ -127,24 +127,17 @@ class Oppdrag(BaseTimeStampedModel):
     noe skjedde ligger i ``Statusmelding``.
     """
 
-    # Samme årsscoping som Patient.year: aktiv vakt styres av AppSetting.
-    year = models.IntegerField(db_index=True, verbose_name='År')
-    # Vakta oppdraget tilhører. Nullbar i deploy 1 — se Patient.vakt for
-    # resonnementet; det er det samme. I deploy 2 flyttes også
-    # oppdragsnummer-sperren fra (year, nummer) til (vakt, nummer).
+    # Vakta oppdraget tilhører — scopet, etter deploy 2. `year` som sto her
+    # er borte; vakta bærer året. Se Patient.vakt for resonnementet.
     vakt = models.ForeignKey(
         'core.Vakt',
-        null=True,
-        blank=True,
         on_delete=models.PROTECT,
         related_name='oppdrag',
         verbose_name='Vakt',
     )
-    # Løpenummeret man sier på samband: «oppdrag 14». Unikt per år, ikke
-    # globalt — nummeret restarter på 1 hver sesong, slik at det holder seg
-    # kort nok til å leses opp. `pasientnummer` er globalt unikt fordi
-    # nullstillingen der sletter radene; oppdrag har ingen slik nullstilling,
-    # så uniktheten må bæres av (year, oppdragsnummer).
+    # Løpenummeret man sier på samband: «oppdrag 14». Unikt per vakt —
+    # nummeret restarter på 1 hver vakt, slik at det holder seg kort nok til
+    # å leses opp, og «oppdrag 14» aldri er tvetydig innenfor vakta.
     oppdragsnummer = models.IntegerField(verbose_name='Oppdragsnummer')
     # PROTECT: et oppdrag uten enhet eller lokasjon gir ingen mening, og
     # historikken skal ikke kunne forsvinne under den.
@@ -195,15 +188,15 @@ class Oppdrag(BaseTimeStampedModel):
         ordering = ['-created_at']
         constraints = [
             models.UniqueConstraint(
-                fields=['year', 'oppdragsnummer'],
-                name='unikt_oppdragsnummer_per_aar',
+                fields=['vakt', 'oppdragsnummer'],
+                name='unikt_oppdragsnummer_per_vakt',
             ),
         ]
         indexes = [
             # Enhetsskjermen henter «mine oppdrag» ved hver poll, og
-            # sentralbordet filtrerer på år + status. Begge går på dette.
+            # sentralbordet filtrerer på vakt + status. Begge går på dette.
             models.Index(fields=['enhet', 'status'], name='oppdrag_enhet_status_idx'),
-            models.Index(fields=['year', 'status'], name='oppdrag_aar_status_idx'),
+            models.Index(fields=['vakt', 'status'], name='oppdrag_vakt_status_idx'),
         ]
 
     def __str__(self) -> str:

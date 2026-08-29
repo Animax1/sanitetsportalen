@@ -157,7 +157,7 @@ Viewene er delt i fem moduler (N13.3) — `views.py` finnes ikke lenger:
 | Modul | Ansvar |
 |-------|--------|
 | `views_common.py` | `_json_body`, `_patient_to_dict` — delt av de andre |
-| `views_patients.py` | Hoved-side, innstillinger, sesjonstimeout, pasient-CRUD, nullstilling |
+| `views_patients.py` | Hoved-side, innstillinger, sesjonstimeout, pasient-CRUD, vaktavslutning/-gjenåpning |
 | `views_registre.py` | Førstehjelper- og helsepersonellregisteret (én fabrikk bygger begge) |
 | `views_arkiv.py` | Vaktarkivet |
 
@@ -285,7 +285,7 @@ Ni moduler i `static/js/` (ingen bundler), fordelt på fire sider — pasientsid
 | `patients-table.js` | pasientsiden, alltid | Tabulator-grid og tavle |
 | `patients-forms.js` | pasientsiden, alltid | Registrerings- og redigeringsskjema |
 | `patients-app.js` | pasientsiden, alltid | Oppstart (`DOMContentLoaded`), faneskift, auto-refresh, lastere for navneregistrene |
-| `patients-admin.js` | pasientsiden, **kun admin** | Registeradmin, sesjonstimeout, nullstilling, vaktarkiv |
+| `patients-admin.js` | pasientsiden, **kun admin** | Registeradmin, sesjonstimeout, vaktavslutning/-gjenåpning, vaktarkiv |
 | `statistikk.js` | **kun** `/statistikk/` | All statistikkrendering (Chart.js), arkivmodus |
 | `oppdrag-sentral.js` | `/oppdrag/`, kontoer uten enhet | Sentralbordet: enhetsliste, oppdragsliste, tidslinje, lokasjonsadmin |
 | `oppdrag-enhet.js` | `/oppdrag/`, enhetskontoer | Enhetsskjermen: to knapper mot de navngitte stemplingsendepunktene, og offline-køen i `localStorage`. Serveren sender `neste_overgang` per rad; kjeden følger med som data kun for å projisere neste steg mens noe ligger usendt |

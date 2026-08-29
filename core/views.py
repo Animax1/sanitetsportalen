@@ -25,7 +25,7 @@ from core.auth_decorators import admin_required
 from accounts.models import CustomUser, LoginEvent
 from audit.models import AuditLog
 from core.forms import ModuleSettingsForm
-from core.models import ModuleSettings
+from core.models import ModuleSettings, Vakt
 from core.modules import get_all_modules, get_dashboard_modules, get_module
 from core.ratelimit import rate_limit
 from core.url_safety import safe_redirect_url
@@ -184,22 +184,35 @@ def portal_settings_view(request):
                 messages.error(
                     request, 'Sesjonstimeout må være mellom 1 og 24 timer.')
             else:
-                # Arrangementsnavnet skrives først etter at timeouten er
-                # validert, slik at en avvist innsending ikke lagrer halve
-                # skjemaet.
-                AppSetting.set('event_name',
-                               (request.POST.get('event_name') or '').strip())
-                AppSetting.set('session_timeout_hours', timer)
-                messages.success(request, 'Portalinnstillingene er lagret.')
-                return redirect('core:portal_settings')
+                # Arrangementsnavnet ER den aktive vaktas navn siden deploy 2
+                # — én kilde. Skrives først etter at timeouten er validert,
+                # slik at en avvist innsending ikke lagrer halve skjemaet.
+                from patients.services import hent_aktiv_vakt
+                nytt_navn = (request.POST.get('event_name') or '').strip()
+                vakt = hent_aktiv_vakt()
+                if not nytt_navn:
+                    messages.error(request, 'Vakta må ha et navn.')
+                elif (Vakt.objects.filter(navn=nytt_navn)
+                      .exclude(pk=vakt.pk).exists()):
+                    messages.error(
+                        request,
+                        f'En annen vakt heter allerede «{nytt_navn}». '
+                        f'Legg på en dato eller velg et annet navn.')
+                else:
+                    vakt.navn = nytt_navn
+                    vakt.save(update_fields=['navn'])
+                    AppSetting.set('session_timeout_hours', timer)
+                    messages.success(request, 'Portalinnstillingene er lagret.')
+                    return redirect('core:portal_settings')
 
     try:
         timer = int(AppSetting.get('session_timeout_hours', 8))
     except (TypeError, ValueError):
         timer = 8
 
+    from patients.services import hent_aktiv_vakt
     return render(request, 'core/portal_settings.html', {
-        'event_name': AppSetting.get('event_name', '') or '',
+        'event_name': hent_aktiv_vakt().navn,
         'session_timeout_hours': timer,
     })
 

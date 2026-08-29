@@ -56,9 +56,9 @@ def cached_stats_response(cache_key: str, ttl: int):
     def decorator(view_func):
         @wraps(view_func)
         def wrapper(request, *args, **kwargs):
-            # Bygg full cache-nøkkel. Views kan overstyre ved å sette
-            # request._stats_cache_key_suffix før vi kommer hit, men i
-            # praksis bruker vi get_active_year() inne i view.
+            # Bygg full cache-nøkkel. Nøkkelen må bære variasjonen selv —
+            # full statistikk legger aktiv vakt-ID i den, slik at et
+            # vaktbytte gir frisk cache i stedet for forrige vakts tall.
             full_key = f'{CACHE_PREFIX}:{cache_key}'
 
             # 1) Forsøk cache-lookup. Hvis cache-backenden (typisk Redis)
