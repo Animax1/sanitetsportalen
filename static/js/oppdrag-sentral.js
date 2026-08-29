@@ -15,7 +15,6 @@ let enheter = [];
 let lokasjoner = [];
 let oppdragsliste = [];
 let enhetsadmin = [];
-let kontoer = [];
 
 // ETag-verdiene fra forrige poll. Serveren svarer 304 når ingenting er
 // endret, og da rendrer vi ikke på nytt — under en rolig time er trafikken
@@ -44,55 +43,43 @@ function renderEnheter() {
   const el = document.getElementById('enhetsliste');
   if (!el) return;
 
-  if (!enheter.length) {
-    el.innerHTML = ('<div class="tom-melding">Ingen aktive enheter.</div>');
-    return;
-  }
-
-  // Enheter som ikke er på vakt skjules ikke — de vises i en egen gruppe
-  // under. En bil som forsvinner fra tavla er en bil ingen husker å sette
+  // Tavla svarer på ett spørsmål: hvem kan sendes nå. Enheter som ikke er på
+  // vakt hører ikke hjemme her — men de forsvinner ikke i stillhet. Antallet
+  // står på Enheter-knappen og under lista, og hele oversikten ligger bak
+  // knappen. En bil som forsvinner uten spor er en bil ingen husker å sette
   // inn igjen, og da mangler den neste vakt uten at noen vet hvorfor.
   const paVakt = enheter.filter((e) => e.pa_vakt);
-  const av = enheter.filter((e) => !e.pa_vakt);
+  const antallAv = enheter.length - paVakt.length;
 
-  const kort = (e) => {
-    // «Ledig (2 venter)» er distinksjonen 113 trenger: enheten har fått
-    // oppdrag, men ikke rykket ut, og kan fortsatt sendes.
-    const meta = e.antall_ventende
-      ? `${e.status_navn} · ${e.antall_ventende} venter`
-      : String(e.status_navn);
-    // Fragmentene bygges før mal-strengen. En nøstet mal-streng inne i en
-    // interpolasjon er usynlig for XSS-gjennomgangen i tests_xss.py, så en
-    // uescapet verdi der ville passert stille.
-    const knappKlasse = e.pa_vakt ? 'btn-outline-secondary' : 'btn-outline-success';
-    const knappHandling = e.pa_vakt ? 'taAvVakt' : 'settPaaVakt';
-    const knappTekst = e.pa_vakt ? 'Av vakt' : 'På vakt';
-    const knapp = (globalThis.OPPDRAG_TILGANG || {}).kanSkrive
-      ? `<button class="btn btn-sm ${knappKlasse}" data-action="${knappHandling}" data-id="${escHtmlValue(e.id)}">${knappTekst}</button>`
-      : '';
-    const kortKlasse = e.pa_vakt ? 'enhet-kort' : 'enhet-kort enhet-av-vakt';
-    const prikk = e.pa_vakt ? e.status : 'av_vakt';
-    const metatekst = e.pa_vakt ? meta : 'Ikke på vakt';
-    return `
-      <div class="${kortKlasse}">
-        <span class="status-prikk status-${escHtmlValue(prikk)}"></span>
+  if (!paVakt.length) {
+    el.innerHTML = '<div class="tom-melding">Ingen enheter på vakt.</div>';
+  } else {
+    el.innerHTML = (paVakt.map((e) => {
+      // «Ledig (2 venter)» er distinksjonen 113 trenger: enheten har fått
+      // oppdrag, men ikke rykket ut, og kan fortsatt sendes.
+      const meta = e.antall_ventende
+        ? `${e.status_navn} · ${e.antall_ventende} venter`
+        : String(e.status_navn);
+      return `
+      <div class="enhet-kort">
+        <span class="status-prikk status-${escHtmlValue(e.status)}"></span>
         <div class="flex-grow-1">
           <div class="enhet-navn">${escapeHtml(e.navn)}</div>
-          <div class="enhet-meta">${escapeHtml(metatekst)}</div>
+          <div class="enhet-meta">${escapeHtml(meta)}</div>
         </div>
-        ${knapp}
       </div>`;
-  };
-
-  const deler = [];
-  deler.push(paVakt.length
-    ? paVakt.map(kort).join('')
-    : '<div class="tom-melding">Ingen enheter på vakt.</div>');
-  if (av.length) {
-    deler.push(`<div class="enhet-gruppe">Ikke på vakt (${escHtmlValue(av.length)})</div>`);
-    deler.push(av.map(kort).join(''));
+    }).join(''));
   }
-  el.innerHTML = (deler.join(''));
+
+  const notis = document.getElementById('av-vakt-notis');
+  if (notis) {
+    notis.textContent = antallAv
+      ? `${antallAv} ${antallAv === 1 ? 'enhet' : 'enheter'} ikke på vakt`
+      : '';
+    notis.hidden = !antallAv;
+  }
+  const teller = document.getElementById('av-vakt-teller');
+  if (teller) teller.textContent = antallAv ? ` (${antallAv} av vakt)` : '';
 }
 
 
@@ -108,6 +95,7 @@ async function _settVakt(id, paVakt) {
   }
   etagEnheter = null;   // tving ny henting, ellers svarer serveren 304
   await lastAlt();
+  if (document.getElementById('enhetsadminliste')) await lastEnhetsadmin();
 }
 
 async function taAvVakt(id) { await _settVakt(id, false); }
@@ -369,53 +357,77 @@ function renderEnhetsadmin() {
   const el = document.getElementById('enhetsadminliste');
   if (!el) return;
   if (!enhetsadmin.length) {
-    el.innerHTML = '<div class="tom-melding">Ingen enheter ennå. Legg til én over.</div>';
+    el.innerHTML = '<div class="tom-melding">Ingen enheter ennå.</div>';
     return;
   }
 
+  // Kontokoblingen vises, men redigeres ikke. Nye biler får kobling ved
+  // oppretting av kontoen, så nedtrekket her var en tredje vei til noe som
+  // allerede er gjort — og den veien inviterte til å tro at koblingen er
+  // tilgangen. Mangler koblingen, er det en ekte feiltilstand, og da (og kun
+  // da) tilbys en reparasjon.
   el.innerHTML = (enhetsadmin.map((e) => {
-    // Kontoen som allerede er valgt må stå i lista selv om den er «opptatt»
-    // — ellers ville et lagre-trykk stille koblet den fra.
-    const valg = kontoer
-      .filter((k) => !k.opptatt || k.id === e.user_id)
-      .map((k) => {
-        const merke = k.er_delt_konto ? ' (delt)' : '';
-        const valgt = k.id === e.user_id ? ' selected' : '';
-        return `<option value="${escHtmlValue(k.id)}"${valgt}>${escapeHtml(k.username + merke)}</option>`;
-      }).join('');
-    const dempet = e.er_aktiv ? '' : ' text-muted';
-    const knapp = e.er_aktiv
-      ? `<button class="btn btn-sm btn-outline-secondary" data-action="deaktiverEnhet" data-id="${escHtmlValue(e.id)}">Deaktiver</button>`
-      : `<button class="btn btn-sm btn-outline-success" data-action="aktiverEnhet" data-id="${escHtmlValue(e.id)}">Aktiver</button>`;
+    const vaktKlasse = e.pa_vakt ? 'btn-outline-secondary' : 'btn-outline-success';
+    const vaktHandling = e.pa_vakt ? 'taAvVakt' : 'settPaaVakt';
+    const vaktTekst = e.pa_vakt ? 'Av vakt' : 'På vakt';
+    const vaktKnapp = e.er_aktiv
+      ? `<button class="btn btn-sm ${vaktKlasse}" data-action="${vaktHandling}" data-id="${escHtmlValue(e.id)}">${vaktTekst}</button>`
+      : '';
+
+    const adminKnapp = OPPDRAG_TILGANG.erAdmin
+      ? (e.er_aktiv
+        ? `<button class="btn btn-sm btn-outline-danger" data-action="pensjonerEnhet" data-id="${escHtmlValue(e.id)}">Pensjoner</button>`
+        : `<button class="btn btn-sm btn-outline-success" data-action="gjenopprettEnhet" data-id="${escHtmlValue(e.id)}">Gjenopprett</button>`)
+      : '';
+
+    const koblingTekst = e.username
+      ? `Logger inn som ${e.username}`
+      : 'Ingen konto knyttet';
+    const koblingKlasse = e.username ? 'enhet-meta' : 'enhet-meta text-danger';
+
+    const status = e.er_aktiv
+      ? (e.pa_vakt ? 'På vakt' : 'Ikke på vakt')
+      : 'Pensjonert';
+    const radKlasse = e.er_aktiv && e.pa_vakt
+      ? 'enhet-kort' : 'enhet-kort enhet-av-vakt';
+
     return `
-    <div class="d-flex align-items-center gap-2 py-2 flex-wrap">
-      <span class="flex-grow-1${dempet}">${escapeHtml(e.navn)}</span>
-      <select class="form-select form-select-sm" style="max-width:16rem"
-              data-enhet-konto="${escHtmlValue(e.id)}">
-        <option value="">Ingen konto</option>
-        ${valg}
-      </select>
-      <button class="btn btn-sm btn-outline-primary"
-              data-action="lagreEnhetskonto" data-id="${escHtmlValue(e.id)}">Lagre</button>
-      ${knapp}
+    <div class="${radKlasse} mb-2">
+      <div class="flex-grow-1">
+        <div class="enhet-navn">${escapeHtml(e.navn)} <span class="enhet-meta">· ${escapeHtml(status)}</span></div>
+        <div class="${koblingKlasse}">${escapeHtml(koblingTekst)}</div>
+      </div>
+      ${vaktKnapp}
+      ${adminKnapp}
     </div>`;
   }).join(''));
 }
 
 
-async function lastEnhetsadmin() {
-  const [enhetSvar, kontoSvar] = await Promise.all([
-    apiFetch('/oppdrag/api/enheter/'),
-    apiFetch('/oppdrag/api/kontoer/'),
-  ]);
-  if (enhetSvar.ok) {
-    // Admin-lista trenger inaktive enheter også, så den hentes per enhet.
-    const grunn = (await enhetSvar.json()).data || [];
-    const detaljer = await Promise.all(
-      grunn.map((e) => apiFetch(`/oppdrag/api/enheter/${e.id}/`).then((r) => r.json())));
-    enhetsadmin = detaljer.filter((d) => d.status === 'ok').map((d) => d.data);
+async function _settAktiv(id, aktiv) {
+  const res = await apiFetch(`/oppdrag/api/enheter/${id}/`, {
+    method: 'PUT',
+    body: JSON.stringify({ er_aktiv: aktiv }),
+  });
+  const d = await res.json();
+  if (!res.ok || d.status !== 'ok') {
+    alert(d.message || 'Kunne ikke endre enheten.');
+    return;
   }
-  if (kontoSvar.ok) kontoer = (await kontoSvar.json()).data || [];
+  etagEnheter = null;
+  await lastEnhetsadmin();
+  await lastAlt();
+}
+
+async function pensjonerEnhet(id) { await _settAktiv(id, false); }
+async function gjenopprettEnhet(id) { await _settAktiv(id, true); }
+
+
+async function lastEnhetsadmin() {
+  // `?alle=1` tar med pensjonerte enheter. Ressursoversikten på tavla skal
+  // ikke se dem; denne lista er stedet man gjenoppretter dem fra.
+  const res = await apiFetch('/oppdrag/api/enheter/?alle=1');
+  if (res.ok) enhetsadmin = (await res.json()).data || [];
   renderEnhetsadmin();
 }
 
@@ -434,36 +446,6 @@ async function leggTilEnhet() {
     await lastAlt();
   }
 }
-
-
-async function lagreEnhetskonto(id) {
-  const valg = document.querySelector(`[data-enhet-konto="${id}"]`);
-  if (!valg) return;
-  const verdi = valg.value ? Number(valg.value) : null;
-  const res = await apiFetch(`/oppdrag/api/enheter/${id}/`, {
-    method: 'PUT',
-    body: JSON.stringify({ user_id: verdi }),
-  });
-  const d = await res.json();
-  if (!res.ok || d.status !== 'ok') {
-    alert(d.message || 'Kunne ikke lagre koblingen.');
-    return;
-  }
-  await lastEnhetsadmin();
-}
-
-
-async function _settEnhetAktiv(id, aktiv) {
-  await apiFetch(`/oppdrag/api/enheter/${id}/`, {
-    method: 'PUT',
-    body: JSON.stringify({ er_aktiv: aktiv }),
-  });
-  await lastEnhetsadmin();
-  await lastAlt();
-}
-
-async function deaktiverEnhet(id) { await _settEnhetAktiv(id, false); }
-async function aktiverEnhet(id) { await _settEnhetAktiv(id, true); }
 
 
 // ── Lasting ─────────────────────────────────────────────

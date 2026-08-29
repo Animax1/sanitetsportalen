@@ -78,12 +78,22 @@ def enheter_view(request):
     lagres.
     """
     year = get_active_year()
-    enheter = list(Enhet.objects.filter(er_aktiv=True).order_by('navn'))
+
+    # `?alle=1` tar med pensjonerte enheter. Ressursoversikten på tavla skal
+    # ikke se dem — de er borte for godt — men enhetspanelet er stedet man
+    # gjenoppretter dem fra, og da må de være synlige et sted.
+    qs = Enhet.objects.select_related('user').order_by('navn')
+    if request.GET.get('alle') != '1':
+        qs = qs.filter(er_aktiv=True)
+    enheter = list(qs)
+
     data = [
         {
             'id': e.pk,
             'navn': e.navn,
             'pa_vakt': e.pa_vakt,
+            'er_aktiv': e.er_aktiv,
+            'username': getattr(e.user, 'username', '') or '',
             'status': info['status'],
             'status_navn': info['status_navn'],
             'antall_ventende': info['antall_ventende'],
@@ -98,7 +108,7 @@ def enheter_view(request):
     # tavla er en bil ingen husker å sette inn igjen.
     etag = etag_for([
         (r['id'], r['status'], r['antall_ventende'], r['aktivt_oppdrag_id'],
-         r['pa_vakt'])
+         r['pa_vakt'], r['er_aktiv'])
         for r in data
     ])
     if request.META.get('HTTP_IF_NONE_MATCH') == etag:

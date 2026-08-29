@@ -38,6 +38,11 @@ REVIEWED_INTERPOLATIONS = {
     # Escapet vi her også, ville teksten blitt dobbeltescapet i visningen.
     'e.status_navn': 'bygger ren tekst i `meta`, som escapes ved innsetting',
     'e.antall_ventende': 'tall, i samme rene tekst som escapes ved innsetting',
+    'e.username': 'bygger ren tekst i `koblingTekst`, som escapes ved innsetting',
+    # Disse havner i `textContent`, ikke i markup. Der finnes ingen parsing å
+    # bryte ut av — escaping ville vist `&amp;` til brukeren.
+    'antallAv': 'tall, settes med textContent',
+    "antallAv === 1 ? 'enhet' : 'enheter'": 'hardkodet ord, settes med textContent',
     # Fragmentene bygges to linjer over interpolasjonen, med escapet innhold.
     # De er hoistet ut av mal-strengen nettopp for at denne testen skal kunne
     # lese dem: en nøstet mal-streng inne i en ${...} er usynlig for regexen.
@@ -45,10 +50,13 @@ REVIEWED_INTERPOLATIONS = {
     'notatBlokk': 'markup bygget lokalt, notatene escapet inni',
     'knapp': 'markup bygget lokalt, id escapet inni',
     'valg': 'options bygget lokalt, brukernavn escapet inni',
-    'knappKlasse': 'hardkodet CSS-klasse fra en ternær',
-    'knappHandling': 'hardkodet handlingsnavn fra en ternær',
-    'knappTekst': 'hardkodet knappetekst fra en ternær',
-    'kortKlasse': 'hardkodet CSS-klasse fra en ternær',
+    'vaktKlasse': 'hardkodet CSS-klasse fra en ternær',
+    'vaktHandling': 'hardkodet handlingsnavn fra en ternær',
+    'vaktTekst': 'hardkodet knappetekst fra en ternær',
+    'vaktKnapp': 'markup bygget lokalt, id escapet inni',
+    'adminKnapp': 'markup bygget lokalt, id escapet inni',
+    'radKlasse': 'hardkodet CSS-klasse fra en ternær',
+    'koblingKlasse': 'hardkodet CSS-klasse fra en ternær',
     'valgt': 'hardkodet selected-attributt fra en ternær',
 }
 

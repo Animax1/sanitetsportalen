@@ -30,12 +30,14 @@
         <i class="bi bi-plus-lg me-1"></i>Nytt oppdrag
       </button>
       {% endif %}
-      {% if er_global_admin %}
+      {% if kan_skrive %}
       <button type="button" class="btn btn-outline-secondary btn-sm"
               data-bs-toggle="modal" data-bs-target="#enheterModal"
               data-action="lastEnhetsadmin">
-        <i class="bi bi-truck me-1"></i>Enheter
+        <i class="bi bi-truck me-1"></i>Enheter<span id="av-vakt-teller"></span>
       </button>
+      {% endif %}
+      {% if er_global_admin %}
       <button type="button" class="btn btn-outline-secondary btn-sm"
               data-bs-toggle="modal" data-bs-target="#lokasjonerModal"
               data-action="lastLokasjonsadmin">
@@ -57,10 +59,15 @@
 
   <div class="row g-3">
     <div class="col-lg-4">
-      <h2 class="h6 text-muted mb-2">Enheter</h2>
+      <h2 class="h6 text-muted mb-2">Ressurser</h2>
       <div id="enhetsliste" class="d-grid gap-2">
         <div class="tom-melding">Laster…</div>
       </div>
+      {# Enheter som ikke er på vakt vises ikke her — tavla skal svare på
+         «hvem kan sendes nå». Men de forsvinner ikke i stillhet: antallet
+         står på Enheter-knappen, og hele lista ligger bak den. En bil som
+         forsvinner uten spor er en bil ingen husker å sette inn igjen. #}
+      <div id="av-vakt-notis" class="enhet-gruppe" hidden></div>
     </div>
 
     <div class="col-lg-8">
@@ -146,7 +153,7 @@
 </div>
 {% endif %}
 
-{% if er_global_admin %}
+{% if kan_skrive %}
 <div class="modal fade" id="enheterModal" tabindex="-1">
   <div class="modal-dialog modal-lg">
     <div class="modal-content">
@@ -155,6 +162,7 @@
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Lukk"></button>
       </div>
       <div class="modal-body">
+        {% if er_global_admin %}
         <div class="input-group mb-3">
           <input type="text" id="ny-enhet" class="form-control"
                  placeholder="Enhetsnavn, f.eks. «Haugesund 56»">
@@ -162,13 +170,21 @@
             Legg til
           </button>
         </div>
+        <p class="form-text mt-0">
+          Vanligvis trengs ikke denne: velg «Bil eller ambulanse» når du oppretter
+          kontoen, så lages enheten og koblingen i samme steg.
+        </p>
+        {% endif %}
+
         <div id="enhetsadminliste"><div class="tom-melding">Laster…</div></div>
+
         <hr>
         <p class="form-text mb-0">
-          <strong>Å knytte en konto til en enhet gir ingen tilgang.</strong>
-          Koblingen avgjør bare hvilket grensesnitt kontoen får: en konto med
-          enhet ser enhetsskjermen, alle andre ser sentralbordet. Hva kontoen
-          har lov til settes i modulmatrisen under brukeradministrasjon.
+          «Av vakt» tar enheten ut av ressursoversikten og hindrer nye oppdrag.
+          Den slettes ikke, og en enhet med et pågående oppdrag kan ikke tas av.
+          {% if er_global_admin %}
+          «Pensjoner» fjerner enheten for godt fra alle lister.
+          {% endif %}
         </p>
       </div>
     </div>

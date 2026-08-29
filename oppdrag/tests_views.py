@@ -337,6 +337,26 @@ class EnhetsadminTests(OppdragBasis):
         self.enhet.refresh_from_db()
         self.assertIsNone(self.enhet.user)
 
+    def test_alle_gir_pensjonerte_enheter(self):
+        """Panelet er stedet man gjenoppretter en pensjonert enhet fra."""
+        Enhet.objects.filter(pk=self.enhet.pk).update(er_aktiv=False)
+        c = _klient(_bruker('sentral40', 'skriv_full'))
+
+        uten = c.get('/oppdrag/api/enheter/').json()['data']
+        med = c.get('/oppdrag/api/enheter/?alle=1').json()['data']
+
+        self.assertNotIn(self.enhet.pk, [r['id'] for r in uten])
+        self.assertIn(self.enhet.pk, [r['id'] for r in med])
+
+    def test_lista_viser_kontokoblingen(self):
+        """Koblingen vises som tekst — den redigeres ikke lenger her."""
+        bil = _bruker('bil_vist', 'skriv_handling', delt=True)
+        Enhet.objects.filter(pk=self.enhet.pk).update(user=bil)
+        data = _klient(_bruker('sentral41', 'skriv_full')).get(
+            '/oppdrag/api/enheter/').json()['data']
+        rad = next(r for r in data if r['id'] == self.enhet.pk)
+        self.assertEqual(rad['username'], 'bil_vist')
+
     def test_kontolista_krever_admin(self):
         c = _klient(_bruker('sentral21', 'skriv_full'))
         self.assertEqual(c.get('/oppdrag/api/kontoer/').status_code, 403)

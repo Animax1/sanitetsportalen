@@ -4,6 +4,41 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-08-29 — Tavla viser ressurser og oppdrag, resten ligger bak knappen
+
+**1136 tester grønne** (2 nye). Ingen migrasjon.
+
+André: «for nå så er det dårlig UI med på vakt, av vakt og oppdragslisten nederst. De to
+viktigste er, hvilke ressurser er tilgjengelige og oppdrag.»
+
+Tavla har derfor to ting: **Ressurser** — enhetene som er på vakt, med status — og
+**Oppdrag**. Enheter av vakt vises ikke der lenger; tavla svarer på ett spørsmål, og det er
+«hvem kan sendes nå».
+
+**Men de forsvinner ikke i stillhet.** Antallet står to steder: under ressurslista («1 enhet
+ikke på vakt») og på Enheter-knappen («Enheter (1 av vakt)»). Innvendingen fra i går står —
+en bil som forsvinner uten spor er en bil ingen husker å sette inn igjen — og et tall er nok
+til å hindre det uten å ta plass på tavla.
+
+**Enheter-knappen er ikke lenger et koblingspanel.** Den viser hele lista: på vakt, av vakt
+og pensjonerte, med vaktbryteren der. Kontokoblingen vises som tekst, men redigeres ikke —
+nye biler får den ved oppretting av kontoen, så nedtrekket var en tredje vei til noe som
+allerede var gjort. Verre: det inviterte til å tro at koblingen *er* tilgangen. Mangler
+koblingen, står det med rød tekst; det er en ekte feiltilstand og verdt å se.
+
+`?alle=1` på enhetsendepunktet tar med pensjonerte. Ressursoversikten skal ikke se dem —
+de er borte for godt — men panelet er stedet man gjenoppretter dem fra, og da må de være
+synlige et sted. En probe som droppet filteret gjorde begge testene røde.
+
+Panelet er åpnet for `skriv_full`: å ta biler på og av vakt er drift. Oppretting og
+pensjonering står fortsatt på global admin.
+
+Verifisert i nettleser, ikke bare i tester: ressurslista viser én enhet, notisen og
+knappetelleren viser den andre, nedtrekket i «Nytt oppdrag» har bare den som er på vakt, og
+panelet lister begge med riktig bryter.
+
+---
+
 ## 2026-08-29 — Biler tas på og av vakt
 
 **1134 tester grønne** (9 nye). Migrasjon `oppdrag.0002_enhet_pa_vakt`.
