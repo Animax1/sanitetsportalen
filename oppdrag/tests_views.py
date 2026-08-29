@@ -274,3 +274,109 @@ class LokasjonsadminTests(OppdragBasis):
         self.lokasjon.refresh_from_db()
         self.assertFalse(self.lokasjon.er_aktiv)
         self.assertTrue(Lokasjon.objects.filter(pk=self.lokasjon.pk).exists())
+
+
+class EnhetsadminTests(OppdragBasis):
+    """Enheter kunne bare lages fra `manage.py shell` fram til 29. aug. 2026.
+
+    Det var ikke en bevisst avgrensning, det var en glipp i fase 3: modulen
+    kunne ikke tas i bruk uten Railway-konsollen. André meldte fra ved å
+    prøve.
+    """
+
+    def test_kun_admin_kan_opprette_enhet(self):
+        c = _klient(_bruker('sentral20', 'skriv_full'))
+        resp = c.post('/oppdrag/api/enheter/ny/', content_type='application/json',
+                      data={'navn': 'Karmøy 13'})
+        self.assertEqual(resp.status_code, 403)
+
+    def test_admin_kan_opprette_enhet(self):
+        c = _klient(_bruker('adm10', 'skriv_full', admin=True))
+        resp = c.post('/oppdrag/api/enheter/ny/', content_type='application/json',
+                      data={'navn': 'Karmøy 13'})
+        self.assertEqual(resp.status_code, 200)
+        self.assertTrue(Enhet.objects.filter(navn='Karmøy 13').exists())
+
+    def test_admin_kan_knytte_konto(self):
+        bil = _bruker('haugesund56', 'les', delt=True)
+        c = _klient(_bruker('adm11', 'skriv_full', admin=True))
+        resp = c.put(f'/oppdrag/api/enheter/{self.enhet.pk}/',
+                     content_type='application/json',
+                     data={'user_id': bil.pk})
+        self.assertEqual(resp.status_code, 200)
+        self.enhet.refresh_from_db()
+        self.assertEqual(self.enhet.user, bil)
+
+    def test_koblingen_gir_ingen_tilgang(self):
+        """§7.3-regelen, håndhevet på den nye flaten.
+
+        Kontoen er knyttet til en enhet, men har ingen `ModulTilgang`-rad.
+        Den skal ikke komme inn.
+        """
+        bil = _bruker('bil_uten_rad', delt=True)
+        Enhet.objects.filter(pk=self.enhet.pk).update(user=bil)
+        self.assertEqual(_klient(bil).get('/oppdrag/').status_code, 403)
+
+    def test_konto_kan_ikke_knyttes_til_to_enheter(self):
+        """OneToOne ville gitt en 500; her får admin en setning å lese."""
+        bil = _bruker('bil_dobbel', 'les', delt=True)
+        Enhet.objects.filter(pk=self.enhet.pk).update(user=bil)
+        c = _klient(_bruker('adm12', 'skriv_full', admin=True))
+        resp = c.put(f'/oppdrag/api/enheter/{self.annen_enhet.pk}/',
+                     content_type='application/json', data={'user_id': bil.pk})
+        self.assertEqual(resp.status_code, 400)
+        self.assertIn('allerede knyttet', resp.json()['message'])
+
+    def test_kobling_kan_fjernes(self):
+        bil = _bruker('bil_los', 'les', delt=True)
+        Enhet.objects.filter(pk=self.enhet.pk).update(user=bil)
+        c = _klient(_bruker('adm13', 'skriv_full', admin=True))
+        resp = c.put(f'/oppdrag/api/enheter/{self.enhet.pk}/',
+                     content_type='application/json', data={'user_id': None})
+        self.assertEqual(resp.status_code, 200)
+        self.enhet.refresh_from_db()
+        self.assertIsNone(self.enhet.user)
+
+    def test_kontolista_krever_admin(self):
+        c = _klient(_bruker('sentral21', 'skriv_full'))
+        self.assertEqual(c.get('/oppdrag/api/kontoer/').status_code, 403)
+
+    def test_kontolista_merker_opptatte(self):
+        bil = _bruker('bil_opptatt', 'les', delt=True)
+        Enhet.objects.filter(pk=self.enhet.pk).update(user=bil)
+        c = _klient(_bruker('adm14', 'skriv_full', admin=True))
+        data = c.get('/oppdrag/api/kontoer/').json()['data']
+        rad = next(r for r in data if r['username'] == 'bil_opptatt')
+        self.assertTrue(rad['opptatt'])
+        self.assertTrue(rad['er_delt_konto'])
+
+    def test_deaktivert_enhet_kan_ikke_faa_oppdrag(self):
+        c = _klient(_bruker('adm15', 'skriv_full', admin=True))
+        c.put(f'/oppdrag/api/enheter/{self.enhet.pk}/',
+              content_type='application/json', data={'er_aktiv': False})
+        resp = c.post('/oppdrag/api/oppdrag/', content_type='application/json', data={
+            'enhet_id': self.enhet.pk, 'lokasjon_id': self.lokasjon.pk,
+            'problemstilling': 'Pustevansker', 'hastegrad': 'Akutt',
+        })
+        self.assertEqual(resp.status_code, 400)
+
+
+class ManglendeOppsettTests(OppdragBasis):
+    """Sida sier fra når forutsetningene mangler.
+
+    Uten enheter ville «Nytt oppdrag» latt deg fylle ut skjemaet og så feilet
+    med «Ukjent eller inaktiv enhet» ved lagring. Det er den verste
+    rekkefølgen: arbeidet gjøres først, beskjeden kommer etterpå.
+    """
+
+    def test_varselet_er_i_malen(self):
+        html = _klient(_bruker('sentral22', 'skriv_full')).get(
+            '/oppdrag/').content.decode()
+        self.assertIn('id="mangler-oppsett"', html)
+        self.assertIn('Modulen mangler oppsett', html)
+
+    def test_enhetslista_er_tom_uten_enheter(self):
+        Enhet.objects.all().delete()
+        data = _klient(_bruker('sentral23', 'les')).get(
+            '/oppdrag/api/enheter/').json()['data']
+        self.assertEqual(data, [])

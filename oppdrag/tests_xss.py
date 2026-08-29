@@ -24,6 +24,7 @@ HTML_BUILDERS = (
     'renderOppdrag',
     'tidslinjeHtml',
     'renderLokasjonsadmin',
+    'renderEnhetsadmin',
 )
 
 ESCAPING_CALLS = ('escHtmlValue(', 'cellHtml(', '_escHtml(', 'escapeHtml(')
@@ -43,6 +44,8 @@ REVIEWED_INTERPOLATIONS = {
     'fritekstBlokk': 'markup bygget lokalt, fritekst escapet inni',
     'notatBlokk': 'markup bygget lokalt, notatene escapet inni',
     'knapp': 'markup bygget lokalt, id escapet inni',
+    'valg': 'options bygget lokalt, brukernavn escapet inni',
+    'valgt': 'hardkodet selected-attributt fra en ternær',
 }
 
 

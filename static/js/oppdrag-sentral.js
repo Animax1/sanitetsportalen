@@ -14,6 +14,8 @@
 let enheter = [];
 let lokasjoner = [];
 let oppdragsliste = [];
+let enhetsadmin = [];
+let kontoer = [];
 
 // ETag-verdiene fra forrige poll. Serveren svarer 304 når ingenting er
 // endret, og da rendrer vi ikke på nytt — under en rolig time er trafikken
@@ -314,6 +316,109 @@ async function deaktiverLokasjon(id) { await _settLokasjonAktiv(id, false); }
 async function aktiverLokasjon(id) { await _settLokasjonAktiv(id, true); }
 
 
+// ── Enhetsadmin ─────────────────────────────────────────
+
+function renderEnhetsadmin() {
+  const el = document.getElementById('enhetsadminliste');
+  if (!el) return;
+  if (!enhetsadmin.length) {
+    el.innerHTML = '<div class="tom-melding">Ingen enheter ennå. Legg til én over.</div>';
+    return;
+  }
+
+  el.innerHTML = (enhetsadmin.map((e) => {
+    // Kontoen som allerede er valgt må stå i lista selv om den er «opptatt»
+    // — ellers ville et lagre-trykk stille koblet den fra.
+    const valg = kontoer
+      .filter((k) => !k.opptatt || k.id === e.user_id)
+      .map((k) => {
+        const merke = k.er_delt_konto ? ' (delt)' : '';
+        const valgt = k.id === e.user_id ? ' selected' : '';
+        return `<option value="${escHtmlValue(k.id)}"${valgt}>${escapeHtml(k.username + merke)}</option>`;
+      }).join('');
+    const dempet = e.er_aktiv ? '' : ' text-muted';
+    const knapp = e.er_aktiv
+      ? `<button class="btn btn-sm btn-outline-secondary" data-action="deaktiverEnhet" data-id="${escHtmlValue(e.id)}">Deaktiver</button>`
+      : `<button class="btn btn-sm btn-outline-success" data-action="aktiverEnhet" data-id="${escHtmlValue(e.id)}">Aktiver</button>`;
+    return `
+    <div class="d-flex align-items-center gap-2 py-2 flex-wrap">
+      <span class="flex-grow-1${dempet}">${escapeHtml(e.navn)}</span>
+      <select class="form-select form-select-sm" style="max-width:16rem"
+              data-enhet-konto="${escHtmlValue(e.id)}">
+        <option value="">Ingen konto</option>
+        ${valg}
+      </select>
+      <button class="btn btn-sm btn-outline-primary"
+              data-action="lagreEnhetskonto" data-id="${escHtmlValue(e.id)}">Lagre</button>
+      ${knapp}
+    </div>`;
+  }).join(''));
+}
+
+
+async function lastEnhetsadmin() {
+  const [enhetSvar, kontoSvar] = await Promise.all([
+    apiFetch('/oppdrag/api/enheter/'),
+    apiFetch('/oppdrag/api/kontoer/'),
+  ]);
+  if (enhetSvar.ok) {
+    // Admin-lista trenger inaktive enheter også, så den hentes per enhet.
+    const grunn = (await enhetSvar.json()).data || [];
+    const detaljer = await Promise.all(
+      grunn.map((e) => apiFetch(`/oppdrag/api/enheter/${e.id}/`).then((r) => r.json())));
+    enhetsadmin = detaljer.filter((d) => d.status === 'ok').map((d) => d.data);
+  }
+  if (kontoSvar.ok) kontoer = (await kontoSvar.json()).data || [];
+  renderEnhetsadmin();
+}
+
+
+async function leggTilEnhet() {
+  const felt = document.getElementById('ny-enhet');
+  const navn = (felt.value || '').trim();
+  if (!navn) return;
+  const res = await apiFetch('/oppdrag/api/enheter/ny/', {
+    method: 'POST',
+    body: JSON.stringify({ navn }),
+  });
+  if (res.ok) {
+    felt.value = '';
+    await lastEnhetsadmin();
+    await lastAlt();
+  }
+}
+
+
+async function lagreEnhetskonto(id) {
+  const valg = document.querySelector(`[data-enhet-konto="${id}"]`);
+  if (!valg) return;
+  const verdi = valg.value ? Number(valg.value) : null;
+  const res = await apiFetch(`/oppdrag/api/enheter/${id}/`, {
+    method: 'PUT',
+    body: JSON.stringify({ user_id: verdi }),
+  });
+  const d = await res.json();
+  if (!res.ok || d.status !== 'ok') {
+    alert(d.message || 'Kunne ikke lagre koblingen.');
+    return;
+  }
+  await lastEnhetsadmin();
+}
+
+
+async function _settEnhetAktiv(id, aktiv) {
+  await apiFetch(`/oppdrag/api/enheter/${id}/`, {
+    method: 'PUT',
+    body: JSON.stringify({ er_aktiv: aktiv }),
+  });
+  await lastEnhetsadmin();
+  await lastAlt();
+}
+
+async function deaktiverEnhet(id) { await _settEnhetAktiv(id, false); }
+async function aktiverEnhet(id) { await _settEnhetAktiv(id, true); }
+
+
 // ── Lasting ─────────────────────────────────────────────
 
 async function lastEnheter() {
@@ -362,11 +467,33 @@ function fyllNedtrekk() {
 }
 
 
+function visManglendeOppsett() {
+  // Et skjema som lar deg trykke «Opprett» og så feiler med «Ukjent enhet» er
+  // verre enn et som sier fra på forhånd hva som mangler.
+  const boks = document.getElementById('mangler-oppsett');
+  if (!boks) return;
+  const mangler = [];
+  if (!enheter.length) mangler.push('ingen enheter');
+  if (!lokasjoner.filter((l) => l.er_aktiv).length) mangler.push('ingen aktive lokasjoner');
+
+  const knapp = document.querySelector('[data-bs-target="#nyttOppdragModal"]');
+  if (mangler.length) {
+    document.getElementById('mangler-hva').textContent = ' Portalen har ' + mangler.join(' og ') + '.';
+    boks.classList.remove('d-none');
+    if (knapp) knapp.disabled = true;
+  } else {
+    boks.classList.add('d-none');
+    if (knapp) knapp.disabled = false;
+  }
+}
+
+
 async function lastAlt() {
   const [nyeEnheter, nyeOppdrag] = await Promise.all([lastEnheter(), lastOppdrag()]);
   if (nyeEnheter) renderEnheter();
   if (nyeOppdrag) renderOppdrag();
   if (nyeEnheter) fyllNedtrekk();
+  visManglendeOppsett();
 }
 
 
@@ -376,6 +503,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   renderEnheter();
   renderOppdrag();
   fyllNedtrekk();
+  visManglendeOppsett();
   // Samme kadens som pasientlista. ETag gjør at et poll uten endring koster
   // en 304 uten kropp.
   setInterval(lastAlt, 30000);

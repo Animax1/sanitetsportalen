@@ -4,6 +4,45 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-08-29 — Enhetsadmin, og et oppsett som sier fra før det feiler
+
+**1103 tester grønne** (11 nye). Ingen migrasjon.
+
+André prøvde å ta modulen i bruk på staging og meldte at det var «litt knotete». Det var
+det, og det var to feil i fase 3 — ikke i oppsettet hans.
+
+**Enheter kunne bare lages fra `manage.py shell`.** Det var ikke en bevisst avgrensning som
+`lokasjon`-kommandoen, det var en glipp: sentralbordet fikk lokasjonsadmin, men enheter ble
+aldri gitt en flate. En modul som ikke kan tas i bruk uten Railway-konsollen er ikke ferdig.
+Enheter opprettes, aktiveres og knyttes til kontoer i et eget admin-panel nå.
+
+Koblingspanelet sier det rett ut, fordi det er stedet feilen ville blitt gjort: **å knytte en
+konto til en enhet gir ingen tilgang.** Koblingen avgjør hvilket grensesnitt kontoen får;
+hva den har lov til står i modulmatrisen. En test setter en enhet på en konto uten
+`ModulTilgang`-rad og krever 403.
+
+At en konto ikke kan være to biler samtidig håndheves nå med en setning admin kan lese.
+`OneToOneField` ville avvist det uansett — med en 500.
+
+**Skjemaet lot deg fylle ut alt og feilet ved lagring.** Uten enheter eller lokasjoner ga
+«Nytt oppdrag» en «Ukjent eller inaktiv enhet» først etter at du hadde valgt problemstilling,
+hastegrad og skrevet fritekst. Det er den verste rekkefølgen: arbeidet gjøres først,
+beskjeden kommer etterpå. Siden viser nå hva som mangler, og knappen er avslått til det er
+på plass.
+
+### Det som *ikke* var feil
+
+Brukernavn lagres med små bokstaver — `clean_username()` gjør `.strip().lower()`, og
+`test_brukernavn_lagres_med_smaa_bokstaver` låser det. `Enhet.navn` er et visningsnavn uten
+noen kobling til brukernavnet; «Haugesund 56» og `haugesund56` er to uavhengige strenger.
+At de ligner er en felle verdt å kjenne, ikke en sammenheng.
+
+Det som stoppet André var at kontoen hadde **`les`**, og at oppretting krever `skriv_full`.
+Siden gjorde akkurat det den skulle — den viste ingen «Nytt oppdrag»-knapp — men den sa ikke
+hvorfor. Reprodusert i en diagnose før noe ble endret, så fiksen traff riktig sted.
+
+---
+
 ## 2026-08-29 — Oppdragsmodulen fase 3: sentralbordet
 
 **1092 tester grønne** (33 nye). Ingen migrasjon. Modulen er synlig i meny og

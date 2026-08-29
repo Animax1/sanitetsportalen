@@ -56,6 +56,16 @@ def index_view(request):
 
 # ── Enheter ──────────────────────────────────────────────────────────────────
 
+def _enhet_admin_dict(enhet):
+    return {
+        'id': enhet.pk,
+        'navn': enhet.navn,
+        'er_aktiv': enhet.er_aktiv,
+        'user_id': enhet.user_id,
+        'username': getattr(enhet.user, 'username', '') or '',
+    }
+
+
 @never_cache
 @modul_kreves('oppdrag', 'les', svar='json')
 @require_http_methods(['GET'])
@@ -93,6 +103,111 @@ def enheter_view(request):
     svar = JsonResponse({'status': 'ok', 'data': data})
     svar['ETag'] = etag
     return svar
+
+
+@modul_kreves('oppdrag', 'les', svar='json')
+@require_http_methods(['POST'])
+def enhet_opprett_view(request):
+    """Opprett en enhet. Kun global admin.
+
+    Fram til nå fantes ingen vei inn utenom `manage.py shell`, og det var
+    unødig knotete: André måtte skrive en enlinjes ORM-kommando for å komme i
+    gang. En modul man ikke kan ta i bruk uten Railway-konsollen er ikke ferdig.
+    """
+    if not er_global_admin(request.user):
+        return JsonResponse({'status': 'error', 'message': 'Ingen tilgang'}, status=403)
+
+    navn = (json_body(request).get('navn') or '').strip()
+    if not navn:
+        return JsonResponse(
+            {'status': 'error', 'message': 'Navn kan ikke være tomt.'}, status=400)
+    if Enhet.objects.filter(navn=navn).exists():
+        return JsonResponse(
+            {'status': 'error', 'message': f'«{navn}» finnes allerede.'}, status=400)
+
+    enhet = Enhet.objects.create(navn=navn)
+    return JsonResponse({'status': 'ok', 'data': _enhet_admin_dict(enhet)})
+
+
+@modul_kreves('oppdrag', 'les', svar='json')
+@require_http_methods(['GET', 'PUT'])
+def enhet_detalj_view(request, pk):
+    """Enhetens administrasjon: navn, aktiv, og koblingen til en konto.
+
+    **Koblingen gir ingen tilgang.** Den avgjør hvilket grensesnitt kontoen
+    får, ikke hva den har lov til — det siste er en `ModulTilgang`-rad. Samme
+    skille som §7.3 gjorde i pasientmodulen, der radioen setter koblingen og
+    matrisen setter tilgangen. Blandes de, gjenoppstår feilen deploy 1–3
+    fjernet.
+    """
+    if not er_global_admin(request.user):
+        return JsonResponse({'status': 'error', 'message': 'Ingen tilgang'}, status=403)
+
+    try:
+        enhet = Enhet.objects.select_related('user').get(pk=pk)
+    except Enhet.DoesNotExist:
+        return JsonResponse(
+            {'status': 'error', 'message': 'Enhet ikke funnet'}, status=404)
+
+    if request.method == 'GET':
+        return JsonResponse({'status': 'ok', 'data': _enhet_admin_dict(enhet)})
+
+    data = json_body(request)
+    if 'navn' in data:
+        navn = (data.get('navn') or '').strip()
+        if not navn:
+            return JsonResponse(
+                {'status': 'error', 'message': 'Navn kan ikke være tomt.'}, status=400)
+        if Enhet.objects.filter(navn=navn).exclude(pk=enhet.pk).exists():
+            return JsonResponse(
+                {'status': 'error', 'message': f'«{navn}» finnes allerede.'}, status=400)
+        enhet.navn = navn
+    if 'er_aktiv' in data:
+        enhet.er_aktiv = bool(data['er_aktiv'])
+    if 'user_id' in data:
+        raa = data['user_id']
+        if raa in (None, '', 0):
+            enhet.user = None
+        else:
+            from accounts.models import CustomUser
+            try:
+                kandidat = CustomUser.objects.get(pk=raa, is_active=True)
+            except (CustomUser.DoesNotExist, ValueError, TypeError):
+                return JsonResponse(
+                    {'status': 'error', 'message': 'Ukjent konto.'}, status=400)
+            # OneToOne: en konto kan ikke være to biler samtidig, og
+            # databasen ville uansett avvist det — men med en 500 i stedet
+            # for en setning brukeren kan forstå.
+            if Enhet.objects.filter(user=kandidat).exclude(pk=enhet.pk).exists():
+                return JsonResponse(
+                    {'status': 'error',
+                     'message': f'«{kandidat.username}» er allerede knyttet til en annen enhet.'},
+                    status=400)
+            enhet.user = kandidat
+    enhet.save()
+    return JsonResponse({'status': 'ok', 'data': _enhet_admin_dict(enhet)})
+
+
+@modul_kreves('oppdrag', 'les', svar='json')
+@require_http_methods(['GET'])
+def kontoer_view(request):
+    """Kontoer som kan knyttes til en enhet. Kun global admin.
+
+    Delte kontoer merkes, men listen begrenses ikke til dem: en enhet kan i
+    prinsippet kjøres fra en personlig konto, og en regel som ser ut som en
+    sperre uten å være det er verre enn ingen.
+    """
+    if not er_global_admin(request.user):
+        return JsonResponse({'status': 'error', 'message': 'Ingen tilgang'}, status=403)
+
+    from accounts.models import CustomUser
+    tatt = set(Enhet.objects.exclude(user=None).values_list('user_id', flat=True))
+    kontoer = CustomUser.objects.filter(is_active=True).order_by('username')
+    return JsonResponse({'status': 'ok', 'data': [
+        {'id': k.pk, 'username': k.username, 'er_delt_konto': k.er_delt_konto,
+         'opptatt': k.pk in tatt}
+        for k in kontoer
+    ]})
 
 
 # ── Lokasjoner ───────────────────────────────────────────────────────────────

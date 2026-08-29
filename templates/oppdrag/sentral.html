@@ -32,12 +32,27 @@
       {% endif %}
       {% if er_global_admin %}
       <button type="button" class="btn btn-outline-secondary btn-sm"
+              data-bs-toggle="modal" data-bs-target="#enheterModal"
+              data-action="lastEnhetsadmin">
+        <i class="bi bi-truck me-1"></i>Enheter
+      </button>
+      <button type="button" class="btn btn-outline-secondary btn-sm"
               data-bs-toggle="modal" data-bs-target="#lokasjonerModal"
               data-action="lastLokasjonsadmin">
         <i class="bi bi-geo-alt me-1"></i>Lokasjoner
       </button>
       {% endif %}
     </div>
+  </div>
+
+  <div id="mangler-oppsett" class="alert alert-warning d-none">
+    <strong>Modulen mangler oppsett.</strong>
+    <span id="mangler-hva"></span>
+    {% if er_global_admin %}
+    Bruk knappene øverst.
+    {% else %}
+    En administrator må legge dem inn.
+    {% endif %}
   </div>
 
   <div class="row g-3">
@@ -124,6 +139,36 @@
         <p class="form-text mb-0">
           Deaktivering skjuler lokasjonen i nedtrekkslista. Den slettes ikke —
           oppdrag som bruker den skal beholde stedet sitt.
+        </p>
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+{% if er_global_admin %}
+<div class="modal fade" id="enheterModal" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Enheter</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Lukk"></button>
+      </div>
+      <div class="modal-body">
+        <div class="input-group mb-3">
+          <input type="text" id="ny-enhet" class="form-control"
+                 placeholder="Enhetsnavn, f.eks. «Haugesund 56»">
+          <button class="btn btn-outline-primary" type="button" data-action="leggTilEnhet">
+            Legg til
+          </button>
+        </div>
+        <div id="enhetsadminliste"><div class="tom-melding">Laster…</div></div>
+        <hr>
+        <p class="form-text mb-0">
+          <strong>Å knytte en konto til en enhet gir ingen tilgang.</strong>
+          Koblingen avgjør bare hvilket grensesnitt kontoen får: en konto med
+          enhet ser enhetsskjermen, alle andre ser sentralbordet. Hva kontoen
+          har lov til settes i modulmatrisen under brukeradministrasjon.
         </p>
       </div>
     </div>

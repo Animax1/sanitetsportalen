@@ -568,6 +568,10 @@ Gjennomgang 13. aug. 2026, med 1000 pasienter og peak 100 brukere som premiss.
             og lokasjonsadmin. ETag på pollingen. Modulen er synlig nå som den har en
             side. To grensesnitt bak én URL, valgt på enhetskoblingen — en test setter
             `skriv_full` på en enhetskonto og krever at den fortsatt får enhetsskjermen.
+      - [x] **Enhetsadmin (29. aug. 2026).** Enheter kunne bare lages fra
+            `manage.py shell` — en glipp, ikke en avgrensning. Opprettelse, aktivering og
+            kontokobling ligger i sentralbordets admin-panel nå, med regelen skrevet rett
+            i panelet: koblingen gir ingen tilgang.
       - [ ] **Fase 3 arver til fase 4:** enhetskontoer får i dag en mellomtilstand som
             sier at skjermen ikke er bygget. Å sende dem til sentralbordet ville vist
             dem alle oppdrag i vakta.
