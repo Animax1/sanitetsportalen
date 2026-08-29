@@ -625,9 +625,11 @@ Gjennomgang 13. aug. 2026, med 1000 pasienter og peak 100 brukere som premiss.
 - [ ] Park-appen er et skriveendepunkt **uten innlogging**: signert lenke via
       `django.core.signing` (ikke gjettbar URL, kan tilbakekalles), rate-limit per token,
       og responsen returnerer kvittering — aldri data.
-- [ ] **Oppdragsmodulen — se `docs/BESLUTNING_OPPDRAGSMODULEN.md`.** Besluttet 28. aug.
-      2026, ikke bygget. Modulen er den første som tar `skriv: handling` i bruk. Sju
-      faser, 35–50 t. Punktene under lå her løst fra før og er nå plassert i planen:
+- [x] **Oppdragsmodulen — se `docs/BESLUTNING_OPPDRAGSMODULEN.md`.** Besluttet 28. aug.
+      2026, **alle sju fasene levert 29. aug. 2026.** Modulen er den første som tar
+      `skriv_handling` i bruk. Den står i staging og venter på merge til prod og på
+      første skarpe vakt; §12.1 (sammenslåing av arkiveringen) er utsatt som egen sak,
+      se punktet lenger ned. Punktene under lå her løst fra før og ble plassert i planen:
       - [x] **Fase 1 — modeller og regler (28. aug. 2026).** App, modulregistrering,
             fem modeller, `choices.py`, statusmaskin, utledet enhetsstatus,
             korreksjonsregel og audit med skjult fritekst. 46 tester. Modulen står med
@@ -952,11 +954,13 @@ Funnene under er allerede kartlagt, så jobben er avgrenset når den skal gjøre
 
 ### Løse punkter
 
-- [ ] **Rate-limit arkivstatistikken.** `/pasienter/api/innstillinger/arkiv/<pk>/full-stats/`
-      (`views_arkiv.arkiv_full_stats_view`) kjører samme tunge beregning som
-      `/api/full-stats/` — chi², Kruskal-Wallis, krysstabeller — men fikk ingen bøtte i S3.
-      Mindre eksponert: admin-only, ingen auto-refresh, og den leser arkiverte rader som
-      ikke endres. Én linje når noen er i filen uansett.
+- [ ] **Rate-limit arkivstatistikken.** Tre endepunkter kjører nå samme tunge beregning
+      som live-statistikken uten å ha fått en bøtte i S3:
+      `/statistikk/api/kilde/<slug>/arkiv/<pk>/full-stats/` (flyttet dit i fase 6),
+      `/pasienter/api/innstillinger/arkiv/<pk>/` og — fra fase 7 —
+      `/oppdrag/api/arkiv/<pk>/`. Alle er admin-only, uten auto-refresh, og leser rader
+      som ikke endres, så eksponeringen er lav. Én linje per view når noen er i filene
+      uansett.
 - [ ] Rydd bort død backup-legacy: modellen `patients.BackupConfig` (singleton som
       ingenting leser lenger) og management-kommandoen `db_backup` som gater på den.
       Krever migrasjon, derfor egen oppgave.
