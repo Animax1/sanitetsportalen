@@ -107,3 +107,22 @@ code {
   color: var(--portal-text-muted);
   border-color: var(--portal-border);
 }
+
+/* ──── Modaler (dark-theme) ──── */
+
+/* `--bs-modal-bg` arver `--bs-body-bg`, som base_portal setter til
+   sidebakgrunnen. Uten dette blir modalen samme farge som siden bak, og
+   `.btn-close` — en svart SVG — forsvinner i den. */
+
+.modal-content {
+  background: var(--portal-surface);
+  color: var(--portal-text);
+  border: 1px solid var(--portal-border);
+}
+.modal-header,
+.modal-footer {
+  border-color: var(--portal-border);
+}
+.btn-close {
+  filter: invert(1) grayscale(100%) brightness(200%);
+}

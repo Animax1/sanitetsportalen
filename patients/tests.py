@@ -2287,6 +2287,45 @@ class MorkTekstPaaMorkBakgrunnTests(TestCase):
             + '\n  '.join(mangler),
         )
 
+    def test_btn_close_er_overstyrt_der_malen_ser_den(self):
+        """Samme feilklasse som dempet tekst: en Bootstrap-standard for lys bakgrunn.
+
+        `.btn-close` er en svart SVG. `--bs-modal-bg` arver `--bs-body-bg`,
+        som `base_portal` setter til sidebakgrunnen — så krysset ble svart på
+        mørkt uten at noe feilet. André meldte det fra oppdragssiden 29. aug.
+        2026; pasientsiden hadde løst det for lenge siden med
+        `btn-close-white`, så feilen bodde kun i portalgrenen.
+        """
+        import re
+        rot = self._rot()
+        mangler = []
+
+        for mal in self._maler():
+            markup = mal.read_text(encoding='utf-8')
+            if not re.search(r'class="[^"]*\bbtn-close\b', markup):
+                continue
+
+            ark, inline = self._stilark_og_inline(mal)
+            if not ark and not inline:
+                continue
+
+            css = inline
+            for navn in ark:
+                fil = rot / 'static' / 'css' / navn
+                if fil.exists():
+                    css += '\n' + fil.read_text(encoding='utf-8')
+
+            if not re.search(r'\.btn-close\s*[,{]', css):
+                mangler.append(
+                    f'{mal.relative_to(rot)} har en .btn-close, men verken '
+                    f'{sorted(ark) or "inline <style>"} overstyrer den'
+                )
+
+        self.assertEqual(
+            mangler, [],
+            'Svart lukkekryss på mørk modal:\n  ' + '\n  '.join(mangler),
+        )
+
     def test_placeholder_er_overstyrt_der_feltet_er_det(self):
         """Farger man `.form-control` mørkt, må `::placeholder` følge med.
 

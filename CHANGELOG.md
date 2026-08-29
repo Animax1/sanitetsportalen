@@ -4,6 +4,35 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-08-29 — Lukkekrysset var svart på mørk modal
+
+**1139 tester grønne** (1 ny). Ingen migrasjon.
+
+André meldte at X-en i Nytt oppdrag, Enheter og Lokasjoner er svart og ikke passer vinduet.
+
+`portal.css` hadde **ingen** modalregler. Bootstraps `--bs-modal-bg` arver `--bs-body-bg`,
+som `base_portal` setter til sidebakgrunnen — så modalen fikk nøyaktig samme farge som siden
+bak seg, og `.btn-close`, som er en svart SVG, forsvant i den. Ingenting feilet; det så bare
+ut som en tom flate med et kryss som ikke var der.
+
+Pasientsiden har aldri hatt problemet: den er frittstående, laster `style.css`, og hver
+knapp der har `btn-close-white`. Feilen bodde kun i portalgrenen, og derfor hører fiksen
+hjemme i `portal.css` — ikke i `oppdrag.css`. Alle modulsider som kommer etter, arver den.
+
+Modalen får nå `--portal-surface` og en kant, så den løfter seg fra siden bak, og krysset
+inverteres.
+
+Testen fant et sted til jeg ikke hadde sett etter: **`base_portal.html` har selv en
+`.btn-close`** — lukkeknappen på Django-meldingene. Den sto svart på `.alert-danger`s
+mørkerøde bakgrunn på hver eneste portalside. Samme linje løser begge.
+
+Guarden ligger i `MorkTekstPaaMorkBakgrunnTests`, som allerede løser `{% extends %}` og
+`{% static %}`: en mal med `.btn-close` må ha overstyringen i et stilark den faktisk laster.
+Samme feilklasse som dempet tekst — en Bootstrap-standard laget for lys bakgrunn, som er
+usynlig i stedet for å feile.
+
+---
+
 ## 2026-08-29 — Sperra på Pensjoner er testet, ikke bare tegnet
 
 **1138 tester grønne** (2 nye). Ingen migrasjon.
