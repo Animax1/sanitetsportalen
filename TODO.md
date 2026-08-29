@@ -355,7 +355,21 @@ personlige kontoer, admin-reset beholdt for alle. Ingenting bygget ennå.
             to deployer, og backfill fra `year`. **Ikke besluttet** — fem åpne
             avklaringer står nederst i notatet og trenger svar fra André før
             migrasjonen skrives.
-      - [ ] **Besvar de fem åpne avklaringene**, og ta stilling til forslaget.
+      - [x] **De fem avklaringene besvart, forslaget vedtatt (29. aug. 2026).**
+            Fritekst-navn (unikt), gjenåpning til kollaps, pasientnummer per vakt
+            (sperren flyttes i deploy 2), manuell sletting av tomme vakter, ingen
+            gruppering nå. Alle med notatets anbefaling.
+      - [x] **Deploy 1 — kodet 29. aug. 2026.** `core.Vakt`, backfill per år
+            (navn = årstallet; `event_name` er global og ville påstått noe vi
+            ikke vet), nullbare FK-er på `Patient`/`Oppdrag`/`VaktArkiv`, alle
+            fire skrivestiene setter vakta, `hent_aktiv_vakt()` med lat
+            opprettelse og pekerreparasjon, og `verifiser_vakt` som også
+            forhåndssjekker deploy 2-sperrene. Backfill, full rollback og ny
+            kjøring bevist mot en base med data i tre år.
+      - [ ] **Deploy 1 til staging/prod, så `verifiser_vakt` mot prod.**
+            Krever Andre. Deretter **deploy 2**:
+            all lesing over på vakt, tellere per vakt, «Avslutt vakt»,
+            `(vakt, pasientnummer)`-sperren, `year` bort fra radene.
       - **Fase 4b og 5 er upåvirket** og kan gjøres i mellomtiden. **Fase 6 og 7 må
         vente:** statistikken grupperer på scopet, og fase 7 arkiverer *en vakt* —
         den ville lagt inn `Vaktarkivering` fra §12.1, som notatet foreslår å erstatte

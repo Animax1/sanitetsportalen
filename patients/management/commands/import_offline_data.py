@@ -32,7 +32,7 @@ from django.db import transaction
 
 from patients.choices import validate_patient_choice_fields
 from patients.models import Patient, Forstehjelper, Helsepersonell
-from patients.services import get_active_year
+from patients.services import get_active_year, vakt_for_year
 from audit.models import AuditLog
 
 
@@ -127,6 +127,10 @@ class Command(BaseCommand):
                     p = Patient(
                         pasientnummer=next_nr,
                         year=year,
+                        # Vakta for radens eget år, ikke den aktive: en
+                        # offline-import kan i prinsippet bære et annet år,
+                        # og da skal koblingen følge året.
+                        vakt=vakt_for_year(year),
                         forstehjelper=forstehjelper_obj,
                         helsepersonell_ref=hp_obj,
                     )

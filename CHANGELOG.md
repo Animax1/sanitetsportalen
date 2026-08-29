@@ -4,6 +4,56 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-08-29 — Vakt som scope: besluttet, og deploy 1 kodet
+
+**1288 tester grønne** (16 nye). Migrasjoner `core.0006`, `patients.0014–0015`,
+`oppdrag.0005–0006`.
+
+**Beslutningen er tatt.** André besvarte de fem avklaringene i §7 — alle med notatets
+anbefaling: fritekst-vaktnavn (unikt), gjenåpning fram til kollaps, pasientnummer per
+vakt (sperren flyttes i deploy 2), manuell sletting av tomme vakter, ingen gruppering nå.
+`docs/BESLUTNING_VAKT_SOM_SCOPE.md` står som besluttet.
+
+**Deploy 1 er den additive halvdelen, og den er bevisst kjedelig:** `Vakt` finnes,
+FK-ene skrives — og *ingenting* leser dem ennå. All lesing går fortsatt fra `year`.
+Kontrakten i mellomtiden er at `year` og vakta aldri er uenige, og den kontrolleres av
+`verifiser_vakt` — som også forhåndssjekker deploy 2-sperrene `(vakt, pasientnummer)` og
+`(vakt, oppdragsnummer)`, slik at den migrasjonen ikke kan overraske.
+
+Det som ligger i deployen:
+
+- **`core.Vakt`**: navn (unikt, fritekst), `year` (utledet, men lagret — sesongstatistikk
+  skal slippe å regne det ut per spørring), `startet`/`avsluttet`, `er_aktiv`. Bevisst
+  ikke `BaseTimeStampedModel`: `startet` er vaktas egen tid, og `created_at` ville løyet
+  for backfillede vakter. Bærer ingen personopplysninger.
+- **Backfill i to migrasjoner som følger kodens avhengighetsretning**: `patients.0015`
+  lager vaktene og kobler pasienter + arkiv, `oppdrag.0006` kobler oppdragene og avhenger
+  av den — oppdrag avhenger av patients i kode, og migrasjonsgrafen går samme vei. Navnet
+  blir årstallet, ikke `event_name`: den er én global verdi som beskriver vakta som var
+  aktiv da noen sist skrev den, og å fryse den inn på historiske vakter ville påstått noe
+  vi ikke vet. `startet`/`avsluttet` er estimater fra radenes tidsstempler, redigerbare.
+- **Reverseringen nuller FK-ene før vaktene slettes** — `PROTECT` nekter ellers, også i
+  en rollback. Bevist mot en base med data i tre år (ett av dem kun som arkiv): backfill,
+  full rollback med alle rader intakt, og ny kjøring.
+- **Fire skrivestier setter vakta**: pasientoppretting, offline-import (vakta for radens
+  *eget* år, ikke den aktive — en import kan bære et annet år), arkivering og
+  oppdragsoppretting. Mutasjonstestet: fjernes tildelingen, blir testene røde.
+- **`hent_aktiv_vakt()`** i `patients.services`, ved siden av `get_active_year` — flyttes
+  til core i deploy 2. Lat opprettelse på fersk base (samme mønster som `get_active_year`
+  sin egen AppSetting-rad), og en død `aktiv_vakt_id`-peker repareres i stedet for å
+  stoppe registrering: en pasient som ikke lar seg registrere fordi en peker er borte, er
+  verre enn en peker som må repareres.
+- **`verifiser_vakt`** slår opp modellene via `apps.get_model` i stedet for å importere
+  `patients` og `oppdrag` fra `core` — en driftskommando skal ikke snu
+  avhengighetsretningen for hele appen. Arkiver uten vakt er info, ikke feil: NULL der
+  betyr «fra før grupperingen fantes».
+
+Kjøreplanen står i notatet: deploy 1 ut, `verifiser_vakt` mot prod, og først da deploy 2
+— der lesingen bytter kilde, tellerne blir per vakt, «Nullstill år» blir «Avslutt vakt»,
+og `year` forsvinner fra radene.
+
+---
+
 ## 2026-08-29 — Fase 5: stemplingen overlever at dekningen ryker
 
 **1272 tester grønne** (23 nye). Ingen migrasjon.

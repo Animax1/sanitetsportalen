@@ -1,7 +1,8 @@
 # Beslutningsnotat: vakt som scope, ikke år
 
-Status: **utkast 29. aug. 2026. Ikke besluttet.** Premisset er fastslått av André;
-utformingen er ikke. Åpne avklaringer nederst må besvares før migrasjonen skrives.
+Status: **besluttet 29. aug. 2026.** De fem avklaringene i §7 er besvart av André
+samme dag — alle med notatets anbefaling. Deploy 1 er under bygging; deploy 2 venter på
+prod-verifisering (§6).
 
 Erstatter TODO-punktet «Vakt som scope, ikke år». Notatet må ligge før fase 6 og 7 av
 oppdragsmodulen — begge bygger på scopet, og bygges de først, bygges de to ganger.
@@ -200,7 +201,7 @@ til hva en vakt er.
 
 | Deploy | Innhold | Rullbar? |
 |---|---|---|
-| **1** | Legg til `Vakt`, backfill fra `year`, legg til nullbare `vakt`-FK-er og fyll dem. `year` og `active_year` står urørt og leses fortsatt | Ja |
+| **1** | ✅ Kodet 29. aug. 2026. Legg til `Vakt`, backfill fra `year`, legg til nullbare `vakt`-FK-er og fyll dem. `year` og `active_year` står urørt og leses fortsatt | Ja — bevist: backfill + full rollback + ny kjøring mot base med data |
 | **2** | Bytt all lesing til `vakt`, gjør FK-ene `NOT NULL`, fjern `year` fra radene og `active_year` fra `AppSetting` | Kun med `Vakt` som fasit |
 
 Skillet er det samme som i rollemodellen: legg til og fyll først, bytt lesing etterpå.
@@ -211,27 +212,27 @@ opp igjen fra `year` alene når flere vakter deler år.
 etter mønster av `verifiser_modultilgang`: rader uten vakt, vakter uten rader, og
 oppdragsnumre som kolliderer innenfor en vakt.
 
-## 7. Åpne avklaringer
+## 7. Avklaringene — besvart 29. aug. 2026
 
-1. **Hva heter en vakt, og hvem gir den navnet?** Forslaget er fritekst satt ved
-   vaktstart. Alternativet er en mal («\<arrangement\> \<dato\>»), som gir ryddigere
-   statistikk men mindre presisjon.
-2. **Skal en vakt kunne gjenåpnes etter avslutning?** Arkiveringen er irreversibel, men
-   selve vakten kunne vært satt aktiv igjen om noen avslutter for tidlig. Anbefaling: ja,
-   så lenge arkivet ikke er kollapset — en feilklikk-avslutning midt i en vakt er ellers
-   en katastrofe uten vei tilbake.
-3. **Skal pasientnummeret restarte per vakt?** Det gjør det allerede i praksis, via
-   nullstillingen (§2.1). Under vakt-scoping blir det eksplisitt. Men merk at
-   `pasientnummer` er `unique=True` **globalt** i dag; restart per vakt krever at sperren
-   flyttes til `(vakt, pasientnummer)`, altså en migrasjon på en tabell med
-   produksjonsdata.
-4. **Hva skjer med vakter uten data?** En vakt opprettet ved en feil, uten pasienter
-   eller oppdrag, kan slettes fritt (`PROTECT` slipper den). Bør den ryddes automatisk,
-   eller står den til noen fjerner den?
-5. **Skal statistikken kunne sammenligne på tvers av vakter?** Dagens arkivstatistikk
-   sammenligner år. Med vakter blir «forrige tilsvarende arrangement» mer nyttig enn
-   «i fjor» — men det krever at vakter kan grupperes, og det er et felt til.
+1. **Vaktnavnet er fritekst, satt ved vaktstart.** Maksimal presisjon, null tvang.
+   Navnet er unikt — to vakter med samme navn ville vært umulige å skille i
+   statistikklister og i «Avslutt vakt»-dialogen, og den som trenger navnet igjen
+   legger på en dato.
+2. **En avsluttet vakt kan gjenåpnes, fram til arkivet er kollapset.** En
+   feilklikk-avslutning midt i en vakt er ellers en katastrofe uten vei tilbake. Er
+   radene alt arkivert og tømt, hentes de fra pre-arkiv-backupen; etter
+   24-måneders-kollapsen finnes ikke radnivået lenger, og døra er låst.
+3. **Pasientnummeret restarter per vakt.** Det er slik nullstillingen allerede har
+   virket i praksis (§2.1) — beslutningen gjør det eksplisitt. Sperren flyttes til
+   `(vakt, pasientnummer)` i **deploy 2**; i deploy 1 står den globale `unique=True`
+   urørt, og holder fordi dagens livssyklus sletter radene før telleren nullstilles.
+4. **Vakter uten data slettes for hånd.** `PROTECT` slipper dem, og en tom vakt er
+   synlig i lista til noen fjerner den. Automatisk rydding ville vært maskineri for et
+   problem som er løst med én sletteknapp.
+5. **Ingen gruppering nå.** Statistikken sammenligner vakter valgt fra en liste; et
+   grupperingsfelt («serie») legges til den dagen behovet er reelt, som en liten
+   migrasjon. Å legge det inn nå er å gjette på formen før noen har brukt den.
 
-**Akseptansekriterium:** ingen rad i `patients` eller `oppdrag` er uten vakt;
+**Akseptansekriterium (uendret av svarene):** ingen rad i `patients` eller `oppdrag` er uten vakt;
 `verifiser_vakt` er grønn; oppdragsnummer er unikt per vakt og restarter på 1;
 «Avslutt vakt» rører kun én vakt; alle eksisterende arkivsignaturer verifiserer fortsatt.

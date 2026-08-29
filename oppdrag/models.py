@@ -129,6 +129,17 @@ class Oppdrag(BaseTimeStampedModel):
 
     # Samme årsscoping som Patient.year: aktiv vakt styres av AppSetting.
     year = models.IntegerField(db_index=True, verbose_name='År')
+    # Vakta oppdraget tilhører. Nullbar i deploy 1 — se Patient.vakt for
+    # resonnementet; det er det samme. I deploy 2 flyttes også
+    # oppdragsnummer-sperren fra (year, nummer) til (vakt, nummer).
+    vakt = models.ForeignKey(
+        'core.Vakt',
+        null=True,
+        blank=True,
+        on_delete=models.PROTECT,
+        related_name='oppdrag',
+        verbose_name='Vakt',
+    )
     # Løpenummeret man sier på samband: «oppdrag 14». Unikt per år, ikke
     # globalt — nummeret restarter på 1 hver sesong, slik at det holder seg
     # kort nok til å leses opp. `pasientnummer` er globalt unikt fordi

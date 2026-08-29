@@ -24,7 +24,7 @@ from django.views.decorators.http import require_http_methods
 from core.auth_decorators import er_global_admin, har_tilgang, modul_kreves
 from core.idempotency import bygg_nokkel, forkast, fullfor, reserver
 from core.ratelimit import rate_limit
-from patients.services import get_active_year
+from patients.services import get_active_year, hent_aktiv_vakt
 
 from . import choices, services
 from .choices import validate_oppdrag_choice_fields
@@ -340,6 +340,8 @@ def oppdrag_liste_view(request):
     with transaction.atomic():
         oppdrag = Oppdrag.objects.create(
             year=year,
+            # Deploy 1 av vakt-scopingen: FK-en skrives, `year` leses.
+            vakt=hent_aktiv_vakt(),
             oppdragsnummer=services.neste_oppdragsnummer(year),
             enhet=enhet,
             problemstilling=data['problemstilling'],
