@@ -489,15 +489,21 @@ statusknappen som det eneste elementet som ikke krever presisjon.
 | 4 | ✅ Enhetsskjermen: statusmaskin, smale endepunkter, objektsjekk, de to skjulereglene, visning av `automatisk` | levert |
 | 4b | ✅ Korreksjoner: ny rad som overstyrer, `gjeldende()`-manager | levert |
 | 5 | ✅ Offline-kø med idempotens | levert |
-| 6 | Statistikkregisteret + oppdragsfanen | 5–7 t |
+| 6 | ✅ Statistikkregisteret (`core/stats.py`) + oppdragsfanen | levert |
 | 7 | Arkivering: `AbstractArkiv` + handler og egen arkivknapp under `/oppdrag/` | 5–7 t |
 
 Fase 2 står før fase 3 fordi fritekstfeltet ellers ville vært i produksjon med
 verdilogging på, og de radene kan ikke fjernes i ettertid uten å røre auditsporet.
 
-**Fase 6 river ut den direkte importen** fra statistikkappen til `patients.services`.
-Pasientfanen skal se lik ut etterpå — det er en refaktorering med en ny modul som
-akseptansekriterium, ikke en ny visning.
+**Fase 6 rev ut den direkte importen** fra statistikkappen til `patients.services`
+(levert 29. aug. 2026). Registeret er `core/stats.py`, og hver modul melder inn en
+`BaseStatistikkHandler` fra `apps.ready()`. Endepunktene bærer kilden i stien
+(`/statistikk/api/kilde/<slug>/full-stats/`), de gamle videresender, og pasientfanen ser
+lik ut — akseptansekriteriet var en refaktorering med en ny modul, ikke en ny visning.
+
+Tilgangsregelen måtte endres i samme slengen: §5 sa «vis kun kilder brukeren kan lese»,
+men implementasjonen ga 403 på hele siden hvis én kilde manglet. Med kilde nummer to ville
+det tatt statistikken fra alle som leser pasienter uten å ha oppdrag.
 
 **Fase 7 er stedet `AbstractArkiv` endelig skal bygges.** TODO har utsatt den til «modell
 nummer to faktisk skrives» — dette er modell nummer to. `VaktArkiv` skal *ikke* migreres til
@@ -541,5 +547,17 @@ oppdrag**. Det er en operativ risiko, ikke en teknisk: den håndteres med et pun
 ### 12.2 Skal `automatisk`-flagget påvirke statistikken, ikke bare vises?
 
 Fra fase 4 lagres flagget, og fra fase 4 vises det (§4.5). Om responstider skal *regnes*
-annerledes når sluttiden er avledet — utelates, merkes, eller telles som alle andre — er
-lettere å svare på når tallene finnes. Tas i fase 6.
+annerledes når sluttiden er avledet — utelates, merkes, eller telles som alle andre — var
+lettere å svare på når tallene fantes.
+
+> **Besluttet 29. aug. 2026 av André, i fase 6: den avledede varigheten utelates, ikke
+> oppdraget.** En varighet som *slutter* i en automatisk stempling telles ikke; oppdraget
+> telles i alle antall og fordelinger, og andre varigheter på det samme oppdraget —
+> typisk responstiden fram til «Fremme» — teller som vanlig. Sluttiden er avledet, ikke
+> målt: mannskapet kan ha vært ferdig et kvarter før enheten rykket ut på det neste.
+>
+> Antallet utelatte vises på siden, sammen med varigheter som er utelatt fordi
+> tidspunktene står i omvendt rekkefølge (en klokke som gikk feil offline). Et tall som er
+> utelatt uten at noen får vite det, er verre enn et tall som mangler — og det er samme
+> regel som pasientstatistikken alt følger: mangler ett av to tidsstempler, teller ikke
+> varigheten, og `n` står i visningen.

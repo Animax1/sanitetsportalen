@@ -25,7 +25,7 @@ import unittest
 from django.test import SimpleTestCase
 
 from patients.js_test_utils import (
-    ADMIN_JS, PORTAL_UTILS_JS, STATISTIKK_JS,
+    ADMIN_JS, PORTAL_UTILS_JS, STATISTIKK_JS, STATISTIKK_OPPDRAG_JS,
     build_harness, extract_function, read_js, run_node,
 )
 
@@ -38,6 +38,12 @@ HTML_BUILDERS = (
     'mkInterpretation',
     'renderForstehjelperAdmin',
     'renderHelsepersonellAdmin',
+    # Oppdragsfanen (fase 6). Byggerne setter ingen verdier inn selv i dag —
+    # de sender rader til mkStatsTable(), som escaper via cellHtml() — men de
+    # står her fordi neste kolonne noen legger til skal måtte gjennom samme
+    # gjennomgang som resten.
+    'mkOppdragTiderTabell',
+    'mkOppdragSdTabell',
 )
 
 # Funksjoner som escaper – en interpolasjon som starter med én av disse er OK.
@@ -91,12 +97,13 @@ class StatsEscapingSourceGuardTests(SimpleTestCase):
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
-        # Byggerne ligger i to filer etter at statistikk ble egen modul:
-        # tabellene og tolkningen i statistikk.js, personellregistrene i
-        # patients-admin.js. Begge setter markup med innerHTML, så
-        # gjennomgangen må dekke begge — leste vi bare den ene, ville
-        # halve vernet forsvunnet uten at noen test ble rød.
-        cls.stats_src = read_js(STATISTIKK_JS) + '\n' + read_js(ADMIN_JS)
+        # Byggerne ligger i tre filer: tabellene og tolkningen i
+        # statistikk.js, personellregistrene i patients-admin.js, og
+        # oppdragstabellene i statistikk-oppdrag.js (fase 6). Alle tre setter
+        # markup med innerHTML, så gjennomgangen må dekke alle — leste vi
+        # bare én, ville resten av vernet forsvunnet uten at noen test ble rød.
+        cls.stats_src = (read_js(STATISTIKK_JS) + '\n' + read_js(ADMIN_JS)
+                         + '\n' + read_js(STATISTIKK_OPPDRAG_JS))
         cls.utils_src = read_js(PORTAL_UTILS_JS)
 
     def test_escape_hjelperne_finnes_i_utils(self):
@@ -174,6 +181,7 @@ class StatsEscapingBehaviourTests(SimpleTestCase):
         (PORTAL_UTILS_JS, ('escHtmlValue', 'trustedHtml', 'cellHtml', 'fmtMin')),
         (STATISTIKK_JS, ('mkStatsTable', 'mkCrosstab', 'mkObsTable',
                          'mkInterpretation')),
+        (STATISTIKK_OPPDRAG_JS, ('_sdRad', 'mkOppdragSdTabell')),
     )
 
     XSS = '<img src=x onerror=alert(1)>'
@@ -212,6 +220,34 @@ const html = mkCrosstab(ct);
 assert(!html.includes('<img'), 'radnøkkelen ble satt inn som markup: ' + html);
 assert(html.includes('&lt;img'), 'radnøkkelen er ikke escapet: ' + html);
 assert(html.includes('onerror=alert(1)&gt;'), 'teksten skal fortsatt vises');
+''')
+
+    def test_oppdragstabell_viser_html_i_enhetsnavn_som_tekst(self):
+        """Enhets-, lokasjons- og problemstillingsnavn er data fra basen.
+
+        Oppdragstabellene bygger ingen markup selv — de sender rader til
+        mkStatsTable(), som escaper via cellHtml(). Testen er beviset på at
+        den veien faktisk holder, ikke bare at den er tenkt.
+        """
+        self._run_js(f'''
+const kart = {{ {self.XSS!r}: {{ n: 2, mean: 5, median: 4, min: 3, max: 7 }} }};
+const html = mkOppdragSdTabell('Enhet', kart);
+assert(!html.includes('<img'), 'enhetsnavnet ble satt inn som markup: ' + html);
+assert(html.includes('&lt;img'), 'enhetsnavnet er ikke escapet: ' + html);
+assert(html.includes('4m'), 'medianen skal vises formatert: ' + html);
+''')
+
+    def test_oppdragstabell_viser_tomme_maalinger_som_bindestrek(self):
+        """En varighet uten målinger skal vise «–», ikke «null» eller «0m».
+
+        Etter §12.2 er tomme tidsledd et normaltilfelle: alle varighetene i
+        en kolonne kan være utelatt fordi sluttiden var avledet.
+        """
+        self._run_js('''
+const rad = _sdRad('Akutt', { n: 0, mean: null, median: null, min: null, max: null });
+assert(rad[1] === 0, 'n skal vises som 0, ikke skjules: ' + rad[1]);
+assert(rad[2] === '\u2013', 'median uten data skal bli en bindestrek: ' + rad[2]);
+assert(rad[5] === '\u2013', 'maks uten data skal bli en bindestrek: ' + rad[5]);
 ''')
 
     def test_krysstabell_escaper_kolonnenokkel(self):

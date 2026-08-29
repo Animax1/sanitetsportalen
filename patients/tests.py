@@ -390,7 +390,7 @@ class LeadViewTests(TestCase):
 
     def test_leder_les_kan_lese_full_stats(self):
         """Profilen har `les` på statistikk, og kan hente full statistikk."""
-        resp = self.client.get('/statistikk/api/full-stats/')
+        resp = self.client.get('/statistikk/api/kilde/patients/full-stats/')
         self.assertIn(resp.status_code, [200, 500])  # 500 OK hvis scipy mangler
 
 
@@ -2109,6 +2109,89 @@ class JsModulLastingTests(TestCase):
             with self.subTest(funksjon=navn):
                 self.assertIn(f'function {navn}(', app)
                 self.assertNotIn(f'function {navn}(', admin)
+
+    # ── Oppdragsfanen på statistikksiden (fase 6) ───────────────────────
+    #
+    # Samme mønster som patients-admin.js: fila lastes betinget, og alt som
+    # kaller inn i den fra alltid-lastet kode må gå gjennom en sjekk. Uten
+    # den ville et faneklikk gitt ReferenceError for kontoer uten
+    # oppdragstilgang — riktignok har de ingen fane å klikke på, men vernet
+    # skal ligge i koden, ikke i at markupen tilfeldigvis mangler.
+
+    def _statistikk_html(self, tilganger):
+        from accounts.models import ModulTilgang
+        bruker = CustomUser.objects.create_user(
+            username='js_' + '_'.join(s for s, _ in tilganger),
+            password='x', role='bruker', must_change_password=False)
+        for slug, nivaa in tilganger:
+            ModulTilgang.objects.create(
+                bruker=bruker, modul_slug=slug, nivaa=nivaa)
+        self.client.force_login(bruker)
+        resp = self.client.get('/statistikk/')
+        self.assertEqual(resp.status_code, 200)
+        return resp.content.decode('utf-8')
+
+    def test_oppdragsfila_lastes_kun_med_oppdragstilgang(self):
+        html = self._statistikk_html(
+            [('statistikk', 'les'), ('patients', 'les'), ('oppdrag', 'les')])
+        self.assertRegex(html, self._monster('statistikk-oppdrag'))
+
+    def test_oppdragsfila_lastes_ikke_uten_oppdragstilgang(self):
+        html = self._statistikk_html([('statistikk', 'les'), ('patients', 'les')])
+        self.assertNotRegex(html, self._monster('statistikk-oppdrag'))
+        # Vern mot at testen består fordi siden er tom for alle.
+        self.assertRegex(html, self._monster('statistikk'))
+
+    def test_statistikk_js_kaller_ikke_oppdragsfila_direkte(self):
+        """Kall fra alltid-lastet kode må gå gjennom `_kallOppdrag()`."""
+        from patients import js_test_utils as jsu
+
+        oppdragsnavn = set(re.findall(
+            r'^(?:async )?function (\w+)',
+            jsu.read_js(jsu.STATISTIKK_OPPDRAG_JS), re.M))
+        self.assertIn('loadOppdragStats', oppdragsnavn, 'testen leser feil fil')
+
+        kilde = '\n'.join(
+            l for l in jsu.read_js(jsu.STATISTIKK_JS).splitlines()
+            if not l.lstrip().startswith('//'))
+        kilde = re.sub(r"_kallOppdrag\(\s*'[^']+'", '_kallOppdrag(', kilde)
+
+        funn = [navn for navn in sorted(oppdragsnavn)
+                if re.search(r'\b' + re.escape(navn) + r'\s*\(', kilde)]
+        self.assertEqual(funn, [], (
+            'statistikk.js kaller funksjoner som bor i statistikk-oppdrag.js:\n  '
+            + '\n  '.join(funn)
+            + '\n\nDen fila lastes kun for kontoer med oppdragstilgang. Kall '
+              'den via _kallOppdrag().'
+        ))
+
+    def test_oppdragsfila_bruker_bare_det_siden_laster(self):
+        """statistikk-oppdrag.js har samme begrensning som statistikk.js.
+
+        patients-utils.js lastes ikke på /statistikk/ og kan ikke lastes —
+        den gjør arbeid på toppnivå som kaster uten pasientskjemaene.
+        """
+        from patients import js_test_utils as jsu
+
+        def definerte(sti):
+            kilde = jsu.read_js(sti)
+            return (set(re.findall(r'^(?:async )?function (\w+)', kilde, re.M))
+                    | set(re.findall(r'^(?:let|const|var) (\w+)', kilde, re.M)))
+
+        tilgjengelig = (definerte(jsu.PORTAL_UTILS_JS)
+                        | definerte(jsu.STATISTIKK_JS)
+                        | definerte(jsu.STATISTIKK_OPPDRAG_JS))
+        kun_i_patients = definerte(jsu.UTILS_JS) - tilgjengelig
+
+        kilde = jsu.read_js(jsu.STATISTIKK_OPPDRAG_JS)
+        funn = [navn for navn in sorted(kun_i_patients)
+                if re.search(r'\b' + re.escape(navn) + r'\s*\(', kilde)]
+        self.assertEqual(funn, [], (
+            'statistikk-oppdrag.js kaller funksjoner som kun finnes i '
+            'patients-utils.js:\n  ' + '\n  '.join(funn)
+            + '\n\nDen fila lastes ikke på /statistikk/. Flytt helperen til '
+              'portal-utils.js.'
+        ))
 
 
 class InlineHandlerTests(SimpleTestCase):

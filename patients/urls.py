@@ -46,7 +46,7 @@ urlpatterns = [
     # 302, ikke 301: en 301 caches av nettleseren for godt, og stien bør
     # kunne tas i bruk igjen uten at gamle klienter sitter fast.
     path('api/full-stats/',
-         lambda req: redirect('/statistikk/api/full-stats/'),
+         lambda req: redirect('/statistikk/api/kilde/patients/full-stats/'),
          name='api_full_stats_flyttet'),
 
     # Arkiver (gammel fil-basert)
@@ -56,7 +56,8 @@ urlpatterns = [
     path('api/innstillinger/arkiv/lagre/', views_arkiv.arkiv_lagre_view, name='api_arkiv_lagre'),
     path('api/innstillinger/arkiv/<int:pk>/', views_arkiv.arkiv_detalj_view, name='api_arkiv_detalj'),
     path('api/innstillinger/arkiv/<int:pk>/full-stats/',
-         lambda req, pk: redirect(f'/statistikk/api/arkiv/{pk}/full-stats/'),
+         lambda req, pk: redirect(
+             f'/statistikk/api/kilde/patients/arkiv/{pk}/full-stats/'),
          name='api_arkiv_full_stats_flyttet'),
 
     # Bakover-kompatibel redirect: /pasienter/admin/server-status/... → /portal-admin/server-status/...

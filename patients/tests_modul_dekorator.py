@@ -23,6 +23,12 @@ UNNTAK = {
         'ren videresending til /statistikk/, som har sin egen gate',
     'api_arkiv_full_stats_flyttet':
         'ren videresending til /statistikk/, som har sin egen gate',
+    # De to under ligger *i* statistikkappen og peker på kilde-stiene fase 6
+    # innførte. Samme begrunnelse: en ren videresending, og målet er gatet.
+    'api_full_stats_gammel_sti':
+        'ren videresending til /statistikk/api/kilde/patients/, som er gatet',
+    'api_arkiv_full_stats_gammel_sti':
+        'ren videresending til /statistikk/api/kilde/patients/, som er gatet',
     'legacy_server_status_redirect':
         'ren videresending til /portal-admin/server-status/, som er admin-gatet',
 }

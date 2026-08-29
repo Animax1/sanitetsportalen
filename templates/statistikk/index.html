@@ -42,6 +42,28 @@
     </button>
   </div>
 
+  {% comment %}
+    Kildefaner (fase 6). Én per modul brukeren har lesetilgang til — §5:
+    modulen komponerer tilgang, den eier den ikke. Lista kommer fra
+    core.stats-registeret via viewet, ikke fra en liste i templaten: en ny
+    kilde skal vises fordi den registrerte seg, ikke fordi noen husket å
+    legge den til her.
+
+    Skjules ved én kilde. En fanerad med ett valg er en knapp som ikke gjør
+    noe.
+  {% endcomment %}
+  {% if kilder|length > 1 %}
+  <div class="kilde-nav" id="kilde-nav">
+    {% for kilde in kilder %}
+    <button class="kilde-btn{% if forloop.first %} active{% endif %}"
+            data-action="visKilde" data-arg="{{ kilde.slug }}">{{ kilde.navn }}</button>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+{% if har_patients %}
+<div class="kilde-panel{% if kilder.0.slug == 'patients' %} active{% endif %}" id="kilde-patients">
+
   <!-- Sub-nav -->
   <div class="stats-subnav">
     <button class="stats-subbtn active" data-stab="oversikt">
@@ -332,6 +354,13 @@
     </div>
   </div><!-- /stab-tester -->
 
+</div><!-- /kilde-patients -->
+{% endif %}
+
+{% if har_oppdrag %}
+{% include "statistikk/_oppdrag.html" %}
+{% endif %}
+
 </div>
 {% endblock %}
 
@@ -344,4 +373,12 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
 <script src="{% static 'js/portal-utils.js' %}"></script>
 <script src="{% static 'js/statistikk.js' %}"></script>
+{% comment %}
+  Oppdragsrenderingen lastes kun når kontoen faktisk har oppdragsfanen —
+  samme mønster som patients-admin.js på pasientsiden. Kall fra den
+  alltid-lastede fila hit går gjennom `_kallOppdrag()`, som sjekker at
+  funksjonen finnes; ellers ville en konto uten oppdragstilgang fått
+  ReferenceError ved faneskift.
+{% endcomment %}
+{% if har_oppdrag %}<script src="{% static 'js/statistikk-oppdrag.js' %}"></script>{% endif %}
 {% endblock %}

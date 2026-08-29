@@ -756,15 +756,42 @@ Gjennomgang 13. aug. 2026, med 1000 pasienter og peak 100 brukere som premiss.
               *serveren* som utleder handlingen av tilstanden.
             - Usendte stemplinger vises i et eget banner — §6: en knapp som ser ut til
               å ha virket, men ikke har det, er verre enn en som feiler synlig.
-      - [ ] **Fase 6** (5–7 t): **statistikkregisteret** + oppdragsfanen. Her rives den
-            direkte importen fra `statistikk` til `patients.services` ut, og erstattes av
-            et registry etter samme idiom som `core.backup` og `core.arkiv` — det CLAUDE.md
-            har varslet siden statistikkmodulen ble skilt ut. Pasientfanen skal se lik ut
-            etterpå.
+      - [x] **Fase 6 — statistikkregisteret + oppdragsfanen (29. aug. 2026).**
+            `core/stats.py` med `BaseStatistikkHandler`; `patients/statistikk.py` og
+            `oppdrag/statistikk.py` melder seg inn fra `apps.ready()`. Statistikkappen
+            navngir ingen kildemodul lenger — endepunktene bærer slug-en
+            (`/statistikk/api/kilde/<slug>/full-stats/`), de gamle stiene videresender,
+            og cache-nøkkelen bærer både slug og vakt-ID. Pasientfanen ser lik ut.
+            - **Tilgangsregelen måtte endres i samme slengen.** §5 sa «vis kun kilder
+              brukeren kan lese», men koden ga 403 på hele siden om én kilde manglet.
+              Med kilde nummer to ville det tatt statistikken fra alle som leser
+              pasienter uten å ha oppdrag. Nå vises de kildene kontoen har, og 403 er
+              forbeholdt «ingen kilder i det hele tatt».
+            - **§12.2 besvart:** en varighet som slutter i en automatisk stempling
+              telles ikke — sluttiden er avledet, ikke målt. Oppdraget telles i antall
+              og fordelinger, og både automatiske og negative utelatelser vises på
+              siden. Mutasjonstestet: fjernes sperren, blir testene røde.
+            - `Statusmelding.objects.gjeldende_bulk()` kom til fordi statistikken går
+              gjennom hele vaktas oppdrag. Regelen «nyeste ikke-korrigerte rad vinner»
+              står fortsatt bare i manageren; `gjeldende()` er nå ett oppslag i
+              bulk-resultatet.
+            - **`hent_aktiv_vakt` står igjen som eneste import fra en modul.** Den er
+              portalens scope, ikke en kildes tall, og hører til ryddejobben under.
       - [ ] **Fase 7** (5–7 t): arkivering. **Her bygges `AbstractArkiv`** — dette er
             modell nummer to, som punktet under har ventet på. Oppdrag får **egen
             arkivknapp** under `/oppdrag/`; sammenslåingen med pasientarkivet er utsatt,
             se punktet under.
+            - Statistikkhandleren er klar: `OppdragStatistikkHandler.arkiv_full_stats`
+              arver basisklassens `None` (404) fram til arkivet finnes. Implementeres
+              den, virker `/statistikk/api/kilde/oppdrag/arkiv/<pk>/full-stats/` uten at
+              statistikkappen må røres.
+
+- [ ] **Flytt `hent_aktiv_vakt` ut av pasientmodulen.** Funksjonen er portalens scope —
+      `Vakt` bor i `core`, og både oppdrag og statistikk importerer den fra
+      `patients.services`. Den ble liggende fordi `AppSetting` (pekeren `aktiv_vakt_id`)
+      gjør det, så flyttingen henger sammen med hvor `AppSetting` hører hjemme. Ikke
+      hastverk: én import fra én modul, og `StatistikkappenNavngirIngenKilde` har den
+      oppført som det ene tillatte unntaket, så den kan ikke gli i glemmeboka.
 
 - [ ] **Flytt arkiveringen til `/portal-admin/` og grupper den.** Utsatt 28. aug. 2026 —
       se §12.1 i `docs/BESLUTNING_OPPDRAGSMODULEN.md`. `core/arkiv/` er modul-agnostisk

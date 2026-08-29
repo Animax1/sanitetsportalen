@@ -1,0 +1,146 @@
+{% comment %}
+  Oppdragsfanen (fase 6). Egen fil framfor 200 linjer til i index.html —
+  panelet har ingen markup felles med pasientfanen, og en sammenslått mal
+  ville vært to layouter i samme fil.
+
+  Panelet rendres kun for kontoer som har lesetilgang til oppdragsmodulen;
+  gaten står i statistikk/views.py, ikke her.
+
+  Tallene fylles inn av statistikk-oppdrag.js. Alle verdier settes med
+  textContent eller escapes — se tests_xss_stats.py, som leser den fila.
+{% endcomment %}
+<div class="kilde-panel{% if kilder.0.slug == 'oppdrag' %} active{% endif %}" id="kilde-oppdrag">
+
+  <!-- KPI-rad -->
+  <div class="row g-2 mb-2">
+    <div class="col-6 col-sm-4 col-md-2">
+      <div class="kpi-card kpi-blue">
+        <div class="kpi-label">Oppdrag</div>
+        <div class="kpi-value" id="okpi-total">0</div>
+        <div class="kpi-sub">i vakta</div>
+      </div>
+    </div>
+    <div class="col-6 col-sm-4 col-md-2">
+      <div class="kpi-card">
+        <div class="kpi-label">Pågår nå</div>
+        <div class="kpi-value" id="okpi-aktive">0</div>
+        <div class="kpi-sub">ikke avsluttet</div>
+      </div>
+    </div>
+    <div class="col-6 col-sm-4 col-md-2">
+      <div class="kpi-card">
+        <div class="kpi-label">Fullførte</div>
+        <div class="kpi-value" id="okpi-fullforte">0</div>
+        <div class="kpi-sub">meldt ledig</div>
+      </div>
+    </div>
+    <div class="col-6 col-sm-4 col-md-2">
+      <div class="kpi-card kpi-teal">
+        <div class="kpi-label">Enheter på vakt</div>
+        <div class="kpi-value" id="okpi-enheter">0</div>
+        <div class="kpi-sub">akkurat nå</div>
+      </div>
+    </div>
+    <div class="col-6 col-sm-4 col-md-2">
+      <div class="kpi-card">
+        <div class="kpi-label">Responstid</div>
+        <div class="kpi-value" id="okpi-responstid">–</div>
+        <div class="kpi-sub">median til fremme</div>
+      </div>
+    </div>
+    <div class="col-6 col-sm-4 col-md-2">
+      <div class="kpi-card">
+        <div class="kpi-label">Oppdragstid</div>
+        <div class="kpi-value" id="okpi-oppdragstid">–</div>
+        <div class="kpi-sub">median til ledig</div>
+      </div>
+    </div>
+  </div>
+
+  {% comment %}
+    §12.2: varigheter som slutter i en automatisk stempling er avledet, ikke
+    målt, og telles ikke. Antallet står her framfor i en fotnote — et tall som
+    er utelatt uten at noen får vite det, er verre enn et tall som mangler.
+  {% endcomment %}
+  <div id="oppdrag-utelatt" class="small mb-3 d-none"
+       style="color: var(--text-muted);"></div>
+
+  <!-- Tidsanalyse -->
+  <div class="row g-2 mb-2">
+    <div class="col-md-6">
+      <div class="chart-card">
+        <div class="chart-title">Tidsledd, hele vakta</div>
+        <div id="tbl-oppdrag-tider" class="mt-2"></div>
+      </div>
+    </div>
+    <div class="col-md-6">
+      <div class="chart-card">
+        <div class="chart-title">Responstid per hastegrad</div>
+        <div id="tbl-oppdrag-resp-hastegrad" class="mt-2"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Fordelinger -->
+  <div class="row g-2 mb-2">
+    <div class="col-md-4">
+      <div class="chart-card">
+        <div class="chart-title">Hastegrad</div>
+        <canvas id="chart-oppdrag-hastegrad" height="180"></canvas>
+      </div>
+    </div>
+    <div class="col-md-4">
+      <div class="chart-card">
+        <div class="chart-title">Status nå</div>
+        <canvas id="chart-oppdrag-status" height="180"></canvas>
+      </div>
+    </div>
+    <div class="col-md-4">
+      <div class="chart-card">
+        <div class="chart-title">Oppdrag per enhet</div>
+        <canvas id="chart-oppdrag-enhet" height="180"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <div class="row g-2 mb-2">
+    <div class="col-md-6">
+      <div class="chart-card">
+        <div class="chart-title">Problemstilling</div>
+        <canvas id="chart-oppdrag-problem" height="220"></canvas>
+      </div>
+    </div>
+    <div class="col-md-6">
+      <div class="chart-card">
+        <div class="chart-title">Lokasjon</div>
+        <canvas id="chart-oppdrag-lokasjon" height="220"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <div class="row g-2 mb-2">
+    <div class="col-12">
+      <div class="chart-card">
+        <div class="chart-title">Oppdrag per klokketime</div>
+        <canvas id="chart-oppdrag-ankomster" height="120"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tabeller -->
+  <div class="row g-2 mb-2">
+    <div class="col-md-6">
+      <div class="chart-card">
+        <div class="chart-title">Responstid per enhet</div>
+        <div id="tbl-oppdrag-resp-enhet" class="mt-2"></div>
+      </div>
+    </div>
+    <div class="col-md-6">
+      <div class="chart-card">
+        <div class="chart-title">Oppdragstid per problemstilling</div>
+        <div id="tbl-oppdrag-tid-problem" class="mt-2"></div>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /kilde-oppdrag -->

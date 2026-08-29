@@ -227,9 +227,29 @@ class StatusmeldingManager(models.Manager):
         ``korrigerer``. Korreksjoner kan kjedes: retter man en retting, er det
         den siste som står, og den forrige blir overstyrt på samme måte.
         """
-        alle = list(self.filter(oppdrag=oppdrag).order_by('created_at'))
+        return self.gjeldende_bulk([oppdrag.pk])[oppdrag.pk]
+
+    def gjeldende_bulk(self, oppdrag_ider):
+        """Samme regel som ``gjeldende()``, for mange oppdrag i én spørring.
+
+        Statistikken går gjennom hele vaktas oppdrag. Ett kall per oppdrag ga
+        én spørring per rad — men å skrive regelen om til en spørring der
+        borte ville vært verre: da fantes «nyeste ikke-korrigerte rad» to
+        steder, og den ene ville før eller siden telt det korrigerte
+        tidspunktet. Regelen står derfor fortsatt bare her, og ``gjeldende()``
+        er nå ett oppslag i dette resultatet.
+
+        Returnerer ``{oppdrag_id: [melding, ...]}`` med en tom liste for
+        oppdrag uten meldinger, slik at kalleren slipper `.get(pk, [])`.
+        """
+        ider = list(oppdrag_ider)
+        alle = list(self.filter(oppdrag_id__in=ider).order_by('created_at'))
         overstyrte = {m.korrigerer_id for m in alle if m.korrigerer_id}
-        return [m for m in alle if m.pk not in overstyrte]
+        ut = {pk: [] for pk in ider}
+        for melding in alle:
+            if melding.pk not in overstyrte:
+                ut[melding.oppdrag_id].append(melding)
+        return ut
 
     def gjeldende_for_status(self, oppdrag, status):
         """Den gjeldende meldingen for én status, eller ``None``."""

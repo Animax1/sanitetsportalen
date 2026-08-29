@@ -4,6 +4,56 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-08-29 — Oppdragsmodulen fase 6: statistikkregisteret og oppdragsfanen
+
+**1342 tester grønne** (46 nye). Ingen migrasjoner.
+
+**Statistikkappen navngir ingen kildemodul lenger.** Den importerte `patients.services`
+direkte — det virket så lenge det fantes én kilde, og var samtidig hele grunnen til at
+kilde nummer to ikke kunne legges til uten å endre appen. `core/stats.py` er registeret,
+samme idiom som `core.backup` og `core.arkiv`: hver modul melder inn en
+`BaseStatistikkHandler` fra `apps.ready()`, og handleren eier både utregningen og formen
+på payloaden. Pasienttallene flyttet ikke en linje — `full_stats()` ligger fortsatt i
+`patients/services.py`, og handleren er koblingen.
+
+- **Endepunktene bærer kilden:** `/statistikk/api/kilde/<slug>/full-stats/` og
+  `.../arkiv/<pk>/full-stats/`. Ett endepunkt per kilde, ikke ett samlet: en fane som
+  ikke er åpnet skal ikke koste noe, og cache-nøkkelen bærer både slug og vakt-ID — delte
+  de nøkkel, ville kilde nummer to servert kilde éns tall i 60 sekunder. De gamle stiene
+  videresender (302), av samme grunn som pasientmodulens gjorde da endepunktene flyttet:
+  en fane som sto åpen da deployen traff feiler ellers stille.
+- **Arkivoppslaget gjør handleren**, ikke statistikkappen — `VaktArkiv` er
+  pasientmodulens modell, og det var nettopp den importen som skulle bort. Oppdrag
+  arkiverer først i fase 7; basisklassen svarer `None`, som blir 404.
+- **Tilgangsregelen måtte endres i samme slengen.** §5 sa «vis kun kilder brukeren kan
+  lese», men koden ga 403 på hele siden om én kilde manglet. Det var det samme så lenge
+  det fantes én kilde; med to ville det tatt statistikken fra alle som leser pasienter
+  uten å ha oppdrag. Nå vises kildene kontoen har, og 403 er forbeholdt «ingen kilder».
+  En modul som er slått av i `ModuleSettings` forsvinner fra fanene — `har_tilgang`
+  svarer nei for den.
+- **Oppdragsfanen** viser responstid (opprettet → fremme), ventetid, utrykningstid, tid
+  på stedet og hele oppdraget, fordelinger per hastegrad, problemstilling, lokasjon og
+  enhet, status akkurat nå, og oppdrag per klokketime. Egen mal og egen JS-fil, lastet
+  kun for kontoer med oppdragstilgang; kall fra `statistikk.js` går gjennom
+  `_kallOppdrag()`, samme vern som `_kall()` på pasientsiden.
+- **§12.2 er besvart (André): den avledede varigheten utelates, ikke oppdraget.** Trykker
+  en enhet «Rykker ut» på et nytt oppdrag mens et annet pågår, lukkes det gamle med samme
+  tidsstempel og merkes `automatisk`. Sluttiden er da avledet — mannskapet kan ha vært
+  ferdig et kvarter før — så varigheter som *slutter* i en slik stempling telles ikke.
+  Oppdraget telles i alle antall og fordelinger, og responstiden fram til «Fremme» teller
+  som vanlig. Negative varigheter (en klokke som gikk feil offline) telles heller ikke.
+  Begge utelatelsene står på siden: et tall som er utelatt uten at noen får vite det, er
+  verre enn et tall som mangler.
+- **`Statusmelding.objects.gjeldende_bulk()`** kom til fordi statistikken går gjennom
+  hele vaktas oppdrag — ett kall per oppdrag ga én spørring per rad. Regelen «nyeste
+  ikke-korrigerte rad vinner» står fortsatt bare i manageren, og `gjeldende()` er nå ett
+  oppslag i bulk-resultatet. Låst av en test på manageren selv: statistikken ville
+  bestått uten regelen, fordi «siste rad per status» tilfeldigvis sammenfaller med den.
+- **Verifisert i nettleser**, ikke bare i testene: fanebytte begge veier, tallene mot
+  seedede oppdrag, og at et enhetsnavn med markup vises som tekst.
+
+---
+
 ## 2026-08-29 — Vakt som scope, deploy 2: vakta er fasit
 
 **1296 tester grønne** (13 nye/omskrevne rundt vakt-semantikken). Migrasjoner

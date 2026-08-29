@@ -11,3 +11,8 @@ class OppdragConfig(AppConfig):
         # Audit-signalene kobles her, slik at de er på plass fra første
         # lagring. Se `oppdrag/signals.py` — særlig `FELT_UTEN_VERDILOGGING`.
         from . import signals  # noqa: F401
+
+        # Statistikkregisteret (fase 6). Uten registreringen finnes ikke
+        # kilden, og statistikksiden viser ingen oppdragsfane.
+        from .statistikk import register_handlers
+        register_handlers()

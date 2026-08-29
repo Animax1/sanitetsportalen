@@ -238,7 +238,7 @@ function fmtChi2Inline(chi2) {
 }
 
 // ════════════════════════════════════════════════════════
-// STATISTICS – MAIN LOADER  (calls /api/full-stats/)
+// STATISTICS – MAIN LOADER  (calls /statistikk/api/kilde/patients/...)
 // ════════════════════════════════════════════════════════
 async function loadStats() {
   // Ingen rollesjekk her. Den lå i den gamle fila og leste `window.USER_ROLE`,
@@ -252,7 +252,7 @@ async function loadStats() {
     return;
   }
   try {
-    const res = await apiFetch('/statistikk/api/full-stats/');
+    const res = await apiFetch('/statistikk/api/kilde/patients/full-stats/');
     if (!res.ok) {
       // 403 = ingen statistikktilgang. 429 = hentet for ofte (S3).
       // Begge skal la forrige visning bli stående: alternativet er å
@@ -569,6 +569,51 @@ function mkInterpretation(s) {
 // TAB NAVIGATION
 // ════════════════════════════════════════════════════════
 
+// ── Kildefaner (fase 6) ─────────────────────────────────────────────────
+//
+// Én fane per modul brukeren kan lese tall fra. Fanene rendres server-side
+// fra core.stats-registeret; her byttes bare panelet, og kilden lastes
+// første gang den åpnes.
+
+// Renderingen av oppdragstallene ligger i statistikk-oppdrag.js, som kun
+// lastes for kontoer med oppdragstilgang. Samme vern som `_kall()` på
+// pasientsiden: uten sjekken ville et faneklikk gitt ReferenceError for
+// alle andre — og fanen finnes riktignok ikke for dem, men et direkte kall
+// fra alltid-lastet kode til en betinget lastet fil er hullet, ikke klikket.
+function _kallOppdrag(navn, ...args) {
+  const fn = globalThis[navn];
+  if (typeof fn !== 'function') return undefined;
+  return fn(...args);
+}
+
+function aktivKilde() {
+  const btn = document.querySelector('.kilde-btn.active');
+  if (btn) return btn.dataset.arg;
+  // Én kilde: fanerada rendres ikke i det hele tatt, og panelet er fasit.
+  const panel = document.querySelector('.kilde-panel.active');
+  return panel ? panel.id.replace(/^kilde-/, '') : 'patients';
+}
+
+function visKilde(slug) {
+  if (!slug) return;
+  document.querySelectorAll('.kilde-panel').forEach(p => {
+    p.classList.toggle('active', p.id === 'kilde-' + slug);
+  });
+  document.querySelectorAll('.kilde-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.arg === slug);
+  });
+
+  if (slug === 'oppdrag') {
+    _kallOppdrag('loadOppdragStats');
+    return;
+  }
+  // Pasientfanen: rendres på nytt av samme grunn som ved sub-faneskift —
+  // panelet var skjult da tallene kom, og Chart.js tegner ikke i et
+  // display:none-element.
+  if (fullStats) renderStatTab(activeStatTab);
+  else loadStats();
+}
+
 // Stats sub-tab navigation
 document.querySelectorAll('.stats-subbtn').forEach(btn => {
   btn.addEventListener('click', () => {
@@ -593,7 +638,7 @@ async function _lastArkivStatistikk(id) {
   // To kall: tallene fra statistikk-appen, metadataene til banneret fra
   // pasientmodulen som eier arkivet. Begge krever arkivrollen.
   const [statsRes, metaRes] = await Promise.all([
-    apiFetch(`/statistikk/api/arkiv/${id}/full-stats/`),
+    apiFetch(`/statistikk/api/kilde/patients/arkiv/${id}/full-stats/`),
     apiFetch(`/pasienter/api/innstillinger/arkiv/${id}/`),
   ]);
 
@@ -623,10 +668,16 @@ document.addEventListener('DOMContentLoaded', async () => {
   const arkivId = new URLSearchParams(window.location.search).get('arkiv');
   if (arkivId && /^\d+$/.test(arkivId)) {
     if (await _lastArkivStatistikk(arkivId)) {
+      // Arkivet er én vakts pasienter. Kildefanene skjules mens vi står i
+      // det: et arkiv har ingen oppdragstall å bytte til (fase 7), og en
+      // fane som fører til en tom visning er en knapp som fører til en vegg.
+      document.getElementById('kilde-nav')?.classList.add('d-none');
       _oppdaterArkivBanner();
       renderStatTab(activeStatTab);
       return;
     }
   }
-  loadStats();
+  // Kontoen kan mangle pasienttilgang — da er oppdrag den åpne fanen, og
+  // `loadStats()` ville hentet noe brukeren ikke får se.
+  visKilde(aktivKilde());
 });
