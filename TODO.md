@@ -863,15 +863,22 @@ Gjennomgang 13. aug. 2026, med 1000 pasienter og peak 100 brukere som premiss.
             reversibel innsjekk-port uten kobling til aktiv vakt; kostbehov utgikk;
             personregistrene i pasientmodulen forblir urørt; kopiering tar oppsettet,
             aldri personene.
-      - [ ] **Korps er en badge, ikke en akse.** `skriv_handling` = fører sitt eget
+      - [x] **Fase 3 — tilgangsmodellen tatt i bruk (29. aug. 2026).**
+            `admin_only` av. Badge- og reservasjonssjekk per objekt på hvert
+            endepunkt; verdimengdene og utdeling av ressurser er `skriv_full`;
+            sletting av en vaktliste er global admin. `korps_id` sjekkes mot
+            **begge** korps, og `user_id` er `skriv_full` fordi koblingen
+            flytter en badge. Grensesnittet gater på `window.MODUL_TILGANG` +
+            badgen, og JS-gatingen kjøres i node. 48 nye tester, tolv
+            mutasjoner prøvd.
+      - [x] **Korps er en badge, ikke en akse.** `skriv_handling` = fører sitt eget
             korps, `skriv_full` = alle korps **og** den eneste som stempler møtt/av
-            vakt. Korpset arves fra `Mannskap.korps` via `Mannskap.user`, som
-            `Enhet.user` i oppdragsmodulen. Ingen ny verdi i `NIVAA_HIERARKI`.
-            - [ ] **Prisen: nivånavnet betyr noe annet her enn i oppdrag.** Matrisen
-                  viser en global etikett («Skrive: handling») fra `TilgangsNivaa`.
-                  Trengs en valgfri etikett per modul per nivå, ellers deles nivået ut
-                  i god tro med feil forventning — nøyaktig feilen rollemodellnotatet
-                  alt har kalt ut én gang.
+            vakt (fase 4). Korpset arves fra `Mannskap.korps` via `Mannskap.user`,
+            som `Enhet.user` i oppdragsmodulen. Ingen ny verdi i `NIVAA_HIERARKI`.
+            - [x] **Prisen betalt: `Module.nivaa_navn`.** Matrisen og «Min profil»
+                  viser nå «Skrive: eget korps» på vaktlista og «Skrive: stempling»
+                  på oppdrag, der begge før het «Skrive: handling». Nivået er det
+                  samme; betydningen er det ikke.
       - [ ] **Matallergi lagres ikke i portalen.** Besluttet fordi det er en
             helseopplysning (art. 9) og ville krevd fem mekanismer for én kolonne.
             Samles inn utenfor. Konsekvensen er ærlig: lista kan ikke brukes til

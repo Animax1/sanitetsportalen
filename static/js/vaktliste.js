@@ -23,6 +23,43 @@ const OVERSIKT = 'oversikt';
 const IKKE_PLASSERT = 'ikke-plassert';
 
 
+// ── Tilgang (fase 3) ─────────────────────────────────────────────────────
+//
+// Speiler services.py. Serveren håndhever uansett — dette avgjør bare hvilke
+// knapper som tegnes, fordi en knapp som fører til en vegg er verre enn ingen
+// knapp. Reglene står to steder med vilje, og de to stedene testes hver for
+// seg: JS-en her i node, serveren i vaktliste/tests_tilgang.py.
+
+function _nivaa() {
+  return ((window.MODUL_TILGANG || {}).vaktliste || '').toLowerCase();
+}
+
+
+function kanSkriveAlt() {
+  return (window.MODUL_TILGANG || {}).admin === true || _nivaa() === 'skriv_full';
+}
+
+
+function kanSkriveNoe() {
+  return kanSkriveAlt() || _nivaa() === 'skriv_handling';
+}
+
+
+function kanBemanne(ressurs) {
+  // Den ene halvdelen av den doble regelen: reservasjonen. En ureservert
+  // ressurs er ikke et fristed — den er vaktlederens bord.
+  if (kanSkriveAlt()) return true;
+  if (_nivaa() !== 'skriv_handling') return false;
+  return window.MITT_KORPS_ID != null && ressurs.korps_id === window.MITT_KORPS_ID;
+}
+
+
+function gateKnapper() {
+  document.querySelectorAll('.vl-krev-full')
+    .forEach((el) => el.classList.toggle('d-none', !kanSkriveAlt()));
+}
+
+
 // ── Henting ──────────────────────────────────────────────────────────────
 
 async function lastVaktlister() {
@@ -200,7 +237,29 @@ function mkRessurs(r) {
   const enhetsmerke = r.enhet_navn
     ? `<span class="vl-merkelapp">Enhet: ${escapeHtml(r.enhet_navn)}</span>` : '';
 
-  const rader = poster.length ? poster.map((vp) => `
+  // «Sett på vakt» følger reservasjonen; «Fjern ressurs» er å dele ut, og
+  // ligger derfor et hakk høyere.
+  const settKnapp = kanBemanne(r)
+    ? `<button class="btn btn-sm btn-primary" type="button"
+               data-action="apneVaktpost" data-id="${escHtmlValue(r.id)}">
+         <i class="bi bi-person-plus me-1"></i>Sett på vakt
+       </button>` : '';
+  const fjernKnapp = kanSkriveAlt()
+    ? `<button class="btn btn-sm btn-outline-danger" type="button"
+               data-action="fjernRessurs" data-id="${escHtmlValue(r.id)}">Fjern ressurs</button>`
+    : '';
+  const knapper = settKnapp + fjernKnapp;
+
+  // Å fjerne et skift er samme handling som å sette det, sett fra motsatt
+  // side — derfor samme regel, ikke en strengere. Avgjøres én gang for
+  // ressursen; knappen bygges per rad fordi den bærer radens id.
+  const kanRore = kanBemanne(r);
+  const rader = poster.length ? poster.map((vp) => {
+    const fjernPost = kanRore
+      ? `<button class="btn btn-sm btn-outline-danger" type="button"
+                 data-action="fjernVaktpost" data-id="${escHtmlValue(vp.id)}">Fjern</button>`
+      : '';
+    return `
     <div class="vl-rad">
       <div>
         <span class="vl-navn">${escapeHtml(vp.navn)}</span>
@@ -208,10 +267,10 @@ function mkRessurs(r) {
       </div>
       <div class="d-flex align-items-center gap-2">
         <span class="vl-meta">${escapeHtml(_tidsspenn(vp))}</span>
-        <button class="btn btn-sm btn-outline-danger" type="button"
-                data-action="fjernVaktpost" data-id="${escHtmlValue(vp.id)}">Fjern</button>
+        ${fjernPost}
       </div>
-    </div>`).join('')
+    </div>`;
+  }).join('')
     : '<div class="vl-tom">Ingen satt opp ennå.</div>';
 
   return `
@@ -225,14 +284,7 @@ function mkRessurs(r) {
           ${korpsmerke}
           ${enhetsmerke}
         </div>
-        <div class="d-flex gap-2">
-          <button class="btn btn-sm btn-primary" type="button"
-                  data-action="apneVaktpost" data-id="${escHtmlValue(r.id)}">
-            <i class="bi bi-person-plus me-1"></i>Sett på vakt
-          </button>
-          <button class="btn btn-sm btn-outline-danger" type="button"
-                  data-action="fjernRessurs" data-id="${escHtmlValue(r.id)}">Fjern ressurs</button>
-        </div>
+        <div class="d-flex gap-2">${knapper}</div>
       </div>
       ${rader}
     </div>`;
@@ -443,5 +495,6 @@ async function fjernVaktpost(id) {
 
 
 document.addEventListener('DOMContentLoaded', () => {
+  gateKnapper();
   lastVaktlister();
 });

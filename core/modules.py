@@ -65,6 +65,20 @@ class Module:
             Den globale lista hadde dessuten motsatt feil samtidig: den tilbød
             `skriv_full` på `statistikk`, der skriving ikke finnes. Et nivå som
             ikke gir noe er lett å dele ut i god tro.
+        nivaa_navn: Valgfri etikett per nivå, som ``(verdi, tekst)``-par.
+            Matrisen og «Min profil» bruker den når den finnes, og
+            ``TilgangsNivaa.choices`` ellers.
+
+            Finnes fordi **samme nivå betyr ulike ting i ulike moduler**. I
+            oppdragsmodulen er `skriv_handling` «navngitte stemplinger, leser
+            ikke request-kroppen»; i vaktlista er det nesten det motsatte —
+            redigering, men bare eget korps, og ingen stempling. Navnet i
+            stigen er generisk nok til å bære begge, men en admin som deler ut
+            «Skrive: handling» på vaktlista ville lest oppdragsmodulens
+            betydning inn i den. Se §4.5 i docs/BESLUTNING_VAKTLISTE.md.
+
+            Par framfor `dict` fordi dataklassen er frosset og hashable, og en
+            `dict` ville tatt hashbarheten med seg.
     """
 
     slug: str
@@ -78,6 +92,20 @@ class Module:
     show_in_nav: bool = True
     show_in_dashboard: bool = True
     nivaaer: tuple[str, ...] = ('les', 'skriv_full')
+    nivaa_navn: tuple[tuple[str, str], ...] = ()
+
+    def etikett_for(self, nivaa: str) -> str:
+        """Modulens egen etikett for nivået, eller stigens generiske.
+
+        Faller tilbake på verdien selv for et ukjent nivå. Det er med vilje
+        udramatisk: dette er visning, ikke håndhevelse, og en ukjent verdi som
+        vises rått er lettere å oppdage enn en som stille blir tom.
+        """
+        for verdi, tekst in self.nivaa_navn:
+            if verdi == nivaa:
+                return tekst
+        from accounts.models import TilgangsNivaa  # noqa: WPS433
+        return dict(TilgangsNivaa.choices).get(nivaa, nivaa)
 
     def is_visible_for(self, user) -> bool:
         """Avgjør om modulen skal vises for gitt bruker.

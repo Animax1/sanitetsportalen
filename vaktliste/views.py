@@ -2,12 +2,16 @@
 
 Se ``docs/BESLUTNING_VAKTLISTE.md``. Tre ting å vite om denne fila:
 
-**Modulen er admin-only i fase 2.** `Module.admin_only=True` gjør at kortet
-kun vises for global admin, og hvert view sjekker `er_global_admin` i tillegg.
-Nivåene (`les`/`skriv_handling`/`skriv_full`) er deklarert, men objektsjekkene
-som gir dem mening — badgen og reservasjonen — kommer i fase 3. Fram til da er
-fail-closed riktigere enn halvt håndhevet: et nivå som slipper inn uten at
-korps-regelen finnes, ville gitt korps-brukeren tilgang til alle korps.
+**Fase 3 gater på nivå og objekt, ikke på admin.** `@modul_kreves(...,
+'les')` slipper inn på lesing; skriving avgjøres inne i viewet, per objekt.
+To terskler, og skillet mellom dem er *hva slags utsagn* nivået får avgi:
+
+| Handling | Krav |
+|---|---|
+| Lese lista | `les` — hele lista, alle korps (§4.4) |
+| Bemanne en ressurs | `services.kan_sette_vaktpost()` — badge **og** reservasjon |
+| Dele ut ressurser, planlegge ny vakt | `services.kan_skrive_alt()` |
+| Slette en vaktliste | global admin — irreversibelt |
 
 **Reglene ligger i `services.py`**, ikke her. `kan_sette_vaktpost()` er
 skrevet som én funksjon nettopp for at et endepunkt ikke skal kunne huske
@@ -39,7 +43,7 @@ from core.auth_decorators import er_global_admin, modul_kreves
 from core.ratelimit import rate_limit
 
 from . import choices, services
-from .models import Kompetanse, Korps, Mannskap, Ressurs, VaktRolle, Vaktliste, Vaktpost
+from .models import Korps, Mannskap, Ressurs, VaktRolle, Vaktliste, Vaktpost
 
 
 # ── Hjelpere ─────────────────────────────────────────────────────────────────
@@ -55,9 +59,35 @@ def _feil(melding, status=400):
     return JsonResponse({'status': 'error', 'message': melding}, status=status)
 
 
-def _nektet():
-    """Fase 2s eneste gate. Erstattes av nivå + objektsjekk i fase 3."""
-    return _feil('Ingen tilgang', status=403)
+def _nektet(melding='Ingen tilgang'):
+    """403 med samme form som resten av API-et.
+
+    Meldingen er generisk som standard: et svar som forteller *hvorfor* en
+    ressurs er stengt, forteller også at den finnes.
+    """
+    return _feil(melding, status=403)
+
+
+def _tilgangskontekst(user):
+    """Nivået, admin-flagget og badgen — det grensesnittet trenger for å gate.
+
+    Sendes til begge sidene i modulen. **Dette er visning, ikke håndhevelse:**
+    hver av verdiene speiler en regel serveren håndhever uansett, og en klient
+    som lyver om dem får fortsatt 403. Poenget er at en knapp som fører til en
+    vegg er verre enn ingen knapp.
+
+    `mitt_korps_id` er badgen, og den er *ikke* tilgang i seg selv — den lar
+    bare nettleseren regne ut det samme som `kan_bemanne_ressurs()` gjør, slik
+    at korps-brukeren ser «Sett på vakt» på sine egne ressurser og ikke på
+    andres.
+    """
+    from core.auth_decorators import nivaa_for
+    korps = services.brukerens_korps(user)
+    return {
+        'modul_nivaa': nivaa_for(user, 'vaktliste') or '',
+        'er_global_admin': er_global_admin(user),
+        'mitt_korps_id': korps.pk if korps else None,
+    }
 
 
 def _int(raa):
@@ -146,15 +176,18 @@ def index_view(request):
 
     Fanene bygges av ressursene i nettleseren — de er data, ikke kode, og
     tilpasser seg vaktas art av seg selv.
+
+    Konteksten bærer nivået og badgen fordi **grensesnittet gater på
+    `window.MODUL_TILGANG`, ikke på rollen** (CLAUDE.md). Uten badgen kunne
+    ikke nettleseren skille en ressurs korps-brukeren får bemanne fra en hun
+    ikke får — og en «Sett på vakt»-knapp som gir 403 er verre enn ingen knapp.
     """
-    if not er_global_admin(request.user):
-        from django.core.exceptions import PermissionDenied
-        raise PermissionDenied
     return render(request, 'vaktliste/index.html', {
         'ressurstyper': [
             {'verdi': v, 'navn': n, 'ikon': choices.RESSURSTYPE_IKON.get(v, 'box')}
             for v, n in choices.RESSURSTYPE_VALG
         ],
+        **_tilgangskontekst(request.user),
     })
 
 
@@ -170,8 +203,11 @@ def vaktlister_view(request):
     POST lager **både** `core.Vakt` og vaktlista, og rører ikke portalens
     aktive vakt — se `services.opprett_planlagt_vakt`. Er `kopier_fra` satt,
     kopieres ressursoppsettet fra en tidligere liste; aldri personene.
+
+    Å planlegge en vakt er `skriv_full`: det lager en rad i `core.Vakt`, som
+    er portalens scope og ikke ett korps' bord.
     """
-    if not er_global_admin(request.user):
+    if request.method == 'POST' and not services.kan_skrive_alt(request.user):
         return _nektet()
 
     if request.method == 'GET':
@@ -207,8 +243,12 @@ def vaktliste_detalj_view(request, pk):
     GET er sidas hovedkall: ressurser, vaktposter og nedtrekksdataene i ett
     svar. Faner uten data er fortsatt faner, så alt hentes samlet framfor ett
     kall per ressurs.
+
+    DELETE er **global admin**. Å slette en vaktliste river hele oppsettet og
+    alle skiftene på det; det hører til samme kategori som resten av det
+    irreversible i portalen, ikke til modulaksen.
     """
-    if not er_global_admin(request.user):
+    if request.method == 'DELETE' and not er_global_admin(request.user):
         return _nektet()
 
     try:
@@ -272,11 +312,12 @@ def _enheter():
 def ressurser_view(request, pk):
     """Legg en ressurs til vaktlista.
 
-    Reservasjonen (`korps`) settes her, av den som deler ut — i fase 2 er det
-    alltid admin. Fra fase 3 er det `skriv_full`/admin, og korps-brukeren
-    bemanner det som er reservert henne.
+    Reservasjonen (`korps`) settes her, av den som **deler ut**: `skriv_full`
+    eller admin. Korps-brukeren bemanner det som er reservert henne, men
+    bestemmer ikke selv hva hun får — kunne hun det, ville reservasjonen ikke
+    vært en tildeling.
     """
-    if not er_global_admin(request.user):
+    if not services.kan_skrive_alt(request.user):
         return _nektet()
 
     try:
@@ -314,8 +355,8 @@ def ressurser_view(request, pk):
 @modul_kreves('vaktliste', 'les', svar='json')
 @require_http_methods(['PUT', 'DELETE'])
 def ressurs_detalj_view(request, pk):
-    """Rediger eller fjern en ressurs."""
-    if not er_global_admin(request.user):
+    """Rediger eller fjern en ressurs. `skriv_full`/admin — se `ressurser_view`."""
+    if not services.kan_skrive_alt(request.user):
         return _nektet()
 
     try:
@@ -362,10 +403,11 @@ def ressurs_detalj_view(request, pk):
 @require_http_methods(['POST'])
 @rate_limit(group='vaktliste:vaktposter', rate='120/m', method='POST')
 def vaktposter_view(request, pk):
-    """Sett en person på en ressurs, med rolle og skifttider."""
-    if not er_global_admin(request.user):
-        return _nektet()
+    """Sett en person på en ressurs, med rolle og skifttider.
 
+    Her lever den doble regelen (§4.2): badgen på personen **og**
+    reservasjonen på ressursen. Begge sjekkes av én funksjon i `services`.
+    """
     try:
         ressurs = Ressurs.objects.select_related('korps').get(pk=pk)
     except Ressurs.DoesNotExist:
@@ -416,10 +458,12 @@ def vaktposter_view(request, pk):
 @modul_kreves('vaktliste', 'les', svar='json')
 @require_http_methods(['PUT', 'DELETE'])
 def vaktpost_detalj_view(request, pk):
-    """Rediger tider, rolle og merknad — eller fjern skiftet."""
-    if not er_global_admin(request.user):
-        return _nektet()
+    """Rediger tider, rolle og merknad — eller fjern skiftet.
 
+    Samme doble regel som ved opprettelsen, og lest fra raden som *finnes*:
+    hadde vi lest den fra request-kroppen, kunne en korps-bruker rørt et skift
+    på en annen ressurs ved å oppgi sin egen.
+    """
     try:
         vaktpost = Vaktpost.objects.select_related(
             'ressurs', 'ressurs__korps', 'mannskap', 'mannskap__korps', 'rolle'

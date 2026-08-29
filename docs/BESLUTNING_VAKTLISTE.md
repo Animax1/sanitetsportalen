@@ -386,7 +386,7 @@ utformingen her stenger for det.
 | 1 | ✅ App, modulregistrering, `Korps`/`Kompetanse`/`VaktRolle`, `Mannskap` med admin. Personvernrader i A.6/A.9, audit-unntak for `notat` | levert |
 | 2 | ✅ `Vaktliste`, `Ressurs` med reservasjon, `Vaktpost` med tider, planlegging med faner. «Ny planlagt vakt», kopiering av oppsett. Admin-only til fase 3 | levert |
 | 2b | ✅ Registersiden `/vaktliste/registre/`: mannskapsoversikt gruppert på korps, og admin for `Korps`/`Kompetanse`/`VaktRolle`. Ikke planlagt — notatet forutsatte stilltiende Django-admin, som er av i prod (S1) | levert |
-| 3 | Tilgangsmodellen: badge- og reservasjonssjekk på objektnivå, per-modul-etikett i matrisen (§4.5) | 5–6 t |
+| 3 | ✅ Tilgangsmodellen: badge- og reservasjonssjekk på objektnivå, per-modul-etikett i matrisen (§4.5). `admin_only` av | levert |
 | 4 | Drift: i/ut av drift, møtt/av vakt (kun `skriv_full`), «Tilstede nå» med utskrift | 5–7 t |
 | 5 | Planleggingstall (§8b): bemanningskurve, per person, varsler | 4–6 t |
 | 6 | Kobling til `/oppdrag`: besetningspanel på enheten | 3–4 t |

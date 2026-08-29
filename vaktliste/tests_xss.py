@@ -37,6 +37,9 @@ REVIEWED_INTERPOLATIONS = {
     "vp.rolle ? ' · ' + escapeHtml(vp.rolle) : ''":
         'ternær der den ene grenen er escapet og den andre er tom streng',
     "deler.join('')": 'markup bygget lokalt i samme funksjon',
+    # Fase 3: knappene bygges lokalt og bare når tilgangen tillater dem.
+    'knapper': 'markup bygget lokalt, id-ene escapet inni',
+    'fjernPost': 'markup bygget lokalt, vaktpost-id escapet inni',
 }
 
 
@@ -99,8 +102,14 @@ class VaktlisteEscapingOppforselTests(SimpleTestCase):
                            '_escHtml', 'klokke')),
         (VAKTLISTE_JS, ('mkRessurs', 'mkOversikt', 'mkIkkePlassert',
                         'tegnFaner', '_posterFor', '_ikkePlassert',
-                        '_tidsspenn')),
+                        '_tidsspenn', '_nivaa', 'kanSkriveAlt', 'kanBemanne')),
     )
+
+    #: Byggerne spør om tilgang fra fase 3. Node har ingen `window`, så den
+    #: stubbes — og med admin, slik at *alle* knappene bygges. Escaping-testene
+    #: skal se mest mulig markup; hvem som får se hva er `tests_tilgang.py`
+    #: sitt bord.
+    VINDU = "globalThis.window = { MODUL_TILGANG: { admin: true } };"
 
     def setUp(self):
         if not node_available():
@@ -118,7 +127,7 @@ class VaktlisteEscapingOppforselTests(SimpleTestCase):
 
     def test_ressursnavn_med_markup_kommer_ut_som_tekst(self):
         """Fritekstfeltet i modulen — admin skriver hva som helst her."""
-        ut = run_node(self.harness, f'''
+        ut = run_node(self.harness, self.VINDU + f'''
             globalThis.aktivListe = {self._liste()};
             console.log(mkRessurs({{
               id: 1, navn: '<img src=x onerror=alert(1)>', ikon: 'people',
@@ -130,7 +139,7 @@ class VaktlisteEscapingOppforselTests(SimpleTestCase):
 
     def test_ikonet_kommer_fra_data_og_escapes(self):
         """Ikonet står i et class-attributt — et bruddpunkt for attributt-XSS."""
-        ut = run_node(self.harness, f'''
+        ut = run_node(self.harness, self.VINDU + f'''
             globalThis.aktivListe = {self._liste()};
             console.log(mkRessurs({{
               id: 1, navn: 'Lag 1', ikon: '" onload="alert(1)',
@@ -140,7 +149,7 @@ class VaktlisteEscapingOppforselTests(SimpleTestCase):
         self.assertNotIn('onload="alert(1)"', ut)
 
     def test_mannskapsnavn_i_oversikten_escapes(self):
-        ut = run_node(self.harness, f'''
+        ut = run_node(self.harness, self.VINDU + f'''
             globalThis.aktivListe = {self._liste(
                 ressurser=[{'id': 1, 'navn': 'Lag 1'}],
                 vaktposter=[{
@@ -157,7 +166,7 @@ class VaktlisteEscapingOppforselTests(SimpleTestCase):
     def test_korpsnavn_i_gruppeoverskriften_escapes(self):
         """Overskriften bygges av en nøkkel i en gruppering — verdien kommer
         fortsatt fra basen, og går gjennom samme escaping."""
-        ut = run_node(self.harness, f'''
+        ut = run_node(self.harness, self.VINDU + f'''
             globalThis.aktivListe = {self._liste(
                 ressurser=[{'id': 1, 'navn': 'Lag 1'}],
                 vaktposter=[{
@@ -172,7 +181,7 @@ class VaktlisteEscapingOppforselTests(SimpleTestCase):
         self.assertIn('&lt;b&gt;', ut)
 
     def test_fanenavn_escapes(self):
-        ut = run_node(self.harness, f'''
+        ut = run_node(self.harness, self.VINDU + f'''
             globalThis.aktivFane = 'oversikt';
             globalThis.OVERSIKT = 'oversikt';
             globalThis.IKKE_PLASSERT = 'ikke-plassert';
@@ -187,7 +196,7 @@ class VaktlisteEscapingOppforselTests(SimpleTestCase):
         self.assertIn('&lt;b&gt;', ut)
 
     def test_ikke_plassert_escapes(self):
-        ut = run_node(self.harness, f'''
+        ut = run_node(self.harness, self.VINDU + f'''
             globalThis.aktivListe = {self._liste(
                 mannskap=[{'id': 1, 'navn': '<i>Kari</i>',
                            'korps_navn': '<i>HGSD</i>'}])};
@@ -255,6 +264,10 @@ REGISTER_REVIEWED = {
     'rader': 'markup bygget lokalt i samme funksjon',
     'innhold': 'markup bygget lokalt i samme funksjon',
     "deler.join('')": 'markup bygget lokalt i samme funksjon',
+    # Fase 3: knappene bygges lokalt og bare når tilgangen tillater dem.
+    'knapper': 'markup bygget lokalt, mannskaps-id escapet inni',
+    'verdiKnapper': 'markup bygget lokalt, rad-id escapet inni',
+    'nyKnapp': 'markup bygget lokalt, etiketten escapet inni',
 }
 
 
@@ -302,8 +315,11 @@ class RegistersidenEscapingOppforselTests(SimpleTestCase):
 
     HARNESS = (
         (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue', 'trustedHtml', '_escHtml')),
-        (VAKTLISTE_REGISTRE_JS, ('mkMannskap', 'mkVerdier')),
+        (VAKTLISTE_REGISTRE_JS, ('mkMannskap', 'mkVerdier', '_nivaa',
+                                 'kanSkriveAlt', 'kanRedigerePerson')),
     )
+
+    VINDU = "globalThis.window = { MODUL_TILGANG: { admin: true } };"
 
     def setUp(self):
         if not node_available():
@@ -311,7 +327,7 @@ class RegistersidenEscapingOppforselTests(SimpleTestCase):
         self.harness = build_harness(self.HARNESS)
 
     def test_personnavn_og_kompetanse_escapes(self):
-        ut = run_node(self.harness, """
+        ut = run_node(self.harness, self.VINDU + """
             globalThis.data = { mannskap: [{
               id: 1, navn: '<img src=x onerror=alert(1)>',
               korps_navn: 'HGSD', korps_kort: 'HGSD',
@@ -325,7 +341,7 @@ class RegistersidenEscapingOppforselTests(SimpleTestCase):
         self.assertIn('&lt;img', ut)
 
     def test_brukernavn_og_telefon_escapes(self):
-        ut = run_node(self.harness, """
+        ut = run_node(self.harness, self.VINDU + """
             globalThis.data = { mannskap: [{
               id: 1, navn: 'Kari', korps_navn: 'HGSD', korps_kort: 'HGSD',
               kompetanser: [], telefon: '<i>90</i>',
@@ -337,7 +353,7 @@ class RegistersidenEscapingOppforselTests(SimpleTestCase):
         self.assertNotIn('<i>90</i>', ut)
 
     def test_verdinavn_og_kortnavn_escapes(self):
-        ut = run_node(self.harness, """
+        ut = run_node(self.harness, self.VINDU + """
             globalThis.aktivRegisterFane = 'korps';
             globalThis.REGISTRE = { korps: {sti:'korps', ental:'korps',
                                             tittel:'Korps', kortnavn:true} };
@@ -353,8 +369,8 @@ class RegistersidenEscapingOppforselTests(SimpleTestCase):
 
     def test_inaktiv_rad_merkes(self):
         """Pensjonering er den normale veien ut — raden skal fortsatt vises,
-        men tydelig nedtonet."""
-        ut = run_node(self.harness, """
+        men tydelig nedtonet. Kontrollen ligger i JS-assertene."""
+        run_node(self.harness, self.VINDU + """
             globalThis.data = { mannskap: [{
               id: 1, navn: 'Kari', korps_navn: 'HGSD', korps_kort: 'HGSD',
               kompetanser: [], telefon: '', brukernavn: '',

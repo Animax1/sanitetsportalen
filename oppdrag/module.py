@@ -31,4 +31,12 @@ OppdragModule = Module(
     # Den første modulen som tar `skriv_handling` i bruk: bilen stempler
     # status uten å kunne redigere felter. Se §3.2 i rollemodellnotatet.
     nivaaer=('les', 'skriv_handling', 'skriv_full'),
+    # Etiketten er denne modulens egen fordi vaktlista bruker samme nivå til
+    # noe annet — «fører sitt eget korps». Stod de begge som «Skrive:
+    # handling» i matrisen, ville den som deler ut lest den ene modulens
+    # betydning inn i den andre. Se §4.5 i vaktlistenotatet.
+    nivaa_navn=(
+        ('skriv_handling', 'Skrive: stempling'),
+        ('skriv_full', 'Skrive: full'),
+    ),
 )

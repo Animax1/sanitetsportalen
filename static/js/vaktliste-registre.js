@@ -28,6 +28,38 @@ const REGISTRE = {
 };
 
 
+// ── Tilgang (fase 3) ─────────────────────────────────────────────────────
+//
+// Speiler views_registre.py. Serveren håndhever uansett; dette avgjør hvilke
+// knapper som tegnes.
+
+function _nivaa() {
+  return ((window.MODUL_TILGANG || {}).vaktliste || '').toLowerCase();
+}
+
+
+function kanSkriveAlt() {
+  return (window.MODUL_TILGANG || {}).admin === true || _nivaa() === 'skriv_full';
+}
+
+
+function kanRedigerePerson(person) {
+  // Badgen. `skriv_handling` fører sitt eget korps og ingen andres.
+  if (kanSkriveAlt()) return true;
+  if (_nivaa() !== 'skriv_handling') return false;
+  return window.MITT_KORPS_ID != null && person.korps_id === window.MITT_KORPS_ID;
+}
+
+
+function gateKnapper() {
+  const skriv = kanSkriveAlt() || _nivaa() === 'skriv_handling';
+  document.querySelectorAll('.vlr-krev-skriv')
+    .forEach((el) => el.classList.toggle('d-none', !skriv));
+  document.querySelectorAll('.vlr-krev-full')
+    .forEach((el) => el.classList.toggle('d-none', !kanSkriveAlt()));
+}
+
+
 // ── Henting ──────────────────────────────────────────────────────────────
 
 async function lastRegistre() {
@@ -93,18 +125,21 @@ function mkMannskap() {
           : '';
         const tlf = m.telefon
           ? `<span class="vl-meta">${escapeHtml(m.telefon)}</span>` : '';
+        // Badgen avgjør per rad: korps-føreren ser knappene på sine egne
+        // folk, og bare leser resten av lista.
+        const knapper = kanRedigerePerson(m)
+          ? `<button class="btn btn-sm btn-outline-secondary" type="button"
+                     data-action="apneRedigerPerson" data-id="${escHtmlValue(m.id)}">Rediger</button>
+             <button class="btn btn-sm btn-outline-danger" type="button"
+                     data-action="slettPerson" data-id="${escHtmlValue(m.id)}">Slett</button>`
+          : '';
         return `
           <div class="vl-rad${inaktiv}">
             <div class="d-flex align-items-center gap-2 flex-wrap">
               <span class="vl-navn">${escapeHtml(m.navn)}</span>
               ${inaktivMerke}${merker}${tlf}${konto}
             </div>
-            <div class="d-flex gap-2">
-              <button class="btn btn-sm btn-outline-secondary" type="button"
-                      data-action="apneRedigerPerson" data-id="${escHtmlValue(m.id)}">Rediger</button>
-              <button class="btn btn-sm btn-outline-danger" type="button"
-                      data-action="slettPerson" data-id="${escHtmlValue(m.id)}">Slett</button>
-            </div>
+            <div class="d-flex gap-2">${knapper}</div>
           </div>`;
       }).join('');
     return `<div class="vl-korpsgruppe"><h3>${escapeHtml(korps)} `
@@ -119,7 +154,16 @@ function mkVerdier(fane) {
   const reg = REGISTRE[fane];
   const rader = data[fane];
 
+  // Verdimengdene er organisasjonens oppsett — `skriv_full`. Korps-føreren
+  // ser dem (nedtrekkslistene trenger dem), men endrer dem ikke.
+  const full = kanSkriveAlt();
   const innhold = rader.length ? rader.map((r) => {
+    const verdiKnapper = full
+      ? `<button class="btn btn-sm btn-outline-secondary" type="button"
+                 data-action="apneRedigerVerdi" data-id="${escHtmlValue(r.id)}">Rediger</button>
+         <button class="btn btn-sm btn-outline-danger" type="button"
+                 data-action="slettVerdi" data-id="${escHtmlValue(r.id)}">Slett</button>`
+      : '';
     const inaktiv = r.er_aktiv ? '' : ' vl-inaktiv';
     const inaktivMerke = r.er_aktiv ? ''
       : '<span class="vl-merkelapp vl-ureservert">Inaktiv</span>';
@@ -136,23 +180,22 @@ function mkVerdier(fane) {
           <span class="vl-navn">${escapeHtml(r.navn)}</span>
           ${inaktivMerke}${kort}${bruk}
         </div>
-        <div class="d-flex gap-2">
-          <button class="btn btn-sm btn-outline-secondary" type="button"
-                  data-action="apneRedigerVerdi" data-id="${escHtmlValue(r.id)}">Rediger</button>
-          <button class="btn btn-sm btn-outline-danger" type="button"
-                  data-action="slettVerdi" data-id="${escHtmlValue(r.id)}">Slett</button>
-        </div>
+        <div class="d-flex gap-2">${verdiKnapper}</div>
       </div>`;
   }).join('') : '<div class="vl-tom">Ingen ennå.</div>';
+
+  const nyKnapp = full
+    ? `<button class="btn btn-sm btn-primary" type="button"
+               data-action="apneNyVerdi">
+         <i class="bi bi-plus-lg me-1"></i>${escapeHtml(reg.nyEtikett)}
+       </button>`
+    : '';
 
   return `
     <div class="vl-kort">
       <div class="vl-kort-topp">
         <span class="vl-kort-tittel">${escapeHtml(reg.tittel)}</span>
-        <button class="btn btn-sm btn-primary" type="button"
-                data-action="apneNyVerdi">
-          <i class="bi bi-plus-lg me-1"></i>${escapeHtml(reg.nyEtikett)}
-        </button>
+        ${nyKnapp}
       </div>
       ${innhold}
     </div>`;
@@ -395,5 +438,6 @@ async function slettVerdi(id) {
 
 
 document.addEventListener('DOMContentLoaded', () => {
+  gateKnapper();
   lastRegistre();
 });

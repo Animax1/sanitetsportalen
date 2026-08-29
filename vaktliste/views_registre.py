@@ -38,11 +38,12 @@ from django.shortcuts import render
 from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_http_methods
 
-from core.auth_decorators import er_global_admin, modul_kreves
+from core.auth_decorators import modul_kreves
 from core.ratelimit import rate_limit
 
 from .models import Kompetanse, Korps, Mannskap, VaktRolle
-from .views import _feil, _int, _json_body, _nektet
+from . import services
+from .views import _feil, _int, _json_body, _nektet, _tilgangskontekst
 
 
 def _ider(raa):
@@ -64,13 +65,11 @@ def _ider(raa):
 def registre_view(request):
     """Mannskaps- og registersiden.
 
-    Admin-only i fase 2, som resten av modulen: `kan_redigere_mannskap()`
-    finnes og er testet, men badgen den avgrenser på håndheves først i fase 3.
+    `les` slipper inn — hele registeret, alle korps. Hva kontoen får *endre*
+    avgjøres per rad, både her og på serveren.
     """
-    if not er_global_admin(request.user):
-        from django.core.exceptions import PermissionDenied
-        raise PermissionDenied
-    return render(request, 'vaktliste/registre.html')
+    return render(request, 'vaktliste/registre.html',
+                  _tilgangskontekst(request.user))
 
 
 # ── De tre verdimengdene ─────────────────────────────────────────────────────
@@ -111,7 +110,10 @@ def _register_views(model, etikett, etikett_bestemt, *, ekstra_felt=()):
     @rate_limit(group=f'vaktliste:register:{model._meta.model_name}',
                 rate='60/m', method='POST')
     def liste_view(request):
-        if not er_global_admin(request.user):
+        # Verdimengdene er organisasjonens oppsett, ikke ett korps' bord:
+        # kunne korps-brukeren opprette korps, kunne hun lage seg et nytt å
+        # føre. `les` ser dem — nedtrekkslistene trenger dem.
+        if request.method == 'POST' and not services.kan_skrive_alt(request.user):
             return _nektet()
 
         if request.method == 'GET':
@@ -140,7 +142,7 @@ def _register_views(model, etikett, etikett_bestemt, *, ekstra_felt=()):
     @modul_kreves('vaktliste', 'les', svar='json')
     @require_http_methods(['PUT', 'DELETE'])
     def detalj_view(request, pk):
-        if not er_global_admin(request.user):
+        if not services.kan_skrive_alt(request.user):
             return _nektet()
 
         try:
@@ -272,10 +274,10 @@ def mannskap_view(request):
     GET sender også de tre verdimengdene og de ledige kontoene: siden trenger
     alle fire for å tegne seg, og fire kall der ett holder er fire steder noe
     kan komme i utakt.
-    """
-    if not er_global_admin(request.user):
-        return _nektet()
 
+    POST er `kan_fore_korps` på **målkorpset**: korps-brukeren legger til sine
+    egne folk, ikke andres.
+    """
     if request.method == 'GET':
         folk = (Mannskap.objects
                 .select_related('korps', 'user')
@@ -289,7 +291,11 @@ def mannskap_view(request):
                             for k in Kompetanse.objects.all()],
             'roller': [{'id': r.pk, 'navn': r.navn, 'er_aktiv': r.er_aktiv}
                        for r in VaktRolle.objects.all()],
-            'kontoer': _kontoer(),
+            # Kontolista er bare med for den som kan bruke den. `user_id`
+            # er `skriv_full`-felt (se under), og en liste over portalens
+            # brukernavn er ikke noe en korps-fører trenger for å føre lista
+            # si.
+            'kontoer': _kontoer() if services.kan_skrive_alt(request.user) else [],
         }})
 
     data = _json_body(request)
@@ -300,8 +306,18 @@ def mannskap_view(request):
     korps = Korps.objects.filter(pk=_int(data.get('korps_id'))).first()
     if korps is None:
         # Uten korps finnes ingen badge, og personen kan verken sorteres i
-        # lista eller redigeres av en korps-bruker fra fase 3.
+        # lista eller redigeres av en korps-bruker.
         return _feil('Velg hvilket korps personen hører til.')
+
+    if not services.kan_fore_korps(request.user, korps.pk):
+        return _nektet()
+
+    # `user`-koblingen flytter en badge: kontoen den peker på arver korpset,
+    # og dermed hva den kontoen får redigere. Den er derfor `skriv_full`, selv
+    # om resten av raden er korps-førerens bord.
+    full = services.kan_skrive_alt(request.user)
+    if data.get('user_id') and not full:
+        return _nektet('Kontokobling krever full skrivetilgang.')
 
     try:
         with transaction.atomic():
@@ -309,7 +325,7 @@ def mannskap_view(request):
                 navn=navn,
                 korps=korps,
                 telefon=(data.get('telefon') or '').strip(),
-                user_id=_int(data.get('user_id')),
+                user_id=_int(data.get('user_id')) if full else None,
                 notat=(data.get('notat') or '').strip(),
             )
             person.kompetanser.set(_ider(data.get('kompetanse_ider')))
@@ -328,17 +344,27 @@ def mannskap_view(request):
 def mannskap_detalj_view(request, pk):
     """Rediger en person, eller fjern en som aldri ble satt opp.
 
-    Fra fase 3 gates dette på `services.kan_redigere_mannskap()` — regelen
-    finnes og er testet, men badgen den avgrenser på håndheves ikke ennå.
-    """
-    if not er_global_admin(request.user):
-        return _nektet()
+    Gates på `services.kan_redigere_mannskap()` — badgen. To felter er likevel
+    unntatt og krever `skriv_full`, fordi de ikke handler om *personen* men om
+    hvem som rår over henne:
 
+    - **`korps_id`** flytter raden ut av korps-førerens rekkevidde, eller
+      henter en inn i den. Begge korps må derfor være hennes, som i praksis
+      betyr at hun ikke flytter noen. Se `services.kan_flytte_mannskap`.
+    - **`user_id`** flytter en badge: kontoen den peker på arver korpset.
+
+    Sletting følger badgen, som tillegging: det er speilbildet av å legge
+    inn, og PROTECT stopper det uansett i det personen har gått en vakt.
+    """
     try:
         person = (Mannskap.objects.select_related('korps', 'user')
                   .prefetch_related('kompetanser').get(pk=pk))
     except Mannskap.DoesNotExist:
         return _feil('Personen finnes ikke', status=404)
+
+    if not services.kan_redigere_mannskap(request.user, person):
+        return _nektet()
+    full = services.kan_skrive_alt(request.user)
 
     if request.method == 'DELETE':
         try:
@@ -361,6 +387,8 @@ def mannskap_detalj_view(request, pk):
         korps = Korps.objects.filter(pk=_int(data['korps_id'])).first()
         if korps is None:
             return _feil('Velg hvilket korps personen hører til.')
+        if not services.kan_flytte_mannskap(request.user, person, korps.pk):
+            return _nektet('Flytting mellom korps krever full skrivetilgang.')
         person.korps = korps
     if 'telefon' in data:
         person.telefon = (data.get('telefon') or '').strip()
@@ -369,6 +397,8 @@ def mannskap_detalj_view(request, pk):
     if 'er_aktiv' in data:
         person.er_aktiv = bool(data['er_aktiv'])
     if 'user_id' in data:
+        if not full:
+            return _nektet('Kontokobling krever full skrivetilgang.')
         person.user_id = _int(data['user_id'])
 
     try:

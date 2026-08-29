@@ -82,12 +82,10 @@ def modultilganger_for_visning(user):
     tilgangsvalg — og bedt om noe hen allerede har fått.
     """
     from accounts.forms import ModulTilgangForm
-    from accounts.models import TilgangsNivaa
     # `_tilganger` framfor `nivaa_for`: se avsnittet over. Samme private
     # helper som `Module.is_visible_for` bruker.
     from core.auth_decorators import _tilganger, er_global_admin
 
-    etiketter = dict(TilgangsNivaa.choices)
     aktive = ModuleSettings.get_enabled_slugs()
     admin = er_global_admin(user)
     tilganger = {} if admin else _tilganger(user)
@@ -97,7 +95,9 @@ def modultilganger_for_visning(user):
         nivaa = 'skriv_full' if admin else tilganger.get(modul.slug)
         rader.append({
             'navn': modul.name,
-            'nivaa': etiketter.get(nivaa) if nivaa else None,
+            # Modulens egen etikett når den har en — kortet skal si det
+            # samme som matrisen der tilgangen ble delt ut.
+            'nivaa': modul.etikett_for(nivaa) if nivaa else None,
             'deaktivert': not (modul.is_core or modul.slug in aktive),
         })
     return rader

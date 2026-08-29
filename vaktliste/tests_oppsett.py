@@ -355,12 +355,6 @@ class ApiTests(TestCase):
         self.assertContains(res, 'js/vaktliste')
         self.assertContains(res, 'css/vaktliste')
 
-    def test_siden_nekter_ikke_admin(self):
-        """Admin-only i fase 2: selv `skriv_full` skal ikke inn før
-        objektsjekkene finnes. Fail-closed er riktigere enn halvt håndhevet."""
-        c = _klient(_bruker('skriver', 'skriv_full'))
-        self.assertEqual(c.get('/vaktliste/').status_code, 403)
-
     def test_siden_nekter_uten_modultilgang(self):
         c = _klient(_bruker('ingen'))
         self.assertEqual(c.get('/vaktliste/').status_code, 403)
@@ -580,34 +574,6 @@ class ApiTests(TestCase):
             self.c.delete(f'/vaktliste/api/vaktposter/{pk}/').status_code, 200)
         self.assertEqual(Vaktpost.objects.count(), 0)
 
-    # ── Gaten ────────────────────────────────────────────────────────────
-    def test_alle_endepunkt_nekter_ikke_admin(self):
-        """Ett svar per endepunkt, ikke ett for siden alene: gaten står i hvert
-        view, og en glemt sjekk er usynlig om testen bare ser på forsida."""
-        vl = self._liste()
-        r = self._ressurs(vl)
-        vp = Vaktpost.objects.create(
-            ressurs=r, mannskap=self.person,
-            fra_tid=self.na, til_tid=self.na + timedelta(hours=8))
-        c = _klient(_bruker('skriver', 'skriv_full'))
-
-        kall = [
-            ('get', '/vaktliste/api/vaktlister/'),
-            ('post', '/vaktliste/api/vaktlister/'),
-            ('get', f'/vaktliste/api/vaktlister/{vl.pk}/'),
-            ('post', f'/vaktliste/api/vaktlister/{vl.pk}/ressurser/'),
-            ('put', f'/vaktliste/api/ressurser/{r.pk}/'),
-            ('delete', f'/vaktliste/api/ressurser/{r.pk}/'),
-            ('post', f'/vaktliste/api/ressurser/{r.pk}/vaktposter/'),
-            ('put', f'/vaktliste/api/vaktposter/{vp.pk}/'),
-            ('delete', f'/vaktliste/api/vaktposter/{vp.pk}/'),
-        ]
-        for metode, sti in kall:
-            with self.subTest(kall=f'{metode.upper()} {sti}'):
-                svar = getattr(c, metode)(
-                    sti, data={}, content_type='application/json')
-                self.assertEqual(svar.status_code, 403)
-
-        # Og ingenting ble rørt.
-        self.assertTrue(Ressurs.objects.filter(pk=r.pk).exists())
-        self.assertTrue(Vaktpost.objects.filter(pk=vp.pk).exists())
+    # Tilgangsmatrisen for fase 3 står i `tests_tilgang.py`. Den hører ikke
+    # hjemme her: dette er endepunktenes oppførsel, den er hvem som slipper
+    # inn på dem — og de to endres av ulike grunner.

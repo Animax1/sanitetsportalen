@@ -16,6 +16,22 @@
 {% endblock %}
 
 {% block content %}
+
+{% comment %}
+  Modultilgang, ikke rolle (CLAUDE.md). `mitt_korps_id` er badgen — den er
+  ikke tilgang i seg selv, men lar siden regne ut det samme som
+  `services.kan_bemanne_ressurs()` gjør, slik at korps-brukeren ser «Sett på
+  vakt» på sine egne ressurser og ikke på andres.
+
+  Serveren håndhever uansett; dette er for at en knapp ikke skal føre til en vegg.
+{% endcomment %}
+<script nonce="{{ csp_nonce }}">
+  window.MODUL_TILGANG = {
+    vaktliste: "{{ modul_nivaa }}",
+    admin: {{ er_global_admin|yesno:"true,false" }}
+  };
+  window.MITT_KORPS_ID = {{ mitt_korps_id|default:'null' }};
+</script>
 <div class="container-fluid px-3 px-md-4 py-3">
 
   <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
@@ -27,11 +43,16 @@
       <a href="/vaktliste/registre/" class="btn btn-outline-secondary btn-sm">
         <i class="bi bi-person-vcard me-1"></i>Mannskap
       </a>
-      <button type="button" class="btn btn-primary btn-sm"
+      {% comment %}
+        Begge er «dele ut»-handlinger: å planlegge en vakt lager en core.Vakt,
+        og å legge til en ressurs setter reservasjonen. Skjules for alle under
+        skriv_full — JS gjør det, se vaktliste.js::gateKnapper().
+      {% endcomment %}
+      <button type="button" class="btn btn-primary btn-sm vl-krev-full d-none"
               data-bs-toggle="modal" data-bs-target="#nyVaktlisteModal">
         <i class="bi bi-plus-lg me-1"></i>Ny vaktliste
       </button>
-      <button type="button" class="btn btn-outline-secondary btn-sm"
+      <button type="button" class="btn btn-outline-secondary btn-sm vl-krev-full d-none"
               data-bs-toggle="modal" data-bs-target="#nyRessursModal">
         <i class="bi bi-diagram-3 me-1"></i>Ny ressurs
       </button>

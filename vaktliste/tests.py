@@ -141,12 +141,12 @@ class AuditTests(TestCase):
 
 
 class ModulRegistreringTests(TestCase):
-    """Fra fase 2 finnes siden, og modulen er synlig — for global admin.
+    """Fra fase 3 er modulen åpen for nivåene, ikke bare for global admin.
 
-    Gjennom fase 1 sto modulen med `url=None` og begge `show_*`-flagg av:
-    et modulkort som fører til 404 er en knapp som fører til en vegg. Nå
-    finnes siden, og `admin_only` er det som holder de andre ute til
-    objektsjekkene kommer i fase 3.
+    Gjennom fase 1 sto den med `url=None` og begge `show_*`-flagg av — et
+    modulkort som fører til 404 er en knapp som fører til en vegg. Fase 2 ga
+    den side, men `admin_only` holdt de andre ute til objektsjekkene fantes.
+    Nå finnes de, og flagget er av.
     """
 
     def test_modulen_peker_paa_siden_sin(self):
@@ -155,11 +155,9 @@ class ModulRegistreringTests(TestCase):
         self.assertEqual(modul.url, '/vaktliste/')
         self.assertTrue(modul.show_in_nav)
         self.assertTrue(modul.show_in_dashboard)
+        self.assertFalse(modul.admin_only, 'åpnet i fase 3')
 
     def test_nivaaene_er_deklarert(self):
-        """Del av beslutningen (§4) — men merk at `skriv_handling` her betyr
-        «fører sitt eget korps», ikke stempling. Etikettspørsmålet (§4.5)
-        løses i fase 3, sammen med objektsjekkene."""
         self.assertEqual(
             get_module('vaktliste').nivaaer,
             ('les', 'skriv_handling', 'skriv_full'))
@@ -171,13 +169,18 @@ class ModulRegistreringTests(TestCase):
         self.assertIn('vaktliste',
                       [m.slug for m in get_visible_modules(admin)])
 
-    def test_andre_ser_den_ikke_i_fase_2(self):
-        """`admin_only=True` til fase 3 — se `vaktliste/module.py`. Et kort
-        som fører til 403 er samme feil som et kort som fører til 404."""
+    def test_konto_med_nivaa_ser_modulen(self):
         from accounts.models import ModulTilgang
         bruker = User.objects.create_user(
-            username='vl_skriver', password='x', must_change_password=False)
+            username='vl_leser', password='x', must_change_password=False)
         ModulTilgang.objects.create(
-            bruker=bruker, modul_slug='vaktliste', nivaa='skriv_full')
+            bruker=bruker, modul_slug='vaktliste', nivaa='les')
+        self.assertIn('vaktliste',
+                      [m.slug for m in get_visible_modules(bruker)])
+
+    def test_konto_uten_rad_ser_den_ikke(self):
+        """Fravær av rad er ingen tilgang — det finnes ingen «ingen»-verdi."""
+        bruker = User.objects.create_user(
+            username='vl_utenfor', password='x', must_change_password=False)
         self.assertNotIn('vaktliste',
                          [m.slug for m in get_visible_modules(bruker)])

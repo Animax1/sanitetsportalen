@@ -14,8 +14,7 @@ from django.utils import timezone
 
 from core.auth_decorators import er_global_admin, har_tilgang
 
-from . import choices
-from .models import Mannskap, Ressurs, Vaktliste, Vaktpost
+from .models import Mannskap, Ressurs, Vaktliste
 
 
 # ── Vakter som ennå ikke er aktive ───────────────────────────────────────────
@@ -36,7 +35,6 @@ def opprett_planlagt_vakt(navn, startet=None):
     Returnerer den nye vaktlista.
     """
     from core.models import Vakt
-    from core.validators import current_local_year
 
     navn = (navn or '').strip()
     if not navn:
@@ -81,7 +79,28 @@ def kopier_oppsett(fra_vaktliste, til_vaktliste):
     return len(kopier)
 
 
-# ── Hvem får røre hva (håndheves fra fase 3) ─────────────────────────────────
+# ── Hvem får røre hva ────────────────────────────────────────────────────────
+#
+# Håndheves fra fase 3, på hvert endepunkt. Tre nivåer av «hvem»:
+#
+#   kan_skrive_alt      — `skriv_full`/admin. Blander korps fritt, deler ut
+#                         ressurser, styrer verdimengdene.
+#   kan_*_korps/…       — `skriv_handling` avgrenset av badgen.
+#   (ingenting)         — `les` skriver ikke.
+#
+# **`les` gjelder hele lista med vilje.** Poenget med en vaktliste er
+# samordning på tvers av korps; den som ikke skal se andre korps, skal ikke ha
+# modulen (§4.4).
+
+def kan_skrive_alt(user) -> bool:
+    """`skriv_full` eller global admin — står utenfor badge og reservasjon.
+
+    Samlet her framfor å gjentas i hvert view: det er terskelen for alt som
+    gjelder *vakta* framfor *et korps* — å dele ut ressurser, å planlegge en ny
+    vakt, og å styre `Korps`/`Kompetanse`/`VaktRolle`.
+    """
+    return er_global_admin(user) or har_tilgang(user, 'vaktliste', 'skriv_full')
+
 
 def brukerens_korps(user):
     """Korpset kontoen arver fra mannskapsraden sin, eller ``None``.
@@ -95,19 +114,39 @@ def brukerens_korps(user):
     return mannskap.korps if mannskap else None
 
 
-def kan_redigere_mannskap(user, mannskap) -> bool:
-    """Får brukeren redigere denne personen?
+def kan_fore_korps(user, korps_id) -> bool:
+    """Får brukeren føre folk i dette korpset?
 
-    `skriv_full` og global admin: alle. `skriv_handling`: kun sitt eget
-    korps. Uten mannskapsrad har kontoen ingen badge og kan ikke skrive noe —
-    fail-closed, samme form som en enhetskonto uten enhet.
+    Grunnregelen begge mannskapssjekkene hviler på. `skriv_full` og global
+    admin: alle korps. `skriv_handling`: kun sitt eget. Uten mannskapsrad har
+    kontoen ingen badge og kan ikke skrive noe — fail-closed, samme form som
+    en enhetskonto uten enhet.
     """
-    if er_global_admin(user) or har_tilgang(user, 'vaktliste', 'skriv_full'):
+    if kan_skrive_alt(user):
         return True
     if not har_tilgang(user, 'vaktliste', 'skriv_handling'):
         return False
     korps = brukerens_korps(user)
-    return korps is not None and mannskap.korps_id == korps.pk
+    return korps is not None and korps_id == korps.pk
+
+
+def kan_redigere_mannskap(user, mannskap) -> bool:
+    """Får brukeren redigere denne personen? Avgjøres av personens korps."""
+    return kan_fore_korps(user, mannskap.korps_id)
+
+
+def kan_flytte_mannskap(user, mannskap, nytt_korps_id) -> bool:
+    """Får brukeren flytte personen til et annet korps?
+
+    **Begge korpsene teller.** Sjekket vi bare det personen har i dag, kunne
+    korps-brukeren flytte sine egne folk ut i et hvilket som helst annet
+    korps; sjekket vi bare målet, kunne hun hente inn andres. Det er samme
+    feilform som den doble regelen i `kan_sette_vaktpost` — og siden
+    `skriv_handling` per definisjon bare har ett korps, betyr det i praksis at
+    hun ikke flytter noen i det hele tatt. Flytting er `skriv_full`.
+    """
+    return (kan_fore_korps(user, mannskap.korps_id)
+            and kan_fore_korps(user, nytt_korps_id))
 
 
 def kan_bemanne_ressurs(user, ressurs) -> bool:
@@ -117,7 +156,7 @@ def kan_bemanne_ressurs(user, ressurs) -> bool:
     være reservert brukerens korps. En **ureservert** ressurs er ikke et
     fristed — den er `skriv_full`/admins bord, typisk KO og samleplass.
     """
-    if er_global_admin(user) or har_tilgang(user, 'vaktliste', 'skriv_full'):
+    if kan_skrive_alt(user):
         return True
     if not har_tilgang(user, 'vaktliste', 'skriv_handling'):
         return False

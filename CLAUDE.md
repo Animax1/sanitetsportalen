@@ -76,7 +76,10 @@ Nivåene er en ordnet stige. **Fravær av rad er ingen tilgang** — det finnes 
 | `skriv_full` | Kan redigere felter |
 
 **Hver modul deklarerer hvilke nivåer som betyr noe for den** — `Module.nivaaer`. Matrisen
-tilbyr de nivåene og ingen andre. En global liste hadde begge feil samtidig: den skjulte
+tilbyr de nivåene og ingen andre. **Og hver modul kan gi dem sin egen etikett** —
+`Module.nivaa_navn`, brukt av matrisen og «Min profil». Det trengs fordi samme nivå betyr
+ulike ting: `skriv_handling` er «stempling» i oppdrag og «fører sitt eget korps» i
+vaktlista. Uten etiketten deles nivået ut i god tro med feil modul i hodet. En global liste hadde begge feil samtidig: den skjulte
 `skriv_handling` for oppdragsmodulen, som er den nivået ble laget for, og tilbød
 `skriv_full` på statistikk, der skriving ikke finnes.
 
@@ -271,9 +274,15 @@ fase 3–7 gjenstår — se `docs/BESLUTNING_VAKTLISTE.md`, som er besluttet i s
   innsjekk), ikke stempling som i oppdrag. Matrisen trenger derfor en etikett per
   modul per nivå (§4.5) før nivået deles ut.
 - **Den doble regelen er skrevet som én funksjon**, `kan_sette_vaktpost()`, nettopp for
-  at et endepunkt ikke skal kunne huske badgen og glemme reservasjonen. Modulen er
-  `admin_only` til fase 3: et nivå som slipper inn før objektsjekkene finnes, ville gitt
-  korps-brukeren *alle* korps.
+  at et endepunkt ikke skal kunne huske badgen og glemme reservasjonen.
+- **Tre terskler, og skillet er hva slags utsagn nivået får avgi.** `les` ser hele lista
+  (alle korps — poenget er samordning). Badge + reservasjon bemanner. `skriv_full` deler
+  *ut*: ressurser, reservasjoner, nye vakter og verdimengdene — kunne korps-brukeren
+  opprette et korps eller omreservere KO, ville badgen sluttet å avgrense noe. Sletting av
+  en vaktliste er global admin.
+- **`Mannskap.korps_id` og `Mannskap.user_id` er unntatt badgen.** Flytting sjekkes mot
+  *begge* korps, og kontokoblingen er `skriv_full` fordi den flytter en badge — kontoen
+  arver korpset, og dermed hva den kontoen får redigere.
 - **Kostbehov/matallergi lagres ikke** (art. 9 — besluttet holdt utenfor portalen), og
   `Mannskap.notat` er unntatt verdilogging i audit (`signals.FELT_UTEN_VERDILOGGING`).
 - **Plan og faktisk er fire felter, ikke to.** `fra_tid`/`til_tid` er planen,

@@ -4,6 +4,58 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-08-29 — Vaktlistemodulen fase 3: tilgangsmodellen tas i bruk
+
+**1574 tester grønne** (48 nye). Ingen migrasjon. `admin_only` er av — modulen
+er åpen for nivåene.
+
+Fase 2 skrev reglene og lot dem stå ubrukte bak en admin-gate; fase 3 håndhever
+dem, per objekt, på hvert endepunkt. Tre terskler, og skillet mellom dem er
+*hva slags utsagn* nivået får avgi:
+
+| Handling | Krav |
+|---|---|
+| Lese lista og registeret | `les` — hele lista, **alle** korps (§4.4) |
+| Bemanne en ressurs, føre eget mannskap | badge **og** reservasjon (§4.2) |
+| Dele ut ressurser, planlegge vakt, styre verdimengdene | `skriv_full` |
+| Slette en vaktliste | global admin — irreversibelt |
+
+- **Den doble regelen håndheves nå der den står i veien for noen.** Badgen på
+  personen *og* reservasjonen på ressursen, som én funksjon
+  (`services.kan_sette_vaktpost`). En ureservert ressurs er fortsatt ikke et
+  fristed.
+- **Verdimengdene er `skriv_full`.** Kunne korps-brukeren opprette korps, kunne
+  hun lage seg et nytt å føre — og badgen hennes ville sluttet å avgrense noe.
+  Samme resonnement stengte «endre reservasjonen på en ressurs»: den korteste
+  veien rundt hele regelen er å sette `korps` på KO til sitt eget og bemanne den
+  etterpå.
+- **To felter på `Mannskap` er unntatt badgen.** `korps_id` sjekkes mot *begge*
+  korps — sjekket vi bare det personen har i dag, kunne hun eksporteres ut av
+  rekkevidde; bare målet, og andres kunne hentes inn. `user_id` er `skriv_full`
+  fordi koblingen flytter en badge: kontoen arver korpset, og dermed hva *den*
+  kontoen får redigere. Sperren står både på POST og PUT — ellers er den ene
+  bare en omvei rundt den andre.
+- **§4.5 løst: etikett per modul per nivå.** `Module.nivaa_navn` er par framfor
+  `dict` fordi dataklassen er frosset og hashable. Matrisen og «Min profil»
+  viser nå «Skrive: eget korps» på vaktlista og «Skrive: stempling» på oppdrag,
+  der begge før het «Skrive: handling». Nivået er det samme; betydningen er det
+  ikke, og den som deler ut skal se hvilken.
+- **Grensesnittet gater på `window.MODUL_TILGANG`**, og badgen sendes med slik
+  at nettleseren kan regne ut det samme som `kan_bemanne_ressurs()`.
+  Verifisert i nettleser som korps-bruker: «Sett på vakt» vises kun på egen
+  ressurs, «Ny vaktliste»/«Ny ressurs» og kontofeltet er borte, og Rediger/Slett
+  står bare på eget korps sine folk.
+- **Kontolista sendes bare til den som kan bruke den.** `user_id` er
+  `skriv_full`-felt, og en liste over portalens brukernavn er ikke noe en
+  korps-fører trenger for å føre lista si.
+- Mutasjonstestet tolv veier. Elleve bet; den tolvte — reservasjonssjekken
+  fjernet fra JS-ens `kanBemanne()` — gjorde det **ikke**: serveren stoppet
+  kallet uansett, så hullet var kosmetisk. Men det er nettopp den slags hull som
+  overlever til noen stoler på grensesnittet, så JS-gatingen kjøres nå i node
+  (`GrensesnittetsGatingTests`), og de tre JS-mutasjonene bet etterpå.
+
+---
+
 ## 2026-08-29 — Registersiden: portalen får tilbake det Django-admin gjorde
 
 **1534 tester grønne** (43 nye). Ingen migrasjon. Ny side på `/vaktliste/registre/`.
