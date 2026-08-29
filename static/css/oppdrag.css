@@ -245,3 +245,10 @@
 /* En overstyrt rad har ingen knapp, så raden under skal ikke få luft den
  * ikke trenger. */
 .rett-tid-skjema { font-size: 0.85rem; }
+
+/* Usendte stemplinger. Dempet mot feilbanneret: dette er en ventetilstand,
+ * ikke en feil — men den må leses fra førersetet, som resten av skjermen. */
+.enhet-usendt {
+  font-size: 1rem;
+  font-weight: 600;
+}

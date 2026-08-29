@@ -488,7 +488,7 @@ statusknappen som det eneste elementet som ikke krever presisjon.
 | 3 | ✅ Sentralbordet: enhetsliste med utledet status, opprett, tildel, flytt, rediger, **lokasjonsadmin som side**. Polling med ETag | levert |
 | 4 | ✅ Enhetsskjermen: statusmaskin, smale endepunkter, objektsjekk, de to skjulereglene, visning av `automatisk` | levert |
 | 4b | ✅ Korreksjoner: ny rad som overstyrer, `gjeldende()`-manager | levert |
-| 5 | Offline-kø med idempotens | 4–6 t |
+| 5 | ✅ Offline-kø med idempotens | levert |
 | 6 | Statistikkregisteret + oppdragsfanen | 5–7 t |
 | 7 | Arkivering: `AbstractArkiv` + handler og egen arkivknapp under `/oppdrag/` | 5–7 t |
 

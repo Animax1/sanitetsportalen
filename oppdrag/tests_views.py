@@ -6,6 +6,7 @@ svar og ikke i nettleseren.
 """
 from datetime import timedelta
 
+from django.core.cache import cache
 from django.db import IntegrityError, transaction
 from django.test import Client, TestCase, override_settings
 from django.utils import timezone
@@ -13,7 +14,7 @@ from django.utils import timezone
 from accounts.models import CustomUser, ModulTilgang
 from patients.models import AppSetting
 
-from oppdrag import choices
+from oppdrag import choices, services
 from oppdrag.models import Enhet, Lokasjon, Oppdrag, Statusmelding
 
 AAR = 2098
@@ -1234,3 +1235,146 @@ class KorreksjonTests(StemplingBasis):
         self.assertEqual(self.oppdrag.status, choices.FREMME)
         self.assertFalse(AuditLog.objects.filter(
             table_name='oppdrag_oppdrag', field_name='status').exists())
+
+
+@override_settings(SECURE_SSL_REDIRECT=False, RATELIMIT_ENABLE=False)
+class IdempotensTests(StemplingBasis):
+    """§5.2: en avspilt kø skal gi én statusmelding, ikke to.
+
+    Uten nøkkelen ville andre forsøk fått 409 fra statusmaskinen — teknisk
+    ufarlig, men ubrukelig for køen: den kan ikke skille «allerede levert» fra
+    «avvist fordi skjermen har sakket akterut», og ville enten hengt fast eller
+    kastet en stempling som faktisk kom fram.
+    """
+
+    def setUp(self):
+        super().setUp()
+        cache.clear()
+
+    def _stemple_med_nokkel(self, oppdrag, overgang, nokkel, klienttid=None):
+        kropp = {'idempotency_key': nokkel}
+        if klienttid:
+            kropp['klienttid'] = klienttid.isoformat()
+        return self._stemple(oppdrag, overgang, body=kropp)
+
+    def test_avspilling_gir_ok_og_ingen_ny_rad(self):
+        o = self._oppdrag()
+        nokkel = 'a1b2c3d4-e5f6-7890-abcd-ef1234567890'
+
+        forste = self._stemple_med_nokkel(o, 'rykker_ut', nokkel)
+        self.assertEqual(forste.status_code, 200)
+        antall = Statusmelding.objects.filter(oppdrag=o).count()
+
+        andre = self._stemple_med_nokkel(o, 'rykker_ut', nokkel)
+        self.assertEqual(andre.status_code, 200)
+        self.assertTrue(andre.json()['data'].get('avspilling'))
+        self.assertEqual(Statusmelding.objects.filter(oppdrag=o).count(), antall)
+
+    def test_avspilling_gir_samme_melding(self):
+        """Køen skal kunne stryke raden i trygg forvissning om hva som står."""
+        o = self._oppdrag()
+        nokkel = 'b1b2c3d4-e5f6-7890-abcd-ef1234567890'
+        forste = self._stemple_med_nokkel(o, 'rykker_ut', nokkel)
+        andre = self._stemple_med_nokkel(o, 'rykker_ut', nokkel)
+        self.assertEqual(andre.json()['data']['melding']['id'],
+                         forste.json()['data']['melding']['id'])
+
+    def test_uten_nokkel_gir_409_som_foer(self):
+        """Eldre klienter og direkte API-kall oppfører seg uendret."""
+        o = self._oppdrag()
+        self.assertEqual(self._stemple(o, 'rykker_ut').status_code, 200)
+        self.assertEqual(self._stemple(o, 'rykker_ut').status_code, 409)
+
+    def test_ulike_noekler_er_ulike_trykk(self):
+        """To reelle trykk skal ikke slås sammen fordi de ligner."""
+        o = self._oppdrag()
+        self._stemple_med_nokkel(o, 'rykker_ut',
+                                 'c1b2c3d4-e5f6-7890-abcd-ef1234567890')
+        andre = self._stemple_med_nokkel(o, 'fremme',
+                                         'd1b2c3d4-e5f6-7890-abcd-ef1234567890')
+        self.assertEqual(andre.status_code, 200)
+        self.assertEqual(Statusmelding.objects.filter(oppdrag=o).count(), 2)
+
+    def test_avvist_overgang_brenner_ikke_noekkelen(self):
+        """En kø som retter seg og prøver igjen skal slippe til.
+
+        Reserverte vi før valideringen, ville et avvist forsøk låst nøkkelen,
+        og det korrigerte forsøket fått «allerede levert» på noe som aldri kom
+        fram.
+        """
+        o = self._oppdrag()
+        nokkel = 'e1b2c3d4-e5f6-7890-abcd-ef1234567890'
+
+        # `fremme` er ulovlig fra `venter` — avvises.
+        self.assertEqual(
+            self._stemple_med_nokkel(o, 'fremme', nokkel).status_code, 409)
+        # Samme nøkkel, lovlig overgang: skal gå gjennom.
+        self.assertEqual(
+            self._stemple_med_nokkel(o, 'rykker_ut', nokkel).status_code, 200)
+        self.assertEqual(Statusmelding.objects.filter(oppdrag=o).count(), 1)
+
+    def test_ugyldig_noekkelform_ignoreres_stille(self):
+        """`bygg_nokkel` avviser rar form. Da gjelder oppførselen uten nøkkel."""
+        o = self._oppdrag()
+        resp = self._stemple_med_nokkel(o, 'rykker_ut', 'kort')
+        self.assertEqual(resp.status_code, 200)
+        self.assertIsNone(resp.json()['data'].get('avspilling'))
+
+    def test_noekkel_er_per_bruker(self):
+        """To enheter kan trekke samme tilfeldige verdi uten å kollidere."""
+        annen_bruker = _bruker('karmoy12', 'skriv_handling', delt=True)
+        Enhet.objects.filter(pk=self.annen_enhet.pk).update(user=annen_bruker)
+        mitt = self._oppdrag()
+        deres = self._oppdrag(enhet=self.annen_enhet)
+        nokkel = 'f1b2c3d4-e5f6-7890-abcd-ef1234567890'
+
+        self._stemple_med_nokkel(mitt, 'rykker_ut', nokkel)
+        resp = self._stemple(deres, 'rykker_ut',
+                             body={'idempotency_key': nokkel},
+                             klient=_klient(annen_bruker))
+        self.assertEqual(resp.status_code, 200)
+        self.assertIsNone(resp.json()['data'].get('avspilling'))
+
+    def test_klienttiden_fra_trykket_bevares_gjennom_koen(self):
+        """Statistikken skal vise når mannskapet meldte, ikke når nettet kom."""
+        o = self._oppdrag()
+        Oppdrag.objects.filter(pk=o.pk).update(
+            created_at=timezone.now() - timedelta(hours=1))
+        o.refresh_from_db()
+        trykket = timezone.now() - timedelta(minutes=20)
+
+        self._stemple_med_nokkel(o, 'rykker_ut',
+                                 '01b2c3d4-e5f6-7890-abcd-ef1234567890',
+                                 klienttid=trykket)
+        melding = Statusmelding.objects.get(oppdrag=o, status=choices.RYKKER_UT)
+        self.assertEqual(melding.tidspunkt, trykket)
+        self.assertTrue(melding.forsinket)
+
+
+@override_settings(SECURE_SSL_REDIRECT=False, RATELIMIT_ENABLE=False)
+class EnhetKjedeDataTests(StemplingBasis):
+    """Skjermen får kjeden som data, for å kunne projisere neste steg offline."""
+
+    def test_kjeden_sendes_med_siden(self):
+        html = self.bil.get('/oppdrag/').content.decode()
+        self.assertIn('OPPDRAG_NESTE', html)
+        self.assertIn('OPPDRAG_STATUSNAVN', html)
+
+    def test_kjeden_stemmer_med_tjenestelaget(self):
+        """Én sannhet: sendes en annen kjede enn serveren håndhever, viser
+        knappen ett steg og endepunktet godtar et annet."""
+        import json as _json
+        import re
+        html = self.bil.get('/oppdrag/').content.decode()
+        treff = re.search(r'window\.OPPDRAG_NESTE = (\{.*?\});', html, re.S)
+        self.assertIsNotNone(treff)
+        sendt = _json.loads(treff.group(1))
+        for status in choices.STATUS_NAVN:
+            with self.subTest(status=status):
+                self.assertEqual(sendt.get(status),
+                                 services.neste_i_kjeden(status))
+
+    def test_sentralbordet_faar_ikke_kjeden(self):
+        """Den finnes for offline-køen, og sentralbordet har ingen kø."""
+        c = _klient(_bruker('sentral_kjede', 'skriv_full'))
+        self.assertNotIn('OPPDRAG_NESTE', c.get('/oppdrag/').content.decode())

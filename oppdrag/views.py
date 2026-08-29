@@ -22,6 +22,7 @@ from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_http_methods
 
 from core.auth_decorators import er_global_admin, har_tilgang, modul_kreves
+from core.idempotency import bygg_nokkel, forkast, fullfor, reserver
 from core.ratelimit import rate_limit
 from patients.services import get_active_year
 
@@ -46,8 +47,20 @@ def index_view(request):
     ville vist enheten alle oppdrag i vakta — nettopp det den ikke skal se.
     """
     if er_enhetskonto(request.user):
+        # Kjeden sendes med som data. Skjermen bruker den **kun** til å regne
+        # ut hva neste knapp skal hete mens en stempling ligger usendt i køen
+        # — uten den ville knappen dødd ved første trykk uten dekning, og hele
+        # offline-køen vært halvveis. Når nettet er der, er det fortsatt
+        # serverens `neste_overgang` per rad som gjelder; §4.2-invarianten om
+        # at *serveren* ikke utleder handlingen av tilstanden er urørt.
+        neste = {
+            status: services.neste_i_kjeden(status)
+            for status in choices.STATUS_NAVN
+        }
         return render(request, 'oppdrag/enhet.html', {
             'enhet': request.user.enhet,
+            'neste_kjede': json.dumps(neste),
+            'status_navn': json.dumps(choices.STATUS_NAVN),
         })
 
     return render(request, 'oppdrag/sentral.html', {
@@ -478,10 +491,13 @@ def stempling_view(request, pk, overgang):
     oppdraget. Sentralbordet stempler ikke; det korrigerer (fase 4b), og en
     konto uten enhet får 403 uansett nivå.
 
-    `idempotency_key` godtas i skjemaet, men leses ikke ennå: statusmaskinen
-    gjør en ren avspilling ufarlig (samme overgang to ganger er ulovlig andre
-    gang og gir 409 uten ny rad). Nøkkelen kobles til `core.idempotency` i
-    fase 5, når offline-køen som skal eie den finnes.
+    **`idempotency_key` kobles til `core.idempotency` (fase 5).** Uten den ville
+    en offline-kø som spilles av på nytt fått 409 på andre forsøk — teknisk
+    ufarlig, siden statusmaskinen avviser overgangen og ingen rad oppstår, men
+    ubrukelig for køen: den kan ikke skille «allerede levert» fra «avvist fordi
+    skjermen har sakket akterut», og ville enten hengt fast eller kastet en
+    stempling som faktisk kom fram. Med nøkkelen svarer en avspilling `ok` med
+    den opprinnelige meldingen, og køen kan trygt stryke raden.
     """
     if overgang not in services.STEMPLBARE:
         return JsonResponse(
@@ -522,6 +538,37 @@ def stempling_view(request, pk, overgang):
 
     tidspunkt, forsinket = services.vurder_klienttid(klienttid, oppdrag)
 
+    # Reserveres her — etter all validering, rett før noe skrives. Reserverte
+    # vi tidligere, ville en avvist stempling brent nøkkelen, og køen som
+    # rettet seg og prøvde igjen fått «allerede levert» på et forsøk som
+    # aldri kom fram.
+    idem = bygg_nokkel('oppdrag_stempling', request.user.pk,
+                       data.get('idempotency_key'))
+    if idem:
+        idem_status, verdi = reserver(idem)
+        if idem_status == 'ferdig':
+            # Køen spiller av et trykk som allerede kom fram. Svar med
+            # meldingen den gang laget, ikke med 409: køen skal kunne stryke
+            # raden, og den kan ikke skille en avvist overgang fra en levert.
+            try:
+                tidligere = Statusmelding.objects.get(pk=verdi)
+                return JsonResponse({'status': 'ok', 'data': {
+                    'oppdrag': oppdrag_til_dict(oppdrag, for_enhet=True),
+                    'melding': melding_til_dict(tidligere),
+                    'avspilling': True,
+                }})
+            except Statusmelding.DoesNotExist:
+                # Meldingen er borte (korrigert bort, eller basen nullstilt).
+                # Nøkkelen beskytter ikke lenger noe — la stemplingen gå.
+                forkast(idem)
+        elif idem_status == 'pagar':
+            # Samme trykk sendt to ganger mens det første fortsatt kjører.
+            return JsonResponse({
+                'status': 'error',
+                'message': 'Stemplingen er allerede sendt.',
+                'duplikat': True,
+            }, status=409)
+
     try:
         if overgang == choices.RYKKER_UT:
             # Lukker et eventuelt pågående oppdrag automatisk (§4.3).
@@ -536,12 +583,18 @@ def stempling_view(request, pk, overgang):
         # Typisk et dobbelttrykk der det første vant, eller en skjerm som har
         # sakket akterut. 409, ikke 400: forespørselen var velformet, det er
         # tilstanden som har flyttet seg. Klienten svarer med å hente på nytt.
+        if idem:
+            # Ingenting ble skrevet, så nøkkelen skal ikke stå som brukt.
+            forkast(idem)
         return JsonResponse({
             'status': 'error',
             'message': (
                 f'Oppdraget står i {oppdrag.get_status_display()} — '
                 'skjermen er oppdatert.'),
         }, status=409)
+
+    if idem:
+        fullfor(idem, melding.pk)
 
     return JsonResponse({'status': 'ok', 'data': {
         'oppdrag': oppdrag_til_dict(oppdrag, for_enhet=True),

@@ -21,6 +21,126 @@ let etagMine = null;
 const HASTEGRAD_REKKEFOLGE = ['Akutt', 'Haster', 'Vanlig'];
 
 
+// ════════════════════════════════════════════════════════
+// OFFLINE-KØ (fase 5)
+//
+// Ved knappetrykk skrives stemplingen til `localStorage` FØRST, skjermen
+// oppdaterer seg med en gang, og synkingen skjer i bakgrunnen. Feiler den,
+// blir raden liggende og forsøkes på nytt — ved neste trykk, ved neste poll,
+// og ved `online`-hendelsen.
+//
+// **Nøkkelen lages ved trykket og beholdes gjennom hvert forsøk.** Det er den
+// som gjør avspilling trygg: serveren svarer `ok` med den opprinnelige
+// meldingen i stedet for 409, og køen kan stryke raden uten å lure på om
+// stemplingen kom fram.
+//
+// **Kun enhetens stemplinger køes.** Sykestua må ha dekning for å opprette
+// oppdrag — se §6. Med bare stemplinger finnes ingen konflikt å løse: hver
+// melding er en ny rad, og rekkefølgen avgjøres av `tidspunkt`.
+// ════════════════════════════════════════════════════════
+
+//: Lagringsnøkkelen som funksjon, ikke som konstant. `build_harness` i
+//: js_test_utils klipper ut funksjoner og ingenting annet, så en `const` her
+//: ville vært udefinert i node — og try/catch-en under ville svelget
+//: `ReferenceError` og meldt «tom kø». Testen hadde da bestått uten å måle
+//: noe. Versjonstallet står i navnet: endres formen på radene, byttes v1 ut,
+//: og en gammel kø leses ikke som en ny.
+function koNokkel() {
+    return 'oppdrag_ko_v1';
+}
+
+
+function koLes() {
+    // localStorage kan være utilgjengelig (privat vindu, blokkert lagring)
+    // eller inneholde noe annet enn det vi skrev. En kø vi ikke kan lese er
+    // en tom kø — skjermen skal virke, men da uten offline-dekning.
+    try {
+        const raa = localStorage.getItem(koNokkel());
+        const verdi = raa ? JSON.parse(raa) : [];
+        return Array.isArray(verdi) ? verdi : [];
+    } catch (e) {
+        return [];
+    }
+}
+
+
+function koSkriv(ko) {
+    try {
+        localStorage.setItem(koNokkel(), JSON.stringify(ko));
+        return true;
+    } catch (e) {
+        return false;
+    }
+}
+
+
+function lagNokkel() {
+    // Serveren krever ^[A-Za-z0-9-]{8,64}$. `randomUUID` gir 36 tegn som
+    // passer; fallbacken finnes for eldre nettlesere i felt.
+    if (globalThis.crypto && typeof crypto.randomUUID === 'function') {
+        return crypto.randomUUID();
+    }
+    const tall = () => Math.floor(Math.random() * 1e9).toString(36);
+    return `k-${Date.now().toString(36)}-${tall()}-${tall()}`;
+}
+
+
+function koLeggTil(oppdragId, overgang) {
+    // Klienttiden fryses her, ved trykket — ikke ved sendingen. Uten det
+    // ville statistikken vist når dekningen kom tilbake i stedet for når
+    // mannskapet faktisk meldte.
+    const rad = {
+        nokkel: lagNokkel(),
+        oppdragId,
+        overgang,
+        klienttid: new Date().toISOString(),
+    };
+    const ko = koLes();
+    ko.push(rad);
+    koSkriv(ko);
+    return rad;
+}
+
+
+function koFjern(nokkel) {
+    koSkriv(koLes().filter((r) => r.nokkel !== nokkel));
+}
+
+
+function projiser(oppdragliste, ko) {
+    // Serverens svar pluss det som ligger usendt = det skjermen skal vise.
+    // Uten dette ville et trykk uten dekning sett ut som ingenting: neste
+    // poll henter serverens uendrede status og overskriver den optimistiske.
+    //
+    // Kjeden brukes KUN her, til å regne ut hva neste knapp skal hete når
+    // serveren ikke har fått vite om trykket ennå. Er den ikke lastet, faller
+    // vi tilbake til ingen neste-knapp — «Ledig» virker uansett, og den er
+    // utgang fra enhver status.
+    const kjede = globalThis.OPPDRAG_NESTE || {};
+    const navn = globalThis.OPPDRAG_STATUSNAVN || {};
+    const rader = Array.isArray(oppdragliste) ? oppdragliste : [];
+    const usendte = Array.isArray(ko) ? ko : [];
+
+    return rader.map((o) => {
+        // Siste trykk vinner: køen er i rekkefølge, og to trykk på samme
+        // oppdrag betyr at mannskapet har gått videre i kjeden.
+        const mine = usendte.filter((r) => r.oppdragId === o.id);
+        if (!mine.length) return o;
+
+        const siste = mine[mine.length - 1];
+        const nesteEtter = kjede[siste.overgang] || null;
+        return {
+            ...o,
+            status: siste.overgang,
+            status_navn: navn[siste.overgang] || siste.overgang,
+            neste_overgang: nesteEtter,
+            neste_navn: nesteEtter ? (navn[nesteEtter] || nesteEtter) : null,
+            usendt: true,
+        };
+    });
+}
+
+
 function hastegradKlasse(h) {
   return 'hastegrad-' + (h || '').toLowerCase();
 }
@@ -42,6 +162,24 @@ function visFeil(melding) {
 function skjulFeil() {
   const el = document.getElementById('enhet-feil');
   if (el) el.classList.add('d-none');
+}
+
+
+function visUsendt() {
+  // Egen, roligere tone enn `visFeil`: dette er ikke en feil, det er en
+  // stempling som venter på dekning. Men den MÅ synes — §6: en knapp som ser
+  // ut til å ha virket, men ikke har det, er verre enn en som feiler synlig.
+  const antall = koLes().length;
+  const el = document.getElementById('enhet-usendt');
+  if (!el) return;
+  if (!antall) {
+    el.classList.add('d-none');
+    return;
+  }
+  el.textContent = antall === 1
+    ? '1 stempling venter på dekning — den sendes av seg selv.'
+    : `${antall} stemplinger venter på dekning — de sendes av seg selv.`;
+  el.classList.remove('d-none');
 }
 
 
@@ -212,6 +350,7 @@ function renderAlt() {
   renderAktivt();
   renderVentende();
   renderAvsluttet();
+  visUsendt();
   const stempel = document.getElementById('enhet-oppdatert');
   if (stempel) stempel.textContent = 'Oppdatert ' + klokke(new Date().toISOString());
 }
@@ -219,44 +358,89 @@ function renderAlt() {
 
 // ── Stempling ───────────────────────────────────────────
 
+//: True mens `synk()` kjører, slik at to utløsere (trykk og poll) ikke
+//: sender samme rad to ganger. Nøkkelen ville gjort det ufarlig, men to
+//: parallelle løp kan levere ut av rekkefølge.
+let synkerNaa = false;
+
+
+async function synk() {
+  if (synkerNaa) return;
+  synkerNaa = true;
+  try {
+    // Serielt og i rekkefølge. Statusmeldinger er et spor av hva som skjedde,
+    // og to parallelle sendinger kunne landet «Avreist» før «Fremme».
+    while (true) {
+      const ko = koLes();
+      if (!ko.length) { skjulFeil(); break; }
+
+      const rad = ko[0];
+      let res;
+      try {
+        res = await apiFetch(
+          `/oppdrag/api/oppdrag/${rad.oppdragId}/status/${rad.overgang}/`, {
+            method: 'POST',
+            body: JSON.stringify({
+              klienttid: rad.klienttid,
+              idempotency_key: rad.nokkel,
+            }),
+          });
+      } catch (e) {
+        // Ingen kontakt. Raden blir liggende og forsøkes ved neste trykk,
+        // neste poll, eller `online`-hendelsen. Stopp her: rekkefølgen.
+        visUsendt();
+        break;
+      }
+
+      if (res.ok) {
+        // Enten levert nå, eller en avspilling serveren kjente igjen på
+        // nøkkelen. Begge betyr at stemplingen står — stryk raden.
+        koFjern(rad.nokkel);
+        continue;
+      }
+
+      let d = {};
+      try { d = await res.json(); } catch (e) { /* tom kropp */ }
+
+      if (res.status === 409 && d.duplikat) {
+        // Samme trykk er allerede underveis. La den andre fullføre.
+        break;
+      }
+      if (res.status >= 400 && res.status < 500) {
+        // Serveren avviste den, og vil gjøre det igjen: ulovlig overgang,
+        // manglende tilgang, oppdrag borte. Å beholde raden ville låst køen
+        // for alt bak den.
+        koFjern(rad.nokkel);
+        visFeil(d.message
+          || 'En stempling ble avvist av serveren. Meld status over nødnett.');
+        continue;
+      }
+      // 5xx: serverfeil. Behold raden og prøv igjen senere.
+      visUsendt();
+      break;
+    }
+  } finally {
+    synkerNaa = false;
+    etagMine = null;      // tving ferskt svar, ellers svarer serveren 304
+    await lastMine();
+  }
+}
+
+
 async function _stemple(id, overgang, knappId) {
   await withSubmitGuard(knappId, async () => {
-    let res;
-    try {
-      res = await apiFetch(`/oppdrag/api/oppdrag/${id}/status/${overgang}/`, {
-        method: 'POST',
-        // Klienttid følger med fra første dag: online er den lik ankomsttid
-        // og ufarlig, og offline-køen (fase 5) gjenbruker samme kropp.
-        body: JSON.stringify({ klienttid: new Date().toISOString() }),
-      });
-    } catch (e) {
-      visFeil('Ingen kontakt med serveren — meldingen er IKKE lagret. '
-        + 'Meld status over nødnett.');
-      return;
-    }
-
-    if (res.status === 409) {
-      // Dobbelttrykk der det første vant, eller en skjerm som har sakket
-      // akterut. Ikke en feil verdt et banner — hent ferskt og vis det.
-      etagMine = null;
-      await lastMine();
-      return;
-    }
-
-    let d = {};
-    try { d = await res.json(); } catch (e) { /* håndteres under */ }
-    if (!res.ok || d.status !== 'ok') {
-      visFeil(d.message || 'Stemplingen feilet — meld status over nødnett.');
-      return;
-    }
-
-    skjulFeil();
-    etagMine = null;
-    await lastMine();
+    // Skriv lokalt FØRST. Skjermen skal vise trykket med en gang, også uten
+    // dekning — en knapp som ser ut til å ha virket, men ikke har det, er
+    // verre enn en som feiler synlig.
+    koLeggTil(id, overgang);
+    renderAlt();
+    await synk();
   });
 }
 
 async function stempleNeste(id) {
+  // `mineOppdrag` er allerede projisert med køen, så `neste_overgang` peker
+  // videre i kjeden også når forrige trykk ligger usendt.
   const o = mineOppdrag.find((x) => x.id === id);
   if (!o || !o.neste_overgang) return;
   await _stemple(id, o.neste_overgang, `stemple-neste-${id}`);
@@ -281,16 +465,38 @@ async function lastMine() {
   if (res.status === 304) return;
   if (!res.ok) return;
   etagMine = res.headers.get('ETag');
-  mineOppdrag = (await res.json()).data || [];
+  // Serverens svar er sannheten, men det som ligger usendt legges oppå —
+  // ellers ville neste poll visket ut et trykk mannskapet nettopp gjorde.
+  mineOppdrag = projiser((await res.json()).data || [], koLes());
   renderAlt();
+}
+
+
+async function pollOgSynk() {
+  // Pollingen er også en synk-utløser: ligger noe usendt, er dette det
+  // hyppigste tidspunktet vi vet at nettet kan ha kommet tilbake.
+  if (koLes().length) {
+    await synk();
+    return;             // synk() laster selv til slutt
+  }
+  await lastMine();
 }
 
 
 document.addEventListener('DOMContentLoaded', async () => {
   await lastMine();
+  visUsendt();
+
+  // Køen kan ha overlevd at fanen ble lukket midt i en vakt.
+  if (koLes().length) await synk();
+
   // Tettere kadens enn sentralbordets 30 s: et nytt oppdrag skal dukke opp i
   // bilen uten at noen står og venter på det. ETag gjør at et poll uten
   // endring koster en 304 uten kropp. Ingen varsling utover lista — beskjeden
   // går uansett over nødnett (§7).
-  setInterval(lastMine, 15000);
+  setInterval(pollOgSynk, 15000);
+
+  // Den raskeste utløseren vi har: nettleseren sier fra selv når dekningen
+  // er tilbake, i stedet for at køen venter på neste poll.
+  globalThis.addEventListener('online', () => { synk(); });
 });

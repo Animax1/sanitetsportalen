@@ -721,10 +721,24 @@ Gjennomgang 13. aug. 2026, med 1000 pasienter og peak 100 brukere som premiss.
               like ut, men vinduet er personvern og arkiveringen er tavlerydding;
               koblet ville sentralbordet kunnet fjerne et oppdrag fra en skjerm noen
               fortsatt så på.
-      - [ ] **Fase 5** (4–6 t): offline-kø for stemplinger, med `core.idempotency`.
-            Endepunktet godtar allerede `idempotency_key` i det lukkede skjemaet —
-            fase 5 kobler nøkkelen til `reserver()`/`fullfor()` og bygger køen i
-            `localStorage`, med synlig «usendt»-markering på skjermen.
+      - [x] **Fase 5 — offline-kø (29. aug. 2026).** Stemplingen skrives til
+            `localStorage` først, skjermen oppdaterer seg med en gang, og synkingen
+            skjer i bakgrunnen. Utløsere: neste trykk, neste poll, og `online`.
+            - **Nøkkelen lages ved trykket og beholdes gjennom hvert forsøk.** Det er
+              den som gjør avspilling trygg: serveren svarer `ok` med den opprinnelige
+              meldingen i stedet for 409, og køen kan stryke raden. Uten den kunne
+              køen ikke skille «allerede levert» fra «avvist fordi skjermen har
+              sakket akterut».
+            - **Reservert etter all validering** — et avvist forsøk brenner ikke
+              nøkkelen, og `forkast()` frigir den når overgangen avvises.
+            - **Serielt og i rekkefølge.** To parallelle sendinger kunne landet
+              «Avreist» før «Fremme», og `Statusmelding` er et spor av hva som skjedde.
+            - **Kjeden sendes til skjermen som data**, kun for å regne ut hva neste
+              knapp skal hete mens noe ligger usendt. Uten den dør knappen ved første
+              trykk uten dekning. §4.2-invarianten er urørt: det er fortsatt ikke
+              *serveren* som utleder handlingen av tilstanden.
+            - Usendte stemplinger vises i et eget banner — §6: en knapp som ser ut til
+              å ha virket, men ikke har det, er verre enn en som feiler synlig.
       - [ ] **Fase 6** (5–7 t): **statistikkregisteret** + oppdragsfanen. Her rives den
             direkte importen fra `statistikk` til `patients.services` ut, og erstattes av
             et registry etter samme idiom som `core.backup` og `core.arkiv` — det CLAUDE.md

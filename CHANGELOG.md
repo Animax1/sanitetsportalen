@@ -4,6 +4,67 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-08-29 — Fase 5: stemplingen overlever at dekningen ryker
+
+**1272 tester grønne** (23 nye). Ingen migrasjon.
+
+Ved knappetrykk skrives stemplingen til `localStorage` **først**, skjermen oppdaterer seg
+med en gang, og synkingen skjer i bakgrunnen. Feiler den, blir raden liggende og forsøkes
+på nytt — ved neste trykk, ved neste poll, og ved `online`-hendelsen.
+
+**Nøkkelen er det som gjør avspilling trygg.** Den lages ved trykket og beholdes gjennom
+hvert forsøk. Serveren kobler den nå til `core.idempotency`, og svarer en avspilling med
+`ok` og den **opprinnelige** meldingen i stedet for 409. Uten det kunne køen ikke skille
+«allerede levert» fra «avvist fordi skjermen har sakket akterut» — den ville enten hengt
+fast, eller kastet en stempling som faktisk kom fram.
+
+**Reservert etter all validering**, aldri før. Et avvist forsøk skal ikke brenne nøkkelen:
+køen som retter seg og prøver igjen ville ellers fått «allerede levert» på noe som aldri
+kom fram. `forkast()` frigir den når statusmaskinen avviser overgangen. Egen test som
+sender en ulovlig overgang først og krever at den lovlige etterpå går gjennom.
+
+**Synkingen er seriell og stopper på første feil.** To parallelle sendinger kunne landet
+«Avreist» før «Fremme», og `Statusmelding` er et spor av hva som faktisk skjedde. En 4xx
+som ikke er `duplikat` stryker raden og melder fra — serveren vil avvise den igjen, og å
+beholde den ville låst køen for alt bak.
+
+**Klienttiden fryses ved trykket**, ikke ved sendingen. Uten det ville statistikken vist
+når dekningen kom tilbake i stedet for når mannskapet meldte. `forsinket`-flagget fra
+§5.1 gjør at tallet kan leses for det det er.
+
+**Skjermen viser hva som ligger usendt** — §6: en knapp som ser ut til å ha virket, men
+ikke har det, er verre enn en som feiler synlig. Eget banner, roligere tone enn
+feilbanneret: dette er en ventetilstand, ikke en feil.
+
+### Kjeden måtte til klienten, og det er verdt å si hvorfor
+
+Skjermen kjente ikke statuskjeden — serveren sendte `neste_overgang` per rad. Det holder
+online, men ikke i en bil uten dekning: første trykk ville drept knappen, og køen vært
+halvveis. Kjeden følger nå med siden som data, og brukes **kun** til å regne ut hva neste
+knapp skal hete mens noe ligger usendt.
+
+§4.2-invarianten er urørt. Den handler om at *serveren* ikke skal utlede handlingen av
+tilstanden — `POST .../status/neste/` ville gitt kappløpet når to trykk kommer tett.
+Klienten måtte uansett vite hvilket navngitt endepunkt den poster til. En test låser
+kjeden som sendes mot `services.neste_i_kjeden`, så de to ikke kan komme i utakt: sendes
+en annen kjede enn serveren håndhever, viser knappen ett steg og endepunktet godtar et
+annet. Sentralbordet får den ikke — det har ingen kø.
+
+### To feller i testoppsettet, begge verdt å notere
+
+`build_harness` klipper ut **funksjoner og ingenting annet**, så `const KO_NOKKEL` var
+udefinert i node — og `koLes()` sin try/catch svelget `ReferenceError` og meldte «tom kø».
+Alle tolv testene bestod i den forstand at de ikke krasjet, men målte ingenting. Nøkkelen
+er nå `koNokkel()`, altså en funksjon harnesset kan se, og det står i koden hvorfor.
+
+Og `crypto` er skrivebeskyttet global fra node 19 — stubben kastet. Node har
+`randomUUID` innebygd, så den er droppet; testene sammenligner aldri nøkler mot faste
+verdier.
+
+Seks av kø-testene er sett røde ved å slå av projeksjonen.
+
+---
+
 ## 2026-08-29 — Oppklart: innloggingen feilet i feil miljø
 
 **Ingen kodeendring.** Kontoen `karmøy56` kom ikke inn fordi innloggingsforsøkene gikk mot

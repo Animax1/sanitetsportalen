@@ -34,6 +34,11 @@
   {# ikke har det, er verre enn en som feiler synlig. #}
   <div id="enhet-feil" class="alert alert-danger enhet-feil d-none" role="alert"></div>
 
+  {# Usendte stemplinger. Roligere tone enn feilbanneret — dette er ikke en #}
+  {# feil, men det MÅ synes: en knapp som ser ut til å ha virket, men ikke #}
+  {# har det, er verre enn en som feiler synlig (§6). #}
+  <div id="enhet-usendt" class="alert alert-warning enhet-usendt d-none" role="status"></div>
+
   <div id="aktivt-oppdrag"></div>
 
   <div id="ventende-seksjon">
@@ -50,6 +55,14 @@
 {% endblock %}
 
 {% block extra_scripts %}
+<script nonce="{{ csp_nonce }}">
+  // Statuskjeden som data. Skjermen bruker den KUN til å regne ut hva neste
+  // knapp skal hete mens en stempling ligger usendt — uten den ville knappen
+  // dødd ved første trykk uten dekning. Når nettet er der, gjelder fortsatt
+  // serverens `neste_overgang` per rad.
+  window.OPPDRAG_NESTE = {{ neste_kjede|safe }};
+  window.OPPDRAG_STATUSNAVN = {{ status_navn|safe }};
+</script>
 <script src="{% static 'js/portal-utils.js' %}"></script>
 <script src="{% static 'js/oppdrag-enhet.js' %}"></script>
 {% endblock %}
