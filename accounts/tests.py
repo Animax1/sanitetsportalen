@@ -525,6 +525,7 @@ class ModulTilgangMatriseTests(TestCase):
 
     def test_ny_bruker_far_tilgangen_med_en_gang(self):
         self.client.post(reverse('accounts:user_create'), {
+            'kontotype': 'person',
             'username': 'ny_med_tilgang', 'role': 'bruker',
             'metode': 'midlertidig', 'modul_patients': 'skriv_full',
         })

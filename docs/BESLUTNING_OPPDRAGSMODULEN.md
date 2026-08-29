@@ -51,12 +51,35 @@ de to — radioen setter koblingen, matrisen setter tilgangen.
 `ModulTilgang('oppdrag', ...)`-rad ser kontoen ingenting, enhet eller ei. Blandes de,
 gjenoppstår feilen deploy 1–3 nettopp fjernet.
 
-### 2.1 Bilkontoene er delte kontoer
+### 2.1 Bilkontoene opprettes som biler
 
 `haugesund56` er ikke en person. `CustomUser.er_delt_konto` finnes allerede for akkurat
 dette: ingen e-post, ingen MFA, ingen selvbetjent passord-reset — admin setter passordet.
-Enhetskontoer skal opprettes med det flagget, og valideringen som allerede ligger i
-`AdminUserCreateForm` håndhever resten.
+
+**Kontotypen velges ved oppretting, og enheten lages i samme steg.** Første utgave krevde
+tre handlinger for én bil: opprett konto, opprett `Enhet` inne i oppdragsmodulen, koble dem.
+André kalte det tullete, og han hadde rett — to av de tre lå på en helt annen side enn den
+første, og ingenting forklarte hvorfor de hang sammen.
+
+`AdminUserCreateForm` har derfor ett valg med tre verdier:
+
+| Kontotype | Hva som lages |
+|---|---|
+| Person | Personlig konto. E-post og navn, kan inviteres |
+| Delt konto | Ingen personlig eier. F.eks. en felles PC på sykestua |
+| Bil eller ambulanse | Delt konto **og** en `Enhet`, i samme innsending |
+
+Ett valg framfor «avkrysningsboks pluss et navnefelt» er med vilje: to kontroller som
+overlapper er nettopp det som gjorde `role` til et rot. Da kunne man krysse av for delt
+konto og likevel skrive et enhetsnavn, eller la være, og skjemaet måtte gjette.
+
+**Det som ble slått sammen er to opprettelser, ikke tilgang og domenedata.** §7.3-skillet
+står uendret: enheten avgjør hvilket grensesnitt kontoen får, matrisen avgjør hva den har
+lov til — og matrisen ligger på det samme skjemaet. En test oppretter en bil og krever 403
+på `/oppdrag/` så lenge den ikke har en `ModulTilgang`-rad.
+
+Enhetspanelet i oppdragsmodulen beholder koblingsredigeringen. Den er for reparasjoner: en
+bilkonto fra før dette fantes, eller en enhet som skal over på en annen konto.
 
 ## 3. Datamodellen
 

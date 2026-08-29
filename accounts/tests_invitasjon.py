@@ -114,6 +114,7 @@ class InvitasjonFlytTests(TestCase):
             'fullt_navn': 'Kari Nordmann',
             'email': 'kari@eksempel.no',
             'role': 'bruker',
+            'kontotype': 'person',
             'metode': 'invitasjon',
         }
         data.update(felt)
@@ -183,7 +184,7 @@ class InvitasjonFlytTests(TestCase):
 
     def test_delt_konto_faar_midlertidig_passord_ikke_invitasjon(self):
         resp = self._opprett(
-            username='bil7', fullt_navn='', email='', er_delt_konto='on',
+            username='bil7', fullt_navn='', email='', kontotype='delt',
         )
         self.assertEqual(resp.status_code, 200)
         self.assertEqual(len(mail.outbox), 0)
@@ -196,7 +197,7 @@ class InvitasjonFlytTests(TestCase):
         """Regelen håndheves i valideringen, ikke bare i grensesnittet."""
         resp = self._opprett(
             username='bil8', fullt_navn='Noen Navnesen',
-            email='bil8@eksempel.no', er_delt_konto='on',
+            email='bil8@eksempel.no', kontotype='delt',
         )
         self.assertEqual(resp.status_code, 200)
         self.assertFalse(CustomUser.objects.filter(username='bil8').exists())
@@ -322,7 +323,7 @@ class EksisterendeKontoerTests(TestCase):
             {
                 'action': 'edit', 'fullt_navn': '', 'email': '',
                 'role': 'bruker', 'is_active': 'on',
-                'mfa_required': 'on', 'er_delt_konto': 'on',
+                'mfa_required': 'on', 'kontotype': 'delt',
             },
         )
         self.assertEqual(svar.status_code, 200)
@@ -461,6 +462,7 @@ class MfaVedOpprettingTests(TestCase):
             'email': 'medmfa@eksempel.no',
             'role': 'bruker',
             'mfa_required': 'on',
+            'kontotype': 'person',
             'metode': 'invitasjon',
         })
         self.assertTrue(
@@ -474,7 +476,7 @@ class MfaVedOpprettingTests(TestCase):
             'email': '',
             'role': 'bruker',
             'mfa_required': 'on',
-            'er_delt_konto': 'on',
+            'kontotype': 'delt',
             'metode': 'passord',
         })
         self.assertEqual(svar.status_code, 200)

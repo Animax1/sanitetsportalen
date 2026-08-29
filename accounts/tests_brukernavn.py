@@ -149,6 +149,7 @@ class BrukernavnNormaliseringTests(TestCase):
             'fullt_navn': 'Kari Nordmann',
             'email': 'kari@eksempel.no',
             'role': 'bruker',
+            'kontotype': 'person',
             'metode': 'invitasjon',
         })
         self.assertTrue(

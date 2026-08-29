@@ -4,6 +4,41 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-08-29 — Kontotypen velges, og bilen opprettes i ett steg
+
+**1120 tester grønne** (9 nye). Ingen migrasjon.
+
+André: «jeg er sterkt kritisk til å måtte koble en delt konto. Å koble slikt er tullete.»
+Han har rett. Å sette opp én bil krevde tre handlinger — opprett konto, opprett `Enhet`
+inne i oppdragsmodulen, koble dem — med to av dem på en helt annen side enn den første, og
+ingenting som forklarte hvorfor de hang sammen.
+
+`AdminUserCreateForm` har nå ett valg med tre verdier: **Person**, **Delt konto**, **Bil
+eller ambulanse**. Velger man den siste, blir enheten opprettet og knyttet til kontoen i
+samme innsending.
+
+**Ett valg, ikke avkrysningsboks pluss navnefelt.** `er_delt_konto` er ikke lenger en boks
+på opprettingsskjemaet — den utledes av valget. To kontroller som overlapper er nettopp det
+som gjorde `role` til et rot: man kunne krysse av for delt konto og *likevel* skrive et
+enhetsnavn, eller la være, og skjemaet måtte gjette hva som var ment. Redigeringsskjemaet
+beholder boksen; der endrer man en konto som finnes, og det er noe annet enn å bestemme hva
+som skal lages.
+
+**Det som ble slått sammen er to opprettelser — ikke tilgang og domenedata.** §7.3-skillet
+står uendret, og en test holder det: en bil opprettet slik får 403 på `/oppdrag/` helt til
+noen gir den en `ModulTilgang`-rad. Prøvd motsatt vei også — en probe som lot
+enhetsopprettingen dele ut `skriv_handling` gjorde testen rød.
+
+Enhetsnavnet sjekkes som ledig i `clean()`, ikke i viewet. En unik-feil fra databasen ville
+kommet etter at kontoen var lagret, og etterlatt en konto uten enhet.
+
+Retningen `accounts` → `oppdrag` er verdt å merke seg. Importen er lokal i funksjonen, som
+`core.views` gjør mot `patients.models`. Skal en modul nummer to også kunne opprettes fra
+brukerskjemaet, er det der et registry hører hjemme — etter samme idiom som `core.backup`
+og `core.arkiv`. Med én modul ville registeret vært mer maskineri enn nytte.
+
+---
+
 ## 2026-08-29 — CSRF: hver skriving fra en modulside var brutt
 
 **1111 tester grønne** (8 nye). Ingen migrasjon. `static/js/portal-utils.js` og

@@ -777,6 +777,28 @@ def _lagre_ny_modultilgang(request, user, tilgang_form):
         )
 
 
+def _lag_enhet_om_bedt_om(form, user):
+    """Opprett `Enhet` når kontotypen er bil eller ambulanse.
+
+    **Retningen er `accounts` → `oppdrag`, og det er verdt å merke seg.**
+    Importen er lokal i funksjonen, som `core.views` gjør mot
+    `patients.models`. Skal en modul nummer to også kunne opprettes fra
+    brukerskjemaet, er det her et registry hører hjemme — etter samme idiom
+    som `core.backup` og `core.arkiv`. Med én modul ville registeret vært mer
+    maskineri enn nytte.
+
+    Navnet er allerede validert som ledig i `AdminUserCreateForm.clean()`, så
+    en unik-feil her ville betydd et kappløp — og da er det riktig at den
+    kaster i stedet for å etterlate en konto uten enhet.
+    """
+    navn = form.skal_lage_enhet()
+    if not navn:
+        return None
+    from oppdrag.models import Enhet  # noqa: WPS433
+    return Enhet.objects.create(navn=navn, user=user)
+
+
+
 @admin_required
 def user_create_view(request):
     """Opprett ny bruker — med invitasjon, eller med midlertidig passord.
@@ -819,6 +841,7 @@ def user_create_view(request):
                 user.must_change_password = False
                 user.save()
                 _lagre_ny_modultilgang(request, user, tilgang_form)
+                _lag_enhet_om_bedt_om(form, user)
 
                 if send_invitasjon(user, request):
                     messages.success(
@@ -841,8 +864,15 @@ def user_create_view(request):
             user.must_change_password = True
             user.save()
             _lagre_ny_modultilgang(request, user, tilgang_form)
-            messages.success(request, f'Bruker «{user.username}» er opprettet.')
-            return render(request, 'accounts/user_form.html', {
+            enhet = _lag_enhet_om_bedt_om(form, user)
+            if enhet is not None:
+                messages.success(
+                    request,
+                    f'Bruker «{user.username}» er opprettet, og knyttet til '
+                    f'enheten «{enhet.navn}».',
+                )
+            else:
+                return render(request, 'accounts/user_form.html', {
                 'form': AdminUserCreateForm(),
                 'tilgang_form': ModulTilgangForm(),
                 'temp_password': temp_password,

@@ -126,18 +126,71 @@ class SettPassordForm(forms.Form):
 class AdminUserCreateForm(forms.ModelForm):
     """Skjema for admin til å opprette ny bruker.
 
-    ``er_delt_konto`` er en **kontotype**, ikke bare et flagg. En delt konto
-    er en bil-innlogging eller liknende: ingen personlig eier, ingen innboks
-    som tilhører én person. Valideringen her **nekter** derfor e-post og navn
-    i stedet for å la dem stå tomme — ellers må unntaket huskes hver gang, og
-    den dagen noen legger inn en kontakt-e-post på en bil, er det plutselig
-    en lateral vei inn i systemet via passord-reset.
+    **Kontotypen velges, den krysses ikke av.** Fram til 29. aug. 2026 var det
+    en avkrysningsboks for «delt konto», og en bil måtte i tillegg opprettes
+    som `Enhet` og kobles til kontoen i et tredje steg inne i oppdragsmodulen.
+    André kalte det tullete, og det var det: tre handlinger for én bil, med to
+    av dem på en helt annen side enn den første.
+
+    Nå er det ett valg med tre verdier, og det som skal lages blir laget:
+
+    ===============  =====================================================
+    Person           Personlig konto. E-post og navn, kan inviteres
+    Delt konto       Ingen personlig eier. F.eks. en felles PC på sykestua
+    Bil/ambulanse    Delt konto **og** en `Enhet`, opprettet i samme steg
+    ===============  =====================================================
+
+    Ett valg framfor «avkrysningsboks pluss et navnefelt» er med vilje: to
+    kontroller som overlapper er nettopp det som gjorde `role` til et rot.
+    Da kunne man krysse av for delt konto og *likevel* skrive et enhetsnavn,
+    eller la være, og skjemaet måtte gjette hva som var ment.
+
+    **Valideringen nekter e-post og navn på begge de delte typene** i stedet
+    for å la dem stå tomme — ellers må unntaket huskes hver gang, og den dagen
+    noen legger inn en kontakt-e-post på en bil, er det plutselig en lateral
+    vei inn i systemet via passord-reset.
+
+    **Enheten gir fortsatt ingen tilgang.** Den avgjør hvilket grensesnitt
+    kontoen får; hva den har lov til settes i matrisen på samme side. Det er
+    §7.3-skillet, og det står uendret — det som ble slått sammen her er to
+    *opprettelser*, ikke tilgang og domenedata.
     """
+
+    PERSON = 'person'
+    DELT = 'delt'
+    ENHET = 'enhet'
+    KONTOTYPER = (
+        (PERSON, 'Person'),
+        (DELT, 'Delt konto (felles innlogging)'),
+        (ENHET, 'Bil eller ambulanse'),
+    )
+
+    kontotype = forms.ChoiceField(
+        choices=KONTOTYPER,
+        initial=PERSON,
+        label='Kontotype',
+        widget=forms.Select(attrs={'class': 'form-select'}),
+        help_text=(
+            'Bil eller ambulanse oppretter også enheten, og knytter den til '
+            'kontoen. Enheten avgjør hvilket grensesnitt kontoen får — ikke '
+            'hva den har lov til.'
+        ),
+    )
+    enhetsnavn = forms.CharField(
+        required=False,
+        max_length=64,
+        label='Enhetsnavn',
+        widget=forms.TextInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'Haugesund 56',
+        }),
+        help_text='Navnet som brukes på samband. Ikke det samme som brukernavnet.',
+    )
 
     class Meta:
         model = CustomUser
         fields = ['username', 'fullt_navn', 'email', 'role',
-                  'mfa_required', 'er_delt_konto']
+                  'mfa_required']
         widgets = {
             'username': forms.TextInput(attrs={'class': 'form-control'}),
             'fullt_navn': forms.TextInput(attrs={
@@ -195,7 +248,15 @@ class AdminUserCreateForm(forms.ModelForm):
 
     def clean(self):
         data = super().clean()
-        if data.get('er_delt_konto'):
+        type_ = data.get('kontotype') or self.PERSON
+        delt = type_ in (self.DELT, self.ENHET)
+
+        # `er_delt_konto` er ikke lenger en avkrysningsboks — den utledes av
+        # valget. Én kilde, så «delt konto uten enhetsnavn» og «enhetsnavn
+        # uten delt konto» ikke kan oppstå i det hele tatt.
+        data['er_delt_konto'] = delt
+
+        if delt:
             if data.get('email'):
                 self.add_error('email', 'En delt konto skal ikke ha e-post.')
             if data.get('fullt_navn'):
@@ -211,7 +272,50 @@ class AdminUserCreateForm(forms.ModelForm):
                     'mfa_required',
                     'MFA kan ikke kreves på en delt konto — enheten deles av flere.',
                 )
+
+        navn = (data.get('enhetsnavn') or '').strip()
+        data['enhetsnavn'] = navn
+
+        if type_ == self.ENHET:
+            if not navn:
+                self.add_error(
+                    'enhetsnavn',
+                    'En bil eller ambulanse må ha et enhetsnavn.',
+                )
+            else:
+                # Sjekkes her, ikke i viewet: en unik-feil fra databasen ville
+                # kommet etter at kontoen var opprettet, og etterlatt en konto
+                # uten enhet.
+                from oppdrag.models import Enhet  # noqa: WPS433
+                if Enhet.objects.filter(navn=navn).exists():
+                    self.add_error(
+                        'enhetsnavn', f'Enheten «{navn}» finnes allerede.')
+        elif navn:
+            self.add_error(
+                'enhetsnavn',
+                'Enhetsnavn gjelder kun for bil eller ambulanse.',
+            )
+
         return data
+
+    def save(self, commit=True):
+        """Sett `er_delt_konto` fra kontotypen. Enheten lages i viewet.
+
+        Enheten kan ikke opprettes her: den trenger brukerens pk, og
+        `commit=False` er nettopp stien opprettingsviewet bruker for å velge
+        mellom invitasjon og midlertidig passord før lagring.
+        """
+        bruker = super().save(commit=False)
+        bruker.er_delt_konto = bool(self.cleaned_data.get('er_delt_konto'))
+        if commit:
+            bruker.save()
+        return bruker
+
+    def skal_lage_enhet(self):
+        """(navn,) hvis kontoen er en bil eller ambulanse, ellers ``None``."""
+        if self.cleaned_data.get('kontotype') == self.ENHET:
+            return self.cleaned_data.get('enhetsnavn')
+        return None
 
     def clean_email(self):
         # Normaliser tom streng til None slik at NULL lagres i databasen.
