@@ -337,8 +337,14 @@
     og med for trange kolonner flyter feltet ut over nabocella. Tabellen er ni
     kolonner med to tidsfelt — den *skal* være bred, og rammen ruller når
     skjermen er smalere.
+
+    **66rem, ikke 82.** Den første verdien hadde slark: den ga tidsfeltene
+    210 px der de trenger 185, og prisen var at rediger-knappen i siste
+    kolonne havnet utenfor skjermen på en vanlig laptop. Kolonnene er
+    strammet til det feltene faktisk krever — `RessurstabellensBreddeTests`
+    regner ut om de fortsatt får plass.
   */
-  min-width: 82rem;
+  min-width: 66rem;
   font-size: 0.85rem;
 }
 
@@ -416,9 +422,29 @@
   font-variant-numeric: tabular-nums;
 }
 
+/*
+  **Handlingskolonnen henger fast til høyre.** Selv med strammere kolonner
+  ruller tabellen på en smal skjerm, og da var rediger-knappen det første som
+  forsvant ut — altså den ene knappen raden finnes for. `position: sticky`
+  holder den i syne; bakgrunnen må settes eksplisitt, ellers ruller innholdet
+  synlig under den.
+*/
 .vl-handling {
   text-align: right;
   white-space: nowrap;
+  position: sticky;
+  right: 0;
+  background: var(--surface-1);
+}
+
+.vl-tabell tbody tr:hover .vl-handling {
+  background: var(--surface-2);
+}
+
+.vl-tabell thead th:last-child {
+  position: sticky;
+  right: 0;
+  background: var(--surface-1);
 }
 
 .vl-handling .btn {
@@ -698,4 +724,46 @@
   border-left: 2px solid rgba(255, 255, 255, 0.55);
   border-radius: 0;
   width: 2px;
+}
+
+
+/* ── Vaktvelgeren: hvilken vakt planlegger du? ────────────────────────── */
+/*
+  Egen linje, ikke et felt inne i knapperaden. Vaktas navn er konteksten for
+  alt annet på sida — sto det mellom «Mannskap» og «Ny vaktliste», leste det
+  som enda en innstilling.
+*/
+.vl-vaktvelger {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  padding: 0.55rem 0.75rem;
+  background: var(--surface-2);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+}
+
+.vl-vaktvelger #vaktliste-velger {
+  min-width: 16rem;
+  max-width: 26rem;
+  width: auto;
+}
+
+/* Fanene og «Ny ressurs» på samme linje — knappen lager en ny fane. */
+.vl-fanerad {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.vl-fanerad .vl-faner {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+@media print {
+  .vl-vaktvelger, .vl-fanerad { display: none !important; }
 }

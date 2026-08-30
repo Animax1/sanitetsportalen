@@ -876,6 +876,13 @@ Gjennomgang 13. aug. 2026, med 1000 pasienter og peak 100 brukere som premiss.
             - **Lærdom å ta med til neste modul:** en modul er ikke ferdig før
               dataene den trenger kan opprettes *gjennom portalen*. Django-admin
               teller ikke, og en testsuite som bare bruker ORM-en ser det ikke.
+      - [x] **Toppen ryddet, tabellen krympet (30. aug. 2026).** Sjuende
+            runde. Ressurstabellen ned fra 82rem til 66rem, så den ikke
+            ruller over 1280 px, og handlingskolonnen festet til høyre så
+            rediger-knappen ikke forsvinner når den likevel ruller. Toppen
+            delt i tre: sida, vakta (velger + «Ny vaktliste»), fanene
+            («Ny ressurs»). «Vakta» → «Innstillinger». Kurven fjernet fra
+            «Oversikt», som nå bare er utskriftslista.
       - [x] **Rediger skift, og kurve per fane (30. aug. 2026).** Sjette
             runde fra Andrés bruk. Blyanten i raden åpner et vindu der
             mannskap, rolle, tider og merknad endres i ett kall — før måtte

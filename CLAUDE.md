@@ -351,8 +351,8 @@ fase 3–7 gjenstår — se `docs/BESLUTNING_VAKTLISTE.md`, som er besluttet i s
   serveren sjekker den doble regelen på nytt mot personen som skal inn. Å
   bytte person ved å slette raden mistet tidene og rollen som sto der.
   Sletting ligger inne i vinduet bak en bekreftelse, som på ressursen.
-- **Kurven står i fanen den gjelder** (`mkGruppekurve`), ikke bare samlet i
-  «Oversikt» — og timeaksen har én celle per søyle med samme flex-bredde, så
+- **Kurven står i fanen den gjelder** (`mkGruppekurve`), ikke i «Oversikt» —
+  og timeaksen har én celle per søyle med samme flex-bredde, så
   klokkeslettet står under sin egen time uansett hvor lang vakta er. Tettheten
   glisner med lengden (`_timesteg`). Den hvite streken i kurven er **midnatt**
   (`vl-dogn`), ikke nåværende tidspunkt; den står i tegnforklaringen fordi en
@@ -361,6 +361,10 @@ fase 3–7 gjenstår — se `docs/BESLUTNING_VAKTLISTE.md`, som er besluttet i s
   summerte samleplassen, ambulansene og KO til ett tall som ikke svarer på noe. Spennet er
   felles (`_vaktensSpenn()`) fordi to kurver man ikke kan sammenligne er verre enn én
   samlet.
+- **Handlingskolonnen i ressurstabellen er `position: sticky`.** Tabellen
+  ruller under 1280 px, og uten den var rediger-knappen det første som forsvant
+  — altså den ene knappen raden finnes for. Bakgrunnen må settes eksplisitt,
+  ellers ruller innholdet synlig under den.
 - **Kolonnebredde i ressurstabellen er `min-width` + `<colgroup>`-andeler, og
   begge deler betyr noe.** Et `datetime-local`-felt har en gulvbredde nettleseren
   bestemmer; blir kolonnen smalere enn den, stikker feltet ut over nabocella —

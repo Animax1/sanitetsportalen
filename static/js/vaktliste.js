@@ -525,9 +525,9 @@ function mkRessurs(r) {
       <div class="vl-tabellramme">
         <table class="vl-tabell">
           <colgroup>
-            <col style="width: 15%"><col style="width: 6%"><col style="width: 11%">
-            <col style="width: 16%"><col style="width: 16%"><col style="width: 6%">
-            <col style="width: 15%"><col style="width: 11%"><col style="width: 4%">
+            <col style="width: 15%"><col style="width: 5%"><col style="width: 11%">
+            <col style="width: 18%"><col style="width: 18%"><col style="width: 5%">
+            <col style="width: 13%"><col style="width: 10%"><col style="width: 5%">
           </colgroup>
           <thead>
             <tr>
@@ -730,27 +730,6 @@ function mkGruppekurve(ressurs) {
 }
 
 
-function mkKurve() {
-  const bunker = _posterPerGruppe();
-  if (!bunker.length) return '';
-
-  const kurver = bunker
-    .map((b) => _mkEnKurve(b.gruppe.navn, b.poster))
-    .filter(Boolean)
-    .join('');
-  if (!kurver) return '';
-
-  return `
-    <div class="vl-kort vl-kurve-kort">
-      <div class="vl-kort-topp">
-        <span class="vl-kort-tittel">Bemanning gjennom vakta</span>
-        <div class="d-flex align-items-center gap-3">${_tegnforklaring()}</div>
-      </div>
-      ${kurver}
-    </div>`;
-}
-
-
 function mkOversikt() {
   // **Utskriftslista.** Hele vakta på ett ark, gruppert på korps — den man
   // henger opp. Kurven står over og følger ikke med på papiret.
@@ -810,8 +789,10 @@ function mkOversikt() {
 
   const tittel = aktivListe.vaktliste.vakt_navn;
   const spenn = _vaktspenn();
+  // **Ingen kurve her.** Den sto samlet på «Oversikt» før hver gruppe fikk
+  // sin i sin egen fane, og to steder å lese den samme kurven er ett for
+  // mye. «Oversikt» er utskriftslista, og bare det.
   return `
-    ${mkKurve()}
     <div class="vl-kort vl-utskriftsark">
       <div class="vl-arkhode">
         <h2>${escapeHtml(tittel)}</h2>

@@ -34,44 +34,55 @@
 </script>
 <div class="container-fluid px-3 px-md-4 py-3">
 
+  {% comment %}
+    **Tre nivåer, i den rekkefølgen man tenker.** Før lå alt på én linje:
+    hvilken vakt man planla, hvem man er, hva man vil lage. Da sto vaktas navn
+    midt inne i en knapperad og så ut som en innstilling.
+
+      1. Sida    — hva dette er, og de to tingene som gjelder portalen
+      2. Vakta   — hvilken vakt du planlegger, og å lage en ny
+      3. Fanene  — ressursene i den vakta, og å lage en ny ressurs
+
+    «Ny ressurs» hører til fanene fordi en ressurs *er* en fane; «Ny vaktliste»
+    hører til velgeren fordi den lager noe velgeren skal peke på.
+  {% endcomment %}
   <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
     <h1 class="h4 mb-0"><i class="bi bi-people me-2"></i>Vaktliste</h1>
     <div class="d-flex gap-2 align-items-center flex-wrap">
-      <select id="vaktliste-velger" class="form-select form-select-sm"
-              style="min-width: 14rem;" data-action="byttVaktliste"></select>
-      <span id="vaktliste-status" class="vl-status"></span>
       <a href="/vaktliste/registre/" class="btn btn-outline-secondary btn-sm">
         <i class="bi bi-person-vcard me-1"></i>Mannskap
       </a>
       {% comment %}
-        **Ett vindu for vakta.** Lengden og utskriften er begge ting man gjør
-        med *vakta*, ikke med en ressurs, og som løse knapper i toppen
-        konkurrerte de om plassen med «Ny ressurs» uten å høre til samme
-        spørsmål. Knappen er ikke gatet: å skrive ut lista er noe alle som
-        ser den skal kunne — det er lengden inne i vinduet som krever
-        skriv_leder, og den er gatet for seg.
+        Vinduet for vakta selv: lengden og utskriften. Het «Vakta» til
+        30. aug. 2026 — et substantiv der de andre knappene er handlinger,
+        og det sa ikke hva som lå bak. Knappen er ikke gatet: å skrive ut
+        lista er noe alle som ser den skal kunne, og det er lengden inne i
+        vinduet som krever skriv_leder.
 
-        Rollene ligger IKKE her lenger; de administreres inne i ressursen,
-        fordi de hører til ressursens gruppe. Se vaktliste.js::apneRoller().
+        Rollene ligger IKKE her; de administreres inne i ressursen, fordi de
+        hører til ressursens gruppe. Se vaktliste.js::apneRoller().
       {% endcomment %}
       <button type="button" class="btn btn-outline-secondary btn-sm"
               data-action="apneVakt">
-        <i class="bi bi-calendar-event me-1"></i>Vakta
-      </button>
-      {% comment %}
-        Å planlegge en vakt lager en core.Vakt, og å legge til en ressurs
-        bestemmer hva vakta består av. Begge er skriv_leder fra 30. aug. 2026
-        — JS skjuler dem, se vaktliste.js::gateKnapper().
-      {% endcomment %}
-      <button type="button" class="btn btn-primary btn-sm vl-krev-leder d-none"
-              data-bs-toggle="modal" data-bs-target="#nyVaktlisteModal">
-        <i class="bi bi-plus-lg me-1"></i>Ny vaktliste
-      </button>
-      <button type="button" class="btn btn-outline-secondary btn-sm vl-krev-leder d-none"
-              data-bs-toggle="modal" data-bs-target="#nyRessursModal">
-        <i class="bi bi-diagram-3 me-1"></i>Ny ressurs
+        <i class="bi bi-sliders me-1"></i>Innstillinger
       </button>
     </div>
+  </div>
+
+  <div class="vl-vaktvelger mb-3">
+    <label class="vl-meta mb-0" for="vaktliste-velger">Planlegger</label>
+    <select id="vaktliste-velger" class="form-select form-select-sm"
+            data-action="byttVaktliste"></select>
+    <span id="vaktliste-status" class="vl-status"></span>
+    <span class="flex-grow-1"></span>
+    {% comment %}
+      Å planlegge en vakt lager en core.Vakt — skriv_leder fra 30. aug. 2026.
+      JS skjuler knappen, se vaktliste.js::gateKnapper().
+    {% endcomment %}
+    <button type="button" class="btn btn-primary btn-sm vl-krev-leder d-none"
+            data-bs-toggle="modal" data-bs-target="#nyVaktlisteModal">
+      <i class="bi bi-plus-lg me-1"></i>Ny vaktliste
+    </button>
   </div>
 
   <div id="vl-tom" class="alert alert-info d-none">
@@ -86,8 +97,15 @@
     <a href="/vaktliste/registre/">Mannskap</a> først.
   </div>
 
-  <!-- Ressursfaner. Bygges av data; «Oversikt» og «Ikke plassert» er faste. -->
-  <div class="vl-faner" id="vl-faner"></div>
+  <!-- Ressursfaner. Bygges av data; «Oversikt» og «Ikke plassert» er faste.
+       «Ny ressurs» står her fordi en ressurs *er* en fane. -->
+  <div class="vl-fanerad">
+    <div class="vl-faner" id="vl-faner"></div>
+    <button type="button" class="btn btn-outline-secondary btn-sm vl-krev-leder d-none"
+            data-bs-toggle="modal" data-bs-target="#nyRessursModal">
+      <i class="bi bi-plus-lg me-1"></i>Ny ressurs
+    </button>
+  </div>
 
   <div id="vl-feil" class="alert alert-danger d-none"></div>
 

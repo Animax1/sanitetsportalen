@@ -26,7 +26,8 @@ HTML_BUILDERS = (
     '_rolleValg',
     '_fyllValgFor',
     'mkOversikt',
-    'mkKurve',
+    'mkGruppekurve',
+    '_mkEnKurve',
     'mkIkkePlassert',
 )
 
@@ -60,7 +61,6 @@ REVIEWED_INTERPOLATIONS = {
     'soyler': 'søyler bygget lokalt i samme funksjon',
     'skille': 'hardkodet CSS-klasse fra en ternær',
     'bunn': 'markup bygget lokalt, datoene escapet inni',
-    'mkKurve()': 'markup fra en bygger som selv skannes her',
     "deler.join('')": 'markup bygget lokalt i samme funksjon',
     'rader': 'markup bygget lokalt av byggere som selv skannes her',
     # `_dag()` bygger «lør 3. okt» av tall fra et Date-objekt og to
@@ -157,7 +157,7 @@ class VaktlisteEscapingOppforselTests(SimpleTestCase):
                            '_escHtml', 'klokke')),
         (VAKTLISTE_JS, ('mkRessurs', '_rolleValg', 'rollerForGruppe',
                         '_fyllValgFor', '_varighet',
-                        'mkRolleRad', 'mkOversikt', 'mkKurve', '_mkEnKurve',
+                        'mkRolleRad', 'mkOversikt', '_mkEnKurve',
                         'mkGruppekurve', '_tegnforklaring', '_timesteg',
                         '_toppunkt', '_posterPerGruppe', '_vaktensSpenn',
                         'mkIkkePlassert', 'tegnFaner', '_posterFor',
@@ -1031,6 +1031,46 @@ class VarighetTests(SimpleTestCase):
         """)
 
 
+class OversiktUtenKurveTests(SimpleTestCase):
+    """«Oversikt» er utskriftslista, og bare det.
+
+    Kurven sto samlet der før hver gruppe fikk sin i sin egen fane. To steder
+    å lese den samme kurven er ett for mye, og på papiret var den uansett
+    skjult.
+    """
+
+    HARNESS = (
+        (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue')),
+        (VAKTLISTE_JS, ('mkOversikt', '_d', '_kl', '_dag', '_sammeDag',
+                        '_tidsspenn', '_vaktspenn')),
+    )
+    VINDU = ("globalThis.DAGER = ['søn','man','tir','ons','tor','fre','lør'];\n"
+             "globalThis.MND = ['jan','feb','mar','apr','mai','jun',"
+             "'jul','aug','sep','okt','nov','des'];\n")
+
+    def setUp(self):
+        if not node_available():
+            self.skipTest('node er ikke tilgjengelig')
+        self.harness = build_harness(self.HARNESS)
+
+    def test_oversikten_tegner_ingen_kurve(self):
+        ut = run_node(self.harness, self.VINDU + """
+            globalThis.aktivListe = {
+              vaktliste: {vakt_navn: 'Vakta', startet: '2026-10-03T08:00:00',
+                          planlagt_slutt: '2026-10-03T12:00:00'},
+              grupper: [{id: 1, navn: 'Samleplass'}],
+              ressurser: [{id: 10, navn: 'Samleplass', gruppe_id: 1}],
+              vaktposter: [{id: 1, ressurs_id: 10, ledig: false, navn: 'Kari',
+                            korps_navn: 'HGSD', rolle: '', merknad: '',
+                            fra_tid: '2026-10-03T08:00:00',
+                            til_tid: '2026-10-03T12:00:00'}]};
+            console.log(mkOversikt());
+        """)
+        self.assertIn('Vakta', ut, 'utskriftslista skal fortsatt tegnes')
+        self.assertNotIn('vl-kurve', ut)
+        self.assertNotIn('vl-stolpe', ut)
+
+
 class KurvePerGruppeTests(SimpleTestCase):
     """Bemanningskurven følger grupperingen.
 
@@ -1043,7 +1083,7 @@ class KurvePerGruppeTests(SimpleTestCase):
         (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue')),
         (VAKTLISTE_JS, ('_d', '_kl', '_dag', '_vaktensSpenn',
                         '_bemanningPerTime', '_posterPerGruppe',
-                        '_mkEnKurve', 'mkKurve', 'mkGruppekurve',
+                        '_mkEnKurve', 'mkGruppekurve',
                         '_tegnforklaring', '_timesteg', '_toppunkt')),
     )
     VINDU = ("globalThis.DAGER = ['søn','man','tir','ons','tor','fre','lør'];\n"
@@ -1104,7 +1144,8 @@ class KurvePerGruppeTests(SimpleTestCase):
         """Samleplassen har to på vakt, ambulansen en ledig plass. Delte de
         skala, ville ambulansens hull sett halvfullt ut."""
         ut = run_node(self.harness, self.VINDU + self.LISTE + """
-            console.log(mkKurve());
+            console.log(mkGruppekurve({id: 10, gruppe_id: 1}));
+            console.log(mkGruppekurve({id: 20, gruppe_id: 2}));
         """)
         self.assertIn('Samleplass', ut)
         self.assertIn('Ambulanse', ut)
@@ -1113,7 +1154,8 @@ class KurvePerGruppeTests(SimpleTestCase):
 
     def test_ledige_plasser_telles_per_gruppe(self):
         ut = run_node(self.harness, self.VINDU + self.LISTE + """
-            console.log(mkKurve());
+            console.log(mkGruppekurve({id: 10, gruppe_id: 1}));
+            console.log(mkGruppekurve({id: 20, gruppe_id: 2}));
         """)
         self.assertIn('Alle plasser fylt', ut)        # samleplassen
         self.assertIn('4 ubesatte plasstimer', ut)    # ambulansen, fire timer
@@ -1122,7 +1164,8 @@ class KurvePerGruppeTests(SimpleTestCase):
         run_node(self.harness, self.VINDU + """
             globalThis.aktivListe = {vaktliste: {}, grupper: [],
                                      ressurser: [], vaktposter: []};
-            assert(mkKurve() === '', 'ingenting aa tegne');
+            assert(mkGruppekurve({id: 1, gruppe_id: 1}) === '',
+                   'ingenting aa tegne');
         """)
 
 

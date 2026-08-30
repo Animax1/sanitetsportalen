@@ -4,6 +4,37 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-08-30 — Rediger-knappen innenfor skjermen, og en topp som er ryddet
+
+**1723 tester grønne** (2 nye). Bare grensesnitt.
+
+- **Ressurstabellen krympet fra 82rem til 66rem.** Den første verdien hadde
+  slark: tidsfeltene fikk 210 px der de trenger 185, og prisen var at
+  rediger-knappen i siste kolonne lå utenfor skjermen selv på en stor laptop.
+  Målt i nettleseren nå: tabellen ruller ikke i det hele tatt fra 1280 px og
+  opp, mot 1600 px før.
+- **Og handlingskolonnen henger fast til høyre.** Under 1280 px ruller
+  tabellen fortsatt, og da var rediger-knappen det første som forsvant — altså
+  den ene knappen raden finnes for. `position: sticky` holder den i syne;
+  bakgrunnen settes eksplisitt, ellers ruller innholdet synlig under den.
+  Verifisert med tabellen rullet helt til venstre på 1000 px.
+- **Toppen av siden er tre nivåer i den rekkefølgen man tenker.** Før lå alt
+  på én linje: hvilken vakt man planla, hvem man er, hva man vil lage — og
+  vaktas navn sto midt inne i en knapperad og leste som en innstilling. Nå:
+  sida øverst (Mannskap, Innstillinger), så en egen linje for vakta med
+  velgeren, statusen og «Ny vaktliste», og til slutt fanene med «Ny ressurs»
+  ved siden av seg. «Ny ressurs» hører til fanene fordi en ressurs *er* en
+  fane; «Ny vaktliste» hører til velgeren fordi den lager noe velgeren skal
+  peke på.
+- **«Vakta» heter nå «Innstillinger».** Et substantiv blant handlinger, og
+  det sa ikke hva som lå bak.
+- **Kurven er ute av «Oversikt».** Den sto samlet der før hver gruppe fikk sin
+  i sin egen fane, og to steder å lese den samme kurven er ett for mye. På
+  papiret var den uansett skjult, så «Oversikt» er nå utskriftslista og bare
+  det. `mkKurve()` er slettet framfor å bli stående ubrukt.
+- Tre mutasjoner prøvd, alle røde — for smal tabell, tidskolonner krympet på
+  bekostning av «Timer», og kurven snek tilbake inn i «Oversikt».
+
 ## 2026-08-30 — Rediger skiftet, og en kurve som sier når
 
 **1722 tester grønne** (15 nye). Ingen migrasjon — alt ligger i grensesnittet;
