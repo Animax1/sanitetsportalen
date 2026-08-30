@@ -991,6 +991,14 @@ Gjennomgang 13. aug. 2026, med 1000 pasienter og peak 100 brukere som premiss.
             «hvem er på vakt». Prisen: et navn kan stå to steder. En nullbar FK er en
             additiv migrasjon den dagen behovet melder seg.
 
+- [x] **Cron-jobbene sier hva som gikk galt (30. aug. 2026).** To jobber i
+      staging falt på feil `DATABASE_URL`; André rettet variabelen i Railway.
+      `core/kommando.py::lesbar_dbfeil()` gir nå én lesbar linje framfor fire
+      stablede tracebacks, i alle tre jobbene. Og den stille SQLite-fallbacken
+      er stengt på Railway: uten den ville `purge_old_logs` rapportert suksess
+      mot en tom base og aldri håndhevet lagringstidene i A.9. Seks mutasjoner
+      prøvd, alle røde.
+
 - [x] **Migrasjonsprøver mot ekte PostgreSQL (30. aug. 2026).** Punktet het
       «kjør suiten mot PostgreSQL», og den formuleringen var feil: Djangos
       testbase lages mot en *tom* base, så dataskrittet skriver ingenting og

@@ -4,6 +4,47 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-08-30 — Cron-jobbene skal si hva som gikk galt
+
+**1806 tester grønne** (12 nye). To cron-jobber i staging — `purge_old_logs` og
+`kollaps_arkiv` — falt på `FATAL: password authentication failed for user
+"postgres"`. Årsaken var en feil `DATABASE_URL` på cron-tjenestene, og André
+rettet den i Railway. Det som er gjort her, er å sørge for at neste gang blir
+lettere å se.
+
+- **Én lesbar linje i stedet for fire stablede tracebacks.**
+  `core/kommando.py::lesbar_dbfeil()` gjør en `OperationalError` om til en
+  `CommandError`: jobben avslutter fortsatt med kode 1 og meldes fortsatt som
+  feilet, men loggen sier hva som ikke ble gjort, hvorfor, og hva man skal se
+  på. Psycopg2 gjentar seg selv — den gjentakelsen klippes bort, og
+  `raise … from` beholder hele sporet for den som vil ha det.
+  - **Alle tre jobbene bruker den**: `purge_old_logs`, `kollaps_arkiv` og
+    `db_backup`. Den som blir glemt er den som feiler uleselig den dagen det
+    haster, og for backupen er «den dagen» per definisjon en dag noe alt har
+    gått galt.
+- **Den stille SQLite-fallbacken er stengt.** `dj_database_url.config()`
+  faller tilbake til en fil i containeren når `DATABASE_URL` mangler. På
+  Railway er den filen tom og flyktig — og fallbacken er *stille*.
+  `purge_old_logs` ville talt null rader i en tom base, skrevet «Slettet 0
+  audit-logger» og avsluttet med kode 0: **en grønn jobb som aldri håndhever
+  lagringstidene i A.9.** Det er en verre feil enn krasjen, fordi den ikke
+  oppdages før noen spør hvorfor det ligger fire år med logger i basen.
+  Oppstarten stopper nå høylytt, som ved manglende `SECRET_KEY`.
+  - Sjekken henger på `RAILWAY_ENVIRONMENT`, ikke på `DEBUG`: offline-modus
+    kjører `DEBUG=False` på en laptop og *skal* bruke SQLite.
+
+**Lærdom, funnet ved mutasjonstesting:** offline-testen gikk grønt uansett
+hvordan sjekken var skrudd sammen, fordi utviklermiljøet kjører `DEBUG=True`.
+Den beviste ingenting før den satte `DEBUG=False` eksplisitt. Samme feil som
+sist runde: en test kan gå grønt uten å teste formen den beskriver.
+
+**Merk at `ALLOWED_HOSTS` ikke var årsaken** — den leses av request-håndteringen,
+og en cron-container betjener aldri en forespørsel. Det står fortsatt et eget
+punkt i TODO om å ha både `portal.sanitet.net` og Railway-domenet der til
+domenet er verifisert.
+
+---
+
 ## 2026-08-30 — Tidsfeltene: fem minutter, og datoen står der
 
 **1794 tester grønne** (7 nye). Andrés punkt: `datetime-local` er fin på mobil

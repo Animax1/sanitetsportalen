@@ -39,6 +39,8 @@ Lagringstiden er begrunnet i docs/PERSONVERN_DOKUMENTASJON.md A.9.
 from datetime import timedelta
 
 from django.core.management.base import BaseCommand, CommandError
+
+from core.kommando import lesbar_dbfeil
 from django.utils import timezone
 
 from audit.models import AuditLog
@@ -99,11 +101,15 @@ class Command(BaseCommand):
 
         totalt_kollapset = 0
         totalt_hoppet = 0
-        for handler in handlere:
-            kollapset, hoppet = self._kjor_modul(
-                handler, options['days'], dry_run, ignorer_sperre)
-            totalt_kollapset += kollapset
-            totalt_hoppet += hoppet
+        # Kollapsen er irreversibel, så en halvveis kjøring er verdt å si
+        # tydelig fra om: meldingen navngir hva som *ikke* ble gjort.
+        # Se core/kommando.py.
+        with lesbar_dbfeil('ingen arkiv ble kollapset'):
+            for handler in handlere:
+                kollapset, hoppet = self._kjor_modul(
+                    handler, options['days'], dry_run, ignorer_sperre)
+                totalt_kollapset += kollapset
+                totalt_hoppet += hoppet
 
         self.stdout.write('')
         if dry_run:

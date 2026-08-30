@@ -618,6 +618,26 @@ databasealias: atten migrasjoner i dette prosjektet gjør ORM-kall i `RunPython`
 uten `schema_editor.connection.alias`, og ville med et alias skrevet til din
 egen base i stedet for prøvebasen.
 
+### Cron-jobbene (core/kommando.py)
+
+Tre jobber kjøres av Railway Cron: `purge_old_logs`, `kollaps_arkiv` og
+`db_backup`. Ingen har en bruker som ser på mens de kjører, så **alle tre
+pakker arbeidet i `lesbar_dbfeil('hva som ikke ble gjort')`** — en
+`OperationalError` blir da til én lesbar linje med årsak og råd, i stedet for
+fire stablede tracebacks. Jobben avslutter fortsatt med kode 1.
+
+**`DATABASE_URL` må peke på PostgreSQL når `RAILWAY_ENVIRONMENT` er satt.**
+`dj_database_url.config()` faller ellers stille tilbake til en SQLite-fil i
+den flyktige containeren, og da ville `purge_old_logs` talt null rader,
+skrevet «Slettet 0 audit-logger» og avsluttet med kode 0 — en grønn jobb som
+aldri håndhever A.9. Sjekken står i `settings.py` og henger på
+`RAILWAY_ENVIRONMENT`, ikke på `DEBUG`: offline-modus kjører `DEBUG=False` på
+en laptop og *skal* bruke SQLite.
+
+Sett variabelen som referansen `${{Postgres.DATABASE_URL}}`, ikke som en
+kopiert verdi — en kopi blir stående igjen når passordet roteres, og da
+feiler bare cron-jobbene mens websiden går videre som før.
+
 ## Miljøvariabler
 
 Settes i `.env` lokalt. Nøkler å kjenne til:

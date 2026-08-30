@@ -171,6 +171,36 @@ DATABASES = {
     )
 }
 
+# **En manglende DATABASE_URL på Railway skal krasje, ikke falle tilbake.**
+#
+# `dj_database_url.config()` faller tilbake til `default` når variabelen ikke
+# finnes, og den fallbacken er en SQLite-fil i containeren. Lokalt er det
+# riktig. På Railway er containeren flyktig, så filen er tom og forsvinner
+# igjen — og det er *stille*: appen starter, migrasjonene «kjører», og
+# ingenting feiler.
+#
+# Det farligste tilfellet er ikke websiden, som ville vist en tom portal og
+# blitt oppdaget samme minutt. Det er cron-jobbene. `purge_old_logs` ville
+# talt null rader i en tom base, skrevet «Slettet 0 audit-logger», og
+# avsluttet med kode 0. En grønn jobb som aldri håndhever lagringstidene i
+# A.9 — en feil som først oppdages den dagen noen spør hvorfor det ligger
+# fire år med logger i basen.
+#
+# Samme mønster som SECRET_KEY-sjekken over og OFFLINE_MODE-sjekken under:
+# en feilkonfigurasjon i prod skal stoppe oppstarten høylytt og med én gang.
+# Sjekken henger på `RAILWAY_ENVIRONMENT` og ikke på `DEBUG`, fordi
+# offline-modus kjører `DEBUG=False` på en laptop og *skal* bruke SQLite.
+if (os.environ.get('RAILWAY_ENVIRONMENT')
+        and 'sqlite' in DATABASES['default'].get('ENGINE', '')):
+    raise ImproperlyConfigured(
+        'DATABASE_URL mangler eller er ugyldig — Django falt tilbake til '
+        'SQLite i containeren. På Railway er den filen tom og flyktig, og '
+        'en cron-jobb mot den ville rapportert suksess uten å gjøre noe. '
+        'Sett DATABASE_URL på tjenesten, helst som referansen '
+        '${{Postgres.DATABASE_URL}} og ikke som en kopiert verdi — en kopi '
+        'blir stående igjen når passordet roteres.'
+    )
+
 # ── Autentisering ─────────────────────────────────────────────────────────────
 AUTH_USER_MODEL = 'accounts.CustomUser'
 LOGIN_URL = '/accounts/login/'

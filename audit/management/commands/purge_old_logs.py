@@ -23,6 +23,7 @@ from django.utils import timezone
 
 from accounts.models import LoginEvent
 from audit.models import AuditLog
+from core.kommando import lesbar_dbfeil
 from core.models import Notification
 
 # Audit- og innloggingslogg: 2 år. Systemet er ikke et journalsystem (se A.4),
@@ -65,6 +66,12 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options):
+        # Én lesbar linje i cron-loggen framfor fire stablede tracebacks —
+        # se core/kommando.py. Jobben er fortsatt rød og avslutter med kode 1.
+        with lesbar_dbfeil('ingenting ble slettet'):
+            self._rydd(options)
+
+    def _rydd(self, options):
         days = options['days']
         notification_days = options['notification_days']
         dry_run = options['dry_run']
