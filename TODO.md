@@ -876,6 +876,15 @@ Gjennomgang 13. aug. 2026, med 1000 pasienter og peak 100 brukere som premiss.
             - **Lærdom å ta med til neste modul:** en modul er ikke ferdig før
               dataene den trenger kan opprettes *gjennom portalen*. Django-admin
               teller ikke, og en testsuite som bare bruker ORM-en ser det ikke.
+      - [x] **Veien inn i gruppa (30. aug. 2026).** Tiende runde, og den
+            handlet ikke om modellen: én `Ressurs` per bil inne i gruppa var
+            riktig hele tiden, men det fantes ingen synlig vei dit.
+            Gruppefanen har nå eget hode med antall enheter og en
+            «Ny <gruppe>»-knapp, tomme grupper forklarer hva de rommer,
+            ukoblede enheter viser «Ikke koblet», og ressursgruppene har fått
+            en flate i Innstillinger (endepunktet fantes uten UI).
+            - **Lærdom:** «det er ikke synlig» er en feilmelding om
+              grensesnittet, ikke en uenighet om arkitektur.
       - [x] **Reservasjonen ned på plassen (30. aug. 2026).** Niende runde.
             `Vaktpost.korps` (migrasjon `0008`, additiv): en samleplass kan ha
             plasser satt av til ulike korps. Tom verdi arver ressursens.

@@ -208,6 +208,18 @@
           <i class="bi bi-printer me-1"></i>Skriv ut vaktlista
         </button>
 
+        {% comment %}
+          Gruppene er portalens oppsett, ikke denne vaktas — de gjelder alle
+          vaktlister. De ligger likevel her, fordi det er her man er når man
+          oppdager at gruppa man trenger ikke finnes.
+        {% endcomment %}
+        <div class="vl-krev-leder d-none mb-3">
+          <button type="button" class="btn btn-outline-secondary btn-sm"
+                  data-action="apneGrupper">
+            <i class="bi bi-collection me-1"></i>Ressursgrupper
+          </button>
+        </div>
+
         <div class="vl-krev-leder d-none">
           <hr>
           {% comment %}
@@ -244,6 +256,54 @@
   sto tidligere naken ved siden av «Sett på vakt»; CASCADE tar alle skiftene,
   så ett feilklikk kostet hele bemanningen på bilen.
 {% endcomment %}
+{% comment %}
+  **Ressursgrupper.** Endepunktet fantes fra 30. aug. 2026 uten noen flate som
+  brukte det — nøyaktig feilen Django-admin ga oss én gang før: et register som
+  bare finnes i API-et, finnes ikke for brukeren. Uten dette kunne man ikke
+  lage «Førstehjelpstelt», bare velge blant de seks migrasjonen seedet.
+{% endcomment %}
+<div class="modal fade" id="grupperModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Ressursgrupper</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Lukk"></button>
+      </div>
+      <div class="modal-body">
+        <p class="form-text mt-0">
+          Gruppa er hva slags ting ressursen er — «Ambulanse», «Samleplass»,
+          «Førstehjelpstelt». Den styrer fanen, ikonet, hvilke roller som
+          tilbys, og hvilken bemanningskurve enhetene telles i. Gruppene
+          gjelder alle vaktlister.
+        </p>
+        <div class="row g-2 mb-3">
+          <div class="col-7">
+            <input type="text" id="ny-gruppe-navn" class="form-control form-control-sm"
+                   maxlength="60" placeholder="Ny gruppe, f.eks. «Førstehjelpstelt»">
+          </div>
+          <div class="col-3">
+            <input type="text" id="ny-gruppe-ikon" class="form-control form-control-sm"
+                   maxlength="40" placeholder="ikon">
+          </div>
+          <div class="col-2">
+            <button class="btn btn-primary btn-sm w-100" type="button" id="ny-gruppe-knapp"
+                    data-action="opprettGruppe">Legg til</button>
+          </div>
+        </div>
+        <div class="form-text mt-0 mb-3">
+          Ikonet er valgfritt — et Bootstrap-ikonnavn uten «bi-», f.eks.
+          <code>tent</code> eller <code>truck</code>. Tomt gir en boks.
+        </div>
+        <div id="gruppe-liste"></div>
+        <div id="gruppe-feil" class="text-danger small d-none"></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Lukk</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div class="modal fade" id="ressursModal" tabindex="-1">
   <div class="modal-dialog">
     <div class="modal-content">
@@ -297,7 +357,7 @@
   <div class="modal-dialog">
     <div class="modal-content">
       <div class="modal-header">
-        <h5 class="modal-title">Ny ressurs</h5>
+        <h5 class="modal-title" id="ny-ressurs-tittel">Ny ressurs</h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Lukk"></button>
       </div>
       <div class="modal-body">

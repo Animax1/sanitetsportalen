@@ -363,6 +363,14 @@ fase 3–7 gjenstår — se `docs/BESLUTNING_VAKTLISTE.md`, som er besluttet i s
   leser den står ved bilen og spør «hvem er her, og når?» — korpset er en kolonne.
   `_skiftrekkefolge()` har `til_tid` som andre ledd fordi skift som begynner samtidig
   ellers står i innsettingsrekkefølge, og et kort skift havner midt blant de lange.
+- **Hver enhet er sin egen `Ressurs` inne i gruppa** — bil A, bil B og bil C er tre
+  rader i fanen «Ambulanse», hver med egne skift og egen `enhet`-kobling. Modellen var
+  riktig fra første stund, men veien dit var usynlig: knappen lå sist i fanerekka og het
+  «Ny ressurs». Gruppefanen har derfor et hode med antall enheter og en «Ny
+  <gruppe>»-knapp, og ukoblede enheter viser «Ikke koblet» framfor ingenting.
+- **Et endepunkt uten flate finnes ikke for brukeren.** `/api/grupper/` sto en dag uten
+  UI, og da kunne ingen lage en gruppe som ikke var seedet — samme feil som Django-admin
+  ga oss i fase 1. Manageren ligger i «Innstillinger».
 - **Fanen er ressursgruppa, ikke ressursen.** «Ambulanse» er alle ambulansene
   på vakta, med hver bil som sitt eget kort inni (`mkGruppe`). Én fane per bil
   ga ti faner på en vakt med ti biler, og ingen plass der man så dem i

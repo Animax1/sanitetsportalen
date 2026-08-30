@@ -456,12 +456,49 @@ function mkGruppe(gruppe) {
   // ressursene som står under den — det er hele grunnen til at fanen er
   // gruppa og ikke den enkelte bilen.
   const ressurser = _ressurserIGruppe(gruppe.id);
+
+  // **Knappen for å legge til én til står HER, i gruppa.** Den lå bare sist i
+  // fanerekka, og da var det usynlig at fanen «Ambulanse» rommer bil A, bil B
+  // og bil C — man så én rad med knapper og trodde gruppa *var* bilen. Det
+  // kostet André en time og meg tre runder.
+  const leggTil = kanLede()
+    ? `<button class="btn btn-sm btn-primary" type="button"
+               data-action="apneNyRessurs" data-arg="${escHtmlValue(gruppe.id)}">
+         <i class="bi bi-plus-lg me-1"></i>Ny ${escapeHtml(gruppe.navn)}
+       </button>`
+    : '';
+
   if (!ressurser.length) {
-    return `<div class="vl-kort"><div class="vl-tom">
-      Ingen ${escapeHtml(gruppe.navn.toLowerCase())} satt opp ennå.
-    </div></div>`;
+    return `
+      <div class="vl-kort">
+        <div class="vl-kort-topp">
+          <span class="vl-kort-tittel">
+            <i class="bi bi-${escHtmlValue(gruppe.ikon)} me-1"></i>${escapeHtml(gruppe.navn)}
+          </span>
+          ${leggTil}
+        </div>
+        <div class="vl-tom">
+          Ingen ${escapeHtml(gruppe.navn)} satt opp ennå. Hver enhet er sin egen
+          rad her — én per bil, lag eller post — med egne skift og egen kobling
+          mot oppdragsmodulen.
+        </div>
+      </div>`;
   }
-  return mkGruppekurve(gruppe) + ressurser.map(mkRessurs).join('');
+
+  const hode = `
+    <div class="vl-kort vl-gruppehode">
+      <div class="vl-kort-topp">
+        <span class="vl-kort-tittel">
+          <i class="bi bi-${escHtmlValue(gruppe.ikon)} me-1"></i>${escapeHtml(gruppe.navn)}
+          <span class="vl-meta">${escHtmlValue(ressurser.length)} ${
+            ressurser.length === 1 ? 'enhet' : 'enheter'} ·
+            ${escHtmlValue(_posterIGruppe(gruppe.id).length)} skift</span>
+        </span>
+        ${leggTil}
+      </div>
+    </div>`;
+
+  return hode + mkGruppekurve(gruppe) + ressurser.map(mkRessurs).join('');
 }
 
 
@@ -489,8 +526,21 @@ function mkRessurs(r) {
   const korpsmerke = r.korps_navn
     ? `<span class="vl-merkelapp vl-korps">${escapeHtml(r.korps_navn)}</span>`
     : '<span class="vl-merkelapp vl-ureservert">Ureservert</span>';
+  // **Koblingen vises også når den mangler.** Merkelappen sto bare der bilen
+  // *var* koblet, så den som ikke hadde koblet noe så ingenting — og kunne
+  // ikke vite at koblingen finnes per bil i det hele tatt. Nå står den som en
+  // tom plass som ber om å fylles, for den som har lov til å fylle den.
   const enhetsmerke = r.enhet_navn
-    ? `<span class="vl-merkelapp">Enhet: ${escapeHtml(r.enhet_navn)}</span>` : '';
+    ? `<span class="vl-merkelapp vl-enhet">
+         <i class="bi bi-broadcast me-1"></i>${escapeHtml(r.enhet_navn)}
+       </span>`
+    : (kanLede()
+        ? `<button class="vl-merkelapp vl-enhet-tom" type="button"
+                   title="Koble denne enheten til oppdragsmodulen"
+                   data-action="apneRessurs" data-id="${escHtmlValue(r.id)}">
+             <i class="bi bi-broadcast me-1"></i>Ikke koblet
+           </button>`
+        : '');
 
   const settKnapp = kanRore
     ? `<button class="btn btn-sm btn-primary" type="button"
@@ -1006,16 +1056,20 @@ async function opprettVaktliste() {
 }
 
 
-function apneNyRessurs() {
-  // Står man i «Ambulanse»-fanen, er det oftest en ambulanse til man skal
-  // lage. Nedtrekket forhåndsvelges derfor til gruppa man står i — men er
-  // fortsatt et nedtrekk, så den første ressursen i en ny gruppe også har en
-  // vei inn.
+function apneNyRessurs(gruppeId) {
+  // Gruppa kommer enten fra knappen inne i fanen (`data-arg`), eller fra
+  // fanen man står i. Nedtrekket er fortsatt et nedtrekk, så den første
+  // enheten i en ny gruppe også har en vei inn.
   _skjulFeil('ny-ressurs-feil');
   const felt = document.getElementById('ny-ressurs-gruppe');
+  const maal = gruppeId != null && gruppeId !== '' ? gruppeId : aktivFane;
   const gruppe = (aktivListe?.grupper || [])
-    .find((g) => String(g.id) === String(aktivFane));
-  if (felt && gruppe) felt.value = String(gruppe.id);
+    .find((g) => String(g.id) === String(maal));
+  if (felt && gruppe) {
+    felt.value = String(gruppe.id);
+    const tittel = document.getElementById('ny-ressurs-tittel');
+    if (tittel) tittel.textContent = `Ny ${gruppe.navn}`;
+  }
   new bootstrap.Modal(document.getElementById('nyRessursModal')).show();
 }
 
@@ -1277,6 +1331,93 @@ async function slettRolle(id) {
   _skjulFeil('rolle-feil');
   await lastListe(aktivListe.vaktliste.id);
   tegnRoller();
+}
+
+
+function apneGrupper() {
+  // **Gruppene hadde endepunkt, men ingen flate.** Det er nøyaktig feilen
+  // Django-admin ga oss én gang før: et register som bare finnes i API-et,
+  // finnes ikke for brukeren. Uten dette kunne man ikke lage «Førstehjelpstelt»
+  // i det hele tatt — bare velge blant de seks migrasjonen seedet.
+  _skjulFeil('gruppe-feil');
+  document.getElementById('ny-gruppe-navn').value = '';
+  document.getElementById('ny-gruppe-ikon').value = '';
+  tegnGrupper();
+  new bootstrap.Modal(document.getElementById('grupperModal')).show();
+}
+
+
+function tegnGrupper() {
+  const el = document.getElementById('gruppe-liste');
+  if (!el) return;
+  const grupper = (aktivListe && aktivListe.grupper) || [];
+  el.innerHTML = grupper.length ? grupper.map(mkGruppeRad).join('')
+    : '<div class="vl-tom">Ingen grupper ennå.</div>';
+}
+
+
+function mkGruppeRad(g) {
+  // «I bruk» er antall ressurser på gruppa. En gruppe man kan slette uten å
+  // vite hvor mange biler som står i den, sletter man for lett — og
+  // `PROTECT` ville uansett stoppet det, men da som en feilmelding framfor
+  // som noe man kunne sett på forhånd.
+  const bruk = g.i_bruk
+    ? `<span class="vl-meta">${escHtmlValue(g.i_bruk)} i bruk</span>`
+    : '<span class="vl-meta">ubrukt</span>';
+  const slett = g.i_bruk ? '' : `
+        <button class="btn btn-sm btn-outline-danger" type="button"
+                title="Slett gruppa" aria-label="Slett gruppa"
+                data-action="slettGruppe" data-id="${escHtmlValue(g.id)}"><i class="bi bi-trash"></i></button>`;
+  return `
+    <div class="vl-rad">
+      <span class="vl-navn">
+        <i class="bi bi-${escHtmlValue(g.ikon)} me-2"></i>${escapeHtml(g.navn)}
+      </span>
+      <div class="d-flex align-items-center gap-2">
+        ${bruk}
+        ${slett}
+      </div>
+    </div>`;
+}
+
+
+async function opprettGruppe() {
+  _skjulFeil('gruppe-feil');
+  await withSubmitGuard('ny-gruppe-knapp', async () => {
+    const navn = (document.getElementById('ny-gruppe-navn')?.value || '').trim();
+    if (!navn) { _visFeil('gruppe-feil', 'Gruppa må ha et navn.'); return; }
+
+    const res = await apiFetch('/vaktliste/api/grupper/', {
+      method: 'POST',
+      body: JSON.stringify({
+        navn,
+        ikon: (document.getElementById('ny-gruppe-ikon')?.value || '').trim(),
+      }),
+    });
+    const d = await res.json().catch(() => ({}));
+    if (!res.ok || d.status !== 'ok') {
+      _visFeil('gruppe-feil', d.message || 'Kunne ikke legge til gruppa.');
+      return;
+    }
+    document.getElementById('ny-gruppe-navn').value = '';
+    document.getElementById('ny-gruppe-ikon').value = '';
+    await lastListe(aktivListe.vaktliste.id);
+    tegnGrupper();
+  });
+}
+
+
+async function slettGruppe(id) {
+  const gruppe = (aktivListe.grupper || []).find((g) => g.id === id);
+  if (!gruppe) return;
+  if (!confirm(`Slette gruppa «${gruppe.navn}»?`)) return;
+
+  const res = await apiFetch(`/vaktliste/api/grupper/${id}/`, { method: 'DELETE' });
+  const d = await res.json().catch(() => ({}));
+  if (!res.ok) { _visFeil('gruppe-feil', d.message || 'Kunne ikke slette.'); return; }
+  _skjulFeil('gruppe-feil');
+  await lastListe(aktivListe.vaktliste.id);
+  tegnGrupper();
 }
 
 

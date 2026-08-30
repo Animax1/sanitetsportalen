@@ -793,3 +793,36 @@
 @media print {
   .vl-vaktvelger { display: none !important; }
 }
+
+
+/* ── Gruppehodet i fanen ──────────────────────────────────────────────── */
+/*
+  Fanen «Ambulanse» rommer bil A, bil B og bil C. Hodet sier hvor mange, og
+  bærer knappen som legger til én til — uten det så man én rad med knapper og
+  trodde gruppa *var* bilen.
+*/
+.vl-gruppehode {
+  padding-bottom: 0.6rem;
+}
+
+.vl-gruppehode .vl-meta {
+  margin-left: 0.6rem;
+  font-weight: 400;
+}
+
+/*
+  Enhetskoblingen vises også når den mangler: en tom plass som ber om å
+  fylles, framfor ingenting. Uten den var det usynlig at koblingen finnes
+  per enhet i det hele tatt.
+*/
+.vl-enhet-tom {
+  border: 1px dashed var(--border-color);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.vl-enhet-tom:hover {
+  border-style: solid;
+  color: var(--text-main);
+}

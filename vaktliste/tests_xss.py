@@ -1570,11 +1570,42 @@ class FanenErGruppaTests(SimpleTestCase):
         """)
         self.assertIn('A-101', ut)
 
-    def test_tom_gruppe_sier_fra_framfor_aa_vise_ingenting(self):
+    def test_tom_gruppe_sier_fra_og_viser_veien_videre(self):
+        """Tomteksten skal forklare hva gruppa rommer — at hver bil er sin
+        egen rad — og bære knappen som lager den første. En tom fane uten vei
+        videre er der André sto fast."""
         ut = run_node(self.harness, self.VINDU + self.LISTE + """
-            console.log(mkGruppe({id: 3, navn: 'Ubrukt'}));
+            console.log(mkGruppe({id: 3, navn: 'Ubrukt', ikon: 'box'}));
         """)
-        self.assertIn('Ingen ubrukt satt opp', ut)
+        self.assertIn('Ingen Ubrukt satt opp', ut)
+        self.assertIn('Ny Ubrukt', ut, 'knappen som lager den første')
+        self.assertIn('sin egen', ut, 'og forklaringen på hva en rad er')
+
+    def test_gruppehodet_teller_enhetene(self):
+        """Fanen «Ambulanse» rommer bil A, bil B og bil C — hodet sier hvor
+        mange, så det ikke ser ut som gruppa *er* bilen."""
+        ut = run_node(self.harness, self.VINDU + self.LISTE + """
+            console.log(mkGruppe({id: 2, navn: 'Ambulanse', ikon: 'truck'}));
+        """)
+        self.assertIn('2 enheter', ut)
+
+    def test_knappen_i_gruppa_baerer_gruppas_id(self):
+        """Uten `data-arg` ville den falt tilbake på `aktivFane`, og en knapp
+        trykket fra et annet sted enn fanen hadde lagt bilen i feil gruppe."""
+        ut = run_node(self.harness, self.VINDU + self.LISTE + """
+            console.log(mkGruppe({id: 2, navn: 'Ambulanse', ikon: 'truck'}));
+        """)
+        self.assertIn('data-arg="2"', ut)
+
+    def test_ukoblet_enhet_vises_som_en_tom_plass(self):
+        """Merkelappen sto bare der bilen *var* koblet, så den som ikke hadde
+        koblet noe så ingenting — og kunne ikke vite at koblingen finnes per
+        bil. Det var halve forvirringen."""
+        ut = run_node(self.harness, self.VINDU + self.LISTE + """
+            console.log(mkGruppe({id: 2, navn: 'Ambulanse', ikon: 'truck'}));
+        """)
+        self.assertIn('A-101', ut, 'den koblede bilen viser enheten')
+        self.assertIn('Ikke koblet', ut, 'og den ukoblede viser at den kan kobles')
 
 
 class UtskriftslistaTests(SimpleTestCase):

@@ -4,6 +4,40 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-08-30 — Bil A, bil B, bil C: veien inn var usynlig
+
+**1764 tester grønne** (8 nye). Bare grensesnitt — men det som manglet var det
+André satt fast på i flere runder, og det var min feil å ikke se det.
+
+**Modellen var riktig hele tiden: én `Ressurs` per bil, inne i gruppa, hver med
+sin egen enhetskobling.** Det var *veien dit* som ikke fantes.
+
+- **Gruppefanen har nå sitt eget hode med «Ny Ambulanse»-knapp.** Den eneste
+  måten å legge til en bil på lå sist i fanerekka og het «Ny ressurs». Fra
+  inne i «Ambulanse»-fanen så man én rad med knapper og ingen antydning om at
+  fanen rommer bil A, bil B og bil C — man trodde gruppa *var* bilen. Hodet
+  sier nå «Ambulanse · 3 enheter · 12 skift», og knappen ved siden av lager
+  den fjerde.
+- **Tomme grupper forklarer hva de rommer.** «Ingen Ambulanse satt opp ennå.
+  Hver enhet er sin egen rad her — én per bil, lag eller post — med egne skift
+  og egen kobling mot oppdragsmodulen.» Med knappen ved siden av.
+- **Enhetskoblingen vises også når den mangler.** Merkelappen sto bare der
+  bilen *var* koblet, så den som ikke hadde koblet noe så ingenting — og kunne
+  ikke vite at koblingen finnes per bil i det hele tatt. Nå står «Ikke koblet»
+  som en stiplet plass som åpner redigeringsvinduet.
+- **Ressursgrupper har fått en flate.** `/api/grupper/` fantes fra i går uten
+  noe som brukte det — nøyaktig feilen Django-admin ga oss én gang før: et
+  register som bare finnes i API-et, finnes ikke for brukeren. Man kunne ikke
+  lage «Førstehjelpstelt», bare velge blant de seks migrasjonen seedet.
+  Manageren ligger i Innstillinger, med «i bruk»-telling og sletting sperret
+  for grupper som er i bruk.
+- Tre mutasjoner prøvd, alle røde.
+
+**Lærdom.** Tre runder gikk med til at jeg forsvarte en modell som var riktig,
+mens brukeren beskrev at han ikke fant veien inn i den. «Det er ikke synlig»
+er ikke en uenighet om arkitektur — det er en feilmelding om grensesnittet, og
+den skulle vært lest som det med én gang.
+
 ## 2026-08-30 — Utskriftslista sorterer og grupperer på noe som betyr noe
 
 **1756 tester grønne** (8 nye). Bare grensesnitt.
