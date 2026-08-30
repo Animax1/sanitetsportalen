@@ -85,8 +85,9 @@
 
   <div id="vl-mangler-mannskap" class="alert alert-warning d-none">
     <strong>Mannskapsregisteret er tomt.</strong>
-    Vaktlista bemannes fra det registeret — legg inn korps og mannskap under
-    <a href="/vaktliste/registre/">Mannskap</a> først.
+    Vaktlista bemannes fra det registeret — legg inn korps under
+    <strong>Innstillinger</strong> og mannskap i <strong>Mannskap</strong>-fanen
+    først.
   </div>
 
   {% comment %}
@@ -97,11 +98,25 @@
     **Én fane per gruppe**, ikke per ressurs: fanen «Ambulanse» er alle
     ambulansene som skal på vakt, med hver bil som sitt eget kort inni.
 
-    **Mannskap er en lenke, ikke en fane.** Den står i rekka fordi det er dit
-    man veksler oftest, men den forlater sida — pila sier det, for ellers
-    koster et klikk deg plassen din uten å ha spurt.
+    **Mannskap er en ekte fane** (30. aug. 2026). Den var en lenke ut til
+    /vaktliste/registre/, og et klikk kostet deg plassen i planleggingen —
+    mens mannskap og ressurser er nettopp de to man veksler mellom. Fanen står
+    også når det ikke finnes noen vaktliste: korps må inn før mannskap, og
+    mannskap før noen kan settes på vakt.
   {% endcomment %}
   <div class="vl-faner" id="vl-faner"></div>
+
+  {% comment %}
+    Søkefeltet hører til mannskapsfanen og ligger UTENFOR #vl-panel med vilje:
+    panelet tegnes på nytt ved hvert tastetrykk, og et input inni ville mistet
+    fokus etter første bokstav. `tegnPanel()` viser og skjuler det.
+  {% endcomment %}
+  <div class="vlr-verktoy d-none" id="vl-verktoy">
+    <input type="search" class="form-control form-control-sm" id="vl-sok"
+           placeholder="Søk i navn, korps, kompetanse eller telefon…"
+           autocomplete="off">
+    <span class="vl-meta" id="vl-treff"></span>
+  </div>
 
   <div id="vl-feil" class="alert alert-danger d-none"></div>
 
@@ -198,21 +213,49 @@
           et skift som faller utenfor et flyttet spenn er ikke noe bemanneren
           kan se komme.
         {% endcomment %}
-        <div class="vl-vaktinfo mb-3">
-          <div class="vl-meta" id="vakt-spenn"></div>
-          <div class="vl-meta" id="vakt-antall"></div>
-        </div>
+        {% comment %}
+          **Alt som gjelder én vaktliste står i denne bolken**, og den skjules
+          når det ikke finnes noen. Vinduet må kunne åpnes likevel: korps og
+          kompetanser ligger her, og de er nettopp det man legger inn før den
+          første vaktlista finnes. Se vaktliste.js::apneVakt().
+        {% endcomment %}
+        <div id="vakt-for-lista">
+          <div class="vl-vaktinfo mb-3">
+            <div class="vl-meta" id="vakt-spenn"></div>
+            <div class="vl-meta" id="vakt-antall"></div>
+          </div>
 
-        <button type="button" class="btn btn-outline-secondary btn-sm mb-3"
-                data-action="skrivUtVakta">
-          <i class="bi bi-printer me-1"></i>Skriv ut vaktlista
-        </button>
+          <button type="button" class="btn btn-outline-secondary btn-sm mb-3"
+                  data-action="skrivUtVakta">
+            <i class="bi bi-printer me-1"></i>Skriv ut vaktlista
+          </button>
+        </div>
 
         {% comment %}
           Gruppene er portalens oppsett, ikke denne vaktas — de gjelder alle
           vaktlister. De ligger likevel her, fordi det er her man er når man
           oppdager at gruppa man trenger ikke finnes.
         {% endcomment %}
+        {% comment %}
+          **Korps og kompetanser bor her fra 30. aug. 2026.** De lå på
+          /vaktliste/registre/, som er lagt ned. De er portalens oppsett, ikke
+          denne vaktas — og de røres sjelden, så de hører til bak
+          «Innstillinger» og ikke i fanerekka, der mannskapet står.
+
+          `skriv_full`, ikke `skriv_leder`: korps-føreren ser dem (nedtrekkene
+          trenger dem), men det er den som deler ut som endrer dem.
+        {% endcomment %}
+        <div class="vl-krev-full d-none mb-3 d-flex gap-2 flex-wrap">
+          <button type="button" class="btn btn-outline-secondary btn-sm"
+                  data-action="apneVerdier" data-arg="korps">
+            <i class="bi bi-flag me-1"></i>Korps
+          </button>
+          <button type="button" class="btn btn-outline-secondary btn-sm"
+                  data-action="apneVerdier" data-arg="kompetanser">
+            <i class="bi bi-award me-1"></i>Kompetanser
+          </button>
+        </div>
+
         <div class="vl-krev-leder d-none mb-3">
           <button type="button" class="btn btn-outline-secondary btn-sm"
                   data-action="apneGrupper">
@@ -220,7 +263,7 @@
           </button>
         </div>
 
-        <div class="vl-krev-leder d-none">
+        <div class="vl-krev-leder d-none" id="vakt-lengde-bolk">
           <hr>
           {% comment %}
             Starten ligger på `core.Vakt`; planlagt slutt på vaktlista. Se
@@ -526,6 +569,132 @@
     </div>
   </div>
 </div>
+{% comment %}
+  Mannskapsskjemaet. Flyttet hit fra registre.html 30. aug. 2026 sammen med
+  fanen.
+{% endcomment %}
+<div class="modal fade" id="personModal" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="person-tittel">Nytt mannskap</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Lukk"></button>
+      </div>
+      <div class="modal-body">
+        <div class="row g-2 mb-3">
+          <div class="col-md-7">
+            <label class="form-label" for="person-navn">Navn</label>
+            <input type="text" id="person-navn" class="form-control" maxlength="150">
+            <div class="form-text">Unikt innenfor korpset. To like navn i samme
+              korps er umulige å skille i lista.</div>
+          </div>
+          <div class="col-md-5">
+            <label class="form-label" for="person-korps">Korps</label>
+            <select id="person-korps" class="form-select"></select>
+          </div>
+        </div>
+        <div class="mb-3">
+          <label class="form-label" for="person-kompetanser">Kompetanser</label>
+          <select id="person-kompetanser" class="form-select" multiple size="5"></select>
+          <div class="form-text">Hold <kbd>Ctrl</kbd> (<kbd>Cmd</kbd> på Mac) for å
+            velge flere. Kompetansen følger personen; rollen settes per vakt.</div>
+        </div>
+        <div class="row g-2 mb-3">
+          <div class="col-md-6">
+            <label class="form-label" for="person-telefon">Telefon</label>
+            <input type="text" id="person-telefon" class="form-control" maxlength="20">
+            <div class="form-text">Brukes av KO og vaktleder under vakt. Valgfritt.</div>
+          </div>
+          <div class="col-md-6 vl-krev-full d-none">
+            <label class="form-label" for="person-konto">Koblet konto</label>
+            <select id="person-konto" class="form-select"></select>
+            <div class="form-text">Valgfritt. Gir i seg selv ingen tilgang — den
+              sier bare hvem kontoen er, og hvilket korps den arver.</div>
+          </div>
+        </div>
+        <div class="mb-3">
+          <label class="form-label" for="person-notat">Notat</label>
+          <textarea id="person-notat" class="form-control" rows="2"></textarea>
+          <div class="form-text text-warning">
+            <i class="bi bi-exclamation-triangle me-1"></i>Verdiene logges ikke i
+            revisjonsloggen. <strong>Ikke skriv helseopplysninger her</strong> —
+            kostbehov og allergier skal ikke inn i portalen.
+          </div>
+        </div>
+        <div class="form-check mb-2" id="person-aktiv-rad">
+          <input class="form-check-input" type="checkbox" id="person-aktiv" checked>
+          <label class="form-check-label" for="person-aktiv">
+            Aktiv — vises i nedtrekkslistene når vakter bemannes
+          </label>
+        </div>
+        <div id="person-feil" class="text-danger small d-none"></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Avbryt</button>
+        <button type="button" class="btn btn-primary" id="person-knapp"
+                data-action="lagrePerson">Lagre</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% comment %}
+  Korps og kompetanser. **Lista og skjemaet i samme vindu**, ikke to modaler:
+  vinduet åpnes selv fra «Innstillinger», og et tredje lag er ett lag man ikke
+  finner tilbake fra. `apneNyVerdi()` og `apneRedigerVerdi()` folder skjemaet
+  ut; «Avbryt» folder det inn igjen.
+{% endcomment %}
+<div class="modal fade" id="verdiModal" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="verdi-tittel">Korps</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Lukk"></button>
+      </div>
+      <div class="modal-body">
+        <button type="button" class="btn btn-sm btn-primary mb-3 d-none"
+                id="verdi-ny-knapp" data-action="apneNyVerdi">Nytt korps</button>
+
+        <div id="verdi-skjema" class="vl-kort mb-3 d-none">
+          <div class="mb-3">
+            <label class="form-label" for="verdi-navn">Navn</label>
+            <input type="text" id="verdi-navn" class="form-control" maxlength="120">
+          </div>
+          <div class="mb-3 d-none" id="verdi-bygger-paa-rad">
+            <label class="form-label" for="verdi-bygger-paa">Bygger på</label>
+            <select id="verdi-bygger-paa" class="form-select"></select>
+            <div class="form-text">
+              Kompetansen denne overordner — f.eks. VFØR for AFØR. Har personen
+              begge, vises bare den øverste i lista.
+            </div>
+          </div>
+          <div class="mb-3 d-none" id="verdi-kortnavn-rad">
+            <label class="form-label" for="verdi-kortnavn">Kortnavn</label>
+            <input type="text" id="verdi-kortnavn" class="form-control" maxlength="20">
+            <div class="form-text">Vises i trange kolonner, f.eks. «HGSD». Valgfritt.</div>
+          </div>
+          <div class="form-check mb-2" id="verdi-aktiv-rad">
+            <input class="form-check-input" type="checkbox" id="verdi-aktiv" checked>
+            <label class="form-check-label" for="verdi-aktiv">Aktiv</label>
+          </div>
+          <div id="verdi-feil" class="text-danger small d-none mb-2"></div>
+          <div class="d-flex gap-2">
+            <button type="button" class="btn btn-primary btn-sm" id="verdi-knapp"
+                    data-action="lagreVerdi">Lagre</button>
+            <button type="button" class="btn btn-secondary btn-sm"
+                    data-action="avbrytVerdi">Avbryt</button>
+          </div>
+        </div>
+
+        <div id="verdi-liste"></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Lukk</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 {% endblock %}
 
 {% block extra_scripts %}

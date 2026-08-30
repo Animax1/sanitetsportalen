@@ -327,10 +327,21 @@ fase 3–7 gjenstår — se `docs/BESLUTNING_VAKTLISTE.md`, som er besluttet i s
   er fasit for duplikater, men en `IntegrityError` som fanges uten savepoint etterlater
   transaksjonen ubrukelig: sesjonslagringen feiler på vei ut, og brukeren får en naken
   400-side i stedet for feilmeldingen viewet formulerte.
-- **Registrene administreres på `/vaktliste/registre/`, ikke i Django-admin.** Den
+- **Registrene administreres på `/vaktliste/`, ikke i Django-admin.** Den
   flaten er kun rutet under `DEBUG`/`OFFLINE_MODE` (S1), så `vaktliste/admin.py` er et
   utviklerverktøy — et register som *bare* finnes der, finnes ikke for brukeren.
   `SjekkAtIngenPekerPaaDjangoAdminTests` skanner alle maler for lenker dit.
+- **Mannskapet er en fane på planleggingssiden; korps og kompetanser ligger i
+  «Innstillinger»** (30. aug. 2026). `/vaktliste/registre/` er lagt ned.
+  Argumentet for en egen side — registrene er globale, fanene gjelder én vakt —
+  holdt ikke i bruk: et klikk dit kostet plassen i planleggingen, og mannskap
+  og ressurser er nettopp de to man veksler mellom. **Både fanen og
+  «Innstillinger» står uten vaktliste**, og fanen velges automatisk da: korps
+  må inn før mannskap, og mannskap før noen kan settes på vakt.
+  `mkMannskap()` tegner registeret, `apneVerdier(navn)` åpner korps eller
+  kompetanser — lista og skjemaet i **samme** vindu, siden vinduet selv åpnes
+  fra «Innstillinger». En lagring kaller `_lastRegisterOgListe()`: navnene
+  står i planleggingens nedtrekk også.
 - **`Ressursgruppe` er typen, og den er en tabell** (30. aug. 2026 — lå i `choices.py`
   før det). Gruppa gjør tre ting samtidig, og det er derfor den er én ting og ikke tre:
   ikonlegger fanen, samler bemanningskurven, og avgrenser rollene. Ikonet er et felt —
@@ -510,8 +521,8 @@ Alle temaene er mørke, så **enhver Bootstrap-klasse for dempet tekst må overs
 malen kan se den. `MorkTekstPaaMorkBakgrunnTests` løser `{% extends %}` og `{% static %}`
 og håndhever det.
 
-Elleve moduler i `static/js/` (ingen bundler), fordelt på seks sider — pasientsiden,
-`/statistikk/`, de to under `/vaktliste/` og de to grensesnittene under `/oppdrag/`:
+Ti moduler i `static/js/` (ingen bundler), fordelt på fem sider — pasientsiden,
+`/statistikk/`, `/vaktliste/` og de to grensesnittene under `/oppdrag/`:
 
 | Modul | Lastes | Ansvar |
 |-------|--------|--------|
@@ -525,8 +536,7 @@ Elleve moduler i `static/js/` (ingen bundler), fordelt på seks sider — pasien
 | `statistikk-oppdrag.js` | `/statistikk/`, **kun** med oppdragstilgang | Oppdragsfanen. Kall hit fra `statistikk.js` går gjennom `_kallOppdrag('navn')` |
 | `oppdrag-sentral.js` | `/oppdrag/`, kontoer uten enhet | Sentralbordet: enhetsliste, oppdragsliste, tidslinje, lokasjonsadmin |
 | `oppdrag-enhet.js` | `/oppdrag/`, enhetskontoer | Enhetsskjermen: to knapper mot de navngitte stemplingsendepunktene, og offline-køen i `localStorage`. Serveren sender `neste_overgang` per rad; kjeden følger med som data kun for å projisere neste steg mens noe ligger usendt |
-| `vaktliste.js` | **kun** `/vaktliste/` | Planleggingssiden: **én fane per ressursgruppe**, hver ressurs er et regneark med redigering i raden, «Oversikt» er utskriftslista, og ressursrollene administreres i en modal på siden |
-| `vaktliste-registre.js` | **kun** `/vaktliste/registre/` | Mannskapsregisteret, korpsene og kompetansene. Egen fil fordi skjemahjelperne er sidespesifikke — de to vaktlistefilene kan ikke lastes i samme node-harness |
+| `vaktliste.js` | **kun** `/vaktliste/` | Hele vaktlistesiden: **én fane per ressursgruppe**, hver ressurs er et regneark med redigering i raden, «Oversikt» er utskriftslista, «Mannskap» er personellregisteret, og roller, grupper, korps og kompetanser administreres i modaler på siden |
 
 **`data-action` + `data-hendelse` er to lyttere, og bare én skal fyre.** Klikk­delegeringen
 i `portal-utils.js` treffer *alle* `[data-action]`. Et element som melder sin egen hendelse

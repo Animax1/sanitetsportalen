@@ -16,16 +16,50 @@
 // det man planlegger etter. Gruppekurven ligger øverst i fanen, over de
 // ressursene den summerer.
 //
-// Faste faner i tillegg: «Oversikt», som er den man skriver ut, og «Ikke
-// plassert», som er de som er meldt på uten å stå noe sted ennå.
+// Faste faner i tillegg: «Oversikt», som er den man skriver ut, «Mannskap»,
+// som er personellregisteret, og «Ikke plassert», som er de som er meldt på
+// uten å stå noe sted ennå.
+//
+// **Mannskapsregisteret er en fane her, ikke en egen side** (30. aug. 2026).
+// Det lå på /vaktliste/registre/, og et klikk dit kostet deg plassen i
+// planleggingen — mens mannskap og ressurser er nettopp de to man veksler
+// mellom. Korps og kompetanser fulgte med inn, men til «Innstillinger»: de
+// røres sjelden, og de er portalens oppsett, ikke denne vaktas.
+//
+// **Mannskapsfanen står også når det ikke finnes noen vaktliste.** Korps må
+// legges inn før mannskap, og mannskap før noen kan settes på vakt — lå
+// registeret bare bak en vaktliste, var portalen låst på første skritt.
 // ════════════════════════════════════════════════════════
 
 let vaktlister = [];        // alle listene, til velgeren
 let aktivListe = null;      // { vaktliste, ressurser, vaktposter, korps, roller, mannskap, enheter }
 let aktivFane = 'oversikt'; // 'oversikt' | 'ikke-plassert' | gruppe-id som streng
 
+//: Personellregisteret: { mannskap, korps, kompetanser, roller, kontoer }.
+//: Hentes for seg fordi det er globalt — `aktivListe.mannskap` er den slanke
+//: lista fanene bemanner fra, uten telefon, konto og notat.
+let register = null;
+let personsok = '';              // fritekstfilter på mannskapstabellen
+let personSortKol = 'korps';     // 'navn' | 'korps' | 'telefon'
+let personSortStigende = true;
+let redigererPerson = null;      // id-en som redigeres, eller null for «ny»
+let redigererVerdi = null;
+let aktivVerdiregister = 'korps';  // hvilket register verdivinduet står i
+
 const OVERSIKT = 'oversikt';
+const MANNSKAP = 'mannskap';
 const IKKE_PLASSERT = 'ikke-plassert';
+
+// Register → hvordan det snakkes om og hvor det ligger.
+// `nyEtikett` er hele knappeteksten, ikke bare ordet: «korps» er intetkjønn
+// og «kompetanse» hankjønn, så en hardkodet «Ny » foran gir feil artikkel på
+// en av dem uansett hvilken man velger.
+const REGISTRE = {
+  korps: { sti: 'korps', nyEtikett: 'Nytt korps', tittel: 'Korps',
+           kortnavn: true },
+  kompetanser: { sti: 'kompetanser', nyEtikett: 'Ny kompetanse',
+                 tittel: 'Kompetanser', stige: true },
+};
 
 
 // ── Tilgang (fase 3) ─────────────────────────────────────────────────────
@@ -160,8 +194,13 @@ async function lastVaktlister() {
   if (vaktlister.length) {
     await lastListe(vaktlister[0].id);
   } else {
+    // **Uten vaktliste er registeret det eneste man kan gjøre noe med** — og
+    // det er også det man må gjøre først: korps før mannskap, mannskap før
+    // noen kan settes på vakt. Sto fanen der uklikket, viste sida ingenting.
     aktivListe = null;
+    aktivFane = MANNSKAP;
     tegn();
+    lastRegister();
   }
 }
 
@@ -177,6 +216,17 @@ async function lastListe(id) {
     ?.classList.toggle('d-none', (aktivListe.mannskap || []).length > 0);
 
   fyllNedtrekk();
+  tegn();
+}
+
+
+async function lastRegister() {
+  // Registeret er globalt, ikke vaktas. Det hentes for seg, og lastes på
+  // nytt etter hver endring — navn og korps står i nedtrekkene på
+  // planleggingssiden, så `lastListe()` må med når personer endres.
+  const res = await apiFetch('/vaktliste/api/mannskap/');
+  if (!res.ok) return;
+  register = (await res.json()).data;
   tegn();
 }
 
@@ -300,6 +350,9 @@ function gruppaHarPlass(g) {
 
 function visFane(id) {
   aktivFane = id;
+  // Registeret hentes først når noen faktisk ber om det. Det er globalt og
+  // uavhengig av vaktlista, så det koster ingenting å utsette.
+  if (id === MANNSKAP && !register) { lastRegister(); }
   tegnFaner();
   tegnPanel();
 }
@@ -321,10 +374,26 @@ function skrivUt() {
 }
 
 
+function _mannskapsfane() {
+  // Antallet er registeret, ikke vaktas påmeldte: fanen *er* registeret.
+  return {
+    id: MANNSKAP, navn: 'Mannskap', ikon: 'person-vcard',
+    antall: register ? register.mannskap.length : null,
+  };
+}
+
+
 function tegnFaner() {
   const el = document.getElementById('vl-faner');
   if (!el) return;
-  if (!aktivListe) { el.innerHTML = ''; return; }
+
+  // **Uten vaktliste står Mannskap alene.** Korps må inn før mannskap, og
+  // mannskap før noen kan settes på vakt. Var fanen borte til den første
+  // vaktlista fantes, sto man fast på skritt én.
+  if (!aktivListe) {
+    el.innerHTML = _fanerad([_mannskapsfane()], '');
+    return;
+  }
 
   const faner = [{ id: OVERSIKT, navn: 'Oversikt', ikon: 'list-ul', antall: null }];
   // **Én fane per gruppe.** «Ambulanse» er alle ambulansene, ikke én av dem.
@@ -340,21 +409,10 @@ function tegnFaner() {
     antall: _ikkePlassert().length,
   });
 
-  const knapper = faner.map((f) => {
-    const aktiv = f.id === aktivFane ? ' active' : '';
-    const antall = f.antall === null ? ''
-      : `<span class="vl-antall">${escHtmlValue(f.antall)}</span>`;
-    return `<button class="vl-fane${aktiv}" data-action="visFane" data-arg="${escHtmlValue(f.id)}">`
-         + `<i class="bi bi-${escHtmlValue(f.ikon)} me-1"></i>${escapeHtml(f.navn)}${antall}</button>`;
-  });
-
-  // **Mannskap står i rekka, men er en lenke.** Fanene bytter innhold i
-  // panelet under; denne forlater sida. Pila sier det — uten den ser den ut
-  // som en fane, og et klikk koster deg plassen din uten å ha spurt.
-  knapper.splice(1, 0,
-    `<a href="/vaktliste/registre/" class="vl-fane vl-fane-lenke">
-       <i class="bi bi-person-vcard me-1"></i>Mannskap<i class="bi bi-box-arrow-up-right ms-1"></i>
-     </a>`);
+  // **Mannskap er en ekte fane, ikke en lenke.** Den var en lenke ut til
+  // /vaktliste/registre/, og et klikk kostet deg plassen i planleggingen —
+  // mens mannskap og ressurser er nettopp de to man veksler mellom.
+  faner.splice(1, 0, _mannskapsfane());
 
   // «Ny ressurs» sist. Bygges her og ikke i malen fordi den skal stå etter
   // faner som kommer fra data; `gateKnapper()` rekker ikke over markup som
@@ -366,13 +424,33 @@ function tegnFaner() {
        </button>`
     : '';
 
-  el.innerHTML = knapper.join('') + nyRessurs;
+  el.innerHTML = _fanerad(faner, nyRessurs);
+}
+
+
+function _fanerad(faner, hale) {
+  return faner.map((f) => {
+    const aktiv = f.id === aktivFane ? ' active' : '';
+    const antall = f.antall === null ? ''
+      : `<span class="vl-antall">${escHtmlValue(f.antall)}</span>`;
+    return `<button class="vl-fane${aktiv}" data-action="visFane" data-arg="${escHtmlValue(f.id)}">`
+         + `<i class="bi bi-${escHtmlValue(f.ikon)} me-1"></i>${escapeHtml(f.navn)}${antall}</button>`;
+  }).join('') + hale;
 }
 
 
 function tegnPanel() {
   const el = document.getElementById('vl-panel');
   if (!el) return;
+
+  // Søkefeltet hører til mannskapsfanen og ligger UTENFOR panelet med vilje:
+  // panelet tegnes på nytt ved hvert tastetrykk, og et input inni ville mistet
+  // fokus etter første bokstav.
+  document.getElementById('vl-verktoy')
+    ?.classList.toggle('d-none', aktivFane !== MANNSKAP);
+
+  // **Mannskapsfanen står også uten vaktliste** — se `tegnFaner()`.
+  if (aktivFane === MANNSKAP) { el.innerHTML = mkMannskap(); return; }
   if (!aktivListe) { el.innerHTML = ''; return; }
 
   if (aktivFane === OVERSIKT) { el.innerHTML = mkOversikt(); return; }
@@ -1447,8 +1525,25 @@ function apneVakt() {
   // med *vakta*, ikke med en ressurs — og som to knapper i toppen konkurrerte
   // de med «Ny ressurs» og «Ny vaktliste» om plassen uten å høre til samme
   // spørsmål. Utskriften ligger her fordi den er hele vaktlista på ett ark.
-  if (!aktivListe) return;
+  //
+  // **Vinduet åpnes også uten vaktliste.** Korps og kompetanser bor her, og
+  // de er nettopp det man legger inn før den første lista finnes — sto
+  // vinduet stengt til da, var registrene uten vei inn. Bolkene som gjelder
+  // én liste skjules i stedet.
   _skjulFeil('vakt-lengde-feil');
+  const harListe = !!aktivListe;
+  document.getElementById('vakt-for-lista')
+    ?.classList.toggle('d-none', !harListe);
+  const lengde = document.getElementById('vakt-lengde-bolk');
+  if (lengde && !harListe) lengde.classList.add('d-none');
+
+  if (!harListe) {
+    const t = document.getElementById('vakt-tittel');
+    if (t) t.textContent = 'Innstillinger';
+    _apneModal('vaktModal');
+    return;
+  }
+
   const vl = aktivListe.vaktliste;
   _settTid('vakt-start', vl.startet);
   _settTid('vakt-slutt', vl.planlagt_slutt);
@@ -1466,7 +1561,8 @@ function apneVakt() {
       : `${poster.length} skift`;
   }
 
-  new bootstrap.Modal(document.getElementById('vaktModal')).show();
+  if (lengde) lengde.classList.toggle('d-none', !kanLede());
+  _apneModal('vaktModal');
 }
 
 
@@ -1683,9 +1779,514 @@ async function slettVaktpost() {
 }
 
 
+
+
+// ── MANNSKAPSREGISTERET ──────────────────────────────────────────────────
+//
+// Flyttet hit fra vaktliste-registre.js 30. aug. 2026, da registersiden ble
+// lagt ned. Fanen er registeret; korps og kompetanser ligger i
+// «Innstillinger», fordi de røres sjelden og er portalens oppsett.
+//
+// Alt som settes med innerHTML escapes: navn, telefon og notat er fritekst.
+
+function kanRedigerePerson(person) {
+  // Badgen. `skriv_handling` fører sitt eget korps og ingen andres.
+  if (kanSkriveAlt()) return true;
+  if (_nivaa() !== 'skriv_handling') return false;
+  return window.MITT_KORPS_ID != null && person.korps_id === window.MITT_KORPS_ID;
+}
+
+
+function _passerPersonsok(m) {
+  if (!personsok) return true;
+  const n = personsok.toLowerCase();
+  return [m.navn, m.korps_navn, m.telefon, m.brukernavn]
+    .concat((m.alle_kompetanser || []).map((k) => k.navn))
+    .some((v) => (v || '').toLowerCase().includes(n));
+}
+
+
+function _sorterMannskap(rader) {
+  const nokkel = (m) => {
+    if (personSortKol === 'navn') return m.navn.toLowerCase();
+    if (personSortKol === 'telefon') return m.telefon || '\uffff';  // tomme sist
+    return m.korps_navn.toLowerCase() + '\u0000' + m.navn.toLowerCase();
+  };
+  const ut = rader.slice().sort((a, b) => nokkel(a).localeCompare(nokkel(b)));
+  return personSortStigende ? ut : ut.reverse();
+}
+
+
+function sorterMannskap(kolonne) {
+  if (personSortKol === kolonne) personSortStigende = !personSortStigende;
+  else { personSortKol = kolonne; personSortStigende = true; }
+  tegnPanel();
+}
+
+
+function settPersonsok(verdi) {
+  personsok = verdi;
+  tegnPanel();
+}
+
+
+function _koblPersonsok() {
+  // Egen lytter framfor `data-action`: delegeringen i portal-utils.js er
+  // klikkbasert, og dette er et tastetrykk.
+  const el = document.getElementById('vl-sok');
+  if (el) el.addEventListener('input', () => settPersonsok(el.value));
+}
+
+
+function _personKolonne(kolonne, tekst) {
+  // Pilen viser hvilken kolonne som styrer, og hvilken vei.
+  const pil = personSortKol === kolonne ? (personSortStigende ? ' \u25b2' : ' \u25bc') : '';
+  return `<th class="vlr-sortbar" data-action="sorterMannskap" data-arg="${escHtmlValue(kolonne)}">`
+       + `${escapeHtml(tekst)}${escapeHtml(pil)}</th>`;
+}
+
+
+function mkMannskap() {
+  if (!register) {
+    return '<div class="vl-kort"><div class="vl-tom">Henter registeret\u2026</div></div>';
+  }
+
+  const nyKnapp = kanSkriveNoe()
+    ? `<button class="btn btn-sm btn-primary" type="button"
+               data-action="apneNyPerson">
+         <i class="bi bi-person-plus me-1"></i>Nytt mannskap
+       </button>`
+    : '';
+  const hode = `
+      <div class="vl-kort-topp">
+        <span class="vl-kort-tittel">
+          <i class="bi bi-person-vcard me-1"></i>Mannskap
+          <span class="vl-meta">${escHtmlValue(register.mannskap.length)} i registeret</span>
+        </span>
+        ${nyKnapp}
+      </div>`;
+
+  if (!register.korps.length) {
+    // **Korpset først.** Det er badgen tilgangsmodellen hviler på, og uten
+    // ett kan ingen person opprettes. Knappen sier derfor «Legg inn korps»
+    // og ikke «Nytt mannskap»: en knapp som åpner noe annet enn det den
+    // heter, er en knapp man klikker på én gang og aldri stoler på igjen.
+    const tilKorps = kanSkriveAlt()
+      ? `<button class="btn btn-sm btn-primary" type="button"
+                 data-action="apneVerdier" data-arg="korps">
+           <i class="bi bi-flag me-1"></i>Legg inn korps
+         </button>`
+      : '';
+    return `
+      <div class="vl-kort">
+        <div class="vl-kort-topp">
+          <span class="vl-kort-tittel">
+            <i class="bi bi-person-vcard me-1"></i>Mannskap
+          </span>
+          ${tilKorps}
+        </div>
+        <div class="vl-tom">
+          Ingen korps ennå. Et mannskap må høre til et korps — korpset er
+          badgen tilgangsmodellen hviler på.
+        </div>
+      </div>`;
+  }
+
+  if (!register.mannskap.length) {
+    return `<div class="vl-kort">${hode}`
+         + '<div class="vl-tom">Ingen i registeret ennå. Trykk «Nytt mannskap».</div></div>';
+  }
+
+  // **Tabell, ikke merkelapper på rad.** Med én kompetanse så den gamle
+  // visningen fin ut; med åtte brøt den om og skjøv telefonnummeret ut av
+  // syne. Faste kolonner gjør at det du leter etter alltid står samme sted.
+  const rader = _sorterMannskap(register.mannskap.filter(_passerPersonsok));
+
+  const kropp = rader.length ? rader.map((m) => {
+    const inaktiv = m.er_aktiv ? '' : ' vl-inaktiv';
+
+    // Bare de synlige kompetansene — har hun AFØR, er VFØR implisert.
+    // Hele settet ligger i `title`, så «har hun egentlig VFØR?» kan besvares
+    // uten å åpne skjemaet.
+    const alle = (m.alle_kompetanser || []).map((k) => k.navn).join(', ');
+    const merker = m.kompetanser.length
+      ? m.kompetanser.map((k) =>
+          `<span class="vl-merkelapp">${escapeHtml(k.navn)}</span>`).join('')
+      : '<span class="vl-meta">—</span>';
+
+    // Ikoner, ikke tekst: to tekstknapper trenger ~150px og sprengte
+    // handlingskolonnen på smale skjermer. `title` og `aria-label` bærer
+    // betydningen — en ikonknapp uten dem er en gåte.
+    const knapper = kanRedigerePerson(m)
+      ? `<button class="btn btn-sm btn-outline-secondary" type="button"
+                 title="Rediger ${escHtmlValue(m.navn)}" aria-label="Rediger ${escHtmlValue(m.navn)}"
+                 data-action="apneRedigerPerson" data-id="${escHtmlValue(m.id)}"><i class="bi bi-pencil"></i></button>
+         <button class="btn btn-sm btn-outline-danger" type="button"
+                 title="Slett ${escHtmlValue(m.navn)}" aria-label="Slett ${escHtmlValue(m.navn)}"
+                 data-action="slettPerson" data-id="${escHtmlValue(m.id)}"><i class="bi bi-trash"></i></button>`
+      : '';
+
+    const inaktivMerke = m.er_aktiv ? ''
+      : ' <span class="vl-merkelapp vl-ureservert">Inaktiv</span>';
+    const konto = m.brukernavn
+      ? escapeHtml(m.brukernavn) : '<span class="vl-meta">—</span>';
+
+    return `
+      <tr class="${escHtmlValue(inaktiv.trim())}">
+        <td class="vl-navn">${escapeHtml(m.navn)}${inaktivMerke}</td>
+        <td>${escapeHtml(m.korps_kort)}</td>
+        <td class="vlr-komp" title="${escHtmlValue(alle)}">${merker}</td>
+        <td class="vlr-tlf">${escapeHtml(m.telefon || '—')}</td>
+        <td>${konto}</td>
+        <td class="vlr-handling">${knapper}</td>
+      </tr>`;
+  }).join('')
+    : `<tr><td colspan="6" class="vl-tom">Ingen treff på «${escapeHtml(personsok)}».</td></tr>`;
+
+  const treff = document.getElementById('vl-treff');
+  if (treff) {
+    treff.textContent = personsok
+      ? `${rader.length} av ${register.mannskap.length}` : `${rader.length}`;
+  }
+
+  return `
+    <div class="vl-kort">
+      ${hode}
+      <div class="vlr-tabellramme">
+        <table class="vlr-tabell">
+          <colgroup>
+            <col style="width: 26%"><col style="width: 9%">
+            <col style="width: 31%"><col style="width: 12%">
+            <col style="width: 10%"><col style="width: 12%">
+          </colgroup>
+          <thead>
+            <tr>
+              ${_personKolonne('navn', 'Navn')}
+              ${_personKolonne('korps', 'Korps')}
+              <th>Kompetanse</th>
+              ${_personKolonne('telefon', 'Telefon')}
+              <th>Konto</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>${kropp}</tbody>
+        </table>
+      </div>
+    </div>`;
+}
+
+
+function _lesFelt(id) {
+  return (document.getElementById(id)?.value || '').trim();
+}
+
+
+function _apneModal(id) {
+  new bootstrap.Modal(document.getElementById(id)).show();
+}
+
+
+function _fyllPersonskjema(person) {
+  // Inaktive korps og kompetanser tilbys ikke på nye rader, men beholdes på
+  // dem som alt har dem — derfor filtreres det bare når feltet er tomt.
+  const korps = register.korps.filter(
+    (k) => k.er_aktiv || (person && person.korps_id === k.id));
+  _fyll('person-korps', korps, '');
+  _fyll('person-kompetanser', register.kompetanser.filter(
+    (k) => k.er_aktiv || (person && person.kompetanser.some((x) => x.id === k.id))), '');
+
+  // En konto kan bare kobles til én person (OneToOne). Vis de ledige, pluss
+  // denne personens egen.
+  const kontoer = register.kontoer
+    .filter((u) => !u.mannskap_id || (person && u.mannskap_id === person.id))
+    .map((u) => ({ id: u.id, navn: u.brukernavn }));
+  _fyll('person-konto', kontoer, 'Ingen konto');
+
+  _settVerdi('person-navn', person ? person.navn : '');
+  _settVerdi('person-korps', person ? person.korps_id : '');
+  _settVerdi('person-telefon', person ? person.telefon : '');
+  _settVerdi('person-konto', person && person.user_id ? person.user_id : '');
+  _settVerdi('person-notat', person ? person.notat : '');
+  document.getElementById('person-aktiv').checked = person ? person.er_aktiv : true;
+  document.getElementById('person-aktiv-rad').classList.toggle('d-none', !person);
+
+  const valgte = new Set(person ? person.kompetanser.map((k) => k.id) : []);
+  Array.from(document.getElementById('person-kompetanser').options).forEach((o) => {
+    o.selected = valgte.has(Number(o.value));
+  });
+}
+
+
+function apneNyPerson() {
+  if (!register) return;
+  if (!register.korps.length) { apneVerdier('korps'); return; }
+  redigererPerson = null;
+  _skjulFeil('person-feil');
+  document.getElementById('person-tittel').textContent = 'Nytt mannskap';
+  _fyllPersonskjema(null);
+  _apneModal('personModal');
+}
+
+
+function apneRedigerPerson(id) {
+  const person = register?.mannskap.find((m) => m.id === id);
+  if (!person) return;
+  redigererPerson = id;
+  _skjulFeil('person-feil');
+  document.getElementById('person-tittel').textContent = person.navn;
+  _fyllPersonskjema(person);
+  _apneModal('personModal');
+}
+
+
+async function lagrePerson() {
+  _skjulFeil('person-feil');
+  await withSubmitGuard('person-knapp', async () => {
+    const navn = _lesFelt('person-navn');
+    if (!navn) { _visFeil('person-feil', 'Personen må ha et navn.'); return; }
+    const korpsId = _lesFelt('person-korps');
+    if (!korpsId) {
+      _visFeil('person-feil', 'Velg hvilket korps personen hører til.');
+      return;
+    }
+
+    const kropp = {
+      navn,
+      korps_id: Number(korpsId),
+      telefon: _lesFelt('person-telefon'),
+      user_id: _lesFelt('person-konto') ? Number(_lesFelt('person-konto')) : null,
+      notat: _lesFelt('person-notat'),
+      kompetanse_ider: Array.from(
+        document.getElementById('person-kompetanser').selectedOptions)
+        .map((o) => Number(o.value)),
+    };
+    if (redigererPerson) {
+      kropp.er_aktiv = document.getElementById('person-aktiv').checked;
+    }
+
+    const res = await apiFetch(
+      redigererPerson ? `/vaktliste/api/mannskap/${redigererPerson}/`
+                      : '/vaktliste/api/mannskap/',
+      { method: redigererPerson ? 'PUT' : 'POST', body: JSON.stringify(kropp) });
+    const d = await res.json().catch(() => ({}));
+    if (!res.ok || d.status !== 'ok') {
+      _visFeil('person-feil', d.message || 'Kunne ikke lagre.');
+      return;
+    }
+    _lukkModal('personModal');
+    await _lastRegisterOgListe();
+  });
+}
+
+
+async function slettPerson(id) {
+  const person = register?.mannskap.find((m) => m.id === id);
+  if (!person) return;
+  if (person.i_bruk) {
+    alert(`${person.navn} står på ${person.i_bruk} vaktpost(er) og kan ikke `
+        + 'slettes.\n\nSett personen inaktiv i stedet — da skjules hun i '
+        + 'nedtrekkslistene, men blir stående der hun gikk vakt.');
+    return;
+  }
+  if (!confirm(`Slette ${person.navn} fra registeret?`)) return;
+
+  const res = await apiFetch(`/vaktliste/api/mannskap/${id}/`, { method: 'DELETE' });
+  const d = await res.json().catch(() => ({}));
+  if (!res.ok) { alert(d.message || 'Kunne ikke slette.'); return; }
+  await _lastRegisterOgListe();
+}
+
+
+async function _lastRegisterOgListe() {
+  // **Begge, ikke bare registeret.** Navn, korps og aktiv-flagget står i
+  // nedtrekkene på planleggingssiden også — endres en person uten at lista
+  // hentes på nytt, bemanner man fra en liste som er utdatert.
+  await lastRegister();
+  if (aktivListe) await lastListe(aktivListe.vaktliste.id);
+}
+
+
+// ── Korps og kompetanser (i «Innstillinger») ─────────────────────────────
+//
+// De to deler bygger og skjema, på samme måte som serveren deler fabrikk —
+// kopier er kopier å glemme. Vinduet viser lista, og skjemaet folder seg ut
+// inni det samme vinduet: en modal oppå en modal oppå en modal er tre lag
+// man ikke finner tilbake fra.
+
+function apneVerdier(navn) {
+  aktivVerdiregister = navn;
+  const reg = REGISTRE[navn];
+  _skjulFeil('verdi-feil');
+  _skjulVerdiskjema();
+  const tittel = document.getElementById('verdi-tittel');
+  if (tittel) tittel.textContent = reg.tittel;
+  const ny = document.getElementById('verdi-ny-knapp');
+  if (ny) {
+    ny.textContent = reg.nyEtikett;
+    ny.classList.toggle('d-none', !kanSkriveAlt());
+  }
+  if (!register) { lastRegister(); }
+  tegnVerdiliste();
+  _apneModal('verdiModal');
+}
+
+
+function tegnVerdiliste() {
+  const el = document.getElementById('verdi-liste');
+  if (!el) return;
+  el.innerHTML = register ? mkVerdiliste(aktivVerdiregister)
+    : '<div class="vl-tom">Henter\u2026</div>';
+}
+
+
+function mkVerdiliste(navn) {
+  const rader = register[navn] || [];
+  // Verdimengdene er organisasjonens oppsett — `skriv_full`. Korps-føreren
+  // ser dem (nedtrekkslistene trenger dem), men endrer dem ikke.
+  const full = kanSkriveAlt();
+  if (!rader.length) return '<div class="vl-tom">Ingen ennå.</div>';
+
+  return rader.map((r) => {
+    const verdiKnapper = full
+      ? `<button class="btn btn-sm btn-outline-secondary" type="button"
+                 data-action="apneRedigerVerdi" data-id="${escHtmlValue(r.id)}">Rediger</button>
+         <button class="btn btn-sm btn-outline-danger" type="button"
+                 data-action="slettVerdi" data-id="${escHtmlValue(r.id)}">Slett</button>`
+      : '';
+    const inaktiv = r.er_aktiv ? '' : ' vl-inaktiv';
+    const inaktivMerke = r.er_aktiv ? ''
+      : '<span class="vl-merkelapp vl-ureservert">Inaktiv</span>';
+    const kort = r.kortnavn
+      ? `<span class="vl-merkelapp">${escapeHtml(r.kortnavn)}</span>` : '';
+    // Stigen synliggjøres i lista: uten den må man åpne hver rad for å se
+    // hvilke kurs som overordner hvilke.
+    const stige = r.bygger_paa_navn
+      ? `<span class="vl-meta">bygger på ${escapeHtml(r.bygger_paa_navn)}</span>`
+      : '';
+    // Tallet står i lista, ikke bare i feilmeldingen: en verdimengde man kan
+    // slette uten å vite hva som henger i den, sletter man for lett.
+    const bruk = r.i_bruk
+      ? `<span class="vl-meta">${escHtmlValue(r.i_bruk)} i bruk</span>`
+      : '<span class="vl-meta">ubrukt</span>';
+    return `
+      <div class="vl-rad${inaktiv}">
+        <div class="d-flex align-items-center gap-2 flex-wrap">
+          <span class="vl-navn">${escapeHtml(r.navn)}</span>
+          ${inaktivMerke}${kort}${stige}${bruk}
+        </div>
+        <div class="d-flex gap-2">${verdiKnapper}</div>
+      </div>`;
+  }).join('');
+}
+
+
+function _skjulVerdiskjema() {
+  document.getElementById('verdi-skjema')?.classList.add('d-none');
+  document.getElementById('verdi-ny-knapp')?.classList.toggle(
+    'd-none', !kanSkriveAlt());
+}
+
+
+function _visVerdiskjema(reg, rad) {
+  document.getElementById('verdi-skjema')?.classList.remove('d-none');
+  document.getElementById('verdi-ny-knapp')?.classList.add('d-none');
+  _settVerdi('verdi-navn', rad ? rad.navn : '');
+  _settVerdi('verdi-kortnavn', rad && rad.kortnavn ? rad.kortnavn : '');
+  document.getElementById('verdi-aktiv').checked = rad ? rad.er_aktiv : true;
+  document.getElementById('verdi-aktiv-rad').classList.toggle('d-none', !rad);
+  document.getElementById('verdi-kortnavn-rad')
+    .classList.toggle('d-none', !reg.kortnavn);
+  _stigefelt(reg, rad);
+}
+
+
+function apneNyVerdi() {
+  const reg = REGISTRE[aktivVerdiregister];
+  redigererVerdi = null;
+  _skjulFeil('verdi-feil');
+  _visVerdiskjema(reg, null);
+}
+
+
+function _stigefelt(reg, rad) {
+  // Kun kompetanser har en stige. En kompetanse kan ikke bygge på seg selv;
+  // resten av ringene stoppes på serveren, som er den som kan se hele treet.
+  const rad_el = document.getElementById('verdi-bygger-paa-rad');
+  if (rad_el) rad_el.classList.toggle('d-none', !reg.stige);
+  if (!reg.stige) return;
+  const valg = ((register && register.kompetanser) || [])
+    .filter((k) => !rad || k.id !== rad.id);
+  _fyll('verdi-bygger-paa', valg, 'Ingen — står alene');
+  _settVerdi('verdi-bygger-paa', rad && rad.bygger_paa_id ? rad.bygger_paa_id : '');
+}
+
+
+function apneRedigerVerdi(id) {
+  const reg = REGISTRE[aktivVerdiregister];
+  const rad = (register[aktivVerdiregister] || []).find((r) => r.id === id);
+  if (!rad) return;
+  redigererVerdi = id;
+  _skjulFeil('verdi-feil');
+  _visVerdiskjema(reg, rad);
+}
+
+
+function avbrytVerdi() {
+  redigererVerdi = null;
+  _skjulFeil('verdi-feil');
+  _skjulVerdiskjema();
+}
+
+
+async function lagreVerdi() {
+  const reg = REGISTRE[aktivVerdiregister];
+  _skjulFeil('verdi-feil');
+  await withSubmitGuard('verdi-knapp', async () => {
+    const navn = _lesFelt('verdi-navn');
+    if (!navn) { _visFeil('verdi-feil', 'Navn må fylles ut.'); return; }
+
+    const kropp = { navn };
+    if (reg.kortnavn) kropp.kortnavn = _lesFelt('verdi-kortnavn');
+    if (reg.stige) kropp.bygger_paa_id = _lesFelt('verdi-bygger-paa') || null;
+    if (redigererVerdi) {
+      kropp.er_aktiv = document.getElementById('verdi-aktiv').checked;
+    }
+
+    const res = await apiFetch(
+      redigererVerdi ? `/vaktliste/api/${reg.sti}/${redigererVerdi}/`
+                     : `/vaktliste/api/${reg.sti}/`,
+      { method: redigererVerdi ? 'PUT' : 'POST', body: JSON.stringify(kropp) });
+    const d = await res.json().catch(() => ({}));
+    if (!res.ok || d.status !== 'ok') {
+      _visFeil('verdi-feil', d.message || 'Kunne ikke lagre.');
+      return;
+    }
+    redigererVerdi = null;
+    _skjulVerdiskjema();
+    await _lastRegisterOgListe();
+    tegnVerdiliste();
+  });
+}
+
+
+async function slettVerdi(id) {
+  const reg = REGISTRE[aktivVerdiregister];
+  const rad = (register[aktivVerdiregister] || []).find((r) => r.id === id);
+  if (!rad) return;
+  if (!confirm(`Slette «${rad.navn}»?`)) return;
+
+  const res = await apiFetch(`/vaktliste/api/${reg.sti}/${id}/`, { method: 'DELETE' });
+  const d = await res.json().catch(() => ({}));
+  if (!res.ok) { alert(d.message || 'Kunne ikke slette.'); return; }
+  await _lastRegisterOgListe();
+  tegnVerdiliste();
+}
+
+
 document.addEventListener('DOMContentLoaded', () => {
   gateKnapper();
   _koblCellelytter();
+  _koblPersonsok();
   document.getElementById('ny-vaktpost-mannskap')
     ?.addEventListener('change', _vaktpostModusSkifte);
   lastVaktlister();

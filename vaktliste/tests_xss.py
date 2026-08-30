@@ -13,7 +13,7 @@ import re
 from django.test import SimpleTestCase
 
 from patients.js_test_utils import (
-    PORTAL_UTILS_JS, VAKTLISTE_JS, VAKTLISTE_REGISTRE_JS, build_harness,
+    PORTAL_UTILS_JS, VAKTLISTE_JS, build_harness,
     extract_function, node_available, read_js, run_node,
 )
 
@@ -21,7 +21,7 @@ HTML_BUILDERS = (
     'fyllVelger',
     'mkRolleRad',
     '_fyll',
-    'tegnFaner',
+    'tegnFaner', '_fanerad', '_mannskapsfane',
     'mkRessurs',
     '_rolleValg',
     '_fyllValgFor',
@@ -165,7 +165,7 @@ class VaktlisteEscapingOppforselTests(SimpleTestCase):
                         '_timesteg', '_ressurserIGruppe',
                         '_grupperMedRessurser',
                         '_toppunkt', '_posterPerGruppe', '_vaktensSpenn',
-                        'mkIkkePlassert', 'tegnFaner', '_posterFor',
+                        'mkIkkePlassert', 'tegnFaner', '_fanerad', '_mannskapsfane', '_posterFor',
                         '_ikkePlassert', '_tidsspenn', '_vaktspenn',
                         '_bemanningPerTime', '_iso16', '_d', '_kl', '_dag',
                         '_sammeDag', '_nivaa', '_erAdmin', 'kanSkriveAlt',
@@ -260,6 +260,8 @@ class VaktlisteEscapingOppforselTests(SimpleTestCase):
             globalThis.aktivFane = 'oversikt';
             globalThis.OVERSIKT = 'oversikt';
             globalThis.IKKE_PLASSERT = 'ikke-plassert';
+            globalThis.MANNSKAP = 'mannskap';
+            globalThis.register = null;
             globalThis.aktivListe = {self._liste(
                 grupper=[{'id': 1, 'navn': '<b>Lag</b>', 'ikon': 'people'}],
                 ressurser=[{'id': 1, 'navn': 'Lag 1', 'gruppe_id': 1,
@@ -278,6 +280,8 @@ class VaktlisteEscapingOppforselTests(SimpleTestCase):
             globalThis.aktivFane = 'oversikt';
             globalThis.OVERSIKT = 'oversikt';
             globalThis.IKKE_PLASSERT = 'ikke-plassert';
+            globalThis.MANNSKAP = 'mannskap';
+            globalThis.register = null;
             globalThis.aktivListe = {self._liste(
                 grupper=[{'id': 1, 'navn': 'Lag',
                           'ikon': '" onload="alert(1)'}],
@@ -340,13 +344,13 @@ class VaktlisteLogikkTests(SimpleTestCase):
         ''')
 
 
-# ── Registersiden ────────────────────────────────────────────────────────────
+# ── Mannskapsregisteret ──────────────────────────────────────────────────────
 #
-# Egen bygger-liste og eget harness: `_visFeil`, `_lukkModal` og vennene deres
-# finnes i begge filene (bevisst — de er sidespesifikke), så de to kan ikke
-# lastes i samme harness.
+# Byggerne lå i vaktliste-registre.js til 30. aug. 2026, da registersiden ble
+# lagt ned og fanen flyttet inn i planleggingssiden. Egen bygger-liste fordi
+# escaping-kravene er de samme, men byggerne er andre enn tabellens.
 
-REGISTER_BUILDERS = ('mkMannskap', 'mkVerdier', '_kolonneHode')
+REGISTER_BUILDERS = ('mkMannskap', 'mkVerdiliste', '_personKolonne')
 
 REGISTER_REVIEWED = {
     'inaktiv': 'hardkodet CSS-klasse fra en ternær',
@@ -363,6 +367,7 @@ REGISTER_REVIEWED = {
     'knapper': 'markup bygget lokalt, mannskaps-id escapet inni',
     'verdiKnapper': 'markup bygget lokalt, rad-id escapet inni',
     'nyKnapp': 'markup bygget lokalt, etiketten escapet inni',
+    'tilKorps': 'markup bygget lokalt, ingen data i seg',
     # Mannskapstabellen. `inaktivMerke`, `merker` og `konto` sto allerede over
     # med samme begrunnelse — tabellen gjenbruker dem.
     'stige': 'markup bygget lokalt, «bygger på»-navnet escapet inni',
@@ -370,32 +375,43 @@ REGISTER_REVIEWED = {
     # Treff-telleren settes med textContent, ikke innerHTML — ingen parsing
     # å bryte ut av, og tallene kommer uansett fra `.length`.
     'rader.length': 'tall, settes med textContent',
-    'data.mannskap.length': 'tall, settes med textContent',
-    "_kolonneHode('navn', 'Navn')": 'bygger med escapet innhold, se funksjonen',
-    "_kolonneHode('korps', 'Korps')": 'bygger med escapet innhold, se funksjonen',
-    "_kolonneHode('telefon', 'Telefon')": 'bygger med escapet innhold, se funksjonen',
+    'register.mannskap.length': 'tall, settes med textContent',
+    'hode': 'markup bygget lokalt i samme funksjon',
+    "_personKolonne('navn', 'Navn')": 'bygger med escapet innhold, se funksjonen',
+    "_personKolonne('korps', 'Korps')": 'bygger med escapet innhold, se funksjonen',
+    "_personKolonne('telefon', 'Telefon')": 'bygger med escapet innhold, se funksjonen',
 }
 
 
 class RegistersidenEscapingKildeTests(SimpleTestCase):
     def test_byggerne_finnes(self):
-        src = read_js(VAKTLISTE_REGISTRE_JS)
+        src = read_js(VAKTLISTE_JS)
         for navn in REGISTER_BUILDERS:
             with self.subTest(navn=navn):
                 self.assertIn(f'function {navn}(', src)
+
+    def test_registersiden_finnes_ikke_lenger(self):
+        """Flata flyttet inn i planleggingssiden 30. aug. 2026. Blir malen
+        eller JS-fila liggende igjen, laster ingen dem — og en fil ingen
+        laster er en fil som råtner uten at noe feiler."""
+        from pathlib import Path
+        from django.conf import settings
+        rot = Path(settings.BASE_DIR)
+        self.assertFalse((rot / 'templates' / 'vaktliste' / 'registre.html').exists())
+        self.assertFalse((rot / 'static' / 'js' / 'vaktliste-registre.js').exists())
 
     def test_siden_laster_ikke_patients_utils(self):
         from pathlib import Path
         from django.conf import settings
         mal = (Path(settings.BASE_DIR) / 'templates' / 'vaktliste'
-               / 'registre.html').read_text(encoding='utf-8')
+               / 'index.html').read_text(encoding='utf-8')
         lastet = re.findall(r"<script\b[^>]*js/([A-Za-z0-9_.-]+\.js)", mal)
         self.assertNotIn('patients-utils.js', lastet)
         self.assertIn('portal-utils.js', lastet)
-        self.assertIn('vaktliste-registre.js', lastet)
+        self.assertIn('vaktliste.js', lastet)
 
     def test_alle_interpolasjoner_er_escapet_eller_gjennomgatt(self):
-        src = read_js(VAKTLISTE_REGISTRE_JS)
+        src = read_js(VAKTLISTE_JS)
         uescapet = []
         for navn in REGISTER_BUILDERS:
             body = _uten_kommentarer(extract_function(src, navn))
@@ -408,7 +424,7 @@ class RegistersidenEscapingKildeTests(SimpleTestCase):
                 uescapet.append(f'{navn}(): ${{{uttrykk}}}')
 
         self.assertEqual(uescapet, [], (
-            'Uescapede interpolasjoner i vaktliste-registre.js:\n  '
+            'Uescapede interpolasjoner i mannskapsbyggerne:\n  '
             + '\n  '.join(uescapet)))
 
 
@@ -421,17 +437,18 @@ class RegistersidenEscapingOppforselTests(SimpleTestCase):
 
     HARNESS = (
         (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue', 'trustedHtml', '_escHtml')),
-        (VAKTLISTE_REGISTRE_JS, ('mkMannskap', 'mkVerdier', '_kolonneHode',
-                                 '_passerSok', '_sorterMannskap', '_nivaa',
-                                 'kanSkriveAlt', 'kanRedigerePerson')),
+        (VAKTLISTE_JS, ('mkMannskap', 'mkVerdiliste', '_personKolonne',
+                        '_passerPersonsok', '_sorterMannskap', '_nivaa',
+                        '_erAdmin', 'kanSkriveAlt', 'kanSkriveNoe',
+                        'kanRedigerePerson')),
     )
 
     #: Tabellen skriver treff-telleren i DOM-en og leser sorteringstilstanden,
     #: så begge stubbes. Node har verken `window` eller `document`.
     VINDU = ("globalThis.window = { MODUL_TILGANG: { admin: true } };\n"
              "globalThis.document = { getElementById: () => null };\n"
-             "globalThis.sok = ''; globalThis.sortKol = 'korps';\n"
-             "globalThis.sortStigende = true;\n")
+             "globalThis.personsok = ''; globalThis.personSortKol = 'korps';\n"
+             "globalThis.personSortStigende = true;\n")
 
     def setUp(self):
         if not node_available():
@@ -440,7 +457,7 @@ class RegistersidenEscapingOppforselTests(SimpleTestCase):
 
     def test_personnavn_og_kompetanse_escapes(self):
         ut = run_node(self.harness, self.VINDU + """
-            globalThis.data = { mannskap: [{
+            globalThis.register = { korps: [{id: 1, navn: 'HGSD'}], mannskap: [{
               id: 1, navn: '<img src=x onerror=alert(1)>',
               korps_navn: 'HGSD', korps_kort: 'HGSD',
               kompetanser: [{id: 1, navn: '<b>Sykepleier</b>'}],
@@ -454,7 +471,7 @@ class RegistersidenEscapingOppforselTests(SimpleTestCase):
 
     def test_brukernavn_og_telefon_escapes(self):
         ut = run_node(self.harness, self.VINDU + """
-            globalThis.data = { mannskap: [{
+            globalThis.register = { korps: [{id: 1, navn: 'HGSD'}], mannskap: [{
               id: 1, navn: 'Kari', korps_navn: 'HGSD', korps_kort: 'HGSD',
               kompetanser: [], telefon: '<i>90</i>',
               brukernavn: '<script>x</script>', er_aktiv: true, i_bruk: 0
@@ -466,14 +483,14 @@ class RegistersidenEscapingOppforselTests(SimpleTestCase):
 
     def test_verdinavn_og_kortnavn_escapes(self):
         ut = run_node(self.harness, self.VINDU + """
-            globalThis.aktivRegisterFane = 'korps';
-            globalThis.REGISTRE = { korps: {sti:'korps', ental:'korps',
+            globalThis.aktivVerdiregister = 'korps';
+            globalThis.REGISTRE = { korps: {sti:'korps', nyEtikett:'Nytt korps',
                                             tittel:'Korps', kortnavn:true} };
-            globalThis.data = { korps: [{
+            globalThis.register = { korps: [{
               id: 1, navn: '<b>Haugesund</b>', kortnavn: '<i>HGSD</i>',
               er_aktiv: true, i_bruk: 0
             }]};
-            console.log(mkVerdier('korps'));
+            console.log(mkVerdiliste('korps'));
         """)
         self.assertNotIn('<b>Haugesund</b>', ut)
         self.assertNotIn('<i>HGSD</i>', ut)
@@ -483,7 +500,7 @@ class RegistersidenEscapingOppforselTests(SimpleTestCase):
         """Pensjonering er den normale veien ut — raden skal fortsatt vises,
         men tydelig nedtonet. Kontrollen ligger i JS-assertene."""
         run_node(self.harness, self.VINDU + """
-            globalThis.data = { mannskap: [{
+            globalThis.register = { korps: [{id: 1, navn: 'HGSD'}], mannskap: [{
               id: 1, navn: 'Kari', korps_navn: 'HGSD', korps_kort: 'HGSD',
               kompetanser: [], telefon: '', brukernavn: '',
               er_aktiv: false, i_bruk: 0
@@ -530,7 +547,7 @@ class MannskapstabellensLayoutTests(SimpleTestCase):
     def test_byggeren_setter_kolonnebredder(self):
         """`fixed` uten `<colgroup>` gir like brede kolonner, som er feil
         fordelig: kompetanse trenger mest, korps minst."""
-        src = read_js(VAKTLISTE_REGISTRE_JS)
+        src = read_js(VAKTLISTE_JS)
         kropp = extract_function(src, 'mkMannskap')
         self.assertIn('<colgroup>', kropp)
         andeler = re.findall(r'width:\s*(\d+)%', kropp)
@@ -1393,7 +1410,7 @@ class NyRessursIFanerekkaTests(SimpleTestCase):
 
     HARNESS = (
         (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue')),
-        (VAKTLISTE_JS, ('tegnFaner', '_posterFor', '_ikkePlassert',
+        (VAKTLISTE_JS, ('tegnFaner', '_fanerad', '_mannskapsfane', '_posterFor', '_ikkePlassert',
                         '_ressurserIGruppe', '_grupperMedRessurser',
                         '_nivaa', '_erAdmin', 'kanLede')),
     )
@@ -1411,6 +1428,8 @@ class NyRessursIFanerekkaTests(SimpleTestCase):
             "globalThis.aktivFane = 'oversikt';\n"
             "globalThis.OVERSIKT = 'oversikt';\n"
             "globalThis.IKKE_PLASSERT = 'ikke-plassert';\n"
+            "globalThis.MANNSKAP = 'mannskap';\n"
+            "globalThis.register = null;\n"
             "globalThis.aktivListe = {grupper: [{id: 3, navn: 'Ambulanse',"
             " ikon: 'truck'}], ressurser: [{id: 7, navn: 'Ambulanse 1',"
             " gruppe_id: 3, ikon: 'truck'}], vaktposter: [], mannskap: []};\n"
@@ -1458,7 +1477,7 @@ class FanenErGruppaTests(SimpleTestCase):
 
     HARNESS = (
         (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue')),
-        (VAKTLISTE_JS, ('tegnFaner', 'mkGruppe', 'mkRessurs', '_rolleValg',
+        (VAKTLISTE_JS, ('tegnFaner', '_fanerad', '_mannskapsfane', 'mkGruppe', 'mkRessurs', '_rolleValg',
                         '_skiftrekkefolge',
                         '_fyllValgFor', '_varighet', 'mkGruppekurve',
                         '_mkEnKurve', '_tegnforklaring', '_timesteg',
@@ -1476,7 +1495,9 @@ class FanenErGruppaTests(SimpleTestCase):
              "'jul','aug','sep','okt','nov','des'];\n"
              "globalThis.aktivFane = 'oversikt';\n"
              "globalThis.OVERSIKT = 'oversikt';\n"
-             "globalThis.IKKE_PLASSERT = 'ikke-plassert';\n")
+             "globalThis.IKKE_PLASSERT = 'ikke-plassert';\n"
+            "globalThis.MANNSKAP = 'mannskap';\n"
+            "globalThis.register = null;\n")
 
     #: To ambulanser i samme gruppe, én samleplass i en annen.
     LISTE = """
@@ -1539,12 +1560,30 @@ class FanenErGruppaTests(SimpleTestCase):
         self.assertLess(ut.index('Oversikt'), ut.index('Mannskap'))
         self.assertLess(ut.index('Mannskap'), ut.index('>Ambulanse<'))
 
-    def test_mannskap_er_en_lenke_med_pil(self):
-        """Den forlater sida der fanene bare bytter innholdet under. Uten
-        pila koster et klikk deg plassen din uten å ha spurt."""
+    def test_mannskap_er_en_ekte_fane(self):
+        """Den var en lenke ut til /vaktliste/registre/, og et klikk kostet
+        deg plassen i planleggingen — mens mannskap og ressurser er nettopp de
+        to man veksler mellom (30. aug. 2026)."""
         ut = self._faner()
-        self.assertIn('href="/vaktliste/registre/"', ut)
-        self.assertIn('box-arrow-up-right', ut)
+        self.assertIn('data-action="visFane" data-arg="mannskap"', ut)
+        self.assertNotIn('/vaktliste/registre/', ut,
+                         'registersiden finnes ikke lenger')
+
+    def test_mannskapsfanen_staar_ogsaa_uten_vaktliste(self):
+        """Korps må inn før mannskap, og mannskap før noen kan settes på
+        vakt. Var fanen borte til den første vaktlista fantes, sto man fast
+        på skritt én."""
+        ut = run_node(self.harness, self.VINDU + """
+            globalThis.aktivListe = null;
+            globalThis.register = {mannskap: [{id: 1}, {id: 2}]};
+            const el = {innerHTML: ''};
+            globalThis.document = {getElementById: () => el};
+            tegnFaner();
+            console.log(el.innerHTML);
+        """)
+        self.assertIn('data-arg="mannskap"', ut)
+        self.assertNotIn('Oversikt', ut, 'det finnes ingen liste å vise')
+        self.assertIn('>2<', ut, 'antallet er registerets, ikke vaktas')
 
     def test_gruppepanelet_viser_alle_ressursene_i_gruppa(self):
         ut = run_node(self.harness, self.VINDU + self.LISTE + """
@@ -1953,3 +1992,168 @@ class NyRessursSkjemaetTests(SimpleTestCase):
           assert(/navn/i.test(globalThis.feilmelding || ''),
                  'brukeren fikk ingen forklaring: ' + globalThis.feilmelding);
         """)
+
+
+class MannskapsfanenTests(SimpleTestCase):
+    """Registeret er en fane på planleggingssiden (30. aug. 2026).
+
+    Det lå på /vaktliste/registre/, og et klikk dit kostet deg plassen i
+    planleggingen — mens mannskap og ressurser er nettopp de to man veksler
+    mellom. Testene her dekker veiene *inn*: fanen, den tomme tilstanden, og
+    vinduet som må åpne seg før den første vaktlista finnes.
+    """
+
+    HARNESS = (
+        (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue')),
+        (VAKTLISTE_JS, ('mkMannskap', '_personKolonne', '_passerPersonsok',
+                        '_sorterMannskap', 'kanRedigerePerson', 'tegnPanel',
+                        'apneVakt', '_apneModal', '_skjulFeil', '_nivaa',
+                        'visFane',
+                        '_erAdmin', 'kanSkriveAlt', 'kanSkriveNoe',
+                        'kanLede')),
+    )
+    VINDU = ("globalThis.window = { MODUL_TILGANG: { admin: true } };\n"
+             "globalThis.MANNSKAP = 'mannskap';\n"
+             "globalThis.OVERSIKT = 'oversikt';\n"
+             "globalThis.IKKE_PLASSERT = 'ikke-plassert';\n")
+
+    def setUp(self):
+        if not node_available():
+            self.skipTest('node er ikke tilgjengelig')
+        self.harness = build_harness(self.HARNESS)
+
+    KARI = ("{id: 1, navn: 'Kari', korps_id: 1, korps_navn: 'Haugesund', "
+            "korps_kort: 'HGSD', kompetanser: [], alle_kompetanser: [], "
+            "telefon: '', brukernavn: '', er_aktiv: true, i_bruk: 0}")
+
+    def _mannskap(self, register):
+        return run_node(self.harness, self.VINDU + f"""
+            globalThis.personsok = '';
+            globalThis.personSortKol = 'korps';
+            globalThis.personSortStigende = true;
+            globalThis.document = {{ getElementById: () => null }};
+            globalThis.register = {register};
+            console.log(mkMannskap());
+        """)
+
+    def test_uten_korps_peker_knappen_paa_korps(self):
+        """Korpset er badgen, og uten ett kan ingen person opprettes. En
+        «Nytt mannskap»-knapp som i stedet åpner korpsvinduet er en knapp man
+        klikker på én gang og aldri stoler på igjen."""
+        ut = self._mannskap("{korps: [], mannskap: []}")
+        self.assertIn('data-action="apneVerdier" data-arg="korps"', ut)
+        self.assertNotIn('apneNyPerson', ut)
+        self.assertIn('Ingen korps', ut)
+
+    def test_med_korps_men_uten_folk_ber_om_folk(self):
+        ut = self._mannskap("{korps: [{id: 1, navn: 'HGSD'}], mannskap: []}")
+        self.assertIn('apneNyPerson', ut)
+        self.assertNotIn('data-arg="korps"', ut)
+
+    def test_registeret_som_ikke_er_hentet_enda_sier_fra(self):
+        """Fanen tegnes før svaret er inne. Uten dette kastet byggeren på
+        `register.mannskap` og panelet ble stående tomt uten forklaring."""
+        ut = run_node(self.harness, self.VINDU + """
+            globalThis.register = null;
+            console.log(mkMannskap());
+        """)
+        self.assertIn('Henter', ut)
+
+    def test_soekefeltet_vises_bare_i_mannskapsfanen(self):
+        """Det ligger utenfor panelet (ellers mister det fokus ved hvert
+        tastetrykk), så det er `tegnPanel()` som må skjule det."""
+        ut = run_node(self.harness, self.VINDU + """
+            globalThis.register = null;
+            globalThis.aktivListe = null;
+            const felter = {
+              'vl-verktoy': {klasser: [], classList: {
+                toggle(k, paa) { felter['vl-verktoy'].klasser.push(paa); }}},
+              'vl-panel': {innerHTML: ''},
+            };
+            globalThis.document = { getElementById: (id) => felter[id] || null };
+
+            globalThis.aktivFane = 'mannskap';
+            tegnPanel();
+            globalThis.aktivFane = 'oversikt';
+            tegnPanel();
+            console.log(JSON.stringify(felter['vl-verktoy'].klasser));
+        """)
+        self.assertIn('[false,true]', ut,
+                      'skjult i mannskapsfanen, eller synlig i de andre')
+
+    def test_fanen_henter_registeret_forste_gang(self):
+        """M14: uten hentingen står fanen på «Henter registeret…» for alltid.
+        Den er lat med vilje — registeret er globalt og koster ingenting å
+        utsette til noen faktisk ber om det."""
+        ut = run_node(self.harness, self.VINDU + """
+            globalThis.register = null;
+            globalThis.aktivListe = null;
+            globalThis.aktivFane = 'oversikt';
+            let hentet = 0;
+            globalThis.lastRegister = () => { hentet += 1; };
+            globalThis.tegnFaner = () => {};
+            // `tegnPanel` er den ekte i dette harnesset og tegner seg tom mot
+            // en DOM som ikke finnes.
+            globalThis.document = { getElementById: () => null };
+            globalThis.register = null;
+            globalThis.personsok = '';
+            globalThis.personSortKol = 'korps';
+            globalThis.personSortStigende = true;
+
+            visFane('mannskap');
+            assert(hentet === 1, 'registeret ble ikke hentet: ' + hentet);
+
+            globalThis.register = {korps: [], mannskap: []};
+            visFane('mannskap');
+            assert(hentet === 1, 'hentet paa nytt selv om det alt laa der');
+        """)
+        self.assertIn('OK', ut)
+
+    def test_mannskapsfanen_tegnes_uten_vaktliste(self):
+        """M15: sto sjekken på `aktivListe` først, var panelet tomt til den
+        første vaktlista fantes — altså akkurat når man skal legge inn folk."""
+        ut = run_node(self.harness, self.VINDU + """
+            globalThis.aktivListe = null;
+            globalThis.aktivFane = 'mannskap';
+            globalThis.register = {korps: [{id: 1, navn: 'HGSD'}],
+                                   mannskap: []};
+            globalThis.personsok = '';
+            globalThis.personSortKol = 'korps';
+            globalThis.personSortStigende = true;
+            const felter = {'vl-panel': {innerHTML: ''}};
+            globalThis.document = { getElementById: (id) => felter[id] || null };
+            tegnPanel();
+            console.log(felter['vl-panel'].innerHTML);
+        """)
+        self.assertIn('apneNyPerson', ut,
+                      'panelet sto tomt uten vaktliste')
+
+    def test_innstillinger_apner_uten_vaktliste(self):
+        """Korps og kompetanser bor i vinduet, og de er nettopp det man
+        legger inn før den første vaktlista finnes. Sto vinduet stengt til
+        da, var registrene uten vei inn."""
+        ut = run_node(self.harness, self.VINDU + """
+            globalThis.aktivListe = null;
+            const felter = {
+              'vakt-for-lista': {skjult: null, classList: {
+                toggle(k, paa) { felter['vakt-for-lista'].skjult = paa; }}},
+              'vakt-lengde-bolk': {skjult: null, classList: {
+                add() { felter['vakt-lengde-bolk'].skjult = true; },
+                toggle(k, paa) { felter['vakt-lengde-bolk'].skjult = paa; }}},
+              'vakt-tittel': {textContent: ''},
+              'vaktModal': {},
+            };
+            globalThis.document = { getElementById: (id) => felter[id] || null };
+            let apnet = false;
+            globalThis.bootstrap = {Modal: class { constructor() { apnet = true; }
+                                                  show() {} }};
+            apneVakt();
+            assert(apnet === true, 'vinduet aapnet seg ikke uten vaktliste');
+            assert(felter['vakt-for-lista'].skjult === true,
+                   'vaktbolken ble staaende med tomme felter');
+            assert(felter['vakt-lengde-bolk'].skjult === true,
+                   'vaktas lengde uten en vakt aa sette den paa');
+            assert(felter['vakt-tittel'].textContent === 'Innstillinger',
+                   'tittelen sto igjen med forrige vakts navn');
+        """)
+        self.assertIn('OK', ut)

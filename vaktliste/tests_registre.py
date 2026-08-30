@@ -89,15 +89,29 @@ class RegisterFlateFinnesTests(TestCase):
         self.assertEqual(satt.status_code, 201)
         self.assertEqual(satt.json()['data']['navn'], 'Kari Nordmann')
 
-    def test_siden_svarer_og_laster_sin_egen_js(self):
-        res = self.c.get('/vaktliste/registre/')
-        self.assertEqual(res.status_code, 200)
-        self.assertContains(res, 'js/vaktliste-registre')
-        self.assertNotContains(res, 'patients-utils')
+    def test_registersiden_er_lagt_ned(self):
+        """Flata flyttet inn i planleggingssiden 30. aug. 2026. Blir ruta
+        stående, svarer den med en mal som ikke finnes."""
+        self.assertEqual(self.c.get('/vaktliste/registre/').status_code, 404)
 
-    def test_planleggingssiden_lenker_hit(self):
-        """Et register uten vei inn er et register som ikke finnes."""
-        self.assertContains(self.c.get('/vaktliste/'), '/vaktliste/registre/')
+    def test_mannskapsfanen_er_veien_inn(self):
+        """Et register uten vei inn er et register som ikke finnes.
+
+        Veien er nå fanen på planleggingssiden, ikke en lenke ut av den:
+        `visFane('mannskap')` og skjemaet den åpner må stå i malen.
+        """
+        res = self.c.get('/vaktliste/')
+        self.assertContains(res, 'js/vaktliste')
+        self.assertNotContains(res, 'patients-utils')
+        self.assertContains(res, 'id="personModal"')
+        self.assertContains(res, 'id="vl-sok"')
+
+    def test_korps_og_kompetanser_ligger_i_innstillinger(self):
+        """De røres sjelden og er portalens oppsett, ikke denne vaktas."""
+        res = self.c.get('/vaktliste/')
+        self.assertContains(res, 'data-action="apneVerdier" data-arg="korps"')
+        self.assertContains(
+            res, 'data-action="apneVerdier" data-arg="kompetanser"')
 
 
 @override_settings(SECURE_SSL_REDIRECT=False, RATELIMIT_ENABLE=False)

@@ -103,20 +103,22 @@ class TilgangsBasis(TestCase):
 
 
 class SidetilgangTests(TilgangsBasis):
-    """`les` slipper inn på begge sidene. Fase 2 slapp bare admin inn."""
+    """`les` slipper inn på sida. Fase 2 slapp bare admin inn.
 
-    def test_alle_med_nivaa_naar_begge_sidene(self):
+    Det var to sider til 30. aug. 2026; registersiden ble lagt ned da
+    mannskapet flyttet inn i fanerekka. Testen for at den er borte står i
+    `RegistersidenErLagtNedTests`.
+    """
+
+    def test_alle_med_nivaa_naar_sida(self):
         for navn, c in (('les', self.c_leser), ('skriv_handling', self.c_kb),
                         ('skriv_full', self.c_vl), ('admin', self.c_adm)):
-            for sti in ('/vaktliste/', '/vaktliste/registre/'):
-                with self.subTest(konto=navn, sti=sti):
-                    self.assertEqual(c.get(sti).status_code, 200)
+            with self.subTest(konto=navn):
+                self.assertEqual(c.get('/vaktliste/').status_code, 200)
 
-    def test_uten_rad_er_begge_stengt(self):
+    def test_uten_rad_er_sida_stengt(self):
         c = _klient(_bruker('utenfor'))
-        for sti in ('/vaktliste/', '/vaktliste/registre/'):
-            with self.subTest(sti=sti):
-                self.assertEqual(c.get(sti).status_code, 403)
+        self.assertEqual(c.get('/vaktliste/').status_code, 403)
 
     def test_siden_sender_nivaa_og_badge_til_nettleseren(self):
         """Grensesnittet gater på `window.MODUL_TILGANG`, ikke på rollen —
@@ -547,17 +549,17 @@ class GrensesnittetsGatingTests(SimpleTestCase):
 
     def setUp(self):
         from patients.js_test_utils import (
-            VAKTLISTE_JS, VAKTLISTE_REGISTRE_JS, build_harness, node_available)
+            VAKTLISTE_JS, build_harness, node_available)
         if not node_available():
             self.skipTest('node er ikke tilgjengelig')
         self.h_plan = build_harness((
             (VAKTLISTE_JS, ('_nivaa', '_erAdmin', 'kanSkriveAlt', 'kanLede',
-                            'kanSkriveNoe', 'kanBemanne')),
+                            'kanSkriveNoe', 'kanBemanne',
+                            'kanRedigerePerson')),
         ))
-        self.h_reg = build_harness((
-            (VAKTLISTE_REGISTRE_JS, ('_nivaa', 'kanSkriveAlt',
-                                     'kanRedigerePerson')),
-        ))
+        # Registeret er samme fil fra 30. aug. 2026 — mannskapsfanen flyttet
+        # inn i planleggingssiden, og med den badge-regelen for personer.
+        self.h_reg = self.h_plan
 
     @staticmethod
     def _vindu(nivaa='', *, admin=False, korps='null'):

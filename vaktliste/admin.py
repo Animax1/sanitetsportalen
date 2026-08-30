@@ -6,7 +6,8 @@ er på (S1 — den omgår rate-limiting, kontosperre, MFA-tvang og `LoginEvent`)
 I produksjon fantes det dermed ingen vei til å opprette et korps eller et
 mannskap i det hele tatt.
 
-Portalens flate er `/vaktliste/registre/`, bygget i `views_registre.py`. Denne
+Portalens flate er mannskapsfanen på `/vaktliste/`, med endepunktene i
+`views_registre.py`. Denne
 fila blir stående fordi den er nyttig lokalt — men et register som *bare*
 finnes her, finnes ikke for brukeren.
 """

@@ -4,6 +4,43 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-08-30 — Mannskapet flytter inn i planleggingen
+
+**1787 tester grønne** (7 nye, og en håndfull skrevet om). Registersiden
+`/vaktliste/registre/` er **lagt ned**; mannskapet er en fane på `/vaktliste/`,
+korps og kompetanser ligger i «Innstillinger».
+
+Argumentet for en egen side holdt ikke i bruk: registrene er globale og fanene
+gjelder én vakt, men et klikk til registeret kostet deg plassen i
+planleggingen — og mannskap og ressurser er nettopp de to man veksler mellom.
+
+- **«Mannskap» er en ekte fane**, ikke en lenke med pil ut av sida. Fanen bærer
+  antallet i registeret, tabellen har søk og sortering som før, og skjemaet er
+  det samme.
+- **Fanen står også når det ikke finnes noen vaktliste**, og velges automatisk
+  da. Korps må inn før mannskap, og mannskap før noen kan settes på vakt — lå
+  registeret bak en vaktliste, sto man fast på skritt én. Av samme grunn åpner
+  «Innstillinger» seg uten en liste; bolkene som gjelder én vakt skjules.
+- **Korps og kompetanser ligger i «Innstillinger»**, sammen med
+  ressursgruppene. De røres sjelden, og de er portalens oppsett — ikke denne
+  vaktas. Lista og skjemaet står i **samme vindu**: vinduet åpnes selv fra
+  «Innstillinger», og et tredje lag er ett lag man ikke finner tilbake fra.
+- **Tomt register uten korps sier «Legg inn korps»**, ikke «Nytt mannskap».
+  Knappen åpnet korpsvinduet uansett — en knapp som gjør noe annet enn det den
+  heter, klikker man på én gang og stoler aldri på igjen.
+- **En lagret person henter både registeret og vaktlista.** Navn, korps og
+  aktiv-flagget står i nedtrekkene på planleggingssiden også; uten begge
+  bemannet man fra en liste som var utdatert.
+- `vaktliste-registre.js` og `registre.html` er **slettet**, ikke bare koblet
+  fra. En fil ingen laster er en fil som råtner uten at noe feiler — en test
+  krever nå at de er borte.
+
+Verifisert i nettleseren hele veien: tom portal → korps → kompetanse →
+mannskap → fanen ved siden av «Ambulanse», med nedtrekket i planleggingen
+oppdatert av lagringen.
+
+---
+
 ## 2026-08-30 — Ny ressurs spør bare om det man vet
 
 **1777 tester grønne** (18 nye). Niende runde fra Andrés bruk, og tre punkter

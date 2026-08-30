@@ -14,9 +14,11 @@ from . import views, views_registre
 urlpatterns = [
     path('', views.index_view, name='vaktliste_index'),
 
-    # Registersiden. Egen side, ikke en fane på planleggingssiden: registrene
-    # er globale, fanene der er ressursene i én vakt.
-    path('registre/', views_registre.registre_view, name='vaktliste_registre'),
+    # **Registersiden er lagt ned (30. aug. 2026).** Mannskapet er en fane på
+    # planleggingssiden, korps og kompetanser ligger i «Innstillinger». Et
+    # klikk ut av planleggingen kostet plassen man sto på, og mannskap og
+    # ressurser er nettopp de to man veksler mellom. Endepunktene under
+    # `api/` står igjen — det var bare flata som flyttet.
 
     # Vaktlistene. POST her planlegger en ny vakt — den lager både
     # `core.Vakt` og lista, og rører ikke portalens aktive vakt.

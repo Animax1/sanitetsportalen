@@ -898,6 +898,13 @@ Gjennomgang 13. aug. 2026, med 1000 pasienter og peak 100 brukere som premiss.
             Innstillinger flyttet til vaktlinja ved «Ny vaktliste», Mannskap
             inn i fanerekka etter «Oversikt» — som lenke med pil, siden den
             forlater sida.
+      - [x] **Mannskapet flytter inn i planleggingen (30. aug. 2026).**
+            Registersiden `/vaktliste/registre/` lagt ned: mannskapet er en
+            fane på `/vaktliste/`, korps og kompetanser ligger i
+            «Innstillinger» sammen med ressursgruppene. Fanen og vinduet står
+            også uten vaktliste — korps må inn før mannskap, og mannskap før
+            noen kan settes på vakt. `vaktliste-registre.js` og
+            `registre.html` slettet.
       - [x] **«Ny ressurs» spør bare om navn og gruppe (30. aug. 2026).**
             Niende runde. Reservert korps og enhetskobling ute av
             opprettelsesskjemaet — de hører til den enkelte enheten, og settes

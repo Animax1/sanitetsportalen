@@ -15,10 +15,12 @@ planleggingssiden hadde en nedtrekksliste som aldri kunne fylles.
 `admin.py` blir stående som utviklerverktøy lokalt. Den er ikke flaten
 portalen bruker.
 
-**Egen side, ikke en fane på planleggingssiden.** Registrene er *globale* —
-personellet organisasjonen har — mens fanene på `/vaktliste/` er ressursene i
-*én* vakt. To ulike omfang i samme faneliste ville sagt at «Mannskap» er noe
-som hører til oktobervakta.
+**Flata ligger på `/vaktliste/`, ikke her** (30. aug. 2026). Registersiden var
+en egen side, med det argumentet at registrene er *globale* mens fanene på
+planleggingssiden er ressursene i *én* vakt. Argumentet holdt ikke i bruk: et
+klikk til registeret kostet plassen man sto på i planleggingen, og mannskap og
+ressurser er nettopp de to man veksler mellom. Mannskapet er nå en fane der,
+korps og kompetanser ligger i «Innstillinger». Endepunktene her står uendret.
 
 **Mannskapslista er ikke et admin-skjermbilde, den er bestillingen.** Første
 setning i det André ba om var «lister opp personell overordnet sortert etter
@@ -38,7 +40,6 @@ from __future__ import annotations
 from django.db import IntegrityError, transaction
 from django.db.models.deletion import ProtectedError
 from django.http import JsonResponse
-from django.shortcuts import render
 from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_http_methods
 
@@ -48,7 +49,7 @@ from core.ratelimit import rate_limit
 from .models import (Kompetanse, Korps, Mannskap, Ressursgruppe,
                      Ressursrolle)
 from . import services
-from .views import _feil, _int, _json_body, _nektet, _tilgangskontekst
+from .views import _feil, _int, _json_body, _nektet
 
 
 def _ider(raa):
@@ -63,18 +64,10 @@ def _ider(raa):
     return [i for i in (_int(v) for v in raa) if i is not None]
 
 
-# ── Siden ────────────────────────────────────────────────────────────────────
-
-@modul_kreves('vaktliste', 'les')
-@require_http_methods(['GET'])
-def registre_view(request):
-    """Mannskaps- og registersiden.
-
-    `les` slipper inn — hele registeret, alle korps. Hva kontoen får *endre*
-    avgjøres per rad, både her og på serveren.
-    """
-    return render(request, 'vaktliste/registre.html',
-                  _tilgangskontekst(request.user))
+# **Registersiden er lagt ned (30. aug. 2026).** Mannskapet er en fane på
+# planleggingssiden, korps og kompetanser ligger i «Innstillinger» — se
+# `vaktliste/urls.py`. Endepunktene under står igjen uendret; det var bare
+# flata som flyttet.
 
 
 # ── De tre verdimengdene ─────────────────────────────────────────────────────
