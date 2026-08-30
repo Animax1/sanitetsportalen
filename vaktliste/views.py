@@ -395,6 +395,7 @@ def _gruppe_til_dict(g):
         'navn': g.navn,
         'ikon': g.ikon,
         'rekkefolge': g.rekkefolge,
+        'flere_enheter': g.flere_enheter,
         'er_aktiv': g.er_aktiv,
         'i_bruk': g.ressurser.count(),
     }
@@ -431,6 +432,9 @@ def grupper_view(request):
         with transaction.atomic():
             gruppe = Ressursgruppe.objects.create(
                 navn=navn, ikon=ikon,
+                # Standard er en flåte. En gruppe som finnes i ett eksemplar
+                # er unntaket, og skal oppgis eksplisitt.
+                flere_enheter=bool(data.get('flere_enheter', True)),
                 rekkefolge=(_int(data.get('rekkefolge'))
                             or services.neste_grupperekkefolge()))
     except IntegrityError:
@@ -471,6 +475,8 @@ def gruppe_detalj_view(request, pk):
         gruppe.navn = navn
     if 'ikon' in data:
         gruppe.ikon = (data.get('ikon') or '').strip() or 'box'
+    if 'flere_enheter' in data:
+        gruppe.flere_enheter = bool(data['flere_enheter'])
     if 'er_aktiv' in data:
         gruppe.er_aktiv = bool(data['er_aktiv'])
     if 'rekkefolge' in data:
@@ -532,15 +538,26 @@ def ressurser_view(request, pk):
         return _feil('Ressursen må ha et navn.')
 
     gruppe_id = _int(data.get('gruppe_id'))
-    if not gruppe_id or not Ressursgruppe.objects.filter(pk=gruppe_id).exists():
+    gruppe = Ressursgruppe.objects.filter(pk=gruppe_id).first()
+    if not gruppe:
         return _feil('Ressursen må høre til en gruppe.')
+
+    # **Noen grupper finnes i ett eksemplar.** Samleplassen og KO er
+    # samlingspunkt for flere korps, ikke flåter — «Samleplass 2» er ikke en
+    # ny samleplass, det er en delt vaktliste ingen leser riktig. Knappen er
+    # borte i grensesnittet, men en regel som bare finnes der er ingen regel:
+    # nedtrekket i «Ny ressurs» og et bart POST når begge hit.
+    if not gruppe.flere_enheter and Ressurs.objects.filter(
+            vaktliste=vl, gruppe=gruppe).exists():
+        return _feil(f'«{gruppe.navn}» finnes i ett eksemplar, og står '
+                     f'allerede på denne vaktlista.')
 
     try:
         with transaction.atomic():
             ressurs = Ressurs.objects.create(
                 vaktliste=vl,
                 navn=navn,
-                gruppe_id=gruppe_id,
+                gruppe=gruppe,
                 korps_id=_int(data.get('korps_id')),
                 enhet_id=_int(data.get('enhet_id')),
                 rekkefolge=(_int(data.get('rekkefolge'))

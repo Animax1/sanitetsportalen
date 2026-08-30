@@ -4,6 +4,47 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-08-30 — Ny ressurs spør bare om det man vet
+
+**1777 tester grønne** (18 nye). Niende runde fra Andrés bruk, og tre punkter
+som alle handler om det samme: skjemaet skal ikke be om svar man ikke har ennå,
+og knappen skal ikke tilby noe som ikke finnes.
+
+- **«Ny ressurs» spør bare om navn og gruppe.** Reservert korps og enhet i
+  oppdragsmodulen sto i opprettelsesskjemaet, men hører hjemme ett nivå lavere
+  etter at reservasjonen flyttet til plassen: koblingen settes på den enkelte
+  bilen, i «Rediger». Å spørre om dem ved opprettelsen ga et skjema man måtte
+  fylle ut før man visste svaret — og det leste som om gruppa *var* enheten.
+- **Ingenting opprettes i oppdragsmodulen på veien.** André mistenkte at en ny
+  gruppe også lagde en enhet. Verifisert i nettleseren at den ikke gjør det:
+  `grupper: 6 → 7`, `ressurser: 0`, `enheter: 0`. Det som *så* slik ut var
+  skjemaet over, som ba om en enhet man ikke hadde.
+- **Samleplass og KO finnes i ett eksemplar.** Nytt felt
+  `Ressursgruppe.flere_enheter` (migrasjon `0009`), av for de to gruppene
+  migrasjon `0007` seeder som samlingspunkt for flere korps. «Samleplass 2» er
+  ikke en ny samleplass, det er en delt vaktliste ingen leser riktig. Den
+  *første* må man fortsatt kunne opprette, så plassen tar slutt først når den
+  ene står der. Nye grupper er flåter som standard — huket av i
+  gruppevinduet gjør dem til ett eksemplar.
+  - Regelen står som **én funksjon** (`gruppaHarPlass()`) fordi den har to
+    lesere: knappen inne i fanen og nedtrekket i «Ny ressurs». Første runde
+    skjulte bare knappen — og da kunne man fortsatt velge gruppa i nedtrekket,
+    altså en regel som var halvveis. Serveren avviser den også: en regel som
+    bare finnes i klienten er ingen regel.
+  - Sperren er **per vaktliste**. Var den global, kunne neste vakt ikke hatt
+    samleplass i det hele tatt.
+- **Migrasjon `0009` har dataskrittet sist**, etter `AddField`. Da er det ingen
+  skjemaendring igjen som triggerkøen kan avvise — motsatt av `0007`, som måtte
+  tømme køen. Kjørt fra bunnen mot ekte PostgreSQL, og
+  `verifiser_migrasjoner` går grønt.
+
+**Lærdom:** en test som går grønt kan likevel teste en vei brukeren ikke har.
+Første utgave av «den første enheten kan alltid opprettes» leste `mkGruppe()` —
+men en tom gruppe har ingen fane, så den koden tegnes aldri. Veien inn til den
+første går gjennom nedtrekket, og det var det som måtte testes.
+
+---
+
 ## 2026-08-30 — Bil A, bil B, bil C: veien inn var usynlig
 
 **1759 tester grønne** (11 nye). Bare grensesnitt — men det som manglet var det

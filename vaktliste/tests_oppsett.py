@@ -27,8 +27,8 @@ from oppdrag.models import Enhet
 from patients.models import AppSetting
 
 from . import choices, services
-from .test_helpers import (KO, LAG, MANNSKAPSBIL, gruppe, lag_ressurs,
-                          lag_rolle)
+from .test_helpers import (KO, LAG, MANNSKAPSBIL, SAMLEPLASS, gruppe,
+                           lag_ressurs, lag_rolle)
 from .models import (Korps, Mannskap, Ressurs, Ressursrolle, Vaktliste,
                      Vaktpost)
 
@@ -490,6 +490,78 @@ class ApiTests(TestCase):
             self.c.get('/vaktliste/api/vaktlister/9999/').status_code, 404)
 
     # ── Ressurser ────────────────────────────────────────────────────────
+    def test_gruppa_kan_finnes_i_ett_eksemplar(self):
+        """Samleplassen og KO er samlingspunkt for flere korps, ikke flåter.
+        Migrasjon 0009 setter flagget for de to."""
+        from .models import Ressursgruppe
+        self.assertFalse(Ressursgruppe.objects.get(navn='Samleplass').flere_enheter)
+        self.assertFalse(Ressursgruppe.objects.get(navn='KO').flere_enheter)
+        for navn in ('Ambulanse', 'Mannskapsbil', 'Lag', 'Annet'):
+            with self.subTest(gruppe=navn):
+                self.assertTrue(
+                    Ressursgruppe.objects.get(navn=navn).flere_enheter,
+                    'flåter beholder muligheten til å legge til flere')
+
+    def test_ny_gruppe_er_en_flaate_som_standard(self):
+        res = self.c.post('/vaktliste/api/grupper/',
+                          data={'navn': 'MC-patrulje'},
+                          content_type='application/json')
+        self.assertTrue(res.json()['data']['flere_enheter'])
+
+    def test_ny_gruppe_kan_settes_til_ett_eksemplar(self):
+        res = self.c.post('/vaktliste/api/grupper/',
+                          data={'navn': 'Innsatsleder', 'flere_enheter': False},
+                          content_type='application/json')
+        self.assertFalse(res.json()['data']['flere_enheter'])
+
+    def test_enkeltgruppa_tar_imot_den_forste(self):
+        """Uten dette var en enkeltgruppe en blindvei."""
+        vl = self._liste()
+        res = self.c.post(
+            f'/vaktliste/api/vaktlister/{vl.pk}/ressurser/',
+            data={'navn': 'Samleplass', 'gruppe_id': gruppe(SAMLEPLASS).pk},
+            content_type='application/json')
+        self.assertEqual(201, res.status_code, res.content)
+
+    def test_enkeltgruppa_nekter_nummer_to(self):
+        """Regelen står i grensesnittet — knappen er borte, gruppa er ute av
+        nedtrekket — men et bart POST når hit, og en regel som bare finnes i
+        klienten er ingen regel."""
+        vl = self._liste()
+        lag_ressurs(vaktliste=vl, navn='Samleplass',
+                    gruppe=gruppe(SAMLEPLASS))
+        res = self.c.post(
+            f'/vaktliste/api/vaktlister/{vl.pk}/ressurser/',
+            data={'navn': 'Samleplass 2', 'gruppe_id': gruppe(SAMLEPLASS).pk},
+            content_type='application/json')
+        self.assertEqual(400, res.status_code)
+        self.assertIn('ett eksemplar', res.json()['message'])
+        self.assertEqual(1, Ressurs.objects.filter(vaktliste=vl).count())
+
+    def test_flaaten_tar_imot_bil_b(self):
+        """Speilet av forrige: «Ambulanse» rommer bil A, bil B og bil C."""
+        vl = self._liste()
+        lag_ressurs(vaktliste=vl, navn='Bil A',
+                    gruppe=gruppe(MANNSKAPSBIL))
+        res = self.c.post(
+            f'/vaktliste/api/vaktlister/{vl.pk}/ressurser/',
+            data={'navn': 'Bil B', 'gruppe_id': gruppe(MANNSKAPSBIL).pk},
+            content_type='application/json')
+        self.assertEqual(201, res.status_code, res.content)
+
+    def test_enkeltgruppa_sperrer_bare_sin_egen_vaktliste(self):
+        """Sperren er per vaktliste. Er den global, kan neste vakt ikke ha
+        samleplass i det hele tatt."""
+        forrige = self._liste()
+        lag_ressurs(vaktliste=forrige, navn='Samleplass',
+                    gruppe=gruppe(SAMLEPLASS))
+        ny = self._liste(navn='Neste vakt')
+        res = self.c.post(
+            f'/vaktliste/api/vaktlister/{ny.pk}/ressurser/',
+            data={'navn': 'Samleplass', 'gruppe_id': gruppe(SAMLEPLASS).pk},
+            content_type='application/json')
+        self.assertEqual(201, res.status_code, res.content)
+
     def test_ressurs_opprettes_med_reservasjon(self):
         vl = self._liste()
         res = self.c.post(

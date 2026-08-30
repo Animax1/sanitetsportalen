@@ -1468,7 +1468,7 @@ class FanenErGruppaTests(SimpleTestCase):
                         '_posterFor', '_ikkePlassert', '_ressurserIGruppe',
                         '_grupperMedRessurser', '_d', '_kl', '_dag',
                         '_nivaa', '_erAdmin', 'kanSkriveAlt', 'kanLede',
-                        'kanBemanne')),
+                        'kanBemanne', 'gruppaHarPlass')),
     )
     VINDU = ("globalThis.window = { MODUL_TILGANG: { admin: true } };\n"
              "globalThis.DAGER = ['søn','man','tir','ons','tor','fre','lør'];\n"
@@ -1733,3 +1733,223 @@ class UtskriftslistaTests(SimpleTestCase):
     def test_arkhodet_teller_ledige_plasser(self):
         """Tallet man planlegger etter, øverst på arket."""
         self.assertIn('3 ledige plasser', self._ut())
+
+
+class EnkeltgruppeTests(SimpleTestCase):
+    """Noen grupper finnes i ett eksemplar.
+
+    Andrés poeng 30. aug. 2026: samleplassen og KO er samlingspunkt for flere
+    korps, ikke flåter. En «Ny samleplass»-knapp inviterer til å lage noe som
+    ikke finnes.
+    """
+
+    HARNESS = (
+        (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue')),
+        (VAKTLISTE_JS, ('mkGruppe', 'mkRessurs', '_rolleValg', '_plassKorps',
+                        '_skiftrekkefolge', '_fyllValgFor', '_varighet',
+                        'mkGruppekurve', '_posterIGruppe', '_mkEnKurve',
+                        '_tegnforklaring', '_timesteg', '_toppunkt',
+                        '_vaktensSpenn', '_bemanningPerTime', 'rollerForGruppe',
+                        '_iso16', '_posterFor', '_ressurserIGruppe',
+                        '_grupperMedRessurser', '_d', '_kl', '_dag',
+                        '_nivaa', '_erAdmin', 'kanSkriveAlt', 'kanLede',
+                        'kanBemanne', 'gruppaHarPlass')),
+    )
+    VINDU = ("globalThis.window = { MODUL_TILGANG: { admin: true } };\n"
+             "globalThis.DAGER = ['søn','man','tir','ons','tor','fre','lør'];\n"
+             "globalThis.MND = ['jan','feb','mar','apr','mai','jun',"
+             "'jul','aug','sep','okt','nov','des'];\n")
+    LISTE = """
+        globalThis.aktivListe = {
+          vaktliste: {startet: '2026-10-03T08:00:00',
+                      planlagt_slutt: '2026-10-03T12:00:00'},
+          grupper: [{id: 1, navn: 'Samleplass', ikon: 'hospital',
+                     flere_enheter: false},
+                    {id: 2, navn: 'Ambulanse', ikon: 'truck',
+                     flere_enheter: true}],
+          ressurser: [], roller: [], mannskap: [], korps: [], vaktposter: []};
+    """
+
+    def setUp(self):
+        if not node_available():
+            self.skipTest('node er ikke tilgjengelig')
+        self.harness = build_harness(self.HARNESS)
+
+    def _gruppe(self, gruppe, ressurser=''):
+        import json
+        return run_node(self.harness, self.VINDU + self.LISTE + f"""
+            globalThis.aktivListe.ressurser = {ressurser or '[]'};
+            console.log(mkGruppe({json.dumps(gruppe)}));
+        """)
+
+    RESSURS = ("[{id: 10, navn: 'Samleplass', gruppe_id: 1, "
+               "gruppe_navn: 'Samleplass', ikon: 'hospital', korps_navn: '', "
+               "enhet_navn: ''}]")
+
+    def _harPlass(self, gruppe, ressurser=''):
+        import json
+        return run_node(self.harness, self.VINDU + self.LISTE + f"""
+            globalThis.aktivListe.ressurser = {ressurser or '[]'};
+            console.log(gruppaHarPlass({json.dumps(gruppe)}) ? 'JA' : 'NEI');
+        """).splitlines()[0]
+
+    def test_den_forste_enheten_kan_alltid_opprettes(self):
+        """Uten dette ville en tom enkeltgruppe vært en blindvei.
+
+        Fanen finnes ikke før gruppa har en ressurs, så veien inn til den
+        første går gjennom nedtrekket i «Ny ressurs» — og det er
+        `gruppaHarPlass()` som avgjør om gruppa står der.
+        """
+        self.assertEqual('JA', self._harPlass(
+            {'id': 1, 'navn': 'Samleplass', 'flere_enheter': False}))
+
+    def test_enkeltgruppa_forsvinner_fra_nedtrekket(self):
+        """Skjulte vi bare knappen i fanen, kunne man fortsatt velge gruppa
+        i nedtrekket — og da var regelen halvveis."""
+        self.assertEqual('NEI', self._harPlass(
+            {'id': 1, 'navn': 'Samleplass', 'flere_enheter': False},
+            self.RESSURS))
+
+    def test_flaaten_blir_staaende_i_nedtrekket(self):
+        ressurs = ("[{id: 20, navn: 'Bil A', gruppe_id: 2, "
+                   "gruppe_navn: 'Ambulanse', ikon: 'truck', korps_navn: '', "
+                   "enhet_navn: ''}]")
+        self.assertEqual('JA', self._harPlass(
+            {'id': 2, 'navn': 'Ambulanse', 'flere_enheter': True}, ressurs))
+
+    def test_knappen_forsvinner_naar_den_ene_staar_der(self):
+        ut = self._gruppe({'id': 1, 'navn': 'Samleplass', 'ikon': 'hospital',
+                           'flere_enheter': False}, self.RESSURS)
+        self.assertIn('Samleplass', ut, 'enheten vises fortsatt')
+        self.assertNotIn('Ny Samleplass', ut)
+
+    def test_flaater_beholder_knappen(self):
+        """«Ambulanse» rommer bil A, bil B og bil C — der gir knappen mening
+        uansett hvor mange som alt står der."""
+        ressurs = ("[{id: 20, navn: 'Bil A', gruppe_id: 2, "
+                   "gruppe_navn: 'Ambulanse', ikon: 'truck', korps_navn: '', "
+                   "enhet_navn: ''}]")
+        ut = self._gruppe({'id': 2, 'navn': 'Ambulanse', 'ikon': 'truck',
+                           'flere_enheter': True}, ressurs)
+        self.assertIn('Ny Ambulanse', ut)
+
+    def test_gruppe_uten_flagget_regnes_som_flaate(self):
+        """Eldre data og nye grupper står uten feltet i klienten før neste
+        lasting. Standarden må være «flere» — ellers forsvinner knappen på en
+        ambulansegruppe fordi et felt manglet."""
+        ressurs = ("[{id: 20, navn: 'Bil A', gruppe_id: 2, "
+                   "gruppe_navn: 'Ambulanse', ikon: 'truck', korps_navn: '', "
+                   "enhet_navn: ''}]")
+        ut = self._gruppe({'id': 2, 'navn': 'Ambulanse', 'ikon': 'truck'},
+                          ressurs)
+        self.assertIn('Ny Ambulanse', ut)
+
+
+class NyRessursSkjemaetTests(SimpleTestCase):
+    """«Ny ressurs» spør bare om navn og gruppe.
+
+    Reservert korps og enhetskobling sto i opprettelsesskjemaet, men hører
+    hjemme ett nivå lavere: reservasjonen ligger på plassen, koblingen på den
+    enkelte enheten. Å spørre om dem her ga et skjema man måtte fylle ut før
+    man visste svaret — og verre: det så ut som gruppa *var* enheten.
+    """
+
+    HARNESS = ((VAKTLISTE_JS, ('opprettRessurs', 'apneNyRessurs', '_fyll',
+                              'gruppaHarPlass', '_ressurserIGruppe')),
+               (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue')))
+
+    PREAMBLE = """
+      globalThis.sendtBody = null;
+      globalThis.felter = {
+        'ny-ressurs-navn': {value: ' Bil A '},
+        'ny-ressurs-gruppe': {value: '2'},
+        'ny-ressurs-korps': {value: '7'},
+        'ny-ressurs-enhet': {value: '9'},
+      };
+      globalThis.document = {
+        getElementById: (id) => felter[id] || null,
+      };
+      globalThis.bootstrap = {Modal: class { constructor() {} show() {} }};
+      globalThis.aktivListe = {vaktliste: {id: 3}};
+      globalThis.aktivFane = '';
+      globalThis.withSubmitGuard = async (id, fn) => { await fn(); };
+      globalThis._skjulFeil = () => {};
+      globalThis._visFeil = (id, m) => { globalThis.feilmelding = m; };
+      globalThis._lukkModal = () => {};
+      globalThis.lastListe = async () => {};
+      globalThis.apiFetch = async (url, opts) => {
+        globalThis.sendtUrl = url;
+        globalThis.sendtBody = JSON.parse(opts.body);
+        return {ok: true, json: async () => ({status: 'ok', data: {gruppe_id: 2}})};
+      };
+    """
+
+    def setUp(self):
+        if not node_available():
+            self.skipTest('node er ikke tilgjengelig')
+        self.harness = build_harness(self.HARNESS)
+
+    def _kjor(self, snippet):
+        return run_node(self.harness, snippet, preamble=self.PREAMBLE)
+
+    def test_kroppen_baerer_bare_navn_og_gruppe(self):
+        """Feltene finnes i stubben, så en kode som leser dem ville tatt dem
+        med. Testen sier at ingen gjør det."""
+        self._kjor("""
+          await opprettRessurs();
+          assert(sendtBody !== null, 'ingen forespørsel ble sendt');
+          const nokler = Object.keys(sendtBody).sort().join(',');
+          assert(nokler === 'gruppe_id,navn',
+                 'skjemaet sendte mer enn navn og gruppe: ' + nokler);
+          assert(sendtBody.navn === 'Bil A',
+                 'navnet ble ikke trimmet: ' + JSON.stringify(sendtBody.navn));
+        """)
+
+    NEDTREKK = """
+      felter['ny-ressurs-gruppe'].innerHTML = '';
+      felter['ny-ressurs-tittel'] = {textContent: ''};
+      felter['nyRessursModal'] = {};
+      globalThis.aktivFane = '2';
+      globalThis.aktivListe.grupper = [
+        {id: 1, navn: 'Samleplass', er_aktiv: true, flere_enheter: false},
+        {id: 2, navn: 'Ambulanse', er_aktiv: true, flere_enheter: true},
+        {id: 3, navn: 'Utgatt', er_aktiv: false, flere_enheter: true}];
+      globalThis.aktivListe.ressurser = [];
+    """
+
+    def test_enkeltgruppa_staar_i_nedtrekket_for_den_forste(self):
+        self._kjor(self.NEDTREKK + """
+          apneNyRessurs(2);
+          const valg = felter['ny-ressurs-gruppe'].innerHTML;
+          assert(/Samleplass/.test(valg),
+                 'den forste samleplassen hadde ingen vei inn: ' + valg);
+        """)
+
+    def test_enkeltgruppa_forsvinner_naar_den_ene_staar_der(self):
+        """M11: skjulte vi bare knappen i fanen, kunne man fortsatt velge
+        gruppa her — og serveren var det eneste som sa nei."""
+        self._kjor(self.NEDTREKK + """
+          aktivListe.ressurser = [{id: 9, gruppe_id: 1}];
+          apneNyRessurs(2);
+          const valg = felter['ny-ressurs-gruppe'].innerHTML;
+          assert(!/Samleplass/.test(valg),
+                 'samleplassen sto igjen i nedtrekket: ' + valg);
+          assert(/Ambulanse/.test(valg),
+                 'flaaten forsvant ogsaa: ' + valg);
+        """)
+
+    def test_utgaatt_gruppe_er_fortsatt_ute(self):
+        self._kjor(self.NEDTREKK + """
+          apneNyRessurs(2);
+          assert(!/Utgatt/.test(felter['ny-ressurs-gruppe'].innerHTML),
+                 'en deaktivert gruppe kunne velges');
+        """)
+
+    def test_navnet_er_fortsatt_paakrevd(self):
+        self._kjor("""
+          felter['ny-ressurs-navn'].value = '   ';
+          await opprettRessurs();
+          assert(sendtBody === null, 'en navnløs ressurs ble sendt til serveren');
+          assert(/navn/i.test(globalThis.feilmelding || ''),
+                 'brukeren fikk ingen forklaring: ' + globalThis.feilmelding);
+        """)

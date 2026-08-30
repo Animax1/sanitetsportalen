@@ -224,10 +224,8 @@ function fyllNedtrekk() {
   if (!aktivListe) return;
   // Gruppene kommer fra basen nå, ikke fra malen: en ny gruppe skal virke
   // uten en ny sidelasting, og uten en deploy.
-  _fyll('ny-ressurs-gruppe',
-        (aktivListe.grupper || []).filter((g) => g.er_aktiv), null);
-  _fyll('ny-ressurs-korps', aktivListe.korps, 'Ureservert (bemannes av vaktleder)');
-  _fyll('ny-ressurs-enhet', aktivListe.enheter, 'Ingen kobling');
+  // «Ny ressurs»-nedtrekket fylles i `apneNyRessurs()`, ikke her: hvilke
+  // grupper som har plass endrer seg hver gang en ressurs opprettes.
   _fyll('ny-vaktpost-mannskap', aktivListe.mannskap.map((m) => ({
     id: m.id, navn: `${m.navn} — ${m.korps_navn}`,
   })), '— ledig plass —');
@@ -282,6 +280,21 @@ function _grupperMedRessurser() {
   // ubrukt gruppe er seks faner på en vakt med to ressurser.
   return (aktivListe.grupper || [])
     .filter((g) => _ressurserIGruppe(g.id).length);
+}
+
+
+function gruppaHarPlass(g) {
+  // **Noen grupper finnes i ett eksemplar.** Samleplassen og KO er
+  // samlingspunkt for flere korps, ikke flåter — «Ny samleplass» inviterer
+  // til å lage noe som ikke finnes. Den *første* må man fortsatt kunne
+  // opprette, så plassen tar slutt først når den ene står der.
+  //
+  // Regelen står som én funksjon fordi den har to lesere: knappen inne i
+  // fanen og nedtrekket i «Ny ressurs». Skjulte vi bare knappen, kunne man
+  // fortsatt velge gruppa i nedtrekket — og da var regelen halvveis, som er
+  // verre enn ingen regel.
+  if (!g) return false;
+  return g.flere_enheter !== false || !_ressurserIGruppe(g.id).length;
 }
 
 
@@ -461,7 +474,7 @@ function mkGruppe(gruppe) {
   // fanerekka, og da var det usynlig at fanen «Ambulanse» rommer bil A, bil B
   // og bil C — man så én rad med knapper og trodde gruppa *var* bilen. Det
   // kostet André en time og meg tre runder.
-  const leggTil = kanLede()
+  const leggTil = kanLede() && gruppaHarPlass(gruppe)
     ? `<button class="btn btn-sm btn-primary" type="button"
                data-action="apneNyRessurs" data-arg="${escHtmlValue(gruppe.id)}">
          <i class="bi bi-plus-lg me-1"></i>Ny ${escapeHtml(gruppe.navn)}
@@ -1063,8 +1076,10 @@ function apneNyRessurs(gruppeId) {
   _skjulFeil('ny-ressurs-feil');
   const felt = document.getElementById('ny-ressurs-gruppe');
   const maal = gruppeId != null && gruppeId !== '' ? gruppeId : aktivFane;
-  const gruppe = (aktivListe?.grupper || [])
-    .find((g) => String(g.id) === String(maal));
+  const valgbare = (aktivListe?.grupper || [])
+    .filter((g) => g.er_aktiv && gruppaHarPlass(g));
+  _fyll('ny-ressurs-gruppe', valgbare, null);
+  const gruppe = valgbare.find((g) => String(g.id) === String(maal));
   if (felt && gruppe) {
     felt.value = String(gruppe.id);
     const tittel = document.getElementById('ny-ressurs-tittel');
@@ -1084,11 +1099,11 @@ async function opprettRessurs() {
     const res = await apiFetch(
       `/vaktliste/api/vaktlister/${aktivListe.vaktliste.id}/ressurser/`, {
         method: 'POST',
+        // Bare navn og gruppe. Reservasjon og enhetskobling settes i
+        // «Rediger» — de hører til enheten, ikke til opprettelsen.
         body: JSON.stringify({
           navn,
           gruppe_id: document.getElementById('ny-ressurs-gruppe')?.value,
-          korps_id: document.getElementById('ny-ressurs-korps')?.value || null,
-          enhet_id: document.getElementById('ny-ressurs-enhet')?.value || null,
         }),
       });
     const d = await res.json().catch(() => ({}));
@@ -1342,6 +1357,8 @@ function apneGrupper() {
   _skjulFeil('gruppe-feil');
   document.getElementById('ny-gruppe-navn').value = '';
   document.getElementById('ny-gruppe-ikon').value = '';
+  const flere = document.getElementById('ny-gruppe-flere');
+  if (flere) flere.checked = true;
   tegnGrupper();
   new bootstrap.Modal(document.getElementById('grupperModal')).show();
 }
@@ -1364,6 +1381,8 @@ function mkGruppeRad(g) {
   const bruk = g.i_bruk
     ? `<span class="vl-meta">${escHtmlValue(g.i_bruk)} i bruk</span>`
     : '<span class="vl-meta">ubrukt</span>';
+  const ett = g.flere_enheter === false
+    ? '<span class="vl-merkelapp">ett eksemplar</span>' : '';
   const slett = g.i_bruk ? '' : `
         <button class="btn btn-sm btn-outline-danger" type="button"
                 title="Slett gruppa" aria-label="Slett gruppa"
@@ -1374,6 +1393,7 @@ function mkGruppeRad(g) {
         <i class="bi bi-${escHtmlValue(g.ikon)} me-2"></i>${escapeHtml(g.navn)}
       </span>
       <div class="d-flex align-items-center gap-2">
+        ${ett}
         ${bruk}
         ${slett}
       </div>
@@ -1392,6 +1412,7 @@ async function opprettGruppe() {
       body: JSON.stringify({
         navn,
         ikon: (document.getElementById('ny-gruppe-ikon')?.value || '').trim(),
+        flere_enheter: !!document.getElementById('ny-gruppe-flere')?.checked,
       }),
     });
     const d = await res.json().catch(() => ({}));

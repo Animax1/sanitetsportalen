@@ -158,6 +158,13 @@ class Ressursgruppe(BaseTimeStampedModel):
     til gruppa, ikke til den enkelte ressursen — «Sjåfør» gir mening på hver
     ambulanse, og ikke på samleplassen.
 
+    **`flere_enheter` skiller flåten fra det som finnes i ett eksemplar.**
+    «Ambulanse» rommer bil A, bil B og bil C — der gir «Ny ambulanse» mening.
+    Samleplassen og KO er én ting hver: de er samlingspunkt for flere korps,
+    ikke en flåte, og en «Ny samleplass»-knapp inviterer til å lage noe som
+    ikke finnes. Flagget skjuler knappen når gruppa alt har sin ene enhet —
+    den *første* må man fortsatt kunne opprette.
+
     Opprettes av `skriv_leder` og global admin. `skriv_full` bemanner, men
     setter ikke opp.
     """
@@ -173,6 +180,12 @@ class Ressursgruppe(BaseTimeStampedModel):
         default=100, verbose_name='Rekkefølge',
         help_text='Styrer rekkefølgen på faner og bemanningskurver. Settes '
                   'automatisk til opprettelsesrekkefølgen.')
+    flere_enheter = models.BooleanField(
+        default=True,
+        verbose_name='Flere enheter',
+        help_text='Av for grupper som er én ting: samleplassen og KO finnes '
+                  'i ett eksemplar. På for flåter — ambulanser, biler, lag.',
+    )
     er_aktiv = models.BooleanField(
         default=True,
         verbose_name='Aktiv',

@@ -368,6 +368,21 @@ fase 3–7 gjenstår — se `docs/BESLUTNING_VAKTLISTE.md`, som er besluttet i s
   riktig fra første stund, men veien dit var usynlig: knappen lå sist i fanerekka og het
   «Ny ressurs». Gruppefanen har derfor et hode med antall enheter og en «Ny
   <gruppe>»-knapp, og ukoblede enheter viser «Ikke koblet» framfor ingenting.
+- **Noen grupper finnes i ett eksemplar** (`Ressursgruppe.flere_enheter`, av
+  for Samleplass og KO). «Samleplass 2» er ikke en ny samleplass, det er en
+  delt vaktliste ingen leser riktig. Den *første* må man fortsatt kunne
+  opprette, så plassen tar slutt først når den ene står der.
+  `services`-siden er serverens sperre i `ressurser_view`, **per vaktliste** —
+  var den global, kunne neste vakt ikke hatt samleplass. Klienten har regelen i
+  **én** funksjon, `gruppaHarPlass()`, fordi den har to lesere: knappen i
+  gruppehodet og nedtrekket i «Ny ressurs». Skjules bare knappen, kan man
+  fortsatt velge gruppa i nedtrekket.
+- **«Ny ressurs» spør bare om navn og gruppe.** Reservasjonen ligger på
+  plassen og koblingen på den enkelte enheten, så begge settes i «Rediger».
+  Skjemaet ba tidligere om dem, og da måtte man svare før man visste svaret —
+  det leste som om gruppa *var* enheten. Nedtrekket fylles derfor i
+  `apneNyRessurs()`, ikke i `fyllNedtrekk()`: hvilke grupper som har plass
+  endrer seg hver gang en ressurs opprettes.
 - **Et endepunkt uten flate finnes ikke for brukeren.** `/api/grupper/` sto en dag uten
   UI, og da kunne ingen lage en gruppe som ikke var seedet — samme feil som Django-admin
   ga oss i fase 1. Manageren ligger i «Innstillinger».

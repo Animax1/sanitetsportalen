@@ -898,6 +898,15 @@ Gjennomgang 13. aug. 2026, med 1000 pasienter og peak 100 brukere som premiss.
             Innstillinger flyttet til vaktlinja ved «Ny vaktliste», Mannskap
             inn i fanerekka etter «Oversikt» — som lenke med pil, siden den
             forlater sida.
+      - [x] **«Ny ressurs» spør bare om navn og gruppe (30. aug. 2026).**
+            Niende runde. Reservert korps og enhetskobling ute av
+            opprettelsesskjemaet — de hører til den enkelte enheten, og settes
+            i «Rediger». Nytt felt `Ressursgruppe.flere_enheter` (migrasjon
+            `0009`): Samleplass og KO finnes i ett eksemplar, så «Ny
+            Samleplass» forsvinner når den ene står der — både knappen i fanen
+            og valget i nedtrekket, gjennom `gruppaHarPlass()`, og serveren
+            avviser nummer to per vaktliste. Verifisert i nettleseren at en ny
+            gruppe ikke oppretter noe i oppdragsmodulen.
       - [x] **Toppen ryddet, tabellen krympet (30. aug. 2026).** Sjuende
             runde. Ressurstabellen ned fra 82rem til 66rem, så den ikke
             ruller over 1280 px, og handlingskolonnen festet til høyre så

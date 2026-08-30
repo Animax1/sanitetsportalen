@@ -290,6 +290,17 @@
                     data-action="opprettGruppe">Legg til</button>
           </div>
         </div>
+        <div class="form-check mb-2">
+          <input class="form-check-input" type="checkbox" id="ny-gruppe-flere" checked>
+          <label class="form-check-label" for="ny-gruppe-flere">
+            Gruppa rommer flere enheter
+          </label>
+          <div class="form-text mt-0">
+            På for flåter — ambulanser, biler, lag. Av for det som finnes i ett
+            eksemplar, som samleplassen og KO: da forsvinner «Ny …»-knappen når
+            den ene enheten er satt opp.
+          </div>
+        </div>
         <div class="form-text mt-0 mb-3">
           Ikonet er valgfritt — et Bootstrap-ikonnavn uten «bi-», f.eks.
           <code>tent</code> eller <code>truck</code>. Tomt gir en boks.
@@ -375,19 +386,13 @@
           {% endcomment %}
           <select id="ny-ressurs-gruppe" class="form-select"></select>
         </div>
-        <div class="mb-3">
-          <label class="form-label" for="ny-ressurs-korps">Reservert korps</label>
-          <select id="ny-ressurs-korps" class="form-select"></select>
-          <div class="form-text">
-            Korpset som har fått ressursen og bemanner den selv. Tom = ureservert,
-            og bemannes av vaktleder — typisk KO og samleplass.
-          </div>
-        </div>
-        <div class="mb-3">
-          <label class="form-label" for="ny-ressurs-enhet">Enhet i oppdragsmodulen</label>
-          <select id="ny-ressurs-enhet" class="form-select"></select>
-          <div class="form-text">Kobles for biler og ambulanser.</div>
-        </div>
+        {% comment %}
+          **Bare navn og gruppe.** Reservert korps og enhetskobling sto her,
+          men hører hjemme ett nivå lavere: reservasjonen ligger på plassen,
+          og koblingen på den enkelte enheten. Å spørre om dem ved
+          opprettelsen ga et skjema man måtte fylle ut før man visste svaret —
+          begge settes i «Rediger» når enheten finnes.
+        {% endcomment %}
         <div id="ny-ressurs-feil" class="text-danger small d-none"></div>
       </div>
       <div class="modal-footer">
