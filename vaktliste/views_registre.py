@@ -86,7 +86,43 @@ def registre_view(request):
 # Korps har ett felt til (`kortnavn`), og fabrikken tar derfor en liste over
 # valgfrie tekstfelter framfor å bli to fabrikker.
 
-def _register_views(model, etikett, etikett_bestemt, *, ekstra_felt=()):
+def verdi_til_dict(model, rad, *, ekstra_felt=(), stige=False):
+    """Én rad fra en verdimengde som JSON.
+
+    **Modulnivå, ikke inne i fabrikken.** Mannskapsendepunktet sender de tre
+    verdimengdene med i sitt eget svar (siden trenger alle fire for å tegne
+    seg), og de radene skal ha nøyaktig samme form som `/api/korps/` og
+    vennene gir. Var de to formene skrevet hver for seg, ville de gli fra
+    hverandre — og det gjorde de: registerfanene viste «ubrukt» på et korps
+    med mannskap, fordi den lette nedtrekkslista manglet `i_bruk`. En
+    Django-test som spurte `/api/korps/` direkte så det ikke, for det er ikke
+    den veien siden går.
+    """
+    ut = {
+        'id': rad.pk,
+        'navn': rad.navn,
+        'er_aktiv': rad.er_aktiv,
+        'i_bruk': _antall_bruk(model, rad),
+    }
+    for felt in ekstra_felt:
+        ut[felt] = getattr(rad, felt)
+    if stige:
+        ut['bygger_paa_id'] = rad.bygger_paa_id
+        ut['bygger_paa_navn'] = rad.bygger_paa.navn if rad.bygger_paa else ''
+    return ut
+
+
+#: Hvordan hver verdimengde serialiseres. Ett sted, brukt av både fabrikken og
+#: mannskapsendepunktet — se `verdi_til_dict`.
+VERDIMENGDER = {
+    'korps': (Korps, {'ekstra_felt': ('kortnavn',)}),
+    'kompetanser': (Kompetanse, {'stige': True}),
+    'roller': (VaktRolle, {}),
+}
+
+
+def _register_views(model, etikett, etikett_bestemt, *, ekstra_felt=(),
+                    stige=False):
     """Bygg (liste-view, detalj-view) for en av verdimengdene.
 
     Args:
@@ -94,18 +130,13 @@ def _register_views(model, etikett, etikett_bestemt, *, ekstra_felt=()):
         etikett: ubestemt form til feilmeldinger («Korpset» → «Korps»)
         etikett_bestemt: bestemt form, til «… er i bruk»-meldingen
         ekstra_felt: valgfrie tekstfelter modellen har utover navn
+        stige: modellen har `bygger_paa` (bare `Kompetanse`). Feltet er en FK
+            til seg selv og må sykkelsjekkes, så det kan ikke behandles som
+            de valgfrie tekstfeltene.
     """
 
     def _til_dict(rad):
-        ut = {
-            'id': rad.pk,
-            'navn': rad.navn,
-            'er_aktiv': rad.er_aktiv,
-            'i_bruk': _antall_bruk(model, rad),
-        }
-        for felt in ekstra_felt:
-            ut[felt] = getattr(rad, felt)
-        return ut
+        return verdi_til_dict(model, rad, ekstra_felt=ekstra_felt, stige=stige)
 
     @never_cache
     @modul_kreves('vaktliste', 'les', svar='json')
@@ -131,6 +162,8 @@ def _register_views(model, etikett, etikett_bestemt, *, ekstra_felt=()):
             return _feil(f'{etikett} må ha et navn.')
 
         felter = {felt: (data.get(felt) or '').strip() for felt in ekstra_felt}
+        if stige:
+            felter['bygger_paa_id'] = _int(data.get('bygger_paa_id'))
         try:
             with transaction.atomic():
                 rad = model.objects.create(
@@ -179,6 +212,15 @@ def _register_views(model, etikett, etikett_bestemt, *, ekstra_felt=()):
         for felt in ekstra_felt:
             if felt in data:
                 setattr(rad, felt, (data.get(felt) or '').strip())
+        if stige and 'bygger_paa_id' in data:
+            forelder = _int(data['bygger_paa_id'])
+            # «A bygger på B, B bygger på A» har ikke noe svar på hvilken som
+            # er øverst. Stoppes ved skriving, ikke ved lesing.
+            if services.lager_sykel(rad.pk, forelder):
+                return _feil(
+                    'Det ville laget en ring i stigen: kompetansen kan ikke '
+                    'bygge på noe som allerede bygger på den.')
+            rad.bygger_paa_id = forelder
         if 'er_aktiv' in data:
             rad.er_aktiv = bool(data['er_aktiv'])
 
@@ -208,7 +250,7 @@ def _antall_bruk(model, rad):
 korps_view, korps_detalj_view = _register_views(
     Korps, 'Korpset', 'Korpset', ekstra_felt=('kortnavn',))
 kompetanser_view, kompetanse_detalj_view = _register_views(
-    Kompetanse, 'Kompetansen', 'Kompetansen')
+    Kompetanse, 'Kompetansen', 'Kompetansen', stige=True)
 roller_view, rolle_detalj_view = _register_views(
     VaktRolle, 'Rollen', 'Rollen')
 
@@ -224,15 +266,28 @@ rolle_detalj_view.__name__ = 'rolle_detalj_view'
 
 # ── Mannskapet ───────────────────────────────────────────────────────────────
 
-def _mannskap_til_dict(m):
+def _mannskap_til_dict(m, foreldre=None):
+    """Én person som JSON.
+
+    `kompetanser` er de **synlige** — har hun AFØR, er VFØR implisert og
+    utelates (§ kompetansestigen i `services.py`). `alle_kompetanser` er hele
+    settet, fordi redigeringsskjemaet må vise det som faktisk er krysset av,
+    og fordi «har hun egentlig VFØR?» skal kunne besvares uten å åpne skjemaet.
+
+    `foreldre` slås opp én gang av kalleren; uten det ville hver rad kostet en
+    spørring.
+    """
+    alle = list(m.kompetanser.all())
+    synlige = (services.synlige_kompetanser(alle, foreldre)
+               if foreldre is not None else alle)
     return {
         'id': m.pk,
         'navn': m.navn,
         'korps_id': m.korps_id,
         'korps_navn': m.korps.navn,
         'korps_kort': m.korps.kortnavn or m.korps.navn,
-        'kompetanser': [
-            {'id': k.pk, 'navn': k.navn} for k in m.kompetanser.all()],
+        'kompetanser': [{'id': k.pk, 'navn': k.navn} for k in synlige],
+        'alle_kompetanser': [{'id': k.pk, 'navn': k.navn} for k in alle],
         'telefon': m.telefon,
         'user_id': m.user_id,
         'brukernavn': m.user.username if m.user else '',
@@ -282,15 +337,14 @@ def mannskap_view(request):
         folk = (Mannskap.objects
                 .select_related('korps', 'user')
                 .prefetch_related('kompetanser'))
+        foreldre = services.foreldrekart()
         return JsonResponse({'status': 'ok', 'data': {
-            'mannskap': [_mannskap_til_dict(m) for m in folk],
-            'korps': [{'id': k.pk, 'navn': k.navn, 'kortnavn': k.kortnavn,
-                       'er_aktiv': k.er_aktiv}
-                      for k in Korps.objects.all()],
-            'kompetanser': [{'id': k.pk, 'navn': k.navn, 'er_aktiv': k.er_aktiv}
-                            for k in Kompetanse.objects.all()],
-            'roller': [{'id': r.pk, 'navn': r.navn, 'er_aktiv': r.er_aktiv}
-                       for r in VaktRolle.objects.all()],
+            'mannskap': [_mannskap_til_dict(m, foreldre) for m in folk],
+            **{
+                nokkel: [verdi_til_dict(modell, r, **kw)
+                         for r in modell.objects.all()]
+                for nokkel, (modell, kw) in VERDIMENGDER.items()
+            },
             # Kontolista er bare med for den som kan bruke den. `user_id`
             # er `skriv_full`-felt (se under), og en liste over portalens
             # brukernavn er ikke noe en korps-fører trenger for å føre lista
@@ -336,7 +390,8 @@ def mannskap_view(request):
     person = (Mannskap.objects.select_related('korps', 'user')
               .prefetch_related('kompetanser').get(pk=person.pk))
     return JsonResponse(
-        {'status': 'ok', 'data': _mannskap_til_dict(person)}, status=201)
+        {'status': 'ok', 'data': _mannskap_til_dict(person, services.foreldrekart())},
+        status=201)
 
 
 @modul_kreves('vaktliste', 'les', svar='json')
@@ -411,4 +466,5 @@ def mannskap_detalj_view(request, pk):
 
     person = (Mannskap.objects.select_related('korps', 'user')
               .prefetch_related('kompetanser').get(pk=person.pk))
-    return JsonResponse({'status': 'ok', 'data': _mannskap_til_dict(person)})
+    return JsonResponse(
+        {'status': 'ok', 'data': _mannskap_til_dict(person, services.foreldrekart())})

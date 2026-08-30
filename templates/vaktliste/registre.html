@@ -65,6 +65,17 @@
     </button>
   </div>
 
+  {% comment %}
+    Søkefeltet ligger UTENFOR #vlr-panel med vilje: panelet tegnes på nytt ved
+    hvert tastetrykk, og et input inni ville mistet fokus etter første bokstav.
+  {% endcomment %}
+  <div class="vlr-verktoy" id="vlr-verktoy">
+    <input type="search" class="form-control form-control-sm" id="vlr-sok"
+           placeholder="Søk i navn, korps, kompetanse eller telefon…"
+           autocomplete="off">
+    <span class="vl-meta" id="vlr-treff"></span>
+  </div>
+
   <div id="vlr-mangler-korps" class="alert alert-warning d-none">
     <strong>Ingen korps ennå.</strong>
     Et mannskap må høre til et korps — korpset er badgen tilgangsmodellen
@@ -151,6 +162,14 @@
         <div class="mb-3">
           <label class="form-label" for="verdi-navn">Navn</label>
           <input type="text" id="verdi-navn" class="form-control" maxlength="120">
+        </div>
+        <div class="mb-3 d-none" id="verdi-bygger-paa-rad">
+          <label class="form-label" for="verdi-bygger-paa">Bygger på</label>
+          <select id="verdi-bygger-paa" class="form-select"></select>
+          <div class="form-text">
+            Kompetansen denne overordner — f.eks. VFØR for AFØR. Har personen
+            begge, vises bare den øverste i lista.
+          </div>
         </div>
         <div class="mb-3 d-none" id="verdi-kortnavn-rad">
           <label class="form-label" for="verdi-kortnavn">Kortnavn</label>

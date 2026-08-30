@@ -4,6 +4,38 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-08-30 — Registersiden: kompetansestige og mannskapstabell
+
+**1595 tester grønne** (15 nye). Migrasjon `vaktliste.0004`. Første runde på
+Andrés tilbakemelding fra å faktisk bruke modulen.
+
+- **Mannskapslista er en tabell.** Med én kompetanse så den gamle
+  merkelapp-raden fin ut; med åtte brøt den om og skjøv telefonnummeret ut av
+  syne. Faste kolonner — Navn · Korps · Kompetanse · Telefon · Konto — gjør at
+  det du leter etter alltid står samme sted. Sticky kolonnehode, sortering på
+  navn/korps/telefon, og et søkefelt som filtrerer på alt inkludert kompetanse.
+  Søkefeltet ligger **utenfor** panelet som tegnes på nytt; lå det inni, mistet
+  det fokus etter første bokstav.
+- **`Kompetanse.bygger_paa`: en stige, ikke en rangering.** AFØR bygger på VFØR,
+  som bygger på GFØR. Har personen AFØR, er de to under implisert og vises ikke
+  — hele settet ligger i `title` på cellen, så «har hun egentlig VFØR?» kan
+  besvares uten å åpne skjemaet. En peker framfor et rangtall fordi et tall
+  måtte være globalt, og da ville «Sykepleier» og «Sjåfør kode 160» fått en
+  innbyrdes rekkefølge de ikke har. Ringer stoppes ved skriving; en ring som
+  likevel finnes i basen gir en avkortet kjede, ikke en evig løkke. SET_NULL:
+  fjernes VFØR, står AFØR igjen frittstående.
+- **Funn i nettleseren, ikke i testene: registerfanene viste «ubrukt» på et
+  korps med mannskap.** Siden tegner dem fra mannskapsendepunktets nyttelast,
+  ikke fra `/api/korps/`, og de to formene var skrevet hver for seg — så
+  `i_bruk` og `bygger_paa_navn` nådde aldri fram. Hver test spurte det
+  endepunktet den selv beskrev, og så det ikke. Nå deler begge veier én
+  `verdi_til_dict()`, og `SammeFormBeggeVeierTests` sammenligner dem direkte.
+- Mutasjonstestet seks veier på stigen, alle røde: stigen ignorert, kjeden
+  avkortet til ett trinn, sykkelvernet fjernet, «bygge på seg selv» sluppet
+  gjennom, ringvernet i kjeden fjernet, og CASCADE i stedet for SET_NULL.
+
+---
+
 ## 2026-08-30 — `rekkefolge` ut av verdimengdene: alfabetisk holder
 
 **1580 tester grønne** (6 nye). Migrasjon `vaktliste.0003`.

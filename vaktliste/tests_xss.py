@@ -251,7 +251,7 @@ class VaktlisteLogikkTests(SimpleTestCase):
 # finnes i begge filene (bevisst — de er sidespesifikke), så de to kan ikke
 # lastes i samme harness.
 
-REGISTER_BUILDERS = ('mkMannskap', 'mkVerdier')
+REGISTER_BUILDERS = ('mkMannskap', 'mkVerdier', '_kolonneHode')
 
 REGISTER_REVIEWED = {
     'inaktiv': 'hardkodet CSS-klasse fra en ternær',
@@ -268,6 +268,17 @@ REGISTER_REVIEWED = {
     'knapper': 'markup bygget lokalt, mannskaps-id escapet inni',
     'verdiKnapper': 'markup bygget lokalt, rad-id escapet inni',
     'nyKnapp': 'markup bygget lokalt, etiketten escapet inni',
+    # Mannskapstabellen. `inaktivMerke`, `merker` og `konto` sto allerede over
+    # med samme begrunnelse — tabellen gjenbruker dem.
+    'stige': 'markup bygget lokalt, «bygger på»-navnet escapet inni',
+    'kropp': 'tabellrader bygget lokalt i samme funksjon',
+    # Treff-telleren settes med textContent, ikke innerHTML — ingen parsing
+    # å bryte ut av, og tallene kommer uansett fra `.length`.
+    'rader.length': 'tall, settes med textContent',
+    'data.mannskap.length': 'tall, settes med textContent',
+    "_kolonneHode('navn', 'Navn')": 'bygger med escapet innhold, se funksjonen',
+    "_kolonneHode('korps', 'Korps')": 'bygger med escapet innhold, se funksjonen',
+    "_kolonneHode('telefon', 'Telefon')": 'bygger med escapet innhold, se funksjonen',
 }
 
 
@@ -315,11 +326,17 @@ class RegistersidenEscapingOppforselTests(SimpleTestCase):
 
     HARNESS = (
         (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue', 'trustedHtml', '_escHtml')),
-        (VAKTLISTE_REGISTRE_JS, ('mkMannskap', 'mkVerdier', '_nivaa',
+        (VAKTLISTE_REGISTRE_JS, ('mkMannskap', 'mkVerdier', '_kolonneHode',
+                                 '_passerSok', '_sorterMannskap', '_nivaa',
                                  'kanSkriveAlt', 'kanRedigerePerson')),
     )
 
-    VINDU = "globalThis.window = { MODUL_TILGANG: { admin: true } };"
+    #: Tabellen skriver treff-telleren i DOM-en og leser sorteringstilstanden,
+    #: så begge stubbes. Node har verken `window` eller `document`.
+    VINDU = ("globalThis.window = { MODUL_TILGANG: { admin: true } };\n"
+             "globalThis.document = { getElementById: () => null };\n"
+             "globalThis.sok = ''; globalThis.sortKol = 'korps';\n"
+             "globalThis.sortStigende = true;\n")
 
     def setUp(self):
         if not node_available():

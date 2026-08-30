@@ -99,6 +99,72 @@ def kopier_oppsett(fra_vaktliste, til_vaktliste):
     return len(kopier)
 
 
+# ── Kompetansestigen ─────────────────────────────────────────────────────────
+#
+# `Kompetanse.bygger_paa` peker på det kurset denne overordner: AFØR bygger på
+# VFØR, som bygger på GFØR. Reglene under er de to som trengs for at pekeren
+# skal bety noe — én for visning, én for å hindre at stigen blir en ring.
+
+
+def _foreldrekjede(kompetanse_id, foreldre, _sett=None):
+    """Alle IDene over `kompetanse_id` i stigen, transitivt.
+
+    `foreldre` er ``{id: bygger_paa_id}`` for hele registeret, slått opp én
+    gang av kalleren — en spørring per kompetanse ville gitt N+1 på en liste
+    med hundre mannskaper.
+
+    `_sett` stopper en ring. Ringer skal ikke kunne oppstå (`lager_sykel`
+    hindrer dem ved skriving), men en gammel rad eller en manuell endring i
+    basen skal gi en avkortet kjede, ikke en evig løkke.
+    """
+    _sett = _sett if _sett is not None else set()
+    forelder = foreldre.get(kompetanse_id)
+    if forelder is None or forelder in _sett:
+        return _sett
+    _sett.add(forelder)
+    return _foreldrekjede(forelder, foreldre, _sett)
+
+
+def synlige_kompetanser(kompetanser, foreldre):
+    """De kompetansene som ikke overordnes av en annen personen har.
+
+    Har hun AFØR, VFØR og Sykepleier, står hun igjen med AFØR og Sykepleier:
+    VFØR er implisert, og Sykepleier er ikke i den stigen i det hele tatt.
+
+    `kompetanser` er radene personen har; `foreldre` er kartet fra
+    `foreldrekart()`. Rekkefølgen bevares.
+    """
+    holdt = {k.pk for k in kompetanser}
+    implisert = set()
+    for pk in holdt:
+        implisert |= _foreldrekjede(pk, foreldre)
+    return [k for k in kompetanser if k.pk not in implisert]
+
+
+def foreldrekart():
+    """``{id: bygger_paa_id}`` for hele kompetanseregisteret.
+
+    Slås opp én gang per forespørsel og sendes med til `synlige_kompetanser`.
+    """
+    from .models import Kompetanse
+    return dict(Kompetanse.objects.values_list('pk', 'bygger_paa_id'))
+
+
+def lager_sykel(kompetanse_id, nytt_forelder_id) -> bool:
+    """True hvis pekeren ville laget en ring i stigen.
+
+    «A bygger på B, B bygger på A» har ikke noe svar på hvilken som er
+    øverst, og ville gjort `synlige_kompetanser` til en smakssak. Det stoppes
+    ved skriving framfor å håndteres ved lesing: en ring i basen er en feil
+    som ikke skal kunne oppstå, ikke en tilstand koden skal tåle.
+    """
+    if nytt_forelder_id is None:
+        return False
+    if nytt_forelder_id == kompetanse_id:
+        return True
+    return kompetanse_id in _foreldrekjede(nytt_forelder_id, foreldrekart())
+
+
 # ── Hvem får røre hva ────────────────────────────────────────────────────────
 #
 # Håndheves fra fase 3, på hvert endepunkt. Tre nivåer av «hvem»:

@@ -376,3 +376,157 @@ class SjekkAtIngenPekerPaaDjangoAdminTests(TestCase):
             + '\n\nFlaten er av i produksjon (S1). Bygg funksjonen i portalen, '
               'eller pek på den portalsiden som alt dekker den.'
         ))
+
+
+@override_settings(SECURE_SSL_REDIRECT=False, RATELIMIT_ENABLE=False)
+class KompetansestigeTests(TestCase):
+    """`Kompetanse.bygger_paa`: har du AFØR, sier det seg selv at du har VFØR.
+
+    Poenget er lesbarhet i mannskapslista. Å vise GFØR, VFØR og AFØR på samme
+    person legger ikke til noe — det fyller bare kolonnen så telefonnummeret
+    forsvinner ut av syne. Se `services.synlige_kompetanser`.
+
+    Pekeren er en stige, ikke en global rangering: «Sykepleier» og «Sjåfør
+    kode 160» har ingen innbyrdes rekkefølge, og skal ikke tvinges inn i en.
+    """
+
+    def setUp(self):
+        self.korps = Korps.objects.create(navn='Haugesund')
+        self.gfor = Kompetanse.objects.create(navn='GFØR')
+        self.vfor = Kompetanse.objects.create(navn='VFØR', bygger_paa=self.gfor)
+        self.afor = Kompetanse.objects.create(navn='AFØR', bygger_paa=self.vfor)
+        self.sykepleier = Kompetanse.objects.create(navn='Sykepleier')
+        self.c = _klient(_bruker('adm', admin=True))
+
+    def _person(self, *kompetanser):
+        p = Mannskap.objects.create(navn='Kari', korps=self.korps)
+        p.kompetanser.set(kompetanser)
+        return p
+
+    def _synlige(self):
+        data = self.c.get('/vaktliste/api/mannskap/').json()['data']
+        return [k['navn'] for k in data['mannskap'][0]['kompetanser']]
+
+    def test_hoyeste_trinn_skjuler_de_under(self):
+        self._person(self.gfor, self.vfor, self.afor)
+        self.assertEqual(self._synlige(), ['AFØR'])
+
+    def test_mellomtrinn_skjuler_bare_det_under_seg(self):
+        self._person(self.gfor, self.vfor)
+        self.assertEqual(self._synlige(), ['VFØR'])
+
+    def test_frittstaaende_kompetanse_skjules_aldri(self):
+        """Sykepleier er ikke i stigen, og skal stå selv om AFØR gjør det."""
+        self._person(self.afor, self.vfor, self.sykepleier)
+        self.assertEqual(sorted(self._synlige()), ['AFØR', 'Sykepleier'])
+
+    def test_hele_settet_folger_med_i_svaret(self):
+        """Redigeringsskjemaet må vise det som faktisk er krysset av, og
+        «har hun egentlig VFØR?» skal kunne besvares uten å åpne det."""
+        self._person(self.gfor, self.vfor, self.afor)
+        data = self.c.get('/vaktliste/api/mannskap/').json()['data']
+        self.assertEqual(
+            sorted(k['navn'] for k in data['mannskap'][0]['alle_kompetanser']),
+            ['AFØR', 'GFØR', 'VFØR'])
+
+    def test_bare_det_laveste_trinnet_staar_alene(self):
+        self._person(self.gfor)
+        self.assertEqual(self._synlige(), ['GFØR'])
+
+    def test_ingen_kompetanser_gir_tom_liste(self):
+        self._person()
+        self.assertEqual(self._synlige(), [])
+
+    # ── Skriving ─────────────────────────────────────────────────────────
+    def test_stigen_settes_gjennom_api_et(self):
+        ny = self.c.post('/vaktliste/api/kompetanser/',
+                         data={'navn': 'Ambulansearbeider',
+                               'bygger_paa_id': self.afor.pk},
+                         content_type='application/json')
+        self.assertEqual(ny.status_code, 201)
+        self.assertEqual(ny.json()['data']['bygger_paa_navn'], 'AFØR')
+
+    def test_kompetanse_kan_ikke_bygge_paa_seg_selv(self):
+        res = self.c.put(f'/vaktliste/api/kompetanser/{self.vfor.pk}/',
+                         data={'bygger_paa_id': self.vfor.pk},
+                         content_type='application/json')
+        self.assertEqual(res.status_code, 400)
+        self.vfor.refresh_from_db()
+        self.assertEqual(self.vfor.bygger_paa_id, self.gfor.pk)
+
+    def test_ring_i_stigen_avvises(self):
+        """«A bygger på B, B bygger på A» har ikke noe svar på hva som er
+        øverst, og ville gjort visningen til en smakssak."""
+        res = self.c.put(f'/vaktliste/api/kompetanser/{self.gfor.pk}/',
+                         data={'bygger_paa_id': self.afor.pk},
+                         content_type='application/json')
+        self.assertEqual(res.status_code, 400)
+        self.assertIn('ring', res.json()['message'])
+        self.gfor.refresh_from_db()
+        self.assertIsNone(self.gfor.bygger_paa_id)
+
+    def test_stigen_kan_kobles_fra(self):
+        res = self.c.put(f'/vaktliste/api/kompetanser/{self.afor.pk}/',
+                         data={'bygger_paa_id': None},
+                         content_type='application/json')
+        self.assertEqual(res.json()['data']['bygger_paa_navn'], '')
+
+    def test_sletting_av_mellomtrinn_lar_toppen_staa(self):
+        """SET_NULL: fjernes VFØR, står AFØR igjen frittstående. Å kaskadere
+        ville slettet det høyeste kurset fordi noen ryddet bort et lavere."""
+        self.vfor.delete()
+        self.afor.refresh_from_db()
+        self.assertIsNone(self.afor.bygger_paa_id)
+        self.assertTrue(Kompetanse.objects.filter(pk=self.afor.pk).exists())
+
+    def test_en_ring_i_basen_gir_avkortet_kjede_ikke_evig_lokke(self):
+        """Ringer skal ikke kunne oppstå, men en manuell endring i basen skal
+        ikke henge serveren."""
+        Kompetanse.objects.filter(pk=self.gfor.pk).update(bygger_paa=self.afor)
+        self._person(self.gfor, self.vfor, self.afor)
+        self.assertEqual(self._synlige(), [])   # alle impliserer hverandre
+
+
+@override_settings(SECURE_SSL_REDIRECT=False, RATELIMIT_ENABLE=False)
+class SammeFormBeggeVeierTests(TestCase):
+    """Verdimengdene skal se like ut uansett hvilket endepunkt de kommer fra.
+
+    Siden tegner registerfanene fra **mannskapsendepunktets** nyttelast, ikke
+    fra `/api/korps/`. Var de to formene skrevet hver for seg, ville de gli fra
+    hverandre — og det gjorde de: fanene viste «ubrukt» på et korps med
+    mannskap, fordi den lette nedtrekkslista manglet `i_bruk`. Feilen ble
+    funnet i nettleser, ikke av testene, fordi hver test spurte det endepunktet
+    den selv beskrev.
+    """
+
+    def setUp(self):
+        self.korps = Korps.objects.create(navn='Haugesund', kortnavn='HGSD')
+        gfor = Kompetanse.objects.create(navn='GFØR')
+        Kompetanse.objects.create(navn='VFØR', bygger_paa=gfor)
+        VaktRolle.objects.create(navn='Lagleder')
+        Mannskap.objects.create(navn='Kari', korps=self.korps)
+        self.c = _klient(_bruker('adm', admin=True))
+
+    def _fra_mannskapsendepunktet(self, nokkel):
+        return self.c.get('/vaktliste/api/mannskap/').json()['data'][nokkel]
+
+    def _fra_registeret(self, sti):
+        return self.c.get(f'/vaktliste/api/{sti}/').json()['data']
+
+    def test_identisk_form_paa_alle_tre(self):
+        for nokkel, sti in (('korps', 'korps'),
+                            ('kompetanser', 'kompetanser'),
+                            ('roller', 'roller')):
+            with self.subTest(mengde=nokkel):
+                self.assertEqual(self._fra_mannskapsendepunktet(nokkel),
+                                 self._fra_registeret(sti))
+
+    def test_i_bruk_naar_fram_til_siden(self):
+        """Selve feilen: fanen viste «ubrukt» på et korps som hadde mannskap."""
+        rad = self._fra_mannskapsendepunktet('korps')[0]
+        self.assertEqual(rad['i_bruk'], 1)
+
+    def test_stigen_naar_fram_til_siden(self):
+        vfor = [k for k in self._fra_mannskapsendepunktet('kompetanser')
+                if k['navn'] == 'VFØR'][0]
+        self.assertEqual(vfor['bygger_paa_navn'], 'GFØR')

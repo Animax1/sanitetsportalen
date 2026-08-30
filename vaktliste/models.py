@@ -94,15 +94,39 @@ class Kompetanse(BaseTimeStampedModel):
     Beskriver hva personen kan, ikke hva hun gjør på en gitt vakt — det er
     `VaktRolle` sin jobb. Skillet er bevisst: kompetansen følger personen,
     rollen følger vaktposten.
+
+    **`bygger_paa` er en stige, ikke en rangering.** Noen kurs overordner
+    andre: AFØR bygger på VFØR, som bygger på GFØR. Har man AFØR, sier det seg
+    selv at man har de to under, og å vise alle tre gjør lista uleselig uten å
+    legge til noe. Så: har personen både en kompetanse og noe den bygger på,
+    vises bare den øverste.
+
+    Hvorfor en peker og ikke et rangtall: et tall måtte være globalt, og da
+    ville «Sykepleier» og «Sjåfør kode 160» fått en innbyrdes rekkefølge de
+    ikke har. Pekeren sier *hva* som overordner *hva*, og lar de frittstående
+    kompetansene stå frittstående.
     """
 
     navn = models.CharField(max_length=120, unique=True, verbose_name='Navn')
+    # SET_NULL: fjernes VFØR fra registeret, står AFØR igjen som en
+    # frittstående kompetanse. Å kaskadere ville slettet det høyeste kurset
+    # fordi noen ryddet bort et lavere.
+    bygger_paa = models.ForeignKey(
+        'self',
+        null=True, blank=True,
+        on_delete=models.SET_NULL,
+        related_name='overordner',
+        verbose_name='Bygger på',
+        help_text='Kompetansen denne overordner, f.eks. VFØR for AFØR. '
+                  'Har personen begge, vises bare denne.',
+    )
     er_aktiv = models.BooleanField(
         default=True,
         verbose_name='Aktiv',
         help_text='Inaktive kompetanser skjules i nedtrekkslister, men '
                   'beholdes på mannskapet som har dem.',
     )
+
     class Meta:
         verbose_name = 'Kompetanse'
         verbose_name_plural = 'Kompetanser'

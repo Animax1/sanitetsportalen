@@ -16,6 +16,9 @@
 let data = null;            // { mannskap, korps, kompetanser, roller, kontoer }
 let aktivRegisterFane = 'mannskap';
 let redigerer = null;       // id-en som redigeres, eller null for «ny»
+let sok = '';               // fritekstfilter på mannskapstabellen
+let sortKol = 'korps';      // 'navn' | 'korps' | 'telefon'
+let sortStigende = true;
 
 // Fane → hvordan registeret snakkes om og hvor det ligger.
 // `nyEtikett` er hele knappeteksten, ikke bare ordet: «korps» er intetkjønn
@@ -23,7 +26,8 @@ let redigerer = null;       // id-en som redigeres, eller null for «ny»
 // en av dem uansett hvilken man velger.
 const REGISTRE = {
   korps: { sti: 'korps', nyEtikett: 'Nytt korps', tittel: 'Korps', kortnavn: true },
-  kompetanser: { sti: 'kompetanser', nyEtikett: 'Ny kompetanse', tittel: 'Kompetanser' },
+  kompetanser: { sti: 'kompetanser', nyEtikett: 'Ny kompetanse',
+                 tittel: 'Kompetanser', stige: true },
   roller: { sti: 'roller', nyEtikett: 'Ny vaktrolle', tittel: 'Vaktroller' },
 };
 
@@ -88,13 +92,62 @@ function visRegisterFane(navn) {
 function tegnRegister() {
   const el = document.getElementById('vlr-panel');
   if (!el || !data) return;
-  el.innerHTML = aktivRegisterFane === 'mannskap'
-    ? mkMannskap()
-    : mkVerdier(aktivRegisterFane);
+  const paaMannskap = aktivRegisterFane === 'mannskap';
+  document.getElementById('vlr-verktoy')?.classList.toggle('d-none', !paaMannskap);
+  el.innerHTML = paaMannskap ? mkMannskap() : mkVerdier(aktivRegisterFane);
 }
 
 
 // ── Byggere (alt escapes — se filhodet) ──────────────────────────────────
+
+function _passerSok(m) {
+  if (!sok) return true;
+  const n = sok.toLowerCase();
+  return [m.navn, m.korps_navn, m.telefon, m.brukernavn]
+    .concat((m.alle_kompetanser || []).map((k) => k.navn))
+    .some((v) => (v || '').toLowerCase().includes(n));
+}
+
+
+function _sorterMannskap(rader) {
+  const nokkel = (m) => {
+    if (sortKol === 'navn') return m.navn.toLowerCase();
+    if (sortKol === 'telefon') return m.telefon || '\uffff';  // tomme sist
+    return m.korps_navn.toLowerCase() + '\u0000' + m.navn.toLowerCase();
+  };
+  const ut = rader.slice().sort((a, b) => nokkel(a).localeCompare(nokkel(b)));
+  return sortStigende ? ut : ut.reverse();
+}
+
+
+function sorterEtter(kolonne) {
+  if (sortKol === kolonne) sortStigende = !sortStigende;
+  else { sortKol = kolonne; sortStigende = true; }
+  tegnRegister();
+}
+
+
+function settSok(verdi) {
+  sok = verdi;
+  tegnRegister();
+}
+
+
+function _koblSok() {
+  // Egen lytter framfor `data-action`: delegeringen i portal-utils.js er
+  // klikkbasert, og dette er et tastetrykk.
+  const el = document.getElementById('vlr-sok');
+  if (el) el.addEventListener('input', () => settSok(el.value));
+}
+
+
+function _kolonneHode(kolonne, tekst) {
+  // Pilen viser hvilken kolonne som styrer, og hvilken vei.
+  const pil = sortKol === kolonne ? (sortStigende ? ' ▲' : ' ▼') : '';
+  return `<th class="vlr-sortbar" data-action="sorterEtter" data-arg="${escHtmlValue(kolonne)}">`
+       + `${escapeHtml(tekst)}${escapeHtml(pil)}</th>`;
+}
+
 
 function mkMannskap() {
   if (!data.mannskap.length) {
@@ -102,51 +155,71 @@ function mkMannskap() {
          + 'Ingen i registeret ennå. Trykk «Nytt mannskap».</div></div>';
   }
 
-  // Gruppert på korps — bestillingen ba om personellet «sortert etter hvilket
-  // korps de tilhører», og det er også slik lista leses.
-  const grupper = {};
-  data.mannskap.forEach((m) => {
-    (grupper[m.korps_navn] = grupper[m.korps_navn] || []).push(m);
-  });
+  // **Tabell, ikke merkelapper på rad.** Med én kompetanse så den gamle
+  // visningen fin ut; med åtte brøt den om og skjøv telefonnummeret ut av
+  // syne. Faste kolonner gjør at det du leter etter alltid står samme sted.
+  const rader = _sorterMannskap(data.mannskap.filter(_passerSok));
 
-  const deler = Object.keys(grupper).sort().map((korps) => {
-    const rader = grupper[korps]
-      .slice()
-      .sort((a, b) => a.navn.localeCompare(b.navn))
-      .map((m) => {
-        const merker = m.kompetanser
-          .map((k) => `<span class="vl-merkelapp">${escapeHtml(k.navn)}</span>`)
-          .join('');
-        const inaktiv = m.er_aktiv ? '' : ' vl-inaktiv';
-        const inaktivMerke = m.er_aktiv ? ''
-          : '<span class="vl-merkelapp vl-ureservert">Inaktiv</span>';
-        const konto = m.brukernavn
-          ? `<span class="vl-meta"><i class="bi bi-person-check me-1"></i>${escapeHtml(m.brukernavn)}</span>`
-          : '';
-        const tlf = m.telefon
-          ? `<span class="vl-meta">${escapeHtml(m.telefon)}</span>` : '';
-        // Badgen avgjør per rad: korps-føreren ser knappene på sine egne
-        // folk, og bare leser resten av lista.
-        const knapper = kanRedigerePerson(m)
-          ? `<button class="btn btn-sm btn-outline-secondary" type="button"
-                     data-action="apneRedigerPerson" data-id="${escHtmlValue(m.id)}">Rediger</button>
-             <button class="btn btn-sm btn-outline-danger" type="button"
-                     data-action="slettPerson" data-id="${escHtmlValue(m.id)}">Slett</button>`
-          : '';
-        return `
-          <div class="vl-rad${inaktiv}">
-            <div class="d-flex align-items-center gap-2 flex-wrap">
-              <span class="vl-navn">${escapeHtml(m.navn)}</span>
-              ${inaktivMerke}${merker}${tlf}${konto}
-            </div>
-            <div class="d-flex gap-2">${knapper}</div>
-          </div>`;
-      }).join('');
-    return `<div class="vl-korpsgruppe"><h3>${escapeHtml(korps)} `
-         + `(${escHtmlValue(grupper[korps].length)})</h3>${rader}</div>`;
-  });
+  const kropp = rader.length ? rader.map((m) => {
+    const inaktiv = m.er_aktiv ? '' : ' vl-inaktiv';
 
-  return `<div class="vl-kort">${deler.join('')}</div>`;
+    // Bare de synlige kompetansene — har hun AFØR, er VFØR implisert.
+    // Hele settet ligger i `title`, så «har hun egentlig VFØR?» kan besvares
+    // uten å åpne skjemaet.
+    const alle = (m.alle_kompetanser || []).map((k) => k.navn).join(', ');
+    const merker = m.kompetanser.length
+      ? m.kompetanser.map((k) =>
+          `<span class="vl-merkelapp">${escapeHtml(k.navn)}</span>`).join('')
+      : '<span class="vl-meta">—</span>';
+
+    const knapper = kanRedigerePerson(m)
+      ? `<button class="btn btn-sm btn-outline-secondary" type="button"
+                 data-action="apneRedigerPerson" data-id="${escHtmlValue(m.id)}">Rediger</button>
+         <button class="btn btn-sm btn-outline-danger" type="button"
+                 data-action="slettPerson" data-id="${escHtmlValue(m.id)}">Slett</button>`
+      : '';
+
+    const inaktivMerke = m.er_aktiv ? ''
+      : ' <span class="vl-merkelapp vl-ureservert">Inaktiv</span>';
+    const konto = m.brukernavn
+      ? escapeHtml(m.brukernavn) : '<span class="vl-meta">—</span>';
+
+    return `
+      <tr class="${escHtmlValue(inaktiv.trim())}">
+        <td class="vl-navn">${escapeHtml(m.navn)}${inaktivMerke}</td>
+        <td>${escapeHtml(m.korps_kort)}</td>
+        <td class="vlr-komp" title="${escHtmlValue(alle)}">${merker}</td>
+        <td class="vlr-tlf">${escapeHtml(m.telefon || '—')}</td>
+        <td>${konto}</td>
+        <td class="vlr-handling">${knapper}</td>
+      </tr>`;
+  }).join('')
+    : `<tr><td colspan="6" class="vl-tom">Ingen treff på «${escapeHtml(sok)}».</td></tr>`;
+
+  const treff = document.getElementById('vlr-treff');
+  if (treff) {
+    treff.textContent = sok
+      ? `${rader.length} av ${data.mannskap.length}` : `${rader.length}`;
+  }
+
+  return `
+    <div class="vl-kort">
+      <div class="vlr-tabellramme">
+        <table class="vlr-tabell">
+          <thead>
+            <tr>
+              ${_kolonneHode('navn', 'Navn')}
+              ${_kolonneHode('korps', 'Korps')}
+              <th>Kompetanse</th>
+              ${_kolonneHode('telefon', 'Telefon')}
+              <th>Konto</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>${kropp}</tbody>
+        </table>
+      </div>
+    </div>`;
 }
 
 
@@ -169,6 +242,11 @@ function mkVerdier(fane) {
       : '<span class="vl-merkelapp vl-ureservert">Inaktiv</span>';
     const kort = r.kortnavn
       ? `<span class="vl-merkelapp">${escapeHtml(r.kortnavn)}</span>` : '';
+    // Stigen synliggjøres i lista: uten den må man åpne hver rad for å se
+    // hvilke kurs som overordner hvilke.
+    const stige = r.bygger_paa_navn
+      ? `<span class="vl-meta">bygger på ${escapeHtml(r.bygger_paa_navn)}</span>`
+      : '';
     // Tallet står i lista, ikke bare i feilmeldingen: en verdimengde man kan
     // slette uten å vite hva som henger i den, sletter man for lett.
     const bruk = r.i_bruk
@@ -178,7 +256,7 @@ function mkVerdier(fane) {
       <div class="vl-rad${inaktiv}">
         <div class="d-flex align-items-center gap-2 flex-wrap">
           <span class="vl-navn">${escapeHtml(r.navn)}</span>
-          ${inaktivMerke}${kort}${bruk}
+          ${inaktivMerke}${kort}${stige}${bruk}
         </div>
         <div class="d-flex gap-2">${verdiKnapper}</div>
       </div>`;
@@ -372,9 +450,22 @@ function apneNyVerdi() {
   _sett('verdi-kortnavn', '');
   document.getElementById('verdi-aktiv').checked = true;
   document.getElementById('verdi-aktiv-rad').classList.add('d-none');
+  _stigefelt(reg, null);
   document.getElementById('verdi-kortnavn-rad')
     .classList.toggle('d-none', !reg.kortnavn);
   _apneModal('verdiModal');
+}
+
+
+function _stigefelt(reg, rad) {
+  // Kun kompetanser har en stige. En kompetanse kan ikke bygge på seg selv;
+  // resten av ringene stoppes på serveren, som er den som kan se hele treet.
+  const rad_el = document.getElementById('verdi-bygger-paa-rad');
+  if (rad_el) rad_el.classList.toggle('d-none', !reg.stige);
+  if (!reg.stige) return;
+  const valg = (data.kompetanser || []).filter((k) => !rad || k.id !== rad.id);
+  _fyllValg('verdi-bygger-paa', valg, 'Ingen — står alene');
+  _sett('verdi-bygger-paa', rad && rad.bygger_paa_id ? rad.bygger_paa_id : '');
 }
 
 
@@ -389,6 +480,7 @@ function apneRedigerVerdi(id) {
   _sett('verdi-kortnavn', rad.kortnavn || '');
   document.getElementById('verdi-aktiv').checked = rad.er_aktiv;
   document.getElementById('verdi-aktiv-rad').classList.remove('d-none');
+  _stigefelt(reg, rad);
   document.getElementById('verdi-kortnavn-rad')
     .classList.toggle('d-none', !reg.kortnavn);
   _apneModal('verdiModal');
@@ -405,6 +497,7 @@ async function lagreVerdi() {
 
     const kropp = { navn };
     if (reg.kortnavn) kropp.kortnavn = _les('verdi-kortnavn');
+    if (reg.stige) kropp.bygger_paa_id = _les('verdi-bygger-paa') || null;
     if (redigerer) kropp.er_aktiv = document.getElementById('verdi-aktiv').checked;
 
     const res = await apiFetch(
@@ -437,5 +530,6 @@ async function slettVerdi(id) {
 
 document.addEventListener('DOMContentLoaded', () => {
   gateKnapper();
+  _koblSok();
   lastRegistre();
 });
