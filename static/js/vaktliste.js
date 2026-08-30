@@ -204,7 +204,7 @@ function fyllNedtrekk() {
   _fyll('ny-vaktpost-rolle', aktivListe.roller, 'Uten rolle');
   _fyll('ny-vaktpost-mannskap', aktivListe.mannskap.map((m) => ({
     id: m.id, navn: `${m.navn} — ${m.korps_navn}`,
-  })), '');
+  })), '— ledig plass —');
 }
 
 
@@ -222,7 +222,12 @@ function tegnStatus() {
   if (!el) return;
   if (!aktivListe) { el.textContent = ''; el.className = 'vl-status'; return; }
   const vl = aktivListe.vaktliste;
-  el.textContent = vl.status_navn;
+  // Spennet står ved siden av statusen: det er det bemanningskurven tegnes
+  // over, og mangler det, skal man se hvorfor kurven er kortere enn ventet.
+  const spenn = vl.planlagt_slutt
+    ? ` · ${_dag(vl.startet)} ${_kl(vl.startet)} – ${_dag(vl.planlagt_slutt)} ${_kl(vl.planlagt_slutt)}`
+    : ' · ingen sluttid satt';
+  el.textContent = vl.status_navn + spenn;
   el.className = 'vl-status' + (vl.i_drift ? ' vl-drift' : '');
 }
 
@@ -309,6 +314,19 @@ function _iso16(iso) {
 }
 
 
+function _fyllValgFor(vp, kanRedigere) {
+  // Å fylle plassen er én feltendring, ikke en flytting mellom to tabeller —
+  // det er hele grunnen til at en ledig plass er en `Vaktpost` uten person.
+  if (!kanRedigere) return '<span class="vl-ledigtekst">Ledig plass</span>';
+  const valg = ['<option value="">— ledig plass —</option>'].concat(
+    (aktivListe.mannskap || []).map((m) =>
+      `<option value="${escHtmlValue(m.id)}">${escapeHtml(m.navn + ' — ' + m.korps_navn)}</option>`
+    )).join('');
+  return `<select class="vl-celle vl-fyll" data-action="endreVaktpost" data-hendelse="change"
+                  data-felt="mannskap_id" data-id="${escHtmlValue(vp.id)}">${valg}</select>`;
+}
+
+
 function _rolleValg(vp, kanRedigere) {
   // Rollen redigeres i raden. Før lå den bare i «Sett på vakt»-modalen, og
   // å endre den krevde å fjerne skiftet og sette det opp på nytt — samme
@@ -386,10 +404,16 @@ function mkRessurs(r) {
         ? escapeHtml(_dag(vp.fra_tid))
         : escapeHtml(`${_dag(vp.fra_tid)} → ${_dag(vp.til_tid)}`);
 
+      // En ledig plass er raden uten person. Den skal se ut som noe som
+      // gjenstår — ikke som en rad der navnet mangler ved en feil.
+      const navnCelle = vp.ledig
+        ? _fyllValgFor(vp, kanRore)
+        : escapeHtml(vp.navn);
+
       return `
-        <tr>
-          <td class="vl-navn">${escapeHtml(vp.navn)}</td>
-          <td>${escapeHtml(vp.korps_kort)}</td>
+        <tr class="${escHtmlValue(vp.ledig ? 'vl-ledig' : '')}">
+          <td class="vl-navn">${navnCelle}</td>
+          <td>${escapeHtml(vp.korps_kort || '—')}</td>
           <td class="vl-kompcelle">${komp}</td>
           <td>${_rolleValg(vp, kanRore)}</td>
           <td class="vl-dagcelle">${dager}</td>
@@ -435,25 +459,39 @@ function mkRessurs(r) {
 
 
 function _bemanningPerTime() {
-  // Hvor mange er på vakt hver time i vaktas spenn. Ett steg per time er
-  // grovt nok til å tegne, og fint nok til å se hullene — det er hullene
-  // planleggeren leter etter.
+  // **Hele vaktas lengde, ikke bare fra første til siste skift.** Leste vi
+  // bare skiftene, ville hullet i begynnelsen vært usynlig nettopp fordi
+  // ingen er satt opp der ennå — og det er det hullet planleggeren leter
+  // etter.
   const poster = aktivListe.vaktposter || [];
-  if (!poster.length) return [];
-
+  const vl = aktivListe.vaktliste || {};
   const TIME = 3600 * 1000;
-  const start = Math.min(...poster.map((v) => _d(v.fra_tid).getTime()));
-  const slutt = Math.max(...poster.map((v) => _d(v.til_tid).getTime()));
+
+  let start = vl.startet ? _d(vl.startet)?.getTime() : null;
+  let slutt = vl.planlagt_slutt ? _d(vl.planlagt_slutt)?.getTime() : null;
+
+  // Mangler spennet, faller vi tilbake på skiftene — bedre en kurve som
+  // dekker for lite enn ingen kurve mens vakta ennå ikke har en slutt.
+  if (start == null || slutt == null || slutt <= start) {
+    if (!poster.length) return [];
+    start = Math.min(...poster.map((v) => _d(v.fra_tid).getTime()));
+    slutt = Math.max(...poster.map((v) => _d(v.til_tid).getTime()));
+  }
+
   const steg = Math.ceil((slutt - start) / TIME);
   if (steg <= 0 || steg > 24 * 14) return [];   // urimelig spenn: ikke tegn
 
   const ut = [];
   for (let i = 0; i < steg; i += 1) {
     const t = start + i * TIME;
+    const paa = poster.filter((v) =>
+      _d(v.fra_tid).getTime() <= t && _d(v.til_tid).getTime() > t);
     ut.push({
       tid: new Date(t).toISOString(),
-      antall: poster.filter((v) =>
-        _d(v.fra_tid).getTime() <= t && _d(v.til_tid).getTime() > t).length,
+      // To tall, ikke ett: `planlagt` er alle plassene, `antall` er de som
+      // faktisk har en person. Avstanden mellom dem er det som gjenstår.
+      antall: paa.filter((v) => !v.ledig).length,
+      planlagt: paa.length,
     });
   }
   return ut;
@@ -463,31 +501,42 @@ function _bemanningPerTime() {
 function mkKurve() {
   const punkter = _bemanningPerTime();
   if (!punkter.length) return '';
-  const topp = Math.max(...punkter.map((p) => p.antall)) || 1;
+  const topp = Math.max(...punkter.map((p) => p.planlagt)) || 1;
+  const ledige = punkter.reduce((n, p) => n + (p.planlagt - p.antall), 0);
 
   // Rene CSS-søyler framfor Chart.js: biblioteket lastes kun på
-  // /statistikk/, og en bemanningskurve er ett tall per time.
+  // /statistikk/, og en bemanningskurve er ett tall per time. Den lyse delen
+  // er plasser uten person — hullene man planlegger for å tette.
   const soyler = punkter.map((p) => {
-    const h = Math.round((p.antall / topp) * 100);
-    const time = _d(p.tid).getHours();
-    // Døgnskillet markeres, ellers mister man hvilken dag man ser på.
-    const skille = time === 0 ? ' vl-dogn' : '';
-    return `<div class="vl-soyle${skille}" style="height: ${escHtmlValue(h)}%"
-                 title="${escHtmlValue(_dag(p.tid) + ' kl. ' + _kl(p.tid) + ': ' + p.antall)}"></div>`;
+    const hBemannet = Math.round((p.antall / topp) * 100);
+    const hPlanlagt = Math.round((p.planlagt / topp) * 100);
+    const skille = _d(p.tid).getHours() === 0 ? ' vl-dogn' : '';
+    const tittel = `${_dag(p.tid)} kl. ${_kl(p.tid)}: `
+                 + `${p.antall} av ${p.planlagt} plasser fylt`;
+    return `<div class="vl-stolpe${skille}" title="${escHtmlValue(tittel)}">
+              <div class="vl-planlagt" style="height: ${escHtmlValue(hPlanlagt)}%"></div>
+              <div class="vl-bemannet" style="height: ${escHtmlValue(hBemannet)}%"></div>
+            </div>`;
   }).join('');
 
-  const bunn = punkter.length
-    ? `${escapeHtml(_dag(punkter[0].tid))} → ${escapeHtml(_dag(punkter[punkter.length - 1].tid))}`
-    : '';
+  const bunn = `${escapeHtml(_dag(punkter[0].tid))} → `
+             + `${escapeHtml(_dag(punkter[punkter.length - 1].tid))}`;
+  const rest = ledige
+    ? `<span class="vl-meta">${escHtmlValue(ledige)} ubesatte plasstimer</span>`
+    : '<span class="vl-meta">Alle plasser fylt</span>';
 
   return `
     <div class="vl-kort vl-kurve-kort">
       <div class="vl-kort-topp">
         <span class="vl-kort-tittel">Bemanning gjennom vakta</span>
-        <span class="vl-meta">Topp: ${escHtmlValue(topp)} personer</span>
+        <div class="d-flex align-items-center gap-3">
+          <span class="vl-tegnforklaring"><i class="vl-prikk vl-prikk-bemannet"></i>Bemannet</span>
+          <span class="vl-tegnforklaring"><i class="vl-prikk vl-prikk-planlagt"></i>Ledig plass</span>
+          ${rest}
+        </div>
       </div>
       <div class="vl-kurve">${soyler}</div>
-      <div class="vl-meta">${bunn}</div>
+      <div class="vl-meta">${bunn} · topp ${escHtmlValue(topp)} plasser</div>
     </div>`;
 }
 
@@ -503,19 +552,29 @@ function mkOversikt() {
   const ressursnavn = {};
   aktivListe.ressurser.forEach((r) => { ressursnavn[r.id] = r.navn; });
 
+  // Ledige plasser hører ikke til noe korps ennå — de samles til slutt, som
+  // det som gjenstår. Uten dette ville de havnet under en gruppe uten navn.
+  const LEDIG = 'Ledige plasser';
   const grupper = {};
   poster.forEach((vp) => {
-    (grupper[vp.korps_navn] = grupper[vp.korps_navn] || []).push(vp);
+    const n = vp.ledig ? LEDIG : vp.korps_navn;
+    (grupper[n] = grupper[n] || []).push(vp);
   });
 
-  const deler = Object.keys(grupper).sort().map((korps) => {
+  const navn = Object.keys(grupper).sort((a, b) => {
+    if (a === LEDIG) return 1;
+    if (b === LEDIG) return -1;
+    return a.localeCompare(b);
+  });
+
+  const deler = navn.map((korps) => {
     const rader = grupper[korps]
       .slice()
       .sort((a, b) => a.fra_tid.localeCompare(b.fra_tid)
                    || a.navn.localeCompare(b.navn))
       .map((vp) => `
-        <tr>
-          <td class="vl-navn">${escapeHtml(vp.navn)}</td>
+        <tr class="${escHtmlValue(vp.ledig ? 'vl-ledig' : '')}">
+          <td class="vl-navn">${escapeHtml(vp.ledig ? '— ledig —' : vp.navn)}</td>
           <td>${escapeHtml(ressursnavn[vp.ressurs_id] || '—')}</td>
           <td>${escapeHtml(vp.rolle || '—')}</td>
           <td>${escapeHtml(_tidsspenn(vp))}</td>
@@ -524,6 +583,7 @@ function mkOversikt() {
     return `
       <div class="vl-korpsgruppe">
         <h3>${escapeHtml(korps)} (${escHtmlValue(grupper[korps].length)})</h3>
+        <div class="vl-tabellramme">
         <table class="vl-tabell vl-utskrift">
           <colgroup>
             <col style="width: 24%"><col style="width: 20%"><col style="width: 16%">
@@ -534,6 +594,7 @@ function mkOversikt() {
           </thead>
           <tbody>${rader}</tbody>
         </table>
+        </div>
       </div>`;
   });
 
@@ -674,7 +735,57 @@ function apneVaktpost(ressursId) {
   document.getElementById('ny-vaktpost-tittel').textContent =
     `Sett på vakt — ${ressurs.navn}`;
   document.getElementById('nyVaktpostModal').dataset.ressurs = String(ressursId);
+  document.getElementById('ny-vaktpost-mannskap').value = '';
+  document.getElementById('ny-vaktpost-antall').value = '1';
+  _vaktpostModusSkifte();
   new bootstrap.Modal(document.getElementById('nyVaktpostModal')).show();
+}
+
+
+function _vaktpostModusSkifte() {
+  // Antall plasser gir bare mening for ledige: to identiske rader med samme
+  // person ville uansett brutt unik-skranken.
+  const valgt = document.getElementById('ny-vaktpost-mannskap')?.value;
+  document.getElementById('ny-vaktpost-antall-rad')
+    ?.classList.toggle('d-none', !!valgt);
+}
+
+
+function apneVaktlengde() {
+  if (!aktivListe) return;
+  _skjulFeil('vakt-lengde-feil');
+  const vl = aktivListe.vaktliste;
+  _settTid('vakt-start', vl.startet);
+  _settTid('vakt-slutt', vl.planlagt_slutt);
+  new bootstrap.Modal(document.getElementById('vaktlengdeModal')).show();
+}
+
+
+function _settTid(id, iso) {
+  const el = document.getElementById(id);
+  if (el) el.value = iso ? _iso16(iso) : '';
+}
+
+
+async function lagreVaktlengde() {
+  _skjulFeil('vakt-lengde-feil');
+  await withSubmitGuard('vakt-lengde-knapp', async () => {
+    const res = await apiFetch(`/vaktliste/api/vaktlister/${aktivListe.vaktliste.id}/`, {
+      method: 'PUT',
+      body: JSON.stringify({
+        startet: _tidFraFelt('vakt-start'),
+        planlagt_slutt: _tidFraFelt('vakt-slutt'),
+      }),
+    });
+    const d = await res.json().catch(() => ({}));
+    if (!res.ok || d.status !== 'ok') {
+      _visFeil('vakt-lengde-feil', d.message || 'Kunne ikke lagre.');
+      return;
+    }
+    _lukkModal('vaktlengdeModal');
+    await lastVaktlister();
+    await lastListe(aktivListe.vaktliste.id);
+  });
 }
 
 
@@ -695,8 +806,9 @@ async function opprettVaktpost() {
     const res = await apiFetch(`/vaktliste/api/ressurser/${ressursId}/vaktposter/`, {
       method: 'POST',
       body: JSON.stringify({
-        mannskap_id: document.getElementById('ny-vaktpost-mannskap')?.value,
+        mannskap_id: document.getElementById('ny-vaktpost-mannskap')?.value || null,
         rolle_id: document.getElementById('ny-vaktpost-rolle')?.value || null,
+        antall: Number(document.getElementById('ny-vaktpost-antall')?.value) || 1,
         fra_tid: fra,
         til_tid: til,
       }),
@@ -767,5 +879,7 @@ async function fjernVaktpost(id) {
 document.addEventListener('DOMContentLoaded', () => {
   gateKnapper();
   _koblCellelytter();
+  document.getElementById('ny-vaktpost-mannskap')
+    ?.addEventListener('change', _vaktpostModusSkifte);
   lastVaktlister();
 });

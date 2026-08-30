@@ -556,3 +556,80 @@ class GrensesnittetsGatingTests(SimpleTestCase):
         self._kjor(self.h_reg, self._vindu('les', korps=1), """
             assert(kanRedigerePerson({korps_id: 1}) === false, 'les redigerer ikke');
         """)
+
+
+class LedigPlassTilgangTests(TilgangsBasis):
+    """Å opprette et behov er å planlegge; å fylle det er å føre sitt korps.
+
+    `mannskap=None` gir badge-halvdelen ingenting å sjekke mot, så regelen
+    ville falt åpen på nøyaktig det tilfellet som er nytt. Derfor er en ledig
+    plass eksplisitt `skriv_full`: vaktleder sier «Lag 1 trenger fire»,
+    korpset fyller dem.
+    """
+
+    def _plass(self, klient, ressurs, **overstyr):
+        kropp = {'fra_tid': self._iso(0), 'til_tid': self._iso(8)}
+        kropp.update(overstyr)
+        return klient.post(f'/vaktliste/api/ressurser/{ressurs.pk}/vaktposter/',
+                           data=kropp, content_type='application/json')
+
+    def test_korpsbruker_kan_ikke_opprette_ledige_plasser(self):
+        """Hun bestemmer ikke hvor mange plasser laget hennes skal ha."""
+        res = self._plass(self.c_kb, self.res_hgsd)
+        self.assertEqual(res.status_code, 403)
+        self.assertEqual(Vaktpost.objects.count(), 0)
+
+    def test_skriv_full_oppretter_dem(self):
+        self.assertEqual(
+            self._plass(self.c_vl, self.res_hgsd).status_code, 201)
+
+    def test_leser_oppretter_ingenting(self):
+        self.assertEqual(
+            self._plass(self.c_leser, self.res_hgsd).status_code, 403)
+
+    def test_korpsbruker_fyller_plass_paa_sin_egen_ressurs(self):
+        pk = self._plass(self.c_vl, self.res_hgsd).json()['data']['id']
+        res = self.c_kb.put(f'/vaktliste/api/vaktposter/{pk}/',
+                            data={'mannskap_id': self.p_hgsd.pk},
+                            content_type='application/json')
+        self.assertEqual(res.status_code, 200)
+
+    def test_korpsbruker_kan_ikke_fylle_med_annet_korps(self):
+        """Regelen sjekkes på nytt mot personen som skal **inn**. Uten det
+        kunne hun fylt sin egen ressurs med en fra et annet korps."""
+        pk = self._plass(self.c_vl, self.res_hgsd).json()['data']['id']
+        res = self.c_kb.put(f'/vaktliste/api/vaktposter/{pk}/',
+                            data={'mannskap_id': self.p_karmoy.pk},
+                            content_type='application/json')
+        self.assertEqual(res.status_code, 403)
+        self.assertIsNone(Vaktpost.objects.get(pk=pk).mannskap_id)
+
+    def test_korpsbruker_kan_ikke_fylle_plass_paa_annen_ressurs(self):
+        pk = self._plass(self.c_vl, self.res_karmoy).json()['data']['id']
+        res = self.c_kb.put(f'/vaktliste/api/vaktposter/{pk}/',
+                            data={'mannskap_id': self.p_hgsd.pk},
+                            content_type='application/json')
+        self.assertEqual(res.status_code, 403)
+
+    def test_korpsbruker_kan_ikke_tomme_en_plass_hun_ikke_raar_over(self):
+        pk = self._plass(self.c_vl, self.res_karmoy,
+                         mannskap_id=self.p_karmoy.pk).json()['data']['id']
+        res = self.c_kb.put(f'/vaktliste/api/vaktposter/{pk}/',
+                            data={'mannskap_id': None},
+                            content_type='application/json')
+        self.assertEqual(res.status_code, 403)
+
+    def test_korpsbruker_kan_ikke_avlyse_en_ledig_plass(self):
+        """Hun fyller plasser, hun avlyser dem ikke — kunne hun det, ville et
+        hull i bemanningen kunne skjules ved å slette raden som viste det."""
+        pk = self._plass(self.c_vl, self.res_hgsd).json()['data']['id']
+        res = self.c_kb.delete(f'/vaktliste/api/vaktposter/{pk}/')
+        self.assertEqual(res.status_code, 403)
+        self.assertTrue(Vaktpost.objects.filter(pk=pk).exists())
+
+    def test_korpsbruker_kan_fjerne_sitt_eget_fylte_skift(self):
+        """Å ta sin egen person av lista er noe annet enn å avlyse plassen."""
+        pk = self._plass(self.c_vl, self.res_hgsd,
+                         mannskap_id=self.p_hgsd.pk).json()['data']['id']
+        self.assertEqual(
+            self.c_kb.delete(f'/vaktliste/api/vaktposter/{pk}/').status_code, 200)

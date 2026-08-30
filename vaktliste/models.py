@@ -274,6 +274,19 @@ class Vaktliste(BaseTimeStampedModel):
         db_index=True,
         verbose_name='Status',
     )
+    # **Planlagt slutt hører til lista, ikke til `core.Vakt`.** Vakta har
+    # `startet` (som *er* starten, og redigeres herfra) og `avsluttet` — men
+    # det siste betyr «vakta ble avsluttet», en hendelse noen utløste. En
+    # planlagt slutt er et anslag som kan flyttes mens man planlegger, og de
+    # to ville kollidert i samme kolonne.
+    #
+    # Spennet er det bemanningskurven tegnes over: uten det kunne kurven bare
+    # vise fra første til siste skift, og da er hullet i begynnelsen usynlig
+    # nettopp fordi ingen er satt opp der ennå.
+    planlagt_slutt = models.DateTimeField(
+        null=True, blank=True,
+        verbose_name='Planlagt slutt',
+        help_text='Når vakta er tenkt å være over. Styrer bemanningskurven.')
     satt_i_drift_at = models.DateTimeField(
         null=True, blank=True, verbose_name='Satt i drift')
     satt_i_drift_av = models.ForeignKey(
@@ -388,13 +401,22 @@ class Vaktpost(BaseTimeStampedModel):
         related_name='vaktposter',
         verbose_name='Ressurs',
     )
+    # **Nullbar: en ledig plass er et skift som mangler en person.**
+    # Planlegging begynner med behovet — «Lag 1 trenger fire, én av dem
+    # lagleder» — og personene fylles inn etter hvert. Alternativet, en egen
+    # plassholder-modell, ville duplisert tider, rolle og ressurs og gjort
+    # «å fylle plassen» til en flytting mellom to tabeller i stedet for én
+    # feltendring.
+    #
     # PROTECT: historikken om hvem som gikk vakt skal ikke kunne rives bort
     # under en sletting. Pensjonering (`er_aktiv=False`) er veien ut.
     mannskap = models.ForeignKey(
         Mannskap,
+        null=True, blank=True,
         on_delete=models.PROTECT,
         related_name='vaktposter',
         verbose_name='Mannskap',
+        help_text='Tom = ledig plass som skal fylles.',
     )
     rolle = models.ForeignKey(
         VaktRolle,
@@ -427,11 +449,18 @@ class Vaktpost(BaseTimeStampedModel):
         verbose_name = 'Vaktpost'
         verbose_name_plural = 'Vaktposter'
         ordering = ['fra_tid', 'mannskap__navn']
+        # NB: ledige plasser (mannskap=NULL) sorteres først innenfor samme
+        # starttid — de er det som gjenstår, og skal være lette å se.
         constraints = [
             # Samme person, samme ressurs, samme starttid er en dobbeltføring.
             # Overlapp på tvers av ressurser stoppes bevisst *ikke*: noen
             # ganger står man på to lister med vilje, og planleggingstallene
             # (§8b) flagger det i stedet for å nekte.
+            #
+            # **Ledige plasser er unntatt av seg selv.** NULL er ikke lik
+            # NULL i en unik-skranke, så fire tomme plasser på samme lag til
+            # samme tid går fint — og det er nettopp det man setter opp når
+            # man planlegger.
             models.UniqueConstraint(
                 fields=['ressurs', 'mannskap', 'fra_tid'],
                 name='unikt_skift_per_person_og_ressurs'),
@@ -441,7 +470,8 @@ class Vaktpost(BaseTimeStampedModel):
         ]
 
     def __str__(self) -> str:
-        return f'{self.mannskap.navn} på {self.ressurs.navn}'
+        hvem = self.mannskap.navn if self.mannskap_id else 'Ledig plass'
+        return f'{hvem} på {self.ressurs.navn}'
 
     @property
     def er_tilstede(self) -> bool:
@@ -451,4 +481,6 @@ class Vaktpost(BaseTimeStampedModel):
         aldri en lagret status — to kilder til samme sannhet går i utakt
         første gang noe feiler halvveis.
         """
-        return self.mott_at is not None and self.av_vakt_at is None
+        return (self.mannskap_id is not None
+                and self.mott_at is not None
+                and self.av_vakt_at is None)

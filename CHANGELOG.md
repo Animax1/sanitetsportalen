@@ -4,6 +4,43 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-08-30 — Vaktlengde, ledige plasser og en kurve over hele vakta
+
+**1647 tester grønne** (33 nye). Migrasjon `vaktliste.0005`. Tredje runde på
+Andrés tilbakemelding, og den som endret modellen mest.
+
+- **`Vaktpost.mannskap` er nullbar: en ledig plass er et skift som mangler en
+  person.** Planlegging begynner med behovet — «Lag 1 trenger fire, én av dem
+  lagleder» — og personene fylles inn etter hvert. En egen plassholder-modell
+  ville duplisert tider, rolle og ressurs, og gjort «å fylle plassen» til en
+  flytting mellom to tabeller i stedet for én feltendring. `antall` lager flere
+  like plasser i ett kall; NULL er ikke lik NULL i unik-skranken, så fire tomme
+  plasser til samme tid går fint.
+- **Vakta kan få og endre en lengde.** Starten redigeres på `Vakt.startet` — den
+  *er* starten — mens planlagt slutt er et nytt felt på `Vaktliste`.
+  `Vakt.avsluttet` betyr «vakta ble avsluttet», en hendelse noen utløste, og kan
+  ikke bære et anslag man flytter på mens man planlegger. Året følger starten,
+  fordi vakta kan flyttes over et årsskifte og `year` er portalens scope-nøkkel.
+- **Kurven dekker hele vakta, ikke bare skiftene**, og viser to tall per time:
+  fylte plasser i mettet farge, alle plasser i lys. Avstanden mellom dem er det
+  som gjenstår å bemanne. Uten vaktas spenn var hullet i begynnelsen usynlig
+  nettopp fordi ingen er satt opp der ennå. Mangler sluttiden, faller den
+  tilbake på skiftene — bedre en kurve som dekker for lite enn ingen kurve.
+- **Utskriftslista holdes i sin egen ramme.** Tabellene arvet `min-width` fra
+  `.vl-tabell` uten en ramme rundt seg og stakk ut av kortet; på papiret
+  nullstilles begge deler. Ledige plasser samles i sin egen gruppe til slutt —
+  de hører ikke til noe korps ennå.
+- **Regelen måtte deles i to, funnet av en ny test.** `kan_sette_vaktpost` spør
+  om et *par* kan opprettes (og `mannskap=None` er å planlegge, altså
+  `skriv_full`). `kan_rore_vaktpost` spør om brukeren får ta i en rad som
+  finnes. Brukt den første til begge, låste den korps-brukeren ute av akkurat de
+  plassene som var satt av til henne. Og å *avlyse* en ledig plass er
+  `skriv_full`: korpset fyller plasser, det skjuler ikke hull ved å slette raden
+  som viste dem.
+- Mutasjonstestet åtte veier, alle røde.
+
+---
+
 ## 2026-08-30 — Planleggingssiden: regneark, datoer, utskrift og bemanningskurve
 
 **1614 tester grønne** (15 nye). Kun frontend og serialisering — ingen migrasjon.

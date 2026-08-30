@@ -592,8 +592,10 @@ class ApiTests(TestCase):
                 self.assertEqual(self._sett_paa(r, **mangel).status_code, 400)
 
     def test_ukjent_mannskap_avvises(self):
+        """En ID som ikke finnes er en feil. **Tom er noe annet:** det er en
+        ledig plass — se `LedigePlasserTests`."""
         r = self._ressurs(self._liste())
-        for daarlig in (9999, None, 'kari'):
+        for daarlig in (9999, 'kari'):
             with self.subTest(id=daarlig):
                 self.assertEqual(
                     self._sett_paa(r, mannskap_id=daarlig).status_code, 400)
@@ -701,3 +703,181 @@ class RessurstabellensDataTests(TestCase):
         etter = res.json()['data']
         self.assertEqual(sorted(etter['kompetanser']), ['AFØR', 'Sykepleier'])
         self.assertIn('rolle_id', etter)
+
+
+@override_settings(SECURE_SSL_REDIRECT=False, RATELIMIT_ENABLE=False)
+class LedigePlasserTests(TestCase):
+    """En ledig plass er et skift som mangler en person.
+
+    Planlegging begynner med behovet — «Lag 1 trenger fire, én av dem
+    lagleder» — og personene fylles inn etter hvert. Derfor er
+    `Vaktpost.mannskap` nullbar framfor at det finnes en egen
+    plassholder-modell: tider, rolle og ressurs virker allerede, og «å fylle
+    plassen» er én feltendring i stedet for en flytting mellom to tabeller.
+    """
+
+    def setUp(self):
+        self.korps = Korps.objects.create(navn='Haugesund', kortnavn='HGSD')
+        self.rolle = VaktRolle.objects.create(navn='Lagleder')
+        self.vl = services.opprett_planlagt_vakt('Vakta')
+        self.ressurs = Ressurs.objects.create(vaktliste=self.vl, navn='Lag 1')
+        self.person = Mannskap.objects.create(navn='Kari', korps=self.korps)
+        self.c = _klient(_bruker('adm', admin=True))
+        self.na = timezone.now()
+
+    def _iso(self, timer=0):
+        return (self.na + timedelta(hours=timer)).isoformat()
+
+    def _plass(self, **overstyr):
+        kropp = {'fra_tid': self._iso(0), 'til_tid': self._iso(8)}
+        kropp.update(overstyr)
+        return self.c.post(
+            f'/vaktliste/api/ressurser/{self.ressurs.pk}/vaktposter/',
+            data=kropp, content_type='application/json')
+
+    def test_plass_uten_person_opprettes(self):
+        res = self._plass(rolle_id=self.rolle.pk)
+        self.assertEqual(res.status_code, 201)
+        data = res.json()['data']
+        self.assertTrue(data['ledig'])
+        self.assertIsNone(data['mannskap_id'])
+        self.assertEqual(data['rolle'], 'Lagleder')
+
+    def test_flere_like_plasser_i_ett_kall(self):
+        """Fire tomme plasser på et lag skal ikke være fire klikk."""
+        res = self._plass(antall=4)
+        self.assertEqual(res.json()['data']['antall_opprettet'], 4)
+        self.assertEqual(Vaktpost.objects.count(), 4)
+
+    def test_identiske_ledige_plasser_bryter_ikke_skranken(self):
+        """NULL er ikke lik NULL i en unik-skranke — og det er nettopp det
+        som gjør at man kan sette opp fire tomme plasser til samme tid."""
+        self._plass()
+        self.assertEqual(self._plass().status_code, 201)
+        self.assertEqual(Vaktpost.objects.count(), 2)
+
+    def test_antall_gjelder_ikke_naar_en_person_er_valgt(self):
+        """To identiske rader med samme person ville brutt skranken."""
+        res = self._plass(mannskap_id=self.person.pk, antall=4)
+        self.assertEqual(res.json()['data']['antall_opprettet'], 1)
+
+    def test_urimelig_antall_avvises(self):
+        for daarlig in (0, -3, 999):
+            with self.subTest(antall=daarlig):
+                self.assertEqual(self._plass(antall=daarlig).status_code, 400)
+        self.assertEqual(Vaktpost.objects.count(), 0)
+
+    def test_plassen_fylles_med_en_feltendring(self):
+        pk = self._plass().json()['data']['id']
+        res = self.c.put(f'/vaktliste/api/vaktposter/{pk}/',
+                         data={'mannskap_id': self.person.pk},
+                         content_type='application/json')
+        data = res.json()['data']
+        self.assertFalse(data['ledig'])
+        self.assertEqual(data['navn'], 'Kari')
+
+    def test_plassen_kan_tommes_igjen(self):
+        """Noen melder avbud i planleggingsfasen — da er plassen ledig på
+        nytt, ikke slettet."""
+        pk = self._plass(mannskap_id=self.person.pk).json()['data']['id']
+        res = self.c.put(f'/vaktliste/api/vaktposter/{pk}/',
+                         data={'mannskap_id': None},
+                         content_type='application/json')
+        self.assertTrue(res.json()['data']['ledig'])
+
+    def test_ukjent_person_avvises_ved_fylling(self):
+        pk = self._plass().json()['data']['id']
+        res = self.c.put(f'/vaktliste/api/vaktposter/{pk}/',
+                         data={'mannskap_id': 9999},
+                         content_type='application/json')
+        self.assertEqual(res.status_code, 400)
+
+    def test_ledig_plass_er_ikke_tilstede(self):
+        pk = self._plass().json()['data']['id']
+        vp = Vaktpost.objects.get(pk=pk)
+        vp.mott_at = self.na
+        self.assertFalse(vp.er_tilstede, 'ingen kan møte på en tom plass')
+
+    def test_str_sier_ledig_plass(self):
+        pk = self._plass().json()['data']['id']
+        self.assertIn('Ledig plass', str(Vaktpost.objects.get(pk=pk)))
+
+
+@override_settings(SECURE_SSL_REDIRECT=False, RATELIMIT_ENABLE=False)
+class VaktlengdeTests(TestCase):
+    """Vakta må kunne få og endre en lengde etter at den er opprettet.
+
+    Spennet er det bemanningskurven tegnes over. Uten det kunne kurven bare
+    vise fra første til siste skift — og da er hullet i begynnelsen usynlig
+    nettopp fordi ingen er satt opp der ennå.
+    """
+
+    def setUp(self):
+        self.start = timezone.now()
+        self.vl = services.opprett_planlagt_vakt('Vakta', startet=self.start)
+        self.c = _klient(_bruker('adm', admin=True))
+
+    def _put(self, **kropp):
+        return self.c.put(f'/vaktliste/api/vaktlister/{self.vl.pk}/',
+                          data=kropp, content_type='application/json')
+
+    def test_slutt_kan_settes(self):
+        slutt = self.start + timedelta(hours=36)
+        res = self._put(planlagt_slutt=slutt.isoformat())
+        self.assertEqual(res.status_code, 200)
+        self.vl.refresh_from_db()
+        self.assertIsNotNone(self.vl.planlagt_slutt)
+
+    def test_start_kan_flyttes(self):
+        ny = self.start + timedelta(days=7)
+        self._put(startet=ny.isoformat())
+        self.vl.vakt.refresh_from_db()
+        self.assertEqual(self.vl.vakt.startet.date(), ny.date())
+
+    def test_aaret_folger_starten(self):
+        """Vakta kan flyttes over et årsskifte mens den planlegges, og `year`
+        er portalens scope-nøkkel."""
+        ny = timezone.make_aware(timezone.datetime(2099, 3, 1, 8, 0))
+        self._put(startet=ny.isoformat())
+        self.vl.vakt.refresh_from_db()
+        self.assertEqual(self.vl.vakt.year, 2099)
+
+    def test_slutt_for_start_avvises(self):
+        res = self._put(planlagt_slutt=(self.start - timedelta(hours=1)).isoformat())
+        self.assertEqual(res.status_code, 400)
+        self.vl.refresh_from_db()
+        self.assertIsNone(self.vl.planlagt_slutt)
+
+    def test_tom_start_avvises(self):
+        res = self._put(startet=None)
+        self.assertEqual(res.status_code, 400)
+
+    def test_slutt_kan_fjernes(self):
+        self._put(planlagt_slutt=(self.start + timedelta(hours=8)).isoformat())
+        self._put(planlagt_slutt=None)
+        self.vl.refresh_from_db()
+        self.assertIsNone(self.vl.planlagt_slutt)
+
+    def test_spennet_ligger_i_svaret(self):
+        slutt = self.start + timedelta(hours=8)
+        self._put(planlagt_slutt=slutt.isoformat())
+        data = self.c.get(f'/vaktliste/api/vaktlister/{self.vl.pk}/').json()['data']
+        self.assertIsNotNone(data['vaktliste']['planlagt_slutt'])
+
+    def test_services_vaktspenn_krever_begge_ender(self):
+        self.assertEqual(services.vaktspenn(self.vl), (None, None))
+        self.vl.planlagt_slutt = self.start + timedelta(hours=8)
+        self.vl.save()
+        start, slutt = services.vaktspenn(self.vl)
+        self.assertIsNotNone(start)
+        self.assertIsNotNone(slutt)
+
+    def test_lengden_er_skriv_full(self):
+        """Spennet gjelder hele vakta, ikke ett korps' del av den."""
+        for nivaa in ('les', 'skriv_handling'):
+            with self.subTest(nivaa=nivaa):
+                c = _klient(_bruker(f'b_{nivaa}', nivaa))
+                res = c.put(f'/vaktliste/api/vaktlister/{self.vl.pk}/',
+                            data={'planlagt_slutt': None},
+                            content_type='application/json')
+                self.assertEqual(res.status_code, 403)

@@ -285,6 +285,14 @@ fase 3–7 gjenstår — se `docs/BESLUTNING_VAKTLISTE.md`, som er besluttet i s
   arver korpset, og dermed hva den kontoen får redigere.
 - **Kostbehov/matallergi lagres ikke** (art. 9 — besluttet holdt utenfor portalen), og
   `Mannskap.notat` er unntatt verdilogging i audit (`signals.FELT_UTEN_VERDILOGGING`).
+- **En ledig plass er en `Vaktpost` uten `mannskap`.** Planlegging begynner med
+  behovet, og «å fylle plassen» er én feltendring. Å *opprette* en ledig plass er
+  `skriv_full` (vaktleder setter behovet), å *fylle* den krever badge og
+  reservasjon som ellers — de to spørsmålene er `services.kan_sette_vaktpost()`
+  og `services.kan_rore_vaktpost()`, og de må ikke slås sammen.
+- **Vaktas lengde: start på `Vakt.startet`, slutt på `Vaktliste.planlagt_slutt`.**
+  `Vakt.avsluttet` betyr «vakta ble avsluttet» — en hendelse — og kan ikke bære
+  et anslag man flytter på. Spennet er det bemanningskurven tegnes over.
 - **Plan og faktisk er fire felter, ikke to.** `fra_tid`/`til_tid` er planen,
   `mott_at`/`av_vakt_at` hva som skjedde. Avviket er informasjonen. Stemplene settes
   først i fase 4, og da bak `skriv_full`.

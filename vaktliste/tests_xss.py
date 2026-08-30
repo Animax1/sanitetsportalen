@@ -23,6 +23,7 @@ HTML_BUILDERS = (
     'tegnFaner',
     'mkRessurs',
     '_rolleValg',
+    '_fyllValgFor',
     'mkOversikt',
     'mkKurve',
     'mkIkkePlassert',
@@ -66,6 +67,17 @@ REVIEWED_INTERPOLATIONS = {
     '_dag(vl.startet)': 'datostreng fra en Date, ingen brukerdata',
     '_dag(vp.fra_tid)': 'datostreng fra en Date, ingen brukerdata',
     '_dag(vp.til_tid)': 'datostreng fra en Date, ingen brukerdata',
+    # Ledige plasser og den todelte kurven (30. aug.):
+    'navnCelle': 'markup fra `_fyllValgFor`, som selv skannes her',
+    'rest': 'markup bygget lokalt, tallet escapet inni',
+    '_dag(punkter[0].tid)': 'datostreng fra en Date, ingen brukerdata',
+    # `tittel` er ren tekst som escapes én gang ved innsetting i `title=`.
+    # Escapet vi her også, ville teksten blitt dobbeltescapet i tooltipen —
+    # samme mønster som `meta` i oppdrag-sentral.js.
+    '_dag(p.tid)': 'bygger ren tekst i `tittel`, som escapes ved innsetting',
+    '_kl(p.tid)': 'bygger ren tekst i `tittel`, som escapes ved innsetting',
+    'p.antall': 'tall, i samme rene tekst som escapes ved innsetting',
+    'p.planlagt': 'tall, i samme rene tekst som escapes ved innsetting',
 }
 
 
@@ -126,7 +138,8 @@ class VaktlisteEscapingOppforselTests(SimpleTestCase):
     HARNESS = (
         (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue', 'trustedHtml',
                            '_escHtml', 'klokke')),
-        (VAKTLISTE_JS, ('mkRessurs', '_rolleValg', 'mkOversikt', 'mkKurve',
+        (VAKTLISTE_JS, ('mkRessurs', '_rolleValg', '_fyllValgFor',
+                        'mkOversikt', 'mkKurve',
                         'mkIkkePlassert', 'tegnFaner', '_posterFor',
                         '_ikkePlassert', '_tidsspenn', '_vaktspenn',
                         '_bemanningPerTime', '_iso16', '_d', '_kl', '_dag',
@@ -606,4 +619,87 @@ class BemanningskurveTests(SimpleTestCase):
               {fra_tid: '2026-10-03T08:00:00', til_tid: '2099-10-03T08:00:00'},
             ]};
             assert(_bemanningPerTime().length === 0, 'skal gi opp, ikke henge');
+        """)
+
+
+class KurveOverHeleVaktaTests(SimpleTestCase):
+    """Kurven skal dekke vaktas lengde, ikke bare skiftene.
+
+    Meldt av André: leste den bare skiftene, ville hullet i begynnelsen vært
+    usynlig nettopp fordi ingen er satt opp der ennå — og det er det hullet
+    planleggeren leter etter.
+    """
+
+    HARNESS = (
+        (VAKTLISTE_JS, ('_d', '_kl', '_dag', '_bemanningPerTime')),
+    )
+
+    def setUp(self):
+        if not node_available():
+            self.skipTest('node er ikke tilgjengelig')
+        self.harness = build_harness(self.HARNESS)
+
+    def test_spennet_kommer_fra_vakta_ikke_fra_skiftene(self):
+        run_node(self.harness, """
+            globalThis.aktivListe = {
+              vaktliste: {startet: '2026-10-03T08:00:00',
+                          planlagt_slutt: '2026-10-03T20:00:00'},
+              vaktposter: [
+                {fra_tid: '2026-10-03T12:00:00', til_tid: '2026-10-03T14:00:00',
+                 ledig: false},
+              ]};
+            const p = _bemanningPerTime();
+            assert(p.length === 12, 'tolv timer fra vakta, fikk ' + p.length);
+            assert(p[0].antall === 0, 'hullet kl 08 skal synes');
+            assert(p[4].antall === 1, 'kl 12 er bemannet');
+            assert(p[11].antall === 0, 'hullet paa slutten skal ogsaa synes');
+        """)
+
+    def test_ledige_plasser_telles_som_behov_ikke_bemanning(self):
+        """Avstanden mellom de to tallene er det som gjenstår å bemanne."""
+        run_node(self.harness, """
+            globalThis.aktivListe = {
+              vaktliste: {startet: '2026-10-03T08:00:00',
+                          planlagt_slutt: '2026-10-03T10:00:00'},
+              vaktposter: [
+                {fra_tid: '2026-10-03T08:00:00', til_tid: '2026-10-03T10:00:00',
+                 ledig: false},
+                {fra_tid: '2026-10-03T08:00:00', til_tid: '2026-10-03T10:00:00',
+                 ledig: true},
+              ]};
+            const p = _bemanningPerTime();
+            assert(p[0].antall === 1, 'en person, fikk ' + p[0].antall);
+            assert(p[0].planlagt === 2, 'to plasser, fikk ' + p[0].planlagt);
+        """)
+
+    def test_uten_sluttid_faller_den_tilbake_paa_skiftene(self):
+        """Bedre en kurve som dekker for lite enn ingen kurve mens vakta
+        ennå ikke har fått en slutt."""
+        run_node(self.harness, """
+            globalThis.aktivListe = {
+              vaktliste: {startet: '2026-10-03T08:00:00', planlagt_slutt: null},
+              vaktposter: [
+                {fra_tid: '2026-10-03T12:00:00', til_tid: '2026-10-03T14:00:00',
+                 ledig: false},
+              ]};
+            const p = _bemanningPerTime();
+            assert(p.length === 2, 'faller tilbake paa skiftene, fikk ' + p.length);
+        """)
+
+    def test_ugyldig_spenn_faller_tilbake_ogsaa(self):
+        run_node(self.harness, """
+            globalThis.aktivListe = {
+              vaktliste: {startet: '2026-10-03T20:00:00',
+                          planlagt_slutt: '2026-10-03T08:00:00'},
+              vaktposter: [
+                {fra_tid: '2026-10-03T12:00:00', til_tid: '2026-10-03T14:00:00',
+                 ledig: false},
+              ]};
+            assert(_bemanningPerTime().length === 2, 'slutt foer start ignoreres');
+        """)
+
+    def test_verken_spenn_eller_skift_gir_ingen_kurve(self):
+        run_node(self.harness, """
+            globalThis.aktivListe = { vaktliste: {}, vaktposter: [] };
+            assert(_bemanningPerTime().length === 0, 'ingenting aa tegne');
         """)

@@ -481,3 +481,101 @@
     max-width: none !important;
   }
 }
+
+/* ── Ledige plasser ───────────────────────────────────────────────────── */
+/*
+   En ledig plass er et skift som mangler en person. Den skal se ut som noe
+   som gjenstår — ikke som en rad der navnet mangler ved en feil.
+*/
+.vl-tabell tr.vl-ledig {
+  background: color-mix(in srgb, var(--portal-warning, #f59e0b) 8%, transparent);
+}
+
+.vl-tabell tr.vl-ledig td {
+  border-left: 0;
+}
+
+.vl-ledigtekst {
+  color: var(--portal-warning, #f59e0b);
+  font-style: italic;
+}
+
+.vl-fyll {
+  border-color: var(--portal-warning, #f59e0b);
+}
+
+/* ── Kurven: bemannet mot planlagt ────────────────────────────────────── */
+/*
+   To lag i samme stolpe. Den lyse er alle plassene, den mettede er de som
+   har en person — avstanden mellom dem er det som gjenstår å bemanne.
+*/
+.vl-stolpe {
+  position: relative;
+  flex: 1 1 auto;
+  min-width: 2px;
+  height: 100%;
+}
+
+.vl-planlagt,
+.vl-bemannet {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  border-radius: 1px 1px 0 0;
+  min-height: 1px;
+}
+
+.vl-planlagt {
+  background: color-mix(in srgb, var(--portal-accent, #3b82f6) 28%, transparent);
+}
+
+.vl-bemannet {
+  background: var(--portal-accent, #3b82f6);
+}
+
+.vl-stolpe.vl-dogn::before {
+  content: '';
+  position: absolute;
+  left: -1px;
+  top: 0;
+  bottom: 0;
+  border-left: 1px solid var(--text-soft);
+}
+
+.vl-tegnforklaring {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.vl-prikk {
+  width: 0.6rem;
+  height: 0.6rem;
+  border-radius: 2px;
+  display: inline-block;
+}
+
+.vl-prikk-bemannet { background: var(--portal-accent, #3b82f6); }
+.vl-prikk-planlagt {
+  background: color-mix(in srgb, var(--portal-accent, #3b82f6) 28%, transparent);
+}
+
+/* ── Utskriftsarket holdes i sin egen ramme ───────────────────────────── */
+/*
+   Utskriftstabellene arvet `min-width` fra `.vl-tabell` uten en ramme rundt
+   seg, og stakk dermed ut av kortet. På papiret finnes ingen rullefelt, så
+   der nullstilles begge deler.
+*/
+.vl-utskrift {
+  min-width: 34rem;
+}
+
+@media print {
+  .vl-tabellramme { overflow: visible !important; }
+  .vl-utskrift { min-width: 0 !important; }
+  .vl-tabell tr.vl-ledig { background: transparent !important; }
+  .vl-ledigtekst { color: #000 !important; }
+}

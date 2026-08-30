@@ -868,6 +868,11 @@ Gjennomgang 13. aug. 2026, med 1000 pasienter og peak 100 brukere som premiss.
             i raden. Dato + ukedag i tidsvisningen (skift over midnatt var
             tvetydige). «Oversikt» er utskriftslista med knapp og print-CSS, og
             bemanningskurven står over den.
+      - [x] **Vaktlengde og ledige plasser (30. aug. 2026).** `Vaktpost.mannskap`
+            nullbar — en ledig plass er et skift som mangler en person, og
+            planlegging begynner med behovet. Vakta har fått `planlagt_slutt` og
+            redigerbar start, og kurven tegnes over hele spennet med fylte mot
+            planlagte plasser. Migrasjon `0005`.
             - **Lærdom å ta med til neste modul:** en modul er ikke ferdig før
               dataene den trenger kan opprettes *gjennom portalen*. Django-admin
               teller ikke, og en testsuite som bare bruker ORM-en ser det ikke.

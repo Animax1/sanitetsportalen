@@ -57,6 +57,10 @@
         og å legge til en ressurs setter reservasjonen. Skjules for alle under
         skriv_full — JS gjør det, se vaktliste.js::gateKnapper().
       {% endcomment %}
+      <button type="button" class="btn btn-outline-secondary btn-sm vl-krev-full d-none"
+              data-action="apneVaktlengde">
+        <i class="bi bi-clock-history me-1"></i>Vaktas lengde
+      </button>
       <button type="button" class="btn btn-primary btn-sm vl-krev-full d-none"
               data-bs-toggle="modal" data-bs-target="#nyVaktlisteModal">
         <i class="bi bi-plus-lg me-1"></i>Ny vaktliste
@@ -126,6 +130,42 @@
   </div>
 </div>
 
+<div class="modal fade" id="vaktlengdeModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Vaktas lengde</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Lukk"></button>
+      </div>
+      <div class="modal-body">
+        {% comment %}
+          Starten ligger på `core.Vakt`; planlagt slutt på vaktlista. Se
+          modellkommentaren — `Vakt.avsluttet` betyr «vakta ble avsluttet»,
+          en hendelse, og kan ikke bære et anslag man flytter på.
+        {% endcomment %}
+        <div class="mb-3">
+          <label class="form-label" for="vakt-start">Starter</label>
+          <input type="datetime-local" id="vakt-start" class="form-control">
+        </div>
+        <div class="mb-3">
+          <label class="form-label" for="vakt-slutt">Planlagt slutt</label>
+          <input type="datetime-local" id="vakt-slutt" class="form-control">
+          <div class="form-text">
+            Bemanningskurven tegnes over dette spennet. Uten det vises den bare
+            fra første til siste skift, og hullet i begynnelsen blir usynlig.
+          </div>
+        </div>
+        <div id="vakt-lengde-feil" class="text-danger small d-none"></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Avbryt</button>
+        <button type="button" class="btn btn-primary" id="vakt-lengde-knapp"
+                data-action="lagreVaktlengde">Lagre</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div class="modal fade" id="nyRessursModal" tabindex="-1">
   <div class="modal-dialog">
     <div class="modal-content">
@@ -182,6 +222,16 @@
         <div class="mb-3">
           <label class="form-label" for="ny-vaktpost-mannskap">Mannskap</label>
           <select id="ny-vaktpost-mannskap" class="form-select"></select>
+          <div class="form-text">
+            Velg <strong>«— ledig plass —»</strong> for å sette opp behovet nå
+            og fylle personen inn senere.
+          </div>
+        </div>
+        <div class="mb-3 d-none" id="ny-vaktpost-antall-rad">
+          <label class="form-label" for="ny-vaktpost-antall">Antall plasser</label>
+          <input type="number" id="ny-vaktpost-antall" class="form-control"
+                 min="1" max="50" value="1">
+          <div class="form-text">Fire tomme plasser på et lag er fire like rader.</div>
         </div>
         <div class="mb-3">
           <label class="form-label" for="ny-vaktpost-rolle">Rolle</label>

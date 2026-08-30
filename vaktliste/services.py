@@ -257,6 +257,55 @@ def kan_sette_vaktpost(user, ressurs, mannskap) -> bool:
 
     Skrevet som én funksjon slik at et endepunkt ikke kan huske den ene og
     glemme den andre.
+
+    **`mannskap=None` er en ledig plass, og den er `skriv_full`.** Å opprette
+    et behov — «Lag 1 trenger fire, én av dem lagleder» — er å planlegge
+    vakta, ikke å føre sitt eget korps. Korps-brukeren *fyller* plassene som
+    er satt av til henne; hun bestemmer ikke hvor mange det skal være. Uten
+    dette unntaket ville badge-halvdelen ikke hatt noe å sjekke mot, og
+    regelen falt åpen på nøyaktig det tilfellet som er nytt.
     """
+    if mannskap is None:
+        return kan_skrive_alt(user)
     return (kan_bemanne_ressurs(user, ressurs)
             and kan_redigere_mannskap(user, mannskap))
+
+
+def kan_rore_vaktpost(user, vaktpost) -> bool:
+    """Får brukeren redigere denne raden slik den står?
+
+    **Et annet spørsmål enn `kan_sette_vaktpost`,** og det er verdt å holde
+    dem fra hverandre:
+
+    - `kan_sette_vaktpost(bruker, ressurs, person)` spør om *paret* kan
+      opprettes. Med `person=None` er det å opprette et behov — `skriv_full`.
+    - `kan_rore_vaktpost(bruker, rad)` spør om brukeren i det hele tatt får
+      ta i raden. En **ledig** plass på hennes egen ressurs skal hun få ta i,
+      for det er nettopp den hun skal fylle.
+
+    Ble den første brukt til begge, låste den korps-brukeren ute av akkurat
+    de plassene som var satt av til henne — funnet av
+    `LedigPlassTilgangTests`.
+    """
+    if not kan_bemanne_ressurs(user, vaktpost.ressurs):
+        return False
+    if vaktpost.mannskap_id is None:
+        return True
+    return kan_redigere_mannskap(user, vaktpost.mannskap)
+
+
+def vaktspenn(vaktliste):
+    """(start, slutt) for vakta — eller ``(None, None)`` hvis den mangler.
+
+    Starten er `Vakt.startet`; slutten er `Vaktliste.planlagt_slutt`. Se
+    modellkommentaren for hvorfor de to ikke bor samme sted.
+
+    Brukes av bemanningskurven, som skal tegnes over **hele** vakta: leste
+    den bare skiftene, ville hullet i begynnelsen vært usynlig nettopp fordi
+    ingen er satt opp der ennå.
+    """
+    start = vaktliste.vakt.startet
+    slutt = vaktliste.planlagt_slutt
+    if start is None or slutt is None or slutt <= start:
+        return (None, None)
+    return (start, slutt)

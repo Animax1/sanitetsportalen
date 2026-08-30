@@ -128,6 +128,8 @@ def _vaktliste_til_dict(vl):
         'status_navn': choices.STATUS_NAVN.get(vl.status, vl.status),
         'i_drift': vl.i_drift,
         'startet': vl.vakt.startet.isoformat() if vl.vakt.startet else None,
+        'planlagt_slutt': (vl.planlagt_slutt.isoformat()
+                           if vl.planlagt_slutt else None),
         'er_aktiv_vakt': vl.vakt.er_aktiv,
         'notat': vl.notat,
     }
@@ -159,16 +161,21 @@ def _vaktpost_til_dict(vp, foreldre=None):
     `rolle_id` følger `rolle` fordi rollen redigeres i raden: en nedtrekksliste
     trenger IDen for å vite hva som er valgt.
     """
-    kompetanser = list(vp.mannskap.kompetanser.all())
+    person = vp.mannskap
+    kompetanser = list(person.kompetanser.all()) if person else []
     if foreldre is not None:
         kompetanser = services.synlige_kompetanser(kompetanser, foreldre)
     return {
         'id': vp.pk,
         'ressurs_id': vp.ressurs_id,
         'mannskap_id': vp.mannskap_id,
-        'navn': vp.mannskap.navn,
-        'korps_navn': vp.mannskap.korps.navn,
-        'korps_kort': vp.mannskap.korps.kortnavn or vp.mannskap.korps.navn,
+        # Tom person = ledig plass. Klienten trenger flagget eksplisitt
+        # framfor å utlede det av et tomt navn: et tomt navn kan også bety
+        # «noe gikk galt», og de to skal ikke se like ut.
+        'ledig': person is None,
+        'navn': person.navn if person else '',
+        'korps_navn': person.korps.navn if person else '',
+        'korps_kort': (person.korps.kortnavn or person.korps.navn) if person else '',
         'kompetanser': [k.navn for k in kompetanser],
         'rolle_id': vp.rolle_id,
         'rolle': vp.rolle.navn if vp.rolle else '',
@@ -251,7 +258,7 @@ def vaktlister_view(request):
 
 @never_cache
 @modul_kreves('vaktliste', 'les', svar='json')
-@require_http_methods(['GET', 'DELETE'])
+@require_http_methods(['GET', 'PUT', 'DELETE'])
 def vaktliste_detalj_view(request, pk):
     """Hele oppsettet for én liste (GET), eller slett den (DELETE).
 
@@ -259,11 +266,17 @@ def vaktliste_detalj_view(request, pk):
     svar. Faner uten data er fortsatt faner, så alt hentes samlet framfor ett
     kall per ressurs.
 
+    PUT endrer vaktas lengde — start og planlagt slutt. Det er `skriv_full`:
+    spennet gjelder hele vakta, ikke ett korps' del av den, og det er
+    grunnlaget bemanningskurven tegnes over.
+
     DELETE er **global admin**. Å slette en vaktliste river hele oppsettet og
     alle skiftene på det; det hører til samme kategori som resten av det
     irreversible i portalen, ikke til modulaksen.
     """
     if request.method == 'DELETE' and not er_global_admin(request.user):
+        return _nektet()
+    if request.method == 'PUT' and not services.kan_skrive_alt(request.user):
         return _nektet()
 
     try:
@@ -278,6 +291,33 @@ def vaktliste_detalj_view(request, pk):
         # vaktliste er uansett bare ett av flere blikk på den.
         vl.delete()
         return JsonResponse({'status': 'ok'})
+
+    if request.method == 'PUT':
+        data = _json_body(request)
+        start = (_tid(data.get('startet')) if 'startet' in data
+                 else vl.vakt.startet)
+        slutt = (_tid(data.get('planlagt_slutt')) if 'planlagt_slutt' in data
+                 else vl.planlagt_slutt)
+        if 'startet' in data and start is None:
+            return _feil('Vakta må ha et starttidspunkt.')
+        if start and slutt and slutt <= start:
+            # Samme regel som på et skift, og av samme grunn: et negativt
+            # spenn ville gitt en kurve som ikke kan tegnes.
+            return _feil('Vakta må slutte etter at den begynner.')
+
+        with transaction.atomic():
+            if 'startet' in data:
+                vl.vakt.startet = start
+                # Året følger starten — vakta kan flyttes over et årsskifte
+                # mens den planlegges, og `year` er portalens scope-nøkkel.
+                vl.vakt.year = timezone.localtime(start).year
+                vl.vakt.save(update_fields=['startet', 'year'])
+            if 'planlagt_slutt' in data:
+                vl.planlagt_slutt = slutt
+                vl.save(update_fields=['planlagt_slutt'])
+
+        vl.refresh_from_db()
+        return JsonResponse({'status': 'ok', 'data': _vaktliste_til_dict(vl)})
 
     ressurser = list(vl.ressurser.select_related('korps', 'enhet'))
     poster = list(
@@ -436,11 +476,18 @@ def vaktposter_view(request, pk):
         return _feil('Ressurs ikke funnet', status=404)
 
     data = _json_body(request)
-    try:
-        mannskap = Mannskap.objects.select_related('korps').get(
-            pk=_int(data.get('mannskap_id')))
-    except (Mannskap.DoesNotExist, TypeError, ValueError):
-        return _feil('Ukjent mannskap.')
+
+    # **Ingen `mannskap_id` = ledig plass.** Det er slik planlegging faktisk
+    # begynner: behovet settes opp først («Lag 1 trenger fire»), personene
+    # fylles inn etter hvert. `antall` lager flere like plasser i én
+    # forespørsel — fire tomme rader er fire klikk uten den.
+    mannskap = None
+    if data.get('mannskap_id') not in (None, ''):
+        try:
+            mannskap = Mannskap.objects.select_related('korps').get(
+                pk=_int(data.get('mannskap_id')))
+        except Mannskap.DoesNotExist:
+            return _feil('Ukjent mannskap.')
 
     # Regelen står i services, som én funksjon — se modul-docstringen.
     if not services.kan_sette_vaktpost(request.user, ressurs, mannskap):
@@ -456,16 +503,27 @@ def vaktposter_view(request, pk):
         # brukeren kan rette det, framfor å regne på det senere.
         return _feil('Skiftet må slutte etter at det begynner.')
 
+    # Flere like plasser i ett kall. Kun for ledige: to identiske rader med
+    # samme person ville uansett brutt unik-skranken.
+    # `or 1` ville gjort et eksplisitt `antall: 0` om til én plass i stillhet.
+    # Utelatt felt betyr «én»; en oppgitt verdi tas på ordet og valideres.
+    antall = _int(data['antall']) if 'antall' in data else 1
+    if mannskap is not None:
+        antall = 1
+    if antall is None or not 1 <= antall <= 50:
+        return _feil('Antall plasser må være mellom 1 og 50.')
+
+    felter = dict(
+        ressurs=ressurs,
+        mannskap=mannskap,
+        rolle_id=_int(data.get('rolle_id')),
+        fra_tid=fra_tid,
+        til_tid=til_tid,
+        merknad=(data.get('merknad') or '').strip(),
+    )
     try:
         with transaction.atomic():
-            vaktpost = Vaktpost.objects.create(
-                ressurs=ressurs,
-                mannskap=mannskap,
-                rolle_id=_int(data.get('rolle_id')),
-                fra_tid=fra_tid,
-                til_tid=til_tid,
-                merknad=(data.get('merknad') or '').strip(),
-            )
+            lagde = [Vaktpost.objects.create(**felter) for _ in range(antall)]
     except IntegrityError:
         return _feil(
             f'{mannskap.navn} står allerede på «{ressurs.navn}» fra dette '
@@ -474,11 +532,10 @@ def vaktposter_view(request, pk):
     vaktpost = (Vaktpost.objects
                 .select_related('mannskap', 'mannskap__korps', 'rolle')
                 .prefetch_related('mannskap__kompetanser')
-                .get(pk=vaktpost.pk))
-    return JsonResponse(
-        {'status': 'ok',
-         'data': _vaktpost_til_dict(vaktpost, services.foreldrekart())},
-        status=201)
+                .get(pk=lagde[0].pk))
+    svar = _vaktpost_til_dict(vaktpost, services.foreldrekart())
+    svar['antall_opprettet'] = len(lagde)
+    return JsonResponse({'status': 'ok', 'data': svar}, status=201)
 
 
 @modul_kreves('vaktliste', 'les', svar='json')
@@ -497,15 +554,41 @@ def vaktpost_detalj_view(request, pk):
     except Vaktpost.DoesNotExist:
         return _feil('Vaktpost ikke funnet', status=404)
 
-    if not services.kan_sette_vaktpost(
-            request.user, vaktpost.ressurs, vaktpost.mannskap):
+    # Inngangsporten er «får du ta i denne raden», ikke «får du opprette
+    # dette paret» — en ledig plass på egen ressurs er nettopp den man skal
+    # fylle. Se `services.kan_rore_vaktpost`.
+    if not services.kan_rore_vaktpost(request.user, vaktpost):
         return _nektet()
 
     if request.method == 'DELETE':
+        # Å fjerne en **ledig** plass er å fjerne et behov vaktleder satte
+        # opp. Korps-brukeren fyller plasser, hun avlyser dem ikke — kunne
+        # hun det, ville et hull i bemanningen kunne skjules ved å slette
+        # raden som viste det.
+        if vaktpost.mannskap_id is None and not services.kan_skrive_alt(request.user):
+            return _nektet('Ledige plasser fjernes av den som satte dem opp.')
         vaktpost.delete()
         return JsonResponse({'status': 'ok'})
 
     data = _json_body(request)
+
+    # **Å fylle en ledig plass er den ene skrivingen som endrer hvem regelen
+    # gjelder for.** Sjekken over gjaldt raden slik den står nå; her sjekkes
+    # den på nytt mot personen som skal inn. Uten det kunne en korps-bruker
+    # fylt en ledig plass på sin egen ressurs med en fra et annet korps.
+    if 'mannskap_id' in data:
+        ny_id = _int(data['mannskap_id'])
+        ny_person = None
+        if ny_id is not None:
+            ny_person = (Mannskap.objects.select_related('korps')
+                         .filter(pk=ny_id).first())
+            if ny_person is None:
+                return _feil('Ukjent mannskap.')
+        if not services.kan_sette_vaktpost(
+                request.user, vaktpost.ressurs, ny_person):
+            return _nektet()
+        vaktpost.mannskap = ny_person
+
     if 'rolle_id' in data:
         vaktpost.rolle_id = _int(data['rolle_id'])
     if 'merknad' in data:
