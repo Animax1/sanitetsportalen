@@ -39,6 +39,7 @@ REVIEWED_INTERPOLATIONS = {
     'korpsmerke': 'markup bygget lokalt, korpsnavnet escapet inni',
     'enhetsmerke': 'markup bygget lokalt, enhetsnavnet escapet inni',
     'rader': 'markup bygget lokalt av byggere som selv skannes her',
+    'rest': 'markup bygget lokalt, tallet escapet inni',
     "vp.rolle ? ' · ' + escapeHtml(vp.rolle) : ''":
         'ternær der den ene grenen er escapet og den andre er tom streng',
     "deler.join('')": 'markup bygget lokalt i samme funksjon',
@@ -158,7 +159,7 @@ class VaktlisteEscapingOppforselTests(SimpleTestCase):
                            '_escHtml', 'klokke')),
         (VAKTLISTE_JS, ('mkRessurs', '_rolleValg', 'rollerForGruppe',
                         '_fyllValgFor', '_varighet',
-                        'mkRolleRad', 'mkOversikt', '_mkEnKurve',
+                        'mkRolleRad', 'mkOversikt', '_skiftrekkefolge', '_mkEnKurve',
                         'mkGruppekurve', '_posterIGruppe', 'mkGruppe', '_plassKorps',
                         '_tegnforklaring',
                         '_timesteg', '_ressurserIGruppe',
@@ -221,7 +222,8 @@ class VaktlisteEscapingOppforselTests(SimpleTestCase):
     def test_mannskapsnavn_i_oversikten_escapes(self):
         ut = run_node(self.harness, self.VINDU + f'''
             globalThis.aktivListe = {self._liste(
-                ressurser=[{'id': 1, 'navn': 'Lag 1'}],
+                grupper=[{'id': 1, 'navn': 'Lag', 'ikon': 'people'}],
+                ressurser=[{'id': 1, 'navn': 'Lag 1', 'gruppe_id': 1}],
                 vaktposter=[{
                     'id': 1, 'ressurs_id': 1, 'mannskap_id': 1,
                     'navn': '<script>x</script>', 'korps_navn': 'HGSD',
@@ -233,21 +235,22 @@ class VaktlisteEscapingOppforselTests(SimpleTestCase):
         self.assertNotIn('<script>x', ut)
         self.assertIn('&lt;script&gt;', ut)
 
-    def test_korpsnavn_i_gruppeoverskriften_escapes(self):
-        """Overskriften bygges av en nøkkel i en gruppering — verdien kommer
-        fortsatt fra basen, og går gjennom samme escaping."""
+    def test_ressursnavn_i_overskriften_escapes(self):
+        """Overskriften er ressursens navn fra 30. aug. 2026 — lista er
+        gruppert på ressurs, ikke korps. Navnet er fritekst fra basen."""
         ut = run_node(self.harness, self.VINDU + f'''
             globalThis.aktivListe = {self._liste(
-                ressurser=[{'id': 1, 'navn': 'Lag 1'}],
+                grupper=[{'id': 1, 'navn': 'Lag', 'ikon': 'people'}],
+                ressurser=[{'id': 1, 'navn': '<b>Lag 1</b>', 'gruppe_id': 1}],
                 vaktposter=[{
                     'id': 1, 'ressurs_id': 1, 'mannskap_id': 1,
-                    'navn': 'Kari', 'korps_navn': '<b>HGSD</b>',
+                    'navn': 'Kari', 'korps_navn': 'HGSD',
                     'korps_kort': 'HGSD', 'rolle': '',
                     'fra_tid': '2026-10-03T08:00:00Z',
                     'til_tid': '2026-10-03T16:00:00Z'}])};
             console.log(mkOversikt());
         ''')
-        self.assertNotIn('<b>HGSD</b>', ut)
+        self.assertNotIn('<b>Lag 1</b>', ut)
         self.assertIn('&lt;b&gt;', ut)
 
     def test_fanenavn_escapes(self):
@@ -1067,8 +1070,9 @@ class OversiktUtenKurveTests(SimpleTestCase):
 
     HARNESS = (
         (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue')),
-        (VAKTLISTE_JS, ('mkOversikt', '_d', '_kl', '_dag', '_sammeDag',
-                        '_tidsspenn', '_vaktspenn')),
+        (VAKTLISTE_JS, ('mkOversikt', '_skiftrekkefolge', '_d', '_kl', '_dag',
+                        '_sammeDag', '_tidsspenn', '_vaktspenn',
+                        '_ressurserIGruppe', '_grupperMedRessurser')),
     )
     VINDU = ("globalThis.DAGER = ['søn','man','tir','ons','tor','fre','lør'];\n"
              "globalThis.MND = ['jan','feb','mar','apr','mai','jun',"
@@ -1455,6 +1459,7 @@ class FanenErGruppaTests(SimpleTestCase):
     HARNESS = (
         (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue')),
         (VAKTLISTE_JS, ('tegnFaner', 'mkGruppe', 'mkRessurs', '_rolleValg',
+                        '_skiftrekkefolge',
                         '_fyllValgFor', '_varighet', 'mkGruppekurve',
                         '_mkEnKurve', '_tegnforklaring', '_timesteg',
                         '_toppunkt', '_posterPerGruppe', '_vaktensSpenn',
@@ -1570,3 +1575,130 @@ class FanenErGruppaTests(SimpleTestCase):
             console.log(mkGruppe({id: 3, navn: 'Ubrukt'}));
         """)
         self.assertIn('Ingen ubrukt satt opp', ut)
+
+
+class UtskriftslistaTests(SimpleTestCase):
+    """Utskriftslista: gruppert på ressurs, og sortert så rekkefølgen sier noe.
+
+    **To ting André så i bruk 30. aug. 2026.** Lista var gruppert på korps,
+    og han spurte hvordan man ser hvem som er på hvilken bil. Og innenfor en
+    gruppe lå et skift som slutter 22:15 midt blant skift som slutter 03:00
+    neste dag — fordi sorteringen stoppet på `fra_tid` og lot resten stå i
+    innsettingsrekkefølge.
+    """
+
+    HARNESS = (
+        (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue')),
+        (VAKTLISTE_JS, ('mkOversikt', '_skiftrekkefolge', '_d', '_kl', '_dag',
+                        '_sammeDag', '_tidsspenn', '_vaktspenn',
+                        '_ressurserIGruppe', '_grupperMedRessurser')),
+    )
+    VINDU = ("globalThis.DAGER = ['søn','man','tir','ons','tor','fre','lør'];\n"
+             "globalThis.MND = ['jan','feb','mar','apr','mai','jun',"
+             "'jul','aug','sep','okt','nov','des'];\n")
+
+    #: Andrés egne rader: tre skift som begynner 17:00, ett av dem kort.
+    LISTE = """
+        globalThis.aktivListe = {
+          vaktliste: {vakt_navn: 'Vakta', startet: '2026-09-04T17:00:00',
+                      planlagt_slutt: '2026-09-05T15:00:00'},
+          korps: [{id: 1, navn: 'Haugesund', kortnavn: 'HGSD'},
+                  {id: 2, navn: 'Karmøy', kortnavn: 'KARM'}],
+          grupper: [{id: 1, navn: 'Samleplass', ikon: 'hospital'},
+                    {id: 2, navn: 'Ambulanse', ikon: 'truck'}],
+          ressurser: [{id: 10, navn: 'Samleplass', gruppe_id: 1},
+                      {id: 20, navn: 'Ambulanse 1', gruppe_id: 2},
+                      {id: 21, navn: 'Ambulanse 2', gruppe_id: 2}],
+          vaktposter: [
+            {id: 1, ressurs_id: 10, ledig: true, navn: '', korps_kort: '',
+             reservert_korps_id: 2, rolle: 'Førstehjelper', merknad: '',
+             fra_tid: '2026-09-04T17:00:00', til_tid: '2026-09-05T03:00:00'},
+            {id: 2, ressurs_id: 10, ledig: true, navn: '', korps_kort: '',
+             reservert_korps_id: 2, rolle: 'Førstehjelper', merknad: '',
+             fra_tid: '2026-09-04T17:00:00', til_tid: '2026-09-05T03:00:00'},
+            {id: 3, ressurs_id: 10, ledig: true, navn: '', korps_kort: '',
+             reservert_korps_id: 2, rolle: 'Førstehjelper', merknad: '',
+             fra_tid: '2026-09-04T17:00:00', til_tid: '2026-09-04T22:15:00'},
+            {id: 4, ressurs_id: 20, ledig: false, navn: 'Kari',
+             korps_kort: 'HGSD', rolle: 'Sjåfør', merknad: '',
+             fra_tid: '2026-09-04T17:00:00', til_tid: '2026-09-05T03:00:00'},
+            {id: 5, ressurs_id: 21, ledig: false, navn: 'Ola',
+             korps_kort: 'HGSD', rolle: 'Sjåfør', merknad: '',
+             fra_tid: '2026-09-04T17:00:00', til_tid: '2026-09-05T03:00:00'}]};
+    """
+
+    def setUp(self):
+        if not node_available():
+            self.skipTest('node er ikke tilgjengelig')
+        self.harness = build_harness(self.HARNESS)
+
+    def _ut(self):
+        return run_node(self.harness, self.VINDU + self.LISTE + """
+            console.log(mkOversikt());
+        """)
+
+    def test_det_korteste_skiftet_kommer_forst_naar_de_begynner_samtidig(self):
+        """Rad 3 hos André: begynner 17:00 som de andre, men slutter 22:15 —
+        og lå likevel som nummer tre. `til_tid` er andre sorteringsledd."""
+        run_node(self.harness, self.VINDU + """
+            const a = {fra_tid: '2026-09-04T17:00:00',
+                       til_tid: '2026-09-05T03:00:00', navn: ''};
+            const kort = {fra_tid: '2026-09-04T17:00:00',
+                          til_tid: '2026-09-04T22:15:00', navn: ''};
+            assert(_skiftrekkefolge(kort, a) < 0,
+                   'det som slutter foerst skal staa foerst');
+            assert(_skiftrekkefolge(a, kort) > 0, 'og motsatt vei');
+        """)
+
+    def test_sorteringen_er_stabil_paa_navn_til_slutt(self):
+        run_node(self.harness, self.VINDU + """
+            const b = {fra_tid: '2026-09-04T17:00:00',
+                       til_tid: '2026-09-05T03:00:00', navn: 'Bodil'};
+            const a = {fra_tid: '2026-09-04T17:00:00',
+                       til_tid: '2026-09-05T03:00:00', navn: 'Anne'};
+            assert(_skiftrekkefolge(a, b) < 0, 'navn avgjoer uavgjort');
+        """)
+
+    def test_lista_er_gruppert_paa_ressurs(self):
+        """Den som leser lista står ved bilen og spør «hvem er her?».
+        Korpset er et kjennetegn ved personen, ikke et sted."""
+        ut = self._ut()
+        for navn in ('Samleplass', 'Ambulanse 1', 'Ambulanse 2'):
+            with self.subTest(ressurs=navn):
+                self.assertIn(f'<h3>{navn}', ut)
+
+    def test_ressursene_kommer_i_gruppenes_rekkefolge(self):
+        ut = self._ut()
+        self.assertLess(ut.index('<h3>Samleplass'), ut.index('<h3>Ambulanse 1'))
+        self.assertLess(ut.index('<h3>Ambulanse 1'), ut.index('<h3>Ambulanse 2'))
+
+    def test_korpset_er_en_kolonne_ikke_en_overskrift(self):
+        ut = self._ut()
+        self.assertIn('<th>Korps</th>', ut)
+        self.assertNotIn('<h3>Haugesund', ut)
+
+    def test_ledig_plass_viser_korpset_den_er_satt_av_til(self):
+        """En ledig plass har ingen person, men kan være reservert. Uten dette
+        står de reserverte plassene som «—» og reservasjonen er usynlig der
+        den skal brukes.
+
+        **KARM finnes bare på de ledige plassene** — de bemannede radene er
+        HGSD. Det er med vilje: en test som lette etter HGSD ville vært grønn
+        uansett, siden de bemannede radene bærer det. Funnet ved
+        mutasjonstesting.
+        """
+        ut = self._ut()
+        self.assertIn('KARM', ut)
+        self.assertIn('HGSD', ut, 'og personens eget korps står der fortsatt')
+
+    def test_ressurs_uten_skift_tas_ikke_med(self):
+        ut = run_node(self.harness, self.VINDU + self.LISTE + """
+            globalThis.aktivListe.ressurser.push(
+              {id: 30, navn: 'Tomjenta', gruppe_id: 2});
+            console.log(mkOversikt());
+        """)
+        self.assertNotIn('Tomjenta', ut)
+
+    def test_arkhodet_teller_ledige_plasser(self):
+        """Tallet man planlegger etter, øverst på arket."""
+        self.assertIn('3 ledige plasser', self._ut())

@@ -522,8 +522,7 @@ function mkRessurs(r) {
   // det står, uten å åpne noe.
   const kropp = poster.length ? poster
     .slice()
-    .sort((a, b) => a.fra_tid.localeCompare(b.fra_tid)
-                 || a.navn.localeCompare(b.navn))
+    .sort(_skiftrekkefolge)
     .map((vp) => {
       // Merkelappene ligger i en wrapper, ikke rett i cella: `display: flex`
       // på en `<td>` tar cella ut av tabellens boksmodell, og da forskyves
@@ -832,73 +831,103 @@ function mkGruppekurve(gruppe) {
 }
 
 
+function _skiftrekkefolge(a, b) {
+  // **Fra, så til, så navn.** Uten `til_tid` som andre ledd står skiftene som
+  // begynner samtidig i tilfeldig rekkefølge, og et kort skift på fem timer
+  // havner midt blant de lange — det var André som så det: en rad som slutter
+  // 22:15 lå mellom rader som slutter 03:00 neste dag. Rekkefølgen skal si
+  // noe, ellers er den bare innsettingsrekkefølgen forkledd som sortering.
+  return a.fra_tid.localeCompare(b.fra_tid)
+      || a.til_tid.localeCompare(b.til_tid)
+      || (a.navn || '').localeCompare(b.navn || '');
+}
+
+
 function mkOversikt() {
-  // **Utskriftslista.** Hele vakta på ett ark, gruppert på korps — den man
-  // henger opp. Kurven står over og følger ikke med på papiret.
+  // **Utskriftslista.** Hele vakta på ett ark, gruppert på **ressurs** — den
+  // man henger opp.
+  //
+  // Gruppert på korps fram til 30. aug. 2026, og det var feil bord: den som
+  // leser lista står på samleplassen eller ved bilen og spør «hvem er her, og
+  // når?». Korpset er et kjennetegn ved personen, ikke et sted — det er en
+  // kolonne, ikke en overskrift.
   const poster = aktivListe.vaktposter || [];
   if (!poster.length) {
     return '<div class="vl-kort"><div class="vl-tom">Ingen er satt opp ennå.</div></div>';
   }
 
-  const ressursnavn = {};
-  aktivListe.ressurser.forEach((r) => { ressursnavn[r.id] = r.navn; });
+  const korpsnavn = {};
+  (aktivListe.korps || []).forEach((k) => {
+    korpsnavn[k.id] = k.kortnavn || k.navn;
+  });
 
-  // Ledige plasser hører ikke til noe korps ennå — de samles til slutt, som
-  // det som gjenstår. Uten dette ville de havnet under en gruppe uten navn.
-  const LEDIG = 'Ledige plasser';
-  const grupper = {};
+  const perRessurs = new Map();
+  (aktivListe.ressurser || []).forEach((r) => perRessurs.set(r.id, []));
   poster.forEach((vp) => {
-    const n = vp.ledig ? LEDIG : vp.korps_navn;
-    (grupper[n] = grupper[n] || []).push(vp);
+    if (perRessurs.has(vp.ressurs_id)) perRessurs.get(vp.ressurs_id).push(vp);
   });
 
-  const navn = Object.keys(grupper).sort((a, b) => {
-    if (a === LEDIG) return 1;
-    if (b === LEDIG) return -1;
-    return a.localeCompare(b);
-  });
-
-  const deler = navn.map((korps) => {
-    const rader = grupper[korps]
-      .slice()
-      .sort((a, b) => a.fra_tid.localeCompare(b.fra_tid)
-                   || a.navn.localeCompare(b.navn))
-      .map((vp) => `
+  // Rekkefølgen er gruppas, så ressursens — samme som fanene. Ressurser uten
+  // skift utelates: en tom tabell på papiret er en linje man må lese for å se
+  // at det ikke står noe der.
+  const deler = _grupperMedRessurser().flatMap((g) =>
+    _ressurserIGruppe(g.id)
+      .filter((r) => (perRessurs.get(r.id) || []).length)
+      .map((r) => {
+        const rader = perRessurs.get(r.id).slice().sort(_skiftrekkefolge)
+          .map((vp) => {
+            // Korpset i lista: personens når raden er fylt, plassens
+            // reservasjon når den er ledig. Det er det samme skillet som i
+            // ressurstabellen, og av samme grunn.
+            const korps = vp.ledig
+              ? (korpsnavn[vp.reservert_korps_id] || '')
+              : (vp.korps_kort || '');
+            return `
         <tr class="${escHtmlValue(vp.ledig ? 'vl-ledig' : '')}">
           <td class="vl-navn">${escapeHtml(vp.ledig ? '— ledig —' : vp.navn)}</td>
-          <td>${escapeHtml(ressursnavn[vp.ressurs_id] || '—')}</td>
+          <td>${escapeHtml(korps || '—')}</td>
           <td>${escapeHtml(vp.rolle || '—')}</td>
           <td>${escapeHtml(_tidsspenn(vp))}</td>
           <td>${escapeHtml(vp.merknad || '')}</td>
-        </tr>`).join('');
-    return `
+        </tr>`;
+          }).join('');
+        const ledige = perRessurs.get(r.id).filter((vp) => vp.ledig).length;
+        const rest = ledige
+          ? ` <span class="vl-meta">· ${escHtmlValue(ledige)} ledige</span>` : '';
+        return `
       <div class="vl-korpsgruppe">
-        <h3>${escapeHtml(korps)} (${escHtmlValue(grupper[korps].length)})</h3>
+        <h3>${escapeHtml(r.navn)}
+          <span class="vl-meta">${escapeHtml(g.navn)} ·
+            ${escHtmlValue(perRessurs.get(r.id).length)} skift</span>${rest}
+        </h3>
         <div class="vl-tabellramme">
         <table class="vl-tabell vl-utskrift">
           <colgroup>
-            <col style="width: 24%"><col style="width: 20%"><col style="width: 16%">
-            <col style="width: 26%"><col style="width: 14%">
+            <col style="width: 26%"><col style="width: 12%"><col style="width: 18%">
+            <col style="width: 30%"><col style="width: 14%">
           </colgroup>
           <thead>
-            <tr><th>Navn</th><th>Ressurs</th><th>Rolle</th><th>Tid</th><th>Merknad</th></tr>
+            <tr><th>Navn</th><th>Korps</th><th>Rolle</th><th>Tid</th><th>Merknad</th></tr>
           </thead>
           <tbody>${rader}</tbody>
         </table>
         </div>
       </div>`;
-  });
+      }));
 
   const tittel = aktivListe.vaktliste.vakt_navn;
   const spenn = _vaktspenn();
-  // **Ingen kurve her.** Den sto samlet på «Oversikt» før hver gruppe fikk
-  // sin i sin egen fane, og to steder å lese den samme kurven er ett for
-  // mye. «Oversikt» er utskriftslista, og bare det.
+  const antallLedige = poster.filter((vp) => vp.ledig).length;
+  const ledigtekst = antallLedige
+    ? ` · ${escHtmlValue(antallLedige)} ledige plasser` : '';
+  // **Ingen kurve her.** Den står i fanen den gjelder, og to steder å lese
+  // den samme kurven er ett for mye. «Oversikt» er utskriftslista, og bare det.
   return `
     <div class="vl-kort vl-utskriftsark">
       <div class="vl-arkhode">
         <h2>${escapeHtml(tittel)}</h2>
-        <div class="vl-meta">${escapeHtml(spenn)} · ${escHtmlValue(poster.length)} skift</div>
+        <div class="vl-meta">${escapeHtml(spenn)} ·
+          ${escHtmlValue(poster.length)} skift${escapeHtml(ledigtekst)}</div>
       </div>
       ${deler.join('')}
     </div>`;

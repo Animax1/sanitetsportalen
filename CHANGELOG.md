@@ -4,6 +4,30 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-08-30 — Utskriftslista sorterer og grupperer på noe som betyr noe
+
+**1756 tester grønne** (8 nye). Bare grensesnitt.
+
+- **Sorteringen stoppet på `fra_tid`.** André så det i sine egne rader: et
+  skift som slutter 22:15 lå som nummer tre blant skift som slutter 03:00
+  neste dag. Alle begynte 17:00, så de var uavgjort — og resten var
+  innsettingsrekkefølge forkledd som sortering. `_skiftrekkefolge()` sorterer
+  nå på fra, så til, så navn, og brukes både på arket og i ressurstabellen.
+- **Utskriftslista er gruppert på ressurs, ikke på korps.** Den som leser
+  lista står ved bilen eller på samleplassen og spør «hvem er her, og når?».
+  Korpset er et kjennetegn ved personen, ikke et sted — det er en kolonne nå,
+  ikke en overskrift. Overskriften er ressursen, med gruppa og antallet ved
+  siden av.
+- **En ledig plass viser korpset den er satt av til.** Ellers sto de
+  reserverte plassene som «—» på arket, og reservasjonen var usynlig akkurat
+  der den skal brukes.
+- **Ressurser uten skift tas ikke med på arket.** En tom tabell på papiret er
+  en linje man må lese for å se at det ikke står noe der.
+- Arkhodet teller ledige plasser — tallet man planlegger etter.
+- Tre mutasjoner prøvd. Én overlevde: testen på reservasjonen i lista lette
+  etter et korps som også sto på de bemannede radene, så den ville vært grønn
+  uansett. Den bruker nå et korps som *bare* finnes på de ledige plassene.
+
 ## 2026-08-30 — Reservasjonen ned på plassen
 
 **1748 tester grønne** (10 nye). Migrasjon `vaktliste.0008`, rent additiv.

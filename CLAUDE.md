@@ -359,6 +359,10 @@ fase 3–7 gjenstår — se `docs/BESLUTNING_VAKTLISTE.md`, som er besluttet i s
   serveren sjekker den doble regelen på nytt mot personen som skal inn. Å
   bytte person ved å slette raden mistet tidene og rollen som sto der.
   Sletting ligger inne i vinduet bak en bekreftelse, som på ressursen.
+- **Utskriftslista grupperes på ressurs og sorteres på fra, til, navn.** Den som
+  leser den står ved bilen og spør «hvem er her, og når?» — korpset er en kolonne.
+  `_skiftrekkefolge()` har `til_tid` som andre ledd fordi skift som begynner samtidig
+  ellers står i innsettingsrekkefølge, og et kort skift havner midt blant de lange.
 - **Fanen er ressursgruppa, ikke ressursen.** «Ambulanse» er alle ambulansene
   på vakta, med hver bil som sitt eget kort inni (`mkGruppe`). Én fane per bil
   ga ti faner på en vakt med ti biler, og ingen plass der man så dem i
