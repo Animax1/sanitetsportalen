@@ -75,6 +75,15 @@ REVIEWED_INTERPOLATIONS = {
     '_dag(punkter[0].tid)': 'datostreng fra en Date, ingen brukerdata',
     # Kolonner, grupper og roller (30. aug., andre runde):
     'merkelapper': 'markup bygget lokalt, hvert kompetansenavn escapet inni',
+    'redigerPost': 'markup bygget lokalt, vaktpost-id escapet inni',
+    'mkGruppekurve(r)': 'kurve fra en bygger som selv skannes her',
+    '_tegnforklaring()': 'hardkodet markup uten data',
+    'timeakse': 'celler bygget lokalt, klokkeslettene escapet inni',
+    'kurve': 'kurve fra `_mkEnKurve`, som selv skannes her',
+    "naar ? ' ' + escapeHtml(naar) : ''":
+        'ternær der den ene grenen er escapet og den andre er tom streng',
+    "vis ? escapeHtml(_kl(p.tid)) : ''":
+        'ternær der den ene grenen er escapet og den andre er tom streng',
     'innhold': 'input eller escapet tekst, bygget lokalt i samme hjelper',
     'merke': 'markup bygget lokalt, ukedagen escapet inni',
     'kurver': 'kurver fra `_mkEnKurve`, som selv skannes her',
@@ -149,7 +158,8 @@ class VaktlisteEscapingOppforselTests(SimpleTestCase):
         (VAKTLISTE_JS, ('mkRessurs', '_rolleValg', 'rollerForGruppe',
                         '_fyllValgFor', '_varighet',
                         'mkRolleRad', 'mkOversikt', 'mkKurve', '_mkEnKurve',
-                        '_posterPerGruppe', '_vaktensSpenn',
+                        'mkGruppekurve', '_tegnforklaring', '_timesteg',
+                        '_toppunkt', '_posterPerGruppe', '_vaktensSpenn',
                         'mkIkkePlassert', 'tegnFaner', '_posterFor',
                         '_ikkePlassert', '_tidsspenn', '_vaktspenn',
                         '_bemanningPerTime', '_iso16', '_d', '_kl', '_dag',
@@ -1033,7 +1043,8 @@ class KurvePerGruppeTests(SimpleTestCase):
         (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue')),
         (VAKTLISTE_JS, ('_d', '_kl', '_dag', '_vaktensSpenn',
                         '_bemanningPerTime', '_posterPerGruppe',
-                        '_mkEnKurve', 'mkKurve')),
+                        '_mkEnKurve', 'mkKurve', 'mkGruppekurve',
+                        '_tegnforklaring', '_timesteg', '_toppunkt')),
     )
     VINDU = ("globalThis.DAGER = ['søn','man','tir','ons','tor','fre','lør'];\n"
              "globalThis.MND = ['jan','feb','mar','apr','mai','jun',"
@@ -1113,3 +1124,173 @@ class KurvePerGruppeTests(SimpleTestCase):
                                      ressurser: [], vaktposter: []};
             assert(mkKurve() === '', 'ingenting aa tegne');
         """)
+
+
+class TimeaksenTests(SimpleTestCase):
+    """Klokkeslett under søylene, og toppunktet med tidspunkt.
+
+    Andrés bestilling: «kjekt med timevisning slik at en lett kan se hvilke
+    klokkeslett bemanningen er høyest». Å lese det av søylehøyder er å gjette.
+    """
+
+    HARNESS = (
+        (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue')),
+        (VAKTLISTE_JS, ('_d', '_kl', '_dag', '_vaktensSpenn',
+                        '_bemanningPerTime', '_mkEnKurve', '_timesteg',
+                        '_toppunkt')),
+    )
+    VINDU = ("globalThis.DAGER = ['søn','man','tir','ons','tor','fre','lør'];\n"
+             "globalThis.MND = ['jan','feb','mar','apr','mai','jun',"
+             "'jul','aug','sep','okt','nov','des'];\n")
+
+    def setUp(self):
+        if not node_available():
+            self.skipTest('node er ikke tilgjengelig')
+        self.harness = build_harness(self.HARNESS)
+
+    def test_steget_glisner_naar_vakta_er_lang(self):
+        """Alle timer på en kort vakt; sjeldnere når spennet er langt —
+        ellers står tallene oppå hverandre, og kurven blir uleselig av å
+        være «mer informativ»."""
+        run_node(self.harness, """
+            assert(_timesteg(8) === 1, 'kort vakt: hver time');
+            assert(_timesteg(24) === 2, 'et doegn: annenhver');
+            assert(_timesteg(48) === 4, 'to doegn: hver fjerde');
+            assert(_timesteg(200) === 6, 'urimelig lang: hver sjette');
+        """)
+
+    def test_ett_klokkeslett_per_soyle_saa_de_staar_under_hverandre(self):
+        """Cellene i timeaksen må være like mange som søylene. Færre, og
+        tallet glir bort fra timen det gjelder."""
+        ut = run_node(self.harness, self.VINDU + """
+            globalThis.aktivListe = {
+              vaktliste: {startet: '2026-10-03T08:00:00',
+                          planlagt_slutt: '2026-10-03T14:00:00'},
+              vaktposter: []};
+            const kurve = _mkEnKurve('Test', [
+              {ledig: false, fra_tid: '2026-10-03T08:00:00',
+               til_tid: '2026-10-03T14:00:00'}]);
+            const soyler = (kurve.match(/vl-stolpe/g) || []).length;
+            // «vl-time"» med hermetegn: `vl-timeakse` er beholderen, og
+            // ville ellers telt med som en celle.
+            const timer = (kurve.match(/vl-time"/g) || []).length;
+            const utfylte = (kurve.match(/vl-time">\d\d:\d\d</g) || []).length;
+            console.log(soyler + ' ' + timer + ' ' + utfylte);
+        """)
+        soyler, timer, utfylte = ut.strip().splitlines()[0].split()
+        self.assertEqual(soyler, timer, 'én timecelle per søyle')
+        # Og cellene må faktisk ha et klokkeslett i seg. Seks tomme celler
+        # står like pent under søylene som seks utfylte, og sier ingenting.
+        self.assertEqual(utfylte, soyler,
+                         'på en kort vakt skal hver time være skrevet ut')
+
+    def test_toppunktet_oppgis_med_klokkeslett(self):
+        """Selve spørsmålet kurven skal svare på: når er det flest på vakt?"""
+        ut = run_node(self.harness, self.VINDU + """
+            globalThis.aktivListe = {
+              vaktliste: {startet: '2026-10-03T08:00:00',
+                          planlagt_slutt: '2026-10-03T12:00:00'},
+              vaktposter: []};
+            // Én person hele veien, to ekstra fra 10 til 12.
+            console.log(_mkEnKurve('Test', [
+              {ledig: false, fra_tid: '2026-10-03T08:00:00', til_tid: '2026-10-03T12:00:00'},
+              {ledig: false, fra_tid: '2026-10-03T10:00:00', til_tid: '2026-10-03T12:00:00'},
+              {ledig: false, fra_tid: '2026-10-03T10:00:00', til_tid: '2026-10-03T12:00:00'}
+            ]));
+        """)
+        self.assertIn('topp 3 plasser', ut)
+        self.assertIn('10:00', ut, 'toppen begynner kl. 10')
+        self.assertIn('12:00', ut, 'og varer ut den siste timen')
+
+    def test_ett_enkelt_topptidspunkt_vises_uten_spenn(self):
+        run_node(self.harness, self.VINDU + """
+            const punkter = [
+              {tid: '2026-10-03T08:00:00.000Z', antall: 1, planlagt: 1},
+              {tid: '2026-10-03T09:00:00.000Z', antall: 3, planlagt: 3},
+              {tid: '2026-10-03T10:00:00.000Z', antall: 1, planlagt: 1}];
+            const ut = _toppunkt(punkter, 3);
+            assert(ut.indexOf('–') === -1, 'en enkelt time er ikke et spenn: ' + ut);
+        """)
+
+    def test_topper_som_ikke_henger_sammen_gir_bare_forste(self):
+        """To adskilte topper er ikke ett spenn — å skrive «kl. 08–20» når
+        det er stille imellom, er å lyve med et bindestrek."""
+        run_node(self.harness, self.VINDU + """
+            const punkter = [
+              {tid: '2026-10-03T08:00:00.000Z', antall: 3, planlagt: 3},
+              {tid: '2026-10-03T09:00:00.000Z', antall: 1, planlagt: 1},
+              {tid: '2026-10-03T10:00:00.000Z', antall: 3, planlagt: 3}];
+            const ut = _toppunkt(punkter, 3);
+            assert(ut.indexOf('–') === -1, 'ikke sammenhengende: ' + ut);
+        """)
+
+
+class GruppekurveIFanenTests(SimpleTestCase):
+    """Kurven står i fanen den gjelder.
+
+    Å lete etter samleplassens bemanning under «Oversikt» mens man bemanner
+    samleplassen, er ett skifte for mye.
+    """
+
+    HARNESS = (
+        (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue')),
+        (VAKTLISTE_JS, ('_d', '_kl', '_dag', '_vaktensSpenn',
+                        '_bemanningPerTime', '_posterPerGruppe', '_mkEnKurve',
+                        '_timesteg', '_toppunkt', '_tegnforklaring',
+                        'mkGruppekurve')),
+    )
+    VINDU = ("globalThis.DAGER = ['søn','man','tir','ons','tor','fre','lør'];\n"
+             "globalThis.MND = ['jan','feb','mar','apr','mai','jun',"
+             "'jul','aug','sep','okt','nov','des'];\n")
+    LISTE = """
+        globalThis.aktivListe = {
+          vaktliste: {startet: '2026-10-03T08:00:00',
+                      planlagt_slutt: '2026-10-03T12:00:00'},
+          grupper: [{id: 1, navn: 'Samleplass'}, {id: 2, navn: 'Ambulanse'}],
+          ressurser: [{id: 10, gruppe_id: 1}, {id: 20, gruppe_id: 2}],
+          vaktposter: [
+            {id: 1, ressurs_id: 10, ledig: false,
+             fra_tid: '2026-10-03T08:00:00', til_tid: '2026-10-03T12:00:00'},
+            {id: 2, ressurs_id: 10, ledig: false,
+             fra_tid: '2026-10-03T08:00:00', til_tid: '2026-10-03T12:00:00'},
+            {id: 3, ressurs_id: 20, ledig: true,
+             fra_tid: '2026-10-03T08:00:00', til_tid: '2026-10-03T12:00:00'}
+          ]};
+    """
+
+    def setUp(self):
+        if not node_available():
+            self.skipTest('node er ikke tilgjengelig')
+        self.harness = build_harness(self.HARNESS)
+
+    def test_fanen_viser_sin_egen_gruppes_kurve(self):
+        ut = run_node(self.harness, self.VINDU + self.LISTE + """
+            console.log(mkGruppekurve({id: 10, gruppe_id: 1}));
+        """)
+        self.assertIn('Samleplass', ut)
+        self.assertNotIn('Ambulanse', ut, 'nabogruppa hører ikke hjemme her')
+        self.assertIn('topp 2 plasser', ut)
+
+    def test_ambulansefanen_viser_ambulansen(self):
+        ut = run_node(self.harness, self.VINDU + self.LISTE + """
+            console.log(mkGruppekurve({id: 20, gruppe_id: 2}));
+        """)
+        self.assertIn('Ambulanse', ut)
+        self.assertNotIn('Samleplass', ut)
+        self.assertIn('4 ubesatte plasstimer', ut)
+
+    def test_ressurs_uten_skift_i_gruppa_gir_ingen_kurve(self):
+        """En tom kurve over en fane man nettopp har laget, sier ingenting."""
+        ut = run_node(self.harness, self.VINDU + self.LISTE + """
+            console.log('[' + mkGruppekurve({id: 30, gruppe_id: 99}) + ']');
+        """)
+        self.assertIn('[]', ut)
+
+    def test_dogn_staar_i_tegnforklaringen(self):
+        """Den hvite streken i kurven er midnatt, ikke nåværende tidspunkt.
+        André måtte spørre hva den var — en strek man må spørre om, er en
+        strek som ikke forklarer noe."""
+        ut = run_node(self.harness, self.VINDU + self.LISTE + """
+            console.log(mkGruppekurve({id: 10, gruppe_id: 1}));
+        """)
+        self.assertIn('Midnatt', ut)

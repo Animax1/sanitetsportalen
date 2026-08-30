@@ -474,10 +474,14 @@ function mkRessurs(r) {
                   data-felt="merknad" data-id="${escHtmlValue(vp.id)}">`
         : escapeHtml(vp.merknad || '—');
 
-      const fjernPost = kanRore
-        ? `<button class="btn btn-sm btn-outline-danger" type="button"
-                   title="Fjern skiftet" aria-label="Fjern skiftet"
-                   data-action="fjernVaktpost" data-id="${escHtmlValue(vp.id)}"><i class="bi bi-trash"></i></button>`
+      // **Rediger, ikke slett.** Å bytte person på et skift var før å fjerne
+      // raden og sette den opp på nytt — og da mistet man tidene og rollen
+      // som allerede sto der. Sletting ligger nå inne i vinduet, bak en
+      // bekreftelse, slik den gjør på ressursen.
+      const redigerPost = kanRore
+        ? `<button class="btn btn-sm btn-outline-secondary" type="button"
+                   title="Rediger skiftet" aria-label="Rediger skiftet"
+                   data-action="apneRedigerVaktpost" data-id="${escHtmlValue(vp.id)}"><i class="bi bi-pencil"></i></button>`
         : '';
 
       // En ledig plass er raden uten person. Den skal se ut som noe som
@@ -499,12 +503,13 @@ function mkRessurs(r) {
           <td class="vl-timer">${escapeHtml(_varighet(vp))}</td>
           <td class="vl-kompcelle">${komp}</td>
           <td>${merknad}</td>
-          <td class="vl-handling">${fjernPost}</td>
+          <td class="vl-handling">${redigerPost}</td>
         </tr>`;
     }).join('')
     : '<tr><td colspan="9" class="vl-tom">Ingen satt opp ennå.</td></tr>';
 
   return `
+    ${mkGruppekurve(r)}
     <div class="vl-kort">
       <div class="vl-kort-topp">
         <div class="d-flex align-items-center gap-2 flex-wrap">
@@ -614,6 +619,36 @@ function _posterPerGruppe() {
 }
 
 
+function _timesteg(antall) {
+  // Hvor ofte klokkeslettet skrives under søylene. Alle timer på en kort
+  // vakt, sjeldnere når spennet er langt — ellers står tallene oppå
+  // hverandre og kurven blir uleselig av å være «mer informativ».
+  if (antall <= 14) return 1;
+  if (antall <= 28) return 2;
+  if (antall <= 60) return 4;
+  return 6;
+}
+
+
+function _toppunkt(punkter, topp) {
+  // **Når er bemanningen høyest?** Det er spørsmålet kurven skal svare på,
+  // og å lese det av søylehøyder er å gjette. Sammenhengende timer på
+  // toppnivå slås sammen til ett spenn.
+  const paaTopp = punkter.filter((p) => p.planlagt === topp);
+  if (!paaTopp.length) return '';
+  const forste = paaTopp[0];
+  const siste = paaTopp[paaTopp.length - 1];
+  const sammenhengende = paaTopp.length ===
+    (punkter.indexOf(siste) - punkter.indexOf(forste) + 1);
+  if (paaTopp.length === 1 || !sammenhengende) {
+    return `kl. ${_kl(forste.tid)}`;
+  }
+  // Toppen varer ut den siste timen, ikke til den begynner.
+  const slutt = new Date(_d(siste.tid).getTime() + 3600 * 1000).toISOString();
+  return `kl. ${_kl(forste.tid)}–${_kl(slutt)}`;
+}
+
+
 function _mkEnKurve(tittel, poster) {
   const punkter = _bemanningPerTime(poster);
   if (!punkter.length) return '';
@@ -635,11 +670,21 @@ function _mkEnKurve(tittel, poster) {
             </div>`;
   }).join('');
 
+  // Klokkeslettene ligger i sin egen rad med én celle per søyle, ikke som
+  // tekst inni søylen: cellene arver samme flex-bredde, så tallet står
+  // under den timen det gjelder uansett hvor mange timer vakta er.
+  const steg = _timesteg(punkter.length);
+  const timeakse = punkter.map((p, i) => {
+    const vis = i % steg === 0;
+    return `<span class="vl-time">${vis ? escapeHtml(_kl(p.tid)) : ''}</span>`;
+  }).join('');
+
   const bunn = `${escapeHtml(_dag(punkter[0].tid))} → `
              + `${escapeHtml(_dag(punkter[punkter.length - 1].tid))}`;
   const rest = ledige
     ? `<span class="vl-meta">${escHtmlValue(ledige)} ubesatte plasstimer</span>`
     : '<span class="vl-meta">Alle plasser fylt</span>';
+  const naar = _toppunkt(punkter, topp);
 
   return `
     <div class="vl-kurvegruppe">
@@ -648,7 +693,39 @@ function _mkEnKurve(tittel, poster) {
         <div class="d-flex align-items-center gap-3">${rest}</div>
       </div>
       <div class="vl-kurve">${soyler}</div>
-      <div class="vl-meta">${bunn} · topp ${escHtmlValue(topp)} plasser</div>
+      <div class="vl-timeakse">${timeakse}</div>
+      <div class="vl-meta">${bunn} · topp ${escHtmlValue(topp)} plasser${
+        naar ? ' ' + escapeHtml(naar) : ''}</div>
+    </div>`;
+}
+
+
+function _tegnforklaring() {
+  // Døgnskillet står i forklaringen fordi André spurte hva den hvite streken
+  // var. En strek man må spørre om, er en strek som ikke forklarer noe.
+  return `
+    <span class="vl-tegnforklaring"><i class="vl-prikk vl-prikk-bemannet"></i>Bemannet</span>
+    <span class="vl-tegnforklaring"><i class="vl-prikk vl-prikk-planlagt"></i>Ledig plass</span>
+    <span class="vl-tegnforklaring"><i class="vl-prikk vl-prikk-dogn"></i>Midnatt</span>`;
+}
+
+
+function mkGruppekurve(ressurs) {
+  // **Kurven står i fanen den gjelder.** Å lete etter samleplassens
+  // bemanning under «Oversikt» mens man bemanner samleplassen, er ett skifte
+  // for mye — og Oversikt viser fortsatt alle gruppene samlet, til den som
+  // vil sammenligne dem.
+  const bunke = _posterPerGruppe().find((b) => b.gruppe.id === ressurs.gruppe_id);
+  if (!bunke) return '';
+  const kurve = _mkEnKurve(bunke.gruppe.navn, bunke.poster);
+  if (!kurve) return '';
+  return `
+    <div class="vl-kort vl-kurve-kort">
+      <div class="vl-kort-topp">
+        <span class="vl-kort-tittel">Bemanning — ${escapeHtml(bunke.gruppe.navn)}</span>
+        <div class="d-flex align-items-center gap-3">${_tegnforklaring()}</div>
+      </div>
+      ${kurve}
     </div>`;
 }
 
@@ -667,10 +744,7 @@ function mkKurve() {
     <div class="vl-kort vl-kurve-kort">
       <div class="vl-kort-topp">
         <span class="vl-kort-tittel">Bemanning gjennom vakta</span>
-        <div class="d-flex align-items-center gap-3">
-          <span class="vl-tegnforklaring"><i class="vl-prikk vl-prikk-bemannet"></i>Bemannet</span>
-          <span class="vl-tegnforklaring"><i class="vl-prikk vl-prikk-planlagt"></i>Ledig plass</span>
-        </div>
+        <div class="d-flex align-items-center gap-3">${_tegnforklaring()}</div>
       </div>
       ${kurver}
     </div>`;
@@ -1218,9 +1292,92 @@ function _koblCellelytter() {
 }
 
 
-async function fjernVaktpost(id) {
+function apneRedigerVaktpost(id) {
+  // **Bytte person skal ikke koste skiftet.** Før måtte man fjerne raden og
+  // sette den opp på nytt, og da mistet man tidene og rollen som allerede
+  // sto der. Her endres alt sammen i ett kall, og serveren sjekker den doble
+  // regelen på nytt mot den som skal inn.
+  const vp = (aktivListe?.vaktposter || []).find((v) => v.id === id);
+  if (!vp) return;
+  const ressurs = aktivListe.ressurser.find((r) => r.id === vp.ressurs_id);
+  if (!ressurs) return;
+
+  _skjulFeil('vaktpost-feil');
+  const modal = document.getElementById('vaktpostModal');
+  modal.dataset.vaktpost = String(id);
+
+  const tittel = document.getElementById('vaktpost-tittel');
+  if (tittel) tittel.textContent = `Rediger skift — ${ressurs.navn}`;
+
+  _fyll('vaktpost-mannskap', (aktivListe.mannskap || []).map((m) => ({
+    id: m.id, navn: `${m.navn} — ${m.korps_navn}`,
+  })), '— ledig plass —');
+  _fyll('vaktpost-rolle', rollerForGruppe(ressurs.gruppe_id, vp.rolle_id),
+        'Uten rolle');
+
+  _settVerdi('vaktpost-mannskap', vp.mannskap_id);
+  _settVerdi('vaktpost-rolle', vp.rolle_id);
+  _settTid('vaktpost-fra', vp.fra_tid);
+  _settTid('vaktpost-til', vp.til_tid);
+  _settVerdi('vaktpost-merknad', vp.merknad || '');
+
+  new bootstrap.Modal(modal).show();
+}
+
+
+function _settVerdi(id, verdi) {
+  const el = document.getElementById(id);
+  if (el) el.value = verdi == null ? '' : String(verdi);
+}
+
+
+async function lagreVaktpost() {
+  const id = document.getElementById('vaktpostModal')?.dataset.vaktpost;
+  if (!id) return;
+  _skjulFeil('vaktpost-feil');
+  await withSubmitGuard('vaktpost-knapp', async () => {
+    const fra = _tidFraFelt('vaktpost-fra');
+    const til = _tidFraFelt('vaktpost-til');
+    if (!fra || !til) {
+      _visFeil('vaktpost-feil', 'Skiftet må ha både fra- og til-tidspunkt.');
+      return;
+    }
+
+    const res = await apiFetch(`/vaktliste/api/vaktposter/${id}/`, {
+      method: 'PUT',
+      body: JSON.stringify({
+        mannskap_id: document.getElementById('vaktpost-mannskap')?.value || null,
+        rolle_id: document.getElementById('vaktpost-rolle')?.value || null,
+        merknad: document.getElementById('vaktpost-merknad')?.value || '',
+        fra_tid: fra,
+        til_tid: til,
+      }),
+    });
+    const d = await res.json().catch(() => ({}));
+    if (!res.ok || d.status !== 'ok') {
+      _visFeil('vaktpost-feil', d.message || 'Kunne ikke lagre skiftet.');
+      return;
+    }
+    _lukkModal('vaktpostModal');
+    await lastListe(aktivListe.vaktliste.id);
+  });
+}
+
+
+async function slettVaktpost() {
+  const id = Number(document.getElementById('vaktpostModal')?.dataset.vaktpost);
+  if (!id) return;
+  const vp = (aktivListe?.vaktposter || []).find((v) => v.id === id);
+  const hvem = vp && !vp.ledig ? `«${vp.navn}»` : 'den ledige plassen';
+  if (!confirm(`Fjerne skiftet for ${hvem}?\n\nDette kan ikke angres.`)) return;
+
   const res = await apiFetch(`/vaktliste/api/vaktposter/${id}/`, { method: 'DELETE' });
-  if (!res.ok) return;
+  const d = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    _visFeil('vaktpost-feil', d.message || 'Kunne ikke fjerne skiftet.');
+    return;
+  }
+  _lukkModal('vaktpostModal');
   await lastListe(aktivListe.vaktliste.id);
 }
 

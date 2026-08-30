@@ -876,6 +876,13 @@ Gjennomgang 13. aug. 2026, med 1000 pasienter og peak 100 brukere som premiss.
             - **Lærdom å ta med til neste modul:** en modul er ikke ferdig før
               dataene den trenger kan opprettes *gjennom portalen*. Django-admin
               teller ikke, og en testsuite som bare bruker ORM-en ser det ikke.
+      - [x] **Rediger skift, og kurve per fane (30. aug. 2026).** Sjette
+            runde fra Andrés bruk. Blyanten i raden åpner et vindu der
+            mannskap, rolle, tider og merknad endres i ett kall — før måtte
+            man slette raden og sette den opp på nytt for å bytte person.
+            Sletting ligger inne i vinduet med bekreftelse. Bemanningskurven
+            står i fanen den gjelder, med klokkeslett under søylene og toppen
+            oppgitt med tidspunkt. Døgnskillet står i tegnforklaringen.
       - [x] **Ressursgrupper, ledernivå og rollene inn i ressursen
             (30. aug. 2026).** Femte runde fra Andrés bruk. `Ressurs.type` ble
             tabellen `Ressursgruppe` (migrasjon `0007`), så et førstehjelpstelt

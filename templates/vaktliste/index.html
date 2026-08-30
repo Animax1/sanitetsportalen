@@ -325,6 +325,69 @@
   </div>
 </div>
 
+{% comment %}
+  **Rediger skift.** Å bytte person var før å fjerne raden og sette den opp på
+  nytt — og da mistet man tidene og rollen som allerede sto der. Sletting
+  ligger her inne, bak en bekreftelse, som på ressursen.
+{% endcomment %}
+<div class="modal fade" id="vaktpostModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="vaktpost-tittel">Rediger skift</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Lukk"></button>
+      </div>
+      <div class="modal-body">
+        <div class="mb-3">
+          <label class="form-label" for="vaktpost-mannskap">Mannskap</label>
+          <select id="vaktpost-mannskap" class="form-select"></select>
+          <div class="form-text">
+            Velg <strong>«— ledig plass —»</strong> for å ta personen av uten å
+            miste plassen i oppsettet.
+          </div>
+        </div>
+        <div class="mb-3">
+          <label class="form-label" for="vaktpost-rolle">Rolle</label>
+          <select id="vaktpost-rolle" class="form-select"></select>
+        </div>
+        <div class="row g-2 mb-3">
+          <div class="col">
+            <label class="form-label" for="vaktpost-fra">Fra</label>
+            <input type="datetime-local" id="vaktpost-fra" class="form-control">
+          </div>
+          <div class="col">
+            <label class="form-label" for="vaktpost-til">Til</label>
+            <input type="datetime-local" id="vaktpost-til" class="form-control">
+          </div>
+        </div>
+        <div class="mb-3">
+          <label class="form-label" for="vaktpost-merknad">Merknad</label>
+          <input type="text" id="vaktpost-merknad" class="form-control" maxlength="255">
+        </div>
+        <div id="vaktpost-feil" class="text-danger small d-none"></div>
+
+        <hr>
+        <div class="vl-farlig">
+          <strong class="d-block mb-1">Fjern skiftet</strong>
+          <span class="vl-meta d-block mb-2">
+            Raden forsvinner fra vaktlista. Skal plassen bestå uten person,
+            velg «— ledig plass —» over i stedet.
+          </span>
+          <button type="button" class="btn btn-outline-danger btn-sm"
+                  data-action="slettVaktpost">
+            <i class="bi bi-trash me-1"></i>Fjern skiftet
+          </button>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Avbryt</button>
+        <button type="button" class="btn btn-primary" id="vaktpost-knapp"
+                data-action="lagreVaktpost">Lagre</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div class="modal fade" id="nyVaktpostModal" tabindex="-1">
   <div class="modal-dialog">
     <div class="modal-content">

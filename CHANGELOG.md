@@ -4,6 +4,40 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-08-30 — Rediger skiftet, og en kurve som sier når
+
+**1722 tester grønne** (15 nye). Ingen migrasjon — alt ligger i grensesnittet;
+serveren tok allerede alt redigeringsvinduet trenger i én PUT.
+
+- **Skiftet redigeres, det slettes ikke og settes opp på nytt.** Å bytte
+  person på en rad krevde før å fjerne den og begynne forfra — og da mistet
+  man tidene og rollen som allerede sto der. Blyanten i raden åpner et vindu
+  med mannskap, rolle, tider og merknad; alt går i ett kall, og serveren
+  sjekker den doble regelen på nytt mot den som skal inn. Å velge «— ledig
+  plass —» tar personen av uten å miste plassen i oppsettet.
+- **Sletting av et skift ligger inne i vinduet, bak en bekreftelse.** Samme
+  grep som på ressursen: den nakne søppelbøtta i raden var ett feilklikk fra
+  å fjerne noe.
+- **Bemanningskurven står i fanen den gjelder.** Ambulansefanen viser
+  ambulansenes kurve, samleplassen sin. Å lete etter samleplassens bemanning
+  under «Oversikt» mens man bemanner samleplassen er ett skifte for mye.
+  «Oversikt» viser fortsatt alle gruppene samlet, til den som vil sammenligne
+  dem.
+- **Klokkeslett under søylene, og toppen oppgitt med tidspunkt.** «topp 4
+  plasser kl. 14:00–18:00» svarer på spørsmålet kurven finnes for; å lese det
+  av søylehøyder er å gjette. Timeaksen har én celle per søyle med samme
+  flex-bredde, så tallet står under den timen det gjelder — målt i nettleseren
+  på tvers av alle søylene. Tettheten glisner med lengden (hver time opp til
+  14, deretter hver andre, fjerde, sjette): tall som står oppå hverandre gjør
+  kurven uleselig av å være «mer informativ».
+- **Den hvite streken er midnatt, ikke nåværende tidspunkt.** André måtte
+  spørre, og en strek man må spørre om forklarer ingenting — den står nå i
+  tegnforklaringen. Den er beholdt: arrangementer varer flere døgn, og
+  døgnskillet er det man orienterer seg etter.
+- Fem mutasjoner prøvd. Én overlevde — at bare første klokkeslett ble skrevet
+  ut — fordi testen talte celler og ikke hvor mange som hadde tall i seg. Den
+  teller nå begge deler.
+
 ## 2026-08-30 — Migrasjonsprøver mot ekte PostgreSQL
 
 **1713 tester grønne** (4 nye, én hoppes over uten PostgreSQL). Lukker hullet

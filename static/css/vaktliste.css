@@ -668,3 +668,34 @@
   flex-direction: column;
   gap: 0.15rem;
 }
+
+
+/* ── Timeaksen under bemanningskurven ─────────────────────────────────── */
+/*
+  Én celle per søyle, med samme flex-vekst: da står klokkeslettet under den
+  timen det gjelder, uansett hvor mange timer vakta er. Tekst inni søylen
+  ville ikke fått plass — søylene er noen få piksler brede på en lang vakt.
+*/
+.vl-timeakse {
+  display: flex;
+  gap: 1px;
+  margin-top: 0.2rem;
+}
+
+.vl-timeakse .vl-time {
+  flex: 1 1 0;
+  min-width: 0;
+  text-align: center;
+  font-size: 0.6rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: visible;
+}
+
+/* Døgnskillet i tegnforklaringen — samme hvite strek som står i kurven. */
+.vl-prikk-dogn {
+  background: transparent;
+  border-left: 2px solid rgba(255, 255, 255, 0.55);
+  border-radius: 0;
+  width: 2px;
+}
