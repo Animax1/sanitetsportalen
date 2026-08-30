@@ -934,13 +934,17 @@ Gjennomgang 13. aug. 2026, med 1000 pasienter og peak 100 brukere som premiss.
             «hvem er på vakt». Prisen: et navn kan stå to steder. En nullbar FK er en
             additiv migrasjon den dagen behovet melder seg.
 
-- [ ] **Kjør testsuiten mot PostgreSQL, ikke bare SQLite.** Deployen kræsjet
-      30. aug. 2026 på `cannot ALTER TABLE … because it has pending trigger
-      events`, og suiten var grønn hele veien: SQLite har ingen utsatte
-      triggere, så feilklassen finnes ikke i dev. `DataOgSkjemaISammeTransaksjonTests`
-      fanger det som faktisk skjedde, men er en statisk regel — den ser at
-      køen tømmes i fila, ikke at det skjer på veien gjennom. Prod er
-      PostgreSQL; dev burde vært det i det minste for migrasjonstestene.
+- [x] **Migrasjonsprøver mot ekte PostgreSQL (30. aug. 2026).** Punktet het
+      «kjør suiten mot PostgreSQL», og den formuleringen var feil: Djangos
+      testbase lages mot en *tom* base, så dataskrittet skriver ingenting og
+      feilen viser seg ikke. Løst med `core/migrasjonsprover.py` og
+      `python manage.py verifiser_migrasjoner` — engangsbase, rader i den
+      historiske formen, og påstander om hva migrasjonen gjorde med dem.
+      Fem mutasjoner prøvd, alle røde.
+      - [ ] **Kjør dem før du pusher en migrasjon som rører data.** De er
+            ikke med i den vanlige testkjøringen, fordi de trenger en
+            PostgreSQL. Docker-oppskriften står i CLAUDE.md. Får prosjektet
+            CI en dag, hører de hjemme der.
 
 - [ ] **Norsk sortering av æ/ø/å i vaktlisteregistrene.** Ikke hastverk, og
       kanskje aldri. Sorteringen bruker `Lower(...)`, så store/små bokstaver er

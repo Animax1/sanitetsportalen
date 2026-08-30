@@ -14,9 +14,12 @@ Denne testen flytter disiplinen fra hukommelse til testsuite. Er det avvik
 mellom modellene og migrasjonene, feiler den her — ikke i release-fasen.
 """
 from io import StringIO
+from unittest import skipUnless
 
 from django.core.management import call_command
 from django.test import TestCase
+
+from core.management.commands.verifiser_migrasjoner import ENV_URL, server_url
 
 
 class MigrasjonerErISyncTests(TestCase):
@@ -71,13 +74,12 @@ class DataOgSkjemaISammeTransaksjonTests(TestCase):
     fulgt av en skjemaendring, ikke bare de som treffer samme tabell. Prisen
     er `KJENTE_UNNTAK`; alternativet var en regel som ikke fanget 0007.
 
-    **Og den har en grense det er verdt å kjenne.** Testen ser at kallet
-    *finnes* i fila, ikke at det faktisk kjøres på veien gjennom. Fjernes
-    kallstedet mens hjelperen blir stående, går testen grønn — det ble prøvd
-    ved mutasjonstesting, og den overlevde. Å lukke det hullet krever å kjøre
-    migrasjonene mot en ekte PostgreSQL med rader i, altså det TODO kaller
-    «kjør suiten mot PostgreSQL». Til da fanger denne det som faktisk skjedde:
-    at kallet aldri ble skrevet.
+    **Og den har en grense.** Testen ser at kallet *finnes* i fila, ikke at
+    det faktisk kjøres på veien gjennom: fjernes kallstedet mens hjelperen
+    blir stående, går den grønn. Det hullet lukkes av
+    `core.migrasjonsprover` — som kjører migrasjonen mot en ekte PostgreSQL
+    med rader i basen, og fanger begge deler. Denne testen er den som alltid
+    kjører; prøvene krever en PostgreSQL å kjøre mot.
     """
 
     #: Operasjoner som lager eller fjerner en hel tabell. Trygge: en tabell
@@ -210,3 +212,80 @@ class DataOgSkjemaISammeTransaksjonTests(TestCase):
         """Grunnlaget for testen over: finner den ingen migrasjoner, måler den
         ingenting og går grønn på tom luft."""
         self.assertGreater(len(self._migrasjoner()), 20)
+
+
+class MigrasjonsproverTests(TestCase):
+    """Hver risikabel migrasjon må ha en prøve i `core.migrasjonsprover`.
+
+    Den statiske regelen over sier at køen skal tømmes. Denne sier at noen
+    faktisk har kjørt migrasjonen mot PostgreSQL med rader i basen og sett at
+    den går gjennom — forskjellen mellom en påstand og en måling.
+    """
+
+    def test_hver_risikabel_migrasjon_har_en_prove(self):
+        from core.migrasjonsprover import PROVER
+        vokter = DataOgSkjemaISammeTransaksjonTests()
+        mangler = [
+            navn for navn, _ in vokter._mistenkelige()
+            if navn not in vokter.KJENTE_UNNTAK and navn not in PROVER
+        ]
+        self.assertEqual(mangler, [], (
+            'Disse migrasjonene skriver rader og endrer skjema, men er aldri '
+            'prøvd mot PostgreSQL:\n  ' + '\n  '.join(mangler)
+            + '\n\nLegg en Migrasjonsprove i core/migrasjonsprover.py — seed '
+              'rader i den historiske formen, og sjekk hva migrasjonen gjorde '
+              'med dem. Kjør den med:\n'
+              '  python manage.py verifiser_migrasjoner --url postgres://…'))
+
+    def test_ingen_prove_uten_migrasjon(self):
+        """En prøve som peker på en migrasjon som ikke finnes lenger, måler
+        ingenting — og ser ut som dekning man ikke har."""
+        from django.db import connection
+        from django.db.migrations.loader import MigrationLoader
+        from core.migrasjonsprover import PROVER
+
+        paa_disk = {f'{app}.{navn}' for app, navn
+                    in MigrationLoader(connection,
+                                       ignore_no_migrations=True).disk_migrations}
+        foreldreloese = sorted(set(PROVER) - paa_disk)
+        self.assertEqual(foreldreloese, [], (
+            f'Prøver uten migrasjon: {foreldreloese}'))
+
+    def test_provenes_foregaaende_migrasjon_finnes(self):
+        """`foregaaende` er der basen settes før prøven. Peker den på noe som
+        ikke finnes, feiler prøven på oppsettet sitt og ikke på migrasjonen."""
+        from django.db import connection
+        from django.db.migrations.loader import MigrationLoader
+        from core.migrasjonsprover import PROVER
+
+        paa_disk = {f'{app}.{navn}' for app, navn
+                    in MigrationLoader(connection,
+                                       ignore_no_migrations=True).disk_migrations}
+        for navn, prove in sorted(PROVER.items()):
+            with self.subTest(prove=navn):
+                self.assertIn(f'{prove.app}.{prove.foregaaende}', paa_disk)
+
+
+@skipUnless(server_url(), f'{ENV_URL} er ikke satt — ingen PostgreSQL å prøve mot')
+class MigrasjonerMotPostgresTests(TestCase):
+    """Kjører prøvene på ordentlig. Hoppes over uten en PostgreSQL å bruke.
+
+    **Dette er det eneste som ser feilen som tok ned deployen.** Å kjøre
+    testsuiten mot PostgreSQL holder ikke: Djangos testbase lages ved å kjøre
+    migrasjonene mot en *tom* base, og et dataskritt uten data skriver
+    ingenting og fyller ingen triggerkø. Prøvene lager sin egen base, legger
+    inn rader i den historiske formen, og kjører så migrasjonen.
+
+    Sett variabelen til en PostgreSQL-server du kan lage baser på::
+
+        MIGRASJONSPROVE_DATABASE_URL=postgres://bruker@vert:5432/postgres
+
+    Kommandoen lager og sletter sin egen engangsbase — den rører aldri basen
+    URL-en peker på.
+    """
+
+    def test_provene_gaar_gjennom(self):
+        from django.core.management import call_command
+        ut = StringIO()
+        call_command('verifiser_migrasjoner', stdout=ut, stderr=ut)
+        self.assertIn('gikk gjennom', ut.getvalue())

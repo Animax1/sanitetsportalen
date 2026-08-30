@@ -11,6 +11,14 @@ relevante punkter i TODO. Dette skal gjøres som del av samme commit, ikke etter
 ## Commands
 
 ```powershell
+# Migrasjonsprøver mot ekte PostgreSQL (se «Migrasjoner» under)
+docker run --rm -d -p 5433:5432 -e POSTGRES_PASSWORD=prove --name pg-prove postgres:16
+$env:MIGRASJONSPROVE_DATABASE_URL = "postgres://postgres:prove@localhost:5433/postgres"
+python manage.py verifiser_migrasjoner
+docker rm -f pg-prove
+```
+
+```powershell
 # Setup (første gang)
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
@@ -510,6 +518,26 @@ grønn uansett; det tok ned deployen 30. aug. 2026.
 `DataOgSkjemaISammeTransaksjonTests` håndhever regelen — de tre veiene ut er å
 tømme køen, sette `atomic = False`, eller dele migrasjonen i to.
 `vaktliste/migrations/0007` er mønsteret.
+
+**Og en migrasjon som har mønsteret må ha en prøve i `core/migrasjonsprover.py`.**
+Den statiske regelen ser at kallet *står* i fila, ikke at det kjøres — fjern
+kallstedet og la hjelperen bli stående, og den går grønn. Prøven kjører
+migrasjonen mot en engangsbase på ekte PostgreSQL, med rader i den historiske
+formen, og sjekker hva den gjorde med dem.
+
+**Å kjøre testsuiten mot PostgreSQL er ikke det samme, og holder ikke.**
+Djangos testbase lages ved å kjøre migrasjonene mot en *tom* base: et
+dataskritt uten data skriver ingenting, fyller ingen triggerkø, og feilen
+viser seg ikke. Feilen krever PostgreSQL **og** rader **og** en skjemaendring
+etter skrivingen.
+
+Prøvene hoppes over uten `MIGRASJONSPROVE_DATABASE_URL` — de er ikke en del av
+den vanlige kjøringen, men skal kjøres før en migrasjon som rører data pushes.
+Kommandoen lager og sletter sin egen engangsbase, og rører aldri basen URL-en
+peker på. Den kjører `migrate` i en **underprosess** mot `default`, ikke som et
+databasealias: atten migrasjoner i dette prosjektet gjør ORM-kall i `RunPython`
+uten `schema_editor.connection.alias`, og ville med et alias skrevet til din
+egen base i stedet for prøvebasen.
 
 ## Miljøvariabler
 

@@ -4,6 +4,43 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-08-30 — Migrasjonsprøver mot ekte PostgreSQL
+
+**1713 tester grønne** (4 nye, én hoppes over uten PostgreSQL). Lukker hullet
+den statiske regelen fra forrige runde ikke nådde.
+
+- **`core/migrasjonsprover.py` + `python manage.py verifiser_migrasjoner`.**
+  Hver migrasjon som skriver rader og deretter endrer skjema må ha en prøve:
+  `foregaaende` sier hvor basen settes, `seed` legger inn rader i den
+  *historiske* formen med rå SQL, `sjekk` leser hva migrasjonen gjorde med
+  dem. Kommandoen lager sin egen engangsbase, kjører prøven, og sletter den —
+  den rører aldri basen URL-en peker på.
+- **Å kjøre testsuiten mot PostgreSQL ville ikke fanget feilen.** Det var det
+  TODO-punktet sa, og det var feil. Djangos testbase lages ved å kjøre
+  migrasjonene mot en *tom* base: dataskrittet finner ingenting å flytte,
+  skriver ingenting, og fyller ingen triggerkø. Feilen krever tre ting
+  samtidig — PostgreSQL, rader, og en skjemaendring etter skrivingen — og det
+  er nettopp de tre prøven setter opp.
+- **Prøven kjører `migrate` i en underprosess mot `default`**, ikke som et
+  andre databasealias. Atten migrasjoner i prosjektet gjør ORM-kall i
+  `RunPython` uten `schema_editor.connection.alias`, altså mot `default`; med
+  et alias ville de skrevet til utviklerens egen base i stedet for prøvebasen,
+  og prøven ville målt noe annet enn den later som. Underprosessen kjører
+  dessuten nøyaktig den stien release-fasen kjører.
+- **Fem mutasjoner, alle røde.** To fanges ved at migrasjonen kræsjer —
+  deriblant «hjelperen står, men kallstedet er fjernet», som er akkurat det
+  den statiske regelen *ikke* ser. Tre fanges av påstandene: ukjent
+  ressurstype som faller til feil gruppe, en pensjonert rolle som blir aktiv
+  i kopien, og roller som ikke viftes ut til alle grupper. De tre migrerer
+  helt fint og gir bare gale data — den slags feil finnes det ellers ingen
+  sperre mot.
+- **Testsuiten håndhever registeret**, ikke bare regelen: en ny migrasjon med
+  mønsteret må ha en prøve, en prøve må peke på en migrasjon som finnes, og
+  `foregaaende` må finnes. Uten det tredje feiler prøven på sitt eget oppsett
+  og ser ut som dekning man ikke har.
+- Kjøres med `MIGRASJONSPROVE_DATABASE_URL` satt; hoppes over ellers.
+  Docker-oppskriften står i CLAUDE.md.
+
 ## 2026-08-30 — Deployfiks: migrasjonen som kræsjet på PostgreSQL
 
 **1709 tester grønne** (3 nye). Ingen ny migrasjon — `vaktliste.0007` er rettet
