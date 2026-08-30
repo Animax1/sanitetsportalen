@@ -21,8 +21,10 @@ HTML_BUILDERS = (
     'fyllVelger',
     'mkRolleRad',
     '_fyll',
-    'tegnFaner', '_fanerad', '_mannskapsfane',
+    'tegnFaner', '_fanerad', '_mannskapsfane', 'iDrift', '_tilstede',
     'mkRessurs',
+    '_stempelknapper',
+    'mkTilstede',
     '_rolleValg',
     '_fyllValgFor',
     'mkOversikt',
@@ -34,6 +36,12 @@ HTML_BUILDERS = (
 ESCAPING_CALLS = ('escHtmlValue(', 'cellHtml(', '_escHtml(', 'escapeHtml(')
 
 REVIEWED_INTERPOLATIONS = {
+    # Drift (fase 4). Knappene bygges lokalt, og bare når tilgangen og
+    # tilstanden tillater dem — id-en er escapet inne i `_stempelknapper`.
+    'stempler': 'markup bygget lokalt av _stempelknapper(), id-en escapet inni',
+    'stil': 'hardkodet Bootstrap-klasse fra kallstedet, ingen data i seg',
+    'linjer': 'tabellrader bygget lokalt i samme funksjon',
+    'bolker': 'markup bygget lokalt i samme funksjon',
     'aktiv': 'hardkodet CSS-klasse fra en ternær',
     'antall': 'markup bygget lokalt, tallet escapet inni',
     'korpsmerke': 'markup bygget lokalt, korpsnavnet escapet inni',
@@ -86,7 +94,8 @@ REVIEWED_INTERPOLATIONS = {
         'ternær der den ene grenen er escapet og den andre er tom streng',
     "vis ? escapeHtml(_kl(p.tid)) : ''":
         'ternær der den ene grenen er escapet og den andre er tom streng',
-    'innhold': 'input eller escapet tekst, bygget lokalt i samme hjelper',
+    'innhold': 'to bruk, begge bygget lokalt: input eller escapet tekst i '
+               'tidscella, og ressursbolkene i «Tilstede nå»',
     'merke': 'to bruk, begge trygge: selected-attributtet fra en ternær i nedtrekkene, og ukedagsmerket der dagen escapes inni',
     'kurver': 'kurver fra `_mkEnKurve`, som selv skannes her',
     # `tittel` er ren tekst som escapes én gang ved innsetting i `title=`.
@@ -157,15 +166,17 @@ class VaktlisteEscapingOppforselTests(SimpleTestCase):
     HARNESS = (
         (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue', 'trustedHtml',
                            '_escHtml', 'klokke')),
-        (VAKTLISTE_JS, ('mkRessurs', '_rolleValg', 'rollerForGruppe',
-                        '_fyllValgFor', '_varighet',
-                        'mkRolleRad', 'mkOversikt', '_skiftrekkefolge', '_mkEnKurve',
-                        'mkGruppekurve', '_posterIGruppe', 'mkGruppe', '_plassKorps',
-                        '_tegnforklaring',
+        (VAKTLISTE_JS, ('mkRessurs', '_radklasse', '_stempelknapper',
+                        'kanStemple', 'iDrift', '_rolleValg',
+                        'rollerForGruppe', '_fyllValgFor', '_varighet',
+                        'mkRolleRad', 'mkOversikt', '_skiftrekkefolge',
+                        '_mkEnKurve', 'mkGruppekurve', '_posterIGruppe',
+                        'mkGruppe', '_plassKorps', '_tegnforklaring',
                         '_timesteg', '_ressurserIGruppe',
-                        '_grupperMedRessurser',
-                        '_toppunkt', '_posterPerGruppe', '_vaktensSpenn',
-                        'mkIkkePlassert', 'tegnFaner', '_fanerad', '_mannskapsfane', '_posterFor',
+                        '_grupperMedRessurser', '_toppunkt',
+                        '_posterPerGruppe', '_vaktensSpenn',
+                        'mkIkkePlassert', 'tegnFaner', '_fanerad',
+                        '_mannskapsfane', '_tilstede', '_posterFor',
                         '_ikkePlassert', '_tidsspenn', '_vaktspenn',
                         '_bemanningPerTime', '_iso16', '_d', '_kl', '_dag',
                         '_sammeDag', '_nivaa', '_erAdmin', 'kanSkriveAlt',
@@ -261,6 +272,7 @@ class VaktlisteEscapingOppforselTests(SimpleTestCase):
             globalThis.OVERSIKT = 'oversikt';
             globalThis.IKKE_PLASSERT = 'ikke-plassert';
             globalThis.MANNSKAP = 'mannskap';
+            globalThis.TILSTEDE = 'tilstede';
             globalThis.register = null;
             globalThis.aktivListe = {self._liste(
                 grupper=[{'id': 1, 'navn': '<b>Lag</b>', 'ikon': 'people'}],
@@ -281,6 +293,7 @@ class VaktlisteEscapingOppforselTests(SimpleTestCase):
             globalThis.OVERSIKT = 'oversikt';
             globalThis.IKKE_PLASSERT = 'ikke-plassert';
             globalThis.MANNSKAP = 'mannskap';
+            globalThis.TILSTEDE = 'tilstede';
             globalThis.register = null;
             globalThis.aktivListe = {self._liste(
                 grupper=[{'id': 1, 'navn': 'Lag',
@@ -365,6 +378,9 @@ REGISTER_REVIEWED = {
     "deler.join('')": 'markup bygget lokalt i samme funksjon',
     # Fase 3: knappene bygges lokalt og bare når tilgangen tillater dem.
     'knapper': 'markup bygget lokalt, mannskaps-id escapet inni',
+    'stempler': 'markup bygget lokalt av _stempelknapper(), id-en escapet inni',
+    'bolker': 'markup bygget lokalt i samme funksjon',
+    'linjer': 'tabellrader bygget lokalt i samme funksjon',
     'verdiKnapper': 'markup bygget lokalt, rad-id escapet inni',
     'nyKnapp': 'markup bygget lokalt, etiketten escapet inni',
     'tilKorps': 'markup bygget lokalt, ingen data i seg',
@@ -1087,8 +1103,8 @@ class OversiktUtenKurveTests(SimpleTestCase):
 
     HARNESS = (
         (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue')),
-        (VAKTLISTE_JS, ('mkOversikt', '_skiftrekkefolge', '_d', '_kl', '_dag',
-                        '_sammeDag', '_tidsspenn', '_vaktspenn',
+        (VAKTLISTE_JS, ('mkOversikt', '_skiftrekkefolge', '_d', '_kl',
+                        '_dag', '_sammeDag', '_tidsspenn', '_vaktspenn',
                         '_ressurserIGruppe', '_grupperMedRessurser')),
     )
     VINDU = ("globalThis.DAGER = ['søn','man','tir','ons','tor','fre','lør'];\n"
@@ -1131,8 +1147,8 @@ class KurvePerGruppeTests(SimpleTestCase):
         (VAKTLISTE_JS, ('_d', '_kl', '_dag', '_vaktensSpenn',
                         '_bemanningPerTime', '_posterPerGruppe',
                         '_mkEnKurve', 'mkGruppekurve', '_posterIGruppe',
-                        '_ressurserIGruppe',
-                        '_tegnforklaring', '_timesteg', '_toppunkt')),
+                        '_ressurserIGruppe', '_tegnforklaring',
+                        '_timesteg', '_toppunkt')),
     )
     VINDU = ("globalThis.DAGER = ['søn','man','tir','ons','tor','fre','lør'];\n"
              "globalThis.MND = ['jan','feb','mar','apr','mai','jun',"
@@ -1326,10 +1342,10 @@ class GruppekurveIFanenTests(SimpleTestCase):
     HARNESS = (
         (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue')),
         (VAKTLISTE_JS, ('_d', '_kl', '_dag', '_vaktensSpenn',
-                        '_bemanningPerTime', '_posterPerGruppe', '_mkEnKurve',
-                        '_timesteg', '_toppunkt', '_tegnforklaring',
-                        '_posterIGruppe', '_ressurserIGruppe',
-                        'mkGruppekurve')),
+                        '_bemanningPerTime', '_posterPerGruppe',
+                        '_mkEnKurve', '_timesteg', '_toppunkt',
+                        '_tegnforklaring', '_posterIGruppe',
+                        '_ressurserIGruppe', 'mkGruppekurve')),
     )
     VINDU = ("globalThis.DAGER = ['søn','man','tir','ons','tor','fre','lør'];\n"
              "globalThis.MND = ['jan','feb','mar','apr','mai','jun',"
@@ -1410,9 +1426,11 @@ class NyRessursIFanerekkaTests(SimpleTestCase):
 
     HARNESS = (
         (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue')),
-        (VAKTLISTE_JS, ('tegnFaner', '_fanerad', '_mannskapsfane', '_posterFor', '_ikkePlassert',
-                        '_ressurserIGruppe', '_grupperMedRessurser',
-                        '_nivaa', '_erAdmin', 'kanLede')),
+        (VAKTLISTE_JS, ('tegnFaner', '_fanerad', '_mannskapsfane',
+                        'iDrift', '_tilstede', '_posterFor',
+                        '_ikkePlassert', '_ressurserIGruppe',
+                        '_grupperMedRessurser', '_nivaa', '_erAdmin',
+                        'kanLede')),
     )
 
     def setUp(self):
@@ -1429,6 +1447,7 @@ class NyRessursIFanerekkaTests(SimpleTestCase):
             "globalThis.OVERSIKT = 'oversikt';\n"
             "globalThis.IKKE_PLASSERT = 'ikke-plassert';\n"
             "globalThis.MANNSKAP = 'mannskap';\n"
+            "globalThis.TILSTEDE = 'tilstede';\n"
             "globalThis.register = null;\n"
             "globalThis.aktivListe = {grupper: [{id: 3, navn: 'Ambulanse',"
             " ikon: 'truck'}], ressurser: [{id: 7, navn: 'Ambulanse 1',"
@@ -1477,11 +1496,13 @@ class FanenErGruppaTests(SimpleTestCase):
 
     HARNESS = (
         (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue')),
-        (VAKTLISTE_JS, ('tegnFaner', '_fanerad', '_mannskapsfane', 'mkGruppe', 'mkRessurs', '_rolleValg',
-                        '_skiftrekkefolge',
-                        '_fyllValgFor', '_varighet', 'mkGruppekurve',
-                        '_mkEnKurve', '_tegnforklaring', '_timesteg',
-                        '_toppunkt', '_posterPerGruppe', '_vaktensSpenn',
+        (VAKTLISTE_JS, ('tegnFaner', '_fanerad', '_mannskapsfane',
+                        'iDrift', '_tilstede', 'mkGruppe', 'mkRessurs',
+                        '_radklasse', '_stempelknapper', 'kanStemple',
+                        '_rolleValg', '_skiftrekkefolge', '_fyllValgFor',
+                        '_varighet', 'mkGruppekurve', '_mkEnKurve',
+                        '_tegnforklaring', '_timesteg', '_toppunkt',
+                        '_posterPerGruppe', '_vaktensSpenn',
                         '_posterIGruppe', '_plassKorps',
                         '_bemanningPerTime', 'rollerForGruppe', '_iso16',
                         '_posterFor', '_ikkePlassert', '_ressurserIGruppe',
@@ -1497,6 +1518,7 @@ class FanenErGruppaTests(SimpleTestCase):
              "globalThis.OVERSIKT = 'oversikt';\n"
              "globalThis.IKKE_PLASSERT = 'ikke-plassert';\n"
             "globalThis.MANNSKAP = 'mannskap';\n"
+            "globalThis.TILSTEDE = 'tilstede';\n"
             "globalThis.register = null;\n")
 
     #: To ambulanser i samme gruppe, én samleplass i en annen.
@@ -1559,6 +1581,26 @@ class FanenErGruppaTests(SimpleTestCase):
         ut = self._faner()
         self.assertLess(ut.index('Oversikt'), ut.index('Mannskap'))
         self.assertLess(ut.index('Mannskap'), ut.index('>Ambulanse<'))
+
+    def test_tilstede_fanen_finnes_bare_i_drift(self):
+        """I planlegging er den tom per definisjon — ingen er stemplet — og
+        en fane som alltid sier null er en fane man slutter å se."""
+        self.assertNotIn('Tilstede nå', self._faner())
+
+    def test_tilstede_fanen_kommer_med_drift(self):
+        ut = run_node(self.harness, self.VINDU + self.LISTE + """
+            aktivListe.vaktliste.i_drift = true;
+            aktivListe.vaktposter = [
+              {id: 1, ressurs_id: 10, ledig: false, tilstede: true},
+              {id: 2, ressurs_id: 10, ledig: false, tilstede: false}];
+            const el = { innerHTML: '' };
+            globalThis.document = { getElementById: () => el };
+            tegnFaner();
+            console.log(el.innerHTML);
+        """)
+        self.assertIn('Tilstede nå', ut)
+        self.assertIn('data-arg="tilstede"', ut)
+        self.assertIn('>1<', ut, 'fanen teller de tilstedeværende')
 
     def test_mannskap_er_en_ekte_fane(self):
         """Den var en lenke ut til /vaktliste/registre/, og et klikk kostet
@@ -1659,8 +1701,8 @@ class UtskriftslistaTests(SimpleTestCase):
 
     HARNESS = (
         (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue')),
-        (VAKTLISTE_JS, ('mkOversikt', '_skiftrekkefolge', '_d', '_kl', '_dag',
-                        '_sammeDag', '_tidsspenn', '_vaktspenn',
+        (VAKTLISTE_JS, ('mkOversikt', '_skiftrekkefolge', '_d', '_kl',
+                        '_dag', '_sammeDag', '_tidsspenn', '_vaktspenn',
                         '_ressurserIGruppe', '_grupperMedRessurser')),
     )
     VINDU = ("globalThis.DAGER = ['søn','man','tir','ons','tor','fre','lør'];\n"
@@ -1784,12 +1826,14 @@ class EnkeltgruppeTests(SimpleTestCase):
 
     HARNESS = (
         (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue')),
-        (VAKTLISTE_JS, ('mkGruppe', 'mkRessurs', '_rolleValg', '_plassKorps',
-                        '_skiftrekkefolge', '_fyllValgFor', '_varighet',
-                        'mkGruppekurve', '_posterIGruppe', '_mkEnKurve',
-                        '_tegnforklaring', '_timesteg', '_toppunkt',
-                        '_vaktensSpenn', '_bemanningPerTime', 'rollerForGruppe',
-                        '_iso16', '_posterFor', '_ressurserIGruppe',
+        (VAKTLISTE_JS, ('mkGruppe', 'mkRessurs', '_radklasse',
+                        '_stempelknapper', 'kanStemple', 'iDrift',
+                        '_rolleValg', '_plassKorps', '_skiftrekkefolge',
+                        '_fyllValgFor', '_varighet', 'mkGruppekurve',
+                        '_posterIGruppe', '_mkEnKurve', '_tegnforklaring',
+                        '_timesteg', '_toppunkt', '_vaktensSpenn',
+                        '_bemanningPerTime', 'rollerForGruppe', '_iso16',
+                        '_posterFor', '_ressurserIGruppe',
                         '_grupperMedRessurser', '_d', '_kl', '_dag',
                         '_nivaa', '_erAdmin', 'kanSkriveAlt', 'kanLede',
                         'kanBemanne', 'gruppaHarPlass')),
@@ -2006,14 +2050,15 @@ class MannskapsfanenTests(SimpleTestCase):
     HARNESS = (
         (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue')),
         (VAKTLISTE_JS, ('mkMannskap', '_personKolonne', '_passerPersonsok',
-                        '_sorterMannskap', 'kanRedigerePerson', 'tegnPanel',
-                        'apneVakt', '_apneModal', '_skjulFeil', '_nivaa',
-                        'visFane',
-                        '_erAdmin', 'kanSkriveAlt', 'kanSkriveNoe',
-                        'kanLede')),
+                        '_sorterMannskap', 'kanRedigerePerson',
+                        'tegnPanel', 'apneVakt', '_apneModal',
+                        '_skjulFeil', '_nivaa', 'visFane', '_erAdmin',
+                        'kanSkriveAlt', 'kanSkriveNoe', 'kanLede')),
     )
     VINDU = ("globalThis.window = { MODUL_TILGANG: { admin: true } };\n"
              "globalThis.MANNSKAP = 'mannskap';\n"
+             "globalThis.TILSTEDE = 'tilstede';\n"
+            "globalThis.TILSTEDE = 'tilstede';\n"
              "globalThis.OVERSIKT = 'oversikt';\n"
              "globalThis.IKKE_PLASSERT = 'ikke-plassert';\n")
 
@@ -2212,8 +2257,8 @@ class NyVaktpostFyllerDatoenTests(SimpleTestCase):
 
     HARNESS = (
         (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue')),
-        (VAKTLISTE_JS, ('apneVaktpost', '_settTid', '_iso16', '_d', '_fyll',
-                        '_skjulFeil', '_vaktpostModusSkifte',
+        (VAKTLISTE_JS, ('apneVaktpost', '_settTid', '_iso16', '_d',
+                        '_fyll', '_skjulFeil', '_vaktpostModusSkifte',
                         'rollerForGruppe')),
     )
 
@@ -2287,3 +2332,198 @@ class NyVaktpostFyllerDatoenTests(SimpleTestCase):
                    'fikk en dato fra ingenting: '
                    + felter['ny-vaktpost-fra'].value);
         """)
+
+
+class StemplingsnavnTests(SimpleTestCase):
+    """De fire knappene og de fire endepunktene skal ikke kunne gli fra
+    hverandre.
+
+    Klienten har én `data-action` per overgang, ikke én generisk med
+    overgangen i et attributt — klikkdelegeringen i `portal-utils.js` sender
+    ett argument, og å utvide den for én sides skyld ville rørt hver side i
+    portalen. Prisen er to lister med samme innhold, og den prisen betales
+    her.
+    """
+
+    def _klientkart(self):
+        """`STEMPLINGER`-objektet i vaktliste.js, som Python-dict."""
+        src = read_js(VAKTLISTE_JS)
+        blokk = src[src.index('const STEMPLINGER = {'):]
+        blokk = blokk[:blokk.index('};')]
+        return dict(re.findall(r"(\w+):\s*'([^']+)'", blokk))
+
+    def test_klienten_kjenner_alle_serverens_overganger(self):
+        from . import services
+        self.assertEqual(
+            set(self._klientkart().values()), set(services.STEMPLINGER),
+            'klientens stemplinger og serverens er ikke de samme')
+
+    def test_hver_klienthandling_finnes_som_funksjon(self):
+        """En `data-action` uten funksjon er en knapp som ikke gjør noe —
+        klikkdelegeringen returnerer stille når navnet ikke finnes."""
+        src = read_js(VAKTLISTE_JS)
+        for navn in self._klientkart():
+            with self.subTest(handling=navn):
+                self.assertIn(f'function {navn}(', src)
+
+    def test_knappene_bruker_de_navnene(self):
+        kropp = extract_function(read_js(VAKTLISTE_JS), '_stempelknapper')
+        for navn in self._klientkart():
+            with self.subTest(handling=navn):
+                self.assertIn(f"'{navn}'", kropp)
+
+
+class DriftflatenTests(SimpleTestCase):
+    """Stemplene i raden, og «Tilstede nå»."""
+
+    HARNESS = (
+        (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue')),
+        (VAKTLISTE_JS, ('_stempelknapper', '_radklasse', 'kanStemple',
+                        'iDrift', 'kanSkriveAlt', '_nivaa', '_erAdmin',
+                        'mkTilstede', '_tilstede', '_kl', '_d', '_dag',
+                        '_tidsspenn', '_sammeDag')),
+    )
+    DAGER = ("globalThis.DAGER = ['søn','man','tir','ons','tor','fre','lør'];\n"
+             "globalThis.MND = ['jan','feb','mar','apr','mai','jun',"
+             "'jul','aug','sep','okt','nov','des'];\n")
+
+    def setUp(self):
+        if not node_available():
+            self.skipTest('node er ikke tilgjengelig')
+        self.harness = build_harness(self.HARNESS)
+
+    def _knapper(self, vp, *, drift=True, nivaa='skriv_full', admin=False):
+        import json
+        ut = run_node(self.harness, self.DAGER + f"""
+            globalThis.window = {{ MODUL_TILGANG: {{
+              vaktliste: '{nivaa}', admin: {str(admin).lower()} }} }};
+            globalThis.aktivListe = {{vaktliste: {{i_drift: {str(drift).lower()}}}}};
+            console.log('[' + _stempelknapper({json.dumps(vp)}) + ']');
+        """)
+        # `run_node` skriver «OK» til slutt. Klammene rundt gjør at en tom
+        # streng er noe man kan se, framfor en linje som mangler.
+        return ut[ut.index('['):ut.rindex(']') + 1]
+
+    POST = {'id': 5, 'ledig': False, 'navn': 'Kari',
+            'mott_at': None, 'av_vakt_at': None, 'tilstede': False}
+
+    def test_uten_stempel_tilbys_bare_mott(self):
+        """Raden er i nøyaktig én tilstand. «Av vakt» på en som ikke har møtt
+        er en knapp som bare kan gi en feilmelding."""
+        ut = self._knapper(self.POST)
+        self.assertIn('stemplMott', ut)
+        self.assertNotIn('stemplAvVakt', ut)
+        self.assertIn('Møtt', ut)
+
+    def test_etter_mott_tilbys_av_vakt_og_angre(self):
+        ut = self._knapper({**self.POST, 'mott_at': '2026-10-03T08:00:00',
+                            'tilstede': True})
+        self.assertIn('stemplAvVakt', ut)
+        self.assertIn('angreMott', ut)
+        self.assertNotIn('stemplMott"', ut)
+
+    def test_etter_av_vakt_staar_tidspunktet_og_en_angre(self):
+        ut = self._knapper({**self.POST, 'mott_at': '2026-10-03T08:00:00',
+                            'av_vakt_at': '2026-10-03T16:00:00'})
+        self.assertIn('angreAvVakt', ut)
+        self.assertIn('16:00', ut)
+
+    def test_utenfor_drift_finnes_ingen_stempler(self):
+        """Innsjekk er stengt i planlegging — knappen ville ført til 409."""
+        self.assertEqual('[]', self._knapper(self.POST, drift=False))
+
+    def test_korpsforeren_ser_ingen_stempler(self):
+        """Avklaring 11.3, speilet i grensesnittet. Serveren nekter uansett,
+        men en knapp som fører til en vegg er verre enn ingen knapp."""
+        self.assertEqual(
+            '[]', self._knapper(self.POST, nivaa='skriv_handling'))
+
+    def test_ledig_plass_har_ingen_aa_stemple(self):
+        self.assertEqual(
+            '[]', self._knapper({**self.POST, 'ledig': True}))
+
+    def _radklasse(self, vp, drift=True):
+        import json
+        return run_node(self.harness, f"""
+            globalThis.aktivListe = {{vaktliste: {{i_drift: {str(drift).lower()}}}}};
+            console.log('[' + _radklasse({json.dumps(vp)}) + ']');
+        """).splitlines()[0]
+
+    def test_tilstede_merkes_paa_raden(self):
+        self.assertIn('vl-tilstede', self._radklasse(
+            {**self.POST, 'tilstede': True}))
+
+    def test_avgatt_merkes_annerledes(self):
+        ut = self._radklasse({**self.POST, 'av_vakt_at': '2026-10-03T16:00:00'})
+        self.assertIn('vl-avgatt', ut)
+
+    def test_ledig_plass_beholder_sin_egen_klasse(self):
+        """Bakgrunnen bærer allerede «ledig plass». To fargekoder i samme
+        flate blir til ingen."""
+        self.assertIn('vl-ledig', self._radklasse({**self.POST, 'ledig': True}))
+
+    def test_planlegging_farger_ingenting(self):
+        self.assertEqual('[]', self._radklasse(
+            {**self.POST, 'tilstede': True}, drift=False))
+
+    # ── «Tilstede nå» ────────────────────────────────────────────────────
+    def _tilstede(self, poster, ressurser=None):
+        import json
+        return run_node(self.harness, self.DAGER + f"""
+            globalThis.window = {{ MODUL_TILGANG: {{ admin: true }} }};
+            globalThis.document = {{ getElementById: () => null }};
+            globalThis.aktivListe = {{
+              vaktliste: {{i_drift: true}},
+              vaktposter: {json.dumps(poster)},
+              ressurser: {json.dumps(ressurser or [
+                  {'id': 1, 'navn': 'Bil A', 'ikon': 'truck'}])}}};
+            console.log(mkTilstede());
+        """)
+
+    RAD = {'id': 1, 'ressurs_id': 1, 'ledig': False, 'navn': 'Kari',
+           'korps_kort': 'HGSD', 'rolle': 'Sjåfør',
+           'mott_at': '2026-10-03T08:04:00', 'av_vakt_at': None,
+           'tilstede': True, 'fra_tid': '2026-10-03T08:00:00',
+           'til_tid': '2026-10-03T16:00:00'}
+
+    def test_tellingen_staar_over_lista(self):
+        """I en evakuering teller man hoder mot et tall, og da skal tallet
+        være det første man ser."""
+        ut = self._tilstede([self.RAD, {**self.RAD, 'id': 2, 'navn': 'Ola'}])
+        self.assertIn('vl-tilstedetall', ut)
+        self.assertIn('>2</div>', ut)
+        self.assertLess(ut.index('vl-tilstedetall'), ut.index('Kari'))
+
+    def test_bare_de_som_er_tilstede(self):
+        """Definisjonen er knivskarp: møtt, og ikke gått av vakt."""
+        ut = self._tilstede([
+            self.RAD,
+            {**self.RAD, 'id': 2, 'navn': 'Avgått', 'tilstede': False,
+             'av_vakt_at': '2026-10-03T12:00:00'},
+            {**self.RAD, 'id': 3, 'navn': 'Ikkemøtt', 'tilstede': False,
+             'mott_at': None},
+        ])
+        self.assertIn('Kari', ut)
+        self.assertNotIn('Avgått', ut)
+        self.assertNotIn('Ikkemøtt', ut)
+
+    def test_de_som_mangler_telles_ogsaa(self):
+        """«3 satt opp, 1 tilstede» er tallet man handler på — hvor mange
+        som gjenstår er halve spørsmålet ved et skiftbytte."""
+        ut = self._tilstede([
+            self.RAD,
+            {**self.RAD, 'id': 2, 'navn': 'Ola', 'tilstede': False,
+             'mott_at': None},
+        ])
+        self.assertIn('2 satt opp', ut)
+        self.assertIn('1 ikke møtt', ut)
+
+    def test_tom_liste_forklarer_veien_videre(self):
+        ut = self._tilstede([])
+        self.assertIn('ressursfanene', ut)
+        self.assertIn('>0</div>', ut)
+
+    def test_navn_escapes(self):
+        ut = self._tilstede([{**self.RAD, 'navn': '<img src=x onerror=alert(1)>'}])
+        self.assertNotIn('<img src=x', ut)
+        self.assertIn('&lt;img', ut)

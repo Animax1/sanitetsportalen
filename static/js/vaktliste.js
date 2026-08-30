@@ -48,6 +48,7 @@ let aktivVerdiregister = 'korps';  // hvilket register verdivinduet står i
 
 const OVERSIKT = 'oversikt';
 const MANNSKAP = 'mannskap';
+const TILSTEDE = 'tilstede';
 const IKKE_PLASSERT = 'ikke-plassert';
 
 // Register → hvordan det snakkes om og hvor det ligger.
@@ -106,6 +107,19 @@ function kanBemanne(ressurs) {
   if (kanSkriveAlt()) return true;
   if (_nivaa() !== 'skriv_handling') return false;
   return window.MITT_KORPS_ID != null && ressurs.korps_id === window.MITT_KORPS_ID;
+}
+
+
+function kanStemple() {
+  // Speiler `services.kan_stemple`. **Avklaring 11.3: ikke korps-føreren.**
+  // Hun setter opp sine egne folk, men «Tilstede nå» er brannsikkerhet, og
+  // det tallet skal ha én ansvarlig — ikke ett per korps.
+  return kanSkriveAlt();
+}
+
+
+function iDrift() {
+  return !!aktivListe?.vaktliste?.i_drift;
 }
 
 
@@ -309,6 +323,31 @@ function tegnStatus() {
     : ' · ingen sluttid satt';
   el.textContent = vl.status_navn + spenn;
   el.className = 'vl-status' + (vl.i_drift ? ' vl-drift' : '');
+
+  tegnDriftknapp();
+}
+
+
+function tegnDriftknapp() {
+  // **Døra til innsjekken står ved statusen den endrer.** Lå den i
+  // «Innstillinger», måtte man åpne et vindu for å se om innsjekken var
+  // åpen — og det er det første man vil vite når vakta begynner.
+  //
+  // Knappen tegnes her og ikke av `gateKnapper()`, fordi teksten skifter med
+  // tilstanden: `gateKnapper()` kjører én gang ved sidelasting.
+  const el = document.getElementById('vl-drift');
+  if (!el) return;
+  if (!aktivListe || !kanSkriveAlt()) { el.innerHTML = ''; return; }
+
+  el.innerHTML = iDrift()
+    ? `<button class="btn btn-sm btn-outline-warning" type="button"
+               data-action="settDrift" data-arg="stopp">
+         <i class="bi bi-pause-circle me-1"></i>Ut av drift
+       </button>`
+    : `<button class="btn btn-sm btn-success" type="button"
+               data-action="settDrift" data-arg="start">
+         <i class="bi bi-play-circle me-1"></i>Sett i drift
+       </button>`;
 }
 
 
@@ -404,6 +443,16 @@ function tegnFaner() {
       antall: ressurser.reduce((n, r) => n + _posterFor(r.id).length, 0),
     });
   });
+  // **«Tilstede nå» finnes bare i drift.** I planlegging er den tom per
+  // definisjon — ingen er stemplet — og en fane som alltid sier null er en
+  // fane man slutter å se.
+  if (iDrift()) {
+    faner.push({
+      id: TILSTEDE, navn: 'Tilstede nå', ikon: 'person-check',
+      antall: _tilstede().length,
+    });
+  }
+
   faner.push({
     id: IKKE_PLASSERT, navn: 'Ikke plassert', ikon: 'person-dash',
     antall: _ikkePlassert().length,
@@ -454,6 +503,7 @@ function tegnPanel() {
   if (!aktivListe) { el.innerHTML = ''; return; }
 
   if (aktivFane === OVERSIKT) { el.innerHTML = mkOversikt(); return; }
+  if (aktivFane === TILSTEDE) { el.innerHTML = mkTilstede(); return; }
   if (aktivFane === IKKE_PLASSERT) { el.innerHTML = mkIkkePlassert(); return; }
 
   const gruppe = (aktivListe.grupper || [])
@@ -593,6 +643,49 @@ function mkGruppe(gruppe) {
 }
 
 
+function _radklasse(vp) {
+  // Tilstanden skal synes på raden, ikke bare i en kolonne. Under drift er
+  // det «hvem mangler» man leter etter, og da er det fargen man skummer.
+  if (vp.ledig) return 'vl-ledig';
+  if (!iDrift()) return '';
+  if (vp.tilstede) return 'vl-tilstede';
+  if (vp.av_vakt_at) return 'vl-avgatt';
+  return '';
+}
+
+
+function _stempelknapper(vp) {
+  // **Én knapp, ikke to.** Se kommentaren i `mkRessurs()`. Rekkefølgen er
+  // radens egen: har hun ikke møtt, er «Møtt» det eneste som gir mening.
+  if (!iDrift() || vp.ledig || !kanStemple()) return '';
+
+  // **Én `data-action` per overgang**, ikke én generisk med overgangen i et
+  // attributt. Klikkdelegeringen i portal-utils.js sender ett argument —
+  // `data-id` — og å utvide den for én sides skyld ville rørt hver side i
+  // portalen. Navnene speiler `services.STEMPLINGER`, og
+  // `StemplingsnavnTests` holder de to listene like.
+  const knapp = (handling, etikett, stil, ikon) =>
+    `<button class="btn btn-sm ${stil} vl-stempel" type="button"
+             data-action="${escHtmlValue(handling)}" data-id="${escHtmlValue(vp.id)}">
+       <i class="bi bi-${escHtmlValue(ikon)} me-1"></i>${escapeHtml(etikett)}
+     </button>`;
+  const angre = (handling, tittel) =>
+    `<button class="btn btn-sm btn-outline-secondary" type="button"
+             title="${escHtmlValue(tittel)}" aria-label="${escHtmlValue(tittel)}"
+             data-action="${escHtmlValue(handling)}" data-id="${escHtmlValue(vp.id)}">
+       <i class="bi bi-arrow-counterclockwise"></i>
+     </button>`;
+
+  if (!vp.mott_at) return knapp('stemplMott', 'Møtt', 'btn-success', 'box-arrow-in-right');
+  if (!vp.av_vakt_at) {
+    return knapp('stemplAvVakt', 'Av vakt', 'btn-outline-warning', 'box-arrow-right')
+         + angre('angreMott', 'Angre møtt');
+  }
+  return `<span class="vl-meta me-1">${escapeHtml(_kl(vp.av_vakt_at))}</span>`
+       + angre('angreAvVakt', 'Angre av vakt');
+}
+
+
 function _varighet(vp) {
   // **Timer per skift, som en egen kolonne.** Andrés bestilling, og den er
   // det eneste tallet man ellers må regne ut i hodet for hver rad — «20:00
@@ -707,6 +800,18 @@ function mkRessurs(r) {
                    data-action="apneRedigerVaktpost" data-id="${escHtmlValue(vp.id)}"><i class="bi bi-pencil"></i></button>`
         : '';
 
+      // **Stemplene står i handlingskolonnen, som er `sticky`.** Den er den
+      // ene kolonnen som aldri ruller bort, og KO står med en telefon i
+      // hånda og skal treffe riktig rad første gang.
+      //
+      // Notatet ba om «to store knapper per rad». Det ble **én** — den som
+      // gjelder nå — pluss en liten angre. Raden er i nøyaktig én tilstand:
+      // «Møtt» på en som alt har møtt gjør enten ingenting eller noe hun
+      // ikke ba om, og to knapper i en kolonne på 5 % blir to *små* knapper,
+      // altså det motsatte av bestillingen. Angreknappen er liten med vilje:
+      // et feiltrykk skal kunne rettes, men ikke like lett som å stemple.
+      const stempler = _stempelknapper(vp);
+
       // En ledig plass er raden uten person. Den skal se ut som noe som
       // gjenstår — ikke som en rad der navnet mangler ved en feil.
       const navnCelle = vp.ledig
@@ -726,7 +831,7 @@ function mkRessurs(r) {
       // lenge — og først da kompetansen, som er det man vurderer laget på
       // når resten står. Merknaden sist, fordi den er unntaket.
       return `
-        <tr class="${escHtmlValue(vp.ledig ? 'vl-ledig' : '')}">
+        <tr class="${escHtmlValue(_radklasse(vp))}">
           <td class="vl-navn">${navnCelle}</td>
           <td>${korpsCelle}</td>
           <td>${_rolleValg(vp, r, kanRore)}</td>
@@ -735,7 +840,7 @@ function mkRessurs(r) {
           <td class="vl-timer">${escapeHtml(_varighet(vp))}</td>
           <td class="vl-kompcelle">${komp}</td>
           <td>${merknad}</td>
-          <td class="vl-handling">${redigerPost}</td>
+          <td class="vl-handling">${stempler}${redigerPost}</td>
         </tr>`;
     }).join('')
     : '<tr><td colspan="9" class="vl-tom">Ingen satt opp ennå.</td></tr>';
@@ -1072,6 +1177,97 @@ function mkOversikt() {
       </div>
       ${deler.join('')}
     </div>`;
+}
+
+
+function _tilstede() {
+  // **Definisjonen er knivskarp: møtt, og ikke gått av vakt.** Utledet av
+  // stemplene, aldri en lagret status — to kilder til samme sannhet går i
+  // utakt første gang noe feiler halvveis. Speiler `Vaktpost.er_tilstede`,
+  // og serveren sender flagget ferdig utregnet nettopp derfor.
+  return (aktivListe?.vaktposter || []).filter((vp) => vp.tilstede);
+}
+
+
+function mkTilstede() {
+  // **Modulens mest alvorlige visning.** På et sted med overnatting brukes
+  // den til å vite hvem som er i bygget ved brann. Det stiller tre krav
+  // resten av sida ikke har:
+  //
+  // 1. Tellingen står øverst, stor. I en evakuering teller man hoder mot et
+  //    tall, og da skal tallet være det første man ser.
+  // 2. Lista skal kunne skrives ut. Strøm og nett er det første som ryker i
+  //    nettopp situasjonen lista finnes for, så rutinen bør være å skrive
+  //    den ut ved vaktstart og ved skiftbytte.
+  // 3. Ingen redigering. Dette er en oversikt man leser under press;
+  //    stemplene settes i ressursfanene, der man ser hvem som mangler.
+  const rader = _tilstede();
+  const alle = (aktivListe?.vaktposter || []).filter((vp) => !vp.ledig);
+  const stemplet = new Date().toLocaleTimeString('no-NO',
+    { hour: '2-digit', minute: '2-digit' });
+
+  // Gruppert på ressurs, som utskriftslista: den som leter etter en person
+  // vet hvilken bil hun står på, ikke hvilken rad hun har.
+  const perRessurs = new Map();
+  rader.forEach((vp) => {
+    if (!perRessurs.has(vp.ressurs_id)) perRessurs.set(vp.ressurs_id, []);
+    perRessurs.get(vp.ressurs_id).push(vp);
+  });
+
+  const bolker = (aktivListe?.ressurser || [])
+    .filter((r) => perRessurs.has(r.id))
+    .map((r) => {
+      const linjer = perRessurs.get(r.id)
+        .slice().sort((a, b) => (a.navn || '').localeCompare(b.navn || ''))
+        .map((vp) => `
+          <tr>
+            <td class="vl-navn">${escapeHtml(vp.navn)}</td>
+            <td>${escapeHtml(vp.korps_kort || '—')}</td>
+            <td>${escapeHtml(vp.rolle || '—')}</td>
+            <td>${escapeHtml(_kl(vp.mott_at))}</td>
+            <td>${escapeHtml(_tidsspenn(vp))}</td>
+          </tr>`).join('');
+      return `
+        <div class="vl-kort">
+          <div class="vl-kort-topp">
+            <span class="vl-kort-tittel">
+              <i class="bi bi-${escHtmlValue(r.ikon)} me-1"></i>${escapeHtml(r.navn)}
+              <span class="vl-meta">${escHtmlValue(perRessurs.get(r.id).length)}</span>
+            </span>
+          </div>
+          <div class="vl-tabellramme">
+            <table class="vl-tabell vl-utskrift">
+              <thead>
+                <tr><th>Navn</th><th>Korps</th><th>Rolle</th>
+                    <th>Møtt</th><th>Planlagt skift</th></tr>
+              </thead>
+              <tbody>${linjer}</tbody>
+            </table>
+          </div>
+        </div>`;
+    }).join('');
+
+  const mangler = alle.length - rader.length;
+  const innhold = bolker || '<div class="vl-kort"><div class="vl-tom">Ingen '
+    + 'er registrert møtt ennå. Stemplene settes i ressursfanene.</div></div>';
+  return `
+    <div class="vl-kort vl-tilstedehode">
+      <div>
+        <div class="vl-tilstedetall">${escHtmlValue(rader.length)}</div>
+        <div class="vl-meta">tilstede nå · ${escapeHtml(stemplet)}</div>
+      </div>
+      <div class="vl-tilstedemeta">
+        <div>${escHtmlValue(alle.length)} satt opp på vakta</div>
+        <div>${escHtmlValue(mangler)} ikke møtt eller gått av vakt</div>
+        <div class="vl-meta">Møtt, og ikke gått av vakt. Utledet av
+          stemplene.</div>
+      </div>
+      <button class="btn btn-sm btn-outline-secondary" type="button"
+              data-action="skrivUt">
+        <i class="bi bi-printer me-1"></i>Skriv ut
+      </button>
+    </div>
+    ${innhold}`;
 }
 
 
@@ -1649,6 +1845,59 @@ async function opprettVaktpost() {
     _lukkModal('nyVaktpostModal');
     await lastListe(aktivListe.vaktliste.id);
   });
+}
+
+
+async function settDrift(tilstand) {
+  if (!aktivListe) return;
+  skjulPanelfeil();
+  const res = await apiFetch(
+    `/vaktliste/api/vaktlister/${aktivListe.vaktliste.id}/drift/${tilstand}/`,
+    { method: 'POST' });
+  const d = await res.json().catch(() => ({}));
+  if (!res.ok || d.status !== 'ok') {
+    visPanelfeil(d.message || 'Kunne ikke endre driftstatus.');
+    return;
+  }
+  // Stenges innsjekken mens man står i «Tilstede nå», forsvinner fanen —
+  // og en fane som forsvinner under føttene skal ikke etterlate et tomt
+  // panel.
+  if (tilstand === 'stopp' && aktivFane === TILSTEDE) aktivFane = OVERSIKT;
+  await lastListe(aktivListe.vaktliste.id);
+}
+
+
+//: Klienthandling → serverens overgang. Ett sted, slik at de fire knappene
+//: og de fire endepunktene ikke kan gli fra hverandre.
+const STEMPLINGER = {
+  stemplMott: 'mott',
+  stemplAvVakt: 'av_vakt',
+  angreMott: 'angre_mott',
+  angreAvVakt: 'angre_av_vakt',
+};
+
+
+function stemplMott(id) { return _stemple(id, STEMPLINGER.stemplMott); }
+function stemplAvVakt(id) { return _stemple(id, STEMPLINGER.stemplAvVakt); }
+function angreMott(id) { return _stemple(id, STEMPLINGER.angreMott); }
+function angreAvVakt(id) { return _stemple(id, STEMPLINGER.angreAvVakt); }
+
+
+async function _stemple(id, handling) {
+  // **Kroppen sendes ikke.** Knappen vet hvilken overgang den utfører, og
+  // serveren utleder ingenting av gjeldende tilstand — samme grep som
+  // oppdragsmodulens stemplinger. `POST .../neste/` ville gitt et kappløp
+  // når to trykk kommer tett.
+  if (!aktivListe) return;
+  skjulPanelfeil();
+  const res = await apiFetch(
+    `/vaktliste/api/vaktposter/${id}/stempling/${handling}/`, { method: 'POST' });
+  const d = await res.json().catch(() => ({}));
+  if (!res.ok || d.status !== 'ok') {
+    visPanelfeil(d.message || 'Kunne ikke registrere stemplingen.');
+    return;
+  }
+  await lastListe(aktivListe.vaktliste.id);
 }
 
 

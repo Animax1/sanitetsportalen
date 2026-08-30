@@ -1,4 +1,4 @@
-"""Vaktlistesiden og API-et — fase 2: planlegging.
+"""Vaktlistesiden og API-et — planlegging og drift.
 
 Se ``docs/BESLUTNING_VAKTLISTE.md``. Tre ting å vite om denne fila:
 
@@ -12,6 +12,7 @@ To terskler, og skillet mellom dem er *hva slags utsagn* nivået får avgi:
 | Bemanne en ressurs | `services.kan_sette_vaktpost()` — badge **og** reservasjon |
 | Dele ut en ressurs, sette opp ledige plasser | `services.kan_skrive_alt()` |
 | Opprette/fjerne ressurser og vaktlister, vaktas lengde, roller, grupper | `services.kan_lede()` |
+| Sette i/ut av drift, stemple møtt og av vakt | `services.kan_stemple()` |
 | Slette en vaktliste | global admin — irreversibelt |
 
 **De to skrivenivåene skilles på hva en feil koster** (30. aug. 2026).
@@ -23,8 +24,14 @@ med den. Derfor er «hvem som er på bilen» og «finnes bilen» to spørsmål.
 skrevet som én funksjon nettopp for at et endepunkt ikke skal kunne huske
 badgen og glemme reservasjonen.
 
-**Innsjekk finnes ikke ennå.** `mott_at`/`av_vakt_at` er felter på modellen,
-men ingen sti setter dem før fase 4 — og da bak `skriv_full`.
+**Innsjekk kom i fase 4** (30. aug. 2026). `mott_at`/`av_vakt_at` settes av
+`stempling_view`, som er ett navngitt endepunkt per overgang og ikke leser
+kroppen — samme grep som oppdragsmodulens stemplinger. Reglene selv ligger som
+data i `services.STEMPLINGER`.
+
+**Innsjekk er stengt utenfor drift.** Et møtt-stempel før vakta finnes ikke, og
+`drift_view` er den ene døra inn. Den er reversibel og rører ingen stempler.
+Korps-føreren stempler *ikke* (avklaring 11.3) — se `services.kan_stemple`.
 
 **Hver skriving som kan bryte en unik-skranke står i `transaction.atomic()`.**
 Databasen er fasit for duplikater — en `exists()`-sjekk foran skrivingen er et
@@ -134,6 +141,8 @@ def _vaktliste_til_dict(vl):
         'status': vl.status,
         'status_navn': choices.STATUS_NAVN.get(vl.status, vl.status),
         'i_drift': vl.i_drift,
+        'satt_i_drift_at': (vl.satt_i_drift_at.isoformat()
+                            if vl.satt_i_drift_at else None),
         'startet': vl.vakt.startet.isoformat() if vl.vakt.startet else None,
         'planlagt_slutt': (vl.planlagt_slutt.isoformat()
                            if vl.planlagt_slutt else None),
@@ -570,6 +579,108 @@ def ressurser_view(request, pk):
                .select_related('korps', 'enhet', 'gruppe').get(pk=ressurs.pk))
     return JsonResponse(
         {'status': 'ok', 'data': _ressurs_til_dict(ressurs)}, status=201)
+
+
+# ── Drift (fase 4) ───────────────────────────────────────────────────────────
+
+@never_cache
+@modul_kreves('vaktliste', 'les', svar='json')
+@require_http_methods(['POST'])
+@rate_limit(group='vaktliste:drift', rate='30/m', method='POST')
+def drift_view(request, pk, tilstand):
+    """Åpne eller stenge innsjekken. Ett navngitt endepunkt per retning.
+
+    **Drift betyr én ting: innsjekk er åpen** (§5). Ikke en livssyklus, ikke
+    en låsing — lista kan fortsatt endres, for folk uteblir og bytter, og en
+    liste som låser seg idet vakta starter er en liste som forlates til
+    fordel for et ark.
+
+    **Retningen står i URL-en, ikke i kroppen.** Samme grep som
+    `oppdrag.views.stempling_view`: `POST .../veksle/` ville gitt et kappløp
+    når to trykk kommer tett, og den som trykket sist ville ikke visst hva
+    hun endte på.
+
+    `skriv_full`, ikke `skriv_leder`: å åpne innsjekken er en driftshandling
+    under vakta, ikke en del av oppsettet. Og ikke `skriv_handling` — se
+    `services.kan_stemple`.
+
+    Ut av drift er reversibel og **rører ingen stempler**. Det er en dør, ikke
+    en sletting.
+    """
+    if tilstand not in ('start', 'stopp'):
+        return _feil(f'Ukjent tilstand «{tilstand}».', status=404)
+    if not services.kan_skrive_alt(request.user):
+        return _nektet()
+
+    try:
+        vl = Vaktliste.objects.select_related('vakt').get(pk=pk)
+    except Vaktliste.DoesNotExist:
+        return _feil('Vaktliste ikke funnet', status=404)
+
+    if tilstand == 'start':
+        vl.status = choices.DRIFT
+        # Tidspunktet settes kun ved åpning, og beholdes ved en senere
+        # stenging: «i drift siden 08:04» skal fortsatt kunne leses etterpå.
+        vl.satt_i_drift_at = timezone.now()
+        vl.satt_i_drift_av = request.user
+        vl.save(update_fields=['status', 'satt_i_drift_at', 'satt_i_drift_av',
+                               'updated_at'])
+    else:
+        vl.status = choices.PLANLEGGING
+        vl.save(update_fields=['status', 'updated_at'])
+
+    return JsonResponse({'status': 'ok', 'data': _vaktliste_til_dict(vl)})
+
+
+@never_cache
+@modul_kreves('vaktliste', 'les', svar='json')
+@require_http_methods(['POST'])
+@rate_limit(group='vaktliste:stempling', rate='120/m', method='POST')
+def stempling_view(request, pk, handling):
+    """Møtt, av vakt, og angring av begge. Ett endepunkt per navngitt overgang.
+
+    **Kroppen leses ikke.** Knappen vet hvilken overgang den utfører, og
+    serveren utleder ingenting av gjeldende tilstand — nøyaktig som
+    `oppdrag.views.stempling_view`. Reglene selv ligger som data i
+    `services.STEMPLINGER`.
+
+    Tre porter, og de svarer på hver sin ting:
+
+    1. **Hvem:** `services.kan_stemple` — ikke korps-føreren (avklaring 11.3).
+    2. **Når:** lista må være i drift. Et møtt-stempel før vakta finnes ikke,
+       og et stempel etter at innsjekken er stengt er en rad ingen har tatt
+       ansvar for.
+    3. **Hva:** overgangens egne forutsetninger — «av vakt» krever «møtt».
+
+    Rekkefølgen er med vilje: en korps-fører som trykker skal få vite at hun
+    ikke har lov, ikke at lista ikke er i drift.
+    """
+    if handling not in services.STEMPLINGER:
+        return _feil(f'Ukjent stempling «{handling}».', status=404)
+    if not services.kan_stemple(request.user):
+        return _nektet()
+
+    try:
+        vp = (Vaktpost.objects
+              .select_related('ressurs__vaktliste', 'mannskap__korps', 'rolle')
+              .get(pk=pk))
+    except Vaktpost.DoesNotExist:
+        return _feil('Skiftet finnes ikke', status=404)
+
+    if not vp.ressurs.vaktliste.i_drift:
+        return _feil(
+            'Innsjekken er stengt. Sett vaktlista i drift først — da åpnes '
+            'møtt og av vakt.', status=409)
+
+    ok, melding = services.stemple(vp, handling)
+    if not ok:
+        return _feil(melding)
+    vp.save(update_fields=['mott_at', 'av_vakt_at', 'updated_at'])
+
+    return JsonResponse({
+        'status': 'ok',
+        'data': _vaktpost_til_dict(vp, services.foreldrekart()),
+    })
 
 
 @modul_kreves('vaktliste', 'les', svar='json')

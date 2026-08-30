@@ -903,6 +903,12 @@ Gjennomgang 13. aug. 2026, med 1000 pasienter og peak 100 brukere som premiss.
             «Opprett vakt» står på vaktas startdato framfor tomt, så bare
             klokkeslettet tastes. Feltet er ellers uendret — native velger og
             visning som før.
+      - [x] **Fase 4 — drift (30. aug. 2026).** Innsjekk-porten
+            (`drift/start|stopp`), møtt og av vakt som navngitte overganger
+            med reglene som data i `services.STEMPLINGER`, og «Tilstede nå»
+            med tellingen stort øverst og utskrift. Korps-føreren stempler
+            ikke (avklaring 11.3). Ingen migrasjon — feltene kom i fase 2.
+            45 nye tester, sytten mutasjoner prøvd.
       - [x] **Mannskapet flytter inn i planleggingen (30. aug. 2026).**
             Registersiden `/vaktliste/registre/` lagt ned: mannskapet er en
             fane på `/vaktliste/`, korps og kompetanser ligger i

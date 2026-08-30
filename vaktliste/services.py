@@ -223,6 +223,96 @@ def kan_lede(user) -> bool:
     return er_global_admin(user) or har_tilgang(user, 'vaktliste', 'skriv_leder')
 
 
+def kan_stemple(user) -> bool:
+    """Får brukeren stemple møtt og av vakt?
+
+    **Avklaring 11.3 sa nei til `skriv_handling`,** og det er hele grunnen
+    til at regelen har et eget navn. Korps-føreren fører sitt eget korps —
+    hun setter dem opp, flytter dem og retter tidene deres. Men innsjekk er
+    noe annet: «Tilstede nå» er brannsikkerhet på et sted med overnatting,
+    og det tallet skal ha én ansvarlig, ikke ett per korps.
+
+    Terskelen er den samme som `kan_skrive_alt`, og funksjonen er derfor et
+    kall videre. Den finnes likevel: leter noen etter «hvem sjekker folk
+    inn», skal de finne beslutningen og ikke bare terskelen — og skulle den
+    en dag åpnes for korpsføreren, er det ett sted å endre.
+    """
+    return kan_skrive_alt(user)
+
+
+#: Stemplingene, som **data**. Hver overgang sier hvilket felt den rører,
+#: om den setter eller fjerner et tidspunkt, og hva som må være sant fra før.
+#:
+#: Samme grep som `oppdrag.services.OVERGANGER`, og av samme grunn: skrevet
+#: som `if`-er i viewet vokser de til en trapp der bare den som skrev den
+#: siste grenen vet hva de andre gjør.
+#:
+#: **Forutsetningene er ikke pedanteri.** «Av vakt» uten «møtt» gir en rad
+#: som sier at noen gikk av en vakt hun aldri kom til, og `er_tilstede`
+#: leser nettopp de to feltene sammen. Å angre «møtt» mens «av vakt» står,
+#: gir samme rad. Begge stenges her, ett sted.
+STEMPLINGER = {
+    'mott': {
+        'felt': 'mott_at', 'setter': True,
+        'krever_tomt': (),
+        'krever_satt': (),
+        'nekt': 'Personen er alt registrert møtt.',
+    },
+    'av_vakt': {
+        'felt': 'av_vakt_at', 'setter': True,
+        'krever_tomt': (),
+        'krever_satt': ('mott_at',),
+        'nekt': 'Personen må registreres møtt før hun kan gå av vakt.',
+    },
+    'angre_mott': {
+        'felt': 'mott_at', 'setter': False,
+        'krever_tomt': ('av_vakt_at',),
+        'krever_satt': ('mott_at',),
+        'nekt': 'Angre «av vakt» først — ellers står raden igjen som '
+                'avgått uten å ha møtt.',
+    },
+    'angre_av_vakt': {
+        'felt': 'av_vakt_at', 'setter': False,
+        'krever_tomt': (),
+        'krever_satt': ('av_vakt_at',),
+        'nekt': 'Personen står ikke som av vakt.',
+    },
+}
+
+
+def stemple(vaktpost, handling, naa=None):
+    """Utfør én navngitt stempling. Returnerer ``(ok, feilmelding)``.
+
+    Skriver ikke til basen — den som kaller lagrer. Da kan regelen testes
+    uten en rad, og viewet eier transaksjonen.
+
+    **En ledig plass kan ikke stemples.** Den har ingen som kan ha møtt, og
+    `er_tilstede` krever en person nettopp derfor.
+    """
+    regel = STEMPLINGER.get(handling)
+    if regel is None:
+        return False, f'Ukjent stempling «{handling}».'
+    if vaktpost.mannskap_id is None:
+        return False, 'Plassen er ledig — det er ingen å registrere.'
+
+    for felt in regel['krever_satt']:
+        if getattr(vaktpost, felt) is None:
+            return False, regel['nekt']
+    for felt in regel['krever_tomt']:
+        if getattr(vaktpost, felt) is not None:
+            return False, regel['nekt']
+
+    # Å sette et stempel som alt står er ikke en feil verdt å stoppe for —
+    # to trykk på samme knapp skal gi samme rad, ikke en rød boks. Men
+    # tidspunktet skal ikke flytte seg: det første er det som skjedde.
+    if regel['setter'] and getattr(vaktpost, regel['felt']) is not None:
+        return True, ''
+
+    setattr(vaktpost, regel['felt'],
+            (naa or timezone.now()) if regel['setter'] else None)
+    return True, ''
+
+
 def brukerens_korps(user):
     """Korpset kontoen arver fra mannskapsraden sin, eller ``None``.
 

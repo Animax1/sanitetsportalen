@@ -21,6 +21,10 @@
   --text-soft: #64748b;
   --surface-3: #0b1220;
   --header-bg: #0f3460;
+  /* Drift (fase 4): grønt betyr «tilstede». Definert her og ikke som en
+     fallback i hvert kall — en farge med tre steder å endres er en farge
+     som før eller siden står ulikt to av dem. */
+  --vl-ok: #4ade80;
 }
 
 /* ── Statusmerke på vaktlista ─────────────────────────────────────────── */
@@ -825,4 +829,56 @@
 .vl-enhet-tom:hover {
   border-style: solid;
   color: var(--text-main);
+}
+
+
+/* ── Drift (fase 4) ───────────────────────────────────────────────────── */
+
+/*
+  **Radens tilstand skal synes uten å lese en kolonne.** Under drift er det
+  «hvem mangler» man leter etter, og da skummer man farger, ikke tekst.
+  Stripen står til venstre og ikke som en bakgrunnsfarge på hele raden:
+  bakgrunnen bærer allerede «ledig plass», og to fargekoder i samme flate
+  blir til ingen.
+*/
+.vl-tabell tr.vl-tilstede td:first-child { box-shadow: inset 3px 0 0 var(--vl-ok); }
+.vl-tabell tr.vl-avgatt td:first-child { box-shadow: inset 3px 0 0 var(--text-muted); }
+.vl-tabell tr.vl-avgatt { opacity: .72; }
+
+/* Stempelknappen skal treffes med tommelen på en telefon i den ene hånda. */
+.vl-stempel {
+  white-space: nowrap;
+  font-weight: 600;
+}
+
+/*
+  **Tellingen står øverst, stor.** I en evakuering teller man hoder mot et
+  tall, og da skal tallet være det første man ser — ikke en linje man må lete
+  etter blant like store linjer.
+*/
+.vl-tilstedehode {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  flex-wrap: wrap;
+}
+
+.vl-tilstedetall {
+  font-size: 3.5rem;
+  line-height: 1;
+  font-weight: 700;
+  color: var(--vl-ok);
+}
+
+.vl-tilstedemeta { flex-grow: 1; }
+
+@media print {
+  /*
+     Arket er lista og tallet. Alt annet er skjerm — og på det arket er
+     tallet hele poenget, så det skal ikke krympes bort med resten.
+  */
+  .vl-tilstedetall { color: #000 !important; font-size: 3rem; }
+  .vl-tabell tr.vl-tilstede td:first-child,
+  .vl-tabell tr.vl-avgatt td:first-child { box-shadow: none !important; }
+  .vl-tabell tr.vl-avgatt { opacity: 1 !important; }
 }

@@ -450,6 +450,29 @@ fase 3–7 gjenstår — se `docs/BESLUTNING_VAKTLISTE.md`, som er besluttet i s
   der brukeren skulle fått «velg korps». `or None` dekker den tomme strengen, men ikke
   en ikke-numerisk.
 
+**Drift (fase 4) er en innsjekk-port, ikke en livssyklus.** `Vaktliste.status`
+har to verdier, og `drift` betyr én ting: møtt/av vakt er åpen. Overgangen går
+begge veier og rører ingen stempler.
+
+- **Retningen og overgangen står i URL-en**, ikke i kroppen —
+  `drift/<start|stopp>/` og `stempling/<handling>/`. Et veksle-endepunkt gir et
+  kappløp når to trykk kommer tett. Samme grep som oppdragsmodulen.
+- **Stemplingsreglene er data**, `services.STEMPLINGER`, med forutsetninger:
+  «av vakt» krever «møtt», og «angre møtt» krever at «av vakt» ikke står. Uten
+  dem finnes rader der `er_tilstede` ikke svarer på noe.
+- **`kan_stemple()` er ikke `skriv_handling`** (avklaring 11.3). Korps-føreren
+  fører sitt eget korps, men «Tilstede nå» skal ha én ansvarlig. Funksjonen er
+  et kall videre til `kan_skrive_alt`, og finnes for at beslutningen skal ha et
+  sted.
+- **Tilgangsporten svares før driftporten.** En korps-fører som trykker skal
+  få vite at hun ikke har lov, ikke at lista ikke er i drift.
+- **«Tilstede nå» utledes, aldri lagres** (`Vaktpost.er_tilstede`). To kilder
+  til samme sannhet går i utakt første gang noe feiler halvveis — og denne
+  brukes til å telle hoder ved brann.
+- **Klienten har én `data-action` per overgang**, ikke én generisk:
+  klikkdelegeringen i `portal-utils.js` sender ett argument. `STEMPLINGER` i
+  `vaktliste.js` og i `services.py` holdes like av `StemplingsnavnTests`.
+
 ### Statistikk-modulen (statistikk/)
 
 Egen app siden august 2026. Eier `/statistikk/`-siden og full statistikk

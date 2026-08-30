@@ -54,6 +54,15 @@
     <select id="vaktliste-velger" class="form-select form-select-sm"
             data-action="byttVaktliste"></select>
     <span id="vaktliste-status" class="vl-status"></span>
+    {% comment %}
+      **Døra til innsjekken står ved statusen den endrer.** Lå den i
+      «Innstillinger», måtte man åpne et vindu for å se om innsjekken var
+      åpen — og det er det første man vil vite når vakta begynner.
+
+      Knappen bygges av `tegnDriftknapp()` og ikke her, fordi teksten skifter
+      med tilstanden; `gateKnapper()` kjører bare én gang ved sidelasting.
+    {% endcomment %}
+    <span id="vl-drift"></span>
     <span class="flex-grow-1"></span>
     {% comment %}
       Vinduet for vakta selv: lengden og utskriften. Ikke gatet — å skrive ut

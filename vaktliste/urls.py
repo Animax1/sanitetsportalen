@@ -38,6 +38,14 @@ urlpatterns = [
     path('api/vaktposter/<int:pk>/', views.vaktpost_detalj_view,
          name='vaktliste_api_vaktpost_detalj'),
 
+    # Drift (fase 4). Retningen og overgangen står i URL-en, ikke i kroppen:
+    # et veksle-endepunkt gir et kappløp når to trykk kommer tett, og den som
+    # trykket sist vet ikke hva hun endte på. Samme grep som oppdragsmodulen.
+    path('api/vaktlister/<int:pk>/drift/<str:tilstand>/', views.drift_view,
+         name='vaktliste_api_drift'),
+    path('api/vaktposter/<int:pk>/stempling/<str:handling>/',
+         views.stempling_view, name='vaktliste_api_stempling'),
+
     # Registrene. Mannskapet er hovedlista; de tre verdimengdene bygges av
     # samme fabrikk — se views_registre.py.
     path('api/mannskap/', views_registre.mannskap_view,

@@ -4,6 +4,54 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-08-30 — Vaktliste fase 4: drift
+
+**1851 tester grønne** (45 nye, sytten mutasjoner satt rødt først). Modellen
+bar feltene fra fase 2, så fasen er endepunkter og flate — **ingen migrasjon**.
+
+- **Drift er en innsjekk-port, ikke en livssyklus** (§5). `POST
+  .../drift/start/` og `.../drift/stopp/` — retningen står i URL-en, ikke i
+  kroppen: et veksle-endepunkt gir et kappløp når to trykk kommer tett, og den
+  som trykket sist vet ikke hva hun endte på. Ut av drift er reversibel og
+  **rører ingen stempler**; det er en dør, ikke en sletting.
+  - Knappen står ved statuslinja den endrer. Lå den i «Innstillinger», måtte
+    man åpne et vindu for å se om innsjekken var åpen — og det er det første
+    man vil vite når vakta begynner.
+- **Møtt og av vakt, som navngitte overganger.** Ett endepunkt per overgang,
+  og kroppen leses ikke — samme grep som oppdragsmodulens stemplinger.
+  Reglene er **data** i `services.STEMPLINGER`, ikke `if`-er i viewet.
+  - Forutsetningene er ikke pedanteri: «av vakt» uten «møtt» gir en rad som
+    sier at noen gikk av en vakt hun aldri kom til, og `er_tilstede` leser
+    nettopp de to feltene sammen. Å angre «møtt» mens «av vakt» står gir
+    samme rad. Begge stenges ett sted.
+  - To trykk på samme knapp gir samme rad, ikke en rød boks — men det første
+    tidspunktet er det som skjedde, og det flytter seg ikke.
+- **Korps-føreren stempler ikke** (avklaring 11.3). Hun setter opp sine egne
+  folk, men «Tilstede nå» er brannsikkerhet, og det tallet skal ha én
+  ansvarlig — ikke ett per korps. Verifisert i nettleseren: hun ser hverken
+  drift-knappen eller stemplene.
+  - Tilgangsporten svares **før** driftporten, med vilje: en korps-fører som
+    trykker skal få vite at hun ikke har lov, ikke at lista ikke er i drift —
+    et råd som fører henne til en knapp hun heller ikke har.
+- **«Tilstede nå» — modulens mest alvorlige visning.** Tellingen står øverst,
+  stor: i en evakuering teller man hoder mot et tall. Definisjonen er
+  knivskarp — møtt, og ikke gått av vakt — og utledet av stemplene, aldri
+  lagret. Lista er gruppert på ressurs og kan skrives ut; strøm og nett er det
+  første som ryker i nettopp situasjonen den finnes for.
+  - Fanen finnes bare i drift. I planlegging er den tom per definisjon, og en
+    fane som alltid sier null er en fane man slutter å se.
+  - Den er lesbar for alle med `les`. I en evakuering er flere lesere bedre
+    enn færre, og det er samme data lista alt viser.
+
+**Ett avvik fra notatet, med vilje.** Det ba om «to store knapper per rad».
+Det ble **én** — den som gjelder nå — pluss en liten angre. Raden er i
+nøyaktig én tilstand: «Møtt» på en som alt har møtt gjør enten ingenting eller
+noe hun ikke ba om, og to knapper i en kolonne på 5 % blir to *små* knapper,
+altså det motsatte av bestillingen. Stemplene står i handlingskolonnen, som er
+`sticky` og den ene som aldri ruller bort.
+
+---
+
 ## 2026-08-30 — Cron-jobbene skal si hva som gikk galt
 
 **1806 tester grønne** (12 nye). To cron-jobber i staging — `purge_old_logs` og
