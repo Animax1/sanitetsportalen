@@ -469,6 +469,13 @@ begge veier og rører ingen stempler.
 - **«Tilstede nå» utledes, aldri lagres** (`Vaktpost.er_tilstede`). To kilder
   til samme sannhet går i utakt første gang noe feiler halvveis — og denne
   brukes til å telle hoder ved brann.
+- **Ressurstabellen har to former, og drift er den andre.** I planlegging er
+  den et regneark; under drift legges `datetime-local`-feltene, kompetansen og
+  merknaden bort, og stempelet står **først** i raden som en 44 px høy knapp
+  (`_driftrad`). De tre feltene er det som gjør raden 1377 px bred, og uten
+  dem slipper drifttabellen `min-width` — ellers står stempelet bak en
+  sidescroll, som det gjorde i første utgave. Redigering under drift går
+  gjennom blyanten.
 - **Klienten har én `data-action` per overgang**, ikke én generisk:
   klikkdelegeringen i `portal-utils.js` sender ett argument. `STEMPLINGER` i
   `vaktliste.js` og i `services.py` holdes like av `StemplingsnavnTests`.

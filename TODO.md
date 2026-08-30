@@ -903,6 +903,12 @@ Gjennomgang 13. aug. 2026, med 1000 pasienter og peak 100 brukere som premiss.
             «Opprett vakt» står på vaktas startdato framfor tomt, så bare
             klokkeslettet tastes. Feltet er ellers uendret — native velger og
             visning som før.
+      - [x] **Drifttabellen bytter form (30. aug. 2026).** Meldt av André:
+            stempelet satt feil. Det var 45×21 px på x=1092 mens navnet sto på
+            x=41, bak en sidescroll. Under drift legges planleggingsfeltene
+            bort — tidene blir tekst, kompetanse og merknad tas ut — og
+            stempelet står først som en 44 px høy knapp. Tabellen ruller ikke
+            lenger.
       - [x] **Fase 4 — drift (30. aug. 2026).** Innsjekk-porten
             (`drift/start|stopp`), møtt og av vakt som navngitte overganger
             med reglene som data i `services.STEMPLINGER`, og «Tilstede nå»

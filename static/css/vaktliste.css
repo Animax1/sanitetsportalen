@@ -845,11 +845,51 @@
 .vl-tabell tr.vl-avgatt td:first-child { box-shadow: inset 3px 0 0 var(--text-muted); }
 .vl-tabell tr.vl-avgatt { opacity: .72; }
 
-/* Stempelknappen skal treffes med tommelen på en telefon i den ene hånda. */
+/*
+  **Stempelet er radens handling, ikke en knapp blant flere.** Første utgave
+  la den i handlingskolonnen ytterst til høyre: 45 × 21 px, tusen piksler fra
+  navnet man nettopp leste, bak en sidescroll — den minste kontrollen på
+  raden, der den skulle vært den største. Nå fyller den cella, og cella står
+  først.
+
+  44 px er gulvet for et trykkmål man skal treffe med tommelen mens man
+  holder en telefon i den andre hånda.
+*/
 .vl-stempel {
   white-space: nowrap;
   font-weight: 600;
+  width: 100%;
+  min-height: 2.75rem;
 }
+
+.vl-stempelcelle { vertical-align: middle; }
+
+/* Tidspunktet står under knappen, ikke i den: det er dokumentasjon, mens
+   knappen er handlingen — og en knapp som skifter tekst er en knapp man må
+   lese før hvert trykk. */
+.vl-stempeltid {
+  display: block;
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  margin-top: 0.15rem;
+  white-space: nowrap;
+}
+
+/* Angre er med vilje lettere enn å stemple: et feiltrykk skal kunne rettes,
+   men ikke være like lett å gjøre som handlingen selv. */
+.vl-angre {
+  padding: 0 0.25rem;
+  color: var(--text-muted);
+  text-decoration: none;
+}
+
+/*
+  **Drifttabellen ruller ikke.** `min-width` på regnearket er satt for ni
+  kolonner med to `datetime-local`-felt i. Drift har sju kolonner uten
+  skjemafelt, og skal få plass — hele poenget med å bytte form er at man
+  slipper å lete sidelengs etter knappen.
+*/
+.vl-tabell-drift { min-width: 0; }
 
 /*
   **Tellingen står øverst, stor.** I en evakuering teller man hoder mot et

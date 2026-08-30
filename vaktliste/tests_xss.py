@@ -24,6 +24,7 @@ HTML_BUILDERS = (
     'tegnFaner', '_fanerad', '_mannskapsfane', 'iDrift', '_tilstede',
     'mkRessurs',
     '_stempelknapper',
+    '_driftrad',
     'mkTilstede',
     '_rolleValg',
     '_fyllValgFor',
@@ -38,7 +39,20 @@ ESCAPING_CALLS = ('escHtmlValue(', 'cellHtml(', '_escHtml(', 'escapeHtml(')
 REVIEWED_INTERPOLATIONS = {
     # Drift (fase 4). Knappene bygges lokalt, og bare når tilgangen og
     # tilstanden tillater dem — id-en er escapet inne i `_stempelknapper`.
-    'stempler': 'markup bygget lokalt av _stempelknapper(), id-en escapet inni',
+    'rediger': 'markup bygget lokalt, skift-id-en escapet inni',
+    '_stempelknapper(vp)': 'markup bygget lokalt av en bygger som selv skannes her',
+    'naar(vp.av_vakt_at)': 'markup bygget lokalt, klokkeslettet escapet inni',
+    'naar(vp.mott_at)': 'markup bygget lokalt, klokkeslettet escapet inni',
+    "angre('angreMott', 'Angre møtt')":
+        'markup bygget lokalt, id-en escapet inni',
+    "angre('angreAvVakt', 'Angre av vakt')":
+        'markup bygget lokalt, id-en escapet inni',
+    "knapp('stemplAvVakt', 'Av vakt', 'btn-outline-warning', 'box-arrow-right')":
+        'markup bygget lokalt, id-en escapet inni',
+    'drift ? 7 : 9': 'tall fra en ternær',
+    'tabellklasse': 'hardkodet CSS-klasse fra en ternær',
+    'tabellhode': 'markup bygget lokalt: to faste kolonneoppsett, ingen data',
+    'navn': 'ternær: escapet personnavn, eller «Ledig plass» som markup',
     'stil': 'hardkodet Bootstrap-klasse fra kallstedet, ingen data i seg',
     'linjer': 'tabellrader bygget lokalt i samme funksjon',
     'bolker': 'markup bygget lokalt i samme funksjon',
@@ -823,18 +837,83 @@ class RessurstabellensBreddeTests(SimpleTestCase):
         self.assertIsNotNone(m, '.vl-tabell mangler min-width')
         return float(m.group(1))
 
-    def _andeler(self):
-        src = read_js(VAKTLISTE_JS)
-        kropp = extract_function(src, 'mkRessurs')
-        return [int(a) for a in re.findall(r'width:\s*(\d+)%', kropp)]
+    #: Tabellen har **to former** fra 30. aug. 2026: regnearket i planlegging
+    #: og innsjekklista i drift. Byggeren har dermed to `<colgroup>` og to
+    #: `<thead>`, i den rekkefølgen — drift først i ternæren.
+    FORMER = ('drift', 'plan')
 
-    def _overskrifter(self):
-        src = read_js(VAKTLISTE_JS)
-        kropp = extract_function(src, 'mkRessurs')
-        blokk = kropp[kropp.index('<thead>'):kropp.index('</thead>')]
+    def _blokker(self, monster):
+        kropp = extract_function(read_js(VAKTLISTE_JS), 'mkRessurs')
+        funn = re.findall(monster, kropp, re.S)
+        self.assertEqual(len(funn), len(self.FORMER),
+                         f'ventet én {monster} per form, fant {len(funn)}')
+        return dict(zip(self.FORMER, funn))
+
+    def _andeler(self, form='plan'):
+        blokk = self._blokker(r'<colgroup>(.*?)</colgroup>')[form]
+        return [int(a) for a in re.findall(r'width:\s*(\d+)%', blokk)]
+
+    def _overskrifter(self, form='plan'):
+        blokk = self._blokker(r'<thead>(.*?)</thead>')[form]
         return re.findall(r'<th>(.*?)</th>', blokk)
 
+    def test_drifttabellen_har_ingen_tidsfelt(self):
+        """**Hele poenget med å bytte form.** `datetime-local`-feltene er det
+        som gjør raden 1377 px bred, og de røres ikke mens man sjekker folk
+        inn. Kommer de tilbake, kommer sidescrollen med dem — og da står
+        stempelet igjen bak den."""
+        # Kommentarene strippes: de *omtaler* `datetime-local`, og en test
+        # som leser sin egen forklaring måler ingenting.
+        kropp = _uten_kommentarer(
+            extract_function(read_js(VAKTLISTE_JS), '_driftrad'))
+        self.assertNotIn('datetime-local', kropp)
+        self.assertNotIn('vl-celle', kropp, 'ingen redigering i raden i drift')
+
+    def test_drifttabellen_slipper_regnearkets_minstebredde(self):
+        """M52: `min-width` på `.vl-tabell` er satt for ni kolonner med to
+        `datetime-local`-felt i. Arver drifttabellen den, ruller den sidelengs
+        selv om den har sju kolonner uten skjemafelt — og da står stempelet
+        igjen bak scrollen, som var hele feilen."""
+        from pathlib import Path
+        from django.conf import settings
+        css = (Path(settings.BASE_DIR) / 'static' / 'css'
+               / 'vaktliste.css').read_text(encoding='utf-8')
+        m = re.search(r'\.vl-tabell-drift\s*\{([^}]*)\}', css)
+        self.assertIsNotNone(m, '.vl-tabell-drift mangler i stilarket')
+        self.assertRegex(m.group(1), r'min-width:\s*0',
+                         'drifttabellen arver regnearkets minstebredde')
+
+    def test_stempelet_staar_forst_i_drift(self):
+        """Første utgave la det ytterst til høyre: 45 × 21 px, tusen piksler
+        fra navnet, bak en sidescroll. Rekkefølgen er halve rettelsen."""
+        self.assertEqual('Innsjekk', self._overskrifter('drift')[0])
+        kropp = extract_function(read_js(VAKTLISTE_JS), '_driftrad')
+        self.assertLess(kropp.index('vl-stempelcelle'), kropp.index('vl-navn'))
+
+    def test_stempelknappen_er_stor_nok_til_en_tommel(self):
+        """44 px er gulvet for et trykkmål man skal treffe mens man holder
+        en telefon i den andre hånda."""
+        from pathlib import Path
+        from django.conf import settings
+        css = (Path(settings.BASE_DIR) / 'static' / 'css'
+               / 'vaktliste.css').read_text(encoding='utf-8')
+        blokk = css[css.index('.vl-stempel {'):css.index('.vl-stempelcelle')]
+        m = re.search(r'min-height:\s*([\d.]+)rem', blokk)
+        self.assertIsNotNone(m, '.vl-stempel mangler min-height')
+        self.assertGreaterEqual(float(m.group(1)) * 16, 44,
+                                'knappen er under gulvet for et trykkmål')
+        self.assertIn('width: 100%', blokk, 'knappen skal fylle cella')
+
     def test_andelene_summerer_til_hundre(self):
+        for form in self.FORMER:
+            with self.subTest(form=form):
+                andeler = self._andeler(form)
+                self.assertEqual(
+                    len(andeler), len(self._overskrifter(form)),
+                    f'{form}: én bredde per kolonne')
+                self.assertEqual(sum(andeler), 100, f'{form}: {andeler}')
+
+    def test_planformens_andeler(self):
         andeler = self._andeler()
         self.assertEqual(len(andeler), len(self._overskrifter()),
                          'én andel per kolonne')
@@ -2428,19 +2507,33 @@ class DriftflatenTests(SimpleTestCase):
         self.assertIn('angreAvVakt', ut)
         self.assertIn('16:00', ut)
 
-    def test_utenfor_drift_finnes_ingen_stempler(self):
-        """Innsjekk er stengt i planlegging — knappen ville ført til 409."""
-        self.assertEqual('[]', self._knapper(self.POST, drift=False))
+    def test_utenfor_drift_bygges_raden_aldri(self):
+        """Innsjekk er stengt i planlegging, og porten står i `mkRessurs`:
+        drifttabellen bygges bare når lista er i drift. Cella selv spør ikke
+        — den kalles ikke."""
+        kropp = _uten_kommentarer(
+            extract_function(read_js(VAKTLISTE_JS), 'mkRessurs'))
+        self.assertIn('const drift = iDrift();', kropp)
+        self.assertIn('if (drift) return _driftrad(', kropp)
 
-    def test_korpsforeren_ser_ingen_stempler(self):
-        """Avklaring 11.3, speilet i grensesnittet. Serveren nekter uansett,
-        men en knapp som fører til en vegg er verre enn ingen knapp."""
-        self.assertEqual(
-            '[]', self._knapper(self.POST, nivaa='skriv_handling'))
+    def test_korpsforeren_ser_status_men_ingen_knapp(self):
+        """Avklaring 11.3, speilet i grensesnittet. En knapp som fører til
+        en vegg er verre enn ingen knapp — men *statusen* er det samme
+        spørsmålet enten man kan svare på det eller ikke, og `les` ser hele
+        lista."""
+        ut = self._knapper(self.POST, nivaa='skriv_handling')
+        self.assertNotIn('data-action', ut, 'ingen knapp for korps-føreren')
+        self.assertIn('Ikke møtt', ut, 'men statusen skal hun se')
+
+    def test_korpsforeren_ser_naar_noen_har_mott(self):
+        ut = self._knapper({**self.POST, 'mott_at': '2026-10-03T08:04:00',
+                            'tilstede': True}, nivaa='skriv_handling')
+        self.assertNotIn('data-action', ut)
+        self.assertIn('08:04', ut)
 
     def test_ledig_plass_har_ingen_aa_stemple(self):
-        self.assertEqual(
-            '[]', self._knapper({**self.POST, 'ledig': True}))
+        ut = self._knapper({**self.POST, 'ledig': True})
+        self.assertNotIn('data-action', ut)
 
     def _radklasse(self, vp, drift=True):
         import json

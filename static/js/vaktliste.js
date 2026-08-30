@@ -643,6 +643,37 @@ function mkGruppe(gruppe) {
 }
 
 
+function _driftrad(vp, kanRore) {
+  // **Under drift er raden ikke et regneark.** Planleggingsfeltene —
+  // `datetime-local`, kompetansemerkene og merknaden — er det som gjør raden
+  // 1377 px bred, og ingen av dem røres mens man sjekker folk inn. Uten dem
+  // får tabellen plass uten sidescroll, og stempelet plass til å være stort.
+  //
+  // Lista skal fortsatt kunne endres — folk uteblir og bytter — og det gjør
+  // den gjennom blyanten, som åpner redigeringsvinduet. Notatets «ikke et
+  // redigeringsskjema» handlet om raden, ikke bare om knappene.
+  const rediger = kanRore
+    ? `<button class="btn btn-sm btn-outline-secondary" type="button"
+               title="Rediger skiftet" aria-label="Rediger skiftet"
+               data-action="apneRedigerVaktpost" data-id="${escHtmlValue(vp.id)}"><i class="bi bi-pencil"></i></button>`
+    : '';
+  const navn = vp.ledig
+    ? '<span class="vl-ledigtekst">Ledig plass</span>'
+    : escapeHtml(vp.navn);
+
+  return `
+    <tr class="${escHtmlValue(_radklasse(vp))}">
+      <td class="vl-stempelcelle">${_stempelknapper(vp)}</td>
+      <td class="vl-navn">${navn}</td>
+      <td>${escapeHtml(vp.korps_kort || '—')}</td>
+      <td>${escapeHtml(vp.rolle || '—')}</td>
+      <td>${escapeHtml(_tidsspenn(vp))}</td>
+      <td class="vl-timer">${escapeHtml(_varighet(vp))}</td>
+      <td class="vl-handling">${rediger}</td>
+    </tr>`;
+}
+
+
 function _radklasse(vp) {
   // Tilstanden skal synes på raden, ikke bare i en kolonne. Under drift er
   // det «hvem mangler» man leter etter, og da er det fargen man skummer.
@@ -655,9 +686,26 @@ function _radklasse(vp) {
 
 
 function _stempelknapper(vp) {
-  // **Én knapp, ikke to.** Se kommentaren i `mkRessurs()`. Rekkefølgen er
-  // radens egen: har hun ikke møtt, er «Møtt» det eneste som gir mening.
-  if (!iDrift() || vp.ledig || !kanStemple()) return '';
+  // **Cella er handlingen, ikke en knapp blant flere.** Første utgave la
+  // stempelet i handlingskolonnen ytterst til høyre: 45 × 21 px, tusen
+  // piksler fra navnet man nettopp leste, bak en sidescroll — den minste
+  // kontrollen på raden, der den skulle vært den største. Nå står den først
+  // og fyller cella.
+  //
+  // **Én knapp, ikke to.** Raden er i nøyaktig én tilstand: «Møtt» på en som
+  // alt har møtt gjør enten ingenting eller noe hun ikke ba om.
+  //
+  // Uten stemplerett vises **statusen** i stedet for en knapp. `les` ser hele
+  // lista, og «hvem har møtt» er det samme spørsmålet enten man kan svare på
+  // det eller ikke.
+  if (vp.ledig) return '<span class="vl-meta">—</span>';
+
+  const naar = (iso) => `<span class="vl-stempeltid">${escapeHtml(_kl(iso))}</span>`;
+  if (!kanStemple()) {
+    if (vp.av_vakt_at) return `<span class="vl-meta">Av vakt</span>${naar(vp.av_vakt_at)}`;
+    if (vp.mott_at) return `<span class="vl-meta">Møtt</span>${naar(vp.mott_at)}`;
+    return '<span class="vl-meta">Ikke møtt</span>';
+  }
 
   // **Én `data-action` per overgang**, ikke én generisk med overgangen i et
   // attributt. Klikkdelegeringen i portal-utils.js sender ett argument —
@@ -665,24 +713,28 @@ function _stempelknapper(vp) {
   // portalen. Navnene speiler `services.STEMPLINGER`, og
   // `StemplingsnavnTests` holder de to listene like.
   const knapp = (handling, etikett, stil, ikon) =>
-    `<button class="btn btn-sm ${stil} vl-stempel" type="button"
+    `<button class="btn ${stil} vl-stempel" type="button"
              data-action="${escHtmlValue(handling)}" data-id="${escHtmlValue(vp.id)}">
        <i class="bi bi-${escHtmlValue(ikon)} me-1"></i>${escapeHtml(etikett)}
      </button>`;
   const angre = (handling, tittel) =>
-    `<button class="btn btn-sm btn-outline-secondary" type="button"
+    `<button class="btn btn-sm btn-link vl-angre" type="button"
              title="${escHtmlValue(tittel)}" aria-label="${escHtmlValue(tittel)}"
              data-action="${escHtmlValue(handling)}" data-id="${escHtmlValue(vp.id)}">
        <i class="bi bi-arrow-counterclockwise"></i>
      </button>`;
 
-  if (!vp.mott_at) return knapp('stemplMott', 'Møtt', 'btn-success', 'box-arrow-in-right');
+  if (!vp.mott_at) {
+    return knapp('stemplMott', 'Møtt', 'btn-success', 'box-arrow-in-right');
+  }
   if (!vp.av_vakt_at) {
     return knapp('stemplAvVakt', 'Av vakt', 'btn-outline-warning', 'box-arrow-right')
-         + angre('angreMott', 'Angre møtt');
+         + `<div class="vl-stempeltid">Møtt ${escapeHtml(_kl(vp.mott_at))}`
+         + angre('angreMott', 'Angre møtt') + '</div>';
   }
-  return `<span class="vl-meta me-1">${escapeHtml(_kl(vp.av_vakt_at))}</span>`
-       + angre('angreAvVakt', 'Angre av vakt');
+  return `<span class="vl-meta">Av vakt</span>`
+       + `<div class="vl-stempeltid">${escapeHtml(_kl(vp.av_vakt_at))}`
+       + angre('angreAvVakt', 'Angre av vakt') + '</div>';
 }
 
 
@@ -751,13 +803,17 @@ function mkRessurs(r) {
        </button>` : '';
   const knapper = settKnapp + rolleKnapp + redigerKnapp;
 
-  // **Regneark, ikke kort.** Radene er skift, kolonnene er det man
-  // sammenligner på tvers av dem — og alt utenom navn og korps redigeres der
-  // det står, uten å åpne noe.
+  // **Tabellen har to former, og drift er den andre.** I planlegging er den
+  // et regneark: radene er skift, kolonnene er det man sammenligner på tvers
+  // av dem, og alt redigeres der det står. Under drift er spørsmålet et helt
+  // annet — «hvem har møtt?» — og da er `datetime-local`-feltene,
+  // kompetansemerkene og merknaden bare bredde. Se `_driftrad()`.
+  const drift = iDrift();
   const kropp = poster.length ? poster
     .slice()
     .sort(_skiftrekkefolge)
     .map((vp) => {
+      if (drift) return _driftrad(vp, kanRore);
       // Merkelappene ligger i en wrapper, ikke rett i cella: `display: flex`
       // på en `<td>` tar cella ut av tabellens boksmodell, og da forskyves
       // kolonnene etter den i forhold til overskriftene.
@@ -800,17 +856,6 @@ function mkRessurs(r) {
                    data-action="apneRedigerVaktpost" data-id="${escHtmlValue(vp.id)}"><i class="bi bi-pencil"></i></button>`
         : '';
 
-      // **Stemplene står i handlingskolonnen, som er `sticky`.** Den er den
-      // ene kolonnen som aldri ruller bort, og KO står med en telefon i
-      // hånda og skal treffe riktig rad første gang.
-      //
-      // Notatet ba om «to store knapper per rad». Det ble **én** — den som
-      // gjelder nå — pluss en liten angre. Raden er i nøyaktig én tilstand:
-      // «Møtt» på en som alt har møtt gjør enten ingenting eller noe hun
-      // ikke ba om, og to knapper i en kolonne på 5 % blir to *små* knapper,
-      // altså det motsatte av bestillingen. Angreknappen er liten med vilje:
-      // et feiltrykk skal kunne rettes, men ikke like lett som å stemple.
-      const stempler = _stempelknapper(vp);
 
       // En ledig plass er raden uten person. Den skal se ut som noe som
       // gjenstår — ikke som en rad der navnet mangler ved en feil.
@@ -831,7 +876,7 @@ function mkRessurs(r) {
       // lenge — og først da kompetansen, som er det man vurderer laget på
       // når resten står. Merknaden sist, fordi den er unntaket.
       return `
-        <tr class="${escHtmlValue(_radklasse(vp))}">
+        <tr class="${escHtmlValue(vp.ledig ? 'vl-ledig' : '')}">
           <td class="vl-navn">${navnCelle}</td>
           <td>${korpsCelle}</td>
           <td>${_rolleValg(vp, r, kanRore)}</td>
@@ -840,10 +885,39 @@ function mkRessurs(r) {
           <td class="vl-timer">${escapeHtml(_varighet(vp))}</td>
           <td class="vl-kompcelle">${komp}</td>
           <td>${merknad}</td>
-          <td class="vl-handling">${stempler}${redigerPost}</td>
+          <td class="vl-handling">${redigerPost}</td>
         </tr>`;
     }).join('')
-    : '<tr><td colspan="9" class="vl-tom">Ingen satt opp ennå.</td></tr>';
+    : `<tr><td colspan="${drift ? 7 : 9}" class="vl-tom">Ingen satt opp ennå.</td></tr>`;
+
+  // Tabellhodet heves ut hit framfor å stå som en ternær med to
+  // template-literaler inne i en tredje: den formen er vanskelig å lese, og
+  // XSS-skanneren i `tests_xss.py` kan ikke se inn i den.
+  const tabellklasse = drift ? 'vl-tabell vl-tabell-drift' : 'vl-tabell';
+  const tabellhode = drift ? `
+          <colgroup>
+            <col style="width: 17%"><col style="width: 27%"><col style="width: 9%">
+            <col style="width: 16%"><col style="width: 19%"><col style="width: 6%">
+            <col style="width: 6%">
+          </colgroup>
+          <thead>
+            <tr>
+              <th>Innsjekk</th><th>Navn</th><th>Korps</th>
+              <th>Rolle</th><th>Skift</th><th>Timer</th><th></th>
+            </tr>
+          </thead>` : `
+          <colgroup>
+            <col style="width: 14%"><col style="width: 10%"><col style="width: 10%">
+            <col style="width: 18%"><col style="width: 18%"><col style="width: 5%">
+            <col style="width: 10%"><col style="width: 10%"><col style="width: 5%">
+          </colgroup>
+          <thead>
+            <tr>
+              <th>Navn</th><th>Korps</th><th>Rolle</th>
+              <th>Fra</th><th>Til</th><th>Timer</th>
+              <th>Kompetanse</th><th>Merknad</th><th></th>
+            </tr>
+          </thead>`;
 
   return `
     <div class="vl-kort">
@@ -859,19 +933,8 @@ function mkRessurs(r) {
         <div class="d-flex gap-2">${knapper}</div>
       </div>
       <div class="vl-tabellramme">
-        <table class="vl-tabell">
-          <colgroup>
-            <col style="width: 14%"><col style="width: 10%"><col style="width: 10%">
-            <col style="width: 18%"><col style="width: 18%"><col style="width: 5%">
-            <col style="width: 10%"><col style="width: 10%"><col style="width: 5%">
-          </colgroup>
-          <thead>
-            <tr>
-              <th>Navn</th><th>Korps</th><th>Rolle</th>
-              <th>Fra</th><th>Til</th><th>Timer</th>
-              <th>Kompetanse</th><th>Merknad</th><th></th>
-            </tr>
-          </thead>
+        <table class="${tabellklasse}">
+          ${tabellhode}
           <tbody>${kropp}</tbody>
         </table>
       </div>

@@ -4,6 +4,40 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-08-30 — Drifttabellen bytter form
+
+**1857 tester grønne** (6 nye, fem mutasjoner satt rødt først). André: «Møtt-
+knappen er ikke helt på plass ennå.» Han hadde rett, og målingene sa hvorfor.
+
+**Slik den var:** 45 × 21 px — den *minste* kontrollen på raden — på x=1092,
+mens navnet sto på x=41. Tusen piksler fra navnet du leser til knappen du skal
+treffe, og bak en sidescroll, siden tabellen er 1377 px og ruller på både 1440
+og 1180 px. På skjermen leste den som enda en liten grå knapp etter
+Timer/Kompetanse/Merknad.
+
+**Slik den er:** 171 × 44 px på x=49, først i raden, og tabellen får plass
+uten sidescroll.
+
+- **Tabellen har to former, og drift er den andre.** Under drift legges
+  planleggingsfeltene bort: tidene vises som tekst i stedet for
+  `datetime-local`, og kompetanse og merknad tas ut. Det er de tre som gjør
+  raden 1377 px bred, og ingen av dem røres mens man sjekker folk inn. Uten
+  dem er det plass til at stempelet kan være stort.
+- **Lista kan fortsatt endres** — folk uteblir og bytter — men gjennom
+  blyanten, som åpner redigeringsvinduet.
+- **Uten stemplerett vises statusen** i stedet for en knapp. `les` ser hele
+  lista, og «hvem har møtt» er samme spørsmål enten man kan svare på det eller
+  ikke.
+
+**Lærdom:** jeg leste notatet for tynt. Det sto «to store knapper per rad,
+**ikke et redigeringsskjema**», og jeg behandlet den andre halvdelen som en
+omskrivning av den første. Den var en egen instruksjon om *raden*. Da jeg i
+forrige runde begrunnet én knapp med at «to knapper i en kolonne på 5 % blir
+to små knapper», var den riktige slutningen at kolonnen var feil — ikke at
+knappen skulle bli én.
+
+---
+
 ## 2026-08-30 — Vaktliste fase 4: drift
 
 **1851 tester grønne** (45 nye, sytten mutasjoner satt rødt først). Modellen
