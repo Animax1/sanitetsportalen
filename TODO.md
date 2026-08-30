@@ -943,8 +943,13 @@ Gjennomgang 13. aug. 2026, med 1000 pasienter og peak 100 brukere som premiss.
       Fem mutasjoner prøvd, alle røde.
       - [ ] **Kjør dem før du pusher en migrasjon som rører data.** De er
             ikke med i den vanlige testkjøringen, fordi de trenger en
-            PostgreSQL. Docker-oppskriften står i CLAUDE.md. Får prosjektet
-            CI en dag, hører de hjemme der.
+            PostgreSQL å lage baser på — lokal installasjon eller en egen
+            Postgres-tjeneste i Railway. Se CLAUDE.md.
+      - [ ] **Vurder GitHub Actions.** Prosjektet har ingen CI, så «husk å
+            kjøre prøvene» er fortsatt hukommelse. En workflow med en
+            postgres-service ville kjørt dem ved hver push, uten at noe måtte
+            installeres lokalt. Det er den eneste veien som tar disiplinen
+            helt ut av hodet.
 
 - [ ] **Norsk sortering av æ/ø/å i vaktlisteregistrene.** Ikke hastverk, og
       kanskje aldri. Sorteringen bruker `Lower(...)`, så store/små bokstaver er

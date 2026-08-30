@@ -39,7 +39,8 @@ den statiske regelen fra forrige runde ikke nådde.
   `foregaaende` må finnes. Uten det tredje feiler prøven på sitt eget oppsett
   og ser ut som dekning man ikke har.
 - Kjøres med `MIGRASJONSPROVE_DATABASE_URL` satt; hoppes over ellers.
-  Docker-oppskriften står i CLAUDE.md.
+  Serveren kan være en lokal PostgreSQL eller en egen Postgres-tjeneste i
+  Railway — se CLAUDE.md.
 
 ## 2026-08-30 — Deployfiks: migrasjonen som kræsjet på PostgreSQL
 

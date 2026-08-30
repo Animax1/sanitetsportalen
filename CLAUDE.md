@@ -11,11 +11,10 @@ relevante punkter i TODO. Dette skal gjøres som del av samme commit, ikke etter
 ## Commands
 
 ```powershell
-# Migrasjonsprøver mot ekte PostgreSQL (se «Migrasjoner» under)
-docker run --rm -d -p 5433:5432 -e POSTGRES_PASSWORD=prove --name pg-prove postgres:16
-$env:MIGRASJONSPROVE_DATABASE_URL = "postgres://postgres:prove@localhost:5433/postgres"
+# Migrasjonsprøver mot ekte PostgreSQL (se «Migrasjoner» under).
+# Krever PostgreSQL lokalt — én gang:  winget install PostgreSQL.PostgreSQL.16
+$env:MIGRASJONSPROVE_DATABASE_URL = "postgres://postgres:DITT_PASSORD@localhost:5432/postgres"
 python manage.py verifiser_migrasjoner
-docker rm -f pg-prove
 ```
 
 ```powershell
@@ -533,6 +532,11 @@ etter skrivingen.
 
 Prøvene hoppes over uten `MIGRASJONSPROVE_DATABASE_URL` — de er ikke en del av
 den vanlige kjøringen, men skal kjøres før en migrasjon som rører data pushes.
+**Serveren kan være hvilken som helst PostgreSQL du får lage baser på**: en
+lokal installasjon (`winget install PostgreSQL.PostgreSQL.16`), eller en egen
+Postgres-tjeneste i Railway. Ikke pek den på prod-basen — kommandoen rører den
+riktignok ikke, men den lager og sletter baser på serveren, og det er ikke noe
+man gjør på siden av produksjonsdata.
 Kommandoen lager og sletter sin egen engangsbase, og rører aldri basen URL-en
 peker på. Den kjører `migrate` i en **underprosess** mot `default`, ikke som et
 databasealias: atten migrasjoner i dette prosjektet gjør ORM-kall i `RunPython`
