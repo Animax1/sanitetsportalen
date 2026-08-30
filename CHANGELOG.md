@@ -4,6 +4,34 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-08-30 — Mannskapstabellen: kolonnene flyter ikke lenger inn i hverandre
+
+**1599 tester grønne** (4 nye). Kun frontend.
+
+Meldt av André: en person med mange kompetanser blåste opp kompetansekolonnen
+og skjøv telefon og konto ut av linje med radene over — nøyaktig det tabellen
+skulle løse.
+
+- **Årsaken var `table-layout: auto`.** Der sizer nettleseren kolonnene etter
+  innhold, og `max-width` på en `td` er bare et forslag. Nå `table-layout:
+  fixed` med et `<colgroup>` som setter andelene, så innholdet brytes inni cella
+  i stedet for å dytte naboene. Målt i nettleser på 1400, 1000 og 780 px: alle
+  radene har identiske kolonneposisjoner, og ingenting flyter ut av cella.
+- **Handlingsknappene ble ikoner.** «Rediger» + «Slett» som tekst trenger
+  ~150 px og sprengte sin egen kolonne på smal skjerm. `title` og `aria-label`
+  bærer betydningen, og knappene har fast bredde så kolonnen ikke hopper mens
+  ikonfonten laster.
+- **Fire regresjonstester**, fordi hver av bitene ser overflødig ut ved siden av
+  de andre: `table-layout: fixed` ser unødvendig ut når det står et `<colgroup>`
+  der, og omvendt. Begge trengs — den ene slår av innholdsbasert sizing, den
+  andre sier hva andelene skal være.
+
+Sidevis vannrett rulling på 780 px kommer fra portalens header, ikke fra
+tabellen, og bare i testmiljøet: Bootstrap-CSS er CDN-sperret der, så
+brukermenyen står åpen i stedet for skjult.
+
+---
+
 ## 2026-08-30 — Registersiden: kompetansestige og mannskapstabell
 
 **1595 tester grønne** (15 nye). Migrasjon `vaktliste.0004`. Første runde på

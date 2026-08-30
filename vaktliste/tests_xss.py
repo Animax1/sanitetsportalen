@@ -397,3 +397,53 @@ class RegistersidenEscapingOppforselTests(SimpleTestCase):
             assert(ut.includes('vl-inaktiv'), 'inaktiv rad skal merkes');
             assert(ut.includes('Kari'), 'og fortsatt vises');
         """)
+
+
+class MannskapstabellensLayoutTests(SimpleTestCase):
+    """Kolonnene skal ikke kunne flyte inn i hverandre igjen.
+
+    Feilen André meldte: en person med mange kompetanser blåste opp
+    kompetansekolonnen og skjøv telefon og konto ut av linje med radene over.
+    Årsaken var `table-layout: auto`, der `max-width` på en `td` bare er et
+    forslag — nettleseren sizer kolonnene etter innhold.
+
+    De to tingene som holder det i sjakk testes her fordi de er lette å
+    fjerne i god tro: `table-layout: fixed` ser overflødig ut ved siden av
+    `<colgroup>`, og `<colgroup>` ser overflødig ut ved siden av `fixed`.
+    Begge trengs — den første slår av innholdsbasert sizing, den andre sier
+    hva andelene skal være.
+    """
+
+    def _css(self):
+        from pathlib import Path
+        from django.conf import settings
+        return (Path(settings.BASE_DIR) / 'static' / 'css'
+                / 'vaktliste.css').read_text(encoding='utf-8')
+
+    def test_tabellen_har_fast_kolonnelayout(self):
+        css = self._css()
+        blokk = css[css.index('.vlr-tabell {'):css.index('.vlr-tabell th')]
+        self.assertIn('table-layout: fixed', blokk)
+        self.assertIn('min-width:', blokk,
+                      'uten min-width klemmes kolonnene i stedet for å rulle')
+
+    def test_rammen_ruller_framfor_sida(self):
+        css = self._css()
+        blokk = css[css.index('.vlr-tabellramme {'):css.index('.vlr-tabell {')]
+        self.assertIn('overflow-x: auto', blokk)
+
+    def test_byggeren_setter_kolonnebredder(self):
+        """`fixed` uten `<colgroup>` gir like brede kolonner, som er feil
+        fordelig: kompetanse trenger mest, korps minst."""
+        src = read_js(VAKTLISTE_REGISTRE_JS)
+        kropp = extract_function(src, 'mkMannskap')
+        self.assertIn('<colgroup>', kropp)
+        andeler = re.findall(r'width:\s*(\d+)%', kropp)
+        self.assertEqual(len(andeler), 6, 'én bredde per kolonne')
+        self.assertEqual(sum(int(a) for a in andeler), 100,
+                         f'andelene skal summere til 100, fikk {andeler}')
+
+    def test_kompetansecella_bryter_framfor_aa_flyte_ut(self):
+        css = self._css()
+        blokk = css[css.index('.vlr-komp {'):css.index('.vlr-handling {')]
+        self.assertIn('flex-wrap: wrap', blokk)

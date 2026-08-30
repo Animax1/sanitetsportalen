@@ -172,11 +172,16 @@ function mkMannskap() {
           `<span class="vl-merkelapp">${escapeHtml(k.navn)}</span>`).join('')
       : '<span class="vl-meta">—</span>';
 
+    // Ikoner, ikke tekst: to tekstknapper trenger ~150px og sprengte
+    // handlingskolonnen på smale skjermer. `title` og `aria-label` bærer
+    // betydningen — en ikonknapp uten dem er en gåte.
     const knapper = kanRedigerePerson(m)
       ? `<button class="btn btn-sm btn-outline-secondary" type="button"
-                 data-action="apneRedigerPerson" data-id="${escHtmlValue(m.id)}">Rediger</button>
+                 title="Rediger ${escHtmlValue(m.navn)}" aria-label="Rediger ${escHtmlValue(m.navn)}"
+                 data-action="apneRedigerPerson" data-id="${escHtmlValue(m.id)}"><i class="bi bi-pencil"></i></button>
          <button class="btn btn-sm btn-outline-danger" type="button"
-                 data-action="slettPerson" data-id="${escHtmlValue(m.id)}">Slett</button>`
+                 title="Slett ${escHtmlValue(m.navn)}" aria-label="Slett ${escHtmlValue(m.navn)}"
+                 data-action="slettPerson" data-id="${escHtmlValue(m.id)}"><i class="bi bi-trash"></i></button>`
       : '';
 
     const inaktivMerke = m.er_aktiv ? ''
@@ -206,6 +211,11 @@ function mkMannskap() {
     <div class="vl-kort">
       <div class="vlr-tabellramme">
         <table class="vlr-tabell">
+          <colgroup>
+            <col style="width: 26%"><col style="width: 9%">
+            <col style="width: 31%"><col style="width: 12%">
+            <col style="width: 10%"><col style="width: 12%">
+          </colgroup>
           <thead>
             <tr>
               ${_kolonneHode('navn', 'Navn')}
