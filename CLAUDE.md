@@ -300,6 +300,13 @@ fase 3–7 gjenstår — se `docs/BESLUTNING_VAKTLISTE.md`, som er besluttet i s
   flaten er kun rutet under `DEBUG`/`OFFLINE_MODE` (S1), så `vaktliste/admin.py` er et
   utviklerverktøy — et register som *bare* finnes der, finnes ikke for brukeren.
   `SjekkAtIngenPekerPaaDjangoAdminTests` skanner alle maler for lenker dit.
+- **Tid vises med dag når skiftet krysser et døgn.** `_tidsspenn()` i
+  `vaktliste.js` nevner dagen én gang innenfor ett døgn og to ganger ellers —
+  «20:00–04:00» alene sier ikke at skiftet går over midnatt, og arrangementer
+  varer flere dager. Vaktas spenn utledes av skiftene, ikke av et felt.
+- **`Kompetanse.bygger_paa` er en stige.** Har personen AFØR, skjules VFØR og
+  GFØR i alle lister — `services.synlige_kompetanser()`. Ringer stoppes ved
+  skriving; en ring som likevel finnes gir avkortet kjede, ikke evig løkke.
 - **Verdimengdene sorteres alfabetisk — det finnes ingen `rekkefolge` å
   vedlikeholde.** `Ressurs` er unntaket, fordi der styrer den fanerekkefølgen, og
   der settes den automatisk til opprettelsesrekkefølgen. Sorteringen bruker
@@ -403,7 +410,7 @@ Elleve moduler i `static/js/` (ingen bundler), fordelt på seks sider — pasien
 | `statistikk-oppdrag.js` | `/statistikk/`, **kun** med oppdragstilgang | Oppdragsfanen. Kall hit fra `statistikk.js` går gjennom `_kallOppdrag('navn')` |
 | `oppdrag-sentral.js` | `/oppdrag/`, kontoer uten enhet | Sentralbordet: enhetsliste, oppdragsliste, tidslinje, lokasjonsadmin |
 | `oppdrag-enhet.js` | `/oppdrag/`, enhetskontoer | Enhetsskjermen: to knapper mot de navngitte stemplingsendepunktene, og offline-køen i `localStorage`. Serveren sender `neste_overgang` per rad; kjeden følger med som data kun for å projisere neste steg mens noe ligger usendt |
-| `vaktliste.js` | **kun** `/vaktliste/` | Planleggingssiden: fanene bygges av ressursene, «Oversikt» grupperer på korps, «Ikke plassert» fanger dem ingen satte opp |
+| `vaktliste.js` | **kun** `/vaktliste/` | Planleggingssiden: fanene bygges av ressursene, ressursen er et regneark med redigering i raden, «Oversikt» er utskriftslista med bemanningskurve |
 | `vaktliste-registre.js` | **kun** `/vaktliste/registre/` | Mannskapsregisteret og de tre verdimengdene. Egen fil fordi skjemahjelperne er sidespesifikke — de to vaktlistefilene kan ikke lastes i samme node-harness |
 
 **`patients-utils.js` kan ikke lastes utenfor pasientsiden.** Den gjør arbeid på toppnivå

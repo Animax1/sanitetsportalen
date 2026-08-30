@@ -863,15 +863,11 @@ Gjennomgang 13. aug. 2026, med 1000 pasienter og peak 100 brukere som premiss.
             sortering (merkelappene brøt om og skjøv telefonnummeret ut av
             syne), og `Kompetanse.bygger_paa` skjuler impliserte trinn — har du
             AFØR trengs ikke VFØR. Migrasjon `0004`.
-      - [ ] **Planleggingssiden ryddes.** Neste runde, før fase 4:
-            - [ ] Ressursen som redigerbar tabell (Excel-inspirert): rolle og
-                  kompetanse som kolonner, redigering i raden framfor i modal.
-            - [ ] Dato + ukedag i tidsvisningen. Et skift lørdag 20:00 til
-                  søndag 04:00 vises i dag som «20:00–04:00», uten at noe sier
-                  at det krysser midnatt. Vaktvelgeren viser ingen dato.
-            - [ ] «Oversikt» blir utskriftslista, med utskriftsknapp og
-                  print-CSS.
-            - [ ] Bemanningskurve som tillegg på oversikten.
+      - [x] **Planleggingssiden ryddet (30. aug. 2026).** Ressursen er et
+            regneark med rolle, kompetanse, dag og tider som kolonner, redigert
+            i raden. Dato + ukedag i tidsvisningen (skift over midnatt var
+            tvetydige). «Oversikt» er utskriftslista med knapp og print-CSS, og
+            bemanningskurven står over den.
             - **Lærdom å ta med til neste modul:** en modul er ikke ferdig før
               dataene den trenger kan opprettes *gjennom portalen*. Django-admin
               teller ikke, og en testsuite som bare bruker ORM-en ser det ikke.

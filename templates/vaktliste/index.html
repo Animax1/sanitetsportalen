@@ -44,6 +44,15 @@
         <i class="bi bi-person-vcard me-1"></i>Mannskap
       </a>
       {% comment %}
+        Utskrift av oversiktsfanen. Knappen står her og ikke inne i panelet
+        fordi den skal være på samme sted uansett hvilken fane man er på —
+        og `@media print` i vaktliste.css skjuler alt annet enn lista.
+      {% endcomment %}
+      <button type="button" class="btn btn-outline-secondary btn-sm"
+              data-action="skrivUt">
+        <i class="bi bi-printer me-1"></i>Skriv ut
+      </button>
+      {% comment %}
         Begge er «dele ut»-handlinger: å planlegge en vakt lager en core.Vakt,
         og å legge til en ressurs setter reservasjonen. Skjules for alle under
         skriv_full — JS gjør det, se vaktliste.js::gateKnapper().
@@ -73,6 +82,8 @@
 
   <!-- Ressursfaner. Bygges av data; «Oversikt» og «Ikke plassert» er faste. -->
   <div class="vl-faner" id="vl-faner"></div>
+
+  <div id="vl-feil" class="alert alert-danger d-none"></div>
 
   <div id="vl-panel"></div>
 

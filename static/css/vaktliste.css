@@ -317,3 +317,167 @@
   text-decoration: line-through;
   text-decoration-thickness: 1px;
 }
+
+/* ── Ressurstabellen (regnearket) ─────────────────────────────────────── */
+/*
+   Samme grep som mannskapstabellen: faste kolonneandeler, så en person med
+   mange kompetanser ikke skyver tidene ut av linje.
+*/
+.vl-tabellramme {
+  overflow-x: auto;
+}
+
+.vl-tabell {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+  min-width: 58rem;
+  font-size: 0.85rem;
+}
+
+.vl-tabell th,
+.vl-tabell td {
+  padding: 0.35rem 0.5rem;
+  border-bottom: 1px solid var(--border-color);
+  text-align: left;
+  vertical-align: middle;
+  overflow-wrap: anywhere;
+}
+
+.vl-tabell thead th {
+  color: var(--text-muted);
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
+.vl-tabell tbody tr:hover {
+  background: var(--surface-2);
+}
+
+.vl-kompcelle {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.2rem;
+}
+
+.vl-dagcelle {
+  white-space: nowrap;
+  color: var(--text-muted);
+}
+
+.vl-handling {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.vl-handling .btn {
+  min-width: 2.1rem;
+  padding-left: 0.4rem;
+  padding-right: 0.4rem;
+}
+
+/* Cellene skal se ut som celler, ikke som skjemafelter: rammen kommer først
+   når man er i ferd med å redigere. Ellers drukner tabellen i bokser. */
+.vl-celle {
+  width: 100%;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  color: var(--text-main);
+  font-size: 0.85rem;
+  padding: 0.15rem 0.3rem;
+}
+
+.vl-celle:hover {
+  border-color: var(--border-color);
+}
+
+.vl-celle:focus {
+  outline: none;
+  border-color: var(--portal-accent, #3b82f6);
+  background: var(--surface-1);
+}
+
+.vl-celle option {
+  background: var(--surface-1);
+  color: var(--text-main);
+}
+
+/* ── Bemanningskurven ─────────────────────────────────────────────────── */
+.vl-kurve {
+  display: flex;
+  align-items: flex-end;
+  gap: 1px;
+  height: 5rem;
+  padding: 0.4rem 0;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.vl-soyle {
+  flex: 1 1 auto;
+  min-width: 2px;
+  background: var(--portal-accent, #3b82f6);
+  border-radius: 1px 1px 0 0;
+  min-height: 1px;          /* en time uten bemanning skal synes som et hull */
+}
+
+/* Døgnskillet, ellers mister man hvilken dag man ser på. */
+.vl-soyle.vl-dogn {
+  box-shadow: -1px 0 0 0 var(--text-soft);
+}
+
+/* ── Utskrift ─────────────────────────────────────────────────────────── */
+.vl-arkhode {
+  margin-bottom: 1rem;
+}
+
+.vl-arkhode h2 {
+  font-size: 1.1rem;
+  margin: 0;
+}
+
+@media print {
+  /*
+     Det som skal ut på papiret er lista, ikke portalen rundt den. Alt som er
+     en handling forsvinner: en knapp på et ark er bare blekk.
+  */
+  .portal-header, .portal-nav, .portal-footer,
+  .vl-faner, .vl-kurve-kort, .modal,
+  #vl-feil, #vl-tom, #vl-mangler-mannskap,
+  .btn, select, .vl-handling {
+    display: none !important;
+  }
+
+  body, .vl-kort, .vl-utskriftsark {
+    background: #fff !important;
+    color: #000 !important;
+    border: none !important;
+    box-shadow: none !important;
+  }
+
+  .vl-tabell, .vl-tabell th, .vl-tabell td, .vl-navn, .vl-meta {
+    color: #000 !important;
+  }
+
+  .vl-tabell th, .vl-tabell td {
+    border-bottom: 1px solid #999 !important;
+  }
+
+  .vl-tabell {
+    min-width: 0;             /* papiret har ingen rullefelt */
+    font-size: 10pt;
+  }
+
+  /* En korpsgruppe skal helst ikke deles over to ark. */
+  .vl-korpsgruppe {
+    break-inside: avoid;
+  }
+
+  .portal-content {
+    padding: 0 !important;
+    max-width: none !important;
+  }
+}

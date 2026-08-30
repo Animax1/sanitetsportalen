@@ -60,6 +60,71 @@ function gateKnapper() {
 }
 
 
+// ── Tid: dato og dag, ikke bare klokkeslett ──────────────────────────────
+//
+// Et skift fra lørdag 20:00 til søndag 04:00 sto som «20:00–04:00», uten at
+// noe sa at det krysset midnatt. Arrangementer varer flere dager, og da er
+// klokkeslettet alene tvetydig.
+
+const DAGER = ['søn', 'man', 'tir', 'ons', 'tor', 'fre', 'lør'];
+const MND = ['jan', 'feb', 'mar', 'apr', 'mai', 'jun',
+             'jul', 'aug', 'sep', 'okt', 'nov', 'des'];
+
+
+function _d(iso) {
+  // Tomt må sjekkes før `new Date`: `new Date(null)` gir epoken (1970), ikke
+  // en ugyldig dato, så et tomt tidsfelt ville vist «01:00» i stedet for
+  // ingenting.
+  if (iso === null || iso === undefined || iso === '') return null;
+  const d = new Date(iso);
+  return isNaN(d) ? null : d;
+}
+
+
+function _kl(iso) {
+  const d = _d(iso);
+  if (!d) return '';
+  return String(d.getHours()).padStart(2, '0') + ':'
+       + String(d.getMinutes()).padStart(2, '0');
+}
+
+
+function _dag(iso) {
+  const d = _d(iso);
+  return d ? `${DAGER[d.getDay()]} ${d.getDate()}. ${MND[d.getMonth()]}` : '';
+}
+
+
+function _sammeDag(a, b) {
+  const x = _d(a);
+  const y = _d(b);
+  return !!x && !!y && x.toDateString() === y.toDateString();
+}
+
+
+function _tidsspenn(vp) {
+  // Dagen nevnes én gang når skiftet holder seg innenfor et døgn, og to
+  // ganger når det ikke gjør det. Å alltid vise begge blir støy på en
+  // endagsvakt; å aldri vise dem skjuler at skiftet krysser midnatt.
+  if (_sammeDag(vp.fra_tid, vp.til_tid)) {
+    return `${_dag(vp.fra_tid)} ${_kl(vp.fra_tid)}–${_kl(vp.til_tid)}`;
+  }
+  return `${_dag(vp.fra_tid)} ${_kl(vp.fra_tid)} – ${_dag(vp.til_tid)} ${_kl(vp.til_tid)}`;
+}
+
+
+function _vaktspenn() {
+  // Vaktas spenn utledes av skiftene framfor å være et felt noen må fylle ut:
+  // da holder det seg riktig av seg selv når lista endrer seg.
+  const poster = (aktivListe && aktivListe.vaktposter) || [];
+  if (!poster.length) return '';
+  const fra = poster.map((v) => v.fra_tid).sort()[0];
+  const til = poster.map((v) => v.til_tid).sort().slice(-1)[0];
+  if (_sammeDag(fra, til)) return `${_dag(fra)} ${_kl(fra)}–${_kl(til)}`;
+  return `${_dag(fra)} ${_kl(fra)} – ${_dag(til)} ${_kl(til)}`;
+}
+
+
 // ── Henting ──────────────────────────────────────────────────────────────
 
 async function lastVaktlister() {
@@ -118,10 +183,12 @@ function fyllVelger() {
   const el = document.getElementById('vaktliste-velger');
   if (!el) return;
   el.innerHTML = vaktlister.map((vl) => {
-    // Statusen står i valget selv: velgeren er ofte det eneste stedet man
-    // ser flere lister samtidig.
+    // Statusen og datoen står i valget selv: velgeren er ofte det eneste
+    // stedet man ser flere lister samtidig, og «Sommervakta» uten dato sier
+    // ikke hvilken av dem det er.
     const merke = vl.i_drift ? ' — i drift' : '';
-    return `<option value="${escHtmlValue(vl.id)}">${escapeHtml(vl.vakt_navn + merke)}</option>`;
+    const dato = vl.startet ? ` (${_dag(vl.startet)})` : '';
+    return `<option value="${escHtmlValue(vl.id)}">${escapeHtml(vl.vakt_navn + dato + merke)}</option>`;
   }).join('');
 
   _fyll('ny-vakt-kopier',
@@ -192,6 +259,13 @@ function tegnFaner() {
 }
 
 
+function skrivUt() {
+  // Nettleserens egen utskrift. `@media print` i vaktliste.css skjuler nav,
+  // faner og knapper, så det som kommer ut er lista og ingenting annet.
+  window.print();
+}
+
+
 function visFane(id) {
   aktivFane = id;
   tegnFaner();
@@ -224,22 +298,45 @@ function tegnPanel() {
 
 // ── Byggere (alt escapes — se filhodet) ──────────────────────────────────
 
-function _tidsspenn(vp) {
-  return `${klokke(vp.fra_tid)}–${klokke(vp.til_tid)}`;
+function _iso16(iso) {
+  // `datetime-local` vil ha «2026-10-03T08:00» i LOKAL tid. `toISOString()`
+  // ville gitt UTC og flyttet skiftet to timer om sommeren.
+  const d = _d(iso);
+  if (!d) return '';
+  const p = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`
+       + `T${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+
+
+function _rolleValg(vp, kanRedigere) {
+  // Rollen redigeres i raden. Før lå den bare i «Sett på vakt»-modalen, og
+  // å endre den krevde å fjerne skiftet og sette det opp på nytt — samme
+  // person kan være sjåfør på bilen én vakt og lagleder på samleplass neste.
+  if (!kanRedigere) {
+    return escapeHtml(vp.rolle || '—');
+  }
+  const valg = ['<option value="">—</option>'].concat(
+    (aktivListe.roller || []).map((r) => {
+      const valgt = r.id === vp.rolle_id ? ' selected' : '';
+      return `<option value="${escHtmlValue(r.id)}"${valgt}>${escapeHtml(r.navn)}</option>`;
+    })).join('');
+  return `<select class="vl-celle" data-action="endreVaktpost" data-hendelse="change"
+                  data-felt="rolle_id" data-id="${escHtmlValue(vp.id)}">${valg}</select>`;
 }
 
 
 function mkRessurs(r) {
   const poster = _posterFor(r.id);
+  const kanRore = kanBemanne(r);
+
   const korpsmerke = r.korps_navn
     ? `<span class="vl-merkelapp vl-korps">${escapeHtml(r.korps_navn)}</span>`
     : '<span class="vl-merkelapp vl-ureservert">Ureservert</span>';
   const enhetsmerke = r.enhet_navn
     ? `<span class="vl-merkelapp">Enhet: ${escapeHtml(r.enhet_navn)}</span>` : '';
 
-  // «Sett på vakt» følger reservasjonen; «Fjern ressurs» er å dele ut, og
-  // ligger derfor et hakk høyere.
-  const settKnapp = kanBemanne(r)
+  const settKnapp = kanRore
     ? `<button class="btn btn-sm btn-primary" type="button"
                data-action="apneVaktpost" data-id="${escHtmlValue(r.id)}">
          <i class="bi bi-person-plus me-1"></i>Sett på vakt
@@ -250,28 +347,59 @@ function mkRessurs(r) {
     : '';
   const knapper = settKnapp + fjernKnapp;
 
-  // Å fjerne et skift er samme handling som å sette det, sett fra motsatt
-  // side — derfor samme regel, ikke en strengere. Avgjøres én gang for
-  // ressursen; knappen bygges per rad fordi den bærer radens id.
-  const kanRore = kanBemanne(r);
-  const rader = poster.length ? poster.map((vp) => {
-    const fjernPost = kanRore
-      ? `<button class="btn btn-sm btn-outline-danger" type="button"
-                 data-action="fjernVaktpost" data-id="${escHtmlValue(vp.id)}">Fjern</button>`
-      : '';
-    return `
-    <div class="vl-rad">
-      <div>
-        <span class="vl-navn">${escapeHtml(vp.navn)}</span>
-        <span class="vl-meta">· ${escapeHtml(vp.korps_kort)}${vp.rolle ? ' · ' + escapeHtml(vp.rolle) : ''}</span>
-      </div>
-      <div class="d-flex align-items-center gap-2">
-        <span class="vl-meta">${escapeHtml(_tidsspenn(vp))}</span>
-        ${fjernPost}
-      </div>
-    </div>`;
-  }).join('')
-    : '<div class="vl-tom">Ingen satt opp ennå.</div>';
+  // **Regneark, ikke kort.** Radene er skift, kolonnene er det man
+  // sammenligner på tvers av dem — og alt utenom navn og korps redigeres der
+  // det står, uten å åpne noe.
+  const kropp = poster.length ? poster
+    .slice()
+    .sort((a, b) => a.fra_tid.localeCompare(b.fra_tid)
+                 || a.navn.localeCompare(b.navn))
+    .map((vp) => {
+      const komp = (vp.kompetanser || []).length
+        ? vp.kompetanser.map((k) =>
+            `<span class="vl-merkelapp">${escapeHtml(k)}</span>`).join('')
+        : '<span class="vl-meta">—</span>';
+
+      const tid = (felt) => kanRore
+        ? `<input type="datetime-local" class="vl-celle"
+                  value="${escHtmlValue(_iso16(vp[felt]))}"
+                  data-action="endreVaktpost" data-hendelse="change"
+                  data-felt="${escHtmlValue(felt)}" data-id="${escHtmlValue(vp.id)}">`
+        : escapeHtml(_kl(vp[felt]));
+
+      const merknad = kanRore
+        ? `<input type="text" class="vl-celle" maxlength="255"
+                  value="${escHtmlValue(vp.merknad || '')}" placeholder="—"
+                  data-action="endreVaktpost" data-hendelse="change"
+                  data-felt="merknad" data-id="${escHtmlValue(vp.id)}">`
+        : escapeHtml(vp.merknad || '—');
+
+      const fjernPost = kanRore
+        ? `<button class="btn btn-sm btn-outline-danger" type="button"
+                   title="Fjern skiftet" aria-label="Fjern skiftet"
+                   data-action="fjernVaktpost" data-id="${escHtmlValue(vp.id)}"><i class="bi bi-trash"></i></button>`
+        : '';
+
+      // Dagen står i sin egen kolonne, ikke inne i tidene: da kan man skanne
+      // nedover og se hvilke skift som er på hvilken dag.
+      const dager = _sammeDag(vp.fra_tid, vp.til_tid)
+        ? escapeHtml(_dag(vp.fra_tid))
+        : escapeHtml(`${_dag(vp.fra_tid)} → ${_dag(vp.til_tid)}`);
+
+      return `
+        <tr>
+          <td class="vl-navn">${escapeHtml(vp.navn)}</td>
+          <td>${escapeHtml(vp.korps_kort)}</td>
+          <td class="vl-kompcelle">${komp}</td>
+          <td>${_rolleValg(vp, kanRore)}</td>
+          <td class="vl-dagcelle">${dager}</td>
+          <td>${tid('fra_tid')}</td>
+          <td>${tid('til_tid')}</td>
+          <td>${merknad}</td>
+          <td class="vl-handling">${fjernPost}</td>
+        </tr>`;
+    }).join('')
+    : '<tr><td colspan="9" class="vl-tom">Ingen satt opp ennå.</td></tr>';
 
   return `
     <div class="vl-kort">
@@ -286,13 +414,87 @@ function mkRessurs(r) {
         </div>
         <div class="d-flex gap-2">${knapper}</div>
       </div>
-      ${rader}
+      <div class="vl-tabellramme">
+        <table class="vl-tabell">
+          <colgroup>
+            <col style="width: 17%"><col style="width: 7%"><col style="width: 20%">
+            <col style="width: 12%"><col style="width: 12%"><col style="width: 11%">
+            <col style="width: 11%"><col style="width: 6%"><col style="width: 4%">
+          </colgroup>
+          <thead>
+            <tr>
+              <th>Navn</th><th>Korps</th><th>Kompetanse</th><th>Rolle</th>
+              <th>Dag</th><th>Fra</th><th>Til</th><th>Merknad</th><th></th>
+            </tr>
+          </thead>
+          <tbody>${kropp}</tbody>
+        </table>
+      </div>
+    </div>`;
+}
+
+
+function _bemanningPerTime() {
+  // Hvor mange er på vakt hver time i vaktas spenn. Ett steg per time er
+  // grovt nok til å tegne, og fint nok til å se hullene — det er hullene
+  // planleggeren leter etter.
+  const poster = aktivListe.vaktposter || [];
+  if (!poster.length) return [];
+
+  const TIME = 3600 * 1000;
+  const start = Math.min(...poster.map((v) => _d(v.fra_tid).getTime()));
+  const slutt = Math.max(...poster.map((v) => _d(v.til_tid).getTime()));
+  const steg = Math.ceil((slutt - start) / TIME);
+  if (steg <= 0 || steg > 24 * 14) return [];   // urimelig spenn: ikke tegn
+
+  const ut = [];
+  for (let i = 0; i < steg; i += 1) {
+    const t = start + i * TIME;
+    ut.push({
+      tid: new Date(t).toISOString(),
+      antall: poster.filter((v) =>
+        _d(v.fra_tid).getTime() <= t && _d(v.til_tid).getTime() > t).length,
+    });
+  }
+  return ut;
+}
+
+
+function mkKurve() {
+  const punkter = _bemanningPerTime();
+  if (!punkter.length) return '';
+  const topp = Math.max(...punkter.map((p) => p.antall)) || 1;
+
+  // Rene CSS-søyler framfor Chart.js: biblioteket lastes kun på
+  // /statistikk/, og en bemanningskurve er ett tall per time.
+  const soyler = punkter.map((p) => {
+    const h = Math.round((p.antall / topp) * 100);
+    const time = _d(p.tid).getHours();
+    // Døgnskillet markeres, ellers mister man hvilken dag man ser på.
+    const skille = time === 0 ? ' vl-dogn' : '';
+    return `<div class="vl-soyle${skille}" style="height: ${escHtmlValue(h)}%"
+                 title="${escHtmlValue(_dag(p.tid) + ' kl. ' + _kl(p.tid) + ': ' + p.antall)}"></div>`;
+  }).join('');
+
+  const bunn = punkter.length
+    ? `${escapeHtml(_dag(punkter[0].tid))} → ${escapeHtml(_dag(punkter[punkter.length - 1].tid))}`
+    : '';
+
+  return `
+    <div class="vl-kort vl-kurve-kort">
+      <div class="vl-kort-topp">
+        <span class="vl-kort-tittel">Bemanning gjennom vakta</span>
+        <span class="vl-meta">Topp: ${escHtmlValue(topp)} personer</span>
+      </div>
+      <div class="vl-kurve">${soyler}</div>
+      <div class="vl-meta">${bunn}</div>
     </div>`;
 }
 
 
 function mkOversikt() {
-  // Gruppert på korps — det er slik lista leses og henges opp.
+  // **Utskriftslista.** Hele vakta på ett ark, gruppert på korps — den man
+  // henger opp. Kurven står over og følger ikke med på papiret.
   const poster = aktivListe.vaktposter || [];
   if (!poster.length) {
     return '<div class="vl-kort"><div class="vl-tom">Ingen er satt opp ennå.</div></div>';
@@ -309,20 +511,43 @@ function mkOversikt() {
   const deler = Object.keys(grupper).sort().map((korps) => {
     const rader = grupper[korps]
       .slice()
-      .sort((a, b) => a.fra_tid.localeCompare(b.fra_tid) || a.navn.localeCompare(b.navn))
+      .sort((a, b) => a.fra_tid.localeCompare(b.fra_tid)
+                   || a.navn.localeCompare(b.navn))
       .map((vp) => `
-        <div class="vl-rad">
-          <div>
-            <span class="vl-navn">${escapeHtml(vp.navn)}</span>
-            <span class="vl-meta">· ${escapeHtml(ressursnavn[vp.ressurs_id] || '—')}${vp.rolle ? ' · ' + escapeHtml(vp.rolle) : ''}</span>
-          </div>
-          <span class="vl-meta">${escapeHtml(_tidsspenn(vp))}</span>
-        </div>`).join('');
-    return `<div class="vl-korpsgruppe"><h3>${escapeHtml(korps)} `
-         + `(${escHtmlValue(grupper[korps].length)})</h3>${rader}</div>`;
+        <tr>
+          <td class="vl-navn">${escapeHtml(vp.navn)}</td>
+          <td>${escapeHtml(ressursnavn[vp.ressurs_id] || '—')}</td>
+          <td>${escapeHtml(vp.rolle || '—')}</td>
+          <td>${escapeHtml(_tidsspenn(vp))}</td>
+          <td>${escapeHtml(vp.merknad || '')}</td>
+        </tr>`).join('');
+    return `
+      <div class="vl-korpsgruppe">
+        <h3>${escapeHtml(korps)} (${escHtmlValue(grupper[korps].length)})</h3>
+        <table class="vl-tabell vl-utskrift">
+          <colgroup>
+            <col style="width: 24%"><col style="width: 20%"><col style="width: 16%">
+            <col style="width: 26%"><col style="width: 14%">
+          </colgroup>
+          <thead>
+            <tr><th>Navn</th><th>Ressurs</th><th>Rolle</th><th>Tid</th><th>Merknad</th></tr>
+          </thead>
+          <tbody>${rader}</tbody>
+        </table>
+      </div>`;
   });
 
-  return `<div class="vl-kort">${deler.join('')}</div>`;
+  const tittel = aktivListe.vaktliste.vakt_navn;
+  const spenn = _vaktspenn();
+  return `
+    ${mkKurve()}
+    <div class="vl-kort vl-utskriftsark">
+      <div class="vl-arkhode">
+        <h2>${escapeHtml(tittel)}</h2>
+        <div class="vl-meta">${escapeHtml(spenn)} · ${escHtmlValue(poster.length)} skift</div>
+      </div>
+      ${deler.join('')}
+    </div>`;
 }
 
 
@@ -487,6 +712,51 @@ async function opprettVaktpost() {
 }
 
 
+async function endreVaktpost(id, felt, verdi) {
+  // Redigering i raden: skriv, gå videre, ferdig. Serveren avviser fortsatt
+  // et skift som slutter før det begynner — da rulles raden tilbake til det
+  // som faktisk står lagret, og meldingen vises over tabellen.
+  const kropp = {};
+  kropp[felt] = verdi === '' ? null : verdi;
+
+  const res = await apiFetch(`/vaktliste/api/vaktposter/${id}/`, {
+    method: 'PUT', body: JSON.stringify(kropp),
+  });
+  const d = await res.json().catch(() => ({}));
+  if (!res.ok || d.status !== 'ok') {
+    visPanelfeil(d.message || 'Kunne ikke lagre endringen.');
+    await lastListe(aktivListe.vaktliste.id);   // rull tilbake til lagret verdi
+    return;
+  }
+  skjulPanelfeil();
+  await lastListe(aktivListe.vaktliste.id);
+}
+
+
+function visPanelfeil(melding) {
+  const el = document.getElementById('vl-feil');
+  if (!el) return;
+  el.textContent = melding;
+  el.classList.remove('d-none');
+}
+
+
+function skjulPanelfeil() {
+  document.getElementById('vl-feil')?.classList.add('d-none');
+}
+
+
+function _koblCellelytter() {
+  // `data-action`-delegeringen i portal-utils.js er klikkbasert. Cellene i
+  // ressurstabellen er nedtrekk og tekstfelt, og de melder `change`.
+  document.getElementById('vl-panel')?.addEventListener('change', (e) => {
+    const el = e.target.closest('[data-hendelse="change"]');
+    if (!el) return;
+    endreVaktpost(Number(el.dataset.id), el.dataset.felt, el.value);
+  });
+}
+
+
 async function fjernVaktpost(id) {
   const res = await apiFetch(`/vaktliste/api/vaktposter/${id}/`, { method: 'DELETE' });
   if (!res.ok) return;
@@ -496,5 +766,6 @@ async function fjernVaktpost(id) {
 
 document.addEventListener('DOMContentLoaded', () => {
   gateKnapper();
+  _koblCellelytter();
   lastVaktlister();
 });

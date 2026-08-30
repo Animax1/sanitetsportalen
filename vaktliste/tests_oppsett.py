@@ -634,3 +634,70 @@ class ApiTests(TestCase):
     # Tilgangsmatrisen for fase 3 står i `tests_tilgang.py`. Den hører ikke
     # hjemme her: dette er endepunktenes oppførsel, den er hvem som slipper
     # inn på dem — og de to endres av ulike grunner.
+
+
+@override_settings(SECURE_SSL_REDIRECT=False, RATELIMIT_ENABLE=False)
+class RessurstabellensDataTests(TestCase):
+    """Ressurstabellen skal kunne vurderes uten å bla til registeret.
+
+    Bestillingen bak kompetansekolonnen var å se **helhetlig sammensetning**
+    av et lag: har vi en sjåfør, har vi noen med AFØR. Det krever at
+    kompetansene følger med vaktposten, ikke bare mannskapsraden.
+
+    `rolle_id` følger `rolle` fordi rollen redigeres i raden nå — en
+    nedtrekksliste trenger IDen for å vite hva som er valgt.
+    """
+
+    def setUp(self):
+        from vaktliste.models import Kompetanse
+        self.korps = Korps.objects.create(navn='Haugesund', kortnavn='HGSD')
+        self.gfor = Kompetanse.objects.create(navn='GFØR')
+        self.afor = Kompetanse.objects.create(navn='AFØR', bygger_paa=self.gfor)
+        self.syk = Kompetanse.objects.create(navn='Sykepleier')
+        self.rolle = VaktRolle.objects.create(navn='Lagleder')
+
+        self.vl = services.opprett_planlagt_vakt('Vakta')
+        self.ressurs = Ressurs.objects.create(vaktliste=self.vl, navn='Lag 1')
+        self.person = Mannskap.objects.create(navn='Kari', korps=self.korps)
+        self.person.kompetanser.set([self.gfor, self.afor, self.syk])
+        na = timezone.now()
+        self.vp = Vaktpost.objects.create(
+            ressurs=self.ressurs, mannskap=self.person, rolle=self.rolle,
+            fra_tid=na, til_tid=na + timedelta(hours=8))
+        self.c = _klient(_bruker('adm', admin=True))
+
+    def _vaktpost(self):
+        data = self.c.get(f'/vaktliste/api/vaktlister/{self.vl.pk}/').json()['data']
+        return data['vaktposter'][0]
+
+    def test_kompetansene_folger_vaktposten(self):
+        self.assertEqual(sorted(self._vaktpost()['kompetanser']),
+                         ['AFØR', 'Sykepleier'])
+
+    def test_stigen_gjelder_ogsaa_her(self):
+        """GFØR er implisert av AFØR, og skal ikke fylle kolonnen."""
+        self.assertNotIn('GFØR', self._vaktpost()['kompetanser'])
+
+    def test_rolle_id_folger_med_til_nedtrekket(self):
+        self.assertEqual(self._vaktpost()['rolle_id'], self.rolle.pk)
+        self.assertEqual(self._vaktpost()['rolle'], 'Lagleder')
+
+    def test_person_uten_kompetanse_gir_tom_liste(self):
+        annen = Mannskap.objects.create(navn='Ola', korps=self.korps)
+        na = timezone.now()
+        Vaktpost.objects.create(
+            ressurs=self.ressurs, mannskap=annen,
+            fra_tid=na + timedelta(hours=12), til_tid=na + timedelta(hours=20))
+        data = self.c.get(f'/vaktliste/api/vaktlister/{self.vl.pk}/').json()['data']
+        tom = [v for v in data['vaktposter'] if v['navn'] == 'Ola'][0]
+        self.assertEqual(tom['kompetanser'], [])
+
+    def test_skrivestiene_gir_samme_form_som_lesestien(self):
+        """Raden tegnes på nytt fra PUT-svaret. Manglet kompetansene der,
+        ville kolonnen tømt seg selv i det man endret rollen."""
+        res = self.c.put(f'/vaktliste/api/vaktposter/{self.vp.pk}/',
+                         data={'merknad': 'Kommer sent'},
+                         content_type='application/json')
+        etter = res.json()['data']
+        self.assertEqual(sorted(etter['kompetanser']), ['AFØR', 'Sykepleier'])
+        self.assertIn('rolle_id', etter)

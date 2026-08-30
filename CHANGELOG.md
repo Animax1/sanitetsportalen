@@ -4,6 +4,47 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-08-30 — Planleggingssiden: regneark, datoer, utskrift og bemanningskurve
+
+**1614 tester grønne** (15 nye). Kun frontend og serialisering — ingen migrasjon.
+Andre runde på Andrés tilbakemelding.
+
+- **Ressursen er et regneark.** Rader er skift, kolonner er det man
+  sammenligner på tvers av dem: Navn · Korps · Kompetanse · Rolle · Dag · Fra ·
+  Til · Merknad. Rolle, tider og merknad redigeres **der de står** — cellene ser
+  ut som celler til man er i ferd med å endre dem. Avviser serveren endringen
+  (et skift som slutter før det begynner), rulles raden tilbake til det som
+  faktisk er lagret, og meldingen står over tabellen.
+- **Rollen flyttet dit arbeidet skjer.** Den lå allerede riktig i modellen — på
+  vaktposten, ikke på personen — men i grensesnittet kunne den bare settes i
+  «Sett på vakt»-modalen. Å endre den krevde å fjerne skiftet og sette det opp
+  på nytt. Samme person er sjåfør på bilen én vakt og lagleder på samleplass
+  neste.
+- **Kompetansekolonnen** følger vaktposten, så et lags sammensetning kan
+  vurderes uten å bla til registeret. Stigen gjelder også her: AFØR skjuler GFØR.
+- **Dato og dag, ikke bare klokkeslett.** Et skift lørdag 20:00 til søndag 04:00
+  sto som «20:00–04:00», uten at noe sa at det krysset midnatt. Dagen nevnes én
+  gang når skiftet holder seg innenfor et døgn og to ganger når det ikke gjør
+  det; vaktvelgeren viser datoen; vaktas spenn utledes av skiftene framfor å
+  være et felt noen må vedlikeholde.
+- **«Oversikt» er utskriftslista.** Hele vakta på ett ark, gruppert på korps,
+  med en «Skriv ut»-knapp. `@media print` fjerner nav, faner, knapper og kurve —
+  en knapp på et ark er bare blekk — og en korpsgruppe brytes ikke over to sider.
+- **Bemanningskurven** står over lista: én søyle per time, døgnskillet markert,
+  hullene synlige. Rene CSS-søyler framfor Chart.js, som kun lastes på
+  `/statistikk/`.
+- **To kanter funnet av de nye testene.** `new Date(null)` gir epoken (1970), ikke
+  en ugyldig dato — et tomt tidsfelt ville vist «01:00» i stedet for ingenting.
+  Og `toISOString()` i `datetime-local`-feltene ville gitt UTC og flyttet hvert
+  skift to timer om sommeren.
+- Mutasjonstestet ni veier, alle røde til slutt. Den ene som ikke bet med én
+  gang — kompetansene fjernet fra vaktpost-svaret — avdekket at
+  ressurstabellens data var utestet; fem nye tester dekker den nå, inkludert at
+  PUT-svaret har samme form som lesestien (ellers ville kolonnen tømt seg selv
+  i det man endret rollen).
+
+---
+
 ## 2026-08-30 — Mannskapstabellen: kolonnene flyter ikke lenger inn i hverandre
 
 **1599 tester grønne** (4 nye). Kun frontend.

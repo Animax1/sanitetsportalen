@@ -22,7 +22,9 @@ HTML_BUILDERS = (
     '_fyll',
     'tegnFaner',
     'mkRessurs',
+    '_rolleValg',
     'mkOversikt',
+    'mkKurve',
     'mkIkkePlassert',
 )
 
@@ -40,6 +42,30 @@ REVIEWED_INTERPOLATIONS = {
     # Fase 3: knappene bygges lokalt og bare når tilgangen tillater dem.
     'knapper': 'markup bygget lokalt, id-ene escapet inni',
     'fjernPost': 'markup bygget lokalt, vaktpost-id escapet inni',
+    # Regnearket (30. aug.): cellene bygges lokalt, med escapet innhold.
+    'komp': 'markup bygget lokalt, kompetansenavnene escapet inni',
+    'merknad': 'input bygget lokalt, verdien escapet i attributtet',
+    'dager': 'escapet i begge grener av ternæren',
+    'kropp': 'tabellrader bygget lokalt i samme funksjon',
+    "tid('fra_tid')": 'input bygget lokalt av en hjelper som escaper',
+    "tid('til_tid')": 'input bygget lokalt av en hjelper som escaper',
+    '_rolleValg(vp, kanRore)': 'nedtrekk fra en bygger som selv skannes her',
+    'valg': 'options bygget lokalt, navn og id escapet inni',
+    'valgt': 'hardkodet selected-attributt fra en ternær',
+    'settKnapp': 'markup bygget lokalt, id escapet inni',
+    'fjernKnapp': 'markup bygget lokalt, id escapet inni',
+    'soyler': 'søyler bygget lokalt i samme funksjon',
+    'skille': 'hardkodet CSS-klasse fra en ternær',
+    'bunn': 'markup bygget lokalt, datoene escapet inni',
+    'mkKurve()': 'markup fra en bygger som selv skannes her',
+    "deler.join('')": 'markup bygget lokalt i samme funksjon',
+    'rader': 'markup bygget lokalt av byggere som selv skannes her',
+    # `_dag()` bygger «lør 3. okt» av tall fra et Date-objekt og to
+    # hardkodede lister. Ingen brukerdata passerer gjennom den — en ugyldig
+    # dato gir tom streng, ikke uescapet innhold.
+    '_dag(vl.startet)': 'datostreng fra en Date, ingen brukerdata',
+    '_dag(vp.fra_tid)': 'datostreng fra en Date, ingen brukerdata',
+    '_dag(vp.til_tid)': 'datostreng fra en Date, ingen brukerdata',
 }
 
 
@@ -100,16 +126,21 @@ class VaktlisteEscapingOppforselTests(SimpleTestCase):
     HARNESS = (
         (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue', 'trustedHtml',
                            '_escHtml', 'klokke')),
-        (VAKTLISTE_JS, ('mkRessurs', 'mkOversikt', 'mkIkkePlassert',
-                        'tegnFaner', '_posterFor', '_ikkePlassert',
-                        '_tidsspenn', '_nivaa', 'kanSkriveAlt', 'kanBemanne')),
+        (VAKTLISTE_JS, ('mkRessurs', '_rolleValg', 'mkOversikt', 'mkKurve',
+                        'mkIkkePlassert', 'tegnFaner', '_posterFor',
+                        '_ikkePlassert', '_tidsspenn', '_vaktspenn',
+                        '_bemanningPerTime', '_iso16', '_d', '_kl', '_dag',
+                        '_sammeDag', '_nivaa', 'kanSkriveAlt', 'kanBemanne')),
     )
 
     #: Byggerne spør om tilgang fra fase 3. Node har ingen `window`, så den
     #: stubbes — og med admin, slik at *alle* knappene bygges. Escaping-testene
     #: skal se mest mulig markup; hvem som får se hva er `tests_tilgang.py`
     #: sitt bord.
-    VINDU = "globalThis.window = { MODUL_TILGANG: { admin: true } };"
+    VINDU = ("globalThis.window = { MODUL_TILGANG: { admin: true } };\n"
+             "globalThis.DAGER = ['søn','man','tir','ons','tor','fre','lør'];\n"
+             "globalThis.MND = ['jan','feb','mar','apr','mai','jun',"
+             "'jul','aug','sep','okt','nov','des'];\n")
 
     def setUp(self):
         if not node_available():
@@ -119,9 +150,10 @@ class VaktlisteEscapingOppforselTests(SimpleTestCase):
     def _liste(self, **overstyr):
         """JS-litteral for `aktivListe`, med felter testen vil overstyre."""
         import json
-        grunn = {'vaktliste': {'id': 1, 'status_navn': 'Planlegging',
-                               'i_drift': False},
-                 'ressurser': [], 'vaktposter': [], 'mannskap': []}
+        grunn = {'vaktliste': {'id': 1, 'vakt_navn': 'Vakta',
+                               'status_navn': 'Planlegging', 'i_drift': False},
+                 'ressurser': [], 'vaktposter': [], 'mannskap': [],
+                 'roller': []}
         grunn.update(overstyr)
         return json.dumps(grunn)
 
@@ -447,3 +479,131 @@ class MannskapstabellensLayoutTests(SimpleTestCase):
         css = self._css()
         blokk = css[css.index('.vlr-komp {'):css.index('.vlr-handling {')]
         self.assertIn('flex-wrap: wrap', blokk)
+
+
+class TidsvisningTests(SimpleTestCase):
+    """Dato og dag, ikke bare klokkeslett.
+
+    Feilen André meldte: et skift fra lørdag 20:00 til søndag 04:00 sto som
+    «20:00–04:00», uten at noe sa at det krysset midnatt. Arrangementer varer
+    flere dager, og da er klokkeslettet alene tvetydig.
+    """
+
+    HARNESS = (
+        (VAKTLISTE_JS, ('_d', '_kl', '_dag', '_sammeDag', '_tidsspenn',
+                        '_vaktspenn', '_iso16', '_bemanningPerTime')),
+    )
+    VINDU = ("globalThis.DAGER = ['søn','man','tir','ons','tor','fre','lør'];\n"
+             "globalThis.MND = ['jan','feb','mar','apr','mai','jun',"
+             "'jul','aug','sep','okt','nov','des'];\n")
+
+    def setUp(self):
+        if not node_available():
+            self.skipTest('node er ikke tilgjengelig')
+        self.harness = build_harness(self.HARNESS)
+
+    def _kjor(self, kode):
+        return run_node(self.harness, self.VINDU + kode)
+
+    def test_endagsskift_nevner_dagen_en_gang(self):
+        self._kjor("""
+            const ut = _tidsspenn({fra_tid: '2026-10-03T08:00:00',
+                                   til_tid: '2026-10-03T16:00:00'});
+            assert(ut === 'lør 3. okt 08:00–16:00', 'fikk: ' + ut);
+        """)
+
+    def test_skift_over_midnatt_nevner_begge_dagene(self):
+        """Selve feilen: «20:00–04:00» sa ikke at det krysset et døgnskille."""
+        self._kjor("""
+            const ut = _tidsspenn({fra_tid: '2026-10-03T20:00:00',
+                                   til_tid: '2026-10-04T04:00:00'});
+            assert(ut.includes('lør 3. okt'), 'startdagen mangler: ' + ut);
+            assert(ut.includes('søn 4. okt'), 'sluttdagen mangler: ' + ut);
+        """)
+
+    def test_vaktspennet_utledes_av_skiftene(self):
+        """Spennet er ikke et felt noen fyller ut — da holder det seg riktig
+        av seg selv når lista endrer seg."""
+        self._kjor("""
+            globalThis.aktivListe = { vaktposter: [
+              {fra_tid: '2026-10-03T12:00:00', til_tid: '2026-10-03T20:00:00'},
+              {fra_tid: '2026-10-03T08:00:00', til_tid: '2026-10-04T02:00:00'},
+            ]};
+            const ut = _vaktspenn();
+            assert(ut.includes('lør 3. okt 08:00'), 'tidligste start: ' + ut);
+            assert(ut.includes('søn 4. okt 02:00'), 'seneste slutt: ' + ut);
+        """)
+
+    def test_tomt_spenn_gir_tom_streng(self):
+        self._kjor("""
+            globalThis.aktivListe = { vaktposter: [] };
+            assert(_vaktspenn() === '', 'ingen skift gir ingen tekst');
+        """)
+
+    def test_ugyldig_dato_gir_tom_streng_ikke_krasj(self):
+        self._kjor("""
+            assert(_dag('ikke en dato') === '', 'skal svare tomt');
+            assert(_kl(null) === '', 'skal svare tomt');
+        """)
+
+    def test_datetime_local_bruker_lokal_tid_ikke_utc(self):
+        """`toISOString()` ville gitt UTC og flyttet skiftet to timer om
+        sommeren — feltet ville vist noe annet enn det som er lagret."""
+        self._kjor("""
+            const ut = _iso16('2026-07-03T08:30:00');
+            assert(ut === '2026-07-03T08:30', 'fikk: ' + ut);
+        """)
+
+
+class BemanningskurveTests(SimpleTestCase):
+    """Kurven svarer på ett spørsmål: hvor er hullene."""
+
+    HARNESS = (
+        (VAKTLISTE_JS, ('_d', '_kl', '_dag', '_bemanningPerTime')),
+    )
+
+    def setUp(self):
+        if not node_available():
+            self.skipTest('node er ikke tilgjengelig')
+        self.harness = build_harness(self.HARNESS)
+
+    def test_teller_overlappende_skift_per_time(self):
+        run_node(self.harness, """
+            globalThis.aktivListe = { vaktposter: [
+              {fra_tid: '2026-10-03T08:00:00', til_tid: '2026-10-03T12:00:00'},
+              {fra_tid: '2026-10-03T10:00:00', til_tid: '2026-10-03T14:00:00'},
+            ]};
+            const p = _bemanningPerTime();
+            assert(p.length === 6, 'seks timer, fikk ' + p.length);
+            assert(p[0].antall === 1, 'kl 08: en');
+            assert(p[2].antall === 2, 'kl 10: to overlapper');
+            assert(p[4].antall === 1, 'kl 12: en igjen');
+        """)
+
+    def test_hull_i_bemanningen_telles_som_null(self):
+        """Hullet er det planleggeren leter etter — det må synes."""
+        run_node(self.harness, """
+            globalThis.aktivListe = { vaktposter: [
+              {fra_tid: '2026-10-03T08:00:00', til_tid: '2026-10-03T10:00:00'},
+              {fra_tid: '2026-10-03T12:00:00', til_tid: '2026-10-03T14:00:00'},
+            ]};
+            const p = _bemanningPerTime();
+            assert(p[2].antall === 0, 'kl 10 skal vaere tom');
+            assert(p[3].antall === 0, 'kl 11 skal vaere tom');
+            assert(p[4].antall === 1, 'kl 12 er bemannet igjen');
+        """)
+
+    def test_ingen_skift_gir_ingen_kurve(self):
+        run_node(self.harness, """
+            globalThis.aktivListe = { vaktposter: [] };
+            assert(_bemanningPerTime().length === 0, 'tom liste');
+        """)
+
+    def test_urimelig_spenn_tegnes_ikke(self):
+        """En feiltastet årstall ville ellers laget hundretusen søyler."""
+        run_node(self.harness, """
+            globalThis.aktivListe = { vaktposter: [
+              {fra_tid: '2026-10-03T08:00:00', til_tid: '2099-10-03T08:00:00'},
+            ]};
+            assert(_bemanningPerTime().length === 0, 'skal gi opp, ikke henge');
+        """)

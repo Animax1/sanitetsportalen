@@ -148,7 +148,20 @@ def _ressurs_til_dict(r):
     }
 
 
-def _vaktpost_til_dict(vp):
+def _vaktpost_til_dict(vp, foreldre=None):
+    """Ett skift som JSON.
+
+    `kompetanser` er personens **synlige** kompetanser (stigen skjuler de
+    impliserte, se `services.synlige_kompetanser`). De er med fordi
+    ressurstabellen skal kunne vurdere sammensetningen av et lag uten å bla
+    til mannskapsregisteret — det var bestillingen bak kompetansekolonnen.
+
+    `rolle_id` følger `rolle` fordi rollen redigeres i raden: en nedtrekksliste
+    trenger IDen for å vite hva som er valgt.
+    """
+    kompetanser = list(vp.mannskap.kompetanser.all())
+    if foreldre is not None:
+        kompetanser = services.synlige_kompetanser(kompetanser, foreldre)
     return {
         'id': vp.pk,
         'ressurs_id': vp.ressurs_id,
@@ -156,6 +169,8 @@ def _vaktpost_til_dict(vp):
         'navn': vp.mannskap.navn,
         'korps_navn': vp.mannskap.korps.navn,
         'korps_kort': vp.mannskap.korps.kortnavn or vp.mannskap.korps.navn,
+        'kompetanser': [k.navn for k in kompetanser],
+        'rolle_id': vp.rolle_id,
         'rolle': vp.rolle.navn if vp.rolle else '',
         'fra_tid': vp.fra_tid.isoformat(),
         'til_tid': vp.til_tid.isoformat(),
@@ -269,11 +284,13 @@ def vaktliste_detalj_view(request, pk):
         Vaktpost.objects
         .filter(ressurs__vaktliste=vl)
         .select_related('mannskap', 'mannskap__korps', 'rolle')
+        .prefetch_related('mannskap__kompetanser')
     )
+    foreldre = services.foreldrekart()
     return JsonResponse({'status': 'ok', 'data': {
         'vaktliste': _vaktliste_til_dict(vl),
         'ressurser': [_ressurs_til_dict(r) for r in ressurser],
-        'vaktposter': [_vaktpost_til_dict(vp) for vp in poster],
+        'vaktposter': [_vaktpost_til_dict(vp, foreldre) for vp in poster],
         'korps': [
             {'id': k.pk, 'navn': k.navn, 'kortnavn': k.kortnavn}
             for k in Korps.objects.filter(er_aktiv=True)
@@ -454,10 +471,14 @@ def vaktposter_view(request, pk):
             f'{mannskap.navn} står allerede på «{ressurs.navn}» fra dette '
             f'tidspunktet.')
 
-    vaktpost = Vaktpost.objects.select_related(
-        'mannskap', 'mannskap__korps', 'rolle').get(pk=vaktpost.pk)
+    vaktpost = (Vaktpost.objects
+                .select_related('mannskap', 'mannskap__korps', 'rolle')
+                .prefetch_related('mannskap__kompetanser')
+                .get(pk=vaktpost.pk))
     return JsonResponse(
-        {'status': 'ok', 'data': _vaktpost_til_dict(vaktpost)}, status=201)
+        {'status': 'ok',
+         'data': _vaktpost_til_dict(vaktpost, services.foreldrekart())},
+        status=201)
 
 
 @modul_kreves('vaktliste', 'les', svar='json')
@@ -507,4 +528,6 @@ def vaktpost_detalj_view(request, pk):
                      'tidspunktet.')
 
     vaktpost.refresh_from_db()
-    return JsonResponse({'status': 'ok', 'data': _vaktpost_til_dict(vaktpost)})
+    return JsonResponse(
+        {'status': 'ok',
+         'data': _vaktpost_til_dict(vaktpost, services.foreldrekart())})
