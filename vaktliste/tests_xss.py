@@ -2157,3 +2157,133 @@ class MannskapsfanenTests(SimpleTestCase):
                    'tittelen sto igjen med forrige vakts navn');
         """)
         self.assertIn('OK', ut)
+
+
+class TidsfeltenesSteglengdeTests(SimpleTestCase):
+    """Fem minutter, ikke ett (30. aug. 2026).
+
+    Andrés punkt: `datetime-local` steger ett minutt som standard, så
+    piltastene trengte tolv trykk for et kvarter. En vakt planlegges ikke på
+    minuttet. `step="300"` er et multiplum av 60, så nettleseren legger *ikke*
+    til et sekundsegment — hadde steget vært under et minutt, hadde feltet
+    fått en kolonne til.
+
+    Regelen, ikke tallet: *hvert* `datetime-local` på sida skal ha steget. Et
+    nytt felt uten det er ett felt som oppfører seg annerledes enn de andre.
+    """
+
+    def _mal(self):
+        from pathlib import Path
+        from django.conf import settings
+        return (Path(settings.BASE_DIR) / 'templates' / 'vaktliste'
+                / 'index.html').read_text(encoding='utf-8')
+
+    def test_hvert_tidsfelt_i_malen_steger_fem_minutter(self):
+        felt = re.findall(r'<input[^>]*type="datetime-local"[^>]*>', self._mal())
+        self.assertTrue(felt, 'fant ingen tidsfelt — leser testen riktig mal?')
+        uten = [f for f in felt if 'step="300"' not in f]
+        self.assertEqual(uten, [], f'{len(uten)} tidsfelt uten femminutterssteg')
+
+    def test_cella_i_ressurstabellen_steger_ogsaa(self):
+        """Den bygges i JS og fanges ikke av malsøket over — og det er den
+        man taster flest ganger."""
+        kropp = extract_function(read_js(VAKTLISTE_JS), 'mkRessurs')
+        self.assertIn('type="datetime-local" step="300"', kropp)
+
+    def test_steget_er_et_helt_minutt(self):
+        """Et steg under 60 sekunder gir feltet et sekundsegment, altså en
+        kolonne til å tabbe seg gjennom."""
+        for kilde in (self._mal(), read_js(VAKTLISTE_JS)):
+            for verdi in re.findall(r'step="(\d+)"', kilde):
+                with self.subTest(step=verdi):
+                    self.assertEqual(int(verdi) % 60, 0)
+
+
+class NyVaktpostFyllerDatoenTests(SimpleTestCase):
+    """Datoen står der på forhånd, hentet fra **vaktas start**.
+
+    Andrés punkt 30. aug. 2026: feltet skal være som før — samme native
+    velger, samme visning — men aldri tomt, så man taster fire siffer for
+    klokkeslettet i stedet for tolv for hele datoen.
+
+    **Vaktas start, ikke klokka nå.** En oktobervakt planlegges i august, og
+    «i dag» er da et årstall på avveie.
+    """
+
+    HARNESS = (
+        (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue')),
+        (VAKTLISTE_JS, ('apneVaktpost', '_settTid', '_iso16', '_d', '_fyll',
+                        '_skjulFeil', '_vaktpostModusSkifte',
+                        'rollerForGruppe')),
+    )
+
+    def setUp(self):
+        if not node_available():
+            self.skipTest('node er ikke tilgjengelig')
+        self.harness = build_harness(self.HARNESS)
+
+    OPPSETT = """
+        globalThis.aktivListe = {
+          vaktliste: {id: 3, startet: '2026-10-03T08:00:00'},
+          ressurser: [{id: 10, navn: 'Bil A', gruppe_id: 2}],
+          roller: [], vaktposter: [],
+        };
+        const felter = {};
+        ['ny-vaktpost-tittel', 'ny-vaktpost-mannskap', 'ny-vaktpost-antall',
+         'ny-vaktpost-fra', 'ny-vaktpost-til', 'ny-vaktpost-rolle',
+         'ny-vaktpost-antall-rad', 'ny-vaktpost-feil'].forEach((id) => {
+          felter[id] = {value: '', innerHTML: '', textContent: '',
+                        classList: {toggle() {}, add() {}, remove() {}}};
+        });
+        felter.nyVaktpostModal = {dataset: {}};
+        globalThis.document = {getElementById: (id) => felter[id] || null};
+        globalThis.bootstrap = {Modal: class { constructor() {} show() {} }};
+    """
+
+    def test_begge_feltene_baerer_vaktas_startdato(self):
+        run_node(self.harness, self.OPPSETT + """
+            apneVaktpost(10);
+            assert(felter['ny-vaktpost-fra'].value === '2026-10-03T08:00',
+                   'fra: ' + felter['ny-vaktpost-fra'].value);
+            assert(felter['ny-vaktpost-til'].value === '2026-10-03T08:00',
+                   'til: ' + felter['ny-vaktpost-til'].value);
+        """)
+
+    def test_datoen_er_vaktas_og_ikke_dagens(self):
+        """Den skarpe kanten: en vakt planlegges måneder i forveien, så
+        `new Date()` ville satt feil år i hvert eneste skift."""
+        run_node(self.harness, self.OPPSETT + """
+            apneVaktpost(10);
+            // Vakta starter 3. oktober. Kjoerer testen en annen dag — og det
+            // gjoer den alltid, med mindre man er uheldig — vil et felt som
+            // foelger klokka ha en annen dato enn denne.
+            const idag = new Date().toISOString().slice(0, 10);
+            assert(idag !== '2026-10-03', 'testen kan ikke skille i dag');
+            assert(felter['ny-vaktpost-fra'].value.startsWith('2026-10-03'),
+                   'fra fulgte ikke vakta: ' + felter['ny-vaktpost-fra'].value);
+        """)
+
+    def test_vinduet_baerer_ikke_forrige_ressurs_tider(self):
+        """Feltene sto urørt ved åpning, så de bar tidene fra forrige gang
+        vinduet var åpent — på en annen bil, i en annen gruppe."""
+        run_node(self.harness, self.OPPSETT + """
+            felter['ny-vaktpost-fra'].value = '2026-10-04T22:15';
+            felter['ny-vaktpost-til'].value = '2026-10-05T03:00';
+            apneVaktpost(10);
+            assert(felter['ny-vaktpost-fra'].value === '2026-10-03T08:00',
+                   'gammel fra-tid ble staaende: '
+                   + felter['ny-vaktpost-fra'].value);
+            assert(felter['ny-vaktpost-til'].value === '2026-10-03T08:00',
+                   'gammel til-tid ble staaende: '
+                   + felter['ny-vaktpost-til'].value);
+        """)
+
+    def test_vakt_uten_starttid_gir_tomme_felter(self):
+        """Ingen dato er bedre enn en gjettet dato."""
+        run_node(self.harness, self.OPPSETT + """
+            aktivListe.vaktliste.startet = null;
+            apneVaktpost(10);
+            assert(felter['ny-vaktpost-fra'].value === '',
+                   'fikk en dato fra ingenting: '
+                   + felter['ny-vaktpost-fra'].value);
+        """)

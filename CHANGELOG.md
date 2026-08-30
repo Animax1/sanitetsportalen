@@ -4,6 +4,34 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-08-30 — Tidsfeltene: fem minutter, og datoen står der
+
+**1794 tester grønne** (7 nye). Andrés punkt: `datetime-local` er fin på mobil
+og knotete på desktop. Feltet er beholdt som det er — samme native velger,
+samme visning — men to ting rundt det er endret.
+
+- **`step="300"` på alle sju tidsfeltene.** Piltastene og velgeren hopper fem
+  minutter, ikke ett. En vakt planlegges ikke på minuttet, og standardsteget
+  gjorde et kvarter til tolv piltrykk. Steget er et multiplum av 60, så feltet
+  får *ikke* et sekundsegment i tillegg. Verifisert i nettleseren:
+  `08:00 → 08:05 → 08:20`.
+- **«Opprett vakt» står på vaktas startdato**, ikke på klokka nå. Feltet var
+  tomt, så hele datoen måtte tastes for hvert eneste skift — tolv siffer der
+  fire holder. Vaktas start og ikke `new Date()`: en oktobervakt planlegges i
+  august, og «i dag» er da et årstall på avveie.
+  - Fikset på veien: feltene sto helt urørt ved åpning, så de bar tidene fra
+    forrige gang vinduet var åpent — på en annen bil, i en annen gruppe.
+- **Et eldre skift på 08:03 blir ikke rørt.** `step` styrer bare hva
+  piltasten og velgeren *tilbyr*; verdien vises og leses tilbake som før.
+  Nettleseren regner feltet som ugyldig, men ingenting leser
+  `checkValidity()` og ingen CSS farger `:invalid`. Notert i malen, fordi en
+  framtidig `was-validated` ville gjort de radene røde uten grunn.
+
+Vaktas egen start og slutt er fortsatt `datetime-local` med full dato: de
+settes én gang per vakt, og der *er* datoen informasjonen.
+
+---
+
 ## 2026-08-30 — Mannskapet flytter inn i planleggingen
 
 **1787 tester grønne** (7 nye, og en håndfull skrevet om). Registersiden

@@ -138,9 +138,23 @@
                  placeholder="f.eks. «Landsskytterstevnet 2027»">
           <div class="form-text">Navnet må være unikt. Det er dette vakta heter i hele portalen.</div>
         </div>
+        {% comment %}
+          **`step="300"` — fem minutter, ikke ett.** Piltastene og den native
+          velgeren hopper i femminutterssteg. En vakt planlegges ikke på
+          minuttet, og standardsteget gjorde hvert klokkeslett til tolv
+          piltrykk. Feltet er ellers uendret: samme native velger, samme
+          visning. Attributtet står på alle sju tidsfeltene på sida.
+
+          **Et eldre skift på 08:03 blir ikke rørt.** Verdien vises og leses
+          tilbake som før — `step` styrer bare hva piltasten og velgeren
+          *tilbyr*. Nettleseren regner riktignok feltet som ugyldig, men
+          ingenting her leser `checkValidity()`, og ingen CSS farger
+          `:invalid`. Legger noen til Bootstraps `was-validated` på et skjema
+          med tidsfelt, blir de radene røde uten at noe er galt.
+        {% endcomment %}
         <div class="mb-3">
           <label class="form-label" for="ny-vakt-start">Starter</label>
-          <input type="datetime-local" id="ny-vakt-start" class="form-control">
+          <input type="datetime-local" step="300" id="ny-vakt-start" class="form-control">
         </div>
         <div class="mb-3">
           <label class="form-label" for="ny-vakt-kopier">Kopier oppsett fra</label>
@@ -272,11 +286,11 @@
           {% endcomment %}
           <div class="mb-3">
             <label class="form-label" for="vakt-start">Starter</label>
-            <input type="datetime-local" id="vakt-start" class="form-control">
+            <input type="datetime-local" step="300" id="vakt-start" class="form-control">
           </div>
           <div class="mb-3">
             <label class="form-label" for="vakt-slutt">Planlagt slutt</label>
-            <input type="datetime-local" id="vakt-slutt" class="form-control">
+            <input type="datetime-local" step="300" id="vakt-slutt" class="form-control">
             <div class="form-text">
               Bemanningskurvene tegnes over dette spennet. Uten det vises de bare
               fra første til siste skift, og hullet i begynnelsen blir usynlig.
@@ -480,11 +494,11 @@
         <div class="row g-2 mb-3">
           <div class="col">
             <label class="form-label" for="vaktpost-fra">Fra</label>
-            <input type="datetime-local" id="vaktpost-fra" class="form-control">
+            <input type="datetime-local" step="300" id="vaktpost-fra" class="form-control">
           </div>
           <div class="col">
             <label class="form-label" for="vaktpost-til">Til</label>
-            <input type="datetime-local" id="vaktpost-til" class="form-control">
+            <input type="datetime-local" step="300" id="vaktpost-til" class="form-control">
           </div>
         </div>
         <div class="mb-3">
@@ -552,11 +566,11 @@
         <div class="row g-2 mb-3">
           <div class="col">
             <label class="form-label" for="ny-vaktpost-fra">Fra</label>
-            <input type="datetime-local" id="ny-vaktpost-fra" class="form-control">
+            <input type="datetime-local" step="300" id="ny-vaktpost-fra" class="form-control">
           </div>
           <div class="col">
             <label class="form-label" for="ny-vaktpost-til">Til</label>
-            <input type="datetime-local" id="ny-vaktpost-til" class="form-control">
+            <input type="datetime-local" step="300" id="ny-vaktpost-til" class="form-control">
           </div>
         </div>
         <div id="ny-vaktpost-feil" class="text-danger small d-none"></div>

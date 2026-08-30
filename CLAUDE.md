@@ -426,6 +426,12 @@ fase 3–7 gjenstår — se `docs/BESLUTNING_VAKTLISTE.md`, som er besluttet i s
   `table-layout: fixed` klipper ikke innholdet. `RessurstabellensBreddeTests`
   regner ut hva tidskolonnene faktisk blir og krever at de rommer feltet, altså
   regelen og ikke tallene.
+- **Tidsfeltene er `datetime-local` med `step="300"`.** Fem minutters steg,
+  ikke ett — en vakt planlegges ikke på minuttet. Steget må være et multiplum
+  av 60, ellers får feltet et sekundsegment. «Opprett vakt» forhåndsutfyller
+  fra- og til-feltet med **vaktas start**, ikke `new Date()`: en oktobervakt
+  planlegges i august. Et eldre skift på 08:03 vises og leses tilbake som før;
+  `step` styrer bare hva velgeren tilbyr, og ingenting leser `checkValidity()`.
 - **Tid vises med dag når skiftet krysser et døgn.** `_tidsspenn()` i
   `vaktliste.js` nevner dagen én gang innenfor ett døgn og to ganger ellers —
   «20:00–04:00» alene sier ikke at skiftet går over midnatt, og arrangementer

@@ -898,6 +898,11 @@ Gjennomgang 13. aug. 2026, med 1000 pasienter og peak 100 brukere som premiss.
             Innstillinger flyttet til vaktlinja ved «Ny vaktliste», Mannskap
             inn i fanerekka etter «Oversikt» — som lenke med pil, siden den
             forlater sida.
+      - [x] **Tidsfeltene på desktop (30. aug. 2026).** `step="300"` på alle
+            sju `datetime-local`-feltene: fem minutters steg, ikke ett. Og
+            «Opprett vakt» står på vaktas startdato framfor tomt, så bare
+            klokkeslettet tastes. Feltet er ellers uendret — native velger og
+            visning som før.
       - [x] **Mannskapet flytter inn i planleggingen (30. aug. 2026).**
             Registersiden `/vaktliste/registre/` lagt ned: mannskapet er en
             fane på `/vaktliste/`, korps og kompetanser ligger i

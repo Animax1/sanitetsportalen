@@ -682,7 +682,7 @@ function mkRessurs(r) {
         const merke = _d(vp[felt])
           ? `<span class="vl-dagmerke">${escapeHtml(_dag(vp[felt]))}</span>` : '';
         const innhold = kanRore
-          ? `<input type="datetime-local" class="vl-celle"
+          ? `<input type="datetime-local" step="300" class="vl-celle"
                     value="${escHtmlValue(_iso16(vp[felt]))}"
                     data-action="endreVaktpost" data-hendelse="change"
                     data-felt="${escHtmlValue(felt)}" data-id="${escHtmlValue(vp.id)}">`
@@ -1316,6 +1316,19 @@ function apneVaktpost(ressursId) {
         rollerForGruppe(ressurs.gruppe_id, null), 'Uten rolle');
   document.getElementById('ny-vaktpost-mannskap').value = '';
   document.getElementById('ny-vaktpost-antall').value = '1';
+
+  // **Datoen står der på forhånd, hentet fra vaktas start.** Feltet er
+  // uendret — samme native velger, samme visning — men det er aldri tomt,
+  // og da taster man fire siffer for klokkeslettet i stedet for tolv for
+  // hele datoen. Vaktas start og ikke klokka nå: en oktobervakt planlegges i
+  // august, og «i dag» er da et årstall på avveie.
+  //
+  // Sto feltene urørt, bar de dessuten tidene fra forrige gang vinduet var
+  // åpent — på en annen ressurs, i en annen gruppe.
+  const start = aktivListe?.vaktliste?.startet || null;
+  _settTid('ny-vaktpost-fra', start);
+  _settTid('ny-vaktpost-til', start);
+
   _vaktpostModusSkifte();
   new bootstrap.Modal(document.getElementById('nyVaktpostModal')).show();
 }
