@@ -6,7 +6,7 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ## 2026-08-30 — Bil A, bil B, bil C: veien inn var usynlig
 
-**1764 tester grønne** (8 nye). Bare grensesnitt — men det som manglet var det
+**1759 tester grønne** (11 nye). Bare grensesnitt — men det som manglet var det
 André satt fast på i flere runder, og det var min feil å ikke se det.
 
 **Modellen var riktig hele tiden: én `Ressurs` per bil, inne i gruppa, hver med
