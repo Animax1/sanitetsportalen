@@ -35,36 +35,18 @@
 <div class="container-fluid px-3 px-md-4 py-3">
 
   {% comment %}
-    **Tre nivåer, i den rekkefølgen man tenker.** Før lå alt på én linje:
-    hvilken vakt man planla, hvem man er, hva man vil lage. Da sto vaktas navn
-    midt inne i en knapperad og så ut som en innstilling.
+    **To linjer, og fanerekka under.** Alt som gjelder *vakta* står på
+    vaktlinja — hvilken du planlegger, innstillingene for den, og å lage en
+    ny. Alt som gjelder *innholdet* i vakta står i fanerekka: gruppene,
+    Mannskap, og «Ny ressurs».
 
-      1. Sida    — hva dette er, og innstillingene for vakta
-      2. Vakta   — hvilken vakt du planlegger, og å lage en ny
-      3. Fanene  — ressursene i den vakta, «Ny ressurs», og Mannskap
-
-    «Ny ressurs» hører til fanene fordi en ressurs *er* en fane; «Ny vaktliste»
-    hører til velgeren fordi den lager noe velgeren skal peke på. Mannskap
-    ligger nede ved fanene fordi det er dit man veksler oftest.
+    «Ny ressurs» hører til fanene fordi en ressurs havner i en fane;
+    «Ny vaktliste» hører til velgeren fordi den lager noe velgeren skal peke
+    på. Innstillinger står ved siden av «Ny vaktliste» fordi begge handler om
+    vakta som helhet.
   {% endcomment %}
   <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
     <h1 class="h4 mb-0"><i class="bi bi-people me-2"></i>Vaktliste</h1>
-    <div class="d-flex gap-2 align-items-center flex-wrap">
-      {% comment %}
-        Vinduet for vakta selv: lengden og utskriften. Het «Vakta» til
-        30. aug. 2026 — et substantiv der de andre knappene er handlinger,
-        og det sa ikke hva som lå bak. Knappen er ikke gatet: å skrive ut
-        lista er noe alle som ser den skal kunne, og det er lengden inne i
-        vinduet som krever skriv_leder.
-
-        Rollene ligger IKKE her; de administreres inne i ressursen, fordi de
-        hører til ressursens gruppe. Se vaktliste.js::apneRoller().
-      {% endcomment %}
-      <button type="button" class="btn btn-outline-secondary btn-sm"
-              data-action="apneVakt">
-        <i class="bi bi-sliders me-1"></i>Innstillinger
-      </button>
-    </div>
   </div>
 
   <div class="vl-vaktvelger mb-3">
@@ -73,6 +55,18 @@
             data-action="byttVaktliste"></select>
     <span id="vaktliste-status" class="vl-status"></span>
     <span class="flex-grow-1"></span>
+    {% comment %}
+      Vinduet for vakta selv: lengden og utskriften. Ikke gatet — å skrive ut
+      lista er noe alle som ser den skal kunne, og det er lengden inne i
+      vinduet som krever skriv_leder.
+
+      Rollene ligger IKKE her; de administreres inne i ressursen, fordi de
+      hører til ressursens gruppe. Se vaktliste.js::apneRoller().
+    {% endcomment %}
+    <button type="button" class="btn btn-outline-secondary btn-sm"
+            data-action="apneVakt">
+      <i class="bi bi-sliders me-1"></i>Innstillinger
+    </button>
     {% comment %}
       Å planlegge en vakt lager en core.Vakt — skriv_leder fra 30. aug. 2026.
       JS skjuler knappen, se vaktliste.js::gateKnapper().
@@ -96,22 +90,18 @@
   </div>
 
   {% comment %}
-    Ressursfaner. Bygges av data; «Oversikt» og «Ikke plassert» er faste, og
-    «Ny ressurs» settes sist i rekka av `tegnFaner()` — en ressurs *er* en
-    fane, så knappen som lager en hører hjemme der fanene slutter.
+    Fanerekka. Bygges i sin helhet av `tegnFaner()`:
 
-    **Mannskap står ved siden av, ikke i rekka.** Fanene bytter innhold i
-    panelet under; Mannskap forlater sida. En knapp som ser ut som en fane,
-    men navigerer bort, er en felle — så den er en lenke med skillelinje
-    foran, plassert her fordi fanene og mannskapsregisteret er de to stedene
-    man faktisk veksler mellom.
+      Oversikt · Mannskap↗ · <én fane per ressursgruppe> · Ikke plassert · + Ny ressurs
+
+    **Én fane per gruppe**, ikke per ressurs: fanen «Ambulanse» er alle
+    ambulansene som skal på vakt, med hver bil som sitt eget kort inni.
+
+    **Mannskap er en lenke, ikke en fane.** Den står i rekka fordi det er dit
+    man veksler oftest, men den forlater sida — pila sier det, for ellers
+    koster et klikk deg plassen din uten å ha spurt.
   {% endcomment %}
-  <div class="vl-fanerad">
-    <div class="vl-faner" id="vl-faner"></div>
-    <a href="/vaktliste/registre/" class="btn btn-outline-secondary btn-sm vl-tilregister">
-      <i class="bi bi-person-vcard me-1"></i>Mannskap
-    </a>
-  </div>
+  <div class="vl-faner" id="vl-faner"></div>
 
   <div id="vl-feil" class="alert alert-danger d-none"></div>
 

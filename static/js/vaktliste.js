@@ -9,15 +9,20 @@
 // Alt som settes med innerHTML escapes. Navn på mannskap, ressurser og
 // korps er data fra basen, og ressursnavn er fritekst satt av admin.
 //
-// Fanene bygges av ressursene — de er data, ikke kode, og tilpasser seg
-// vaktas art av seg selv. To faste faner i tillegg: «Oversikt», som er den
-// man skriver ut, og «Ikke plassert», som er de som er meldt på uten å stå
-// noe sted ennå.
+// **Én fane per ressursgruppe**, ikke per ressurs (30. aug. 2026). Fanen
+// «Ambulanse» er oversikten over alle ambulansene som skal på vakt, med hver
+// bil som sitt eget kort inni. Én fane per bil ga ti faner på en vakt med ti
+// biler, og ingen plass der man kunne se dem i sammenheng — som er nettopp
+// det man planlegger etter. Gruppekurven ligger øverst i fanen, over de
+// ressursene den summerer.
+//
+// Faste faner i tillegg: «Oversikt», som er den man skriver ut, og «Ikke
+// plassert», som er de som er meldt på uten å stå noe sted ennå.
 // ════════════════════════════════════════════════════════
 
 let vaktlister = [];        // alle listene, til velgeren
 let aktivListe = null;      // { vaktliste, ressurser, vaktposter, korps, roller, mannskap, enheter }
-let aktivFane = 'oversikt'; // 'oversikt' | 'ikke-plassert' | ressurs-id som streng
+let aktivFane = 'oversikt'; // 'oversikt' | 'ikke-plassert' | gruppe-id som streng
 
 const OVERSIKT = 'oversikt';
 const IKKE_PLASSERT = 'ikke-plassert';
@@ -260,54 +265,19 @@ function _posterFor(ressursId) {
 }
 
 
-function tegnFaner() {
-  const el = document.getElementById('vl-faner');
-  if (!el) return;
-  if (!aktivListe) { el.innerHTML = ''; return; }
-
-  const faner = [{ id: OVERSIKT, navn: 'Oversikt', ikon: 'list-ul', antall: null }];
-  aktivListe.ressurser.forEach((r) => {
-    faner.push({
-      id: String(r.id), navn: r.navn, ikon: r.ikon,
-      antall: _posterFor(r.id).length,
-    });
-  });
-  faner.push({
-    id: IKKE_PLASSERT, navn: 'Ikke plassert', ikon: 'person-dash',
-    antall: _ikkePlassert().length,
-  });
-
-  const knapper = faner.map((f) => {
-    const aktiv = f.id === aktivFane ? ' active' : '';
-    const antall = f.antall === null ? ''
-      : `<span class="vl-antall">${escHtmlValue(f.antall)}</span>`;
-    return `<button class="vl-fane${aktiv}" data-action="visFane" data-arg="${escHtmlValue(f.id)}">`
-         + `<i class="bi bi-${escHtmlValue(f.ikon)} me-1"></i>${escapeHtml(f.navn)}${antall}</button>`;
-  }).join('');
-
-  // **«Ny ressurs» står i fanerekka, ikke ved siden av den.** En ressurs
-  // *er* en fane, så knappen som lager en hører hjemme der fanene slutter —
-  // som pluss-fanen i en nettleser. Sto den til høyre for hele rekka, leste
-  // den som enda en handling på sida framfor som «legg til én til her».
-  //
-  // Bygges her og ikke i malen fordi den skal stå sist, etter faner som
-  // kommer fra data. `gateKnapper()` rekker ikke over den — den tegnes på
-  // nytt ved hvert panelbytte — så tilgangen sjekkes rett i byggeren.
-  const nyRessurs = kanLede()
-    ? `<button class="vl-fane vl-fane-ny" type="button"
-               data-bs-toggle="modal" data-bs-target="#nyRessursModal">
-         <i class="bi bi-plus-lg me-1"></i>Ny ressurs
-       </button>`
-    : '';
-
-  el.innerHTML = knapper + nyRessurs;
+function _ressurserIGruppe(gruppeId) {
+  // Rekkefølgen er den serveren sender — `Ressurs.rekkefolge`, satt til
+  // opprettelsesrekkefølgen. Den som bygger vakta legger inn bilene i den
+  // rekkefølgen hun tenker på dem.
+  return (aktivListe.ressurser || []).filter((r) => r.gruppe_id === gruppeId);
 }
 
 
-function skrivUt() {
-  // Nettleserens egen utskrift. `@media print` i vaktliste.css skjuler nav,
-  // faner og knapper, så det som kommer ut er lista og ingenting annet.
-  window.print();
+function _grupperMedRessurser() {
+  // Bare grupper som faktisk har noe i seg blir faner. En tom fane per
+  // ubrukt gruppe er seks faner på en vakt med to ressurser.
+  return (aktivListe.grupper || [])
+    .filter((g) => _ressurserIGruppe(g.id).length);
 }
 
 
@@ -327,6 +297,62 @@ function _ikkePlassert() {
 }
 
 
+function skrivUt() {
+  // Nettleserens egen utskrift. `@media print` i vaktliste.css skjuler nav,
+  // faner og knapper, så det som kommer ut er lista og ingenting annet.
+  window.print();
+}
+
+
+function tegnFaner() {
+  const el = document.getElementById('vl-faner');
+  if (!el) return;
+  if (!aktivListe) { el.innerHTML = ''; return; }
+
+  const faner = [{ id: OVERSIKT, navn: 'Oversikt', ikon: 'list-ul', antall: null }];
+  // **Én fane per gruppe.** «Ambulanse» er alle ambulansene, ikke én av dem.
+  _grupperMedRessurser().forEach((g) => {
+    const ressurser = _ressurserIGruppe(g.id);
+    faner.push({
+      id: String(g.id), navn: g.navn, ikon: g.ikon,
+      antall: ressurser.reduce((n, r) => n + _posterFor(r.id).length, 0),
+    });
+  });
+  faner.push({
+    id: IKKE_PLASSERT, navn: 'Ikke plassert', ikon: 'person-dash',
+    antall: _ikkePlassert().length,
+  });
+
+  const knapper = faner.map((f) => {
+    const aktiv = f.id === aktivFane ? ' active' : '';
+    const antall = f.antall === null ? ''
+      : `<span class="vl-antall">${escHtmlValue(f.antall)}</span>`;
+    return `<button class="vl-fane${aktiv}" data-action="visFane" data-arg="${escHtmlValue(f.id)}">`
+         + `<i class="bi bi-${escHtmlValue(f.ikon)} me-1"></i>${escapeHtml(f.navn)}${antall}</button>`;
+  });
+
+  // **Mannskap står i rekka, men er en lenke.** Fanene bytter innhold i
+  // panelet under; denne forlater sida. Pila sier det — uten den ser den ut
+  // som en fane, og et klikk koster deg plassen din uten å ha spurt.
+  knapper.splice(1, 0,
+    `<a href="/vaktliste/registre/" class="vl-fane vl-fane-lenke">
+       <i class="bi bi-person-vcard me-1"></i>Mannskap<i class="bi bi-box-arrow-up-right ms-1"></i>
+     </a>`);
+
+  // «Ny ressurs» sist. Bygges her og ikke i malen fordi den skal stå etter
+  // faner som kommer fra data; `gateKnapper()` rekker ikke over markup som
+  // tegnes på nytt ved hvert panelbytte, så tilgangen sjekkes her.
+  const nyRessurs = kanLede()
+    ? `<button class="vl-fane vl-fane-ny" type="button"
+               data-action="apneNyRessurs">
+         <i class="bi bi-plus-lg me-1"></i>Ny ressurs
+       </button>`
+    : '';
+
+  el.innerHTML = knapper.join('') + nyRessurs;
+}
+
+
 function tegnPanel() {
   const el = document.getElementById('vl-panel');
   if (!el) return;
@@ -335,9 +361,10 @@ function tegnPanel() {
   if (aktivFane === OVERSIKT) { el.innerHTML = mkOversikt(); return; }
   if (aktivFane === IKKE_PLASSERT) { el.innerHTML = mkIkkePlassert(); return; }
 
-  const ressurs = aktivListe.ressurser.find((r) => String(r.id) === String(aktivFane));
-  el.innerHTML = ressurs ? mkRessurs(ressurs)
-    : '<div class="vl-tom">Ressursen finnes ikke lenger.</div>';
+  const gruppe = (aktivListe.grupper || [])
+    .find((g) => String(g.id) === String(aktivFane));
+  el.innerHTML = gruppe ? mkGruppe(gruppe)
+    : '<div class="vl-tom">Gruppa finnes ikke lenger.</div>';
 }
 
 
@@ -396,6 +423,20 @@ function _rolleValg(vp, ressurs, kanRedigere) {
     })).join('');
   return `<select class="vl-celle" data-action="endreVaktpost" data-hendelse="change"
                   data-felt="rolle_id" data-id="${escHtmlValue(vp.id)}">${valg}</select>`;
+}
+
+
+function mkGruppe(gruppe) {
+  // **Fanen er oversikten over gruppa.** Kurven øverst summerer akkurat de
+  // ressursene som står under den — det er hele grunnen til at fanen er
+  // gruppa og ikke den enkelte bilen.
+  const ressurser = _ressurserIGruppe(gruppe.id);
+  if (!ressurser.length) {
+    return `<div class="vl-kort"><div class="vl-tom">
+      Ingen ${escapeHtml(gruppe.navn.toLowerCase())} satt opp ennå.
+    </div></div>`;
+  }
+  return mkGruppekurve(gruppe) + ressurser.map(mkRessurs).join('');
 }
 
 
@@ -526,7 +567,6 @@ function mkRessurs(r) {
     : '<tr><td colspan="9" class="vl-tom">Ingen satt opp ennå.</td></tr>';
 
   return `
-    ${mkGruppekurve(r)}
     <div class="vl-kort">
       <div class="vl-kort-topp">
         <div class="d-flex align-items-center gap-2 flex-wrap">
@@ -727,12 +767,11 @@ function _tegnforklaring() {
 }
 
 
-function mkGruppekurve(ressurs) {
-  // **Kurven står i fanen den gjelder.** Å lete etter samleplassens
-  // bemanning under «Oversikt» mens man bemanner samleplassen, er ett skifte
-  // for mye — og Oversikt viser fortsatt alle gruppene samlet, til den som
-  // vil sammenligne dem.
-  const bunke = _posterPerGruppe().find((b) => b.gruppe.id === ressurs.gruppe_id);
+function mkGruppekurve(gruppe) {
+  // **Kurven står i fanen den gjelder**, øverst, over de ressursene den
+  // summerer. Å lete etter samleplassens bemanning under «Oversikt» mens man
+  // bemanner samleplassen, er ett skifte for mye.
+  const bunke = _posterPerGruppe().find((b) => b.gruppe.id === gruppe.id);
   if (!bunke) return '';
   const kurve = _mkEnKurve(bunke.gruppe.navn, bunke.poster);
   if (!kurve) return '';
@@ -892,6 +931,20 @@ async function opprettVaktliste() {
 }
 
 
+function apneNyRessurs() {
+  // Står man i «Ambulanse»-fanen, er det oftest en ambulanse til man skal
+  // lage. Nedtrekket forhåndsvelges derfor til gruppa man står i — men er
+  // fortsatt et nedtrekk, så den første ressursen i en ny gruppe også har en
+  // vei inn.
+  _skjulFeil('ny-ressurs-feil');
+  const felt = document.getElementById('ny-ressurs-gruppe');
+  const gruppe = (aktivListe?.grupper || [])
+    .find((g) => String(g.id) === String(aktivFane));
+  if (felt && gruppe) felt.value = String(gruppe.id);
+  new bootstrap.Modal(document.getElementById('nyRessursModal')).show();
+}
+
+
 async function opprettRessurs() {
   if (!aktivListe) return;
   _skjulFeil('ny-ressurs-feil');
@@ -916,7 +969,8 @@ async function opprettRessurs() {
     }
     _lukkModal('nyRessursModal');
     document.getElementById('ny-ressurs-navn').value = '';
-    aktivFane = String(d.data.id);   // åpne den nye med én gang
+    // Fanen er gruppa, så det er dit den nye ressursen dukker opp.
+    aktivFane = String(d.data.gruppe_id);
     await lastListe(aktivListe.vaktliste.id);
   });
 }
@@ -1015,8 +1069,14 @@ async function slettRessurs() {
     return;
   }
   _lukkModal('ressursModal');
-  aktivFane = OVERSIKT;
+  // Bli stående i gruppa hvis den har flere ressurser igjen; var det den
+  // siste, forsvinner fanen og «Oversikt» er det eneste rimelige stedet.
+  const gruppeId = ressurs ? ressurs.gruppe_id : null;
   await lastListe(aktivListe.vaktliste.id);
+  if (!gruppeId || !_ressurserIGruppe(gruppeId).length) {
+    aktivFane = OVERSIKT;
+    tegn();
+  }
 }
 
 

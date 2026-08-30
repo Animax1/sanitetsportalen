@@ -876,6 +876,14 @@ Gjennomgang 13. aug. 2026, med 1000 pasienter og peak 100 brukere som premiss.
             - **Lærdom å ta med til neste modul:** en modul er ikke ferdig før
               dataene den trenger kan opprettes *gjennom portalen*. Django-admin
               teller ikke, og en testsuite som bare bruker ORM-en ser det ikke.
+      - [x] **Fanen er gruppa (30. aug. 2026).** Åttende runde. Én fane per
+            ressursgruppe i stedet for per ressurs: «Ambulanse» er alle
+            ambulansene, med hver bil som sitt eget kort inni og gruppekurven
+            øverst. Enhetskobling, reservasjon og roller blir stående på den
+            enkelte ressursen. «Ny ressurs» forhåndsvelger gruppa du står i.
+            Innstillinger flyttet til vaktlinja ved «Ny vaktliste», Mannskap
+            inn i fanerekka etter «Oversikt» — som lenke med pil, siden den
+            forlater sida.
       - [x] **Toppen ryddet, tabellen krympet (30. aug. 2026).** Sjuende
             runde. Ressurstabellen ned fra 82rem til 66rem, så den ikke
             ruller over 1280 px, og handlingskolonnen festet til høyre så

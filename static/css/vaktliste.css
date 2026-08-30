@@ -751,23 +751,23 @@
 }
 
 /* Fanene og «Ny ressurs» på samme linje — knappen lager en ny fane. */
-.vl-fanerad {
-  display: flex;
-  align-items: flex-start;
-  gap: 0.75rem;
-  flex-wrap: wrap;
+/*
+  Mannskap står i fanerekka, men er en lenke: den forlater sida der fanene
+  bare bytter innholdet under. Pila i markupen bærer skillet; her holdes den
+  visuelt litt tilbake, så den ikke konkurrerer med den aktive fanen.
+*/
+.vl-fane-lenke {
+  text-decoration: none;
+  color: var(--text-muted);
 }
 
-/*
-  Mannskap står ved siden av fanerekka, ikke i den. Skillelinja og
-  knappeformen sier at den forlater sida — fanene bytter bare innholdet under.
-*/
-.vl-tilregister {
-  margin-top: 0.4rem;
-  border-left: 1px solid var(--border-color);
-  padding-left: 0.9rem;
-  border-radius: 6px;
-  white-space: nowrap;
+.vl-fane-lenke:hover {
+  color: var(--text-main);
+}
+
+.vl-fane-lenke .bi-box-arrow-up-right {
+  font-size: 0.7em;
+  opacity: 0.7;
 }
 
 /*
@@ -791,5 +791,5 @@
 }
 
 @media print {
-  .vl-vaktvelger, .vl-fanerad { display: none !important; }
+  .vl-vaktvelger { display: none !important; }
 }

@@ -4,6 +4,39 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-08-30 — Fanen er gruppa, ikke bilen
+
+**1737 tester grønne** (23 nye). Bare grensesnitt.
+
+- **Én fane per ressursgruppe, ikke per ressurs.** «Ambulanse» er nå alle
+  ambulansene som skal på vakt, med hver bil som sitt eget kort inni. Én fane
+  per bil ga ti faner på en vakt med ti biler, og ingen plass der man kunne se
+  dem i sammenheng — som er nettopp det man planlegger etter. Gruppekurven
+  ligger øverst i fanen, over de ressursene den summerer, og tallet på fanen
+  teller skiftene i hele gruppa.
+- **Det som er per ressurs blir stående på ressursen.** Enhetskoblingen mot
+  oppdragsmodulen, korpsreservasjonen, rollene og «Sett på vakt» hører til den
+  enkelte bilen, og ligger derfor på kortet inne i fanen — ikke på gruppa.
+- **«Ny ressurs» forhåndsvelger gruppa du står i.** Står du i
+  «Ambulanse»-fanen er det oftest en ambulanse til du skal lage. Det er
+  fortsatt et nedtrekk, så den første ressursen i en ny gruppe har også en vei
+  inn. Etter opprettelsen åpnes gruppas fane; sletter du den siste ressursen i
+  en gruppe, forsvinner fanen og «Oversikt» tar over.
+- **Innstillinger står nå til venstre for «Ny vaktliste».** Begge handler om
+  vakta som helhet, og hører derfor på vaktlinja.
+- **Mannskap er flyttet inn i fanerekka, rett etter «Oversikt»** — dit man
+  veksler oftest. Den er fortsatt en lenke og ikke en fane, og bærer en liten
+  pil: fanene bytter innhold i panelet under, denne forlater sida. Uten pila
+  koster et klikk deg plassen din uten å ha spurt.
+- Fem mutasjoner prøvd, alle røde: bare første ressurs vist i fanen, tomme
+  grupper som faner, fanetallet som bare teller én ressurs, Mannskap flyttet
+  ut av posisjon, og pila fjernet.
+- **En feil jeg gjorde underveis, verdt å notere:** da jeg byttet ut hele
+  regionen mellom to funksjoner, forsvant `visFane`, `_ikkePlassert` og
+  `skrivUt` med den. Testene fanget det umiddelbart — men et
+  `git diff | grep '^-function'` før commit er billigere enn å lete i en rød
+  suite.
+
 ## 2026-08-30 — «Ny ressurs» inn i fanerekka, Mannskap ned til fanene
 
 **1728 tester grønne** (5 nye). Bare grensesnitt.

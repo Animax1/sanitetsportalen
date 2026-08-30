@@ -351,6 +351,11 @@ fase 3–7 gjenstår — se `docs/BESLUTNING_VAKTLISTE.md`, som er besluttet i s
   serveren sjekker den doble regelen på nytt mot personen som skal inn. Å
   bytte person ved å slette raden mistet tidene og rollen som sto der.
   Sletting ligger inne i vinduet bak en bekreftelse, som på ressursen.
+- **Fanen er ressursgruppa, ikke ressursen.** «Ambulanse» er alle ambulansene
+  på vakta, med hver bil som sitt eget kort inni (`mkGruppe`). Én fane per bil
+  ga ti faner på en vakt med ti biler, og ingen plass der man så dem i
+  sammenheng. `aktivFane` bærer derfor en **gruppe-ID**. Det som er per
+  ressurs — enhetskobling, reservasjon, roller — blir stående på ressursen.
 - **Kurven står i fanen den gjelder** (`mkGruppekurve`), ikke i «Oversikt» —
   og timeaksen har én celle per søyle med samme flex-bredde, så
   klokkeslettet står under sin egen time uansett hvor lang vakta er. Tettheten
@@ -485,7 +490,7 @@ Elleve moduler i `static/js/` (ingen bundler), fordelt på seks sider — pasien
 | `statistikk-oppdrag.js` | `/statistikk/`, **kun** med oppdragstilgang | Oppdragsfanen. Kall hit fra `statistikk.js` går gjennom `_kallOppdrag('navn')` |
 | `oppdrag-sentral.js` | `/oppdrag/`, kontoer uten enhet | Sentralbordet: enhetsliste, oppdragsliste, tidslinje, lokasjonsadmin |
 | `oppdrag-enhet.js` | `/oppdrag/`, enhetskontoer | Enhetsskjermen: to knapper mot de navngitte stemplingsendepunktene, og offline-køen i `localStorage`. Serveren sender `neste_overgang` per rad; kjeden følger med som data kun for å projisere neste steg mens noe ligger usendt |
-| `vaktliste.js` | **kun** `/vaktliste/` | Planleggingssiden: fanene bygges av ressursene, ressursen er et regneark med redigering i raden, «Oversikt» er utskriftslista med bemanningskurve, og ressursrollene administreres i en modal på siden |
+| `vaktliste.js` | **kun** `/vaktliste/` | Planleggingssiden: **én fane per ressursgruppe**, hver ressurs er et regneark med redigering i raden, «Oversikt» er utskriftslista, og ressursrollene administreres i en modal på siden |
 | `vaktliste-registre.js` | **kun** `/vaktliste/registre/` | Mannskapsregisteret, korpsene og kompetansene. Egen fil fordi skjemahjelperne er sidespesifikke — de to vaktlistefilene kan ikke lastes i samme node-harness |
 
 **`data-action` + `data-hendelse` er to lyttere, og bare én skal fyre.** Klikk­delegeringen

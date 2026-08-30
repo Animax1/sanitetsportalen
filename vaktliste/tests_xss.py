@@ -158,7 +158,9 @@ class VaktlisteEscapingOppforselTests(SimpleTestCase):
         (VAKTLISTE_JS, ('mkRessurs', '_rolleValg', 'rollerForGruppe',
                         '_fyllValgFor', '_varighet',
                         'mkRolleRad', 'mkOversikt', '_mkEnKurve',
-                        'mkGruppekurve', '_tegnforklaring', '_timesteg',
+                        'mkGruppekurve', 'mkGruppe', '_tegnforklaring',
+                        '_timesteg', '_ressurserIGruppe',
+                        '_grupperMedRessurser',
                         '_toppunkt', '_posterPerGruppe', '_vaktensSpenn',
                         'mkIkkePlassert', 'tegnFaner', '_posterFor',
                         '_ikkePlassert', '_tidsspenn', '_vaktspenn',
@@ -247,19 +249,41 @@ class VaktlisteEscapingOppforselTests(SimpleTestCase):
         self.assertIn('&lt;b&gt;', ut)
 
     def test_fanenavn_escapes(self):
+        """Fanenavnet er gruppas navn fra 30. aug. 2026, og gruppenavn er
+        fritekst satt av vaktleder."""
         ut = run_node(self.harness, self.VINDU + f'''
             globalThis.aktivFane = 'oversikt';
             globalThis.OVERSIKT = 'oversikt';
             globalThis.IKKE_PLASSERT = 'ikke-plassert';
             globalThis.aktivListe = {self._liste(
-                ressurser=[{'id': 1, 'navn': '<b>Lag 1</b>', 'ikon': 'people'}])};
+                grupper=[{'id': 1, 'navn': '<b>Lag</b>', 'ikon': 'people'}],
+                ressurser=[{'id': 1, 'navn': 'Lag 1', 'gruppe_id': 1,
+                            'ikon': 'people'}])};
             const el = {{ innerHTML: '' }};
             globalThis.document = {{ getElementById: () => el }};
             tegnFaner();
             console.log(el.innerHTML);
         ''')
-        self.assertNotIn('<b>Lag 1</b>', ut)
+        self.assertNotIn('<b>Lag</b>', ut)
         self.assertIn('&lt;b&gt;', ut)
+
+    def test_gruppeikonet_escapes_i_fanen(self):
+        """Ikonet står i et class-attributt — attributt-XSS."""
+        ut = run_node(self.harness, self.VINDU + f'''
+            globalThis.aktivFane = 'oversikt';
+            globalThis.OVERSIKT = 'oversikt';
+            globalThis.IKKE_PLASSERT = 'ikke-plassert';
+            globalThis.aktivListe = {self._liste(
+                grupper=[{'id': 1, 'navn': 'Lag',
+                          'ikon': '" onload="alert(1)'}],
+                ressurser=[{'id': 1, 'navn': 'Lag 1', 'gruppe_id': 1,
+                            'ikon': 'people'}])};
+            const el = {{ innerHTML: '' }};
+            globalThis.document = {{ getElementById: () => el }};
+            tegnFaner();
+            console.log(el.innerHTML);
+        ''')
+        self.assertNotIn('onload="alert(1)"', ut)
 
     def test_ikke_plassert_escapes(self):
         ut = run_node(self.harness, self.VINDU + f'''
@@ -1144,8 +1168,8 @@ class KurvePerGruppeTests(SimpleTestCase):
         """Samleplassen har to på vakt, ambulansen en ledig plass. Delte de
         skala, ville ambulansens hull sett halvfullt ut."""
         ut = run_node(self.harness, self.VINDU + self.LISTE + """
-            console.log(mkGruppekurve({id: 10, gruppe_id: 1}));
-            console.log(mkGruppekurve({id: 20, gruppe_id: 2}));
+            console.log(mkGruppekurve({id: 1, navn: 'Samleplass'}));
+            console.log(mkGruppekurve({id: 2, navn: 'Ambulanse'}));
         """)
         self.assertIn('Samleplass', ut)
         self.assertIn('Ambulanse', ut)
@@ -1154,8 +1178,8 @@ class KurvePerGruppeTests(SimpleTestCase):
 
     def test_ledige_plasser_telles_per_gruppe(self):
         ut = run_node(self.harness, self.VINDU + self.LISTE + """
-            console.log(mkGruppekurve({id: 10, gruppe_id: 1}));
-            console.log(mkGruppekurve({id: 20, gruppe_id: 2}));
+            console.log(mkGruppekurve({id: 1, navn: 'Samleplass'}));
+            console.log(mkGruppekurve({id: 2, navn: 'Ambulanse'}));
         """)
         self.assertIn('Alle plasser fylt', ut)        # samleplassen
         self.assertIn('4 ubesatte plasstimer', ut)    # ambulansen, fire timer
@@ -1164,7 +1188,7 @@ class KurvePerGruppeTests(SimpleTestCase):
         run_node(self.harness, self.VINDU + """
             globalThis.aktivListe = {vaktliste: {}, grupper: [],
                                      ressurser: [], vaktposter: []};
-            assert(mkGruppekurve({id: 1, gruppe_id: 1}) === '',
+            assert(mkGruppekurve({id: 1, navn: 'X'}) === '',
                    'ingenting aa tegne');
         """)
 
@@ -1308,7 +1332,7 @@ class GruppekurveIFanenTests(SimpleTestCase):
 
     def test_fanen_viser_sin_egen_gruppes_kurve(self):
         ut = run_node(self.harness, self.VINDU + self.LISTE + """
-            console.log(mkGruppekurve({id: 10, gruppe_id: 1}));
+            console.log(mkGruppekurve({id: 1, navn: 'Samleplass'}));
         """)
         self.assertIn('Samleplass', ut)
         self.assertNotIn('Ambulanse', ut, 'nabogruppa hører ikke hjemme her')
@@ -1316,7 +1340,7 @@ class GruppekurveIFanenTests(SimpleTestCase):
 
     def test_ambulansefanen_viser_ambulansen(self):
         ut = run_node(self.harness, self.VINDU + self.LISTE + """
-            console.log(mkGruppekurve({id: 20, gruppe_id: 2}));
+            console.log(mkGruppekurve({id: 2, navn: 'Ambulanse'}));
         """)
         self.assertIn('Ambulanse', ut)
         self.assertNotIn('Samleplass', ut)
@@ -1325,7 +1349,7 @@ class GruppekurveIFanenTests(SimpleTestCase):
     def test_ressurs_uten_skift_i_gruppa_gir_ingen_kurve(self):
         """En tom kurve over en fane man nettopp har laget, sier ingenting."""
         ut = run_node(self.harness, self.VINDU + self.LISTE + """
-            console.log('[' + mkGruppekurve({id: 30, gruppe_id: 99}) + ']');
+            console.log('[' + mkGruppekurve({id: 99, navn: 'Tom'}) + ']');
         """)
         self.assertIn('[]', ut)
 
@@ -1334,7 +1358,7 @@ class GruppekurveIFanenTests(SimpleTestCase):
         André måtte spørre hva den var — en strek man må spørre om, er en
         strek som ikke forklarer noe."""
         ut = run_node(self.harness, self.VINDU + self.LISTE + """
-            console.log(mkGruppekurve({id: 10, gruppe_id: 1}));
+            console.log(mkGruppekurve({id: 1, navn: 'Samleplass'}));
         """)
         self.assertIn('Midnatt', ut)
 
@@ -1351,6 +1375,7 @@ class NyRessursIFanerekkaTests(SimpleTestCase):
     HARNESS = (
         (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue')),
         (VAKTLISTE_JS, ('tegnFaner', '_posterFor', '_ikkePlassert',
+                        '_ressurserIGruppe', '_grupperMedRessurser',
                         '_nivaa', '_erAdmin', 'kanLede')),
     )
 
@@ -1367,8 +1392,9 @@ class NyRessursIFanerekkaTests(SimpleTestCase):
             "globalThis.aktivFane = 'oversikt';\n"
             "globalThis.OVERSIKT = 'oversikt';\n"
             "globalThis.IKKE_PLASSERT = 'ikke-plassert';\n"
-            "globalThis.aktivListe = {ressurser: [{id: 7, navn: 'Ambulanse 1',"
-            " ikon: 'truck'}], vaktposter: [], mannskap: []};\n"
+            "globalThis.aktivListe = {grupper: [{id: 3, navn: 'Ambulanse',"
+            " ikon: 'truck'}], ressurser: [{id: 7, navn: 'Ambulanse 1',"
+            " gruppe_id: 3, ikon: 'truck'}], vaktposter: [], mannskap: []};\n"
             "let lagret = '';\n"
             "globalThis.document = { getElementById: () => ("
             "{ set innerHTML(v) { lagret = v; }, get innerHTML() { return lagret; } }) };\n"
@@ -1384,9 +1410,9 @@ class NyRessursIFanerekkaTests(SimpleTestCase):
     def test_lederen_ser_knappen_sist_i_rekka(self):
         ut = self._tegn('skriv_leder')
         self.assertIn('Ny ressurs', ut)
-        self.assertLess(ut.index('Ambulanse 1'), ut.index('Ny ressurs'),
+        self.assertLess(ut.index('Ambulanse'), ut.index('Ny ressurs'),
                         'knappen skal stå etter fanene, ikke foran dem')
-        self.assertIn('#nyRessursModal', ut)
+        self.assertIn('apneNyRessurs', ut)
 
     def test_admin_ser_den_ogsaa(self):
         self.assertIn('Ny ressurs', self._tegn('', admin=True))
@@ -1395,8 +1421,136 @@ class NyRessursIFanerekkaTests(SimpleTestCase):
         """`skriv_full` bemanner; hva vakta består av er vaktlederens
         beslutning. Knappen ville gitt 403."""
         ut = self._tegn('skriv_full')
-        self.assertIn('Ambulanse 1', ut, 'fanene skal fortsatt tegnes')
+        self.assertIn('Ambulanse', ut, 'fanene skal fortsatt tegnes')
         self.assertNotIn('Ny ressurs', ut)
 
     def test_leseren_ser_den_ikke(self):
         self.assertNotIn('Ny ressurs', self._tegn('les'))
+
+
+class FanenErGruppaTests(SimpleTestCase):
+    """Fanen er ressursgruppa, ikke den enkelte ressursen.
+
+    Andrés bestilling 30. aug. 2026: «når jeg lager ny ressurs så skal fanen
+    være en oversikt — ambulanse er for alle ambulansene som skal være på
+    vakt». Én fane per bil ga ti faner på en vakt med ti biler, og ingen
+    plass der man kunne se dem i sammenheng — som er det man planlegger etter.
+    """
+
+    HARNESS = (
+        (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue')),
+        (VAKTLISTE_JS, ('tegnFaner', 'mkGruppe', 'mkRessurs', '_rolleValg',
+                        '_fyllValgFor', '_varighet', 'mkGruppekurve',
+                        '_mkEnKurve', '_tegnforklaring', '_timesteg',
+                        '_toppunkt', '_posterPerGruppe', '_vaktensSpenn',
+                        '_bemanningPerTime', 'rollerForGruppe', '_iso16',
+                        '_posterFor', '_ikkePlassert', '_ressurserIGruppe',
+                        '_grupperMedRessurser', '_d', '_kl', '_dag',
+                        '_nivaa', '_erAdmin', 'kanSkriveAlt', 'kanLede',
+                        'kanBemanne')),
+    )
+    VINDU = ("globalThis.window = { MODUL_TILGANG: { admin: true } };\n"
+             "globalThis.DAGER = ['søn','man','tir','ons','tor','fre','lør'];\n"
+             "globalThis.MND = ['jan','feb','mar','apr','mai','jun',"
+             "'jul','aug','sep','okt','nov','des'];\n"
+             "globalThis.aktivFane = 'oversikt';\n"
+             "globalThis.OVERSIKT = 'oversikt';\n"
+             "globalThis.IKKE_PLASSERT = 'ikke-plassert';\n")
+
+    #: To ambulanser i samme gruppe, én samleplass i en annen.
+    LISTE = """
+        globalThis.aktivListe = {
+          vaktliste: {startet: '2026-10-03T08:00:00',
+                      planlagt_slutt: '2026-10-03T12:00:00'},
+          grupper: [{id: 1, navn: 'Samleplass', ikon: 'hospital'},
+                    {id: 2, navn: 'Ambulanse', ikon: 'truck'},
+                    {id: 3, navn: 'Ubrukt', ikon: 'box'}],
+          ressurser: [
+            {id: 10, navn: 'Samleplass', gruppe_id: 1, gruppe_navn: 'Samleplass',
+             ikon: 'hospital', korps_navn: '', enhet_navn: ''},
+            {id: 20, navn: 'Ambulanse 1', gruppe_id: 2, gruppe_navn: 'Ambulanse',
+             ikon: 'truck', korps_navn: '', enhet_navn: 'A-101'},
+            {id: 21, navn: 'Ambulanse 2', gruppe_id: 2, gruppe_navn: 'Ambulanse',
+             ikon: 'truck', korps_navn: '', enhet_navn: ''}],
+          roller: [], mannskap: [],
+          vaktposter: [
+            {id: 1, ressurs_id: 20, ledig: false, navn: 'Kari', korps_kort: 'HG',
+             kompetanser: [], rolle_id: null, merknad: '',
+             fra_tid: '2026-10-03T08:00:00', til_tid: '2026-10-03T12:00:00'},
+            {id: 2, ressurs_id: 21, ledig: true, navn: '', korps_kort: '',
+             kompetanser: [], rolle_id: null, merknad: '',
+             fra_tid: '2026-10-03T08:00:00', til_tid: '2026-10-03T12:00:00'}]};
+    """
+
+    def setUp(self):
+        if not node_available():
+            self.skipTest('node er ikke tilgjengelig')
+        self.harness = build_harness(self.HARNESS)
+
+    def _faner(self):
+        return run_node(self.harness, self.VINDU + self.LISTE + """
+            const el = { innerHTML: '' };
+            globalThis.document = { getElementById: () => el };
+            tegnFaner();
+            console.log(el.innerHTML);
+        """)
+
+    def test_en_fane_per_gruppe_ikke_per_ressurs(self):
+        ut = self._faner()
+        self.assertIn('>Ambulanse<', ut, 'gruppa er fanen')
+        self.assertNotIn('Ambulanse 1', ut, 'den enkelte bilen er ikke en fane')
+        self.assertNotIn('Ambulanse 2', ut)
+
+    def test_gruppe_uten_ressurser_blir_ingen_fane(self):
+        """En tom fane per ubrukt gruppe er seks faner på en vakt med to
+        ressurser."""
+        self.assertNotIn('Ubrukt', self._faner())
+
+    def test_fanen_teller_skiftene_i_hele_gruppa(self):
+        """Tallet på fanen er gruppas, ikke én ressurs' — ellers svarer det
+        på et spørsmål ingen stilte."""
+        ut = self._faner()
+        # Ambulansegruppa har to skift til sammen, ett på hver bil.
+        self.assertRegex(ut, r'Ambulanse<span class="vl-antall">2</span>')
+
+    def test_mannskap_staar_rett_etter_oversikt(self):
+        ut = self._faner()
+        self.assertLess(ut.index('Oversikt'), ut.index('Mannskap'))
+        self.assertLess(ut.index('Mannskap'), ut.index('>Ambulanse<'))
+
+    def test_mannskap_er_en_lenke_med_pil(self):
+        """Den forlater sida der fanene bare bytter innholdet under. Uten
+        pila koster et klikk deg plassen din uten å ha spurt."""
+        ut = self._faner()
+        self.assertIn('href="/vaktliste/registre/"', ut)
+        self.assertIn('box-arrow-up-right', ut)
+
+    def test_gruppepanelet_viser_alle_ressursene_i_gruppa(self):
+        ut = run_node(self.harness, self.VINDU + self.LISTE + """
+            console.log(mkGruppe({id: 2, navn: 'Ambulanse'}));
+        """)
+        self.assertIn('Ambulanse 1', ut)
+        self.assertIn('Ambulanse 2', ut)
+        self.assertNotIn('>Samleplass<', ut, 'nabogruppa hører ikke hjemme her')
+
+    def test_gruppepanelet_har_kurven_over_ressursene(self):
+        ut = run_node(self.harness, self.VINDU + self.LISTE + """
+            console.log(mkGruppe({id: 2, navn: 'Ambulanse'}));
+        """)
+        self.assertIn('vl-kurve', ut)
+        self.assertLess(ut.index('vl-kurve'), ut.index('Ambulanse 1'),
+                        'kurven summerer ressursene under seg')
+
+    def test_enhetskoblingen_staar_paa_ressursen_i_fanen(self):
+        """Koblingen til oppdragsmodulen er per bil, ikke per gruppe — den
+        må derfor stå på ressurskortet inne i fanen."""
+        ut = run_node(self.harness, self.VINDU + self.LISTE + """
+            console.log(mkGruppe({id: 2, navn: 'Ambulanse'}));
+        """)
+        self.assertIn('A-101', ut)
+
+    def test_tom_gruppe_sier_fra_framfor_aa_vise_ingenting(self):
+        ut = run_node(self.harness, self.VINDU + self.LISTE + """
+            console.log(mkGruppe({id: 3, navn: 'Ubrukt'}));
+        """)
+        self.assertIn('Ingen ubrukt satt opp', ut)
