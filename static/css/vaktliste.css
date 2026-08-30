@@ -364,15 +364,56 @@
   background: var(--surface-2);
 }
 
-.vl-kompcelle {
+/*
+  **Cella er en tabellcelle, innmaten er flex.** `display: flex` direkte på
+  en `<td>` tar cella ut av tabellens boksmodell: den slutter å være en
+  `table-cell`, og cellene etter den forskyves i forhold til overskriftene.
+  Det var årsaken til at kompetansekolonnen «flyttet seg» i forhold til
+  resten. Wrapperen gjør samme jobb uten å røre tabellen.
+*/
+.vl-kompcelle > .vl-merkelapper {
   display: flex;
   flex-wrap: wrap;
   gap: 0.2rem;
 }
 
-.vl-dagcelle {
+/*
+  Tidskolonnen: feltet med ukedagen under. Dagen sto i sin egen kolonne til
+  30. aug. 2026 — et tredje sted å lese for å forstå én rad. `datetime-local`
+  bærer datoen selv; det var bare ukedagen som manglet, og den er det man
+  planlegger etter.
+*/
+.vl-tidcelle {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  min-width: 0;
+}
+
+.vl-dagmerke {
+  color: var(--text-muted);
+  display: block;
+  font-size: 0.7rem;
+  padding-left: 0.3rem;
+  white-space: nowrap;
+}
+
+/*
+  Stor forbokstav — men bare på den første. `text-transform: capitalize`
+  gjør «lør 3. okt» til «Lør 3. Okt», og en stor O midt i en dato ser ut som
+  en skrivefeil. `::first-letter` krever et blokkelement, derav `display`
+  over.
+*/
+.vl-dagmerke::first-letter {
+  text-transform: uppercase;
+}
+
+/* Timer per skift — tallet man ellers regner ut i hodet for hver rad. */
+.vl-timer {
   white-space: nowrap;
   color: var(--text-muted);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
 }
 
 .vl-handling {
@@ -590,4 +631,40 @@
   .vl-utskrift { min-width: 0 !important; }
   .vl-tabell tr.vl-ledig { background: transparent !important; }
   .vl-ledigtekst { color: #000 !important; }
+}
+
+
+/* ── Nytt 30. aug. 2026 ───────────────────────────────────────────────── */
+
+/*
+  **En kurve per ressursgruppe.** Én samlet kurve summerte samleplassen,
+  ambulansene og KO til ett tall, og det tallet svarer ikke på noe: fire på
+  samleplassen og null på ambulansen ser likt ut som to og to. Kurvene deler
+  spenn, så søylene ligger under hverandre og kan sammenlignes.
+*/
+.vl-kurvegruppe {
+  padding-top: 0.75rem;
+}
+
+.vl-kurvegruppe + .vl-kurvegruppe {
+  border-top: 1px solid var(--border-color);
+  margin-top: 0.75rem;
+}
+
+.vl-kurvegruppe .vl-kort-topp {
+  margin-bottom: 0.35rem;
+}
+
+/* Sletting i «Rediger ressurs». Den skal se ut som det den er. */
+.vl-farlig {
+  border: 1px solid rgba(220, 53, 69, 0.35);
+  border-radius: 6px;
+  padding: 0.75rem;
+  background: rgba(220, 53, 69, 0.06);
+}
+
+.vl-vaktinfo {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
 }

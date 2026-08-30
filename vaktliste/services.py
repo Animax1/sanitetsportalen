@@ -75,8 +75,23 @@ def neste_rekkefolge(vaktliste) -> int:
     return (fra_for or 0) + 10
 
 
+def neste_grupperekkefolge() -> int:
+    """Neste ledige rekkefølge for en ressursgruppe — «sist», altså.
+
+    Samme grep som `neste_rekkefolge`, men globalt: gruppene er ikke knyttet
+    til én vaktliste. Den som legger til «Førstehjelpstelt» skal ikke måtte
+    finne på et tall, og en ny gruppe hører naturlig sist.
+    """
+    from .models import Ressursgruppe
+    hoyest = (Ressursgruppe.objects
+              .order_by('-rekkefolge')
+              .values_list('rekkefolge', flat=True)
+              .first())
+    return (hoyest or 0) + 10
+
+
 def kopier_oppsett(fra_vaktliste, til_vaktliste):
-    """Kopier ressursene — med type, reservasjon, enhet og rekkefølge.
+    """Kopier ressursene — med gruppe, reservasjon, enhet og rekkefølge.
 
     **Aldri personene.** Å kopiere folk ville satt dem opp på en vakt de ikke
     har sagt ja til, og en liste ingen har sagt ja til er verre enn en tom
@@ -88,7 +103,7 @@ def kopier_oppsett(fra_vaktliste, til_vaktliste):
         Ressurs(
             vaktliste=til_vaktliste,
             navn=r.navn,
-            type=r.type,
+            gruppe_id=r.gruppe_id,
             korps=r.korps,
             enhet=r.enhet,
             rekkefolge=r.rekkefolge,
@@ -167,8 +182,9 @@ def lager_sykel(kompetanse_id, nytt_forelder_id) -> bool:
 
 # ── Hvem får røre hva ────────────────────────────────────────────────────────
 #
-# Håndheves fra fase 3, på hvert endepunkt. Tre nivåer av «hvem»:
+# Håndheves fra fase 3, på hvert endepunkt. Fire nivåer av «hvem»:
 #
+#   kan_lede            — `skriv_leder`/admin. Setter opp selve vakta.
 #   kan_skrive_alt      — `skriv_full`/admin. Blander korps fritt, deler ut
 #                         ressurser, styrer verdimengdene.
 #   kan_*_korps/…       — `skriv_handling` avgrenset av badgen.
@@ -179,13 +195,32 @@ def lager_sykel(kompetanse_id, nytt_forelder_id) -> bool:
 # modulen (§4.4).
 
 def kan_skrive_alt(user) -> bool:
-    """`skriv_full` eller global admin — står utenfor badge og reservasjon.
+    """`skriv_full` eller høyere — står utenfor badge og reservasjon.
 
     Samlet her framfor å gjentas i hvert view: det er terskelen for alt som
-    gjelder *vakta* framfor *et korps* — å dele ut ressurser, å planlegge en ny
-    vakt, og å styre `Korps`/`Kompetanse`/`Ressursrolle`.
+    gjelder *vakta* framfor *et korps* — å bemanne på tvers, å dele ut
+    ressurser, og å styre `Korps`/`Kompetanse`.
+
+    Stigen er ordnet, så `skriv_leder` er sant her også. Det er meningen:
+    lederen gjør alt bemanneren gjør, og litt til.
     """
     return er_global_admin(user) or har_tilgang(user, 'vaktliste', 'skriv_full')
+
+
+def kan_lede(user) -> bool:
+    """`skriv_leder` eller global admin — den som *setter opp* vakta.
+
+    **Skillet mot `kan_skrive_alt` er hva slags skade en feil gjør** (30. aug.
+    2026). Bemanneren setter folk på plasser: retter hun noe galt, retter hun
+    det tilbake. Lederen oppretter og fjerner ressurser og vaktlister, endrer
+    vaktas lengde og lager roller og grupper — og en fjernet ressurs tar
+    bemanningen med seg. Det er ikke en handling man angrer.
+
+    Terskelen er ikke global admin, og det er poenget med å ha nivået i det
+    hele tatt: en vaktleder skal kunne sette opp sin egen vaktliste uten å få
+    brukeradministrasjon, backup og arkiv på kjøpet.
+    """
+    return er_global_admin(user) or har_tilgang(user, 'vaktliste', 'skriv_leder')
 
 
 def brukerens_korps(user):

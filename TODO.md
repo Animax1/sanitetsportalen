@@ -876,6 +876,22 @@ Gjennomgang 13. aug. 2026, med 1000 pasienter og peak 100 brukere som premiss.
             - **Lærdom å ta med til neste modul:** en modul er ikke ferdig før
               dataene den trenger kan opprettes *gjennom portalen*. Django-admin
               teller ikke, og en testsuite som bare bruker ORM-en ser det ikke.
+      - [x] **Ressursgrupper, ledernivå og rollene inn i ressursen
+            (30. aug. 2026).** Femte runde fra Andrés bruk. `Ressurs.type` ble
+            tabellen `Ressursgruppe` (migrasjon `0007`), så et førstehjelpstelt
+            kan legges til uten deploy; rollene hører til gruppa, ikke til
+            portalen, og administreres inne i ressursen. Nytt nivå
+            `skriv_leder` (migrasjon `accounts.0015`): `skriv_full` bemanner,
+            `skriv_leder` setter opp — oppretter og fjerner ressurser og
+            vaktlister, endrer vaktas lengde, lager roller og grupper.
+            Sletting av ressurs ligger bak «Rediger» med bekreftelse begge
+            veier. Kolonnene: dag inn i tidsfeltene, ny «Timer», kompetansen
+            sist. Bemanningskurve per gruppe. Og buggen André meldte:
+            klikkdelegeringen fyrte på celler som melder sin egen hendelse,
+            så nedtrekket ble revet bort idet det åpnet seg.
+            - **Lærdom:** en delt klikkdelegering må vite om elementer som
+              melder sin egen hendelse. Feilen så ut som en visningsbug, men
+              sendte en tom skriving ved hvert klikk i tabellen.
       - [x] **Ressursroller, og kolonner som blir stående (30. aug. 2026).**
             `VaktRolle` → `Ressursrolle` (migrasjon `0006`, ren `RenameModel`):
             rollen gjelder plassen på ressursen, ikke vakta. Administrasjonen

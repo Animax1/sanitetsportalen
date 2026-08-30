@@ -136,6 +136,55 @@ class Kompetanse(BaseTimeStampedModel):
         return self.navn
 
 
+class Ressursgruppe(BaseTimeStampedModel):
+    """Hva slags ting ressursen er: samleplass, ambulanse, mannskapsbil, lag.
+
+    **Dette var `Ressurs.type` i `choices.py` til 30. aug. 2026.** Begrunnelsen
+    for å ha den i kode var at ikonet uansett krevde en deploy. Den holdt ikke:
+    et arrangement kan ha et førstehjelpstelt eller en MC-patrulje, og en
+    vaktleder som trenger den gruppa i kveld kan ikke vente på en utrulling.
+    Ikonet ble et felt i stedet — feil ikon er en skjønnhetsfeil, en manglende
+    gruppe er en vaktliste man ikke får satt opp.
+
+    Gruppa gjør tre ting samtidig, og det er derfor den er én ting og ikke tre:
+    den ikonlegger fanen, den samler bemanningskurven (samleplassen skal ikke
+    telles sammen med ambulansene), og den avgrenser rollene. En rolle hører
+    til gruppa, ikke til den enkelte ressursen — «Sjåfør» gir mening på hver
+    ambulanse, og ikke på samleplassen.
+
+    Opprettes av `skriv_leder` og global admin. `skriv_full` bemanner, men
+    setter ikke opp.
+    """
+
+    navn = models.CharField(max_length=60, unique=True, verbose_name='Navn')
+    ikon = models.CharField(
+        max_length=40,
+        default='box',
+        verbose_name='Ikon',
+        help_text='Bootstrap-ikon uten «bi-»-prefiks, f.eks. «truck».',
+    )
+    rekkefolge = models.IntegerField(
+        default=100, verbose_name='Rekkefølge',
+        help_text='Styrer rekkefølgen på faner og bemanningskurver. Settes '
+                  'automatisk til opprettelsesrekkefølgen.')
+    er_aktiv = models.BooleanField(
+        default=True,
+        verbose_name='Aktiv',
+        help_text='Inaktive grupper skjules i nedtrekk, men beholdes på '
+                  'ressurser som allerede bruker dem.',
+    )
+
+    class Meta:
+        verbose_name = 'Ressursgruppe'
+        verbose_name_plural = 'Ressursgrupper'
+        # Rekkefølgen betyr noe her, som på `Ressurs` — den styrer fanene og
+        # rekkefølgen på bemanningskurvene. Navnet avgjør bare uavgjort.
+        ordering = ['rekkefolge', Lower('navn')]
+
+    def __str__(self) -> str:
+        return self.navn
+
+
 class Ressursrolle(BaseTimeStampedModel):
     """Rollen en person har **på en ressurs** — «Lagleder», «Sjåfør», «KO-operatør».
 
@@ -147,19 +196,40 @@ class Ressursrolle(BaseTimeStampedModel):
     Administreres fra planleggingssiden, der den brukes, ikke fra
     mannskapsregisteret: trenger man en rolle som ikke finnes mens man
     bemanner et lag, skal man slippe å forlate siden for å lage den.
+
+    **Rollen hører til en `Ressursgruppe`, ikke til hele portalen** (30. aug.
+    2026). «Sjåfør» hører hjemme på ambulansene og bilene, ikke på
+    samleplassen, og et globalt register tvinger hver eneste rolle inn i hvert
+    eneste nedtrekk. Gruppa er riktig nivå og ikke den enkelte ressursen: har
+    du tre ambulanser, vil du lage «Sjåfør» én gang, ikke tre.
+
+    Navnet er derfor unikt *per gruppe*, ikke globalt — to grupper kan begge
+    ha en «Lagleder», og de er ikke samme rad.
     """
 
-    navn = models.CharField(max_length=120, unique=True, verbose_name='Navn')
+    gruppe = models.ForeignKey(
+        Ressursgruppe,
+        on_delete=models.CASCADE,
+        related_name='roller',
+        verbose_name='Ressursgruppe',
+        help_text='Rollen tilbys på ressurser i denne gruppa.',
+    )
+    navn = models.CharField(max_length=120, verbose_name='Navn')
     er_aktiv = models.BooleanField(
         default=True,
         verbose_name='Aktiv',
         help_text='Inaktive roller skjules i nedtrekkslister, men beholdes '
                   'på vaktposter som allerede bruker dem.',
     )
+
     class Meta:
         verbose_name = 'Ressursrolle'
         verbose_name_plural = 'Ressursroller'
-        ordering = [Lower('navn')]
+        ordering = ['gruppe__rekkefolge', Lower('navn')]
+        constraints = [
+            models.UniqueConstraint(
+                fields=['gruppe', 'navn'], name='unikt_rollenavn_per_gruppe'),
+        ]
 
     def __str__(self) -> str:
         return self.navn
@@ -343,11 +413,14 @@ class Ressurs(BaseTimeStampedModel):
         verbose_name='Navn',
         help_text='Slik den omtales på vakta, f.eks. «Mannskapsbil 1».',
     )
-    type = models.CharField(
-        max_length=16,
-        choices=choices.RESSURSTYPE_VALG,
-        default=choices.ANNET,
-        verbose_name='Type',
+    gruppe = models.ForeignKey(
+        Ressursgruppe,
+        on_delete=models.PROTECT,
+        related_name='ressurser',
+        verbose_name='Gruppe',
+        help_text='Hva slags ting ressursen er. Styrer ikon, fanerekkefølge, '
+                  'hvilke roller som tilbys, og hvilken bemanningskurve den '
+                  'telles i.',
     )
     korps = models.ForeignKey(
         Korps,

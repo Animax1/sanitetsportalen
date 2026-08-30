@@ -156,12 +156,22 @@ class TilgangsNivaa(models.TextChoices):
     inne i den generelle PUT-en — der er stemplingen en bivirkning av en
     redigering. Regelen er at en innskrenket aktør får et *smalt endepunkt*
     som ikke leser request-kroppen. Tas i bruk når oppdragsmodulen skrives.
+    ``SKRIV_LEDER`` kom 30. aug. 2026, og er det fjerde trinnet. Det finnes
+    fordi vaktlista har to skrivende roller som ikke er samme rolle: den som
+    *bemanner* (setter folk på plassene, på tvers av korps) og den som *setter
+    opp vakta* (oppretter og fjerner ressurser og vaktlister, endrer vaktas
+    lengde, lager roller og grupper). Det siste er få handlinger, men de river
+    bort andres arbeid — en fjernet ressurs tar bemanningen med seg. Uten et
+    trinn til måtte de to enten deles ut samlet, eller så måtte oppsettet bli
+    global admin, og da ville en vaktleder uten adminrettigheter ikke kunne
+    lage sin egen vaktliste. Ingen annen modul deklarerer nivået i dag.
     Se §3.2 i docs/BESLUTNING_ROLLEMODELLEN.md.
     """
 
     LES = 'les', 'Lese'
     SKRIV_HANDLING = 'skriv_handling', 'Skrive: handling'
     SKRIV_FULL = 'skriv_full', 'Skrive: full'
+    SKRIV_LEDER = 'skriv_leder', 'Skrive: leder'
 
 
 class ModulTilgang(BaseTimeStampedModel):

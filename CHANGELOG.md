@@ -4,6 +4,83 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-08-30 — Ressursgrupper, et ledernivå, og en popup som blinket bort
+
+**1706 tester grønne** (49 nye). Migrasjoner `vaktliste.0007` og
+`accounts.0015`. Femte runde på Andrés tilbakemelding, og den største:
+tilgangsmodellen fikk et trinn til, og ressurstypen ble en tabell.
+
+- **Ressurstypen er nå tabellen `Ressursgruppe`.** Den lå i `choices.py` med
+  den begrunnelsen at et nytt ikon uansett krever deploy. Den holdt ikke: et
+  arrangement kan ha et førstehjelpstelt eller en MC-patrulje, og en vaktleder
+  som trenger gruppa i kveld kan ikke vente på en utrulling. Ikonet ble et
+  felt — feil ikon er en skjønnhetsfeil, en manglende gruppe er en vaktliste
+  man ikke får satt opp. Gruppa gjør tre ting samtidig, og det er derfor den
+  er én ting: den ikonlegger fanen, den samler bemanningskurven, og den
+  avgrenser rollene.
+- **Rollen hører til gruppa, ikke til portalen.** «Sjåfør» gir mening på hver
+  ambulanse og ikke på samleplassen. Gruppa er riktig nivå og ikke den enkelte
+  ressursen: har du tre ambulanser vil du lage rollen én gang, ikke tre.
+  Manageren åpnes derfor inne i ressursen — «Roller»-knappen i kortets topp —
+  og navnet er unikt *per gruppe*. Migrasjonen vifter hver eksisterende rolle
+  ut til alle seks gruppene og peker vaktpostene på kopien som hører til sin
+  egen ressurs' gruppe. Å gjette hvilken gruppe «Lagleder» *egentlig* hørte
+  til ville tatt rollen bort fra rader som lovlig brukte den; noen ubrukte
+  rader man kan slette er den billige feilen.
+- **Nytt nivå: `skriv_leder` («Skrive: leder — setter opp vakta»).** Det
+  fjerde trinnet i `NIVAA_HIERARKI`, og det første siden stigen ble laget.
+  Skillet mot `skriv_full` er hva slags skade en feil gjør: bemanneren setter
+  folk på plasser og kan rette tilbake; lederen oppretter og fjerner ressurser
+  og vaktlister, endrer vaktas lengde og lager roller og grupper — og en
+  fjernet ressurs tar bemanningen med seg. `skriv_full` beholder alt som
+  handler om å bemanne, inkludert utskriften. Terskelen er ikke global admin,
+  og det er hele poenget: en vaktleder skal kunne sette opp sin egen vaktliste
+  uten å få brukeradministrasjon, backup og arkiv på kjøpet. Vaktlista er den
+  eneste modulen som deklarerer nivået, så det er additivt for de andre.
+- **«Fjern ressurs» ligger bak «Rediger ressurs», og krever bekreftelse to
+  ganger.** Knappen sto naken ved siden av «Sett på vakt», og CASCADE tar
+  skiftene: ett feilklikk kostet hele bemanningen på bilen. Nå må man inn i
+  vinduet, bekrefte i dialogen, og serveren krever i tillegg
+  `{"confirm": true}` — dialogen stopper feilklikket, kroppen stopper et kall
+  som treffer URL-en uten å mene det.
+- **Vaktas lengde og utskriften er samlet i ett vindu for vakta.** To løse
+  knapper i toppen konkurrerte med «Ny ressurs» om plassen uten å høre til
+  samme spørsmål. Utskriften er åpen for alle som ser lista — den er hele
+  grunnen til at bemanneren har den; lengden inne i vinduet krever
+  `skriv_leder`.
+- **Kolonnene i ressurstabellen leser nå som ett strekk:** Navn, Korps, Rolle,
+  Fra, Til, Timer, Kompetanse, Merknad. «Dag» er borte som egen kolonne — den
+  var et tredje sted å lese for å forstå én rad, og `datetime-local` bærer
+  datoen selv; det manglet bare ukedagen, som nå står under feltet den hører
+  til. «Timer» er nytt, og er det ene tallet man ellers regner ut i hodet for
+  hver rad: «20:00 til 04:30» er ikke åtte timer.
+- **Kompetansekolonnen flyttet seg fordi cella var `display: flex`.** En
+  `<td>` med flex slutter å være en `table-cell` og faller ut av kolonnesporet,
+  så alt etter den forskyves i forhold til overskriftene — `table-layout:
+  fixed` hjelper ikke mot det. Layouten ligger nå på et element *inne* i cella.
+  `TabellcellersLayoutTests` leser hvilke klasser som står på `<td>`-ene og
+  krever at ingen av dem får en `display` som bryter tabellen, så neste
+  cellemerkelapp fanges av samme test.
+- **Bemanningskurven følger grupperingen.** Én samlet kurve summerte
+  samleplassen, ambulansene og KO til ett tall, og det tallet svarer ikke på
+  noe: fire på samleplassen og null på ambulansen ser likt ut som to og to.
+  Kurvene deler spenn, så søylene ligger under hverandre — to kurver man ikke
+  kan sammenligne er verre enn én samlet. Grupper uten et eneste skift tegnes
+  ikke.
+- **«En kort popup som forsvinner» var to lyttere på samme element.**
+  Nedtrekkene i ressurstabellen er `<select data-action="…"
+  data-hendelse="change">`, og klikkdelegeringen i `portal-utils.js` traff dem
+  også: klikket som åpnet lista kalte handlingen uten felt og verdi, sendte en
+  tom PUT, og tegnet panelet på nytt — så lista ble revet bort i det øyeblikket
+  den kom. Regelen er nå `klikkSkalKjore()`: et element som melder sin egen
+  hendelse fyrer ikke på klikk. Den traff hver celle i tabellen, ikke bare
+  nedtrekket, så hvert klikk i et tekstfelt kostet en tom skriving og en full
+  ny-tegning.
+- Elleve mutasjoner prøvd. Én overlevde — kompetansecellas layout — og fikk
+  testen over. Verifisert i nettleser: kolonnene står på linje med
+  overskriftene på 1600, 1280 og 1000 px, og klikk på nedtrekket gir null kall
+  og null ny-tegninger.
+
 ## 2026-08-30 — Ressursroller, og kolonner som blir stående
 
 **1659 tester grønne** (12 nye). Migrasjon `vaktliste.0006`. Fjerde runde på

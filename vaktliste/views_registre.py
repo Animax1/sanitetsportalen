@@ -45,7 +45,8 @@ from django.views.decorators.http import require_http_methods
 from core.auth_decorators import modul_kreves
 from core.ratelimit import rate_limit
 
-from .models import Kompetanse, Korps, Mannskap, Ressursrolle
+from .models import (Kompetanse, Korps, Mannskap, Ressursgruppe,
+                     Ressursrolle)
 from . import services
 from .views import _feil, _int, _json_body, _nektet, _tilgangskontekst
 
@@ -86,7 +87,7 @@ def registre_view(request):
 # Korps har ett felt til (`kortnavn`), og fabrikken tar derfor en liste over
 # valgfrie tekstfelter framfor å bli to fabrikker.
 
-def verdi_til_dict(model, rad, *, ekstra_felt=(), stige=False):
+def verdi_til_dict(model, rad, *, ekstra_felt=(), stige=False, gruppe=False):
     """Én rad fra en verdimengde som JSON.
 
     **Modulnivå, ikke inne i fabrikken.** Mannskapsendepunktet sender de tre
@@ -109,6 +110,11 @@ def verdi_til_dict(model, rad, *, ekstra_felt=(), stige=False):
     if stige:
         ut['bygger_paa_id'] = rad.bygger_paa_id
         ut['bygger_paa_navn'] = rad.bygger_paa.navn if rad.bygger_paa else ''
+    if gruppe:
+        # Rollen hører til en gruppe, og nedtrekket i ressurstabellen filtrerer
+        # på den. Uten IDen i svaret måtte klienten gjette ut fra navnet.
+        ut['gruppe_id'] = rad.gruppe_id
+        ut['gruppe_navn'] = rad.gruppe.navn
     return ut
 
 
@@ -117,12 +123,12 @@ def verdi_til_dict(model, rad, *, ekstra_felt=(), stige=False):
 VERDIMENGDER = {
     'korps': (Korps, {'ekstra_felt': ('kortnavn',)}),
     'kompetanser': (Kompetanse, {'stige': True}),
-    'roller': (Ressursrolle, {}),
+    'roller': (Ressursrolle, {'gruppe': True}),
 }
 
 
 def _register_views(model, etikett, etikett_bestemt, *, ekstra_felt=(),
-                    stige=False):
+                    stige=False, gruppe=False, krav='skriv_alt'):
     """Bygg (liste-view, detalj-view) for en av verdimengdene.
 
     Args:
@@ -133,10 +139,21 @@ def _register_views(model, etikett, etikett_bestemt, *, ekstra_felt=(),
         stige: modellen har `bygger_paa` (bare `Kompetanse`). Feltet er en FK
             til seg selv og må sykkelsjekkes, så det kan ikke behandles som
             de valgfrie tekstfeltene.
+        gruppe: modellen henger under en `Ressursgruppe` (bare `Ressursrolle`).
+            Feltet er påkrevd ved opprettelse — en rolle uten gruppe ville
+            ikke dukket opp i noe nedtrekk, altså en rad man lager og aldri
+            finner igjen.
+        krav: hvilken terskel skriving krever. `'skriv_alt'` for
+            organisasjonsdataene (korps, kompetanser), `'lede'` for rollene:
+            en rolle er del av vaktoppsettet, og `skriv_full` bemanner det
+            oppsettet uten å bestemme det.
     """
+    _slipper_inn = (services.kan_lede if krav == 'lede'
+                    else services.kan_skrive_alt)
 
     def _til_dict(rad):
-        return verdi_til_dict(model, rad, ekstra_felt=ekstra_felt, stige=stige)
+        return verdi_til_dict(model, rad, ekstra_felt=ekstra_felt,
+                              stige=stige, gruppe=gruppe)
 
     @never_cache
     @modul_kreves('vaktliste', 'les', svar='json')
@@ -147,14 +164,17 @@ def _register_views(model, etikett, etikett_bestemt, *, ekstra_felt=(),
         # Verdimengdene er organisasjonens oppsett, ikke ett korps' bord:
         # kunne korps-brukeren opprette korps, kunne hun lage seg et nytt å
         # føre. `les` ser dem — nedtrekkslistene trenger dem.
-        if request.method == 'POST' and not services.kan_skrive_alt(request.user):
+        if request.method == 'POST' and not _slipper_inn(request.user):
             return _nektet()
 
         if request.method == 'GET':
             # Inaktive er med: de skal kunne aktiveres igjen, og en rad som
             # forsvinner helt ser ut som en sletting som ikke skjedde.
+            qs = model.objects.all()
+            if gruppe:
+                qs = qs.select_related('gruppe')
             return JsonResponse({'status': 'ok', 'data': [
-                _til_dict(r) for r in model.objects.all()]})
+                _til_dict(r) for r in qs]})
 
         data = _json_body(request)
         navn = (data.get('navn') or '').strip()
@@ -164,6 +184,12 @@ def _register_views(model, etikett, etikett_bestemt, *, ekstra_felt=(),
         felter = {felt: (data.get(felt) or '').strip() for felt in ekstra_felt}
         if stige:
             felter['bygger_paa_id'] = _int(data.get('bygger_paa_id'))
+        if gruppe:
+            gruppe_id = _int(data.get('gruppe_id'))
+            if not gruppe_id or not Ressursgruppe.objects.filter(
+                    pk=gruppe_id).exists():
+                return _feil(f'{etikett} må høre til en ressursgruppe.')
+            felter['gruppe_id'] = gruppe_id
         try:
             with transaction.atomic():
                 rad = model.objects.create(
@@ -177,11 +203,12 @@ def _register_views(model, etikett, etikett_bestemt, *, ekstra_felt=(),
     @modul_kreves('vaktliste', 'les', svar='json')
     @require_http_methods(['PUT', 'DELETE'])
     def detalj_view(request, pk):
-        if not services.kan_skrive_alt(request.user):
+        if not _slipper_inn(request.user):
             return _nektet()
 
         try:
-            rad = model.objects.get(pk=pk)
+            rad = (model.objects.select_related('gruppe').get(pk=pk) if gruppe
+                   else model.objects.get(pk=pk))
         except model.DoesNotExist:
             return _feil(f'{etikett} ikke funnet', status=404)
 
@@ -252,7 +279,7 @@ korps_view, korps_detalj_view = _register_views(
 kompetanser_view, kompetanse_detalj_view = _register_views(
     Kompetanse, 'Kompetansen', 'Kompetansen', stige=True)
 roller_view, rolle_detalj_view = _register_views(
-    Ressursrolle, 'Rollen', 'Rollen')
+    Ressursrolle, 'Rollen', 'Rollen', gruppe=True, krav='lede')
 
 # Navn for tracebacks og URL-reversering — uten dette heter alle seks
 # `liste_view`/`detalj_view`. Samme grep som i pasientmodulen.

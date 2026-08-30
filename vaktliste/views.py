@@ -10,8 +10,14 @@ To terskler, og skillet mellom dem er *hva slags utsagn* nivået får avgi:
 |---|---|
 | Lese lista | `les` — hele lista, alle korps (§4.4) |
 | Bemanne en ressurs | `services.kan_sette_vaktpost()` — badge **og** reservasjon |
-| Dele ut ressurser, planlegge ny vakt | `services.kan_skrive_alt()` |
+| Dele ut en ressurs, sette opp ledige plasser | `services.kan_skrive_alt()` |
+| Opprette/fjerne ressurser og vaktlister, vaktas lengde, roller, grupper | `services.kan_lede()` |
 | Slette en vaktliste | global admin — irreversibelt |
+
+**De to skrivenivåene skilles på hva en feil koster** (30. aug. 2026).
+`kan_skrive_alt` bemanner: setter feil person på feil plass, og retter det
+tilbake. `kan_lede` setter opp: fjerner en ressurs, og bemanningen forsvinner
+med den. Derfor er «hvem som er på bilen» og «finnes bilen» to spørsmål.
 
 **Reglene ligger i `services.py`**, ikke her. `kan_sette_vaktpost()` er
 skrevet som én funksjon nettopp for at et endepunkt ikke skal kunne huske
@@ -43,7 +49,8 @@ from core.auth_decorators import er_global_admin, modul_kreves
 from core.ratelimit import rate_limit
 
 from . import choices, services
-from .models import Korps, Mannskap, Ressurs, Ressursrolle, Vaktliste, Vaktpost
+from .models import (Korps, Mannskap, Ressurs, Ressursgruppe, Ressursrolle,
+                     Vaktliste, Vaktpost)
 
 
 # ── Hjelpere ─────────────────────────────────────────────────────────────────
@@ -139,9 +146,9 @@ def _ressurs_til_dict(r):
     return {
         'id': r.pk,
         'navn': r.navn,
-        'type': r.type,
-        'type_navn': choices.RESSURSTYPE_NAVN.get(r.type, r.type),
-        'ikon': choices.RESSURSTYPE_IKON.get(r.type, 'box'),
+        'gruppe_id': r.gruppe_id,
+        'gruppe_navn': r.gruppe.navn,
+        'ikon': r.gruppe.ikon,
         'korps_id': r.korps_id,
         'korps_navn': r.korps.navn if r.korps else '',
         'enhet_id': r.enhet_id,
@@ -204,13 +211,8 @@ def index_view(request):
     ikke nettleseren skille en ressurs korps-brukeren får bemanne fra en hun
     ikke får — og en «Sett på vakt»-knapp som gir 403 er verre enn ingen knapp.
     """
-    return render(request, 'vaktliste/index.html', {
-        'ressurstyper': [
-            {'verdi': v, 'navn': n, 'ikon': choices.RESSURSTYPE_IKON.get(v, 'box')}
-            for v, n in choices.RESSURSTYPE_VALG
-        ],
-        **_tilgangskontekst(request.user),
-    })
+    return render(request, 'vaktliste/index.html',
+                  _tilgangskontekst(request.user))
 
 
 # ── Vaktlister ───────────────────────────────────────────────────────────────
@@ -226,10 +228,11 @@ def vaktlister_view(request):
     aktive vakt — se `services.opprett_planlagt_vakt`. Er `kopier_fra` satt,
     kopieres ressursoppsettet fra en tidligere liste; aldri personene.
 
-    Å planlegge en vakt er `skriv_full`: det lager en rad i `core.Vakt`, som
-    er portalens scope og ikke ett korps' bord.
+    Å planlegge en vakt er `skriv_leder`: det lager en rad i `core.Vakt`, som
+    er portalens scope og ikke ett korps' bord — og en vaktliste til er ikke
+    noe den som bemanner trenger for å bemanne.
     """
-    if request.method == 'POST' and not services.kan_skrive_alt(request.user):
+    if request.method == 'POST' and not services.kan_lede(request.user):
         return _nektet()
 
     if request.method == 'GET':
@@ -266,9 +269,10 @@ def vaktliste_detalj_view(request, pk):
     svar. Faner uten data er fortsatt faner, så alt hentes samlet framfor ett
     kall per ressurs.
 
-    PUT endrer vaktas lengde — start og planlagt slutt. Det er `skriv_full`:
-    spennet gjelder hele vakta, ikke ett korps' del av den, og det er
-    grunnlaget bemanningskurven tegnes over.
+    PUT endrer vaktas lengde — start og planlagt slutt. Det er `skriv_leder`:
+    spennet gjelder hele vakta, ikke ett korps' del av den, det er grunnlaget
+    bemanningskurven tegnes over, og et skift som faller utenfor et flyttet
+    spenn er ikke noe bemanneren kan se komme.
 
     DELETE er **global admin**. Å slette en vaktliste river hele oppsettet og
     alle skiftene på det; det hører til samme kategori som resten av det
@@ -276,7 +280,7 @@ def vaktliste_detalj_view(request, pk):
     """
     if request.method == 'DELETE' and not er_global_admin(request.user):
         return _nektet()
-    if request.method == 'PUT' and not services.kan_skrive_alt(request.user):
+    if request.method == 'PUT' and not services.kan_lede(request.user):
         return _nektet()
 
     try:
@@ -319,7 +323,7 @@ def vaktliste_detalj_view(request, pk):
         vl.refresh_from_db()
         return JsonResponse({'status': 'ok', 'data': _vaktliste_til_dict(vl)})
 
-    ressurser = list(vl.ressurser.select_related('korps', 'enhet'))
+    ressurser = list(vl.ressurser.select_related('korps', 'enhet', 'gruppe'))
     poster = list(
         Vaktpost.objects
         .filter(ressurs__vaktliste=vl)
@@ -339,8 +343,14 @@ def vaktliste_detalj_view(request, pk):
         # sida nå, og manageren trenger `i_bruk`. Skrev vi formen på nytt her,
         # ville den glidd fra registerendepunktets, akkurat som `i_bruk` gjorde
         # på registersiden. Alle rollene sendes; nedtrekket filtrerer på
-        # `er_aktiv` i nettleseren.
-        'roller': [_rolle_til_dict(r) for r in Ressursrolle.objects.all()],
+        # gruppa og på `er_aktiv` i nettleseren.
+        'roller': [_rolle_til_dict(r)
+                   for r in Ressursrolle.objects.select_related('gruppe')],
+        # Gruppene: nedtrekket i «Ny ressurs», ikonet på fanen, og rekkefølgen
+        # bemanningskurvene tegnes i. Alle sendes, også de inaktive — en
+        # ressurs kan stå på en gruppe som er tatt ut av bruk, og fanen dens
+        # skal fortsatt ha et navn.
+        'grupper': [_gruppe_til_dict(g) for g in Ressursgruppe.objects.all()],
         'mannskap': [
             {'id': m.pk, 'navn': m.navn, 'korps_id': m.korps_id,
              'korps_navn': m.korps.navn}
@@ -363,7 +373,109 @@ def _rolle_til_dict(rolle):
     """
     from .views_registre import verdi_til_dict
     from .models import Ressursrolle as _Rolle
-    return verdi_til_dict(_Rolle, rolle)
+    return verdi_til_dict(_Rolle, rolle, gruppe=True)
+
+
+def _gruppe_til_dict(g):
+    """Én ressursgruppe som JSON.
+
+    `i_bruk` er antall ressurser som står på gruppa — samme grunn som på
+    rollene: en gruppe man kan slette uten å vite hvor mange ressurser som
+    peker på den, sletter man for lett.
+    """
+    return {
+        'id': g.pk,
+        'navn': g.navn,
+        'ikon': g.ikon,
+        'rekkefolge': g.rekkefolge,
+        'er_aktiv': g.er_aktiv,
+        'i_bruk': g.ressurser.count(),
+    }
+
+
+@never_cache
+@modul_kreves('vaktliste', 'les', svar='json')
+@require_http_methods(['GET', 'POST'])
+@rate_limit(group='vaktliste:grupper', rate='60/m', method='POST')
+def grupper_view(request):
+    """Ressursgruppene: liste (GET) eller opprett (POST).
+
+    **Å opprette en gruppe er `skriv_leder`.** Gruppa bestemmer hvilke roller
+    en ressurs kan få og hvilken bemanningskurve den telles i; den er en del
+    av oppsettet, ikke av bemanningen.
+
+    Rekkefølgen settes automatisk til «sist», som på ressursene: den som
+    legger til «Førstehjelpstelt» skal ikke måtte finne på et tall.
+    """
+    if request.method == 'GET':
+        return JsonResponse({'status': 'ok', 'data': [
+            _gruppe_til_dict(g) for g in Ressursgruppe.objects.all()]})
+
+    if not services.kan_lede(request.user):
+        return _nektet()
+
+    data = _json_body(request)
+    navn = (data.get('navn') or '').strip()
+    if not navn:
+        return _feil('Gruppa må ha et navn.')
+    ikon = (data.get('ikon') or '').strip() or 'box'
+
+    try:
+        with transaction.atomic():
+            gruppe = Ressursgruppe.objects.create(
+                navn=navn, ikon=ikon,
+                rekkefolge=(_int(data.get('rekkefolge'))
+                            or services.neste_grupperekkefolge()))
+    except IntegrityError:
+        return _feil(f'«{navn}» finnes allerede.')
+
+    return JsonResponse(
+        {'status': 'ok', 'data': _gruppe_til_dict(gruppe)}, status=201)
+
+
+@modul_kreves('vaktliste', 'les', svar='json')
+@require_http_methods(['PUT', 'DELETE'])
+def gruppe_detalj_view(request, pk):
+    """Rediger eller fjern en ressursgruppe. `skriv_leder`/admin.
+
+    Sletting stoppes av `PROTECT` på `Ressurs.gruppe` når noen ressurs står på
+    gruppa. Det er med vilje: en gruppe i bruk deaktiveres, den fjernes ikke —
+    ellers ville en vaktliste mistet fanen sin fordi noen ryddet i et register.
+    """
+    if not services.kan_lede(request.user):
+        return _nektet()
+
+    try:
+        gruppe = Ressursgruppe.objects.get(pk=pk)
+    except Ressursgruppe.DoesNotExist:
+        return _feil('Ressursgruppe ikke funnet', status=404)
+
+    if request.method == 'DELETE':
+        if gruppe.ressurser.exists():
+            return _feil('Gruppa er i bruk. Deaktiver den i stedet.')
+        gruppe.delete()
+        return JsonResponse({'status': 'ok'})
+
+    data = _json_body(request)
+    if 'navn' in data:
+        navn = (data.get('navn') or '').strip()
+        if not navn:
+            return _feil('Gruppa må ha et navn.')
+        gruppe.navn = navn
+    if 'ikon' in data:
+        gruppe.ikon = (data.get('ikon') or '').strip() or 'box'
+    if 'er_aktiv' in data:
+        gruppe.er_aktiv = bool(data['er_aktiv'])
+    if 'rekkefolge' in data:
+        gruppe.rekkefolge = _int(data['rekkefolge']) or 100
+
+    try:
+        with transaction.atomic():
+            gruppe.save()
+    except IntegrityError:
+        return _feil(f'«{gruppe.navn}» finnes allerede.')
+
+    return JsonResponse({'status': 'ok', 'data': _gruppe_til_dict(gruppe)})
 
 
 def _enheter():
@@ -391,12 +503,15 @@ def ressurser_view(request, pk):
     inn ressursene i den rekkefølgen hun tenker på dem, og det er den fanene
     skal ha. Ingen skriver et tall.
 
-    Reservasjonen (`korps`) settes her, av den som **deler ut**: `skriv_full`
-    eller admin. Korps-brukeren bemanner det som er reservert henne, men
-    bestemmer ikke selv hva hun får — kunne hun det, ville reservasjonen ikke
-    vært en tildeling.
+    Reservasjonen (`korps`) settes her, av den som **deler ut**. Korps-brukeren
+    bemanner det som er reservert henne, men bestemmer ikke selv hva hun får —
+    kunne hun det, ville reservasjonen ikke vært en tildeling.
+
+    **Å opprette en ressurs er `skriv_leder`**, ikke `skriv_full` (30. aug.
+    2026). Bemanneren fyller plassene på ressursene som finnes; hva vakta
+    består av er vaktlederens beslutning.
     """
-    if not services.kan_skrive_alt(request.user):
+    if not services.kan_lede(request.user):
         return _nektet()
 
     try:
@@ -409,16 +524,16 @@ def ressurser_view(request, pk):
     if not navn:
         return _feil('Ressursen må ha et navn.')
 
-    type_ = data.get('type') or choices.ANNET
-    if type_ not in choices.RESSURSTYPE_NAVN:
-        return _feil(f'Ukjent ressurstype: {type_!r}')
+    gruppe_id = _int(data.get('gruppe_id'))
+    if not gruppe_id or not Ressursgruppe.objects.filter(pk=gruppe_id).exists():
+        return _feil('Ressursen må høre til en gruppe.')
 
     try:
         with transaction.atomic():
             ressurs = Ressurs.objects.create(
                 vaktliste=vl,
                 navn=navn,
-                type=type_,
+                gruppe_id=gruppe_id,
                 korps_id=_int(data.get('korps_id')),
                 enhet_id=_int(data.get('enhet_id')),
                 rekkefolge=(_int(data.get('rekkefolge'))
@@ -427,7 +542,8 @@ def ressurser_view(request, pk):
     except IntegrityError:
         return _feil(f'«{navn}» finnes allerede på denne vaktlista.')
 
-    ressurs = Ressurs.objects.select_related('korps', 'enhet').get(pk=ressurs.pk)
+    ressurs = (Ressurs.objects
+               .select_related('korps', 'enhet', 'gruppe').get(pk=ressurs.pk))
     return JsonResponse(
         {'status': 'ok', 'data': _ressurs_til_dict(ressurs)}, status=201)
 
@@ -435,16 +551,26 @@ def ressurser_view(request, pk):
 @modul_kreves('vaktliste', 'les', svar='json')
 @require_http_methods(['PUT', 'DELETE'])
 def ressurs_detalj_view(request, pk):
-    """Rediger eller fjern en ressurs. `skriv_full`/admin — se `ressurser_view`."""
-    if not services.kan_skrive_alt(request.user):
+    """Rediger eller fjern en ressurs. `skriv_leder`/admin — se `ressurser_view`.
+
+    **DELETE krever `{"confirm": true}`**, som sletting av en vaktliste. Det er
+    ikke en bekreftelsesdialog flyttet til serveren — dialogen står i
+    grensesnittet — men et krav om at klienten sier hva den mener. En
+    slette-URL som virker på et bart kall er en URL noe annet kan treffe ved
+    et uhell, og CASCADE tar alle skiftene med seg.
+    """
+    if not services.kan_lede(request.user):
         return _nektet()
 
     try:
-        ressurs = Ressurs.objects.select_related('korps', 'enhet').get(pk=pk)
+        ressurs = (Ressurs.objects
+                   .select_related('korps', 'enhet', 'gruppe').get(pk=pk))
     except Ressurs.DoesNotExist:
         return _feil('Ressurs ikke funnet', status=404)
 
     if request.method == 'DELETE':
+        if not _json_body(request).get('confirm'):
+            return _feil('Bekreftelse mangler. Send {"confirm": true}.')
         # CASCADE tar vaktpostene. Det er riktig her: fjernes bilen fra
         # vakta, finnes ikke skiftene på den heller.
         ressurs.delete()
@@ -456,10 +582,11 @@ def ressurs_detalj_view(request, pk):
         if not navn:
             return _feil('Ressursen må ha et navn.')
         ressurs.navn = navn
-    if 'type' in data:
-        if data['type'] not in choices.RESSURSTYPE_NAVN:
-            return _feil(f'Ukjent ressurstype: {data["type"]!r}')
-        ressurs.type = data['type']
+    if 'gruppe_id' in data:
+        gruppe_id = _int(data['gruppe_id'])
+        if not gruppe_id or not Ressursgruppe.objects.filter(pk=gruppe_id).exists():
+            return _feil('Ressursen må høre til en gruppe.')
+        ressurs.gruppe_id = gruppe_id
     if 'korps_id' in data:
         ressurs.korps_id = _int(data['korps_id'])
     if 'enhet_id' in data:

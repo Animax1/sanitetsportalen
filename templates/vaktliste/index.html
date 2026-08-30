@@ -44,37 +44,30 @@
         <i class="bi bi-person-vcard me-1"></i>Mannskap
       </a>
       {% comment %}
-        Utskrift av oversiktsfanen. Knappen står her og ikke inne i panelet
-        fordi den skal være på samme sted uansett hvilken fane man er på —
-        og `@media print` i vaktliste.css skjuler alt annet enn lista.
+        **Ett vindu for vakta.** Lengden og utskriften er begge ting man gjør
+        med *vakta*, ikke med en ressurs, og som løse knapper i toppen
+        konkurrerte de om plassen med «Ny ressurs» uten å høre til samme
+        spørsmål. Knappen er ikke gatet: å skrive ut lista er noe alle som
+        ser den skal kunne — det er lengden inne i vinduet som krever
+        skriv_leder, og den er gatet for seg.
+
+        Rollene ligger IKKE her lenger; de administreres inne i ressursen,
+        fordi de hører til ressursens gruppe. Se vaktliste.js::apneRoller().
       {% endcomment %}
       <button type="button" class="btn btn-outline-secondary btn-sm"
-              data-action="skrivUt">
-        <i class="bi bi-printer me-1"></i>Skriv ut
+              data-action="apneVakt">
+        <i class="bi bi-calendar-event me-1"></i>Vakta
       </button>
       {% comment %}
-        Begge er «dele ut»-handlinger: å planlegge en vakt lager en core.Vakt,
-        og å legge til en ressurs setter reservasjonen. Skjules for alle under
-        skriv_full — JS gjør det, se vaktliste.js::gateKnapper().
+        Å planlegge en vakt lager en core.Vakt, og å legge til en ressurs
+        bestemmer hva vakta består av. Begge er skriv_leder fra 30. aug. 2026
+        — JS skjuler dem, se vaktliste.js::gateKnapper().
       {% endcomment %}
-      {% comment %}
-        Rollene administreres her, ikke i mannskapsregisteret: de brukes i
-        ressurstabellen, og å måtte bytte side for å lage «Sjåfør» mens man
-        bemanner en bil er akkurat den knotet André meldte.
-      {% endcomment %}
-      <button type="button" class="btn btn-outline-secondary btn-sm vl-krev-full d-none"
-              data-action="apneRoller">
-        <i class="bi bi-person-badge me-1"></i>Roller
-      </button>
-      <button type="button" class="btn btn-outline-secondary btn-sm vl-krev-full d-none"
-              data-action="apneVaktlengde">
-        <i class="bi bi-clock-history me-1"></i>Vaktas lengde
-      </button>
-      <button type="button" class="btn btn-primary btn-sm vl-krev-full d-none"
+      <button type="button" class="btn btn-primary btn-sm vl-krev-leder d-none"
               data-bs-toggle="modal" data-bs-target="#nyVaktlisteModal">
         <i class="bi bi-plus-lg me-1"></i>Ny vaktliste
       </button>
-      <button type="button" class="btn btn-outline-secondary btn-sm vl-krev-full d-none"
+      <button type="button" class="btn btn-outline-secondary btn-sm vl-krev-leder d-none"
               data-bs-toggle="modal" data-bs-target="#nyRessursModal">
         <i class="bi bi-diagram-3 me-1"></i>Ny ressurs
       </button>
@@ -143,10 +136,18 @@
   <div class="modal-dialog">
     <div class="modal-content">
       <div class="modal-header">
-        <h5 class="modal-title">Ressursroller</h5>
+        <h5 class="modal-title" id="roller-tittel">Ressursroller</h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Lukk"></button>
       </div>
       <div class="modal-body">
+        {% comment %}
+          Vinduet åpnes fra en ressurs og gjelder ressursens **gruppe**:
+          «Sjåfør» hører hjemme på ambulansene, ikke på samleplassen. Har du
+          tre ambulanser vil du lage rollen én gang, ikke tre — derfor gruppa
+          og ikke den enkelte ressursen. Tittel og hjelpetekst settes av JS,
+          fordi de nevner gruppa man står i.
+        {% endcomment %}
+        <p class="form-text mt-0" id="roller-hjelp"></p>
         <p class="form-text mt-0">
           Rollen en person har <strong>på en ressurs</strong> — «Lagleder»,
           «Sjåfør», «KO-operatør». Samme person kan ha ulik rolle på ulike
@@ -168,37 +169,111 @@
   </div>
 </div>
 
-<div class="modal fade" id="vaktlengdeModal" tabindex="-1">
+<div class="modal fade" id="vaktModal" tabindex="-1">
   <div class="modal-dialog">
     <div class="modal-content">
       <div class="modal-header">
-        <h5 class="modal-title">Vaktas lengde</h5>
+        <h5 class="modal-title"><span id="vakt-tittel">Vakta</span></h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Lukk"></button>
       </div>
       <div class="modal-body">
         {% comment %}
-          Starten ligger på `core.Vakt`; planlagt slutt på vaktlista. Se
-          modellkommentaren — `Vakt.avsluttet` betyr «vakta ble avsluttet»,
-          en hendelse, og kan ikke bære et anslag man flytter på.
+          **Alt som gjelder vakta selv, på ett sted.** Utskriften er åpen for
+          alle som ser lista — den er hele grunnen til at bemanneren har den.
+          Lengden er skriv_leder: spennet er grunnlaget kurven tegnes over, og
+          et skift som faller utenfor et flyttet spenn er ikke noe bemanneren
+          kan se komme.
         {% endcomment %}
+        <div class="vl-vaktinfo mb-3">
+          <div class="vl-meta" id="vakt-spenn"></div>
+          <div class="vl-meta" id="vakt-antall"></div>
+        </div>
+
+        <button type="button" class="btn btn-outline-secondary btn-sm mb-3"
+                data-action="skrivUtVakta">
+          <i class="bi bi-printer me-1"></i>Skriv ut vaktlista
+        </button>
+
+        <div class="vl-krev-leder d-none">
+          <hr>
+          {% comment %}
+            Starten ligger på `core.Vakt`; planlagt slutt på vaktlista. Se
+            modellkommentaren — `Vakt.avsluttet` betyr «vakta ble avsluttet»,
+            en hendelse, og kan ikke bære et anslag man flytter på.
+          {% endcomment %}
+          <div class="mb-3">
+            <label class="form-label" for="vakt-start">Starter</label>
+            <input type="datetime-local" id="vakt-start" class="form-control">
+          </div>
+          <div class="mb-3">
+            <label class="form-label" for="vakt-slutt">Planlagt slutt</label>
+            <input type="datetime-local" id="vakt-slutt" class="form-control">
+            <div class="form-text">
+              Bemanningskurvene tegnes over dette spennet. Uten det vises de bare
+              fra første til siste skift, og hullet i begynnelsen blir usynlig.
+            </div>
+          </div>
+          <button type="button" class="btn btn-primary" id="vakt-lengde-knapp"
+                  data-action="lagreVaktlengde">Lagre vaktas lengde</button>
+        </div>
+        <div id="vakt-lengde-feil" class="text-danger small d-none mt-2"></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Lukk</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% comment %}
+  **Rediger ressurs — og det eneste stedet den kan fjernes.** «Fjern ressurs»
+  sto tidligere naken ved siden av «Sett på vakt»; CASCADE tar alle skiftene,
+  så ett feilklikk kostet hele bemanningen på bilen.
+{% endcomment %}
+<div class="modal fade" id="ressursModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Rediger ressurs</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Lukk"></button>
+      </div>
+      <div class="modal-body">
         <div class="mb-3">
-          <label class="form-label" for="vakt-start">Starter</label>
-          <input type="datetime-local" id="vakt-start" class="form-control">
+          <label class="form-label" for="ressurs-navn">Navn</label>
+          <input type="text" id="ressurs-navn" class="form-control" maxlength="120">
         </div>
         <div class="mb-3">
-          <label class="form-label" for="vakt-slutt">Planlagt slutt</label>
-          <input type="datetime-local" id="vakt-slutt" class="form-control">
+          <label class="form-label" for="ressurs-gruppe">Gruppe</label>
+          <select id="ressurs-gruppe" class="form-select"></select>
           <div class="form-text">
-            Bemanningskurven tegnes over dette spennet. Uten det vises den bare
-            fra første til siste skift, og hullet i begynnelsen blir usynlig.
+            Styrer ikon, hvilke roller som tilbys, og hvilken bemanningskurve
+            ressursen telles i.
           </div>
         </div>
-        <div id="vakt-lengde-feil" class="text-danger small d-none"></div>
+        <div class="mb-3">
+          <label class="form-label" for="ressurs-korps">Reservert korps</label>
+          <select id="ressurs-korps" class="form-select"></select>
+        </div>
+        <div class="mb-3">
+          <label class="form-label" for="ressurs-enhet">Enhet i oppdragsmodulen</label>
+          <select id="ressurs-enhet" class="form-select"></select>
+        </div>
+        <div id="ressurs-feil" class="text-danger small d-none"></div>
+
+        <hr>
+        <div class="vl-farlig">
+          <strong class="d-block mb-1">Fjern ressursen</strong>
+          <span class="vl-meta d-block mb-2" id="ressurs-slett-tekst"></span>
+          <button type="button" class="btn btn-outline-danger btn-sm"
+                  data-action="slettRessurs">
+            <i class="bi bi-trash me-1"></i>Fjern ressurs
+          </button>
+        </div>
       </div>
       <div class="modal-footer">
         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Avbryt</button>
-        <button type="button" class="btn btn-primary" id="vakt-lengde-knapp"
-                data-action="lagreVaktlengde">Lagre</button>
+        <button type="button" class="btn btn-primary" id="ressurs-knapp"
+                data-action="lagreRessurs">Lagre</button>
       </div>
     </div>
   </div>
@@ -218,12 +293,13 @@
                  placeholder="f.eks. «Mannskapsbil 1»">
         </div>
         <div class="mb-3">
-          <label class="form-label" for="ny-ressurs-type">Type</label>
-          <select id="ny-ressurs-type" class="form-select">
-            {% for t in ressurstyper %}
-            <option value="{{ t.verdi }}">{{ t.navn }}</option>
-            {% endfor %}
-          </select>
+          <label class="form-label" for="ny-ressurs-gruppe">Gruppe</label>
+          {% comment %}
+            Fylles av JS fra `/vaktliste/api/vaktlister/<id>/`. Gruppene lå i
+            `choices.py` til 30. aug. 2026 og ble rendret her; nå er de en
+            tabell, slik at et førstehjelpstelt kan legges til uten deploy.
+          {% endcomment %}
+          <select id="ny-ressurs-gruppe" class="form-select"></select>
         </div>
         <div class="mb-3">
           <label class="form-label" for="ny-ressurs-korps">Reservert korps</label>

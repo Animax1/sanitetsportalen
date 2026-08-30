@@ -195,9 +195,25 @@ function _handlerArgument(el) {
   return el.dataset.arg;
 }
 
+function klikkSkalKjore(el) {
+  // **Et element som melder sin egen hendelse skal ikke også fyre på klikk.**
+  // Nedtrekkene i vaktlistas ressurstabell er `<select data-action="..."
+  // data-hendelse="change">`. Klikket som åpnet lista traff klikkdelegeringen
+  // under, som kalte handlingen uten felt og verdi, lagret ingenting og tegnet
+  // panelet på nytt — så den åpne lista forsvant i det øyeblikket den kom.
+  // Symptomet var «en kort popup som blinker bort»; årsaken var to lyttere på
+  // samme element.
+  //
+  // Regelen står som en egen funksjon fordi den er hele forskjellen, og fordi
+  // en anonym `if` inne i en lytter ikke lar seg kjøre i en test.
+  return !el.dataset.hendelse;
+}
+
+
 document.addEventListener('click', (e) => {
   const el = e.target.closest('[data-action]');
   if (!el) return;
+  if (!klikkSkalKjore(el)) return;
 
   // Funksjonen kan bo i patients-admin.js, som kun lastes for admin.
   const handler = globalThis[el.dataset.action];

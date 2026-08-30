@@ -32,8 +32,9 @@ from django.utils import timezone
 from accounts.models import CustomUser, ModulTilgang
 from core.modules import get_module
 
-from . import choices, services
-from .models import Kompetanse, Korps, Mannskap, Ressurs, Ressursrolle, Vaktpost
+from . import services
+from .models import Kompetanse, Korps, Mannskap, Ressurs, Vaktpost
+from .test_helpers import KO, LAG, gruppe, lag_ressurs, lag_rolle
 
 
 def _bruker(navn, nivaa=None, *, admin=False):
@@ -58,17 +59,17 @@ class TilgangsBasis(TestCase):
     def setUp(self):
         self.hgsd = Korps.objects.create(navn='Haugesund', kortnavn='HGSD')
         self.karmoy = Korps.objects.create(navn='Karmøy')
-        self.rolle = Ressursrolle.objects.create(navn='Lagleder')
+        self.rolle = lag_rolle('Lagleder')
         self.komp = Kompetanse.objects.create(navn='Sykepleier')
 
         self.vl = services.opprett_planlagt_vakt('Vakta')
-        self.res_hgsd = Ressurs.objects.create(
-            vaktliste=self.vl, navn='Lag HGSD', type=choices.LAG, korps=self.hgsd)
-        self.res_karmoy = Ressurs.objects.create(
-            vaktliste=self.vl, navn='Lag Karmøy', type=choices.LAG,
+        self.res_hgsd = lag_ressurs(
+            vaktliste=self.vl, navn='Lag HGSD', gruppe=gruppe(LAG), korps=self.hgsd)
+        self.res_karmoy = lag_ressurs(
+            vaktliste=self.vl, navn='Lag Karmøy', gruppe=gruppe(LAG),
             korps=self.karmoy)
-        self.res_fri = Ressurs.objects.create(
-            vaktliste=self.vl, navn='KO', type=choices.KO)
+        self.res_fri = lag_ressurs(
+            vaktliste=self.vl, navn='KO', gruppe=gruppe(KO))
 
         self.p_hgsd = Mannskap.objects.create(navn='Kari', korps=self.hgsd)
         self.p_karmoy = Mannskap.objects.create(navn='Ola', korps=self.karmoy)
@@ -78,11 +79,15 @@ class TilgangsBasis(TestCase):
         self.p_hgsd.user = self.korpsbruker
         self.p_hgsd.save()
         self.vaktleder = _bruker('vl', 'skriv_full')
+        # `skriv_leder` kom 30. aug. 2026 og er trinnet over: den som *setter
+        # opp* vakta framfor den som bemanner den.
+        self.leder = _bruker('leder', 'skriv_leder')
         self.admin = _bruker('adm', admin=True)
 
         self.c_leser = _klient(self.leser)
         self.c_kb = _klient(self.korpsbruker)
         self.c_vl = _klient(self.vaktleder)
+        self.c_leder = _klient(self.leder)
         self.c_adm = _klient(self.admin)
         self.na = timezone.now()
 
@@ -152,12 +157,19 @@ class LesingTests(TilgangsBasis):
 
 
 class UtdelingTests(TilgangsBasis):
-    """Å dele ut er `skriv_full`: ressurser, vakter og verdimengder."""
+    """To skrivende terskler, ikke én.
 
-    def test_bare_skriv_full_planlegger_ny_vakt(self):
+    **`skriv_full` bemanner, `skriv_leder` setter opp** (30. aug. 2026, Andrés
+    bestilling). Skillet er hva slags skade en feil gjør: setter bemanneren
+    feil person på feil plass, retter hun det tilbake; fjerner noen en ressurs,
+    forsvinner bemanningen med den.
+    """
+
+    def test_bare_lederen_planlegger_ny_vakt(self):
         for navn, c, ventet in (('les', self.c_leser, 403),
                                 ('skriv_handling', self.c_kb, 403),
-                                ('skriv_full', self.c_vl, 201),
+                                ('skriv_full', self.c_vl, 403),
+                                ('skriv_leder', self.c_leder, 201),
                                 ('admin', self.c_adm, 201)):
             with self.subTest(konto=navn):
                 res = c.post('/vaktliste/api/vaktlister/',
@@ -165,19 +177,68 @@ class UtdelingTests(TilgangsBasis):
                              content_type='application/json')
                 self.assertEqual(res.status_code, ventet)
 
-    def test_bare_skriv_full_legger_til_ressurs(self):
+    def test_bare_lederen_legger_til_ressurs(self):
         """Reservasjonen settes av den som deler ut. Kunne korps-brukeren
         opprette ressurser, kunne hun tildele seg selv — og da er
-        reservasjonen ikke en tildeling."""
+        reservasjonen ikke en tildeling.
+
+        Fra 30. aug. 2026 stopper det også `skriv_full`: hva vakta *består av*
+        er vaktlederens beslutning, ikke bemannerens.
+        """
         for navn, c, ventet in (('les', self.c_leser, 403),
                                 ('skriv_handling', self.c_kb, 403),
-                                ('skriv_full', self.c_vl, 201)):
+                                ('skriv_full', self.c_vl, 403),
+                                ('skriv_leder', self.c_leder, 201)):
             with self.subTest(konto=navn):
                 res = c.post(
                     f'/vaktliste/api/vaktlister/{self.vl.pk}/ressurser/',
-                    data={'navn': f'Lag {navn}', 'korps_id': self.hgsd.pk},
+                    data={'navn': f'Lag {navn}', 'gruppe_id': gruppe(LAG).pk,
+                          'korps_id': self.hgsd.pk},
                     content_type='application/json')
                 self.assertEqual(res.status_code, ventet)
+
+    def test_bemanneren_fjerner_ikke_en_ressurs(self):
+        """CASCADE tar skiftene. Den som bemanner skal ikke kunne slette
+        andres arbeid ved å rydde bort en fane."""
+        res = self.c_vl.delete(f'/vaktliste/api/ressurser/{self.res_hgsd.pk}/',
+                               data={'confirm': True},
+                               content_type='application/json')
+        self.assertEqual(res.status_code, 403)
+        self.assertTrue(Ressurs.objects.filter(pk=self.res_hgsd.pk).exists())
+
+    def test_lederen_fjerner_en_ressurs_med_bekreftelse(self):
+        uten = self.c_leder.delete(
+            f'/vaktliste/api/ressurser/{self.res_hgsd.pk}/')
+        self.assertEqual(uten.status_code, 400, 'bekreftelse mangler')
+        self.assertTrue(Ressurs.objects.filter(pk=self.res_hgsd.pk).exists())
+
+        med = self.c_leder.delete(
+            f'/vaktliste/api/ressurser/{self.res_hgsd.pk}/',
+            data={'confirm': True}, content_type='application/json')
+        self.assertEqual(med.status_code, 200)
+        self.assertFalse(Ressurs.objects.filter(pk=self.res_hgsd.pk).exists())
+
+    def test_bemanneren_endrer_ikke_vaktas_lengde(self):
+        """Spennet er grunnlaget kurven tegnes over, og et skift som faller
+        utenfor et flyttet spenn er ikke noe bemanneren kan se komme."""
+        res = self.c_vl.put(f'/vaktliste/api/vaktlister/{self.vl.pk}/',
+                            data={'planlagt_slutt': self._iso(12)},
+                            content_type='application/json')
+        self.assertEqual(res.status_code, 403)
+        self.assertEqual(
+            self.c_leder.put(f'/vaktliste/api/vaktlister/{self.vl.pk}/',
+                             data={'planlagt_slutt': self._iso(12)},
+                             content_type='application/json').status_code, 200)
+
+    def test_bemanneren_beholder_det_hun_skal_ha(self):
+        """Nivået mistet oppsettet, ikke bemanningen — og heller ikke
+        utskriften, som er hele grunnen til at hun ser lista."""
+        self.assertEqual(
+            self._sett_paa(self.c_vl, self.res_karmoy, self.p_karmoy).status_code,
+            201, 'bemanner på tvers av korps som før')
+        self.assertEqual(
+            self.c_vl.get(f'/vaktliste/api/vaktlister/{self.vl.pk}/').status_code,
+            200, 'leser hele oppsettet — utskriftslista bygges av det')
 
     def test_korpsbruker_kan_ikke_fjerne_sin_egen_ressurs(self):
         """Hun bemanner den — hun eier den ikke."""
@@ -197,8 +258,12 @@ class UtdelingTests(TilgangsBasis):
 
     def test_verdimengdene_er_skriv_full(self):
         """Kunne korps-brukeren opprette korps, kunne hun lage seg et nytt
-        å føre — og badgen hennes ville sluttet å avgrense noe."""
-        for sti in ('korps', 'kompetanser', 'roller'):
+        å føre — og badgen hennes ville sluttet å avgrense noe.
+
+        Rollene står ikke her: de er del av vaktoppsettet og krever
+        `skriv_leder`. Se `RollerErGruppasTests` i `tests_registre.py`.
+        """
+        for sti in ('korps', 'kompetanser'):
             with self.subTest(sti=sti):
                 self.assertEqual(
                     self.c_kb.post(f'/vaktliste/api/{sti}/', data={'navn': 'Nytt'},
@@ -217,8 +282,14 @@ class UtdelingTests(TilgangsBasis):
                     self.c_kb.get(f'/vaktliste/api/{sti}/').status_code, 200)
 
     def test_sletting_av_vaktliste_er_global_admin(self):
-        """Irreversibelt: hele oppsettet og alle skiftene på det."""
-        for navn, c in (('skriv_full', self.c_vl), ('skriv_handling', self.c_kb)):
+        """Irreversibelt: hele oppsettet og alle skiftene på det.
+
+        Også `skriv_leder` stoppes. Lederen fjerner en ressurs, men å rive
+        hele lista hører til samme kategori som resten av det irreversible i
+        portalen — det er ikke en gradsforskjell fra å fjerne en bil.
+        """
+        for navn, c in (('skriv_full', self.c_vl), ('skriv_handling', self.c_kb),
+                        ('skriv_leder', self.c_leder)):
             with self.subTest(konto=navn):
                 res = c.delete(f'/vaktliste/api/vaktlister/{self.vl.pk}/',
                                data={'confirm': True},
@@ -480,8 +551,8 @@ class GrensesnittetsGatingTests(SimpleTestCase):
         if not node_available():
             self.skipTest('node er ikke tilgjengelig')
         self.h_plan = build_harness((
-            (VAKTLISTE_JS, ('_nivaa', 'kanSkriveAlt', 'kanSkriveNoe',
-                            'kanBemanne')),
+            (VAKTLISTE_JS, ('_nivaa', '_erAdmin', 'kanSkriveAlt', 'kanLede',
+                            'kanSkriveNoe', 'kanBemanne')),
         ))
         self.h_reg = build_harness((
             (VAKTLISTE_REGISTRE_JS, ('_nivaa', 'kanSkriveAlt',
@@ -517,15 +588,43 @@ class GrensesnittetsGatingTests(SimpleTestCase):
             assert(kanBemanne({korps_id: 7}) === true, 'og andres');
         """)
 
+    def test_bemanneren_ser_ikke_oppsettsknappene(self):
+        """`skriv_full` bemanner, men setter ikke opp (30. aug. 2026).
+
+        Knappene bak `kanLede()` er «Ny vaktliste», «Ny ressurs», «Rediger»,
+        «Roller» og vaktas lengde. Serveren nekter uansett — men en knapp som
+        fører til en vegg er verre enn ingen knapp.
+        """
+        self._kjor(self.h_plan, self._vindu('skriv_full'), """
+            assert(kanSkriveAlt() === true, 'bemanner fortsatt alt');
+            assert(kanLede() === false, 'men setter ikke opp vakta');
+        """)
+
+    def test_lederen_ser_alt_bemanneren_ser_og_mer(self):
+        """Stigen er ordnet: `skriv_leder` inneholder `skriv_full`. Speiles
+        det ikke i JS, mister lederen knappene bemanneren har."""
+        self._kjor(self.h_plan, self._vindu('skriv_leder'), """
+            assert(kanLede() === true, 'setter opp vakta');
+            assert(kanSkriveAlt() === true, 'og bemanner alt bemanneren gjor');
+            assert(kanBemanne({korps_id: 7}) === true, 'paa tvers av korps');
+        """)
+
+    def test_korpsbrukeren_leder_ingenting(self):
+        self._kjor(self.h_plan, self._vindu('skriv_handling', korps=1), """
+            assert(kanLede() === false, 'badgen fører et korps, ikke vakta');
+        """)
+
     def test_admin_ser_alle_uten_nivaa(self):
         self._kjor(self.h_plan, self._vindu('', admin=True), """
             assert(kanSkriveAlt() === true, 'global admin staar utenfor');
+            assert(kanLede() === true, 'ogsaa oppsettet');
             assert(kanBemanne({korps_id: 9}) === true, 'uansett reservasjon');
         """)
 
     def test_leser_ser_ingen_knapper(self):
         self._kjor(self.h_plan, self._vindu('les', korps=1), """
             assert(kanSkriveAlt() === false, 'les skriver ikke');
+            assert(kanLede() === false, 'og setter ikke opp');
             assert(kanSkriveNoe() === false, 'heller ikke litt');
             assert(kanBemanne({korps_id: 1}) === false, 'selv med badge');
         """)
@@ -633,3 +732,95 @@ class LedigPlassTilgangTests(TilgangsBasis):
                          mannskap_id=self.p_hgsd.pk).json()['data']['id']
         self.assertEqual(
             self.c_kb.delete(f'/vaktliste/api/vaktposter/{pk}/').status_code, 200)
+
+
+@override_settings(SECURE_SSL_REDIRECT=False, RATELIMIT_ENABLE=False)
+class LedernivaaetsPlassIStigenTests(TestCase):
+    """`skriv_leder` er fjerde trinn, og det er nytt for hele portalen.
+
+    Et nytt trinn i `NIVAA_HIERARKI` er additivt for modulene som ikke
+    deklarerer det — men bare hvis det faktisk ligger *over* `skriv_full` og
+    bare hvis ingen andre moduler tilbyr det. Begge deler er lette å tro på
+    uten å sjekke, og begge ville gitt tilgang ingen hadde bestemt.
+    """
+
+    def test_stigen_er_ordnet(self):
+        from core.auth_decorators import har_tilgang
+        bruker = _bruker('leder', 'skriv_leder')
+        for krav in ('les', 'skriv_handling', 'skriv_full', 'skriv_leder'):
+            with self.subTest(krav=krav):
+                self.assertTrue(har_tilgang(bruker, 'vaktliste', krav))
+
+    def test_skriv_full_naar_ikke_opp(self):
+        from core.auth_decorators import har_tilgang
+        bruker = _bruker('bemanner', 'skriv_full')
+        self.assertTrue(har_tilgang(bruker, 'vaktliste', 'skriv_full'))
+        self.assertFalse(har_tilgang(bruker, 'vaktliste', 'skriv_leder'))
+
+    def test_bare_vaktlista_tilbyr_nivaaet(self):
+        """Matrisen tilbyr de nivåene modulen deklarerer og ingen andre. Kom
+        `skriv_leder` snikende inn på en annen modul, ville den fått et
+        toppnivå ingen har definert hva betyr der."""
+        from core.modules import get_all_modules
+        for modul in get_all_modules():
+            with self.subTest(modul=modul.slug):
+                if modul.slug == 'vaktliste':
+                    self.assertIn('skriv_leder', modul.nivaaer)
+                else:
+                    self.assertNotIn('skriv_leder', modul.nivaaer)
+
+    def test_nivaaet_har_sin_egen_etikett(self):
+        """«Skrive: leder» sier ikke hva lederen gjør. Etiketten må skille
+        den fra «Skrive: alle korps» der den deles ut."""
+        modul = get_module('vaktliste')
+        leder = modul.etikett_for('skriv_leder')
+        self.assertNotEqual(leder, modul.etikett_for('skriv_full'))
+        self.assertIn('leder', leder.lower())
+
+
+@override_settings(SECURE_SSL_REDIRECT=False, RATELIMIT_ENABLE=False)
+class MalensGatingTests(TestCase):
+    """Malen må merke oppsettsknappene med riktig klasse.
+
+    JS-en skjuler `.vl-krev-leder` for alle under `skriv_leder`. Står en
+    oppsettsknapp med `.vl-krev-full` i stedet, vises den for bemanneren og
+    fører til en 403 — og en knapp som fører til en vegg er verre enn ingen
+    knapp. Testen leser malen, fordi det er der feilen ville stått.
+    """
+
+    def _mal(self):
+        from pathlib import Path
+        from django.conf import settings
+        return (Path(settings.BASE_DIR) / 'templates' / 'vaktliste'
+                / 'index.html').read_text(encoding='utf-8')
+
+    def test_oppsettsknappene_krever_leder(self):
+        import re
+        mal = self._mal()
+        for maal in ('#nyVaktlisteModal', '#nyRessursModal'):
+            with self.subTest(knapp=maal):
+                m = re.search(
+                    r'<button[^>]*data-bs-target="' + re.escape(maal) + r'"',
+                    mal, re.S)
+                self.assertIsNotNone(m, f'fant ikke knappen for {maal}')
+                self.assertIn('vl-krev-leder', m.group(0))
+
+    def test_vaktas_lengde_ligger_bak_ledergaten(self):
+        self.assertIn('class="vl-krev-leder d-none"', self._mal())
+
+    def test_utskriften_er_ikke_gatet(self):
+        """Å skrive ut lista er hele grunnen til at bemanneren ser den."""
+        import re
+        m = re.search(r'<button[^>]*data-action="skrivUtVakta"[^>]*>',
+                      self._mal(), re.S)
+        self.assertIsNotNone(m)
+        self.assertNotIn('vl-krev', m.group(0))
+
+    def test_ingen_naken_fjern_ressurs_knapp(self):
+        """Sletting skal bare finnes inne i «Rediger ressurs». Bygges den
+        tilbake i kortets topp, er vi tilbake til ett feilklikk fra å rive
+        bort hele bemanningen."""
+        from patients.js_test_utils import VAKTLISTE_JS, read_js
+        kilde = read_js(VAKTLISTE_JS)
+        self.assertNotIn('fjernRessurs', kilde)
+        self.assertIn('slettRessurs', kilde)

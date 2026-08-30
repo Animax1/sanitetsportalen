@@ -51,7 +51,8 @@ REVIEWED_INTERPOLATIONS = {
     'kropp': 'tabellrader bygget lokalt i samme funksjon',
     "tid('fra_tid')": 'input bygget lokalt av en hjelper som escaper',
     "tid('til_tid')": 'input bygget lokalt av en hjelper som escaper',
-    '_rolleValg(vp, kanRore)': 'nedtrekk fra en bygger som selv skannes her',
+    '_rolleValg(vp, r, kanRore)':
+        'nedtrekk fra en bygger som selv skannes her',
     'valg': 'options bygget lokalt, navn og id escapet inni',
     'valgt': 'hardkodet selected-attributt fra en ternær',
     'settKnapp': 'markup bygget lokalt, id escapet inni',
@@ -72,6 +73,11 @@ REVIEWED_INTERPOLATIONS = {
     'navnCelle': 'markup fra `_fyllValgFor`, som selv skannes her',
     'rest': 'markup bygget lokalt, tallet escapet inni',
     '_dag(punkter[0].tid)': 'datostreng fra en Date, ingen brukerdata',
+    # Kolonner, grupper og roller (30. aug., andre runde):
+    'merkelapper': 'markup bygget lokalt, hvert kompetansenavn escapet inni',
+    'innhold': 'input eller escapet tekst, bygget lokalt i samme hjelper',
+    'merke': 'markup bygget lokalt, ukedagen escapet inni',
+    'kurver': 'kurver fra `_mkEnKurve`, som selv skannes her',
     # `tittel` er ren tekst som escapes én gang ved innsetting i `title=`.
     # Escapet vi her også, ville teksten blitt dobbeltescapet i tooltipen —
     # samme mønster som `meta` i oppdrag-sentral.js.
@@ -140,12 +146,15 @@ class VaktlisteEscapingOppforselTests(SimpleTestCase):
     HARNESS = (
         (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue', 'trustedHtml',
                            '_escHtml', 'klokke')),
-        (VAKTLISTE_JS, ('mkRessurs', '_rolleValg', '_fyllValgFor',
-                        'mkRolleRad', 'mkOversikt', 'mkKurve',
+        (VAKTLISTE_JS, ('mkRessurs', '_rolleValg', 'rollerForGruppe',
+                        '_fyllValgFor', '_varighet',
+                        'mkRolleRad', 'mkOversikt', 'mkKurve', '_mkEnKurve',
+                        '_posterPerGruppe', '_vaktensSpenn',
                         'mkIkkePlassert', 'tegnFaner', '_posterFor',
                         '_ikkePlassert', '_tidsspenn', '_vaktspenn',
                         '_bemanningPerTime', '_iso16', '_d', '_kl', '_dag',
-                        '_sammeDag', '_nivaa', 'kanSkriveAlt', 'kanBemanne')),
+                        '_sammeDag', '_nivaa', '_erAdmin', 'kanSkriveAlt',
+                        'kanLede', 'kanBemanne')),
     )
 
     #: Byggerne spør om tilgang fra fase 3. Node har ingen `window`, så den
@@ -168,7 +177,7 @@ class VaktlisteEscapingOppforselTests(SimpleTestCase):
         grunn = {'vaktliste': {'id': 1, 'vakt_navn': 'Vakta',
                                'status_navn': 'Planlegging', 'i_drift': False},
                  'ressurser': [], 'vaktposter': [], 'mannskap': [],
-                 'roller': []}
+                 'roller': [], 'grupper': [], 'korps': [], 'enheter': []}
         grunn.update(overstyr)
         return json.dumps(grunn)
 
@@ -178,7 +187,7 @@ class VaktlisteEscapingOppforselTests(SimpleTestCase):
             globalThis.aktivListe = {self._liste()};
             console.log(mkRessurs({{
               id: 1, navn: '<img src=x onerror=alert(1)>', ikon: 'people',
-              type_navn: 'Lag', korps_navn: '', enhet_navn: ''
+              gruppe_navn: 'Lag', korps_navn: '', enhet_navn: ''
             }}));
         ''')
         self.assertNotIn('<img src=x', ut)
@@ -190,7 +199,7 @@ class VaktlisteEscapingOppforselTests(SimpleTestCase):
             globalThis.aktivListe = {self._liste()};
             console.log(mkRessurs({{
               id: 1, navn: 'Lag 1', ikon: '" onload="alert(1)',
-              type_navn: 'Lag', korps_navn: '', enhet_navn: ''
+              gruppe_navn: 'Lag', korps_navn: '', enhet_navn: ''
             }}));
         ''')
         self.assertNotIn('onload="alert(1)"', ut)
@@ -506,7 +515,8 @@ class TidsvisningTests(SimpleTestCase):
 
     HARNESS = (
         (VAKTLISTE_JS, ('_d', '_kl', '_dag', '_sammeDag', '_tidsspenn',
-                        '_vaktspenn', '_iso16', '_bemanningPerTime')),
+                        '_vaktspenn', '_iso16', '_bemanningPerTime',
+                        '_vaktensSpenn', '_varighet')),
     )
     VINDU = ("globalThis.DAGER = ['søn','man','tir','ons','tor','fre','lør'];\n"
              "globalThis.MND = ['jan','feb','mar','apr','mai','jun',"
@@ -574,7 +584,8 @@ class BemanningskurveTests(SimpleTestCase):
     """Kurven svarer på ett spørsmål: hvor er hullene."""
 
     HARNESS = (
-        (VAKTLISTE_JS, ('_d', '_kl', '_dag', '_bemanningPerTime')),
+        (VAKTLISTE_JS, ('_d', '_kl', '_dag', '_bemanningPerTime',
+                        '_vaktensSpenn')),
     )
 
     def setUp(self):
@@ -633,7 +644,8 @@ class KurveOverHeleVaktaTests(SimpleTestCase):
     """
 
     HARNESS = (
-        (VAKTLISTE_JS, ('_d', '_kl', '_dag', '_bemanningPerTime')),
+        (VAKTLISTE_JS, ('_d', '_kl', '_dag', '_bemanningPerTime',
+                        '_vaktensSpenn')),
     )
 
     def setUp(self):
@@ -723,8 +735,11 @@ class RessurstabellensBreddeTests(SimpleTestCase):
 
     #: Chrome trenger omtrent dette til et `datetime-local` med innrykk.
     MIN_TIDSFELT_PX = 185
-    #: Kolonneindeksene til Fra og Til i ressurstabellens ni kolonner.
-    TIDSKOLONNER = (5, 6)
+    #: Overskriftene på kolonnene som inneholder et tidsfelt. Slås opp på
+    #: navn, ikke på indeks: kolonnerekkefølgen er endret to ganger på to
+    #: dager, og en test som teller kolonner måler da rekkefølgen framfor
+    #: regelen — og går grønn på feil kolonne.
+    TIDSKOLONNER = ('Fra', 'Til')
 
     def _min_width_rem(self):
         from pathlib import Path
@@ -741,22 +756,31 @@ class RessurstabellensBreddeTests(SimpleTestCase):
         kropp = extract_function(src, 'mkRessurs')
         return [int(a) for a in re.findall(r'width:\s*(\d+)%', kropp)]
 
+    def _overskrifter(self):
+        src = read_js(VAKTLISTE_JS)
+        kropp = extract_function(src, 'mkRessurs')
+        blokk = kropp[kropp.index('<thead>'):kropp.index('</thead>')]
+        return re.findall(r'<th>(.*?)</th>', blokk)
+
     def test_andelene_summerer_til_hundre(self):
         andeler = self._andeler()
-        self.assertEqual(len(andeler), 9, 'ni kolonner')
+        self.assertEqual(len(andeler), len(self._overskrifter()),
+                         'én andel per kolonne')
         self.assertEqual(sum(andeler), 100, f'fikk {andeler}')
 
     def test_tidskolonnene_rommer_et_datetime_felt(self):
         piksler = self._min_width_rem() * 16
         andeler = self._andeler()
-        for i in self.TIDSKOLONNER:
-            with self.subTest(kolonne=i):
-                bredde = piksler * andeler[i] / 100
+        overskrifter = self._overskrifter()
+        for navn in self.TIDSKOLONNER:
+            with self.subTest(kolonne=navn):
+                self.assertIn(navn, overskrifter)
+                bredde = piksler * andeler[overskrifter.index(navn)] / 100
                 self.assertGreaterEqual(
                     round(bredde), self.MIN_TIDSFELT_PX,
-                    f'kolonne {i} blir {bredde:.0f} px ved min-width — for '
-                    f'smal til et datetime-felt, og feltet flyter da ut over '
-                    f'nabocella.')
+                    f'kolonnen «{navn}» blir {bredde:.0f} px ved min-width — '
+                    f'for smal til et datetime-felt, og feltet flyter da ut '
+                    f'over nabocella.')
 
     def test_feltene_kan_ikke_vokse_forbi_cella(self):
         """Beltet ved siden av bukseselene: selv med feil andeler skal et
@@ -771,6 +795,64 @@ class RessurstabellensBreddeTests(SimpleTestCase):
                 self.assertIn(regel, blokk)
 
 
+class TabellcellersLayoutTests(SimpleTestCase):
+    """En `<td>` må forbli en tabellcelle.
+
+    **Buggen André meldte:** «inne i ressursvinduet flytter kompetansekolonnen
+    seg slik at de ikke er likt med resten». Årsaken var `display: flex`
+    direkte på `.vl-kompcelle`, som er en `<td>`: da slutter cella å være en
+    `table-cell`, faller ut av kolonnesporet, og alt etter den forskyves i
+    forhold til overskriftene. `table-layout: fixed` hjelper ikke — regelen
+    gjelder cellene som *er* i tabellen.
+
+    Testen leser hvilke klasser som faktisk står på `<td>`-ene i tabellen og
+    krever at ingen av dem får en `display` som bryter tabellen. Da er
+    *regelen* låst og ikke navnet på én klasse: neste cellemerkelapp fanges
+    av samme test.
+    """
+
+    #: Verdier som tar elementet ut av tabellens boksmodell.
+    FARLIGE = ('flex', 'grid', 'inline-flex', 'inline-grid', 'block')
+
+    def _celleklasser(self):
+        """Klassene som står på `<td>` i ressurstabellen."""
+        kropp = extract_function(read_js(VAKTLISTE_JS), 'mkRessurs')
+        klasser = set()
+        for treff in re.findall(r'<td class="([^"$]*)"', kropp):
+            klasser.update(treff.split())
+        return klasser
+
+    def _css(self):
+        from pathlib import Path
+        from django.conf import settings
+        return (Path(settings.BASE_DIR) / 'static' / 'css'
+                / 'vaktliste.css').read_text(encoding='utf-8')
+
+    def test_celleklassene_finnes_i_stilarket(self):
+        """Grunnlaget for testen under: finner den ingen klasser, måler den
+        ingenting og går grønn på tom luft."""
+        self.assertTrue(self._celleklasser(), 'fant ingen td-klasser')
+
+    def test_ingen_celleklasse_bryter_tabellen(self):
+        css = self._css()
+        for klasse in sorted(self._celleklasser()):
+            # Regelblokka der klassen står *alene* som selektor — altså
+            # regelen som treffer selve `<td>`-en, ikke `.klasse > .noe`.
+            for m in re.finditer(
+                    r'(?m)^\.' + re.escape(klasse) + r'\s*\{([^}]*)\}', css):
+                display = re.search(r'display:\s*([\w-]+)', m.group(1))
+                if not display:
+                    continue
+                with self.subTest(klasse=klasse):
+                    self.assertNotIn(
+                        display.group(1), self.FARLIGE,
+                        f'.{klasse} står på en <td> og setter '
+                        f'display: {display.group(1)} — cella slutter da å '
+                        f'være en table-cell, og kolonnene etter den '
+                        f'forskyves i forhold til overskriftene. Legg '
+                        f'layouten på et element inne i cella i stedet.')
+
+
 class RollenedtrekketTests(SimpleTestCase):
     """Nedtrekket tilbyr aktive roller — og den raden allerede har.
 
@@ -781,7 +863,7 @@ class RollenedtrekketTests(SimpleTestCase):
 
     HARNESS = (
         (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue')),
-        (VAKTLISTE_JS, ('_rolleValg',)),
+        (VAKTLISTE_JS, ('_rolleValg', 'rollerForGruppe')),
     )
 
     def setUp(self):
@@ -789,32 +871,245 @@ class RollenedtrekketTests(SimpleTestCase):
             self.skipTest('node er ikke tilgjengelig')
         self.harness = build_harness(self.HARNESS)
 
+    #: Gruppe 1 er «Ambulanse», gruppe 2 «Samleplass» i disse testene.
     ROLLER = """
         globalThis.aktivListe = { roller: [
-          {id: 1, navn: 'Lagleder', er_aktiv: true},
-          {id: 2, navn: 'Utgaatt', er_aktiv: false},
+          {id: 1, navn: 'Lagleder', er_aktiv: true, gruppe_id: 1},
+          {id: 2, navn: 'Utgaatt', er_aktiv: false, gruppe_id: 1},
+          {id: 3, navn: 'Innsatsleder', er_aktiv: true, gruppe_id: 2},
         ]};
+        globalThis.AMBULANSE = {id: 5, gruppe_id: 1};
+        globalThis.SAMLEPLASS = {id: 6, gruppe_id: 2};
     """
 
     def test_inaktiv_rolle_tilbys_ikke(self):
         ut = run_node(self.harness, self.ROLLER + """
-            console.log(_rolleValg({id: 9, rolle_id: null}, true));
+            console.log(_rolleValg({id: 9, rolle_id: null}, AMBULANSE, true));
         """)
         self.assertIn('Lagleder', ut)
         self.assertNotIn('Utgaatt', ut)
+
+    def test_en_annen_gruppes_rolle_tilbys_ikke(self):
+        """«Sjåfør» hører hjemme på ambulansen, ikke på samleplassen. Uten
+        dette leddet er gruppa bare en etikett, og nedtrekket like langt som
+        et globalt register."""
+        ut = run_node(self.harness, self.ROLLER + """
+            console.log(_rolleValg({id: 9, rolle_id: null}, AMBULANSE, true));
+        """)
+        self.assertNotIn('Innsatsleder', ut)
+
+    def test_gruppa_far_sine_egne(self):
+        ut = run_node(self.harness, self.ROLLER + """
+            console.log(_rolleValg({id: 9, rolle_id: null}, SAMLEPLASS, true));
+        """)
+        self.assertIn('Innsatsleder', ut)
+        self.assertNotIn('Lagleder', ut)
 
     def test_raden_beholder_rollen_den_alt_har(self):
         """Ellers ville et skift med en utgått rolle sett ut som om rollen
         var fjernet, og neste lagring hadde fjernet den på ordentlig."""
         ut = run_node(self.harness, self.ROLLER + """
-            console.log(_rolleValg({id: 9, rolle_id: 2}, true));
+            console.log(_rolleValg({id: 9, rolle_id: 2}, AMBULANSE, true));
         """)
         self.assertIn('Utgaatt', ut)
         self.assertIn('selected', ut)
 
+    def test_raden_beholder_rollen_selv_fra_en_annen_gruppe(self):
+        """Flyttes en ressurs til en annen gruppe, står skiftene igjen med
+        roller fra den gamle. De skal fortsatt vises — ellers byttes de
+        stilltiende bort ved neste tegning."""
+        ut = run_node(self.harness, self.ROLLER + """
+            console.log(_rolleValg({id: 9, rolle_id: 3}, AMBULANSE, true));
+        """)
+        self.assertIn('Innsatsleder', ut)
+        self.assertIn('selected', ut)
+
     def test_uten_skrivetilgang_vises_rollen_som_tekst(self):
         ut = run_node(self.harness, self.ROLLER + """
-            console.log(_rolleValg({id: 9, rolle_id: 1, rolle: 'Lagleder'}, false));
+            console.log(_rolleValg({id: 9, rolle_id: 1, rolle: 'Lagleder'},
+                                   AMBULANSE, false));
         """)
         self.assertNotIn('<select', ut)
         self.assertIn('Lagleder', ut)
+
+
+class CelleklikkTests(SimpleTestCase):
+    """Et element som melder sin egen hendelse skal ikke også fyre på klikk.
+
+    **Buggen André meldte:** «trykker jeg på ledig plass får jeg en kort popup
+    som forsvinner». Nedtrekket i navnekolonnen er `<select data-action=
+    "endreVaktpost" data-hendelse="change">`, og klikkdelegeringen i
+    `portal-utils.js` traff det også. Klikket som åpnet lista kalte altså
+    `endreVaktpost(id)` uten felt og verdi, sendte en tom PUT, og tegnet
+    panelet på nytt — så den åpne lista ble revet bort i det øyeblikket den
+    kom.
+
+    Regelen ligger i `klikkSkalKjore()` og ikke som en anonym `if` inne i
+    lytteren, nettopp for at den skal kunne kjøres her.
+    """
+
+    HARNESS = ((PORTAL_UTILS_JS, ('klikkSkalKjore',)),)
+
+    def setUp(self):
+        if not node_available():
+            self.skipTest('node er ikke tilgjengelig')
+        self.harness = build_harness(self.HARNESS)
+
+    def test_element_med_egen_hendelse_hopper_over_klikk(self):
+        run_node(self.harness, """
+            const cella = { dataset: { action: 'endreVaktpost',
+                                       hendelse: 'change', felt: 'rolle_id' } };
+            assert(klikkSkalKjore(cella) === false,
+                   'nedtrekket melder change og skal ikke fyre paa klikk');
+        """)
+
+    def test_vanlig_knapp_fyrer_som_for(self):
+        """Regelen må ikke slå av delegeringen for alle andre — den er
+        hele mekanismen bak `data-action` i portalen."""
+        run_node(self.harness, """
+            const knapp = { dataset: { action: 'apneVaktpost', id: '3' } };
+            assert(klikkSkalKjore(knapp) === true, 'knapper fyrer som for');
+        """)
+
+
+class VarighetTests(SimpleTestCase):
+    """Timer per skift — kolonnen André ba om.
+
+    Det er det ene tallet man ellers regner ut i hodet for hver rad, og
+    «20:00 til 04:30» er ikke åtte timer.
+    """
+
+    HARNESS = ((VAKTLISTE_JS, ('_d', '_varighet')),)
+
+    def setUp(self):
+        if not node_available():
+            self.skipTest('node er ikke tilgjengelig')
+        self.harness = build_harness(self.HARNESS)
+
+    def test_helt_antall_timer_vises_uten_desimal(self):
+        run_node(self.harness, """
+            const ut = _varighet({fra_tid: '2026-10-03T08:00:00',
+                                  til_tid: '2026-10-03T16:00:00'});
+            assert(ut === '8 t', 'fikk ' + ut);
+        """)
+
+    def test_skift_over_midnatt_regnes_riktig(self):
+        """Klokkeslettene alene sier 20 til 04; det er åtte timer, ikke seksten
+        og ikke minus seksten."""
+        run_node(self.harness, """
+            const ut = _varighet({fra_tid: '2026-10-03T20:00:00',
+                                  til_tid: '2026-10-04T04:00:00'});
+            assert(ut === '8 t', 'fikk ' + ut);
+        """)
+
+    def test_halvtime_far_en_desimal(self):
+        run_node(self.harness, """
+            const ut = _varighet({fra_tid: '2026-10-03T20:00:00',
+                                  til_tid: '2026-10-04T04:30:00'});
+            assert(ut === '8,5 t', 'fikk ' + ut);
+        """)
+
+    def test_manglende_eller_negativ_tid_gir_strek(self):
+        """Et skift under oppsett kan mangle den ene tida, og serveren
+        avviser et negativt spenn — men raden tegnes før svaret kommer."""
+        run_node(self.harness, """
+            assert(_varighet({fra_tid: null, til_tid: '2026-10-03T16:00:00'})
+                   === '—', 'mangler fra');
+            assert(_varighet({fra_tid: '2026-10-03T16:00:00',
+                              til_tid: '2026-10-03T08:00:00'}) === '—',
+                   'negativt spenn');
+        """)
+
+
+class KurvePerGruppeTests(SimpleTestCase):
+    """Bemanningskurven følger grupperingen.
+
+    Én samlet kurve summerte samleplassen, ambulansene og KO til ett tall, og
+    det tallet svarer ikke på noe: fire på samleplassen og null på ambulansen
+    ser likt ut som to og to.
+    """
+
+    HARNESS = (
+        (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue')),
+        (VAKTLISTE_JS, ('_d', '_kl', '_dag', '_vaktensSpenn',
+                        '_bemanningPerTime', '_posterPerGruppe',
+                        '_mkEnKurve', 'mkKurve')),
+    )
+    VINDU = ("globalThis.DAGER = ['søn','man','tir','ons','tor','fre','lør'];\n"
+             "globalThis.MND = ['jan','feb','mar','apr','mai','jun',"
+             "'jul','aug','sep','okt','nov','des'];\n")
+
+    #: To grupper, to ressurser, tre skift. Ambulansen har én ledig plass.
+    LISTE = """
+        globalThis.aktivListe = {
+          vaktliste: {startet: '2026-10-03T08:00:00',
+                      planlagt_slutt: '2026-10-03T12:00:00'},
+          grupper: [{id: 1, navn: 'Samleplass'}, {id: 2, navn: 'Ambulanse'},
+                    {id: 3, navn: 'Ubrukt'}],
+          ressurser: [{id: 10, gruppe_id: 1}, {id: 20, gruppe_id: 2}],
+          vaktposter: [
+            {id: 1, ressurs_id: 10, ledig: false,
+             fra_tid: '2026-10-03T08:00:00', til_tid: '2026-10-03T12:00:00'},
+            {id: 2, ressurs_id: 10, ledig: false,
+             fra_tid: '2026-10-03T08:00:00', til_tid: '2026-10-03T12:00:00'},
+            {id: 3, ressurs_id: 20, ledig: true,
+             fra_tid: '2026-10-03T08:00:00', til_tid: '2026-10-03T12:00:00'}
+          ]};
+    """
+
+    def setUp(self):
+        if not node_available():
+            self.skipTest('node er ikke tilgjengelig')
+        self.harness = build_harness(self.HARNESS)
+
+    def test_hver_gruppe_teller_bare_sine_egne(self):
+        run_node(self.harness, self.VINDU + self.LISTE + """
+            const bunker = _posterPerGruppe();
+            assert(bunker.length === 2, 'to grupper med skift, fikk ' + bunker.length);
+            assert(bunker[0].gruppe.navn === 'Samleplass', 'rekkefolgen fra serveren');
+            assert(bunker[0].poster.length === 2, 'samleplassen har to');
+            assert(bunker[1].poster.length === 1, 'ambulansen har ett');
+        """)
+
+    def test_gruppe_uten_skift_tegnes_ikke(self):
+        """Seks tomme kurver på en vakt med to ressurser er verre enn ingen."""
+        run_node(self.harness, self.VINDU + self.LISTE + """
+            const navn = _posterPerGruppe().map((b) => b.gruppe.navn);
+            assert(navn.indexOf('Ubrukt') === -1, 'fikk ' + navn.join(', '));
+        """)
+
+    def test_kurvene_deler_spenn(self):
+        """Ellers ligger ikke søylene under hverandre, og to kurver man ikke
+        kan sammenligne er verre enn én samlet."""
+        run_node(self.harness, self.VINDU + self.LISTE + """
+            const bunker = _posterPerGruppe();
+            const a = _bemanningPerTime(bunker[0].poster);
+            const b = _bemanningPerTime(bunker[1].poster);
+            assert(a.length === b.length, 'like mange timer');
+            assert(a[0].tid === b[0].tid, 'samme starttime');
+        """)
+
+    def test_hver_kurve_far_sin_egen_topp(self):
+        """Samleplassen har to på vakt, ambulansen en ledig plass. Delte de
+        skala, ville ambulansens hull sett halvfullt ut."""
+        ut = run_node(self.harness, self.VINDU + self.LISTE + """
+            console.log(mkKurve());
+        """)
+        self.assertIn('Samleplass', ut)
+        self.assertIn('Ambulanse', ut)
+        self.assertIn('topp 2 plasser', ut)
+        self.assertIn('topp 1 plasser', ut)
+
+    def test_ledige_plasser_telles_per_gruppe(self):
+        ut = run_node(self.harness, self.VINDU + self.LISTE + """
+            console.log(mkKurve());
+        """)
+        self.assertIn('Alle plasser fylt', ut)        # samleplassen
+        self.assertIn('4 ubesatte plasstimer', ut)    # ambulansen, fire timer
+
+    def test_ingen_grupper_gir_ingen_kurve(self):
+        run_node(self.harness, self.VINDU + """
+            globalThis.aktivListe = {vaktliste: {}, grupper: [],
+                                     ressurser: [], vaktposter: []};
+            assert(mkKurve() === '', 'ingenting aa tegne');
+        """)

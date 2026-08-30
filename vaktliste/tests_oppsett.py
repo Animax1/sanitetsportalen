@@ -27,6 +27,8 @@ from oppdrag.models import Enhet
 from patients.models import AppSetting
 
 from . import choices, services
+from .test_helpers import (KO, LAG, MANNSKAPSBIL, gruppe, lag_ressurs,
+                          lag_rolle)
 from .models import (Korps, Mannskap, Ressurs, Ressursrolle, Vaktliste,
                      Vaktpost)
 
@@ -118,12 +120,12 @@ class KopierOppsettTests(TestCase):
         self.fra = services.opprett_planlagt_vakt('Fjorårets vakt')
         self.til = services.opprett_planlagt_vakt('Årets vakt')
 
-        self.bil = Ressurs.objects.create(
+        self.bil = lag_ressurs(
             vaktliste=self.fra, navn='Mannskapsbil 1',
-            type=choices.MANNSKAPSBIL, korps=self.korps, enhet=self.enhet,
+            gruppe=gruppe(MANNSKAPSBIL), korps=self.korps, enhet=self.enhet,
             rekkefolge=10)
-        Ressurs.objects.create(
-            vaktliste=self.fra, navn='KO', type=choices.KO, rekkefolge=20)
+        lag_ressurs(
+            vaktliste=self.fra, navn='KO', gruppe=gruppe(KO), rekkefolge=20)
         # Rekkefølgen settes normalt av `neste_rekkefolge()`; her settes den
         # eksplisitt fordi testen handler om at kopien bevarer den.
 
@@ -138,7 +140,7 @@ class KopierOppsettTests(TestCase):
         self.assertEqual(antall, 2)
 
         bil = self.til.ressurser.get(navn='Mannskapsbil 1')
-        self.assertEqual(bil.type, choices.MANNSKAPSBIL)
+        self.assertEqual(bil.gruppe.navn, MANNSKAPSBIL)
         self.assertEqual(bil.korps_id, self.korps.pk)
         self.assertEqual(bil.enhet_id, self.enhet.pk)
         self.assertEqual(bil.rekkefolge, 10)
@@ -179,7 +181,8 @@ class FanerekkefolgeTests(TestCase):
     def _legg_til(self, navn):
         return self.c.post(
             f'/vaktliste/api/vaktlister/{self.vl.pk}/ressurser/',
-            data={'navn': navn}, content_type='application/json')
+            data={'navn': navn, 'gruppe_id': gruppe().pk},
+            content_type='application/json')
 
     def test_fanene_folger_opprettelsesrekkefolgen(self):
         for navn in ('Samleplass', 'Mannskapsbil 1', 'Ambulanse', 'Lag 1', 'KO'):
@@ -221,8 +224,8 @@ class ModellReglerTests(TestCase):
     def setUp(self):
         self.korps = Korps.objects.create(navn='Haugesund')
         self.vl = services.opprett_planlagt_vakt('Vakta')
-        self.ressurs = Ressurs.objects.create(
-            vaktliste=self.vl, navn='Lag 1', type=choices.LAG)
+        self.ressurs = lag_ressurs(
+            vaktliste=self.vl, navn='Lag 1', gruppe=gruppe(LAG))
         self.person = Mannskap.objects.create(navn='Kari', korps=self.korps)
         self.na = timezone.now()
 
@@ -235,10 +238,10 @@ class ModellReglerTests(TestCase):
 
     def test_ressursnavn_er_unikt_per_vaktliste_ikke_globalt(self):
         annen = services.opprett_planlagt_vakt('Annen vakt')
-        Ressurs.objects.create(vaktliste=annen, navn='Lag 1')   # går fint
+        lag_ressurs(vaktliste=annen, navn='Lag 1')   # går fint
         with self.assertRaises(IntegrityError):
             with transaction.atomic():
-                Ressurs.objects.create(vaktliste=self.vl, navn='Lag 1')
+                lag_ressurs(vaktliste=self.vl, navn='Lag 1')
 
     def test_samme_person_samme_ressurs_samme_starttid_er_dobbeltforing(self):
         self._post()
@@ -257,7 +260,7 @@ class ModellReglerTests(TestCase):
     def test_overlapp_paa_tvers_av_ressurser_stoppes_ikke(self):
         """Bevisst: noen ganger står man på to lister. Planleggingstallene
         flagger det (fase 5), basen nekter det ikke."""
-        annen = Ressurs.objects.create(vaktliste=self.vl, navn='KO')
+        annen = lag_ressurs(vaktliste=self.vl, navn='KO')
         self._post()
         self._post(ressurs=annen)
         self.assertEqual(self.person.vaktposter.count(), 2)
@@ -304,11 +307,11 @@ class TilgangsregelTests(TestCase):
         self.karmoy = Korps.objects.create(navn='Karmøy')
         self.vl = services.opprett_planlagt_vakt('Vakta')
 
-        self.res_hgsd = Ressurs.objects.create(
+        self.res_hgsd = lag_ressurs(
             vaktliste=self.vl, navn='Lag HGSD', korps=self.hgsd)
-        self.res_karmoy = Ressurs.objects.create(
+        self.res_karmoy = lag_ressurs(
             vaktliste=self.vl, navn='Lag Karmøy', korps=self.karmoy)
-        self.res_fri = Ressurs.objects.create(vaktliste=self.vl, navn='KO')
+        self.res_fri = lag_ressurs(vaktliste=self.vl, navn='KO')
 
         self.p_hgsd = Mannskap.objects.create(navn='Kari', korps=self.hgsd)
         self.p_karmoy = Mannskap.objects.create(navn='Ola', korps=self.karmoy)
@@ -390,7 +393,7 @@ class ApiTests(TestCase):
         from patients.test_helpers import sett_aktiv_vakt
         self.aktiv = sett_aktiv_vakt(2098)
         self.korps = Korps.objects.create(navn='Haugesund', kortnavn='HGSD')
-        self.rolle = Ressursrolle.objects.create(navn='Lagleder')
+        self.rolle = lag_rolle('Lagleder')
         self.person = Mannskap.objects.create(navn='Kari', korps=self.korps)
         self.admin = _bruker('adm', admin=True)
         self.c = _klient(self.admin)
@@ -403,7 +406,7 @@ class ApiTests(TestCase):
         return services.opprett_planlagt_vakt(navn)
 
     def _ressurs(self, vl, navn='Lag 1', **kwargs):
-        return Ressurs.objects.create(vaktliste=vl, navn=navn, **kwargs)
+        return lag_ressurs(vaktliste=vl, navn=navn, **kwargs)
 
     # ── Siden ────────────────────────────────────────────────────────────
     def test_siden_svarer_for_admin(self):
@@ -430,7 +433,7 @@ class ApiTests(TestCase):
 
     def test_post_med_kopier_fra_tar_ressursene(self):
         kilde = self._liste('I fjor')
-        self._ressurs(kilde, 'Mannskapsbil 1', type=choices.MANNSKAPSBIL,
+        self._ressurs(kilde, 'Mannskapsbil 1', gruppe=gruppe(MANNSKAPSBIL),
                       korps=self.korps)
         res = self.c.post(
             '/vaktliste/api/vaktlister/',
@@ -491,7 +494,7 @@ class ApiTests(TestCase):
         vl = self._liste()
         res = self.c.post(
             f'/vaktliste/api/vaktlister/{vl.pk}/ressurser/',
-            data={'navn': 'Lag Nord', 'type': choices.LAG,
+            data={'navn': 'Lag Nord', 'gruppe_id': gruppe(LAG).pk,
                   'korps_id': self.korps.pk},
             content_type='application/json')
         self.assertEqual(res.status_code, 201)
@@ -501,15 +504,26 @@ class ApiTests(TestCase):
         vl = self._liste()
         res = self.c.post(
             f'/vaktliste/api/vaktlister/{vl.pk}/ressurser/',
-            data={'navn': 'KO', 'type': choices.KO},
+            data={'navn': 'KO', 'gruppe_id': gruppe(KO).pk},
             content_type='application/json')
         self.assertIsNone(res.json()['data']['korps_id'])
 
-    def test_ukjent_ressurstype_avvises(self):
+    def test_ressurs_uten_gruppe_avvises(self):
+        """Gruppa styrer ikon, fane, roller og kurve. En ressurs uten gruppe
+        er en fane uten navn og et nedtrekk uten innhold — den skal ikke
+        kunne opprettes, ikke opprettes med en stille standardverdi."""
         vl = self._liste()
         res = self.c.post(
             f'/vaktliste/api/vaktlister/{vl.pk}/ressurser/',
-            data={'navn': 'Noe', 'type': 'helikopter'},
+            data={'navn': 'Noe'}, content_type='application/json')
+        self.assertEqual(res.status_code, 400)
+        self.assertIn('gruppe', res.json()['message'])
+
+    def test_ukjent_gruppe_avvises(self):
+        vl = self._liste()
+        res = self.c.post(
+            f'/vaktliste/api/vaktlister/{vl.pk}/ressurser/',
+            data={'navn': 'Noe', 'gruppe_id': 99999},
             content_type='application/json')
         self.assertEqual(res.status_code, 400)
 
@@ -523,7 +537,8 @@ class ApiTests(TestCase):
         self._ressurs(vl, 'Lag 1')
         res = self.c.post(
             f'/vaktliste/api/vaktlister/{vl.pk}/ressurser/',
-            data={'navn': 'Lag 1'}, content_type='application/json')
+            data={'navn': 'Lag 1', 'gruppe_id': gruppe().pk},
+            content_type='application/json')
         self.assertEqual(res.status_code, 400)
         self.assertIn('Lag 1', res.json()['message'])
 
@@ -541,7 +556,8 @@ class ApiTests(TestCase):
         vl = self._liste()
         res = self.c.post(
             f'/vaktliste/api/vaktlister/{vl.pk}/ressurser/',
-            data={'navn': '   '}, content_type='application/json')
+            data={'navn': '   ', 'gruppe_id': gruppe().pk},
+            content_type='application/json')
         self.assertEqual(res.status_code, 400)
 
     def test_ressurs_kan_endres_og_fjernes(self):
@@ -553,8 +569,15 @@ class ApiTests(TestCase):
             content_type='application/json')
         self.assertEqual(res.json()['data']['navn'], 'Lag Sør')
 
+        # Sletting krever bekreftelse: CASCADE tar alle skiftene med seg.
         self.assertEqual(
-            self.c.delete(f'/vaktliste/api/ressurser/{r.pk}/').status_code, 200)
+            self.c.delete(f'/vaktliste/api/ressurser/{r.pk}/').status_code, 400)
+        self.assertTrue(Ressurs.objects.filter(pk=r.pk).exists())
+
+        self.assertEqual(
+            self.c.delete(f'/vaktliste/api/ressurser/{r.pk}/',
+                          data={'confirm': True},
+                          content_type='application/json').status_code, 200)
         self.assertFalse(Ressurs.objects.filter(pk=r.pk).exists())
 
     # ── Vaktposter ───────────────────────────────────────────────────────
@@ -657,10 +680,10 @@ class RessurstabellensDataTests(TestCase):
         self.gfor = Kompetanse.objects.create(navn='GFØR')
         self.afor = Kompetanse.objects.create(navn='AFØR', bygger_paa=self.gfor)
         self.syk = Kompetanse.objects.create(navn='Sykepleier')
-        self.rolle = Ressursrolle.objects.create(navn='Lagleder')
+        self.rolle = lag_rolle('Lagleder')
 
         self.vl = services.opprett_planlagt_vakt('Vakta')
-        self.ressurs = Ressurs.objects.create(vaktliste=self.vl, navn='Lag 1')
+        self.ressurs = lag_ressurs(vaktliste=self.vl, navn='Lag 1')
         self.person = Mannskap.objects.create(navn='Kari', korps=self.korps)
         self.person.kompetanser.set([self.gfor, self.afor, self.syk])
         na = timezone.now()
@@ -719,9 +742,9 @@ class LedigePlasserTests(TestCase):
 
     def setUp(self):
         self.korps = Korps.objects.create(navn='Haugesund', kortnavn='HGSD')
-        self.rolle = Ressursrolle.objects.create(navn='Lagleder')
+        self.rolle = lag_rolle('Lagleder')
         self.vl = services.opprett_planlagt_vakt('Vakta')
-        self.ressurs = Ressurs.objects.create(vaktliste=self.vl, navn='Lag 1')
+        self.ressurs = lag_ressurs(vaktliste=self.vl, navn='Lag 1')
         self.person = Mannskap.objects.create(navn='Kari', korps=self.korps)
         self.c = _klient(_bruker('adm', admin=True))
         self.na = timezone.now()
@@ -900,10 +923,10 @@ class RessursrolleTests(TestCase):
 
     def setUp(self):
         self.korps = Korps.objects.create(navn='Haugesund')
-        self.rolle = Ressursrolle.objects.create(navn='Lagleder')
-        self.utgatt = Ressursrolle.objects.create(navn='Utgått', er_aktiv=False)
+        self.rolle = lag_rolle('Lagleder')
+        self.utgatt = lag_rolle('Utgått', er_aktiv=False)
         self.vl = services.opprett_planlagt_vakt('Vakta')
-        self.ressurs = Ressurs.objects.create(vaktliste=self.vl, navn='Lag 1')
+        self.ressurs = lag_ressurs(vaktliste=self.vl, navn='Lag 1')
         self.person = Mannskap.objects.create(navn='Kari', korps=self.korps)
         na = timezone.now()
         Vaktpost.objects.create(ressurs=self.ressurs, mannskap=self.person,

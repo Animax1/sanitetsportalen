@@ -49,6 +49,11 @@ urlpatterns = [
          name='vaktliste_api_kompetanser'),
     path('api/kompetanser/<int:pk>/', views_registre.kompetanse_detalj_view,
          name='vaktliste_api_kompetanse_detalj'),
+    # Ressursgruppene. Egen sti, ikke en av verdimengdene i views_registre:
+    # gruppa har ikon og rekkefølge, og administreres på planleggingssiden.
+    path('api/grupper/', views.grupper_view, name='vaktliste_api_grupper'),
+    path('api/grupper/<int:pk>/', views.gruppe_detalj_view,
+         name='vaktliste_api_gruppe_detalj'),
     path('api/roller/', views_registre.roller_view, name='vaktliste_api_roller'),
     path('api/roller/<int:pk>/', views_registre.rolle_detalj_view,
          name='vaktliste_api_rolle_detalj'),

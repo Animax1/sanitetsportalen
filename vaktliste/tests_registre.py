@@ -18,7 +18,9 @@ from django.utils import timezone
 from accounts.models import CustomUser, ModulTilgang
 
 from . import services
-from .models import Kompetanse, Korps, Mannskap, Ressurs, Ressursrolle, Vaktpost
+from .models import Kompetanse, Korps, Mannskap, Ressursrolle, Vaktpost
+from .test_helpers import (AMBULANSE, LAG, SAMLEPLASS, gruppe,
+                          lag_ressurs, lag_rolle)
 
 
 def _bruker(navn, nivaa=None, *, admin=False):
@@ -56,7 +58,10 @@ class RegisterFlateFinnesTests(TestCase):
         self.assertEqual(korps.status_code, 201)
         komp = self._post('/vaktliste/api/kompetanser/', navn='Sykepleier')
         self.assertEqual(komp.status_code, 201)
-        rolle = self._post('/vaktliste/api/roller/', navn='Lagleder')
+        # Gruppa finnes fra migrasjonen; rollen hører til den.
+        lag = gruppe(LAG)
+        rolle = self._post('/vaktliste/api/roller/', navn='Lagleder',
+                           gruppe_id=lag.pk)
         self.assertEqual(rolle.status_code, 201)
 
         person = self._post(
@@ -73,7 +78,7 @@ class RegisterFlateFinnesTests(TestCase):
         vl = self._post('/vaktliste/api/vaktlister/', navn='Vakta')
         ressurs = self._post(
             f'/vaktliste/api/vaktlister/{vl.json()["data"]["id"]}/ressurser/',
-            navn='Lag 1')
+            navn='Lag 1', gruppe_id=lag.pk)
         na = timezone.now()
         satt = self._post(
             f'/vaktliste/api/ressurser/{ressurs.json()["data"]["id"]}/vaktposter/',
@@ -97,9 +102,15 @@ class RegisterFlateFinnesTests(TestCase):
 
 @override_settings(SECURE_SSL_REDIRECT=False, RATELIMIT_ENABLE=False)
 class VerdimengdeTests(TestCase):
-    """De tre som deler fabrikk. Testene kjører mot alle tre der regelen deles."""
+    """De som deler fabrikk. Testene kjører mot begge der regelen deles.
 
-    STIER = ('korps', 'kompetanser', 'roller')
+    **Rollene deler fabrikk, men ikke kontrakt** (30. aug. 2026): de henger
+    under en `Ressursgruppe` og krever `skriv_leder`. De kjøres derfor ikke i
+    løkka her — en delt løkke som må gjøre unntak for ett av leddene tester
+    ikke lenger at leddene er like. Se `RollerErGruppasTests`.
+    """
+
+    STIER = ('korps', 'kompetanser')
 
     def setUp(self):
         self.c = _klient(_bruker('adm', admin=True))
@@ -131,7 +142,8 @@ class VerdimengdeTests(TestCase):
     def test_korps_har_kortnavn_de_andre_ikke(self):
         res = self._post('korps', navn='Haugesund', kortnavn='HGSD')
         self.assertEqual(res.json()['data']['kortnavn'], 'HGSD')
-        self.assertNotIn('kortnavn', self._post('roller', navn='X').json()['data'])
+        self.assertNotIn(
+            'kortnavn', self._post('kompetanser', navn='X').json()['data'])
 
     def test_inaktive_er_med_i_lista(self):
         """De skal kunne aktiveres igjen. En rad som forsvinner helt ser ut
@@ -157,10 +169,11 @@ class VerdimengdeTests(TestCase):
 
     # ── Sletting ─────────────────────────────────────────────────────────
     def test_ubrukt_verdi_kan_slettes(self):
-        pk = self._post('roller', navn='Feilskrevet').json()['data']['id']
+        pk = self._post('kompetanser', navn='Feilskrevet').json()['data']['id']
         self.assertEqual(
-            self.c.delete(f'/vaktliste/api/roller/{pk}/').status_code, 200)
-        self.assertFalse(Ressursrolle.objects.exists())
+            self.c.delete(f'/vaktliste/api/kompetanser/{pk}/').status_code, 200)
+        self.assertFalse(Kompetanse.objects.exists())
+
 
     def test_korps_i_bruk_kan_ikke_slettes(self):
         korps = Korps.objects.create(navn='Haugesund')
@@ -181,7 +194,7 @@ class VerdimengdeTests(TestCase):
         """
         korps = Korps.objects.create(navn='Karmøy')
         vl = services.opprett_planlagt_vakt('Vakta')
-        Ressurs.objects.create(vaktliste=vl, navn='Lag K', korps=korps)
+        lag_ressurs(vaktliste=vl, navn='Lag K', korps=korps)
 
         rad = [k for k in self.c.get('/vaktliste/api/korps/').json()['data']
                if k['navn'] == 'Karmøy'][0]
@@ -204,10 +217,10 @@ class VerdimengdeTests(TestCase):
 
     def test_rolle_i_bruk_kan_ikke_slettes(self):
         korps = Korps.objects.create(navn='Haugesund')
-        rolle = Ressursrolle.objects.create(navn='Lagleder')
+        rolle = lag_rolle('Lagleder')
         person = Mannskap.objects.create(navn='Kari', korps=korps)
         vl = services.opprett_planlagt_vakt('Vakta')
-        r = Ressurs.objects.create(vaktliste=vl, navn='Lag 1')
+        r = lag_ressurs(vaktliste=vl, navn='Lag 1')
         na = timezone.now()
         Vaktpost.objects.create(ressurs=r, mannskap=person, rolle=rolle,
                                 fra_tid=na, til_tid=na + timedelta(hours=8))
@@ -222,6 +235,139 @@ class VerdimengdeTests(TestCase):
         Mannskap.objects.create(navn='Ola', korps=korps)
         data = self.c.get('/vaktliste/api/korps/').json()['data']
         self.assertEqual(data[0]['i_bruk'], 2)
+
+
+@override_settings(SECURE_SSL_REDIRECT=False, RATELIMIT_ENABLE=False)
+class RollerErGruppasTests(TestCase):
+    """Rollen hører til en `Ressursgruppe`, og opprettes av `skriv_leder`.
+
+    Begge deler er nye 30. aug. 2026, og begge er svar på noe André så da han
+    brukte modulen: «Sjåfør» hører hjemme på ambulansene, ikke på samleplassen,
+    og den som bare skal bemanne skal ikke kunne finne på nye roller.
+    """
+
+    def setUp(self):
+        self.leder = _klient(_bruker('leder', 'skriv_leder'))
+        self.bemanner = _klient(_bruker('bemanner', 'skriv_full'))
+        self.amb = gruppe(AMBULANSE)
+        self.sam = gruppe(SAMLEPLASS)
+
+    def _post(self, klient, **kropp):
+        return klient.post('/vaktliste/api/roller/', data=kropp,
+                           content_type='application/json')
+
+    def test_rolle_uten_gruppe_avvises(self):
+        """En rolle uten gruppe ville aldri dukket opp i noe nedtrekk — altså
+        en rad man lager og aldri finner igjen."""
+        res = self._post(self.leder, navn='Sjåfør')
+        self.assertEqual(res.status_code, 400)
+        self.assertIn('ressursgruppe', res.json()['message'])
+
+    def test_rolle_med_ukjent_gruppe_avvises(self):
+        res = self._post(self.leder, navn='Sjåfør', gruppe_id=99999)
+        self.assertEqual(res.status_code, 400)
+
+    def test_samme_navn_i_to_grupper_er_to_roller(self):
+        """Unikheten er per gruppe, ikke global: «Lagleder» på ambulansen og
+        «Lagleder» på samleplassen er ikke samme rad."""
+        self.assertEqual(
+            self._post(self.leder, navn='Lagleder', gruppe_id=self.amb.pk
+                       ).status_code, 201)
+        self.assertEqual(
+            self._post(self.leder, navn='Lagleder', gruppe_id=self.sam.pk
+                       ).status_code, 201)
+        self.assertEqual(Ressursrolle.objects.filter(navn='Lagleder').count(), 2)
+
+    def test_duplikat_i_samme_gruppe_avvises(self):
+        self._post(self.leder, navn='Sjåfør', gruppe_id=self.amb.pk)
+        res = self._post(self.leder, navn='Sjåfør', gruppe_id=self.amb.pk)
+        self.assertEqual(res.status_code, 400)
+        self.assertIn('Sjåfør', res.json()['message'])
+
+    def test_svaret_baerer_gruppa(self):
+        """Nedtrekket i ressurstabellen filtrerer på gruppa. Uten IDen i
+        svaret måtte klienten gjette ut fra navnet."""
+        rad = self._post(self.leder, navn='Sjåfør',
+                         gruppe_id=self.amb.pk).json()['data']
+        self.assertEqual(rad['gruppe_id'], self.amb.pk)
+        self.assertEqual(rad['gruppe_navn'], AMBULANSE)
+
+    def test_bemanneren_lager_ikke_roller(self):
+        """`skriv_full` bemanner oppsettet uten å bestemme det."""
+        res = self._post(self.bemanner, navn='Sjåfør', gruppe_id=self.amb.pk)
+        self.assertEqual(res.status_code, 403)
+        self.assertFalse(Ressursrolle.objects.filter(navn='Sjåfør').exists())
+
+    def test_bemanneren_fjerner_ikke_roller(self):
+        rolle = lag_rolle('Sjåfør', AMBULANSE)
+        self.assertEqual(
+            self.bemanner.delete(f'/vaktliste/api/roller/{rolle.pk}/').status_code,
+            403)
+        self.assertTrue(Ressursrolle.objects.filter(pk=rolle.pk).exists())
+
+    def test_bemanneren_leser_rollene(self):
+        """Hun må se dem — nedtrekket i raden er hennes."""
+        lag_rolle('Sjåfør', AMBULANSE)
+        res = self.bemanner.get('/vaktliste/api/roller/')
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual([r['navn'] for r in res.json()['data']], ['Sjåfør'])
+
+
+@override_settings(SECURE_SSL_REDIRECT=False, RATELIMIT_ENABLE=False)
+class RessursgruppeApiTests(TestCase):
+    """Gruppene: seedet av migrasjonen, administrert av `skriv_leder`."""
+
+    def setUp(self):
+        self.leder = _klient(_bruker('leder', 'skriv_leder'))
+        self.bemanner = _klient(_bruker('bemanner', 'skriv_full'))
+
+    def test_standardgruppene_finnes_uten_at_noen_lager_dem(self):
+        """Migrasjon 0007 seeder de seks. Uten dem kan ingen opprette en
+        ressurs i det hele tatt — en tom gruppetabell er en portal der
+        vaktlista ikke kan settes opp."""
+        navn = [g['navn'] for g in
+                self.bemanner.get('/vaktliste/api/grupper/').json()['data']]
+        self.assertEqual(
+            navn, ['Samleplass', 'Mannskapsbil', 'Ambulanse', 'Lag', 'KO', 'Annet'],
+            'seedet rekkefølge, ikke alfabetisk — den styrer fanene')
+
+    def test_lederen_oppretter_en_gruppe(self):
+        res = self.leder.post('/vaktliste/api/grupper/',
+                              data={'navn': 'Førstehjelpstelt', 'ikon': 'tent'},
+                              content_type='application/json')
+        self.assertEqual(res.status_code, 201)
+        rad = res.json()['data']
+        self.assertEqual(rad['ikon'], 'tent')
+        self.assertEqual(rad['i_bruk'], 0)
+
+    def test_ny_gruppe_havner_sist(self):
+        """Ingen skal måtte finne på et tall — samme grep som på ressursene."""
+        self.leder.post('/vaktliste/api/grupper/', data={'navn': 'MC-patrulje'},
+                        content_type='application/json')
+        navn = [g['navn'] for g in
+                self.leder.get('/vaktliste/api/grupper/').json()['data']]
+        self.assertEqual(navn[-1], 'MC-patrulje')
+
+    def test_bemanneren_oppretter_ikke_grupper(self):
+        res = self.bemanner.post('/vaktliste/api/grupper/',
+                                 data={'navn': 'Førstehjelpstelt'},
+                                 content_type='application/json')
+        self.assertEqual(res.status_code, 403)
+
+    def test_gruppe_i_bruk_kan_ikke_slettes(self):
+        """PROTECT ville uansett stoppet det, men meldingen skal peke på
+        veien ut: en gruppe i bruk deaktiveres, den fjernes ikke."""
+        vl = services.opprett_planlagt_vakt('Vakta')
+        lag_ressurs(vaktliste=vl, navn='Ambulanse 1', gruppe=gruppe(AMBULANSE))
+        res = self.leder.delete(f'/vaktliste/api/grupper/{gruppe(AMBULANSE).pk}/')
+        self.assertEqual(res.status_code, 400)
+        self.assertIn('Deaktiver', res.json()['message'])
+
+    def test_ubrukt_gruppe_kan_slettes(self):
+        pk = self.leder.post('/vaktliste/api/grupper/', data={'navn': 'Feil'},
+                             content_type='application/json').json()['data']['id']
+        self.assertEqual(
+            self.leder.delete(f'/vaktliste/api/grupper/{pk}/').status_code, 200)
 
 
 @override_settings(SECURE_SSL_REDIRECT=False, RATELIMIT_ENABLE=False)
@@ -283,7 +429,7 @@ class MannskapApiTests(TestCase):
     def test_person_paa_vaktpost_kan_ikke_slettes(self):
         pk = self._opprett().json()['data']['id']
         vl = services.opprett_planlagt_vakt('Vakta')
-        r = Ressurs.objects.create(vaktliste=vl, navn='Lag 1')
+        r = lag_ressurs(vaktliste=vl, navn='Lag 1')
         na = timezone.now()
         Vaktpost.objects.create(ressurs=r, mannskap_id=pk,
                                 fra_tid=na, til_tid=na + timedelta(hours=8))
@@ -503,7 +649,7 @@ class SammeFormBeggeVeierTests(TestCase):
         self.korps = Korps.objects.create(navn='Haugesund', kortnavn='HGSD')
         gfor = Kompetanse.objects.create(navn='GFØR')
         Kompetanse.objects.create(navn='VFØR', bygger_paa=gfor)
-        Ressursrolle.objects.create(navn='Lagleder')
+        lag_rolle('Lagleder')
         Mannskap.objects.create(navn='Kari', korps=self.korps)
         self.c = _klient(_bruker('adm', admin=True))
 

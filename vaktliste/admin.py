@@ -12,7 +12,8 @@ finnes her, finnes ikke for brukeren.
 """
 from django.contrib import admin
 
-from .models import Kompetanse, Korps, Mannskap, Ressursrolle
+from .models import (Kompetanse, Korps, Mannskap, Ressursgruppe,
+                     Ressursrolle)
 
 
 @admin.register(Korps)
@@ -35,12 +36,21 @@ class KompetanseAdmin(admin.ModelAdmin):
     ordering = ('navn',)
 
 
-@admin.register(Ressursrolle)
-class RessursrolleAdmin(admin.ModelAdmin):
-    list_display = ('navn', 'er_aktiv')
+@admin.register(Ressursgruppe)
+class RessursgruppeAdmin(admin.ModelAdmin):
+    list_display = ('navn', 'ikon', 'rekkefolge', 'er_aktiv')
     list_filter = ('er_aktiv',)
     search_fields = ('navn',)
-    ordering = ('navn',)
+    ordering = ('rekkefolge', 'navn')
+
+
+@admin.register(Ressursrolle)
+class RessursrolleAdmin(admin.ModelAdmin):
+    list_display = ('navn', 'gruppe', 'er_aktiv')
+    list_filter = ('gruppe', 'er_aktiv')
+    search_fields = ('navn',)
+    list_select_related = ('gruppe',)
+    ordering = ('gruppe__rekkefolge', 'navn')
 
 
 @admin.register(Mannskap)

@@ -74,6 +74,14 @@ Nivåene er en ordnet stige. **Fravær av rad er ingen tilgang** — det finnes 
 | `les` | Kan se modulens data |
 | `skriv_handling` | Navngitte overganger (stemplinger), leser ikke request-kroppen |
 | `skriv_full` | Kan redigere felter |
+| `skriv_leder` | Kan sette opp — oppretter og fjerner det de andre redigerer |
+
+**`skriv_leder` (30. aug. 2026) deklareres kun av vaktlista**, og skillet mot `skriv_full`
+er *hva slags skade en feil gjør*: den som bemanner setter folk på plasser og kan rette
+tilbake; den som setter opp fjerner en ressurs, og bemanningen forsvinner med den. Uten
+trinnet måtte de to deles ut samlet, eller oppsettet bli global admin — og da kunne ikke en
+vaktleder lage sin egen vaktliste uten å få brukeradmin, backup og arkiv på kjøpet. Et nytt
+trinn er additivt: modulene som ikke deklarerer det, tilbyr det ikke i matrisen.
 
 **Hver modul deklarerer hvilke nivåer som betyr noe for den** — `Module.nivaaer`. Matrisen
 tilbyr de nivåene og ingen andre. **Og hver modul kan gi dem sin egen etikett** —
@@ -308,13 +316,33 @@ fase 3–7 gjenstår — se `docs/BESLUTNING_VAKTLISTE.md`, som er besluttet i s
   flaten er kun rutet under `DEBUG`/`OFFLINE_MODE` (S1), så `vaktliste/admin.py` er et
   utviklerverktøy — et register som *bare* finnes der, finnes ikke for brukeren.
   `SjekkAtIngenPekerPaaDjangoAdminTests` skanner alle maler for lenker dit.
-- **Rollen heter `Ressursrolle`, og administreres på planleggingssiden.** Den
-  gjelder plassen på ressursen — lagleder *på bilen* — ikke vakta; «vaktrolle»
-  leste som noe man har på hele vakta. Den er derfor det ene registeret som
-  *ikke* ligger på `/vaktliste/registre/`: det brukes der ressursene settes opp.
-  Nedtrekket i raden tilbyr bare aktive roller **pluss den raden alt står på** —
-  uten det siste forsvinner en deaktivert rolle fra sin egen rad ved neste
-  tegning, og velges bort i stillhet.
+- **`Ressursgruppe` er typen, og den er en tabell** (30. aug. 2026 — lå i `choices.py`
+  før det). Gruppa gjør tre ting samtidig, og det er derfor den er én ting og ikke tre:
+  ikonlegger fanen, samler bemanningskurven, og avgrenser rollene. Ikonet er et felt —
+  feil ikon er en skjønnhetsfeil, en manglende gruppe er en vaktliste man ikke får satt
+  opp. Migrasjon `0007` seeder de seks standardgruppene; testene slår dem opp med
+  `test_helpers.gruppe()` framfor å lage sine egne, slik at seeding som slutter å virke
+  blir synlig.
+- **Rollen heter `Ressursrolle`, hører til en `Ressursgruppe`, og administreres inne i
+  ressursen.** Den gjelder plassen på ressursen — lagleder *på bilen* — ikke vakta;
+  «vaktrolle» leste som noe man har på hele vakta. Gruppa er riktig nivå og ikke den
+  enkelte ressursen: «Sjåfør» hører hjemme på hver ambulanse, og har du tre av dem vil du
+  lage rollen én gang. Navnet er derfor unikt *per gruppe*. Nedtrekket i raden filtrerer
+  på tre ting, og hvert ledd er en egen feil å gjøre: gruppa, `er_aktiv`, **og den rollen
+  raden alt står på** — uten det siste forsvinner en deaktivert rolle fra sin egen rad ved
+  neste tegning, og velges bort i stillhet.
+- **Sletting av en ressurs ligger bak «Rediger ressurs» og krever bekreftelse to ganger.**
+  CASCADE tar skiftene. Dialogen stopper feilklikket; `{"confirm": true}` i kroppen stopper
+  et kall som treffer URL-en uten å mene det. De to er ikke samme sperre.
+- **En `<td>` må forbli en `table-cell`.** `display: flex` direkte på en celle tar den ut
+  av tabellens boksmodell, og alt etter den forskyves i forhold til overskriftene —
+  `table-layout: fixed` hjelper ikke. Legg layouten på et element *inne* i cella.
+  `TabellcellersLayoutTests` leser hvilke klasser som står på `<td>`-ene i `mkRessurs()`
+  og håndhever regelen for dem alle.
+- **Bemanningskurven tegnes per ressursgruppe, over ett felles spenn.** Én samlet kurve
+  summerte samleplassen, ambulansene og KO til ett tall som ikke svarer på noe. Spennet er
+  felles (`_vaktensSpenn()`) fordi to kurver man ikke kan sammenligne er verre enn én
+  samlet.
 - **Kolonnebredde i ressurstabellen er `min-width` + `<colgroup>`-andeler, og
   begge deler betyr noe.** Et `datetime-local`-felt har en gulvbredde nettleseren
   bestemmer; blir kolonnen smalere enn den, stikker feltet ut over nabocella —
@@ -433,6 +461,14 @@ Elleve moduler i `static/js/` (ingen bundler), fordelt på seks sider — pasien
 | `oppdrag-enhet.js` | `/oppdrag/`, enhetskontoer | Enhetsskjermen: to knapper mot de navngitte stemplingsendepunktene, og offline-køen i `localStorage`. Serveren sender `neste_overgang` per rad; kjeden følger med som data kun for å projisere neste steg mens noe ligger usendt |
 | `vaktliste.js` | **kun** `/vaktliste/` | Planleggingssiden: fanene bygges av ressursene, ressursen er et regneark med redigering i raden, «Oversikt» er utskriftslista med bemanningskurve, og ressursrollene administreres i en modal på siden |
 | `vaktliste-registre.js` | **kun** `/vaktliste/registre/` | Mannskapsregisteret, korpsene og kompetansene. Egen fil fordi skjemahjelperne er sidespesifikke — de to vaktlistefilene kan ikke lastes i samme node-harness |
+
+**`data-action` + `data-hendelse` er to lyttere, og bare én skal fyre.** Klikk­delegeringen
+i `portal-utils.js` treffer *alle* `[data-action]`. Et element som melder sin egen hendelse
+— `<select data-action="…" data-hendelse="change">` i vaktlistas ressurstabell — ble derfor
+kalt både på klikk og på endring: klikket som åpnet nedtrekket kalte handlingen uten felt og
+verdi, sendte en tom PUT, og tegnet panelet på nytt, så lista forsvant idet den kom.
+`klikkSkalKjore()` er regelen, og den ligger som en egen funksjon nettopp fordi en anonym
+`if` inne i en lytter ikke lar seg kjøre i en test.
 
 **`patients-utils.js` kan ikke lastes utenfor pasientsiden.** Den gjør arbeid på toppnivå
 — `Chart.defaults` og `new bootstrap.Modal(document.getElementById('newModal'))` — og
