@@ -77,7 +77,6 @@ REVIEWED_INTERPOLATIONS = {
     'merkelapper': 'markup bygget lokalt, hvert kompetansenavn escapet inni',
     'redigerPost': 'markup bygget lokalt, vaktpost-id escapet inni',
     'korpsCelle': 'nedtrekk eller escapet tekst, bygget lokalt',
-    'merke': 'hardkodet selected-attributt fra en ternær',
     'mkGruppekurve(r)': 'kurve fra en bygger som selv skannes her',
     '_tegnforklaring()': 'hardkodet markup uten data',
     'timeakse': 'celler bygget lokalt, klokkeslettene escapet inni',
@@ -87,7 +86,7 @@ REVIEWED_INTERPOLATIONS = {
     "vis ? escapeHtml(_kl(p.tid)) : ''":
         'ternær der den ene grenen er escapet og den andre er tom streng',
     'innhold': 'input eller escapet tekst, bygget lokalt i samme hjelper',
-    'merke': 'markup bygget lokalt, ukedagen escapet inni',
+    'merke': 'to bruk, begge trygge: selected-attributtet fra en ternær i nedtrekkene, og ukedagsmerket der dagen escapes inni',
     'kurver': 'kurver fra `_mkEnKurve`, som selv skannes her',
     # `tittel` er ren tekst som escapes én gang ved innsetting i `title=`.
     # Escapet vi her også, ville teksten blitt dobbeltescapet i tooltipen —
