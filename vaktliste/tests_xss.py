@@ -1337,3 +1337,66 @@ class GruppekurveIFanenTests(SimpleTestCase):
             console.log(mkGruppekurve({id: 10, gruppe_id: 1}));
         """)
         self.assertIn('Midnatt', ut)
+
+
+class NyRessursIFanerekkaTests(SimpleTestCase):
+    """«Ny ressurs» er sist i fanerekka, og bare for `skriv_leder`.
+
+    Knappen lå i malen og ble skjult av `gateKnapper()`. Da den flyttet inn i
+    rekka — en ressurs *er* en fane — måtte tilgangen flytte med: `tegnFaner()`
+    tegner på nytt ved hvert panelbytte, og en klasse satt én gang ved
+    sidelasting rekker ikke over markup som lages på nytt.
+    """
+
+    HARNESS = (
+        (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue')),
+        (VAKTLISTE_JS, ('tegnFaner', '_posterFor', '_ikkePlassert',
+                        '_nivaa', '_erAdmin', 'kanLede')),
+    )
+
+    def setUp(self):
+        if not node_available():
+            self.skipTest('node er ikke tilgjengelig')
+        self.harness = build_harness(self.HARNESS)
+
+    @staticmethod
+    def _vindu(nivaa='', *, admin=False):
+        return (
+            f"globalThis.window = {{ MODUL_TILGANG: "
+            f"{{ vaktliste: '{nivaa}', admin: {str(admin).lower()} }} }};\n"
+            "globalThis.aktivFane = 'oversikt';\n"
+            "globalThis.OVERSIKT = 'oversikt';\n"
+            "globalThis.IKKE_PLASSERT = 'ikke-plassert';\n"
+            "globalThis.aktivListe = {ressurser: [{id: 7, navn: 'Ambulanse 1',"
+            " ikon: 'truck'}], vaktposter: [], mannskap: []};\n"
+            "let lagret = '';\n"
+            "globalThis.document = { getElementById: () => ("
+            "{ set innerHTML(v) { lagret = v; }, get innerHTML() { return lagret; } }) };\n"
+        )
+
+    def _tegn(self, nivaa='', *, admin=False):
+        return run_node(self.harness, self._vindu(nivaa, admin=admin) + """
+            const el = document.getElementById('vl-faner');
+            tegnFaner();
+            console.log(el.innerHTML);
+        """)
+
+    def test_lederen_ser_knappen_sist_i_rekka(self):
+        ut = self._tegn('skriv_leder')
+        self.assertIn('Ny ressurs', ut)
+        self.assertLess(ut.index('Ambulanse 1'), ut.index('Ny ressurs'),
+                        'knappen skal stå etter fanene, ikke foran dem')
+        self.assertIn('#nyRessursModal', ut)
+
+    def test_admin_ser_den_ogsaa(self):
+        self.assertIn('Ny ressurs', self._tegn('', admin=True))
+
+    def test_bemanneren_ser_den_ikke(self):
+        """`skriv_full` bemanner; hva vakta består av er vaktlederens
+        beslutning. Knappen ville gitt 403."""
+        ut = self._tegn('skriv_full')
+        self.assertIn('Ambulanse 1', ut, 'fanene skal fortsatt tegnes')
+        self.assertNotIn('Ny ressurs', ut)
+
+    def test_leseren_ser_den_ikke(self):
+        self.assertNotIn('Ny ressurs', self._tegn('les'))

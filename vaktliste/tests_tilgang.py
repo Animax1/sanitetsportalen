@@ -795,15 +795,23 @@ class MalensGatingTests(TestCase):
                 / 'index.html').read_text(encoding='utf-8')
 
     def test_oppsettsknappene_krever_leder(self):
+        """«Ny vaktliste» står i malen og gates av klassen.
+
+        «Ny ressurs» står *ikke* her: den bygges sist i fanerekka av
+        `tegnFaner()`, som tegnes på nytt ved hvert panelbytte og derfor
+        sjekker tilgangen selv. Se `NyRessursIFanerekkaTests`.
+        """
         import re
-        mal = self._mal()
-        for maal in ('#nyVaktlisteModal', '#nyRessursModal'):
-            with self.subTest(knapp=maal):
-                m = re.search(
-                    r'<button[^>]*data-bs-target="' + re.escape(maal) + r'"',
-                    mal, re.S)
-                self.assertIsNotNone(m, f'fant ikke knappen for {maal}')
-                self.assertIn('vl-krev-leder', m.group(0))
+        m = re.search(
+            r'<button[^>]*data-bs-target="' + re.escape('#nyVaktlisteModal') + r'"',
+            self._mal(), re.S)
+        self.assertIsNotNone(m, 'fant ikke «Ny vaktliste»-knappen')
+        self.assertIn('vl-krev-leder', m.group(0))
+
+    def test_ny_ressurs_bygges_i_js_og_ikke_i_malen(self):
+        """Står den begge steder, vises den to ganger — og den ene kopien
+        gates av en klasse som ikke rekker over den andre."""
+        self.assertNotIn('#nyRessursModal', self._mal().split('<div class="modal')[0])
 
     def test_vaktas_lengde_ligger_bak_ledergaten(self):
         self.assertIn('class="vl-krev-leder d-none"', self._mal())

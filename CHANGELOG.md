@@ -4,6 +4,25 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-08-30 — «Ny ressurs» inn i fanerekka, Mannskap ned til fanene
+
+**1728 tester grønne** (5 nye). Bare grensesnitt.
+
+- **«Ny ressurs» står sist i fanerekka**, som pluss-fanen i en nettleser. Den
+  lå til høyre for hele rekka og leste som enda en handling på sida; en
+  ressurs *er* en fane, så knappen hører hjemme der fanene slutter. Stiplet
+  kant skiller den fra fanene som faktisk er noe.
+- **Tilgangen måtte flytte med.** Knappen lå i malen og ble skjult av
+  `gateKnapper()` ved sidelasting. `tegnFaner()` tegner på nytt ved hvert
+  panelbytte, så en klasse satt én gang rekker ikke over den — `kanLede()`
+  sjekkes nå rett i byggeren. Mutasjonstestet: uten sjekken ser bemanneren en
+  knapp som gir 403.
+- **Mannskap er flyttet ned til fanene, men står utenfor rekka.** Fanene
+  bytter innhold i panelet under; Mannskap forlater sida. En knapp som ser ut
+  som en fane og navigerer bort er en felle — den har derfor skillelinje foran
+  og beholder knappeformen. Nærheten er poenget: fanene og
+  mannskapsregisteret er de to stedene man veksler mellom.
+
 ## 2026-08-30 — Rediger-knappen innenfor skjermen, og en topp som er ryddet
 
 **1723 tester grønne** (2 nye). Bare grensesnitt.

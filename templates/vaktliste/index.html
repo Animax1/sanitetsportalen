@@ -39,19 +39,17 @@
     hvilken vakt man planla, hvem man er, hva man vil lage. Da sto vaktas navn
     midt inne i en knapperad og så ut som en innstilling.
 
-      1. Sida    — hva dette er, og de to tingene som gjelder portalen
+      1. Sida    — hva dette er, og innstillingene for vakta
       2. Vakta   — hvilken vakt du planlegger, og å lage en ny
-      3. Fanene  — ressursene i den vakta, og å lage en ny ressurs
+      3. Fanene  — ressursene i den vakta, «Ny ressurs», og Mannskap
 
     «Ny ressurs» hører til fanene fordi en ressurs *er* en fane; «Ny vaktliste»
-    hører til velgeren fordi den lager noe velgeren skal peke på.
+    hører til velgeren fordi den lager noe velgeren skal peke på. Mannskap
+    ligger nede ved fanene fordi det er dit man veksler oftest.
   {% endcomment %}
   <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
     <h1 class="h4 mb-0"><i class="bi bi-people me-2"></i>Vaktliste</h1>
     <div class="d-flex gap-2 align-items-center flex-wrap">
-      <a href="/vaktliste/registre/" class="btn btn-outline-secondary btn-sm">
-        <i class="bi bi-person-vcard me-1"></i>Mannskap
-      </a>
       {% comment %}
         Vinduet for vakta selv: lengden og utskriften. Het «Vakta» til
         30. aug. 2026 — et substantiv der de andre knappene er handlinger,
@@ -97,14 +95,22 @@
     <a href="/vaktliste/registre/">Mannskap</a> først.
   </div>
 
-  <!-- Ressursfaner. Bygges av data; «Oversikt» og «Ikke plassert» er faste.
-       «Ny ressurs» står her fordi en ressurs *er* en fane. -->
+  {% comment %}
+    Ressursfaner. Bygges av data; «Oversikt» og «Ikke plassert» er faste, og
+    «Ny ressurs» settes sist i rekka av `tegnFaner()` — en ressurs *er* en
+    fane, så knappen som lager en hører hjemme der fanene slutter.
+
+    **Mannskap står ved siden av, ikke i rekka.** Fanene bytter innhold i
+    panelet under; Mannskap forlater sida. En knapp som ser ut som en fane,
+    men navigerer bort, er en felle — så den er en lenke med skillelinje
+    foran, plassert her fordi fanene og mannskapsregisteret er de to stedene
+    man faktisk veksler mellom.
+  {% endcomment %}
   <div class="vl-fanerad">
     <div class="vl-faner" id="vl-faner"></div>
-    <button type="button" class="btn btn-outline-secondary btn-sm vl-krev-leder d-none"
-            data-bs-toggle="modal" data-bs-target="#nyRessursModal">
-      <i class="bi bi-plus-lg me-1"></i>Ny ressurs
-    </button>
+    <a href="/vaktliste/registre/" class="btn btn-outline-secondary btn-sm vl-tilregister">
+      <i class="bi bi-person-vcard me-1"></i>Mannskap
+    </a>
   </div>
 
   <div id="vl-feil" class="alert alert-danger d-none"></div>

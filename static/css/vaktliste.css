@@ -753,10 +753,36 @@
 /* Fanene og «Ny ressurs» på samme linje — knappen lager en ny fane. */
 .vl-fanerad {
   display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
+  align-items: flex-start;
   gap: 0.75rem;
   flex-wrap: wrap;
+}
+
+/*
+  Mannskap står ved siden av fanerekka, ikke i den. Skillelinja og
+  knappeformen sier at den forlater sida — fanene bytter bare innholdet under.
+*/
+.vl-tilregister {
+  margin-top: 0.4rem;
+  border-left: 1px solid var(--border-color);
+  padding-left: 0.9rem;
+  border-radius: 6px;
+  white-space: nowrap;
+}
+
+/*
+  «Ny ressurs» sist i fanerekka — som pluss-fanen i en nettleser. Stiplet
+  kant skiller den fra fanene som *er* noe, uten å ta den ut av rekka.
+*/
+.vl-fane-ny {
+  border-style: dashed;
+  background: transparent;
+  color: var(--text-muted);
+}
+
+.vl-fane-ny:hover {
+  border-style: solid;
+  color: var(--text-main);
 }
 
 .vl-fanerad .vl-faner {

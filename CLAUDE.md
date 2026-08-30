@@ -361,6 +361,10 @@ fase 3–7 gjenstår — se `docs/BESLUTNING_VAKTLISTE.md`, som er besluttet i s
   summerte samleplassen, ambulansene og KO til ett tall som ikke svarer på noe. Spennet er
   felles (`_vaktensSpenn()`) fordi to kurver man ikke kan sammenligne er verre enn én
   samlet.
+- **Markup som tegnes på nytt kan ikke gates av `gateKnapper()`.** Den setter
+  `.d-none` én gang ved sidelasting; `tegnFaner()` og `mkRessurs()` bygger på
+  nytt ved hvert panelbytte og må derfor spørre `kanLede()`/`kanBemanne()`
+  selv. «Ny ressurs» sist i fanerekka er eksempelet.
 - **Handlingskolonnen i ressurstabellen er `position: sticky`.** Tabellen
   ruller under 1280 px, og uten den var rediger-knappen det første som forsvant
   — altså den ene knappen raden finnes for. Bakgrunnen må settes eksplisitt,

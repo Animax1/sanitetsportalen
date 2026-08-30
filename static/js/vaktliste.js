@@ -277,13 +277,30 @@ function tegnFaner() {
     antall: _ikkePlassert().length,
   });
 
-  el.innerHTML = faner.map((f) => {
+  const knapper = faner.map((f) => {
     const aktiv = f.id === aktivFane ? ' active' : '';
     const antall = f.antall === null ? ''
       : `<span class="vl-antall">${escHtmlValue(f.antall)}</span>`;
     return `<button class="vl-fane${aktiv}" data-action="visFane" data-arg="${escHtmlValue(f.id)}">`
          + `<i class="bi bi-${escHtmlValue(f.ikon)} me-1"></i>${escapeHtml(f.navn)}${antall}</button>`;
   }).join('');
+
+  // **«Ny ressurs» står i fanerekka, ikke ved siden av den.** En ressurs
+  // *er* en fane, så knappen som lager en hører hjemme der fanene slutter —
+  // som pluss-fanen i en nettleser. Sto den til høyre for hele rekka, leste
+  // den som enda en handling på sida framfor som «legg til én til her».
+  //
+  // Bygges her og ikke i malen fordi den skal stå sist, etter faner som
+  // kommer fra data. `gateKnapper()` rekker ikke over den — den tegnes på
+  // nytt ved hvert panelbytte — så tilgangen sjekkes rett i byggeren.
+  const nyRessurs = kanLede()
+    ? `<button class="vl-fane vl-fane-ny" type="button"
+               data-bs-toggle="modal" data-bs-target="#nyRessursModal">
+         <i class="bi bi-plus-lg me-1"></i>Ny ressurs
+       </button>`
+    : '';
+
+  el.innerHTML = knapper + nyRessurs;
 }
 
 
