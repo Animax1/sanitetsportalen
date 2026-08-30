@@ -38,6 +38,12 @@ urlpatterns = [
     path('api/vaktposter/<int:pk>/', views.vaktpost_detalj_view,
          name='vaktliste_api_vaktpost_detalj'),
 
+    # Planleggingstall (fase 5). Belastningen henger under én vaktliste;
+    # grensene varslene måler mot er organisasjonens og gjelder alle.
+    path('api/vaktlister/<int:pk>/belastning/', views.belastning_view,
+         name='vaktliste_api_belastning'),
+    path('api/grenser/', views.grenser_view, name='vaktliste_api_grenser'),
+
     # Drift (fase 4). Retningen og overgangen står i URL-en, ikke i kroppen:
     # et veksle-endepunkt gir et kappløp når to trykk kommer tett, og den som
     # trykket sist vet ikke hva hun endte på. Samme grep som oppdragsmodulen.

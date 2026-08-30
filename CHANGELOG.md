@@ -4,6 +4,51 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-08-30 — Vaktliste fase 5: planleggingstall
+
+**1902 tester grønne** (45 nye, sytten mutasjoner satt rødt først). Ny fane
+«Planlegging»: hva vakta koster dem som går den.
+
+- **Per person: timer, skift, lengste skift, korteste hvile.** Sortert på
+  timer synkende — den som er i ferd med å bli brukt opp skal ligge øverst,
+  ikke på rad tolv i en alfabetisk liste.
+- **Varsler, ikke sperrer.** Et skift over grensa eller en hvile under den
+  merkes, og det er alt. Ingenting avvises: noen ganger *må* noen ta et langt
+  skift, og da skal lista si det høyt framfor å tvinge planleggeren til å lyve
+  om tidene for å komme videre. Fargen er **gul, ikke rød** — et langt skift
+  er ikke galt, det er noe man skal se og ta stilling til.
+- **Grensene er organisasjonens, ikke portalens.** Ny modell
+  `Belastningsgrenser` (migrasjon `0010`), én rad, standard 12 t skift og 8 t
+  hvile. `skriv_leder` flytter dem: det endrer hva *alle* vaktlister varsler
+  om, og er en beslutning om hvordan organisasjonen bemanner.
+- **Faktisk mot planlagt.** Har noen stemplet både møtt og av vakt, kommer en
+  «Faktisk»-kolonne opp ved siden av planen. Et *pågående* skift får ingen
+  faktisk tid — et anslag som endrer seg mens man ser på det er ikke et tall.
+  Kolonnen står bare når det finnes noe å vise; en kolonne med bare streker
+  stjeler bredde fra dem som betyr noe.
+- **Ledige plasser telles i sammendraget, ikke i persontabellen.** De er et
+  behov, ikke en belastning, og en rad uten navn i en persontabell ser ut som
+  en feil.
+- **Overlapp gir hvile 0, ikke et negativt tall.** To lister på samme tid er
+  noe planleggeren skal se, men et negativt tall i en «korteste hvile»-kolonne
+  ser ut som en regnefeil framfor et varsel.
+
+**To lærdommer, begge fra mutasjonstesting:**
+
+- Sorteringen inne i `_hviletider()` lot seg fjerne uten at noe ble rødt,
+  fordi `Vaktpost.Meta.ordering` alt sorterer på `fra_tid` — testene gjennom
+  basen målte *modellens* ordering, ikke hjelperens. Nå prøves hjelperen
+  direkte, med usortert inndata.
+- `test_steget_er_et_helt_minutt` leste *alle* `step="…"` på sida, og ble rød
+  den dagen et `<input type="number">` fikk `step="1"` — riktig for et tall,
+  meningsløst for et klokkeslett. Den leser nå bare `datetime-local`-felt.
+
+**Ikke levert, og det står i notatet:** kompetansedekning per ressurs («har
+samleplassen helsepersonell hele åpningstiden») er merket som mulig utvidelse,
+ikke første leveranse.
+
+---
+
 ## 2026-08-30 — Drifttabellen bytter form
 
 **1857 tester grønne** (6 nye, fem mutasjoner satt rødt først). André: «Møtt-

@@ -14,7 +14,7 @@ from django.utils import timezone
 
 from core.auth_decorators import er_global_admin, har_tilgang
 
-from .models import Mannskap, Ressurs, Vaktliste
+from .models import Belastningsgrenser, Mannskap, Ressurs, Vaktliste
 
 
 # ── Vakter som ennå ikke er aktive ───────────────────────────────────────────
@@ -448,6 +448,104 @@ def kan_rore_vaktpost(user, vaktpost) -> bool:
     if vaktpost.mannskap_id is None:
         return True
     return kan_redigere_mannskap(user, vaktpost.mannskap)
+
+
+def _timer(fra, til):
+    """Timer mellom to tidspunkt, eller ``0.0`` hvis spennet ikke gir mening."""
+    if fra is None or til is None or til <= fra:
+        return 0.0
+    return round((til - fra).total_seconds() / 3600, 2)
+
+
+def _hviletider(skift):
+    """Hullene mellom en persons skift, i timer, i kronologisk rekkefølge.
+
+    **Overlappende skift gir hvile 0, ikke en negativ verdi.** To lister på
+    samme tid er noe planleggeren skal se, og et negativt tall i en
+    «korteste hvile»-kolonne ser ut som en regnefeil framfor et varsel.
+    Overlappet i seg selv fanges av `overlapp`-tellingen.
+    """
+    ordnet = sorted(skift, key=lambda vp: vp.fra_tid)
+    ut = []
+    for forrige, neste in zip(ordnet, ordnet[1:]):
+        if neste.fra_tid < forrige.til_tid:
+            ut.append(0.0)
+        else:
+            ut.append(_timer(forrige.til_tid, neste.fra_tid))
+    return ut
+
+
+def belastning_per_person(vaktliste, grenser=None):
+    """Timer, skift, lengste skift og korteste hvile — per person.
+
+    Bestillingen bak §8b: «lista skal hjelpe planleggeren å se *belastningen*
+    før vakta, ikke bare bemanningen».
+
+    **Sortert på totaltimer, synkende.** Den som er i ferd med å bli brukt opp
+    skal ligge øverst — en alfabetisk liste ville skjult henne på rad tolv.
+
+    **Ledige plasser telles ikke som en person.** De er et behov, ikke en
+    belastning, og en rad uten navn i en persontabell ser ut som en feil.
+
+    Under drift følger et **faktisk**-tall med, regnet fra stemplene i stedet
+    for planen (`mott_at`/`av_vakt_at`). Da blir «planlagt mot faktisk»
+    synlig: hvem gikk lengre enn planlagt. Det koster lite når feltene alt er
+    atskilt — samme grep som oppdragsstatistikkens plan/målt-skille.
+    """
+    from .models import Vaktpost
+    grenser = grenser or Belastningsgrenser.hent()
+
+    poster = (Vaktpost.objects
+              .filter(ressurs__vaktliste=vaktliste, mannskap__isnull=False)
+              .select_related('mannskap__korps'))
+
+    per_person = {}
+    for vp in poster:
+        per_person.setdefault(vp.mannskap_id, []).append(vp)
+
+    rader = []
+    for skift in per_person.values():
+        person = skift[0].mannskap
+        timer = [_timer(vp.fra_tid, vp.til_tid) for vp in skift]
+        hvile = _hviletider(skift)
+        # Faktisk tid finnes bare for skift som er både møtt og av vakt. Et
+        # pågående skift har ingen sluttid å regne mot, og et anslag der
+        # ville vært et tall som endrer seg mens man ser på det.
+        faktisk = [_timer(vp.mott_at, vp.av_vakt_at) for vp in skift
+                   if vp.mott_at and vp.av_vakt_at]
+
+        rader.append({
+            'mannskap_id': person.pk,
+            'navn': person.navn,
+            'korps_kort': person.korps.kortnavn or person.korps.navn,
+            'antall_skift': len(skift),
+            'timer': round(sum(timer), 2),
+            'lengste_skift': max(timer) if timer else 0.0,
+            'korteste_hvile': min(hvile) if hvile else None,
+            'faktiske_timer': round(sum(faktisk), 2) if faktisk else None,
+            # Varslene regnes her og ikke i klienten: grensene ligger i
+            # basen, og to steder å sammenligne dem er ett sted for mye.
+            'langt_skift': bool(timer) and max(timer) > grenser.maks_skift_timer,
+            'kort_hvile': bool(hvile) and min(hvile) < grenser.min_hvile_timer,
+        })
+
+    rader.sort(key=lambda r: (-r['timer'], r['navn'].lower()))
+    return rader
+
+
+def belastning_sammendrag(vaktliste, rader):
+    """Tallene som står over lista: hvor mange, hvor mye, hvor mange varsler."""
+    from .models import Vaktpost
+    ledige = Vaktpost.objects.filter(
+        ressurs__vaktliste=vaktliste, mannskap__isnull=True).count()
+    return {
+        'personer': len(rader),
+        'skift': sum(r['antall_skift'] for r in rader),
+        'timer': round(sum(r['timer'] for r in rader), 2),
+        'ledige_plasser': ledige,
+        'lange_skift': sum(1 for r in rader if r['langt_skift']),
+        'korte_hviler': sum(1 for r in rader if r['kort_hvile']),
+    }
 
 
 def vaktspenn(vaktliste):

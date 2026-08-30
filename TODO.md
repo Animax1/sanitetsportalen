@@ -903,6 +903,14 @@ Gjennomgang 13. aug. 2026, med 1000 pasienter og peak 100 brukere som premiss.
             «Opprett vakt» står på vaktas startdato framfor tomt, så bare
             klokkeslettet tastes. Feltet er ellers uendret — native velger og
             visning som før.
+      - [x] **Fase 5 — planleggingstall (30. aug. 2026).** Fanen
+            «Planlegging»: timer, skift, lengste skift og korteste hvile per
+            person, sortert på timer. Varsler mot admin-styrte grenser
+            (`Belastningsgrenser`, migrasjon `0010`, 12 t / 8 t som standard,
+            `skriv_leder` flytter dem). Faktisk-kolonne når stemplene finnes.
+            Varsler, ikke sperrer. 45 nye tester, sytten mutasjoner prøvd.
+            - Kompetansedekning per ressurs står fortsatt som mulig utvidelse
+              i §8b, ikke levert.
       - [x] **Drifttabellen bytter form (30. aug. 2026).** Meldt av André:
             stempelet satt feil. Det var 45×21 px på x=1092 mens navnet sto på
             x=41, bak en sidescroll. Under drift legges planleggingsfeltene

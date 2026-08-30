@@ -407,6 +407,52 @@ class Vaktliste(BaseTimeStampedModel):
         return self.status == choices.DRIFT
 
 
+class Belastningsgrenser(models.Model):
+    """Når planleggingstallene skal si fra. Én rad for hele portalen.
+
+    **Grensene er organisasjonens, ikke portalens** (§8b). En vaktliste med
+    tolvtimersskift er normal i én organisasjon og en avviksmelding i en
+    annen, så tallene kan ikke stå hardkodet i en `if`.
+
+    **Varsler, ikke sperrer.** Ingenting her nekter noe: et skift over grensa
+    merkes i lista, og det er alt. Noen ganger *må* noen ta et langt skift, og
+    da skal lista si det høyt framfor å tvinge planleggeren til å lyve om
+    tidene for å komme videre.
+
+    Én rad, som `patients.BackupConfig` — grensene gjelder alle vaktlister.
+    Per vakt ville vært en annen beslutning: da måtte hver ny liste svare på
+    et spørsmål vaktlederen sjelden har grunnlag for å svare annerledes på
+    enn sist.
+    """
+
+    maks_skift_timer = models.PositiveSmallIntegerField(
+        default=12,
+        verbose_name='Lengste skift (timer)',
+        help_text='Skift over dette merkes i planleggingstallene. '
+                  'Standard 12 timer.',
+    )
+    min_hvile_timer = models.PositiveSmallIntegerField(
+        default=8,
+        verbose_name='Korteste hvile (timer)',
+        help_text='Mindre hvile enn dette mellom to skift merkes. '
+                  'Standard 8 timer.',
+    )
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = 'Belastningsgrenser'
+        verbose_name_plural = 'Belastningsgrenser'
+
+    def __str__(self) -> str:
+        return (f'Maks {self.maks_skift_timer} t skift, '
+                f'min {self.min_hvile_timer} t hvile')
+
+    @classmethod
+    def hent(cls):
+        obj, _ = cls.objects.get_or_create(pk=1)
+        return obj
+
+
 class Ressurs(BaseTimeStampedModel):
     """Noe som bemannes: samleplass, bil, lag, KO.
 

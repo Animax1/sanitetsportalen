@@ -25,6 +25,9 @@
      fallback i hvert kall — en farge med tre steder å endres er en farge
      som før eller siden står ulikt to av dem. */
   --vl-ok: #4ade80;
+  /* Gult varsler, rødt feiler. Et langt skift er ikke en feil — se
+     `.vl-varselantall`. */
+  --vl-varsel: #fbbf24;
 }
 
 /* ── Statusmerke på vaktlista ─────────────────────────────────────────── */
@@ -921,4 +924,52 @@
   .vl-tabell tr.vl-tilstede td:first-child,
   .vl-tabell tr.vl-avgatt td:first-child { box-shadow: none !important; }
   .vl-tabell tr.vl-avgatt { opacity: 1 !important; }
+}
+
+
+/* ── Planleggingstall (fase 5) ────────────────────────────────────────── */
+
+.vl-belastningshode {
+  display: flex;
+  align-items: center;
+  gap: 2rem;
+  flex-wrap: wrap;
+}
+
+/*
+  Nøkkeltallene står som tall over etikett, ikke som «Personer: 12». Man
+  skummer dem, og da er tallet det man leter etter.
+*/
+.vl-noekkeltall {
+  display: flex;
+  gap: 2rem;
+  flex-wrap: wrap;
+}
+
+.vl-noekkeltall > div { display: flex; flex-direction: column; }
+.vl-noekkeltall b { font-size: 1.75rem; line-height: 1.1; }
+
+.vl-varsler { flex-grow: 1; display: flex; gap: 1.5rem; flex-wrap: wrap; }
+.vl-varseltall { display: flex; flex-direction: column; }
+
+/*
+  **Varselfargen er gul, ikke rød.** Rødt betyr «dette er galt og må
+  rettes»; et langt skift er ikke galt, det er noe planleggeren skal se og
+  ta stilling til. Fargen skal si «se her», ikke «du har gjort en feil».
+*/
+.vl-varselantall {
+  font-size: 1.75rem;
+  line-height: 1.1;
+  font-weight: 700;
+  color: var(--vl-varsel);
+}
+
+.vl-advarsel {
+  color: var(--vl-varsel);
+  font-weight: 600;
+}
+
+@media print {
+  .vl-varselantall, .vl-advarsel { color: #000 !important; }
+  .vl-advarsel::after { content: ' (!)'; }
 }

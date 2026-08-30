@@ -25,6 +25,7 @@ HTML_BUILDERS = (
     'mkRessurs',
     '_stempelknapper',
     '_driftrad',
+    'mkBelastning',
     'mkTilstede',
     '_rolleValg',
     '_fyllValgFor',
@@ -51,6 +52,24 @@ REVIEWED_INTERPOLATIONS = {
         'markup bygget lokalt, id-en escapet inni',
     'drift ? 7 : 9': 'tall fra en ternær',
     'tabellklasse': 'hardkodet CSS-klasse fra en ternær',
+    # Planleggingstall (fase 5). Tallene kommer fra serverens beregning og
+    # settes med escHtmlValue; markupen bygges lokalt i samme funksjon.
+    'hode': 'markup bygget lokalt i samme funksjon',
+    'lengste': 'markup bygget lokalt, tallet escapet inni',
+    'hvile': 'markup bygget lokalt, tallet escapet inni',
+    'faktisk': 'markup bygget lokalt, tallet escapet inni',
+    'g.maks_skift_timer': 'går inn som ren tekst til varsel(), som escaper '
+                          'hele strengen ved innsetting — og er uansett et '
+                          'PositiveSmallIntegerField',
+    'g.min_hvile_timer': 'samme som over',
+    'langeSkift': 'markup bygget lokalt av varsel(), tallene escapet inni',
+    'korteHviler': 'markup bygget lokalt av varsel(), tallene escapet inni',
+    'ingenVarsler': 'hardkodet tekst fra en ternær',
+    'grenseknapp': 'markup bygget lokalt, ingen data i seg',
+    'faktiskHode': 'hardkodet overskrift fra en ternær',
+    'faktiskTall': 'tallet escapet, eller en hardkodet strek',
+    'hvileklasse': 'hardkodet CSS-klasse fra en ternær',
+    'lengsteklasse': 'hardkodet CSS-klasse fra en ternær',
     'tabellhode': 'markup bygget lokalt: to faste kolonneoppsett, ingen data',
     'navn': 'ternær: escapet personnavn, eller «Ledig plass» som markup',
     'stil': 'hardkodet Bootstrap-klasse fra kallstedet, ingen data i seg',
@@ -287,6 +306,8 @@ class VaktlisteEscapingOppforselTests(SimpleTestCase):
             globalThis.IKKE_PLASSERT = 'ikke-plassert';
             globalThis.MANNSKAP = 'mannskap';
             globalThis.TILSTEDE = 'tilstede';
+            globalThis.BELASTNING = 'belastning';
+            globalThis.belastning = null;
             globalThis.register = null;
             globalThis.aktivListe = {self._liste(
                 grupper=[{'id': 1, 'navn': '<b>Lag</b>', 'ikon': 'people'}],
@@ -308,6 +329,8 @@ class VaktlisteEscapingOppforselTests(SimpleTestCase):
             globalThis.IKKE_PLASSERT = 'ikke-plassert';
             globalThis.MANNSKAP = 'mannskap';
             globalThis.TILSTEDE = 'tilstede';
+            globalThis.BELASTNING = 'belastning';
+            globalThis.belastning = null;
             globalThis.register = null;
             globalThis.aktivListe = {self._liste(
                 grupper=[{'id': 1, 'navn': 'Lag',
@@ -1527,6 +1550,8 @@ class NyRessursIFanerekkaTests(SimpleTestCase):
             "globalThis.IKKE_PLASSERT = 'ikke-plassert';\n"
             "globalThis.MANNSKAP = 'mannskap';\n"
             "globalThis.TILSTEDE = 'tilstede';\n"
+            "globalThis.BELASTNING = 'belastning';\n"
+            "globalThis.belastning = null;\n"
             "globalThis.register = null;\n"
             "globalThis.aktivListe = {grupper: [{id: 3, navn: 'Ambulanse',"
             " ikon: 'truck'}], ressurser: [{id: 7, navn: 'Ambulanse 1',"
@@ -1598,6 +1623,8 @@ class FanenErGruppaTests(SimpleTestCase):
              "globalThis.IKKE_PLASSERT = 'ikke-plassert';\n"
             "globalThis.MANNSKAP = 'mannskap';\n"
             "globalThis.TILSTEDE = 'tilstede';\n"
+            "globalThis.BELASTNING = 'belastning';\n"
+            "globalThis.belastning = null;\n"
             "globalThis.register = null;\n")
 
     #: To ambulanser i samme gruppe, én samleplass i en annen.
@@ -2137,7 +2164,13 @@ class MannskapsfanenTests(SimpleTestCase):
     VINDU = ("globalThis.window = { MODUL_TILGANG: { admin: true } };\n"
              "globalThis.MANNSKAP = 'mannskap';\n"
              "globalThis.TILSTEDE = 'tilstede';\n"
+             "globalThis.BELASTNING = 'belastning';\n"
+             "globalThis.belastning = null;\n"
+            "globalThis.BELASTNING = 'belastning';\n"
+            "globalThis.belastning = null;\n"
             "globalThis.TILSTEDE = 'tilstede';\n"
+            "globalThis.BELASTNING = 'belastning';\n"
+            "globalThis.belastning = null;\n"
              "globalThis.OVERSIKT = 'oversikt';\n"
              "globalThis.IKKE_PLASSERT = 'ikke-plassert';\n")
 
@@ -2316,10 +2349,20 @@ class TidsfeltenesSteglengdeTests(SimpleTestCase):
 
     def test_steget_er_et_helt_minutt(self):
         """Et steg under 60 sekunder gir feltet et sekundsegment, altså en
-        kolonne til å tabbe seg gjennom."""
+        kolonne til å tabbe seg gjennom.
+
+        **Bare tidsfeltene.** Første utgave leste *alle* `step="…"` på sida,
+        og ble rød den dagen et `<input type="number">` fikk `step="1"` —
+        som er riktig for et tall og meningsløst for et klokkeslett. En test
+        som måler feil felt måler ikke regelen sin.
+        """
+        felt = []
         for kilde in (self._mal(), read_js(VAKTLISTE_JS)):
-            for verdi in re.findall(r'step="(\d+)"', kilde):
-                with self.subTest(step=verdi):
+            felt += re.findall(r'<input[^>]*type="datetime-local"[^>]*>', kilde)
+        self.assertTrue(felt, 'fant ingen tidsfelt')
+        for f in felt:
+            for verdi in re.findall(r'step="(\d+)"', f):
+                with self.subTest(felt=f[:60], step=verdi):
                     self.assertEqual(int(verdi) % 60, 0)
 
 
@@ -2618,5 +2661,143 @@ class DriftflatenTests(SimpleTestCase):
 
     def test_navn_escapes(self):
         ut = self._tilstede([{**self.RAD, 'navn': '<img src=x onerror=alert(1)>'}])
+        self.assertNotIn('<img src=x', ut)
+        self.assertIn('&lt;img', ut)
+
+
+class PlanleggingsfanenTests(SimpleTestCase):
+    """Belastningstabellen (§8b).
+
+    **Varsler, ikke sperrer** — og det skal *synes* at det er et varsel og
+    ikke en feil. Fargen er gul, ikke rød: et langt skift er ikke galt, det
+    er noe planleggeren skal se og ta stilling til.
+    """
+
+    HARNESS = (
+        (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue')),
+        (VAKTLISTE_JS, ('mkBelastning', '_tall', 'kanLede', '_nivaa',
+                        '_erAdmin', 'visFane')),
+    )
+    VINDU = "globalThis.window = { MODUL_TILGANG: { admin: true } };\n"
+
+    def setUp(self):
+        if not node_available():
+            self.skipTest('node er ikke tilgjengelig')
+        self.harness = build_harness(self.HARNESS)
+
+    RAD = {'mannskap_id': 1, 'navn': 'Kari', 'korps_kort': 'HGSD',
+           'antall_skift': 2, 'timer': 14.0, 'lengste_skift': 8.0,
+           'korteste_hvile': 10.0, 'faktiske_timer': None,
+           'langt_skift': False, 'kort_hvile': False}
+    SAM = {'personer': 1, 'skift': 2, 'timer': 14.0, 'ledige_plasser': 0,
+           'lange_skift': 0, 'korte_hviler': 0}
+
+    def _vis(self, personer=None, sammendrag=None, *, nivaa='admin'):
+        import json
+        data = {
+            'personer': personer if personer is not None else [self.RAD],
+            'sammendrag': {**self.SAM, **(sammendrag or {})},
+            'grenser': {'maks_skift_timer': 12, 'min_hvile_timer': 8},
+        }
+        vindu = ("globalThis.window = { MODUL_TILGANG: "
+                 + ("{ admin: true }" if nivaa == 'admin'
+                    else f"{{ vaktliste: '{nivaa}', admin: false }}")
+                 + " };\n")
+        return run_node(self.harness, vindu + f"""
+            globalThis.belastning = {json.dumps(data)};
+            console.log(mkBelastning());
+        """)
+
+    def test_uhentet_sier_fra_framfor_aa_kaste(self):
+        ut = run_node(self.harness, self.VINDU + """
+            globalThis.belastning = null;
+            console.log(mkBelastning());
+        """)
+        self.assertIn('Regner', ut)
+
+    def test_noekkeltallene_staar_over_lista(self):
+        ut = self._vis()
+        self.assertIn('vl-noekkeltall', ut)
+        self.assertLess(ut.index('vl-noekkeltall'), ut.index('Kari'))
+
+    def test_hele_timer_vises_uten_desimal(self):
+        """«14 t» leses raskere enn «14.0 t» i en kolonne man skummer."""
+        ut = self._vis()
+        self.assertIn('>14 t<', ut)
+        self.assertNotIn('14.0', ut)
+
+    def test_halve_timer_beholder_desimalen(self):
+        ut = self._vis([{**self.RAD, 'timer': 7.5}])
+        self.assertIn('7.5 t', ut)
+
+    def test_langt_skift_merkes_men_sperrer_ingenting(self):
+        ut = self._vis([{**self.RAD, 'lengste_skift': 14.0,
+                         'langt_skift': True}],
+                       {'lange_skift': 1})
+        self.assertIn('vl-advarsel', ut)
+        self.assertIn('skift over 12 t', ut, 'varselet sier hva grensa er')
+        self.assertIn('Kari', ut, 'raden står der som før')
+
+    def test_kort_hvile_merkes(self):
+        ut = self._vis([{**self.RAD, 'korteste_hvile': 4.0,
+                         'kort_hvile': True}], {'korte_hviler': 1})
+        self.assertIn('vl-advarsel', ut)
+        self.assertIn('hviler under 8 t', ut)
+
+    def test_uten_varsler_sies_det(self):
+        """En tom boks der varslene ellers står ser ut som noe som ikke er
+        lastet."""
+        self.assertIn('Ingen varsler', self._vis())
+
+    def test_manglende_hvile_er_en_strek_ikke_en_null(self):
+        """Null timers hvile er en beskjed om noe galt; «ingen hvile å måle»
+        er fraværet av et tall."""
+        ut = self._vis([{**self.RAD, 'korteste_hvile': None}])
+        self.assertIn('—', ut)
+        self.assertNotIn('0 t</span>', ut)
+
+    def test_faktisk_kolonne_bare_naar_noe_er_stemplet(self):
+        """En kolonne med bare streker stjeler bredde fra dem som betyr noe."""
+        self.assertNotIn('Faktisk', self._vis())
+        ut = self._vis([{**self.RAD, 'faktiske_timer': 9.5}])
+        self.assertIn('Faktisk', ut)
+        self.assertIn('9.5 t', ut)
+
+    def test_tom_liste_forklarer_hvorfor(self):
+        ut = self._vis([], {'personer': 0, 'skift': 0, 'timer': 0})
+        self.assertIn('Ingen er satt', ut)
+
+    def test_grenseknappen_er_ledernivaa(self):
+        """Å flytte grensa endrer hva *alle* vaktlister varsler om."""
+        self.assertIn('apneGrenser', self._vis())
+        self.assertNotIn('apneGrenser', self._vis(nivaa='skriv_full'))
+        self.assertNotIn('apneGrenser', self._vis(nivaa='les'))
+
+    def test_fanen_henter_tallene_forste_gang(self):
+        """M70: uten hentingen står fanen på «Regner…» for alltid. Den er lat
+        med vilje — en fane som ikke er åpnet skal ikke koste en spørring."""
+        ut = run_node(self.harness, self.VINDU + """
+            globalThis.belastning = null;
+            globalThis.register = null;
+            globalThis.MANNSKAP = 'mannskap';
+            globalThis.BELASTNING = 'belastning';
+            globalThis.aktivFane = 'oversikt';
+            let hentet = 0;
+            globalThis.lastBelastning = () => { hentet += 1; };
+            globalThis.lastRegister = () => {};
+            globalThis.tegnFaner = () => {};
+            globalThis.tegnPanel = () => {};
+
+            visFane('belastning');
+            assert(hentet === 1, 'tallene ble ikke hentet: ' + hentet);
+
+            globalThis.belastning = {personer: [], sammendrag: {}, grenser: {}};
+            visFane('belastning');
+            assert(hentet === 1, 'hentet paa nytt selv om de alt laa der');
+        """)
+        self.assertIn('OK', ut)
+
+    def test_navn_escapes(self):
+        ut = self._vis([{**self.RAD, 'navn': '<img src=x onerror=alert(1)>'}])
         self.assertNotIn('<img src=x', ut)
         self.assertIn('&lt;img', ut)

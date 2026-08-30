@@ -450,6 +450,24 @@ fase 3–7 gjenstår — se `docs/BESLUTNING_VAKTLISTE.md`, som er besluttet i s
   der brukeren skulle fått «velg korps». `or None` dekker den tomme strengen, men ikke
   en ikke-numerisk.
 
+**Planleggingstall (fase 5) varsler, de sperrer ikke.** `services`
+regner ut timer, skift, lengste skift og korteste hvile per person;
+`Belastningsgrenser` (én rad) bærer grensene varslene måles mot.
+
+- **Grensene er organisasjonens**, ikke portalens — derfor data og ikke tall i
+  en `if`. `skriv_leder` flytter dem: det endrer hva *alle* vaktlister varsler
+  om.
+- **Ingenting avvises.** Noen ganger må noen ta et langt skift, og da skal
+  lista si det høyt. Fargen er gul (`--vl-varsel`), ikke rød.
+- **Overlappende skift gir hvile 0**, ikke et negativt tall — et negativt tall
+  i en «korteste hvile»-kolonne ser ut som en regnefeil.
+- **Faktisk tid regnes bare av ferdige skift** (både `mott_at` og
+  `av_vakt_at`). Et pågående skift ville gitt et tall som endrer seg mens man
+  ser på det.
+- `_hviletider()` **sorterer selv**, selv om `Vaktpost.Meta.ordering` gjør det
+  også: en hjelper skal ikke hvile på at den som kaller den har sortert. Uten
+  den egne sorteringen målte testene modellens ordering.
+
 **Drift (fase 4) er en innsjekk-port, ikke en livssyklus.** `Vaktliste.status`
 har to verdier, og `drift` betyr én ting: møtt/av vakt er åpen. Overgangen går
 begge veier og rører ingen stempler.

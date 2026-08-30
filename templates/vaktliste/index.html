@@ -718,6 +718,51 @@
   </div>
 </div>
 
+{% comment %}
+  Grensene planleggingsvarslene måler mot. **Organisasjonens regler, ikke
+  portalens** (§8b) — derfor er de data og ikke tall i en `if`, og derfor er
+  de `skriv_leder`: å flytte grensa endrer hva *alle* vaktlister varsler om.
+
+  De sperrer ingenting. Settes de urimelig høyt, forsvinner varslene — og det
+  er en beslutning noen har tatt, ikke en feil portalen skal hindre.
+{% endcomment %}
+<div class="modal fade" id="grenserModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Grenser for varsler</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Lukk"></button>
+      </div>
+      <div class="modal-body">
+        <div class="mb-3">
+          <label class="form-label" for="grense-skift">Lengste skift (timer)</label>
+          <input type="number" id="grense-skift" class="form-control"
+                 min="1" max="168" step="1">
+          <div class="form-text">Skift <em>over</em> dette merkes i lista.</div>
+        </div>
+        <div class="mb-3">
+          <label class="form-label" for="grense-hvile">Korteste hvile (timer)</label>
+          <input type="number" id="grense-hvile" class="form-control"
+                 min="1" max="168" step="1">
+          <div class="form-text">Mindre hvile enn dette mellom to skift merkes.</div>
+        </div>
+        <div class="form-text">
+          <i class="bi bi-info-circle me-1"></i>Grensene <strong>varsler,
+          de sperrer ikke</strong>. Noen ganger må noen ta et langt skift, og
+          da skal lista si det høyt framfor å nekte. De gjelder alle
+          vaktlister.
+        </div>
+        <div id="grenser-feil" class="text-danger small d-none mt-2"></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Avbryt</button>
+        <button type="button" class="btn btn-primary" id="grenser-knapp"
+                data-action="lagreGrenser">Lagre</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 {% endblock %}
 
 {% block extra_scripts %}

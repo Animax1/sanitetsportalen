@@ -56,8 +56,8 @@ from core.auth_decorators import er_global_admin, modul_kreves
 from core.ratelimit import rate_limit
 
 from . import choices, services
-from .models import (Korps, Mannskap, Ressurs, Ressursgruppe, Ressursrolle,
-                     Vaktliste, Vaktpost)
+from .models import (Belastningsgrenser, Korps, Mannskap, Ressurs,
+                     Ressursgruppe, Ressursrolle, Vaktliste, Vaktpost)
 
 
 # ── Hjelpere ─────────────────────────────────────────────────────────────────
@@ -579,6 +579,75 @@ def ressurser_view(request, pk):
                .select_related('korps', 'enhet', 'gruppe').get(pk=ressurs.pk))
     return JsonResponse(
         {'status': 'ok', 'data': _ressurs_til_dict(ressurs)}, status=201)
+
+
+# ── Planleggingstall (fase 5) ────────────────────────────────────────────────
+
+@never_cache
+@modul_kreves('vaktliste', 'les', svar='json')
+@require_http_methods(['GET'])
+def belastning_view(request, pk):
+    """Timer, skift og hvile per person — belastningen før vakta.
+
+    **`les` ser tallene.** De er lista, regnet sammen: hvem som står oppført
+    hvor mange timer er ikke en annen opplysning enn selve vaktlista, og en
+    korps-fører som planlegger sine egne folk trenger nettopp dette for å se
+    at hun er i ferd med å slite dem ut.
+
+    **Regnestykket ligger i `services`,** ikke her — det er ikke et view som
+    skal kunne svare på hva «korteste hvile» betyr.
+    """
+    try:
+        vl = Vaktliste.objects.select_related('vakt').get(pk=pk)
+    except Vaktliste.DoesNotExist:
+        return _feil('Vaktliste ikke funnet', status=404)
+
+    grenser = Belastningsgrenser.hent()
+    rader = services.belastning_per_person(vl, grenser)
+    return JsonResponse({'status': 'ok', 'data': {
+        'personer': rader,
+        'sammendrag': services.belastning_sammendrag(vl, rader),
+        'grenser': {
+            'maks_skift_timer': grenser.maks_skift_timer,
+            'min_hvile_timer': grenser.min_hvile_timer,
+        },
+    }})
+
+
+@never_cache
+@modul_kreves('vaktliste', 'les', svar='json')
+@require_http_methods(['PUT'])
+@rate_limit(group='vaktliste:grenser', rate='30/m', method='PUT')
+def grenser_view(request):
+    """Sett grensene varslene måler mot. `skriv_leder`.
+
+    **Organisasjonens regler, ikke portalens** (§8b) — derfor er de data og
+    ikke tall i en `if`. Og derfor er de `skriv_leder`: å flytte grensa
+    endrer hva *alle* vaktlister varsler om, og det er en beslutning om
+    hvordan organisasjonen bemanner, ikke om hvem som står på bilen i kveld.
+
+    Grensene sperrer ingenting. Settes de urimelig høyt, forsvinner varslene —
+    og det er en beslutning noen har tatt, ikke en feil portalen skal hindre.
+    """
+    if not services.kan_lede(request.user):
+        return _nektet()
+
+    data = _json_body(request)
+    grenser = Belastningsgrenser.hent()
+    for felt in ('maks_skift_timer', 'min_hvile_timer'):
+        if felt not in data:
+            continue
+        verdi = _int(data[felt])
+        if verdi is None or not 1 <= verdi <= 168:
+            return _feil('Grensene oppgis i hele timer, mellom 1 og 168 '
+                         '(en uke).')
+        setattr(grenser, felt, verdi)
+    grenser.save()
+
+    return JsonResponse({'status': 'ok', 'data': {
+        'maks_skift_timer': grenser.maks_skift_timer,
+        'min_hvile_timer': grenser.min_hvile_timer,
+    }})
 
 
 # ── Drift (fase 4) ───────────────────────────────────────────────────────────

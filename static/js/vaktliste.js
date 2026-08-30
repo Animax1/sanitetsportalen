@@ -39,6 +39,9 @@ let aktivFane = 'oversikt'; // 'oversikt' | 'ikke-plassert' | gruppe-id som stre
 //: Hentes for seg fordi det er globalt — `aktivListe.mannskap` er den slanke
 //: lista fanene bemanner fra, uten telefon, konto og notat.
 let register = null;
+//: Planleggingstallene for den aktive lista, eller `null` før de er hentet.
+//: Hentes for seg: en fane som ikke er åpnet skal ikke koste en spørring.
+let belastning = null;
 let personsok = '';              // fritekstfilter på mannskapstabellen
 let personSortKol = 'korps';     // 'navn' | 'korps' | 'telefon'
 let personSortStigende = true;
@@ -49,6 +52,7 @@ let aktivVerdiregister = 'korps';  // hvilket register verdivinduet står i
 const OVERSIKT = 'oversikt';
 const MANNSKAP = 'mannskap';
 const TILSTEDE = 'tilstede';
+const BELASTNING = 'belastning';
 const IKKE_PLASSERT = 'ikke-plassert';
 
 // Register → hvordan det snakkes om og hvor det ligger.
@@ -223,6 +227,10 @@ async function lastListe(id) {
   const res = await apiFetch(`/vaktliste/api/vaktlister/${id}/`);
   if (!res.ok) return;
   aktivListe = (await res.json()).data;
+  // **Tallene er utdaterte i det et skift endres.** De hentes derfor på nytt
+  // sammen med lista, ikke bufres over en endring — en belastningstabell som
+  // viser gårsdagens oppsett er verre enn ingen.
+  belastning = null;
   const velger = document.getElementById('vaktliste-velger');
   if (velger) velger.value = String(id);
 
@@ -392,6 +400,7 @@ function visFane(id) {
   // Registeret hentes først når noen faktisk ber om det. Det er globalt og
   // uavhengig av vaktlista, så det koster ingenting å utsette.
   if (id === MANNSKAP && !register) { lastRegister(); }
+  if (id === BELASTNING && !belastning) { lastBelastning(); }
   tegnFaner();
   tegnPanel();
 }
@@ -443,6 +452,15 @@ function tegnFaner() {
       antall: ressurser.reduce((n, r) => n + _posterFor(r.id).length, 0),
     });
   });
+  // **Planleggingstallene er lista regnet sammen** (§8b), ikke en ny kilde.
+  // Fanen står ved siden av «Oversikt» fordi det er samme spørsmål sett fra
+  // en annen kant: oversikten er hvem som står hvor, denne er hva det koster
+  // dem.
+  faner.push({
+    id: BELASTNING, navn: 'Planlegging', ikon: 'graph-up',
+    antall: belastning ? belastning.sammendrag.personer : null,
+  });
+
   // **«Tilstede nå» finnes bare i drift.** I planlegging er den tom per
   // definisjon — ingen er stemplet — og en fane som alltid sier null er en
   // fane man slutter å se.
@@ -503,6 +521,7 @@ function tegnPanel() {
   if (!aktivListe) { el.innerHTML = ''; return; }
 
   if (aktivFane === OVERSIKT) { el.innerHTML = mkOversikt(); return; }
+  if (aktivFane === BELASTNING) { el.innerHTML = mkBelastning(); return; }
   if (aktivFane === TILSTEDE) { el.innerHTML = mkTilstede(); return; }
   if (aktivFane === IKKE_PLASSERT) { el.innerHTML = mkIkkePlassert(); return; }
 
@@ -1252,6 +1271,130 @@ function _tilstede() {
 }
 
 
+async function lastBelastning() {
+  if (!aktivListe) return;
+  const res = await apiFetch(
+    `/vaktliste/api/vaktlister/${aktivListe.vaktliste.id}/belastning/`);
+  if (!res.ok) return;
+  belastning = (await res.json()).data;
+  tegn();
+}
+
+
+function _tall(n) {
+  // Timer med én desimal, og uten «.0» på hele tall: «14 t» leses raskere
+  // enn «14.0 t» i en kolonne man skummer.
+  const rundet = Math.round(n * 10) / 10;
+  return Number.isInteger(rundet) ? String(rundet) : rundet.toFixed(1);
+}
+
+
+function mkBelastning() {
+  // **Belastningen før vakta, ikke bemanningen** (§8b). Bemanningskurvene
+  // svarer på «er plassene fylt»; denne svarer på «hva koster det dem som
+  // fyller dem».
+  //
+  // **Varsler, ikke sperrer.** Ingenting her nekter noe — et langt skift
+  // merkes, og det er alt. Noen ganger *må* noen ta et langt skift, og da
+  // skal lista si det høyt framfor å tvinge planleggeren til å lyve om
+  // tidene for å komme videre.
+  if (!belastning) {
+    return '<div class="vl-kort"><div class="vl-tom">Regner\u2026</div></div>';
+  }
+  const s = belastning.sammendrag;
+  const g = belastning.grenser;
+
+  // Hvert ledd heves ut i sin egen variabel framfor å stå som en ternær med
+  // en template-literal inni en annen: den formen er vanskelig å lese, og
+  // XSS-skanneren i `tests_xss.py` kan ikke se inn i den.
+  const varsel = (antall, tekst) => antall
+    ? `<div class="vl-varseltall"><span class="vl-varselantall">${escHtmlValue(antall)}</span>
+         <span class="vl-meta">${escapeHtml(tekst)}</span></div>`
+    : '';
+  const langeSkift = varsel(s.lange_skift, `skift over ${g.maks_skift_timer} t`);
+  const korteHviler = varsel(s.korte_hviler, `hviler under ${g.min_hvile_timer} t`);
+  const ingenVarsler = (!s.lange_skift && !s.korte_hviler)
+    ? '<span class="vl-meta">Ingen varsler</span>' : '';
+  const grenseknapp = kanLede()
+    ? `<button class="btn btn-sm btn-outline-secondary" type="button"
+               data-action="apneGrenser">
+         <i class="bi bi-sliders me-1"></i>Grenser
+       </button>`
+    : '';
+
+  const hode = `
+    <div class="vl-kort vl-belastningshode">
+      <div class="vl-noekkeltall">
+        <div><b>${escHtmlValue(s.personer)}</b><span class="vl-meta">personer</span></div>
+        <div><b>${escHtmlValue(s.skift)}</b><span class="vl-meta">skift</span></div>
+        <div><b>${escapeHtml(_tall(s.timer))}</b><span class="vl-meta">timer totalt</span></div>
+        <div><b>${escHtmlValue(s.ledige_plasser)}</b><span class="vl-meta">ledige plasser</span></div>
+      </div>
+      <div class="vl-varsler">
+        ${langeSkift}${korteHviler}${ingenVarsler}
+      </div>
+      ${grenseknapp}
+    </div>`;
+
+  if (!belastning.personer.length) {
+    return hode + '<div class="vl-kort"><div class="vl-tom">Ingen er satt '
+         + 'opp på vakta ennå. Tallene fylles ut etter hvert som plassene '
+         + 'bemannes.</div></div>';
+  }
+
+  // Faktisk-kolonnen står bare når det finnes noe å vise. I planlegging er
+  // den tom for alle, og en kolonne med bare streker er en kolonne som
+  // stjeler bredde fra dem som betyr noe.
+  const harFaktisk = belastning.personer.some((r) => r.faktiske_timer !== null);
+
+  const merket = (paa) => (paa ? 'vl-advarsel' : '');
+  const strek = '<span class="vl-meta">—</span>';
+
+  const rader = belastning.personer.map((r) => {
+    const hvileklasse = merket(r.kort_hvile);
+    const hvile = r.korteste_hvile === null ? strek
+      : `<span class="${hvileklasse}">${escapeHtml(_tall(r.korteste_hvile))} t</span>`;
+    const lengsteklasse = merket(r.langt_skift);
+    const lengste = `<span class="${lengsteklasse}">${escapeHtml(_tall(r.lengste_skift))} t</span>`;
+    const faktiskTall = r.faktiske_timer === null
+      ? strek : `${escapeHtml(_tall(r.faktiske_timer))} t`;
+    const faktisk = harFaktisk ? `<td>${faktiskTall}</td>` : '';
+    return `
+      <tr>
+        <td class="vl-navn">${escapeHtml(r.navn)}</td>
+        <td>${escapeHtml(r.korps_kort)}</td>
+        <td>${escHtmlValue(r.antall_skift)}</td>
+        <td><b>${escapeHtml(_tall(r.timer))} t</b></td>
+        ${faktisk}
+        <td>${lengste}</td>
+        <td>${hvile}</td>
+      </tr>`;
+  }).join('');
+
+  const faktiskHode = harFaktisk ? '<th>Faktisk</th>' : '';
+  return hode + `
+    <div class="vl-kort">
+      <div class="vl-kort-topp">
+        <span class="vl-kort-tittel">Per person</span>
+        <span class="vl-meta">Sortert på timer — den som er i ferd med å bli
+          brukt opp ligger øverst</span>
+      </div>
+      <div class="vl-tabellramme">
+        <table class="vl-tabell vl-tabell-drift vl-utskrift">
+          <thead>
+            <tr>
+              <th>Navn</th><th>Korps</th><th>Skift</th><th>Planlagt</th>
+              ${faktiskHode}
+              <th>Lengste skift</th><th>Korteste hvile</th>
+            </tr>
+          </thead>
+          <tbody>${rader}</tbody>
+        </table>
+      </div>
+    </div>`;
+}
+
+
 function mkTilstede() {
   // **Modulens mest alvorlige visning.** På et sted med overnatting brukes
   // den til å vite hvem som er i bygget ved brann. Det stiller tre krav
@@ -1907,6 +2050,39 @@ async function opprettVaktpost() {
     }
     _lukkModal('nyVaktpostModal');
     await lastListe(aktivListe.vaktliste.id);
+  });
+}
+
+
+function apneGrenser() {
+  if (!belastning) return;
+  _skjulFeil('grenser-feil');
+  _settVerdi('grense-skift', belastning.grenser.maks_skift_timer);
+  _settVerdi('grense-hvile', belastning.grenser.min_hvile_timer);
+  _apneModal('grenserModal');
+}
+
+
+async function lagreGrenser() {
+  _skjulFeil('grenser-feil');
+  await withSubmitGuard('grenser-knapp', async () => {
+    const res = await apiFetch('/vaktliste/api/grenser/', {
+      method: 'PUT',
+      body: JSON.stringify({
+        maks_skift_timer: _lesFelt('grense-skift'),
+        min_hvile_timer: _lesFelt('grense-hvile'),
+      }),
+    });
+    const d = await res.json().catch(() => ({}));
+    if (!res.ok || d.status !== 'ok') {
+      _visFeil('grenser-feil', d.message || 'Kunne ikke lagre grensene.');
+      return;
+    }
+    _lukkModal('grenserModal');
+    // Varslene regnes på serveren mot grensene, så tallene må hentes på nytt
+    // — ikke bare tekstene som nevner dem.
+    belastning = null;
+    await lastBelastning();
   });
 }
 
