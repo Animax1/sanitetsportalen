@@ -934,6 +934,14 @@ Gjennomgang 13. aug. 2026, med 1000 pasienter og peak 100 brukere som premiss.
             «hvem er på vakt». Prisen: et navn kan stå to steder. En nullbar FK er en
             additiv migrasjon den dagen behovet melder seg.
 
+- [ ] **Kjør testsuiten mot PostgreSQL, ikke bare SQLite.** Deployen kræsjet
+      30. aug. 2026 på `cannot ALTER TABLE … because it has pending trigger
+      events`, og suiten var grønn hele veien: SQLite har ingen utsatte
+      triggere, så feilklassen finnes ikke i dev. `DataOgSkjemaISammeTransaksjonTests`
+      fanger det som faktisk skjedde, men er en statisk regel — den ser at
+      køen tømmes i fila, ikke at det skjer på veien gjennom. Prod er
+      PostgreSQL; dev burde vært det i det minste for migrasjonstestene.
+
 - [ ] **Norsk sortering av æ/ø/å i vaktlisteregistrene.** Ikke hastverk, og
       kanskje aldri. Sorteringen bruker `Lower(...)`, så store/små bokstaver er
       deterministiske — men Æ/Ø/Å følger databasens kollasjon, og den er ulik i

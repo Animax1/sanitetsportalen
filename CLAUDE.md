@@ -490,6 +490,27 @@ fordelt på de tre.
 
 JS-oppførsel testes ved å kjøre funksjonene i node, se `patients/js_test_utils.py`. Ikke skriv nye tester som bare grep-er etter kodelinjer i JS-filer.
 
+## Migrasjoner
+
+**Prod er PostgreSQL, dev er SQLite — og det er ikke bare en detalj.** En
+migrasjon som først skriver rader (`RunPython`/`RunSQL`) og deretter endrer
+skjema, må tømme PostgreSQLs triggerkø imellom:
+
+```python
+if schema_editor.connection.vendor == 'postgresql':
+    schema_editor.execute('SET CONSTRAINTS ALL IMMEDIATE')
+```
+
+Djangos fremmednøkler er `DEFERRABLE INITIALLY DEFERRED`, så hver skriving
+legger en hendelse i kø som først fyres ved commit — og migrasjonen er én
+transaksjon. `ALTER TABLE` på en tabell med hendelser i køen avvises med
+`cannot ALTER TABLE … because it has pending trigger events`, og release-fasen
+crash-looper containeren. **SQLite har ingen utsatte triggere**, så suiten er
+grønn uansett; det tok ned deployen 30. aug. 2026.
+`DataOgSkjemaISammeTransaksjonTests` håndhever regelen — de tre veiene ut er å
+tømme køen, sette `atomic = False`, eller dele migrasjonen i to.
+`vaktliste/migrations/0007` er mønsteret.
+
 ## Miljøvariabler
 
 Settes i `.env` lokalt. Nøkler å kjenne til:

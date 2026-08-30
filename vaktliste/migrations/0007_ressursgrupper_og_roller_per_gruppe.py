@@ -31,6 +31,30 @@ STANDARDGRUPPER = (
 )
 
 
+def toem_triggerkoen(schema_editor):
+    """Fyr av de utsatte FK-sjekkene nå, før skjemaskrittene under.
+
+    **Dette er ikke pynt — uten det kræsjer migrasjonen på PostgreSQL.**
+    Djangos fremmednøkler er `DEFERRABLE INITIALLY DEFERRED`, så hver
+    INSERT/UPDATE/DELETE i dataskrittet legger en triggerhendelse i kø som
+    først fyres ved commit. Men migrasjonen er én transaksjon, og
+    `ALTER TABLE` på en tabell med hendelser i køen avvises:
+
+        cannot ALTER TABLE "vaktliste_ressursrolle" because it has pending
+        trigger events
+
+    `SET CONSTRAINTS ALL IMMEDIATE` tømmer køen ved å utføre sjekkene med én
+    gang. Feiler en av dem, feiler migrasjonen her — som den skal.
+
+    SQLite har ingen utsatte triggere og trenger ikke dette. Det er derfor
+    hele testsuiten var grønn mens deployen sto og kræsjet i loop: en
+    migrasjon som rører rader og deretter endrer skjema er noe dev-basen ikke
+    kan si noe om.
+    """
+    if schema_editor.connection.vendor == 'postgresql':
+        schema_editor.execute('SET CONSTRAINTS ALL IMMEDIATE')
+
+
 def seed_og_flytt(apps, schema_editor):
     Ressursgruppe = apps.get_model('vaktliste', 'Ressursgruppe')
     Ressurs = apps.get_model('vaktliste', 'Ressurs')
@@ -61,6 +85,8 @@ def seed_og_flytt(apps, schema_editor):
             vp.save(update_fields=['rolle'])
         gammel.delete()
 
+    toem_triggerkoen(schema_editor)
+
 
 def tilbake(apps, schema_editor):
     """Nok til at migrasjonen kan rulles tilbake uten å felle skranker.
@@ -81,6 +107,8 @@ def tilbake(apps, schema_editor):
             beholdt[rolle.navn] = rolle
             rolle.gruppe = None
             rolle.save(update_fields=['gruppe'])
+
+    toem_triggerkoen(schema_editor)
 
 
 class Migration(migrations.Migration):

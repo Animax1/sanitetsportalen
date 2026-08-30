@@ -4,6 +4,44 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-08-30 — Deployfiks: migrasjonen som kræsjet på PostgreSQL
+
+**1709 tester grønne** (3 nye). Ingen ny migrasjon — `vaktliste.0007` er rettet
+på plass, og den har aldri blitt anvendt noe sted.
+
+- **`vaktliste.0007` tok ned deployen i crash-loop.** PostgreSQL svarte
+  `cannot ALTER TABLE "vaktliste_ressursrolle" because it has pending trigger
+  events`. Årsaken: Djangos fremmednøkler er `DEFERRABLE INITIALLY DEFERRED`,
+  så hver skriving i dataskrittet legger en triggerhendelse i kø som først
+  fyres ved commit — og migrasjonen er én transaksjon. `ALTER TABLE` på en
+  tabell med hendelser i køen avvises. Løst med `SET CONSTRAINTS ALL
+  IMMEDIATE` mellom dataskrittet og skjemaskrittene, i begge retninger.
+- **Reprodusert før den ble rettet.** En lokal PostgreSQL 16 ble satt opp,
+  basen rullet tilbake til `0006`, ekte rader lagt inn — ressurser, en rolle,
+  vaktposter — og `0007` kjørt: samme feil, ord for ord. Etter rettelsen går
+  den gjennom, dataene står riktig (rollene viftet ut per gruppe, hver
+  vaktpost på sin egen gruppes kopi, `gruppe_id` NOT NULL, `type`-kolonnen
+  borte), og veien tilbake til `0006` virker også. Hele historikken kjører
+  dessuten rent fra tom base.
+- **Databasen trengte ingen opprydding.** Migrasjonen er atomisk, så den
+  rullet helt tilbake ved hver feilede oppstart; basen sto på `0006`.
+- **Testsuiten kunne ikke se feilen, og det er det egentlige problemet.**
+  SQLite har ingen utsatte triggere — en migrasjon som rører rader og deretter
+  endrer skjema er noe dev-basen ikke kan si noe om i det hele tatt.
+  `DataOgSkjemaISammeTransaksjonTests` flytter regelen inn i suiten: skriver en
+  migrasjon rader og gjør noe som blir til `ALTER TABLE` etterpå, må den enten
+  tømme køen, sette `atomic = False`, eller deles i to. Åtte eldre migrasjoner
+  har mønsteret og står i `KJENTE_UNNTAK` — alle er anvendt i produksjon, og
+  hele historikken er kjørt fra null mot PostgreSQL for å bekrefte at de ikke
+  feller på en tom base.
+- **Mutasjonstesting fant en svakhet i sperren.** Første versjon lette etter
+  strengen i fila, og gikk grønn når kallet ble fjernet mens docstringen som
+  *forklarer* regelen sto igjen. En migrasjon som omtaler sperren er ikke en
+  migrasjon som har den. Nå leses fila med AST, og strengen må stå som
+  argument i et kall. Grensen som står igjen er notert i testen: den ser at
+  kallet finnes, ikke at det kjøres — det krever å kjøre suiten mot
+  PostgreSQL, som nå står i TODO.
+
 ## 2026-08-30 — Ressursgrupper, et ledernivå, og en popup som blinket bort
 
 **1706 tester grønne** (49 nye). Migrasjoner `vaktliste.0007` og
