@@ -832,3 +832,125 @@ class MalensGatingTests(TestCase):
         kilde = read_js(VAKTLISTE_JS)
         self.assertNotIn('fjernRessurs', kilde)
         self.assertIn('slettRessurs', kilde)
+
+
+class KorpsPaaPlassenTests(TilgangsBasis):
+    """Reservasjonen finnes på to nivåer, og plassen vinner over ressursen.
+
+    **Andrés bestilling 30. aug. 2026:** en samleplass bemannes av flere
+    korps. `Ressurs.korps` reserverer hele ressursen til ett, og da måtte
+    samleplassen deles i én ressurs per korps — og da er den ikke lenger én
+    samleplass. `Vaktpost.korps` setter av én plass til ett korps.
+    """
+
+    def _ledig(self, klient, ressurs, **overstyr):
+        kropp = {'fra_tid': self._iso(0), 'til_tid': self._iso(8)}
+        kropp.update(overstyr)
+        return klient.post(
+            f'/vaktliste/api/ressurser/{ressurs.pk}/vaktposter/',
+            data=kropp, content_type='application/json')
+
+    def test_plassen_arver_ressursens_reservasjon(self):
+        """Tom `korps` betyr «som ressursen», ikke «ingen». Ellers ville
+        alle eksisterende plasser blitt fritt vilt ved oppgraderingen."""
+        res = self._ledig(self.c_vl, self.res_hgsd)
+        self.assertEqual(res.status_code, 201)
+        rad = res.json()['data']
+        self.assertIsNone(rad['plass_korps_id'], 'ingen egen reservasjon')
+        self.assertEqual(rad['reservert_korps_id'], self.hgsd.pk,
+                         'men den arver bilens')
+
+    def test_plassens_korps_vinner_over_ressursens(self):
+        res = self._ledig(self.c_vl, self.res_hgsd, korps_id=self.karmoy.pk)
+        rad = res.json()['data']
+        self.assertEqual(rad['plass_korps_id'], self.karmoy.pk)
+        self.assertEqual(rad['reservert_korps_id'], self.karmoy.pk)
+
+    def test_korpsbruker_fyller_plassen_satt_av_til_henne(self):
+        """Selve poenget: en plass på en ureservert samleplass, satt av til
+        Haugesund, skal Haugesunds fører kunne fylle."""
+        pk = self._ledig(self.c_vl, self.res_fri,
+                         korps_id=self.hgsd.pk).json()['data']['id']
+        res = self.c_kb.put(f'/vaktliste/api/vaktposter/{pk}/',
+                            data={'mannskap_id': self.p_hgsd.pk},
+                            content_type='application/json')
+        self.assertEqual(res.status_code, 200)
+
+    def test_korpsbruker_nektes_plassen_satt_av_til_et_annet_korps(self):
+        """To plasser på samme samleplass: én til Haugesund, én til Karmøy.
+        Uten dette ville reservasjonen på plassen vært pynt."""
+        pk = self._ledig(self.c_vl, self.res_fri,
+                         korps_id=self.karmoy.pk).json()['data']['id']
+        res = self.c_kb.put(f'/vaktliste/api/vaktposter/{pk}/',
+                            data={'mannskap_id': self.p_hgsd.pk},
+                            content_type='application/json')
+        self.assertEqual(res.status_code, 403)
+
+    def test_plassens_korps_stenger_ogsaa_paa_en_reservert_ressurs(self):
+        """Bilen er Haugesunds, men denne ene plassen er satt av til Karmøy.
+        Da skal Haugesunds fører ikke inn — plassen vinner."""
+        pk = self._ledig(self.c_vl, self.res_hgsd,
+                         korps_id=self.karmoy.pk).json()['data']['id']
+        res = self.c_kb.put(f'/vaktliste/api/vaktposter/{pk}/',
+                            data={'mannskap_id': self.p_hgsd.pk},
+                            content_type='application/json')
+        self.assertEqual(res.status_code, 403)
+
+    def test_korpsbruker_kan_ikke_omreservere_en_plass(self):
+        """Den korteste veien rundt hele regelen: sett plassens korps til mitt
+        eget, og fyll den etterpå."""
+        pk = self._ledig(self.c_vl, self.res_fri,
+                         korps_id=self.karmoy.pk).json()['data']['id']
+        res = self.c_kb.put(f'/vaktliste/api/vaktposter/{pk}/',
+                            data={'korps_id': self.hgsd.pk},
+                            content_type='application/json')
+        self.assertEqual(res.status_code, 403)
+        self.assertEqual(Vaktpost.objects.get(pk=pk).korps_id, self.karmoy.pk,
+                         'reservasjonen skal stå urørt')
+
+    def test_korpsbruker_kan_ikke_omreservere_sin_egen_plass(self):
+        """**Den som avslører hullet.** Testen over stoppes av inngangsporten:
+        plassen er en annens, så hun kommer aldri fram til
+        reservasjonssjekken. Her er plassen *hennes* — hun får ta i raden — og
+        da er det bare den indre sjekken som hindrer henne i å skrive om hvem
+        plassen tilhører. Å dele ut er vaktlederens bord, også når det er ens
+        egen plass man deler bort.
+
+        Funnet ved mutasjonstesting: uten den indre sjekken var testen over
+        fortsatt grønn.
+        """
+        pk = self._ledig(self.c_vl, self.res_hgsd).json()['data']['id']
+        # Hun får fylle den — beviser at porten slipper henne inn.
+        self.assertEqual(
+            self.c_kb.put(f'/vaktliste/api/vaktposter/{pk}/',
+                          data={'merknad': 'min'},
+                          content_type='application/json').status_code, 200)
+        # Men ikke skrive om hvem den er satt av til.
+        res = self.c_kb.put(f'/vaktliste/api/vaktposter/{pk}/',
+                            data={'korps_id': self.karmoy.pk},
+                            content_type='application/json')
+        self.assertEqual(res.status_code, 403)
+        self.assertIsNone(Vaktpost.objects.get(pk=pk).korps_id,
+                          'reservasjonen skal stå urørt')
+
+    def test_korpsbruker_kan_ikke_sette_korps_ved_opprettelse(self):
+        """Hun oppretter uansett ikke ledige plasser, men regelen skal ikke
+        hvile på det ene."""
+        res = self._ledig(self.c_kb, self.res_hgsd, korps_id=self.hgsd.pk)
+        self.assertEqual(res.status_code, 403)
+
+    def test_lederen_setter_reservasjonen(self):
+        pk = self._ledig(self.c_vl, self.res_fri).json()['data']['id']
+        res = self.c_vl.put(f'/vaktliste/api/vaktposter/{pk}/',
+                            data={'korps_id': self.karmoy.pk},
+                            content_type='application/json')
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(Vaktpost.objects.get(pk=pk).korps_id, self.karmoy.pk)
+
+    def test_reservasjonen_kan_fjernes_igjen(self):
+        """Tom verdi tilbake til «som ressursen» — ikke en blindvei."""
+        pk = self._ledig(self.c_vl, self.res_hgsd,
+                         korps_id=self.karmoy.pk).json()['data']['id']
+        self.c_vl.put(f'/vaktliste/api/vaktposter/{pk}/',
+                      data={'korps_id': None}, content_type='application/json')
+        self.assertIsNone(Vaktpost.objects.get(pk=pk).korps_id)

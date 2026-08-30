@@ -876,6 +876,11 @@ Gjennomgang 13. aug. 2026, med 1000 pasienter og peak 100 brukere som premiss.
             - **Lærdom å ta med til neste modul:** en modul er ikke ferdig før
               dataene den trenger kan opprettes *gjennom portalen*. Django-admin
               teller ikke, og en testsuite som bare bruker ORM-en ser det ikke.
+      - [x] **Reservasjonen ned på plassen (30. aug. 2026).** Niende runde.
+            `Vaktpost.korps` (migrasjon `0008`, additiv): en samleplass kan ha
+            plasser satt av til ulike korps. Tom verdi arver ressursens.
+            Å reservere krever `skriv_full`. «Sett på vakt» → «Opprett vakt».
+            Kurven tegnes også før gruppa har skift.
       - [x] **Fanen er gruppa (30. aug. 2026).** Åttende runde. Én fane per
             ressursgruppe i stedet for per ressurs: «Ambulanse» er alle
             ambulansene, med hver bil som sitt eget kort inni og gruppekurven

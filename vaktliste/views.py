@@ -183,6 +183,13 @@ def _vaktpost_til_dict(vp, foreldre=None):
         'navn': person.navn if person else '',
         'korps_navn': person.korps.navn if person else '',
         'korps_kort': (person.korps.kortnavn or person.korps.navn) if person else '',
+        # **Reservasjonen på plassen.** `korps_navn` over er personens korps —
+        # et annet spørsmål. En ledig plass har ingen person, men kan være satt
+        # av til et korps, og det er det denne bærer. `reservert_korps_id`
+        # arver ressursens når plassen ikke har sin egen, slik at grensesnittet
+        # viser det samme som serveren håndhever.
+        'plass_korps_id': vp.korps_id,
+        'reservert_korps_id': services.reservert_korps(vaktpost=vp),
         'kompetanser': [k.navn for k in kompetanser],
         'rolle_id': vp.rolle_id,
         'rolle': vp.rolle.navn if vp.rolle else '',
@@ -327,7 +334,7 @@ def vaktliste_detalj_view(request, pk):
     poster = list(
         Vaktpost.objects
         .filter(ressurs__vaktliste=vl)
-        .select_related('mannskap', 'mannskap__korps', 'rolle')
+        .select_related('mannskap', 'mannskap__korps', 'rolle', 'ressurs')
         .prefetch_related('mannskap__kompetanser')
     )
     foreldre = services.foreldrekart()
@@ -613,7 +620,11 @@ def vaktposter_view(request, pk):
     """Sett en person på en ressurs, med rolle og skifttider.
 
     Her lever den doble regelen (§4.2): badgen på personen **og**
-    reservasjonen på ressursen. Begge sjekkes av én funksjon i `services`.
+    reservasjonen. Begge sjekkes av én funksjon i `services`.
+
+    **Reservasjonen leses fra plassen når den har sin egen** (30. aug. 2026):
+    en samleplass kan ha to plasser satt av til Haugesund og to til Karmøy.
+    `services.reservert_korps()` slår de to nivåene sammen.
     """
     try:
         ressurs = Ressurs.objects.select_related('korps').get(pk=pk)
@@ -658,9 +669,17 @@ def vaktposter_view(request, pk):
     if antall is None or not 1 <= antall <= 50:
         return _feil('Antall plasser må være mellom 1 og 50.')
 
+    # **Reservasjonen på plassen.** Oppgis den ikke, arver plassen ressursens
+    # — `NULL` betyr «som ressursen», ikke «ingen». Å sette den er å dele ut,
+    # og krever `skriv_full` som all annen utdeling.
+    korps_id = _int(data.get('korps_id')) if 'korps_id' in data else None
+    if korps_id is not None and not services.kan_skrive_alt(request.user):
+        return _nektet('Reservasjonen settes av den som deler ut.')
+
     felter = dict(
         ressurs=ressurs,
         mannskap=mannskap,
+        korps_id=korps_id,
         rolle_id=_int(data.get('rolle_id')),
         fra_tid=fra_tid,
         til_tid=til_tid,
@@ -675,7 +694,8 @@ def vaktposter_view(request, pk):
             f'tidspunktet.')
 
     vaktpost = (Vaktpost.objects
-                .select_related('mannskap', 'mannskap__korps', 'rolle')
+                .select_related('mannskap', 'mannskap__korps', 'rolle',
+                                'ressurs')
                 .prefetch_related('mannskap__kompetanser')
                 .get(pk=lagde[0].pk))
     svar = _vaktpost_til_dict(vaktpost, services.foreldrekart())
@@ -730,10 +750,17 @@ def vaktpost_detalj_view(request, pk):
             if ny_person is None:
                 return _feil('Ukjent mannskap.')
         if not services.kan_sette_vaktpost(
-                request.user, vaktpost.ressurs, ny_person):
+                request.user, vaktpost.ressurs, ny_person, vaktpost=vaktpost):
             return _nektet()
         vaktpost.mannskap = ny_person
 
+    if 'korps_id' in data:
+        # Å endre hvem plassen er satt av til, er å dele ut på nytt — samme
+        # terskel som å reservere hele ressursen. Kunne korps-brukeren gjøre
+        # det, kunne hun tildelt seg selv en plass på samleplassen.
+        if not services.kan_skrive_alt(request.user):
+            return _nektet('Reservasjonen settes av den som deler ut.')
+        vaktpost.korps_id = _int(data['korps_id'])
     if 'rolle_id' in data:
         vaktpost.rolle_id = _int(data['rolle_id'])
     if 'merknad' in data:

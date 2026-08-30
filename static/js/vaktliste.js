@@ -231,6 +231,10 @@ function fyllNedtrekk() {
   _fyll('ny-vaktpost-mannskap', aktivListe.mannskap.map((m) => ({
     id: m.id, navn: `${m.navn} — ${m.korps_navn}`,
   })), '— ledig plass —');
+  _fyll('ny-vaktpost-korps', (aktivListe.korps || []).map((k) => ({
+    id: k.id, navn: k.kortnavn || k.navn,
+  })), '— som ressursen —');
+
   // Rollenedtrekket i «Sett på vakt» fylles når vinduet åpnes: det som
   // tilbys avhenger av hvilken ressurs man står på, altså av gruppa.
 }
@@ -409,6 +413,27 @@ function rollerForGruppe(gruppeId, valgtId) {
 }
 
 
+function _plassKorps(vp) {
+  // Reservasjonen på en ledig plass. Bare den som deler ut kan endre den —
+  // kunne korps-brukeren, kunne hun tildelt seg selv en plass. Andre ser
+  // hvem plassen tilhører, som tekst.
+  const valgt = vp.plass_korps_id != null ? vp.plass_korps_id
+    : (vp.reservert_korps_id != null ? vp.reservert_korps_id : '');
+  if (!kanSkriveAlt()) {
+    const k = (aktivListe.korps || []).find((x) => x.id === valgt);
+    return `<span class="vl-meta">${escapeHtml(k ? (k.kortnavn || k.navn) : '—')}</span>`;
+  }
+  const valg = ['<option value="">— alle —</option>'].concat(
+    (aktivListe.korps || []).map((k) => {
+      const merke = k.id === valgt ? ' selected' : '';
+      return `<option value="${escHtmlValue(k.id)}"${merke}>`
+           + `${escapeHtml(k.kortnavn || k.navn)}</option>`;
+    })).join('');
+  return `<select class="vl-celle" data-action="endreVaktpost" data-hendelse="change"
+                  data-felt="korps_id" data-id="${escHtmlValue(vp.id)}">${valg}</select>`;
+}
+
+
 function _rolleValg(vp, ressurs, kanRedigere) {
   // Rollen redigeres i raden. Før lå den bare i «Sett på vakt»-modalen, og
   // å endre den krevde å fjerne skiftet og sette det opp på nytt — samme
@@ -470,7 +495,7 @@ function mkRessurs(r) {
   const settKnapp = kanRore
     ? `<button class="btn btn-sm btn-primary" type="button"
                data-action="apneVaktpost" data-id="${escHtmlValue(r.id)}">
-         <i class="bi bi-person-plus me-1"></i>Sett på vakt
+         <i class="bi bi-plus-lg me-1"></i>Opprett vakt
        </button>` : '';
 
   // **Rollene administreres inne i ressursen**, ikke i toppen av siden.
@@ -548,13 +573,22 @@ function mkRessurs(r) {
         ? _fyllValgFor(vp, kanRore)
         : escapeHtml(vp.navn);
 
+      // **Korpskolonnen svarer på to ulike spørsmål.** Står det en person
+      // der, er det *hennes* korps — et faktum. Er plassen ledig, er det
+      // korpset plassen er *satt av til* — en beslutning, og den kan endres
+      // av den som deler ut. En samleplass har gjerne to plasser til
+      // Haugesund og to til Karmøy.
+      const korpsCelle = vp.ledig
+        ? _plassKorps(vp)
+        : escapeHtml(vp.korps_kort || '—');
+
       // Rekkefølgen er lesestrekket: hvem, hvorfra, hvilken rolle, når, hvor
       // lenge — og først da kompetansen, som er det man vurderer laget på
       // når resten står. Merknaden sist, fordi den er unntaket.
       return `
         <tr class="${escHtmlValue(vp.ledig ? 'vl-ledig' : '')}">
           <td class="vl-navn">${navnCelle}</td>
-          <td>${escapeHtml(vp.korps_kort || '—')}</td>
+          <td>${korpsCelle}</td>
           <td>${_rolleValg(vp, r, kanRore)}</td>
           <td>${tid('fra_tid')}</td>
           <td>${tid('til_tid')}</td>
@@ -582,9 +616,9 @@ function mkRessurs(r) {
       <div class="vl-tabellramme">
         <table class="vl-tabell">
           <colgroup>
-            <col style="width: 15%"><col style="width: 5%"><col style="width: 11%">
+            <col style="width: 14%"><col style="width: 10%"><col style="width: 10%">
             <col style="width: 18%"><col style="width: 18%"><col style="width: 5%">
-            <col style="width: 13%"><col style="width: 10%"><col style="width: 5%">
+            <col style="width: 10%"><col style="width: 10%"><col style="width: 5%">
           </colgroup>
           <thead>
             <tr>
@@ -767,18 +801,30 @@ function _tegnforklaring() {
 }
 
 
+function _posterIGruppe(gruppeId) {
+  const ressurser = new Set(_ressurserIGruppe(gruppeId).map((r) => r.id));
+  return (aktivListe.vaktposter || [])
+    .filter((vp) => ressurser.has(vp.ressurs_id));
+}
+
+
 function mkGruppekurve(gruppe) {
   // **Kurven står i fanen den gjelder**, øverst, over de ressursene den
   // summerer. Å lete etter samleplassens bemanning under «Oversikt» mens man
   // bemanner samleplassen, er ett skifte for mye.
-  const bunke = _posterPerGruppe().find((b) => b.gruppe.id === gruppe.id);
-  if (!bunke) return '';
-  const kurve = _mkEnKurve(bunke.gruppe.navn, bunke.poster);
+  //
+  // **Og den tegnes selv om gruppa ennå ikke har et eneste skift.** Den falt
+  // bort i den tilstanden fram til 30. aug. 2026, og det var feil på akkurat
+  // samme måte som at kurven en gang bare dekket skiftene: hullet man
+  // planlegger for å tette er størst når ingen er satt opp, og da forsvant
+  // hele kurven. Nå står den flat på null over vaktas spenn — som er svaret
+  // på «hvor mye gjenstår her».
+  const kurve = _mkEnKurve(gruppe.navn, _posterIGruppe(gruppe.id));
   if (!kurve) return '';
   return `
     <div class="vl-kort vl-kurve-kort">
       <div class="vl-kort-topp">
-        <span class="vl-kort-tittel">Bemanning — ${escapeHtml(bunke.gruppe.navn)}</span>
+        <span class="vl-kort-tittel">Bemanning — ${escapeHtml(gruppe.navn)}</span>
         <div class="d-flex align-items-center gap-3">${_tegnforklaring()}</div>
       </div>
       ${kurve}
@@ -1087,7 +1133,7 @@ function apneVaktpost(ressursId) {
   if (!ressurs) return;
   _skjulFeil('ny-vaktpost-feil');
   document.getElementById('ny-vaktpost-tittel').textContent =
-    `Sett på vakt — ${ressurs.navn}`;
+    `Opprett vakt — ${ressurs.navn}`;
   document.getElementById('nyVaktpostModal').dataset.ressurs = String(ressursId);
   // Rollene som tilbys er gruppas — samme regel som i raden.
   _fyll('ny-vaktpost-rolle',
@@ -1288,6 +1334,7 @@ async function opprettVaktpost() {
       method: 'POST',
       body: JSON.stringify({
         mannskap_id: document.getElementById('ny-vaktpost-mannskap')?.value || null,
+        korps_id: document.getElementById('ny-vaktpost-korps')?.value || null,
         rolle_id: document.getElementById('ny-vaktpost-rolle')?.value || null,
         antall: Number(document.getElementById('ny-vaktpost-antall')?.value) || 1,
         fra_tid: fra,
@@ -1372,6 +1419,10 @@ function apneRedigerVaktpost(id) {
   })), '— ledig plass —');
   _fyll('vaktpost-rolle', rollerForGruppe(ressurs.gruppe_id, vp.rolle_id),
         'Uten rolle');
+  _fyll('vaktpost-korps', (aktivListe.korps || []).map((k) => ({
+    id: k.id, navn: k.kortnavn || k.navn,
+  })), '— som ressursen —');
+  _settVerdi('vaktpost-korps', vp.plass_korps_id);
 
   _settVerdi('vaktpost-mannskap', vp.mannskap_id);
   _settVerdi('vaktpost-rolle', vp.rolle_id);
@@ -1405,6 +1456,7 @@ async function lagreVaktpost() {
       method: 'PUT',
       body: JSON.stringify({
         mannskap_id: document.getElementById('vaktpost-mannskap')?.value || null,
+        korps_id: document.getElementById('vaktpost-korps')?.value || null,
         rolle_id: document.getElementById('vaktpost-rolle')?.value || null,
         merknad: document.getElementById('vaktpost-merknad')?.value || '',
         fra_tid: fra,

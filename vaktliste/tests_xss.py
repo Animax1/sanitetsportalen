@@ -76,6 +76,8 @@ REVIEWED_INTERPOLATIONS = {
     # Kolonner, grupper og roller (30. aug., andre runde):
     'merkelapper': 'markup bygget lokalt, hvert kompetansenavn escapet inni',
     'redigerPost': 'markup bygget lokalt, vaktpost-id escapet inni',
+    'korpsCelle': 'nedtrekk eller escapet tekst, bygget lokalt',
+    'merke': 'hardkodet selected-attributt fra en ternær',
     'mkGruppekurve(r)': 'kurve fra en bygger som selv skannes her',
     '_tegnforklaring()': 'hardkodet markup uten data',
     'timeakse': 'celler bygget lokalt, klokkeslettene escapet inni',
@@ -158,7 +160,8 @@ class VaktlisteEscapingOppforselTests(SimpleTestCase):
         (VAKTLISTE_JS, ('mkRessurs', '_rolleValg', 'rollerForGruppe',
                         '_fyllValgFor', '_varighet',
                         'mkRolleRad', 'mkOversikt', '_mkEnKurve',
-                        'mkGruppekurve', 'mkGruppe', '_tegnforklaring',
+                        'mkGruppekurve', '_posterIGruppe', 'mkGruppe', '_plassKorps',
+                        '_tegnforklaring',
                         '_timesteg', '_ressurserIGruppe',
                         '_grupperMedRessurser',
                         '_toppunkt', '_posterPerGruppe', '_vaktensSpenn',
@@ -1107,7 +1110,8 @@ class KurvePerGruppeTests(SimpleTestCase):
         (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue')),
         (VAKTLISTE_JS, ('_d', '_kl', '_dag', '_vaktensSpenn',
                         '_bemanningPerTime', '_posterPerGruppe',
-                        '_mkEnKurve', 'mkGruppekurve',
+                        '_mkEnKurve', 'mkGruppekurve', '_posterIGruppe',
+                        '_ressurserIGruppe',
                         '_tegnforklaring', '_timesteg', '_toppunkt')),
     )
     VINDU = ("globalThis.DAGER = ['søn','man','tir','ons','tor','fre','lør'];\n"
@@ -1304,6 +1308,7 @@ class GruppekurveIFanenTests(SimpleTestCase):
         (VAKTLISTE_JS, ('_d', '_kl', '_dag', '_vaktensSpenn',
                         '_bemanningPerTime', '_posterPerGruppe', '_mkEnKurve',
                         '_timesteg', '_toppunkt', '_tegnforklaring',
+                        '_posterIGruppe', '_ressurserIGruppe',
                         'mkGruppekurve')),
     )
     VINDU = ("globalThis.DAGER = ['søn','man','tir','ons','tor','fre','lør'];\n"
@@ -1346,12 +1351,23 @@ class GruppekurveIFanenTests(SimpleTestCase):
         self.assertNotIn('Samleplass', ut)
         self.assertIn('4 ubesatte plasstimer', ut)
 
-    def test_ressurs_uten_skift_i_gruppa_gir_ingen_kurve(self):
-        """En tom kurve over en fane man nettopp har laget, sier ingenting."""
+    def test_gruppe_uten_skift_faar_kurven_likevel(self):
+        """**Endret 30. aug. 2026.** Kurven falt bort når gruppa ikke hadde et
+        eneste skift — altså akkurat mens man setter opp. Det var feil på samme
+        måte som at kurven en gang bare dekket skiftene: hullet man planlegger
+        for å tette er størst når ingen er satt opp, og da forsvant hele
+        kurven. Nå står den flat på null over vaktas spenn.
+
+        Gruppa må ha ressurser; en gruppe uten ressurser er ingen fane.
+        """
         ut = run_node(self.harness, self.VINDU + self.LISTE + """
-            console.log('[' + mkGruppekurve({id: 99, navn: 'Tom'}) + ']');
+            globalThis.aktivListe.grupper.push({id: 9, navn: 'Tom'});
+            globalThis.aktivListe.ressurser.push({id: 90, gruppe_id: 9});
+            console.log(mkGruppekurve({id: 9, navn: 'Tom'}));
         """)
-        self.assertIn('[]', ut)
+        self.assertIn('Tom', ut)
+        self.assertIn('vl-stolpe', ut, 'spennet tegnes selv uten skift')
+        self.assertIn('topp 1 plasser', ut, 'flat null skaleres mot 1')
 
     def test_dogn_staar_i_tegnforklaringen(self):
         """Den hvite streken i kurven er midnatt, ikke nåværende tidspunkt.
@@ -1443,6 +1459,7 @@ class FanenErGruppaTests(SimpleTestCase):
                         '_fyllValgFor', '_varighet', 'mkGruppekurve',
                         '_mkEnKurve', '_tegnforklaring', '_timesteg',
                         '_toppunkt', '_posterPerGruppe', '_vaktensSpenn',
+                        '_posterIGruppe', '_plassKorps',
                         '_bemanningPerTime', 'rollerForGruppe', '_iso16',
                         '_posterFor', '_ikkePlassert', '_ressurserIGruppe',
                         '_grupperMedRessurser', '_d', '_kl', '_dag',

@@ -280,6 +280,7 @@ fase 3–7 gjenstår — se `docs/BESLUTNING_VAKTLISTE.md`, som er besluttet i s
 |---|---|
 | Badgen på personen | `Mannskap.korps`, arvet av kontoen via `Mannskap.user` |
 | Reservasjonen på ressursen | `Ressurs.korps` — tom betyr **vaktlederens bord**, ikke fritt fram |
+| Reservasjonen på plassen | `Vaktpost.korps` — overstyrer ressursens, `services.reservert_korps()` |
 | Begge halvdelene sjekkes samlet | `services.kan_sette_vaktpost()` |
 | Ett skift er én rad | `Vaktpost`, med plan og faktisk i hvert sitt feltpar |
 | Planlagt vakt rører ikke pekeren | `services.opprett_planlagt_vakt()` |
@@ -290,6 +291,13 @@ fase 3–7 gjenstår — se `docs/BESLUTNING_VAKTLISTE.md`, som er besluttet i s
   modul per nivå (§4.5) før nivået deles ut.
 - **Den doble regelen er skrevet som én funksjon**, `kan_sette_vaktpost()`, nettopp for
   at et endepunkt ikke skal kunne huske badgen og glemme reservasjonen.
+- **Reservasjonen finnes på to nivåer, og plassen vinner** (30. aug. 2026).
+  `Ressurs.korps` er standarden; `Vaktpost.korps` overstyrer den for én plass, fordi en
+  samleplass bemannes av flere korps. `services.reservert_korps()` er det ene stedet som
+  slår dem sammen — leses de hver for seg, vil ett endepunkt før eller siden huske
+  ressursen og glemme plassen. **Tom verdi betyr «som ressursen», ikke «ingen»**: en
+  annen tolkning ville gjort alle eksisterende plasser fritt vilt ved oppgraderingen.
+  Å *sette* reservasjonen er å dele ut, og krever `skriv_full`.
 - **Tre terskler, og skillet er hva slags utsagn nivået får avgi.** `les` ser hele lista
   (alle korps — poenget er samordning). Badge + reservasjon bemanner. `skriv_full` deler
   *ut*: ressurser, reservasjoner, nye vakter og verdimengdene — kunne korps-brukeren

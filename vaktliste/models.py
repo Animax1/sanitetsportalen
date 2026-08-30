@@ -41,6 +41,12 @@ regler er verdt å kjenne før man rører dem:
 5. **Plan og faktisk holdes atskilt.** `fra_tid`/`til_tid` er planen;
    `mott_at`/`av_vakt_at` er hva som skjedde. Avviket mellom dem er selve
    informasjonen, og derfor er de fire ulike felter — ikke to som overskrives.
+6. **Reservasjonen finnes på to nivåer** (30. aug. 2026). `Ressurs.korps` er
+   standarden — hele bilen er HGSDs. `Vaktpost.korps` overstyrer den for én
+   plass, og finnes fordi en samleplass bemannes av *flere* korps: to plasser
+   til Haugesund, to til Karmøy, på samme ressurs. Uten det måtte samleplassen
+   deles i én ressurs per korps, og da er den ikke lenger én samleplass.
+   `services.reservert_korps()` er det ene stedet som slår dem sammen.
 
 Ingen modell her rører ``patients``. `Ressurs.enhet` peker på ``oppdrag`` —
 den ene koblingen, og den går én vei (§6).
@@ -496,6 +502,15 @@ class Vaktpost(BaseTimeStampedModel):
         related_name='vaktposter',
         verbose_name='Mannskap',
         help_text='Tom = ledig plass som skal fylles.',
+    )
+    korps = models.ForeignKey(
+        Korps,
+        null=True, blank=True,
+        on_delete=models.PROTECT,
+        related_name='reserverte_vaktposter',
+        verbose_name='Reservert korps',
+        help_text='Korpset plassen er satt av til. Tom = arver ressursens '
+                  'reservasjon.',
     )
     rolle = models.ForeignKey(
         Ressursrolle,

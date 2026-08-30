@@ -287,7 +287,38 @@ def kan_bemanne_ressurs(user, ressurs) -> bool:
             and ressurs.korps_id == korps.pk)
 
 
-def kan_sette_vaktpost(user, ressurs, mannskap) -> bool:
+def reservert_korps(vaktpost=None, ressurs=None):
+    """Hvilket korps er denne plassen satt av til?
+
+    **Ett sted, fordi reservasjonen finnes på to nivåer.** `Ressurs.korps` er
+    standarden — hele bilen er HGSDs. `Vaktpost.korps` overstyrer den for én
+    plass, og finnes fordi en samleplass bemannes av flere korps.
+
+    Leses de to hver for seg ute i endepunktene, vil ett av dem før eller
+    siden huske ressursen og glemme plassen — og da er en plass satt av til
+    Karmøy plutselig HGSDs igjen.
+    """
+    if vaktpost is not None and vaktpost.korps_id is not None:
+        return vaktpost.korps_id
+    if vaktpost is not None:
+        return vaktpost.ressurs.korps_id
+    return ressurs.korps_id if ressurs is not None else None
+
+
+def kan_bemanne_plass(user, ressurs, vaktpost=None) -> bool:
+    """Reservasjonshalvdelen, lest fra plassen når den har sin egen.
+
+    `kan_bemanne_ressurs` svarer på ressursnivået og brukes fortsatt der det
+    er ressursen som er spørsmålet (å dele den ut, å fjerne den). Denne
+    svarer på plassen, og er den som gjelder når man bemanner.
+    """
+    if kan_skrive_alt(user):
+        return True
+    korps_id = reservert_korps(vaktpost=vaktpost, ressurs=ressurs)
+    return kan_fore_korps(user, korps_id)
+
+
+def kan_sette_vaktpost(user, ressurs, mannskap, vaktpost=None) -> bool:
     """Begge halvdelene av regelen: badgen på personen, og reservasjonen.
 
     Skrevet som én funksjon slik at et endepunkt ikke kan huske den ene og
@@ -302,7 +333,7 @@ def kan_sette_vaktpost(user, ressurs, mannskap) -> bool:
     """
     if mannskap is None:
         return kan_skrive_alt(user)
-    return (kan_bemanne_ressurs(user, ressurs)
+    return (kan_bemanne_plass(user, ressurs, vaktpost)
             and kan_redigere_mannskap(user, mannskap))
 
 
@@ -322,7 +353,7 @@ def kan_rore_vaktpost(user, vaktpost) -> bool:
     de plassene som var satt av til henne — funnet av
     `LedigPlassTilgangTests`.
     """
-    if not kan_bemanne_ressurs(user, vaktpost.ressurs):
+    if not kan_bemanne_plass(user, vaktpost.ressurs, vaktpost):
         return False
     if vaktpost.mannskap_id is None:
         return True

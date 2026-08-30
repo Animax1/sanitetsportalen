@@ -4,6 +4,38 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-08-30 — Reservasjonen ned på plassen
+
+**1748 tester grønne** (10 nye). Migrasjon `vaktliste.0008`, rent additiv.
+
+- **`Vaktpost.korps`: en plass kan settes av til ett korps.** Andrés
+  innvending, og den var riktig: `Ressurs.korps` reserverer *hele* ressursen
+  til ett korps, men en samleplass bemannes av flere. Uten dette måtte
+  samleplassen deles i én ressurs per korps — og da er den ikke lenger én
+  samleplass. Nå kan den ha to plasser til Haugesund og én til Karmøy, i
+  samme tabell.
+- **De to nivåene slås sammen ett sted**, `services.reservert_korps()`. Tom
+  verdi på plassen betyr «som ressursen», ikke «ingen» — ellers ville alle
+  eksisterende plasser blitt fritt vilt ved oppgraderingen. Migrasjonen er
+  derfor ren `AddField`: oppførselen er uendret til noen faktisk setter et
+  korps på en plass.
+- **Å reservere er å dele ut, og krever `skriv_full`.** Korps-brukeren fyller
+  plassene som er satt av til henne; hun bestemmer ikke hvilke. Mutasjonstesting
+  avslørte at den første testen min ikke prøvde regelen i det hele tatt —
+  plassen tilhørte et annet korps, så inngangsporten stoppet henne før
+  reservasjonssjekken. Testen som faktisk biter bruker en plass hun *får* ta
+  i, og viser at hun likevel ikke kan skrive om hvem den tilhører.
+- **Korpskolonnen svarer nå på to ulike spørsmål.** Står det en person der, er
+  det *hennes* korps — et faktum. Er plassen ledig, er det korpset plassen er
+  *satt av til* — en beslutning, redigerbar i raden for den som deler ut.
+- **«Sett på vakt» heter nå «Opprett vakt».** Knappen lager en plass, som ofte
+  er tom; «sett på vakt» lovet en person.
+- **Kurven tegnes selv når gruppa ennå ikke har et eneste skift.** Den falt
+  bort i akkurat den tilstanden man setter opp i, og det var feil på samme
+  måte som at kurven en gang bare dekket skiftene: hullet man planlegger for å
+  tette er størst når ingen er satt opp, og da forsvant hele kurven.
+- Tre mutasjoner prøvd. Én overlevde og fikk testen beskrevet over.
+
 ## 2026-08-30 — Fanen er gruppa, ikke bilen
 
 **1737 tester grønne** (23 nye). Bare grensesnitt.

@@ -360,6 +360,11 @@
             miste plassen i oppsettet.
           </div>
         </div>
+        <div class="mb-3 vl-krev-full d-none">
+          <label class="form-label" for="vaktpost-korps">Reservert korps</label>
+          <select id="vaktpost-korps" class="form-select"></select>
+          <div class="form-text">Tom = som ressursen.</div>
+        </div>
         <div class="mb-3">
           <label class="form-label" for="vaktpost-rolle">Rolle</label>
           <select id="vaktpost-rolle" class="form-select"></select>
@@ -406,7 +411,7 @@
   <div class="modal-dialog">
     <div class="modal-content">
       <div class="modal-header">
-        <h5 class="modal-title" id="ny-vaktpost-tittel">Sett på vakt</h5>
+        <h5 class="modal-title" id="ny-vaktpost-tittel">Opprett vakt</h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Lukk"></button>
       </div>
       <div class="modal-body">
@@ -416,6 +421,14 @@
           <div class="form-text">
             Velg <strong>«— ledig plass —»</strong> for å sette opp behovet nå
             og fylle personen inn senere.
+          </div>
+        </div>
+        <div class="mb-3 vl-krev-full d-none" id="ny-vaktpost-korps-rad">
+          <label class="form-label" for="ny-vaktpost-korps">Reservert korps</label>
+          <select id="ny-vaktpost-korps" class="form-select"></select>
+          <div class="form-text">
+            Hvilket korps plassen er satt av til. Tom = som ressursen.
+            En samleplass har gjerne plasser til flere korps.
           </div>
         </div>
         <div class="mb-3 d-none" id="ny-vaktpost-antall-rad">
