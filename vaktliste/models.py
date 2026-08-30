@@ -3,6 +3,20 @@
 Se ``docs/BESLUTNING_VAKTLISTE.md``. To ting er verdt å ha i hodet når man
 leser fila:
 
+0. **Verdimengdene sorteres alfabetisk, uten et `rekkefolge`-felt.** Feltet
+   fantes til 30. aug. 2026, men alle radene sto på standardverdien, så
+   `ordering` falt uansett tilbake på navnet — det var alfabetisk i praksis,
+   med et tallfelt i skjemaet som pris. `Ressurs` beholder sitt, fordi der
+   *betyr* rekkefølgen noe (fanerekkefølgen på planleggingssiden), og der
+   settes den automatisk.
+
+   **`Lower(...)` er ikke pynt.** Uten den sorterer basen på kodepunkt, og da
+   havner «karmøy» etter «Åsen» i én base og før «Bokn» i en annen — sorteringen
+   ville sett ulik ut i dev (SQLite) og prod (PostgreSQL). Æ/Ø/Å står vi
+   derimot igjen med databasens svar på: en ekte norsk kollasjon krever enten
+   en sorteringsnøkkel-kolonne eller en `db_collation`, og for en håndfull
+   korps er det ikke verdt det. Det er notert i TODO om noen får et korps som
+   begynner på Å.
 1. **`Korps`, `Kompetanse` og `VaktRolle` er tabeller, ikke `choices.py`.**
    Motsatt av oppdragsmodulen, der problemstilling og hastegrad ligger i
    kode. Skillet er det samme som mellom `PROBLEMSTILLING` og `Lokasjon`:
@@ -35,6 +49,7 @@ from __future__ import annotations
 
 from django.conf import settings
 from django.db import models
+from django.db.models.functions import Lower
 
 from core.models import BaseTimeStampedModel
 
@@ -64,16 +79,10 @@ class Korps(BaseTimeStampedModel):
         help_text='Inaktive korps skjules i nedtrekkslister, men beholdes '
                   'på mannskapet som allerede tilhører dem.',
     )
-    rekkefolge = models.IntegerField(
-        default=100,
-        verbose_name='Rekkefølge',
-        help_text='Lavere kommer først i lister.',
-    )
-
     class Meta:
         verbose_name = 'Korps'
         verbose_name_plural = 'Korps'
-        ordering = ['rekkefolge', 'navn']
+        ordering = [Lower('navn')]
 
     def __str__(self) -> str:
         return self.navn
@@ -94,16 +103,10 @@ class Kompetanse(BaseTimeStampedModel):
         help_text='Inaktive kompetanser skjules i nedtrekkslister, men '
                   'beholdes på mannskapet som har dem.',
     )
-    rekkefolge = models.IntegerField(
-        default=100,
-        verbose_name='Rekkefølge',
-        help_text='Lavere kommer først i lister.',
-    )
-
     class Meta:
         verbose_name = 'Kompetanse'
         verbose_name_plural = 'Kompetanser'
-        ordering = ['rekkefolge', 'navn']
+        ordering = [Lower('navn')]
 
     def __str__(self) -> str:
         return self.navn
@@ -123,16 +126,10 @@ class VaktRolle(BaseTimeStampedModel):
         help_text='Inaktive roller skjules i nedtrekkslister, men beholdes '
                   'på vaktposter som allerede bruker dem.',
     )
-    rekkefolge = models.IntegerField(
-        default=100,
-        verbose_name='Rekkefølge',
-        help_text='Lavere kommer først i lister.',
-    )
-
     class Meta:
         verbose_name = 'Vaktrolle'
         verbose_name_plural = 'Vaktroller'
-        ordering = ['rekkefolge', 'navn']
+        ordering = [Lower('navn')]
 
     def __str__(self) -> str:
         return self.navn
@@ -208,7 +205,7 @@ class Mannskap(BaseTimeStampedModel):
     class Meta:
         verbose_name = 'Mannskap'
         verbose_name_plural = 'Mannskap'
-        ordering = ['korps__rekkefolge', 'korps__navn', 'navn']
+        ordering = [Lower('korps__navn'), Lower('navn')]
         constraints = [
             # Unikt per korps, ikke globalt: to korps kan ha hver sin
             # «Ola Hansen», men to like navn i samme korps er umulige å
@@ -329,7 +326,8 @@ class Ressurs(BaseTimeStampedModel):
     )
     rekkefolge = models.IntegerField(
         default=100, verbose_name='Rekkefølge',
-        help_text='Lavere kommer først. Styrer fanerekkefølgen.')
+        help_text='Styrer fanerekkefølgen. Settes automatisk til '
+                  'opprettelsesrekkefølgen — se services.neste_rekkefolge().')
 
     class Meta:
         verbose_name = 'Ressurs'

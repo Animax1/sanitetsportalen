@@ -370,7 +370,6 @@ function apneNyVerdi() {
   document.getElementById('verdi-tittel').textContent = reg.nyEtikett;
   _sett('verdi-navn', '');
   _sett('verdi-kortnavn', '');
-  _sett('verdi-rekkefolge', 100);
   document.getElementById('verdi-aktiv').checked = true;
   document.getElementById('verdi-aktiv-rad').classList.add('d-none');
   document.getElementById('verdi-kortnavn-rad')
@@ -388,7 +387,6 @@ function apneRedigerVerdi(id) {
   document.getElementById('verdi-tittel').textContent = rad.navn;
   _sett('verdi-navn', rad.navn);
   _sett('verdi-kortnavn', rad.kortnavn || '');
-  _sett('verdi-rekkefolge', rad.rekkefolge);
   document.getElementById('verdi-aktiv').checked = rad.er_aktiv;
   document.getElementById('verdi-aktiv-rad').classList.remove('d-none');
   document.getElementById('verdi-kortnavn-rad')
@@ -405,7 +403,7 @@ async function lagreVerdi() {
     const navn = _les('verdi-navn');
     if (!navn) { _visFeil('verdi-feil', 'Navn må fylles ut.'); return; }
 
-    const kropp = { navn, rekkefolge: Number(_les('verdi-rekkefolge')) || 100 };
+    const kropp = { navn };
     if (reg.kortnavn) kropp.kortnavn = _les('verdi-kortnavn');
     if (redigerer) kropp.er_aktiv = document.getElementById('verdi-aktiv').checked;
 

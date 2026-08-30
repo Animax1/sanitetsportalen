@@ -1,5 +1,9 @@
 """Registersiden: mannskapet og de tre verdimengdene admin styrer.
 
+**Verdimengdene sorteres alfabetisk.** `rekkefolge` ble fjernet 30. aug. 2026:
+alle radene sto på standardverdien, så `ordering` falt uansett tilbake på
+navnet — det var alfabetisk i praksis, med et tallfelt i skjemaet som pris.
+
 **Hvorfor denne fila finnes.** Fase 1 la registrene i `vaktliste/admin.py` og
 skrev at «Django-admin er uansett riktig hjem for `Korps`, `Kompetanse` og
 `VaktRolle`». Det var feil: `/django-admin/` er kun rutet når `DEBUG` eller
@@ -74,10 +78,10 @@ def registre_view(request):
 
 # ── De tre verdimengdene ─────────────────────────────────────────────────────
 #
-# `Korps`, `Kompetanse` og `VaktRolle` har samme form — navn, er_aktiv,
-# rekkefolge — og fire views hver ville vært ord for ord like bortsett fra
-# modellnavnet. Samme grep som `patients/views_registre.py` (N13.2), og av
-# samme grunn: tre kopier er tre steder en rettelse kan bli glemt.
+# `Korps`, `Kompetanse` og `VaktRolle` har samme form — navn og er_aktiv —
+# og fire views hver ville vært ord for ord like bortsett fra modellnavnet.
+# Samme grep som `patients/views_registre.py` (N13.2), og av samme grunn: tre
+# kopier er tre steder en rettelse kan bli glemt.
 #
 # Korps har ett felt til (`kortnavn`), og fabrikken tar derfor en liste over
 # valgfrie tekstfelter framfor å bli to fabrikker.
@@ -97,7 +101,6 @@ def _register_views(model, etikett, etikett_bestemt, *, ekstra_felt=()):
             'id': rad.pk,
             'navn': rad.navn,
             'er_aktiv': rad.er_aktiv,
-            'rekkefolge': rad.rekkefolge,
             'i_bruk': _antall_bruk(model, rad),
         }
         for felt in ekstra_felt:
@@ -132,7 +135,6 @@ def _register_views(model, etikett, etikett_bestemt, *, ekstra_felt=()):
             with transaction.atomic():
                 rad = model.objects.create(
                     navn=navn,
-                    rekkefolge=_int(data.get('rekkefolge')) or 100,
                     **felter,
                 )
         except IntegrityError:
@@ -179,8 +181,6 @@ def _register_views(model, etikett, etikett_bestemt, *, ekstra_felt=()):
                 setattr(rad, felt, (data.get(felt) or '').strip())
         if 'er_aktiv' in data:
             rad.er_aktiv = bool(data['er_aktiv'])
-        if 'rekkefolge' in data:
-            rad.rekkefolge = _int(data['rekkefolge']) or 100
 
         try:
             with transaction.atomic():

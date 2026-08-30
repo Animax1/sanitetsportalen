@@ -300,6 +300,12 @@ fase 3–7 gjenstår — se `docs/BESLUTNING_VAKTLISTE.md`, som er besluttet i s
   flaten er kun rutet under `DEBUG`/`OFFLINE_MODE` (S1), så `vaktliste/admin.py` er et
   utviklerverktøy — et register som *bare* finnes der, finnes ikke for brukeren.
   `SjekkAtIngenPekerPaaDjangoAdminTests` skanner alle maler for lenker dit.
+- **Verdimengdene sorteres alfabetisk — det finnes ingen `rekkefolge` å
+  vedlikeholde.** `Ressurs` er unntaket, fordi der styrer den fanerekkefølgen, og
+  der settes den automatisk til opprettelsesrekkefølgen. Sorteringen bruker
+  `Lower(...)`: uten den er «alfabetisk» databasens alfabet, og SQLite (dev) og
+  PostgreSQL (prod) svarer ulikt på store/små bokstaver. Æ/Ø/Å er fortsatt
+  databasens svar.
 - **ID-er fra klienten går gjennom `views._int()`.** Et nedtrekk med «Ingen valgt»
   sender `''`, ikke `null`, og den strengen i et FK-filter gir `ValueError` — altså 500
   der brukeren skulle fått «velg korps». `or None` dekker den tomme strengen, men ikke

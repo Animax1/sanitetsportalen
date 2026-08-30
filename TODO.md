@@ -854,6 +854,10 @@ Gjennomgang 13. aug. 2026, med 1000 pasienter og peak 100 brukere som premiss.
             M2M-en ikke ville protestert); antall bruk vises i lista.
             `SjekkAtIngenPekerPaaDjangoAdminTests` skanner alle maler for at
             det ikke skal gjenta seg. 43 nye tester.
+      - [x] **`rekkefolge` fjernet fra verdimengdene (30. aug. 2026).** Andrés
+            innvending, og den var riktig: feltet ga allerede alfabetisk, siden
+            hver rad sto på standardverdien. `Ressurs` beholder sitt (styrer
+            fanerekkefølgen) men setter det automatisk. Migrasjon `0003`.
             - **Lærdom å ta med til neste modul:** en modul er ikke ferdig før
               dataene den trenger kan opprettes *gjennom portalen*. Django-admin
               teller ikke, og en testsuite som bare bruker ORM-en ser det ikke.
@@ -890,6 +894,14 @@ Gjennomgang 13. aug. 2026, med 1000 pasienter og peak 100 brukere som premiss.
             to i pasientmodulen (§9). De svarer på «hvem behandlet pasienten», ikke
             «hvem er på vakt». Prisen: et navn kan stå to steder. En nullbar FK er en
             additiv migrasjon den dagen behovet melder seg.
+
+- [ ] **Norsk sortering av æ/ø/å i vaktlisteregistrene.** Ikke hastverk, og
+      kanskje aldri. Sorteringen bruker `Lower(...)`, så store/små bokstaver er
+      deterministiske — men Æ/Ø/Å følger databasens kollasjon, og den er ulik i
+      SQLite (dev) og PostgreSQL (prod). Merkes først den dagen noen legger inn
+      et korps som begynner på Æ, Ø eller Å. Fikses med `db_collation` på
+      kolonnen eller en egen sorteringsnøkkel; begge er større enn problemet er
+      i dag, med en håndfull korps.
 
 - [ ] **Flytt `hent_aktiv_vakt` ut av pasientmodulen.** Funksjonen er portalens scope —
       `Vakt` bor i `core`, og både oppdrag og statistikk importerer den fra

@@ -3,9 +3,9 @@
 Reglene som ikke hører hjemme i et view: å lage en planlagt vakt, å kopiere
 et oppsett, og å avgjøre hvem som får røre hva.
 
-**Korps-sjekkene bor her, ikke i viewene.** De håndheves først fra fase 3 —
-modulen er admin-only fram til da — men regelen skrives én gang, på ett sted,
-slik at fase 3 blir å ta den i bruk framfor å finne den opp per endepunkt.
+**Korps-sjekkene bor her, ikke i viewene.** Regelen er skrevet én gang, på
+ett sted, og viewene tar den i bruk — det er derfor et endepunkt ikke kan
+huske badgen og glemme reservasjonen.
 """
 from __future__ import annotations
 
@@ -53,6 +53,26 @@ def opprett_planlagt_vakt(navn, startet=None):
             er_aktiv=False,
         )
         return Vaktliste.objects.create(vakt=vakt)
+
+
+def neste_rekkefolge(vaktliste) -> int:
+    """Neste ledige fanerekkefølge på lista — altså «sist».
+
+    `Ressurs.rekkefolge` er det ene stedet i modulen der rekkefølgen *betyr*
+    noe: den styrer fanene på planleggingssiden, og alfabetisk ville stokket
+    om på den operative rekkefølgen (samleplass, biler, lag, KO blir
+    «Ambulanse, KO, Lag 1, Mannskapsbil 1»).
+
+    Men brukeren skal ikke skrive et tall. Den som bygger vakta legger inn
+    ressursene i den rekkefølgen hun tenker på dem, og det er den rekkefølgen
+    fanene skal ha. Steget på 10 gir plass til å skyte inn en ressurs mellom
+    to andre den dagen noen vil kunne omorganisere.
+    """
+    fra_for = (vaktliste.ressurser
+               .order_by('-rekkefolge')
+               .values_list('rekkefolge', flat=True)
+               .first())
+    return (fra_for or 0) + 10
 
 
 def kopier_oppsett(fra_vaktliste, til_vaktliste):

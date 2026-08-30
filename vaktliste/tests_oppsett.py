@@ -123,6 +123,8 @@ class KopierOppsettTests(TestCase):
             rekkefolge=10)
         Ressurs.objects.create(
             vaktliste=self.fra, navn='KO', type=choices.KO, rekkefolge=20)
+        # Rekkefølgen settes normalt av `neste_rekkefolge()`; her settes den
+        # eksplisitt fordi testen handler om at kopien bevarer den.
 
         self.person = Mannskap.objects.create(navn='Kari', korps=self.korps)
         na = timezone.now()
@@ -157,6 +159,61 @@ class KopierOppsettTests(TestCase):
         kopi.navn = 'KO 2'
         kopi.save()
         self.assertTrue(self.fra.ressurser.filter(navn='KO').exists())
+
+
+@override_settings(SECURE_SSL_REDIRECT=False, RATELIMIT_ENABLE=False)
+class FanerekkefolgeTests(TestCase):
+    """`Ressurs.rekkefolge` er det ene stedet rekkefølgen *betyr* noe.
+
+    Fanene på planleggingssiden skal stå i operativ rekkefølge — samleplass,
+    biler, lag, KO — og alfabetisk ville stokket om på den («Ambulanse, KO,
+    Lag 1, Mannskapsbil 1»). Men brukeren skriver ikke et tall: den som bygger
+    vakta legger inn ressursene i den rekkefølgen hun tenker på dem.
+    """
+
+    def setUp(self):
+        self.vl = services.opprett_planlagt_vakt('Vakta')
+        self.c = _klient(_bruker('adm', admin=True))
+
+    def _legg_til(self, navn):
+        return self.c.post(
+            f'/vaktliste/api/vaktlister/{self.vl.pk}/ressurser/',
+            data={'navn': navn}, content_type='application/json')
+
+    def test_fanene_folger_opprettelsesrekkefolgen(self):
+        for navn in ('Samleplass', 'Mannskapsbil 1', 'Ambulanse', 'Lag 1', 'KO'):
+            self.assertEqual(self._legg_til(navn).status_code, 201)
+
+        data = self.c.get(f'/vaktliste/api/vaktlister/{self.vl.pk}/').json()['data']
+        self.assertEqual(
+            [r['navn'] for r in data['ressurser']],
+            ['Samleplass', 'Mannskapsbil 1', 'Ambulanse', 'Lag 1', 'KO'],
+            'alfabetisk ville stokket om på den operative rekkefølgen')
+
+    def test_ingen_maa_skrive_et_tall(self):
+        """Kroppen har ingen `rekkefolge`, og radene får likevel ulik verdi."""
+        self._legg_til('Først')
+        self._legg_til('Så')
+        verdier = list(self.vl.ressurser.values_list('rekkefolge', flat=True))
+        self.assertEqual(len(set(verdier)), 2, f'ulike verdier, fikk {verdier}')
+
+    def test_steget_gir_plass_til_aa_skyte_inn(self):
+        """Steg på 10 slik at en omorganisering senere slipper å nummerere om."""
+        self._legg_til('En')
+        self._legg_til('To')
+        self.assertEqual(
+            sorted(self.vl.ressurser.values_list('rekkefolge', flat=True)),
+            [10, 20])
+
+    def test_neste_rekkefolge_paa_tom_liste(self):
+        self.assertEqual(services.neste_rekkefolge(self.vl), 10)
+
+    def test_lista_er_uavhengig_av_andre_vaktlister(self):
+        """Tellingen er per liste — ellers ville fane nummer én på årets vakt
+        arvet et tall fra i fjor."""
+        annen = services.opprett_planlagt_vakt('Annen vakt')
+        self._legg_til('En')
+        self.assertEqual(services.neste_rekkefolge(annen), 10)
 
 
 class ModellReglerTests(TestCase):

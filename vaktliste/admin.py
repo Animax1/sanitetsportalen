@@ -17,10 +17,10 @@ from .models import Kompetanse, Korps, Mannskap, VaktRolle
 
 @admin.register(Korps)
 class KorpsAdmin(admin.ModelAdmin):
-    list_display = ('navn', 'kortnavn', 'er_aktiv', 'rekkefolge', 'antall_mannskap')
+    list_display = ('navn', 'kortnavn', 'er_aktiv', 'antall_mannskap')
     list_filter = ('er_aktiv',)
     search_fields = ('navn', 'kortnavn')
-    ordering = ('rekkefolge', 'navn')
+    ordering = ('navn',)
 
     @admin.display(description='Mannskap')
     def antall_mannskap(self, obj):
@@ -29,18 +29,18 @@ class KorpsAdmin(admin.ModelAdmin):
 
 @admin.register(Kompetanse)
 class KompetanseAdmin(admin.ModelAdmin):
-    list_display = ('navn', 'er_aktiv', 'rekkefolge')
+    list_display = ('navn', 'er_aktiv')
     list_filter = ('er_aktiv',)
     search_fields = ('navn',)
-    ordering = ('rekkefolge', 'navn')
+    ordering = ('navn',)
 
 
 @admin.register(VaktRolle)
 class VaktRolleAdmin(admin.ModelAdmin):
-    list_display = ('navn', 'er_aktiv', 'rekkefolge')
+    list_display = ('navn', 'er_aktiv')
     list_filter = ('er_aktiv',)
     search_fields = ('navn',)
-    ordering = ('rekkefolge', 'navn')
+    ordering = ('navn',)
 
 
 @admin.register(Mannskap)
@@ -51,7 +51,7 @@ class MannskapAdmin(admin.ModelAdmin):
     list_select_related = ('korps',)
     filter_horizontal = ('kompetanser',)
     autocomplete_fields = ('user',)
-    ordering = ('korps__rekkefolge', 'korps__navn', 'navn')
+    ordering = ('korps__navn', 'navn')
 
     @admin.display(boolean=True, description='Konto')
     def har_konto(self, obj):

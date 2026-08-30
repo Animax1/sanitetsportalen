@@ -143,11 +143,17 @@ class VerdimengdeTests(TestCase):
         self.assertEqual([(r['navn'], r['er_aktiv']) for r in data],
                          [('Utgått', False)])
 
-    def test_rekkefolge_styrer_lista(self):
-        self._post('korps', navn='Bokn', rekkefolge=200)
-        self._post('korps', navn='Karmøy', rekkefolge=50)
+    def test_lista_er_alfabetisk_uansett_hva_som_ble_lagt_inn_forst(self):
+        self._post('korps', navn='Karmøy')
+        self._post('korps', navn='Bokn')
         data = self.c.get('/vaktliste/api/korps/').json()['data']
-        self.assertEqual([r['navn'] for r in data], ['Karmøy', 'Bokn'])
+        self.assertEqual([r['navn'] for r in data], ['Bokn', 'Karmøy'])
+
+    def test_api_et_tilbyr_ikke_rekkefolge(self):
+        """Feltet er borte fra verdimengdene, og skal ikke lekke tilbake
+        gjennom svaret — et felt klienten ser, er et felt noen vil sette."""
+        rad = self._post('korps', navn='Haugesund').json()['data']
+        self.assertNotIn('rekkefolge', rad)
 
     # ── Sletting ─────────────────────────────────────────────────────────
     def test_ubrukt_verdi_kan_slettes(self):

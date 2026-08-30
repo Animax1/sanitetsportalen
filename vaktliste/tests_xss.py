@@ -359,7 +359,7 @@ class RegistersidenEscapingOppforselTests(SimpleTestCase):
                                             tittel:'Korps', kortnavn:true} };
             globalThis.data = { korps: [{
               id: 1, navn: '<b>Haugesund</b>', kortnavn: '<i>HGSD</i>',
-              er_aktiv: true, rekkefolge: 100, i_bruk: 0
+              er_aktiv: true, i_bruk: 0
             }]};
             console.log(mkVerdier('korps'));
         """)

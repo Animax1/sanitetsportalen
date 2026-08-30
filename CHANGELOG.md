@@ -4,6 +4,39 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-08-30 — `rekkefolge` ut av verdimengdene: alfabetisk holder
+
+**1580 tester grønne** (6 nye). Migrasjon `vaktliste.0003`.
+
+**Andrés innvending, og den var riktig.** Feltet ga allerede alfabetisk: hver
+rad sto på standardverdien 100, så `ordering = ['rekkefolge', 'navn']` falt
+uansett tilbake på navnet. Det vi hadde var altså alfabetisk sortering med et
+tallfelt i skjemaet som pris — et felt du måtte se på og lure på hva «100»
+betyr mens du skrev «Sykepleier».
+
+- **Fjernet fra `Korps`, `Kompetanse` og `VaktRolle`.** Ingen tallfelt igjen i
+  grensesnittet. Trygt å droppe kolonnene: modulen har aldri vært i prod.
+- **Beholdt på `Ressurs`, men brukeren skriver ikke tallet.** Der *betyr*
+  rekkefølgen noe — den styrer fanene på planleggingssiden — og alfabetisk ville
+  stokket om på den operative rekkefølgen («Ambulanse, KO, Lag 1, Mannskapsbil
+  1» framfor samleplass, biler, lag, KO). `services.neste_rekkefolge()` setter
+  den til «sist», så fanene følger den rekkefølgen du la ressursene inn i.
+  Steget på 10 gir plass til å skyte inn en ressurs den dagen noen vil
+  omorganisere.
+- **Funn fra den nye testen: «alfabetisk» er databasens alfabet.** SQLite
+  sorterte «Åsen» før «Ærlig» og ville sortert «karmøy» etter begge; PostgreSQL
+  svarer annerledes på begge. Sorteringen bruker derfor `Lower(...)`, som gjør
+  store/små bokstaver deterministisk i enhver base. **Æ/Ø/Å står vi igjen med
+  databasens svar på** — en ekte norsk kollasjon krever en sorteringsnøkkel eller
+  `db_collation`, og for en håndfull korps er det ikke verdt det. Notert i TODO.
+  Testen sier det samme: den prøver store/små bokstaver, ikke æ/ø/å, fordi en
+  test på det siste ville målt hvilken base som kjørte den.
+- Mutasjonstestet fire veier, alle røde: `Lower()` fjernet, `neste_rekkefolge`
+  som alltid gir 10 (kolliderende faner), telling på tvers av vaktlister, og
+  ressursen tilbake på fast 100.
+
+---
+
 ## 2026-08-29 — Vaktlistemodulen fase 3: tilgangsmodellen tas i bruk
 
 **1574 tester grønne** (48 nye). Ingen migrasjon. `admin_only` er av — modulen

@@ -312,6 +312,10 @@ def _enheter():
 def ressurser_view(request, pk):
     """Legg en ressurs til vaktlista.
 
+    Fanerekkefølgen settes automatisk til «sist» — den som bygger vakta legger
+    inn ressursene i den rekkefølgen hun tenker på dem, og det er den fanene
+    skal ha. Ingen skriver et tall.
+
     Reservasjonen (`korps`) settes her, av den som **deler ut**: `skriv_full`
     eller admin. Korps-brukeren bemanner det som er reservert henne, men
     bestemmer ikke selv hva hun får — kunne hun det, ville reservasjonen ikke
@@ -342,7 +346,8 @@ def ressurser_view(request, pk):
                 type=type_,
                 korps_id=_int(data.get('korps_id')),
                 enhet_id=_int(data.get('enhet_id')),
-                rekkefolge=_int(data.get('rekkefolge')) or 100,
+                rekkefolge=(_int(data.get('rekkefolge'))
+                            or services.neste_rekkefolge(vl)),
             )
     except IntegrityError:
         return _feil(f'«{navn}» finnes allerede på denne vaktlista.')

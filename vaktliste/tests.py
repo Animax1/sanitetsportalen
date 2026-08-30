@@ -26,11 +26,29 @@ class RegisterTests(TestCase):
             with transaction.atomic():
                 Korps.objects.create(navn='Haugesund')
 
-    def test_rekkefolge_styrer_sortering(self):
-        """Rekkefølgen er visningsrekkefølgen i lister og faner."""
-        b = Korps.objects.create(navn='Bokn', rekkefolge=200)
-        a = Korps.objects.create(navn='Karmøy', rekkefolge=50)
-        self.assertEqual(list(Korps.objects.all()), [a, b])
+    def test_verdimengdene_sorteres_alfabetisk(self):
+        """Ingen `rekkefolge` å vedlikeholde (fjernet 30. aug. 2026).
+
+        Feltet fantes, men hver rad sto på standardverdien, så `ordering` falt
+        uansett tilbake på navnet — alfabetisk i praksis, med et tallfelt i
+        skjemaet som pris. Sorteringen må derfor testes: uten den er det ingen
+        som ser at lista blir tilfeldig hvis `Meta.ordering` ryker.
+
+        **Store/små bokstaver testes, æ/ø/å ikke.** Det første er vårt eget
+        valg (`Lower(...)`) og gjelder i enhver base. Det andre er databasens
+        kollasjon, og den er ulik i SQLite og PostgreSQL — en test på det ville
+        målt hvilken base som kjørte testen, ikke hva koden gjør.
+        """
+        for model in (Korps, Kompetanse, VaktRolle):
+            with self.subTest(model=model.__name__):
+                model.objects.create(navn='Stavanger')
+                model.objects.create(navn='bokn')     # liten forbokstav
+                model.objects.create(navn='Karmøy')
+                self.assertEqual(
+                    [r.navn for r in model.objects.all()],
+                    ['bokn', 'Karmøy', 'Stavanger'],
+                    'alfabetisk, og uavhengig av forbokstav')
+                model.objects.all().delete()
 
     def test_kompetanse_og_rolle_er_egne_registre(self):
         """Kompetansen følger personen, rollen følger vaktposten (fase 2).
