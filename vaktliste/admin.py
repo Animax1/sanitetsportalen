@@ -12,7 +12,7 @@ finnes her, finnes ikke for brukeren.
 """
 from django.contrib import admin
 
-from .models import Kompetanse, Korps, Mannskap, VaktRolle
+from .models import Kompetanse, Korps, Mannskap, Ressursrolle
 
 
 @admin.register(Korps)
@@ -35,8 +35,8 @@ class KompetanseAdmin(admin.ModelAdmin):
     ordering = ('navn',)
 
 
-@admin.register(VaktRolle)
-class VaktRolleAdmin(admin.ModelAdmin):
+@admin.register(Ressursrolle)
+class RessursrolleAdmin(admin.ModelAdmin):
     list_display = ('navn', 'er_aktiv')
     list_filter = ('er_aktiv',)
     search_fields = ('navn',)

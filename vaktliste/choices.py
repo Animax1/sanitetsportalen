@@ -1,6 +1,6 @@
 """Verdimengder for vaktlistemodulen.
 
-**Kun det strukturelle ligger her.** `Korps`, `Kompetanse` og `VaktRolle` er
+**Kun det strukturelle ligger her.** `Korps`, `Kompetanse` og `Ressursrolle` er
 tabeller (fase 1) fordi de er organisasjonsdata admin skal styre uten deploy.
 Ressurstypene er noe annet: de avgjør hvordan grensesnittet grupperer og
 ikonlegger, og et nytt ikon krever uansett en kodeendring. Samme skille som

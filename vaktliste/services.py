@@ -183,7 +183,7 @@ def kan_skrive_alt(user) -> bool:
 
     Samlet her framfor å gjentas i hvert view: det er terskelen for alt som
     gjelder *vakta* framfor *et korps* — å dele ut ressurser, å planlegge en ny
-    vakt, og å styre `Korps`/`Kompetanse`/`VaktRolle`.
+    vakt, og å styre `Korps`/`Kompetanse`/`Ressursrolle`.
     """
     return er_global_admin(user) or har_tilgang(user, 'vaktliste', 'skriv_full')
 

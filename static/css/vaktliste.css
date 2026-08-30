@@ -331,7 +331,14 @@
   width: 100%;
   border-collapse: collapse;
   table-layout: fixed;
-  min-width: 58rem;
+  /*
+    **Bred nok til at feltene får plass.** Et `datetime-local` har en
+    minstebredde fra nettleseren (~190 px) som `width: 100%` ikke overstyrer,
+    og med for trange kolonner flyter feltet ut over nabocella. Tabellen er ni
+    kolonner med to tidsfelt — den *skal* være bred, og rammen ruller når
+    skjermen er smalere.
+  */
+  min-width: 82rem;
   font-size: 0.85rem;
 }
 
@@ -383,6 +390,11 @@
    når man er i ferd med å redigere. Ellers drukner tabellen i bokser. */
 .vl-celle {
   width: 100%;
+  /* Uten disse to vokser feltet forbi cella si: `width: 100%` regnes uten
+     ramme og innrykk, og et input har en egen minstebredde som ellers vinner. */
+  box-sizing: border-box;
+  min-width: 0;
+  max-width: 100%;
   background: transparent;
   border: 1px solid transparent;
   border-radius: 4px;

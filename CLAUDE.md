@@ -308,6 +308,19 @@ fase 3–7 gjenstår — se `docs/BESLUTNING_VAKTLISTE.md`, som er besluttet i s
   flaten er kun rutet under `DEBUG`/`OFFLINE_MODE` (S1), så `vaktliste/admin.py` er et
   utviklerverktøy — et register som *bare* finnes der, finnes ikke for brukeren.
   `SjekkAtIngenPekerPaaDjangoAdminTests` skanner alle maler for lenker dit.
+- **Rollen heter `Ressursrolle`, og administreres på planleggingssiden.** Den
+  gjelder plassen på ressursen — lagleder *på bilen* — ikke vakta; «vaktrolle»
+  leste som noe man har på hele vakta. Den er derfor det ene registeret som
+  *ikke* ligger på `/vaktliste/registre/`: det brukes der ressursene settes opp.
+  Nedtrekket i raden tilbyr bare aktive roller **pluss den raden alt står på** —
+  uten det siste forsvinner en deaktivert rolle fra sin egen rad ved neste
+  tegning, og velges bort i stillhet.
+- **Kolonnebredde i ressurstabellen er `min-width` + `<colgroup>`-andeler, og
+  begge deler betyr noe.** Et `datetime-local`-felt har en gulvbredde nettleseren
+  bestemmer; blir kolonnen smalere enn den, stikker feltet ut over nabocella —
+  `table-layout: fixed` klipper ikke innholdet. `RessurstabellensBreddeTests`
+  regner ut hva tidskolonnene faktisk blir og krever at de rommer feltet, altså
+  regelen og ikke tallene.
 - **Tid vises med dag når skiftet krysser et døgn.** `_tidsspenn()` i
   `vaktliste.js` nevner dagen én gang innenfor ett døgn og to ganger ellers —
   «20:00–04:00» alene sier ikke at skiftet går over midnatt, og arrangementer
@@ -418,8 +431,8 @@ Elleve moduler i `static/js/` (ingen bundler), fordelt på seks sider — pasien
 | `statistikk-oppdrag.js` | `/statistikk/`, **kun** med oppdragstilgang | Oppdragsfanen. Kall hit fra `statistikk.js` går gjennom `_kallOppdrag('navn')` |
 | `oppdrag-sentral.js` | `/oppdrag/`, kontoer uten enhet | Sentralbordet: enhetsliste, oppdragsliste, tidslinje, lokasjonsadmin |
 | `oppdrag-enhet.js` | `/oppdrag/`, enhetskontoer | Enhetsskjermen: to knapper mot de navngitte stemplingsendepunktene, og offline-køen i `localStorage`. Serveren sender `neste_overgang` per rad; kjeden følger med som data kun for å projisere neste steg mens noe ligger usendt |
-| `vaktliste.js` | **kun** `/vaktliste/` | Planleggingssiden: fanene bygges av ressursene, ressursen er et regneark med redigering i raden, «Oversikt» er utskriftslista med bemanningskurve |
-| `vaktliste-registre.js` | **kun** `/vaktliste/registre/` | Mannskapsregisteret og de tre verdimengdene. Egen fil fordi skjemahjelperne er sidespesifikke — de to vaktlistefilene kan ikke lastes i samme node-harness |
+| `vaktliste.js` | **kun** `/vaktliste/` | Planleggingssiden: fanene bygges av ressursene, ressursen er et regneark med redigering i raden, «Oversikt» er utskriftslista med bemanningskurve, og ressursrollene administreres i en modal på siden |
+| `vaktliste-registre.js` | **kun** `/vaktliste/registre/` | Mannskapsregisteret, korpsene og kompetansene. Egen fil fordi skjemahjelperne er sidespesifikke — de to vaktlistefilene kan ikke lastes i samme node-harness |
 
 **`patients-utils.js` kan ikke lastes utenfor pasientsiden.** Den gjør arbeid på toppnivå
 — `Chart.defaults` og `new bootstrap.Modal(document.getElementById('newModal'))` — og

@@ -8,9 +8,12 @@
 // Alt som settes med innerHTML escapes. Navn på personer, korps og
 // kompetanser er fritekst fra basen, og notatfeltet er helt fritt.
 //
-// De tre verdimengdene deler bygger og skjema (mkVerdier / lagreVerdi) på
-// samme måte som serveren deler fabrikk — tre kopier ville vært tre steder en
-// rettelse kan bli glemt.
+// De to verdimengdene her deler bygger og skjema (mkVerdier / lagreVerdi) på
+// samme måte som serveren deler fabrikk — kopier er kopier å glemme.
+//
+// **Ressursrollene hører ikke hjemme her.** De administreres fra
+// planleggingssiden, der de brukes: trenger man en rolle som ikke finnes mens
+// man bemanner et lag, skal man slippe å bytte side for å lage den.
 // ════════════════════════════════════════════════════════
 
 let data = null;            // { mannskap, korps, kompetanser, roller, kontoer }
@@ -28,7 +31,6 @@ const REGISTRE = {
   korps: { sti: 'korps', nyEtikett: 'Nytt korps', tittel: 'Korps', kortnavn: true },
   kompetanser: { sti: 'kompetanser', nyEtikett: 'Ny kompetanse',
                  tittel: 'Kompetanser', stige: true },
-  roller: { sti: 'roller', nyEtikett: 'Ny vaktrolle', tittel: 'Vaktroller' },
 };
 
 

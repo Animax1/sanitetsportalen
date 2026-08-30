@@ -27,7 +27,8 @@ from oppdrag.models import Enhet
 from patients.models import AppSetting
 
 from . import choices, services
-from .models import Korps, Mannskap, Ressurs, VaktRolle, Vaktliste, Vaktpost
+from .models import (Korps, Mannskap, Ressurs, Ressursrolle, Vaktliste,
+                     Vaktpost)
 
 
 def _bruker(navn, nivaa=None, *, admin=False):
@@ -389,7 +390,7 @@ class ApiTests(TestCase):
         from patients.test_helpers import sett_aktiv_vakt
         self.aktiv = sett_aktiv_vakt(2098)
         self.korps = Korps.objects.create(navn='Haugesund', kortnavn='HGSD')
-        self.rolle = VaktRolle.objects.create(navn='Lagleder')
+        self.rolle = Ressursrolle.objects.create(navn='Lagleder')
         self.person = Mannskap.objects.create(navn='Kari', korps=self.korps)
         self.admin = _bruker('adm', admin=True)
         self.c = _klient(self.admin)
@@ -656,7 +657,7 @@ class RessurstabellensDataTests(TestCase):
         self.gfor = Kompetanse.objects.create(navn='GFØR')
         self.afor = Kompetanse.objects.create(navn='AFØR', bygger_paa=self.gfor)
         self.syk = Kompetanse.objects.create(navn='Sykepleier')
-        self.rolle = VaktRolle.objects.create(navn='Lagleder')
+        self.rolle = Ressursrolle.objects.create(navn='Lagleder')
 
         self.vl = services.opprett_planlagt_vakt('Vakta')
         self.ressurs = Ressurs.objects.create(vaktliste=self.vl, navn='Lag 1')
@@ -718,7 +719,7 @@ class LedigePlasserTests(TestCase):
 
     def setUp(self):
         self.korps = Korps.objects.create(navn='Haugesund', kortnavn='HGSD')
-        self.rolle = VaktRolle.objects.create(navn='Lagleder')
+        self.rolle = Ressursrolle.objects.create(navn='Lagleder')
         self.vl = services.opprett_planlagt_vakt('Vakta')
         self.ressurs = Ressurs.objects.create(vaktliste=self.vl, navn='Lag 1')
         self.person = Mannskap.objects.create(navn='Kari', korps=self.korps)
@@ -881,3 +882,60 @@ class VaktlengdeTests(TestCase):
                             data={'planlagt_slutt': None},
                             content_type='application/json')
                 self.assertEqual(res.status_code, 403)
+
+
+@override_settings(SECURE_SSL_REDIRECT=False, RATELIMIT_ENABLE=False)
+class RessursrolleTests(TestCase):
+    """Rollen gjelder **ressursen**, ikke vakta — derfor navnet.
+
+    Het `VaktRolle` til 30. aug. 2026. Samme person er sjåfør på
+    mannskapsbilen lørdag og lagleder på samleplassen søndag, og det er
+    nettopp derfor rollen sitter på `Vaktpost` og ikke på `Mannskap`.
+
+    Administreres fra planleggingssiden, der den brukes. Rollene må derfor
+    komme med i **samme form** i planleggingssvaret som fra `/api/roller/` —
+    manageren trenger `i_bruk`, og to former skrevet hver for seg glir fra
+    hverandre.
+    """
+
+    def setUp(self):
+        self.korps = Korps.objects.create(navn='Haugesund')
+        self.rolle = Ressursrolle.objects.create(navn='Lagleder')
+        self.utgatt = Ressursrolle.objects.create(navn='Utgått', er_aktiv=False)
+        self.vl = services.opprett_planlagt_vakt('Vakta')
+        self.ressurs = Ressurs.objects.create(vaktliste=self.vl, navn='Lag 1')
+        self.person = Mannskap.objects.create(navn='Kari', korps=self.korps)
+        na = timezone.now()
+        Vaktpost.objects.create(ressurs=self.ressurs, mannskap=self.person,
+                                rolle=self.rolle, fra_tid=na,
+                                til_tid=na + timedelta(hours=8))
+        self.c = _klient(_bruker('adm', admin=True))
+
+    def _roller(self):
+        data = self.c.get(f'/vaktliste/api/vaktlister/{self.vl.pk}/').json()['data']
+        return data['roller']
+
+    def test_planleggingssvaret_har_samme_form_som_registeret(self):
+        fra_registeret = self.c.get('/vaktliste/api/roller/').json()['data']
+        self.assertEqual(self._roller(), fra_registeret)
+
+    def test_i_bruk_naar_fram_til_manageren(self):
+        rad = [r for r in self._roller() if r['navn'] == 'Lagleder'][0]
+        self.assertEqual(rad['i_bruk'], 1)
+
+    def test_inaktive_roller_sendes_ogsaa(self):
+        """Manageren skal vise dem — nedtrekket filtrerer dem bort selv."""
+        self.assertIn('Utgått', [r['navn'] for r in self._roller()])
+
+    def test_rolle_i_bruk_kan_ikke_slettes(self):
+        res = self.c.delete(f'/vaktliste/api/roller/{self.rolle.pk}/')
+        self.assertEqual(res.status_code, 409)
+
+    def test_ubrukt_rolle_kan_slettes_fra_planleggingssiden(self):
+        self.assertEqual(
+            self.c.delete(f'/vaktliste/api/roller/{self.utgatt.pk}/').status_code,
+            200)
+
+    def test_rollen_heter_ressursrolle(self):
+        self.assertEqual(Ressursrolle._meta.verbose_name, 'Ressursrolle')
+        self.assertEqual(Ressursrolle._meta.verbose_name_plural, 'Ressursroller')

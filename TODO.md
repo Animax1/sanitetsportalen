@@ -876,6 +876,14 @@ Gjennomgang 13. aug. 2026, med 1000 pasienter og peak 100 brukere som premiss.
             - **Lærdom å ta med til neste modul:** en modul er ikke ferdig før
               dataene den trenger kan opprettes *gjennom portalen*. Django-admin
               teller ikke, og en testsuite som bare bruker ORM-en ser det ikke.
+      - [x] **Ressursroller, og kolonner som blir stående (30. aug. 2026).**
+            `VaktRolle` → `Ressursrolle` (migrasjon `0006`, ren `RenameModel`):
+            rollen gjelder plassen på ressursen, ikke vakta. Administrasjonen
+            flyttet fra registersiden til «Roller» på planleggingssiden, der
+            ressursene settes opp, med «i bruk»-telling i lista. Nedtrekket i
+            raden tilbyr bare aktive roller pluss den raden alt står på.
+            Kolonnebredden målt i nettleseren og rettet: `min-width: 82rem`,
+            rebalansert `<colgroup>` og `box-sizing` på feltene.
       - [x] **Alle ti avklaringene besvart 29. aug. 2026** (§11 i notatet er fasit).
             De som endret utformingen: korps er en badge og ikke en ny akse; ressurser
             reserveres til korps og korpsene bemanner sine egne, med tider; drift er en

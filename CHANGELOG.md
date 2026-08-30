@@ -4,6 +4,40 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-08-30 — Ressursroller, og kolonner som blir stående
+
+**1659 tester grønne** (12 nye). Migrasjon `vaktliste.0006`. Fjerde runde på
+Andrés tilbakemelding, og den korteste: to ting han pekte på etter å ha brukt
+planleggingssiden.
+
+- **`VaktRolle` heter nå `Ressursrolle`.** Navnet var misvisende på den måten
+  navn er farlige: rollen gjelder plassen på ressursen — lagleder *på bilen*,
+  sjåfør *på bilen* — ikke vakta. «Vaktrolle» leste som noe man har på hele
+  vakta, og en modul der to begreper heter nesten det samme får de to
+  forvekslet før den får dem forklart. Migrasjonen er en ren `RenameModel`;
+  ingen rad flyttes.
+- **Rolleadministrasjonen flyttet fra registersiden til planleggingssiden.**
+  Rollene brukes der ressursene settes opp, og de var det eneste registeret man
+  måtte forlate siden for å endre. Nå ligger de bak «Roller» i toppen av
+  `/vaktliste/`, med «i bruk»-tellingen i lista — en rolle man kan slette uten å
+  se hvor mange skift som peker på den, sletter man for lett. Registersiden har
+  tre faner igjen: mannskap, korps og kompetanser.
+- **Nedtrekket i raden tilbyr bare aktive roller — pluss den raden alt står
+  på.** Uten det siste ville en deaktivert rolle forsvunnet fra sin egen rad ved
+  første tegning, og en tilfeldig annen rolle blitt valgt neste gang noen rørte
+  cella.
+- **Kolonnene i ressurstabellen flyter ikke lenger inn i hverandre.** Årsaken
+  ble målt i nettleseren, ikke gjettet: `datetime-local`- og tekstfeltene var
+  bredere enn cellene sine på alle skjermbredder. `min-width` opp til `82rem`,
+  `<colgroup>`-andelene rebalansert, og `box-sizing: border-box; min-width: 0`
+  på feltene. Målt igjen på 1600, 1280 og 1000 px: ingen kolonne beveger seg,
+  ingen felt stikker ut.
+- **To mutasjoner overlevde første runde, og fikk hver sin test.**
+  `RessurstabellensBreddeTests` regner ut hva tidskolonnene faktisk blir i
+  piksler av `min-width` og `<colgroup>`-andelene, og krever at de rommer et
+  datetime-felt — den låser *regelen*, ikke tallene, så en rebalansering som
+  fortsatt holder er lov. `RollenedtrekketTests` kjører filteret i node.
+
 ## 2026-08-30 — Vaktlengde, ledige plasser og en kurve over hele vakta
 
 **1647 tester grønne** (33 nye). Migrasjon `vaktliste.0005`. Tredje runde på

@@ -6,7 +6,7 @@ navnet — det var alfabetisk i praksis, med et tallfelt i skjemaet som pris.
 
 **Hvorfor denne fila finnes.** Fase 1 la registrene i `vaktliste/admin.py` og
 skrev at «Django-admin er uansett riktig hjem for `Korps`, `Kompetanse` og
-`VaktRolle`». Det var feil: `/django-admin/` er kun rutet når `DEBUG` eller
+`Ressursrolle`». Det var feil: `/django-admin/` er kun rutet når `DEBUG` eller
 `OFFLINE_MODE` er på (S1 — den er en parallell innloggingsflate som omgår
 rate-limiting, kontosperre, MFA-tvang og `LoginEvent`). I produksjon fantes det
 dermed ingen vei til å opprette et korps eller et mannskap, og
@@ -27,7 +27,7 @@ gruppert på korps og viser kompetansene, framfor å være en flat tabell med en
 blyant på hver rad.
 
 **Sletting er ikke veien ut av et register.** `Mannskap`, `Korps` og
-`VaktRolle` er PROTECT-et fra rader som beskriver historikk, og `Kompetanse`
+`Ressursrolle` er PROTECT-et fra rader som beskriver historikk, og `Kompetanse`
 er blokkert her selv om M2M-en ikke ville protestert — å slette den ville
 stilltiende strippet kompetansen fra alle som har den. Pensjonering
 (`er_aktiv=False`) er den normale veien ut, som i pasientmodulens
@@ -45,7 +45,7 @@ from django.views.decorators.http import require_http_methods
 from core.auth_decorators import modul_kreves
 from core.ratelimit import rate_limit
 
-from .models import Kompetanse, Korps, Mannskap, VaktRolle
+from .models import Kompetanse, Korps, Mannskap, Ressursrolle
 from . import services
 from .views import _feil, _int, _json_body, _nektet, _tilgangskontekst
 
@@ -78,7 +78,7 @@ def registre_view(request):
 
 # ── De tre verdimengdene ─────────────────────────────────────────────────────
 #
-# `Korps`, `Kompetanse` og `VaktRolle` har samme form — navn og er_aktiv —
+# `Korps`, `Kompetanse` og `Ressursrolle` har samme form — navn og er_aktiv —
 # og fire views hver ville vært ord for ord like bortsett fra modellnavnet.
 # Samme grep som `patients/views_registre.py` (N13.2), og av samme grunn: tre
 # kopier er tre steder en rettelse kan bli glemt.
@@ -117,7 +117,7 @@ def verdi_til_dict(model, rad, *, ekstra_felt=(), stige=False):
 VERDIMENGDER = {
     'korps': (Korps, {'ekstra_felt': ('kortnavn',)}),
     'kompetanser': (Kompetanse, {'stige': True}),
-    'roller': (VaktRolle, {}),
+    'roller': (Ressursrolle, {}),
 }
 
 
@@ -126,7 +126,7 @@ def _register_views(model, etikett, etikett_bestemt, *, ekstra_felt=(),
     """Bygg (liste-view, detalj-view) for en av verdimengdene.
 
     Args:
-        model: Korps, Kompetanse eller VaktRolle
+        model: Korps, Kompetanse eller Ressursrolle
         etikett: ubestemt form til feilmeldinger («Korpset» → «Korps»)
         etikett_bestemt: bestemt form, til «… er i bruk»-meldingen
         ekstra_felt: valgfrie tekstfelter modellen har utover navn
@@ -186,7 +186,7 @@ def _register_views(model, etikett, etikett_bestemt, *, ekstra_felt=(),
             return _feil(f'{etikett} ikke funnet', status=404)
 
         if request.method == 'DELETE':
-            # PROTECT dekker Korps og VaktRolle. Kompetanse er en M2M og ville
+            # PROTECT dekker Korps og Ressursrolle. Kompetanse er en M2M og ville
             # sluppet gjennom — og stilltiende strippet kompetansen fra alle
             # som har den. Telle-sjekken under gjelder derfor alle tre.
             if _antall_bruk(model, rad):
@@ -244,7 +244,7 @@ def _antall_bruk(model, rad):
         return rad.mannskap.count() + rad.reserverte_ressurser.count()
     if model is Kompetanse:
         return rad.mannskap.count()
-    return rad.vaktposter.count()          # VaktRolle
+    return rad.vaktposter.count()          # Ressursrolle
 
 
 korps_view, korps_detalj_view = _register_views(
@@ -252,7 +252,7 @@ korps_view, korps_detalj_view = _register_views(
 kompetanser_view, kompetanse_detalj_view = _register_views(
     Kompetanse, 'Kompetansen', 'Kompetansen', stige=True)
 roller_view, rolle_detalj_view = _register_views(
-    VaktRolle, 'Rollen', 'Rollen')
+    Ressursrolle, 'Rollen', 'Rollen')
 
 # Navn for tracebacks og URL-reversering — uten dette heter alle seks
 # `liste_view`/`detalj_view`. Samme grep som i pasientmodulen.

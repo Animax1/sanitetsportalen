@@ -12,7 +12,7 @@ Regelen er bygget inn fra første lagring, ikke ettermontert — samme
 rekkefølgekrav som fase 2 i oppdragsmodulen, og av samme grunn: rader som er
 skrevet feil kan ikke fjernes i ettertid uten å røre auditsporet.
 
-Registrene (`Korps`, `Kompetanse`, `VaktRolle`) auditlogges ikke på feltnivå:
+Registrene (`Korps`, `Kompetanse`, `Ressursrolle`) auditlogges ikke på feltnivå:
 de er organisasjonsoppsett uten personopplysninger, og endres fra
 Django-admin, som har sin egen historikk.
 """

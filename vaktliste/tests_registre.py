@@ -18,7 +18,7 @@ from django.utils import timezone
 from accounts.models import CustomUser, ModulTilgang
 
 from . import services
-from .models import Kompetanse, Korps, Mannskap, Ressurs, VaktRolle, Vaktpost
+from .models import Kompetanse, Korps, Mannskap, Ressurs, Ressursrolle, Vaktpost
 
 
 def _bruker(navn, nivaa=None, *, admin=False):
@@ -160,7 +160,7 @@ class VerdimengdeTests(TestCase):
         pk = self._post('roller', navn='Feilskrevet').json()['data']['id']
         self.assertEqual(
             self.c.delete(f'/vaktliste/api/roller/{pk}/').status_code, 200)
-        self.assertFalse(VaktRolle.objects.exists())
+        self.assertFalse(Ressursrolle.objects.exists())
 
     def test_korps_i_bruk_kan_ikke_slettes(self):
         korps = Korps.objects.create(navn='Haugesund')
@@ -204,7 +204,7 @@ class VerdimengdeTests(TestCase):
 
     def test_rolle_i_bruk_kan_ikke_slettes(self):
         korps = Korps.objects.create(navn='Haugesund')
-        rolle = VaktRolle.objects.create(navn='Lagleder')
+        rolle = Ressursrolle.objects.create(navn='Lagleder')
         person = Mannskap.objects.create(navn='Kari', korps=korps)
         vl = services.opprett_planlagt_vakt('Vakta')
         r = Ressurs.objects.create(vaktliste=vl, navn='Lag 1')
@@ -503,7 +503,7 @@ class SammeFormBeggeVeierTests(TestCase):
         self.korps = Korps.objects.create(navn='Haugesund', kortnavn='HGSD')
         gfor = Kompetanse.objects.create(navn='GFØR')
         Kompetanse.objects.create(navn='VFØR', bygger_paa=gfor)
-        VaktRolle.objects.create(navn='Lagleder')
+        Ressursrolle.objects.create(navn='Lagleder')
         Mannskap.objects.create(navn='Kari', korps=self.korps)
         self.c = _klient(_bruker('adm', admin=True))
 

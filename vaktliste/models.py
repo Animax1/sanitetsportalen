@@ -17,7 +17,7 @@ leser fila:
    en sorteringsnøkkel-kolonne eller en `db_collation`, og for en håndfull
    korps er det ikke verdt det. Det er notert i TODO om noen får et korps som
    begynner på Å.
-1. **`Korps`, `Kompetanse` og `VaktRolle` er tabeller, ikke `choices.py`.**
+1. **`Korps`, `Kompetanse` og `Ressursrolle` er tabeller, ikke `choices.py`.**
    Motsatt av oppdragsmodulen, der problemstilling og hastegrad ligger i
    kode. Skillet er det samme som mellom `PROBLEMSTILLING` og `Lokasjon`:
    faglige verdimengder som endres sjelden hører i kode, organisasjonsdata i
@@ -92,7 +92,7 @@ class Kompetanse(BaseTimeStampedModel):
     """En kompetanse — «Sanitetsvakt», «Sykepleier», «Sjåfør kode 160» …
 
     Beskriver hva personen kan, ikke hva hun gjør på en gitt vakt — det er
-    `VaktRolle` sin jobb. Skillet er bevisst: kompetansen følger personen,
+    `Ressursrolle` sin jobb. Skillet er bevisst: kompetansen følger personen,
     rollen følger vaktposten.
 
     **`bygger_paa` er en stige, ikke en rangering.** Noen kurs overordner
@@ -136,11 +136,17 @@ class Kompetanse(BaseTimeStampedModel):
         return self.navn
 
 
-class VaktRolle(BaseTimeStampedModel):
-    """En rolle under vakt — «Lagleder», «Fagleder helse», «KO-operatør» …
+class Ressursrolle(BaseTimeStampedModel):
+    """Rollen en person har **på en ressurs** — «Lagleder», «Sjåfør», «KO-operatør».
 
-    Settes på vaktposten (fase 2), ikke på personen: samme person kan være
-    lagleder lørdag og sjåfør søndag.
+    Het `VaktRolle` til 30. aug. 2026. Navnet var misvisende: rollen gjelder
+    ikke vakta, den gjelder plassen på bilen eller laget. Samme person er
+    sjåfør på mannskapsbilen lørdag og lagleder på samleplassen søndag — og
+    det er nettopp derfor rollen sitter på `Vaktpost` og ikke på `Mannskap`.
+
+    Administreres fra planleggingssiden, der den brukes, ikke fra
+    mannskapsregisteret: trenger man en rolle som ikke finnes mens man
+    bemanner et lag, skal man slippe å forlate siden for å lage den.
     """
 
     navn = models.CharField(max_length=120, unique=True, verbose_name='Navn')
@@ -151,8 +157,8 @@ class VaktRolle(BaseTimeStampedModel):
                   'på vaktposter som allerede bruker dem.',
     )
     class Meta:
-        verbose_name = 'Vaktrolle'
-        verbose_name_plural = 'Vaktroller'
+        verbose_name = 'Ressursrolle'
+        verbose_name_plural = 'Ressursroller'
         ordering = [Lower('navn')]
 
     def __str__(self) -> str:
@@ -419,7 +425,7 @@ class Vaktpost(BaseTimeStampedModel):
         help_text='Tom = ledig plass som skal fylles.',
     )
     rolle = models.ForeignKey(
-        VaktRolle,
+        Ressursrolle,
         null=True, blank=True,
         on_delete=models.PROTECT,
         related_name='vaktposter',

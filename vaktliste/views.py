@@ -43,7 +43,7 @@ from core.auth_decorators import er_global_admin, modul_kreves
 from core.ratelimit import rate_limit
 
 from . import choices, services
-from .models import Korps, Mannskap, Ressurs, VaktRolle, Vaktliste, Vaktpost
+from .models import Korps, Mannskap, Ressurs, Ressursrolle, Vaktliste, Vaktpost
 
 
 # ── Hjelpere ─────────────────────────────────────────────────────────────────
@@ -335,10 +335,12 @@ def vaktliste_detalj_view(request, pk):
             {'id': k.pk, 'navn': k.navn, 'kortnavn': k.kortnavn}
             for k in Korps.objects.filter(er_aktiv=True)
         ],
-        'roller': [
-            {'id': r.pk, 'navn': r.navn}
-            for r in VaktRolle.objects.filter(er_aktiv=True)
-        ],
+        # Samme form som `/api/roller/` gir — rollene administreres fra denne
+        # sida nå, og manageren trenger `i_bruk`. Skrev vi formen på nytt her,
+        # ville den glidd fra registerendepunktets, akkurat som `i_bruk` gjorde
+        # på registersiden. Alle rollene sendes; nedtrekket filtrerer på
+        # `er_aktiv` i nettleseren.
+        'roller': [_rolle_til_dict(r) for r in Ressursrolle.objects.all()],
         'mannskap': [
             {'id': m.pk, 'navn': m.navn, 'korps_id': m.korps_id,
              'korps_navn': m.korps.navn}
@@ -346,6 +348,22 @@ def vaktliste_detalj_view(request, pk):
         ],
         'enheter': _enheter(),
     }})
+
+
+def _rolle_til_dict(rolle):
+    """Én rolle, i **samme form** som `/api/roller/` gir.
+
+    Importen er lokal fordi `views_registre` importerer hjelpere herfra —
+    en ring på modulnivå ellers. Samme grep som `_enheter()`.
+
+    Grunnen til å dele formen: rollene administreres fra planleggingssiden nå,
+    og manageren trenger `i_bruk`. Skrev vi formen på nytt her, ville den
+    glidd fra registerendepunktets — akkurat slik `i_bruk` gjorde på
+    registersiden, der fanene viste «ubrukt» på et korps som var i bruk.
+    """
+    from .views_registre import verdi_til_dict
+    from .models import Ressursrolle as _Rolle
+    return verdi_til_dict(_Rolle, rolle)
 
 
 def _enheter():

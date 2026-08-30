@@ -19,6 +19,7 @@ from patients.js_test_utils import (
 
 HTML_BUILDERS = (
     'fyllVelger',
+    'mkRolleRad',
     '_fyll',
     'tegnFaner',
     'mkRessurs',
@@ -78,6 +79,7 @@ REVIEWED_INTERPOLATIONS = {
     '_kl(p.tid)': 'bygger ren tekst i `tittel`, som escapes ved innsetting',
     'p.antall': 'tall, i samme rene tekst som escapes ved innsetting',
     'p.planlagt': 'tall, i samme rene tekst som escapes ved innsetting',
+    'bruk': 'markup bygget lokalt, tallet escapet inni',
 }
 
 
@@ -139,7 +141,7 @@ class VaktlisteEscapingOppforselTests(SimpleTestCase):
         (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue', 'trustedHtml',
                            '_escHtml', 'klokke')),
         (VAKTLISTE_JS, ('mkRessurs', '_rolleValg', '_fyllValgFor',
-                        'mkOversikt', 'mkKurve',
+                        'mkRolleRad', 'mkOversikt', 'mkKurve',
                         'mkIkkePlassert', 'tegnFaner', '_posterFor',
                         '_ikkePlassert', '_tidsspenn', '_vaktspenn',
                         '_bemanningPerTime', '_iso16', '_d', '_kl', '_dag',
@@ -703,3 +705,116 @@ class KurveOverHeleVaktaTests(SimpleTestCase):
             globalThis.aktivListe = { vaktliste: {}, vaktposter: [] };
             assert(_bemanningPerTime().length === 0, 'ingenting aa tegne');
         """)
+
+
+class RessurstabellensBreddeTests(SimpleTestCase):
+    """Tidsfeltene må få plass i kolonnene sine.
+
+    Meldt av André: kolonnene i ressursoversikten overlappet. Årsaken var at
+    et `datetime-local` har en minstebredde fra nettleseren (~190 px) som
+    `width: 100%` ikke overstyrer — med for trange kolonner flyter feltet ut
+    over nabocella.
+
+    Testen regner ut hva kolonnene faktisk blir ved `min-width`, framfor å
+    slå fast at tallene er akkurat 82rem og 15 %. Da er det *regelen* som er
+    låst, ikke verdiene: justerer noen andelene, holder testen så lenge
+    tidsfeltene fortsatt får plass.
+    """
+
+    #: Chrome trenger omtrent dette til et `datetime-local` med innrykk.
+    MIN_TIDSFELT_PX = 185
+    #: Kolonneindeksene til Fra og Til i ressurstabellens ni kolonner.
+    TIDSKOLONNER = (5, 6)
+
+    def _min_width_rem(self):
+        from pathlib import Path
+        from django.conf import settings
+        css = (Path(settings.BASE_DIR) / 'static' / 'css'
+               / 'vaktliste.css').read_text(encoding='utf-8')
+        blokk = css[css.index('.vl-tabell {'):css.index('.vl-tabell th')]
+        m = re.search(r'min-width:\s*([\d.]+)rem', blokk)
+        self.assertIsNotNone(m, '.vl-tabell mangler min-width')
+        return float(m.group(1))
+
+    def _andeler(self):
+        src = read_js(VAKTLISTE_JS)
+        kropp = extract_function(src, 'mkRessurs')
+        return [int(a) for a in re.findall(r'width:\s*(\d+)%', kropp)]
+
+    def test_andelene_summerer_til_hundre(self):
+        andeler = self._andeler()
+        self.assertEqual(len(andeler), 9, 'ni kolonner')
+        self.assertEqual(sum(andeler), 100, f'fikk {andeler}')
+
+    def test_tidskolonnene_rommer_et_datetime_felt(self):
+        piksler = self._min_width_rem() * 16
+        andeler = self._andeler()
+        for i in self.TIDSKOLONNER:
+            with self.subTest(kolonne=i):
+                bredde = piksler * andeler[i] / 100
+                self.assertGreaterEqual(
+                    round(bredde), self.MIN_TIDSFELT_PX,
+                    f'kolonne {i} blir {bredde:.0f} px ved min-width — for '
+                    f'smal til et datetime-felt, og feltet flyter da ut over '
+                    f'nabocella.')
+
+    def test_feltene_kan_ikke_vokse_forbi_cella(self):
+        """Beltet ved siden av bukseselene: selv med feil andeler skal et
+        felt aldri stikke ut av cella si."""
+        from pathlib import Path
+        from django.conf import settings
+        css = (Path(settings.BASE_DIR) / 'static' / 'css'
+               / 'vaktliste.css').read_text(encoding='utf-8')
+        blokk = css[css.index('.vl-celle {'):css.index('.vl-celle:hover')]
+        for regel in ('box-sizing: border-box', 'min-width: 0', 'max-width: 100%'):
+            with self.subTest(regel=regel):
+                self.assertIn(regel, blokk)
+
+
+class RollenedtrekketTests(SimpleTestCase):
+    """Nedtrekket tilbyr aktive roller — og den raden allerede har.
+
+    Alle rollene sendes til siden fordi manageren skal vise dem. Ble de tilbudt
+    i nedtrekket også, kunne en utgått rolle deles ut på nytt; ble den *bare*
+    filtrert bort, ville raden som allerede har den vist tomt.
+    """
+
+    HARNESS = (
+        (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue')),
+        (VAKTLISTE_JS, ('_rolleValg',)),
+    )
+
+    def setUp(self):
+        if not node_available():
+            self.skipTest('node er ikke tilgjengelig')
+        self.harness = build_harness(self.HARNESS)
+
+    ROLLER = """
+        globalThis.aktivListe = { roller: [
+          {id: 1, navn: 'Lagleder', er_aktiv: true},
+          {id: 2, navn: 'Utgaatt', er_aktiv: false},
+        ]};
+    """
+
+    def test_inaktiv_rolle_tilbys_ikke(self):
+        ut = run_node(self.harness, self.ROLLER + """
+            console.log(_rolleValg({id: 9, rolle_id: null}, true));
+        """)
+        self.assertIn('Lagleder', ut)
+        self.assertNotIn('Utgaatt', ut)
+
+    def test_raden_beholder_rollen_den_alt_har(self):
+        """Ellers ville et skift med en utgått rolle sett ut som om rollen
+        var fjernet, og neste lagring hadde fjernet den på ordentlig."""
+        ut = run_node(self.harness, self.ROLLER + """
+            console.log(_rolleValg({id: 9, rolle_id: 2}, true));
+        """)
+        self.assertIn('Utgaatt', ut)
+        self.assertIn('selected', ut)
+
+    def test_uten_skrivetilgang_vises_rollen_som_tekst(self):
+        ut = run_node(self.harness, self.ROLLER + """
+            console.log(_rolleValg({id: 9, rolle_id: 1, rolle: 'Lagleder'}, false));
+        """)
+        self.assertNotIn('<select', ut)
+        self.assertIn('Lagleder', ut)

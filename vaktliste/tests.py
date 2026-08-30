@@ -13,7 +13,7 @@ from django.test import TestCase
 from audit.models import AuditLog
 from core.modules import get_module, get_visible_modules
 
-from .models import Kompetanse, Korps, Mannskap, VaktRolle
+from .models import Kompetanse, Korps, Mannskap, Ressursrolle
 from .signals import SKJULT, TABELLNAVN
 
 User = get_user_model()
@@ -39,7 +39,7 @@ class RegisterTests(TestCase):
         kollasjon, og den er ulik i SQLite og PostgreSQL — en test på det ville
         målt hvilken base som kjørte testen, ikke hva koden gjør.
         """
-        for model in (Korps, Kompetanse, VaktRolle):
+        for model in (Korps, Kompetanse, Ressursrolle):
             with self.subTest(model=model.__name__):
                 model.objects.create(navn='Stavanger')
                 model.objects.create(navn='bokn')     # liten forbokstav
@@ -55,9 +55,9 @@ class RegisterTests(TestCase):
         Én tabell for begge ville tvunget «Sykepleier» og «Lagleder» inn i
         samme liste, der de svarer på hver sitt spørsmål."""
         Kompetanse.objects.create(navn='Sykepleier')
-        VaktRolle.objects.create(navn='Lagleder')
+        Ressursrolle.objects.create(navn='Lagleder')
         self.assertEqual(Kompetanse.objects.count(), 1)
-        self.assertEqual(VaktRolle.objects.count(), 1)
+        self.assertEqual(Ressursrolle.objects.count(), 1)
 
 
 class MannskapTests(TestCase):

@@ -33,7 +33,7 @@ from accounts.models import CustomUser, ModulTilgang
 from core.modules import get_module
 
 from . import choices, services
-from .models import Kompetanse, Korps, Mannskap, Ressurs, VaktRolle, Vaktpost
+from .models import Kompetanse, Korps, Mannskap, Ressurs, Ressursrolle, Vaktpost
 
 
 def _bruker(navn, nivaa=None, *, admin=False):
@@ -58,7 +58,7 @@ class TilgangsBasis(TestCase):
     def setUp(self):
         self.hgsd = Korps.objects.create(navn='Haugesund', kortnavn='HGSD')
         self.karmoy = Korps.objects.create(navn='Karmøy')
-        self.rolle = VaktRolle.objects.create(navn='Lagleder')
+        self.rolle = Ressursrolle.objects.create(navn='Lagleder')
         self.komp = Kompetanse.objects.create(navn='Sykepleier')
 
         self.vl = services.opprett_planlagt_vakt('Vakta')

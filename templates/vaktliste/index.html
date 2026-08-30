@@ -57,6 +57,15 @@
         og å legge til en ressurs setter reservasjonen. Skjules for alle under
         skriv_full — JS gjør det, se vaktliste.js::gateKnapper().
       {% endcomment %}
+      {% comment %}
+        Rollene administreres her, ikke i mannskapsregisteret: de brukes i
+        ressurstabellen, og å måtte bytte side for å lage «Sjåfør» mens man
+        bemanner en bil er akkurat den knotet André meldte.
+      {% endcomment %}
+      <button type="button" class="btn btn-outline-secondary btn-sm vl-krev-full d-none"
+              data-action="apneRoller">
+        <i class="bi bi-person-badge me-1"></i>Roller
+      </button>
       <button type="button" class="btn btn-outline-secondary btn-sm vl-krev-full d-none"
               data-action="apneVaktlengde">
         <i class="bi bi-clock-history me-1"></i>Vaktas lengde
@@ -125,6 +134,35 @@
         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Avbryt</button>
         <button type="button" class="btn btn-primary" id="ny-vakt-knapp"
                 data-action="opprettVaktliste">Opprett</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="rollerModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Ressursroller</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Lukk"></button>
+      </div>
+      <div class="modal-body">
+        <p class="form-text mt-0">
+          Rollen en person har <strong>på en ressurs</strong> — «Lagleder»,
+          «Sjåfør», «KO-operatør». Samme person kan ha ulik rolle på ulike
+          ressurser, så rollen settes per skift i tabellen.
+        </p>
+        <div class="input-group input-group-sm mb-3">
+          <input type="text" id="ny-rolle-navn" class="form-control"
+                 maxlength="120" placeholder="Ny rolle, f.eks. «Sjåfør»">
+          <button class="btn btn-primary" type="button" id="ny-rolle-knapp"
+                  data-action="opprettRolle">Legg til</button>
+        </div>
+        <div id="rolle-liste"></div>
+        <div id="rolle-feil" class="text-danger small d-none"></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Lukk</button>
       </div>
     </div>
   </div>

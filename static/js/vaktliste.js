@@ -334,11 +334,15 @@ function _rolleValg(vp, kanRedigere) {
   if (!kanRedigere) {
     return escapeHtml(vp.rolle || '—');
   }
+  // Alle rollene sendes (manageren trenger dem); nedtrekket tilbyr bare de
+  // aktive, pluss den som alt er valgt på raden.
   const valg = ['<option value="">—</option>'].concat(
-    (aktivListe.roller || []).map((r) => {
+    (aktivListe.roller || [])
+      .filter((r) => r.er_aktiv || r.id === vp.rolle_id)
+      .map((r) => {
       const valgt = r.id === vp.rolle_id ? ' selected' : '';
       return `<option value="${escHtmlValue(r.id)}"${valgt}>${escapeHtml(r.navn)}</option>`;
-    })).join('');
+      })).join('');
   return `<select class="vl-celle" data-action="endreVaktpost" data-hendelse="change"
                   data-felt="rolle_id" data-id="${escHtmlValue(vp.id)}">${valg}</select>`;
 }
@@ -441,9 +445,9 @@ function mkRessurs(r) {
       <div class="vl-tabellramme">
         <table class="vl-tabell">
           <colgroup>
-            <col style="width: 17%"><col style="width: 7%"><col style="width: 20%">
-            <col style="width: 12%"><col style="width: 12%"><col style="width: 11%">
-            <col style="width: 11%"><col style="width: 6%"><col style="width: 4%">
+            <col style="width: 14%"><col style="width: 5%"><col style="width: 15%">
+            <col style="width: 10%"><col style="width: 9%"><col style="width: 15%">
+            <col style="width: 15%"><col style="width: 13%"><col style="width: 4%">
           </colgroup>
           <thead>
             <tr>
@@ -748,6 +752,83 @@ function _vaktpostModusSkifte() {
   const valgt = document.getElementById('ny-vaktpost-mannskap')?.value;
   document.getElementById('ny-vaktpost-antall-rad')
     ?.classList.toggle('d-none', !!valgt);
+}
+
+
+// ── Ressursroller ────────────────────────────────────────────────────────
+//
+// Administreres herfra, ikke fra mannskapsregisteret: rollene brukes i
+// ressurstabellen, og å måtte bytte side for å lage «Sjåfør» mens man bemanner
+// en bil er akkurat den knotet dette skal fjerne.
+
+function apneRoller() {
+  _skjulFeil('rolle-feil');
+  document.getElementById('ny-rolle-navn').value = '';
+  tegnRoller();
+  new bootstrap.Modal(document.getElementById('rollerModal')).show();
+}
+
+
+function tegnRoller() {
+  const el = document.getElementById('rolle-liste');
+  if (!el) return;
+  const roller = (aktivListe && aktivListe.roller) || [];
+  el.innerHTML = roller.length ? roller.map(mkRolleRad).join('')
+    : '<div class="vl-tom">Ingen roller ennå.</div>';
+}
+
+
+function mkRolleRad(r) {
+  // «I bruk» står i lista: en rolle man kan slette uten å vite hvor mange
+  // skift som peker på den, sletter man for lett.
+  const bruk = r.i_bruk
+    ? `<span class="vl-meta">${escHtmlValue(r.i_bruk)} i bruk</span>`
+    : '<span class="vl-meta">ubrukt</span>';
+  return `
+    <div class="vl-rad">
+      <span class="vl-navn">${escapeHtml(r.navn)}</span>
+      <div class="d-flex align-items-center gap-2">
+        ${bruk}
+        <button class="btn btn-sm btn-outline-danger" type="button"
+                title="Slett rollen" aria-label="Slett rollen"
+                data-action="slettRolle" data-id="${escHtmlValue(r.id)}"><i class="bi bi-trash"></i></button>
+      </div>
+    </div>`;
+}
+
+
+async function opprettRolle() {
+  _skjulFeil('rolle-feil');
+  await withSubmitGuard('ny-rolle-knapp', async () => {
+    const navn = (document.getElementById('ny-rolle-navn')?.value || '').trim();
+    if (!navn) { _visFeil('rolle-feil', 'Rollen må ha et navn.'); return; }
+
+    const res = await apiFetch('/vaktliste/api/roller/', {
+      method: 'POST', body: JSON.stringify({ navn }),
+    });
+    const d = await res.json().catch(() => ({}));
+    if (!res.ok || d.status !== 'ok') {
+      _visFeil('rolle-feil', d.message || 'Kunne ikke legge til rollen.');
+      return;
+    }
+    document.getElementById('ny-rolle-navn').value = '';
+    await lastListe(aktivListe.vaktliste.id);
+    tegnRoller();
+  });
+}
+
+
+async function slettRolle(id) {
+  const rolle = (aktivListe.roller || []).find((r) => r.id === id);
+  if (!rolle) return;
+  if (!confirm(`Slette rollen «${rolle.navn}»?`)) return;
+
+  const res = await apiFetch(`/vaktliste/api/roller/${id}/`, { method: 'DELETE' });
+  const d = await res.json().catch(() => ({}));
+  if (!res.ok) { _visFeil('rolle-feil', d.message || 'Kunne ikke slette.'); return; }
+  _skjulFeil('rolle-feil');
+  await lastListe(aktivListe.vaktliste.id);
+  tegnRoller();
 }
 
 
