@@ -65,6 +65,16 @@ def index_view(request):
 
     return render(request, 'oppdrag/sentral.html', {
         'kan_skrive': har_tilgang(request.user, 'oppdrag', 'skriv_full'),
+        # **Besetningspanelet er vaktlistas data, lånt inn** (§6 i
+        # vaktlistenotatet). Flagget er en *slug* gjennom `core`, ikke en
+        # import: oppdragsmodulen skal ikke kjenne vaktlista i Python, og
+        # `OppdragImportererIkkeVaktlista` håndhever det.
+        #
+        # Gaten er `les` i **vaktliste**, ikke i oppdrag — komposisjonsregelen
+        # fra rollemodellen §5. Har ikke operatøren vaktlistetilgang, vises
+        # panelet ikke i det hele tatt, framfor å gi avledet innsyn i hvem som
+        # går vakt.
+        'kan_se_besetning': har_tilgang(request.user, 'vaktliste', 'les'),
         'problemstillinger': choices.PROBLEMSTILLING,
         'hastegrader': choices.HASTEGRAD,
     })

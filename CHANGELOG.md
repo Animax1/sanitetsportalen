@@ -4,6 +4,50 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-08-30 — Vaktliste fase 6: besetning i sentralbordet
+
+**1918 tester grønne** (16 nye, ni mutasjoner satt rødt først). Ingen migrasjon
+— `Ressurs.enhet` har pekt på `oppdrag.Enhet` siden fase 2.
+
+113 klikker på en enhet i sentralbordet og ser hvem som er i bilen: navn,
+rolle og innsjekkstatus, med de som faktisk er der øverst.
+
+- **Avhengighetsretningen går én vei: `vaktliste` → `oppdrag`** (§6).
+  Oppdragsmodulen importerer ikke vaktlista; sentralbordet henter
+  `/vaktliste/api/enhet/<pk>/besetning/` og rendrer svaret. Koblingen ligger i
+  nettleseren, ikke i Python — samme grep som lot statistikkappen slutte å
+  importere pasientmodulen. `OppdragImportererIkkeVaktlista` leser importene
+  med AST og håndhever det.
+- **Gaten er `les` i vaktliste, ikke i oppdrag.** Komposisjonsregelen fra
+  rollemodellen §5: en operatør med oppdragstilgang men uten vaktlistetilgang
+  får ikke avledet innsyn i hvem som går vakt — panelet finnes ikke for henne.
+- **Svaret er innskrenket med vilje.** Navn, rolle og innsjekkstatus. Ikke
+  telefonnummer, ikke kompetanseliste, ikke `notat`: sentralbordet skal se om
+  bilen er klar, ikke lese personalmapper. En test leser rå-svaret og krever
+  at ingen av feltene er der.
+- **Bare skiftene som dekker nå.** «Er bilen bemannet» er et annet spørsmål
+  enn «hvem har vakt i helga», og en liste med tretti rader over to døgn
+  svarer ikke på noe man kan handle på.
+- **Ukoblet er ikke ubemannet.** 404 mot 200-med-null: ubemannet er et problem
+  her og nå, ukoblet er et oppsett som mangler, og de to skal ikke se like ut.
+- **Hentes når operatøren spør**, ikke ved hver polling — enhetslista pollet
+  hvert par sekund ville gitt ett kall per bil per runde. Bufferet tømmes når
+  lista faktisk endret seg, *etter* 304-sjekken; tømte vi det på hver runde,
+  ville et åpent panel stått på «Henter…» for alltid.
+
+**Rettet før det rakk ut:** første utgave sorterte besetningen på
+`rolle__navn`, som er nullbar — og **SQLite (dev) og PostgreSQL (prod)
+plasserer NULL i hver sin ende**. Lista ville stått i ulik rekkefølge lokalt og
+i drift, en feil man aldri ser før den betyr noe. Sorteres nå i Python: de som
+er i bilen først, så alfabetisk.
+
+**Og en test som ikke målte noe:** «ressurs i en annen vakt teller ikke» ga
+begge ressursene samme navn, så den gikk grønt uansett hvilken endepunktet
+fant. Funnet ved mutasjonstesting, to ganger — andre forsøk trengte også
+`rekkefolge=0` på den andre raden for at den skulle vinne uten vaktfilteret.
+
+---
+
 ## 2026-08-30 — Vaktliste fase 5: planleggingstall
 
 **1902 tester grønne** (45 nye, sytten mutasjoner satt rødt først). Ny fane

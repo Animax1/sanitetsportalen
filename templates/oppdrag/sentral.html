@@ -19,6 +19,16 @@
 {% endblock %}
 
 {% block content %}
+{% comment %}
+  **Besetningspanelet er vaktlistas data, lånt inn** (§6 i vaktlistenotatet).
+  Flagget avgjør bare om panelet finnes i det hele tatt — endepunktet
+  `/vaktliste/api/enhet/<pk>/besetning/` håndhever `les` i vaktliste uansett.
+  Retningen går én vei: oppdragsmodulen importerer ikke vaktlista, den henter
+  svaret fra nettleseren.
+{% endcomment %}
+<script nonce="{{ csp_nonce }}">
+  window.KAN_SE_BESETNING = {{ kan_se_besetning|yesno:"true,false" }};
+</script>
 <div class="container-fluid px-3 px-md-4 py-3">
 
   <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">

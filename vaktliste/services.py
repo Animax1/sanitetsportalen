@@ -548,6 +548,73 @@ def belastning_sammendrag(vaktliste, rader):
     }
 
 
+def besetning(enhet_id, naa=None):
+    """Hvem som er på bilen nå — navn, rolle og innsjekkstatus.
+
+    Sentralbordets spørsmål er **«er bilen bemannet?»**, ikke «hvem har vakt i
+    løpet av helga». Derfor bare skiftene som dekker tidspunktet: en liste med
+    tretti rader over to døgn svarer ikke på noe man kan handle på.
+
+    **Ikke telefonnummer, ikke kompetanseliste, ikke `notat`** (§6).
+    Operatøren skal se om ressursen er klar, ikke lese personalmapper. Det er
+    en bevisst innskrenking, ikke en forglemmelse — den som trenger
+    telefonnummeret har vaktlista.
+
+    Returnerer ``None`` hvis enheten ikke er koblet til en ressurs i vakta.
+    Det er noe annet enn «ingen på vakt», og de to skal ikke se like ut:
+    ubemannet er et problem, ukoblet er et oppsett som mangler.
+    """
+    from patients.services import hent_aktiv_vakt
+    from .models import Vaktpost
+
+    naa = naa or timezone.now()
+    vakt = hent_aktiv_vakt()
+    if vakt is None:
+        return None
+
+    ressurs = (Ressurs.objects
+               .filter(enhet_id=enhet_id, vaktliste__vakt=vakt)
+               .select_related('vaktliste')
+               .first())
+    if ressurs is None:
+        return None
+
+    poster = (Vaktpost.objects
+              .filter(ressurs=ressurs, mannskap__isnull=False,
+                      fra_tid__lte=naa, til_tid__gte=naa)
+              .select_related('mannskap', 'rolle')
+              .order_by('mannskap__navn'))
+
+    mannskap = [{
+        'navn': vp.mannskap.navn,
+        'rolle': vp.rolle.navn if vp.rolle else '',
+        'tilstede': vp.er_tilstede,
+        'mott': vp.mott_at is not None,
+    } for vp in poster]
+
+    # **De som er i bilen først.** Operatørens spørsmål er «hvem har jeg», og
+    # da skal svaret stå øverst; de som mangler er den andre halvdelen av
+    # samme liste.
+    #
+    # Sorteringen skjer **i Python**, ikke i basen, av to grunner: `tilstede`
+    # er en utledet egenskap uten kolonne å sortere på, og `rolle__navn` er
+    # nullbar — og SQLite (dev) og PostgreSQL (prod) plasserer NULL i hver sin
+    # ende. En besetningsliste som står i ulik rekkefølge lokalt og i drift er
+    # en feil man aldri ser før den betyr noe.
+    mannskap.sort(key=lambda m: (not m['tilstede'], m['navn'].lower()))
+
+    return {
+        'ressurs_navn': ressurs.navn,
+        'i_drift': ressurs.vaktliste.i_drift,
+        'mannskap': mannskap,
+        'antall': len(mannskap),
+        # **Tilstede utledes av stemplene** (`Vaktpost.er_tilstede`), aldri av
+        # en lagret status. Er lista ikke i drift, er ingen stemplet — og da
+        # er tallet 0 med rette: innsjekken har ikke åpnet.
+        'tilstede': sum(1 for m in mannskap if m['tilstede']),
+    }
+
+
 def vaktspenn(vaktliste):
     """(start, slutt) for vakta — eller ``(None, None)`` hvis den mangler.
 

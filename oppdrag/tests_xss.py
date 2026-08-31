@@ -23,6 +23,9 @@ from patients.js_test_utils import (
 HTML_BUILDERS_PER_FIL = {
     OPPDRAG_SENTRAL_JS: (
         'renderEnheter',
+        # Vaktlistas data, lånt inn (§6 i vaktlistenotatet). Navn og rolle er
+        # fritekst fra et annet moduls register, og escapes her som alt annet.
+        'mkBesetning',
         'renderOppdrag',
         'tidslinjeHtml',
         'renderLokasjonsadmin',
@@ -57,6 +60,15 @@ REVIEWED_INTERPOLATIONS = {
     'fritekstBlokk': 'markup bygget lokalt, fritekst escapet inni',
     'notatBlokk': 'markup bygget lokalt, notatene escapet inni',
     'knapp': 'markup bygget lokalt, id escapet inni',
+    # Besetningspanelet (vaktliste fase 6). Alle tre er hoistet ut av
+    # mal-strengen av samme grunn som `fritekstBlokk` over.
+    'klikkbar': 'hardkodet CSS-klasse fra en ternær',
+    'apner': 'markup bygget lokalt, enhets-id escapet inni',
+    'besetning': 'markup bygget lokalt av mkBesetning(), som selv skannes her',
+    'merke': 'hardkodet markup fra en ternær, ingen data i seg',
+    'rolle': 'markup bygget lokalt, rollenavnet escapet inni',
+    'rader': 'markup bygget lokalt i samme funksjon',
+    'status': 'bygget lokalt av tall som escapes inni',
     'valg': 'options bygget lokalt, brukernavn escapet inni',
     'vaktKlasse': 'hardkodet CSS-klasse fra en ternær',
     'vaktHandling': 'hardkodet handlingsnavn fra en ternær',
@@ -144,8 +156,16 @@ class OppdragEscapingOppforselTests(SimpleTestCase):
         (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue', 'trustedHtml', '_escHtml',
                            'klokke')),
         (OPPDRAG_SENTRAL_JS, ('renderOppdrag', 'renderEnheter', 'tidslinjeHtml',
-                              'hastegradKlasse')),
+                              'hastegradKlasse', 'mkBesetning',
+                              'kanSeBesetning')),
     )
+
+    #: Besetningspanelet leser to globaler som ellers settes ved sidelasting.
+    #: Ingen av testene her har panelet åpent — de skal fange escaping i
+    #: enhetskortet, og et lukket panel er den vanlige tilstanden.
+    BESETNING_STUBB = ("globalThis.apenBesetning = null;\n"
+                       "globalThis.besetninger = {};\n"
+                       "globalThis.window = { KAN_SE_BESETNING: true };\n")
 
     def setUp(self):
         if not node_available():
@@ -171,7 +191,7 @@ class OppdragEscapingOppforselTests(SimpleTestCase):
         self.assertIn('&lt;img', ut)
 
     def test_enhetsnavn_escapes(self):
-        ut = run_node(self.harness, '''
+        ut = run_node(self.harness, self.BESETNING_STUBB + '''
             globalThis.enheter = [{
               id: 1, navn: '<b>56</b>', status: 'ledig', pa_vakt: true,
               status_navn: 'Ledig', antall_ventende: 0
@@ -186,7 +206,7 @@ class OppdragEscapingOppforselTests(SimpleTestCase):
 
     def test_statusklassen_kommer_fra_data_og_escapes(self):
         """Statusen brukes i et class-attributt — et bruddpunkt for attributt-XSS."""
-        ut = run_node(self.harness, '''
+        ut = run_node(self.harness, self.BESETNING_STUBB + '''
             globalThis.enheter = [{
               id: 1, navn: 'E1', status: '" onload="alert(1)', pa_vakt: true,
               status_navn: 'Rar', antall_ventende: 0

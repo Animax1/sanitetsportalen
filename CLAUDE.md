@@ -450,6 +450,22 @@ fase 3–7 gjenstår — se `docs/BESLUTNING_VAKTLISTE.md`, som er besluttet i s
   der brukeren skulle fått «velg korps». `or None` dekker den tomme strengen, men ikke
   en ikke-numerisk.
 
+**Besetningen i sentralbordet (fase 6) går én vei: `vaktliste` → `oppdrag`.**
+Oppdragsmodulen importerer **ikke** vaktlista; `oppdrag-sentral.js` henter
+`/vaktliste/api/enhet/<pk>/besetning/` og rendrer svaret.
+`OppdragImportererIkkeVaktlista` leser importene med AST og håndhever det.
+
+- **Gatet på `les` i vaktliste**, ikke i oppdrag — komposisjonsregelen fra
+  rollemodellen §5. Malen får et flagg via `har_tilgang(..., 'vaktliste', ...)`:
+  en slug gjennom `core`, ikke en import.
+- **Svaret bærer navn, rolle og innsjekkstatus.** Ikke telefon, ikke
+  kompetanser, ikke `notat` — sentralbordet skal se om bilen er klar, ikke lese
+  personalmapper.
+- **Bare skiftene som dekker nå**, og **404 når enheten er ukoblet**: ubemannet
+  og ukoblet er ulike svar på ulike problemer.
+- **Rekkefølgen sorteres i Python.** `rolle` er nullbar, og SQLite (dev) og
+  PostgreSQL (prod) plasserer NULL i hver sin ende.
+
 **Planleggingstall (fase 5) varsler, de sperrer ikke.** `services`
 regner ut timer, skift, lengste skift og korteste hvile per person;
 `Belastningsgrenser` (én rad) bærer grensene varslene måles mot.

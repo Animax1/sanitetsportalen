@@ -903,6 +903,12 @@ Gjennomgang 13. aug. 2026, med 1000 pasienter og peak 100 brukere som premiss.
             «Opprett vakt» står på vaktas startdato framfor tomt, så bare
             klokkeslettet tastes. Feltet er ellers uendret — native velger og
             visning som før.
+      - [x] **Fase 6 — besetning i sentralbordet (30. aug. 2026).**
+            `/vaktliste/api/enhet/<pk>/besetning/`, hentet fra nettleseren av
+            `oppdrag-sentral.js`. Avhengighetsretningen håndheves med AST
+            (`OppdragImportererIkkeVaktlista`). Gatet på `les` i vaktliste.
+            Navn, rolle og innsjekkstatus — ikke telefon, kompetanse eller
+            notat. Ingen migrasjon. 16 nye tester, ni mutasjoner prøvd.
       - [x] **Fase 5 — planleggingstall (30. aug. 2026).** Fanen
             «Planlegging»: timer, skift, lengste skift og korteste hvile per
             person, sortert på timer. Varsler mot admin-styrte grenser

@@ -581,6 +581,36 @@ def ressurser_view(request, pk):
         {'status': 'ok', 'data': _ressurs_til_dict(ressurs)}, status=201)
 
 
+# ── Koblingen til /oppdrag (fase 6) ──────────────────────────────────────────
+
+@never_cache
+@modul_kreves('vaktliste', 'les', svar='json')
+@require_http_methods(['GET'])
+def besetning_view(request, pk):
+    """Besetningen på én enhet — sentralbordets vindu inn i vaktlista.
+
+    **Avhengighetsretningen går én vei: `vaktliste` → `oppdrag`** (§6).
+    Oppdragsmodulen importerer ikke vaktlista; sentralbordet henter dette
+    endepunktet og rendrer svaret. Koblingen ligger dermed i nettleseren, ikke
+    i Python — samme grep som lot statistikkappen slutte å importere
+    pasientmodulen.
+
+    **Gaten er `les` i vaktliste, ikke i oppdrag.** Har ikke operatøren
+    vaktlistetilgang, får hun 403 og panelet vises ikke i det hele tatt. Det
+    er komposisjonsregelen fra rollemodellen §5: en modul viser bare kilder
+    brukeren har tilgang til, framfor å gi avledet innsyn i data hun ikke
+    skulle sett.
+
+    404 betyr «enheten er ikke koblet til en ressurs i denne vakta» — noe
+    annet enn «ingen på vakt», og de to skal ikke se like ut for operatøren.
+    """
+    data = services.besetning(pk)
+    if data is None:
+        return _feil('Enheten er ikke koblet til en ressurs i denne vakta.',
+                     status=404)
+    return JsonResponse({'status': 'ok', 'data': data})
+
+
 # ── Planleggingstall (fase 5) ────────────────────────────────────────────────
 
 @never_cache

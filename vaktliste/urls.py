@@ -38,6 +38,12 @@ urlpatterns = [
     path('api/vaktposter/<int:pk>/', views.vaktpost_detalj_view,
          name='vaktliste_api_vaktpost_detalj'),
 
+    # Koblingen til /oppdrag (fase 6). **Vaktlista eier endepunktet**;
+    # sentralbordet henter det fra nettleseren. Oppdragsmodulen importerer
+    # ikke vaktlista — se §6 i beslutningsnotatet.
+    path('api/enhet/<int:pk>/besetning/', views.besetning_view,
+         name='vaktliste_api_besetning'),
+
     # Planleggingstall (fase 5). Belastningen henger under én vaktliste;
     # grensene varslene måler mot er organisasjonens og gjelder alle.
     path('api/vaktlister/<int:pk>/belastning/', views.belastning_view,

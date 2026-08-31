@@ -389,7 +389,7 @@ utformingen her stenger for det.
 | 3 | ✅ Tilgangsmodellen: badge- og reservasjonssjekk på objektnivå, per-modul-etikett i matrisen (§4.5). `admin_only` av | levert |
 | 4 | ✅ Drift: i/ut av drift, møtt/av vakt (kun `skriv_full`), «Tilstede nå» med utskrift. Ingen migrasjon — feltene kom i fase 2. Ett avvik: én stempelknapp per rad framfor to, se CHANGELOG 30. aug. | levert |
 | 5 | ✅ Planleggingstall (§8b): per person, varsler mot admin-styrte grenser, faktisk mot planlagt. Bemanningskurvene kom i fase 2 og står per ressursgruppe. Kompetansedekning ikke levert — den sto som mulig utvidelse | levert |
-| 6 | Kobling til `/oppdrag`: besetningspanel på enheten | 3–4 t |
+| 6 | ✅ Kobling til `/oppdrag`: besetningspanel på enheten, åpnes ved klikk. Retningen håndheves med AST-test. Ingen migrasjon | levert |
 | 7 | Arkiv + statistikk via `core.arkiv` og `core.stats` | 4–6 t |
 
 **Fram til fase 3 er modulen admin-only.** Det er fail-closed, og ingen andre slipper
