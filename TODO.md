@@ -903,6 +903,11 @@ Gjennomgang 13. aug. 2026, med 1000 pasienter og peak 100 brukere som premiss.
             «Opprett vakt» står på vaktas startdato framfor tomt, så bare
             klokkeslettet tastes. Feltet er ellers uendret — native velger og
             visning som før.
+      - [x] **«Ingen biler oppkoblet» forklares (30. aug. 2026).** Meldt av
+            André. Bilene var koblet i en *planlagt* vakt, og sentralbordet
+            scoper til den aktive — scopingen er riktig, men meldingen sa
+            bare «ikke koblet». Den navngir nå vakta koblingen ligger i, og
+            skiller den fra «ikke koblet noe sted».
       - [x] **Fase 6 — besetning i sentralbordet (30. aug. 2026).**
             `/vaktliste/api/enhet/<pk>/besetning/`, hentet fra nettleseren av
             `oppdrag-sentral.js`. Avhengighetsretningen håndheves med AST

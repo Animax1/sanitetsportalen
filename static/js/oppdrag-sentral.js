@@ -99,11 +99,14 @@ function mkBesetning(enhetId) {
   if (b === undefined) {
     return '<div class="besetning"><span class="enhet-meta">Henter…</span></div>';
   }
-  if (b === null) {
-    // **Ukoblet er ikke ubemannet**, og de to skal ikke se like ut:
-    // ubemannet er et problem her og nå, ukoblet er et oppsett som mangler.
-    return '<div class="besetning"><span class="enhet-meta">'
-         + 'Ikke koblet til en ressurs i denne vakta.</span></div>';
+  if (b.feil) {
+    // **Serverens forklaring, ikke vår egen.** Den vanligste grunnen til at
+    // en besetning ikke finnes er at bilen er koblet i en vakt man har
+    // *planlagt*, mens sentralbordet står i den aktive — og da er ikke
+    // oppsettet feil, det er feil vakt som er aktiv. Skrev vi vår egen
+    // generiske «ikke koblet» her, sendte vi operatøren ut på jakt etter en
+    // feil som ikke finnes.
+    return `<div class="besetning"><span class="enhet-meta">${escapeHtml(b.feil)}</span></div>`;
   }
   if (!b.mannskap.length) {
     return `<div class="besetning"><span class="enhet-meta">`
@@ -148,9 +151,12 @@ async function visBesetning(enhetId) {
 
 async function hentBesetning(enhetId) {
   const res = await apiFetch(`/vaktliste/api/enhet/${enhetId}/besetning/`);
-  // 404 betyr ukoblet, 403 at operatøren ikke har vaktlistetilgang. Begge
-  // lagres som `null` — panelet sier fra framfor å stå tomt og se ødelagt ut.
-  besetninger[enhetId] = res.ok ? (await res.json()).data : null;
+  const d = await res.json().catch(() => ({}));
+  // Serveren skiller mellom «koblet i en annen vakt» og «ikke koblet noe
+  // sted», og meldingen bæres uendret hit — se `mkBesetning`.
+  besetninger[enhetId] = res.ok
+    ? d.data
+    : { feil: d.message || 'Kunne ikke hente besetningen.' };
   renderEnheter();
 }
 

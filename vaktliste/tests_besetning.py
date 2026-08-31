@@ -24,6 +24,10 @@ from pathlib import Path
 
 from django.conf import settings
 from django.test import SimpleTestCase, override_settings
+
+from patients.js_test_utils import (
+    OPPDRAG_SENTRAL_JS, PORTAL_UTILS_JS, build_harness, node_available,
+    run_node)
 from django.utils import timezone
 
 from oppdrag.models import Enhet
@@ -189,6 +193,47 @@ class BesetningTests(TilgangsBasis):
                          'fant ressursen i feil vakt')
         self.assertEqual(['Kari'], [m['navn'] for m in d['mannskap']])
 
+    def test_koblet_i_en_planlagt_vakt_forklares(self):
+        """**Meldt av André 30. aug. 2026.** Han planla oktobervakta i august
+        og koblet bilene der. Sentralbordet — som står i den aktive vakta —
+        sa «ikke koblet», og han brukte en kveld på å lete etter en feil som
+        ikke fantes.
+
+        Scopingen er riktig: å vise oktobers besetning på tavla mens man
+        kjører i kveld ville vært verre. Men meldingen skal si *hvorfor*, og
+        navngi vakta — da er det ikke oppsettet som er feil, det er feil vakt
+        som er aktiv, og det er noe helt annet å rette.
+        """
+        annen = services.opprett_planlagt_vakt('Oktobervakta')
+        enhet = Enhet.objects.create(navn='HGSD 90')
+        lag_ressurs(vaktliste=annen, navn='Ambulanse 9',
+                    gruppe=gruppe(AMBULANSE), enhet=enhet)
+
+        res = self._hent(enhet=enhet)
+        self.assertEqual(404, res.status_code)
+        melding = res.json()['message']
+        self.assertIn('Oktobervakta', melding, 'vakta må navngis')
+        self.assertIn('aktive', melding)
+
+    def test_helt_ukoblet_sier_noe_annet(self):
+        """De to er ulike problemer: det ene er feil vakt, det andre er et
+        oppsett som mangler. Samme melding hadde sendt begge på feil jakt."""
+        enhet = Enhet.objects.create(navn='Uten ressurs')
+        melding = self._hent(enhet=enhet).json()['message']
+        self.assertIn('noen vaktliste', melding)
+        self.assertNotIn('aktive vakta', melding)
+
+    def test_den_aktive_vinner_naar_bilen_staar_i_begge(self):
+        """En bil kan være koblet i både kveldens og oktobers vaktliste. Da
+        er det kveldens besetning sentralbordet skal vise — ikke en melding
+        om den andre."""
+        annen = services.opprett_planlagt_vakt('Oktobervakta')
+        lag_ressurs(vaktliste=annen, navn='Oktoberbilen',
+                    gruppe=gruppe(AMBULANSE), enhet=self.enhet, rekkefolge=0)
+        self._skift(self.p_hgsd)
+        d = self._hent().json()['data']
+        self.assertEqual('Ambulanse 1', d['ressurs_navn'])
+
     # ── Gaten ────────────────────────────────────────────────────────────
     def test_alle_med_les_i_vaktliste_ser_besetningen(self):
         self._skift(self.p_hgsd)
@@ -245,3 +290,122 @@ class OppdragImportererIkkeVaktlista(SimpleTestCase):
         js = Path(settings.BASE_DIR, 'static', 'js',
                   'oppdrag-sentral.js').read_text(encoding='utf-8')
         self.assertIn('/vaktliste/api/enhet/', js)
+
+
+class BesetningspanelTests(SimpleTestCase):
+    """Panelet i sentralbordet, kjørt i node.
+
+    Det bygges av `oppdrag-sentral.js`, men hører til denne fasen: det er
+    vaktlistas data som rendres, og reglene for hva panelet *sier* er
+    vaktlistas beslutninger.
+    """
+
+    HARNESS = (
+        (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue')),
+        (OPPDRAG_SENTRAL_JS, ('mkBesetning', 'kanSeBesetning',
+                              'hentBesetning')),
+    )
+
+    def setUp(self):
+        if not node_available():
+            self.skipTest('node er ikke tilgjengelig')
+        self.harness = build_harness(self.HARNESS)
+
+    def _panel(self, verdi):
+        import json
+        return run_node(self.harness, f"""
+            globalThis.window = {{ KAN_SE_BESETNING: true }};
+            globalThis.apenBesetning = 1;
+            globalThis.besetninger = {{ 1: {json.dumps(verdi)} }};
+            console.log(mkBesetning(1));
+        """)
+
+    FULL = {'ressurs_navn': 'Ambulanse 1', 'i_drift': True, 'antall': 2,
+            'tilstede': 1, 'mannskap': [
+                {'navn': 'Kari', 'rolle': 'Sjåfør', 'tilstede': True, 'mott': True},
+                {'navn': 'Ola', 'rolle': '', 'tilstede': False, 'mott': False}]}
+
+    def test_serverens_forklaring_vises_uendret(self):
+        """M83: skrev klienten sin egen generiske «ikke koblet», sendte den
+        operatøren ut på jakt etter en feil som ikke finnes. Den vanligste
+        årsaken er at bilen er koblet i en vakt man har *planlagt*."""
+        ut = self._panel({'feil': 'Enheten er koblet i vaktlista for '
+                                  '«Oktobervakta», som ikke er den aktive vakta.'})
+        self.assertIn('Oktobervakta', ut)
+        self.assertIn('ikke er den aktive', ut)
+
+    def test_feilmeldingen_escapes(self):
+        ut = self._panel({'feil': '<img src=x onerror=alert(1)>'})
+        self.assertNotIn('<img src=x', ut)
+        self.assertIn('&lt;img', ut)
+
+    def test_besetningen_vises_med_status(self):
+        ut = self._panel(self.FULL)
+        self.assertIn('Ambulanse 1', ut)
+        self.assertIn('1 av 2 møtt', ut)
+        self.assertIn('Kari', ut)
+        self.assertIn('Sjåfør', ut)
+
+    def test_uten_drift_sies_det_i_stedet_for_null_moett(self):
+        """«0 av 4 møtt» på en liste som ikke er i drift leses som et problem.
+        Innsjekken har bare ikke åpnet."""
+        ut = self._panel({**self.FULL, 'i_drift': False, 'tilstede': 0})
+        self.assertIn('innsjekk ikke åpnet', ut)
+        self.assertNotIn('0 av 2 møtt', ut)
+
+    def test_tom_besetning_navngir_ressursen(self):
+        ut = self._panel({**self.FULL, 'mannskap': [], 'antall': 0})
+        self.assertIn('Ingen på vakt på Ambulanse 1 nå', ut)
+
+    def test_uhentet_sier_fra(self):
+        ut = run_node(self.harness, """
+            globalThis.window = { KAN_SE_BESETNING: true };
+            globalThis.apenBesetning = 1;
+            globalThis.besetninger = {};
+            console.log('[' + mkBesetning(1) + ']');
+        """)
+        self.assertIn('Henter', ut)
+
+    def test_lukket_panel_tegner_ingenting(self):
+        ut = run_node(self.harness, """
+            globalThis.window = { KAN_SE_BESETNING: true };
+            globalThis.apenBesetning = null;
+            globalThis.besetninger = {};
+            console.log('[' + mkBesetning(1) + ']');
+        """)
+        self.assertIn('[]', ut)
+
+    def _hentet(self, status, kropp):
+        """Kjør `hentBesetning` mot et stubbet svar og les hva den lagret."""
+        import json
+        return run_node(self.harness, f"""
+            globalThis.window = {{ KAN_SE_BESETNING: true }};
+            globalThis.apenBesetning = 1;
+            globalThis.besetninger = {{}};
+            globalThis.renderEnheter = () => {{}};
+            globalThis.apiFetch = async () => ({{
+              ok: {str(status == 200).lower()},
+              json: async () => ({json.dumps(kropp)}),
+            }});
+            await hentBesetning(1);
+            console.log(JSON.stringify(besetninger[1]));
+        """)
+
+    def test_serverens_melding_baeres_uendret_hit(self):
+        """M83: skrev klienten sin egen tekst her, forsvant forklaringen om
+        hvilken vakt bilen faktisk er koblet i — og det er hele poenget."""
+        ut = self._hentet(404, {'status': 'error',
+                                'message': 'Koblet i «Oktobervakta».'})
+        self.assertIn('Oktobervakta', ut)
+
+    def test_svar_uten_melding_faar_en_reservetekst(self):
+        """Et tomt panel ser ødelagt ut. Noe skal alltid stå der."""
+        ut = self._hentet(500, {})
+        self.assertIn('feil', ut)
+        self.assertIn('Kunne ikke hente', ut)
+
+    def test_vellykket_svar_lagres_som_data(self):
+        ut = self._hentet(200, {'status': 'ok',
+                                'data': {'ressurs_navn': 'Ambulanse 1'}})
+        self.assertIn('Ambulanse 1', ut)
+        self.assertNotIn('feil', ut)

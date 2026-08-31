@@ -4,6 +4,39 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-08-30 — «Ingen biler oppkoblet» var feil vakt, ikke feil oppsett
+
+**1931 tester grønne** (13 nye, fire mutasjoner satt rødt først). Meldt av
+André: han hadde koblet bilene, men sentralbordet sa at ingen var koblet.
+Hans egen mistanke — at det hang sammen med at han hadde planlagt en vakt
+fram i tid — var riktig.
+
+**Reprodusert:** vakta han planla er `er_aktiv=False`, og sentralbordet scoper
+til portalens **aktive** vakt. Koblingen lå i den planlagte vaktlista og var
+derfor usynlig.
+
+**Scopingen er riktig og beholdes.** Å vise oktobers besetning på tavla mens
+man kjører i kveld ville vært verre enn å vise ingenting.
+
+**Meldingen løy ved å tie.** «Ikke koblet til en ressurs i denne vakta» leses
+som «koblingen din er ødelagt», og sendte André ut på jakt etter en feil som
+ikke fantes. Endepunktet skiller nå mellom to helt ulike problemer:
+
+- **Koblet i en annen vakt:** navngir vakta og sier hva som må gjøres — «bytt
+  den aktive vakta i vaktadministrasjonen, eller koble enheten i vaktlista for
+  vakta som går nå».
+- **Ikke koblet noe sted:** et oppsett som mangler, som før.
+
+Klienten viser serverens tekst uendret. Skrev den sin egen generiske, forsvant
+nettopp forklaringen som gjør forskjellen.
+
+**Ryddet på veien:** `koblet_i_annen_vakt()` hadde en `exclude()` på den aktive
+vakta som ikke lot seg sette rød — kallstedet garanterer allerede at den aktive
+vakta ikke har ressursen. En gren ingen test kan nå er en gren man ikke kan
+begrunne, så den er borte.
+
+---
+
 ## 2026-08-30 — Vaktliste fase 6: besetning i sentralbordet
 
 **1918 tester grønne** (16 nye, ni mutasjoner satt rødt først). Ingen migrasjon

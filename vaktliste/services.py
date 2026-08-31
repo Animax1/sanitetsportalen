@@ -615,6 +615,27 @@ def besetning(enhet_id, naa=None):
     }
 
 
+def koblet_i_annen_vakt(enhet_id):
+    """Navnet på en vakt der enheten *er* koblet, men som ikke er den aktive.
+
+    Finnes for at feilmeldingen skal kunne si sannheten. «Ikke koblet til en
+    ressurs i denne vakta» leses som «koblingen din er ødelagt» — og André
+    brukte en kveld på å lete etter en feil som ikke fantes, fordi han hadde
+    planlagt oktobervakta i august og koblet bilene der.
+
+    Spørringen kjøres **bare** når `besetning()` alt har svart nei, så den
+    koster ingenting i det vanlige tilfellet — og av samme grunn trengs ingen
+    `exclude()` på den aktive vakta: har den en ressurs for enheten, kom vi
+    aldri hit. Nyeste vakt først, fordi det er den man planla sist.
+    """
+    ressurs = (Ressurs.objects
+               .filter(enhet_id=enhet_id)
+               .select_related('vaktliste__vakt')
+               .order_by('-vaktliste__vakt__startet')
+               .first())
+    return ressurs.vaktliste.vakt.navn if ressurs else None
+
+
 def vaktspenn(vaktliste):
     """(start, slutt) for vakta — eller ``(None, None)`` hvis den mangler.
 

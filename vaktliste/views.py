@@ -605,10 +605,23 @@ def besetning_view(request, pk):
     annet enn «ingen på vakt», og de to skal ikke se like ut for operatøren.
     """
     data = services.besetning(pk)
-    if data is None:
-        return _feil('Enheten er ikke koblet til en ressurs i denne vakta.',
-                     status=404)
-    return JsonResponse({'status': 'ok', 'data': data})
+    if data is not None:
+        return JsonResponse({'status': 'ok', 'data': data})
+
+    # **Meldingen skal si sannheten, ikke bare nei.** «Ikke koblet» leses som
+    # «koblingen din er ødelagt» — og den vanligste grunnen til at man ikke
+    # finner besetningen er at bilen er koblet i en vakt man har *planlagt*,
+    # mens sentralbordet står i den aktive. Da er ikke oppsettet feil; det er
+    # feil vakt som er aktiv, og det er noe helt annet å rette.
+    annen = services.koblet_i_annen_vakt(pk)
+    if annen:
+        return _feil(
+            f'Enheten er koblet i vaktlista for «{annen}», som ikke er den '
+            f'aktive vakta. Sentralbordet viser den aktive vakta — bytt den '
+            f'i vaktadministrasjonen, eller koble enheten i vaktlista for '
+            f'vakta som går nå.', status=404)
+    return _feil('Enheten er ikke koblet til en ressurs i noen vaktliste.',
+                 status=404)
 
 
 # ── Planleggingstall (fase 5) ────────────────────────────────────────────────

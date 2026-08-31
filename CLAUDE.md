@@ -463,6 +463,11 @@ Oppdragsmodulen importerer **ikke** vaktlista; `oppdrag-sentral.js` henter
   personalmapper.
 - **Bare skiftene som dekker nå**, og **404 når enheten er ukoblet**: ubemannet
   og ukoblet er ulike svar på ulike problemer.
+- **Scopet er portalens aktive vakt**, og 404-meldingen skiller «koblet i en
+  annen vakt» fra «ikke koblet noe sted» (`services.koblet_i_annen_vakt`).
+  Den som planlegger en vakt fram i tid kobler bilene der, og en melding som
+  bare sier «ikke koblet» sender henne ut på jakt etter en feil som ikke
+  finnes — det kostet André en kveld 30. aug. 2026.
 - **Rekkefølgen sorteres i Python.** `rolle` er nullbar, og SQLite (dev) og
   PostgreSQL (prod) plasserer NULL i hver sin ende.
 
