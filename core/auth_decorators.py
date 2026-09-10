@@ -47,10 +47,14 @@ from django.http import JsonResponse
 # ═════════════════════════════════════════════════════════════════════════════
 
 # Ordnet stige. `ingen` finnes ikke som verdi — fravær av rad er ingen tilgang.
+# Hvert trinn inneholder trinnene under seg — `har_tilgang(..., 'les')` er sant
+# for alle fire. Et nytt trinn er derfor additivt for modulene som ikke
+# deklarerer det: de tilbyr det ikke i matrisen, og ingen kan få det der.
 NIVAA_HIERARKI = {
     'les': 0,
     'skriv_handling': 1,
     'skriv_full': 2,
+    'skriv_leder': 3,
 }
 
 _TILGANG_CACHE = '_modultilgang_cache'

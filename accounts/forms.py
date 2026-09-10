@@ -466,11 +466,17 @@ class ModulTilgangForm(forms.Form):
             navn = self.PREFIKS + modul.slug
             har = self._naavaerende.get(modul.slug, self.INGEN)
             valg = [(self.INGEN, 'Ingen tilgang')]
-            valg += [(v, l) for v, l in TilgangsNivaa.choices if v in modul.nivaaer]
+            # Etiketten er modulens egen når den har en (`Module.nivaa_navn`),
+            # ellers stigens generiske. Samme nivå betyr ulike ting i ulike
+            # moduler — se §4.5 i vaktlistenotatet. Filtreringen mot
+            # `TilgangsNivaa` beholdes: en skrivefeil i `nivaaer` skal ikke
+            # kunne lage et valg som ikke finnes i modellen.
+            kjente = dict(TilgangsNivaa.choices)
+            valg += [(v, modul.etikett_for(v)) for v in modul.nivaaer if v in kjente]
             # Et nivå brukeren allerede har, men som ikke tilbys, må stå i
             # lista — ellers ville et lagre-trykk stille fjernet det.
             if har and har not in [v for v, _ in valg]:
-                valg.append((har, dict(TilgangsNivaa.choices).get(har, har)))
+                valg.append((har, modul.etikett_for(har)))
             self.fields[navn] = forms.ChoiceField(
                 choices=valg,
                 required=False,

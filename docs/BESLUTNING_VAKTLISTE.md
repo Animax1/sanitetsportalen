@@ -383,12 +383,13 @@ utformingen her stenger for det.
 
 | Fase | Innhold | Estimat |
 |---|---|---|
-| 1 | App, modulregistrering, `Korps`/`Kompetanse`/`VaktRolle`, `Mannskap` med admin. Personvernrader i A.6/A.9, audit-unntak for `notat` | 7–9 t |
-| 2 | `Vaktliste`, `Ressurs` med reservasjon, `Vaktpost` med tider, planlegging med faner. «Ny planlagt vakt», kopiering av oppsett | 9–11 t |
-| 3 | Tilgangsmodellen: badge- og reservasjonssjekk på objektnivå, per-modul-etikett i matrisen (§4.5) | 5–6 t |
-| 4 | Drift: i/ut av drift, møtt/av vakt (kun `skriv_full`), «Tilstede nå» med utskrift | 5–7 t |
-| 5 | Planleggingstall (§8b): bemanningskurve, per person, varsler | 4–6 t |
-| 6 | Kobling til `/oppdrag`: besetningspanel på enheten | 3–4 t |
+| 1 | ✅ App, modulregistrering, `Korps`/`Kompetanse`/`VaktRolle`, `Mannskap` med admin. Personvernrader i A.6/A.9, audit-unntak for `notat` | levert |
+| 2 | ✅ `Vaktliste`, `Ressurs` med reservasjon, `Vaktpost` med tider, planlegging med faner. «Ny planlagt vakt», kopiering av oppsett. Admin-only til fase 3 | levert |
+| 2b | ✅ Registrene i portalen: mannskapsoversikt og admin for `Korps`/`Kompetanse`/`Ressursrolle`. Ikke planlagt — notatet forutsatte stilltiende Django-admin, som er av i prod (S1). Lå på `/vaktliste/registre/` til 30. aug. 2026; mannskapet er nå en fane på `/vaktliste/`, korps og kompetanser ligger i «Innstillinger» | levert |
+| 3 | ✅ Tilgangsmodellen: badge- og reservasjonssjekk på objektnivå, per-modul-etikett i matrisen (§4.5). `admin_only` av | levert |
+| 4 | ✅ Drift: i/ut av drift, møtt/av vakt (kun `skriv_full`), «Tilstede nå» med utskrift. Ingen migrasjon — feltene kom i fase 2. Ett avvik: én stempelknapp per rad framfor to, se CHANGELOG 30. aug. | levert |
+| 5 | ✅ Planleggingstall (§8b): per person, varsler mot admin-styrte grenser, faktisk mot planlagt. Bemanningskurvene kom i fase 2 og står per ressursgruppe. Kompetansedekning ikke levert — den sto som mulig utvidelse | levert |
+| 6 | ✅ Kobling til `/oppdrag`: besetningspanel på enheten, åpnes ved klikk. Retningen håndheves med AST-test. Ingen migrasjon | levert |
 | 7 | Arkiv + statistikk via `core.arkiv` og `core.stats` | 4–6 t |
 
 **Fram til fase 3 er modulen admin-only.** Det er fail-closed, og ingen andre slipper

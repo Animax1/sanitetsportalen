@@ -22,6 +22,16 @@ let enhetsadmin = [];
 let etagEnheter = null;
 let etagOppdrag = null;
 
+// **Besetningen er vaktlistas data, lånt inn** (§6 i vaktlistenotatet).
+// Oppdragsmodulen importerer ikke vaktlista i Python — koblingen ligger her,
+// i nettleseren, som `Ressurs.enhet` peker sammen.
+//
+// Hentes **når operatøren spør**, ikke ved hver polling: enhetslista pollet
+// hvert par sekund ville gitt ett kall per bil per runde, og svaret er
+// dessuten bare interessant i det øyeblikket noen lurer.
+let besetninger = {};
+let apenBesetning = null;
+
 const STATUS_REKKEFOLGE = ['venter', 'rykker_ut', 'fremme', 'avreist', 'leverer', 'ledig'];
 
 
@@ -50,19 +60,104 @@ function renderEnheter() {
       const meta = e.antall_ventende
         ? `${e.status_navn} · ${e.antall_ventende} venter`
         : String(e.status_navn);
+      // Hoistet ut av mal-strengen: en nøstet mal-streng inne i en `${...}`
+      // er usynlig for XSS-skanneren i tests_xss.py, og vanskelig å lese.
+      const klikkbar = kanSeBesetning() ? ' enhet-kort-klikkbar' : '';
+      const apner = kanSeBesetning()
+        ? `data-action="visBesetning" data-id="${escHtmlValue(e.id)}"` : '';
+      const besetning = mkBesetning(e.id);
       return `
-      <div class="enhet-kort">
+      <div class="enhet-kort${klikkbar}" ${apner}>
         <span class="status-prikk status-${escHtmlValue(e.status)}"></span>
         <div class="flex-grow-1">
           <div class="enhet-navn">${escapeHtml(e.navn)}</div>
           <div class="enhet-meta">${escapeHtml(meta)}</div>
         </div>
-      </div>`;
+      </div>${besetning}`;
     }).join(''));
   }
 
   const teller = document.getElementById('av-vakt-teller');
   if (teller) teller.textContent = antallAv ? ` (${antallAv} av vakt)` : '';
+}
+
+
+function kanSeBesetning() {
+  // Speiler `har_tilgang(bruker, 'vaktliste', 'les')`, satt av malen.
+  // **Komposisjonsregelen fra rollemodellen §5:** en modul viser bare kilder
+  // brukeren har tilgang til, framfor å gi avledet innsyn. Serveren nekter
+  // uansett — dette avgjør bare om panelet finnes.
+  return globalThis.window?.KAN_SE_BESETNING === true;
+}
+
+
+function mkBesetning(enhetId) {
+  // Panelet ligger *under* enhetskortet, ikke inni: kortet er en linje 113
+  // skummer, og en besetning på fire ville sprengt den.
+  if (apenBesetning !== enhetId) return '';
+  const b = besetninger[enhetId];
+  if (b === undefined) {
+    return '<div class="besetning"><span class="enhet-meta">Henter…</span></div>';
+  }
+  if (b.feil) {
+    // **Serverens forklaring, ikke vår egen.** Den vanligste grunnen til at
+    // en besetning ikke finnes er at bilen er koblet i en vakt man har
+    // *planlagt*, mens sentralbordet står i den aktive — og da er ikke
+    // oppsettet feil, det er feil vakt som er aktiv. Skrev vi vår egen
+    // generiske «ikke koblet» her, sendte vi operatøren ut på jakt etter en
+    // feil som ikke finnes.
+    return `<div class="besetning"><span class="enhet-meta">${escapeHtml(b.feil)}</span></div>`;
+  }
+  if (!b.mannskap.length) {
+    return `<div class="besetning"><span class="enhet-meta">`
+         + `Ingen på vakt på ${escapeHtml(b.ressurs_navn)} nå.</span></div>`;
+  }
+
+  const rader = b.mannskap.map((m) => {
+    // Tre tilstander, ikke to: «møtt» og «av vakt» er begge stemplet, men
+    // bare den ene er til stede nå.
+    const merke = m.tilstede
+      ? '<span class="besetning-inne" title="Møtt">●</span>'
+      : (m.mott
+          ? '<span class="besetning-ute" title="Av vakt">○</span>'
+          : '<span class="besetning-ute" title="Ikke møtt">○</span>');
+    const rolle = m.rolle
+      ? `<span class="enhet-meta">${escapeHtml(m.rolle)}</span>` : '';
+    return `<div class="besetning-rad">${merke}
+              <span>${escapeHtml(m.navn)}</span>${rolle}</div>`;
+  }).join('');
+
+  const status = b.i_drift
+    ? `${escHtmlValue(b.tilstede)} av ${escHtmlValue(b.antall)} møtt`
+    : `${escHtmlValue(b.antall)} satt opp · innsjekk ikke åpnet`;
+
+  return `<div class="besetning">
+      <div class="besetning-topp">
+        <span>${escapeHtml(b.ressurs_navn)}</span>
+        <span class="enhet-meta">${status}</span>
+      </div>
+      ${rader}
+    </div>`;
+}
+
+
+async function visBesetning(enhetId) {
+  if (apenBesetning === enhetId) { apenBesetning = null; renderEnheter(); return; }
+  apenBesetning = enhetId;
+  renderEnheter();
+  await hentBesetning(enhetId);
+}
+
+
+async function hentBesetning(enhetId) {
+  const res = await apiFetch(`/vaktliste/api/enhet/${enhetId}/besetning/`);
+  const d = await res.json().catch(() => ({}));
+  // Serveren skiller mellom «koblet i en annen vakt» og «ikke koblet noe
+  // sted», og meldingen bæres uendret hit — se `mkBesetning`.
+  besetninger[enhetId] = res.ok
+    ? d.data
+    : { feil: d.message || 'Kunne ikke hente besetningen.' };
+  renderEnheter();
 }
 
 
@@ -565,6 +660,16 @@ async function lastEnheter() {
   if (!res.ok) return false;
   etagEnheter = res.headers.get('ETag');
   enheter = (await res.json()).data || [];
+
+  // **Bufferet tømmes bare når noe faktisk endret seg** — etter 304-sjekken,
+  // ikke før. Tømte vi det på hver runde, ville et åpent panel stått på
+  // «Henter…» for alltid: `undefined` betyr «ikke hentet», og ingenting
+  // ville hentet det på nytt.
+  //
+  // Står et panel åpent, hentes det på nytt her. Et tall om hvem som er i
+  // bilen skal ikke bli stående fra forrige time.
+  besetninger = {};
+  if (apenBesetning !== null) hentBesetning(apenBesetning);
   return true;
 }
 

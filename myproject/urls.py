@@ -55,6 +55,7 @@ urlpatterns = [
     # Oppdrag (bil og beredskapsambulanse, august 2026). Samme grunn til å stå
     # før core.
     path('oppdrag/', include('oppdrag.urls')),
+    path('vaktliste/', include('vaktliste.urls')),
 
     # Sanitetsportal-skall (dashboard + legacy-redirects)
     # Mountet på '' så portal-dashboardet ligger på /.

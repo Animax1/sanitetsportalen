@@ -252,3 +252,40 @@
   font-size: 1rem;
   font-weight: 600;
 }
+
+/* ── Besetning (vaktliste fase 6) ─────────────────────────────────────── */
+
+/*
+  **Vaktlistas data, lånt inn.** Panelet ligger under enhetskortet, ikke
+  inni: kortet er én linje 113 skummer, og en besetning på fire ville
+  sprengt den.
+*/
+.enhet-kort-klikkbar { cursor: pointer; }
+
+.besetning {
+  margin: -0.25rem 0 0.5rem 1.75rem;
+  padding: 0.5rem 0.75rem;
+  border-left: 2px solid var(--border-color);
+  font-size: 0.85rem;
+}
+
+.besetning-topp {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.35rem;
+  font-weight: 600;
+}
+
+.besetning-rad {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+}
+
+/*
+  Fylt prikk = møtt og ikke gått av vakt. Åpen = alt annet. Distinksjonen er
+  den samme som «Tilstede nå» i vaktlista, og utledes av de samme stemplene.
+*/
+.besetning-inne { color: var(--vl-inne, #4ade80); }
+.besetning-ute { color: var(--portal-text-muted, #94a3b8); }

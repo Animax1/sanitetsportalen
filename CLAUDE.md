@@ -11,6 +11,13 @@ relevante punkter i TODO. Dette skal gjøres som del av samme commit, ikke etter
 ## Commands
 
 ```powershell
+# Migrasjonsprøver mot ekte PostgreSQL (se «Migrasjoner» under).
+# Krever PostgreSQL lokalt — én gang:  winget install PostgreSQL.PostgreSQL.16
+$env:MIGRASJONSPROVE_DATABASE_URL = "postgres://postgres:DITT_PASSORD@localhost:5432/postgres"
+python manage.py verifiser_migrasjoner
+```
+
+```powershell
 # Setup (første gang)
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
@@ -23,7 +30,7 @@ python manage.py create_admin --username admin --password "bytt-meg"
 python manage.py runserver           # http://127.0.0.1:8000/
 
 # Tester – hele suiten
-python manage.py test patients accounts audit core statistikk oppdrag -v 2
+python manage.py test patients accounts audit core statistikk oppdrag vaktliste -v 2
 
 # Én enkelt test
 python manage.py test patients.tests.PatientAPITest.test_create_patient -v 2
@@ -74,9 +81,20 @@ Nivåene er en ordnet stige. **Fravær av rad er ingen tilgang** — det finnes 
 | `les` | Kan se modulens data |
 | `skriv_handling` | Navngitte overganger (stemplinger), leser ikke request-kroppen |
 | `skriv_full` | Kan redigere felter |
+| `skriv_leder` | Kan sette opp — oppretter og fjerner det de andre redigerer |
+
+**`skriv_leder` (30. aug. 2026) deklareres kun av vaktlista**, og skillet mot `skriv_full`
+er *hva slags skade en feil gjør*: den som bemanner setter folk på plasser og kan rette
+tilbake; den som setter opp fjerner en ressurs, og bemanningen forsvinner med den. Uten
+trinnet måtte de to deles ut samlet, eller oppsettet bli global admin — og da kunne ikke en
+vaktleder lage sin egen vaktliste uten å få brukeradmin, backup og arkiv på kjøpet. Et nytt
+trinn er additivt: modulene som ikke deklarerer det, tilbyr det ikke i matrisen.
 
 **Hver modul deklarerer hvilke nivåer som betyr noe for den** — `Module.nivaaer`. Matrisen
-tilbyr de nivåene og ingen andre. En global liste hadde begge feil samtidig: den skjulte
+tilbyr de nivåene og ingen andre. **Og hver modul kan gi dem sin egen etikett** —
+`Module.nivaa_navn`, brukt av matrisen og «Min profil». Det trengs fordi samme nivå betyr
+ulike ting: `skriv_handling` er «stempling» i oppdrag og «fører sitt eget korps» i
+vaktlista. Uten etiketten deles nivået ut i god tro med feil modul i hodet. En global liste hadde begge feil samtidig: den skjulte
 `skriv_handling` for oppdragsmodulen, som er den nivået ble laget for, og tilbød
 `skriv_full` på statistikk, der skriving ikke finnes.
 
@@ -253,6 +271,254 @@ stemplingsendepunkter, ikke en feltwhitelist inne i en generell `PUT`. Og skille
 to grensesnittene er **ikke nivået** — det er om kontoen er knyttet til en `Enhet`. Å knytte
 en konto til en enhet gir ingen tilgang; det er domenedata, som `Forstehjelper.user`.
 
+### Vaktlistemodulen (vaktliste/)
+
+Fase 1–2 levert (registre, mannskap, oppsett og planleggingsside på `/vaktliste/`);
+fase 3–7 gjenstår — se `docs/BESLUTNING_VAKTLISTE.md`, som er besluttet i sin helhet.
+
+| Regel | Hvor |
+|---|---|
+| Badgen på personen | `Mannskap.korps`, arvet av kontoen via `Mannskap.user` |
+| Reservasjonen på ressursen | `Ressurs.korps` — tom betyr **vaktlederens bord**, ikke fritt fram |
+| Reservasjonen på plassen | `Vaktpost.korps` — overstyrer ressursens, `services.reservert_korps()` |
+| Begge halvdelene sjekkes samlet | `services.kan_sette_vaktpost()` |
+| Ett skift er én rad | `Vaktpost`, med plan og faktisk i hvert sitt feltpar |
+| Planlagt vakt rører ikke pekeren | `services.opprett_planlagt_vakt()` |
+
+- **`Mannskap.korps` er badgen** tilgangsmodellen hviler på fra fase 3:
+  `skriv_handling` betyr her «fører sitt eget korps» (avgrenset av badgen, ingen
+  innsjekk), ikke stempling som i oppdrag. Matrisen trenger derfor en etikett per
+  modul per nivå (§4.5) før nivået deles ut.
+- **Den doble regelen er skrevet som én funksjon**, `kan_sette_vaktpost()`, nettopp for
+  at et endepunkt ikke skal kunne huske badgen og glemme reservasjonen.
+- **Reservasjonen finnes på to nivåer, og plassen vinner** (30. aug. 2026).
+  `Ressurs.korps` er standarden; `Vaktpost.korps` overstyrer den for én plass, fordi en
+  samleplass bemannes av flere korps. `services.reservert_korps()` er det ene stedet som
+  slår dem sammen — leses de hver for seg, vil ett endepunkt før eller siden huske
+  ressursen og glemme plassen. **Tom verdi betyr «som ressursen», ikke «ingen»**: en
+  annen tolkning ville gjort alle eksisterende plasser fritt vilt ved oppgraderingen.
+  Å *sette* reservasjonen er å dele ut, og krever `skriv_full`.
+- **Tre terskler, og skillet er hva slags utsagn nivået får avgi.** `les` ser hele lista
+  (alle korps — poenget er samordning). Badge + reservasjon bemanner. `skriv_full` deler
+  *ut*: ressurser, reservasjoner, nye vakter og verdimengdene — kunne korps-brukeren
+  opprette et korps eller omreservere KO, ville badgen sluttet å avgrense noe. Sletting av
+  en vaktliste er global admin.
+- **`Mannskap.korps_id` og `Mannskap.user_id` er unntatt badgen.** Flytting sjekkes mot
+  *begge* korps, og kontokoblingen er `skriv_full` fordi den flytter en badge — kontoen
+  arver korpset, og dermed hva den kontoen får redigere.
+- **Kostbehov/matallergi lagres ikke** (art. 9 — besluttet holdt utenfor portalen), og
+  `Mannskap.notat` er unntatt verdilogging i audit (`signals.FELT_UTEN_VERDILOGGING`).
+- **En ledig plass er en `Vaktpost` uten `mannskap`.** Planlegging begynner med
+  behovet, og «å fylle plassen» er én feltendring. Å *opprette* en ledig plass er
+  `skriv_full` (vaktleder setter behovet), å *fylle* den krever badge og
+  reservasjon som ellers — de to spørsmålene er `services.kan_sette_vaktpost()`
+  og `services.kan_rore_vaktpost()`, og de må ikke slås sammen.
+- **Vaktas lengde: start på `Vakt.startet`, slutt på `Vaktliste.planlagt_slutt`.**
+  `Vakt.avsluttet` betyr «vakta ble avsluttet» — en hendelse — og kan ikke bære
+  et anslag man flytter på. Spennet er det bemanningskurven tegnes over.
+- **Plan og faktisk er fire felter, ikke to.** `fra_tid`/`til_tid` er planen,
+  `mott_at`/`av_vakt_at` hva som skjedde. Avviket er informasjonen. Stemplene settes
+  først i fase 4, og da bak `skriv_full`.
+- **«Ny planlagt vakt» lager en `core.Vakt` med `er_aktiv=False` og lar `aktiv_vakt_id`
+  stå.** Oktobervakta skal kunne planlegges i august uten at pasienter og oppdrag
+  registrert i dag scopes til den. Kopiering av oppsett tar ressursene, **aldri**
+  personene — en liste ingen har sagt ja til ser ferdig ut.
+- **Skrivinger som kan bryte en unik-skranke står i `transaction.atomic()`.** Databasen
+  er fasit for duplikater, men en `IntegrityError` som fanges uten savepoint etterlater
+  transaksjonen ubrukelig: sesjonslagringen feiler på vei ut, og brukeren får en naken
+  400-side i stedet for feilmeldingen viewet formulerte.
+- **Registrene administreres på `/vaktliste/`, ikke i Django-admin.** Den
+  flaten er kun rutet under `DEBUG`/`OFFLINE_MODE` (S1), så `vaktliste/admin.py` er et
+  utviklerverktøy — et register som *bare* finnes der, finnes ikke for brukeren.
+  `SjekkAtIngenPekerPaaDjangoAdminTests` skanner alle maler for lenker dit.
+- **Mannskapet er en fane på planleggingssiden; korps og kompetanser ligger i
+  «Innstillinger»** (30. aug. 2026). `/vaktliste/registre/` er lagt ned.
+  Argumentet for en egen side — registrene er globale, fanene gjelder én vakt —
+  holdt ikke i bruk: et klikk dit kostet plassen i planleggingen, og mannskap
+  og ressurser er nettopp de to man veksler mellom. **Både fanen og
+  «Innstillinger» står uten vaktliste**, og fanen velges automatisk da: korps
+  må inn før mannskap, og mannskap før noen kan settes på vakt.
+  `mkMannskap()` tegner registeret, `apneVerdier(navn)` åpner korps eller
+  kompetanser — lista og skjemaet i **samme** vindu, siden vinduet selv åpnes
+  fra «Innstillinger». En lagring kaller `_lastRegisterOgListe()`: navnene
+  står i planleggingens nedtrekk også.
+- **`Ressursgruppe` er typen, og den er en tabell** (30. aug. 2026 — lå i `choices.py`
+  før det). Gruppa gjør tre ting samtidig, og det er derfor den er én ting og ikke tre:
+  ikonlegger fanen, samler bemanningskurven, og avgrenser rollene. Ikonet er et felt —
+  feil ikon er en skjønnhetsfeil, en manglende gruppe er en vaktliste man ikke får satt
+  opp. Migrasjon `0007` seeder de seks standardgruppene; testene slår dem opp med
+  `test_helpers.gruppe()` framfor å lage sine egne, slik at seeding som slutter å virke
+  blir synlig.
+- **Rollen heter `Ressursrolle`, hører til en `Ressursgruppe`, og administreres inne i
+  ressursen.** Den gjelder plassen på ressursen — lagleder *på bilen* — ikke vakta;
+  «vaktrolle» leste som noe man har på hele vakta. Gruppa er riktig nivå og ikke den
+  enkelte ressursen: «Sjåfør» hører hjemme på hver ambulanse, og har du tre av dem vil du
+  lage rollen én gang. Navnet er derfor unikt *per gruppe*. Nedtrekket i raden filtrerer
+  på tre ting, og hvert ledd er en egen feil å gjøre: gruppa, `er_aktiv`, **og den rollen
+  raden alt står på** — uten det siste forsvinner en deaktivert rolle fra sin egen rad ved
+  neste tegning, og velges bort i stillhet.
+- **Sletting av en ressurs ligger bak «Rediger ressurs» og krever bekreftelse to ganger.**
+  CASCADE tar skiftene. Dialogen stopper feilklikket; `{"confirm": true}` i kroppen stopper
+  et kall som treffer URL-en uten å mene det. De to er ikke samme sperre.
+- **En `<td>` må forbli en `table-cell`.** `display: flex` direkte på en celle tar den ut
+  av tabellens boksmodell, og alt etter den forskyves i forhold til overskriftene —
+  `table-layout: fixed` hjelper ikke. Legg layouten på et element *inne* i cella.
+  `TabellcellersLayoutTests` leser hvilke klasser som står på `<td>`-ene i `mkRessurs()`
+  og håndhever regelen for dem alle.
+- **Et skift redigeres i et vindu, ikke ved å settes opp på nytt.**
+  `apneRedigerVaktpost()` endrer mannskap, rolle, tider og merknad i én PUT;
+  serveren sjekker den doble regelen på nytt mot personen som skal inn. Å
+  bytte person ved å slette raden mistet tidene og rollen som sto der.
+  Sletting ligger inne i vinduet bak en bekreftelse, som på ressursen.
+- **Utskriftslista grupperes på ressurs og sorteres på fra, til, navn.** Den som
+  leser den står ved bilen og spør «hvem er her, og når?» — korpset er en kolonne.
+  `_skiftrekkefolge()` har `til_tid` som andre ledd fordi skift som begynner samtidig
+  ellers står i innsettingsrekkefølge, og et kort skift havner midt blant de lange.
+- **Hver enhet er sin egen `Ressurs` inne i gruppa** — bil A, bil B og bil C er tre
+  rader i fanen «Ambulanse», hver med egne skift og egen `enhet`-kobling. Modellen var
+  riktig fra første stund, men veien dit var usynlig: knappen lå sist i fanerekka og het
+  «Ny ressurs». Gruppefanen har derfor et hode med antall enheter og en «Ny
+  <gruppe>»-knapp, og ukoblede enheter viser «Ikke koblet» framfor ingenting.
+- **Noen grupper finnes i ett eksemplar** (`Ressursgruppe.flere_enheter`, av
+  for Samleplass og KO). «Samleplass 2» er ikke en ny samleplass, det er en
+  delt vaktliste ingen leser riktig. Den *første* må man fortsatt kunne
+  opprette, så plassen tar slutt først når den ene står der.
+  `services`-siden er serverens sperre i `ressurser_view`, **per vaktliste** —
+  var den global, kunne neste vakt ikke hatt samleplass. Klienten har regelen i
+  **én** funksjon, `gruppaHarPlass()`, fordi den har to lesere: knappen i
+  gruppehodet og nedtrekket i «Ny ressurs». Skjules bare knappen, kan man
+  fortsatt velge gruppa i nedtrekket.
+- **«Ny ressurs» spør bare om navn og gruppe.** Reservasjonen ligger på
+  plassen og koblingen på den enkelte enheten, så begge settes i «Rediger».
+  Skjemaet ba tidligere om dem, og da måtte man svare før man visste svaret —
+  det leste som om gruppa *var* enheten. Nedtrekket fylles derfor i
+  `apneNyRessurs()`, ikke i `fyllNedtrekk()`: hvilke grupper som har plass
+  endrer seg hver gang en ressurs opprettes.
+- **Et endepunkt uten flate finnes ikke for brukeren.** `/api/grupper/` sto en dag uten
+  UI, og da kunne ingen lage en gruppe som ikke var seedet — samme feil som Django-admin
+  ga oss i fase 1. Manageren ligger i «Innstillinger».
+- **Fanen er ressursgruppa, ikke ressursen.** «Ambulanse» er alle ambulansene
+  på vakta, med hver bil som sitt eget kort inni (`mkGruppe`). Én fane per bil
+  ga ti faner på en vakt med ti biler, og ingen plass der man så dem i
+  sammenheng. `aktivFane` bærer derfor en **gruppe-ID**. Det som er per
+  ressurs — enhetskobling, reservasjon, roller — blir stående på ressursen.
+- **Kurven står i fanen den gjelder** (`mkGruppekurve`), ikke i «Oversikt» —
+  og timeaksen har én celle per søyle med samme flex-bredde, så
+  klokkeslettet står under sin egen time uansett hvor lang vakta er. Tettheten
+  glisner med lengden (`_timesteg`). Den hvite streken i kurven er **midnatt**
+  (`vl-dogn`), ikke nåværende tidspunkt; den står i tegnforklaringen fordi en
+  strek man må spørre om ikke forklarer noe.
+- **Bemanningskurven tegnes per ressursgruppe, over ett felles spenn.** Én samlet kurve
+  summerte samleplassen, ambulansene og KO til ett tall som ikke svarer på noe. Spennet er
+  felles (`_vaktensSpenn()`) fordi to kurver man ikke kan sammenligne er verre enn én
+  samlet.
+- **Markup som tegnes på nytt kan ikke gates av `gateKnapper()`.** Den setter
+  `.d-none` én gang ved sidelasting; `tegnFaner()` og `mkRessurs()` bygger på
+  nytt ved hvert panelbytte og må derfor spørre `kanLede()`/`kanBemanne()`
+  selv. «Ny ressurs» sist i fanerekka er eksempelet.
+- **Handlingskolonnen i ressurstabellen er `position: sticky`.** Tabellen
+  ruller under 1280 px, og uten den var rediger-knappen det første som forsvant
+  — altså den ene knappen raden finnes for. Bakgrunnen må settes eksplisitt,
+  ellers ruller innholdet synlig under den.
+- **Kolonnebredde i ressurstabellen er `min-width` + `<colgroup>`-andeler, og
+  begge deler betyr noe.** Et `datetime-local`-felt har en gulvbredde nettleseren
+  bestemmer; blir kolonnen smalere enn den, stikker feltet ut over nabocella —
+  `table-layout: fixed` klipper ikke innholdet. `RessurstabellensBreddeTests`
+  regner ut hva tidskolonnene faktisk blir og krever at de rommer feltet, altså
+  regelen og ikke tallene.
+- **Tidsfeltene er `datetime-local` med `step="300"`.** Fem minutters steg,
+  ikke ett — en vakt planlegges ikke på minuttet. Steget må være et multiplum
+  av 60, ellers får feltet et sekundsegment. «Opprett vakt» forhåndsutfyller
+  fra- og til-feltet med **vaktas start**, ikke `new Date()`: en oktobervakt
+  planlegges i august. Et eldre skift på 08:03 vises og leses tilbake som før;
+  `step` styrer bare hva velgeren tilbyr, og ingenting leser `checkValidity()`.
+- **Tid vises med dag når skiftet krysser et døgn.** `_tidsspenn()` i
+  `vaktliste.js` nevner dagen én gang innenfor ett døgn og to ganger ellers —
+  «20:00–04:00» alene sier ikke at skiftet går over midnatt, og arrangementer
+  varer flere dager. Vaktas spenn utledes av skiftene, ikke av et felt.
+- **`Kompetanse.bygger_paa` er en stige.** Har personen AFØR, skjules VFØR og
+  GFØR i alle lister — `services.synlige_kompetanser()`. Ringer stoppes ved
+  skriving; en ring som likevel finnes gir avkortet kjede, ikke evig løkke.
+- **Verdimengdene sorteres alfabetisk — det finnes ingen `rekkefolge` å
+  vedlikeholde.** `Ressurs` er unntaket, fordi der styrer den fanerekkefølgen, og
+  der settes den automatisk til opprettelsesrekkefølgen. Sorteringen bruker
+  `Lower(...)`: uten den er «alfabetisk» databasens alfabet, og SQLite (dev) og
+  PostgreSQL (prod) svarer ulikt på store/små bokstaver. Æ/Ø/Å er fortsatt
+  databasens svar.
+- **ID-er fra klienten går gjennom `views._int()`.** Et nedtrekk med «Ingen valgt»
+  sender `''`, ikke `null`, og den strengen i et FK-filter gir `ValueError` — altså 500
+  der brukeren skulle fått «velg korps». `or None` dekker den tomme strengen, men ikke
+  en ikke-numerisk.
+
+**Besetningen i sentralbordet (fase 6) går én vei: `vaktliste` → `oppdrag`.**
+Oppdragsmodulen importerer **ikke** vaktlista; `oppdrag-sentral.js` henter
+`/vaktliste/api/enhet/<pk>/besetning/` og rendrer svaret.
+`OppdragImportererIkkeVaktlista` leser importene med AST og håndhever det.
+
+- **Gatet på `les` i vaktliste**, ikke i oppdrag — komposisjonsregelen fra
+  rollemodellen §5. Malen får et flagg via `har_tilgang(..., 'vaktliste', ...)`:
+  en slug gjennom `core`, ikke en import.
+- **Svaret bærer navn, rolle og innsjekkstatus.** Ikke telefon, ikke
+  kompetanser, ikke `notat` — sentralbordet skal se om bilen er klar, ikke lese
+  personalmapper.
+- **Bare skiftene som dekker nå**, og **404 når enheten er ukoblet**: ubemannet
+  og ukoblet er ulike svar på ulike problemer.
+- **Scopet er portalens aktive vakt**, og 404-meldingen skiller «koblet i en
+  annen vakt» fra «ikke koblet noe sted» (`services.koblet_i_annen_vakt`).
+  Den som planlegger en vakt fram i tid kobler bilene der, og en melding som
+  bare sier «ikke koblet» sender henne ut på jakt etter en feil som ikke
+  finnes — det kostet André en kveld 30. aug. 2026.
+- **Rekkefølgen sorteres i Python.** `rolle` er nullbar, og SQLite (dev) og
+  PostgreSQL (prod) plasserer NULL i hver sin ende.
+
+**Planleggingstall (fase 5) varsler, de sperrer ikke.** `services`
+regner ut timer, skift, lengste skift og korteste hvile per person;
+`Belastningsgrenser` (én rad) bærer grensene varslene måles mot.
+
+- **Grensene er organisasjonens**, ikke portalens — derfor data og ikke tall i
+  en `if`. `skriv_leder` flytter dem: det endrer hva *alle* vaktlister varsler
+  om.
+- **Ingenting avvises.** Noen ganger må noen ta et langt skift, og da skal
+  lista si det høyt. Fargen er gul (`--vl-varsel`), ikke rød.
+- **Overlappende skift gir hvile 0**, ikke et negativt tall — et negativt tall
+  i en «korteste hvile»-kolonne ser ut som en regnefeil.
+- **Faktisk tid regnes bare av ferdige skift** (både `mott_at` og
+  `av_vakt_at`). Et pågående skift ville gitt et tall som endrer seg mens man
+  ser på det.
+- `_hviletider()` **sorterer selv**, selv om `Vaktpost.Meta.ordering` gjør det
+  også: en hjelper skal ikke hvile på at den som kaller den har sortert. Uten
+  den egne sorteringen målte testene modellens ordering.
+
+**Drift (fase 4) er en innsjekk-port, ikke en livssyklus.** `Vaktliste.status`
+har to verdier, og `drift` betyr én ting: møtt/av vakt er åpen. Overgangen går
+begge veier og rører ingen stempler.
+
+- **Retningen og overgangen står i URL-en**, ikke i kroppen —
+  `drift/<start|stopp>/` og `stempling/<handling>/`. Et veksle-endepunkt gir et
+  kappløp når to trykk kommer tett. Samme grep som oppdragsmodulen.
+- **Stemplingsreglene er data**, `services.STEMPLINGER`, med forutsetninger:
+  «av vakt» krever «møtt», og «angre møtt» krever at «av vakt» ikke står. Uten
+  dem finnes rader der `er_tilstede` ikke svarer på noe.
+- **`kan_stemple()` er ikke `skriv_handling`** (avklaring 11.3). Korps-føreren
+  fører sitt eget korps, men «Tilstede nå» skal ha én ansvarlig. Funksjonen er
+  et kall videre til `kan_skrive_alt`, og finnes for at beslutningen skal ha et
+  sted.
+- **Tilgangsporten svares før driftporten.** En korps-fører som trykker skal
+  få vite at hun ikke har lov, ikke at lista ikke er i drift.
+- **«Tilstede nå» utledes, aldri lagres** (`Vaktpost.er_tilstede`). To kilder
+  til samme sannhet går i utakt første gang noe feiler halvveis — og denne
+  brukes til å telle hoder ved brann.
+- **Ressurstabellen har to former, og drift er den andre.** I planlegging er
+  den et regneark; under drift legges `datetime-local`-feltene, kompetansen og
+  merknaden bort, og stempelet står **først** i raden som en 44 px høy knapp
+  (`_driftrad`). De tre feltene er det som gjør raden 1377 px bred, og uten
+  dem slipper drifttabellen `min-width` — ellers står stempelet bak en
+  sidescroll, som det gjorde i første utgave. Redigering under drift går
+  gjennom blyanten.
+- **Klienten har én `data-action` per overgang**, ikke én generisk:
+  klikkdelegeringen i `portal-utils.js` sender ett argument. `STEMPLINGER` i
+  `vaktliste.js` og i `services.py` holdes like av `StemplingsnavnTests`.
+
 ### Statistikk-modulen (statistikk/)
 
 Egen app siden august 2026. Eier `/statistikk/`-siden og full statistikk
@@ -313,6 +579,7 @@ virkningsløs endring, ikke som en feil:
 | `static/css/style.css` | **kun** `templates/patients/index.html` | `--text-muted` m.fl. |
 | `static/css/portal.css` | alt som arver `core/templates/core/base_portal.html` | `--portal-text-muted` m.fl. |
 | `static/css/statistikk.css` | **kun** `templates/statistikk/index.html` | definerer selv de fire `base_portal` mangler |
+| `static/css/vaktliste.css` | **kun** `templates/vaktliste/index.html` | samme — `statistikk.css` er mønsteret |
 
 Noen frittstående sider (`403.html`, `mfa_setup.html`, `mfa_verify.html`, innlogging)
 laster ingen av dem — de har egen `<style>`-blokk og må overstyre selv.
@@ -329,8 +596,8 @@ Alle temaene er mørke, så **enhver Bootstrap-klasse for dempet tekst må overs
 malen kan se den. `MorkTekstPaaMorkBakgrunnTests` løser `{% extends %}` og `{% static %}`
 og håndhever det.
 
-Ni moduler i `static/js/` (ingen bundler), fordelt på fire sider — pasientsiden,
-`/statistikk/` og de to grensesnittene under `/oppdrag/`:
+Ti moduler i `static/js/` (ingen bundler), fordelt på fem sider — pasientsiden,
+`/statistikk/`, `/vaktliste/` og de to grensesnittene under `/oppdrag/`:
 
 | Modul | Lastes | Ansvar |
 |-------|--------|--------|
@@ -344,6 +611,15 @@ Ni moduler i `static/js/` (ingen bundler), fordelt på fire sider — pasientsid
 | `statistikk-oppdrag.js` | `/statistikk/`, **kun** med oppdragstilgang | Oppdragsfanen. Kall hit fra `statistikk.js` går gjennom `_kallOppdrag('navn')` |
 | `oppdrag-sentral.js` | `/oppdrag/`, kontoer uten enhet | Sentralbordet: enhetsliste, oppdragsliste, tidslinje, lokasjonsadmin |
 | `oppdrag-enhet.js` | `/oppdrag/`, enhetskontoer | Enhetsskjermen: to knapper mot de navngitte stemplingsendepunktene, og offline-køen i `localStorage`. Serveren sender `neste_overgang` per rad; kjeden følger med som data kun for å projisere neste steg mens noe ligger usendt |
+| `vaktliste.js` | **kun** `/vaktliste/` | Hele vaktlistesiden: **én fane per ressursgruppe**, hver ressurs er et regneark med redigering i raden, «Oversikt» er utskriftslista, «Mannskap» er personellregisteret, og roller, grupper, korps og kompetanser administreres i modaler på siden |
+
+**`data-action` + `data-hendelse` er to lyttere, og bare én skal fyre.** Klikk­delegeringen
+i `portal-utils.js` treffer *alle* `[data-action]`. Et element som melder sin egen hendelse
+— `<select data-action="…" data-hendelse="change">` i vaktlistas ressurstabell — ble derfor
+kalt både på klikk og på endring: klikket som åpnet nedtrekket kalte handlingen uten felt og
+verdi, sendte en tom PUT, og tegnet panelet på nytt, så lista forsvant idet den kom.
+`klikkSkalKjore()` er regelen, og den ligger som en egen funksjon nettopp fordi en anonym
+`if` inne i en lytter ikke lar seg kjøre i en test.
 
 **`patients-utils.js` kan ikke lastes utenfor pasientsiden.** Den gjør arbeid på toppnivå
 — `Chart.defaults` og `new bootstrap.Modal(document.getElementById('newModal'))` — og
@@ -364,6 +640,72 @@ og leser `statistikk.js`, `patients-admin.js` og `statistikk-oppdrag.js` — byg
 fordelt på de tre.
 
 JS-oppførsel testes ved å kjøre funksjonene i node, se `patients/js_test_utils.py`. Ikke skriv nye tester som bare grep-er etter kodelinjer i JS-filer.
+
+## Migrasjoner
+
+**Prod er PostgreSQL, dev er SQLite — og det er ikke bare en detalj.** En
+migrasjon som først skriver rader (`RunPython`/`RunSQL`) og deretter endrer
+skjema, må tømme PostgreSQLs triggerkø imellom:
+
+```python
+if schema_editor.connection.vendor == 'postgresql':
+    schema_editor.execute('SET CONSTRAINTS ALL IMMEDIATE')
+```
+
+Djangos fremmednøkler er `DEFERRABLE INITIALLY DEFERRED`, så hver skriving
+legger en hendelse i kø som først fyres ved commit — og migrasjonen er én
+transaksjon. `ALTER TABLE` på en tabell med hendelser i køen avvises med
+`cannot ALTER TABLE … because it has pending trigger events`, og release-fasen
+crash-looper containeren. **SQLite har ingen utsatte triggere**, så suiten er
+grønn uansett; det tok ned deployen 30. aug. 2026.
+`DataOgSkjemaISammeTransaksjonTests` håndhever regelen — de tre veiene ut er å
+tømme køen, sette `atomic = False`, eller dele migrasjonen i to.
+`vaktliste/migrations/0007` er mønsteret.
+
+**Og en migrasjon som har mønsteret må ha en prøve i `core/migrasjonsprover.py`.**
+Den statiske regelen ser at kallet *står* i fila, ikke at det kjøres — fjern
+kallstedet og la hjelperen bli stående, og den går grønn. Prøven kjører
+migrasjonen mot en engangsbase på ekte PostgreSQL, med rader i den historiske
+formen, og sjekker hva den gjorde med dem.
+
+**Å kjøre testsuiten mot PostgreSQL er ikke det samme, og holder ikke.**
+Djangos testbase lages ved å kjøre migrasjonene mot en *tom* base: et
+dataskritt uten data skriver ingenting, fyller ingen triggerkø, og feilen
+viser seg ikke. Feilen krever PostgreSQL **og** rader **og** en skjemaendring
+etter skrivingen.
+
+Prøvene hoppes over uten `MIGRASJONSPROVE_DATABASE_URL` — de er ikke en del av
+den vanlige kjøringen, men skal kjøres før en migrasjon som rører data pushes.
+**Serveren kan være hvilken som helst PostgreSQL du får lage baser på**: en
+lokal installasjon (`winget install PostgreSQL.PostgreSQL.16`), eller en egen
+Postgres-tjeneste i Railway. Ikke pek den på prod-basen — kommandoen rører den
+riktignok ikke, men den lager og sletter baser på serveren, og det er ikke noe
+man gjør på siden av produksjonsdata.
+Kommandoen lager og sletter sin egen engangsbase, og rører aldri basen URL-en
+peker på. Den kjører `migrate` i en **underprosess** mot `default`, ikke som et
+databasealias: atten migrasjoner i dette prosjektet gjør ORM-kall i `RunPython`
+uten `schema_editor.connection.alias`, og ville med et alias skrevet til din
+egen base i stedet for prøvebasen.
+
+### Cron-jobbene (core/kommando.py)
+
+Tre jobber kjøres av Railway Cron: `purge_old_logs`, `kollaps_arkiv` og
+`db_backup`. Ingen har en bruker som ser på mens de kjører, så **alle tre
+pakker arbeidet i `lesbar_dbfeil('hva som ikke ble gjort')`** — en
+`OperationalError` blir da til én lesbar linje med årsak og råd, i stedet for
+fire stablede tracebacks. Jobben avslutter fortsatt med kode 1.
+
+**`DATABASE_URL` må peke på PostgreSQL når `RAILWAY_ENVIRONMENT` er satt.**
+`dj_database_url.config()` faller ellers stille tilbake til en SQLite-fil i
+den flyktige containeren, og da ville `purge_old_logs` talt null rader,
+skrevet «Slettet 0 audit-logger» og avsluttet med kode 0 — en grønn jobb som
+aldri håndhever A.9. Sjekken står i `settings.py` og henger på
+`RAILWAY_ENVIRONMENT`, ikke på `DEBUG`: offline-modus kjører `DEBUG=False` på
+en laptop og *skal* bruke SQLite.
+
+Sett variabelen som referansen `${{Postgres.DATABASE_URL}}`, ikke som en
+kopiert verdi — en kopi blir stående igjen når passordet roteres, og da
+feiler bare cron-jobbene mens websiden går videre som før.
 
 ## Miljøvariabler
 

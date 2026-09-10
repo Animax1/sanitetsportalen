@@ -1,0 +1,653 @@
+"""Tjenester for vaktlistemodulen.
+
+Reglene som ikke hører hjemme i et view: å lage en planlagt vakt, å kopiere
+et oppsett, og å avgjøre hvem som får røre hva.
+
+**Korps-sjekkene bor her, ikke i viewene.** Regelen er skrevet én gang, på
+ett sted, og viewene tar den i bruk — det er derfor et endepunkt ikke kan
+huske badgen og glemme reservasjonen.
+"""
+from __future__ import annotations
+
+from django.db import transaction
+from django.utils import timezone
+
+from core.auth_decorators import er_global_admin, har_tilgang
+
+from .models import Belastningsgrenser, Mannskap, Ressurs, Vaktliste
+
+
+# ── Vakter som ennå ikke er aktive ───────────────────────────────────────────
+
+def opprett_planlagt_vakt(navn, startet=None):
+    """Lag en `core.Vakt` som ikke er aktiv, og en tom vaktliste for den.
+
+    **Rører ikke portalens peker.** `AppSetting['aktiv_vakt_id']` står som
+    den står — oktobervakta skal kunne planlegges i august uten at pasienter
+    og oppdrag plutselig scopes til den. Aktiv vakt byttes der den alltid
+    byttes, i vaktadministrasjonen.
+
+    Dette er det andre stedet i portalen som lager `Vakt`-rader (det første
+    er «Avslutt vakt» i pasientmodulen). Det er notert som en ryddejobb i
+    TODO sammen med `hent_aktiv_vakt` — vaktas livssyklus bør samles i
+    `core` når noen er i den koden uansett.
+
+    Returnerer den nye vaktlista.
+    """
+    from core.models import Vakt
+
+    navn = (navn or '').strip()
+    if not navn:
+        raise ValueError('Vakta må ha et navn.')
+    if Vakt.objects.filter(navn=navn).exists():
+        raise ValueError(
+            f'En vakt med navnet «{navn}» finnes allerede. '
+            f'Legg på en dato eller velg et annet navn.')
+
+    startet = startet or timezone.now()
+    with transaction.atomic():
+        vakt = Vakt.objects.create(
+            navn=navn,
+            year=timezone.localtime(startet).year,
+            startet=startet,
+            er_aktiv=False,
+        )
+        return Vaktliste.objects.create(vakt=vakt)
+
+
+def neste_rekkefolge(vaktliste) -> int:
+    """Neste ledige fanerekkefølge på lista — altså «sist».
+
+    `Ressurs.rekkefolge` er det ene stedet i modulen der rekkefølgen *betyr*
+    noe: den styrer fanene på planleggingssiden, og alfabetisk ville stokket
+    om på den operative rekkefølgen (samleplass, biler, lag, KO blir
+    «Ambulanse, KO, Lag 1, Mannskapsbil 1»).
+
+    Men brukeren skal ikke skrive et tall. Den som bygger vakta legger inn
+    ressursene i den rekkefølgen hun tenker på dem, og det er den rekkefølgen
+    fanene skal ha. Steget på 10 gir plass til å skyte inn en ressurs mellom
+    to andre den dagen noen vil kunne omorganisere.
+    """
+    fra_for = (vaktliste.ressurser
+               .order_by('-rekkefolge')
+               .values_list('rekkefolge', flat=True)
+               .first())
+    return (fra_for or 0) + 10
+
+
+def neste_grupperekkefolge() -> int:
+    """Neste ledige rekkefølge for en ressursgruppe — «sist», altså.
+
+    Samme grep som `neste_rekkefolge`, men globalt: gruppene er ikke knyttet
+    til én vaktliste. Den som legger til «Førstehjelpstelt» skal ikke måtte
+    finne på et tall, og en ny gruppe hører naturlig sist.
+    """
+    from .models import Ressursgruppe
+    hoyest = (Ressursgruppe.objects
+              .order_by('-rekkefolge')
+              .values_list('rekkefolge', flat=True)
+              .first())
+    return (hoyest or 0) + 10
+
+
+def kopier_oppsett(fra_vaktliste, til_vaktliste):
+    """Kopier ressursene — med gruppe, reservasjon, enhet og rekkefølge.
+
+    **Aldri personene.** Å kopiere folk ville satt dem opp på en vakt de ikke
+    har sagt ja til, og en liste ingen har sagt ja til er verre enn en tom
+    liste: den ser ferdig ut.
+
+    Returnerer antall kopierte ressurser.
+    """
+    kopier = [
+        Ressurs(
+            vaktliste=til_vaktliste,
+            navn=r.navn,
+            gruppe_id=r.gruppe_id,
+            korps=r.korps,
+            enhet=r.enhet,
+            rekkefolge=r.rekkefolge,
+        )
+        for r in fra_vaktliste.ressurser.all()
+    ]
+    Ressurs.objects.bulk_create(kopier)
+    return len(kopier)
+
+
+# ── Kompetansestigen ─────────────────────────────────────────────────────────
+#
+# `Kompetanse.bygger_paa` peker på det kurset denne overordner: AFØR bygger på
+# VFØR, som bygger på GFØR. Reglene under er de to som trengs for at pekeren
+# skal bety noe — én for visning, én for å hindre at stigen blir en ring.
+
+
+def _foreldrekjede(kompetanse_id, foreldre, _sett=None):
+    """Alle IDene over `kompetanse_id` i stigen, transitivt.
+
+    `foreldre` er ``{id: bygger_paa_id}`` for hele registeret, slått opp én
+    gang av kalleren — en spørring per kompetanse ville gitt N+1 på en liste
+    med hundre mannskaper.
+
+    `_sett` stopper en ring. Ringer skal ikke kunne oppstå (`lager_sykel`
+    hindrer dem ved skriving), men en gammel rad eller en manuell endring i
+    basen skal gi en avkortet kjede, ikke en evig løkke.
+    """
+    _sett = _sett if _sett is not None else set()
+    forelder = foreldre.get(kompetanse_id)
+    if forelder is None or forelder in _sett:
+        return _sett
+    _sett.add(forelder)
+    return _foreldrekjede(forelder, foreldre, _sett)
+
+
+def synlige_kompetanser(kompetanser, foreldre):
+    """De kompetansene som ikke overordnes av en annen personen har.
+
+    Har hun AFØR, VFØR og Sykepleier, står hun igjen med AFØR og Sykepleier:
+    VFØR er implisert, og Sykepleier er ikke i den stigen i det hele tatt.
+
+    `kompetanser` er radene personen har; `foreldre` er kartet fra
+    `foreldrekart()`. Rekkefølgen bevares.
+    """
+    holdt = {k.pk for k in kompetanser}
+    implisert = set()
+    for pk in holdt:
+        implisert |= _foreldrekjede(pk, foreldre)
+    return [k for k in kompetanser if k.pk not in implisert]
+
+
+def foreldrekart():
+    """``{id: bygger_paa_id}`` for hele kompetanseregisteret.
+
+    Slås opp én gang per forespørsel og sendes med til `synlige_kompetanser`.
+    """
+    from .models import Kompetanse
+    return dict(Kompetanse.objects.values_list('pk', 'bygger_paa_id'))
+
+
+def lager_sykel(kompetanse_id, nytt_forelder_id) -> bool:
+    """True hvis pekeren ville laget en ring i stigen.
+
+    «A bygger på B, B bygger på A» har ikke noe svar på hvilken som er
+    øverst, og ville gjort `synlige_kompetanser` til en smakssak. Det stoppes
+    ved skriving framfor å håndteres ved lesing: en ring i basen er en feil
+    som ikke skal kunne oppstå, ikke en tilstand koden skal tåle.
+    """
+    if nytt_forelder_id is None:
+        return False
+    if nytt_forelder_id == kompetanse_id:
+        return True
+    return kompetanse_id in _foreldrekjede(nytt_forelder_id, foreldrekart())
+
+
+# ── Hvem får røre hva ────────────────────────────────────────────────────────
+#
+# Håndheves fra fase 3, på hvert endepunkt. Fire nivåer av «hvem»:
+#
+#   kan_lede            — `skriv_leder`/admin. Setter opp selve vakta.
+#   kan_skrive_alt      — `skriv_full`/admin. Blander korps fritt, deler ut
+#                         ressurser, styrer verdimengdene.
+#   kan_*_korps/…       — `skriv_handling` avgrenset av badgen.
+#   (ingenting)         — `les` skriver ikke.
+#
+# **`les` gjelder hele lista med vilje.** Poenget med en vaktliste er
+# samordning på tvers av korps; den som ikke skal se andre korps, skal ikke ha
+# modulen (§4.4).
+
+def kan_skrive_alt(user) -> bool:
+    """`skriv_full` eller høyere — står utenfor badge og reservasjon.
+
+    Samlet her framfor å gjentas i hvert view: det er terskelen for alt som
+    gjelder *vakta* framfor *et korps* — å bemanne på tvers, å dele ut
+    ressurser, og å styre `Korps`/`Kompetanse`.
+
+    Stigen er ordnet, så `skriv_leder` er sant her også. Det er meningen:
+    lederen gjør alt bemanneren gjør, og litt til.
+    """
+    return er_global_admin(user) or har_tilgang(user, 'vaktliste', 'skriv_full')
+
+
+def kan_lede(user) -> bool:
+    """`skriv_leder` eller global admin — den som *setter opp* vakta.
+
+    **Skillet mot `kan_skrive_alt` er hva slags skade en feil gjør** (30. aug.
+    2026). Bemanneren setter folk på plasser: retter hun noe galt, retter hun
+    det tilbake. Lederen oppretter og fjerner ressurser og vaktlister, endrer
+    vaktas lengde og lager roller og grupper — og en fjernet ressurs tar
+    bemanningen med seg. Det er ikke en handling man angrer.
+
+    Terskelen er ikke global admin, og det er poenget med å ha nivået i det
+    hele tatt: en vaktleder skal kunne sette opp sin egen vaktliste uten å få
+    brukeradministrasjon, backup og arkiv på kjøpet.
+    """
+    return er_global_admin(user) or har_tilgang(user, 'vaktliste', 'skriv_leder')
+
+
+def kan_stemple(user) -> bool:
+    """Får brukeren stemple møtt og av vakt?
+
+    **Avklaring 11.3 sa nei til `skriv_handling`,** og det er hele grunnen
+    til at regelen har et eget navn. Korps-føreren fører sitt eget korps —
+    hun setter dem opp, flytter dem og retter tidene deres. Men innsjekk er
+    noe annet: «Tilstede nå» er brannsikkerhet på et sted med overnatting,
+    og det tallet skal ha én ansvarlig, ikke ett per korps.
+
+    Terskelen er den samme som `kan_skrive_alt`, og funksjonen er derfor et
+    kall videre. Den finnes likevel: leter noen etter «hvem sjekker folk
+    inn», skal de finne beslutningen og ikke bare terskelen — og skulle den
+    en dag åpnes for korpsføreren, er det ett sted å endre.
+    """
+    return kan_skrive_alt(user)
+
+
+#: Stemplingene, som **data**. Hver overgang sier hvilket felt den rører,
+#: om den setter eller fjerner et tidspunkt, og hva som må være sant fra før.
+#:
+#: Samme grep som `oppdrag.services.OVERGANGER`, og av samme grunn: skrevet
+#: som `if`-er i viewet vokser de til en trapp der bare den som skrev den
+#: siste grenen vet hva de andre gjør.
+#:
+#: **Forutsetningene er ikke pedanteri.** «Av vakt» uten «møtt» gir en rad
+#: som sier at noen gikk av en vakt hun aldri kom til, og `er_tilstede`
+#: leser nettopp de to feltene sammen. Å angre «møtt» mens «av vakt» står,
+#: gir samme rad. Begge stenges her, ett sted.
+STEMPLINGER = {
+    'mott': {
+        'felt': 'mott_at', 'setter': True,
+        'krever_tomt': (),
+        'krever_satt': (),
+        'nekt': 'Personen er alt registrert møtt.',
+    },
+    'av_vakt': {
+        'felt': 'av_vakt_at', 'setter': True,
+        'krever_tomt': (),
+        'krever_satt': ('mott_at',),
+        'nekt': 'Personen må registreres møtt før hun kan gå av vakt.',
+    },
+    'angre_mott': {
+        'felt': 'mott_at', 'setter': False,
+        'krever_tomt': ('av_vakt_at',),
+        'krever_satt': ('mott_at',),
+        'nekt': 'Angre «av vakt» først — ellers står raden igjen som '
+                'avgått uten å ha møtt.',
+    },
+    'angre_av_vakt': {
+        'felt': 'av_vakt_at', 'setter': False,
+        'krever_tomt': (),
+        'krever_satt': ('av_vakt_at',),
+        'nekt': 'Personen står ikke som av vakt.',
+    },
+}
+
+
+def stemple(vaktpost, handling, naa=None):
+    """Utfør én navngitt stempling. Returnerer ``(ok, feilmelding)``.
+
+    Skriver ikke til basen — den som kaller lagrer. Da kan regelen testes
+    uten en rad, og viewet eier transaksjonen.
+
+    **En ledig plass kan ikke stemples.** Den har ingen som kan ha møtt, og
+    `er_tilstede` krever en person nettopp derfor.
+    """
+    regel = STEMPLINGER.get(handling)
+    if regel is None:
+        return False, f'Ukjent stempling «{handling}».'
+    if vaktpost.mannskap_id is None:
+        return False, 'Plassen er ledig — det er ingen å registrere.'
+
+    for felt in regel['krever_satt']:
+        if getattr(vaktpost, felt) is None:
+            return False, regel['nekt']
+    for felt in regel['krever_tomt']:
+        if getattr(vaktpost, felt) is not None:
+            return False, regel['nekt']
+
+    # Å sette et stempel som alt står er ikke en feil verdt å stoppe for —
+    # to trykk på samme knapp skal gi samme rad, ikke en rød boks. Men
+    # tidspunktet skal ikke flytte seg: det første er det som skjedde.
+    if regel['setter'] and getattr(vaktpost, regel['felt']) is not None:
+        return True, ''
+
+    setattr(vaktpost, regel['felt'],
+            (naa or timezone.now()) if regel['setter'] else None)
+    return True, ''
+
+
+def brukerens_korps(user):
+    """Korpset kontoen arver fra mannskapsraden sin, eller ``None``.
+
+    Badgen (§4). Koblingen `Mannskap.user` gir i seg selv ingen tilgang —
+    den sier bare hvem du er, som `Enhet.user` i oppdragsmodulen.
+    """
+    if not getattr(user, 'is_authenticated', False):
+        return None
+    mannskap = Mannskap.objects.filter(user=user).select_related('korps').first()
+    return mannskap.korps if mannskap else None
+
+
+def kan_fore_korps(user, korps_id) -> bool:
+    """Får brukeren føre folk i dette korpset?
+
+    Grunnregelen begge mannskapssjekkene hviler på. `skriv_full` og global
+    admin: alle korps. `skriv_handling`: kun sitt eget. Uten mannskapsrad har
+    kontoen ingen badge og kan ikke skrive noe — fail-closed, samme form som
+    en enhetskonto uten enhet.
+    """
+    if kan_skrive_alt(user):
+        return True
+    if not har_tilgang(user, 'vaktliste', 'skriv_handling'):
+        return False
+    korps = brukerens_korps(user)
+    return korps is not None and korps_id == korps.pk
+
+
+def kan_redigere_mannskap(user, mannskap) -> bool:
+    """Får brukeren redigere denne personen? Avgjøres av personens korps."""
+    return kan_fore_korps(user, mannskap.korps_id)
+
+
+def kan_flytte_mannskap(user, mannskap, nytt_korps_id) -> bool:
+    """Får brukeren flytte personen til et annet korps?
+
+    **Begge korpsene teller.** Sjekket vi bare det personen har i dag, kunne
+    korps-brukeren flytte sine egne folk ut i et hvilket som helst annet
+    korps; sjekket vi bare målet, kunne hun hente inn andres. Det er samme
+    feilform som den doble regelen i `kan_sette_vaktpost` — og siden
+    `skriv_handling` per definisjon bare har ett korps, betyr det i praksis at
+    hun ikke flytter noen i det hele tatt. Flytting er `skriv_full`.
+    """
+    return (kan_fore_korps(user, mannskap.korps_id)
+            and kan_fore_korps(user, nytt_korps_id))
+
+
+def kan_bemanne_ressurs(user, ressurs) -> bool:
+    """Får brukeren sette folk på denne ressursen?
+
+    Regelen er dobbel (§4.2), og dette er den ene halvdelen: ressursen må
+    være reservert brukerens korps. En **ureservert** ressurs er ikke et
+    fristed — den er `skriv_full`/admins bord, typisk KO og samleplass.
+    """
+    if kan_skrive_alt(user):
+        return True
+    if not har_tilgang(user, 'vaktliste', 'skriv_handling'):
+        return False
+    korps = brukerens_korps(user)
+    return (korps is not None
+            and ressurs.korps_id is not None
+            and ressurs.korps_id == korps.pk)
+
+
+def reservert_korps(vaktpost=None, ressurs=None):
+    """Hvilket korps er denne plassen satt av til?
+
+    **Ett sted, fordi reservasjonen finnes på to nivåer.** `Ressurs.korps` er
+    standarden — hele bilen er HGSDs. `Vaktpost.korps` overstyrer den for én
+    plass, og finnes fordi en samleplass bemannes av flere korps.
+
+    Leses de to hver for seg ute i endepunktene, vil ett av dem før eller
+    siden huske ressursen og glemme plassen — og da er en plass satt av til
+    Karmøy plutselig HGSDs igjen.
+    """
+    if vaktpost is not None and vaktpost.korps_id is not None:
+        return vaktpost.korps_id
+    if vaktpost is not None:
+        return vaktpost.ressurs.korps_id
+    return ressurs.korps_id if ressurs is not None else None
+
+
+def kan_bemanne_plass(user, ressurs, vaktpost=None) -> bool:
+    """Reservasjonshalvdelen, lest fra plassen når den har sin egen.
+
+    `kan_bemanne_ressurs` svarer på ressursnivået og brukes fortsatt der det
+    er ressursen som er spørsmålet (å dele den ut, å fjerne den). Denne
+    svarer på plassen, og er den som gjelder når man bemanner.
+    """
+    if kan_skrive_alt(user):
+        return True
+    korps_id = reservert_korps(vaktpost=vaktpost, ressurs=ressurs)
+    return kan_fore_korps(user, korps_id)
+
+
+def kan_sette_vaktpost(user, ressurs, mannskap, vaktpost=None) -> bool:
+    """Begge halvdelene av regelen: badgen på personen, og reservasjonen.
+
+    Skrevet som én funksjon slik at et endepunkt ikke kan huske den ene og
+    glemme den andre.
+
+    **`mannskap=None` er en ledig plass, og den er `skriv_full`.** Å opprette
+    et behov — «Lag 1 trenger fire, én av dem lagleder» — er å planlegge
+    vakta, ikke å føre sitt eget korps. Korps-brukeren *fyller* plassene som
+    er satt av til henne; hun bestemmer ikke hvor mange det skal være. Uten
+    dette unntaket ville badge-halvdelen ikke hatt noe å sjekke mot, og
+    regelen falt åpen på nøyaktig det tilfellet som er nytt.
+    """
+    if mannskap is None:
+        return kan_skrive_alt(user)
+    return (kan_bemanne_plass(user, ressurs, vaktpost)
+            and kan_redigere_mannskap(user, mannskap))
+
+
+def kan_rore_vaktpost(user, vaktpost) -> bool:
+    """Får brukeren redigere denne raden slik den står?
+
+    **Et annet spørsmål enn `kan_sette_vaktpost`,** og det er verdt å holde
+    dem fra hverandre:
+
+    - `kan_sette_vaktpost(bruker, ressurs, person)` spør om *paret* kan
+      opprettes. Med `person=None` er det å opprette et behov — `skriv_full`.
+    - `kan_rore_vaktpost(bruker, rad)` spør om brukeren i det hele tatt får
+      ta i raden. En **ledig** plass på hennes egen ressurs skal hun få ta i,
+      for det er nettopp den hun skal fylle.
+
+    Ble den første brukt til begge, låste den korps-brukeren ute av akkurat
+    de plassene som var satt av til henne — funnet av
+    `LedigPlassTilgangTests`.
+    """
+    if not kan_bemanne_plass(user, vaktpost.ressurs, vaktpost):
+        return False
+    if vaktpost.mannskap_id is None:
+        return True
+    return kan_redigere_mannskap(user, vaktpost.mannskap)
+
+
+def _timer(fra, til):
+    """Timer mellom to tidspunkt, eller ``0.0`` hvis spennet ikke gir mening."""
+    if fra is None or til is None or til <= fra:
+        return 0.0
+    return round((til - fra).total_seconds() / 3600, 2)
+
+
+def _hviletider(skift):
+    """Hullene mellom en persons skift, i timer, i kronologisk rekkefølge.
+
+    **Overlappende skift gir hvile 0, ikke en negativ verdi.** To lister på
+    samme tid er noe planleggeren skal se, og et negativt tall i en
+    «korteste hvile»-kolonne ser ut som en regnefeil framfor et varsel.
+    Overlappet i seg selv fanges av `overlapp`-tellingen.
+    """
+    ordnet = sorted(skift, key=lambda vp: vp.fra_tid)
+    ut = []
+    for forrige, neste in zip(ordnet, ordnet[1:]):
+        if neste.fra_tid < forrige.til_tid:
+            ut.append(0.0)
+        else:
+            ut.append(_timer(forrige.til_tid, neste.fra_tid))
+    return ut
+
+
+def belastning_per_person(vaktliste, grenser=None):
+    """Timer, skift, lengste skift og korteste hvile — per person.
+
+    Bestillingen bak §8b: «lista skal hjelpe planleggeren å se *belastningen*
+    før vakta, ikke bare bemanningen».
+
+    **Sortert på totaltimer, synkende.** Den som er i ferd med å bli brukt opp
+    skal ligge øverst — en alfabetisk liste ville skjult henne på rad tolv.
+
+    **Ledige plasser telles ikke som en person.** De er et behov, ikke en
+    belastning, og en rad uten navn i en persontabell ser ut som en feil.
+
+    Under drift følger et **faktisk**-tall med, regnet fra stemplene i stedet
+    for planen (`mott_at`/`av_vakt_at`). Da blir «planlagt mot faktisk»
+    synlig: hvem gikk lengre enn planlagt. Det koster lite når feltene alt er
+    atskilt — samme grep som oppdragsstatistikkens plan/målt-skille.
+    """
+    from .models import Vaktpost
+    grenser = grenser or Belastningsgrenser.hent()
+
+    poster = (Vaktpost.objects
+              .filter(ressurs__vaktliste=vaktliste, mannskap__isnull=False)
+              .select_related('mannskap__korps'))
+
+    per_person = {}
+    for vp in poster:
+        per_person.setdefault(vp.mannskap_id, []).append(vp)
+
+    rader = []
+    for skift in per_person.values():
+        person = skift[0].mannskap
+        timer = [_timer(vp.fra_tid, vp.til_tid) for vp in skift]
+        hvile = _hviletider(skift)
+        # Faktisk tid finnes bare for skift som er både møtt og av vakt. Et
+        # pågående skift har ingen sluttid å regne mot, og et anslag der
+        # ville vært et tall som endrer seg mens man ser på det.
+        faktisk = [_timer(vp.mott_at, vp.av_vakt_at) for vp in skift
+                   if vp.mott_at and vp.av_vakt_at]
+
+        rader.append({
+            'mannskap_id': person.pk,
+            'navn': person.navn,
+            'korps_kort': person.korps.kortnavn or person.korps.navn,
+            'antall_skift': len(skift),
+            'timer': round(sum(timer), 2),
+            'lengste_skift': max(timer) if timer else 0.0,
+            'korteste_hvile': min(hvile) if hvile else None,
+            'faktiske_timer': round(sum(faktisk), 2) if faktisk else None,
+            # Varslene regnes her og ikke i klienten: grensene ligger i
+            # basen, og to steder å sammenligne dem er ett sted for mye.
+            'langt_skift': bool(timer) and max(timer) > grenser.maks_skift_timer,
+            'kort_hvile': bool(hvile) and min(hvile) < grenser.min_hvile_timer,
+        })
+
+    rader.sort(key=lambda r: (-r['timer'], r['navn'].lower()))
+    return rader
+
+
+def belastning_sammendrag(vaktliste, rader):
+    """Tallene som står over lista: hvor mange, hvor mye, hvor mange varsler."""
+    from .models import Vaktpost
+    ledige = Vaktpost.objects.filter(
+        ressurs__vaktliste=vaktliste, mannskap__isnull=True).count()
+    return {
+        'personer': len(rader),
+        'skift': sum(r['antall_skift'] for r in rader),
+        'timer': round(sum(r['timer'] for r in rader), 2),
+        'ledige_plasser': ledige,
+        'lange_skift': sum(1 for r in rader if r['langt_skift']),
+        'korte_hviler': sum(1 for r in rader if r['kort_hvile']),
+    }
+
+
+def besetning(enhet_id, naa=None):
+    """Hvem som er på bilen nå — navn, rolle og innsjekkstatus.
+
+    Sentralbordets spørsmål er **«er bilen bemannet?»**, ikke «hvem har vakt i
+    løpet av helga». Derfor bare skiftene som dekker tidspunktet: en liste med
+    tretti rader over to døgn svarer ikke på noe man kan handle på.
+
+    **Ikke telefonnummer, ikke kompetanseliste, ikke `notat`** (§6).
+    Operatøren skal se om ressursen er klar, ikke lese personalmapper. Det er
+    en bevisst innskrenking, ikke en forglemmelse — den som trenger
+    telefonnummeret har vaktlista.
+
+    Returnerer ``None`` hvis enheten ikke er koblet til en ressurs i vakta.
+    Det er noe annet enn «ingen på vakt», og de to skal ikke se like ut:
+    ubemannet er et problem, ukoblet er et oppsett som mangler.
+    """
+    from patients.services import hent_aktiv_vakt
+    from .models import Vaktpost
+
+    naa = naa or timezone.now()
+    vakt = hent_aktiv_vakt()
+    if vakt is None:
+        return None
+
+    ressurs = (Ressurs.objects
+               .filter(enhet_id=enhet_id, vaktliste__vakt=vakt)
+               .select_related('vaktliste')
+               .first())
+    if ressurs is None:
+        return None
+
+    poster = (Vaktpost.objects
+              .filter(ressurs=ressurs, mannskap__isnull=False,
+                      fra_tid__lte=naa, til_tid__gte=naa)
+              .select_related('mannskap', 'rolle')
+              .order_by('mannskap__navn'))
+
+    mannskap = [{
+        'navn': vp.mannskap.navn,
+        'rolle': vp.rolle.navn if vp.rolle else '',
+        'tilstede': vp.er_tilstede,
+        'mott': vp.mott_at is not None,
+    } for vp in poster]
+
+    # **De som er i bilen først.** Operatørens spørsmål er «hvem har jeg», og
+    # da skal svaret stå øverst; de som mangler er den andre halvdelen av
+    # samme liste.
+    #
+    # Sorteringen skjer **i Python**, ikke i basen, av to grunner: `tilstede`
+    # er en utledet egenskap uten kolonne å sortere på, og `rolle__navn` er
+    # nullbar — og SQLite (dev) og PostgreSQL (prod) plasserer NULL i hver sin
+    # ende. En besetningsliste som står i ulik rekkefølge lokalt og i drift er
+    # en feil man aldri ser før den betyr noe.
+    mannskap.sort(key=lambda m: (not m['tilstede'], m['navn'].lower()))
+
+    return {
+        'ressurs_navn': ressurs.navn,
+        'i_drift': ressurs.vaktliste.i_drift,
+        'mannskap': mannskap,
+        'antall': len(mannskap),
+        # **Tilstede utledes av stemplene** (`Vaktpost.er_tilstede`), aldri av
+        # en lagret status. Er lista ikke i drift, er ingen stemplet — og da
+        # er tallet 0 med rette: innsjekken har ikke åpnet.
+        'tilstede': sum(1 for m in mannskap if m['tilstede']),
+    }
+
+
+def koblet_i_annen_vakt(enhet_id):
+    """Navnet på en vakt der enheten *er* koblet, men som ikke er den aktive.
+
+    Finnes for at feilmeldingen skal kunne si sannheten. «Ikke koblet til en
+    ressurs i denne vakta» leses som «koblingen din er ødelagt» — og André
+    brukte en kveld på å lete etter en feil som ikke fantes, fordi han hadde
+    planlagt oktobervakta i august og koblet bilene der.
+
+    Spørringen kjøres **bare** når `besetning()` alt har svart nei, så den
+    koster ingenting i det vanlige tilfellet — og av samme grunn trengs ingen
+    `exclude()` på den aktive vakta: har den en ressurs for enheten, kom vi
+    aldri hit. Nyeste vakt først, fordi det er den man planla sist.
+    """
+    ressurs = (Ressurs.objects
+               .filter(enhet_id=enhet_id)
+               .select_related('vaktliste__vakt')
+               .order_by('-vaktliste__vakt__startet')
+               .first())
+    return ressurs.vaktliste.vakt.navn if ressurs else None
+
+
+def vaktspenn(vaktliste):
+    """(start, slutt) for vakta — eller ``(None, None)`` hvis den mangler.
+
+    Starten er `Vakt.startet`; slutten er `Vaktliste.planlagt_slutt`. Se
+    modellkommentaren for hvorfor de to ikke bor samme sted.
+
+    Brukes av bemanningskurven, som skal tegnes over **hele** vakta: leste
+    den bare skiftene, ville hullet i begynnelsen vært usynlig nettopp fordi
+    ingen er satt opp der ennå.
+    """
+    start = vaktliste.vakt.startet
+    slutt = vaktliste.planlagt_slutt
+    if start is None or slutt is None or slutt <= start:
+        return (None, None)
+    return (start, slutt)

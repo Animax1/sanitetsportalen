@@ -122,8 +122,10 @@ class CacheHealthHelperTests(TestCase):
         fortsatt levere payload — ikke 500."""
         from django.http import JsonResponse
         from django.test import RequestFactory
-        from patients import stats_cache as stats_cache_module
-        from patients.stats_cache import cached_stats_response
+        # Modulen flyttet til `core` da statistikk ble sin egen app: to apper
+        # bruker den nå, og den hørte ikke lenger hjemme i pasientmodulen.
+        from core import stats_cache as stats_cache_module
+        from core.stats_cache import cached_stats_response
 
         @cached_stats_response('test_failsafe', ttl=15)
         def fake_view(request):

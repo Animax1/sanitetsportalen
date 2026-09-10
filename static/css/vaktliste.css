@@ -1,0 +1,975 @@
+/* Stilark for vaktlistemodulen (/vaktliste/).
+ *
+ * Egen fil, som statistikk.css: style.css lastes KUN av
+ * templates/patients/index.html, så en regel lagt der ville vært
+ * virkningsløs her — en endring som ser ut som ingenting, ikke som en feil.
+ * Se CLAUDE.md om de tre stilarkene.
+ *
+ * Fire av variablene reglene bruker finnes IKKE i base_portal.html:
+ * --text-muted, --text-soft, --surface-3 og --header-bg. En udefinert custom
+ * property gjør ikke regelen ugyldig — den gjør fargen arvet — så teksten
+ * ville blitt lesbar eller uleselig tilfeldig, uten at noe feilet. De
+ * defineres derfor her, med nøyaktig de verdiene de har i style.css.
+ *
+ * De fire som base_portal FAKTISK aliaser (--surface-1, --surface-2,
+ * --border-color, --text-main) gjentas ikke: da ville portalens tema og
+ * dette stilarket kunne komme i utakt.
+ */
+
+:root {
+  --text-muted: #94a3b8;
+  --text-soft: #64748b;
+  --surface-3: #0b1220;
+  --header-bg: #0f3460;
+  /* Drift (fase 4): grønt betyr «tilstede». Definert her og ikke som en
+     fallback i hvert kall — en farge med tre steder å endres er en farge
+     som før eller siden står ulikt to av dem. */
+  --vl-ok: #4ade80;
+  /* Gult varsler, rødt feiler. Et langt skift er ikke en feil — se
+     `.vl-varselantall`. */
+  --vl-varsel: #fbbf24;
+}
+
+/* ── Statusmerke på vaktlista ─────────────────────────────────────────── */
+.vl-status {
+  font-size: 0.78rem;
+  font-weight: 600;
+  padding: 0.2rem 0.6rem;
+  border-radius: 999px;
+  border: 1px solid var(--border-color);
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.vl-status.vl-drift {
+  background: #14532d;
+  border-color: #14532d;
+  color: #bbf7d0;
+}
+
+/* ── Ressursfaner ─────────────────────────────────────────────────────── */
+.vl-faner {
+  display: flex;
+  gap: 0.3rem;
+  flex-wrap: wrap;
+  background: var(--surface-1);
+  padding: 0.4rem 0.5rem;
+  border-radius: 10px;
+  border: 1px solid var(--border-color);
+  margin-bottom: 0.9rem;
+}
+
+.vl-fane {
+  border: 1px solid var(--border-color);
+  background: var(--surface-2);
+  border-radius: 6px;
+  padding: 0.32rem 0.9rem;
+  font-size: 0.82rem;
+  font-weight: 500;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.12s;
+  line-height: 1.5;
+}
+
+.vl-fane:hover {
+  background: var(--surface-3);
+  color: var(--text-main);
+}
+
+.vl-fane.active {
+  background: var(--header-bg) !important;
+  color: #fff !important;
+  border-color: var(--header-bg) !important;
+}
+
+/* Antallet på fanen. Dempet, men lesbart — det er et tall man skanner
+   etter, ikke leser. */
+.vl-fane .vl-antall {
+  opacity: 0.75;
+  font-variant-numeric: tabular-nums;
+  margin-left: 0.35rem;
+}
+
+/* ── Kort per ressurs ─────────────────────────────────────────────────── */
+.vl-kort {
+  background: var(--surface-1);
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  padding: 0.9rem 1rem;
+  margin-bottom: 0.9rem;
+}
+
+.vl-kort-topp {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 0.6rem;
+}
+
+.vl-kort-tittel {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-main);
+}
+
+.vl-merkelapp {
+  font-size: 0.72rem;
+  padding: 0.12rem 0.5rem;
+  border-radius: 999px;
+  border: 1px solid var(--border-color);
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+/* Reservasjonen er den viktigste opplysningen på et ressurskort: den sier
+   hvem som skal bemanne den. Derfor tydeligere enn de andre merkelappene. */
+.vl-merkelapp.vl-korps {
+  background: var(--header-bg);
+  border-color: var(--header-bg);
+  color: #fff;
+}
+
+.vl-merkelapp.vl-ureservert {
+  border-style: dashed;
+  color: var(--text-soft);
+}
+
+/* ── Rader ────────────────────────────────────────────────────────────── */
+.vl-rad {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  padding: 0.45rem 0.2rem;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.vl-rad:last-child { border-bottom: none; }
+
+.vl-navn {
+  font-weight: 500;
+  color: var(--text-main);
+}
+
+.vl-meta {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.vl-tom {
+  color: var(--text-soft);
+  font-size: 0.85rem;
+  padding: 0.5rem 0.2rem;
+}
+
+/* ── Oversiktsfanen ───────────────────────────────────────────────────── */
+.vl-korpsgruppe {
+  margin-bottom: 1.1rem;
+}
+
+.vl-korpsgruppe h3 {
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+  border-bottom: 2px solid var(--border-color);
+  padding-bottom: 0.3rem;
+  margin-bottom: 0.4rem;
+}
+
+/* ── Registersiden ────────────────────────────────────────────────────── */
+/*
+   En inaktiv rad skal være tydelig nedtonet uten å bli uleselig: pensjonering
+   er den normale veien ut av registeret, ikke en feiltilstand, og raden må
+   fortsatt kunne leses av den som skal aktivere den igjen.
+*/
+.vl-rad.vl-inaktiv .vl-navn {
+  color: var(--text-muted);
+  text-decoration: line-through;
+  text-decoration-thickness: 1px;
+}
+
+.vl-rad.vl-inaktiv {
+  opacity: 0.7;
+}
+
+/* Kompetansemerkene kan bli mange på én person — la dem brytes, ikke
+   presse knappene ut av kortet. */
+#vlr-panel .vl-rad {
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+#vlr-panel .vl-merkelapp {
+  font-size: 0.72rem;
+}
+
+/* ── Mannskapstabellen ────────────────────────────────────────────────── */
+/*
+   Tabell, ikke merkelapper på rad. Med én kompetanse så den gamle visningen
+   fin ut; med åtte brøt den om og skjøv telefonnummeret ut av syne. Faste
+   kolonner gjør at det du leter etter alltid står samme sted.
+*/
+.vlr-verktoy {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.vlr-verktoy input[type="search"] {
+  max-width: 26rem;
+}
+
+.vlr-tabellramme {
+  overflow-x: auto;          /* smale skjermer skal rulle tabellen, ikke sida */
+}
+
+.vlr-tabell {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.88rem;
+  /*
+    **`fixed` er hele poenget.** Med `auto` sizer nettleseren kolonnene etter
+    innhold, og `max-width` på en `td` er da bare et forslag: en person med
+    seks kompetanser blåste opp kompetansekolonnen og skjøv telefon og konto
+    ut av linje med radene over. Faste andeler (se `<colgroup>` i
+    vaktliste-registre.js) gjør at innholdet brytes inni cella i stedet.
+  */
+  table-layout: fixed;
+  min-width: 52rem;          /* under dette ruller rammen heller enn å klemme */
+}
+
+.vlr-tabell th,
+.vlr-tabell td {
+  padding: 0.45rem 0.6rem;
+  border-bottom: 1px solid var(--border-color);
+  text-align: left;
+  vertical-align: top;
+}
+
+.vlr-tabell thead th {
+  position: sticky;          /* hodet står når lista er lang */
+  top: 0;
+  background: var(--surface-2);
+  color: var(--text-muted);
+  font-size: 0.74rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  z-index: 1;
+}
+
+.vlr-tabell tbody tr:hover {
+  background: var(--surface-2);
+}
+
+.vlr-sortbar {
+  cursor: pointer;
+  user-select: none;
+}
+
+.vlr-sortbar:hover {
+  color: var(--text-main);
+}
+
+/* Telefonnummeret er det man skanner etter — gi det tabulærsifre så
+   kolonnen står rett, og hindre at det brytes. */
+.vlr-tlf {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* Kompetansene brytes til flere linjer i sin egen celle. Raden blir høyere;
+   kolonnene står stille — det er den byttehandelen vi vil ha. */
+.vlr-komp {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.2rem;
+}
+
+.vlr-komp .vl-merkelapp {
+  flex: 0 0 auto;
+}
+
+/* Et langt navn uten mellomrom skal brytes, ikke sprenge kolonnen. */
+.vlr-tabell td {
+  overflow-wrap: anywhere;
+}
+
+.vlr-handling {
+  white-space: nowrap;
+  text-align: right;
+}
+
+/* Fast bredde uansett om ikonfonten har rukket å laste — ellers måler
+   kolonnen seg etter en glyf som ikke er der ennå, og hopper når den kommer. */
+.vlr-handling .btn {
+  min-width: 2.1rem;
+  padding-left: 0.4rem;
+  padding-right: 0.4rem;
+}
+
+.vlr-tabell tr.vl-inaktiv td {
+  opacity: 0.65;
+}
+
+.vlr-tabell tr.vl-inaktiv .vl-navn {
+  text-decoration: line-through;
+  text-decoration-thickness: 1px;
+}
+
+/* ── Ressurstabellen (regnearket) ─────────────────────────────────────── */
+/*
+   Samme grep som mannskapstabellen: faste kolonneandeler, så en person med
+   mange kompetanser ikke skyver tidene ut av linje.
+*/
+.vl-tabellramme {
+  overflow-x: auto;
+}
+
+.vl-tabell {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+  /*
+    **Bred nok til at feltene får plass.** Et `datetime-local` har en
+    minstebredde fra nettleseren (~190 px) som `width: 100%` ikke overstyrer,
+    og med for trange kolonner flyter feltet ut over nabocella. Tabellen er ni
+    kolonner med to tidsfelt — den *skal* være bred, og rammen ruller når
+    skjermen er smalere.
+
+    **66rem, ikke 82.** Den første verdien hadde slark: den ga tidsfeltene
+    210 px der de trenger 185, og prisen var at rediger-knappen i siste
+    kolonne havnet utenfor skjermen på en vanlig laptop. Kolonnene er
+    strammet til det feltene faktisk krever — `RessurstabellensBreddeTests`
+    regner ut om de fortsatt får plass.
+  */
+  min-width: 66rem;
+  font-size: 0.85rem;
+}
+
+.vl-tabell th,
+.vl-tabell td {
+  padding: 0.35rem 0.5rem;
+  border-bottom: 1px solid var(--border-color);
+  text-align: left;
+  vertical-align: middle;
+  overflow-wrap: anywhere;
+}
+
+.vl-tabell thead th {
+  color: var(--text-muted);
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
+.vl-tabell tbody tr:hover {
+  background: var(--surface-2);
+}
+
+/*
+  **Cella er en tabellcelle, innmaten er flex.** `display: flex` direkte på
+  en `<td>` tar cella ut av tabellens boksmodell: den slutter å være en
+  `table-cell`, og cellene etter den forskyves i forhold til overskriftene.
+  Det var årsaken til at kompetansekolonnen «flyttet seg» i forhold til
+  resten. Wrapperen gjør samme jobb uten å røre tabellen.
+*/
+.vl-kompcelle > .vl-merkelapper {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.2rem;
+}
+
+/*
+  Tidskolonnen: feltet med ukedagen under. Dagen sto i sin egen kolonne til
+  30. aug. 2026 — et tredje sted å lese for å forstå én rad. `datetime-local`
+  bærer datoen selv; det var bare ukedagen som manglet, og den er det man
+  planlegger etter.
+*/
+.vl-tidcelle {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  min-width: 0;
+}
+
+.vl-dagmerke {
+  color: var(--text-muted);
+  display: block;
+  font-size: 0.7rem;
+  padding-left: 0.3rem;
+  white-space: nowrap;
+}
+
+/*
+  Stor forbokstav — men bare på den første. `text-transform: capitalize`
+  gjør «lør 3. okt» til «Lør 3. Okt», og en stor O midt i en dato ser ut som
+  en skrivefeil. `::first-letter` krever et blokkelement, derav `display`
+  over.
+*/
+.vl-dagmerke::first-letter {
+  text-transform: uppercase;
+}
+
+/* Timer per skift — tallet man ellers regner ut i hodet for hver rad. */
+.vl-timer {
+  white-space: nowrap;
+  color: var(--text-muted);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+/*
+  **Handlingskolonnen henger fast til høyre.** Selv med strammere kolonner
+  ruller tabellen på en smal skjerm, og da var rediger-knappen det første som
+  forsvant ut — altså den ene knappen raden finnes for. `position: sticky`
+  holder den i syne; bakgrunnen må settes eksplisitt, ellers ruller innholdet
+  synlig under den.
+*/
+.vl-handling {
+  text-align: right;
+  white-space: nowrap;
+  position: sticky;
+  right: 0;
+  background: var(--surface-1);
+}
+
+.vl-tabell tbody tr:hover .vl-handling {
+  background: var(--surface-2);
+}
+
+.vl-tabell thead th:last-child {
+  position: sticky;
+  right: 0;
+  background: var(--surface-1);
+}
+
+.vl-handling .btn {
+  min-width: 2.1rem;
+  padding-left: 0.4rem;
+  padding-right: 0.4rem;
+}
+
+/* Cellene skal se ut som celler, ikke som skjemafelter: rammen kommer først
+   når man er i ferd med å redigere. Ellers drukner tabellen i bokser. */
+.vl-celle {
+  width: 100%;
+  /* Uten disse to vokser feltet forbi cella si: `width: 100%` regnes uten
+     ramme og innrykk, og et input har en egen minstebredde som ellers vinner. */
+  box-sizing: border-box;
+  min-width: 0;
+  max-width: 100%;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  color: var(--text-main);
+  font-size: 0.85rem;
+  padding: 0.15rem 0.3rem;
+}
+
+.vl-celle:hover {
+  border-color: var(--border-color);
+}
+
+.vl-celle:focus {
+  outline: none;
+  border-color: var(--portal-accent, #3b82f6);
+  background: var(--surface-1);
+}
+
+.vl-celle option {
+  background: var(--surface-1);
+  color: var(--text-main);
+}
+
+/* ── Bemanningskurven ─────────────────────────────────────────────────── */
+.vl-kurve {
+  display: flex;
+  align-items: flex-end;
+  gap: 1px;
+  height: 5rem;
+  padding: 0.4rem 0;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.vl-soyle {
+  flex: 1 1 auto;
+  min-width: 2px;
+  background: var(--portal-accent, #3b82f6);
+  border-radius: 1px 1px 0 0;
+  min-height: 1px;          /* en time uten bemanning skal synes som et hull */
+}
+
+/* Døgnskillet, ellers mister man hvilken dag man ser på. */
+.vl-soyle.vl-dogn {
+  box-shadow: -1px 0 0 0 var(--text-soft);
+}
+
+/* ── Utskrift ─────────────────────────────────────────────────────────── */
+.vl-arkhode {
+  margin-bottom: 1rem;
+}
+
+.vl-arkhode h2 {
+  font-size: 1.1rem;
+  margin: 0;
+}
+
+@media print {
+  /*
+     Det som skal ut på papiret er lista, ikke portalen rundt den. Alt som er
+     en handling forsvinner: en knapp på et ark er bare blekk.
+  */
+  .portal-header, .portal-nav, .portal-footer,
+  .vl-faner, .vl-kurve-kort, .modal,
+  #vl-feil, #vl-tom, #vl-mangler-mannskap,
+  .btn, select, .vl-handling {
+    display: none !important;
+  }
+
+  body, .vl-kort, .vl-utskriftsark {
+    background: #fff !important;
+    color: #000 !important;
+    border: none !important;
+    box-shadow: none !important;
+  }
+
+  .vl-tabell, .vl-tabell th, .vl-tabell td, .vl-navn, .vl-meta {
+    color: #000 !important;
+  }
+
+  .vl-tabell th, .vl-tabell td {
+    border-bottom: 1px solid #999 !important;
+  }
+
+  .vl-tabell {
+    min-width: 0;             /* papiret har ingen rullefelt */
+    font-size: 10pt;
+  }
+
+  /* En korpsgruppe skal helst ikke deles over to ark. */
+  .vl-korpsgruppe {
+    break-inside: avoid;
+  }
+
+  .portal-content {
+    padding: 0 !important;
+    max-width: none !important;
+  }
+}
+
+/* ── Ledige plasser ───────────────────────────────────────────────────── */
+/*
+   En ledig plass er et skift som mangler en person. Den skal se ut som noe
+   som gjenstår — ikke som en rad der navnet mangler ved en feil.
+*/
+.vl-tabell tr.vl-ledig {
+  background: color-mix(in srgb, var(--portal-warning, #f59e0b) 8%, transparent);
+}
+
+.vl-tabell tr.vl-ledig td {
+  border-left: 0;
+}
+
+.vl-ledigtekst {
+  color: var(--portal-warning, #f59e0b);
+  font-style: italic;
+}
+
+.vl-fyll {
+  border-color: var(--portal-warning, #f59e0b);
+}
+
+/* ── Kurven: bemannet mot planlagt ────────────────────────────────────── */
+/*
+   To lag i samme stolpe. Den lyse er alle plassene, den mettede er de som
+   har en person — avstanden mellom dem er det som gjenstår å bemanne.
+*/
+.vl-stolpe {
+  position: relative;
+  flex: 1 1 auto;
+  min-width: 2px;
+  height: 100%;
+}
+
+.vl-planlagt,
+.vl-bemannet {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  border-radius: 1px 1px 0 0;
+  min-height: 1px;
+}
+
+.vl-planlagt {
+  background: color-mix(in srgb, var(--portal-accent, #3b82f6) 28%, transparent);
+}
+
+.vl-bemannet {
+  background: var(--portal-accent, #3b82f6);
+}
+
+.vl-stolpe.vl-dogn::before {
+  content: '';
+  position: absolute;
+  left: -1px;
+  top: 0;
+  bottom: 0;
+  border-left: 1px solid var(--text-soft);
+}
+
+.vl-tegnforklaring {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.vl-prikk {
+  width: 0.6rem;
+  height: 0.6rem;
+  border-radius: 2px;
+  display: inline-block;
+}
+
+.vl-prikk-bemannet { background: var(--portal-accent, #3b82f6); }
+.vl-prikk-planlagt {
+  background: color-mix(in srgb, var(--portal-accent, #3b82f6) 28%, transparent);
+}
+
+/* ── Utskriftsarket holdes i sin egen ramme ───────────────────────────── */
+/*
+   Utskriftstabellene arvet `min-width` fra `.vl-tabell` uten en ramme rundt
+   seg, og stakk dermed ut av kortet. På papiret finnes ingen rullefelt, så
+   der nullstilles begge deler.
+*/
+.vl-utskrift {
+  min-width: 34rem;
+}
+
+@media print {
+  .vl-tabellramme { overflow: visible !important; }
+  .vl-utskrift { min-width: 0 !important; }
+  .vl-tabell tr.vl-ledig { background: transparent !important; }
+  .vl-ledigtekst { color: #000 !important; }
+}
+
+
+/* ── Nytt 30. aug. 2026 ───────────────────────────────────────────────── */
+
+/*
+  **En kurve per ressursgruppe.** Én samlet kurve summerte samleplassen,
+  ambulansene og KO til ett tall, og det tallet svarer ikke på noe: fire på
+  samleplassen og null på ambulansen ser likt ut som to og to. Kurvene deler
+  spenn, så søylene ligger under hverandre og kan sammenlignes.
+*/
+.vl-kurvegruppe {
+  padding-top: 0.75rem;
+}
+
+.vl-kurvegruppe + .vl-kurvegruppe {
+  border-top: 1px solid var(--border-color);
+  margin-top: 0.75rem;
+}
+
+.vl-kurvegruppe .vl-kort-topp {
+  margin-bottom: 0.35rem;
+}
+
+/* Sletting i «Rediger ressurs». Den skal se ut som det den er. */
+.vl-farlig {
+  border: 1px solid rgba(220, 53, 69, 0.35);
+  border-radius: 6px;
+  padding: 0.75rem;
+  background: rgba(220, 53, 69, 0.06);
+}
+
+.vl-vaktinfo {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+
+/* ── Timeaksen under bemanningskurven ─────────────────────────────────── */
+/*
+  Én celle per søyle, med samme flex-vekst: da står klokkeslettet under den
+  timen det gjelder, uansett hvor mange timer vakta er. Tekst inni søylen
+  ville ikke fått plass — søylene er noen få piksler brede på en lang vakt.
+*/
+.vl-timeakse {
+  display: flex;
+  gap: 1px;
+  margin-top: 0.2rem;
+}
+
+.vl-timeakse .vl-time {
+  flex: 1 1 0;
+  min-width: 0;
+  text-align: center;
+  font-size: 0.6rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: visible;
+}
+
+/* Døgnskillet i tegnforklaringen — samme hvite strek som står i kurven. */
+.vl-prikk-dogn {
+  background: transparent;
+  border-left: 2px solid rgba(255, 255, 255, 0.55);
+  border-radius: 0;
+  width: 2px;
+}
+
+
+/* ── Vaktvelgeren: hvilken vakt planlegger du? ────────────────────────── */
+/*
+  Egen linje, ikke et felt inne i knapperaden. Vaktas navn er konteksten for
+  alt annet på sida — sto det mellom «Mannskap» og «Ny vaktliste», leste det
+  som enda en innstilling.
+*/
+.vl-vaktvelger {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  padding: 0.55rem 0.75rem;
+  background: var(--surface-2);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+}
+
+.vl-vaktvelger #vaktliste-velger {
+  min-width: 16rem;
+  max-width: 26rem;
+  width: auto;
+}
+
+/* Fanene og «Ny ressurs» på samme linje — knappen lager en ny fane. */
+/*
+  Mannskap står i fanerekka, men er en lenke: den forlater sida der fanene
+  bare bytter innholdet under. Pila i markupen bærer skillet; her holdes den
+  visuelt litt tilbake, så den ikke konkurrerer med den aktive fanen.
+*/
+.vl-fane-lenke {
+  text-decoration: none;
+  color: var(--text-muted);
+}
+
+.vl-fane-lenke:hover {
+  color: var(--text-main);
+}
+
+.vl-fane-lenke .bi-box-arrow-up-right {
+  font-size: 0.7em;
+  opacity: 0.7;
+}
+
+/*
+  «Ny ressurs» sist i fanerekka — som pluss-fanen i en nettleser. Stiplet
+  kant skiller den fra fanene som *er* noe, uten å ta den ut av rekka.
+*/
+.vl-fane-ny {
+  border-style: dashed;
+  background: transparent;
+  color: var(--text-muted);
+}
+
+.vl-fane-ny:hover {
+  border-style: solid;
+  color: var(--text-main);
+}
+
+.vl-fanerad .vl-faner {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+@media print {
+  .vl-vaktvelger { display: none !important; }
+}
+
+
+/* ── Gruppehodet i fanen ──────────────────────────────────────────────── */
+/*
+  Fanen «Ambulanse» rommer bil A, bil B og bil C. Hodet sier hvor mange, og
+  bærer knappen som legger til én til — uten det så man én rad med knapper og
+  trodde gruppa *var* bilen.
+*/
+.vl-gruppehode {
+  padding-bottom: 0.6rem;
+}
+
+.vl-gruppehode .vl-meta {
+  margin-left: 0.6rem;
+  font-weight: 400;
+}
+
+/*
+  Enhetskoblingen vises også når den mangler: en tom plass som ber om å
+  fylles, framfor ingenting. Uten den var det usynlig at koblingen finnes
+  per enhet i det hele tatt.
+*/
+.vl-enhet-tom {
+  border: 1px dashed var(--border-color);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.vl-enhet-tom:hover {
+  border-style: solid;
+  color: var(--text-main);
+}
+
+
+/* ── Drift (fase 4) ───────────────────────────────────────────────────── */
+
+/*
+  **Radens tilstand skal synes uten å lese en kolonne.** Under drift er det
+  «hvem mangler» man leter etter, og da skummer man farger, ikke tekst.
+  Stripen står til venstre og ikke som en bakgrunnsfarge på hele raden:
+  bakgrunnen bærer allerede «ledig plass», og to fargekoder i samme flate
+  blir til ingen.
+*/
+.vl-tabell tr.vl-tilstede td:first-child { box-shadow: inset 3px 0 0 var(--vl-ok); }
+.vl-tabell tr.vl-avgatt td:first-child { box-shadow: inset 3px 0 0 var(--text-muted); }
+.vl-tabell tr.vl-avgatt { opacity: .72; }
+
+/*
+  **Stempelet er radens handling, ikke en knapp blant flere.** Første utgave
+  la den i handlingskolonnen ytterst til høyre: 45 × 21 px, tusen piksler fra
+  navnet man nettopp leste, bak en sidescroll — den minste kontrollen på
+  raden, der den skulle vært den største. Nå fyller den cella, og cella står
+  først.
+
+  44 px er gulvet for et trykkmål man skal treffe med tommelen mens man
+  holder en telefon i den andre hånda.
+*/
+.vl-stempel {
+  white-space: nowrap;
+  font-weight: 600;
+  width: 100%;
+  min-height: 2.75rem;
+}
+
+.vl-stempelcelle { vertical-align: middle; }
+
+/* Tidspunktet står under knappen, ikke i den: det er dokumentasjon, mens
+   knappen er handlingen — og en knapp som skifter tekst er en knapp man må
+   lese før hvert trykk. */
+.vl-stempeltid {
+  display: block;
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  margin-top: 0.15rem;
+  white-space: nowrap;
+}
+
+/* Angre er med vilje lettere enn å stemple: et feiltrykk skal kunne rettes,
+   men ikke være like lett å gjøre som handlingen selv. */
+.vl-angre {
+  padding: 0 0.25rem;
+  color: var(--text-muted);
+  text-decoration: none;
+}
+
+/*
+  **Drifttabellen ruller ikke.** `min-width` på regnearket er satt for ni
+  kolonner med to `datetime-local`-felt i. Drift har sju kolonner uten
+  skjemafelt, og skal få plass — hele poenget med å bytte form er at man
+  slipper å lete sidelengs etter knappen.
+*/
+.vl-tabell-drift { min-width: 0; }
+
+/*
+  **Tellingen står øverst, stor.** I en evakuering teller man hoder mot et
+  tall, og da skal tallet være det første man ser — ikke en linje man må lete
+  etter blant like store linjer.
+*/
+.vl-tilstedehode {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  flex-wrap: wrap;
+}
+
+.vl-tilstedetall {
+  font-size: 3.5rem;
+  line-height: 1;
+  font-weight: 700;
+  color: var(--vl-ok);
+}
+
+.vl-tilstedemeta { flex-grow: 1; }
+
+@media print {
+  /*
+     Arket er lista og tallet. Alt annet er skjerm — og på det arket er
+     tallet hele poenget, så det skal ikke krympes bort med resten.
+  */
+  .vl-tilstedetall { color: #000 !important; font-size: 3rem; }
+  .vl-tabell tr.vl-tilstede td:first-child,
+  .vl-tabell tr.vl-avgatt td:first-child { box-shadow: none !important; }
+  .vl-tabell tr.vl-avgatt { opacity: 1 !important; }
+}
+
+
+/* ── Planleggingstall (fase 5) ────────────────────────────────────────── */
+
+.vl-belastningshode {
+  display: flex;
+  align-items: center;
+  gap: 2rem;
+  flex-wrap: wrap;
+}
+
+/*
+  Nøkkeltallene står som tall over etikett, ikke som «Personer: 12». Man
+  skummer dem, og da er tallet det man leter etter.
+*/
+.vl-noekkeltall {
+  display: flex;
+  gap: 2rem;
+  flex-wrap: wrap;
+}
+
+.vl-noekkeltall > div { display: flex; flex-direction: column; }
+.vl-noekkeltall b { font-size: 1.75rem; line-height: 1.1; }
+
+.vl-varsler { flex-grow: 1; display: flex; gap: 1.5rem; flex-wrap: wrap; }
+.vl-varseltall { display: flex; flex-direction: column; }
+
+/*
+  **Varselfargen er gul, ikke rød.** Rødt betyr «dette er galt og må
+  rettes»; et langt skift er ikke galt, det er noe planleggeren skal se og
+  ta stilling til. Fargen skal si «se her», ikke «du har gjort en feil».
+*/
+.vl-varselantall {
+  font-size: 1.75rem;
+  line-height: 1.1;
+  font-weight: 700;
+  color: var(--vl-varsel);
+}
+
+.vl-advarsel {
+  color: var(--vl-varsel);
+  font-weight: 600;
+}
+
+@media print {
+  .vl-varselantall, .vl-advarsel { color: #000 !important; }
+  .vl-advarsel::after { content: ' (!)'; }
+}
