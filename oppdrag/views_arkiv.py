@@ -50,12 +50,23 @@ def _logg_audit(request, handling, detalj):
     )
 
 
+def _antall_oppdrag(arkiv) -> int:
+    if arkiv.er_kollapset:
+        total = ((arkiv.aggregat or {}).get('full') or {}).get('summary', {}).get('total')
+        return arkiv.antall_rader if total is None else total
+    return arkiv.oppdrag.values('oppdragsnummer').distinct().count()
+
+
 def _arkiv_til_dict(arkiv, *, med_stats=False):
     data = {
         'id': arkiv.pk,
         'tittel': arkiv.tittel,
         'vakt_navn': arkiv.vakt_navn,
-        'antall_oppdrag': arkiv.antall_rader,
+        # Radene er én per oppdrag × enhet (11. sep. 2026); oppdragene
+        # telles distinkt. Etter kollaps finnes bare aggregatet, og det bærer
+        # tallet i `summary.total`.
+        'antall_oppdrag': _antall_oppdrag(arkiv),
+        'antall_enhetsrader': arkiv.antall_rader,
         'importert_at': arkiv.importert_at.isoformat(),
         'importert_av': arkiv.importert_av_visning,
         'notat': arkiv.notat,

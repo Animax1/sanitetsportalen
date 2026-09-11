@@ -119,6 +119,16 @@ kodeveier i `sha_payload` for all framtid.
 tallene faktisk har. Prisen er at «antall oppdrag» i statistikken må telle distinkt, og at
 det står i notatet så neste person ikke «retter» det.
 
+**Levert i trinn 4 (11. sep. 2026), som A.** `ArkivertOppdrag` er unik på
+(arkiv, oppdragsnummer, enhet_navn) — `0013`, ren skjemaendring — og `sha_payload`
+sorterer på `(oppdragsnummer, enhet_navn)`; for eldre arkiver med unike nummer er det
+samme rekkefølge, og `SignaturLaastTests` står urørt. `arkiv._per_enhet()` er det ene
+stedet som sier hva en rad er, delt av arkivet og `statistikk.rader_for_vakt`.
+I `_stats_fra_rader` telles *bilens* tall per rad (responstid, ventetid, utrykning, tid
+på stedet, oppdragstid, `per_enhet`) og *oppdragets* én gang per nummer (antall,
+hastegrad, problemstilling, lokasjon, status nå med `utledet_av_statuser`, ankomster).
+`summary.enhetsinnsatser` er radtallet, så leseren ser at de to skiller.
+
 ## 6. Migrasjonen og deployen
 
 **Slik det ble (trinn 1, 11. sep. 2026):** deploy 1 er to migrasjoner, ikke tre.

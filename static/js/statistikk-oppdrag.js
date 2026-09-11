@@ -72,7 +72,11 @@ function renderOppdragStats(s) {
   if (!s || !s.summary) return;
   const sum = s.summary;
 
-  document.getElementById('okpi-total').textContent = sum.total;
+  // Med flere biler på ett oppdrag er radene flere enn oppdragene, og
+  // leseren skal se at tallene skiller: «12 (15 enhetsinnsatser)».
+  document.getElementById('okpi-total').textContent =
+    (sum.enhetsinnsatser != null && sum.enhetsinnsatser !== sum.total)
+      ? `${sum.total} (${sum.enhetsinnsatser} enhetsinnsatser)` : String(sum.total);
   document.getElementById('okpi-aktive').textContent = sum.aktive;
   document.getElementById('okpi-fullforte').textContent = sum.fullforte;
   document.getElementById('okpi-enheter').textContent = sum.enheter_pa_vakt;

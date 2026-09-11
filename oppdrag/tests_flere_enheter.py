@@ -1005,3 +1005,110 @@ class InnlinjeskjemaeneTests(TestCase):
         self.assertNotIn('value="fremme"', ut, 'ikke et ledd hun kan hoppe til')
         self.assertIn('Sykehus', ut)
         self.assertIn('data-action="lagreFoerStatus" data-id="4"', ut)
+
+
+# ── Trinn 4: arkiv og statistikk ────────────────────────────────────────────
+
+class ArkivOgStatistikkMedFlereEnheterTests(FlereEnheterBasis):
+    """§5 A: én arkivrad per oppdrag × enhet, oppdrag telles distinkt,
+    responstider per bil — og arkivet gir de samme tallene som live."""
+
+    def setUp(self):
+        super().setUp()
+        self.admin = _bruker('adm', admin=True)
+
+    def _for(self, minutter):
+        return timezone.now() - timedelta(minutes=minutter)
+
+    def _to_biler_paa_vei(self):
+        o = self._to_enheter()
+        Oppdrag.objects.filter(pk=o.pk).update(created_at=self._for(60))
+        o.refresh_from_db()
+        services.sett_status(o, choices.RYKKER_UT, enhet=self.a, tidspunkt=self._for(58))
+        services.sett_status(o, choices.FREMME, enhet=self.a, tidspunkt=self._for(50))
+        services.sett_status(o, choices.RYKKER_UT, enhet=self.b, tidspunkt=self._for(55))
+        services.sett_status(o, choices.FREMME, enhet=self.b, tidspunkt=self._for(40))
+        services.sett_status(o, choices.LEDIG, enhet=self.b, tidspunkt=self._for(30))
+        return o
+
+    def test_arkivet_faar_en_rad_per_enhet_med_hennes_tider(self):
+        from oppdrag.arkiv import arkiver_vakt
+        from oppdrag.models import ArkivertOppdrag
+        self._to_biler_paa_vei()
+        arkiv, antall = arkiver_vakt(self.vakt, '', self.admin)
+        self.assertEqual(antall, 2)
+        self.assertEqual(arkiv.antall_rader, 2)
+        rader = {r.enhet_navn: r for r in ArkivertOppdrag.objects.filter(arkiv=arkiv)}
+        self.assertEqual(set(rader), {'Haugesund 56', 'Karmøy 12'})
+        self.assertEqual(rader['Haugesund 56'].sluttstatus, choices.FREMME)
+        self.assertEqual(rader['Karmøy 12'].sluttstatus, choices.LEDIG)
+        self.assertIsNone(rader['Haugesund 56'].ledig_at)
+        self.assertIsNotNone(rader['Karmøy 12'].ledig_at)
+        self.assertNotEqual(rader['Haugesund 56'].fremme_at, rader['Karmøy 12'].fremme_at)
+
+    def test_signaturen_verifiserer_og_er_uavhengig_av_radrekkefolge(self):
+        from core.arkiv import beregn_sha256, verifiser
+        from oppdrag.arkiv import OppdragArkivHandler, arkiver_vakt
+        self._to_biler_paa_vei()
+        arkiv, _ = arkiver_vakt(self.vakt, '', self.admin)
+        handler = OppdragArkivHandler()
+        self.assertFalse(verifiser(handler, arkiv))
+        rader = handler.rad_dicts(arkiv)
+        self.assertEqual(beregn_sha256(handler, arkiv, list(reversed(rader))), arkiv.sha256)
+
+    def test_oppdrag_telles_distinkt_og_responstid_per_bil(self):
+        from oppdrag.statistikk import oppdrag_stats
+        self._to_biler_paa_vei()
+        s = oppdrag_stats(self.vakt)
+        self.assertEqual(s['summary']['total'], 1)
+        self.assertEqual(s['summary']['enhetsinnsatser'], 2)
+        self.assertEqual(s['summary']['aktive'], 1, 'A er fortsatt fremme')
+        self.assertEqual(s['summary']['responstid']['n'], 2)
+        self.assertEqual(s['summary']['responstid']['min'], 10.0)
+        self.assertEqual(s['summary']['responstid']['max'], 20.0)
+        self.assertEqual(dict(_flat(s['per_hastegrad'])), {'Akutt': 1}, 'ett oppdrag, ikke to')
+        self.assertEqual(dict(_flat(s['per_enhet'])), {'Haugesund 56': 1, 'Karmøy 12': 1})
+        status = {r['status']: r['antall'] for r in s['status_naa']}
+        self.assertEqual(status[choices.FREMME], 1, 'oppdragets status er den mest aktive')
+        self.assertEqual(status[choices.LEDIG], 0)
+        self.assertEqual(sum(a['antall'] for a in s['ankomster']), 1)
+
+    def test_arkivets_tall_er_de_samme_som_live(self):
+        from oppdrag.arkiv import arkiver_vakt
+        from oppdrag.statistikk import arkiv_stats, oppdrag_stats
+        self._to_biler_paa_vei()
+        annet = self._oppdrag(self.c)
+        services.sett_status(annet, choices.RYKKER_UT, enhet=self.c)
+        live = oppdrag_stats(self.vakt)
+        arkiv, _ = arkiver_vakt(self.vakt, '', self.admin)
+        frosset = arkiv_stats(arkiv)
+        live_sum = dict(live['summary']); live_sum.pop('enheter_pa_vakt')
+        frosset_sum = dict(frosset['summary']); frosset_sum.pop('enheter_pa_vakt')
+        self.assertEqual(live_sum, frosset_sum)
+        for nokkel in ('per_hastegrad', 'per_problemstilling', 'per_lokasjon', 'per_enhet',
+                       'status_naa', 'responstid_per_hastegrad', 'responstid_per_enhet',
+                       'oppdragstid_per_problemstilling', 'ankomster'):
+            with self.subTest(nokkel=nokkel):
+                self.assertEqual(live[nokkel], frosset[nokkel])
+
+    def test_arkivlista_teller_oppdrag_og_enhetsrader_hver_for_seg(self):
+        from oppdrag.arkiv import arkiver_vakt
+        self._to_biler_paa_vei()
+        arkiver_vakt(self.vakt, '', self.admin)
+        res = _klient(self.admin).get('/oppdrag/api/arkiv/')
+        self.assertEqual(res.status_code, 200, res.content)
+        rad = res.json()['data'][0]
+        self.assertEqual((rad['antall_oppdrag'], rad['antall_enhetsrader']), (1, 2))
+
+
+def _flat(fordeling):
+    """`_sortert_synkende` gir en liste av par eller dicter — normaliser."""
+    if isinstance(fordeling, dict):
+        return list(fordeling.items())
+    ut = []
+    for post in fordeling:
+        if isinstance(post, dict):
+            ut.append((post.get('navn'), post.get('antall')))
+        else:
+            ut.append(tuple(post))
+    return ut

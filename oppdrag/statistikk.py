@@ -42,12 +42,14 @@ from __future__ import annotations
 
 import statistics as smod
 
+from django.db.models import Prefetch
 from django.utils import timezone
 
 from core.stats import BaseStatistikkHandler, register
 
 from . import choices
-from .models import Enhet, Oppdrag, Statusmelding
+from .models import Enhet, Oppdrag, Oppdragsenhet, Statusmelding
+from .services import utledet_av_statuser
 
 #: Status → kolonnenavn på `ArkivertOppdrag`. Kartet er det ene stedet de to
 #: er koblet: `ArkivOppdragsstatusKolonnerTests` går gjennom statusene og
@@ -131,30 +133,36 @@ def rader_for_vakt(vakt):
     åpen fane — det er den samme regningen som gjorde pasientlista til appens
     dyreste sti før den fikk `select_related`.
     """
+    from .arkiv import _per_enhet
+
     oppdragene = list(
         Oppdrag.objects
         .filter(vakt=vakt)
         .select_related('enhet', 'lokasjon')
+        .prefetch_related(Prefetch('enheter', Oppdragsenhet.objects.select_related('enhet')))
         .order_by('oppdragsnummer')
     )
     meldinger = Statusmelding.objects.gjeldende_bulk([o.pk for o in oppdragene])
 
+    # **Én rad per oppdrag × enhet** (§5 i notatet om flere enheter) — samme
+    # form som arkivet fryser. Responstiden er bilens, ikke oppdragets;
+    # antall oppdrag telles distinkt i `_stats_fra_rader`.
     rader = []
     for oppdrag in oppdragene:
-        gjeldende = meldinger[oppdrag.pk]
-        rader.append({
-            'oppdragsnummer': oppdrag.oppdragsnummer,
-            'hastegrad': oppdrag.hastegrad,
-            'problemstilling': oppdrag.problemstilling,
-            'enhet': oppdrag.enhet.navn,
-            'lokasjon': oppdrag.lokasjon.navn if oppdrag.lokasjon else '(ingen)',
-            'status': oppdrag.status,
-            'opprettet': oppdrag.created_at,
-            # Gjeldende melding per status: en korreksjon overstyrer raden den
-            # peker på, og regelen bor i manageren.
-            'tider': {m.status: (m.tidspunkt, m.automatisk) for m in gjeldende},
-            'forsinket': sum(1 for m in gjeldende if m.forsinket),
-        })
+        for enhetsnavn, status, gjeldende in _per_enhet(oppdrag, meldinger[oppdrag.pk]):
+            rader.append({
+                'oppdragsnummer': oppdrag.oppdragsnummer,
+                'hastegrad': oppdrag.hastegrad,
+                'problemstilling': oppdrag.problemstilling,
+                'enhet': enhetsnavn,
+                'lokasjon': oppdrag.lokasjon.navn if oppdrag.lokasjon else '(ingen)',
+                'status': status,
+                'opprettet': oppdrag.created_at,
+                # Gjeldende melding per status: en korreksjon overstyrer raden
+                # den peker på, og regelen bor i manageren.
+                'tider': {m.status: (m.tidspunkt, m.automatisk) for m in gjeldende},
+                'forsinket': sum(1 for m in gjeldende if m.forsinket),
+            })
     return rader
 
 
@@ -199,7 +207,16 @@ def arkiv_stats(arkiv):
 
 
 def _stats_fra_rader(rader, *, enheter_pa_vakt=None):
-    """Tallene, regnet på nøytrale rader fra vakta eller fra et arkiv."""
+    """Tallene, regnet på nøytrale rader fra vakta eller fra et arkiv.
+
+    **En rad er én enhets innsats på ett oppdrag** (11. sep. 2026). Det som
+    er *bilens* — responstid, ventetid, utrykning, tid på stedet, oppdragstid
+    og `per_enhet` — telles per rad. Det som er *oppdragets* — antall,
+    hastegrad, problemstilling, lokasjon, status nå og ankomsttime — telles
+    én gang per `oppdragsnummer`, med statusen utledet av radene som på tavla.
+    Et arkiv med én rad per oppdrag gir nøyaktig de gamle tallene; ikke
+    «rett» tellingen til å gå per rad — det står i notatets §5.
+    """
     var = _Varigheter()
 
     responstider, ventetider, utrykningstider = [], [], []
@@ -211,6 +228,7 @@ def _stats_fra_rader(rader, *, enheter_pa_vakt=None):
     status_naa = {status: 0 for status, _ in choices.STATUS_VALG}
     ankomster = {time: 0 for time in range(24)}
     forsinket_meldt = 0
+    per_oppdrag = {}
 
     for rad in rader:
         tider = rad['tider']
@@ -239,16 +257,10 @@ def _stats_fra_rader(rader, *, enheter_pa_vakt=None):
                 samling.append(verdi)
 
         enhetsnavn = rad['enhet']
-        lokasjonsnavn = rad['lokasjon']
         hastegrad = rad['hastegrad']
         problemstilling = rad['problemstilling']
 
-        per_hastegrad[hastegrad] = per_hastegrad.get(hastegrad, 0) + 1
-        per_problemstilling[problemstilling] = (
-            per_problemstilling.get(problemstilling, 0) + 1)
-        per_lokasjon[lokasjonsnavn] = per_lokasjon.get(lokasjonsnavn, 0) + 1
         per_enhet[enhetsnavn] = per_enhet.get(enhetsnavn, 0) + 1
-
         if respons is not None:
             resp_per_hastegrad.setdefault(hastegrad, []).append(respons)
             resp_per_enhet.setdefault(enhetsnavn, []).append(respons)
@@ -256,16 +268,31 @@ def _stats_fra_rader(rader, *, enheter_pa_vakt=None):
             oppdragstid_per_problem.setdefault(
                 problemstilling, []).append(oppdragstid)
 
-        status_naa[rad['status']] = status_naa.get(rad['status'], 0) + 1
-        ankomster[timezone.localtime(opprettet).hour] += 1
+        gruppe = per_oppdrag.setdefault(rad['oppdragsnummer'], {'rad': rad, 'statuser': []})
+        gruppe['statuser'].append(rad['status'])
+
+    # Oppdragets egne tall — én gang per nummer, uansett hvor mange biler.
+    for gruppe in per_oppdrag.values():
+        rad = gruppe['rad']
+        per_hastegrad[rad['hastegrad']] = per_hastegrad.get(rad['hastegrad'], 0) + 1
+        per_problemstilling[rad['problemstilling']] = (
+            per_problemstilling.get(rad['problemstilling'], 0) + 1)
+        per_lokasjon[rad['lokasjon']] = per_lokasjon.get(rad['lokasjon'], 0) + 1
+        status = utledet_av_statuser(gruppe['statuser'])
+        status_naa[status] = status_naa.get(status, 0) + 1
+        ankomster[timezone.localtime(rad['opprettet']).hour] += 1
 
     fullforte = status_naa.get(choices.TERMINAL, 0)
+    total = len(per_oppdrag)
 
     return {
         'summary': {
-            'total': len(rader),
-            'aktive': len(rader) - fullforte,
+            'total': total,
+            'aktive': total - fullforte,
             'fullforte': fullforte,
+            # Radene: én per oppdrag × enhet. Lik `total` når hvert oppdrag
+            # hadde én bil, og det er slik en leser ser at tallene skiller.
+            'enhetsinnsatser': len(rader),
             # `None` for et arkiv: beredskapen «akkurat nå» finnes ikke for en
             # vakt som er over, og et tall der ville vært oppdiktet.
             'enheter_pa_vakt': enheter_pa_vakt,

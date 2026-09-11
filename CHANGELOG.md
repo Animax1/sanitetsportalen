@@ -4,9 +4,36 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-11 — Flere enheter på ett oppdrag, trinn 4: arkiv og statistikk
+
+**2180 tester grønne** (6 nye). Én migrasjon, `oppdrag/0013`: unikhet og
+rekkefølge på `ArkivertOppdrag` — ren skjemaendring, ingen data flyttes.
+Alle fire trinn er levert; deploy 2 (fjerne `Oppdrag.enhet`, stramme
+`Statusmelding.oppdragsenhet`) står igjen som eget punkt.
+
+- **Én arkivrad per oppdrag × enhet** (§5 A). Nummeret gjentas per bil, og
+  hver rad bærer *hennes* tidsstempler og sluttstatus. Samme radform og samme
+  signaturform: `sha_payload` sorterer nå på `(oppdragsnummer, enhet_navn)`,
+  som for unike nummer er den gamle rekkefølgen — `SignaturLaastTests` står
+  urørt, og eksisterende arkiver verifiserer som før. `arkiv._per_enhet()` er
+  det ene stedet som sier hva en rad er.
+- **Statistikken teller oppdrag distinkt og varigheter per bil.** Det som er
+  bilens — responstid, ventetid, utrykning, tid på stedet, oppdragstid,
+  `per_enhet` — per rad; det som er oppdragets — antall, hastegrad,
+  problemstilling, lokasjon, status nå, ankomster — én gang per nummer, med
+  status utledet som på tavla (`services.utledet_av_statuser`, delt). Et
+  arkiv med én bil per oppdrag gir nøyaktig de gamle tallene, og
+  `ArkivStatsMatcherTests` er utvidet til to biler: arkivet gir det live gir.
+- **`summary.enhetsinnsatser`** er radtallet; statistikksiden viser
+  «12 (15 enhetsinnsatser)» når de skiller. Arkivlista viser `antall_oppdrag`
+  distinkt og `antall_enhetsrader` ved siden av.
+- Koblingsradene hentes med én `Prefetch` med enheten joinet inn —
+  `GjeldendeBulkTests` holder statistikken på fire spørringer uansett antall
+  oppdrag.
+
 ## 2026-09-11 — Flere enheter på ett oppdrag, trinn 3: sentralbordets knapper
 
-**2172 tester grønne** (13 nye), og en røyktest i Chromium mot hele flyten:
+**2174 tester grønne** (15 nye), og en røyktest i Chromium mot hele flyten:
 opprett med to biler, før status for den ene, ta den andre av, varsle henne
 igjen. Ingen migrasjon.
 

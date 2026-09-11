@@ -19,12 +19,13 @@ oppdrag; det er en operativ risiko, og den håndteres med et punkt i
 from __future__ import annotations
 
 from django.db import transaction
+from django.db.models import Prefetch
 from django.utils import timezone
 
 from core.arkiv import BaseArkivHandler, beregn_sha256, register
 
 from . import choices
-from .models import ArkivertOppdrag, Oppdrag, OppdragArkiv, Statusmelding
+from .models import ArkivertOppdrag, Oppdrag, OppdragArkiv, Oppdragsenhet, Statusmelding
 from .statistikk import _STATUSFELT, arkiv_stats
 
 
@@ -43,6 +44,7 @@ def arkiver_vakt(vakt, notat, user):
             Oppdrag.objects
             .filter(vakt=vakt)
             .select_related('enhet', 'lokasjon')
+            .prefetch_related(Prefetch('enheter', Oppdragsenhet.objects.select_related('enhet')))
             .order_by('oppdragsnummer')
         )
         meldinger = Statusmelding.objects.gjeldende_bulk(
@@ -62,35 +64,57 @@ def arkiver_vakt(vakt, notat, user):
             sha256='',   # settes når radene finnes
         )
 
+        # **Én rad per oppdrag × enhet** (§5 A i notatet om flere enheter):
+        # nummeret gjentas for hver bil, og hver rad bærer *hennes*
+        # tidsstempler og sluttstatus. Samme radform som før — et arkiv med
+        # én bil per oppdrag er nøyaktig det det alltid har vært.
         rader = []
         for oppdrag in oppdragene:
-            gjeldende = meldinger[oppdrag.pk]
-            per_status = {m.status: m for m in gjeldende}
-            felter = {
-                felt: (per_status[status].tidspunkt if status in per_status else None)
-                for status, felt in _STATUSFELT.items()
-            }
-            rader.append(ArkivertOppdrag(
-                arkiv=arkiv,
-                oppdragsnummer=oppdrag.oppdragsnummer,
-                enhet_navn=oppdrag.enhet.navn if oppdrag.enhet else '',
-                lokasjon_navn=oppdrag.lokasjon.navn if oppdrag.lokasjon else '',
-                problemstilling=oppdrag.problemstilling or '',
-                hastegrad=oppdrag.hastegrad or '',
-                sluttstatus=oppdrag.status,
-                opprettet_at=oppdrag.created_at,
-                automatiske_statuser=sorted(
-                    m.status for m in gjeldende if m.automatisk),
-                antall_forsinket=sum(1 for m in gjeldende if m.forsinket),
-                **felter,
-            ))
+            for enhetsnavn, status, gjeldende in _per_enhet(oppdrag, meldinger[oppdrag.pk]):
+                per_status = {m.status: m for m in gjeldende}
+                felter = {
+                    felt: (per_status[status_].tidspunkt if status_ in per_status else None)
+                    for status_, felt in _STATUSFELT.items()
+                }
+                rader.append(ArkivertOppdrag(
+                    arkiv=arkiv,
+                    oppdragsnummer=oppdrag.oppdragsnummer,
+                    enhet_navn=enhetsnavn,
+                    lokasjon_navn=oppdrag.lokasjon.navn if oppdrag.lokasjon else '',
+                    problemstilling=oppdrag.problemstilling or '',
+                    hastegrad=oppdrag.hastegrad or '',
+                    sluttstatus=status,
+                    opprettet_at=oppdrag.created_at,
+                    automatiske_statuser=sorted(
+                        m.status for m in gjeldende if m.automatisk),
+                    antall_forsinket=sum(1 for m in gjeldende if m.forsinket),
+                    **felter,
+                ))
         ArkivertOppdrag.objects.bulk_create(rader)
+        arkiv.antall_rader = len(rader)
 
         handler = OppdragArkivHandler()
         arkiv.sha256 = beregn_sha256(handler, arkiv)
-        arkiv.save(update_fields=['sha256'])
+        arkiv.save(update_fields=['sha256', 'antall_rader'])
 
         return arkiv, len(rader)
+
+
+def _per_enhet(oppdrag, gjeldende):
+    """``[(enhetsnavn, status, meldinger), ...]`` — én per koblingsrad.
+
+    Delt med `statistikk.rader_for_vakt`, så arkivet og live-tallene deler
+    én oppfatning av hva en rad er. Uten koblingsrader (kan ikke skje etter
+    `0011`) faller den tilbake til oppdragets egen enhet.
+    """
+    rader = list(oppdrag.enheter.all())
+    if not rader:
+        return [(oppdrag.enhet.navn if oppdrag.enhet else '', oppdrag.status, gjeldende)]
+    return [
+        (rad.enhet.navn, rad.status,
+         [m for m in gjeldende if m.oppdragsenhet_id == rad.pk])
+        for rad in rader
+    ]
 
 
 class OppdragArkivHandler(BaseArkivHandler):
@@ -139,10 +163,14 @@ class OppdragArkivHandler(BaseArkivHandler):
 
     def sha_payload(self, arkiv, rader):
         """Radnivå-payload. **Endres denne, verifiserer ingen arkiv igjen.**"""
+        # `enhet_navn` som andre nøkkel (11. sep. 2026): med flere enheter
+        # gjentas nummeret, og to rader med samme nummer må ligge stabilt.
+        # For eldre arkiver, der nummeret er unikt, endrer det ingenting —
+        # `SignaturLaastTests` står urørt.
         return {
             'arkiv_id': arkiv.pk,
             'vakt_navn': arkiv.vakt_navn,
-            'oppdrag': sorted(rader, key=lambda r: r['oppdragsnummer']),
+            'oppdrag': sorted(rader, key=lambda r: (r['oppdragsnummer'], r['enhet_navn'])),
         }
 
     def aggregat_sha_payload(self, arkiv, aggregat):

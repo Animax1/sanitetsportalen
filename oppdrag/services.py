@@ -232,6 +232,12 @@ def utledet_status(oppdrag) -> str:
     statuser = list(oppdrag.enheter.values_list('status', flat=True))
     if not statuser:
         return oppdrag.status
+    return utledet_av_statuser(statuser)
+
+
+def utledet_av_statuser(statuser) -> str:
+    """Regelen i `utledet_status`, på en liste statuser — delt med
+    statistikken, som regner på arkivrader uten et oppdragsobjekt."""
     aktive = [s for s in statuser if s != choices.LEDIG]
     if not aktive:
         return choices.LEDIG

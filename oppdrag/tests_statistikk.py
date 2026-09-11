@@ -300,15 +300,17 @@ class GjeldendeBulkTests(OppdragStatsBasis):
             Statusmelding.objects.gjeldende_bulk([oppdrag.pk])[oppdrag.pk], [])
 
     def test_statistikken_bruker_faa_spoerringer(self):
-        """To spørringer for radene, uansett hvor mange oppdrag vakta har.
+        """Tre spørringer for radene, uansett hvor mange oppdrag vakta har.
 
         Ett kall per oppdrag ville gitt én spørring per rad — samme felle som
-        pasientlista gikk i før den fikk `select_related`.
+        pasientlista gikk i før den fikk `select_related`. Koblingsradene
+        (flere enheter, 11. sep. 2026) er én prefetch med enheten joinet inn,
+        ikke to.
         """
         for _ in range(5):
             oppdrag = self._oppdrag()
             self._stempel(oppdrag, choices.RYKKER_UT, 2)
 
-        with self.assertNumQueries(3):
-            # oppdrag + statusmeldinger + Enhet-tellingen i sammendraget
+        with self.assertNumQueries(4):
+            # oppdrag + koblingsrader + statusmeldinger + Enhet-tellingen
             oppdrag_stats(self.vakt)

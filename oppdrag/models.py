@@ -556,8 +556,11 @@ class ArkivertOppdrag(models.Model):
         help_text='Stemplinger sendt fra en enhet som var uten dekning.')
 
     class Meta:
-        unique_together = [['arkiv', 'oppdragsnummer']]
-        ordering = ['oppdragsnummer']
+        # Én rad per oppdrag × enhet (flere enheter, 11. sep. 2026, §5 A i
+        # notatet): nummeret gjentas for hver bil, med hennes tidsstempler.
+        # Eldre arkiver har én rad per oppdrag og passer som før.
+        unique_together = [['arkiv', 'oppdragsnummer', 'enhet_navn']]
+        ordering = ['oppdragsnummer', 'enhet_navn']
         verbose_name = 'Arkivert oppdrag'
         verbose_name_plural = 'Arkiverte oppdrag'
 

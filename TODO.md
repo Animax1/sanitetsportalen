@@ -184,7 +184,10 @@ ingen av dem gir feilmelding — de er bare stille inaktive.
                   matrisen i lista, enhetsradene i detaljen med «Før status»,
                   «Gjenåpne», «Ta av» og «Varsle enhet til», flytt av én rad.
                   Fant og rettet «Rett tid», som viste «[object Object]».
-            - [ ] Trinn 4: arkiv (rad per enhet) og statistikk
+            - [x] Trinn 4 (11. sep. 2026): én arkivrad per oppdrag × enhet
+                  (`0013`, unik på enhet_navn), samme signaturform;
+                  statistikken teller oppdrag distinkt og varigheter per bil,
+                  `summary.enhetsinnsatser`.
             - [ ] Deploy 2, senere: fjern `Oppdrag.enhet`
       - [ ] **Stripe på blokklinja** (mini-Gantt over vaktas spenn) — alternativ
             «Begge deler» i spørsmålet 11. sep.; valgt bort for nå, lett å
