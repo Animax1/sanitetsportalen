@@ -109,6 +109,54 @@
 .hastegrad-haster { background: #78350f; color: #fde68a; }
 .hastegrad-vanlig { background: #1e3a5f; color: #bfdbfe; }
 
+/* Bilens grovsortering (11. sep. 2026) — ved siden av hastegraden, aldri i
+   stedet for. Samme form som hastegradmerket, med en fargeprikk foran:
+   fargen bærer ikke informasjonen alene (WCAG 1.4.1), teksten står der. */
+.grov-merke {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  padding: 0.1rem 0.45rem;
+  border-radius: 4px;
+  border: 1px solid var(--border-color);
+  color: var(--text-main);
+  white-space: nowrap;
+}
+.grov-merke::before {
+  content: '';
+  display: inline-block;
+  width: 0.55rem;
+  height: 0.55rem;
+  border-radius: 50%;
+  margin-right: 0.3rem;
+  vertical-align: middle;
+  background: var(--text-muted);
+}
+.grov-rod::before   { background: #dc2626; }
+.grov-gul::before   { background: #eab308; }
+.grov-gronn::before { background: #16a34a; }
+.grov-tom { color: var(--text-muted); }
+
+/* Knappene i bilen: tre, den valgte fylt. */
+.grov-knapp {
+  flex: 1 1 0;
+  min-height: 44px;
+  font-weight: 700;
+  border: 2px solid var(--border-color);
+  color: var(--text-main);
+  background: transparent;
+}
+.grov-knapp.grov-rod.grov-valgt   { background: #dc2626; border-color: #dc2626; color: #fff; }
+.grov-knapp.grov-gul.grov-valgt   { background: #eab308; border-color: #eab308; color: #111; }
+.grov-knapp.grov-gronn.grov-valgt { background: #16a34a; border-color: #16a34a; color: #fff; }
+
+/* Stedvalget ved «Avreist»: seks store knapper i to kolonner. */
+.stedvalg {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+}
+
 /* ── Oppdragsliste ───────────────────────────────────────────────────────── */
 
 .oppdrag-rad {

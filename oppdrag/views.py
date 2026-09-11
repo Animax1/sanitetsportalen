@@ -61,6 +61,10 @@ def index_view(request):
             'enhet': request.user.enhet,
             'neste_kjede': json.dumps(neste),
             'status_navn': json.dumps(choices.STATUS_NAVN),
+            # Stedene ved «Avreist» og grovsorteringens tre verdier — data
+            # til knappene, som kjeden. Én kilde: `choices`.
+            'avreist_til': json.dumps(list(choices.AVREIST_TIL)),
+            'grovsortering': json.dumps(list(choices.GROVSORTERING)),
         })
 
     return render(request, 'oppdrag/sentral.html', {
@@ -86,12 +90,15 @@ def _aktivt_oppdrag_felter(oppdrag):
     """Feltene enhetskortet viser om det aktive oppdraget — alle ``None``
     når det ikke finnes noe, slik at kortet kan lese dem uten å spørre."""
     if oppdrag is None:
-        return {'oppdragsnummer': None, 'hastegrad': None,
-                'problemstilling': None, 'status_tidspunkt': None}
+        return {'oppdragsnummer': None, 'hastegrad': None, 'grovsortering': None,
+                'grovsortering_navn': None, 'problemstilling': None,
+                'status_tidspunkt': None}
     melding = Statusmelding.objects.gjeldende_for_status(oppdrag, oppdrag.status)
     return {
         'oppdragsnummer': oppdrag.oppdragsnummer,
         'hastegrad': oppdrag.hastegrad,
+        'grovsortering': oppdrag.grovsortering,
+        'grovsortering_navn': choices.GROVSORTERING_NAVN.get(oppdrag.grovsortering, ''),
         'problemstilling': oppdrag.problemstilling,
         'status_tidspunkt': melding.tidspunkt.isoformat() if melding else None,
     }
@@ -515,8 +522,43 @@ def _stempling_kropp(request):
 
 @modul_kreves('oppdrag', 'skriv_handling', svar='json')
 @require_http_methods(['POST'])
+@rate_limit(group='oppdrag:grovsortering', rate='60/m', method='POST')
+def grovsortering_view(request, pk, verdi):
+    """Bilen setter Rød/Gul/Grønn på sitt eget oppdrag.
+
+    Samme form som stemplingene: verdien i URL-en, ikke i kroppen, og bare
+    enhetskontoen som eier oppdraget. Det er ikke en statusovergang — bilen
+    kan endre vurderingen underveis — så den går ikke gjennom
+    `sett_status`, og den er ikke idempotent-nøklet: å sette «Rød» to ganger
+    er «Rød».
+    """
+    if verdi not in choices.GROVSORTERING_NAVN:
+        return JsonResponse(
+            {'status': 'error', 'message': f'Ukjent grovsortering «{verdi}».'},
+            status=404)
+    if not er_enhetskonto(request.user):
+        return JsonResponse(
+            {'status': 'error', 'message': 'Bare enhetskontoer grovsorterer.'},
+            status=403)
+    try:
+        oppdrag = (Oppdrag.objects.select_related('enhet', 'lokasjon')
+                   .get(pk=pk, vakt=hent_aktiv_vakt()))
+    except Oppdrag.DoesNotExist:
+        return JsonResponse(
+            {'status': 'error', 'message': 'Oppdrag ikke funnet'}, status=404)
+    if oppdrag.enhet_id != request.user.enhet.pk:
+        return JsonResponse(
+            {'status': 'error', 'message': 'Oppdraget tilhører en annen enhet.'},
+            status=403)
+    oppdrag.grovsortering = verdi
+    oppdrag.save(update_fields=['grovsortering', 'updated_at'])
+    return JsonResponse({'status': 'ok', 'data': oppdrag_til_dict(oppdrag, for_enhet=True)})
+
+
+@modul_kreves('oppdrag', 'skriv_handling', svar='json')
+@require_http_methods(['POST'])
 @rate_limit(group='oppdrag:stempling', rate='60/m', method='POST')
-def stempling_view(request, pk, overgang):
+def stempling_view(request, pk, overgang, sted=None):
     """Ett navngitt endepunkt per overgang — bilens eneste skriveflate.
 
     Første faktiske bruk av `skriv_handling` (§3.2 i rollemodellnotatet): en
@@ -540,6 +582,13 @@ def stempling_view(request, pk, overgang):
     if overgang not in services.STEMPLBARE:
         return JsonResponse(
             {'status': 'error', 'message': f'Ukjent overgang «{overgang}».'},
+            status=404)
+    # Stedet finnes bare for «Avreist», og bare fra lista. 404, som for en
+    # ukjent overgang: en URL som ikke finnes, ikke en kropp som er feil.
+    if sted is not None and (overgang != choices.AVREIST
+                             or sted not in choices.AVREIST_TIL_NAVN):
+        return JsonResponse(
+            {'status': 'error', 'message': f'Ukjent sted «{sted}» for «{overgang}».'},
             status=404)
 
     if not er_enhetskonto(request.user):
@@ -616,7 +665,7 @@ def stempling_view(request, pk, overgang):
         else:
             melding = services.sett_status(
                 oppdrag, overgang, bruker=request.user,
-                tidspunkt=tidspunkt, forsinket=forsinket)
+                tidspunkt=tidspunkt, forsinket=forsinket, sted=sted or '')
     except services.UlovligOvergang:
         # Typisk et dobbelttrykk der det første vant, eller en skjerm som har
         # sakket akterut. 409, ikke 400: forespørselen var velformet, det er

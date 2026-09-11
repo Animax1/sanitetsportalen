@@ -83,6 +83,10 @@ def oppdrag_til_dict(oppdrag, *, for_enhet: bool = False,
         'enhet_navn': oppdrag.enhet.navn,
         'problemstilling': oppdrag.problemstilling,
         'hastegrad': oppdrag.hastegrad,
+        # Bilens Rød/Gul/Grønn. Tom til bilen har satt den — klienten viser
+        # «—», og det er informasjon: ikke vurdert ennå.
+        'grovsortering': oppdrag.grovsortering,
+        'grovsortering_navn': choices.GROVSORTERING_NAVN.get(oppdrag.grovsortering, ''),
         'lokasjon_id': oppdrag.lokasjon_id,
         'lokasjon_navn': oppdrag.lokasjon.navn,
         'status': oppdrag.status,
@@ -113,6 +117,9 @@ def melding_til_dict(melding) -> dict:
         'forsinket': melding.forsinket,
         'automatisk': melding.automatisk,
         'korrigerer': melding.korrigerer_id,
+        # «Avreist → Sykehus». Tom for alle andre statuser.
+        'sted': melding.sted,
+        'sted_navn': choices.AVREIST_TIL_NAVN.get(melding.sted, ''),
     }
 
 

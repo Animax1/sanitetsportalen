@@ -89,6 +89,30 @@ TERMINAL = LEDIG
 KJEDEN: tuple[str, ...] = (VENTER, RYKKER_UT, FREMME, AVREIST, LEVERER)
 
 
+#: Hvor bilen dro — valget ved «Avreist» (prosjektleder, 11. sep. 2026).
+#: Forkortet, som han ba om: «Skadepol» er skadepoliklinikken. Verdien er
+#: nøkkelen i URL-en (`status/avreist/<sted>/`), etiketten det som vises.
+AVREIST_TIL: tuple[tuple[str, str], ...] = (
+    ('samleplass', 'Samleplass'),
+    ('skadepol', 'Skadepol'),
+    ('legevakt', 'Legevakt'),
+    ('sykehus', 'Sykehus'),
+    ('annen_ambulanse', 'Annen ambulanse'),
+    ('annet', 'Annet sted'),
+)
+AVREIST_TIL_NAVN: dict[str, str] = dict(AVREIST_TIL)
+
+#: Grovsorteringen bilen setter — Rød/Gul/Grønn — ved siden av hastegraden
+#: KO/AMK satte ved opprettelsen. To vurderinger fra to ståsteder, og begge
+#: skal synes (prosjektleder, 11. sep. 2026). Tom til bilen har satt den.
+GROVSORTERING: tuple[tuple[str, str], ...] = (
+    ('rod', 'Rød'),
+    ('gul', 'Gul'),
+    ('gronn', 'Grønn'),
+)
+GROVSORTERING_NAVN: dict[str, str] = dict(GROVSORTERING)
+
+
 CHOICE_FIELDS: dict[str, tuple[str, ...]] = {
     'problemstilling': PROBLEMSTILLING,
     'hastegrad': HASTEGRAD,

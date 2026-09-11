@@ -4,7 +4,42 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
-## 2026-09-11 — Prosjektleders tilbakemeldinger, runde 1: fem små
+## 2026-09-11 — Prosjektleders runde 2a: «Avreist til» og bilens grovsortering
+
+**2060 tester grønne** (27 nye, to mutasjoner satt rødt først). Én migrasjon,
+`oppdrag/0009`, to `AddField` med tom streng som standard — intet dataskritt.
+
+**«Avreist» spør hvor.** Samleplass, Skadepol, Legevakt, Sykehus, Annen
+ambulanse, Annet sted — forkortet, som prosjektleder ba om. Stedet er et
+URL-ledd, `status/avreist/<sted>/`, ikke et felt i kroppen: stemplings-
+endepunktet leser ingen domenefelt derfra (rollemodellen §3.2), og «Avreist
+til Sykehus» er ett navngitt endepunkt til. Lagres på **statusmeldingen**
+(`Statusmelding.sted`) — meldingen er det som ble meldt, og en korreksjon
+av klokkeslettet arver stedet. `sett_status` avviser et sted på enhver annen
+status; viewet gir 404 før det. Uten sted virker «Avreist» som før, så gamle
+køer ikke feiler.
+- **Bilen:** «Avreist»-knappen åpner seks store knapper og «Avbryt» *i
+  stedet for* knapperaden — midt i valget skal det ikke finnes en feil knapp
+  å treffe. Valget følger «Avreist» gjennom offline-køen (`rad.sted`), og
+  `synk` legger det i URL-en.
+- **Tidslinjene** sier «Avreist → Sykehus», på begge skjermene.
+
+**Bilens grovsortering: Rød/Gul/Grønn, ved siden av hastegraden.** To
+vurderinger fra to ståsteder: KO/AMK setter hastegrad ved opprettelsen,
+bilen setter grovsortering underveis — og begge skal synes. Hastegrad står
+til venstre, «Bil: Rød» til høyre, med fargeprikk og tekst (fargen alene
+bærer ikke informasjonen). Tom vises som «Bil: —»: «ikke vurdert ennå» er
+informasjon. `Oppdrag.grovsortering`, satt av bilen via
+`grovsortering/<rod|gul|gronn>/` — samme form som stemplingene, men ikke
+gjennom `sett_status` (det er en vurdering som kan endres, ikke et ledd i
+kjeden) og ikke i køen (uten dekning sier skjermen fra). Sentralbordet
+setter den ikke. Vises på det aktive kortet i bilen (tre knapper, den
+valgte fylt), i oppdragslista og på enhetskortet.
+
+**Arkivet er urørt.** Ingen av feltene inngår i `ArkivertOppdrag` eller i
+SHA-payloaden — signaturene i prod verifiserer som før. Skal de arkiveres,
+er det en egen beslutning (payloadens form er låst).
+
 
 **2033 tester grønne** (15 nye). Fem av elleve punkter fra prosjektleder —
 de som var klare og små. Resten står i TODO med plan.

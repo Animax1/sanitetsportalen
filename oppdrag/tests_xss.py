@@ -27,6 +27,7 @@ HTML_BUILDERS_PER_FIL = {
         # fritekst fra et annet moduls register, og escapes her som alt annet.
         'mkBesetning',
         'renderOppdrag',
+        '_grovMerke',
         'tidslinjeHtml',
         'renderLokasjonsadmin',
         'renderEnhetsadmin',
@@ -35,6 +36,8 @@ HTML_BUILDERS_PER_FIL = {
     OPPDRAG_ENHET_JS: (
         'tidslinjeEnhetHtml',
         'renderAktivt',
+        '_stedvalg',
+        '_grovsorteringsrad',
         'renderVentende',
         'renderAvsluttet',
     ),
@@ -63,6 +66,18 @@ REVIEWED_INTERPOLATIONS = {
     # Besetningspanelet (vaktliste fase 6). Alle tre er hoistet ut av
     # mal-strengen av samme grunn som `fritekstBlokk` over.
     'klikkbar': 'hardkodet CSS-klasse fra en ternær',
+    # Avreist til og grovsortering (11. sep. 2026):
+    'grov': 'markup fra `_grovMerke`, som selv skannes her',
+    'grovsortering': 'markup fra `_grovMerke`, som selv skannes her',
+    'm.status_navn': 'bygger ren tekst i `statusMedSted`, som escapes ved innsetting',
+    'm.sted_navn': 'bygger ren tekst i `statusMedSted`, som escapes ved innsetting',
+    '_grovsorteringsrad(o)': 'markup fra en bygger som selv skannes her',
+    'knapperad': 'markup bygget lokalt: `_stedvalg()` eller knappene, begge skannet her',
+    "valgt ? 'true' : 'false'": 'hardkodet attributtverdi fra en ternær',
+    'knapper': 'markup bygget lokalt, nøkkel og navn escapet inni',
+    'o.grovsortering_navn': 'bygger ren tekst i `status`, som escapes ved innsetting',
+    'nokkel': 'nøkkelen fra serverens `choices` (rod/gul/gronn), bygger klassestrengen '
+              '`klasse` som escapes ved innsetting',
     # Enhetskortet med oppdragsinfo og tid siden (11. sep. 2026):
     'oppdragslinje': 'markup bygget lokalt, nummer/hastegrad/problemstilling escapet inni',
     'statusTid': 'ren tekst av klokkeslett og minutter, bygger `meta` som escapes ved innsetting',
@@ -167,7 +182,7 @@ class OppdragEscapingOppforselTests(SimpleTestCase):
                            'klokke')),
         (OPPDRAG_SENTRAL_JS, ('renderOppdrag', 'renderEnheter', 'tidslinjeHtml',
                               'hastegradKlasse', 'mkBesetning',
-                              'kanSeBesetning', 'tidSiden')),
+                              'kanSeBesetning', 'tidSiden', '_grovMerke')),
     )
 
     #: Besetningspanelet leser to globaler som ellers settes ved sidelasting.
@@ -253,8 +268,17 @@ class EnhetEscapingOppforselTests(SimpleTestCase):
         (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue', 'trustedHtml', '_escHtml',
                            'klokke')),
         (OPPDRAG_ENHET_JS, ('renderAktivt', 'renderVentende', 'renderAvsluttet',
-                            'tidslinjeEnhetHtml', 'hastegradKlasse')),
+                            'tidslinjeEnhetHtml', 'hastegradKlasse',
+                            '_stedvalg', '_grovsorteringsrad')),
     )
+
+    #: Toppnivå-tilstanden `renderAktivt` leser: stedvalget, og listene som
+    #: ellers settes av malen. Stubbes, som `OPPDRAG_NESTE` i køtestene.
+    STUBB = ("globalThis.velgerStedFor = null;\n"
+             "globalThis.AVREIST_TIL = [['samleplass','Samleplass'],"
+             "['skadepol','Skadepol'],['legevakt','Legevakt'],['sykehus','Sykehus'],"
+             "['annen_ambulanse','Annen ambulanse'],['annet','Annet sted']];\n"
+             "globalThis.GROVSORTERING = [['rod','Rød'],['gul','Gul'],['gronn','Grønn']];\n")
 
     def setUp(self):
         if not node_available():
@@ -263,7 +287,7 @@ class EnhetEscapingOppforselTests(SimpleTestCase):
 
     def test_fritekst_paa_aktivt_kort_kommer_ut_som_tekst(self):
         """Kortet bilen stirrer på — med feltet en operatør skriver fritt i."""
-        ut = run_node(self.harness, '''
+        ut = run_node(self.harness, self.STUBB + '''
             globalThis.mineOppdrag = [{
               id: 1, status: 'fremme', status_navn: 'Fremme',
               problemstilling: 'Pustevansker', hastegrad: 'Akutt',
@@ -282,7 +306,7 @@ class EnhetEscapingOppforselTests(SimpleTestCase):
 
     def test_neste_navn_i_knappen_escapes(self):
         """Knappeteksten kommer fra serverens payload — den skal også escapes."""
-        ut = run_node(self.harness, '''
+        ut = run_node(self.harness, self.STUBB + '''
             globalThis.mineOppdrag = [{
               id: 1, status: 'venter', status_navn: 'Venter',
               problemstilling: 'Transport', hastegrad: 'Vanlig',
@@ -419,3 +443,190 @@ class EnhetskortetTests(SimpleTestCase):
             console.log(el.innerHTML);
         """)
         self.assertIn('>Venter<', ut)
+
+
+class AvreistTilOgGrovsorteringTests(SimpleTestCase):
+    """Bilens skjerm: stedvalget ved «Avreist», og Rød/Gul/Grønn.
+
+    Prosjektleder, 11. sep. 2026. Stedet er et URL-ledd, ikke et felt —
+    og det følger «Avreist» gjennom offline-køen.
+    """
+
+    HARNESS = (
+        (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue', 'trustedHtml', '_escHtml',
+                           'klokke')),
+        (OPPDRAG_ENHET_JS, ('renderAktivt', 'tidslinjeEnhetHtml', 'hastegradKlasse',
+                            '_stedvalg', '_grovsorteringsrad', 'koNokkel', 'koLes',
+                            'koSkriv', 'koLeggTil', 'koFjern', 'lagNokkel', 'synk')),
+    )
+    STUBB = EnhetEscapingOppforselTests.STUBB + (
+        "globalThis.localStorage = (() => { const m = {}; return {"
+        "getItem: (k) => (k in m ? m[k] : null), setItem: (k, v) => { m[k] = String(v); },"
+        "removeItem: (k) => { delete m[k]; } }; })();\n"
+        "globalThis.window = { ENHET_ID: 5 };\n")
+
+    AKTIV = ("globalThis.mineOppdrag = [{ id: 1, status: 'fremme', status_navn: 'Fremme',"
+             " problemstilling: 'Fallskade', hastegrad: 'Haster', lokasjon_navn: 'Scene',"
+             " opprettet: '2026-10-03T12:00:00Z', fritekst: '', grovsortering: '',"
+             " grovsortering_navn: '', neste_overgang: 'avreist', neste_navn: 'Avreist',"
+             " statusmeldinger: [] }];\n"
+             "const el = { innerHTML: '' };\n"
+             "globalThis.document = { getElementById: () => el };\n")
+
+    def setUp(self):
+        if not node_available():
+            self.skipTest('node er ikke tilgjengelig')
+        self.harness = build_harness(self.HARNESS)
+
+    def test_avreist_knappen_staar_til_valget_er_apnet(self):
+        ut = run_node(self.harness, self.STUBB + self.AKTIV + """
+            renderAktivt();
+            console.log(el.innerHTML);
+        """)
+        self.assertIn('stempleNeste', ut, 'knappen «Avreist» er der')
+        self.assertNotIn('stedvalg', ut, 'valget er ikke åpent ennå')
+
+    def test_stedvalget_viser_seks_steder_og_ingen_ledig(self):
+        """Midt i valget skal det ikke finnes en feil knapp å treffe."""
+        ut = run_node(self.harness, self.STUBB + self.AKTIV + """
+            globalThis.velgerStedFor = 1;
+            renderAktivt();
+            console.log(el.innerHTML);
+        """)
+        for navn in ('Samleplass', 'Skadepol', 'Legevakt', 'Sykehus',
+                     'Annen ambulanse', 'Annet sted'):
+            self.assertIn(navn, ut)
+        self.assertEqual(ut.count('stempleAvreistTil'), 6)
+        self.assertNotIn('stempleLedig', ut)
+        self.assertIn('avbrytStedvalg', ut)
+
+    def test_koen_baerer_stedet_og_url_en_faar_det(self):
+        ut = run_node(self.harness, self.STUBB + """
+            const rad = koLeggTil(7, 'avreist', 'sykehus');
+            assert(koLes()[0].sted === 'sykehus', 'stedet overlever i koen');
+            assert(koLeggTil(7, 'fremme').sted === null, 'uten sted: null');
+            // Tøm og legg bare avreist-raden tilbake, saa synk sender en.
+            koSkriv([rad]);
+            const kall = [];
+            globalThis.apiFetch = async (url) => { kall.push(url); return { ok: true }; };
+            globalThis.synkerNaa = false;
+            globalThis.etagMine = null;
+            globalThis.skjulFeil = () => {};
+            globalThis.visUsendt = () => {};
+            globalThis.visFeil = () => {};
+            globalThis.lastMine = async () => {};
+            await synk();
+            console.log(JSON.stringify(kall));
+        """)
+        self.assertIn('/oppdrag/api/oppdrag/7/status/avreist/sykehus/', ut)
+
+    def test_uten_sted_er_url_en_som_for(self):
+        ut = run_node(self.harness, self.STUBB + """
+            koSkriv([koLeggTil(7, 'fremme')]);
+            const kall = [];
+            globalThis.apiFetch = async (url) => { kall.push(url); return { ok: true }; };
+            globalThis.synkerNaa = false; globalThis.etagMine = null;
+            globalThis.skjulFeil = () => {}; globalThis.visUsendt = () => {};
+            globalThis.visFeil = () => {}; globalThis.lastMine = async () => {};
+            await synk();
+            console.log(JSON.stringify(kall));
+        """)
+        self.assertIn('/oppdrag/api/oppdrag/7/status/fremme/"', ut)
+
+    def test_tidslinjen_sier_hvor(self):
+        ut = run_node(self.harness, self.STUBB + """
+            console.log(tidslinjeEnhetHtml({ statusmeldinger: [{
+              id: 1, status: 'avreist', status_navn: 'Avreist', sted: 'sykehus',
+              sted_navn: 'Sykehus', tidspunkt: '2026-10-03T12:41:00Z',
+              forsinket: false, automatisk: false
+            }, {
+              id: 2, status: 'fremme', status_navn: 'Fremme', sted: '', sted_navn: '',
+              tidspunkt: '2026-10-03T12:20:00Z', forsinket: false, automatisk: false
+            }]}));
+        """)
+        self.assertIn('Avreist → Sykehus', ut)
+        self.assertNotIn('Fremme →', ut)
+
+    def test_grovsortering_tre_knapper_og_den_valgte_fylt(self):
+        ut = run_node(self.harness, self.STUBB + self.AKTIV + """
+            mineOppdrag[0].grovsortering = 'gul';
+            mineOppdrag[0].grovsortering_navn = 'Gul';
+            renderAktivt();
+            console.log(el.innerHTML);
+        """)
+        self.assertEqual(ut.count('settGrovsortering'), 3)
+        self.assertIn('grov-gul grov-valgt', ut)
+        self.assertNotIn('grov-rod grov-valgt', ut)
+        self.assertIn('Grovsortering: Gul', ut)
+
+    def test_ikke_vurdert_staar_som_tekst(self):
+        ut = run_node(self.harness, self.STUBB + self.AKTIV + """
+            renderAktivt();
+            console.log(el.innerHTML);
+        """)
+        self.assertIn('ikke vurdert', ut)
+        self.assertNotIn('grov-valgt', ut)
+
+    def test_stedsnavn_escapes(self):
+        ut = run_node(self.harness, self.STUBB + self.AKTIV + """
+            globalThis.AVREIST_TIL = [['x', '<img src=x onerror=alert(1)>']];
+            globalThis.velgerStedFor = 1;
+            renderAktivt();
+            console.log(el.innerHTML);
+        """)
+        self.assertNotIn('<img src=x', ut)
+        self.assertIn('&lt;img', ut)
+
+
+class SentralbordetsGrovmerkeTests(SimpleTestCase):
+    """To vurderinger, to plasser: hastegrad til venstre, bilens grovsortering
+    til høyre — og «—» til bilen har vurdert."""
+
+    HARNESS = OppdragEscapingOppforselTests.HARNESS
+    STUBB = OppdragEscapingOppforselTests.BESETNING_STUBB
+
+    def setUp(self):
+        if not node_available():
+            self.skipTest('node er ikke tilgjengelig')
+        self.harness = build_harness(self.HARNESS)
+
+    def _rad(self, **felt):
+        import json
+        o = {'id': 1, 'status': 'fremme', 'status_navn': 'Fremme', 'nummer': 3,
+             'enhet_navn': 'E1', 'lokasjon_navn': 'Scene', 'problemstilling': 'Fall',
+             'hastegrad': 'Haster', 'opprettet': '2026-10-03T12:00:00Z',
+             'status_tidspunkt': None, 'fritekst': '', 'grovsortering': '',
+             'grovsortering_navn': ''}
+        o.update(felt)
+        return run_node(self.harness, self.STUBB + f"""
+            globalThis.oppdragsliste = [{json.dumps(o)}];
+            const el = {{ innerHTML: '' }};
+            globalThis.document = {{ getElementById: () => el }};
+            renderOppdrag();
+            console.log(el.innerHTML);
+        """)
+
+    def test_hastegrad_forst_saa_grovsortering(self):
+        ut = self._rad(grovsortering='rod', grovsortering_navn='Rød')
+        self.assertLess(ut.index('hastegrad-haster'), ut.index('grov-rod'))
+        self.assertIn('Bil: Rød', ut)
+
+    def test_ikke_vurdert_er_en_strek(self):
+        ut = self._rad()
+        self.assertIn('Bil: —', ut)
+        self.assertIn('grov-tom', ut)
+
+    def test_grovsorteringsnavn_escapes(self):
+        ut = self._rad(grovsortering='rod', grovsortering_navn='<b>x</b>')
+        self.assertNotIn('<b>x</b>', ut)
+
+    def test_tidslinjen_i_sentralbordet_sier_hvor(self):
+        ut = run_node(self.harness, self.STUBB + """
+            globalThis.OPPDRAG_TILGANG = { kanSkrive: false };
+            console.log(tidslinjeHtml({ historikk: [{
+              id: 1, status: 'avreist', status_navn: 'Avreist', sted: 'legevakt',
+              sted_navn: 'Legevakt', tidspunkt: '2026-10-03T12:41:00Z',
+              forsinket: false, automatisk: false, korrigerer: null
+            }], enhetsbytter: [] }));
+        """)
+        self.assertIn('Avreist → Legevakt', ut)

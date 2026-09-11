@@ -40,6 +40,17 @@ function hastegradKlasse(h) {
 }
 
 
+function _grovMerke(o) {
+  // Bilens Rød/Gul/Grønn som merke; «—» når bilen ikke har vurdert ennå.
+  // `grovsortering` er nøkkelen (rod/gul/gronn) og styrer fargen;
+  // `grovsortering_navn` er teksten.
+  if (!o.grovsortering) {
+    return '<span class="grov-merke grov-tom" title="Bilen har ikke grovsortert ennå">Bil: —</span>';
+  }
+  return `<span class="grov-merke grov-${escHtmlValue(o.grovsortering)}">Bil: ${escapeHtml(o.grovsortering_navn || o.grovsortering)}</span>`;
+}
+
+
 function tidSiden(iso, naa) {
   // «12 min», «1 t 05 min» — hvor lenge siden et tidspunkt. Prosjektleder,
   // 11. sep. 2026: «tidspunkt siden oppdrag». Klokkeslettet står der alt;
@@ -84,10 +95,12 @@ function renderEnheter() {
         : `${e.status_navn}${statusTid}`;
       // Det aktive oppdraget i ett blikk: nummer, hastegrad, problemstilling.
       // Hoistet ut av mal-strengen, som resten.
+      const grov = e.oppdragsnummer != null ? _grovMerke(e) : '';
       const oppdragslinje = e.oppdragsnummer != null
         ? `<div class="enhet-oppdrag">
              <span class="oppdrag-nr">#${escHtmlValue(e.oppdragsnummer)}</span>
              <span class="hastegrad ${escHtmlValue(hastegradKlasse(e.hastegrad))}">${escapeHtml(e.hastegrad || '')}</span>
+             ${grov}
              <span class="enhet-oppdrag-problem">${escapeHtml(e.problemstilling || '')}</span>
            </div>`
         : '';
@@ -244,12 +257,17 @@ function renderOppdrag() {
       ? `${o.status_navn} · ${tidSiden(o.status_tidspunkt)}`
       : String(o.status_navn);
     const opprettetTekst = `${klokke(o.opprettet)} · ${tidSiden(o.opprettet)} siden`;
+    // To vurderinger, to plasser: KO/AMKs hastegrad til venstre, bilens
+    // grovsortering til høyre. Tom grovsortering vises som «—», fordi
+    // «ikke vurdert ennå» er informasjon.
+    const grovsortering = _grovMerke(o);
     return `
     <div class="oppdrag-rad" data-action="visOppdrag" data-id="${escHtmlValue(o.id)}"
          role="button" tabindex="0">
       <div class="d-flex align-items-center gap-2 flex-wrap">
         <span class="oppdrag-nr">#${escHtmlValue(o.nummer)}</span>
         <span class="hastegrad ${escHtmlValue(hastegradKlasse(o.hastegrad))}">${escapeHtml(o.hastegrad)}</span>
+        ${grovsortering}
         <span class="oppdrag-problem">${escapeHtml(o.problemstilling)}</span>
         <span class="ms-auto d-flex align-items-center gap-1">
           <span class="status-prikk status-${escHtmlValue(o.status)}"></span>
@@ -300,12 +318,14 @@ function tidslinjeHtml(data) {
       ? `<button type="button" class="btn btn-link btn-sm tidslinje-rett p-0 ms-2"
                  data-action="visRettTid" data-id="${escHtmlValue(m.id)}">Rett tid</button>`
       : '';
+    // «Avreist → Sykehus» — stedet ved statusen, som på enhetsskjermen.
+    const statusMedSted = m.sted_navn ? `${m.status_navn} → ${m.sted_navn}` : String(m.status_navn);
     rader.push({
       tid: m.tidspunkt,
       html: `
         <div class="${klasse}" id="tidslinje-rad-${escHtmlValue(m.id)}">
           <span class="${tidKlasse}"${tittel}>${escapeHtml(klokke(m.tidspunkt))}</span>
-          <span>${escapeHtml(m.status_navn)}</span>
+          <span>${escapeHtml(statusMedSted)}</span>
           ${notatBlokk}
           ${rettKnapp}
         </div>`,

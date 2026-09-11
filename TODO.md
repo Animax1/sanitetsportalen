@@ -153,14 +153,14 @@ ingen av dem gir feilmelding — de er bare stille inaktive.
 
 - [ ] **Prosjektleders tilbakemeldinger — resten** (planlagt 11. sep. 2026,
       rekkefølgen er avtalt med André):
-      - [ ] **Avreist til** som valg: Samleplass, Skadepol, Legevakt, Sykehus,
-            Annen ambulanse, Annet sted. Stedet i URL-en
-            (`stempling/avreist/<sted>/`), lagret på statusmeldingen.
-            Sentralbordet viser «Avreist → Sykehus 14:41».
-      - [ ] **Grovsortering Rød/Gul/Grønn på oppdraget**, satt av bilen — ved
-            siden av hastegrad fra KO/AMK, ikke i stedet for. Venstre: «AMK:
-            Haster», høyre: «Bil: Rød» som fargeprikk; tom («—») til bilen har
-            satt den. Bilen setter den via URL (`grovsortering/<rod|gul|gronn>/`).
+      - [x] **Avreist til** (11. sep. 2026): `status/avreist/<sted>/`, lagret på
+            statusmeldingen, følger offline-køen. Tidslinjene sier «→ Sykehus».
+      - [x] **Grovsortering Rød/Gul/Grønn** (11. sep. 2026): `Oppdrag.grovsortering`,
+            satt av bilen via `grovsortering/<verdi>/`. Hastegrad venstre,
+            «Bil: Rød» høyre, «Bil: —» til bilen har vurdert. `oppdrag/0009`.
+            - [ ] **Skal grovsortering og sted inn i arkivet?** Payloaden er
+                  signaturlåst; nye felt krever en versjonert payload (nye
+                  arkiver får dem, gamle verifiserer som før). Egen beslutning.
       - [ ] **Probono-skift**: avkryssing på skiftet, redigerbar av alle som
             kan redigere raden. Telles ikke i timesummene; telles fortsatt i
             lengste skift og korteste hvile.

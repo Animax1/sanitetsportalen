@@ -150,6 +150,12 @@ class Oppdrag(BaseTimeStampedModel):
         verbose_name='Hastegrad')
     lokasjon = models.ForeignKey(
         Lokasjon, on_delete=models.PROTECT, related_name='oppdrag', verbose_name='Lokasjon')
+    # Bilens egen vurdering, satt fra enhetsskjermen (11. sep. 2026). Står
+    # ved siden av `hastegrad` — KO/AMKs vurdering ved opprettelsen — ikke i
+    # stedet for. Tom betyr «ikke vurdert ennå», og det skal synes.
+    grovsortering = models.CharField(
+        max_length=8, blank=True, default='', choices=choices.GROVSORTERING,
+        verbose_name='Grovsortering')
     # Eneste frie felt i modulen. Unntatt verdilogging i audit — se signals.py.
     fritekst = models.TextField(blank=True, default='', verbose_name='Fritekst')
     status = models.CharField(
@@ -288,6 +294,12 @@ class Statusmelding(BaseTimeStampedModel):
         verbose_name='Satt automatisk',
         help_text='Oppdraget ble avsluttet fordi enheten startet det neste.',
     )
+    # Hvor bilen dro — bare meningsfullt for `avreist` (11. sep. 2026).
+    # Ligger på meldingen, ikke på oppdraget: meldingen er *det som ble
+    # meldt*, og en korreksjon er en ny rad som arver stedet.
+    sted = models.CharField(
+        max_length=20, blank=True, default='', choices=choices.AVREIST_TIL,
+        verbose_name='Avreist til')
     # PROTECT: den korrigerte raden skal ikke kunne forsvinne under
     # korreksjonen — da ville tidslinjen vist en retting av ingenting.
     korrigerer = models.ForeignKey(

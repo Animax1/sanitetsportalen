@@ -1475,3 +1475,146 @@ class OppdragslistaStatustidspunktTests(OppdragBasis):
         for _ in range(4):
             services.sett_status(self._oppdrag(self.enhet), choices.RYKKER_UT)
         self.assertEqual(antall(), med_to, 'spørringene vokser med radene')
+
+
+class AvreistTilTests(OppdragBasis):
+    """«Avreist» spør hvor (prosjektleder, 11. sep. 2026).
+
+    Stedet er et URL-ledd — `status/avreist/<sted>/` — ikke et felt i
+    kroppen: stemplingsendepunktet leser ingen domenefelt derfra. Lagres på
+    statusmeldingen, og en korreksjon arver det.
+    """
+
+    def setUp(self):
+        super().setUp()
+        self.bil = _bruker('bil_sted', 'skriv_handling')
+        self.enhet.user = self.bil
+        self.enhet.save()
+        self.c = _klient(self.bil)
+
+    def _fremme(self):
+        o = self._oppdrag(self.enhet)
+        services.sett_status(o, choices.RYKKER_UT)
+        services.sett_status(o, choices.FREMME)
+        return o
+
+    def test_avreist_med_sted_lagres_paa_meldingen(self):
+        o = self._fremme()
+        res = self.c.post(f'/oppdrag/api/oppdrag/{o.pk}/status/avreist/sykehus/',
+                          content_type='application/json', data={})
+        self.assertEqual(res.status_code, 200, res.content)
+        melding = Statusmelding.objects.gjeldende_for_status(o, choices.AVREIST)
+        self.assertEqual(melding.sted, 'sykehus')
+        self.assertEqual(res.json()['data']['melding']['sted_navn'], 'Sykehus')
+
+    def test_alle_seks_stedene_godtas(self):
+        for sted, navn in choices.AVREIST_TIL:
+            with self.subTest(sted=sted):
+                o = self._fremme()
+                res = self.c.post(f'/oppdrag/api/oppdrag/{o.pk}/status/avreist/{sted}/',
+                                  content_type='application/json', data={})
+                self.assertEqual(res.status_code, 200)
+                self.assertEqual(res.json()['data']['melding']['sted_navn'], navn)
+
+    def test_ukjent_sted_er_404_og_skriver_ingenting(self):
+        o = self._fremme()
+        res = self.c.post(f'/oppdrag/api/oppdrag/{o.pk}/status/avreist/manen/',
+                          content_type='application/json', data={})
+        self.assertEqual(res.status_code, 404)
+        o.refresh_from_db()
+        self.assertEqual(o.status, choices.FREMME)
+
+    def test_sted_paa_annen_status_er_404(self):
+        """Et sted hører til «Avreist» og ingen annen overgang."""
+        o = self._oppdrag(self.enhet)
+        services.sett_status(o, choices.RYKKER_UT)
+        res = self.c.post(f'/oppdrag/api/oppdrag/{o.pk}/status/fremme/sykehus/',
+                          content_type='application/json', data={})
+        self.assertEqual(res.status_code, 404)
+        o.refresh_from_db()
+        self.assertEqual(o.status, choices.RYKKER_UT)
+
+    def test_avreist_uten_sted_virker_som_for(self):
+        """Gamle klienter og køer sender uten sted; det skal ikke bli 404."""
+        o = self._fremme()
+        res = self.c.post(f'/oppdrag/api/oppdrag/{o.pk}/status/avreist/',
+                          content_type='application/json', data={})
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(res.json()['data']['melding']['sted'], '')
+
+    def test_tjenesten_avviser_sted_paa_feil_status(self):
+        o = self._oppdrag(self.enhet)
+        with self.assertRaises(ValueError):
+            services.sett_status(o, choices.RYKKER_UT, sted='sykehus')
+
+    def test_korreksjonen_arver_stedet(self):
+        o = self._fremme()
+        melding = services.sett_status(o, choices.AVREIST, sted='legevakt')
+        ny = services.korriger_tidspunkt(
+            melding, melding.tidspunkt - timedelta(minutes=2), bruker=self.bil)
+        self.assertEqual(ny.sted, 'legevakt')
+
+    def test_sentralbordets_tidslinje_baerer_stedet(self):
+        o = self._fremme()
+        services.sett_status(o, choices.AVREIST, sted='skadepol')
+        c = _klient(_bruker('sentral_sted', 'les'))
+        data = c.get(f'/oppdrag/api/oppdrag/{o.pk}/').json()['data']
+        avreist = next(m for m in data['historikk'] if m['status'] == choices.AVREIST)
+        self.assertEqual(avreist['sted_navn'], 'Skadepol')
+
+
+class GrovsorteringTests(OppdragBasis):
+    """Bilen setter Rød/Gul/Grønn — ved siden av KO/AMKs hastegrad, ikke i
+    stedet for (prosjektleder, 11. sep. 2026)."""
+
+    def setUp(self):
+        super().setUp()
+        self.bil = _bruker('bil_grov', 'skriv_handling')
+        self.enhet.user = self.bil
+        self.enhet.save()
+        self.c = _klient(self.bil)
+        self.o = self._oppdrag(self.enhet)
+        services.sett_status(self.o, choices.RYKKER_UT)
+
+    def _sett(self, verdi, klient=None, oppdrag=None):
+        return (klient or self.c).post(
+            f'/oppdrag/api/oppdrag/{(oppdrag or self.o).pk}/grovsortering/{verdi}/')
+
+    def test_bilen_setter_og_hastegraden_staar(self):
+        res = self._sett('rod')
+        self.assertEqual(res.status_code, 200, res.content)
+        self.o.refresh_from_db()
+        self.assertEqual(self.o.grovsortering, 'rod')
+        self.assertEqual(self.o.hastegrad, 'Akutt', 'hastegraden er KO/AMKs og røres ikke')
+        self.assertEqual(res.json()['data']['grovsortering_navn'], 'Rød')
+
+    def test_vurderingen_kan_endres(self):
+        self._sett('rod')
+        self._sett('gronn')
+        self.o.refresh_from_db()
+        self.assertEqual(self.o.grovsortering, 'gronn')
+
+    def test_ukjent_verdi_er_404(self):
+        self.assertEqual(self._sett('lilla').status_code, 404)
+
+    def test_sentralbordet_grovsorterer_ikke(self):
+        c = _klient(_bruker('sentral_grov', 'skriv_full'))
+        self.assertEqual(self._sett('rod', klient=c).status_code, 403)
+
+    def test_annen_bils_oppdrag_er_403(self):
+        annen = self._oppdrag(self.annen_enhet)
+        self.assertEqual(self._sett('rod', oppdrag=annen).status_code, 403)
+
+    def test_tom_til_bilen_har_vurdert(self):
+        c = _klient(_bruker('sentral_grov2', 'les'))
+        rad = next(r for r in c.get('/oppdrag/api/oppdrag/').json()['data']
+                   if r['id'] == self.o.pk)
+        self.assertEqual(rad['grovsortering'], '')
+        self.assertEqual(rad['grovsortering_navn'], '')
+
+    def test_enhetskortet_baerer_grovsorteringen(self):
+        self._sett('gul')
+        c = _klient(_bruker('sentral_grov3', 'les'))
+        rad = next(r for r in c.get('/oppdrag/api/enheter/').json()['data']
+                   if r['id'] == self.enhet.pk)
+        self.assertEqual(rad['grovsortering_navn'], 'Gul')

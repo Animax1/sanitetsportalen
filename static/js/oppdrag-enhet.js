@@ -17,6 +17,12 @@
 
 let mineOppdrag = [];
 let etagMine = null;
+// Oppdraget som har stedvalget åpent — «Avreist» spør hvor (11. sep. 2026).
+// Ett om gangen: knappene bærer bare stedet, og oppdraget står her.
+let velgerStedFor = null;
+// Stedene og grovsorteringen kommer fra serveren via malen, som kjeden.
+const AVREIST_TIL = globalThis.OPPDRAG_AVREIST_TIL || [];
+const GROVSORTERING = globalThis.OPPDRAG_GROVSORTERING || [];
 
 const HASTEGRAD_REKKEFOLGE = ['Akutt', 'Haster', 'Vanlig'];
 
@@ -85,14 +91,17 @@ function lagNokkel() {
 }
 
 
-function koLeggTil(oppdragId, overgang) {
+function koLeggTil(oppdragId, overgang, sted) {
     // Klienttiden fryses her, ved trykket — ikke ved sendingen. Uten det
     // ville statistikken vist når dekningen kom tilbake i stedet for når
     // mannskapet faktisk meldte.
+    // `sted` følger «Avreist» gjennom køen: valget ble tatt i bilen uten
+    // dekning, og skal ikke gå tapt før det kommer fram.
     const rad = {
         nokkel: lagNokkel(),
         oppdragId,
         overgang,
+        sted: sted || null,
         klienttid: new Date().toISOString(),
     };
     const ko = koLes();
@@ -188,6 +197,44 @@ function visUsendt() {
 // tests_xss.py kan ikke se inn i en nøstet mal-streng, så en uescapet verdi
 // der ville passert stille.
 
+function _stedvalg() {
+  // Seks steder fra serveren (`OPPDRAG_AVREIST_TIL`), som store knapper.
+  // Nøkkelen er det som sendes; etiketten det som vises.
+  const knapper = AVREIST_TIL.map(([nokkel, navn]) =>
+    `<button type="button" class="btn btn-primary stor-knapp"
+             id="stemple-sted-${escHtmlValue(nokkel)}"
+             data-action="stempleAvreistTil" data-id="${escHtmlValue(nokkel)}">
+       ${escapeHtml(navn)}</button>`).join('');
+  return `
+    <div class="mt-3">
+      <div class="oppdrag-meta mb-2">Avreist til:</div>
+      <div class="stedvalg">${knapper}</div>
+      <button type="button" class="btn btn-outline-light stor-knapp mt-2 w-100"
+              data-action="avbrytStedvalg">Avbryt</button>
+    </div>`;
+}
+
+
+function _grovsorteringsrad(o) {
+  // Bilens vurdering: tre knapper, den valgte fylt. Ingen valgt betyr
+  // «ikke vurdert ennå», og det står som tekst — ikke som en tom rad.
+  const knapper = GROVSORTERING.map(([nokkel, navn]) => {
+    const valgt = o.grovsortering === nokkel;
+    const klasse = valgt ? `btn grov-knapp grov-${nokkel} grov-valgt` : `btn grov-knapp grov-${nokkel}`;
+    return `<button type="button" class="${escHtmlValue(klasse)}" id="grov-${escHtmlValue(nokkel)}"
+                    data-action="settGrovsortering" data-id="${escHtmlValue(nokkel)}"
+                    aria-pressed="${valgt ? 'true' : 'false'}">${escapeHtml(navn)}</button>`;
+  }).join('');
+  const status = o.grovsortering_navn
+    ? `Grovsortering: ${o.grovsortering_navn}` : 'Grovsortering: ikke vurdert';
+  return `
+    <div class="grovsortering mt-2">
+      <span class="oppdrag-meta">${escapeHtml(status)}</span>
+      <div class="d-flex gap-2 mt-1">${knapper}</div>
+    </div>`;
+}
+
+
 function tidslinjeEnhetHtml(o) {
   return (o.statusmeldinger || []).map((m) => {
     // Markøren for et avledet tidspunkt sitter på KLOKKESLETTET, ikke på
@@ -206,10 +253,12 @@ function tidslinjeEnhetHtml(o) {
     const notatBlokk = notat.length
       ? `<span class="tidslinje-notat">· ${escapeHtml(notat.join(', '))}</span>`
       : '';
+    // «Avreist → Sykehus»: stedet står ved statusen, ikke som notat.
+    const statusMedSted = m.sted_navn ? `${m.status_navn} → ${m.sted_navn}` : String(m.status_navn);
     return `
       <div class="tidslinje-rad">
         <span class="${tidKlasse}"${tittel}>${escapeHtml(klokke(m.tidspunkt))}</span>
-        <span>${escapeHtml(m.status_navn)}</span>
+        <span>${escapeHtml(statusMedSted)}</span>
         ${notatBlokk}
       </div>`;
   }).join('');
@@ -246,6 +295,12 @@ function renderAktivt() {
               id="stemple-ledig-${escHtmlValue(o.id)}"
               data-action="stempleLedig" data-id="${escHtmlValue(o.id)}">
         Ledig</button>`;
+    // **Stedvalget erstatter knapperaden** når «Avreist» er trykket: seks
+    // store knapper og «Avbryt», ingen «Ledig» ved siden av — i en bil i
+    // bevegelse skal det ikke finnes en feil knapp å treffe midt i valget.
+    const knapperad = velgerStedFor === o.id
+      ? _stedvalg()
+      : `<div class="d-flex gap-2 mt-3">${nesteKnapp}${ledigKnapp}</div>`;
     return `
     <div class="aktivt-kort">
       <div class="d-flex align-items-center gap-2 flex-wrap mb-1">
@@ -255,11 +310,9 @@ function renderAktivt() {
       </div>
       <div class="oppdrag-meta mb-1">${escapeHtml(o.lokasjon_navn)}</div>
       ${fritekstBlokk}
+      ${_grovsorteringsrad(o)}
       <div class="mt-2">${tidslinjeEnhetHtml(o)}</div>
-      <div class="d-flex gap-2 mt-3">
-        ${nesteKnapp}
-        ${ledigKnapp}
-      </div>
+      ${knapperad}
     </div>`;
   }).join('');
 }
@@ -377,8 +430,11 @@ async function synk() {
       const rad = ko[0];
       let res;
       try {
+        // Stedet er et URL-ledd, ikke et felt i kroppen — endepunktet leser
+        // ingen domenefelt derfra.
+        const stedLedd = rad.sted ? `${encodeURIComponent(rad.sted)}/` : '';
         res = await apiFetch(
-          `/oppdrag/api/oppdrag/${rad.oppdragId}/status/${rad.overgang}/`, {
+          `/oppdrag/api/oppdrag/${rad.oppdragId}/status/${rad.overgang}/${stedLedd}`, {
             method: 'POST',
             body: JSON.stringify({
               klienttid: rad.klienttid,
@@ -427,12 +483,12 @@ async function synk() {
 }
 
 
-async function _stemple(id, overgang, knappId) {
+async function _stemple(id, overgang, knappId, sted) {
   await withSubmitGuard(knappId, async () => {
     // Skriv lokalt FØRST. Skjermen skal vise trykket med en gang, også uten
     // dekning — en knapp som ser ut til å ha virket, men ikke har det, er
     // verre enn en som feiler synlig.
-    koLeggTil(id, overgang);
+    koLeggTil(id, overgang, sted);
     renderAlt();
     await synk();
   });
@@ -443,7 +499,52 @@ async function stempleNeste(id) {
   // videre i kjeden også når forrige trykk ligger usendt.
   const o = mineOppdrag.find((x) => x.id === id);
   if (!o || !o.neste_overgang) return;
+  if (o.neste_overgang === 'avreist') {
+    // «Avreist» spør hvor. Knappen åpner valget i stedet for å stemple;
+    // stempelet settes av `stempleAvreistTil` med stedet.
+    velgerStedFor = id;
+    renderAlt();
+    return;
+  }
   await _stemple(id, o.neste_overgang, `stemple-neste-${id}`);
+}
+
+async function stempleAvreistTil(sted) {
+  const id = velgerStedFor;
+  if (id == null) return;
+  if (!AVREIST_TIL.some((s) => s[0] === sted)) return;
+  velgerStedFor = null;
+  await _stemple(id, 'avreist', `stemple-sted-${sted}`, sted);
+}
+
+function avbrytStedvalg() {
+  velgerStedFor = null;
+  renderAlt();
+}
+
+async function settGrovsortering(verdi) {
+  // Bilens Rød/Gul/Grønn på det påbegynte oppdraget. Ikke i køen: det er
+  // en vurdering som kan endres, ikke et stempel i en kjede — og uten
+  // dekning sier skjermen fra i stedet for å late som.
+  const o = mineOppdrag.find((x) => x.status !== 'venter' && x.status !== 'ledig');
+  if (!o || !GROVSORTERING.some((g) => g[0] === verdi)) return;
+  await withSubmitGuard(`grov-${verdi}`, async () => {
+    let res;
+    try {
+      res = await apiFetch(`/oppdrag/api/oppdrag/${o.id}/grovsortering/${encodeURIComponent(verdi)}/`,
+                           { method: 'POST' });
+    } catch (e) {
+      visFeil('Ingen kontakt — grovsorteringen ble ikke lagret. Prøv igjen når dekningen er tilbake.');
+      return;
+    }
+    const d = await res.json().catch(() => ({}));
+    if (!res.ok || d.status !== 'ok') {
+      visFeil(d.message || 'Kunne ikke lagre grovsorteringen.');
+      return;
+    }
+    etagMine = null;
+    await lastMine();
+  });
 }
 
 async function stempleLedig(id) {

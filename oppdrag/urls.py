@@ -24,6 +24,13 @@ urlpatterns = [
     # Ett navngitt endepunkt per overgang. Navnene er statusverdiene selv,
     # og settet håndheves i viewet mot `services.STEMPLBARE` — utledet fra
     # overgangstabellen, ikke skrevet ned på nytt her.
+    # Stedet i URL-en, ikke i kroppen: stemplingsendepunktet leser ingen
+    # domenefelt fra kroppen (rollemodellen §3.2), og «Avreist til Sykehus»
+    # er ett navngitt endepunkt til, ikke et felt.
+    path('api/oppdrag/<int:pk>/status/<str:overgang>/<str:sted>/', views.stempling_view,
+         name='oppdrag_api_stempling_sted'),
+    path('api/oppdrag/<int:pk>/grovsortering/<str:verdi>/', views.grovsortering_view,
+         name='oppdrag_api_grovsortering'),
     path('api/oppdrag/<int:pk>/status/<str:overgang>/', views.stempling_view,
          name='oppdrag_api_stempling'),
     # Arkivering = rydding av tavla, ikke vaktarkivet. POST arkiverer,

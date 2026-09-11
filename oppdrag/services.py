@@ -262,7 +262,8 @@ class UlovligOvergang(Exception):
 
 @transaction.atomic
 def sett_status(oppdrag, ny_status: str, *, bruker=None, tidspunkt=None,
-                forsinket: bool = False, automatisk: bool = False) -> Statusmelding:
+                forsinket: bool = False, automatisk: bool = False,
+                sted: str = '') -> Statusmelding:
     """Skriv en statusmelding og oppdater oppdragets cachede status.
 
     Kaster ``UlovligOvergang`` hvis overgangen ikke står i tabellen. Sjekken
@@ -280,6 +281,11 @@ def sett_status(oppdrag, ny_status: str, *, bruker=None, tidspunkt=None,
         raise UlovligOvergang(
             f'Kan ikke gå fra {oppdrag.status!r} til {ny_status!r}.'
         )
+    # Stedet hører til «Avreist» og ingen annen status. Sjekken ligger her og
+    # ikke bare i viewet, av samme grunn som overgangssjekken: alle veier inn
+    # skal gjennom den.
+    if sted and (ny_status != choices.AVREIST or sted not in choices.AVREIST_TIL_NAVN):
+        raise ValueError(f'Ugyldig sted {sted!r} for status {ny_status!r}.')
 
     melding = Statusmelding.objects.create(
         oppdrag=oppdrag,
@@ -288,6 +294,7 @@ def sett_status(oppdrag, ny_status: str, *, bruker=None, tidspunkt=None,
         meldt_av=bruker,
         forsinket=forsinket,
         automatisk=automatisk,
+        sted=sted or '',
     )
     oppdrag.status = ny_status
     felter = ['status', 'updated_at']
@@ -434,6 +441,9 @@ def korriger_tidspunkt(melding, nytt_tidspunkt, *, bruker) -> Statusmelding:
         forsinket=False,
         automatisk=False,
         korrigerer=melding,
+        # Stedet følger med: en retting av klokkeslettet er ikke en retting
+        # av hvor bilen dro, og en rad uten sted ville lest som «ukjent».
+        sted=melding.sted,
     )
 
 
