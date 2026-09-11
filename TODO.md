@@ -141,6 +141,8 @@ ingen av dem gir feilmelding — de er bare stille inaktive.
       - [x] **Planleggingstabellen klemmes ikke på mobil** (samme dag).
       - [x] **Korpsfilteret** (samme dag): `les` og `skriv_handling` ser eget
             korps på `/vaktliste/`, nytt trinn `les_alle` ser alle. `accounts/0016`.
+      - [x] **Korpsvelgeren** for den som ser alle (samme dag) — nedtrekk i
+            vaktlinja, `?korps=` på planleggingstallene.
             - [ ] **Etter deploy til prod: gå gjennom matrisen.** Alle som hadde
                   `les` ser nå bare sitt eget korps — den som skal samordne må
                   få `les_alle`. Og kontoer med `les`/`skriv_handling` uten

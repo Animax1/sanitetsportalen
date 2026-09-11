@@ -134,6 +134,10 @@ class FooterTests(TestCase):
         self.assertContains(res, 'portal-versjon')
         self.assertContains(res, 'a03b5e5')
         self.assertContains(res, '11.09.2026')
+        # Klokkeslettet står bare i tooltipen: «Vi trenger ikke ha tidsstempel
+        # etter dato i footer» (André, 11. sep. 2026).
+        self.assertNotContains(res, '11.09.2026 12:15')
+        self.assertNotContains(res, '11.09.2026 10:15')
 
     def test_uten_dato_staar_bygget_alene(self):
         with mock.patch('core.versjon.finn_versjon',

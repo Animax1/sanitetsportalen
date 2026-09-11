@@ -30,6 +30,20 @@ sier hvorfor. Sentralbordets besetning i `/oppdrag/` er **ikke** filtrert.
 Notatets §4.4 («`les` ser hele lista — poenget er samordning») er strøket
 med dato og begrunnelse; CLAUDE.md oppdatert.
 
+**Korpsvelgeren for den som ser alle** (samme dag): «Det må og være en måte
+for de med full tilgang å sortere på korps.» Et nedtrekk i vaktlinja — «Alle
+korps / HGSD — Haugesund / …» — som gjør i nettleseren det serveren gjør for
+korps-brukeren: `_synligePoster()` speiler `poster_for_korps()`, og
+`brukKorpsfilter()` legger den på `aktivListe.vaktposter` og
+`register.mannskap`, så oversikt, ressursfaner, tilstede, kurver og registeret
+følger med uten å vite om den. Planleggingstallene regnes på serveren og får
+`?korps=<id>` — honorert bare for den som ser alle. Velgeren finnes ikke for
+korps-brukeren: hun er alt avgrenset, og et nedtrekk med ett valg ser
+ødelagt ut. Skiftet bærer nå `korps_id` (personens), ved siden av
+`reservert_korps_id` (plassens).
+
+**Footeren viser datoen alene** — klokkeslettet står i tooltipen.
+
 ---
 
 ## 2026-09-11 — Bygg og dato i footeren, og en planleggingstabell som ikke klemmes

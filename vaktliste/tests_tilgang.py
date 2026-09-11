@@ -1128,3 +1128,68 @@ class KorpsfilterTests(TilgangsBasis):
                     self.assertIn('les_alle', modul.nivaaer)
                 else:
                     self.assertNotIn('les_alle', modul.nivaaer)
+
+
+@override_settings(SECURE_SSL_REDIRECT=False, RATELIMIT_ENABLE=False)
+class KorpsvelgerTests(KorpsfilterTests):
+    """Korpsvelgeren (11. sep. 2026): den som ser alle korps kan velge ett.
+
+    André: «Det må og være en måte for de med full tilgang å sortere på korps
+    eller ha en fane som viser korpsoversikt.» Velgeren gjør i nettleseren
+    det serveren gjør for korps-brukeren; tallene i planleggingsfanen regnes
+    på serveren og får parameteret `?korps=`.
+    """
+
+    def _belastning(self, c, korps=None):
+        url = f'/vaktliste/api/vaktlister/{self.vl.pk}/belastning/'
+        if korps is not None:
+            url += f'?korps={korps}'
+        return c.get(url).json()['data']
+
+    def test_parameteret_avgrenser_for_den_som_ser_alle(self):
+        for navn, c in (('les_alle', self.c_sam), ('skriv_full', self.c_vl),
+                        ('admin', self.c_adm)):
+            with self.subTest(konto=navn):
+                data = self._belastning(c, self.karmoy.pk)
+                self.assertEqual({r['navn'] for r in data['personer']}, {'Ola'})
+                self.assertEqual(data['sammendrag']['ledige_plasser'], 1,
+                                 'Karmøys plass på den frie ressursen')
+
+    def test_uten_parameter_ser_hun_alle(self):
+        data = self._belastning(self.c_vl)
+        self.assertEqual({r['navn'] for r in data['personer']}, {'Kari', 'Ola'})
+
+    def test_parameteret_er_ingen_dor_for_korps_brukeren(self):
+        """Badgen avgrenser henne alt; et parameter som flyttet den ville
+        vært en vei rundt filteret."""
+        for navn, c in (('les', self.c_leser), ('skriv_handling', self.c_kb)):
+            with self.subTest(konto=navn):
+                data = self._belastning(c, self.karmoy.pk)
+                self.assertEqual({r['navn'] for r in data['personer']}, {'Kari'})
+
+    def test_ugyldig_parameter_gir_alle_ikke_500(self):
+        data = self._belastning(self.c_vl, 'x')
+        self.assertEqual({r['navn'] for r in data['personer']}, {'Kari', 'Ola'})
+
+    def test_velgeren_finnes_bare_for_den_som_ser_alle(self):
+        for navn, c, venter in (('les', self.c_leser, False),
+                                ('skriv_handling', self.c_kb, False),
+                                ('les_alle', self.c_sam, True),
+                                ('skriv_full', self.c_vl, True),
+                                ('admin', self.c_adm, True)):
+            with self.subTest(konto=navn):
+                res = c.get('/vaktliste/')
+                if venter:
+                    self.assertContains(res, 'id="vl-korpsvalg"')
+                else:
+                    self.assertNotContains(res, 'id="vl-korpsvalg"')
+
+    def test_skiftet_baerer_personens_korps_id(self):
+        """Velgeren filtrerer på ID, ikke navn — et omdøpt korps skal ikke
+        falle ut av sitt eget filter."""
+        poster = self._poster(self.c_vl)
+        kari = next(vp for vp in poster if vp['navn'] == 'Kari')
+        self.assertEqual(kari['korps_id'], self.hgsd.pk)
+        ledig = next(vp for vp in poster if vp['id'] == self.ledig_hgsd.pk)
+        self.assertIsNone(ledig['korps_id'])
+        self.assertEqual(ledig['reservert_korps_id'], self.hgsd.pk)

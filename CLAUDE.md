@@ -306,6 +306,11 @@ fase 3–7 gjenstår — se `docs/BESLUTNING_VAKTLISTE.md`, som er besluttet i s
   `synlig_mannskap()` filtrerer i svaret sida bygges av, så alle fanene følger med.
   Uten badge er lista tom, og malen sier hvorfor. Sentralbordets besetning i
   `/oppdrag/` er **ikke** filtrert — der er spørsmålet «er bilen klar».
+  **Den som ser alle får en korpsvelger** i vaktlinja: `_synligePoster()` i
+  `vaktliste.js` speiler `poster_for_korps()` og legges på `aktivListe.vaktposter`
+  og `register.mannskap` i `brukKorpsfilter()`, så byggerne følger med uten å vite om
+  den. Planleggingstallene regnes på serveren og får `?korps=` — bare honorert for den
+  som ser alle; for korps-brukeren ville parameteret vært en dør rundt badgen.
 - **Tre terskler, og skillet er hva slags utsagn nivået får avgi.** Badge + reservasjon bemanner. `skriv_full` deler
   *ut*: ressurser, reservasjoner, nye vakter og verdimengdene — kunne korps-brukeren
   opprette et korps eller omreservere KO, ville badgen sluttet å avgrense noe. Sletting av

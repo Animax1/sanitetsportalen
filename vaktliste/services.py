@@ -353,6 +353,18 @@ def ser_alle_korps(user) -> bool:
     return nivaa_for(user, 'vaktliste') == 'les_alle'
 
 
+def poster_for_korps(qs, korps_id):
+    """Skiftene som hører til ett korps: personene med badgen, **og de ledige
+    plassene satt av til det** — via plassen eller via ressursen, samme
+    sammenslåing som `reservert_korps()`. Én regel, to lesere: korpsfilteret
+    for korps-brukeren, og korpsvelgeren for den som ser alle."""
+    from django.db.models import Q
+    return qs.filter(
+        Q(mannskap__korps_id=korps_id)
+        | Q(mannskap__isnull=True, korps_id=korps_id)
+        | Q(mannskap__isnull=True, korps__isnull=True, ressurs__korps_id=korps_id))
+
+
 def synlige_vaktposter(qs, user):
     """Skiftene brukeren får se: alle, eller bare sitt eget korps.
 
@@ -362,16 +374,12 @@ def synlige_vaktposter(qs, user):
     hun kunne se. Uten badge finnes intet korps, og lista er tom —
     fail-closed, som skrivingen.
     """
-    from django.db.models import Q
     if ser_alle_korps(user):
         return qs
     korps = brukerens_korps(user)
     if korps is None:
         return qs.none()
-    return qs.filter(
-        Q(mannskap__korps=korps)
-        | Q(mannskap__isnull=True, korps=korps)
-        | Q(mannskap__isnull=True, korps__isnull=True, ressurs__korps=korps))
+    return poster_for_korps(qs, korps.pk)
 
 
 def synlig_mannskap(qs, user):
@@ -532,7 +540,7 @@ def _hviletider(skift):
     return ut
 
 
-def belastning_per_person(vaktliste, grenser=None, user=None):
+def belastning_per_person(vaktliste, grenser=None, user=None, korps_id=None):
     """Timer, skift, lengste skift og korteste hvile — per person.
 
     Bestillingen bak §8b: «lista skal hjelpe planleggeren å se *belastningen*
@@ -559,6 +567,10 @@ def belastning_per_person(vaktliste, grenser=None, user=None):
     # lista — for kall som ikke kommer fra et view.
     if user is not None:
         poster = synlige_vaktposter(poster, user)
+    # Korpsvelgeren for den som ser alle — viewet sender bare parameteret
+    # når brukeren har rett til å velge.
+    if korps_id is not None:
+        poster = poster_for_korps(poster, korps_id)
 
     per_person = {}
     for vp in poster:
@@ -594,13 +606,15 @@ def belastning_per_person(vaktliste, grenser=None, user=None):
     return rader
 
 
-def belastning_sammendrag(vaktliste, rader, user=None):
+def belastning_sammendrag(vaktliste, rader, user=None, korps_id=None):
     """Tallene som står over lista: hvor mange, hvor mye, hvor mange varsler."""
     from .models import Vaktpost
     ledige = Vaktpost.objects.filter(
         ressurs__vaktliste=vaktliste, mannskap__isnull=True)
     if user is not None:
         ledige = synlige_vaktposter(ledige, user)
+    if korps_id is not None:
+        ledige = poster_for_korps(ledige, korps_id)
     ledige = ledige.count()
     return {
         'personer': len(rader),

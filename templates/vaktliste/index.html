@@ -63,6 +63,18 @@
       med tilstanden; `gateKnapper()` kjører bare én gang ved sidelasting.
     {% endcomment %}
     <span id="vl-drift"></span>
+    {% comment %}
+      Korpsvelgeren (11. sep. 2026), bare for den som ser alle korps. Den gjør
+      i nettleseren det serveren gjør for korps-brukeren: viser ett korps i
+      alle fanene. Fylles av `lastListe()`; regelen er `_synligePoster()`.
+      Korps-brukeren får den ikke — hun er alt avgrenset, og et nedtrekk med
+      ett valg er et nedtrekk som ser ødelagt ut.
+    {% endcomment %}
+    {% if ser_alle_korps %}
+    <label class="vl-meta mb-0 ms-2" for="vl-korpsvalg">Korps</label>
+    <select id="vl-korpsvalg" class="form-select form-select-sm vl-korpsvalg"
+            data-action="velgKorps" data-hendelse="change"></select>
+    {% endif %}
     <span class="flex-grow-1"></span>
     {% comment %}
       Vinduet for vakta selv: lengden og utskriften. Ikke gatet — å skrive ut

@@ -3200,3 +3200,98 @@ class BelastningstabellensBreddeTests(SimpleTestCase):
             with self.subTest(faktisk=rad['faktiske_timer'] is not None):
                 self.assertEqual(sum(andeler), 100, andeler)
                 self.assertEqual(len(andeler), ut.count('<th>'), 'én andel per kolonne')
+
+
+class KorpsvelgerenTests(SimpleTestCase):
+    """Korpsvelgeren i nettleseren (11. sep. 2026).
+
+    Regelen `_synligePoster()` speiler serverens `poster_for_korps()`: en
+    person vises når badgen er korpset, en ledig plass når reservasjonen er
+    det. `brukKorpsfilter()` legger den på `aktivListe.vaktposter` og
+    `register.mannskap`, så alle byggerne følger med uten å vite om den.
+    """
+
+    HARNESS = (
+        (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue')),
+        (VAKTLISTE_JS, ('_synligePoster', 'brukKorpsfilter', 'fyllKorpsvelger',
+                        '_fyll')),
+    )
+    POSTER = """
+        const poster = [
+          {id: 1, ledig: false, navn: 'Kari', korps_id: 1, reservert_korps_id: 1},
+          {id: 2, ledig: false, navn: 'Ola', korps_id: 2, reservert_korps_id: 2},
+          {id: 3, ledig: true, navn: '', korps_id: null, reservert_korps_id: 1},
+          {id: 4, ledig: true, navn: '', korps_id: null, reservert_korps_id: null},
+        ];
+    """
+
+    def setUp(self):
+        if not node_available():
+            self.skipTest('node er ikke tilgjengelig')
+        self.harness = build_harness(self.HARNESS)
+
+    def test_uten_valg_vises_alt(self):
+        run_node(self.harness, self.POSTER + """
+            assert(_synligePoster(poster, null).length === 4, 'null = alle');
+            assert(_synligePoster(poster, undefined).length === 4, 'undefined = alle');
+        """)
+
+    def test_personen_paa_badgen_plassen_paa_reservasjonen(self):
+        run_node(self.harness, self.POSTER + """
+            const ids = _synligePoster(poster, 1).map((v) => v.id);
+            assert(JSON.stringify(ids) === '[1,3]', 'fikk ' + ids);
+            const karmoy = _synligePoster(poster, 2).map((v) => v.id);
+            assert(JSON.stringify(karmoy) === '[2]', 'fikk ' + karmoy);
+        """)
+
+    def test_ureservert_ledig_plass_er_ingens(self):
+        """Vaktlederens bord vises ikke under noe korps — den er ikke satt av
+        til noen, og under HGSD ville den sett ut som HGSDs å fylle."""
+        run_node(self.harness, self.POSTER + """
+            assert(!_synligePoster(poster, 1).some((v) => v.id === 4), 'ikke under HGSD');
+            assert(!_synligePoster(poster, 2).some((v) => v.id === 4), 'ikke under Karmoy');
+        """)
+
+    def test_filteret_legges_paa_lista_og_registeret(self):
+        run_node(self.harness, self.POSTER + """
+            globalThis.aktivListe = {alle_vaktposter: poster, vaktposter: poster};
+            globalThis.register = {
+              alle_mannskap: [{id: 1, navn: 'Kari', korps_id: 1}, {id: 2, navn: 'Ola', korps_id: 2}],
+              mannskap: [],
+            };
+            globalThis.korpsfilter = 2;
+            brukKorpsfilter();
+            assert(aktivListe.vaktposter.length === 1, 'skift: ' + aktivListe.vaktposter.length);
+            assert(register.mannskap.length === 1 && register.mannskap[0].navn === 'Ola',
+                   'register: ' + JSON.stringify(register.mannskap));
+            globalThis.korpsfilter = null;
+            brukKorpsfilter();
+            assert(aktivListe.vaktposter.length === 4, 'tilbake til alle');
+            assert(register.mannskap.length === 2, 'registeret tilbake');
+        """)
+
+    def test_velgeren_faller_tilbake_naar_korpset_er_borte(self):
+        """Et valg som ikke finnes i lista er et filter man ikke ser."""
+        ut = run_node(self.harness, """
+            const el = {innerHTML: '', value: ''};
+            globalThis.document = {getElementById: (id) => (id === 'vl-korpsvalg' ? el : null)};
+            globalThis.aktivListe = {korps: [{id: 1, navn: 'Haugesund', kortnavn: 'HGSD'}]};
+            globalThis.korpsfilter = 99;
+            fyllKorpsvelger();
+            assert(el.innerHTML.includes('Alle korps'), 'tomt valg mangler');
+            assert(el.innerHTML.includes('HGSD — Haugesund'), 'korpset mangler');
+            assert(korpsfilter === null, 'valget skulle falt tilbake: ' + korpsfilter);
+        """)
+        self.assertIn('OK', ut)
+
+    def test_korpsnavn_escapes_i_velgeren(self):
+        ut = run_node(self.harness, """
+            const el = {innerHTML: '', value: ''};
+            globalThis.document = {getElementById: () => el};
+            globalThis.aktivListe = {korps: [{id: 1, navn: '<img src=x onerror=alert(1)>', kortnavn: ''}]};
+            globalThis.korpsfilter = null;
+            fyllKorpsvelger();
+            console.log(el.innerHTML);
+        """)
+        self.assertNotIn('<img src=x', ut)
+        self.assertIn('&lt;img', ut)

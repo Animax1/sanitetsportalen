@@ -958,6 +958,9 @@
   André: «veldig tett på mobil». 36rem er nok til at hvert tall står på én
   linje; på en telefon ruller tabellen i ramma, som ressurstabellen gjør.
 */
+/* Korpsvelgeren i vaktlinja: like smal som vaktvelgeren, ikke hele linja. */
+.vl-korpsvalg { width: auto; max-width: 16rem; }
+
 .vl-tabell-belastning { min-width: 38rem; }
 
 /*

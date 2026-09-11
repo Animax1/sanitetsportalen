@@ -195,6 +195,10 @@ def _vaktpost_til_dict(vp, foreldre=None):
         # «noe gikk galt», og de to skal ikke se like ut.
         'ledig': person is None,
         'navn': person.navn if person else '',
+        # Personens korps som ID, for korpsvelgeren (11. sep. 2026): den
+        # filtrerer i nettleseren med samme regel som serveren bruker for
+        # korps-brukeren, og en regel på navn ville brutt ved omdøping.
+        'korps_id': person.korps_id if person else None,
         'korps_navn': person.korps.navn if person else '',
         'korps_kort': (person.korps.kortnavn or person.korps.navn) if person else '',
         # **Reservasjonen på plassen.** `korps_navn` over er personens korps —
@@ -659,10 +663,17 @@ def belastning_view(request, pk):
         return _feil('Vaktliste ikke funnet', status=404)
 
     grenser = Belastningsgrenser.hent()
-    rader = services.belastning_per_person(vl, grenser, user=request.user)
+    # `?korps=<id>` er korpsvelgeren for den som ser alle (11. sep. 2026).
+    # Bare for henne: korps-brukeren er alt avgrenset av badgen, og et
+    # parameter som kunne flytte den avgrensningen ville vært en dør.
+    korps_id = (_int(request.GET.get('korps'))
+                if services.ser_alle_korps(request.user) else None)
+    rader = services.belastning_per_person(
+        vl, grenser, user=request.user, korps_id=korps_id)
     return JsonResponse({'status': 'ok', 'data': {
         'personer': rader,
-        'sammendrag': services.belastning_sammendrag(vl, rader, user=request.user),
+        'sammendrag': services.belastning_sammendrag(
+            vl, rader, user=request.user, korps_id=korps_id),
         'grenser': {
             'maks_skift_timer': grenser.maks_skift_timer,
             'min_hvile_timer': grenser.min_hvile_timer,

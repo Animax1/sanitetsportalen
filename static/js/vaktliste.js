@@ -42,6 +42,10 @@ let register = null;
 //: Planleggingstallene for den aktive lista, eller `null` før de er hentet.
 //: Hentes for seg: en fane som ikke er åpnet skal ikke koste en spørring.
 let belastning = null;
+// Korpsvelgeren (11. sep. 2026): korps-ID for den som ser alle korps og vil
+// se ett, ellers `null`. Brukes bare i nettleseren — serveren avgrenser
+// korps-brukeren selv, og for henne finnes ikke velgeren.
+let korpsfilter = null;
 let personsok = '';              // fritekstfilter på mannskapstabellen
 let personSortKol = 'korps';     // 'navn' | 'korps' | 'telefon'
 let personSortStigende = true;
@@ -227,6 +231,12 @@ async function lastListe(id) {
   const res = await apiFetch(`/vaktliste/api/vaktlister/${id}/`);
   if (!res.ok) return;
   aktivListe = (await res.json()).data;
+  // Alt serveren sendte beholdes i `alle_vaktposter`; `vaktposter` er det
+  // korpsvelgeren lar stå igjen. Byggerne leser `vaktposter` som før, så
+  // filteret gjelder alle fanene uten at noen av dem vet om det.
+  aktivListe.alle_vaktposter = aktivListe.vaktposter;
+  fyllKorpsvelger();
+  brukKorpsfilter();
   // **Tallene er utdaterte i det et skift endres.** De hentes derfor på nytt
   // sammen med lista, ikke bufres over en endring — en belastningstabell som
   // viser gårsdagens oppsett er verre enn ingen.
@@ -249,6 +259,62 @@ async function lastRegister() {
   const res = await apiFetch('/vaktliste/api/mannskap/');
   if (!res.ok) return;
   register = (await res.json()).data;
+  register.alle_mannskap = register.mannskap;
+  brukKorpsfilter();
+  tegn();
+}
+
+
+// ── Korpsvelgeren ────────────────────────────────────────────────────────
+
+function _synligePoster(poster, korpsId) {
+  // **Samme regel som serverens `poster_for_korps()`**: personene med
+  // badgen, og de ledige plassene satt av til korpset — via plassen eller
+  // ressursen, ferdig slått sammen i `reservert_korps_id`. Uten valg er
+  // alt synlig.
+  if (korpsId == null) return poster;
+  return (poster || []).filter((vp) => (vp.ledig
+    ? vp.reservert_korps_id === korpsId
+    : vp.korps_id === korpsId));
+}
+
+
+function brukKorpsfilter() {
+  if (aktivListe && aktivListe.alle_vaktposter) {
+    aktivListe.vaktposter = _synligePoster(aktivListe.alle_vaktposter, korpsfilter);
+  }
+  if (register && register.alle_mannskap) {
+    register.mannskap = korpsfilter == null ? register.alle_mannskap
+      : register.alle_mannskap.filter((m) => m.korps_id === korpsfilter);
+  }
+}
+
+
+function fyllKorpsvelger() {
+  const el = document.getElementById('vl-korpsvalg');
+  if (!el) return;
+  _fyll('vl-korpsvalg', (aktivListe.korps || []).map((k) => ({
+    id: k.id, navn: k.kortnavn ? `${k.kortnavn} — ${k.navn}` : k.navn,
+  })), 'Alle korps');
+  // Valget overlever en ny lasting av lista; forsvant korpset, faller
+  // velgeren tilbake til alle framfor å stå på et valg som ikke finnes.
+  // Sjekket mot lista, ikke mot hva `<select>` gjør med en ukjent verdi —
+  // det er regelen, og den skal kunne kjøres uten en nettleser.
+  const finnes = (aktivListe.korps || []).some((k) => k.id === korpsfilter);
+  if (!finnes) korpsfilter = null;
+  el.value = korpsfilter == null ? '' : String(korpsfilter);
+}
+
+
+function velgKorps() {
+  const el = document.getElementById('vl-korpsvalg');
+  const valgt = el && el.value ? Number(el.value) : null;
+  korpsfilter = Number.isFinite(valgt) ? valgt : null;
+  brukKorpsfilter();
+  // Tallene regnes på serveren og må hentes på nytt for det valgte korpset;
+  // fanen henter dem selv når den åpnes.
+  belastning = null;
+  if (aktivFane === BELASTNING) lastBelastning();
   tegn();
 }
 
@@ -1373,8 +1439,9 @@ function _tilstede() {
 
 async function lastBelastning() {
   if (!aktivListe) return;
+  const korps = korpsfilter == null ? '' : `?korps=${encodeURIComponent(korpsfilter)}`;
   const res = await apiFetch(
-    `/vaktliste/api/vaktlister/${aktivListe.vaktliste.id}/belastning/`);
+    `/vaktliste/api/vaktlister/${aktivListe.vaktliste.id}/belastning/${korps}`);
   if (!res.ok) return;
   belastning = (await res.json()).data;
   tegn();

@@ -259,9 +259,9 @@
 {# ──── Footer ──── #}
 <footer class="portal-footer">
   Sanitetsportalen &middot; {{ request.user.username|default:"" }}
-  {# Bygg og dato: svaret på «er dette den nye koden, eller cachen?». #}
+  {# Bygg og dato: svaret på «er dette den nye koden, eller cachen?». Klokkeslettet står i tooltipen, ikke i teksten — André ville ha datoen alene. #}
   <span class="portal-versjon" title="Bygg {{ versjon.bygg }}{% if versjon.dato %} · {{ versjon.dato|date:'j. M Y H:i' }}{% endif %}">
-    &middot; {{ versjon.bygg }}{% if versjon.dato %} &middot; {{ versjon.dato|date:'d.m.Y H:i' }}{% endif %}
+    &middot; {{ versjon.bygg }}{% if versjon.dato %} &middot; {{ versjon.dato|date:'d.m.Y' }}{% endif %}
   </span>
 </footer>
 
