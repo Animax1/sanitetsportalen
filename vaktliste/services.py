@@ -581,18 +581,23 @@ def belastning_per_person(vaktliste, grenser=None, user=None, korps_id=None):
         person = skift[0].mannskap
         timer = [_timer(vp.fra_tid, vp.til_tid) for vp in skift]
         hvile = _hviletider(skift)
+        # **Probono telles ikke i timene, men i alt annet.** Summen er det
+        # organisasjonen betaler for; lengste skift og korteste hvile er
+        # hva kroppen tåler, og den skiller ikke på lønn.
+        betalt = [t for vp, t in zip(skift, timer) if not vp.probono]
         # Faktisk tid finnes bare for skift som er både møtt og av vakt. Et
         # pågående skift har ingen sluttid å regne mot, og et anslag der
         # ville vært et tall som endrer seg mens man ser på det.
         faktisk = [_timer(vp.mott_at, vp.av_vakt_at) for vp in skift
-                   if vp.mott_at and vp.av_vakt_at]
+                   if vp.mott_at and vp.av_vakt_at and not vp.probono]
 
         rader.append({
             'mannskap_id': person.pk,
             'navn': person.navn,
             'korps_kort': person.korps.kortnavn or person.korps.navn,
             'antall_skift': len(skift),
-            'timer': round(sum(timer), 2),
+            'timer': round(sum(betalt), 2),
+            'probono_skift': sum(1 for vp in skift if vp.probono),
             'lengste_skift': max(timer) if timer else 0.0,
             'korteste_hvile': min(hvile) if hvile else None,
             'faktiske_timer': round(sum(faktisk), 2) if faktisk else None,

@@ -218,6 +218,7 @@ def _vaktpost_til_dict(vp, foreldre=None):
         'avmeldt_at': vp.avmeldt_at.isoformat() if vp.avmeldt_at else None,
         'tilstede': vp.er_tilstede,
         'merknad': vp.merknad,
+        'probono': vp.probono,
     }
 
 
@@ -948,6 +949,7 @@ def vaktposter_view(request, pk):
         fra_tid=fra_tid,
         til_tid=til_tid,
         merknad=(data.get('merknad') or '').strip(),
+        probono=bool(data.get('probono')),
     )
     try:
         with transaction.atomic():
@@ -1029,6 +1031,10 @@ def vaktpost_detalj_view(request, pk):
         vaktpost.rolle_id = _int(data['rolle_id'])
     if 'merknad' in data:
         vaktpost.merknad = (data.get('merknad') or '').strip()
+    # Probono settes av alle som kan redigere raden — samme port som
+    # merknaden. Det er ikke å dele ut noe; det er å si hva skiftet er.
+    if 'probono' in data:
+        vaktpost.probono = bool(data.get('probono'))
 
     fra_tid = _tid(data.get('fra_tid')) if 'fra_tid' in data else vaktpost.fra_tid
     til_tid = _tid(data.get('til_tid')) if 'til_tid' in data else vaktpost.til_tid

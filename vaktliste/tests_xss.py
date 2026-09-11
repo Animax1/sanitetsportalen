@@ -22,7 +22,7 @@ HTML_BUILDERS = (
     'mkRolleRad',
     '_fyll',
     'tegnFaner', '_fanerad', '_mannskapsfane', 'iDrift', '_tilstede',
-    'mkRessurs', '_planrad', '_blokklinje',
+    'mkRessurs', '_planrad', '_blokklinje', '_dagoverskrift', '_probonoMerke',
     '_stempelknapper',
     '_driftrad',
     'mkBelastning',
@@ -53,6 +53,11 @@ REVIEWED_INTERPOLATIONS = {
     # Tidsblokker (11. sep. 2026): summene bygges lokalt av `_tall`, som
     # bare kan gi sifre og komma — og escapes uansett inni.
     'timer': 'markup bygget lokalt, tallet escapet inni',
+    '_probonoMerke(vp)': 'hardkodet merke fra en ternær, ingen data i seg',
+    # Dagoverskriften bygger ren tekst i `tekst`, som escapes ved innsetting:
+    'DAGER_LANGE[d.getDay()]': 'ukedag fra en lokal, hardkodet liste',
+    'd.getDate()': 'tall fra en Date',
+    'mnd': 'månedsnavn fra `MND`, en hardkodet liste på sida',
     'sumTimer': 'markup bygget lokalt, tallet escapet inni',
     'tabellklasse': 'hardkodet CSS-klasse fra en ternær',
     # Planleggingstall (fase 5). Tallene kommer fra serverens beregning og
@@ -208,7 +213,8 @@ class VaktlisteEscapingOppforselTests(SimpleTestCase):
                         'kanStemple', 'iDrift', '_rolleValg',
                         'rollerForGruppe', '_fyllValgFor', '_varighet',
                         'mkRolleRad', 'mkOversikt', '_skiftrekkefolge',
-                        '_planrad', '_tidsblokker', '_blokklinje',
+                        '_planrad', '_tidsblokker', '_blokklinje', '_blokkerMedDager',
+                        '_dagnokkel', '_dagoverskrift', '_probonoMerke',
                         '_sumTimer', '_skifttimer', '_tall', '_telling',
                         '_mkEnKurve', 'mkGruppekurve', '_posterIGruppe',
                         'mkGruppe', '_plassKorps', '_tegnforklaring',
@@ -1262,7 +1268,8 @@ class OversiktUtenKurveTests(SimpleTestCase):
     HARNESS = (
         (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue')),
         (VAKTLISTE_JS, ('mkOversikt', '_skiftrekkefolge', '_d', '_kl',
-                        '_tidsblokker', '_blokklinje', '_sumTimer',
+                        '_tidsblokker', '_blokklinje', '_blokkerMedDager',
+                        '_dagnokkel', '_dagoverskrift', '_probonoMerke', '_sumTimer',
                         '_varighet', '_skifttimer', '_tall', '_telling',
                         '_dag', '_sammeDag', '_tidsspenn', '_vaktspenn',
                         '_ressurserIGruppe', '_grupperMedRessurser')),
@@ -1663,7 +1670,8 @@ class FanenErGruppaTests(SimpleTestCase):
                         '_radklasse', '_stempelknapper', 'kanStemple',
                         '_rolleValg', '_skiftrekkefolge', '_fyllValgFor',
                         '_varighet', '_skifttimer', '_tall', '_planrad',
-                        '_tidsblokker', '_blokklinje', '_tidsspenn', '_telling',
+                        '_tidsblokker', '_blokklinje', '_blokkerMedDager',
+                        '_dagnokkel', '_dagoverskrift', '_probonoMerke', '_tidsspenn', '_telling',
                         '_sammeDag', '_driftrad', 'mkGruppekurve', '_mkEnKurve',
                         '_tegnforklaring', '_timesteg', '_toppunkt',
                         '_posterPerGruppe', '_vaktensSpenn',
@@ -1880,7 +1888,8 @@ class UtskriftslistaTests(SimpleTestCase):
     HARNESS = (
         (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue')),
         (VAKTLISTE_JS, ('mkOversikt', '_skiftrekkefolge', '_d', '_kl',
-                        '_tidsblokker', '_blokklinje', '_sumTimer',
+                        '_tidsblokker', '_blokklinje', '_blokkerMedDager',
+                        '_dagnokkel', '_dagoverskrift', '_probonoMerke', '_sumTimer',
                         '_varighet', '_skifttimer', '_tall', '_telling',
                         '_dag', '_sammeDag', '_tidsspenn', '_vaktspenn',
                         '_ressurserIGruppe', '_grupperMedRessurser')),
@@ -2010,7 +2019,8 @@ class EnkeltgruppeTests(SimpleTestCase):
                         '_stempelknapper', 'kanStemple', 'iDrift',
                         '_rolleValg', '_plassKorps', '_skiftrekkefolge',
                         '_fyllValgFor', '_varighet', '_skifttimer', '_tall',
-                        '_planrad', '_tidsblokker', '_blokklinje',
+                        '_planrad', '_tidsblokker', '_blokklinje', '_blokkerMedDager',
+                        '_dagnokkel', '_dagoverskrift', '_probonoMerke',
                         '_tidsspenn', '_sammeDag', 'mkGruppekurve', '_telling',
                         '_posterIGruppe', '_mkEnKurve', '_tegnforklaring',
                         '_timesteg', '_toppunkt', '_vaktensSpenn',
@@ -2893,7 +2903,8 @@ class TidsblokkerTests(SimpleTestCase):
 
     HARNESS = (
         (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue')),
-        (VAKTLISTE_JS, ('mkOversikt', '_tidsblokker', '_blokklinje',
+        (VAKTLISTE_JS, ('mkOversikt', '_tidsblokker', '_blokklinje', '_blokkerMedDager',
+                        '_dagnokkel', '_dagoverskrift', '_probonoMerke',
                         '_telling', '_driftrad', '_radklasse', '_stempelknapper',
                         'kanStemple', 'iDrift', 'kanSkriveAlt', '_nivaa',
                         '_erAdmin', '_skiftrekkefolge', '_sumTimer',
@@ -3317,3 +3328,116 @@ class KorpsvelgerenTests(SimpleTestCase):
         """)
         self.assertNotIn('<img src=x', ut)
         self.assertIn('&lt;img', ut)
+
+
+class ProbonoOgDagoverskrifterTests(SimpleTestCase):
+    """Runde 2b fra prosjektleder (11. sep. 2026).
+
+    Probono: skiftet går, men telles ikke i timesummene — merket står ved
+    navnet, timene i raden står som før. Dagoverskrifter: «Fredag 2. okt»
+    over blokkene når vakta spenner over flere dager; starttiden bestemmer
+    dagen; en endagsvakt ser ut som før.
+    """
+
+    HARNESS = TidsblokkerTests.HARNESS
+    VINDU = TidsblokkerTests.VINDU
+    LISTE = TidsblokkerTests.LISTE
+
+    def setUp(self):
+        if not node_available():
+            self.skipTest('node er ikke tilgjengelig')
+        self.harness = build_harness(self.HARNESS)
+
+    def _oversikt(self, ekstra=''):
+        return run_node(self.harness, self.VINDU + self.LISTE + ekstra
+                        + "console.log(mkOversikt());")
+
+    # ── Probono ──────────────────────────────────────────────────────────
+    def test_summen_hopper_over_probono(self):
+        run_node(self.harness, """
+            const sum = _sumTimer([
+              {fra_tid: '2026-10-03T08:00:00', til_tid: '2026-10-03T16:00:00'},
+              {fra_tid: '2026-10-03T16:00:00', til_tid: '2026-10-04T00:00:00', probono: true},
+            ]);
+            assert(sum === 8, 'fikk ' + sum);
+        """)
+
+    def test_blokklinja_viser_skiftets_lengde_uansett(self):
+        """Blokkas timer er skiftets lengde — det er summene som hopper over
+        probono, ikke raden."""
+        ut = run_node(self.harness, self.VINDU + """
+            console.log(_blokklinje({fra_tid: '2026-10-03T08:00:00',
+                                     til_tid: '2026-10-03T16:00:00',
+                                     poster: [{ledig: false, probono: true}]}, 4));
+        """)
+        self.assertIn('8 t', ut)
+
+    def test_merket_staar_ved_navnet_i_oversikten(self):
+        ut = self._oversikt("aktivListe.vaktposter[3].probono = true;\n")
+        self.assertIn('Kari <span class="vl-merkelapp vl-probono">Probono</span>', ut)
+        self.assertNotIn('Ola <span', ut)
+
+    def test_ressursens_sum_hopper_over_probono(self):
+        """Ambulanse 1: Karis skift på 10 t er probono → «0 t» i overskriften."""
+        ut = self._oversikt("aktivListe.vaktposter[3].probono = true;\n")
+        amb1 = ut[ut.index('<h3>Ambulanse 1'):ut.index('<h3>Ambulanse 2')]
+        self.assertIn('1 mannskap · 0 t', amb1)
+
+    def test_driftraden_baerer_merket(self):
+        ut = run_node(self.harness, self.VINDU + """
+            globalThis.aktivListe = {vaktliste: {i_drift: true}};
+            console.log(_driftrad({id: 5, ledig: false, navn: 'Kari', probono: true,
+                                   korps_kort: 'HGSD', rolle: '', mott_at: null,
+                                   av_vakt_at: null, tilstede: false,
+                                   fra_tid: '2026-10-03T08:00:00',
+                                   til_tid: '2026-10-03T16:00:00'}, true));
+        """)
+        self.assertIn('vl-probono', ut)
+
+    # ── Dagoverskrifter ──────────────────────────────────────────────────
+    def test_endagsvakt_har_ingen_dagoverskrift(self):
+        """Alle Andrés skift begynner 4. sep.: én dag, ingen overskrift."""
+        self.assertNotIn('vl-dag"', self._oversikt())
+
+    def test_flerdagsvakt_faar_en_overskrift_per_dag(self):
+        ut = self._oversikt("""
+            aktivListe.vaktposter.push({id: 9, ressurs_id: 10, ledig: false, navn: 'Nina',
+              korps_kort: 'HGSD', rolle: '', merknad: '',
+              fra_tid: '2026-09-05T08:00:00', til_tid: '2026-09-05T16:00:00'});
+        """)
+        samleplass = ut[ut.index('<h3>Samleplass'):ut.index('<h3>Ambulanse 1')]
+        self.assertEqual(samleplass.count('class="vl-dag"'), 2)
+        self.assertIn('Fredag 4. sep', samleplass)
+        self.assertIn('Lørdag 5. sep', samleplass)
+        self.assertLess(samleplass.index('Fredag'), samleplass.index('Lørdag'))
+
+    def test_starttiden_bestemmer_dagen(self):
+        """Et skift 17:00–03:00 er fredagens, selv om det slutter lørdag —
+        og et som begynner 00:30 lørdag er lørdagens."""
+        run_node(self.harness, """
+            assert(_dagnokkel('2026-09-04T17:00:00') === _dagnokkel('2026-09-04T23:59:00'),
+                   'samme dag');
+            assert(_dagnokkel('2026-09-04T17:00:00') !== _dagnokkel('2026-09-05T00:30:00'),
+                   'over midnatt er neste dag');
+            assert(_dagnokkel(null) === '', 'ugyldig gir tom noekkel');
+        """)
+
+    def test_overskriften_bare_der_dagen_skifter(self):
+        """To blokker på samme dag deler én overskrift."""
+        ut = run_node(self.harness, self.VINDU + """
+            globalThis.aktivListe = {vaktliste: {i_drift: false}};
+            const rad = () => '';
+            const blokker = _tidsblokker([
+              {fra_tid: '2026-09-04T17:00:00', til_tid: '2026-09-04T22:00:00', navn: 'A'},
+              {fra_tid: '2026-09-04T22:00:00', til_tid: '2026-09-05T03:00:00', navn: 'B'},
+              {fra_tid: '2026-09-05T08:00:00', til_tid: '2026-09-05T16:00:00', navn: 'C'},
+            ]);
+            console.log(_blokkerMedDager(blokker, 4, rad));
+        """)
+        self.assertEqual(ut.count('class="vl-dag"'), 2)
+        self.assertEqual(ut.count('class="vl-blokk"'), 3)
+
+    def test_ressurstabellen_i_planlegging_faar_ogsaa_dager(self):
+        """Ikke bare utskriftslista: den man planlegger i."""
+        kropp = extract_function(read_js(VAKTLISTE_JS), 'mkRessurs')
+        self.assertIn('_blokkerMedDager(', kropp)

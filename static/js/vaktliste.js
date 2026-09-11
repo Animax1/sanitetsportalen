@@ -755,7 +755,7 @@ function _driftrad(vp, kanRore) {
     : '';
   const navn = vp.ledig
     ? '<span class="vl-ledigtekst">Ledig plass</span>'
-    : escapeHtml(vp.navn);
+    : escapeHtml(vp.navn) + _probonoMerke(vp);
 
   return `
     <tr class="${escHtmlValue(_radklasse(vp))}">
@@ -857,7 +857,16 @@ function _skifttimer(vp) {
 function _sumTimer(poster) {
   // Summen av skiftene, som tall. Skift uten gyldig spenn teller null —
   // de vises som «—» i raden, og en strek har ingen timer å legge til.
-  return poster.reduce((sum, vp) => sum + (_skifttimer(vp) || 0), 0);
+  // **Probono teller heller ikke** (11. sep. 2026): skiftet går, men
+  // timene er ikke organisasjonens. Speiler `belastning_per_person`.
+  return poster.reduce((sum, vp) => sum + (vp.probono ? 0 : (_skifttimer(vp) || 0)), 0);
+}
+
+
+function _probonoMerke(vp) {
+  // Merket ved navnet, ikke i timekolonnen: timene står der fortsatt —
+  // det er summene som hopper over dem, og det skal man kunne se hvorfor.
+  return vp.probono ? ' <span class="vl-merkelapp vl-probono">Probono</span>' : '';
 }
 
 
@@ -912,7 +921,7 @@ function _planrad(vp, r, kanRore) {
   // gjenstår — ikke som en rad der navnet mangler ved en feil.
   const navnCelle = vp.ledig
     ? _fyllValgFor(vp, kanRore)
-    : escapeHtml(vp.navn);
+    : escapeHtml(vp.navn) + _probonoMerke(vp);
 
   // **Korpskolonnen svarer på to ulike spørsmål.** Står det en person
   // der, er det *hennes* korps — et faktum. Er plassen ledig, er det
@@ -1001,8 +1010,7 @@ function mkRessurs(r) {
   const rad = (vp) => (drift ? _driftrad(vp, kanRore) : _planrad(vp, r, kanRore));
   const kolonner = drift ? 5 : 9;
   const kropp = poster.length
-    ? _tidsblokker(poster).map((blokk) =>
-        _blokklinje(blokk, kolonner) + blokk.poster.map(rad).join('')).join('')
+    ? _blokkerMedDager(_tidsblokker(poster), kolonner, rad)
     : `<tr><td colspan="${escHtmlValue(kolonner)}" class="vl-tom">Ingen satt opp ennå.</td></tr>`;
 
   // Tabellhodet heves ut hit framfor å stå som en ternær med to
@@ -1301,6 +1309,47 @@ function _telling(poster, skift) {
 }
 
 
+function _dagnokkel(iso) {
+  // Lokal dato som nøkkel — «hvilken dag» er et spørsmål om lokal tid, og
+  // et skift som starter 00:30 lørdag er lørdagens, ikke fredagens.
+  const d = _d(iso);
+  return d ? `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}` : '';
+}
+
+
+function _dagoverskrift(iso, kolonner) {
+  // «Fredag 2. okt» over blokkene når vakta spenner over flere dager
+  // (prosjektleder, 11. sep. 2026: «starttid definerer hvilken dag»). Lang
+  // ukedag, fordi linja er en overskrift og ikke et merke; lista er lokal så
+  // byggerne kan kjøres uten mer enn `MND` fra sida.
+  const DAGER_LANGE = ['Søndag', 'Mandag', 'Tirsdag', 'Onsdag', 'Torsdag',
+                       'Fredag', 'Lørdag'];
+  const d = _d(iso);
+  if (!d) return '';
+  const mnd = (globalThis.MND || [])[d.getMonth()] || '';
+  const tekst = `${DAGER_LANGE[d.getDay()]} ${d.getDate()}. ${mnd}`;
+  return `
+        <tr class="vl-dag">
+          <td colspan="${escHtmlValue(kolonner)}">${escapeHtml(tekst)}</td>
+        </tr>`;
+}
+
+
+function _blokkerMedDager(blokker, kolonner, radbygger) {
+  // Blokkene, med en dagoverskrift der dagen skifter — men bare når vakta
+  // faktisk har mer enn én dag. En endagsvakt ser ut som før: én overskrift
+  // over alt sier ingenting.
+  const dager = new Set(blokker.map((b) => _dagnokkel(b.fra_tid)));
+  let forrige = null;
+  return blokker.map((blokk) => {
+    const dag = _dagnokkel(blokk.fra_tid);
+    const overskrift = dager.size > 1 && dag !== forrige ? _dagoverskrift(blokk.fra_tid, kolonner) : '';
+    forrige = dag;
+    return overskrift + _blokklinje(blokk, kolonner) + blokk.poster.map(radbygger).join('');
+  }).join('');
+}
+
+
 function _blokklinje(blokk, kolonner) {
   // Linja over en blokk: tiden, timene og hvor mange som står der. **Ordene
   // er Andrés (11. sep. 2026): et skift er en vakttid, og de som går det er
@@ -1366,7 +1415,7 @@ function mkOversikt() {
       : (vp.korps_kort || '');
     return `
         <tr class="${escHtmlValue(vp.ledig ? 'vl-ledig' : '')}">
-          <td class="vl-navn">${escapeHtml(vp.ledig ? '— ledig —' : vp.navn)}</td>
+          <td class="vl-navn">${escapeHtml(vp.ledig ? '— ledig —' : vp.navn)}${_probonoMerke(vp)}</td>
           <td>${escapeHtml(korps || '—')}</td>
           <td>${escapeHtml(vp.rolle || '—')}</td>
           <td>${escapeHtml(vp.merknad || '')}</td>
@@ -1379,8 +1428,7 @@ function mkOversikt() {
       .map((r) => {
         const egne = perRessurs.get(r.id);
         const blokker = _tidsblokker(egne);
-        const rader = blokker.map((blokk) =>
-          _blokklinje(blokk, 4) + blokk.poster.map(rad).join('')).join('');
+        const rader = _blokkerMedDager(blokker, 4, rad);
         const ledige = egne.filter((vp) => vp.ledig).length;
         const rest = ledige
           ? ` <span class="vl-meta">· ${escHtmlValue(ledige)} ${escapeHtml(ledige === 1 ? 'ledig' : 'ledige')}</span>` : '';
@@ -1912,6 +1960,8 @@ function apneVaktpost(ressursId) {
         rollerForGruppe(ressurs.gruppe_id, null), 'Uten rolle');
   document.getElementById('ny-vaktpost-mannskap').value = '';
   document.getElementById('ny-vaktpost-antall').value = '1';
+  const nyProbono = document.getElementById('ny-vaktpost-probono');
+  if (nyProbono) nyProbono.checked = false;
 
   // **Datoen står der på forhånd, hentet fra vaktas start.** Feltet er
   // uendret — samme native velger, samme visning — men det er aldri tomt,
@@ -2233,6 +2283,7 @@ async function opprettVaktpost() {
         mannskap_id: document.getElementById('ny-vaktpost-mannskap')?.value || null,
         korps_id: document.getElementById('ny-vaktpost-korps')?.value || null,
         rolle_id: document.getElementById('ny-vaktpost-rolle')?.value || null,
+        probono: !!document.getElementById('ny-vaktpost-probono')?.checked,
         antall: Number(document.getElementById('ny-vaktpost-antall')?.value) || 1,
         fra_tid: fra,
         til_tid: til,
@@ -2412,6 +2463,8 @@ function apneRedigerVaktpost(id) {
   _settTid('vaktpost-fra', vp.fra_tid);
   _settTid('vaktpost-til', vp.til_tid);
   _settVerdi('vaktpost-merknad', vp.merknad || '');
+  const probono = document.getElementById('vaktpost-probono');
+  if (probono) probono.checked = !!vp.probono;
 
   new bootstrap.Modal(modal).show();
 }
@@ -2442,6 +2495,7 @@ async function lagreVaktpost() {
         korps_id: document.getElementById('vaktpost-korps')?.value || null,
         rolle_id: document.getElementById('vaktpost-rolle')?.value || null,
         merknad: document.getElementById('vaktpost-merknad')?.value || '',
+        probono: !!document.getElementById('vaktpost-probono')?.checked,
         fra_tid: fra,
         til_tid: til,
       }),

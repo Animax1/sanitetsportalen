@@ -305,3 +305,77 @@ class GrenseApiTests(TilgangsBasis):
         """Singleton uten seeding: ingen migrasjon skal måtte huske den."""
         Belastningsgrenser.objects.all().delete()
         self.assertEqual(12, Belastningsgrenser.hent().maks_skift_timer)
+
+
+class ProbonoTests(TilgangsBasis):
+    """Probono telles ikke i timene, men i alt annet (11. sep. 2026).
+
+    Summen er det organisasjonen betaler for; lengste skift og korteste
+    hvile er hva kroppen tåler, og den skiller ikke på lønn.
+    """
+
+    def setUp(self):
+        super().setUp()
+        na = timezone.now()
+        self.betalt = Vaktpost.objects.create(
+            ressurs=self.res_hgsd, mannskap=self.p_hgsd,
+            fra_tid=na, til_tid=na + timedelta(hours=8))
+        self.probono = Vaktpost.objects.create(
+            ressurs=self.res_hgsd, mannskap=self.p_hgsd, probono=True,
+            fra_tid=na + timedelta(hours=10), til_tid=na + timedelta(hours=24))
+
+    def _rad(self):
+        return services.belastning_per_person(self.vl)[0]
+
+    def test_timene_hopper_over_probono(self):
+        self.assertEqual(8.0, self._rad()['timer'])
+
+    def test_lengste_skift_teller_probono(self):
+        """14 timer sliter like mye uansett hvem som betaler."""
+        self.assertEqual(14.0, self._rad()['lengste_skift'])
+
+    def test_hvilen_teller_probono(self):
+        self.assertEqual(2.0, self._rad()['korteste_hvile'])
+
+    def test_antall_skift_teller_begge_og_probono_for_seg(self):
+        rad = self._rad()
+        self.assertEqual(2, rad['antall_skift'])
+        self.assertEqual(1, rad['probono_skift'])
+
+    def test_faktiske_timer_hopper_over_probono(self):
+        na = timezone.now()
+        for vp in (self.betalt, self.probono):
+            vp.mott_at = vp.fra_tid
+            vp.av_vakt_at = vp.til_tid
+            vp.save()
+        self.assertEqual(8.0, self._rad()['faktiske_timer'])
+
+    def test_sammendraget_summerer_uten_probono(self):
+        rader = services.belastning_per_person(self.vl)
+        self.assertEqual(8.0, services.belastning_sammendrag(self.vl, rader)['timer'])
+
+    def test_flagget_settes_ved_opprettelse_og_endring(self):
+        c = self.c_vl
+        res = c.post(f'/vaktliste/api/ressurser/{self.res_karmoy.pk}/vaktposter/',
+                     data={'mannskap_id': self.p_karmoy.pk, 'probono': True,
+                           'fra_tid': self._iso(0), 'til_tid': self._iso(4)},
+                     content_type='application/json')
+        self.assertEqual(res.status_code, 201, res.content)
+        vp_id = res.json()['data']['id']
+        self.assertTrue(res.json()['data']['probono'])
+        res = c.put(f'/vaktliste/api/vaktposter/{vp_id}/', data={'probono': False},
+                    content_type='application/json')
+        self.assertEqual(res.status_code, 200, res.content)
+        self.assertFalse(Vaktpost.objects.get(pk=vp_id).probono)
+
+    def test_korpsforeren_kan_sette_det_paa_sitt_eget(self):
+        """«Kan settes av alle som har tilgang» — samme port som merknaden."""
+        res = self.c_kb.put(f'/vaktliste/api/vaktposter/{self.betalt.pk}/',
+                            data={'probono': True}, content_type='application/json')
+        self.assertEqual(res.status_code, 200, res.content)
+        self.assertTrue(Vaktpost.objects.get(pk=self.betalt.pk).probono)
+
+    def test_leseren_setter_ingenting(self):
+        res = self.c_leser.put(f'/vaktliste/api/vaktposter/{self.betalt.pk}/',
+                               data={'probono': True}, content_type='application/json')
+        self.assertEqual(res.status_code, 403)

@@ -161,11 +161,10 @@ ingen av dem gir feilmelding — de er bare stille inaktive.
             - [ ] **Skal grovsortering og sted inn i arkivet?** Payloaden er
                   signaturlåst; nye felt krever en versjonert payload (nye
                   arkiver får dem, gamle verifiserer som før). Egen beslutning.
-      - [ ] **Probono-skift**: avkryssing på skiftet, redigerbar av alle som
-            kan redigere raden. Telles ikke i timesummene; telles fortsatt i
-            lengste skift og korteste hvile.
-      - [ ] **Dagoverskrifter** over blokkene («Fredag 2. okt») når vakta
-            spenner over mer enn én dag; starttid bestemmer dagen.
+      - [x] **Probono-skift** (11. sep. 2026): `Vaktpost.probono`, `0011`.
+            Ute av timesummene, med i lengste skift og hvile.
+      - [x] **Dagoverskrifter** (11. sep. 2026): `_blokkerMedDager()`, bare
+            på flerdagsvakter.
       - [ ] **«Mitt korps»-fane**: plassene korpset har ansvar for på tvers av
             ressurser — «4 plasser å dekke» øverst. Krever tre tilstander på
             plassen: tildelt korps / tildelt alle (`alle_korps`) / utildelt.

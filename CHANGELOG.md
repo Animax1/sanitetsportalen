@@ -4,7 +4,30 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
-## 2026-09-11 — Prosjektleders runde 2a: «Avreist til» og bilens grovsortering
+## 2026-09-11 — Prosjektleders runde 2b: probono-skift og dagoverskrifter
+
+**2079 tester grønne** (19 nye, tre mutasjoner satt rødt først). Én
+migrasjon, `vaktliste/0011`, ett `AddField` med `False` som standard.
+
+**Probono-skift telles ikke i timene — men i alt annet.** `Vaktpost.probono`,
+en avkryssing i «Opprett vakt» og «Rediger skift», redigerbar av alle som kan
+redigere raden (samme port som merknaden — det er ikke å dele ut noe, det er å
+si hva skiftet er). Timesummene hopper over det: blokklinja (nei — blokkas
+timer er skiftets lengde), ressursoverskriften, arkhodet, planleggingstallenes
+«timer» per person og i sammendraget, og faktiske timer. **Lengste skift og
+korteste hvile teller det fortsatt**: et probono-skift sliter like mye, og
+varslene handler om sliting, ikke om lønn. Merket «Probono» står ved navnet,
+ikke i timekolonnen — timene i raden står som før, det er summene som hopper
+over dem, og det skal man kunne se hvorfor. `probono_skift` per person følger
+med i planleggingstallene.
+
+**Dagoverskrifter over blokkene.** «Fredag 4. sep» / «Lørdag 5. sep» i
+ressursfanene og utskriftslista, der dagen skifter — men bare når vakta
+faktisk spenner over mer enn én dag; en endagsvakt ser ut som før.
+Starttiden bestemmer dagen (prosjektleder): et skift 17:00–03:00 er fredagens.
+`_dagnokkel()` bruker lokal dato, `_blokkerMedDager()` er det ene stedet som
+setter overskriftene, og begge tabellene går gjennom den.
+
 
 **2060 tester grønne** (27 nye, to mutasjoner satt rødt først). Én migrasjon,
 `oppdrag/0009`, to `AddField` med tom streng som standard — intet dataskritt.

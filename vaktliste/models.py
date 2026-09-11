@@ -597,6 +597,12 @@ class Vaktpost(BaseTimeStampedModel):
                   'stående, slik at det synes at plassen ble tom.')
     merknad = models.CharField(
         max_length=255, blank=True, default='', verbose_name='Merknad')
+    # **Probono: skiftet går, men telles ikke i timene** (prosjektleder,
+    # 11. sep. 2026). Et flagg på skiftet, ikke på personen — samme person kan
+    # gå ett betalt og ett probono skift på samme vakt. Timesummene hopper
+    # over det; lengste skift og korteste hvile teller det fortsatt, for et
+    # probono-skift sliter like mye, og varslene handler om sliting.
+    probono = models.BooleanField(default=False, verbose_name='Probono')
 
     class Meta:
         verbose_name = 'Vaktpost'

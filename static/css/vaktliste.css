@@ -445,6 +445,28 @@
   white-space: nowrap;
 }
 
+/* Dagoverskriften over blokkene på en flerdagsvakt (11. sep. 2026): en
+   kraftigere linje enn blokklinja, for den skiller dager og ikke skift. */
+.vl-tabell tr.vl-dag td {
+  background: color-mix(in srgb, var(--text-muted) 22%, transparent);
+  border-bottom: 1px solid var(--border-color);
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  padding: 0.35rem 0.5rem;
+  text-transform: uppercase;
+}
+
+/* Probono-merket ved navnet: skiftet går, timene telles ikke. */
+.vl-probono {
+  border-style: dashed;
+  color: var(--text-muted);
+}
+
+@media print {
+  .vl-tabell tr.vl-dag td { background: #ddd !important; }
+}
+
 /* `::first-letter` krever et blokkelement — derav `inline-block`. */
 .vl-blokktid {
   display: inline-block;
