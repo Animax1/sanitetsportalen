@@ -33,3 +33,5 @@ start_offline_deprecated.bat
 
 #CLAUDE
 .claude/settings.local.json
+# Byggstempelet skrives av core/skriv_bygg.py i byggfasen (nixpacks.toml)
+bygg.json

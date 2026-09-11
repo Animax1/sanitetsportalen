@@ -1475,6 +1475,22 @@ function mkBelastning() {
   }).join('');
 
   const faktiskHode = harFaktisk ? '<th>Faktisk</th>' : '';
+  // **Tabellen får ikke krympes under det navnet trenger.** Med
+  // `table-layout: fixed` og ingen kolonnebredder delte nettleseren 308 px
+  // likt på seks kolonner — 51 px hver, og «Korteste hvile» sto i tre
+  // linjer over et tall. André: «veldig tett på mobil». Kolonnene får
+  // andeler, og stilarket gir tabellen en gulvbredde så den ruller i ramma
+  // på en telefon i stedet for å klemmes.
+  const kolonner = harFaktisk ? `
+          <colgroup>
+            <col style="width: 26%"><col style="width: 11%"><col style="width: 9%">
+            <col style="width: 14%"><col style="width: 12%"><col style="width: 14%">
+            <col style="width: 14%">
+          </colgroup>` : `
+          <colgroup>
+            <col style="width: 30%"><col style="width: 12%"><col style="width: 10%">
+            <col style="width: 16%"><col style="width: 16%"><col style="width: 16%">
+          </colgroup>`;
   return hode + `
     <div class="vl-kort">
       <div class="vl-kort-topp">
@@ -1483,7 +1499,8 @@ function mkBelastning() {
           brukt opp ligger øverst</span>
       </div>
       <div class="vl-tabellramme">
-        <table class="vl-tabell vl-tabell-drift vl-utskrift">
+        <table class="vl-tabell vl-tabell-belastning vl-utskrift">
+          ${kolonner}
           <thead>
             <tr>
               <th>Navn</th><th>Korps</th><th>Skift</th><th>Planlagt</th>

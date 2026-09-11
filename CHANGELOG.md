@@ -4,6 +4,31 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-11 — Bygg og dato i footeren, og en planleggingstabell som ikke klemmes
+
+**1972 tester grønne** (13 nye). To punkter fra André.
+
+**Footeren viser bygg og dato** — «Sanitetsportalen · adm · a03b5e5 ·
+11.09.2026 10:15». Det er svaret på «er dette den nye koden, eller cachen?».
+`core/versjon.py` prøver tre kilder i rekkefølge: `bygg.json` skrevet i
+byggfasen på Railway (`nixpacks.toml` kjører `core/skriv_bygg.py`, som bare
+bruker standardbiblioteket — et Django-oppsett i bygget ville gjort footeren
+til en grunn til at deployen feiler), så `git` i arbeidskatalogen, så
+`RAILWAY_GIT_COMMIT_SHA` alene med `manage.py` sin mtime som dato. Ingen
+kilde gir «ukjent», ikke tomt. Regnes ut én gang per prosess.
+- **Første deploy med `nixpacks.toml` må ses på.** Fila legger bare til ett
+  byggsteg etter «install», og Python-provideren oppdages som før — men det
+  er første gang bygget har en egen fase. Feiler steget, står footeren
+  likevel med SHA fra miljøet.
+
+**Planleggingstabellen på mobil.** «Veldig tett»: den arvet `min-width: 0`
+fra drifttabellen, og `table-layout: fixed` delte 308 px likt på seks
+kolonner — 51 px hver, «Korteste hvile» i tre linjer over et tall. Nå har
+den egen klasse med gulvbredde 36rem og kolonneandeler, så den ruller i
+ramma på en telefon i stedet for å klemmes, som ressurstabellen gjør.
+
+---
+
 ## 2026-09-11 — Tidsblokker, slutt-tid i «Ny vaktliste», og «8,5 t» overalt
 
 **1956 tester grønne** (25 nye, fem mutasjoner satt rødt først). Tre punkter

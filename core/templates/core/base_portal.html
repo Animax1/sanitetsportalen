@@ -259,6 +259,10 @@
 {# ──── Footer ──── #}
 <footer class="portal-footer">
   Sanitetsportalen &middot; {{ request.user.username|default:"" }}
+  {# Bygg og dato: svaret på «er dette den nye koden, eller cachen?». #}
+  <span class="portal-versjon" title="Bygg {{ versjon.bygg }}{% if versjon.dato %} · {{ versjon.dato|date:'j. M Y H:i' }}{% endif %}">
+    &middot; {{ versjon.bygg }}{% if versjon.dato %} &middot; {{ versjon.dato|date:'d.m.Y H:i' }}{% endif %}
+  </span>
 </footer>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>

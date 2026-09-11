@@ -133,6 +133,14 @@ ingen av dem gir feilmelding — de er bare stille inaktive.
             - [ ] **Sjekk på Andrés telefon** at ingenting følger nå. Gjør det
                   fortsatt det, er det ikke sticky som er årsaken, og da
                   trengs et skjermbilde.
+      - [x] **Bygg og dato i footeren** (samme dag). `core/versjon.py`,
+            byggstempel fra `nixpacks.toml` → `core/skriv_bygg.py`.
+            - [ ] **Se på første deploy til staging med `nixpacks.toml`.**
+                  Forventet i bygglogg: «bygg.json: <sha> <tid>». Mangler
+                  stemplet, faller footeren tilbake på SHA fra miljøet og
+                  utsjekkstiden — den står ikke tom, men datoen er da
+                  ikke byggtiden.
+      - [x] **Planleggingstabellen klemmes ikke på mobil** (samme dag).
       - [ ] **Stripe på blokklinja** (mini-Gantt over vaktas spenn) — alternativ
             «Begge deler» i spørsmålet 11. sep.; valgt bort for nå, lett å
             legge til siden blokka alt bærer spennet.

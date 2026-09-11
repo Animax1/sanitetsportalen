@@ -74,6 +74,8 @@ REVIEWED_INTERPOLATIONS = {
     'hvileklasse': 'hardkodet CSS-klasse fra en ternær',
     'lengsteklasse': 'hardkodet CSS-klasse fra en ternær',
     'tabellhode': 'markup bygget lokalt: to faste kolonneoppsett, ingen data',
+    'kolonner': 'to bruk, begge uten data: colspan-tallet i mkRessurs og '
+                'colgroup-markupen i mkBelastning, begge bygget lokalt',
     'navn': 'ternær: escapet personnavn, eller «Ledig plass» som markup',
     'stil': 'hardkodet Bootstrap-klasse fra kallstedet, ingen data i seg',
     'linjer': 'tabellrader bygget lokalt i samme funksjon',
@@ -3134,3 +3136,59 @@ class NyVaktlisteSporOmSluttenTests(SimpleTestCase):
             assert(sendt.planlagt_slutt === null, 'slutt: ' + sendt.planlagt_slutt);
         """)
         self.assertIn('OK', ut)
+
+
+class BelastningstabellensBreddeTests(SimpleTestCase):
+    """«Veldig tett på mobil» (André, 11. sep. 2026).
+
+    Tabellen arvet `min-width: 0` fra drifttabellen, og `table-layout: fixed`
+    delte 308 px likt på seks kolonner. Regelen: tabellen har en gulvbredde
+    og kolonnene har andeler, så den ruller i ramma framfor å klemmes.
+    """
+
+    HARNESS = (
+        (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue')),
+        (VAKTLISTE_JS, ('mkBelastning', '_tall', 'kanLede', '_nivaa',
+                        '_erAdmin')),
+    )
+    RAD = PlanleggingsfanenTests.RAD
+    SAM = PlanleggingsfanenTests.SAM
+
+    def setUp(self):
+        if not node_available():
+            self.skipTest('node er ikke tilgjengelig')
+        self.harness = build_harness(self.HARNESS)
+
+    def _vis(self, rad):
+        import json
+        data = {'personer': [rad], 'sammendrag': self.SAM,
+                'grenser': {'maks_skift_timer': 12, 'min_hvile_timer': 8}}
+        return run_node(self.harness, "globalThis.window = { MODUL_TILGANG: { admin: true } };\n" + f"""
+            globalThis.belastning = {json.dumps(data)};
+            console.log(mkBelastning());
+        """)
+
+    def _css(self):
+        from pathlib import Path
+        from django.conf import settings
+        return (Path(settings.BASE_DIR) / 'static' / 'css'
+                / 'vaktliste.css').read_text(encoding='utf-8')
+
+    def test_tabellen_har_egen_klasse_med_gulvbredde(self):
+        ut = self._vis(self.RAD)
+        self.assertIn('vl-tabell-belastning', ut)
+        self.assertNotIn('vl-tabell-drift', ut, 'drifttabellens min-width: 0 er feil her')
+        m = re.search(r'(?m)^\.vl-tabell-belastning \{([^}]*)\}', self._css())
+        self.assertIsNotNone(m, 'regelen finnes ikke i stilarket')
+        bredde = re.search(r'min-width:\s*(\d+)rem', m.group(1))
+        self.assertIsNotNone(bredde)
+        self.assertGreaterEqual(int(bredde.group(1)), 30)
+
+    def test_kolonnene_har_andeler_som_summerer_til_hundre(self):
+        """Med og uten «Faktisk» — begge oppsettene skal fylle tabellen."""
+        for rad in (self.RAD, {**self.RAD, 'faktiske_timer': 9.5}):
+            ut = self._vis(rad)
+            andeler = [int(a) for a in re.findall(r'<col style="width: (\d+)%">', ut)]
+            with self.subTest(faktisk=rad['faktiske_timer'] is not None):
+                self.assertEqual(sum(andeler), 100, andeler)
+                self.assertEqual(len(andeler), ut.count('<th>'), 'én andel per kolonne')

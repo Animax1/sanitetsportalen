@@ -68,3 +68,13 @@ def tilgang(request):
     """
     from core.auth_decorators import er_global_admin
     return {'er_global_admin': er_global_admin(getattr(request, 'user', None))}
+
+
+def versjon(request):
+    """Legg til ``versjon`` — bygg og dato — i template-context.
+
+    Footeren i ``base_portal.html`` viser den. Regnes ut én gang per prosess
+    i ``core.versjon.hent_versjon``; her kostes ingenting per request.
+    """
+    from core.versjon import hent_versjon
+    return {'versjon': hent_versjon()}

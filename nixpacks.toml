@@ -1,0 +1,8 @@
+# Byggfasen på Railway. Python-provideren oppdages som før — denne fila
+# legger bare til ett steg etter «install»: stemple bygget, slik at footeren
+# kan si hvilken commit og hvilket klokkeslett som kjører. Skriptet bruker
+# bare standardbiblioteket, så det kan ikke feile på manglende miljø.
+# Se core/versjon.py for hvordan fila leses.
+[phases.build]
+dependsOn = ["install"]
+cmds = ["python core/skriv_bygg.py"]
