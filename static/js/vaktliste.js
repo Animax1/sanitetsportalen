@@ -1483,13 +1483,13 @@ function mkBelastning() {
   // på en telefon i stedet for å klemmes.
   const kolonner = harFaktisk ? `
           <colgroup>
-            <col style="width: 26%"><col style="width: 11%"><col style="width: 9%">
-            <col style="width: 14%"><col style="width: 12%"><col style="width: 14%">
-            <col style="width: 14%">
+            <col style="width: 24%"><col style="width: 10%"><col style="width: 8%">
+            <col style="width: 13%"><col style="width: 11%"><col style="width: 17%">
+            <col style="width: 17%">
           </colgroup>` : `
           <colgroup>
-            <col style="width: 30%"><col style="width: 12%"><col style="width: 10%">
-            <col style="width: 16%"><col style="width: 16%"><col style="width: 16%">
+            <col style="width: 27%"><col style="width: 11%"><col style="width: 9%">
+            <col style="width: 15%"><col style="width: 19%"><col style="width: 19%">
           </colgroup>`;
   return hode + `
     <div class="vl-kort">

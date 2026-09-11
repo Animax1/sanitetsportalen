@@ -3184,6 +3184,14 @@ class BelastningstabellensBreddeTests(SimpleTestCase):
         self.assertIsNotNone(bredde)
         self.assertGreaterEqual(int(bredde.group(1)), 30)
 
+    def test_overskriftene_faar_bryte(self):
+        """«Korteste hvile» trenger 123 px; med `nowrap` fra `.vl-tabell thead
+        th` skrev den seg inn over nabocella (André: «fortsatt litt
+        overlapp»). Regelen for denne tabellen slår brytningen på igjen."""
+        m = re.search(r'(?m)^\.vl-tabell-belastning thead th \{([^}]*)\}', self._css())
+        self.assertIsNotNone(m, 'ingen egen regel for tabellhodet')
+        self.assertIn('white-space: normal', m.group(1))
+
     def test_kolonnene_har_andeler_som_summerer_til_hundre(self):
         """Med og uten «Faktisk» — begge oppsettene skal fylle tabellen."""
         for rad in (self.RAD, {**self.RAD, 'faktiske_timer': 9.5}):

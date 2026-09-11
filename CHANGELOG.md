@@ -24,8 +24,17 @@ kilde gir «ukjent», ikke tomt. Regnes ut én gang per prosess.
 **Planleggingstabellen på mobil.** «Veldig tett»: den arvet `min-width: 0`
 fra drifttabellen, og `table-layout: fixed` delte 308 px likt på seks
 kolonner — 51 px hver, «Korteste hvile» i tre linjer over et tall. Nå har
-den egen klasse med gulvbredde 36rem og kolonneandeler, så den ruller i
-ramma på en telefon i stedet for å klemmes, som ressurstabellen gjør.
+den egen klasse med gulvbredde og kolonneandeler, så den ruller i ramma på
+en telefon i stedet for å klemmes, som ressurstabellen gjør.
+- **«Fortsatt litt overlapp»** etter første runde: målt i iPhone-viewport
+  var det overskriftene «Lengste skift» (114 px) og «Korteste hvile»
+  (123 px) som skrev seg over nabocella — `thead th` er `nowrap`. Denne
+  tabellen får bryte i hodet, gulvbredden er 38rem, og de to kolonnene fikk
+  19 % hver. Målt etterpå: ingen celle flyter over.
+
+**Footeren første gang på staging:** «8447399 · 11.09.2026 12:34» — det
+er byggtiden i norsk tid (pushen gikk 10:34 UTC), altså riktig, og det
+viser at byggsteget i `nixpacks.toml` kjørte.
 
 ---
 

@@ -958,7 +958,20 @@
   André: «veldig tett på mobil». 36rem er nok til at hvert tall står på én
   linje; på en telefon ruller tabellen i ramma, som ressurstabellen gjør.
 */
-.vl-tabell-belastning { min-width: 36rem; }
+.vl-tabell-belastning { min-width: 38rem; }
+
+/*
+  Overskriftene i denne tabellen får bryte. `thead th` er `nowrap` for at
+  «Navn» og «Korps» ikke skal brekke i ressurstabellen — men «Korteste
+  hvile» trenger 123 px, og med nowrap skrev den seg inn over nabocella
+  («fortsatt litt overlapp», André). To linjer i et tabellhode er bedre enn
+  én linje som ikke får plass.
+*/
+.vl-tabell-belastning thead th {
+  white-space: normal;
+  line-height: 1.15;
+  vertical-align: bottom;
+}
 
 /*
   **Tellingen står øverst, stor.** I en evakuering teller man hoder mot et

@@ -135,11 +135,9 @@ ingen av dem gir feilmelding — de er bare stille inaktive.
                   trengs et skjermbilde.
       - [x] **Bygg og dato i footeren** (samme dag). `core/versjon.py`,
             byggstempel fra `nixpacks.toml` → `core/skriv_bygg.py`.
-            - [ ] **Se på første deploy til staging med `nixpacks.toml`.**
-                  Forventet i bygglogg: «bygg.json: <sha> <tid>». Mangler
-                  stemplet, faller footeren tilbake på SHA fra miljøet og
-                  utsjekkstiden — den står ikke tom, men datoen er da
-                  ikke byggtiden.
+            - [x] **Første deploy med `nixpacks.toml` gikk:** footeren
+                  viste «8447399 · 11.09.2026 12:34» — byggtiden i norsk
+                  tid. Byggsteget kjørte.
       - [x] **Planleggingstabellen klemmes ikke på mobil** (samme dag).
       - [ ] **Stripe på blokklinja** (mini-Gantt over vaktas spenn) — alternativ
             «Begge deler» i spørsmålet 11. sep.; valgt bort for nå, lett å
