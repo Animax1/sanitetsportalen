@@ -495,6 +495,22 @@
   background: var(--surface-1);
 }
 
+/*
+  **På en telefon henger ingenting fast.** André meldte 11. sep. 2026 at
+  merknadskolonnen fulgte med når tabellen rullet på mobilen, mens knappene
+  ikke gjorde det — og at han ikke ville ha noe som fulgte. Sticky-kolonnen
+  ble laget for laptopen, der tabellen ruller litt og blyanten forsvant ut;
+  på en 390 px bred skjerm tar den en sjettedel av det synlige og gir lite.
+  Regelen slår av begge sticky-reglene, cella og hodet, så de ikke kan glippe
+  hver for seg.
+*/
+@media (max-width: 768px) {
+  .vl-handling,
+  .vl-tabell thead th:last-child {
+    position: static;
+  }
+}
+
 .vl-handling .btn {
   min-width: 2.1rem;
   padding-left: 0.4rem;

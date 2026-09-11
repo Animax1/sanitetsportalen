@@ -652,7 +652,8 @@ function mkGruppe(gruppe) {
           <i class="bi bi-${escHtmlValue(gruppe.ikon)} me-1"></i>${escapeHtml(gruppe.navn)}
           <span class="vl-meta">${escHtmlValue(ressurser.length)} ${
             ressurser.length === 1 ? 'enhet' : 'enheter'} ·
-            ${escHtmlValue(_posterIGruppe(gruppe.id).length)} skift</span>
+            ${escapeHtml(_telling(_posterIGruppe(gruppe.id),
+                                  _tidsblokker(_posterIGruppe(gruppe.id)).length))}</span>
         </span>
         ${leggTil}
       </div>
@@ -1217,8 +1218,22 @@ function _tidsblokker(poster) {
 }
 
 
+function _telling(poster, skift) {
+  // «2 skift · 5 mannskap» som ren tekst — escapes der den settes inn.
+  // Mannskap utelates når ingen er satt opp: «0 mannskap» ved siden av
+  // «3 ledige» sier det samme to ganger.
+  const mannskap = poster.filter((vp) => !vp.ledig).length;
+  const deler = [skift + ' skift'];
+  if (mannskap) deler.push(mannskap + ' mannskap');
+  return deler.join(' · ');
+}
+
+
 function _blokklinje(blokk, kolonner) {
-  // Linja over en blokk: tiden, timene og hvor mange som står der. Blokka
+  // Linja over en blokk: tiden, timene og hvor mange som står der. **Ordene
+  // er Andrés (11. sep. 2026): et skift er en vakttid, og de som går det er
+  // mannskap.** «4 satt opp» kunne leses som fire skift.
+  // Blokka
   // har samme form som et skift (`fra_tid`/`til_tid`), så `_tidsspenn` og
   // `_varighet` leser den rett. Tellingen bygges med `+`, ikke i en
   // template-literal — XSS-skanneren leser hvert `${}` i byggerne, og et
@@ -1226,7 +1241,7 @@ function _blokklinje(blokk, kolonner) {
   const ledige = blokk.poster.filter((vp) => vp.ledig).length;
   const bemannet = blokk.poster.length - ledige;
   const deler = [];
-  if (bemannet) deler.push(bemannet + ' satt opp');
+  if (bemannet) deler.push(bemannet + ' mannskap');
   if (ledige) deler.push(ledige + (ledige === 1 ? ' ledig' : ' ledige'));
   return `
         <tr class="vl-blokk">
@@ -1291,19 +1306,23 @@ function mkOversikt() {
       .filter((r) => (perRessurs.get(r.id) || []).length)
       .map((r) => {
         const egne = perRessurs.get(r.id);
-        const rader = _tidsblokker(egne).map((blokk) =>
+        const blokker = _tidsblokker(egne);
+        const rader = blokker.map((blokk) =>
           _blokklinje(blokk, 4) + blokk.poster.map(rad).join('')).join('');
         const ledige = egne.filter((vp) => vp.ledig).length;
         const rest = ledige
           ? ` <span class="vl-meta">· ${escHtmlValue(ledige)} ${escapeHtml(ledige === 1 ? 'ledig' : 'ledige')}</span>` : '';
-        // Summen per ressurs er det tallet man ellers legger sammen for
-        // hånd når man skal si hvor mye bilen er bemannet.
+        // **Et skift er en vakttid, mannskap er de som går den** (André,
+        // 11. sep. 2026). Tallene er derfor blokkene og de bemannede radene,
+        // ikke radene. Summen per ressurs er det man ellers legger sammen
+        // for hånd når man skal si hvor mye bilen er bemannet.
+        const tall = _telling(egne, blokker.length);
         const timer = `${escapeHtml(_tall(_sumTimer(egne)))} t`;
         return `
       <div class="vl-korpsgruppe">
         <h3>${escapeHtml(r.navn)}
           <span class="vl-meta">${escapeHtml(g.navn)} ·
-            ${escHtmlValue(egne.length)} skift · ${timer}</span>${rest}
+            ${escapeHtml(tall)} · ${timer}</span>${rest}
         </h3>
         <div class="vl-tabellramme">
         <table class="vl-tabell vl-utskrift">
@@ -1326,6 +1345,9 @@ function mkOversikt() {
   const ledigtekst = antallLedige
     ? ` · ${escHtmlValue(antallLedige)} ${escapeHtml(antallLedige === 1 ? 'ledig plass' : 'ledige plasser')}` : '';
   const sumTimer = `${escapeHtml(_tall(_sumTimer(poster)))} t`;
+  // Skiftene over hele vakta er de *ulike* vakttidene — samme spenn på
+  // samleplassen og på bilen er ett skift, ikke to.
+  const vaktTall = _telling(poster, _tidsblokker(poster).length);
   // **Ingen kurve her.** Den står i fanen den gjelder, og to steder å lese
   // den samme kurven er ett for mye. «Oversikt» er utskriftslista, og bare det.
   return `
@@ -1333,7 +1355,7 @@ function mkOversikt() {
       <div class="vl-arkhode">
         <h2>${escapeHtml(tittel)}</h2>
         <div class="vl-meta">${escapeHtml(spenn)} ·
-          ${escHtmlValue(poster.length)} skift · ${sumTimer}${escapeHtml(ledigtekst)}</div>
+          ${escapeHtml(vaktTall)} · ${sumTimer}${escapeHtml(ledigtekst)}</div>
       </div>
       ${deler.join('')}
     </div>`;
@@ -2053,9 +2075,10 @@ function apneVakt() {
   if (antall) {
     const poster = aktivListe.vaktposter || [];
     const ledige = poster.filter((v) => v.ledig).length;
+    const tall = _telling(poster, _tidsblokker(poster).length);
     antall.textContent = ledige
-      ? `${poster.length} skift, hvorav ${ledige} ledige plasser`
-      : `${poster.length} skift`;
+      ? `${tall} · ${ledige} ${ledige === 1 ? 'ledig plass' : 'ledige plasser'}`
+      : tall;
   }
 
   if (lengde) lengde.classList.toggle('d-none', !kanLede());

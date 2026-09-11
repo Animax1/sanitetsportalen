@@ -34,6 +34,22 @@ skrev «8.5». `_tall()` er nå det ene stedet, og `_varighet()` går gjennom de
 
 **Rettet på veien:** «1 ledige» og «1 ledige plasser» i oversikten.
 
+**Ordene, samme dag:** «Skift må vel tolkes som ulike vakttider, og
+personell som mannskap.» Tellingene skrev «9 skift» om ni rader. Nå er et
+skift en blokk — én vakttid — og mannskap er de bemannede radene:
+«2 skift · 5 mannskap · 70,8 t · 1 ledig». Over hele vakta er skiftene de
+*ulike* vakttidene, så samme spenn på samleplassen og bilen er ett skift.
+`_telling()` er det ene stedet; gruppehodet, ressursoverskriften, arkhodet,
+blokklinja og innstillingsvinduet bruker den. Belastningsfanen står som
+før — der er «skift» per person nettopp skift.
+
+**På en telefon henger ingen kolonne fast.** André så merknadskolonnen følge
+med når tabellen rullet på mobilen, og ville ikke ha noe som fulgte. I
+Chromium med iPhone-viewport er det bare blyantcella som er sticky, så det
+han ser er trolig en WebKit-forskjell jeg ikke kan gjenskape her — men
+sticky-kolonnen ble laget for laptopen, og på 390 px tar den en sjettedel
+av det synlige. Under 768 px slås begge sticky-reglene av, cella og hodet.
+
 ---
 
 ## 2026-09-11 — Vaktlistemodulen merget til prod

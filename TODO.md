@@ -125,6 +125,14 @@ ingen av dem gir feilmelding — de er bare stille inaktive.
       Tre punkter etter første bruk i prod. Skift med samme fra–til samles
       under én blokklinje i ressursfanene og utskriftslista; «Ny vaktliste»
       spør om slutten; timeformatet er det samme overalt. Se CHANGELOG.
+      - [x] **Ordene (samme dag):** skift = vakttid, mannskap = folk, i alle
+            tellingene på siden. Belastningsfanen uendret.
+      - [x] **Ingen sticky kolonne under 768 px** (samme dag). André så
+            merknadskolonnen følge med på mobilen; ikke gjenskapt i Chromium,
+            der bare blyantcella er sticky. Slått av for telefonen uansett.
+            - [ ] **Sjekk på Andrés telefon** at ingenting følger nå. Gjør det
+                  fortsatt det, er det ikke sticky som er årsaken, og da
+                  trengs et skjermbilde.
       - [ ] **Stripe på blokklinja** (mini-Gantt over vaktas spenn) — alternativ
             «Begge deler» i spørsmålet 11. sep.; valgt bort for nå, lett å
             legge til siden blokka alt bærer spennet.

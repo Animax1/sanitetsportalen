@@ -207,7 +207,7 @@ class VaktlisteEscapingOppforselTests(SimpleTestCase):
                         'rollerForGruppe', '_fyllValgFor', '_varighet',
                         'mkRolleRad', 'mkOversikt', '_skiftrekkefolge',
                         '_planrad', '_tidsblokker', '_blokklinje',
-                        '_sumTimer', '_skifttimer', '_tall',
+                        '_sumTimer', '_skifttimer', '_tall', '_telling',
                         '_mkEnKurve', 'mkGruppekurve', '_posterIGruppe',
                         'mkGruppe', '_plassKorps', '_tegnforklaring',
                         '_timesteg', '_ressurserIGruppe',
@@ -1036,6 +1036,41 @@ class TabellcellersLayoutTests(SimpleTestCase):
                         f'layouten på et element inne i cella i stedet.')
 
 
+class IngentingHengerFastPaaTelefonenTests(SimpleTestCase):
+    """På en telefon henger ingen kolonne fast (11. sep. 2026).
+
+    André: merknadskolonnen fulgte med når tabellen rullet på mobilen, mens
+    knappene ikke gjorde det — og han ville ikke ha noe som fulgte.
+    Sticky-kolonnen ble laget for laptopen. Testen leser regelblokka for
+    smale skjermer og krever at *begge* sticky-reglene slås av der — cella
+    og hodet — så de ikke kan glippe hver for seg.
+    """
+
+    def _smal(self):
+        from pathlib import Path
+        from django.conf import settings
+        css = (Path(settings.BASE_DIR) / 'static' / 'css'
+               / 'vaktliste.css').read_text(encoding='utf-8')
+        m = re.search(r'@media \(max-width: 768px\) \{(.*?)\n\}', css, re.S)
+        self.assertIsNotNone(m, 'fant ingen regelblokk for smale skjermer')
+        return m.group(1)
+
+    def test_cella_og_hodet_slippes_paa_smal_skjerm(self):
+        blokk = self._smal()
+        self.assertIn('.vl-handling', blokk)
+        self.assertIn('thead th:last-child', blokk)
+        self.assertIn('position: static', blokk)
+
+    def test_paa_bred_skjerm_henger_den_fortsatt(self):
+        """Regelen er for telefonen — laptopen beholder blyanten i syne."""
+        from pathlib import Path
+        from django.conf import settings
+        css = (Path(settings.BASE_DIR) / 'static' / 'css'
+               / 'vaktliste.css').read_text(encoding='utf-8')
+        m = re.search(r'(?m)^\.vl-handling \{([^}]*)\}', css)
+        self.assertIn('position: sticky', m.group(1))
+
+
 class RollenedtrekketTests(SimpleTestCase):
     """Nedtrekket tilbyr aktive roller — og den raden allerede har.
 
@@ -1216,7 +1251,7 @@ class OversiktUtenKurveTests(SimpleTestCase):
         (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue')),
         (VAKTLISTE_JS, ('mkOversikt', '_skiftrekkefolge', '_d', '_kl',
                         '_tidsblokker', '_blokklinje', '_sumTimer',
-                        '_varighet', '_skifttimer', '_tall',
+                        '_varighet', '_skifttimer', '_tall', '_telling',
                         '_dag', '_sammeDag', '_tidsspenn', '_vaktspenn',
                         '_ressurserIGruppe', '_grupperMedRessurser')),
     )
@@ -1616,7 +1651,7 @@ class FanenErGruppaTests(SimpleTestCase):
                         '_radklasse', '_stempelknapper', 'kanStemple',
                         '_rolleValg', '_skiftrekkefolge', '_fyllValgFor',
                         '_varighet', '_skifttimer', '_tall', '_planrad',
-                        '_tidsblokker', '_blokklinje', '_tidsspenn',
+                        '_tidsblokker', '_blokklinje', '_tidsspenn', '_telling',
                         '_sammeDag', 'mkGruppekurve', '_mkEnKurve',
                         '_tegnforklaring', '_timesteg', '_toppunkt',
                         '_posterPerGruppe', '_vaktensSpenn',
@@ -1822,7 +1857,7 @@ class UtskriftslistaTests(SimpleTestCase):
         (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue')),
         (VAKTLISTE_JS, ('mkOversikt', '_skiftrekkefolge', '_d', '_kl',
                         '_tidsblokker', '_blokklinje', '_sumTimer',
-                        '_varighet', '_skifttimer', '_tall',
+                        '_varighet', '_skifttimer', '_tall', '_telling',
                         '_dag', '_sammeDag', '_tidsspenn', '_vaktspenn',
                         '_ressurserIGruppe', '_grupperMedRessurser')),
     )
@@ -1952,7 +1987,7 @@ class EnkeltgruppeTests(SimpleTestCase):
                         '_rolleValg', '_plassKorps', '_skiftrekkefolge',
                         '_fyllValgFor', '_varighet', '_skifttimer', '_tall',
                         '_planrad', '_tidsblokker', '_blokklinje',
-                        '_tidsspenn', '_sammeDag', 'mkGruppekurve',
+                        '_tidsspenn', '_sammeDag', 'mkGruppekurve', '_telling',
                         '_posterIGruppe', '_mkEnKurve', '_tegnforklaring',
                         '_timesteg', '_toppunkt', '_vaktensSpenn',
                         '_bemanningPerTime', 'rollerForGruppe', '_iso16',
@@ -2835,7 +2870,7 @@ class TidsblokkerTests(SimpleTestCase):
     HARNESS = (
         (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue')),
         (VAKTLISTE_JS, ('mkOversikt', '_tidsblokker', '_blokklinje',
-                        '_driftrad', '_radklasse', '_stempelknapper',
+                        '_telling', '_driftrad', '_radklasse', '_stempelknapper',
                         'kanStemple', 'iDrift', 'kanSkriveAlt', '_nivaa',
                         '_erAdmin', '_skiftrekkefolge', '_sumTimer',
                         '_varighet', '_skifttimer', '_tall', '_d', '_kl',
@@ -2908,7 +2943,7 @@ class TidsblokkerTests(SimpleTestCase):
         self.assertIn('20:00', ut)
         self.assertIn('04:30', ut)
         self.assertIn('8,5 t', ut)
-        self.assertIn('2 satt opp · 1 ledig', ut)
+        self.assertIn('2 mannskap · 1 ledig', ut)
 
     def test_linja_spenner_over_alle_kolonnene(self):
         """Én celle over hele bredden — ellers faller den ut av
@@ -2919,7 +2954,7 @@ class TidsblokkerTests(SimpleTestCase):
     def test_flertall_naar_flere_er_ledige(self):
         ut = self._linje([{'ledig': True}, {'ledig': True}])
         self.assertIn('2 ledige', ut)
-        self.assertNotIn('satt opp', ut, 'ingen er satt opp, så det står ikke')
+        self.assertNotIn('mannskap', ut, 'ingen er satt opp, så det står ikke')
 
     def test_linja_krysser_dogn_med_dagen_nevnt_to_ganger(self):
         """Samme regel som `_tidsspenn`: dagen én gang innenfor et døgn, to
@@ -2947,14 +2982,38 @@ class TidsblokkerTests(SimpleTestCase):
         self.assertEqual(samleplass.count('17:00'), 2)
 
     def test_ressursen_summerer_timene(self):
-        """10 + 10 + 5,25 på samleplassen: «25,3 t» i overskriften, med komma."""
+        """10 + 10 + 5,25 på samleplassen: «25,3 t» i overskriften, med komma.
+        To *skift* — vakttidene — ikke tre rader; og ingen mannskap, siden
+        alle tre plassene er ledige."""
         ut = self._oversikt()
         samleplass = ut[ut.index('<h3>Samleplass'):ut.index('<h3>Ambulanse 1')]
-        self.assertIn('3 skift · 25,3 t', samleplass)
+        self.assertIn('2 skift · 25,3 t', samleplass)
+        self.assertNotIn('0 mannskap', samleplass)
+        self.assertIn('3 ledige', samleplass)
 
     def test_arkhodet_summerer_hele_vakta(self):
-        """25,25 + 10 + 10 = 45,25 → «45,3 t»."""
-        self.assertIn('5 skift · 45,3 t', self._oversikt())
+        """25,25 + 10 + 10 = 45,25 → «45,3 t». Skiftene er de ulike vakttidene
+        over hele vakta: 17–03 og 17–22:15 er to, selv om 17–03 går på tre
+        ressurser. Mannskap er Kari og Ola."""
+        self.assertIn('2 skift · 2 mannskap · 45,3 t', self._oversikt())
+
+    def test_skift_er_vakttider_og_mannskap_er_folk(self):
+        """Andrés ord (11. sep. 2026): «skift må vel tolkes som ulike
+        vakttider, og personell som mannskap». Fem rader på to spenn er to
+        skift og fire mannskap."""
+        ut = run_node(self.harness, """
+            const poster = [
+              {ledig: false, fra_tid: 'a', til_tid: 'b'},
+              {ledig: false, fra_tid: 'a', til_tid: 'b'},
+              {ledig: true,  fra_tid: 'a', til_tid: 'b'},
+              {ledig: false, fra_tid: 'c', til_tid: 'd'},
+              {ledig: false, fra_tid: 'c', til_tid: 'd'},
+            ];
+            console.log('[' + _telling(poster, 2) + ']');
+            console.log('[' + _telling([{ledig: true, fra_tid: 'a', til_tid: 'b'}], 1) + ']');
+        """)
+        self.assertIn('[2 skift · 4 mannskap]', ut)
+        self.assertIn('[1 skift]', ut, 'bare ledige: mannskap utelates')
 
     def test_ledige_plasser_beholder_sin_rad(self):
         ut = self._oversikt()
