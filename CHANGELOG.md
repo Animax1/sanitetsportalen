@@ -4,6 +4,32 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-11 — Vaktlistemodulen merget til prod
+
+`rollemodell` → `main` (`567ee11`). 33 commits, 66 filer, 18551 linjer.
+Hele `vaktliste`-appen var **ny for prod** — den fantes ikke på `main` i det
+hele tatt. Elleve migrasjoner gikk ut: `vaktliste.0001`–`0010` og
+`accounts.0015` (det nye nivået `skriv_leder`, rent additivt).
+
+Innholdet er vaktliste fase 1–6 — registre og planleggingsside, tilgangsmodellen
+med badge og reservasjon, drift med stemplingsregler som data, planleggingstall
+som varsler uten å sperre, og besetning i sentralbordet. Med på lasset:
+lesbare cron-feil (`core/kommando.py`), sperren mot stille SQLite-tilbakefall i
+`settings.py`, og migrasjonsprøvene mot ekte PostgreSQL.
+
+**Verifisert før merge**, fordi `vaktliste.0007` tok ned release-fasen én gang:
+1931 tester grønne, `verifiser_migrasjoner` OK, full migrasjon fra tom base mot
+PostgreSQL 16, og en oppgraderingssimulering — en base migrert til `main`,
+seedet med prod-lignende rader (brukere, tilganger, vakt, pasienter), deretter
+migrert med den nye koden. Elleve migrasjoner OK, alle rader intakt, de seks
+ressursgruppene seedet riktig.
+
+Backup av prod tatt av André før pushen. Pushen ble holdt igjen til den var
+bekreftet: push til `main` *er* deployen, og elleve migrasjoner er ikke noe man
+angrer på uten backup.
+
+---
+
 ## 2026-08-30 — «Ingen biler oppkoblet» var feil vakt, ikke feil oppsett
 
 **1931 tester grønne** (13 nye, fire mutasjoner satt rødt først). Meldt av

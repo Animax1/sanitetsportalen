@@ -103,6 +103,23 @@ ingen av dem gir feilmelding — de er bare stille inaktive.
       - [x] **`verifiser_vakt` kjørt i prod etter deployen: «Ingen funn»**
             (André, 29. aug. 2026). Deploy 2 landet rent — vakta er fasit i prod.
 
+- [x] **Merget til prod 11. sep. 2026** (`567ee11`). 33 commits, 66 filer:
+      vaktlistemodulen fase 1–6, det nye nivået `skriv_leder`, lesbare cron-feil
+      og migrasjonsprøvene mot ekte PostgreSQL. **Hele `vaktliste`-appen var ny
+      for prod** — elleve migrasjoner gikk ut (`vaktliste.0001`–`0010` og
+      `accounts.0015`). Backup av prod tatt av André før pushen.
+      Verifisert før merge: 1931 tester grønne, `verifiser_migrasjoner` OK, full
+      migrasjon fra tom base mot PostgreSQL 16, og en oppgraderingssimulering der
+      en base ble migrert til `main`, seedet med prod-lignende rader, og deretter
+      migrert med den nye koden — elleve migrasjoner OK, alle rader intakt.
+      - [ ] **Kontroller deployen i Railway.** `vaktliste.0007` er migrasjonen
+            som tok ned release-fasen sist (pending trigger events); den har
+            mønsteret nå, og prøven i `core/migrasjonsprover.py` dekker den, men
+            det er første gang den kjøres mot prod-data.
+      - [ ] **Åpne `/vaktliste/` i prod og sjekk at de seks ressursgruppene er
+            seedet.** Migrasjon `0007` seeder dem; en tom gruppeliste er en
+            vaktliste man ikke får satt opp.
+
 - [ ] **Første skarpe vakt med oppdragsmodulen.** Modulen er ferdig og testet, men
       aldri brukt under en reell vakt — og det er den prøven som finner det ingen
       testsuite gjør: samband, dekning i felt, og om knappene sitter der hendene
