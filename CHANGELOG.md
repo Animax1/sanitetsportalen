@@ -6,7 +6,7 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ## 2026-09-11 — Flere enheter på ett oppdrag, trinn 4: arkiv og statistikk
 
-**2180 tester grønne** (6 nye). Én migrasjon, `oppdrag/0013`: unikhet og
+**2179 tester grønne** (5 nye). Én migrasjon, `oppdrag/0013`: unikhet og
 rekkefølge på `ArkivertOppdrag` — ren skjemaendring, ingen data flyttes.
 Alle fire trinn er levert; deploy 2 (fjerne `Oppdrag.enhet`, stramme
 `Statusmelding.oppdragsenhet`) står igjen som eget punkt.
