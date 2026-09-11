@@ -4,6 +4,43 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-11 — Flere enheter på ett oppdrag, trinn 1: koblingsraden
+
+**2129 tester grønne** (32 nye i `oppdrag/tests_flere_enheter.py`). To migrasjoner,
+`oppdrag/0010` (skjema) og `0011` (bare data, med prøve i `core/migrasjonsprover.py`).
+**Backup av prod før deploy** — `0011` skriver én rad per oppdrag.
+
+**`Oppdragsenhet` er nå det en statusmelding hører til.** Én melding er *én enhets*
+utsagn om *ett* oppdrag, og kjeden Venter → Rykker ut → … → Ledig går per koblingsrad
+(`services.sett_status(..., enhet=)`, `start_oppdrag(..., enhet=)`). `Oppdrag.status`
+er fra nå **utledet** (`services.utledet_status`): den mest aktive enheten vinner,
+`Ledig` bare når alle er ledige — og det er da oppdraget flyttes til historikken. Med
+én enhet gir det samme svar som før; 305 eksisterende oppdragstester gikk uendret,
+bortsett fra én hjelper som satte statuscachen for hånd og nå setter den der den bor.
+
+- **Broene i deploy 1.** `Oppdrag.enhet` lever til deploy 2, og `Oppdrag.save()` lager
+  koblingsraden ved opprettelse; `Statusmelding.save()` fyller `oppdragsenhet` fra
+  oppdragets primære rad når en melding lages med bare `oppdrag`. Ingen eldre kode
+  trenger å vite at raden finnes. `0012` (NOT NULL) er derfor flyttet til deploy 2 —
+  notatets §6 er oppdatert.
+- **Per enhet, ikke per oppdrag:** den automatiske lukkingen (§4.3) lukker *hennes*
+  pågående, 30-minuttersvinduet på enhetsskjermen måles mot *hennes* ledig-melding,
+  `enhet_status` og `ventende_oppdrag` leser radene, og `flytt_til_enhet` flytter én
+  rad (og holder den gamle kolonnen i takt når den primære flyttes).
+- **`varsle_enhet` / `ta_av_enhet`** (§4): varsle legger raden sist i `Venter`, og
+  henter et ferdig oppdrag tilbake fra historikken; ta av bare mens hun venter, og
+  aldri den siste. Endepunktene kommer i trinn 2.
+- **Bilen ser sin egen kjede og de andres navn** (§7.3). `oppdrag_til_dict(...,
+  koblingsrad=)` gir `status`/`neste_overgang` fra *hennes* rad og `varslede` som
+  navneliste uten status; liste og detalj sender bare hennes meldinger. Eierskapet i
+  detalj, stempling og grovsortering er «har enheten en rad», så bil nummer to kan
+  stemple på et oppdrag som ble opprettet med bil én.
+- **Sentralbordet får matrisen** som `enheter` på hvert oppdrag — data først, UI i
+  trinn 3. Lista prefetcher radene.
+- **Backup** tar koblingsraden med, mellom meldingen og oppdraget i
+  gjenopprettingsrekkefølgen; `varslet_av` strippes som de andre kontopekerne.
+  `BackupTests` gjenoppretter to enheter med hver sin status.
+
 ## 2026-09-11 — Beslutningsnotat: flere enheter på ett oppdrag
 
 `docs/BESLUTNING_FLERE_ENHETER_PER_OPPDRAG.md` — utkast, ikke besluttet. Det siste

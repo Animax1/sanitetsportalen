@@ -140,6 +140,61 @@ def _sjekk_0007(c):
     assert c.fetchone()[0] == 1, 'unikhetsskranken per gruppe mangler'
 
 
+# ── oppdrag.0011 ─────────────────────────────────────────────────────────────
+
+def _seed_oppdrag_0011(c):
+    """To oppdrag på hver sin enhet, med meldinger — slik prod ser ut før
+    koblingsraden finnes. Det ene er ledig og i historikken."""
+    c.execute("""INSERT INTO core_vakt (navn, year, startet, er_aktiv)
+                 VALUES ('Proevevakt', 2026, now(), true) RETURNING id""")
+    vakt = c.fetchone()[0]
+    c.execute("""INSERT INTO oppdrag_lokasjon (created_at, updated_at, navn, er_aktiv, rekkefolge)
+                 VALUES (now(), now(), 'Scene', true, 100) RETURNING id""")
+    lok = c.fetchone()[0]
+    enheter = {}
+    for navn in ('HGSD 56', 'KARM 12'):
+        c.execute("""INSERT INTO oppdrag_enhet (created_at, updated_at, navn, er_aktiv, pa_vakt)
+                     VALUES (now(), now(), %s, true, true) RETURNING id""", [navn])
+        enheter[navn] = c.fetchone()[0]
+
+    oppdrag = {}
+    for nr, navn, status, hist in ((1, 'HGSD 56', 'fremme', None),
+                                   (2, 'KARM 12', 'ledig', 'now()')):
+        c.execute(f"""INSERT INTO oppdrag_oppdrag
+                     (created_at, updated_at, oppdragsnummer, problemstilling, hastegrad,
+                      fritekst, status, grovsortering, vakt_id, enhet_id, lokasjon_id,
+                      historikk_fra)
+                     VALUES (now(), now(), %s, 'Fall', 'Haster', '', %s, '', %s, %s, %s,
+                             {hist or 'NULL'}) RETURNING id""",
+                  [nr, status, vakt, enheter[navn], lok])
+        oppdrag[nr] = c.fetchone()[0]
+
+    for nr, statuser in ((1, ('rykker_ut', 'fremme')), (2, ('rykker_ut', 'ledig'))):
+        for st in statuser:
+            c.execute("""INSERT INTO oppdrag_statusmelding
+                         (created_at, updated_at, status, tidspunkt, forsinket, automatisk,
+                          sted, oppdrag_id)
+                         VALUES (now(), now(), %s, now(), false, false, '', %s)""",
+                      [st, oppdrag[nr]])
+
+
+def _sjekk_oppdrag_0011(c):
+    c.execute("""SELECT o.oppdragsnummer, count(oe.id), min(oe.status), min(oe.enhet_id) = o.enhet_id
+                 FROM oppdrag_oppdrag o LEFT JOIN oppdrag_oppdragsenhet oe ON oe.oppdrag_id = o.id
+                 GROUP BY o.id ORDER BY o.oppdragsnummer""")
+    rader = c.fetchall()
+    assert [r[1] for r in rader] == [1, 1], f'nøyaktig én koblingsrad per oppdrag: {rader}'
+    assert [r[2] for r in rader] == ['fremme', 'ledig'], f'status følger oppdraget: {rader}'
+    assert all(r[3] for r in rader), f'koblingsraden peker på oppdragets enhet: {rader}'
+
+    c.execute('SELECT count(*) FROM oppdrag_statusmelding WHERE oppdragsenhet_id IS NULL')
+    assert c.fetchone()[0] == 0, 'meldinger uten koblingsrad'
+    c.execute("""SELECT count(*) FROM oppdrag_statusmelding m
+                 JOIN oppdrag_oppdragsenhet oe ON oe.id = m.oppdragsenhet_id
+                 WHERE oe.oppdrag_id <> m.oppdrag_id""")
+    assert c.fetchone()[0] == 0, 'melding pekt på feil oppdrags koblingsrad'
+
+
 #: Registeret. Nøkkelen er «app.migrasjonsnavn», som i `MigrationLoader`.
 PROVER: dict[str, Migrasjonsprove] = {
     p.migrasjon: p for p in (
@@ -149,6 +204,13 @@ PROVER: dict[str, Migrasjonsprove] = {
             beskrivelse='Ressursgrupper seedes, rollene viftes ut per gruppe',
             seed=_seed_0007,
             sjekk=_sjekk_0007,
+        ),
+        Migrasjonsprove(
+            migrasjon='oppdrag.0011_fyll_oppdragsenhet',
+            foregaaende='0010_flere_enheter',
+            beskrivelse='Én koblingsrad per oppdrag, meldingene pekes på den',
+            seed=_seed_oppdrag_0011,
+            sjekk=_sjekk_oppdrag_0011,
         ),
     )
 }

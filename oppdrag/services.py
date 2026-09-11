@@ -10,7 +10,7 @@ from django.db import models, transaction
 from django.utils import timezone
 
 from . import choices
-from .models import Enhetsbytte, Oppdrag, Statusmelding
+from .models import Enhetsbytte, Oppdrag, Oppdragsenhet, Statusmelding
 
 # ── Statusmaskinen ───────────────────────────────────────────────────────────
 #
@@ -208,25 +208,62 @@ def vurder_klienttid(klienttid, oppdrag, naa=None):
 
 # ── Enhetens tilstand ────────────────────────────────────────────────────────
 
-def aktivt_oppdrag(enhet, vakt=None):
-    """Enhetens påbegynte oppdrag, eller ``None``.
+def koblingsrad(oppdrag, enhet=None):
+    """Enhetens rad på oppdraget — eller den primære når ingen enhet oppgis.
 
-    Påbegynt betyr «har passert `venter` og er ikke avsluttet». Et oppdrag som
+    ``None`` hvis enheten ikke er varslet på oppdraget. Det er svaret på
+    «eier bilen dette oppdraget?», og alle eierskapssjekkene går her.
+    """
+    if enhet is None:
+        return oppdrag.primaer
+    return oppdrag.enheter.filter(enhet=enhet).select_related('enhet').first()
+
+
+def utledet_status(oppdrag) -> str:
+    """Oppdragets status, lest av enhetenes (§2.2 i notatet).
+
+    Den mest aktive vinner: står én bil i `Fremme` og én i `Ledig`, er
+    oppdraget i `Fremme`. `Ledig` bare når alle er ledige — det er da tavla
+    kan ryddes. Uten koblingsrader (kan ikke skje etter `0011`, men
+    `Oppdrag.save` kjører før raden finnes) står cachen som den er.
+    """
+    statuser = list(oppdrag.enheter.values_list('status', flat=True))
+    if not statuser:
+        return oppdrag.status
+    aktive = [s for s in statuser if s != choices.LEDIG]
+    if not aktive:
+        return choices.LEDIG
+    return max(aktive, key=choices.KJEDEN.index)
+
+
+def aktiv_koblingsrad(enhet, vakt=None):
+    """Enhetens påbegynte koblingsrad, eller ``None``.
+
+    Påbegynt betyr «har passert `venter` og er ikke avsluttet». En rad som
     ligger og venter teller ikke: enheten har ikke rykket ut, og kan fortsatt
     sendes et annet sted.
     """
-    qs = enhet.oppdrag.exclude(status__in=(choices.VENTER, choices.LEDIG))
+    qs = (Oppdragsenhet.objects
+          .filter(enhet=enhet)
+          .exclude(status__in=(choices.VENTER, choices.LEDIG))
+          .select_related('oppdrag', 'oppdrag__enhet', 'oppdrag__lokasjon'))
     if vakt is not None:
-        qs = qs.filter(vakt=vakt)
-    return qs.order_by('-created_at').first()
+        qs = qs.filter(oppdrag__vakt=vakt)
+    return qs.order_by('-oppdrag__created_at').first()
+
+
+def aktivt_oppdrag(enhet, vakt=None):
+    """Enhetens påbegynte oppdrag, eller ``None``. Se `aktiv_koblingsrad`."""
+    rad = aktiv_koblingsrad(enhet, vakt)
+    return rad.oppdrag if rad is not None else None
 
 
 def ventende_oppdrag(enhet, vakt=None):
-    """Oppdrag som er tildelt, men ikke påbegynt."""
-    qs = enhet.oppdrag.filter(status=choices.VENTER)
+    """Oppdrag enheten er varslet på, men ikke har påbegynt."""
+    qs = Oppdrag.objects.filter(enheter__enhet=enhet, enheter__status=choices.VENTER)
     if vakt is not None:
         qs = qs.filter(vakt=vakt)
-    return qs.order_by('created_at')
+    return qs.order_by('created_at').distinct()
 
 
 def enhet_status(enhet, vakt=None) -> dict:
@@ -241,13 +278,17 @@ def enhet_status(enhet, vakt=None) -> dict:
     ``Ledig (2 venter)`` er distinksjonen 113 trenger for å vite hvem som kan
     sendes: enheten har fått to oppdrag, men ikke rykket ut på noen av dem.
     """
-    aktivt = aktivt_oppdrag(enhet, vakt)
+    rad = aktiv_koblingsrad(enhet, vakt)
+    aktivt = rad.oppdrag if rad is not None else None
     antall_ventende = ventende_oppdrag(enhet, vakt).count()
     return {
+        # Koblingsraden er *enhetens* status på oppdraget — med flere enheter
+        # er ikke oppdragets status hennes.
+        'koblingsrad': rad,
         'enhet': enhet,
-        'status': aktivt.status if aktivt else choices.LEDIG,
+        'status': rad.status if rad else choices.LEDIG,
         'status_navn': (
-            aktivt.get_status_display() if aktivt else choices.STATUS_NAVN[choices.LEDIG]
+            rad.get_status_display() if rad else choices.STATUS_NAVN[choices.LEDIG]
         ),
         'aktivt_oppdrag': aktivt,
         'antall_ventende': antall_ventende,
@@ -263,7 +304,7 @@ class UlovligOvergang(Exception):
 @transaction.atomic
 def sett_status(oppdrag, ny_status: str, *, bruker=None, tidspunkt=None,
                 forsinket: bool = False, automatisk: bool = False,
-                sted: str = '') -> Statusmelding:
+                sted: str = '', enhet=None) -> Statusmelding:
     """Skriv en statusmelding og oppdater oppdragets cachede status.
 
     Kaster ``UlovligOvergang`` hvis overgangen ikke står i tabellen. Sjekken
@@ -277,9 +318,14 @@ def sett_status(oppdrag, ny_status: str, *, bruker=None, tidspunkt=None,
     ferdig som ett noen trykket `Ledig` på. Lå regelen i viewet, ville tavla
     beholdt nettopp de oppdragene ingen trykket på.
     """
-    if not kan_gaa_til(oppdrag.status, ny_status):
+    # **Per enhet fra 11. sep. 2026.** Uten `enhet` er det den primære —
+    # slik all eldre kode og alle eldre tester mener det.
+    rad = koblingsrad(oppdrag, enhet)
+    if rad is None:
+        raise UlovligOvergang('Enheten er ikke varslet på oppdraget.')
+    if not kan_gaa_til(rad.status, ny_status):
         raise UlovligOvergang(
-            f'Kan ikke gå fra {oppdrag.status!r} til {ny_status!r}.'
+            f'Kan ikke gå fra {rad.status!r} til {ny_status!r}.'
         )
     # Stedet hører til «Avreist» og ingen annen status. Sjekken ligger her og
     # ikke bare i viewet, av samme grunn som overgangssjekken: alle veier inn
@@ -289,6 +335,7 @@ def sett_status(oppdrag, ny_status: str, *, bruker=None, tidspunkt=None,
 
     melding = Statusmelding.objects.create(
         oppdrag=oppdrag,
+        oppdragsenhet=rad,
         status=ny_status,
         tidspunkt=tidspunkt or timezone.now(),
         meldt_av=bruker,
@@ -296,10 +343,14 @@ def sett_status(oppdrag, ny_status: str, *, bruker=None, tidspunkt=None,
         automatisk=automatisk,
         sted=sted or '',
     )
-    oppdrag.status = ny_status
+    rad.status = ny_status
+    rad.save(update_fields=['status', 'updated_at'])
+    # Oppdragets status er utledet: den mest aktive enheten, `Ledig` når
+    # alle er det. Én enhet gir samme svar som før.
+    oppdrag.status = utledet_status(oppdrag)
     felter = ['status', 'updated_at']
 
-    if ny_status == choices.TERMINAL and oppdrag.historikk_fra is None:
+    if oppdrag.status == choices.TERMINAL and oppdrag.historikk_fra is None:
         # `historikk_av` står igjen som NULL, og det er informasjon, ikke en
         # mangel: NULL betyr «ryddet bort av seg selv», satt betyr «noen
         # trykket». Samme skille som `Statusmelding.automatisk`. Å føre opp
@@ -314,7 +365,7 @@ def sett_status(oppdrag, ny_status: str, *, bruker=None, tidspunkt=None,
 
 @transaction.atomic
 def start_oppdrag(oppdrag, *, bruker=None, tidspunkt=None,
-                  forsinket: bool = False) -> Statusmelding:
+                  forsinket: bool = False, enhet=None) -> Statusmelding:
     """Enheten rykker ut. Lukker et eventuelt pågående oppdrag automatisk.
 
     En enhet kan ha flere tildelte oppdrag, men bare ett påbegynt. Trykkes
@@ -326,14 +377,62 @@ def start_oppdrag(oppdrag, *, bruker=None, tidspunkt=None,
     for det neste. Flagget gjør at statistikken kan skille dem.
     """
     naa = tidspunkt or timezone.now()
+    rad = koblingsrad(oppdrag, enhet)
+    if rad is None:
+        raise UlovligOvergang('Enheten er ikke varslet på oppdraget.')
 
-    pagaende = aktivt_oppdrag(oppdrag.enhet, oppdrag.vakt)
-    if pagaende is not None and pagaende.pk != oppdrag.pk:
-        sett_status(pagaende, choices.LEDIG, bruker=bruker,
-                    tidspunkt=naa, automatisk=True)
+    # Per enhet: det er *hennes* pågående som lukkes, ikke oppdragets.
+    pagaende = aktiv_koblingsrad(rad.enhet, oppdrag.vakt)
+    if pagaende is not None and pagaende.oppdrag_id != oppdrag.pk:
+        sett_status(pagaende.oppdrag, choices.LEDIG, bruker=bruker,
+                    tidspunkt=naa, automatisk=True, enhet=rad.enhet)
 
     return sett_status(oppdrag, choices.RYKKER_UT, bruker=bruker,
-                       tidspunkt=naa, forsinket=forsinket)
+                       tidspunkt=naa, forsinket=forsinket, enhet=rad.enhet)
+
+
+def varsle_enhet(oppdrag, enhet, *, bruker=None) -> Oppdragsenhet:
+    """Sett en enhet til på oppdraget — i `Venter`, sist i rekka.
+
+    Et ferdig oppdrag som får en enhet til er ikke ferdig lenger: statusen
+    utledes på nytt, og er det ryddet til historikken, hentes det tilbake.
+    """
+    if oppdrag.enheter.filter(enhet=enhet).exists():
+        raise ValueError(f'«{enhet.navn}» er alt varslet på oppdraget.')
+    neste = (oppdrag.enheter.aggregate(models.Max('rekkefolge'))['rekkefolge__max'] or 0) + 1
+    rad = Oppdragsenhet.objects.create(
+        oppdrag=oppdrag, enhet=enhet, varslet_av=bruker, rekkefolge=neste)
+    oppdrag.status = utledet_status(oppdrag)
+    felter = ['status', 'updated_at']
+    if oppdrag.historikk_fra is not None:
+        oppdrag.historikk_fra = None
+        oppdrag.historikk_av = None
+        felter += ['historikk_fra', 'historikk_av']
+    oppdrag.save(update_fields=felter)
+    return rad
+
+
+def ta_av_enhet(oppdrag, enhet) -> None:
+    """Ta en enhet av oppdraget — bare mens den venter, og aldri den siste.
+
+    Har bilen rykket ut, er det en hendelse: da er svaret `Ledig` fra bilen
+    eller en føring fra sentralbordet (§9), ikke å late som den aldri var der.
+    """
+    rad = koblingsrad(oppdrag, enhet)
+    if rad is None:
+        raise ValueError(f'«{enhet.navn}» er ikke varslet på oppdraget.')
+    if rad.status != choices.VENTER:
+        raise ValueError(
+            f'«{enhet.navn}» har rykket ut ({rad.get_status_display()}) — '
+            'meld ledig i stedet.')
+    if oppdrag.enheter.count() == 1:
+        raise ValueError('Oppdraget må ha minst én enhet.')
+    rad.delete()
+    if oppdrag.enhet_id == enhet.pk:
+        # Den gamle kolonnen (deploy 1) skal peke på en som fortsatt er der.
+        oppdrag.enhet = oppdrag.primaer.enhet
+    oppdrag.status = utledet_status(oppdrag)
+    oppdrag.save(update_fields=['status', 'enhet', 'updated_at'])
 
 
 class KorreksjonUgyldig(Exception):
@@ -433,6 +532,7 @@ def korriger_tidspunkt(melding, nytt_tidspunkt, *, bruker) -> Statusmelding:
     """
     return Statusmelding.objects.create(
         oppdrag=melding.oppdrag,
+        oppdragsenhet=melding.oppdragsenhet,
         status=melding.status,
         tidspunkt=nytt_tidspunkt,
         meldt_av=bruker,
@@ -448,7 +548,7 @@ def korriger_tidspunkt(melding, nytt_tidspunkt, *, bruker) -> Statusmelding:
 
 
 @transaction.atomic
-def flytt_til_enhet(oppdrag, ny_enhet, *, bruker) -> Enhetsbytte | None:
+def flytt_til_enhet(oppdrag, ny_enhet, *, bruker, fra_enhet=None) -> Enhetsbytte | None:
     """Flytt oppdraget til en annen enhet, og skriv det i oppdragets logg.
 
     Returnerer ``None`` hvis enheten er den samme — et bytte til seg selv er
@@ -457,17 +557,27 @@ def flytt_til_enhet(oppdrag, ny_enhet, *, bruker) -> Enhetsbytte | None:
     Statusen står. Meldingene den første enheten rakk å sende blir stående med
     ``meldt_av`` intakt: de skjedde.
     """
-    if oppdrag.enhet_id == ny_enhet.pk:
+    rad = koblingsrad(oppdrag, fra_enhet)
+    if rad is None:
+        raise ValueError('Enheten er ikke varslet på oppdraget.')
+    if rad.enhet_id == ny_enhet.pk:
         return None
+    if oppdrag.enheter.filter(enhet=ny_enhet).exists():
+        raise ValueError(f'«{ny_enhet.navn}» er alt varslet på oppdraget.')
 
     bytte = Enhetsbytte.objects.create(
         oppdrag=oppdrag,
-        fra_enhet=oppdrag.enhet,
+        fra_enhet=rad.enhet,
         til_enhet=ny_enhet,
         byttet_av=bruker,
     )
-    oppdrag.enhet = ny_enhet
-    oppdrag.save(update_fields=['enhet', 'updated_at'])
+    gammel = rad.enhet_id
+    rad.enhet = ny_enhet
+    rad.save(update_fields=['enhet', 'updated_at'])
+    if oppdrag.enhet_id == gammel:
+        # Den gamle kolonnen følger den primære til deploy 2 fjerner den.
+        oppdrag.enhet = ny_enhet
+        oppdrag.save(update_fields=['enhet', 'updated_at'])
     return bytte
 
 
@@ -501,17 +611,21 @@ def synlige_for_enhet(enhet, vakt=None):
     """
     from datetime import timedelta
 
-    qs = enhet.oppdrag.select_related('lokasjon', 'enhet')
+    # Per koblingsrad (11. sep. 2026): det er *bilens* ledig-melding vinduet
+    # måles mot, ikke oppdragets — den andre bilen kan fortsatt kjøre.
+    rader = (Oppdragsenhet.objects.filter(enhet=enhet)
+             .select_related('oppdrag', 'oppdrag__lokasjon', 'oppdrag__enhet'))
     if vakt is not None:
-        qs = qs.filter(vakt=vakt)
+        rader = rader.filter(oppdrag__vakt=vakt)
 
     grense = timezone.now() - timedelta(seconds=SKJUL_ETTER_LEDIG)
     ut = []
-    for oppdrag in qs:
-        if oppdrag.status != choices.LEDIG:
-            ut.append(oppdrag)
+    for rad in rader.order_by('oppdrag__created_at'):
+        if rad.status != choices.LEDIG:
+            ut.append(rad.oppdrag)
             continue
-        melding = Statusmelding.objects.gjeldende_for_status(oppdrag, choices.LEDIG)
+        melding = Statusmelding.objects.gjeldende_for_status(
+            rad.oppdrag, choices.LEDIG, oppdragsenhet=rad)
         if melding is not None and melding.tidspunkt > grense:
-            ut.append(oppdrag)
+            ut.append(rad.oppdrag)
     return ut

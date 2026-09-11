@@ -60,8 +60,21 @@ def status_tidspunkt_for(oppdrag_liste) -> dict:
     return ut
 
 
+def enheter_til_liste(oppdrag) -> list:
+    """Enhetene på oppdraget med hver sin status — matrisen sentralbordet
+    ser. Leser `oppdrag.enheter`; kalleren prefetcher `enheter__enhet` der
+    det er mange oppdrag."""
+    return [{
+        'enhet_id': rad.enhet_id,
+        'enhet_navn': rad.enhet.navn,
+        'status': rad.status,
+        'status_navn': rad.get_status_display(),
+        'rekkefolge': rad.rekkefolge,
+    } for rad in oppdrag.enheter.all()]
+
+
 def oppdrag_til_dict(oppdrag, *, for_enhet: bool = False,
-                     status_tidspunkt=None) -> dict:
+                     status_tidspunkt=None, koblingsrad=None) -> dict:
     """Serialiser ett oppdrag.
 
     ``for_enhet=True`` **utelater fritekst når oppdraget er avsluttet**. Det er
@@ -73,7 +86,13 @@ def oppdrag_til_dict(oppdrag, *, for_enhet: bool = False,
     `status_tidspunkt_for`). Sentralbordet viser «tid siden» av den —
     prosjektleder, 11. sep. 2026 — og den sendes bare der lista bygges, slik at
     ett kall per rad ikke sniker seg inn via denne funksjonen.
+
+    ``koblingsrad`` er **bilens** rad på oppdraget (flere enheter, 11. sep.
+    2026). Med den er `status` og `neste_overgang` hennes, ikke oppdragets
+    utledede — bilen skal se sin egen kjede. Og `varslede` er de andre
+    enhetenes *navn*, ikke status (§7.3 i notatet).
     """
+    status = koblingsrad.status if koblingsrad is not None else oppdrag.status
     data = {
         'id': oppdrag.pk,
         # Nummeret man sier på samband. `id` er databasenøkkelen og skal ikke
@@ -89,21 +108,25 @@ def oppdrag_til_dict(oppdrag, *, for_enhet: bool = False,
         'grovsortering_navn': choices.GROVSORTERING_NAVN.get(oppdrag.grovsortering, ''),
         'lokasjon_id': oppdrag.lokasjon_id,
         'lokasjon_navn': oppdrag.lokasjon.navn,
-        'status': oppdrag.status,
-        'status_navn': oppdrag.get_status_display(),
+        'status': status,
+        'status_navn': choices.STATUS_NAVN.get(status, status),
+        'enheter': enheter_til_liste(oppdrag),
         'opprettet': oppdrag.created_at.isoformat(),
         'status_tidspunkt': status_tidspunkt,
         'historikk_fra': (oppdrag.historikk_fra.isoformat()
                           if oppdrag.historikk_fra else None),
     }
-    skjul_fritekst = for_enhet and oppdrag.status == choices.TERMINAL
+    skjul_fritekst = for_enhet and status == choices.TERMINAL
     data['fritekst'] = '' if skjul_fritekst else oppdrag.fritekst
     if for_enhet:
         # «Neste»-knappen vet hvilken overgang den utfører fordi serveren sier
         # det her — JS-en har ingen egen kopi av kjeden å komme i utakt med.
-        neste = services.neste_i_kjeden(oppdrag.status)
+        neste = services.neste_i_kjeden(status)
         data['neste_overgang'] = neste
         data['neste_navn'] = choices.STATUS_NAVN.get(neste) if neste else None
+        egen = koblingsrad.enhet_id if koblingsrad is not None else None
+        data['varslede'] = [e['enhet_navn'] for e in data['enheter']
+                            if e['enhet_id'] != egen]
     return data
 
 

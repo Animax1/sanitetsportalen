@@ -121,14 +121,26 @@ det står i notatet så neste person ikke «retter» det.
 
 ## 6. Migrasjonen og deployen
 
+**Slik det ble (trinn 1, 11. sep. 2026):** deploy 1 er to migrasjoner, ikke tre.
+
 1. `0010`: `Oppdragsenhet` + nullbar `Statusmelding.oppdragsenhet`.
-2. `0011` (`RunPython`, egen migrasjon): én koblingsrad per oppdrag fra `Oppdrag.enhet`,
-   meldingene pekes på den. `SET CONSTRAINTS ALL IMMEDIATE` før skjemasteget i `0012`.
-3. `0012`: `Statusmelding.oppdragsenhet` blir `NOT NULL`.
-4. Prøve i `core/migrasjonsprover.py` med rader i den historiske formen — regelen fra
-   30. aug.
-5. **Backup av prod før pushen** — Andrés regel for enveismigrasjoner.
-6. Deploy 2, senere: `Oppdrag.enhet` fjernes.
+2. `0011` (`RunPython`, egen migrasjon, **bare data**): én koblingsrad per oppdrag fra
+   `Oppdrag.enhet`, meldingene pekes på den. Ingen skjemaendring følger etter i samme
+   transaksjon, så triggerkøen fra 30. aug. er ikke et tema her — og derfor ingen
+   `SET CONSTRAINTS ALL IMMEDIATE`.
+3. ~~`0012`: `Statusmelding.oppdragsenhet` blir `NOT NULL`.~~ **Flyttet til deploy 2.**
+   Nullbarheten er broen: `Statusmelding.save()` fyller feltet fra oppdragets primære
+   rad når en melding lages med bare `oppdrag`, og all eldre kode og alle eldre tester
+   går den veien. Strammes feltet i deploy 1, må hvert kallsted skrives om i samme
+   push — det er nettopp det to-trinns-deployen skal slippe.
+4. Prøve i `core/migrasjonsprover.py` (`oppdrag.0011_fyll_oppdragsenhet`) med rader i
+   den historiske formen — regelen fra 30. aug. Sjekker at hvert oppdrag fikk nøyaktig
+   én rad med oppdragets status, og at ingen melding står uten.
+5. **Backup av prod før pushen** — Andrés regel for enveismigrasjoner. `0011` er
+   reversibel (`tom`), men `Oppdrag.enhet` er kilden, og den er urørt.
+6. Deploy 2, senere: `Oppdrag.enhet` fjernes, `Statusmelding.oppdragsenhet` blir
+   `NOT NULL` (med `SET CONSTRAINTS ALL IMMEDIATE` om et dataskritt går foran), og
+   `Oppdrag.save()`/`Statusmelding.save()` mister broene sine.
 
 ## 7. Spørsmålene — besvart 11. sep. 2026
 

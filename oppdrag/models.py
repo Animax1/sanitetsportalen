@@ -19,6 +19,7 @@ from __future__ import annotations
 
 from django.conf import settings
 from django.db import models
+from django.utils import timezone
 
 from core.arkiv import AbstractArkiv
 from core.models import BaseTimeStampedModel
@@ -210,13 +211,87 @@ class Oppdrag(BaseTimeStampedModel):
         return (f'Oppdrag #{self.oppdragsnummer} – {self.problemstilling} '
                 f'({self.get_status_display()})')
 
+    def save(self, *args, **kwargs):
+        # **Broen i deploy 1 av flere enheter** (§2.3 i notatet). `enhet` står
+        # fortsatt på oppdraget, og all eksisterende kode og alle tester
+        # oppretter oppdrag med den. Koblingsraden lages her, slik at ingen
+        # av dem trenger å vite at den finnes før deploy 2 fjerner kolonnen.
+        ny = self._state.adding
+        super().save(*args, **kwargs)
+        if ny and self.enhet_id and not self.enheter.exists():
+            Oppdragsenhet.objects.create(
+                oppdrag=self, enhet_id=self.enhet_id, status=self.status,
+                varslet_av=self.opprettet_av, rekkefolge=0)
+
     @property
     def er_avsluttet(self) -> bool:
         return self.status == choices.TERMINAL
 
     @property
+    def primaer(self):
+        """Koblingsraden med lavest `rekkefolge` — den først varslede.
+
+        Finnes som begrep bare fordi arkivet og statistikken i dag har én
+        `enhet_navn` per rad, og fordi `Oppdrag.enhet` lever til deploy 2.
+        """
+        return self.enheter.order_by('rekkefolge', 'created_at').first()
+
+    @property
     def i_historikk(self) -> bool:
         return self.historikk_fra is not None
+
+
+class Oppdragsenhet(BaseTimeStampedModel):
+    """Én enhet på ett oppdrag — med sin egen statuskjede.
+
+    Flere enheter på ett oppdrag (11. sep. 2026, `docs/BESLUTNING_FLERE_
+    ENHETER_PER_OPPDRAG.md`). Fram til da var oppdraget «tildelt én enhet»,
+    og statusmeldingene hang på oppdraget. Nå er en statusmelding *én enhets*
+    utsagn om *ett* oppdrag, og den henger her.
+
+    ``status`` er en cache av siste gjeldende melding for denne enheten, på
+    samme måte som `Oppdrag.status` var det — og `Oppdrag.status` er fra nå
+    *utledet* av disse: den mest aktive, `Ledig` bare når alle er ledige
+    (`services.utledet_status`).
+    """
+
+    oppdrag = models.ForeignKey(
+        Oppdrag, on_delete=models.CASCADE, related_name='enheter',
+        verbose_name='Oppdrag')
+    # PROTECT: en enhet med oppdrag bak seg kan pensjoneres, ikke slettes.
+    enhet = models.ForeignKey(
+        Enhet, on_delete=models.PROTECT, related_name='oppdragsenheter',
+        verbose_name='Enhet')
+    status = models.CharField(
+        max_length=16, choices=choices.STATUS_VALG, default=choices.VENTER,
+        db_index=True, verbose_name='Status')
+    varslet_at = models.DateTimeField(
+        default=timezone.now, verbose_name='Varslet')
+    varslet_av = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True,
+        on_delete=models.SET_NULL, related_name='varslede_enheter',
+        verbose_name='Varslet av')
+    # Den først varslede er «primær» — se `Oppdrag.primaer`.
+    rekkefolge = models.PositiveSmallIntegerField(default=0, verbose_name='Rekkefølge')
+
+    class Meta:
+        verbose_name = 'Oppdragsenhet'
+        verbose_name_plural = 'Oppdragsenheter'
+        ordering = ['rekkefolge', 'created_at']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['oppdrag', 'enhet'], name='unik_enhet_per_oppdrag'),
+        ]
+        indexes = [
+            models.Index(fields=['enhet', 'status'], name='oppdragsenhet_enh_st_idx'),
+        ]
+
+    def __str__(self) -> str:
+        return f'{self.enhet.navn} på #{self.oppdrag.oppdragsnummer} ({self.get_status_display()})'
+
+    @property
+    def er_avsluttet(self) -> bool:
+        return self.status == choices.TERMINAL
 
 
 class StatusmeldingManager(models.Manager):
@@ -258,12 +333,30 @@ class StatusmeldingManager(models.Manager):
                 ut[melding.oppdrag_id].append(melding)
         return ut
 
-    def gjeldende_for_status(self, oppdrag, status):
-        """Den gjeldende meldingen for én status, eller ``None``."""
+    def gjeldende_for_enhet(self, oppdragsenhet):
+        """De gjeldende meldingene for én enhet på oppdraget, én per status.
+
+        Med flere enheter kan oppdraget ha to `Fremme` som gjelder — én per
+        bil. Spørsmål som handler om *bilen* går her; `gjeldende(oppdrag)` er
+        hele oppdragets spor.
+        """
+        return [m for m in self.gjeldende(oppdragsenhet.oppdrag)
+                if m.oppdragsenhet_id == oppdragsenhet.pk]
+
+    def gjeldende_for_status(self, oppdrag, status, *, oppdragsenhet=None):
+        """Den gjeldende meldingen for én status, eller ``None``.
+
+        Uten `oppdragsenhet` er det **siste** meldingen med statusen som
+        gjelder, uansett enhet — det som svarer på «når fikk oppdraget denne
+        statusen». Med `oppdragsenhet` er det bilens egen.
+        """
+        treff = None
         for melding in self.gjeldende(oppdrag):
+            if oppdragsenhet is not None and melding.oppdragsenhet_id != oppdragsenhet.pk:
+                continue
             if melding.status == status:
-                return melding
-        return None
+                treff = melding
+        return treff
 
 
 class Statusmelding(BaseTimeStampedModel):
@@ -276,6 +369,13 @@ class Statusmelding(BaseTimeStampedModel):
 
     oppdrag = models.ForeignKey(
         Oppdrag, on_delete=models.CASCADE, related_name='statusmeldinger')
+    # **Hvilken enhet som meldte.** Meningsbærende nøkkel fra 11. sep. 2026;
+    # `oppdrag` over er avledet av den og beholdes for spørringene som går
+    # på oppdrag (`gjeldende_bulk`). Nullbar i deploy 1 — settes i `save()`
+    # fra `oppdrag.enhet` når den mangler, slik at eldre kode virker.
+    oppdragsenhet = models.ForeignKey(
+        Oppdragsenhet, null=True, blank=True, on_delete=models.CASCADE,
+        related_name='statusmeldinger', verbose_name='Enhet på oppdraget')
     status = models.CharField(max_length=16, choices=choices.STATUS_VALG)
     # Hendelsestid, ikke lagringstid. De to er ikke like når bilen var uten
     # dekning — se `forsinket`.
@@ -307,6 +407,16 @@ class Statusmelding(BaseTimeStampedModel):
         related_name='korreksjoner', verbose_name='Korrigerer')
 
     objects = StatusmeldingManager()
+
+    def save(self, *args, **kwargs):
+        # Broen (§2.3): en melding laget med bare `oppdrag` hører til
+        # oppdragets primære enhet. Alle nye veier inn oppgir koblingsraden
+        # eksplisitt; dette er for koden og testene som ennå ikke gjør det.
+        if self.oppdragsenhet_id is None and self.oppdrag_id is not None:
+            self.oppdragsenhet = self.oppdrag.primaer
+        elif self.oppdrag_id is None and self.oppdragsenhet_id is not None:
+            self.oppdrag_id = self.oppdragsenhet.oppdrag_id
+        super().save(*args, **kwargs)
 
     class Meta:
         verbose_name = 'Statusmelding'

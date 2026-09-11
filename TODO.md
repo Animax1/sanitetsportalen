@@ -172,8 +172,12 @@ ingen av dem gir feilmelding — de er bare stille inaktive.
             `docs/BESLUTNING_FLERE_ENHETER_PER_OPPDRAG.md`. §7 besvart, §9 kom
             til: sentralbordet fører status manuelt, også på ferdige oppdrag
             innen 48 t (forslag). Fire trinn; backup før deploy.
-            - [ ] Trinn 1: modell, migrasjoner (0010–0012), prøve, services
-            - [ ] Trinn 2: endepunkter, bilen, manuell føring fra sentralbordet
+            - [x] Trinn 1 (11. sep. 2026): `Oppdragsenhet`, `0010`–`0011`, prøve,
+                  services per koblingsrad, utledet oppdragsstatus, bilen ser
+                  sin egen kjede og de andres navn. `0012` (NOT NULL) flyttet
+                  til deploy 2 — nullbarheten *er* broen.
+            - [ ] Trinn 2: endepunkter (`enhet_ider` ved opprettelse, varsle/ta
+                  av), manuell føring fra sentralbordet (§9, 48 t)
             - [ ] Trinn 3: sentralbordets UI
             - [ ] Trinn 4: arkiv (rad per enhet) og statistikk
             - [ ] Deploy 2, senere: fjern `Oppdrag.enhet`

@@ -47,6 +47,9 @@ class OppdragBackupHandler(BaseBackupHandler):
         # peker på Enhet og Lokasjon.
         'oppdrag.Statusmelding',
         'oppdrag.Enhetsbytte',
+        # Koblingsraden (flere enheter, 11. sep. 2026) står mellom meldingen
+        # som peker på den og oppdraget den peker på.
+        'oppdrag.Oppdragsenhet',
         'oppdrag.Oppdrag',
         'oppdrag.Lokasjon',
         'oppdrag.Enhet',
@@ -59,6 +62,7 @@ class OppdragBackupHandler(BaseBackupHandler):
     strip_fields = {
         'oppdrag.Oppdrag': ['opprettet_av', 'historikk_av'],
         'oppdrag.Statusmelding': ['meldt_av'],
+        'oppdrag.Oppdragsenhet': ['varslet_av'],
         'oppdrag.Enhetsbytte': ['byttet_av'],
         'oppdrag.Enhet': ['user'],
     }

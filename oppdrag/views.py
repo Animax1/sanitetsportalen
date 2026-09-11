@@ -86,14 +86,17 @@ def index_view(request):
 
 # ── Enheter ──────────────────────────────────────────────────────────────────
 
-def _aktivt_oppdrag_felter(oppdrag):
+def _aktivt_oppdrag_felter(rad):
     """Feltene enhetskortet viser om det aktive oppdraget — alle ``None``
-    når det ikke finnes noe, slik at kortet kan lese dem uten å spørre."""
-    if oppdrag is None:
+    når det ikke finnes noe, slik at kortet kan lese dem uten å spørre.
+    `rad` er enhetens koblingsrad: statusen og tidspunktet er *hennes*."""
+    if rad is None:
         return {'oppdragsnummer': None, 'hastegrad': None, 'grovsortering': None,
                 'grovsortering_navn': None, 'problemstilling': None,
                 'status_tidspunkt': None}
-    melding = Statusmelding.objects.gjeldende_for_status(oppdrag, oppdrag.status)
+    oppdrag = rad.oppdrag
+    melding = Statusmelding.objects.gjeldende_for_status(
+        oppdrag, rad.status, oppdragsenhet=rad)
     return {
         'oppdragsnummer': oppdrag.oppdragsnummer,
         'hastegrad': oppdrag.hastegrad,
@@ -140,7 +143,7 @@ def enheter_view(request):
             # 2026): «det handler om å kjapt skaffe oversikt». Nummer,
             # hastegrad, problemstilling og *når* statusen ble satt — uten
             # å åpne oppdraget. Tomt når enheten er ledig.
-            **_aktivt_oppdrag_felter(info['aktivt_oppdrag']),
+            **_aktivt_oppdrag_felter(info['koblingsrad']),
         }
         for e, info in ((e, services.enhet_status(e, vakt)) for e in enheter)
     ]
@@ -318,14 +321,15 @@ def oppdrag_liste_view(request):
             # innenfor 30-minuttersvinduet — så N+1 her er N liten.
             data = []
             egne = list(services.synlige_for_enhet(request.user.enhet, vakt))
-            status_tid = status_tidspunkt_for(egne)
             for o in egne:
-                rad = oppdrag_til_dict(o, for_enhet=True,
-                                       status_tidspunkt=status_tid.get(o.pk))
-                rad['statusmeldinger'] = [
-                    melding_til_dict(m)
-                    for m in Statusmelding.objects.gjeldende(o)
-                ]
+                # Bilens egen rad: statusen, kjeden og tidslinjen er hennes.
+                kobling = services.koblingsrad(o, request.user.enhet)
+                egne_meldinger = Statusmelding.objects.gjeldende_for_enhet(kobling)
+                siste = [m for m in egne_meldinger if m.status == kobling.status]
+                rad = oppdrag_til_dict(
+                    o, for_enhet=True, koblingsrad=kobling,
+                    status_tidspunkt=siste[-1].tidspunkt.isoformat() if siste else None)
+                rad['statusmeldinger'] = [melding_til_dict(m) for m in egne_meldinger]
                 data.append(rad)
             # Meldings-ID-ene må inn i ETag-en: en korreksjon endrer tidslinjen
             # uten å røre oppdragets status, og skal ikke drukne i en 304.
@@ -338,7 +342,8 @@ def oppdrag_liste_view(request):
             # Ferdigstilte er ute av den aktive lista. De er ikke borte —
             # de ligger i `historikk_liste_view`, søkbare på nummer.
             qs = list(Oppdrag.objects.filter(vakt=vakt, historikk_fra__isnull=True)
-                      .select_related('enhet', 'lokasjon').order_by('-created_at'))
+                      .select_related('enhet', 'lokasjon')
+                      .prefetch_related('enheter__enhet').order_by('-created_at'))
             status_tid = status_tidspunkt_for(qs)
             data = [oppdrag_til_dict(o, status_tidspunkt=status_tid.get(o.pk))
                     for o in qs]
@@ -417,14 +422,25 @@ def oppdrag_detalj_view(request, pk):
         return JsonResponse(
             {'status': 'error', 'message': 'Oppdrag ikke funnet'}, status=404)
 
-    if er_enhetskonto(request.user) and oppdrag.enhet_id != request.user.enhet.pk:
-        return JsonResponse({'status': 'error', 'message': 'Ingen tilgang'}, status=403)
+    kobling = None
+    if er_enhetskonto(request.user):
+        kobling = services.koblingsrad(oppdrag, request.user.enhet)
+        if kobling is None:
+            return JsonResponse({'status': 'error', 'message': 'Ingen tilgang'}, status=403)
 
     if request.method == 'GET':
-        gjeldende = Statusmelding.objects.gjeldende(oppdrag)
-        alle = Statusmelding.objects.filter(oppdrag=oppdrag).order_by('created_at')
+        if kobling is not None:
+            # Bilen får sin egen kjede. De andre enhetenes meldinger er deres
+            # status, og den ser bilen ikke (§7.3) — bare at de er varslet.
+            gjeldende = Statusmelding.objects.gjeldende_for_enhet(kobling)
+            alle = (Statusmelding.objects.filter(oppdragsenhet=kobling)
+                    .order_by('created_at'))
+        else:
+            gjeldende = Statusmelding.objects.gjeldende(oppdrag)
+            alle = Statusmelding.objects.filter(oppdrag=oppdrag).order_by('created_at')
         return JsonResponse({'status': 'ok', 'data': {
-            **oppdrag_til_dict(oppdrag, for_enhet=er_enhetskonto(request.user)),
+            **oppdrag_til_dict(oppdrag, for_enhet=er_enhetskonto(request.user),
+                               koblingsrad=kobling),
             'statusmeldinger': [melding_til_dict(m) for m in gjeldende],
             'historikk': [melding_til_dict(m) for m in alle],
             'enhetsbytter': [bytte_til_dict(b) for b in oppdrag.enhetsbytter.all()],
@@ -546,13 +562,15 @@ def grovsortering_view(request, pk, verdi):
     except Oppdrag.DoesNotExist:
         return JsonResponse(
             {'status': 'error', 'message': 'Oppdrag ikke funnet'}, status=404)
-    if oppdrag.enhet_id != request.user.enhet.pk:
+    rad = services.koblingsrad(oppdrag, request.user.enhet)
+    if rad is None:
         return JsonResponse(
             {'status': 'error', 'message': 'Oppdraget tilhører en annen enhet.'},
             status=403)
     oppdrag.grovsortering = verdi
     oppdrag.save(update_fields=['grovsortering', 'updated_at'])
-    return JsonResponse({'status': 'ok', 'data': oppdrag_til_dict(oppdrag, for_enhet=True)})
+    return JsonResponse({'status': 'ok', 'data': oppdrag_til_dict(
+        oppdrag, for_enhet=True, koblingsrad=rad)})
 
 
 @modul_kreves('oppdrag', 'skriv_handling', svar='json')
@@ -603,7 +621,8 @@ def stempling_view(request, pk, overgang, sted=None):
         return JsonResponse(
             {'status': 'error', 'message': 'Oppdrag ikke funnet'}, status=404)
 
-    if oppdrag.enhet_id != request.user.enhet.pk:
+    rad = services.koblingsrad(oppdrag, request.user.enhet)
+    if rad is None:
         return JsonResponse(
             {'status': 'error', 'message': 'Oppdraget tilhører en annen enhet.'},
             status=403)
@@ -640,7 +659,8 @@ def stempling_view(request, pk, overgang, sted=None):
             try:
                 tidligere = Statusmelding.objects.get(pk=verdi)
                 return JsonResponse({'status': 'ok', 'data': {
-                    'oppdrag': oppdrag_til_dict(oppdrag, for_enhet=True),
+                    'oppdrag': oppdrag_til_dict(
+                        oppdrag, for_enhet=True, koblingsrad=rad),
                     'melding': melding_til_dict(tidligere),
                     'avspilling': True,
                 }})
@@ -660,11 +680,11 @@ def stempling_view(request, pk, overgang, sted=None):
         if overgang == choices.RYKKER_UT:
             # Lukker et eventuelt pågående oppdrag automatisk (§4.3).
             melding = services.start_oppdrag(
-                oppdrag, bruker=request.user,
+                oppdrag, bruker=request.user, enhet=request.user.enhet,
                 tidspunkt=tidspunkt, forsinket=forsinket)
         else:
             melding = services.sett_status(
-                oppdrag, overgang, bruker=request.user,
+                oppdrag, overgang, bruker=request.user, enhet=request.user.enhet,
                 tidspunkt=tidspunkt, forsinket=forsinket, sted=sted or '')
     except services.UlovligOvergang:
         # Typisk et dobbelttrykk der det første vant, eller en skjerm som har
@@ -683,8 +703,12 @@ def stempling_view(request, pk, overgang, sted=None):
     if idem:
         fullfor(idem, melding.pk)
 
+    # Raden leses på nytt: `sett_status` skrev på sitt eget eksemplar av den,
+    # og bilen skal se statusen den nettopp stemplet, ikke den før.
     return JsonResponse({'status': 'ok', 'data': {
-        'oppdrag': oppdrag_til_dict(oppdrag, for_enhet=True),
+        'oppdrag': oppdrag_til_dict(
+            oppdrag, for_enhet=True,
+            koblingsrad=services.koblingsrad(oppdrag, request.user.enhet)),
         'melding': melding_til_dict(melding),
     }})
 

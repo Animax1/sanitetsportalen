@@ -290,6 +290,10 @@ class SynlighetForEnhetTests(TestCase):
         Statusmelding.objects.create(
             oppdrag=oppdrag, status=choices.LEDIG,
             tidspunkt=timezone.now() - timedelta(minutes=minutter_siden))
+        # Statusen bor på koblingsraden (11. sep. 2026); oppdragets er
+        # utledet av den. Hjelperen går utenom `sett_status` med vilje, og
+        # må da sette begge selv.
+        oppdrag.enheter.update(status=choices.LEDIG)
         Oppdrag.objects.filter(pk=oppdrag.pk).update(status=choices.LEDIG)
 
     def test_pagaende_oppdrag_vises(self):

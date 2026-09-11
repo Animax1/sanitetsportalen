@@ -1,0 +1,394 @@
+"""Flere enheter på ett oppdrag — trinn 1 (11. sep. 2026).
+
+`docs/BESLUTNING_FLERE_ENHETER_PER_OPPDRAG.md`. Det som testes er reglene
+modellen hviler på, ikke flatene (de kommer i trinn 2–3):
+
+* Én statusmelding er *én enhets* utsagn — kjeden går per koblingsrad.
+* Oppdragets status er **utledet**: den mest aktive vinner, `Ledig` bare
+  når alle er ledige, og det er da tavla ryddes.
+* Bilen ser hvem som er varslet, ikke hva de gjør (§7.3).
+* Broen: all kode som fortsatt oppretter oppdrag med `enhet` får én
+  koblingsrad uten å vite om den.
+"""
+from datetime import timedelta
+
+from django.apps import apps
+from django.test import Client, TestCase, override_settings
+from django.utils import timezone
+
+from accounts.models import CustomUser, ModulTilgang
+from core.backup import KIND_MANUAL, create_backup, restore_backup
+
+from oppdrag import choices, services
+from oppdrag.models import Enhet, Lokasjon, Oppdrag, Oppdragsenhet, Statusmelding
+
+
+AAR = 2098
+
+
+def _bruker(navn, nivaa=None, *, admin=False):
+    b = CustomUser.objects.create_user(
+        username=navn, password='x', role='admin' if admin else 'bruker',
+        must_change_password=False)
+    if nivaa:
+        ModulTilgang.objects.create(bruker=b, modul_slug='oppdrag', nivaa=nivaa)
+    return b
+
+
+def _klient(bruker):
+    c = Client()
+    c.force_login(bruker)
+    return c
+
+
+@override_settings(SECURE_SSL_REDIRECT=False, RATELIMIT_ENABLE=False)
+class FlereEnheterBasis(TestCase):
+    def setUp(self):
+        from patients.test_helpers import sett_aktiv_vakt
+        self.vakt = sett_aktiv_vakt(AAR)
+        self.lokasjon = Lokasjon.objects.create(navn='Hovedscene')
+        self.a = Enhet.objects.create(navn='Haugesund 56')
+        self.b = Enhet.objects.create(navn='Karmøy 12')
+        self.c = Enhet.objects.create(navn='Tysvær 3')
+
+    def _oppdrag(self, enhet=None, **kwargs):
+        kwargs.setdefault('oppdragsnummer', services.neste_oppdragsnummer(self.vakt))
+        return Oppdrag.objects.create(
+            vakt=self.vakt, enhet=enhet or self.a,
+            problemstilling='Pustevansker', hastegrad='Akutt',
+            lokasjon=self.lokasjon, **kwargs)
+
+    def _to_enheter(self):
+        o = self._oppdrag(self.a)
+        services.varsle_enhet(o, self.b)
+        return o
+
+
+class BroenTests(FlereEnheterBasis):
+    """`Oppdrag.enhet` lever til deploy 2, og all eldre kode går gjennom den."""
+
+    def test_oppdrag_med_enhet_faar_en_koblingsrad(self):
+        o = self._oppdrag(self.a, status=choices.FREMME)
+        rader = list(o.enheter.all())
+        self.assertEqual(len(rader), 1)
+        self.assertEqual(rader[0].enhet, self.a)
+        self.assertEqual(rader[0].status, choices.FREMME)
+        self.assertEqual(o.primaer, rader[0])
+
+    def test_melding_uten_koblingsrad_havner_paa_den_primaere(self):
+        o = self._to_enheter()
+        m = Statusmelding.objects.create(
+            oppdrag=o, status=choices.RYKKER_UT, tidspunkt=timezone.now())
+        self.assertEqual(m.oppdragsenhet, o.primaer)
+        self.assertEqual(m.oppdragsenhet.enhet, self.a)
+
+    def test_melding_med_bare_koblingsrad_faar_oppdraget(self):
+        o = self._to_enheter()
+        rad = services.koblingsrad(o, self.b)
+        m = Statusmelding.objects.create(
+            oppdragsenhet=rad, status=choices.RYKKER_UT, tidspunkt=timezone.now())
+        self.assertEqual(m.oppdrag, o)
+
+    def test_backfillen_gir_hvert_oppdrag_en_rad_og_meldingene_peker_paa_den(self):
+        """`0011.fyll` kjørt mot rader i den historiske formen."""
+        from importlib import import_module
+        fyll = import_module('oppdrag.migrations.0011_fyll_oppdragsenhet').fyll
+        o = self._oppdrag(self.a, status=choices.FREMME)
+        for st in (choices.RYKKER_UT, choices.FREMME):
+            Statusmelding.objects.create(oppdrag=o, status=st, tidspunkt=timezone.now())
+        # Tilbake til før 0010: ingen koblingsrad, meldingene peker på ingenting.
+        Statusmelding.objects.filter(oppdrag=o).update(oppdragsenhet=None)
+        o.enheter.all().delete()
+
+        fyll(apps, None)
+
+        rad = o.enheter.get()
+        self.assertEqual((rad.enhet, rad.status, rad.rekkefolge), (self.a, choices.FREMME, 0))
+        self.assertEqual(
+            set(Statusmelding.objects.filter(oppdrag=o).values_list('oppdragsenhet_id', flat=True)),
+            {rad.pk})
+        # Idempotent: et oppdrag som alt har rad får ikke en til.
+        fyll(apps, None)
+        self.assertEqual(o.enheter.count(), 1)
+
+
+class UtledetStatusTests(FlereEnheterBasis):
+    """§2.2: den mest aktive vinner, `Ledig` bare når alle er ledige."""
+
+    def test_en_enhet_gir_samme_svar_som_foer(self):
+        o = self._oppdrag(self.a)
+        services.sett_status(o, choices.RYKKER_UT)
+        o.refresh_from_db()
+        self.assertEqual(o.status, choices.RYKKER_UT)
+
+    def test_den_mest_aktive_vinner(self):
+        o = self._to_enheter()
+        services.sett_status(o, choices.RYKKER_UT, enhet=self.a)
+        services.sett_status(o, choices.FREMME, enhet=self.a)
+        services.sett_status(o, choices.RYKKER_UT, enhet=self.b)
+        o.refresh_from_db()
+        self.assertEqual(o.status, choices.FREMME)
+        # B har ikke kommet fram, og det står på hennes rad.
+        self.assertEqual(services.koblingsrad(o, self.b).status, choices.RYKKER_UT)
+
+    def test_ledig_bare_naar_alle_er_ledige(self):
+        o = self._to_enheter()
+        services.sett_status(o, choices.RYKKER_UT, enhet=self.a)
+        services.sett_status(o, choices.RYKKER_UT, enhet=self.b)
+        services.sett_status(o, choices.LEDIG, enhet=self.a)
+        o.refresh_from_db()
+        self.assertEqual(o.status, choices.RYKKER_UT)
+        self.assertIsNone(o.historikk_fra, 'B kjører fortsatt — tavla skal ikke ryddes')
+        services.sett_status(o, choices.LEDIG, enhet=self.b)
+        o.refresh_from_db()
+        self.assertEqual(o.status, choices.LEDIG)
+        self.assertIsNotNone(o.historikk_fra)
+
+    def test_en_ventende_enhet_holder_oppdraget_aapent(self):
+        """Ledig fra den ene mens den andre ennå ikke har rykket ut: `Venter`."""
+        o = self._to_enheter()
+        services.sett_status(o, choices.RYKKER_UT, enhet=self.a)
+        services.sett_status(o, choices.LEDIG, enhet=self.a)
+        o.refresh_from_db()
+        self.assertEqual(o.status, choices.VENTER)
+        self.assertIsNone(o.historikk_fra)
+
+
+class KjedePerEnhetTests(FlereEnheterBasis):
+    """En melding er én enhets utsagn, og overgangene måles per rad."""
+
+    def test_overgangen_maales_mot_enhetens_egen_rad(self):
+        o = self._to_enheter()
+        services.sett_status(o, choices.RYKKER_UT, enhet=self.a)
+        # A står i Rykker ut; B står i Venter og kan ikke gå til Fremme.
+        with self.assertRaises(services.UlovligOvergang):
+            services.sett_status(o, choices.FREMME, enhet=self.b)
+
+    def test_meldingen_peker_paa_riktig_rad(self):
+        o = self._to_enheter()
+        m = services.sett_status(o, choices.RYKKER_UT, enhet=self.b)
+        self.assertEqual(m.oppdragsenhet.enhet, self.b)
+        self.assertEqual(services.koblingsrad(o, self.a).status, choices.VENTER)
+
+    def test_en_enhet_som_ikke_er_varslet_kan_ikke_stemple(self):
+        o = self._oppdrag(self.a)
+        with self.assertRaises(services.UlovligOvergang):
+            services.sett_status(o, choices.RYKKER_UT, enhet=self.c)
+
+    def test_gjeldende_for_enhet_er_bare_hennes(self):
+        o = self._to_enheter()
+        services.sett_status(o, choices.RYKKER_UT, enhet=self.a)
+        services.sett_status(o, choices.FREMME, enhet=self.a)
+        services.sett_status(o, choices.RYKKER_UT, enhet=self.b)
+        for_b = Statusmelding.objects.gjeldende_for_enhet(services.koblingsrad(o, self.b))
+        self.assertEqual([m.status for m in for_b], [choices.RYKKER_UT])
+        self.assertEqual(len(Statusmelding.objects.gjeldende(o)), 3)
+
+    def test_korreksjon_arver_koblingsrad_og_sted(self):
+        o = self._to_enheter()
+        services.sett_status(o, choices.RYKKER_UT, enhet=self.b)
+        services.sett_status(o, choices.FREMME, enhet=self.b)
+        m = services.sett_status(o, choices.AVREIST, enhet=self.b, sted='sykehus')
+        ny = services.korriger_tidspunkt(m, m.tidspunkt - timedelta(minutes=3), bruker=None)
+        self.assertEqual(ny.oppdragsenhet, m.oppdragsenhet)
+        self.assertEqual(ny.sted, 'sykehus')
+
+    def test_automatisk_lukking_gjelder_enhetens_eget_paagaaende(self):
+        """§4.3 per enhet: A rykker ut på nytt oppdrag, A's forrige lukkes — B's ikke."""
+        felles = self._to_enheter()
+        services.sett_status(felles, choices.RYKKER_UT, enhet=self.a)
+        services.sett_status(felles, choices.RYKKER_UT, enhet=self.b)
+        nytt = self._oppdrag(self.a)
+        services.start_oppdrag(nytt, enhet=self.a)
+        felles.refresh_from_db()
+        self.assertEqual(services.koblingsrad(felles, self.a).status, choices.LEDIG)
+        self.assertEqual(services.koblingsrad(felles, self.b).status, choices.RYKKER_UT)
+        self.assertEqual(felles.status, choices.RYKKER_UT)
+        lukking = Statusmelding.objects.gjeldende_for_status(
+            felles, choices.LEDIG, oppdragsenhet=services.koblingsrad(felles, self.a))
+        self.assertTrue(lukking.automatisk)
+
+
+class VarsleOgTaAvTests(FlereEnheterBasis):
+
+    def test_varsle_legger_raden_sist_i_venter(self):
+        o = self._oppdrag(self.a)
+        rad = services.varsle_enhet(o, self.b)
+        self.assertEqual(rad.status, choices.VENTER)
+        self.assertGreater(rad.rekkefolge, o.primaer.rekkefolge)
+        self.assertEqual(o.primaer.enhet, self.a)
+
+    def test_samme_enhet_to_ganger_avvises(self):
+        o = self._oppdrag(self.a)
+        with self.assertRaises(ValueError):
+            services.varsle_enhet(o, self.a)
+
+    def test_varsle_henter_et_ferdig_oppdrag_tilbake_fra_historikken(self):
+        o = self._oppdrag(self.a)
+        services.sett_status(o, choices.RYKKER_UT)
+        services.sett_status(o, choices.LEDIG)
+        o.refresh_from_db()
+        self.assertIsNotNone(o.historikk_fra)
+        services.varsle_enhet(o, self.b)
+        o.refresh_from_db()
+        self.assertIsNone(o.historikk_fra)
+        self.assertEqual(o.status, choices.VENTER)
+
+    def test_ta_av_bare_mens_hun_venter(self):
+        o = self._to_enheter()
+        services.sett_status(o, choices.RYKKER_UT, enhet=self.b)
+        with self.assertRaises(ValueError):
+            services.ta_av_enhet(o, self.b)
+        services.ta_av_enhet(o, self.a)   # A venter fortsatt
+        self.assertEqual([r.enhet for r in o.enheter.all()], [self.b])
+
+    def test_den_siste_kan_ikke_tas_av(self):
+        o = self._oppdrag(self.a)
+        with self.assertRaises(ValueError):
+            services.ta_av_enhet(o, self.a)
+        self.assertEqual(o.enheter.count(), 1)
+
+    def test_flytt_bytter_en_rad_og_holder_den_gamle_kolonnen_i_takt(self):
+        o = self._to_enheter()
+        bruker = _bruker('sentral', 'skriv_full')
+        services.flytt_til_enhet(o, self.c, bruker=bruker, fra_enhet=self.b)
+        self.assertEqual({r.enhet for r in o.enheter.all()}, {self.a, self.c})
+        o.refresh_from_db()
+        self.assertEqual(o.enhet, self.a, 'primær ble ikke flyttet')
+        services.flytt_til_enhet(o, self.b, bruker=bruker, fra_enhet=self.a)
+        o.refresh_from_db()
+        self.assertEqual(o.enhet, self.b, 'primær flyttet — kolonnen følger')
+
+    def test_flytt_til_en_enhet_som_alt_er_varslet_avvises(self):
+        o = self._to_enheter()
+        with self.assertRaises(ValueError):
+            services.flytt_til_enhet(o, self.b, bruker=None, fra_enhet=self.a)
+
+
+class EnhetensSynTests(FlereEnheterBasis):
+    """Enhetsstatus og 30-minuttersvinduet måles per rad, ikke per oppdrag."""
+
+    def test_enhetsstatus_er_hennes_egen(self):
+        o = self._to_enheter()
+        services.sett_status(o, choices.RYKKER_UT, enhet=self.a)
+        self.assertEqual(services.enhet_status(self.a)['status'], choices.RYKKER_UT)
+        st_b = services.enhet_status(self.b)
+        self.assertEqual(st_b['status'], choices.LEDIG)
+        self.assertEqual(st_b['antall_ventende'], 1)
+
+    def test_vinduet_maales_mot_bilens_egen_ledigmelding(self):
+        o = self._to_enheter()
+        services.sett_status(o, choices.RYKKER_UT, enhet=self.a)
+        services.sett_status(o, choices.RYKKER_UT, enhet=self.b)
+        services.sett_status(o, choices.LEDIG, enhet=self.a,
+                             tidspunkt=timezone.now() - timedelta(minutes=45))
+        self.assertNotIn(o, services.synlige_for_enhet(self.a))
+        self.assertIn(o, services.synlige_for_enhet(self.b))
+
+    def test_ventende_oppdrag_er_per_rad(self):
+        o = self._to_enheter()
+        services.sett_status(o, choices.RYKKER_UT, enhet=self.a)
+        self.assertEqual(list(services.ventende_oppdrag(self.b)), [o])
+        self.assertEqual(list(services.ventende_oppdrag(self.a)), [])
+
+
+class SerialiseringTests(FlereEnheterBasis):
+    """§7.3: bilen ser hvem som er varslet, ikke deres status."""
+
+    def test_varslede_er_de_andres_navn(self):
+        from oppdrag.views_common import oppdrag_til_dict
+        o = self._to_enheter()
+        services.sett_status(o, choices.RYKKER_UT, enhet=self.a)
+        d = oppdrag_til_dict(o, for_enhet=True, koblingsrad=services.koblingsrad(o, self.b))
+        self.assertEqual(d['varslede'], ['Haugesund 56'])
+        self.assertEqual(d['status'], choices.VENTER, 'B sin egen status, ikke oppdragets')
+        self.assertEqual(d['neste_overgang'], choices.RYKKER_UT)
+
+    def test_sentralbordet_faar_matrisen(self):
+        from oppdrag.views_common import oppdrag_til_dict
+        o = self._to_enheter()
+        services.sett_status(o, choices.RYKKER_UT, enhet=self.a)
+        d = oppdrag_til_dict(o)
+        self.assertEqual(
+            [(e['enhet_navn'], e['status']) for e in d['enheter']],
+            [('Haugesund 56', choices.RYKKER_UT), ('Karmøy 12', choices.VENTER)])
+        self.assertEqual(d['status'], choices.RYKKER_UT)
+
+
+class EnhetskontoApiTests(FlereEnheterBasis):
+    """Bil B er varslet i tillegg til A — hun stempler på sin egen rad."""
+
+    def setUp(self):
+        super().setUp()
+        self.bil_b = _bruker('bil_b', 'skriv_handling')
+        self.b.user = self.bil_b
+        self.b.save()
+        self.bil_c = _bruker('bil_c', 'skriv_handling')
+        self.c.user = self.bil_c
+        self.c.save()
+        self.kb = _klient(self.bil_b)
+        self.kc = _klient(self.bil_c)
+
+    def test_lista_viser_oppdraget_med_hennes_status_og_de_andres_navn(self):
+        o = self._to_enheter()
+        services.sett_status(o, choices.RYKKER_UT, enhet=self.a)
+        services.sett_status(o, choices.FREMME, enhet=self.a)
+        res = self.kb.get('/oppdrag/api/oppdrag/')
+        self.assertEqual(res.status_code, 200)
+        rader = res.json()['data']
+        self.assertEqual([r['id'] for r in rader], [o.pk])
+        self.assertEqual(rader[0]['status'], choices.VENTER)
+        self.assertEqual(rader[0]['varslede'], ['Haugesund 56'])
+        self.assertEqual(rader[0]['statusmeldinger'], [], 'A sine meldinger er ikke hennes')
+
+    def test_hun_stempler_paa_sin_egen_rad(self):
+        o = self._to_enheter()
+        res = self.kb.post(f'/oppdrag/api/oppdrag/{o.pk}/status/rykker_ut/',
+                           content_type='application/json', data={})
+        self.assertEqual(res.status_code, 200, res.content)
+        self.assertEqual(res.json()['data']['oppdrag']['status'], choices.RYKKER_UT)
+        self.assertEqual(services.koblingsrad(o, self.b).status, choices.RYKKER_UT)
+        self.assertEqual(services.koblingsrad(o, self.a).status, choices.VENTER)
+
+    def test_detaljen_viser_bare_hennes_kjede(self):
+        o = self._to_enheter()
+        services.sett_status(o, choices.RYKKER_UT, enhet=self.a)
+        services.sett_status(o, choices.RYKKER_UT, enhet=self.b)
+        res = self.kb.get(f'/oppdrag/api/oppdrag/{o.pk}/')
+        self.assertEqual(res.status_code, 200)
+        d = res.json()['data']
+        self.assertEqual(len(d['statusmeldinger']), 1)
+        self.assertEqual(len(d['historikk']), 1)
+
+    def test_en_bil_som_ikke_er_varslet_faar_403(self):
+        o = self._to_enheter()
+        self.assertEqual(self.kc.get(f'/oppdrag/api/oppdrag/{o.pk}/').status_code, 403)
+        res = self.kc.post(f'/oppdrag/api/oppdrag/{o.pk}/status/rykker_ut/',
+                           content_type='application/json', data={})
+        self.assertEqual(res.status_code, 403)
+        self.assertEqual(self.kc.get('/oppdrag/api/oppdrag/').json()['data'], [])
+
+    def test_grovsortering_settes_av_en_varslet_bil(self):
+        o = self._to_enheter()
+        res = self.kb.post(f'/oppdrag/api/oppdrag/{o.pk}/grovsortering/rod/',
+                           content_type='application/json', data={})
+        self.assertEqual(res.status_code, 200, res.content)
+        self.assertEqual(res.json()['data']['status'], choices.VENTER)
+
+
+class BackupTests(FlereEnheterBasis):
+    """Koblingsraden er med i dumpen, i FK-trygg rekkefølge."""
+
+    def test_gjenoppretting_tar_med_koblingsradene(self):
+        o = self._to_enheter()
+        services.sett_status(o, choices.RYKKER_UT, enhet=self.b)
+        backup = create_backup(slug='oppdrag', kind=KIND_MANUAL)
+        Oppdrag.objects.all().delete()
+        self.assertEqual(Oppdragsenhet.objects.count(), 0)
+
+        restore_backup(backup)
+
+        o = Oppdrag.objects.get()
+        self.assertEqual({r.enhet.navn: r.status for r in o.enheter.all()},
+                         {'Haugesund 56': choices.VENTER, 'Karmøy 12': choices.RYKKER_UT})
+        self.assertEqual(Statusmelding.objects.get().oppdragsenhet.enhet, self.b)
