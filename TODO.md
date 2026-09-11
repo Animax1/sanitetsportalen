@@ -180,7 +180,10 @@ ingen av dem gir feilmelding — de er bare stille inaktive.
                   varsle/ta av, flytt av én rad, sentralbordets føring med
                   tidspunkt (`Statusmelding.manuell`, `0012`) og gjenåpning
                   av «Ledig» innen 48 t. Bilen ser «Også varslet: …».
-            - [ ] Trinn 3: sentralbordets UI
+            - [x] Trinn 3 (11. sep. 2026): avkryssing i «Nytt oppdrag»,
+                  matrisen i lista, enhetsradene i detaljen med «Før status»,
+                  «Gjenåpne», «Ta av» og «Varsle enhet til», flytt av én rad.
+                  Fant og rettet «Rett tid», som viste «[object Object]».
             - [ ] Trinn 4: arkiv (rad per enhet) og statistikk
             - [ ] Deploy 2, senere: fjern `Oppdrag.enhet`
       - [ ] **Stripe på blokklinja** (mini-Gantt over vaktas spenn) — alternativ

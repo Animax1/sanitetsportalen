@@ -111,8 +111,11 @@
       </div>
       <div class="modal-body">
         <div class="mb-3">
-          <label class="form-label" for="nytt-enhet">Enhet</label>
-          <select id="nytt-enhet" class="form-select"></select>
+          {# Avkryssing, ikke nedtrekk: operatøren sender gjerne to biler på #}
+          {# samme hendelse (flere enheter, 11. sep. 2026). #}
+          <div class="form-label">Enheter</div>
+          <div id="nytt-enheter" class="nytt-enheter"></div>
+          <div class="form-text">Kryss av én eller flere. Den første i lista blir primær.</div>
         </div>
         <div class="mb-3">
           <label class="form-label" for="nytt-problemstilling">Problemstilling</label>
@@ -263,6 +266,9 @@
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Lukk"></button>
       </div>
       <div class="modal-body" id="detalj-innhold"></div>
+      {# Feil fra handlingene per enhet (varsle, ta av, gjenåpne) står her, #}
+      {# under innholdet som tegnes på nytt — så meldingen overlever tegningen. #}
+      <div id="enheter-feil" class="text-danger small px-3 pb-3 d-none"></div>
     </div>
   </div>
 </div>
@@ -273,6 +279,8 @@
   window.OPPDRAG_TILGANG = {
     kanSkrive: {% if kan_skrive %}true{% else %}false{% endif %}
   };
+  window.OPPDRAG_AVREIST_TIL = {{ avreist_til|safe }};
+  window.OPPDRAG_STATUS_NAVN = {{ status_navn|safe }};
 </script>
 <script src="{% static 'js/portal-utils.js' %}"></script>
 <script src="{% static 'js/oppdrag-sentral.js' %}"></script>

@@ -153,6 +153,9 @@ def melding_til_dict(melding) -> dict:
         'id': melding.pk,
         'status': melding.status,
         'status_navn': melding.get_status_display(),
+        # Hvem sin melding: med flere enheter må tidslinjen si det.
+        'enhet_id': melding.oppdragsenhet.enhet_id if melding.oppdragsenhet_id else None,
+        'enhet_navn': melding.oppdragsenhet.enhet.navn if melding.oppdragsenhet_id else '',
         'tidspunkt': melding.tidspunkt.isoformat(),
         'meldt_av': getattr(melding.meldt_av, 'username', '') or '',
         'forsinket': melding.forsinket,

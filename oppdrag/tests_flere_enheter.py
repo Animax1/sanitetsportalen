@@ -562,6 +562,21 @@ class FoeringTests(SentralbordBasis):
                 self.assertEqual(res.status_code, 400, res.content)
                 self.assertIn(feil, res.json()['message'])
 
+    def test_naa_avrundet_til_minuttet_godtas_rett_etter_opprettelsen(self):
+        """`datetime-local` har minuttoppløsning: «nå» ned til minuttet ligger
+        før et oppdrag opprettet sekunder tidligere, og skal likevel gå."""
+        o = self._oppdrag(self.a)
+        Oppdrag.objects.filter(pk=o.pk).update(created_at=timezone.now())
+        tid = timezone.now().replace(second=0, microsecond=0)
+        res = self.ks.post(self._url(o, self.a, 'rykker_ut'), content_type='application/json',
+                           data={'tidspunkt': tid.isoformat()})
+        self.assertEqual(res.status_code, 200, res.content)
+        # Men ikke to minutter før.
+        o2 = self._oppdrag(self.a)
+        res = self.ks.post(self._url(o2, self.a, 'rykker_ut'), content_type='application/json',
+                           data={'tidspunkt': (timezone.now() - timedelta(minutes=2)).isoformat()})
+        self.assertEqual(res.status_code, 400)
+
     def test_avreist_med_sted(self):
         o = self._gammelt(self.a)
         services.sett_status(o, choices.RYKKER_UT, tidspunkt=self._for(60))
@@ -778,3 +793,215 @@ class BilenSerDeAndreTests(TestCase):
             {'status': 'rykker_ut', 'status_navn': 'Rykker ut',
              'tidspunkt': '2026-08-29T20:05:00Z', 'manuell': True}])
         self.assertIn('ført av sentralen', self._render(o, 'renderAktivt'))
+
+
+# ── Trinn 3: sentralbordets flater ──────────────────────────────────────────
+
+class SentralbordetsMatriseTests(TestCase):
+    """Matrisen i lista, avkryssingen, radene og knappene i detaljvisningen."""
+
+    def setUp(self):
+        from patients.js_test_utils import (
+            OPPDRAG_SENTRAL_JS, PORTAL_UTILS_JS, build_harness, node_available)
+        if not node_available():
+            self.skipTest('node er ikke tilgjengelig')
+        self.harness = build_harness((
+            (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue', 'trustedHtml', '_escHtml', 'klokke')),
+            (OPPDRAG_SENTRAL_JS, ('renderOppdrag', '_enhetsmatrise', '_grovMerke',
+                                  'hastegradKlasse', 'tidSiden', 'mkEnhetsvalg',
+                                  'mkEnhetsrader', '_enhetsknapper', '_varsleValg',
+                                  '_lovligeOverganger', 'tidslinjeHtml')),
+        ))
+
+    STUBB = ("globalThis.OPPDRAG_TILGANG = { kanSkrive: true };\n"
+             "globalThis.STATUS_REKKEFOLGE = ['venter', 'rykker_ut', 'fremme',"
+             " 'avreist', 'leverer', 'ledig'];\n"
+             "globalThis.enheter = [{id: 1, navn: 'HGSD 56', pa_vakt: true},"
+             " {id: 2, navn: 'KARM 12', pa_vakt: true}, {id: 3, navn: 'TYSV 3', pa_vakt: false}];\n")
+
+    def _kjor(self, kode):
+        from patients.js_test_utils import run_node
+        return run_node(self.harness, self.STUBB + kode)
+
+    OPPDRAG = ("{id: 7, nummer: 7, status: 'fremme', status_navn: 'Fremme',"
+               " enhet_navn: 'HGSD 56', lokasjon_navn: 'Scene', problemstilling: 'Fall',"
+               " hastegrad: 'Akutt', opprettet: '2026-08-28T20:00:00Z', fritekst: '',"
+               " enheter: [{enhet_id: 1, enhet_navn: 'HGSD 56', status: 'fremme',"
+               " status_navn: 'Fremme', status_tidspunkt: null},"
+               " {enhet_id: 2, enhet_navn: '<b>KARM</b>', status: 'venter',"
+               " status_navn: 'Venter', status_tidspunkt: null}]}")
+
+    def test_lista_viser_en_brikke_per_enhet_og_escaper(self):
+        ut = self._kjor(f"""
+            globalThis.oppdragsliste = [{self.OPPDRAG}];
+            const el = {{ innerHTML: '' }};
+            globalThis.document = {{ getElementById: () => el }};
+            renderOppdrag();
+            console.log(el.innerHTML);
+        """)
+        self.assertEqual(ut.count('enhet-brikke'), 2)
+        self.assertIn('status-venter', ut)
+        self.assertIn('status-fremme', ut)
+        self.assertIn('&lt;b&gt;KARM&lt;/b&gt;', ut)
+        self.assertNotIn('<b>KARM</b>', ut)
+
+    def test_uten_enheter_faller_brikken_tilbake_paa_toppnivaa(self):
+        ut = self._kjor("""
+            console.log(_enhetsmatrise({enhet_navn: 'E1', status: 'venter',
+                                        status_navn: 'Venter', status_tidspunkt: null}));
+        """)
+        self.assertEqual(ut.count('enhet-brikke'), 1)
+        self.assertIn('E1', ut)
+
+    def test_avkryssingen_tar_bare_enheter_paa_vakt(self):
+        ut = self._kjor("console.log(mkEnhetsvalg());")
+        self.assertEqual(ut.count('type="checkbox"'), 2)
+        self.assertIn('HGSD 56', ut)
+        self.assertNotIn('TYSV 3', ut)
+
+    def test_knappene_foelger_tilstanden(self):
+        ut = self._kjor(f"console.log(mkEnhetsrader({self.OPPDRAG}));")
+        self.assertEqual(ut.count('Før status'), 2)
+        self.assertEqual(ut.count('Ta av'), 1, 'bare den som venter')
+        self.assertNotIn('Gjenåpne', ut)
+        ledig = self._kjor("""
+            console.log(mkEnhetsrader({enheter: [{enhet_id: 1, enhet_navn: 'A', status: 'ledig',
+              status_navn: 'Ledig', status_tidspunkt: null}]}));
+        """)
+        self.assertIn('Gjenåpne', ledig)
+        self.assertNotIn('Før status', ledig)
+        self.assertNotIn('Ta av', ledig)
+
+    def test_den_siste_kan_ikke_tas_av_i_grensesnittet(self):
+        ut = self._kjor("""
+            console.log(mkEnhetsrader({enheter: [{enhet_id: 1, enhet_navn: 'A', status: 'venter',
+              status_navn: 'Venter', status_tidspunkt: null}]}));
+        """)
+        self.assertNotIn('Ta av', ut)
+
+    def test_uten_skrivetilgang_ingen_knapper(self):
+        ut = self._kjor(f"""
+            globalThis.OPPDRAG_TILGANG = {{ kanSkrive: false }};
+            console.log(mkEnhetsrader({self.OPPDRAG}));
+        """)
+        for tekst in ('Før status', 'Ta av', 'Gjenåpne', '<button'):
+            self.assertNotIn(tekst, ut)
+
+    def test_varslevalget_utelater_dem_som_alt_er_paa(self):
+        ut = self._kjor(f"console.log(_varsleValg({self.OPPDRAG}));")
+        self.assertNotIn('HGSD 56', ut)
+        self.assertNotIn('TYSV 3', ut, 'ikke på vakt')
+        # KARM 12 står alt på oppdraget som enhet 2 — ingen igjen å varsle.
+        self.assertNotIn('Varsle enhet til', ut)
+        ut = self._kjor("console.log(_varsleValg({id: 1, enheter: [{enhet_id: 1}]}));")
+        self.assertIn('KARM 12', ut)
+        self.assertIn('Varsle enhet til', ut)
+
+    def test_lovlige_overganger_speiler_kjeden(self):
+        ut = self._kjor("""
+            console.log(JSON.stringify([
+              _lovligeOverganger('venter'), _lovligeOverganger('leverer'),
+              _lovligeOverganger('ledig')]));
+        """)
+        self.assertEqual(ut.splitlines()[0], '[["rykker_ut","ledig"],["ledig"],[]]')
+
+    def test_tidslinjen_sier_hvem_bare_med_flere_enheter(self):
+        melding = ("{id: 1, status: 'fremme', status_navn: 'Fremme', enhet_navn: 'KARM 12',"
+                   " tidspunkt: '2026-08-28T20:00:00Z', manuell: true, meldt_av: '<i>ops</i>'}")
+        to = self._kjor(f"""
+            console.log(tidslinjeHtml({{historikk: [{melding}], enhetsbytter: [],
+                                       enheter: [{{enhet_id: 1}}, {{enhet_id: 2}}]}}));
+        """)
+        self.assertIn('KARM 12: Fremme', to)
+        self.assertIn('ført av sentralen (&lt;i&gt;ops&lt;/i&gt;)', to)
+        en = self._kjor(f"""
+            console.log(tidslinjeHtml({{historikk: [{melding}], enhetsbytter: [],
+                                       enheter: [{{enhet_id: 2}}]}}));
+        """)
+        self.assertNotIn('KARM 12:', en)
+        self.assertIn('Fremme', en)
+
+
+class SentralsidenTests(SentralbordBasis):
+    """Malen: avkryssingen og dataene til «Før status» følger skrivetilgangen."""
+
+    def test_skriver_faar_avkryssing_og_stedene(self):
+        res = self.ks.get('/oppdrag/')
+        self.assertEqual(res.status_code, 200)
+        html = res.content.decode()
+        self.assertIn('id="nytt-enheter"', html)
+        self.assertIn('window.OPPDRAG_AVREIST_TIL', html)
+        self.assertIn('Sykehus', html)
+        self.assertNotIn('id="nytt-enhet"', html, 'nedtrekket er borte')
+
+    def test_leser_faar_ingen_avkryssing(self):
+        leser = _klient(_bruker('leser', 'les'))
+        html = leser.get('/oppdrag/').content.decode()
+        self.assertNotIn('id="nytt-enheter"', html)
+
+    def test_detaljen_navngir_enheten_bak_hver_melding(self):
+        o = self._to_enheter()
+        services.sett_status(o, choices.RYKKER_UT, enhet=self.b)
+        d = self.ks.get(f'/oppdrag/api/oppdrag/{o.pk}/').json()['data']
+        self.assertEqual([m['enhet_navn'] for m in d['historikk']], ['Karmøy 12'])
+
+
+class InnlinjeskjemaeneTests(TestCase):
+    """«Rett tid» og «Før status» bygger et skjema i raden med `innerHTML`.
+
+    `trustedHtml()` pakker strengen inn i et objekt for `cellHtml()`; satt
+    som innerHTML blir det «[object Object]». «Rett tid» sto slik fra fase 3
+    til 11. sep. 2026 uten at noen test så det — ingen kjørte funksjonen.
+    Her kjøres begge mot en minimal DOM-stubb, og skjemaet må være en streng
+    med knappen i.
+    """
+
+    DOM = """
+        globalThis.skjemaer = [];
+        const rad = { querySelector: () => null, appendChild: (el) => skjemaer.push(el) };
+        globalThis.document = {
+          getElementById: (id) => (id.startsWith('tidslinje-rad-') || id.startsWith('enhet-rad-'))
+            ? rad : { focus() {} },
+          createElement: () => ({ _html: '', set innerHTML(v) { this._html = v; },
+                                  get innerHTML() { return this._html; } }),
+        };
+        globalThis.window = { OPPDRAG_STATUS_NAVN: { rykker_ut: 'Rykker ut', ledig: 'Ledig' },
+                              OPPDRAG_AVREIST_TIL: [['sykehus', 'Sykehus']] };
+        globalThis.STATUS_REKKEFOLGE = ['venter', 'rykker_ut', 'fremme', 'avreist', 'leverer', 'ledig'];
+        globalThis.apentOppdrag = { enheter: [{ enhet_id: 4, status: 'venter' }] };
+    """
+
+    def setUp(self):
+        from patients.js_test_utils import (
+            OPPDRAG_SENTRAL_JS, PORTAL_UTILS_JS, build_harness, node_available)
+        if not node_available():
+            self.skipTest('node er ikke tilgjengelig')
+        self.harness = build_harness((
+            (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue', 'trustedHtml', '_escHtml')),
+            (OPPDRAG_SENTRAL_JS, ('visRettTid', 'visFoerStatus', '_lovligeOverganger')),
+        ))
+
+    def _skjema(self, kall):
+        from patients.js_test_utils import run_node
+        return run_node(self.harness, self.DOM + f"""
+            {kall};
+            const html = skjemaer[0].innerHTML;
+            console.log(typeof html);
+            console.log(html);
+        """)
+
+    def test_rett_tid_er_et_skjema_og_ikke_object_object(self):
+        ut = self._skjema('visRettTid(5)')
+        self.assertTrue(ut.startswith('string'), ut[:80])
+        self.assertNotIn('[object Object]', ut)
+        self.assertIn('data-action="lagreRettTid" data-id="5"', ut)
+
+    def test_foer_status_tilbyr_de_lovlige_overgangene_og_stedene(self):
+        ut = self._skjema('visFoerStatus(4)')
+        self.assertTrue(ut.startswith('string'), ut[:80])
+        self.assertNotIn('[object Object]', ut)
+        self.assertIn('value="rykker_ut"', ut)
+        self.assertIn('value="ledig"', ut)
+        self.assertNotIn('value="fremme"', ut, 'ikke et ledd hun kan hoppe til')
+        self.assertIn('Sykehus', ut)
+        self.assertIn('data-action="lagreFoerStatus" data-id="4"', ut)

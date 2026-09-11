@@ -274,12 +274,34 @@ function renderOppdrag() {
           <span class="oppdrag-meta">${escapeHtml(statusTekst)}</span>
         </span>
       </div>
+      <div class="enhetsmatrise mt-1">${_enhetsmatrise(o)}</div>
       <div class="oppdrag-meta mt-1">
-        ${escapeHtml(o.enhet_navn)} · ${escapeHtml(o.lokasjon_navn)} · ${escapeHtml(opprettetTekst)}
+        ${escapeHtml(o.lokasjon_navn)} · ${escapeHtml(opprettetTekst)}
       </div>
       ${fritekstBlokk}
     </div>`;
   }).join(''));
+}
+
+
+function _enhetsmatrise(o) {
+  // Én brikke per enhet: navn, status og tid siden — matrisen fra §4 i
+  // notatet om flere enheter. Oppdragets egen status står fortsatt til
+  // høyre i raden; den er utledet av disse. Uten `enheter` (eldre svar)
+  // er det én brikke av toppnivåfeltene.
+  const rader = (o.enheter && o.enheter.length) ? o.enheter : [{
+    enhet_navn: o.enhet_navn, status: o.status, status_navn: o.status_navn,
+    status_tidspunkt: o.status_tidspunkt,
+  }];
+  return rader.map((e) => {
+    const statusTid = e.status_tidspunkt ? ` · ${tidSiden(e.status_tidspunkt)}` : '';
+    const meta = `${e.status_navn}${statusTid}`;
+    return `<span class="enhet-brikke">
+      <span class="status-prikk status-${escHtmlValue(e.status)}"></span>
+      <span>${escapeHtml(e.enhet_navn)}</span>
+      <span class="oppdrag-meta">${escapeHtml(meta)}</span>
+    </span>`;
+  }).join('');
 }
 
 
@@ -293,6 +315,7 @@ function tidslinjeHtml(data) {
 
   const erstattet = new Set(
     (data.historikk || []).filter((m) => m.korrigerer).map((m) => m.korrigerer));
+  const flere = (data.enheter || []).length > 1;
 
   (data.historikk || []).forEach((m) => {
     // Markøren for et avledet tidspunkt sitter på KLOKKESLETTET, ikke på
@@ -306,6 +329,8 @@ function tidslinjeHtml(data) {
     if (m.automatisk) notat.push('avsluttet automatisk');
     if (m.forsinket) notat.push('meldt forsinket');
     if (m.korrigerer) notat.push('rettet av sentralen');
+    // §9: sentralbordet førte statusen — og hvem, for det er ikke bilen.
+    if (m.manuell) notat.push('ført av sentralen' + (m.meldt_av ? ` (${m.meldt_av})` : ''));
     const erErstattet = erstattet.has(m.id);
     const klasse = erErstattet ? 'tidslinje-rad tidslinje-erstattet' : 'tidslinje-rad';
     const notatBlokk = notat.length
@@ -319,7 +344,10 @@ function tidslinjeHtml(data) {
                  data-action="visRettTid" data-id="${escHtmlValue(m.id)}">Rett tid</button>`
       : '';
     // «Avreist → Sykehus» — stedet ved statusen, som på enhetsskjermen.
-    const statusMedSted = m.sted_navn ? `${m.status_navn} → ${m.sted_navn}` : String(m.status_navn);
+    // Og med flere enheter: hvem sin — «KARM 12: Fremme». Med én står
+    // navnet alt i tittelen.
+    const hvem = (flere && m.enhet_navn) ? m.enhet_navn + ': ' : '';
+    const statusMedSted = hvem + (m.sted_navn ? `${m.status_navn} → ${m.sted_navn}` : String(m.status_navn));
     rader.push({
       tid: m.tidspunkt,
       html: `
@@ -366,8 +394,12 @@ async function visOppdrag(id) {
   }
 
   const o = d.data;
+  apentOppdrag = o;
+  const navn = (o.enheter || []).map((e) => e.enhet_navn).join(', ') || o.enhet_navn;
   document.getElementById('detalj-tittel').textContent =
-    `#${o.nummer} ${o.problemstilling} – ${o.enhet_navn}`;
+    `#${o.nummer} ${o.problemstilling} – ${navn}`;
+  const enheterFeil = document.getElementById('enheter-feil');
+  if (enheterFeil) enheterFeil.classList.add('d-none');
 
   // Ferdigstilte oppdrag går til historikken av seg selv i `sett_status`, så
   // knappen her er for hånd-tilfellene: hent tilbake til tavla, og rydd bort
@@ -383,11 +415,18 @@ async function visOppdrag(id) {
            <i class="bi bi-clock-history me-1"></i>Legg i historikk</button>`)
     : '';
 
+  // Med flere enheter er «flytt» flytt av én rad — hvilken, spørres om.
+  const flyttFra = (o.enheter || []).length > 1
+    ? `<select id="flytt-fra" class="form-select" aria-label="Flytt fra">
+        ${(o.enheter || []).map((e) => `<option value="${escHtmlValue(e.enhet_id)}">${escapeHtml(e.enhet_navn)}</option>`).join('')}
+       </select><span class="input-group-text">→</span>`
+    : '';
   const flyttValg = OPPDRAG_TILGANG.kanSkrive
     ? `
       <hr>
       <label class="form-label" for="flytt-enhet">Flytt til enhet</label>
       <div class="input-group">
+        ${flyttFra}
         <select id="flytt-enhet" class="form-select">
           ${enheter.map((e) => `<option value="${escHtmlValue(e.id)}">${escapeHtml(e.navn)}</option>`).join('')}
         </select>
@@ -404,10 +443,202 @@ async function visOppdrag(id) {
       <span class="ms-2">${escapeHtml(o.status_navn)}</span>
     </div>
     ${o.fritekst ? `<div class="oppdrag-fritekst mb-3">${escapeHtml(o.fritekst)}</div>` : ''}
+    <h6 class="text-muted">Enheter</h6>
+    <div class="mb-3">${mkEnhetsrader(o)}${OPPDRAG_TILGANG.kanSkrive ? _varsleValg(o) : ''}</div>
     <h6 class="text-muted">Tidslinje</h6>
     ${tidslinjeHtml(o)}
     ${historikkKnapp ? `<div class="mt-3">${historikkKnapp}</div>` : ''}
     ${flyttValg}`);
+}
+
+
+// ── Enhetene på oppdraget (flere enheter, 11. sep. 2026) ───────────
+// Radene i detaljvisningen, med handlingene per enhet: «Før status» (§9),
+// «Gjenåpne» og «Ta av». Og «Varsle enhet til» under dem. Alle går på
+// `apentOppdrag` — klikkdelegeringen sender ett argument, og det er enheten.
+
+//: Oppdraget som står åpent i detaljmodalen, som data. `apentOppdragId`
+//: under er ID-en alene; handlingene per enhet trenger radene.
+let apentOppdrag = null;
+
+
+function mkEnhetsrader(o) {
+  const flere = (o.enheter || []).length > 1;
+  return (o.enheter || []).map((e) => {
+    const statusTid = e.status_tidspunkt
+      ? ` ${klokke(e.status_tidspunkt)} · ${tidSiden(e.status_tidspunkt)}` : '';
+    const meta = `${e.status_navn}${statusTid}`;
+    const knapper = OPPDRAG_TILGANG.kanSkrive ? _enhetsknapper(e, flere) : '';
+    return `
+      <div class="enhet-rad" id="enhet-rad-${escHtmlValue(e.enhet_id)}">
+        <span class="status-prikk status-${escHtmlValue(e.status)}"></span>
+        <span class="enhet-rad-navn">${escapeHtml(e.enhet_navn)}</span>
+        <span class="oppdrag-meta">${escapeHtml(meta)}</span>
+        <span class="ms-auto d-flex gap-1 flex-wrap">${knapper}</span>
+      </div>`;
+  }).join('');
+}
+
+
+function _enhetsknapper(e, flere) {
+  // Bare knappene som kan brukes: «Ta av» mens hun venter og ikke er den
+  // siste, «Gjenåpne» når hun er ledig, «Før status» ellers. En knapp som
+  // alltid feiler er verre enn ingen.
+  const ut = [];
+  if (e.status !== 'ledig') {
+    ut.push(`<button type="button" class="btn btn-outline-primary btn-sm"
+                     data-action="visFoerStatus" data-id="${escHtmlValue(e.enhet_id)}">Før status</button>`);
+  } else {
+    ut.push(`<button type="button" class="btn btn-outline-secondary btn-sm"
+                     data-action="gjenaapneEnhet" data-id="${escHtmlValue(e.enhet_id)}">Gjenåpne</button>`);
+  }
+  if (e.status === 'venter' && flere) {
+    ut.push(`<button type="button" class="btn btn-outline-danger btn-sm"
+                     data-action="taAvEnhet" data-id="${escHtmlValue(e.enhet_id)}">Ta av</button>`);
+  }
+  return ut.join('');
+}
+
+
+function _varsleValg(o) {
+  // Enhetene på vakt som ikke alt står på oppdraget.
+  const paa = new Set((o.enheter || []).map((e) => e.enhet_id));
+  const ledige = enheter.filter((e) => e.pa_vakt && !paa.has(e.id));
+  if (!ledige.length) return '';
+  const valg = ledige.map(
+    (e) => `<option value="${escHtmlValue(e.id)}">${escapeHtml(e.navn)}</option>`).join('');
+  return `
+    <div class="input-group input-group-sm mt-2">
+      <select id="varsle-enhet" class="form-select" aria-label="Enhet å varsle">${valg}</select>
+      <button class="btn btn-outline-primary" type="button"
+              data-action="varsleEnhet" data-id="${escHtmlValue(o.id)}">Varsle enhet til</button>
+    </div>`;
+}
+
+
+function _lovligeOverganger(status) {
+  // Speiler `services.OVERGANGER`: neste ledd i kjeden, og «Ledig» fra alt.
+  // Serveren avgjør uansett; dette er hva nedtrekket tilbyr.
+  const kjede = STATUS_REKKEFOLGE.filter((s) => s !== 'ledig');
+  const i = kjede.indexOf(status);
+  const ut = [];
+  if (i >= 0 && i + 1 < kjede.length) ut.push(kjede[i + 1]);
+  if (status !== 'ledig') ut.push('ledig');
+  return ut;
+}
+
+
+function _visEnhetsfeil(melding) {
+  const el = document.getElementById('enheter-feil');
+  if (!el) return;
+  el.textContent = melding;
+  el.classList.remove('d-none');
+}
+
+
+async function _enhetshandling(url, metode, feiltekst) {
+  const res = await apiFetch(url, { method: metode });
+  const d = await res.json();
+  if (!res.ok || d.status !== 'ok') {
+    _visEnhetsfeil(d.message || feiltekst);
+    return false;
+  }
+  if (apentOppdragId !== null) await visOppdrag(apentOppdragId);
+  await lastAlt();
+  return true;
+}
+
+
+async function varsleEnhet(oppdragId) {
+  const valg = document.getElementById('varsle-enhet');
+  if (!valg || !valg.value) return;
+  await _enhetshandling(
+    `/oppdrag/api/oppdrag/${oppdragId}/enheter/${Number(valg.value)}/`, 'POST',
+    'Kunne ikke varsle enheten.');
+}
+
+
+async function taAvEnhet(enhetId) {
+  if (apentOppdragId === null) return;
+  await _enhetshandling(
+    `/oppdrag/api/oppdrag/${apentOppdragId}/enheter/${Number(enhetId)}/`, 'DELETE',
+    'Kunne ikke ta enheten av.');
+}
+
+
+async function gjenaapneEnhet(enhetId) {
+  if (apentOppdragId === null) return;
+  await _enhetshandling(
+    `/oppdrag/api/oppdrag/${apentOppdragId}/enheter/${Number(enhetId)}/gjenaapne/`, 'POST',
+    'Kunne ikke gjenåpne.');
+}
+
+
+function visFoerStatus(enhetId) {
+  const rad = document.getElementById(`enhet-rad-${enhetId}`);
+  if (!rad || rad.querySelector('.foer-skjema')) return;
+  const e = ((apentOppdrag && apentOppdrag.enheter) || [])
+    .find((x) => Number(x.enhet_id) === Number(enhetId));
+  if (!e) return;
+
+  const navn = window.OPPDRAG_STATUS_NAVN || {};
+  const statusvalg = _lovligeOverganger(e.status).map(
+    (st) => `<option value="${escHtmlValue(st)}">${escapeHtml(navn[st] || st)}</option>`).join('');
+  const stedvalg = (window.OPPDRAG_AVREIST_TIL || []).map(
+    ([nokkel, tekst]) => `<option value="${escHtmlValue(nokkel)}">${escapeHtml(tekst)}</option>`).join('');
+  // Som «Rett tid»: `datetime-local` vil ha lokal tid uten sone, og nå er
+  // utgangspunktet — operatøren fører noe som skjedde for litt siden.
+  const naa = new Date();
+  const lokal = new Date(naa.getTime() - naa.getTimezoneOffset() * 60000)
+    .toISOString().slice(0, 16);
+
+  const skjema = document.createElement('div');
+  skjema.className = 'foer-skjema mt-1 d-flex gap-2 align-items-center flex-wrap w-100';
+  skjema.innerHTML = (`
+    <select id="foer-status" class="form-select form-select-sm w-auto" aria-label="Status">${statusvalg}</select>
+    <select id="foer-sted" class="form-select form-select-sm w-auto" aria-label="Sted ved Avreist">
+      <option value="">Sted (ved Avreist)</option>${stedvalg}</select>
+    <input type="datetime-local" class="form-control form-control-sm w-auto"
+           id="foer-tid" value="${lokal}" step="60">
+    <button type="button" class="btn btn-sm btn-primary"
+            id="foer-lagre" data-action="lagreFoerStatus" data-id="${escHtmlValue(enhetId)}">Før</button>
+    <button type="button" class="btn btn-sm btn-outline-secondary"
+            data-action="avbrytFoerStatus">Avbryt</button>
+    <span id="foer-feil" class="text-danger small"></span>`);
+  rad.appendChild(skjema);
+  document.getElementById('foer-tid').focus();
+}
+
+
+function avbrytFoerStatus() {
+  document.querySelectorAll('.foer-skjema').forEach((el) => el.remove());
+}
+
+
+async function lagreFoerStatus(enhetId) {
+  const status = document.getElementById('foer-status');
+  const sted = document.getElementById('foer-sted');
+  const tid = document.getElementById('foer-tid');
+  const feil = document.getElementById('foer-feil');
+  if (!status || !tid || !tid.value || apentOppdragId === null) return;
+
+  await withSubmitGuard('foer-lagre', async () => {
+    // Stedet hører til «Avreist» og ingen annen status — sendes bare da.
+    const stedLedd = (status.value === 'avreist' && sted && sted.value) ? `${sted.value}/` : '';
+    const res = await apiFetch(
+      `/oppdrag/api/oppdrag/${apentOppdragId}/enheter/${Number(enhetId)}/status/${status.value}/${stedLedd}`, {
+        method: 'POST',
+        // Ingen sone på `datetime-local`; serveren tolker den som lokal tid.
+        body: JSON.stringify({ tidspunkt: tid.value }),
+      });
+    const d = await res.json();
+    if (!res.ok || d.status !== 'ok') {
+      feil.textContent = d.message || 'Kunne ikke føre statusen.';
+      return;
+    }
+    await visOppdrag(apentOppdragId);
+    await lastAlt();
+  });
 }
 
 
@@ -434,7 +665,10 @@ function visRettTid(meldingId) {
 
   const skjema = document.createElement('div');
   skjema.className = 'rett-tid-skjema mt-1 d-flex gap-2 align-items-center flex-wrap';
-  skjema.innerHTML = trustedHtml(`
+  // En streng, ikke `trustedHtml(...)`: den pakker inn i et objekt for
+  // `cellHtml()`, og som innerHTML blir det «[object Object]». Skjemaet sto
+  // slik fra fase 3 til 11. sep. 2026 — «Rett tid» viste ingenting.
+  skjema.innerHTML = (`
     <input type="datetime-local" class="form-control form-control-sm w-auto"
            id="rett-tid-verdi" value="${lokal}">
     <button type="button" class="btn btn-sm btn-primary"
@@ -481,10 +715,13 @@ async function lagreRettTid(meldingId) {
 
 async function flyttOppdrag(id) {
   const valg = document.getElementById('flytt-enhet');
+  const fra = document.getElementById('flytt-fra');
   const feil = document.getElementById('flytt-feil');
+  const kropp = { enhet_id: Number(valg.value) };
+  if (fra) kropp.fra_enhet_id = Number(fra.value);
   const res = await apiFetch(`/oppdrag/api/oppdrag/${id}/flytt/`, {
     method: 'POST',
-    body: JSON.stringify({ enhet_id: Number(valg.value) }),
+    body: JSON.stringify(kropp),
   });
   const d = await res.json();
   if (!res.ok || d.status !== 'ok') {
@@ -576,10 +813,17 @@ async function opprettOppdrag() {
   const feil = document.getElementById('nytt-feil');
   feil.classList.add('d-none');
 
+  const enhetIder = _valgteEnheter();
+  if (!enhetIder.length) {
+    feil.textContent = 'Kryss av minst én enhet.';
+    feil.classList.remove('d-none');
+    return;
+  }
+
   const res = await apiFetch('/oppdrag/api/oppdrag/', {
     method: 'POST',
     body: JSON.stringify({
-      enhet_id: Number(document.getElementById('nytt-enhet').value),
+      enhet_ider: enhetIder,
       lokasjon_id: Number(document.getElementById('nytt-lokasjon').value),
       problemstilling: document.getElementById('nytt-problemstilling').value,
       hastegrad: document.getElementById('nytt-hastegrad').value,
@@ -594,7 +838,26 @@ async function opprettOppdrag() {
   }
   bootstrap.Modal.getInstance(document.getElementById('nyttOppdragModal'))?.hide();
   document.getElementById('nytt-fritekst').value = '';
+  document.querySelectorAll('input[name="nytt-enhet"]:checked').forEach((i) => { i.checked = false; });
   await lastAlt();
+}
+
+
+function _valgteEnheter() {
+  // I avkryssingsrekkefølge = listas rekkefølge; den første blir primær.
+  return Array.from(document.querySelectorAll('input[name="nytt-enhet"]:checked'))
+    .map((i) => Number(i.value));
+}
+
+
+function mkEnhetsvalg() {
+  // Avkryssing, ikke nedtrekk: operatøren sender gjerne to biler på samme
+  // hendelse. Bare enhetene på vakt — som nedtrekket var.
+  return enheter.filter((e) => e.pa_vakt).map((e) => `
+    <label class="form-check nytt-enhet-valg">
+      <input class="form-check-input" type="checkbox" name="nytt-enhet" value="${escHtmlValue(e.id)}">
+      <span class="form-check-label">${escapeHtml(e.navn)}</span>
+    </label>`).join('');
 }
 
 
@@ -752,10 +1015,10 @@ async function lastLokasjoner() {
 
 
 function fyllNedtrekk() {
-  const enhetsvalg = document.getElementById('nytt-enhet');
+  const enhetsvalg = document.getElementById('nytt-enheter');
   if (enhetsvalg) {
-    enhetsvalg.innerHTML = (enheter.filter((e) => e.pa_vakt).map(
-      (e) => `<option value="${escHtmlValue(e.id)}">${escapeHtml(e.navn)}</option>`).join(''));
+    enhetsvalg.innerHTML = mkEnhetsvalg()
+      || '<div class="tom-melding">Ingen enheter på vakt.</div>';
   }
   const lokvalg = document.getElementById('nytt-lokasjon');
   if (lokvalg) {

@@ -187,6 +187,50 @@
   white-space: pre-wrap;
 }
 
+/* ── Flere enheter på ett oppdrag (11. sep. 2026) ────────────────────────── */
+
+/* Én brikke per enhet i oppdragsraden: prikk, navn, status og tid siden.
+ * Samme brikke med én enhet — lista skal lese likt uansett antall. */
+.enhetsmatrise {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.9rem;
+}
+
+.enhet-brikke {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.85rem;
+  color: var(--text-main);
+}
+
+/* Avkryssingen i «Nytt oppdrag». */
+.nytt-enheter {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 1rem;
+}
+
+.nytt-enhet-valg { margin: 0; }
+
+/* Radene i detaljvisningen, med handlingene per enhet til høyre. */
+.enhet-rad {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  padding: 0.35rem 0;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.enhet-rad-navn {
+  font-weight: 600;
+  color: var(--text-main);
+}
+
+.foer-skjema { font-size: 0.85rem; }
+
 /* ── Tidslinje ───────────────────────────────────────────────────────────── */
 
 .tidslinje-rad {

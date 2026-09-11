@@ -28,6 +28,13 @@ HTML_BUILDERS_PER_FIL = {
         'mkBesetning',
         'renderOppdrag',
         '_grovMerke',
+        # Flere enheter (11. sep. 2026): matrisen i lista, avkryssingen i
+        # «Nytt oppdrag», radene og knappene i detaljvisningen.
+        '_enhetsmatrise',
+        'mkEnhetsvalg',
+        'mkEnhetsrader',
+        '_enhetsknapper',
+        '_varsleValg',
         'tidslinjeHtml',
         'renderLokasjonsadmin',
         'renderEnhetsadmin',
@@ -111,6 +118,9 @@ REVIEWED_INTERPOLATIONS = {
     'startKnapp': 'markup bygget lokalt, navn og id escapet inni',
     'tidslinjeEnhetHtml(o)': 'markup fra en bygger som selv skannes her',
     '_varsledeRad(o)': 'markup fra en bygger som selv skannes her',
+    # Sentralbordet med flere enheter (11. sep. 2026):
+    '_enhetsmatrise(o)': 'markup fra en bygger som selv skannes her',
+    'm.meldt_av': 'brukernavn i ren tekst i `notat`, som escapes ved innsetting',
 }
 
 
@@ -183,7 +193,8 @@ class OppdragEscapingOppforselTests(SimpleTestCase):
                            'klokke')),
         (OPPDRAG_SENTRAL_JS, ('renderOppdrag', 'renderEnheter', 'tidslinjeHtml',
                               'hastegradKlasse', 'mkBesetning',
-                              'kanSeBesetning', 'tidSiden', '_grovMerke')),
+                              'kanSeBesetning', 'tidSiden', '_grovMerke',
+                              '_enhetsmatrise')),
     )
 
     #: Besetningspanelet leser to globaler som ellers settes ved sidelasting.

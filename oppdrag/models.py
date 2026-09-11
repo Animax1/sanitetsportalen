@@ -325,7 +325,11 @@ class StatusmeldingManager(models.Manager):
         oppdrag uten meldinger, slik at kalleren slipper `.get(pk, [])`.
         """
         ider = list(oppdrag_ider)
-        alle = list(self.filter(oppdrag_id__in=ider).order_by('created_at'))
+        # Enheten bak hver melding følger med: tidslinjen med flere enheter
+        # skriver «HGSD 56: Fremme», og skal ikke koste én spørring per rad.
+        alle = list(self.filter(oppdrag_id__in=ider)
+                    .select_related('oppdragsenhet__enhet', 'meldt_av')
+                    .order_by('created_at'))
         overstyrte = {m.korrigerer_id for m in alle if m.korrigerer_id}
         ut = {pk: [] for pk in ider}
         for melding in alle:

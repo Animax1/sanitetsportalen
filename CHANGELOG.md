@@ -4,6 +4,41 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-11 — Flere enheter på ett oppdrag, trinn 3: sentralbordets knapper
+
+**2172 tester grønne** (13 nye), og en røyktest i Chromium mot hele flyten:
+opprett med to biler, før status for den ene, ta den andre av, varsle henne
+igjen. Ingen migrasjon.
+
+- **«Nytt oppdrag» krysser av enheter** (`mkEnhetsvalg`), ikke velger én. Den
+  første i lista blir primær; ingen avkrysset gir «Kryss av minst én enhet» før
+  noe sendes.
+- **Oppdragslista viser én brikke per enhet** (`_enhetsmatrise`): prikk, navn,
+  status og tid siden. Samme brikke med én enhet — lista skal lese likt.
+  Oppdragets utledede status står fortsatt til høyre.
+- **Detaljvisningen har fått «Enheter»** (`mkEnhetsrader`): én rad per enhet
+  med status, klokkeslett og tid siden, og bare knappene som kan brukes —
+  «Før status» (ikke når hun er ledig), «Gjenåpne» (bare da), «Ta av» (bare
+  mens hun venter, og ikke den siste). «Varsle enhet til» under, med enhetene
+  på vakt som ikke alt står på oppdraget. Feil fra handlingene står under
+  innholdet, så de overlever at det tegnes på nytt.
+- **«Før status» er et skjema i raden**, som «Rett tid»: nedtrekket tilbyr
+  neste ledd og «Ledig» (`_lovligeOverganger` speiler `services.OVERGANGER`),
+  sted ved «Avreist», og klokkeslett med nå som utgangspunkt. Stedet sendes
+  bare når statusen er «Avreist».
+- **Tidslinjen sier hvem sin melding** når oppdraget har flere enheter
+  («KARM 12: Fremme»), og «ført av sentralen (adm)» på det operatøren førte.
+  `melding_til_dict` bærer `enhet_navn`; `gjeldende_bulk` henter enheten med,
+  så det ikke koster en spørring per rad.
+- **Flytt av én rad:** med flere enheter får «Flytt til enhet» et «fra»-valg.
+- **Rettet: «Rett tid» viste «[object Object]».** Skjemaet ble satt med
+  `trustedHtml(...)` som innerHTML — den pakker inn i et objekt for
+  `cellHtml()`. Det har stått slik siden fase 3; ingen test kjørte funksjonen.
+  `InnlinjeskjemaeneTests` kjører begge skjemaene mot en DOM-stubb nå.
+- **Ett minutts slakk mot `created_at`** (`services.MINUTTSLAKK`) i føring og
+  «Rett tid»: `datetime-local` har minuttoppløsning, og «nå» rundet ned lå før
+  et oppdrag opprettet sekunder tidligere. Røyktesten fant det.
+
 ## 2026-09-11 — Flere enheter på ett oppdrag, trinn 2: endepunktene og §9
 
 **2159 tester grønne** (30 nye). Én migrasjon, `oppdrag/0012`: ett `AddField`,

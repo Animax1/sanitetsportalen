@@ -80,6 +80,10 @@ def index_view(request):
         # går vakt.
         'kan_se_besetning': har_tilgang(request.user, 'vaktliste', 'les'),
         'problemstillinger': choices.PROBLEMSTILLING,
+        # Til «Før status» i detaljvisningen (§9): stedene ved «Avreist» og
+        # statusnavnene. Samme kilde som enhetsskjermen: `choices`.
+        'avreist_til': json.dumps(list(choices.AVREIST_TIL)),
+        'status_navn': json.dumps(choices.STATUS_NAVN),
         'hastegrader': choices.HASTEGRAD,
     })
 
@@ -464,10 +468,13 @@ def oppdrag_detalj_view(request, pk):
             # status, og den ser bilen ikke (§7.3) — bare at de er varslet.
             gjeldende = Statusmelding.objects.gjeldende_for_enhet(kobling)
             alle = (Statusmelding.objects.filter(oppdragsenhet=kobling)
+                    .select_related('oppdragsenhet__enhet', 'meldt_av')
                     .order_by('created_at'))
         else:
             gjeldende = Statusmelding.objects.gjeldende(oppdrag)
-            alle = Statusmelding.objects.filter(oppdrag=oppdrag).order_by('created_at')
+            alle = (Statusmelding.objects.filter(oppdrag=oppdrag)
+                    .select_related('oppdragsenhet__enhet', 'meldt_av')
+                    .order_by('created_at'))
         return JsonResponse({'status': 'ok', 'data': {
             **oppdrag_til_dict(oppdrag, for_enhet=er_enhetskonto(request.user),
                                koblingsrad=kobling),

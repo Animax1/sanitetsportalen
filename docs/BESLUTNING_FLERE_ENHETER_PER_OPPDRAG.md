@@ -207,6 +207,17 @@ detaljvisningen, og reglene finnes.
 - En manuell `Rykker ut` lukker **ikke** bilens andre pågående oppdrag slik
   bilens eget stempel gjør (§4.3): tidspunktet er fortid, og hva bilen gjorde siden
   er operatørens sak å føre.
+- **Én minutts slakk mot `created_at`** (`services.MINUTTSLAKK`), i både føring og
+  «Rett tid». Skjemaet er `datetime-local` med minuttoppløsning: «nå» rundet ned
+  ligger før et oppdrag opprettet sekunder tidligere, og røyktesten i nettleseren
+  fikk «Tidspunktet er før oppdraget ble opprettet» på en føring som var riktig.
+
+**Trinn 3 (samme dag):** knappene finnes. Detaljvisningen har en «Enheter»-seksjon
+med én rad per enhet — status med klokkeslett og tid siden — og «Før status»,
+«Gjenåpne» og «Ta av» der de kan brukes, «Varsle enhet til» under. «Nytt oppdrag»
+krysser av enheter i stedet for å velge én. Oppdragslista viser én brikke per enhet.
+Tidslinjen sier hvem sin melding når det er flere («KARM 12: Fremme»), og «ført av
+sentralen (adm)» på det operatøren førte.
 
 ## 8. Anslag
 

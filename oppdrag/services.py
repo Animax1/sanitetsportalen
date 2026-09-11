@@ -6,6 +6,8 @@ knapp som ikke vises er ikke en knapp som ikke kan trykkes.
 """
 from __future__ import annotations
 
+from datetime import timedelta
+
 from django.db import models, transaction
 from django.utils import timezone
 
@@ -436,6 +438,13 @@ def ta_av_enhet(oppdrag, enhet) -> None:
     oppdrag.save(update_fields=['status', 'enhet', 'updated_at'])
 
 
+#: Skjemaene (`datetime-local`) har minuttoppløsning. «Nå» avrundet ned til
+#: minuttet ligger før et oppdrag opprettet sekunder tidligere, og «før
+#: oppdraget ble opprettet» ville da avvist en føring som var riktig.
+#: Slakken er én minuttgrense, ikke mer — og bare mot `created_at`.
+MINUTTSLAKK = timedelta(minutes=1)
+
+
 class KorreksjonUgyldig(Exception):
     """Tidspunktet lar seg ikke rette til den oppgitte verdien."""
 
@@ -505,7 +514,7 @@ def valider_korreksjon(melding, nytt_tidspunkt, naa=None):
     if nytt_tidspunkt > naa:
         raise KorreksjonUgyldig('Tidspunktet kan ikke ligge i framtiden.')
 
-    if nytt_tidspunkt < melding.oppdrag.created_at:
+    if nytt_tidspunkt < melding.oppdrag.created_at - MINUTTSLAKK:
         raise KorreksjonUgyldig(
             'Tidspunktet er før oppdraget ble opprettet.')
 
@@ -615,7 +624,7 @@ def valider_foering(rad, ny_status: str, tidspunkt, naa=None) -> None:
             f'{choices.STATUS_NAVN.get(ny_status, ny_status)!r}.')
     if tidspunkt > naa:
         raise KorreksjonUgyldig('Tidspunktet kan ikke ligge i framtiden.')
-    if tidspunkt < rad.oppdrag.created_at:
+    if tidspunkt < rad.oppdrag.created_at - MINUTTSLAKK:
         raise KorreksjonUgyldig('Tidspunktet er før oppdraget ble opprettet.')
     egne = Statusmelding.objects.gjeldende_for_enhet(rad)
     if egne:
