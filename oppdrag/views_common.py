@@ -42,13 +42,37 @@ def er_enhetskonto(user) -> bool:
     return getattr(user, 'enhet', None) is not None
 
 
-def oppdrag_til_dict(oppdrag, *, for_enhet: bool = False) -> dict:
+def status_tidspunkt_for(oppdrag_liste) -> dict:
+    """``{oppdrag_id: iso-tidspunkt}`` for den gjeldende meldingen bak hvert
+    oppdrags nåværende status — «Fremme siden 14:32».
+
+    Én spørring for hele lista (`gjeldende_bulk`), ikke én per rad: sentralbordet
+    henter lista hvert 30. sekund. Oppdrag uten melding for statusen (venter,
+    før noen har stemplet) får ``None``, og klienten viser da bare tiden siden
+    opprettelse.
+    """
+    from .models import Statusmelding
+    meldinger = Statusmelding.objects.gjeldende_bulk([o.pk for o in oppdrag_liste])
+    ut = {}
+    for o in oppdrag_liste:
+        treff = [m for m in meldinger.get(o.pk, []) if m.status == o.status]
+        ut[o.pk] = treff[-1].tidspunkt.isoformat() if treff else None
+    return ut
+
+
+def oppdrag_til_dict(oppdrag, *, for_enhet: bool = False,
+                     status_tidspunkt=None) -> dict:
     """Serialiser ett oppdrag.
 
     ``for_enhet=True`` **utelater fritekst når oppdraget er avsluttet**. Det er
     en av de to skjulereglene, og den håndheves her — i serverens svar — ikke i
     nettleseren. Skjules teksten i JS, ligger den fortsatt i responsen, og en
     bil som blir stående ulåst er nettopp scenarioet regelen finnes for.
+
+    ``status_tidspunkt`` er når oppdraget fikk statusen det står i (fra
+    `status_tidspunkt_for`). Sentralbordet viser «tid siden» av den —
+    prosjektleder, 11. sep. 2026 — og den sendes bare der lista bygges, slik at
+    ett kall per rad ikke sniker seg inn via denne funksjonen.
     """
     data = {
         'id': oppdrag.pk,
@@ -64,6 +88,7 @@ def oppdrag_til_dict(oppdrag, *, for_enhet: bool = False) -> dict:
         'status': oppdrag.status,
         'status_navn': oppdrag.get_status_display(),
         'opprettet': oppdrag.created_at.isoformat(),
+        'status_tidspunkt': status_tidspunkt,
         'historikk_fra': (oppdrag.historikk_fra.isoformat()
                           if oppdrag.historikk_fra else None),
     }

@@ -725,7 +725,13 @@ function mkGruppe(gruppe) {
       </div>
     </div>`;
 
-  return hode + mkGruppekurve(gruppe) + ressurser.map(mkRessurs).join('');
+  // **I drift står kurven nederst** (prosjektleder, 11. sep. 2026). I
+  // planlegging er kurven det man ser først — hullene er jobben. I drift er
+  // spørsmålet «hvem har møtt?», og da skal stemplene stå øverst; kurven er
+  // fortsatt der, for den som vil se resten av vakta, men under.
+  const kurve = mkGruppekurve(gruppe);
+  const kort = ressurser.map(mkRessurs).join('');
+  return hode + (iDrift() ? kort + kurve : kurve + kort);
 }
 
 
@@ -2599,9 +2605,12 @@ function mkMannskap() {
     // Hele settet ligger i `title`, så «har hun egentlig VFØR?» kan besvares
     // uten å åpne skjemaet.
     const alle = (m.alle_kompetanser || []).map((k) => k.navn).join(', ');
-    const merker = m.kompetanser.length
-      ? m.kompetanser.map((k) =>
-          `<span class="vl-merkelapp">${escapeHtml(k.navn)}</span>`).join('')
+    // Merkelappene ligger i en wrapper, ikke rett i cella: `display: flex`
+    // på en `<td>` tar cella ut av tabellens boksmodell (se stilarket).
+    const merkelapper = m.kompetanser.map((k) =>
+      `<span class="vl-merkelapp">${escapeHtml(k.navn)}</span>`).join('');
+    const merker = merkelapper
+      ? `<div class="vlr-kompliste">${merkelapper}</div>`
       : '<span class="vl-meta">—</span>';
 
     // Ikoner, ikke tekst: to tekstknapper trenger ~150px og sprengte

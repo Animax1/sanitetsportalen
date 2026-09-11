@@ -413,6 +413,7 @@ REGISTER_REVIEWED = {
     'inaktiv': 'hardkodet CSS-klasse fra en ternær',
     'inaktivMerke': 'markup bygget lokalt, ingen data i seg',
     'merker': 'markup bygget lokalt, kompetansenavnene escapet inni',
+    'merkelapper': 'markup bygget lokalt, hvert kompetansenavn escapet inni',
     'konto': 'markup bygget lokalt, brukernavnet escapet inni',
     'tlf': 'markup bygget lokalt, telefonnummeret escapet inni',
     'kort': 'markup bygget lokalt, kortnavnet escapet inni',
@@ -616,9 +617,14 @@ class MannskapstabellensLayoutTests(SimpleTestCase):
                          f'andelene skal summere til 100, fikk {andeler}')
 
     def test_kompetansecella_bryter_framfor_aa_flyte_ut(self):
+        """Brytningen ligger på wrapperen *inne* i cella (11. sep. 2026) —
+        `display: flex` rett på `<td>`-en var det som tok kompetansekolonnen
+        ut av kolonnesporet. `TabellcellersLayoutTests` vokter det siste."""
         css = self._css()
-        blokk = css[css.index('.vlr-komp {'):css.index('.vlr-handling {')]
+        blokk = css[css.index('.vlr-kompliste {'):css.index('.vlr-handling {')]
         self.assertIn('flex-wrap: wrap', blokk)
+        kropp = extract_function(read_js(VAKTLISTE_JS), 'mkMannskap')
+        self.assertIn('<div class="vlr-kompliste">', kropp)
 
 
 class TidsvisningTests(SimpleTestCase):
@@ -1001,7 +1007,11 @@ class TabellcellersLayoutTests(SimpleTestCase):
         tre byggere siden 11. sep. 2026, og alle tre leses."""
         src = read_js(VAKTLISTE_JS)
         klasser = set()
-        for navn in ('mkRessurs', '_planrad', '_driftrad', '_blokklinje'):
+        # `mkMannskap` er med fra 11. sep. 2026: `.vlr-komp` hadde nettopp
+        # denne feilen, og testen fant den ikke fordi den bare leste
+        # ressurstabellen.
+        for navn in ('mkRessurs', '_planrad', '_driftrad', '_blokklinje',
+                     'mkMannskap'):
             for treff in re.findall(r'<td class="([^"$]*)"',
                                     extract_function(src, navn)):
                 klasser.update(treff.split())
@@ -1654,7 +1664,7 @@ class FanenErGruppaTests(SimpleTestCase):
                         '_rolleValg', '_skiftrekkefolge', '_fyllValgFor',
                         '_varighet', '_skifttimer', '_tall', '_planrad',
                         '_tidsblokker', '_blokklinje', '_tidsspenn', '_telling',
-                        '_sammeDag', 'mkGruppekurve', '_mkEnKurve',
+                        '_sammeDag', '_driftrad', 'mkGruppekurve', '_mkEnKurve',
                         '_tegnforklaring', '_timesteg', '_toppunkt',
                         '_posterPerGruppe', '_vaktensSpenn',
                         '_posterIGruppe', '_plassKorps',
@@ -1798,6 +1808,18 @@ class FanenErGruppaTests(SimpleTestCase):
         self.assertIn('vl-kurve', ut)
         self.assertLess(ut.index('vl-kurve'), ut.index('Ambulanse 1'),
                         'kurven summerer ressursene under seg')
+
+    def test_i_drift_staar_kurven_under_ressursene(self):
+        """Prosjektleder, 11. sep. 2026: «ved driftsmodus skal
+        bemanningskurver til bunn». Stemplene er jobben da; kurven er
+        fortsatt der, men under."""
+        ut = run_node(self.harness, self.VINDU + self.LISTE + """
+            aktivListe.vaktliste.i_drift = true;
+            console.log(mkGruppe({id: 2, navn: 'Ambulanse'}));
+        """)
+        self.assertIn('vl-kurve', ut, 'kurven skal fortsatt tegnes')
+        self.assertGreater(ut.index('vl-kurve'), ut.index('Ambulanse 2'),
+                           'i drift står kurven under den siste ressursen')
 
     def test_enhetskoblingen_staar_paa_ressursen_i_fanen(self):
         """Koblingen til oppdragsmodulen er per bil, ikke per gruppe — den

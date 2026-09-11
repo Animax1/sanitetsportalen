@@ -147,6 +147,36 @@ ingen av dem gir feilmelding — de er bare stille inaktive.
                   `les` ser nå bare sitt eget korps — den som skal samordne må
                   få `les_alle`. Og kontoer med `les`/`skriv_handling` uten
                   mannskapsrad ser ingenting til de er koblet.
+      - [x] **Prosjektleders runde 1** (samme dag): kompetanse-cella,
+            kurven ned i drift, «Oppdragsliste», enhetskortet med oppdrag og
+            tidsstempel, «tid siden» på oppdragslista.
+
+- [ ] **Prosjektleders tilbakemeldinger — resten** (planlagt 11. sep. 2026,
+      rekkefølgen er avtalt med André):
+      - [ ] **Avreist til** som valg: Samleplass, Skadepol, Legevakt, Sykehus,
+            Annen ambulanse, Annet sted. Stedet i URL-en
+            (`stempling/avreist/<sted>/`), lagret på statusmeldingen.
+            Sentralbordet viser «Avreist → Sykehus 14:41».
+      - [ ] **Grovsortering Rød/Gul/Grønn på oppdraget**, satt av bilen — ved
+            siden av hastegrad fra KO/AMK, ikke i stedet for. Venstre: «AMK:
+            Haster», høyre: «Bil: Rød» som fargeprikk; tom («—») til bilen har
+            satt den. Bilen setter den via URL (`grovsortering/<rod|gul|gronn>/`).
+      - [ ] **Probono-skift**: avkryssing på skiftet, redigerbar av alle som
+            kan redigere raden. Telles ikke i timesummene; telles fortsatt i
+            lengste skift og korteste hvile.
+      - [ ] **Dagoverskrifter** over blokkene («Fredag 2. okt») når vakta
+            spenner over mer enn én dag; starttid bestemmer dagen.
+      - [ ] **«Mitt korps»-fane**: plassene korpset har ansvar for på tvers av
+            ressurser — «4 plasser å dekke» øverst. Krever tre tilstander på
+            plassen: tildelt korps / tildelt alle (`alle_korps`) / utildelt.
+            Korps-brukeren får fylle egne og universale; utildelte deles ikke ut.
+            Tildeling er `skriv_full`.
+      - [ ] **Flere enheter på ett oppdrag** — egen fase med beslutningsnotat
+            først. `Oppdragsenhet(oppdrag, enhet, varslet_at)`, statusmeldinger
+            per enhet, sentralbordet ser matrisen, bilen ser hvem som er varslet
+            men ikke deres status. Datamigrasjon (0007-mønsteret, prøve, backup),
+            arkivsignaturene må verifisere som før, statistikken per enhet.
+            «Dupliser oppdrag» droppes til fordel for denne.
       - [ ] **Stripe på blokklinja** (mini-Gantt over vaktas spenn) — alternativ
             «Begge deler» i spørsmålet 11. sep.; valgt bort for nå, lett å
             legge til siden blokka alt bærer spennet.

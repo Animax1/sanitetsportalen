@@ -63,6 +63,16 @@ REVIEWED_INTERPOLATIONS = {
     # Besetningspanelet (vaktliste fase 6). Alle tre er hoistet ut av
     # mal-strengen av samme grunn som `fritekstBlokk` over.
     'klikkbar': 'hardkodet CSS-klasse fra en ternær',
+    # Enhetskortet med oppdragsinfo og tid siden (11. sep. 2026):
+    'oppdragslinje': 'markup bygget lokalt, nummer/hastegrad/problemstilling escapet inni',
+    'statusTid': 'ren tekst av klokkeslett og minutter, bygger `meta` som escapes ved innsetting',
+    'e.status_navn}${statusTid': 'ren tekst: statusnavn og tid, i `meta` som escapes ved innsetting',
+    'tidSiden(e.status_tidspunkt)': 'tall og «min», i ren tekst som escapes ved innsetting',
+    'klokke(e.status_tidspunkt)': 'klokkeslett fra en Date, i ren tekst som escapes ved innsetting',
+    'o.status_navn': 'bygger ren tekst i `statusTekst`, som escapes ved innsetting',
+    'tidSiden(o.status_tidspunkt)': 'tall og «min», i ren tekst som escapes ved innsetting',
+    'tidSiden(o.opprettet)': 'samme',
+    'klokke(o.opprettet)': 'klokkeslett fra en Date, i ren tekst som escapes ved innsetting',
     'apner': 'markup bygget lokalt, enhets-id escapet inni',
     'besetning': 'markup bygget lokalt av mkBesetning(), som selv skannes her',
     'merke': 'hardkodet markup fra en ternær, ingen data i seg',
@@ -157,7 +167,7 @@ class OppdragEscapingOppforselTests(SimpleTestCase):
                            'klokke')),
         (OPPDRAG_SENTRAL_JS, ('renderOppdrag', 'renderEnheter', 'tidslinjeHtml',
                               'hastegradKlasse', 'mkBesetning',
-                              'kanSeBesetning')),
+                              'kanSeBesetning', 'tidSiden')),
     )
 
     #: Besetningspanelet leser to globaler som ellers settes ved sidelasting.
@@ -297,3 +307,115 @@ class EnhetEscapingOppforselTests(SimpleTestCase):
             }]}));
         ''')
         self.assertNotIn('<script>x', ut)
+
+
+class EnhetskortetTests(SimpleTestCase):
+    """Enhetskortet i sentralbordet: oppdraget i ett blikk, og tid siden.
+
+    Prosjektleder, 11. sep. 2026: «på ressurser ikke bare vise status men og
+    oppdragsnummer, hastegrad, problemstilling, og på statusen så må
+    tidsstemplet og vise. For det handler om å kjapt skaffe oversikt.» Og:
+    «tidspunkt siden oppdrag».
+    """
+
+    HARNESS = OppdragEscapingOppforselTests.HARNESS
+    STUBB = OppdragEscapingOppforselTests.BESETNING_STUBB
+
+    def setUp(self):
+        if not node_available():
+            self.skipTest('node er ikke tilgjengelig')
+        self.harness = build_harness(self.HARNESS)
+
+    def _kort(self, enhet):
+        import json
+        return run_node(self.harness, self.STUBB + f"""
+            globalThis.enheter = [{json.dumps(enhet)}];
+            const el = {{ innerHTML: '' }};
+            globalThis.document = {{ getElementById: () => el }};
+            renderEnheter();
+            console.log(el.innerHTML);
+        """)
+
+    #: Tidspunktet er relativt til nå: en fast dato ville ligget i framtida
+    #: når testen kjøres før den — og da sier `tidSiden` «nå».
+    @property
+    def AKTIV(self):
+        from datetime import datetime, timedelta, timezone
+        for_12_min_siden = datetime.now(timezone.utc) - timedelta(minutes=12)
+        return {'id': 1, 'navn': 'HGSD 56', 'status': 'fremme', 'pa_vakt': True,
+                'status_navn': 'Fremme', 'antall_ventende': 0,
+                'oppdragsnummer': 12, 'hastegrad': 'Haster',
+                'problemstilling': 'Fallskade',
+                'status_tidspunkt': for_12_min_siden.isoformat()}
+
+    def test_kortet_viser_oppdraget(self):
+        ut = self._kort(self.AKTIV)
+        self.assertIn('#12', ut)
+        self.assertIn('Haster', ut)
+        self.assertIn('Fallskade', ut)
+        self.assertIn('hastegrad-haster', ut)
+
+    def test_statusen_har_klokkeslett_og_tid_siden(self):
+        ut = self._kort(self.AKTIV)
+        self.assertIn('Fremme', ut)
+        self.assertRegex(ut, r'Fremme \d\d:\d\d · 12 min')
+
+    def test_ledig_enhet_har_ingen_oppdragslinje(self):
+        ut = self._kort({'id': 1, 'navn': 'E1', 'status': 'ledig', 'pa_vakt': True,
+                         'status_navn': 'Ledig', 'antall_ventende': 0,
+                         'oppdragsnummer': None, 'hastegrad': None,
+                         'problemstilling': None, 'status_tidspunkt': None})
+        self.assertNotIn('enhet-oppdrag', ut)
+        self.assertIn('>Ledig<', ut)
+
+    def test_problemstilling_escapes(self):
+        ut = self._kort({**self.AKTIV, 'problemstilling': '<img src=x onerror=alert(1)>'})
+        self.assertNotIn('<img src=x', ut)
+        self.assertIn('&lt;img', ut)
+
+    def test_tid_siden(self):
+        run_node(self.harness, """
+            const naa = Date.parse('2026-10-03T12:00:00Z');
+            const ved = (min) => new Date(naa - min * 60000).toISOString();
+            assert(tidSiden(ved(0), naa) === 'nå', 'null minutter er naa');
+            assert(tidSiden(ved(0.5), naa) === 'nå', 'under ett minutt er naa');
+            assert(tidSiden(ved(12), naa) === '12 min', tidSiden(ved(12), naa));
+            assert(tidSiden(ved(65), naa) === '1 t 05 min', tidSiden(ved(65), naa));
+            assert(tidSiden(ved(180), naa) === '3 t 00 min', tidSiden(ved(180), naa));
+            assert(tidSiden(null, naa) === '', 'tomt gir tomt');
+            assert(tidSiden('ikke en dato', naa) === '', 'ugyldig gir tomt');
+        """)
+
+    def test_oppdragsraden_viser_tid_i_status_og_siden_opprettet(self):
+        ut = run_node(self.harness, """
+            globalThis.oppdragsliste = [{
+              id: 1, status: 'fremme', status_navn: 'Fremme',
+              enhet_navn: 'E1', lokasjon_navn: 'Scene', nummer: 12,
+              problemstilling: 'Fallskade', hastegrad: 'Haster',
+              opprettet: new Date(Date.now() - 31 * 60000).toISOString(),
+              status_tidspunkt: new Date(Date.now() - 12 * 60000).toISOString(),
+              fritekst: ''
+            }];
+            const el = { innerHTML: '' };
+            globalThis.document = { getElementById: () => el };
+            renderOppdrag();
+            console.log(el.innerHTML);
+        """)
+        self.assertIn('Fremme · 12 min', ut)
+        self.assertIn('31 min siden', ut)
+
+    def test_oppdrag_uten_statusmelding_viser_bare_ordet(self):
+        ut = run_node(self.harness, """
+            globalThis.oppdragsliste = [{
+              id: 1, status: 'venter', status_navn: 'Venter',
+              enhet_navn: 'E1', lokasjon_navn: 'Scene', nummer: 12,
+              problemstilling: 'Fallskade', hastegrad: 'Haster',
+              opprettet: new Date().toISOString(), status_tidspunkt: null,
+              fritekst: ''
+            }];
+            const el = { innerHTML: '' };
+            globalThis.document = { getElementById: () => el };
+            renderOppdrag();
+            console.log(el.innerHTML);
+        """)
+        self.assertIn('>Venter<', ut)

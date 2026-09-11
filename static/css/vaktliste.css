@@ -287,14 +287,22 @@
 }
 
 /* Kompetansene brytes til flere linjer i sin egen celle. Raden blir høyere;
-   kolonnene står stille — det er den byttehandelen vi vil ha. */
-.vlr-komp {
+   kolonnene står stille — det er den byttehandelen vi vil ha.
+
+   **Layouten ligger på en wrapper inne i cella, ikke på `<td>`-en.** Fram til
+   11. sep. 2026 sto `display: flex` rett på `.vlr-komp`, og da sluttet cella
+   å være en `table-cell`: den falt ut av kolonnesporet, og kolonnene etter
+   forskjøv seg i forhold til overskriftene — «kompetanse detter fra
+   kolonne–rad-matchingen», som prosjektleder skrev. Samme feil som
+   ressurstabellen hadde 30. aug.; `TabellcellersLayoutTests` leser nå denne
+   tabellen også. */
+.vlr-kompliste {
   display: flex;
   flex-wrap: wrap;
   gap: 0.2rem;
 }
 
-.vlr-komp .vl-merkelapp {
+.vlr-kompliste .vl-merkelapp {
   flex: 0 0 auto;
 }
 

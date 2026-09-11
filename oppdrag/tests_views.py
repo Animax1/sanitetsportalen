@@ -1383,3 +1383,95 @@ class EnhetKjedeDataTests(StemplingBasis):
         """Den finnes for offline-køen, og sentralbordet har ingen kø."""
         c = _klient(_bruker('sentral_kjede', 'skriv_full'))
         self.assertNotIn('OPPDRAG_NESTE', c.get('/oppdrag/').content.decode())
+
+
+class EnhetskortetsOppdragsfelterTests(OppdragBasis):
+    """Enhetslista bærer det aktive oppdraget og når statusen ble satt
+    (prosjektleder, 11. sep. 2026: «kjapt skaffe oversikt»)."""
+
+    def _enhet_rad(self, klient=None):
+        c = klient or _klient(_bruker('sentral_kort', 'les'))
+        data = c.get('/oppdrag/api/enheter/').json()['data']
+        return next(r for r in data if r['id'] == self.enhet.pk)
+
+    def test_ledig_enhet_har_tomme_felter(self):
+        rad = self._enhet_rad()
+        self.assertIsNone(rad['oppdragsnummer'])
+        self.assertIsNone(rad['status_tidspunkt'])
+        self.assertIsNone(rad['problemstilling'])
+
+    def test_aktiv_enhet_baerer_oppdraget_og_statustidspunktet(self):
+        oppdrag = self._oppdrag(self.enhet)
+        services.sett_status(oppdrag, choices.RYKKER_UT)
+        melding = services.sett_status(oppdrag, choices.FREMME)
+        rad = self._enhet_rad()
+        self.assertEqual(rad['oppdragsnummer'], oppdrag.oppdragsnummer)
+        self.assertEqual(rad['hastegrad'], 'Akutt')
+        self.assertEqual(rad['problemstilling'], 'Pustevansker')
+        self.assertEqual(rad['status'], choices.FREMME)
+        self.assertEqual(rad['status_tidspunkt'], melding.tidspunkt.isoformat())
+
+    def test_rettet_tid_endrer_etag(self):
+        """«Rett tid» endrer tidspunktet uten å røre statusen — og skal ikke
+        drukne i en 304."""
+        oppdrag = self._oppdrag(self.enhet)
+        services.sett_status(oppdrag, choices.RYKKER_UT)
+        c = _klient(_bruker('sentral_etag', 'les'))
+        etag = c.get('/oppdrag/api/enheter/')['ETag']
+        # En korreksjon: ny rad som peker på den gamle, ett minutt tidligere.
+        gammel = Statusmelding.objects.gjeldende_for_status(oppdrag, choices.RYKKER_UT)
+        Statusmelding.objects.create(
+            oppdrag=oppdrag, status=choices.RYKKER_UT,
+            tidspunkt=gammel.tidspunkt - timedelta(minutes=1), korrigerer=gammel)
+        self.assertEqual(
+            c.get('/oppdrag/api/enheter/', HTTP_IF_NONE_MATCH=etag).status_code, 200)
+
+
+class OppdragslistaStatustidspunktTests(OppdragBasis):
+    """Oppdragslista bærer når statusen ble satt — «Fremme · 12 min»."""
+
+    def _liste(self):
+        c = _klient(_bruker('sentral_liste', 'les'))
+        return c.get('/oppdrag/api/oppdrag/').json()['data']
+
+    def test_venter_har_ingen_melding_bak_seg(self):
+        self._oppdrag(self.enhet)
+        self.assertIsNone(self._liste()[0]['status_tidspunkt'])
+
+    def test_statusen_baerer_sin_meldings_tidspunkt(self):
+        oppdrag = self._oppdrag(self.enhet)
+        services.sett_status(oppdrag, choices.RYKKER_UT)
+        melding = services.sett_status(oppdrag, choices.FREMME)
+        rad = next(r for r in self._liste() if r['id'] == oppdrag.pk)
+        self.assertEqual(rad['status_tidspunkt'], melding.tidspunkt.isoformat())
+
+    def test_korrigert_tidspunkt_vinner(self):
+        """Den gjeldende meldingen, ikke den første — en retting skal synes."""
+        oppdrag = self._oppdrag(self.enhet)
+        gammel = services.sett_status(oppdrag, choices.RYKKER_UT)
+        ny_tid = gammel.tidspunkt - timedelta(minutes=5)
+        Statusmelding.objects.create(
+            oppdrag=oppdrag, status=choices.RYKKER_UT,
+            tidspunkt=ny_tid, korrigerer=gammel)
+        rad = next(r for r in self._liste() if r['id'] == oppdrag.pk)
+        self.assertEqual(rad['status_tidspunkt'], ny_tid.isoformat())
+
+    def test_antall_sporringer_vokser_ikke_med_lista(self):
+        """Sentralbordet henter lista hvert 30. sekund; ett kall per rad hadde
+        vært N+1 på den travleste sida i portalen. Regelen, ikke tallet: like
+        mange spørringer for to rader som for seks."""
+        from django.db import connection
+        from django.test.utils import CaptureQueriesContext
+        c = _klient(_bruker('sentral_n1', 'les'))
+
+        def antall():
+            with CaptureQueriesContext(connection) as ctx:
+                c.get('/oppdrag/api/oppdrag/')
+            return len(ctx)
+
+        for _ in range(2):
+            services.sett_status(self._oppdrag(self.enhet), choices.RYKKER_UT)
+        med_to = antall()
+        for _ in range(4):
+            services.sett_status(self._oppdrag(self.enhet), choices.RYKKER_UT)
+        self.assertEqual(antall(), med_to, 'spørringene vokser med radene')

@@ -4,7 +4,32 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
-## 2026-09-11 — Korpsfilteret: `les` og `skriv_handling` ser sitt eget korps
+## 2026-09-11 — Prosjektleders tilbakemeldinger, runde 1: fem små
+
+**2033 tester grønne** (15 nye). Fem av elleve punkter fra prosjektleder —
+de som var klare og små. Resten står i TODO med plan.
+
+- **Kompetansekolonnen i Mannskap «detter fra kolonne–rad-matchingen».**
+  Bekreftet: `.vlr-komp` satte `display: flex` rett på `<td>`-en — samme feil
+  som ressurstabellen hadde 30. aug. Layouten ligger nå på en wrapper inne i
+  cella, og `TabellcellersLayoutTests` leser mannskapstabellen også; den
+  hadde funnet feilen om den hadde lest den.
+- **Bemanningskurven står nederst i drift.** I planlegging er hullene jobben
+  og kurven det første man ser; i drift er spørsmålet «hvem har møtt», og
+  stemplene står øverst.
+- **«Oppdrag i vakta» heter «Oppdragsliste».**
+- **Enhetskortet i sentralbordet viser oppdraget i ett blikk**: nummer,
+  hastegrad, problemstilling — og statusen med klokkeslett og tid siden,
+  «Fremme 14:32 · 12 min». Enhetslista bærer feltene fra serveren
+  (`_aktivt_oppdrag_felter`), og statustidspunktet er med i ETag-en: «Rett
+  tid» endrer det uten å røre statusen.
+- **«Tid siden» på oppdragslista**: «Fremme · 12 min» og «14:20 · 31 min
+  siden». `status_tidspunkt_for()` finner den gjeldende meldingen bak hvert
+  oppdrags status i én spørring for hele lista (`gjeldende_bulk`) — testen
+  krever at antall spørringer ikke vokser med radene. Klienten tegner lista
+  på nytt én gang i minuttet, siden serveren svarer 304 når ingenting er
+  endret og «12 min» ellers ville stått stille.
+
 
 André: «de med rollen skrive eget korps ser bare de som er med i sitt eget
 korps, og samme med de som bare har lesetilgang — gjelder bare /vaktliste/».

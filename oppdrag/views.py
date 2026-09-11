@@ -31,7 +31,7 @@ from .choices import validate_oppdrag_choice_fields
 from .models import Enhet, Lokasjon, Oppdrag, Statusmelding
 from .views_common import (
     bytte_til_dict, er_enhetskonto, etag_for, json_body, melding_til_dict,
-    oppdrag_til_dict,
+    oppdrag_til_dict, status_tidspunkt_for,
 )
 
 
@@ -82,6 +82,21 @@ def index_view(request):
 
 # ── Enheter ──────────────────────────────────────────────────────────────────
 
+def _aktivt_oppdrag_felter(oppdrag):
+    """Feltene enhetskortet viser om det aktive oppdraget — alle ``None``
+    når det ikke finnes noe, slik at kortet kan lese dem uten å spørre."""
+    if oppdrag is None:
+        return {'oppdragsnummer': None, 'hastegrad': None,
+                'problemstilling': None, 'status_tidspunkt': None}
+    melding = Statusmelding.objects.gjeldende_for_status(oppdrag, oppdrag.status)
+    return {
+        'oppdragsnummer': oppdrag.oppdragsnummer,
+        'hastegrad': oppdrag.hastegrad,
+        'problemstilling': oppdrag.problemstilling,
+        'status_tidspunkt': melding.tidspunkt.isoformat() if melding else None,
+    }
+
+
 @never_cache
 @modul_kreves('oppdrag', 'les', svar='json')
 @require_http_methods(['GET'])
@@ -114,6 +129,11 @@ def enheter_view(request):
             'antall_ventende': info['antall_ventende'],
             'aktivt_oppdrag_id': (
                 info['aktivt_oppdrag'].pk if info['aktivt_oppdrag'] else None),
+            # Det aktive oppdraget i ett blikk (prosjektleder, 11. sep.
+            # 2026): «det handler om å kjapt skaffe oversikt». Nummer,
+            # hastegrad, problemstilling og *når* statusen ble satt — uten
+            # å åpne oppdraget. Tomt når enheten er ledig.
+            **_aktivt_oppdrag_felter(info['aktivt_oppdrag']),
         }
         for e, info in ((e, services.enhet_status(e, vakt)) for e in enheter)
     ]
@@ -123,7 +143,7 @@ def enheter_view(request):
     # tavla er en bil ingen husker å sette inn igjen.
     etag = etag_for([
         (r['id'], r['status'], r['antall_ventende'], r['aktivt_oppdrag_id'],
-         r['pa_vakt'], r['er_aktiv'])
+         r['pa_vakt'], r['er_aktiv'], r['status_tidspunkt'])
         for r in data
     ])
     if request.META.get('HTTP_IF_NONE_MATCH') == etag:
@@ -290,8 +310,11 @@ def oppdrag_liste_view(request):
             # avsluttede, uten et kall per rad. Få rader — egne, i vakta,
             # innenfor 30-minuttersvinduet — så N+1 her er N liten.
             data = []
-            for o in services.synlige_for_enhet(request.user.enhet, vakt):
-                rad = oppdrag_til_dict(o, for_enhet=True)
+            egne = list(services.synlige_for_enhet(request.user.enhet, vakt))
+            status_tid = status_tidspunkt_for(egne)
+            for o in egne:
+                rad = oppdrag_til_dict(o, for_enhet=True,
+                                       status_tidspunkt=status_tid.get(o.pk))
                 rad['statusmeldinger'] = [
                     melding_til_dict(m)
                     for m in Statusmelding.objects.gjeldende(o)
@@ -307,10 +330,15 @@ def oppdrag_liste_view(request):
         else:
             # Ferdigstilte er ute av den aktive lista. De er ikke borte —
             # de ligger i `historikk_liste_view`, søkbare på nummer.
-            qs = (Oppdrag.objects.filter(vakt=vakt, historikk_fra__isnull=True)
-                  .select_related('enhet', 'lokasjon').order_by('-created_at'))
-            data = [oppdrag_til_dict(o) for o in qs]
-            etag_rader = [(r['id'], r['status'], r['enhet_id']) for r in data]
+            qs = list(Oppdrag.objects.filter(vakt=vakt, historikk_fra__isnull=True)
+                      .select_related('enhet', 'lokasjon').order_by('-created_at'))
+            status_tid = status_tidspunkt_for(qs)
+            data = [oppdrag_til_dict(o, status_tidspunkt=status_tid.get(o.pk))
+                    for o in qs]
+            # Tidspunktet er med i ETag-en: «Rett tid» endrer det uten å røre
+            # statusen, og «12 min i Fremme» skal ikke drukne i en 304.
+            etag_rader = [(r['id'], r['status'], r['enhet_id'], r['status_tidspunkt'])
+                          for r in data]
 
         etag = etag_for(etag_rader)
         if request.META.get('HTTP_IF_NONE_MATCH') == etag:

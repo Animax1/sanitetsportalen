@@ -42,6 +42,22 @@
   color: var(--text-muted);
 }
 
+/* Det aktive oppdraget på enhetskortet: nummer, hastegrad, problemstilling.
+   Prosjektleder, 11. sep. 2026 — «kjapt skaffe oversikt» uten å åpne noe. */
+.enhet-oppdrag {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+  font-size: 0.82rem;
+  margin-top: 0.2rem;
+}
+
+.enhet-oppdrag-problem {
+  color: var(--text-main);
+  overflow-wrap: anywhere;
+}
+
 /* Statusprikken bærer ikke informasjon alene — statusteksten står ved siden
  * av. Farge alene ville brutt WCAG 1.4.1. */
 .status-prikk {

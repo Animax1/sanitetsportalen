@@ -40,6 +40,23 @@ function hastegradKlasse(h) {
 }
 
 
+function tidSiden(iso, naa) {
+  // «12 min», «1 t 05 min» — hvor lenge siden et tidspunkt. Prosjektleder,
+  // 11. sep. 2026: «tidspunkt siden oppdrag». Klokkeslettet står der alt;
+  // dette er tallet man ellers regner ut i hodet, og det er det som sier om
+  // bilen har stått lenge i Fremme. Under et minutt er «nå», ikke «0 min».
+  if (!iso) return '';
+  const t = new Date(iso).getTime();
+  if (!Number.isFinite(t)) return '';
+  const min = Math.floor(((naa ?? Date.now()) - t) / 60000);
+  if (min < 1) return 'nå';
+  if (min < 60) return `${min} min`;
+  const h = Math.floor(min / 60);
+  const rest = min % 60;
+  return `${h} t ${String(rest).padStart(2, '0')} min`;
+}
+
+
 // ── Enhetsliste ─────────────────────────────────────────
 
 function renderEnheter() {
@@ -57,9 +74,23 @@ function renderEnheter() {
     el.innerHTML = (paVakt.map((e) => {
       // «Ledig (2 venter)» er distinksjonen 113 trenger: enheten har fått
       // oppdrag, men ikke rykket ut, og kan fortsatt sendes.
+      // Statusen med klokkeslett og tid siden: «Fremme 14:32 · 12 min».
+      // Prosjektleder, 11. sep. 2026 — «på statusen så må tidsstemplet og
+      // vise». Ledig har ingen melding bak seg, så der står bare ordet.
+      const statusTid = e.status_tidspunkt
+        ? ` ${klokke(e.status_tidspunkt)} · ${tidSiden(e.status_tidspunkt)}` : '';
       const meta = e.antall_ventende
-        ? `${e.status_navn} · ${e.antall_ventende} venter`
-        : String(e.status_navn);
+        ? `${e.status_navn}${statusTid} · ${e.antall_ventende} venter`
+        : `${e.status_navn}${statusTid}`;
+      // Det aktive oppdraget i ett blikk: nummer, hastegrad, problemstilling.
+      // Hoistet ut av mal-strengen, som resten.
+      const oppdragslinje = e.oppdragsnummer != null
+        ? `<div class="enhet-oppdrag">
+             <span class="oppdrag-nr">#${escHtmlValue(e.oppdragsnummer)}</span>
+             <span class="hastegrad ${escHtmlValue(hastegradKlasse(e.hastegrad))}">${escapeHtml(e.hastegrad || '')}</span>
+             <span class="enhet-oppdrag-problem">${escapeHtml(e.problemstilling || '')}</span>
+           </div>`
+        : '';
       // Hoistet ut av mal-strengen: en nøstet mal-streng inne i en `${...}`
       // er usynlig for XSS-skanneren i tests_xss.py, og vanskelig å lese.
       const klikkbar = kanSeBesetning() ? ' enhet-kort-klikkbar' : '';
@@ -72,6 +103,7 @@ function renderEnheter() {
         <div class="flex-grow-1">
           <div class="enhet-navn">${escapeHtml(e.navn)}</div>
           <div class="enhet-meta">${escapeHtml(meta)}</div>
+          ${oppdragslinje}
         </div>
       </div>${besetning}`;
     }).join(''));
@@ -206,6 +238,12 @@ function renderOppdrag() {
     const fritekstBlokk = o.fritekst
       ? `<div class="oppdrag-fritekst">${escapeHtml(o.fritekst)}</div>`
       : '';
+    // «Fremme · 12 min» og «14:20 · 31 min siden» — ren tekst, escapet ved
+    // innsetting. Uten statusmelding (venter) står bare ordet.
+    const statusTekst = o.status_tidspunkt
+      ? `${o.status_navn} · ${tidSiden(o.status_tidspunkt)}`
+      : String(o.status_navn);
+    const opprettetTekst = `${klokke(o.opprettet)} · ${tidSiden(o.opprettet)} siden`;
     return `
     <div class="oppdrag-rad" data-action="visOppdrag" data-id="${escHtmlValue(o.id)}"
          role="button" tabindex="0">
@@ -215,11 +253,11 @@ function renderOppdrag() {
         <span class="oppdrag-problem">${escapeHtml(o.problemstilling)}</span>
         <span class="ms-auto d-flex align-items-center gap-1">
           <span class="status-prikk status-${escHtmlValue(o.status)}"></span>
-          <span class="oppdrag-meta">${escapeHtml(o.status_navn)}</span>
+          <span class="oppdrag-meta">${escapeHtml(statusTekst)}</span>
         </span>
       </div>
       <div class="oppdrag-meta mt-1">
-        ${escapeHtml(o.enhet_navn)} · ${escapeHtml(o.lokasjon_navn)} · ${escapeHtml(klokke(o.opprettet))}
+        ${escapeHtml(o.enhet_navn)} · ${escapeHtml(o.lokasjon_navn)} · ${escapeHtml(opprettetTekst)}
       </div>
       ${fritekstBlokk}
     </div>`;
@@ -862,4 +900,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Samme kadens som pasientlista. ETag gjør at et poll uten endring koster
   // en 304 uten kropp.
   setInterval(lastAlt, 30000);
+  // «12 min siden» eldes uten at serveren sier noe — lista svarer 304 når
+  // ingenting er endret. Én tegning i minuttet holder tallene ærlige.
+  setInterval(() => { renderOppdrag(); renderEnheter(); }, 60000);
 });
