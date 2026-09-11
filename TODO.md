@@ -168,12 +168,10 @@ ingen av dem gir feilmelding — de er bare stille inaktive.
       - [x] **«Mitt korps»-fane** (11. sep. 2026): `Vaktpost.alle_korps`,
             `0012`. Tre tilstander på plassen; fanen viser tildelte og
             universale, ledige først, med «N plasser å dekke».
-      - [ ] **Flere enheter på ett oppdrag** — egen fase med beslutningsnotat
-            først. `Oppdragsenhet(oppdrag, enhet, varslet_at)`, statusmeldinger
-            per enhet, sentralbordet ser matrisen, bilen ser hvem som er varslet
-            men ikke deres status. Datamigrasjon (0007-mønsteret, prøve, backup),
-            arkivsignaturene må verifisere som før, statistikken per enhet.
-            «Dupliser oppdrag» droppes til fordel for denne.
+      - [ ] **Flere enheter på ett oppdrag** — notat skrevet 11. sep. 2026:
+            `docs/BESLUTNING_FLERE_ENHETER_PER_OPPDRAG.md`. **Venter på svar på
+            §7.1–7.4** før kode. Anslag to dager i fire trinn; backup før deploy.
+            «Dupliser oppdrag» droppet til fordel for denne.
       - [ ] **Stripe på blokklinja** (mini-Gantt over vaktas spenn) — alternativ
             «Begge deler» i spørsmålet 11. sep.; valgt bort for nå, lett å
             legge til siden blokka alt bærer spennet.

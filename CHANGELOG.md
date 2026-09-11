@@ -4,7 +4,16 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
-## 2026-09-11 — Prosjektleders runde 3: «Mitt korps» og plasser tildelt alle
+## 2026-09-11 — Beslutningsnotat: flere enheter på ett oppdrag
+
+`docs/BESLUTNING_FLERE_ENHETER_PER_OPPDRAG.md` — utkast, ikke besluttet. Det siste
+punktet fra prosjektleders runde, og det eneste som snur en antakelse som ligger i ni
+steder: at et oppdrag er tildelt én enhet. Notatet foreslår `Oppdragsenhet` som
+koblingsrad med egen statuskjede, oppdragsstatus utledet som «mest aktive», ferdig
+når alle er ledige, én arkivrad per oppdrag × enhet (samme payload-form — gamle
+arkiver verifiserer som før), og deploy i to trinn som `year` → `vakt`. Fire
+spørsmål til André i §7 før kode; §7.1 (arkivformen) lar seg ikke gjøre om etterpå.
+
 
 **2097 tester grønne** (18 nye, to mutasjoner satt rødt først). Én migrasjon,
 `vaktliste/0012`, ett `AddField` med `False` som standard — ingen eksisterende
