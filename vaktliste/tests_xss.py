@@ -23,6 +23,7 @@ HTML_BUILDERS = (
     '_fyll',
     'tegnFaner', '_fanerad', '_mannskapsfane', 'iDrift', '_tilstede',
     'mkRessurs', '_planrad', '_blokklinje', '_dagoverskrift', '_probonoMerke',
+    'mkMittKorps', '_plassKorps',
     '_stempelknapper',
     '_driftrad',
     'mkBelastning',
@@ -54,6 +55,8 @@ REVIEWED_INTERPOLATIONS = {
     # bare kan gi sifre og komma — og escapes uansett inni.
     'timer': 'markup bygget lokalt, tallet escapet inni',
     '_probonoMerke(vp)': 'hardkodet merke fra en ternær, ingen data i seg',
+    'hvem': 'nedtrekk fra `_fyllValgFor` (skannes her) eller escapet navn med merke',
+    'alleMerke': 'hardkodet selected-attributt fra en ternær',
     # Dagoverskriften bygger ren tekst i `tekst`, som escapes ved innsetting:
     'DAGER_LANGE[d.getDay()]': 'ukedag fra en lokal, hardkodet liste',
     'd.getDate()': 'tall fra en Date',
@@ -213,7 +216,8 @@ class VaktlisteEscapingOppforselTests(SimpleTestCase):
                         'kanStemple', 'iDrift', '_rolleValg',
                         'rollerForGruppe', '_fyllValgFor', '_varighet',
                         'mkRolleRad', 'mkOversikt', '_skiftrekkefolge',
-                        '_planrad', '_tidsblokker', '_blokklinje', '_blokkerMedDager',
+                        '_planrad', '_tidsblokker', '_blokklinje', '_blokkerMedDager', 'kanBemannePlass',
+                        '_mittKorpsId', '_synligePoster',
                         '_dagnokkel', '_dagoverskrift', '_probonoMerke',
                         '_sumTimer', '_skifttimer', '_tall', '_telling',
                         '_mkEnKurve', 'mkGruppekurve', '_posterIGruppe',
@@ -317,6 +321,8 @@ class VaktlisteEscapingOppforselTests(SimpleTestCase):
             globalThis.aktivFane = 'oversikt';
             globalThis.OVERSIKT = 'oversikt';
             globalThis.IKKE_PLASSERT = 'ikke-plassert';
+            globalThis.MITT_KORPS = 'mitt-korps';
+            globalThis.korpsfilter = null;
             globalThis.MANNSKAP = 'mannskap';
             globalThis.TILSTEDE = 'tilstede';
             globalThis.BELASTNING = 'belastning';
@@ -340,6 +346,8 @@ class VaktlisteEscapingOppforselTests(SimpleTestCase):
             globalThis.aktivFane = 'oversikt';
             globalThis.OVERSIKT = 'oversikt';
             globalThis.IKKE_PLASSERT = 'ikke-plassert';
+            globalThis.MITT_KORPS = 'mitt-korps';
+            globalThis.korpsfilter = null;
             globalThis.MANNSKAP = 'mannskap';
             globalThis.TILSTEDE = 'tilstede';
             globalThis.BELASTNING = 'belastning';
@@ -1268,7 +1276,8 @@ class OversiktUtenKurveTests(SimpleTestCase):
     HARNESS = (
         (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue')),
         (VAKTLISTE_JS, ('mkOversikt', '_skiftrekkefolge', '_d', '_kl',
-                        '_tidsblokker', '_blokklinje', '_blokkerMedDager',
+                        '_tidsblokker', '_blokklinje', '_blokkerMedDager', 'kanBemannePlass',
+                        '_mittKorpsId', '_synligePoster',
                         '_dagnokkel', '_dagoverskrift', '_probonoMerke', '_sumTimer',
                         '_varighet', '_skifttimer', '_tall', '_telling',
                         '_dag', '_sammeDag', '_tidsspenn', '_vaktspenn',
@@ -1594,6 +1603,7 @@ class NyRessursIFanerekkaTests(SimpleTestCase):
     HARNESS = (
         (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue')),
         (VAKTLISTE_JS, ('tegnFaner', '_fanerad', '_mannskapsfane',
+                        '_mittKorpsId', '_synligePoster',
                         'iDrift', '_tilstede', '_posterFor',
                         '_ikkePlassert', '_ressurserIGruppe',
                         '_grupperMedRessurser', '_nivaa', '_erAdmin',
@@ -1613,6 +1623,8 @@ class NyRessursIFanerekkaTests(SimpleTestCase):
             "globalThis.aktivFane = 'oversikt';\n"
             "globalThis.OVERSIKT = 'oversikt';\n"
             "globalThis.IKKE_PLASSERT = 'ikke-plassert';\n"
+             "globalThis.MITT_KORPS = 'mitt-korps';\n"
+             "globalThis.korpsfilter = null;\n"
             "globalThis.MANNSKAP = 'mannskap';\n"
             "globalThis.TILSTEDE = 'tilstede';\n"
             "globalThis.BELASTNING = 'belastning';\n"
@@ -1665,21 +1677,21 @@ class FanenErGruppaTests(SimpleTestCase):
 
     HARNESS = (
         (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue')),
-        (VAKTLISTE_JS, ('tegnFaner', '_fanerad', '_mannskapsfane',
-                        'iDrift', '_tilstede', 'mkGruppe', 'mkRessurs',
-                        '_radklasse', '_stempelknapper', 'kanStemple',
+        (VAKTLISTE_JS, ('tegnFaner', '_fanerad', '_mannskapsfane', '_mittKorpsId',
+                        '_synligePoster', 'iDrift', '_tilstede', 'mkGruppe',
+                        'mkRessurs', '_radklasse', '_stempelknapper', 'kanStemple',
                         '_rolleValg', '_skiftrekkefolge', '_fyllValgFor',
                         '_varighet', '_skifttimer', '_tall', '_planrad',
                         '_tidsblokker', '_blokklinje', '_blokkerMedDager',
-                        '_dagnokkel', '_dagoverskrift', '_probonoMerke', '_tidsspenn', '_telling',
-                        '_sammeDag', '_driftrad', 'mkGruppekurve', '_mkEnKurve',
+                        'kanBemannePlass', '_dagnokkel', '_dagoverskrift',
+                        '_probonoMerke', '_tidsspenn', '_telling', '_sammeDag',
+                        '_driftrad', 'mkGruppekurve', '_mkEnKurve',
                         '_tegnforklaring', '_timesteg', '_toppunkt',
-                        '_posterPerGruppe', '_vaktensSpenn',
-                        '_posterIGruppe', '_plassKorps',
-                        '_bemanningPerTime', 'rollerForGruppe', '_iso16',
-                        '_posterFor', '_ikkePlassert', '_ressurserIGruppe',
-                        '_grupperMedRessurser', '_d', '_kl', '_dag',
-                        '_nivaa', '_erAdmin', 'kanSkriveAlt', 'kanLede',
+                        '_posterPerGruppe', '_vaktensSpenn', '_posterIGruppe',
+                        '_plassKorps', '_bemanningPerTime', 'rollerForGruppe',
+                        '_iso16', '_posterFor', '_ikkePlassert',
+                        '_ressurserIGruppe', '_grupperMedRessurser', '_d', '_kl',
+                        '_dag', '_nivaa', '_erAdmin', 'kanSkriveAlt', 'kanLede',
                         'kanBemanne', 'gruppaHarPlass')),
     )
     VINDU = ("globalThis.window = { MODUL_TILGANG: { admin: true } };\n"
@@ -1689,6 +1701,8 @@ class FanenErGruppaTests(SimpleTestCase):
              "globalThis.aktivFane = 'oversikt';\n"
              "globalThis.OVERSIKT = 'oversikt';\n"
              "globalThis.IKKE_PLASSERT = 'ikke-plassert';\n"
+             "globalThis.MITT_KORPS = 'mitt-korps';\n"
+             "globalThis.korpsfilter = null;\n"
             "globalThis.MANNSKAP = 'mannskap';\n"
             "globalThis.TILSTEDE = 'tilstede';\n"
             "globalThis.BELASTNING = 'belastning';\n"
@@ -1888,7 +1902,8 @@ class UtskriftslistaTests(SimpleTestCase):
     HARNESS = (
         (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue')),
         (VAKTLISTE_JS, ('mkOversikt', '_skiftrekkefolge', '_d', '_kl',
-                        '_tidsblokker', '_blokklinje', '_blokkerMedDager',
+                        '_tidsblokker', '_blokklinje', '_blokkerMedDager', 'kanBemannePlass',
+                        '_mittKorpsId', '_synligePoster',
                         '_dagnokkel', '_dagoverskrift', '_probonoMerke', '_sumTimer',
                         '_varighet', '_skifttimer', '_tall', '_telling',
                         '_dag', '_sammeDag', '_tidsspenn', '_vaktspenn',
@@ -2019,7 +2034,8 @@ class EnkeltgruppeTests(SimpleTestCase):
                         '_stempelknapper', 'kanStemple', 'iDrift',
                         '_rolleValg', '_plassKorps', '_skiftrekkefolge',
                         '_fyllValgFor', '_varighet', '_skifttimer', '_tall',
-                        '_planrad', '_tidsblokker', '_blokklinje', '_blokkerMedDager',
+                        '_planrad', '_tidsblokker', '_blokklinje', '_blokkerMedDager', 'kanBemannePlass',
+                        '_mittKorpsId', '_synligePoster',
                         '_dagnokkel', '_dagoverskrift', '_probonoMerke',
                         '_tidsspenn', '_sammeDag', 'mkGruppekurve', '_telling',
                         '_posterIGruppe', '_mkEnKurve', '_tegnforklaring',
@@ -2258,7 +2274,9 @@ class MannskapsfanenTests(SimpleTestCase):
             "globalThis.BELASTNING = 'belastning';\n"
             "globalThis.belastning = null;\n"
              "globalThis.OVERSIKT = 'oversikt';\n"
-             "globalThis.IKKE_PLASSERT = 'ikke-plassert';\n")
+             "globalThis.IKKE_PLASSERT = 'ikke-plassert';\n"
+             "globalThis.MITT_KORPS = 'mitt-korps';\n"
+             "globalThis.korpsfilter = null;\n")
 
     def setUp(self):
         if not node_available():
@@ -2903,7 +2921,8 @@ class TidsblokkerTests(SimpleTestCase):
 
     HARNESS = (
         (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue')),
-        (VAKTLISTE_JS, ('mkOversikt', '_tidsblokker', '_blokklinje', '_blokkerMedDager',
+        (VAKTLISTE_JS, ('mkOversikt', '_tidsblokker', '_blokklinje', '_blokkerMedDager', 'kanBemannePlass',
+                        '_mittKorpsId', '_synligePoster',
                         '_dagnokkel', '_dagoverskrift', '_probonoMerke',
                         '_telling', '_driftrad', '_radklasse', '_stempelknapper',
                         'kanStemple', 'iDrift', 'kanSkriveAlt', '_nivaa',
@@ -3441,3 +3460,127 @@ class ProbonoOgDagoverskrifterTests(SimpleTestCase):
         """Ikke bare utskriftslista: den man planlegger i."""
         kropp = extract_function(read_js(VAKTLISTE_JS), 'mkRessurs')
         self.assertIn('_blokkerMedDager(', kropp)
+
+
+class MittKorpsTests(SimpleTestCase):
+    """«Mitt korps»-fanen (11. sep. 2026): plassene korpset har ansvar for,
+    på tvers av ressursene — tildelte og universale, ledige først."""
+
+    HARNESS = (
+        (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue')),
+        (VAKTLISTE_JS, ('mkMittKorps', '_mittKorpsId', '_synligePoster',
+                        'kanBemannePlass', 'kanSkriveAlt', '_nivaa', '_erAdmin',
+                        '_fyllValgFor', '_probonoMerke', '_tidsblokker',
+                        '_blokkerMedDager', '_dagnokkel', '_dagoverskrift',
+                        '_blokklinje', '_telling', '_skiftrekkefolge',
+                        '_varighet', '_skifttimer', '_tall', '_d', '_kl',
+                        '_dag', '_sammeDag', '_tidsspenn', '_korpsKropp',
+                        '_plassKorps')),
+    )
+    VINDU = ("globalThis.DAGER = ['søn','man','tir','ons','tor','fre','lør'];\n"
+             "globalThis.MND = ['jan','feb','mar','apr','mai','jun',"
+             "'jul','aug','sep','okt','nov','des'];\n"
+             "globalThis.korpsfilter = null;\n")
+    LISTE = """
+        globalThis.aktivListe = {
+          vaktliste: {i_drift: false},
+          korps: [{id: 1, navn: 'Haugesund', kortnavn: 'HGSD'},
+                  {id: 2, navn: 'Karmøy', kortnavn: 'KARM'}],
+          ressurser: [{id: 10, navn: 'Samleplass', gruppe_id: 1, korps_id: null},
+                      {id: 20, navn: 'Ambulanse 1', gruppe_id: 2, korps_id: 1}],
+          mannskap: [{id: 1, navn: 'Kari', korps_navn: 'Haugesund'}],
+          vaktposter: [
+            {id: 1, ressurs_id: 10, ledig: true, navn: '', korps_id: null, korps_kort: '',
+             reservert_korps_id: null, alle_korps: true, rolle: '', merknad: '',
+             fra_tid: '2026-09-04T17:00:00', til_tid: '2026-09-05T03:00:00'},
+            {id: 2, ressurs_id: 10, ledig: true, navn: '', korps_id: null, korps_kort: '',
+             reservert_korps_id: 2, alle_korps: false, rolle: '', merknad: '',
+             fra_tid: '2026-09-04T17:00:00', til_tid: '2026-09-05T03:00:00'},
+            {id: 3, ressurs_id: 10, ledig: true, navn: '', korps_id: null, korps_kort: '',
+             reservert_korps_id: null, alle_korps: false, rolle: '', merknad: '',
+             fra_tid: '2026-09-04T17:00:00', til_tid: '2026-09-05T03:00:00'},
+            {id: 4, ressurs_id: 20, ledig: false, navn: 'Kari', korps_id: 1, korps_kort: 'HGSD',
+             reservert_korps_id: 1, alle_korps: false, rolle: 'Sjåfør', merknad: '',
+             fra_tid: '2026-09-04T17:00:00', til_tid: '2026-09-05T03:00:00'}]};
+        aktivListe.alle_vaktposter = aktivListe.vaktposter;
+    """
+
+    def setUp(self):
+        if not node_available():
+            self.skipTest('node er ikke tilgjengelig')
+        self.harness = build_harness(self.HARNESS)
+
+    def _som(self, nivaa, mitt, ekstra=''):
+        vindu = (f"globalThis.window = {{ MODUL_TILGANG: {{ vaktliste: '{nivaa}', admin: false }},"
+                 f" MITT_KORPS_ID: {mitt} }};\n")
+        return run_node(self.harness, self.VINDU + vindu + self.LISTE + ekstra
+                        + "console.log(mkMittKorps());")
+
+    def test_korpsbrukeren_ser_sine_og_de_universale(self):
+        ut = self._som('skriv_handling', 1)
+        self.assertIn('<b>1</b><span class="vl-meta">plass å dekke</span>', ut,
+                      'én universal plass å dekke')
+        self.assertIn('Kari', ut, 'og sitt eget mannskap')
+        self.assertNotIn('KARM', ut, 'Karmøys plass er ikke hennes')
+
+    def test_utildelt_plass_vises_ikke(self):
+        """Plass 3 er vaktlederens bord."""
+        run_node(self.harness, self.VINDU + self.LISTE + """
+            const mine = _synligePoster(aktivListe.vaktposter, 1);
+            assert(JSON.stringify(mine.map((v) => v.id)) === '[1,4]', JSON.stringify(mine.map((v) => v.id)));
+        """)
+
+    def test_universal_plass_kan_fylles_av_korpsbrukeren(self):
+        ut = self._som('skriv_handling', 1)
+        self.assertIn('vl-fyll', ut, 'nedtrekket for å fylle plassen')
+
+    def test_uten_korps_finnes_ingen_fane(self):
+        run_node(self.harness, self.VINDU + """
+            globalThis.window = { MODUL_TILGANG: { vaktliste: 'les', admin: false }, MITT_KORPS_ID: null };
+            assert(_mittKorpsId() === null, 'ingen badge, ingen velger: null');
+            globalThis.korpsfilter = 2;
+            assert(_mittKorpsId() === 2, 'korpsvelgeren vinner');
+        """)
+
+    def test_korpsvelgeren_styrer_fanen_for_den_som_ser_alle(self):
+        ut = self._som('skriv_full', 'null', "globalThis.korpsfilter = 2;\n")
+        self.assertIn('Karmøy', ut)
+        self.assertIn('2</b>', ut, 'to plasser å dekke: Karmøys og den universale')
+
+    def test_kanBemannePlass_speiler_serveren(self):
+        run_node(self.harness, self.VINDU + """
+            globalThis.window = { MODUL_TILGANG: { vaktliste: 'skriv_handling', admin: false }, MITT_KORPS_ID: 1 };
+            const r = {korps_id: null};
+            assert(kanBemannePlass({alle_korps: true, reservert_korps_id: null}, r), 'universal');
+            assert(kanBemannePlass({alle_korps: false, reservert_korps_id: 1}, r), 'egen');
+            assert(!kanBemannePlass({alle_korps: false, reservert_korps_id: 2}, r), 'andres');
+            assert(!kanBemannePlass({alle_korps: false, reservert_korps_id: null}, r), 'utildelt');
+            globalThis.window.MITT_KORPS_ID = null;
+            assert(!kanBemannePlass({alle_korps: true, reservert_korps_id: null}, r), 'uten badge');
+        """)
+
+    def test_korpsKropp_oversetter_de_tre_tilstandene(self):
+        run_node(self.harness, """
+            assert(JSON.stringify(_korpsKropp('korps_id', 'alle')) === '{"alle_korps":true,"korps_id":null}', 'alle');
+            assert(JSON.stringify(_korpsKropp('korps_id', '2')) === '{"alle_korps":false,"korps_id":"2"}', 'ett korps');
+            assert(JSON.stringify(_korpsKropp('korps_id', '')) === '{"alle_korps":false,"korps_id":null}', 'utildelt');
+            assert(JSON.stringify(_korpsKropp('merknad', 'x')) === '{"merknad":"x"}', 'andre felt uroert');
+        """)
+
+    def test_plassKorps_viser_alle_korps(self):
+        ut = run_node(self.harness, self.VINDU + """
+            globalThis.window = { MODUL_TILGANG: { vaktliste: 'skriv_full', admin: false }, MITT_KORPS_ID: null };
+            globalThis.aktivListe = {korps: [{id: 1, navn: 'Haugesund', kortnavn: 'HGSD'}]};
+            console.log(_plassKorps({id: 9, alle_korps: true, plass_korps_id: null, reservert_korps_id: null}));
+            globalThis.window.MODUL_TILGANG.vaktliste = 'les';
+            console.log(_plassKorps({id: 9, alle_korps: true, plass_korps_id: null, reservert_korps_id: null}));
+        """)
+        self.assertIn('value="alle" selected', ut)
+        self.assertIn('— utildelt —', ut)
+        self.assertIn('>Alle korps</span>', ut)
+
+    def test_ressursnavn_escapes(self):
+        ut = self._som('skriv_handling', 1,
+                       "aktivListe.ressurser[0].navn = '<img src=x onerror=alert(1)>';\n")
+        self.assertNotIn('<img src=x', ut)
+        self.assertIn('&lt;img', ut)

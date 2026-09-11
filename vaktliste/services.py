@@ -362,7 +362,9 @@ def poster_for_korps(qs, korps_id):
     return qs.filter(
         Q(mannskap__korps_id=korps_id)
         | Q(mannskap__isnull=True, korps_id=korps_id)
-        | Q(mannskap__isnull=True, korps__isnull=True, ressurs__korps_id=korps_id))
+        | Q(mannskap__isnull=True, korps__isnull=True, ressurs__korps_id=korps_id)
+        # Tildelt alle korps: hennes å fylle, altså hennes å se.
+        | Q(mannskap__isnull=True, alle_korps=True))
 
 
 def synlige_vaktposter(qs, user):
@@ -469,6 +471,12 @@ def kan_bemanne_plass(user, ressurs, vaktpost=None) -> bool:
     """
     if kan_skrive_alt(user):
         return True
+    # **Tildelt alle korps** (11. sep. 2026): enhver korps-bruker med badge
+    # får fylle den. Badgen kreves fortsatt — uten korps finnes ingen
+    # person å sette inn, og ingen å avgrense til.
+    if vaktpost is not None and vaktpost.alle_korps:
+        return (har_tilgang(user, 'vaktliste', 'skriv_handling')
+                and brukerens_korps(user) is not None)
     korps_id = reservert_korps(vaktpost=vaktpost, ressurs=ressurs)
     return kan_fore_korps(user, korps_id)
 

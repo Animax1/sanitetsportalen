@@ -4,7 +4,39 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
-## 2026-09-11 — Prosjektleders runde 2b: probono-skift og dagoverskrifter
+## 2026-09-11 — Prosjektleders runde 3: «Mitt korps» og plasser tildelt alle
+
+**2097 tester grønne** (18 nye, to mutasjoner satt rødt først). Én migrasjon,
+`vaktliste/0012`, ett `AddField` med `False` som standard — ingen eksisterende
+plass blir universal ved oppgraderingen.
+
+**Tre tilstander på en ledig plass.** Prosjektleder: «Dine tildelte vakter og
+de vakter som er satt universal tildelt. Utildelte vakter skal ikke deles ut.»
+Det er ett nytt flagg, `Vaktpost.alle_korps`, og én regelendring:
+- **Tildelt ett korps** — som før (`Vaktpost.korps`, eller ressursens).
+- **Tildelt alle korps** — `alle_korps`. Enhver korps-bruker med badge får
+  fylle den (`kan_bemanne_plass`); badgen kreves fortsatt, uten korps finnes
+  ingen å sette inn. Flagget vinner over `korps`: en plass alle kan fylle er
+  ikke satt av til én.
+- **Utildelt** — vaktlederens bord, deles ikke ut. Som før.
+Å tildele er å dele ut: `skriv_full`, samme port som reservasjonen.
+Korpsfilteret tar de universale med — hennes å fylle, altså hennes å se.
+
+**Reservasjonsnedtrekket** i ressursraden og i begge skiftvinduene har fått
+«Alle korps», og «— alle —» heter nå «— utildelt —»: det var feil ord for en
+plass som ikke deles ut til noen. `_korpsKropp()` oversetter de tre
+tilstandene til serverens to felt.
+
+**Fanen «Mitt korps».** Plassene korpset har ansvar for, på tvers av alle
+ressursene: «N plasser å dekke» øverst, så blokkene med dagoverskrifter,
+ledige først i hver blokk, med nedtrekket for å fylle dem. For korps-brukeren
+er det hennes korps; for den som ser alle, det korpsvelgeren står på — uten
+korps finnes ikke fanen. Tallet på fanen er det som gjenstår.
+
+**Rettet på veien:** korps-brukeren så ikke nedtrekket på en plass satt av til
+henne på en *ureservert* ressurs — klienten spurte bare ressursen. `kanBemannePlass()`
+speiler nå `services.kan_bemanne_plass` plass for plass.
+
 
 **2079 tester grønne** (19 nye, tre mutasjoner satt rødt først). Én
 migrasjon, `vaktliste/0011`, ett `AddField` med `False` som standard.

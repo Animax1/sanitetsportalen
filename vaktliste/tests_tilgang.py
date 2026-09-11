@@ -1193,3 +1193,83 @@ class KorpsvelgerTests(KorpsfilterTests):
         ledig = next(vp for vp in poster if vp['id'] == self.ledig_hgsd.pk)
         self.assertIsNone(ledig['korps_id'])
         self.assertEqual(ledig['reservert_korps_id'], self.hgsd.pk)
+
+
+@override_settings(SECURE_SSL_REDIRECT=False, RATELIMIT_ENABLE=False)
+class TildeltAlleKorpsTests(TilgangsBasis):
+    """«Mitt korps» og plassen tildelt alle (prosjektleder, 11. sep. 2026).
+
+    Tre tilstander på en ledig plass: tildelt ett korps, tildelt alle
+    (`alle_korps`), eller utildelt — vaktlederens bord, som ikke deles ut.
+    Korps-brukeren får fylle sine egne og de universale; tildelingen er
+    `skriv_full`.
+    """
+
+    def _ledig(self, klient, ressurs, **overstyr):
+        kropp = {'fra_tid': self._iso(0), 'til_tid': self._iso(8)}
+        kropp.update(overstyr)
+        return klient.post(f'/vaktliste/api/ressurser/{ressurs.pk}/vaktposter/',
+                           data=kropp, content_type='application/json')
+
+    def _fyll(self, klient, pk, mannskap):
+        return klient.put(f'/vaktliste/api/vaktposter/{pk}/',
+                          data={'mannskap_id': mannskap.pk},
+                          content_type='application/json')
+
+    def test_lederen_tildeler_alle(self):
+        res = self._ledig(self.c_vl, self.res_fri, alle_korps=True)
+        self.assertEqual(res.status_code, 201, res.content)
+        self.assertTrue(res.json()['data']['alle_korps'])
+        self.assertIsNone(res.json()['data']['plass_korps_id'])
+
+    def test_alle_vinner_over_korps(self):
+        """En plass alle kan fylle er ikke satt av til én."""
+        res = self._ledig(self.c_vl, self.res_fri, alle_korps=True, korps_id=self.karmoy.pk)
+        self.assertIsNone(Vaktpost.objects.get(pk=res.json()['data']['id']).korps_id)
+
+    def test_korpsbrukeren_tildeler_ikke_alle(self):
+        pk = self._ledig(self.c_vl, self.res_hgsd).json()['data']['id']
+        res = self.c_kb.put(f'/vaktliste/api/vaktposter/{pk}/',
+                            data={'alle_korps': True}, content_type='application/json')
+        self.assertEqual(res.status_code, 403)
+        self.assertFalse(Vaktpost.objects.get(pk=pk).alle_korps)
+
+    def test_korpsbrukeren_fyller_en_universal_plass(self):
+        """Selve poenget: på KO, som ellers er vaktlederens bord."""
+        pk = self._ledig(self.c_vl, self.res_fri, alle_korps=True).json()['data']['id']
+        res = self._fyll(self.c_kb, pk, self.p_hgsd)
+        self.assertEqual(res.status_code, 200, res.content)
+        self.assertEqual(Vaktpost.objects.get(pk=pk).mannskap_id, self.p_hgsd.pk)
+
+    def test_utildelt_plass_deles_fortsatt_ikke_ut(self):
+        pk = self._ledig(self.c_vl, self.res_fri).json()['data']['id']
+        self.assertEqual(self._fyll(self.c_kb, pk, self.p_hgsd).status_code, 403)
+
+    def test_badgen_kreves_ogsaa_paa_en_universal_plass(self):
+        """Uten korps finnes ingen å sette inn — og badge-halvdelen står."""
+        uten = _klient(_bruker('kb_uten', 'skriv_handling'))
+        pk = self._ledig(self.c_vl, self.res_fri, alle_korps=True).json()['data']['id']
+        self.assertEqual(self._fyll(uten, pk, self.p_hgsd).status_code, 403)
+
+    def test_leseren_fyller_ingenting(self):
+        pk = self._ledig(self.c_vl, self.res_fri, alle_korps=True).json()['data']['id']
+        self.assertEqual(self._fyll(self.c_leser, pk, self.p_hgsd).status_code, 403)
+
+    def test_universal_plass_er_synlig_for_korpsbrukeren(self):
+        """Hennes å fylle, altså hennes å se — også gjennom korpsfilteret."""
+        pk = self._ledig(self.c_vl, self.res_fri, alle_korps=True).json()['data']['id']
+        utildelt = self._ledig(self.c_vl, self.res_fri).json()['data']['id']
+        data = self.c_kb.get(f'/vaktliste/api/vaktlister/{self.vl.pk}/').json()['data']
+        ider = {vp['id'] for vp in data['vaktposter']}
+        self.assertIn(pk, ider)
+        self.assertNotIn(utildelt, ider, 'vaktlederens bord vises ikke')
+
+    def test_lederen_kan_ta_tildelingen_tilbake(self):
+        pk = self._ledig(self.c_vl, self.res_fri, alle_korps=True).json()['data']['id']
+        res = self.c_vl.put(f'/vaktliste/api/vaktposter/{pk}/',
+                            data={'alle_korps': False, 'korps_id': self.karmoy.pk},
+                            content_type='application/json')
+        self.assertEqual(res.status_code, 200)
+        vp = Vaktpost.objects.get(pk=pk)
+        self.assertFalse(vp.alle_korps)
+        self.assertEqual(vp.korps_id, self.karmoy.pk)

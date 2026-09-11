@@ -58,6 +58,9 @@ const MANNSKAP = 'mannskap';
 const TILSTEDE = 'tilstede';
 const BELASTNING = 'belastning';
 const IKKE_PLASSERT = 'ikke-plassert';
+// «Mitt korps» (11. sep. 2026): plassene korpset har ansvar for, på tvers
+// av ressursene — sine tildelte, og de som er tildelt alle.
+const MITT_KORPS = 'mitt-korps';
 
 // Register → hvordan det snakkes om og hvor det ligger.
 // `nyEtikett` er hele knappeteksten, ikke bare ordet: «korps» er intetkjønn
@@ -106,6 +109,19 @@ function kanLede() {
 
 function kanSkriveNoe() {
   return kanSkriveAlt() || _nivaa() === 'skriv_handling';
+}
+
+
+function kanBemannePlass(vp, ressurs) {
+  // Plassens svar på reservasjonshalvdelen — speiler `services.kan_bemanne_plass`.
+  // Plassen kan være satt av til et annet korps enn ressursen, eller til
+  // alle; ressursen alene visste ikke det, og korps-brukeren så ingen
+  // nedtrekk på nettopp den plassen som var hennes.
+  if (kanSkriveAlt()) return true;
+  if (_nivaa() !== 'skriv_handling' || window.MITT_KORPS_ID == null) return false;
+  if (vp.alle_korps) return true;
+  const reservert = vp.reservert_korps_id != null ? vp.reservert_korps_id : (ressurs ? ressurs.korps_id : null);
+  return reservert === window.MITT_KORPS_ID;
 }
 
 
@@ -273,9 +289,20 @@ function _synligePoster(poster, korpsId) {
   // ressursen, ferdig slått sammen i `reservert_korps_id`. Uten valg er
   // alt synlig.
   if (korpsId == null) return poster;
+  // En ledig plass tildelt alle korps er hennes å fylle, altså hennes å se.
   return (poster || []).filter((vp) => (vp.ledig
-    ? vp.reservert_korps_id === korpsId
+    ? (vp.alle_korps || vp.reservert_korps_id === korpsId)
     : vp.korps_id === korpsId));
+}
+
+
+function _mittKorpsId() {
+  // Korpset «Mitt korps» viser: korpsvelgeren for den som ser alle, badgen
+  // for korps-brukeren. `null` når ingen av delene finnes — da er det ingen
+  // fane å vise.
+  if (korpsfilter != null) return korpsfilter;
+  const mitt = globalThis.window?.MITT_KORPS_ID;
+  return mitt == null ? null : mitt;
 }
 
 
@@ -367,9 +394,10 @@ function fyllNedtrekk() {
   _fyll('ny-vaktpost-mannskap', aktivListe.mannskap.map((m) => ({
     id: m.id, navn: `${m.navn} — ${m.korps_navn}`,
   })), '— ledig plass —');
-  _fyll('ny-vaktpost-korps', (aktivListe.korps || []).map((k) => ({
-    id: k.id, navn: k.kortnavn || k.navn,
-  })), '— som ressursen —');
+  _fyll('ny-vaktpost-korps', [{ id: 'alle', navn: 'Alle korps' }].concat(
+    (aktivListe.korps || []).map((k) => ({
+      id: k.id, navn: k.kortnavn || k.navn,
+    }))), '— som ressursen —');
 
   // Rollenedtrekket i «Sett på vakt» fylles når vinduet åpnes: det som
   // tilbys avhenger av hvilken ressurs man står på, altså av gruppa.
@@ -542,6 +570,17 @@ function tegnFaner() {
     antall: _ikkePlassert().length,
   });
 
+  // **«Mitt korps»** (11. sep. 2026): plassene korpset har ansvar for, på
+  // tvers av ressursene. Tallet er det som gjenstår å dekke. Finnes bare
+  // når det er et korps å vise — badgen, eller korpsvelgeren.
+  if (_mittKorpsId() != null) {
+    const mine = _synligePoster(aktivListe.alle_vaktposter || aktivListe.vaktposter, _mittKorpsId());
+    faner.splice(2, 0, {
+      id: MITT_KORPS, navn: 'Mitt korps', ikon: 'people-fill',
+      antall: mine.filter((vp) => vp.ledig).length,
+    });
+  }
+
   // **Mannskap er en ekte fane, ikke en lenke.** Den var en lenke ut til
   // /vaktliste/registre/, og et klikk kostet deg plassen i planleggingen —
   // mens mannskap og ressurser er nettopp de to man veksler mellom.
@@ -590,6 +629,7 @@ function tegnPanel() {
   if (aktivFane === BELASTNING) { el.innerHTML = mkBelastning(); return; }
   if (aktivFane === TILSTEDE) { el.innerHTML = mkTilstede(); return; }
   if (aktivFane === IKKE_PLASSERT) { el.innerHTML = mkIkkePlassert(); return; }
+  if (aktivFane === MITT_KORPS) { el.innerHTML = mkMittKorps(); return; }
 
   const gruppe = (aktivListe.grupper || [])
     .find((g) => String(g.id) === String(aktivFane));
@@ -643,13 +683,20 @@ function _plassKorps(vp) {
   // Reservasjonen på en ledig plass. Bare den som deler ut kan endre den —
   // kunne korps-brukeren, kunne hun tildelt seg selv en plass. Andre ser
   // hvem plassen tilhører, som tekst.
-  const valgt = vp.plass_korps_id != null ? vp.plass_korps_id
-    : (vp.reservert_korps_id != null ? vp.reservert_korps_id : '');
+  // Tre tilstander (11. sep. 2026): ett korps, alle korps, eller
+  // utildelt — vaktlederens bord. «— utildelt —» het «— alle —» før, og det
+  // var feil ord: en utildelt plass deles ikke ut til noen.
+  const valgt = vp.alle_korps ? 'alle'
+    : (vp.plass_korps_id != null ? vp.plass_korps_id
+      : (vp.reservert_korps_id != null ? vp.reservert_korps_id : ''));
   if (!kanSkriveAlt()) {
+    if (vp.alle_korps) return '<span class="vl-meta">Alle korps</span>';
     const k = (aktivListe.korps || []).find((x) => x.id === valgt);
     return `<span class="vl-meta">${escapeHtml(k ? (k.kortnavn || k.navn) : '—')}</span>`;
   }
-  const valg = ['<option value="">— alle —</option>'].concat(
+  const alleMerke = valgt === 'alle' ? ' selected' : '';
+  const valg = ['<option value="">— utildelt —</option>',
+                `<option value="alle"${alleMerke}>Alle korps</option>`].concat(
     (aktivListe.korps || []).map((k) => {
       const merke = k.id === valgt ? ' selected' : '';
       return `<option value="${escHtmlValue(k.id)}"${merke}>`
@@ -920,7 +967,7 @@ function _planrad(vp, r, kanRore) {
   // En ledig plass er raden uten person. Den skal se ut som noe som
   // gjenstår — ikke som en rad der navnet mangler ved en feil.
   const navnCelle = vp.ledig
-    ? _fyllValgFor(vp, kanRore)
+    ? _fyllValgFor(vp, kanRore || kanBemannePlass(vp, r))
     : escapeHtml(vp.navn) + _probonoMerke(vp);
 
   // **Korpskolonnen svarer på to ulike spørsmål.** Står det en person
@@ -1411,7 +1458,7 @@ function mkOversikt() {
     // når den er ledig. Det er det samme skillet som i ressurstabellen, og
     // av samme grunn.
     const korps = vp.ledig
-      ? (korpsnavn[vp.reservert_korps_id] || '')
+      ? (vp.alle_korps ? 'Alle korps' : (korpsnavn[vp.reservert_korps_id] || ''))
       : (vp.korps_kort || '');
     return `
         <tr class="${escHtmlValue(vp.ledig ? 'vl-ledig' : '')}">
@@ -1715,6 +1762,72 @@ function mkTilstede() {
       </button>
     </div>
     ${innhold}`;
+}
+
+
+function mkMittKorps() {
+  // Prosjektleder, 11. sep. 2026: «Mitt korps som viser alle vaktene som
+  // skal dekkes» — «dine tildelte vakter og de vakter som er satt universal
+  // tildelt». Ledige først i hver blokk (sorteringen setter tomt navn
+  // først), dagoverskrifter som ellers, og det som gjenstår å dekke øverst.
+  const korpsId = _mittKorpsId();
+  if (korpsId == null) {
+    return '<div class="vl-kort"><div class="vl-tom">Velg et korps for å se plassene det har ansvar for.</div></div>';
+  }
+  const korps = (aktivListe.korps || []).find((k) => k.id === korpsId);
+  const korpsnavn = korps ? korps.navn : 'korpset';
+  const poster = _synligePoster(aktivListe.alle_vaktposter || aktivListe.vaktposter, korpsId);
+  const ledige = poster.filter((vp) => vp.ledig).length;
+  const bemannet = poster.length - ledige;
+
+  const hode = `
+    <div class="vl-kort vl-belastningshode">
+      <div class="vl-noekkeltall">
+        <div><b>${escHtmlValue(ledige)}</b><span class="vl-meta">${escapeHtml(ledige === 1 ? 'plass å dekke' : 'plasser å dekke')}</span></div>
+        <div><b>${escHtmlValue(bemannet)}</b><span class="vl-meta">mannskap satt opp</span></div>
+      </div>
+      <span class="vl-meta">${escapeHtml(korpsnavn)} — tildelte plasser, og plasser tildelt alle korps</span>
+    </div>`;
+
+  if (!poster.length) {
+    return hode + '<div class="vl-kort"><div class="vl-tom">Ingen plasser er tildelt korpset ennå.</div></div>';
+  }
+
+  const ressursnavn = {};
+  (aktivListe.ressurser || []).forEach((r) => { ressursnavn[r.id] = r; });
+  const rad = (vp) => {
+    const r = ressursnavn[vp.ressurs_id];
+    const hvem = vp.ledig
+      ? _fyllValgFor(vp, kanBemannePlass(vp, r))
+      : escapeHtml(vp.navn) + _probonoMerke(vp);
+    const tildelt = vp.ledig
+      ? (vp.alle_korps ? 'Alle korps' : (korps ? (korps.kortnavn || korps.navn) : ''))
+      : (vp.korps_kort || '');
+    return `
+        <tr class="${escHtmlValue(vp.ledig ? 'vl-ledig' : '')}">
+          <td class="vl-navn">${escapeHtml(r ? r.navn : '')}</td>
+          <td>${hvem}</td>
+          <td>${escapeHtml(tildelt || '—')}</td>
+          <td>${escapeHtml(vp.rolle || '—')}</td>
+          <td>${escapeHtml(vp.merknad || '')}</td>
+        </tr>`;
+  };
+  const rader = _blokkerMedDager(_tidsblokker(poster), 5, rad);
+  return hode + `
+    <div class="vl-kort">
+      <div class="vl-tabellramme">
+        <table class="vl-tabell vl-utskrift">
+          <colgroup>
+            <col style="width: 22%"><col style="width: 30%"><col style="width: 14%">
+            <col style="width: 16%"><col style="width: 18%">
+          </colgroup>
+          <thead>
+            <tr><th>Ressurs</th><th>Hvem</th><th>Tildelt</th><th>Rolle</th><th>Merknad</th></tr>
+          </thead>
+          <tbody>${rader}</tbody>
+        </table>
+      </div>
+    </div>`;
 }
 
 
@@ -2281,7 +2394,7 @@ async function opprettVaktpost() {
       method: 'POST',
       body: JSON.stringify({
         mannskap_id: document.getElementById('ny-vaktpost-mannskap')?.value || null,
-        korps_id: document.getElementById('ny-vaktpost-korps')?.value || null,
+        ..._korpsKropp('korps_id', document.getElementById('ny-vaktpost-korps')?.value || ''),
         rolle_id: document.getElementById('ny-vaktpost-rolle')?.value || null,
         probono: !!document.getElementById('ny-vaktpost-probono')?.checked,
         antall: Number(document.getElementById('ny-vaktpost-antall')?.value) || 1,
@@ -2386,12 +2499,25 @@ async function _stemple(id, handling) {
 }
 
 
+function _korpsKropp(felt, verdi) {
+  // Reservasjonsfeltet bærer tre tilstander i ett nedtrekk; serveren har to
+  // felt. «alle» blir `alle_korps: true`, et korps blir `korps_id` og slår
+  // `alle_korps` av, tomt er utildelt. Andre felt går rett gjennom.
+  if (felt !== 'korps_id') {
+    const kropp = {};
+    kropp[felt] = verdi === '' ? null : verdi;
+    return kropp;
+  }
+  if (verdi === 'alle') return { alle_korps: true, korps_id: null };
+  return { alle_korps: false, korps_id: verdi === '' || verdi == null ? null : verdi };
+}
+
+
 async function endreVaktpost(id, felt, verdi) {
   // Redigering i raden: skriv, gå videre, ferdig. Serveren avviser fortsatt
   // et skift som slutter før det begynner — da rulles raden tilbake til det
   // som faktisk står lagret, og meldingen vises over tabellen.
-  const kropp = {};
-  kropp[felt] = verdi === '' ? null : verdi;
+  const kropp = _korpsKropp(felt, verdi);
 
   const res = await apiFetch(`/vaktliste/api/vaktposter/${id}/`, {
     method: 'PUT', body: JSON.stringify(kropp),
@@ -2453,10 +2579,11 @@ function apneRedigerVaktpost(id) {
   })), '— ledig plass —');
   _fyll('vaktpost-rolle', rollerForGruppe(ressurs.gruppe_id, vp.rolle_id),
         'Uten rolle');
-  _fyll('vaktpost-korps', (aktivListe.korps || []).map((k) => ({
-    id: k.id, navn: k.kortnavn || k.navn,
-  })), '— som ressursen —');
-  _settVerdi('vaktpost-korps', vp.plass_korps_id);
+  _fyll('vaktpost-korps', [{ id: 'alle', navn: 'Alle korps' }].concat(
+    (aktivListe.korps || []).map((k) => ({
+      id: k.id, navn: k.kortnavn || k.navn,
+    }))), '— som ressursen —');
+  _settVerdi('vaktpost-korps', vp.alle_korps ? 'alle' : vp.plass_korps_id);
 
   _settVerdi('vaktpost-mannskap', vp.mannskap_id);
   _settVerdi('vaktpost-rolle', vp.rolle_id);
@@ -2492,7 +2619,7 @@ async function lagreVaktpost() {
       method: 'PUT',
       body: JSON.stringify({
         mannskap_id: document.getElementById('vaktpost-mannskap')?.value || null,
-        korps_id: document.getElementById('vaktpost-korps')?.value || null,
+        ..._korpsKropp('korps_id', document.getElementById('vaktpost-korps')?.value || ''),
         rolle_id: document.getElementById('vaktpost-rolle')?.value || null,
         merknad: document.getElementById('vaktpost-merknad')?.value || '',
         probono: !!document.getElementById('vaktpost-probono')?.checked,

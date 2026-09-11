@@ -165,11 +165,9 @@ ingen av dem gir feilmelding — de er bare stille inaktive.
             Ute av timesummene, med i lengste skift og hvile.
       - [x] **Dagoverskrifter** (11. sep. 2026): `_blokkerMedDager()`, bare
             på flerdagsvakter.
-      - [ ] **«Mitt korps»-fane**: plassene korpset har ansvar for på tvers av
-            ressurser — «4 plasser å dekke» øverst. Krever tre tilstander på
-            plassen: tildelt korps / tildelt alle (`alle_korps`) / utildelt.
-            Korps-brukeren får fylle egne og universale; utildelte deles ikke ut.
-            Tildeling er `skriv_full`.
+      - [x] **«Mitt korps»-fane** (11. sep. 2026): `Vaktpost.alle_korps`,
+            `0012`. Tre tilstander på plassen; fanen viser tildelte og
+            universale, ledige først, med «N plasser å dekke».
       - [ ] **Flere enheter på ett oppdrag** — egen fase med beslutningsnotat
             først. `Oppdragsenhet(oppdrag, enhet, varslet_at)`, statusmeldinger
             per enhet, sentralbordet ser matrisen, bilen ser hvem som er varslet

@@ -219,6 +219,7 @@ def _vaktpost_til_dict(vp, foreldre=None):
         'tilstede': vp.er_tilstede,
         'merknad': vp.merknad,
         'probono': vp.probono,
+        'alle_korps': vp.alle_korps,
     }
 
 
@@ -940,6 +941,12 @@ def vaktposter_view(request, pk):
     korps_id = _int(data.get('korps_id')) if 'korps_id' in data else None
     if korps_id is not None and not services.kan_skrive_alt(request.user):
         return _nektet('Reservasjonen settes av den som deler ut.')
+    # Tildelt alle korps er også å dele ut. Vinner over korps_id.
+    alle_korps = bool(data.get('alle_korps'))
+    if alle_korps and not services.kan_skrive_alt(request.user):
+        return _nektet('Tildelingen settes av den som deler ut.')
+    if alle_korps:
+        korps_id = None
 
     felter = dict(
         ressurs=ressurs,
@@ -950,6 +957,7 @@ def vaktposter_view(request, pk):
         til_tid=til_tid,
         merknad=(data.get('merknad') or '').strip(),
         probono=bool(data.get('probono')),
+        alle_korps=alle_korps,
     )
     try:
         with transaction.atomic():
@@ -1035,6 +1043,13 @@ def vaktpost_detalj_view(request, pk):
     # merknaden. Det er ikke å dele ut noe; det er å si hva skiftet er.
     if 'probono' in data:
         vaktpost.probono = bool(data.get('probono'))
+    if 'alle_korps' in data:
+        # Å tildele alle er å dele ut — samme port som reservasjonen.
+        if not services.kan_skrive_alt(request.user):
+            return _nektet('Tildelingen settes av den som deler ut.')
+        vaktpost.alle_korps = bool(data.get('alle_korps'))
+        if vaktpost.alle_korps:
+            vaktpost.korps_id = None
 
     fra_tid = _tid(data.get('fra_tid')) if 'fra_tid' in data else vaktpost.fra_tid
     til_tid = _tid(data.get('til_tid')) if 'til_tid' in data else vaktpost.til_tid
