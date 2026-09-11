@@ -4,6 +4,31 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-12 — Merget til prod: flere enheter, korpsfilter, utskrift
+
+`rollemodell` → `main` (`4c6017b`), fast-forward. 19 commits: 59 files changed, 7288 insertions(+), 403 deletions(-).
+Åtte migrasjoner gikk ut — `accounts.0016` (nivået `les_alle`),
+`vaktliste.0011`–`0012` (probono, plass tildelt alle korps), `oppdrag.0009`–`0013`
+(avreist til/grovsortering, koblingsraden `Oppdragsenhet`, backfill, `manuell`,
+arkivrad per enhet). **Én av dem skriver data**, `oppdrag.0011`: én koblingsrad per
+eksisterende oppdrag. Backup av prod bekreftet tatt før pushen (André, «Backup
+tatt — push»).
+
+Innholdet er alt siden forrige merge: tidsblokker og «8,5 t», korpsfilteret med
+`les_alle` og korpsvelgeren, bygg og dato i footeren, prosjektleders tre runder,
+flere enheter på ett oppdrag i fire trinn, og utskrift per korps eller ressurs
+med korpsvelgeren rettet.
+
+**Verifisert før merge:** 2186 tester grønne, `verifiser_migrasjoner` OK mot
+PostgreSQL 16 for begge prøvene (`vaktliste.0007` og `oppdrag.0011` med rader i
+den historiske formen), og røyktester i Chromium av sentralbordet med to biler
+og av korpsvelgeren. Ingen oppgraderingssimulering av hele basen denne gangen —
+den ene datamigrasjonen er dekket av prøven, og de sju andre er rene
+skjemaendringer.
+
+**Deploy 2 står igjen** (eget punkt i TODO): fjerne `Oppdrag.enhet` og gjøre
+`Statusmelding.oppdragsenhet` NOT NULL, når koden har gått en stund med broene.
+
 ## 2026-09-12 — Korpsvelgeren virket ikke, og utskrift per korps eller ressurs
 
 **2186 tester grønne** (7 nye), og en røyktest i Chromium: velg korps, velg

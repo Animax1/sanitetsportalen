@@ -188,7 +188,11 @@ ingen av dem gir feilmelding — de er bare stille inaktive.
                   (`0013`, unik på enhet_navn), samme signaturform;
                   statistikken teller oppdrag distinkt og varigheter per bil,
                   `summary.enhetsinnsatser`.
-            - [ ] Deploy 2, senere: fjern `Oppdrag.enhet`
+            - [x] **Deploy 1 til prod 12. sep. 2026** (`4c6017b`), backup tatt først.
+            - [ ] Deploy 2, senere: fjern `Oppdrag.enhet`, `Statusmelding.oppdragsenhet`
+                  NOT NULL (med `SET CONSTRAINTS ALL IMMEDIATE` om et dataskritt går
+                  foran), og broene i `Oppdrag.save()`/`Statusmelding.save()` bort.
+                  Backup før — og la prod gå noen vakter med broene først.
       - [x] **Utskrift per korps eller ressurs** (12. sep. 2026): velger over
             «Oversikt», arkhodet sier utvalget. Fant og rettet at korpsvelgeren
             aldri var koblet til `change` — delegeringen ligger nå i
