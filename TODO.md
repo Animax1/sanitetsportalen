@@ -189,6 +189,8 @@ ingen av dem gir feilmelding — de er bare stille inaktive.
                   statistikken teller oppdrag distinkt og varigheter per bil,
                   `summary.enhetsinnsatser`.
             - [x] **Deploy 1 til prod 12. sep. 2026** (`4c6017b`), backup tatt først.
+            - [x] Hotfix samme dag: detaljvinduet frøs sida etter «Ta av»/«Varsle»
+                  (én Bootstrap-modalinstans for mye; `getOrCreateInstance` overalt).
             - [ ] Deploy 2, senere: fjern `Oppdrag.enhet`, `Statusmelding.oppdragsenhet`
                   NOT NULL (med `SET CONSTRAINTS ALL IMMEDIATE` om et dataskritt går
                   foran), og broene i `Oppdrag.save()`/`Statusmelding.save()` bort.

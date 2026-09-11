@@ -4,6 +4,26 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-12 — Rettet: sida frøs etter «Ta av» eller «Varsle» i detaljvinduet
+
+Funnet av André i prod rett etter deployen: «fjerner en bil eller gir en annen
+bil et oppdrag og du går ut av det vinduet så fryser appen.»
+
+**Årsaken var en modalinstans for mye.** Handlingene per enhet tegner
+detaljvinduet på nytt mens det står åpent, og `visOppdrag()` gjorde
+`new bootstrap.Modal(el).show()` hver gang. Bootstrap 5 lar ett element ha
+én instans: den nye overtok, `.show()` på den la en bakgrunn til, og
+lukkingen fjernet bare den sistes. De andre ble liggende over hele sida.
+«Rett tid» og «Før status» hadde samme feil, og alle modalene i vaktlista
+og pasientarkivet gikk samme vei ved gjentatte åpninger.
+
+Reprodusert med ekte Bootstrap 5.3.2 i Chromium: to bakgrunner igjen etter
+lukking, null med rettelsen, og «Nytt oppdrag»-knappen klikkbar igjen.
+`bootstrap.Modal.getOrCreateInstance(el).show()` overalt der et vindu åpnes
+— ni steder — og `DetaljvinduetTegnesPaaNyttTests` kjører `visOppdrag()`
+tre ganger mot en Modal-stubb med Bootstraps regler og krever én instans.
+Ingen migrasjon.
+
 ## 2026-09-12 — Merget til prod: flere enheter, korpsfilter, utskrift
 
 `rollemodell` → `main` (`4c6017b`), fast-forward. 19 commits: 59 files changed, 7288 insertions(+), 403 deletions(-).

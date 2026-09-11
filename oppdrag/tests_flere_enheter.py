@@ -1112,3 +1112,69 @@ def _flat(fordeling):
         else:
             ut.append(tuple(post))
     return ut
+
+
+class DetaljvinduetTegnesPaaNyttTests(TestCase):
+    """Detaljvinduet tegnes på nytt etter «Ta av», «Varsle», «Før status» og
+    «Rett tid» — mens det står åpent.
+
+    André, 12. sep. 2026: «fjerner en bil eller gir en annen bil et oppdrag
+    og du går ut av det vinduet så fryser appen.» `new bootstrap.Modal(el)`
+    på et element som alt har en instans lager en ny, og `.show()` på den
+    legger en bakgrunn til. Lukkingen fjerner bare den siste; de andre blir
+    liggende over sida. Reprodusert med ekte Bootstrap 5.3.2: to bakgrunner
+    igjen etter lukking. `getOrCreateInstance` gir den som finnes, og
+    `.show()` på et åpent vindu er ingenting.
+    """
+
+    def setUp(self):
+        from patients.js_test_utils import (
+            OPPDRAG_SENTRAL_JS, PORTAL_UTILS_JS, build_harness, node_available)
+        if not node_available():
+            self.skipTest('node er ikke tilgjengelig')
+        self.harness = build_harness((
+            (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue', 'trustedHtml', '_escHtml', 'klokke')),
+            (OPPDRAG_SENTRAL_JS, ('visOppdrag', 'mkEnhetsrader', '_enhetsknapper', '_varsleValg',
+                                  'tidslinjeHtml', 'hastegradKlasse', 'tidSiden')),
+        ))
+
+    STUBB = """
+        globalThis.OPPDRAG_TILGANG = { kanSkrive: true };
+        globalThis.enheter = [];
+        globalThis.apentOppdrag = null;
+        globalThis.apentOppdragId = null;
+        globalThis.apiFetch = async () => ({ ok: true, json: async () => ({ status: 'ok', data: {
+          id: 1, nummer: 1, problemstilling: 'Fall', hastegrad: 'Akutt', lokasjon_navn: 'Scene',
+          status: 'venter', status_navn: 'Venter', fritekst: '', historikk_fra: null,
+          enhet_navn: 'A', enheter: [{enhet_id: 1, enhet_navn: 'A', status: 'venter',
+          status_navn: 'Venter', status_tidspunkt: null}], statusmeldinger: [], historikk: [],
+          enhetsbytter: [] } }) });
+        // Samme element for samme id, som i en ekte DOM — Bootstrap slår opp
+        // instansen på elementet, og et nytt objekt per kall ville skjult feilen.
+        const els = {};
+        const el = () => ({ innerHTML: '', textContent: '', classList: { add() {}, remove() {} } });
+        globalThis.document = { getElementById: (id) => (els[id] = els[id] || el()) };
+        // Bootstrap 5 sin Modal, slik den oppfører seg: én instans per element via
+        // getOrCreateInstance, og en ny konstruksjon teller som en instans til.
+        let laget = 0; const instanser = new Map();
+        class Modal {
+          constructor(e) { laget++; this.e = e; this.vist = 0; }
+          show() { this.vist++; }
+          static getOrCreateInstance(e) {
+            if (!instanser.has(e)) instanser.set(e, new Modal(e));
+            return instanser.get(e);
+          }
+          static getInstance(e) { return instanser.get(e) || null; }
+        }
+        globalThis.bootstrap = { Modal };
+        globalThis.antallLaget = () => laget;
+    """
+
+    def test_a_tegne_vinduet_paa_nytt_lager_ikke_en_ny_modal(self):
+        from patients.js_test_utils import run_node
+        run_node(self.harness, self.STUBB + """
+            await visOppdrag(1);
+            await visOppdrag(1);
+            await visOppdrag(1);
+            assert(antallLaget() === 1, 'forventet én modalinstans, fikk ' + antallLaget());
+        """)

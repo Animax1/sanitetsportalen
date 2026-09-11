@@ -1992,7 +1992,7 @@ function apneNyRessurs(gruppeId) {
     const tittel = document.getElementById('ny-ressurs-tittel');
     if (tittel) tittel.textContent = `Ny ${gruppe.navn}`;
   }
-  new bootstrap.Modal(document.getElementById('nyRessursModal')).show();
+  bootstrap.Modal.getOrCreateInstance(document.getElementById('nyRessursModal')).show();
 }
 
 
@@ -2051,7 +2051,7 @@ function apneRessurs(id) {
       ? `${antall} oppsatt(e) skift fjernes sammen med ressursen.`
       : 'Ressursen har ingen skift på seg.';
   }
-  new bootstrap.Modal(modal).show();
+  bootstrap.Modal.getOrCreateInstance(modal).show();
 }
 
 
@@ -2161,7 +2161,7 @@ function apneVaktpost(ressursId) {
   _settTid('ny-vaktpost-til', start);
 
   _vaktpostModusSkifte();
-  new bootstrap.Modal(document.getElementById('nyVaktpostModal')).show();
+  bootstrap.Modal.getOrCreateInstance(document.getElementById('nyVaktpostModal')).show();
 }
 
 
@@ -2201,7 +2201,7 @@ function apneRoller(ressursId) {
   }
 
   tegnRoller();
-  new bootstrap.Modal(modal).show();
+  bootstrap.Modal.getOrCreateInstance(modal).show();
 }
 
 
@@ -2282,7 +2282,7 @@ function apneGrupper() {
   const flere = document.getElementById('ny-gruppe-flere');
   if (flere) flere.checked = true;
   tegnGrupper();
-  new bootstrap.Modal(document.getElementById('grupperModal')).show();
+  bootstrap.Modal.getOrCreateInstance(document.getElementById('grupperModal')).show();
 }
 
 
@@ -2654,7 +2654,7 @@ function apneRedigerVaktpost(id) {
   const probono = document.getElementById('vaktpost-probono');
   if (probono) probono.checked = !!vp.probono;
 
-  new bootstrap.Modal(modal).show();
+  bootstrap.Modal.getOrCreateInstance(modal).show();
 }
 
 
@@ -2923,7 +2923,7 @@ function _lesFelt(id) {
 
 
 function _apneModal(id) {
-  new bootstrap.Modal(document.getElementById(id)).show();
+  bootstrap.Modal.getOrCreateInstance(document.getElementById(id)).show();
 }
 
 

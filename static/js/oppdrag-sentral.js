@@ -383,7 +383,7 @@ async function visOppdrag(id) {
   const modalEl = document.getElementById('oppdragDetaljModal');
   const innhold = document.getElementById('detalj-innhold');
   innhold.innerHTML = ('<div class="tom-melding">Laster…</div>');
-  new bootstrap.Modal(modalEl).show();
+  bootstrap.Modal.getOrCreateInstance(modalEl).show();
 
   const res = await apiFetch(`/oppdrag/api/oppdrag/${id}/`);
   const d = await res.json();

@@ -2202,7 +2202,7 @@ class NyRessursSkjemaetTests(SimpleTestCase):
       globalThis.document = {
         getElementById: (id) => felter[id] || null,
       };
-      globalThis.bootstrap = {Modal: class { constructor() {} show() {} }};
+      globalThis.bootstrap = {Modal: class { static getOrCreateInstance(el) { return new this(el); } constructor() {} show() {} }};
       globalThis.aktivListe = {vaktliste: {id: 3}};
       globalThis.aktivFane = '';
       globalThis.withSubmitGuard = async (id, fn) => { await fn(); };
@@ -2448,7 +2448,7 @@ class MannskapsfanenTests(SimpleTestCase):
             };
             globalThis.document = { getElementById: (id) => felter[id] || null };
             let apnet = false;
-            globalThis.bootstrap = {Modal: class { constructor() { apnet = true; }
+            globalThis.bootstrap = {Modal: class { static getOrCreateInstance(el) { return new this(el); } constructor() { apnet = true; }
                                                   show() {} }};
             apneVakt();
             assert(apnet === true, 'vinduet aapnet seg ikke uten vaktliste');
@@ -2551,7 +2551,7 @@ class NyVaktpostFyllerDatoenTests(SimpleTestCase):
         });
         felter.nyVaktpostModal = {dataset: {}};
         globalThis.document = {getElementById: (id) => felter[id] || null};
-        globalThis.bootstrap = {Modal: class { constructor() {} show() {} }};
+        globalThis.bootstrap = {Modal: class { static getOrCreateInstance(el) { return new this(el); } constructor() {} show() {} }};
     """
 
     def test_begge_feltene_baerer_vaktas_startdato(self):

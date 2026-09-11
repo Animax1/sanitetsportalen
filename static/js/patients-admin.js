@@ -275,7 +275,7 @@ async function loadArkivListe() {
 
 async function visArkivDetalj(id) {
   _aktivtArkivId = id;
-  const modal = new bootstrap.Modal(document.getElementById('arkivDetaljModal'));
+  const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('arkivDetaljModal'));
   modal.show();
 
   document.getElementById('arkiv-detalj-tittel').innerHTML =
