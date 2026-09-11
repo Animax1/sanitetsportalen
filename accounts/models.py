@@ -166,9 +166,17 @@ class TilgangsNivaa(models.TextChoices):
     global admin, og da ville en vaktleder uten adminrettigheter ikke kunne
     lage sin egen vaktliste. Ingen annen modul deklarerer nivået i dag.
     Se §3.2 i docs/BESLUTNING_ROLLEMODELLEN.md.
+    ``LES_ALLE`` kom 11. sep. 2026, for vaktlista: André ville at den som
+    leser eller fører sitt eget korps bare skal se sitt eget korps på
+    ``/vaktliste/`` — og da trengs et eget trinn for den som skal lese alle.
+    ``les`` er det smale trinnet med vilje: eksisterende rader ble smalere
+    ved oppgraderingen, ikke videre. Synligheten følger ikke stigen —
+    ``skriv_handling`` ligger over ``les_alle`` og ser likevel bare sitt
+    eget korps; se ``vaktliste.services.ser_alle_korps``.
     """
 
     LES = 'les', 'Lese'
+    LES_ALLE = 'les_alle', 'Lese: alt'
     SKRIV_HANDLING = 'skriv_handling', 'Skrive: handling'
     SKRIV_FULL = 'skriv_full', 'Skrive: full'
     SKRIV_LEDER = 'skriv_leder', 'Skrive: leder'

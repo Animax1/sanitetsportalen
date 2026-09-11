@@ -78,7 +78,8 @@ Nivåene er en ordnet stige. **Fravær av rad er ingen tilgang** — det finnes 
 
 | Nivå | Betyr |
 |---|---|
-| `les` | Kan se modulens data |
+| `les` | Kan se modulens data — i vaktlista: **sitt eget korps** |
+| `les_alle` | Vaktlista: ser alle korps. Deklareres kun der |
 | `skriv_handling` | Navngitte overganger (stemplinger), leser ikke request-kroppen |
 | `skriv_full` | Kan redigere felter |
 | `skriv_leder` | Kan sette opp — oppretter og fjerner det de andre redigerer |
@@ -298,8 +299,14 @@ fase 3–7 gjenstår — se `docs/BESLUTNING_VAKTLISTE.md`, som er besluttet i s
   ressursen og glemme plassen. **Tom verdi betyr «som ressursen», ikke «ingen»**: en
   annen tolkning ville gjort alle eksisterende plasser fritt vilt ved oppgraderingen.
   Å *sette* reservasjonen er å dele ut, og krever `skriv_full`.
-- **Tre terskler, og skillet er hva slags utsagn nivået får avgi.** `les` ser hele lista
-  (alle korps — poenget er samordning). Badge + reservasjon bemanner. `skriv_full` deler
+- **Korpsfilteret (11. sep. 2026): `les` og `skriv_handling` ser bare sitt eget korps
+  på `/vaktliste/`; `les_alle`, `skriv_full` og oppover ser alle.** Synligheten følger
+  *ikke* stigen — `skriv_handling` ligger over `les_alle` og ser likevel bare sitt eget.
+  `services.ser_alle_korps()` er det ene stedet; `synlige_vaktposter()` og
+  `synlig_mannskap()` filtrerer i svaret sida bygges av, så alle fanene følger med.
+  Uten badge er lista tom, og malen sier hvorfor. Sentralbordets besetning i
+  `/oppdrag/` er **ikke** filtrert — der er spørsmålet «er bilen klar».
+- **Tre terskler, og skillet er hva slags utsagn nivået får avgi.** Badge + reservasjon bemanner. `skriv_full` deler
   *ut*: ressurser, reservasjoner, nye vakter og verdimengdene — kunne korps-brukeren
   opprette et korps eller omreservere KO, ville badgen sluttet å avgrense noe. Sletting av
   en vaktliste er global admin.

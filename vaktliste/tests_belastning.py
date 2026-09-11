@@ -237,13 +237,21 @@ class BelastningApiTests(TilgangsBasis):
 
     def test_alle_med_les_ser_tallene(self):
         """Tallene *er* lista, regnet sammen. En korps-fører som planlegger
-        sine egne folk trenger nettopp dette."""
-        for navn, c in (('les', self.c_leser), ('korpsfører', self.c_kb),
-                        ('skriv_full', self.c_vl), ('admin', self.c_adm)):
+        sine egne folk trenger nettopp dette.
+
+        **Leseren uten badge ser tallene for en tom liste** (11. sep. 2026):
+        endepunktet svarer 200, men korpsfilteret gir henne ingen skift å
+        regne på. Selve filteret testes i `KorpsfilterTests`; her står bare
+        at porten er åpen for alle med `les`."""
+        for navn, c, personer in (('les uten badge', self.c_leser, 0),
+                                  ('korpsfører', self.c_kb, 1),
+                                  ('skriv_full', self.c_vl, 1),
+                                  ('admin', self.c_adm, 1)):
             with self.subTest(konto=navn):
                 res = self._hent(c)
                 self.assertEqual(200, res.status_code)
-                self.assertEqual(1, res.json()['data']['sammendrag']['personer'])
+                self.assertEqual(personer,
+                                 res.json()['data']['sammendrag']['personer'])
 
     def test_uten_rad_er_det_stengt(self):
         self.assertEqual(403, self._hent(_klient(_bruker('utenfor'))).status_code)

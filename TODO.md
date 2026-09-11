@@ -139,6 +139,12 @@ ingen av dem gir feilmelding — de er bare stille inaktive.
                   viste «8447399 · 11.09.2026 12:34» — byggtiden i norsk
                   tid. Byggsteget kjørte.
       - [x] **Planleggingstabellen klemmes ikke på mobil** (samme dag).
+      - [x] **Korpsfilteret** (samme dag): `les` og `skriv_handling` ser eget
+            korps på `/vaktliste/`, nytt trinn `les_alle` ser alle. `accounts/0016`.
+            - [ ] **Etter deploy til prod: gå gjennom matrisen.** Alle som hadde
+                  `les` ser nå bare sitt eget korps — den som skal samordne må
+                  få `les_alle`. Og kontoer med `les`/`skriv_handling` uten
+                  mannskapsrad ser ingenting til de er koblet.
       - [ ] **Stripe på blokklinja** (mini-Gantt over vaktas spenn) — alternativ
             «Begge deler» i spørsmålet 11. sep.; valgt bort for nå, lett å
             legge til siden blokka alt bærer spennet.

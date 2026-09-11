@@ -333,6 +333,55 @@ def brukerens_korps(user):
     return mannskap.korps if mannskap else None
 
 
+def ser_alle_korps(user) -> bool:
+    """Ser brukeren alle korps på `/vaktliste/`, eller bare sitt eget?
+
+    Andrés bestilling 11. sep. 2026: «de med rollen skrive eget korps ser
+    bare de som er med i sitt eget korps, og samme med de som bare har
+    lesetilgang». **Synligheten følger derfor ikke stigen.** `les_alle` ser
+    alle; `skriv_handling` ligger over den i `NIVAA_HIERARKI` og ser likevel
+    bare sitt eget korps. `skriv_full` og oppover ser alle — de bemanner på
+    tvers. Global admin ser alt.
+
+    Gjelder bare `/vaktliste/`. Sentralbordets besetning i oppdragsmodulen
+    er uendret: den er gatet på `les` i vaktlista og viser bilens folk
+    uansett korps — der er spørsmålet «er bilen klar», ikke «hvem er mine».
+    """
+    from core.auth_decorators import nivaa_for
+    if kan_skrive_alt(user):
+        return True
+    return nivaa_for(user, 'vaktliste') == 'les_alle'
+
+
+def synlige_vaktposter(qs, user):
+    """Skiftene brukeren får se: alle, eller bare sitt eget korps.
+
+    For korps-brukeren: personene i hennes korps, **og de ledige plassene som
+    er satt av til det** — via plassen eller via ressursen, samme
+    sammenslåing som `reservert_korps()`. En ledig plass hun kan fylle må
+    hun kunne se. Uten badge finnes intet korps, og lista er tom —
+    fail-closed, som skrivingen.
+    """
+    from django.db.models import Q
+    if ser_alle_korps(user):
+        return qs
+    korps = brukerens_korps(user)
+    if korps is None:
+        return qs.none()
+    return qs.filter(
+        Q(mannskap__korps=korps)
+        | Q(mannskap__isnull=True, korps=korps)
+        | Q(mannskap__isnull=True, korps__isnull=True, ressurs__korps=korps))
+
+
+def synlig_mannskap(qs, user):
+    """Registeret slik brukeren får se det: alle, eller bare sitt eget korps."""
+    if ser_alle_korps(user):
+        return qs
+    korps = brukerens_korps(user)
+    return qs.filter(korps=korps) if korps is not None else qs.none()
+
+
 def kan_fore_korps(user, korps_id) -> bool:
     """Får brukeren føre folk i dette korpset?
 
@@ -483,7 +532,7 @@ def _hviletider(skift):
     return ut
 
 
-def belastning_per_person(vaktliste, grenser=None):
+def belastning_per_person(vaktliste, grenser=None, user=None):
     """Timer, skift, lengste skift og korteste hvile — per person.
 
     Bestillingen bak §8b: «lista skal hjelpe planleggeren å se *belastningen*
@@ -506,6 +555,10 @@ def belastning_per_person(vaktliste, grenser=None):
     poster = (Vaktpost.objects
               .filter(ressurs__vaktliste=vaktliste, mannskap__isnull=False)
               .select_related('mannskap__korps'))
+    # Korps-brukeren ser sine egne (11. sep. 2026). `user=None` er hele
+    # lista — for kall som ikke kommer fra et view.
+    if user is not None:
+        poster = synlige_vaktposter(poster, user)
 
     per_person = {}
     for vp in poster:
@@ -541,11 +594,14 @@ def belastning_per_person(vaktliste, grenser=None):
     return rader
 
 
-def belastning_sammendrag(vaktliste, rader):
+def belastning_sammendrag(vaktliste, rader, user=None):
     """Tallene som står over lista: hvor mange, hvor mye, hvor mange varsler."""
     from .models import Vaktpost
     ledige = Vaktpost.objects.filter(
-        ressurs__vaktliste=vaktliste, mannskap__isnull=True).count()
+        ressurs__vaktliste=vaktliste, mannskap__isnull=True)
+    if user is not None:
+        ledige = synlige_vaktposter(ledige, user)
+    ledige = ledige.count()
     return {
         'personer': len(rader),
         'skift': sum(r['antall_skift'] for r in rader),

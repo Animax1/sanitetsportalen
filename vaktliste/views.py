@@ -101,6 +101,11 @@ def _tilgangskontekst(user):
         'modul_nivaa': nivaa_for(user, 'vaktliste') or '',
         'er_global_admin': er_global_admin(user),
         'mitt_korps_id': korps.pk if korps else None,
+        # Korpsfilteret (11. sep. 2026): sida sier fra når den viser bare
+        # ett korps, og når den viser ingenting fordi kontoen mangler badge.
+        # En tom liste uten forklaring ser ut som en vakt ingen har satt opp.
+        'ser_alle_korps': services.ser_alle_korps(user),
+        'mitt_korps_navn': korps.navn if korps else '',
     }
 
 
@@ -342,12 +347,18 @@ def vaktliste_detalj_view(request, pk):
         return JsonResponse({'status': 'ok', 'data': _vaktliste_til_dict(vl)})
 
     ressurser = list(vl.ressurser.select_related('korps', 'enhet', 'gruppe'))
-    poster = list(
+    # **Skiftene filtreres her, i svaret sida bygges av.** Da gjelder
+    # korpsfilteret alle fanene på én gang — oversikt, ressursfaner,
+    # tilstede og kurver — i stedet for i hver bygger i nettleseren.
+    # Ressursene er infrastruktur og sendes alle: en bil reservert et
+    # annet korps står der med tom tabell, og merkelappen sier hvorfor.
+    poster = list(services.synlige_vaktposter(
         Vaktpost.objects
         .filter(ressurs__vaktliste=vl)
         .select_related('mannskap', 'mannskap__korps', 'rolle', 'ressurs')
-        .prefetch_related('mannskap__kompetanser')
-    )
+        .prefetch_related('mannskap__kompetanser'),
+        request.user,
+    ))
     foreldre = services.foreldrekart()
     return JsonResponse({'status': 'ok', 'data': {
         'vaktliste': _vaktliste_til_dict(vl),
@@ -648,10 +659,10 @@ def belastning_view(request, pk):
         return _feil('Vaktliste ikke funnet', status=404)
 
     grenser = Belastningsgrenser.hent()
-    rader = services.belastning_per_person(vl, grenser)
+    rader = services.belastning_per_person(vl, grenser, user=request.user)
     return JsonResponse({'status': 'ok', 'data': {
         'personer': rader,
-        'sammendrag': services.belastning_sammendrag(vl, rader),
+        'sammendrag': services.belastning_sammendrag(vl, rader, user=request.user),
         'grenser': {
             'maks_skift_timer': grenser.maks_skift_timer,
             'min_hvile_timer': grenser.min_hvile_timer,

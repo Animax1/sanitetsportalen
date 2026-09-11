@@ -143,7 +143,8 @@ skal påvirke stort utenfor vaktlista — og da holder stigen portalen allerede 
 
 | Nivå | Betyr i denne modulen |
 |---|---|
-| `les` | Ser hele lista, alle korps |
+| `les` | Ser **sitt eget korps** (endret 11. sep. 2026 — sto «hele lista, alle korps» fram til da, se §4.4) |
+| `les_alle` | Ser hele lista, alle korps (nytt 11. sep. 2026) |
 | `skriv_handling` | Fører **sitt eget korps**: legger til og redigerer mannskap med sin egen badge, og plasserer dem — med tider — på ressurser **reservert sitt korps** (§4.2). **Kan ikke** stemple møtt/av vakt |
 | `skriv_full` | Alle korps, fritt blandet på tvers av badge. Reserverer ressurser til korps, setter lista i drift og ut av drift, og er — sammen med admin — den eneste som stempler møtt/av vakt |
 
@@ -193,8 +194,32 @@ Prisen står i §4.5.
   Å legge inn flere korps per person nå ville vært å bygge for et tilfelle som ikke
   finnes — og bestillingen var eksplisitt på å ikke overkomplisere korpsbegrepet.
 
-`les` gjelder hele lista med vilje: poenget med en vaktliste er samordning på tvers av
-korps. Den som ikke skal se andre korps, skal ikke ha modulen.
+~~`les` gjelder hele lista med vilje: poenget med en vaktliste er samordning på tvers av
+korps. Den som ikke skal se andre korps, skal ikke ha modulen.~~
+
+**Snudd 11. sep. 2026.** André, etter første bruk i prod: «Kan vi få det sånn at de
+med rollen skrive eget korps på oversikt ser bare de som er med i sitt eget korps? Og
+samme med de som har bare lese tilgang på vaktlista? Dette gjelder bare for
+/vaktliste/.» Og på spørsmål om leseren uten korps: «La oss for orden skyld ha 2 lese
+tilganger da, en for eget korps og en for alle korps.»
+
+- **`les` ble det smale trinnet, `les_alle` det vide.** Eksisterende `les`-rader ble
+  smalere ved oppgraderingen, ikke videre — den trygge retningen. Samordneren får
+  `les_alle` i matrisen.
+- **Synligheten følger ikke stigen.** `skriv_handling` ligger over `les_alle` i
+  `NIVAA_HIERARKI` og ser likevel bare sitt eget korps. Stigen ordner hva man får
+  *gjøre*; hvilket korps man ser er modulens egen regel, `services.ser_alle_korps()`.
+  Det er en pris, og den er betalt med vilje: alternativet var å legge `les_alle` over
+  `skriv_handling`, og da hadde en leser rangert over en som skriver.
+- **Filteret ligger i svaret sida bygges av** — `vaktliste_detalj_view`,
+  `belastning_view` og `mannskap_view` — ikke i byggerne i nettleseren. Da følger alle
+  fanene med på én gang. Ressursene sendes alle: en bil reservert et annet korps står
+  der med tom tabell og merkelappen sier hvorfor. Ledige plasser satt av til eget korps
+  vises — en plass hun kan fylle må hun kunne se.
+- **Uten badge er lista tom**, og malen sier hvorfor (`#vl-korpsfilter`). Samme form
+  som skrivingen: uten korps finnes ingenting å avgrense til.
+- **Gjelder bare `/vaktliste/`.** Sentralbordets besetning i oppdragsmodulen (fase 6)
+  er uendret — der er spørsmålet «er bilen klar», ikke «hvem er mine».
 
 ### 4.5 Prisen: nivånavnet betyr noe annet her enn i oppdrag
 

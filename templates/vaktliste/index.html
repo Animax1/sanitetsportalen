@@ -92,6 +92,29 @@
     portalen.
   </div>
 
+  {% comment %}
+    Korpsfilteret (11. sep. 2026). Serveren sender bare brukerens eget korps
+    til den som leser eller fører eget korps — og da må sida si det, ellers
+    ser en halv liste ut som en halvferdig vakt. Uten badge er lista tom, og
+    en tom liste uten forklaring ser ut som en vakt ingen har satt opp.
+  {% endcomment %}
+  {% if not ser_alle_korps %}
+    {% if mitt_korps_navn %}
+    <div id="vl-korpsfilter" class="alert alert-secondary py-2">
+      <i class="bi bi-funnel me-1"></i>Du ser bare ditt eget korps:
+      <strong>{{ mitt_korps_navn }}</strong>. Ledige plasser satt av til
+      korpset vises også.
+    </div>
+    {% else %}
+    <div id="vl-korpsfilter" class="alert alert-warning py-2">
+      <i class="bi bi-person-x me-1"></i><strong>Kontoen din er ikke knyttet
+      til et korps.</strong> Tilgangen din gjelder eget korps, og uten
+      kobling i mannskapsregisteret er lista tom. Be den som administrerer
+      vaktlista koble kontoen til mannskapsraden din.
+    </div>
+    {% endif %}
+  {% endif %}
+
   <div id="vl-mangler-mannskap" class="alert alert-warning d-none">
     <strong>Mannskapsregisteret er tomt.</strong>
     Vaktlista bemannes fra det registeret — legg inn korps under

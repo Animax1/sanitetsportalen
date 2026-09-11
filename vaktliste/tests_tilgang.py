@@ -12,7 +12,7 @@ hvem som holdes ute.
 
 | Konto | Har |
 |---|---|
-| `leser` | `les` |
+| `leser` | `les` — uten badge fram til 11. sep. 2026; nå med badge i Haugesund, se `KorpsfilterTests` |
 | `kb` | `skriv_handling` + mannskapsrad i Haugesund (badgen) |
 | `vaktleder` | `skriv_full`, ingen badge |
 | `admin` | global admin |
@@ -133,20 +133,26 @@ class SidetilgangTests(TilgangsBasis):
 
 
 class LesingTests(TilgangsBasis):
-    """`les` ser **hele** lista, alle korps (§4.4).
+    """Hvem som ser hva — snudd 11. sep. 2026 (§4.4).
 
-    Poenget med en vaktliste er samordning på tvers av korps. Den som ikke
-    skal se andre korps, skal ikke ha modulen.
+    Fram til da så `les` hele lista, alle korps: «poenget er samordning».
+    André ville ha det motsatt: leseren og korps-føreren ser sitt eget korps,
+    og den som samordner får det nye trinnet `les_alle`. Detaljene står i
+    `KorpsfilterTests`; her står bare det som ikke er filtrert.
     """
 
-    def test_leser_ser_alle_korps_sine_ressurser(self):
-        data = self.c_leser.get(
-            f'/vaktliste/api/vaktlister/{self.vl.pk}/').json()['data']
-        self.assertEqual(len(data['ressurser']), 3)
+    def test_alle_ser_alle_ressursene(self):
+        """Ressursene er infrastruktur, ikke folk: en bil reservert et annet
+        korps står der med tom tabell, og merkelappen sier hvorfor."""
+        for navn, c in (('les', self.c_leser), ('skriv_handling', self.c_kb)):
+            with self.subTest(konto=navn):
+                data = c.get(
+                    f'/vaktliste/api/vaktlister/{self.vl.pk}/').json()['data']
+                self.assertEqual(len(data['ressurser']), 3)
 
-    def test_korpsbruker_ser_ogsaa_andre_korps(self):
+    def test_korpsbruker_ser_bare_sitt_eget_korps_i_registeret(self):
         data = self.c_kb.get('/vaktliste/api/mannskap/').json()['data']
-        self.assertEqual({m['navn'] for m in data['mannskap']}, {'Kari', 'Ola'})
+        self.assertEqual({m['navn'] for m in data['mannskap']}, {'Kari'})
 
     def test_kontolista_er_bare_for_dem_som_kan_bruke_den(self):
         """`user_id` er `skriv_full`-felt. En liste over portalens brukernavn
@@ -749,7 +755,8 @@ class LedernivaaetsPlassIStigenTests(TestCase):
     def test_stigen_er_ordnet(self):
         from core.auth_decorators import har_tilgang
         bruker = _bruker('leder', 'skriv_leder')
-        for krav in ('les', 'skriv_handling', 'skriv_full', 'skriv_leder'):
+        for krav in ('les', 'les_alle', 'skriv_handling', 'skriv_full',
+                     'skriv_leder'):
             with self.subTest(krav=krav):
                 self.assertTrue(har_tilgang(bruker, 'vaktliste', krav))
 
@@ -956,3 +963,168 @@ class KorpsPaaPlassenTests(TilgangsBasis):
         self.c_vl.put(f'/vaktliste/api/vaktposter/{pk}/',
                       data={'korps_id': None}, content_type='application/json')
         self.assertIsNone(Vaktpost.objects.get(pk=pk).korps_id)
+
+
+@override_settings(SECURE_SSL_REDIRECT=False, RATELIMIT_ENABLE=False)
+class KorpsfilterTests(TilgangsBasis):
+    """Korpsfilteret (11. sep. 2026): hvem ser hvilke korps på `/vaktliste/`.
+
+    André: «de med rollen skrive eget korps ser bare de som er med i sitt
+    eget korps, og samme med de som bare har lesetilgang — gjelder bare
+    /vaktliste/». Og: «to lesetilganger, en for eget korps og en for alle».
+
+    Fem kontoer gjennom samme spørsmål, fra begge sider: hvem holdes ute er
+    like viktig som hvem som slipper inn.
+
+    | Konto | Nivå | Badge | Ser |
+    |---|---|---|---|
+    | `leser` | `les` | Haugesund | eget korps |
+    | `leser_uten` | `les` | — | ingenting |
+    | `samordner` | `les_alle` | — | alle |
+    | `kb` | `skriv_handling` | Haugesund | eget korps — over `les_alle` i stigen, ser likevel bare sitt eget |
+    | `vaktleder` | `skriv_full` | — | alle |
+    """
+
+    def setUp(self):
+        super().setUp()
+        # Leseren får badge i Haugesund; Ola i Karmøy får sin egen leser.
+        self.p_leser = Mannskap.objects.create(
+            navn='Leseren', korps=self.hgsd, user=self.leser)
+        self.leser_uten = _bruker('leser_uten', 'les')
+        self.samordner = _bruker('samordner', 'les_alle')
+        self.c_uten = _klient(self.leser_uten)
+        self.c_sam = _klient(self.samordner)
+
+        # Ett skift per korps, og to ledige plasser: én satt av til Haugesund
+        # via ressursen, én til Karmøy via plassen på den frie ressursen.
+        Vaktpost.objects.create(ressurs=self.res_hgsd, mannskap=self.p_hgsd,
+                                fra_tid=self.na, til_tid=self.na + timedelta(hours=8))
+        Vaktpost.objects.create(ressurs=self.res_karmoy, mannskap=self.p_karmoy,
+                                fra_tid=self.na, til_tid=self.na + timedelta(hours=8))
+        self.ledig_hgsd = Vaktpost.objects.create(
+            ressurs=self.res_hgsd, mannskap=None,
+            fra_tid=self.na, til_tid=self.na + timedelta(hours=4))
+        self.ledig_karmoy = Vaktpost.objects.create(
+            ressurs=self.res_fri, mannskap=None, korps=self.karmoy,
+            fra_tid=self.na, til_tid=self.na + timedelta(hours=4))
+
+    def _poster(self, c):
+        data = c.get(f'/vaktliste/api/vaktlister/{self.vl.pk}/').json()['data']
+        return data['vaktposter']
+
+    def _navn(self, c):
+        return {vp['navn'] for vp in self._poster(c) if not vp['ledig']}
+
+    def _ledige(self, c):
+        return {vp['id'] for vp in self._poster(c) if vp['ledig']}
+
+    # ── Skiftene ─────────────────────────────────────────────────────────
+    def test_leser_med_badge_ser_bare_sitt_korps(self):
+        self.assertEqual(self._navn(self.c_leser), {'Kari'})
+
+    def test_korpsforeren_ser_bare_sitt_korps(self):
+        """Over `les_alle` i stigen, og ser likevel bare sitt eget: synligheten
+        følger ikke stigen."""
+        self.assertEqual(self._navn(self.c_kb), {'Kari'})
+
+    def test_les_alle_ser_alle(self):
+        self.assertEqual(self._navn(self.c_sam), {'Kari', 'Ola'})
+
+    def test_skriv_full_og_admin_ser_alle(self):
+        for navn, c in (('skriv_full', self.c_vl), ('skriv_leder', self.c_leder),
+                        ('admin', self.c_adm)):
+            with self.subTest(konto=navn):
+                self.assertEqual(self._navn(c), {'Kari', 'Ola'})
+
+    def test_uten_badge_er_lista_tom(self):
+        """Fail-closed, som skrivingen: uten korps finnes ingenting å
+        avgrense til."""
+        self.assertEqual(self._poster(self.c_uten), [])
+
+    def test_ledige_plasser_folger_reservasjonen(self):
+        """En plass hun kan fylle må hun kunne se — via ressursen *eller*
+        plassen, samme sammenslåing som `reservert_korps()`. Karmøys plass
+        på den frie ressursen er ikke hennes."""
+        self.assertEqual(self._ledige(self.c_leser), {self.ledig_hgsd.pk})
+        self.assertEqual(self._ledige(self.c_sam),
+                         {self.ledig_hgsd.pk, self.ledig_karmoy.pk})
+
+    def test_ureservert_ledig_plass_er_vaktlederens_og_vises_ikke(self):
+        fri = Vaktpost.objects.create(
+            ressurs=self.res_fri, mannskap=None,
+            fra_tid=self.na, til_tid=self.na + timedelta(hours=4))
+        self.assertNotIn(fri.pk, self._ledige(self.c_leser))
+        self.assertIn(fri.pk, self._ledige(self.c_vl))
+
+    # ── Registeret og planleggingstallene ────────────────────────────────
+    def test_registeret_folger_filteret(self):
+        for navn, c, venter in (('les', self.c_leser, {'Kari', 'Leseren'}),
+                                ('les_alle', self.c_sam, {'Kari', 'Leseren', 'Ola'}),
+                                ('uten badge', self.c_uten, set())):
+            with self.subTest(konto=navn):
+                data = c.get('/vaktliste/api/mannskap/').json()['data']
+                self.assertEqual({m['navn'] for m in data['mannskap']}, venter)
+
+    def test_planleggingstallene_folger_filteret(self):
+        """Tallene er lista, regnet sammen — og da må de regnes av den lista
+        brukeren ser. Ellers sto «2 personer» over en tabell med én rad."""
+        for navn, c, venter in (('les', self.c_leser, {'Kari'}),
+                                ('les_alle', self.c_sam, {'Kari', 'Ola'}),
+                                ('uten badge', self.c_uten, set())):
+            with self.subTest(konto=navn):
+                data = c.get(
+                    f'/vaktliste/api/vaktlister/{self.vl.pk}/belastning/').json()['data']
+                self.assertEqual({r['navn'] for r in data['personer']}, venter)
+                self.assertEqual(data['sammendrag']['personer'], len(venter))
+        # Ledige plasser i sammendraget følger også reservasjonen.
+        data = self.c_leser.get(
+            f'/vaktliste/api/vaktlister/{self.vl.pk}/belastning/').json()['data']
+        self.assertEqual(data['sammendrag']['ledige_plasser'], 1)
+
+    # ── Sida sier fra ────────────────────────────────────────────────────
+    def test_sida_sier_hvilket_korps_den_viser(self):
+        res = self.c_leser.get('/vaktliste/')
+        self.assertContains(res, 'id="vl-korpsfilter"')
+        self.assertContains(res, 'Haugesund')
+
+    def test_sida_forklarer_den_tomme_lista(self):
+        res = self.c_uten.get('/vaktliste/')
+        self.assertContains(res, 'id="vl-korpsfilter"')
+        self.assertContains(res, 'ikke knyttet')
+
+    def test_den_som_ser_alt_faar_ingen_merknad(self):
+        for navn, c in (('les_alle', self.c_sam), ('skriv_full', self.c_vl),
+                        ('admin', self.c_adm)):
+            with self.subTest(konto=navn):
+                self.assertNotContains(c.get('/vaktliste/'), 'vl-korpsfilter')
+
+    # ── Regelen selv ─────────────────────────────────────────────────────
+    def test_ser_alle_korps_folger_ikke_stigen(self):
+        self.assertFalse(services.ser_alle_korps(self.leser))
+        self.assertTrue(services.ser_alle_korps(self.samordner))
+        self.assertFalse(services.ser_alle_korps(self.korpsbruker),
+                         'skriv_handling ligger over les_alle, men ser eget korps')
+        self.assertTrue(services.ser_alle_korps(self.vaktleder))
+        self.assertTrue(services.ser_alle_korps(self.admin))
+
+    def test_les_alle_skriver_ingenting(self):
+        """Et lesetrinn er et lesetrinn — også det vide."""
+        res = self._sett_paa(self.c_sam, self.res_hgsd, self.p_hgsd)
+        self.assertEqual(res.status_code, 403)
+
+    def test_matrisen_tilbyr_begge_lesetrinnene_med_egne_etiketter(self):
+        from accounts.forms import ModulTilgangForm
+        bruker = CustomUser.objects.create_user(
+            username='m4', password='x', must_change_password=False)
+        valg = dict(ModulTilgangForm(bruker=bruker).fields['modul_vaktliste'].choices)
+        self.assertEqual(valg['les'], 'Lese: eget korps')
+        self.assertEqual(valg['les_alle'], 'Lese: alle korps')
+
+    def test_bare_vaktlista_tilbyr_les_alle(self):
+        from core.modules import get_all_modules
+        for modul in get_all_modules():
+            with self.subTest(modul=modul.slug):
+                if modul.slug == 'vaktliste':
+                    self.assertIn('les_alle', modul.nivaaer)
+                else:
+                    self.assertNotIn('les_alle', modul.nivaaer)

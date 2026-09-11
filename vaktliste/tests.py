@@ -184,7 +184,7 @@ class ModulRegistreringTests(TestCase):
     def test_nivaaene_er_deklarert(self):
         self.assertEqual(
             get_module('vaktliste').nivaaer,
-            ('les', 'skriv_handling', 'skriv_full', 'skriv_leder'))
+            ('les', 'les_alle', 'skriv_handling', 'skriv_full', 'skriv_leder'))
 
     def test_admin_ser_modulen(self):
         admin = User.objects.create_user(

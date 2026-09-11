@@ -354,9 +354,14 @@ def mannskap_view(request):
     egne folk, ikke andres.
     """
     if request.method == 'GET':
-        folk = (Mannskap.objects
-                .select_related('korps', 'user')
-                .prefetch_related('kompetanser'))
+        # Korps-brukeren ser sitt eget korps (11. sep. 2026) — registeret
+        # er adresseboka, og andres telefonnumre er ikke noe hun trenger
+        # for å føre sin egen liste.
+        folk = services.synlig_mannskap(
+            Mannskap.objects
+            .select_related('korps', 'user')
+            .prefetch_related('kompetanser'),
+            request.user)
         foreldre = services.foreldrekart()
         return JsonResponse({'status': 'ok', 'data': {
             'mannskap': [_mannskap_til_dict(m, foreldre) for m in folk],

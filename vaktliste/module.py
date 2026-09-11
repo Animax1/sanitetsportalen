@@ -25,6 +25,13 @@ den noe galt, retter man det tilbake. `skriv_leder` setter opp vakta:
 oppretter og fjerner ressurser og vaktlister, endrer vaktas lengde, lager
 roller og grupper. En fjernet ressurs tar bemanningen med seg, og det er ikke
 en feil man angrer. Vaktlista er den eneste modulen som deklarerer nivået.
+
+**Fem nivåer fra 11. sep. 2026: `les` ble «eget korps», og `les_alle` kom
+til.** Andrés bestilling: den som leser eller fører sitt eget korps skal bare
+se sitt eget korps på `/vaktliste/`. Notatets §4.4 sa det motsatte — «`les`
+ser hele lista, poenget er samordning» — og den som samordner får nå
+`les_alle`. Synligheten følger ikke stigen: `skriv_handling` ligger over
+`les_alle` og ser likevel bare sitt eget korps. Se `services.ser_alle_korps`.
 """
 from core.modules import Module
 
@@ -43,9 +50,10 @@ VaktlisteModule = Module(
     order=115,              # mellom statistikk (110) og oppdrag (120)
     show_in_nav=True,
     show_in_dashboard=True,
-    nivaaer=('les', 'skriv_handling', 'skriv_full', 'skriv_leder'),
+    nivaaer=('les', 'les_alle', 'skriv_handling', 'skriv_full', 'skriv_leder'),
     nivaa_navn=(
-        ('les', 'Lese — hele lista, alle korps'),
+        ('les', 'Lese: eget korps'),
+        ('les_alle', 'Lese: alle korps'),
         ('skriv_handling', 'Skrive: eget korps'),
         ('skriv_full', 'Skrive: alle korps'),
         ('skriv_leder', 'Skrive: leder — setter opp vakta'),

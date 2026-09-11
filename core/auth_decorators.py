@@ -50,11 +50,18 @@ from django.http import JsonResponse
 # Hvert trinn inneholder trinnene under seg — `har_tilgang(..., 'les')` er sant
 # for alle fire. Et nytt trinn er derfor additivt for modulene som ikke
 # deklarerer det: de tilbyr det ikke i matrisen, og ingen kan få det der.
+#
+# `les_alle` (11. sep. 2026) er trinnet mellom `les` og `skriv_handling`, og
+# finnes for vaktlista: `les` ser sitt eget korps, `les_alle` ser alle. Merk at
+# **synlighet ikke følger stigen**: `skriv_handling` ligger over `les_alle`,
+# men ser bare sitt eget korps. Stigen ordner hva man får *gjøre*; hvilket
+# korps man ser er modulens egen regel (`vaktliste.services.ser_alle_korps`).
 NIVAA_HIERARKI = {
     'les': 0,
-    'skriv_handling': 1,
-    'skriv_full': 2,
-    'skriv_leder': 3,
+    'les_alle': 1,
+    'skriv_handling': 2,
+    'skriv_full': 3,
+    'skriv_leder': 4,
 }
 
 _TILGANG_CACHE = '_modultilgang_cache'

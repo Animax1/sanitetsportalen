@@ -4,6 +4,34 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-11 — Korpsfilteret: `les` og `skriv_handling` ser sitt eget korps
+
+André: «de med rollen skrive eget korps ser bare de som er med i sitt eget
+korps, og samme med de som bare har lesetilgang — gjelder bare /vaktliste/».
+Og om leseren uten korps: «to lesetilganger, en for eget korps og en for
+alle korps».
+
+**Nytt trinn `les_alle`** mellom `les` og `skriv_handling` i `NIVAA_HIERARKI`
+(`accounts/0016`, ren `AlterField`). Vaktlista er den eneste som deklarerer
+det: `les` = «Lese: eget korps», `les_alle` = «Lese: alle korps».
+**Eksisterende `les`-rader ble smalere**, ikke videre — den trygge retningen;
+den som skal samordne får `les_alle` i matrisen.
+
+**Synligheten følger ikke stigen.** `skriv_handling` ligger over `les_alle`
+og ser likevel bare sitt eget korps; `skriv_full` og oppover ser alle.
+`services.ser_alle_korps()` er det ene stedet. `synlige_vaktposter()` og
+`synlig_mannskap()` filtrerer i svaret sida bygges av — `vaktliste_detalj_view`,
+`belastning_view`, `mannskap_view` — så oversikt, ressursfaner, tilstede,
+kurver, planleggingstall og registeret følger med på én gang. Ledige plasser
+satt av til eget korps vises (via plassen eller ressursen, samme
+sammenslåing som `reservert_korps()`). Uten badge er lista tom, og malen
+sier hvorfor. Sentralbordets besetning i `/oppdrag/` er **ikke** filtrert.
+
+Notatets §4.4 («`les` ser hele lista — poenget er samordning») er strøket
+med dato og begrunnelse; CLAUDE.md oppdatert.
+
+---
+
 ## 2026-09-11 — Bygg og dato i footeren, og en planleggingstabell som ikke klemmes
 
 **1972 tester grønne** (13 nye). To punkter fra André.
