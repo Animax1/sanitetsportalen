@@ -392,3 +392,389 @@ class BackupTests(FlereEnheterBasis):
         self.assertEqual({r.enhet.navn: r.status for r in o.enheter.all()},
                          {'Haugesund 56': choices.VENTER, 'Karmøy 12': choices.RYKKER_UT})
         self.assertEqual(Statusmelding.objects.get().oppdragsenhet.enhet, self.b)
+
+
+# ── Trinn 2: endepunktene og sentralbordets føring ──────────────────────────
+
+class SentralbordBasis(FlereEnheterBasis):
+    def setUp(self):
+        super().setUp()
+        self.sentral = _bruker('sentral', 'skriv_full')
+        self.ks = _klient(self.sentral)
+
+    def _gammelt(self, *enheter):
+        """Et oppdrag opprettet for to timer siden — så en føring har rom
+        mellom `created_at` og nå."""
+        o = self._oppdrag(enheter[0] if enheter else self.a)
+        for e in enheter[1:]:
+            services.varsle_enhet(o, e)
+        Oppdrag.objects.filter(pk=o.pk).update(
+            created_at=timezone.now() - timedelta(hours=2))
+        o.refresh_from_db()
+        return o
+
+    def _for(self, minutter):
+        return timezone.now() - timedelta(minutes=minutter)
+
+
+class OpprettMedFlereEnheterTests(SentralbordBasis):
+    """`POST api/oppdrag/` tar `enhet_ider` — den første er primær (§4)."""
+
+    def _kropp(self, **ekstra):
+        return {'problemstilling': 'Pustevansker', 'hastegrad': 'Akutt',
+                'lokasjon_id': self.lokasjon.pk, **ekstra}
+
+    def test_enhet_ider_gir_en_rad_per_enhet_i_rekkefolge(self):
+        res = self.ks.post('/oppdrag/api/oppdrag/', content_type='application/json',
+                           data=self._kropp(enhet_ider=[self.b.pk, self.a.pk, self.b.pk]))
+        self.assertEqual(res.status_code, 200, res.content)
+        o = Oppdrag.objects.get(pk=res.json()['data']['id'])
+        self.assertEqual([r.enhet for r in o.enheter.all()], [self.b, self.a],
+                         'dubletten strøket, rekkefølgen holdt')
+        self.assertEqual(o.enhet, self.b, 'den første er primær')
+        self.assertEqual([e['enhet_navn'] for e in res.json()['data']['enheter']],
+                         ['Karmøy 12', 'Haugesund 56'])
+        self.assertTrue(all(r.varslet_av == self.sentral for r in o.enheter.all()))
+
+    def test_enhet_id_virker_fortsatt_og_betyr_en(self):
+        res = self.ks.post('/oppdrag/api/oppdrag/', content_type='application/json',
+                           data=self._kropp(enhet_id=self.a.pk))
+        self.assertEqual(res.status_code, 200, res.content)
+        self.assertEqual(len(res.json()['data']['enheter']), 1)
+
+    def test_tom_liste_og_ukjent_enhet_avvises_uten_at_noe_opprettes(self):
+        for ider in ([], [self.a.pk, 999999], ['x'], 'ikke-en-liste'):
+            with self.subTest(ider=ider):
+                res = self.ks.post('/oppdrag/api/oppdrag/', content_type='application/json',
+                                   data=self._kropp(enhet_ider=ider))
+                self.assertEqual(res.status_code, 400, res.content)
+        self.assertEqual(Oppdrag.objects.count(), 0)
+
+    def test_enhet_som_ikke_er_paa_vakt_avviser_hele_opprettelsen(self):
+        self.b.pa_vakt = False
+        self.b.save()
+        res = self.ks.post('/oppdrag/api/oppdrag/', content_type='application/json',
+                           data=self._kropp(enhet_ider=[self.a.pk, self.b.pk]))
+        self.assertEqual(res.status_code, 400)
+        self.assertEqual(Oppdrag.objects.count(), 0)
+
+
+class VarsleOgTaAvEndepunktTests(SentralbordBasis):
+
+    def _url(self, o, enhet):
+        return f'/oppdrag/api/oppdrag/{o.pk}/enheter/{enhet.pk}/'
+
+    def test_post_varsler_og_delete_tar_av(self):
+        o = self._oppdrag(self.a)
+        res = self.ks.post(self._url(o, self.b), content_type='application/json', data={})
+        self.assertEqual(res.status_code, 200, res.content)
+        self.assertEqual([e['enhet_navn'] for e in res.json()['data']['enheter']],
+                         ['Haugesund 56', 'Karmøy 12'])
+        res = self.ks.delete(self._url(o, self.b))
+        self.assertEqual(res.status_code, 200, res.content)
+        self.assertEqual([e['enhet_navn'] for e in res.json()['data']['enheter']],
+                         ['Haugesund 56'])
+
+    def test_reglene_gir_400_med_forklaring(self):
+        o = self._to_enheter()
+        self.assertEqual(self.ks.post(self._url(o, self.b), content_type='application/json',
+                                      data={}).status_code, 400, 'alt varslet')
+        services.sett_status(o, choices.RYKKER_UT, enhet=self.b)
+        res = self.ks.delete(self._url(o, self.b))
+        self.assertEqual(res.status_code, 400)
+        self.assertIn('meld ledig', res.json()['message'])
+        self.ks.delete(self._url(o, self.a))
+        self.assertEqual(self.ks.delete(self._url(o, self.b)).status_code, 400, 'den siste')
+
+    def test_enhet_utenfor_vakt_kan_ikke_varsles(self):
+        o = self._oppdrag(self.a)
+        self.b.pa_vakt = False
+        self.b.save()
+        self.assertEqual(self.ks.post(self._url(o, self.b), content_type='application/json',
+                                      data={}).status_code, 400)
+
+    def test_gaten_er_skriv_full_og_ikke_enhetskonto(self):
+        o = self._oppdrag(self.a)
+        handling = _klient(_bruker('handling', 'skriv_handling'))
+        self.assertEqual(handling.post(self._url(o, self.b), content_type='application/json',
+                                       data={}).status_code, 403)
+        bil = _bruker('bil_a', 'skriv_full')
+        self.a.user = bil
+        self.a.save()
+        self.assertEqual(_klient(bil).post(self._url(o, self.b), content_type='application/json',
+                                           data={}).status_code, 403)
+
+    def test_ukjent_oppdrag_eller_enhet_er_404(self):
+        o = self._oppdrag(self.a)
+        self.assertEqual(self.ks.post(f'/oppdrag/api/oppdrag/999999/enheter/{self.b.pk}/',
+                                      content_type='application/json', data={}).status_code, 404)
+        self.assertEqual(self.ks.post(f'/oppdrag/api/oppdrag/{o.pk}/enheter/999999/',
+                                      content_type='application/json', data={}).status_code, 404)
+
+
+class FoeringTests(SentralbordBasis):
+    """§9: sentralbordet fører en status bilen glemte — bakover i tid."""
+
+    def _url(self, o, enhet, overgang, sted=None):
+        u = f'/oppdrag/api/oppdrag/{o.pk}/enheter/{enhet.pk}/status/{overgang}/'
+        return u + f'{sted}/' if sted else u
+
+    def test_foering_lager_en_manuell_melding_paa_hennes_rad(self):
+        o = self._gammelt(self.a, self.b)
+        res = self.ks.post(self._url(o, self.b, 'rykker_ut'), content_type='application/json',
+                           data={'tidspunkt': self._for(30).isoformat()})
+        self.assertEqual(res.status_code, 200, res.content)
+        m = Statusmelding.objects.get(oppdragsenhet__enhet=self.b)
+        self.assertTrue(m.manuell)
+        self.assertFalse(m.automatisk)
+        self.assertEqual(m.meldt_av, self.sentral)
+        self.assertEqual(services.koblingsrad(o, self.b).status, choices.RYKKER_UT)
+        self.assertEqual(services.koblingsrad(o, self.a).status, choices.VENTER)
+        self.assertTrue(res.json()['data']['melding']['manuell'])
+        self.assertEqual(res.json()['data']['oppdrag']['status'], choices.RYKKER_UT)
+
+    def test_tidspunkt_er_paakrevd(self):
+        o = self._gammelt(self.a)
+        for kropp in ({}, {'tidspunkt': ''}, {'tidspunkt': 'i går'}):
+            with self.subTest(kropp=kropp):
+                res = self.ks.post(self._url(o, self.a, 'rykker_ut'),
+                                   content_type='application/json', data=kropp)
+                self.assertEqual(res.status_code, 400, res.content)
+        self.assertEqual(Statusmelding.objects.count(), 0)
+
+    def test_overgangsreglene_gjelder_operatoren(self):
+        o = self._gammelt(self.a)
+        res = self.ks.post(self._url(o, self.a, 'fremme'), content_type='application/json',
+                           data={'tidspunkt': self._for(30).isoformat()})
+        self.assertEqual(res.status_code, 400)
+        self.assertIn('Venter', res.json()['message'])
+
+    def test_ikke_i_framtiden_ikke_foer_oppdraget_ikke_bak_siste(self):
+        o = self._gammelt(self.a)
+        services.sett_status(o, choices.RYKKER_UT, tidspunkt=self._for(60))
+        for tid, feil in ((timezone.now() + timedelta(minutes=5), 'framtiden'),
+                          (self._for(180), 'opprettet'),
+                          (self._for(90), 'Rykker ut')):
+            with self.subTest(feil=feil):
+                res = self.ks.post(self._url(o, self.a, 'fremme'),
+                                   content_type='application/json',
+                                   data={'tidspunkt': tid.isoformat()})
+                self.assertEqual(res.status_code, 400, res.content)
+                self.assertIn(feil, res.json()['message'])
+
+    def test_avreist_med_sted(self):
+        o = self._gammelt(self.a)
+        services.sett_status(o, choices.RYKKER_UT, tidspunkt=self._for(60))
+        services.sett_status(o, choices.FREMME, tidspunkt=self._for(50))
+        res = self.ks.post(self._url(o, self.a, 'avreist', 'sykehus'),
+                           content_type='application/json',
+                           data={'tidspunkt': self._for(40).isoformat()})
+        self.assertEqual(res.status_code, 200, res.content)
+        self.assertEqual(res.json()['data']['melding']['sted_navn'], 'Sykehus')
+        self.assertEqual(self.ks.post(self._url(o, self.a, 'fremme', 'sykehus'),
+                                      content_type='application/json',
+                                      data={'tidspunkt': self._for(40).isoformat()}
+                                      ).status_code, 404)
+
+    def test_ukjent_overgang_er_404_og_enhetskonto_403(self):
+        o = self._gammelt(self.a)
+        self.assertEqual(self.ks.post(self._url(o, self.a, 'flyr'),
+                                      content_type='application/json',
+                                      data={'tidspunkt': self._for(1).isoformat()}
+                                      ).status_code, 404)
+        bil = _bruker('bil_a', 'skriv_full')
+        self.a.user = bil
+        self.a.save()
+        self.assertEqual(_klient(bil).post(self._url(o, self.a, 'rykker_ut'),
+                                           content_type='application/json',
+                                           data={'tidspunkt': self._for(1).isoformat()}
+                                           ).status_code, 403)
+
+    def test_ledig_fort_av_sentralen_rydder_naar_alle_er_ledige(self):
+        o = self._gammelt(self.a, self.b)
+        services.sett_status(o, choices.RYKKER_UT, enhet=self.a, tidspunkt=self._for(60))
+        services.sett_status(o, choices.LEDIG, enhet=self.a, tidspunkt=self._for(50))
+        res = self.ks.post(self._url(o, self.b, 'ledig'), content_type='application/json',
+                           data={'tidspunkt': self._for(40).isoformat()})
+        self.assertEqual(res.status_code, 200, res.content)
+        o.refresh_from_db()
+        self.assertEqual(o.status, choices.LEDIG)
+        self.assertIsNotNone(o.historikk_fra)
+
+
+class GjenaapningTests(SentralbordBasis):
+    """§9: «Ledig» tas tilbake som en korreksjon — innen 48 timer."""
+
+    def _url(self, o, enhet):
+        return f'/oppdrag/api/oppdrag/{o.pk}/enheter/{enhet.pk}/gjenaapne/'
+
+    def _ferdig(self, o, enhet, ledig_for=10):
+        services.sett_status(o, choices.RYKKER_UT, enhet=enhet, tidspunkt=self._for(60))
+        services.sett_status(o, choices.FREMME, enhet=enhet, tidspunkt=self._for(50))
+        services.sett_status(o, choices.LEDIG, enhet=enhet, tidspunkt=self._for(ledig_for))
+
+    def test_gjenaapning_setter_raden_tilbake_der_den_sto(self):
+        o = self._gammelt(self.a)
+        self._ferdig(o, self.a)
+        o.refresh_from_db()
+        self.assertIsNotNone(o.historikk_fra)
+        res = self.ks.post(self._url(o, self.a), content_type='application/json', data={})
+        self.assertEqual(res.status_code, 200, res.content)
+        rad = services.koblingsrad(o, self.a)
+        self.assertEqual(rad.status, choices.FREMME)
+        o.refresh_from_db()
+        self.assertEqual(o.status, choices.FREMME)
+        self.assertIsNone(o.historikk_fra, 'tilbake på tavla')
+        # Korreksjonen peker på Ledig-meldingen, som blir stående som spor.
+        ny = Statusmelding.objects.get(pk=res.json()['data']['melding']['id'])
+        self.assertEqual(ny.korrigerer.status, choices.LEDIG)
+        self.assertTrue(ny.manuell)
+        self.assertIsNone(Statusmelding.objects.gjeldende_for_status(
+            o, choices.LEDIG, oppdragsenhet=rad))
+        # Fremme-tidspunktet flyttet seg ikke.
+        fremme = Statusmelding.objects.gjeldende_for_status(o, choices.FREMME, oppdragsenhet=rad)
+        self.assertEqual(fremme.tidspunkt, ny.tidspunkt)
+        # Og operatøren kan føre videre derfra.
+        res = self.ks.post(f'/oppdrag/api/oppdrag/{o.pk}/enheter/{self.a.pk}/status/avreist/legevakt/',
+                           content_type='application/json',
+                           data={'tidspunkt': self._for(5).isoformat()})
+        self.assertEqual(res.status_code, 200, res.content)
+
+    def test_ledig_rett_fra_venter_gjenaapnes_til_venter(self):
+        o = self._gammelt(self.a)
+        services.sett_status(o, choices.LEDIG, tidspunkt=self._for(10))
+        res = self.ks.post(self._url(o, self.a), content_type='application/json', data={})
+        self.assertEqual(res.status_code, 200, res.content)
+        self.assertEqual(services.koblingsrad(o, self.a).status, choices.VENTER)
+
+    def test_eldre_enn_48_timer_er_arkivets(self):
+        o = self._gammelt(self.a)
+        Oppdrag.objects.filter(pk=o.pk).update(created_at=timezone.now() - timedelta(days=3))
+        self._ferdig(o, self.a, ledig_for=49 * 60)
+        res = self.ks.post(self._url(o, self.a), content_type='application/json', data={})
+        self.assertEqual(res.status_code, 400)
+        self.assertIn('48 timer', res.json()['message'])
+        self.assertEqual(services.koblingsrad(o, self.a).status, choices.LEDIG)
+
+    def test_en_rad_som_ikke_er_ledig_kan_ikke_gjenaapnes(self):
+        o = self._gammelt(self.a)
+        res = self.ks.post(self._url(o, self.a), content_type='application/json', data={})
+        self.assertEqual(res.status_code, 400)
+        self.assertIn('ikke ledig', res.json()['message'])
+
+    def test_bare_hennes_rad_gjenaapnes(self):
+        o = self._gammelt(self.a, self.b)
+        self._ferdig(o, self.a)
+        self._ferdig(o, self.b)
+        self.ks.post(self._url(o, self.b), content_type='application/json', data={})
+        self.assertEqual(services.koblingsrad(o, self.a).status, choices.LEDIG)
+        self.assertEqual(services.koblingsrad(o, self.b).status, choices.FREMME)
+
+
+class FlyttEnRadTests(SentralbordBasis):
+
+    def test_fra_enhet_id_velger_raden(self):
+        o = self._to_enheter()
+        res = self.ks.post(f'/oppdrag/api/oppdrag/{o.pk}/flytt/', content_type='application/json',
+                           data={'enhet_id': self.c.pk, 'fra_enhet_id': self.b.pk})
+        self.assertEqual(res.status_code, 200, res.content)
+        self.assertEqual({r.enhet for r in o.enheter.all()}, {self.a, self.c})
+        self.assertEqual(res.json()['data']['fra_enhet'], 'Karmøy 12')
+
+    def test_uten_fra_enhet_id_er_det_den_primaere(self):
+        o = self._to_enheter()
+        self.ks.post(f'/oppdrag/api/oppdrag/{o.pk}/flytt/', content_type='application/json',
+                     data={'enhet_id': self.c.pk})
+        self.assertEqual([r.enhet for r in o.enheter.all()], [self.c, self.b])
+
+    def test_til_en_som_alt_er_varslet_er_400(self):
+        o = self._to_enheter()
+        res = self.ks.post(f'/oppdrag/api/oppdrag/{o.pk}/flytt/', content_type='application/json',
+                           data={'enhet_id': self.b.pk})
+        self.assertEqual(res.status_code, 400)
+
+
+class KorreksjonPerRadTests(SentralbordBasis):
+    """`_naboer` måler mot bilens egne meldinger, ikke hele oppdragets."""
+
+    def test_den_andre_bilens_meldinger_staar_ikke_i_veien(self):
+        o = self._gammelt(self.a, self.b)
+        services.sett_status(o, choices.RYKKER_UT, enhet=self.a, tidspunkt=self._for(60))
+        fremme = services.sett_status(o, choices.FREMME, enhet=self.a, tidspunkt=self._for(50))
+        services.sett_status(o, choices.RYKKER_UT, enhet=self.b, tidspunkt=self._for(45))
+        # A's Fremme flyttes til etter B's Rykker ut — lovlig, B er ikke en nabo.
+        services.valider_korreksjon(fremme, self._for(40))
+        # Men ikke før A's eget Rykker ut.
+        with self.assertRaises(services.KorreksjonUgyldig):
+            services.valider_korreksjon(fremme, self._for(70))
+
+
+class MatrisensTidspunktTests(SentralbordBasis):
+
+    def test_status_tidspunkt_per_enhet(self):
+        from oppdrag.views_common import oppdrag_til_dict
+        o = self._gammelt(self.a, self.b)
+        m = services.sett_status(o, choices.RYKKER_UT, enhet=self.b, tidspunkt=self._for(30))
+        enheter = {e['enhet_navn']: e for e in oppdrag_til_dict(o)['enheter']}
+        self.assertIsNone(enheter['Haugesund 56']['status_tidspunkt'])
+        self.assertEqual(enheter['Karmøy 12']['status_tidspunkt'], m.tidspunkt.isoformat())
+
+    def test_lista_koster_ikke_en_sporring_per_rad(self):
+        for _ in range(3):
+            self._to_enheter()
+        from django.db import connection
+        from django.test.utils import CaptureQueriesContext
+        with CaptureQueriesContext(connection) as tre:
+            self.ks.get('/oppdrag/api/oppdrag/')
+        for _ in range(3):
+            self._to_enheter()
+        with CaptureQueriesContext(connection) as seks:
+            self.ks.get('/oppdrag/api/oppdrag/')
+        self.assertEqual(len(tre), len(seks))
+
+
+class BilenSerDeAndreTests(TestCase):
+    """Enhetsskjermen: «Også varslet: …» og «ført av sentralen»."""
+
+    def setUp(self):
+        from patients.js_test_utils import build_harness, node_available
+        from oppdrag.tests_xss import EnhetEscapingOppforselTests
+        if not node_available():
+            self.skipTest('node er ikke tilgjengelig')
+        self.harness = build_harness(EnhetEscapingOppforselTests.HARNESS)
+        self.stubb = EnhetEscapingOppforselTests.STUBB
+
+    def _render(self, oppdrag, fn):
+        import json
+        from patients.js_test_utils import run_node
+        return run_node(self.harness, self.stubb + f"""
+            globalThis.mineOppdrag = [{json.dumps(oppdrag)}];
+            const el = {{ innerHTML: '' }};
+            globalThis.document = {{ getElementById: () => el }};
+            {fn}();
+            console.log(el.innerHTML);
+        """)
+
+    def _oppdrag(self, **ekstra):
+        return {'id': 1, 'status': 'venter', 'status_navn': 'Venter',
+                'problemstilling': 'Pustevansker', 'hastegrad': 'Akutt',
+                'lokasjon_navn': 'Scene', 'opprettet': '2026-08-29T20:00:00Z',
+                'fritekst': '', 'neste_overgang': 'rykker_ut', 'neste_navn': 'Rykker ut',
+                'statusmeldinger': [], 'varslede': [], **ekstra}
+
+    def test_varslede_vises_som_navn_og_escapes(self):
+        o = self._oppdrag(varslede=['KARM 12', '<b>x</b>'])
+        ut = self._render(o, 'renderVentende')
+        self.assertIn('Også varslet: KARM 12, &lt;b&gt;x&lt;/b&gt;', ut)
+        o.update(status='fremme', status_navn='Fremme')
+        self.assertIn('Også varslet: KARM 12', self._render(o, 'renderAktivt'))
+
+    def test_uten_andre_staar_det_ingenting(self):
+        ut = self._render(self._oppdrag(), 'renderVentende')
+        self.assertNotIn('Også varslet', ut)
+
+    def test_manuell_melding_merkes(self):
+        o = self._oppdrag(status='fremme', status_navn='Fremme', statusmeldinger=[
+            {'status': 'rykker_ut', 'status_navn': 'Rykker ut',
+             'tidspunkt': '2026-08-29T20:05:00Z', 'manuell': True}])
+        self.assertIn('ført av sentralen', self._render(o, 'renderAktivt'))

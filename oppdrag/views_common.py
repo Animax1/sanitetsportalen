@@ -42,7 +42,7 @@ def er_enhetskonto(user) -> bool:
     return getattr(user, 'enhet', None) is not None
 
 
-def status_tidspunkt_for(oppdrag_liste) -> dict:
+def status_tidspunkt_for(oppdrag_liste, meldinger=None) -> dict:
     """``{oppdrag_id: iso-tidspunkt}`` for den gjeldende meldingen bak hvert
     oppdrags nåværende status — «Fremme siden 14:32».
 
@@ -52,7 +52,8 @@ def status_tidspunkt_for(oppdrag_liste) -> dict:
     opprettelse.
     """
     from .models import Statusmelding
-    meldinger = Statusmelding.objects.gjeldende_bulk([o.pk for o in oppdrag_liste])
+    if meldinger is None:
+        meldinger = Statusmelding.objects.gjeldende_bulk([o.pk for o in oppdrag_liste])
     ut = {}
     for o in oppdrag_liste:
         treff = [m for m in meldinger.get(o.pk, []) if m.status == o.status]
@@ -60,21 +61,35 @@ def status_tidspunkt_for(oppdrag_liste) -> dict:
     return ut
 
 
-def enheter_til_liste(oppdrag) -> list:
+def enheter_til_liste(oppdrag, meldinger=None) -> list:
     """Enhetene på oppdraget med hver sin status — matrisen sentralbordet
     ser. Leser `oppdrag.enheter`; kalleren prefetcher `enheter__enhet` der
-    det er mange oppdrag."""
-    return [{
-        'enhet_id': rad.enhet_id,
-        'enhet_navn': rad.enhet.navn,
-        'status': rad.status,
-        'status_navn': rad.get_status_display(),
-        'rekkefolge': rad.rekkefolge,
-    } for rad in oppdrag.enheter.all()]
+    det er mange oppdrag.
+
+    ``status_tidspunkt`` per enhet er når *hun* fikk statusen hun står i.
+    ``meldinger`` er oppdragets gjeldende meldinger (fra `gjeldende_bulk`)
+    når kalleren alt har dem; ellers hentes de her — én spørring, som er
+    greit for ett oppdrag og ikke for en liste."""
+    from .models import Statusmelding
+    if meldinger is None:
+        meldinger = Statusmelding.objects.gjeldende(oppdrag)
+    ut = []
+    for rad in oppdrag.enheter.all():
+        treff = [m for m in meldinger
+                 if m.oppdragsenhet_id == rad.pk and m.status == rad.status]
+        ut.append({
+            'enhet_id': rad.enhet_id,
+            'enhet_navn': rad.enhet.navn,
+            'status': rad.status,
+            'status_navn': rad.get_status_display(),
+            'status_tidspunkt': treff[-1].tidspunkt.isoformat() if treff else None,
+            'rekkefolge': rad.rekkefolge,
+        })
+    return ut
 
 
 def oppdrag_til_dict(oppdrag, *, for_enhet: bool = False,
-                     status_tidspunkt=None, koblingsrad=None) -> dict:
+                     status_tidspunkt=None, koblingsrad=None, meldinger=None) -> dict:
     """Serialiser ett oppdrag.
 
     ``for_enhet=True`` **utelater fritekst når oppdraget er avsluttet**. Det er
@@ -91,6 +106,9 @@ def oppdrag_til_dict(oppdrag, *, for_enhet: bool = False,
     2026). Med den er `status` og `neste_overgang` hennes, ikke oppdragets
     utledede — bilen skal se sin egen kjede. Og `varslede` er de andre
     enhetenes *navn*, ikke status (§7.3 i notatet).
+
+    ``meldinger`` sendes videre til `enheter_til_liste` av samme grunn som
+    ``status_tidspunkt``: lista skal ikke koste én spørring per rad.
     """
     status = koblingsrad.status if koblingsrad is not None else oppdrag.status
     data = {
@@ -110,7 +128,7 @@ def oppdrag_til_dict(oppdrag, *, for_enhet: bool = False,
         'lokasjon_navn': oppdrag.lokasjon.navn,
         'status': status,
         'status_navn': choices.STATUS_NAVN.get(status, status),
-        'enheter': enheter_til_liste(oppdrag),
+        'enheter': enheter_til_liste(oppdrag, meldinger),
         'opprettet': oppdrag.created_at.isoformat(),
         'status_tidspunkt': status_tidspunkt,
         'historikk_fra': (oppdrag.historikk_fra.isoformat()
@@ -139,6 +157,8 @@ def melding_til_dict(melding) -> dict:
         'meldt_av': getattr(melding.meldt_av, 'username', '') or '',
         'forsinket': melding.forsinket,
         'automatisk': melding.automatisk,
+        # Ført av sentralbordet (§9), ikke stemplet av bilen.
+        'manuell': melding.manuell,
         'korrigerer': melding.korrigerer_id,
         # «Avreist → Sykehus». Tom for alle andre statuser.
         'sted': melding.sted,

@@ -110,6 +110,7 @@ REVIEWED_INTERPOLATIONS = {
     'ledigKnapp': 'markup bygget lokalt, id escapet inni',
     'startKnapp': 'markup bygget lokalt, navn og id escapet inni',
     'tidslinjeEnhetHtml(o)': 'markup fra en bygger som selv skannes her',
+    '_varsledeRad(o)': 'markup fra en bygger som selv skannes her',
 }
 
 
@@ -269,7 +270,7 @@ class EnhetEscapingOppforselTests(SimpleTestCase):
                            'klokke')),
         (OPPDRAG_ENHET_JS, ('renderAktivt', 'renderVentende', 'renderAvsluttet',
                             'tidslinjeEnhetHtml', 'hastegradKlasse',
-                            '_stedvalg', '_grovsorteringsrad')),
+                            '_stedvalg', '_grovsorteringsrad', '_varsledeRad')),
     )
 
     #: Toppnivå-tilstanden `renderAktivt` leser: stedvalget, og listene som
@@ -456,7 +457,8 @@ class AvreistTilOgGrovsorteringTests(SimpleTestCase):
         (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue', 'trustedHtml', '_escHtml',
                            'klokke')),
         (OPPDRAG_ENHET_JS, ('renderAktivt', 'tidslinjeEnhetHtml', 'hastegradKlasse',
-                            '_stedvalg', '_grovsorteringsrad', 'koNokkel', 'koLes',
+                            '_stedvalg', '_grovsorteringsrad', '_varsledeRad',
+                            'koNokkel', 'koLes',
                             'koSkriv', 'koLeggTil', 'koFjern', 'lagNokkel', 'synk')),
     )
     STUBB = EnhetEscapingOppforselTests.STUBB + (

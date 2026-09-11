@@ -394,6 +394,12 @@ class Statusmelding(BaseTimeStampedModel):
         verbose_name='Satt automatisk',
         help_text='Oppdraget ble avsluttet fordi enheten startet det neste.',
     )
+    # Ført av sentralbordet (§9, 11. sep. 2026) — ikke stemplet av bilen.
+    # Lagret, ikke utledet av `meldt_av`: en konto kan bytte enhet, og da
+    # ville historien skiftet mening.
+    manuell = models.BooleanField(
+        default=False, verbose_name='Ført manuelt',
+        help_text='Ført av sentralbordet, ikke stemplet av enheten.')
     # Hvor bilen dro — bare meningsfullt for `avreist` (11. sep. 2026).
     # Ligger på meldingen, ikke på oppdraget: meldingen er *det som ble
     # meldt*, og en korreksjon er en ny rad som arver stedet.

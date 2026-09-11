@@ -235,6 +235,15 @@ function _grovsorteringsrad(o) {
 }
 
 
+function _varsledeRad(o) {
+  // §7.3: bilen ser hvem som ellers er varslet på oppdraget — navnene,
+  // ikke hva de gjør. Deres status er sentralbordets.
+  const andre = o.varslede || [];
+  if (!andre.length) return '';
+  return `<div class="oppdrag-meta oppdrag-varslede mb-1">Også varslet: ${escapeHtml(andre.join(', '))}</div>`;
+}
+
+
 function tidslinjeEnhetHtml(o) {
   return (o.statusmeldinger || []).map((m) => {
     // Markøren for et avledet tidspunkt sitter på KLOKKESLETTET, ikke på
@@ -250,6 +259,8 @@ function tidslinjeEnhetHtml(o) {
     // §4.5: bilen ser at sentralen har rettet tidspunktet, men kan ikke
     // rette det selv. Samme dempede linje som på sentralbordet.
     if (m.korrigerer) notat.push('rettet av sentralen');
+    // §9: sentralbordet førte statusen — bilen stemplet den ikke selv.
+    if (m.manuell) notat.push('ført av sentralen');
     const notatBlokk = notat.length
       ? `<span class="tidslinje-notat">· ${escapeHtml(notat.join(', '))}</span>`
       : '';
@@ -309,6 +320,7 @@ function renderAktivt() {
         <span class="ms-auto oppdrag-status-naa">${escapeHtml(o.status_navn)}</span>
       </div>
       <div class="oppdrag-meta mb-1">${escapeHtml(o.lokasjon_navn)}</div>
+      ${_varsledeRad(o)}
       ${fritekstBlokk}
       ${_grovsorteringsrad(o)}
       <div class="mt-2">${tidslinjeEnhetHtml(o)}</div>
@@ -355,6 +367,7 @@ function renderVentende() {
         <span class="oppdrag-problem">${escapeHtml(o.problemstilling)}</span>
       </div>
       <div class="oppdrag-meta mt-1">${escapeHtml(o.lokasjon_navn)} · ${escapeHtml(klokke(o.opprettet))}</div>
+      ${_varsledeRad(o)}
       ${fritekstBlokk}
       ${startKnapp}
     </div>`;

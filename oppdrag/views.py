@@ -344,8 +344,10 @@ def oppdrag_liste_view(request):
             qs = list(Oppdrag.objects.filter(vakt=vakt, historikk_fra__isnull=True)
                       .select_related('enhet', 'lokasjon')
                       .prefetch_related('enheter__enhet').order_by('-created_at'))
-            status_tid = status_tidspunkt_for(qs)
-            data = [oppdrag_til_dict(o, status_tidspunkt=status_tid.get(o.pk))
+            gjeldende = Statusmelding.objects.gjeldende_bulk([o.pk for o in qs])
+            status_tid = status_tidspunkt_for(qs, gjeldende)
+            data = [oppdrag_til_dict(o, status_tidspunkt=status_tid.get(o.pk),
+                                     meldinger=gjeldende[o.pk])
                     for o in qs]
             # Tidspunktet er med i ETag-en: «Rett tid» endrer det uten å røre
             # statusen, og «12 min i Fremme» skal ikke drukne i en 304.
@@ -372,13 +374,11 @@ def oppdrag_liste_view(request):
         return JsonResponse(
             {'status': 'error', 'message': '; '.join(feil.messages)}, status=400)
 
-    try:
-        enhet = Enhet.objects.get(
-            pk=data.get('enhet_id'), er_aktiv=True, pa_vakt=True)
-    except (Enhet.DoesNotExist, ValueError, TypeError):
-        return JsonResponse(
-            {'status': 'error',
-             'message': 'Ukjent enhet, eller enheten er ikke på vakt.'}, status=400)
+    # `enhet_ider` (flere enheter, §4) — den første er primær. `enhet_id`
+    # godtas fortsatt og betyr én: gamle klienter og tester skal ikke brekke.
+    enheter, feil = _enheter_fra_kroppen(data)
+    if feil:
+        return JsonResponse({'status': 'error', 'message': feil}, status=400)
     try:
         lokasjon = Lokasjon.objects.get(pk=data.get('lokasjon_id'), er_aktiv=True)
     except (Lokasjon.DoesNotExist, ValueError, TypeError):
@@ -391,14 +391,44 @@ def oppdrag_liste_view(request):
         oppdrag = Oppdrag.objects.create(
             vakt=vakt,
             oppdragsnummer=services.neste_oppdragsnummer(vakt),
-            enhet=enhet,
+            enhet=enheter[0],
             problemstilling=data['problemstilling'],
             hastegrad=data['hastegrad'],
             lokasjon=lokasjon,
             fritekst=(data.get('fritekst') or '').strip(),
             opprettet_av=request.user,
         )
+        for enhet in enheter[1:]:
+            services.varsle_enhet(oppdrag, enhet, bruker=request.user)
     return JsonResponse({'status': 'ok', 'data': oppdrag_til_dict(oppdrag)})
+
+
+def _enheter_fra_kroppen(data):
+    """``(enheter, feil)`` fra `enhet_ider` eller `enhet_id`, i oppgitt rekkefølge.
+
+    Dubletter strykes (samme bil to ganger er én bil), og alle må være
+    aktive og på vakt — én ukjent avviser hele opprettelsen, ikke bare den
+    ene: operatøren mente å sende flere, og skal ikke få ett oppdrag med
+    færre enn hun krysset av.
+    """
+    ukjent = 'Ukjent enhet, eller enheten er ikke på vakt.'
+    raa = data.get('enhet_ider')
+    if raa is None:
+        raa = [data.get('enhet_id')]
+    if not isinstance(raa, list) or not raa:
+        return None, 'Oppgi minst én enhet.'
+    ider = []
+    for verdi in raa:
+        try:
+            pk = int(verdi)
+        except (TypeError, ValueError):
+            return None, ukjent
+        if pk not in ider:
+            ider.append(pk)
+    funnet = {e.pk: e for e in Enhet.objects.filter(pk__in=ider, er_aktiv=True, pa_vakt=True)}
+    if len(funnet) != len(ider):
+        return None, ukjent
+    return [funnet[pk] for pk in ider], None
 
 
 @modul_kreves('oppdrag', 'les', svar='json')
@@ -487,20 +517,156 @@ def flytt_view(request, pk):
         return JsonResponse(
             {'status': 'error', 'message': 'Oppdrag ikke funnet'}, status=404)
 
+    kropp = json_body(request)
     try:
         ny_enhet = Enhet.objects.get(
-            pk=json_body(request).get('enhet_id'), er_aktiv=True, pa_vakt=True)
+            pk=kropp.get('enhet_id'), er_aktiv=True, pa_vakt=True)
     except (Enhet.DoesNotExist, ValueError, TypeError):
         return JsonResponse(
             {'status': 'error',
              'message': 'Ukjent enhet, eller enheten er ikke på vakt.'}, status=400)
+    # Med flere enheter er «flytt» flytt av *én* rad. Uten `fra_enhet_id` er
+    # det den primære — slik det alltid har vært.
+    fra_enhet = None
+    if kropp.get('fra_enhet_id') is not None:
+        try:
+            fra_enhet = Enhet.objects.get(pk=kropp['fra_enhet_id'])
+        except (Enhet.DoesNotExist, ValueError, TypeError):
+            return JsonResponse(
+                {'status': 'error', 'message': 'Ukjent enhet å flytte fra.'}, status=400)
 
-    bytte = services.flytt_til_enhet(oppdrag, ny_enhet, bruker=request.user)
+    try:
+        bytte = services.flytt_til_enhet(
+            oppdrag, ny_enhet, bruker=request.user, fra_enhet=fra_enhet)
+    except ValueError as feil:
+        return JsonResponse({'status': 'error', 'message': str(feil)}, status=400)
     if bytte is None:
         return JsonResponse(
             {'status': 'error', 'message': 'Oppdraget står allerede på denne enheten.'},
             status=400)
     return JsonResponse({'status': 'ok', 'data': bytte_til_dict(bytte)})
+
+
+# ── Enhetene på oppdraget (flere enheter, §4 og §9) ─────────────────────────
+
+def _oppdrag_og_enhet(request, pk, enhet_pk):
+    """``(oppdrag, enhet, feilsvar)`` for endepunktene under.
+
+    Enhetskontoer stenges ute uansett nivå, som i `korriger_view`: dette er
+    sentralbordets føring av hva bilene gjør, ikke bilens stempling.
+    """
+    if er_enhetskonto(request.user):
+        return None, None, JsonResponse(
+            {'status': 'error', 'message': 'Enheter fører ikke for hverandre.'},
+            status=403)
+    try:
+        oppdrag = (Oppdrag.objects.select_related('enhet', 'lokasjon')
+                   .get(pk=pk, vakt=hent_aktiv_vakt()))
+    except Oppdrag.DoesNotExist:
+        return None, None, JsonResponse(
+            {'status': 'error', 'message': 'Oppdrag ikke funnet'}, status=404)
+    try:
+        enhet = Enhet.objects.get(pk=enhet_pk)
+    except Enhet.DoesNotExist:
+        return None, None, JsonResponse(
+            {'status': 'error', 'message': 'Ukjent enhet.'}, status=404)
+    return oppdrag, enhet, None
+
+
+@modul_kreves('oppdrag', 'skriv_full', svar='json')
+@require_http_methods(['POST', 'DELETE'])
+@rate_limit(group='oppdrag:oppdragsenhet', rate='60/m', method='POST')
+def oppdragsenhet_view(request, pk, enhet_pk):
+    """Varsle en enhet til (POST), eller ta henne av (DELETE).
+
+    Å ta av går bare mens hun venter, og aldri den siste — har bilen rykket
+    ut, er det en hendelse, og svaret er «Ledig» fra bilen eller en føring
+    (`foering_view`), ikke å late som hun aldri var der.
+    """
+    oppdrag, enhet, feil = _oppdrag_og_enhet(request, pk, enhet_pk)
+    if feil:
+        return feil
+    try:
+        if request.method == 'POST':
+            if not (enhet.er_aktiv and enhet.pa_vakt):
+                return JsonResponse(
+                    {'status': 'error',
+                     'message': 'Ukjent enhet, eller enheten er ikke på vakt.'},
+                    status=400)
+            services.varsle_enhet(oppdrag, enhet, bruker=request.user)
+        else:
+            services.ta_av_enhet(oppdrag, enhet)
+    except ValueError as feil:
+        return JsonResponse({'status': 'error', 'message': str(feil)}, status=400)
+    oppdrag.refresh_from_db()
+    return JsonResponse({'status': 'ok', 'data': oppdrag_til_dict(oppdrag)})
+
+
+@modul_kreves('oppdrag', 'skriv_full', svar='json')
+@require_http_methods(['POST'])
+@rate_limit(group='oppdrag:foering', rate='60/m', method='POST')
+def foering_view(request, pk, enhet_pk, overgang, sted=None):
+    """Sentralbordet fører en status for en enhet (§9).
+
+    **Leser kroppen** — `tidspunkt` er påkrevd, for hele poenget er å føre
+    bakover i tid. Det er derfor `skriv_full` og ikke `skriv_handling`: bilens
+    stemplingsendepunkt leser ingen domenefelt, og dette er en annen aktør
+    med et annet endepunkt. Overgangsreglene gjelder også operatøren.
+    """
+    if overgang not in services.STEMPLBARE:
+        return JsonResponse(
+            {'status': 'error', 'message': f'Ukjent overgang «{overgang}».'}, status=404)
+    if sted and (overgang != choices.AVREIST or sted not in choices.AVREIST_TIL_NAVN):
+        return JsonResponse(
+            {'status': 'error', 'message': f'Ukjent sted «{sted}» for «{overgang}».'},
+            status=404)
+    oppdrag, enhet, feil = _oppdrag_og_enhet(request, pk, enhet_pk)
+    if feil:
+        return feil
+
+    raa = json_body(request).get('tidspunkt')
+    if not raa:
+        return JsonResponse(
+            {'status': 'error', 'message': 'Mangler tidspunkt.'}, status=400)
+    tidspunkt = parse_datetime(str(raa))
+    if tidspunkt is None:
+        return JsonResponse(
+            {'status': 'error', 'message': 'Ugyldig tidspunkt.'}, status=400)
+    if timezone.is_naive(tidspunkt):
+        tidspunkt = timezone.make_aware(tidspunkt)
+
+    try:
+        melding = services.foer_status(
+            oppdrag, enhet, overgang, tidspunkt=tidspunkt, bruker=request.user,
+            sted=sted or '')
+    except (services.UlovligOvergang, services.KorreksjonUgyldig) as feil:
+        # 400, ikke 409: operatøren sitter ved et skjema, og meldingen sier
+        # hvilket ledd som mangler eller hvilken nabo som er i veien.
+        return JsonResponse({'status': 'error', 'message': str(feil)}, status=400)
+    oppdrag.refresh_from_db()
+    return JsonResponse({'status': 'ok', 'data': {
+        'oppdrag': oppdrag_til_dict(oppdrag),
+        'melding': melding_til_dict(melding),
+    }})
+
+
+@modul_kreves('oppdrag', 'skriv_full', svar='json')
+@require_http_methods(['POST'])
+@rate_limit(group='oppdrag:gjenaapne', rate='60/m', method='POST')
+def gjenaapne_view(request, pk, enhet_pk):
+    """Ta en enhets «Ledig» tilbake — innen `KORRIGERBAR_ETTER_LEDIG` (§9)."""
+    oppdrag, enhet, feil = _oppdrag_og_enhet(request, pk, enhet_pk)
+    if feil:
+        return feil
+    try:
+        melding = services.gjenaapne_enhet(oppdrag, enhet, bruker=request.user)
+    except (services.UlovligOvergang, services.KorreksjonUgyldig) as feil:
+        return JsonResponse({'status': 'error', 'message': str(feil)}, status=400)
+    oppdrag.refresh_from_db()
+    return JsonResponse({'status': 'ok', 'data': {
+        'oppdrag': oppdrag_til_dict(oppdrag),
+        'melding': melding_til_dict(melding),
+    }})
 
 
 # ── Stempling ────────────────────────────────────────────────────────────────

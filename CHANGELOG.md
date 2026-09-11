@@ -4,6 +4,43 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-11 — Flere enheter på ett oppdrag, trinn 2: endepunktene og §9
+
+**2159 tester grønne** (30 nye). Én migrasjon, `oppdrag/0012`: ett `AddField`,
+`Statusmelding.manuell`, standard `False`.
+
+Endepunktene fra notatets §4, og sentralbordets føring fra §9 — data og API;
+knappene kommer i trinn 3.
+
+- **`POST api/oppdrag/` tar `enhet_ider`** — den første er primær, dubletter
+  strykes, og én enhet som ikke er på vakt avviser hele opprettelsen: operatøren
+  mente å sende flere, og skal ikke få ett oppdrag med færre enn hun krysset av.
+  `enhet_id` godtas fortsatt og betyr én.
+- **`POST`/`DELETE api/oppdrag/<pk>/enheter/<enhet_pk>/`** varsler en enhet til
+  og tar henne av. Ta av bare mens hun venter, og aldri den siste. `skriv_full`,
+  og enhetskontoer stengt ute uansett nivå — som «Rett tid».
+- **`POST api/oppdrag/<pk>/enheter/<enhet_pk>/status/<overgang>/[<sted>/]`** er
+  sentralbordets føring av en status bilen glemte (§9). `tidspunkt` i kroppen er
+  **påkrevd** — poenget er å føre bakover i tid — og derfor `skriv_full`, ikke
+  `skriv_handling`: bilens stemplingsendepunkt leser ingen domenefelt, og dette er
+  en annen aktør. Overgangsreglene gjelder operatøren også; tidspunktet må være
+  inntruffet, etter oppdraget og etter bilens siste melding. Raden merkes
+  `manuell`, og tidslinjen sier «ført av sentralen».
+- **`POST api/oppdrag/<pk>/enheter/<enhet_pk>/gjenaapne/`** tar «Ledig» tilbake
+  innen `KORRIGERBAR_ETTER_LEDIG` (48 t, André: «innenfor en rimelig
+  tidsperiode»). En korreksjon, ikke en sletting: `Ledig`-meldingen blir stående,
+  og en ny rad peker på den med statusen som gjaldt før — med *dens* tidspunkt,
+  så ingen varighet flytter seg. Oppdraget hentes tilbake fra historikken.
+- **`flytt/` tar `fra_enhet_id`**: med flere enheter er flytt flytt av én rad.
+  Uten er det den primære, som før.
+- **Rettet fra trinn 1:** `_naboer` målte korreksjoner mot hele oppdragets
+  meldinger, så den andre bilens «Rykker ut» sto i veien for å rette denne bilens
+  «Fremme». Nå per koblingsrad.
+- **`enheter[]` bærer `status_tidspunkt`** per enhet, uten en spørring per rad —
+  lista gjenbruker `gjeldende_bulk`, og en test holder spørringstallet flatt.
+- **Bilen ser «Også varslet: KARM 12»** på aktivt og ventende kort — navn, ikke
+  status (§7.3).
+
 ## 2026-09-11 — Flere enheter på ett oppdrag, trinn 1: koblingsraden
 
 **2129 tester grønne** (32 nye i `oppdrag/tests_flere_enheter.py`). To migrasjoner,

@@ -21,6 +21,18 @@ urlpatterns = [
     path('api/oppdrag/', views.oppdrag_liste_view, name='oppdrag_api_liste'),
     path('api/oppdrag/<int:pk>/', views.oppdrag_detalj_view, name='oppdrag_api_detalj'),
     path('api/oppdrag/<int:pk>/flytt/', views.flytt_view, name='oppdrag_api_flytt'),
+    # Enhetene på oppdraget (flere enheter, 11. sep. 2026). POST varsler en
+    # til, DELETE tar henne av mens hun venter. Under den: sentralbordets
+    # føring av *hennes* status (§9) — samme form som bilens stempling, men
+    # med enheten i URL-en og tidspunktet i kroppen — og gjenåpning av «Ledig».
+    path('api/oppdrag/<int:pk>/enheter/<int:enhet_pk>/', views.oppdragsenhet_view,
+         name='oppdrag_api_oppdragsenhet'),
+    path('api/oppdrag/<int:pk>/enheter/<int:enhet_pk>/status/<str:overgang>/<str:sted>/',
+         views.foering_view, name='oppdrag_api_foering_sted'),
+    path('api/oppdrag/<int:pk>/enheter/<int:enhet_pk>/status/<str:overgang>/',
+         views.foering_view, name='oppdrag_api_foering'),
+    path('api/oppdrag/<int:pk>/enheter/<int:enhet_pk>/gjenaapne/', views.gjenaapne_view,
+         name='oppdrag_api_gjenaapne'),
     # Ett navngitt endepunkt per overgang. Navnene er statusverdiene selv,
     # og settet håndheves i viewet mot `services.STEMPLBARE` — utledet fra
     # overgangstabellen, ikke skrevet ned på nytt her.

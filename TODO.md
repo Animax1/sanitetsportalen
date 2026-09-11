@@ -176,8 +176,10 @@ ingen av dem gir feilmelding — de er bare stille inaktive.
                   services per koblingsrad, utledet oppdragsstatus, bilen ser
                   sin egen kjede og de andres navn. `0012` (NOT NULL) flyttet
                   til deploy 2 — nullbarheten *er* broen.
-            - [ ] Trinn 2: endepunkter (`enhet_ider` ved opprettelse, varsle/ta
-                  av), manuell føring fra sentralbordet (§9, 48 t)
+            - [x] Trinn 2 (11. sep. 2026): `enhet_ider` ved opprettelse,
+                  varsle/ta av, flytt av én rad, sentralbordets føring med
+                  tidspunkt (`Statusmelding.manuell`, `0012`) og gjenåpning
+                  av «Ledig» innen 48 t. Bilen ser «Også varslet: …».
             - [ ] Trinn 3: sentralbordets UI
             - [ ] Trinn 4: arkiv (rad per enhet) og statistikk
             - [ ] Deploy 2, senere: fjern `Oppdrag.enhet`

@@ -128,7 +128,8 @@ det står i notatet så neste person ikke «retter» det.
    `Oppdrag.enhet`, meldingene pekes på den. Ingen skjemaendring følger etter i samme
    transaksjon, så triggerkøen fra 30. aug. er ikke et tema her — og derfor ingen
    `SET CONSTRAINTS ALL IMMEDIATE`.
-3. ~~`0012`: `Statusmelding.oppdragsenhet` blir `NOT NULL`.~~ **Flyttet til deploy 2.**
+3. ~~`0012`: `Statusmelding.oppdragsenhet` blir `NOT NULL`.~~ **Flyttet til deploy 2**
+   (`0012` ble i stedet `Statusmelding.manuell`, ett `AddField` for §9).
    Nullbarheten er broen: `Statusmelding.save()` fyller feltet fra oppdragets primære
    rad når en melding lages med bare `oppdrag`, og all eldre kode og alle eldre tester
    går den veien. Strammes feltet i deploy 1, må hvert kallsted skrives om i samme
@@ -192,6 +193,20 @@ oppdrag som er ledig. Det trengs, og det passer rett inn i formen som alt finnes
 
 Går inn i **trinn 2** i anslaget; det er ett endepunkt og én knapp per enhet i
 detaljvisningen, og reglene finnes.
+
+**Levert i trinn 2 (11. sep. 2026), med to presiseringer:**
+
+- Føringen er merket på raden — `Statusmelding.manuell` — og ikke utledet av
+  `meldt_av`: en konto kan bytte enhet, og da ville historien skiftet mening. Samme
+  grep som `automatisk` og `forsinket`.
+- Gjenåpningen skriver korreksjonsraden med **samme tidspunkt som meldingen den
+  gjenoppretter** (Fremme 14:30 blir stående som Fremme 14:30), ikke med
+  `Ledig`-meldingens. Ellers hadde varigheten i statistikken flyttet seg ved en
+  handling som skal være uten spor i tallene. Var det ingen melding før `Ledig`,
+  er «før» `Venter`, med `varslet_at` som tidspunkt.
+- En manuell `Rykker ut` lukker **ikke** bilens andre pågående oppdrag slik
+  bilens eget stempel gjør (§4.3): tidspunktet er fortid, og hva bilen gjorde siden
+  er operatørens sak å føre.
 
 ## 8. Anslag
 
