@@ -189,6 +189,10 @@ ingen av dem gir feilmelding — de er bare stille inaktive.
                   statistikken teller oppdrag distinkt og varigheter per bil,
                   `summary.enhetsinnsatser`.
             - [ ] Deploy 2, senere: fjern `Oppdrag.enhet`
+      - [x] **Utskrift per korps eller ressurs** (12. sep. 2026): velger over
+            «Oversikt», arkhodet sier utvalget. Fant og rettet at korpsvelgeren
+            aldri var koblet til `change` — delegeringen ligger nå i
+            `portal-utils.js` ved siden av klikk.
       - [ ] **Stripe på blokklinja** (mini-Gantt over vaktas spenn) — alternativ
             «Begge deler» i spørsmålet 11. sep.; valgt bort for nå, lett å
             legge til siden blokka alt bærer spennet.

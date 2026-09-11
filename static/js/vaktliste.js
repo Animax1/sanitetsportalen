@@ -46,6 +46,10 @@ let belastning = null;
 // se ett, ellers `null`. Brukes bare i nettleseren — serveren avgrenser
 // korps-brukeren selv, og for henne finnes ikke velgeren.
 let korpsfilter = null;
+// Utskriftsutvalget (12. sep. 2026): ressurs-ID når «Oversikt» skal vise
+// én ressurs, ellers `null` for hele vakta. Korpset styres av korpsvelgeren
+// over — de to utvalgene kombineres.
+let utskriftRessurs = null;
 let personsok = '';              // fritekstfilter på mannskapstabellen
 let personSortKol = 'korps';     // 'navn' | 'korps' | 'telefon'
 let personSortStigende = true;
@@ -330,6 +334,61 @@ function fyllKorpsvelger() {
   const finnes = (aktivListe.korps || []).some((k) => k.id === korpsfilter);
   if (!finnes) korpsfilter = null;
   el.value = korpsfilter == null ? '' : String(korpsfilter);
+}
+
+
+function velgUtskrift() {
+  const el = document.getElementById('vl-utskriftsvalg');
+  const valgt = el && el.value ? Number(el.value) : null;
+  utskriftRessurs = Number.isFinite(valgt) ? valgt : null;
+  tegnPanel();
+}
+
+
+function _utvalgstekst() {
+  // Det arket sier om seg selv: korpset og/eller ressursen det er avgrenset
+  // til. Tomt når det er hele vakta. Korpset er velgerens for den som ser
+  // alle, badgen for korps-brukeren — samme regel som «Mitt korps».
+  const deler = [];
+  const korpsId = _mittKorpsId();
+  if (korpsId != null) {
+    const k = (aktivListe.korps || []).find((x) => x.id === korpsId);
+    if (k) deler.push(k.navn);
+  }
+  if (utskriftRessurs != null) {
+    const r = (aktivListe.ressurser || []).find((x) => x.id === utskriftRessurs);
+    if (r) deler.push(r.navn);
+  }
+  return deler.join(' · ');
+}
+
+
+function mkUtskriftsverktoy() {
+  // Velgeren og knappen over utskriftslista. Skjules på papiret
+  // (`.vl-utskriftsverktoy` i @media print) — det som står der er utvalget,
+  // og det står i arkhodet. Tegnes på nytt med panelet, så det valgte
+  // merkes fra `utskriftRessurs`, ikke fra hva `<select>` husker.
+  // Bare ressurser som har skift i det som vises — en tom ressurs tegnes
+  // ikke i lista, og skal ikke kunne velges til et tomt ark.
+  const harSkift = new Set((aktivListe.vaktposter || []).map((vp) => vp.ressurs_id));
+  const grupper = _grupperMedRessurser().map((g) => {
+    const valg = _ressurserIGruppe(g.id).filter((r) => harSkift.has(r.id)).map((r) => {
+      const merke = r.id === utskriftRessurs ? ' selected' : '';
+      return `<option value="${escHtmlValue(r.id)}"${merke}>${escapeHtml(r.navn)}</option>`;
+    }).join('');
+    return valg ? `<optgroup label="${escHtmlValue(g.navn)}">${valg}</optgroup>` : '';
+  }).join('');
+  return `
+    <div class="vl-utskriftsverktoy d-flex align-items-center gap-2 flex-wrap mb-2">
+      <label class="vl-meta mb-0" for="vl-utskriftsvalg">Vis</label>
+      <select id="vl-utskriftsvalg" class="form-select form-select-sm w-auto"
+              data-action="velgUtskrift" data-hendelse="change">
+        <option value="">Hele vakta</option>${grupper}
+      </select>
+      <button type="button" class="btn btn-outline-secondary btn-sm" data-action="skrivUt">
+        <i class="bi bi-printer me-1"></i>Skriv ut
+      </button>
+    </div>`;
 }
 
 
@@ -1430,9 +1489,15 @@ function mkOversikt() {
   // leser lista står på samleplassen eller ved bilen og spør «hvem er her, og
   // når?». Korpset er et kjennetegn ved personen, ikke et sted — det er en
   // kolonne, ikke en overskrift.
-  const poster = aktivListe.vaktposter || [];
+  // **Utvalget** (12. sep. 2026): korpset kommer ferdig filtrert i
+  // `aktivListe.vaktposter` (korpsvelgeren, eller serveren for korps-
+  // brukeren); ressursen velges her. Arket skal kunne henges opp på bilen
+  // eller gis til ett korps, og da er resten av vakta bare sider å bla forbi.
+  const verktoy = mkUtskriftsverktoy();
+  const poster = (aktivListe.vaktposter || [])
+    .filter((vp) => utskriftRessurs == null || vp.ressurs_id === utskriftRessurs);
   if (!poster.length) {
-    return '<div class="vl-kort"><div class="vl-tom">Ingen er satt opp ennå.</div></div>';
+    return `${verktoy}<div class="vl-kort"><div class="vl-tom">Ingen er satt opp ennå.</div></div>`;
   }
 
   const korpsnavn = {};
@@ -1471,6 +1536,7 @@ function mkOversikt() {
 
   const deler = _grupperMedRessurser().flatMap((g) =>
     _ressurserIGruppe(g.id)
+      .filter((r) => utskriftRessurs == null || r.id === utskriftRessurs)
       .filter((r) => (perRessurs.get(r.id) || []).length)
       .map((r) => {
         const egne = perRessurs.get(r.id);
@@ -1517,10 +1583,16 @@ function mkOversikt() {
   const vaktTall = _telling(poster, _tidsblokker(poster).length);
   // **Ingen kurve her.** Den står i fanen den gjelder, og to steder å lese
   // den samme kurven er ett for mye. «Oversikt» er utskriftslista, og bare det.
-  return `
+  // Utvalget står i arkhodet, for det er arket som skal si hva det er —
+  // «HGSD · Ambulanse 1» — ikke velgeren, som ikke kommer med på papiret.
+  const utvalg = _utvalgstekst();
+  const utvalgslinje = utvalg
+    ? `<div class="vl-utvalg">${escapeHtml(utvalg)}</div>` : '';
+  return `${verktoy}
     <div class="vl-kort vl-utskriftsark">
       <div class="vl-arkhode">
         <h2>${escapeHtml(tittel)}</h2>
+        ${utvalgslinje}
         <div class="vl-meta">${escapeHtml(spenn)} ·
           ${escapeHtml(vaktTall)} · ${sumTimer}${escapeHtml(ledigtekst)}</div>
       </div>
@@ -2546,17 +2618,6 @@ function skjulPanelfeil() {
 }
 
 
-function _koblCellelytter() {
-  // `data-action`-delegeringen i portal-utils.js er klikkbasert. Cellene i
-  // ressurstabellen er nedtrekk og tekstfelt, og de melder `change`.
-  document.getElementById('vl-panel')?.addEventListener('change', (e) => {
-    const el = e.target.closest('[data-hendelse="change"]');
-    if (!el) return;
-    endreVaktpost(Number(el.dataset.id), el.dataset.felt, el.value);
-  });
-}
-
-
 function apneRedigerVaktpost(id) {
   // **Bytte person skal ikke koste skiftet.** Før måtte man fjerne raden og
   // sette den opp på nytt, og da mistet man tidene og rollen som allerede
@@ -3165,7 +3226,9 @@ async function slettVerdi(id) {
 
 document.addEventListener('DOMContentLoaded', () => {
   gateKnapper();
-  _koblCellelytter();
+  // Cellene i ressurstabellen og korpsvelgeren melder `change`; begge går
+  // gjennom `haandterHendelse` i portal-utils.js (12. sep. 2026). Lytteren
+  // som lå her var scopet til panelet, og korpsvelgeren står utenfor det.
   _koblPersonsok();
   document.getElementById('ny-vaktpost-mannskap')
     ?.addEventListener('change', _vaktpostModusSkifte);

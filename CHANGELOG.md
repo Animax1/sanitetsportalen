@@ -4,6 +4,32 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-12 — Korpsvelgeren virket ikke, og utskrift per korps eller ressurs
+
+**2186 tester grønne** (7 nye), og en røyktest i Chromium: velg korps, velg
+ressurs, begge samtidig, og velgeren borte i utskrift. Ingen migrasjon.
+
+- **Rettet: korpsvelgeren i vaktlinja filtrerte ingenting.** André: «Når vi
+  setter til et korps i nedtrekksvinduet så vises fortsatt alt i oversikt.»
+  Markupen var riktig (`data-action="velgKorps" data-hendelse="change"`), og
+  `velgKorps()` virket når den ble kalt — men ingen kalte den. Klikkdelegeringen
+  i `portal-utils.js` hopper over `data-hendelse`-elementer med vilje
+  (`klikkSkalKjore`), og den eneste `change`-lytteren var scopet til
+  ressurspanelet og hardkodet til `endreVaktpost`. Korpsvelgeren står utenfor
+  panelet. Nå har `change` sin egen delegering ved siden av klikk,
+  `haandterHendelse`, og `hendelseArgumenter` gir cellene (id, felt, verdi) og
+  alt annet ett argument. Panellytteren er borte. `HendelsedelegeringTests`
+  kjører delegeringen mot falske elementer — testene som fantes kalte
+  `velgKorps()` direkte og så aldri at knappen ikke var koblet.
+- **Utskrift per korps eller per ressurs.** «Oversikt» har fått en velger over
+  lista: «Hele vakta» eller én ressurs, gruppert på ressursgruppe og bare
+  ressurser med skift (`mkUtskriftsverktoy`, `velgUtskrift`, `utskriftRessurs`).
+  Korpset er korpsvelgerens — de to kombineres — og for korps-brukeren er lista
+  alt hennes korps. **Arket sier selv hva det er avgrenset til**
+  (`_utvalgstekst`, «Haugesund · Ambulanse 1» i arkhodet), for velgeren
+  kommer ikke med på papiret. Summene i arkhodet er utvalgets. En
+  «Skriv ut»-knapp står ved velgeren.
+
 ## 2026-09-11 — Flere enheter på ett oppdrag, trinn 4: arkiv og statistikk
 
 **2179 tester grønne** (5 nye). Én migrasjon, `oppdrag/0013`: unikhet og

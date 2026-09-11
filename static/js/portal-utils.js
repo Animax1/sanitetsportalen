@@ -210,6 +210,31 @@ function klikkSkalKjore(el) {
 }
 
 
+function hendelseArgumenter(el) {
+  // Cellene i vaktlistas ressurstabell bærer `data-felt`, og handlingen
+  // deres vil ha (id, felt, verdi). Alt annet får ett argument, som ved
+  // klikk. Regelen er en egen funksjon av samme grunn som `klikkSkalKjore`.
+  if (el.dataset.felt !== undefined) {
+    return [Number(el.dataset.id), el.dataset.felt, el.value];
+  }
+  return [_handlerArgument(el)];
+}
+
+function haandterHendelse(e) {
+  // **`data-hendelse="change"` er den andre lytteren.** Klikkdelegeringen
+  // under hopper over slike elementer med vilje (`klikkSkalKjore`), og fram
+  // til 12. sep. 2026 fantes det ingen delegering for `change` utenfor
+  // vaktlistas ressurspanel: korpsvelgeren i vaktlinja hadde riktig markup
+  // og en handling som virket når den ble kalt — og ingen kalte den.
+  const el = e.target.closest('[data-action][data-hendelse="change"]');
+  if (!el) return;
+  const handler = globalThis[el.dataset.action];
+  if (typeof handler !== 'function') return;
+  handler(...hendelseArgumenter(el));
+}
+
+document.addEventListener('change', haandterHendelse);
+
 document.addEventListener('click', (e) => {
   const el = e.target.closest('[data-action]');
   if (!el) return;

@@ -618,7 +618,7 @@
      en handling forsvinner: en knapp på et ark er bare blekk.
   */
   .portal-header, .portal-nav, .portal-footer,
-  .vl-faner, .vl-kurve-kort, .modal,
+  .vl-faner, .vl-kurve-kort, .modal, .vl-utskriftsverktoy,
   #vl-feil, #vl-tom, #vl-mangler-mannskap,
   .btn, select, .vl-handling {
     display: none !important;
@@ -653,6 +653,13 @@
     padding: 0 !important;
     max-width: none !important;
   }
+}
+
+/* Utvalget i arkhodet: «HGSD · Ambulanse 1». Står med på papiret. */
+.vl-utvalg {
+  font-weight: 600;
+  color: var(--text-main);
+  margin-bottom: 0.15rem;
 }
 
 /* ── Ledige plasser ───────────────────────────────────────────────────── */

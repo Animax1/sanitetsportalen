@@ -30,7 +30,7 @@ HTML_BUILDERS = (
     'mkTilstede',
     '_rolleValg',
     '_fyllValgFor',
-    'mkOversikt',
+    'mkOversikt', 'mkUtskriftsverktoy', '_utvalgstekst',
     'mkGruppekurve',
     '_mkEnKurve',
     'mkIkkePlassert',
@@ -39,6 +39,11 @@ HTML_BUILDERS = (
 ESCAPING_CALLS = ('escHtmlValue(', 'cellHtml(', '_escHtml(', 'escapeHtml(')
 
 REVIEWED_INTERPOLATIONS = {
+    # Utskriftsutvalget (12. sep. 2026): verktøylinja og utvalgslinja bygges
+    # lokalt av byggere som selv skannes her, med navnene escapet inni.
+    'verktoy': 'markup fra `mkUtskriftsverktoy`, som selv skannes her',
+    'utvalgslinje': 'markup bygget lokalt, utvalgsteksten escapet inni',
+    'grupper': 'optgroups bygget lokalt i samme funksjon, navn escapet inni',
     # Drift (fase 4). Knappene bygges lokalt, og bare når tilgangen og
     # tilstanden tillater dem — id-en er escapet inne i `_stempelknapper`.
     'rediger': 'markup bygget lokalt, skift-id-en escapet inni',
@@ -215,7 +220,7 @@ class VaktlisteEscapingOppforselTests(SimpleTestCase):
         (VAKTLISTE_JS, ('mkRessurs', '_radklasse', '_stempelknapper',
                         'kanStemple', 'iDrift', '_rolleValg',
                         'rollerForGruppe', '_fyllValgFor', '_varighet',
-                        'mkRolleRad', 'mkOversikt', '_skiftrekkefolge',
+                        'mkRolleRad', 'mkOversikt', 'mkUtskriftsverktoy', '_utvalgstekst', '_skiftrekkefolge',
                         '_planrad', '_tidsblokker', '_blokklinje', '_blokkerMedDager', 'kanBemannePlass',
                         '_mittKorpsId', '_synligePoster',
                         '_dagnokkel', '_dagoverskrift', '_probonoMerke',
@@ -260,6 +265,8 @@ class VaktlisteEscapingOppforselTests(SimpleTestCase):
     def test_ressursnavn_med_markup_kommer_ut_som_tekst(self):
         """Fritekstfeltet i modulen — admin skriver hva som helst her."""
         ut = run_node(self.harness, self.VINDU + f'''
+            globalThis.utskriftRessurs = null; globalThis.korpsfilter = null;
+            globalThis.utskriftRessurs = null; globalThis.korpsfilter = null;
             globalThis.aktivListe = {self._liste()};
             console.log(mkRessurs({{
               id: 1, navn: '<img src=x onerror=alert(1)>', ikon: 'people',
@@ -272,6 +279,8 @@ class VaktlisteEscapingOppforselTests(SimpleTestCase):
     def test_ikonet_kommer_fra_data_og_escapes(self):
         """Ikonet står i et class-attributt — et bruddpunkt for attributt-XSS."""
         ut = run_node(self.harness, self.VINDU + f'''
+            globalThis.utskriftRessurs = null; globalThis.korpsfilter = null;
+            globalThis.utskriftRessurs = null; globalThis.korpsfilter = null;
             globalThis.aktivListe = {self._liste()};
             console.log(mkRessurs({{
               id: 1, navn: 'Lag 1', ikon: '" onload="alert(1)',
@@ -282,6 +291,8 @@ class VaktlisteEscapingOppforselTests(SimpleTestCase):
 
     def test_mannskapsnavn_i_oversikten_escapes(self):
         ut = run_node(self.harness, self.VINDU + f'''
+            globalThis.utskriftRessurs = null; globalThis.korpsfilter = null;
+            globalThis.utskriftRessurs = null; globalThis.korpsfilter = null;
             globalThis.aktivListe = {self._liste(
                 grupper=[{'id': 1, 'navn': 'Lag', 'ikon': 'people'}],
                 ressurser=[{'id': 1, 'navn': 'Lag 1', 'gruppe_id': 1}],
@@ -300,6 +311,8 @@ class VaktlisteEscapingOppforselTests(SimpleTestCase):
         """Overskriften er ressursens navn fra 30. aug. 2026 — lista er
         gruppert på ressurs, ikke korps. Navnet er fritekst fra basen."""
         ut = run_node(self.harness, self.VINDU + f'''
+            globalThis.utskriftRessurs = null; globalThis.korpsfilter = null;
+            globalThis.utskriftRessurs = null; globalThis.korpsfilter = null;
             globalThis.aktivListe = {self._liste(
                 grupper=[{'id': 1, 'navn': 'Lag', 'ikon': 'people'}],
                 ressurser=[{'id': 1, 'navn': '<b>Lag 1</b>', 'gruppe_id': 1}],
@@ -322,12 +335,14 @@ class VaktlisteEscapingOppforselTests(SimpleTestCase):
             globalThis.OVERSIKT = 'oversikt';
             globalThis.IKKE_PLASSERT = 'ikke-plassert';
             globalThis.MITT_KORPS = 'mitt-korps';
-            globalThis.korpsfilter = null;
+            globalThis.korpsfilter = null; globalThis.utskriftRessurs = null;
             globalThis.MANNSKAP = 'mannskap';
             globalThis.TILSTEDE = 'tilstede';
             globalThis.BELASTNING = 'belastning';
             globalThis.belastning = null;
             globalThis.register = null;
+            globalThis.utskriftRessurs = null; globalThis.korpsfilter = null;
+            globalThis.utskriftRessurs = null; globalThis.korpsfilter = null;
             globalThis.aktivListe = {self._liste(
                 grupper=[{'id': 1, 'navn': '<b>Lag</b>', 'ikon': 'people'}],
                 ressurser=[{'id': 1, 'navn': 'Lag 1', 'gruppe_id': 1,
@@ -347,12 +362,14 @@ class VaktlisteEscapingOppforselTests(SimpleTestCase):
             globalThis.OVERSIKT = 'oversikt';
             globalThis.IKKE_PLASSERT = 'ikke-plassert';
             globalThis.MITT_KORPS = 'mitt-korps';
-            globalThis.korpsfilter = null;
+            globalThis.korpsfilter = null; globalThis.utskriftRessurs = null;
             globalThis.MANNSKAP = 'mannskap';
             globalThis.TILSTEDE = 'tilstede';
             globalThis.BELASTNING = 'belastning';
             globalThis.belastning = null;
             globalThis.register = null;
+            globalThis.utskriftRessurs = null; globalThis.korpsfilter = null;
+            globalThis.utskriftRessurs = null; globalThis.korpsfilter = null;
             globalThis.aktivListe = {self._liste(
                 grupper=[{'id': 1, 'navn': 'Lag',
                           'ikon': '" onload="alert(1)'}],
@@ -367,6 +384,8 @@ class VaktlisteEscapingOppforselTests(SimpleTestCase):
 
     def test_ikke_plassert_escapes(self):
         ut = run_node(self.harness, self.VINDU + f'''
+            globalThis.utskriftRessurs = null; globalThis.korpsfilter = null;
+            globalThis.utskriftRessurs = null; globalThis.korpsfilter = null;
             globalThis.aktivListe = {self._liste(
                 mannskap=[{'id': 1, 'navn': '<i>Kari</i>',
                            'korps_navn': '<i>HGSD</i>'}])};
@@ -393,6 +412,7 @@ class VaktlisteLogikkTests(SimpleTestCase):
         """Fanen finnes for at ingen skal bli glemt: en person som er meldt på
         og ikke satt opp er usynlig ellers."""
         run_node(self.harness, '''
+            globalThis.utskriftRessurs = null; globalThis.korpsfilter = null;
             globalThis.aktivListe = {
               mannskap: [{id: 1, navn: 'Kari'}, {id: 2, navn: 'Ola'}],
               vaktposter: [{id: 9, ressurs_id: 1, mannskap_id: 1}]
@@ -405,6 +425,7 @@ class VaktlisteLogikkTests(SimpleTestCase):
         """Fanetallene hviler på dette utvalget — treffer det feil ressurs,
         viser fanen et antall som ikke stemmer med panelet under."""
         run_node(self.harness, '''
+            globalThis.utskriftRessurs = null; globalThis.korpsfilter = null;
             globalThis.aktivListe = { vaktposter: [
               {id: 1, ressurs_id: 1}, {id: 2, ressurs_id: 2},
               {id: 3, ressurs_id: 1}
@@ -687,6 +708,7 @@ class TidsvisningTests(SimpleTestCase):
         """Spennet er ikke et felt noen fyller ut — da holder det seg riktig
         av seg selv når lista endrer seg."""
         self._kjor("""
+            globalThis.utskriftRessurs = null; globalThis.korpsfilter = null;
             globalThis.aktivListe = { vaktposter: [
               {fra_tid: '2026-10-03T12:00:00', til_tid: '2026-10-03T20:00:00'},
               {fra_tid: '2026-10-03T08:00:00', til_tid: '2026-10-04T02:00:00'},
@@ -698,6 +720,7 @@ class TidsvisningTests(SimpleTestCase):
 
     def test_tomt_spenn_gir_tom_streng(self):
         self._kjor("""
+            globalThis.utskriftRessurs = null; globalThis.korpsfilter = null;
             globalThis.aktivListe = { vaktposter: [] };
             assert(_vaktspenn() === '', 'ingen skift gir ingen tekst');
         """)
@@ -732,6 +755,7 @@ class BemanningskurveTests(SimpleTestCase):
 
     def test_teller_overlappende_skift_per_time(self):
         run_node(self.harness, """
+            globalThis.utskriftRessurs = null; globalThis.korpsfilter = null;
             globalThis.aktivListe = { vaktposter: [
               {fra_tid: '2026-10-03T08:00:00', til_tid: '2026-10-03T12:00:00'},
               {fra_tid: '2026-10-03T10:00:00', til_tid: '2026-10-03T14:00:00'},
@@ -746,6 +770,7 @@ class BemanningskurveTests(SimpleTestCase):
     def test_hull_i_bemanningen_telles_som_null(self):
         """Hullet er det planleggeren leter etter — det må synes."""
         run_node(self.harness, """
+            globalThis.utskriftRessurs = null; globalThis.korpsfilter = null;
             globalThis.aktivListe = { vaktposter: [
               {fra_tid: '2026-10-03T08:00:00', til_tid: '2026-10-03T10:00:00'},
               {fra_tid: '2026-10-03T12:00:00', til_tid: '2026-10-03T14:00:00'},
@@ -758,6 +783,7 @@ class BemanningskurveTests(SimpleTestCase):
 
     def test_ingen_skift_gir_ingen_kurve(self):
         run_node(self.harness, """
+            globalThis.utskriftRessurs = null; globalThis.korpsfilter = null;
             globalThis.aktivListe = { vaktposter: [] };
             assert(_bemanningPerTime().length === 0, 'tom liste');
         """)
@@ -765,6 +791,7 @@ class BemanningskurveTests(SimpleTestCase):
     def test_urimelig_spenn_tegnes_ikke(self):
         """En feiltastet årstall ville ellers laget hundretusen søyler."""
         run_node(self.harness, """
+            globalThis.utskriftRessurs = null; globalThis.korpsfilter = null;
             globalThis.aktivListe = { vaktposter: [
               {fra_tid: '2026-10-03T08:00:00', til_tid: '2099-10-03T08:00:00'},
             ]};
@@ -792,6 +819,7 @@ class KurveOverHeleVaktaTests(SimpleTestCase):
 
     def test_spennet_kommer_fra_vakta_ikke_fra_skiftene(self):
         run_node(self.harness, """
+            globalThis.utskriftRessurs = null; globalThis.korpsfilter = null;
             globalThis.aktivListe = {
               vaktliste: {startet: '2026-10-03T08:00:00',
                           planlagt_slutt: '2026-10-03T20:00:00'},
@@ -809,6 +837,7 @@ class KurveOverHeleVaktaTests(SimpleTestCase):
     def test_ledige_plasser_telles_som_behov_ikke_bemanning(self):
         """Avstanden mellom de to tallene er det som gjenstår å bemanne."""
         run_node(self.harness, """
+            globalThis.utskriftRessurs = null; globalThis.korpsfilter = null;
             globalThis.aktivListe = {
               vaktliste: {startet: '2026-10-03T08:00:00',
                           planlagt_slutt: '2026-10-03T10:00:00'},
@@ -827,6 +856,7 @@ class KurveOverHeleVaktaTests(SimpleTestCase):
         """Bedre en kurve som dekker for lite enn ingen kurve mens vakta
         ennå ikke har fått en slutt."""
         run_node(self.harness, """
+            globalThis.utskriftRessurs = null; globalThis.korpsfilter = null;
             globalThis.aktivListe = {
               vaktliste: {startet: '2026-10-03T08:00:00', planlagt_slutt: null},
               vaktposter: [
@@ -839,6 +869,7 @@ class KurveOverHeleVaktaTests(SimpleTestCase):
 
     def test_ugyldig_spenn_faller_tilbake_ogsaa(self):
         run_node(self.harness, """
+            globalThis.utskriftRessurs = null; globalThis.korpsfilter = null;
             globalThis.aktivListe = {
               vaktliste: {startet: '2026-10-03T20:00:00',
                           planlagt_slutt: '2026-10-03T08:00:00'},
@@ -851,6 +882,7 @@ class KurveOverHeleVaktaTests(SimpleTestCase):
 
     def test_verken_spenn_eller_skift_gir_ingen_kurve(self):
         run_node(self.harness, """
+            globalThis.utskriftRessurs = null; globalThis.korpsfilter = null;
             globalThis.aktivListe = { vaktliste: {}, vaktposter: [] };
             assert(_bemanningPerTime().length === 0, 'ingenting aa tegne');
         """)
@@ -1117,6 +1149,7 @@ class RollenedtrekketTests(SimpleTestCase):
 
     #: Gruppe 1 er «Ambulanse», gruppe 2 «Samleplass» i disse testene.
     ROLLER = """
+        globalThis.utskriftRessurs = null; globalThis.korpsfilter = null;
         globalThis.aktivListe = { roller: [
           {id: 1, navn: 'Lagleder', er_aktiv: true, gruppe_id: 1},
           {id: 2, navn: 'Utgaatt', er_aktiv: false, gruppe_id: 1},
@@ -1275,7 +1308,7 @@ class OversiktUtenKurveTests(SimpleTestCase):
 
     HARNESS = (
         (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue')),
-        (VAKTLISTE_JS, ('mkOversikt', '_skiftrekkefolge', '_d', '_kl',
+        (VAKTLISTE_JS, ('mkOversikt', 'mkUtskriftsverktoy', '_utvalgstekst', '_skiftrekkefolge', '_d', '_kl',
                         '_tidsblokker', '_blokklinje', '_blokkerMedDager', 'kanBemannePlass',
                         '_mittKorpsId', '_synligePoster',
                         '_dagnokkel', '_dagoverskrift', '_probonoMerke', '_sumTimer',
@@ -1294,6 +1327,7 @@ class OversiktUtenKurveTests(SimpleTestCase):
 
     def test_oversikten_tegner_ingen_kurve(self):
         ut = run_node(self.harness, self.VINDU + """
+            globalThis.utskriftRessurs = null; globalThis.korpsfilter = null;
             globalThis.aktivListe = {
               vaktliste: {vakt_navn: 'Vakta', startet: '2026-10-03T08:00:00',
                           planlagt_slutt: '2026-10-03T12:00:00'},
@@ -1332,6 +1366,7 @@ class KurvePerGruppeTests(SimpleTestCase):
 
     #: To grupper, to ressurser, tre skift. Ambulansen har én ledig plass.
     LISTE = """
+        globalThis.utskriftRessurs = null; globalThis.korpsfilter = null;
         globalThis.aktivListe = {
           vaktliste: {startet: '2026-10-03T08:00:00',
                       planlagt_slutt: '2026-10-03T12:00:00'},
@@ -1402,6 +1437,7 @@ class KurvePerGruppeTests(SimpleTestCase):
 
     def test_ingen_grupper_gir_ingen_kurve(self):
         run_node(self.harness, self.VINDU + """
+            globalThis.utskriftRessurs = null; globalThis.korpsfilter = null;
             globalThis.aktivListe = {vaktliste: {}, grupper: [],
                                      ressurser: [], vaktposter: []};
             assert(mkGruppekurve({id: 1, navn: 'X'}) === '',
@@ -1446,6 +1482,7 @@ class TimeaksenTests(SimpleTestCase):
         """Cellene i timeaksen må være like mange som søylene. Færre, og
         tallet glir bort fra timen det gjelder."""
         ut = run_node(self.harness, self.VINDU + """
+            globalThis.utskriftRessurs = null; globalThis.korpsfilter = null;
             globalThis.aktivListe = {
               vaktliste: {startet: '2026-10-03T08:00:00',
                           planlagt_slutt: '2026-10-03T14:00:00'},
@@ -1470,6 +1507,7 @@ class TimeaksenTests(SimpleTestCase):
     def test_toppunktet_oppgis_med_klokkeslett(self):
         """Selve spørsmålet kurven skal svare på: når er det flest på vakt?"""
         ut = run_node(self.harness, self.VINDU + """
+            globalThis.utskriftRessurs = null; globalThis.korpsfilter = null;
             globalThis.aktivListe = {
               vaktliste: {startet: '2026-10-03T08:00:00',
                           planlagt_slutt: '2026-10-03T12:00:00'},
@@ -1527,6 +1565,7 @@ class GruppekurveIFanenTests(SimpleTestCase):
              "globalThis.MND = ['jan','feb','mar','apr','mai','jun',"
              "'jul','aug','sep','okt','nov','des'];\n")
     LISTE = """
+        globalThis.utskriftRessurs = null; globalThis.korpsfilter = null;
         globalThis.aktivListe = {
           vaktliste: {startet: '2026-10-03T08:00:00',
                       planlagt_slutt: '2026-10-03T12:00:00'},
@@ -1711,6 +1750,7 @@ class FanenErGruppaTests(SimpleTestCase):
 
     #: To ambulanser i samme gruppe, én samleplass i en annen.
     LISTE = """
+        globalThis.utskriftRessurs = null; globalThis.korpsfilter = null;
         globalThis.aktivListe = {
           vaktliste: {startet: '2026-10-03T08:00:00',
                       planlagt_slutt: '2026-10-03T12:00:00'},
@@ -1901,7 +1941,7 @@ class UtskriftslistaTests(SimpleTestCase):
 
     HARNESS = (
         (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue')),
-        (VAKTLISTE_JS, ('mkOversikt', '_skiftrekkefolge', '_d', '_kl',
+        (VAKTLISTE_JS, ('mkOversikt', 'mkUtskriftsverktoy', '_utvalgstekst', '_skiftrekkefolge', '_d', '_kl',
                         '_tidsblokker', '_blokklinje', '_blokkerMedDager', 'kanBemannePlass',
                         '_mittKorpsId', '_synligePoster',
                         '_dagnokkel', '_dagoverskrift', '_probonoMerke', '_sumTimer',
@@ -1915,6 +1955,7 @@ class UtskriftslistaTests(SimpleTestCase):
 
     #: Andrés egne rader: tre skift som begynner 17:00, ett av dem kort.
     LISTE = """
+        globalThis.utskriftRessurs = null; globalThis.korpsfilter = null;
         globalThis.aktivListe = {
           vaktliste: {vakt_navn: 'Vakta', startet: '2026-09-04T17:00:00',
                       planlagt_slutt: '2026-09-05T15:00:00'},
@@ -2051,6 +2092,7 @@ class EnkeltgruppeTests(SimpleTestCase):
              "globalThis.MND = ['jan','feb','mar','apr','mai','jun',"
              "'jul','aug','sep','okt','nov','des'];\n")
     LISTE = """
+        globalThis.utskriftRessurs = null; globalThis.korpsfilter = null;
         globalThis.aktivListe = {
           vaktliste: {startet: '2026-10-03T08:00:00',
                       planlagt_slutt: '2026-10-03T12:00:00'},
@@ -2494,6 +2536,7 @@ class NyVaktpostFyllerDatoenTests(SimpleTestCase):
         self.harness = build_harness(self.HARNESS)
 
     OPPSETT = """
+        globalThis.utskriftRessurs = null; globalThis.korpsfilter = null;
         globalThis.aktivListe = {
           vaktliste: {id: 3, startet: '2026-10-03T08:00:00'},
           ressurser: [{id: 10, navn: 'Bil A', gruppe_id: 2}],
@@ -2623,6 +2666,7 @@ class DriftflatenTests(SimpleTestCase):
         ut = run_node(self.harness, self.DAGER + f"""
             globalThis.window = {{ MODUL_TILGANG: {{
               vaktliste: '{nivaa}', admin: {str(admin).lower()} }} }};
+            globalThis.utskriftRessurs = null; globalThis.korpsfilter = null;
             globalThis.aktivListe = {{vaktliste: {{i_drift: {str(drift).lower()}}}}};
             console.log('[' + _stempelknapper({json.dumps(vp)}) + ']');
         """)
@@ -2685,6 +2729,7 @@ class DriftflatenTests(SimpleTestCase):
     def _radklasse(self, vp, drift=True):
         import json
         return run_node(self.harness, f"""
+            globalThis.utskriftRessurs = null; globalThis.korpsfilter = null;
             globalThis.aktivListe = {{vaktliste: {{i_drift: {str(drift).lower()}}}}};
             console.log('[' + _radklasse({json.dumps(vp)}) + ']');
         """).splitlines()[0]
@@ -2712,6 +2757,7 @@ class DriftflatenTests(SimpleTestCase):
         return run_node(self.harness, self.DAGER + f"""
             globalThis.window = {{ MODUL_TILGANG: {{ admin: true }} }};
             globalThis.document = {{ getElementById: () => null }};
+            globalThis.utskriftRessurs = null; globalThis.korpsfilter = null;
             globalThis.aktivListe = {{
               vaktliste: {{i_drift: true}},
               vaktposter: {json.dumps(poster)},
@@ -2921,7 +2967,7 @@ class TidsblokkerTests(SimpleTestCase):
 
     HARNESS = (
         (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue')),
-        (VAKTLISTE_JS, ('mkOversikt', '_tidsblokker', '_blokklinje', '_blokkerMedDager', 'kanBemannePlass',
+        (VAKTLISTE_JS, ('mkOversikt', 'mkUtskriftsverktoy', '_utvalgstekst', '_tidsblokker', '_blokklinje', '_blokkerMedDager', 'kanBemannePlass',
                         '_mittKorpsId', '_synligePoster',
                         '_dagnokkel', '_dagoverskrift', '_probonoMerke',
                         '_telling', '_driftrad', '_radklasse', '_stempelknapper',
@@ -3079,6 +3125,7 @@ class TidsblokkerTests(SimpleTestCase):
         """Den står på blokklinja over. Fire like tider under hverandre var det
         som gjorde lista lang og lik."""
         ut = run_node(self.harness, self.VINDU + """
+            globalThis.utskriftRessurs = null; globalThis.korpsfilter = null;
             globalThis.aktivListe = {vaktliste: {i_drift: true}};
             console.log(_driftrad({id: 5, ledig: false, navn: 'Kari',
                                    korps_kort: 'HGSD', rolle: 'Sjåfør',
@@ -3306,6 +3353,7 @@ class KorpsvelgerenTests(SimpleTestCase):
 
     def test_filteret_legges_paa_lista_og_registeret(self):
         run_node(self.harness, self.POSTER + """
+            globalThis.utskriftRessurs = null; globalThis.korpsfilter = null;
             globalThis.aktivListe = {alle_vaktposter: poster, vaktposter: poster};
             globalThis.register = {
               alle_mannskap: [{id: 1, navn: 'Kari', korps_id: 1}, {id: 2, navn: 'Ola', korps_id: 2}],
@@ -3316,7 +3364,7 @@ class KorpsvelgerenTests(SimpleTestCase):
             assert(aktivListe.vaktposter.length === 1, 'skift: ' + aktivListe.vaktposter.length);
             assert(register.mannskap.length === 1 && register.mannskap[0].navn === 'Ola',
                    'register: ' + JSON.stringify(register.mannskap));
-            globalThis.korpsfilter = null;
+            globalThis.korpsfilter = null; globalThis.utskriftRessurs = null;
             brukKorpsfilter();
             assert(aktivListe.vaktposter.length === 4, 'tilbake til alle');
             assert(register.mannskap.length === 2, 'registeret tilbake');
@@ -3327,6 +3375,7 @@ class KorpsvelgerenTests(SimpleTestCase):
         ut = run_node(self.harness, """
             const el = {innerHTML: '', value: ''};
             globalThis.document = {getElementById: (id) => (id === 'vl-korpsvalg' ? el : null)};
+            globalThis.utskriftRessurs = null; globalThis.korpsfilter = null;
             globalThis.aktivListe = {korps: [{id: 1, navn: 'Haugesund', kortnavn: 'HGSD'}]};
             globalThis.korpsfilter = 99;
             fyllKorpsvelger();
@@ -3340,8 +3389,9 @@ class KorpsvelgerenTests(SimpleTestCase):
         ut = run_node(self.harness, """
             const el = {innerHTML: '', value: ''};
             globalThis.document = {getElementById: () => el};
+            globalThis.utskriftRessurs = null; globalThis.korpsfilter = null;
             globalThis.aktivListe = {korps: [{id: 1, navn: '<img src=x onerror=alert(1)>', kortnavn: ''}]};
-            globalThis.korpsfilter = null;
+            globalThis.korpsfilter = null; globalThis.utskriftRessurs = null;
             fyllKorpsvelger();
             console.log(el.innerHTML);
         """)
@@ -3404,6 +3454,7 @@ class ProbonoOgDagoverskrifterTests(SimpleTestCase):
 
     def test_driftraden_baerer_merket(self):
         ut = run_node(self.harness, self.VINDU + """
+            globalThis.utskriftRessurs = null; globalThis.korpsfilter = null;
             globalThis.aktivListe = {vaktliste: {i_drift: true}};
             console.log(_driftrad({id: 5, ledig: false, navn: 'Kari', probono: true,
                                    korps_kort: 'HGSD', rolle: '', mott_at: null,
@@ -3444,6 +3495,7 @@ class ProbonoOgDagoverskrifterTests(SimpleTestCase):
     def test_overskriften_bare_der_dagen_skifter(self):
         """To blokker på samme dag deler én overskrift."""
         ut = run_node(self.harness, self.VINDU + """
+            globalThis.utskriftRessurs = null; globalThis.korpsfilter = null;
             globalThis.aktivListe = {vaktliste: {i_drift: false}};
             const rad = () => '';
             const blokker = _tidsblokker([
@@ -3482,6 +3534,7 @@ class MittKorpsTests(SimpleTestCase):
              "'jul','aug','sep','okt','nov','des'];\n"
              "globalThis.korpsfilter = null;\n")
     LISTE = """
+        globalThis.utskriftRessurs = null; globalThis.korpsfilter = null;
         globalThis.aktivListe = {
           vaktliste: {i_drift: false},
           korps: [{id: 1, navn: 'Haugesund', kortnavn: 'HGSD'},
@@ -3570,6 +3623,7 @@ class MittKorpsTests(SimpleTestCase):
     def test_plassKorps_viser_alle_korps(self):
         ut = run_node(self.harness, self.VINDU + """
             globalThis.window = { MODUL_TILGANG: { vaktliste: 'skriv_full', admin: false }, MITT_KORPS_ID: null };
+            globalThis.utskriftRessurs = null; globalThis.korpsfilter = null;
             globalThis.aktivListe = {korps: [{id: 1, navn: 'Haugesund', kortnavn: 'HGSD'}]};
             console.log(_plassKorps({id: 9, alle_korps: true, plass_korps_id: null, reservert_korps_id: null}));
             globalThis.window.MODUL_TILGANG.vaktliste = 'les';
@@ -3584,3 +3638,106 @@ class MittKorpsTests(SimpleTestCase):
                        "aktivListe.ressurser[0].navn = '<img src=x onerror=alert(1)>';\n")
         self.assertNotIn('<img src=x', ut)
         self.assertIn('&lt;img', ut)
+
+
+class UtskriftsutvalgTests(SimpleTestCase):
+    """Utskrift per korps eller per ressurs (André, 12. sep. 2026).
+
+    Korpset kommer fra korpsvelgeren (alt filtrert i `aktivListe.vaktposter`),
+    ressursen fra velgeren over lista. Arket sier selv hva det er avgrenset
+    til — velgeren kommer ikke med på papiret.
+    """
+
+    HARNESS = TidsblokkerTests.HARNESS
+    VINDU = TidsblokkerTests.VINDU
+    LISTE = UtskriftslistaTests.LISTE
+
+    def setUp(self):
+        if not node_available():
+            self.skipTest('node er ikke tilgjengelig')
+        self.harness = build_harness(self.HARNESS)
+
+    def _oversikt(self, ekstra=''):
+        return run_node(self.harness, self.VINDU + self.LISTE + ekstra
+                        + "console.log(mkOversikt());")
+
+    def test_valgt_ressurs_gir_bare_den_ressursen(self):
+        ut = self._oversikt("globalThis.utskriftRessurs = 20;\n")
+        self.assertEqual(ut.count('vl-korpsgruppe'), 1)
+        self.assertIn('<h3>Ambulanse 1', ut)
+        self.assertNotIn('<h3>Ambulanse 2', ut)
+        self.assertNotIn('<h3>Samleplass', ut)
+        # Summene i arkhodet er utvalgets, ikke hele vaktas.
+        self.assertIn('1 skift · 1 mannskap · 10 t', ut)
+
+    def test_arket_sier_hva_det_er_avgrenset_til(self):
+        hele = self._oversikt()
+        self.assertNotIn('vl-utvalg"', hele)
+        ressurs = self._oversikt("globalThis.utskriftRessurs = 20;\n")
+        self.assertIn('<div class="vl-utvalg">Ambulanse 1</div>', ressurs)
+        begge = self._oversikt("globalThis.utskriftRessurs = 20; globalThis.korpsfilter = 1;\n")
+        self.assertIn('<div class="vl-utvalg">Haugesund · Ambulanse 1</div>', begge)
+
+    def test_velgeren_lister_ressursene_med_skift_og_merker_den_valgte(self):
+        ut = self._oversikt("globalThis.utskriftRessurs = 21;\n")
+        self.assertIn('<option value="">Hele vakta</option>', ut)
+        self.assertIn('<optgroup label="Ambulanse">', ut)
+        self.assertIn('<option value="21" selected>Ambulanse 2</option>', ut)
+        self.assertIn('<option value="20">Ambulanse 1</option>', ut)
+        self.assertIn('data-action="velgUtskrift" data-hendelse="change"', ut)
+        self.assertIn('data-action="skrivUt"', ut)
+
+    def test_ressursnavn_i_velgeren_escapes(self):
+        ut = run_node(self.harness, self.VINDU + self.LISTE + """
+            aktivListe.ressurser[1].navn = '<b>Bil</b>';
+            console.log(mkUtskriftsverktoy());
+        """)
+        self.assertNotIn('<b>Bil</b>', ut)
+        self.assertIn('&lt;b&gt;Bil&lt;/b&gt;', ut)
+
+
+class HendelsedelegeringTests(SimpleTestCase):
+    """`data-hendelse="change"` har sin egen delegering (12. sep. 2026).
+
+    Klikkdelegeringen hopper over slike elementer med vilje
+    (`klikkSkalKjore`), og fram til nå fantes det ingen lytter for `change`
+    utenfor vaktlistas ressurspanel. Korpsvelgeren i vaktlinja hadde riktig
+    markup og en handling som virket når den ble kalt — og ingen kalte den.
+    André: «Når vi setter til et korps i nedtrekksvinduet så vises fortsatt
+    alt i oversikt.»
+    """
+
+    HARNESS = ((PORTAL_UTILS_JS, ('hendelseArgumenter', 'haandterHendelse',
+                                  '_handlerArgument')),)
+
+    def setUp(self):
+        if not node_available():
+            self.skipTest('node er ikke tilgjengelig')
+        self.harness = build_harness(self.HARNESS)
+
+    def test_korpsvelgeren_kaller_handlingen_sin(self):
+        run_node(self.harness, """
+            let kalt = [];
+            globalThis.velgKorps = (...a) => kalt.push(a);
+            const el = { dataset: { action: 'velgKorps', hendelse: 'change' }, value: '2' };
+            haandterHendelse({ target: { closest: () => el } });
+            assert(kalt.length === 1, 'handlingen ble kalt ' + kalt.length + ' ganger');
+            assert(kalt[0].length === 1 && kalt[0][0] === undefined, 'ett argument, uten id: ' + JSON.stringify(kalt[0]));
+        """)
+
+    def test_cellene_i_ressurstabellen_faar_id_felt_og_verdi(self):
+        run_node(self.harness, """
+            let kalt = null;
+            globalThis.endreVaktpost = (...a) => { kalt = a; };
+            const el = { dataset: { action: 'endreVaktpost', hendelse: 'change',
+                                    felt: 'rolle_id', id: '7' }, value: '3' };
+            haandterHendelse({ target: { closest: () => el } });
+            assert(JSON.stringify(kalt) === '[7,"rolle_id","3"]', 'fikk ' + JSON.stringify(kalt));
+        """)
+
+    def test_uten_treff_eller_uten_handling_skjer_ingenting(self):
+        run_node(self.harness, """
+            haandterHendelse({ target: { closest: () => null } });
+            const el = { dataset: { action: 'finnesIkke', hendelse: 'change' }, value: '' };
+            haandterHendelse({ target: { closest: () => el } });
+        """)
