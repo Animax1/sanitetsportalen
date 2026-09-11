@@ -168,10 +168,15 @@ ingen av dem gir feilmelding — de er bare stille inaktive.
       - [x] **«Mitt korps»-fane** (11. sep. 2026): `Vaktpost.alle_korps`,
             `0012`. Tre tilstander på plassen; fanen viser tildelte og
             universale, ledige først, med «N plasser å dekke».
-      - [ ] **Flere enheter på ett oppdrag** — notat skrevet 11. sep. 2026:
-            `docs/BESLUTNING_FLERE_ENHETER_PER_OPPDRAG.md`. **Venter på svar på
-            §7.1–7.4** før kode. Anslag to dager i fire trinn; backup før deploy.
-            «Dupliser oppdrag» droppet til fordel for denne.
+      - [ ] **Flere enheter på ett oppdrag** — besluttet 11. sep. 2026:
+            `docs/BESLUTNING_FLERE_ENHETER_PER_OPPDRAG.md`. §7 besvart, §9 kom
+            til: sentralbordet fører status manuelt, også på ferdige oppdrag
+            innen 48 t (forslag). Fire trinn; backup før deploy.
+            - [ ] Trinn 1: modell, migrasjoner (0010–0012), prøve, services
+            - [ ] Trinn 2: endepunkter, bilen, manuell føring fra sentralbordet
+            - [ ] Trinn 3: sentralbordets UI
+            - [ ] Trinn 4: arkiv (rad per enhet) og statistikk
+            - [ ] Deploy 2, senere: fjern `Oppdrag.enhet`
       - [ ] **Stripe på blokklinja** (mini-Gantt over vaktas spenn) — alternativ
             «Begge deler» i spørsmålet 11. sep.; valgt bort for nå, lett å
             legge til siden blokka alt bærer spennet.

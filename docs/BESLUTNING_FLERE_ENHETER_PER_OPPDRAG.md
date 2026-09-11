@@ -1,7 +1,7 @@
 # Beslutningsnotat: flere enheter på ett oppdrag
 
-Status: **utkast 11. sep. 2026, ikke besluttet.** Skrevet før kode, slik de andre
-fasene ble. Fire åpne spørsmål nederst; ingen kode før André har svart på §7.1.
+Status: **besluttet 11. sep. 2026** — André svarte på §7 samme dag, se svarene der.
+Skrevet før kode, slik de andre fasene ble. §9 kom til med svarene.
 
 Bestillingen (prosjektleder, via André 11. sep. 2026):
 
@@ -130,23 +130,56 @@ det står i notatet så neste person ikke «retter» det.
 5. **Backup av prod før pushen** — Andrés regel for enveismigrasjoner.
 6. Deploy 2, senere: `Oppdrag.enhet` fjernes.
 
-## 7. Åpne spørsmål — svar før kode
+## 7. Spørsmålene — besvart 11. sep. 2026
 
 ### 7.1 Arkivrad per oppdrag × enhet (§5 A)?
-Det ene valget som ikke lar seg gjøre om uten å versjonere payloaden. **Anbefaling: A.**
+**Ja.** Det ene valget som ikke lar seg gjøre om uten å versjonere payloaden.
 
 ### 7.2 «Ferdig» = alle enheter ledige?
-Alternativet er «ferdig når primær er ledig», og da rydder tavla mens KARM 12 fortsatt
-kjører. **Anbefaling: alle.**
+André: «Oppdraget er ferdig per enhet når de registrerer ledig. Men i listen hos
+AMK-operatøren til alle er ledige.» Altså to begreper, og de har hvert sitt sted:
+**enhetens** oppdrag er ferdig når *hennes* koblingsrad er `Ledig` — det er det bilen ser
+og det 30-minuttersvinduet måles mot; **oppdraget** er ferdig, og forlater tavla, når
+alle er ledige. Nøyaktig §2.2.
 
 ### 7.3 Skal bilen se de andres status?
-Prosjektleder: «ikke nødvendigvis». Navnene koster ingenting og hjelper på samband
-(«HGSD 56 er også varslet»); statusen er sentralbordets bilde, og to biler som leser
-hverandres status over en skjerm i stedet for over nødnett er ikke noe vi vil oppmuntre.
-**Anbefaling: bare navn.**
+**Nei — bare navnene.**
 
 ### 7.4 Kan en enhet tas av etter «Rykker ut»?
-**Anbefaling: nei** — det er en hendelse, og hendelser lukkes med `Ledig` eller rettes.
+**Nei.** André: «da må de slå seg ledig evt.» — eller sentralbordet fører det, se §9.
+
+## 9. Sentralbordet fører status manuelt — også på ferdige oppdrag
+
+André, med svarene: «AMK-operatøren må kunne manuelt endre enhver oppdrags statuser for
+korreksjon ved mangel på oppfølging eller feil gjort av personellet. Selv ferdige oppdrag
+innenfor en rimelig tidsperiode.»
+
+I dag kan sentralbordet **rette tidspunktet** på en melding som finnes («Rett tid»,
+`korriger_tidspunkt`). Det kan ikke *sette* en status bilen glemte, og ikke røre et
+oppdrag som er ledig. Det trengs, og det passer rett inn i formen som alt finnes:
+
+- **Å føre en status for en enhet** er å lage en `Statusmelding` på hennes koblingsrad,
+  med `tidspunkt` oppgitt av operatøren og `meldt_av` = operatøren. Ikke et stempel fra
+  bilen — det skal synes i tidslinjen («ført av sentralen»), som korreksjoner gjør i dag.
+  Endepunkt: `POST api/oppdrag/<pk>/enheter/<enhet_pk>/status/<overgang>/` med
+  `{"tidspunkt": ...}` i kroppen. `skriv_full`. Sentralbordet *leser* kroppen — det er
+  bilens endepunkt som ikke gjør det, og det er en annen aktør.
+- **Overgangsreglene gjelder fortsatt** (`kan_gaa_til`), også for operatøren: å føre
+  `Avreist` på en bil som står i `Venter` er en feil, ikke en korreksjon. Mangler et ledd,
+  føres det først. Én forskjell: operatøren får føre **bakover i tid** — det er hele
+  poenget — og `tidspunkt` er derfor påkrevd, ikke valgfritt.
+- **Ferdige oppdrag innenfor en rimelig tidsperiode.** En koblingsrad i `Ledig` kan
+  gjenåpnes av sentralbordet ved å korrigere `Ledig`-meldingen bort (ny rad som peker på
+  den, med status = forrige gjeldende) — det er en korreksjon, og den finnes nesten alt.
+  «Rimelig» er en konstant, `KORRIGERBAR_ETTER_LEDIG = 48 timer`, i `services` ved siden
+  av `SKJUL_ETTER_LEDIG`. Etter det er oppdraget arkivets, ikke tavlas. **48 timer er et
+  forslag** — det dekker «vi oppdaget det dagen etter», og er kort nok til at et arkiv
+  tatt etter vakta ikke løper fra seg.
+- Alt dette er per enhet. Å «endre oppdragets status» betyr å endre en enhets — det
+  utledede oppdragsnivået (§2.2) følger med av seg selv.
+
+Går inn i **trinn 2** i anslaget; det er ett endepunkt og én knapp per enhet i
+detaljvisningen, og reglene finnes.
 
 ## 8. Anslag
 

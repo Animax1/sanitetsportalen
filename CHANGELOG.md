@@ -13,6 +13,10 @@ koblingsrad med egen statuskjede, oppdragsstatus utledet som «mest aktive», fe
 når alle er ledige, én arkivrad per oppdrag × enhet (samme payload-form — gamle
 arkiver verifiserer som før), og deploy i to trinn som `year` → `vakt`. Fire
 spørsmål til André i §7 før kode; §7.1 (arkivformen) lar seg ikke gjøre om etterpå.
+**Besvart samme dag** — alle fire som anbefalt, med én presisering på §7.2: enhetens
+oppdrag er ferdig når hun melder ledig, oppdraget forlater tavla når alle er det. Og
+ett krav til, §9: sentralbordet skal kunne føre status manuelt for enhver enhet, også
+på ferdige oppdrag innenfor en rimelig tid (forslag: 48 t). Kode starter.
 
 
 **2097 tester grønne** (18 nye, to mutasjoner satt rødt først). Én migrasjon,
