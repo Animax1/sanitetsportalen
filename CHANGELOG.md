@@ -4,6 +4,38 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-11 — Tidsblokker, slutt-tid i «Ny vaktliste», og «8,5 t» overalt
+
+**1956 tester grønne** (25 nye, fem mutasjoner satt rødt først). Tre punkter
+fra André etter at han hadde brukt modulen i prod.
+
+**«Ny vaktliste» spør om slutten.** Feltet fantes, men bare bak «Vaktas
+lengde» inne i innstillingsvinduet — og han fant det ikke. Dialogen har nå
+«Slutter (planlagt)» rett under «Starter»; `opprett_planlagt_vakt` tar det
+imot og håndhever samme regel som endringsendepunktet: slutten må komme etter
+starten.
+
+**Skift med samme fra–til samles i tidsblokker.** Mange på en vakt deler tid,
+og en liste der «fre. 20:00 – lør. 04:00» sto på fire rader under hverandre
+var lang og lik — man så ikke skiftbyttet før man hadde lest hver rad.
+`_tidsblokker()` grupperer på *likhet* (ikke overlapp — et skift som slutter
+en time før de andre er sitt eget), og `_blokklinje()` skriver tiden, timene
+og antallet én gang over blokka: «Fre 2. okt 20:00 – lør 3. okt 04:00 · 8 t ·
+4 satt opp · 1 ledig». Gjelder ressursfanene i planlegging og drift, og
+utskriftslista. Radene under er hvem.
+- Driftraden mistet «Skift» og «Timer» — de står på blokklinja — og
+  drifttabellen ble fem kolonner. Planleggingsraden ble hevet ut til
+  `_planrad()`; den er uendret, men står ikke lenger inne i `mkRessurs()`.
+- Utskriftslista mistet kolonnen «Tid» av samme grunn, og fikk sum timer
+  per ressurs i overskriften og for hele vakta i arkhodet.
+
+**Ett timeformat: «8,5 t».** Ressurstabellen skrev komma, planleggingsfanen
+skrev «8.5». `_tall()` er nå det ene stedet, og `_varighet()` går gjennom den.
+
+**Rettet på veien:** «1 ledige» og «1 ledige plasser» i oversikten.
+
+---
+
 ## 2026-09-11 — Vaktlistemodulen merget til prod
 
 `rollemodell` → `main` (`567ee11`). 33 commits, 66 filer, 18551 linjer.

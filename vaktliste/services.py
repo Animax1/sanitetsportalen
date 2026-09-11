@@ -19,7 +19,7 @@ from .models import Belastningsgrenser, Mannskap, Ressurs, Vaktliste
 
 # ── Vakter som ennå ikke er aktive ───────────────────────────────────────────
 
-def opprett_planlagt_vakt(navn, startet=None):
+def opprett_planlagt_vakt(navn, startet=None, planlagt_slutt=None):
     """Lag en `core.Vakt` som ikke er aktiv, og en tom vaktliste for den.
 
     **Rører ikke portalens peker.** `AppSetting['aktiv_vakt_id']` står som
@@ -31,6 +31,12 @@ def opprett_planlagt_vakt(navn, startet=None):
     er «Avslutt vakt» i pasientmodulen). Det er notert som en ryddejobb i
     TODO sammen med `hent_aktiv_vakt` — vaktas livssyklus bør samles i
     `core` når noen er i den koden uansett.
+
+    **Slutten tas imot her, ikke bare i «Innstillinger».** Fram til
+    11. sep. 2026 spurte «Ny vaktliste» bare om start, og slutten lå bak
+    «Vaktas lengde» inne i innstillingsvinduet — André fant den ikke. Det er
+    samme regel som i `vaktliste_detalj_view`: slutten må komme etter
+    starten, ellers finnes ikke spennet kurvene tegnes over.
 
     Returnerer den nye vaktlista.
     """
@@ -45,6 +51,8 @@ def opprett_planlagt_vakt(navn, startet=None):
             f'Legg på en dato eller velg et annet navn.')
 
     startet = startet or timezone.now()
+    if planlagt_slutt is not None and planlagt_slutt <= startet:
+        raise ValueError('Vakta må slutte etter at den begynner.')
     with transaction.atomic():
         vakt = Vakt.objects.create(
             navn=navn,
@@ -52,7 +60,7 @@ def opprett_planlagt_vakt(navn, startet=None):
             startet=startet,
             er_aktiv=False,
         )
-        return Vaktliste.objects.create(vakt=vakt)
+        return Vaktliste.objects.create(vakt=vakt, planlagt_slutt=planlagt_slutt)
 
 
 def neste_rekkefolge(vaktliste) -> int:

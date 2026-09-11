@@ -671,6 +671,10 @@ function _driftrad(vp, kanRore) {
   // Lista skal fortsatt kunne endres — folk uteblir og bytter — og det gjør
   // den gjennom blyanten, som åpner redigeringsvinduet. Notatets «ikke et
   // redigeringsskjema» handlet om raden, ikke bare om knappene.
+  //
+  // **Tiden står ikke i raden.** Den står på blokklinja over, sammen med
+  // timene — skiftene i en blokk deler den, og fire like tider under
+  // hverandre var det som gjorde lista lang og lik (11. sep. 2026).
   const rediger = kanRore
     ? `<button class="btn btn-sm btn-outline-secondary" type="button"
                title="Rediger skiftet" aria-label="Rediger skiftet"
@@ -686,8 +690,6 @@ function _driftrad(vp, kanRore) {
       <td class="vl-navn">${navn}</td>
       <td>${escapeHtml(vp.korps_kort || '—')}</td>
       <td>${escapeHtml(vp.rolle || '—')}</td>
-      <td>${escapeHtml(_tidsspenn(vp))}</td>
-      <td class="vl-timer">${escapeHtml(_varighet(vp))}</td>
       <td class="vl-handling">${rediger}</td>
     </tr>`;
 }
@@ -762,15 +764,107 @@ function _varighet(vp) {
   // det eneste tallet man ellers må regne ut i hodet for hver rad — «20:00
   // til 04:30» er ikke åtte timer, og kolonnen er det man summerer når man
   // vurderer om noen står for lenge.
+  const timer = _skifttimer(vp);
+  return timer == null ? '—' : `${_tall(timer)} t`;
+}
+
+
+function _skifttimer(vp) {
+  // Skiftets lengde i timer som tall, eller `null` når spennet mangler
+  // eller er negativt. Et skift under oppsett kan mangle den ene tida, og
+  // serveren avviser et negativt spenn — men raden tegnes før svaret kommer.
   const fra = _d(vp.fra_tid);
   const til = _d(vp.til_tid);
-  if (!fra || !til) return '—';
+  if (!fra || !til) return null;
   const timer = (til.getTime() - fra.getTime()) / 3600000;
-  if (!(timer > 0)) return '—';
-  // Halvtimer forekommer; en desimal holder og «8» skal ikke bli «8,0».
-  const vist = Number.isInteger(timer) ? String(timer)
-    : timer.toFixed(1).replace('.', ',');
-  return `${vist} t`;
+  return timer > 0 ? timer : null;
+}
+
+
+function _sumTimer(poster) {
+  // Summen av skiftene, som tall. Skift uten gyldig spenn teller null —
+  // de vises som «—» i raden, og en strek har ingen timer å legge til.
+  return poster.reduce((sum, vp) => sum + (_skifttimer(vp) || 0), 0);
+}
+
+
+function _planrad(vp, r, kanRore) {
+  // **Regnearkraden.** Alt redigeres der det står: tider, rolle, merknad og
+  // — for en ledig plass — hvem som skal fylle den. Lå inne i `mkRessurs()`
+  // fram til 11. sep. 2026; hevet ut da radene fikk blokklinjer over seg.
+  // Merkelappene ligger i en wrapper, ikke rett i cella: `display: flex`
+  // på en `<td>` tar cella ut av tabellens boksmodell, og da forskyves
+  // kolonnene etter den i forhold til overskriftene.
+  const merkelapper = (vp.kompetanser || []).map((k) =>
+    `<span class="vl-merkelapp">${escapeHtml(k)}</span>`).join('');
+  const komp = merkelapper
+    ? `<div class="vl-merkelapper">${merkelapper}</div>`
+    : '<span class="vl-meta">—</span>';
+
+  // **Dagen står i tidsfeltet, ikke i en egen kolonne.** Kolonnen var
+  // et tredje sted å lese for å forstå én rad, og `datetime-local` bærer
+  // datoen selv — den manglet bare ukedagen, som er den man planlegger
+  // etter. Nå står «lør.» under feltet den hører til.
+  const tid = (felt) => {
+    const merke = _d(vp[felt])
+      ? `<span class="vl-dagmerke">${escapeHtml(_dag(vp[felt]))}</span>` : '';
+    const innhold = kanRore
+      ? `<input type="datetime-local" step="300" class="vl-celle"
+                value="${escHtmlValue(_iso16(vp[felt]))}"
+                data-action="endreVaktpost" data-hendelse="change"
+                data-felt="${escHtmlValue(felt)}" data-id="${escHtmlValue(vp.id)}">`
+      : escapeHtml(_kl(vp[felt]));
+    return `<div class="vl-tidcelle">${innhold}${merke}</div>`;
+  };
+
+  const merknad = kanRore
+    ? `<input type="text" class="vl-celle" maxlength="255"
+              value="${escHtmlValue(vp.merknad || '')}" placeholder="—"
+              data-action="endreVaktpost" data-hendelse="change"
+              data-felt="merknad" data-id="${escHtmlValue(vp.id)}">`
+    : escapeHtml(vp.merknad || '—');
+
+  // **Rediger, ikke slett.** Å bytte person på et skift var før å fjerne
+  // raden og sette den opp på nytt — og da mistet man tidene og rollen
+  // som allerede sto der. Sletting ligger nå inne i vinduet, bak en
+  // bekreftelse, slik den gjør på ressursen.
+  const redigerPost = kanRore
+    ? `<button class="btn btn-sm btn-outline-secondary" type="button"
+               title="Rediger skiftet" aria-label="Rediger skiftet"
+               data-action="apneRedigerVaktpost" data-id="${escHtmlValue(vp.id)}"><i class="bi bi-pencil"></i></button>`
+    : '';
+
+
+  // En ledig plass er raden uten person. Den skal se ut som noe som
+  // gjenstår — ikke som en rad der navnet mangler ved en feil.
+  const navnCelle = vp.ledig
+    ? _fyllValgFor(vp, kanRore)
+    : escapeHtml(vp.navn);
+
+  // **Korpskolonnen svarer på to ulike spørsmål.** Står det en person
+  // der, er det *hennes* korps — et faktum. Er plassen ledig, er det
+  // korpset plassen er *satt av til* — en beslutning, og den kan endres
+  // av den som deler ut. En samleplass har gjerne to plasser til
+  // Haugesund og to til Karmøy.
+  const korpsCelle = vp.ledig
+    ? _plassKorps(vp)
+    : escapeHtml(vp.korps_kort || '—');
+
+  // Rekkefølgen er lesestrekket: hvem, hvorfra, hvilken rolle, når, hvor
+  // lenge — og først da kompetansen, som er det man vurderer laget på
+  // når resten står. Merknaden sist, fordi den er unntaket.
+  return `
+    <tr class="${escHtmlValue(vp.ledig ? 'vl-ledig' : '')}">
+      <td class="vl-navn">${navnCelle}</td>
+      <td>${korpsCelle}</td>
+      <td>${_rolleValg(vp, r, kanRore)}</td>
+      <td>${tid('fra_tid')}</td>
+      <td>${tid('til_tid')}</td>
+      <td class="vl-timer">${escapeHtml(_varighet(vp))}</td>
+      <td class="vl-kompcelle">${komp}</td>
+      <td>${merknad}</td>
+      <td class="vl-handling">${redigerPost}</td>
+    </tr>`;
 }
 
 
@@ -828,86 +922,15 @@ function mkRessurs(r) {
   // annet — «hvem har møtt?» — og da er `datetime-local`-feltene,
   // kompetansemerkene og merknaden bare bredde. Se `_driftrad()`.
   const drift = iDrift();
-  const kropp = poster.length ? poster
-    .slice()
-    .sort(_skiftrekkefolge)
-    .map((vp) => {
-      if (drift) return _driftrad(vp, kanRore);
-      // Merkelappene ligger i en wrapper, ikke rett i cella: `display: flex`
-      // på en `<td>` tar cella ut av tabellens boksmodell, og da forskyves
-      // kolonnene etter den i forhold til overskriftene.
-      const merkelapper = (vp.kompetanser || []).map((k) =>
-        `<span class="vl-merkelapp">${escapeHtml(k)}</span>`).join('');
-      const komp = merkelapper
-        ? `<div class="vl-merkelapper">${merkelapper}</div>`
-        : '<span class="vl-meta">—</span>';
-
-      // **Dagen står i tidsfeltet, ikke i en egen kolonne.** Kolonnen var
-      // et tredje sted å lese for å forstå én rad, og `datetime-local` bærer
-      // datoen selv — den manglet bare ukedagen, som er den man planlegger
-      // etter. Nå står «lør.» under feltet den hører til.
-      const tid = (felt) => {
-        const merke = _d(vp[felt])
-          ? `<span class="vl-dagmerke">${escapeHtml(_dag(vp[felt]))}</span>` : '';
-        const innhold = kanRore
-          ? `<input type="datetime-local" step="300" class="vl-celle"
-                    value="${escHtmlValue(_iso16(vp[felt]))}"
-                    data-action="endreVaktpost" data-hendelse="change"
-                    data-felt="${escHtmlValue(felt)}" data-id="${escHtmlValue(vp.id)}">`
-          : escapeHtml(_kl(vp[felt]));
-        return `<div class="vl-tidcelle">${innhold}${merke}</div>`;
-      };
-
-      const merknad = kanRore
-        ? `<input type="text" class="vl-celle" maxlength="255"
-                  value="${escHtmlValue(vp.merknad || '')}" placeholder="—"
-                  data-action="endreVaktpost" data-hendelse="change"
-                  data-felt="merknad" data-id="${escHtmlValue(vp.id)}">`
-        : escapeHtml(vp.merknad || '—');
-
-      // **Rediger, ikke slett.** Å bytte person på et skift var før å fjerne
-      // raden og sette den opp på nytt — og da mistet man tidene og rollen
-      // som allerede sto der. Sletting ligger nå inne i vinduet, bak en
-      // bekreftelse, slik den gjør på ressursen.
-      const redigerPost = kanRore
-        ? `<button class="btn btn-sm btn-outline-secondary" type="button"
-                   title="Rediger skiftet" aria-label="Rediger skiftet"
-                   data-action="apneRedigerVaktpost" data-id="${escHtmlValue(vp.id)}"><i class="bi bi-pencil"></i></button>`
-        : '';
-
-
-      // En ledig plass er raden uten person. Den skal se ut som noe som
-      // gjenstår — ikke som en rad der navnet mangler ved en feil.
-      const navnCelle = vp.ledig
-        ? _fyllValgFor(vp, kanRore)
-        : escapeHtml(vp.navn);
-
-      // **Korpskolonnen svarer på to ulike spørsmål.** Står det en person
-      // der, er det *hennes* korps — et faktum. Er plassen ledig, er det
-      // korpset plassen er *satt av til* — en beslutning, og den kan endres
-      // av den som deler ut. En samleplass har gjerne to plasser til
-      // Haugesund og to til Karmøy.
-      const korpsCelle = vp.ledig
-        ? _plassKorps(vp)
-        : escapeHtml(vp.korps_kort || '—');
-
-      // Rekkefølgen er lesestrekket: hvem, hvorfra, hvilken rolle, når, hvor
-      // lenge — og først da kompetansen, som er det man vurderer laget på
-      // når resten står. Merknaden sist, fordi den er unntaket.
-      return `
-        <tr class="${escHtmlValue(vp.ledig ? 'vl-ledig' : '')}">
-          <td class="vl-navn">${navnCelle}</td>
-          <td>${korpsCelle}</td>
-          <td>${_rolleValg(vp, r, kanRore)}</td>
-          <td>${tid('fra_tid')}</td>
-          <td>${tid('til_tid')}</td>
-          <td class="vl-timer">${escapeHtml(_varighet(vp))}</td>
-          <td class="vl-kompcelle">${komp}</td>
-          <td>${merknad}</td>
-          <td class="vl-handling">${redigerPost}</td>
-        </tr>`;
-    }).join('')
-    : `<tr><td colspan="${drift ? 7 : 9}" class="vl-tom">Ingen satt opp ennå.</td></tr>`;
+  // **Blokker, ikke bare rader.** Skift med samme fra–til samles under én
+  // blokklinje som bærer tiden, timene og antallet — se `_tidsblokker()`.
+  // Raden under er enten regnearket (`_planrad`) eller driftraden.
+  const rad = (vp) => (drift ? _driftrad(vp, kanRore) : _planrad(vp, r, kanRore));
+  const kolonner = drift ? 5 : 9;
+  const kropp = poster.length
+    ? _tidsblokker(poster).map((blokk) =>
+        _blokklinje(blokk, kolonner) + blokk.poster.map(rad).join('')).join('')
+    : `<tr><td colspan="${escHtmlValue(kolonner)}" class="vl-tom">Ingen satt opp ennå.</td></tr>`;
 
   // Tabellhodet heves ut hit framfor å stå som en ternær med to
   // template-literaler inne i en tredje: den formen er vanskelig å lese, og
@@ -915,14 +938,13 @@ function mkRessurs(r) {
   const tabellklasse = drift ? 'vl-tabell vl-tabell-drift' : 'vl-tabell';
   const tabellhode = drift ? `
           <colgroup>
-            <col style="width: 17%"><col style="width: 27%"><col style="width: 9%">
-            <col style="width: 16%"><col style="width: 19%"><col style="width: 6%">
-            <col style="width: 6%">
+            <col style="width: 22%"><col style="width: 40%"><col style="width: 12%">
+            <col style="width: 18%"><col style="width: 8%">
           </colgroup>
           <thead>
             <tr>
               <th>Innsjekk</th><th>Navn</th><th>Korps</th>
-              <th>Rolle</th><th>Skift</th><th>Timer</th><th></th>
+              <th>Rolle</th><th></th>
             </tr>
           </thead>` : `
           <colgroup>
@@ -1171,6 +1193,52 @@ function _skiftrekkefolge(a, b) {
 }
 
 
+function _tidsblokker(poster) {
+  // **Skift med samme fra–til er én blokk.** Andrés punkt 11. sep. 2026:
+  // mange på en vakt deler tid, og en liste der «fre. 20:00 – lør. 04:00»
+  // står på fire rader under hverandre er lang og lik — man ser ikke
+  // skiftbyttet før man har lest hver rad. Tiden skrives derfor én gang, på
+  // en blokklinje, og radene under er hvem.
+  //
+  // Sortert med `_skiftrekkefolge` først, så blokkene kommer kronologisk og
+  // radene i hver blokk alfabetisk. Nøkkelen er ISO-strengene som de kom fra
+  // serveren: to skift er i samme blokk når de er *like*, ikke når de
+  // overlapper — et skift som slutter en time før de andre er sitt eget.
+  const blokker = [];
+  poster.slice().sort(_skiftrekkefolge).forEach((vp) => {
+    const sist = blokker[blokker.length - 1];
+    if (sist && sist.fra_tid === vp.fra_tid && sist.til_tid === vp.til_tid) {
+      sist.poster.push(vp);
+    } else {
+      blokker.push({ fra_tid: vp.fra_tid, til_tid: vp.til_tid, poster: [vp] });
+    }
+  });
+  return blokker;
+}
+
+
+function _blokklinje(blokk, kolonner) {
+  // Linja over en blokk: tiden, timene og hvor mange som står der. Blokka
+  // har samme form som et skift (`fra_tid`/`til_tid`), så `_tidsspenn` og
+  // `_varighet` leser den rett. Tellingen bygges med `+`, ikke i en
+  // template-literal — XSS-skanneren leser hvert `${}` i byggerne, og et
+  // tall den ikke kan se er escapet er et funn den må avvise.
+  const ledige = blokk.poster.filter((vp) => vp.ledig).length;
+  const bemannet = blokk.poster.length - ledige;
+  const deler = [];
+  if (bemannet) deler.push(bemannet + ' satt opp');
+  if (ledige) deler.push(ledige + (ledige === 1 ? ' ledig' : ' ledige'));
+  return `
+        <tr class="vl-blokk">
+          <td colspan="${escHtmlValue(kolonner)}">
+            <span class="vl-blokktid">${escapeHtml(_tidsspenn(blokk))}</span>
+            <span class="vl-blokktimer">${escapeHtml(_varighet(blokk))}</span>
+            <span class="vl-meta">${escapeHtml(deler.join(' · '))}</span>
+          </td>
+        </tr>`;
+}
+
+
 function mkOversikt() {
   // **Utskriftslista.** Hele vakta på ett ark, gruppert på **ressurs** — den
   // man henger opp.
@@ -1198,44 +1266,53 @@ function mkOversikt() {
   // Rekkefølgen er gruppas, så ressursens — samme som fanene. Ressurser uten
   // skift utelates: en tom tabell på papiret er en linje man må lese for å se
   // at det ikke står noe der.
-  const deler = _grupperMedRessurser().flatMap((g) =>
-    _ressurserIGruppe(g.id)
-      .filter((r) => (perRessurs.get(r.id) || []).length)
-      .map((r) => {
-        const rader = perRessurs.get(r.id).slice().sort(_skiftrekkefolge)
-          .map((vp) => {
-            // Korpset i lista: personens når raden er fylt, plassens
-            // reservasjon når den er ledig. Det er det samme skillet som i
-            // ressurstabellen, og av samme grunn.
-            const korps = vp.ledig
-              ? (korpsnavn[vp.reservert_korps_id] || '')
-              : (vp.korps_kort || '');
-            return `
+  // **Tiden står på blokklinja, ikke i raden** (11. sep. 2026). Skift med
+  // samme fra–til samles i `_tidsblokker()`, og linja over dem bærer spennet,
+  // timene og antallet. Raden under er hvem — navn, korps, rolle, merknad.
+  // Kolonnen «Tid» er borte fordi den sto med samme verdi fire ganger.
+  const rad = (vp) => {
+    // Korpset i lista: personens når raden er fylt, plassens reservasjon
+    // når den er ledig. Det er det samme skillet som i ressurstabellen, og
+    // av samme grunn.
+    const korps = vp.ledig
+      ? (korpsnavn[vp.reservert_korps_id] || '')
+      : (vp.korps_kort || '');
+    return `
         <tr class="${escHtmlValue(vp.ledig ? 'vl-ledig' : '')}">
           <td class="vl-navn">${escapeHtml(vp.ledig ? '— ledig —' : vp.navn)}</td>
           <td>${escapeHtml(korps || '—')}</td>
           <td>${escapeHtml(vp.rolle || '—')}</td>
-          <td>${escapeHtml(_tidsspenn(vp))}</td>
           <td>${escapeHtml(vp.merknad || '')}</td>
         </tr>`;
-          }).join('');
-        const ledige = perRessurs.get(r.id).filter((vp) => vp.ledig).length;
+  };
+
+  const deler = _grupperMedRessurser().flatMap((g) =>
+    _ressurserIGruppe(g.id)
+      .filter((r) => (perRessurs.get(r.id) || []).length)
+      .map((r) => {
+        const egne = perRessurs.get(r.id);
+        const rader = _tidsblokker(egne).map((blokk) =>
+          _blokklinje(blokk, 4) + blokk.poster.map(rad).join('')).join('');
+        const ledige = egne.filter((vp) => vp.ledig).length;
         const rest = ledige
-          ? ` <span class="vl-meta">· ${escHtmlValue(ledige)} ledige</span>` : '';
+          ? ` <span class="vl-meta">· ${escHtmlValue(ledige)} ${escapeHtml(ledige === 1 ? 'ledig' : 'ledige')}</span>` : '';
+        // Summen per ressurs er det tallet man ellers legger sammen for
+        // hånd når man skal si hvor mye bilen er bemannet.
+        const timer = `${escapeHtml(_tall(_sumTimer(egne)))} t`;
         return `
       <div class="vl-korpsgruppe">
         <h3>${escapeHtml(r.navn)}
           <span class="vl-meta">${escapeHtml(g.navn)} ·
-            ${escHtmlValue(perRessurs.get(r.id).length)} skift</span>${rest}
+            ${escHtmlValue(egne.length)} skift · ${timer}</span>${rest}
         </h3>
         <div class="vl-tabellramme">
         <table class="vl-tabell vl-utskrift">
           <colgroup>
-            <col style="width: 26%"><col style="width: 12%"><col style="width: 18%">
-            <col style="width: 30%"><col style="width: 14%">
+            <col style="width: 34%"><col style="width: 14%"><col style="width: 22%">
+            <col style="width: 30%">
           </colgroup>
           <thead>
-            <tr><th>Navn</th><th>Korps</th><th>Rolle</th><th>Tid</th><th>Merknad</th></tr>
+            <tr><th>Navn</th><th>Korps</th><th>Rolle</th><th>Merknad</th></tr>
           </thead>
           <tbody>${rader}</tbody>
         </table>
@@ -1247,7 +1324,8 @@ function mkOversikt() {
   const spenn = _vaktspenn();
   const antallLedige = poster.filter((vp) => vp.ledig).length;
   const ledigtekst = antallLedige
-    ? ` · ${escHtmlValue(antallLedige)} ledige plasser` : '';
+    ? ` · ${escHtmlValue(antallLedige)} ${escapeHtml(antallLedige === 1 ? 'ledig plass' : 'ledige plasser')}` : '';
+  const sumTimer = `${escapeHtml(_tall(_sumTimer(poster)))} t`;
   // **Ingen kurve her.** Den står i fanen den gjelder, og to steder å lese
   // den samme kurven er ett for mye. «Oversikt» er utskriftslista, og bare det.
   return `
@@ -1255,7 +1333,7 @@ function mkOversikt() {
       <div class="vl-arkhode">
         <h2>${escapeHtml(tittel)}</h2>
         <div class="vl-meta">${escapeHtml(spenn)} ·
-          ${escHtmlValue(poster.length)} skift${escapeHtml(ledigtekst)}</div>
+          ${escHtmlValue(poster.length)} skift · ${sumTimer}${escapeHtml(ledigtekst)}</div>
       </div>
       ${deler.join('')}
     </div>`;
@@ -1282,10 +1360,13 @@ async function lastBelastning() {
 
 
 function _tall(n) {
-  // Timer med én desimal, og uten «.0» på hele tall: «14 t» leses raskere
-  // enn «14.0 t» i en kolonne man skummer.
+  // **Ett format for timer, overalt: «8,5», ikke «8.5».** Én desimal, komma
+  // som desimaltegn, og uten «,0» på hele tall — «14 t» leses raskere enn
+  // «14,0 t» i en kolonne man skummer. Planleggingsfanen skrev «8.5» fram
+  // til 11. sep. 2026, mens ressurstabellen skrev «8,5»; André ba om komma.
   const rundet = Math.round(n * 10) / 10;
-  return Number.isInteger(rundet) ? String(rundet) : rundet.toFixed(1);
+  return Number.isInteger(rundet) ? String(rundet)
+    : rundet.toFixed(1).replace('.', ',');
 }
 
 
@@ -1533,6 +1614,7 @@ async function opprettVaktliste() {
       body: JSON.stringify({
         navn,
         startet: _tidFraFelt('ny-vakt-start'),
+        planlagt_slutt: _tidFraFelt('ny-vakt-slutt'),
         kopier_fra: document.getElementById('ny-vakt-kopier')?.value || null,
       }),
     });

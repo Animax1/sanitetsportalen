@@ -165,6 +165,16 @@
           <label class="form-label" for="ny-vakt-start">Starter</label>
           <input type="datetime-local" step="300" id="ny-vakt-start" class="form-control">
         </div>
+        {% comment %}
+          Slutten spørres om her, ikke bare i «Innstillinger». Uten den
+          tegnes bemanningskurvene bare fra første til siste skift — og
+          feltet inne i innstillingsvinduet var ikke til å finne.
+        {% endcomment %}
+        <div class="mb-3">
+          <label class="form-label" for="ny-vakt-slutt">Slutter (planlagt)</label>
+          <input type="datetime-local" step="300" id="ny-vakt-slutt" class="form-control">
+          <div class="form-text">Kan endres senere under «Innstillinger».</div>
+        </div>
         <div class="mb-3">
           <label class="form-label" for="ny-vakt-kopier">Kopier oppsett fra</label>
           <select id="ny-vakt-kopier" class="form-select"></select>

@@ -259,7 +259,9 @@ def vaktlister_view(request):
     data = _json_body(request)
     try:
         ny = services.opprett_planlagt_vakt(
-            data.get('navn'), startet=_tid(data.get('startet')))
+            data.get('navn'),
+            startet=_tid(data.get('startet')),
+            planlagt_slutt=_tid(data.get('planlagt_slutt')))
     except ValueError as feil:
         return _feil(str(feil))
 

@@ -112,13 +112,22 @@ ingen av dem gir feilmelding — de er bare stille inaktive.
       migrasjon fra tom base mot PostgreSQL 16, og en oppgraderingssimulering der
       en base ble migrert til `main`, seedet med prod-lignende rader, og deretter
       migrert med den nye koden — elleve migrasjoner OK, alle rader intakt.
-      - [ ] **Kontroller deployen i Railway.** `vaktliste.0007` er migrasjonen
+      - [x] **Kontroller deployen i Railway.** `vaktliste.0007` er migrasjonen
             som tok ned release-fasen sist (pending trigger events); den har
             mønsteret nå, og prøven i `core/migrasjonsprover.py` dekker den, men
             det er første gang den kjøres mot prod-data.
-      - [ ] **Åpne `/vaktliste/` i prod og sjekk at de seks ressursgruppene er
+      - [x] **Åpne `/vaktliste/` i prod og sjekk at de seks ressursgruppene er
             seedet.** Migrasjon `0007` seeder dem; en tom gruppeliste er en
             vaktliste man ikke får satt opp.
+      - [x] **Kontrollert av André 11. sep. 2026: «alt så bra ut».**
+
+- [x] **Tidsblokker, slutt-tid i «Ny vaktliste» og «8,5 t» (11. sep. 2026).**
+      Tre punkter etter første bruk i prod. Skift med samme fra–til samles
+      under én blokklinje i ressursfanene og utskriftslista; «Ny vaktliste»
+      spør om slutten; timeformatet er det samme overalt. Se CHANGELOG.
+      - [ ] **Stripe på blokklinja** (mini-Gantt over vaktas spenn) — alternativ
+            «Begge deler» i spørsmålet 11. sep.; valgt bort for nå, lett å
+            legge til siden blokka alt bærer spennet.
 
 - [ ] **Første skarpe vakt med oppdragsmodulen.** Modulen er ferdig og testet, men
       aldri brukt under en reell vakt — og det er den prøven som finner det ingen

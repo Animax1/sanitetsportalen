@@ -22,7 +22,7 @@ HTML_BUILDERS = (
     'mkRolleRad',
     '_fyll',
     'tegnFaner', '_fanerad', '_mannskapsfane', 'iDrift', '_tilstede',
-    'mkRessurs',
+    'mkRessurs', '_planrad', '_blokklinje',
     '_stempelknapper',
     '_driftrad',
     'mkBelastning',
@@ -50,7 +50,10 @@ REVIEWED_INTERPOLATIONS = {
         'markup bygget lokalt, id-en escapet inni',
     "knapp('stemplAvVakt', 'Av vakt', 'btn-outline-warning', 'box-arrow-right')":
         'markup bygget lokalt, id-en escapet inni',
-    'drift ? 7 : 9': 'tall fra en ternær',
+    # Tidsblokker (11. sep. 2026): summene bygges lokalt av `_tall`, som
+    # bare kan gi sifre og komma — og escapes uansett inni.
+    'timer': 'markup bygget lokalt, tallet escapet inni',
+    'sumTimer': 'markup bygget lokalt, tallet escapet inni',
     'tabellklasse': 'hardkodet CSS-klasse fra en ternær',
     # Planleggingstall (fase 5). Tallene kommer fra serverens beregning og
     # settes med escHtmlValue; markupen bygges lokalt i samme funksjon.
@@ -203,6 +206,8 @@ class VaktlisteEscapingOppforselTests(SimpleTestCase):
                         'kanStemple', 'iDrift', '_rolleValg',
                         'rollerForGruppe', '_fyllValgFor', '_varighet',
                         'mkRolleRad', 'mkOversikt', '_skiftrekkefolge',
+                        '_planrad', '_tidsblokker', '_blokklinje',
+                        '_sumTimer', '_skifttimer', '_tall',
                         '_mkEnKurve', 'mkGruppekurve', '_posterIGruppe',
                         'mkGruppe', '_plassKorps', '_tegnforklaring',
                         '_timesteg', '_ressurserIGruppe',
@@ -625,7 +630,8 @@ class TidsvisningTests(SimpleTestCase):
     HARNESS = (
         (VAKTLISTE_JS, ('_d', '_kl', '_dag', '_sammeDag', '_tidsspenn',
                         '_vaktspenn', '_iso16', '_bemanningPerTime',
-                        '_vaktensSpenn', '_varighet')),
+                        '_vaktensSpenn', '_varighet', '_skifttimer',
+                        '_tall')),
     )
     VINDU = ("globalThis.DAGER = ['søn','man','tir','ons','tor','fre','lør'];\n"
              "globalThis.MND = ['jan','feb','mar','apr','mai','jun',"
@@ -989,11 +995,14 @@ class TabellcellersLayoutTests(SimpleTestCase):
     FARLIGE = ('flex', 'grid', 'inline-flex', 'inline-grid', 'block')
 
     def _celleklasser(self):
-        """Klassene som står på `<td>` i ressurstabellen."""
-        kropp = extract_function(read_js(VAKTLISTE_JS), 'mkRessurs')
+        """Klassene som står på `<td>` i ressurstabellen — radene bygges av
+        tre byggere siden 11. sep. 2026, og alle tre leses."""
+        src = read_js(VAKTLISTE_JS)
         klasser = set()
-        for treff in re.findall(r'<td class="([^"$]*)"', kropp):
-            klasser.update(treff.split())
+        for navn in ('mkRessurs', '_planrad', '_driftrad', '_blokklinje'):
+            for treff in re.findall(r'<td class="([^"$]*)"',
+                                    extract_function(src, navn)):
+                klasser.update(treff.split())
         return klasser
 
     def _css(self):
@@ -1153,7 +1162,7 @@ class VarighetTests(SimpleTestCase):
     «20:00 til 04:30» er ikke åtte timer.
     """
 
-    HARNESS = ((VAKTLISTE_JS, ('_d', '_varighet')),)
+    HARNESS = ((VAKTLISTE_JS, ('_d', '_varighet', '_skifttimer', '_tall')),)
 
     def setUp(self):
         if not node_available():
@@ -1206,6 +1215,8 @@ class OversiktUtenKurveTests(SimpleTestCase):
     HARNESS = (
         (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue')),
         (VAKTLISTE_JS, ('mkOversikt', '_skiftrekkefolge', '_d', '_kl',
+                        '_tidsblokker', '_blokklinje', '_sumTimer',
+                        '_varighet', '_skifttimer', '_tall',
                         '_dag', '_sammeDag', '_tidsspenn', '_vaktspenn',
                         '_ressurserIGruppe', '_grupperMedRessurser')),
     )
@@ -1604,7 +1615,9 @@ class FanenErGruppaTests(SimpleTestCase):
                         'iDrift', '_tilstede', 'mkGruppe', 'mkRessurs',
                         '_radklasse', '_stempelknapper', 'kanStemple',
                         '_rolleValg', '_skiftrekkefolge', '_fyllValgFor',
-                        '_varighet', 'mkGruppekurve', '_mkEnKurve',
+                        '_varighet', '_skifttimer', '_tall', '_planrad',
+                        '_tidsblokker', '_blokklinje', '_tidsspenn',
+                        '_sammeDag', 'mkGruppekurve', '_mkEnKurve',
                         '_tegnforklaring', '_timesteg', '_toppunkt',
                         '_posterPerGruppe', '_vaktensSpenn',
                         '_posterIGruppe', '_plassKorps',
@@ -1808,6 +1821,8 @@ class UtskriftslistaTests(SimpleTestCase):
     HARNESS = (
         (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue')),
         (VAKTLISTE_JS, ('mkOversikt', '_skiftrekkefolge', '_d', '_kl',
+                        '_tidsblokker', '_blokklinje', '_sumTimer',
+                        '_varighet', '_skifttimer', '_tall',
                         '_dag', '_sammeDag', '_tidsspenn', '_vaktspenn',
                         '_ressurserIGruppe', '_grupperMedRessurser')),
     )
@@ -1935,7 +1950,9 @@ class EnkeltgruppeTests(SimpleTestCase):
         (VAKTLISTE_JS, ('mkGruppe', 'mkRessurs', '_radklasse',
                         '_stempelknapper', 'kanStemple', 'iDrift',
                         '_rolleValg', '_plassKorps', '_skiftrekkefolge',
-                        '_fyllValgFor', '_varighet', 'mkGruppekurve',
+                        '_fyllValgFor', '_varighet', '_skifttimer', '_tall',
+                        '_planrad', '_tidsblokker', '_blokklinje',
+                        '_tidsspenn', '_sammeDag', 'mkGruppekurve',
                         '_posterIGruppe', '_mkEnKurve', '_tegnforklaring',
                         '_timesteg', '_toppunkt', '_vaktensSpenn',
                         '_bemanningPerTime', 'rollerForGruppe', '_iso16',
@@ -2344,7 +2361,7 @@ class TidsfeltenesSteglengdeTests(SimpleTestCase):
     def test_cella_i_ressurstabellen_steger_ogsaa(self):
         """Den bygges i JS og fanges ikke av malsøket over — og det er den
         man taster flest ganger."""
-        kropp = extract_function(read_js(VAKTLISTE_JS), 'mkRessurs')
+        kropp = extract_function(read_js(VAKTLISTE_JS), '_planrad')
         self.assertIn('type="datetime-local" step="300"', kropp)
 
     def test_steget_er_et_helt_minutt(self):
@@ -2557,7 +2574,7 @@ class DriftflatenTests(SimpleTestCase):
         kropp = _uten_kommentarer(
             extract_function(read_js(VAKTLISTE_JS), 'mkRessurs'))
         self.assertIn('const drift = iDrift();', kropp)
-        self.assertIn('if (drift) return _driftrad(', kropp)
+        self.assertIn('drift ? _driftrad(vp, kanRore) : _planrad(', kropp)
 
     def test_korpsforeren_ser_status_men_ingen_knapp(self):
         """Avklaring 11.3, speilet i grensesnittet. En knapp som fører til
@@ -2726,9 +2743,12 @@ class PlanleggingsfanenTests(SimpleTestCase):
         self.assertIn('>14 t<', ut)
         self.assertNotIn('14.0', ut)
 
-    def test_halve_timer_beholder_desimalen(self):
+    def test_halve_timer_beholder_desimalen_med_komma(self):
+        """«7,5 t», ikke «7.5 t» — Andrés format, og det samme som
+        ressurstabellen alt skrev (11. sep. 2026)."""
         ut = self._vis([{**self.RAD, 'timer': 7.5}])
-        self.assertIn('7.5 t', ut)
+        self.assertIn('7,5 t', ut)
+        self.assertNotIn('7.5', ut)
 
     def test_langt_skift_merkes_men_sperrer_ingenting(self):
         ut = self._vis([{**self.RAD, 'lengste_skift': 14.0,
@@ -2761,7 +2781,7 @@ class PlanleggingsfanenTests(SimpleTestCase):
         self.assertNotIn('Faktisk', self._vis())
         ut = self._vis([{**self.RAD, 'faktiske_timer': 9.5}])
         self.assertIn('Faktisk', ut)
-        self.assertIn('9.5 t', ut)
+        self.assertIn('9,5 t', ut)
 
     def test_tom_liste_forklarer_hvorfor(self):
         ut = self._vis([], {'personer': 0, 'skift': 0, 'timer': 0})
@@ -2801,3 +2821,257 @@ class PlanleggingsfanenTests(SimpleTestCase):
         ut = self._vis([{**self.RAD, 'navn': '<img src=x onerror=alert(1)>'}])
         self.assertNotIn('<img src=x', ut)
         self.assertIn('&lt;img', ut)
+
+
+class TidsblokkerTests(SimpleTestCase):
+    """Skift med samme fra–til samles under én blokklinje (11. sep. 2026).
+
+    Andrés punkt: mange på en vakt deler tid, og en liste der samme spenn
+    står på fire rader under hverandre er lang og lik — man ser ikke
+    skiftbyttet før man har lest hver rad. Tiden skrives én gang, på
+    blokklinja, sammen med timene og hvor mange som står der.
+    """
+
+    HARNESS = (
+        (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue')),
+        (VAKTLISTE_JS, ('mkOversikt', '_tidsblokker', '_blokklinje',
+                        '_driftrad', '_radklasse', '_stempelknapper',
+                        'kanStemple', 'iDrift', 'kanSkriveAlt', '_nivaa',
+                        '_erAdmin', '_skiftrekkefolge', '_sumTimer',
+                        '_varighet', '_skifttimer', '_tall', '_d', '_kl',
+                        '_dag', '_sammeDag', '_tidsspenn', '_vaktspenn',
+                        '_ressurserIGruppe', '_grupperMedRessurser')),
+    )
+    VINDU = ("globalThis.window = { MODUL_TILGANG: { admin: true } };\n"
+             "globalThis.DAGER = ['søn','man','tir','ons','tor','fre','lør'];\n"
+             "globalThis.MND = ['jan','feb','mar','apr','mai','jun',"
+             "'jul','aug','sep','okt','nov','des'];\n")
+    LISTE = UtskriftslistaTests.LISTE
+
+    def setUp(self):
+        if not node_available():
+            self.skipTest('node er ikke tilgjengelig')
+        self.harness = build_harness(self.HARNESS)
+
+    def _oversikt(self):
+        return run_node(self.harness, self.VINDU + self.LISTE
+                        + "console.log(mkOversikt());")
+
+    # ── _tidsblokker ─────────────────────────────────────────────────────
+    def test_like_spenn_blir_en_blokk_og_ulike_blir_hver_sin(self):
+        """Andrés tre rader på samleplassen: to som slutter 03:00, én som
+        slutter 22:15. Det er to blokker — og den korte kommer først, fordi
+        blokkene arver `_skiftrekkefolge`."""
+        run_node(self.harness, self.LISTE + """
+            const poster = aktivListe.vaktposter.filter((v) => v.ressurs_id === 10);
+            const b = _tidsblokker(poster);
+            assert(b.length === 2, 'fikk ' + b.length + ' blokker');
+            assert(b[0].til_tid === '2026-09-04T22:15:00', 'den korte foerst');
+            assert(b[0].poster.length === 1, 'kort blokk: ' + b[0].poster.length);
+            assert(b[1].poster.length === 2, 'lang blokk: ' + b[1].poster.length);
+        """)
+
+    def test_blokka_krever_likhet_ikke_overlapp(self):
+        """Et skift som begynner samtidig men slutter en time før de andre er
+        sitt eget — ellers hadde blokklinja løyet om når folk går av."""
+        run_node(self.harness, """
+            const b = _tidsblokker([
+              {fra_tid: '2026-09-04T17:00:00', til_tid: '2026-09-05T03:00:00', navn: 'A'},
+              {fra_tid: '2026-09-04T17:00:00', til_tid: '2026-09-05T02:00:00', navn: 'B'},
+            ]);
+            assert(b.length === 2, 'overlapp er ikke likhet: ' + b.length);
+        """)
+
+    def test_radene_i_blokka_er_sortert_paa_navn(self):
+        run_node(self.harness, """
+            const b = _tidsblokker([
+              {fra_tid: '2026-09-04T17:00:00', til_tid: '2026-09-05T03:00:00', navn: 'Ola'},
+              {fra_tid: '2026-09-04T17:00:00', til_tid: '2026-09-05T03:00:00', navn: 'Anne'},
+            ]);
+            assert(b[0].poster[0].navn === 'Anne', 'fikk ' + b[0].poster[0].navn);
+        """)
+
+    def test_tom_liste_gir_ingen_blokker(self):
+        run_node(self.harness, "assert(_tidsblokker([]).length === 0, 'tom');")
+
+    # ── _blokklinje ──────────────────────────────────────────────────────
+    def _linje(self, poster, kolonner=9):
+        import json
+        return run_node(self.harness, self.VINDU + f"""
+            console.log(_blokklinje({{fra_tid: '2026-09-04T20:00:00',
+                                      til_tid: '2026-09-05T04:30:00',
+                                      poster: {json.dumps(poster)}}}, {kolonner}));
+        """)
+
+    def test_linja_baerer_tid_timer_og_antall(self):
+        ut = self._linje([{'ledig': False}, {'ledig': False}, {'ledig': True}])
+        self.assertIn('20:00', ut)
+        self.assertIn('04:30', ut)
+        self.assertIn('8,5 t', ut)
+        self.assertIn('2 satt opp · 1 ledig', ut)
+
+    def test_linja_spenner_over_alle_kolonnene(self):
+        """Én celle over hele bredden — ellers faller den ut av
+        `table-layout: fixed` og forskyver kolonnene under."""
+        self.assertIn('colspan="9"', self._linje([{'ledig': False}], 9))
+        self.assertIn('colspan="4"', self._linje([{'ledig': False}], 4))
+
+    def test_flertall_naar_flere_er_ledige(self):
+        ut = self._linje([{'ledig': True}, {'ledig': True}])
+        self.assertIn('2 ledige', ut)
+        self.assertNotIn('satt opp', ut, 'ingen er satt opp, så det står ikke')
+
+    def test_linja_krysser_dogn_med_dagen_nevnt_to_ganger(self):
+        """Samme regel som `_tidsspenn`: dagen én gang innenfor et døgn, to
+        ganger ellers."""
+        ut = self._linje([{'ledig': False}])
+        self.assertEqual(ut.count('fre'), 1)
+        self.assertEqual(ut.count('lør'), 1)
+
+    # ── Oversikten ───────────────────────────────────────────────────────
+    def test_oversikten_har_ingen_tidskolonne_lenger(self):
+        """Kolonnen sto med samme verdi fire ganger. Tiden står på blokklinja."""
+        ut = self._oversikt()
+        self.assertNotIn('<th>Tid</th>', ut)
+        self.assertIn('vl-blokk', ut)
+
+    def test_en_blokklinje_per_spenn_per_ressurs(self):
+        """Samleplassen har to spenn, hver ambulanse ett: fire linjer."""
+        self.assertEqual(self._oversikt().count('class="vl-blokk"'), 4)
+
+    def test_tiden_skrives_en_gang_per_blokk(self):
+        """Tre rader på samleplassen begynner 17:00 — men 17:00 står to
+        ganger der, én per blokk, ikke tre. Det er hele poenget."""
+        ut = self._oversikt()
+        samleplass = ut[ut.index('<h3>Samleplass'):ut.index('<h3>Ambulanse 1')]
+        self.assertEqual(samleplass.count('17:00'), 2)
+
+    def test_ressursen_summerer_timene(self):
+        """10 + 10 + 5,25 på samleplassen: «25,3 t» i overskriften, med komma."""
+        ut = self._oversikt()
+        samleplass = ut[ut.index('<h3>Samleplass'):ut.index('<h3>Ambulanse 1')]
+        self.assertIn('3 skift · 25,3 t', samleplass)
+
+    def test_arkhodet_summerer_hele_vakta(self):
+        """25,25 + 10 + 10 = 45,25 → «45,3 t»."""
+        self.assertIn('5 skift · 45,3 t', self._oversikt())
+
+    def test_ledige_plasser_beholder_sin_rad(self):
+        ut = self._oversikt()
+        self.assertIn('— ledig —', ut)
+        self.assertIn('KARM', ut, 'reservasjonen står fortsatt på raden')
+
+    # ── Driftraden ───────────────────────────────────────────────────────
+    def test_driftraden_har_ikke_tiden_i_seg(self):
+        """Den står på blokklinja over. Fire like tider under hverandre var det
+        som gjorde lista lang og lik."""
+        ut = run_node(self.harness, self.VINDU + """
+            globalThis.aktivListe = {vaktliste: {i_drift: true}};
+            console.log(_driftrad({id: 5, ledig: false, navn: 'Kari',
+                                   korps_kort: 'HGSD', rolle: 'Sjåfør',
+                                   mott_at: null, av_vakt_at: null, tilstede: false,
+                                   fra_tid: '2026-10-03T08:00:00',
+                                   til_tid: '2026-10-03T16:00:00'}, true));
+        """)
+        self.assertNotIn('08:00', ut)
+        self.assertNotIn('16:00', ut)
+        self.assertEqual(ut.count('<td'), 5, 'innsjekk, navn, korps, rolle, blyant')
+
+    # ── Timeformatet ─────────────────────────────────────────────────────
+    def test_tall_bruker_komma_og_dropper_null_desimal(self):
+        run_node(self.harness, """
+            assert(_tall(8.5) === '8,5', _tall(8.5));
+            assert(_tall(14) === '14', _tall(14));
+            assert(_tall(14.0) === '14', _tall(14.0));
+            assert(_tall(8.25) === '8,3', _tall(8.25));
+            assert(_tall(0) === '0', _tall(0));
+        """)
+
+    def test_sum_hopper_over_skift_uten_spenn(self):
+        """Et skift som mangler den ene tida vises som «—», og en strek har
+        ingen timer å legge til."""
+        run_node(self.harness, """
+            const sum = _sumTimer([
+              {fra_tid: '2026-10-03T08:00:00', til_tid: '2026-10-03T16:30:00'},
+              {fra_tid: null, til_tid: '2026-10-03T16:00:00'},
+              {fra_tid: '2026-10-03T16:00:00', til_tid: '2026-10-03T08:00:00'},
+            ]);
+            assert(sum === 8.5, 'fikk ' + sum);
+            assert(_sumTimer([]) === 0, 'tom liste');
+        """)
+
+
+class NyVaktlisteSporOmSluttenTests(SimpleTestCase):
+    """«Ny vaktliste» spør om slutten, ikke bare starten (11. sep. 2026).
+
+    Feltet fantes, men bare bak «Vaktas lengde» inne i innstillingsvinduet —
+    André fant det ikke. Uten slutt tegnes kurvene bare fra første til siste
+    skift, og hullet i begynnelsen er usynlig.
+    """
+
+    HARNESS = (
+        (VAKTLISTE_JS, ('opprettVaktliste', '_skjulFeil', '_visFeil',
+                        '_tidFraFelt')),
+    )
+
+    def setUp(self):
+        if not node_available():
+            self.skipTest('node er ikke tilgjengelig')
+        self.harness = build_harness(self.HARNESS)
+
+    def test_malen_har_feltet_i_opprettelsesvinduet(self):
+        from pathlib import Path
+        from django.conf import settings
+        mal = (Path(settings.BASE_DIR) / 'templates' / 'vaktliste'
+               / 'index.html').read_text(encoding='utf-8')
+        vindu = mal[mal.index('id="nyVaktlisteModal"'):]
+        vindu = vindu[:vindu.index('</div>\n</div>')]
+        self.assertIn('id="ny-vakt-slutt"', vindu)
+        self.assertIn('id="ny-vakt-start"', vindu, 'starten står der fortsatt')
+
+    def test_opprettelsen_sender_slutten_med(self):
+        ut = run_node(self.harness, """
+            const felter = {
+              'ny-vakt-navn': {value: 'Oktobervakta'},
+              'ny-vakt-start': {value: '2026-10-03T08:00'},
+              'ny-vakt-slutt': {value: '2026-10-03T18:00'},
+              'ny-vakt-kopier': {value: ''},
+              'ny-vakt-feil': {classList: {add() {}, remove() {}}, textContent: ''},
+            };
+            globalThis.document = {getElementById: (id) => felter[id] || null};
+            globalThis.withSubmitGuard = async (_id, fn) => fn();
+            let sendt = null;
+            globalThis.apiFetch = async (_url, opts) => {
+              sendt = JSON.parse(opts.body);
+              return {ok: false, json: async () => ({})};
+            };
+            await opprettVaktliste();
+            assert(sendt !== null, 'ingenting ble sendt');
+            assert(sendt.planlagt_slutt === '2026-10-03T18:00',
+                   'slutt: ' + sendt.planlagt_slutt);
+            assert(sendt.startet === '2026-10-03T08:00', 'start: ' + sendt.startet);
+        """)
+        self.assertIn('OK', ut)
+
+    def test_tomt_sluttfelt_sendes_som_null(self):
+        """Slutten er valgfri ved opprettelsen — en tom streng ville serveren
+        lest som «ugyldig tid» og ikke som «ingen»."""
+        ut = run_node(self.harness, """
+            const felter = {
+              'ny-vakt-navn': {value: 'Uten slutt'},
+              'ny-vakt-start': {value: ''},
+              'ny-vakt-slutt': {value: ''},
+              'ny-vakt-kopier': {value: ''},
+              'ny-vakt-feil': {classList: {add() {}, remove() {}}, textContent: ''},
+            };
+            globalThis.document = {getElementById: (id) => felter[id] || null};
+            globalThis.withSubmitGuard = async (_id, fn) => fn();
+            let sendt = null;
+            globalThis.apiFetch = async (_url, opts) => {
+              sendt = JSON.parse(opts.body);
+              return {ok: false, json: async () => ({})};
+            };
+            await opprettVaktliste();
+            assert(sendt.planlagt_slutt === null, 'slutt: ' + sendt.planlagt_slutt);
+        """)
+        self.assertIn('OK', ut)

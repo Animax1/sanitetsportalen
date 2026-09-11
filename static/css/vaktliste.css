@@ -421,6 +421,47 @@
   text-transform: uppercase;
 }
 
+/* ── Tidsblokker ──────────────────────────────────────────────────────── */
+/*
+   Skift med samme fra–til deler én linje over seg (11. sep. 2026). Linja er
+   en `<tr>` med én celle over alle kolonnene — den hører til tabellen og
+   ruller med den, og den bryter ikke `table-layout: fixed`. Bakgrunnen er
+   svak, ikke en farge med mening: en blokk er en gruppering, ikke en status,
+   og de statusene som finnes (ledig, tilstede, avgått) står på radene under.
+*/
+.vl-tabell tr.vl-blokk td {
+  background: color-mix(in srgb, var(--text-muted) 12%, transparent);
+  border-bottom: 1px solid var(--border-color);
+  font-size: 0.78rem;
+  padding: 0.3rem 0.5rem;
+  white-space: nowrap;
+}
+
+/* `::first-letter` krever et blokkelement — derav `inline-block`. */
+.vl-blokktid {
+  display: inline-block;
+  font-weight: 700;
+  margin-right: 0.7rem;
+}
+
+.vl-blokktid::first-letter {
+  text-transform: uppercase;
+}
+
+.vl-blokktimer {
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+  margin-right: 0.7rem;
+}
+
+@media print {
+  .vl-tabell tr.vl-blokk td {
+    background: #eee !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+}
+
 /* Timer per skift — tallet man ellers regner ut i hodet for hver rad. */
 .vl-timer {
   white-space: nowrap;

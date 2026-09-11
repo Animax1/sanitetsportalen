@@ -61,6 +61,29 @@ class PlanlagtVaktTests(TestCase):
         self.assertEqual(vl.vakt.navn, 'Landsskytterstevnet 2099')
         self.assertEqual(vl.status, choices.PLANLEGGING)
 
+    def test_planlagt_slutt_tas_imot_ved_opprettelsen(self):
+        """Fram til 11. sep. 2026 spurte «Ny vaktliste» bare om start, og
+        slutten lå bak «Vaktas lengde» i innstillingsvinduet — André fant
+        den ikke. Den skal kunne settes der vakta lages."""
+        start = timezone.now() + timedelta(days=30)
+        vl = services.opprett_planlagt_vakt(
+            'Oktobervakta', startet=start, planlagt_slutt=start + timedelta(hours=10))
+        self.assertEqual(vl.planlagt_slutt, start + timedelta(hours=10))
+
+    def test_slutt_for_start_avvises_ved_opprettelsen(self):
+        """Samme regel som `vaktliste_detalj_view` håndhever ved endring:
+        et negativt spenn gir en kurve som ikke kan tegnes."""
+        start = timezone.now() + timedelta(days=30)
+        with self.assertRaisesMessage(ValueError, 'slutte etter'):
+            services.opprett_planlagt_vakt(
+                'Baklengs', startet=start, planlagt_slutt=start - timedelta(hours=1))
+        self.assertFalse(Vakt.objects.filter(navn='Baklengs').exists(),
+                         'en avvist opprettelse skal ikke etterlate en vakt')
+
+    def test_uten_slutt_er_feltet_tomt(self):
+        vl = services.opprett_planlagt_vakt('Uten slutt')
+        self.assertIsNone(vl.planlagt_slutt)
+
     def test_den_nye_vakta_er_ikke_aktiv(self):
         vl = services.opprett_planlagt_vakt('Oktobervakta')
         self.assertFalse(vl.vakt.er_aktiv)
@@ -430,6 +453,28 @@ class ApiTests(TestCase):
 
         from patients.services import hent_aktiv_vakt
         self.assertEqual(hent_aktiv_vakt().pk, self.aktiv.pk)
+
+    def test_post_tar_med_planlagt_slutt(self):
+        start = self.na + timedelta(days=30)
+        res = self.c.post(
+            '/vaktliste/api/vaktlister/',
+            data={'navn': 'Med slutt', 'startet': start.isoformat(),
+                  'planlagt_slutt': (start + timedelta(hours=10)).isoformat()},
+            content_type='application/json')
+        self.assertEqual(res.status_code, 201)
+        self.assertIsNotNone(res.json()['data']['planlagt_slutt'])
+        vl = Vaktliste.objects.get(pk=res.json()['data']['id'])
+        self.assertEqual(vl.planlagt_slutt, start + timedelta(hours=10))
+
+    def test_post_med_slutt_for_start_gir_400(self):
+        start = self.na + timedelta(days=30)
+        res = self.c.post(
+            '/vaktliste/api/vaktlister/',
+            data={'navn': 'Baklengs', 'startet': start.isoformat(),
+                  'planlagt_slutt': (start - timedelta(hours=1)).isoformat()},
+            content_type='application/json')
+        self.assertEqual(res.status_code, 400)
+        self.assertIn('slutte etter', res.json()['message'])
 
     def test_post_med_kopier_fra_tar_ressursene(self):
         kilde = self._liste('I fjor')
