@@ -151,7 +151,11 @@ class StartOppdragTests(TestCase):
 
         forste.refresh_from_db()
         neste.refresh_from_db()
-        self.assertEqual(forste.status, choices.LEDIG)
+        # Bilens rad lukkes — men oppdraget er ikke ferdig (12. sep. 2026):
+        # det står på tavla som «trenger ny ressurs».
+        self.assertEqual(services.koblingsrad(forste).status, choices.LEDIG)
+        self.assertEqual(forste.status, choices.VENTER)
+        self.assertTrue(forste.trenger_ressurs)
         self.assertEqual(neste.status, choices.RYKKER_UT)
 
     def test_den_automatiske_meldingen_er_merket(self):

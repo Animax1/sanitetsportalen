@@ -196,6 +196,12 @@ class Oppdrag(BaseTimeStampedModel):
     # boolean kan ikke svare på det. NULL = står på tavla.
     historikk_fra = models.DateTimeField(
         null=True, blank=True, db_index=True, verbose_name='I historikk fra')
+    # **Trenger ny ressurs** (André, 12. sep. 2026): bilen rykket ut på et
+    # annet oppdrag mens dette sto uferdig. Hennes rad lukkes automatisk som
+    # før, men oppdraget er ikke ferdig — det står på tavla i `Venter` til
+    # sentralbordet varsler en ny enhet, som nullstiller flagget.
+    trenger_ressurs = models.BooleanField(
+        default=False, verbose_name='Trenger ny ressurs')
     historikk_av = models.ForeignKey(
         settings.AUTH_USER_MODEL, null=True, blank=True,
         on_delete=models.SET_NULL, related_name='oppdrag_lagt_i_historikk',
@@ -315,12 +321,19 @@ class Enhetshendelse(BaseTimeStampedModel):
     """
 
     TATT_AV = 'tatt_av'
-    TYPER = ((TATT_AV, 'Tatt av oppdraget'),)
+    RYKKET_VIDERE = 'rykket_videre'
+    TYPER = (
+        (TATT_AV, 'Tatt av oppdraget'),
+        # Bilen rykket ut på et annet oppdrag mens dette sto uferdig
+        # (12. sep. 2026). `detalj` bærer nummeret på det hun dro til.
+        (RYKKET_VIDERE, 'Rykket ut på et annet oppdrag'),
+    )
 
     oppdrag = models.ForeignKey(
         Oppdrag, on_delete=models.CASCADE, related_name='enhetshendelser')
     enhet = models.ForeignKey(Enhet, on_delete=models.PROTECT, related_name='+')
     type = models.CharField(max_length=16, choices=TYPER, verbose_name='Hendelse')
+    detalj = models.CharField(max_length=64, blank=True, default='', verbose_name='Detalj')
     tidspunkt = models.DateTimeField(default=timezone.now)
     av = models.ForeignKey(
         settings.AUTH_USER_MODEL, null=True, blank=True,

@@ -4,6 +4,20 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-12 — Andrés runde på staging, del C: «trenger ny ressurs»
+
+Én migrasjon, `oppdrag/0016`: `Oppdrag.trenger_ressurs` og
+`Enhetshendelse.detalj`. Rene skjemaendringer.
+
+- **Rykker bilen ut på et nytt oppdrag mens hun står på et annet, blir det
+  forrige stående på tavla som «Trenger ny ressurs»** i stedet for å ryddes
+  til historikken. Hennes rad lukkes automatisk som før (§4.3); oppdraget
+  gjør det ikke. Merket står først i enhetsmatrisen, tidslinjen sier «Rykket
+  videre til #12», og sentralbordet varsler en ny enhet — det nullstiller
+  flagget — eller sletter oppdraget hvis det ikke lenger trengs.
+- Var en annen bil fortsatt på oppdraget, endres ingenting: hun kjører
+  videre, og oppdraget følger henne.
+
 ## 2026-09-12 — Andrés runde på staging, del B: oppdragsmodulen
 
 Én migrasjon, `oppdrag/0015`: `Enhet.type`, `Oppdrag.antall` og de nye

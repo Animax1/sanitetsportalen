@@ -232,7 +232,12 @@ def utledet_status(oppdrag) -> str:
     statuser = list(oppdrag.enheter.values_list('status', flat=True))
     if not statuser:
         return oppdrag.status
-    return utledet_av_statuser(statuser)
+    status = utledet_av_statuser(statuser)
+    # Alle ledige, men oppdraget er ikke ferdig: bilen rykket videre, og
+    # tavla skal vise at det trengs en ny ressurs (12. sep. 2026).
+    if status == choices.LEDIG and oppdrag.trenger_ressurs:
+        return choices.VENTER
+    return status
 
 
 def utledet_av_statuser(statuser) -> str:
@@ -408,8 +413,22 @@ def start_oppdrag(oppdrag, *, bruker=None, tidspunkt=None,
     # Per enhet: det er *hennes* pågående som lukkes, ikke oppdragets.
     pagaende = aktiv_koblingsrad(rad.enhet, oppdrag.vakt)
     if pagaende is not None and pagaende.oppdrag_id != oppdrag.pk:
-        sett_status(pagaende.oppdrag, choices.LEDIG, bruker=bruker,
+        forrige = pagaende.oppdrag
+        # **Det forrige oppdraget er ikke ferdig** (André, 12. sep. 2026):
+        # bilen dro, men noen må fortsatt ta det. Var hun den siste som
+        # ikke var ledig, blir det stående på tavla som «trenger ny
+        # ressurs» i stedet for å ryddes til historikken. Flagget settes
+        # *før* lukkingen, så `utledet_status` ser det.
+        andre_aktive = (forrige.enheter.exclude(pk=pagaende.pk)
+                        .exclude(status=choices.LEDIG).exists())
+        if not andre_aktive:
+            forrige.trenger_ressurs = True
+            forrige.save(update_fields=['trenger_ressurs', 'updated_at'])
+        sett_status(forrige, choices.LEDIG, bruker=bruker,
                     tidspunkt=naa, automatisk=True, enhet=rad.enhet)
+        Enhetshendelse.objects.create(
+            oppdrag=forrige, enhet=rad.enhet, type=Enhetshendelse.RYKKET_VIDERE,
+            tidspunkt=naa, av=bruker, detalj=f'#{oppdrag.oppdragsnummer}')
 
     return sett_status(oppdrag, choices.RYKKER_UT, bruker=bruker,
                        tidspunkt=naa, forsinket=forsinket, enhet=rad.enhet)
@@ -426,8 +445,12 @@ def varsle_enhet(oppdrag, enhet, *, bruker=None) -> Oppdragsenhet:
     neste = (oppdrag.enheter.aggregate(models.Max('rekkefolge'))['rekkefolge__max'] or 0) + 1
     rad = Oppdragsenhet.objects.create(
         oppdrag=oppdrag, enhet=enhet, varslet_av=bruker, rekkefolge=neste)
-    oppdrag.status = utledet_status(oppdrag)
     felter = ['status', 'updated_at']
+    if oppdrag.trenger_ressurs:
+        # Ressursen er her. Flagget nullstilles før utledningen.
+        oppdrag.trenger_ressurs = False
+        felter.append('trenger_ressurs')
+    oppdrag.status = utledet_status(oppdrag)
     if oppdrag.historikk_fra is not None:
         oppdrag.historikk_fra = None
         oppdrag.historikk_av = None
@@ -784,6 +807,10 @@ def kan_slettes(oppdrag, user) -> bool:
         return True
     if not har_tilgang(user, 'oppdrag', 'skriv_full'):
         return False
+    if oppdrag.trenger_ressurs:
+        # Står og venter på en ny ressurs — ingen er på vei, og sentralbordet
+        # skal kunne stryke det hvis det ikke lenger trengs.
+        return True
     statuser = list(oppdrag.enheter.values_list('status', flat=True))
     return bool(statuser) and all(st == choices.VENTER for st in statuser)
 

@@ -280,6 +280,15 @@ de ikke vet.
 for det forrige oppdraget blir starttiden for det neste. Det er en bevisst avveining for
 farten i felt, og `automatisk`-flagget gjør at statistikken kan skille dem senere.
 
+**Snudd for oppdraget, ikke for bilen (12. sep. 2026).** André: «det de var på først
+[må] flyttes til et ventende på sentralbord og trenger ny ressurs på seg.» Bilens rad
+lukkes fortsatt automatisk som over — men var hun den siste som ikke var ledig, er
+oppdraget ikke ferdig. Det får `trenger_ressurs=True`, `utledet_status` gir `Venter` i
+stedet for `Ledig`, og det blir stående på tavla med merket «Trenger ny ressurs» til
+sentralbordet varsler en ny enhet, som nullstiller flagget. Hendelsen «Rykket videre til
+#12» står i tidslinjen (`Enhetshendelse.RYKKET_VIDERE`). Sentralbordet kan slette et
+oppdrag som står slik — ingen er på vei.
+
 ### 4.4 Korreksjoner er nye rader, ikke redigeringer
 
 113 kan rette tidspunktet på en statusmelding — typisk en `Ledig` som ble satt automatisk,

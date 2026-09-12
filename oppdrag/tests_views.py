@@ -567,7 +567,8 @@ class StemplingTests(StemplingBasis):
 
         forste.refresh_from_db()
         andre.refresh_from_db()
-        self.assertEqual(forste.status, choices.LEDIG)
+        self.assertEqual(services.koblingsrad(forste).status, choices.LEDIG)
+        self.assertEqual(forste.status, choices.VENTER, 'trenger ny ressurs (12. sep. 2026)')
         self.assertEqual(andre.status, choices.RYKKER_UT)
 
         ledig = Statusmelding.objects.get(oppdrag=forste, status=choices.LEDIG)
@@ -1015,21 +1016,20 @@ class AutoHistorikkTests(StemplingBasis):
         self.assertIsNotNone(o.historikk_fra)
         self.assertNotIn(o.pk, self._aktiv_liste())
 
-    def test_automatisk_lukking_gaar_ogsaa_i_historikk(self):
-        """§4.3: startes neste oppdrag, lukkes det pågående — og ryddes bort.
-
-        Dette er grunnen til at regelen ligger i `sett_status` og ikke i
-        viewet: ingen trykket `Ledig` på dette oppdraget.
-        """
+    def test_automatisk_lukking_lar_oppdraget_staa_som_trenger_ressurs(self):
+        """§4.3, snudd 12. sep. 2026: startes neste oppdrag, lukkes bilens
+        rad på det forrige — men oppdraget er ikke ferdig. Det blir stående
+        på tavla som «trenger ny ressurs» i stedet for å ryddes bort."""
         forste = self._oppdrag()
         andre = self._oppdrag()
         self._stemple(forste, 'rykker_ut')
         self._stemple(andre, 'rykker_ut')
 
         forste.refresh_from_db()
-        self.assertEqual(forste.status, choices.LEDIG)
-        self.assertIsNotNone(forste.historikk_fra)
-        self.assertNotIn(forste.pk, self._aktiv_liste())
+        self.assertEqual(forste.status, choices.VENTER)
+        self.assertTrue(forste.trenger_ressurs)
+        self.assertIsNone(forste.historikk_fra)
+        self.assertIn(forste.pk, self._aktiv_liste())
         self.assertIn(andre.pk, self._aktiv_liste())
 
     def test_automatisk_flytting_har_ingen_historikk_av(self):

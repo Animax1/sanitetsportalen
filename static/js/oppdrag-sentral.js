@@ -392,7 +392,14 @@ function _enhetsmatrise(o) {
     enhet_navn: o.enhet_navn, status: o.status, status_navn: o.status_navn,
     status_tidspunkt: o.status_tidspunkt,
   }];
-  return rader.map((e) => {
+  // Bilen rykket videre og ingen har tatt over (André, 12. sep. 2026):
+  // merket står først, så det er det første 113 ser på raden.
+  const mangler = o.trenger_ressurs
+    ? `<span class="enhet-brikke enhet-brikke-mangler">
+      <span class="status-prikk status-mangler"></span>
+      <span>Trenger ny ressurs</span>
+    </span>` : '';
+  return mangler + rader.map((e) => {
     const statusTid = e.status_tidspunkt ? ` · ${tidSiden(e.status_tidspunkt)}` : '';
     const sted = e.sted_navn ? ` → ${e.sted_navn}` : '';
     const meta = `${e.status_navn}${sted}${statusTid}`;
@@ -440,12 +447,17 @@ function tidslinjeHtml(data) {
     });
   });
   (data.enhetshendelser || []).forEach((h) => {
+    // «Rykket videre til #12: HGSD 56» — bilen dro til et annet oppdrag, og
+    // dette trenger en ny ressurs. Ellers «Tatt av».
+    const tekst = h.type === 'rykket_videre'
+      ? 'Rykket videre' + (h.detalj ? ' til ' + h.detalj : '') + ': ' + h.enhet_navn
+      : 'Tatt av: ' + h.enhet_navn;
     rader.push({
       tid: h.tidspunkt,
       html: `
         <div class="tidslinje-rad">
           <span class="tidslinje-tid">${escapeHtml(klokke(h.tidspunkt))}</span>
-          <span>Tatt av: ${escapeHtml(h.enhet_navn)}</span>
+          <span>${escapeHtml(tekst)}</span>
           <span class="tidslinje-notat">· ${escapeHtml(h.av)}</span>
         </div>`,
     });

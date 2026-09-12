@@ -140,7 +140,8 @@ class UdefinertSperrerLedigTests(StemplingBasis):
         neste = self._oppdrag()
         services.start_oppdrag(neste, enhet=self.enhet)
         o.refresh_from_db()
-        self.assertEqual(o.status, choices.LEDIG)
+        self.assertEqual(services.koblingsrad(o, self.enhet).status, choices.LEDIG)
+        self.assertTrue(o.trenger_ressurs, 'og oppdraget står igjen på tavla')
 
 
 @override_settings(SECURE_SSL_REDIRECT=False, RATELIMIT_ENABLE=False)

@@ -220,6 +220,8 @@ ingen av dem gir feilmelding — de er bare stille inaktive.
             - [x] Andrés rapport 3 (12. sep.): bilen ser de andres stempler, arkivtittel
                   uten vaktnavn, «Mitt korps» skiller korpsets fra åpent for alle, kurvens
                   hode med tre tall, «Arkiv» i eget vindu, manifest og logo.
+            - [x] Andrés runde på staging, del C (12. sep.): bilen rykker videre →
+                  oppdraget står som «trenger ny ressurs» på tavla (`0016`).
             - [x] Andrés runde på staging, del B (12. sep.): teknisk hastegrad med egne
                   problemstillinger, rekkefølge i skjemaet, «Udefinert» som sperrer
                   ledig, antall på transport, enhetstyper med gruppering, lokasjoner

@@ -141,6 +141,8 @@ def oppdrag_til_dict(oppdrag, *, for_enhet: bool = False,
         'status_tidspunkt': status_tidspunkt,
         'historikk_fra': (oppdrag.historikk_fra.isoformat()
                           if oppdrag.historikk_fra else None),
+        # Bilen rykket videre; oppdraget står på tavla og venter på en ny.
+        'trenger_ressurs': oppdrag.trenger_ressurs,
     }
     skjul_fritekst = for_enhet and status == choices.TERMINAL
     data['fritekst'] = '' if skjul_fritekst else oppdrag.fritekst
@@ -181,6 +183,8 @@ def hendelse_til_dict(h) -> dict:
     return {
         'id': h.pk,
         'type': h.type,
+        'type_navn': h.get_type_display(),
+        'detalj': h.detalj,
         'enhet_navn': h.enhet.navn,
         'tidspunkt': h.tidspunkt.isoformat(),
         'av': getattr(h.av, 'username', '') or '',
