@@ -1286,14 +1286,14 @@ const VERDIMENGDER = {
   lokasjoner: { tittel: 'Lokasjoner', ny: 'Ny lokasjon' },
   enhetstyper: { tittel: 'Enhetstyper', ny: 'Ny enhetstype' },
   problemstillinger: { tittel: 'Problemstillinger', ny: 'Ny problemstilling' },
-  // Ikke en liste, men et skjema (12. sep. 2026): tersklene per hastegrad.
-  lydvarsel: { tittel: 'Lydvarsel', ny: '' },
+  // Ikke en liste, men et skjema (12. sep. 2026): lydvarsel og krav i bilen.
+  bilinnstillinger: { tittel: 'Bilen', ny: '' },
 };
 const PROBLEM_KATEGORIER = [
   ['medisinsk', 'Medisinsk'], ['drift', 'Drift'], ['begge', 'Begge'],
 ];
 let verdiFane = 'lokasjoner';
-let verdier = { lokasjoner: [], enhetstyper: [], problemstillinger: [], lydvarsel: null };
+let verdier = { lokasjoner: [], enhetstyper: [], problemstillinger: [], bilinnstillinger: null };
 
 
 function _verdiArg(arg) {
@@ -1321,9 +1321,9 @@ async function lastVerdier(slug) {
   const res = await apiFetch(`/oppdrag/api/${slug}/`);
   if (!res.ok) return false;
   verdier[slug] = (await res.json()).data || [];
-  if (slug === 'lydvarsel') {
-    if (globalThis.window && verdier.lydvarsel?.terskler) {
-      globalThis.window.OPPDRAG_LYDVARSEL = verdier.lydvarsel.terskler;
+  if (slug === 'bilinnstillinger') {
+    if (globalThis.window && verdier.bilinnstillinger?.terskler) {
+      globalThis.window.OPPDRAG_LYDVARSEL = verdier.bilinnstillinger.terskler;
     }
     return true;
   }
@@ -1357,9 +1357,9 @@ async function lastLokasjoner() {
 
 
 async function lastVerdiadmin() {
-  // Lydvarselet hentes bare for admin — fanen finnes ikke for andre.
+  // Bilinnstillingene hentes bare for admin — fanen finnes ikke for andre.
   const slugs = Object.keys(VERDIMENGDER).filter(
-    (slug) => slug !== 'lydvarsel' || globalThis.window?.OPPDRAG_TILGANG?.erAdmin);
+    (slug) => slug !== 'bilinnstillinger' || globalThis.window?.OPPDRAG_TILGANG?.erAdmin);
   await Promise.all(slugs.map((slug) => lastVerdier(slug)));
   renderVerdiadmin();
 }
@@ -1380,6 +1380,11 @@ function _lydvarselSkjema(d) {
       </tr>`;
   }).join('');
   return `
+    <h6 class="mb-2">Lydvarsel</h6>
+    <div class="form-check mb-2">
+      <input class="form-check-input" type="checkbox" id="lyd-aktiv"${d.lyd_aktiv !== false ? ' checked' : ''}>
+      <label class="form-check-label" for="lyd-aktiv">Lydvarsel i bilene er på</label>
+    </div>
     <table class="table table-sm mb-2 lyd-tabell">
       <thead><tr><th>Hastegrad</th><th>Første varsel etter (s)</th><th>Gjenta hvert (s)</th></tr></thead>
       <tbody>${rader}</tbody>
@@ -1388,8 +1393,14 @@ function _lydvarselSkjema(d) {
       <input class="form-check-input" type="checkbox" id="lyd-nytt"${d.nytt_oppdrag ? ' checked' : ''}>
       <label class="form-check-label" for="lyd-nytt">Pip i bilen når den får et nytt oppdrag</label>
     </div>
+    <h6 class="mb-2">Grovsortering</h6>
+    <p class="form-text mt-0 mb-2">Kreves alltid før «Behandlet på sted» og før Ledig etter Leverer. Ikke på Drift.</p>
+    <div class="form-check mb-3">
+      <input class="form-check-input" type="checkbox" id="krev-grov-avreist"${d.krev_grov_avreist ? ' checked' : ''}>
+      <label class="form-check-label" for="krev-grov-avreist">Krev grovsortering også før Avreist</label>
+    </div>
     <button type="button" class="btn btn-sm btn-primary" id="lyd-lagre" data-action="lagreLydvarsel">Lagre</button>
-    <span class="form-text ms-2">Gjelder alle biler; bilen henter tallene innen fem minutter.</span>`;
+    <span class="form-text ms-2">Gjelder alle biler; bilen henter innstillingene innen fem minutter.</span>`;
 }
 
 
@@ -1399,12 +1410,17 @@ async function lagreLydvarsel() {
     terskler[h] = [Number(document.getElementById(`lyd-forste-${h}`)?.value),
                    Number(document.getElementById(`lyd-gjenta-${h}`)?.value)];
   });
-  const nytt = !!document.getElementById('lyd-nytt')?.checked;
+  const kropp = {
+    terskler,
+    nytt_oppdrag: !!document.getElementById('lyd-nytt')?.checked,
+    lyd_aktiv: !!document.getElementById('lyd-aktiv')?.checked,
+    krev_grov_avreist: !!document.getElementById('krev-grov-avreist')?.checked,
+  };
   await withSubmitGuard('lyd-lagre', async () => {
-    if (await _verdiKall('/oppdrag/api/lydvarsel/',
-                         { method: 'PUT', body: JSON.stringify({ terskler, nytt_oppdrag: nytt }) },
-                         'Kunne ikke lagre lydvarslene.')) {
-      await lastVerdier('lydvarsel');
+    if (await _verdiKall('/oppdrag/api/bilinnstillinger/',
+                         { method: 'PUT', body: JSON.stringify(kropp) },
+                         'Kunne ikke lagre bilinnstillingene.')) {
+      await lastVerdier('bilinnstillinger');
       renderVerdiadmin();
     }
   });
@@ -1468,9 +1484,9 @@ function renderVerdiadmin() {
   const nyKategori = document.getElementById('ny-verdi-kategori');
   if (nyKategori) nyKategori.classList.toggle('d-none', verdiFane !== 'problemstillinger');
   const nyRad = document.getElementById('ny-verdi-rad');
-  if (nyRad) nyRad.classList.toggle('d-none', verdiFane === 'lydvarsel');
-  if (verdiFane === 'lydvarsel') {
-    el.innerHTML = _lydvarselSkjema(verdier.lydvarsel || {});
+  if (nyRad) nyRad.classList.toggle('d-none', verdiFane === 'bilinnstillinger');
+  if (verdiFane === 'bilinnstillinger') {
+    el.innerHTML = _lydvarselSkjema(verdier.bilinnstillinger || {});
     return;
   }
   const rader = verdier[verdiFane] || [];

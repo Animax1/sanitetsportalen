@@ -4,6 +4,25 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-12 — Prodtest runde G–I: lyd, grovsortering, iPhone
+
+Ingen migrasjon. Deployes til staging først.
+
+- **Lyd på som standard, med dempeikon** i bilen (per enhet, husket lokalt)
+  i stedet for «alltid på uten valg». Linja «trykk hvor som helst» er
+  dempet tekst, ikke en gul boks, og forsvinner etter første trykk.
+- **Admin kan slå lydvarselet av** for alle biler, i fanen «Bilen» i
+  «Valglister» (het «Lydvarsel»). Endepunktet heter `api/bilinnstillinger/`.
+- **iOS med lydbryteren på stille:** Web Audio dempes av bryteren; bilen
+  starter en stum, loopende lydfil ved første trykk og ber om
+  «playback»-lydøkt, som er omveien som finnes. Ingen garanti fra Apple.
+- **Grovsortering kreves** før «Behandlet på sted» og før Ledig etter
+  Leverer — alltid, unntatt på Drift. Før Avreist bare når admin har slått
+  det på («Krev grovsortering også før Avreist»). Bilen får beskjeden idet
+  hun trykker; serveren avviser uansett.
+- Statistikk: «På stedet» heter «Behandlet på stedet».
+- iPhone: gruppeoverskriftene i «Nytt oppdrag» tar hele linja igjen.
+
 ## 2026-09-12 — Andrés forbedringsliste, del I: lydvarselet
 
 To migrasjoner, `oppdrag/0023` (tabellen `Lydvarsel`) og `0024` (seed med

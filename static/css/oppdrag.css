@@ -270,6 +270,9 @@
 }
 
 .nytt-enhet-valg { margin: 0; }
+/* Gruppeoverskriften tar hele linja (iPhone, 12. sep. 2026: «ingen luft
+ * mellom de» — som flex-element sto den inne blant avkryssingene). */
+.nytt-enheter .enhet-gruppe { flex-basis: 100%; width: 100%; }
 
 /* Radene i detaljvisningen, med handlingene per enhet til høyre. */
 .enhet-rad {
@@ -514,3 +517,6 @@
 .lyd-tabell { color: var(--text-main); }
 .lyd-tabell th { color: var(--text-muted); font-weight: 600; font-size: 0.8rem; }
 .lyd-felt { max-width: 9rem; }
+
+/* Dempeikonet i bilen (12. sep. 2026): lyd på som standard, dempet = tydelig. */
+.lyd-demp.lyd-demp-paa { color: #fbbf24; border-color: #fbbf24; }

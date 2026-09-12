@@ -28,15 +28,16 @@ class VarsletAtTests(StemplingBasis):
         res = self.bil.get('/oppdrag/')
         self.assertNotContains(res, 'id="lyd-knapp"')
         self.assertContains(res, 'id="lyd-hint"')
-        self.assertContains(res, 'OPPDRAG_LYDVARSEL')
-        self.assertContains(res, 'OPPDRAG_LYD_NYTT')
+        self.assertContains(res, 'OPPDRAG_BILINNSTILLINGER')
+        self.assertContains(res, 'id="lyd-demp"')
 
 
 class LydvarselJsTests(SimpleTestCase):
     HARNESS = (
         (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue')),
         (OPPDRAG_ENHET_JS, ('skalPipe', 'ventetSekunder', '_lydTerskler', 'lydTerskler',
-                            'ventendeSomSkalPipe', '_strengeste', 'lydTikk', 'lydErKlar')),
+                            'ventendeSomSkalPipe', '_strengeste', 'lydTikk', 'lydErKlar',
+                            'lydSkalSpille', 'bilinnstillinger', 'erDempet', 'dempNokkel')),
     )
     LAGER = ("globalThis.localStorage = (() => { const m = {}; return {"
              "getItem: (k) => (k in m ? m[k] : null), setItem: (k, v) => { m[k] = String(v); },"

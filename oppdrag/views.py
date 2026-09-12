@@ -76,8 +76,7 @@ def index_view(request):
             'alternativ_navn': json.dumps({a[0]: a[1] for a in services.ALTERNATIV.values()}),
             # Lydvarselets terskler og om nytt oppdrag skal pipe (12. sep.
             # 2026) — data fra tabellen, hentet på nytt hvert femte minutt.
-            'lydvarsel': json.dumps(verdier.lydvarsel()),
-            'lyd_nytt': json.dumps(verdier.lyd_ved_nytt_oppdrag()),
+            'bilinnstillinger': json.dumps(verdier.bilinnstillinger()),
         })
 
     return render(request, 'oppdrag/sentral.html', {
@@ -913,6 +912,13 @@ def stempling_view(request, pk, overgang, sted=None):
         return JsonResponse({'status': 'error', 'message': (
             'Ledig meldes etter Leverer eller Behandlet på sted. '
             'Skal oppdraget avbrytes, meld det til KO.')}, status=400)
+    # **Grovsorteringen må stå** før Behandlet på sted og før Ledig fra
+    # Leverer — og før Avreist når innstillingen sier det (André, 12. sep.
+    # 2026). Ellers ender pasienter i statistikken uten sortering.
+    if (not oppdrag.grovsortering and services.kan_gaa_til(rad.status, overgang)
+            and verdier.grov_kreves_for(oppdrag, overgang, rad.status)):
+        return JsonResponse({'status': 'error', 'message': (
+            'Sett grovsortering (Rød, Gul eller Grønn) først.')}, status=400)
 
     data, feil = _stempling_kropp(request)
     if feil:

@@ -330,7 +330,7 @@ class EnhetEscapingOppforselTests(SimpleTestCase):
     HARNESS = (
         (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue', 'trustedHtml', '_escHtml',
                            'klokke')),
-        (OPPDRAG_ENHET_JS, ('renderAktivt', '_antallRad', '_udefinertVarsel', 'renderVentende', 'skalPipe', 'ventetSekunder', '_lydTerskler', 'lydTerskler', 'renderAvsluttet',
+        (OPPDRAG_ENHET_JS, ('renderAktivt', '_antallRad', '_udefinertVarsel', 'renderVentende', 'skalPipe', 'ventetSekunder', '_lydTerskler', 'lydTerskler', 'bilinnstillinger', 'renderAvsluttet',
                             'tidslinjeEnhetHtml', 'hastegradKlasse',
                             '_stedvalg', '_grovsorteringsrad', '_kanGrovsortere', '_varsledeRad', '_problemMedAntall', '_medAntall')),
     )

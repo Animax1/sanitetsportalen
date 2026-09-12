@@ -291,12 +291,18 @@ sletting for global admin med `{"confirm": true}`, PROTECT/i bruk gir 409. **Rek
 settes med hele lista** (`PUT …/rekkefolge/`), ikke «opp» per rad. Klienten har ett vindu
 med tre faner («Valglister», `renderVerdiadmin`) og bygger `OPPDRAG_PROBLEMSTILLINGER_FOR`
 selv fra radene (`_byggProblemkart`), så nedtrekkene følger med uten sidelasting.
-**Lydvarselet (12. sep. 2026):** tersklene per hastegrad er tabellen `Lydvarsel`
-(`verdier.lydvarsel()`, seedet av `0024`), og «pip ved nytt oppdrag» er `AppSetting`
-`oppdrag_lyd_nytt`. `views_verdier.lydvarsel_view`: GET for `les`, PUT for **global
-admin** (fanen «Lydvarsel» i «Valglister» vises bare for admin). Sentralbordet leser samme
-tabell for **uthevingen** av ventende oppdrag forbi første terskel (`venterForbiTerskel()`,
-`.oppdrag-rad-venter-lenge`).
+**Bilinnstillingene (12. sep. 2026):** `verdier.bilinnstillinger()` samler lydvarselets
+terskler per hastegrad (tabellen `Lydvarsel`, seedet av `0024`), og tre brytere i
+`AppSetting`: `oppdrag_lyd_aktiv` (lyden av for alle biler), `oppdrag_lyd_nytt` (pip ved
+nytt oppdrag) og `oppdrag_krev_grov_avreist`. `views_verdier.bilinnstillinger_view`: GET for
+`les`, PUT for **global admin** (fanen «Bilen» i «Valglister» vises bare for admin). I bilen
+er lyden **på som standard**; dempeikonet husker per enhet (`erDempet`), og
+`lydSkalSpille()` er det ene stedet som slår sammen klar/admin/dempet. **Grovsortering
+kreves** (`verdier.grov_kreves_for`, speilet i `grovKrevesFor` i JS) før Behandlet på sted
+og før Ledig fra Leverer, før Avreist når bryteren sier det, aldri på Drift — sjekket i
+`stempling_view` etter at overgangen er lovlig, så 409 fortsatt vinner. Sentralbordet leser
+tersklene for **uthevingen** av ventende oppdrag forbi første terskel
+(`venterForbiTerskel()`, `.oppdrag-rad-venter-lenge`).
 «Udefinert» kan opprettes, men **`sett_status` avviser `Ledig` så lenge den står**
 (`ProblemstillingUdefinert`, 400 med melding til bilen, og kortet i bilen varsler før
 hun trykker); den automatiske lukkingen slipper. **`Oppdrag.antall` settes av bilen**, ikke

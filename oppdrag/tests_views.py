@@ -527,6 +527,7 @@ class StemplingTests(StemplingBasis):
 
     def test_hele_kjeden_kan_stemples(self):
         o = self._oppdrag()
+        Oppdrag.objects.filter(pk=o.pk).update(grovsortering='gul')   # kreves før Ledig fra Leverer
         for overgang in ('rykker_ut', 'fremme', 'avreist', 'leverer', 'ledig'):
             with self.subTest(overgang=overgang):
                 resp = self._stemple(o, overgang)
@@ -540,6 +541,7 @@ class StemplingTests(StemplingBasis):
         ledig før du har levert.» I Rykker ut heter utgangen Avbryt, i Fremme
         Behandlet på sted. Sentralen fører fortsatt Ledig fra alt."""
         o = self._oppdrag()
+        Oppdrag.objects.filter(pk=o.pk).update(grovsortering='gul')
         self._stemple(o, 'rykker_ut')
         for status in ('rykker_ut', 'fremme', 'avreist'):
             with self.subTest(fra=status):
@@ -564,6 +566,7 @@ class StemplingTests(StemplingBasis):
         self._stemple(o, 'rykker_ut')
         self.assertEqual(self._stemple(o, 'behandlet').status_code, 409, 'ikke fra Rykker ut')
         self._stemple(o, 'fremme')
+        Oppdrag.objects.filter(pk=o.pk).update(grovsortering='gul')
         resp = self._stemple(o, 'behandlet')
         self.assertEqual(resp.status_code, 200, resp.content)
         rad = resp.json()['data']['oppdrag']
@@ -1078,6 +1081,7 @@ class AutoHistorikkTests(StemplingBasis):
         self.assertIn(o.pk, self._aktiv_liste())
 
         self._stemple(o, 'fremme')
+        Oppdrag.objects.filter(pk=o.pk).update(grovsortering='gul')
         self._stemple(o, 'behandlet')
         self._stemple(o, 'ledig')
         o.refresh_from_db()
@@ -1105,6 +1109,7 @@ class AutoHistorikkTests(StemplingBasis):
         o = self._oppdrag()
         self._stemple(o, 'rykker_ut')
         self._stemple(o, 'fremme')
+        Oppdrag.objects.filter(pk=o.pk).update(grovsortering='gul')
         self._stemple(o, 'behandlet')
         self._stemple(o, 'ledig')
         o.refresh_from_db()
@@ -1120,6 +1125,7 @@ class AutoHistorikkTests(StemplingBasis):
         o = self._oppdrag()
         self._stemple(o, 'rykker_ut')
         self._stemple(o, 'fremme')
+        Oppdrag.objects.filter(pk=o.pk).update(grovsortering='gul')
         self._stemple(o, 'behandlet')
         self._stemple(o, 'ledig')
         historikk = self.sentral.get('/oppdrag/api/historikk/').json()['data']
@@ -1134,6 +1140,7 @@ class AutoHistorikkTests(StemplingBasis):
         o = self._oppdrag()
         self._stemple(o, 'rykker_ut')
         self._stemple(o, 'fremme')
+        Oppdrag.objects.filter(pk=o.pk).update(grovsortering='gul')
         self._stemple(o, 'behandlet')
         self._stemple(o, 'ledig')
         self.sentral.delete(f'/oppdrag/api/oppdrag/{o.pk}/historikk/')
@@ -1155,6 +1162,7 @@ class AutoHistorikkTests(StemplingBasis):
         o = self._oppdrag()
         self._stemple(o, 'rykker_ut')
         self._stemple(o, 'fremme')
+        Oppdrag.objects.filter(pk=o.pk).update(grovsortering='gul')
         self._stemple(o, 'behandlet')
         self._stemple(o, 'ledig')
 

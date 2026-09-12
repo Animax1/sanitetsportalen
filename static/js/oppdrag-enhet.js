@@ -532,11 +532,33 @@ let lydSistFor = {};
 let kjenteOppdrag = null;
 
 
-//: **Lydvarselet er alltid på** (André, 12. sep. 2026: «Det skal ikke være
-//: et alternativ»). Det som gjenstår er nettleserens regel: lyd får spille
-//: først etter et trykk, og `lydErKlar()` sier om det trykket har kommet.
+//: **Lyden er på som standard** (André, 12. sep. 2026). Tre ting kan gjøre
+//: den stille: nettleseren har ikke fått trykket sitt ennå (`lydErKlar`),
+//: admin har slått lydvarselet av for alle biler (`bilinnstillinger`), eller
+//: føreren har dempet denne enheten med ikonet (`erDempet`, husket lokalt).
 function lydErKlar() {
   return !!(lydKontekst && lydKontekst.state === 'running');
+}
+
+
+function bilinnstillinger() {
+  return globalThis.OPPDRAG_BILINNSTILLINGER || {};
+}
+
+
+//: Lagringsnøkkelen som funksjon — se `koNokkel()`.
+function dempNokkel() {
+  return 'oppdrag_lyd_demp_v1';
+}
+
+
+function erDempet() {
+  try { return globalThis.localStorage.getItem(dempNokkel()) === '1'; } catch (e) { return false; }
+}
+
+
+function lydSkalSpille() {
+  return lydErKlar() && bilinnstillinger().lyd_aktiv !== false && !erDempet();
 }
 
 
@@ -548,7 +570,7 @@ function lydErKlar() {
 //: Grønn etter 15 minutt deretter hvert 1 minutt.» Som funksjon, ikke
 //: konstant — se `koNokkel()`.
 function lydTerskler() {
-  const fra = globalThis.OPPDRAG_LYDVARSEL;
+  const fra = bilinnstillinger().terskler;
   if (fra && typeof fra === 'object' && Object.keys(fra).length) return fra;
   return { Akutt: [60, 10], Haster: [300, 60], Vanlig: [900, 60], Drift: [900, 60] };
 }
@@ -651,7 +673,7 @@ function lydTikk(naaMs) {
   const naa = naaMs || Date.now();
   const venter = new Set((mineOppdrag || []).filter((o) => o.status === 'venter').map((o) => o.id));
   Object.keys(lydSistFor).forEach((id) => { if (!venter.has(Number(id))) delete lydSistFor[id]; });
-  if (!lydErKlar()) return [];
+  if (!lydSkalSpille()) return [];
   const ider = ventendeSomSkalPipe(mineOppdrag, naa, lydSistFor);
   if (!ider.length) return [];
   ider.forEach((id) => { lydSistFor[id] = naa; });
@@ -662,15 +684,63 @@ function lydTikk(naaMs) {
 
 function _lydHintTegn() {
   // Linja «trykk for å slå på lyden» står til nettleseren har sluppet lyden
-  // gjennom; ikonet i toppen viser det samme.
+  // gjennom. Dempeikonet viser om lyden faktisk vil spille: dempet av
+  // føreren, slått av av admin, eller klar.
   const hint = document.getElementById('lyd-hint');
   if (hint) hint.classList.toggle('d-none', lydErKlar());
-  const status = document.getElementById('lyd-status');
-  if (status) {
-    status.innerHTML = lydErKlar()
-      ? '<i class="bi bi-volume-up-fill"></i>'
-      : '<i class="bi bi-volume-mute"></i>';
+  const knapp = document.getElementById('lyd-demp');
+  if (!knapp) return;
+  const dempet = erDempet();
+  const adminAv = bilinnstillinger().lyd_aktiv === false;
+  knapp.setAttribute('aria-pressed', dempet ? 'true' : 'false');
+  knapp.classList.toggle('lyd-demp-paa', dempet);
+  knapp.disabled = adminAv;
+  knapp.title = adminAv ? 'Lydvarselet er slått av av admin'
+    : (dempet ? 'Slå på lydvarsel' : 'Demp lydvarsel');
+  knapp.setAttribute('aria-label', knapp.title);
+  knapp.innerHTML = (dempet || adminAv)
+    ? '<i class="bi bi-volume-mute"></i>'
+    : '<i class="bi bi-volume-up-fill"></i>';
+}
+
+
+async function vekslDemp() {
+  // Per enhet, husket lokalt. Å slå på igjen vekker også lyden om trykket
+  // er det første på siden.
+  const dempet = !erDempet();
+  try { globalThis.localStorage.setItem(dempNokkel(), dempet ? '1' : '0'); } catch (e) { /* uten lagring: gjelder til siden lastes */ }
+  if (!dempet && await _lydKlar()) {
+    _tone(lydKontekst, lydKontekst.currentTime, 0.15, 660);
   }
+  _lydHintTegn();
+}
+
+
+function _stilleLydbaerer() {
+  // **iOS med lydbryteren på stille.** Web Audio regnes som «ambient» og
+  // dempes av bryteren — men et `<audio>`-element som spiller, flytter
+  // lydøkta til «playback», og da går Web Audio gjennom likevel. En stum,
+  // loopende WAV på ett tiendedels sekund holder økta åpen. Fra iOS 17 sier
+  // vi det også rett ut med `navigator.audioSession`. Ingen garanti — det er
+  // en omvei rundt en regel Apple eier — men det er den omveien som finnes.
+  try {
+    if (globalThis.navigator?.audioSession) globalThis.navigator.audioSession.type = 'playback';
+  } catch (e) { /* ikke støttet */ }
+  if (globalThis._lydbaerer || typeof Audio === 'undefined') return;
+  const rate = 8000; const n = rate / 10;
+  const buf = new ArrayBuffer(44 + n);
+  const dv = new DataView(buf);
+  const skriv = (pos, str) => { for (let i = 0; i < str.length; i++) dv.setUint8(pos + i, str.charCodeAt(i)); };
+  skriv(0, 'RIFF'); dv.setUint32(4, 36 + n, true); skriv(8, 'WAVE'); skriv(12, 'fmt ');
+  dv.setUint32(16, 16, true); dv.setUint16(20, 1, true); dv.setUint16(22, 1, true);
+  dv.setUint32(24, rate, true); dv.setUint32(28, rate, true); dv.setUint16(32, 1, true);
+  dv.setUint16(34, 8, true); skriv(36, 'data'); dv.setUint32(40, n, true);
+  for (let i = 0; i < n; i++) dv.setUint8(44 + i, 128);
+  const blob = new Blob([buf], { type: 'audio/wav' });
+  const a = new Audio(URL.createObjectURL(blob));
+  a.loop = true; a.setAttribute('playsinline', ''); a.volume = 0.01;
+  a.play().catch(() => {});
+  globalThis._lydbaerer = a;
 }
 
 
@@ -683,18 +753,39 @@ async function _lydKlar() {
   if (lydKontekst.state !== 'running') {
     try { await lydKontekst.resume(); } catch (e) { /* ikke lov ennå */ }
   }
+  if (lydErKlar()) _stilleLydbaerer();
   return lydErKlar();
 }
 
 
-async function lastLydvarsel() {
-  // Tersklene admin setter skal nå bilen uten at siden lastes på nytt.
+async function lastBilinnstillinger() {
+  // Det admin setter skal nå bilen uten at siden lastes på nytt.
   let res;
-  try { res = await apiFetch('/oppdrag/api/lydvarsel/'); } catch (e) { return; }
+  try { res = await apiFetch('/oppdrag/api/bilinnstillinger/'); } catch (e) { return; }
   if (!res.ok) return;
   const d = (await res.json()).data || {};
-  if (d.terskler) globalThis.OPPDRAG_LYDVARSEL = d.terskler;
-  if (typeof d.nytt_oppdrag === 'boolean') globalThis.OPPDRAG_LYD_NYTT = d.nytt_oppdrag;
+  if (d.terskler) globalThis.OPPDRAG_BILINNSTILLINGER = d;
+  _lydHintTegn();
+}
+
+
+function grovKrevesFor(o, overgang) {
+  // Speiler `verdier.grov_kreves_for` på serveren: alltid før Behandlet på
+  // sted og før Ledig fra Leverer; før Avreist når admin har satt det.
+  // Aldri på Drift. Sjekkes før trykket går i køen, så bilen får beskjeden
+  // med en gang i stedet for en avvist rad.
+  if (o.hastegrad === 'Drift') return false;
+  if (overgang === 'behandlet') return true;
+  if (overgang === 'ledig' && o.status === 'leverer') return true;
+  if (overgang === 'avreist') return bilinnstillinger().krev_grov_avreist === true;
+  return false;
+}
+
+
+function _grovMangler(o, overgang) {
+  if (o.grovsortering || !grovKrevesFor(o, overgang)) return false;
+  visFeil('Sett grovsortering (Rød, Gul eller Grønn) først.');
+  return true;
 }
 
 
@@ -804,6 +895,7 @@ async function stempleNeste(id) {
   // videre i kjeden også når forrige trykk ligger usendt.
   const o = mineOppdrag.find((x) => x.id === id);
   if (!o || !o.neste_overgang) return;
+  if (_grovMangler(o, o.neste_overgang)) return;
   if (o.neste_overgang === 'avreist') {
     // «Avreist» spør hvor. Knappen åpner valget i stedet for å stemple;
     // stempelet settes av `stempleAvreistTil` med stedet.
@@ -880,6 +972,7 @@ async function stempleAlternativ(id) {
   // til sentralen, og et feiltrykk i en bil i fart skal ikke gjøre det.
   const o = mineOppdrag.find((x) => x.id === id);
   if (!o || !o.alternativ_overgang) return;
+  if (_grovMangler(o, o.alternativ_overgang)) return;
   if (o.alternativ_overgang === 'avbryt'
       && !confirm('Avbryte oppdraget? Enheten meldes ledig, og oppdraget går tilbake til sentralen som ventende.')) {
     return;
@@ -908,7 +1001,7 @@ async function lastMine() {
   // Nytt oppdrag i lista piper én gang (12. sep. 2026), om admin ikke har
   // slått det av. Ventevarselet tar over fra første terskel.
   const nye = nyeOppdrag(mineOppdrag.filter((o) => o.status === 'venter'));
-  if (nye.length && globalThis.OPPDRAG_LYD_NYTT !== false && lydErKlar()) pipNytt();
+  if (nye.length && bilinnstillinger().nytt_oppdrag !== false && lydSkalSpille()) pipNytt();
   renderAlt();
 }
 
@@ -934,7 +1027,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   const vekk = async () => { if (await _lydKlar()) { _lydHintTegn(); document.removeEventListener('pointerdown', vekk); } };
   document.addEventListener('pointerdown', vekk);
   setInterval(() => lydTikk(), 5000);
-  setInterval(lastLydvarsel, 5 * 60 * 1000);
+  setInterval(lastBilinnstillinger, 5 * 60 * 1000);
 
   // Køen kan ha overlevd at fanen ble lukket midt i en vakt.
   if (koLes().length) await synk();

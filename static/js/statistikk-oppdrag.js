@@ -84,7 +84,7 @@ function mkOppdragTiderTabell(sum) {
     ['Til utrykning', sum.ventetid],
     ['Utrykning → fremme', sum.utrykningstid],
     ['Responstid (til fremme)', sum.responstid],
-    ['På stedet', sum.tid_pa_stedet],
+    ['Behandlet på stedet', sum.tid_pa_stedet],
     ['Hele oppdraget', sum.oppdragstid],
   ];
   const rader = ledd.map(([navn, sd]) => _sdRad(navn, sd));

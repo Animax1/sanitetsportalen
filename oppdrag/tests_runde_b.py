@@ -144,6 +144,7 @@ class UdefinertSperrerLedigTests(StemplingBasis):
         o = self._udefinert()
         self.assertEqual(self._stemple(o, 'rykker_ut').status_code, 200)
         self.assertEqual(self._stemple(o, 'fremme').status_code, 200)
+        Oppdrag.objects.filter(pk=o.pk).update(grovsortering='gul')
         self.assertEqual(self._stemple(o, 'behandlet').status_code, 200)
         res = self._stemple(o, 'ledig')
         self.assertEqual(res.status_code, 400, res.content)

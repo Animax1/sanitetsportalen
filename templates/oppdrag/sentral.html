@@ -163,7 +163,7 @@
   <div class="modal-dialog modal-lg">
     <div class="modal-content">
       <div class="modal-header">
-        <h5 class="modal-title">Valglister <span class="enhet-meta fw-normal">· lokasjoner, enhetstyper og problemstillinger</span></h5>
+        <h5 class="modal-title">Valglister <span class="enhet-meta fw-normal">· lokasjoner, enhetstyper, problemstillinger og bilen</span></h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Lukk"></button>
       </div>
       <div class="modal-body">
@@ -175,9 +175,9 @@
           <li class="nav-item"><button type="button" class="nav-link" data-verdifane="problemstillinger"
                   data-action="velgVerdifane" data-arg="problemstillinger">Problemstillinger</button></li>
           {% if er_global_admin %}
-          {# Lydvarselets terskler (12. sep. 2026) er global admin — de gjelder alle biler. #}
-          <li class="nav-item"><button type="button" class="nav-link" data-verdifane="lydvarsel"
-                  data-action="velgVerdifane" data-arg="lydvarsel">Lydvarsel</button></li>
+          {# Bilinnstillingene (12. sep. 2026) er global admin — de gjelder alle biler. #}
+          <li class="nav-item"><button type="button" class="nav-link" data-verdifane="bilinnstillinger"
+                  data-action="velgVerdifane" data-arg="bilinnstillinger">Bilen</button></li>
           {% endif %}
         </ul>
         <div class="input-group mb-3" id="ny-verdi-rad">

@@ -18,7 +18,8 @@ from patients.js_test_utils import (
 from . import verdier
 from .models import Lydvarsel
 from .tests_runde_d import _konst
-from .tests_views import OppdragBasis, _bruker, _klient
+from .models import Oppdrag
+from .tests_views import OppdragBasis, StemplingBasis, _bruker, _klient
 
 
 def _json(klient, metode, url, data=None):
@@ -38,37 +39,80 @@ class LydvarselApiTests(OppdragBasis):
         self.assertEqual(verdier.lydvarsel(), {
             'Akutt': [60, 10], 'Haster': [300, 60], 'Vanlig': [900, 60], 'Drift': [900, 60]})
         self.assertTrue(verdier.lyd_ved_nytt_oppdrag())
-        d = self.leser.get('/oppdrag/api/lydvarsel/').json()['data']
+        d = self.leser.get('/oppdrag/api/bilinnstillinger/').json()['data']
         self.assertEqual(d['terskler']['Akutt'], [60, 10])
         self.assertTrue(d['nytt_oppdrag'])
+        self.assertTrue(d['lyd_aktiv'])
+        self.assertFalse(d['krev_grov_avreist'])
 
     def test_bare_admin_endrer(self):
-        kropp = {'terskler': {'Akutt': [30, 5]}, 'nytt_oppdrag': False}
-        self.assertEqual(_json(self.leder, 'put', '/oppdrag/api/lydvarsel/', kropp).status_code, 403)
-        res = _json(self.admin, 'put', '/oppdrag/api/lydvarsel/', kropp)
+        kropp = {'terskler': {'Akutt': [30, 5]}, 'nytt_oppdrag': False, 'lyd_aktiv': False, 'krev_grov_avreist': True}
+        self.assertEqual(_json(self.leder, 'put', '/oppdrag/api/bilinnstillinger/', kropp).status_code, 403)
+        res = _json(self.admin, 'put', '/oppdrag/api/bilinnstillinger/', kropp)
         self.assertEqual(res.status_code, 200, res.content)
         self.assertEqual(Lydvarsel.objects.get(hastegrad='Akutt').gjenta_sekunder, 5)
         self.assertEqual(verdier.lydvarsel()['Haster'], [300, 60], 'de andre står')
         self.assertFalse(verdier.lyd_ved_nytt_oppdrag())
+        self.assertFalse(verdier.lyd_aktiv())
+        self.assertTrue(verdier.krev_grov_for_avreist())
 
     def test_ugyldige_tall_avvises(self):
         for kropp in ({'terskler': {'Tull': [1, 5]}}, {'terskler': {'Akutt': [1]}},
                       {'terskler': {'Akutt': [10, 1]}}, {'terskler': 'x'}):
             with self.subTest(kropp=kropp):
-                self.assertEqual(_json(self.admin, 'put', '/oppdrag/api/lydvarsel/', kropp).status_code, 400)
+                self.assertEqual(_json(self.admin, 'put', '/oppdrag/api/bilinnstillinger/', kropp).status_code, 400)
 
     def test_sidene_baerer_tersklene(self):
         Lydvarsel.objects.filter(hastegrad='Akutt').update(forste_sekunder=45)
         res = self.leder.get('/oppdrag/')
         self.assertContains(res, 'OPPDRAG_LYDVARSEL')
         self.assertContains(res, '"Akutt": [45, 10]')
-        self.assertNotContains(res, 'data-verdifane="lydvarsel"', msg_prefix='fanen er admin')
-        self.assertContains(self.admin.get('/oppdrag/'), 'data-verdifane="lydvarsel"')
+        self.assertNotContains(res, 'data-verdifane="bilinnstillinger"', msg_prefix='fanen er admin')
+        self.assertContains(self.admin.get('/oppdrag/'), 'data-verdifane="bilinnstillinger"')
+
+
+@override_settings(SECURE_SSL_REDIRECT=False, RATELIMIT_ENABLE=False)
+class GrovsorteringKrevesTests(StemplingBasis):
+    def _til(self, o, *statuser):
+        for st in statuser:
+            self.assertEqual(self._stemple(o, st).status_code, 200, st)
+
+    def test_behandlet_og_ledig_etter_leverer_krever_grovsortering(self):
+        o = self._oppdrag()
+        self._til(o, 'rykker_ut', 'fremme')
+        res = self._stemple(o, 'behandlet')
+        self.assertEqual(res.status_code, 400, res.content)
+        self.assertIn('grovsortering', res.json()['message'])
+        self.assertEqual(self.bil.post(f'/oppdrag/api/oppdrag/{o.pk}/grovsortering/gul/').status_code, 200)
+        self._til(o, 'behandlet', 'ledig')
+        o2 = self._oppdrag()
+        self._til(o2, 'rykker_ut', 'fremme', 'avreist', 'leverer')
+        self.assertEqual(self._stemple(o2, 'ledig').status_code, 400, 'ikke uten grovsortering')
+        self.bil.post(f'/oppdrag/api/oppdrag/{o2.pk}/grovsortering/gronn/')
+        self.assertEqual(self._stemple(o2, 'ledig').status_code, 200)
+
+    def test_avreist_krever_bare_naar_admin_sier_det(self):
+        from patients.models import AppSetting
+        o = self._oppdrag()
+        self._til(o, 'rykker_ut', 'fremme', 'avreist')
+        AppSetting.set(verdier.KREV_GROV_AVREIST_NOKKEL, '1')
+        o2 = self._oppdrag()
+        self._til(o2, 'rykker_ut', 'fremme')
+        self.assertEqual(self._stemple(o2, 'avreist').status_code, 400)
+
+    def test_drift_krever_aldri(self):
+        o = self._oppdrag()
+        Oppdrag.objects.filter(pk=o.pk).update(hastegrad='Drift', problemstilling='Utstyr')
+        self._til(o, 'rykker_ut', 'fremme', 'behandlet', 'ledig')
 
 
 class LydAlltidPaaJsTests(SimpleTestCase):
+    LAGER = ("globalThis.localStorage = (() => { const m = {}; return {"
+             "getItem: (k) => (k in m ? m[k] : null), setItem: (k, v) => { m[k] = String(v); },"
+             "removeItem: (k) => { delete m[k]; } }; })();\n")
     HARNESS = (
-        (OPPDRAG_ENHET_JS, ('lydTerskler', '_lydTerskler', 'lydErKlar', 'nyeOppdrag', 'pipNytt', '_tone')),
+        (OPPDRAG_ENHET_JS, ('lydTerskler', '_lydTerskler', 'lydErKlar', 'nyeOppdrag', 'pipNytt', '_tone',
+                            'bilinnstillinger', 'erDempet', 'dempNokkel', 'lydSkalSpille', 'grovKrevesFor')),
     )
 
     def setUp(self):
@@ -80,7 +124,7 @@ class LydAlltidPaaJsTests(SimpleTestCase):
     def test_tersklene_kommer_fra_siden_med_fall_tilbake(self):
         ut = run_node(self.harness, """
             console.log(JSON.stringify(_lydTerskler('Akutt')));
-            globalThis.OPPDRAG_LYDVARSEL = { Akutt: [30, 5], Haster: [120, 30], Vanlig: [600, 60], Drift: [600, 60] };
+            globalThis.OPPDRAG_BILINNSTILLINGER = { terskler: { Akutt: [30, 5], Haster: [120, 30], Vanlig: [600, 60], Drift: [600, 60] } };
             console.log(JSON.stringify(_lydTerskler('Akutt')));
             console.log(JSON.stringify(_lydTerskler('Ukjent')));
         """)
@@ -106,6 +150,31 @@ class LydAlltidPaaJsTests(SimpleTestCase):
             globalThis.lydKontekst = { state: 'running' }; console.log(lydErKlar());
         """)
         self.assertEqual(ut.strip().splitlines()[:3], ['false', 'false', 'true'])
+
+    def test_paa_som_standard_dempes_lokalt_og_slaas_av_av_admin(self):
+        ut = run_node(self.harness, self.LAGER + """
+            globalThis.lydKontekst = { state: 'running' };
+            console.log(lydSkalSpille());                                  // på som standard
+            localStorage.setItem(dempNokkel(), '1'); console.log(lydSkalSpille());
+            localStorage.setItem(dempNokkel(), '0'); console.log(lydSkalSpille());
+            globalThis.OPPDRAG_BILINNSTILLINGER = { lyd_aktiv: false }; console.log(lydSkalSpille());
+        """)
+        self.assertEqual(ut.strip().splitlines()[:4], ['true', 'false', 'true', 'false'])
+
+    def test_grovsortering_kreves_der_serveren_krever_den(self):
+        ut = run_node(self.harness, """
+            const o = (status, h) => ({ status, hastegrad: h || 'Akutt' });
+            globalThis.OPPDRAG_BILINNSTILLINGER = { krev_grov_avreist: false };
+            console.log(JSON.stringify([
+              grovKrevesFor(o('fremme'), 'behandlet'), grovKrevesFor(o('leverer'), 'ledig'),
+              grovKrevesFor(o('fremme'), 'avreist'), grovKrevesFor(o('behandlet'), 'ledig'),
+              grovKrevesFor(o('fremme', 'Drift'), 'behandlet')]));
+            globalThis.OPPDRAG_BILINNSTILLINGER = { krev_grov_avreist: true };
+            console.log(JSON.stringify([grovKrevesFor(o('fremme'), 'avreist'), grovKrevesFor(o('fremme', 'Drift'), 'avreist')]));
+        """)
+        l = ut.strip().splitlines()
+        self.assertEqual(json.loads(l[0]), [True, True, False, False, False])
+        self.assertEqual(json.loads(l[1]), [True, False])
 
 
 class UthevingHosOperatorJsTests(SimpleTestCase):

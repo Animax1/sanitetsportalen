@@ -107,6 +107,54 @@ def lydvarsel() -> dict[str, list[int]]:
     return {h: rader.get(h, list(LYDVARSEL_STANDARD.get(h, (900, 60)))) for h in choices.HASTEGRAD}
 
 
-def lyd_ved_nytt_oppdrag() -> bool:
+LYD_AKTIV_NOKKEL = 'oppdrag_lyd_aktiv'
+KREV_GROV_AVREIST_NOKKEL = 'oppdrag_krev_grov_avreist'
+
+
+def _bryter(nokkel, standard='1') -> bool:
     from patients.models import AppSetting
-    return AppSetting.get(LYD_NYTT_NOKKEL, '1') == '1'
+    return AppSetting.get(nokkel, standard) == '1'
+
+
+def lyd_ved_nytt_oppdrag() -> bool:
+    return _bryter(LYD_NYTT_NOKKEL)
+
+
+def lyd_aktiv() -> bool:
+    """Lydvarselet i bilene, som helhet (André, 12. sep. 2026: «Må kunne slå
+    av lydvarsel»). Av betyr stille i alle biler, uansett terskler."""
+    return _bryter(LYD_AKTIV_NOKKEL)
+
+
+def krev_grov_for_avreist() -> bool:
+    """Om bilen må ha satt grovsortering før Avreist (André, 12. sep. 2026:
+    «La det være en innstilling»). Før Behandlet på sted og før Ledig fra
+    Leverer kreves den alltid — se `grov_kreves_for`."""
+    return _bryter(KREV_GROV_AVREIST_NOKKEL, '0')
+
+
+def bilinnstillinger() -> dict:
+    return {
+        'terskler': lydvarsel(),
+        'nytt_oppdrag': lyd_ved_nytt_oppdrag(),
+        'lyd_aktiv': lyd_aktiv(),
+        'krev_grov_avreist': krev_grov_for_avreist(),
+    }
+
+
+def grov_kreves_for(oppdrag, overgang: str, fra_status: str) -> bool:
+    """Må grovsorteringen stå før bilen får gjøre denne overgangen?
+
+    Alltid før «Behandlet på sted» og før Ledig fra Leverer (André, 12. sep.
+    2026: «Må kreve at grovsortering settes før ledig ved levering som
+    minimum»); før Avreist bare når innstillingen sier det. Aldri på Drift —
+    der er det ingen pasient å sortere."""
+    if oppdrag.hastegrad == choices.DRIFT:
+        return False
+    if overgang == choices.BEHANDLET:
+        return True
+    if overgang == choices.LEDIG and fra_status == choices.LEVERER:
+        return True
+    if overgang == choices.AVREIST:
+        return krev_grov_for_avreist()
+    return False

@@ -271,23 +271,23 @@ problemstilling_detalj_view = _detalj_view('problemstillinger')
 problemstillinger_rekkefolge_view = _rekkefolge_view('problemstillinger')
 
 
-# ── Lydvarselet (12. sep. 2026) ───────────────────────────────────────────────
+# ── Bilinnstillingene (12. sep. 2026) ─────────────────────────────────────────
 
 @never_cache
 @modul_kreves('oppdrag', 'les', svar='json')
 @require_http_methods(['GET', 'PUT'])
-def lydvarsel_view(request):
-    """Tersklene per hastegrad og om nytt oppdrag skal pipe.
+def bilinnstillinger_view(request):
+    """Lydvarselets terskler per hastegrad, om lyden er på i det hele tatt,
+    om nytt oppdrag skal pipe, og om grovsortering kreves før Avreist.
 
     GET for alle med `les` — bilen henter dem hvert femte minutt, så en
     endring når fram uten at siden lastes på nytt. PUT er **global admin**
     (André: «Admin kan justere»): tallene gjelder alle biler på alle vakter.
     """
     if request.method == 'GET':
-        return JsonResponse({'status': 'ok', 'data': {
-            'terskler': verdier.lydvarsel(), 'nytt_oppdrag': verdier.lyd_ved_nytt_oppdrag()}})
+        return JsonResponse({'status': 'ok', 'data': verdier.bilinnstillinger()})
     if not er_global_admin(request.user):
-        return _feil('Lydvarslene settes av global admin.', 403)
+        return _feil('Bilinnstillingene settes av global admin.', 403)
     data = json_body(request)
     terskler = data.get('terskler') or {}
     if not isinstance(terskler, dict):
@@ -306,8 +306,10 @@ def lydvarsel_view(request):
     for hastegrad, (forste, gjenta) in nye.items():
         Lydvarsel.objects.update_or_create(
             hastegrad=hastegrad, defaults={'forste_sekunder': forste, 'gjenta_sekunder': gjenta})
-    if 'nytt_oppdrag' in data:
-        from patients.models import AppSetting
-        AppSetting.set(verdier.LYD_NYTT_NOKKEL, '1' if data['nytt_oppdrag'] else '0')
-    return JsonResponse({'status': 'ok', 'data': {
-        'terskler': verdier.lydvarsel(), 'nytt_oppdrag': verdier.lyd_ved_nytt_oppdrag()}})
+    from patients.models import AppSetting
+    for felt, nokkel in (('nytt_oppdrag', verdier.LYD_NYTT_NOKKEL),
+                         ('lyd_aktiv', verdier.LYD_AKTIV_NOKKEL),
+                         ('krev_grov_avreist', verdier.KREV_GROV_AVREIST_NOKKEL)):
+        if felt in data:
+            AppSetting.set(nokkel, '1' if data[felt] else '0')
+    return JsonResponse({'status': 'ok', 'data': verdier.bilinnstillinger()})

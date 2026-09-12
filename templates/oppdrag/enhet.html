@@ -28,14 +28,18 @@
     <h1 class="h5 mb-0"><i class="bi bi-truck-front me-2"></i>{{ enhet.navn }}</h1>
     <div class="d-flex align-items-center gap-2">
       <span id="enhet-oppdatert" class="enhet-meta"></span>
-      <span id="lyd-status" class="enhet-meta" title="Lydvarsel"><i class="bi bi-volume-up-fill"></i></span>
+      {# Lyden er på som standard; ikonet demper på denne enheten (André, #}
+      {# 12. sep. 2026: «en demp lyd ikon og at lyd er på som standard»). #}
+      <button type="button" class="btn btn-sm btn-outline-secondary lyd-demp" id="lyd-demp"
+              data-action="vekslDemp" aria-pressed="false" aria-label="Demp lydvarsel" title="Demp lydvarsel">
+        <i class="bi bi-volume-up-fill"></i>
+      </button>
     </div>
   </div>
-  {# Lydvarselet er alltid på (André, 12. sep. 2026: «Det skal ikke være et #}
-  {# alternativ»). Nettleseren krever likevel et trykk før lyd får spille — #}
-  {# linja står til det første trykket har vekket den. #}
-  <div id="lyd-hint" class="alert alert-warning enhet-usendt mb-2" role="status">
-    <i class="bi bi-volume-mute me-1"></i>Trykk hvor som helst på skjermen for å slå på lydvarslene.
+  {# Nettleseren krever et trykk før lyd får spille — linja står til det #}
+  {# første trykket på siden har vekket den, og forsvinner så. #}
+  <div id="lyd-hint" class="enhet-meta mb-2" role="status">
+    <i class="bi bi-hand-index me-1"></i>Trykk hvor som helst på skjermen for å slå på lydvarslene.
   </div>
 
   {# Feil skal synes fra førersetet — banneret er stort og blir stående til #}
@@ -76,8 +80,7 @@
   window.OPPDRAG_MED_ANTALL = {{ med_antall|safe }};
   window.OPPDRAG_ALTERNATIV = {{ alternativ|safe }};
   window.OPPDRAG_ALTERNATIV_NAVN = {{ alternativ_navn|safe }};
-  window.OPPDRAG_LYDVARSEL = {{ lydvarsel|safe }};
-  window.OPPDRAG_LYD_NYTT = {{ lyd_nytt|safe }};
+  window.OPPDRAG_BILINNSTILLINGER = {{ bilinnstillinger|safe }};
 </script>
 <script src="{% static 'js/portal-utils.js' %}"></script>
 <script src="{% static 'js/oppdrag-enhet.js' %}"></script>
