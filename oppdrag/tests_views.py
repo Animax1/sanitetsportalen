@@ -570,9 +570,20 @@ class StemplingTests(StemplingBasis):
         resp = self._stemple(o, 'behandlet')
         self.assertEqual(resp.status_code, 200, resp.content)
         rad = resp.json()['data']['oppdrag']
+        # Ett trykk: Behandlet og Ledig (André, 12. sep. 2026: «Når du trykker på
+        # behandlet på stedet så sendes det og automatisk ledig status»).
         self.assertEqual((rad['status'], rad['neste_overgang'], rad['alternativ_overgang']),
-                         ('behandlet', 'ledig', None))
-        self.assertEqual(self._stemple(o, 'ledig').status_code, 200)
+                         ('ledig', None, None))
+        o.refresh_from_db()
+        self.assertEqual(o.status, choices.LEDIG)
+        self.assertEqual(
+            list(Statusmelding.objects.filter(oppdrag=o)
+                 .order_by('tidspunkt', 'pk').values_list('status', flat=True)),
+            ['rykker_ut', 'fremme', 'behandlet', 'ledig'])
+        b, l = Statusmelding.objects.filter(oppdrag=o, status__in=['behandlet', 'ledig']).order_by('pk')
+        self.assertEqual(b.tidspunkt, l.tidspunkt, 'samme tidspunkt')
+        self.assertFalse(l.automatisk, 'målt, ikke avledet — statistikken teller den')
+        self.assertIn(self._stemple(o, 'ledig').status_code, (400, 409), 'raden er alt Ledig')
 
     def test_avbryt_i_rykker_ut_sender_oppdraget_tilbake(self):
         o = self._oppdrag()
@@ -1082,8 +1093,7 @@ class AutoHistorikkTests(StemplingBasis):
 
         self._stemple(o, 'fremme')
         Oppdrag.objects.filter(pk=o.pk).update(grovsortering='gul')
-        self._stemple(o, 'behandlet')
-        self._stemple(o, 'ledig')
+        self._stemple(o, 'behandlet')   # lukker med Ledig i samme trykk
         o.refresh_from_db()
         self.assertIsNotNone(o.historikk_fra)
         self.assertNotIn(o.pk, self._aktiv_liste())
@@ -1110,8 +1120,7 @@ class AutoHistorikkTests(StemplingBasis):
         self._stemple(o, 'rykker_ut')
         self._stemple(o, 'fremme')
         Oppdrag.objects.filter(pk=o.pk).update(grovsortering='gul')
-        self._stemple(o, 'behandlet')
-        self._stemple(o, 'ledig')
+        self._stemple(o, 'behandlet')   # lukker med Ledig i samme trykk
         o.refresh_from_db()
         self.assertIsNone(o.historikk_av)
 
@@ -1126,8 +1135,7 @@ class AutoHistorikkTests(StemplingBasis):
         self._stemple(o, 'rykker_ut')
         self._stemple(o, 'fremme')
         Oppdrag.objects.filter(pk=o.pk).update(grovsortering='gul')
-        self._stemple(o, 'behandlet')
-        self._stemple(o, 'ledig')
+        self._stemple(o, 'behandlet')   # lukker med Ledig i samme trykk
         historikk = self.sentral.get('/oppdrag/api/historikk/').json()['data']
         self.assertEqual([r['id'] for r in historikk], [o.pk])
 
@@ -1141,8 +1149,7 @@ class AutoHistorikkTests(StemplingBasis):
         self._stemple(o, 'rykker_ut')
         self._stemple(o, 'fremme')
         Oppdrag.objects.filter(pk=o.pk).update(grovsortering='gul')
-        self._stemple(o, 'behandlet')
-        self._stemple(o, 'ledig')
+        self._stemple(o, 'behandlet')   # lukker med Ledig i samme trykk
         self.sentral.delete(f'/oppdrag/api/oppdrag/{o.pk}/historikk/')
 
         o.refresh_from_db()
@@ -1163,8 +1170,7 @@ class AutoHistorikkTests(StemplingBasis):
         self._stemple(o, 'rykker_ut')
         self._stemple(o, 'fremme')
         Oppdrag.objects.filter(pk=o.pk).update(grovsortering='gul')
-        self._stemple(o, 'behandlet')
-        self._stemple(o, 'ledig')
+        self._stemple(o, 'behandlet')   # lukker med Ledig i samme trykk
 
         mine = self.bil.get('/oppdrag/api/oppdrag/').json()['data']
         self.assertIn(o.pk, [r['id'] for r in mine])

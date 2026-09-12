@@ -495,6 +495,28 @@ def avbryt_oppdrag(oppdrag, *, bruker=None, tidspunkt=None,
     return melding
 
 
+@transaction.atomic
+def behandle_paa_sted(oppdrag, *, bruker=None, tidspunkt=None,
+                      forsinket: bool = False, enhet=None) -> Statusmelding:
+    """«Behandlet på sted så ledig» (André, 12. sep. 2026): ett trykk i bilen
+    skriver Behandlet og Ledig med samme tidspunkt. Ledig-meldingen er
+    **målt**, ikke avledet — det var da hun var ferdig — så den er ikke
+    `automatisk`, og statistikken teller oppdragstiden.
+
+    Udefinert sjekkes før noe skrives: ellers hadde raden stått i Behandlet
+    med en avvist Ledig bak seg."""
+    if oppdrag.problemstilling == choices.UDEFINERT:
+        raise ProblemstillingUdefinert(
+            'Problemstillingen står som «Udefinert». Meld problemstillingen til KO, '
+            'så setter sentralbordet den — først da kan enheten meldes ledig.')
+    naa = tidspunkt or timezone.now()
+    melding = sett_status(oppdrag, choices.BEHANDLET, bruker=bruker, tidspunkt=naa,
+                          forsinket=forsinket, enhet=enhet)
+    sett_status(oppdrag, choices.LEDIG, bruker=bruker, tidspunkt=naa,
+                forsinket=forsinket, enhet=enhet)
+    return melding
+
+
 def varsle_enhet(oppdrag, enhet, *, bruker=None) -> Oppdragsenhet:
     """Sett en enhet til på oppdraget — i `Venter`, sist i rekka.
 

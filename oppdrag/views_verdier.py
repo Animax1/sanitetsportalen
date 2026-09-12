@@ -306,6 +306,12 @@ def bilinnstillinger_view(request):
     for hastegrad, (forste, gjenta) in nye.items():
         Lydvarsel.objects.update_or_create(
             hastegrad=hastegrad, defaults={'forste_sekunder': forste, 'gjenta_sekunder': gjenta})
+    aktive = data.get('aktive')
+    if aktive is not None:
+        if not isinstance(aktive, dict) or any(h not in choices.HASTEGRAD for h in aktive):
+            return _feil('Send `aktive` som {hastegrad: true/false}.')
+        for hastegrad, paa in aktive.items():
+            Lydvarsel.objects.update_or_create(hastegrad=hastegrad, defaults={'aktiv': bool(paa)})
     from patients.models import AppSetting
     for felt, nokkel in (('nytt_oppdrag', verdier.LYD_NYTT_NOKKEL),
                          ('lyd_aktiv', verdier.LYD_AKTIV_NOKKEL),

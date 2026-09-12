@@ -182,6 +182,9 @@ class Lydvarsel(BaseTimeStampedModel):
         default=60, verbose_name='Første varsel etter (sekunder)')
     gjenta_sekunder = models.PositiveIntegerField(
         default=60, verbose_name='Gjenta hvert (sekunder)')
+    # Per hastegrad av/på (André, 12. sep. 2026). Rører ikke pipet ved nytt
+    # oppdrag — det er ikke per hastegrad.
+    aktiv = models.BooleanField(default=True, verbose_name='Aktiv')
 
     class Meta:
         verbose_name = 'Lydvarsel'

@@ -292,14 +292,16 @@ settes med hele lista** (`PUT …/rekkefolge/`), ikke «opp» per rad. Klienten 
 med tre faner («Valglister», `renderVerdiadmin`) og bygger `OPPDRAG_PROBLEMSTILLINGER_FOR`
 selv fra radene (`_byggProblemkart`), så nedtrekkene følger med uten sidelasting.
 **Bilinnstillingene (12. sep. 2026):** `verdier.bilinnstillinger()` samler lydvarselets
-terskler per hastegrad (tabellen `Lydvarsel`, seedet av `0024`), og tre brytere i
+terskler per hastegrad (tabellen `Lydvarsel`, seedet av `0024`; `Lydvarsel.aktiv` slår
+ventevarselet av per hastegrad, `0025`, uten å røre pipet ved nytt oppdrag), og tre brytere i
 `AppSetting`: `oppdrag_lyd_aktiv` (lyden av for alle biler), `oppdrag_lyd_nytt` (pip ved
 nytt oppdrag) og `oppdrag_krev_grov_avreist`. `views_verdier.bilinnstillinger_view`: GET for
 `les`, PUT for **global admin** (fanen «Bilen» i «Valglister» vises bare for admin). I bilen
 er lyden **på som standard**; dempeikonet husker per enhet (`erDempet`), og
 `lydSkalSpille()` er det ene stedet som slår sammen klar/admin/dempet. **Grovsortering
 kreves** (`verdier.grov_kreves_for`, speilet i `grovKrevesFor` i JS) før Behandlet på sted
-og før Ledig fra Leverer, før Avreist når bryteren sier det, aldri på Drift — sjekket i
+og før Ledig fra Leverer, før Avreist når bryteren sier det, aldri på Drift — og på Drift finnes verken
+grovsorteringsraden i bilen (`_kanGrovsortere`) eller merket hos operatøren (`_grovMerke`) — sjekket i
 `stempling_view` etter at overgangen er lovlig, så 409 fortsatt vinner. Sentralbordet leser
 tersklene for **uthevingen** av ventende oppdrag forbi første terskel
 (`venterForbiTerskel()`, `.oppdrag-rad-venter-lenge`).
@@ -316,7 +318,9 @@ i enhetspanelet (`PUT api/enheter/<pk>/` med `type` = ID, `skriv_full`).
 **Bilens utganger (12. sep. 2026):** «Behandlet på sted» (`BEHANDLET`) er en sidegren
 fra Fremme rett til Ledig — `KJEDEN` er fortsatt lineær, `neste_i_kjeden` gir Ledig etter
 Leverer og Behandlet, og `alternativ_for()` gir den andre knappen (Avbryt i Rykker ut,
-Behandlet i Fremme). Bilen har **ingen egen Ledig-knapp**; stemplingsviewet avviser Ledig
+Behandlet i Fremme). **Ett trykk på Behandlet skriver Behandlet og Ledig** med samme
+tidspunkt (`services.behandle_paa_sted`, Ledig ikke `automatisk`; Udefinert sjekkes før noe
+skrives), og bilens projeksjon viser Ledig. Bilen har **ingen egen Ledig-knapp**; stemplingsviewet avviser Ledig
 utenom `BILEN_KAN_LEDIG_FRA` med 400, mens sentralens føring følger `OVERGANGER` som før.
 «Avbryt» (`choices.AVBRYT`) er en handling, ikke en status: den går i køen som en stempling
 (`status/avbryt/`), `services.avbryt_oppdrag` setter raden Ledig (uten Udefinert-sperre —

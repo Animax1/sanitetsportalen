@@ -145,14 +145,17 @@ class UdefinertSperrerLedigTests(StemplingBasis):
         self.assertEqual(self._stemple(o, 'rykker_ut').status_code, 200)
         self.assertEqual(self._stemple(o, 'fremme').status_code, 200)
         Oppdrag.objects.filter(pk=o.pk).update(grovsortering='gul')
-        self.assertEqual(self._stemple(o, 'behandlet').status_code, 200)
-        res = self._stemple(o, 'ledig')
+        # «Behandlet på sted» lukker med Ledig i samme trykk (12. sep. 2026),
+        # så Udefinert stopper alt før noe skrives — raden står i Fremme.
+        res = self._stemple(o, 'behandlet')
         self.assertEqual(res.status_code, 400, res.content)
         self.assertIn('Udefinert', res.json()['message'])
         o.refresh_from_db()
-        self.assertEqual(o.status, choices.BEHANDLET, 'ingenting ble skrevet')
+        self.assertEqual(o.status, choices.FREMME, 'ingenting ble skrevet')
         Oppdrag.objects.filter(pk=o.pk).update(problemstilling='Pustevansker')
-        self.assertEqual(self._stemple(o, 'ledig').status_code, 200)
+        self.assertEqual(self._stemple(o, 'behandlet').status_code, 200)
+        o.refresh_from_db()
+        self.assertEqual(o.status, choices.LEDIG)
 
     def test_sentralbordets_foering_stoppes_ogsaa(self):
         o = self._udefinert()

@@ -94,6 +94,8 @@ function _grovMerke(o) {
   // Bilens Rød/Gul/Grønn som merke; «—» når bilen ikke har vurdert ennå.
   // `grovsortering` er nøkkelen (rod/gul/gronn) og styrer fargen;
   // `grovsortering_navn` er teksten.
+  // Drift har ingen pasient å sortere (12. sep. 2026): ingen merke.
+  if (o.hastegrad === 'Drift') return '';
   if (!o.grovsortering) {
     return '<span class="grov-merke grov-tom" title="Bilen har ikke grovsortert ennå">Bil: —</span>';
   }
@@ -1370,9 +1372,11 @@ function _lydvarselSkjema(d) {
   // bryteren for pip ved nytt oppdrag. Lagres samlet med «Lagre».
   const rader = HASTEGRAD_REKKEFOLGE.map((h) => {
     const [forste, gjenta] = (d.terskler || {})[h] || [900, 60];
+    const paa = (d.aktive || {})[h] !== false;
     return `
       <tr>
-        <td>${escapeHtml(h)}</td>
+        <td><input type="checkbox" class="form-check-input me-1" id="lyd-aktiv-${escHtmlValue(h)}"${paa ? ' checked' : ''}
+                   aria-label="Lydvarsel på for ${escHtmlValue(h)}"> ${escapeHtml(h)}</td>
         <td><input type="number" class="form-control form-control-sm lyd-felt" min="0" max="86400" step="5"
                    id="lyd-forste-${escHtmlValue(h)}" value="${escHtmlValue(forste)}" aria-label="Første varsel"></td>
         <td><input type="number" class="form-control form-control-sm lyd-felt" min="5" max="86400" step="5"
@@ -1386,7 +1390,7 @@ function _lydvarselSkjema(d) {
       <label class="form-check-label" for="lyd-aktiv">Lydvarsel i bilene er på</label>
     </div>
     <table class="table table-sm mb-2 lyd-tabell">
-      <thead><tr><th>Hastegrad</th><th>Første varsel etter (s)</th><th>Gjenta hvert (s)</th></tr></thead>
+      <thead><tr><th>På · hastegrad</th><th>Første varsel etter (s)</th><th>Gjenta hvert (s)</th></tr></thead>
       <tbody>${rader}</tbody>
     </table>
     <div class="form-check mb-3">
@@ -1406,12 +1410,15 @@ function _lydvarselSkjema(d) {
 
 async function lagreLydvarsel() {
   const terskler = {};
+  const aktive = {};
   HASTEGRAD_REKKEFOLGE.forEach((h) => {
     terskler[h] = [Number(document.getElementById(`lyd-forste-${h}`)?.value),
                    Number(document.getElementById(`lyd-gjenta-${h}`)?.value)];
+    aktive[h] = !!document.getElementById(`lyd-aktiv-${h}`)?.checked;
   });
   const kropp = {
     terskler,
+    aktive,
     nytt_oppdrag: !!document.getElementById('lyd-nytt')?.checked,
     lyd_aktiv: !!document.getElementById('lyd-aktiv')?.checked,
     krev_grov_avreist: !!document.getElementById('krev-grov-avreist')?.checked,

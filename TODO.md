@@ -231,6 +231,10 @@ ingen av dem gir feilmelding — de er bare stille inaktive.
                         kan slå lyden av, iOS-omvei for stillebryteren, grovsortering
                         kreves før Behandlet/Ledig etter Leverer (+ valgfritt før Avreist),
                         «Behandlet på stedet» i statistikken, gruppeoverskrifter på iPhone.
+                  - [x] Prodtest G–I, del 2 (12. sep.): lydvarsel av/på per hastegrad
+                        (`0025`), «Behandlet på sted» sender Ledig i samme trykk, Drift
+                        uten grovsortering i bil og hos operatør, rullbare
+                        statistikktabeller på iPhone.
                   - [x] I: lyd alltid på (ingen av/på), lengre varsel, admin justerer terskler
                         per hastegrad og lyd ved nytt oppdrag (`0023`–`0024`), utheving hos
                         operatør.

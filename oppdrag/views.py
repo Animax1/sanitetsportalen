@@ -979,6 +979,11 @@ def stempling_view(request, pk, overgang, sted=None):
             melding = services.avbryt_oppdrag(
                 oppdrag, bruker=request.user, enhet=request.user.enhet,
                 tidspunkt=tidspunkt, forsinket=forsinket)
+        elif overgang == choices.BEHANDLET:
+            # Ett trykk: Behandlet og Ledig (André, 12. sep. 2026).
+            melding = services.behandle_paa_sted(
+                oppdrag, bruker=request.user, enhet=request.user.enhet,
+                tidspunkt=tidspunkt, forsinket=forsinket)
         else:
             melding = services.sett_status(
                 oppdrag, overgang, bruker=request.user, enhet=request.user.enhet,

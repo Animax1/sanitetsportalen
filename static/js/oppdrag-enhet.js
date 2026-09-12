@@ -138,8 +138,10 @@ function projiser(oppdragliste, ko) {
         if (!mine.length) return o;
 
         const siste = mine[mine.length - 1];
-        // «Avbryt» er en handling, ikke en status: raden ender i Ledig.
-        const status = siste.overgang === 'avbryt' ? 'ledig' : siste.overgang;
+        // «Avbryt» er en handling, ikke en status, og «Behandlet på sted»
+        // lukker med Ledig i samme trykk: raden ender i Ledig for begge.
+        const status = (siste.overgang === 'avbryt' || siste.overgang === 'behandlet')
+          ? 'ledig' : siste.overgang;
         const nesteEtter = kjede[status] || null;
         const alt = (globalThis.OPPDRAG_ALTERNATIV || {})[status] || null;
         const altNavn = (globalThis.OPPDRAG_ALTERNATIV_NAVN || {})[alt] || alt;
@@ -263,6 +265,8 @@ function _stedvalg() {
 
 
 function _kanGrovsortere(o) {
+  // Ingen pasient på Drift (André, 12. sep. 2026) — raden vises ikke der.
+  if (o.hastegrad === 'Drift') return false;
   return ['fremme', 'avreist', 'leverer'].includes(o.status);
 }
 
@@ -594,6 +598,9 @@ function skalPipe(o, naaMs, sist) {
   // svart, selv om serveren ikke vet det ennå), forbi første terskel, og
   // lenge nok siden forrige pip.
   if (o.status !== 'venter' || o.usendt) return false;
+  // Admin kan slå ventevarselet av per hastegrad (12. sep. 2026).
+  const aktive = bilinnstillinger().aktive || {};
+  if (aktive[o.hastegrad] === false) return false;
   const [forste, hver] = _lydTerskler(o.hastegrad);
   if (ventetSekunder(o, naaMs) < forste) return false;
   if (sist == null) return true;

@@ -116,6 +116,12 @@ def _bryter(nokkel, standard='1') -> bool:
     return AppSetting.get(nokkel, standard) == '1'
 
 
+def lydvarsel_aktive() -> dict[str, bool]:
+    """{hastegrad: True/False} — om ventevarselet er på for hastegraden."""
+    rader = {r.hastegrad: r.aktiv for r in Lydvarsel.objects.all()}
+    return {h: rader.get(h, True) for h in choices.HASTEGRAD}
+
+
 def lyd_ved_nytt_oppdrag() -> bool:
     return _bryter(LYD_NYTT_NOKKEL)
 
@@ -136,6 +142,7 @@ def krev_grov_for_avreist() -> bool:
 def bilinnstillinger() -> dict:
     return {
         'terskler': lydvarsel(),
+        'aktive': lydvarsel_aktive(),
         'nytt_oppdrag': lyd_ved_nytt_oppdrag(),
         'lyd_aktiv': lyd_aktiv(),
         'krev_grov_avreist': krev_grov_for_avreist(),

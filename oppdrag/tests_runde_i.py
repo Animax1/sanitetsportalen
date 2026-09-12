@@ -56,6 +56,21 @@ class LydvarselApiTests(OppdragBasis):
         self.assertFalse(verdier.lyd_aktiv())
         self.assertTrue(verdier.krev_grov_for_avreist())
 
+    def test_ventevarselet_kan_slaas_av_per_hastegrad(self):
+        """«En ting vi må kunne deaktivere lydvarsel per hastegrad (påvirker
+        ikke lyd ved nytt oppdrag i listen).» (André, 12. sep. 2026)"""
+        d = self.leser.get('/oppdrag/api/bilinnstillinger/').json()['data']
+        self.assertEqual(d['aktive'], {'Akutt': True, 'Haster': True, 'Vanlig': True, 'Drift': True})
+        res = _json(self.admin, 'put', '/oppdrag/api/bilinnstillinger/', {'aktive': {'Drift': False}})
+        self.assertEqual(res.status_code, 200, res.content)
+        self.assertEqual(verdier.lydvarsel_aktive(), {'Akutt': True, 'Haster': True, 'Vanlig': True, 'Drift': False})
+        self.assertEqual(verdier.lydvarsel()['Drift'], [900, 60], 'tersklene står')
+        self.assertTrue(verdier.lyd_ved_nytt_oppdrag(), 'pipet ved nytt oppdrag rører den ikke')
+        for kropp in ({'aktive': {'Tull': False}}, {'aktive': [True]}):
+            self.assertEqual(_json(self.admin, 'put', '/oppdrag/api/bilinnstillinger/', kropp).status_code, 400, kropp)
+        d = self.leser.get('/oppdrag/api/bilinnstillinger/').json()['data']
+        self.assertFalse(d['aktive']['Drift'])
+
     def test_ugyldige_tall_avvises(self):
         for kropp in ({'terskler': {'Tull': [1, 5]}}, {'terskler': {'Akutt': [1]}},
                       {'terskler': {'Akutt': [10, 1]}}, {'terskler': 'x'}):
@@ -84,7 +99,7 @@ class GrovsorteringKrevesTests(StemplingBasis):
         self.assertEqual(res.status_code, 400, res.content)
         self.assertIn('grovsortering', res.json()['message'])
         self.assertEqual(self.bil.post(f'/oppdrag/api/oppdrag/{o.pk}/grovsortering/gul/').status_code, 200)
-        self._til(o, 'behandlet', 'ledig')
+        self._til(o, 'behandlet')   # lukker med Ledig i samme trykk
         o2 = self._oppdrag()
         self._til(o2, 'rykker_ut', 'fremme', 'avreist', 'leverer')
         self.assertEqual(self._stemple(o2, 'ledig').status_code, 400, 'ikke uten grovsortering')
@@ -103,7 +118,10 @@ class GrovsorteringKrevesTests(StemplingBasis):
     def test_drift_krever_aldri(self):
         o = self._oppdrag()
         Oppdrag.objects.filter(pk=o.pk).update(hastegrad='Drift', problemstilling='Utstyr')
-        self._til(o, 'rykker_ut', 'fremme', 'behandlet', 'ledig')
+        self._til(o, 'rykker_ut', 'fremme', 'behandlet')
+        o.refresh_from_db()
+        self.assertEqual(o.status, 'ledig')
+        self.assertEqual(verdier.grov_kreves_for(o, 'ledig', 'leverer'), False)
 
 
 class LydAlltidPaaJsTests(SimpleTestCase):
@@ -112,7 +130,8 @@ class LydAlltidPaaJsTests(SimpleTestCase):
              "removeItem: (k) => { delete m[k]; } }; })();\n")
     HARNESS = (
         (OPPDRAG_ENHET_JS, ('lydTerskler', '_lydTerskler', 'lydErKlar', 'nyeOppdrag', 'pipNytt', '_tone',
-                            'bilinnstillinger', 'erDempet', 'dempNokkel', 'lydSkalSpille', 'grovKrevesFor')),
+                            'bilinnstillinger', 'erDempet', 'dempNokkel', 'lydSkalSpille', 'grovKrevesFor',
+                            'skalPipe', 'ventetSekunder')),
     )
 
     def setUp(self):
@@ -160,6 +179,19 @@ class LydAlltidPaaJsTests(SimpleTestCase):
             globalThis.OPPDRAG_BILINNSTILLINGER = { lyd_aktiv: false }; console.log(lydSkalSpille());
         """)
         self.assertEqual(ut.strip().splitlines()[:4], ['true', 'false', 'true', 'false'])
+
+    def test_ventevarselet_tier_for_hastegrader_admin_har_slaatt_av(self):
+        ut = run_node(self.harness, """
+            const t0 = Date.UTC(2026, 8, 12, 10, 0, 0);
+            const o = (h) => ({ status: 'venter', hastegrad: h, varslet_at: new Date(t0).toISOString() });
+            globalThis.OPPDRAG_BILINNSTILLINGER = { terskler: { Akutt: [60, 10], Drift: [60, 10] }, aktive: { Drift: false } };
+            console.log(JSON.stringify([skalPipe(o('Akutt'), t0 + 61000, null), skalPipe(o('Drift'), t0 + 61000, null)]));
+            globalThis.OPPDRAG_BILINNSTILLINGER = { terskler: { Akutt: [60, 10], Drift: [60, 10] } };
+            console.log(JSON.stringify([skalPipe(o('Drift'), t0 + 61000, null)]));
+        """)
+        l = ut.strip().splitlines()
+        self.assertEqual(json.loads(l[0]), [True, False])
+        self.assertEqual(json.loads(l[1]), [True], 'uten nøkkel: på')
 
     def test_grovsortering_kreves_der_serveren_krever_den(self):
         ut = run_node(self.harness, """
@@ -226,3 +258,11 @@ class LydvarselSkjemaJsTests(SimpleTestCase):
         self.assertIn('value="60"', ut)
         self.assertIn('id="lyd-nytt" checked', ut)
         self.assertIn('lagreLydvarsel', ut)
+        for h in ('Akutt', 'Haster', 'Vanlig', 'Drift'):
+            self.assertIn(f'id="lyd-aktiv-{h}" checked', ut, 'på når nøkkelen mangler')
+        ut = run_node(self.harness, """
+            console.log(_lydvarselSkjema({ terskler: {}, aktive: { Drift: false, Akutt: true } }));
+        """)
+        self.assertIn('id="lyd-aktiv-Akutt" checked', ut)
+        self.assertIn('id="lyd-aktiv-Drift"', ut)
+        self.assertNotIn('id="lyd-aktiv-Drift" checked', ut)

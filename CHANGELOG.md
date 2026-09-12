@@ -4,6 +4,21 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-12 — Prodtest runde G–I, del 2: lyd per hastegrad, ett trykk, Drift
+
+Én migrasjon, `oppdrag/0025` (`Lydvarsel.aktiv`). Deployes til staging først.
+
+- **Ventevarselet kan slås av per hastegrad** i fanen «Bilen»: en avkryssing
+  per rad. Rører ikke pipet ved nytt oppdrag, som ikke er per hastegrad.
+- **«Behandlet på sted» lukker med Ledig i samme trykk.** Serveren skriver
+  Behandlet og Ledig med samme tidspunkt (`services.behandle_paa_sted`);
+  Ledig-meldingen er målt, ikke automatisk, så statistikken teller
+  oppdragstiden. Udefinert stopper alt før noe skrives.
+- **Drift har ingen grovsortering:** raden i bilen og merket hos operatøren
+  er borte for Drift. Serveren krevde den aldri der.
+- Statistikk: tabellene ruller sidelengs på iPhone i stedet for å gå ut av
+  kortet.
+
 ## 2026-09-12 — Prodtest runde G–I: lyd, grovsortering, iPhone
 
 Ingen migrasjon. Deployes til staging først.
