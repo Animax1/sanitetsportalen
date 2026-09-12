@@ -60,6 +60,7 @@ _STATUSFELT = {
     choices.FREMME: 'fremme_at',
     choices.AVREIST: 'avreist_at',
     choices.LEVERER: 'leverer_at',
+    choices.BEHANDLET: 'behandlet_at',
     choices.LEDIG: 'ledig_at',
 }
 
@@ -237,7 +238,9 @@ def _stats_fra_rader(rader, *, enheter_pa_vakt=None):
         opprettet = rad['opprettet']
         rykker_ut = tider.get(choices.RYKKER_UT)
         fremme = tider.get(choices.FREMME)
-        avreist = tider.get(choices.AVREIST)
+        # Tida på stedet slutter når bilen drar — eller når pasienten er
+        # behandlet på sted (12. sep. 2026), som er den andre veien ut.
+        avreist = tider.get(choices.AVREIST) or tider.get(choices.BEHANDLET)
         ledig = tider.get(choices.LEDIG)
 
         respons = var.minutter(opprettet, fremme)

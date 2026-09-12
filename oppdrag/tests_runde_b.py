@@ -143,11 +143,13 @@ class UdefinertSperrerLedigTests(StemplingBasis):
     def test_bilen_kan_ikke_melde_ledig_foer_problemstillingen_er_satt(self):
         o = self._udefinert()
         self.assertEqual(self._stemple(o, 'rykker_ut').status_code, 200)
+        self.assertEqual(self._stemple(o, 'fremme').status_code, 200)
+        self.assertEqual(self._stemple(o, 'behandlet').status_code, 200)
         res = self._stemple(o, 'ledig')
         self.assertEqual(res.status_code, 400, res.content)
         self.assertIn('Udefinert', res.json()['message'])
         o.refresh_from_db()
-        self.assertEqual(o.status, choices.RYKKER_UT, 'ingenting ble skrevet')
+        self.assertEqual(o.status, choices.BEHANDLET, 'ingenting ble skrevet')
         Oppdrag.objects.filter(pk=o.pk).update(problemstilling='Pustevansker')
         self.assertEqual(self._stemple(o, 'ledig').status_code, 200)
 

@@ -154,6 +154,12 @@ def oppdrag_til_dict(oppdrag, *, for_enhet: bool = False,
         neste = services.neste_i_kjeden(status)
         data['neste_overgang'] = neste
         data['neste_navn'] = choices.STATUS_NAVN.get(neste) if neste else None
+        # Den andre knappen (12. sep. 2026): «Avbryt» i Rykker ut, «Behandlet
+        # på sted» i Fremme. Ingen egen Ledig-knapp lenger — Ledig er «neste»
+        # etter Leverer og Behandlet, og finnes ikke mellom Avreist og Leverer.
+        alternativ = services.alternativ_for(status)
+        data['alternativ_overgang'] = alternativ[0] if alternativ else None
+        data['alternativ_navn'] = alternativ[1] if alternativ else None
         egen = koblingsrad.enhet_id if koblingsrad is not None else None
         data['varslede'] = [e['enhet_navn'] for e in data['enheter']
                             if e['enhet_id'] != egen]

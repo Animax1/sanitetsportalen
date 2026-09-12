@@ -1,0 +1,101 @@
+"""Andrés forbedringsliste 12. sep. 2026, statusene i bilen.
+
+«Behandlet på sted så ledig», «når du trykker rykker ut så skal det der
+ledig nå står erstattes med avbryt», og «etter avreist kan du ikke slå deg
+ledig før du har levert. Sentralen kan selvsagt redigere.»
+"""
+import json
+
+from django.test import SimpleTestCase, override_settings
+
+from patients.js_test_utils import (
+    OPPDRAG_ENHET_JS, PORTAL_UTILS_JS, build_harness, node_available, run_node)
+
+from . import choices, services
+from .arkiv import OppdragArkivHandler, arkiver_vakt
+from .models import ArkivertOppdrag, OppdragArkiv
+from .statistikk import _STATUSFELT
+from .tests_flere_enheter import FlereEnheterBasis
+
+
+@override_settings(SECURE_SSL_REDIRECT=False, RATELIMIT_ENABLE=False)
+class BehandletIStatistikkOgArkivTests(FlereEnheterBasis):
+    def _behandlet(self):
+        o = self._oppdrag(self.a)
+        for st in (choices.RYKKER_UT, choices.FREMME, choices.BEHANDLET, choices.LEDIG):
+            services.sett_status(o, st, enhet=self.a)
+        return o
+
+    def test_utledet_status_regner_behandlet_som_ferdig_paa_stedet(self):
+        self.assertEqual(services.utledet_av_statuser([choices.BEHANDLET, choices.VENTER]), choices.BEHANDLET)
+        self.assertEqual(services.utledet_av_statuser([choices.BEHANDLET, choices.LEVERER]), choices.LEVERER)
+        self.assertEqual(services.utledet_av_statuser([choices.BEHANDLET, choices.LEDIG]), choices.BEHANDLET)
+
+    def test_tid_paa_stedet_slutter_ved_behandlet(self):
+        from .statistikk import oppdrag_stats
+        self._behandlet()
+        stats = oppdrag_stats(self.vakt)
+        self.assertEqual(stats['summary']['tid_pa_stedet']['n'], 1)
+
+    def test_arkivet_har_kolonnen_og_signaturen_utelater_den_naar_tom(self):
+        self.assertEqual(_STATUSFELT[choices.BEHANDLET], 'behandlet_at')
+        o = self._behandlet()
+        u = self._oppdrag(self.b)
+        services.sett_status(u, choices.RYKKER_UT, enhet=self.b)
+        services.sett_status(u, choices.LEDIG, enhet=self.b, manuell=True)
+        arkiv, _ = arkiver_vakt(self.vakt, 'test', None)
+        rader = {r['enhet_navn']: r for r in OppdragArkivHandler().rad_dicts(arkiv)}
+        self.assertIn('behandlet_at', rader[self.a.navn], 'satt: står i payloaden')
+        self.assertNotIn('behandlet_at', rader[self.b.navn], 'tom: utelatt, så eldre signaturer holder')
+        self.assertIsNotNone(ArkivertOppdrag.objects.get(arkiv=arkiv, enhet_navn=self.a.navn).behandlet_at)
+
+
+class BilensKnapperJsTests(SimpleTestCase):
+    HARNESS = (
+        (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue', 'klokke')),
+        (OPPDRAG_ENHET_JS, ('renderAktivt', 'hastegradKlasse', '_udefinertVarsel', '_antallRad', '_medAntall',
+                            '_problemMedAntall', 'tidslinjeEnhetHtml', '_stedvalg',
+                            '_grovsorteringsrad', '_kanGrovsortere', '_varsledeRad', 'projiser')),
+    )
+    STUBB = ("globalThis.velgerStedFor = null; globalThis.AVREIST_TIL = []; globalThis.GROVSORTERING = [];\n"
+             "const el = { innerHTML: '' }; globalThis.document = { getElementById: () => el };\n")
+
+    def setUp(self):
+        if not node_available():
+            self.skipTest('node er ikke tilgjengelig')
+        self.harness = build_harness(self.HARNESS)
+
+    def _kort(self, status, neste, alt):
+        return run_node(self.harness, self.STUBB + f"""
+            globalThis.mineOppdrag = [{{ id: 1, status: '{status}', status_navn: 'x', problemstilling: 'Fall',
+              hastegrad: 'Akutt', lokasjon_navn: 'Scene', opprettet: '2026-09-12T10:00:00Z', fritekst: '',
+              neste_overgang: {json.dumps(neste)}, neste_navn: {json.dumps(neste)},
+              alternativ_overgang: {json.dumps(alt)}, alternativ_navn: {json.dumps(alt)},
+              statusmeldinger: [], varslede: [] }}];
+            renderAktivt();
+            console.log(el.innerHTML);
+        """)
+
+    def test_ingen_egen_ledig_knapp_og_den_andre_knappen_folger_statusen(self):
+        ut = self._kort('rykker_ut', 'fremme', 'avbryt')
+        self.assertNotIn('stempleLedig', ut)
+        self.assertIn('stempleAlternativ', ut)
+        self.assertIn('>avbryt<', ut.replace('\n', '').replace(' ', ''))
+        ut = self._kort('avreist', 'leverer', None)
+        self.assertNotIn('stempleAlternativ', ut, 'mellom Avreist og Leverer: bare neste')
+        self.assertEqual(ut.count('stor-knapp'), 1)
+
+    def test_projeksjonen_kjenner_avbryt(self):
+        ut = run_node(self.harness, """
+            globalThis.OPPDRAG_NESTE = { rykker_ut: 'fremme', fremme: 'avreist', behandlet: 'ledig' };
+            globalThis.OPPDRAG_STATUSNAVN = { ledig: 'Ledig', behandlet: 'Behandlet på sted' };
+            globalThis.OPPDRAG_ALTERNATIV = { rykker_ut: 'avbryt', fremme: 'behandlet' };
+            globalThis.OPPDRAG_ALTERNATIV_NAVN = { avbryt: 'Avbryt', behandlet: 'Behandlet på sted' };
+            const r = projiser([{ id: 7, status: 'rykker_ut' }], [{ oppdragId: 7, overgang: 'avbryt' }]);
+            console.log(JSON.stringify([r[0].status, r[0].neste_overgang, r[0].alternativ_overgang]));
+            const b = projiser([{ id: 7, status: 'fremme' }], [{ oppdragId: 7, overgang: 'behandlet' }]);
+            console.log(JSON.stringify([b[0].status, b[0].neste_overgang, b[0].neste_navn, b[0].alternativ_overgang]));
+        """)
+        l = ut.strip().splitlines()
+        self.assertEqual(json.loads(l[0]), ['ledig', None, None])
+        self.assertEqual(json.loads(l[1]), ['behandlet', 'ledig', 'Ledig', None])

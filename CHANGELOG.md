@@ -4,6 +4,22 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-12 — Andrés forbedringsliste, del H: bilens utganger
+
+Én migrasjon, `oppdrag/0022`: statusvalg og hendelsestyper, og kolonnen
+`behandlet_at` på arkivrader. Ren skjemaendring. Deployes til staging først.
+
+- **«Behandlet på sted»** er en ny status fra Fremme: pasienten ble ferdig
+  der bilen sto, ingen transport. Neste er Ledig. Statistikken regner tid på
+  stedet fram til behandlet, og arkivet får kolonnen — i signaturen bare når
+  den er satt, så eldre arkiv verifiserer som før.
+- **«Avbryt» i Rykker ut** der Ledig sto: enheten meldes ledig, og oppdraget
+  går tilbake til Venter hos sentralen som «trenger ny ressurs», med
+  «Avbrutt: HGSD 56» i tidslinjen. Bilen spør om bekreftelse først.
+- **Ingen Ledig mellom Avreist og Leverer.** Bilen melder Ledig bare fra
+  Leverer og Behandlet, og den egne Ledig-knappen er borte: Ledig er «neste»
+  der. Sentralen fører og retter som før, fra alle statuser.
+
 ## 2026-09-12 — Andrés forbedringsliste, del G: vaktlista
 
 Ingen migrasjon. Deployes til staging først.

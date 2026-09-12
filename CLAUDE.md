@@ -264,6 +264,7 @@ Fem ting det er verdt å kjenne før man rører modulen:
 | «Historikk» rydder tavla, **arkivet fryser og lukker vakta** | `Oppdrag.historikk_fra` vs. `oppdrag/arkiv.py` |
 | Bilen rykker videre → oppdraget **trenger ny ressurs**, ikke ferdig | `Oppdrag.trenger_ressurs` + `trenger_ressurs_siden`, `services.start_oppdrag` |
 | Lista sorteres på hastegrad, så nummer; ferdige nederst | `_sorterOppdrag()` i `oppdrag-sentral.js` |
+| Bilen melder Ledig bare fra Leverer og Behandlet; Avbryt i Rykker ut, Behandlet på sted i Fremme | `services.BILEN_KAN_LEDIG_FRA`, `ALTERNATIV`, `avbryt_oppdrag` |
 
 **Historikk og arkiv er to helt ulike handlinger**, og har derfor hver sin knapp.
 Historikk flytter ett oppdrag ut av den aktive tavla og er fullt reversibel; arkivering
@@ -299,6 +300,18 @@ pasienter». Tømmes for problemstillinger uten — ikke i arkivet. `Enhet.enhet
 null = «Uten type») grupperer tavla og «Nytt oppdrag» i typenes rekkefølge, alfabetisk
 innenfor gruppa (`_grupperEnheter()` i JS; serveren sorterer på `Lower(navn)`), og settes
 i enhetspanelet (`PUT api/enheter/<pk>/` med `type` = ID, `skriv_full`).
+
+**Bilens utganger (12. sep. 2026):** «Behandlet på sted» (`BEHANDLET`) er en sidegren
+fra Fremme rett til Ledig — `KJEDEN` er fortsatt lineær, `neste_i_kjeden` gir Ledig etter
+Leverer og Behandlet, og `alternativ_for()` gir den andre knappen (Avbryt i Rykker ut,
+Behandlet i Fremme). Bilen har **ingen egen Ledig-knapp**; stemplingsviewet avviser Ledig
+utenom `BILEN_KAN_LEDIG_FRA` med 400, mens sentralens føring følger `OVERGANGER` som før.
+«Avbryt» (`choices.AVBRYT`) er en handling, ikke en status: den går i køen som en stempling
+(`status/avbryt/`), `services.avbryt_oppdrag` setter raden Ledig (uten Udefinert-sperre —
+hun så aldri pasienten), oppdraget til «trenger ny ressurs» og en `Enhetshendelse.AVBRUTT`.
+`utledet_av_statuser` rangerer med `choices.AKTIVITET`, ikke `KJEDEN.index`, fordi
+Behandlet ikke står i kjeden. Arkivraden har `behandlet_at`, som står i SHA-payloaden
+**bare når satt** — eldre arkiv har ingen slik nøkkel i signaturen sin.
 
 Den er den første modulen som tar `skriv_handling` i bruk: bilen får smale, navngitte
 stemplingsendepunkter, ikke en feltwhitelist inne i en generell `PUT`. Og skillet mellom de

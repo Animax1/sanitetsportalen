@@ -224,9 +224,9 @@ ingen av dem gir feilmelding — de er bare stille inaktive.
                   - [x] G: «Sett i drift» i Innstillinger, tydelig statusmerke, redigering i
                         drift, drift i auditloggen, knappefarger, én innlogging per konto
                         (fantes; nå testet).
-                  - [ ] H: «Behandlet på sted» fra Fremme (→ Ledig), «Avbryt» i Rykker ut
+                  - [x] H: «Behandlet på sted» fra Fremme (→ Ledig), «Avbryt» i Rykker ut
                         (enheten ledig, oppdraget trenger ressurs), ingen Ledig mellom
-                        Avreist og Leverer. Sentralen redigerer som før.
+                        Avreist og Leverer (`0022`). Sentralen redigerer som før.
                   - [ ] I: lyd alltid på (ingen av/på), lengre varsel, admin justerer terskler
                         per hastegrad og lyd ved nytt oppdrag, utheving hos operatør.
             - [x] Railway-variabler (André, 12. sep.): `testportal.sanitet.net` inn i

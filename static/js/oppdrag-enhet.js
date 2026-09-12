@@ -138,13 +138,19 @@ function projiser(oppdragliste, ko) {
         if (!mine.length) return o;
 
         const siste = mine[mine.length - 1];
-        const nesteEtter = kjede[siste.overgang] || null;
+        // «Avbryt» er en handling, ikke en status: raden ender i Ledig.
+        const status = siste.overgang === 'avbryt' ? 'ledig' : siste.overgang;
+        const nesteEtter = kjede[status] || null;
+        const alt = (globalThis.OPPDRAG_ALTERNATIV || {})[status] || null;
+        const altNavn = (globalThis.OPPDRAG_ALTERNATIV_NAVN || {})[alt] || alt;
         return {
             ...o,
-            status: siste.overgang,
-            status_navn: navn[siste.overgang] || siste.overgang,
+            status,
+            status_navn: navn[status] || status,
             neste_overgang: nesteEtter,
             neste_navn: nesteEtter ? (navn[nesteEtter] || nesteEtter) : null,
+            alternativ_overgang: alt,
+            alternativ_navn: alt ? altNavn : null,
             usendt: true,
         };
     });
@@ -373,17 +379,23 @@ function renderAktivt() {
                  data-action="stempleNeste" data-id="${escHtmlValue(o.id)}">
            ${escapeHtml(o.neste_navn)}</button>`
       : '';
-    const ledigKnapp = `
-      <button type="button" class="btn btn-outline-light stor-knapp"
-              id="stemple-ledig-${escHtmlValue(o.id)}"
-              data-action="stempleLedig" data-id="${escHtmlValue(o.id)}">
-        Ledig</button>`;
+    // **Ingen egen Ledig-knapp** (André, 12. sep. 2026). Den andre knappen
+    // er statusens: «Avbryt» i Rykker ut (enheten ledig, oppdraget tilbake
+    // til sentralen), «Behandlet på sted» i Fremme. Mellom Avreist og
+    // Leverer finnes bare «neste» — hun har en pasient i bilen. Ledig er
+    // «neste» etter Leverer og etter Behandlet.
+    const altKnapp = o.alternativ_overgang
+      ? `<button type="button" class="btn btn-outline-light stor-knapp"
+                 id="stemple-alt-${escHtmlValue(o.id)}"
+                 data-action="stempleAlternativ" data-id="${escHtmlValue(o.id)}">
+           ${escapeHtml(o.alternativ_navn)}</button>`
+      : '';
     // **Stedvalget erstatter knapperaden** når «Avreist» er trykket: seks
-    // store knapper og «Avbryt», ingen «Ledig» ved siden av — i en bil i
+    // store knapper og «Avbryt», ingen annen knapp ved siden av — i en bil i
     // bevegelse skal det ikke finnes en feil knapp å treffe midt i valget.
     const knapperad = velgerStedFor === o.id
       ? _stedvalg()
-      : `<div class="d-flex gap-2 mt-3">${nesteKnapp}${ledigKnapp}</div>`;
+      : `<div class="d-flex gap-2 mt-3">${nesteKnapp}${altKnapp}</div>`;
     // Grovsorteringen er en vurdering av pasienten, og den finnes ikke før
     // bilen er framme (André, 12. sep. 2026). Under utrykning står den ikke.
     const grovRad = _kanGrovsortere(o) ? _grovsorteringsrad(o) : '';
@@ -836,8 +848,16 @@ async function settAntall(verdi) {
   });
 }
 
-async function stempleLedig(id) {
-  await _stemple(id, 'ledig', `stemple-ledig-${id}`);
+async function stempleAlternativ(id) {
+  // Den andre knappen: «Avbryt» spør først — den sender oppdraget tilbake
+  // til sentralen, og et feiltrykk i en bil i fart skal ikke gjøre det.
+  const o = mineOppdrag.find((x) => x.id === id);
+  if (!o || !o.alternativ_overgang) return;
+  if (o.alternativ_overgang === 'avbryt'
+      && !confirm('Avbryte oppdraget? Enheten meldes ledig, og oppdraget går tilbake til sentralen som ventende.')) {
+    return;
+  }
+  await _stemple(id, o.alternativ_overgang, `stemple-alt-${id}`);
 }
 
 

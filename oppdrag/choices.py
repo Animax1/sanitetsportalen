@@ -117,6 +117,10 @@ RYKKER_UT = 'rykker_ut'
 FREMME = 'fremme'
 AVREIST = 'avreist'
 LEVERER = 'leverer'
+#: «Behandlet på sted» (André, 12. sep. 2026): pasienten ble ferdigbehandlet
+#: der bilen sto, og det ble ingen transport. En sidegren fra `Fremme` som
+#: går rett til `Ledig` — Avreist og Leverer hører ikke til.
+BEHANDLET = 'behandlet'
 LEDIG = 'ledig'
 
 STATUS_VALG: tuple[tuple[str, str], ...] = (
@@ -125,8 +129,22 @@ STATUS_VALG: tuple[tuple[str, str], ...] = (
     (FREMME, 'Fremme'),
     (AVREIST, 'Avreist'),
     (LEVERER, 'Leverer'),
+    (BEHANDLET, 'Behandlet på sted'),
     (LEDIG, 'Ledig'),
 )
+
+#: «Avbryt» (André, 12. sep. 2026) er en **handling**, ikke en status: bilen
+#: i `Rykker ut` melder seg ledig, og oppdraget går tilbake til Venter hos
+#: sentralen som «trenger ny ressurs». Navnet står i URL-en som en stempling
+#: (`status/avbryt/`), så køen i bilen kan bære den som alt annet.
+AVBRYT = 'avbryt'
+
+#: Hvor «aktiv» en status er, til utledning av oppdragets status når flere
+#: biler står på det (den mest aktive vinner). `Behandlet` teller som
+#: `Avreist`: begge er «ferdig på stedet».
+AKTIVITET: dict[str, int] = {
+    VENTER: 0, RYKKER_UT: 1, FREMME: 2, AVREIST: 3, BEHANDLET: 3, LEVERER: 4,
+}
 
 STATUS_NAVN: dict[str, str] = dict(STATUS_VALG)
 
@@ -135,7 +153,8 @@ STATUS_NAVN: dict[str, str] = dict(STATUS_VALG)
 TERMINAL = LEDIG
 
 #: Rekkefølgen «neste»-knappen følger. `ledig` står ikke her: den er utgang
-#: fra enhver status, ikke et ledd i kjeden.
+#: fra enhver status, ikke et ledd i kjeden. `Behandlet` er en sidegren fra
+#: `Fremme` (se `services.neste_i_kjeden` og `alternativ_for`).
 KJEDEN: tuple[str, ...] = (VENTER, RYKKER_UT, FREMME, AVREIST, LEVERER)
 
 

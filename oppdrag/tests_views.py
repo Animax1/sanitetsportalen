@@ -15,7 +15,7 @@ from accounts.models import CustomUser, ModulTilgang
 from patients.models import AppSetting
 
 from oppdrag import choices, services
-from oppdrag.models import Enhet, Lokasjon, Oppdrag, Statusmelding
+from oppdrag.models import Enhet, Enhetshendelse, Lokasjon, Oppdrag, Statusmelding
 
 AAR = 2098
 
@@ -535,13 +535,77 @@ class StemplingTests(StemplingBasis):
                 self.assertEqual(o.status, overgang)
         self.assertEqual(Statusmelding.objects.filter(oppdrag=o).count(), 5)
 
-    def test_ledig_er_utgang_fra_enhver_status(self):
+    def test_bilen_melder_ledig_bare_fra_leverer_og_behandlet(self):
+        """Snudd 12. sep. 2026 (André): «Etter avreist kan du ikke slå deg
+        ledig før du har levert.» I Rykker ut heter utgangen Avbryt, i Fremme
+        Behandlet på sted. Sentralen fører fortsatt Ledig fra alt."""
         o = self._oppdrag()
         self._stemple(o, 'rykker_ut')
-        resp = self._stemple(o, 'ledig')
-        self.assertEqual(resp.status_code, 200)
+        for status in ('rykker_ut', 'fremme', 'avreist'):
+            with self.subTest(fra=status):
+                resp = self._stemple(o, 'ledig')
+                self.assertEqual(resp.status_code, 400, resp.content)
+                self.assertIn('Leverer eller Behandlet', resp.json()['message'])
+                neste = {'rykker_ut': 'fremme', 'fremme': 'avreist', 'avreist': 'leverer'}[status]
+                self.assertEqual(self._stemple(o, neste).status_code, 200)
+        self.assertEqual(self._stemple(o, 'ledig').status_code, 200, 'fra Leverer')
         o.refresh_from_db()
         self.assertEqual(o.status, choices.LEDIG)
+        # Sentralen kan fortsatt: Ledig fra Avreist er lov i tabellen.
+        o2 = self._oppdrag()
+        for st in (choices.RYKKER_UT, choices.FREMME, choices.AVREIST):
+            services.sett_status(o2, st, enhet=self.enhet)
+        services.sett_status(o2, choices.LEDIG, enhet=self.enhet, manuell=True)
+        o2.refresh_from_db()
+        self.assertEqual(o2.status, choices.LEDIG)
+
+    def test_behandlet_paa_sted_gaar_fra_fremme_til_ledig(self):
+        o = self._oppdrag()
+        self._stemple(o, 'rykker_ut')
+        self.assertEqual(self._stemple(o, 'behandlet').status_code, 409, 'ikke fra Rykker ut')
+        self._stemple(o, 'fremme')
+        resp = self._stemple(o, 'behandlet')
+        self.assertEqual(resp.status_code, 200, resp.content)
+        rad = resp.json()['data']['oppdrag']
+        self.assertEqual((rad['status'], rad['neste_overgang'], rad['alternativ_overgang']),
+                         ('behandlet', 'ledig', None))
+        self.assertEqual(self._stemple(o, 'ledig').status_code, 200)
+
+    def test_avbryt_i_rykker_ut_sender_oppdraget_tilbake(self):
+        o = self._oppdrag()
+        self._stemple(o, 'rykker_ut')
+        resp = self._stemple(o, 'avbryt')
+        self.assertEqual(resp.status_code, 200, resp.content)
+        o.refresh_from_db()
+        self.assertEqual(services.koblingsrad(o, self.enhet).status, choices.LEDIG)
+        self.assertTrue(o.trenger_ressurs)
+        self.assertEqual(o.status, choices.VENTER, 'står på tavla hos sentralen')
+        self.assertIsNone(o.historikk_fra)
+        self.assertTrue(Enhetshendelse.objects.filter(oppdrag=o, type=Enhetshendelse.AVBRUTT).exists())
+        # Bare fra Rykker ut.
+        o2 = self._oppdrag()
+        self._stemple(o2, 'rykker_ut'); self._stemple(o2, 'fremme')
+        self.assertEqual(self._stemple(o2, 'avbryt').status_code, 409)
+
+    def test_avbryt_slipper_udefinert(self):
+        o = self._oppdrag()
+        Oppdrag.objects.filter(pk=o.pk).update(problemstilling=choices.UDEFINERT)
+        self._stemple(o, 'rykker_ut')
+        self.assertEqual(self._stemple(o, 'avbryt').status_code, 200, 'hun har ikke sett pasienten')
+
+    def test_svaret_baerer_den_andre_knappen(self):
+        o = self._oppdrag()
+        rad = self.bil.get('/oppdrag/api/oppdrag/').json()['data'][0]
+        self.assertIsNone(rad['alternativ_overgang'])
+        self._stemple(o, 'rykker_ut')
+        rad = self.bil.get('/oppdrag/api/oppdrag/').json()['data'][0]
+        self.assertEqual((rad['alternativ_overgang'], rad['alternativ_navn']), ('avbryt', 'Avbryt'))
+        self._stemple(o, 'fremme')
+        rad = self.bil.get('/oppdrag/api/oppdrag/').json()['data'][0]
+        self.assertEqual(rad['alternativ_overgang'], 'behandlet')
+        self._stemple(o, 'avreist')
+        rad = self.bil.get('/oppdrag/api/oppdrag/').json()['data'][0]
+        self.assertEqual((rad['neste_overgang'], rad['alternativ_overgang']), ('leverer', None))
 
     def test_ulovlig_overgang_gir_409_og_ingen_rad(self):
         """Dobbelttrykket: det første vant, det andre skal ikke lage noe."""
@@ -1013,6 +1077,8 @@ class AutoHistorikkTests(StemplingBasis):
         self._stemple(o, 'rykker_ut')
         self.assertIn(o.pk, self._aktiv_liste())
 
+        self._stemple(o, 'fremme')
+        self._stemple(o, 'behandlet')
         self._stemple(o, 'ledig')
         o.refresh_from_db()
         self.assertIsNotNone(o.historikk_fra)
@@ -1038,6 +1104,8 @@ class AutoHistorikkTests(StemplingBasis):
         """NULL betyr «ryddet bort av seg selv», satt betyr «noen trykket»."""
         o = self._oppdrag()
         self._stemple(o, 'rykker_ut')
+        self._stemple(o, 'fremme')
+        self._stemple(o, 'behandlet')
         self._stemple(o, 'ledig')
         o.refresh_from_db()
         self.assertIsNone(o.historikk_av)
@@ -1051,6 +1119,8 @@ class AutoHistorikkTests(StemplingBasis):
     def test_ferdigstilt_havner_i_historikken(self):
         o = self._oppdrag()
         self._stemple(o, 'rykker_ut')
+        self._stemple(o, 'fremme')
+        self._stemple(o, 'behandlet')
         self._stemple(o, 'ledig')
         historikk = self.sentral.get('/oppdrag/api/historikk/').json()['data']
         self.assertEqual([r['id'] for r in historikk], [o.pk])
@@ -1063,6 +1133,8 @@ class AutoHistorikkTests(StemplingBasis):
         """
         o = self._oppdrag()
         self._stemple(o, 'rykker_ut')
+        self._stemple(o, 'fremme')
+        self._stemple(o, 'behandlet')
         self._stemple(o, 'ledig')
         self.sentral.delete(f'/oppdrag/api/oppdrag/{o.pk}/historikk/')
 
@@ -1082,6 +1154,8 @@ class AutoHistorikkTests(StemplingBasis):
         """
         o = self._oppdrag()
         self._stemple(o, 'rykker_ut')
+        self._stemple(o, 'fremme')
+        self._stemple(o, 'behandlet')
         self._stemple(o, 'ledig')
 
         mine = self.bil.get('/oppdrag/api/oppdrag/').json()['data']

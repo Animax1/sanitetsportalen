@@ -93,8 +93,14 @@ class StatusmaskinTests(TestCase):
 
     def test_neste_i_kjeden(self):
         self.assertEqual(services.neste_i_kjeden(choices.VENTER), choices.RYKKER_UT)
-        self.assertEqual(services.neste_i_kjeden(choices.LEVERER), None)
+        # Ledig er «neste» etter Leverer og Behandlet (12. sep. 2026) — bilen
+        # har ingen egen Ledig-knapp lenger.
+        self.assertEqual(services.neste_i_kjeden(choices.LEVERER), choices.LEDIG)
+        self.assertEqual(services.neste_i_kjeden(choices.BEHANDLET), choices.LEDIG)
         self.assertEqual(services.neste_i_kjeden(choices.LEDIG), None)
+        self.assertEqual(services.alternativ_for(choices.FREMME), (choices.BEHANDLET, 'Behandlet på sted'))
+        self.assertEqual(services.alternativ_for(choices.RYKKER_UT), (choices.AVBRYT, 'Avbryt'))
+        self.assertIsNone(services.alternativ_for(choices.AVREIST))
 
     def test_ulovlig_overgang_kaster(self):
         oppdrag = _oppdrag(_enhet('E1'))

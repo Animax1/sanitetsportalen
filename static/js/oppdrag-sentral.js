@@ -496,7 +496,7 @@ function tidslinjeHtml(data) {
     // dette trenger en ny ressurs. Ellers «Tatt av».
     const tekst = h.type === 'rykket_videre'
       ? 'Rykket videre' + (h.detalj ? ' til ' + h.detalj : '') + ': ' + h.enhet_navn
-      : 'Tatt av: ' + h.enhet_navn;
+      : (h.type === 'avbrutt' ? 'Avbrutt: ' + h.enhet_navn : 'Tatt av: ' + h.enhet_navn);
     rader.push({
       tid: h.tidspunkt,
       html: `
@@ -745,6 +745,8 @@ function _lovligeOverganger(status) {
   const i = kjede.indexOf(status);
   const ut = [];
   if (i >= 0 && i + 1 < kjede.length) ut.push(kjede[i + 1]);
+  // «Behandlet på sted» (12. sep. 2026): sidegrenen fra Fremme, rett til Ledig.
+  if (status === 'fremme') ut.push('behandlet');
   if (status !== 'ledig') ut.push('ledig');
   return ut;
 }

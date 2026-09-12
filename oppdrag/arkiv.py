@@ -175,6 +175,12 @@ class OppdragArkivHandler(BaseArkivHandler):
             }
             for status, felt in _STATUSFELT.items():
                 verdi = getattr(rad, felt)
+                # `behandlet_at` kom 12. sep. 2026, etter at arkiv fantes med
+                # signatur. Den står i payloaden **bare når den er satt**:
+                # eldre rader (og nye uten behandling) får nøyaktig samme
+                # payload som før, og signaturene deres verifiserer fortsatt.
+                if felt == 'behandlet_at' and not verdi:
+                    continue
                 data[felt] = verdi.isoformat() if verdi else None
             rader.append(data)
         return rader

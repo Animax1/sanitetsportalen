@@ -277,6 +277,14 @@ ville latt serveren utlede handlingen av gjeldende tilstand, og da er det ikke l
 navngitt handling — det er en tilstandsmaskin styrt utenfra, med det kappløpet som følger
 når to trykk kommer tett. Knappen vet hvilken overgang den utfører og poster til den.
 
+> **Utvidet 12. sep. 2026 (André).** Bilen har ikke lenger en Ledig-knapp fra alle
+> statuser. Utgangene er: `Avbryt` i Rykker ut (enheten ledig, oppdraget tilbake til
+> Venter som «trenger ny ressurs»), `Behandlet på sted` i Fremme (ny status, rett til
+> Ledig — ingen transport), og Ledig som «neste» etter Leverer og Behandlet. Mellom
+> Avreist og Leverer finnes ingen utgang: hun har en pasient i bilen. Overgangstabellen
+> er uendret for sentralen, som fører og retter alt; begrensningen ligger i
+> stemplingsendepunktet (`services.BILEN_KAN_LEDIG_FRA`).
+
 ### 4.3 Å starte neste oppdrag lukker det pågående
 
 En enhet kan ha flere tildelte oppdrag, men bare ett påbegynt. Trykker mannskapet

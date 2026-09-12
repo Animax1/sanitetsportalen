@@ -112,6 +112,7 @@
 .status-fremme     { background: #3b82f6; }
 .status-avreist    { background: #8b5cf6; }
 .status-leverer    { background: #06b6d4; }
+.status-behandlet  { background: #10b981; }
 
 /* Enheter som ikke er på vakt dempes, men skjules ikke. Fargen bærer ikke
  * informasjonen alene — teksten «Ikke på vakt» står i kortet. */

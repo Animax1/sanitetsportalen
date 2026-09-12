@@ -70,6 +70,10 @@ def index_view(request):
             'avreist_til': json.dumps(list(choices.AVREIST_TIL)),
             'grovsortering': json.dumps(list(choices.GROVSORTERING)),
             'med_antall': med_antall,
+            # Den andre knappen per status (12. sep. 2026), til projeksjonen
+            # mens et trykk ligger usendt — samme grunn som kjeden.
+            'alternativ': json.dumps({s: a[0] for s, a in services.ALTERNATIV.items()}),
+            'alternativ_navn': json.dumps({a[0]: a[1] for a in services.ALTERNATIV.values()}),
         })
 
     return render(request, 'oppdrag/sentral.html', {
@@ -863,7 +867,9 @@ def stempling_view(request, pk, overgang, sted=None):
     stempling som faktisk kom fram. Med nøkkelen svarer en avspilling `ok` med
     den opprinnelige meldingen, og køen kan trygt stryke raden.
     """
-    if overgang not in services.STEMPLBARE:
+    # «Avbryt» (12. sep. 2026) er en handling, ikke en status, men går
+    # samme vei som en stempling: navngitt i URL-en, køet i bilen, nøklet.
+    if overgang not in services.STEMPLBARE and overgang != choices.AVBRYT:
         return JsonResponse(
             {'status': 'error', 'message': f'Ukjent overgang «{overgang}».'},
             status=404)
@@ -892,6 +898,14 @@ def stempling_view(request, pk, overgang, sted=None):
         return JsonResponse(
             {'status': 'error', 'message': 'Oppdraget tilhører en annen enhet.'},
             status=403)
+    # **Bilen melder Ledig bare fra Leverer og Behandlet** (André, 12. sep.
+    # 2026: «Etter avreist kan du ikke slå deg ledig før du har levert»). I
+    # Rykker ut heter utgangen Avbryt, i Fremme Behandlet på sted. Sentralen
+    # kan fortsatt føre Ledig fra alt — det går gjennom `foering_view`.
+    if overgang == choices.LEDIG and rad.status not in services.BILEN_KAN_LEDIG_FRA:
+        return JsonResponse({'status': 'error', 'message': (
+            'Ledig meldes etter Leverer eller Behandlet på sted. '
+            'Skal oppdraget avbrytes, meld det til KO.')}, status=400)
 
     data, feil = _stempling_kropp(request)
     if feil:
@@ -946,6 +960,10 @@ def stempling_view(request, pk, overgang, sted=None):
         if overgang == choices.RYKKER_UT:
             # Lukker et eventuelt pågående oppdrag automatisk (§4.3).
             melding = services.start_oppdrag(
+                oppdrag, bruker=request.user, enhet=request.user.enhet,
+                tidspunkt=tidspunkt, forsinket=forsinket)
+        elif overgang == choices.AVBRYT:
+            melding = services.avbryt_oppdrag(
                 oppdrag, bruker=request.user, enhet=request.user.enhet,
                 tidspunkt=tidspunkt, forsinket=forsinket)
         else:

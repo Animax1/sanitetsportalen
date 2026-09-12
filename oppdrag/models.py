@@ -404,11 +404,15 @@ class Enhetshendelse(BaseTimeStampedModel):
 
     TATT_AV = 'tatt_av'
     RYKKET_VIDERE = 'rykket_videre'
+    AVBRUTT = 'avbrutt'
     TYPER = (
         (TATT_AV, 'Tatt av oppdraget'),
         # Bilen rykket ut på et annet oppdrag mens dette sto uferdig
         # (12. sep. 2026). `detalj` bærer nummeret på det hun dro til.
         (RYKKET_VIDERE, 'Rykket ut på et annet oppdrag'),
+        # Bilen trykket «Avbryt» i Rykker ut (12. sep. 2026): hun er ledig,
+        # oppdraget står som «trenger ny ressurs».
+        (AVBRUTT, 'Avbrøt oppdraget'),
     )
 
     oppdrag = models.ForeignKey(
@@ -674,6 +678,11 @@ class ArkivertOppdrag(models.Model):
     fremme_at = models.DateTimeField(null=True, blank=True, verbose_name='Fremme')
     avreist_at = models.DateTimeField(null=True, blank=True, verbose_name='Avreist')
     leverer_at = models.DateTimeField(null=True, blank=True, verbose_name='Leverer')
+    # «Behandlet på sted» (12. sep. 2026). I SHA-payloaden **bare når satt**:
+    # eldre arkiv har ingen slik kolonne i signaturen sin, og et felt som
+    # alltid sto med `null` ville meldt tukling på hvert av dem. Se
+    # `OppdragArkivHandler.rader_for_payload`.
+    behandlet_at = models.DateTimeField(null=True, blank=True, verbose_name='Behandlet på sted')
     ledig_at = models.DateTimeField(null=True, blank=True, verbose_name='Ledig')
 
     #: Statusene som ble stemplet automatisk, som liste med statusnavn.

@@ -22,10 +22,26 @@ from .models import Enhetsbytte, Enhetshendelse, Oppdrag, Oppdragsenhet, Statusm
 OVERGANGER: dict[str, frozenset[str]] = {
     choices.VENTER:    frozenset({choices.RYKKER_UT, choices.LEDIG}),
     choices.RYKKER_UT: frozenset({choices.FREMME, choices.LEDIG}),
-    choices.FREMME:    frozenset({choices.AVREIST, choices.LEDIG}),
+    # «Behandlet på sted» (12. sep. 2026): sidegrenen fra Fremme.
+    choices.FREMME:    frozenset({choices.AVREIST, choices.BEHANDLET, choices.LEDIG}),
     choices.AVREIST:   frozenset({choices.LEVERER, choices.LEDIG}),
     choices.LEVERER:   frozenset({choices.LEDIG}),
+    choices.BEHANDLET: frozenset({choices.LEDIG}),
     choices.LEDIG:     frozenset(),          # terminal
+}
+
+#: **Bilens** vei til `Ledig` (André, 12. sep. 2026): bare fra Leverer og
+#: Behandlet. I Rykker ut heter utgangen «Avbryt», i Fremme «Behandlet på
+#: sted», og mellom Avreist og Leverer finnes ingen — hun har en pasient i
+#: bilen. Tabellen over er fortsatt fasit for *sentralen*, som retter og
+#: fører alt; dette er hva stemplingsendepunktet slipper gjennom.
+BILEN_KAN_LEDIG_FRA: frozenset[str] = frozenset({choices.LEVERER, choices.BEHANDLET})
+
+#: Den andre knappen i bilen per status: `Avbryt` i Rykker ut, `Behandlet på
+#: sted` i Fremme. Ellers ingen. Verdien er navnet i URL-en.
+ALTERNATIV: dict[str, tuple[str, str]] = {
+    choices.RYKKER_UT: (choices.AVBRYT, 'Avbryt'),
+    choices.FREMME: (choices.BEHANDLET, 'Behandlet på sted'),
 }
 
 
@@ -53,6 +69,10 @@ def neste_i_kjeden(fra: str) -> str | None:
     bevegelse. Knappen slår opp her og poster til det **navngitte**
     endepunktet for den overgangen; serveren utleder ingenting.
     """
+    # Utgangene til Ledig (12. sep. 2026): «neste» etter Leverer og etter
+    # Behandlet er Ledig — bilen har ikke lenger en egen Ledig-knapp.
+    if fra in BILEN_KAN_LEDIG_FRA:
+        return choices.LEDIG
     try:
         i = choices.KJEDEN.index(fra)
     except ValueError:
@@ -60,6 +80,11 @@ def neste_i_kjeden(fra: str) -> str | None:
     if i + 1 >= len(choices.KJEDEN):
         return None
     return choices.KJEDEN[i + 1]
+
+
+def alternativ_for(fra: str):
+    """``(overgang, navn)`` for den andre knappen i bilen, eller ``None``."""
+    return ALTERNATIV.get(fra)
 
 
 # ── Oppdragsnummer ───────────────────────────────────────────────────────────
@@ -246,7 +271,7 @@ def utledet_av_statuser(statuser) -> str:
     aktive = [s for s in statuser if s != choices.LEDIG]
     if not aktive:
         return choices.LEDIG
-    return max(aktive, key=choices.KJEDEN.index)
+    return max(aktive, key=lambda s: choices.AKTIVITET.get(s, -1))
 
 
 def aktiv_koblingsrad(enhet, vakt=None):
@@ -324,7 +349,8 @@ class ProblemstillingUdefinert(UlovligOvergang):
 @transaction.atomic
 def sett_status(oppdrag, ny_status: str, *, bruker=None, tidspunkt=None,
                 forsinket: bool = False, automatisk: bool = False,
-                sted: str = '', enhet=None, manuell: bool = False) -> Statusmelding:
+                sted: str = '', enhet=None, manuell: bool = False,
+                avbrutt: bool = False) -> Statusmelding:
     """Skriv en statusmelding og oppdater oppdragets cachede status.
 
     Kaster ``UlovligOvergang`` hvis overgangen ikke står i tabellen. Sjekken
@@ -350,7 +376,7 @@ def sett_status(oppdrag, ny_status: str, *, bruker=None, tidspunkt=None,
     # «Udefinert» må bort før bilen slås ledig (André, 12. sep. 2026): et
     # ferdig oppdrag uten problemstilling er en statistikk som ikke svarer.
     # Den automatiske lukkingen slipper — den er ikke et valg bilen tar.
-    if (ny_status == choices.LEDIG and not automatisk
+    if (ny_status == choices.LEDIG and not automatisk and not avbrutt
             and oppdrag.problemstilling == choices.UDEFINERT):
         raise ProblemstillingUdefinert(
             'Problemstillingen står som «Udefinert». Meld problemstillingen til KO, '
@@ -435,6 +461,40 @@ def start_oppdrag(oppdrag, *, bruker=None, tidspunkt=None,
                        tidspunkt=naa, forsinket=forsinket, enhet=rad.enhet)
 
 
+@transaction.atomic
+def avbryt_oppdrag(oppdrag, *, bruker=None, tidspunkt=None,
+                   forsinket: bool = False, enhet=None) -> Statusmelding:
+    """Bilen trykker «Avbryt» i Rykker ut (André, 12. sep. 2026).
+
+    Hun meldes ledig på oppdraget, og oppdraget går tilbake til Venter hos
+    sentralen som «trenger ny ressurs» — samme spor som når hun rykker videre
+    (`start_oppdrag`), men uten et nytt oppdrag å dra til. Bare fra Rykker ut:
+    er hun framme, er svaret «Behandlet på sted» eller Avreist.
+
+    `Ledig`-meldingen er ekte, ikke automatisk — tidspunktet er målt. Men
+    «Udefinert» sperrer ikke: hun har ikke sett pasienten, og problemstillingen
+    er sentralens sak når en ny bil sendes.
+    """
+    naa = tidspunkt or timezone.now()
+    rad = koblingsrad(oppdrag, enhet)
+    if rad is None:
+        raise UlovligOvergang('Enheten er ikke varslet på oppdraget.')
+    if rad.status != choices.RYKKER_UT:
+        raise UlovligOvergang('Avbryt finnes bare i Rykker ut.')
+    andre_aktive = (oppdrag.enheter.exclude(pk=rad.pk)
+                    .exclude(status=choices.LEDIG).exists())
+    if not andre_aktive:
+        oppdrag.trenger_ressurs = True
+        oppdrag.trenger_ressurs_siden = naa
+        oppdrag.save(update_fields=['trenger_ressurs', 'trenger_ressurs_siden', 'updated_at'])
+    melding = sett_status(oppdrag, choices.LEDIG, bruker=bruker, tidspunkt=naa,
+                          forsinket=forsinket, enhet=rad.enhet, avbrutt=True)
+    Enhetshendelse.objects.create(
+        oppdrag=oppdrag, enhet=rad.enhet, type=Enhetshendelse.AVBRUTT,
+        tidspunkt=naa, av=bruker)
+    return melding
+
+
 def varsle_enhet(oppdrag, enhet, *, bruker=None) -> Oppdragsenhet:
     """Sett en enhet til på oppdraget — i `Venter`, sist i rekka.
 
@@ -512,6 +572,7 @@ class KorreksjonUgyldig(Exception):
 #: `ledig` fordi den er utgang fra enhver status, ikke et ledd — men når vi
 #: sjekker at tidspunktene står i rekkefølge, er den sist.
 _REKKEFOLGE = {status: i for i, status in enumerate(choices.KJEDEN)}
+_REKKEFOLGE[choices.BEHANDLET] = _REKKEFOLGE[choices.AVREIST]   # sidegren etter Fremme
 _REKKEFOLGE[choices.LEDIG] = len(choices.KJEDEN)
 
 
