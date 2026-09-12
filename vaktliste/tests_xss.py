@@ -39,6 +39,8 @@ HTML_BUILDERS = (
 ESCAPING_CALLS = ('escHtmlValue(', 'cellHtml(', '_escHtml(', 'escapeHtml(')
 
 REVIEWED_INTERPOLATIONS = {
+    'probono': 'tall utledet i JS',
+    'probonoDel': 'markup bygget rett over, tallene escapet inni',
     # Utskriftsutvalget (12. sep. 2026): verktøylinja og utvalgslinja bygges
     # lokalt av byggere som selv skannes her, med navnene escapet inni.
     'verktoy': 'markup fra `mkUtskriftsverktoy`, som selv skannes her',
@@ -450,6 +452,12 @@ REGISTER_REVIEWED = {
     'merker': 'markup bygget lokalt, kompetansenavnene escapet inni',
     'merkelapper': 'markup bygget lokalt, hvert kompetansenavn escapet inni',
     'konto': 'markup bygget lokalt, brukernavnet escapet inni',
+    'epost': 'markup bygget lokalt, adressen escapet inni og et ikon',
+    'kontoCelle': 'tom streng eller <td> med `konto`, som er escapet over',
+    '_erAdmin() ? 7 : 6': 'tall fra en ternær',
+    '_erAdmin() ? \'<col style="width: 9%">\' : \'\'': 'intern markup fra en ternær',
+    "_erAdmin() ? '<th>Konto</th>' : ''": 'intern markup fra en ternær',
+    'kolonner': 'intern <colgroup>-markup valgt av en ternær',
     'tlf': 'markup bygget lokalt, telefonnummeret escapet inni',
     'kort': 'markup bygget lokalt, kortnavnet escapet inni',
     'bruk': 'markup bygget lokalt, tallet escapet inni',
@@ -642,14 +650,28 @@ class MannskapstabellensLayoutTests(SimpleTestCase):
 
     def test_byggeren_setter_kolonnebredder(self):
         """`fixed` uten `<colgroup>` gir like brede kolonner, som er feil
-        fordelig: kompetanse trenger mest, korps minst."""
-        src = read_js(VAKTLISTE_JS)
-        kropp = extract_function(src, 'mkMannskap')
-        self.assertIn('<colgroup>', kropp)
-        andeler = re.findall(r'width:\s*(\d+)%', kropp)
-        self.assertEqual(len(andeler), 6, 'én bredde per kolonne')
-        self.assertEqual(sum(int(a) for a in andeler), 100,
-                         f'andelene skal summere til 100, fikk {andeler}')
+        fordeling: kompetanse trenger mest, korps minst. Kontokolonnen finnes
+        bare for global admin (12. sep. 2026), så andelene må summere til 100
+        i begge utgaver."""
+        if not node_available():
+            self.skipTest('node er ikke tilgjengelig')
+        harness = build_harness(RegistersidenEscapingOppforselTests.HARNESS)
+        for admin in (True, False):
+            with self.subTest(admin=admin):
+                ut = run_node(harness, RegistersidenEscapingOppforselTests.VINDU + f"""
+                    globalThis.window = {{ MODUL_TILGANG: {{ vaktliste: 'skriv_full', admin: {str(admin).lower()} }} }};
+                    globalThis.document = {{ getElementById: () => null }};
+                    globalThis.register = {{ mannskap: [{{id: 1, navn: 'Kari', korps_id: 1, korps_navn: 'H', korps_kort: 'H',
+                        kompetanser: [], alle_kompetanser: [], telefon: '', epost: '', user_id: null,
+                        brukernavn: '', er_aktiv: true, notat: '', i_bruk: 0}}],
+                        korps: [{{id: 1, navn: 'H', er_aktiv: true}}], kompetanser: [], kontoer: [] }};
+                    console.log(mkMannskap());
+                """)
+                self.assertIn('<colgroup>', ut)
+                andeler = [int(a) for a in re.findall(r'width:\s*(\d+)%', ut)]
+                self.assertEqual(len(andeler), 7 if admin else 6, 'én bredde per kolonne')
+                self.assertEqual(sum(andeler), 100, f'andelene skal summere til 100, fikk {andeler}')
+                self.assertEqual('<th>Konto</th>' in ut, admin, 'kontokolonnen er admin sin')
 
     def test_kompetansecella_bryter_framfor_aa_flyte_ut(self):
         """Brytningen ligger på wrapperen *inne* i cella (11. sep. 2026) —
@@ -1538,6 +1560,31 @@ class TimeaksenTests(SimpleTestCase):
         self.assertIn('3 personell på det meste', ut)
         self.assertNotIn('topp 3', ut)
         self.assertIn('Alle plasser fylt', ut)
+
+    def test_probono_tegnes_som_egen_del_av_soylen(self):
+        """Probono i annen farge (André, 12. sep. 2026). Den er med i
+        `antall` — søylen er like høy — men den øverste delen er grønn."""
+        ut = run_node(self.harness, self.VINDU + """
+            globalThis.utskriftRessurs = null; globalThis.korpsfilter = null;
+            globalThis.aktivListe = {
+              vaktliste: {startet: '2026-10-03T08:00:00',
+                          planlagt_slutt: '2026-10-03T10:00:00'},
+              vaktposter: []};
+            const p = _bemanningPerTime([
+              {ledig: false, navn: 'Kari', fra_tid: '2026-10-03T08:00:00', til_tid: '2026-10-03T10:00:00'},
+              {ledig: false, navn: 'Ola', probono: true, fra_tid: '2026-10-03T08:00:00', til_tid: '2026-10-03T10:00:00'},
+              {ledig: true, navn: '', fra_tid: '2026-10-03T08:00:00', til_tid: '2026-10-03T10:00:00'}]);
+            assert(p[0].antall === 2 && p[0].probono === 1 && p[0].planlagt === 3, JSON.stringify(p[0]));
+            console.log(_mkEnKurve('Test', [
+              {ledig: false, navn: 'Kari', fra_tid: '2026-10-03T08:00:00', til_tid: '2026-10-03T10:00:00'},
+              {ledig: false, navn: 'Ola', probono: true, fra_tid: '2026-10-03T08:00:00', til_tid: '2026-10-03T10:00:00'},
+              {ledig: true, navn: '', fra_tid: '2026-10-03T08:00:00', til_tid: '2026-10-03T10:00:00'}]));
+        """)
+        # 2 av 3 bemannet: bemannet-delen 67 %, probono-delen 33 % som starter på 33 %.
+        self.assertIn('class="vl-bemannet" style="height: 67%"', ut)
+        self.assertIn('class="vl-probonodel" style="height: 33%; bottom: 33%"', ut)
+        self.assertIn('(1 probono)', ut)
+        self.assertIn('Probono</span>', ut, 'tegnforklaringen') if '_tegnforklaring' in ''.join(n for h in self.HARNESS for n in h[1]) else None
 
     def test_hodet_har_tre_tall_og_ikke_mer(self):
         """André, 12. sep. 2026: «Holder med ledige plasser: N og N plasser på

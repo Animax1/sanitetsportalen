@@ -4,6 +4,26 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-12 — Andrés runde på staging, del A: vaktlisten
+
+Én migrasjon, `vaktliste/0014`: `Mannskap.epost`, ingen data flyttes.
+
+- **Rettet: besetningen i sentralbordet fant ikke bilen.** Scopet var portalens
+  aktive vakt alene; nå vinner vaktlista som er **i drift**, og den aktive
+  vakta er reserven. Dekker ingen skift nå, står neste skift i svaret («Neste
+  skift 16:00: Kari, Ola») i stedet for bare «ingen».
+- **E-post på mannskapet, og kontoen kobles av seg selv.** Finnes en aktiv,
+  ledig portalkonto med samme e-post, kobles den ved lagring. Et merke ved
+  adressen sier at en bruker finnes. Adminkontoer kobles bare av global admin.
+- **Kontokobling for hånd er global admin.** Konto-feltet og -kolonnen finnes
+  bare for admin; vaktlederen kobler gjennom e-posten.
+- **«Skrive: eget korps» ser alle korps.** Korps-føreren ser hele lista og
+  registeret, får korpsvelgeren, og redigerer fortsatt bare sitt eget.
+  Etiketten i matrisen heter «Skrive: eget korps, ser alle».
+- **Probono i bemanningskurven** som den øverste delen av søylen, i grønt,
+  med egen post i tegnforklaringen.
+- Registeret annoterer «i bruk» i stedet for én spørring per rad.
+
 ## 2026-09-12 — Plan: reserve og offline
 
 Ingen kode. Planen for reserve og offline står i `TODO.md` under «Pågående / neste»:

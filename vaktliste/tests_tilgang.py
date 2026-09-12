@@ -150,18 +150,19 @@ class LesingTests(TilgangsBasis):
                     f'/vaktliste/api/vaktlister/{self.vl.pk}/').json()['data']
                 self.assertEqual(len(data['ressurser']), 3)
 
-    def test_korpsbruker_ser_bare_sitt_eget_korps_i_registeret(self):
+    def test_korpsbruker_ser_hele_registeret(self):
+        """Fra 12. sep. 2026 inkluderer «skrive: eget korps» lese: alle
+        korps — hun ser alle, og redigerer sine egne."""
         data = self.c_kb.get('/vaktliste/api/mannskap/').json()['data']
-        self.assertEqual({m['navn'] for m in data['mannskap']}, {'Kari'})
+        self.assertTrue({'Kari', 'Ola'} <= {m['navn'] for m in data['mannskap']})
 
-    def test_kontolista_er_bare_for_dem_som_kan_bruke_den(self):
-        """`user_id` er `skriv_full`-felt. En liste over portalens brukernavn
-        er ikke noe en korps-fører trenger for å føre lista si."""
-        self.assertEqual(
-            self.c_kb.get('/vaktliste/api/mannskap/').json()['data']['kontoer'],
-            [])
+    def test_kontolista_er_bare_for_global_admin(self):
+        """Kontokobling for hånd er admin; en liste over portalens
+        brukernavn er ikke noe andre trenger."""
+        for c in (self.c_kb, self.c_vl):
+            self.assertEqual(c.get('/vaktliste/api/mannskap/').json()['data']['kontoer'], [])
         self.assertTrue(
-            self.c_vl.get('/vaktliste/api/mannskap/').json()['data']['kontoer'])
+            self.c_adm.get('/vaktliste/api/mannskap/').json()['data']['kontoer'])
 
 
 class UtdelingTests(TilgangsBasis):
@@ -465,12 +466,18 @@ class MannskapsregisterTilgangTests(TilgangsBasis):
         self.assertEqual(res.status_code, 403)
         self.assertFalse(Mannskap.objects.filter(user=offer).exists())
 
-    def test_skriv_full_kobler_konto(self):
+    def test_kontokobling_for_haand_er_global_admin(self):
+        """«Konto-raden fjernes fra alle som ikke er admin» (André, 12. sep.
+        2026). Vaktlederen kobler gjennom e-posten i stedet."""
         bruker = _bruker('koblet')
         ny = Mannskap.objects.create(navn='Nyansatt', korps=self.hgsd)
         res = self.c_vl.put(f'/vaktliste/api/mannskap/{ny.pk}/',
                             data={'user_id': bruker.pk},
                             content_type='application/json')
+        self.assertEqual(res.status_code, 403)
+        res = self.c_adm.put(f'/vaktliste/api/mannskap/{ny.pk}/',
+                             data={'user_id': bruker.pk},
+                             content_type='application/json')
         self.assertEqual(res.json()['data']['brukernavn'], 'koblet')
 
     def test_korpsbruker_sletter_sin_egen_ubrukte(self):
@@ -512,7 +519,7 @@ class NivaaEtikettTests(TestCase):
             username='m', password='x', must_change_password=False)
         skjema = ModulTilgangForm(bruker=bruker)
         valg = dict(skjema.fields['modul_vaktliste'].choices)
-        self.assertEqual(valg['skriv_handling'], 'Skrive: eget korps')
+        self.assertEqual(valg['skriv_handling'], 'Skrive: eget korps, ser alle')
         self.assertEqual(
             dict(skjema.fields['modul_oppdrag'].choices)['skriv_handling'],
             'Skrive: stempling')
@@ -536,7 +543,7 @@ class NivaaEtikettTests(TestCase):
             bruker=bruker, modul_slug='vaktliste', nivaa='skriv_handling')
         rader = {r['navn']: r['nivaa']
                  for r in modultilganger_for_visning(bruker)}
-        self.assertEqual(rader['Vaktliste'], 'Skrive: eget korps')
+        self.assertEqual(rader['Vaktliste'], 'Skrive: eget korps, ser alle')
 
 
 class GrensesnittetsGatingTests(SimpleTestCase):
@@ -1022,10 +1029,10 @@ class KorpsfilterTests(TilgangsBasis):
     def test_leser_med_badge_ser_bare_sitt_korps(self):
         self.assertEqual(self._navn(self.c_leser), {'Kari'})
 
-    def test_korpsforeren_ser_bare_sitt_korps(self):
-        """Over `les_alle` i stigen, og ser likevel bare sitt eget: synligheten
-        følger ikke stigen."""
-        self.assertEqual(self._navn(self.c_kb), {'Kari'})
+    def test_korpsforeren_ser_alle(self):
+        """12. sep. 2026: «Endre skrive: eget korps til å inkludere lese:
+        alle korps.» Hun ser alle — og redigerer fortsatt bare sitt eget."""
+        self.assertEqual(self._navn(self.c_kb), {'Kari', 'Ola'})
 
     def test_les_alle_ser_alle(self):
         self.assertEqual(self._navn(self.c_sam), {'Kari', 'Ola'})
@@ -1099,11 +1106,11 @@ class KorpsfilterTests(TilgangsBasis):
                 self.assertNotContains(c.get('/vaktliste/'), 'vl-korpsfilter')
 
     # ── Regelen selv ─────────────────────────────────────────────────────
-    def test_ser_alle_korps_folger_ikke_stigen(self):
+    def test_bare_les_ser_eget_korps(self):
         self.assertFalse(services.ser_alle_korps(self.leser))
         self.assertTrue(services.ser_alle_korps(self.samordner))
-        self.assertFalse(services.ser_alle_korps(self.korpsbruker),
-                         'skriv_handling ligger over les_alle, men ser eget korps')
+        self.assertTrue(services.ser_alle_korps(self.korpsbruker),
+                        'skriv: eget korps inkluderer lese: alle korps (12. sep. 2026)')
         self.assertTrue(services.ser_alle_korps(self.vaktleder))
         self.assertTrue(services.ser_alle_korps(self.admin))
 
@@ -1162,10 +1169,8 @@ class KorpsvelgerTests(KorpsfilterTests):
     def test_parameteret_er_ingen_dor_for_korps_brukeren(self):
         """Badgen avgrenser henne alt; et parameter som flyttet den ville
         vært en vei rundt filteret."""
-        for navn, c in (('les', self.c_leser), ('skriv_handling', self.c_kb)):
-            with self.subTest(konto=navn):
-                data = self._belastning(c, self.karmoy.pk)
-                self.assertEqual({r['navn'] for r in data['personer']}, {'Kari'})
+        data = self._belastning(self.c_leser, self.karmoy.pk)
+        self.assertEqual({r['navn'] for r in data['personer']}, {'Kari'})
 
     def test_ugyldig_parameter_gir_alle_ikke_500(self):
         data = self._belastning(self.c_vl, 'x')
@@ -1173,7 +1178,7 @@ class KorpsvelgerTests(KorpsfilterTests):
 
     def test_velgeren_finnes_bare_for_den_som_ser_alle(self):
         for navn, c, venter in (('les', self.c_leser, False),
-                                ('skriv_handling', self.c_kb, False),
+                                ('skriv_handling', self.c_kb, True),
                                 ('les_alle', self.c_sam, True),
                                 ('skriv_full', self.c_vl, True),
                                 ('admin', self.c_adm, True)):
@@ -1262,7 +1267,12 @@ class TildeltAlleKorpsTests(TilgangsBasis):
         data = self.c_kb.get(f'/vaktliste/api/vaktlister/{self.vl.pk}/').json()['data']
         ider = {vp['id'] for vp in data['vaktposter']}
         self.assertIn(pk, ider)
-        self.assertNotIn(planlagt, ider, 'vaktlederens bord vises ikke')
+        # Fra 12. sep. 2026 ser korps-føreren alle, også lederens kladd —
+        # men hun kan ikke fylle den (`kanBemannePlass`). Leseren ser den ikke.
+        self.assertIn(planlagt, ider)
+        ider_leser = {vp['id'] for vp in
+                      self.c_leser.get(f'/vaktliste/api/vaktlister/{self.vl.pk}/').json()['data']['vaktposter']}
+        self.assertNotIn(planlagt, ider_leser, 'vaktlederens bord vises ikke for leseren')
 
     def test_lederen_kan_ta_tildelingen_tilbake(self):
         pk = self._ledig(self.c_vl, self.res_fri, alle_korps=True).json()['data']['id']

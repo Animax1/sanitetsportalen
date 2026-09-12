@@ -692,10 +692,10 @@ class SammeFormBeggeVeierTests(TestCase):
         self.assertEqual(vfor['bygger_paa_navn'], 'GFØR')
 
 
-class AdminkoblingTests(TestCase):
-    """Å koble en adminkonto til et korps er global admin (André, 12. sep.
-    2026). Badgen avgjør hva kontoen får redigere, og en vaktleder skal
-    ikke kunne gi administratoren et korps — eller ta det fra henne."""
+class KontokoblingTests(TestCase):
+    """Kontokobling for hånd er global admin (André, 12. sep. 2026: «Konto-
+    raden fjernes fra alle som ikke er admin»). Alle andre kobler gjennom
+    e-posten — se `EpostkoblingTests`."""
 
     def setUp(self):
         self.korps = Korps.objects.create(navn='Haugesund', kortnavn='HGSD')
@@ -709,20 +709,102 @@ class AdminkoblingTests(TestCase):
         return klient.post('/vaktliste/api/mannskap/', content_type='application/json',
                            data={'navn': 'Kari', 'korps_id': self.korps.pk, 'user_id': user_id})
 
-    def test_vaktleder_kan_ikke_koble_en_adminkonto(self):
-        res = self._opprett(self.c_vl, self.admin.pk)
+    def test_vaktleder_kan_ikke_koble_for_haand(self):
+        res = self._opprett(self.c_vl, self.vanlig.pk)
         self.assertEqual(res.status_code, 403, res.content)
+        self.assertIn('e-posten', res.json()['message'])
         self.assertEqual(Mannskap.objects.count(), 0)
 
-    def test_vaktleder_kobler_vanlige_kontoer_som_foer(self):
-        self.assertEqual(self._opprett(self.c_vl, self.vanlig.pk).status_code, 201)
-
-    def test_global_admin_kobler_adminkontoer(self):
+    def test_global_admin_kobler_ogsaa_adminkontoer(self):
         self.assertEqual(self._opprett(self.c_adm, self.admin.pk).status_code, 201)
 
     def test_heller_ikke_ved_redigering(self):
-        pk = self._opprett(self.c_vl, self.vanlig.pk).json()['data']['id']
+        pk = self._opprett(self.c_adm, self.vanlig.pk).json()['data']['id']
         res = self.c_vl.put(f'/vaktliste/api/mannskap/{pk}/', content_type='application/json',
-                            data={'user_id': self.admin.pk})
+                            data={'user_id': None})
         self.assertEqual(res.status_code, 403)
         self.assertEqual(Mannskap.objects.get(pk=pk).user_id, self.vanlig.pk)
+
+    def test_vaktleder_redigerer_resten_som_foer(self):
+        pk = self._opprett(self.c_adm, self.vanlig.pk).json()['data']['id']
+        res = self.c_vl.put(f'/vaktliste/api/mannskap/{pk}/', content_type='application/json',
+                            data={'telefon': '99900000'})
+        self.assertEqual(res.status_code, 200, res.content)
+
+
+class EpostkoblingTests(TestCase):
+    """E-post på mannskapet, og automatisk kontokobling på adressen (André,
+    12. sep. 2026: «automatisk oppkobling til brukere og ser om det er
+    brukere med den eposten»)."""
+
+    def setUp(self):
+        self.korps = Korps.objects.create(navn='Haugesund', kortnavn='HGSD')
+        self.vaktleder = _bruker('vl', 'skriv_full')
+        self.admin = _bruker('adm', admin=True)
+        self.c_vl = _klient(self.vaktleder)
+        self.c_adm = _klient(self.admin)
+        self.kari = CustomUser.objects.create_user(
+            username='kari', password='x', email='Kari@Example.org',
+            must_change_password=False)
+
+    def _opprett(self, klient, **felt):
+        data = {'navn': 'Kari Nordmann', 'korps_id': self.korps.pk, **felt}
+        return klient.post('/vaktliste/api/mannskap/', content_type='application/json', data=data)
+
+    def test_epost_lagres_normalisert_og_kobler_kontoen(self):
+        res = self._opprett(self.c_vl, epost='  kari@example.ORG ')
+        self.assertEqual(res.status_code, 201, res.content)
+        d = res.json()['data']
+        self.assertEqual(d['epost'], 'kari@example.org')
+        self.assertEqual(d['brukernavn'], 'kari', 'kontoen med samme e-post er koblet')
+        self.assertTrue(d['konto_finnes'])
+
+    def test_uten_treff_ingen_kobling_og_merket_er_av(self):
+        d = self._opprett(self.c_vl, epost='ukjent@example.org').json()['data']
+        self.assertEqual(d['user_id'], None)
+        self.assertFalse(d['konto_finnes'])
+
+    def test_ugyldig_epost_avvises(self):
+        res = self._opprett(self.c_vl, epost='ikke en adresse')
+        self.assertEqual(res.status_code, 400)
+        self.assertEqual(Mannskap.objects.count(), 0)
+
+    def test_en_konto_kobles_bare_en_gang(self):
+        self._opprett(self.c_vl, epost='kari@example.org')
+        d = self._opprett(self.c_vl, navn='Kari II', epost='kari@example.org').json()['data']
+        self.assertIsNone(d['user_id'], 'OneToOne — den andre raden får ikke kontoen')
+        self.assertTrue(d['konto_finnes'], 'men merket sier at brukeren finnes')
+
+    def test_adminkonto_kobles_ikke_av_vaktleder_men_av_admin(self):
+        self.admin.email = 'adm@example.org'
+        self.admin.save(update_fields=['email'])
+        d = self._opprett(self.c_vl, epost='adm@example.org').json()['data']
+        self.assertIsNone(d['user_id'], 'badgen på en adminkonto er global admin sin å sette')
+        self.assertTrue(d['konto_finnes'])
+        d2 = self._opprett(self.c_adm, navn='Admin selv', epost='adm@example.org').json()['data']
+        self.assertEqual(d2['brukernavn'], 'adm')
+
+    def test_redigering_av_eposten_kobler_ogsaa(self):
+        pk = self._opprett(self.c_vl).json()['data']['id']
+        res = self.c_vl.put(f'/vaktliste/api/mannskap/{pk}/', content_type='application/json',
+                            data={'epost': 'kari@example.org'})
+        self.assertEqual(res.status_code, 200, res.content)
+        self.assertEqual(res.json()['data']['brukernavn'], 'kari')
+        self.assertEqual(Mannskap.objects.get(pk=pk).user_id, self.kari.pk)
+
+    def test_registeret_baerer_merket_uten_en_sporring_per_rad(self):
+        from django.db import connection
+        from django.test.utils import CaptureQueriesContext
+        self._opprett(self.c_vl, navn='A', epost='kari@example.org')
+        self._opprett(self.c_vl, navn='B', epost='ukjent@example.org')
+        self._opprett(self.c_vl, navn='C')
+        with CaptureQueriesContext(connection) as tre:
+            data = self.c_vl.get('/vaktliste/api/mannskap/').json()['data']
+        merker = {m['navn']: m['konto_finnes'] for m in data['mannskap']}
+        self.assertEqual(merker, {'A': True, 'B': False, 'C': False})
+        for navn in ('D', 'E', 'F'):
+            self._opprett(self.c_vl, navn=navn, epost=f'{navn.lower()}@example.org')
+        with CaptureQueriesContext(connection) as seks:
+            self.c_vl.get('/vaktliste/api/mannskap/')
+        self.assertEqual(len(tre), len(seks), 'antall spørringer skal ikke vokse med radene')
+

@@ -220,11 +220,15 @@ ingen av dem gir feilmelding — de er bare stille inaktive.
             - [x] Andrés rapport 3 (12. sep.): bilen ser de andres stempler, arkivtittel
                   uten vaktnavn, «Mitt korps» skiller korpsets fra åpent for alle, kurvens
                   hode med tre tall, «Arkiv» i eget vindu, manifest og logo.
+            - [x] Andrés runde på staging, del A (12. sep.): besetning følger lista i
+                  drift og viser neste skift, `Mannskap.epost` med automatisk
+                  kontokobling, konto for hånd bare admin, skriv_handling ser alle
+                  korps, probono i kurven.
             - [ ] **Å tenke på (André, 12. sep.):** bilen ser nå de andres stempler
+                  (avgjort 12. sep.). Sentralbordets besetning følger lista i drift
                   (avgjort 12. sep.). Skal bil 2, som ikke tar med
                   pasienten, få sette/se grovsorteringen? Kontokobling til admin bare av
-                  admin — riktig terskel? Sentralbordets besetning følger portalens
-                  aktive vakt, ikke vaktlista i drift — er det riktig scope?
+                  admin — riktig terskel?
             - [ ] Deploy 2, senere: fjern `Oppdrag.enhet`, `Statusmelding.oppdragsenhet`
                   NOT NULL (med `SET CONSTRAINTS ALL IMMEDIATE` om et dataskritt går
                   foran), og broene i `Oppdrag.save()`/`Statusmelding.save()` bort.

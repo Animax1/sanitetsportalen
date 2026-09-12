@@ -172,6 +172,8 @@ function gateKnapper() {
     .forEach((el) => el.classList.toggle('d-none', !kanSkriveAlt()));
   document.querySelectorAll('.vl-krev-leder')
     .forEach((el) => el.classList.toggle('d-none', !kanLede()));
+  document.querySelectorAll('.vl-krev-admin')
+    .forEach((el) => el.classList.toggle('d-none', !_erAdmin()));
 }
 
 
@@ -1234,12 +1236,16 @@ function _bemanningPerTime(poster) {
     const t = spenn.start + i * TIME;
     const paa = rader.filter((v) =>
       _d(v.fra_tid).getTime() <= t && _d(v.til_tid).getTime() > t);
+    const bemannet = paa.filter((v) => !v.ledig);
     ut.push({
       tid: new Date(t).toISOString(),
       // To tall, ikke ett: `planlagt` er alle plassene, `antall` er de som
       // faktisk har en person. Avstanden mellom dem er det som gjenstår.
-      antall: paa.filter((v) => !v.ledig).length,
+      antall: bemannet.length,
       planlagt: paa.length,
+      // Probono for seg (André, 12. sep. 2026): de er med i `antall`, og
+      // tegnes som den øverste delen av søylen i egen farge.
+      probono: bemannet.filter((v) => v.probono).length,
     });
   }
   return ut;
@@ -1300,12 +1306,20 @@ function _mkEnKurve(tittel, poster) {
   const soyler = punkter.map((p) => {
     const hBemannet = Math.round((p.antall / topp) * 100);
     const hPlanlagt = Math.round((p.planlagt / topp) * 100);
+    const probono = p.probono || 0;
+    const hProbono = Math.round((probono / topp) * 100);
+    const bunnProbono = Math.round(((p.antall - probono) / topp) * 100);
     const skille = _d(p.tid).getHours() === 0 ? ' vl-dogn' : '';
     const tittelTekst = `${_dag(p.tid)} kl. ${_kl(p.tid)}: `
-                      + `${p.antall} av ${p.planlagt} plasser fylt`;
+                      + `${p.antall} av ${p.planlagt} plasser fylt`
+                      + (probono ? ` (${probono} probono)` : '');
+    const probonoDel = probono
+      ? `<div class="vl-probonodel" style="height: ${escHtmlValue(hProbono)}%; bottom: ${escHtmlValue(bunnProbono)}%"></div>`
+      : '';
     return `<div class="vl-stolpe${skille}" title="${escHtmlValue(tittelTekst)}">
               <div class="vl-planlagt" style="height: ${escHtmlValue(hPlanlagt)}%"></div>
               <div class="vl-bemannet" style="height: ${escHtmlValue(hBemannet)}%"></div>
+              ${probonoDel}
             </div>`;
   }).join('');
 
@@ -1347,6 +1361,7 @@ function _tegnforklaring() {
   // var. En strek man må spørre om, er en strek som ikke forklarer noe.
   return `
     <span class="vl-tegnforklaring"><i class="vl-prikk vl-prikk-bemannet"></i>Bemannet</span>
+    <span class="vl-tegnforklaring"><i class="vl-prikk vl-prikk-probono"></i>Probono</span>
     <span class="vl-tegnforklaring"><i class="vl-prikk vl-prikk-planlagt"></i>Ledig plass</span>
     <span class="vl-tegnforklaring"><i class="vl-prikk vl-prikk-dogn"></i>Midnatt</span>`;
 }
@@ -2917,7 +2932,7 @@ function kanRedigerePerson(person) {
 function _passerPersonsok(m) {
   if (!personsok) return true;
   const n = personsok.toLowerCase();
-  return [m.navn, m.korps_navn, m.telefon, m.brukernavn]
+  return [m.navn, m.korps_navn, m.telefon, m.epost, m.brukernavn]
     .concat((m.alle_kompetanser || []).map((k) => k.navn))
     .some((v) => (v || '').toLowerCase().includes(n));
 }
@@ -3050,6 +3065,14 @@ function mkMannskap() {
       : ' <span class="vl-merkelapp vl-ureservert">Inaktiv</span>';
     const konto = m.brukernavn
       ? escapeHtml(m.brukernavn) : '<span class="vl-meta">—</span>';
+    // Merket ved e-posten sier at en portalbruker finnes med adressen —
+    // altså at koblingen skjer (eller har skjedd) av seg selv.
+    const epost = m.epost
+      ? escapeHtml(m.epost) + (m.konto_finnes
+          ? ' <i class="bi bi-person-check vl-konto-finnes" title="Portalbruker med denne e-posten"></i>'
+          : '')
+      : '<span class="vl-meta">—</span>';
+    const kontoCelle = _erAdmin() ? `<td>${konto}</td>` : '';
 
     return `
       <tr class="${escHtmlValue(inaktiv.trim())}">
@@ -3057,11 +3080,12 @@ function mkMannskap() {
         <td>${escapeHtml(m.korps_kort)}</td>
         <td class="vlr-komp" title="${escHtmlValue(alle)}">${merker}</td>
         <td class="vlr-tlf">${escapeHtml(m.telefon || '—')}</td>
-        <td>${konto}</td>
+        <td class="vlr-epost">${epost}</td>
+        ${kontoCelle}
         <td class="vlr-handling">${knapper}</td>
       </tr>`;
   }).join('')
-    : `<tr><td colspan="6" class="vl-tom">Ingen treff på «${escapeHtml(personsok)}».</td></tr>`;
+    : `<tr><td colspan="${_erAdmin() ? 7 : 6}" class="vl-tom">Ingen treff på «${escapeHtml(personsok)}».</td></tr>`;
 
   const treff = document.getElementById('vl-treff');
   if (treff) {
@@ -3069,23 +3093,35 @@ function mkMannskap() {
       ? `${rader.length} av ${register.mannskap.length}` : `${rader.length}`;
   }
 
+  // Andelene summerer til 100 i begge utgaver — kontokolonnen finnes bare
+  // for global admin, og de andre kolonnene får plassen når den mangler.
+  const kolonner = _erAdmin()
+    ? `<colgroup>
+            <col style="width: 20%"><col style="width: 8%">
+            <col style="width: 25%"><col style="width: 11%">
+            <col style="width: 17%"><col style="width: 9%">
+            <col style="width: 10%">
+          </colgroup>`
+    : `<colgroup>
+            <col style="width: 22%"><col style="width: 9%">
+            <col style="width: 28%"><col style="width: 12%">
+            <col style="width: 18%"><col style="width: 11%">
+          </colgroup>`;
+
   return `
     <div class="vl-kort">
       ${hode}
       <div class="vlr-tabellramme">
         <table class="vlr-tabell">
-          <colgroup>
-            <col style="width: 26%"><col style="width: 9%">
-            <col style="width: 31%"><col style="width: 12%">
-            <col style="width: 10%"><col style="width: 12%">
-          </colgroup>
+          ${kolonner}
           <thead>
             <tr>
               ${_personKolonne('navn', 'Navn')}
               ${_personKolonne('korps', 'Korps')}
               <th>Kompetanse</th>
               ${_personKolonne('telefon', 'Telefon')}
-              <th>Konto</th>
+              <th>E-post</th>
+              ${_erAdmin() ? '<th>Konto</th>' : ''}
               <th></th>
             </tr>
           </thead>
@@ -3125,6 +3161,7 @@ function _fyllPersonskjema(person) {
   _settVerdi('person-navn', person ? person.navn : '');
   _settVerdi('person-korps', person ? person.korps_id : '');
   _settVerdi('person-telefon', person ? person.telefon : '');
+  _settVerdi('person-epost', person ? person.epost : '');
   _settVerdi('person-konto', person && person.user_id ? person.user_id : '');
   _settVerdi('person-notat', person ? person.notat : '');
   document.getElementById('person-aktiv').checked = person ? person.er_aktiv : true;
@@ -3174,7 +3211,7 @@ async function lagrePerson() {
       navn,
       korps_id: Number(korpsId),
       telefon: _lesFelt('person-telefon'),
-      user_id: _lesFelt('person-konto') ? Number(_lesFelt('person-konto')) : null,
+      epost: _lesFelt('person-epost'),
       notat: _lesFelt('person-notat'),
       kompetanse_ider: Array.from(
         document.getElementById('person-kompetanser').selectedOptions)
@@ -3182,6 +3219,11 @@ async function lagrePerson() {
     };
     if (redigererPerson) {
       kropp.er_aktiv = document.getElementById('person-aktiv').checked;
+    }
+    // Kontokobling for hånd er global admin; andre sender ikke feltet, og
+    // serveren avviser det uansett.
+    if (_erAdmin()) {
+      kropp.user_id = _lesFelt('person-konto') ? Number(_lesFelt('person-konto')) : null;
     }
 
     const res = await apiFetch(

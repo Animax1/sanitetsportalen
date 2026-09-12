@@ -14,6 +14,7 @@ from django.utils import timezone
 
 from core.auth_decorators import er_global_admin, har_tilgang
 
+from . import choices
 from .models import Belastningsgrenser, Mannskap, Ressurs, Vaktliste
 
 
@@ -336,12 +337,12 @@ def brukerens_korps(user):
 def ser_alle_korps(user) -> bool:
     """Ser brukeren alle korps på `/vaktliste/`, eller bare sitt eget?
 
-    Andrés bestilling 11. sep. 2026: «de med rollen skrive eget korps ser
-    bare de som er med i sitt eget korps, og samme med de som bare har
-    lesetilgang». **Synligheten følger derfor ikke stigen.** `les_alle` ser
-    alle; `skriv_handling` ligger over den i `NIVAA_HIERARKI` og ser likevel
-    bare sitt eget korps. `skriv_full` og oppover ser alle — de bemanner på
-    tvers. Global admin ser alt.
+    11. sep. 2026 så korps-føreren (`skriv_handling`) bare sitt eget korps.
+    Snudd 12. sep.: «Endre skrive: eget korps til å inkludere lese: alle
+    korps.» Fra `les_alle` og oppover ser man alle; bare `les` ser sitt
+    eget. **Å se er ikke å redigere** — korps-føreren redigerer fortsatt bare
+    eget korps (`kan_fore_korps`), og nedtrekkene tilbyr bare hennes folk
+    (`mannskap_brukeren_kan_sette`). Global admin ser alt.
 
     Gjelder bare `/vaktliste/`. Sentralbordets besetning i oppdragsmodulen
     er uendret: den er gatet på `les` i vaktlista og viser bilens folk
@@ -350,7 +351,7 @@ def ser_alle_korps(user) -> bool:
     from core.auth_decorators import nivaa_for
     if kan_skrive_alt(user):
         return True
-    return nivaa_for(user, 'vaktliste') == 'les_alle'
+    return nivaa_for(user, 'vaktliste') in ('les_alle', 'skriv_handling')
 
 
 def poster_for_korps(qs, korps_id):
@@ -686,34 +687,49 @@ def besetning(enhet_id, naa=None):
     Returnerer ``None`` hvis enheten ikke er koblet til en ressurs i vakta.
     Det er noe annet enn «ingen på vakt», og de to skal ikke se like ut:
     ubemannet er et problem, ukoblet er et oppsett som mangler.
+
+    **Lista i drift vinner** (André, 12. sep. 2026: «koblingen fungerer
+    ikke»). Scopet var portalens aktive vakt alene, og da fant sentralbordet
+    ingenting når vaktlista som faktisk kjørte lå på en annen vakt. Er en
+    liste satt i drift med bilen koblet, er det den som gjelder; ellers den
+    aktive vaktas. Og dekker ingen skift akkurat nå, sendes **neste skift**
+    med, så svaret er «ingen nå, Kari og Ola fra 16:00» og ikke bare «ingen».
     """
     from patients.services import hent_aktiv_vakt
     from .models import Vaktpost
 
     naa = naa or timezone.now()
     vakt = hent_aktiv_vakt()
-    if vakt is None:
-        return None
 
-    ressurs = (Ressurs.objects
-               .filter(enhet_id=enhet_id, vaktliste__vakt=vakt)
-               .select_related('vaktliste')
-               .first())
+    kandidater = (Ressurs.objects
+                  .filter(enhet_id=enhet_id)
+                  .select_related('vaktliste__vakt'))
+    ressurs = (kandidater.filter(vaktliste__status=choices.DRIFT).first()
+               or (kandidater.filter(vaktliste__vakt=vakt).first() if vakt else None))
     if ressurs is None:
         return None
 
-    poster = (Vaktpost.objects
-              .filter(ressurs=ressurs, mannskap__isnull=False,
-                      fra_tid__lte=naa, til_tid__gte=naa)
-              .select_related('mannskap', 'rolle')
-              .order_by('mannskap__navn'))
+    def _rad(vp):
+        return {
+            'navn': vp.mannskap.navn,
+            'rolle': vp.rolle.navn if vp.rolle else '',
+            'tilstede': vp.er_tilstede,
+            'mott': vp.mott_at is not None,
+        }
 
-    mannskap = [{
-        'navn': vp.mannskap.navn,
-        'rolle': vp.rolle.navn if vp.rolle else '',
-        'tilstede': vp.er_tilstede,
-        'mott': vp.mott_at is not None,
-    } for vp in poster]
+    bemannede = (Vaktpost.objects
+                 .filter(ressurs=ressurs, mannskap__isnull=False)
+                 .select_related('mannskap', 'rolle'))
+    poster = bemannede.filter(fra_tid__lte=naa, til_tid__gte=naa).order_by('mannskap__navn')
+    mannskap = [_rad(vp) for vp in poster]
+
+    neste, neste_fra = [], None
+    if not mannskap:
+        forste = bemannede.filter(fra_tid__gt=naa).order_by('fra_tid').first()
+        if forste is not None:
+            neste_fra = forste.fra_tid
+            neste = [_rad(vp) for vp in
+                     bemannede.filter(fra_tid=neste_fra).order_by('mannskap__navn')]
 
     # **De som er i bilen først.** Operatørens spørsmål er «hvem har jeg», og
     # da skal svaret stå øverst; de som mangler er den andre halvdelen av
@@ -728,8 +744,12 @@ def besetning(enhet_id, naa=None):
 
     return {
         'ressurs_navn': ressurs.navn,
+        'vaktliste_navn': ressurs.vaktliste.vakt.navn,
         'i_drift': ressurs.vaktliste.i_drift,
         'mannskap': mannskap,
+        # Neste skift når ingen dekker nå — navn og klokkeslett, ikke et tomt svar.
+        'neste': neste,
+        'neste_fra': neste_fra.isoformat() if neste_fra else None,
         'antall': len(mannskap),
         # **Tilstede utledes av stemplene** (`Vaktpost.er_tilstede`), aldri av
         # en lagret status. Er lista ikke i drift, er ingen stemplet — og da

@@ -714,6 +714,16 @@
   background: var(--portal-accent, #3b82f6);
 }
 
+/* Probono som den øverste delen av søylen, i egen farge (12. sep. 2026).
+   `bottom` settes inline: den begynner der de ordinære slutter. */
+.vl-probonodel {
+  position: absolute;
+  left: 0;
+  right: 0;
+  border-radius: 1px 1px 0 0;
+  background: #10b981;
+}
+
 .vl-stolpe.vl-dogn::before {
   content: '';
   position: absolute;
@@ -739,6 +749,8 @@
 }
 
 .vl-prikk-bemannet { background: var(--portal-accent, #3b82f6); }
+.vl-prikk-probono { background: #10b981; }
+.vl-konto-finnes { color: #10b981; }
 .vl-prikk-planlagt {
   background: color-mix(in srgb, var(--portal-accent, #3b82f6) 28%, transparent);
 }

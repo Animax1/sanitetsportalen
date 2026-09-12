@@ -37,6 +37,7 @@ navneregistre.
 """
 from __future__ import annotations
 
+from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
 from django.db.models.deletion import ProtectedError
 from django.http import JsonResponse
@@ -286,7 +287,49 @@ rolle_detalj_view.__name__ = 'rolle_detalj_view'
 
 # ── Mannskapet ───────────────────────────────────────────────────────────────
 
-def _mannskap_til_dict(m, foreldre=None):
+def _kjente_eposter():
+    """E-postene til aktive portalkontoer, små bokstaver — for «finnes det
+    en bruker med denne e-posten?» uten én spørring per rad."""
+    from accounts.models import CustomUser
+    return {e.lower() for e in
+            CustomUser.objects.filter(is_active=True)
+            .exclude(email__isnull=True).exclude(email='')
+            .values_list('email', flat=True)}
+
+
+def _normaliser_epost(raa):
+    """Trimmet og i små bokstaver. Kaster `ValidationError` hvis den ikke er
+    en e-postadresse; tom streng er lov."""
+    from django.core.validators import validate_email
+    epost = (raa or '').strip().lower()
+    if epost:
+        validate_email(epost)
+    return epost
+
+
+def _koble_paa_epost(request, person):
+    """Koble kontoen med samme e-post, hvis personen ikke alt har en
+    (André, 12. sep. 2026: «automatisk oppkobling til brukere»).
+
+    Kobles bare når kontoen er ledig — `Mannskap.user` er OneToOne — og
+    aldri en adminkonto for andre enn global admin: badgen avgjør hva kontoen
+    får redigere, og den regelen skal ikke kunne omgås ved å skrive inn
+    administratorens e-post. Returnerer True hvis noe ble koblet."""
+    from accounts.models import CustomUser
+    if person.user_id or not person.epost:
+        return False
+    konto = (CustomUser.objects
+             .filter(email__iexact=person.epost, is_active=True, mannskap__isnull=True)
+             .first())
+    if konto is None:
+        return False
+    if konto.role == 'admin' and not er_global_admin(request.user):
+        return False
+    person.user = konto
+    return True
+
+
+def _mannskap_til_dict(m, foreldre=None, kjente_eposter=None):
     """Én person som JSON.
 
     `kompetanser` er de **synlige** — har hun AFØR, er VFØR implisert og
@@ -309,13 +352,22 @@ def _mannskap_til_dict(m, foreldre=None):
         'kompetanser': [{'id': k.pk, 'navn': k.navn} for k in synlige],
         'alle_kompetanser': [{'id': k.pk, 'navn': k.navn} for k in alle],
         'telefon': m.telefon,
+        'epost': m.epost,
+        # Finnes det en portalbruker med denne e-posten? Vises som et merke
+        # ved adressen, så den som legger inn folk ser at koblingen kan skje.
+        'konto_finnes': bool(m.epost) and (
+            m.user_id is not None
+            or (m.epost.lower() in kjente_eposter if kjente_eposter is not None
+                else _kjente_eposter().__contains__(m.epost.lower()))),
         'user_id': m.user_id,
         'brukernavn': m.user.username if m.user else '',
         'er_aktiv': m.er_aktiv,
         'notat': m.notat,
         # Er personen satt opp noe sted, kan raden ikke slettes. Klienten
-        # trenger å vite det før knappen trykkes, ikke etterpå.
-        'i_bruk': m.vaktposter.count(),
+        # trenger å vite det før knappen trykkes, ikke etterpå. Lista
+        # annoterer tallet; én rad regner det selv.
+        'i_bruk': (m.i_bruk_antall if getattr(m, 'i_bruk_antall', None) is not None
+                   else m.vaktposter.count()),
     }
 
 
@@ -339,20 +391,6 @@ def _kontoer():
     ]
 
 
-def _kobler_til_admin(request, user_id) -> bool:
-    """Å koble en **adminkonto** til et korps er global admin (André,
-    12. sep. 2026). Badgen avgjør hva kontoen får redigere, og en
-    vaktleder skal ikke kunne gi administratoren et korps — eller ta det
-    fra henne."""
-    from django.contrib.auth import get_user_model
-    if er_global_admin(request.user):
-        return False
-    pk = _int(user_id)
-    if pk is None:
-        return False
-    return get_user_model().objects.filter(pk=pk, role='admin').exists()
-
-
 @never_cache
 @modul_kreves('vaktliste', 'les', svar='json')
 @require_http_methods(['GET', 'POST'])
@@ -371,24 +409,27 @@ def mannskap_view(request):
         # Korps-brukeren ser sitt eget korps (11. sep. 2026) — registeret
         # er adresseboka, og andres telefonnumre er ikke noe hun trenger
         # for å føre sin egen liste.
+        from django.db.models import Count
         folk = services.synlig_mannskap(
             Mannskap.objects
             .select_related('korps', 'user')
-            .prefetch_related('kompetanser'),
+            .prefetch_related('kompetanser')
+            .annotate(i_bruk_antall=Count('vaktposter')),
             request.user)
         foreldre = services.foreldrekart()
+        kjente = _kjente_eposter()
         return JsonResponse({'status': 'ok', 'data': {
-            'mannskap': [_mannskap_til_dict(m, foreldre) for m in folk],
+            'mannskap': [_mannskap_til_dict(m, foreldre, kjente) for m in folk],
             **{
                 nokkel: [verdi_til_dict(modell, r, **kw)
                          for r in modell.objects.all()]
                 for nokkel, (modell, kw) in VERDIMENGDER.items()
             },
-            # Kontolista er bare med for den som kan bruke den. `user_id`
-            # er `skriv_full`-felt (se under), og en liste over portalens
-            # brukernavn er ikke noe en korps-fører trenger for å føre lista
-            # si.
-            'kontoer': _kontoer() if services.kan_skrive_alt(request.user) else [],
+            # Kontolista er bare med for den som kan bruke den: kontokobling
+            # for hånd er global admin (André, 12. sep. 2026 — «Konto-raden
+            # fjernes fra alle som ikke er admin»). Alle andre kobler
+            # gjennom e-posten, av seg selv.
+            'kontoer': _kontoer() if er_global_admin(request.user) else [],
         }})
 
     data = _json_body(request)
@@ -406,23 +447,28 @@ def mannskap_view(request):
         return _nektet()
 
     # `user`-koblingen flytter en badge: kontoen den peker på arver korpset,
-    # og dermed hva den kontoen får redigere. Den er derfor `skriv_full`, selv
-    # om resten av raden er korps-førerens bord.
-    full = services.kan_skrive_alt(request.user)
-    if data.get('user_id') and not full:
-        return _nektet('Kontokobling krever full skrivetilgang.')
-    if data.get('user_id') and _kobler_til_admin(request, data.get('user_id')):
-        return _nektet('Bare global admin kan koble en adminkonto til et korps.')
+    # og dermed hva den kontoen får redigere. For hånd er den global admin
+    # (12. sep. 2026); alle andre kobler gjennom e-posten under.
+    admin = er_global_admin(request.user)
+    if data.get('user_id') and not admin:
+        return _nektet('Kontokobling for hånd er global admin. Legg inn e-posten, så kobles kontoen av seg selv.')
+    try:
+        epost = _normaliser_epost(data.get('epost'))
+    except ValidationError:
+        return _feil('E-postadressen ser ikke riktig ut.')
 
     try:
         with transaction.atomic():
-            person = Mannskap.objects.create(
+            person = Mannskap(
                 navn=navn,
                 korps=korps,
                 telefon=(data.get('telefon') or '').strip(),
-                user_id=_int(data.get('user_id')) if full else None,
+                epost=epost,
+                user_id=_int(data.get('user_id')) if admin else None,
                 notat=(data.get('notat') or '').strip(),
             )
+            _koble_paa_epost(request, person)
+            person.save()
             person.kompetanser.set(_ider(data.get('kompetanse_ider')))
     except IntegrityError:
         return _feil(f'«{navn}» finnes allerede i {korps.navn}. '
@@ -460,7 +506,7 @@ def mannskap_detalj_view(request, pk):
 
     if not services.kan_redigere_mannskap(request.user, person):
         return _nektet()
-    full = services.kan_skrive_alt(request.user)
+    admin = er_global_admin(request.user)
 
     if request.method == 'DELETE':
         try:
@@ -488,16 +534,22 @@ def mannskap_detalj_view(request, pk):
         person.korps = korps
     if 'telefon' in data:
         person.telefon = (data.get('telefon') or '').strip()
+    if 'epost' in data:
+        try:
+            person.epost = _normaliser_epost(data.get('epost'))
+        except ValidationError:
+            return _feil('E-postadressen ser ikke riktig ut.')
     if 'notat' in data:
         person.notat = (data.get('notat') or '').strip()
     if 'er_aktiv' in data:
         person.er_aktiv = bool(data['er_aktiv'])
     if 'user_id' in data:
-        if not full:
-            return _nektet('Kontokobling krever full skrivetilgang.')
-        if _kobler_til_admin(request, data['user_id']):
-            return _nektet('Bare global admin kan koble en adminkonto til et korps.')
+        if not admin:
+            # Korps-føreren og vaktlederen sender ikke feltet — skjemaet
+            # deres har det ikke. Et kall utenom skjemaet avvises.
+            return _nektet('Kontokobling for hånd er global admin. Legg inn e-posten, så kobles kontoen av seg selv.')
         person.user_id = _int(data['user_id'])
+    _koble_paa_epost(request, person)
 
     try:
         with transaction.atomic():

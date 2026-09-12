@@ -741,10 +741,17 @@
             <input type="text" id="person-telefon" class="form-control" maxlength="20">
             <div class="form-text">Brukes av KO og vaktleder under vakt. Valgfritt.</div>
           </div>
-          <div class="col-md-6 vl-krev-full d-none">
+          <div class="col-md-6">
+            <label class="form-label" for="person-epost">E-post</label>
+            <input type="email" id="person-epost" class="form-control" maxlength="120">
+            <div class="form-text">Valgfritt. Finnes en portalbruker med samme
+              e-post, kobles kontoen av seg selv.</div>
+          </div>
+          {# Kontokobling for hånd er global admin (12. sep. 2026). #}
+          <div class="col-md-6 vl-krev-admin d-none">
             <label class="form-label" for="person-konto">Koblet konto</label>
             <select id="person-konto" class="form-select"></select>
-            <div class="form-text">Valgfritt. Gir i seg selv ingen tilgang — den
+            <div class="form-text">Gir i seg selv ingen tilgang — den
               sier bare hvem kontoen er, og hvilket korps den arver.</div>
           </div>
         </div>

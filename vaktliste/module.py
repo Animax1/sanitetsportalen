@@ -54,7 +54,7 @@ VaktlisteModule = Module(
     nivaa_navn=(
         ('les', 'Lese: eget korps'),
         ('les_alle', 'Lese: alle korps'),
-        ('skriv_handling', 'Skrive: eget korps'),
+        ('skriv_handling', 'Skrive: eget korps, ser alle'),
         ('skriv_full', 'Skrive: alle korps'),
         ('skriv_leder', 'Skrive: leder — setter opp vakta'),
     ),

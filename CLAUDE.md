@@ -301,9 +301,11 @@ fase 3–7 gjenstår — se `docs/BESLUTNING_VAKTLISTE.md`, som er besluttet i s
   ressursen og glemme plassen. **Tom verdi betyr «som ressursen», ikke «ingen»**: en
   annen tolkning ville gjort alle eksisterende plasser fritt vilt ved oppgraderingen.
   Å *sette* reservasjonen er å dele ut, og krever `skriv_full`.
-- **Korpsfilteret (11. sep. 2026): `les` og `skriv_handling` ser bare sitt eget korps
-  på `/vaktliste/`; `les_alle`, `skriv_full` og oppover ser alle.** Synligheten følger
-  *ikke* stigen — `skriv_handling` ligger over `les_alle` og ser likevel bare sitt eget.
+- **Korpsfilteret (11.–12. sep. 2026): bare `les` ser sitt eget korps på `/vaktliste/`;
+  `les_alle`, `skriv_handling` og oppover ser alle.** `skriv_handling` så én dag bare sitt
+  eget; André snudde det 12. sep. («inkludere lese: alle korps»). **Å se er ikke å
+  redigere**: korps-føreren redigerer fortsatt bare eget korps (`kan_fore_korps`), og
+  nedtrekkene tilbyr bare hennes folk (`mannskap_brukeren_kan_sette`).
   `services.ser_alle_korps()` er det ene stedet; `synlige_vaktposter()` og
   `synlig_mannskap()` filtrerer i svaret sida bygges av, så alle fanene følger med.
   Uten badge er lista tom, og malen sier hvorfor. Sentralbordets besetning i
@@ -318,14 +320,18 @@ fase 3–7 gjenstår — se `docs/BESLUTNING_VAKTLISTE.md`, som er besluttet i s
   opprette et korps eller omreservere KO, ville badgen sluttet å avgrense noe. Sletting av
   en vaktliste er global admin.
 - **`Mannskap.korps_id` og `Mannskap.user_id` er unntatt badgen.** Flytting sjekkes mot
-  *begge* korps, og kontokoblingen er `skriv_full` fordi den flytter en badge — kontoen
-  arver korpset, og dermed hva den kontoen får redigere.
+  *begge* korps, og kontokobling **for hånd er global admin** (12. sep. 2026) fordi den
+  flytter en badge — kontoen arver korpset, og dermed hva den kontoen får redigere. Alle
+  andre kobler gjennom **`Mannskap.epost`**: finnes en aktiv, ledig portalkonto med samme
+  e-post, kobles den av seg selv ved lagring (`views_registre._koble_paa_epost`) — aldri en
+  adminkonto for andre enn admin. `konto_finnes` i svaret sier om en bruker med adressen
+  finnes, regnet av ett sett e-poster, ikke én spørring per rad.
 - **Kostbehov/matallergi lagres ikke** (art. 9 — besluttet holdt utenfor portalen), og
   `Mannskap.notat` er unntatt verdilogging i audit (`signals.FELT_UTEN_VERDILOGGING`).
 - **En ledig plass har tre tilstander** (11.–12. sep. 2026): tildelt ett korps
   (`Vaktpost.korps`/ressursens), **åpen for alle** (`Vaktpost.alle_korps` — alle ser og kan
-  fylle; het «utildelt» én dag), eller **planlagt** — lederens kladd, som korps-brukerne ikke ser
-  (`services.er_planlagt`). `alle_korps` vinner over `korps`. Å dele ut er `skriv_full`,
+  fylle; het «utildelt» én dag), eller **planlagt** — lederens kladd, som `les` ikke ser og
+  som ingen under `skriv_full` kan fylle (`services.er_planlagt`). `alle_korps` vinner over `korps`. Å dele ut er `skriv_full`,
   og **planlagt går én vei**: en plass som er delt ut tas ikke tilbake til kladden —
   viewet avviser det, og nedtrekket tilbyr «Planlagt» bare så lenge plassen står der. Fanen «Mitt korps» (`mkMittKorps`) viser korpsets tildelte og
   universale plasser på tvers av ressursene; `kanBemannePlass()` i JS speiler serveren
@@ -485,11 +491,11 @@ Oppdragsmodulen importerer **ikke** vaktlista; `oppdrag-sentral.js` henter
   personalmapper.
 - **Bare skiftene som dekker nå**, og **404 når enheten er ukoblet**: ubemannet
   og ukoblet er ulike svar på ulike problemer.
-- **Scopet er portalens aktive vakt**, og 404-meldingen skiller «koblet i en
-  annen vakt» fra «ikke koblet noe sted» (`services.koblet_i_annen_vakt`).
-  Den som planlegger en vakt fram i tid kobler bilene der, og en melding som
-  bare sier «ikke koblet» sender henne ut på jakt etter en feil som ikke
-  finnes — det kostet André en kveld 30. aug. 2026.
+- **Lista i drift vinner; ellers portalens aktive vakt** (12. sep. 2026 — «koblingen
+  fungerer ikke»: vaktlista som kjørte lå på en annen vakt enn den aktive). Dekker
+  ingen skift nå, sendes **neste skift** med (`neste`, `neste_fra`), så svaret er «ingen
+  nå, Kari fra 16:00». 404-meldingen skiller fortsatt «koblet i en annen vakt» fra «ikke
+  koblet noe sted» (`services.koblet_i_annen_vakt`) — det kostet André en kveld 30. aug.
 - **Rekkefølgen sorteres i Python.** `rolle` er nullbar, og SQLite (dev) og
   PostgreSQL (prod) plasserer NULL i hver sin ende.
 

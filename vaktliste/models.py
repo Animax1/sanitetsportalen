@@ -292,6 +292,16 @@ class Mannskap(BaseTimeStampedModel):
         verbose_name='Telefon',
         help_text='Brukes av KO og vaktleder under vakt. Valgfritt.',
     )
+    # E-post (André, 12. sep. 2026): kontaktinfo, og nøkkelen som kobler
+    # personen til portalkontoen av seg selv — se `views_registre`.
+    epost = models.EmailField(
+        max_length=120,
+        blank=True,
+        default='',
+        verbose_name='E-post',
+        help_text='Valgfritt. Finnes en portalbruker med samme e-post, '
+                  'kobles kontoen automatisk.',
+    )
     # Badgen-koblingen (§4): kontoen arver korpset herfra. SET_NULL, ikke
     # CASCADE — slettes kontoen, består personen i registeret. Samme valg
     # som `Enhet.user` og `Forstehjelper.user`.

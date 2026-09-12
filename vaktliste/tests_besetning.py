@@ -223,6 +223,52 @@ class BesetningTests(TilgangsBasis):
         self.assertIn('noen vaktliste', melding)
         self.assertNotIn('aktive vakta', melding)
 
+    def test_lista_i_drift_vinner_over_den_aktive_vakta(self):
+        """André, 12. sep. 2026: «koblingen fungerer ikke mellom
+        ambulanse/mannskapsbil og oppdrag». Vaktlista som kjørte lå på en
+        annen vakt enn portalens aktive. Er en liste i drift med bilen
+        koblet, er det den som gjelder."""
+        annen = services.opprett_planlagt_vakt('Helgevakten')
+        annen.status = choices.DRIFT
+        annen.save(update_fields=['status'])
+        drift_bil = lag_ressurs(vaktliste=annen, navn='Driftsbilen',
+                                gruppe=gruppe(AMBULANSE), enhet=self.enhet, rekkefolge=9)
+        Vaktpost.objects.create(
+            ressurs=drift_bil, mannskap=self.p_karmoy,
+            fra_tid=self.na - timedelta(hours=1), til_tid=self.na + timedelta(hours=7))
+        self._skift(self.p_hgsd)
+        d = self._hent().json()['data']
+        self.assertEqual('Driftsbilen', d['ressurs_navn'])
+        self.assertEqual(['Ola'], [m['navn'] for m in d['mannskap']])
+        self.assertEqual('Helgevakten', d['vaktliste_navn'])
+
+    def test_bare_i_drift_uten_aktiv_vakt_virker_ogsaa(self):
+        """Uten en aktiv vakt i portalen fant endepunktet ingenting før."""
+        self.vl.status = choices.DRIFT
+        self.vl.save(update_fields=['status'])
+        AppSetting.set('aktiv_vakt_id', '')
+        self._skift(self.p_hgsd)
+        d = self._hent().json()['data']
+        self.assertEqual(['Kari'], [m['navn'] for m in d['mannskap']])
+
+    def test_neste_skift_naar_ingen_dekker_naa(self):
+        """«Ingen på vakt nå» alene sa ikke om bilen var ubemannet eller bare
+        ikke begynt ennå."""
+        self._skift(self.p_hgsd, fra=3, til=11)
+        self._skift(self.p_karmoy, fra=3, til=11)
+        self._skift(self.p_hgsd, fra=12, til=20)
+        d = self._hent().json()['data']
+        self.assertEqual(d['mannskap'], [])
+        self.assertEqual([m['navn'] for m in d['neste']], ['Kari', 'Ola'],
+                         'bare det første kommende skiftet')
+        self.assertEqual(d['neste_fra'][:16], (self.na + timedelta(hours=3)).isoformat()[:16])
+
+    def test_ingen_neste_naar_noen_er_paa_naa(self):
+        self._skift(self.p_hgsd)
+        d = self._hent().json()['data']
+        self.assertEqual(d['neste'], [])
+        self.assertIsNone(d['neste_fra'])
+
     def test_den_aktive_vinner_naar_bilen_staar_i_begge(self):
         """En bil kan være koblet i både kveldens og oktobers vaktliste. Da
         er det kveldens besetning sentralbordet skal vise — ikke en melding
@@ -302,6 +348,7 @@ class BesetningspanelTests(SimpleTestCase):
 
     HARNESS = (
         (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue')),
+        (PORTAL_UTILS_JS, ('klokke',)),
         (OPPDRAG_SENTRAL_JS, ('mkBesetning', 'kanSeBesetning',
                               'hentBesetning')),
     )
@@ -324,6 +371,15 @@ class BesetningspanelTests(SimpleTestCase):
             'tilstede': 1, 'mannskap': [
                 {'navn': 'Kari', 'rolle': 'Sjåfør', 'tilstede': True, 'mott': True},
                 {'navn': 'Ola', 'rolle': '', 'tilstede': False, 'mott': False}]}
+
+    def test_neste_skift_vises_naar_ingen_er_paa_naa(self):
+        ut = self._panel({'ressurs_navn': 'Ambulanse 1', 'i_drift': False, 'mannskap': [],
+                           'antall': 0, 'tilstede': 0,
+                           'neste': [{'navn': 'Kari'}, {'navn': '<b>Ola</b>'}],
+                           'neste_fra': '2026-10-03T14:00:00Z'})
+        self.assertIn('Ingen på vakt på Ambulanse 1 nå.', ut)
+        self.assertIn('Neste skift', ut)
+        self.assertIn('Kari, &lt;b&gt;Ola&lt;/b&gt;.', ut)
 
     def test_serverens_forklaring_vises_uendret(self):
         """M83: skrev klienten sin egen generiske «ikke koblet», sendte den

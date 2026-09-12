@@ -676,10 +676,9 @@ def besetning_view(request, pk):
     annen = services.koblet_i_annen_vakt(pk)
     if annen:
         return _feil(
-            f'Enheten er koblet i vaktlista for «{annen}», som ikke er den '
-            f'aktive vakta. Sentralbordet viser den aktive vakta — bytt den '
-            f'i vaktadministrasjonen, eller koble enheten i vaktlista for '
-            f'vakta som går nå.', status=404)
+            f'Enheten er koblet i vaktlista for «{annen}», som verken er i '
+            f'drift eller hører til den aktive vakten. Sett den lista i drift, '
+            f'eller koble enheten i vaktlista for vakten som går nå.', status=404)
     return _feil('Enheten er ikke koblet til en ressurs i noen vaktliste.',
                  status=404)
 

@@ -119,6 +119,7 @@ REVIEWED_INTERPOLATIONS = {
     'tidslinjeEnhetHtml(o)': 'markup fra en bygger som selv skannes her',
     '_varsledeRad(o)': 'markup fra en bygger som selv skannes her',
     'andresTidslinje': 'tom streng eller markup fra `tidslinjeEnhetHtml`, som selv skannes her',
+    'neste': 'tom streng eller tekst bygget rett over med escapeHtml',
     'hvem': 'tom streng eller escapet enhetsnavn bygget rett over',
     "andres ? ' tidslinje-andre' : ''": 'intern CSS-klasse fra en ternær',
     '_arkivTittel(a)': 'tittelen, escapet der den settes inn',

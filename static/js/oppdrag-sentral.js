@@ -156,8 +156,14 @@ function mkBesetning(enhetId) {
     return `<div class="besetning"><span class="enhet-meta">${escapeHtml(b.feil)}</span></div>`;
   }
   if (!b.mannskap.length) {
+    // Neste skift når ingen dekker nå: «ingen» alene sa ikke om bilen var
+    // ubemannet eller bare ikke begynt ennå (André, 12. sep. 2026).
+    const neste = (b.neste || []).length
+      ? ` Neste skift ${escapeHtml(klokke(b.neste_fra))}: `
+        + escapeHtml(b.neste.map((m) => m.navn).join(', ')) + '.'
+      : '';
     return `<div class="besetning"><span class="enhet-meta">`
-         + `Ingen på vakt på ${escapeHtml(b.ressurs_navn)} nå.</span></div>`;
+         + `Ingen på vakt på ${escapeHtml(b.ressurs_navn)} nå.${neste}</span></div>`;
   }
 
   const rader = b.mannskap.map((m) => {
