@@ -220,12 +220,9 @@ ingen av dem gir feilmelding — de er bare stille inaktive.
             - [x] Andrés rapport 3 (12. sep.): bilen ser de andres stempler, arkivtittel
                   uten vaktnavn, «Mitt korps» skiller korpsets fra åpent for alle, kurvens
                   hode med tre tall, «Arkiv» i eget vindu, manifest og logo.
-            - [ ] **Railway-variabler på staging (André, 12. sep.):** `ALLOWED_HOSTS` er
-                  prods (`portal.sanitet.net,.railway.app`) — `testportal.sanitet.net`
-                  må inn hvis domenet skal brukes, ellers bør DNS-pekeren bort. Og
-                  `CSRF_TRUSTED_ORIGINS` har en skrivefeil: `/ https://*.railway.app`
-                  (ledende «/ ») — railway.app-origins er ikke CSRF-trygge i dag. Sjekk
-                  prods verdi også.
+            - [x] Railway-variabler (André, 12. sep.): `testportal.sanitet.net` inn i
+                  staging sine `ALLOWED_HOSTS`/`CSRF_TRUSTED_ORIGINS`, og skrivefeilen
+                  `/ https://*.railway.app` rettet begge steder.
             - [x] Feilvarsel (12. sep.): `django`-loggeren bruker vår dempede, slanke
                   e-posthandler; `DisallowedHost` går bare til konsollen.
             - [x] **Deploy til prod 12. sep. 2026** (`39ece18`, fra `49406fd`), backup tatt
