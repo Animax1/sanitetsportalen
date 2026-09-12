@@ -6,10 +6,13 @@ mens en gjeninnført Settings-dump ville gått upåaktet hen.
 
 Kjør med: python manage.py test core.tests_error_reporting
 """
+import logging
 import sys
 
 from django.conf import settings
-from django.test import RequestFactory, TestCase, override_settings
+from django.core import mail
+from django.test import Client, RequestFactory, TestCase, override_settings
+from django.utils.log import AdminEmailHandler
 
 from core.error_reporting import SlankExceptionReporter
 
@@ -131,3 +134,40 @@ class KoblingTests(TestCase):
         self.assertIs(
             settings.LOGGING['handlers']['mail_admins'].get('include_html'), False
         )
+
+
+class DjangoLoggerenTests(TestCase):
+    """Alt som logges under `django.*` skal gå gjennom **vår** e-posthandler
+    — dempet og slank — ikke Djangos egen fra DEFAULT_LOGGING (12. sep.
+    2026: en skanner mot staging ga hundre e-poster med full Settings-dump
+    på fem minutter, via `django.security.DisallowedHost`)."""
+
+    def _epost_handlere(self, navn):
+        logger = logging.getLogger(navn)
+        handlere = []
+        while logger is not None:
+            handlere += [h for h in logger.handlers if isinstance(h, AdminEmailHandler)]
+            if not logger.propagate:
+                break
+            logger = logger.parent
+        return handlere
+
+    def test_django_loggeren_bruker_den_slanke_og_dempede_handleren(self):
+        from core.log_filters import ThrottleByMessageFilter
+        handlere = self._epost_handlere('django')
+        self.assertEqual(len(handlere), 1, 'én e-posthandler, vår')
+        h = handlere[0]
+        self.assertIs(h.reporter_class, SlankExceptionReporter)
+        self.assertTrue(any(isinstance(f, ThrottleByMessageFilter) for f in h.filters))
+
+    def test_feil_host_gir_400_uten_e_post(self):
+        self.assertEqual(self._epost_handlere('django.security.DisallowedHost'), [])
+        res = Client().get('/healthz/', HTTP_HOST='skanner.example', secure=True)
+        self.assertEqual(res.status_code, 400)
+        self.assertEqual(mail.outbox, [])
+
+    @override_settings(DEBUG=True)
+    def test_ingen_e_post_i_debug(self):
+        self.assertTrue(all(
+            any(f.__class__.__name__ == 'RequireDebugFalse' for f in h.filters)
+            for h in self._epost_handlere('django.request')))

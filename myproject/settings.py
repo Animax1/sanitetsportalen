@@ -477,6 +477,7 @@ LOGGING = {
             '()': 'core.log_filters.ThrottleByMessageFilter',
             'window_seconds': 15 * 60,
         },
+        'require_debug_false': {'()': 'django.utils.log.RequireDebugFalse'},
     },
     'handlers': {
         'console': {
@@ -486,7 +487,7 @@ LOGGING = {
         'mail_admins': {
             'level': 'ERROR',
             'class': 'django.utils.log.AdminEmailHandler',
-            'filters': ['error_throttle'],
+            'filters': ['require_debug_false', 'error_throttle'],
             # include_html=False er et sikkerhetsvalg, ikke en formateringssak.
             # HTML-malen (technical_500.html) tar med *lokale variabler* for hver
             # stackramme. En feil i en pasientvisning ville da sendt kliniske
@@ -511,9 +512,30 @@ LOGGING = {
             'level': 'INFO',
             'propagate': False,
         },
+        # **`django`-loggeren må stå her, ellers bruker den Djangos egen
+        # e-posthandler** (12. sep. 2026). Django konfigurerer DEFAULT_LOGGING
+        # før vår LOGGING, og en logger vi ikke nevner beholder handlerne
+        # derfra: `django` fikk da en AdminEmailHandler *uten* demping og
+        # *uten* den slanke rapportøren. Alt som logges under `django.*` utenom
+        # `django.request` — `django.security.*` først og fremst — gikk den
+        # veien, og sendte hele Settings- og META-dumpen på e-post. En
+        # portskanner mot staging ga hundre slike på fem minutter.
+        'django': {
+            'handlers': ['console', 'mail_admins'],
+            'level': 'INFO',
+            'propagate': False,
+        },
         # Uhåndterte exceptions i views. Django logger disse på ERROR.
         'django.request': {
             'handlers': ['console', 'mail_admins'],
+            'level': 'ERROR',
+            'propagate': False,
+        },
+        # Feil Host-header er ikke en feil hos oss: det er skannere som
+        # prøver domener på måfå, og svaret er 400 uansett. Konsollen får
+        # linja, ingen får e-post — Djangos egen anbefaling for denne loggeren.
+        'django.security.DisallowedHost': {
+            'handlers': ['console'],
             'level': 'ERROR',
             'propagate': False,
         },

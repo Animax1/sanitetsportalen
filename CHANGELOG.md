@@ -4,6 +4,26 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-12 — Feilvarsel: `django`-loggeren bruker vår e-posthandler
+
+En skanner (leakix) prøvde `testportal.sanitet.net` mot staging, fikk 400
+på hver forespørsel — og hver forespørsel ble en e-post med **full
+Settings- og META-dump**, rundt hundre på fem minutter.
+
+- **Årsak:** Django konfigurerer sin egen `DEFAULT_LOGGING` før vår, og en
+  logger vi ikke nevner beholder handlerne derfra. `django.request` var
+  vår, men `django.security.DisallowedHost` propagerte til `django`, som
+  fortsatt hadde Djangos AdminEmailHandler — uten demping og uten den slanke
+  rapportøren. Den slanke rapporten var altså bare i bruk for uhåndterte
+  exceptions i views.
+- **Rettet:** `django` står nå i LOGGING med vår handler,
+  `django.security.DisallowedHost` går bare til konsollen (Djangos egen
+  anbefaling — feil Host-header er skannere, ikke feil hos oss), og
+  e-posthandleren har `require_debug_false` som Djangos.
+- Ikke rettet i kode: staging-tjenesten har prods `ALLOWED_HOSTS` og en
+  `CSRF_TRUSTED_ORIGINS` med en skrivefeil (`/ https://*.railway.app`). Se
+  TODO.
+
 ## 2026-09-12 — «Valglister», og fanene i mørkt
 
 - Knappen og vinduet «Verdier» heter **«Valglister»** (André: «noe annet
