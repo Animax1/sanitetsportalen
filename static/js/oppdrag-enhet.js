@@ -200,10 +200,13 @@ function visUsendt() {
 function _stedvalg() {
   // Seks steder fra serveren (`OPPDRAG_AVREIST_TIL`), som store knapper.
   // Nøkkelen er det som sendes; etiketten det som vises.
+  // **`data-arg`, ikke `data-id`**: delegeringen gjør `data-id` om til tall,
+  // og `Number('sykehus')` er NaN. Knappene sto døde i prod 12. sep. 2026
+  // fordi node-testene bare så på markupen — ingen klikket på dem.
   const knapper = AVREIST_TIL.map(([nokkel, navn]) =>
     `<button type="button" class="btn btn-primary stor-knapp"
              id="stemple-sted-${escHtmlValue(nokkel)}"
-             data-action="stempleAvreistTil" data-id="${escHtmlValue(nokkel)}">
+             data-action="stempleAvreistTil" data-arg="${escHtmlValue(nokkel)}">
        ${escapeHtml(navn)}</button>`).join('');
   return `
     <div class="mt-3">
@@ -215,6 +218,11 @@ function _stedvalg() {
 }
 
 
+function _kanGrovsortere(o) {
+  return ['fremme', 'avreist', 'leverer'].includes(o.status);
+}
+
+
 function _grovsorteringsrad(o) {
   // Bilens vurdering: tre knapper, den valgte fylt. Ingen valgt betyr
   // «ikke vurdert ennå», og det står som tekst — ikke som en tom rad.
@@ -222,7 +230,7 @@ function _grovsorteringsrad(o) {
     const valgt = o.grovsortering === nokkel;
     const klasse = valgt ? `btn grov-knapp grov-${nokkel} grov-valgt` : `btn grov-knapp grov-${nokkel}`;
     return `<button type="button" class="${escHtmlValue(klasse)}" id="grov-${escHtmlValue(nokkel)}"
-                    data-action="settGrovsortering" data-id="${escHtmlValue(nokkel)}"
+                    data-action="settGrovsortering" data-arg="${escHtmlValue(nokkel)}"
                     aria-pressed="${valgt ? 'true' : 'false'}">${escapeHtml(navn)}</button>`;
   }).join('');
   const status = o.grovsortering_navn
@@ -312,6 +320,9 @@ function renderAktivt() {
     const knapperad = velgerStedFor === o.id
       ? _stedvalg()
       : `<div class="d-flex gap-2 mt-3">${nesteKnapp}${ledigKnapp}</div>`;
+    // Grovsorteringen er en vurdering av pasienten, og den finnes ikke før
+    // bilen er framme (André, 12. sep. 2026). Under utrykning står den ikke.
+    const grovRad = _kanGrovsortere(o) ? _grovsorteringsrad(o) : '';
     return `
     <div class="aktivt-kort">
       <div class="d-flex align-items-center gap-2 flex-wrap mb-1">
@@ -322,7 +333,7 @@ function renderAktivt() {
       <div class="oppdrag-meta mb-1">${escapeHtml(o.lokasjon_navn)}</div>
       ${_varsledeRad(o)}
       ${fritekstBlokk}
-      ${_grovsorteringsrad(o)}
+      ${grovRad}
       <div class="mt-2">${tidslinjeEnhetHtml(o)}</div>
       ${knapperad}
     </div>`;

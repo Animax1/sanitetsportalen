@@ -35,15 +35,15 @@
 <div class="container-fluid px-3 px-md-4 py-3">
 
   {% comment %}
-    **To linjer, og fanerekka under.** Alt som gjelder *vakta* står på
+    **To linjer, og fanerekka under.** Alt som gjelder *vakten* står på
     vaktlinja — hvilken du planlegger, innstillingene for den, og å lage en
-    ny. Alt som gjelder *innholdet* i vakta står i fanerekka: gruppene,
+    ny. Alt som gjelder *innholdet* i vakten står i fanerekka: gruppene,
     Mannskap, og «Ny ressurs».
 
     «Ny ressurs» hører til fanene fordi en ressurs havner i en fane;
     «Ny vaktliste» hører til velgeren fordi den lager noe velgeren skal peke
     på. Innstillinger står ved siden av «Ny vaktliste» fordi begge handler om
-    vakta som helhet.
+    vakten som helhet.
   {% endcomment %}
   <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
     <h1 class="h4 mb-0"><i class="bi bi-people me-2"></i>Vaktliste</h1>
@@ -57,7 +57,7 @@
     {% comment %}
       **Døra til innsjekken står ved statusen den endrer.** Lå den i
       «Innstillinger», måtte man åpne et vindu for å se om innsjekken var
-      åpen — og det er det første man vil vite når vakta begynner.
+      åpen — og det er det første man vil vite når vakten begynner.
 
       Knappen bygges av `tegnDriftknapp()` og ikke her, fordi teksten skifter
       med tilstanden; `gateKnapper()` kjører bare én gang ved sidelasting.
@@ -77,7 +77,7 @@
     {% endif %}
     <span class="flex-grow-1"></span>
     {% comment %}
-      Vinduet for vakta selv: lengden og utskriften. Ikke gatet — å skrive ut
+      Vinduet for vakten selv: lengden og utskriften. Ikke gatet — å skrive ut
       lista er noe alle som ser den skal kunne, og det er lengden inne i
       vinduet som krever skriv_leder.
 
@@ -100,7 +100,7 @@
 
   <div id="vl-tom" class="alert alert-info d-none">
     Ingen vaktlister ennå. Trykk <strong>Ny vaktliste</strong> for å planlegge
-    en vakt. Vakta opprettes som planlagt og rører ikke den aktive vakta i
+    en vakt. Vakten opprettes som planlagt og rører ikke den aktive vakten i
     portalen.
   </div>
 
@@ -180,7 +180,7 @@
           <label class="form-label" for="ny-vakt-navn">Vaktnavn</label>
           <input type="text" id="ny-vakt-navn" class="form-control" maxlength="255"
                  placeholder="f.eks. «Landsskytterstevnet 2027»">
-          <div class="form-text">Navnet må være unikt. Det er dette vakta heter i hele portalen.</div>
+          <div class="form-text">Navnet må være unikt. Det er dette vakten heter i hele portalen.</div>
         </div>
         {% comment %}
           **`step="300"` — fem minutter, ikke ett.** Piltastene og den native
@@ -270,12 +270,12 @@
   <div class="modal-dialog">
     <div class="modal-content">
       <div class="modal-header">
-        <h5 class="modal-title"><span id="vakt-tittel">Vakta</span></h5>
+        <h5 class="modal-title"><span id="vakt-tittel">Vakten</span></h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Lukk"></button>
       </div>
       <div class="modal-body">
         {% comment %}
-          **Alt som gjelder vakta selv, på ett sted.** Utskriften er åpen for
+          **Alt som gjelder vakten selv, på ett sted.** Utskriften er åpen for
           alle som ser lista — den er hele grunnen til at bemanneren har den.
           Lengden er skriv_leder: spennet er grunnlaget kurven tegnes over, og
           et skift som faller utenfor et flyttet spenn er ikke noe bemanneren
@@ -335,7 +335,7 @@
           <hr>
           {% comment %}
             Starten ligger på `core.Vakt`; planlagt slutt på vaktlista. Se
-            modellkommentaren — `Vakt.avsluttet` betyr «vakta ble avsluttet»,
+            modellkommentaren — `Vakt.avsluttet` betyr «vakten ble avsluttet»,
             en hendelse, og kan ikke bære et anslag man flytter på.
           {% endcomment %}
           <div class="mb-3">

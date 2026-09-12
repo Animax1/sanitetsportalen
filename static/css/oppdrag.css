@@ -146,6 +146,12 @@
   color: var(--text-main);
   background: transparent;
 }
+/* Fargen står på knappen også før den er valgt (André, 12. sep. 2026):
+ * tre like grå knapper med ordene Rød/Gul/Grønn er en lesejobb i en bil i
+ * bevegelse. Uvalgt: farget ramme og tekst. Valgt: fylt. */
+.grov-knapp.grov-rod   { border-color: #dc2626; color: #fca5a5; }
+.grov-knapp.grov-gul   { border-color: #eab308; color: #fde047; }
+.grov-knapp.grov-gronn { border-color: #16a34a; color: #86efac; }
 .grov-knapp.grov-rod.grov-valgt   { background: #dc2626; border-color: #dc2626; color: #fff; }
 .grov-knapp.grov-gul.grov-valgt   { background: #eab308; border-color: #eab308; color: #111; }
 .grov-knapp.grov-gronn.grov-valgt { background: #16a34a; border-color: #16a34a; color: #fff; }
@@ -188,6 +194,10 @@
 }
 
 /* ── Flere enheter på ett oppdrag (11. sep. 2026) ────────────────────────── */
+
+/* Mens «Endre status» står åpent på én rad, skjules knappene på de andre:
+ * ett skjema om gangen, og ingenting annet å trykke på ved siden av det. */
+.foer-aapen .enhet-rad > .ms-auto { display: none; }
 
 /* Én brikke per enhet i oppdragsraden: prikk, navn, status og tid siden.
  * Samme brikke med én enhet — lista skal lese likt uansett antall. */

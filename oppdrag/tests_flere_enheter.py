@@ -861,7 +861,7 @@ class SentralbordetsMatriseTests(TestCase):
 
     def test_knappene_foelger_tilstanden(self):
         ut = self._kjor(f"console.log(mkEnhetsrader({self.OPPDRAG}));")
-        self.assertEqual(ut.count('Før status'), 2)
+        self.assertEqual(ut.count('Endre status'), 2)
         self.assertEqual(ut.count('Ta av'), 1, 'bare den som venter')
         self.assertNotIn('Gjenåpne', ut)
         ledig = self._kjor("""
@@ -869,7 +869,7 @@ class SentralbordetsMatriseTests(TestCase):
               status_navn: 'Ledig', status_tidspunkt: null}]}));
         """)
         self.assertIn('Gjenåpne', ledig)
-        self.assertNotIn('Før status', ledig)
+        self.assertNotIn('Endre status', ledig)
         self.assertNotIn('Ta av', ledig)
 
     def test_den_siste_kan_ikke_tas_av_i_grensesnittet(self):
@@ -884,7 +884,7 @@ class SentralbordetsMatriseTests(TestCase):
             globalThis.OPPDRAG_TILGANG = {{ kanSkrive: false }};
             console.log(mkEnhetsrader({self.OPPDRAG}));
         """)
-        for tekst in ('Før status', 'Ta av', 'Gjenåpne', '<button'):
+        for tekst in ('Endre status', 'Ta av', 'Gjenåpne', '<button'):
             self.assertNotIn(tekst, ut)
 
     def test_varslevalget_utelater_dem_som_alt_er_paa(self):
@@ -961,7 +961,7 @@ class InnlinjeskjemaeneTests(TestCase):
         const rad = { querySelector: () => null, appendChild: (el) => skjemaer.push(el) };
         globalThis.document = {
           getElementById: (id) => (id.startsWith('tidslinje-rad-') || id.startsWith('enhet-rad-'))
-            ? rad : { focus() {} },
+            ? rad : { focus() {}, classList: { add() {}, remove() {} } },
           createElement: () => ({ _html: '', set innerHTML(v) { this._html = v; },
                                   get innerHTML() { return this._html; } }),
         };
@@ -978,7 +978,7 @@ class InnlinjeskjemaeneTests(TestCase):
             self.skipTest('node er ikke tilgjengelig')
         self.harness = build_harness((
             (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue', 'trustedHtml', '_escHtml')),
-            (OPPDRAG_SENTRAL_JS, ('visRettTid', 'visFoerStatus', '_lovligeOverganger')),
+            (OPPDRAG_SENTRAL_JS, ('visRettTid', 'visFoerStatus', '_lovligeOverganger', '_lokalNaa')),
         ))
 
     def _skjema(self, kall):
@@ -1177,4 +1177,46 @@ class DetaljvinduetTegnesPaaNyttTests(TestCase):
             await visOppdrag(1);
             await visOppdrag(1);
             assert(antallLaget() === 1, 'forventet én modalinstans, fikk ' + antallLaget());
+        """)
+
+
+class StedOgGrovKnappeneTests(TestCase):
+    """Klikkdelegeringen gjør `data-id` om til tall. Sted- og grovknappene
+    bærer en nøkkel som er tekst, og må derfor bruke `data-arg` — ellers får
+    handlingen NaN og gjør ingenting. Slik sto de i prod 12. sep. 2026
+    («jeg får trykke knappen men kommer ikke videre»)."""
+
+    def setUp(self):
+        from patients.js_test_utils import (
+            OPPDRAG_ENHET_JS, PORTAL_UTILS_JS, build_harness, node_available)
+        if not node_available():
+            self.skipTest('node er ikke tilgjengelig')
+        self.harness = build_harness((
+            (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue', '_handlerArgument')),
+            (OPPDRAG_ENHET_JS, ('_stedvalg', '_grovsorteringsrad', '_kanGrovsortere')),
+        ))
+
+    STUBB = ("globalThis.AVREIST_TIL = [['sykehus','Sykehus'],['legevakt','Legevakt']];\n"
+             "globalThis.GROVSORTERING = [['rod','Rød'],['gul','Gul'],['gronn','Grønn']];\n"
+             # Det delegeringen ser: dataset-attributtene på knappen i markupen.
+             "function datasetFra(html, id) {\n"
+             "  const m = html.match(new RegExp('<button[^>]*id=\"' + id + '\"[^>]*>'));\n"
+             "  const ds = {}; for (const [, k, v] of m[0].matchAll(/data-([a-z]+)=\"([^\"]*)\"/g)) ds[k] = v;\n"
+             "  return { dataset: ds };\n"
+             "}\n")
+
+    def test_argumentet_er_nokkelen(self):
+        from patients.js_test_utils import run_node
+        run_node(self.harness, self.STUBB + """
+            const sted = _handlerArgument(datasetFra(_stedvalg(), 'stemple-sted-sykehus'));
+            assert(sted === 'sykehus', 'stedknappen gir ' + JSON.stringify(sted));
+            const grov = _handlerArgument(datasetFra(_grovsorteringsrad({grovsortering: ''}), 'grov-gul'));
+            assert(grov === 'gul', 'grovknappen gir ' + JSON.stringify(grov));
+        """)
+
+    def test_grovsortering_finnes_fra_fremme(self):
+        from patients.js_test_utils import run_node
+        run_node(self.harness, self.STUBB + """
+            assert(!_kanGrovsortere({status: 'venter'}) && !_kanGrovsortere({status: 'rykker_ut'}), 'ikke før fremme');
+            assert(_kanGrovsortere({status: 'fremme'}) && _kanGrovsortere({status: 'avreist'}) && _kanGrovsortere({status: 'leverer'}), 'fra fremme');
         """)

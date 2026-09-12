@@ -191,6 +191,16 @@ ingen av dem gir feilmelding — de er bare stille inaktive.
             - [x] **Deploy 1 til prod 12. sep. 2026** (`4c6017b`), backup tatt først.
             - [x] Hotfix samme dag: detaljvinduet frøs sida etter «Ta av»/«Varsle»
                   (én Bootstrap-modalinstans for mye; `getOrCreateInstance` overalt).
+            - [x] Andrés testrapport runde 1 (12. sep.): sted/grov-knappene i bilen
+                  (`data-arg`), grov fra Fremme, historikk med alle biler, «Endre
+                  status» med sted bare ved Avreist, «Opprettet» først i tidslinjen,
+                  arkivstatistikk på /statistikk/, KPI-boksen, «vakten».
+            - [ ] Andrés testrapport runde 2 (vaktliste): eget korps får redigere
+                  egne folk på andres plass, probono-merke på ledig plass, til-tid
+                  = fra + 8 t, «Mitt korps» med timer, «Korps»-etiketten, arkivering
+                  av vaktliste i stedet for sletting, admin-kobling bare av admin.
+            - [ ] Avklare med André: «utildelt» synlig for alle + ny tilstand «planlagt»
+                  (skjult kladd) som bare går én vei.
             - [ ] Deploy 2, senere: fjern `Oppdrag.enhet`, `Statusmelding.oppdragsenhet`
                   NOT NULL (med `SET CONSTRAINTS ALL IMMEDIATE` om et dataskritt går
                   foran), og broene i `Oppdrag.save()`/`Statusmelding.save()` bort.

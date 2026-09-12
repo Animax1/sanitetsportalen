@@ -36,6 +36,35 @@ async function loadOppdragStats() {
   renderOppdragStats(oppdragStats);
 }
 
+// ── Arkivmodus ───────────────────────────────────────────────────────────
+// Samme mekanikk som pasientarkivet i statistikk.js: `?kilde=oppdrag&arkiv=<id>`
+// laster de frosne tallene og et banner, og fanerada skjules.
+async function lastOppdragArkivStatistikk(id) {
+  const [statsRes, metaRes] = await Promise.all([
+    apiFetch(`/statistikk/api/kilde/oppdrag/arkiv/${id}/full-stats/`),
+    apiFetch(`/oppdrag/api/arkiv/${id}/`),
+  ]);
+  if (!statsRes.ok) {
+    const err = await statsRes.json().catch(() => ({}));
+    alert(err.error || 'Kunne ikke hente statistikk for arkivet.');
+    return false;
+  }
+  oppdragStats = await statsRes.json();
+  const meta = metaRes.ok ? (await metaRes.json().catch(() => ({}))).data : null;
+  const dato = meta?.importert_at ? meta.importert_at.slice(0, 16).replace('T', ' ') : '';
+  arkivStatsMode = true;
+  arkivStatsMeta = {
+    id,
+    tittel: meta?.tittel || `Arkiv ${id}`,
+    importert_at: meta?.importert_at || '',
+    meta_tekst: meta
+      ? `(${meta.vakt_navn} — arkivert ${dato}, ${meta.antall_oppdrag} oppdrag)` : '',
+  };
+  _oppdaterArkivBanner();
+  renderOppdragStats(oppdragStats);
+  return true;
+}
+
 // ── Tabellbyggere ────────────────────────────────────────────────────────
 
 // Rad i en varighetstabell. `sd` er {n, mean, median, min, max} — samme form
@@ -72,11 +101,15 @@ function renderOppdragStats(s) {
   if (!s || !s.summary) return;
   const sum = s.summary;
 
-  // Med flere biler på ett oppdrag er radene flere enn oppdragene, og
-  // leseren skal se at tallene skiller: «12 (15 enhetsinnsatser)».
-  document.getElementById('okpi-total').textContent =
-    (sum.enhetsinnsatser != null && sum.enhetsinnsatser !== sum.total)
-      ? `${sum.total} (${sum.enhetsinnsatser} enhetsinnsatser)` : String(sum.total);
+  // Med flere biler på ett oppdrag er radene flere enn oppdragene. Tallet
+  // er oppdragene; radene står som undertekst — «(15 enhetsinnsatser)» i
+  // selve tallet fikk ikke plass i boksen (André, 12. sep. 2026).
+  document.getElementById('okpi-total').textContent = String(sum.total);
+  const sub = document.getElementById('okpi-sub');
+  if (sub) {
+    sub.textContent = (sum.enhetsinnsatser != null && sum.enhetsinnsatser !== sum.total)
+      ? `${sum.enhetsinnsatser} enhetsinnsatser` : '';
+  }
   document.getElementById('okpi-aktive').textContent = sum.aktive;
   document.getElementById('okpi-fullforte').textContent = sum.fullforte;
   document.getElementById('okpi-enheter').textContent = sum.enheter_pa_vakt;

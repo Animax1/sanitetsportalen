@@ -47,7 +47,7 @@ let belastning = null;
 // korps-brukeren selv, og for henne finnes ikke velgeren.
 let korpsfilter = null;
 // Utskriftsutvalget (12. sep. 2026): ressurs-ID når «Oversikt» skal vise
-// én ressurs, ellers `null` for hele vakta. Korpset styres av korpsvelgeren
+// én ressurs, ellers `null` for hele vakten. Korpset styres av korpsvelgeren
 // over — de to utvalgene kombineres.
 let utskriftRessurs = null;
 let personsok = '';              // fritekstfilter på mannskapstabellen
@@ -104,7 +104,7 @@ function kanSkriveAlt() {
 
 
 function kanLede() {
-  // Den som *setter opp* vakta: oppretter og fjerner ressurser og
+  // Den som *setter opp* vakten: oppretter og fjerner ressurser og
   // vaktlister, endrer vaktas lengde, lager roller og grupper. Speiler
   // `services.kan_lede`.
   return _erAdmin() || _nivaa() === 'skriv_leder';
@@ -347,7 +347,7 @@ function velgUtskrift() {
 
 function _utvalgstekst() {
   // Det arket sier om seg selv: korpset og/eller ressursen det er avgrenset
-  // til. Tomt når det er hele vakta. Korpset er velgerens for den som ser
+  // til. Tomt når det er hele vakten. Korpset er velgerens for den som ser
   // alle, badgen for korps-brukeren — samme regel som «Mitt korps».
   const deler = [];
   const korpsId = _mittKorpsId();
@@ -383,7 +383,7 @@ function mkUtskriftsverktoy() {
       <label class="vl-meta mb-0" for="vl-utskriftsvalg">Vis</label>
       <select id="vl-utskriftsvalg" class="form-select form-select-sm w-auto"
               data-action="velgUtskrift" data-hendelse="change">
-        <option value="">Hele vakta</option>${grupper}
+        <option value="">Hele vakten</option>${grupper}
       </select>
       <button type="button" class="btn btn-outline-secondary btn-sm" data-action="skrivUt">
         <i class="bi bi-printer me-1"></i>Skriv ut
@@ -492,7 +492,7 @@ function tegnStatus() {
 function tegnDriftknapp() {
   // **Døra til innsjekken står ved statusen den endrer.** Lå den i
   // «Innstillinger», måtte man åpne et vindu for å se om innsjekken var
-  // åpen — og det er det første man vil vite når vakta begynner.
+  // åpen — og det er det første man vil vite når vakten begynner.
   //
   // Knappen tegnes her og ikke av `gateKnapper()`, fordi teksten skifter med
   // tilstanden: `gateKnapper()` kjører én gang ved sidelasting.
@@ -519,7 +519,7 @@ function _posterFor(ressursId) {
 
 function _ressurserIGruppe(gruppeId) {
   // Rekkefølgen er den serveren sender — `Ressurs.rekkefolge`, satt til
-  // opprettelsesrekkefølgen. Den som bygger vakta legger inn bilene i den
+  // opprettelsesrekkefølgen. Den som bygger vakten legger inn bilene i den
   // rekkefølgen hun tenker på dem.
   return (aktivListe.ressurser || []).filter((r) => r.gruppe_id === gruppeId);
 }
@@ -834,7 +834,7 @@ function mkGruppe(gruppe) {
   // **I drift står kurven nederst** (prosjektleder, 11. sep. 2026). I
   // planlegging er kurven det man ser først — hullene er jobben. I drift er
   // spørsmålet «hvem har møtt?», og da skal stemplene stå øverst; kurven er
-  // fortsatt der, for den som vil se resten av vakta, men under.
+  // fortsatt der, for den som vil se resten av vakten, men under.
   const kurve = mkGruppekurve(gruppe);
   const kort = ressurser.map(mkRessurs).join('');
   return hode + (iDrift() ? kort + kurve : kurve + kort);
@@ -1182,7 +1182,7 @@ function _vaktensSpenn() {
   let slutt = vl.planlagt_slutt ? _d(vl.planlagt_slutt)?.getTime() : null;
 
   // Mangler spennet, faller vi tilbake på skiftene — bedre en kurve som
-  // dekker for lite enn ingen kurve mens vakta ennå ikke har en slutt.
+  // dekker for lite enn ingen kurve mens vakten ennå ikke har en slutt.
   if (start == null || slutt == null || slutt <= start) {
     if (!poster.length) return null;
     start = Math.min(...poster.map((v) => _d(v.fra_tid).getTime()));
@@ -1299,7 +1299,7 @@ function _mkEnKurve(tittel, poster) {
 
   // Klokkeslettene ligger i sin egen rad med én celle per søyle, ikke som
   // tekst inni søylen: cellene arver samme flex-bredde, så tallet står
-  // under den timen det gjelder uansett hvor mange timer vakta er.
+  // under den timen det gjelder uansett hvor mange timer vakten er.
   const steg = _timesteg(punkter.length);
   const timeakse = punkter.map((p, i) => {
     const vis = i % steg === 0;
@@ -1424,7 +1424,7 @@ function _dagnokkel(iso) {
 
 
 function _dagoverskrift(iso, kolonner) {
-  // «Fredag 2. okt» over blokkene når vakta spenner over flere dager
+  // «Fredag 2. okt» over blokkene når vakten spenner over flere dager
   // (prosjektleder, 11. sep. 2026: «starttid definerer hvilken dag»). Lang
   // ukedag, fordi linja er en overskrift og ikke et merke; lista er lokal så
   // byggerne kan kjøres uten mer enn `MND` fra sida.
@@ -1442,7 +1442,7 @@ function _dagoverskrift(iso, kolonner) {
 
 
 function _blokkerMedDager(blokker, kolonner, radbygger) {
-  // Blokkene, med en dagoverskrift der dagen skifter — men bare når vakta
+  // Blokkene, med en dagoverskrift der dagen skifter — men bare når vakten
   // faktisk har mer enn én dag. En endagsvakt ser ut som før: én overskrift
   // over alt sier ingenting.
   const dager = new Set(blokker.map((b) => _dagnokkel(b.fra_tid)));
@@ -1482,7 +1482,7 @@ function _blokklinje(blokk, kolonner) {
 
 
 function mkOversikt() {
-  // **Utskriftslista.** Hele vakta på ett ark, gruppert på **ressurs** — den
+  // **Utskriftslista.** Hele vakten på ett ark, gruppert på **ressurs** — den
   // man henger opp.
   //
   // Gruppert på korps fram til 30. aug. 2026, og det var feil bord: den som
@@ -1492,7 +1492,7 @@ function mkOversikt() {
   // **Utvalget** (12. sep. 2026): korpset kommer ferdig filtrert i
   // `aktivListe.vaktposter` (korpsvelgeren, eller serveren for korps-
   // brukeren); ressursen velges her. Arket skal kunne henges opp på bilen
-  // eller gis til ett korps, og da er resten av vakta bare sider å bla forbi.
+  // eller gis til ett korps, og da er resten av vakten bare sider å bla forbi.
   const verktoy = mkUtskriftsverktoy();
   const poster = (aktivListe.vaktposter || [])
     .filter((vp) => utskriftRessurs == null || vp.ressurs_id === utskriftRessurs);
@@ -1578,7 +1578,7 @@ function mkOversikt() {
   const ledigtekst = antallLedige
     ? ` · ${escHtmlValue(antallLedige)} ${escapeHtml(antallLedige === 1 ? 'ledig plass' : 'ledige plasser')}` : '';
   const sumTimer = `${escapeHtml(_tall(_sumTimer(poster)))} t`;
-  // Skiftene over hele vakta er de *ulike* vakttidene — samme spenn på
+  // Skiftene over hele vakten er de *ulike* vakttidene — samme spenn på
   // samleplassen og på bilen er ett skift, ikke to.
   const vaktTall = _telling(poster, _tidsblokker(poster).length);
   // **Ingen kurve her.** Den står i fanen den gjelder, og to steder å lese
@@ -1633,7 +1633,7 @@ function _tall(n) {
 
 
 function mkBelastning() {
-  // **Belastningen før vakta, ikke bemanningen** (§8b). Bemanningskurvene
+  // **Belastningen før vakten, ikke bemanningen** (§8b). Bemanningskurvene
   // svarer på «er plassene fylt»; denne svarer på «hva koster det dem som
   // fyller dem».
   //
@@ -1681,7 +1681,7 @@ function mkBelastning() {
 
   if (!belastning.personer.length) {
     return hode + '<div class="vl-kort"><div class="vl-tom">Ingen er satt '
-         + 'opp på vakta ennå. Tallene fylles ut etter hvert som plassene '
+         + 'opp på vakten ennå. Tallene fylles ut etter hvert som plassene '
          + 'bemannes.</div></div>';
   }
 
@@ -1823,7 +1823,7 @@ function mkTilstede() {
         <div class="vl-meta">tilstede nå · ${escapeHtml(stemplet)}</div>
       </div>
       <div class="vl-tilstedemeta">
-        <div>${escHtmlValue(alle.length)} satt opp på vakta</div>
+        <div>${escHtmlValue(alle.length)} satt opp på vakten</div>
         <div>${escHtmlValue(mangler)} ikke møtt eller gått av vakt</div>
         <div class="vl-meta">Møtt, og ikke gått av vakt. Utledet av
           stemplene.</div>
@@ -1952,7 +1952,7 @@ async function opprettVaktliste() {
   _skjulFeil('ny-vakt-feil');
   await withSubmitGuard('ny-vakt-knapp', async () => {
     const navn = (document.getElementById('ny-vakt-navn')?.value || '').trim();
-    if (!navn) { _visFeil('ny-vakt-feil', 'Vakta må ha et navn.'); return; }
+    if (!navn) { _visFeil('ny-vakt-feil', 'Vakten må ha et navn.'); return; }
 
     const res = await apiFetch('/vaktliste/api/vaktlister/', {
       method: 'POST',
@@ -2365,8 +2365,8 @@ async function slettGruppe(id) {
 
 
 function apneVakt() {
-  // **Ett vindu for vakta.** Lengden og utskriften er begge ting man gjør
-  // med *vakta*, ikke med en ressurs — og som to knapper i toppen konkurrerte
+  // **Ett vindu for vakten.** Lengden og utskriften er begge ting man gjør
+  // med *vakten*, ikke med en ressurs — og som to knapper i toppen konkurrerte
   // de med «Ny ressurs» og «Ny vaktliste» om plassen uten å høre til samme
   // spørsmål. Utskriften ligger her fordi den er hele vaktlista på ett ark.
   //

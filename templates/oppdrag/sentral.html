@@ -4,7 +4,7 @@
 {% block title %}Oppdrag – Sanitetsportalen{% endblock %}
 
 {% comment %}
-  Sentralbordet: enhetsliste med utledet status, og oppdragslista for vakta.
+  Sentralbordet: enhetsliste med utledet status, og oppdragslista for vakten.
 
   Skrivekontroller rendres server-side med {% if kan_skrive %}. De skjules
   ikke i nettleseren — markup som ikke skal brukes, sendes ikke. Se
@@ -60,7 +60,7 @@
       </button>
       {% comment %}
         Vaktarkivet (fase 7). Egen knapp, ikke en variant av «Historikk»:
-        historikken rydder tavla og er reversibel, arkivet fryser vakta med
+        historikken rydder tavla og er reversibel, arkivet fryser vakten med
         signatur og en kollaps som sletter radnivået etter 24 måneder. To
         handlinger som ser like ut i en meny, blir før eller siden forvekslet.
       {% endcomment %}
@@ -92,7 +92,7 @@
     </div>
 
     <div class="col-lg-8">
-      {# «Oppdragsliste», ikke «Oppdrag i vakta» — prosjektleder, 11. sep. 2026. #}
+      {# «Oppdragsliste», ikke «Oppdrag i vakten» — prosjektleder, 11. sep. 2026. #}
       <h2 class="h6 text-muted mb-2">Oppdragsliste</h2>
       <div id="oppdragsliste">
         <div class="tom-melding">Laster…</div>
@@ -237,7 +237,7 @@
       </div>
       <div class="modal-body">
         <div class="border rounded p-3 mb-3">
-          <label class="form-label" for="arkiv-notat">Arkiver vakta som går nå</label>
+          <label class="form-label" for="arkiv-notat">Arkiver vakten som går nå</label>
           <input type="text" id="arkiv-notat" class="form-control mb-2"
                  placeholder="Notat (valgfritt)" maxlength="500">
           <button class="btn btn-primary" type="button" id="arkiv-knapp"

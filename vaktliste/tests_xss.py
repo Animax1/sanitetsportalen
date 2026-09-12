@@ -3680,7 +3680,7 @@ class UtskriftsutvalgTests(SimpleTestCase):
 
     def test_velgeren_lister_ressursene_med_skift_og_merker_den_valgte(self):
         ut = self._oversikt("globalThis.utskriftRessurs = 21;\n")
-        self.assertIn('<option value="">Hele vakta</option>', ut)
+        self.assertIn('<option value="">Hele vakten</option>', ut)
         self.assertIn('<optgroup label="Ambulanse">', ut)
         self.assertIn('<option value="21" selected>Ambulanse 2</option>', ut)
         self.assertIn('<option value="20">Ambulanse 1</option>', ut)

@@ -232,7 +232,7 @@ function renderOppdrag() {
   if (!el) return;
 
   if (!oppdragsliste.length) {
-    el.innerHTML = ('<div class="tom-melding">Ingen oppdrag i vakta ennå.</div>');
+    el.innerHTML = ('<div class="tom-melding">Ingen oppdrag i vakten ennå.</div>');
     return;
   }
 
@@ -360,6 +360,20 @@ function tidslinjeHtml(data) {
     });
   });
 
+  // Opprettelsen er første hendelse (André, 12. sep. 2026). Den har ingen
+  // «Rett tid»: den er ikke et stempel, og ingen melding kan rettes til før
+  // den — serveren stopper det uansett.
+  if (data.opprettet) {
+    rader.push({
+      tid: data.opprettet,
+      html: `
+        <div class="tidslinje-rad">
+          <span class="tidslinje-tid">${escapeHtml(klokke(data.opprettet))}</span>
+          <span>Oppdrag opprettet</span>
+        </div>`,
+    });
+  }
+
   (data.enhetsbytter || []).forEach((b) => {
     rader.push({
       tid: b.tidspunkt,
@@ -400,6 +414,7 @@ async function visOppdrag(id) {
     `#${o.nummer} ${o.problemstilling} – ${navn}`;
   const enheterFeil = document.getElementById('enheter-feil');
   if (enheterFeil) enheterFeil.classList.add('d-none');
+  innhold.classList.remove('foer-aapen');
 
   // Ferdigstilte oppdrag går til historikken av seg selv i `sett_status`, så
   // knappen her er for hånd-tilfellene: hent tilbake til tavla, og rydd bort
@@ -487,7 +502,7 @@ function _enhetsknapper(e, flere) {
   const ut = [];
   if (e.status !== 'ledig') {
     ut.push(`<button type="button" class="btn btn-outline-primary btn-sm"
-                     data-action="visFoerStatus" data-id="${escHtmlValue(e.enhet_id)}">Før status</button>`);
+                     data-action="visFoerStatus" data-id="${escHtmlValue(e.enhet_id)}">Endre status</button>`);
   } else {
     ut.push(`<button type="button" class="btn btn-outline-secondary btn-sm"
                      data-action="gjenaapneEnhet" data-id="${escHtmlValue(e.enhet_id)}">Gjenåpne</button>`);
@@ -582,24 +597,27 @@ function visFoerStatus(enhetId) {
   if (!e) return;
 
   const navn = window.OPPDRAG_STATUS_NAVN || {};
-  const statusvalg = _lovligeOverganger(e.status).map(
+  const overganger = _lovligeOverganger(e.status);
+  const statusvalg = overganger.map(
     (st) => `<option value="${escHtmlValue(st)}">${escapeHtml(navn[st] || st)}</option>`).join('');
   const stedvalg = (window.OPPDRAG_AVREIST_TIL || []).map(
     ([nokkel, tekst]) => `<option value="${escHtmlValue(nokkel)}">${escapeHtml(tekst)}</option>`).join('');
-  // Som «Rett tid»: `datetime-local` vil ha lokal tid uten sone, og nå er
-  // utgangspunktet — operatøren fører noe som skjedde for litt siden.
-  const naa = new Date();
-  const lokal = new Date(naa.getTime() - naa.getTimezoneOffset() * 60000)
-    .toISOString().slice(0, 16);
+  // Stedet hører til «Avreist» og vises bare når det er valgt (André,
+  // 12. sep. 2026). Nedtrekket melder `change`, og `foerStatusEndret`
+  // slår stedet av og på.
+  const stedSkjult = overganger[0] === 'avreist' ? '' : ' hidden';
+  // Ett skjema om gangen: de andre radenes knapper skjules mens dette står.
+  document.getElementById('detalj-innhold')?.classList.add('foer-aapen');
 
   const skjema = document.createElement('div');
   skjema.className = 'foer-skjema mt-1 d-flex gap-2 align-items-center flex-wrap w-100';
   skjema.innerHTML = (`
-    <select id="foer-status" class="form-select form-select-sm w-auto" aria-label="Status">${statusvalg}</select>
-    <select id="foer-sted" class="form-select form-select-sm w-auto" aria-label="Sted ved Avreist">
-      <option value="">Sted (ved Avreist)</option>${stedvalg}</select>
+    <select id="foer-status" class="form-select form-select-sm w-auto" aria-label="Status"
+            data-action="foerStatusEndret" data-hendelse="change">${statusvalg}</select>
+    <select id="foer-sted" class="form-select form-select-sm w-auto" aria-label="Sted ved Avreist"${stedSkjult}>
+      <option value="">Velg sted</option>${stedvalg}</select>
     <input type="datetime-local" class="form-control form-control-sm w-auto"
-           id="foer-tid" value="${lokal}" step="60">
+           id="foer-tid" value="${_lokalNaa()}" step="60">
     <button type="button" class="btn btn-sm btn-primary"
             id="foer-lagre" data-action="lagreFoerStatus" data-id="${escHtmlValue(enhetId)}">Før</button>
     <button type="button" class="btn btn-sm btn-outline-secondary"
@@ -612,6 +630,25 @@ function visFoerStatus(enhetId) {
 
 function avbrytFoerStatus() {
   document.querySelectorAll('.foer-skjema').forEach((el) => el.remove());
+  document.getElementById('detalj-innhold')?.classList.remove('foer-aapen');
+}
+
+
+function foerStatusEndret() {
+  // Stedet finnes bare for «Avreist».
+  const status = document.getElementById('foer-status');
+  const sted = document.getElementById('foer-sted');
+  if (!status || !sted) return;
+  sted.hidden = status.value !== 'avreist';
+  if (sted.hidden) sted.value = '';
+}
+
+
+function _lokalNaa() {
+  // `datetime-local` vil ha lokal tid uten sone.
+  const naa = new Date();
+  return new Date(naa.getTime() - naa.getTimezoneOffset() * 60000)
+    .toISOString().slice(0, 16);
 }
 
 
@@ -634,6 +671,9 @@ async function lagreFoerStatus(enhetId) {
     const d = await res.json();
     if (!res.ok || d.status !== 'ok') {
       feil.textContent = d.message || 'Kunne ikke føre statusen.';
+      // Et avvist klokkeslett settes tilbake til nå (André, 12. sep. 2026):
+      // det som sto der var galt, og nå er det tryggeste utgangspunktet.
+      tid.value = _lokalNaa();
       return;
     }
     await visOppdrag(apentOppdragId);
@@ -656,12 +696,9 @@ function visRettTid(meldingId) {
   const rad = document.getElementById(`tidslinje-rad-${meldingId}`);
   if (!rad || rad.querySelector('.rett-tid-skjema')) return;
 
-  // `datetime-local` vil ha lokal tid uten sone. Klokkeslettet som allerede
-  // står i raden er utgangspunktet — operatøren retter et minutt eller to,
-  // hun skriver ikke inn datoen på nytt.
-  const naa = new Date();
-  const lokal = new Date(naa.getTime() - naa.getTimezoneOffset() * 60000)
-    .toISOString().slice(0, 16);
+  // Klokkeslettet som allerede står i raden er utgangspunktet — operatøren
+  // retter et minutt eller to, hun skriver ikke inn datoen på nytt.
+  const lokal = _lokalNaa();
 
   const skjema = document.createElement('div');
   skjema.className = 'rett-tid-skjema mt-1 d-flex gap-2 align-items-center flex-wrap';
@@ -753,6 +790,9 @@ function renderHistorikk() {
     const fritekstBlokk = o.fritekst
       ? `<div class="oppdrag-fritekst">${escapeHtml(o.fritekst)}</div>`
       : '';
+    // Alle bilene, ikke bare den primære — historikken viste én til
+    // 12. sep. 2026.
+    const enhetsnavn = (o.enheter || []).map((e) => e.enhet_navn).join(', ') || o.enhet_navn;
     return `
     <div class="oppdrag-rad" data-action="visOppdrag" data-id="${escHtmlValue(o.id)}"
          role="button" tabindex="0">
@@ -762,7 +802,7 @@ function renderHistorikk() {
         <span class="oppdrag-problem">${escapeHtml(o.problemstilling)}</span>
       </div>
       <div class="oppdrag-meta mt-1">
-        ${escapeHtml(o.enhet_navn)} · ${escapeHtml(o.lokasjon_navn)} · ferdig ${escapeHtml(klokke(o.historikk_fra))}
+        ${escapeHtml(enhetsnavn)} · ${escapeHtml(o.lokasjon_navn)} · ferdig ${escapeHtml(klokke(o.historikk_fra))}
       </div>
       ${fritekstBlokk}
     </div>`;
@@ -840,6 +880,14 @@ async function opprettOppdrag() {
   document.getElementById('nytt-fritekst').value = '';
   document.querySelectorAll('input[name="nytt-enhet"]:checked').forEach((i) => { i.checked = false; });
   await lastAlt();
+}
+
+
+function nullstillNyttOppdrag() {
+  // Ved hver åpning (André, 12. sep. 2026: «husker den avhukede enheter fra
+  // forrige opprettelse»). Uavhengig av hvilken vei forrige forsøk gikk.
+  document.querySelectorAll('input[name="nytt-enhet"]').forEach((i) => { i.checked = false; });
+  document.getElementById('nytt-feil')?.classList.add('d-none');
 }
 
 
@@ -1062,7 +1110,7 @@ async function lastAlt() {
 // ── Vaktarkiv (fase 7) ───────────────────────────────────────────────────
 //
 // Kun global admin ser knappen, og serveren gater alle fire endepunktene på
-// nytt. Arkivering fryser vakta med signatur; historikken over rydder tavla
+// nytt. Arkivering fryser vakten med signatur; historikken over rydder tavla
 // og er reversibel. To handlinger, to knapper.
 
 let arkivliste = [];
@@ -1089,8 +1137,10 @@ function renderArkiv() {
         ${kollaps}
       </div>
       <div class="mt-2 d-flex gap-2">
+        <button class="btn btn-sm btn-outline-primary" type="button"
+                data-action="visArkivStatistikk" data-id="${escHtmlValue(a.id)}">Vis statistikk</button>
         <button class="btn btn-sm btn-outline-secondary" type="button"
-                data-action="visArkiv" data-id="${escHtmlValue(a.id)}">Vis tall</button>
+                data-action="visArkiv" data-id="${escHtmlValue(a.id)}">Signatur</button>
         <button class="btn btn-sm btn-outline-danger" type="button"
                 data-action="slettArkiv" data-id="${escHtmlValue(a.id)}">Slett</button>
       </div>
@@ -1134,6 +1184,14 @@ async function arkiverVakt() {
 }
 
 
+function visArkivStatistikk(id) {
+  // Som pasientarkivet: tallene tegnes på /statistikk/, ikke som en linje
+  // her (André, 12. sep. 2026: «viser i ren tekst»). Arkiv-id-en i URL-en,
+  // så sida kan lastes på nytt og deles.
+  window.location.href = `/statistikk/?kilde=oppdrag&arkiv=${encodeURIComponent(id)}`;
+}
+
+
 async function visArkiv(id) {
   const boks = document.getElementById(`arkiv-detalj-${id}`);
   if (!boks) return;
@@ -1163,7 +1221,7 @@ async function visArkiv(id) {
 
 async function slettArkiv(id) {
   if (!confirm('Slette arkivet? Det kan ikke angres, og arkivet er det '
-             + 'eneste som står igjen etter at vakta er avsluttet.')) return;
+             + 'eneste som står igjen etter at vakten er avsluttet.')) return;
   const res = await apiFetch(`/oppdrag/api/arkiv/${id}/`, {
     method: 'DELETE',
     body: JSON.stringify({ confirm: true }),
@@ -1187,3 +1245,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   // ingenting er endret. Én tegning i minuttet holder tallene ærlige.
   setInterval(() => { renderOppdrag(); renderEnheter(); }, 60000);
 });
+
+
+// «Nytt oppdrag» begynner tomt hver gang det åpnes — se `nullstillNyttOppdrag`.
+document.getElementById('nyttOppdragModal')
+  ?.addEventListener('show.bs.modal', nullstillNyttOppdrag);

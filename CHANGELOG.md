@@ -4,6 +4,42 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-12 — Andrés testrapport, runde 1: oppdrag og statistikk
+
+Fra prodtesten på staging (rapporten i chatten). Ingen migrasjon.
+
+- **Rettet: sted- og grovsorteringsknappene i bilen gjorde ingenting.**
+  «Jeg får trykke knappen men kommer ikke videre.» Knappene bar nøkkelen i
+  `data-id`, og klikkdelegeringen gjør `data-id` om til tall — `Number('sykehus')`
+  er NaN, og handlingen avviste den stille. Nå `data-arg`.
+  `StedOgGrovKnappeneTests` kjører delegeringens argumentregel mot knappenes
+  markup, og røyktesten i Chromium går hele kjeden: Rykker ut, Fremme, Gul,
+  Avreist → Sykehus, Leverer, Ledig. Node-testene som fantes så bare på
+  markupen; ingen klikket.
+- **Grovsorteringen finnes fra Fremme**, ikke fra Rykker ut: den er en
+  vurdering av pasienten, og den finnes ikke før bilen er framme.
+  Knappene har fått fargen sin også før de er valgt — tre grå knapper med
+  ordene Rød/Gul/Grønn var en lesejobb i en bil i bevegelse.
+- **Rettet: historikken viste bare den primære bilen.** Alle enhetene står
+  der nå.
+- **«Nytt oppdrag» nullstilles ved hver åpning** (`show.bs.modal`), uansett
+  hvilken vei forrige forsøk gikk. Kunne ikke reproduseres, men regelen er
+  nå uavhengig av stien dit.
+- **«Før status» heter «Endre status».** «Før» leste som fortid. Stedet vises
+  bare når «Avreist» er valgt i nedtrekket (`foerStatusEndret`). Mens ett
+  skjema står åpent, skjules knappene på de andre radene — ett om gangen. Et
+  avvist klokkeslett settes tilbake til nå.
+- **Tidslinjen begynner med «Oppdrag opprettet».** Uten «Rett tid»: den er
+  ikke et stempel, og ingen melding kan rettes til før den.
+- **Oppdragsarkivets tall vises på /statistikk/**, som pasientarkivet, via
+  `?kilde=oppdrag&arkiv=<id>` (`lastOppdragArkivStatistikk`) med banner og
+  «Tilbake». «Vis tall» i vaktarkivet viste én linje ren tekst; knappen heter
+  «Vis statistikk» nå, og «Signatur» viser det den viste før.
+- **KPI-boksen «Oppdrag»** viser tallet alene, og «N enhetsinnsatser» som
+  undertekst når det skiller — «(15 enhetsinnsatser)» i selve tallet fikk
+  ikke plass. Underteksten «i vakta» er borte.
+- **«vakta» → «vakten»** i alle brukervendte tekster i maler og JS (46 steder).
+
 ## 2026-09-12 — Rettet: sida frøs etter «Ta av» eller «Varsle» i detaljvinduet
 
 Funnet av André i prod rett etter deployen: «fjerner en bil eller gir en annen

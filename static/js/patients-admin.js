@@ -127,7 +127,7 @@ async function doAvsluttVakt() {
   feil.classList.add('d-none');
   const navn = (document.getElementById('avslutt-nytt-navn').value || '').trim();
   if (!navn) {
-    feil.textContent = 'Den nye vakta må ha et navn.';
+    feil.textContent = 'Den nye vakten må ha et navn.';
     feil.classList.remove('d-none');
     return;
   }
@@ -141,7 +141,7 @@ async function doAvsluttVakt() {
     if (!res.ok) {
       // Feilen (typisk navnekollisjon) skal stå der operatøren kan rette
       // den — ikke i en alert som lukker seg over skjemaet.
-      feil.textContent = d.error || 'Feil ved avslutning av vakta.';
+      feil.textContent = d.error || 'Feil ved avslutning av vakten.';
       feil.classList.remove('d-none');
       return;
     }
@@ -177,7 +177,7 @@ async function visVakter() {
 
 
 async function gjenaapneVakt(id) {
-  if (!confirm('Gjenåpne vakta? Den blir aktiv igjen — slettede pasienter '
+  if (!confirm('Gjenåpne vakten? Den blir aktiv igjen — slettede pasienter '
     + 'hentes IKKE tilbake (de ligger i backupen).')) return;
   const res = await apiFetch('/pasienter/api/gjenaapne-vakt/', {
     method: 'POST',
@@ -185,7 +185,7 @@ async function gjenaapneVakt(id) {
   });
   const d = await res.json();
   if (!res.ok) {
-    alert(d.error || 'Kunne ikke gjenåpne vakta.');
+    alert(d.error || 'Kunne ikke gjenåpne vakten.');
     return;
   }
   alert(d.melding);

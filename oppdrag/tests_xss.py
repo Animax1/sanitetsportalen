@@ -118,6 +118,7 @@ REVIEWED_INTERPOLATIONS = {
     'startKnapp': 'markup bygget lokalt, navn og id escapet inni',
     'tidslinjeEnhetHtml(o)': 'markup fra en bygger som selv skannes her',
     '_varsledeRad(o)': 'markup fra en bygger som selv skannes her',
+    'grovRad': 'markup fra `_grovsorteringsrad`, som selv skannes her, eller tom',
     # Sentralbordet med flere enheter (11. sep. 2026):
     '_enhetsmatrise(o)': 'markup fra en bygger som selv skannes her',
     'm.meldt_av': 'brukernavn i ren tekst i `notat`, som escapes ved innsetting',
@@ -281,7 +282,7 @@ class EnhetEscapingOppforselTests(SimpleTestCase):
                            'klokke')),
         (OPPDRAG_ENHET_JS, ('renderAktivt', 'renderVentende', 'renderAvsluttet',
                             'tidslinjeEnhetHtml', 'hastegradKlasse',
-                            '_stedvalg', '_grovsorteringsrad', '_varsledeRad')),
+                            '_stedvalg', '_grovsorteringsrad', '_kanGrovsortere', '_varsledeRad')),
     )
 
     #: Toppnivå-tilstanden `renderAktivt` leser: stedvalget, og listene som
@@ -468,7 +469,7 @@ class AvreistTilOgGrovsorteringTests(SimpleTestCase):
         (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue', 'trustedHtml', '_escHtml',
                            'klokke')),
         (OPPDRAG_ENHET_JS, ('renderAktivt', 'tidslinjeEnhetHtml', 'hastegradKlasse',
-                            '_stedvalg', '_grovsorteringsrad', '_varsledeRad',
+                            '_stedvalg', '_grovsorteringsrad', '_kanGrovsortere', '_varsledeRad',
                             'koNokkel', 'koLes',
                             'koSkriv', 'koLeggTil', 'koFjern', 'lagNokkel', 'synk')),
     )

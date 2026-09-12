@@ -280,8 +280,10 @@ function _oppdaterArkivBanner() {
       : '';
     const arr = arkivStatsMeta.arrangement_navn || '';
     const ant = arkivStatsMeta.antall_pasienter ?? '?';
+    // Oppdragsarkivet setter teksten selv (`meta_tekst`) — det har ingen
+    // pasienter å telle.
     document.getElementById('arkiv-stats-banner-meta').textContent =
-      `(${arr} — arkivert ${datoStr}, ${ant} pasienter)`;
+      arkivStatsMeta.meta_tekst ?? `(${arr} — arkivert ${datoStr}, ${ant} pasienter)`;
     banner.classList.remove('d-none');
   } else {
     banner.classList.add('d-none');
@@ -293,7 +295,10 @@ function exitArkivStatsMode() {
   arkivStatsMeta = null;
   fullStats = null;
   _oppdaterArkivBanner();
-  loadStats();
+  document.getElementById('kilde-nav')?.classList.remove('d-none');
+  // Tilbake til live-tallene for kilden som står åpen — oppdrag eller
+  // pasienter, alt etter hvilket arkiv man kom fra.
+  visKilde(aktivKilde());
 }
 
 function renderStatTab(tab) {
@@ -665,7 +670,17 @@ async function _lastArkivStatistikk(id) {
 }
 
 document.addEventListener('DOMContentLoaded', async () => {
-  const arkivId = new URLSearchParams(window.location.search).get('arkiv');
+  const params = new URLSearchParams(window.location.search);
+  const arkivId = params.get('arkiv');
+  if (arkivId && /^\d+$/.test(arkivId) && params.get('kilde') === 'oppdrag') {
+    // Oppdragsarkivet (12. sep. 2026). Panelet byttes uten `visKilde`, som
+    // ville hentet live-tallene oppå de frosne.
+    document.querySelectorAll('.kilde-panel').forEach(p => {
+      p.classList.toggle('active', p.id === 'kilde-oppdrag');
+    });
+    document.getElementById('kilde-nav')?.classList.add('d-none');
+    if (await _kallOppdrag('lastOppdragArkivStatistikk', arkivId)) return;
+  }
   if (arkivId && /^\d+$/.test(arkivId)) {
     if (await _lastArkivStatistikk(arkivId)) {
       // Arkivet er én vakts pasienter. Kildefanene skjules mens vi står i
