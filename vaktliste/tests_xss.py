@@ -798,6 +798,20 @@ class BemanningskurveTests(SimpleTestCase):
             assert(_bemanningPerTime().length === 0, 'skal gi opp, ikke henge');
         """)
 
+    def test_for_langt_vaktspenn_faller_tilbake_paa_skiftene(self):
+        """Kurven var «fullstendig vekke» på en vaktliste der vaktens start lå
+        uker før slutten (André, 12. sep. 2026). Skiftene er fortsatt et spenn."""
+        run_node(self.harness, """
+            globalThis.utskriftRessurs = null; globalThis.korpsfilter = null;
+            globalThis.aktivListe = {
+              vaktliste: {startet: '2026-09-12T10:00:00', planlagt_slutt: '2026-10-04T02:00:00'},
+              vaktposter: [
+                {fra_tid: '2026-10-03T08:00:00', til_tid: '2026-10-03T16:00:00'},
+              ]};
+            const p = _bemanningPerTime();
+            assert(p.length === 8, 'åtte timer fra skiftet, fikk ' + p.length);
+        """)
+
 
 class KurveOverHeleVaktaTests(SimpleTestCase):
     """Kurven skal dekke vaktas lengde, ikke bare skiftene.
@@ -1424,8 +1438,8 @@ class KurvePerGruppeTests(SimpleTestCase):
         """)
         self.assertIn('Samleplass', ut)
         self.assertIn('Ambulanse', ut)
-        self.assertIn('2 plasser på det meste', ut)
-        self.assertIn('1 plass på det meste', ut)
+        self.assertIn('2 personell på det meste', ut)
+        self.assertIn('0 personell på det meste', ut, 'ambulansen står tom')
 
     def test_ledige_plasser_telles_per_gruppe(self):
         ut = run_node(self.harness, self.VINDU + self.LISTE + """
@@ -1440,8 +1454,11 @@ class KurvePerGruppeTests(SimpleTestCase):
             globalThis.utskriftRessurs = null; globalThis.korpsfilter = null;
             globalThis.aktivListe = {vaktliste: {}, grupper: [],
                                      ressurser: [], vaktposter: []};
-            assert(mkGruppekurve({id: 1, navn: 'X'}) === '',
-                   'ingenting aa tegne');
+            const ut = mkGruppekurve({id: 1, navn: 'X'});
+            // Ingen søyler — men heller ingen tom flate: kortet sier hva som
+            // mangler (André, 12. sep. 2026: kurven var «fullstendig vekke»).
+            assert(ut.indexOf('vl-stolpe') === -1, 'ingen søyler');
+            assert(ut.indexOf('Kurven trenger vaktens start og slutt') !== -1, 'forklaring: ' + ut);
         """)
 
 
@@ -1518,7 +1535,7 @@ class TimeaksenTests(SimpleTestCase):
               {ledig: false, fra_tid: '2026-10-03T10:00:00', til_tid: '2026-10-03T12:00:00'}
             ]));
         """)
-        self.assertIn('3 plasser på det meste', ut)
+        self.assertIn('3 personell på det meste', ut)
         self.assertNotIn('topp 3', ut)
         self.assertIn('Alle plasser fylt', ut)
 
@@ -1539,7 +1556,7 @@ class TimeaksenTests(SimpleTestCase):
             ]));
         """)
         self.assertIn('Ledige plasser: 3 · 1 plass dekket', ut)
-        self.assertIn('4 plasser på det meste', ut)
+        self.assertIn('1 personell på det meste', ut, 'folk, ikke plasser')
         self.assertNotIn('plasstimer', ut)
         self.assertNotIn('×', ut, 'ingen liste over skiftene')
 
@@ -1590,7 +1607,7 @@ class GruppekurveIFanenTests(SimpleTestCase):
         """)
         self.assertIn('Samleplass', ut)
         self.assertNotIn('Ambulanse', ut, 'nabogruppa hører ikke hjemme her')
-        self.assertIn('2 plasser på det meste', ut)
+        self.assertIn('2 personell på det meste', ut)
 
     def test_ambulansefanen_viser_ambulansen(self):
         ut = run_node(self.harness, self.VINDU + self.LISTE + """
@@ -1616,7 +1633,7 @@ class GruppekurveIFanenTests(SimpleTestCase):
         """)
         self.assertIn('Tom', ut)
         self.assertIn('vl-stolpe', ut, 'spennet tegnes selv uten skift')
-        self.assertIn('1 plass på det meste', ut, 'flat null skaleres mot 1')
+        self.assertIn('0 personell på det meste', ut, 'flat null')
 
     def test_dogn_staar_i_tegnforklaringen(self):
         """Den hvite streken i kurven er midnatt, ikke nåværende tidspunkt.

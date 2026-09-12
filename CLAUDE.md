@@ -259,12 +259,14 @@ Fem ting det er verdt å kjenne før man rører modulen:
 | Enhetens status **utledes**, den lagres ikke | `services.enhet_status()` |
 | Korreksjoner er **nye rader** som peker på den gamle | `Statusmelding.objects.gjeldende()` |
 | `fritekst` logges som endret, men **uten verdier** | `signals.FELT_UTEN_VERDILOGGING` |
-| «Historikk» rydder tavla, **arkivet fryser vakta** | `Oppdrag.historikk_fra` vs. `oppdrag/arkiv.py` |
+| «Historikk» rydder tavla, **arkivet fryser og lukker vakta** | `Oppdrag.historikk_fra` vs. `oppdrag/arkiv.py` |
 
 **Historikk og arkiv er to helt ulike handlinger**, og har derfor hver sin knapp.
 Historikk flytter ett oppdrag ut av den aktive tavla og er fullt reversibel; arkivering
-fryser hele vakta med signatur og starter klokka mot en kollaps som sletter radnivået
-etter 24 måneder. `fritekst` arkiveres **ikke** — feltet er unntatt verdilogging i audit,
+fryser hele vakta med signatur, **sletter så oppdragene fra tavla og historikken og
+nullstiller telleren** (12. sep. 2026 — neste oppdrag får #1), og starter klokka mot en
+kollaps som sletter radnivået etter 24 måneder. Viewet avviser arkivering mens noe står
+på tavla. Pasientarkivet gjør *ikke* dette — der står pasientene igjen etter frysing. `fritekst` arkiveres **ikke** — feltet er unntatt verdilogging i audit,
 og å fryse det i 24 måneder ville uthult unntaket.
 
 Den er den første modulen som tar `skriv_handling` i bruk: bilen får smale, navngitte
@@ -607,8 +609,8 @@ laster ingen av dem — de har egen `<style>`-blokk og må overstyre selv.
 **Hver mal med eget `<head>` tar med `partials/_ikoner.html`** — manifest, favicon,
 apple-touch-icon og `theme-color`. Manifestet er en view (`core/manifest.py`, uten
 innlogging), ikke en statisk fil, fordi ikonstiene må gjennom `{% static %}`: WhiteNoise
-hasher navnene. Merket i `static/img/logo.svg` er en ring med en pulslinje, bevisst uten
-kors. `core/tests_manifest.py` håndhever alle tre.
+hasher navnene. Merket i `static/img/logo.svg` er et skjold med en person i, bevisst uten
+kors og uten rødt. `core/tests_manifest.py` håndhever alle tre.
 
 **`base_portal.html` aliaser ikke alle variablene `style.css` definerer.** Den setter
 `--surface-1`, `--surface-2`, `--border-color` og `--text-main`, men *ikke* `--text-muted`,

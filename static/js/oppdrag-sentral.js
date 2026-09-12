@@ -1357,7 +1357,10 @@ async function arkiverVakt() {
     }
     const notatfelt = document.getElementById('arkiv-notat');
     if (notatfelt) notatfelt.value = '';
+    // Vakta er lukket: tavla og historikken er tomme, og nummeret starter
+    // på nytt. Alt som viser oppdrag må tegnes på nytt.
     await lastArkiv();
+    await lastAlt();
   });
 }
 

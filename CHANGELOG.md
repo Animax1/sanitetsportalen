@@ -4,6 +4,27 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-12 — Andrés rapport 4: arkivering lukker vakta, ny logo
+
+Ingen migrasjon.
+
+- **Arkivering av oppdragsvakta lukker den.** Radene fryses med signatur
+  som før, og deretter tømmes tavla og historikken og telleren nullstilles,
+  så neste oppdrag får #1 (André: «tallene må resettes … historikklisten
+  tømmes»). Avvises med 400 mens noe står på tavla — et pågående oppdrag
+  slettet halvveis er en hendelse uten slutt. `arkiver_vakt(..., tomm=False)`
+  fryser uten å rydde, for testene som sammenligner arkiv med live. Vaktarkivet
+  var alt global admin i alle fire endepunkter.
+- **Bilen ser de andres stempler også mens hun venter.** Tidslinjen sto
+  bare på det aktive kortet; nå står den på det ventende når andre biler har
+  stemplet.
+- **Bemanningskurven forsvant** på en vaktliste der vaktens start lå uker
+  før slutten: spennet over 14 dager ga stille opp. Nå faller den tilbake på
+  skiftene, og uten spenn sier kortet hva som mangler i stedet for å stå tomt.
+  Bunnlinja heter «N personell på det meste» og teller folk, ikke plasser.
+- **Ny logo:** et skjold med en person i, to farger på portalens blå. Den
+  første leste som EKG («trenger bare noe subtilt»).
+
 ## 2026-09-12 — Andrés rapport 3, manifest og logo
 
 Ingen migrasjon. Nye arkiv får tittelen «Arkivert dd.mm.åååå hh:mm»; eldre

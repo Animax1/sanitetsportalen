@@ -212,6 +212,9 @@ ingen av dem gir feilmelding — de er bare stille inaktive.
                   registeret hentes ved sidelasting, lesbar tidstekst på /statistikk/.
             - [x] Navnet «utildelt» ble «Åpen for alle» (12. sep.). «Ledig korps»
                   ble forkastet: «ledig» er alt plassen uten person.
+            - [x] Andrés rapport 4 (12. sep.): arkivering lukker vakta (tømmer tavla,
+                  nummer fra #1), bilen ser de andres stempler også i Venter, kurven
+                  faller tilbake på skiftene, «personell på det meste», ny logo.
             - [x] Andrés rapport 3 (12. sep.): bilen ser de andres stempler, arkivtittel
                   uten vaktnavn, «Mitt korps» skiller korpsets fra åpent for alle, kurvens
                   hode med tre tall, «Arkiv» i eget vindu, manifest og logo.

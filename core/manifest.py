@@ -9,10 +9,11 @@ finnes etter `collectstatic`.
 manifest bak innloggingen er et manifest som ikke finnes. Det inneholder
 bare navn, farger og ikonstier.
 
-Merket (`static/img/logo.svg`) er en ring — portalen — med en pulslinje
-gjennom — sanitet. Bevisst uten kors: et rødt kors på hvitt er Røde
-Kors-emblemet og beskyttet, og et hvitt kors på farget flate leser som
-apotek eller førstehjelpsskilt.
+Merket (`static/img/logo.svg`) er et skjold med en person i — vern om
+folk. Bevisst uten kors: et rødt kors på hvitt er Røde Kors-emblemet og
+beskyttet, og et hvitt kors på farget flate leser som apotek eller
+førstehjelpsskilt. Første utkast var en ring med pulslinje; André leste
+den som EKG og ville ha noe subtilt (12. sep. 2026).
 """
 from django.http import JsonResponse
 from django.templatetags.static import static

@@ -29,16 +29,24 @@ from .models import ArkivertOppdrag, Oppdrag, OppdragArkiv, Oppdragsenhet, Statu
 from .statistikk import _STATUSFELT, arkiv_stats
 
 
-def arkiver_vakt(vakt, notat, user):
+def arkiver_vakt(vakt, notat, user, *, tomm=True):
     """Frys oppdragene i ``vakt`` som et arkiv. Returnerer (arkiv, antall).
 
     Hele operasjonen ligger i én transaksjon: et arkiv med signatur over rader
     som ikke ble opprettet, ville meldt tukling ved første visning.
 
     Rettinger er regnet inn før frysingen — radene bygges fra `gjeldende()`,
-    så det er det korrigerte tidspunktet som lagres. Originalen blir liggende i
-    `Statusmelding` så lenge vakta finnes, og i auditsporet etterpå.
+    så det er det korrigerte tidspunktet som lagres.
+
+    **Arkivering lukker vakta** (André, 12. sep. 2026): oppdragene slettes fra
+    tavla og historikken når de er frosset, og telleren nullstilles, så neste
+    oppdrag får #1. Sporet av det som sto der er arkivet — og auditloggen, som
+    logger slettingene. ``tomm=False`` fryser uten å rydde; det finnes for
+    tester som sammenligner arkivet med det som lå der.
     """
+    from . import services  # noqa: WPS433 — services importerer ikke arkiv, men holdes lokal
+    from patients.models import AppSetting  # noqa: WPS433
+
     with transaction.atomic():
         oppdragene = list(
             Oppdrag.objects
@@ -98,6 +106,14 @@ def arkiver_vakt(vakt, notat, user):
         handler = OppdragArkivHandler()
         arkiv.sha256 = beregn_sha256(handler, arkiv)
         arkiv.save(update_fields=['sha256', 'antall_rader'])
+
+        if tomm:
+            # Vakta lukkes: radene er frosset med signatur over, og tavla og
+            # historikken tømmes. Telleren slettes, ikke settes til 1 —
+            # `neste_oppdragsnummer` gjenskaper den fra det som finnes.
+            for oppdrag in oppdragene:
+                services.slett_oppdrag(oppdrag)
+            AppSetting.objects.filter(key=services._nummer_nokkel(vakt)).delete()
 
         return arkiv, len(rader)
 

@@ -796,6 +796,18 @@ class BilenSerDeAndreTests(TestCase):
         ut = self._render(self._oppdrag(), 'renderVentende')
         self.assertNotIn('Også varslet', ut)
 
+    def test_ogsaa_mens_hun_venter_ser_hun_de_andres_stempler(self):
+        """André, 12. sep. 2026: «Bil B ser ikke A sine stempler så lenge den
+        står i venter» — og det er nettopp da det er verdt å vite."""
+        o = self._oppdrag(andre_meldinger=[
+            {'status': 'rykker_ut', 'status_navn': 'Rykker ut', 'enhet_navn': 'HGSD 56',
+             'tidspunkt': '2026-08-29T20:01:00Z'}])
+        ut = self._render(o, 'renderVentende')
+        self.assertIn('tidslinje-andre', ut)
+        self.assertIn('HGSD 56:</span> Rykker ut', ut)
+        # Uten andres stempler står det ingen tom tidslinje.
+        self.assertNotIn('tidslinje-rad', self._render(self._oppdrag(), 'renderVentende'))
+
     def test_de_andres_stempler_staar_i_tidslinjen_med_navn_og_i_tidsrekkefolge(self):
         """André, 12. sep. 2026: «nyttig for de å vite historikken der»."""
         o = self._oppdrag(status='rykker_ut', status_navn='Rykker ut', statusmeldinger=[

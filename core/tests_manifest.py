@@ -44,15 +44,14 @@ class ManifestTests(TestCase):
         self.assertIn(f'--portal-header-bg: {TEMAFARGE};', base)
         self.assertIn(f'--portal-bg: {BAKGRUNN};', base)
 
-    def test_merket_har_ikke_kors(self):
-        """Et rødt kors på hvitt er Røde Kors-emblemet og beskyttet. Merket er
-        en ring og en pulslinje, og skal forbli det."""
+    def test_merket_er_rolig_og_uten_roedt(self):
+        """Et rødt kors på hvitt er Røde Kors-emblemet og beskyttet, og André
+        ville ha noe subtilt (12. sep. 2026). Merket er et skjold med en
+        person i — to farger på portalens blå, ingen rødt."""
         svg = (Path(settings.BASE_DIR) / 'static/img/logo.svg').read_text(encoding='utf-8')
-        self.assertIn('<circle', svg)
-        self.assertIn('<polyline', svg)
-        self.assertNotIn('<path', svg, 'ingen frihåndsfigurer — et kors sniker seg inn som path')
-        self.assertNotIn('#dc', svg.lower())
-        self.assertNotIn('red', svg.lower())
+        self.assertIn('<title>Sanitetsportalen</title>', svg)
+        farger = set(re.findall(r'#[0-9a-fA-F]{6}', svg))
+        self.assertEqual(farger, {'#0f3460', '#8fb3f0', '#ffffff'}, farger)
 
 
 class AlleSiderLenkerTilManifestetTests(TestCase):

@@ -382,6 +382,12 @@ function renderVentende() {
               id="stemple-neste-${escHtmlValue(o.id)}"
               data-action="stempleNeste" data-id="${escHtmlValue(o.id)}">
         ${escapeHtml(o.neste_navn)}</button>`;
+    // Mens hun venter har hun ingen egne stempler — men de andre bilene kan
+    // ha rykket ut alt, og det er nettopp da det er verdt å vite (André,
+    // 12. sep. 2026: «Bil B ser ikke A sine stempler så lenge den står i
+    // venter»).
+    const andresTidslinje = (o.andre_meldinger || []).length
+      ? `<div class="mt-2">${tidslinjeEnhetHtml(o)}</div>` : '';
     return `
     <div class="oppdrag-rad">
       <div class="d-flex align-items-center gap-2 flex-wrap">
@@ -391,6 +397,7 @@ function renderVentende() {
       <div class="oppdrag-meta mt-1">${escapeHtml(o.lokasjon_navn)} · ${escapeHtml(klokke(o.opprettet))}</div>
       ${_varsledeRad(o)}
       ${fritekstBlokk}
+      ${andresTidslinje}
       ${startKnapp}
     </div>`;
   }).join('');

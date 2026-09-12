@@ -1202,17 +1202,20 @@ function _vaktensSpenn() {
   let start = vl.startet ? _d(vl.startet)?.getTime() : null;
   let slutt = vl.planlagt_slutt ? _d(vl.planlagt_slutt)?.getTime() : null;
 
-  // Mangler spennet, faller vi tilbake på skiftene — bedre en kurve som
-  // dekker for lite enn ingen kurve mens vakten ennå ikke har en slutt.
-  if (start == null || slutt == null || slutt <= start) {
+  // Mangler spennet — eller er det urimelig langt — faller vi tilbake på
+  // skiftene. Bedre en kurve som dekker for lite enn ingen kurve. Kurven
+  // forsvant helt på en vaktliste der vaktens start lå uker før slutten
+  // (André, 12. sep. 2026: «fullstendig vekke»).
+  const MAKS = 24 * 14;
+  const rimelig = (a, b) => a != null && b != null && b > a && (b - a) / TIME <= MAKS;
+  if (!rimelig(start, slutt)) {
     if (!poster.length) return null;
     start = Math.min(...poster.map((v) => _d(v.fra_tid).getTime()));
     slutt = Math.max(...poster.map((v) => _d(v.til_tid).getTime()));
+    if (!rimelig(start, slutt)) return null;   // et feiltastet årstall: ikke tegn
   }
 
-  const steg = Math.ceil((slutt - start) / TIME);
-  if (steg <= 0 || steg > 24 * 14) return null;   // urimelig spenn: ikke tegn
-  return { start, steg };
+  return { start, steg: Math.ceil((slutt - start) / TIME) };
 }
 
 
@@ -1280,8 +1283,15 @@ function _timesteg(antall) {
 
 function _mkEnKurve(tittel, poster) {
   const punkter = _bemanningPerTime(poster);
-  if (!punkter.length) return '';
+  if (!punkter.length) {
+    // Ingen tom flate: en kurve som mangler uten et ord ser ut som en feil
+    // (og var det, 12. sep. 2026). Si hva som mangler.
+    return '<div class="vl-meta">Kurven trenger vaktens start og slutt — sett dem i «Innstillinger» (høyst 14 dager), eller legg inn et skift.</div>';
+  }
   const topp = Math.max(...punkter.map((p) => p.planlagt)) || 1;
+  // Bunnlinja teller folk, ikke plasser (André, 12. sep. 2026: «N personell
+  // på det meste»). Skalaen er fortsatt planlagte plasser.
+  const flest = Math.max(...punkter.map((p) => p.antall));
   const ledige = punkter.reduce((n, p) => n + (p.planlagt - p.antall), 0);
 
   // Rene CSS-søyler framfor Chart.js: biblioteket lastes kun på
@@ -1327,7 +1337,7 @@ function _mkEnKurve(tittel, poster) {
       </div>
       <div class="vl-kurve">${soyler}</div>
       <div class="vl-timeakse">${timeakse}</div>
-      <div class="vl-meta">${bunn} · ${escHtmlValue(topp)} ${escapeHtml(topp === 1 ? 'plass' : 'plasser')} på det meste</div>
+      <div class="vl-meta">${bunn} · ${escHtmlValue(flest)} personell på det meste</div>
     </div>`;
 }
 

@@ -178,10 +178,21 @@ class ArkiveringTests(ArkivBasis):
         _, antall = arkiver_vakt(self.vakt, '', self.admin)
         self.assertEqual(antall, 1)
 
-    def test_arkivering_rorer_ikke_oppdragene(self):
-        """Frysing er en kopi. Tavla står som den sto."""
+    def test_arkivering_lukker_vakta(self):
+        """André, 12. sep. 2026: «Når jeg vaktarkiverer så må tallene resettes
+        på oppdragsnumrene … Og da må historikklisten tømmes.» Radene er
+        frosset i arkivet; tavla og historikken tømmes, og neste oppdrag får #1."""
         self._full_vakt()
-        arkiver_vakt(self.vakt, '', self.admin)
+        self.assertEqual(services.neste_oppdragsnummer(self.vakt), 4)
+        arkiv, _ = arkiver_vakt(self.vakt, '', self.admin)
+        self.assertEqual(Oppdrag.objects.filter(vakt=self.vakt).count(), 0)
+        self.assertEqual(arkiv.oppdrag.count(), 3, 'arkivet står')
+        self.assertFalse(verifiser(OppdragArkivHandler(), arkiv), 'og verifiserer')
+        self.assertEqual(services.neste_oppdragsnummer(self.vakt), 1)
+
+    def test_tomm_false_fryser_uten_aa_rydde(self):
+        self._full_vakt()
+        arkiver_vakt(self.vakt, '', self.admin, tomm=False)
         self.assertEqual(Oppdrag.objects.filter(vakt=self.vakt).count(), 3)
 
 
@@ -496,17 +507,32 @@ class ArkivEndepunktTests(ArkivBasis):
         return bruker
 
     def test_admin_kan_arkivere(self):
-        self._full_vakt()
+        a, b, c_ = self._full_vakt()
+        # Alt må ligge i historikken først — b er halvferdig.
+        self._stempel(b, choices.LEDIG, 30)
         c = self._klient(self.admin)
 
         resp = c.post('/oppdrag/api/arkiv/',
                       data=json.dumps({'notat': 'Tørt og fint'}),
                       content_type='application/json')
 
-        self.assertEqual(resp.status_code, 201)
+        self.assertEqual(resp.status_code, 201, resp.content)
         data = resp.json()['data']
         self.assertEqual(data['antall_oppdrag'], 3)
         self.assertEqual(OppdragArkiv.objects.count(), 1)
+        self.assertEqual(Oppdrag.objects.filter(vakt=self.vakt).count(), 0, 'tavla er tømt')
+
+    def test_arkivering_avvises_mens_noe_staar_paa_tavla(self):
+        """Et pågående oppdrag slettet halvveis ville vært en hendelse uten
+        slutt. Meldingen sier hva som må gjøres først."""
+        self._full_vakt()   # b er halvferdig
+        resp = self._klient(self.admin).post(
+            '/oppdrag/api/arkiv/', data=json.dumps({'notat': ''}),
+            content_type='application/json')
+        self.assertEqual(resp.status_code, 400)
+        self.assertIn('1 oppdrag står fortsatt på tavla', resp.json()['message'])
+        self.assertEqual(OppdragArkiv.objects.count(), 0)
+        self.assertEqual(Oppdrag.objects.filter(vakt=self.vakt).count(), 3)
 
     def test_skriv_full_er_ikke_nok(self):
         """Arkivering starter en klokke mot en irreversibel sletting."""
@@ -565,7 +591,9 @@ class ArkivEndepunktTests(ArkivBasis):
     def test_arkivering_loggfores_i_audit(self):
         from audit.models import AuditLog
 
-        self._oppdrag()
+        o = self._oppdrag()
+        o.historikk_fra = timezone.now()
+        o.save(update_fields=['historikk_fra'])
         self._klient(self.admin).post(
             '/oppdrag/api/arkiv/', data=json.dumps({}),
             content_type='application/json')

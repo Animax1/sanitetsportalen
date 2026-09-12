@@ -24,7 +24,7 @@ from core.auth_decorators import er_global_admin, modul_kreves
 from patients.services import hent_aktiv_vakt
 
 from .arkiv import OppdragArkivHandler, arkiver_vakt
-from .models import OppdragArkiv
+from .models import Oppdrag, OppdragArkiv
 from .statistikk import arkiv_stats
 from .views_common import json_body
 
@@ -103,6 +103,14 @@ def arkiv_liste_view(request):
 
     vakt = hent_aktiv_vakt()
     notat = (json_body(request).get('notat') or '').strip()
+    # Arkivering lukker vakta: tavla tømmes og nummeret starter på nytt.
+    # Da kan ingenting stå igjen på tavla — et pågående oppdrag som ble
+    # slettet halvveis ville vært en hendelse uten slutt.
+    paa_tavla = Oppdrag.objects.filter(vakt=vakt, historikk_fra__isnull=True).count()
+    if paa_tavla:
+        return JsonResponse({'status': 'error', 'message': (
+            f'{paa_tavla} oppdrag står fortsatt på tavla. Legg dem i historikken '
+            'eller slett dem før vakten arkiveres.')}, status=400)
     try:
         arkiv, antall = arkiver_vakt(vakt, notat, request.user)
     except Exception:
