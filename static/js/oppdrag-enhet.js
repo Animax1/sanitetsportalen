@@ -155,10 +155,40 @@ function hastegradKlasse(h) {
 }
 
 
+function _medAntall(problemstilling) {
+  return (globalThis.window?.OPPDRAG_MED_ANTALL || []).includes(problemstilling);
+}
+
+
 function _problemMedAntall(o) {
-  // «Transport · 3» — som i sentralbordet.
+  // «Transport · 3 pasienter» — som i sentralbordet. Tomt betyr én.
   const p = o.problemstilling || '';
-  return o.antall != null ? `${p} · ${o.antall}` : p;
+  if (!_medAntall(p)) return p;
+  const n = o.antall == null ? 1 : Number(o.antall);
+  return `${p} · ${n} ${n === 1 ? 'pasient' : 'pasienter'}`;
+}
+
+
+function _antallRad(o) {
+  // Bilen setter antall pasienter (André, 12. sep. 2026: «bilen må sette
+  // antall pasienter ikke operatøren»). Bare der problemstillingen bærer et
+  // antall, og bare på det påbegynte oppdraget. To store knapper, ikke et
+  // tallfelt: hansker og en bil i bevegelse.
+  if (!_medAntall(o.problemstilling)) return '';
+  const n = o.antall == null ? 1 : Number(o.antall);
+  return `
+    <div class="antall-rad mt-2">
+      <span class="oppdrag-meta">Pasienter</span>
+      <div class="d-flex align-items-center gap-2 mt-1">
+        <button type="button" class="btn btn-outline-light antall-knapp" id="antall-ned"
+                data-action="settAntall" data-arg="${escHtmlValue(n - 1)}"${n <= 1 ? ' disabled' : ''}
+                aria-label="Én pasient færre">−</button>
+        <span class="antall-tall">${escHtmlValue(n)}</span>
+        <button type="button" class="btn btn-outline-light antall-knapp" id="antall-opp"
+                data-action="settAntall" data-arg="${escHtmlValue(n + 1)}"
+                aria-label="Én pasient til">+</button>
+      </div>
+    </div>`;
 }
 
 
@@ -368,6 +398,7 @@ function renderAktivt() {
       ${udefinert}
       ${_varsledeRad(o)}
       ${fritekstBlokk}
+      ${_antallRad(o)}
       ${grovRad}
       <div class="mt-2">${tidslinjeEnhetHtml(o)}</div>
       ${knapperad}
@@ -613,6 +644,29 @@ async function settGrovsortering(verdi) {
     const d = await res.json().catch(() => ({}));
     if (!res.ok || d.status !== 'ok') {
       visFeil(d.message || 'Kunne ikke lagre grovsorteringen.');
+      return;
+    }
+    etagMine = null;
+    await lastMine();
+  });
+}
+
+async function settAntall(verdi) {
+  // Som grovsorteringen: ikke i køen, og uten dekning sier skjermen fra.
+  const n = Number(verdi);
+  const o = mineOppdrag.find((x) => x.status !== 'venter' && x.status !== 'ledig');
+  if (!o || !Number.isInteger(n) || n < 1) return;
+  await withSubmitGuard(n > (o.antall == null ? 1 : o.antall) ? 'antall-opp' : 'antall-ned', async () => {
+    let res;
+    try {
+      res = await apiFetch(`/oppdrag/api/oppdrag/${o.id}/antall/${n}/`, { method: 'POST' });
+    } catch (e) {
+      visFeil('Ingen kontakt — antallet ble ikke lagret. Prøv igjen når dekningen er tilbake.');
+      return;
+    }
+    const d = await res.json().catch(() => ({}));
+    if (!res.ok || d.status !== 'ok') {
+      visFeil(d.message || 'Kunne ikke lagre antallet.');
       return;
     }
     etagMine = null;

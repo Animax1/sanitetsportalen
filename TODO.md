@@ -220,17 +220,15 @@ ingen av dem gir feilmelding — de er bare stille inaktive.
             - [x] Andrés rapport 3 (12. sep.): bilen ser de andres stempler, arkivtittel
                   uten vaktnavn, «Mitt korps» skiller korpsets fra åpent for alle, kurvens
                   hode med tre tall, «Arkiv» i eget vindu, manifest og logo.
-            - [ ] **Andrés runde på staging, del E og F (12. sep.)** — gjenstår:
-                  - [ ] E: enhetstyper, problemstillinger og lokasjoner som tabeller
-                        admin kan redigere og sortere (rekkefølge i nedtrekkene);
-                        enheter alfabetisk innenfor gruppa; `skriv_leder` i
-                        oppdragsmodulen for lokasjoner/typer/problemstillinger;
-                        antall pasienter settes av **bilen** (blank = «1 pasient»,
-                        vises som «N pasienter»), ikke av operatøren.
+            - [ ] **Andrés runde på staging, del F (12. sep.)** — gjenstår:
                   - [ ] F: lydvarsel i bilen for ventende oppdrag som ikke er rykket
                         ut på: Akutt innen 1 min, så hvert 10. s; Haster innen 5 min,
                         så hvert minutt; Vanlig/Drift etter 15 min, så hvert minutt.
                         1–3 s lyd, «Lyd på»-bryter som låser opp AudioContext.
+            - [x] Andrés runde på staging, del E (12. sep.): problemstillinger og
+                  enhetstyper som tabeller med rekkefølge (`0019`–`0021`), «Verdier»-vinduet
+                  med tre faner, `skriv_leder` i oppdragsmodulen, enheter alfabetisk i
+                  gruppa, antall pasienter satt av bilen.
             - [x] Andrés runde på staging, del D (12. sep.): fanikon og «vis passord»
                   synlige på innloggingssiden, avkryssingen i «Nytt oppdrag» overlever
                   pollingen, nedtrekkene starter øverst, lista sortert på hastegrad og

@@ -26,6 +26,10 @@ from django.core.exceptions import ValidationError
 #: `services.sett_status` avviser `Ledig` så lenge den står.
 UDEFINERT = 'Udefinert'
 
+#: **Seed-data**, ikke fasit (12. sep. 2026): problemstillingene er en tabell
+#: (`models.Problemstilling`), og migrasjon `0020` la disse inn. Etter det
+#: er databasen kilden — `verdier.problemstillinger_for()`. Listene står
+#: igjen for seeding og for testene som bygger en base fra bunnen.
 PROBLEMSTILLING_MEDISINSK = (
     UDEFINERT,
     'Stor ytre blødning',
@@ -64,8 +68,7 @@ PROBLEMSTILLING_DRIFT = (
     'Annet',
 )
 
-#: Alle problemstillinger, til validering av feltet alene. Hvilke som passer
-#: en gitt hastegrad står i `PROBLEMSTILLINGER_FOR`.
+#: Unionen av seed-listene — brukes bare av seedingen og av tester.
 PROBLEMSTILLING = PROBLEMSTILLING_MEDISINSK + tuple(
     p for p in PROBLEMSTILLING_DRIFT if p not in PROBLEMSTILLING_MEDISINSK)
 
@@ -82,38 +85,24 @@ HASTEGRAD = (
     DRIFT,
 )
 
-PROBLEMSTILLINGER_FOR: dict[str, tuple[str, ...]] = {
-    'Akutt': PROBLEMSTILLING_MEDISINSK,
-    'Haster': PROBLEMSTILLING_MEDISINSK,
-    'Vanlig': PROBLEMSTILLING_MEDISINSK,
-    DRIFT: PROBLEMSTILLING_DRIFT,
-}
+#: Seed for `Problemstilling.med_antall` (André, 12. sep. 2026: «Transport
+#: har antall som fast hele tall»). Etter `0020` er flagget på raden fasit.
+MED_ANTALL_SEED = ('Transport',)
 
-#: Problemstillinger som bærer et antall (André, 12. sep. 2026: «Transport
-#: har antall som fast hele tall»). `Oppdrag.antall` tømmes for alle andre.
-MED_ANTALL = ('Transport',)
+#: «Udefinert» står øverst i begge seed-listene (André, 12. sep. 2026) — og
+#: `verdier.problemstillinger_for()` setter den først uansett rekkefølge.
+assert PROBLEMSTILLING_MEDISINSK[0] == UDEFINERT and PROBLEMSTILLING_DRIFT[0] == UDEFINERT
 
-
-#: «Udefinert» står øverst i alle fire listene (André, 12. sep. 2026) —
-#: `VerdimengdeneTests` håndhever det, så en omsortering ikke flytter den.
-assert all(liste[0] == UDEFINERT for liste in PROBLEMSTILLINGER_FOR.values())
-
-
-def problemstilling_passer(hastegrad: str, problemstilling: str) -> bool:
-    """Hører problemstillingen til hastegradens liste? Ukjent hastegrad gir
-    False — en skrivefeil skal stenge, ikke åpne."""
-    return problemstilling in PROBLEMSTILLINGER_FOR.get(hastegrad, ())
-
-
-#: Enhetstypen (André, 12. sep. 2026): grupperer bilene i «Nytt oppdrag» og i
-#: ressursoversikten, ambulansene først. Rekkefølgen her er visningsrekkefølgen.
-ENHETSTYPE: tuple[tuple[str, str], ...] = (
+#: Seed for enhetstypene (André, 12. sep. 2026): grupperer bilene i «Nytt
+#: oppdrag» og i ressursoversikten, ambulansene først. Tabellen
+#: `models.Enhetstype` er fasit etter `0020`; slugene her var feltverdiene i
+#: `Enhet.type` fram til da, og migrasjonen oversetter dem.
+ENHETSTYPE_SEED: tuple[tuple[str, str], ...] = (
     ('ambulanse', 'Ambulanse'),
     ('mannskapsbil', 'Mannskapsbil'),
     ('lag', 'Lag til fots'),
     ('annet', 'Annet'),
 )
-ENHETSTYPE_NAVN: dict[str, str] = dict(ENHETSTYPE)
 
 
 # ── Statuser ─────────────────────────────────────────────────────────────────
@@ -174,8 +163,9 @@ GROVSORTERING: tuple[tuple[str, str], ...] = (
 GROVSORTERING_NAVN: dict[str, str] = dict(GROVSORTERING)
 
 
+#: Problemstillingen står ikke her lenger: den valideres mot tabellen i
+#: `verdier.valider_problemstilling()`.
 CHOICE_FIELDS: dict[str, tuple[str, ...]] = {
-    'problemstilling': PROBLEMSTILLING,
     'hastegrad': HASTEGRAD,
 }
 

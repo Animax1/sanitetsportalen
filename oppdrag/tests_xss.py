@@ -36,7 +36,9 @@ HTML_BUILDERS_PER_FIL = {
         '_enhetsknapper',
         '_varsleValg',
         'tidslinjeHtml',
-        'renderLokasjonsadmin',
+        # Verdimengdene (12. sep. 2026): lista og raden i «Verdier».
+        'renderVerdiadmin',
+        '_verdirad',
         'renderEnhetsadmin',
         'renderHistorikk',
     ),
@@ -45,6 +47,7 @@ HTML_BUILDERS_PER_FIL = {
         'renderAktivt',
         '_stedvalg',
         '_grovsorteringsrad',
+        '_antallRad',
         'renderVentende',
         'renderAvsluttet',
     ),
@@ -58,6 +61,30 @@ REVIEWED_INTERPOLATIONS = {
     'tittel': 'hardkodet title-attributt fra en ternær',
     'dempet': 'hardkodet CSS-klasse fra en ternær',
     'manglerKlasse': 'hardkodet CSS-klasse fra en ternær og `_manglerTrinn()`, som velger blant tre faste ord',
+    # Verdimengdene (12. sep. 2026): raden bygges av fragmenter som selv er
+    # bygget med escHtmlValue/escapeHtml to linjer over, og av faste attributter
+    # fra ternærer.
+    "verdi === valgt ? ' selected' : ''": 'hardkodet attributt fra en ternær',
+    "v === r.kategori ? ' selected' : ''": 'hardkodet attributt fra en ternær',
+    "r.med_antall ? '' : ' selected'": 'hardkodet attributt fra en ternær',
+    "r.med_antall ? ' selected' : ''": 'hardkodet attributt fra en ternær',
+    "(siste || r.fast) ? ' disabled' : ''": 'hardkodet attributt fra en ternær',
+    "(forste || r.fast) ? ' disabled' : ''": 'hardkodet attributt fra en ternær',
+    "n <= 1 ? ' disabled' : ''": 'hardkodet attributt fra en ternær',
+    'opp': 'knapp bygget med escHtmlValue i `_verdirad`',
+    'ned': 'knapp bygget med escHtmlValue i `_verdirad`',
+    'knappAktiv': 'knapp bygget med escHtmlValue i `_verdirad`',
+    'kategorivalg': 'options bygget med escHtmlValue/escapeHtml i `_verdirad`',
+    'iBruk': 'tall gjennom escHtmlValue, i `_verdirad`',
+    'fast': 'fast tekst uten data, i `_verdirad`',
+    'ekstra': 'nedtrekk bygget med escHtmlValue i `_verdirad`',
+    "arg('slett')": 'escHtmlValue over slug, id og et fast ord',
+    "arg('opp')": 'escHtmlValue over slug, id og et fast ord',
+    "arg('ned')": 'escHtmlValue over slug, id og et fast ord',
+    "arg('navn')": 'escHtmlValue over slug, id og et fast ord',
+    "arg('1')": 'escHtmlValue over slug, id og et fast ord',
+    "arg('0')": 'escHtmlValue over slug, id og et fast ord',
+    '_antallRad(o)': 'markup fra en bygger som selv skannes her',
     'udefinert': 'markup fra `_udefinertVarsel()`, som er fast tekst uten data fra oppdraget',
     # `meta` er ren tekst, ikke markup, og escapes én gang ved innsetting.
     # Escapet vi her også, ville teksten blitt dobbeltescapet i visningen.
@@ -212,7 +239,7 @@ class OppdragEscapingOppforselTests(SimpleTestCase):
         (OPPDRAG_SENTRAL_JS, ('renderOppdrag', 'renderEnheter', 'tidslinjeHtml',
                               'hastegradKlasse', 'mkBesetning',
                               'kanSeBesetning', 'tidSiden', '_grovMerke',
-                              '_enhetsmatrise', '_problemMedAntall', '_grupperEnheter', '_typeRekkefolge', '_enhetskort',
+                              '_enhetsmatrise', '_problemMedAntall', '_medAntall', '_grupperEnheter', '_typeRekkefolge', '_enhetskort',
                               '_sorterOppdrag', '_manglerTrinn', '_manglerMinutter')),
     )
 
@@ -300,9 +327,9 @@ class EnhetEscapingOppforselTests(SimpleTestCase):
     HARNESS = (
         (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue', 'trustedHtml', '_escHtml',
                            'klokke')),
-        (OPPDRAG_ENHET_JS, ('renderAktivt', '_udefinertVarsel', 'renderVentende', 'renderAvsluttet',
+        (OPPDRAG_ENHET_JS, ('renderAktivt', '_antallRad', '_udefinertVarsel', 'renderVentende', 'renderAvsluttet',
                             'tidslinjeEnhetHtml', 'hastegradKlasse',
-                            '_stedvalg', '_grovsorteringsrad', '_kanGrovsortere', '_varsledeRad', '_problemMedAntall')),
+                            '_stedvalg', '_grovsorteringsrad', '_kanGrovsortere', '_varsledeRad', '_problemMedAntall', '_medAntall')),
     )
 
     #: Toppnivå-tilstanden `renderAktivt` leser: stedvalget, og listene som
@@ -490,10 +517,10 @@ class AvreistTilOgGrovsorteringTests(SimpleTestCase):
     HARNESS = (
         (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue', 'trustedHtml', '_escHtml',
                            'klokke')),
-        (OPPDRAG_ENHET_JS, ('renderAktivt', '_udefinertVarsel', 'tidslinjeEnhetHtml', 'hastegradKlasse',
+        (OPPDRAG_ENHET_JS, ('renderAktivt', '_antallRad', '_udefinertVarsel', 'tidslinjeEnhetHtml', 'hastegradKlasse',
                             '_stedvalg', '_grovsorteringsrad', '_kanGrovsortere', '_varsledeRad',
                             'koNokkel', 'koLes',
-                            'koSkriv', 'koLeggTil', 'koFjern', 'lagNokkel', 'synk', '_problemMedAntall')),
+                            'koSkriv', 'koLeggTil', 'koFjern', 'lagNokkel', 'synk', '_problemMedAntall', '_medAntall')),
     )
     STUBB = EnhetEscapingOppforselTests.STUBB + (
         "globalThis.localStorage = (() => { const m = {}; return {"

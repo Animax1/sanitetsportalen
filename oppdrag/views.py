@@ -17,6 +17,7 @@ from django.db.models import Q
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
 from django.http import HttpResponseNotModified, JsonResponse
+from django.db.models.functions import Lower
 from django.shortcuts import render
 from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_http_methods
@@ -26,9 +27,9 @@ from core.idempotency import bygg_nokkel, forkast, fullfor, reserver
 from core.ratelimit import rate_limit
 from patients.services import hent_aktiv_vakt
 
-from . import choices, services
+from . import choices, services, verdier
 from .choices import validate_oppdrag_choice_fields
-from .models import Enhet, Lokasjon, Oppdrag, Statusmelding
+from .models import Enhet, Enhetstype, Lokasjon, Oppdrag, Statusmelding
 from .views_common import (
     bytte_til_dict, er_enhetskonto, etag_for, hendelse_til_dict, json_body, melding_til_dict,
     oppdrag_til_dict, status_tidspunkt_for,
@@ -47,6 +48,9 @@ def index_view(request):
     ville vist enheten alle oppdrag i vakta — nettopp det den ikke skal se.
     """
     if er_enhetskonto(request.user):
+        # Bilen setter antall pasienter på problemstillingene som bærer et
+        # (André, 12. sep. 2026) — hvilke det er, er data fra tabellen.
+        med_antall = json.dumps(verdier.med_antall())
         # Kjeden sendes med som data. Skjermen bruker den **kun** til å regne
         # ut hva neste knapp skal hete mens en stempling ligger usendt i køen
         # — uten den ville knappen dødd ved første trykk uten dekning, og hele
@@ -65,10 +69,15 @@ def index_view(request):
             # til knappene, som kjeden. Én kilde: `choices`.
             'avreist_til': json.dumps(list(choices.AVREIST_TIL)),
             'grovsortering': json.dumps(list(choices.GROVSORTERING)),
+            'med_antall': med_antall,
         })
 
     return render(request, 'oppdrag/sentral.html', {
         'kan_skrive': har_tilgang(request.user, 'oppdrag', 'skriv_full'),
+        # Verdimengdene — lokasjoner, enhetstyper, problemstillinger — settes
+        # opp av `skriv_leder` (André, 12. sep. 2026). Knappen vises bare da.
+        'kan_lede': (er_global_admin(request.user)
+                     or har_tilgang(request.user, 'oppdrag', 'skriv_leder')),
         # **Besetningspanelet er vaktlistas data, lånt inn** (§6 i
         # vaktlistenotatet). Flagget er en *slug* gjennom `core`, ikke en
         # import: oppdragsmodulen skal ikke kjenne vaktlista i Python, og
@@ -79,14 +88,14 @@ def index_view(request):
         # panelet ikke i det hele tatt, framfor å gi avledet innsyn i hvem som
         # går vakt.
         'kan_se_besetning': har_tilgang(request.user, 'vaktliste', 'les'),
-        'problemstillinger': choices.PROBLEMSTILLING,
+        'problemstillinger': verdier.problemstillinger_for(choices.HASTEGRAD[0]),
         # Hvilke problemstillinger som hører til hver hastegrad, og hvilke
         # som bærer et antall — skjemaet bygger nedtrekket om når hastegraden
-        # endres (André, 12. sep. 2026). Én kilde: `choices`.
-        'problemstillinger_for': json.dumps(
-            {h: list(p) for h, p in choices.PROBLEMSTILLINGER_FOR.items()}),
-        'med_antall': json.dumps(list(choices.MED_ANTALL)),
-        'enhetstyper': json.dumps(list(choices.ENHETSTYPE)),
+        # endres (André, 12. sep. 2026). Én kilde: tabellene, gjennom
+        # `verdier`. Klienten henter dem på nytt når noen redigerer dem.
+        'problemstillinger_for': json.dumps(verdier.problemstillinger_per_hastegrad()),
+        'med_antall': json.dumps(verdier.med_antall()),
+        'enhetstyper': json.dumps([[t.pk, t.navn] for t in verdier.enhetstyper()]),
         # Til «Før status» i detaljvisningen (§9): stedene ved «Avreist» og
         # statusnavnene. Samme kilde som enhetsskjermen: `choices`.
         'avreist_til': json.dumps(list(choices.AVREIST_TIL)),
@@ -135,7 +144,9 @@ def enheter_view(request):
     # `?alle=1` tar med pensjonerte enheter. Ressursoversikten på tavla skal
     # ikke se dem — de er borte for godt — men enhetspanelet er stedet man
     # gjenoppretter dem fra, og da må de være synlige et sted.
-    qs = Enhet.objects.select_related('user').order_by('navn')
+    # Alfabetisk innenfor gruppa (André, 12. sep. 2026) — `Lower`, ellers er
+    # «alfabetisk» databasens alfabet, og SQLite og PostgreSQL svarer ulikt.
+    qs = Enhet.objects.select_related('user', 'enhetstype').order_by(Lower('navn'))
     if request.GET.get('alle') != '1':
         qs = qs.filter(er_aktiv=True)
     enheter = list(qs)
@@ -147,8 +158,9 @@ def enheter_view(request):
             'pa_vakt': e.pa_vakt,
             'er_aktiv': e.er_aktiv,
             'username': getattr(e.user, 'username', '') or '',
-            'type': e.type,
-            'type_navn': choices.ENHETSTYPE_NAVN.get(e.type, e.type),
+            'type': e.enhetstype_id,
+            'type_navn': e.enhetstype.navn if e.enhetstype else '',
+            'type_rekkefolge': e.enhetstype.rekkefolge if e.enhetstype else None,
             'status': info['status'],
             'status_navn': info['status_navn'],
             'antall_ventende': info['antall_ventende'],
@@ -194,14 +206,20 @@ def enhet_detalj_view(request, pk):
             {'status': 'error', 'message': 'Enhet ikke funnet'}, status=404)
     data = json_body(request)
     if 'type' in data:
-        if data['type'] not in choices.ENHETSTYPE_NAVN:
-            return JsonResponse(
-                {'status': 'error', 'message': 'Ukjent enhetstype.'}, status=400)
-        enhet.type = data['type']
-    enhet.save(update_fields=['type', 'updated_at'])
+        # ID-en til en aktiv type, eller tom. Typen er en tabell (12. sep.
+        # 2026); en inaktiv type kan beholdes, men ikke velges på nytt.
+        if data['type'] in (None, ''):
+            enhet.enhetstype = None
+        else:
+            try:
+                enhet.enhetstype = Enhetstype.objects.get(pk=int(data['type']), er_aktiv=True)
+            except (Enhetstype.DoesNotExist, TypeError, ValueError):
+                return JsonResponse(
+                    {'status': 'error', 'message': 'Ukjent enhetstype.'}, status=400)
+    enhet.save(update_fields=['enhetstype', 'updated_at'])
     return JsonResponse({'status': 'ok', 'data': {
-        'id': enhet.pk, 'type': enhet.type,
-        'type_navn': choices.ENHETSTYPE_NAVN[enhet.type]}})
+        'id': enhet.pk, 'type': enhet.enhetstype_id,
+        'type_navn': enhet.enhetstype.navn if enhet.enhetstype else ''}})
 
 
 @modul_kreves('oppdrag', 'skriv_full', svar='json')
@@ -240,113 +258,6 @@ def enhet_vakt_view(request, pk):
     enhet.save(update_fields=['pa_vakt', 'updated_at'])
     return JsonResponse({'status': 'ok', 'data': {
         'id': enhet.pk, 'navn': enhet.navn, 'pa_vakt': enhet.pa_vakt}})
-
-
-# ── Lokasjoner ───────────────────────────────────────────────────────────────
-
-@never_cache
-@modul_kreves('oppdrag', 'les', svar='json')
-@require_http_methods(['GET', 'POST'])
-def lokasjoner_view(request):
-    """Liste (alle med `les`), eller opprett (kun global admin).
-
-    Lokasjonene er arrangementsdata og hører til modulen, på samme måte som
-    navneregistrene hører til pasientmodulen. Admin-gaten ligger inne i viewet
-    fordi lesing og skriving har ulike krav — modulgaten dekker begge.
-    """
-    if request.method == 'GET':
-        rader = list(Lokasjon.objects.all())
-        data = [
-            {'id': r.pk, 'navn': r.navn, 'er_aktiv': r.er_aktiv,
-             'rekkefolge': r.rekkefolge}
-            for r in rader
-        ]
-        etag = etag_for([(r['id'], r['navn'], r['er_aktiv'], r['rekkefolge'])
-                         for r in data])
-        if request.META.get('HTTP_IF_NONE_MATCH') == etag:
-            svar = HttpResponseNotModified()
-            svar['ETag'] = etag
-            return svar
-        svar = JsonResponse({'status': 'ok', 'data': data})
-        svar['ETag'] = etag
-        return svar
-
-    # Å legge til og endre lokasjoner er `skriv_full` (André, 12. sep.
-    # 2026): sentralbordet lager stedene mens vakta går. Sletting er admin.
-    if not har_tilgang(request.user, 'oppdrag', 'skriv_full'):
-        return JsonResponse({'status': 'error', 'message': 'Ingen tilgang'}, status=403)
-
-    navn = (json_body(request).get('navn') or '').strip()
-    if not navn:
-        return JsonResponse(
-            {'status': 'error', 'message': 'Navn kan ikke være tomt.'}, status=400)
-    if Lokasjon.objects.filter(navn=navn).exists():
-        return JsonResponse(
-            {'status': 'error', 'message': f'«{navn}» finnes allerede.'}, status=400)
-
-    lok = Lokasjon.objects.create(navn=navn)
-    return JsonResponse({'status': 'ok', 'data': {
-        'id': lok.pk, 'navn': lok.navn, 'er_aktiv': lok.er_aktiv,
-        'rekkefolge': lok.rekkefolge}})
-
-
-@modul_kreves('oppdrag', 'les', svar='json')
-@require_http_methods(['PUT', 'DELETE'])
-def lokasjon_detalj_view(request, pk):
-    """Endre navn/aktiv (PUT, `skriv_full`) eller slett (DELETE, global admin).
-
-    **DELETE sletter for godt** (André, 12. sep. 2026: «admin kan slette
-    lokasjoner»), med `{"confirm": true}` i kroppen som på oppdrag og
-    vaktlister. FK-en fra `Oppdrag` er `PROTECT`: en lokasjon som er brukt
-    kan ikke forsvinne uten å ta historikken med seg, og svaret er da 409
-    med råd om å deaktivere — som fortsatt går via PUT.
-    """
-    if not har_tilgang(request.user, 'oppdrag', 'skriv_full'):
-        return JsonResponse({'status': 'error', 'message': 'Ingen tilgang'}, status=403)
-
-    try:
-        lok = Lokasjon.objects.get(pk=pk)
-    except Lokasjon.DoesNotExist:
-        return JsonResponse(
-            {'status': 'error', 'message': 'Lokasjon ikke funnet'}, status=404)
-
-    if request.method == 'DELETE':
-        if not er_global_admin(request.user):
-            return JsonResponse({'status': 'error', 'message': 'Sletting er global admin.'}, status=403)
-        if not json_body(request).get('confirm'):
-            return JsonResponse(
-                {'status': 'error', 'message': 'Bekreftelse mangler. Send {"confirm": true}.'},
-                status=400)
-        brukt = lok.oppdrag.count()
-        if brukt:
-            return JsonResponse({'status': 'error', 'message': (
-                f'«{lok.navn}» er brukt av {brukt} oppdrag og kan ikke slettes. '
-                'Deaktiver den i stedet — da forsvinner den fra nedtrekket.')}, status=409)
-        lok.delete()
-        return JsonResponse({'status': 'ok'})
-
-    data = json_body(request)
-    if 'navn' in data:
-        navn = (data.get('navn') or '').strip()
-        if not navn:
-            return JsonResponse(
-                {'status': 'error', 'message': 'Navn kan ikke være tomt.'}, status=400)
-        if Lokasjon.objects.filter(navn=navn).exclude(pk=lok.pk).exists():
-            return JsonResponse(
-                {'status': 'error', 'message': f'«{navn}» finnes allerede.'}, status=400)
-        lok.navn = navn
-    if 'er_aktiv' in data:
-        lok.er_aktiv = bool(data['er_aktiv'])
-    if 'rekkefolge' in data:
-        try:
-            lok.rekkefolge = int(data['rekkefolge'])
-        except (TypeError, ValueError):
-            return JsonResponse(
-                {'status': 'error', 'message': 'Rekkefølge må være et tall.'}, status=400)
-    lok.save()
-    return JsonResponse({'status': 'ok', 'data': {
-        'id': lok.pk, 'navn': lok.navn, 'er_aktiv': lok.er_aktiv,
-        'rekkefolge': lok.rekkefolge}})
 
 
 # ── Oppdrag ──────────────────────────────────────────────────────────────────
@@ -431,7 +342,8 @@ def oppdrag_liste_view(request):
     except ValidationError as feil:
         return JsonResponse(
             {'status': 'error', 'message': '; '.join(feil.messages)}, status=400)
-    feil = _valider_problemstilling_og_antall(data, data.get('hastegrad'), data.get('problemstilling'))
+    feil = (verdier.valider_problemstilling(data)
+            or _valider_problemstilling_og_antall(data, data.get('hastegrad'), data.get('problemstilling')))
     if feil:
         return JsonResponse({'status': 'error', 'message': feil}, status=400)
 
@@ -465,7 +377,7 @@ def oppdrag_liste_view(request):
     return JsonResponse({'status': 'ok', 'data': oppdrag_til_dict(oppdrag)})
 
 
-def _valider_problemstilling_og_antall(data, hastegrad, problemstilling):
+def _valider_problemstilling_og_antall(data, hastegrad, problemstilling, *, gjeldende=None):
     """Problemstillingen må høre til hastegraden, og `antall` er et heltall
     som bare finnes for problemstillinger som bærer et. Muterer ``data`` —
     `antall` normaliseres til int eller None. Returnerer feiltekst eller None.
@@ -473,10 +385,10 @@ def _valider_problemstilling_og_antall(data, hastegrad, problemstilling):
     Ved redigering sendes bare feltene som endres, så kalleren gir de
     *gjeldende* verdiene for det som mangler i kroppen."""
     if hastegrad is not None and problemstilling is not None:
-        if not choices.problemstilling_passer(hastegrad, problemstilling):
+        if not verdier.problemstilling_passer(hastegrad, problemstilling, gjeldende=gjeldende):
             return (f'«{problemstilling}» er ikke en problemstilling for '
                     f'hastegrad {hastegrad}.')
-    if problemstilling not in choices.MED_ANTALL:
+    if not verdier.baerer_antall(problemstilling or ''):
         # Ingen antall å bære: feltet tømmes uansett hva klienten sendte.
         if 'antall' in data or problemstilling is not None:
             data['antall'] = None
@@ -605,9 +517,11 @@ def oppdrag_detalj_view(request, pk):
         return JsonResponse(
             {'status': 'error', 'message': '; '.join(feil.messages)}, status=400)
 
-    feil = _valider_problemstilling_og_antall(
-        data, data.get('hastegrad', oppdrag.hastegrad),
-        data.get('problemstilling', oppdrag.problemstilling))
+    feil = (verdier.valider_problemstilling(data, gjeldende=oppdrag.problemstilling)
+            or _valider_problemstilling_og_antall(
+                data, data.get('hastegrad', oppdrag.hastegrad),
+                data.get('problemstilling', oppdrag.problemstilling),
+                gjeldende=oppdrag.problemstilling))
     if feil:
         return JsonResponse({'status': 'error', 'message': feil}, status=400)
     if 'problemstilling' in data:
@@ -881,6 +795,46 @@ def grovsortering_view(request, pk, verdi):
             status=403)
     oppdrag.grovsortering = verdi
     oppdrag.save(update_fields=['grovsortering', 'updated_at'])
+    return JsonResponse({'status': 'ok', 'data': oppdrag_til_dict(
+        oppdrag, for_enhet=True, koblingsrad=rad)})
+
+
+@modul_kreves('oppdrag', 'skriv_handling', svar='json')
+@require_http_methods(['POST'])
+@rate_limit(group='oppdrag:antall', rate='60/m', method='POST')
+def antall_view(request, pk, antall):
+    """Bilen setter antall pasienter på sitt eget oppdrag (André, 12. sep.
+    2026: «bilen må sette antall pasienter ikke operatøren»).
+
+    Samme form som grovsorteringen: tallet i URL-en, bare enhetskontoen som
+    er på oppdraget, ikke idempotent-nøklet — «3» to ganger er «3». Bare for
+    problemstillinger som bærer et antall; ellers 400. Tomt felt vises som
+    «1 pasient», så det laveste tallet som kan settes er 1.
+    """
+    if not er_enhetskonto(request.user):
+        return JsonResponse(
+            {'status': 'error', 'message': 'Bare enhetskontoer setter antall.'},
+            status=403)
+    if antall < 1 or antall > 999:
+        return JsonResponse(
+            {'status': 'error', 'message': 'Antall må være mellom 1 og 999.'}, status=400)
+    try:
+        oppdrag = (Oppdrag.objects.select_related('enhet', 'lokasjon')
+                   .get(pk=pk, vakt=hent_aktiv_vakt()))
+    except Oppdrag.DoesNotExist:
+        return JsonResponse(
+            {'status': 'error', 'message': 'Oppdrag ikke funnet'}, status=404)
+    rad = services.koblingsrad(oppdrag, request.user.enhet)
+    if rad is None:
+        return JsonResponse(
+            {'status': 'error', 'message': 'Oppdraget tilhører en annen enhet.'},
+            status=403)
+    if not verdier.baerer_antall(oppdrag.problemstilling):
+        return JsonResponse(
+            {'status': 'error', 'message': f'«{oppdrag.problemstilling}» bærer ikke et antall.'},
+            status=400)
+    oppdrag.antall = antall
+    oppdrag.save(update_fields=['antall', 'updated_at'])
     return JsonResponse({'status': 'ok', 'data': oppdrag_til_dict(
         oppdrag, for_enhet=True, koblingsrad=rad)})
 

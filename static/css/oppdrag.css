@@ -457,3 +457,24 @@
 */
 .besetning-inne { color: var(--vl-inne, #4ade80); }
 .besetning-ute { color: var(--portal-text-muted, #94a3b8); }
+
+/* Antall pasienter på enhetsskjermen (12. sep. 2026): to store knapper og
+ * tallet imellom — samme høyde som stemplene, for hansker og bil i fart. */
+.antall-knapp {
+  min-width: 3.25rem;
+  min-height: 3rem;
+  font-size: 1.5rem;
+  font-weight: 700;
+  line-height: 1;
+}
+.antall-tall {
+  min-width: 2.5rem;
+  text-align: center;
+  font-size: 1.5rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Verdimengdene (12. sep. 2026): nedtrekkene i raden får ikke ta hele bredden. */
+.verdi-rad .verdi-kategori { max-width: 8.5rem; }
+.verdi-rad .verdi-antall { max-width: 8.5rem; }

@@ -46,9 +46,13 @@ function hastegradKlasse(h) {
 
 
 function _problemMedAntall(o) {
-  // «Transport · 3» — antallet står ved problemstillingen der den finnes.
+  // «Transport · 3 pasienter» — antallet bilen satte står ved
+  // problemstillingen der den bærer et. Tomt betyr én (André, 12. sep.
+  // 2026: «hvis den er blank så må det stå 1 pasient»).
   const p = o.problemstilling || '';
-  return o.antall != null ? `${p} · ${o.antall}` : p;
+  if (!_medAntall(p)) return p;
+  const n = o.antall == null ? 1 : Number(o.antall);
+  return `${p} · ${n} ${n === 1 ? 'pasient' : 'pasienter'}`;
 }
 
 
@@ -66,15 +70,14 @@ function problemstillingerFor(hastegrad) {
 function fyllProblemstillinger(prefiks, hastegrad, valgt) {
   // Nedtrekket bygges om av hastegraden (André, 12. sep. 2026: «teknisk [nå Drift]
   // hastegrad endrer innholdet i problemstillinger»). Står den valgte ikke
-  // i den nye lista, velges den første — «Udefinert» — og antall-raden
-  // følger problemstillingen.
+  // i den nye lista, velges den første — «Udefinert». Antallet settes av
+  // bilen, ikke her (12. sep. 2026).
   const sel = document.getElementById(`${prefiks}-problemstilling`);
   if (!sel) return;
   const liste = problemstillingerFor(hastegrad);
   const ny = liste.includes(valgt) ? valgt : (liste[0] || '');
   sel.innerHTML = liste.map((p) =>
     `<option value="${escHtmlValue(p)}"${p === ny ? ' selected' : ''}>${escapeHtml(p)}</option>`).join('');
-  problemstillingEndret(prefiks);
 }
 
 
@@ -85,19 +88,6 @@ function hastegradEndret(prefiks) {
 }
 
 
-function problemstillingEndret(prefiks) {
-  const p = document.getElementById(`${prefiks}-problemstilling`)?.value || '';
-  const rad = document.getElementById(`${prefiks}-antall-rad`);
-  if (rad) rad.classList.toggle('d-none', !_medAntall(p));
-}
-
-
-function _lesAntall(prefiks) {
-  const p = document.getElementById(`${prefiks}-problemstilling`)?.value || '';
-  if (!_medAntall(p)) return null;
-  const raa = (document.getElementById(`${prefiks}-antall`)?.value || '').trim();
-  return raa === '' ? null : Number(raa);
-}
 
 
 function _grovMerke(o) {
@@ -158,28 +148,38 @@ function renderEnheter() {
 
 
 function _typeRekkefolge() {
-  return (globalThis.window?.OPPDRAG_ENHETSTYPER || []).map((t) => t[0]);
+  // Typenes ID-er i visningsrekkefølge — tabellen `Enhetstype`, sortert av
+  // serveren (12. sep. 2026). `OPPDRAG_ENHETSTYPER` er `[[id, navn], …]`.
+  return (globalThis.window?.OPPDRAG_ENHETSTYPER || []).map((t) => String(t[0]));
 }
 
 
 function _grupperEnheter(liste) {
   // [{type, navn, enheter}] i typenes rekkefølge — ambulanse først — og
-  // bare typene som faktisk finnes i lista. Én regel, to lesere: tavla og
-  // avkryssingen i «Nytt oppdrag».
+  // bare typene som faktisk finnes i lista. Enheter uten type, eller med en
+  // type som er tatt ut av lista, står sist. Innenfor gruppa alfabetisk
+  // (André, 12. sep. 2026). Én regel, to lesere: tavla og avkryssingen i
+  // «Nytt oppdrag».
   const rekkefolge = _typeRekkefolge();
-  const navn = Object.fromEntries(globalThis.window?.OPPDRAG_ENHETSTYPER || []);
+  const navn = Object.fromEntries(
+    (globalThis.window?.OPPDRAG_ENHETSTYPER || []).map(([id, n]) => [String(id), n]));
   const grupper = new Map();
   liste.forEach((e) => {
-    const t = e.type || 'annet';
+    const t = e.type == null ? '' : String(e.type);
     if (!grupper.has(t)) grupper.set(t, []);
     grupper.get(t).push(e);
   });
+  const alfabetisk = (a, b) => String(a.navn).localeCompare(String(b.navn), 'nb', { sensitivity: 'base' });
   return Array.from(grupper.entries())
     .sort((a, b) => {
       const ai = rekkefolge.indexOf(a[0]); const bi = rekkefolge.indexOf(b[0]);
       return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi);
     })
-    .map(([type, enheter]) => ({ type, navn: navn[type] || type, enheter }));
+    .map(([type, enheter]) => ({
+      type,
+      navn: navn[type] || (type === '' ? 'Uten type' : (enheter[0].type_navn || 'Annet')),
+      enheter: [...enheter].sort(alfabetisk),
+    }));
 }
 
 
@@ -902,7 +902,6 @@ function visRedigerOppdrag() {
     .join('');
   const lokvalg = lokasjoner.filter((l) => l.er_aktiv || l.id === o.lokasjon_id).map(
     (l) => `<option value="${escHtmlValue(l.id)}"${l.id === o.lokasjon_id ? ' selected' : ''}>${escapeHtml(l.navn)}</option>`).join('');
-  const antallRad = _medAntall(o.problemstilling) ? '' : ' d-none';
   boks.innerHTML = (`
     <div class="row g-2 mt-1">
       <div class="col-md-6"><label class="form-label" for="red-hastegrad">Hastegrad</label>
@@ -911,10 +910,7 @@ function visRedigerOppdrag() {
       <div class="col-md-6"><label class="form-label" for="red-lokasjon">Lokasjon</label>
         <select id="red-lokasjon" class="form-select form-select-sm">${lokvalg}</select></div>
       <div class="col-md-6"><label class="form-label" for="red-problemstilling">Problemstilling</label>
-        <select id="red-problemstilling" class="form-select form-select-sm"
-                data-action="problemstillingEndret" data-hendelse="change" data-arg="red"></select></div>
-      <div class="col-md-6${antallRad}" id="red-antall-rad"><label class="form-label" for="red-antall">Antall</label>
-        <input type="number" id="red-antall" class="form-control form-control-sm" min="0" step="1" value="${escHtmlValue(o.antall == null ? '' : o.antall)}"></div>
+        <select id="red-problemstilling" class="form-select form-select-sm"></select></div>
       <div class="col-12"><label class="form-label" for="red-fritekst">Fritekst</label>
         <textarea id="red-fritekst" class="form-control form-control-sm" rows="2">${escapeHtml(o.fritekst || '')}</textarea></div>
       <div class="col-12 d-flex gap-2 align-items-center">
@@ -936,7 +932,6 @@ async function lagreOppdrag(id) {
       body: JSON.stringify({
         problemstilling: document.getElementById('red-problemstilling').value,
         hastegrad: document.getElementById('red-hastegrad').value,
-        antall: _lesAntall('red'),
         lokasjon_id: Number(document.getElementById('red-lokasjon').value),
         fritekst: document.getElementById('red-fritekst').value,
       }),
@@ -1192,7 +1187,6 @@ async function opprettOppdrag() {
       lokasjon_id: Number(document.getElementById('nytt-lokasjon').value),
       problemstilling: document.getElementById('nytt-problemstilling').value,
       hastegrad: document.getElementById('nytt-hastegrad').value,
-      antall: _lesAntall('nytt'),
       fritekst: document.getElementById('nytt-fritekst').value,
     }),
   });
@@ -1204,8 +1198,6 @@ async function opprettOppdrag() {
   }
   bootstrap.Modal.getInstance(document.getElementById('nyttOppdragModal'))?.hide();
   document.getElementById('nytt-fritekst').value = '';
-  const antallFelt = document.getElementById('nytt-antall');
-  if (antallFelt) antallFelt.value = '';
   document.querySelectorAll('input[name="nytt-enhet"]:checked').forEach((i) => { i.checked = false; });
   await lastAlt();
 }
@@ -1221,7 +1213,7 @@ function nullstillNyttOppdrag() {
     const sel = document.getElementById(id);
     if (sel && sel.options.length) sel.selectedIndex = 0;
   });
-  ['nytt-fritekst', 'nytt-antall'].forEach((id) => {
+  ['nytt-fritekst'].forEach((id) => {
     const felt = document.getElementById(id);
     if (felt) felt.value = '';
   });
@@ -1254,92 +1246,238 @@ function mkEnhetsvalg() {
 }
 
 
-// ── Lokasjonsadmin ──────────────────────────────────────
+// ── Verdimengdene: lokasjoner, enhetstyper, problemstillinger ────────────
+//
+// Tre tabeller, ett vindu med tre faner (André, 12. sep. 2026: «Admin må
+// kunne redigere listen over problemstillinger blant annet hvor de skal stå i
+// rekkefølgen i nedtrekksvinduet. Samme gjelder med rekkefølge på lokasjoner
+// og grupperinger.»). Serveren svarer likt for alle tre (`views_verdier`), så
+// klienten har én bygger og én sett handlinger med tabellen i argumentet.
+// Rekkefølgen sendes som hele lista etter et flytt, ikke som «opp» per rad.
 
-function renderLokasjonsadmin() {
-  const el = document.getElementById('lokasjonsliste');
+const VERDIMENGDER = {
+  lokasjoner: { tittel: 'Lokasjoner', ny: 'Ny lokasjon' },
+  enhetstyper: { tittel: 'Enhetstyper', ny: 'Ny enhetstype' },
+  problemstillinger: { tittel: 'Problemstillinger', ny: 'Ny problemstilling' },
+};
+const PROBLEM_KATEGORIER = [
+  ['medisinsk', 'Medisinsk'], ['drift', 'Drift'], ['begge', 'Begge'],
+];
+let verdiFane = 'lokasjoner';
+let verdier = { lokasjoner: [], enhetstyper: [], problemstillinger: [] };
+
+
+function _verdiArg(arg) {
+  // «slug:id[:hva]» — klikkdelegeringen sender ett argument.
+  const [slug, id, hva] = String(arg).split(':');
+  return { slug, id: Number(id), hva, rad: (verdier[slug] || []).find((r) => r.id === Number(id)) };
+}
+
+
+function _byggProblemkart(rader) {
+  // Speiler `Problemstilling.passer()` på serveren: begge → alle
+  // hastegrader, drift → Drift, medisinsk → resten. Udefinert først.
+  // Bygges her, ikke hentet, så nedtrekket følger med idet noen endrer lista.
+  const aktive = rader.filter((r) => r.er_aktiv);
+  const passer = (r, h) => r.kategori === 'begge' || (r.kategori === 'drift') === (h === 'Drift');
+  const kart = {};
+  HASTEGRAD_REKKEFOLGE.forEach((h) => {
+    kart[h] = aktive.filter((r) => passer(r, h)).map((r) => r.navn);
+  });
+  return { kart, medAntall: aktive.filter((r) => r.med_antall).map((r) => r.navn) };
+}
+
+
+async function lastVerdier(slug) {
+  const res = await apiFetch(`/oppdrag/api/${slug}/`);
+  if (!res.ok) return false;
+  verdier[slug] = (await res.json()).data || [];
+  // Det som ellers på siden leser tabellen, følger med.
+  if (slug === 'lokasjoner') {
+    lokasjoner = verdier[slug];
+    fyllNedtrekk();
+  } else if (slug === 'enhetstyper') {
+    if (globalThis.window) {
+      globalThis.window.OPPDRAG_ENHETSTYPER = verdier[slug]
+        .filter((t) => t.er_aktiv).map((t) => [t.id, t.navn]);
+    }
+    renderEnheter();
+    fyllNedtrekk();
+    renderEnhetsadmin();
+  } else if (slug === 'problemstillinger') {
+    const { kart, medAntall } = _byggProblemkart(verdier[slug]);
+    if (globalThis.window) {
+      globalThis.window.OPPDRAG_PROBLEMSTILLINGER_FOR = kart;
+      globalThis.window.OPPDRAG_MED_ANTALL = medAntall;
+    }
+    hastegradEndret('nytt');
+  }
+  return true;
+}
+
+
+async function lastLokasjoner() {
+  await lastVerdier('lokasjoner');
+}
+
+
+async function lastVerdiadmin() {
+  await Promise.all(Object.keys(VERDIMENGDER).map((slug) => lastVerdier(slug)));
+  renderVerdiadmin();
+}
+
+
+async function velgVerdifane(slug) {
+  if (!VERDIMENGDER[slug]) return;
+  verdiFane = slug;
+  renderVerdiadmin();
+}
+
+
+function _verdirad(slug, r, forste, siste) {
+  const arg = (hva) => escHtmlValue(slug + ':' + r.id + ':' + hva);
+  const dempet = r.er_aktiv ? '' : ' text-muted';
+  const knappAktiv = r.fast ? '' : (r.er_aktiv
+    ? `<button class="btn btn-sm btn-outline-secondary" data-action="settVerdiAktiv" data-arg="${arg('0')}">Deaktiver</button>`
+    : `<button class="btn btn-sm btn-outline-success" data-action="settVerdiAktiv" data-arg="${arg('1')}">Aktiver</button>`);
+  const endre = r.fast ? ''
+    : `<button class="btn btn-sm btn-outline-secondary" data-action="endreVerdinavn" data-arg="${arg('navn')}" title="Endre navn"><i class="bi bi-pencil"></i></button>`;
+  const slett = (globalThis.window?.OPPDRAG_TILGANG?.erAdmin && !r.fast)
+    ? `<button class="btn btn-sm btn-outline-danger" data-action="slettVerdi" data-arg="${arg('slett')}" title="Slett"><i class="bi bi-trash"></i></button>`
+    : '';
+  // Opp/ned: «Udefinert» er fast øverst, og flyttes ikke — knappene ligger
+  // der, men er avslått, så raden ikke hopper i høyde.
+  const opp = `<button class="btn btn-sm btn-outline-secondary" data-action="flyttVerdi" data-arg="${arg('opp')}" title="Flytt opp"${(forste || r.fast) ? ' disabled' : ''}><i class="bi bi-chevron-up"></i></button>`;
+  const ned = `<button class="btn btn-sm btn-outline-secondary" data-action="flyttVerdi" data-arg="${arg('ned')}" title="Flytt ned"${(siste || r.fast) ? ' disabled' : ''}><i class="bi bi-chevron-down"></i></button>`;
+  let ekstra = '';
+  if (slug === 'problemstillinger' && !r.fast) {
+    const kategorivalg = PROBLEM_KATEGORIER.map(([v, n]) =>
+      `<option value="${escHtmlValue(v)}"${v === r.kategori ? ' selected' : ''}>${escapeHtml(n)}</option>`).join('');
+    ekstra = `
+      <select class="form-select form-select-sm verdi-kategori" aria-label="Kategori"
+              data-action="settVerdifelt" data-hendelse="change" data-felt="kategori" data-id="${escHtmlValue(r.id)}">${kategorivalg}</select>
+      <select class="form-select form-select-sm verdi-antall" aria-label="Bærer antall"
+              data-action="settVerdifelt" data-hendelse="change" data-felt="med_antall" data-id="${escHtmlValue(r.id)}">
+        <option value="0"${r.med_antall ? '' : ' selected'}>Uten antall</option>
+        <option value="1"${r.med_antall ? ' selected' : ''}>Med antall</option>
+      </select>`;
+  }
+  const iBruk = r.i_bruk ? `<span class="oppdrag-meta">· ${escHtmlValue(r.i_bruk)} i bruk</span>` : '';
+  const fast = r.fast ? '<span class="oppdrag-meta">· fast</span>' : '';
+  return `
+    <div class="d-flex align-items-center gap-2 py-1 verdi-rad">
+      <span class="btn-group">${opp}${ned}</span>
+      <span class="flex-grow-1${dempet}">${escapeHtml(r.navn)} ${iBruk}${fast}</span>
+      ${ekstra}${endre}${knappAktiv}${slett}
+    </div>`;
+}
+
+
+function renderVerdiadmin() {
+  const el = document.getElementById('verdiliste');
   if (!el) return;
-  if (!lokasjoner.length) {
-    el.innerHTML = ('<div class="tom-melding">Ingen lokasjoner ennå.</div>');
+  document.querySelectorAll('[data-verdifane]').forEach((k) => {
+    k.classList.toggle('active', k.dataset.verdifane === verdiFane);
+  });
+  const nyFelt = document.getElementById('ny-verdi');
+  if (nyFelt) nyFelt.placeholder = VERDIMENGDER[verdiFane].ny;
+  const nyKategori = document.getElementById('ny-verdi-kategori');
+  if (nyKategori) nyKategori.classList.toggle('d-none', verdiFane !== 'problemstillinger');
+  const rader = verdier[verdiFane] || [];
+  if (!rader.length) {
+    el.innerHTML = ('<div class="tom-melding">Ingen ennå.</div>');
     return;
   }
-  el.innerHTML = (lokasjoner.map((l) => {
-    const knapp = l.er_aktiv
-      ? `<button class="btn btn-sm btn-outline-secondary" data-action="deaktiverLokasjon" data-id="${escHtmlValue(l.id)}">Deaktiver</button>`
-      : `<button class="btn btn-sm btn-outline-success" data-action="aktiverLokasjon" data-id="${escHtmlValue(l.id)}">Aktiver</button>`;
-    // Endre navn er skriv_full; sletting er global admin (12. sep. 2026).
-    const endre = `<button class="btn btn-sm btn-outline-secondary" data-action="endreLokasjonsnavn" data-id="${escHtmlValue(l.id)}" title="Endre navn"><i class="bi bi-pencil"></i></button>`;
-    const slett = globalThis.window?.OPPDRAG_TILGANG?.erAdmin
-      ? `<button class="btn btn-sm btn-outline-danger" data-action="slettLokasjon" data-id="${escHtmlValue(l.id)}" title="Slett"><i class="bi bi-trash"></i></button>`
-      : '';
-    const dempet = l.er_aktiv ? '' : ' text-muted';
-    return `
-    <div class="d-flex align-items-center gap-2 py-1">
-      <span class="flex-grow-1${dempet}">${escapeHtml(l.navn)}</span>
-      ${endre}${knapp}${slett}
-    </div>`;
-  }).join(''));
+  el.innerHTML = (rader.map((r, i) => _verdirad(verdiFane, r, i === 0, i === rader.length - 1)).join(''));
 }
 
 
-async function endreLokasjonsnavn(id) {
-  const lok = lokasjoner.find((l) => l.id === id);
-  if (!lok) return;
-  const navn = (prompt('Nytt navn på lokasjonen:', lok.navn) || '').trim();
-  if (!navn || navn === lok.navn) return;
-  const res = await apiFetch(`/oppdrag/api/lokasjoner/${id}/`, {
-    method: 'PUT', body: JSON.stringify({ navn }),
-  });
+async function _verdiKall(url, valg, feilmelding) {
+  const res = await apiFetch(url, valg);
   const d = await res.json().catch(() => ({}));
-  if (!res.ok || d.status !== 'ok') { alert(d.message || 'Kunne ikke endre navnet.'); return; }
-  await lastLokasjonsadmin();
+  if (!res.ok || d.status !== 'ok') { alert(d.message || feilmelding); return false; }
+  return true;
 }
 
 
-async function slettLokasjon(id) {
-  const lok = lokasjoner.find((l) => l.id === id);
-  if (!lok) return;
-  if (!confirm(`Slette lokasjonen «${lok.navn}» for godt?`)) return;
-  const res = await apiFetch(`/oppdrag/api/lokasjoner/${id}/`, {
-    method: 'DELETE', body: JSON.stringify({ confirm: true }),
-  });
-  const d = await res.json().catch(() => ({}));
-  if (!res.ok || d.status !== 'ok') { alert(d.message || 'Kunne ikke slette.'); return; }
-  await lastLokasjonsadmin();
-}
-
-
-async function lastLokasjonsadmin() {
-  await lastLokasjoner();
-  renderLokasjonsadmin();
-}
-
-
-async function leggTilLokasjon() {
-  const felt = document.getElementById('ny-lokasjon');
-  const navn = (felt.value || '').trim();
+async function leggTilVerdi() {
+  const felt = document.getElementById('ny-verdi');
+  const navn = (felt?.value || '').trim();
   if (!navn) return;
-  const res = await apiFetch('/oppdrag/api/lokasjoner/', {
-    method: 'POST',
-    body: JSON.stringify({ navn }),
-  });
-  if (res.ok) {
+  const kropp = { navn };
+  if (verdiFane === 'problemstillinger') {
+    kropp.kategori = document.getElementById('ny-verdi-kategori')?.value || 'medisinsk';
+  }
+  if (await _verdiKall(`/oppdrag/api/${verdiFane}/`, { method: 'POST', body: JSON.stringify(kropp) },
+                       'Kunne ikke legge til.')) {
     felt.value = '';
-    await lastLokasjonsadmin();
+    await lastVerdier(verdiFane);
+    renderVerdiadmin();
   }
 }
 
 
-async function _settLokasjonAktiv(id, aktiv) {
-  await apiFetch(`/oppdrag/api/lokasjoner/${id}/`, {
-    method: 'PUT',
-    body: JSON.stringify({ er_aktiv: aktiv }),
-  });
-  await lastLokasjonsadmin();
+async function endreVerdinavn(arg) {
+  const { slug, id, rad } = _verdiArg(arg);
+  if (!rad) return;
+  const navn = (prompt('Nytt navn:', rad.navn) || '').trim();
+  if (!navn || navn === rad.navn) return;
+  if (await _verdiKall(`/oppdrag/api/${slug}/${id}/`, { method: 'PUT', body: JSON.stringify({ navn }) },
+                       'Kunne ikke endre navnet.')) {
+    await lastVerdier(slug);
+    renderVerdiadmin();
+  }
 }
 
-async function deaktiverLokasjon(id) { await _settLokasjonAktiv(id, false); }
-async function aktiverLokasjon(id) { await _settLokasjonAktiv(id, true); }
+
+async function settVerdiAktiv(arg) {
+  const { slug, id, hva } = _verdiArg(arg);
+  if (await _verdiKall(`/oppdrag/api/${slug}/${id}/`,
+                       { method: 'PUT', body: JSON.stringify({ er_aktiv: hva === '1' }) },
+                       'Kunne ikke endre.')) {
+    await lastVerdier(slug);
+    renderVerdiadmin();
+  }
+}
+
+
+async function settVerdifelt(id, felt, verdi) {
+  // Kategori og antall på en problemstilling — nedtrekk i raden, som
+  // enhetstypen i enhetspanelet. Bare problemstillinger har slike felt.
+  const kropp = felt === 'med_antall' ? { med_antall: verdi === '1' } : { [felt]: verdi };
+  if (await _verdiKall(`/oppdrag/api/problemstillinger/${id}/`,
+                       { method: 'PUT', body: JSON.stringify(kropp) }, 'Kunne ikke endre.')) {
+    await lastVerdier('problemstillinger');
+    renderVerdiadmin();
+  }
+}
+
+
+async function flyttVerdi(arg) {
+  const { slug, id, hva } = _verdiArg(arg);
+  const ider = (verdier[slug] || []).map((r) => r.id);
+  const i = ider.indexOf(id);
+  const j = hva === 'opp' ? i - 1 : i + 1;
+  if (i < 0 || j < 0 || j >= ider.length) return;
+  [ider[i], ider[j]] = [ider[j], ider[i]];
+  if (await _verdiKall(`/oppdrag/api/${slug}/rekkefolge/`,
+                       { method: 'PUT', body: JSON.stringify({ ider }) }, 'Kunne ikke flytte.')) {
+    await lastVerdier(slug);
+    renderVerdiadmin();
+  }
+}
+
+
+async function slettVerdi(arg) {
+  const { slug, id, rad } = _verdiArg(arg);
+  if (!rad) return;
+  if (!confirm(`Slette «${rad.navn}» for godt?`)) return;
+  if (await _verdiKall(`/oppdrag/api/${slug}/${id}/`,
+                       { method: 'DELETE', body: JSON.stringify({ confirm: true }) }, 'Kunne ikke slette.')) {
+    await lastVerdier(slug);
+    renderVerdiadmin();
+  }
+}
 
 
 // ── Enhetsadmin ─────────────────────────────────────────
@@ -1374,8 +1512,13 @@ function renderEnhetsadmin() {
     const radKlasse = e.er_aktiv && e.pa_vakt
       ? 'enhet-kort' : 'enhet-kort enhet-av-vakt';
     // Typen settes her (12. sep. 2026): kontoskjemaet vet ikke hva bilen er.
-    const typevalg = (globalThis.window?.OPPDRAG_ENHETSTYPER || []).map(([verdi, navn]) =>
-      `<option value="${escHtmlValue(verdi)}"${verdi === e.type ? ' selected' : ''}>${escapeHtml(navn)}</option>`).join('');
+    const typer = (globalThis.window?.OPPDRAG_ENHETSTYPER || []).map(([id, navn]) => [String(id), navn]);
+    const valgt = e.type == null ? '' : String(e.type);
+    // En type som er deaktivert står fortsatt på bilen som har den — nedtrekket
+    // må tilby den, ellers velges den bort i stillhet ved neste tegning.
+    if (valgt && !typer.some(([id]) => id === valgt)) typer.push([valgt, e.type_navn || 'Inaktiv type']);
+    const typevalg = [['', 'Uten type'], ...typer].map(([verdi, navn]) =>
+      `<option value="${escHtmlValue(verdi)}"${verdi === valgt ? ' selected' : ''}>${escapeHtml(navn)}</option>`).join('');
     const typeNedtrekk = `<select class="form-select form-select-sm enhet-type" aria-label="Enhetstype"
               data-action="settEnhetstype" data-hendelse="change" data-felt="type" data-id="${escHtmlValue(e.id)}">${typevalg}</select>`;
 
@@ -1394,7 +1537,7 @@ function renderEnhetsadmin() {
 
 async function settEnhetstype(id, felt, verdi) {
   const res = await apiFetch(`/oppdrag/api/enheter/${id}/`, {
-    method: 'PUT', body: JSON.stringify({ type: verdi }),
+    method: 'PUT', body: JSON.stringify({ type: verdi ? Number(verdi) : null }),
   });
   if (!res.ok) { alert('Kunne ikke endre enhetstypen.'); return; }
   await lastEnhetsadmin();
@@ -1445,13 +1588,6 @@ async function lastOppdrag() {
   etagOppdrag = res.headers.get('ETag');
   oppdragsliste = (await res.json()).data || [];
   return true;
-}
-
-
-async function lastLokasjoner() {
-  const res = await apiFetch('/oppdrag/api/lokasjoner/');
-  if (!res.ok) return;
-  lokasjoner = (await res.json()).data || [];
 }
 
 

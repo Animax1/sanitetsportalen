@@ -54,6 +54,10 @@ class OppdragBackupHandler(BaseBackupHandler):
         'oppdrag.Oppdrag',
         'oppdrag.Lokasjon',
         'oppdrag.Enhet',
+        # Verdimengdene (12. sep. 2026). Enhet peker på Enhetstype, så typen
+        # kommer etter enheten i barn-først-rekkefølgen.
+        'oppdrag.Enhetstype',
+        'oppdrag.Problemstilling',
     ]
     # FK-er ut av modulens eget datasett. Med `natural_foreign` lagres de som
     # brukernavn, og er kontoen slettet feiler HELE gjenopprettingen med

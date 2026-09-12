@@ -52,12 +52,15 @@
               data-action="lastHistorikk">
         <i class="bi bi-clock-history me-1"></i>Historikk
       </button>
-      {% if kan_skrive %}
+      {% if kan_lede %}
+      {# Verdimengdene — lokasjoner, enhetstyper, problemstillinger — er skriv_leder (12. sep. 2026). #}
       <button type="button" class="btn btn-outline-secondary btn-sm"
-              data-bs-toggle="modal" data-bs-target="#lokasjonerModal"
-              data-action="lastLokasjonsadmin">
-        <i class="bi bi-geo-alt me-1"></i>Lokasjoner
+              data-bs-toggle="modal" data-bs-target="#verdierModal"
+              data-action="lastVerdiadmin">
+        <i class="bi bi-list-ul me-1"></i>Verdier
       </button>
+      {% endif %}
+      {% if kan_skrive %}
       {% comment %}
         Vaktarkivet (fase 7). Egen knapp, ikke en variant av «Historikk»:
         historikken rydder tavla og er reversibel, arkivet fryser vakten med
@@ -129,19 +132,13 @@
         <div class="mb-3">
           <label class="form-label" for="nytt-lokasjon">Lokasjon</label>
           <select id="nytt-lokasjon" class="form-select"></select>
-          <div class="form-text">Lista vedlikeholdes under «Lokasjoner».</div>
+          <div class="form-text">Lista vedlikeholdes under «Verdier».</div>
         </div>
         <div class="mb-3">
           <label class="form-label" for="nytt-problemstilling">Problemstilling</label>
-          <select id="nytt-problemstilling" class="form-select"
-                  data-action="problemstillingEndret" data-hendelse="change" data-arg="nytt">
+          <select id="nytt-problemstilling" class="form-select">
             {% for p in problemstillinger %}<option>{{ p }}</option>{% endfor %}
           </select>
-        </div>
-        <div class="mb-3 d-none" id="nytt-antall-rad">
-          <label class="form-label" for="nytt-antall">Antall</label>
-          <input type="number" id="nytt-antall" class="form-control" min="0" step="1" inputmode="numeric">
-          <div class="form-text">Hvor mange som skal transporteres. Helt tall.</div>
         </div>
         <div class="mb-3">
           <label class="form-label" for="nytt-fritekst">Fritekst</label>
@@ -161,26 +158,40 @@
 </div>
 {% endif %}
 
-{% if kan_skrive %}
-<div class="modal fade" id="lokasjonerModal" tabindex="-1">
-  <div class="modal-dialog">
+{% if kan_lede %}
+<div class="modal fade" id="verdierModal" tabindex="-1">
+  <div class="modal-dialog modal-lg">
     <div class="modal-content">
       <div class="modal-header">
-        <h5 class="modal-title">Lokasjoner</h5>
+        <h5 class="modal-title">Verdier</h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Lukk"></button>
       </div>
       <div class="modal-body">
+        <ul class="nav nav-tabs mb-3">
+          <li class="nav-item"><button type="button" class="nav-link active" data-verdifane="lokasjoner"
+                  data-action="velgVerdifane" data-arg="lokasjoner">Lokasjoner</button></li>
+          <li class="nav-item"><button type="button" class="nav-link" data-verdifane="enhetstyper"
+                  data-action="velgVerdifane" data-arg="enhetstyper">Enhetstyper</button></li>
+          <li class="nav-item"><button type="button" class="nav-link" data-verdifane="problemstillinger"
+                  data-action="velgVerdifane" data-arg="problemstillinger">Problemstillinger</button></li>
+        </ul>
         <div class="input-group mb-3">
-          <input type="text" id="ny-lokasjon" class="form-control" placeholder="Ny lokasjon">
-          <button class="btn btn-outline-primary" type="button" data-action="leggTilLokasjon">
+          <input type="text" id="ny-verdi" class="form-control" placeholder="Ny lokasjon">
+          <select id="ny-verdi-kategori" class="form-select d-none" aria-label="Kategori" style="max-width: 11rem">
+            <option value="medisinsk">Medisinsk</option>
+            <option value="drift">Drift</option>
+            <option value="begge">Begge</option>
+          </select>
+          <button class="btn btn-outline-primary" type="button" data-action="leggTilVerdi">
             Legg til
           </button>
         </div>
-        <div id="lokasjonsliste"><div class="tom-melding">Laster…</div></div>
+        <div id="verdiliste"><div class="tom-melding">Laster…</div></div>
         <p class="form-text mb-0">
-          Deaktivering skjuler lokasjonen i nedtrekkslista; oppdrag som bruker
-          den beholder stedet sitt. Sletting er global admin, og bare for
-          lokasjoner ingen oppdrag har brukt.
+          Rekkefølgen her er rekkefølgen i nedtrekkene. Deaktivering skjuler
+          verdien i nedtrekket; det som alt bruker den beholder den. Sletting
+          er global admin, og bare for verdier ingenting bruker. «Udefinert»
+          er fast og står alltid øverst.
         </p>
       </div>
     </div>
@@ -297,6 +308,7 @@
 <script nonce="{{ csp_nonce }}">
   window.OPPDRAG_TILGANG = {
     kanSkrive: {% if kan_skrive %}true{% else %}false{% endif %},
+    kanLede: {% if kan_lede %}true{% else %}false{% endif %},
     erAdmin: {% if er_global_admin %}true{% else %}false{% endif %}
   };
   window.OPPDRAG_AVREIST_TIL = {{ avreist_til|safe }};

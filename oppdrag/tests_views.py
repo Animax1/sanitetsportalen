@@ -261,10 +261,11 @@ class LokasjonsadminTests(OppdragBasis):
             '/oppdrag/api/lokasjoner/').json()['data']
         self.assertEqual(len(data), 1)
 
-    def test_skriv_full_oppretter_og_endrer_les_kan_ikke(self):
-        """André, 12. sep. 2026: sentralbordet (`skriv_full`) legger til og
-        endrer lokasjoner. `les` kan fortsatt bare lese."""
-        c = _klient(_bruker('sentral12', 'skriv_full'))
+    def test_skriv_leder_oppretter_og_endrer_de_andre_kan_ikke(self):
+        """André, 12. sep. 2026: lokasjonene var `skriv_full` én dag, og ble
+        `skriv_leder` samme kveld («La oss ha skriv_leder rolle på dette»).
+        `les` og `skriv_full` kan bare lese."""
+        c = _klient(_bruker('leder12', 'skriv_leder'))
         resp = c.post('/oppdrag/api/lokasjoner/', content_type='application/json',
                       data={'navn': 'Inngang Nord'})
         self.assertEqual(resp.status_code, 200, resp.content)
@@ -273,11 +274,12 @@ class LokasjonsadminTests(OppdragBasis):
                      data={'navn': 'Inngang Sør'})
         self.assertEqual(resp.status_code, 200)
         self.assertEqual(Lokasjon.objects.get(pk=pk).navn, 'Inngang Sør')
-        leser = _klient(_bruker('leser12', 'les'))
-        self.assertEqual(leser.post('/oppdrag/api/lokasjoner/', content_type='application/json',
-                                    data={'navn': 'X'}).status_code, 403)
-        self.assertEqual(leser.put(f'/oppdrag/api/lokasjoner/{pk}/', content_type='application/json',
-                                   data={'navn': 'X'}).status_code, 403)
+        for navn, nivaa in (('leser12', 'les'), ('sentral12', 'skriv_full')):
+            andre = _klient(_bruker(navn, nivaa))
+            self.assertEqual(andre.post('/oppdrag/api/lokasjoner/', content_type='application/json',
+                                        data={'navn': 'X'}).status_code, 403, nivaa)
+            self.assertEqual(andre.put(f'/oppdrag/api/lokasjoner/{pk}/', content_type='application/json',
+                                       data={'navn': 'X'}).status_code, 403, nivaa)
 
     def test_admin_kan_opprette(self):
         c = _klient(_bruker('adm', 'skriv_full', admin=True))
@@ -301,7 +303,7 @@ class LokasjonsadminTests(OppdragBasis):
     def test_sletting_er_admin_og_brukt_lokasjon_gir_409(self):
         """FK-en er PROTECT — en lokasjon i bruk kan ikke forsvinne, og
         svaret sier at den kan deaktiveres i stedet."""
-        vl = _klient(_bruker('sentral13', 'skriv_full'))
+        vl = _klient(_bruker('leder13', 'skriv_leder'))
         self.assertEqual(vl.delete(f'/oppdrag/api/lokasjoner/{self.lokasjon.pk}/',
                                    content_type='application/json',
                                    data={'confirm': True}).status_code, 403)

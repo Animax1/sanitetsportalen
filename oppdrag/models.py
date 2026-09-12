@@ -76,11 +76,12 @@ class Enhet(BaseTimeStampedModel):
         help_text='Enheter som ikke er på vakt kan ikke få nye oppdrag.',
     )
     # Typen grupperer enhetene i sentralbordet, ambulansene først (André,
-    # 12. sep. 2026). «Annet» som standard: kontoskjemaet vet ikke hva bilen
-    # er, og et gjett ville stått som fasit til noen la merke til det.
-    type = models.CharField(
-        max_length=16, choices=choices.ENHETSTYPE, default='annet',
-        verbose_name='Enhetstype')
+    # 12. sep. 2026). Tom som standard: kontoskjemaet vet ikke hva bilen er,
+    # og et gjett ville stått som fasit til noen la merke til det. PROTECT:
+    # en type med biler i kan ikke slettes — deaktiver den.
+    enhetstype = models.ForeignKey(
+        'Enhetstype', null=True, blank=True, on_delete=models.PROTECT,
+        related_name='enheter', verbose_name='Enhetstype')
 
     class Meta:
         verbose_name = 'Enhet'
@@ -89,6 +90,83 @@ class Enhet(BaseTimeStampedModel):
 
     def __str__(self) -> str:
         return self.navn
+
+
+class Enhetstype(BaseTimeStampedModel):
+    """Grupperingen av enhetene — ambulanse, mannskapsbil, lag til fots.
+
+    Var en tuple i `choices.py` én dag (12. sep. 2026); André ville redigere
+    og sortere grupperingene selv, «som i lokasjoner». Rekkefølgen er
+    visningsrekkefølgen i tavla og i «Nytt oppdrag». Migrasjon `0020` seeder
+    de fire standardtypene.
+    """
+
+    navn = models.CharField(max_length=64, unique=True, verbose_name='Enhetstype')
+    er_aktiv = models.BooleanField(
+        default=True, verbose_name='Aktiv',
+        help_text='Inaktive typer tilbys ikke i enhetspanelet, men enheter som har dem beholder dem.')
+    rekkefolge = models.IntegerField(default=100, verbose_name='Rekkefølge')
+
+    class Meta:
+        verbose_name = 'Enhetstype'
+        verbose_name_plural = 'Enhetstyper'
+        ordering = ['rekkefolge', 'navn']
+
+    def __str__(self) -> str:
+        return self.navn
+
+
+class Problemstilling(BaseTimeStampedModel):
+    """Problemstillingene i nedtrekket, én rad per navn.
+
+    Lå i `choices.py` som to lister til 12. sep. 2026; André ville redigere
+    lista og rekkefølgen selv. `kategori` sier hvilke hastegrader raden
+    tilbys for: medisinsk (Akutt/Haster/Vanlig), drift, eller begge.
+    `Oppdrag.problemstilling` er fortsatt en tekst — arkivets radform er
+    signert, og navnet er det som sies på samband — og valideres mot de
+    aktive radene her (`verdier.py`).
+
+    **«Udefinert» er en fast rad**: står alltid først, kan ikke endres,
+    deaktiveres eller slettes — `services.sett_status` sperrer «Ledig» på
+    navnet, og et navn som kan skrives om er ingen sperre.
+    """
+
+    MEDISINSK = 'medisinsk'
+    DRIFT = 'drift'
+    BEGGE = 'begge'
+    KATEGORI = (
+        (MEDISINSK, 'Medisinsk (Akutt, Haster, Vanlig)'),
+        (DRIFT, 'Drift'),
+        (BEGGE, 'Begge'),
+    )
+
+    navn = models.CharField(max_length=64, unique=True, verbose_name='Problemstilling')
+    kategori = models.CharField(
+        max_length=12, choices=KATEGORI, default=MEDISINSK, verbose_name='Kategori')
+    med_antall = models.BooleanField(
+        default=False, verbose_name='Bærer antall',
+        help_text='Bilen setter antall pasienter på oppdraget (f.eks. transport).')
+    er_aktiv = models.BooleanField(default=True, verbose_name='Aktiv')
+    rekkefolge = models.IntegerField(default=100, verbose_name='Rekkefølge')
+
+    class Meta:
+        verbose_name = 'Problemstilling'
+        verbose_name_plural = 'Problemstillinger'
+        ordering = ['rekkefolge', 'navn']
+
+    def __str__(self) -> str:
+        return self.navn
+
+    @property
+    def er_fast(self) -> bool:
+        return self.navn == choices.UDEFINERT
+
+    def passer(self, hastegrad: str) -> bool:
+        if self.kategori == self.BEGGE:
+            return hastegrad in choices.HASTEGRAD
+        if self.kategori == self.DRIFT:
+            return hastegrad == choices.DRIFT
+        return hastegrad in choices.HASTEGRAD and hastegrad != choices.DRIFT
 
 
 class Lokasjon(BaseTimeStampedModel):
@@ -163,7 +241,7 @@ class Oppdrag(BaseTimeStampedModel):
     grovsortering = models.CharField(
         max_length=8, blank=True, default='', choices=choices.GROVSORTERING,
         verbose_name='Grovsortering')
-    # Antall — for problemstillinger som bærer et (`choices.MED_ANTALL`,
+    # Antall — for problemstillinger som bærer et (`Problemstilling.med_antall`,
     # transport). Tomt for alle andre. Ikke i arkivet: radformen der er del
     # av signaturen på hvert arkiv i prod.
     antall = models.PositiveSmallIntegerField(

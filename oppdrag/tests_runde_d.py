@@ -184,8 +184,7 @@ class NyttOppdragSkjemaJsTests(SimpleTestCase):
           'nytt-lokasjon': nedtrekk([]),
           'nytt-hastegrad': nedtrekk(['Akutt', 'Haster', 'Vanlig', 'Drift']),
           'nytt-problemstilling': nedtrekk(['Udefinert', 'Transport']),
-          'nytt-fritekst': { value: '' }, 'nytt-antall': { value: '' },
-          'nytt-antall-rad': { classList: { toggle() {} } },
+          'nytt-fritekst': { value: '' },
           'nytt-feil': { classList: { add() {} } },
         };
         globalThis.document = {
@@ -233,21 +232,20 @@ class NyttOppdragSkjemaJsTests(SimpleTestCase):
             felter['nytt-lokasjon'].value = '11';
             felter['nytt-problemstilling'].value = 'Transport';
             felter['nytt-fritekst'].value = 'noe';
-            felter['nytt-antall'].value = '3';
             nullstillNyttOppdrag();
             console.log(JSON.stringify([
               _valgteEnheter(), felter['nytt-hastegrad'].value, felter['nytt-lokasjon'].value,
               felter['nytt-problemstilling'].value, felter['nytt-fritekst'].value,
-              felter['nytt-antall'].value, globalThis.sisteFyll]));
+              globalThis.sisteFyll]));
         """)
         self.assertEqual(ut.strip().splitlines()[0],
-                         '[[],"Akutt","10","Udefinert","","",["Akutt","Udefinert"]]')
+                         '[[],"Akutt","10","Udefinert","",["Akutt","Udefinert"]]')
 
 
 class EnhetsskjermJsTests(SimpleTestCase):
     HARNESS = (
         (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue', 'klokke')),
-        (OPPDRAG_ENHET_JS, ('renderAvsluttet', '_problemMedAntall', '_udefinertVarsel',
+        (OPPDRAG_ENHET_JS, ('renderAvsluttet', '_problemMedAntall', '_medAntall', '_udefinertVarsel',
                             'koLes', 'koSkriv', 'koFjern', 'koNokkel', 'synk')),
     )
     STUBB = (

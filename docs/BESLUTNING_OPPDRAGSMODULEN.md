@@ -146,6 +146,17 @@ er stedene på *dette* arrangementet — de skifter fra vakt til vakt, og skal k
 admin uten deploy. Det er samme skille som mellom `PROBLEMSTILLING` og navneregistrene i
 pasientmodulen, og administrasjonen følger `views_registre.py`-mønsteret.
 
+> **Snudd 12. sep. 2026 for problemstillingene og enhetstypene.** André ville redigere
+> listene og rekkefølgen selv — «Admin må kunne redigere listen over problemstillinger
+> blant annet hvor de skal stå i rekkefølgen i nedtrekksvinduet. Samme gjelder med
+> rekkefølge på lokasjoner og grupperinger.» Argumentet over holdt ikke i bruk: en liste
+> som må gjennom en deploy for å få «Solstikk» inn, blir stående uten. `Problemstilling`
+> og `Enhetstype` er derfor tabeller, seedet fra `choices.py` av `0020`, og hastegraden
+> er den ene verdimengden som fortsatt er kode — den bærer statusmaskinens skille mellom
+> pasient og drift. `Oppdrag.problemstilling` er fortsatt tekst, fordi arkivets radform er
+> signert. «Udefinert» er en fast rad: `sett_status` sperrer på navnet. Oppsettet er
+> `skriv_leder`, som i vaktlista — se `oppdrag/verdier.py` og `views_verdier.py`.
+
 `er_aktiv` framfor sletting: en lokasjon som er brukt på et oppdrag kan ikke forsvinne uten
 å ta historikken med seg. Deaktivering fjerner den fra nedtrekkslista og lar radene bestå.
 

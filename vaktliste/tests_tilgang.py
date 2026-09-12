@@ -773,15 +773,22 @@ class LedernivaaetsPlassIStigenTests(TestCase):
         self.assertTrue(har_tilgang(bruker, 'vaktliste', 'skriv_full'))
         self.assertFalse(har_tilgang(bruker, 'vaktliste', 'skriv_leder'))
 
-    def test_bare_vaktlista_tilbyr_nivaaet(self):
+    #: Modulene som har definert hva `skriv_leder` betyr hos dem. Vaktlista
+    #: (30. aug. 2026: setter opp vakta) og oppdrag (12. sep. 2026: setter opp
+    #: verdimengdene). Et nytt trinn er additivt — men bare der det er
+    #: forklart, og etiketten er forklaringen.
+    MED_LEDER = {'vaktliste', 'oppdrag'}
+
+    def test_bare_modulene_som_har_forklart_nivaaet_tilbyr_det(self):
         """Matrisen tilbyr de nivåene modulen deklarerer og ingen andre. Kom
         `skriv_leder` snikende inn på en annen modul, ville den fått et
         toppnivå ingen har definert hva betyr der."""
         from core.modules import get_all_modules
         for modul in get_all_modules():
             with self.subTest(modul=modul.slug):
-                if modul.slug == 'vaktliste':
+                if modul.slug in self.MED_LEDER:
                     self.assertIn('skriv_leder', modul.nivaaer)
+                    self.assertIn('leder', modul.etikett_for('skriv_leder').lower())
                 else:
                     self.assertNotIn('skriv_leder', modul.nivaaer)
 

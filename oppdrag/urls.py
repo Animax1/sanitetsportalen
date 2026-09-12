@@ -6,7 +6,7 @@ ville fanget ``/api/...``.
 """
 from django.urls import path
 
-from . import views, views_arkiv
+from . import views, views_arkiv, views_verdier
 
 urlpatterns = [
     # Én URL, to grensesnitt. Hvilket avgjøres av om kontoen er knyttet til en
@@ -16,9 +16,25 @@ urlpatterns = [
     path('api/enheter/', views.enheter_view, name='oppdrag_api_enheter'),
     path('api/enheter/<int:pk>/', views.enhet_detalj_view, name='oppdrag_api_enhet_detalj'),
     path('api/enheter/<int:pk>/vakt/', views.enhet_vakt_view, name='oppdrag_api_enhet_vakt'),
-    path('api/lokasjoner/', views.lokasjoner_view, name='oppdrag_api_lokasjoner'),
-    path('api/lokasjoner/<int:pk>/', views.lokasjon_detalj_view,
+    # Verdimengdene (12. sep. 2026): lokasjoner, enhetstyper og
+    # problemstillinger, tre tabeller med samme tre endepunkter. Rekkefølgen
+    # settes med hele lista — se `views_verdier`.
+    path('api/lokasjoner/', views_verdier.lokasjoner_view, name='oppdrag_api_lokasjoner'),
+    path('api/lokasjoner/rekkefolge/', views_verdier.lokasjoner_rekkefolge_view,
+         name='oppdrag_api_lokasjoner_rekkefolge'),
+    path('api/lokasjoner/<int:pk>/', views_verdier.lokasjon_detalj_view,
          name='oppdrag_api_lokasjon_detalj'),
+    path('api/enhetstyper/', views_verdier.enhetstyper_view, name='oppdrag_api_enhetstyper'),
+    path('api/enhetstyper/rekkefolge/', views_verdier.enhetstyper_rekkefolge_view,
+         name='oppdrag_api_enhetstyper_rekkefolge'),
+    path('api/enhetstyper/<int:pk>/', views_verdier.enhetstype_detalj_view,
+         name='oppdrag_api_enhetstype_detalj'),
+    path('api/problemstillinger/', views_verdier.problemstillinger_view,
+         name='oppdrag_api_problemstillinger'),
+    path('api/problemstillinger/rekkefolge/', views_verdier.problemstillinger_rekkefolge_view,
+         name='oppdrag_api_problemstillinger_rekkefolge'),
+    path('api/problemstillinger/<int:pk>/', views_verdier.problemstilling_detalj_view,
+         name='oppdrag_api_problemstilling_detalj'),
     path('api/oppdrag/', views.oppdrag_liste_view, name='oppdrag_api_liste'),
     path('api/oppdrag/<int:pk>/', views.oppdrag_detalj_view, name='oppdrag_api_detalj'),
     path('api/oppdrag/<int:pk>/flytt/', views.flytt_view, name='oppdrag_api_flytt'),
@@ -46,6 +62,8 @@ urlpatterns = [
          name='oppdrag_api_stempling_sted'),
     path('api/oppdrag/<int:pk>/grovsortering/<str:verdi>/', views.grovsortering_view,
          name='oppdrag_api_grovsortering'),
+    path('api/oppdrag/<int:pk>/antall/<int:antall>/', views.antall_view,
+         name='oppdrag_api_antall'),
     path('api/oppdrag/<int:pk>/status/<str:overgang>/', views.stempling_view,
          name='oppdrag_api_stempling'),
     # Arkivering = rydding av tavla, ikke vaktarkivet. POST arkiverer,

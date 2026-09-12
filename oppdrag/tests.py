@@ -389,9 +389,12 @@ class ChoicesTests(TestCase):
     """Verdimengden håndheves server-side, ikke bare i nettleseren."""
 
     def test_gyldige_verdier_gaar_gjennom(self):
-        data = {'problemstilling': ' Pustevansker ', 'hastegrad': 'Akutt'}
+        # Problemstillingen er en tabell (12. sep. 2026) og valideres i
+        # `verdier`; hastegraden er fortsatt kode.
+        data = {'problemstilling': ' Pustevansker ', 'hastegrad': ' Akutt '}
         validate_oppdrag_choice_fields(data)
-        self.assertEqual(data['problemstilling'], 'Pustevansker')
+        self.assertEqual(data['hastegrad'], 'Akutt')
+        self.assertEqual(data['problemstilling'], ' Pustevansker ', 'rørt ikke her')
 
     def test_ugyldig_verdi_avvises(self):
         with self.assertRaises(ValidationError):

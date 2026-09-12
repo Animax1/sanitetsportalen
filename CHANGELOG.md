@@ -4,6 +4,33 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-12 — Andrés runde på staging, del E: verdimengdene som tabeller
+
+Tre migrasjoner, `oppdrag/0019`–`0021`: tabellene `Enhetstype` og
+`Problemstilling`, seeding fra listene i `choices.py` med oversetting av
+`Enhet.type` til FK, og fjerning av det gamle feltet. Delt i tre så
+dataskrittet ikke står i samme transaksjon som en skjemaendring
+(PostgreSQLs triggerkø). **Kjør `verifiser_migrasjoner` ikke — mønsteret
+finnes ikke her — men ta backup før `main`, som alltid.** Eksisterende
+enheter beholder typen sin; nye står som «Uten type» til noen setter den.
+
+- **Problemstillinger, enhetstyper og lokasjoner redigeres og sorteres på
+  sentralbordet**, i ett vindu med tre faner («Verdier»). Opp/ned flytter
+  raden, og rekkefølgen er rekkefølgen i nedtrekkene. Problemstillingene har
+  kategori (medisinsk, drift, begge) og om de bærer antall. «Udefinert» er
+  fast og står alltid øverst.
+- **Oppsettet er `skriv_leder`** — nytt trinn i oppdragsmodulen («Skrive:
+  leder (verdimengdene)»). Lokasjonene var `skriv_full` én dag. Sletting er
+  fortsatt global admin, og bare for verdier ingenting bruker.
+- **Enhetene står alfabetisk innenfor gruppa**, i enhetslista, tavla og
+  «Nytt oppdrag».
+- **Antall pasienter settes av bilen**, ikke av operatøren: to store knapper
+  på det påbegynte oppdraget der problemstillingen bærer et antall. Tomt
+  vises som «1 pasient», ellers «N pasienter». Feltet er borte fra
+  operatørens skjemaer.
+- Et oppdrag beholder problemstillingen sin om noen deaktiverer den — KO kan
+  fortsatt rette fritekst og hastegrad på det.
+
 ## 2026-09-12 — Andrés runde på staging, del D: småfeil og visning
 
 Én migrasjon, `oppdrag/0018`: `Oppdrag.trenger_ressurs_siden`. Ren
