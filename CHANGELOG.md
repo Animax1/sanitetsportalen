@@ -22,7 +22,7 @@ lukking, null med rettelsen, og «Nytt oppdrag»-knappen klikkbar igjen.
 `bootstrap.Modal.getOrCreateInstance(el).show()` overalt der et vindu åpnes
 — ni steder — og `DetaljvinduetTegnesPaaNyttTests` kjører `visOppdrag()`
 tre ganger mot en Modal-stubb med Bootstraps regler og krever én instans.
-Ingen migrasjon.
+Ingen migrasjon. **Pushet til `main` som `9437986`** samme kveld.
 
 ## 2026-09-12 — Merget til prod: flere enheter, korpsfilter, utskrift
 
