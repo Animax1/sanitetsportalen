@@ -472,12 +472,15 @@ class MannskapApiTests(TestCase):
         """`Mannskap.user` er en OneToOne. Klienten må vite hvilke kontoer som
         er tatt — ellers tilbyr nedtrekket et valg som ikke kan lagres."""
         bruker = _bruker('kari')
+        _bruker('ola')
         pk = self._opprett(user_id=bruker.pk).json()['data']['id']
         kontoer = self.c.get('/vaktliste/api/mannskap/').json()['data']['kontoer']
         koblet = [u for u in kontoer if u['brukernavn'] == 'kari']
         self.assertEqual(koblet[0]['mannskap_id'], pk)
-        ledig = [u for u in kontoer if u['brukernavn'] == 'adm']
+        ledig = [u for u in kontoer if u['brukernavn'] == 'ola']
         self.assertIsNone(ledig[0]['mannskap_id'])
+        self.assertEqual([u for u in kontoer if u['brukernavn'] == 'adm'], [],
+                         'adminkontoen er utenfor — den tilbys ikke')
 
     def test_get_gir_alle_fire_listene(self):
         """Fire kall der ett holder er fire steder noe kan komme i utakt."""
@@ -715,8 +718,26 @@ class KontokoblingTests(TestCase):
         self.assertIn('e-posten', res.json()['message'])
         self.assertEqual(Mannskap.objects.count(), 0)
 
-    def test_global_admin_kobler_ogsaa_adminkontoer(self):
-        self.assertEqual(self._opprett(self.c_adm, self.admin.pk).status_code, 201)
+    def test_global_admin_kobler_vanlige_kontoer(self):
+        self.assertEqual(self._opprett(self.c_adm, self.vanlig.pk).status_code, 201)
+
+    def test_adminkontoer_er_aldri_mannskap(self):
+        # «Vi skal ikke ha adminkonto som mannskap. Den er utenfor.» (André,
+        # 12. sep. 2026) — heller ikke når global admin kobler for hånd.
+        res = self._opprett(self.c_adm, self.admin.pk)
+        self.assertEqual(res.status_code, 400, res.content)
+        self.assertIn('Adminkontoer er ikke mannskap', res.json()['message'])
+        self.assertEqual(Mannskap.objects.count(), 0)
+        pk = self._opprett(self.c_adm, self.vanlig.pk).json()['data']['id']
+        res = self.c_adm.put(f'/vaktliste/api/mannskap/{pk}/', content_type='application/json',
+                             data={'user_id': self.admin.pk})
+        self.assertEqual(res.status_code, 400)
+        self.assertEqual(Mannskap.objects.get(pk=pk).user_id, self.vanlig.pk)
+
+    def test_kontolista_tilbyr_ikke_adminkontoer(self):
+        ider = {k['id'] for k in self.c_adm.get('/vaktliste/api/mannskap/').json()['data']['kontoer']}
+        self.assertIn(self.vanlig.pk, ider)
+        self.assertNotIn(self.admin.pk, ider)
 
     def test_heller_ikke_ved_redigering(self):
         pk = self._opprett(self.c_adm, self.vanlig.pk).json()['data']['id']
@@ -775,14 +796,18 @@ class EpostkoblingTests(TestCase):
         self.assertIsNone(d['user_id'], 'OneToOne — den andre raden får ikke kontoen')
         self.assertTrue(d['konto_finnes'], 'men merket sier at brukeren finnes')
 
-    def test_adminkonto_kobles_ikke_av_vaktleder_men_av_admin(self):
+    def test_adminkonto_kobles_aldri_paa_epost(self):
+        # Adminkontoen står utenfor (André, 12. sep. 2026) — verken vaktleder
+        # eller admin selv får koblet den, og merket sier ikke at det finnes
+        # en konto å koble.
         self.admin.email = 'adm@example.org'
         self.admin.save(update_fields=['email'])
         d = self._opprett(self.c_vl, epost='adm@example.org').json()['data']
-        self.assertIsNone(d['user_id'], 'badgen på en adminkonto er global admin sin å sette')
-        self.assertTrue(d['konto_finnes'])
+        self.assertIsNone(d['user_id'])
+        self.assertFalse(d['konto_finnes'])
         d2 = self._opprett(self.c_adm, navn='Admin selv', epost='adm@example.org').json()['data']
-        self.assertEqual(d2['brukernavn'], 'adm')
+        self.assertIsNone(d2['user_id'])
+        self.assertFalse(d2['konto_finnes'])
 
     def test_redigering_av_eposten_kobler_ogsaa(self):
         pk = self._opprett(self.c_vl).json()['data']['id']

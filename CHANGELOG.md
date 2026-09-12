@@ -4,6 +4,32 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-12 — Andrés runde på staging, del D: småfeil og visning
+
+Én migrasjon, `oppdrag/0018`: `Oppdrag.trenger_ressurs_siden`. Ren
+skjemaendring.
+
+- **Innloggingssiden:** fanikonet er en lys utgave av merket uten bakgrunn
+  (`static/img/favicon.svg`) — merket på blått ble en mørk flekk i en mørk
+  fanelinje. PWA-ikonene er som før. «Vis passord» er portalens egen, lyse
+  knapp; nettleserens svarte øye (Edge) skjules.
+- **«Nytt oppdrag»:** avkryssingen av enheter og valgt lokasjon overlever at
+  pollingen tegner lista på nytt — det var derfor krysset forsvant. Alle
+  nedtrekkene starter øverst hver gang vinduet åpnes, og fritekst og antall
+  tømmes.
+- **Oppdragslista på sentralbordet sorteres på hastegraden operatøren satte**
+  (Akutt, Haster, Vanlig, Drift) og innenfor den på nummer. Ferdige nederst.
+- **«Trenger ny ressurs» trappes opp med tida:** gul kant de første fem
+  minuttene, oransje rad til et kvarter, så rødt med puls. Merket har egen
+  trekant, ikke statusprikken bilene har, og sier hvor lenge det har stått.
+  Bilen som rykket videre står i loggen, ikke lenger i enhetsraden på lista.
+- **Bilen:** «Nylig avsluttet» viser oppdragsnummeret. Står problemstillingen
+  som «Udefinert», sier kortet fra *før* hun trykker «Ledig»: meld
+  problemstillingen til KO. Avvisningen fra serveren ble tidligere skjult i
+  samme åndedrag som køen ble tom — bilen så bare «venter på dekning».
+- **Adminkontoer er aldri mannskap** («Den er utenfor.»): de kobles ikke på
+  e-post, tilbys ikke i kontolista, og avvises ved kobling for hånd.
+
 ## 2026-09-12 — «Teknisk» heter «Drift»
 
 Migrasjon `oppdrag/0017`: nye hastegradvalg, og rader som sto som «Teknisk»

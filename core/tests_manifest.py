@@ -158,3 +158,30 @@ class AlleSiderLenkerTilManifestetTests(TestCase):
         self.assertContains(res, 'rel="manifest" href="/manifest.webmanifest"')
         self.assertContains(res, 'rel="apple-touch-icon"')
         self.assertContains(res, 'name="theme-color"')
+
+
+class FanikonOgVisPassordTests(TestCase):
+    """Fanen og «vis passord» på innloggingssiden var svarte (André, 12. sep.
+    2026). Fanikonet er en lys utgave av merket uten bakgrunn — merket på
+    blått ble en mørk flekk i en mørk fanelinje — og «vis passord» er
+    portalens egen, lyse knapp, ikke nettleserens svarte øye."""
+
+    def test_fanikonet_er_lyst_og_uten_bakgrunn(self):
+        svg = (Path(settings.BASE_DIR) / 'static/img/favicon.svg').read_text(encoding='utf-8')
+        self.assertNotIn('<rect', svg, 'ingen bakgrunnsflate — fanelinjen er bakgrunnen')
+        self.assertIn('fill="#ffffff"', svg, 'skjoldet er hvitt')
+        farger = set(re.findall(r'#[0-9a-fA-F]{6}', svg))
+        self.assertEqual(farger, {'#0f3460', '#8fb3f0', '#ffffff'}, farger)
+
+    def test_fanen_bruker_fanikonet_og_merket_staar_i_manifestet(self):
+        partial = (Path(settings.BASE_DIR) / 'templates/partials/_ikoner.html').read_text(encoding='utf-8')
+        self.assertIn("rel=\"icon\" href=\"{% static 'img/favicon.svg' %}\"", partial)
+        self.assertIn('img/logo.svg', [i[0] for i in IKONER], 'PWA-ikonet er fortsatt merket på blått')
+
+    def test_innloggingssiden_har_egen_vis_passord_knapp(self):
+        res = Client().get('/accounts/login/')
+        self.assertContains(res, 'id="vis-passord"')
+        self.assertContains(res, 'aria-label="Vis passord"')
+        self.assertContains(res, '::-ms-reveal { display: none; }')
+        # Inline-skriptet må bære nonce, ellers kjører det ikke (F5).
+        self.assertRegex(res.content.decode(), r'<script nonce="[^"]+">\s*\(function \(\) \{\s*var knapp')

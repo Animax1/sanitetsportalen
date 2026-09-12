@@ -143,6 +143,8 @@ def oppdrag_til_dict(oppdrag, *, for_enhet: bool = False,
                           if oppdrag.historikk_fra else None),
         # Bilen rykket videre; oppdraget står på tavla og venter på en ny.
         'trenger_ressurs': oppdrag.trenger_ressurs,
+        'trenger_ressurs_siden': (oppdrag.trenger_ressurs_siden.isoformat()
+                                  if oppdrag.trenger_ressurs_siden else None),
     }
     skjul_fritekst = for_enhet and status == choices.TERMINAL
     data['fritekst'] = '' if skjul_fritekst else oppdrag.fritekst

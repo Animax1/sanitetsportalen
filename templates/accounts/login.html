@@ -21,6 +21,11 @@
   .form-control:focus { box-shadow: 0 0 0 0.2rem rgba(59,130,246,0.2) !important; border-color: #3b82f6 !important; }
   .form-label { color: #cbd5e1; font-size: 0.85rem; font-weight: 600; }
   .alert-danger { background: #450a0a; border-color: #7f1d1d; color: #fca5a5; font-size: 0.85rem; }
+  /* «Vis passord» er portalens egen knapp, lys mot det mørke feltet. Edge
+     legger sitt eget øye i feltet, i svart — det skjules, ellers står det to. */
+  .form-control::-ms-reveal { display: none; }
+  .vis-passord { border-color: #334155; color: #e5e7eb; background: #1e293b; }
+  .vis-passord:hover, .vis-passord:focus { color: #ffffff; background: #334155; border-color: #475569; }
 </style>
 </head>
 <body>
@@ -51,7 +56,12 @@
     </div>
     <div class="mb-3">
       <label class="form-label" for="id_password">Passord</label>
-      <input type="password" name="password" id="id_password" class="form-control" autocomplete="current-password">
+      <div class="input-group">
+        <input type="password" name="password" id="id_password" class="form-control" autocomplete="current-password">
+        <button type="button" class="btn vis-passord" id="vis-passord" aria-label="Vis passord" aria-pressed="false" title="Vis passord">
+          <i class="bi bi-eye"></i>
+        </button>
+      </div>
     </div>
     <button type="submit" class="btn btn-primary w-100">
       <i class="bi bi-box-arrow-in-right me-1"></i>Logg inn
@@ -61,5 +71,20 @@
      style="color:#94a3b8;font-size:0.85rem;">Glemt passord?</a>
 </div>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<script nonce="{{ csp_nonce }}">
+  (function () {
+    var knapp = document.getElementById('vis-passord');
+    var felt = document.getElementById('id_password');
+    if (!knapp || !felt) return;
+    knapp.addEventListener('click', function () {
+      var vis = felt.type === 'password';
+      felt.type = vis ? 'text' : 'password';
+      knapp.setAttribute('aria-pressed', vis ? 'true' : 'false');
+      knapp.setAttribute('aria-label', vis ? 'Skjul passord' : 'Vis passord');
+      knapp.querySelector('i').className = vis ? 'bi bi-eye-slash' : 'bi bi-eye';
+      felt.focus();
+    });
+  })();
+</script>
 </body>
 </html>

@@ -202,6 +202,10 @@ class Oppdrag(BaseTimeStampedModel):
     # sentralbordet varsler en ny enhet, som nullstiller flagget.
     trenger_ressurs = models.BooleanField(
         default=False, verbose_name='Trenger ny ressurs')
+    # Når det begynte å stå uten noen — sentralbordet viser det tydeligere
+    # jo lenger det har stått. Settes sammen med flagget, tømmes med det.
+    trenger_ressurs_siden = models.DateTimeField(
+        null=True, blank=True, verbose_name='Trenger ny ressurs siden')
     historikk_av = models.ForeignKey(
         settings.AUTH_USER_MODEL, null=True, blank=True,
         on_delete=models.SET_NULL, related_name='oppdrag_lagt_i_historikk',

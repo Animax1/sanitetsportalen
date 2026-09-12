@@ -353,8 +353,8 @@ def sett_status(oppdrag, ny_status: str, *, bruker=None, tidspunkt=None,
     if (ny_status == choices.LEDIG and not automatisk
             and oppdrag.problemstilling == choices.UDEFINERT):
         raise ProblemstillingUdefinert(
-            'Problemstillingen er «Udefinert». Sentralbordet må sette den før '
-            'enheten meldes ledig.')
+            'Problemstillingen står som «Udefinert». Meld problemstillingen til KO, '
+            'så setter sentralbordet den — først da kan enheten meldes ledig.')
     # Stedet hører til «Avreist» og ingen annen status. Sjekken ligger her og
     # ikke bare i viewet, av samme grunn som overgangssjekken: alle veier inn
     # skal gjennom den.
@@ -423,7 +423,8 @@ def start_oppdrag(oppdrag, *, bruker=None, tidspunkt=None,
                         .exclude(status=choices.LEDIG).exists())
         if not andre_aktive:
             forrige.trenger_ressurs = True
-            forrige.save(update_fields=['trenger_ressurs', 'updated_at'])
+            forrige.trenger_ressurs_siden = naa
+            forrige.save(update_fields=['trenger_ressurs', 'trenger_ressurs_siden', 'updated_at'])
         sett_status(forrige, choices.LEDIG, bruker=bruker,
                     tidspunkt=naa, automatisk=True, enhet=rad.enhet)
         Enhetshendelse.objects.create(
@@ -449,7 +450,8 @@ def varsle_enhet(oppdrag, enhet, *, bruker=None) -> Oppdragsenhet:
     if oppdrag.trenger_ressurs:
         # Ressursen er her. Flagget nullstilles før utledningen.
         oppdrag.trenger_ressurs = False
-        felter.append('trenger_ressurs')
+        oppdrag.trenger_ressurs_siden = None
+        felter += ['trenger_ressurs', 'trenger_ressurs_siden']
     oppdrag.status = utledet_status(oppdrag)
     if oppdrag.historikk_fra is not None:
         oppdrag.historikk_fra = None

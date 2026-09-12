@@ -33,6 +33,11 @@ let besetninger = {};
 let apenBesetning = null;
 
 const STATUS_REKKEFOLGE = ['venter', 'rykker_ut', 'fremme', 'avreist', 'leverer', 'ledig'];
+//: Lista sorteres på hastegraden operatøren satte (André, 12. sep. 2026),
+//: og innenfor den på nummer. Ferdige oppdrag står nederst.
+const HASTEGRAD_REKKEFOLGE = ['Akutt', 'Haster', 'Vanlig', 'Drift'];
+//: «Trenger ny ressurs» blir tydeligere jo lenger det står (minutter).
+const MANGLER_TRINN = [[15, 'alvorlig'], [5, 'varsel'], [0, 'ny']];
 
 
 function hastegradKlasse(h) {
@@ -335,12 +340,7 @@ function renderOppdrag() {
     return;
   }
 
-  const sortert = [...oppdragsliste].sort((a, b) => {
-    const ai = STATUS_REKKEFOLGE.indexOf(a.status);
-    const bi = STATUS_REKKEFOLGE.indexOf(b.status);
-    if (ai !== bi) return ai - bi;
-    return new Date(b.opprettet) - new Date(a.opprettet);
-  });
+  const sortert = _sorterOppdrag(oppdragsliste);
 
   el.innerHTML = (sortert.map((o) => {
     // Fragmentene bygges før mal-strengen, ikke inne i en ${...}. En nøstet
@@ -360,8 +360,9 @@ function renderOppdrag() {
     // grovsortering til høyre. Tom grovsortering vises som «—», fordi
     // «ikke vurdert ennå» er informasjon.
     const grovsortering = _grovMerke(o);
+    const manglerKlasse = o.trenger_ressurs ? ' oppdrag-rad-mangler mangler-' + _manglerTrinn(o) : '';
     return `
-    <div class="oppdrag-rad" data-action="visOppdrag" data-id="${escHtmlValue(o.id)}"
+    <div class="oppdrag-rad${manglerKlasse}" data-action="visOppdrag" data-id="${escHtmlValue(o.id)}"
          role="button" tabindex="0">
       <div class="d-flex align-items-center gap-2 flex-wrap">
         <span class="oppdrag-nr">#${escHtmlValue(o.nummer)}</span>
@@ -383,6 +384,46 @@ function renderOppdrag() {
 }
 
 
+function _sorterOppdrag(liste) {
+  // Ferdige nederst; ellers hastegraden KO/AMK satte, og innenfor den
+  // nummeret — «Akutt #3» over «Akutt #7», og alle Akutt over alle Haster.
+  // Statusen sorterer ikke lenger: det er hastegraden som sier hva som er
+  // viktigst, og nummeret som sier hva som kom først.
+  const rang = (h) => {
+    const i = HASTEGRAD_REKKEFOLGE.indexOf(h);
+    return i < 0 ? HASTEGRAD_REKKEFOLGE.length : i;
+  };
+  return [...liste].sort((a, b) => {
+    const af = a.status === 'ledig' ? 1 : 0;
+    const bf = b.status === 'ledig' ? 1 : 0;
+    if (af !== bf) return af - bf;
+    const ah = rang(a.hastegrad);
+    const bh = rang(b.hastegrad);
+    if (ah !== bh) return ah - bh;
+    return (Number(a.nummer) || 0) - (Number(b.nummer) || 0);
+  });
+}
+
+
+function _manglerMinutter(o, naa) {
+  // Fra bilen rykket videre — `trenger_ressurs_siden`. Eldre svar uten
+  // feltet regner fra siste status.
+  const fra = o.trenger_ressurs_siden || o.status_tidspunkt || o.opprettet;
+  if (!fra) return 0;
+  const ms = (naa ? new Date(naa) : new Date()) - new Date(fra);
+  return Math.max(0, Math.floor(ms / 60000));
+}
+
+
+function _manglerTrinn(o, naa) {
+  // Trinnene er visuelle, ikke regler: raden skal skille seg mer ut jo
+  // lenger oppdraget har stått uten noen (André, 12. sep. 2026: «gjerne som
+  // blir tydeligere desto lenger tiden går»).
+  const min = _manglerMinutter(o, naa);
+  return (MANGLER_TRINN.find(([grense]) => min >= grense) || [0, 'ny'])[1];
+}
+
+
 function _enhetsmatrise(o) {
   // Én brikke per enhet: navn, status og tid siden — matrisen fra §4 i
   // notatet om flere enheter. Oppdragets egen status står fortsatt til
@@ -393,13 +434,17 @@ function _enhetsmatrise(o) {
     status_tidspunkt: o.status_tidspunkt,
   }];
   // Bilen rykket videre og ingen har tatt over (André, 12. sep. 2026):
-  // merket står først, så det er det første 113 ser på raden.
+  // merket står først, så det er det første 113 ser på raden — med egen
+  // trekant, ikke statusprikken bilene har, og med tida det har stått.
+  // Bilene som er ferdige med det står i loggen, ikke i lista: «den bilen
+  // må vekk» — ellers ser oppdraget bemannet ut.
   const mangler = o.trenger_ressurs
-    ? `<span class="enhet-brikke enhet-brikke-mangler">
-      <span class="status-prikk status-mangler"></span>
-      <span>Trenger ny ressurs</span>
+    ? `<span class="enhet-brikke enhet-brikke-mangler mangler-${escHtmlValue(_manglerTrinn(o))}">
+      <i class="bi bi-exclamation-triangle-fill"></i>
+      <span>Trenger ny ressurs · ${escHtmlValue(_manglerMinutter(o))} min</span>
     </span>` : '';
-  return mangler + rader.map((e) => {
+  const synlige = o.trenger_ressurs ? rader.filter((e) => e.status !== 'ledig') : rader;
+  return mangler + synlige.map((e) => {
     const statusTid = e.status_tidspunkt ? ` · ${tidSiden(e.status_tidspunkt)}` : '';
     const sted = e.sted_navn ? ` → ${e.sted_navn}` : '';
     const meta = `${e.status_navn}${sted}${statusTid}`;
@@ -1168,10 +1213,19 @@ async function opprettOppdrag() {
 
 function nullstillNyttOppdrag() {
   // Ved hver åpning (André, 12. sep. 2026: «husker den avhukede enheter fra
-  // forrige opprettelse»). Uavhengig av hvilken vei forrige forsøk gikk.
+  // forrige opprettelse», og senere «nedtrekksfeltene … må starte øverst på
+  // hver»). Uavhengig av hvilken vei forrige forsøk gikk.
   document.querySelectorAll('input[name="nytt-enhet"]').forEach((i) => { i.checked = false; });
   document.getElementById('nytt-feil')?.classList.add('d-none');
-  // Problemstillingene følger hastegraden som står valgt.
+  ['nytt-hastegrad', 'nytt-lokasjon', 'nytt-problemstilling'].forEach((id) => {
+    const sel = document.getElementById(id);
+    if (sel && sel.options.length) sel.selectedIndex = 0;
+  });
+  ['nytt-fritekst', 'nytt-antall'].forEach((id) => {
+    const felt = document.getElementById(id);
+    if (felt) felt.value = '';
+  });
+  // Problemstillingene følger hastegraden som står valgt — den første nå.
   hastegradEndret('nytt');
 }
 
@@ -1402,16 +1456,27 @@ async function lastLokasjoner() {
 
 
 function fyllNedtrekk() {
+  // Kalles fra pollingen hver gang enhetslista har endret seg — og en
+  // statusendring på en bil er en endring. Mens operatøren fyller ut «Nytt
+  // oppdrag» bygges avkryssingen altså om under henne; det som sto krysset
+  // av og valgt må derfor settes tilbake (André, 12. sep. 2026: «krysset
+  // forsvinner når jeg går nedover i listen»).
   const enhetsvalg = document.getElementById('nytt-enheter');
   if (enhetsvalg) {
+    const krysset = _valgteEnheter();
     enhetsvalg.innerHTML = mkEnhetsvalg()
       || '<div class="tom-melding">Ingen enheter på vakt.</div>';
+    enhetsvalg.querySelectorAll('input[name="nytt-enhet"]').forEach((i) => {
+      if (krysset.includes(Number(i.value))) i.checked = true;
+    });
   }
   const lokvalg = document.getElementById('nytt-lokasjon');
   if (lokvalg) {
+    const valgt = lokvalg.value;
     const aktive = lokasjoner.filter((l) => l.er_aktiv);
     lokvalg.innerHTML = (aktive.map(
       (l) => `<option value="${escHtmlValue(l.id)}">${escapeHtml(l.navn)}</option>`).join(''));
+    if (valgt && aktive.some((l) => String(l.id) === String(valgt))) lokvalg.value = valgt;
   }
 }
 

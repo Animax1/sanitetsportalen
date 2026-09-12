@@ -260,7 +260,8 @@ Fem ting det er verdt å kjenne før man rører modulen:
 | Korreksjoner er **nye rader** som peker på den gamle | `Statusmelding.objects.gjeldende()` |
 | `fritekst` logges som endret, men **uten verdier** | `signals.FELT_UTEN_VERDILOGGING` |
 | «Historikk» rydder tavla, **arkivet fryser og lukker vakta** | `Oppdrag.historikk_fra` vs. `oppdrag/arkiv.py` |
-| Bilen rykker videre → oppdraget **trenger ny ressurs**, ikke ferdig | `Oppdrag.trenger_ressurs`, `services.start_oppdrag` |
+| Bilen rykker videre → oppdraget **trenger ny ressurs**, ikke ferdig | `Oppdrag.trenger_ressurs` + `trenger_ressurs_siden`, `services.start_oppdrag` |
+| Lista sorteres på hastegrad, så nummer; ferdige nederst | `_sorterOppdrag()` i `oppdrag-sentral.js` |
 
 **Historikk og arkiv er to helt ulike handlinger**, og har derfor hver sin knapp.
 Historikk flytter ett oppdrag ut av den aktive tavla og er fullt reversibel; arkivering
@@ -337,9 +338,12 @@ fase 3–7 gjenstår — se `docs/BESLUTNING_VAKTLISTE.md`, som er besluttet i s
   *begge* korps, og kontokobling **for hånd er global admin** (12. sep. 2026) fordi den
   flytter en badge — kontoen arver korpset, og dermed hva den kontoen får redigere. Alle
   andre kobler gjennom **`Mannskap.epost`**: finnes en aktiv, ledig portalkonto med samme
-  e-post, kobles den av seg selv ved lagring (`views_registre._koble_paa_epost`) — aldri en
-  adminkonto for andre enn admin. `konto_finnes` i svaret sier om en bruker med adressen
-  finnes, regnet av ett sett e-poster, ikke én spørring per rad.
+  e-post, kobles den av seg selv ved lagring (`views_registre._koble_paa_epost`).
+  **Adminkontoer er aldri mannskap** (12. sep. 2026: «Den er utenfor.») —
+  `_koblbare_kontoer()` er det ene stedet som sier hvem som kan kobles, og e-postmerket,
+  autokoblingen og kontolista leser alle derfra; kobling for hånd til en adminkonto gir
+  400. `konto_finnes` i svaret sier om en bruker med adressen finnes, regnet av ett sett
+  e-poster, ikke én spørring per rad.
 - **Kostbehov/matallergi lagres ikke** (art. 9 — besluttet holdt utenfor portalen), og
   `Mannskap.notat` er unntatt verdilogging i audit (`signals.FELT_UTEN_VERDILOGGING`).
 - **En ledig plass har tre tilstander** (11.–12. sep. 2026): tildelt ett korps
@@ -626,7 +630,8 @@ virkningsløs endring, ikke som en feil:
 Noen frittstående sider (`403.html`, `mfa_setup.html`, `mfa_verify.html`, innlogging)
 laster ingen av dem — de har egen `<style>`-blokk og må overstyre selv.
 
-**Hver mal med eget `<head>` tar med `partials/_ikoner.html`** — manifest, favicon,
+**Hver mal med eget `<head>` tar med `partials/_ikoner.html`** — manifest, fanikon
+(`favicon.svg`, lys utgave uten bakgrunn — merket på blått var en mørk flekk i fanen),
 apple-touch-icon og `theme-color`. Manifestet er en view (`core/manifest.py`, uten
 innlogging), ikke en statisk fil, fordi ikonstiene må gjennom `{% static %}`: WhiteNoise
 hasher navnene. Merket i `static/img/logo.svg` er et skjold med en person i, bevisst uten

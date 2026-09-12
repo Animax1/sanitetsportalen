@@ -846,12 +846,15 @@ class SentralbordetsMatriseTests(TestCase):
             OPPDRAG_SENTRAL_JS, PORTAL_UTILS_JS, build_harness, node_available)
         if not node_available():
             self.skipTest('node er ikke tilgjengelig')
-        self.harness = build_harness((
+        from .tests_runde_d import _konst
+        self.harness = _konst(OPPDRAG_SENTRAL_JS, 'HASTEGRAD_REKKEFOLGE') + _konst(
+            OPPDRAG_SENTRAL_JS, 'MANGLER_TRINN') + build_harness((
             (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue', 'trustedHtml', '_escHtml', 'klokke')),
             (OPPDRAG_SENTRAL_JS, ('renderOppdrag', '_enhetsmatrise', '_grovMerke',
                                   'hastegradKlasse', 'tidSiden', 'mkEnhetsvalg',
                                   'mkEnhetsrader', '_enhetsknapper', '_varsleValg',
-                                  '_lovligeOverganger', 'tidslinjeHtml', '_problemMedAntall', '_grupperEnheter', '_typeRekkefolge', '_enhetskort')),
+                                  '_lovligeOverganger', 'tidslinjeHtml', '_problemMedAntall', '_grupperEnheter', '_typeRekkefolge', '_enhetskort',
+                                  '_sorterOppdrag', '_manglerTrinn', '_manglerMinutter')),
         ))
 
     STUBB = ("globalThis.OPPDRAG_TILGANG = { kanSkrive: true };\n"

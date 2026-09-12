@@ -292,9 +292,27 @@ def _kjente_eposter():
     en bruker med denne e-posten?» uten én spørring per rad."""
     from accounts.models import CustomUser
     return {e.lower() for e in
-            CustomUser.objects.filter(is_active=True)
+            _koblbare_kontoer(CustomUser)
             .exclude(email__isnull=True).exclude(email='')
             .values_list('email', flat=True)}
+
+
+ADMINKONTO_MELDING = ('Adminkontoer er ikke mannskap — de står utenfor korpsene. '
+                      'Gi personen en vanlig konto.')
+
+
+def _er_adminkonto(user_id):
+    from accounts.models import CustomUser
+    return bool(user_id) and CustomUser.objects.filter(pk=user_id, role='admin').exists()
+
+
+def _koblbare_kontoer(CustomUser):
+    """Kontoene som kan være mannskap: aktive, og **ikke** global admin.
+    Adminkontoen står utenfor rollemodellens modulakse og skal ikke få en
+    badge (André, 12. sep. 2026: «Vi skal ikke ha adminkonto som mannskap.
+    Den er utenfor.»). Ett sted, så e-postmerket, autokoblingen og
+    kontolista svarer likt."""
+    return CustomUser.objects.filter(is_active=True).exclude(role='admin')
 
 
 def _normaliser_epost(raa):
@@ -312,18 +330,15 @@ def _koble_paa_epost(request, person):
     (André, 12. sep. 2026: «automatisk oppkobling til brukere»).
 
     Kobles bare når kontoen er ledig — `Mannskap.user` er OneToOne — og
-    aldri en adminkonto for andre enn global admin: badgen avgjør hva kontoen
-    får redigere, og den regelen skal ikke kunne omgås ved å skrive inn
-    administratorens e-post. Returnerer True hvis noe ble koblet."""
+    aldri en adminkonto: den er utenfor (`_koblbare_kontoer`). Returnerer
+    True hvis noe ble koblet."""
     from accounts.models import CustomUser
     if person.user_id or not person.epost:
         return False
-    konto = (CustomUser.objects
-             .filter(email__iexact=person.epost, is_active=True, mannskap__isnull=True)
+    konto = (_koblbare_kontoer(CustomUser)
+             .filter(email__iexact=person.epost, mannskap__isnull=True)
              .first())
     if konto is None:
-        return False
-    if konto.role == 'admin' and not er_global_admin(request.user):
         return False
     person.user = konto
     return True
@@ -384,8 +399,7 @@ def _kontoer():
     return [
         {'id': u.pk, 'brukernavn': u.username,
          'mannskap_id': getattr(u, 'mannskap', None) and u.mannskap.pk}
-        for u in (CustomUser.objects
-                  .filter(is_active=True)
+        for u in (_koblbare_kontoer(CustomUser)
                   .select_related('mannskap')
                   .order_by('username'))
     ]
@@ -452,6 +466,8 @@ def mannskap_view(request):
     admin = er_global_admin(request.user)
     if data.get('user_id') and not admin:
         return _nektet('Kontokobling for hånd er global admin. Legg inn e-posten, så kobles kontoen av seg selv.')
+    if data.get('user_id') and _er_adminkonto(_int(data.get('user_id'))):
+        return _feil(ADMINKONTO_MELDING)
     try:
         epost = _normaliser_epost(data.get('epost'))
     except ValidationError:
@@ -548,6 +564,8 @@ def mannskap_detalj_view(request, pk):
             # Korps-føreren og vaktlederen sender ikke feltet — skjemaet
             # deres har det ikke. Et kall utenom skjemaet avvises.
             return _nektet('Kontokobling for hånd er global admin. Legg inn e-posten, så kobles kontoen av seg selv.')
+        if _er_adminkonto(_int(data['user_id'])):
+            return _feil(ADMINKONTO_MELDING)
         person.user_id = _int(data['user_id'])
     _koble_paa_epost(request, person)
 

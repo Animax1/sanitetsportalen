@@ -24,7 +24,7 @@ let velgerStedFor = null;
 const AVREIST_TIL = globalThis.OPPDRAG_AVREIST_TIL || [];
 const GROVSORTERING = globalThis.OPPDRAG_GROVSORTERING || [];
 
-const HASTEGRAD_REKKEFOLGE = ['Akutt', 'Haster', 'Vanlig'];
+const HASTEGRAD_REKKEFOLGE = ['Akutt', 'Haster', 'Vanlig', 'Drift'];
 
 
 // ════════════════════════════════════════════════════════
@@ -302,6 +302,21 @@ function tidslinjeEnhetHtml(o) {
 }
 
 
+function _udefinertVarsel(o) {
+  // Står problemstillingen som «Udefinert», avviser serveren «Ledig». Det
+  // skal bilen få vite FØR hun trykker, ikke som en avvisning etterpå
+  // (André, 12. sep. 2026: «tydelig melding om at å melde problemstilling
+  // til KO»). Ingen knapp fjernes — KO kan sette den mens hun leser.
+  if ((o.problemstilling || '') !== 'Udefinert') return '';
+  return `
+      <div class="alert alert-warning enhet-udefinert mb-2" role="status">
+        <i class="bi bi-exclamation-triangle-fill me-1"></i>
+        Problemstillingen står som «Udefinert». Meld problemstillingen til KO —
+        enheten kan ikke meldes ledig før sentralbordet har satt den.
+      </div>`;
+}
+
+
 function renderAktivt() {
   const el = document.getElementById('aktivt-oppdrag');
   if (!el) return;
@@ -341,6 +356,7 @@ function renderAktivt() {
     // Grovsorteringen er en vurdering av pasienten, og den finnes ikke før
     // bilen er framme (André, 12. sep. 2026). Under utrykning står den ikke.
     const grovRad = _kanGrovsortere(o) ? _grovsorteringsrad(o) : '';
+    const udefinert = _udefinertVarsel(o);
     return `
     <div class="aktivt-kort">
       <div class="d-flex align-items-center gap-2 flex-wrap mb-1">
@@ -349,6 +365,7 @@ function renderAktivt() {
         <span class="ms-auto oppdrag-status-naa">${escapeHtml(o.status_navn)}</span>
       </div>
       <div class="oppdrag-meta mb-1">${escapeHtml(o.lokasjon_navn)}</div>
+      ${udefinert}
       ${_varsledeRad(o)}
       ${fritekstBlokk}
       ${grovRad}
@@ -437,6 +454,7 @@ function renderAvsluttet() {
     return `
     <div class="oppdrag-rad oppdrag-avsluttet">
       <div class="d-flex align-items-center gap-2 flex-wrap">
+        <span class="oppdrag-nr">#${escHtmlValue(o.nummer)}</span>
         <span class="oppdrag-meta">${escapeHtml(_problemMedAntall(o))}</span>
         <span class="ms-auto">
           <span class="${tidKlasse}"${tittel}>Ledig ${escapeHtml(tid)}</span>
@@ -472,9 +490,14 @@ async function synk() {
   try {
     // Serielt og i rekkefølge. Statusmeldinger er et spor av hva som skjedde,
     // og to parallelle sendinger kunne landet «Avreist» før «Fremme».
+    // En avvisning i denne runden skal bli stående når køen er tom etterpå:
+    // «køen er tom» er ellers akkurat det som skjer når serveren nettopp
+    // strøk raden med en beskjed (André, 12. sep. 2026: bilen fikk aldri se
+    // «Udefinert»-meldingen — den ble skjult i samme åndedrag).
+    let avvist = false;
     while (true) {
       const ko = koLes();
-      if (!ko.length) { skjulFeil(); break; }
+      if (!ko.length) { if (!avvist) skjulFeil(); break; }
 
       const rad = ko[0];
       let res;
@@ -516,6 +539,7 @@ async function synk() {
         // manglende tilgang, oppdrag borte. Å beholde raden ville låst køen
         // for alt bak den.
         koFjern(rad.nokkel);
+        avvist = true;
         visFeil(d.message
           || 'En stempling ble avvist av serveren. Meld status over nødnett.');
         continue;

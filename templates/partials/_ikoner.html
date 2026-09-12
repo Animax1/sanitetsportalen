@@ -1,5 +1,6 @@
 {% load static %}{# Manifest og ikoner — inkluderes i <head> på hver side som har sitt eget. Se core/manifest.py. #}
 <link rel="manifest" href="{% url 'manifest' %}">
-<link rel="icon" href="{% static 'img/logo.svg' %}" type="image/svg+xml">
+{# Fanen: lys utgave uten bakgrunn. Merket på blått ble en mørk flekk i en mørk fanelinje (André, 12. sep. 2026). #}
+<link rel="icon" href="{% static 'img/favicon.svg' %}" type="image/svg+xml">
 <link rel="apple-touch-icon" href="{% static 'img/apple-touch-icon.png' %}">
 <meta name="theme-color" content="#0f3460">

@@ -220,6 +220,23 @@ ingen av dem gir feilmelding — de er bare stille inaktive.
             - [x] Andrés rapport 3 (12. sep.): bilen ser de andres stempler, arkivtittel
                   uten vaktnavn, «Mitt korps» skiller korpsets fra åpent for alle, kurvens
                   hode med tre tall, «Arkiv» i eget vindu, manifest og logo.
+            - [ ] **Andrés runde på staging, del E og F (12. sep.)** — gjenstår:
+                  - [ ] E: enhetstyper, problemstillinger og lokasjoner som tabeller
+                        admin kan redigere og sortere (rekkefølge i nedtrekkene);
+                        enheter alfabetisk innenfor gruppa; `skriv_leder` i
+                        oppdragsmodulen for lokasjoner/typer/problemstillinger;
+                        antall pasienter settes av **bilen** (blank = «1 pasient»,
+                        vises som «N pasienter»), ikke av operatøren.
+                  - [ ] F: lydvarsel i bilen for ventende oppdrag som ikke er rykket
+                        ut på: Akutt innen 1 min, så hvert 10. s; Haster innen 5 min,
+                        så hvert minutt; Vanlig/Drift etter 15 min, så hvert minutt.
+                        1–3 s lyd, «Lyd på»-bryter som låser opp AudioContext.
+            - [x] Andrés runde på staging, del D (12. sep.): fanikon og «vis passord»
+                  synlige på innloggingssiden, avkryssingen i «Nytt oppdrag» overlever
+                  pollingen, nedtrekkene starter øverst, lista sortert på hastegrad og
+                  nummer, «trenger ny ressurs» trappes opp med tida og skjuler bilen
+                  som dro (`0018`), nummer i «nylig avsluttet», «Udefinert»-meldingen
+                  når fram til bilen, adminkontoer er aldri mannskap.
             - [x] Andrés runde på staging, del C (12. sep.): bilen rykker videre →
                   oppdraget står som «trenger ny ressurs» på tavla (`0016`).
             - [x] Andrés runde på staging, del B (12. sep.): hastegraden Drift med egne
@@ -233,8 +250,8 @@ ingen av dem gir feilmelding — de er bare stille inaktive.
             - [ ] **Å tenke på (André, 12. sep.):** bilen ser nå de andres stempler
                   (avgjort 12. sep.). Sentralbordets besetning følger lista i drift
                   (avgjort 12. sep.). Skal bil 2, som ikke tar med
-                  pasienten, få sette/se grovsorteringen? Kontokobling til admin bare av
-                  admin — riktig terskel?
+                  pasienten, få sette/se grovsorteringen? Adminkontoer er aldri
+                  mannskap (avgjort 12. sep.: «Den er utenfor.»).
             - [ ] Deploy 2, senere: fjern `Oppdrag.enhet`, `Statusmelding.oppdragsenhet`
                   NOT NULL (med `SET CONSTRAINTS ALL IMMEDIATE` om et dataskritt går
                   foran), og broene i `Oppdrag.save()`/`Statusmelding.save()` bort.

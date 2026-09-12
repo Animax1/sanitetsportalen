@@ -85,18 +85,20 @@ class TrengerRessursTests(FlereEnheterBasis):
 class TrengerRessursJsTests(SimpleTestCase):
     HARNESS = (
         (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue', 'klokke')),
-        (OPPDRAG_SENTRAL_JS, ('_enhetsmatrise', 'tidslinjeHtml', 'tidSiden')),
+        (OPPDRAG_SENTRAL_JS, ('_enhetsmatrise', 'tidslinjeHtml', 'tidSiden',
+                              '_manglerTrinn', '_manglerMinutter')),
     )
 
     def setUp(self):
+        from .tests_runde_d import _konst
         if not node_available():
             self.skipTest('node er ikke tilgjengelig')
-        self.harness = build_harness(self.HARNESS)
+        self.harness = _konst(OPPDRAG_SENTRAL_JS, 'MANGLER_TRINN') + build_harness(self.HARNESS)
 
     def test_merket_staar_forst_i_matrisen(self):
         ut = run_node(self.harness, """
             console.log(_enhetsmatrise({trenger_ressurs: true, enheter: [
-              {enhet_id: 1, enhet_navn: 'HGSD 56', status: 'ledig', status_navn: 'Ledig', status_tidspunkt: null}]}));
+              {enhet_id: 1, enhet_navn: 'HGSD 56', status: 'venter', status_navn: 'Venter', status_tidspunkt: null}]}));
             console.log('---');
             console.log(_enhetsmatrise({trenger_ressurs: false, enheter: [
               {enhet_id: 1, enhet_navn: 'HGSD 56', status: 'ledig', status_navn: 'Ledig', status_tidspunkt: null}]}));

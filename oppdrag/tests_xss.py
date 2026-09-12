@@ -57,6 +57,8 @@ REVIEWED_INTERPOLATIONS = {
     'tidKlasse': 'intern CSS-klasse valgt av en ternær i koden',
     'tittel': 'hardkodet title-attributt fra en ternær',
     'dempet': 'hardkodet CSS-klasse fra en ternær',
+    'manglerKlasse': 'hardkodet CSS-klasse fra en ternær og `_manglerTrinn()`, som velger blant tre faste ord',
+    'udefinert': 'markup fra `_udefinertVarsel()`, som er fast tekst uten data fra oppdraget',
     # `meta` er ren tekst, ikke markup, og escapes én gang ved innsetting.
     # Escapet vi her også, ville teksten blitt dobbeltescapet i visningen.
     'e.status_navn': 'bygger ren tekst i `meta`, som escapes ved innsetting',
@@ -210,7 +212,8 @@ class OppdragEscapingOppforselTests(SimpleTestCase):
         (OPPDRAG_SENTRAL_JS, ('renderOppdrag', 'renderEnheter', 'tidslinjeHtml',
                               'hastegradKlasse', 'mkBesetning',
                               'kanSeBesetning', 'tidSiden', '_grovMerke',
-                              '_enhetsmatrise', '_problemMedAntall', '_grupperEnheter', '_typeRekkefolge', '_enhetskort')),
+                              '_enhetsmatrise', '_problemMedAntall', '_grupperEnheter', '_typeRekkefolge', '_enhetskort',
+                              '_sorterOppdrag', '_manglerTrinn', '_manglerMinutter')),
     )
 
     #: Besetningspanelet leser to globaler som ellers settes ved sidelasting.
@@ -223,7 +226,9 @@ class OppdragEscapingOppforselTests(SimpleTestCase):
     def setUp(self):
         if not node_available():
             self.skipTest('node er ikke tilgjengelig')
-        self.harness = build_harness(self.HARNESS)
+        from .tests_runde_d import _konst
+        self.harness = (_konst(OPPDRAG_SENTRAL_JS, 'HASTEGRAD_REKKEFOLGE')
+                        + _konst(OPPDRAG_SENTRAL_JS, 'MANGLER_TRINN') + build_harness(self.HARNESS))
 
     def test_fritekst_med_markup_kommer_ut_som_tekst(self):
         """Det farligste feltet i modulen: en operatør skriver fritt."""
@@ -295,7 +300,7 @@ class EnhetEscapingOppforselTests(SimpleTestCase):
     HARNESS = (
         (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue', 'trustedHtml', '_escHtml',
                            'klokke')),
-        (OPPDRAG_ENHET_JS, ('renderAktivt', 'renderVentende', 'renderAvsluttet',
+        (OPPDRAG_ENHET_JS, ('renderAktivt', '_udefinertVarsel', 'renderVentende', 'renderAvsluttet',
                             'tidslinjeEnhetHtml', 'hastegradKlasse',
                             '_stedvalg', '_grovsorteringsrad', '_kanGrovsortere', '_varsledeRad', '_problemMedAntall')),
     )
@@ -376,7 +381,9 @@ class EnhetskortetTests(SimpleTestCase):
     def setUp(self):
         if not node_available():
             self.skipTest('node er ikke tilgjengelig')
-        self.harness = build_harness(self.HARNESS)
+        from .tests_runde_d import _konst
+        self.harness = (_konst(OPPDRAG_SENTRAL_JS, 'HASTEGRAD_REKKEFOLGE')
+                        + _konst(OPPDRAG_SENTRAL_JS, 'MANGLER_TRINN') + build_harness(self.HARNESS))
 
     def _kort(self, enhet):
         import json
@@ -483,7 +490,7 @@ class AvreistTilOgGrovsorteringTests(SimpleTestCase):
     HARNESS = (
         (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue', 'trustedHtml', '_escHtml',
                            'klokke')),
-        (OPPDRAG_ENHET_JS, ('renderAktivt', 'tidslinjeEnhetHtml', 'hastegradKlasse',
+        (OPPDRAG_ENHET_JS, ('renderAktivt', '_udefinertVarsel', 'tidslinjeEnhetHtml', 'hastegradKlasse',
                             '_stedvalg', '_grovsorteringsrad', '_kanGrovsortere', '_varsledeRad',
                             'koNokkel', 'koLes',
                             'koSkriv', 'koLeggTil', 'koFjern', 'lagNokkel', 'synk', '_problemMedAntall')),
@@ -617,7 +624,9 @@ class SentralbordetsGrovmerkeTests(SimpleTestCase):
     def setUp(self):
         if not node_available():
             self.skipTest('node er ikke tilgjengelig')
-        self.harness = build_harness(self.HARNESS)
+        from .tests_runde_d import _konst
+        self.harness = (_konst(OPPDRAG_SENTRAL_JS, 'HASTEGRAD_REKKEFOLGE')
+                        + _konst(OPPDRAG_SENTRAL_JS, 'MANGLER_TRINN') + build_harness(self.HARNESS))
 
     def _rad(self, **felt):
         import json
