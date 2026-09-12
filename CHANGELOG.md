@@ -4,6 +4,19 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-12 — Prodtest runde G–I, del 3: iPhone-rettelser
+
+Ingen migrasjon. Deployes til staging først.
+
+- **Alle statistikktabellene ruller sidelengs** på en smal skjerm, i
+  pasientfanen som i oppdragsfanen. Beholderne bærer klassen `stats-rull`
+  i malen; ingen inline-stiler lenger.
+- **Vaktlinja på telefonen:** statusmerket («Planlegging · 12.09 08:00 –
+  13.09 20:00») gikk utenfor kortet — spennet bryter nå til linja under
+  formen. Vaktvelgeren tar bredden, og «Innstillinger»/«Ny vaktliste» står
+  alltid sist på egen linje, så korpsvelgeren ikke havner et sært sted i
+  liggende visning.
+
 ## 2026-09-12 — Prodtest runde G–I, del 2: lyd per hastegrad, ett trykk, Drift
 
 Én migrasjon, `oppdrag/0025` (`Lydvarsel.aktiv`). Deployes til staging først.

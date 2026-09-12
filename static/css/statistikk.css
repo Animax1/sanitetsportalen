@@ -218,6 +218,17 @@
   .stab-panel { display: none; }
   .stab-panel.active { display: block; }
 
+  /* Beholderen rundt hver tabell ruller sidelengs på en smal skjerm (André,
+     12. sep. 2026: «på iphone så går teksten ut av tabellen»). Tabellene
+     bygges av JS med `innerHTML`, så regelen ligger på beholderen i malen —
+     `stats-rull` — ikke på tabellen: en tabell med `display: block` mister
+     bredden sin. Både pasient- og oppdragsfanen bruker klassen. */
+  .stats-rull {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    max-width: 100%;
+  }
+
   /* Statistics data tables */
   .stats-table {
     width: 100%;

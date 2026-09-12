@@ -697,6 +697,12 @@ uten at noe feiler. Et nytt modulstilark må derfor definere de fire selv, og *i
 de fire portalen faktisk aliaser (da kan temaene komme i utakt). `statistikk.css` er
 mønsteret.
 
+**Statistikktabellene bygges med `innerHTML`, så rullingen ligger på beholderen i malen**
+(`stats-rull`, 12. sep. 2026), ikke på tabellen — en tabell med `display: block` mister
+bredden sin. `TabelleneRullerPaaTelefonTests` krever klassen på hver `tbl-*`/`xt-*`-beholder
+i begge fanene. Vaktlinja (`.vl-vaktvelger`) er tre linjer under 992 px: statusmerket
+slipper `nowrap` for spennet, og spaceren foran knappene tar hele linja.
+
 Alle temaene er mørke, så **enhver Bootstrap-klasse for dempet tekst må overstyres** der
 malen kan se den. `MorkTekstPaaMorkBakgrunnTests` løser `{% extends %}` og `{% static %}`
 og håndhever det.

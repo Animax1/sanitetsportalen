@@ -4,7 +4,7 @@ Modulen ble skilt ut fra pasientmodulen august 2026. Testene her dekker det
 utskillingen faktisk endret: hvor endepunktene ligger, hvem som slipper inn,
 og at ingen fikk mer tilgang enn før flyttingen.
 """
-from django.test import Client, TestCase, override_settings
+from django.test import Client, SimpleTestCase, TestCase, override_settings
 
 from accounts.models import CustomUser, ModulTilgang
 from accounts.test_helpers import PROFILER
@@ -348,3 +348,36 @@ class LesbarTidstekstTests(TestCase):
         """Statistikksiden er ikke pasientmodulens; navigasjonen ligger i
         portalens meny (André, 12. sep. 2026)."""
         self.assertNotIn('Til pasientregistrering', self._les('templates/statistikk/index.html'))
+
+
+class TabelleneRullerPaaTelefonTests(SimpleTestCase):
+    """«På iphone så går teksten ut av tabellen» (André, 12. sep. 2026) —
+    først i oppdragsfanen, så «litt samme problemstilling» i pasientfanen.
+    Tabellene bygges med `innerHTML`, så regelen ligger på beholderen i malen:
+    hver `tbl-*`/`xt-*`-beholder bærer `stats-rull`, og stilarket lar den
+    rulle sidelengs."""
+
+    def _mal(self, navn):
+        from pathlib import Path
+        from django.conf import settings
+        return (Path(settings.BASE_DIR) / 'templates' / 'statistikk' / navn).read_text(encoding='utf-8')
+
+    def test_hver_tabellbeholder_ruller(self):
+        import re
+        for navn in ('index.html', '_oppdrag.html'):
+            html = self._mal(navn)
+            beholdere = re.findall(r'<div[^>]*id="(?:tbl|xt)-[^"]+"[^>]*>', html)
+            self.assertTrue(beholdere, navn)
+            for tag in beholdere:
+                with self.subTest(mal=navn, tag=tag):
+                    self.assertIn('stats-rull', tag)
+                    self.assertNotIn('style=', tag, 'regelen står i stilarket, ikke inline')
+
+    def test_stilarket_lar_beholderen_rulle(self):
+        import re
+        from pathlib import Path
+        from django.conf import settings
+        css = (Path(settings.BASE_DIR) / 'static' / 'css' / 'statistikk.css').read_text(encoding='utf-8')
+        m = re.search(r'\.stats-rull \{([^}]*)\}', css)
+        self.assertIsNotNone(m)
+        self.assertIn('overflow-x: auto', m.group(1))

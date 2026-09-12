@@ -99,3 +99,35 @@ class KnappefargerTests(SimpleTestCase):
         self.assertIsNotNone(m)
         self.assertIn('var(--portal-text)', m.group(1))
         self.assertIn('var(--portal-border)', m.group(1))
+
+
+class VaktlinjaPaaTelefonTests(SimpleTestCase):
+    """Del 3 (12. sep. 2026): «drift ikonet i vaktlister i planlegging delen
+    går litt utenfor på iphone og alle korps nedtrekksfeltet blir flyttet på
+    sær plass i horisontal visning på ios.» Statusmerket er `nowrap` på
+    skjermer med plass; under 992 px får spennet bryte, formen står på én
+    linje, og spaceren tar hele linja så knappene alltid står sist."""
+
+    def _mobilblokk(self):
+        css = (Path(settings.BASE_DIR) / 'static' / 'css' / 'vaktliste.css').read_text(encoding='utf-8')
+        start = css.index('@media (max-width: 991.98px) {')
+        return css[start:css.index('\n}\n', start)]
+
+    def test_statusmerket_faar_bryte_men_formen_staar_paa_en_linje(self):
+        blokk = self._mobilblokk()
+        m = re.search(r'\.vl-status \{([^}]*)\}', blokk)
+        self.assertIsNotNone(m)
+        self.assertIn('white-space: normal', m.group(1))
+        self.assertIn('max-width: 100%', m.group(1))
+        m = re.search(r'\.vl-status strong \{([^}]*)\}', blokk)
+        self.assertIn('white-space: nowrap', m.group(1))
+
+    def test_knappene_staar_sist_paa_egen_linje(self):
+        blokk = self._mobilblokk()
+        m = re.search(r'\.vl-vaktvelger \.flex-grow-1 \{([^}]*)\}', blokk)
+        self.assertIsNotNone(m, 'spaceren foran knappene må ta hele linja')
+        self.assertIn('flex-basis: 100%', m.group(1))
+        m = re.search(r'\.vl-korpsvalg \{([^}]*)\}', blokk)
+        self.assertIn('margin-left: 0', m.group(1))
+        m = re.search(r'\.vl-vaktvelger #vaktliste-velger \{([^}]*)\}', blokk)
+        self.assertIn('max-width: none', m.group(1))

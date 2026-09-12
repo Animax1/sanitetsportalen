@@ -886,6 +886,25 @@
   width: auto;
 }
 
+/*
+  På telefonen er vaktlinja tre linjer, ikke én (André, 12. sep. 2026:
+  «drift ikonet … går litt utenfor på iphone», og korpsvelgeren «blir flyttet
+  på sær plass i horisontal visning»). Statusmerket er `nowrap` for at
+  «Drift · 12.09 08:00 – 13.09 20:00» skal leses som ett merke på en skjerm
+  som har plass; på 390 px gikk det utenfor kortet. Her får spennet bryte
+  til linja under formen, som fortsatt står på én. Vaktvelgeren tar
+  bredden, og spaceren foran knappene tar hele linja, så knappene alltid
+  står sist på egen linje — i liggende visning havnet korpsvelgeren ellers
+  alene på linje to med knappene dyttet ut til høyre av spaceren.
+*/
+@media (max-width: 991.98px) {
+  .vl-vaktvelger #vaktliste-velger { flex: 1 1 12rem; min-width: 0; max-width: none; }
+  .vl-status { white-space: normal; flex-wrap: wrap; max-width: 100%; }
+  .vl-status strong { white-space: nowrap; }
+  .vl-korpsvalg { margin-left: 0 !important; max-width: 100%; }
+  .vl-vaktvelger .flex-grow-1 { flex-basis: 100%; height: 0; margin-top: -0.6rem; }
+}
+
 /* Fanene og «Ny ressurs» på samme linje — knappen lager en ny fane. */
 /*
   Mannskap står i fanerekka, men er en lenke: den forlater sida der fanene

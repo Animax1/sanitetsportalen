@@ -231,6 +231,9 @@ ingen av dem gir feilmelding — de er bare stille inaktive.
                         kan slå lyden av, iOS-omvei for stillebryteren, grovsortering
                         kreves før Behandlet/Ledig etter Leverer (+ valgfritt før Avreist),
                         «Behandlet på stedet» i statistikken, gruppeoverskrifter på iPhone.
+                  - [x] Prodtest G–I, del 3 (12. sep.): alt OK. Pasientstatistikkens
+                        tabeller ruller på iPhone (`stats-rull`), vaktlinja bryter i tre
+                        linjer under 992 px.
                   - [x] Prodtest G–I, del 2 (12. sep.): lydvarsel av/på per hastegrad
                         (`0025`), «Behandlet på sted» sender Ledig i samme trykk, Drift
                         uten grovsortering i bil og hos operatør, rullbare
