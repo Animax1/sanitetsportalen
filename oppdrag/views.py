@@ -30,7 +30,7 @@ from . import choices, services
 from .choices import validate_oppdrag_choice_fields
 from .models import Enhet, Lokasjon, Oppdrag, Statusmelding
 from .views_common import (
-    bytte_til_dict, er_enhetskonto, etag_for, json_body, melding_til_dict,
+    bytte_til_dict, er_enhetskonto, etag_for, hendelse_til_dict, json_body, melding_til_dict,
     oppdrag_til_dict, status_tidspunkt_for,
 )
 
@@ -97,7 +97,7 @@ def _aktivt_oppdrag_felter(rad):
     if rad is None:
         return {'oppdragsnummer': None, 'hastegrad': None, 'grovsortering': None,
                 'grovsortering_navn': None, 'problemstilling': None,
-                'status_tidspunkt': None}
+                'status_tidspunkt': None, 'sted_navn': ''}
     oppdrag = rad.oppdrag
     melding = Statusmelding.objects.gjeldende_for_status(
         oppdrag, rad.status, oppdragsenhet=rad)
@@ -108,6 +108,7 @@ def _aktivt_oppdrag_felter(rad):
         'grovsortering_navn': choices.GROVSORTERING_NAVN.get(oppdrag.grovsortering, ''),
         'problemstilling': oppdrag.problemstilling,
         'status_tidspunkt': melding.tidspunkt.isoformat() if melding else None,
+        'sted_navn': choices.AVREIST_TIL_NAVN.get(melding.sted, '') if melding else '',
     }
 
 
@@ -436,7 +437,7 @@ def _enheter_fra_kroppen(data):
 
 
 @modul_kreves('oppdrag', 'les', svar='json')
-@require_http_methods(['GET', 'PUT'])
+@require_http_methods(['GET', 'PUT', 'DELETE'])
 @rate_limit(group='oppdrag:detalj-skriv', rate='120/m', method='PUT')
 def oppdrag_detalj_view(request, pk):
     """Hent ett oppdrag med tidslinje (GET), eller rediger felt (PUT).
@@ -481,7 +482,25 @@ def oppdrag_detalj_view(request, pk):
             'statusmeldinger': [melding_til_dict(m) for m in gjeldende],
             'historikk': [melding_til_dict(m) for m in alle],
             'enhetsbytter': [bytte_til_dict(b) for b in oppdrag.enhetsbytter.all()],
+            'enhetshendelser': [hendelse_til_dict(h) for h in
+                                oppdrag.enhetshendelser.select_related('enhet', 'av')],
+            # Knappen skal bare finnes når den kan brukes.
+            'kan_slettes': (not er_enhetskonto(request.user)
+                            and services.kan_slettes(oppdrag, request.user)),
         }})
+
+    if request.method == 'DELETE':
+        # Sletting (André, 12. sep. 2026): sentralbordet mens alle venter,
+        # global admin i historikken. `{"confirm": true}` i kroppen stopper et
+        # kall som treffer URL-en uten å mene det — dialogen stopper feilklikket.
+        if er_enhetskonto(request.user) or not services.kan_slettes(oppdrag, request.user):
+            return JsonResponse({'status': 'error', 'message': 'Ingen tilgang'}, status=403)
+        if not json_body(request).get('confirm'):
+            return JsonResponse(
+                {'status': 'error', 'message': 'Bekreftelse mangler. Send {"confirm": true}.'},
+                status=400)
+        services.slett_oppdrag(oppdrag)
+        return JsonResponse({'status': 'ok'})
 
     if not har_tilgang(request.user, 'oppdrag', 'skriv_full'):
         return JsonResponse({'status': 'error', 'message': 'Ingen tilgang'}, status=403)
@@ -602,7 +621,7 @@ def oppdragsenhet_view(request, pk, enhet_pk):
                     status=400)
             services.varsle_enhet(oppdrag, enhet, bruker=request.user)
         else:
-            services.ta_av_enhet(oppdrag, enhet)
+            services.ta_av_enhet(oppdrag, enhet, bruker=request.user)
     except ValueError as feil:
         return JsonResponse({'status': 'error', 'message': str(feil)}, status=400)
     oppdrag.refresh_from_db()
@@ -672,7 +691,27 @@ def gjenaapne_view(request, pk, enhet_pk):
     oppdrag.refresh_from_db()
     return JsonResponse({'status': 'ok', 'data': {
         'oppdrag': oppdrag_til_dict(oppdrag),
-        'melding': melding_til_dict(melding),
+        'melding': melding_til_dict(melding) if melding else None,
+    }})
+
+
+@modul_kreves('oppdrag', 'skriv_full', svar='json')
+@require_http_methods(['POST'])
+@rate_limit(group='oppdrag:angre', rate='60/m', method='POST')
+def angre_view(request, pk, enhet_pk):
+    """Ta enhetens siste status tilbake (André, 12. sep. 2026). En korreksjon,
+    som «Gjenåpne» — den er dette med «Ledig» som siste status."""
+    oppdrag, enhet, feil = _oppdrag_og_enhet(request, pk, enhet_pk)
+    if feil:
+        return feil
+    try:
+        melding = services.angre_siste_status(oppdrag, enhet, bruker=request.user)
+    except (services.UlovligOvergang, services.KorreksjonUgyldig) as feil:
+        return JsonResponse({'status': 'error', 'message': str(feil)}, status=400)
+    oppdrag.refresh_from_db()
+    return JsonResponse({'status': 'ok', 'data': {
+        'oppdrag': oppdrag_til_dict(oppdrag),
+        'melding': melding_til_dict(melding) if melding else None,
     }})
 
 
@@ -934,7 +973,7 @@ def historikk_view(request, pk):
 
 @never_cache
 @modul_kreves('oppdrag', 'les', svar='json')
-@require_http_methods(['GET'])
+@require_http_methods(['GET', 'DELETE'])
 def historikk_liste_view(request):
     """Historikken for aktiv vakt — de ferdigstilte oppdragene, nyest først.
 
@@ -947,6 +986,21 @@ def historikk_liste_view(request):
     Enhetskontoer får 403: historikken er sentralbordets oversikt over hele
     vakta, og bilen skal se sine egne oppdrag, ikke andres.
     """
+    if request.method == 'DELETE':
+        # Global admin tømmer historikken for vakta (André, 12. sep. 2026:
+        # «individuelt og alle»). Bekreftelse i kroppen, som enkeltsletting.
+        if not er_global_admin(request.user):
+            return JsonResponse({'status': 'error', 'message': 'Ingen tilgang'}, status=403)
+        if not json_body(request).get('confirm'):
+            return JsonResponse(
+                {'status': 'error', 'message': 'Bekreftelse mangler. Send {"confirm": true}.'},
+                status=400)
+        antall = 0
+        for o in Oppdrag.objects.filter(vakt=hent_aktiv_vakt(), historikk_fra__isnull=False):
+            services.slett_oppdrag(o)
+            antall += 1
+        return JsonResponse({'status': 'ok', 'data': {'slettet': antall}})
+
     if er_enhetskonto(request.user):
         return JsonResponse(
             {'status': 'error', 'message': 'Ingen tilgang'}, status=403)

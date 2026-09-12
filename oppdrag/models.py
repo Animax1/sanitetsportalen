@@ -294,6 +294,33 @@ class Oppdragsenhet(BaseTimeStampedModel):
         return self.status == choices.TERMINAL
 
 
+class Enhetshendelse(BaseTimeStampedModel):
+    """En hendelse på oppdraget som ikke er en status: en enhet ble tatt av.
+
+    Koblingsraden slettes når enheten tas av mens hun venter, og da sto det
+    ingenting igjen i tidslinjen (André, 12. sep. 2026: «hvem som er
+    fjernet, for synligheten»). Varslingen leses av koblingsradens
+    `varslet_at`; det er bare fjerningen som trenger et eget spor.
+    """
+
+    TATT_AV = 'tatt_av'
+    TYPER = ((TATT_AV, 'Tatt av oppdraget'),)
+
+    oppdrag = models.ForeignKey(
+        Oppdrag, on_delete=models.CASCADE, related_name='enhetshendelser')
+    enhet = models.ForeignKey(Enhet, on_delete=models.PROTECT, related_name='+')
+    type = models.CharField(max_length=16, choices=TYPER, verbose_name='Hendelse')
+    tidspunkt = models.DateTimeField(default=timezone.now)
+    av = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True,
+        on_delete=models.SET_NULL, related_name='+')
+
+    class Meta:
+        ordering = ['tidspunkt']
+        verbose_name = 'Enhetshendelse'
+        verbose_name_plural = 'Enhetshendelser'
+
+
 class StatusmeldingManager(models.Manager):
     """Manager med regelen «nyeste ikke-korrigerte rad per status vinner».
 

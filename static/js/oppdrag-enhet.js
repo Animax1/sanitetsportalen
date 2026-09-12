@@ -268,7 +268,7 @@ function tidslinjeEnhetHtml(o) {
     // rette det selv. Samme dempede linje som på sentralbordet.
     if (m.korrigerer) notat.push('rettet av sentralen');
     // §9: sentralbordet førte statusen — bilen stemplet den ikke selv.
-    if (m.manuell) notat.push('ført av sentralen');
+    if (m.manuell) notat.push('endret av KO');
     const notatBlokk = notat.length
       ? `<span class="tidslinje-notat">· ${escapeHtml(notat.join(', '))}</span>`
       : '';

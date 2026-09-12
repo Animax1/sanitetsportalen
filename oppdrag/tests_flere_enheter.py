@@ -640,15 +640,11 @@ class GjenaapningTests(SentralbordBasis):
         o.refresh_from_db()
         self.assertEqual(o.status, choices.FREMME)
         self.assertIsNone(o.historikk_fra, 'tilbake på tavla')
-        # Korreksjonen peker på Ledig-meldingen, som blir stående som spor.
-        ny = Statusmelding.objects.get(pk=res.json()['data']['melding']['id'])
-        self.assertEqual(ny.korrigerer.status, choices.LEDIG)
-        self.assertTrue(ny.manuell)
-        self.assertIsNone(Statusmelding.objects.gjeldende_for_status(
-            o, choices.LEDIG, oppdragsenhet=rad))
-        # Fremme-tidspunktet flyttet seg ikke.
+        # Ledig-meldingen er borte (sporet ligger i revisjonsloggen), og
+        # svaret er meldingen bak statusen raden står i nå.
+        self.assertFalse(Statusmelding.objects.filter(oppdragsenhet=rad, status=choices.LEDIG).exists())
         fremme = Statusmelding.objects.gjeldende_for_status(o, choices.FREMME, oppdragsenhet=rad)
-        self.assertEqual(fremme.tidspunkt, ny.tidspunkt)
+        self.assertEqual(res.json()['data']['melding']['id'], fremme.pk)
         # Og operatøren kan føre videre derfra.
         res = self.ks.post(f'/oppdrag/api/oppdrag/{o.pk}/enheter/{self.a.pk}/status/avreist/legevakt/',
                            content_type='application/json',
@@ -749,7 +745,7 @@ class MatrisensTidspunktTests(SentralbordBasis):
 
 
 class BilenSerDeAndreTests(TestCase):
-    """Enhetsskjermen: «Også varslet: …» og «ført av sentralen»."""
+    """Enhetsskjermen: «Også varslet: …» og «endret av KO»."""
 
     def setUp(self):
         from patients.js_test_utils import build_harness, node_available
@@ -792,7 +788,7 @@ class BilenSerDeAndreTests(TestCase):
         o = self._oppdrag(status='fremme', status_navn='Fremme', statusmeldinger=[
             {'status': 'rykker_ut', 'status_navn': 'Rykker ut',
              'tidspunkt': '2026-08-29T20:05:00Z', 'manuell': True}])
-        self.assertIn('ført av sentralen', self._render(o, 'renderAktivt'))
+        self.assertIn('endret av KO', self._render(o, 'renderAktivt'))
 
 
 # ── Trinn 3: sentralbordets flater ──────────────────────────────────────────
@@ -913,7 +909,7 @@ class SentralbordetsMatriseTests(TestCase):
                                        enheter: [{{enhet_id: 1}}, {{enhet_id: 2}}]}}));
         """)
         self.assertIn('KARM 12: Fremme', to)
-        self.assertIn('ført av sentralen (&lt;i&gt;ops&lt;/i&gt;)', to)
+        self.assertIn('endret av KO (&lt;i&gt;ops&lt;/i&gt;)', to)
         en = self._kjor(f"""
             console.log(tidslinjeHtml({{historikk: [{melding}], enhetsbytter: [],
                                        enheter: [{{enhet_id: 2}}]}}));
@@ -958,7 +954,7 @@ class InnlinjeskjemaeneTests(TestCase):
 
     DOM = """
         globalThis.skjemaer = [];
-        const rad = { querySelector: () => null, appendChild: (el) => skjemaer.push(el) };
+        const rad = { querySelector: () => null, querySelectorAll: () => [], appendChild: (el) => skjemaer.push(el) };
         globalThis.document = {
           getElementById: (id) => (id.startsWith('tidslinje-rad-') || id.startsWith('enhet-rad-'))
             ? rad : { focus() {}, classList: { add() {}, remove() {} } },
@@ -1220,3 +1216,166 @@ class StedOgGrovKnappeneTests(TestCase):
             assert(!_kanGrovsortere({status: 'venter'}) && !_kanGrovsortere({status: 'rykker_ut'}), 'ikke før fremme');
             assert(_kanGrovsortere({status: 'fremme'}) && _kanGrovsortere({status: 'avreist'}) && _kanGrovsortere({status: 'leverer'}), 'fra fremme');
         """)
+
+
+# ── Andrés rapport 2 (12. sep. 2026) ─────────────────────────────────────────
+
+class RapportToOppdragTests(SentralbordBasis):
+
+    def test_naa_rundet_til_minuttet_er_ikke_framtid_selv_om_klokka_gaar_foran(self):
+        """Nettleserens «nå» kan ligge sekunder foran serverens; rundet til
+        minuttet lå det i framtiden for serveren."""
+        o = self._gammelt(self.a)
+        tid = timezone.now().replace(second=0, microsecond=0) + timedelta(seconds=40)
+        res = self.ks.post(self._url_status(o, self.a, 'rykker_ut'), content_type='application/json',
+                           data={'tidspunkt': tid.isoformat()})
+        self.assertEqual(res.status_code, 200, res.content)
+        res = self.ks.post(self._url_status(o, self.a, 'fremme'), content_type='application/json',
+                           data={'tidspunkt': (timezone.now() + timedelta(minutes=3)).isoformat()})
+        self.assertEqual(res.status_code, 400)
+
+    def _url_status(self, o, enhet, overgang):
+        return f'/oppdrag/api/oppdrag/{o.pk}/enheter/{enhet.pk}/status/{overgang}/'
+
+    def test_ta_av_den_siste_ventende_rydder_til_historikken(self):
+        """A meldte ledig, B ble tatt av mens hun ventet — da er oppdraget ferdig."""
+        o = self._to_enheter()
+        services.sett_status(o, choices.RYKKER_UT, enhet=self.a)
+        services.sett_status(o, choices.LEDIG, enhet=self.a)
+        o.refresh_from_db()
+        self.assertIsNone(o.historikk_fra, 'B venter fortsatt')
+        res = self.ks.delete(f'/oppdrag/api/oppdrag/{o.pk}/enheter/{self.b.pk}/')
+        self.assertEqual(res.status_code, 200, res.content)
+        o.refresh_from_db()
+        self.assertEqual(o.status, choices.LEDIG)
+        self.assertIsNotNone(o.historikk_fra)
+        # Og sporet står i tidslinjen.
+        d = self.ks.get(f'/oppdrag/api/oppdrag/{o.pk}/').json()['data']
+        self.assertEqual([(h['type'], h['enhet_navn'], h['av']) for h in d['enhetshendelser']],
+                         [('tatt_av', 'Karmøy 12', 'sentral')])
+        self.assertTrue(all(e['varslet_at'] for e in d['enheter']))
+
+    def test_angre_tar_siste_status_tilbake(self):
+        o = self._gammelt(self.a)
+        services.sett_status(o, choices.RYKKER_UT, tidspunkt=self._for(60))
+        services.sett_status(o, choices.FREMME, tidspunkt=self._for(50))
+        m = services.sett_status(o, choices.AVREIST, tidspunkt=self._for(40), sted='sykehus')
+        res = self.ks.post(f'/oppdrag/api/oppdrag/{o.pk}/enheter/{self.a.pk}/angre/')
+        self.assertEqual(res.status_code, 200, res.content)
+        rad = services.koblingsrad(o, self.a)
+        self.assertEqual(rad.status, choices.FREMME)
+        self.assertFalse(Statusmelding.objects.filter(pk=m.pk).exists(), 'Avreist-meldingen er borte')
+        self.assertEqual(res.json()['data']['melding']['status'], choices.FREMME)
+        # Angre helt tilbake til Venter.
+        self.ks.post(f'/oppdrag/api/oppdrag/{o.pk}/enheter/{self.a.pk}/angre/')
+        res = self.ks.post(f'/oppdrag/api/oppdrag/{o.pk}/enheter/{self.a.pk}/angre/')
+        self.assertEqual(res.status_code, 200)
+        self.assertIsNone(res.json()['data']['melding'], 'Venter har ingen melding')
+        self.assertEqual(services.koblingsrad(o, self.a).status, choices.VENTER)
+        res = self.ks.post(f'/oppdrag/api/oppdrag/{o.pk}/enheter/{self.a.pk}/angre/')
+        self.assertEqual(res.status_code, 400)
+
+    def test_angre_tar_med_rettingshistorikken_og_sletter_gjennom_korreksjoner(self):
+        """En status som er rettet («Rett tid») har to rader; angre tar begge —
+        ellers ble den gamle gjeldende igjen. Og et oppdrag med korreksjoner
+        kan slettes."""
+        o = self._gammelt(self.a)
+        services.sett_status(o, choices.RYKKER_UT, tidspunkt=self._for(60))
+        f = services.sett_status(o, choices.FREMME, tidspunkt=self._for(50))
+        services.korriger_tidspunkt(f, self._for(48), bruker=self.sentral)
+        self.assertEqual(self.ks.post(f'/oppdrag/api/oppdrag/{o.pk}/enheter/{self.a.pk}/angre/').status_code, 200)
+        self.assertEqual(services.koblingsrad(o, self.a).status, choices.RYKKER_UT)
+        self.assertFalse(Statusmelding.objects.filter(oppdragsenhet__enhet=self.a, status=choices.FREMME).exists())
+        r = Statusmelding.objects.get(oppdragsenhet__enhet=self.a)
+        services.korriger_tidspunkt(r, self._for(61), bruker=self.sentral)
+        self.ks.post(f'/oppdrag/api/oppdrag/{o.pk}/enheter/{self.a.pk}/angre/')
+        res = self.ks.delete(f'/oppdrag/api/oppdrag/{o.pk}/', content_type='application/json',
+                             data={'confirm': True})
+        self.assertEqual(res.status_code, 200, res.content)
+
+    def test_sentralbordet_sletter_bare_mens_alle_venter(self):
+        o = self._to_enheter()
+        d = self.ks.get(f'/oppdrag/api/oppdrag/{o.pk}/').json()['data']
+        self.assertTrue(d['kan_slettes'])
+        services.sett_status(o, choices.RYKKER_UT, enhet=self.b)
+        self.assertFalse(self.ks.get(f'/oppdrag/api/oppdrag/{o.pk}/').json()['data']['kan_slettes'])
+        res = self.ks.delete(f'/oppdrag/api/oppdrag/{o.pk}/', content_type='application/json',
+                             data={'confirm': True})
+        self.assertEqual(res.status_code, 403)
+        # Angre B tilbake til Venter — da kan det slettes, med bekreftelse.
+        self.ks.post(f'/oppdrag/api/oppdrag/{o.pk}/enheter/{self.b.pk}/angre/')
+        self.assertEqual(self.ks.delete(f'/oppdrag/api/oppdrag/{o.pk}/', content_type='application/json',
+                                        data={}).status_code, 400, 'bekreftelse mangler')
+        res = self.ks.delete(f'/oppdrag/api/oppdrag/{o.pk}/', content_type='application/json',
+                             data={'confirm': True})
+        self.assertEqual(res.status_code, 200, res.content)
+        self.assertFalse(Oppdrag.objects.filter(pk=o.pk).exists())
+
+    def test_global_admin_sletter_i_historikken_enkeltvis_og_alt(self):
+        adm = _klient(_bruker('adm', admin=True))
+        ferdig = []
+        for _ in range(2):
+            o = self._oppdrag(self.a)
+            services.sett_status(o, choices.RYKKER_UT)
+            services.sett_status(o, choices.LEDIG)
+            ferdig.append(o)
+        aktivt = self._oppdrag(self.a)
+        services.sett_status(aktivt, choices.RYKKER_UT)
+        # Sentralbordet får ikke slette i historikken; admin får.
+        self.assertEqual(self.ks.delete(f'/oppdrag/api/oppdrag/{ferdig[0].pk}/',
+                                        content_type='application/json',
+                                        data={'confirm': True}).status_code, 403)
+        self.assertEqual(adm.delete(f'/oppdrag/api/oppdrag/{ferdig[0].pk}/',
+                                    content_type='application/json',
+                                    data={'confirm': True}).status_code, 200)
+        self.assertEqual(self.ks.delete('/oppdrag/api/historikk/', content_type='application/json',
+                                        data={'confirm': True}).status_code, 403)
+        res = adm.delete('/oppdrag/api/historikk/', content_type='application/json',
+                         data={'confirm': True})
+        self.assertEqual(res.status_code, 200, res.content)
+        self.assertEqual(set(Oppdrag.objects.values_list('pk', flat=True)), {aktivt.pk},
+                         'det aktive oppdraget står')
+
+    def test_stedet_er_med_i_matrisen_og_paa_enhetskortet(self):
+        o = self._gammelt(self.a)
+        services.sett_status(o, choices.RYKKER_UT, tidspunkt=self._for(60))
+        services.sett_status(o, choices.FREMME, tidspunkt=self._for(50))
+        services.sett_status(o, choices.AVREIST, tidspunkt=self._for(40), sted='sykehus')
+        rad = self.ks.get('/oppdrag/api/oppdrag/').json()['data'][0]
+        self.assertEqual(rad['enheter'][0]['sted_navn'], 'Sykehus')
+        kort = next(e for e in self.ks.get('/oppdrag/api/enheter/').json()['data'] if e['id'] == self.a.pk)
+        self.assertEqual(kort['sted_navn'], 'Sykehus')
+
+
+class TidslinjeMedVarsletOgAngreTests(TestCase):
+    def setUp(self):
+        from patients.js_test_utils import (
+            OPPDRAG_SENTRAL_JS, PORTAL_UTILS_JS, build_harness, node_available)
+        if not node_available():
+            self.skipTest('node er ikke tilgjengelig')
+        self.harness = build_harness((
+            (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue', 'klokke')),
+            (OPPDRAG_SENTRAL_JS, ('tidslinjeHtml',)),
+        ))
+
+    def test_varslet_tatt_av_og_angre_paa_siste(self):
+        from patients.js_test_utils import run_node
+        ut = run_node(self.harness, """
+            globalThis.OPPDRAG_TILGANG = { kanSkrive: true };
+            console.log(tidslinjeHtml({
+              opprettet: '2026-08-28T20:00:00Z',
+              enheter: [{enhet_id: 1, enhet_navn: 'HGSD 56', varslet_at: '2026-08-28T20:00:00Z'},
+                        {enhet_id: 2, enhet_navn: '<b>KARM</b>', varslet_at: '2026-08-28T20:05:00Z'}],
+              enhetshendelser: [{id: 1, type: 'tatt_av', enhet_navn: '<b>KARM</b>',
+                                 tidspunkt: '2026-08-28T20:10:00Z', av: 'adm'}],
+              historikk: [
+                {id: 1, enhet_id: 1, status: 'rykker_ut', status_navn: 'Rykker ut', tidspunkt: '2026-08-28T20:02:00Z'},
+                {id: 2, enhet_id: 1, status: 'fremme', status_navn: 'Fremme', tidspunkt: '2026-08-28T20:08:00Z'}],
+              enhetsbytter: []}));
+        """)
+        self.assertIn('Varslet: HGSD 56', ut)
+        self.assertIn('Varslet: &lt;b&gt;KARM&lt;/b&gt;', ut)
+        self.assertIn('Tatt av: &lt;b&gt;KARM&lt;/b&gt;', ut)
+        self.assertEqual(ut.count('data-action="angreStatus"'), 1, 'bare siste melding kan angres')
+        self.assertIn('data-action="angreStatus" data-id="1"', ut)
+        self.assertLess(ut.index('Rykker ut'), ut.index('Fremme'))

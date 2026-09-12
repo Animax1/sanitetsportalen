@@ -90,9 +90,11 @@ function renderEnheter() {
       // vise». Ledig har ingen melding bak seg, så der står bare ordet.
       const statusTid = e.status_tidspunkt
         ? ` ${klokke(e.status_tidspunkt)} · ${tidSiden(e.status_tidspunkt)}` : '';
+      // «Avreist → Sykehus» — hvor bilen dro skal synes her også.
+      const sted = e.sted_navn ? ` → ${e.sted_navn}` : '';
       const meta = e.antall_ventende
-        ? `${e.status_navn}${statusTid} · ${e.antall_ventende} venter`
-        : `${e.status_navn}${statusTid}`;
+        ? `${e.status_navn}${sted}${statusTid} · ${e.antall_ventende} venter`
+        : `${e.status_navn}${sted}${statusTid}`;
       // Det aktive oppdraget i ett blikk: nummer, hastegrad, problemstilling.
       // Hoistet ut av mal-strengen, som resten.
       const grov = e.oppdragsnummer != null ? _grovMerke(e) : '';
@@ -295,7 +297,8 @@ function _enhetsmatrise(o) {
   }];
   return rader.map((e) => {
     const statusTid = e.status_tidspunkt ? ` · ${tidSiden(e.status_tidspunkt)}` : '';
-    const meta = `${e.status_navn}${statusTid}`;
+    const sted = e.sted_navn ? ` → ${e.sted_navn}` : '';
+    const meta = `${e.status_navn}${sted}${statusTid}`;
     return `<span class="enhet-brikke">
       <span class="status-prikk status-${escHtmlValue(e.status)}"></span>
       <span>${escapeHtml(e.enhet_navn)}</span>
@@ -316,6 +319,40 @@ function tidslinjeHtml(data) {
   const erstattet = new Set(
     (data.historikk || []).filter((m) => m.korrigerer).map((m) => m.korrigerer));
   const flere = (data.enheter || []).length > 1;
+  // Siste gjeldende melding per enhet — den eneste som kan angres.
+  const sisteFor = new Map();
+  (data.historikk || []).forEach((m) => {
+    if (erstattet.has(m.id)) return;
+    const s = sisteFor.get(m.enhet_id);
+    if (!s || m.tidspunkt > s.tid || (m.tidspunkt === s.tid && m.id > s.id)) {
+      sisteFor.set(m.enhet_id, { id: m.id, tid: m.tidspunkt });
+    }
+  });
+  sisteFor.forEach((v, k) => sisteFor.set(k, v.id));
+
+  // Hvem som ble varslet, og hvem som ble tatt av (André, 12. sep. 2026).
+  (data.enheter || []).forEach((e) => {
+    if (!e.varslet_at) return;
+    rader.push({
+      tid: e.varslet_at,
+      html: `
+        <div class="tidslinje-rad">
+          <span class="tidslinje-tid">${escapeHtml(klokke(e.varslet_at))}</span>
+          <span>Varslet: ${escapeHtml(e.enhet_navn)}</span>
+        </div>`,
+    });
+  });
+  (data.enhetshendelser || []).forEach((h) => {
+    rader.push({
+      tid: h.tidspunkt,
+      html: `
+        <div class="tidslinje-rad">
+          <span class="tidslinje-tid">${escapeHtml(klokke(h.tidspunkt))}</span>
+          <span>Tatt av: ${escapeHtml(h.enhet_navn)}</span>
+          <span class="tidslinje-notat">· ${escapeHtml(h.av)}</span>
+        </div>`,
+    });
+  });
 
   (data.historikk || []).forEach((m) => {
     // Markøren for et avledet tidspunkt sitter på KLOKKESLETTET, ikke på
@@ -330,7 +367,7 @@ function tidslinjeHtml(data) {
     if (m.forsinket) notat.push('meldt forsinket');
     if (m.korrigerer) notat.push('rettet av sentralen');
     // §9: sentralbordet førte statusen — og hvem, for det er ikke bilen.
-    if (m.manuell) notat.push('ført av sentralen' + (m.meldt_av ? ` (${m.meldt_av})` : ''));
+    if (m.manuell) notat.push('endret av KO' + (m.meldt_av ? ` (${m.meldt_av})` : ''));
     const erErstattet = erstattet.has(m.id);
     const klasse = erErstattet ? 'tidslinje-rad tidslinje-erstattet' : 'tidslinje-rad';
     const notatBlokk = notat.length
@@ -342,6 +379,12 @@ function tidslinjeHtml(data) {
     const rettKnapp = (OPPDRAG_TILGANG.kanSkrive && !erErstattet)
       ? `<button type="button" class="btn btn-link btn-sm tidslinje-rett p-0 ms-2"
                  data-action="visRettTid" data-id="${escHtmlValue(m.id)}">Rett tid</button>`
+      : '';
+    // «Angre» på enhetens siste gjeldende melding (André, 12. sep. 2026):
+    // tar statusen tilbake til forrige, som en korreksjon.
+    const angreKnapp = (OPPDRAG_TILGANG.kanSkrive && !erErstattet && sisteFor.get(m.enhet_id) === m.id)
+      ? `<button type="button" class="btn btn-link btn-sm tidslinje-rett p-0 ms-2"
+                 data-action="angreStatus" data-id="${escHtmlValue(m.enhet_id)}">Angre</button>`
       : '';
     // «Avreist → Sykehus» — stedet ved statusen, som på enhetsskjermen.
     // Og med flere enheter: hvem sin — «KARM 12: Fremme». Med én står
@@ -355,7 +398,7 @@ function tidslinjeHtml(data) {
           <span class="${tidKlasse}"${tittel}>${escapeHtml(klokke(m.tidspunkt))}</span>
           <span>${escapeHtml(statusMedSted)}</span>
           ${notatBlokk}
-          ${rettKnapp}
+          ${rettKnapp}${angreKnapp}
         </div>`,
     });
   });
@@ -451,18 +494,27 @@ async function visOppdrag(id) {
       <div id="flytt-feil" class="text-danger small mt-2 d-none"></div>`
     : '';
 
+  const redigerKnapp = OPPDRAG_TILGANG.kanSkrive
+    ? `<button type="button" class="btn btn-link btn-sm p-0 ms-2" data-action="visRedigerOppdrag">Rediger</button>`
+    : '';
+  const slettKnapp = o.kan_slettes
+    ? `<button type="button" class="btn btn-outline-danger btn-sm" data-action="slettOppdrag"
+               data-id="${escHtmlValue(o.id)}"><i class="bi bi-trash me-1"></i>Slett oppdrag</button>`
+    : '';
   innhold.innerHTML = (`
     <div class="oppdrag-meta mb-2">
       <span class="hastegrad ${escHtmlValue(hastegradKlasse(o.hastegrad))}">${escapeHtml(o.hastegrad)}</span>
       <span class="ms-2">${escapeHtml(o.lokasjon_navn)}</span>
       <span class="ms-2">${escapeHtml(o.status_navn)}</span>
+      ${redigerKnapp}
     </div>
     ${o.fritekst ? `<div class="oppdrag-fritekst mb-3">${escapeHtml(o.fritekst)}</div>` : ''}
+    <div id="rediger-oppdrag"></div>
     <h6 class="text-muted">Enheter</h6>
     <div class="mb-3">${mkEnhetsrader(o)}${OPPDRAG_TILGANG.kanSkrive ? _varsleValg(o) : ''}</div>
     <h6 class="text-muted">Tidslinje</h6>
     ${tidslinjeHtml(o)}
-    ${historikkKnapp ? `<div class="mt-3">${historikkKnapp}</div>` : ''}
+    ${(historikkKnapp || slettKnapp) ? `<div class="mt-3 d-flex gap-2 flex-wrap">${historikkKnapp}${slettKnapp}</div>` : ''}
     ${flyttValg}`);
 }
 
@@ -482,7 +534,8 @@ function mkEnhetsrader(o) {
   return (o.enheter || []).map((e) => {
     const statusTid = e.status_tidspunkt
       ? ` ${klokke(e.status_tidspunkt)} · ${tidSiden(e.status_tidspunkt)}` : '';
-    const meta = `${e.status_navn}${statusTid}`;
+    const sted = e.sted_navn ? ` → ${e.sted_navn}` : '';
+    const meta = `${e.status_navn}${sted}${statusTid}`;
     const knapper = OPPDRAG_TILGANG.kanSkrive ? _enhetsknapper(e, flere) : '';
     return `
       <div class="enhet-rad" id="enhet-rad-${escHtmlValue(e.enhet_id)}">
@@ -606,8 +659,10 @@ function visFoerStatus(enhetId) {
   // 12. sep. 2026). Nedtrekket melder `change`, og `foerStatusEndret`
   // slår stedet av og på.
   const stedSkjult = overganger[0] === 'avreist' ? '' : ' hidden';
-  // Ett skjema om gangen: de andre radenes knapper skjules mens dette står.
+  // Ett skjema om gangen: de andre radenes knapper skjules mens dette står,
+  // og radens egen «Endre status» låses (André, 12. sep. 2026).
   document.getElementById('detalj-innhold')?.classList.add('foer-aapen');
+  rad.querySelectorAll('[data-action="visFoerStatus"]').forEach((b) => { b.disabled = true; });
 
   const skjema = document.createElement('div');
   skjema.className = 'foer-skjema mt-1 d-flex gap-2 align-items-center flex-wrap w-100';
@@ -619,7 +674,7 @@ function visFoerStatus(enhetId) {
     <input type="datetime-local" class="form-control form-control-sm w-auto"
            id="foer-tid" value="${_lokalNaa()}" step="60">
     <button type="button" class="btn btn-sm btn-primary"
-            id="foer-lagre" data-action="lagreFoerStatus" data-id="${escHtmlValue(enhetId)}">Før</button>
+            id="foer-lagre" data-action="lagreFoerStatus" data-id="${escHtmlValue(enhetId)}">Endre</button>
     <button type="button" class="btn btn-sm btn-outline-secondary"
             data-action="avbrytFoerStatus">Avbryt</button>
     <span id="foer-feil" class="text-danger small"></span>`);
@@ -631,6 +686,108 @@ function visFoerStatus(enhetId) {
 function avbrytFoerStatus() {
   document.querySelectorAll('.foer-skjema').forEach((el) => el.remove());
   document.getElementById('detalj-innhold')?.classList.remove('foer-aapen');
+  document.querySelectorAll('#detalj-innhold [data-action="visFoerStatus"]')
+    .forEach((b) => { b.disabled = false; });
+}
+
+
+async function angreStatus(enhetId) {
+  if (apentOppdragId === null) return;
+  await _enhetshandling(
+    `/oppdrag/api/oppdrag/${apentOppdragId}/enheter/${Number(enhetId)}/angre/`, 'POST',
+    'Kunne ikke angre.');
+}
+
+
+async function slettOppdrag(id) {
+  // Sletting mens alle biler venter (sentralbord), eller i historikken
+  // (global admin). Dialogen stopper feilklikket; `confirm: true` i kroppen
+  // stopper et kall som treffer URL-en uten å mene det.
+  if (!confirm('Slette oppdraget? Det kan ikke angres.')) return;
+  const res = await apiFetch(`/oppdrag/api/oppdrag/${id}/`, {
+    method: 'DELETE', body: JSON.stringify({ confirm: true }),
+  });
+  const d = await res.json().catch(() => ({}));
+  if (!res.ok || d.status !== 'ok') {
+    _visEnhetsfeil(d.message || 'Kunne ikke slette oppdraget.');
+    return;
+  }
+  bootstrap.Modal.getInstance(document.getElementById('oppdragDetaljModal'))?.hide();
+  await lastAlt();
+  if (historikkliste.length) await lastHistorikk();
+}
+
+
+async function slettHistorikk() {
+  const feil = document.getElementById('historikk-feil');
+  if (!confirm('Slette alle oppdragene i historikken for vakten? Det kan ikke angres.')) return;
+  const res = await apiFetch('/oppdrag/api/historikk/', {
+    method: 'DELETE', body: JSON.stringify({ confirm: true }),
+  });
+  const d = await res.json().catch(() => ({}));
+  if (!res.ok || d.status !== 'ok') {
+    if (feil) { feil.textContent = d.message || 'Kunne ikke slette.'; feil.classList.remove('d-none'); }
+    return;
+  }
+  await lastHistorikk();
+  await lastAlt();
+}
+
+
+function visRedigerOppdrag() {
+  // Sentralbordet retter oppdraget (André, 12. sep. 2026): lokasjon,
+  // hastegrad, problemstilling og fritekst. Valgene hentes fra
+  // «Nytt oppdrag»-skjemaet, som finnes for alle med skrivetilgang — én
+  // kilde for verdimengdene.
+  const o = apentOppdrag;
+  const boks = document.getElementById('rediger-oppdrag');
+  if (!o || !boks) return;
+  if (boks.innerHTML) { boks.innerHTML = ''; return; }
+  const kopier = (fraId, valgt) => Array.from(document.querySelectorAll(`#${fraId} option`))
+    .map((op) => `<option value="${escHtmlValue(op.value)}"${op.value === valgt ? ' selected' : ''}>${escapeHtml(op.textContent)}</option>`)
+    .join('');
+  const lokvalg = lokasjoner.filter((l) => l.er_aktiv || l.id === o.lokasjon_id).map(
+    (l) => `<option value="${escHtmlValue(l.id)}"${l.id === o.lokasjon_id ? ' selected' : ''}>${escapeHtml(l.navn)}</option>`).join('');
+  boks.innerHTML = (`
+    <div class="row g-2 mt-1">
+      <div class="col-md-6"><label class="form-label" for="red-problemstilling">Problemstilling</label>
+        <select id="red-problemstilling" class="form-select form-select-sm">${kopier('nytt-problemstilling', o.problemstilling)}</select></div>
+      <div class="col-md-6"><label class="form-label" for="red-hastegrad">Hastegrad</label>
+        <select id="red-hastegrad" class="form-select form-select-sm">${kopier('nytt-hastegrad', o.hastegrad)}</select></div>
+      <div class="col-md-6"><label class="form-label" for="red-lokasjon">Lokasjon</label>
+        <select id="red-lokasjon" class="form-select form-select-sm">${lokvalg}</select></div>
+      <div class="col-12"><label class="form-label" for="red-fritekst">Fritekst</label>
+        <textarea id="red-fritekst" class="form-control form-control-sm" rows="2">${escapeHtml(o.fritekst || '')}</textarea></div>
+      <div class="col-12 d-flex gap-2 align-items-center">
+        <button type="button" class="btn btn-sm btn-primary" id="red-lagre"
+                data-action="lagreOppdrag" data-id="${escHtmlValue(o.id)}">Lagre</button>
+        <button type="button" class="btn btn-sm btn-outline-secondary" data-action="visRedigerOppdrag">Avbryt</button>
+        <span id="red-feil" class="text-danger small"></span>
+      </div>
+    </div>`);
+}
+
+
+async function lagreOppdrag(id) {
+  const feil = document.getElementById('red-feil');
+  await withSubmitGuard('red-lagre', async () => {
+    const res = await apiFetch(`/oppdrag/api/oppdrag/${id}/`, {
+      method: 'PUT',
+      body: JSON.stringify({
+        problemstilling: document.getElementById('red-problemstilling').value,
+        hastegrad: document.getElementById('red-hastegrad').value,
+        lokasjon_id: Number(document.getElementById('red-lokasjon').value),
+        fritekst: document.getElementById('red-fritekst').value,
+      }),
+    });
+    const d = await res.json().catch(() => ({}));
+    if (!res.ok || d.status !== 'ok') {
+      if (feil) feil.textContent = d.message || 'Kunne ikke lagre.';
+      return;
+    }
+    await visOppdrag(id);
+    await lastAlt();
+  });
 }
 
 
@@ -793,6 +950,12 @@ function renderHistorikk() {
     // Alle bilene, ikke bare den primære — historikken viste én til
     // 12. sep. 2026.
     const enhetsnavn = (o.enheter || []).map((e) => e.enhet_navn).join(', ') || o.enhet_navn;
+    // Sletting i historikken er global admin. Knappen er sin egen rad-
+    // handling: klikk på resten av raden åpner oppdraget.
+    const slett = OPPDRAG_TILGANG.erAdmin
+      ? `<button type="button" class="btn btn-sm btn-outline-danger mt-2"
+                 data-action="slettOppdrag" data-id="${escHtmlValue(o.id)}">Slett</button>`
+      : '';
     return `
     <div class="oppdrag-rad" data-action="visOppdrag" data-id="${escHtmlValue(o.id)}"
          role="button" tabindex="0">
@@ -805,6 +968,7 @@ function renderHistorikk() {
         ${escapeHtml(enhetsnavn)} · ${escapeHtml(o.lokasjon_navn)} · ferdig ${escapeHtml(klokke(o.historikk_fra))}
       </div>
       ${fritekstBlokk}
+      ${slett}
     </div>`;
   }).join(''));
 }
@@ -1136,6 +1300,7 @@ function renderArkiv() {
         ${escapeHtml(a.vakt_navn)} · arkivert av ${escapeHtml(a.importert_av)}
         ${kollaps}
       </div>
+      ${a.notat ? `<div class="oppdrag-fritekst">${escapeHtml(a.notat)}</div>` : ''}
       <div class="mt-2 d-flex gap-2">
         <button class="btn btn-sm btn-outline-primary" type="button"
                 data-action="visArkivStatistikk" data-id="${escHtmlValue(a.id)}">Vis statistikk</button>

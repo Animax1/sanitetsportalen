@@ -4,6 +4,42 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-12 — Andrés rapport 2, runde 1: oppdragsmodulen
+
+Én migrasjon, `oppdrag/0014`: ny tabell `Enhetshendelse`, ingen data flyttes.
+
+- **Rettet: «kan ikke ligge i framtiden» når man trykket med én gang.**
+  Nettleserens klokke kan gå sekunder foran serverens, og «nå» rundet ned
+  til minuttet lå da i framtiden for serveren. `MINUTTSLAKK` gjelder nå
+  begge veier, i føring og «Rett tid».
+- **Rettet: oppdraget ble stående på tavla** når én bil meldte ledig og en
+  annen ble tatt av etterpå. `ta_av_enhet` rydder til historikken når den
+  som ble tatt av var den siste som ikke var ledig.
+- **Tidslinjen viser hvem som ble varslet og hvem som ble tatt av.**
+  Varslingen leses av koblingsradens `varslet_at`; fjerningen får et eget
+  spor, `Enhetshendelse` — raden er borte, hendelsen står. Flytting sto der
+  fra før.
+- **«Angre» på enhetens siste status** (`angre_siste_status`, `POST
+  …/enheter/<pk>/angre/`): meldingene for statusen slettes med
+  rettingshistorikken sin, og raden går tilbake til den forrige.
+  Slettingen logges i revisjonsloggen. **«Gjenåpne» gjør nå det samme** for
+  «Ledig», med 48-timersgrensen — den la før en korreksjonsrad med forrige
+  status, og da sto forrige status dobbelt og et nytt angre landet på den
+  samme. Knappen står ved «Rett tid» på enhetens siste melding.
+- **Sletting av oppdrag** (`DELETE api/oppdrag/<pk>/`, `{"confirm": true}`):
+  sentralbordet mens alle biler venter — er noen på vei, angres statusen
+  først — og global admin i historikken, enkeltvis eller «Slett alle i
+  historikken» (`DELETE api/historikk/`). Korreksjonsradene kobles fra før
+  slettingen (`korrigerer` er PROTECT, og stoppet ellers alt).
+- **Sentralbordet redigerer oppdraget**: «Rediger» i detaljvinduet gir
+  problemstilling, hastegrad, lokasjon og fritekst (PUT-endepunktet fantes).
+- **«Avreist → Sykehus» synes i sentralbordet**: på enhetskortet, i
+  oppdragslistas brikker og i enhetsradene (`sted_navn`).
+- **«Endre»** heter knappen i skjemaet (var «Før»), og radens «Endre
+  status» låses mens skjemaet står. «endret av KO» i tidslinjene (var «ført
+  av sentralen»), i bilen og i sentralbordet.
+- **Arkivlista viser notatet.**
+
 ## 2026-09-12 — Planlagt og utildelt: navnene, og én vei
 
 André: «Utildelte vakter må vises til alle, og så må vi ha en annen som heter

@@ -12,7 +12,7 @@ from django.db import models, transaction
 from django.utils import timezone
 
 from . import choices
-from .models import Enhetsbytte, Oppdrag, Oppdragsenhet, Statusmelding
+from .models import Enhetsbytte, Enhetshendelse, Oppdrag, Oppdragsenhet, Statusmelding
 
 # ── Statusmaskinen ───────────────────────────────────────────────────────────
 #
@@ -421,7 +421,7 @@ def varsle_enhet(oppdrag, enhet, *, bruker=None) -> Oppdragsenhet:
     return rad
 
 
-def ta_av_enhet(oppdrag, enhet) -> None:
+def ta_av_enhet(oppdrag, enhet, *, bruker=None) -> None:
     """Ta en enhet av oppdraget — bare mens den venter, og aldri den siste.
 
     Har bilen rykket ut, er det en hendelse: da er svaret `Ledig` fra bilen
@@ -437,17 +437,30 @@ def ta_av_enhet(oppdrag, enhet) -> None:
     if oppdrag.enheter.count() == 1:
         raise ValueError('Oppdraget må ha minst én enhet.')
     rad.delete()
+    # Sporet i tidslinjen: raden er borte, hendelsen står.
+    Enhetshendelse.objects.create(
+        oppdrag=oppdrag, enhet=enhet, type=Enhetshendelse.TATT_AV, av=bruker)
     if oppdrag.enhet_id == enhet.pk:
         # Den gamle kolonnen (deploy 1) skal peke på en som fortsatt er der.
         oppdrag.enhet = oppdrag.primaer.enhet
     oppdrag.status = utledet_status(oppdrag)
-    oppdrag.save(update_fields=['status', 'enhet', 'updated_at'])
+    felter = ['status', 'enhet', 'updated_at']
+    # Var den som ble tatt av den siste som ikke var ledig, er oppdraget
+    # ferdig nå — og skal rydde seg som ellers (André, 12. sep. 2026: «da
+    # må vi ha det at det går i historikken automatisk»).
+    if oppdrag.status == choices.TERMINAL and oppdrag.historikk_fra is None:
+        oppdrag.historikk_fra = timezone.now()
+        felter.append('historikk_fra')
+    oppdrag.save(update_fields=felter)
 
 
 #: Skjemaene (`datetime-local`) har minuttoppløsning. «Nå» avrundet ned til
 #: minuttet ligger før et oppdrag opprettet sekunder tidligere, og «før
 #: oppdraget ble opprettet» ville da avvist en føring som var riktig.
-#: Slakken er én minuttgrense, ikke mer — og bare mot `created_at`.
+#: Og mot framtiden: nettleserens klokke kan gå noen sekunder foran
+#: serverens, og da lå «nå» rundet til minuttet i framtiden for serveren
+#: (André, 12. sep. 2026: «kunne ikke ta det i fremtiden når jeg trykket
+#: umiddelbart»). Slakken er én minuttgrense, begge veier.
 MINUTTSLAKK = timedelta(minutes=1)
 
 
@@ -517,7 +530,7 @@ def valider_korreksjon(melding, nytt_tidspunkt, naa=None):
         raise KorreksjonUgyldig(
             'Denne meldingen er allerede rettet. Rett den nyeste i stedet.')
 
-    if nytt_tidspunkt > naa:
+    if nytt_tidspunkt > naa + MINUTTSLAKK:
         raise KorreksjonUgyldig('Tidspunktet kan ikke ligge i framtiden.')
 
     if nytt_tidspunkt < melding.oppdrag.created_at - MINUTTSLAKK:
@@ -628,7 +641,7 @@ def valider_foering(rad, ny_status: str, tidspunkt, naa=None) -> None:
         raise UlovligOvergang(
             f'Kan ikke gå fra {rad.get_status_display()!r} til '
             f'{choices.STATUS_NAVN.get(ny_status, ny_status)!r}.')
-    if tidspunkt > naa:
+    if tidspunkt > naa + MINUTTSLAKK:
         raise KorreksjonUgyldig('Tidspunktet kan ikke ligge i framtiden.')
     if tidspunkt < rad.oppdrag.created_at - MINUTTSLAKK:
         raise KorreksjonUgyldig('Tidspunktet er før oppdraget ble opprettet.')
@@ -660,17 +673,61 @@ def foer_status(oppdrag, enhet, ny_status: str, *, tidspunkt, bruker,
                        sted=sted, enhet=rad.enhet, manuell=True)
 
 
+def _slett_meldinger(qs) -> int:
+    """Slett statusmeldinger uten å gå på `korrigerer`s PROTECT: rader som
+    peker på dem kobles fra først. Sporet av hva som sto der ligger i
+    revisjonsloggen, som logger slettinger."""
+    ider = list(qs.values_list('pk', flat=True))
+    if not ider:
+        return 0
+    Statusmelding.objects.filter(korrigerer_id__in=ider).update(korrigerer=None)
+    return Statusmelding.objects.filter(pk__in=ider).delete()[0]
+
+
 @transaction.atomic
-def gjenaapne_enhet(oppdrag, enhet, *, bruker, naa=None) -> Statusmelding:
+def angre_siste_status(oppdrag, enhet, *, bruker=None):
+    """Ta enhetens nåværende status bort, tilbake til den forrige (André,
+    12. sep. 2026: «fjerne nåværende status og ta den tilbake til forrige»).
+
+    **Meldingene for statusen slettes**, med hele rettingshistorikken sin —
+    en korreksjon som pekte på dem ville ellers gjort den gamle raden
+    gjeldende igjen, og statusen sto der fortsatt. Slettingen logges i
+    revisjonsloggen. Den forrige statusen er den høyeste i kjeden som står
+    igjen; er ingen igjen, er det `Venter`. Returnerer meldingen bak den
+    forrige statusen, eller ``None`` for `Venter`.
+    `gjenaapne_enhet` er dette med «Ledig» som status, pluss 48-timersgrensen.
+    """
+    rad = koblingsrad(oppdrag, enhet)
+    if rad is None:
+        raise UlovligOvergang('Enheten er ikke varslet på oppdraget.')
+    if rad.status == choices.VENTER:
+        raise KorreksjonUgyldig('Enheten har ingen status å angre — hun venter.')
+    _slett_meldinger(Statusmelding.objects.filter(oppdragsenhet=rad, status=rad.status))
+    igjen = Statusmelding.objects.gjeldende_for_enhet(rad)
+    if igjen:
+        forrige = max(igjen, key=lambda m: (_REKKEFOLGE.get(m.status, -1), m.tidspunkt))
+        status, melding = forrige.status, forrige
+    else:
+        status, melding = choices.VENTER, None
+    rad.status = status
+    rad.save(update_fields=['status', 'updated_at'])
+    oppdrag.status = utledet_status(oppdrag)
+    felter = ['status', 'updated_at']
+    if oppdrag.status != choices.TERMINAL and oppdrag.historikk_fra is not None:
+        oppdrag.historikk_fra = None
+        oppdrag.historikk_av = None
+        felter += ['historikk_fra', 'historikk_av']
+    oppdrag.save(update_fields=felter)
+    return melding
+
+
+@transaction.atomic
+def gjenaapne_enhet(oppdrag, enhet, *, bruker, naa=None):
     """Ta en enhets «Ledig» tilbake — innen `KORRIGERBAR_ETTER_LEDIG`.
 
-    En korreksjon, ikke en sletting: `Ledig`-meldingen blir stående, og en
-    ny rad peker på den med status = det som gjaldt før (samme tidspunkt som
-    den meldingen, så ingen varighet flytter seg). Raden er da tilbake der
-    den sto, og operatøren fører videre derfra. Var det ingen melding før
-    `Ledig`, er «før» `Venter`.
-
-    Oppdraget hentes tilbake fra historikken hvis det ikke lenger er ledig.
+    `angre_siste_status` med «Ledig» som status, og en grense: etter 48
+    timer er oppdraget arkivets, ikke tavlas. Oppdraget hentes tilbake fra
+    historikken hvis det ikke lenger er ledig.
     """
     naa = naa or timezone.now()
     rad = koblingsrad(oppdrag, enhet)
@@ -687,27 +744,33 @@ def gjenaapne_enhet(oppdrag, enhet, *, bruker, naa=None) -> Statusmelding:
         timer = KORRIGERBAR_ETTER_LEDIG // 3600
         raise KorreksjonUgyldig(
             f'«Ledig» er eldre enn {timer} timer — oppdraget er arkivets nå.')
+    return angre_siste_status(oppdrag, enhet, bruker=bruker)
 
-    foer = [m for m in egne if m.status != choices.LEDIG]
-    if foer:
-        forrige = max(foer, key=lambda m: _REKKEFOLGE.get(m.status, -1))
-        status, tidspunkt, sted = forrige.status, forrige.tidspunkt, forrige.sted
-    else:
-        status, tidspunkt, sted = choices.VENTER, rad.varslet_at, ''
 
-    melding = Statusmelding.objects.create(
-        oppdrag=oppdrag, oppdragsenhet=rad, status=status, tidspunkt=tidspunkt,
-        meldt_av=bruker, korrigerer=ledig, manuell=True, sted=sted)
-    rad.status = status
-    rad.save(update_fields=['status', 'updated_at'])
-    oppdrag.status = utledet_status(oppdrag)
-    felter = ['status', 'updated_at']
-    if oppdrag.status != choices.TERMINAL and oppdrag.historikk_fra is not None:
-        oppdrag.historikk_fra = None
-        oppdrag.historikk_av = None
-        felter += ['historikk_fra', 'historikk_av']
-    oppdrag.save(update_fields=felter)
-    return melding
+@transaction.atomic
+def slett_oppdrag(oppdrag) -> None:
+    """Slett et oppdrag med meldingene sine. `korrigerer` er PROTECT, så
+    meldingene kobles fra hverandre først — ellers stopper den første
+    korreksjonen hele slettingen."""
+    _slett_meldinger(Statusmelding.objects.filter(oppdrag=oppdrag))
+    oppdrag.delete()
+
+
+def kan_slettes(oppdrag, user) -> bool:
+    """Hvem får slette et oppdrag (André, 12. sep. 2026).
+
+    Sentralbordet (`skriv_full`) får slette så lenge **ingen** bil har rykket
+    ut — alle rader i `Venter`. Er noen på vei, er det en hendelse, og da er
+    svaret å føre statusen tilbake først. Global admin får i tillegg slette
+    det som ligger i historikken, enkeltvis eller alt.
+    """
+    from core.auth_decorators import er_global_admin, har_tilgang
+    if er_global_admin(user) and oppdrag.historikk_fra is not None:
+        return True
+    if not har_tilgang(user, 'oppdrag', 'skriv_full'):
+        return False
+    statuser = list(oppdrag.enheter.values_list('status', flat=True))
+    return bool(statuser) and all(st == choices.VENTER for st in statuser)
 
 
 # ── Synlighet for enheten ────────────────────────────────────────────────────

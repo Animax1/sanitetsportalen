@@ -119,6 +119,11 @@ REVIEWED_INTERPOLATIONS = {
     'tidslinjeEnhetHtml(o)': 'markup fra en bygger som selv skannes her',
     '_varsledeRad(o)': 'markup fra en bygger som selv skannes her',
     'grovRad': 'markup fra `_grovsorteringsrad`, som selv skannes her, eller tom',
+    # Sted i sentralbordet (12. sep. 2026): ren tekst i `meta`, som escapes ved innsetting.
+    'e.sted_navn': 'bygger ren tekst i `sted`, som går inn i `meta` og escapes ved innsetting',
+    'sted': 'ren tekst («→ Sykehus») i `meta`, som escapes ved innsetting',
+    'slett': 'markup bygget lokalt, id escapet inni',
+    'angreKnapp': 'markup bygget lokalt, enhets-id escapet inni',
     # Sentralbordet med flere enheter (11. sep. 2026):
     '_enhetsmatrise(o)': 'markup fra en bygger som selv skannes her',
     'm.meldt_av': 'brukernavn i ren tekst i `notat`, som escapes ved innsetting',

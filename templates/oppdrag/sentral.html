@@ -216,6 +216,15 @@
           </button>
         </div>
         <div id="historikkliste"><div class="tom-melding">Laster…</div></div>
+        {% if er_global_admin %}
+        {# Sletting i historikken er global admin (André, 12. sep. 2026). #}
+        <div class="mt-3">
+          <button class="btn btn-sm btn-outline-danger" type="button" data-action="slettHistorikk">
+            <i class="bi bi-trash me-1"></i>Slett alle i historikken
+          </button>
+          <span id="historikk-feil" class="text-danger small ms-2 d-none"></span>
+        </div>
+        {% endif %}
         <p class="form-text mb-0 mt-3">
           Oppdrag havner her av seg selv når de blir ledige. Ingenting er
           slettet eller fryst — åpne et oppdrag for å hente det tilbake til
@@ -277,7 +286,8 @@
 {% block extra_scripts %}
 <script nonce="{{ csp_nonce }}">
   window.OPPDRAG_TILGANG = {
-    kanSkrive: {% if kan_skrive %}true{% else %}false{% endif %}
+    kanSkrive: {% if kan_skrive %}true{% else %}false{% endif %},
+    erAdmin: {% if er_global_admin %}true{% else %}false{% endif %}
   };
   window.OPPDRAG_AVREIST_TIL = {{ avreist_til|safe }};
   window.OPPDRAG_STATUS_NAVN = {{ status_navn|safe }};

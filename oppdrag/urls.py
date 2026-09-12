@@ -33,6 +33,8 @@ urlpatterns = [
          views.foering_view, name='oppdrag_api_foering'),
     path('api/oppdrag/<int:pk>/enheter/<int:enhet_pk>/gjenaapne/', views.gjenaapne_view,
          name='oppdrag_api_gjenaapne'),
+    path('api/oppdrag/<int:pk>/enheter/<int:enhet_pk>/angre/', views.angre_view,
+         name='oppdrag_api_angre'),
     # Ett navngitt endepunkt per overgang. Navnene er statusverdiene selv,
     # og settet håndheves i viewet mot `services.STEMPLBARE` — utledet fra
     # overgangstabellen, ikke skrevet ned på nytt her.

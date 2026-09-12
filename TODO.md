@@ -201,6 +201,15 @@ ingen av dem gir feilmelding — de er bare stille inaktive.
                   (`0013`), admin-kobling bare av admin.
             - [x] Planlagt/utildelt (12. sep.): utildelt = alle ser, planlagt = lederens
                   kladd, én vei. Bare navn og regel — ingen skjemaendring.
+            - [x] Andrés rapport 2, oppdrag (12. sep.): framtidsslakk, ta av → historikk,
+                  varslet/tatt av i tidslinjen (`0014`), angre siste status, sletting
+                  (sentral mens alle venter, admin i historikken), rediger oppdrag,
+                  sted i sentralbordet, «Endre», «endret av KO», notat i arkivlista.
+            - [ ] **Å tenke på (André, 12. sep.):** skal bilen se de andre bilenes
+                  tidsstempler? (§7.3 sier nei i dag.) Skal bil 2, som ikke tar med
+                  pasienten, få sette/se grovsorteringen? Kontokobling til admin bare av
+                  admin — riktig terskel? Sentralbordets besetning følger portalens
+                  aktive vakt, ikke vaktlista i drift — er det riktig scope?
             - [ ] Deploy 2, senere: fjern `Oppdrag.enhet`, `Statusmelding.oppdragsenhet`
                   NOT NULL (med `SET CONSTRAINTS ALL IMMEDIATE` om et dataskritt går
                   foran), og broene i `Oppdrag.save()`/`Statusmelding.save()` bort.

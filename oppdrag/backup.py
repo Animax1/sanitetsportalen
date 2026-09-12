@@ -47,6 +47,7 @@ class OppdragBackupHandler(BaseBackupHandler):
         # peker på Enhet og Lokasjon.
         'oppdrag.Statusmelding',
         'oppdrag.Enhetsbytte',
+        'oppdrag.Enhetshendelse',
         # Koblingsraden (flere enheter, 11. sep. 2026) står mellom meldingen
         # som peker på den og oppdraget den peker på.
         'oppdrag.Oppdragsenhet',
@@ -64,6 +65,7 @@ class OppdragBackupHandler(BaseBackupHandler):
         'oppdrag.Statusmelding': ['meldt_av'],
         'oppdrag.Oppdragsenhet': ['varslet_av'],
         'oppdrag.Enhetsbytte': ['byttet_av'],
+        'oppdrag.Enhetshendelse': ['av'],
         'oppdrag.Enhet': ['user'],
     }
 

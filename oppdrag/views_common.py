@@ -77,12 +77,17 @@ def enheter_til_liste(oppdrag, meldinger=None) -> list:
     for rad in oppdrag.enheter.all():
         treff = [m for m in meldinger
                  if m.oppdragsenhet_id == rad.pk and m.status == rad.status]
+        siste = treff[-1] if treff else None
         ut.append({
             'enhet_id': rad.enhet_id,
             'enhet_navn': rad.enhet.navn,
             'status': rad.status,
             'status_navn': rad.get_status_display(),
-            'status_tidspunkt': treff[-1].tidspunkt.isoformat() if treff else None,
+            'status_tidspunkt': siste.tidspunkt.isoformat() if siste else None,
+            # «Avreist → Sykehus» skal synes i sentralbordet, ikke bare i
+            # tidslinjen (André, 12. sep. 2026).
+            'sted_navn': choices.AVREIST_TIL_NAVN.get(siste.sted, '') if siste else '',
+            'varslet_at': rad.varslet_at.isoformat(),
             'rekkefolge': rad.rekkefolge,
         })
     return ut
@@ -166,6 +171,16 @@ def melding_til_dict(melding) -> dict:
         # «Avreist → Sykehus». Tom for alle andre statuser.
         'sted': melding.sted,
         'sted_navn': choices.AVREIST_TIL_NAVN.get(melding.sted, ''),
+    }
+
+
+def hendelse_til_dict(h) -> dict:
+    return {
+        'id': h.pk,
+        'type': h.type,
+        'enhet_navn': h.enhet.navn,
+        'tidspunkt': h.tidspunkt.isoformat(),
+        'av': getattr(h.av, 'username', '') or '',
     }
 
 
