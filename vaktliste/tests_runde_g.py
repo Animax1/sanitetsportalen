@@ -50,7 +50,7 @@ class DriftknappenBorIInnstillingerTests(SimpleTestCase):
 class StatusmerkeJsTests(SimpleTestCase):
     HARNESS = (
         (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue')),
-        (VAKTLISTE_JS, ('tegnStatus', 'tegnDriftknapp', 'iDrift', '_dag', '_kl', '_d')),
+        (VAKTLISTE_JS, ('tegnStatus', 'tegnDriftknapp', 'tegnFilknapper', '_utsendingTekst', 'iDrift', '_dag', '_kl', '_d')),
     )
     STUBB = ("globalThis.DAGER = ['søn','man','tir','ons','tor','fre','lør'];\n"
              "globalThis.MND = ['jan','feb','mar','apr','mai','jun','jul','aug','sep','okt','nov','des'];\n")

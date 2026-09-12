@@ -27,7 +27,7 @@ from django.utils import timezone
 from audit.models import AuditLog
 from audit.utils import get_current_request
 
-from .models import Mannskap, Ressurs, Vaktliste, Vaktpost
+from .models import Mannskap, Ressurs, Utsending, Vaktliste, Vaktpost
 
 TABELLNAVN = 'vaktliste_mannskap'
 
@@ -300,3 +300,23 @@ def ressurs_post_save(sender, instance, created, **kwargs):
 @receiver(post_delete, sender=Ressurs)
 def ressurs_post_delete(sender, instance, **kwargs):
     _logg_slettet(instance, RESSURS_TABELLNAVN, f'{instance} ({instance.gruppe})')
+
+
+# ── Utsendinger av vaktlista som fil ─────────────────────────────────────────
+#
+# Raden er sporet, men den skal også stå i auditloggen der resten av vaktlista
+# står: «hvem sendte fila hvor» er et spørsmål om utlevering av
+# personopplysninger, og det svares under audit, ikke i en modultabell.
+
+UTSENDING_TABELLNAVN = 'vaktliste_utsending'
+
+
+@receiver(post_save, sender=Utsending)
+def utsending_post_save(sender, instance, created, **kwargs):
+    if created:
+        status = 'sendt' if not instance.feil else f'feilet: {instance.feil[:120]}'
+        _logg_opprettet(
+            instance, UTSENDING_TABELLNAVN,
+            f'Vaktlista «{instance.vaktliste.vakt.navn}» {status} — '
+            f'{instance.get_utloest_display().lower()}, {instance.antall_rader} skift, '
+            f'til: {instance.mottakere or "(ingen)"}')

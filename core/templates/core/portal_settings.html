@@ -42,6 +42,33 @@
     </div>
   </div>
 
+  <div class="card mb-3">
+    <div class="card-header"><strong>Vaktlista på e-post</strong></div>
+    <div class="card-body">
+      <label class="form-label" for="vaktliste_fil_mottakere">Mottakere</label>
+      <textarea id="vaktliste_fil_mottakere" name="vaktliste_fil_mottakere"
+                class="form-control" rows="3"
+                placeholder="Én adresse per linje">{{ vaktliste_fil_mottakere }}</textarea>
+      <div class="form-text">
+        Vaktlista sendes hit som en selvstendig HTML-fil — reserven når
+        portalen er nede. Fila inneholder navn, korps, rolle, skift, telefon
+        og ISSI. Hold lista kort: hver adresse er en kopi som blir liggende.
+      </div>
+      <div class="form-check mt-3">
+        <input class="form-check-input" type="checkbox" id="vaktliste_fil_ved_drift"
+               name="vaktliste_fil_ved_drift" value="1"
+               {% if vaktliste_fil_ved_drift %}checked{% endif %}>
+        <label class="form-check-label" for="vaktliste_fil_ved_drift">
+          Send automatisk når en vaktliste settes i drift
+        </label>
+      </div>
+      <div class="form-text">
+        Vaktleder kan alltid sende på knapp fra «Innstillinger» på vaktlista.
+        Hver utsending logges.
+      </div>
+    </div>
+  </div>
+
   <button type="submit" class="btn btn-primary">Lagre innstillinger</button>
 </form>
 {% endblock %}

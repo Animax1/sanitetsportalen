@@ -304,6 +304,14 @@
                   data-action="skrivUtVakta">
             <i class="bi bi-printer me-1"></i>Skriv ut vaktlisten
           </button>
+
+          {% comment %}
+            **Reserven** (12. sep. 2026): vaktlista som selvstendig fil, til
+            nedlasting eller på e-post til mottakerne admin har satt. Bygges
+            av `tegnFilknapper()` — for `skriv_full`, og teksten sier hva som
+            skjedde sist og om det finnes mottakere.
+          {% endcomment %}
+          <div id="vl-fil" class="mb-3"></div>
         </div>
 
         {% comment %}

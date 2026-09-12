@@ -138,10 +138,15 @@ class IkonfileneTests(TestCase):
 class AlleSiderLenkerTilManifestetTests(TestCase):
     """Hver mal med sitt eget `<head>` tar med `partials/_ikoner.html`."""
 
+    # Maler som ikke er sider, men filer som forlater portalen. Vaktlista som
+    # fil (12. sep. 2026) skal åpne uten nett og uten server — et manifest og
+    # ikoner via `{% static %}` ville pekt på en tjener som er nede.
+    IKKE_SIDER = ('templates/vaktliste/fil.html',)
+
     def _maler_med_eget_head(self):
         rot = Path(settings.BASE_DIR)
         for sti in list((rot / 'templates').rglob('*.html')) + list((rot / 'core/templates').rglob('*.html')):
-            if 'partials' in sti.parts:
+            if 'partials' in sti.parts or str(sti.relative_to(rot)) in self.IKKE_SIDER:
                 continue
             tekst = sti.read_text(encoding='utf-8')
             if re.search(r'<head\b', tekst):

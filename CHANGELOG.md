@@ -4,6 +4,24 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-12 — Reserve 1: vaktlista som fil på e-post
+
+Én migrasjon, `vaktliste/0016` (`Utsending`). Deployes til staging først.
+
+- **Vaktlista som selvstendig HTML-fil**: grupper, ressurser og skift med korps,
+  rolle, telefon og ISSI. Ikke e-post, notat eller merknad. Åpner uten nett og
+  skrives ut fra nettleseren. «Last ned som fil» og «Send på e-post» i
+  «Innstillinger» på vaktlista, for `skriv_full`.
+- **Sendes automatisk ved «Sett i drift»** når admin har slått det på og satt
+  mottakere. Feiler e-posten, åpner innsjekken likevel, og vaktleder får feilen.
+- **Mottakere og bryteren** settes av global admin under Portalinnstillinger →
+  «Vaktlista på e-post». Adressene valideres før noe lagres.
+- **Hver utsending logges**: `Utsending`-rad og auditrad med hvem, når, hvilke
+  adresser og antall skift. Teksten i «Innstillinger» sier hva som skjedde sist.
+- AHASend-transporten sender vedlegg (base64, v2-formatet). Første vedlegg som
+  går gjennom den — bekreftes på staging.
+- Vurderingen av ukryptert sending står i vaktlistenotatet §12.
+
 ## 2026-09-12 — ISSI på mannskapet, telefon og ISSI i sentralbordets besetning
 
 Én migrasjon, `vaktliste/0015` (`Mannskap.issi`). Deployes til staging først.

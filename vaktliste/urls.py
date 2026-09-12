@@ -61,6 +61,11 @@ urlpatterns = [
     # trykket sist vet ikke hva hun endte på. Samme grep som oppdragsmodulen.
     path('api/vaktlister/<int:pk>/drift/<str:tilstand>/', views.drift_view,
          name='vaktliste_api_drift'),
+    # Reserven (12. sep. 2026): vaktlista som fil — last ned, eller send til
+    # mottakerne admin har satt.
+    path('api/vaktlister/<int:pk>/fil/', views.fil_view, name='vaktliste_api_fil'),
+    path('api/vaktlister/<int:pk>/fil/send/', views.send_fil_view,
+         name='vaktliste_api_send_fil'),
     path('api/vaktposter/<int:pk>/stempling/<str:handling>/',
          views.stempling_view, name='vaktliste_api_stempling'),
 

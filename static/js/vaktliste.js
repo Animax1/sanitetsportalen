@@ -539,6 +539,65 @@ function tegnDriftknapp() {
          <i class="bi bi-play-circle me-1"></i>Sett i drift
        </button>`)
     + `<div class="form-text mt-1">${escapeHtml(forklaring)}</div>`;
+  tegnFilknapper();
+}
+
+
+function _utsendingTekst(u) {
+  // «Sist sendt 12.09 08:04 til 3 mottakere (knapp)» — eller feilen, om
+  // den siste ikke gikk. Uten utsending: tom streng.
+  if (!u) return '';
+  const naar = `${_dag(u.sendt_at)} ${_kl(u.sendt_at)}`;
+  const hvordan = u.utloest === 'drift' ? 'ved sett i drift' : 'på knapp';
+  if (u.feil) return `Siste forsøk ${naar} (${hvordan}) feilet: ${u.feil}`;
+  const mott = `${u.antall_mottakere} ${u.antall_mottakere === 1 ? 'mottaker' : 'mottakere'}`;
+  return `Sist sendt ${naar} til ${mott} (${hvordan}), ${u.antall_rader} skift.`;
+}
+
+
+function tegnFilknapper() {
+  // **Reserven** (12. sep. 2026): vaktlista som selvstendig HTML-fil. «Last
+  // ned» henter fila til egen maskin; «Send på e-post» sender den til
+  // mottakerne admin har satt. Begge for `skriv_full` — fila bærer
+  // telefonnumre for hele vakta. Tegnes fra `tegnDriftknapp()`, av samme
+  // grunn som den: teksten skifter med tilstanden.
+  const el = document.getElementById('vl-fil');
+  if (!el) return;
+  if (!aktivListe || !kanSkriveAlt()) { el.innerHTML = ''; return; }
+  const vl = aktivListe.vaktliste;
+  const harMottakere = (vl.fil_mottakere || 0) > 0;
+  const mottakere = harMottakere
+    ? `${vl.fil_mottakere} ${vl.fil_mottakere === 1 ? 'mottaker' : 'mottakere'} er satt`
+      + (vl.fil_ved_drift ? '; sendes også ved sett i drift.' : '.')
+    : 'Ingen mottakere er satt — global admin setter dem under Portalinnstillinger.';
+  const sist = _utsendingTekst(vl.siste_utsending);
+  el.innerHTML = `
+    <a class="btn btn-sm btn-outline-secondary me-1" href="/vaktliste/api/vaktlister/${escHtmlValue(vl.id)}/fil/">
+      <i class="bi bi-download me-1"></i>Last ned som fil
+    </a>
+    <button class="btn btn-sm btn-outline-secondary" type="button"
+            data-action="sendVaktlistefil"${harMottakere ? '' : ' disabled'}>
+      <i class="bi bi-envelope me-1"></i>Send på e-post
+    </button>
+    <div class="form-text mt-1">Reserve når portalen er nede: én fil med navn, korps, rolle,
+      skift, telefon og ISSI. ${escapeHtml(mottakere)}${sist ? ' ' + escapeHtml(sist) : ''}</div>`;
+}
+
+
+async function sendVaktlistefil() {
+  if (!aktivListe) return;
+  const vl = aktivListe.vaktliste;
+  const antall = vl.fil_mottakere || 0;
+  // Bekreftelse: fila går ut av portalen, og hver adresse er en kopi.
+  if (!confirm(`Sende vaktlista for «${vl.vakt_navn}» til ${antall} `
+             + `${antall === 1 ? 'mottaker' : 'mottakere'}? Fila inneholder navn og telefonnumre.`)) return;
+  skjulPanelfeil();
+  const res = await apiFetch(`/vaktliste/api/vaktlister/${vl.id}/fil/send/`, { method: 'POST' });
+  const d = await res.json().catch(() => ({}));
+  if (!res.ok || d.status !== 'ok') {
+    visPanelfeil(d.message || 'Kunne ikke sende vaktlista.');
+  }
+  await lastListe(vl.id);
 }
 
 
@@ -2707,6 +2766,11 @@ async function settDrift(tilstand) {
   // panel.
   if (tilstand === 'stopp' && aktivFane === TILSTEDE) aktivFane = OVERSIKT;
   await lastListe(aktivListe.vaktliste.id);
+  // Reserven sendes ved sett i drift når admin har slått det på. Drift ble
+  // satt uansett; feilet sendingen, skal vaktleder få vite det nå — ikke
+  // oppdage det når portalen er nede.
+  const u = d.data && d.data.utsending;
+  if (u && u.feil) visPanelfeil(`Lista er i drift, men fila ble ikke sendt: ${u.feil}`);
 }
 
 

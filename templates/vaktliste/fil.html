@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="nb">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Vaktliste – {{ vakt_navn }}</title>
+<style>
+  :root { color-scheme: light; }
+  * { box-sizing: border-box; }
+  body { margin: 0; padding: 16px; font: 14px/1.4 -apple-system, "Segoe UI", system-ui, sans-serif; color: #16213a; background: #fff; }
+  h1 { font-size: 1.5rem; margin: 0 0 4px; }
+  h2 { font-size: 1.1rem; margin: 24px 0 8px; padding-bottom: 4px; border-bottom: 2px solid #16213a; }
+  h3 { font-size: 1rem; margin: 14px 0 4px; }
+  h3 small { font-weight: normal; color: #4b5670; }
+  .meta { color: #4b5670; margin: 0; }
+  .merk { margin: 12px 0 0; padding: 8px 12px; border-left: 3px solid #b3261e; background: #f9dedb; color: #4a1f1b; font-size: 0.9rem; }
+  table { width: 100%; border-collapse: collapse; margin-top: 4px; }
+  th, td { text-align: left; padding: 4px 8px; border-bottom: 1px solid #cdd4e0; vertical-align: top; }
+  th { font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.04em; color: #4b5670; }
+  td.tall { font-variant-numeric: tabular-nums; white-space: nowrap; }
+  tr.ledig td { color: #7b8499; font-style: italic; }
+  .tom { color: #7b8499; }
+  @media print {
+    body { padding: 0; }
+    h2 { break-after: avoid; }
+    h3 { break-after: avoid; }
+    tr { break-inside: avoid; }
+    .merk { border-color: #000; background: none; color: #000; }
+  }
+</style>
+</head>
+<body>
+<h1>Vaktliste – {{ vakt_navn }}</h1>
+<p class="meta">{% if spenn %}{{ spenn }} · {% endif %}{{ antall }} skift · fila laget {{ laget }}{% if i_drift %} · lista var i drift{% endif %}</p>
+<p class="merk">Reserve for portalen. Fila inneholder navn og telefonnumre — slett den etter vakta. Skriv ut med Ctrl+P / Cmd+P.</p>
+
+{% for g in grupper %}
+<h2>{{ g.navn }}</h2>
+{% for r in g.ressurser %}
+<h3>{{ r.navn }} <small>· {{ r.antall }} satt opp{% if r.ledige %} · {{ r.ledige }} ledig{{ r.ledige|pluralize:"e" }}{% endif %}</small></h3>
+<table>
+  <thead><tr><th>Tid</th><th>Navn</th><th>Korps</th><th>Rolle</th><th>Telefon</th><th>ISSI</th></tr></thead>
+  <tbody>
+  {% for s in r.skift %}
+    <tr{% if s.ledig %} class="ledig"{% endif %}>
+      <td class="tall">{{ s.tid }}</td>
+      <td>{{ s.navn }}</td>
+      <td>{{ s.korps }}</td>
+      <td>{{ s.rolle|default:"—" }}</td>
+      <td class="tall">{{ s.telefon|default:"—" }}</td>
+      <td class="tall">{{ s.issi|default:"—" }}</td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endfor %}
+{% empty %}
+<p class="tom">Ingen er satt opp på vakta.</p>
+{% endfor %}
+</body>
+</html>

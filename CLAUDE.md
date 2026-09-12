@@ -389,6 +389,15 @@ fase 3–7 gjenstår — se `docs/BESLUTNING_VAKTLISTE.md`, som er besluttet i s
   autokoblingen og kontolista leser alle derfra; kobling for hånd til en adminkonto gir
   400. `konto_finnes` i svaret sier om en bruker med adressen finnes, regnet av ett sett
   e-poster, ikke én spørring per rad.
+- **Vaktlista som fil på e-post er reserven** (12. sep. 2026, notatet §12):
+  `vaktliste/fil.py` bygger `templates/vaktliste/fil.html` — selvstendig, uten
+  `{% static %}` og uten ikon-partialen (unntatt i `core/tests_manifest.py`). Telefon og
+  ISSI er med, **ikke** e-post, notat eller merknad. Mottakerne og bryteren for «Sett i
+  drift» er `AppSetting`-nøkler (`fil.MOTTAKERE_NOKKEL`, `fil.VED_DRIFT_NOKKEL`) satt
+  under portalinnstillingene; `send_fil()` kaster aldri og lager alltid en
+  `Utsending`-rad (auditlogget), og drift-viewet sender *etter* at drift er lagret —
+  e-post nede skal ikke stenge innsjekken. AHASend-transporten sender vedlegg som
+  base64 (`_vedlegg`).
 - **Kostbehov/matallergi lagres ikke** (art. 9 — besluttet holdt utenfor portalen), og
   `Mannskap.notat` er unntatt verdilogging i audit (`signals.FELT_UTEN_VERDILOGGING`).
 - **En ledig plass har tre tilstander** (11.–12. sep. 2026): tildelt ett korps

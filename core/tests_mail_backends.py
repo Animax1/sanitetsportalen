@@ -189,3 +189,30 @@ class KonfigurasjonTests(SimpleTestCase):
 
     def test_tom_liste_gjor_ingenting(self):
         self.assertEqual(AhaSendApiBackend().send_messages([]), 0)
+
+
+@override_settings(**KONFIG)
+class VedleggTests(SimpleTestCase):
+    """Vaktlista som fil (12. sep. 2026) er første vedlegg som sendes.
+    AHASend v2 vil ha dem base64-kodet i `data`, med `base64: true`."""
+
+    def _kropp(self, melding):
+        with patch('core.mail_backends.request.urlopen', return_value=_svar()) as urlopen:
+            AhaSendApiBackend().send_messages([melding])
+        return json.loads(urlopen.call_args.args[0].data.decode('utf-8'))
+
+    def test_tekstvedlegg_kodes_base64(self):
+        import base64
+        m = EmailMessage('Emne', 'Kropp', to=['x@example.org'])
+        m.attach('vaktliste.html', '<p>Kari æøå</p>', 'text/html')
+        kropp = self._kropp(m)
+        self.assertEqual(len(kropp['attachments']), 1)
+        v = kropp['attachments'][0]
+        self.assertEqual(v['file_name'], 'vaktliste.html')
+        self.assertEqual(v['content_type'], 'text/html')
+        self.assertTrue(v['base64'])
+        self.assertEqual(base64.b64decode(v['data']).decode('utf-8'), '<p>Kari æøå</p>')
+
+    def test_uten_vedlegg_finnes_ikke_feltet(self):
+        kropp = self._kropp(EmailMessage('Emne', 'Kropp', to=['x@example.org']))
+        self.assertNotIn('attachments', kropp)

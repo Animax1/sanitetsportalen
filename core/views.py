@@ -173,14 +173,29 @@ def portal_settings_view(request):
     """
     from patients.models import AppSetting
 
+    from django.core.exceptions import ValidationError
+    from vaktliste import fil as vaktliste_fil
+
     if request.method == 'POST':
         raa = (request.POST.get('session_timeout_hours') or '').strip()
+        # Vaktlista på e-post (12. sep. 2026): mottakerne valideres før noe
+        # lagres, av samme grunn som timeouten — en avvist innsending skal
+        # ikke lagre halve skjemaet.
+        try:
+            mottakere = vaktliste_fil.valider_mottakere(
+                request.POST.get('vaktliste_fil_mottakere') or '')
+        except ValidationError as exc:
+            messages.error(request, exc.messages[0])
+            mottakere = None
+        ved_drift = '1' if request.POST.get('vaktliste_fil_ved_drift') else '0'
         try:
             timer = int(raa)
         except (TypeError, ValueError):
             messages.error(request, 'Sesjonstimeout må være et helt tall.')
         else:
-            if not 1 <= timer <= 24:
+            if mottakere is None:
+                pass
+            elif not 1 <= timer <= 24:
                 messages.error(
                     request, 'Sesjonstimeout må være mellom 1 og 24 timer.')
             else:
@@ -202,6 +217,8 @@ def portal_settings_view(request):
                     vakt.navn = nytt_navn
                     vakt.save(update_fields=['navn'])
                     AppSetting.set('session_timeout_hours', timer)
+                    AppSetting.set(vaktliste_fil.MOTTAKERE_NOKKEL, '\n'.join(mottakere))
+                    AppSetting.set(vaktliste_fil.VED_DRIFT_NOKKEL, ved_drift)
                     messages.success(request, 'Portalinnstillingene er lagret.')
                     return redirect('core:portal_settings')
 
@@ -214,6 +231,8 @@ def portal_settings_view(request):
     return render(request, 'core/portal_settings.html', {
         'event_name': hent_aktiv_vakt().navn,
         'session_timeout_hours': timer,
+        'vaktliste_fil_mottakere': '\n'.join(vaktliste_fil.mottakere()),
+        'vaktliste_fil_ved_drift': vaktliste_fil.sendes_ved_drift(),
     })
 
 

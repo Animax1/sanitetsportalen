@@ -55,8 +55,8 @@ from django.views.decorators.http import require_http_methods
 from core.auth_decorators import er_global_admin, modul_kreves
 from core.ratelimit import rate_limit
 
-from . import choices, services
-from .models import (Belastningsgrenser, Korps, Mannskap, Ressurs,
+from . import choices, fil, services
+from .models import (Belastningsgrenser, Korps, Mannskap, Ressurs, Utsending,
                      Ressursgruppe, Ressursrolle, Vaktliste, Vaktpost)
 
 
@@ -154,6 +154,12 @@ def _vaktliste_til_dict(vl):
         'er_aktiv_vakt': vl.vakt.er_aktiv,
         'notat': vl.notat,
         'arkivert_at': vl.arkivert_at.isoformat() if vl.arkivert_at else None,
+        # Reserven (12. sep. 2026): siste utsending av vaktlista som fil, og
+        # om det finnes mottakere å sende til — knappen skal si det før man
+        # trykker, ikke etter.
+        'siste_utsending': fil.utsending_til_dict(vl.utsendinger.first()),
+        'fil_mottakere': len(fil.mottakere()),
+        'fil_ved_drift': fil.sendes_ved_drift(),
     }
 
 
@@ -795,6 +801,7 @@ def drift_view(request, pk, tilstand):
     except Vaktliste.DoesNotExist:
         return _feil('Vaktliste ikke funnet', status=404)
 
+    utsending = None
     if tilstand == 'start':
         vl.status = choices.DRIFT
         # Tidspunktet settes kun ved åpning, og beholdes ved en senere
@@ -803,11 +810,69 @@ def drift_view(request, pk, tilstand):
         vl.satt_i_drift_av = request.user
         vl.save(update_fields=['status', 'satt_i_drift_at', 'satt_i_drift_av',
                                'updated_at'])
+        # **Reserven sendes ved vaktstart** (12. sep. 2026) når admin har
+        # slått det på og satt mottakere. Etter at drift er lagret, og aldri
+        # som en sperre: en e-posttjeneste som er nede skal ikke hindre at
+        # innsjekken åpner. `send_fil` kaster ikke; svaret bærer resultatet.
+        if fil.sendes_ved_drift() and fil.mottakere():
+            utsending = fil.send_fil(vl, bruker=request.user, utloest=Utsending.DRIFT)
     else:
         vl.status = choices.PLANLEGGING
         vl.save(update_fields=['status', 'updated_at'])
 
-    return JsonResponse({'status': 'ok', 'data': _vaktliste_til_dict(vl)})
+    data = _vaktliste_til_dict(vl)
+    data['utsending'] = fil.utsending_til_dict(utsending)
+    return JsonResponse({'status': 'ok', 'data': data})
+
+
+@never_cache
+@modul_kreves('vaktliste', 'les', svar='html')
+@require_http_methods(['GET'])
+def fil_view(request, pk):
+    """Vaktlista som selvstendig HTML-fil, til nedlasting (12. sep. 2026).
+
+    Samme fil som e-posten sender. `skriv_full` (`kan_skrive_alt`): fila
+    bærer telefonnumre for hele vakta, og det er vaktleders bord. Ingen
+    `Utsending`-rad — nedlasting til egen maskin er ikke en utlevering.
+    """
+    from django.http import HttpResponse
+    if not services.kan_skrive_alt(request.user):
+        return HttpResponse('Ingen tilgang', status=403)
+    try:
+        vl = Vaktliste.objects.select_related('vakt').get(pk=pk)
+    except Vaktliste.DoesNotExist:
+        return HttpResponse('Vaktliste ikke funnet', status=404)
+    svar = HttpResponse(fil.bygg_fil(vl), content_type='text/html; charset=utf-8')
+    svar['Content-Disposition'] = f'attachment; filename="{fil.filnavn(vl)}"'
+    return svar
+
+
+@never_cache
+@modul_kreves('vaktliste', 'les', svar='json')
+@require_http_methods(['POST'])
+@rate_limit(group='vaktliste:send_fil', rate='10/m', method='POST')
+def send_fil_view(request, pk):
+    """Send vaktlista som fil til mottakerne admin har satt (12. sep. 2026).
+
+    `skriv_full`, som drift. Mottakerne velges ikke her — de er en fast
+    liste under portalinnstillingene, så vi vet hvor fila går. 400 uten
+    mottakere, med beskjed om hvor de settes; 502 når e-posttjenesten sa nei,
+    men raden er lagret uansett, med feilen.
+    """
+    if not services.kan_skrive_alt(request.user):
+        return _nektet()
+    try:
+        vl = Vaktliste.objects.select_related('vakt').get(pk=pk)
+    except Vaktliste.DoesNotExist:
+        return _feil('Vaktliste ikke funnet', status=404)
+    if not fil.mottakere():
+        return _feil('Ingen mottakere er satt. Global admin setter dem under '
+                     'Portalinnstillinger → «Vaktlista på e-post».')
+    rad = fil.send_fil(vl, bruker=request.user, utloest=Utsending.KNAPP)
+    if rad.feil:
+        return JsonResponse({'status': 'error', 'message': f'Fila ble ikke sendt: {rad.feil}',
+                             'data': fil.utsending_til_dict(rad)}, status=502)
+    return JsonResponse({'status': 'ok', 'data': fil.utsending_til_dict(rad)})
 
 
 @never_cache

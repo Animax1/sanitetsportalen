@@ -463,3 +463,39 @@ Totalt 37–49 timer.
 - **Selvinnsjekk** (mannskap med konto stempler seg selv) er bevisst utenfor planen.
   Kommer den, er det med samme skille som oppdragsmodulen bruker: å stemple for seg
   selv er noe annet enn å stemple for andre.
+
+---
+
+## 12. Reserven: vaktlista som fil på e-post (12. sep. 2026)
+
+Bakgrunn: ingen deploy under vakt, og et speil til staging dekker ingenting av det
+som faktisk kan falle. Det som skal overleve at Railway er nede, er vaktlista i drift.
+Første ledd er **fila**: én selvstendig HTML-fil med stilene inni, som åpner uten nett
+og skrives ut fra nettleseren.
+
+**Innhold:** gruppene, ressursene og skiftene sortert på fra, til, navn — med korps,
+rolle, telefon og ISSI. **Ikke** e-post, notat eller merknad. Fritekst er der
+helseopplysninger dukker opp, og fila havner i innbokser.
+
+**Ukryptert, etter vurdering.** Alminnelige personopplysninger, ikke særlige
+kategorier — å stå på en vaktliste sier ingenting om helse, og kompetanse er en
+yrkeskvalifikasjon. Risikoen sitter i kanalen: e-post er en kopi vi ikke kontrollerer
+etterpå. Tiltakene som gjør det forsvarlig:
+
+- **Minimering** — telefon fordi drift skal ringe folk inn; ISSI av samme grunn; ingen
+  e-postadresser, ingen fritekst.
+- **Fast mottakerliste satt av global admin** under portalinnstillingene. Vaktleder
+  velger ikke adresser ved sending.
+- **Bare ved «Sett i drift» og på knapp**, ikke ved hver endring. Automatikken kan
+  admin slå av.
+- **Hver utsending logges** — `Utsending`-raden og en auditrad: hvem, når, til hvilke
+  adresser, hvor mange skift. Ikke innholdet. Nedlasting til egen maskin logges ikke; det
+  er ingen utlevering.
+- **Fila sier selv «slett etter vakta»** øverst.
+- Inn i personverndokumentasjonen som utlevering, formål «reserve ved bortfall».
+
+Sendingen **sperrer aldri drift**: feiler e-posttjenesten ved «Sett i drift», åpner
+innsjekken likevel, og svaret bærer feilen så vaktleder får vite det der og da.
+
+`vaktliste/fil.py` bygger og sender; `templates/vaktliste/fil.html` er fila.
+AHASend-transporten fikk vedlegg for dette (`core/mail_backends.py`).

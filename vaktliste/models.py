@@ -678,3 +678,52 @@ class Vaktpost(BaseTimeStampedModel):
         return (self.mannskap_id is not None
                 and self.mott_at is not None
                 and self.av_vakt_at is None)
+
+
+class Utsending(BaseTimeStampedModel):
+    """Én utsending av vaktlista som fil på e-post (reserve, 12. sep. 2026).
+
+    Raden *er* sporet: hvem sendte, når, til hvilke adresser, hvor mange
+    rader fila hadde, og hva som utløste det — knappen eller «Sett i drift».
+    Innholdet lagres ikke; det er vaktlista slik den sto, og den står i
+    basen. Mottakerne fryses som tekst, for admin kan endre lista etterpå,
+    og spørsmålet i ettertid er «hvor gikk fila *da*».
+
+    `feil` er tom når sendingen gikk. En mislykket sending får også en rad —
+    at noen prøvde og hva som stoppet det, er det man leter etter når fila
+    ikke kom fram.
+    """
+
+    KNAPP = 'knapp'
+    DRIFT = 'drift'
+    UTLOEST_VALG = [(KNAPP, 'Knapp'), (DRIFT, 'Sett i drift')]
+
+    vaktliste = models.ForeignKey(
+        Vaktliste, on_delete=models.CASCADE, related_name='utsendinger',
+        verbose_name='Vaktliste')
+    sendt_av = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL,
+        related_name='+', verbose_name='Sendt av')
+    sendt_av_navn = models.CharField(
+        max_length=150, blank=True, default='', verbose_name='Sendt av (navn)')
+    utloest = models.CharField(
+        max_length=10, choices=UTLOEST_VALG, default=KNAPP, verbose_name='Utløst av')
+    mottakere = models.TextField(blank=True, default='', verbose_name='Mottakere')
+    antall_rader = models.PositiveIntegerField(default=0, verbose_name='Antall skift')
+    feil = models.TextField(blank=True, default='', verbose_name='Feil')
+
+    class Meta:
+        verbose_name = 'Utsending'
+        verbose_name_plural = 'Utsendinger'
+        ordering = ['-created_at']
+
+    def __str__(self) -> str:
+        return f'{self.vaktliste} sendt {self.created_at:%d.%m %H:%M} til {self.antall_mottakere}'
+
+    @property
+    def antall_mottakere(self) -> int:
+        return len([m for m in self.mottakere.split(',') if m.strip()])
+
+    @property
+    def gikk(self) -> bool:
+        return not self.feil

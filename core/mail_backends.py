@@ -161,7 +161,40 @@ class AhaSendApiBackend(BaseEmailBackend):
         if not tekst and not html:
             # API-et krever minst ett av feltene.
             kropp['text_content'] = ''
+        vedlegg = self._vedlegg(melding)
+        if vedlegg:
+            kropp['attachments'] = vedlegg
         return kropp
+
+    @staticmethod
+    def _vedlegg(melding):
+        """Vedleggene som AHASend v2 vil ha dem: base64 i `data`, med
+        `base64: true`. Vaktlista som fil (12. sep. 2026) er første bruk.
+
+        Django lagrer `attach(navn, innhold, mimetype)` som tupler, og
+        `attach_file`/MIME-objekter som `MIMEBase`. Begge former tas imot.
+        """
+        import base64
+        from email.mime.base import MIMEBase
+
+        ut = []
+        for a in getattr(melding, 'attachments', None) or ():
+            if isinstance(a, MIMEBase):
+                navn = a.get_filename() or 'vedlegg'
+                innhold = a.get_payload(decode=True) or b''
+                mimetype = a.get_content_type()
+            else:
+                navn, innhold, mimetype = a
+                if isinstance(innhold, str):
+                    innhold = innhold.encode('utf-8')
+                mimetype = mimetype or 'application/octet-stream'
+            ut.append({
+                'file_name': navn,
+                'content_type': mimetype,
+                'data': base64.b64encode(innhold).decode('ascii'),
+                'base64': True,
+            })
+        return ut
 
     @staticmethod
     def _innhold(melding):

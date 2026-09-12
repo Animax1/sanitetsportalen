@@ -312,12 +312,15 @@ Bakgrunn: ingen deploy under vakt. Da dekker et speil til staging nesten ingenti
 Pasienter har Excel, oppdrag går på nødnett. Det som skal overleve at Railway faller er
 **dataene** (utenfor Railway) og **vaktlista i drift** (på drifts-PC-en, uten server).
 
-- [ ] **1. Vaktlista som fil, på e-post.** Én selvstendig HTML-fil med stilene inni —
-      utskriftsvisningen med grupper, blokker og korps — som åpner uten nett og kan
-      skrives ut. Innhold: navn, rolle, tider, korps. **Telefonnummer: avgjøres av
-      André** før bygging (fila havner i innbokser). Sendes via AHASend ved vaktstart og
-      på knapp («Send vaktlista på e-post» i innstillingene). Admin setter mottakere og
-      om utsending ved vaktstart er på, under `/portal-admin/innstillinger/`. Ca. én dag.
+- [x] **1. Vaktlista som fil, på e-post** (12. sep. 2026, `vaktliste/fil.py`,
+      `Utsending`, `vaktliste/0016`). Ukryptert etter vurdering (§12 i notatet):
+      telefon og ISSI med, ikke e-post/notat/merknad; fast mottakerliste hos admin;
+      ved «Sett i drift» og på knapp; hver utsending logget. AHASend fikk vedlegg.
+      - [ ] **Bekreft på staging** at AHASend tar imot vedlegget (første bruk av
+            `attachments` i v2-API-et) og at fila åpner på iPhone (lagre til Filer →
+            Safari) og på PC.
+      - [ ] **Personverndokumentasjonen:** utleveringen inn i A.2/A.6, formål
+            «reserve ved bortfall av portalen».
 - [ ] **2. Offline drift på `/vaktliste/`, for PC-en som fører drift.** Service worker
       holder siden og siste liste lokalt; møtt/av vakt legges i kø når serveren ikke
       svarer og sendes når den svarer igjen — samme mønster som enhetsskjermens
