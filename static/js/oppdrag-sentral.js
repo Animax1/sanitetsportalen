@@ -59,7 +59,7 @@ function problemstillingerFor(hastegrad) {
 
 
 function fyllProblemstillinger(prefiks, hastegrad, valgt) {
-  // Nedtrekket bygges om av hastegraden (André, 12. sep. 2026: «teknisk
+  // Nedtrekket bygges om av hastegraden (André, 12. sep. 2026: «teknisk [nå Drift]
   // hastegrad endrer innholdet i problemstillinger»). Står den valgte ikke
   // i den nye lista, velges den første — «Udefinert» — og antall-raden
   // følger problemstillingen.

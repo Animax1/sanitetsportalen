@@ -52,46 +52,51 @@ PROBLEMSTILLING_MEDISINSK = (
     'Transport',
 )
 
-#: Tekniske oppdrag (André, 12. sep. 2026): hastegraden «Teknisk» har sine
+#: Driftsoppdrag (André, 12. sep. 2026): hastegraden «Drift» har sine
 #: egne problemstillinger — matutlevering, transport, utstyr. Lista er kode,
 #: som den medisinske, og endres ved å endre den her.
-PROBLEMSTILLING_TEKNISK = (
+PROBLEMSTILLING_DRIFT = (
     UDEFINERT,
     'Matutlevering',
     'Transport',
     'Utstyr',
     'Forsyning',
-    'Annet teknisk',
+    'Annet',
 )
 
 #: Alle problemstillinger, til validering av feltet alene. Hvilke som passer
 #: en gitt hastegrad står i `PROBLEMSTILLINGER_FOR`.
 PROBLEMSTILLING = PROBLEMSTILLING_MEDISINSK + tuple(
-    p for p in PROBLEMSTILLING_TEKNISK if p not in PROBLEMSTILLING_MEDISINSK)
+    p for p in PROBLEMSTILLING_DRIFT if p not in PROBLEMSTILLING_MEDISINSK)
 
 #: AMK-inndelingen, ikke fargenavn. Fargekoding i grensesnittet er en
 #: presentasjonsdetalj; navnet skal være det personellet faktisk sier.
-#: «Teknisk» (12. sep. 2026) er ikke en hastegrad i AMK-forstand, men et
+#: «Drift» (12. sep. 2026; het «Teknisk» én dag) er ikke en hastegrad i AMK-forstand, men et
 #: oppdrag uten pasient — og det er den forskjellen som avgjør hvilke
 #: problemstillinger som tilbys.
-TEKNISK = 'Teknisk'
+DRIFT = 'Drift'
 HASTEGRAD = (
     'Akutt',
     'Haster',
     'Vanlig',
-    TEKNISK,
+    DRIFT,
 )
 
 PROBLEMSTILLINGER_FOR: dict[str, tuple[str, ...]] = {
     'Akutt': PROBLEMSTILLING_MEDISINSK,
     'Haster': PROBLEMSTILLING_MEDISINSK,
     'Vanlig': PROBLEMSTILLING_MEDISINSK,
-    TEKNISK: PROBLEMSTILLING_TEKNISK,
+    DRIFT: PROBLEMSTILLING_DRIFT,
 }
 
 #: Problemstillinger som bærer et antall (André, 12. sep. 2026: «Transport
 #: har antall som fast hele tall»). `Oppdrag.antall` tømmes for alle andre.
 MED_ANTALL = ('Transport',)
+
+
+#: «Udefinert» står øverst i alle fire listene (André, 12. sep. 2026) —
+#: `VerdimengdeneTests` håndhever det, så en omsortering ikke flytter den.
+assert all(liste[0] == UDEFINERT for liste in PROBLEMSTILLINGER_FOR.values())
 
 
 def problemstilling_passer(hastegrad: str, problemstilling: str) -> bool:

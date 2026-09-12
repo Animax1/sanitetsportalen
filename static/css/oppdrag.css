@@ -111,9 +111,9 @@
 .hastegrad-akutt   { background: #7f1d1d; color: #fecaca; }
 .hastegrad-haster  { background: #78350f; color: #fde68a; }
 .hastegrad-vanlig  { background: #14532d; color: #bbf7d0; }
-/* Teknisk er blå (André, 12. sep. 2026) — Vanlig flyttet til grønn, som i
+/* Drift er blå (André, 12. sep. 2026) — Vanlig flyttet til grønn, som i
    statistikken, så de to ikke leser likt. */
-.hastegrad-teknisk { background: #1e3a8a; color: #bfdbfe; }
+.hastegrad-drift   { background: #1e3a8a; color: #bfdbfe; }
 
 /* Enhetene gruppert på type, i tavla og i «Nytt oppdrag». */
 .enhet-gruppe {

@@ -172,7 +172,7 @@ function _tegnGrafer(s) {
     // Akutt/Haster/Vanlig i AMK-rekkefølge — fargene følger navnet, ikke
     // posisjonen, slik at en tom hastegrad ikke forskyver paletten.
     hastegrader.map(h => ({
-      'Akutt': '#dc2626', 'Haster': '#f59e0b', 'Vanlig': '#16a34a', 'Teknisk': '#2563eb',
+      'Akutt': '#dc2626', 'Haster': '#f59e0b', 'Vanlig': '#16a34a', 'Drift': '#2563eb',
     }[h] || '#64748b')));
 
   const statuser = s.status_naa.filter(r => r.antall > 0);

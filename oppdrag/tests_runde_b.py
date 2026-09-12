@@ -1,6 +1,6 @@
 """Andrés runde på staging 12. sep. 2026, del B — verdimengdene og lokasjonene.
 
-Teknisk hastegrad med egne problemstillinger, «Udefinert» som må bort før
+Hastegraden Drift med egne problemstillinger, «Udefinert» som må bort før
 bilen slås ledig, antall på transport, enhetstyper som grupperer tavla, og
 lokasjoner som sentralbordet vedlikeholder selv.
 """
@@ -18,13 +18,14 @@ from .tests_views import OppdragBasis, StemplingBasis, _bruker, _klient
 
 
 class VerdimengdeneTests(SimpleTestCase):
-    def test_teknisk_har_egne_problemstillinger_og_alle_har_udefinert(self):
+    def test_drift_har_egne_problemstillinger_og_alle_har_udefinert(self):
         for h in choices.HASTEGRAD:
-            self.assertIn(choices.UDEFINERT, choices.PROBLEMSTILLINGER_FOR[h], h)
-        self.assertIn('Matutlevering', choices.PROBLEMSTILLINGER_FOR['Teknisk'])
+            # Øverst, ikke bare med (André, 12. sep. 2026).
+            self.assertEqual(choices.PROBLEMSTILLINGER_FOR[h][0], choices.UDEFINERT, h)
+        self.assertIn('Matutlevering', choices.PROBLEMSTILLINGER_FOR['Drift'])
         self.assertNotIn('Matutlevering', choices.PROBLEMSTILLINGER_FOR['Akutt'])
-        self.assertNotIn('Pustevansker', choices.PROBLEMSTILLINGER_FOR['Teknisk'])
-        self.assertTrue(choices.problemstilling_passer('Teknisk', 'Transport'))
+        self.assertNotIn('Pustevansker', choices.PROBLEMSTILLINGER_FOR['Drift'])
+        self.assertTrue(choices.problemstilling_passer('Drift', 'Transport'))
         self.assertTrue(choices.problemstilling_passer('Vanlig', 'Transport'))
         self.assertFalse(choices.problemstilling_passer('Vanlig', 'Matutlevering'))
         self.assertFalse(choices.problemstilling_passer('Tull', 'Transport'), 'ukjent stenger')
@@ -48,13 +49,13 @@ class OpprettelseTests(OppdragBasis):
         return self.c.post('/oppdrag/api/oppdrag/', data=json.dumps(data),
                            content_type='application/json')
 
-    def test_teknisk_med_matutlevering(self):
-        res = self._post(hastegrad='Teknisk', problemstilling='Matutlevering')
+    def test_drift_med_matutlevering(self):
+        res = self._post(hastegrad='Drift', problemstilling='Matutlevering')
         self.assertEqual(res.status_code, 200, res.content)
-        self.assertEqual(res.json()['data']['hastegrad'], 'Teknisk')
+        self.assertEqual(res.json()['data']['hastegrad'], 'Drift')
 
     def test_problemstillingen_maa_hore_til_hastegraden(self):
-        for h, p in (('Teknisk', 'Pustevansker'), ('Vanlig', 'Matutlevering')):
+        for h, p in (('Drift', 'Pustevansker'), ('Vanlig', 'Matutlevering')):
             with self.subTest(h=h, p=p):
                 res = self._post(hastegrad=h, problemstilling=p)
                 self.assertEqual(res.status_code, 400)
@@ -82,15 +83,15 @@ class OpprettelseTests(OppdragBasis):
 
     def test_redigering_sjekker_mot_gjeldende_verdier(self):
         o = self._oppdrag()   # Akutt / Pustevansker
-        res = self.c.put(f'/oppdrag/api/oppdrag/{o.pk}/', data=json.dumps({'hastegrad': 'Teknisk'}),
+        res = self.c.put(f'/oppdrag/api/oppdrag/{o.pk}/', data=json.dumps({'hastegrad': 'Drift'}),
                          content_type='application/json')
-        self.assertEqual(res.status_code, 400, 'Pustevansker er ikke teknisk')
+        self.assertEqual(res.status_code, 400, 'Pustevansker er ikke drift')
         res = self.c.put(f'/oppdrag/api/oppdrag/{o.pk}/',
-                         data=json.dumps({'hastegrad': 'Teknisk', 'problemstilling': 'Transport', 'antall': 4}),
+                         data=json.dumps({'hastegrad': 'Drift', 'problemstilling': 'Transport', 'antall': 4}),
                          content_type='application/json')
         self.assertEqual(res.status_code, 200, res.content)
         o.refresh_from_db()
-        self.assertEqual((o.hastegrad, o.problemstilling, o.antall), ('Teknisk', 'Transport', 4))
+        self.assertEqual((o.hastegrad, o.problemstilling, o.antall), ('Drift', 'Transport', 4))
         res = self.c.put(f'/oppdrag/api/oppdrag/{o.pk}/', data=json.dumps({'problemstilling': 'Utstyr'}),
                          content_type='application/json')
         self.assertEqual(res.status_code, 200)
@@ -177,7 +178,7 @@ class GrupperingJsTests(SimpleTestCase):
     VINDU = ("globalThis.window = { OPPDRAG_ENHETSTYPER: [['ambulanse','Ambulanse'],['mannskapsbil','Mannskapsbil'],"
              "['lag','Lag til fots'],['annet','Annet']],"
              " OPPDRAG_PROBLEMSTILLINGER_FOR: {Akutt: ['Udefinert','Pustevansker','Transport'],"
-             " Teknisk: ['Udefinert','Matutlevering','Transport']}, OPPDRAG_MED_ANTALL: ['Transport'] };\n")
+             " Drift: ['Udefinert','Matutlevering','Transport']}, OPPDRAG_MED_ANTALL: ['Transport'] };\n")
 
     def setUp(self):
         if not node_available():
@@ -219,11 +220,11 @@ class GrupperingJsTests(SimpleTestCase):
             };
             felter['nytt-antall-rad'].classList.s = felter['nytt-antall-rad'].klasser;
             globalThis.document = { getElementById: (id) => felter[id] || null };
-            felter['nytt-hastegrad'].value = 'Teknisk';
+            felter['nytt-hastegrad'].value = 'Drift';
             hastegradEndret('nytt');
             const html = felter['nytt-problemstilling'].innerHTML;
             assert(html.includes('Matutlevering') && !html.includes('Pustevansker'), html);
-            assert(html.includes('value="Udefinert" selected'), 'Pustevansker finnes ikke teknisk: første velges');
+            assert(html.includes('value="Udefinert" selected'), 'Pustevansker finnes ikke i drift: første velges');
             // Transport finnes i begge: valget beholdes, og antall-raden vises.
             felter['nytt-problemstilling'].value = 'Transport';
             felter['nytt-hastegrad'].value = 'Akutt';
@@ -248,7 +249,7 @@ class EnhetsskjermAntallTests(SimpleTestCase):
         harness = build_harness(EnhetEscapingOppforselTests.HARNESS)
         ut = run_node(harness, EnhetEscapingOppforselTests.STUBB + """
             globalThis.mineOppdrag = [{id: 1, status: 'venter', status_navn: 'Venter',
-              problemstilling: 'Transport', antall: 3, hastegrad: 'Teknisk', lokasjon_navn: 'Scene',
+              problemstilling: 'Transport', antall: 3, hastegrad: 'Drift', lokasjon_navn: 'Scene',
               opprettet: '2026-08-29T20:00:00Z', fritekst: '', neste_overgang: 'rykker_ut',
               neste_navn: 'Rykker ut', statusmeldinger: [], varslede: []}];
             const el = { innerHTML: '' };
@@ -257,4 +258,4 @@ class EnhetsskjermAntallTests(SimpleTestCase):
             console.log(el.innerHTML);
         """)
         self.assertIn('Transport · 3', ut)
-        self.assertIn('hastegrad-teknisk', ut)
+        self.assertIn('hastegrad-drift', ut)

@@ -270,7 +270,7 @@ kollaps som sletter radnivået etter 24 måneder. Viewet avviser arkivering mens
 på tavla. Pasientarkivet gjør *ikke* dette — der står pasientene igjen etter frysing. `fritekst` arkiveres **ikke** — feltet er unntatt verdilogging i audit,
 og å fryse det i 24 måneder ville uthult unntaket.
 
-**Verdimengdene (12. sep. 2026):** `HASTEGRAD` har fått «Teknisk» — et oppdrag uten
+**Verdimengdene (12. sep. 2026):** `HASTEGRAD` har fått «Drift» (het «Teknisk» én dag) — et oppdrag uten
 pasient — og problemstillingene avhenger av hastegraden: `choices.PROBLEMSTILLINGER_FOR`
 gir lista per hastegrad, `problemstilling_passer()` er regelen, og viewene sjekker paret
 mot de *gjeldende* verdiene ved redigering. «Udefinert» finnes i alle listene og kan

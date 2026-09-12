@@ -4,6 +4,12 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-12 — «Teknisk» heter «Drift»
+
+Migrasjon `oppdrag/0017`: nye hastegradvalg, og rader som sto som «Teknisk»
+på staging rettes til «Drift». «Udefinert» står øverst i alle fire listene,
+og `choices` håndhever det.
+
 ## 2026-09-12 — Andrés runde på staging, del C: «trenger ny ressurs»
 
 Én migrasjon, `oppdrag/0016`: `Oppdrag.trenger_ressurs` og
