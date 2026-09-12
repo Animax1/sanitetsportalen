@@ -23,6 +23,12 @@ urlpatterns = [
     # Vaktlistene. POST her planlegger en ny vakt — den lager både
     # `core.Vakt` og lista, og rører ikke portalens aktive vakt.
     path('api/vaktlister/', views.vaktlister_view, name='vaktliste_api_vaktlister'),
+    # Arkivering (12. sep. 2026): to navngitte stier, ikke `<str:retning>` —
+    # et fritt ledd her ville fanget `ressurser/`, `belastning/` og `drift/`.
+    path('api/vaktlister/<int:pk>/arkiver/', views.vaktliste_arkiver_view,
+         {'retning': 'arkiver'}, name='vaktliste_api_vaktliste_arkiver'),
+    path('api/vaktlister/<int:pk>/gjenopprett/', views.vaktliste_arkiver_view,
+         {'retning': 'gjenopprett'}, name='vaktliste_api_vaktliste_gjenopprett'),
     path('api/vaktlister/<int:pk>/', views.vaktliste_detalj_view,
          name='vaktliste_api_vaktliste_detalj'),
 

@@ -4,6 +4,39 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-12 — Andrés testrapport, runde 2: vaktlisten
+
+Én migrasjon, `vaktliste/0013`: `Vaktliste.arkivert_at`, rent `AddField`.
+
+- **Egne folk på andres plass.** «En ressurs som er tildelt et annet korps
+  men har fått et personell fra et annet korps kan ikke den med skriv eget
+  korps redigere.» Nå: **en fylt rad følger personen, en tom følger
+  reservasjonen** (`kan_rore_vaktpost`, `kan_sette_vaktpost`, og
+  `kanRoreRad` i JS). Står en av korpsets egne på Karmøys plass, kan
+  korps-føreren rette raden, bytte til en annen av egne, eller ta henne ut
+  så plassen blir ledig — men ikke fylle den med et annet korps, og er
+  raden først tom, er den Karmøys igjen. Andres person på egen ressurs er
+  deres rad. `EgenPersonPaaAndresPlassTests` på server, speilet i JS.
+- **Arkivering av vaktliste i stedet for sletting.** «Vi må kunne
+  lagre/arkivere vaktlista for å hente den igjen ved feil.» Global admin
+  får «Arkiver vaktlisten» i vaktvinduet: lista går ut av velgeren, alt
+  står, og «Arkiverte vaktlister» under har «Hent tilbake».
+  `POST api/vaktlister/<pk>/arkiver/` og `gjenopprett/` — to navngitte stier,
+  ikke `<str:retning>`, som ville fanget `ressurser/` og `belastning/`
+  (testen fant det). `DELETE` finnes fortsatt, uten knapp.
+- **Til-tiden foreslås som fra + 8 t** i «Opprett vakt» og «Rediger skift»
+  når den er tom eller ligger før fra (`foreslaaTil`); et til som alt står
+  etter fra røres ikke.
+- **«Mitt korps» viser timer**: avsatt (uten probono) og probono for seg.
+- **Probono-merket vises også på en ledig plass**, i ressurstabellen og i
+  «Mitt korps».
+- **Bare global admin kan koble en adminkonto til et korps**
+  (`_kobler_til_admin` i registerviewet): badgen avgjør hva kontoen får
+  redigere, og en vaktleder skal ikke kunne gi eller ta administratorens
+  korps.
+- **«Korps»-etiketten ved korpsvelgeren er borte.** Den leste som en knapp
+  som ikke gjorde noe; nedtrekkets «Alle korps» sier hva det er.
+
 ## 2026-09-12 — Andrés testrapport, runde 1: oppdrag og statistikk
 
 Fra prodtesten på staging (rapporten i chatten). Ingen migrasjon.

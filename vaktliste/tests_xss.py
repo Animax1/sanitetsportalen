@@ -235,7 +235,7 @@ class VaktlisteEscapingOppforselTests(SimpleTestCase):
                         '_ikkePlassert', '_tidsspenn', '_vaktspenn',
                         '_bemanningPerTime', '_iso16', '_d', '_kl', '_dag',
                         '_sammeDag', '_nivaa', '_erAdmin', 'kanSkriveAlt',
-                        'kanLede', 'kanBemanne')),
+                        'kanLede', 'kanBemanne', 'kanRoreRad')),
     )
 
     #: Byggerne spør om tilgang fra fase 3. Node har ingen `window`, så den
@@ -1731,7 +1731,7 @@ class FanenErGruppaTests(SimpleTestCase):
                         '_iso16', '_posterFor', '_ikkePlassert',
                         '_ressurserIGruppe', '_grupperMedRessurser', '_d', '_kl',
                         '_dag', '_nivaa', '_erAdmin', 'kanSkriveAlt', 'kanLede',
-                        'kanBemanne', 'gruppaHarPlass')),
+                        'kanBemanne', 'gruppaHarPlass', 'kanRoreRad')),
     )
     VINDU = ("globalThis.window = { MODUL_TILGANG: { admin: true } };\n"
              "globalThis.DAGER = ['søn','man','tir','ons','tor','fre','lør'];\n"
@@ -2085,7 +2085,7 @@ class EnkeltgruppeTests(SimpleTestCase):
                         '_posterFor', '_ressurserIGruppe',
                         '_grupperMedRessurser', '_d', '_kl', '_dag',
                         '_nivaa', '_erAdmin', 'kanSkriveAlt', 'kanLede',
-                        'kanBemanne', 'gruppaHarPlass')),
+                        'kanBemanne', 'gruppaHarPlass', 'kanRoreRad')),
     )
     VINDU = ("globalThis.window = { MODUL_TILGANG: { admin: true } };\n"
              "globalThis.DAGER = ['søn','man','tir','ons','tor','fre','lør'];\n"
@@ -2527,7 +2527,7 @@ class NyVaktpostFyllerDatoenTests(SimpleTestCase):
         (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue')),
         (VAKTLISTE_JS, ('apneVaktpost', '_settTid', '_iso16', '_d',
                         '_fyll', '_skjulFeil', '_vaktpostModusSkifte',
-                        'rollerForGruppe')),
+                        'rollerForGruppe', '_plussTimer')),
     )
 
     def setUp(self):
@@ -2559,7 +2559,8 @@ class NyVaktpostFyllerDatoenTests(SimpleTestCase):
             apneVaktpost(10);
             assert(felter['ny-vaktpost-fra'].value === '2026-10-03T08:00',
                    'fra: ' + felter['ny-vaktpost-fra'].value);
-            assert(felter['ny-vaktpost-til'].value === '2026-10-03T08:00',
+            // Til står åtte timer etter fra (André, 12. sep. 2026).
+            assert(felter['ny-vaktpost-til'].value === '2026-10-03T16:00',
                    'til: ' + felter['ny-vaktpost-til'].value);
         """)
 
@@ -2587,7 +2588,7 @@ class NyVaktpostFyllerDatoenTests(SimpleTestCase):
             assert(felter['ny-vaktpost-fra'].value === '2026-10-03T08:00',
                    'gammel fra-tid ble staaende: '
                    + felter['ny-vaktpost-fra'].value);
-            assert(felter['ny-vaktpost-til'].value === '2026-10-03T08:00',
+            assert(felter['ny-vaktpost-til'].value === '2026-10-03T16:00',
                    'gammel til-tid ble staaende: '
                    + felter['ny-vaktpost-til'].value);
         """)
@@ -2705,7 +2706,7 @@ class DriftflatenTests(SimpleTestCase):
         kropp = _uten_kommentarer(
             extract_function(read_js(VAKTLISTE_JS), 'mkRessurs'))
         self.assertIn('const drift = iDrift();', kropp)
-        self.assertIn('drift ? _driftrad(vp, kanRore) : _planrad(', kropp)
+        self.assertIn('drift ? _driftrad(vp, kanRoreRad(vp, r, kanRore))', kropp)
 
     def test_korpsforeren_ser_status_men_ingen_knapp(self):
         """Avklaring 11.3, speilet i grensesnittet. En knapp som fører til
@@ -2975,7 +2976,7 @@ class TidsblokkerTests(SimpleTestCase):
                         '_erAdmin', '_skiftrekkefolge', '_sumTimer',
                         '_varighet', '_skifttimer', '_tall', '_d', '_kl',
                         '_dag', '_sammeDag', '_tidsspenn', '_vaktspenn',
-                        '_ressurserIGruppe', '_grupperMedRessurser')),
+                        '_ressurserIGruppe', '_grupperMedRessurser', 'kanRoreRad')),
     )
     VINDU = ("globalThis.window = { MODUL_TILGANG: { admin: true } };\n"
              "globalThis.DAGER = ['søn','man','tir','ons','tor','fre','lør'];\n"
@@ -3527,7 +3528,7 @@ class MittKorpsTests(SimpleTestCase):
                         '_blokklinje', '_telling', '_skiftrekkefolge',
                         '_varighet', '_skifttimer', '_tall', '_d', '_kl',
                         '_dag', '_sammeDag', '_tidsspenn', '_korpsKropp',
-                        '_plassKorps')),
+                        '_plassKorps', '_sumTimer')),
     )
     VINDU = ("globalThis.DAGER = ['søn','man','tir','ons','tor','fre','lør'];\n"
              "globalThis.MND = ['jan','feb','mar','apr','mai','jun',"
@@ -3741,3 +3742,122 @@ class HendelsedelegeringTests(SimpleTestCase):
             const el = { dataset: { action: 'finnesIkke', hendelse: 'change' }, value: '' };
             haandterHendelse({ target: { closest: () => el } });
         """)
+
+
+class EgenPersonPaaAndresPlassJsTests(SimpleTestCase):
+    """`kanRoreRad` speiler `services.kan_rore_vaktpost` (12. sep. 2026)."""
+
+    HARNESS = (
+        (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue')),
+        (VAKTLISTE_JS, ('kanRoreRad', 'kanBemannePlass', 'kanSkriveAlt', '_nivaa', '_erAdmin')),
+    )
+
+    def setUp(self):
+        if not node_available():
+            self.skipTest('node er ikke tilgjengelig')
+        self.harness = build_harness(self.HARNESS)
+
+    def test_egen_person_paa_karmoys_plass_er_egen_rad(self):
+        run_node(self.harness, """
+            globalThis.window = { MODUL_TILGANG: { vaktliste: 'skriv_handling' }, MITT_KORPS_ID: 1 };
+            const karmoy = { id: 20, korps_id: 2 };
+            assert(kanRoreRad({ledig: false, korps_id: 1, reservert_korps_id: 2}, karmoy, false), 'egen person: egen rad');
+            assert(!kanRoreRad({ledig: false, korps_id: 2, reservert_korps_id: 2}, karmoy, false), 'deres person: deres rad');
+            assert(!kanRoreRad({ledig: true, korps_id: null, reservert_korps_id: 2}, karmoy, false), 'tom plass hos dem: deres');
+            assert(kanRoreRad({ledig: true, korps_id: null, reservert_korps_id: 1}, karmoy, false), 'tom plass satt av til meg');
+            assert(kanRoreRad({ledig: true, korps_id: null, reservert_korps_id: 2}, karmoy, true), 'ressursen min: tom plass');
+            assert(!kanRoreRad({ledig: false, korps_id: 2, reservert_korps_id: 1}, {id: 10, korps_id: 1}, true), 'deres person på min ressurs: deres rad');
+            globalThis.window = { MODUL_TILGANG: { vaktliste: 'skriv_full' }, MITT_KORPS_ID: null };
+            assert(kanRoreRad({ledig: false, korps_id: 2, reservert_korps_id: 1}, {id: 10, korps_id: 1}, true), 'skriv_full: alt');
+        """)
+
+
+class ForeslaaTilTests(SimpleTestCase):
+    """Til-tiden foreslås som fra + 8 t når den er tom eller før fra
+    (André, 12. sep. 2026). Et til som alt står etter fra røres ikke."""
+
+    HARNESS = ((VAKTLISTE_JS, ('foreslaaTil', '_plussTimer', '_iso16', '_d')),)
+
+    def setUp(self):
+        if not node_available():
+            self.skipTest('node er ikke tilgjengelig')
+        self.harness = build_harness(self.HARNESS)
+
+    DOM = """
+        const felter = { fra: { value: '2026-10-03T08:00' }, til: { value: '' } };
+        globalThis.document = { getElementById: (id) => felter[id] };
+    """
+
+    def test_tom_til_blir_fra_pluss_aatte(self):
+        run_node(self.harness, self.DOM + """
+            foreslaaTil('fra', 'til');
+            assert(felter.til.value === '2026-10-03T16:00', 'fikk ' + felter.til.value);
+        """)
+
+    def test_til_foer_fra_flyttes_men_til_etter_fra_staar(self):
+        run_node(self.harness, self.DOM + """
+            felter.til.value = '2026-10-03T06:00';
+            foreslaaTil('fra', 'til');
+            assert(felter.til.value === '2026-10-03T16:00', 'før fra: ' + felter.til.value);
+            felter.til.value = '2026-10-03T12:00';
+            foreslaaTil('fra', 'til');
+            assert(felter.til.value === '2026-10-03T12:00', 'etter fra skal stå: ' + felter.til.value);
+        """)
+
+    def test_over_midnatt(self):
+        run_node(self.harness, self.DOM + """
+            felter.fra.value = '2026-10-03T20:00';
+            foreslaaTil('fra', 'til');
+            assert(felter.til.value === '2026-10-04T04:00', 'fikk ' + felter.til.value);
+        """)
+
+
+class MittKorpsTimerTests(SimpleTestCase):
+    """Timene i «Mitt korps»: avsatt (uten probono) og probono for seg."""
+
+    HARNESS = MittKorpsTests.HARNESS
+    VINDU = MittKorpsTests.VINDU
+    LISTE = MittKorpsTests.LISTE
+
+    def setUp(self):
+        if not node_available():
+            self.skipTest('node er ikke tilgjengelig')
+        self.harness = build_harness(self.HARNESS)
+
+    def test_avsatt_og_probono_summeres_hver_for_seg(self):
+        ut = run_node(self.harness, self.VINDU + self.LISTE + """
+            globalThis.window = { MODUL_TILGANG: { vaktliste: 'skriv_handling' }, MITT_KORPS_ID: 1 };
+            aktivListe.vaktposter[3].probono = true;
+            console.log(mkMittKorps());
+        """)
+        # HGSD ser plass 1 (alle korps, 10 t) og Kari (10 t, probono).
+        self.assertIn('<b>10 t</b><span class="vl-meta">avsatt</span>', ut)
+        self.assertIn('<b>10 t</b><span class="vl-meta">probono</span>', ut)
+        # Og en ledig plass med probono viser merket (André: «ser ingen merke der»).
+        ut2 = run_node(self.harness, self.VINDU + self.LISTE + """
+            globalThis.window = { MODUL_TILGANG: { vaktliste: 'skriv_handling' }, MITT_KORPS_ID: 1 };
+            aktivListe.vaktposter[0].probono = true;
+            console.log(mkMittKorps());
+        """)
+        self.assertIn('vl-probono', ut2)
+
+
+class ArkiverteVaktlisterTests(SimpleTestCase):
+    HARNESS = (
+        (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue')),
+        (VAKTLISTE_JS, ('mkArkiverteVaktlister', '_dag', '_kl', '_d')),
+    )
+
+    def setUp(self):
+        if not node_available():
+            self.skipTest('node er ikke tilgjengelig')
+        self.harness = build_harness(self.HARNESS)
+
+    def test_lista_med_hent_tilbake_og_escaping(self):
+        ut = run_node(self.harness, MittKorpsTests.VINDU + """
+            console.log(mkArkiverteVaktlister([{id: 4, vakt_navn: '<b>TEST</b>', arkivert_at: '2026-09-12T10:00:00'}]));
+            console.log(mkArkiverteVaktlister([]));
+        """)
+        self.assertIn('&lt;b&gt;TEST&lt;/b&gt;', ut)
+        self.assertIn('data-action="gjenopprettVaktliste" data-id="4"', ut)
+        self.assertIn('Ingen arkiverte vaktlister', ut)

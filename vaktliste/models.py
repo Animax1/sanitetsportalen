@@ -382,6 +382,12 @@ class Vaktliste(BaseTimeStampedModel):
         null=True, blank=True,
         verbose_name='Planlagt slutt',
         help_text='Når vakta er tenkt å være over. Styrer bemanningskurven.')
+    # **Arkivert, ikke slettet** (André, 12. sep. 2026: «lagre/arkivere
+    # vaktlista for å hente den igjen ved feil»). En arkivert liste er ute
+    # av velgeren, men alt står — og global admin henter den tilbake.
+    # `DELETE` finnes fortsatt for det som skal bort for godt.
+    arkivert_at = models.DateTimeField(
+        null=True, blank=True, db_index=True, verbose_name='Arkivert')
     satt_i_drift_at = models.DateTimeField(
         null=True, blank=True, verbose_name='Satt i drift')
     satt_i_drift_av = models.ForeignKey(

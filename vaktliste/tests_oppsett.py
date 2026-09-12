@@ -1079,3 +1079,36 @@ class RessursrolleTests(TestCase):
     def test_rollen_heter_ressursrolle(self):
         self.assertEqual(Ressursrolle._meta.verbose_name, 'Ressursrolle')
         self.assertEqual(Ressursrolle._meta.verbose_name_plural, 'Ressursroller')
+
+
+class ArkiveringAvVaktlisteTests(ApiTests):
+    """Arkivert, ikke slettet (André, 12. sep. 2026): lista går ut av
+    velgeren, alt står, og global admin henter den tilbake."""
+
+    def test_arkivering_tar_lista_ut_av_velgeren_og_gjenoppretting_inn(self):
+        vl = self._liste('Testvakten')
+        res = self.c.post(f'/vaktliste/api/vaktlister/{vl.pk}/arkiver/')
+        self.assertEqual(res.status_code, 200, res.content)
+        self.assertIsNotNone(res.json()['data']['arkivert_at'])
+        self.assertEqual([v['id'] for v in self.c.get('/vaktliste/api/vaktlister/').json()['data']], [])
+        arkiverte = self.c.get('/vaktliste/api/vaktlister/?arkiverte=1').json()['data']
+        self.assertEqual([v['id'] for v in arkiverte], [vl.pk])
+        # Alt står: ressursene og skiftene er der.
+        self.assertEqual(self.c.get(f'/vaktliste/api/vaktlister/{vl.pk}/').status_code, 200)
+        res = self.c.post(f'/vaktliste/api/vaktlister/{vl.pk}/gjenopprett/')
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual([v['id'] for v in self.c.get('/vaktliste/api/vaktlister/').json()['data']], [vl.pk])
+
+    def test_bare_global_admin(self):
+        vl = self._liste('Testvakten')
+        leder = _klient(_bruker('leder', 'skriv_leder'))
+        self.assertEqual(leder.post(f'/vaktliste/api/vaktlister/{vl.pk}/arkiver/').status_code, 403)
+        self.assertEqual(leder.get('/vaktliste/api/vaktlister/?arkiverte=1').status_code, 403)
+        self.assertIsNone(vl.__class__.objects.get(pk=vl.pk).arkivert_at)
+
+    def test_undersstiene_er_urort(self):
+        """`arkiver/` og `gjenopprett/` er navngitte stier — `ressurser/` og
+        `belastning/` må fortsatt treffe sine egne views."""
+        vl = self._liste('Testvakten')
+        self.assertEqual(self.c.get(f'/vaktliste/api/vaktlister/{vl.pk}/belastning/').status_code, 200)
+        self.assertEqual(self.c.post(f'/vaktliste/api/vaktlister/{vl.pk}/tull/').status_code, 404)

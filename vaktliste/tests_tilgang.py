@@ -1273,3 +1273,66 @@ class TildeltAlleKorpsTests(TilgangsBasis):
         vp = Vaktpost.objects.get(pk=pk)
         self.assertFalse(vp.alle_korps)
         self.assertEqual(vp.korps_id, self.karmoy.pk)
+
+
+class EgenPersonPaaAndresPlassTests(TilgangsBasis):
+    """Står en av korpsets egne på en plass satt av til et annet korps, er
+    raden korpsets så lenge personen står der (André, 12. sep. 2026):
+    «Den må kunne endre det til sine mannskaper eller til og med sette den
+    tom.» Reservasjonen sier hvem som får fylle en *tom* plass."""
+
+    def _egen_paa_karmoys_plass(self):
+        res = self.c_vl.post(f'/vaktliste/api/ressurser/{self.res_karmoy.pk}/vaktposter/',
+                             data={'fra_tid': self._iso(0), 'til_tid': self._iso(8),
+                                   'mannskap_id': self.p_hgsd.pk},
+                             content_type='application/json')
+        self.assertEqual(res.status_code, 201, res.content)
+        return res.json()['data']['id']
+
+    def test_korpsbrukeren_faar_redigere_raden(self):
+        pk = self._egen_paa_karmoys_plass()
+        res = self.c_kb.put(f'/vaktliste/api/vaktposter/{pk}/',
+                            data={'merknad': 'Kommer 17:30'}, content_type='application/json')
+        self.assertEqual(res.status_code, 200, res.content)
+
+    def test_hun_kan_bytte_til_en_annen_av_egne(self):
+        pk = self._egen_paa_karmoys_plass()
+        ola = Mannskap.objects.create(navn='Ola HGSD', korps=self.hgsd)
+        res = self.c_kb.put(f'/vaktliste/api/vaktposter/{pk}/',
+                            data={'mannskap_id': ola.pk}, content_type='application/json')
+        self.assertEqual(res.status_code, 200, res.content)
+        self.assertEqual(Vaktpost.objects.get(pk=pk).mannskap, ola)
+
+    def test_hun_kan_sette_raden_tom(self):
+        pk = self._egen_paa_karmoys_plass()
+        res = self.c_kb.put(f'/vaktliste/api/vaktposter/{pk}/',
+                            data={'mannskap_id': None}, content_type='application/json')
+        self.assertEqual(res.status_code, 200, res.content)
+        self.assertIsNone(Vaktpost.objects.get(pk=pk).mannskap_id)
+
+    def test_men_ikke_fylle_den_med_et_annet_korps(self):
+        pk = self._egen_paa_karmoys_plass()
+        res = self.c_kb.put(f'/vaktliste/api/vaktposter/{pk}/',
+                            data={'mannskap_id': self.p_karmoy.pk}, content_type='application/json')
+        self.assertEqual(res.status_code, 403)
+
+    def test_en_tom_plass_hos_de_andre_er_fortsatt_deres(self):
+        """Er raden først tømt, gjelder reservasjonen igjen."""
+        pk = self._egen_paa_karmoys_plass()
+        self.c_kb.put(f'/vaktliste/api/vaktposter/{pk}/',
+                      data={'mannskap_id': None}, content_type='application/json')
+        res = self.c_kb.put(f'/vaktliste/api/vaktposter/{pk}/',
+                            data={'mannskap_id': self.p_hgsd.pk}, content_type='application/json')
+        self.assertEqual(res.status_code, 403)
+
+    def test_en_annens_person_paa_egen_ressurs_er_ikke_hennes(self):
+        """Regelen går på personen, ikke på ressursen: Karmøys mann på HGSDs
+        lag er Karmøys rad."""
+        res = self.c_vl.post(f'/vaktliste/api/ressurser/{self.res_hgsd.pk}/vaktposter/',
+                             data={'fra_tid': self._iso(0), 'til_tid': self._iso(8),
+                                   'mannskap_id': self.p_karmoy.pk},
+                             content_type='application/json')
+        pk = res.json()['data']['id']
+        res = self.c_kb.put(f'/vaktliste/api/vaktposter/{pk}/',
+                            data={'merknad': 'x'}, content_type='application/json')
+        self.assertEqual(res.status_code, 403)

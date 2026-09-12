@@ -43,7 +43,7 @@ from django.http import JsonResponse
 from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_http_methods
 
-from core.auth_decorators import modul_kreves
+from core.auth_decorators import er_global_admin, modul_kreves
 from core.ratelimit import rate_limit
 
 from .models import (Kompetanse, Korps, Mannskap, Ressursgruppe,
@@ -339,6 +339,20 @@ def _kontoer():
     ]
 
 
+def _kobler_til_admin(request, user_id) -> bool:
+    """Å koble en **adminkonto** til et korps er global admin (André,
+    12. sep. 2026). Badgen avgjør hva kontoen får redigere, og en
+    vaktleder skal ikke kunne gi administratoren et korps — eller ta det
+    fra henne."""
+    from django.contrib.auth import get_user_model
+    if er_global_admin(request.user):
+        return False
+    pk = _int(user_id)
+    if pk is None:
+        return False
+    return get_user_model().objects.filter(pk=pk, role='admin').exists()
+
+
 @never_cache
 @modul_kreves('vaktliste', 'les', svar='json')
 @require_http_methods(['GET', 'POST'])
@@ -397,6 +411,8 @@ def mannskap_view(request):
     full = services.kan_skrive_alt(request.user)
     if data.get('user_id') and not full:
         return _nektet('Kontokobling krever full skrivetilgang.')
+    if data.get('user_id') and _kobler_til_admin(request, data.get('user_id')):
+        return _nektet('Bare global admin kan koble en adminkonto til et korps.')
 
     try:
         with transaction.atomic():
@@ -479,6 +495,8 @@ def mannskap_detalj_view(request, pk):
     if 'user_id' in data:
         if not full:
             return _nektet('Kontokobling krever full skrivetilgang.')
+        if _kobler_til_admin(request, data['user_id']):
+            return _nektet('Bare global admin kan koble en adminkonto til et korps.')
         person.user_id = _int(data['user_id'])
 
     try:

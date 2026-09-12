@@ -153,6 +153,7 @@ def _vaktliste_til_dict(vl):
                            if vl.planlagt_slutt else None),
         'er_aktiv_vakt': vl.vakt.er_aktiv,
         'notat': vl.notat,
+        'arkivert_at': vl.arkivert_at.isoformat() if vl.arkivert_at else None,
     }
 
 
@@ -263,7 +264,15 @@ def vaktlister_view(request):
         return _nektet()
 
     if request.method == 'GET':
-        qs = Vaktliste.objects.select_related('vakt').all()
+        # Arkiverte lister er ute av velgeren. `?arkiverte=1` gir dem, og
+        # bare til global admin — det er hun som henter tilbake.
+        if request.GET.get('arkiverte'):
+            if not er_global_admin(request.user):
+                return _nektet()
+            qs = (Vaktliste.objects.select_related('vakt')
+                  .filter(arkivert_at__isnull=False).order_by('-arkivert_at'))
+        else:
+            qs = Vaktliste.objects.select_related('vakt').filter(arkivert_at__isnull=True)
         return JsonResponse({'status': 'ok', 'data': [
             _vaktliste_til_dict(vl) for vl in qs]})
 
@@ -286,6 +295,34 @@ def vaktlister_view(request):
     svar = _vaktliste_til_dict(ny)
     svar['kopierte_ressurser'] = kopiert
     return JsonResponse({'status': 'ok', 'data': svar}, status=201)
+
+
+@never_cache
+@modul_kreves('vaktliste', 'les', svar='json')
+@require_http_methods(['POST'])
+def vaktliste_arkiver_view(request, pk, retning):
+    """Arkiver (`arkiver`) eller hent tilbake (`gjenopprett`) en vaktliste.
+
+    Global admin, som sletting — det er den samme handlingen sett fra
+    velgeren, bare reversibel. Retningen står i URL-en, ikke i kroppen,
+    av samme grunn som driftporten: et veksle-endepunkt gir et kappløp.
+    """
+    if not er_global_admin(request.user):
+        return _nektet()
+    if retning not in ('arkiver', 'gjenopprett'):
+        return _feil('Ukjent retning.', status=404)
+    try:
+        vl = Vaktliste.objects.select_related('vakt').get(pk=pk)
+    except Vaktliste.DoesNotExist:
+        return _feil('Vaktliste ikke funnet', status=404)
+    if retning == 'arkiver':
+        if vl.arkivert_at is None:
+            vl.arkivert_at = timezone.now()
+            vl.save(update_fields=['arkivert_at', 'updated_at'])
+    else:
+        vl.arkivert_at = None
+        vl.save(update_fields=['arkivert_at', 'updated_at'])
+    return JsonResponse({'status': 'ok', 'data': _vaktliste_til_dict(vl)})
 
 
 @never_cache

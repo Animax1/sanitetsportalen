@@ -129,6 +129,22 @@ function kanBemannePlass(vp, ressurs) {
 }
 
 
+function kanRoreRad(vp, ressurs, kanRoreRessurs) {
+  // Speiler `services.kan_rore_vaktpost`: står en av korpsets egne på
+  // raden, er raden korpsets — uansett hvem plassen er satt av til (André,
+  // 12. sep. 2026). Ellers gjelder reservasjonen på plassen.
+  if (!vp.ledig) {
+    // En fylt rad følger personen: egen person er egen rad, andres er deres
+    // — også på egen ressurs. Den som skriver alt, skriver alt.
+    if (kanSkriveAlt()) return true;
+    return _nivaa() === 'skriv_handling'
+      && window.MITT_KORPS_ID != null && vp.korps_id === window.MITT_KORPS_ID;
+  }
+  if (kanRoreRessurs) return true;
+  return kanBemannePlass(vp, ressurs);
+}
+
+
 function kanBemanne(ressurs) {
   // Den ene halvdelen av den doble regelen: reservasjonen. En ureservert
   // ressurs er ikke et fristed — den er vaktlederens bord.
@@ -1026,7 +1042,7 @@ function _planrad(vp, r, kanRore) {
   // En ledig plass er raden uten person. Den skal se ut som noe som
   // gjenstår — ikke som en rad der navnet mangler ved en feil.
   const navnCelle = vp.ledig
-    ? _fyllValgFor(vp, kanRore || kanBemannePlass(vp, r))
+    ? _fyllValgFor(vp, kanRore || kanBemannePlass(vp, r)) + _probonoMerke(vp)
     : escapeHtml(vp.navn) + _probonoMerke(vp);
 
   // **Korpskolonnen svarer på to ulike spørsmål.** Står det en person
@@ -1059,6 +1075,8 @@ function _planrad(vp, r, kanRore) {
 function mkRessurs(r) {
   const poster = _posterFor(r.id);
   const kanRore = kanBemanne(r);
+  // Per rad, ikke per ressurs: egen person på andres plass er egen rad
+  // (`kanRoreRad`), og en ledig plass satt av til korpset er hennes å fylle.
 
   const korpsmerke = r.korps_navn
     ? `<span class="vl-merkelapp vl-korps">${escapeHtml(r.korps_navn)}</span>`
@@ -1113,7 +1131,8 @@ function mkRessurs(r) {
   // **Blokker, ikke bare rader.** Skift med samme fra–til samles under én
   // blokklinje som bærer tiden, timene og antallet — se `_tidsblokker()`.
   // Raden under er enten regnearket (`_planrad`) eller driftraden.
-  const rad = (vp) => (drift ? _driftrad(vp, kanRore) : _planrad(vp, r, kanRore));
+  const rad = (vp) => (drift ? _driftrad(vp, kanRoreRad(vp, r, kanRore))
+                              : _planrad(vp, r, kanRoreRad(vp, r, kanRore)));
   const kolonner = drift ? 5 : 9;
   const kropp = poster.length
     ? _blokkerMedDager(_tidsblokker(poster), kolonner, rad)
@@ -1851,12 +1870,18 @@ function mkMittKorps() {
   const poster = _synligePoster(aktivListe.alle_vaktposter || aktivListe.vaktposter, korpsId);
   const ledige = poster.filter((vp) => vp.ledig).length;
   const bemannet = poster.length - ledige;
+  // Timene korpset har fått, og timene som er probono (André, 12. sep.
+  // 2026). `_sumTimer` hopper over probono; probono-summen regnes for seg.
+  const avsatt = _tall(_sumTimer(poster));
+  const probono = _tall(poster.reduce((sum, vp) => sum + (vp.probono ? (_skifttimer(vp) || 0) : 0), 0));
 
   const hode = `
     <div class="vl-kort vl-belastningshode">
       <div class="vl-noekkeltall">
         <div><b>${escHtmlValue(ledige)}</b><span class="vl-meta">${escapeHtml(ledige === 1 ? 'plass å dekke' : 'plasser å dekke')}</span></div>
         <div><b>${escHtmlValue(bemannet)}</b><span class="vl-meta">mannskap satt opp</span></div>
+        <div><b>${escapeHtml(avsatt)} t</b><span class="vl-meta">avsatt</span></div>
+        <div><b>${escapeHtml(probono)} t</b><span class="vl-meta">probono</span></div>
       </div>
       <span class="vl-meta">${escapeHtml(korpsnavn)} — tildelte plasser, og plasser tildelt alle korps</span>
     </div>`;
@@ -1870,7 +1895,7 @@ function mkMittKorps() {
   const rad = (vp) => {
     const r = ressursnavn[vp.ressurs_id];
     const hvem = vp.ledig
-      ? _fyllValgFor(vp, kanBemannePlass(vp, r))
+      ? _fyllValgFor(vp, kanBemannePlass(vp, r)) + _probonoMerke(vp)
       : escapeHtml(vp.navn) + _probonoMerke(vp);
     const tildelt = vp.ledig
       ? (vp.alle_korps ? 'Alle korps' : (korps ? (korps.kortnavn || korps.navn) : ''))
@@ -2158,7 +2183,9 @@ function apneVaktpost(ressursId) {
   // åpent — på en annen ressurs, i en annen gruppe.
   const start = aktivListe?.vaktliste?.startet || null;
   _settTid('ny-vaktpost-fra', start);
-  _settTid('ny-vaktpost-til', start);
+  // Til-tiden står åtte timer etter fra (André, 12. sep. 2026) — et
+  // vanlig skift, og aldri før fra.
+  _settTid('ny-vaktpost-til', _plussTimer(start, 8));
 
   _vaktpostModusSkifte();
   bootstrap.Modal.getOrCreateInstance(document.getElementById('nyVaktpostModal')).show();
@@ -2407,7 +2434,63 @@ function apneVakt() {
   }
 
   if (lengde) lengde.classList.toggle('d-none', !kanLede());
+  const arkivBolk = document.getElementById('vakt-arkiv-bolk');
+  if (arkivBolk) {
+    arkivBolk.classList.toggle('d-none', !_erAdmin());
+    if (_erAdmin()) lastArkiverteVaktlister();
+  }
   _apneModal('vaktModal');
+}
+
+
+async function arkiverVaktliste() {
+  // Arkivert, ikke slettet: lista går ut av velgeren, alt står, og den
+  // kan hentes tilbake her (André, 12. sep. 2026).
+  if (!aktivListe) return;
+  if (!confirm(`Arkivere vaktlisten for «${aktivListe.vaktliste.vakt_navn}»? Den kan hentes tilbake her.`)) return;
+  const res = await apiFetch(`/vaktliste/api/vaktlister/${aktivListe.vaktliste.id}/arkiver/`, { method: 'POST' });
+  const d = await res.json().catch(() => ({}));
+  if (!res.ok || d.status !== 'ok') {
+    _visFeil('vakt-lengde-feil', d.message || 'Kunne ikke arkivere.');
+    return;
+  }
+  _lukkModal('vaktModal');
+  await lastVaktlister();
+}
+
+
+async function gjenopprettVaktliste(id) {
+  const res = await apiFetch(`/vaktliste/api/vaktlister/${id}/gjenopprett/`, { method: 'POST' });
+  const d = await res.json().catch(() => ({}));
+  if (!res.ok || d.status !== 'ok') {
+    _visFeil('vakt-lengde-feil', d.message || 'Kunne ikke hente tilbake.');
+    return;
+  }
+  _lukkModal('vaktModal');
+  await lastVaktlister();
+  await lastListe(id);
+}
+
+
+async function lastArkiverteVaktlister() {
+  const el = document.getElementById('vakt-arkiverte');
+  if (!el) return;
+  const res = await apiFetch('/vaktliste/api/vaktlister/?arkiverte=1');
+  if (!res.ok) return;
+  const lister = (await res.json()).data || [];
+  el.innerHTML = mkArkiverteVaktlister(lister);
+}
+
+
+function mkArkiverteVaktlister(lister) {
+  if (!lister.length) return '<div class="vl-meta">Ingen arkiverte vaktlister.</div>';
+  return lister.map((vl) => `
+    <div class="d-flex align-items-center gap-2 py-1">
+      <span class="flex-grow-1">${escapeHtml(vl.vakt_navn)}
+        <span class="vl-meta">· arkivert ${escapeHtml(_dag(vl.arkivert_at))} ${escapeHtml(_kl(vl.arkivert_at))}</span></span>
+      <button type="button" class="btn btn-outline-secondary btn-sm"
+              data-action="gjenopprettVaktliste" data-id="${escHtmlValue(vl.id)}">Hent tilbake</button>
+    </div>`).join('');
 }
 
 
@@ -2417,6 +2500,25 @@ function skrivUtVakta() {
   _lukkModal('vaktModal');
   visFane(OVERSIKT);
   setTimeout(skrivUt, 250);
+}
+
+
+function _plussTimer(iso, timer) {
+  const d = _d(iso);
+  if (!d) return null;
+  d.setTime(d.getTime() + timer * 3600000);
+  return d.toISOString();
+}
+
+
+function foreslaaTil(fraId, tilId) {
+  // Når fra endres og til er tom eller ligger før fra, settes til = fra + 8 t.
+  // Et til som alt står etter fra røres ikke — det er noen som har satt det.
+  const fra = document.getElementById(fraId);
+  const til = document.getElementById(tilId);
+  if (!fra || !til || !fra.value) return;
+  if (til.value && til.value > fra.value) return;
+  til.value = _iso16(_plussTimer(fra.value, 8));
 }
 
 
@@ -3232,5 +3334,9 @@ document.addEventListener('DOMContentLoaded', () => {
   _koblPersonsok();
   document.getElementById('ny-vaktpost-mannskap')
     ?.addEventListener('change', _vaktpostModusSkifte);
+  document.getElementById('ny-vaktpost-fra')
+    ?.addEventListener('change', () => foreslaaTil('ny-vaktpost-fra', 'ny-vaktpost-til'));
+  document.getElementById('vaktpost-fra')
+    ?.addEventListener('change', () => foreslaaTil('vaktpost-fra', 'vaktpost-til'));
   lastVaktlister();
 });

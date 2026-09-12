@@ -690,3 +690,39 @@ class SammeFormBeggeVeierTests(TestCase):
         vfor = [k for k in self._fra_mannskapsendepunktet('kompetanser')
                 if k['navn'] == 'VFØR'][0]
         self.assertEqual(vfor['bygger_paa_navn'], 'GFØR')
+
+
+class AdminkoblingTests(TestCase):
+    """Å koble en adminkonto til et korps er global admin (André, 12. sep.
+    2026). Badgen avgjør hva kontoen får redigere, og en vaktleder skal
+    ikke kunne gi administratoren et korps — eller ta det fra henne."""
+
+    def setUp(self):
+        self.korps = Korps.objects.create(navn='Haugesund', kortnavn='HGSD')
+        self.admin = _bruker('adm', admin=True)
+        self.vaktleder = _bruker('vl', 'skriv_full')
+        self.vanlig = _bruker('vanlig', 'les')
+        self.c_vl = _klient(self.vaktleder)
+        self.c_adm = _klient(self.admin)
+
+    def _opprett(self, klient, user_id):
+        return klient.post('/vaktliste/api/mannskap/', content_type='application/json',
+                           data={'navn': 'Kari', 'korps_id': self.korps.pk, 'user_id': user_id})
+
+    def test_vaktleder_kan_ikke_koble_en_adminkonto(self):
+        res = self._opprett(self.c_vl, self.admin.pk)
+        self.assertEqual(res.status_code, 403, res.content)
+        self.assertEqual(Mannskap.objects.count(), 0)
+
+    def test_vaktleder_kobler_vanlige_kontoer_som_foer(self):
+        self.assertEqual(self._opprett(self.c_vl, self.vanlig.pk).status_code, 201)
+
+    def test_global_admin_kobler_adminkontoer(self):
+        self.assertEqual(self._opprett(self.c_adm, self.admin.pk).status_code, 201)
+
+    def test_heller_ikke_ved_redigering(self):
+        pk = self._opprett(self.c_vl, self.vanlig.pk).json()['data']['id']
+        res = self.c_vl.put(f'/vaktliste/api/mannskap/{pk}/', content_type='application/json',
+                            data={'user_id': self.admin.pk})
+        self.assertEqual(res.status_code, 403)
+        self.assertEqual(Mannskap.objects.get(pk=pk).user_id, self.vanlig.pk)

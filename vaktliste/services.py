@@ -494,8 +494,18 @@ def kan_sette_vaktpost(user, ressurs, mannskap, vaktpost=None) -> bool:
     dette unntaket ville badge-halvdelen ikke hatt noe å sjekke mot, og
     regelen falt åpen på nøyaktig det tilfellet som er nytt.
     """
+    # **Egen person på andres plass (André, 12. sep. 2026).** Står en av
+    # korpsets egne på en plass satt av til et annet korps, er raden
+    # korpsets så lenge personen står der: hun kan byttes mot en annen av
+    # egne, eller tas ut så plassen blir ledig igjen. Reservasjonen sier
+    # hvem som får *fylle* en tom plass — ikke hvem som får rydde opp i sin
+    # egen bemanning.
+    egen_staar_der = (vaktpost is not None and vaktpost.mannskap_id is not None
+                      and kan_redigere_mannskap(user, vaktpost.mannskap))
     if mannskap is None:
-        return kan_skrive_alt(user)
+        return egen_staar_der or kan_skrive_alt(user)
+    if egen_staar_der and kan_redigere_mannskap(user, mannskap):
+        return True
     return (kan_bemanne_plass(user, ressurs, vaktpost)
             and kan_redigere_mannskap(user, mannskap))
 
@@ -516,11 +526,12 @@ def kan_rore_vaktpost(user, vaktpost) -> bool:
     de plassene som var satt av til henne — funnet av
     `LedigPlassTilgangTests`.
     """
-    if not kan_bemanne_plass(user, vaktpost.ressurs, vaktpost):
-        return False
-    if vaktpost.mannskap_id is None:
-        return True
-    return kan_redigere_mannskap(user, vaktpost.mannskap)
+    # **En fylt rad følger personen, en tom følger reservasjonen** (12. sep.
+    # 2026). Egen person på andres plass er egen rad; andres person på egen
+    # ressurs er deres. Se `kan_sette_vaktpost`.
+    if vaktpost.mannskap_id is not None:
+        return kan_redigere_mannskap(user, vaktpost.mannskap)
+    return kan_bemanne_plass(user, vaktpost.ressurs, vaktpost)
 
 
 def _timer(fra, til):

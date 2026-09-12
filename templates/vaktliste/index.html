@@ -71,9 +71,10 @@
       ett valg er et nedtrekk som ser ødelagt ut.
     {% endcomment %}
     {% if ser_alle_korps %}
-    <label class="vl-meta mb-0 ms-2" for="vl-korpsvalg">Korps</label>
-    <select id="vl-korpsvalg" class="form-select form-select-sm vl-korpsvalg"
-            data-action="velgKorps" data-hendelse="change"></select>
+    {# Ingen egen etikett: den leste som en knapp som ikke gjorde noe (André, #}
+    {# 12. sep. 2026). Nedtrekkets første valg, «Alle korps», sier hva det er. #}
+    <select id="vl-korpsvalg" class="form-select form-select-sm vl-korpsvalg ms-2"
+            aria-label="Korps" data-action="velgKorps" data-hendelse="change"></select>
     {% endif %}
     <span class="flex-grow-1"></span>
     {% comment %}
@@ -295,9 +296,29 @@
 
           <button type="button" class="btn btn-outline-secondary btn-sm mb-3"
                   data-action="skrivUtVakta">
-            <i class="bi bi-printer me-1"></i>Skriv ut vaktlista
+            <i class="bi bi-printer me-1"></i>Skriv ut vaktlisten
           </button>
         </div>
+
+        {% comment %}
+          **Arkivering i stedet for sletting** (André, 12. sep. 2026). Global
+          admin — som sletting, men reversibel: lista går ut av velgeren, alt
+          står, og den hentes tilbake her. Bolken vises av `apneVakt()`.
+        {% endcomment %}
+        {% if er_global_admin %}
+        <div id="vakt-arkiv-bolk" class="d-none mb-3">
+          <hr>
+          <div class="d-flex align-items-center gap-2 flex-wrap mb-2">
+            <button type="button" class="btn btn-outline-danger btn-sm"
+                    data-action="arkiverVaktliste">
+              <i class="bi bi-archive me-1"></i>Arkiver vaktlisten
+            </button>
+            <span class="vl-meta">Tas ut av velgeren. Kan hentes tilbake under.</span>
+          </div>
+          <div class="vl-meta mb-1">Arkiverte vaktlister</div>
+          <div id="vakt-arkiverte"></div>
+        </div>
+        {% endif %}
 
         {% comment %}
           Gruppene er portalens oppsett, ikke denne vaktas — de gjelder alle
