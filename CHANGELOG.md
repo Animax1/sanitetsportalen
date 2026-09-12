@@ -4,6 +4,33 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-12 — Andrés rapport 3, manifest og logo
+
+Ingen migrasjon. Nye arkiv får tittelen «Arkivert dd.mm.åååå hh:mm»; eldre
+arkiv står som før i basen, og klienten klipper vaktnavnet av tittelen.
+
+- **Bilen ser de andre bilenes stempler i tidslinjen** (§7.3 snudd: «nyttig
+  for de å vite historikken der»). `andre_meldinger` i lista og detaljen,
+  tegnet dempet med bilens navn på raden. Egen kjede og knappene bygger
+  fortsatt bare på `statusmeldinger`, og de andres ID-er er med i ETag-en.
+- **Vaktarkivets tittel uten vaktnavnet.** Det sto på raden under alt, og
+  leste dobbelt («Test — arkivert … / Test · arkivert av»).
+- **«Mitt korps» skiller å dekke for korpset fra åpent for alle.** 32 t «å
+  dekke» der det meste var åpent for alle, leste som korpsets gjeld.
+- **Bemanningskurvens hode har tre tall og ikke mer:** «Ledige plasser: N ·
+  M plasser dekket» og «K plasser på det meste». Lista over ledige skift er
+  borte («for mye clutter»).
+- **«Arkiv» ved siden av «Arkiver vaktlisten», i sitt eget vindu.**
+  Vaktvinduet lukkes først (`_byttModal`), så to modaler aldri står oppå
+  hverandre — det var den feilen som frøs oppdragsvinduet.
+- **Manifest og logo.** `/manifest.webmanifest` (`core/manifest.py`, uten
+  innlogging, med `{% static %}`-stier fordi WhiteNoise hasher navnene) og
+  `static/img/logo.svg` med PNG-er i 192, 512, maskable og apple-touch.
+  Merket er en ring — portalen — med en pulslinje — sanitet; bevisst uten
+  kors, som er Røde Kors-emblemet. `partials/_ikoner.html` tas med i hver
+  mal med eget `<head>`, og logoen står i portalheaderen og på innloggingen.
+  `core/tests_manifest.py` håndhever alt tre.
+
 ## 2026-09-12 — Andrés rapport 2, runde 2: vaktlisten og statistikken
 
 Ingen migrasjon.

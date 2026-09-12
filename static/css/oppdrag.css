@@ -265,6 +265,10 @@
   cursor: help;
 }
 
+/* De andre bilenes rader i bilens tidslinje: dempet, med navnet først. */
+.tidslinje-andre { opacity: 0.72; }
+.tidslinje-enhet { font-weight: 600; }
+
 .tidslinje-notat {
   color: var(--text-muted);
   font-size: 0.8rem;

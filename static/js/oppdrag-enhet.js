@@ -244,8 +244,8 @@ function _grovsorteringsrad(o) {
 
 
 function _varsledeRad(o) {
-  // §7.3: bilen ser hvem som ellers er varslet på oppdraget — navnene,
-  // ikke hva de gjør. Deres status er sentralbordets.
+  // Hvem som ellers er varslet på oppdraget. Hva de gjør står i tidslinjen
+  // under, med navn på hver rad (`andre_meldinger`).
   const andre = o.varslede || [];
   if (!andre.length) return '';
   return `<div class="oppdrag-meta oppdrag-varslede mb-1">Også varslet: ${escapeHtml(andre.join(', '))}</div>`;
@@ -253,7 +253,15 @@ function _varsledeRad(o) {
 
 
 function tidslinjeEnhetHtml(o) {
-  return (o.statusmeldinger || []).map((m) => {
+  // **Egne og de andres stempler i én tidslinje** (André, 12. sep. 2026:
+  // «nyttig for de å vite historikken der»). De andres rader bærer bilens
+  // navn og er dempet; egen kjede og knappene hviler bare på
+  // `statusmeldinger`, så en annen bils Fremme flytter ikke denne bilen.
+  const egne = (o.statusmeldinger || []).map((m) => ({ m, andres: false }));
+  const andre = (o.andre_meldinger || []).map((m) => ({ m, andres: true }));
+  const rader = egne.concat(andre)
+    .sort((x, y) => String(x.m.tidspunkt).localeCompare(String(y.m.tidspunkt)));
+  return rader.map(({ m, andres }) => {
     // Markøren for et avledet tidspunkt sitter på KLOKKESLETTET, ikke på
     // statusordet — det er tidspunktet som er utledet. Gråtoner, ingen
     // badge: en ny farge ville gjort metadata om til en tilstand.
@@ -274,10 +282,13 @@ function tidslinjeEnhetHtml(o) {
       : '';
     // «Avreist → Sykehus»: stedet står ved statusen, ikke som notat.
     const statusMedSted = m.sted_navn ? `${m.status_navn} → ${m.sted_navn}` : String(m.status_navn);
+    const hvem = andres
+      ? `<span class="tidslinje-enhet">${escapeHtml(m.enhet_navn || '')}:</span> `
+      : '';
     return `
-      <div class="tidslinje-rad">
+      <div class="tidslinje-rad${andres ? ' tidslinje-andre' : ''}">
         <span class="${tidKlasse}"${tittel}>${escapeHtml(klokke(m.tidspunkt))}</span>
-        <span>${escapeHtml(statusMedSted)}</span>
+        <span>${hvem}${escapeHtml(statusMedSted)}</span>
         ${notatBlokk}
       </div>`;
   }).join('');

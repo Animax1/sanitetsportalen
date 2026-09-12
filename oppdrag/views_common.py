@@ -109,8 +109,9 @@ def oppdrag_til_dict(oppdrag, *, for_enhet: bool = False,
 
     ``koblingsrad`` er **bilens** rad på oppdraget (flere enheter, 11. sep.
     2026). Med den er `status` og `neste_overgang` hennes, ikke oppdragets
-    utledede — bilen skal se sin egen kjede. Og `varslede` er de andre
-    enhetenes *navn*, ikke status (§7.3 i notatet).
+    utledede — bilen skal se sin egen kjede. `varslede` er de andre
+    enhetenes navn; deres stempler sendes som `andre_meldinger` der lista og
+    detaljen bygges (§7.3, snudd 12. sep. 2026).
 
     ``meldinger`` sendes videre til `enheter_til_liste` av samme grunn som
     ``status_tidspunkt``: lista skal ikke koste én spørring per rad.

@@ -1279,6 +1279,19 @@ async function lastAlt() {
 
 let arkivliste = [];
 
+function _arkivTittel(a) {
+  // Eldre arkiv har «Vaktnavn — arkivert …» som tittel; navnet står alt på
+  // raden under, så det klippes her. Nye arkiv lages uten det.
+  const prefiks = `${a.vakt_navn} — `;
+  const t = String(a.tittel || '');
+  if (a.vakt_navn && t.startsWith(prefiks)) {
+    const rest = t.slice(prefiks.length);
+    return rest.charAt(0).toUpperCase() + rest.slice(1);
+  }
+  return t;
+}
+
+
 function renderArkiv() {
   const el = document.getElementById('arkivliste');
   if (!el) return;
@@ -1293,7 +1306,7 @@ function renderArkiv() {
     return `
     <div class="oppdrag-rad">
       <div class="d-flex align-items-center gap-2 flex-wrap">
-        <span class="oppdrag-problem">${escapeHtml(a.tittel)}</span>
+        <span class="oppdrag-problem">${escapeHtml(_arkivTittel(a))}</span>
         <span class="oppdrag-nr">${escHtmlValue(a.antall_oppdrag)} oppdrag</span>
       </div>
       <div class="oppdrag-meta mt-1">

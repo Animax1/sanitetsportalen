@@ -329,18 +329,25 @@ def oppdrag_liste_view(request):
             for o in egne:
                 # Bilens egen rad: statusen, kjeden og tidslinjen er hennes.
                 kobling = services.koblingsrad(o, request.user.enhet)
-                egne_meldinger = Statusmelding.objects.gjeldende_for_enhet(kobling)
+                gjeldende = Statusmelding.objects.gjeldende(o)
+                egne_meldinger = [m for m in gjeldende if m.oppdragsenhet_id == kobling.pk]
                 siste = [m for m in egne_meldinger if m.status == kobling.status]
                 rad = oppdrag_til_dict(
                     o, for_enhet=True, koblingsrad=kobling,
                     status_tidspunkt=siste[-1].tidspunkt.isoformat() if siste else None)
                 rad['statusmeldinger'] = [melding_til_dict(m) for m in egne_meldinger]
+                # De andre bilenes stempler, med navn (André, 12. sep. 2026:
+                # «nyttig for de å vite historikken der»). Egen kjede og
+                # knapper hviler fortsatt bare på `statusmeldinger`.
+                rad['andre_meldinger'] = [melding_til_dict(m) for m in gjeldende
+                                          if m.oppdragsenhet_id != kobling.pk]
                 data.append(rad)
             # Meldings-ID-ene må inn i ETag-en: en korreksjon endrer tidslinjen
             # uten å røre oppdragets status, og skal ikke drukne i en 304.
             etag_rader = [
                 (r['id'], r['status'], r['enhet_id'],
-                 tuple(m['id'] for m in r['statusmeldinger']))
+                 tuple(m['id'] for m in r['statusmeldinger']),
+                 tuple(m['id'] for m in r['andre_meldinger']))
                 for r in data
             ]
         else:
@@ -464,10 +471,15 @@ def oppdrag_detalj_view(request, pk):
             return JsonResponse({'status': 'error', 'message': 'Ingen tilgang'}, status=403)
 
     if request.method == 'GET':
+        andre = []
         if kobling is not None:
-            # Bilen får sin egen kjede. De andre enhetenes meldinger er deres
-            # status, og den ser bilen ikke (§7.3) — bare at de er varslet.
-            gjeldende = Statusmelding.objects.gjeldende_for_enhet(kobling)
+            # Bilen får sin egen kjede i `statusmeldinger` — det er den
+            # knappene bygger på. De andre bilenes gjeldende stempler følger
+            # med i `andre_meldinger` (§7.3, snudd 12. sep. 2026): historikken
+            # på oppdraget er nyttig i bilen, og navnet står på hver rad.
+            alle_gjeldende = Statusmelding.objects.gjeldende(oppdrag)
+            gjeldende = [m for m in alle_gjeldende if m.oppdragsenhet_id == kobling.pk]
+            andre = [m for m in alle_gjeldende if m.oppdragsenhet_id != kobling.pk]
             alle = (Statusmelding.objects.filter(oppdragsenhet=kobling)
                     .select_related('oppdragsenhet__enhet', 'meldt_av')
                     .order_by('created_at'))
@@ -480,6 +492,7 @@ def oppdrag_detalj_view(request, pk):
             **oppdrag_til_dict(oppdrag, for_enhet=er_enhetskonto(request.user),
                                koblingsrad=kobling),
             'statusmeldinger': [melding_til_dict(m) for m in gjeldende],
+            'andre_meldinger': [melding_til_dict(m) for m in andre],
             'historikk': [melding_til_dict(m) for m in alle],
             'enhetsbytter': [bytte_til_dict(b) for b in oppdrag.enhetsbytter.all()],
             'enhetshendelser': [hendelse_til_dict(h) for h in

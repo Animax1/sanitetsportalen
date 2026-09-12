@@ -52,7 +52,9 @@ def arkiver_vakt(vakt, notat, user):
 
         naa_lokal = timezone.localtime(timezone.now())
         arkiv = OppdragArkiv.objects.create(
-            tittel=f"{vakt.navn} — arkivert {naa_lokal.strftime('%d.%m.%Y %H:%M')}",
+            # Uten vaktnavnet: det står på raden under fra `vakt_navn`, og
+            # stod dobbelt (André, 12. sep. 2026: «Vi trenger ikke Test»).
+            tittel=f"Arkivert {naa_lokal.strftime('%d.%m.%Y %H:%M')}",
             vakt=vakt,
             # Frosset: vakta kan bli omdøpt eller slettet, arkivet skal
             # fortsatt kunne fortelle hvilken vakt det er.

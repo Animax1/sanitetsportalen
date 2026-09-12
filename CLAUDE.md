@@ -604,6 +604,12 @@ virkningsløs endring, ikke som en feil:
 Noen frittstående sider (`403.html`, `mfa_setup.html`, `mfa_verify.html`, innlogging)
 laster ingen av dem — de har egen `<style>`-blokk og må overstyre selv.
 
+**Hver mal med eget `<head>` tar med `partials/_ikoner.html`** — manifest, favicon,
+apple-touch-icon og `theme-color`. Manifestet er en view (`core/manifest.py`, uten
+innlogging), ikke en statisk fil, fordi ikonstiene må gjennom `{% static %}`: WhiteNoise
+hasher navnene. Merket i `static/img/logo.svg` er en ring med en pulslinje, bevisst uten
+kors. `core/tests_manifest.py` håndhever alle tre.
+
 **`base_portal.html` aliaser ikke alle variablene `style.css` definerer.** Den setter
 `--surface-1`, `--surface-2`, `--border-color` og `--text-main`, men *ikke* `--text-muted`,
 `--text-soft`, `--surface-3` eller `--header-bg`. En udefinert custom property gjør ikke

@@ -79,7 +79,7 @@ lenger. Én migrasjon som både backfyller og dropper kolonnen er nettopp det
 
 | Spørsmål | Svar |
 |---|---|
-| Hvem ser hva på bilen | Sitt eget oppdrag som før, pluss **navnene** på de andre varslede — «Varslet: HGSD 56, KARM 12». Ikke deres status (§7.3). |
+| Hvem ser hva på bilen | Sitt eget oppdrag som før, pluss navnene på de andre varslede — og fra 12. sep. 2026 deres stempler i tidslinjen, med navn på raden (§7.3). |
 | Hvem ser hva i sentralbordet | Matrisen: hvert oppdrag med hver enhet og dens status og tidslinje. |
 | Stempling | `stempling_view` finner enhetens `Oppdragsenhet` på oppdraget; finnes den ikke, 403 som i dag. Endepunktene er de samme — bilen vet ikke at oppdraget har flere. |
 | Auto-lukking | Per enhet: «Rykker ut» på et nytt oppdrag lukker *enhetens* pågående koblingsrad, ikke oppdraget. |
@@ -166,7 +166,12 @@ og det 30-minuttersvinduet måles mot; **oppdraget** er ferdig, og forlater tavl
 alle er ledige. Nøyaktig §2.2.
 
 ### 7.3 Skal bilen se de andres status?
-**Nei — bare navnene.**
+**Først nei — bare navnene.** Snudd 12. sep. 2026, etter André: «Vi har ikke gitt i
+loggen til bilene at de kan se flere bilers tidsstempler og status. Det kan være nyttig
+for de å vite historikken der.» Bilen får de andres gjeldende stempler som
+`andre_meldinger`, tegnet dempet i samme tidslinje med bilens navn på raden. Hennes egen
+kjede og knappene bygger fortsatt bare på `statusmeldinger` — en annen bils «Fremme»
+flytter ikke denne bilen.
 
 ### 7.4 Kan en enhet tas av etter «Rykker ut»?
 **Nei.** André: «da må de slå seg ledig evt.» — eller sentralbordet fører det, se §9.

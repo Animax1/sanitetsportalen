@@ -118,6 +118,9 @@ REVIEWED_INTERPOLATIONS = {
     'startKnapp': 'markup bygget lokalt, navn og id escapet inni',
     'tidslinjeEnhetHtml(o)': 'markup fra en bygger som selv skannes her',
     '_varsledeRad(o)': 'markup fra en bygger som selv skannes her',
+    'hvem': 'tom streng eller escapet enhetsnavn bygget rett over',
+    "andres ? ' tidslinje-andre' : ''": 'intern CSS-klasse fra en ternær',
+    '_arkivTittel(a)': 'tittelen, escapet der den settes inn',
     'grovRad': 'markup fra `_grovsorteringsrad`, som selv skannes her, eller tom',
     # Sted i sentralbordet (12. sep. 2026): ren tekst i `meta`, som escapes ved innsetting.
     'e.sted_navn': 'bygger ren tekst i `sted`, som går inn i `meta` og escapes ved innsetting',

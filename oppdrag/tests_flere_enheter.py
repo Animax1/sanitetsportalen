@@ -293,7 +293,8 @@ class EnhetensSynTests(FlereEnheterBasis):
 
 
 class SerialiseringTests(FlereEnheterBasis):
-    """§7.3: bilen ser hvem som er varslet, ikke deres status."""
+    """§7.3: bilen ser hvem som er varslet; deres stempler kommer som
+    `andre_meldinger` der lista bygges, ikke fra `oppdrag_til_dict`."""
 
     def test_varslede_er_de_andres_navn(self):
         from oppdrag.views_common import oppdrag_til_dict
@@ -339,7 +340,17 @@ class EnhetskontoApiTests(FlereEnheterBasis):
         self.assertEqual([r['id'] for r in rader], [o.pk])
         self.assertEqual(rader[0]['status'], choices.VENTER)
         self.assertEqual(rader[0]['varslede'], ['Haugesund 56'])
-        self.assertEqual(rader[0]['statusmeldinger'], [], 'A sine meldinger er ikke hennes')
+        self.assertEqual(rader[0]['statusmeldinger'], [], 'A sine meldinger er ikke hennes kjede')
+        # …men hun ser dem, med navn (§7.3 snudd 12. sep. 2026).
+        self.assertEqual([(m['enhet_navn'], m['status']) for m in rader[0]['andre_meldinger']],
+                         [('Haugesund 56', choices.RYKKER_UT), ('Haugesund 56', choices.FREMME)])
+
+    def test_de_andres_stempler_er_med_i_etag(self):
+        o = self._to_enheter()
+        forste = self.kb.get('/oppdrag/api/oppdrag/')
+        services.sett_status(o, choices.RYKKER_UT, enhet=self.a)
+        andre = self.kb.get('/oppdrag/api/oppdrag/', HTTP_IF_NONE_MATCH=forste['ETag'])
+        self.assertEqual(andre.status_code, 200, 'A sitt stempel skal ikke drukne i en 304')
 
     def test_hun_stempler_paa_sin_egen_rad(self):
         o = self._to_enheter()
@@ -359,6 +370,7 @@ class EnhetskontoApiTests(FlereEnheterBasis):
         d = res.json()['data']
         self.assertEqual(len(d['statusmeldinger']), 1)
         self.assertEqual(len(d['historikk']), 1)
+        self.assertEqual([m['enhet_navn'] for m in d['andre_meldinger']], ['Haugesund 56'])
 
     def test_en_bil_som_ikke_er_varslet_faar_403(self):
         o = self._to_enheter()
@@ -783,6 +795,27 @@ class BilenSerDeAndreTests(TestCase):
     def test_uten_andre_staar_det_ingenting(self):
         ut = self._render(self._oppdrag(), 'renderVentende')
         self.assertNotIn('Også varslet', ut)
+
+    def test_de_andres_stempler_staar_i_tidslinjen_med_navn_og_i_tidsrekkefolge(self):
+        """André, 12. sep. 2026: «nyttig for de å vite historikken der»."""
+        o = self._oppdrag(status='rykker_ut', status_navn='Rykker ut', statusmeldinger=[
+            {'status': 'rykker_ut', 'status_navn': 'Rykker ut',
+             'tidspunkt': '2026-08-29T20:05:00Z'}],
+            andre_meldinger=[
+            {'status': 'fremme', 'status_navn': 'Fremme', 'enhet_navn': '<b>HGSD 56</b>',
+             'tidspunkt': '2026-08-29T20:09:00Z'},
+            {'status': 'rykker_ut', 'status_navn': 'Rykker ut', 'enhet_navn': 'HGSD 56',
+             'tidspunkt': '2026-08-29T20:01:00Z'}])
+        ut = self._render(o, 'renderAktivt')
+        self.assertIn('tidslinje-andre', ut)
+        self.assertIn('&lt;b&gt;HGSD 56&lt;/b&gt;:', ut, 'navnet escapes')
+        i_andres_rykker = ut.index('HGSD 56:</span> Rykker ut')
+        i_egen = ut.index('<span>Rykker ut</span>')
+        i_andres_fremme = ut.index('Fremme')
+        self.assertLess(i_andres_rykker, i_egen, 'A rykket ut før B')
+        self.assertLess(i_egen, i_andres_fremme, 'og var framme etter')
+        # Egen kjede er urørt: B står i Rykker ut, ikke i A sin Fremme.
+        self.assertIn('Rykker ut</span>', ut)
 
     def test_manuell_melding_merkes(self):
         o = self._oppdrag(status='fremme', status_navn='Fremme', statusmeldinger=[

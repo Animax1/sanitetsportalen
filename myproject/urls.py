@@ -15,6 +15,7 @@ from django.conf import settings
 from django.contrib import admin
 from django.urls import path, include
 
+from core.manifest import manifest_view
 from core.robots import robots_txt
 from patients.health import healthz
 from patients import admin_status as _admin_status
@@ -29,6 +30,7 @@ urlpatterns = [
     # portalen ute av søkemotorer og AI-crawlere. Se core/robots.py for
     # hvorfor denne og X-Robots-Tag-headeren begge trengs.
     path('robots.txt', robots_txt, name='robots_txt'),
+    path('manifest.webmanifest', manifest_view, name='manifest'),
 
     # Kontoer og administrasjon. Modulen mountes på root fordi den betjener
     # både /accounts/ (innlogging) og /portal-admin/ (brukeradmin) — se

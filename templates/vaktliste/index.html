@@ -315,14 +315,13 @@
             </button>
             <button type="button" class="btn btn-outline-secondary btn-sm"
                     data-action="visArkiverteVaktlister">
-              <i class="bi bi-box-arrow-in-left me-1"></i>Arkiverte vaktlister
+              <i class="bi bi-collection me-1"></i>Arkiv
             </button>
             <button type="button" class="btn btn-outline-danger btn-sm"
                     data-action="slettVaktliste">
               <i class="bi bi-trash me-1"></i>Slett vaktlisten
             </button>
           </div>
-          <div id="vakt-arkiverte" class="d-none"></div>
         </div>
         {% endif %}
 
@@ -400,6 +399,27 @@
   bare finnes i API-et, finnes ikke for brukeren. Uten dette kunne man ikke
   lage «Førstehjelpstelt», bare velge blant de seks migrasjonen seedet.
 {% endcomment %}
+{% comment %}
+  **Arkivet i sitt eget vindu** (André, 12. sep. 2026). Åpnes fra «Arkiv» i
+  vaktvinduet, som lukkes først — se vaktliste.js::_byttModal().
+{% endcomment %}
+{% if er_global_admin %}
+<div class="modal fade" id="vaktArkivModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Arkiverte vaktlister</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Lukk"></button>
+      </div>
+      <div class="modal-body">
+        <div id="vakt-arkiv-feil" class="text-danger small d-none mb-2"></div>
+        <div id="vakt-arkiverte"></div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}
+
 <div class="modal fade" id="grupperModal" tabindex="-1">
   <div class="modal-dialog">
     <div class="modal-content">

@@ -90,7 +90,10 @@ class ArkiveringTests(ArkivBasis):
         self.assertEqual(arkiv.vakt_navn, self.vakt.navn)
         self.assertEqual(arkiv.vakt_id, self.vakt.pk)
         self.assertEqual(arkiv.notat, 'Regnvær')
-        self.assertIn(self.vakt.navn, arkiv.tittel)
+        # Tittelen bærer ikke vaktnavnet — det står i `vakt_navn`, og sto
+        # dobbelt i lista (André, 12. sep. 2026).
+        self.assertTrue(arkiv.tittel.startswith('Arkivert '), arkiv.tittel)
+        self.assertNotIn(self.vakt.navn, arkiv.tittel)
         self.assertEqual(arkiv.importert_av_navn, 'arkivadmin')
 
     def test_navnene_fryses_som_tekst(self):

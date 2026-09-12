@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <title>Sanitetsportalen</title>
+  <rect width="512" height="512" rx="112" fill="#0f3460"/>
+  <circle cx="256" cy="256" r="150" fill="none" stroke="#3b82f6" stroke-width="34"/>
+  <polyline points="88,256 172,256 206,190 250,336 292,214 318,256 424,256"
+            fill="none" stroke="#ffffff" stroke-width="34"
+            stroke-linejoin="round" stroke-linecap="round"/>
+</svg>

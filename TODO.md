@@ -212,8 +212,11 @@ ingen av dem gir feilmelding — de er bare stille inaktive.
                   registeret hentes ved sidelasting, lesbar tidstekst på /statistikk/.
             - [x] Navnet «utildelt» ble «Åpen for alle» (12. sep.). «Ledig korps»
                   ble forkastet: «ledig» er alt plassen uten person.
-            - [ ] **Å tenke på (André, 12. sep.):** skal bilen se de andre bilenes
-                  tidsstempler? (§7.3 sier nei i dag.) Skal bil 2, som ikke tar med
+            - [x] Andrés rapport 3 (12. sep.): bilen ser de andres stempler, arkivtittel
+                  uten vaktnavn, «Mitt korps» skiller korpsets fra åpent for alle, kurvens
+                  hode med tre tall, «Arkiv» i eget vindu, manifest og logo.
+            - [ ] **Å tenke på (André, 12. sep.):** bilen ser nå de andres stempler
+                  (avgjort 12. sep.). Skal bil 2, som ikke tar med
                   pasienten, få sette/se grovsorteringen? Kontokobling til admin bare av
                   admin — riktig terskel? Sentralbordets besetning følger portalens
                   aktive vakt, ikke vaktlista i drift — er det riktig scope?
