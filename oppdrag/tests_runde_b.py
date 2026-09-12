@@ -125,11 +125,11 @@ class OpprettelseTests(OppdragBasis):
         # Antallet settes av bilen (12. sep. 2026) — ikke i operatørens skjema.
         self.assertNotContains(res, 'id="nytt-antall-rad"')
         # Verdiene er skriv_leder; skriv_full har ikke vinduet.
-        self.assertNotContains(res, 'id="verdierModal"')
+        self.assertNotContains(res, 'id="valglisterModal"')
         leder = _klient(_bruker('leder', 'skriv_leder')).get('/oppdrag/')
-        self.assertContains(leder, 'id="verdierModal"')
+        self.assertContains(leder, 'id="valglisterModal"')
         adm = _klient(_bruker('adm_b', 'skriv_full', admin=True)).get('/oppdrag/')
-        self.assertContains(adm, 'id="verdierModal"', msg_prefix='global admin ser alt')
+        self.assertContains(adm, 'id="valglisterModal"', msg_prefix='global admin ser alt')
 
 
 @override_settings(SECURE_SSL_REDIRECT=False, RATELIMIT_ENABLE=False)

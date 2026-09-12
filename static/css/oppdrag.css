@@ -475,7 +475,23 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* Verdimengdene (12. sep. 2026): nedtrekkene i raden får ikke ta hele bredden. */
+/* Fanene i «Valglister» (12. sep. 2026). Bootstraps .nav-tabs er laget for
+ * lys bakgrunn: den aktive fanen blir hvit med mørk tekst, og bryter med
+ * resten av det mørke vinduet. Samme flater som ellers på siden. */
+.nav-tabs { border-bottom-color: var(--border-color); }
+.nav-tabs .nav-link { color: var(--text-muted); border-color: transparent; }
+.nav-tabs .nav-link:hover, .nav-tabs .nav-link:focus {
+  color: var(--text-main);
+  border-color: var(--border-color) var(--border-color) transparent;
+  isolation: isolate;
+}
+.nav-tabs .nav-link.active {
+  color: var(--text-main);
+  background: var(--surface-2);
+  border-color: var(--border-color) var(--border-color) var(--surface-2);
+}
+
+/* Valglistene (12. sep. 2026): nedtrekkene i raden får ikke ta hele bredden. */
 .verdi-rad .verdi-kategori { max-width: 8.5rem; }
 .verdi-rad .verdi-antall { max-width: 8.5rem; }
 

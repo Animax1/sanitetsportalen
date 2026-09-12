@@ -53,11 +53,11 @@
         <i class="bi bi-clock-history me-1"></i>Historikk
       </button>
       {% if kan_lede %}
-      {# Verdimengdene — lokasjoner, enhetstyper, problemstillinger — er skriv_leder (12. sep. 2026). #}
+      {# Valglistene — lokasjoner, enhetstyper, problemstillinger — er skriv_leder (12. sep. 2026). Het «Verdier» én dag; André ville ha et navn som sier hva det er. #}
       <button type="button" class="btn btn-outline-secondary btn-sm"
-              data-bs-toggle="modal" data-bs-target="#verdierModal"
+              data-bs-toggle="modal" data-bs-target="#valglisterModal"
               data-action="lastVerdiadmin">
-        <i class="bi bi-list-ul me-1"></i>Verdier
+        <i class="bi bi-list-ul me-1"></i>Valglister
       </button>
       {% endif %}
       {% if kan_skrive %}
@@ -132,7 +132,7 @@
         <div class="mb-3">
           <label class="form-label" for="nytt-lokasjon">Lokasjon</label>
           <select id="nytt-lokasjon" class="form-select"></select>
-          <div class="form-text">Lista vedlikeholdes under «Verdier».</div>
+          <div class="form-text">Lista vedlikeholdes under «Valglister».</div>
         </div>
         <div class="mb-3">
           <label class="form-label" for="nytt-problemstilling">Problemstilling</label>
@@ -159,11 +159,11 @@
 {% endif %}
 
 {% if kan_lede %}
-<div class="modal fade" id="verdierModal" tabindex="-1">
+<div class="modal fade" id="valglisterModal" tabindex="-1">
   <div class="modal-dialog modal-lg">
     <div class="modal-content">
       <div class="modal-header">
-        <h5 class="modal-title">Verdier</h5>
+        <h5 class="modal-title">Valglister <span class="enhet-meta fw-normal">· lokasjoner, enhetstyper og problemstillinger</span></h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Lukk"></button>
       </div>
       <div class="modal-body">

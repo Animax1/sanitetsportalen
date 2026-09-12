@@ -220,6 +220,8 @@ ingen av dem gir feilmelding — de er bare stille inaktive.
             - [x] Andrés rapport 3 (12. sep.): bilen ser de andres stempler, arkivtittel
                   uten vaktnavn, «Mitt korps» skiller korpsets fra åpent for alle, kurvens
                   hode med tre tall, «Arkiv» i eget vindu, manifest og logo.
+            - [x] Prodtest c8ab831 (12. sep.): alt OK. «Verdier» ble «Valglister», og
+                  fanene i vinduet fikk mørke flater.
             - [x] Andrés runde på staging, del F (12. sep.): lydvarsel i bilen for
                   ventende oppdrag — Akutt 1 min/10 s, Haster 5 min/60 s, Vanlig og
                   Drift 15 min/60 s, «Lyd»-knapp som vekker lyden og husker valget,

@@ -4,6 +4,14 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-12 — «Valglister», og fanene i mørkt
+
+- Knappen og vinduet «Verdier» heter **«Valglister»** (André: «noe annet
+  bedre beskrivende»), med undertittelen lokasjoner, enhetstyper og
+  problemstillinger.
+- Fanene i vinduet var Bootstraps lyse: hvit aktiv fane med mørk tekst. De
+  følger nå sidens mørke flater.
+
 ## 2026-09-12 — Andrés runde på staging, del F: lydvarsel i bilen
 
 Ingen migrasjon.

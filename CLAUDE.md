@@ -288,7 +288,7 @@ opprett/endre/omsortere for **`skriv_leder`** (André: «La oss ha skriv_leder r
 dette»; global admin regnes med eksplisitt, siden `nivaa_for` gir admin `skriv_full`),
 sletting for global admin med `{"confirm": true}`, PROTECT/i bruk gir 409. **Rekkefølgen
 settes med hele lista** (`PUT …/rekkefolge/`), ikke «opp» per rad. Klienten har ett vindu
-med tre faner («Verdier», `renderVerdiadmin`) og bygger `OPPDRAG_PROBLEMSTILLINGER_FOR`
+med tre faner («Valglister», `renderVerdiadmin`) og bygger `OPPDRAG_PROBLEMSTILLINGER_FOR`
 selv fra radene (`_byggProblemkart`), så nedtrekkene følger med uten sidelasting.
 «Udefinert» kan opprettes, men **`sett_status` avviser `Ledig` så lenge den står**
 (`ProblemstillingUdefinert`, 400 med melding til bilen, og kortet i bilen varsler før
