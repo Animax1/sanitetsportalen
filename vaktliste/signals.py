@@ -1,4 +1,4 @@
-"""Audit-logging for vaktlistemodulen — fase 1: `Mannskap`.
+"""Audit-logging for vaktlistemodulen: `Mannskap`, `Vaktpost`, `Ressurs` og `Vaktliste`.
 
 Samme mønster som ``oppdrag/signals.py``, med samme unntak av samme grunn:
 `notat` er fritekst, og fritekst er der helseopplysninger havner når det ikke
@@ -22,11 +22,12 @@ import logging
 
 from django.db.models.signals import post_delete, post_save, pre_save
 from django.dispatch import receiver
+from django.utils import timezone
 
 from audit.models import AuditLog
 from audit.utils import get_current_request
 
-from .models import Mannskap, Vaktliste
+from .models import Mannskap, Ressurs, Vaktliste, Vaktpost
 
 TABELLNAVN = 'vaktliste_mannskap'
 
@@ -192,3 +193,110 @@ def vaktliste_pre_save(sender, instance, **kwargs):
             user=bruker,
             ip=ip,
         )
+
+
+# ── Skift og ressurser ────────────────────────────────────────────────────────
+#
+# «Ønsker dette for å få logget det meste» (André, 12. sep. 2026): skiftene
+# (opprett, endre, slett), ressursene, og først og fremst stemplene — møtt og
+# av vakt er det som telles ved brann, og hvem som satte dem og når er det
+# man leter etter når tallet ikke stemmer. Samme feltnivå som mannskapet.
+#
+# `merknad` på skiftet er fritekst, og unntas verdilogging av samme grunn som
+# `Mannskap.notat`: «gikk hjem, syk» er en helseopplysning som ikke skal ligge
+# i 730 dager. Raden sier at feltet ble endret, ikke hva som sto der.
+#
+# Sletting av en ressurs CASCADE-r skiftene, og Django sender `post_delete`
+# for hver rad som ryker — de blir logget som slettet hver for seg, med den
+# som slettet ressursen som bruker.
+
+VAKTPOST_TABELLNAVN = 'vaktliste_vaktpost'
+RESSURS_TABELLNAVN = 'vaktliste_ressurs'
+
+VAKTPOST_FELT_UTEN_VERDILOGGING = frozenset({'merknad'})
+
+
+def _felter_for(modell):
+    return [f.name for f in modell._meta.concrete_fields if f.name not in FELT_UTEN_AUDIT]
+
+
+def _verdi_for(obj, felt, uten_verdi):
+    if felt in uten_verdi:
+        return SKJULT
+    verdi = getattr(obj, felt, None)
+    return '' if verdi is None else str(verdi)
+
+
+def _beskriv_vaktpost(vp) -> str:
+    """Hvem, hvor og når — det en CREATE/DELETE-rad må bære for å kunne
+    leses uten skiftet, som er borte etter sletting."""
+    fra = timezone.localtime(vp.fra_tid).strftime('%d.%m %H:%M') if vp.fra_tid else '?'
+    til = timezone.localtime(vp.til_tid).strftime('%d.%m %H:%M') if vp.til_tid else '?'
+    return f'{vp} {fra}–{til}'
+
+
+def _logg_endringer(modell, instance, tabell, uten_verdi=frozenset()):
+    if not instance.pk:
+        return
+    try:
+        gammel = modell.objects.get(pk=instance.pk)
+    except modell.DoesNotExist:
+        return
+    bruker, ip = _bruker_og_ip()
+    for felt in _felter_for(modell):
+        if felt in uten_verdi:
+            if getattr(gammel, felt, None) == getattr(instance, felt, None):
+                continue
+        elif _verdi_for(gammel, felt, uten_verdi) == _verdi_for(instance, felt, uten_verdi):
+            continue
+        AuditLog.objects.create(
+            table_name=tabell, record_id=instance.pk, action='UPDATE', field_name=felt,
+            old_value=_verdi_for(gammel, felt, uten_verdi),
+            new_value=_verdi_for(instance, felt, uten_verdi),
+            user=bruker, ip=ip)
+
+
+def _logg_opprettet(instance, tabell, beskrivelse):
+    bruker, ip = _bruker_og_ip()
+    AuditLog.objects.create(
+        table_name=tabell, record_id=instance.pk, action='CREATE', field_name='',
+        old_value='', new_value=beskrivelse, user=bruker, ip=ip)
+
+
+def _logg_slettet(instance, tabell, beskrivelse):
+    bruker, ip = _bruker_og_ip()
+    AuditLog.objects.create(
+        table_name=tabell, record_id=instance.pk or 0, action='DELETE', field_name='',
+        old_value=beskrivelse, new_value='', user=bruker, ip=ip)
+
+
+@receiver(pre_save, sender=Vaktpost)
+def vaktpost_pre_save(sender, instance, **kwargs):
+    _logg_endringer(Vaktpost, instance, VAKTPOST_TABELLNAVN, VAKTPOST_FELT_UTEN_VERDILOGGING)
+
+
+@receiver(post_save, sender=Vaktpost)
+def vaktpost_post_save(sender, instance, created, **kwargs):
+    if created:
+        _logg_opprettet(instance, VAKTPOST_TABELLNAVN, _beskriv_vaktpost(instance))
+
+
+@receiver(post_delete, sender=Vaktpost)
+def vaktpost_post_delete(sender, instance, **kwargs):
+    _logg_slettet(instance, VAKTPOST_TABELLNAVN, _beskriv_vaktpost(instance))
+
+
+@receiver(pre_save, sender=Ressurs)
+def ressurs_pre_save(sender, instance, **kwargs):
+    _logg_endringer(Ressurs, instance, RESSURS_TABELLNAVN)
+
+
+@receiver(post_save, sender=Ressurs)
+def ressurs_post_save(sender, instance, created, **kwargs):
+    if created:
+        _logg_opprettet(instance, RESSURS_TABELLNAVN, f'{instance} ({instance.gruppe})')
+
+
+@receiver(post_delete, sender=Ressurs)
+def ressurs_post_delete(sender, instance, **kwargs):
+    _logg_slettet(instance, RESSURS_TABELLNAVN, f'{instance} ({instance.gruppe})')

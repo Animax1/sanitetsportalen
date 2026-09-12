@@ -108,8 +108,12 @@ def kopier_oppsett(fra_vaktliste, til_vaktliste):
 
     Returnerer antall kopierte ressurser.
     """
-    kopier = [
-        Ressurs(
+    # Én `create` per rad, ikke `bulk_create`: den hopper over signalene, og
+    # da ble ikke kopiene auditlogget (12. sep. 2026). En vakt har en håndfull
+    # ressurser, så spørringene koster ingenting.
+    antall = 0
+    for r in fra_vaktliste.ressurser.all():
+        Ressurs.objects.create(
             vaktliste=til_vaktliste,
             navn=r.navn,
             gruppe_id=r.gruppe_id,
@@ -117,10 +121,8 @@ def kopier_oppsett(fra_vaktliste, til_vaktliste):
             enhet=r.enhet,
             rekkefolge=r.rekkefolge,
         )
-        for r in fra_vaktliste.ressurser.all()
-    ]
-    Ressurs.objects.bulk_create(kopier)
-    return len(kopier)
+        antall += 1
+    return antall
 
 
 # ── Kompetansestigen ─────────────────────────────────────────────────────────

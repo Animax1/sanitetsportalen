@@ -4,6 +4,19 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-12 — Vaktliste: skift, ressurser og stemplene i auditloggen
+
+Ingen migrasjon. Deployes til staging først.
+
+- **Skift logges på feltnivå** (`vaktliste_vaktpost`): opprettet, hver
+  feltendring med gammel og ny verdi, og slettet — med hvem og når.
+  Møtt/av vakt og angringene er feltendringer på `mott_at`/`av_vakt_at`, og
+  får dermed sitt spor. `merknad` logges som endret, uten verdier, som
+  `Mannskap.notat`.
+- **Ressurser logges** (`vaktliste_ressurs`): opprettet, endret, slettet.
+  Slettes en ressurs, får hvert skift som ryker med sin egen rad.
+  Kopiert oppsett går nå én rad om gangen, så kopiene logges.
+
 ## 2026-09-12 — Prodtest runde G–I, del 3: iPhone-rettelser
 
 Ingen migrasjon. Deployes til staging først.

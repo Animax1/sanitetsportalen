@@ -612,6 +612,12 @@ begge veier og rører ingen stempler.
   i vaktlinja (`tegnStatus`, `.vl-status.vl-drift`/`.vl-planlegging`) sier formen med
   ikon og fet skrift, i drift med pulserende prikk. Drift inn og ut auditlogges på
   feltnivå (`vaktliste/signals.py`, `vaktliste_vaktliste`).
+- **Skift og ressurser auditlogges på feltnivå** (12. sep. 2026 — «for å få logget det
+  meste»): `vaktliste_vaktpost` og `vaktliste_ressurs`, opprettet/endret/slettet med hvem.
+  Stemplene er feltendringer på `mott_at`/`av_vakt_at` og trenger ingen egen kode.
+  `Vaktpost.merknad` er fritekst og logges uten verdier, som `Mannskap.notat`. Derfor
+  **ingen `bulk_create` på disse modellene** — den hopper over signalene; `kopier_oppsett`
+  gikk i den fella.
 - **Klienten har én `data-action` per overgang**, ikke én generisk:
   klikkdelegeringen i `portal-utils.js` sender ett argument. `STEMPLINGER` i
   `vaktliste.js` og i `services.py` holdes like av `StemplingsnavnTests`.
