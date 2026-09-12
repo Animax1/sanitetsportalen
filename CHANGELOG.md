@@ -4,6 +4,17 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-12 — Hjem-skjerm-ikonet: full flate, og kortnavnet
+
+- **Rettet: ikonet på hjem-skjermen hadde blå flekk øverst til venstre og
+  gjennomsiktig resten.** Rendringen skalerte bakgrunnsrektangelet sammen
+  med `<svg>`-taggen, så flaten dekket 180 av 512 enheter. Generatoren
+  ligger nå i `scripts/lag_ikoner.py` og skalerer bare rot-elementet;
+  `IkonfileneTests` leser hjørnepikslene i PNG-ene (egen liten PNG-leser,
+  Pillow er ikke i requirements) og stopper det.
+- **Kortnavnet er «Sanitetsportalen»**, som navnet (André: «Vi har
+  sanitetsportalen på begge»).
+
 ## 2026-09-12 — Andrés rapport 4: arkivering lukker vakta, ny logo
 
 Ingen migrasjon.

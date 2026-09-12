@@ -610,7 +610,8 @@ laster ingen av dem — de har egen `<style>`-blokk og må overstyre selv.
 apple-touch-icon og `theme-color`. Manifestet er en view (`core/manifest.py`, uten
 innlogging), ikke en statisk fil, fordi ikonstiene må gjennom `{% static %}`: WhiteNoise
 hasher navnene. Merket i `static/img/logo.svg` er et skjold med en person i, bevisst uten
-kors og uten rødt. `core/tests_manifest.py` håndhever alle tre.
+kors og uten rødt; PNG-ene rendres med `python scripts/lag_ikoner.py` (Playwright), aldri
+for hånd. `core/tests_manifest.py` håndhever alle tre og leser hjørnepikslene i PNG-ene.
 
 **`base_portal.html` aliaser ikke alle variablene `style.css` definerer.** Den setter
 `--surface-1`, `--surface-2`, `--border-color` og `--text-main`, men *ikke* `--text-muted`,

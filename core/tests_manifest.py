@@ -24,6 +24,7 @@ class ManifestTests(TestCase):
         self.assertEqual(res['Content-Type'], 'application/manifest+json')
         data = json.loads(res.content)
         self.assertEqual(data['name'], 'Sanitetsportalen')
+        self.assertEqual(data['short_name'], 'Sanitetsportalen')
         self.assertEqual(data['display'], 'standalone')
         self.assertEqual(data['start_url'], '/')
         self.assertEqual(data['theme_color'], TEMAFARGE)
@@ -52,6 +53,86 @@ class ManifestTests(TestCase):
         self.assertIn('<title>Sanitetsportalen</title>', svg)
         farger = set(re.findall(r'#[0-9a-fA-F]{6}', svg))
         self.assertEqual(farger, {'#0f3460', '#8fb3f0', '#ffffff'}, farger)
+
+
+def _png_piksler(sti):
+    """Minimal PNG-leser (8-bit RGB/RGBA, ikke interlaced) — nok til å lese
+    hjørne- og midtpiksler uten Pillow, som ikke er i requirements."""
+    import struct
+    import zlib
+    data = Path(sti).read_bytes()
+    assert data[:8] == b'\x89PNG\r\n\x1a\n', sti
+    pos, idat, bredde, hoyde, kanaler = 8, b'', 0, 0, 0
+    while pos < len(data):
+        lengde, typ = struct.unpack('>I4s', data[pos:pos + 8])
+        kropp = data[pos + 8:pos + 8 + lengde]
+        if typ == b'IHDR':
+            bredde, hoyde, dybde, farge, _, _, interlace = struct.unpack('>IIBBBBB', kropp)
+            assert dybde == 8 and interlace == 0 and farge in (2, 6), (dybde, farge, interlace)
+            kanaler = 3 if farge == 2 else 4
+        elif typ == b'IDAT':
+            idat += kropp
+        pos += 12 + lengde
+    raa = zlib.decompress(idat)
+    stride = bredde * kanaler
+    forrige = bytearray(stride)
+    rader = []
+    for y in range(hoyde):
+        start = y * (stride + 1)
+        filt = raa[start]
+        linje = bytearray(raa[start + 1:start + 1 + stride])
+        for i in range(stride):
+            a = linje[i - kanaler] if i >= kanaler else 0
+            b = forrige[i]
+            c = forrige[i - kanaler] if i >= kanaler else 0
+            if filt == 1:
+                linje[i] = (linje[i] + a) & 255
+            elif filt == 2:
+                linje[i] = (linje[i] + b) & 255
+            elif filt == 3:
+                linje[i] = (linje[i] + ((a + b) >> 1)) & 255
+            elif filt == 4:
+                p = a + b - c
+                pa, pb, pc = abs(p - a), abs(p - b), abs(p - c)
+                pred = a if pa <= pb and pa <= pc else (b if pb <= pc else c)
+                linje[i] = (linje[i] + pred) & 255
+        rader.append(bytes(linje))
+        forrige = linje
+    def piksel(x, y):
+        r = rader[y][x * kanaler:(x + 1) * kanaler]
+        return tuple(r) if kanaler == 4 else tuple(r) + (255,)
+    return bredde, hoyde, piksel
+
+
+class IkonfileneTests(TestCase):
+    """PNG-ene er rendret fra SVG-en (`scripts/lag_ikoner.py`). Første utgave
+    skalerte bakgrunnsrektangelet ned i hjørnet, så hjem-skjerm-ikonet fikk
+    blå flekk øverst til venstre og gjennomsiktig resten (André, 12. sep.
+    2026). Pikslene sier om flaten dekker."""
+
+    NAVY = (15, 52, 96, 255)
+
+    def _les(self, navn):
+        return _png_piksler(Path(settings.BASE_DIR) / 'static/img' / navn)
+
+    def test_full_flate_paa_maskable_og_apple_touch(self):
+        for navn, px in (('logo-maskable-512.png', 512), ('apple-touch-icon.png', 180)):
+            with self.subTest(navn=navn):
+                b, h, piksel = self._les(navn)
+                self.assertEqual((b, h), (px, px))
+                for x, y in ((1, 1), (px - 2, 1), (1, px - 2), (px - 2, px - 2)):
+                    self.assertEqual(piksel(x, y), self.NAVY, f'{navn} hjørne {x},{y}')
+
+    def test_avrundede_ikoner_har_flate_og_figur(self):
+        for navn, px in (('logo-192.png', 192), ('logo-512.png', 512)):
+            with self.subTest(navn=navn):
+                b, h, piksel = self._les(navn)
+                self.assertEqual((b, h), (px, px))
+                self.assertEqual(piksel(1, 1)[3], 0, 'hjørnet utenfor radiusen er gjennomsiktig')
+                # Innenfor radiusen, men utenfor skjoldet: flaten.
+                self.assertEqual(piksel(px // 2, px // 20), self.NAVY, 'flaten dekker')
+                self.assertEqual(piksel(px // 2, px - px // 20), self.NAVY, 'helt ned')
+                self.assertEqual(piksel(px // 2, px // 2)[:3], (255, 255, 255), 'personen i midten')
 
 
 class AlleSiderLenkerTilManifestetTests(TestCase):

@@ -46,7 +46,9 @@ def _ikon(sti, sizes, type_, purpose):
 def manifest_data() -> dict:
     return {
         'name': 'Sanitetsportalen',
-        'short_name': 'Sanitet',
+        # Samme navn begge steder (André, 12. sep. 2026). Kortnavnet er det
+        # som står under ikonet på hjem-skjermen.
+        'short_name': 'Sanitetsportalen',
         'description': 'Pasientregistrering, oppdrag, vaktliste og statistikk for sanitetsvakten.',
         'lang': 'no',
         'start_url': '/',
