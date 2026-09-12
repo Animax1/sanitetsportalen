@@ -368,6 +368,7 @@ def _mannskap_til_dict(m, foreldre=None, kjente_eposter=None):
         'alle_kompetanser': [{'id': k.pk, 'navn': k.navn} for k in alle],
         'telefon': m.telefon,
         'epost': m.epost,
+        'issi': m.issi,
         # Finnes det en portalbruker med denne e-posten? Vises som et merke
         # ved adressen, så den som legger inn folk ser at koblingen kan skje.
         'konto_finnes': bool(m.epost) and (
@@ -480,6 +481,7 @@ def mannskap_view(request):
                 korps=korps,
                 telefon=(data.get('telefon') or '').strip(),
                 epost=epost,
+                issi=(data.get('issi') or '').strip(),
                 user_id=_int(data.get('user_id')) if admin else None,
                 notat=(data.get('notat') or '').strip(),
             )
@@ -555,6 +557,8 @@ def mannskap_detalj_view(request, pk):
             person.epost = _normaliser_epost(data.get('epost'))
         except ValidationError:
             return _feil('E-postadressen ser ikke riktig ut.')
+    if 'issi' in data:
+        person.issi = (data.get('issi') or '').strip()
     if 'notat' in data:
         person.notat = (data.get('notat') or '').strip()
     if 'er_aktiv' in data:

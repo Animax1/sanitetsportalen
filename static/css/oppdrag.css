@@ -459,6 +459,21 @@
   Fylt prikk = møtt og ikke gått av vakt. Åpen = alt annet. Distinksjonen er
   den samme som «Tilstede nå» i vaktlista, og utledes av de samme stemplene.
 */
+/* Telefon og ISSI på besetningsraden (12. sep. 2026): til høyre, dempet,
+ * tabelltall så numrene står under hverandre. Bryter til egen linje når
+ * raden er smal. */
+.besetning-rad { flex-wrap: wrap; }
+.besetning-kontakt {
+  margin-left: auto;
+  display: inline-flex;
+  gap: 0.75rem;
+  font-size: 0.8rem;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.besetning-tlf { color: inherit; text-decoration: none; }
+.besetning-tlf:hover { text-decoration: underline; }
+.besetning-issi { color: var(--text-muted); }
 .besetning-inne { color: var(--vl-inne, #4ade80); }
 .besetning-ute { color: var(--portal-text-muted, #94a3b8); }
 

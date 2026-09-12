@@ -4,6 +4,18 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-12 — ISSI på mannskapet, telefon og ISSI i sentralbordets besetning
+
+Én migrasjon, `vaktliste/0015` (`Mannskap.issi`). Deployes til staging først.
+
+- **ISSI** (nødnettsterminalens nummer) på hver person i mannskapsregisteret,
+  etter telefon og e-post: kolonne i tabellen, felt i skjemaet, søkbart.
+  Tekst, så ledende nuller overlever.
+- **Sentralbordets besetning viser telefon og ISSI per person** på koblede
+  enheter. Telefonen er en `tel:`-lenke. §6 i vaktlistenotatet er snudd
+  for telefon: operatøren skal kunne ringe bilen uten å åpne vaktlista.
+  Kompetanse, notat, e-post og konto er fortsatt ikke med.
+
 ## 2026-09-12 — Statistikk: chi²-merket bryter på iPhone
 
 Ingen migrasjon. «✗ N.S. (χ²=12.0, p=0,062)» gikk utenfor kortet i

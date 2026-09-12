@@ -117,20 +117,24 @@ class BesetningTests(TilgangsBasis):
         self.assertTrue(self._hent().json()['data']['i_drift'])
 
     def test_svaret_baerer_ikke_personalmappa(self):
-        """§6, ordrett: ikke telefonnummer, ikke kompetanseliste, ikke notat.
-        Sentralbordet skal se om bilen er klar."""
+        """§6: ikke kompetanseliste, ikke notat, ikke konto. Telefon og ISSI
+        er med fra 12. sep. 2026 (André: «på koblede enheter i /oppdrag skal
+        det vises telefon nummer og ISSI for hver person som er på enheten»),
+        så sentralbordet kan ringe bilen uten å åpne vaktlista."""
         self.p_hgsd.telefon = '90000000'
+        self.p_hgsd.issi = '1234567'
         self.p_hgsd.notat = 'Skal hentes 0800'
         self.p_hgsd.save()
         self.p_hgsd.kompetanser.add(self.komp)
         self._skift(self.p_hgsd)
 
         raa = self._hent().content.decode()
-        self.assertNotIn('90000000', raa)
         self.assertNotIn('Skal hentes', raa)
         self.assertNotIn('Sykepleier', raa)
-        for felt in ('telefon', 'notat', 'kompetanser', 'brukernavn'):
+        for felt in ('notat', 'kompetanser', 'brukernavn', 'epost'):
             self.assertNotIn(felt, raa, f'«{felt}» lekket ut i svaret')
+        rad = self._hent().json()['data']['mannskap'][0]
+        self.assertEqual((rad['telefon'], rad['issi']), ('90000000', '1234567'))
 
     def test_de_som_er_i_bilen_staar_forst(self):
         """Operatørens spørsmål er «hvem har jeg». De som mangler er den
@@ -349,7 +353,7 @@ class BesetningspanelTests(SimpleTestCase):
     HARNESS = (
         (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue')),
         (PORTAL_UTILS_JS, ('klokke',)),
-        (OPPDRAG_SENTRAL_JS, ('mkBesetning', 'kanSeBesetning',
+        (OPPDRAG_SENTRAL_JS, ('mkBesetning', '_besetningKontakt', 'kanSeBesetning',
                               'hentBesetning')),
     )
 
@@ -401,6 +405,21 @@ class BesetningspanelTests(SimpleTestCase):
         self.assertIn('1 av 2 møtt', ut)
         self.assertIn('Kari', ut)
         self.assertIn('Sjåfør', ut)
+
+    def test_telefon_og_issi_vises_per_person(self):
+        """Telefonen er en `tel:`-lenke uten mellomrom; ISSI ren tekst.
+        Mangler begge, tegnes ingen kontaktbolk."""
+        full = {**self.FULL, 'mannskap': [
+            {'navn': 'Kari', 'rolle': '', 'tilstede': True, 'mott': True,
+             'telefon': '900 00 000', 'issi': '<b>1234567</b>'},
+            {'navn': 'Ola', 'rolle': '', 'tilstede': False, 'mott': False,
+             'telefon': '', 'issi': ''}]}
+        ut = self._panel(full)
+        self.assertIn('href="tel:90000000"', ut)
+        self.assertIn('900 00 000', ut)
+        self.assertIn('&lt;b&gt;1234567&lt;/b&gt;', ut)
+        self.assertNotIn('<b>1234567', ut)
+        self.assertEqual(ut.count('besetning-kontakt'), 1, 'Ola uten kontaktinfo får ingen bolk')
 
     def test_uten_drift_sies_det_i_stedet_for_null_moett(self):
         """«0 av 4 møtt» på en liste som ikke er i drift leses som et problem.

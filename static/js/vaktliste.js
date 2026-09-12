@@ -2941,7 +2941,7 @@ function kanRedigerePerson(person) {
 function _passerPersonsok(m) {
   if (!personsok) return true;
   const n = personsok.toLowerCase();
-  return [m.navn, m.korps_navn, m.telefon, m.epost, m.brukernavn]
+  return [m.navn, m.korps_navn, m.telefon, m.epost, m.issi, m.brukernavn]
     .concat((m.alle_kompetanser || []).map((k) => k.navn))
     .some((v) => (v || '').toLowerCase().includes(n));
 }
@@ -3090,11 +3090,12 @@ function mkMannskap() {
         <td class="vlr-komp" title="${escHtmlValue(alle)}">${merker}</td>
         <td class="vlr-tlf">${escapeHtml(m.telefon || '—')}</td>
         <td class="vlr-epost">${epost}</td>
+        <td class="vlr-tlf">${escapeHtml(m.issi || '—')}</td>
         ${kontoCelle}
         <td class="vlr-handling">${knapper}</td>
       </tr>`;
   }).join('')
-    : `<tr><td colspan="${_erAdmin() ? 7 : 6}" class="vl-tom">Ingen treff på «${escapeHtml(personsok)}».</td></tr>`;
+    : `<tr><td colspan="${_erAdmin() ? 8 : 7}" class="vl-tom">Ingen treff på «${escapeHtml(personsok)}».</td></tr>`;
 
   const treff = document.getElementById('vl-treff');
   if (treff) {
@@ -3104,17 +3105,19 @@ function mkMannskap() {
 
   // Andelene summerer til 100 i begge utgaver — kontokolonnen finnes bare
   // for global admin, og de andre kolonnene får plassen når den mangler.
+  // Kolonnene: navn, korps, kompetanse, telefon, e-post, ISSI, [konto], handling.
   const kolonner = _erAdmin()
     ? `<colgroup>
-            <col style="width: 20%"><col style="width: 8%">
-            <col style="width: 25%"><col style="width: 11%">
-            <col style="width: 17%"><col style="width: 9%">
-            <col style="width: 10%">
+            <col style="width: 18%"><col style="width: 8%">
+            <col style="width: 23%"><col style="width: 11%">
+            <col style="width: 16%"><col style="width: 8%">
+            <col style="width: 8%"><col style="width: 8%">
           </colgroup>`
     : `<colgroup>
-            <col style="width: 22%"><col style="width: 9%">
-            <col style="width: 28%"><col style="width: 12%">
-            <col style="width: 18%"><col style="width: 11%">
+            <col style="width: 20%"><col style="width: 9%">
+            <col style="width: 26%"><col style="width: 12%">
+            <col style="width: 17%"><col style="width: 8%">
+            <col style="width: 8%">
           </colgroup>`;
 
   return `
@@ -3130,6 +3133,7 @@ function mkMannskap() {
               <th>Kompetanse</th>
               ${_personKolonne('telefon', 'Telefon')}
               <th>E-post</th>
+              <th title="Nødnettsterminalens nummer">ISSI</th>
               ${_erAdmin() ? '<th>Konto</th>' : ''}
               <th></th>
             </tr>
@@ -3171,6 +3175,7 @@ function _fyllPersonskjema(person) {
   _settVerdi('person-korps', person ? person.korps_id : '');
   _settVerdi('person-telefon', person ? person.telefon : '');
   _settVerdi('person-epost', person ? person.epost : '');
+  _settVerdi('person-issi', person ? person.issi : '');
   _settVerdi('person-konto', person && person.user_id ? person.user_id : '');
   _settVerdi('person-notat', person ? person.notat : '');
   document.getElementById('person-aktiv').checked = person ? person.er_aktiv : true;
@@ -3221,6 +3226,7 @@ async function lagrePerson() {
       korps_id: Number(korpsId),
       telefon: _lesFelt('person-telefon'),
       epost: _lesFelt('person-epost'),
+      issi: _lesFelt('person-issi'),
       notat: _lesFelt('person-notat'),
       kompetanse_ider: Array.from(
         document.getElementById('person-kompetanser').selectedOptions)

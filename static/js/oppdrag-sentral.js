@@ -274,8 +274,12 @@ function mkBesetning(enhetId) {
           : '<span class="besetning-ute" title="Ikke møtt">○</span>');
     const rolle = m.rolle
       ? `<span class="enhet-meta">${escapeHtml(m.rolle)}</span>` : '';
+    // Telefon og ISSI (André, 12. sep. 2026): operatøren skal kunne ringe
+    // bilen uten å åpne vaktlista. Telefonen er en `tel:`-lenke, ISSI ren
+    // tekst — nødnettet ringes fra terminalen, ikke fra nettleseren.
+    const kontakt = _besetningKontakt(m);
     return `<div class="besetning-rad">${merke}
-              <span>${escapeHtml(m.navn)}</span>${rolle}</div>`;
+              <span>${escapeHtml(m.navn)}</span>${rolle}${kontakt}</div>`;
   }).join('');
 
   const status = b.i_drift
@@ -289,6 +293,21 @@ function mkBesetning(enhetId) {
       </div>
       ${rader}
     </div>`;
+}
+
+
+function _besetningKontakt(m) {
+  const deler = [];
+  if (m.telefon) {
+    const tlf = String(m.telefon);
+    deler.push(`<a class="besetning-tlf" href="tel:${escHtmlValue(tlf.replace(/\s+/g, ''))}">`
+             + `<i class="bi bi-telephone"></i> ${escapeHtml(tlf)}</a>`);
+  }
+  if (m.issi) {
+    deler.push(`<span class="besetning-issi" title="ISSI (nødnett)">`
+             + `<i class="bi bi-broadcast"></i> ${escapeHtml(m.issi)}</span>`);
+  }
+  return deler.length ? `<span class="besetning-kontakt">${deler.join('')}</span>` : '';
 }
 
 

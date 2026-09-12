@@ -549,9 +549,12 @@ Oppdragsmodulen importerer **ikke** vaktlista; `oppdrag-sentral.js` henter
 - **Gatet på `les` i vaktliste**, ikke i oppdrag — komposisjonsregelen fra
   rollemodellen §5. Malen får et flagg via `har_tilgang(..., 'vaktliste', ...)`:
   en slug gjennom `core`, ikke en import.
-- **Svaret bærer navn, rolle og innsjekkstatus.** Ikke telefon, ikke
-  kompetanser, ikke `notat` — sentralbordet skal se om bilen er klar, ikke lese
-  personalmapper.
+- **Svaret bærer navn, rolle, innsjekkstatus, telefon og ISSI** (telefon og ISSI
+  fra 12. sep. 2026 — «på koblede enheter i /oppdrag skal det vises telefon nummer
+  og ISSI»). Ikke kompetanser, ikke `notat`, ikke e-post eller konto — sentralbordet
+  skal kunne ringe bilen, ikke lese personalmapper. `Mannskap.issi` (`0015`) er
+  nødnettsterminalens nummer, tekst med ledende nuller, etter telefon og e-post i
+  registeret.
 - **Bare skiftene som dekker nå**, og **404 når enheten er ukoblet**: ubemannet
   og ukoblet er ulike svar på ulike problemer.
 - **Lista i drift vinner; ellers portalens aktive vakt** (12. sep. 2026 — «koblingen

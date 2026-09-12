@@ -681,10 +681,11 @@ def besetning(enhet_id, naa=None):
     løpet av helga». Derfor bare skiftene som dekker tidspunktet: en liste med
     tretti rader over to døgn svarer ikke på noe man kan handle på.
 
-    **Ikke telefonnummer, ikke kompetanseliste, ikke `notat`** (§6).
-    Operatøren skal se om ressursen er klar, ikke lese personalmapper. Det er
-    en bevisst innskrenking, ikke en forglemmelse — den som trenger
-    telefonnummeret har vaktlista.
+    **Telefon og ISSI er med, kompetanseliste og `notat` er det ikke** (§6,
+    snudd for telefon 12. sep. 2026 — André: «på koblede enheter i /oppdrag
+    skal det vises telefon nummer og ISSI for hver person som er på
+    enheten»). Sentralbordet skal kunne ringe bilen på nødnett eller mobil
+    uten å åpne vaktlista; personalmappa skal det fortsatt ikke lese.
 
     Returnerer ``None`` hvis enheten ikke er koblet til en ressurs i vakta.
     Det er noe annet enn «ingen på vakt», og de to skal ikke se like ut:
@@ -715,6 +716,8 @@ def besetning(enhet_id, naa=None):
         return {
             'navn': vp.mannskap.navn,
             'rolle': vp.rolle.navn if vp.rolle else '',
+            'telefon': vp.mannskap.telefon,
+            'issi': vp.mannskap.issi,
             'tilstede': vp.er_tilstede,
             'mott': vp.mott_at is not None,
         }

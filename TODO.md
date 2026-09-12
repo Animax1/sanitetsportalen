@@ -231,6 +231,9 @@ ingen av dem gir feilmelding — de er bare stille inaktive.
                         kan slå lyden av, iOS-omvei for stillebryteren, grovsortering
                         kreves før Behandlet/Ledig etter Leverer (+ valgfritt før Avreist),
                         «Behandlet på stedet» i statistikken, gruppeoverskrifter på iPhone.
+                  - [x] ISSI (12. sep.): `Mannskap.issi` (`vaktliste/0015`), etter
+                        telefon og e-post; besetningen i `/oppdrag/` viser telefon
+                        og ISSI per person.
                   - [x] Statistikk (12. sep.): chi²-merket bryter på iPhone.
                   - [x] Audit i vaktlista (12. sep.): skift, ressurser og stemplene
                         logges på feltnivå; `merknad` uten verdier.

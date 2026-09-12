@@ -455,7 +455,7 @@ REGISTER_REVIEWED = {
     'konto': 'markup bygget lokalt, brukernavnet escapet inni',
     'epost': 'markup bygget lokalt, adressen escapet inni og et ikon',
     'kontoCelle': 'tom streng eller <td> med `konto`, som er escapet over',
-    '_erAdmin() ? 7 : 6': 'tall fra en ternær',
+    '_erAdmin() ? 8 : 7': 'tall fra en ternær',
     '_erAdmin() ? \'<col style="width: 9%">\' : \'\'': 'intern markup fra en ternær',
     "_erAdmin() ? '<th>Konto</th>' : ''": 'intern markup fra en ternær',
     'kolonner': 'intern <colgroup>-markup valgt av en ternær',
@@ -670,7 +670,7 @@ class MannskapstabellensLayoutTests(SimpleTestCase):
                 """)
                 self.assertIn('<colgroup>', ut)
                 andeler = [int(a) for a in re.findall(r'width:\s*(\d+)%', ut)]
-                self.assertEqual(len(andeler), 7 if admin else 6, 'én bredde per kolonne')
+                self.assertEqual(len(andeler), 8 if admin else 7, 'én bredde per kolonne')
                 self.assertEqual(sum(andeler), 100, f'andelene skal summere til 100, fikk {andeler}')
                 self.assertEqual('<th>Konto</th>' in ut, admin, 'kontokolonnen er admin sin')
 

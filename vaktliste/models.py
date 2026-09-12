@@ -302,6 +302,16 @@ class Mannskap(BaseTimeStampedModel):
         help_text='Valgfritt. Finnes en portalbruker med samme e-post, '
                   'kobles kontoen automatisk.',
     )
+    # ISSI (André, 12. sep. 2026): nødnettsterminalens nummer — «da vet vi
+    # hvilken nødnett vi skal ringe». Tekst, ikke tall: et ISSI kan ha
+    # ledende nuller, og ingen regner med det.
+    issi = models.CharField(
+        max_length=20,
+        blank=True,
+        default='',
+        verbose_name='ISSI',
+        help_text='Nødnettsterminalens ISSI. Valgfritt.',
+    )
     # Badgen-koblingen (§4): kontoen arver korpset herfra. SET_NULL, ikke
     # CASCADE — slettes kontoen, består personen i registeret. Samme valg
     # som `Enhet.user` og `Forstehjelper.user`.

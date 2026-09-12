@@ -398,6 +398,18 @@ class MannskapApiTests(TestCase):
         return self.c.post('/vaktliste/api/mannskap/', data=kropp,
                            content_type='application/json')
 
+    def test_issi_lagres_som_tekst_og_kan_endres(self):
+        """ISSI (12. sep. 2026): nødnettsterminalens nummer, etter telefon og
+        e-post. Tekst, så ledende nuller overlever."""
+        res = self._opprett(issi=' 0012345 ')
+        self.assertEqual(res.status_code, 201, res.content)
+        d = res.json()['data']
+        self.assertEqual(d['issi'], '0012345')
+        res = self.c.put(f'/vaktliste/api/mannskap/{d["id"]}/', data={'issi': ''},
+                         content_type='application/json')
+        self.assertEqual(res.status_code, 200, res.content)
+        self.assertEqual(res.json()['data']['issi'], '')
+
     def test_person_uten_korps_avvises(self):
         """Uten korps finnes ingen badge — personen kan verken sorteres i lista
         eller redigeres av en korps-bruker fra fase 3."""

@@ -288,8 +288,14 @@ statistikksiden bruker (§5 i rollemodellen): en modul viser bare kilder brukere
 tilgang til, framfor å gi avledet innsyn.
 
 Svaret inneholder navn, rolle og innsjekkstatus — det operatøren trenger for å vite
-om bilen er bemannet. Ikke telefonnummer, ikke kompetanseliste, ikke `notat`:
-sentralbordet skal se om ressursen er klar, ikke lese personalmapper.
+om bilen er bemannet — og fra 12. sep. 2026 **telefon og ISSI** (André: «på koblede
+enheter i /oppdrag skal det vises telefon nummer og ISSI for hver person som er på
+enheten»). Grensen går fortsatt ved personalmappa: ikke kompetanseliste, ikke `notat`,
+ikke e-post eller konto. Sentralbordet skal kunne ringe bilen, på nødnett eller mobil,
+uten å åpne vaktlista.
+
+`Mannskap.issi` er nødnettsterminalens nummer, lagret som tekst (ledende nuller), og
+står etter telefon og e-post i registeret.
 
 ---
 

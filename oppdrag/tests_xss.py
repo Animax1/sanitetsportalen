@@ -26,6 +26,7 @@ HTML_BUILDERS_PER_FIL = {
         # Vaktlistas data, lånt inn (§6 i vaktlistenotatet). Navn og rolle er
         # fritekst fra et annet moduls register, og escapes her som alt annet.
         'mkBesetning',
+        '_besetningKontakt',
         'renderOppdrag',
         '_grovMerke',
         # Flere enheter (11. sep. 2026): matrisen i lista, avkryssingen i
@@ -131,6 +132,8 @@ REVIEWED_INTERPOLATIONS = {
     'besetning': 'markup bygget lokalt av mkBesetning(), som selv skannes her',
     'merke': 'hardkodet markup fra en ternær, ingen data i seg',
     'rolle': 'markup bygget lokalt, rollenavnet escapet inni',
+    'kontakt': 'markup bygget lokalt av _besetningKontakt(), som selv skannes her',
+    "deler.join('')": 'markup bygget lokalt i samme funksjon, telefon og ISSI escapet inni',
     'rader': 'markup bygget lokalt i samme funksjon',
     'status': 'bygget lokalt av tall som escapes inni',
     'valg': 'options bygget lokalt, brukernavn escapet inni',
