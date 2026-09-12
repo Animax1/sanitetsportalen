@@ -3583,7 +3583,7 @@ class MittKorpsTests(SimpleTestCase):
         self.assertIn('Kari', ut, 'og sitt eget mannskap')
         self.assertNotIn('KARM', ut, 'Karmøys plass er ikke hennes')
 
-    def test_utildelt_plass_vises_ikke(self):
+    def test_planlagt_plass_vises_ikke(self):
         """Plass 3 er vaktlederens bord."""
         run_node(self.harness, self.VINDU + self.LISTE + """
             const mine = _synligePoster(aktivListe.vaktposter, 1);
@@ -3614,7 +3614,7 @@ class MittKorpsTests(SimpleTestCase):
             assert(kanBemannePlass({alle_korps: true, reservert_korps_id: null}, r), 'universal');
             assert(kanBemannePlass({alle_korps: false, reservert_korps_id: 1}, r), 'egen');
             assert(!kanBemannePlass({alle_korps: false, reservert_korps_id: 2}, r), 'andres');
-            assert(!kanBemannePlass({alle_korps: false, reservert_korps_id: null}, r), 'utildelt');
+            assert(!kanBemannePlass({alle_korps: false, reservert_korps_id: null}, r), 'planlagt');
             globalThis.window.MITT_KORPS_ID = null;
             assert(!kanBemannePlass({alle_korps: true, reservert_korps_id: null}, r), 'uten badge');
         """)
@@ -3623,7 +3623,7 @@ class MittKorpsTests(SimpleTestCase):
         run_node(self.harness, """
             assert(JSON.stringify(_korpsKropp('korps_id', 'alle')) === '{"alle_korps":true,"korps_id":null}', 'alle');
             assert(JSON.stringify(_korpsKropp('korps_id', '2')) === '{"alle_korps":false,"korps_id":"2"}', 'ett korps');
-            assert(JSON.stringify(_korpsKropp('korps_id', '')) === '{"alle_korps":false,"korps_id":null}', 'utildelt');
+            assert(JSON.stringify(_korpsKropp('korps_id', '')) === '{"alle_korps":false,"korps_id":null}', 'planlagt');
             assert(JSON.stringify(_korpsKropp('merknad', 'x')) === '{"merknad":"x"}', 'andre felt uroert');
         """)
 
@@ -3639,7 +3639,7 @@ class MittKorpsTests(SimpleTestCase):
         self.assertIn('value="alle" selected', ut)
         # Delt ut: «Planlagt» tilbys ikke lenger — veien går én vei.
         self.assertNotIn('>Planlagt</option>', ut)
-        self.assertIn('>Utildelt</span>', ut)
+        self.assertIn('>Åpen for alle</span>', ut)
         planlagt = run_node(self.harness, self.VINDU + """
             globalThis.window = { MODUL_TILGANG: { vaktliste: 'skriv_full', admin: false }, MITT_KORPS_ID: null };
             globalThis.utskriftRessurs = null; globalThis.korpsfilter = null;

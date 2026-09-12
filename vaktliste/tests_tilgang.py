@@ -1200,7 +1200,7 @@ class TildeltAlleKorpsTests(TilgangsBasis):
     """«Mitt korps» og plassen tildelt alle (prosjektleder, 11. sep. 2026).
 
     Tre tilstander på en ledig plass: tildelt ett korps, tildelt alle
-    (`alle_korps`), eller utildelt — vaktlederens bord, som ikke deles ut.
+    (`alle_korps`, «Åpen for alle»), eller planlagt — vaktlederens bord, som ikke deles ut.
     Korps-brukeren får fylle sine egne og de universale; tildelingen er
     `skriv_full`.
     """
@@ -1241,7 +1241,7 @@ class TildeltAlleKorpsTests(TilgangsBasis):
         self.assertEqual(res.status_code, 200, res.content)
         self.assertEqual(Vaktpost.objects.get(pk=pk).mannskap_id, self.p_hgsd.pk)
 
-    def test_utildelt_plass_deles_fortsatt_ikke_ut(self):
+    def test_planlagt_plass_deles_fortsatt_ikke_ut(self):
         pk = self._ledig(self.c_vl, self.res_fri).json()['data']['id']
         self.assertEqual(self._fyll(self.c_kb, pk, self.p_hgsd).status_code, 403)
 
@@ -1258,11 +1258,11 @@ class TildeltAlleKorpsTests(TilgangsBasis):
     def test_universal_plass_er_synlig_for_korpsbrukeren(self):
         """Hennes å fylle, altså hennes å se — også gjennom korpsfilteret."""
         pk = self._ledig(self.c_vl, self.res_fri, alle_korps=True).json()['data']['id']
-        utildelt = self._ledig(self.c_vl, self.res_fri).json()['data']['id']
+        planlagt = self._ledig(self.c_vl, self.res_fri).json()['data']['id']
         data = self.c_kb.get(f'/vaktliste/api/vaktlister/{self.vl.pk}/').json()['data']
         ider = {vp['id'] for vp in data['vaktposter']}
         self.assertIn(pk, ider)
-        self.assertNotIn(utildelt, ider, 'vaktlederens bord vises ikke')
+        self.assertNotIn(planlagt, ider, 'vaktlederens bord vises ikke')
 
     def test_lederen_kan_ta_tildelingen_tilbake(self):
         pk = self._ledig(self.c_vl, self.res_fri, alle_korps=True).json()['data']['id']
@@ -1340,7 +1340,7 @@ class EgenPersonPaaAndresPlassTests(TilgangsBasis):
 
 class PlanlagtGaarEnVeiTests(TilgangsBasis):
     """En planlagt plass (lederens kladd) kan deles ut — til et korps eller
-    til «utildelt», som alle ser — men aldri tas tilbake (André, 12. sep.
+    til «åpen for alle», som alle ser — men aldri tas tilbake (André, 12. sep.
     2026: «En kan ikke bytte tilbake til planlagt etter den er satt til
     utildelt eller er tildelt et korps»)."""
 
@@ -1364,12 +1364,12 @@ class PlanlagtGaarEnVeiTests(TilgangsBasis):
         self.assertIn('planlagt', res.json()['message'])
         self.assertEqual(Vaktpost.objects.get(pk=pk).korps_id, self.hgsd.pk)
 
-    def test_utildelt_kan_heller_ikke_bli_planlagt(self):
+    def test_aapen_for_alle_kan_heller_ikke_bli_planlagt(self):
         pk = self._plass(self.res_fri)
         self.assertEqual(self._put(pk, alle_korps=True).status_code, 200)
         self.assertEqual(self._put(pk, alle_korps=False).status_code, 400)
         self.assertTrue(Vaktpost.objects.get(pk=pk).alle_korps)
-        # Men fra utildelt til ett korps går an — det er fortsatt delt ut.
+        # Men fra åpen for alle til ett korps går an — det er fortsatt delt ut.
         self.assertEqual(self._put(pk, alle_korps=False, korps_id=self.hgsd.pk).status_code, 200)
 
     def test_som_ressursen_er_ikke_planlagt_naar_ressursen_har_korps(self):

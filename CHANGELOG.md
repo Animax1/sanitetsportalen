@@ -8,6 +8,11 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 Ingen migrasjon.
 
+- **«Utildelt» heter «Åpen for alle».** André foreslo «ledig korps»; «ledig»
+  er alt plassen uten person, og to «ledig» i samme rad leser som ett. Bare
+  navnet — nedtrekket, oversikten og «Mitt korps». Feltet er fortsatt
+  `alle_korps`.
+
 - **Nedtrekkene tilbyr bare dem brukeren får sette inn.** Korps-føreren
   kunne velge hvem som helst; serveren avviste, men lista lot som.
   `services.mannskap_brukeren_kan_sette` speiler `kan_redigere_mannskap`:

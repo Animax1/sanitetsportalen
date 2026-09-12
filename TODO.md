@@ -210,9 +210,8 @@ ingen av dem gir feilmelding — de er bare stille inaktive.
                   dekke/probono, kurven lister ledige skift, «Dupliser som ledig
                   plass», «Slett vaktlisten» for admin, arkiverte bak én knapp,
                   registeret hentes ved sidelasting, lesbar tidstekst på /statistikk/.
-            - [ ] **Navnet «utildelt»** — André foreslår «ledig korps». Avvent svar:
-                  «ledig» brukes alt om plassen uten person, og to «ledig» i samme
-                  rad leser som samme ting.
+            - [x] Navnet «utildelt» ble «Åpen for alle» (12. sep.). «Ledig korps»
+                  ble forkastet: «ledig» er alt plassen uten person.
             - [ ] **Å tenke på (André, 12. sep.):** skal bilen se de andre bilenes
                   tidsstempler? (§7.3 sier nei i dag.) Skal bil 2, som ikke tar med
                   pasienten, få sette/se grovsorteringen? Kontokobling til admin bare av

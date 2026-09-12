@@ -469,7 +469,7 @@ function fyllNedtrekk() {
   _fyll('ny-vaktpost-mannskap', aktivListe.mannskap.map((m) => ({
     id: m.id, navn: `${m.navn} — ${m.korps_navn}`,
   })), '— ledig plass —');
-  _fyll('ny-vaktpost-korps', [{ id: 'alle', navn: 'Utildelt' }].concat(
+  _fyll('ny-vaktpost-korps', [{ id: 'alle', navn: 'Åpen for alle' }].concat(
     (aktivListe.korps || []).map((k) => ({
       id: k.id, navn: k.kortnavn || k.navn,
     }))), '— som ressursen —');
@@ -758,7 +758,7 @@ function _plassKorps(vp) {
   // Reservasjonen på en ledig plass. Bare den som deler ut kan endre den —
   // kunne korps-brukeren, kunne hun tildelt seg selv en plass. Andre ser
   // hvem plassen tilhører, som tekst.
-  // Tre tilstander (André, 12. sep. 2026): ett korps, **utildelt** (alle
+  // Tre tilstander (André, 12. sep. 2026): ett korps, **åpen for alle** (alle
   // ser og kan fylle — `alle_korps`), eller **planlagt** — lederens kladd,
   // som korps-brukerne ikke ser. Planlagt går én vei: valget finnes bare
   // så lenge plassen står der, og serveren avviser veien tilbake.
@@ -766,14 +766,14 @@ function _plassKorps(vp) {
     : (vp.plass_korps_id != null ? vp.plass_korps_id
       : (vp.reservert_korps_id != null ? vp.reservert_korps_id : ''));
   if (!kanSkriveAlt()) {
-    if (vp.alle_korps) return '<span class="vl-meta">Utildelt</span>';
+    if (vp.alle_korps) return '<span class="vl-meta">Åpen for alle</span>';
     const k = (aktivListe.korps || []).find((x) => x.id === valgt);
     return `<span class="vl-meta">${escapeHtml(k ? (k.kortnavn || k.navn) : '—')}</span>`;
   }
   const alleMerke = valgt === 'alle' ? ' selected' : '';
   const planlagt = valgt === '' ? ['<option value="" selected>Planlagt</option>'] : [];
   const valg = planlagt.concat([
-                `<option value="alle"${alleMerke}>Utildelt</option>`]).concat(
+                `<option value="alle"${alleMerke}>Åpen for alle</option>`]).concat(
     (aktivListe.korps || []).map((k) => {
       const merke = k.id === valgt ? ' selected' : '';
       return `<option value="${escHtmlValue(k.id)}"${merke}>`
@@ -1535,7 +1535,7 @@ function mkOversikt() {
     // når den er ledig. Det er det samme skillet som i ressurstabellen, og
     // av samme grunn.
     const korps = vp.ledig
-      ? (vp.alle_korps ? 'Utildelt' : (korpsnavn[vp.reservert_korps_id] || 'Planlagt'))
+      ? (vp.alle_korps ? 'Åpen for alle' : (korpsnavn[vp.reservert_korps_id] || 'Planlagt'))
       : (vp.korps_kort || '');
     return `
         <tr class="${escHtmlValue(vp.ledig ? 'vl-ledig' : '')}">
@@ -1879,7 +1879,7 @@ function mkMittKorps() {
         <div><b>${escapeHtml(dekke_t)} t</b><span class="vl-meta">å dekke</span></div>
         <div><b>${escapeHtml(probono)} t</b><span class="vl-meta">probono</span></div>
       </div>
-      <span class="vl-meta">${escapeHtml(korpsnavn)} — tildelte og utildelte plasser</span>
+      <span class="vl-meta">${escapeHtml(korpsnavn)} — tildelte plasser og plasser åpne for alle</span>
     </div>`;
 
   if (!poster.length) {
@@ -1894,7 +1894,7 @@ function mkMittKorps() {
       ? _fyllValgFor(vp, kanBemannePlass(vp, r)) + _probonoMerke(vp)
       : escapeHtml(vp.navn) + _probonoMerke(vp);
     const tildelt = vp.ledig
-      ? (vp.alle_korps ? 'Utildelt' : (korps ? (korps.kortnavn || korps.navn) : ''))
+      ? (vp.alle_korps ? 'Åpen for alle' : (korps ? (korps.kortnavn || korps.navn) : ''))
       : (vp.korps_kort || '');
     return `
         <tr class="${escHtmlValue(vp.ledig ? 'vl-ledig' : '')}">
@@ -2703,7 +2703,7 @@ async function _stemple(id, handling) {
 function _korpsKropp(felt, verdi) {
   // Reservasjonsfeltet bærer tre tilstander i ett nedtrekk; serveren har to
   // felt. «alle» blir `alle_korps: true`, et korps blir `korps_id` og slår
-  // `alle_korps` av, tomt er utildelt. Andre felt går rett gjennom.
+  // `alle_korps` av, tomt er planlagt. Andre felt går rett gjennom.
   if (felt !== 'korps_id') {
     const kropp = {};
     kropp[felt] = verdi === '' ? null : verdi;
@@ -2769,7 +2769,7 @@ function apneRedigerVaktpost(id) {
   })), '— ledig plass —');
   _fyll('vaktpost-rolle', rollerForGruppe(ressurs.gruppe_id, vp.rolle_id),
         'Uten rolle');
-  _fyll('vaktpost-korps', [{ id: 'alle', navn: 'Utildelt' }].concat(
+  _fyll('vaktpost-korps', [{ id: 'alle', navn: 'Åpen for alle' }].concat(
     (aktivListe.korps || []).map((k) => ({
       id: k.id, navn: k.kortnavn || k.navn,
     }))), '— som ressursen —');

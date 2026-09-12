@@ -321,8 +321,8 @@ fase 3–7 gjenstår — se `docs/BESLUTNING_VAKTLISTE.md`, som er besluttet i s
 - **Kostbehov/matallergi lagres ikke** (art. 9 — besluttet holdt utenfor portalen), og
   `Mannskap.notat` er unntatt verdilogging i audit (`signals.FELT_UTEN_VERDILOGGING`).
 - **En ledig plass har tre tilstander** (11.–12. sep. 2026): tildelt ett korps
-  (`Vaktpost.korps`/ressursens), **utildelt** (`Vaktpost.alle_korps` — alle ser og kan
-  fylle), eller **planlagt** — lederens kladd, som korps-brukerne ikke ser
+  (`Vaktpost.korps`/ressursens), **åpen for alle** (`Vaktpost.alle_korps` — alle ser og kan
+  fylle; het «utildelt» én dag), eller **planlagt** — lederens kladd, som korps-brukerne ikke ser
   (`services.er_planlagt`). `alle_korps` vinner over `korps`. Å dele ut er `skriv_full`,
   og **planlagt går én vei**: en plass som er delt ut tas ikke tilbake til kladden —
   viewet avviser det, og nedtrekket tilbyr «Planlagt» bare så lenge plassen står der. Fanen «Mitt korps» (`mkMittKorps`) viser korpsets tildelte og
