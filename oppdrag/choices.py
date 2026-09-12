@@ -21,7 +21,13 @@ from django.core.exceptions import ValidationError
 
 # ── Verdimengder ─────────────────────────────────────────────────────────────
 
-PROBLEMSTILLING = (
+#: «Udefinert» (André, 12. sep. 2026): oppdraget kan opprettes før noen vet
+#: hva det er, men **må** få en problemstilling før enheten meldes ledig —
+#: `services.sett_status` avviser `Ledig` så lenge den står.
+UDEFINERT = 'Udefinert'
+
+PROBLEMSTILLING_MEDISINSK = (
+    UDEFINERT,
     'Stor ytre blødning',
     'Bevisstløs',
     'Nedsatt bevissthet',
@@ -46,13 +52,63 @@ PROBLEMSTILLING = (
     'Transport',
 )
 
+#: Tekniske oppdrag (André, 12. sep. 2026): hastegraden «Teknisk» har sine
+#: egne problemstillinger — matutlevering, transport, utstyr. Lista er kode,
+#: som den medisinske, og endres ved å endre den her.
+PROBLEMSTILLING_TEKNISK = (
+    UDEFINERT,
+    'Matutlevering',
+    'Transport',
+    'Utstyr',
+    'Forsyning',
+    'Annet teknisk',
+)
+
+#: Alle problemstillinger, til validering av feltet alene. Hvilke som passer
+#: en gitt hastegrad står i `PROBLEMSTILLINGER_FOR`.
+PROBLEMSTILLING = PROBLEMSTILLING_MEDISINSK + tuple(
+    p for p in PROBLEMSTILLING_TEKNISK if p not in PROBLEMSTILLING_MEDISINSK)
+
 #: AMK-inndelingen, ikke fargenavn. Fargekoding i grensesnittet er en
 #: presentasjonsdetalj; navnet skal være det personellet faktisk sier.
+#: «Teknisk» (12. sep. 2026) er ikke en hastegrad i AMK-forstand, men et
+#: oppdrag uten pasient — og det er den forskjellen som avgjør hvilke
+#: problemstillinger som tilbys.
+TEKNISK = 'Teknisk'
 HASTEGRAD = (
     'Akutt',
     'Haster',
     'Vanlig',
+    TEKNISK,
 )
+
+PROBLEMSTILLINGER_FOR: dict[str, tuple[str, ...]] = {
+    'Akutt': PROBLEMSTILLING_MEDISINSK,
+    'Haster': PROBLEMSTILLING_MEDISINSK,
+    'Vanlig': PROBLEMSTILLING_MEDISINSK,
+    TEKNISK: PROBLEMSTILLING_TEKNISK,
+}
+
+#: Problemstillinger som bærer et antall (André, 12. sep. 2026: «Transport
+#: har antall som fast hele tall»). `Oppdrag.antall` tømmes for alle andre.
+MED_ANTALL = ('Transport',)
+
+
+def problemstilling_passer(hastegrad: str, problemstilling: str) -> bool:
+    """Hører problemstillingen til hastegradens liste? Ukjent hastegrad gir
+    False — en skrivefeil skal stenge, ikke åpne."""
+    return problemstilling in PROBLEMSTILLINGER_FOR.get(hastegrad, ())
+
+
+#: Enhetstypen (André, 12. sep. 2026): grupperer bilene i «Nytt oppdrag» og i
+#: ressursoversikten, ambulansene først. Rekkefølgen her er visningsrekkefølgen.
+ENHETSTYPE: tuple[tuple[str, str], ...] = (
+    ('ambulanse', 'Ambulanse'),
+    ('mannskapsbil', 'Mannskapsbil'),
+    ('lag', 'Lag til fots'),
+    ('annet', 'Annet'),
+)
+ENHETSTYPE_NAVN: dict[str, str] = dict(ENHETSTYPE)
 
 
 # ── Statuser ─────────────────────────────────────────────────────────────────

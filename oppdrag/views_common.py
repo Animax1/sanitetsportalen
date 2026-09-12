@@ -125,6 +125,8 @@ def oppdrag_til_dict(oppdrag, *, for_enhet: bool = False,
         'enhet_id': oppdrag.enhet_id,
         'enhet_navn': oppdrag.enhet.navn,
         'problemstilling': oppdrag.problemstilling,
+        # Antall for problemstillinger som bærer et (transport); ellers null.
+        'antall': oppdrag.antall,
         'hastegrad': oppdrag.hastegrad,
         # Bilens Rød/Gul/Grønn. Tom til bilen har satt den — klienten viser
         # «—», og det er informasjon: ikke vurdert ennå.

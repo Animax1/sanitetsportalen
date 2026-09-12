@@ -309,6 +309,13 @@ class UlovligOvergang(Exception):
     """Overgangen finnes ikke i tabellen over."""
 
 
+class ProblemstillingUdefinert(UlovligOvergang):
+    """`Ledig` på et oppdrag som fortsatt står som «Udefinert». Egen klasse
+    fordi svaret er et annet: ikke «skjermen er utdatert», men «sett
+    problemstillingen først»."""
+
+
+
 @transaction.atomic
 def sett_status(oppdrag, ny_status: str, *, bruker=None, tidspunkt=None,
                 forsinket: bool = False, automatisk: bool = False,
@@ -335,6 +342,14 @@ def sett_status(oppdrag, ny_status: str, *, bruker=None, tidspunkt=None,
         raise UlovligOvergang(
             f'Kan ikke gå fra {rad.status!r} til {ny_status!r}.'
         )
+    # «Udefinert» må bort før bilen slås ledig (André, 12. sep. 2026): et
+    # ferdig oppdrag uten problemstilling er en statistikk som ikke svarer.
+    # Den automatiske lukkingen slipper — den er ikke et valg bilen tar.
+    if (ny_status == choices.LEDIG and not automatisk
+            and oppdrag.problemstilling == choices.UDEFINERT):
+        raise ProblemstillingUdefinert(
+            'Problemstillingen er «Udefinert». Sentralbordet må sette den før '
+            'enheten meldes ledig.')
     # Stedet hører til «Avreist» og ingen annen status. Sjekken ligger her og
     # ikke bare i viewet, av samme grunn som overgangssjekken: alle veier inn
     # skal gjennom den.

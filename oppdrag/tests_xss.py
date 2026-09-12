@@ -120,6 +120,11 @@ REVIEWED_INTERPOLATIONS = {
     '_varsledeRad(o)': 'markup fra en bygger som selv skannes her',
     'andresTidslinje': 'tom streng eller markup fra `tidslinjeEnhetHtml`, som selv skannes her',
     'neste': 'tom streng eller tekst bygget rett over med escapeHtml',
+    'endre': 'knapp bygget lokalt, id-en escapet inni',
+    "verdi === e.type ? ' selected' : ''": 'intern attributt fra en ternær',
+    'typevalg': 'options bygget lokalt, verdi og navn escapet inni',
+    'typeNedtrekk': 'select bygget lokalt, id-en escapet inni',
+    'hode': 'gruppeoverskrift bygget lokalt, navnet escapet inni',
     'hvem': 'tom streng eller escapet enhetsnavn bygget rett over',
     "andres ? ' tidslinje-andre' : ''": 'intern CSS-klasse fra en ternær',
     '_arkivTittel(a)': 'tittelen, escapet der den settes inn',
@@ -205,7 +210,7 @@ class OppdragEscapingOppforselTests(SimpleTestCase):
         (OPPDRAG_SENTRAL_JS, ('renderOppdrag', 'renderEnheter', 'tidslinjeHtml',
                               'hastegradKlasse', 'mkBesetning',
                               'kanSeBesetning', 'tidSiden', '_grovMerke',
-                              '_enhetsmatrise')),
+                              '_enhetsmatrise', '_problemMedAntall', '_grupperEnheter', '_typeRekkefolge', '_enhetskort')),
     )
 
     #: Besetningspanelet leser to globaler som ellers settes ved sidelasting.
@@ -292,7 +297,7 @@ class EnhetEscapingOppforselTests(SimpleTestCase):
                            'klokke')),
         (OPPDRAG_ENHET_JS, ('renderAktivt', 'renderVentende', 'renderAvsluttet',
                             'tidslinjeEnhetHtml', 'hastegradKlasse',
-                            '_stedvalg', '_grovsorteringsrad', '_kanGrovsortere', '_varsledeRad')),
+                            '_stedvalg', '_grovsorteringsrad', '_kanGrovsortere', '_varsledeRad', '_problemMedAntall')),
     )
 
     #: Toppnivå-tilstanden `renderAktivt` leser: stedvalget, og listene som
@@ -481,7 +486,7 @@ class AvreistTilOgGrovsorteringTests(SimpleTestCase):
         (OPPDRAG_ENHET_JS, ('renderAktivt', 'tidslinjeEnhetHtml', 'hastegradKlasse',
                             '_stedvalg', '_grovsorteringsrad', '_kanGrovsortere', '_varsledeRad',
                             'koNokkel', 'koLes',
-                            'koSkriv', 'koLeggTil', 'koFjern', 'lagNokkel', 'synk')),
+                            'koSkriv', 'koLeggTil', 'koFjern', 'lagNokkel', 'synk', '_problemMedAntall')),
     )
     STUBB = EnhetEscapingOppforselTests.STUBB + (
         "globalThis.localStorage = (() => { const m = {}; return {"

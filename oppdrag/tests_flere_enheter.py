@@ -851,7 +851,7 @@ class SentralbordetsMatriseTests(TestCase):
             (OPPDRAG_SENTRAL_JS, ('renderOppdrag', '_enhetsmatrise', '_grovMerke',
                                   'hastegradKlasse', 'tidSiden', 'mkEnhetsvalg',
                                   'mkEnhetsrader', '_enhetsknapper', '_varsleValg',
-                                  '_lovligeOverganger', 'tidslinjeHtml')),
+                                  '_lovligeOverganger', 'tidslinjeHtml', '_problemMedAntall', '_grupperEnheter', '_typeRekkefolge', '_enhetskort')),
         ))
 
     STUBB = ("globalThis.OPPDRAG_TILGANG = { kanSkrive: true };\n"

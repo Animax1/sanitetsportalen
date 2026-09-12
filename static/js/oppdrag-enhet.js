@@ -155,6 +155,13 @@ function hastegradKlasse(h) {
 }
 
 
+function _problemMedAntall(o) {
+  // «Transport · 3» — som i sentralbordet.
+  const p = o.problemstilling || '';
+  return o.antall != null ? `${p} · ${o.antall}` : p;
+}
+
+
 // ── Feilbanner ──────────────────────────────────────────
 // Feil skal synes fra førersetet, og bli stående til noe lykkes. En knapp
 // som ser ut til å ha virket, men ikke har det, er verre enn en som feiler
@@ -338,7 +345,7 @@ function renderAktivt() {
     <div class="aktivt-kort">
       <div class="d-flex align-items-center gap-2 flex-wrap mb-1">
         <span class="hastegrad ${escHtmlValue(hastegradKlasse(o.hastegrad))}">${escapeHtml(o.hastegrad)}</span>
-        <span class="oppdrag-problem">${escapeHtml(o.problemstilling)}</span>
+        <span class="oppdrag-problem">${escapeHtml(_problemMedAntall(o))}</span>
         <span class="ms-auto oppdrag-status-naa">${escapeHtml(o.status_navn)}</span>
       </div>
       <div class="oppdrag-meta mb-1">${escapeHtml(o.lokasjon_navn)}</div>
@@ -392,7 +399,7 @@ function renderVentende() {
     <div class="oppdrag-rad">
       <div class="d-flex align-items-center gap-2 flex-wrap">
         <span class="hastegrad ${escHtmlValue(hastegradKlasse(o.hastegrad))}">${escapeHtml(o.hastegrad)}</span>
-        <span class="oppdrag-problem">${escapeHtml(o.problemstilling)}</span>
+        <span class="oppdrag-problem">${escapeHtml(_problemMedAntall(o))}</span>
       </div>
       <div class="oppdrag-meta mt-1">${escapeHtml(o.lokasjon_navn)} · ${escapeHtml(klokke(o.opprettet))}</div>
       ${_varsledeRad(o)}
@@ -430,7 +437,7 @@ function renderAvsluttet() {
     return `
     <div class="oppdrag-rad oppdrag-avsluttet">
       <div class="d-flex align-items-center gap-2 flex-wrap">
-        <span class="oppdrag-meta">${escapeHtml(o.problemstilling)}</span>
+        <span class="oppdrag-meta">${escapeHtml(_problemMedAntall(o))}</span>
         <span class="ms-auto">
           <span class="${tidKlasse}"${tittel}>Ledig ${escapeHtml(tid)}</span>
           ${notatBlokk}

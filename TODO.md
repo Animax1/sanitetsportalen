@@ -220,6 +220,10 @@ ingen av dem gir feilmelding — de er bare stille inaktive.
             - [x] Andrés rapport 3 (12. sep.): bilen ser de andres stempler, arkivtittel
                   uten vaktnavn, «Mitt korps» skiller korpsets fra åpent for alle, kurvens
                   hode med tre tall, «Arkiv» i eget vindu, manifest og logo.
+            - [x] Andrés runde på staging, del B (12. sep.): teknisk hastegrad med egne
+                  problemstillinger, rekkefølge i skjemaet, «Udefinert» som sperrer
+                  ledig, antall på transport, enhetstyper med gruppering, lokasjoner
+                  for skriv_full og sletting for admin (`0015`).
             - [x] Andrés runde på staging, del A (12. sep.): besetning følger lista i
                   drift og viser neste skift, `Mannskap.epost` med automatisk
                   kontokobling, konto for hånd bare admin, skriv_handling ser alle

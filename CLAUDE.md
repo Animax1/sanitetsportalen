@@ -269,6 +269,19 @@ kollaps som sletter radnivået etter 24 måneder. Viewet avviser arkivering mens
 på tavla. Pasientarkivet gjør *ikke* dette — der står pasientene igjen etter frysing. `fritekst` arkiveres **ikke** — feltet er unntatt verdilogging i audit,
 og å fryse det i 24 måneder ville uthult unntaket.
 
+**Verdimengdene (12. sep. 2026):** `HASTEGRAD` har fått «Teknisk» — et oppdrag uten
+pasient — og problemstillingene avhenger av hastegraden: `choices.PROBLEMSTILLINGER_FOR`
+gir lista per hastegrad, `problemstilling_passer()` er regelen, og viewene sjekker paret
+mot de *gjeldende* verdiene ved redigering. «Udefinert» finnes i alle listene og kan
+opprettes, men **`sett_status` avviser `Ledig` så lenge den står**
+(`ProblemstillingUdefinert`, 400 med melding til bilen); den automatiske lukkingen
+slipper. `Oppdrag.antall` bærer et heltall for problemstillingene i `MED_ANTALL`
+(transport) og tømmes for alle andre — ikke i arkivet, radformen der er signert.
+`Enhet.type` grupperer tavla og «Nytt oppdrag», ambulansene først (`ENHETSTYPE`;
+`_grupperEnheter()` i JS), og settes i enhetspanelet (`PUT api/enheter/<pk>/`,
+`skriv_full`). Lokasjoner: `skriv_full` legger til og endrer, global admin sletter med
+`{"confirm": true}` — PROTECT gir 409 med råd om å deaktivere.
+
 Den er den første modulen som tar `skriv_handling` i bruk: bilen får smale, navngitte
 stemplingsendepunkter, ikke en feltwhitelist inne i en generell `PUT`. Og skillet mellom de
 to grensesnittene er **ikke nivået** — det er om kontoen er knyttet til en `Enhet`. Å knytte

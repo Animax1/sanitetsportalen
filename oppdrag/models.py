@@ -75,6 +75,12 @@ class Enhet(BaseTimeStampedModel):
         verbose_name='På vakt',
         help_text='Enheter som ikke er på vakt kan ikke få nye oppdrag.',
     )
+    # Typen grupperer enhetene i sentralbordet, ambulansene først (André,
+    # 12. sep. 2026). «Annet» som standard: kontoskjemaet vet ikke hva bilen
+    # er, og et gjett ville stått som fasit til noen la merke til det.
+    type = models.CharField(
+        max_length=16, choices=choices.ENHETSTYPE, default='annet',
+        verbose_name='Enhetstype')
 
     class Meta:
         verbose_name = 'Enhet'
@@ -157,6 +163,11 @@ class Oppdrag(BaseTimeStampedModel):
     grovsortering = models.CharField(
         max_length=8, blank=True, default='', choices=choices.GROVSORTERING,
         verbose_name='Grovsortering')
+    # Antall — for problemstillinger som bærer et (`choices.MED_ANTALL`,
+    # transport). Tomt for alle andre. Ikke i arkivet: radformen der er del
+    # av signaturen på hvert arkiv i prod.
+    antall = models.PositiveSmallIntegerField(
+        null=True, blank=True, verbose_name='Antall')
     # Eneste frie felt i modulen. Unntatt verdilogging i audit — se signals.py.
     fritekst = models.TextField(blank=True, default='', verbose_name='Fritekst')
     status = models.CharField(

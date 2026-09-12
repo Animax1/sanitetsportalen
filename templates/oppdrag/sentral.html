@@ -52,7 +52,7 @@
               data-action="lastHistorikk">
         <i class="bi bi-clock-history me-1"></i>Historikk
       </button>
-      {% if er_global_admin %}
+      {% if kan_skrive %}
       <button type="button" class="btn btn-outline-secondary btn-sm"
               data-bs-toggle="modal" data-bs-target="#lokasjonerModal"
               data-action="lastLokasjonsadmin">
@@ -117,22 +117,31 @@
           <div id="nytt-enheter" class="nytt-enheter"></div>
           <div class="form-text">Kryss av én eller flere. Den første i lista blir primær.</div>
         </div>
-        <div class="mb-3">
-          <label class="form-label" for="nytt-problemstilling">Problemstilling</label>
-          <select id="nytt-problemstilling" class="form-select">
-            {% for p in problemstillinger %}<option>{{ p }}</option>{% endfor %}
-          </select>
-        </div>
+        {# Hastegrad og lokasjon før problemstillingen (André, 12. sep. 2026): #}
+        {# «Teknisk» bytter ut lista over problemstillinger, så den må velges først. #}
         <div class="mb-3">
           <label class="form-label" for="nytt-hastegrad">Hastegrad</label>
-          <select id="nytt-hastegrad" class="form-select">
+          <select id="nytt-hastegrad" class="form-select"
+                  data-action="hastegradEndret" data-hendelse="change" data-arg="nytt">
             {% for h in hastegrader %}<option>{{ h }}</option>{% endfor %}
           </select>
         </div>
         <div class="mb-3">
           <label class="form-label" for="nytt-lokasjon">Lokasjon</label>
           <select id="nytt-lokasjon" class="form-select"></select>
-          <div class="form-text">Lista vedlikeholdes av admin.</div>
+          <div class="form-text">Lista vedlikeholdes under «Lokasjoner».</div>
+        </div>
+        <div class="mb-3">
+          <label class="form-label" for="nytt-problemstilling">Problemstilling</label>
+          <select id="nytt-problemstilling" class="form-select"
+                  data-action="problemstillingEndret" data-hendelse="change" data-arg="nytt">
+            {% for p in problemstillinger %}<option>{{ p }}</option>{% endfor %}
+          </select>
+        </div>
+        <div class="mb-3 d-none" id="nytt-antall-rad">
+          <label class="form-label" for="nytt-antall">Antall</label>
+          <input type="number" id="nytt-antall" class="form-control" min="0" step="1" inputmode="numeric">
+          <div class="form-text">Hvor mange som skal transporteres. Helt tall.</div>
         </div>
         <div class="mb-3">
           <label class="form-label" for="nytt-fritekst">Fritekst</label>
@@ -152,7 +161,7 @@
 </div>
 {% endif %}
 
-{% if er_global_admin %}
+{% if kan_skrive %}
 <div class="modal fade" id="lokasjonerModal" tabindex="-1">
   <div class="modal-dialog">
     <div class="modal-content">
@@ -169,8 +178,9 @@
         </div>
         <div id="lokasjonsliste"><div class="tom-melding">Laster…</div></div>
         <p class="form-text mb-0">
-          Deaktivering skjuler lokasjonen i nedtrekkslista. Den slettes ikke —
-          oppdrag som bruker den skal beholde stedet sitt.
+          Deaktivering skjuler lokasjonen i nedtrekkslista; oppdrag som bruker
+          den beholder stedet sitt. Sletting er global admin, og bare for
+          lokasjoner ingen oppdrag har brukt.
         </p>
       </div>
     </div>
@@ -291,6 +301,9 @@
   };
   window.OPPDRAG_AVREIST_TIL = {{ avreist_til|safe }};
   window.OPPDRAG_STATUS_NAVN = {{ status_navn|safe }};
+  window.OPPDRAG_PROBLEMSTILLINGER_FOR = {{ problemstillinger_for|safe }};
+  window.OPPDRAG_MED_ANTALL = {{ med_antall|safe }};
+  window.OPPDRAG_ENHETSTYPER = {{ enhetstyper|safe }};
 </script>
 <script src="{% static 'js/portal-utils.js' %}"></script>
 <script src="{% static 'js/oppdrag-sentral.js' %}"></script>

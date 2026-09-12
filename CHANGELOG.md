@@ -4,6 +4,29 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-12 — Andrés runde på staging, del B: oppdragsmodulen
+
+Én migrasjon, `oppdrag/0015`: `Enhet.type`, `Oppdrag.antall` og de nye
+hastegradvalgene. Rene skjemaendringer; eksisterende enheter får «Annet».
+
+- **Hastegrad «Teknisk», i blått**, med egne problemstillinger
+  (matutlevering, transport, utstyr, forsyning, annet teknisk). «Vanlig» er
+  grønn, som i statistikken. Problemstillingen må høre til hastegraden —
+  serveren avviser paret, og skjemaet bygger nedtrekket om når hastegraden
+  endres.
+- **Rekkefølgen i skjemaet er hastegrad → lokasjon → problemstilling**, i
+  «Nytt oppdrag» og i «Rediger».
+- **«Udefinert»** som problemstilling i alle listene. Bilen får ikke melde
+  ledig før sentralbordet har satt en ekte problemstilling; meldingen står på
+  enhetsskjermen.
+- **Transport har antall**, et helt tall, vist som «Transport · 3» på tavla,
+  i bilen og på enhetskortet.
+- **Enhetstyper.** Ambulanse, mannskapsbil, lag til fots, annet — settes i
+  enhetspanelet, og grupperer ressursoversikten og avkryssingen i «Nytt
+  oppdrag» med ambulansene først.
+- **Lokasjoner:** sentralbordet (`skriv_full`) legger til og endrer navn;
+  global admin sletter ubrukte, med bekreftelse. Brukte kan bare deaktiveres.
+
 ## 2026-09-12 — Andrés runde på staging, del A: vaktlisten
 
 Én migrasjon, `vaktliste/0014`: `Mannskap.epost`, ingen data flyttes.

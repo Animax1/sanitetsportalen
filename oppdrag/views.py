@@ -80,6 +80,13 @@ def index_view(request):
         # går vakt.
         'kan_se_besetning': har_tilgang(request.user, 'vaktliste', 'les'),
         'problemstillinger': choices.PROBLEMSTILLING,
+        # Hvilke problemstillinger som hører til hver hastegrad, og hvilke
+        # som bærer et antall — skjemaet bygger nedtrekket om når hastegraden
+        # endres (André, 12. sep. 2026). Én kilde: `choices`.
+        'problemstillinger_for': json.dumps(
+            {h: list(p) for h, p in choices.PROBLEMSTILLINGER_FOR.items()}),
+        'med_antall': json.dumps(list(choices.MED_ANTALL)),
+        'enhetstyper': json.dumps(list(choices.ENHETSTYPE)),
         # Til «Før status» i detaljvisningen (§9): stedene ved «Avreist» og
         # statusnavnene. Samme kilde som enhetsskjermen: `choices`.
         'avreist_til': json.dumps(list(choices.AVREIST_TIL)),
@@ -96,7 +103,7 @@ def _aktivt_oppdrag_felter(rad):
     `rad` er enhetens koblingsrad: statusen og tidspunktet er *hennes*."""
     if rad is None:
         return {'oppdragsnummer': None, 'hastegrad': None, 'grovsortering': None,
-                'grovsortering_navn': None, 'problemstilling': None,
+                'grovsortering_navn': None, 'problemstilling': None, 'antall': None,
                 'status_tidspunkt': None, 'sted_navn': ''}
     oppdrag = rad.oppdrag
     melding = Statusmelding.objects.gjeldende_for_status(
@@ -107,6 +114,7 @@ def _aktivt_oppdrag_felter(rad):
         'grovsortering': oppdrag.grovsortering,
         'grovsortering_navn': choices.GROVSORTERING_NAVN.get(oppdrag.grovsortering, ''),
         'problemstilling': oppdrag.problemstilling,
+        'antall': oppdrag.antall,
         'status_tidspunkt': melding.tidspunkt.isoformat() if melding else None,
         'sted_navn': choices.AVREIST_TIL_NAVN.get(melding.sted, '') if melding else '',
     }
@@ -139,6 +147,8 @@ def enheter_view(request):
             'pa_vakt': e.pa_vakt,
             'er_aktiv': e.er_aktiv,
             'username': getattr(e.user, 'username', '') or '',
+            'type': e.type,
+            'type_navn': choices.ENHETSTYPE_NAVN.get(e.type, e.type),
             'status': info['status'],
             'status_navn': info['status_navn'],
             'antall_ventende': info['antall_ventende'],
@@ -158,7 +168,7 @@ def enheter_view(request):
     # tavla er en bil ingen husker å sette inn igjen.
     etag = etag_for([
         (r['id'], r['status'], r['antall_ventende'], r['aktivt_oppdrag_id'],
-         r['pa_vakt'], r['er_aktiv'], r['status_tidspunkt'])
+         r['pa_vakt'], r['er_aktiv'], r['status_tidspunkt'], r['type'])
         for r in data
     ])
     if request.META.get('HTTP_IF_NONE_MATCH') == etag:
@@ -169,6 +179,29 @@ def enheter_view(request):
     svar = JsonResponse({'status': 'ok', 'data': data})
     svar['ETag'] = etag
     return svar
+
+
+@modul_kreves('oppdrag', 'skriv_full', svar='json')
+@require_http_methods(['PUT'])
+def enhet_detalj_view(request, pk):
+    """Enhetstypen (André, 12. sep. 2026). Navn og konto settes i
+    brukeradministrasjonen, som før; typen er oppdragsmodulens egen, og
+    settes i enhetspanelet av den som setter biler på og av vakt."""
+    try:
+        enhet = Enhet.objects.get(pk=pk)
+    except Enhet.DoesNotExist:
+        return JsonResponse(
+            {'status': 'error', 'message': 'Enhet ikke funnet'}, status=404)
+    data = json_body(request)
+    if 'type' in data:
+        if data['type'] not in choices.ENHETSTYPE_NAVN:
+            return JsonResponse(
+                {'status': 'error', 'message': 'Ukjent enhetstype.'}, status=400)
+        enhet.type = data['type']
+    enhet.save(update_fields=['type', 'updated_at'])
+    return JsonResponse({'status': 'ok', 'data': {
+        'id': enhet.pk, 'type': enhet.type,
+        'type_navn': choices.ENHETSTYPE_NAVN[enhet.type]}})
 
 
 @modul_kreves('oppdrag', 'skriv_full', svar='json')
@@ -238,7 +271,9 @@ def lokasjoner_view(request):
         svar['ETag'] = etag
         return svar
 
-    if not er_global_admin(request.user):
+    # Å legge til og endre lokasjoner er `skriv_full` (André, 12. sep.
+    # 2026): sentralbordet lager stedene mens vakta går. Sletting er admin.
+    if not har_tilgang(request.user, 'oppdrag', 'skriv_full'):
         return JsonResponse({'status': 'error', 'message': 'Ingen tilgang'}, status=403)
 
     navn = (json_body(request).get('navn') or '').strip()
@@ -258,14 +293,15 @@ def lokasjoner_view(request):
 @modul_kreves('oppdrag', 'les', svar='json')
 @require_http_methods(['PUT', 'DELETE'])
 def lokasjon_detalj_view(request, pk):
-    """Endre navn/aktiv (PUT) eller deaktiver (DELETE). Kun global admin.
+    """Endre navn/aktiv (PUT, `skriv_full`) eller slett (DELETE, global admin).
 
-    **DELETE deaktiverer, den sletter ikke.** FK-en fra `Oppdrag` er `PROTECT`,
-    så en lokasjon i bruk kan ikke forsvinne uten å ta historikken med seg.
-    Å la knappen hete «slett» og gjøre noe annet ville vært verre enn å la
-    være — den heter «deaktiver» i grensesnittet.
+    **DELETE sletter for godt** (André, 12. sep. 2026: «admin kan slette
+    lokasjoner»), med `{"confirm": true}` i kroppen som på oppdrag og
+    vaktlister. FK-en fra `Oppdrag` er `PROTECT`: en lokasjon som er brukt
+    kan ikke forsvinne uten å ta historikken med seg, og svaret er da 409
+    med råd om å deaktivere — som fortsatt går via PUT.
     """
-    if not er_global_admin(request.user):
+    if not har_tilgang(request.user, 'oppdrag', 'skriv_full'):
         return JsonResponse({'status': 'error', 'message': 'Ingen tilgang'}, status=403)
 
     try:
@@ -275,8 +311,18 @@ def lokasjon_detalj_view(request, pk):
             {'status': 'error', 'message': 'Lokasjon ikke funnet'}, status=404)
 
     if request.method == 'DELETE':
-        lok.er_aktiv = False
-        lok.save(update_fields=['er_aktiv', 'updated_at'])
+        if not er_global_admin(request.user):
+            return JsonResponse({'status': 'error', 'message': 'Sletting er global admin.'}, status=403)
+        if not json_body(request).get('confirm'):
+            return JsonResponse(
+                {'status': 'error', 'message': 'Bekreftelse mangler. Send {"confirm": true}.'},
+                status=400)
+        brukt = lok.oppdrag.count()
+        if brukt:
+            return JsonResponse({'status': 'error', 'message': (
+                f'«{lok.navn}» er brukt av {brukt} oppdrag og kan ikke slettes. '
+                'Deaktiver den i stedet — da forsvinner den fra nedtrekket.')}, status=409)
+        lok.delete()
         return JsonResponse({'status': 'ok'})
 
     data = json_body(request)
@@ -385,6 +431,9 @@ def oppdrag_liste_view(request):
     except ValidationError as feil:
         return JsonResponse(
             {'status': 'error', 'message': '; '.join(feil.messages)}, status=400)
+    feil = _valider_problemstilling_og_antall(data, data.get('hastegrad'), data.get('problemstilling'))
+    if feil:
+        return JsonResponse({'status': 'error', 'message': feil}, status=400)
 
     # `enhet_ider` (flere enheter, §4) — den første er primær. `enhet_id`
     # godtas fortsatt og betyr én: gamle klienter og tester skal ikke brekke.
@@ -406,6 +455,7 @@ def oppdrag_liste_view(request):
             enhet=enheter[0],
             problemstilling=data['problemstilling'],
             hastegrad=data['hastegrad'],
+            antall=data.get('antall'),
             lokasjon=lokasjon,
             fritekst=(data.get('fritekst') or '').strip(),
             opprettet_av=request.user,
@@ -413,6 +463,36 @@ def oppdrag_liste_view(request):
         for enhet in enheter[1:]:
             services.varsle_enhet(oppdrag, enhet, bruker=request.user)
     return JsonResponse({'status': 'ok', 'data': oppdrag_til_dict(oppdrag)})
+
+
+def _valider_problemstilling_og_antall(data, hastegrad, problemstilling):
+    """Problemstillingen må høre til hastegraden, og `antall` er et heltall
+    som bare finnes for problemstillinger som bærer et. Muterer ``data`` —
+    `antall` normaliseres til int eller None. Returnerer feiltekst eller None.
+
+    Ved redigering sendes bare feltene som endres, så kalleren gir de
+    *gjeldende* verdiene for det som mangler i kroppen."""
+    if hastegrad is not None and problemstilling is not None:
+        if not choices.problemstilling_passer(hastegrad, problemstilling):
+            return (f'«{problemstilling}» er ikke en problemstilling for '
+                    f'hastegrad {hastegrad}.')
+    if problemstilling not in choices.MED_ANTALL:
+        # Ingen antall å bære: feltet tømmes uansett hva klienten sendte.
+        if 'antall' in data or problemstilling is not None:
+            data['antall'] = None
+        return None
+    raa = data.get('antall')
+    if raa in (None, ''):
+        data['antall'] = None
+        return None
+    try:
+        antall = int(raa)
+    except (TypeError, ValueError):
+        return 'Antall må være et helt tall.'
+    if antall < 0 or antall > 32000:
+        return 'Antall må være et helt tall mellom 0 og 32000.'
+    data['antall'] = antall
+    return None
 
 
 def _enheter_fra_kroppen(data):
@@ -525,10 +605,17 @@ def oppdrag_detalj_view(request, pk):
         return JsonResponse(
             {'status': 'error', 'message': '; '.join(feil.messages)}, status=400)
 
+    feil = _valider_problemstilling_og_antall(
+        data, data.get('hastegrad', oppdrag.hastegrad),
+        data.get('problemstilling', oppdrag.problemstilling))
+    if feil:
+        return JsonResponse({'status': 'error', 'message': feil}, status=400)
     if 'problemstilling' in data:
         oppdrag.problemstilling = data['problemstilling']
     if 'hastegrad' in data:
         oppdrag.hastegrad = data['hastegrad']
+    if 'antall' in data:
+        oppdrag.antall = data['antall']
     if 'fritekst' in data:
         oppdrag.fritekst = (data.get('fritekst') or '').strip()
     if 'lokasjon_id' in data:
@@ -911,6 +998,12 @@ def stempling_view(request, pk, overgang, sted=None):
             melding = services.sett_status(
                 oppdrag, overgang, bruker=request.user, enhet=request.user.enhet,
                 tidspunkt=tidspunkt, forsinket=forsinket, sted=sted or '')
+    except services.ProblemstillingUdefinert as feil:
+        # Ikke en utdatert skjerm — et oppdrag som mangler noe. Meldingen er
+        # bilens å lese, og 400 får køen til å slippe raden og vise den.
+        if idem:
+            forkast(idem)
+        return JsonResponse({'status': 'error', 'message': str(feil)}, status=400)
     except services.UlovligOvergang:
         # Typisk et dobbelttrykk der det første vant, eller en skjerm som har
         # sakket akterut. 409, ikke 400: forespørselen var velformet, det er

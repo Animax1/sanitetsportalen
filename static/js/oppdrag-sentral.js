@@ -40,6 +40,61 @@ function hastegradKlasse(h) {
 }
 
 
+function _problemMedAntall(o) {
+  // «Transport · 3» — antallet står ved problemstillingen der den finnes.
+  const p = o.problemstilling || '';
+  return o.antall != null ? `${p} · ${o.antall}` : p;
+}
+
+
+function _medAntall(problemstilling) {
+  return (globalThis.window?.OPPDRAG_MED_ANTALL || []).includes(problemstilling);
+}
+
+
+function problemstillingerFor(hastegrad) {
+  const kart = globalThis.window?.OPPDRAG_PROBLEMSTILLINGER_FOR || {};
+  return kart[hastegrad] || [];
+}
+
+
+function fyllProblemstillinger(prefiks, hastegrad, valgt) {
+  // Nedtrekket bygges om av hastegraden (André, 12. sep. 2026: «teknisk
+  // hastegrad endrer innholdet i problemstillinger»). Står den valgte ikke
+  // i den nye lista, velges den første — «Udefinert» — og antall-raden
+  // følger problemstillingen.
+  const sel = document.getElementById(`${prefiks}-problemstilling`);
+  if (!sel) return;
+  const liste = problemstillingerFor(hastegrad);
+  const ny = liste.includes(valgt) ? valgt : (liste[0] || '');
+  sel.innerHTML = liste.map((p) =>
+    `<option value="${escHtmlValue(p)}"${p === ny ? ' selected' : ''}>${escapeHtml(p)}</option>`).join('');
+  problemstillingEndret(prefiks);
+}
+
+
+function hastegradEndret(prefiks) {
+  const h = document.getElementById(`${prefiks}-hastegrad`)?.value || '';
+  const valgt = document.getElementById(`${prefiks}-problemstilling`)?.value || '';
+  fyllProblemstillinger(prefiks, h, valgt);
+}
+
+
+function problemstillingEndret(prefiks) {
+  const p = document.getElementById(`${prefiks}-problemstilling`)?.value || '';
+  const rad = document.getElementById(`${prefiks}-antall-rad`);
+  if (rad) rad.classList.toggle('d-none', !_medAntall(p));
+}
+
+
+function _lesAntall(prefiks) {
+  const p = document.getElementById(`${prefiks}-problemstilling`)?.value || '';
+  if (!_medAntall(p)) return null;
+  const raa = (document.getElementById(`${prefiks}-antall`)?.value || '').trim();
+  return raa === '' ? null : Number(raa);
+}
+
+
 function _grovMerke(o) {
   // Bilens Rød/Gul/Grønn som merke; «—» når bilen ikke har vurdert ennå.
   // `grovsortering` er nøkkelen (rod/gul/gronn) og styrer fargen;
@@ -82,7 +137,48 @@ function renderEnheter() {
   if (!paVakt.length) {
     el.innerHTML = '<div class="tom-melding">Ingen enheter på vakt.</div>';
   } else {
-    el.innerHTML = (paVakt.map((e) => {
+    // Gruppert på enhetstype, ambulansene først (André, 12. sep. 2026).
+    // Overskriften står bare når det finnes mer enn én type å skille.
+    const grupper = _grupperEnheter(paVakt);
+    el.innerHTML = grupper.map((g) => {
+      const hode = grupper.length > 1
+        ? `<div class="enhet-gruppe">${escapeHtml(g.navn)}</div>` : '';
+      return hode + g.enheter.map((e) => _enhetskort(e)).join('');
+    }).join('');
+  }
+
+  const teller = document.getElementById('av-vakt-teller');
+  if (teller) teller.textContent = antallAv ? ` (${antallAv} av vakt)` : '';
+}
+
+
+function _typeRekkefolge() {
+  return (globalThis.window?.OPPDRAG_ENHETSTYPER || []).map((t) => t[0]);
+}
+
+
+function _grupperEnheter(liste) {
+  // [{type, navn, enheter}] i typenes rekkefølge — ambulanse først — og
+  // bare typene som faktisk finnes i lista. Én regel, to lesere: tavla og
+  // avkryssingen i «Nytt oppdrag».
+  const rekkefolge = _typeRekkefolge();
+  const navn = Object.fromEntries(globalThis.window?.OPPDRAG_ENHETSTYPER || []);
+  const grupper = new Map();
+  liste.forEach((e) => {
+    const t = e.type || 'annet';
+    if (!grupper.has(t)) grupper.set(t, []);
+    grupper.get(t).push(e);
+  });
+  return Array.from(grupper.entries())
+    .sort((a, b) => {
+      const ai = rekkefolge.indexOf(a[0]); const bi = rekkefolge.indexOf(b[0]);
+      return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi);
+    })
+    .map(([type, enheter]) => ({ type, navn: navn[type] || type, enheter }));
+}
+
+
+function _enhetskort(e) {
       // «Ledig (2 venter)» er distinksjonen 113 trenger: enheten har fått
       // oppdrag, men ikke rykket ut, og kan fortsatt sendes.
       // Statusen med klokkeslett og tid siden: «Fremme 14:32 · 12 min».
@@ -103,7 +199,7 @@ function renderEnheter() {
              <span class="oppdrag-nr">#${escHtmlValue(e.oppdragsnummer)}</span>
              <span class="hastegrad ${escHtmlValue(hastegradKlasse(e.hastegrad))}">${escapeHtml(e.hastegrad || '')}</span>
              ${grov}
-             <span class="enhet-oppdrag-problem">${escapeHtml(e.problemstilling || '')}</span>
+             <span class="enhet-oppdrag-problem">${escapeHtml(_problemMedAntall(e))}</span>
            </div>`
         : '';
       // Hoistet ut av mal-strengen: en nøstet mal-streng inne i en `${...}`
@@ -121,11 +217,6 @@ function renderEnheter() {
           ${oppdragslinje}
         </div>
       </div>${besetning}`;
-    }).join(''));
-  }
-
-  const teller = document.getElementById('av-vakt-teller');
-  if (teller) teller.textContent = antallAv ? ` (${antallAv} av vakt)` : '';
 }
 
 
@@ -276,7 +367,7 @@ function renderOppdrag() {
         <span class="oppdrag-nr">#${escHtmlValue(o.nummer)}</span>
         <span class="hastegrad ${escHtmlValue(hastegradKlasse(o.hastegrad))}">${escapeHtml(o.hastegrad)}</span>
         ${grovsortering}
-        <span class="oppdrag-problem">${escapeHtml(o.problemstilling)}</span>
+        <span class="oppdrag-problem">${escapeHtml(_problemMedAntall(o))}</span>
         <span class="ms-auto d-flex align-items-center gap-1">
           <span class="status-prikk status-${escHtmlValue(o.status)}"></span>
           <span class="oppdrag-meta">${escapeHtml(statusTekst)}</span>
@@ -754,14 +845,19 @@ function visRedigerOppdrag() {
     .join('');
   const lokvalg = lokasjoner.filter((l) => l.er_aktiv || l.id === o.lokasjon_id).map(
     (l) => `<option value="${escHtmlValue(l.id)}"${l.id === o.lokasjon_id ? ' selected' : ''}>${escapeHtml(l.navn)}</option>`).join('');
+  const antallRad = _medAntall(o.problemstilling) ? '' : ' d-none';
   boks.innerHTML = (`
     <div class="row g-2 mt-1">
-      <div class="col-md-6"><label class="form-label" for="red-problemstilling">Problemstilling</label>
-        <select id="red-problemstilling" class="form-select form-select-sm">${kopier('nytt-problemstilling', o.problemstilling)}</select></div>
       <div class="col-md-6"><label class="form-label" for="red-hastegrad">Hastegrad</label>
-        <select id="red-hastegrad" class="form-select form-select-sm">${kopier('nytt-hastegrad', o.hastegrad)}</select></div>
+        <select id="red-hastegrad" class="form-select form-select-sm"
+                data-action="hastegradEndret" data-hendelse="change" data-arg="red">${kopier('nytt-hastegrad', o.hastegrad)}</select></div>
       <div class="col-md-6"><label class="form-label" for="red-lokasjon">Lokasjon</label>
         <select id="red-lokasjon" class="form-select form-select-sm">${lokvalg}</select></div>
+      <div class="col-md-6"><label class="form-label" for="red-problemstilling">Problemstilling</label>
+        <select id="red-problemstilling" class="form-select form-select-sm"
+                data-action="problemstillingEndret" data-hendelse="change" data-arg="red"></select></div>
+      <div class="col-md-6${antallRad}" id="red-antall-rad"><label class="form-label" for="red-antall">Antall</label>
+        <input type="number" id="red-antall" class="form-control form-control-sm" min="0" step="1" value="${escHtmlValue(o.antall == null ? '' : o.antall)}"></div>
       <div class="col-12"><label class="form-label" for="red-fritekst">Fritekst</label>
         <textarea id="red-fritekst" class="form-control form-control-sm" rows="2">${escapeHtml(o.fritekst || '')}</textarea></div>
       <div class="col-12 d-flex gap-2 align-items-center">
@@ -771,6 +867,7 @@ function visRedigerOppdrag() {
         <span id="red-feil" class="text-danger small"></span>
       </div>
     </div>`);
+  fyllProblemstillinger('red', o.hastegrad, o.problemstilling);
 }
 
 
@@ -782,6 +879,7 @@ async function lagreOppdrag(id) {
       body: JSON.stringify({
         problemstilling: document.getElementById('red-problemstilling').value,
         hastegrad: document.getElementById('red-hastegrad').value,
+        antall: _lesAntall('red'),
         lokasjon_id: Number(document.getElementById('red-lokasjon').value),
         fritekst: document.getElementById('red-fritekst').value,
       }),
@@ -1037,6 +1135,7 @@ async function opprettOppdrag() {
       lokasjon_id: Number(document.getElementById('nytt-lokasjon').value),
       problemstilling: document.getElementById('nytt-problemstilling').value,
       hastegrad: document.getElementById('nytt-hastegrad').value,
+      antall: _lesAntall('nytt'),
       fritekst: document.getElementById('nytt-fritekst').value,
     }),
   });
@@ -1048,6 +1147,8 @@ async function opprettOppdrag() {
   }
   bootstrap.Modal.getInstance(document.getElementById('nyttOppdragModal'))?.hide();
   document.getElementById('nytt-fritekst').value = '';
+  const antallFelt = document.getElementById('nytt-antall');
+  if (antallFelt) antallFelt.value = '';
   document.querySelectorAll('input[name="nytt-enhet"]:checked').forEach((i) => { i.checked = false; });
   await lastAlt();
 }
@@ -1058,6 +1159,8 @@ function nullstillNyttOppdrag() {
   // forrige opprettelse»). Uavhengig av hvilken vei forrige forsøk gikk.
   document.querySelectorAll('input[name="nytt-enhet"]').forEach((i) => { i.checked = false; });
   document.getElementById('nytt-feil')?.classList.add('d-none');
+  // Problemstillingene følger hastegraden som står valgt.
+  hastegradEndret('nytt');
 }
 
 
@@ -1070,12 +1173,18 @@ function _valgteEnheter() {
 
 function mkEnhetsvalg() {
   // Avkryssing, ikke nedtrekk: operatøren sender gjerne to biler på samme
-  // hendelse. Bare enhetene på vakt — som nedtrekket var.
-  return enheter.filter((e) => e.pa_vakt).map((e) => `
+  // hendelse. Bare enhetene på vakt — gruppert på type, ambulansene først
+  // (André, 12. sep. 2026).
+  const grupper = _grupperEnheter(enheter.filter((e) => e.pa_vakt));
+  return grupper.map((g) => {
+    const hode = grupper.length > 1
+      ? `<div class="enhet-gruppe">${escapeHtml(g.navn)}</div>` : '';
+    return hode + g.enheter.map((e) => `
     <label class="form-check nytt-enhet-valg">
       <input class="form-check-input" type="checkbox" name="nytt-enhet" value="${escHtmlValue(e.id)}">
       <span class="form-check-label">${escapeHtml(e.navn)}</span>
     </label>`).join('');
+  }).join('');
 }
 
 
@@ -1092,13 +1201,45 @@ function renderLokasjonsadmin() {
     const knapp = l.er_aktiv
       ? `<button class="btn btn-sm btn-outline-secondary" data-action="deaktiverLokasjon" data-id="${escHtmlValue(l.id)}">Deaktiver</button>`
       : `<button class="btn btn-sm btn-outline-success" data-action="aktiverLokasjon" data-id="${escHtmlValue(l.id)}">Aktiver</button>`;
+    // Endre navn er skriv_full; sletting er global admin (12. sep. 2026).
+    const endre = `<button class="btn btn-sm btn-outline-secondary" data-action="endreLokasjonsnavn" data-id="${escHtmlValue(l.id)}" title="Endre navn"><i class="bi bi-pencil"></i></button>`;
+    const slett = globalThis.window?.OPPDRAG_TILGANG?.erAdmin
+      ? `<button class="btn btn-sm btn-outline-danger" data-action="slettLokasjon" data-id="${escHtmlValue(l.id)}" title="Slett"><i class="bi bi-trash"></i></button>`
+      : '';
     const dempet = l.er_aktiv ? '' : ' text-muted';
     return `
     <div class="d-flex align-items-center gap-2 py-1">
       <span class="flex-grow-1${dempet}">${escapeHtml(l.navn)}</span>
-      ${knapp}
+      ${endre}${knapp}${slett}
     </div>`;
   }).join(''));
+}
+
+
+async function endreLokasjonsnavn(id) {
+  const lok = lokasjoner.find((l) => l.id === id);
+  if (!lok) return;
+  const navn = (prompt('Nytt navn på lokasjonen:', lok.navn) || '').trim();
+  if (!navn || navn === lok.navn) return;
+  const res = await apiFetch(`/oppdrag/api/lokasjoner/${id}/`, {
+    method: 'PUT', body: JSON.stringify({ navn }),
+  });
+  const d = await res.json().catch(() => ({}));
+  if (!res.ok || d.status !== 'ok') { alert(d.message || 'Kunne ikke endre navnet.'); return; }
+  await lastLokasjonsadmin();
+}
+
+
+async function slettLokasjon(id) {
+  const lok = lokasjoner.find((l) => l.id === id);
+  if (!lok) return;
+  if (!confirm(`Slette lokasjonen «${lok.navn}» for godt?`)) return;
+  const res = await apiFetch(`/oppdrag/api/lokasjoner/${id}/`, {
+    method: 'DELETE', body: JSON.stringify({ confirm: true }),
+  });
+  const d = await res.json().catch(() => ({}));
+  if (!res.ok || d.status !== 'ok') { alert(d.message || 'Kunne ikke slette.'); return; }
+  await lastLokasjonsadmin();
 }
 
 
@@ -1166,6 +1307,11 @@ function renderEnhetsadmin() {
       : 'Pensjonert';
     const radKlasse = e.er_aktiv && e.pa_vakt
       ? 'enhet-kort' : 'enhet-kort enhet-av-vakt';
+    // Typen settes her (12. sep. 2026): kontoskjemaet vet ikke hva bilen er.
+    const typevalg = (globalThis.window?.OPPDRAG_ENHETSTYPER || []).map(([verdi, navn]) =>
+      `<option value="${escHtmlValue(verdi)}"${verdi === e.type ? ' selected' : ''}>${escapeHtml(navn)}</option>`).join('');
+    const typeNedtrekk = `<select class="form-select form-select-sm enhet-type" aria-label="Enhetstype"
+              data-action="settEnhetstype" data-hendelse="change" data-felt="type" data-id="${escHtmlValue(e.id)}">${typevalg}</select>`;
 
     return `
     <div class="${radKlasse} mb-2">
@@ -1173,9 +1319,20 @@ function renderEnhetsadmin() {
         <div class="enhet-navn">${escapeHtml(e.navn)} <span class="enhet-meta">· ${escapeHtml(status)}</span></div>
         <div class="${koblingKlasse}">${escapeHtml(koblingTekst)}</div>
       </div>
+      ${typeNedtrekk}
       ${vaktKnapp}
     </div>`;
   }).join(''));
+}
+
+
+async function settEnhetstype(id, felt, verdi) {
+  const res = await apiFetch(`/oppdrag/api/enheter/${id}/`, {
+    method: 'PUT', body: JSON.stringify({ type: verdi }),
+  });
+  if (!res.ok) { alert('Kunne ikke endre enhetstypen.'); return; }
+  await lastEnhetsadmin();
+  await lastEnheter();
 }
 
 

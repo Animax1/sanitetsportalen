@@ -261,11 +261,23 @@ class LokasjonsadminTests(OppdragBasis):
             '/oppdrag/api/lokasjoner/').json()['data']
         self.assertEqual(len(data), 1)
 
-    def test_kun_admin_kan_opprette(self):
+    def test_skriv_full_oppretter_og_endrer_les_kan_ikke(self):
+        """André, 12. sep. 2026: sentralbordet (`skriv_full`) legger til og
+        endrer lokasjoner. `les` kan fortsatt bare lese."""
         c = _klient(_bruker('sentral12', 'skriv_full'))
         resp = c.post('/oppdrag/api/lokasjoner/', content_type='application/json',
                       data={'navn': 'Inngang Nord'})
-        self.assertEqual(resp.status_code, 403)
+        self.assertEqual(resp.status_code, 200, resp.content)
+        pk = resp.json()['data']['id']
+        resp = c.put(f'/oppdrag/api/lokasjoner/{pk}/', content_type='application/json',
+                     data={'navn': 'Inngang Sør'})
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(Lokasjon.objects.get(pk=pk).navn, 'Inngang Sør')
+        leser = _klient(_bruker('leser12', 'les'))
+        self.assertEqual(leser.post('/oppdrag/api/lokasjoner/', content_type='application/json',
+                                    data={'navn': 'X'}).status_code, 403)
+        self.assertEqual(leser.put(f'/oppdrag/api/lokasjoner/{pk}/', content_type='application/json',
+                                   data={'navn': 'X'}).status_code, 403)
 
     def test_admin_kan_opprette(self):
         c = _klient(_bruker('adm', 'skriv_full', admin=True))
@@ -274,13 +286,31 @@ class LokasjonsadminTests(OppdragBasis):
         self.assertEqual(resp.status_code, 200)
         self.assertTrue(Lokasjon.objects.filter(navn='Inngang Nord').exists())
 
-    def test_delete_deaktiverer_i_stedet_for_a_slette(self):
-        """FK-en er PROTECT — en lokasjon i bruk kan ikke forsvinne."""
-        c = _klient(_bruker('adm2', 'skriv_full', admin=True))
-        resp = c.delete(f'/oppdrag/api/lokasjoner/{self.lokasjon.pk}/')
-        self.assertEqual(resp.status_code, 200)
-        self.lokasjon.refresh_from_db()
-        self.assertFalse(self.lokasjon.er_aktiv)
+    def test_delete_sletter_ubrukt_lokasjon_for_admin_med_bekreftelse(self):
+        """André, 12. sep. 2026: «admin kan slette lokasjoner». Med
+        `{"confirm": true}`, som oppdrag og vaktlister."""
+        ubrukt = Lokasjon.objects.create(navn='Aldri brukt')
+        adm = _klient(_bruker('adm2', 'skriv_full', admin=True))
+        self.assertEqual(adm.delete(f'/oppdrag/api/lokasjoner/{ubrukt.pk}/',
+                                    content_type='application/json', data={}).status_code, 400)
+        resp = adm.delete(f'/oppdrag/api/lokasjoner/{ubrukt.pk}/',
+                          content_type='application/json', data={'confirm': True})
+        self.assertEqual(resp.status_code, 200, resp.content)
+        self.assertFalse(Lokasjon.objects.filter(pk=ubrukt.pk).exists())
+
+    def test_sletting_er_admin_og_brukt_lokasjon_gir_409(self):
+        """FK-en er PROTECT — en lokasjon i bruk kan ikke forsvinne, og
+        svaret sier at den kan deaktiveres i stedet."""
+        vl = _klient(_bruker('sentral13', 'skriv_full'))
+        self.assertEqual(vl.delete(f'/oppdrag/api/lokasjoner/{self.lokasjon.pk}/',
+                                   content_type='application/json',
+                                   data={'confirm': True}).status_code, 403)
+        adm = _klient(_bruker('adm3', 'skriv_full', admin=True))
+        self._oppdrag()
+        resp = adm.delete(f'/oppdrag/api/lokasjoner/{self.lokasjon.pk}/',
+                          content_type='application/json', data={'confirm': True})
+        self.assertEqual(resp.status_code, 409, resp.content)
+        self.assertIn('eaktiver', resp.json()['message'])
         self.assertTrue(Lokasjon.objects.filter(pk=self.lokasjon.pk).exists())
 
 
@@ -315,12 +345,14 @@ class EnhetsadminTests(OppdragBasis):
                     getattr(c, metode)(url, content_type='application/json',
                                        data={}).status_code, 404)
 
+        # `PUT api/enheter/<pk>/` finnes igjen fra 12. sep. 2026 — for
+        # enhetstypen alene. Pensjonering går fortsatt bare via kontoen.
         self.assertEqual(
             c.put(f'/oppdrag/api/enheter/{self.enhet.pk}/',
                   content_type='application/json',
-                  data={'er_aktiv': False}).status_code, 404)
+                  data={'er_aktiv': False}).status_code, 200)
         self.enhet.refresh_from_db()
-        self.assertTrue(self.enhet.er_aktiv)
+        self.assertTrue(self.enhet.er_aktiv, 'feltet leses ikke')
 
     def test_koblingen_gir_ingen_tilgang(self):
         """§7.3-regelen, håndhevet på den nye flaten.
