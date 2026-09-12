@@ -220,6 +220,8 @@ ingen av dem gir feilmelding — de er bare stille inaktive.
             - [x] Andrés rapport 3 (12. sep.): bilen ser de andres stempler, arkivtittel
                   uten vaktnavn, «Mitt korps» skiller korpsets fra åpent for alle, kurvens
                   hode med tre tall, «Arkiv» i eget vindu, manifest og logo.
+            - [x] **Deploy til prod 12. sep. 2026** (`39ece18`, fra `49406fd`), backup tatt
+                  først. Migrasjoner: `vaktliste/0014`, `oppdrag/0015`–`0021`.
             - [x] Prodtest c8ab831 (12. sep.): alt OK. «Verdier» ble «Valglister», og
                   fanene i vinduet fikk mørke flater.
             - [x] Andrés runde på staging, del F (12. sep.): lydvarsel i bilen for
