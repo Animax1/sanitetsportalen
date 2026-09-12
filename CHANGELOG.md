@@ -4,6 +4,13 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-12 — Plan: reserve og offline
+
+Ingen kode. Planen for reserve og offline står i `TODO.md` under «Pågående / neste»:
+vaktlista som fil på e-post, offline drift på drifts-PC-en, backupene kryptert og
+komprimert til Scaleway Object Storage, og fjerning av den gamle offline-arkitekturen.
+Speiling til staging ble vurdert og tatt ut, fordi det ikke deployes under vakt.
+
 ## 2026-09-12 — Hjem-skjerm-ikonet: full flate, og kortnavnet
 
 - **Rettet: ikonet på hjem-skjermen hadde blå flekk øverst til venstre og

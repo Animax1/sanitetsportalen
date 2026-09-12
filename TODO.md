@@ -245,6 +245,55 @@ ingen av dem gir feilmelding — de er bare stille inaktive.
 
 ## Pågående / neste
 
+### Reserve og offline — besluttet 12. sep. 2026
+
+Bakgrunn: ingen deploy under vakt. Da dekker et speil til staging nesten ingenting
+(plattformbortfall tar begge, en datafeil kopieres innen minutter), og det er tatt ut.
+Pasienter har Excel, oppdrag går på nødnett. Det som skal overleve at Railway faller er
+**dataene** (utenfor Railway) og **vaktlista i drift** (på drifts-PC-en, uten server).
+
+- [ ] **1. Vaktlista som fil, på e-post.** Én selvstendig HTML-fil med stilene inni —
+      utskriftsvisningen med grupper, blokker og korps — som åpner uten nett og kan
+      skrives ut. Innhold: navn, rolle, tider, korps. **Telefonnummer: avgjøres av
+      André** før bygging (fila havner i innbokser). Sendes via AHASend ved vaktstart og
+      på knapp («Send vaktlista på e-post» i innstillingene). Admin setter mottakere og
+      om utsending ved vaktstart er på, under `/portal-admin/innstillinger/`. Ca. én dag.
+- [ ] **2. Offline drift på `/vaktliste/`, for PC-en som fører drift.** Service worker
+      holder siden og siste liste lokalt; møtt/av vakt legges i kø når serveren ikke
+      svarer og sendes når den svarer igjen — samme mønster som enhetsskjermens
+      offline-kø i oppdrag. Serveren tar tidspunktet fra køen, ikke klokka ved mottak.
+      Markør «Klar for offline» i vaktlinja når kopien ligger der; banner med antall
+      ventende stemplinger hvis innloggingen gikk ut imens. Mobil og ledelse får live som
+      i dag og fila fra punkt 1 som reserve — de trenger ikke offline drift. Ett til to
+      dager, testes i Chrome/Edge på PC.
+- [ ] **3. Backupene ut av Railway, til Scaleway Object Storage.** Bucket i Amsterdam,
+      klasse Standard One Zone (€0,00803/GB/mnd; opplasting gratis, 75 GB ut gratis per
+      måned — våre volumer er under 1 GB). S3-protokollen, `boto3`.
+      - Filene er de per-modul-JSON-ene `core.backup` alt lager, **gzip-komprimert**
+        (standardbiblioteket, ingen ny avhengighet; JSON krymper 10–20×) og **kryptert
+        før de forlater Railway** — pasientfilene er helseopplysninger. Nøkkel i en
+        Railway-variabel, aldri i repoet.
+      - **Frekvens = når noe har endret seg.** Auto-backupen har alt hash-skip, så en
+        kjøring uten endringer skriver ingenting; opplastingen henger på at en *ny* fil
+        ble skrevet, ikke på en egen klokke. Under vakt settes `interval_minutes` til 10
+        per modul i `/portal-admin/backup/` — det er det meste man taper — og i pausene
+        koster kjøringene ingenting. Ingen egen cron for opplasting.
+      - Livssyklusregel på bucketen: slett etter 24 måneder, samme frist som
+        arkivkollapsen. Backuper er ikke et arkiv.
+      - Gjenoppretting: kommando som henter, dekrypterer og pakker opp én fil, og
+        legger den der `restore_backup` finner den. Prøves én gang mot staging før den
+        regnes som ferdig.
+      - Personverndokumentasjonen får Scaleway som databehandler. **Krever Andre:**
+        konto, bucket, nøkkelpar og databehandleravtale.
+      Ca. en halv dag kode.
+- [ ] **4. Fjerne den gamle offline-arkitekturen** når punkt 2 er i drift:
+      `OFFLINE_MODE`-grenene i settings, CSRF-unntakene for private nett, Django-admin
+      rutet under offline, `OFFLINE_GUIDE.md` og USB-pakken. En halv dag, mest sletting
+      og tester som bekrefter at rutene er borte.
+
+Rekkefølgen er 1, 2, 3, 4. Speiling til staging er **tatt ut** — den ble vurdert og
+forkastet fordi det ikke deployes under vakt.
+
 ### GDPR-gjennomgang
 
 Fase 0–5 er gjennomført. Begrunnelsene og de varige beslutningene ligger i
