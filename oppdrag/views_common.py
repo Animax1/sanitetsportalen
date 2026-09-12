@@ -157,6 +157,10 @@ def oppdrag_til_dict(oppdrag, *, for_enhet: bool = False,
         egen = koblingsrad.enhet_id if koblingsrad is not None else None
         data['varslede'] = [e['enhet_navn'] for e in data['enheter']
                             if e['enhet_id'] != egen]
+        # Når *hun* ble varslet — lydvarselet i bilen (12. sep. 2026) måler
+        # ventetida fra dette, ikke fra da oppdraget ble opprettet.
+        data['varslet_at'] = (koblingsrad.varslet_at.isoformat()
+                              if koblingsrad is not None else None)
     return data
 
 

@@ -4,6 +4,24 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-12 — Andrés runde på staging, del F: lydvarsel i bilen
+
+Ingen migrasjon.
+
+- **Et ventende oppdrag bilen ikke har rykket ut på, piper.** Akutt etter
+  ett minutt og så hvert tiende sekund; Haster etter fem minutter og så
+  hvert minutt; Vanlig og Drift etter et kvarter og så hvert minutt. Tida
+  regnes fra da *bilen* ble varslet. Lyden lages i nettleseren (ingen fil,
+  ingen dekning) og varer under tre sekunder; Akutt har tre toner, Haster
+  to, resten én.
+- **«Lyd»-knappen øverst på bilskjermen** slår varselet på og av og husker
+  valget. Nettleseren krever et trykk før den får spille lyd — er lyden på
+  fra før, holder det første trykket hvor som helst på skjermen, og en
+  linje under knappen sier det til lyden er vekket.
+- Raden pulserer i gult når terskelen er passert, uansett om lyden er på:
+  lyd alene overhøres i en bil med sirene.
+- Et trykk som ligger usendt i køen teller som svart — da piper det ikke.
+
 ## 2026-09-12 — Andrés runde på staging, del E: verdimengdene som tabeller
 
 Tre migrasjoner, `oppdrag/0019`–`0021`: tabellene `Enhetstype` og

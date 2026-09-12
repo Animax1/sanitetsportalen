@@ -48,7 +48,7 @@ HTML_BUILDERS_PER_FIL = {
         '_stedvalg',
         '_grovsorteringsrad',
         '_antallRad',
-        'renderVentende',
+        'renderVentende', 'skalPipe', 'ventetSekunder', '_lydTerskler', 'lydTerskler',
         'renderAvsluttet',
     ),
 }
@@ -85,6 +85,7 @@ REVIEWED_INTERPOLATIONS = {
     "arg('1')": 'escHtmlValue over slug, id og et fast ord',
     "arg('0')": 'escHtmlValue over slug, id og et fast ord',
     '_antallRad(o)': 'markup fra en bygger som selv skannes her',
+    'venterLenge': 'hardkodet CSS-klasse fra en ternær over `skalPipe()`',
     'udefinert': 'markup fra `_udefinertVarsel()`, som er fast tekst uten data fra oppdraget',
     # `meta` er ren tekst, ikke markup, og escapes én gang ved innsetting.
     # Escapet vi her også, ville teksten blitt dobbeltescapet i visningen.
@@ -327,7 +328,7 @@ class EnhetEscapingOppforselTests(SimpleTestCase):
     HARNESS = (
         (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue', 'trustedHtml', '_escHtml',
                            'klokke')),
-        (OPPDRAG_ENHET_JS, ('renderAktivt', '_antallRad', '_udefinertVarsel', 'renderVentende', 'renderAvsluttet',
+        (OPPDRAG_ENHET_JS, ('renderAktivt', '_antallRad', '_udefinertVarsel', 'renderVentende', 'skalPipe', 'ventetSekunder', '_lydTerskler', 'lydTerskler', 'renderAvsluttet',
                             'tidslinjeEnhetHtml', 'hastegradKlasse',
                             '_stedvalg', '_grovsorteringsrad', '_kanGrovsortere', '_varsledeRad', '_problemMedAntall', '_medAntall')),
     )

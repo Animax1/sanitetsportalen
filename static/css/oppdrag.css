@@ -478,3 +478,17 @@
 /* Verdimengdene (12. sep. 2026): nedtrekkene i raden får ikke ta hele bredden. */
 .verdi-rad .verdi-kategori { max-width: 8.5rem; }
 .verdi-rad .verdi-antall { max-width: 8.5rem; }
+
+/* Ventende oppdrag forbi første varselterskel (12. sep. 2026): pulserende
+ * kant, uansett om lyden er på. Samme puls som «trenger ny ressurs». */
+.oppdrag-rad-venter-lenge {
+  border-color: #f59e0b;
+  animation: venter-puls 1.2s ease-in-out infinite;
+}
+@keyframes venter-puls {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.0); }
+  50%      { box-shadow: 0 0 0 4px rgba(245, 158, 11, 0.45); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .oppdrag-rad-venter-lenge { animation: none; box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.45); }
+}

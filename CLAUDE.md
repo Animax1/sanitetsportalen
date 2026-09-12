@@ -680,7 +680,7 @@ Ti moduler i `static/js/` (ingen bundler), fordelt på fem sider — pasientside
 | `statistikk.js` | **kun** `/statistikk/` | Pasientstatistikk (Chart.js), arkivmodus, kildefanene |
 | `statistikk-oppdrag.js` | `/statistikk/`, **kun** med oppdragstilgang | Oppdragsfanen. Kall hit fra `statistikk.js` går gjennom `_kallOppdrag('navn')` |
 | `oppdrag-sentral.js` | `/oppdrag/`, kontoer uten enhet | Sentralbordet: enhetsliste, oppdragsliste, tidslinje, lokasjonsadmin |
-| `oppdrag-enhet.js` | `/oppdrag/`, enhetskontoer | Enhetsskjermen: to knapper mot de navngitte stemplingsendepunktene, og offline-køen i `localStorage`. Serveren sender `neste_overgang` per rad; kjeden følger med som data kun for å projisere neste steg mens noe ligger usendt |
+| `oppdrag-enhet.js` | `/oppdrag/`, enhetskontoer | Enhetsskjermen: to knapper mot de navngitte stemplingsendepunktene, offline-køen i `localStorage`, antall-knappene, og **lydvarselet** for ventende oppdrag (`lydTerskler()`, `skalPipe()`, `lydTikk()` hvert 5. s; Web Audio, vekket av «Lyd»-knappen, valget i `localStorage`; tida fra bilens `varslet_at`, og et usendt trykk i køen teller som svart). Serveren sender `neste_overgang` per rad; kjeden følger med som data kun for å projisere neste steg mens noe ligger usendt |
 | `vaktliste.js` | **kun** `/vaktliste/` | Hele vaktlistesiden: **én fane per ressursgruppe**, hver ressurs er et regneark med redigering i raden, «Oversikt» er utskriftslista, «Mannskap» er personellregisteret, og roller, grupper, korps og kompetanser administreres i modaler på siden |
 
 **`data-action` + `data-hendelse` er to lyttere, og bare én skal fyre.** Klikk­delegeringen

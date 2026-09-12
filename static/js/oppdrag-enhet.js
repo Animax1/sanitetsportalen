@@ -27,6 +27,7 @@ const GROVSORTERING = globalThis.OPPDRAG_GROVSORTERING || [];
 const HASTEGRAD_REKKEFOLGE = ['Akutt', 'Haster', 'Vanlig', 'Drift'];
 
 
+
 // ════════════════════════════════════════════════════════
 // OFFLINE-KØ (fase 5)
 //
@@ -443,8 +444,11 @@ function renderVentende() {
     // venter»).
     const andresTidslinje = (o.andre_meldinger || []).length
       ? `<div class="mt-2">${tidslinjeEnhetHtml(o)}</div>` : '';
+    // Forbi første terskel: raden pulserer, uansett om lyden er på. Lyd
+    // alene kan overhøres i en bil med sirene.
+    const venterLenge = skalPipe({ ...o, usendt: false }, Date.now(), null) ? ' oppdrag-rad-venter-lenge' : '';
     return `
-    <div class="oppdrag-rad">
+    <div class="oppdrag-rad${venterLenge}">
       <div class="d-flex align-items-center gap-2 flex-wrap">
         <span class="hastegrad ${escHtmlValue(hastegradKlasse(o.hastegrad))}">${escapeHtml(o.hastegrad)}</span>
         <span class="oppdrag-problem">${escapeHtml(_problemMedAntall(o))}</span>
@@ -494,6 +498,164 @@ function renderAvsluttet() {
       </div>
     </div>`;
   }).join('');
+}
+
+
+// ── Lydvarsel ───────────────────────────────────────────
+//
+// Et ventende oppdrag som ingen trykker «Rykker ut» på skal høres, og
+// oftere jo mer det haster. Lyden lages med Web Audio (ingen fil å laste,
+// ingen dekning å vente på), og nettleseren krever et trykk før den får
+// spille — derfor «Lyd»-knappen, som også husker valget i localStorage.
+// Tida måles fra da *bilen* ble varslet (`varslet_at`), ikke fra
+// opprettelsen: et oppdrag som fikk henne som bil nummer to skal ikke pipe
+// som om hun hadde oversett det i en time.
+
+//: Lagringsnøkkelen som funksjon — se `koNokkel()`.
+function lydNokkel() {
+  return 'oppdrag_lyd_v1';
+}
+
+let lydKontekst = null;
+//: Oppdrag-ID → tidspunkt (ms) for siste pip. Nullstilles når oppdraget
+//: ikke lenger venter.
+let lydSistFor = {};
+
+
+function lydErPaa() {
+  try { return globalThis.localStorage.getItem(lydNokkel()) === '1'; } catch (e) { return false; }
+}
+
+
+//: Tersklene per hastegrad (André, 12. sep. 2026): [første varsel etter
+//: sekunder, deretter hvert sekund]. «Rød innen 1 minutt, deretter hvert 10
+//: sekund. Gul innen 5 minutt deretter hvert 1 minutt. Grønn etter 15 minutt
+//: deretter hvert 1 minutt.» Drift følger Vanlig. Som funksjon, ikke
+//: konstant — se `koNokkel()`.
+function lydTerskler() {
+  return { Akutt: [60, 10], Haster: [300, 60], Vanlig: [900, 60], Drift: [900, 60] };
+}
+
+
+function _lydTerskler(hastegrad) {
+  const alle = lydTerskler();
+  return alle[hastegrad] || alle.Vanlig;
+}
+
+
+function ventetSekunder(o, naaMs) {
+  const fra = o.varslet_at || o.opprettet;
+  if (!fra) return 0;
+  return Math.max(0, (naaMs - new Date(fra).getTime()) / 1000);
+}
+
+
+function skalPipe(o, naaMs, sist) {
+  // Ventende, ikke trykket på (et usendt trykk ligger i køen — da har hun
+  // svart, selv om serveren ikke vet det ennå), forbi første terskel, og
+  // lenge nok siden forrige pip.
+  if (o.status !== 'venter' || o.usendt) return false;
+  const [forste, hver] = _lydTerskler(o.hastegrad);
+  if (ventetSekunder(o, naaMs) < forste) return false;
+  if (sist == null) return true;
+  return (naaMs - sist) / 1000 >= hver;
+}
+
+
+function ventendeSomSkalPipe(liste, naaMs, sistKart) {
+  return (liste || []).filter((o) => skalPipe(o, naaMs, sistKart[o.id])).map((o) => o.id);
+}
+
+
+function _strengeste(liste, ider) {
+  const valgte = (liste || []).filter((o) => ider.includes(o.id));
+  return valgte.map((o) => o.hastegrad)
+    .sort((a, b) => HASTEGRAD_REKKEFOLGE.indexOf(a) - HASTEGRAD_REKKEFOLGE.indexOf(b))[0] || 'Vanlig';
+}
+
+
+function _tone(ctx, fra, varighet, frekvens) {
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  osc.type = 'square';
+  osc.frequency.value = frekvens;
+  gain.gain.setValueAtTime(0.0001, fra);
+  gain.gain.exponentialRampToValueAtTime(0.4, fra + 0.02);
+  gain.gain.exponentialRampToValueAtTime(0.0001, fra + varighet);
+  osc.connect(gain).connect(ctx.destination);
+  osc.start(fra);
+  osc.stop(fra + varighet + 0.05);
+}
+
+
+function pip(hastegrad) {
+  // Akutt: tre toner på halvannet sekund. Haster: to. Vanlig/Drift: én kort.
+  // Aldri over tre sekunder — «trenger ikke vare langt».
+  if (!lydKontekst) return;
+  const ctx = lydKontekst;
+  const t = ctx.currentTime;
+  if (hastegrad === 'Akutt') {
+    _tone(ctx, t, 0.4, 880); _tone(ctx, t + 0.5, 0.4, 660); _tone(ctx, t + 1.0, 0.5, 880);
+  } else if (hastegrad === 'Haster') {
+    _tone(ctx, t, 0.4, 660); _tone(ctx, t + 0.6, 0.5, 660);
+  } else {
+    _tone(ctx, t, 0.6, 520);
+  }
+}
+
+
+function lydTikk(naaMs) {
+  // Kalles hvert femte sekund. Rydder først: et oppdrag som ikke lenger
+  // venter skal ikke bære et gammelt tidspunkt til det dukker opp igjen.
+  const naa = naaMs || Date.now();
+  const venter = new Set((mineOppdrag || []).filter((o) => o.status === 'venter').map((o) => o.id));
+  Object.keys(lydSistFor).forEach((id) => { if (!venter.has(Number(id))) delete lydSistFor[id]; });
+  if (!lydErPaa() || !lydKontekst || lydKontekst.state !== 'running') return [];
+  const ider = ventendeSomSkalPipe(mineOppdrag, naa, lydSistFor);
+  if (!ider.length) return [];
+  ider.forEach((id) => { lydSistFor[id] = naa; });
+  pip(_strengeste(mineOppdrag, ider));
+  return ider;
+}
+
+
+function _lydKnappTegn() {
+  const knapp = document.getElementById('lyd-knapp');
+  if (!knapp) return;
+  const paa = lydErPaa();
+  const klar = paa && lydKontekst && lydKontekst.state === 'running';
+  knapp.classList.toggle('btn-warning', paa);
+  knapp.classList.toggle('btn-outline-secondary', !paa);
+  knapp.setAttribute('aria-pressed', paa ? 'true' : 'false');
+  knapp.innerHTML = paa
+    ? '<i class="bi bi-volume-up-fill me-1"></i>Lyd på'
+    : '<i class="bi bi-volume-mute me-1"></i>Lyd av';
+  const hint = document.getElementById('lyd-hint');
+  if (hint) hint.classList.toggle('d-none', !(paa && !klar));
+}
+
+
+async function _lydKlar() {
+  // Nettleseren lar lyd spille først etter et trykk; kontekst lages og
+  // vekkes her, fra klikket på knappen (eller det første trykket på siden).
+  const AC = globalThis.AudioContext || globalThis.webkitAudioContext;
+  if (!AC) return false;
+  if (!lydKontekst) lydKontekst = new AC();
+  if (lydKontekst.state !== 'running') {
+    try { await lydKontekst.resume(); } catch (e) { /* ikke lov ennå */ }
+  }
+  return lydKontekst.state === 'running';
+}
+
+
+async function vekslLyd() {
+  const paa = !lydErPaa();
+  try { globalThis.localStorage.setItem(lydNokkel(), paa ? '1' : '0'); } catch (e) { /* uten lagring: gjelder til siden lastes */ }
+  if (paa && await _lydKlar()) {
+    // Et kort kvitteringspip, så føreren hører at lyden faktisk virker.
+    _tone(lydKontekst, lydKontekst.currentTime, 0.15, 660);
+  }
+  _lydKnappTegn();
 }
 
 
@@ -714,6 +876,15 @@ async function pollOgSynk() {
 document.addEventListener('DOMContentLoaded', async () => {
   await lastMine();
   visUsendt();
+
+  // Lydvarselet. Valget huskes; selve lyden må vekkes av et trykk, så er
+  // den på fra før, tas det første trykket hvor som helst på siden.
+  _lydKnappTegn();
+  if (lydErPaa()) {
+    const vekk = async () => { if (await _lydKlar()) { _lydKnappTegn(); document.removeEventListener('pointerdown', vekk); } };
+    document.addEventListener('pointerdown', vekk);
+  }
+  setInterval(() => lydTikk(), 5000);
 
   // Køen kan ha overlevd at fanen ble lukket midt i en vakt.
   if (koLes().length) await synk();
