@@ -186,7 +186,9 @@ function mkCrosstab(ctData) {
       const pctStr = rowTotal > 0 ? `<br><small style="font-weight:400;opacity:0.75">${Math.round(pct)}%</small>` : '';
       html += `<td class="${cls}">${escHtmlValue(val)}${pctStr}</td>`;
     });
-    html += `<td style="font-weight:700;color:#1e293b">${rowTotal}</td></tr>`;
+    // Klassen, ikke en innlagt farge: `#1e293b` var lys bakgrunns mørke
+    // tekst, og på det mørke temaet var radsummen uleselig (André, 12. sep. 2026).
+    html += `<td class="xt-total">${escHtmlValue(rowTotal)}</td></tr>`;
   });
   html += '</tbody></table>';
   return html;

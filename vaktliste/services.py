@@ -408,6 +408,19 @@ def kan_fore_korps(user, korps_id) -> bool:
     return korps is not None and korps_id == korps.pk
 
 
+def mannskap_brukeren_kan_sette(user):
+    """Personene brukeren får sette på en plass — for nedtrekkene. Speiler
+    `kan_redigere_mannskap`: alle for den som skriver alt, eget korps for
+    korps-føreren, ingen uten badge."""
+    qs = Mannskap.objects.filter(er_aktiv=True).select_related('korps')
+    if kan_skrive_alt(user):
+        return qs
+    korps = brukerens_korps(user)
+    if korps is None or not har_tilgang(user, 'vaktliste', 'skriv_handling'):
+        return qs.none()
+    return qs.filter(korps=korps)
+
+
 def kan_redigere_mannskap(user, mannskap) -> bool:
     """Får brukeren redigere denne personen? Avgjøres av personens korps."""
     return kan_fore_korps(user, mannskap.korps_id)

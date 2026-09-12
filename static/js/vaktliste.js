@@ -1278,25 +1278,6 @@ function _timesteg(antall) {
 }
 
 
-function _toppunkt(punkter, topp) {
-  // **Når er bemanningen høyest?** Det er spørsmålet kurven skal svare på,
-  // og å lese det av søylehøyder er å gjette. Sammenhengende timer på
-  // toppnivå slås sammen til ett spenn.
-  const paaTopp = punkter.filter((p) => p.planlagt === topp);
-  if (!paaTopp.length) return '';
-  const forste = paaTopp[0];
-  const siste = paaTopp[paaTopp.length - 1];
-  const sammenhengende = paaTopp.length ===
-    (punkter.indexOf(siste) - punkter.indexOf(forste) + 1);
-  if (paaTopp.length === 1 || !sammenhengende) {
-    return `kl. ${_kl(forste.tid)}`;
-  }
-  // Toppen varer ut den siste timen, ikke til den begynner.
-  const slutt = new Date(_d(siste.tid).getTime() + 3600 * 1000).toISOString();
-  return `kl. ${_kl(forste.tid)}–${_kl(slutt)}`;
-}
-
-
 function _mkEnKurve(tittel, poster) {
   const punkter = _bemanningPerTime(poster);
   if (!punkter.length) return '';
@@ -1329,10 +1310,12 @@ function _mkEnKurve(tittel, poster) {
 
   const bunn = `${escapeHtml(_dag(punkter[0].tid))} → `
              + `${escapeHtml(_dag(punkter[punkter.length - 1].tid))}`;
+  // Det som mangler, som skift — ikke som plasstimer (André, 12. sep.
+  // 2026: «20 ubesatte plasstimer sier meg lite i en planlegging. Må stå
+  // vaktene som ikke er bemannet»). Like spenn samles: «2 × fre 17:00–03:00».
   const rest = ledige
-    ? `<span class="vl-meta">${escHtmlValue(ledige)} ubesatte plasstimer</span>`
+    ? `<span class="vl-meta">Ledige plasser: ${escapeHtml(_ledigeSkift(poster))}</span>`
     : '<span class="vl-meta">Alle plasser fylt</span>';
-  const naar = _toppunkt(punkter, topp);
 
   return `
     <div class="vl-kurvegruppe">
@@ -1342,9 +1325,17 @@ function _mkEnKurve(tittel, poster) {
       </div>
       <div class="vl-kurve">${soyler}</div>
       <div class="vl-timeakse">${timeakse}</div>
-      <div class="vl-meta">${bunn} · topp ${escHtmlValue(topp)} plasser${
-        naar ? ' ' + escapeHtml(naar) : ''}</div>
+      <div class="vl-meta">${bunn} · ${escHtmlValue(topp)} ${escapeHtml(topp === 1 ? 'plass' : 'plasser')} på det meste</div>
     </div>`;
+}
+
+
+function _ledigeSkift(poster) {
+  // «2 × fre 17:00–03:00, 1 × 11:12–15:12» — de ledige plassene gruppert på
+  // spenn, i skiftrekkefølge.
+  return _tidsblokker(poster.filter((vp) => vp.ledig))
+    .map((b) => `${b.poster.length} × ${_tidsspenn(b)}`)
+    .join(', ');
 }
 
 
@@ -1872,9 +1863,11 @@ function mkMittKorps() {
   const poster = _synligePoster(aktivListe.alle_vaktposter || aktivListe.vaktposter, korpsId);
   const ledige = poster.filter((vp) => vp.ledig).length;
   const bemannet = poster.length - ledige;
-  // Timene korpset har fått, og timene som er probono (André, 12. sep.
-  // 2026). `_sumTimer` hopper over probono; probono-summen regnes for seg.
-  const avsatt = _tall(_sumTimer(poster));
+  // Timene, delt slik André leste dem (12. sep. 2026): bemannet er
+  // korpsets egne folk, å dekke er de ledige plassene korpset kan fylle,
+  // probono for seg. Ett samlet «avsatt» blandet de to og leste som feil.
+  const bemannet_t = _tall(_sumTimer(poster.filter((vp) => !vp.ledig)));
+  const dekke_t = _tall(_sumTimer(poster.filter((vp) => vp.ledig)));
   const probono = _tall(poster.reduce((sum, vp) => sum + (vp.probono ? (_skifttimer(vp) || 0) : 0), 0));
 
   const hode = `
@@ -1882,7 +1875,8 @@ function mkMittKorps() {
       <div class="vl-noekkeltall">
         <div><b>${escHtmlValue(ledige)}</b><span class="vl-meta">${escapeHtml(ledige === 1 ? 'plass å dekke' : 'plasser å dekke')}</span></div>
         <div><b>${escHtmlValue(bemannet)}</b><span class="vl-meta">mannskap satt opp</span></div>
-        <div><b>${escapeHtml(avsatt)} t</b><span class="vl-meta">avsatt</span></div>
+        <div><b>${escapeHtml(bemannet_t)} t</b><span class="vl-meta">bemannet</span></div>
+        <div><b>${escapeHtml(dekke_t)} t</b><span class="vl-meta">å dekke</span></div>
         <div><b>${escapeHtml(probono)} t</b><span class="vl-meta">probono</span></div>
       </div>
       <span class="vl-meta">${escapeHtml(korpsnavn)} — tildelte og utildelte plasser</span>
@@ -2437,11 +2431,42 @@ function apneVakt() {
 
   if (lengde) lengde.classList.toggle('d-none', !kanLede());
   const arkivBolk = document.getElementById('vakt-arkiv-bolk');
-  if (arkivBolk) {
-    arkivBolk.classList.toggle('d-none', !_erAdmin());
-    if (_erAdmin()) lastArkiverteVaktlister();
-  }
+  if (arkivBolk) arkivBolk.classList.toggle('d-none', !_erAdmin());
+  // Lista over arkiverte står bak en knapp (André, 12. sep. 2026: «ikke
+  // clean»), og lukkes ved hver åpning.
+  document.getElementById('vakt-arkiverte')?.classList.add('d-none');
   _apneModal('vaktModal');
+}
+
+
+async function visArkiverteVaktlister() {
+  const el = document.getElementById('vakt-arkiverte');
+  if (!el) return;
+  if (!el.classList.contains('d-none')) { el.classList.add('d-none'); return; }
+  el.innerHTML = '<div class="vl-meta">Henter…</div>';
+  el.classList.remove('d-none');
+  await lastArkiverteVaktlister();
+}
+
+
+async function slettVaktliste() {
+  // Sletting for godt — global admin, to bekreftelser (dialogen og
+  // `confirm: true` i kroppen), som på ressursen. Arkivering er det
+  // reversible alternativet ved siden av.
+  if (!aktivListe) return;
+  const navn = aktivListe.vaktliste.vakt_navn;
+  if (!confirm(`Slette vaktlisten for «${navn}» for godt? Alle ressurser og skift forsvinner. Arkiver i stedet hvis du kan trenge den igjen.`)) return;
+  if (!confirm(`Er du sikker? «${navn}» kan ikke hentes tilbake.`)) return;
+  const res = await apiFetch(`/vaktliste/api/vaktlister/${aktivListe.vaktliste.id}/`, {
+    method: 'DELETE', body: JSON.stringify({ confirm: true }),
+  });
+  const d = await res.json().catch(() => ({}));
+  if (!res.ok || d.status !== 'ok') {
+    _visFeil('vakt-lengde-feil', d.message || 'Kunne ikke slette.');
+    return;
+  }
+  _lukkModal('vaktModal');
+  await lastVaktlister();
 }
 
 
@@ -2759,6 +2784,36 @@ function apneRedigerVaktpost(id) {
   if (probono) probono.checked = !!vp.probono;
 
   bootstrap.Modal.getOrCreateInstance(modal).show();
+}
+
+
+async function dupliserVaktpost() {
+  // En ledig plass til med samme spenn, rolle og reservasjon (André,
+  // 12. sep. 2026: «om jeg glemte å sette flere plasser»). Personen kopieres
+  // ikke — det er plassen som mangler, ikke henne.
+  const modal = document.getElementById('vaktpostModal');
+  const id = modal?.dataset.vaktpost;
+  const vp = (aktivListe?.vaktposter || []).find((v) => v.id === Number(id));
+  if (!vp) return;
+  _skjulFeil('vaktpost-feil');
+  const fra = _tidFraFelt('vaktpost-fra');
+  const til = _tidFraFelt('vaktpost-til');
+  const res = await apiFetch(`/vaktliste/api/ressurser/${vp.ressurs_id}/vaktposter/`, {
+    method: 'POST',
+    body: JSON.stringify({
+      fra_tid: fra, til_tid: til,
+      rolle_id: document.getElementById('vaktpost-rolle')?.value || null,
+      ..._korpsKropp('korps_id', document.getElementById('vaktpost-korps')?.value || ''),
+      probono: !!document.getElementById('vaktpost-probono')?.checked,
+    }),
+  });
+  const d = await res.json().catch(() => ({}));
+  if (!res.ok || d.status !== 'ok') {
+    _visFeil('vaktpost-feil', d.message || 'Kunne ikke duplisere skiftet.');
+    return;
+  }
+  _lukkModal('vaktpostModal');
+  await lastListe(aktivListe.vaktliste.id);
 }
 
 
@@ -3341,4 +3396,8 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('vaktpost-fra')
     ?.addEventListener('change', () => foreslaaTil('vaktpost-fra', 'vaktpost-til'));
   lastVaktlister();
+  // Registeret (korps, kompetanser, mannskap) hentes med én gang, ikke
+  // først når noen åpner «Innstillinger» — vinduet sto og ventet på nettet
+  // (André, 12. sep. 2026: «delay når en trykker på korps»).
+  lastRegister();
 });

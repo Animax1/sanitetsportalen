@@ -4,6 +4,32 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-12 — Andrés rapport 2, runde 2: vaktlisten og statistikken
+
+Ingen migrasjon.
+
+- **Nedtrekkene tilbyr bare dem brukeren får sette inn.** Korps-føreren
+  kunne velge hvem som helst; serveren avviste, men lista lot som.
+  `services.mannskap_brukeren_kan_sette` speiler `kan_redigere_mannskap`:
+  alle for den som skriver alt, eget korps med badge, ellers ingen.
+- **«Mitt korps» teller bemannet, å dekke og probono hver for seg.** Ett
+  samlet «avsatt» blandet korpsets egne timer med de ledige plassene og
+  leste som feil (24 t der André ventet 16).
+- **Bemanningskurven lister ledige skift, ikke plasstimer.** «20 ubesatte
+  plasstimer» ble «Ledige plasser: 2 × fre 17:00 – lør 03:00». Bunnlinja
+  sier «3 plasser på det meste»; «topp 3 plasser kl. 11–15» er borte.
+- **«Dupliser som ledig plass»** i skiftvinduet: samme spenn, rolle,
+  reservasjon og probono, uten personen. `skriv_full`, som å opprette.
+- **«Slett vaktlisten»** for global admin ved siden av «Arkiver», med to
+  bekreftelser og `{"confirm": true}` (endepunktet fantes). **Arkiverte
+  vaktlister ligger bak én knapp** og vises først når man ber om det.
+- **Registeret hentes ved sidelasting**, så «Korps» i innstillingene åpner
+  uten ventetid første gang.
+- **Lesbar tidstekst på /statistikk/.** Ventetid, tid på obspost, total
+  behandlingstid og krysstabellens radsum sto med `color:#1e293b` rett i
+  markupen — mørk tekst for lys bakgrunn. Nå `.kpi-tid` og `.xt-total` i
+  stilarket. **«Til pasientregistrering»-knappen er fjernet.**
+
 ## 2026-09-12 — Andrés rapport 2, runde 1: oppdragsmodulen
 
 Én migrasjon, `oppdrag/0014`: ny tabell `Enhetshendelse`, ingen data flyttes.

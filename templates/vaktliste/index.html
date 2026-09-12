@@ -309,14 +309,20 @@
         <div id="vakt-arkiv-bolk" class="d-none mb-3">
           <hr>
           <div class="d-flex align-items-center gap-2 flex-wrap mb-2">
-            <button type="button" class="btn btn-outline-danger btn-sm"
+            <button type="button" class="btn btn-outline-secondary btn-sm"
                     data-action="arkiverVaktliste">
               <i class="bi bi-archive me-1"></i>Arkiver vaktlisten
             </button>
-            <span class="vl-meta">Tas ut av velgeren. Kan hentes tilbake under.</span>
+            <button type="button" class="btn btn-outline-secondary btn-sm"
+                    data-action="visArkiverteVaktlister">
+              <i class="bi bi-box-arrow-in-left me-1"></i>Arkiverte vaktlister
+            </button>
+            <button type="button" class="btn btn-outline-danger btn-sm"
+                    data-action="slettVaktliste">
+              <i class="bi bi-trash me-1"></i>Slett vaktlisten
+            </button>
           </div>
-          <div class="vl-meta mb-1">Arkiverte vaktlister</div>
-          <div id="vakt-arkiverte"></div>
+          <div id="vakt-arkiverte" class="d-none"></div>
         </div>
         {% endif %}
 
@@ -587,6 +593,15 @@
           </label>
         </div>
         <div id="vaktpost-feil" class="text-danger small d-none"></div>
+
+        {# Duplisering (André, 12. sep. 2026): en ledig plass til med samme #}
+        {# spenn, rolle og reservasjon. Å opprette en plass er skriv_full. #}
+        <div class="vl-krev-full d-none mb-3">
+          <button type="button" class="btn btn-outline-secondary btn-sm"
+                  data-action="dupliserVaktpost">
+            <i class="bi bi-files me-1"></i>Dupliser som ledig plass
+          </button>
+        </div>
 
         <hr>
         <div class="vl-farlig">

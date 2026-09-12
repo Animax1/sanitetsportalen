@@ -228,14 +228,14 @@ class VaktlisteEscapingOppforselTests(SimpleTestCase):
                         '_mkEnKurve', 'mkGruppekurve', '_posterIGruppe',
                         'mkGruppe', '_plassKorps', '_tegnforklaring',
                         '_timesteg', '_ressurserIGruppe',
-                        '_grupperMedRessurser', '_toppunkt',
+                        '_grupperMedRessurser',
                         '_posterPerGruppe', '_vaktensSpenn',
                         'mkIkkePlassert', 'tegnFaner', '_fanerad',
                         '_mannskapsfane', '_tilstede', '_posterFor',
                         '_ikkePlassert', '_tidsspenn', '_vaktspenn',
                         '_bemanningPerTime', '_iso16', '_d', '_kl', '_dag',
                         '_sammeDag', '_nivaa', '_erAdmin', 'kanSkriveAlt',
-                        'kanLede', 'kanBemanne', 'kanRoreRad')),
+                        'kanLede', 'kanBemanne', 'kanRoreRad', '_ledigeSkift')),
     )
 
     #: Byggerne spør om tilgang fra fase 3. Node har ingen `window`, så den
@@ -1358,7 +1358,7 @@ class KurvePerGruppeTests(SimpleTestCase):
                         '_bemanningPerTime', '_posterPerGruppe',
                         '_mkEnKurve', 'mkGruppekurve', '_posterIGruppe',
                         '_ressurserIGruppe', '_tegnforklaring',
-                        '_timesteg', '_toppunkt')),
+                        '_timesteg', '_ledigeSkift', '_tidsblokker', '_tidsspenn', '_sammeDag', '_skiftrekkefolge')),
     )
     VINDU = ("globalThis.DAGER = ['søn','man','tir','ons','tor','fre','lør'];\n"
              "globalThis.MND = ['jan','feb','mar','apr','mai','jun',"
@@ -1424,8 +1424,8 @@ class KurvePerGruppeTests(SimpleTestCase):
         """)
         self.assertIn('Samleplass', ut)
         self.assertIn('Ambulanse', ut)
-        self.assertIn('topp 2 plasser', ut)
-        self.assertIn('topp 1 plasser', ut)
+        self.assertIn('2 plasser på det meste', ut)
+        self.assertIn('1 plass på det meste', ut)
 
     def test_ledige_plasser_telles_per_gruppe(self):
         ut = run_node(self.harness, self.VINDU + self.LISTE + """
@@ -1433,7 +1433,7 @@ class KurvePerGruppeTests(SimpleTestCase):
             console.log(mkGruppekurve({id: 2, navn: 'Ambulanse'}));
         """)
         self.assertIn('Alle plasser fylt', ut)        # samleplassen
-        self.assertIn('4 ubesatte plasstimer', ut)    # ambulansen, fire timer
+        self.assertIn('Ledige plasser: 1 × lør 3. okt 08:00–12:00', ut)    # ambulansen
 
     def test_ingen_grupper_gir_ingen_kurve(self):
         run_node(self.harness, self.VINDU + """
@@ -1455,8 +1455,7 @@ class TimeaksenTests(SimpleTestCase):
     HARNESS = (
         (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue')),
         (VAKTLISTE_JS, ('_d', '_kl', '_dag', '_vaktensSpenn',
-                        '_bemanningPerTime', '_mkEnKurve', '_timesteg',
-                        '_toppunkt')),
+                        '_bemanningPerTime', '_mkEnKurve', '_timesteg', '_ledigeSkift', '_tidsblokker', '_tidsspenn', '_sammeDag', '_skiftrekkefolge')),
     )
     VINDU = ("globalThis.DAGER = ['søn','man','tir','ons','tor','fre','lør'];\n"
              "globalThis.MND = ['jan','feb','mar','apr','mai','jun',"
@@ -1504,45 +1503,52 @@ class TimeaksenTests(SimpleTestCase):
         self.assertEqual(utfylte, soyler,
                          'på en kort vakt skal hver time være skrevet ut')
 
-    def test_toppunktet_oppgis_med_klokkeslett(self):
-        """Selve spørsmålet kurven skal svare på: når er det flest på vakt?"""
+    def test_bunnlinja_sier_hvor_mange_plasser_paa_det_meste(self):
+        """«3 plasser på det meste» — ikke «topp 3 plasser kl. 10:00–12:00»,
+        som André leste som noe han ikke forsto (12. sep. 2026)."""
         ut = run_node(self.harness, self.VINDU + """
             globalThis.utskriftRessurs = null; globalThis.korpsfilter = null;
             globalThis.aktivListe = {
               vaktliste: {startet: '2026-10-03T08:00:00',
                           planlagt_slutt: '2026-10-03T12:00:00'},
               vaktposter: []};
-            // Én person hele veien, to ekstra fra 10 til 12.
             console.log(_mkEnKurve('Test', [
               {ledig: false, fra_tid: '2026-10-03T08:00:00', til_tid: '2026-10-03T12:00:00'},
               {ledig: false, fra_tid: '2026-10-03T10:00:00', til_tid: '2026-10-03T12:00:00'},
               {ledig: false, fra_tid: '2026-10-03T10:00:00', til_tid: '2026-10-03T12:00:00'}
             ]));
         """)
-        self.assertIn('topp 3 plasser', ut)
-        self.assertIn('10:00', ut, 'toppen begynner kl. 10')
-        self.assertIn('12:00', ut, 'og varer ut den siste timen')
+        self.assertIn('3 plasser på det meste', ut)
+        self.assertNotIn('topp 3', ut)
+        self.assertIn('Alle plasser fylt', ut)
 
-    def test_ett_enkelt_topptidspunkt_vises_uten_spenn(self):
-        run_node(self.harness, self.VINDU + """
-            const punkter = [
-              {tid: '2026-10-03T08:00:00.000Z', antall: 1, planlagt: 1},
-              {tid: '2026-10-03T09:00:00.000Z', antall: 3, planlagt: 3},
-              {tid: '2026-10-03T10:00:00.000Z', antall: 1, planlagt: 1}];
-            const ut = _toppunkt(punkter, 3);
-            assert(ut.indexOf('–') === -1, 'en enkelt time er ikke et spenn: ' + ut);
+    def test_ledige_plasser_listes_som_skift_ikke_som_plasstimer(self):
+        """André, 12. sep. 2026: «20 ubesatte plasstimer sier meg lite i en
+        planlegging. Må stå vaktene som ikke er bemannet og mangler»."""
+        ut = run_node(self.harness, self.VINDU + """
+            globalThis.utskriftRessurs = null; globalThis.korpsfilter = null;
+            globalThis.aktivListe = {
+              vaktliste: {startet: '2026-10-03T08:00:00',
+                          planlagt_slutt: '2026-10-03T12:00:00'},
+              vaktposter: []};
+            console.log(_mkEnKurve('Test', [
+              {ledig: false, navn: 'Kari', fra_tid: '2026-10-03T08:00:00', til_tid: '2026-10-03T12:00:00'},
+              {ledig: true, navn: '', fra_tid: '2026-10-03T08:00:00', til_tid: '2026-10-03T12:00:00'},
+              {ledig: true, navn: '', fra_tid: '2026-10-03T08:00:00', til_tid: '2026-10-03T12:00:00'},
+              {ledig: true, navn: '', fra_tid: '2026-10-03T10:00:00', til_tid: '2026-10-03T12:00:00'}
+            ]));
         """)
+        self.assertIn('Ledige plasser: 2 × lør 3. okt 08:00–12:00, 1 × lør 3. okt 10:00–12:00', ut)
+        self.assertNotIn('plasstimer', ut)
 
-    def test_topper_som_ikke_henger_sammen_gir_bare_forste(self):
-        """To adskilte topper er ikke ett spenn — å skrive «kl. 08–20» når
-        det er stille imellom, er å lyve med et bindestrek."""
+    def test_ledige_skift_grupperes_paa_spenn(self):
         run_node(self.harness, self.VINDU + """
-            const punkter = [
-              {tid: '2026-10-03T08:00:00.000Z', antall: 3, planlagt: 3},
-              {tid: '2026-10-03T09:00:00.000Z', antall: 1, planlagt: 1},
-              {tid: '2026-10-03T10:00:00.000Z', antall: 3, planlagt: 3}];
-            const ut = _toppunkt(punkter, 3);
-            assert(ut.indexOf('–') === -1, 'ikke sammenhengende: ' + ut);
+            const ut = _ledigeSkift([
+              {ledig: true, navn: '', fra_tid: '2026-10-02T17:00:00', til_tid: '2026-10-03T03:00:00'},
+              {ledig: false, navn: 'Ola', fra_tid: '2026-10-02T17:00:00', til_tid: '2026-10-03T03:00:00'},
+              {ledig: true, navn: '', fra_tid: '2026-10-02T17:00:00', til_tid: '2026-10-03T03:00:00'}]);
+            assert(ut === '2 × fre 2. okt 17:00 – lør 3. okt 03:00', 'fikk: ' + ut);
+            assert(_ledigeSkift([]) === '', 'tom liste gir tom tekst');
         """)
 
 
@@ -1557,9 +1563,9 @@ class GruppekurveIFanenTests(SimpleTestCase):
         (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue')),
         (VAKTLISTE_JS, ('_d', '_kl', '_dag', '_vaktensSpenn',
                         '_bemanningPerTime', '_posterPerGruppe',
-                        '_mkEnKurve', '_timesteg', '_toppunkt',
+                        '_mkEnKurve', '_timesteg',
                         '_tegnforklaring', '_posterIGruppe',
-                        '_ressurserIGruppe', 'mkGruppekurve')),
+                        '_ressurserIGruppe', 'mkGruppekurve', '_ledigeSkift', '_tidsblokker', '_tidsspenn', '_sammeDag', '_skiftrekkefolge')),
     )
     VINDU = ("globalThis.DAGER = ['søn','man','tir','ons','tor','fre','lør'];\n"
              "globalThis.MND = ['jan','feb','mar','apr','mai','jun',"
@@ -1592,7 +1598,7 @@ class GruppekurveIFanenTests(SimpleTestCase):
         """)
         self.assertIn('Samleplass', ut)
         self.assertNotIn('Ambulanse', ut, 'nabogruppa hører ikke hjemme her')
-        self.assertIn('topp 2 plasser', ut)
+        self.assertIn('2 plasser på det meste', ut)
 
     def test_ambulansefanen_viser_ambulansen(self):
         ut = run_node(self.harness, self.VINDU + self.LISTE + """
@@ -1600,7 +1606,7 @@ class GruppekurveIFanenTests(SimpleTestCase):
         """)
         self.assertIn('Ambulanse', ut)
         self.assertNotIn('Samleplass', ut)
-        self.assertIn('4 ubesatte plasstimer', ut)
+        self.assertIn('Ledige plasser: 1 × lør 3. okt 08:00–12:00', ut)
 
     def test_gruppe_uten_skift_faar_kurven_likevel(self):
         """**Endret 30. aug. 2026.** Kurven falt bort når gruppa ikke hadde et
@@ -1618,7 +1624,7 @@ class GruppekurveIFanenTests(SimpleTestCase):
         """)
         self.assertIn('Tom', ut)
         self.assertIn('vl-stolpe', ut, 'spennet tegnes selv uten skift')
-        self.assertIn('topp 1 plasser', ut, 'flat null skaleres mot 1')
+        self.assertIn('1 plass på det meste', ut, 'flat null skaleres mot 1')
 
     def test_dogn_staar_i_tegnforklaringen(self):
         """Den hvite streken i kurven er midnatt, ikke nåværende tidspunkt.
@@ -1725,13 +1731,13 @@ class FanenErGruppaTests(SimpleTestCase):
                         'kanBemannePlass', '_dagnokkel', '_dagoverskrift',
                         '_probonoMerke', '_tidsspenn', '_telling', '_sammeDag',
                         '_driftrad', 'mkGruppekurve', '_mkEnKurve',
-                        '_tegnforklaring', '_timesteg', '_toppunkt',
+                        '_tegnforklaring', '_timesteg',
                         '_posterPerGruppe', '_vaktensSpenn', '_posterIGruppe',
                         '_plassKorps', '_bemanningPerTime', 'rollerForGruppe',
                         '_iso16', '_posterFor', '_ikkePlassert',
                         '_ressurserIGruppe', '_grupperMedRessurser', '_d', '_kl',
                         '_dag', '_nivaa', '_erAdmin', 'kanSkriveAlt', 'kanLede',
-                        'kanBemanne', 'gruppaHarPlass', 'kanRoreRad')),
+                        'kanBemanne', 'gruppaHarPlass', 'kanRoreRad', '_ledigeSkift')),
     )
     VINDU = ("globalThis.window = { MODUL_TILGANG: { admin: true } };\n"
              "globalThis.DAGER = ['søn','man','tir','ons','tor','fre','lør'];\n"
@@ -2080,12 +2086,12 @@ class EnkeltgruppeTests(SimpleTestCase):
                         '_dagnokkel', '_dagoverskrift', '_probonoMerke',
                         '_tidsspenn', '_sammeDag', 'mkGruppekurve', '_telling',
                         '_posterIGruppe', '_mkEnKurve', '_tegnforklaring',
-                        '_timesteg', '_toppunkt', '_vaktensSpenn',
+                        '_timesteg', '_vaktensSpenn',
                         '_bemanningPerTime', 'rollerForGruppe', '_iso16',
                         '_posterFor', '_ressurserIGruppe',
                         '_grupperMedRessurser', '_d', '_kl', '_dag',
                         '_nivaa', '_erAdmin', 'kanSkriveAlt', 'kanLede',
-                        'kanBemanne', 'gruppaHarPlass', 'kanRoreRad')),
+                        'kanBemanne', 'gruppaHarPlass', 'kanRoreRad', '_ledigeSkift')),
     )
     VINDU = ("globalThis.window = { MODUL_TILGANG: { admin: true } };\n"
              "globalThis.DAGER = ['søn','man','tir','ons','tor','fre','lør'];\n"
@@ -3821,7 +3827,7 @@ class ForeslaaTilTests(SimpleTestCase):
 
 
 class MittKorpsTimerTests(SimpleTestCase):
-    """Timene i «Mitt korps»: avsatt (uten probono) og probono for seg."""
+    """Timene i «Mitt korps»: bemannet, å dekke og probono hver for seg."""
 
     HARNESS = MittKorpsTests.HARNESS
     VINDU = MittKorpsTests.VINDU
@@ -3839,8 +3845,12 @@ class MittKorpsTimerTests(SimpleTestCase):
             console.log(mkMittKorps());
         """)
         # HGSD ser plass 1 (alle korps, 10 t) og Kari (10 t, probono).
-        self.assertIn('<b>10 t</b><span class="vl-meta">avsatt</span>', ut)
+        # Bemannet teller organisasjonens timer — Kari er probono, så 0 t.
+        # Å dekke er den ledige plassen. Ett samlet «avsatt» blandet de to.
+        self.assertIn('<b>0 t</b><span class="vl-meta">bemannet</span>', ut)
+        self.assertIn('<b>10 t</b><span class="vl-meta">å dekke</span>', ut)
         self.assertIn('<b>10 t</b><span class="vl-meta">probono</span>', ut)
+        self.assertNotIn('avsatt', ut)
         # Og en ledig plass med probono viser merket (André: «ser ingen merke der»).
         ut2 = run_node(self.harness, self.VINDU + self.LISTE + """
             globalThis.window = { MODUL_TILGANG: { vaktliste: 'skriv_handling' }, MITT_KORPS_ID: 1 };
@@ -3869,3 +3879,132 @@ class ArkiverteVaktlisterTests(SimpleTestCase):
         self.assertIn('&lt;b&gt;TEST&lt;/b&gt;', ut)
         self.assertIn('data-action="gjenopprettVaktliste" data-id="4"', ut)
         self.assertIn('Ingen arkiverte vaktlister', ut)
+
+
+class DupliserVaktpostTests(SimpleTestCase):
+    """«Dupliser som ledig plass» (André, 12. sep. 2026): en plass til med
+    samme spenn, rolle og reservasjon — men uten personen."""
+
+    HARNESS = ((VAKTLISTE_JS, ('dupliserVaktpost', '_tidFraFelt', '_korpsKropp')),)
+
+    PREAMBLE = """
+      globalThis.sendt = null;
+      globalThis.felter = {
+        'vaktpostModal': {dataset: {vaktpost: '7'}},
+        'vaktpost-fra': {value: '2026-10-03T08:00'},
+        'vaktpost-til': {value: '2026-10-03T16:00'},
+        'vaktpost-rolle': {value: '3'},
+        'vaktpost-korps': {value: '2'},
+        'vaktpost-probono': {checked: true},
+        'vaktpost-mannskap': {value: '11'},
+      };
+      globalThis.document = { getElementById: (id) => felter[id] || null };
+      globalThis.aktivListe = {vaktliste: {id: 3},
+        vaktposter: [{id: 7, ressurs_id: 20, mannskap_id: 11, navn: 'Kari'}]};
+      globalThis._skjulFeil = () => {};
+      globalThis._visFeil = (id, m) => { globalThis.feilmelding = m; };
+      globalThis.lukket = false;
+      globalThis._lukkModal = () => { globalThis.lukket = true; };
+      globalThis.lastet = null;
+      globalThis.lastListe = async (id) => { globalThis.lastet = id; };
+      globalThis.apiFetch = async (url, opts) => {
+        globalThis.sendt = {url, method: opts.method, body: JSON.parse(opts.body)};
+        return {ok: true, json: async () => ({status: 'ok', data: {id: 8}})};
+      };
+    """
+
+    def setUp(self):
+        if not node_available():
+            self.skipTest('node er ikke tilgjengelig')
+        self.harness = build_harness(self.HARNESS)
+
+    def test_oppretter_en_ledig_plass_paa_samme_ressurs(self):
+        run_node(self.harness, """
+          await dupliserVaktpost();
+          assert(sendt, 'ingen forespørsel');
+          assert(sendt.url === '/vaktliste/api/ressurser/20/vaktposter/', sendt.url);
+          assert(sendt.method === 'POST', sendt.method);
+          assert(sendt.body.fra_tid === '2026-10-03T08:00', 'fra');
+          assert(sendt.body.til_tid === '2026-10-03T16:00', 'til');
+          assert(sendt.body.rolle_id === '3', 'rolle');
+          assert(sendt.body.korps_id === '2' && sendt.body.alle_korps === false, 'korps');
+          assert(sendt.body.probono === true, 'probono');
+          assert(!('mannskap_id' in sendt.body), 'personen skal ikke kopieres');
+          assert(lukket && lastet === 3, 'vinduet lukkes og lista lastes');
+        """, preamble=self.PREAMBLE)
+
+    def test_feil_vises_i_vinduet(self):
+        run_node(self.harness, """
+          globalThis.apiFetch = async () => ({ok: false, json: async () => ({status: 'error', message: 'Nei'})});
+          await dupliserVaktpost();
+          assert(feilmelding === 'Nei', feilmelding);
+          assert(!lukket, 'vinduet står');
+        """, preamble=self.PREAMBLE)
+
+
+class ArkivbolkenTests(SimpleTestCase):
+    """Arkiverte vaktlister ligger bak én knapp (André, 12. sep. 2026: lista
+    «rett under knappen er ikke ryddig»), og «Slett vaktlisten» står ved
+    siden av «Arkiver» med to bekreftelser."""
+
+    HARNESS = ((VAKTLISTE_JS, ('visArkiverteVaktlister', 'slettVaktliste')),)
+
+    PREAMBLE = """
+      const klasser = (init) => {
+        const s = new Set(init);
+        return {contains: (c) => s.has(c), add: (c) => s.add(c), remove: (c) => s.delete(c)};
+      };
+      globalThis.felter = {
+        'vakt-arkiverte': {classList: klasser(['d-none']), innerHTML: ''},
+      };
+      globalThis.document = { getElementById: (id) => felter[id] || null };
+      globalThis.hentet = 0;
+      globalThis.lastArkiverteVaktlister = async () => { globalThis.hentet += 1; };
+      globalThis.aktivListe = {vaktliste: {id: 5, vakt_navn: 'Høstvakten'}};
+      globalThis.sendt = null;
+      globalThis.apiFetch = async (url, opts) => {
+        globalThis.sendt = {url, method: opts.method, body: JSON.parse(opts.body)};
+        return {ok: true, json: async () => ({status: 'ok'})};
+      };
+      globalThis._visFeil = (id, m) => { globalThis.feilmelding = m; };
+      globalThis.lukket = false;
+      globalThis._lukkModal = () => { globalThis.lukket = true; };
+      globalThis.lastVaktlister = async () => { globalThis.lastetLister = true; };
+      globalThis.svar = [];
+      globalThis.confirm = () => svar.shift();
+    """
+
+    def setUp(self):
+        if not node_available():
+            self.skipTest('node er ikke tilgjengelig')
+        self.harness = build_harness(self.HARNESS)
+
+    def test_knappen_veksler_lista(self):
+        run_node(self.harness, """
+          const el = felter['vakt-arkiverte'];
+          await visArkiverteVaktlister();
+          assert(!el.classList.contains('d-none'), 'første trykk viser');
+          assert(hentet === 1, 'og henter');
+          await visArkiverteVaktlister();
+          assert(el.classList.contains('d-none'), 'andre trykk skjuler');
+          assert(hentet === 1, 'uten å hente på nytt');
+        """, preamble=self.PREAMBLE)
+
+    def test_sletting_krever_to_ja(self):
+        run_node(self.harness, """
+          svar = [true, false];
+          await slettVaktliste();
+          assert(sendt === null, 'ett ja er ikke nok');
+          svar = [true, true];
+          await slettVaktliste();
+          assert(sendt.method === 'DELETE' && sendt.url === '/vaktliste/api/vaktlister/5/', JSON.stringify(sendt));
+          assert(sendt.body.confirm === true, 'confirm i kroppen');
+          assert(lukket && lastetLister, 'vinduet lukkes og velgeren lastes');
+        """, preamble=self.PREAMBLE)
+
+    def test_nei_paa_forste_sender_ingenting(self):
+        run_node(self.harness, """
+          svar = [false, true];
+          await slettVaktliste();
+          assert(sendt === null, 'nei er nei');
+        """, preamble=self.PREAMBLE)

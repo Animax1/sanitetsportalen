@@ -62,7 +62,6 @@ REVIEWED_INTERPOLATIONS = {
     'Math.round(pct)': 'tall',
     'Math.min(100,pct)': 'tall (pct går gjennom Number() over)',
     'pct.toFixed(1)': 'tall',
-    'rowTotal': 'sum av tall',
     'b.id': 'primærnøkkel (tall) fra API-et',
     'h.id': 'primærnøkkel (tall) fra API-et',
 
@@ -274,6 +273,22 @@ const ct = {
 const html = mkCrosstab(ct);
 assert(html.includes('heat-zero'), 'null-cellen mangler heat-zero');
 assert(/>0</.test(html) || />0<br/.test(html), 'tallet 0 vises ikke: ' + html);
+''')
+        self.assertIn('OK', out)
+
+    def test_krysstabellens_radsum_baerer_klasse_ikke_innlagt_farge(self):
+        """Radsummen sto med `color:#1e293b` — mørk tekst for lys bakgrunn —
+        og var uleselig i det mørke temaet (André, 12. sep. 2026). Fargen
+        skal komme fra stilarket, som for resten av tabellen."""
+        out = self._run_js('''
+const ct = {
+  rows: ['Brystsmerter'],
+  cols: ['Rød', 'Gul'],
+  counts: { 'Brystsmerter': { 'Rød': 3, 'Gul': 1 } },
+};
+const html = mkCrosstab(ct);
+assert(html.includes('<td class="xt-total">4</td>'), 'radsummen mangler klassen: ' + html);
+assert(!html.includes('#1e293b'), 'innlagt mørk farge: ' + html);
 ''')
         self.assertIn('OK', out)
 

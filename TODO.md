@@ -205,6 +205,14 @@ ingen av dem gir feilmelding — de er bare stille inaktive.
                   varslet/tatt av i tidslinjen (`0014`), angre siste status, sletting
                   (sentral mens alle venter, admin i historikken), rediger oppdrag,
                   sted i sentralbordet, «Endre», «endret av KO», notat i arkivlista.
+            - [x] Andrés rapport 2, vaktliste og statistikk (12. sep.): nedtrekkene
+                  tilbyr bare dem brukeren får sette, «Mitt korps» med bemannet/å
+                  dekke/probono, kurven lister ledige skift, «Dupliser som ledig
+                  plass», «Slett vaktlisten» for admin, arkiverte bak én knapp,
+                  registeret hentes ved sidelasting, lesbar tidstekst på /statistikk/.
+            - [ ] **Navnet «utildelt»** — André foreslår «ledig korps». Avvent svar:
+                  «ledig» brukes alt om plassen uten person, og to «ledig» i samme
+                  rad leser som samme ting.
             - [ ] **Å tenke på (André, 12. sep.):** skal bilen se de andre bilenes
                   tidsstempler? (§7.3 sier nei i dag.) Skal bil 2, som ikke tar med
                   pasienten, få sette/se grovsorteringen? Kontokobling til admin bare av

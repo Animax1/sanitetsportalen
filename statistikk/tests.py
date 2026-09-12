@@ -314,3 +314,37 @@ class ModulTilgangSynlighetTests(TestCase):
         from django.contrib.auth.models import AnonymousUser
         self.assertFalse(har_tilgang(AnonymousUser(), 'statistikk', 'les'))
         self.assertIsNone(nivaa_for(AnonymousUser(), 'statistikk'))
+
+
+class LesbarTidstekstTests(TestCase):
+    """De tre tidstallene på pasientfanen og krysstabellens radsum sto med
+    `color:#1e293b` rett i markupen — mørk tekst laget for lys bakgrunn, og
+    uleselig i det mørke temaet (André, 12. sep. 2026). Fargen skal komme
+    fra `statistikk.css`, som for `.kpi-value`."""
+
+    def _les(self, sti):
+        from pathlib import Path
+        from django.conf import settings
+        return (Path(settings.BASE_DIR) / sti).read_text(encoding='utf-8')
+
+    def test_ingen_innlagt_moerk_farge_paa_statistikksiden(self):
+        for sti in ('templates/statistikk/index.html', 'templates/statistikk/_oppdrag.html',
+                    'static/js/statistikk.js', 'static/js/statistikk-oppdrag.js'):
+            tekst = self._les(sti)
+            # Kommentarer som forklarer historien får nevne fargen; markup får ikke.
+            linjer = [l for l in tekst.splitlines()
+                      if '#1e293b' in l and not l.strip().startswith(('//', '/*', '*', '{#'))]
+            self.assertEqual(linjer, [], f'{sti}: {linjer}')
+
+    def test_tidstallene_har_klassen_og_klassen_er_definert(self):
+        mal = self._les('templates/statistikk/index.html')
+        for pk in ('kpi-wait-both', 'kpi-obs-both', 'kpi-total-both'):
+            self.assertIn(f'class="kpi-tid" id="{pk}"', mal, pk)
+        css = self._les('static/css/statistikk.css')
+        self.assertIn('.kpi-tid {', css)
+        self.assertIn('.stats-table td.xt-total', css)
+
+    def test_knappen_til_pasientregistrering_er_borte(self):
+        """Statistikksiden er ikke pasientmodulens; navigasjonen ligger i
+        portalens meny (André, 12. sep. 2026)."""
+        self.assertNotIn('Til pasientregistrering', self._les('templates/statistikk/index.html'))

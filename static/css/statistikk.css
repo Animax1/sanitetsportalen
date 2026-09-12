@@ -54,6 +54,15 @@
     margin-top: 1px;
   }
 
+  /* Tidstallene (ventetid, obspost, total) — sto med innlagt `#1e293b`,
+     altså mørk tekst laget for lys bakgrunn, og var uleselige i det mørke
+     temaet. Samme farge som `.kpi-value`, mindre skrift. */
+  .kpi-tid {
+    font-size: 1.15rem;
+    font-weight: 700;
+    color: var(--text-main);
+  }
+
   .chart-card {
     background: var(--surface-1);
     border-radius: 10px;
@@ -254,6 +263,7 @@
   .heat-mid { background: #713f12 !important; font-weight: 600; color: #fde68a !important; }
   .heat-lo { background: #14532d !important; color: #bbf7d0 !important; }
   .heat-zero { color: var(--text-soft) !important; }
+  .stats-table td.xt-total { font-weight: 700; color: var(--text-main); }
 
 .sig-yes { color:#22c55e !important; font-weight:700; }
 .sig-no  { color:#94a3b8 !important; }

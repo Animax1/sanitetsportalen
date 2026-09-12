@@ -1378,3 +1378,37 @@ class PlanlagtGaarEnVeiTests(TilgangsBasis):
         pk = self._plass(self.res_hgsd, korps_id=self.karmoy.pk)
         self.assertEqual(self._put(pk, korps_id=None).status_code, 200)
         self.assertFalse(services.er_planlagt(Vaktpost.objects.get(pk=pk)))
+
+
+class NedtrekketTilbyrBareDemManFaarSetteTests(TilgangsBasis):
+    """André, 12. sep. 2026: korps-føreren «kan bytte til hvem som helst
+    mannskap uavhengig av korps». Serveren avviste det — men nedtrekket lot
+    som. `mannskap`-lista i detaljsvaret speiler derfor `kan_redigere_mannskap`."""
+
+    def _navn(self, c):
+        res = c.get(f'/vaktliste/api/vaktlister/{self.vl.pk}/')
+        self.assertEqual(res.status_code, 200, res.content)
+        return sorted(m['navn'] for m in res.json()['data']['mannskap'])
+
+    def test_korpsbrukeren_faar_bare_eget_korps(self):
+        self.assertEqual(self._navn(self.c_kb), ['Kari'])
+
+    def test_vaktleder_og_admin_faar_alle(self):
+        self.assertEqual(self._navn(self.c_vl), ['Kari', 'Ola'])
+        self.assertEqual(self._navn(self.c_adm), ['Kari', 'Ola'])
+
+    def test_leseren_faar_ingen(self):
+        """`les` setter ingen på plass, og skal ikke få en liste å velge fra."""
+        self.assertEqual(self._navn(self.c_leser), [])
+
+    def test_korpsbruker_uten_badge_faar_ingen(self):
+        self.p_hgsd.user = None
+        self.p_hgsd.save()
+        self.assertEqual(self._navn(self.c_kb), [])
+
+    def test_tjenesten_speiler_kan_redigere_mannskap(self):
+        for bruker in (self.leser, self.korpsbruker, self.vaktleder):
+            fikk = set(services.mannskap_brukeren_kan_sette(bruker).values_list('pk', flat=True))
+            forventet = {m.pk for m in Mannskap.objects.all()
+                         if services.kan_redigere_mannskap(bruker, m)}
+            self.assertEqual(fikk, forventet, bruker.username)

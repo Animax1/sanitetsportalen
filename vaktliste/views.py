@@ -423,10 +423,14 @@ def vaktliste_detalj_view(request, pk):
         # ressurs kan stå på en gruppe som er tatt ut av bruk, og fanen dens
         # skal fortsatt ha et navn.
         'grupper': [_gruppe_til_dict(g) for g in Ressursgruppe.objects.all()],
+        # **Nedtrekkene tilbyr bare dem brukeren får sette inn** (André,
+        # 12. sep. 2026: «kan bytte til hvem som helst mannskap uavhengig av
+        # korps» — serveren avviste det, men lista lot som). Korps-føreren
+        # får eget korps; den som skriver alt får alle.
         'mannskap': [
             {'id': m.pk, 'navn': m.navn, 'korps_id': m.korps_id,
              'korps_navn': m.korps.navn}
-            for m in Mannskap.objects.filter(er_aktiv=True).select_related('korps')
+            for m in services.mannskap_brukeren_kan_sette(request.user)
         ],
         'enheter': _enheter(),
     }})
