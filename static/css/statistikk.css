@@ -80,6 +80,10 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
+    /* Tittel og chi²-merke på hver sin linje når det ikke er plass til begge
+       (André, 12. sep. 2026: merket «går utenfor vinduet» på iPhone). */
+    flex-wrap: wrap;
+    gap: 0.25rem 0.6rem;
   }
 
   .kpi-blue {
@@ -285,7 +289,11 @@
     font-weight: 600;
     padding: 2px 9px;
     border-radius: 10px;
-    white-space: nowrap;
+    /* Får bryte: «✗ N.S. (χ²=12.0, p=0,062)» er bredere enn KPI-kortet på en
+       telefon, og med `nowrap` gikk det ut av kortet i stedet for ned. */
+    white-space: normal;
+    max-width: 100%;
+    line-height: 1.3;
   }
 
   .chi2-sig {

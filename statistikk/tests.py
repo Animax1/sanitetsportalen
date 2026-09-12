@@ -381,3 +381,16 @@ class TabelleneRullerPaaTelefonTests(SimpleTestCase):
         m = re.search(r'\.stats-rull \{([^}]*)\}', css)
         self.assertIsNotNone(m)
         self.assertIn('overflow-x: auto', m.group(1))
+
+    def test_chi2_merket_faar_bryte(self):
+        """«✗ IKKE SIGN. (χ²=12.0, p=0,062)» gikk utenfor kortet på iPhone,
+        i krysstabellene og på obspost (André, 12. sep. 2026)."""
+        import re
+        from pathlib import Path
+        from django.conf import settings
+        css = (Path(settings.BASE_DIR) / 'static' / 'css' / 'statistikk.css').read_text(encoding='utf-8')
+        m = re.search(r'\.chi2-badge \{([^}]*)\}', css)
+        self.assertIn('white-space: normal', m.group(1))
+        self.assertIn('max-width: 100%', m.group(1))
+        m = re.search(r'\.chart-title \{([^}]*)\}', css)
+        self.assertIn('flex-wrap: wrap', m.group(1), 'tittel og merke på hver sin linje ved behov')

@@ -4,6 +4,12 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-12 — Statistikk: chi²-merket bryter på iPhone
+
+Ingen migrasjon. «✗ N.S. (χ²=12.0, p=0,062)» gikk utenfor kortet i
+krysstabellene og på obspost; merket får nå bryte, og tittel og merke står
+på hver sin linje når det ikke er plass til begge.
+
 ## 2026-09-12 — Vaktliste: skift, ressurser og stemplene i auditloggen
 
 Ingen migrasjon. Deployes til staging først.
