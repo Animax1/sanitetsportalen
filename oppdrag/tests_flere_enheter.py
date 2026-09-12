@@ -850,7 +850,7 @@ class SentralbordetsMatriseTests(TestCase):
         self.harness = _konst(OPPDRAG_SENTRAL_JS, 'HASTEGRAD_REKKEFOLGE') + _konst(
             OPPDRAG_SENTRAL_JS, 'MANGLER_TRINN') + build_harness((
             (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue', 'trustedHtml', '_escHtml', 'klokke')),
-            (OPPDRAG_SENTRAL_JS, ('renderOppdrag', '_enhetsmatrise', '_grovMerke',
+            (OPPDRAG_SENTRAL_JS, ('renderOppdrag', 'venterForbiTerskel', 'lydTerskler', '_enhetsmatrise', '_grovMerke',
                                   'hastegradKlasse', 'tidSiden', 'mkEnhetsvalg',
                                   'mkEnhetsrader', '_enhetsknapper', '_varsleValg',
                                   '_lovligeOverganger', 'tidslinjeHtml', '_problemMedAntall', '_medAntall', '_grupperEnheter', '_typeRekkefolge', '_enhetskort',

@@ -21,7 +21,7 @@ from __future__ import annotations
 from django.db.models.functions import Lower
 
 from . import choices
-from .models import Enhetstype, Problemstilling
+from .models import Enhetstype, Lydvarsel, Problemstilling
 
 
 def _sortert(rader):
@@ -91,3 +91,22 @@ def enhetstyper(*, inkluder_inaktive=False):
     if not inkluder_inaktive:
         qs = qs.filter(er_aktiv=True)
     return list(qs.order_by('rekkefolge', Lower('navn')))
+
+
+# ── Lydvarselet ──────────────────────────────────────────────────────────────
+
+#: Tallene fra første utgave (André, 12. sep. 2026) — fasit til raden finnes.
+LYDVARSEL_STANDARD = {'Akutt': (60, 10), 'Haster': (300, 60), 'Vanlig': (900, 60), 'Drift': (900, 60)}
+LYD_NYTT_NOKKEL = 'oppdrag_lyd_nytt'
+
+
+def lydvarsel() -> dict[str, list[int]]:
+    """{hastegrad: [første, gjenta]} i sekunder — tabellen, med standard for
+    hastegrader som mangler rad."""
+    rader = {r.hastegrad: [r.forste_sekunder, r.gjenta_sekunder] for r in Lydvarsel.objects.all()}
+    return {h: rader.get(h, list(LYDVARSEL_STANDARD.get(h, (900, 60)))) for h in choices.HASTEGRAD}
+
+
+def lyd_ved_nytt_oppdrag() -> bool:
+    from patients.models import AppSetting
+    return AppSetting.get(LYD_NYTT_NOKKEL, '1') == '1'

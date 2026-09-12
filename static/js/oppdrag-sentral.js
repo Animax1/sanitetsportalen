@@ -361,8 +361,9 @@ function renderOppdrag() {
     // «ikke vurdert ennå» er informasjon.
     const grovsortering = _grovMerke(o);
     const manglerKlasse = o.trenger_ressurs ? ' oppdrag-rad-mangler mangler-' + _manglerTrinn(o) : '';
+    const venterKlasse = venterForbiTerskel(o) ? ' oppdrag-rad-venter-lenge' : '';
     return `
-    <div class="oppdrag-rad${manglerKlasse}" data-action="visOppdrag" data-id="${escHtmlValue(o.id)}"
+    <div class="oppdrag-rad${manglerKlasse}${venterKlasse}" data-action="visOppdrag" data-id="${escHtmlValue(o.id)}"
          role="button" tabindex="0">
       <div class="d-flex align-items-center gap-2 flex-wrap">
         <span class="oppdrag-nr">#${escHtmlValue(o.nummer)}</span>
@@ -402,6 +403,30 @@ function _sorterOppdrag(liste) {
     if (ah !== bh) return ah - bh;
     return (Number(a.nummer) || 0) - (Number(b.nummer) || 0);
   });
+}
+
+
+function lydTerskler() {
+  // Samme tabell som bilen leser (`OPPDRAG_LYDVARSEL`); fallet tilbake er
+  // første utgaves tall. Som funksjon — se `koNokkel()` i enhetsskjermen.
+  const fra = globalThis.window?.OPPDRAG_LYDVARSEL;
+  if (fra && typeof fra === 'object' && Object.keys(fra).length) return fra;
+  return { Akutt: [60, 10], Haster: [300, 60], Vanlig: [900, 60], Drift: [900, 60] };
+}
+
+
+function venterForbiTerskel(o, naaMs) {
+  // Utheving hos operatør (André, 12. sep. 2026): et oppdrag som venter på
+  // at en bil skal trykke Rykker ut, forbi første lydterskel for
+  // hastegraden. Tida regnes fra da den *første* ventende bilen ble varslet;
+  // et oppdrag uten bil («trenger ny ressurs») har sin egen utheving.
+  if (o.status !== 'venter' || o.trenger_ressurs) return false;
+  const ventende = (o.enheter || []).filter((e) => e.status === 'venter' && e.varslet_at);
+  if (!ventende.length) return false;
+  const tidligst = Math.min(...ventende.map((e) => new Date(e.varslet_at).getTime()));
+  const alle = lydTerskler();
+  const [forste] = alle[o.hastegrad] || alle.Vanlig || [900];
+  return ((naaMs || Date.now()) - tidligst) / 1000 >= forste;
 }
 
 
@@ -1261,12 +1286,14 @@ const VERDIMENGDER = {
   lokasjoner: { tittel: 'Lokasjoner', ny: 'Ny lokasjon' },
   enhetstyper: { tittel: 'Enhetstyper', ny: 'Ny enhetstype' },
   problemstillinger: { tittel: 'Problemstillinger', ny: 'Ny problemstilling' },
+  // Ikke en liste, men et skjema (12. sep. 2026): tersklene per hastegrad.
+  lydvarsel: { tittel: 'Lydvarsel', ny: '' },
 };
 const PROBLEM_KATEGORIER = [
   ['medisinsk', 'Medisinsk'], ['drift', 'Drift'], ['begge', 'Begge'],
 ];
 let verdiFane = 'lokasjoner';
-let verdier = { lokasjoner: [], enhetstyper: [], problemstillinger: [] };
+let verdier = { lokasjoner: [], enhetstyper: [], problemstillinger: [], lydvarsel: null };
 
 
 function _verdiArg(arg) {
@@ -1294,6 +1321,12 @@ async function lastVerdier(slug) {
   const res = await apiFetch(`/oppdrag/api/${slug}/`);
   if (!res.ok) return false;
   verdier[slug] = (await res.json()).data || [];
+  if (slug === 'lydvarsel') {
+    if (globalThis.window && verdier.lydvarsel?.terskler) {
+      globalThis.window.OPPDRAG_LYDVARSEL = verdier.lydvarsel.terskler;
+    }
+    return true;
+  }
   // Det som ellers på siden leser tabellen, følger med.
   if (slug === 'lokasjoner') {
     lokasjoner = verdier[slug];
@@ -1324,8 +1357,57 @@ async function lastLokasjoner() {
 
 
 async function lastVerdiadmin() {
-  await Promise.all(Object.keys(VERDIMENGDER).map((slug) => lastVerdier(slug)));
+  // Lydvarselet hentes bare for admin — fanen finnes ikke for andre.
+  const slugs = Object.keys(VERDIMENGDER).filter(
+    (slug) => slug !== 'lydvarsel' || globalThis.window?.OPPDRAG_TILGANG?.erAdmin);
+  await Promise.all(slugs.map((slug) => lastVerdier(slug)));
   renderVerdiadmin();
+}
+
+
+function _lydvarselSkjema(d) {
+  // Én rad per hastegrad: første varsel og gjentakelse, i sekunder. Og
+  // bryteren for pip ved nytt oppdrag. Lagres samlet med «Lagre».
+  const rader = HASTEGRAD_REKKEFOLGE.map((h) => {
+    const [forste, gjenta] = (d.terskler || {})[h] || [900, 60];
+    return `
+      <tr>
+        <td>${escapeHtml(h)}</td>
+        <td><input type="number" class="form-control form-control-sm lyd-felt" min="0" max="86400" step="5"
+                   id="lyd-forste-${escHtmlValue(h)}" value="${escHtmlValue(forste)}" aria-label="Første varsel"></td>
+        <td><input type="number" class="form-control form-control-sm lyd-felt" min="5" max="86400" step="5"
+                   id="lyd-gjenta-${escHtmlValue(h)}" value="${escHtmlValue(gjenta)}" aria-label="Gjenta hvert"></td>
+      </tr>`;
+  }).join('');
+  return `
+    <table class="table table-sm mb-2 lyd-tabell">
+      <thead><tr><th>Hastegrad</th><th>Første varsel etter (s)</th><th>Gjenta hvert (s)</th></tr></thead>
+      <tbody>${rader}</tbody>
+    </table>
+    <div class="form-check mb-3">
+      <input class="form-check-input" type="checkbox" id="lyd-nytt"${d.nytt_oppdrag ? ' checked' : ''}>
+      <label class="form-check-label" for="lyd-nytt">Pip i bilen når den får et nytt oppdrag</label>
+    </div>
+    <button type="button" class="btn btn-sm btn-primary" id="lyd-lagre" data-action="lagreLydvarsel">Lagre</button>
+    <span class="form-text ms-2">Gjelder alle biler; bilen henter tallene innen fem minutter.</span>`;
+}
+
+
+async function lagreLydvarsel() {
+  const terskler = {};
+  HASTEGRAD_REKKEFOLGE.forEach((h) => {
+    terskler[h] = [Number(document.getElementById(`lyd-forste-${h}`)?.value),
+                   Number(document.getElementById(`lyd-gjenta-${h}`)?.value)];
+  });
+  const nytt = !!document.getElementById('lyd-nytt')?.checked;
+  await withSubmitGuard('lyd-lagre', async () => {
+    if (await _verdiKall('/oppdrag/api/lydvarsel/',
+                         { method: 'PUT', body: JSON.stringify({ terskler, nytt_oppdrag: nytt }) },
+                         'Kunne ikke lagre lydvarslene.')) {
+      await lastVerdier('lydvarsel');
+      renderVerdiadmin();
+    }
+  });
 }
 
 
@@ -1385,6 +1467,12 @@ function renderVerdiadmin() {
   if (nyFelt) nyFelt.placeholder = VERDIMENGDER[verdiFane].ny;
   const nyKategori = document.getElementById('ny-verdi-kategori');
   if (nyKategori) nyKategori.classList.toggle('d-none', verdiFane !== 'problemstillinger');
+  const nyRad = document.getElementById('ny-verdi-rad');
+  if (nyRad) nyRad.classList.toggle('d-none', verdiFane === 'lydvarsel');
+  if (verdiFane === 'lydvarsel') {
+    el.innerHTML = _lydvarselSkjema(verdier.lydvarsel || {});
+    return;
+  }
   const rader = verdier[verdiFane] || [];
   if (!rader.length) {
     el.innerHTML = ('<div class="tom-melding">Ingen ennå.</div>');

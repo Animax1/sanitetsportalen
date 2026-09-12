@@ -174,8 +174,13 @@
                   data-action="velgVerdifane" data-arg="enhetstyper">Enhetstyper</button></li>
           <li class="nav-item"><button type="button" class="nav-link" data-verdifane="problemstillinger"
                   data-action="velgVerdifane" data-arg="problemstillinger">Problemstillinger</button></li>
+          {% if er_global_admin %}
+          {# Lydvarselets terskler (12. sep. 2026) er global admin — de gjelder alle biler. #}
+          <li class="nav-item"><button type="button" class="nav-link" data-verdifane="lydvarsel"
+                  data-action="velgVerdifane" data-arg="lydvarsel">Lydvarsel</button></li>
+          {% endif %}
         </ul>
-        <div class="input-group mb-3">
+        <div class="input-group mb-3" id="ny-verdi-rad">
           <input type="text" id="ny-verdi" class="form-control" placeholder="Ny lokasjon">
           <select id="ny-verdi-kategori" class="form-select d-none" aria-label="Kategori" style="max-width: 11rem">
             <option value="medisinsk">Medisinsk</option>
@@ -316,6 +321,7 @@
   window.OPPDRAG_PROBLEMSTILLINGER_FOR = {{ problemstillinger_for|safe }};
   window.OPPDRAG_MED_ANTALL = {{ med_antall|safe }};
   window.OPPDRAG_ENHETSTYPER = {{ enhetstyper|safe }};
+  window.OPPDRAG_LYDVARSEL = {{ lydvarsel|safe }};
 </script>
 <script src="{% static 'js/portal-utils.js' %}"></script>
 <script src="{% static 'js/oppdrag-sentral.js' %}"></script>

@@ -23,17 +23,20 @@ class VarsletAtTests(StemplingBasis):
         rad = self.bil.get('/oppdrag/api/oppdrag/').json()['data'][0]
         self.assertEqual(rad['varslet_at'], o.enheter.get(enhet=self.enhet).varslet_at.isoformat())
 
-    def test_siden_har_lydknappen(self):
+    def test_siden_har_ingen_lydbryter_men_baerer_tersklene(self):
+        # Lyden er alltid på (12. sep. 2026: «Det skal ikke være et alternativ»).
         res = self.bil.get('/oppdrag/')
-        self.assertContains(res, 'id="lyd-knapp"')
-        self.assertContains(res, 'data-action="vekslLyd"')
+        self.assertNotContains(res, 'id="lyd-knapp"')
+        self.assertContains(res, 'id="lyd-hint"')
+        self.assertContains(res, 'OPPDRAG_LYDVARSEL')
+        self.assertContains(res, 'OPPDRAG_LYD_NYTT')
 
 
 class LydvarselJsTests(SimpleTestCase):
     HARNESS = (
         (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue')),
         (OPPDRAG_ENHET_JS, ('skalPipe', 'ventetSekunder', '_lydTerskler', 'lydTerskler',
-                            'ventendeSomSkalPipe', '_strengeste', 'lydTikk', 'lydErPaa', 'lydNokkel')),
+                            'ventendeSomSkalPipe', '_strengeste', 'lydTikk', 'lydErKlar')),
     )
     LAGER = ("globalThis.localStorage = (() => { const m = {}; return {"
              "getItem: (k) => (k in m ? m[k] : null), setItem: (k, v) => { m[k] = String(v); },"
@@ -88,10 +91,9 @@ class LydvarselJsTests(SimpleTestCase):
               { id: 4, status: 'fremme', hastegrad: 'Akutt', varslet_at: iso }];
             const pipet = [];
             globalThis.pip = (h) => pipet.push(h);
-            // Lyd av: ingenting, selv forbi terskelen.
+            // Konteksten ikke vekket ennå (nettleseren krever et trykk): stille.
             console.log(JSON.stringify(lydTikk(t0 + 1000000)));
-            localStorage.setItem(lydNokkel(), '1');
-            // Lyd på, men konteksten ikke vekket ennå: fortsatt stille.
+            globalThis.lydKontekst = { state: 'suspended' };
             console.log(JSON.stringify(lydTikk(t0 + 1000000)));
             globalThis.lydKontekst = { state: 'running' };
             console.log(JSON.stringify(lydTikk(t0 + 61000)));     // bare Akutt er forbi
@@ -141,6 +143,7 @@ class LydenJsTests(SimpleTestCase):
         linjer = ut.strip().splitlines()[:4]
         for linje in linjer:
             _, antall, slutt = linje.split()
-            self.assertGreaterEqual(int(antall), 1)
+            self.assertGreaterEqual(int(antall), 3)
             self.assertLessEqual(float(slutt), 3.0, linje)
-        self.assertTrue(linjer[0].startswith('Akutt 3 '), 'Akutt: tre toner')
+            self.assertGreaterEqual(float(slutt), 2.0, 'lengre enn første utgave (André, 12. sep. 2026)')
+        self.assertTrue(linjer[0].startswith('Akutt 6 '), 'Akutt: seks toner')

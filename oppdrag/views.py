@@ -74,6 +74,10 @@ def index_view(request):
             # mens et trykk ligger usendt — samme grunn som kjeden.
             'alternativ': json.dumps({s: a[0] for s, a in services.ALTERNATIV.items()}),
             'alternativ_navn': json.dumps({a[0]: a[1] for a in services.ALTERNATIV.values()}),
+            # Lydvarselets terskler og om nytt oppdrag skal pipe (12. sep.
+            # 2026) — data fra tabellen, hentet på nytt hvert femte minutt.
+            'lydvarsel': json.dumps(verdier.lydvarsel()),
+            'lyd_nytt': json.dumps(verdier.lyd_ved_nytt_oppdrag()),
         })
 
     return render(request, 'oppdrag/sentral.html', {
@@ -100,6 +104,9 @@ def index_view(request):
         'problemstillinger_for': json.dumps(verdier.problemstillinger_per_hastegrad()),
         'med_antall': json.dumps(verdier.med_antall()),
         'enhetstyper': json.dumps([[t.pk, t.navn] for t in verdier.enhetstyper()]),
+        # Sentralbordet uthever ventende oppdrag forbi første lydterskel
+        # (André, 12. sep. 2026: «Det bør og komme en utheving hos operatør»).
+        'lydvarsel': json.dumps(verdier.lydvarsel()),
         # Til «Før status» i detaljvisningen (§9): stedene ved «Avreist» og
         # statusnavnene. Samme kilde som enhetsskjermen: `choices`.
         'avreist_til': json.dumps(list(choices.AVREIST_TIL)),

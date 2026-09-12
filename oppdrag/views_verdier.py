@@ -25,7 +25,8 @@ from django.views.decorators.http import require_http_methods
 
 from core.auth_decorators import er_global_admin, har_tilgang, modul_kreves
 
-from .models import Enhetstype, Lokasjon, Problemstilling
+from . import choices, verdier
+from .models import Enhetstype, Lokasjon, Lydvarsel, Problemstilling
 from .views_common import etag_for, json_body
 
 
@@ -268,3 +269,45 @@ enhetstyper_rekkefolge_view = _rekkefolge_view('enhetstyper')
 problemstillinger_view = _liste_view('problemstillinger')
 problemstilling_detalj_view = _detalj_view('problemstillinger')
 problemstillinger_rekkefolge_view = _rekkefolge_view('problemstillinger')
+
+
+# ── Lydvarselet (12. sep. 2026) ───────────────────────────────────────────────
+
+@never_cache
+@modul_kreves('oppdrag', 'les', svar='json')
+@require_http_methods(['GET', 'PUT'])
+def lydvarsel_view(request):
+    """Tersklene per hastegrad og om nytt oppdrag skal pipe.
+
+    GET for alle med `les` — bilen henter dem hvert femte minutt, så en
+    endring når fram uten at siden lastes på nytt. PUT er **global admin**
+    (André: «Admin kan justere»): tallene gjelder alle biler på alle vakter.
+    """
+    if request.method == 'GET':
+        return JsonResponse({'status': 'ok', 'data': {
+            'terskler': verdier.lydvarsel(), 'nytt_oppdrag': verdier.lyd_ved_nytt_oppdrag()}})
+    if not er_global_admin(request.user):
+        return _feil('Lydvarslene settes av global admin.', 403)
+    data = json_body(request)
+    terskler = data.get('terskler') or {}
+    if not isinstance(terskler, dict):
+        return _feil('Send `terskler` som {hastegrad: [første, gjenta]}.')
+    nye = {}
+    for hastegrad, par in terskler.items():
+        if hastegrad not in choices.HASTEGRAD:
+            return _feil(f'Ukjent hastegrad «{hastegrad}».')
+        try:
+            forste, gjenta = (int(par[0]), int(par[1]))
+        except (TypeError, ValueError, IndexError, KeyError):
+            return _feil(f'{hastegrad}: send to hele tall i sekunder.')
+        if forste < 0 or gjenta < 5 or forste > 86400 or gjenta > 86400:
+            return _feil(f'{hastegrad}: første varsel 0–86400 s, gjenta minst 5 s.')
+        nye[hastegrad] = (forste, gjenta)
+    for hastegrad, (forste, gjenta) in nye.items():
+        Lydvarsel.objects.update_or_create(
+            hastegrad=hastegrad, defaults={'forste_sekunder': forste, 'gjenta_sekunder': gjenta})
+    if 'nytt_oppdrag' in data:
+        from patients.models import AppSetting
+        AppSetting.set(verdier.LYD_NYTT_NOKKEL, '1' if data['nytt_oppdrag'] else '0')
+    return JsonResponse({'status': 'ok', 'data': {
+        'terskler': verdier.lydvarsel(), 'nytt_oppdrag': verdier.lyd_ved_nytt_oppdrag()}})

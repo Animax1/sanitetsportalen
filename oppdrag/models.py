@@ -169,6 +169,29 @@ class Problemstilling(BaseTimeStampedModel):
         return hastegrad in choices.HASTEGRAD and hastegrad != choices.DRIFT
 
 
+class Lydvarsel(BaseTimeStampedModel):
+    """Terskler for lydvarselet i bilen, én rad per hastegrad (André,
+    12. sep. 2026: «Admin kan justere frekvens på lydvarsler, både første
+    gangs og repeterende, på de ulike hastegradene»). Seedet av `0024` med
+    tallene fra første utgave; global admin endrer dem i «Valglister».
+    Om det skal pipe når bilen får et nytt oppdrag ligger i `AppSetting`
+    (`oppdrag_lyd_nytt`), fordi det ikke er per hastegrad."""
+
+    hastegrad = models.CharField(max_length=16, unique=True, verbose_name='Hastegrad')
+    forste_sekunder = models.PositiveIntegerField(
+        default=60, verbose_name='Første varsel etter (sekunder)')
+    gjenta_sekunder = models.PositiveIntegerField(
+        default=60, verbose_name='Gjenta hvert (sekunder)')
+
+    class Meta:
+        verbose_name = 'Lydvarsel'
+        verbose_name_plural = 'Lydvarsler'
+        ordering = ['hastegrad']
+
+    def __str__(self) -> str:
+        return f'{self.hastegrad}: {self.forste_sekunder}/{self.gjenta_sekunder} s'
+
+
 class Lokasjon(BaseTimeStampedModel):
     """Et sted på arrangementet. Vedlikeholdes av admin.
 

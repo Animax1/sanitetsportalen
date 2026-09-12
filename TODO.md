@@ -227,8 +227,9 @@ ingen av dem gir feilmelding — de er bare stille inaktive.
                   - [x] H: «Behandlet på sted» fra Fremme (→ Ledig), «Avbryt» i Rykker ut
                         (enheten ledig, oppdraget trenger ressurs), ingen Ledig mellom
                         Avreist og Leverer (`0022`). Sentralen redigerer som før.
-                  - [ ] I: lyd alltid på (ingen av/på), lengre varsel, admin justerer terskler
-                        per hastegrad og lyd ved nytt oppdrag, utheving hos operatør.
+                  - [x] I: lyd alltid på (ingen av/på), lengre varsel, admin justerer terskler
+                        per hastegrad og lyd ved nytt oppdrag (`0023`–`0024`), utheving hos
+                        operatør.
             - [x] Railway-variabler (André, 12. sep.): `testportal.sanitet.net` inn i
                   staging sine `ALLOWED_HOSTS`/`CSRF_TRUSTED_ORIGINS`, og skrivefeilen
                   `/ https://*.railway.app` rettet begge steder.

@@ -4,6 +4,28 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-12 — Andrés forbedringsliste, del I: lydvarselet
+
+To migrasjoner, `oppdrag/0023` (tabellen `Lydvarsel`) og `0024` (seed med
+første utgaves tall). Data og skjema hver for seg. Deployes til staging
+først.
+
+- **Lyden er alltid på.** «Lyd av/på»-knappen er borte. Nettleseren krever
+  fortsatt et trykk før lyd får spille; en gul linje øverst sier «trykk hvor
+  som helst» til det første trykket har vekket den, og et ikon ved klokka
+  viser tilstanden.
+- **Lengre varsel:** Akutt seks toner på tre sekunder, Haster fire, Vanlig
+  og Drift tre rolige. Aldri over tre sekunder.
+- **Admin justerer tersklene** per hastegrad — første varsel og gjentakelse
+  i sekunder — i ny fane «Lydvarsel» i «Valglister» (bare global admin), og
+  om bilen skal pipe når den får et nytt oppdrag. Bilen henter tallene hvert
+  femte minutt.
+- **Pip ved nytt oppdrag:** to stigende toner når et ventende oppdrag dukker
+  opp i bilens liste, ikke for det som lå der da siden åpnet.
+- **Utheving hos operatør:** på sentralbordet pulserer raden i gult når et
+  oppdrag har ventet forbi første terskel på at bilen skal rykke ut, regnet
+  fra da den første ventende bilen ble varslet.
+
 ## 2026-09-12 — Andrés forbedringsliste, del H: bilens utganger
 
 Én migrasjon, `oppdrag/0022`: statusvalg og hendelsestyper, og kolonnen

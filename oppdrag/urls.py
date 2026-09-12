@@ -35,6 +35,7 @@ urlpatterns = [
          name='oppdrag_api_problemstillinger_rekkefolge'),
     path('api/problemstillinger/<int:pk>/', views_verdier.problemstilling_detalj_view,
          name='oppdrag_api_problemstilling_detalj'),
+    path('api/lydvarsel/', views_verdier.lydvarsel_view, name='oppdrag_api_lydvarsel'),
     path('api/oppdrag/', views.oppdrag_liste_view, name='oppdrag_api_liste'),
     path('api/oppdrag/<int:pk>/', views.oppdrag_detalj_view, name='oppdrag_api_detalj'),
     path('api/oppdrag/<int:pk>/flytt/', views.flytt_view, name='oppdrag_api_flytt'),

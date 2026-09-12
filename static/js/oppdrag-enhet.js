@@ -523,35 +523,40 @@ function renderAvsluttet() {
 // opprettelsen: et oppdrag som fikk henne som bil nummer to skal ikke pipe
 // som om hun hadde oversett det i en time.
 
-//: Lagringsnøkkelen som funksjon — se `koNokkel()`.
-function lydNokkel() {
-  return 'oppdrag_lyd_v1';
-}
-
 let lydKontekst = null;
 //: Oppdrag-ID → tidspunkt (ms) for siste pip. Nullstilles når oppdraget
 //: ikke lenger venter.
 let lydSistFor = {};
+//: Oppdrag-ID-ene skjermen har sett — for «nytt oppdrag»-pipet. `null` til
+//: første lasting, så det ikke piper for alt som lå der da siden åpnet.
+let kjenteOppdrag = null;
 
 
-function lydErPaa() {
-  try { return globalThis.localStorage.getItem(lydNokkel()) === '1'; } catch (e) { return false; }
+//: **Lydvarselet er alltid på** (André, 12. sep. 2026: «Det skal ikke være
+//: et alternativ»). Det som gjenstår er nettleserens regel: lyd får spille
+//: først etter et trykk, og `lydErKlar()` sier om det trykket har kommet.
+function lydErKlar() {
+  return !!(lydKontekst && lydKontekst.state === 'running');
 }
 
 
-//: Tersklene per hastegrad (André, 12. sep. 2026): [første varsel etter
-//: sekunder, deretter hvert sekund]. «Rød innen 1 minutt, deretter hvert 10
-//: sekund. Gul innen 5 minutt deretter hvert 1 minutt. Grønn etter 15 minutt
-//: deretter hvert 1 minutt.» Drift følger Vanlig. Som funksjon, ikke
+//: Tersklene per hastegrad: [første varsel etter sekunder, deretter hvert
+//: sekund]. Fra tabellen `Lydvarsel` via `OPPDRAG_LYDVARSEL` (12. sep. 2026:
+//: admin justerer dem), hentet på nytt hvert femte minutt. Tallene her er
+//: bare fallet tilbake når siden ikke fikk dem: «Rød innen 1 minutt,
+//: deretter hvert 10 sekund. Gul innen 5 minutt deretter hvert 1 minutt.
+//: Grønn etter 15 minutt deretter hvert 1 minutt.» Som funksjon, ikke
 //: konstant — se `koNokkel()`.
 function lydTerskler() {
+  const fra = globalThis.OPPDRAG_LYDVARSEL;
+  if (fra && typeof fra === 'object' && Object.keys(fra).length) return fra;
   return { Akutt: [60, 10], Haster: [300, 60], Vanlig: [900, 60], Drift: [900, 60] };
 }
 
 
 function _lydTerskler(hastegrad) {
   const alle = lydTerskler();
-  return alle[hastegrad] || alle.Vanlig;
+  return alle[hastegrad] || alle.Vanlig || [900, 60];
 }
 
 
@@ -601,18 +606,42 @@ function _tone(ctx, fra, varighet, frekvens) {
 
 
 function pip(hastegrad) {
-  // Akutt: tre toner på halvannet sekund. Haster: to. Vanlig/Drift: én kort.
-  // Aldri over tre sekunder — «trenger ikke vare langt».
+  // Lengre enn første utgave (André, 12. sep. 2026: «noe som er litt lengre
+  // i varighet»), men aldri over tre sekunder. Akutt: seks toner, vekslende
+  // høyt og lavt. Haster: fire. Vanlig/Drift: tre rolige.
   if (!lydKontekst) return;
   const ctx = lydKontekst;
   const t = ctx.currentTime;
   if (hastegrad === 'Akutt') {
-    _tone(ctx, t, 0.4, 880); _tone(ctx, t + 0.5, 0.4, 660); _tone(ctx, t + 1.0, 0.5, 880);
+    for (let i = 0; i < 6; i++) _tone(ctx, t + i * 0.48, 0.4, i % 2 ? 660 : 880);
   } else if (hastegrad === 'Haster') {
-    _tone(ctx, t, 0.4, 660); _tone(ctx, t + 0.6, 0.5, 660);
+    for (let i = 0; i < 4; i++) _tone(ctx, t + i * 0.65, 0.5, 660);
   } else {
-    _tone(ctx, t, 0.6, 520);
+    for (let i = 0; i < 3; i++) _tone(ctx, t + i * 0.8, 0.6, 520);
   }
+}
+
+
+function pipNytt() {
+  // Nytt oppdrag i lista (12. sep. 2026): to korte stigende toner, tydelig
+  // forskjellig fra ventevarselet. Admin kan slå det av (`OPPDRAG_LYD_NYTT`).
+  if (!lydKontekst) return;
+  const t = lydKontekst.currentTime;
+  _tone(lydKontekst, t, 0.25, 660); _tone(lydKontekst, t + 0.3, 0.45, 990);
+}
+
+
+function nyeOppdrag(liste) {
+  // ID-ene i `liste` skjermen ikke har sett før. Første kall lærer bare
+  // lista og svarer tomt — det som lå der da siden åpnet er ikke nytt.
+  const ider = (liste || []).map((o) => o.id);
+  if (kjenteOppdrag === null) {
+    kjenteOppdrag = new Set(ider);
+    return [];
+  }
+  const nye = ider.filter((id) => !kjenteOppdrag.has(id));
+  ider.forEach((id) => kjenteOppdrag.add(id));
+  return nye;
 }
 
 
@@ -622,7 +651,7 @@ function lydTikk(naaMs) {
   const naa = naaMs || Date.now();
   const venter = new Set((mineOppdrag || []).filter((o) => o.status === 'venter').map((o) => o.id));
   Object.keys(lydSistFor).forEach((id) => { if (!venter.has(Number(id))) delete lydSistFor[id]; });
-  if (!lydErPaa() || !lydKontekst || lydKontekst.state !== 'running') return [];
+  if (!lydErKlar()) return [];
   const ider = ventendeSomSkalPipe(mineOppdrag, naa, lydSistFor);
   if (!ider.length) return [];
   ider.forEach((id) => { lydSistFor[id] = naa; });
@@ -631,43 +660,41 @@ function lydTikk(naaMs) {
 }
 
 
-function _lydKnappTegn() {
-  const knapp = document.getElementById('lyd-knapp');
-  if (!knapp) return;
-  const paa = lydErPaa();
-  const klar = paa && lydKontekst && lydKontekst.state === 'running';
-  knapp.classList.toggle('btn-warning', paa);
-  knapp.classList.toggle('btn-outline-secondary', !paa);
-  knapp.setAttribute('aria-pressed', paa ? 'true' : 'false');
-  knapp.innerHTML = paa
-    ? '<i class="bi bi-volume-up-fill me-1"></i>Lyd på'
-    : '<i class="bi bi-volume-mute me-1"></i>Lyd av';
+function _lydHintTegn() {
+  // Linja «trykk for å slå på lyden» står til nettleseren har sluppet lyden
+  // gjennom; ikonet i toppen viser det samme.
   const hint = document.getElementById('lyd-hint');
-  if (hint) hint.classList.toggle('d-none', !(paa && !klar));
+  if (hint) hint.classList.toggle('d-none', lydErKlar());
+  const status = document.getElementById('lyd-status');
+  if (status) {
+    status.innerHTML = lydErKlar()
+      ? '<i class="bi bi-volume-up-fill"></i>'
+      : '<i class="bi bi-volume-mute"></i>';
+  }
 }
 
 
 async function _lydKlar() {
   // Nettleseren lar lyd spille først etter et trykk; kontekst lages og
-  // vekkes her, fra klikket på knappen (eller det første trykket på siden).
+  // vekkes her, fra det første trykket på siden.
   const AC = globalThis.AudioContext || globalThis.webkitAudioContext;
   if (!AC) return false;
   if (!lydKontekst) lydKontekst = new AC();
   if (lydKontekst.state !== 'running') {
     try { await lydKontekst.resume(); } catch (e) { /* ikke lov ennå */ }
   }
-  return lydKontekst.state === 'running';
+  return lydErKlar();
 }
 
 
-async function vekslLyd() {
-  const paa = !lydErPaa();
-  try { globalThis.localStorage.setItem(lydNokkel(), paa ? '1' : '0'); } catch (e) { /* uten lagring: gjelder til siden lastes */ }
-  if (paa && await _lydKlar()) {
-    // Et kort kvitteringspip, så føreren hører at lyden faktisk virker.
-    _tone(lydKontekst, lydKontekst.currentTime, 0.15, 660);
-  }
-  _lydKnappTegn();
+async function lastLydvarsel() {
+  // Tersklene admin setter skal nå bilen uten at siden lastes på nytt.
+  let res;
+  try { res = await apiFetch('/oppdrag/api/lydvarsel/'); } catch (e) { return; }
+  if (!res.ok) return;
+  const d = (await res.json()).data || {};
+  if (d.terskler) globalThis.OPPDRAG_LYDVARSEL = d.terskler;
+  if (typeof d.nytt_oppdrag === 'boolean') globalThis.OPPDRAG_LYD_NYTT = d.nytt_oppdrag;
 }
 
 
@@ -878,6 +905,10 @@ async function lastMine() {
   // Serverens svar er sannheten, men det som ligger usendt legges oppå —
   // ellers ville neste poll visket ut et trykk mannskapet nettopp gjorde.
   mineOppdrag = projiser((await res.json()).data || [], koLes());
+  // Nytt oppdrag i lista piper én gang (12. sep. 2026), om admin ikke har
+  // slått det av. Ventevarselet tar over fra første terskel.
+  const nye = nyeOppdrag(mineOppdrag.filter((o) => o.status === 'venter'));
+  if (nye.length && globalThis.OPPDRAG_LYD_NYTT !== false && lydErKlar()) pipNytt();
   renderAlt();
 }
 
@@ -897,14 +928,13 @@ document.addEventListener('DOMContentLoaded', async () => {
   await lastMine();
   visUsendt();
 
-  // Lydvarselet. Valget huskes; selve lyden må vekkes av et trykk, så er
-  // den på fra før, tas det første trykket hvor som helst på siden.
-  _lydKnappTegn();
-  if (lydErPaa()) {
-    const vekk = async () => { if (await _lydKlar()) { _lydKnappTegn(); document.removeEventListener('pointerdown', vekk); } };
-    document.addEventListener('pointerdown', vekk);
-  }
+  // Lydvarselet er alltid på; selve lyden må vekkes av et trykk, og det
+  // første trykket hvor som helst på siden er det trykket.
+  _lydHintTegn();
+  const vekk = async () => { if (await _lydKlar()) { _lydHintTegn(); document.removeEventListener('pointerdown', vekk); } };
+  document.addEventListener('pointerdown', vekk);
   setInterval(() => lydTikk(), 5000);
+  setInterval(lastLydvarsel, 5 * 60 * 1000);
 
   // Køen kan ha overlevd at fanen ble lukket midt i en vakt.
   if (koLes().length) await synk();
