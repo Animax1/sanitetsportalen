@@ -570,13 +570,19 @@ begge veier og rører ingen stempler.
 - **«Tilstede nå» utledes, aldri lagres** (`Vaktpost.er_tilstede`). To kilder
   til samme sannhet går i utakt første gang noe feiler halvveis — og denne
   brukes til å telle hoder ved brann.
-- **Ressurstabellen har to former, og drift er den andre.** I planlegging er
-  den et regneark; under drift legges `datetime-local`-feltene, kompetansen og
-  merknaden bort, og stempelet står **først** i raden som en 44 px høy knapp
-  (`_driftrad`). De tre feltene er det som gjør raden 1377 px bred, og uten
-  dem slipper drifttabellen `min-width` — ellers står stempelet bak en
-  sidescroll, som det gjorde i første utgave. Redigering under drift går
-  gjennom blyanten.
+- **Drift er planleggingsraden pluss innsjekken foran** (12. sep. 2026 — André:
+  «Kunne redigere mannskaper selv om vi er i drift modus»). Fram til da var
+  driftraden en egen, smal form uten tidsfelt, kompetanse og merknad, med
+  redigering bak blyanten; det holdt ikke i bruk. `_driftrad` er stempelet (44 px
+  høy knapp, først i raden) + `_plancellene`, som `_planrad` også bruker.
+  Prisen er bredden: `.vl-tabell-drift` har eget `min-width` over regnearkets, og
+  `RessurstabellensBreddeTests` regner ut at tidskolonnene rommer feltet i begge
+  former.
+- **«Sett i drift» bor i «Innstillinger»** (12. sep. 2026), i bolken for én liste,
+  og tegnes av `tegnDriftknapp()` både ved lasting og når vinduet åpnes. Statusmerket
+  i vaktlinja (`tegnStatus`, `.vl-status.vl-drift`/`.vl-planlegging`) sier formen med
+  ikon og fet skrift, i drift med pulserende prikk. Drift inn og ut auditlogges på
+  feltnivå (`vaktliste/signals.py`, `vaktliste_vaktliste`).
 - **Klienten har én `data-action` per overgang**, ikke én generisk:
   klikkdelegeringen i `portal-utils.js` sender ett argument. `STEMPLINGER` i
   `vaktliste.js` og i `services.py` holdes like av `StemplingsnavnTests`.

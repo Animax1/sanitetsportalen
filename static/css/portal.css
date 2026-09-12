@@ -24,6 +24,27 @@
   color: var(--portal-text-muted) !important;
 }
 
+/* ──── Knapper ──── */
+
+/* Bootstraps .btn-outline-secondary er #6c757d på #6c757d — laget for lys
+   bakgrunn. Mot portalens mørke flater ble «Innstillinger» på /vaktliste/ en
+   grå knapp med grå kant (André, 12. sep. 2026: «Fiks fargene på
+   innstillinger knappen»). Lys tekst og portalens kantfarge; hover fyller
+   med flate 2 i stedet for Bootstraps grå. */
+.btn-outline-secondary {
+  color: var(--portal-text) !important;
+  border-color: var(--portal-border) !important;
+}
+.btn-outline-secondary:hover,
+.btn-outline-secondary:focus-visible,
+.btn-outline-secondary:active,
+.btn-outline-secondary.active {
+  background: var(--portal-surface-2) !important;
+  border-color: var(--portal-accent) !important;
+  color: var(--portal-text) !important;
+}
+.btn-outline-secondary:disabled { opacity: 0.45; }
+
 /* ──── Skjema (mørk bakgrunn på portal-sider) ──── */
 
 .form-control, .form-select {

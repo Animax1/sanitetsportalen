@@ -53,16 +53,14 @@
     <label class="vl-meta mb-0" for="vaktliste-velger">Planlegger</label>
     <select id="vaktliste-velger" class="form-select form-select-sm"
             data-action="byttVaktliste"></select>
-    <span id="vaktliste-status" class="vl-status"></span>
     {% comment %}
-      **Døra til innsjekken står ved statusen den endrer.** Lå den i
-      «Innstillinger», måtte man åpne et vindu for å se om innsjekken var
-      åpen — og det er det første man vil vite når vakten begynner.
-
-      Knappen bygges av `tegnDriftknapp()` og ikke her, fordi teksten skifter
-      med tilstanden; `gateKnapper()` kjører bare én gang ved sidelasting.
+      Statusmerket sier hvilken form lista er i — planlegging eller drift —
+      og det skal synes uten å åpne noe (André, 12. sep. 2026). Døra som
+      *endrer* den står i «Innstillinger»: den trykkes to ganger per vakt,
+      og lå i vaktlinja der den så ut som en del av det daglige.
+      Bygges av `tegnStatus()`.
     {% endcomment %}
-    <span id="vl-drift"></span>
+    <span id="vaktliste-status" class="vl-status"></span>
     {% comment %}
       Korpsvelgeren (11. sep. 2026), bare for den som ser alle korps. Den gjør
       i nettleseren det serveren gjør for korps-brukeren: viser ett korps i
@@ -293,6 +291,14 @@
             <div class="vl-meta" id="vakt-spenn"></div>
             <div class="vl-meta" id="vakt-antall"></div>
           </div>
+
+          {% comment %}
+            **Sett i drift bor her fra 12. sep. 2026** (André: «Flytt sett i
+            drift inn under innstillinger»). Knappen bygges av
+            `tegnDriftknapp()` fordi teksten skifter med tilstanden, og den
+            tegnes både ved lasting og når vinduet åpnes.
+          {% endcomment %}
+          <div id="vl-drift" class="mb-3"></div>
 
           <button type="button" class="btn btn-outline-secondary btn-sm mb-3"
                   data-action="skrivUtVakta">

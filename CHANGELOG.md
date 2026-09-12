@@ -4,6 +4,24 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-12 — Andrés forbedringsliste, del G: vaktlista
+
+Ingen migrasjon. Deployes til staging først.
+
+- **«Sett i drift» ligger i «Innstillinger»**, i bolken for lista, med en
+  linje som sier hva knappen gjør. Statusmerket i vaktlinja er større:
+  ikon, «Planlegging»/«I drift» i fet, og i drift en pulserende grønn prikk.
+- **Redigering under drift som i planlegging.** Driftraden er regnearket
+  med innsjekken foran — tider, rolle, kompetanse og merknad rettes der de
+  står. Tabellen ruller sidelengs på en laptop; stempelet står først.
+- **Drift inn og ut står i auditloggen**, på feltnivå med hvem som gjorde
+  det (`vaktliste_vaktliste`: status, satt i drift når/av, planlagt slutt,
+  arkivert).
+- **Knappene med grå kant** (`btn-outline-secondary`, «Innstillinger» m.fl.)
+  har lys tekst og portalens kantfarge på alle portalsider.
+- **Én innlogging per konto** har stått siden N10 — logger kontoen inn et
+  nytt sted, ryker den forrige økta. Nå låst av tester fra utsiden.
+
 ## 2026-09-12 — Feilvarsel: `django`-loggeren bruker vår e-posthandler
 
 En skanner (leakix) prøvde `testportal.sanitet.net` mot staging, fikk 400

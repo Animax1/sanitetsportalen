@@ -22,7 +22,7 @@ HTML_BUILDERS = (
     'mkRolleRad',
     '_fyll',
     'tegnFaner', '_fanerad', '_mannskapsfane', 'iDrift', '_tilstede',
-    'mkRessurs', '_planrad', '_blokklinje', '_dagoverskrift', '_probonoMerke',
+    'mkRessurs', '_planrad', '_plancellene', '_blokklinje', '_dagoverskrift', '_probonoMerke',
     'mkMittKorps', '_plassKorps',
     '_stempelknapper',
     '_driftrad',
@@ -39,6 +39,7 @@ HTML_BUILDERS = (
 ESCAPING_CALLS = ('escHtmlValue(', 'cellHtml(', '_escHtml(', 'escapeHtml(')
 
 REVIEWED_INTERPOLATIONS = {
+    '_plancellene(vp, r, kanRore)': 'markup fra en bygger som selv skannes her (regnearkradens celler, 12. sep. 2026)',
     'probono': 'tall utledet i JS',
     'probonoDel': 'markup bygget rett over, tallene escapet inni',
     # Utskriftsutvalget (12. sep. 2026): verktøylinja og utvalgslinja bygges
@@ -223,7 +224,7 @@ class VaktlisteEscapingOppforselTests(SimpleTestCase):
                         'kanStemple', 'iDrift', '_rolleValg',
                         'rollerForGruppe', '_fyllValgFor', '_varighet',
                         'mkRolleRad', 'mkOversikt', 'mkUtskriftsverktoy', '_utvalgstekst', '_skiftrekkefolge',
-                        '_planrad', '_tidsblokker', '_blokklinje', '_blokkerMedDager', 'kanBemannePlass',
+                        '_planrad', '_plancellene', '_tidsblokker', '_blokklinje', '_blokkerMedDager', 'kanBemannePlass',
                         '_mittKorpsId', '_synligePoster',
                         '_dagnokkel', '_dagoverskrift', '_probonoMerke',
                         '_sumTimer', '_skifttimer', '_tall', '_telling',
@@ -976,38 +977,55 @@ class RessurstabellensBreddeTests(SimpleTestCase):
         blokk = self._blokker(r'<thead>(.*?)</thead>')[form]
         return re.findall(r'<th>(.*?)</th>', blokk)
 
-    def test_drifttabellen_har_ingen_tidsfelt(self):
-        """**Hele poenget med å bytte form.** `datetime-local`-feltene er det
-        som gjør raden 1377 px bred, og de røres ikke mens man sjekker folk
-        inn. Kommer de tilbake, kommer sidescrollen med dem — og da står
-        stempelet igjen bak den."""
-        # Kommentarene strippes: de *omtaler* `datetime-local`, og en test
-        # som leser sin egen forklaring måler ingenting.
+    def test_driftraden_er_planraden_med_stempelet_foran(self):
+        """Snudd 12. sep. 2026 (André: «Kunne redigere mannskaper selv om vi
+        er i drift modus»). Driftraden var en egen, smal form uten tidsfelt;
+        nå er den planleggingsradens celler med innsjekken først, så raden
+        kan rettes der den står også under drift."""
         kropp = _uten_kommentarer(
             extract_function(read_js(VAKTLISTE_JS), '_driftrad'))
-        self.assertNotIn('datetime-local', kropp)
-        self.assertNotIn('vl-celle', kropp, 'ingen redigering i raden i drift')
+        self.assertIn('_plancellene(', kropp)
+        self.assertIn('_stempelknapper(', kropp)
+        self.assertEqual(self._overskrifter('drift'),
+                         ['Innsjekk'] + self._overskrifter('plan'))
 
-    def test_drifttabellen_slipper_regnearkets_minstebredde(self):
-        """M52: `min-width` på `.vl-tabell` er satt for ni kolonner med to
-        `datetime-local`-felt i. Arver drifttabellen den, ruller den sidelengs
-        selv om den har sju kolonner uten skjemafelt — og da står stempelet
-        igjen bak scrollen, som var hele feilen."""
+    def test_drifttabellen_har_gulv_for_stempelet_i_tillegg(self):
+        """Regnearkets `min-width` er satt for ni kolonner; drift har ti.
+        Arver drifttabellen bare regnearkets gulv, klemmes tidsfeltene."""
         from pathlib import Path
         from django.conf import settings
         css = (Path(settings.BASE_DIR) / 'static' / 'css'
                / 'vaktliste.css').read_text(encoding='utf-8')
         m = re.search(r'\.vl-tabell-drift\s*\{([^}]*)\}', css)
         self.assertIsNotNone(m, '.vl-tabell-drift mangler i stilarket')
-        self.assertRegex(m.group(1), r'min-width:\s*0',
-                         'drifttabellen arver regnearkets minstebredde')
+        d = re.search(r'min-width:\s*([\d.]+)rem', m.group(1))
+        self.assertIsNotNone(d, 'drifttabellen mangler egen min-width')
+        self.assertGreater(float(d.group(1)), self._min_width_rem())
+
+    def _drift_min_width_rem(self):
+        from pathlib import Path
+        from django.conf import settings
+        css = (Path(settings.BASE_DIR) / 'static' / 'css'
+               / 'vaktliste.css').read_text(encoding='utf-8')
+        blokk = re.search(r'\.vl-tabell-drift\s*\{([^}]*)\}', css).group(1)
+        return float(re.search(r'min-width:\s*([\d.]+)rem', blokk).group(1))
+
+    def test_tidskolonnene_rommer_feltet_ogsaa_i_drift(self):
+        piksler = self._drift_min_width_rem() * 16
+        andeler = self._andeler('drift')
+        overskrifter = self._overskrifter('drift')
+        for navn in self.TIDSKOLONNER:
+            with self.subTest(kolonne=navn):
+                bredde = piksler * andeler[overskrifter.index(navn)] / 100
+                self.assertGreaterEqual(round(bredde), self.MIN_TIDSFELT_PX,
+                                        f'«{navn}» blir {bredde:.0f} px i drift')
 
     def test_stempelet_staar_forst_i_drift(self):
         """Første utgave la det ytterst til høyre: 45 × 21 px, tusen piksler
         fra navnet, bak en sidescroll. Rekkefølgen er halve rettelsen."""
         self.assertEqual('Innsjekk', self._overskrifter('drift')[0])
         kropp = extract_function(read_js(VAKTLISTE_JS), '_driftrad')
-        self.assertLess(kropp.index('vl-stempelcelle'), kropp.index('vl-navn'))
+        self.assertLess(kropp.index('vl-stempelcelle'), kropp.index('_plancellene('))
 
     def test_stempelknappen_er_stor_nok_til_en_tommel(self):
         """44 px er gulvet for et trykkmål man skal treffe mens man holder
@@ -1092,7 +1110,7 @@ class TabellcellersLayoutTests(SimpleTestCase):
         # `mkMannskap` er med fra 11. sep. 2026: `.vlr-komp` hadde nettopp
         # denne feilen, og testen fant den ikke fordi den bare leste
         # ressurstabellen.
-        for navn in ('mkRessurs', '_planrad', '_driftrad', '_blokklinje',
+        for navn in ('mkRessurs', '_planrad', '_plancellene', '_driftrad', '_blokklinje',
                      'mkMannskap'):
             for treff in re.findall(r'<td class="([^"$]*)"',
                                     extract_function(src, navn)):
@@ -1782,7 +1800,7 @@ class FanenErGruppaTests(SimpleTestCase):
                         '_synligePoster', 'iDrift', '_tilstede', 'mkGruppe',
                         'mkRessurs', '_radklasse', '_stempelknapper', 'kanStemple',
                         '_rolleValg', '_skiftrekkefolge', '_fyllValgFor',
-                        '_varighet', '_skifttimer', '_tall', '_planrad',
+                        '_varighet', '_skifttimer', '_tall', '_planrad', '_plancellene',
                         '_tidsblokker', '_blokklinje', '_blokkerMedDager',
                         'kanBemannePlass', '_dagnokkel', '_dagoverskrift',
                         '_probonoMerke', '_tidsspenn', '_telling', '_sammeDag',
@@ -2137,7 +2155,7 @@ class EnkeltgruppeTests(SimpleTestCase):
                         '_stempelknapper', 'kanStemple', 'iDrift',
                         '_rolleValg', '_plassKorps', '_skiftrekkefolge',
                         '_fyllValgFor', '_varighet', '_skifttimer', '_tall',
-                        '_planrad', '_tidsblokker', '_blokklinje', '_blokkerMedDager', 'kanBemannePlass',
+                        '_planrad', '_plancellene', '_tidsblokker', '_blokklinje', '_blokkerMedDager', 'kanBemannePlass',
                         '_mittKorpsId', '_synligePoster',
                         '_dagnokkel', '_dagoverskrift', '_probonoMerke',
                         '_tidsspenn', '_sammeDag', 'mkGruppekurve', '_telling',
@@ -2552,7 +2570,7 @@ class TidsfeltenesSteglengdeTests(SimpleTestCase):
     def test_cella_i_ressurstabellen_steger_ogsaa(self):
         """Den bygges i JS og fanges ikke av malsøket over — og det er den
         man taster flest ganger."""
-        kropp = extract_function(read_js(VAKTLISTE_JS), '_planrad')
+        kropp = extract_function(read_js(VAKTLISTE_JS), '_plancellene')
         self.assertIn('type="datetime-local" step="300"', kropp)
 
     def test_steget_er_et_helt_minutt(self):
@@ -2768,7 +2786,7 @@ class DriftflatenTests(SimpleTestCase):
         kropp = _uten_kommentarer(
             extract_function(read_js(VAKTLISTE_JS), 'mkRessurs'))
         self.assertIn('const drift = iDrift();', kropp)
-        self.assertIn('drift ? _driftrad(vp, kanRoreRad(vp, r, kanRore))', kropp)
+        self.assertIn('drift ? _driftrad(vp, r, kanRoreRad(vp, r, kanRore))', kropp)
 
     def test_korpsforeren_ser_status_men_ingen_knapp(self):
         """Avklaring 11.3, speilet i grensesnittet. En knapp som fører til
@@ -3030,15 +3048,7 @@ class TidsblokkerTests(SimpleTestCase):
 
     HARNESS = (
         (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue')),
-        (VAKTLISTE_JS, ('mkOversikt', 'mkUtskriftsverktoy', '_utvalgstekst', '_tidsblokker', '_blokklinje', '_blokkerMedDager', 'kanBemannePlass',
-                        '_mittKorpsId', '_synligePoster',
-                        '_dagnokkel', '_dagoverskrift', '_probonoMerke',
-                        '_telling', '_driftrad', '_radklasse', '_stempelknapper',
-                        'kanStemple', 'iDrift', 'kanSkriveAlt', '_nivaa',
-                        '_erAdmin', '_skiftrekkefolge', '_sumTimer',
-                        '_varighet', '_skifttimer', '_tall', '_d', '_kl',
-                        '_dag', '_sammeDag', '_tidsspenn', '_vaktspenn',
-                        '_ressurserIGruppe', '_grupperMedRessurser', 'kanRoreRad')),
+        (VAKTLISTE_JS, ('mkOversikt', 'mkUtskriftsverktoy', '_utvalgstekst', '_tidsblokker', '_blokklinje', '_blokkerMedDager', 'kanBemannePlass', '_mittKorpsId', '_synligePoster', '_dagnokkel', '_dagoverskrift', '_probonoMerke', '_telling', '_driftrad', '_plancellene', '_planrad', '_rolleValg', '_fyllValgFor', '_plassKorps', '_varighet', '_skifttimer', '_tall', '_iso16', '_radklasse', '_stempelknapper', 'kanStemple', 'iDrift', 'kanSkriveAlt', '_nivaa', '_erAdmin', '_skiftrekkefolge', '_sumTimer', '_d', '_kl', '_dag', '_sammeDag', '_tidsspenn', '_vaktspenn', '_ressurserIGruppe', '_grupperMedRessurser', 'kanRoreRad')),
     )
     VINDU = ("globalThis.window = { MODUL_TILGANG: { admin: true } };\n"
              "globalThis.DAGER = ['søn','man','tir','ons','tor','fre','lør'];\n"
@@ -3184,21 +3194,24 @@ class TidsblokkerTests(SimpleTestCase):
         self.assertIn('KARM', ut, 'reservasjonen står fortsatt på raden')
 
     # ── Driftraden ───────────────────────────────────────────────────────
-    def test_driftraden_har_ikke_tiden_i_seg(self):
-        """Den står på blokklinja over. Fire like tider under hverandre var det
-        som gjorde lista lang og lik."""
+    def test_driftraden_er_regnearket_med_stempelet_foran(self):
+        """Snudd 12. sep. 2026: driftraden var uten tidsfelt («fire like
+        tider under hverandre»), men André ville redigere under drift som i
+        planlegging. Blokklinja bærer fortsatt tiden; raden bærer feltene."""
         ut = run_node(self.harness, self.VINDU + """
             globalThis.utskriftRessurs = null; globalThis.korpsfilter = null;
+            globalThis.rollerForGruppe = () => []; globalThis.kanStemple = () => true;
             globalThis.aktivListe = {vaktliste: {i_drift: true}};
             console.log(_driftrad({id: 5, ledig: false, navn: 'Kari',
                                    korps_kort: 'HGSD', rolle: 'Sjåfør',
                                    mott_at: null, av_vakt_at: null, tilstede: false,
                                    fra_tid: '2026-10-03T08:00:00',
-                                   til_tid: '2026-10-03T16:00:00'}, true));
+                                   til_tid: '2026-10-03T16:00:00'}, {id: 1, gruppe_id: 1}, true));
         """)
-        self.assertNotIn('08:00', ut)
-        self.assertNotIn('16:00', ut)
-        self.assertEqual(ut.count('<td'), 5, 'innsjekk, navn, korps, rolle, blyant')
+        self.assertEqual(ut.count('<td'), 10, 'innsjekk + regnearkets ni')
+        self.assertLess(ut.index('vl-stempelcelle'), ut.index('vl-navn'))
+        self.assertIn('type="datetime-local"', ut, 'tidene redigeres i raden også i drift')
+        self.assertIn('stemplMott', ut)
 
     # ── Timeformatet ─────────────────────────────────────────────────────
     def test_tall_bruker_komma_og_dropper_null_desimal(self):
@@ -3518,12 +3531,13 @@ class ProbonoOgDagoverskrifterTests(SimpleTestCase):
     def test_driftraden_baerer_merket(self):
         ut = run_node(self.harness, self.VINDU + """
             globalThis.utskriftRessurs = null; globalThis.korpsfilter = null;
+            globalThis.rollerForGruppe = () => []; globalThis.kanStemple = () => true;
             globalThis.aktivListe = {vaktliste: {i_drift: true}};
             console.log(_driftrad({id: 5, ledig: false, navn: 'Kari', probono: true,
                                    korps_kort: 'HGSD', rolle: '', mott_at: null,
                                    av_vakt_at: null, tilstede: false,
                                    fra_tid: '2026-10-03T08:00:00',
-                                   til_tid: '2026-10-03T16:00:00'}, true));
+                                   til_tid: '2026-10-03T16:00:00'}, {id: 1, gruppe_id: 1}, true));
         """)
         self.assertIn('vl-probono', ut)
 

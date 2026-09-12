@@ -220,6 +220,15 @@ ingen av dem gir feilmelding — de er bare stille inaktive.
             - [x] Andrés rapport 3 (12. sep.): bilen ser de andres stempler, arkivtittel
                   uten vaktnavn, «Mitt korps» skiller korpsets fra åpent for alle, kurvens
                   hode med tre tall, «Arkiv» i eget vindu, manifest og logo.
+            - [ ] **Andrés forbedringsliste 12. sep. (staging først):**
+                  - [x] G: «Sett i drift» i Innstillinger, tydelig statusmerke, redigering i
+                        drift, drift i auditloggen, knappefarger, én innlogging per konto
+                        (fantes; nå testet).
+                  - [ ] H: «Behandlet på sted» fra Fremme (→ Ledig), «Avbryt» i Rykker ut
+                        (enheten ledig, oppdraget trenger ressurs), ingen Ledig mellom
+                        Avreist og Leverer. Sentralen redigerer som før.
+                  - [ ] I: lyd alltid på (ingen av/på), lengre varsel, admin justerer terskler
+                        per hastegrad og lyd ved nytt oppdrag, utheving hos operatør.
             - [x] Railway-variabler (André, 12. sep.): `testportal.sanitet.net` inn i
                   staging sine `ALLOWED_HOSTS`/`CSRF_TRUSTED_ORIGINS`, og skrivefeilen
                   `/ https://*.railway.app` rettet begge steder.

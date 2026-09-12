@@ -500,25 +500,36 @@ function tegnStatus() {
   const spenn = vl.planlagt_slutt
     ? ` · ${_dag(vl.startet)} ${_kl(vl.startet)} – ${_dag(vl.planlagt_slutt)} ${_kl(vl.planlagt_slutt)}`
     : ' · ingen sluttid satt';
-  el.textContent = vl.status_navn + spenn;
-  el.className = 'vl-status' + (vl.i_drift ? ' vl-drift' : '');
+  // Merket skal kunne leses på avstand (André, 12. sep. 2026: «noe visuelt
+  // som viser at vaktlisten er i planlegging eller i drift»): ikon, navnet
+  // på formen i fet, og i drift en pulserende prikk — spennet dempet etter.
+  const ikon = vl.i_drift ? 'play-circle-fill' : 'pencil-square';
+  el.innerHTML = `<i class="bi bi-${escHtmlValue(ikon)} me-1"></i>`
+    + `<strong>${escapeHtml(vl.status_navn)}</strong>`
+    + `<span class="vl-status-spenn">${escapeHtml(spenn)}</span>`;
+  el.className = 'vl-status ' + (vl.i_drift ? 'vl-drift' : 'vl-planlegging');
 
   tegnDriftknapp();
 }
 
 
 function tegnDriftknapp() {
-  // **Døra til innsjekken står ved statusen den endrer.** Lå den i
-  // «Innstillinger», måtte man åpne et vindu for å se om innsjekken var
-  // åpen — og det er det første man vil vite når vakten begynner.
+  // **Døra til innsjekken står i «Innstillinger»** (André, 12. sep. 2026).
+  // Den sto i vaktlinja ved statusmerket til da — men den trykkes to ganger
+  // per vakt, og der så den ut som en del av det daglige. Merket i
+  // vaktlinja sier fortsatt hvilken form lista er i.
   //
   // Knappen tegnes her og ikke av `gateKnapper()`, fordi teksten skifter med
-  // tilstanden: `gateKnapper()` kjører én gang ved sidelasting.
+  // tilstanden: `gateKnapper()` kjører én gang ved sidelasting. Kalles fra
+  // `tegnStatus()` og fra `apneVakt()`.
   const el = document.getElementById('vl-drift');
   if (!el) return;
   if (!aktivListe || !kanSkriveAlt()) { el.innerHTML = ''; return; }
 
-  el.innerHTML = iDrift()
+  const forklaring = iDrift()
+    ? 'Innsjekken er åpen. Ut av drift stenger den; ingen stempler røres.'
+    : 'Sett i drift åpner innsjekken — møtt og av vakt — for denne lista.';
+  el.innerHTML = (iDrift()
     ? `<button class="btn btn-sm btn-outline-warning" type="button"
                data-action="settDrift" data-arg="stopp">
          <i class="bi bi-pause-circle me-1"></i>Ut av drift
@@ -526,7 +537,8 @@ function tegnDriftknapp() {
     : `<button class="btn btn-sm btn-success" type="button"
                data-action="settDrift" data-arg="start">
          <i class="bi bi-play-circle me-1"></i>Sett i drift
-       </button>`;
+       </button>`)
+    + `<div class="form-text mt-1">${escapeHtml(forklaring)}</div>`;
 }
 
 
@@ -861,35 +873,18 @@ function mkGruppe(gruppe) {
 }
 
 
-function _driftrad(vp, kanRore) {
-  // **Under drift er raden ikke et regneark.** Planleggingsfeltene —
-  // `datetime-local`, kompetansemerkene og merknaden — er det som gjør raden
-  // 1377 px bred, og ingen av dem røres mens man sjekker folk inn. Uten dem
-  // får tabellen plass uten sidescroll, og stempelet plass til å være stort.
-  //
-  // Lista skal fortsatt kunne endres — folk uteblir og bytter — og det gjør
-  // den gjennom blyanten, som åpner redigeringsvinduet. Notatets «ikke et
-  // redigeringsskjema» handlet om raden, ikke bare om knappene.
-  //
-  // **Tiden står ikke i raden.** Den står på blokklinja over, sammen med
-  // timene — skiftene i en blokk deler den, og fire like tider under
-  // hverandre var det som gjorde lista lang og lik (11. sep. 2026).
-  const rediger = kanRore
-    ? `<button class="btn btn-sm btn-outline-secondary" type="button"
-               title="Rediger skiftet" aria-label="Rediger skiftet"
-               data-action="apneRedigerVaktpost" data-id="${escHtmlValue(vp.id)}"><i class="bi bi-pencil"></i></button>`
-    : '';
-  const navn = vp.ledig
-    ? '<span class="vl-ledigtekst">Ledig plass</span>'
-    : escapeHtml(vp.navn) + _probonoMerke(vp);
-
+function _driftrad(vp, r, kanRore) {
+  // **Drift er planleggingsraden pluss innsjekken** (André, 12. sep. 2026:
+  // «Kunne redigere mannskaper selv om vi er i drift modus»). Fram til da
+  // var driftraden en egen, smal form uten tidsfelt, kompetanse og merknad
+  // — redigering gikk gjennom blyanten. Det holdt ikke i bruk: folk uteblir
+  // og bytter midt i vakta, og da skal raden kunne rettes der den står,
+  // som i planlegging. Prisen er bredden: tabellen ruller sidelengs på en
+  // laptop, og stempelet står først så det er det man ser.
   return `
     <tr class="${escHtmlValue(_radklasse(vp))}">
       <td class="vl-stempelcelle">${_stempelknapper(vp)}</td>
-      <td class="vl-navn">${navn}</td>
-      <td>${escapeHtml(vp.korps_kort || '—')}</td>
-      <td>${escapeHtml(vp.rolle || '—')}</td>
-      <td class="vl-handling">${rediger}</td>
+      ${_plancellene(vp, r, kanRore)}
     </tr>`;
 }
 
@@ -997,9 +992,19 @@ function _probonoMerke(vp) {
 
 
 function _planrad(vp, r, kanRore) {
-  // **Regnearkraden.** Alt redigeres der det står: tider, rolle, merknad og
-  // — for en ledig plass — hvem som skal fylle den. Lå inne i `mkRessurs()`
-  // fram til 11. sep. 2026; hevet ut da radene fikk blokklinjer over seg.
+  return `
+    <tr class="${escHtmlValue(vp.ledig ? 'vl-ledig' : '')}">
+      ${_plancellene(vp, r, kanRore)}
+    </tr>`;
+}
+
+
+function _plancellene(vp, r, kanRore) {
+  // **Regnearkradens celler.** Alt redigeres der det står: tider, rolle,
+  // merknad og — for en ledig plass — hvem som skal fylle den. Lå inne i
+  // `mkRessurs()` fram til 11. sep. 2026; hevet ut da radene fikk
+  // blokklinjer over seg. Cellene uten `<tr>`, fordi driftraden (12. sep.
+  // 2026) er de samme cellene med stempelet foran.
   // Merkelappene ligger i en wrapper, ikke rett i cella: `display: flex`
   // på en `<td>` tar cella ut av tabellens boksmodell, og da forskyves
   // kolonnene etter den i forhold til overskriftene.
@@ -1062,7 +1067,6 @@ function _planrad(vp, r, kanRore) {
   // lenge — og først da kompetansen, som er det man vurderer laget på
   // når resten står. Merknaden sist, fordi den er unntaket.
   return `
-    <tr class="${escHtmlValue(vp.ledig ? 'vl-ledig' : '')}">
       <td class="vl-navn">${navnCelle}</td>
       <td>${korpsCelle}</td>
       <td>${_rolleValg(vp, r, kanRore)}</td>
@@ -1071,8 +1075,7 @@ function _planrad(vp, r, kanRore) {
       <td class="vl-timer">${escapeHtml(_varighet(vp))}</td>
       <td class="vl-kompcelle">${komp}</td>
       <td>${merknad}</td>
-      <td class="vl-handling">${redigerPost}</td>
-    </tr>`;
+      <td class="vl-handling">${redigerPost}</td>`;
 }
 
 
@@ -1126,18 +1129,18 @@ function mkRessurs(r) {
        </button>` : '';
   const knapper = settKnapp + rolleKnapp + redigerKnapp;
 
-  // **Tabellen har to former, og drift er den andre.** I planlegging er den
-  // et regneark: radene er skift, kolonnene er det man sammenligner på tvers
-  // av dem, og alt redigeres der det står. Under drift er spørsmålet et helt
-  // annet — «hvem har møtt?» — og da er `datetime-local`-feltene,
-  // kompetansemerkene og merknaden bare bredde. Se `_driftrad()`.
+  // **Tabellen har én form, og drift legger innsjekken foran.** I
+  // planlegging er den et regneark: radene er skift, kolonnene er det man
+  // sammenligner på tvers av dem, og alt redigeres der det står. Under
+  // drift står stempelet først i raden — resten er som før (André, 12. sep.
+  // 2026). Se `_driftrad()`.
   const drift = iDrift();
   // **Blokker, ikke bare rader.** Skift med samme fra–til samles under én
   // blokklinje som bærer tiden, timene og antallet — se `_tidsblokker()`.
   // Raden under er enten regnearket (`_planrad`) eller driftraden.
-  const rad = (vp) => (drift ? _driftrad(vp, kanRoreRad(vp, r, kanRore))
+  const rad = (vp) => (drift ? _driftrad(vp, r, kanRoreRad(vp, r, kanRore))
                               : _planrad(vp, r, kanRoreRad(vp, r, kanRore)));
-  const kolonner = drift ? 5 : 9;
+  const kolonner = drift ? 10 : 9;
   const kropp = poster.length
     ? _blokkerMedDager(_tidsblokker(poster), kolonner, rad)
     : `<tr><td colspan="${escHtmlValue(kolonner)}" class="vl-tom">Ingen satt opp ennå.</td></tr>`;
@@ -1146,15 +1149,20 @@ function mkRessurs(r) {
   // template-literaler inne i en tredje: den formen er vanskelig å lese, og
   // XSS-skanneren i `tests_xss.py` kan ikke se inn i den.
   const tabellklasse = drift ? 'vl-tabell vl-tabell-drift' : 'vl-tabell';
+  // Driftkolonnene er planleggingens andeler skalert til 88 %, med 12 % til
+  // stempelet foran; `.vl-tabell-drift` har en bredere gulvbredde tilsvarende.
   const tabellhode = drift ? `
           <colgroup>
-            <col style="width: 22%"><col style="width: 40%"><col style="width: 12%">
-            <col style="width: 18%"><col style="width: 8%">
+            <col style="width: 12%">
+            <col style="width: 12%"><col style="width: 9%"><col style="width: 9%">
+            <col style="width: 16%"><col style="width: 16%"><col style="width: 4%">
+            <col style="width: 9%"><col style="width: 9%"><col style="width: 4%">
           </colgroup>
           <thead>
             <tr>
-              <th>Innsjekk</th><th>Navn</th><th>Korps</th>
-              <th>Rolle</th><th></th>
+              <th>Innsjekk</th><th>Navn</th><th>Korps</th><th>Rolle</th>
+              <th>Fra</th><th>Til</th><th>Timer</th>
+              <th>Kompetanse</th><th>Merknad</th><th></th>
             </tr>
           </thead>` : `
           <colgroup>
@@ -2453,6 +2461,7 @@ function apneVakt() {
   if (lengde) lengde.classList.toggle('d-none', !kanLede());
   const arkivBolk = document.getElementById('vakt-arkiv-bolk');
   if (arkivBolk) arkivBolk.classList.toggle('d-none', !_erAdmin());
+  tegnDriftknapp();
   _apneModal('vaktModal');
 }
 

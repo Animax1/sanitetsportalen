@@ -26,7 +26,7 @@ from django.dispatch import receiver
 from audit.models import AuditLog
 from audit.utils import get_current_request
 
-from .models import Mannskap
+from .models import Mannskap, Vaktliste
 
 TABELLNAVN = 'vaktliste_mannskap'
 
@@ -154,3 +154,41 @@ def mannskap_post_delete(sender, instance, **kwargs):
         user=bruker,
         ip=ip,
     )
+
+
+# ── Vaktlista: drift inn og ut ────────────────────────────────────────────────
+#
+# «Driftmodus og planleggingsmodus må logges i auditlog» (André, 12. sep.
+# 2026). Statusen er den ene døra til innsjekken, og hvem som åpnet og
+# stengte den er det man leter etter når stemplene ikke stemmer. Feltnivå,
+# som mannskapet — men bare feltene som beskriver formen og spennet, ikke
+# navnet på vakta (det bor på `core.Vakt`).
+
+VAKTLISTE_TABELLNAVN = 'vaktliste_vaktliste'
+VAKTLISTE_FELTER = ('status', 'satt_i_drift_at', 'satt_i_drift_av', 'planlagt_slutt', 'arkivert_at')
+
+
+@receiver(pre_save, sender=Vaktliste)
+def vaktliste_pre_save(sender, instance, **kwargs):
+    if not instance.pk:
+        return
+    try:
+        gammel = Vaktliste.objects.get(pk=instance.pk)
+    except Vaktliste.DoesNotExist:
+        return
+    bruker, ip = _bruker_og_ip()
+    for felt in VAKTLISTE_FELTER:
+        gammel_verdi = _verdi(gammel, felt)
+        ny_verdi = _verdi(instance, felt)
+        if gammel_verdi == ny_verdi:
+            continue
+        AuditLog.objects.create(
+            table_name=VAKTLISTE_TABELLNAVN,
+            record_id=instance.pk,
+            action='UPDATE',
+            field_name=felt,
+            old_value=gammel_verdi,
+            new_value=ny_verdi,
+            user=bruker,
+            ip=ip,
+        )
