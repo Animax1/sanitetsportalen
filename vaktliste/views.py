@@ -1065,6 +1065,7 @@ def vaktpost_detalj_view(request, pk):
             return _nektet()
         vaktpost.mannskap = ny_person
 
+    var_planlagt = services.er_planlagt(vaktpost)
     if 'korps_id' in data:
         # Å endre hvem plassen er satt av til, er å dele ut på nytt — samme
         # terskel som å reservere hele ressursen. Kunne korps-brukeren gjøre
@@ -1087,6 +1088,10 @@ def vaktpost_detalj_view(request, pk):
         vaktpost.alle_korps = bool(data.get('alle_korps'))
         if vaktpost.alle_korps:
             vaktpost.korps_id = None
+    # **Planlagt går én vei** (André, 12. sep. 2026): en plass som er delt
+    # ut — til et korps eller til alle — kan ikke tas tilbake til kladden.
+    if services.er_planlagt(vaktpost) and not var_planlagt:
+        return _feil('En plass som er delt ut kan ikke settes tilbake til planlagt.')
 
     fra_tid = _tid(data.get('fra_tid')) if 'fra_tid' in data else vaktpost.fra_tid
     til_tid = _tid(data.get('til_tid')) if 'til_tid' in data else vaktpost.til_tid

@@ -4,6 +4,26 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-12 — Planlagt og utildelt: navnene, og én vei
+
+André: «Utildelte vakter må vises til alle, og så må vi ha en annen som heter
+planlagt. En kan ikke bytte tilbake til planlagt etter den er satt til
+utildelt eller er tildelt et korps.» Avklart: utildelt = alle ser; planlagt =
+synlig for lederne før de deler ut.
+
+Ingen skjemaendring: dagens skjulte «utildelt» *er* planlagt, og dagens
+«alle korps» *er* utildelt. Det som manglet var navnene og énveisregelen.
+
+- **Navnene.** Nedtrekket på plassen sier «Planlagt», «Utildelt» og korpsene;
+  oversikten og «Mitt korps» skriver «Utildelt» der det sto «Alle korps», og
+  «Planlagt» der kolonnen sto tom. Korpsvelgeren i vaktlinja heter fortsatt
+  «Alle korps» — den er et filter, ikke en tildeling.
+- **Planlagt går én vei.** `services.er_planlagt` (ingen reservasjon, ikke
+  utildelt). PUT som ville gjort en delt-ut plass planlagt igjen får 400 med
+  forklaring; nedtrekket tilbyr «Planlagt» bare så lenge plassen står der.
+  «Som ressursen» på en ressurs med korps er ikke planlagt — den veien er åpen.
+  `PlanlagtGaarEnVeiTests` på server, `_plassKorps` i node.
+
 ## 2026-09-12 — Andrés testrapport, runde 2: vaktlisten
 
 Én migrasjon, `vaktliste/0013`: `Vaktliste.arkivert_at`, rent `AddField`.

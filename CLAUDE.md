@@ -320,11 +320,12 @@ fase 3–7 gjenstår — se `docs/BESLUTNING_VAKTLISTE.md`, som er besluttet i s
   arver korpset, og dermed hva den kontoen får redigere.
 - **Kostbehov/matallergi lagres ikke** (art. 9 — besluttet holdt utenfor portalen), og
   `Mannskap.notat` er unntatt verdilogging i audit (`signals.FELT_UTEN_VERDILOGGING`).
-- **En ledig plass har tre tilstander** (11. sep. 2026): tildelt ett korps
-  (`Vaktpost.korps`/ressursens), tildelt alle (`Vaktpost.alle_korps`), eller utildelt —
-  vaktlederens bord, som ikke deles ut. `alle_korps` vinner over `korps`, og enhver
-  korps-bruker med badge får fylle en universal plass (`kan_bemanne_plass`). Å tildele
-  er `skriv_full`. Fanen «Mitt korps» (`mkMittKorps`) viser korpsets tildelte og
+- **En ledig plass har tre tilstander** (11.–12. sep. 2026): tildelt ett korps
+  (`Vaktpost.korps`/ressursens), **utildelt** (`Vaktpost.alle_korps` — alle ser og kan
+  fylle), eller **planlagt** — lederens kladd, som korps-brukerne ikke ser
+  (`services.er_planlagt`). `alle_korps` vinner over `korps`. Å dele ut er `skriv_full`,
+  og **planlagt går én vei**: en plass som er delt ut tas ikke tilbake til kladden —
+  viewet avviser det, og nedtrekket tilbyr «Planlagt» bare så lenge plassen står der. Fanen «Mitt korps» (`mkMittKorps`) viser korpsets tildelte og
   universale plasser på tvers av ressursene; `kanBemannePlass()` i JS speiler serveren
   plass for plass, og `_korpsKropp()` oversetter nedtrekkets tre tilstander til to felt.
 - **En ledig plass er en `Vaktpost` uten `mannskap`.** Planlegging begynner med

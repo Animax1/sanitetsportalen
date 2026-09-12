@@ -609,12 +609,13 @@ class Vaktpost(BaseTimeStampedModel):
     # over det; lengste skift og korteste hvile teller det fortsatt, for et
     # probono-skift sliter like mye, og varslene handler om sliting.
     probono = models.BooleanField(default=False, verbose_name='Probono')
-    # **Tildelt alle korps** (prosjektleder, 11. sep. 2026: «universal
-    # tildelt»). Tre tilstander på en ledig plass: tildelt ett korps
-    # (`korps`/ressursens), tildelt alle (dette flagget), eller utildelt —
-    # vaktlederens bord, som ikke deles ut. Flagget vinner over `korps`:
-    # en plass alle kan fylle er ikke satt av til én. Å sette det er å dele
-    # ut, og krever `skriv_full` som reservasjonen ellers.
+    # **Utildelt — alle ser og kan fylle** (prosjektleder, 11. sep. 2026:
+    # «universal tildelt»; navnet «utildelt» fra André 12. sep.). Tre
+    # tilstander på en ledig plass: tildelt ett korps (`korps`/ressursens),
+    # utildelt (dette flagget), eller **planlagt** — lederens kladd, som
+    # korps-brukerne ikke ser (`services.er_planlagt`). Flagget vinner over
+    # `korps`. Å sette det er å dele ut, og krever `skriv_full`. Planlagt
+    # går én vei: en plass som er delt ut tas ikke tilbake til kladden.
     alle_korps = models.BooleanField(default=False, verbose_name='Tildelt alle korps')
 
     class Meta:

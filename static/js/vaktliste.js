@@ -469,7 +469,7 @@ function fyllNedtrekk() {
   _fyll('ny-vaktpost-mannskap', aktivListe.mannskap.map((m) => ({
     id: m.id, navn: `${m.navn} — ${m.korps_navn}`,
   })), '— ledig plass —');
-  _fyll('ny-vaktpost-korps', [{ id: 'alle', navn: 'Alle korps' }].concat(
+  _fyll('ny-vaktpost-korps', [{ id: 'alle', navn: 'Utildelt' }].concat(
     (aktivListe.korps || []).map((k) => ({
       id: k.id, navn: k.kortnavn || k.navn,
     }))), '— som ressursen —');
@@ -758,20 +758,22 @@ function _plassKorps(vp) {
   // Reservasjonen på en ledig plass. Bare den som deler ut kan endre den —
   // kunne korps-brukeren, kunne hun tildelt seg selv en plass. Andre ser
   // hvem plassen tilhører, som tekst.
-  // Tre tilstander (11. sep. 2026): ett korps, alle korps, eller
-  // utildelt — vaktlederens bord. «— utildelt —» het «— alle —» før, og det
-  // var feil ord: en utildelt plass deles ikke ut til noen.
+  // Tre tilstander (André, 12. sep. 2026): ett korps, **utildelt** (alle
+  // ser og kan fylle — `alle_korps`), eller **planlagt** — lederens kladd,
+  // som korps-brukerne ikke ser. Planlagt går én vei: valget finnes bare
+  // så lenge plassen står der, og serveren avviser veien tilbake.
   const valgt = vp.alle_korps ? 'alle'
     : (vp.plass_korps_id != null ? vp.plass_korps_id
       : (vp.reservert_korps_id != null ? vp.reservert_korps_id : ''));
   if (!kanSkriveAlt()) {
-    if (vp.alle_korps) return '<span class="vl-meta">Alle korps</span>';
+    if (vp.alle_korps) return '<span class="vl-meta">Utildelt</span>';
     const k = (aktivListe.korps || []).find((x) => x.id === valgt);
     return `<span class="vl-meta">${escapeHtml(k ? (k.kortnavn || k.navn) : '—')}</span>`;
   }
   const alleMerke = valgt === 'alle' ? ' selected' : '';
-  const valg = ['<option value="">— utildelt —</option>',
-                `<option value="alle"${alleMerke}>Alle korps</option>`].concat(
+  const planlagt = valgt === '' ? ['<option value="" selected>Planlagt</option>'] : [];
+  const valg = planlagt.concat([
+                `<option value="alle"${alleMerke}>Utildelt</option>`]).concat(
     (aktivListe.korps || []).map((k) => {
       const merke = k.id === valgt ? ' selected' : '';
       return `<option value="${escHtmlValue(k.id)}"${merke}>`
@@ -1542,7 +1544,7 @@ function mkOversikt() {
     // når den er ledig. Det er det samme skillet som i ressurstabellen, og
     // av samme grunn.
     const korps = vp.ledig
-      ? (vp.alle_korps ? 'Alle korps' : (korpsnavn[vp.reservert_korps_id] || ''))
+      ? (vp.alle_korps ? 'Utildelt' : (korpsnavn[vp.reservert_korps_id] || 'Planlagt'))
       : (vp.korps_kort || '');
     return `
         <tr class="${escHtmlValue(vp.ledig ? 'vl-ledig' : '')}">
@@ -1883,7 +1885,7 @@ function mkMittKorps() {
         <div><b>${escapeHtml(avsatt)} t</b><span class="vl-meta">avsatt</span></div>
         <div><b>${escapeHtml(probono)} t</b><span class="vl-meta">probono</span></div>
       </div>
-      <span class="vl-meta">${escapeHtml(korpsnavn)} — tildelte plasser, og plasser tildelt alle korps</span>
+      <span class="vl-meta">${escapeHtml(korpsnavn)} — tildelte og utildelte plasser</span>
     </div>`;
 
   if (!poster.length) {
@@ -1898,7 +1900,7 @@ function mkMittKorps() {
       ? _fyllValgFor(vp, kanBemannePlass(vp, r)) + _probonoMerke(vp)
       : escapeHtml(vp.navn) + _probonoMerke(vp);
     const tildelt = vp.ledig
-      ? (vp.alle_korps ? 'Alle korps' : (korps ? (korps.kortnavn || korps.navn) : ''))
+      ? (vp.alle_korps ? 'Utildelt' : (korps ? (korps.kortnavn || korps.navn) : ''))
       : (vp.korps_kort || '');
     return `
         <tr class="${escHtmlValue(vp.ledig ? 'vl-ledig' : '')}">
@@ -2742,7 +2744,7 @@ function apneRedigerVaktpost(id) {
   })), '— ledig plass —');
   _fyll('vaktpost-rolle', rollerForGruppe(ressurs.gruppe_id, vp.rolle_id),
         'Uten rolle');
-  _fyll('vaktpost-korps', [{ id: 'alle', navn: 'Alle korps' }].concat(
+  _fyll('vaktpost-korps', [{ id: 'alle', navn: 'Utildelt' }].concat(
     (aktivListe.korps || []).map((k) => ({
       id: k.id, navn: k.kortnavn || k.navn,
     }))), '— som ressursen —');

@@ -1336,3 +1336,45 @@ class EgenPersonPaaAndresPlassTests(TilgangsBasis):
         res = self.c_kb.put(f'/vaktliste/api/vaktposter/{pk}/',
                             data={'merknad': 'x'}, content_type='application/json')
         self.assertEqual(res.status_code, 403)
+
+
+class PlanlagtGaarEnVeiTests(TilgangsBasis):
+    """En planlagt plass (lederens kladd) kan deles ut — til et korps eller
+    til «utildelt», som alle ser — men aldri tas tilbake (André, 12. sep.
+    2026: «En kan ikke bytte tilbake til planlagt etter den er satt til
+    utildelt eller er tildelt et korps»)."""
+
+    def _plass(self, ressurs, **ekstra):
+        kropp = {'fra_tid': self._iso(0), 'til_tid': self._iso(8), **ekstra}
+        res = self.c_vl.post(f'/vaktliste/api/ressurser/{ressurs.pk}/vaktposter/',
+                             data=kropp, content_type='application/json')
+        self.assertEqual(res.status_code, 201, res.content)
+        return res.json()['data']['id']
+
+    def _put(self, pk, **data):
+        return self.c_vl.put(f'/vaktliste/api/vaktposter/{pk}/', data=data,
+                             content_type='application/json')
+
+    def test_planlagt_kan_deles_ut_men_ikke_tas_tilbake(self):
+        pk = self._plass(self.res_fri)                       # ingen korps på KO: planlagt
+        self.assertTrue(services.er_planlagt(Vaktpost.objects.get(pk=pk)))
+        self.assertEqual(self._put(pk, korps_id=self.hgsd.pk).status_code, 200)
+        res = self._put(pk, korps_id=None)
+        self.assertEqual(res.status_code, 400)
+        self.assertIn('planlagt', res.json()['message'])
+        self.assertEqual(Vaktpost.objects.get(pk=pk).korps_id, self.hgsd.pk)
+
+    def test_utildelt_kan_heller_ikke_bli_planlagt(self):
+        pk = self._plass(self.res_fri)
+        self.assertEqual(self._put(pk, alle_korps=True).status_code, 200)
+        self.assertEqual(self._put(pk, alle_korps=False).status_code, 400)
+        self.assertTrue(Vaktpost.objects.get(pk=pk).alle_korps)
+        # Men fra utildelt til ett korps går an — det er fortsatt delt ut.
+        self.assertEqual(self._put(pk, alle_korps=False, korps_id=self.hgsd.pk).status_code, 200)
+
+    def test_som_ressursen_er_ikke_planlagt_naar_ressursen_har_korps(self):
+        """`korps_id: null` på HGSDs lag betyr «som ressursen», altså HGSD —
+        ikke planlagt. Den veien er åpen."""
+        pk = self._plass(self.res_hgsd, korps_id=self.karmoy.pk)
+        self.assertEqual(self._put(pk, korps_id=None).status_code, 200)
+        self.assertFalse(services.er_planlagt(Vaktpost.objects.get(pk=pk)))

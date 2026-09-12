@@ -199,8 +199,8 @@ ingen av dem gir feilmelding — de er bare stille inaktive.
                   andres plass, probono-merke på ledig plass, til-tid = fra + 8 t,
                   «Mitt korps» med timer, «Korps»-etiketten, arkivering av vaktliste
                   (`0013`), admin-kobling bare av admin.
-            - [ ] Avklare med André: «utildelt» synlig for alle + ny tilstand «planlagt»
-                  (skjult kladd) som bare går én vei.
+            - [x] Planlagt/utildelt (12. sep.): utildelt = alle ser, planlagt = lederens
+                  kladd, én vei. Bare navn og regel — ingen skjemaendring.
             - [ ] Deploy 2, senere: fjern `Oppdrag.enhet`, `Statusmelding.oppdragsenhet`
                   NOT NULL (med `SET CONSTRAINTS ALL IMMEDIATE` om et dataskritt går
                   foran), og broene i `Oppdrag.save()`/`Statusmelding.save()` bort.

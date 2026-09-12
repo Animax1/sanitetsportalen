@@ -444,6 +444,14 @@ def kan_bemanne_ressurs(user, ressurs) -> bool:
             and ressurs.korps_id == korps.pk)
 
 
+def er_planlagt(vaktpost) -> bool:
+    """En **planlagt** plass er lederens kladd (André, 12. sep. 2026): ikke
+    satt av til noe korps, og ikke gjort utildelt. Korps-brukerne ser den
+    ikke. Den går én vei — til et korps, eller til «utildelt» (alle ser og
+    kan fylle) — og aldri tilbake."""
+    return not vaktpost.alle_korps and reservert_korps(vaktpost=vaktpost) is None
+
+
 def reservert_korps(vaktpost=None, ressurs=None):
     """Hvilket korps er denne plassen satt av til?
 

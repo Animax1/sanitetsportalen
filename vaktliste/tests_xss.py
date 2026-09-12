@@ -3631,8 +3631,16 @@ class MittKorpsTests(SimpleTestCase):
             console.log(_plassKorps({id: 9, alle_korps: true, plass_korps_id: null, reservert_korps_id: null}));
         """)
         self.assertIn('value="alle" selected', ut)
-        self.assertIn('— utildelt —', ut)
-        self.assertIn('>Alle korps</span>', ut)
+        # Delt ut: «Planlagt» tilbys ikke lenger — veien går én vei.
+        self.assertNotIn('>Planlagt</option>', ut)
+        self.assertIn('>Utildelt</span>', ut)
+        planlagt = run_node(self.harness, self.VINDU + """
+            globalThis.window = { MODUL_TILGANG: { vaktliste: 'skriv_full', admin: false }, MITT_KORPS_ID: null };
+            globalThis.utskriftRessurs = null; globalThis.korpsfilter = null;
+            globalThis.aktivListe = {korps: [{id: 1, navn: 'Haugesund', kortnavn: 'HGSD'}]};
+            console.log(_plassKorps({id: 9, alle_korps: false, plass_korps_id: null, reservert_korps_id: null}));
+        """)
+        self.assertIn('<option value="" selected>Planlagt</option>', planlagt)
 
     def test_ressursnavn_escapes(self):
         ut = self._som('skriv_handling', 1,
