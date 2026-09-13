@@ -201,7 +201,7 @@ class FreezeThawPortalTests(TestCase):
         self.assertTrue(self.target.is_active)
 
 
-@override_settings(SECURE_SSL_REDIRECT=False)
+@override_settings(SECURE_SSL_REDIRECT=False, RATELIMIT_ENABLE=False)
 class UserDeleteTests(TestCase):
     """Permanent sletting av brukerkonto fra portalen."""
 

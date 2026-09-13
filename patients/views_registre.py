@@ -10,6 +10,7 @@ from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_http_methods
 
 from core.auth_decorators import er_global_admin, modul_kreves
+from core.ratelimit import rate_limit
 
 from .models import Forstehjelper, Helsepersonell
 from .views_common import _json_body
@@ -37,6 +38,7 @@ def _navneliste_views(model, etikett, etikett_bestemt):
     @never_cache
     @modul_kreves('patients', 'les', svar='json')
     @require_http_methods(['GET', 'POST'])
+    @rate_limit(group=f'patients:register:{model._meta.model_name}', rate='60/m', method='POST')
     def liste_view(request):
         """Liste alle (GET), eller opprett ny (POST, kun admin).
 
@@ -84,6 +86,7 @@ def _navneliste_views(model, etikett, etikett_bestemt):
 
     @modul_kreves('patients', 'les', svar='json')
     @require_http_methods(['PUT', 'DELETE'])
+    @rate_limit(group=f'patients:register:{model._meta.model_name}:detalj', rate='60/m', method=['PUT', 'DELETE'])
     def detalj_view(request, pk):
         """Oppdater (PUT) eller slett (DELETE). Kun admin."""
         if not er_global_admin(request.user):

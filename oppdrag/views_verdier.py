@@ -24,6 +24,7 @@ from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_http_methods
 
 from core.auth_decorators import er_global_admin, har_tilgang, modul_kreves
+from core.ratelimit import rate_limit
 
 from . import choices, verdier
 from .models import Enhetstype, Lokasjon, Lydvarsel, Problemstilling
@@ -169,6 +170,7 @@ def _liste_view(slug):
     @never_cache
     @modul_kreves('oppdrag', 'les', svar='json')
     @require_http_methods(['GET', 'POST'])
+    @rate_limit(group=f'oppdrag:verdier:{slug}', rate='60/m', method='POST')
     def view(request):
         if request.method == 'GET':
             data = [vm.til_dict(r) for r in vm.rader()]
@@ -203,6 +205,7 @@ def _detalj_view(slug):
 
     @modul_kreves('oppdrag', 'les', svar='json')
     @require_http_methods(['PUT', 'DELETE'])
+    @rate_limit(group=f'oppdrag:verdier:{slug}:detalj', rate='60/m', method=['PUT', 'DELETE'])
     def view(request, pk):
         if not _kan_lede(request):
             return _feil('Å sette opp verdimengdene er skriv_leder.', 403)
@@ -242,6 +245,7 @@ def _rekkefolge_view(slug):
 
     @modul_kreves('oppdrag', 'les', svar='json')
     @require_http_methods(['PUT'])
+    @rate_limit(group=f'oppdrag:verdier:{slug}:rekkefolge', rate='30/m', method='PUT')
     def view(request):
         if not _kan_lede(request):
             return _feil('Å sette opp verdimengdene er skriv_leder.', 403)
@@ -279,6 +283,7 @@ problemstillinger_rekkefolge_view = _rekkefolge_view('problemstillinger')
 @never_cache
 @modul_kreves('oppdrag', 'les', svar='json')
 @require_http_methods(['GET', 'PUT'])
+@rate_limit(group='oppdrag:bilinnstillinger', rate='30/m', method='PUT')
 def bilinnstillinger_view(request):
     """Lydvarselets terskler per hastegrad, om lyden er på i det hele tatt,
     om nytt oppdrag skal pipe, og om grovsortering kreves før Avreist.

@@ -21,7 +21,7 @@ python manage.py verifiser_migrasjoner
 # Setup (første gang)
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
-pip install -r requirements.txt
+pip install -r requirements.txt   # låst med hasher; ny pakke går i requirements.in + pip-compile
 Copy-Item .env.example .env          # rediger SECRET_KEY
 python manage.py migrate
 python manage.py create_admin --username admin --password "bytt-meg"
@@ -104,6 +104,9 @@ vaktlista. Uten etiketten deles nivået ut i god tro med feil modul i hodet. En 
 Ukjent nivånavn gir **False**, ikke True — en skrivefeil i en dekoratør skal stenge døra.
 **Global admin får toppen av stigen** fra `nivaa_for` (13. sep. 2026 — var `skriv_full`,
 og da måtte hvert `skriv_leder`-kallsted huske `er_global_admin(...) or`).
+`admin_required` setter `_admin_required` på viewet, og `core/tests_sikkerhet_runde2.py`
+går gjennom alt under `/portal-admin/`, `/varsler/` og `/min-profil/` med anonym og
+vanlig bruker — dekoratørtesten dekket bare modulprefiksene.
 `ModuleSettings.enabled=False` gir 403 for alle andre enn global admin.
 
 **Hvert view under en modul må være dekorert.** `patients/tests_modul_dekorator.py` går
@@ -139,8 +142,17 @@ klientens påstand. Innloggingsloggen, audit-signalene, arkivene og rate-limit-b
 IP (`ratelimit_nokkel`) bruker den; `REMOTE_ADDR` direkte er proxyen i prod.
 
 **Data inn i et `<script>`-element går gjennom `js_json()`**, aldri `json.dumps` + `|safe`:
-`json.dumps` escaper ikke `<`, og et navn med `</script>` lukker skriptet — noncen hjelper
-ikke når CDN-vertene står i `script-src`.
+`json.dumps` escaper ikke `<`, og et navn med `</script>` lukker skriptet.
+
+**Bootstrap, ikonene, Tabulator og Chart.js ligger under `static/vendor/`** (13. sep. 2026,
+H3) — ikke på CDN. CSP-ens `script-src` er `'self'` + nonce, uten verter: med
+`cdn.jsdelivr.net` i lista kunne én HTML-injeksjon laste en hvilken som helst npm-pakke.
+Oppdatering av bibliotekene står i `static/vendor/README.md`; `tests_security_headers`
+håndhever at ingen mal peker på et CDN.
+
+**Avhengighetene er låst med hasher** (M16): `requirements.in` er ønskene, `requirements.txt`
+er det `pip-compile --generate-hashes --strip-extras` løste dem til, og det er den Railway
+installerer. Ny pakke: legg den i `.in`, kjør `pip-compile`, commit begge.
 
 ### Rate-limiting (core/ratelimit.py)
 
@@ -436,9 +448,9 @@ fase 3–7 gjenstår — se `docs/BESLUTNING_VAKTLISTE.md`, som er besluttet i s
 - **Offline drift på `/vaktliste/`** (13. sep. 2026, notatet §13): service workeren
   `static/js/vaktliste-sw.js` serveres av `vaktliste.views.sw_view` på `/vaktliste/sw.js`
   (en worker styrer bare stier under sin egen; uten innlogging, unntatt i
-  `patients/tests_modul_dekorator.py`, med egen CSP så den kan hente CDN-filer).
+  `patients/tests_modul_dekorator.py`, med egen CSP begrenset til `'self'`).
   `avgjor()` er den ene regelen: API-GET nett først med kopi som reserve (header
-  `X-Vl-Kopi`), siden nett først, statisk/CDN kopi først; **aldri POST, aldri en
+  `X-Vl-Kopi`), siden nett først, statisk kopi først; **aldri POST, aldri en
   omdirigering** (innloggingssiden), og **ingen datakopi eldre enn 24 timer**
   (`erForGammel`). **«Logg ut» sender `Clear-Site-Data: "cache", "storage"`** (13. sep.
   2026) — Cache Storage, localStorage og workeren ryddes i ett på en delt drifts-PC;

@@ -30,7 +30,18 @@ reell feil fra en tilfeldighet.
 Rapportøren faller tilbake til Djangos egen ved enhver feil i seg selv. En
 loggehandler som kaster, tar med seg varslingen den skulle levere.
 """
-from django.views.debug import ExceptionReporter
+from django.views.debug import ExceptionReporter, SafeExceptionReporterFilter
+
+
+class SlankReporterFilter(SafeExceptionReporterFilter):
+    """Cookies i feilvarselet (13. sep. 2026, L1): Djangos filter skjuler bare
+    nøkler som matcher `API|TOKEN|KEY|SECRET|PASS|SIGNATURE`, og `sessionid`
+    gjør ikke det. Den slanke rapporten tar ikke med cookies i det hele tatt,
+    men faller den tilbake til Djangos egen, skal den heller ikke."""
+
+    def get_safe_cookies(self, request):
+        cookies = super().get_safe_cookies(request)
+        return {navn: self.cleansed_substitute for navn in cookies}
 
 
 class SlankExceptionReporter(ExceptionReporter):

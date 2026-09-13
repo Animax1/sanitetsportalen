@@ -196,6 +196,8 @@ def _register_views(model, etikett, etikett_bestemt, *, ekstra_felt=(),
 
     @modul_kreves('vaktliste', 'les', svar='json')
     @require_http_methods(['PUT', 'DELETE'])
+    @rate_limit(group=f'vaktliste:register:{model._meta.model_name}:detalj',
+                rate='60/m', method=['PUT', 'DELETE'])
     def detalj_view(request, pk):
         if not _slipper_inn(request.user):
             return _nektet()
@@ -506,6 +508,7 @@ def mannskap_view(request):
 
 @modul_kreves('vaktliste', 'les', svar='json')
 @require_http_methods(['PUT', 'DELETE'])
+@rate_limit(group='vaktliste:mannskap-skriv', rate='60/m', method=['PUT', 'DELETE'])
 def mannskap_detalj_view(request, pk):
     """Rediger en person, eller fjern en som aldri ble satt opp.
 

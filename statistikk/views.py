@@ -136,6 +136,7 @@ def kilde_full_stats_view(request, slug):
 
 @modul_kreves('statistikk', 'les', svar='json')
 @require_http_methods(['GET'])
+@rate_limit(group='statistikk:arkiv-full-stats', rate='30/m', method='GET')
 def kilde_arkiv_full_stats_view(request, slug, pk):
     """Full statistikk for ett arkiv fra én kilde.
 

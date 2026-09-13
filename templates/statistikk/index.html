@@ -367,7 +367,7 @@
   (Chart.defaults, `new bootstrap.Modal(...#newModal)`) og kaster på en side
   uten pasientskjemaene. Primitivene begge trenger ligger i portal-utils.js.
 {% endcomment %}
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+<script src="{% static 'vendor/chartjs/chart.umd.js' %}"></script>
 <script src="{% static 'js/portal-utils.js' %}"></script>
 <script src="{% static 'js/statistikk.js' %}"></script>
 {% comment %}

@@ -82,8 +82,8 @@ class ServiceWorkerViewTests(TilgangsBasis):
         self.assertIn('application/javascript', res['Content-Type'])
         self.assertEqual(res['Cache-Control'], 'no-cache')
         self.assertEqual(res['Service-Worker-Allowed'], '/vaktliste/')
-        self.assertIn('https://cdn.jsdelivr.net', res['Content-Security-Policy'],
-                      'workeren henter CDN-filer til cachen')
+        self.assertNotIn('https://', res['Content-Security-Policy'],
+                         'bibliotekene ligger under /static/ — ingen CDN (H3)')
         self.assertIn("addEventListener('fetch'", res.content.decode())
 
     def test_siden_registrerer_workeren(self):
@@ -117,13 +117,13 @@ class WorkerensRegelJsTests(SimpleTestCase):
               a(o + '/oppdrag/', 'GET', 'navigate'),
               a(o + '/vaktliste/sw.js'),
               a(o + '/static/js/vaktliste.abc123.js'),
-              a('https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css'),
+              a('https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css'),   // ikke lenger vår
               a('https://evil.example/x.js'),
               a(o + '/accounts/login/', 'GET', 'navigate'),
             ]));
         """)
         self.assertEqual(json.loads(ut.strip().splitlines()[0]),
-                         ['api', None, None, 'side', None, None, 'statisk', 'statisk', None, None])
+                         ['api', None, None, 'side', None, None, 'statisk', None, None, None])
 
     def test_omdirigering_og_feil_lagres_ikke(self):
         ut = run_node(self.harness, """

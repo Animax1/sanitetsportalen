@@ -1485,7 +1485,10 @@ Funnene under er allerede kartlagt, så jobben er avgrenset når den skal gjøre
       - [x] Runde 1 (H1, H2, H4, M1–M11, L2, L3, L5, L10, L11) — 13. sep. 2026, se CHANGELOG
             - [ ] **Krever Andre før push til main:** `SECRET_KEY` i Railway (prod og staging) må
                   være minst 50 tegn — kortere stopper oppstarten nå (L10). Sjekk lengden i Variables.
-      - [ ] Runde 2 (H3 vendor CDN + CSP, M12–M16, L1, L13, L14)
+      - [x] Runde 2 (H3 vendor CDN + CSP, M12–M16, L1, L13, L14) — 13. sep. 2026, se CHANGELOG.
+            M14: brukernavn-røpingen er tettet; låsen er fortsatt global per konto (bevisst — den
+            er vernet som ikke hviler på cachen). Utestengelse av andre ved å gjette mot navnet
+            deres står under «senere».
       - [ ] Senere: L6, L8, L12, L17, L18, L22
 - [x] **Server-status utvidet (13. sep. 2026).** Minne nå + topp, offsite, disk,
       database (svartid, tilkoblinger), vaktbildet, tregeste stier, konfigsjekk,

@@ -23,6 +23,7 @@ from django.views.decorators.http import require_http_methods
 
 from core.arkiv import verifiser
 from core.auth_decorators import er_global_admin, modul_kreves
+from core.ratelimit import rate_limit
 from patients.services import hent_aktiv_vakt
 
 from .arkiv import OppdragArkivHandler, arkiver_vakt
@@ -91,6 +92,7 @@ def _arkiv_til_dict(arkiv, *, med_stats=False):
 
 @modul_kreves('oppdrag', 'les', svar='json')
 @require_http_methods(['GET', 'POST'])
+@rate_limit(group='oppdrag:arkiv', rate='10/m', method='POST')
 def arkiv_liste_view(request):
     """Liste arkivene (GET), eller arkiver den aktive vakta (POST)."""
     if not er_global_admin(request.user):
@@ -132,6 +134,7 @@ def arkiv_liste_view(request):
 
 @modul_kreves('oppdrag', 'les', svar='json')
 @require_http_methods(['GET', 'DELETE'])
+@rate_limit(group='oppdrag:arkiv-slett', rate='10/m', method='DELETE')
 def arkiv_detalj_view(request, pk):
     """Vis ett arkiv med tall og integritetssjekk (GET), eller slett det.
 

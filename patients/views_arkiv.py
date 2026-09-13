@@ -11,6 +11,7 @@ from django.http import JsonResponse
 from django.views.decorators.http import require_http_methods
 
 from core.auth_decorators import er_global_admin, modul_kreves
+from core.ratelimit import rate_limit
 
 from .services import arkiver_aktiv_vakt, compute_arkiv_stats
 from .views_common import _json_body
@@ -42,6 +43,7 @@ def _log_audit(request, action, detail):
 
 @modul_kreves('patients', 'les', svar='json')
 @require_http_methods(['POST'])
+@rate_limit(group='patients:arkiv', rate='10/m', method='POST')
 def arkiv_lagre_view(request):
     """Lagre aktiv vakt som arkiv-snapshot. Kun admin.
 
@@ -98,6 +100,7 @@ def arkiv_liste_view(request):
 
 @modul_kreves('patients', 'les', svar='json')
 @require_http_methods(['GET', 'DELETE'])
+@rate_limit(group='patients:arkiv-slett', rate='10/m', method='DELETE')
 def arkiv_detalj_view(request, pk):
     """Vis (GET) eller slett (DELETE) et arkiv.
 

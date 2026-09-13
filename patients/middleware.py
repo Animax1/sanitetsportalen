@@ -37,7 +37,7 @@ class BackupSchedulerMiddleware:
 #
 # Tillater:
 #   - 'self' for egen origin
-#   - cdn.jsdelivr.net og unpkg.com for Bootstrap/ikoner/QR-kode
+#   - (Bootstrap, ikoner, Tabulator og Chart.js lå på CDN til 13. sep. 2026)
 #   - data: for bilder (QR-koder rendres som data-URL)
 #
 # ── script-src: nonce, ikke 'unsafe-inline' (F5) ────────────────────────────
@@ -54,18 +54,20 @@ class BackupSchedulerMiddleware:
 #      må ha riktig nonce, ellers kjører den ikke.
 #   2. Inline event-handlere (onclick=) dekkes ikke av nonce i det hele tatt.
 #      De er flyttet til data-action; se F5 trinn 1.
-#   3. Vertsnavnene under er fortsatt i kraft — nonce slår ikke ut
-#      allowlisten slik 'strict-dynamic' ville gjort.
+#   3. Ingen vertsnavn i script-src (13. sep. 2026, sikkerhetsgjennomgangen
+#      H3): Bootstrap, Tabulator og Chart.js ligger under static/vendor/ og
+#      serveres av WhiteNoise. Med cdn.jsdelivr.net i lista kunne én
+#      HTML-injeksjon laste en hvilken som helst npm-pakke, nonce eller ei.
 #
 # style-src beholder 'unsafe-inline' med vilje: markup har ~50 inline
 # style-attributter, og statistikk-tabellene bygger flere. Det er utenfor
 # akseptansekriteriet for F5 og et eget stykke arbeid.
 _CSP_DIRECTIVES = [
     "default-src 'self'",
-    "script-src 'self' 'nonce-{nonce}' https://cdn.jsdelivr.net https://unpkg.com",
-    "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://unpkg.com",
+    "script-src 'self' 'nonce-{nonce}'",
+    "style-src 'self' 'unsafe-inline'",
     "img-src 'self' data:",
-    "font-src 'self' https://cdn.jsdelivr.net data:",
+    "font-src 'self' data:",
     "connect-src 'self'",
     "frame-ancestors 'none'",
     "base-uri 'self'",

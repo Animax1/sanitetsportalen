@@ -583,6 +583,7 @@ def backup_admin_module_view(request, slug: str):
 
 @admin_required
 @require_http_methods(['POST'])
+@rate_limit(group='backup:run', rate='6/m', method='POST', on_limit='html')
 def backup_admin_run_view(request, slug: str):
     """Trigger en manuell backup for modulen NÅ."""
     from core.backup import KIND_MANUAL, create_backup, enforce_cap, get_handler
@@ -616,6 +617,7 @@ def backup_admin_run_view(request, slug: str):
 
 @admin_required
 @require_http_methods(['GET', 'POST'])
+@rate_limit(group='backup:restore', rate='6/m', method='POST', on_limit='html')
 def backup_admin_restore_view(request, slug: str, pk: int):
     """Restore-flyt med slug-bekreftelse + audit-log-oppføring."""
     from core.backup import get_handler, restore_backup

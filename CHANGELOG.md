@@ -4,6 +4,43 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-13 — Sikkerhetsgjennomgangen, runde 2: 9 funn rettet
+
+Ingen migrasjon. Numrene viser til `docs/SIKKERHETSGJENNOMGANG_2026-09-13.md`.
+
+- **H3 — bibliotekene inn i repoet.** Bootstrap 5.3.2, Bootstrap Icons 1.11.3,
+  Tabulator 6.2.5 og Chart.js 4.4.2 ligger under `static/vendor/` (fra npm,
+  uten kartreferanser, med lisens og `README.md` om oppdatering) og serveres av
+  WhiteNoise. Alle tretten malene peker dit. CSP-en har ingen verter lenger:
+  `script-src 'self' 'nonce-…'`, `style-src 'self' 'unsafe-inline'`,
+  `font-src 'self' data:`. Service-workerens CSP er `'self'`, `CDN`-lista er tom
+  og `VERSJON` bumpet til `vl-sw-4`. `tests_security_headers` krever at ingen mal
+  laster fra et CDN.
+- **M12 — trust-cookien** signeres med egen `salt` og bærer et passordavtrykk:
+  bytter eller nullstilles passordet, må enheten godkjennes på nytt. Cookies
+  fra før i dag avvises, så alle med «stol på denne enheten» tar MFA én gang til.
+- **M13** — passordskjemaene får brukeren, så «kan ikke ligne brukernavnet»
+  håndheves. **M14** — hasheren kjøres også for låste kontoer, og «kontoen er
+  låst» vises bare for den som har riktig passord; alle andre får «feil
+  brukernavn eller passord». Låsen i seg selv er uendret (5 feil, 15 min) — den
+  er det ene vernet som ikke hviler på cachen.
+- **M15** — `LocMemCache` går fra 200 til 5000 poster. **L1** —
+  `SlankReporterFilter` skjuler alle cookies i Djangos reserve-feilrapport
+  (`DEFAULT_EXCEPTION_REPORTER_FILTER`).
+- **M16 — avhengighetene er låst.** `requirements.in` bærer ønskene,
+  `requirements.txt` er `pip-compile --generate-hashes --strip-extras` (25
+  pakker, 471 hasher). `pip-audit`: ingen kjente sårbarheter. Railway
+  installerer nå nøyaktig det som er testet.
+- **L13** — `@rate_limit` på resten av skriveendepunktene: verdimengdene,
+  bilinnstillinger, arkivering og sletting i begge arkiver, vaktlistas detalj-
+  PUT/DELETE (vaktliste, gruppe, ressurs, vaktpost, mannskap, registre),
+  pasientregistrene, backup run/restore, arkiv-statistikk, brukeradmin.
+  Eksisterende bremser dekker nå også DELETE der den fantes.
+- **L14** — `admin_required` merker viewet, og `core/tests_sikkerhet_runde2.py`
+  går gjennom alt under `/portal-admin/`, `/varsler/`, `/api/varsler/` og
+  `/min-profil/` med anonym og vanlig bruker.
+- 19 nye tester i `*/tests_sikkerhet_runde2.py`.
+
 ## 2026-09-13 — Sikkerhetsgjennomgangen, runde 1: 19 funn rettet
 
 Ingen migrasjon. Numrene viser til `docs/SIKKERHETSGJENNOMGANG_2026-09-13.md`.

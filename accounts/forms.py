@@ -60,6 +60,11 @@ class ChangePasswordForm(forms.Form):
         widget=forms.PasswordInput(attrs={'class': 'form-control'}),
     )
 
+    def __init__(self, *args, user=None, **kwargs):
+        # Uten brukeren er likhetsvalidatoren en no-op (13. sep. 2026, M13).
+        super().__init__(*args, **kwargs)
+        self.user = user
+
     def clean_new_password2(self):
         p1 = self.cleaned_data.get('new_password1', '')
         p2 = self.cleaned_data.get('new_password2', '')
@@ -67,7 +72,7 @@ class ChangePasswordForm(forms.Form):
             raise forms.ValidationError('Du må bekrefte det nye passordet.')
         if p1 and p1 != p2:
             raise forms.ValidationError('Passordene stemmer ikke overens.')
-        password_validation.validate_password(p2)
+        password_validation.validate_password(p2, user=self.user)
         return p2
 
 
@@ -113,6 +118,10 @@ class SettPassordForm(forms.Form):
         widget=forms.PasswordInput(attrs={'class': 'form-control'}),
     )
 
+    def __init__(self, *args, user=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.user = user
+
     def clean_new_password2(self):
         p1 = self.cleaned_data.get('new_password1', '')
         p2 = self.cleaned_data.get('new_password2', '')
@@ -120,7 +129,7 @@ class SettPassordForm(forms.Form):
             raise forms.ValidationError('Du må gjenta passordet.')
         if p1 and p1 != p2:
             raise forms.ValidationError('Passordene stemmer ikke overens.')
-        password_validation.validate_password(p2)
+        password_validation.validate_password(p2, user=self.user)
         return p2
 
 

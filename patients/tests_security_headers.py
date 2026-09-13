@@ -24,19 +24,27 @@ class SecurityHeadersTests(TestCase):
         self.assertIn("frame-ancestors 'none'", csp)
         self.assertIn("object-src 'none'", csp)
 
-    def test_csp_tillater_nodvendige_cdns(self):
+    def test_csp_uten_cdn_verter(self):
+        """H3 (13. sep. 2026): bibliotekene ligger under static/vendor/, og
+        ingen vert står i CSP-en — med cdn.jsdelivr.net i script-src kunne én
+        HTML-injeksjon laste en hvilken som helst npm-pakke."""
         resp = self.client.get('/accounts/login/')
         csp = resp.headers['Content-Security-Policy']
-        # Del CSP i direktiver for presis sjekk per direktiv
+        self.assertNotIn('jsdelivr', csp)
+        self.assertNotIn('unpkg', csp)
+        self.assertNotIn('https://', csp)
         directives = {d.strip().split(' ', 1)[0]: d.strip()
                       for d in csp.split(';') if d.strip()}
-        # Både script og style må tillate jsdelivr og unpkg – ellers
-        # blir Tabulator/Bootstrap/Chart.js blokkert og UI kollapser.
-        for src in ('script-src', 'style-src'):
-            self.assertIn('https://cdn.jsdelivr.net', directives.get(src, ''),
-                          f'{src} må tillate cdn.jsdelivr.net')
-            self.assertIn('https://unpkg.com', directives.get(src, ''),
-                          f'{src} må tillate unpkg.com')
+        self.assertRegex(directives['script-src'], r"^script-src 'self' 'nonce-[A-Za-z0-9_\-]+'$")
+
+    def test_ingen_mal_laster_fra_cdn(self):
+        import glob
+        from pathlib import Path
+        rot = Path(__file__).resolve().parent.parent
+        for p in glob.glob(str(rot / '**' / 'templates' / '**' / '*.html'), recursive=True):
+            tekst = Path(p).read_text(encoding='utf-8')
+            self.assertNotIn('jsdelivr', tekst, p)
+            self.assertNotIn('unpkg.com', tekst, p)
 
     def test_referrer_policy_satt(self):
         resp = self.client.get('/accounts/login/')

@@ -235,8 +235,9 @@ sårbarheter i dagens oppløsning; Django 5.2 er LTS.
 
 ## Status og rekkefølge
 
-**13. sep. 2026:** runde 1 er rettet (commit `2b88853` på `rollemodell`, se CHANGELOG).
-Runde 2 og «senere» står igjen.
+**13. sep. 2026:** runde 1 (commit `2b88853`) og runde 2 er rettet på `rollemodell`, se
+CHANGELOG. M14 er rettet for brukernavn-røping og svartid; låsen er fortsatt global per
+konto, bevisst — utestengelsesvektoren står under «senere». «Senere» står igjen.
 
 **Runde 1 — nå, uten migrasjon:** H1 (escaping), H2 (klient-IP-hjelper), H4
 (`Clear-Site-Data` + maks alder), M1, M2, M3, M4, M5, M6, M7, M8, M9, M10, M11, L2, L3,

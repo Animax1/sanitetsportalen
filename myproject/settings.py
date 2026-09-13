@@ -349,7 +349,10 @@ else:
             'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
             'LOCATION': 'pasientregistrering-ratelimit',
             'OPTIONS': {
-                'MAX_ENTRIES': 200,
+                # 200 delte rate-limit-tellere med idempotens- og
+                # statistikknøkler, og 200 ulike brukernavn mot innlogging
+                # kunne kaste ut tellerne (13. sep. 2026, M15).
+                'MAX_ENTRIES': 5000,
                 'CULL_FREQUENCY': 4,
             },
         }
@@ -446,6 +449,9 @@ elif EMAIL_HOST:
 else:
     # Ingen transport konfigurert: skriv e-posten til stdout i stedet for å feile.
     EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
+
+# Cookies (sessionid) ut av Djangos reserve-feilrapport (13. sep. 2026, L1).
+DEFAULT_EXCEPTION_REPORTER_FILTER = 'core.error_reporting.SlankReporterFilter'
 
 # ── Logging (N3) ─────────────────────────────────────────────────────────────
 #

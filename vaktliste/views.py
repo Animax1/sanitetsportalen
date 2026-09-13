@@ -311,6 +311,7 @@ def vaktlister_view(request):
 @never_cache
 @modul_kreves('vaktliste', 'les', svar='json')
 @require_http_methods(['POST'])
+@rate_limit(group='vaktliste:arkiver', rate='30/m', method='POST')
 def vaktliste_arkiver_view(request, pk, retning):
     """Arkiver (`arkiver`) eller hent tilbake (`gjenopprett`) en vaktliste.
 
@@ -339,6 +340,7 @@ def vaktliste_arkiver_view(request, pk, retning):
 @never_cache
 @modul_kreves('vaktliste', 'les', svar='json')
 @require_http_methods(['GET', 'PUT', 'DELETE'])
+@rate_limit(group='vaktliste:vaktliste-skriv', rate='60/m', method=['PUT', 'DELETE'])
 def vaktliste_detalj_view(request, pk):
     """Hele oppsettet for én liste (GET), eller slett den (DELETE).
 
@@ -526,6 +528,7 @@ def grupper_view(request):
 
 @modul_kreves('vaktliste', 'les', svar='json')
 @require_http_methods(['PUT', 'DELETE'])
+@rate_limit(group='vaktliste:gruppe-skriv', rate='60/m', method=['PUT', 'DELETE'])
 def gruppe_detalj_view(request, pk):
     """Rediger eller fjern en ressursgruppe. `skriv_leder`/admin.
 
@@ -969,13 +972,15 @@ def sw_view(request):
                         content_type='application/javascript; charset=utf-8')
     svar['Cache-Control'] = 'no-cache'
     svar['Service-Worker-Allowed'] = '/vaktliste/'
-    svar['Content-Security-Policy'] = (
-        "default-src 'self'; connect-src 'self' https://cdn.jsdelivr.net https://unpkg.com")
+    # Bibliotekene ligger under /static/ siden 13. sep. 2026 (H3) — workeren
+    # trenger ikke nå noe utenfor eget opphav.
+    svar['Content-Security-Policy'] = "default-src 'self'; connect-src 'self'"
     return svar
 
 
 @modul_kreves('vaktliste', 'les', svar='json')
 @require_http_methods(['PUT', 'DELETE'])
+@rate_limit(group='vaktliste:ressurs-skriv', rate='120/m', method=['PUT', 'DELETE'])
 def ressurs_detalj_view(request, pk):
     """Rediger eller fjern en ressurs. `skriv_leder`/admin — se `ressurser_view`.
 
@@ -1132,6 +1137,7 @@ def vaktposter_view(request, pk):
 
 @modul_kreves('vaktliste', 'les', svar='json')
 @require_http_methods(['PUT', 'DELETE'])
+@rate_limit(group='vaktliste:vaktpost-skriv', rate='120/m', method=['PUT', 'DELETE'])
 def vaktpost_detalj_view(request, pk):
     """Rediger tider, rolle og merknad — eller fjern skiftet.
 

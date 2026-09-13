@@ -34,10 +34,10 @@ Pasientregistreringssystemet er en nettbasert applikasjon for sanntids registrer
 | Testing | Django TestCase | – | 178 tester totalt (145 opprinnelige + 19 admin server-status + 14 stats-cache/ETag) |
 | Python-versjon | Python | 3.12 (runtime.txt) | Kjøretidsmiljø |
 | Deploy-plattform | Railway | – | Hosting, Postgres, Volume, HTTPS |
-| Frontend-grid | Tabulator | (CDN) | Pasienttabell med sortering og filtrering |
-| Frontend-diagram | Chart.js | (CDN) | Statistikk-diagrammer |
-| Frontend-UI | Bootstrap 5 | (CDN) | Responsivt grensesnitt, modaler |
-| Frontend-ikoner | Bootstrap Icons | (CDN) | UI-ikoner |
+| Frontend-grid | Tabulator | 6.2.5, `static/vendor/` | Pasienttabell med sortering og filtrering |
+| Frontend-diagram | Chart.js | 4.4.2, `static/vendor/` | Statistikk-diagrammer |
+| Frontend-UI | Bootstrap 5 | 5.3.2, `static/vendor/` | Responsivt grensesnitt, modaler |
+| Frontend-ikoner | Bootstrap Icons | 1.11.3, `static/vendor/` | UI-ikoner |
 | Frontend-logikk | Vanlig JavaScript | – | Ingen rammeverk, ingen bundler; fire moduler i `static/js/` |
 
 ---
@@ -688,7 +688,7 @@ SECURE_HSTS_PRELOAD = True
 
 | Header | Verdi |
 |---|---|
-| `Content-Security-Policy` | Restriktiv policy tilpasset CDN-avhengighetene |
+| `Content-Security-Policy` | `script-src 'self' 'nonce-…'` uten verter — bibliotekene ligger under `static/vendor/` (13. sep. 2026) |
 | `Referrer-Policy` | `same-origin` |
 | `Permissions-Policy` | `camera=(), microphone=(), geolocation=()` |
 

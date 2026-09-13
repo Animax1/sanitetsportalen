@@ -19,10 +19,11 @@
  * Serveres av vaktliste.views.sw_view, ikke fra /static/ — en worker styrer
  * bare stier under sin egen.
  */
-const VERSJON = 'vl-sw-3';
+const VERSJON = 'vl-sw-4';
 const SKALL = `${VERSJON}-skall`;
 const DATA = `${VERSJON}-data`;
-const CDN = ['https://cdn.jsdelivr.net', 'https://unpkg.com'];
+// Bibliotekene ligger under /static/ (13. sep. 2026, H3) — ingen CDN å hente.
+const CDN = [];
 // Datakopien serveres ikke etter dette (13. sep. 2026, H4): en vakt varer
 // ikke lenger, og en kopi av mannskapsregisteret skal ikke ligge klar til
 // den som åpner sida uten nett uker senere. Logg ut rydder alt uansett.

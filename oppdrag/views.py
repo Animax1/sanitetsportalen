@@ -218,6 +218,7 @@ def enheter_view(request):
 
 @modul_kreves('oppdrag', 'skriv_full', svar='json')
 @require_http_methods(['PUT'])
+@rate_limit(group='oppdrag:enhet-skriv', rate='60/m', method='PUT')
 def enhet_detalj_view(request, pk):
     """Enhetstypen (André, 12. sep. 2026). Navn og konto settes i
     brukeradministrasjonen, som før; typen er oppdragsmodulens egen, og
@@ -460,7 +461,7 @@ def _enheter_fra_kroppen(data):
 
 @modul_kreves('oppdrag', 'les', svar='json')
 @require_http_methods(['GET', 'PUT', 'DELETE'])
-@rate_limit(group='oppdrag:detalj-skriv', rate='120/m', method='PUT')
+@rate_limit(group='oppdrag:detalj-skriv', rate='120/m', method=['PUT', 'DELETE'])
 def oppdrag_detalj_view(request, pk):
     """Hent ett oppdrag med tidslinje (GET), eller rediger felt (PUT).
 
@@ -642,7 +643,7 @@ def _oppdrag_og_enhet(request, pk, enhet_pk):
 
 @modul_kreves('oppdrag', 'skriv_full', svar='json')
 @require_http_methods(['POST', 'DELETE'])
-@rate_limit(group='oppdrag:oppdragsenhet', rate='60/m', method='POST')
+@rate_limit(group='oppdrag:oppdragsenhet', rate='60/m', method=['POST', 'DELETE'])
 def oppdragsenhet_view(request, pk, enhet_pk):
     """Varsle en enhet til (POST), eller ta henne av (DELETE).
 
@@ -1057,7 +1058,7 @@ def stempling_view(request, pk, overgang, sted=None):
 
 @modul_kreves('oppdrag', 'skriv_full', svar='json')
 @require_http_methods(['POST', 'DELETE'])
-@rate_limit(group='oppdrag:historikk', rate='60/m', method='POST')
+@rate_limit(group='oppdrag:historikk', rate='60/m', method=['POST', 'DELETE'])
 def historikk_view(request, pk):
     """Flytt et ferdigstilt oppdrag til historikken (POST), eller hent det
     tilbake til tavla (DELETE).
@@ -1096,6 +1097,7 @@ def historikk_view(request, pk):
 @never_cache
 @modul_kreves('oppdrag', 'les', svar='json')
 @require_http_methods(['GET', 'DELETE'])
+@rate_limit(group='oppdrag:historikk-liste', rate='60/m', method=['GET', 'DELETE'])
 def historikk_liste_view(request):
     """Historikken for aktiv vakt — de ferdigstilte oppdragene, nyest først.
 

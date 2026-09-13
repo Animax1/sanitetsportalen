@@ -244,8 +244,8 @@ class MFATrustCookieTests(TestCase):
     def test_mfa_trust_cookie_skips_verify(self):
         """Gyldig trust-cookie skal hoppe over MFA-verifisering."""
         # Sett trust-cookie manuelt
-        signer = signing.TimestampSigner()
-        token = signer.sign(f'{self.user.pk}:{self.device.pk}')
+        from accounts.views import _trust_token
+        token = _trust_token(self.user, self.device)
         self.client.cookies[f'mfa_trusted_{self.user.pk}'] = token
 
         resp = self.client.post(self.url, {
@@ -266,9 +266,9 @@ class MFATrustCookieTests(TestCase):
         from unittest.mock import patch
         import datetime
 
-        signer = signing.TimestampSigner()
+        from accounts.views import _trust_token
         # Lag en kode som er 31 dager gammel
-        token = signer.sign(f'{self.user.pk}:{self.device.pk}')
+        token = _trust_token(self.user, self.device)
 
         # Simuler at cookien ble satt for 31 dager siden
         future_time = timezone.now() + datetime.timedelta(days=31)

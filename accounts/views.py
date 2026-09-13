@@ -1,5 +1,7 @@
 """Views for brukerkontoer og admin-panel."""
 import base64
+import hashlib
+import hmac
 import io
 import secrets
 import string
@@ -41,6 +43,7 @@ from .passord import lag_midlertidig_passord
 from .backends import finn_konto
 from .models import CustomUser, LoginEvent
 from core.klientip import klient_ip, ratelimit_nokkel
+from core.ratelimit import rate_limit
 
 
 def _get_client_ip(request):
@@ -162,11 +165,29 @@ def _log_event(user, username_attempt, success, request, event_type=LoginEvent.E
     )
 
 
+_TRUST_SALT = 'accounts.mfa_trust'
+
+
+def _trust_avtrykk(user):
+    """Passordavtrykk i trust-cookien (13. sep. 2026, M12): bytter passordet,
+    eller nullstilles det, stemmer ikke avtrykket lenger, og enheten må
+    godkjennes på nytt. Samme grep som `signert_lenke._passordavtrykk`."""
+    return hashlib.sha256((user.password or '').encode('utf-8')).hexdigest()[:16]
+
+
+def _trust_token(user, device):
+    return signing.TimestampSigner(salt=_TRUST_SALT).sign(
+        f'{user.pk}:{device.pk}:{_trust_avtrykk(user)}')
+
+
 def _check_mfa_trust(request, user):
     """Sjekk om denne enheten er klarert via trust-cookie.
 
     Returnerer True hvis cookie eksisterer, signaturen er gyldig og ikke utløpt.
-    Cookie-verdien er et signert token med user_id og device_id.
+    Cookie-verdien er et signert token med user_id, device_id og et
+    passordavtrykk — egen `salt`, så ingen annen signatur i portalen deler
+    nøkkelrom med den (M12). Cookies fra før 13. sep. 2026 har verken salt
+    eller avtrykk og avvises; enheten godkjennes på nytt én gang.
     """
     cookie_name = f'mfa_trusted_{user.pk}'
     token = request.COOKIES.get(cookie_name)
@@ -176,11 +197,13 @@ def _check_mfa_trust(request, user):
     trust_days = getattr(django_settings, 'MFA_TRUST_DEVICE_DAYS', 30)
     max_age = trust_days * 86400  # sekunder
 
-    signer = signing.TimestampSigner()
+    signer = signing.TimestampSigner(salt=_TRUST_SALT)
     try:
         value = signer.unsign(token, max_age=max_age)
-        user_id_str, device_id_str = value.split(':', 1)
+        user_id_str, device_id_str, avtrykk = value.split(':', 2)
         if str(user_id_str) != str(user.pk):
+            return False
+        if not hmac.compare_digest(avtrykk, _trust_avtrykk(user)):
             return False
         # Sjekk at enheten fortsatt finnes og er bekreftet
         device_id = int(device_id_str)
@@ -194,13 +217,10 @@ def _check_mfa_trust(request, user):
 def _set_mfa_trust_cookie(response, user, device, is_secure):
     """Sett trust-cookie på response."""
     trust_days = getattr(django_settings, 'MFA_TRUST_DEVICE_DAYS', 30)
-    signer = signing.TimestampSigner()
-    value = f'{user.pk}:{device.pk}'
-    token = signer.sign(value)
     cookie_name = f'mfa_trusted_{user.pk}'
     response.set_cookie(
         cookie_name,
-        token,
+        _trust_token(user, device),
         max_age=trust_days * 86400,
         httponly=True,
         secure=is_secure,
@@ -388,15 +408,20 @@ def login_view(request):
         # dette oppslaget var ikke det.
         user_obj = finn_konto(username)
 
-        if user_obj and user_obj.is_locked():
-            remaining = int((user_obj.locked_until - timezone.now()).total_seconds() / 60) + 1
+        # Hasheren kjøres alltid — også for en låst konto (13. sep. 2026,
+        # M14). Før hoppet låst konto over `authenticate`, og både svartiden
+        # og meldingen skilte «finnes og er låst» fra «finnes ikke». Nå får
+        # bare den som har riktig passord vite at kontoen er låst; alle andre
+        # får samme svar som ved feil passord.
+        user = authenticate(request, username=username, password=password)
+        if user is not None and user.is_active and user.is_locked():
+            remaining = int((user.locked_until - timezone.now()).total_seconds() / 60) + 1
             error = f'Kontoen er midlertidig låst. Prøv igjen om {remaining} minutt(er).'
             LoginEvent.objects.create(
-                user=user_obj, username_attempt=username, success=False,
+                user=user, username_attempt=username, success=False,
                 ip=ip, user_agent=user_agent, event_type=LoginEvent.EVENT_LOGIN,
             )
         else:
-            user = authenticate(request, username=username, password=password)
             if user is not None and user.is_active:
                 # Telleren nullstilles først når begge faktorene er bevist
                 # (13. sep. 2026, M1): for en konto med MFA skjer det i
@@ -687,7 +712,7 @@ def change_password_view(request):
     error = None
 
     if request.method == 'POST':
-        form = ChangePasswordForm(request.POST)
+        form = ChangePasswordForm(request.POST, user=request.user)
         if form.is_valid():
             if not request.user.must_change_password:
                 old = form.cleaned_data.get('old_password', '')
@@ -891,6 +916,7 @@ def _ta_enhet_av_vakt(user):
 
 @never_cache
 @admin_required
+@rate_limit(group='accounts:user-create', rate='20/m', method='POST', on_limit='html')
 def user_create_view(request):
     """Opprett ny bruker — med invitasjon, eller med midlertidig passord.
 
@@ -1026,7 +1052,7 @@ def passord_reset_view(request, token):
 
     form = SettPassordForm()
     if request.method == 'POST':
-        form = SettPassordForm(request.POST)
+        form = SettPassordForm(request.POST, user=user)
         if form.is_valid():
             user.set_password(form.cleaned_data['new_password1'])
             user.must_change_password = False
@@ -1065,7 +1091,7 @@ def invitasjon_view(request, token):
 
     form = SettPassordForm()
     if request.method == 'POST':
-        form = SettPassordForm(request.POST)
+        form = SettPassordForm(request.POST, user=user)
         if form.is_valid():
             user.set_password(form.cleaned_data['new_password1'])
             user.must_change_password = False
@@ -1084,6 +1110,7 @@ def invitasjon_view(request, token):
 
 @never_cache
 @admin_required
+@rate_limit(group='accounts:user-detail', rate='60/m', method='POST', on_limit='html')
 def user_detail_view(request, pk):
     """Vis og rediger brukerdetaljer."""
     user = get_object_or_404(CustomUser, pk=pk)
@@ -1334,6 +1361,7 @@ def _kan_slettes(target, actor):
 
 @admin_required
 @require_http_methods(['POST'])
+@rate_limit(group='accounts:user-delete', rate='10/m', method='POST', on_limit='html')
 def user_delete_view(request, pk):
     """Slett en brukerkonto permanent.
 

@@ -91,6 +91,7 @@ def admin_required(view_func):
         if not er_global_admin(request.user):
             raise PermissionDenied
         return view_func(request, *args, **kwargs)
+    wrapper._admin_required = True   # leses av tests_modul_dekorator (L14)
     return wrapper
 
 
