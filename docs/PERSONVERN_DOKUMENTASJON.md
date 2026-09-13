@@ -39,6 +39,16 @@ Behandlingsansvarlig er ansvarlig for at personopplysninger behandles i tråd me
 
 Databehandleravtale (DPA) er inngått i samsvar med GDPR artikkel 28. Data lagres utelukkende i EU-regionen europe-west4 (Nederland). Ingen behandling skjer utenfor EU/EØS.
 
+| Felt | Opplysning |
+|---|---|
+| Navn | Scaleway SAS |
+| Rolle | Databehandler (Object Storage for krypterte sikkerhetskopier av modulenes data, fra 13. sep. 2026) |
+| Avtalegrunnlag | Scaleway Data Processing Agreement, https://www-uploads.scaleway.com/DPA_2024_ENG_b0abb5cc26.pdf |
+| Databehandlingsregion | nl-ams (Amsterdam, Nederland, EU), One Zone |
+| Innhold | De per-modul-backupene portalen selv lager, **kryptert før de forlater Railway** (AES-256-GCM, nøkkel som Scaleway ikke har). Scaleway ser bare chiffertekst. I tillegg Scaleways egen kryptering på disk (SSE) |
+| Sletting | Livssyklusregel på bucketen: objekter slettes etter 730 dager, samme frist som arkivkollapsen (A.9) |
+| Tilgang | Egen IAM-applikasjon med skrive- og leserett på objekter, uten sletterett. Bucketen er privat, uten versjonering |
+
 **Tjenester driftet av Railway Corp. på vegne av behandlingsansvarlig:**
 
 Applikasjonen kjøres i to driftsmoduser (se TEKNISK_DOKUMENTASJON.md kapittel 8E og RUNBOOK_VAKT.md §1b for detaljer). Hvilke tjenester som er aktive avhenger av modus:

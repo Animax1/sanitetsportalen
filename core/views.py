@@ -521,8 +521,10 @@ def backup_admin_overview_view(request):
             'backup_count': backup_count,
         })
 
+    from core import offsite
     return render(request, 'core/backup_admin_overview.html', {
         'rows': rows,
+        'offsite': offsite.status(),
     })
 
 

@@ -329,26 +329,18 @@ Pasienter har Excel, oppdrag går på nødnett. Det som skal overleve at Railway
       - [x] **Bekreftet på staging 13. sep.:** kopi med nettet av, kø sendt når nettet
             kom tilbake, tida fra trykket, avvist trykk fjernet med beskjed, utgått
             innlogging håndtert, /django-admin/ borte.
-- [ ] **3. Backupene ut av Railway, til Scaleway Object Storage.** Bucket i Amsterdam,
-      klasse Standard One Zone (€0,00803/GB/mnd; opplasting gratis, 75 GB ut gratis per
-      måned — våre volumer er under 1 GB). S3-protokollen, `boto3`.
-      - Filene er de per-modul-JSON-ene `core.backup` alt lager, **gzip-komprimert**
-        (standardbiblioteket, ingen ny avhengighet; JSON krymper 10–20×) og **kryptert
-        før de forlater Railway** — pasientfilene er helseopplysninger. Nøkkel i en
-        Railway-variabel, aldri i repoet.
-      - **Frekvens = når noe har endret seg.** Auto-backupen har alt hash-skip, så en
-        kjøring uten endringer skriver ingenting; opplastingen henger på at en *ny* fil
-        ble skrevet, ikke på en egen klokke. Under vakt settes `interval_minutes` til 10
-        per modul i `/portal-admin/backup/` — det er det meste man taper — og i pausene
-        koster kjøringene ingenting. Ingen egen cron for opplasting.
-      - Livssyklusregel på bucketen: slett etter 24 måneder, samme frist som
-        arkivkollapsen. Backuper er ikke et arkiv.
-      - Gjenoppretting: kommando som henter, dekrypterer og pakker opp én fil, og
-        legger den der `restore_backup` finner den. Prøves én gang mot staging før den
-        regnes som ferdig.
-      - Personverndokumentasjonen får Scaleway som databehandler. **Krever Andre:**
-        konto, bucket, nøkkelpar og databehandleravtale.
-      Ca. en halv dag kode.
+- [x] **3. Backupene ut av Railway, til Scaleway Object Storage** (13. sep. 2026,
+      `core/offsite.py`, `OffsiteKopi`, `core/0007`, `hent_offsite`). Kryptert før
+      opplasting (AES-256-GCM), henger på ny fil fra `create_backup`, kaster aldri, status
+      på /portal-admin/backup/. Bucket i Amsterdam, One Zone, SSE på, versjonering av,
+      lifecycle 730 dager / multipart 7 dager — satt av André. DPA:
+      https://www-uploads.scaleway.com/DPA_2024_ENG_b0abb5cc26.pdf
+      - [ ] **André:** IAM-applikasjon med policy (ObjectStorageObjectsWrite/Read,
+            BucketsRead, ikke delete), API-nøkkel, `OFFSITE_BACKUP_KEY` i passordbehandler,
+            de seks variablene på prod-tjenesten.
+      - [ ] **Prøv gjenopprettingen én gang** i prod-containeren når variablene står:
+            `railway ssh --service web -- python manage.py hent_offsite --list`, hent én
+            fil, og se at den dukker opp under /portal-admin/backup/.
 - [x] **4. Den gamle offline-arkitekturen er fjernet** (13. sep. 2026, samtidig med 2
       etter Andrés valg): `OFFLINE_MODE`, CSRF for LAN, Django-admin under offline,
       `create_offline_users`, `.env.offline.example`, `OFFLINE_PASSORD.md`, USB-pakken.

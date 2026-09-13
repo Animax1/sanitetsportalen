@@ -4,6 +4,25 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-13 — Reserve 3: backupene ut av Railway, til Scaleway
+
+Én migrasjon, `core/0007` (`OffsiteKopi`). To nye avhengigheter: `boto3` og
+`cryptography`. Inert uten variablene — bare prod skal ha dem.
+
+- **Hver ny backup-fil lastes opp til Scaleway Object Storage**, kryptert
+  før den forlater Railway (AES-256-GCM, nøkkel avledet av
+  `OFFSITE_BACKUP_KEY`). Henger på at `create_backup` faktisk skrev en ny fil;
+  hash-skip gir ingen opplasting. Ingen egen klokke.
+- **Kaster aldri:** feiler bucketen, står backupen på volumet som før, og
+  raden `OffsiteKopi` bærer feilen. Kortet «Offsite-kopi (Scaleway)» øverst på
+  /portal-admin/backup/ viser status, siste opplasting og siste feil.
+- **Gjenoppretting:** `python manage.py hent_offsite --list` og
+  `hent_offsite <filnavn>` henter, dekrypterer og legger fila i `BACKUP_DIR`
+  med en `Backup`-rad, så den kan gjenopprettes fra backup-siden.
+- Variabler: `OFFSITE_S3_BUCKET`, `OFFSITE_S3_REGION`, `OFFSITE_S3_ENDPOINT`,
+  `OFFSITE_S3_ACCESS_KEY`, `OFFSITE_S3_SECRET_KEY`, `OFFSITE_BACKUP_KEY`.
+- Scaleway inn i personverndokumentasjonen A.2 som databehandler, med DPA.
+
 ## 2026-09-13 — Reserve 2 og 4: offline drift på /vaktliste/, gammel offline-modus lagt ned
 
 Ingen migrasjon. Deployes til staging først; testes i Chrome/Edge på PC.

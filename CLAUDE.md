@@ -218,6 +218,17 @@ En test som kaller `clear_registry()` må rydde opp med
 det siste, mister resten av testkjøringen de andre modulenes handlere, og feilen dukker
 opp i en helt annen fil.
 
+**Offsite til Scaleway (13. sep. 2026, `core/offsite.py`):** `create_backup` kaller
+`offsite.meld_ny_backup(backup, path)` etter at fila er skrevet — inert uten
+`OFFSITE_S3_BUCKET`/nøklene/`OFFSITE_BACKUP_KEY`, og **kaster aldri**: volumet er første
+nett, og feilen står i `OffsiteKopi.feil` og på kortet øverst på `/portal-admin/backup/`.
+Fila krypteres med AES-256-GCM (`krypter`/`dekrypter`, format `SPBK1`+nonce+chiffer) før
+den lastes opp som `backups/<filnavn>.enc`; opplastingen henger på at en ny fil ble
+skrevet, hash-skip gir ingen. `hent_offsite --list` / `hent_offsite <filnavn>` henter,
+dekrypterer og legger fila i `BACKUP_DIR` med en `Backup`-rad. S3 mockes i
+`core/tests_offsite.py` ved å bytte ut `_klient`. Nøkkelen skal også ligge i en
+passordbehandler — uten den er bucketen uleselig, og det er meningen.
+
 Logikken ligger i `core/backup/`. `patients/backup_service.py` er en tynn proxy som beholder bakoverkompatibelt API for `db_backup`-kommandoen, `views_patients.py` og eldre tester — nye moduler skal registrere en handler og kalle `core.backup.create_backup(slug=...)` direkte.
 
 ### Arkivmønster (core/arkiv/)
@@ -868,6 +879,8 @@ Settes i `.env` lokalt. Nøkler å kjenne til:
 | `AHASEND_API_KEY` + `AHASEND_ACCOUNT_ID` | AHASends HTTP-API v2 (`core/mail_backends.py`). **Dette er transporten i prod** — Railway sperrer utgående SMTP på alle porter |
 | `EMAIL_HOST` m.fl. | SMTP for feilvarsel. Brukes kun lokalt |
 | `EMAIL_TIMEOUT` | Tidsgrense for utsending, default 10 s. Må aldri være `None` |
+| `OFFSITE_S3_BUCKET`, `OFFSITE_S3_REGION`, `OFFSITE_S3_ENDPOINT`, `OFFSITE_S3_ACCESS_KEY`, `OFFSITE_S3_SECRET_KEY` | Scaleway Object Storage for offsite backup (`core/offsite.py`). Bare prod |
+| `OFFSITE_BACKUP_KEY` | Krypteringsnøkkelen for offsite-backupene. Skal også ligge i en passordbehandler utenfor Railway |
 
 ## Deployment
 

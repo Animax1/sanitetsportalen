@@ -404,6 +404,17 @@ SERVER_EMAIL = DEFAULT_FROM_EMAIL
 AHASEND_API_KEY = os.environ.get('AHASEND_API_KEY', '')
 AHASEND_ACCOUNT_ID = os.environ.get('AHASEND_ACCOUNT_ID', '')
 
+# ── Offsite backup til Scaleway Object Storage (13. sep. 2026) ───────────────
+# Inert uten bucket, nøkler og OFFSITE_BACKUP_KEY — bare prod har dem. Se
+# core/offsite.py. OFFSITE_BACKUP_KEY må også ligge i en passordbehandler:
+# uten den er bucketen uleselig, og det er meningen.
+OFFSITE_S3_BUCKET = os.environ.get('OFFSITE_S3_BUCKET', '')
+OFFSITE_S3_REGION = os.environ.get('OFFSITE_S3_REGION', 'nl-ams')
+OFFSITE_S3_ENDPOINT = os.environ.get('OFFSITE_S3_ENDPOINT', 'https://s3.nl-ams.scw.cloud')
+OFFSITE_S3_ACCESS_KEY = os.environ.get('OFFSITE_S3_ACCESS_KEY', '')
+OFFSITE_S3_SECRET_KEY = os.environ.get('OFFSITE_S3_SECRET_KEY', '')
+OFFSITE_BACKUP_KEY = os.environ.get('OFFSITE_BACKUP_KEY', '')
+
 # Rekkefølgen er en prioritering, ikke en tilfeldighet: HTTP-API-et først fordi
 # det er det eneste som faktisk kommer ut av containeren. SMTP beholdes fordi
 # det virker i offline-modus og lokalt, der ingen brannmur står i veien.

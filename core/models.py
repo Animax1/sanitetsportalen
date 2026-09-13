@@ -377,3 +377,34 @@ class Vakt(models.Model):
 
     def __str__(self):
         return self.navn
+
+
+class OffsiteKopi(models.Model):
+    """Én opplasting av en backup-fil til Scaleway (13. sep. 2026).
+
+    Raden er sporet: hvilken fil, hvor den ligger i bucketen, hvor stor den
+    ble kryptert, når den gikk — og `feil` når den ikke gikk. Et mislykket
+    forsøk får også en rad; oversikten på /portal-admin/backup/ viser den
+    siste feilen, for en offsite-backup som stille har sluttet å virke er
+    den feilen man oppdager den dagen Railway er borte.
+    """
+
+    backup_filnavn = models.CharField(max_length=255, verbose_name='Backup-fil')
+    module_slug = models.CharField(max_length=50, blank=True, default='', verbose_name='Modul')
+    objektnavn = models.CharField(max_length=300, verbose_name='Objekt i bucketen')
+    bytes = models.BigIntegerField(default=0, verbose_name='Bytes (kryptert)')
+    sendt_at = models.DateTimeField(null=True, blank=True, verbose_name='Lastet opp')
+    feil = models.TextField(blank=True, default='', verbose_name='Feil')
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name='Forsøkt')
+
+    class Meta:
+        verbose_name = 'Offsite-kopi'
+        verbose_name_plural = 'Offsite-kopier'
+        ordering = ['-created_at']
+
+    def __str__(self) -> str:
+        return f'{self.objektnavn} ({"ok" if not self.feil else "feilet"})'
+
+    @property
+    def gikk(self) -> bool:
+        return not self.feil

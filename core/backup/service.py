@@ -163,6 +163,11 @@ def create_backup(slug: str, kind: str = KIND_MANUAL,
         module_slug=slug,
     )
     logger.info('core.backup: opprettet %s (%d bytes)', filename, size)
+    # Offsite (13. sep. 2026): hver ny fil ut av Railway, kryptert. Henger på
+    # at fila faktisk ble skrevet — hash-skip over betyr ingen opplasting.
+    # Inert uten konfigurasjon, og kaster aldri: volumet er første nett.
+    from core import offsite
+    offsite.meld_ny_backup(backup, path)
     return backup
 
 

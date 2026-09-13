@@ -11,6 +11,35 @@
   </p>
 </section>
 
+{# Offsite til Scaleway (13. sep. 2026): hver ny fil lastes opp kryptert. Kortet sier om det virker. #}
+<div class="card mb-3" id="offsite-kort" style="background: var(--portal-surface); border-color: var(--portal-border);">
+  <div class="card-body py-2">
+    <div class="d-flex flex-wrap align-items-center gap-3">
+      <strong><i class="bi bi-cloud-check me-1"></i>Offsite-kopi (Scaleway)</strong>
+      {% if not offsite.konfigurert %}
+        <span class="badge bg-secondary">Ikke konfigurert</span>
+        <span class="small text-muted">Mangler {{ offsite.mangler|join:", " }} på tjenesten. Bare prod skal ha dem.</span>
+      {% else %}
+        {% if offsite.siste_feil %}
+          <span class="badge bg-danger">Siste opplasting feilet</span>
+        {% else %}
+          <span class="badge bg-success">Aktiv</span>
+        {% endif %}
+        <span class="small text-muted">
+          Bucket <code>{{ offsite.bucket }}</code> · {{ offsite.antall }} fil{{ offsite.antall|pluralize:"er" }} lastet opp
+          {% if offsite.siste_ok %} · sist {{ offsite.siste_ok.sendt_at|date:"d.m.Y H:i" }}
+            ({{ offsite.siste_ok.backup_filnavn }}){% endif %}
+        </span>
+        {% if offsite.siste_feil %}
+          <div class="small text-danger w-100">
+            {{ offsite.siste_feil.created_at|date:"d.m.Y H:i" }}: {{ offsite.siste_feil.feil }}
+          </div>
+        {% endif %}
+      {% endif %}
+    </div>
+  </div>
+</div>
+
 <div class="card" style="background: var(--portal-surface); border-color: var(--portal-border);">
   <div class="card-body p-0">
     <table class="table table-dark table-hover mb-0" style="background: transparent;">
