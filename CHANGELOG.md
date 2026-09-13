@@ -100,6 +100,10 @@ tre runder. Ingen kode er endret i denne commiten.
 
 ## 2026-09-13 — Sikkerhetssjekk utenfra: `scripts/sikkerhetssjekk.py`
 
+**Rettelse etter første kjøring mot staging:** Cloudflare sender hodenavn med små
+bokstaver (`location`), og WhiteNoise hasher `oppdrag-enhet.js` — scriptet meldte 65
+falske FEIL. Hodene normaliseres nå, og enhetsskjermen gjenkjennes på navnet uten hash.
+
 Et script som kjøres fra en PC mot staging (runbook §14). Bare standardbiblioteket.
 Anonymt: HTTPS-omdirigering, HSTS, CSP, X-Content-Type-Options, rammesperre,
 Referrer-Policy, cookieflagg, 64 sider og API-er som skal være stengt uten

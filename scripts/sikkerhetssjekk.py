@@ -134,11 +134,14 @@ class Klient:
             h['Referer'] = self.base + '/'
         h.update(hoder or {})
         req = urllib.request.Request(url, data=kropp, method=metode, headers=h)
+        # Hodenavnene normaliseres til små bokstaver: Cloudflare og HTTP/2 sender
+        # `location`, gunicorn direkte sender `Location` — første kjøring mot
+        # staging meldte 64 falske FEIL på det.
         try:
             with self.opener.open(req, timeout=timeout) as r:
-                return r.status, dict(r.headers), r.read().decode('utf-8', 'replace')
+                return r.status, {k.lower(): v for k, v in r.headers.items()}, r.read().decode('utf-8', 'replace')
         except urllib.error.HTTPError as e:
-            return e.code, dict(e.headers), e.read().decode('utf-8', 'replace')
+            return e.code, {k.lower(): v for k, v in e.headers.items()}, e.read().decode('utf-8', 'replace')
 
     def cookie(self, navn):
         for c in self.jar:
@@ -205,13 +208,13 @@ def test_transport(base, r):
     if u.scheme == 'https':
         try:
             st, h, _ = Klient('http://' + u.netloc).kall('/healthz/')
-            r.sjekk(st in (301, 302, 307, 308) and (h.get('Location') or '').startswith('https://'),
+            r.sjekk(st in (301, 302, 307, 308) and (h.get('location') or '').startswith('https://'),
                     f'http:// omdirigeres til https:// ({st})', f'http:// svarte {st} uten omdirigering til https')
         except Exception as e:   # noqa: BLE001
             r.info(f'http:// ble ikke nådd ({e.__class__.__name__}) — porten er trolig stengt, som er greit')
     st, h, html = k.kall('/accounts/login/')
     r.sjekk(st == 200, f'/accounts/login/ svarer {st}')
-    lav = {n.lower(): v for n, v in h.items()}
+    lav = h
     hsts = lav.get('strict-transport-security', '')
     r.sjekk('max-age=' in hsts and int(re.search(r'max-age=(\d+)', hsts or 'max-age=0').group(1)) >= 15552000,
             f'HSTS: {hsts or "mangler"}', f'HSTS mangler eller er for kort: {hsts or "mangler"}')
@@ -264,7 +267,7 @@ def test_stengt(base, r):
     k = Klient(base)
     for sti in STENGT_GET:
         st, h, html = k.kall(sti)
-        loc = h.get('Location', '')
+        loc = h.get('location', '')
         ok = st in (401, 403, 404, 405) or (st in (301, 302) and '/accounts/login/' in loc)
         if st == 200 and sti == '/':
             ok = False
@@ -274,7 +277,7 @@ def test_stengt(base, r):
     r.ok(f'{len(STENGT_GET)} sider og API-er sjekket — de som ikke står som FEIL over, er stengt')
     for sti in STENGT_POST:
         st, h, html = k.kall(sti, 'POST', json_data={})
-        loc = h.get('Location', '')
+        loc = h.get('location', '')
         ok = st in (401, 403, 404, 405) or (st in (301, 302) and '/accounts/login/' in loc)
         if not ok:
             r.feil(f'POST {sti} uten innlogging og CSRF svarte {st}')
@@ -289,7 +292,7 @@ def test_stengt(base, r):
             r.sjekk(len(html) < 300 and 'Traceback' not in html, f'/healthz/ er kort ({len(html)} tegn): {html.strip()[:80]!r}',
                     f'/healthz/ er lang ({len(html)} tegn) — lekker den noe?')
         if sti == '/vaktliste/sw.js':
-            r.sjekk('javascript' in h.get('Content-Type', ''), 'sw.js serveres som JavaScript')
+            r.sjekk('javascript' in h.get('content-type', ''), 'sw.js serveres som JavaScript')
     for sti in FINNES_IKKE:
         st, h, html = k.kall(sti)
         r.sjekk(st in (404, 403, 301, 302) and 'Traceback' not in html, f'GET {sti} → {st}',
@@ -364,7 +367,7 @@ def test_roller(base, r, admin, leser, enhet):
         ke = Klient(base)
         if logg_inn(ke, r, enhet, getpass.getpass(f'  Passord for {enhet} (enhetskonto): '), 'enhet'):
             st, h, html = ke.kall('/oppdrag/')
-            r.sjekk(st == 200 and 'oppdrag-enhet.js' in html, f'enhet: /oppdrag/ gir enhetsskjermen ({st})',
+            r.sjekk(st == 200 and 'oppdrag-enhet' in html, f'enhet: /oppdrag/ gir enhetsskjermen ({st})',
                     f'enhet: /oppdrag/ → {st}, og ikke enhetsskjermen')
             for sti in ('/oppdrag/api/lokasjoner/', '/oppdrag/api/enhetstyper/', '/oppdrag/api/problemstillinger/'):
                 st, h, _ = ke.kall(sti, 'POST', json_data={'navn': 'Test'}, csrf=True)
