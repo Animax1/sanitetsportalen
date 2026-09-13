@@ -22,7 +22,10 @@ from .handlers import (
     utled_restore_models,
 )
 from . import klokke
-from .portal import PortalBackupHandler, register_handlers
+from .full import FullBackupHandler
+from .full import register_handlers as _register_full
+from .portal import PortalBackupHandler
+from .portal import register_handlers as _register_portal
 from .klokke import (
     kjor_forfalte,
     kjor_plan,
@@ -43,8 +46,23 @@ from .service import (
     restore_backup,
 )
 
+def register_handlers() -> None:
+    """Registrer `core` sine egne handlere — portalfila og den hele basen.
+
+    Ligger her og ikke bare i `apps.py` fordi `registrer_alle_moduler()`
+    importerer `<app>.backup` og kaller modulens `register_handlers`. For
+    `core` er «`core.backup`» denne pakka, og uten funksjonen her ville en test
+    som kaller `clear_registry()` fått tilbake alle modulene *unntatt* portalen
+    og den hele — og feilen dukket opp i en helt annen fil, som den gangen
+    oppdragsmodulen forsvant fra registeret midt i suiten.
+    """
+    _register_portal()
+    _register_full()
+
+
 __all__ = [
     'BaseBackupHandler',
+    'FullBackupHandler',
     'PortalBackupHandler',
     'KIND_AUTO',
     'KIND_MANUAL',

@@ -41,8 +41,24 @@ from django.utils import timezone
 logger = logging.getLogger(__name__)
 
 MAGI = b'SPBK1'
-PREFIKS = 'backups/'
 SUFFIKS = '.enc'
+
+#: **Ett prefiks per oppbevaringstid** (13. sep. 2026). Fristene kan bare
+#: skilles i bucketen hvis filene ligger på hver sin sti, og livssyklusreglene
+#: filtrerer på prefiks: `backups/` i 730 dager, `full/` i 90. Se
+#: `docs/PLAN_BACKUP_OMLEGGING.md` §6.2 og §7.
+PREFIKS = 'backups/'
+PREFIKS_FULL = 'full/'
+ALLE_PREFIKS = (PREFIKS, PREFIKS_FULL)
+
+
+def prefiks_for(module_slug: str) -> str:
+    """Hvor i bucketen filene til denne modulen skal ligge.
+
+    Den hele basen ligger for seg selv fordi den har en annen frist — ikke
+    fordi den er en annen slags fil.
+    """
+    return PREFIKS_FULL if module_slug == 'full' else PREFIKS
 
 
 # ── Konfigurasjon ────────────────────────────────────────────────────────────
@@ -112,8 +128,8 @@ def _klient():
     )
 
 
-def objektnavn(filnavn: str) -> str:
-    return f'{PREFIKS}{filnavn}{SUFFIKS}'
+def objektnavn(filnavn: str, module_slug: str = '') -> str:
+    return f'{prefiks_for(module_slug)}{filnavn}{SUFFIKS}'
 
 
 def last_opp(backup, sti) -> 'OffsiteKopi':
@@ -122,7 +138,7 @@ def last_opp(backup, sti) -> 'OffsiteKopi':
     from core.models import OffsiteKopi
     k = konfig()
     rad = OffsiteKopi(backup_filnavn=backup.filename, module_slug=backup.module_slug,
-                      objektnavn=objektnavn(backup.filename))
+                      objektnavn=objektnavn(backup.filename, backup.module_slug))
     try:
         raa = open(sti, 'rb').read()
         blob = krypter(raa, k['nokkel'])
@@ -153,20 +169,22 @@ def meld_ny_backup(backup, sti) -> None:
 
 
 def list_objekter() -> list[dict]:
-    """[{navn, bytes, endret}] for alt under prefikset, nyeste først."""
+    """[{navn, bytes, endret}] for alt under begge prefiksene, nyeste først."""
     k = konfig()
     ut = []
-    token = None
-    while True:
-        args = {'Bucket': k['bucket'], 'Prefix': PREFIKS}
-        if token:
-            args['ContinuationToken'] = token
-        svar = _klient().list_objects_v2(**args)
-        for o in svar.get('Contents', []) or []:
-            ut.append({'navn': o['Key'], 'bytes': o.get('Size', 0), 'endret': o.get('LastModified')})
-        if not svar.get('IsTruncated'):
-            break
-        token = svar.get('NextContinuationToken')
+    for prefiks in ALLE_PREFIKS:
+        token = None
+        while True:
+            args = {'Bucket': k['bucket'], 'Prefix': prefiks}
+            if token:
+                args['ContinuationToken'] = token
+            svar = _klient().list_objects_v2(**args)
+            for o in svar.get('Contents', []) or []:
+                ut.append({'navn': o['Key'], 'bytes': o.get('Size', 0),
+                           'endret': o.get('LastModified')})
+            if not svar.get('IsTruncated'):
+                break
+            token = svar.get('NextContinuationToken')
     ut.sort(key=lambda o: (o['endret'] is None, o['endret']), reverse=True)
     return ut
 
@@ -178,11 +196,15 @@ def hent(objekt: str):
     from core.backup import get_backup_dir
     from patients.models import Backup
     k = konfig()
-    if not objekt.startswith(PREFIKS):
-        objekt = PREFIKS + objekt
+    # Filnavnet alene holder: prefikset utledes av slugen i navnet, så
+    # `hent_offsite backup-full-...` finner fila under `full/` uten at man må
+    # vite hvor den ligger.
+    if not objekt.startswith(ALLE_PREFIKS):
+        objekt = prefiks_for(_slug_fra_filnavn(objekt)) + objekt
     if not objekt.endswith(SUFFIKS):
         objekt += SUFFIKS
-    filnavn = objekt[len(PREFIKS):-len(SUFFIKS)]
+    brukt_prefiks = next(p for p in ALLE_PREFIKS if objekt.startswith(p))
+    filnavn = objekt[len(brukt_prefiks):-len(SUFFIKS)]
     # Objektnavnet bestemmer stien fila skrives til (13. sep. 2026, L3): en
     # kompromittert bucket skal ikke være en vei ut av BACKUP_DIR.
     if not filnavn or '/' in filnavn or '\\' in filnavn or filnavn != Path(filnavn).name:

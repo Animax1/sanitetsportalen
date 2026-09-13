@@ -16,7 +16,7 @@ from django.dispatch import receiver
 from .models import Patient, Forstehjelper, Helsepersonell
 from audit.models import AuditLog
 from audit.signals import utled_app_label
-from audit.utils import get_current_request
+from audit.utils import get_current_request, ikke_under_loaddata
 from core.notifications import notify
 
 # Tabellnavnet som brukes i AuditLog for pasientrader.
@@ -88,6 +88,7 @@ def _audit_verdi(obj, felt):
 
 
 @receiver(pre_save, sender=Patient)
+@ikke_under_loaddata
 def patient_pre_save(sender, instance, **kwargs):
     """Logg feltendringer (UPDATE) for eksisterende pasienter.
 
@@ -149,6 +150,7 @@ def patient_pre_save(sender, instance, **kwargs):
 
 
 @receiver(post_save, sender=Patient)
+@ikke_under_loaddata
 def patient_post_save(sender, instance, created, **kwargs):
     """Logg opprettelse (CREATE) av ny pasient + send varsler."""
     if created:

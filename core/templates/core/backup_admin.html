@@ -123,6 +123,98 @@ Dette er beviset på at den lever: er den stille, står det her.
 {% endif %}
 
 {% comment %}
+── Hele databasen ──
+En annen slags fil enn modulfilene: den dekker alt, har 90 dagers oppbevaring
+offsite i stedet for 730, og gjenopprettingen rører kontoen du er logget inn
+med. Derfor eget kort, ikke en rad blant modulene.
+{% endcomment %}
+{% if hel %}
+<details class="bk-kort">
+  <summary class="bk-hode" style="cursor: pointer; list-style: none;">
+    <i class="bi bi-database"></i>
+    <span class="bk-navn">{{ hel.navn }}</span>
+    {% if hel.plan.modus == 'av' %}
+      <span class="badge bg-secondary">Av</span>
+    {% else %}
+      <span class="badge bg-success">{{ hel.plan.get_modus_display }}</span>
+    {% endif %}
+    <span class="bk-meta">
+      {{ hel.plan.intervall_tekst }} · behold {{ hel.plan.behold }}
+    </span>
+    <span class="bk-meta bk-skyv">
+      {% if hel.plan.sist_fil_at %}
+        siste {{ hel.plan.sist_fil_at|date:"d.m H:i" }}
+      {% else %}ingen fil{% endif %}
+      · {{ hel.antall }} fil{{ hel.antall|pluralize:"er" }} · {{ hel.mb }} MB
+    </span>
+  </summary>
+  <div class="bk-kropp">
+    <div class="bk-meta mb-2">
+      Alt i databasen unntatt sesjoner: brukere med passordhasher,
+      MFA-enheter, tilganger, audit- og innloggingslogg, vakta og alle
+      modulenes data. Kryptert før den forlater Railway, og lagret under
+      <code>full/</code> hos Scaleway med <strong>90 dagers</strong>
+      oppbevaring — modulfilene ligger i 730.
+    </div>
+
+    <form method="post" action="{% url 'core:backup_admin_plan' slug=hel.slug %}"
+          class="row g-2 align-items-end mb-3">
+      {% csrf_token %}
+      {% include "core/partials/_backupplan_felter.html" with form=hel.form %}
+      <div class="col-auto">
+        <button type="submit" class="btn btn-primary btn-sm">
+          <i class="bi bi-save me-1"></i>Lagre plan
+        </button>
+      </div>
+    </form>
+
+    <div class="d-flex gap-2 flex-wrap mb-3">
+      <form method="post" action="{% url 'core:backup_admin_run' slug=hel.slug %}"
+            data-confirm="Ta en hel databasebackup nå?">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-outline-success btn-sm">
+          <i class="bi bi-play-circle me-1"></i>Ta hel backup nå
+        </button>
+      </form>
+    </div>
+
+    {% if hel.filer %}
+    <div class="table-responsive">
+      <table class="table table-dark table-sm bk-filer mb-0" style="background: transparent;">
+        <thead>
+          <tr><th>Tidspunkt</th><th>Type</th><th>Filnavn</th><th>Størrelse</th>
+              <th class="text-end">Handlinger</th></tr>
+        </thead>
+        <tbody>
+          {% for b in hel.filer %}
+          <tr>
+            <td>{{ b.created_at|date:"d.m.Y H:i:s" }}</td>
+            <td>{{ b.get_kind_display }}</td>
+            <td class="bk-filnavn">{{ b.filename }}</td>
+            <td>{{ b.size_bytes|filesizeformat }}</td>
+            <td class="text-end">
+              <a href="{% url 'core:backup_admin_restore' slug=hel.slug pk=b.pk %}"
+                 class="btn btn-outline-danger btn-sm py-0">Gjenopprett alt</a>
+              <form method="post" class="d-inline"
+                    action="{% url 'core:backup_admin_delete' slug=hel.slug pk=b.pk %}"
+                    data-confirm="Slette {{ b.filename }}?">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-outline-danger btn-sm py-0">Slett</button>
+              </form>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+      <div class="bk-meta">Ingen hel backup tatt ennå.</div>
+    {% endif %}
+  </div>
+</details>
+{% endif %}
+
+{% comment %}
 ── Verste tilfelle ──
 Det du egentlig vil vite er ikke intervallet, men hvor mye arbeid som går tapt.
 Målt mot siste kopi som ville overlevd at Railway forsvant.

@@ -38,8 +38,11 @@ class CoreConfig(AppConfig):
         # Portalens egen backup-handler: `core.Vakt` og moduloppsettet.
         # Uten den kan ingen av modulfilene gjenopprettes i en tom base, fordi
         # de peker på vakta med et heltall.
-        from core.backup.portal import register_handlers as registrer_portal
-        registrer_portal()
+        # Portalfila (`core.Vakt` + moduloppsettet) og den hele databasen.
+        # Uten portalfila kan ingen modulfil gjenopprettes i en tom base, fordi
+        # de peker på vakta med et heltall.
+        from core.backup import register_handlers as registrer_core_backup
+        registrer_core_backup()
 
         # Backup-klokka (13. sep. 2026). Starter ikke under test, migrate eller
         # engangskommandoer — `klokke.skal_starte()` er det ene stedet den

@@ -4,6 +4,58 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-13 — Backup fase 4: hele databasen i én fil
+
+Katastrofekopien finnes nå. `core/backup/full.py` dumper alt i databasen unntatt
+sesjoner, contenttypes, permissions, `admin.LogEntry` og backup-metadata.
+Brukere med passordhasher, MFA-enheter, tilganger, audit- og innloggingslogg,
+vakta og alle modulenes data er med — fila er **selvbærende**, og
+fremmednøkler til kontoer strippes derfor ikke slik modulfilene gjør.
+
+**Appene listes ikke opp for hånd.** `collect_apps()` regner dem ut fra
+app-registeret ved hvert kall, så en ny modul er med fra dagen den finnes. En
+hardkodet liste ville vært en ny sjanse til å glemme noe, og en katastrofekopi
+som stille mangler en app er verre enn ingen — fordi man tror man har den.
+
+**Eget prefiks offsite.** `full/` ved siden av `backups/`, fordi
+livssyklusreglene i bucketen filtrerer på sti og 90 dager ikke kan skilles fra
+730 uten. `hent_offsite` utleder prefikset av slugen i filnavnet, så man trenger
+ikke vite hvor fila ligger.
+
+**Bevist i en tom PostgreSQL-base:** hele basen tilbake fra den ene fila —
+brukere, MFA-enheter, audit, vakt, pasienter, oppdrag, mannskap og vaktposter,
+alle tall like — og innlogging med det opprinnelige passordet virker etterpå.
+En gjenoppretting man ikke kan logge inn etter, er ingen gjenoppretting.
+
+**Funnet som stoppet den første kjøringen var en eksisterende feil.** Ingen av
+de atten lagringssignalene i portalen så etter `raw=True`. Django sender det når
+`loaddata` skriver en rad, og det betyr «denne raden kommer fra en fil, ikke fra
+noen som gjorde noe». Uten vakten fyrte audit-signalene under hver eneste
+gjenoppretting, og de leser relaterte objekter for å skrive hva som ble endret.
+I den hele fila kommer et `Vaktpost` før sitt `Mannskap`, og gjenopprettingen
+stoppet med «Mannskap matching query does not exist». Modulenes gjenopprettinger
+feilet ikke, men skrev **én auditrad per lastet rad** — tusen pasienter tilbake
+ga tusen «endret»-rader uten en bruker som hadde endret noe.
+`audit.utils.ikke_under_loaddata` er vakten nå, lagt på alle atten,
+og `SignalerFyrerIkkeUnderLoaddataTests` krever den også av neste mottaker.
+Selve gjenopprettingen logges fortsatt, av viewet, med hvem som gjorde den.
+
+Gjenopprettingsbekreftelsen sier hva som skjer: brukere, passord, MFA, tilganger
+og logger erstattes, kontoer opprettet etter backupen forsvinner, og **kontoen
+du er logget inn med byttes ut underveis** — var passordet et annet da backupen
+ble tatt, blir du logget ut med det samme.
+
+`CLAUDE.md`-avsnittet om backup er skrevet om: sju handlere,
+gjenopprettingsrekkefølgen, den utledede slettelista, `raw`-vakten, de to
+prefiksene og at det ikke finnes nedlasting.
+
+Verifisert: 2592 tester grønne på SQLite og PostgreSQL 16.
+
+**Krever André før dette er i prod:** livssyklusregelen på `full/` (fase 7).
+Uten den lander de første hele backupene under 730-dagersregelen.
+
+---
+
 ## 2026-09-13 — Backup fase 3: vaktlista dekket, og slettelista utledes
 
 **Vaktlistemodulen hadde ingen backup i det hele tatt.** Korps, mannskap med

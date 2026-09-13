@@ -215,46 +215,98 @@ Feltendringer logges automatisk via Django-signal i `audit/signals.py`. `Request
 
 ### Backup-system
 
-`BackupSchedulerMiddleware` kjører automatisk backup in-process etter request.
-
-Backup er **per modul**, ikke én samlet dump. Hver modul registrerer en `BaseBackupHandler` i `core.backup`-registryet (fra `apps.ready()`). Fire handlere finnes i dag:
+Backup er **per modul**, ikke én samlet dump — pluss én hel databasebackup ved
+siden av. Hver modul registrerer en `BaseBackupHandler` i `core.backup`-registeret
+(fra `apps.ready()`). Sju handlere i dag:
 
 | Slug | Fil | Innhold |
 |------|-----|---------|
+| `portal` | `core/backup/portal.py` | `core.Vakt` + `ModuleSettings`. **Først i gjenopprettingsrekkefølgen** — uten den feiler alle modulfilene i en tom base, fordi de peker på vakta med et heltall |
 | `patients` | `patients/backup.py` | Pasientdata. Arkivmodellene er eksplisitt ekskludert |
-| `arkiv` | `patients/backup.py` | `VaktArkiv` + `ArkivertPasient` — endres sjelden, og skal aldri berøres av en pasient-restore |
-| `oppdrag` | `oppdrag/backup.py` | Oppdrag, statusmeldinger, enhetsbytter, enheter og lokasjoner |
+| `arkiv` | `patients/backup.py` | `VaktArkiv` + `ArkivertPasient`. Heter «Pasientregistreringsarkiv» |
+| `oppdrag` | `oppdrag/backup.py` | Oppdrag, statusmeldinger, enhetsbytter, enheter, lokasjoner og verdimengdene |
 | `oppdrag_arkiv` | `oppdrag/backup.py` | `OppdragArkiv` + `ArkivertOppdrag`. Er også **sperren** foran kollaps |
+| `vaktliste` | `vaktliste/backup.py` | Korps, mannskap, kompetanser, ressurser, vaktposter, vaktlister |
+| `full` | `core/backup/full.py` | **Hele databasen** unntatt sesjoner, contenttypes, permissions og backup-metadata. Brukere, MFA og logg er med. Eget prefiks og egen frist offsite |
 
-Brukere, MFA-hemmeligheter og audit-spor er bevisst utelatt fra alle fire. FK-er ut av
-modulens eget datasett strippes (`strip_fields`): med `natural_foreign` lagres de som
-brukernavn, og er kontoen slettet feiler hele gjenopprettingen — altså akkurat når man
-trenger backupen.
+Gjenoppretting i tom base går i rekkefølge: **portal → patients → arkiv →
+oppdrag → oppdrag_arkiv → vaktliste**, eller `full` alene.
+`AlleFileneGjenopprettesTests` håndhever at det virker.
 
-**Scheduleren finner moduler gjennom registeret**, ikke gjennom
-`ModuleBackupConfig`-tabellen: en modul uten konfigrad får en med standardverdier
-første gang scheduleren ser den. Leste den tabellen direkte — slik den gjorde fram til
-fase 7 — var en nyregistrert modul uten backup til noen tilfeldigvis åpnet
-`/portal-admin/backup/`, og for et arkiv betyr manglende backup at kollapsen nekter å
-kjøre, altså en feil som først viser seg to år senere.
+**`restore_models` skrives ikke for hånd.** `get_restore_models()` utleder lista
+topologisk fra `apps` minus `exclude`, barn før foreldre. Den håndskrevne lista
+var gjeldspunkt 3.4: `Lydvarsel` var med i dumpen, glemt i slettelista, og
+radene ble stående igjen etter en gjenoppretting. `SlettelistaDekkerDumpenTests`
+håndhever at hver modell som dumpes også tømmes.
+
+**Lagringssignaler må ha `@ikke_under_loaddata`** (`audit/utils.py`). Django
+sender `raw=True` når `loaddata` skriver en rad, og uten vakten fyrer
+audit-signalene: de leser relaterte objekter som kanskje ikke er lastet ennå
+(«Mannskap matching query does not exist» midt i en gjenoppretting), og de
+skriver en auditrad per lastede rad. Selve gjenopprettingen logges av viewet,
+med hvem som gjorde den. `SignalerFyrerIkkeUnderLoaddataTests` leser alle
+mottakerne og krever vakten.
+
+FK-er ut av modulens eget datasett strippes (`strip_fields`): med
+`natural_foreign` lagres de som brukernavn, og er kontoen slettet feiler hele
+gjenopprettingen — altså akkurat når man trenger backupen. Den hele fila
+strippes **ikke**: brukerne er med i den, så den er selvbærende.
+
+**Klokka er en tråd i web-prosessen** (`core/backup/klokke.py`), ikke en
+cron-jobb: et Railway-volum kan bare henge på én tjeneste, og `/data` henger på
+web-tjenesten. Se «Cron-jobbene» under for hva en cron-tjeneste uten volum ville
+gjort. `BackupSchedulerMiddleware` står igjen som reservenett gjennom samme
+`kjor_forfalte()`, og er det eneste stedet som varsler om at tråden har stoppet
+— et varsel om at klokka er død, sendt av klokka, kommer aldri fram.
+
+**`core.Backupplan` styrer hva som skjer når.** Tre moduser — `av`,
+`ved_endring`, `alltid` — og intervallet settes fritt som tall + enhet
+(minutt/time/døgn). `behold` er cap på filer **på volumet**; oppbevaringen
+offsite styres av bucketens livssyklusregel og er noe helt annet.
+Modulene arver en `standard`-plan; `full` og `standard` styrer alltid seg selv.
+Raden har **to** tidsstempler: `sist_sjekket_at` ved hver vurdering,
+`sist_fil_at` bare når noe ble skrevet — uten det første er «ingenting har
+endret seg» umulig å skille fra «jobben er død».
+
+**Registeret er fasit for hvilke moduler som finnes, ikke plantabellen.** En
+modul uten plan får en med standardverdier første gang klokka ser handleren.
+Leste vi tabellen direkte, var en nyregistrert modul uten backup til noen
+tilfeldigvis åpnet `/portal-admin/backup/` — og for et arkiv betyr manglende
+backup at kollapsen nekter å kjøre, altså en feil som først viser seg to år
+senere.
 
 En test som kaller `clear_registry()` må rydde opp med
-`core.backup.registrer_alle_moduler()`, ikke med én moduls `register_handlers()`. Gjør den
-det siste, mister resten av testkjøringen de andre modulenes handlere, og feilen dukker
-opp i en helt annen fil.
+`core.backup.registrer_alle_moduler()`, ikke med én moduls `register_handlers()`.
+Gjør den det siste, mister resten av testkjøringen de andre modulenes handlere,
+og feilen dukker opp i en helt annen fil. `core/backup/__init__.py` har derfor
+sin egen `register_handlers()` som tar **både** portalfila og den hele.
 
-**Offsite til Scaleway (13. sep. 2026, `core/offsite.py`):** `create_backup` kaller
-`offsite.meld_ny_backup(backup, path)` etter at fila er skrevet — inert uten
-`OFFSITE_S3_BUCKET`/nøklene/`OFFSITE_BACKUP_KEY`, og **kaster aldri**: volumet er første
-nett, og feilen står i `OffsiteKopi.feil` og på kortet øverst på `/portal-admin/backup/`.
-Fila krypteres med AES-256-GCM (`krypter`/`dekrypter`, format `SPBK1`+nonce+chiffer) før
-den lastes opp som `backups/<filnavn>.enc`; opplastingen henger på at en ny fil ble
-skrevet, hash-skip gir ingen. `hent_offsite --list` / `hent_offsite <filnavn>` henter,
-dekrypterer og legger fila i `BACKUP_DIR` med en `Backup`-rad. S3 mockes i
+**Offsite til Scaleway (13. sep. 2026, `core/offsite.py`):** `create_backup`
+kaller `offsite.meld_ny_backup(backup, path)` etter at fila er skrevet — inert
+uten `OFFSITE_S3_BUCKET`/nøklene/`OFFSITE_BACKUP_KEY`, og **kaster aldri**:
+volumet er første nett, og feilen står i `OffsiteKopi.feil` og på
+`/portal-admin/backup/`. Fila **komprimeres først, krypteres så** — chiffertekst
+lar seg ikke komprimere, mens gzip på dumpdata-JSON gir 5–15 % av rå størrelse.
+AES-256-GCM, format `SPBK1`+nonce+chiffer. **To prefikser, ett per
+oppbevaringstid:** `backups/` for modulfilene (730 dager) og `full/` for den
+hele (90 dager) — fristene kan bare skilles i bucketen hvis filene ligger på
+hver sin sti, fordi livssyklusreglene filtrerer på prefiks. `hent_offsite --list`
+/ `hent_offsite <filnavn>` henter, dekrypterer og legger fila i `BACKUP_DIR` med
+en `Backup`-rad; prefikset utledes av slugen i filnavnet. S3 mockes i
 `core/tests_offsite.py` ved å bytte ut `_klient`. Nøkkelen skal også ligge i en
 passordbehandler — uten den er bucketen uleselig, og det er meningen.
 
-Logikken ligger i `core/backup/`. `patients/backup_service.py` er en tynn proxy som beholder bakoverkompatibelt API for `db_backup`-kommandoen, `views_patients.py` og eldre tester — nye moduler skal registrere en handler og kalle `core.backup.create_backup(slug=...)` direkte.
+**Backupfilene skal ikke finnes andre steder enn hos Scaleway eller på Railway.**
+Det finnes ingen nedlastingsknapp, heller ikke for modulfilene: en `.json.gz`
+med hele pasientregisteret i nedlastingsmappa er en helseopplysningsdump utenfor
+portalens kontroll, og den hele fila bærer i tillegg passordhasher og
+TOTP-hemmeligheter.
+
+Logikken ligger i `core/backup/`. `patients/backup_service.py` er en tynn proxy
+som beholder et bakoverkompatibelt API for `views_patients.py` og eldre tester;
+`db_backup`-kommandoen er utgått og slettes sammen med `patients.BackupConfig`.
+Nye moduler skal registrere en handler og kalle
+`core.backup.create_backup(slug=...)` direkte.
 
 ### Arkivmønster (core/arkiv/)
 

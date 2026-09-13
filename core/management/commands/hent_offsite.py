@@ -35,7 +35,7 @@ class Command(BaseCommand):
                 return
             for o in objekter:
                 endret = o['endret'].strftime('%Y-%m-%d %H:%M') if o['endret'] else '?'
-                self.stdout.write(f"{endret}  {o['bytes']:>10}  {o['navn'][len(offsite.PREFIKS):]}")
+                self.stdout.write(f"{endret}  {o['bytes']:>10}  {o['navn']}")
             self.stdout.write(f'{len(objekter)} objekt(er).')
             return
         if not opts['objekt']:

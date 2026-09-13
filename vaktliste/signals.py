@@ -27,7 +27,7 @@ from django.dispatch import receiver
 from django.utils import timezone
 
 from audit.models import AuditLog
-from audit.utils import get_current_request
+from audit.utils import get_current_request, ikke_under_loaddata
 
 from .models import Mannskap, Ressurs, Utsending, Vaktliste, Vaktpost
 
@@ -91,6 +91,7 @@ def _verdi(obj, felt):
 
 
 @receiver(pre_save, sender=Mannskap)
+@ikke_under_loaddata
 def mannskap_pre_save(sender, instance, **kwargs):
     """Logg feltendringer for eksisterende mannskap."""
     if not instance.pk:
@@ -125,6 +126,7 @@ def mannskap_pre_save(sender, instance, **kwargs):
 
 
 @receiver(post_save, sender=Mannskap)
+@ikke_under_loaddata
 def mannskap_post_save(sender, instance, created, **kwargs):
     """Logg opprettelse."""
     if not created:
@@ -172,6 +174,7 @@ VAKTLISTE_FELTER = ('status', 'satt_i_drift_at', 'satt_i_drift_av', 'planlagt_sl
 
 
 @receiver(pre_save, sender=Vaktliste)
+@ikke_under_loaddata
 def vaktliste_pre_save(sender, instance, **kwargs):
     if not instance.pk:
         return
@@ -273,11 +276,13 @@ def _logg_slettet(instance, tabell, beskrivelse):
 
 
 @receiver(pre_save, sender=Vaktpost)
+@ikke_under_loaddata
 def vaktpost_pre_save(sender, instance, **kwargs):
     _logg_endringer(Vaktpost, instance, VAKTPOST_TABELLNAVN, VAKTPOST_FELT_UTEN_VERDILOGGING)
 
 
 @receiver(post_save, sender=Vaktpost)
+@ikke_under_loaddata
 def vaktpost_post_save(sender, instance, created, **kwargs):
     if created:
         _logg_opprettet(instance, VAKTPOST_TABELLNAVN, _beskriv_vaktpost(instance))
@@ -289,11 +294,13 @@ def vaktpost_post_delete(sender, instance, **kwargs):
 
 
 @receiver(pre_save, sender=Ressurs)
+@ikke_under_loaddata
 def ressurs_pre_save(sender, instance, **kwargs):
     _logg_endringer(Ressurs, instance, RESSURS_TABELLNAVN)
 
 
 @receiver(post_save, sender=Ressurs)
+@ikke_under_loaddata
 def ressurs_post_save(sender, instance, created, **kwargs):
     if created:
         _logg_opprettet(instance, RESSURS_TABELLNAVN, f'{instance} ({instance.gruppe})')
@@ -314,6 +321,7 @@ UTSENDING_TABELLNAVN = 'vaktliste_utsending'
 
 
 @receiver(post_save, sender=Utsending)
+@ikke_under_loaddata
 def utsending_post_save(sender, instance, created, **kwargs):
     if created:
         status = 'sendt' if not instance.feil else f'feilet: {instance.feil[:120]}'

@@ -39,6 +39,24 @@
           </p>
         </div>
 
+        {% if slug == 'full' %}
+        <div class="alert alert-danger" style="background:#450a0a;border-color:#991b1b;color:#fecaca;">
+          <h5 class="mb-2">
+            <i class="bi bi-database-exclamation me-2"></i>Dette er <em>hele</em> databasen
+          </h5>
+          <p class="mb-2">
+            Brukere, passord, MFA-enheter, tilganger, logger og alle modulenes
+            data erstattes med innholdet fra denne fila. Kontoer som er
+            opprettet etter at backupen ble tatt, forsvinner.
+          </p>
+          <p class="mb-0">
+            <strong>Kontoen du er logget inn med byttes ut underveis.</strong>
+            Var passordet ditt et annet da backupen ble tatt, blir du logget ut
+            med det samme og må logge inn med det gamle passordet.
+          </p>
+        </div>
+        {% endif %}
+
         <dl class="row mb-3">
           <dt class="col-sm-4 text-muted">Modul</dt>
           <dd class="col-sm-8">{{ handler.display_name|default:slug }}</dd>

@@ -41,6 +41,8 @@ def verste_tilfelle() -> dict:
 
     rader = []
     for handler in all_handlers():
+        if handler.slug == 'full':
+            continue   # dekker alt; ville dublert hver modul i lista
         if har_offsite:
             tid = (OffsiteKopi.objects
                    .filter(module_slug=handler.slug, feil='')
@@ -132,6 +134,8 @@ def modulrader(plan_form_klasse=None) -> list[dict]:
 
     rader = []
     for handler in all_handlers():
+        if handler.slug == Backupplan.FULL_SLUG:
+            continue   # egen boks øverst; se `sideinnhold()`
         plan = Backupplan.hent(handler.slug)
         t = tall.get(handler.slug, {})
         rader.append({
@@ -149,6 +153,38 @@ def modulrader(plan_form_klasse=None) -> list[dict]:
     return rader
 
 
+def helrad(plan_form_klasse=None) -> dict | None:
+    """Kortet for den hele databasen, eller None om handleren ikke er
+    registrert. Skilt fra modulradene fordi den er en annen slags fil: den
+    dekker alt, har egen frist offsite, og gjenopprettingen rører kontoen du
+    er logget inn med."""
+    from django.db.models import Count, Sum
+
+    from core.backup import get_handler
+    from core.models import Backupplan
+    from patients.models import Backup
+
+    handler = get_handler(Backupplan.FULL_SLUG)
+    if handler is None:
+        return None
+
+    plan = Backupplan.hent(Backupplan.FULL_SLUG)
+    tall = (Backup.objects.filter(module_slug=Backupplan.FULL_SLUG)
+            .aggregate(antall=Count('id'), bytes=Sum('size_bytes')))
+    return {
+        'slug': plan.slug,
+        'navn': handler.display_name,
+        'plan': plan,
+        'gjeldende': plan,
+        'antall': tall['antall'] or 0,
+        'mb': round((tall['bytes'] or 0) / 1048576, 1),
+        'form': plan_form_klasse(instance=plan, prefix=plan.slug)
+        if plan_form_klasse else None,
+        'filer': list(Backup.objects.filter(module_slug=Backupplan.FULL_SLUG)
+                      .order_by('-created_at')[:10]),
+    }
+
+
 def sideinnhold(plan_form_klasse=None) -> dict:
     """Alt siden trenger, i én dict."""
     from core import offsite
@@ -157,6 +193,7 @@ def sideinnhold(plan_form_klasse=None) -> dict:
 
     advarsler = vakthund()
     return {
+        'hel': helrad(plan_form_klasse),
         'standard': Backupplan.standardplanen(),
         'standard_form': (plan_form_klasse(instance=Backupplan.standardplanen(),
                                            prefix='standard')

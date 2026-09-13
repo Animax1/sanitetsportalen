@@ -24,7 +24,7 @@ from django.db.models.signals import post_delete, post_save, pre_save
 from django.dispatch import receiver
 
 from audit.models import AuditLog
-from audit.utils import get_current_request
+from audit.utils import get_current_request, ikke_under_loaddata
 
 from .models import Oppdrag
 
@@ -92,6 +92,7 @@ def _verdi(obj, felt):
 
 
 @receiver(pre_save, sender=Oppdrag)
+@ikke_under_loaddata
 def oppdrag_pre_save(sender, instance, **kwargs):
     """Logg feltendringer for eksisterende oppdrag."""
     if not instance.pk:
@@ -131,6 +132,7 @@ def oppdrag_pre_save(sender, instance, **kwargs):
 
 
 @receiver(post_save, sender=Oppdrag)
+@ikke_under_loaddata
 def oppdrag_post_save(sender, instance, created, **kwargs):
     if not created:
         return

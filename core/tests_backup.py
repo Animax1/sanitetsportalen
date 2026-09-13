@@ -1576,8 +1576,215 @@ class AlleFileneGjenopprettesTests(TestCase):
         pekere = {o['pk'] for o in json.loads(raa) if o['model'] == 'core.vakt'}
         self.assertIn(vakt.pk, pekere)
 
-    def test_rekkefolgen_er_dokumentert_i_alle_handlerne(self) -> None:
-        """Alle seks slugene skal finnes som registrerte handlere — er en av
-        dem borte, er rekkefølgen over en løgn."""
-        registrerte = {h.slug for h in all_handlers()}
-        self.assertEqual(set(self.REKKEFOLGE), registrerte)
+    def test_rekkefolgen_dekker_alle_modulfilene(self) -> None:
+        """Hver registrert handler skal stå i rekkefølgen — er en av dem borte,
+        er rekkefølgen over en løgn. `full` er unntaket: den er ikke en
+        modulfil, den er hele basen i én, og gjenopprettes alene."""
+        from core.models import Backupplan
+
+        modulfiler = {h.slug for h in all_handlers()
+                      if h.slug != Backupplan.FULL_SLUG}
+        self.assertEqual(set(self.REKKEFOLGE), modulfiler)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Hel databasebackup
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+@override_settings(SECURE_SSL_REDIRECT=False, RATELIMIT_ENABLE=False)
+class HelBackupTests(TestCase):
+    """Katastrofekopien: alt i databasen i én fil.
+
+    Forskjellen fra modulfilene er ikke bare omfanget — den er **selvbærende**.
+    Brukerne er med, så fremmednøkler til kontoer trenger ikke strippes, og
+    den kan lastes inn i en base som ikke har noe fra før.
+    """
+
+    def setUp(self) -> None:
+        registrer_alle_moduler()
+        self.backup_dir = _prepare_backup_dir()
+
+    def _modeller_i_fila(self, backup):
+        raa = gzip.open(self.backup_dir / backup.filename, 'rb').read()
+        return {o['model'] for o in json.loads(raa)}
+
+    def test_brukere_og_mfa_er_med(self) -> None:
+        from django_otp.plugins.otp_totp.models import TOTPDevice
+
+        bruker = CustomUser.objects.create_user(
+            username='medmfa', password='x', must_change_password=False)
+        TOTPDevice.objects.create(user=bruker, name='telefon', confirmed=True)
+
+        with patch.dict(os.environ, {'BACKUP_DIR': str(self.backup_dir)}):
+            backup = create_backup(slug='full', kind=KIND_MANUAL)
+        modeller = self._modeller_i_fila(backup)
+        self.assertIn('accounts.customuser', modeller)
+        self.assertIn('otp_totp.totpdevice', modeller)
+
+    def test_sesjoner_og_contenttypes_er_utelatt(self) -> None:
+        """`contenttypes` og `auth.permission` gjenskapes av `migrate`; lastes
+        de på nytt, kolliderer primærnøklene. Sesjoner ville gitt gamle økter
+        tilbake."""
+        from django.contrib.sessions.models import Session
+
+        Session.objects.create(session_key='abc123', session_data='x',
+                               expire_date=timezone.now() + timedelta(days=1))
+        with patch.dict(os.environ, {'BACKUP_DIR': str(self.backup_dir)}):
+            backup = create_backup(slug='full', kind=KIND_MANUAL)
+        modeller = self._modeller_i_fila(backup)
+        for uonsket in ('sessions.session', 'contenttypes.contenttype',
+                        'auth.permission', 'admin.logentry',
+                        'patients.backup', 'core.backupplan', 'core.offsitekopi'):
+            with self.subTest(modell=uonsket):
+                self.assertNotIn(uonsket, modeller)
+
+    def test_appene_regnes_ut_og_ikke_listes(self) -> None:
+        """En hardkodet liste er en ny sjanse til å glemme en app — og en
+        katastrofekopi som stille mangler en, er verre enn ingen."""
+        apper = set(get_handler('full').collect_apps())
+        for ventet in ('accounts', 'audit', 'core', 'patients', 'oppdrag',
+                       'vaktliste', 'otp_totp', 'otp_static'):
+            with self.subTest(app=ventet):
+                self.assertIn(ventet, apper)
+        self.assertNotIn('sessions', apper)
+
+    def test_slettelista_dekker_hele_settet_paa_tvers_av_apper(self) -> None:
+        """Brukeren og vakta skal tømmes sist: alt annet peker på dem."""
+        rekkefolge = get_handler('full').get_restore_models()
+        plass = {m: i for i, m in enumerate(rekkefolge)}
+        self.assertLess(plass['accounts.ModulTilgang'], plass['accounts.CustomUser'])
+        self.assertLess(plass['patients.Patient'], plass['core.Vakt'])
+        self.assertLess(plass['vaktliste.Vaktpost'], plass['vaktliste.Mannskap'])
+
+    def test_rundtur_over_hele_basen(self) -> None:
+        from oppdrag.models import Enhet
+        from patients.models import Patient
+        from vaktliste.models import Korps
+
+        with patch.dict(os.environ, {'BACKUP_DIR': str(self.backup_dir)}):
+            vakt = vakt_for_year(2026)
+            Patient.objects.create(pasientnummer=7, vakt=vakt, problemstilling='X')
+            Enhet.objects.create(navn='Bil 9')
+            Korps.objects.create(navn='Korpset')
+            bruker = CustomUser.objects.create_user(
+                username='overlever', password='x', must_change_password=False)
+
+            backup = create_backup(slug='full', kind=KIND_MANUAL)
+
+            # Alt forsvinner — også kontoen.
+            Patient.objects.all().delete()
+            Enhet.objects.all().delete()
+            Korps.objects.all().delete()
+            bruker.delete()
+            self.assertFalse(CustomUser.objects.filter(username='overlever').exists())
+
+            restore_backup(backup)
+
+        self.assertTrue(CustomUser.objects.filter(username='overlever').exists())
+        self.assertEqual(Patient.objects.count(), 1)
+        self.assertEqual(Enhet.objects.get().navn, 'Bil 9')
+        self.assertEqual(Korps.objects.get().navn, 'Korpset')
+
+    def test_passordet_overlever(self) -> None:
+        """En gjenoppretting man ikke kan logge inn etter, er ingen
+        gjenoppretting."""
+        with patch.dict(os.environ, {'BACKUP_DIR': str(self.backup_dir)}):
+            bruker = CustomUser.objects.create_user(
+                username='innlogger', password='Hemmelig-123',
+                must_change_password=False)
+            hash_for = bruker.password
+            backup = create_backup(slug='full', kind=KIND_MANUAL)
+            bruker.delete()
+            restore_backup(backup)
+
+        etter = CustomUser.objects.get(username='innlogger')
+        self.assertEqual(etter.password, hash_for)
+        self.assertTrue(etter.check_password('Hemmelig-123'))
+
+    def test_offsite_legger_den_under_eget_prefiks(self) -> None:
+        """To oppbevaringstider krever to prefikser: livssyklusreglene i
+        bucketen filtrerer på sti, og 90 dager kan ikke skilles fra 730 uten."""
+        from core import offsite
+
+        self.assertEqual(offsite.objektnavn('backup-full-x.json.gz', 'full'),
+                         'full/backup-full-x.json.gz.enc')
+        self.assertEqual(offsite.objektnavn('backup-patients-x.json.gz', 'patients'),
+                         'backups/backup-patients-x.json.gz.enc')
+
+    def test_planen_er_alltid_hver_24_time(self) -> None:
+        """En hel base endrer seg konstant, så «ved endring» ville aldri hoppet
+        over noe. «Alltid» er det ærlige valget — og 24 timer gir 90 filer på
+        90 dager, mot 2 160 for hver time."""
+        from core.models import Backupplan
+
+        plan = Backupplan.hent('full')
+        self.assertEqual(plan.modus, Backupplan.MODUS_ALLTID)
+        self.assertEqual(plan.intervall_min, 24 * 60)
+        self.assertEqual(plan.behold, 7)
+        self.assertFalse(plan.arver, 'Den hele fila skal aldri følge standardplanen.')
+
+
+@override_settings(SECURE_SSL_REDIRECT=False, RATELIMIT_ENABLE=False)
+class SignalerFyrerIkkeUnderLoaddataTests(TestCase):
+    """`loaddata` skal ikke utløse applikasjonslogikk.
+
+    Django sender `raw=True` når en rad kommer fra en fixture. Fram til
+    13. sep. 2026 så ingen av de atten signalmottakerne etter det, og det ga
+    to reelle problemer:
+
+    1. **Gjenoppretting feilet.** Handlerne leser relaterte objekter, og
+       `loaddata` laster i filas rekkefølge — et `Vaktpost` kan komme før sitt
+       `Mannskap`. Den hele databasebackupen stoppet på nettopp det:
+       «Mannskap matching query does not exist», midt i en gjenoppretting.
+    2. **Auditsporet ble støy.** En gjenoppretting av tusen pasienter skrev
+       tusen «endret»-rader uten en bruker som hadde endret noe.
+    """
+
+    def setUp(self) -> None:
+        registrer_alle_moduler()
+        self.backup_dir = _prepare_backup_dir()
+
+    def test_alle_lagringssignaler_har_vakten(self) -> None:
+        """Statisk: en ny mottaker skal ikke kunne glemme den."""
+        import re
+        from pathlib import Path
+
+        from django.conf import settings
+
+        manglende = []
+        for navn in ('oppdrag', 'patients', 'vaktliste'):
+            sti = Path(settings.BASE_DIR) / navn / 'signals.py'
+            if not sti.exists():
+                continue
+            tekst = sti.read_text(encoding='utf-8')
+            for treff in re.finditer(
+                    r'@receiver\((pre_save|post_save), sender=(\w+)\)\n(.*?)def ',
+                    tekst, re.S):
+                if 'ikke_under_loaddata' not in treff.group(3):
+                    manglende.append(f'{navn}/signals.py: {treff.group(2)} '
+                                     f'({treff.group(1)})')
+        self.assertEqual(
+            manglende, [],
+            'Disse lagringssignalene mangler @ikke_under_loaddata og vil '
+            'fyre under `loaddata`:\n  ' + '\n  '.join(manglende))
+
+    def test_gjenoppretting_skriver_ingen_auditrader(self) -> None:
+        from patients.models import Patient
+
+        with patch.dict(os.environ, {'BACKUP_DIR': str(self.backup_dir)}):
+            vakt = vakt_for_year(2026)
+            for nr in range(1, 6):
+                Patient.objects.create(pasientnummer=nr, vakt=vakt,
+                                       problemstilling='Test')
+            backup = create_backup(slug='patients', kind=KIND_MANUAL)
+            Patient.objects.all().delete()
+
+            for_restore = AuditLog.objects.count()
+            restore_backup(backup)
+
+        self.assertEqual(Patient.objects.count(), 5)
+        self.assertEqual(
+            AuditLog.objects.count(), for_restore,
+            'Gjenopprettingen skal ikke skrive auditrader for hver lastede '
+            'rad. Selve handlingen logges av viewet, med hvem som gjorde den.')

@@ -384,11 +384,33 @@ bindende: 1 før 2, fordi backupen speiler hvor modellene bor.
             nøyaktig hullet `TEKNISK_GJELD.md` §4 beskrev.
             `AlleFileneGjenopprettesTests` gjør den samme øvelsen i suiten.
             2582 tester grønne på SQLite og PostgreSQL.
-      - [ ] **Fase 4 — hel backup** (`docs/BACKUP.md` §1): alt unntatt sesjoner,
-            contenttypes, permissions og backup-metadata. Gjenoppretting er
-            `flush` + `loaddata`, ikke en slettelista — **og du blir logget ut**, fordi
-            sesjonene ligger i basen. Eget prefiks `full/` offsite. Standard: alltid,
-            hver 24. time, cap 7. **Fase 7 må være gjort først** (se der).
+      - [x] **Fase 4 — hel backup (13. sep. 2026).** `core/backup/full.py`:
+            alt i databasen unntatt sesjoner, contenttypes, permissions,
+            `admin.LogEntry` og backup-metadata. Brukere med passordhasher,
+            MFA-enheter, tilganger og logg er med — fila er **selvbærende**, og
+            FK-er til kontoer strippes derfor ikke. Appene **regnes ut** av
+            app-registeret ved hvert kall, ikke listet for hånd: en
+            katastrofekopi som stille mangler en app er verre enn ingen.
+            Eget prefiks `full/` offsite, så 90 dager kan skilles fra 730.
+            Eget kort på backup-siden, og gjenopprettingsbekreftelsen sier at
+            kontoen du er logget inn med byttes ut underveis.
+            Standard: alltid, hver 24. time, behold 7.
+            **Bevist i tom PostgreSQL-base:** hele basen tilbake fra den ene
+            fila, og innlogging med det opprinnelige passordet virker etterpå.
+            - [x] **Funn som stoppet den første kjøringen, og som var en
+                  eksisterende feil:** ingen av de atten lagringssignalene så
+                  etter `raw=True`. `loaddata` fyrte dermed audit-signalene,
+                  som leser relaterte objekter — og i den hele fila kommer et
+                  `Vaktpost` før sitt `Mannskap`, så gjenopprettingen stoppet
+                  med «Mannskap matching query does not exist». Det skrev også
+                  én auditrad per lastet rad ved **hver** gjenoppretting, også
+                  modulenes. `audit.utils.ikke_under_loaddata` er vakten, og
+                  `SignalerFyrerIkkeUnderLoaddataTests` krever den på alle
+                  mottakere.
+            - [ ] **Krever Andre før dette er i prod:** livssyklusregelen på
+                  `full/` (fase 7). Uten den lander de første hele backupene
+                  under 730-dagersregelen, og 90 dager er en
+                  personvernbeslutning.
       - [ ] **Fase 5 — `gjenopprett`-kommandoen.** `--list`, `--ja` (nødvendig under
             `railway ssh`, som ikke har interaktiv terminal), `--full` og `--hent` som
             henter fra Scaleway og gjenoppretter i ett. **I dag finnes ingen
