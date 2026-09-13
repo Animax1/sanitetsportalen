@@ -4,6 +4,33 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-13 — Backup-omleggingen planlagt: `docs/PLAN_BACKUP_OMLEGGING.md`
+
+Ingen kodeendring. Bestillingen var at modulenes backup og gjenoppretting er tungvint, at
+intervallet skal kunne settes fritt med valget mellom konsekvent lagring og lagring ved
+endring, at det samme skal gjelde en hel databasebackup, og at oppbevaringstidene i
+Scaleway skal skilles: 90 dager for hele basen, 730 for modulene.
+
+Planen i sju faser: `core.Backupplan` med tre moduser og fritt intervall erstatter
+nedtrekket med sju valg, en standardplan modulene arver, og `backup_kjor` som
+Railway-cron blir klokka. Én side i stedet for en side per modul. `get_restore_models()`
+utledes topologisk, med test som krever dekning. Hel backup med `flush` + `loaddata` og
+eget prefiks `full/`. `verifiser_backup` laster de nyeste filene i en engangsbase, fordi
+en backup ingen har gjenopprettet er en hypotese.
+
+Tre funn under lesingen av koden: **klokka er trafikk** — uten forespørsler tas ingen
+backup, så «konsekvent lagring hvert tidsintervall» er ikke mulig med dagens mekanisme;
+**`db_backup` er en felle** — den står i `CRON_JOBBER` og `CLAUDE.md` sier den er én av
+tre Railway-jobber, men tabellen i TODO lister to, og kommandoen går uansett gjennom det
+nedlagte `patients/backup_service.py` og tar bare pasientmodulen; og **`restore_models`
+vedlikeholdes for hånd**, som er sykdommen bak gjeldspunkt 3.4.
+
+Rekkefølgen komprimering → kryptering står fast, mot bestillingens «kryptering og så
+komprimering»: chiffertekst lar seg ikke komprimere, mens gzip på dumpdata-JSON typisk
+gir 5–15 % av rå størrelse. Dagens kode gjør det riktig allerede.
+
+---
+
 ## 2026-09-13 — Strategisk plan for rekkefølgen: `docs/PLAN_REKKEFOLGE_2026-09.md`
 
 Ingen kodeendring. På spørsmål om hva som bør tas først av teknisk gjeld, backup,

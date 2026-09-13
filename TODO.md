@@ -324,21 +324,54 @@ bindende: 1 før 2, fordi backupen speiler hvor modellene bor.
       ingen datamigrasjon). Backupfilene bærer modellnavn — lasteren får en navnetabell
       med test som laster en fil i gammel form. `patients/backup_service.py` og
       `RETENTION_HOURS` legges ned i samme runde.
-- [ ] **2. Backupene på nytt grunnlag** (§4 i notatet), etter 1:
-      - [ ] `core.Vakt` inn i backupen (portalfil sammen med innstillingene), og en test som
-            gjenoppretter **alle** filene i en tom database — den finnes ikke i dag.
-      - [ ] `vaktliste`-handler etter samme mønster som `oppdrag`, med bruker-FK-er
-            strippet.
-      - [ ] Modulen `arkiv` døpes om til «Pasientregistreringsarkiv» i grensesnittet.
-      - [ ] `Lydvarsel` inn i `restore_models` i `oppdrag/backup.py` (3.4).
-      - [ ] **Hel backup — besluttet 13. sep. 2026** (`docs/BACKUP.md` §1): alt i
-            databasen unntatt sesjoner, kryptert, eget prefiks offsite, **90 dager** og
-            få filer. Modulfilene beholdes med 730 dager. Bare global admin, gjenoppretting
-            med `{"confirm": true}`.
-      - [ ] Testen som mangler: gjenoppretting av **alle** filene i en tom database,
-            modulfilene i rekkefølge og den hele fila alene (`BACKUP.md` §3.6).
-      - [ ] Livssyklusregel på bucketen for `full/`-prefikset (90 dager) — **krever
-            Andre** i Scaleway-konsollen når koden er ute.
+- [ ] **2. Backupene på nytt grunnlag** (§4 i notatet). **Planen er skrevet ut i
+      [`docs/PLAN_BACKUP_OMLEGGING.md`](./docs/PLAN_BACKUP_OMLEGGING.md)** (13. sep. 2026)
+      etter Andrés bestilling: modulløsningen er tungvint, han vil ha fritt intervall og
+      valget mellom konsekvent lagring og lagring ved endring, det samme for hele basen,
+      og en instruks for oppbevaringstidene i Scaleway. Fasene under er notatets §9; fase
+      1–5 kan kjøres **før** punkt 1 over, jf. `PLAN_REKKEFOLGE_2026-09.md`.
+      - [ ] **Fase 1 — plan og klokke.** `core.Backupplan` erstatter `ModuleBackupConfig`:
+            tre moduser (av / ved endring / alltid), **fritt intervall** i stedet for
+            nedtrekket med sju valg, standardplan modulene arver, og `sist_sjekket_at` ved
+            siden av `sist_fil_at` så stille skilles fra stoppet. Ny kommando
+            `backup_kjor` som Railway-cron er klokka — **i dag tas det ingen backup uten
+            trafikk**, fordi middlewaren er eneste utløser. Datamigrasjonen rører data og
+            skjema i samme transaksjon: `SET CONSTRAINTS`-mønsteret **og** en prøve i
+            `core/migrasjonsprover.py`.
+      - [ ] **Fase 2 — én side.** Standardplan, inline fillister, «Ta backup av alle nå»,
+            «Gjenopprett siste», bekreftelse i dialog. Modul- og gjenopprettingssidene
+            legges ned. I dag er en gjenoppretting fem steg og en backup av alt fire
+            runder.
+      - [ ] **Fase 3 — handlerne og utledet slettelista.** `vaktliste`-handler (største
+            udekkede datamengde i dag) og `portal`-handler med `core.Vakt`;
+            `get_restore_models()` utledes topologisk fra `apps`, med test som krever at
+            hver modell i dumpen er dekket. **3.4 (`Lydvarsel`) faller ut av seg selv** —
+            og kan ikke oppstå igjen. Modulen `arkiv` døpes om til
+            «Pasientregistreringsarkiv».
+      - [ ] **Fase 4 — hel backup** (`docs/BACKUP.md` §1): alt unntatt sesjoner,
+            contenttypes, permissions og backup-metadata. Gjenoppretting er
+            `flush` + `loaddata`, ikke en slettelista — **og du blir logget ut**, fordi
+            sesjonene ligger i basen. `gjenopprett_full` er veien i tom base. Eget prefiks
+            `full/` offsite. **Ingen nedlastingsknapp** for denne fila: den bærer
+            passordhasher og MFA-hemmeligheter.
+      - [ ] **Fase 5 — `verifiser_backup`.** Engangsbase som `verifiser_migrasjoner`,
+            laster de nyeste filene i rekkefølge og skriver radtall. Pluss testen fra
+            `BACKUP.md` §3.6, kjørt mot PostgreSQL minst én gang — SQLite har ingen
+            utsatte fremmednøkler, og det er dem testen finnes for.
+      - [ ] **Fase 6 — oppbevaringstidene i Scaleway** (`PLAN_BACKUP_OMLEGGING.md` §7,
+            **krever Andre**): den eksisterende 730-dagersregelen snevres inn til prefikset
+            `backups/` **før** en ny regel på `full/` med 90 dager legges til — to regler
+            som treffer samme objekt er et sted å gjette. Kontrolleres med
+            `get-bucket-lifecycle-configuration`, og kortet på `/portal-admin/backup/`
+            leser det samme kallet.
+      - [ ] **Fase 7 — rydding:** `db_backup`, `patients/backup_service.py`,
+            `patients.BackupConfig`, `RETENTION_HOURS`. Krever migrasjon. Slås sammen med
+            det løse punktet «Rydd bort død backup-legacy» lenger ned.
+      - [ ] **Krever Andre — før fase 4 og 6:** de fem spørsmålene i notatets §10
+            (standardintervall, intervall for hel backup, nedlasting av hel fil,
+            **om `db_backup` faktisk står som cron-tjeneste i Railway** — `CLAUDE.md` sier
+            tre jobber, tabellen øverst her lister to — og hva livssyklusregelen i
+            bucketen står på i dag).
 - [ ] **3. Dokumentrunden — når 1 og 2 er levert.** Én runde, ikke stykkevis, og den tar
       med seg **alt fra 11.–13. september** (sikkerhetsrundene, server-status, reserve og
       offline, offsite, flere enheter per oppdrag, ISSI og besetning, audit i vaktlista,
@@ -1521,7 +1554,11 @@ Funnene under er allerede kartlagt, så jobben er avgrenset når den skal gjøre
       uansett.
 - [ ] Rydd bort død backup-legacy: modellen `patients.BackupConfig` (singleton som
       ingenting leser lenger) og management-kommandoen `db_backup` som gater på den.
-      Krever migrasjon, derfor egen oppgave.
+      Krever migrasjon, derfor egen oppgave. **Tas som fase 7 i
+      `docs/PLAN_BACKUP_OMLEGGING.md`** — `db_backup` er verre enn død kode: den står i
+      `CRON_JOBBER` og heter som om den tar hele databasen, men går gjennom
+      `patients/backup_service.py` og tar bare pasientmodulen, på et intervall ingen
+      flate redigerer.
 - [ ] Flytte sesjonsdelen til en admin-side
 - [ ] Testene er massive, kan vi komprimere dem? (kjøretiden er løst: 500 s → 15 s via
       PASSWORD_HASHERS under test. Gjenstår evt. å redusere *antall* tester)
