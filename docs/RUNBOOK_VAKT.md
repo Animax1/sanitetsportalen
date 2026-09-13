@@ -581,6 +581,12 @@ det om i terminalen; ingenting lagres.
 Alt som står som `FEIL` skal forklares eller fikses. Lim hele utskriften inn i chatten.
 Kjør den ikke mot prod under vakt — rate-limit-testen bruker 11 av IP-bøttas 50 forsøk.
 
+**Drifts-PC-en er en enhet portalen legger data på.** Offline-driften på `/vaktliste/`
+legger vaktlista og mannskapsregisteret (navn, telefon, e-post, ISSI) i nettleserens
+lager, så lista er der når nettet er borte. **«Logg ut» er det som rydder** — knappen
+sender `Clear-Site-Data`, og alt lokalt lager slettes. Lukk aldri bare vinduet på en delt
+maskin; logg ut. En kopi eldre enn ett døgn brukes uansett ikke.
+
 ---
 
 *Sist oppdatert: 13.09.2026*

@@ -102,6 +102,8 @@ vaktlista. Uten etiketten deles nivået ut i god tro med feil modul i hodet. En 
 `skriv_full` på statistikk, der skriving ikke finnes.
 
 Ukjent nivånavn gir **False**, ikke True — en skrivefeil i en dekoratør skal stenge døra.
+**Global admin får toppen av stigen** fra `nivaa_for` (13. sep. 2026 — var `skriv_full`,
+og da måtte hvert `skriv_leder`-kallsted huske `er_global_admin(...) or`).
 `ModuleSettings.enabled=False` gir 403 for alle andre enn global admin.
 
 **Hvert view under en modul må være dekorert.** `patients/tests_modul_dekorator.py` går
@@ -128,6 +130,17 @@ ikke hadde noe flagg kunne ikke gates i det hele tatt.
 Profilen oppgis eksplisitt — `leser`, `skriver`, `leder_les`, `leder`, `admin` — fordi
 rollen ikke lenger sier noe om tilgang. En bruker uten rader er stengt ute av modulen, så
 en test som glemmer kallet tester 403-stien uten å vite det.
+
+### Klient-IP og data inn i `<script>` (core/klientip.py, core/jsdata.py)
+
+**`klient_ip(request)` er det ene stedet IP-en leses** (13. sep. 2026): siste ledd i
+`X-Forwarded-For` — det Railway la til — validert, ellers `REMOTE_ADDR`. Første ledd er
+klientens påstand. Innloggingsloggen, audit-signalene, arkivene og rate-limit-bøttene per
+IP (`ratelimit_nokkel`) bruker den; `REMOTE_ADDR` direkte er proxyen i prod.
+
+**Data inn i et `<script>`-element går gjennom `js_json()`**, aldri `json.dumps` + `|safe`:
+`json.dumps` escaper ikke `<`, og et navn med `</script>` lukker skriptet — noncen hjelper
+ikke når CDN-vertene står i `script-src`.
 
 ### Rate-limiting (core/ratelimit.py)
 
@@ -276,6 +289,7 @@ Fem ting det er verdt å kjenne før man rører modulen:
 | Bilen rykker videre → oppdraget **trenger ny ressurs**, ikke ferdig | `Oppdrag.trenger_ressurs` + `trenger_ressurs_siden`, `services.start_oppdrag` |
 | Lista sorteres på hastegrad, så nummer; ferdige nederst | `_sorterOppdrag()` i `oppdrag-sentral.js` |
 | Bilen melder Ledig bare fra Leverer og Behandlet; Avbryt i Rykker ut, Behandlet på sted i Fremme | `services.BILEN_KAN_LEDIG_FRA`, `ALTERNATIV`, `avbryt_oppdrag` |
+| Bilen ser bare det lista viser (30 min etter Ledig) — også på detalj, stempling, grovsortering og antall; og aldri flåten, flytting eller verdimengdene | `views._synlig_for_bilen`, `er_enhetskonto`-sjekkene |
 
 **Historikk og arkiv er to helt ulike handlinger**, og har derfor hver sin knapp.
 Historikk flytter ett oppdrag ut av den aktive tavla og er fullt reversibel; arkivering
@@ -297,7 +311,7 @@ for; **«Udefinert» er en fast rad** som ikke kan endres, deaktiveres eller sle
 `sett_status` sperrer på navnet. `Oppdrag.problemstilling` er fortsatt tekst — arkivets
 radform er signert. `views_verdier.py` er én fabrikk for de tre: liste for `les`,
 opprett/endre/omsortere for **`skriv_leder`** (André: «La oss ha skriv_leder rolle på
-dette»; global admin regnes med eksplisitt, siden `nivaa_for` gir admin `skriv_full`),
+dette»; enhetskontoer får 403 uansett nivå),
 sletting for global admin med `{"confirm": true}`, PROTECT/i bruk gir 409. **Rekkefølgen
 settes med hele lista** (`PUT …/rekkefolge/`), ikke «opp» per rad. Klienten har ett vindu
 med tre faner («Valglister», `renderVerdiadmin`) og bygger `OPPDRAG_PROBLEMSTILLINGER_FOR`
@@ -380,7 +394,9 @@ fase 3–7 gjenstår — se `docs/BESLUTNING_VAKTLISTE.md`, som er besluttet i s
   `services.ser_alle_korps()` er det ene stedet; `synlige_vaktposter()` og
   `synlig_mannskap()` filtrerer i svaret sida bygges av, så alle fanene følger med.
   Uten badge er lista tom, og malen sier hvorfor. Sentralbordets besetning i
-  `/oppdrag/` er **ikke** filtrert — der er spørsmålet «er bilen klar».
+  `/oppdrag/` er **ikke** filtrert — der er spørsmålet «er bilen klar» — men
+  endepunktet krever derfor `ser_alle_korps` eller `oppdrag:les` (13. sep. 2026):
+  en ren `les` skal ikke kunne iterere `<pk>` og få telefon og ISSI for alle korps.
   **Den som ser alle får en korpsvelger** i vaktlinja: `_synligePoster()` i
   `vaktliste.js` speiler `poster_for_korps()` og legges på `aktivListe.vaktposter`
   og `register.mannskap` i `brukKorpsfilter()`, så byggerne følger med uten å vite om
@@ -394,7 +410,10 @@ fase 3–7 gjenstår — se `docs/BESLUTNING_VAKTLISTE.md`, som er besluttet i s
   *begge* korps, og kontokobling **for hånd er global admin** (12. sep. 2026) fordi den
   flytter en badge — kontoen arver korpset, og dermed hva den kontoen får redigere. Alle
   andre kobler gjennom **`Mannskap.epost`**: finnes en aktiv, ledig portalkonto med samme
-  e-post, kobles den av seg selv ved lagring (`views_registre._koble_paa_epost`).
+  e-post, kobles den av seg selv ved lagring (`views_registre._koble_paa_epost`) — men
+  **bare når den som lagrer er admin eller `skriv_full`+** (13. sep. 2026): koblingen
+  flytter en badge, og korps-føreren kunne ellers velge hvilken konto som blir hvem i
+  eget korps. Hun lagrer e-posten; merket sier at kontoen finnes.
   **Adminkontoer er aldri mannskap** (12. sep. 2026: «Den er utenfor.») —
   `_koblbare_kontoer()` er det ene stedet som sier hvem som kan kobles, og e-postmerket,
   autokoblingen og kontolista leser alle derfra; kobling for hånd til en adminkonto gir
@@ -420,7 +439,10 @@ fase 3–7 gjenstår — se `docs/BESLUTNING_VAKTLISTE.md`, som er besluttet i s
   `patients/tests_modul_dekorator.py`, med egen CSP så den kan hente CDN-filer).
   `avgjor()` er den ene regelen: API-GET nett først med kopi som reserve (header
   `X-Vl-Kopi`), siden nett først, statisk/CDN kopi først; **aldri POST, aldri en
-  omdirigering** (innloggingssiden). Køen for møtt/av vakt ligger i `vaktliste.js`
+  omdirigering** (innloggingssiden), og **ingen datakopi eldre enn 24 timer**
+  (`erForGammel`). **«Logg ut» sender `Clear-Site-Data: "cache", "storage"`** (13. sep.
+  2026) — Cache Storage, localStorage og workeren ryddes i ett på en delt drifts-PC;
+  cookies røres ikke. Køen for møtt/av vakt ligger i `vaktliste.js`
   (`koLes`/`koSkriv`, `_leggIKo`, `_projiserKo`, `synkKo`, `tegnOffline`) — samme
   mønster som bilens kø i `oppdrag-enhet.js`. **Står noe i kø, går alt i kø** —
   rekkefølgen er regelen. `stempling_view` leser `tidspunkt` i kroppen, og
