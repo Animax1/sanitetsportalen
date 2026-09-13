@@ -4,6 +4,20 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-13 — Strategisk plan for rekkefølgen: `docs/PLAN_REKKEFOLGE_2026-09.md`
+
+Ingen kodeendring. På spørsmål om hva som bør tas først av teknisk gjeld, backup,
+datteroppdrag og statistikk-utvidelsen: **backuphullene først** (vaktlista er udekket og
+offsite-kopiene kan ikke gjenopprettes i tom base), **så flyttingen ut av `patients`**
+(med gjenopprettbar backup foran migrasjonen), så hel backup og dokumentrunden. De to
+funksjonene står etter: begge er blokkert på avgjørelser fra André, og oppdragsmodulen
+har ikke hatt sin første skarpe vakt. Notatet begrunner avviket fra `BACKUP.md` §3 (det
+som ikke rører `AppSetting` kan bygges før flyttingen), anbefaler å beholde tabellnavnene
+ved flyttingen, og at statistikk-utvidelsen bygges som A- og B-nivå med F4-lasttest før,
+og lar C/D vente. TODO har fått en henvisning under «Teknisk gjeld».
+
+---
+
 ## 2026-09-13 — Forslag: datteroppdrag, og `docs/` ryddet
 
 Ingen kodeendring. `docs/FORSLAG_DATTEROPPDRAG.md` er et idénotat (ikke besluttet):

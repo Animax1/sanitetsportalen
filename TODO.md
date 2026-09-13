@@ -310,6 +310,14 @@ ingen av dem gir feilmelding — de er bare stille inaktive.
 Underlaget er `docs/TEKNISK_GJELD.md`; det forklarer hvorfor. Rekkefølgen her er
 bindende: 1 før 2, fordi backupen speiler hvor modellene bor.
 
+> **Rekkefølgen foreslått justert 13. sep. 2026** — se
+> `docs/PLAN_REKKEFOLGE_2026-09.md`: det av punkt 2 som *ikke* rører `AppSetting`
+> (`vaktliste`-handler, `core.Vakt` i egen portalfil, gjenopprettingstesten i tom base,
+> 3.4 og omdøpingen) tas **før** flyttingen, så prod har en gjenopprettbar backup foran
+> tilstandsmigrasjonen. Hel backup og `AppSetting` i portalfila tas etter. Datteroppdrag
+> og statistikk-utvidelsen står etter dokumentrunden og etter første skarpe vakt med
+> oppdragsmodulen.
+
 - [ ] **1. Flytt det portalvide ut av `patients` og inn i `core`** (§2 i notatet):
       `AppSetting`, `Backup`, `BackupConfig`, `hent_aktiv_vakt`, CSP-/metrikk-/backup-
       middlewaren, `healthz` og server-status. Tabellnavnene beholdes (tilstandsmigrasjon,
