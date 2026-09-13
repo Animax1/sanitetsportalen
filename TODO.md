@@ -326,8 +326,9 @@ Pasienter har Excel, oppdrag går på nødnett. Det som skal overleve at Railway
       (`vaktliste-sw.js`), kø for møtt/av vakt i `localStorage` med klienttid,
       `services.vurder_klienttid`, banner og «Klar for offline». Testes i Chrome/Edge på
       PC på staging.
-      - [ ] **Bekreft på staging:** kopien vises med flymodus, køen sendes når nettet
-            kommer tilbake, og tida på stempelet er trykket, ikke mottaket.
+      - [x] **Bekreftet på staging 13. sep.:** kopi med nettet av, kø sendt når nettet
+            kom tilbake, tida fra trykket, avvist trykk fjernet med beskjed, utgått
+            innlogging håndtert, /django-admin/ borte.
 - [ ] **3. Backupene ut av Railway, til Scaleway Object Storage.** Bucket i Amsterdam,
       klasse Standard One Zone (€0,00803/GB/mnd; opplasting gratis, 75 GB ut gratis per
       måned — våre volumer er under 1 GB). S3-protokollen, `boto3`.
