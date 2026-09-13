@@ -21,7 +21,13 @@ from .handlers import (
     register,
 )
 from . import klokke
-from .klokke import kjor_forfalte, kjor_plan, start_klokke, vakthund
+from .klokke import (
+    kjor_forfalte,
+    kjor_plan,
+    start_klokke,
+    vakthund,
+    varsle_stoppet_klokke,
+)
 from .service import (
     KIND_AUTO,
     KIND_MANUAL,
@@ -57,4 +63,5 @@ __all__ = [
     'restore_backup',
     'start_klokke',
     'vakthund',
+    'varsle_stoppet_klokke',
 ]

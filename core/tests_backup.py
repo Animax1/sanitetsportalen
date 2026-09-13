@@ -647,37 +647,36 @@ class BackupAdminViewTests(TestCase):
         self.assertEqual(resp.status_code, 200)
         self.assertContains(resp, 'patients')
 
-    def test_overview_viser_arkiv_modulen(self) -> None:
-        """Arkivet er egen backup-modul og skal ha egen rad i oversikten."""
+    def test_alle_moduler_staar_paa_samme_side(self) -> None:
+        """Modulsidene er lagt ned. Alt skal være på én side — det var de fire
+        rundene for å ta backup av alt som var tungvint."""
         client = Client()
         client.force_login(self.admin)
         resp = client.get('/portal-admin/backup/')
-        self.assertContains(resp, 'Vaktarkiv')
+        for slug in ('patients', 'arkiv', 'oppdrag', 'oppdrag_arkiv'):
+            with self.subTest(slug=slug):
+                self.assertContains(resp, slug)
 
-    def test_arkiv_modul_har_egen_side(self) -> None:
+    def test_siden_har_skjema_for_hver_modul_med_prefiks(self) -> None:
+        """Hver rad har sitt eget skjema, prefikset med slugen — ellers ville
+        seks skjemaer på én side delt feltnavn og overskrevet hverandre."""
         client = Client()
         client.force_login(self.admin)
-        resp = client.get('/portal-admin/backup/arkiv/')
-        self.assertEqual(resp.status_code, 200)
-
-    def test_module_view_renders_form(self) -> None:
-        client = Client()
-        client.force_login(self.admin)
-        resp = client.get('/portal-admin/backup/patients/')
-        self.assertEqual(resp.status_code, 200)
+        resp = client.get('/portal-admin/backup/')
         for felt in ('modus', 'intervall_verdi', 'intervall_enhet', 'behold'):
             with self.subTest(felt=felt):
-                self.assertContains(resp, f'name="{felt}"')
+                self.assertContains(resp, f'name="patients-{felt}"')
+                self.assertContains(resp, f'name="standard-{felt}"')
 
-    def test_module_view_post_saves_config(self) -> None:
+    def test_plan_view_lagrer_egen_plan(self) -> None:
         client = Client()
         client.force_login(self.admin)
-        resp = client.post('/portal-admin/backup/patients/', data={
-            'folger_standard': '',       # egen plan
-            'modus': 'av',
-            'intervall_verdi': '30',
-            'intervall_enhet': 'minutt',
-            'behold': '25',
+        resp = client.post('/portal-admin/backup/plan/patients/', data={
+            'patients-folger_standard': '',       # egen plan
+            'patients-modus': 'av',
+            'patients-intervall_verdi': '30',
+            'patients-intervall_enhet': 'minutt',
+            'patients-behold': '25',
         })
         self.assertEqual(resp.status_code, 302)
         plan = Backupplan.objects.get(slug='patients')
@@ -686,16 +685,56 @@ class BackupAdminViewTests(TestCase):
         self.assertEqual(plan.intervall_min, 30)
         self.assertEqual(plan.behold, 25)
 
+    def test_plan_view_lagrer_standardplanen(self) -> None:
+        client = Client()
+        client.force_login(self.admin)
+        resp = client.post('/portal-admin/backup/plan/standard/', data={
+            'standard-modus': 'alltid',
+            'standard-intervall_verdi': '2',
+            'standard-intervall_enhet': 'time',
+            'standard-behold': '11',
+        })
+        self.assertEqual(resp.status_code, 302)
+        standard = Backupplan.objects.get(slug='standard')
+        self.assertEqual(standard.modus, 'alltid')
+        self.assertEqual(standard.intervall_min, 120)
+        self.assertEqual(standard.behold, 11)
+
+    def test_plan_view_avviser_ugyldig_intervall(self) -> None:
+        client = Client()
+        client.force_login(self.admin)
+        client.post('/portal-admin/backup/plan/patients/', data={
+            'patients-folger_standard': '', 'patients-modus': 'ved_endring',
+            'patients-intervall_verdi': '0', 'patients-intervall_enhet': 'minutt',
+            'patients-behold': '25',
+        })
+        self.assertNotEqual(Backupplan.objects.get(slug='patients').intervall_verdi, 0)
+
     def test_run_view_creates_manual_backup(self) -> None:
         Patient.objects.create(pasientnummer=1, vakt=vakt_for_year(2025), problemstilling='X')
         client = Client()
         client.force_login(self.admin)
         with patch.dict(os.environ, {'BACKUP_DIR': str(self.backup_dir)}):
-            resp = client.post('/portal-admin/backup/patients/run/')
+            resp = client.post('/portal-admin/backup/kjor/patients/')
         self.assertEqual(resp.status_code, 302)
         self.assertTrue(
             Backup.objects.filter(module_slug='patients', kind=KIND_MANUAL).exists(),
         )
+
+    def test_ta_backup_av_alle_tar_alle_modulene(self) -> None:
+        """Knappen som gjorde de fire rundene overflødige."""
+        from core.backup import all_handlers
+
+        Patient.objects.create(pasientnummer=1, vakt=vakt_for_year(2025), problemstilling='X')
+        client = Client()
+        client.force_login(self.admin)
+        with patch.dict(os.environ, {'BACKUP_DIR': str(self.backup_dir)}):
+            resp = client.post('/portal-admin/backup/kjor/')
+        self.assertEqual(resp.status_code, 302)
+        for handler in all_handlers():
+            with self.subTest(slug=handler.slug):
+                self.assertTrue(
+                    Backup.objects.filter(module_slug=handler.slug).exists())
 
     def test_restore_requires_correct_slug(self) -> None:
         Patient.objects.create(pasientnummer=1, vakt=vakt_for_year(2025), problemstilling='X')
@@ -743,7 +782,7 @@ class BackupAdminViewTests(TestCase):
         """Manuell backup skal være admin-only, som resten av flaten."""
         client = Client()
         client.force_login(self.lead)
-        resp = client.post('/portal-admin/backup/patients/run/')
+        resp = client.post('/portal-admin/backup/kjor/patients/')
         self.assertIn(resp.status_code, (302, 403))
 
     def test_restore_view_requires_admin(self) -> None:
@@ -758,16 +797,21 @@ class BackupAdminViewTests(TestCase):
         )
         self.assertIn(resp.status_code, (302, 403))
 
-    def test_download_view_returns_gzip(self) -> None:
+    def test_nedlasting_finnes_ikke(self) -> None:
+        """Backupfilene skal ikke finnes andre steder enn hos Scaleway eller på
+        Railway (André, 13. sep. 2026). Det gjelder pasientfila like mye som
+        den hele: en `.json.gz` med hele pasientregisteret i nedlastingsmappa
+        er en helseopplysningsdump utenfor portalens kontroll."""
         Patient.objects.create(pasientnummer=1, vakt=vakt_for_year(2025), problemstilling='X')
         client = Client()
         client.force_login(self.admin)
         with patch.dict(os.environ, {'BACKUP_DIR': str(self.backup_dir)}):
             backup = create_backup(slug='patients', kind=KIND_MANUAL)
             resp = client.get(f'/portal-admin/backup/patients/last-ned/{backup.pk}/')
-        self.assertEqual(resp.status_code, 200)
-        self.assertEqual(resp['Content-Type'], 'application/gzip')
-        self.assertIn(backup.filename, resp['Content-Disposition'])
+        self.assertEqual(resp.status_code, 404)
+
+        siden = client.get('/portal-admin/backup/')
+        self.assertNotContains(siden, 'last-ned')
 
     def test_delete_view_removes_backup(self) -> None:
         Patient.objects.create(pasientnummer=1, vakt=vakt_for_year(2025), problemstilling='X')
@@ -784,11 +828,38 @@ class BackupAdminViewTests(TestCase):
         self.assertFalse(Backup.objects.filter(pk=backup.pk).exists())
         self.assertFalse(path.exists())
 
-    def test_unknown_module_redirects_with_error(self) -> None:
+    def test_ukjent_modul_omdirigerer_med_feil(self) -> None:
         client = Client()
         client.force_login(self.admin)
-        resp = client.get('/portal-admin/backup/finnes-ikke/')
+        resp = client.post('/portal-admin/backup/kjor/finnes-ikke/')
         self.assertEqual(resp.status_code, 302)
+        resp = client.post('/portal-admin/backup/plan/finnes-ikke/', data={})
+        self.assertEqual(resp.status_code, 302)
+
+    def test_bekreftelsen_sier_hvor_mange_rader_som_slettes(self) -> None:
+        """«Slett og erstatt» er et annet svar når man ser tallet."""
+        Patient.objects.create(pasientnummer=1, vakt=vakt_for_year(2025), problemstilling='X')
+        client = Client()
+        client.force_login(self.admin)
+        with patch.dict(os.environ, {'BACKUP_DIR': str(self.backup_dir)}):
+            backup = create_backup(slug='patients', kind=KIND_MANUAL)
+        resp = client.get(f'/portal-admin/backup/patients/restore/{backup.pk}/')
+        self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, 'Dette slettes og erstattes')
+
+    def test_vakthunden_vises_naar_klokka_er_stille(self) -> None:
+        """Klokka er en tråd og synes ikke i Railway. Siden er beviset."""
+        plan = Backupplan.hent('patients')
+        plan.folger_standard = False
+        plan.modus = Backupplan.MODUS_VED_ENDRING
+        plan.intervall_verdi, plan.intervall_enhet = 10, 'minutt'
+        plan.sist_sjekket_at = timezone.now() - timedelta(hours=5)
+        plan.save()
+
+        client = Client()
+        client.force_login(self.admin)
+        resp = client.get('/portal-admin/backup/')
+        self.assertContains(resp, 'Backup-klokka svarer ikke')
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -1012,11 +1083,13 @@ class KlokkeOppstartTests(TestCase):
         _restore_patients_handler()
         self.backup_dir = _prepare_backup_dir()
 
-    def test_starter_ikke_under_test_og_migrate(self) -> None:
+    def test_starter_ikke_under_engangskommandoer(self) -> None:
+        """Tillatelsesliste, ikke blokkliste: en ny management-kommando skal
+        ikke kunne etterlate seg en tråd fordi noen glemte å liste den."""
         from core.backup.klokke import skal_starte
 
         for kommando in ('test', 'migrate', 'makemigrations', 'collectstatic',
-                         'backup_kjor'):
+                         'backup_kjor', 'check', 'shell', 'en_helt_ny_kommando'):
             with self.subTest(kommando=kommando):
                 with patch('sys.argv', ['manage.py', kommando]):
                     self.assertFalse(skal_starte())
@@ -1024,13 +1097,27 @@ class KlokkeOppstartTests(TestCase):
     def test_starter_under_web(self) -> None:
         from core.backup.klokke import skal_starte
 
-        with patch('sys.argv', ['gunicorn']):
-            self.assertTrue(skal_starte())
+        for server in ('gunicorn', '/usr/local/bin/gunicorn', 'uvicorn'):
+            with self.subTest(server=server):
+                with patch('sys.argv', [server, 'myproject.wsgi']):
+                    self.assertTrue(skal_starte())
+
+    def test_runserver_starter_bare_i_underprosessen(self) -> None:
+        """`runserver` starter seg selv på nytt; uten RUN_MAIN-sjekken får
+        utviklingsserveren to klokketråder."""
+        from core.backup.klokke import skal_starte
+
+        with patch('sys.argv', ['manage.py', 'runserver']):
+            with patch.dict(os.environ, {'RUN_MAIN': 'true'}):
+                self.assertTrue(skal_starte())
+            with patch.dict(os.environ, {}, clear=False):
+                os.environ.pop('RUN_MAIN', None)
+                self.assertFalse(skal_starte())
 
     def test_miljovariabel_slaar_av(self) -> None:
         from core.backup.klokke import skal_starte
 
-        with patch('sys.argv', ['gunicorn']), \
+        with patch('sys.argv', ['gunicorn', 'myproject.wsgi']), \
                 patch.dict(os.environ, {'BACKUP_KLOKKE': 'av'}):
             self.assertFalse(skal_starte())
 

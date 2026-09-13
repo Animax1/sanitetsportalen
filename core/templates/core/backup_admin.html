@@ -1,0 +1,375 @@
+{% extends "core/base_portal.html" %}
+
+{% comment %}
+Hele backup-administrasjonen på én side (13. sep. 2026).
+
+Modulsidene er lagt ned. Hver modul er en `<details>` som folder seg ut der den
+står, med plan, handlinger og filer i samme boks — det trengs ingen JS for det,
+og en side som virker uten skript er en side som virker.
+
+Ingen nedlastingsknapp. Backupfilene skal ikke finnes andre steder enn hos
+Scaleway eller på Railway, og det gjelder pasientfila like mye som den hele:
+en `.json.gz` med hele pasientregisteret i nedlastingsmappa er en
+helseopplysningsdump utenfor portalens kontroll.
+{% endcomment %}
+
+{% block title %}Backup – Sanitetsportalen{% endblock %}
+
+{% block extra_head %}
+<style>
+  .bk-kort {
+    background: var(--portal-surface);
+    border: 1px solid var(--portal-border);
+    border-radius: 10px;
+    margin-bottom: 1rem;
+  }
+  .bk-kort > .bk-hode {
+    padding: 0.7rem 1rem;
+    border-bottom: 1px solid var(--portal-border);
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+  }
+  .bk-kropp { padding: 1rem; }
+  .bk-rad {
+    border-bottom: 1px solid var(--portal-border);
+  }
+  .bk-rad:last-child { border-bottom: none; }
+  .bk-rad > summary {
+    padding: 0.7rem 1rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    flex-wrap: wrap;
+    list-style: none;
+  }
+  .bk-rad > summary::-webkit-details-marker { display: none; }
+  .bk-rad > summary::before {
+    content: "\25B8";
+    color: var(--portal-text-muted);
+    transition: transform 0.15s;
+  }
+  .bk-rad[open] > summary::before { transform: rotate(90deg); }
+  .bk-rad > summary:hover { background: rgba(255,255,255,0.04); }
+  .bk-navn { font-weight: 600; min-width: 11rem; }
+  .bk-meta { color: var(--portal-text-muted); font-size: 0.85rem; }
+  .bk-skyv { margin-left: auto; }
+  .bk-utfoldet {
+    padding: 0 1rem 1rem 2rem;
+    border-top: 1px dashed var(--portal-border);
+  }
+  .bk-filer { font-size: 0.82rem; }
+  .bk-filer td, .bk-filer th { padding: 0.3rem 0.5rem; }
+  .bk-filnavn {
+    font-family: ui-monospace, "Cascadia Code", monospace;
+    font-size: 0.78rem;
+  }
+  .bk-maaler {
+    height: 6px;
+    border-radius: 3px;
+    background: var(--portal-surface-2);
+    overflow: hidden;
+    max-width: 320px;
+  }
+  .bk-maaler > span { display: block; height: 100%; background: var(--portal-accent); }
+  .bk-maaler.bk-trangt > span { background: var(--portal-warning); }
+  .bk-rpo { display: flex; flex-wrap: wrap; gap: 0.4rem 1.2rem; }
+  .bk-rpo-tall { font-weight: 700; }
+</style>
+{% endblock %}
+
+{% block content %}
+<section class="mb-3 d-flex align-items-center flex-wrap gap-2">
+  <div>
+    <h1 class="mb-1"><i class="bi bi-cloud-arrow-up me-2"></i>Backup</h1>
+    <p class="text-muted mb-0">
+      Planene styrer hvor ofte og hvor mange. Klokka tikker hvert
+      {{ tikk_sekunder }}. sekund i web-prosessen, uavhengig av trafikk.
+    </p>
+  </div>
+  <form method="post" action="{% url 'core:backup_admin_run_alle' %}" class="ms-auto"
+        data-confirm="Ta backup av alle moduler nå?">
+    {% csrf_token %}
+    <button type="submit" class="btn btn-success btn-sm">
+      <i class="bi bi-play-circle me-1"></i>Ta backup av alle nå
+    </button>
+  </form>
+</section>
+
+{% comment %}
+── Vakthund ──
+Klokka er en tråd og synes ikke i Railways grensesnitt slik en cron-jobb gjør.
+Dette er beviset på at den lever: er den stille, står det her.
+{% endcomment %}
+{% if vakthund %}
+<div class="alert alert-danger py-2">
+  <strong><i class="bi bi-exclamation-triangle me-1"></i>Backup-klokka svarer ikke.</strong>
+  {% for v in vakthund %}
+    <div class="small">
+      <code>{{ v.slug }}</code> er ikke vurdert
+      {% if v.sist_sjekket_at %}siden {{ v.sist_sjekket_at|date:"d.m.Y H:i" }}{% else %}noen gang{% endif %}
+      — grensen er {{ v.grense_min }} min.
+    </div>
+  {% endfor %}
+  <div class="small mt-1">
+    Står web-tjenesten, har klokketråden stoppet. En omstart av tjenesten
+    starter den på nytt; <code>python manage.py backup_kjor</code> tar en runde
+    med det samme.
+  </div>
+</div>
+{% endif %}
+
+{% comment %}
+── Verste tilfelle ──
+Det du egentlig vil vite er ikke intervallet, men hvor mye arbeid som går tapt.
+Målt mot siste kopi som ville overlevd at Railway forsvant.
+{% endcomment %}
+<div class="bk-kort">
+  <div class="bk-hode">
+    <i class="bi bi-hourglass-split"></i>
+    Verste tilfelle hvis Railway forsvinner nå
+    {% if rpo.verste_minutter is not None %}
+      <span class="badge {% if rpo.verste_minutter > 1440 %}bg-warning text-dark{% else %}bg-secondary{% endif %}">
+        inntil {{ rpo.verste_minutter|floatformat:0 }} min
+      </span>
+    {% endif %}
+  </div>
+  <div class="bk-kropp">
+    <div class="bk-rpo">
+      {% for r in rpo.rader %}
+        <span>
+          {{ r.navn }}
+          <span class="bk-rpo-tall {% if r.tid is None %}text-danger{% endif %}">
+            {% if r.tid %}{{ r.minutter }} min{% else %}ingen kopi{% endif %}
+          </span>
+        </span>
+      {% endfor %}
+    </div>
+    <div class="bk-meta mt-2">
+      {% if rpo.offsite %}
+        Målt mot siste vellykkede opplasting til Scaleway. Er volumet borte, er
+        det bare bucketen som teller.
+      {% else %}
+        <i class="bi bi-info-circle me-1"></i>Offsite er ikke konfigurert her,
+        så tallene er målt mot filene på volumet. De overlever ikke at Railway
+        forsvinner.
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+{# ── Offsite og volum ─────────────────────────────────────────────────────── #}
+<div class="bk-kort" id="offsite-kort">
+  <div class="bk-hode">
+    <i class="bi bi-cloud-check"></i>Offsite-kopi (Scaleway)
+    {% if not offsite.konfigurert %}
+      <span class="badge bg-secondary">Ikke konfigurert</span>
+    {% elif offsite.siste_feil %}
+      <span class="badge bg-danger">Siste opplasting feilet</span>
+    {% else %}
+      <span class="badge bg-success">Aktiv</span>
+    {% endif %}
+  </div>
+  <div class="bk-kropp">
+    {% if not offsite.konfigurert %}
+      <div class="bk-meta">
+        Mangler {{ offsite.mangler|join:", " }} på tjenesten. Bare prod skal ha dem.
+      </div>
+    {% else %}
+      <div class="bk-meta">
+        Bucket <code>{{ offsite.bucket }}</code> ·
+        {{ offsite.antall }} fil{{ offsite.antall|pluralize:"er" }} lastet opp
+        {% if offsite.siste_ok %}· sist {{ offsite.siste_ok.sendt_at|date:"d.m.Y H:i" }}
+          ({{ offsite.siste_ok.backup_filnavn }}){% endif %}
+      </div>
+      {% if offsite.siste_feil %}
+        <div class="small text-danger mt-1">
+          {{ offsite.siste_feil.created_at|date:"d.m.Y H:i" }}: {{ offsite.siste_feil.feil }}
+        </div>
+      {% endif %}
+    {% endif %}
+
+    <hr style="border-color: var(--portal-border);">
+
+    {% if disk.error %}
+      <div class="small text-warning">Kunne ikke lese volumet: {{ disk.error }}</div>
+    {% else %}
+      <div class="d-flex align-items-center gap-3 flex-wrap">
+        <div class="bk-maaler {% if disk.trangt %}bk-trangt{% endif %}" style="flex: 1 1 220px;">
+          <span style="width: {{ disk.brukt_prosent|default:0 }}%"></span>
+        </div>
+        <div class="bk-meta">
+          Volumet: {{ disk.brukt_mb }} MB av {{ disk.total_mb }} MB brukt
+          ({{ disk.brukt_prosent }} %) · backupfiler {{ disk.backup_mb }} MB
+        </div>
+      </div>
+      {% if disk.trangt %}
+        <div class="small text-warning mt-1">
+          <i class="bi bi-exclamation-triangle me-1"></i>Volumet begynner å bli
+          fullt. Et fullt volum stopper backupen, og ingenting annet merker det.
+          Senk «behold» på planene under.
+        </div>
+      {% endif %}
+    {% endif %}
+  </div>
+</div>
+
+{% comment %}
+── Standardplanen ──
+Ett sted å sette modus, intervall og cap for alle modulene som følger den.
+Det er forskjellen på å vedlikeholde tre tall og atten.
+{% endcomment %}
+<div class="bk-kort">
+  <div class="bk-hode">
+    <i class="bi bi-sliders"></i>Standardplan
+    <span class="bk-meta fw-normal">
+      gjelder alle modulene som følger den —
+      {{ standard.get_modus_display|lower }}, {{ standard.intervall_tekst }},
+      behold {{ standard.behold }}
+    </span>
+  </div>
+  <div class="bk-kropp">
+    <form method="post" action="{% url 'core:backup_admin_plan' slug=standard.slug %}"
+          class="row g-2 align-items-end">
+      {% csrf_token %}
+      {% include "core/partials/_backupplan_felter.html" with form=standard_form %}
+      <div class="col-auto">
+        <button type="submit" class="btn btn-primary btn-sm">
+          <i class="bi bi-save me-1"></i>Lagre
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+{# ── Modulene ─────────────────────────────────────────────────────────────── #}
+<div class="bk-kort">
+  <div class="bk-hode"><i class="bi bi-boxes"></i>Moduler</div>
+  {% for rad in rader %}
+  <details class="bk-rad" {% if rad.slug in apne %}open{% endif %}>
+    <summary>
+      <span class="bk-navn">{{ rad.navn }}</span>
+      {% if rad.gjeldende.modus == 'av' %}
+        <span class="badge bg-secondary">Av</span>
+      {% elif rad.gjeldende.modus == 'alltid' %}
+        <span class="badge bg-success">Alltid</span>
+      {% else %}
+        <span class="badge bg-success">Ved endring</span>
+      {% endif %}
+      <span class="bk-meta">
+        {{ rad.gjeldende.intervall_tekst }}{% if rad.plan.arver %} (standard){% endif %}
+        · behold {{ rad.gjeldende.behold }}
+      </span>
+      <span class="bk-meta bk-skyv">
+        {% if rad.plan.sist_fil_at %}
+          siste fil {{ rad.plan.sist_fil_at|date:"d.m H:i" }}
+          {% if rad.plan.sist_resultat %}({{ rad.plan.sist_resultat }}){% endif %}
+        {% else %}
+          ingen fil
+        {% endif %}
+        · {{ rad.antall }} fil{{ rad.antall|pluralize:"er" }} · {{ rad.mb }} MB
+      </span>
+    </summary>
+
+    <div class="bk-utfoldet">
+      {% comment %}
+      Sist vurdert ved siden av siste fil: uten den første ser «ingenting har
+      endret seg» nøyaktig ut som «jobben er død».
+      {% endcomment %}
+      <div class="bk-meta mb-2">
+        Sist vurdert:
+        {% if rad.plan.sist_sjekket_at %}
+          {{ rad.plan.sist_sjekket_at|date:"d.m.Y H:i:s" }}
+        {% else %}
+          aldri
+        {% endif %}
+        · slug <code>{{ rad.slug }}</code>
+      </div>
+
+      <form method="post" action="{% url 'core:backup_admin_plan' slug=rad.slug %}"
+            class="row g-2 align-items-end mb-3">
+        {% csrf_token %}
+        {% include "core/partials/_backupplan_felter.html" with form=rad.form %}
+        <div class="col-auto">
+          <button type="submit" class="btn btn-primary btn-sm">
+            <i class="bi bi-save me-1"></i>Lagre plan
+          </button>
+        </div>
+        {% if rad.plan.arver %}
+        <div class="col-12">
+          <div class="bk-meta">
+            <i class="bi bi-info-circle me-1"></i>Standardplanen gjelder nå
+            ({{ standard.get_modus_display|lower }}, {{ standard.intervall_tekst }},
+            behold {{ standard.behold }}). Verdiene over tas i bruk først når
+            «Følg standardplanen» er av.
+          </div>
+        </div>
+        {% endif %}
+      </form>
+
+      <div class="d-flex gap-2 flex-wrap mb-3">
+        <form method="post" action="{% url 'core:backup_admin_run' slug=rad.slug %}"
+              data-confirm="Ta backup av {{ rad.navn }} nå?">
+          {% csrf_token %}
+          <button type="submit" class="btn btn-outline-success btn-sm">
+            <i class="bi bi-play-circle me-1"></i>Ta backup nå
+          </button>
+        </form>
+        {% if rad.filer %}
+        <a href="{% url 'core:backup_admin_restore' slug=rad.slug pk=rad.filer.0.pk %}"
+           class="btn btn-outline-warning btn-sm">
+          <i class="bi bi-arrow-counterclockwise me-1"></i>Gjenopprett siste
+        </a>
+        {% endif %}
+      </div>
+
+      {% if rad.filer %}
+      <div class="table-responsive">
+        <table class="table table-dark table-sm bk-filer mb-0" style="background: transparent;">
+          <thead>
+            <tr>
+              <th>Tidspunkt</th><th>Type</th><th>Filnavn</th>
+              <th>Størrelse</th><th class="text-end">Handlinger</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for b in rad.filer %}
+            <tr>
+              <td>{{ b.created_at|date:"d.m.Y H:i:s" }}</td>
+              <td>{{ b.get_kind_display }}</td>
+              <td class="bk-filnavn">{{ b.filename }}</td>
+              <td>{{ b.size_bytes|filesizeformat }}</td>
+              <td class="text-end">
+                <a href="{% url 'core:backup_admin_restore' slug=rad.slug pk=b.pk %}"
+                   class="btn btn-outline-warning btn-sm py-0">Gjenopprett</a>
+                <form method="post" class="d-inline"
+                      action="{% url 'core:backup_admin_delete' slug=rad.slug pk=b.pk %}"
+                      data-confirm="Slette {{ b.filename }}?">
+                  {% csrf_token %}
+                  <button type="submit" class="btn btn-outline-danger btn-sm py-0">Slett</button>
+                </form>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% if rad.antall > rad.filer|length %}
+        <div class="bk-meta mt-1">
+          Viser de {{ rad.filer|length }} nyeste av {{ rad.antall }} på volumet.
+          Eldre filer ligger hos Scaleway til livssyklusregelen tar dem.
+        </div>
+      {% endif %}
+      {% else %}
+        <div class="bk-meta">Ingen filer ennå.</div>
+      {% endif %}
+    </div>
+  </details>
+  {% empty %}
+  <div class="bk-kropp bk-meta">Ingen moduler har registrert en backup-handler.</div>
+  {% endfor %}
+</div>
+{% endblock %}

@@ -4,6 +4,58 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-13 — Backup fase 2: alt på én side
+
+`/portal-admin/backup/` er nå hele backup-flaten. Oversikten, én side per modul
+og veien mellom dem er lagt ned.
+
+**Det som var tungvint, målt:** å ta backup av alt kostet fire runder gjennom
+tre sider; å gjenopprette kostet fem steg. Nå står standardplanen øverst, og
+hver modul er en rad som folder seg ut der den står med plan, knapper og
+filliste i samme boks. «Ta backup av alle nå» er én knapp. «Gjenopprett siste»
+dekker det man vil i ni av ti tilfeller.
+
+**Gjenopprettingen beholdt sin egen bekreftelsesside.** Den er ikke det som var
+tungvint — den er den ene handlingen her som sletter rader, og skal koste et
+bevisst klikk. Men den sier nå **hvor mange rader i hvor mange tabeller** som
+forsvinner. «Slett og erstatt» er et annet svar når man ser at det gjelder 1 240
+rader i ni tabeller.
+
+**Nedlastingsknappene er fjernet helt**, også for modulfilene: backupfilene skal
+ikke finnes andre steder enn hos Scaleway eller på Railway. Argumentet mot å
+laste ned den hele fila — passordhasher og TOTP-hemmeligheter til en laptop — er
+like gyldig for pasientfila, som er en helseopplysningsdump utenfor portalens
+kontroll.
+
+**«Verste tilfelle nå»** står øverst, per modul, og er målt mot siste
+*vellykkede opplasting til Scaleway* — ikke mot siste fil på volumet. Er volumet
+borte, er det bare bucketen som teller, og en linje som leste volumet ville vist
+fire minutter mens den virkelige avstanden var to dager. Uten offsite
+konfigurert sier kortet det selv framfor å påstå noe det ikke vet.
+
+**Vakthunden har fått flate:** rødt på backup-siden, egen linje på
+`/portal-admin/server-status/` ved siden av cron-jobbene (ikke blant dem — klokka
+er ingen cron-jobb), og et varsel til global admin. Varselet sendes **bare fra
+reservenettet i middlewaren**, aldri fra tråden: et varsel om at klokka er død,
+sendt av klokka, er et varsel som aldri kommer. Reservenettet kjører i en
+forespørsel, altså i live, og oppdager derfor nettopp det tråden ikke kan melde
+om seg selv. Det varsler heller ikke om planer som aldri er vurdert — «har aldri
+kjørt» og «har sluttet å kjøre» er to tilstander, og bare den andre er en feil.
+
+**Funn underveis, fanget av et skjermbilde og ikke av suiten:** `{# … #}` er en
+**enlinjes** kommentar i Django. Strekker den seg over flere linjer, rendres den
+som tekst midt i grensesnittet — malen er gyldig, testene passerer, ingenting
+logges. Den sto både i den nye malen og i `templates/accounts/user_form.html`
+fra før. Begge rettet til `{% comment %}`, og
+`patients.tests.FlerlinjesMalkommentarTests` skanner nå alle maler så den ikke
+kan komme tilbake.
+
+Verifisert: 2563 tester grønne på SQLite og PostgreSQL 16, og siden er kjørt i
+Chromium — lagring av standardplan og modulplan, et avvist intervall med lesbar
+melding, «ta backup av alle» og gjenopprettingsbekreftelsen.
+
+---
+
 ## 2026-09-13 — Backup fase 1: `Backupplan`, og klokka ut av trafikken
 
 Første kode i omleggingen (`docs/PLAN_BACKUP_OMLEGGING.md` fase 1).

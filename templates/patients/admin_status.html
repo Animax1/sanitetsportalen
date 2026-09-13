@@ -188,6 +188,17 @@
       <div class="sub" style="margin-top:0.5rem;">Siste kjøring, registrert av jobben selv. «Aldri» betyr at jobben ikke har kjørt siden sporingen kom, eller at cron ikke er satt opp.</div>
     </div>
 
+    <!-- Backup-klokka. Står for seg selv og ikke blant cron-jobbene: den er
+         en tråd i denne prosessen, fordi Railway-volumet bare kan henge på én
+         tjeneste. En tråd er usynlig i Railways grensesnitt, så dette kortet
+         er det eneste stedet man ser at den lever. -->
+    <div class="status-card">
+      <h3>Backup-klokka</h3>
+      <div class="status-row"><span class="label">Siste tikk</span><span class="val" id="klokke-tikk">–</span></div>
+      <div class="status-row"><span class="label">Forsinkede planer</span><span class="val" id="klokke-forsinket">–</span></div>
+      <div class="sub" style="margin-top:0.5rem;">Tråd i web-prosessen, ikke en cron-jobb. Står noe forsinket, har tråden stoppet — og backup tas da bare av reservenettet, som krever trafikk.</div>
+    </div>
+
     <!-- E-post -->
     <div class="status-card">
       <h3>E-post</h3>
@@ -375,6 +386,7 @@ const ADMIN_URLS = {
     renderInnlogging(d.innlogging || {});
     renderKonfig(d.konfig || {});
     renderCron(d.cron || {});
+    renderBackupklokke(d.backupklokke || {});
     renderEpost(d.epost || {});
 
     // Oppdater JSON-preview
@@ -528,9 +540,19 @@ const ADMIN_URLS = {
     setVal('konfig-versjon', (v.bygg || '?') + (v.dato ? ' · ' + klokke(v.dato) : ''));
   }
 
+  function renderBackupklokke(k) {
+    if (k.error) { setVal('klokke-tikk', k.error, 'status-warn'); return; }
+    setVal('klokke-tikk',
+           k.siste_tikk ? klokke(k.siste_tikk) + ' (' + tidSiden(k.minutter_siden) + ')' : 'Aldri',
+           k.siste_tikk ? (k.ok ? 'status-ok' : 'status-crit') : 'status-warn');
+    const f = k.forsinkede || [];
+    setVal('klokke-forsinket', f.length ? f.join(', ') : 'Ingen',
+           f.length ? 'status-crit' : 'status-ok');
+  }
+
   function renderCron(c) {
-    const navn = {db_backup: 'db_backup', purge_old_logs: 'purge_old_logs', kollaps_arkiv: 'kollaps_arkiv'};
-    const forventet = {db_backup: 26, purge_old_logs: 26, kollaps_arkiv: 8 * 24};
+    const navn = {purge_old_logs: 'purge_old_logs', kollaps_arkiv: 'kollaps_arkiv'};
+    const forventet = {purge_old_logs: 26, kollaps_arkiv: 8 * 24};
     if (c.error) { document.getElementById('cron-rader').innerHTML = '<div class="sub">' + escapeHtml(c.error) + '</div>'; return; }
     document.getElementById('cron-rader').innerHTML = Object.keys(navn).map(n => {
       const k = c[n];

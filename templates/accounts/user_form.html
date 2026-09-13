@@ -67,9 +67,11 @@
           {% if form.kontotype.errors %}<div class="text-danger small mt-1">{{ form.kontotype.errors.0 }}</div>{% endif %}
         </div>
 
-        {# Vises kun for bil/ambulanse. JS skjuler den ellers; serveren
-           avviser et enhetsnavn på de andre typene uansett, så skjulingen er
-           en bekvemmelighet og ikke regelen. #}
+        {% comment %}
+        Vises kun for bil/ambulanse. JS skjuler den ellers; serveren avviser et
+        enhetsnavn på de andre typene uansett, så skjulingen er en
+        bekvemmelighet og ikke regelen.
+        {% endcomment %}
         <div class="mb-3" id="enhetsnavn-rad">
           <label class="form-label" for="{{ form.enhetsnavn.id_for_label }}">Enhetsnavn</label>
           {{ form.enhetsnavn }}

@@ -2603,3 +2603,48 @@ class AktivMineMarkeringTests(TestCase):
         js = self._les('static', 'js', 'patients-table.js')
         self.assertIn("getElementById('btn-board-mine')", js)
         self.assertIn("classList.toggle('active-mine'", js)
+
+
+class FlerlinjesMalkommentarTests(TestCase):
+    """`{# … #}` er en **enlinjes** kommentar i Django, og strekker den seg
+    over flere linjer, rendres den som tekst på siden.
+
+    Feilen er stille på alle måter som betyr noe: malen er gyldig, testene
+    passerer, ingenting logges — kommentaren står bare midt i grensesnittet og
+    forklarer for brukeren hvorfor koden er skrevet som den er. Det skjedde på
+    backup-siden 13. sep. 2026, og ble oppdaget av et skjermbilde, ikke av
+    suiten.
+
+    Flerlinjes kommentarer skal bruke `{% comment %} … {% endcomment %}`.
+    """
+
+    def _maler(self):
+        from pathlib import Path
+
+        from django.conf import settings
+
+        rot = Path(settings.BASE_DIR)
+        for sti in rot.rglob('*.html'):
+            if any(del_ in sti.parts for del_ in
+                   ('.venv', 'staticfiles', 'node_modules', '.git')):
+                continue
+            yield sti
+
+    def test_ingen_maler_har_flerlinjes_kortkommentar(self) -> None:
+        import re
+
+        # `{#` uten `#}` på samme linje er starten på noe som ikke er en
+        # kommentar for Django, men som ser ut som en for den som skrev den.
+        apner = re.compile(r'\{#(?![^\n]*#\})')
+
+        funn = []
+        for sti in self._maler():
+            for nr, linje in enumerate(sti.read_text(encoding='utf-8').splitlines(), 1):
+                if apner.search(linje):
+                    funn.append(f'{sti.name}:{nr}: {linje.strip()[:70]}')
+
+        self.assertEqual(
+            funn, [],
+            'Flerlinjes {# … #} rendres som tekst på siden. Bruk '
+            '{% comment %} … {% endcomment %}:\n  ' + '\n  '.join(funn),
+        )

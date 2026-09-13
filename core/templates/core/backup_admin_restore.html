@@ -6,13 +6,8 @@
 <nav aria-label="breadcrumb" class="mb-2">
   <ol class="breadcrumb" style="background: transparent;">
     <li class="breadcrumb-item">
-      <a href="{% url 'core:backup_admin_overview' %}" class="text-info">
+      <a href="{% url 'core:backup_admin' %}" class="text-info">
         <i class="bi bi-cloud-arrow-up me-1"></i>Backup
-      </a>
-    </li>
-    <li class="breadcrumb-item">
-      <a href="{% url 'core:backup_admin_module' slug=slug %}" class="text-info">
-        {{ handler.display_name|default:slug }}
       </a>
     </li>
     <li class="breadcrumb-item active text-muted" aria-current="page">
@@ -66,6 +61,31 @@
           {% endif %}
         </dl>
 
+        {% comment %}
+        Hva som faktisk står på spill. Bekreftelsen ba tidligere om modul-slugen
+        uten å si hvor mye den gjaldt — «slett og erstatt» er et annet svar når
+        man ser tallet.
+        {% endcomment %}
+        {% if berort %}
+        <details class="mb-3">
+          <summary class="text-muted" style="cursor: pointer;">
+            Dette slettes og erstattes:
+            <strong>{{ berort_sum }}</strong> rad{{ berort_sum|pluralize:"er" }}
+            i {{ berort|length }} tabell{{ berort|length|pluralize:"er" }}
+          </summary>
+          <table class="table table-dark table-sm mt-2 mb-0" style="background: transparent; font-size: 0.85rem;">
+            <tbody>
+              {% for b in berort %}
+              <tr>
+                <td>{{ b.navn|capfirst }}</td>
+                <td class="text-end">{{ b.antall }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </details>
+        {% endif %}
+
         <form method="post">
           {% csrf_token %}
           <div class="mb-3">
@@ -82,7 +102,7 @@
           </div>
 
           <div class="d-flex gap-2 justify-content-end">
-            <a href="{% url 'core:backup_admin_module' slug=slug %}"
+            <a href="{% url 'core:backup_admin' %}"
                class="btn btn-outline-light">
               <i class="bi bi-x-lg me-1"></i>Avbryt
             </a>

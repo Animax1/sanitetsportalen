@@ -53,19 +53,26 @@ urlpatterns = [
         name='audit_log_csv_export',
     ),
 
-    # ── Backup-admin (Fase 4) ────────────────────────────────────────
+    # ── Backup-admin ────────────────────────────────────────────────────────
+    # Én side (13. sep. 2026). De spesifikke stiene står FØR `<slug>`-stiene,
+    # ellers ville «plan» og «kjor» blitt lest som modul-slugger.
     path(
         'portal-admin/backup/',
-        views.backup_admin_overview_view,
-        name='backup_admin_overview',
+        views.backup_admin_view,
+        name='backup_admin',
     ),
     path(
-        'portal-admin/backup/<slug:slug>/',
-        views.backup_admin_module_view,
-        name='backup_admin_module',
+        'portal-admin/backup/plan/<slug:slug>/',
+        views.backup_admin_plan_view,
+        name='backup_admin_plan',
     ),
     path(
-        'portal-admin/backup/<slug:slug>/run/',
+        'portal-admin/backup/kjor/',
+        views.backup_admin_run_view,
+        name='backup_admin_run_alle',
+    ),
+    path(
+        'portal-admin/backup/kjor/<slug:slug>/',
         views.backup_admin_run_view,
         name='backup_admin_run',
     ),
@@ -73,11 +80,6 @@ urlpatterns = [
         'portal-admin/backup/<slug:slug>/restore/<int:pk>/',
         views.backup_admin_restore_view,
         name='backup_admin_restore',
-    ),
-    path(
-        'portal-admin/backup/<slug:slug>/last-ned/<int:pk>/',
-        views.backup_admin_download_view,
-        name='backup_admin_download',
     ),
     path(
         'portal-admin/backup/<slug:slug>/slett/<int:pk>/',

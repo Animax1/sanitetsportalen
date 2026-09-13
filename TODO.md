@@ -344,19 +344,28 @@ bindende: 1 før 2, fordi backupen speiler hvor modellene bor.
             oppgraderingssimulering med rader i historisk form mot ekte
             PostgreSQL — migrasjonene er delt i tre (skjema, data, skjema), så
             triggerkø-fella ikke kan oppstå.
-            - [ ] **Krever Andre:** bekreft i Railway at et volum fortsatt bare
-                  kan henge på én tjeneste. Hele valget av klokke hviler på det;
-                  åpner plattformen for flere, er en cron-tjeneste brukbar igjen
-                  (men tråden er fortsatt enklere).
-      - [ ] **Fase 2 — én side.** Standardplan, «verste tilfelle nå» målt mot siste
-            vellykkede offsite-kopi, diskbruk på volumet, inline fillister, «Ta backup av
-            alle nå», «Gjenopprett siste», bekreftelse i dialog. **Vakthund:** er en plan
-            ikke sjekket på tre ganger intervallet, står det rødt og det opprettes et
-            `Notification` til global admin — det er slik vi ser at tråden lever.
-            **Nedlastingsknappene fjernes helt**, også for modulfilene (André 13. sep.:
-            filene skal ikke finnes andre steder enn hos Scaleway eller på Railway). Modul-
-            og gjenopprettingssidene legges ned. I dag er en gjenoppretting fem steg og en
-            backup av alt fire runder.
+            - [x] **Bekreftet av André 13. sep.:** ett volum per tjeneste.
+                  Klokkevalget står.
+      - [x] **Fase 2 — én side (13. sep. 2026).** `/portal-admin/backup/` er nå
+            hele flaten: standardplan øverst, «verste tilfelle nå» målt mot siste
+            *vellykkede offsite-kopi*, diskbruk mot volumet, og én utfoldbar rad
+            per modul med plan, knapper og filliste i samme boks. Modulsidene og
+            oversikten er lagt ned. «Ta backup av alle nå» erstatter fire runder;
+            «Gjenopprett siste» dekker det vanlige tilfellet.
+            Gjenopprettingen har fortsatt egen bekreftelsesside — den er den ene
+            handlingen her som sletter rader — men den sier nå **hvor mange rader
+            i hvor mange tabeller** som forsvinner.
+            **Nedlastingsknappene er fjernet helt**, også for modulfilene.
+            Vakthunden vises på siden og på `/portal-admin/server-status/`, og
+            varsler global admin — men bare fra reservenettet i middlewaren, for
+            et varsel om at klokka er død, sendt av klokka, kommer aldri fram.
+            2563 tester grønne på SQLite og PostgreSQL, og siden er kjørt i
+            Chromium: lagring, avvist intervall, «ta backup av alle» og
+            gjenopprettingsbekreftelsen virker.
+            - Fant og rettet underveis: flerlinjes `{# … #}` er ikke en
+              kommentar i Django og rendres som tekst på siden. Den sto både i
+              den nye malen og i `user_form.html` fra før.
+              `FlerlinjesMalkommentarTests` skanner nå alle maler.
       - [ ] **Fase 3 — handlerne og utledet slettelista.** `vaktliste`-handler (største
             udekkede datamengde i dag) og `portal`-handler med `core.Vakt`;
             `get_restore_models()` utledes topologisk fra `apps`, med test som krever at

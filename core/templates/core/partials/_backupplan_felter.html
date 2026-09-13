@@ -1,0 +1,49 @@
+{% comment %}
+Feltene i en backupplan, brukt både av standardplanen og av hver modulrad.
+
+Ligger i en partial fordi de to stedene må se like ut og oppføre seg likt —
+skrives de to ganger, driver de fra hverandre, og da betyr «hvert 10. minutt»
+to forskjellige ting avhengig av hvilken boks du sto i.
+
+`folger_standard` finnes ikke i skjemaet for standardplanen selv; malen spør
+derfor etter feltet framfor å anta at det er der.
+{% endcomment %}
+
+{% if form.folger_standard %}
+<div class="col-auto">
+  <div class="form-check mt-4">
+    {{ form.folger_standard }}
+    <label class="form-check-label small" for="{{ form.folger_standard.id_for_label }}">
+      Følg standardplanen
+    </label>
+  </div>
+</div>
+{% endif %}
+
+<div class="col-auto">
+  <label for="{{ form.modus.id_for_label }}" class="form-label small mb-1">Modus</label>
+  {{ form.modus }}
+</div>
+
+<div class="col-auto">
+  <label for="{{ form.intervall_verdi.id_for_label }}" class="form-label small mb-1">
+    Hvert
+  </label>
+  <div class="d-flex gap-1">
+    <div style="width: 5.5rem;">{{ form.intervall_verdi }}</div>
+    <div style="width: 7.5rem;">{{ form.intervall_enhet }}</div>
+  </div>
+  {% if form.intervall_verdi.errors %}
+    <div class="text-danger small mt-1">{{ form.intervall_verdi.errors.0 }}</div>
+  {% endif %}
+</div>
+
+<div class="col-auto">
+  <label for="{{ form.behold.id_for_label }}" class="form-label small mb-1">
+    Behold filer
+  </label>
+  <div style="width: 6.5rem;">{{ form.behold }}</div>
+  {% if form.behold.errors %}
+    <div class="text-danger small mt-1">{{ form.behold.errors.0 }}</div>
+  {% endif %}
+</div>

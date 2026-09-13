@@ -223,12 +223,19 @@ def kjor_forfalte() -> int:
 
 # ── Vakthund ─────────────────────────────────────────────────────────────────
 
-def vakthund() -> list[dict]:
+def vakthund(*, krev_tidligere_kjoring: bool = False) -> list[dict]:
     """Planer som ikke er vurdert på `VAKTHUND_FAKTOR` ganger intervallet.
 
     Dette er hele svaret på at en tråd ikke er synlig noe sted: er lista tom,
     lever klokka. Planer i modus «av» er ikke med — de skal ikke vurderes, og
-    et varsel om dem ville vært støy.
+    et varsel om dem ville vært støy. Tre ganger intervallet, ikke én, fordi en
+    deploy eller en restart legitimt hopper over et tikk eller to.
+
+    ``krev_tidligere_kjoring`` utelater planer som aldri er vurdert. Visningen
+    vil ha dem med — «aldri» er verdt å se — men et *varsel* om dem ville
+    fyrt ved hver eneste førstegangsoppstart, før klokka rakk sitt første
+    tikk. «Har aldri kjørt» og «har sluttet å kjøre» er to forskjellige
+    tilstander, og bare den andre er en feil.
     """
     from core.models import Backupplan
 
@@ -239,6 +246,8 @@ def vakthund() -> list[dict]:
             continue
         if plan.modus_effektiv == Backupplan.MODUS_AV:
             continue
+        if plan.sist_sjekket_at is None and krev_tidligere_kjoring:
+            continue
         grense = timedelta(minutes=plan.intervall_min_effektiv * VAKTHUND_FAKTOR)
         if plan.sist_sjekket_at is None or na - plan.sist_sjekket_at > grense:
             ut.append({
@@ -247,6 +256,46 @@ def vakthund() -> list[dict]:
                 'grense_min': int(grense.total_seconds() // 60),
             })
     return ut
+
+
+def varsle_stoppet_klokke() -> int:
+    """Varsle global admin om at klokketråden har sluttet å tikke.
+
+    **Dette kan bare kalles fra reservenettet, ikke fra tråden selv.** Et
+    varsel om at klokka er død, sendt av klokka, er et varsel som aldri kommer.
+    Reservenettet i middlewaren kjører i en forespørsel, altså i live — og
+    oppdager derfor nettopp det tråden ikke kan melde om seg selv.
+
+    `notify()` dedupliserer mot siste døgn, så et stoppet tikk gir ett varsel,
+    ikke ett per forespørsel. Returnerer antall varsler som ble opprettet.
+    """
+    from django.contrib.auth import get_user_model
+
+    from core.notifications import notify
+
+    forsinket = vakthund(krev_tidligere_kjoring=True)
+    if not forsinket:
+        return 0
+
+    slugger = ', '.join(r['slug'] for r in forsinket)
+    antall = 0
+    try:
+        for bruker in get_user_model().objects.filter(role='admin', is_active=True):
+            if notify(
+                bruker,
+                module_slug='core',
+                kind='backup_klokke_stoppet',
+                title='Backup-klokka har stoppet',
+                message=(f'Disse planene er ikke vurdert på lenge: {slugger}. '
+                         'Backup tas nå av reservenettet i stedet, som bare '
+                         'virker så lenge portalen får trafikk.'),
+                url='/portal-admin/backup/',
+                level='critical',
+            ) is not None:
+                antall += 1
+    except Exception:   # noqa: BLE001 — et varsel som feiler skal ikke stoppe backupen
+        logger.exception('backup-klokka: kunne ikke varsle om stoppet klokke')
+    return antall
 
 
 # ── Opprydding ───────────────────────────────────────────────────────────────
@@ -299,11 +348,15 @@ def _lokke() -> None:
 def skal_starte() -> bool:
     """Om klokka skal starte i denne prosessen.
 
-    Nei under test (en bakgrunnstråd som skriver filer midt i en test som ikke
-    handler om backup gjør suiten flaky, og en flaky suite lærer deg å kjøre om
-    igjen i stedet for å lese), og nei under `migrate`, `makemigrations`,
-    `collectstatic` og de andre kommandoene: tabellen finnes kanskje ikke ennå,
-    og en engangskommando skal ikke etterlate seg en tråd.
+    **Tillatelsesliste, ikke blokkliste.** Første utkast listet opp
+    kommandoene klokka *ikke* skulle starte under, og `manage.py check` startet
+    den allerede dagen den ble skrevet. Med en blokkliste er hver nye
+    management-kommando en ny sjanse til å etterlate seg en tråd som skriver
+    backupfiler fra en engangsprosess.
+
+    Klokka skal kjøre i den prosessen som serverer portalen, og bare der:
+    gunicorn i prod, `runserver` lokalt. Alt annet — test, `migrate`,
+    `collectstatic`, `shell`, `backup_kjor` selv — er engangsprosesser.
     """
     import sys
 
@@ -313,14 +366,19 @@ def skal_starte() -> bool:
         return False
     if os.environ.get('BACKUP_KLOKKE') == 'av':
         return False
+
     argv = sys.argv
-    if len(argv) > 1 and argv[1] in {
-        'test', 'migrate', 'makemigrations', 'collectstatic', 'shell',
-        'createsuperuser', 'dbshell', 'showmigrations', 'sqlmigrate',
-        'verifiser_migrasjoner', 'backup_kjor', 'hent_offsite',
-    }:
+    if not argv:
         return False
-    return True
+
+    # `runserver` starter seg selv på nytt i en underprosess; bare den har
+    # RUN_MAIN satt. Uten sjekken får utviklingsserveren to tråder.
+    if len(argv) > 1 and argv[1] == 'runserver':
+        return os.environ.get('RUN_MAIN') == 'true'
+
+    # Kjørt av en WSGI/ASGI-server: da er argv[0] serveren, ikke manage.py.
+    navn = os.path.basename(argv[0])
+    return navn in {'gunicorn', 'uvicorn', 'daphne'}
 
 
 def start_klokke() -> bool:
@@ -367,6 +425,9 @@ def kanskje_kjor() -> None:
     def _arbeid():
         global _kjorer
         try:
+            # Kommer vi hit og noe er forsinket, tikker ikke tråden. Varselet
+            # må sendes før vi retter opp, ellers forsvinner beviset.
+            varsle_stoppet_klokke()
             kjor_forfalte()
         except Exception:   # noqa: BLE001
             logger.exception('backup-klokka: feil i reservenettet')

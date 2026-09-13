@@ -114,7 +114,7 @@ class PortalAdminNavTests(TestCase):
         'core:portal_settings',
         'core:audit_log_list',
         'accounts:login_event_list',
-        'core:backup_admin_overview',
+        'core:backup_admin',
     )
 
     def setUp(self):

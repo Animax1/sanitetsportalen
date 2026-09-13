@@ -331,8 +331,37 @@ def _get_innlogging(minutter=60):
         return {'error': _scrub_secrets(str(exc))[:200]}
 
 
+def _get_backupklokke():
+    """Backup-klokka: lever tråden, og når tikket den sist?
+
+    Står **ikke** blant cron-jobbene, for den er ingen cron-jobb — klokka er
+    en tråd i web-prosessen, fordi Railway-volumet bare kan henge på én
+    tjeneste og det er denne. En tråd er ikke synlig i Railways grensesnitt
+    slik en cron-tjeneste er, så dette kortet er det eneste stedet man ser at
+    den gjør jobben sin.
+    """
+    try:
+        from core.backup.klokke import vakthund
+        from core.models import Backupplan
+
+        siste = (Backupplan.objects.exclude(sist_sjekket_at=None)
+                 .order_by('-sist_sjekket_at')
+                 .values_list('sist_sjekket_at', flat=True).first())
+        forsinket = vakthund()
+        return {
+            'siste_tikk': siste.isoformat() if siste else None,
+            'minutter_siden': (
+                None if siste is None
+                else int((timezone.now() - siste).total_seconds() // 60)),
+            'forsinkede': [r['slug'] for r in forsinket],
+            'ok': not forsinket,
+        }
+    except Exception as exc:   # noqa: BLE001 — et kort som feiler er borte
+        return {'error': _scrub_secrets(str(exc))[:200]}
+
+
 def _get_cron():
-    """Siste kjøring av de tre Railway-cron-jobbene, fra `core.kommando`.
+    """Siste kjøring av Railway-cron-jobbene, fra `core.kommando`.
     None betyr «aldri registrert» — enten har jobben ikke kjørt siden
     sporingen kom (13. sep. 2026), eller cron er ikke satt opp."""
     try:
@@ -431,6 +460,7 @@ def _build_status_payload():
         'konfig': _get_konfig_sjekk(),
         'innlogging': _get_innlogging(),
         'cron': _get_cron(),
+        'backupklokke': _get_backupklokke(),
         'epost': _get_epost(),
     }
 

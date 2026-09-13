@@ -192,7 +192,7 @@
           <li><a class="dropdown-item" href="{% url 'core:audit_log_list' %}" style="color:var(--portal-text)">
             <i class="bi bi-journal-text me-2"></i>Revisjonslogg
           </a></li>
-          <li><a class="dropdown-item" href="{% url 'core:backup_admin_overview' %}" style="color:var(--portal-text)">
+          <li><a class="dropdown-item" href="{% url 'core:backup_admin' %}" style="color:var(--portal-text)">
             <i class="bi bi-cloud-arrow-up me-2"></i>Backup
           </a></li>
           {% endif %}
@@ -243,7 +243,7 @@
     <a href="{% url 'accounts:login_event_list' %}" {% if '/portal-admin/innloggingslogg' in request.path %}class="active"{% endif %}>
       <i class="bi bi-box-arrow-in-right me-1"></i>Innloggingslogg
     </a>
-    <a href="{% url 'core:backup_admin_overview' %}" {% if '/portal-admin/backup' in request.path %}class="active"{% endif %}>
+    <a href="{% url 'core:backup_admin' %}" {% if '/portal-admin/backup' in request.path %}class="active"{% endif %}>
       <i class="bi bi-cloud-arrow-up me-1"></i>Backup
     </a>
   {% endif %}
