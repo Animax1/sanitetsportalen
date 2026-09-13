@@ -1478,6 +1478,13 @@ Funnene under er allerede kartlagt, så jobben er avgrenset når den skal gjøre
 
 ## Ferdig ✓
 
+- [x] **Server-status utvidet (13. sep. 2026).** Minne nå + topp, offsite, disk,
+      database (svartid, tilkoblinger), vaktbildet, tregeste stier, konfigsjekk,
+      innlogging siste time, cron-jobbenes siste kjøring, e-posttransport. Se CHANGELOG.
+      - [ ] **Krever Andre:** etter deploy, åpne `/portal-admin/server-status/` i prod
+            og se at konfigsjekk-kortet sier «alt OK» og at offsite står grønt. Cron-radene
+            står «Aldri» til hver jobb har kjørt én gang etter deployen — sjekk igjen
+            dagen etter at de tre viser ✓.
 - [x] Sett `runtime.txt` tilbake til Python 3.13 (var utilsiktet 3.12) før Railway-repo-bytte
 - [x] Rydde opp i CSS filene, det er flere plasser hvor tekst farger er for mørke, det må vi se litt på. Dette krever nok en del arbeid.
 - [x] Del opp `script.js` i separate moduler (patients-utils, patients-table, patients-forms, patients-stats)

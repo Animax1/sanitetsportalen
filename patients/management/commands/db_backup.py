@@ -21,7 +21,7 @@ class Command(BaseCommand):
         # Én lesbar linje i cron-loggen — se core/kommando.py. **Og den
         # viktigste av de tre å oppdage:** en backup som ikke ble tatt, blir
         # savnet den dagen man trenger den, ikke den dagen den feilet.
-        with lesbar_dbfeil('ingen backup ble tatt'):
+        with lesbar_dbfeil('ingen backup ble tatt', navn='db_backup'):
             self._kjor(opts)
 
     def _kjor(self, opts):

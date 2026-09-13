@@ -4,6 +4,38 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-13 — Server-status: ni nye mål på /portal-admin/server-status/
+
+Ingen migrasjon. Gjennomgangen av dashbordet etter reserve 3 fant at det målte
+serveren, men ikke det serveren er til for, og at ett tall var galt.
+
+- **Minne viste toppen, ikke nå.** `ru_maxrss` går aldri ned, så kortet kunne
+  bare stige. Nå leses RSS fra `/proc/self/status`, med toppen som egen rad.
+- **Offsite-kopien** står i backup-kortet: konfigurert/ikke, antall filer, sist
+  lastet opp, siste feil. Rødt når siste opplasting feilet, gult over ett døgn.
+- **Disk på volumet** (`BACKUP_DIR`): brukt/ledig og hvor mye backupfilene tar.
+- **Database:** svartid på `SELECT 1`, og på PostgreSQL tilkoblinger mot
+  `max_connections` — feilen som kommer først når `WEB_WORKERS` skrus opp.
+- **Vaktbildet:** aktiv vakt, vaktlister i drift, oppdrag på tavla, ventende,
+  «trenger ressurs» med eldste ventende i minutter, og siste vaktlistefil.
+- **Tregeste stier siste 5 min** — P95 per sti, under tre treff utelatt
+  (`metrics_store.tregeste_stier()`), så «P95 er høy» blir «det er den siden».
+- **Konfigsjekk:** DEBUG, RATELIMIT_ENABLE, HTTPS, ALLOWED_HOSTS,
+  CSRF_TRUSTED_ORIGINS, cache, e-posttransport, ADMINS, offsite — hver rad ✓/✗,
+  pluss versjon. Reglene er prods; lokalt står DEBUG og HTTPS rødt med vilje.
+- **Innlogging siste time:** feilede forsøk, hvor mange brukernavn og IP-er de
+  kom fra, avviste MFA-koder. Én IP bak fem feil markeres rødt.
+- **Cron-jobbenes siste kjøring** — jobbene registrerer seg selv via
+  `lesbar_dbfeil(..., navn=...)` → `AppSetting['cron.<navn>']`, ok eller feil
+  med melding (`core.kommando.registrer_kjoring`/`siste_kjoringer`). Gult når
+  `db_backup`/`purge_old_logs` er over 26 timer gamle, `kollaps_arkiv` over 8
+  døgn. «Aldri» til jobben har kjørt én gang etter denne deployen.
+- **E-post:** transporten (AHASend/SMTP/konsoll) og siste vellykkede og feilede
+  utsending av vaktlistefila. Ingen prøvesending fra et kort som polles hvert
+  10. sekund.
+- Hver innhenter tåler at delen den leser er nede — kortet viser feilen, siden
+  viser resten. Payloadnøkkelen `memory_mb` er byttet ut med `memory.naa/topp`.
+
 ## 2026-09-13 — Runbook §8b: offsite-backup — oppsett, kontroll og gjenoppretting
 
 Dokumentasjon. Oppsettet hos Scaleway og i Railway, kontrollen før hver vakt,

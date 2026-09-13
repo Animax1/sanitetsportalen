@@ -371,7 +371,8 @@ class LastBackupInfoTests(TestCase):
     def test_uten_backups_returnerer_found_false(self):
         from .admin_status import _get_last_backup_info
         info = _get_last_backup_info()
-        self.assertEqual(info, {'found': False})
+        self.assertFalse(info['found'])
+        self.assertIn('offsite', info, 'offsite-kopien rapporteres også uten lokal backup')
 
     def test_med_backup_returnerer_found_true(self):
         from .admin_status import _get_last_backup_info
@@ -677,3 +678,164 @@ class AdminSessionKillAllTests(TestCase):
         self.assertIsNotNone(log)
         self.assertIn('force_logout_all', log.new_value)
         self.assertIn('by=adm', log.new_value)
+
+
+class TregesteStierTests(TestCase):
+    """`tregeste_stier()` (13. sep. 2026): P95 per sti, stier med under tre
+    treff utelatt, tregeste først."""
+
+    def setUp(self):
+        self.store = _MetricsStore()
+
+    def test_sorterer_paa_p95_og_utelater_enkelttreff(self):
+        for ms in (10, 20, 30, 40):
+            self.store.record('/pasienter/api/liste/', 'GET', 200, ms)
+        for ms in (100, 900, 950):
+            self.store.record('/statistikk/api/x/', 'GET', 200, ms)
+        self.store.record('/en-gang/', 'GET', 200, 5000)
+        ut = self.store.tregeste_stier(window_seconds=60)
+        self.assertEqual([r['path'] for r in ut], ['/statistikk/api/x/', '/pasienter/api/liste/'])
+        self.assertEqual(ut[0]['count'], 3)
+        self.assertGreaterEqual(ut[0]['p95_ms'], 900)
+        self.assertNotIn('/en-gang/', [r['path'] for r in ut], 'én treg request er ikke et mønster')
+
+    def test_tom(self):
+        self.assertEqual(self.store.tregeste_stier(), [])
+
+    def test_antall_begrenser(self):
+        for i in range(8):
+            for ms in (1, 2, 3):
+                self.store.record(f'/sti-{i}/', 'GET', 200, ms + i)
+        self.assertEqual(len(self.store.tregeste_stier(antall=5)), 5)
+
+
+class UtvidetStatusTests(TestCase):
+    """De nye kortene (13. sep. 2026). Hver innhenter skal tåle at delen den
+    leser mangler, og payloaden skal bære alle nøklene klienten leser."""
+
+    def setUp(self):
+        self.client = Client()
+        self.admin = CustomUser.objects.create_user(
+            username='admin1', password='testpass123', role='admin', must_change_password=False,
+        )
+        gi_standardtilgang(self.admin, 'admin')
+
+    def test_payload_har_alle_nokler(self):
+        from .admin_status import _build_status_payload
+        p = _build_status_payload()
+        for n in ('memory', 'db_health', 'disk', 'tregeste', 'vaktbilde', 'konfig',
+                  'innlogging', 'cron', 'epost', 'last_backup', 'cache_health'):
+            self.assertIn(n, p, n)
+        self.assertNotIn('memory_mb', p, 'gammel nøkkel byttet ut med memory.naa/topp')
+
+    def test_minne_har_naa_og_topp(self):
+        from .admin_status import _get_memory_mb
+        m = _get_memory_mb()
+        self.assertEqual(set(m), {'naa', 'topp'})
+        self.assertIsNotNone(m['naa'])
+        self.assertLessEqual(m['naa'], m['topp'] + 1, 'nå kan ikke være over toppen')
+
+    def test_db_health(self):
+        from .admin_status import _get_db_health
+        d = _get_db_health()
+        self.assertTrue(d['healthy'])
+        self.assertIsNotNone(d['latency_ms'])
+        self.assertIn(d['vendor'], ('sqlite', 'postgresql'))
+
+    def test_disk(self):
+        from .admin_status import _get_disk
+        d = _get_disk()
+        self.assertIn('brukt_prosent', d)
+        self.assertGreater(d['total_mb'], 0)
+
+    def test_konfigsjekk_flagger_debug_og_offsite(self):
+        from .admin_status import _get_konfig_sjekk
+        with override_settings(DEBUG=True):
+            k = _get_konfig_sjekk()
+        rader = {r['nokkel']: r for r in k['rader']}
+        self.assertFalse(rader['DEBUG']['ok'])
+        self.assertFalse(rader['Offsite backup']['ok'])
+        self.assertFalse(k['alle_ok'])
+        self.assertIn('bygg', k['versjon'])
+        with override_settings(DEBUG=False):
+            self.assertTrue({r['nokkel']: r for r in _get_konfig_sjekk()['rader']}['DEBUG']['ok'])
+
+    def test_innlogging_teller_feilede(self):
+        from accounts.models import LoginEvent
+        from .admin_status import _get_innlogging
+        for i in range(3):
+            LoginEvent.objects.create(username_attempt='kari', success=False, ip='10.0.0.1',
+                                      event_type=LoginEvent.EVENT_LOGIN)
+        LoginEvent.objects.create(username_attempt='ola', success=False, ip='10.0.0.2',
+                                  event_type=LoginEvent.EVENT_LOGIN)
+        LoginEvent.objects.create(user=self.admin, username_attempt='admin1', success=True,
+                                  event_type=LoginEvent.EVENT_LOGIN)
+        LoginEvent.objects.create(user=self.admin, username_attempt='admin1', success=False,
+                                  event_type=LoginEvent.EVENT_MFA_VERIFY_FAILED)
+        i = _get_innlogging()
+        self.assertEqual((i['feilede'], i['feilede_brukernavn'], i['feilede_ip'], i['vellykkede'], i['mfa_feilet']),
+                         (4, 2, 2, 1, 1))
+
+    def test_vaktbilde(self):
+        from django.utils import timezone
+        from oppdrag import choices
+        from oppdrag.models import Enhet, Lokasjon, Oppdrag
+        from patients.services import hent_aktiv_vakt
+        from vaktliste.models import Vaktliste
+        from vaktliste import choices as vl
+        from .admin_status import _get_vaktbilde
+        vakt = hent_aktiv_vakt()
+        Vaktliste.objects.create(vakt=vakt, status=vl.DRIFT, satt_i_drift_at=timezone.now())
+        enhet = Enhet.objects.create(navn='Bil 1')
+        lok = Lokasjon.objects.create(navn='Scene')
+
+        def lag(nr, **kw):
+            return Oppdrag.objects.create(vakt=vakt, oppdragsnummer=nr, enhet=enhet, lokasjon=lok,
+                                          problemstilling='Udefinert', hastegrad='Akutt', **kw)
+        lag(1, status=choices.VENTER)
+        lag(2, status=choices.VENTER, trenger_ressurs=True)
+        lag(3, status=choices.LEDIG, historikk_fra=timezone.now())
+        v = _get_vaktbilde()
+        self.assertEqual(v['aktiv_vakt']['id'], vakt.pk)
+        self.assertEqual(len(v['vaktlister_i_drift']), 1)
+        self.assertIsNone(v['siste_utsending'])
+        self.assertEqual((v['oppdrag']['paa_tavla'], v['oppdrag']['ventende'], v['oppdrag']['trenger_ressurs']),
+                         (2, 1, 1))
+        self.assertIsNotNone(v['oppdrag']['eldste_ventende_minutter'])
+
+    def test_cron_uten_kjoringer_og_med(self):
+        from core.kommando import registrer_kjoring
+        from .admin_status import _get_cron
+        c = _get_cron()
+        self.assertEqual(set(c), {'db_backup', 'purge_old_logs', 'kollaps_arkiv'})
+        self.assertIsNone(c['db_backup'])
+        registrer_kjoring('db_backup', True)
+        c = _get_cron()
+        self.assertTrue(c['db_backup']['ok'])
+        self.assertIsNotNone(c['db_backup']['timer_siden'])
+
+    def test_epost_transport(self):
+        from .admin_status import _get_epost
+        with override_settings(EMAIL_BACKEND='core.mail_backends.AhaSendApiBackend'):
+            self.assertEqual(_get_epost()['transport'], 'ahasend')
+        with override_settings(EMAIL_BACKEND='django.core.mail.backends.console.EmailBackend'):
+            self.assertEqual(_get_epost()['transport'], 'console')
+
+    def test_json_endepunktet_baerer_de_nye_kortene(self):
+        self.client.login(username='admin1', password='testpass123')
+        with override_settings(SECURE_SSL_REDIRECT=False):
+            r = self.client.get(reverse('admin_server_status_json'))
+        self.assertEqual(r.status_code, 200)
+        d = r.json()
+        self.assertIn('naa', d['memory'])
+        self.assertIn('rader', d['konfig'])
+        self.assertIn('offsite', d['last_backup'])
+
+    def test_siden_har_de_nye_kortene(self):
+        self.client.login(username='admin1', password='testpass123')
+        with override_settings(SECURE_SSL_REDIRECT=False):
+            html = self.client.get(reverse('admin_server_status')).content.decode()
+        for id_ in ('memory', 'memory-peak', 'db-latency', 'db-conns', 'disk-used', 'offsite-status',
+                    'vakt-navn', 'vakt-drift', 'vakt-oppdrag', 'tregeste', 'konfig-rader', 'konfig-versjon',
+                    'login-failed', 'cron-rader', 'epost-transport'):
+            self.assertIn(f'id="{id_}"', html, id_)

@@ -511,9 +511,16 @@ skjer via to kilder:
 
 ### Admin-dashbord (/portal-admin/server-status/)
 
-1. **Feilteller** – antall 4xx/5xx siste 5/15/60 min
-2. **Sist sette feil** – endepunkt, tidspunkt og status-kode
-3. **AuditLog** (Django-admin) – hver feilet handling på pasient/bruker logges
+1. **Feilresponser** – antall 4xx/5xx siste 5 min
+2. **Tregeste stier** – hvilken side som drar P95 opp
+3. **Database** – svartid og tilkoblinger; nær taket betyr *ikke* øk `WEB_WORKERS`
+4. **Konfigsjekk** – skal si «alt OK» i prod; et ✗ er noe som er satt feil i Railway
+5. **Innlogging siste time** – mange feil fra én IP er et angrep, mange fra mange er
+   et passord ingen husker
+6. **Vaktbildet** – oppdrag som venter på ressurs, og siste vaktlistefil
+7. **Cron-jobber** og **Offsite** – gult/rødt her er noe som har sluttet å virke i det
+   stille; se §8b
+8. **Audit-loggen** (`/portal-admin/auditlog/`) – hver feilet handling på pasient/bruker logges
 
 ### Vakt-prosedyre når en bruker rapporterer feil
 
@@ -539,6 +546,8 @@ skjer via to kilder:
 - Antall unike pålogginger som ikke har utløpt. Gir deg et pålitelig estimat på samtidige brukere (selv om noen kan ha flere faner).
 
 **Minne (RSS)**
+- Kortet viser «nå» stort og toppen siden oppstart under. Det er «nå» som sier om noe
+  lekker — toppen går aldri ned.
 - 1 worker: ~100–200 MB (vokser gradvis; typisk 150–300 MB etter noen dagers drift uten redeploy)
 - 2 workers: ~300–400 MB total. Over 500 MB per worker = vurder redeploy for å frigjøre minne.
 - 3 workers: ~450–600 MB total.

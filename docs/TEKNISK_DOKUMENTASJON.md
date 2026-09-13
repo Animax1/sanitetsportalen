@@ -22,7 +22,7 @@ Pasientregistreringssystemet er en nettbasert applikasjon for sanntids registrer
 | Database-driver | psycopg2-binary | >=2.9 | Kobling Django–Postgres |
 | Database-URL-parsing | dj-database-url | >=2.1 | Tolker `DATABASE_URL`-miljøvariabelen |
 | WSGI-server | Gunicorn | >=21.2 | Produksjonsserver (default 1 worker × 4 tråder, parametrisert) |
-| Prosessmålinger | psutil | >=5.9 | Henter `memory_mb` og prosessinfo for server-status-dashbordet |
+| Prosessmålinger | `resource` + `/proc/self/status` | stdlib | RSS nå og topp for server-status-dashbordet — ingen psutil |
 | Statiske filer | WhiteNoise | >=6.6 | Serverer komprimerte statiske filer fra Django |
 | Miljøvariabler | python-dotenv | >=1.0 | Laster `.env`-filer lokalt |
 | MFA / OTP | django-otp + otp_totp + otp_static | >=1.5.0 | TOTP-enheter og backup-koder |
@@ -528,7 +528,7 @@ passordbytte og `LoginEvent`-logging — alle sikringene ligger på
 
 | Metode | Path | Rolle | Beskrivelse |
 |---|---|---|---|
-| GET | `/portal-admin/server-status/` | `admin` | HTML-dashbord: metrics (p50/p95/max/errors), RAM, aktive sesjoner, siste backup, feature-flags, worker-config |
+| GET | `/portal-admin/server-status/` | `admin` | HTML-dashbord: metrics (p50/p95/max/errors), tregeste stier, RAM nå/topp, disk, database, aktive sesjoner, siste backup + offsite, vaktbildet, konfigsjekk, innlogging, cron, e-post, feature-flags, worker-config |
 | GET | `/portal-admin/server-status/json/` | `admin` | Maskinlesbart JSON-snapshot av samme data (for automatisering og ekstern overvåkning) |
 | POST | `/portal-admin/server-status/flag/` | `admin` | Oppdaterer en feature-flag i `AppSetting`. Krever CSRF-token og `admin`-rolle. Body: `key` og `value` (form-encoded) |
 
@@ -836,14 +836,25 @@ Dashbordet viser følgende paneler:
 
 | Panel | Innhold | Kilde |
 |---|---|---|
-| Requestmetrics | p50 / p95 / max / feil for 1-min og 5-min vindu | `RequestMetricsMiddleware`-ringbufferen |
-| RAM-bruk | `memory_mb` for gjeldende prosess | `psutil.Process().memory_info().rss / 1024 / 1024` |
-| Aktive sesjoner | Antall ikke-utgåtte `django.contrib.sessions.Session`-rader | DB-spørring |
-| Siste backup | Filnavn, størrelse, tidspunkt og type | `Backup`-modellen (siste rad etter `created_at`) |
+| Requestmetrics | p50 / p95 / max / feil for 1-min og 5-min vindu | `RequestMetricsMiddleware`-ringbufferen (Redis på tvers av workere når den finnes) |
+| Tregeste stier | P95 og antall per sti siste 5 min, stier med under tre treff utelatt | `metrics_store.tregeste_stier()` |
+| Minne (RSS) | Nå og topp siden oppstart, i MB | `/proc/self/status` (`VmRSS`) og `resource.getrusage().ru_maxrss` |
+| Database | Type, svartid på `SELECT 1`, tilkoblinger mot `max_connections` (PostgreSQL) | `connection.cursor()`, `pg_stat_activity`, `pg_settings` |
+| Disk | Brukt/ledig på volumet, størrelsen på backupfilene | `shutil.disk_usage(BACKUP_DIR)` |
+| Aktive sesjoner | Antall ikke-utgåtte `django.contrib.sessions.Session`-rader, med liste og utlogging | DB-spørring |
+| Siste backup | Filnavn, størrelse, tidspunkt og type, pluss offsite-kopien (konfigurert, antall, sist, siste feil) | `Backup`-modellen og `core.offsite.status()` |
+| Vaktbildet | Aktiv vakt, vaktlister i drift, oppdrag på tavla/ventende/trenger ressurs, siste vaktlistefil | `hent_aktiv_vakt()`, `Vaktliste`, `Oppdrag`, `Utsending` |
+| Konfigsjekk | DEBUG, RATELIMIT_ENABLE, HTTPS, ALLOWED_HOSTS, CSRF_TRUSTED_ORIGINS, cache, e-posttransport, ADMINS, offsite — ✓/✗ per rad, og versjon | `settings`, `core.versjon.hent_versjon()` |
+| Innlogging siste time | Feilede og vellykkede innlogginger, brukernavn/IP-er bak feilene, avviste MFA-koder | `LoginEvent` |
+| Cron-jobber | Siste kjøring av `db_backup`, `purge_old_logs`, `kollaps_arkiv` — tid, ok/feil, melding | `AppSetting['cron.<navn>']` via `core.kommando.siste_kjoringer()` |
+| E-post | Transport (AHASend/SMTP/konsoll), siste vellykkede og feilede utsending | `settings.EMAIL_BACKEND`, `Utsending` |
 | Feature-flags | Alle nøkler med prefiks `feature.` og deres verdi | `AppSetting`-tabellen |
-| Worker-config | `WEB_WORKERS`, `WEB_THREADS`, `WEB_MAX_REQUESTS` og faktisk prosessantall | Env-variabler og `os.getpid()` |
+| Worker-config | `WEB_WORKERS`, `WEB_THREADS`, `WEB_MAX_REQUESTS` og PID | Env-variabler og `os.getpid()` |
 
-Dashbordet polles ikke automatisk; brukeren refresher manuelt. Dette er et bevisst valg slik at dashbordet ikke selv bidrar til trafikken det måler.
+Dashbordet polles hvert 10. sekund fra JSON-endepunktet; requestene til
+server-status er unntatt fra metrikkene, så det bidrar ikke til tallene det
+viser. Hver innhenter fanger sine egne feil og legger dem i svaret, så én
+del som er nede tar ikke ned siden.
 
 ### 8A.4 JSON-endepunkt
 

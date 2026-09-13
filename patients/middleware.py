@@ -302,13 +302,9 @@ class _MetricsStore:
                 continue
         return out
 
-    def snapshot(self, window_seconds=300):
-        """Returner aggregert snapshot for siste `window_seconds`.
-
-        Hvis Redis er aktiv: aggregerer på tvers av alle workere.
-        Hvis Redis er av: bruker bare lokal deque (denne workerens tall).
-        """
-        # Hent samples — primært fra Redis hvis tilgjengelig, ellers lokal deque.
+    def _recent(self, window_seconds):
+        """(samples, source) for siste `window_seconds` — Redis når den er
+        aktiv (alle workere), ellers lokal deque (denne workeren)."""
         recent = []
         source = 'local'
         if _redis_is_available():
@@ -323,6 +319,37 @@ class _MetricsStore:
             with self._lock:
                 recent = [s for s in self._samples if s['ts'] >= cutoff]
             source = 'local' if source != 'redis' else 'redis'
+        return recent, source
+
+    def tregeste_stier(self, window_seconds=300, antall=5):
+        """De tregeste stiene i vinduet, målt på P95 (13. sep. 2026).
+
+        Gjør «P95 er høy» om til «det er statistikksiden». Stier med under
+        tre treff utelates — én treg request er ikke et mønster.
+        """
+        recent, _ = self._recent(window_seconds)
+        per_sti = {}
+        for s in recent:
+            per_sti.setdefault(s.get('path') or '?', []).append(s['duration_ms'])
+        ut = []
+        for sti, tider in per_sti.items():
+            if len(tider) < 3:
+                continue
+            tider.sort()
+            idx = max(0, min(len(tider) - 1, int(round(0.95 * (len(tider) - 1)))))
+            ut.append({'path': sti, 'count': len(tider),
+                       'p95_ms': round(tider[idx], 1),
+                       'avg_ms': round(sum(tider) / len(tider), 1)})
+        ut.sort(key=lambda r: r['p95_ms'], reverse=True)
+        return ut[:antall]
+
+    def snapshot(self, window_seconds=300):
+        """Returner aggregert snapshot for siste `window_seconds`.
+
+        Hvis Redis er aktiv: aggregerer på tvers av alle workere.
+        Hvis Redis er av: bruker bare lokal deque (denne workerens tall).
+        """
+        recent, source = self._recent(window_seconds)
 
         if not recent:
             return {

@@ -104,7 +104,7 @@ class Command(BaseCommand):
         # Kollapsen er irreversibel, så en halvveis kjøring er verdt å si
         # tydelig fra om: meldingen navngir hva som *ikke* ble gjort.
         # Se core/kommando.py.
-        with lesbar_dbfeil('ingen arkiv ble kollapset'):
+        with lesbar_dbfeil('ingen arkiv ble kollapset', navn='kollaps_arkiv'):
             for handler in handlere:
                 kollapset, hoppet = self._kjor_modul(
                     handler, options['days'], dry_run, ignorer_sperre)

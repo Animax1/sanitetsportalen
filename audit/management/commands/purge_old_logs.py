@@ -68,7 +68,7 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         # Én lesbar linje i cron-loggen framfor fire stablede tracebacks —
         # se core/kommando.py. Jobben er fortsatt rød og avslutter med kode 1.
-        with lesbar_dbfeil('ingenting ble slettet'):
+        with lesbar_dbfeil('ingenting ble slettet', navn='purge_old_logs'):
             self._rydd(options)
 
     def _rydd(self, options):

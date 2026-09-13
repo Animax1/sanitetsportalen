@@ -94,8 +94,27 @@
     <!-- Minnebruk -->
     <div class="status-card">
       <h3>Minne (RSS)</h3>
-      <div><span class="big-number" id="memory">–</span><span class="unit">MB</span></div>
-      <div class="sub">Denne worker-prosessen</div>
+      <div><span class="big-number" id="memory">–</span><span class="unit">MB nå</span></div>
+      <div class="status-row"><span class="label">Topp siden oppstart</span><span class="val" id="memory-peak">–</span></div>
+      <div class="sub">Denne worker-prosessen. Toppen går aldri ned — det er «nå» som sier om noe lekker.</div>
+    </div>
+
+    <!-- Database -->
+    <div class="status-card">
+      <h3>Database</h3>
+      <div class="status-row"><span class="label">Type</span><span class="val" id="db-vendor">–</span></div>
+      <div class="status-row"><span class="label">Svartid (SELECT 1)</span><span class="val" id="db-latency">–</span></div>
+      <div class="status-row"><span class="label">Tilkoblinger</span><span class="val" id="db-conns">–</span></div>
+      <div class="sub" id="db-hint" style="margin-top:0.5rem;">–</div>
+    </div>
+
+    <!-- Disk -->
+    <div class="status-card">
+      <h3>Disk (volumet)</h3>
+      <div><span class="big-number" id="disk-used">–</span><span class="unit">% brukt</span></div>
+      <div class="status-row"><span class="label">Ledig</span><span class="val" id="disk-free">–</span></div>
+      <div class="status-row"><span class="label">Backupfiler</span><span class="val" id="disk-backups">–</span></div>
+      <div class="sub" id="disk-path">–</div>
     </div>
 
     <!-- Worker-config -->
@@ -122,6 +141,8 @@
       <h3>Siste vellykkede backup</h3>
       <div><span class="big-number" id="backup-age">–</span><span class="unit">min siden</span></div>
       <div class="sub" id="backup-details">–</div>
+      <div class="status-row" style="margin-top:0.5rem;"><span class="label">Offsite (Scaleway)</span><span class="val" id="offsite-status">–</span></div>
+      <div class="sub" id="offsite-details">–</div>
     </div>
 
     <!-- Feature flags -->
@@ -132,6 +153,58 @@
         <span class="val" id="flag-live-stats">–</span>
       </div>
       <div class="sub" style="margin-top:0.5rem;">Flagg for fremtidig live-statistikk-fane. Funksjonen er ikke implementert ennå — default er derfor <code>false</code>. Endring trer i kraft ved neste request (ingen restart).</div>
+    </div>
+
+    <!-- Vaktbildet -->
+    <div class="status-card">
+      <h3>Vaktbildet</h3>
+      <div class="status-row"><span class="label">Aktiv vakt</span><span class="val" id="vakt-navn">–</span></div>
+      <div class="status-row"><span class="label">Vaktlister i drift</span><span class="val" id="vakt-drift">–</span></div>
+      <div class="status-row"><span class="label">Oppdrag på tavla</span><span class="val" id="vakt-oppdrag">–</span></div>
+      <div class="status-row"><span class="label">Venter på ressurs</span><span class="val" id="vakt-venter">–</span></div>
+      <div class="status-row"><span class="label">Siste vaktlistefil</span><span class="val" id="vakt-utsending">–</span></div>
+      <div class="sub" id="vakt-hint" style="margin-top:0.5rem;">–</div>
+    </div>
+
+    <!-- Tregeste stier -->
+    <div class="status-card">
+      <h3>Tregeste stier siste 5 min</h3>
+      <div id="tregeste"><div class="sub">–</div></div>
+      <div class="sub" style="margin-top:0.5rem;">P95 per sti, stier med under tre treff er utelatt. Gjør «P95 er høy» om til «det er den siden».</div>
+    </div>
+
+    <!-- Innlogging -->
+    <div class="status-card">
+      <h3>Innlogging siste time</h3>
+      <div><span class="big-number" id="login-failed">–</span><span class="unit">feilede forsøk</span></div>
+      <div class="status-row"><span class="label">Vellykkede</span><span class="val" id="login-ok">–</span></div>
+      <div class="status-row"><span class="label">Brukernavn / IP-er bak feilene</span><span class="val" id="login-spread">–</span></div>
+      <div class="status-row"><span class="label">MFA-koder avvist</span><span class="val" id="login-mfa">–</span></div>
+      <div class="sub" id="login-hint" style="margin-top:0.5rem;">Mange feil fra én IP er et angrep. Mange feil fra mange brukere er et passord ingen husker.</div>
+    </div>
+
+    <!-- Konfigsjekk -->
+    <div class="status-card">
+      <h3>Konfigsjekk <span id="konfig-sum" class="unit"></span></h3>
+      <div id="konfig-rader"><div class="sub">–</div></div>
+      <div class="status-row" style="margin-top:0.5rem;"><span class="label">Versjon</span><span class="val" id="konfig-versjon">–</span></div>
+      <div class="sub" style="margin-top:0.5rem;">Reglene gjelder prod. Lokalt vil DEBUG og HTTPS stå rødt, og det er riktig.</div>
+    </div>
+
+    <!-- Cron -->
+    <div class="status-card">
+      <h3>Cron-jobber (Railway)</h3>
+      <div id="cron-rader"><div class="sub">–</div></div>
+      <div class="sub" style="margin-top:0.5rem;">Siste kjøring, registrert av jobben selv. «Aldri» betyr at jobben ikke har kjørt siden sporingen kom, eller at cron ikke er satt opp.</div>
+    </div>
+
+    <!-- E-post -->
+    <div class="status-card">
+      <h3>E-post</h3>
+      <div class="status-row"><span class="label">Transport</span><span class="val" id="epost-transport">–</span></div>
+      <div class="status-row"><span class="label">Siste vellykkede utsending</span><span class="val" id="epost-ok">–</span></div>
+      <div class="status-row"><span class="label">Siste feil</span><span class="val" id="epost-feil">–</span></div>
+      <div class="sub" id="epost-hint" style="margin-top:0.5rem;">–</div>
     </div>
   </div>
 
@@ -251,7 +324,9 @@ const ADMIN_URLS = {
     document.getElementById('count-5min').textContent = fmt(m5.count);
 
     document.getElementById('sessions').textContent = fmt(d.active_sessions);
-    document.getElementById('memory').textContent = fmt(d.memory_mb);
+    const mem = d.memory || {};
+    document.getElementById('memory').textContent = fmt(mem.naa);
+    document.getElementById('memory-peak').textContent = fmt(mem.topp) + ' MB';
     refreshSessionsList();
 
     const cfg = d.worker_config || {};
@@ -302,6 +377,16 @@ const ADMIN_URLS = {
       document.getElementById('backup-details').textContent = 'Ingen backup funnet';
     }
 
+    renderOffsite((d.last_backup || {}).offsite || {});
+    renderDb(d.db_health || {});
+    renderDisk(d.disk || {});
+    renderVaktbilde(d.vaktbilde || {});
+    renderTregeste(d.tregeste || []);
+    renderInnlogging(d.innlogging || {});
+    renderKonfig(d.konfig || {});
+    renderCron(d.cron || {});
+    renderEpost(d.epost || {});
+
     const flags = d.feature_flags || {};
     document.getElementById('flag-live-stats').textContent =
       flags['feature.live_stats_enabled'] || 'false';
@@ -309,6 +394,178 @@ const ADMIN_URLS = {
     // Oppdater JSON-preview
     document.getElementById('json-preview').textContent =
       JSON.stringify(d, null, 2);
+  }
+
+  // ── De nye kortene (13. sep. 2026) ─────────────────────────────
+  function setVal(id, text, cls) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.textContent = text;
+    el.className = 'val' + (cls ? ' ' + cls : '');
+  }
+  function tidSiden(minutter) {
+    if (minutter === null || minutter === undefined) return '–';
+    if (minutter < 60) return minutter + ' min siden';
+    if (minutter < 48 * 60) return Math.round(minutter / 60) + ' t siden';
+    return Math.round(minutter / 1440) + ' d siden';
+  }
+  function klokke(iso) {
+    if (!iso) return '–';
+    const t = new Date(iso);
+    return isNaN(t) ? '–' : t.toLocaleString('no-NO', {day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit'});
+  }
+
+  function renderOffsite(o) {
+    const det = document.getElementById('offsite-details');
+    if (o.konfigurert === false) {
+      setVal('offsite-status', 'Ikke konfigurert', 'status-warn');
+      det.textContent = 'Mangler ' + (o.mangler || []).join(', ') + '. Bare prod skal ha dem.';
+      return;
+    }
+    if (o.konfigurert !== true) {
+      setVal('offsite-status', 'Ukjent', 'status-warn');
+      det.textContent = o.error || '';
+      return;
+    }
+    if (o.siste_feil) {
+      setVal('offsite-status', 'Siste opplasting feilet', 'status-crit');
+      det.textContent = klokke(o.siste_feil_at) + ': ' + o.siste_feil;
+      return;
+    }
+    const gammel = o.siste_ok_minutter !== null && o.siste_ok_minutter > 26 * 60;
+    setVal('offsite-status', gammel ? 'Over ett døgn siden' : 'OK', gammel ? 'status-warn' : 'status-ok');
+    det.textContent = (o.antall || 0) + ' fil(er) i ' + (o.bucket || '?') +
+      (o.siste_ok_minutter !== null ? ' · sist ' + tidSiden(o.siste_ok_minutter) : ' · ingen opplasting ennå');
+  }
+
+  function renderDb(db) {
+    setVal('db-vendor', (db.vendor || '–').toUpperCase());
+    const hint = document.getElementById('db-hint');
+    if (!db.healthy) {
+      setVal('db-latency', 'FEIL', 'status-crit');
+      setVal('db-conns', '–');
+      hint.textContent = db.error || 'Databasen svarte ikke.';
+      return;
+    }
+    const lat = db.latency_ms || 0;
+    setVal('db-latency', lat + ' ms', lat < 50 ? 'status-ok' : (lat < 200 ? 'status-warn' : 'status-crit'));
+    if (db.maks_tilkoblinger) {
+      const andel = db.tilkoblinger / db.maks_tilkoblinger;
+      setVal('db-conns', db.tilkoblinger + ' / ' + db.maks_tilkoblinger,
+        andel < 0.6 ? 'status-ok' : (andel < 0.85 ? 'status-warn' : 'status-crit'));
+      hint.textContent = 'Hver worker holder egne tilkoblinger. Nær taket: ikke øk WEB_WORKERS.';
+    } else {
+      setVal('db-conns', 'n/a');
+      hint.textContent = db.vendor === 'sqlite' ? 'SQLite lokalt — ingen tilkoblingsgrense.' : (db.error || '');
+    }
+  }
+
+  function renderDisk(disk) {
+    const el = document.getElementById('disk-used');
+    if (disk.error || disk.brukt_prosent === undefined) {
+      el.textContent = '–'; el.className = 'big-number';
+      document.getElementById('disk-path').textContent = disk.error || '';
+      return;
+    }
+    const p = disk.brukt_prosent;
+    el.textContent = p;
+    el.className = 'big-number ' + (p < 70 ? 'status-ok' : (p < 90 ? 'status-warn' : 'status-crit'));
+    setVal('disk-free', Math.round(disk.ledig_mb) + ' MB av ' + Math.round(disk.total_mb) + ' MB');
+    setVal('disk-backups', Math.round(disk.backup_mb) + ' MB');
+    document.getElementById('disk-path').textContent = disk.sti || '';
+  }
+
+  function renderVaktbilde(v) {
+    const vakt = v.aktiv_vakt;
+    setVal('vakt-navn', vakt ? vakt.navn : '–');
+    const drift = v.vaktlister_i_drift || [];
+    setVal('vakt-drift', drift.length ? drift.map(d => d.vakt).join(', ') : 'Ingen',
+      drift.length ? 'status-ok' : '');
+    const o = v.oppdrag;
+    if (o) {
+      setVal('vakt-oppdrag', o.paa_tavla + (o.ventende ? ' (' + o.ventende + ' venter)' : ''),
+        o.ventende ? 'status-warn' : '');
+      setVal('vakt-venter', o.trenger_ressurs + (o.eldste_ventende_minutter !== null ? ' · eldste ventende ' + o.eldste_ventende_minutter + ' min' : ''),
+        o.trenger_ressurs ? 'status-crit' : '');
+    } else {
+      setVal('vakt-oppdrag', '–'); setVal('vakt-venter', '–');
+    }
+    const u = v.siste_utsending;
+    if (u) {
+      setVal('vakt-utsending', tidSiden(u.minutter_siden) + ' (' + u.utloest + ', ' + u.antall_mottakere + ' mott.)',
+        u.ok ? 'status-ok' : 'status-crit');
+    } else {
+      setVal('vakt-utsending', 'Aldri');
+    }
+    document.getElementById('vakt-hint').textContent = v.error ? v.error :
+      (vakt ? 'Vakta startet ' + klokke(vakt.startet) + '. Tallene er den aktive vaktas.' : '');
+  }
+
+  function renderTregeste(rader) {
+    const el = document.getElementById('tregeste');
+    if (!rader.length) {
+      el.innerHTML = '<div class="sub">Ingen sti med tre eller flere treff ennå.</div>';
+      return;
+    }
+    el.innerHTML = rader.map(r => {
+      const cls = r.p95_ms < 300 ? 'status-ok' : (r.p95_ms < 1000 ? 'status-warn' : 'status-crit');
+      return '<div class="status-row"><span class="label" style="word-break:break-all;">' + escapeHtml(r.path) +
+        ' <span style="opacity:.7">×' + r.count + '</span></span><span class="val ' + cls + '">' +
+        escapeHtml(r.p95_ms) + ' ms</span></div>';
+    }).join('');
+  }
+
+  function renderInnlogging(i) {
+    const el = document.getElementById('login-failed');
+    if (i.error) { el.textContent = '–'; el.className = 'big-number'; document.getElementById('login-hint').textContent = i.error; return; }
+    const f = i.feilede || 0;
+    el.textContent = f;
+    el.className = 'big-number ' + (f < 5 ? 'status-ok' : (f < 20 ? 'status-warn' : 'status-crit'));
+    setVal('login-ok', fmt(i.vellykkede));
+    setVal('login-spread', fmt(i.feilede_brukernavn) + ' / ' + fmt(i.feilede_ip),
+      (i.feilede_ip === 1 && f >= 5) ? 'status-crit' : '');
+    setVal('login-mfa', fmt(i.mfa_feilet), (i.mfa_feilet || 0) >= 5 ? 'status-warn' : '');
+  }
+
+  function renderKonfig(k) {
+    const rader = k.rader || [];
+    document.getElementById('konfig-rader').innerHTML = rader.length ? rader.map(r =>
+      '<div class="status-row"><span class="label">' + escapeHtml(r.nokkel) + '</span><span class="val ' +
+      (r.ok ? 'status-ok' : 'status-crit') + '" title="' + escapeHtml(r.verdi) + '">' +
+      (r.ok ? '✓ ' : '✗ ') + escapeHtml(String(r.verdi).length > 28 ? String(r.verdi).slice(0, 26) + '…' : r.verdi) +
+      '</span></div>').join('') : '<div class="sub">–</div>';
+    const sum = document.getElementById('konfig-sum');
+    const feil = rader.filter(r => !r.ok).length;
+    sum.textContent = rader.length ? (feil ? feil + ' avvik' : 'alt OK') : '';
+    sum.className = 'unit ' + (feil ? 'status-crit' : 'status-ok');
+    const v = k.versjon || {};
+    setVal('konfig-versjon', (v.bygg || '?') + (v.dato ? ' · ' + klokke(v.dato) : ''));
+  }
+
+  function renderCron(c) {
+    const navn = {db_backup: 'db_backup', purge_old_logs: 'purge_old_logs', kollaps_arkiv: 'kollaps_arkiv'};
+    const forventet = {db_backup: 26, purge_old_logs: 26, kollaps_arkiv: 8 * 24};
+    if (c.error) { document.getElementById('cron-rader').innerHTML = '<div class="sub">' + escapeHtml(c.error) + '</div>'; return; }
+    document.getElementById('cron-rader').innerHTML = Object.keys(navn).map(n => {
+      const k = c[n];
+      let tekst, cls;
+      if (!k) { tekst = 'Aldri'; cls = 'status-warn'; }
+      else if (!k.ok) { tekst = '✗ ' + klokke(k.tid); cls = 'status-crit'; }
+      else { tekst = '✓ ' + klokke(k.tid); cls = (k.timer_siden !== null && k.timer_siden > forventet[n]) ? 'status-warn' : 'status-ok'; }
+      const tittel = k && k.melding ? ' title="' + escapeHtml(k.melding) + '"' : '';
+      return '<div class="status-row"><span class="label">' + navn[n] + '</span><span class="val ' + cls + '"' + tittel + '>' + tekst + '</span></div>';
+    }).join('');
+  }
+
+  function renderEpost(e) {
+    const t = e.transport || '–';
+    setVal('epost-transport', t.toUpperCase(), t === 'ahasend' ? 'status-ok' : (t === 'console' || t === 'locmem' ? 'status-crit' : 'status-warn'));
+    setVal('epost-ok', e.siste_ok_at ? klokke(e.siste_ok_at) : 'Aldri');
+    setVal('epost-feil', e.siste_feil ? klokke(e.siste_feil_at) + ': ' + e.siste_feil : 'Ingen', e.siste_feil ? 'status-crit' : '');
+    document.getElementById('epost-hint').textContent =
+      t === 'ahasend' ? 'AHASend HTTP-API — transporten i prod. Railway sperrer SMTP.' :
+      t === 'console' ? 'Konsoll: ingenting sendes. I prod mangler AHASEND_API_KEY/ACCOUNT_ID.' :
+      t === 'smtp' ? 'SMTP virker bare lokalt — Railway sperrer utgående SMTP.' : (e.error || '');
   }
 
   // ── Sesjonshåndtering ─────────────────────────────────────────

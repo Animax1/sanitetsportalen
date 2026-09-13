@@ -863,6 +863,26 @@ Sett variabelen som referansen `${{Postgres.DATABASE_URL}}`, ikke som en
 kopiert verdi — en kopi blir stående igjen når passordet roteres, og da
 feiler bare cron-jobbene mens websiden går videre som før.
 
+**Hver jobb registrerer sin siste kjøring** (13. sep. 2026): `lesbar_dbfeil(..., navn='db_backup')`
+skriver `AppSetting['cron.<navn>']` med tid, ok/feil og melding, både når det
+gikk og når det ikke gikk — `core.kommando.registrer_kjoring()` kaster aldri.
+`/portal-admin/server-status/` leser `siste_kjoringer()` og viser «Aldri» til
+jobben har kjørt én gang. En ny cron-jobb skal ha navnet sitt i `CRON_JOBBER`
+og sende det inn, ellers finnes den ikke for dashbordet.
+
+### Server-status (patients/admin_status.py)
+
+`/portal-admin/server-status/` polles hvert 10. sekund fra `…/json/`, og
+`_build_status_payload()` er én dict med én innhenter per kort. **Hver
+innhenter fanger sine egne feil og legger dem i svaret** — et dashbord som
+selv gir 500 når databasen er treg, er borte akkurat når man trenger det.
+Minne er `{'naa', 'topp'}` (13. sep. 2026): `ru_maxrss` er toppen og går aldri
+ned, så «nå» leses fra `/proc/self/status`. Tregeste stier kommer fra
+`metrics_store.tregeste_stier()` (P95 per sti, under tre treff utelatt).
+Konfigsjekken leser `settings`, ikke `os.environ` — det er settings viewene
+kjører med — og reglene er prods: lokalt står DEBUG og HTTPS rødt med vilje.
+Feilmeldinger går gjennom `_scrub_secrets()` før de sendes til klienten.
+
 ## Miljøvariabler
 
 Settes i `.env` lokalt. Nøkler å kjenne til:

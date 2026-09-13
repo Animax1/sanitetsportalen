@@ -123,3 +123,49 @@ class CronjobbeneBrukerDenTests(TestCase):
             'db_backup',
             'patients.models.BackupConfig.get',
             'ingen backup ble tatt')
+
+
+class SisteKjoringRegistreresTests(TestCase):
+    """Siste kjøring skrives til `AppSetting` (13. sep. 2026), både når det
+    gikk og når det ikke gikk — det er «har jobben stille sluttet å kjøre»
+    server-status skal svare på, og et svar som bare fantes ved suksess
+    hadde vært taust akkurat da."""
+
+    def test_vellykket_kjoring(self):
+        from core.kommando import lesbar_dbfeil, siste_kjoringer
+        self.assertIsNone(siste_kjoringer()['purge_old_logs'], 'ingen kjøring ennå')
+        with lesbar_dbfeil('ingenting ble slettet', navn='purge_old_logs'):
+            pass
+        k = siste_kjoringer()['purge_old_logs']
+        self.assertTrue(k['ok'])
+        self.assertEqual(k['melding'], '')
+        self.assertTrue(k['tid'])
+
+    def test_tilkoblingsfeil_registreres_som_feil(self):
+        from core.kommando import lesbar_dbfeil, siste_kjoringer
+        with self.assertRaises(CommandError):
+            with lesbar_dbfeil('ingen backup ble tatt', navn='db_backup'):
+                raise OperationalError(PSYCOPG_TEKST)
+        k = siste_kjoringer()['db_backup']
+        self.assertFalse(k['ok'])
+        self.assertIn('password authentication failed', k['melding'])
+
+    def test_annen_feil_registreres_og_slipper_gjennom(self):
+        from core.kommando import lesbar_dbfeil, siste_kjoringer
+        with self.assertRaises(ValueError):
+            with lesbar_dbfeil('ingen arkiv ble kollapset', navn='kollaps_arkiv'):
+                raise ValueError('noe annet')
+        k = siste_kjoringer()['kollaps_arkiv']
+        self.assertFalse(k['ok'])
+        self.assertIn('ValueError', k['melding'])
+
+    def test_uten_navn_registreres_ingenting(self):
+        from core.kommando import lesbar_dbfeil, siste_kjoringer
+        with lesbar_dbfeil('x'):
+            pass
+        self.assertEqual(set(siste_kjoringer().values()), {None})
+
+    def test_kommandoene_registrerer_seg(self):
+        from core.kommando import siste_kjoringer
+        call_command('purge_old_logs', stdout=StringIO(), stderr=StringIO())
+        self.assertTrue(siste_kjoringer()['purge_old_logs']['ok'])

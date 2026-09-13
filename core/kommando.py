@@ -47,7 +47,7 @@ def _forste_linje(feil):
 
 
 @contextmanager
-def lesbar_dbfeil(jobb):
+def lesbar_dbfeil(jobb, navn=None):
     """Gjør en tilkoblingsfeil om til én lesbar linje i cron-loggen.
 
     Args:
@@ -55,11 +55,54 @@ def lesbar_dbfeil(jobb):
             slettet». Meldingen skal si hva som *ikke skjedde*, ikke bare at
             noe feilet: en cron-jobb som feiler halvveis er noe annet enn en
             som aldri kom i gang.
+        navn: jobbens navn for `registrer_kjoring` (13. sep. 2026) — siste
+            kjøring, ok/feil, vises på /portal-admin/server-status/. Ingen
+            har en bruker som ser cron-loggen, og en jobb som stille har
+            sluttet å kjøre er den feilen man ellers oppdager for sent.
     """
     try:
         yield
     except OperationalError as feil:
+        if navn:
+            registrer_kjoring(navn, False, f'Databasen tok ikke imot tilkoblingen: {_forste_linje(feil)}')
         raise CommandError(
             f'Databasen tok ikke imot tilkoblingen, så {jobb}: '
             f'{_forste_linje(feil)}\n{RAAD}'
         ) from feil
+    except Exception as feil:
+        if navn:
+            registrer_kjoring(navn, False, f'{feil.__class__.__name__}: {_forste_linje(feil)}')
+        raise
+    else:
+        if navn:
+            registrer_kjoring(navn, True, '')
+
+
+CRON_JOBBER = ('db_backup', 'purge_old_logs', 'kollaps_arkiv')
+
+
+def registrer_kjoring(navn, ok, melding=''):
+    """Skriv siste kjøring av en cron-jobb til `AppSetting` (`cron.<navn>`).
+    Kaster aldri — en logg som tar ned jobben er verre enn ingen logg."""
+    import json
+    from django.utils import timezone
+    try:
+        from patients.models import AppSetting
+        AppSetting.set(f'cron.{navn}', json.dumps(
+            {'tid': timezone.now().isoformat(), 'ok': bool(ok), 'melding': (melding or '')[:300]}))
+    except Exception:   # noqa: BLE001
+        pass
+
+
+def siste_kjoringer():
+    """{navn: {tid, ok, melding} | None} for de tre jobbene."""
+    import json
+    from patients.models import AppSetting
+    ut = {}
+    for navn in CRON_JOBBER:
+        raa = AppSetting.get(f'cron.{navn}', '')
+        try:
+            ut[navn] = json.loads(raa) if raa else None
+        except (TypeError, ValueError):
+            ut[navn] = None
+    return ut
