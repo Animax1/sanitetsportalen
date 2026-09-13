@@ -300,3 +300,181 @@ class FilknappeneJsTests(SimpleTestCase):
         ut = self._kjor({'id': 7, 'fil_mottakere': 1, 'siste_utsending': feilet})
         self.assertIn('feilet: &lt;b&gt;nede&lt;/b&gt;', ut)
         self.assertNotIn('<b>nede', ut)
+
+
+class IntervallTests(FilBasis):
+    """«En intervall på sending av epost og checkbox, mail sendes bare hvis
+    det er endringer i vaktlisten» (André, 13. sep. 2026)."""
+
+    def setUp(self):
+        super().setUp()
+        AppSetting.set(fil.INTERVALL_NOKKEL, '5')
+        self._skift(self.res_hgsd, self.p_hgsd)
+        self.vl.status = 'drift'
+        self.vl.save()
+
+    def _sist(self, minutter):
+        """Flytt den siste utsendingen `minutter` tilbake i tid."""
+        rad = self.vl.utsendinger.first()
+        Utsending.objects.filter(pk=rad.pk).update(created_at=timezone.now() - timedelta(minutes=minutter))
+        return rad
+
+    def test_av_naar_intervallet_er_null_eller_lista_ikke_er_i_drift(self):
+        AppSetting.set(fil.INTERVALL_NOKKEL, '0')
+        self.assertEqual(fil.send_planlagte(), [])
+        AppSetting.set(fil.INTERVALL_NOKKEL, '5')
+        self.vl.status = 'planlegging'
+        self.vl.save()
+        self.assertEqual(fil.send_planlagte(), [])
+        self.assertEqual(len(mail.outbox), 0)
+
+    def test_forste_sending_i_drift_uten_tidligere_utsending(self):
+        rader = fil.send_planlagte()
+        self.assertEqual(len(rader), 1)
+        self.assertEqual(rader[0].utloest, Utsending.INTERVALL)
+        self.assertEqual(rader[0].sendt_av, None)
+        self.assertTrue(rader[0].innhold_sha256)
+        self.assertEqual(len(mail.outbox), 1)
+
+    def test_venter_til_intervallet_er_gaatt(self):
+        fil.send_fil(self.vl, bruker=self.vaktleder)
+        self._sist(4)
+        self.assertEqual(fil.send_planlagte(), [], 'fire minutter: for tidlig')
+        self._sist(5)
+        AppSetting.set(fil.BARE_ENDRET_NOKKEL, '0')
+        self.assertEqual(len(fil.send_planlagte()), 1)
+
+    def test_bare_ved_endring_hopper_over_uendret_liste(self):
+        fil.send_fil(self.vl, bruker=self.vaktleder)
+        self._sist(6)
+        self.assertEqual(fil.send_planlagte(), [], 'uendret: ingenting sendes, ingen rad')
+        self.assertEqual(Utsending.objects.count(), 1)
+        self._skift(self.res_karmoy, self.p_karmoy, fra=8, til=16)
+        rader = fil.send_planlagte()
+        self.assertEqual(len(rader), 1, 'endret: sendes')
+        self.assertNotEqual(rader[0].innhold_sha256, Utsending.objects.order_by('pk').first().innhold_sha256)
+        self.assertEqual(len(mail.outbox), 2)
+
+    def test_uten_bare_ved_endring_sendes_uendret_liste(self):
+        AppSetting.set(fil.BARE_ENDRET_NOKKEL, '0')
+        fil.send_fil(self.vl, bruker=self.vaktleder)
+        self._sist(6)
+        self.assertEqual(len(fil.send_planlagte()), 1)
+
+    def test_et_feilet_forsoek_teller_som_forrige(self):
+        """E-posttjenesten nede: ett forsøk per intervall, ikke ett per
+        minutt. Og sammenligningen går mot den sist *sendte*, så en endring
+        som feilet første gang går ut når tjenesten er oppe igjen."""
+        fil.send_fil(self.vl, bruker=self.vaktleder)
+        self._sist(6)
+        self._skift(self.res_karmoy, self.p_karmoy, fra=8, til=16)
+        with override_settings(EMAIL_BACKEND='vaktliste.tests_fil.SviktendeBackend'):
+            feilet = fil.send_planlagte()
+        self.assertEqual(len(feilet), 1)
+        self.assertTrue(feilet[0].feil)
+        self.assertEqual(fil.send_planlagte(), [], 'nytt forsøk først etter intervallet')
+        self._sist(6)
+        rader = fil.send_planlagte()
+        self.assertEqual(len(rader), 1)
+        self.assertEqual(rader[0].feil, '')
+
+    def test_stempling_er_en_endring(self):
+        fil.send_fil(self.vl, bruker=self.vaktleder)
+        self._sist(6)
+        self.assertEqual(fil.send_planlagte(), [])
+        vp = self.vl.ressurser.get(navn='Lag HGSD').vaktposter.get()
+        # Stemplene står ikke i fila, og skal ikke utløse en ny utsending —
+        # fila er planen, ikke innsjekken.
+        vp.mott_at = timezone.now()
+        vp.save()
+        self.assertEqual(fil.send_planlagte(), [], 'møtt endrer ikke fila')
+        vp.til_tid = vp.til_tid + timedelta(hours=1)
+        vp.save()
+        self.assertEqual(len(fil.send_planlagte()), 1, 'en ny til-tid gjør det')
+
+
+class FilutsendingMiddlewareTests(FilBasis):
+    def setUp(self):
+        super().setUp()
+        from . import middleware
+        middleware.nullstill_for_test()
+
+    def tearDown(self):
+        from . import middleware
+        middleware.nullstill_for_test()
+        super().tearDown()
+
+    def test_maks_en_sjekk_per_minutt(self):
+        from unittest.mock import patch
+        from . import middleware
+        with patch.object(middleware.threading, 'Thread') as Thread:
+            self.assertTrue(middleware.maybe_send_planlagte())
+            self.assertFalse(middleware.maybe_send_planlagte(), 'throttlet')
+            Thread.return_value.start.assert_called_once()
+
+    def test_traaden_kaller_send_planlagte_og_slipper_laasen(self):
+        from unittest.mock import patch
+        from . import middleware
+        with patch.object(fil, 'send_planlagte', return_value=[]) as sp:
+            middleware._kjor()
+            sp.assert_called_once()
+        self.assertFalse(middleware._kjorer)
+        with patch.object(fil, 'send_planlagte', side_effect=RuntimeError('boom')):
+            middleware._kjor()      # kaster ikke
+        self.assertFalse(middleware._kjorer)
+
+    def test_middlewaren_er_registrert_men_ikke_under_test(self):
+        from django.conf import settings as s
+        self.assertNotIn('vaktliste.middleware.FilutsendingMiddleware', s.MIDDLEWARE,
+                         'tas ut under test, som backup-planleggeren')
+        from pathlib import Path
+        kilde = (Path(s.BASE_DIR) / 'myproject' / 'settings.py').read_text(encoding='utf-8')
+        self.assertIn("'vaktliste.middleware.FilutsendingMiddleware',\n", kilde)
+
+
+class IntervallInnstillingeneTests(FilBasis):
+    def setUp(self):
+        super().setUp()
+        self.adm = _klient(_bruker('ps_adm2', admin=True))
+        self.kropp = {'event_name': self.vl.vakt.navn, 'session_timeout_hours': '8',
+                      'vaktliste_fil_mottakere': 'x@example.org'}
+
+    def test_intervall_og_bryter_lagres(self):
+        res = self.adm.post('/portal-admin/innstillinger/', {
+            **self.kropp, 'vaktliste_fil_intervall_min': '5', 'vaktliste_fil_bare_endret': '1'})
+        self.assertEqual(res.status_code, 302, res.content)
+        self.assertEqual(fil.intervall_minutter(), 5)
+        self.assertTrue(fil.bare_ved_endring())
+        res = self.adm.post('/portal-admin/innstillinger/', {**self.kropp, 'vaktliste_fil_intervall_min': ''})
+        self.assertEqual(res.status_code, 302)
+        self.assertEqual(fil.intervall_minutter(), 0, 'tomt = av')
+        self.assertFalse(fil.bare_ved_endring())
+
+    def test_ugyldig_intervall_avvises_uten_aa_lagre(self):
+        AppSetting.set(fil.INTERVALL_NOKKEL, '5')
+        for verdi in ('-1', 'fem', '9999'):
+            with self.subTest(verdi=verdi):
+                res = self.adm.post('/portal-admin/innstillinger/', {
+                    **self.kropp, 'session_timeout_hours': '3', 'vaktliste_fil_intervall_min': verdi})
+                self.assertEqual(res.status_code, 200)
+                self.assertEqual(fil.intervall_minutter(), 5)
+                self.assertEqual(AppSetting.get('session_timeout_hours', '8'), '8', 'halve skjemaet lagres ikke')
+
+    def test_teksten_i_innstillinger_sier_intervallet(self):
+        AppSetting.set(fil.INTERVALL_NOKKEL, '5')
+        d = self.c_vl.get(f'/vaktliste/api/vaktlister/{self.vl.pk}/').json()['data']['vaktliste']
+        self.assertEqual((d['fil_intervall_min'], d['fil_bare_endret']), (5, True))
+
+
+class IntervallTekstJsTests(FilknappeneJsTests):
+    def test_teksten_nevner_intervallet_og_endringskravet(self):
+        ut = self._kjor({'id': 7, 'fil_mottakere': 1, 'fil_ved_drift': True,
+                         'fil_intervall_min': 5, 'fil_bare_endret': True})
+        self.assertIn('sendes også ved sett i drift og hvert 5. min i drift når lista er endret.', ut)
+        ut = self._kjor({'id': 7, 'fil_mottakere': 1, 'fil_ved_drift': False,
+                         'fil_intervall_min': 10, 'fil_bare_endret': False})
+        self.assertIn('sendes også hvert 10. min i drift.', ut)
+        ut = self._kjor({'id': 7, 'fil_mottakere': 1, 'siste_utsending': {
+            'sendt_at': '2026-09-13T06:04:00Z', 'utloest': 'intervall', 'antall_mottakere': 1,
+            'antall_rader': 3, 'feil': ''}})
+        self.assertIn('(på intervall)', ut)

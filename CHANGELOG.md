@@ -4,6 +4,22 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-13 — Reserve 1b: intervallsending mens lista er i drift
+
+Én migrasjon, `vaktliste/0017` (`Utsending.innhold_sha256`, ny utløser
+«intervall»). Deployes til staging først.
+
+- **Send på nytt hvert N. minutt mens lista er i drift**, satt under
+  Portalinnstillinger → «Vaktlista på e-post». 0 = av. Klokka går fra forrige
+  utsending uansett hva som utløste den, så et feilet forsøk gir ikke ett nytt
+  per minutt mens e-posten er nede.
+- **«Bare hvis vaktlista er endret siden forrige utsending»**: fila får en
+  signatur over innholdet, og en uendret liste går ikke ut igjen. Stemplene
+  (møtt/av vakt) står ikke i fila og teller ikke som endring.
+- Kjøres av `vaktliste.middleware.FilutsendingMiddleware` etter trafikk, maks
+  én sjekk i minuttet per prosess, i bakgrunnstråd — samme klokke som
+  backup-planleggeren. Tas ut under test, som den.
+
 ## 2026-09-12 — Reserve 1: vaktlista som fil på e-post
 
 Én migrasjon, `vaktliste/0016` (`Utsending`). Deployes til staging først.

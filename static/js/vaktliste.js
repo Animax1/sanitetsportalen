@@ -548,7 +548,8 @@ function _utsendingTekst(u) {
   // den siste ikke gikk. Uten utsending: tom streng.
   if (!u) return '';
   const naar = `${_dag(u.sendt_at)} ${_kl(u.sendt_at)}`;
-  const hvordan = u.utloest === 'drift' ? 'ved sett i drift' : 'på knapp';
+  const hvordan = u.utloest === 'drift' ? 'ved sett i drift'
+    : (u.utloest === 'intervall' ? 'på intervall' : 'på knapp');
   if (u.feil) return `Siste forsøk ${naar} (${hvordan}) feilet: ${u.feil}`;
   const mott = `${u.antall_mottakere} ${u.antall_mottakere === 1 ? 'mottaker' : 'mottakere'}`;
   return `Sist sendt ${naar} til ${mott} (${hvordan}), ${u.antall_rader} skift.`;
@@ -566,9 +567,17 @@ function tegnFilknapper() {
   if (!aktivListe || !kanSkriveAlt()) { el.innerHTML = ''; return; }
   const vl = aktivListe.vaktliste;
   const harMottakere = (vl.fil_mottakere || 0) > 0;
+  // Automatikken, som admin har satt den: ved sett i drift, og/eller hvert
+  // N. minutt i drift (bare ved endringer, om det er krysset av).
+  const auto = [];
+  if (vl.fil_ved_drift) auto.push('ved sett i drift');
+  if (vl.fil_intervall_min > 0) {
+    auto.push(`hvert ${vl.fil_intervall_min}. min i drift`
+              + (vl.fil_bare_endret ? ' når lista er endret' : ''));
+  }
   const mottakere = harMottakere
     ? `${vl.fil_mottakere} ${vl.fil_mottakere === 1 ? 'mottaker' : 'mottakere'} er satt`
-      + (vl.fil_ved_drift ? '; sendes også ved sett i drift.' : '.')
+      + (auto.length ? `; sendes også ${auto.join(' og ')}.` : '.')
     : 'Ingen mottakere er satt — global admin setter dem under Portalinnstillinger.';
   const sist = _utsendingTekst(vl.siste_utsending);
   el.innerHTML = `

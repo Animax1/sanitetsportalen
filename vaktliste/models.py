@@ -696,7 +696,8 @@ class Utsending(BaseTimeStampedModel):
 
     KNAPP = 'knapp'
     DRIFT = 'drift'
-    UTLOEST_VALG = [(KNAPP, 'Knapp'), (DRIFT, 'Sett i drift')]
+    INTERVALL = 'intervall'
+    UTLOEST_VALG = [(KNAPP, 'Knapp'), (DRIFT, 'Sett i drift'), (INTERVALL, 'Intervall')]
 
     vaktliste = models.ForeignKey(
         Vaktliste, on_delete=models.CASCADE, related_name='utsendinger',
@@ -711,6 +712,11 @@ class Utsending(BaseTimeStampedModel):
     mottakere = models.TextField(blank=True, default='', verbose_name='Mottakere')
     antall_rader = models.PositiveIntegerField(default=0, verbose_name='Antall skift')
     feil = models.TextField(blank=True, default='', verbose_name='Feil')
+    # Signatur over innholdet (André, 13. sep. 2026: «mail sendes bare hvis
+    # det er endringer i vaktlisten»). Intervallsendingen sammenligner mot
+    # den sist *sendte* — så lista som ikke har rørt seg ikke går ut igjen.
+    innhold_sha256 = models.CharField(
+        max_length=64, blank=True, default='', verbose_name='Innholdssignatur')
 
     class Meta:
         verbose_name = 'Utsending'

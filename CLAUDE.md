@@ -397,7 +397,12 @@ fase 3–7 gjenstår — se `docs/BESLUTNING_VAKTLISTE.md`, som er besluttet i s
   under portalinnstillingene; `send_fil()` kaster aldri og lager alltid en
   `Utsending`-rad (auditlogget), og drift-viewet sender *etter* at drift er lagret —
   e-post nede skal ikke stenge innsjekken. AHASend-transporten sender vedlegg som
-  base64 (`_vedlegg`).
+  base64 (`_vedlegg`). **Intervallsendingen** (13. sep. 2026, `fil.send_planlagte()`,
+  `INTERVALL_NOKKEL`/`BARE_ENDRET_NOKKEL`) kjøres av
+  `vaktliste.middleware.FilutsendingMiddleware` — trafikken er klokka, som for
+  backup — og sammenligner `Utsending.innhold_sha256` mot den sist *sendte*; klokka går
+  fra forrige *forsøk*. Middlewaren tas ut under test i `settings.py`, som
+  backup-planleggeren.
 - **Kostbehov/matallergi lagres ikke** (art. 9 — besluttet holdt utenfor portalen), og
   `Mannskap.notat` er unntatt verdilogging i audit (`signals.FELT_UTEN_VERDILOGGING`).
 - **En ledig plass har tre tilstander** (11.–12. sep. 2026): tildelt ett korps

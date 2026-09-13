@@ -316,9 +316,10 @@ Pasienter har Excel, oppdrag går på nødnett. Det som skal overleve at Railway
       `Utsending`, `vaktliste/0016`). Ukryptert etter vurdering (§12 i notatet):
       telefon og ISSI med, ikke e-post/notat/merknad; fast mottakerliste hos admin;
       ved «Sett i drift» og på knapp; hver utsending logget. AHASend fikk vedlegg.
-      - [ ] **Bekreft på staging** at AHASend tar imot vedlegget (første bruk av
-            `attachments` i v2-API-et) og at fila åpner på iPhone (lagre til Filer →
-            Safari) og på PC.
+      - [x] **Bekreftet på staging 13. sep.:** vedlegget kommer fram, fila åpner på
+            iPhone og PC, automatikken kan slås av.
+      - [x] **Intervallsending** (13. sep., `0017`): hvert N. minutt i drift, bare ved
+            endring, via `FilutsendingMiddleware`.
       - [ ] **Personverndokumentasjonen:** utleveringen inn i A.2/A.6, formål
             «reserve ved bortfall av portalen».
 - [ ] **2. Offline drift på `/vaktliste/`, for PC-en som fører drift.** Service worker

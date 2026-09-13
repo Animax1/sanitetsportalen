@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import logging
 import re
+from datetime import timedelta
 
 from django.conf import settings
 from django.core.mail import EmailMessage
@@ -34,6 +35,12 @@ logger = logging.getLogger(__name__)
 
 MOTTAKERE_NOKKEL = 'vaktliste_fil_mottakere'
 VED_DRIFT_NOKKEL = 'vaktliste_fil_ved_drift'
+#: Intervallsending mens lista er i drift (André, 13. sep. 2026): «en
+#: intervall på sending av epost og checkbox, mail sendes bare hvis det er
+#: endringer i vaktlisten». 0 = av.
+INTERVALL_NOKKEL = 'vaktliste_fil_intervall_min'
+BARE_ENDRET_NOKKEL = 'vaktliste_fil_bare_endret'
+MAKS_INTERVALL_MIN = 24 * 60
 
 
 # ── Innstillingene ───────────────────────────────────────────────────────────
@@ -48,6 +55,20 @@ def mottakere() -> list[str]:
 def sendes_ved_drift() -> bool:
     from patients.models import AppSetting
     return AppSetting.get(VED_DRIFT_NOKKEL, '1') == '1'
+
+
+def intervall_minutter() -> int:
+    """Hvor ofte lista sendes på nytt mens den er i drift. 0 = aldri."""
+    from patients.models import AppSetting
+    try:
+        return max(0, int(AppSetting.get(INTERVALL_NOKKEL, '0') or 0))
+    except (TypeError, ValueError):
+        return 0
+
+
+def bare_ved_endring() -> bool:
+    from patients.models import AppSetting
+    return AppSetting.get(BARE_ENDRET_NOKKEL, '1') == '1'
 
 
 def valider_mottakere(raa: str) -> list[str]:
@@ -169,7 +190,8 @@ def send_fil(vaktliste, *, bruker=None, utloest=Utsending.KNAPP, adresser=None) 
     rad = Utsending(
         vaktliste=vaktliste, sendt_av=bruker if getattr(bruker, 'pk', None) else None,
         sendt_av_navn=getattr(bruker, 'username', '') or '',
-        utloest=utloest, mottakere=', '.join(adresser), antall_rader=antall_skift(grupper))
+        utloest=utloest, mottakere=', '.join(adresser), antall_rader=antall_skift(grupper),
+        innhold_sha256=signatur(grupper))
     if not adresser:
         rad.feil = 'Ingen mottakere er satt under portalinnstillingene.'
         rad.save()
@@ -194,6 +216,48 @@ def send_fil(vaktliste, *, bruker=None, utloest=Utsending.KNAPP, adresser=None) 
         rad.feil = str(exc)[:500] or exc.__class__.__name__
     rad.save()
     return rad
+
+
+def signatur(grupper) -> str:
+    """SHA-256 over det fila bærer — ikke over fila, som har «laget»-tida i
+    seg og derfor aldri er lik seg selv."""
+    import hashlib
+    import json
+    return hashlib.sha256(
+        json.dumps(grupper, sort_keys=True, ensure_ascii=False).encode('utf-8')).hexdigest()
+
+
+def send_planlagte(naa=None) -> list:
+    """Intervallsendingen (13. sep. 2026): for hver liste i drift, send på
+    nytt når intervallet er gått siden forrige utsending — og, når admin har
+    satt «bare ved endringer», bare hvis lista har endret seg siden den sist
+    ble *sendt*.
+
+    Forrige utsending teller uansett hva som utløste den og om den gikk: et
+    forsøk som feilet skal ikke gi et nytt forsøk hvert minutt mens
+    e-posttjenesten er nede. Uendret liste gir ingen rad — det er ikke en
+    hendelse, det er fravær av en.
+
+    Returnerer radene som ble skrevet. Kaster ikke.
+    """
+    from . import choices
+    from .models import Vaktliste
+
+    minutter = intervall_minutter()
+    if not minutter or not mottakere():
+        return []
+    naa = naa or timezone.now()
+    ut = []
+    for vl in Vaktliste.objects.filter(status=choices.DRIFT).select_related('vakt'):
+        siste = vl.utsendinger.first()
+        if siste is not None and (naa - siste.created_at) < timedelta(minutes=minutter):
+            continue
+        if bare_ved_endring():
+            sist_sendt = vl.utsendinger.filter(feil='').first()
+            if sist_sendt is not None and sist_sendt.innhold_sha256 == signatur(rader_for(vl)):
+                continue
+        ut.append(send_fil(vl, utloest=Utsending.INTERVALL))
+    return ut
 
 
 def utsending_til_dict(rad):

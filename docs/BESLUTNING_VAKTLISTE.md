@@ -499,3 +499,11 @@ innsjekken likevel, og svaret bærer feilen så vaktleder får vite det der og d
 
 `vaktliste/fil.py` bygger og sender; `templates/vaktliste/fil.html` er fila.
 AHASend-transporten fikk vedlegg for dette (`core/mail_backends.py`).
+
+**Intervall (13. sep. 2026):** admin kan la fila gå på nytt hvert N. minutt mens lista
+er i drift, og bare når lista er endret siden forrige sendte fil. Signaturen er over det
+fila bærer, ikke over fila selv (som har «laget»-tida i seg). Stemplene står ikke i fila
+og er ingen endring. Klokka går fra forrige *forsøk*, så en e-posttjeneste som er nede
+gir ett forsøk per intervall, ikke ett per minutt. Portalen har ingen egen klokke —
+sjekken henger på trafikken, som backup-planleggeren, og under vakt er det alltid
+trafikk.

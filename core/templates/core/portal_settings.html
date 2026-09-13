@@ -66,6 +66,29 @@
         Vaktleder kan alltid sende på knapp fra «Innstillinger» på vaktlista.
         Hver utsending logges.
       </div>
+
+      <hr>
+      <label class="form-label" for="vaktliste_fil_intervall_min">Send på nytt mens lista er i drift</label>
+      <div class="input-group" style="max-width:220px;">
+        <span class="input-group-text">hvert</span>
+        <input type="number" id="vaktliste_fil_intervall_min" name="vaktliste_fil_intervall_min"
+               class="form-control" min="0" max="{{ vaktliste_fil_maks_intervall }}"
+               value="{{ vaktliste_fil_intervall_min }}">
+        <span class="input-group-text">min</span>
+      </div>
+      <div class="form-text">
+        0 slår det av. Sendingen henger på trafikken i portalen og treffer
+        innen et minutt etter intervallet. Klokka går fra forrige utsending,
+        uansett hva som utløste den.
+      </div>
+      <div class="form-check mt-2">
+        <input class="form-check-input" type="checkbox" id="vaktliste_fil_bare_endret"
+               name="vaktliste_fil_bare_endret" value="1"
+               {% if vaktliste_fil_bare_endret %}checked{% endif %}>
+        <label class="form-check-label" for="vaktliste_fil_bare_endret">
+          Bare hvis vaktlista er endret siden forrige utsending
+        </label>
+      </div>
     </div>
   </div>
 

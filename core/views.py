@@ -188,12 +188,24 @@ def portal_settings_view(request):
             messages.error(request, exc.messages[0])
             mottakere = None
         ved_drift = '1' if request.POST.get('vaktliste_fil_ved_drift') else '0'
+        # Intervallet (13. sep. 2026): 0 = av, ellers minutter mellom
+        # utsendinger mens lista er i drift. Tomt felt leses som 0.
+        bare_endret = '1' if request.POST.get('vaktliste_fil_bare_endret') else '0'
+        intervall_raa = (request.POST.get('vaktliste_fil_intervall_min') or '0').strip()
+        try:
+            intervall = int(intervall_raa)
+            if not 0 <= intervall <= vaktliste_fil.MAKS_INTERVALL_MIN:
+                raise ValueError
+        except (TypeError, ValueError):
+            messages.error(request, f'Intervallet må være et helt tall mellom 0 og '
+                                    f'{vaktliste_fil.MAKS_INTERVALL_MIN} minutter.')
+            intervall = None
         try:
             timer = int(raa)
         except (TypeError, ValueError):
             messages.error(request, 'Sesjonstimeout må være et helt tall.')
         else:
-            if mottakere is None:
+            if mottakere is None or intervall is None:
                 pass
             elif not 1 <= timer <= 24:
                 messages.error(
@@ -219,6 +231,8 @@ def portal_settings_view(request):
                     AppSetting.set('session_timeout_hours', timer)
                     AppSetting.set(vaktliste_fil.MOTTAKERE_NOKKEL, '\n'.join(mottakere))
                     AppSetting.set(vaktliste_fil.VED_DRIFT_NOKKEL, ved_drift)
+                    AppSetting.set(vaktliste_fil.INTERVALL_NOKKEL, intervall)
+                    AppSetting.set(vaktliste_fil.BARE_ENDRET_NOKKEL, bare_endret)
                     messages.success(request, 'Portalinnstillingene er lagret.')
                     return redirect('core:portal_settings')
 
@@ -233,6 +247,9 @@ def portal_settings_view(request):
         'session_timeout_hours': timer,
         'vaktliste_fil_mottakere': '\n'.join(vaktliste_fil.mottakere()),
         'vaktliste_fil_ved_drift': vaktliste_fil.sendes_ved_drift(),
+        'vaktliste_fil_intervall_min': vaktliste_fil.intervall_minutter(),
+        'vaktliste_fil_bare_endret': vaktliste_fil.bare_ved_endring(),
+        'vaktliste_fil_maks_intervall': vaktliste_fil.MAKS_INTERVALL_MIN,
     })
 
 

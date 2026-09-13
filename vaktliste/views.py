@@ -160,6 +160,8 @@ def _vaktliste_til_dict(vl):
         'siste_utsending': fil.utsending_til_dict(vl.utsendinger.first()),
         'fil_mottakere': len(fil.mottakere()),
         'fil_ved_drift': fil.sendes_ved_drift(),
+        'fil_intervall_min': fil.intervall_minutter(),
+        'fil_bare_endret': fil.bare_ved_endring(),
     }
 
 

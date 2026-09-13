@@ -134,6 +134,9 @@ MIDDLEWARE = [
     'accounts.middleware.MustChangePasswordMiddleware',
     'accounts.middleware.DynamicSessionTimeoutMiddleware',
     'patients.middleware.BackupSchedulerMiddleware',
+    # Intervallsending av vaktlista som fil (13. sep. 2026) — samme klokke
+    # som backup-planleggeren: trafikken driver den.
+    'vaktliste.middleware.FilutsendingMiddleware',
     'patients.middleware.SecurityHeadersMiddleware',
     'patients.middleware.RequestMetricsMiddleware',
 ]
@@ -250,8 +253,12 @@ if _RUNNING_TESTS:
     # En flaky suite er verre enn ingen suite: den lærer deg å kjøre om igjen
     # i stedet for å lese. Planleggeren testes direkte i patients-testene, så
     # ingenting mistes ved å ta den ut her.
+    # Intervallsendingen av vaktlista ut av samme grunn: en bakgrunnstråd som
+    # sender e-post midt i en test som ikke handler om det. Den testes direkte
+    # i vaktliste/tests_fil.py.
     MIDDLEWARE = [m for m in MIDDLEWARE
-                  if m != 'patients.middleware.BackupSchedulerMiddleware']
+                  if m not in ('patients.middleware.BackupSchedulerMiddleware',
+                               'vaktliste.middleware.FilutsendingMiddleware')]
 
 # ── Internasjonalisering ──────────────────────────────────────────────────────
 LANGUAGE_CODE = 'nb'
