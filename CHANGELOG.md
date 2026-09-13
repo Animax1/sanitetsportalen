@@ -4,6 +4,16 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-13 — Sikkerhetssjekk utenfra: `scripts/sikkerhetssjekk.py`
+
+Et script som kjøres fra en PC mot staging (runbook §14). Bare standardbiblioteket.
+Anonymt: HTTPS-omdirigering, HSTS, CSP, X-Content-Type-Options, rammesperre,
+Referrer-Policy, cookieflagg, 64 sider og API-er som skal være stengt uten
+innlogging, 14 skriveendepunkter uten CSRF, rate-limiting på innlogging, egen
+404, Django-admin og kjente filer. Med `--admin/--leser/--enhet`: rollegrensene,
+sesjonsfiksering, utlogging med POST, at gammel sesjons-ID dør, og konfigsjekken
+fra server-status. Kjørt lokalt mot en dev-server som kontroll av selve scriptet.
+
 ## 2026-09-13 — Rate-limiting var av i prod: `RATELIMIT_ENABLE=true` ble lest som False
 
 Funnet av konfigsjekken på server-status, første kvelden den var oppe: kortet sa

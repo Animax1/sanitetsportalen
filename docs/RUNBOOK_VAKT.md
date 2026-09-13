@@ -559,4 +559,28 @@ skjer via to kilder:
 
 ---
 
-*Sist oppdatert: 05.06.2026*
+## 14. Sikkerhetssjekk utenfra — `scripts/sikkerhetssjekk.py`
+
+**Når:** før en vakt, etter en deploy som rører innlogging, hoder eller tilgang, og
+ellers et par ganger i året. Kjøres **mot staging**, fra din PC, i prosjektets venv:
+
+```powershell
+python scripts/sikkerhetssjekk.py https://testportal.sanitet.net
+python scripts/sikkerhetssjekk.py https://testportal.sanitet.net --admin admin --leser kari --enhet bil1
+```
+
+Uten kontoer testes det som kan testes anonymt: HTTPS-omdirigering, HSTS, CSP og de
+andre hodene, cookieflagg, at ingen av portalens sider og API-er svarer 200 uten
+innlogging, CSRF på skriveendepunktene, rate-limiting på innlogging (12 feilede forsøk
+med et tilfeldig brukernavn som ikke finnes), egen 404-side, og at Django-admin og
+kjente filer ikke finnes. Med kontoer testes rollegrensene i tillegg: leseren nektes
+admin-sidene og all skriving, enhetskontoen nektes sentralens oppsett, admin når alt —
+og konfigsjekken fra server-status leses ut rad for rad. Passord og MFA-kode spørres
+det om i terminalen; ingenting lagres.
+
+Alt som står som `FEIL` skal forklares eller fikses. Lim hele utskriften inn i chatten.
+Kjør den ikke mot prod under vakt — rate-limit-testen bruker 11 av IP-bøttas 50 forsøk.
+
+---
+
+*Sist oppdatert: 13.09.2026*

@@ -1478,6 +1478,9 @@ Funnene under er allerede kartlagt, så jobben er avgrenset når den skal gjøre
 
 ## Ferdig ✓
 
+- [x] **Sikkerhetssjekk utenfra (13. sep. 2026).** `scripts/sikkerhetssjekk.py`, runbook §14.
+      - [ ] **Krever Andre:** kjør scriptet mot staging med admin-, leser- og enhetskonto og lim
+            inn rapporten. Statisk gjennomgang av koden pågår parallelt.
 - [x] **Server-status utvidet (13. sep. 2026).** Minne nå + topp, offsite, disk,
       database (svartid, tilkoblinger), vaktbildet, tregeste stier, konfigsjekk,
       innlogging siste time, cron-jobbenes siste kjøring, e-posttransport. Feature-flagg-kortet
