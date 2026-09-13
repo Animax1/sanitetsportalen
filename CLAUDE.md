@@ -152,7 +152,7 @@ skjemainnsending — hører tellingen hjemme inne i viewet, ved siden av den sje
 
 Bremsen faller åpen ved cache-feil, med vilje. Både `RATELIMIT_FAIL_OPEN=True` og
 try/except i `er_rate_limited` trengs — se modulens docstring. Nød-bryter:
-`RATELIMIT_ENABLE=False`.
+`RATELIMIT_ENABLE=false` (leses uavhengig av store og små bokstaver — `_env_bool` i `settings.py`; `== 'True'` hadde rate-limitingen av i prod til 13. sep. 2026).
 
 ### Idempotens (core/idempotency.py)
 

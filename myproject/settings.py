@@ -14,7 +14,23 @@ load_dotenv()
 # ── Grunnleggende ────────────────────────────────────────────────────────────
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-DEBUG = os.environ.get('DEBUG', 'False') == 'True'
+
+
+def _env_bool(navn, default):
+    """Boolsk miljøvariabel, uavhengig av store og små bokstaver.
+
+    Fram til 13. sep. 2026 sto det `== 'True'` her — og Railway hadde
+    `RATELIMIT_ENABLE=true`, slik dokumentasjonen sa. Da ble verdien False, og
+    rate-limitingen var av i prod uten at noe meldte fra. Konfigsjekken på
+    server-status fant det. Alt som ligner på ja er ja; alt annet er nei.
+    """
+    verdi = os.environ.get(navn)
+    if verdi is None or verdi.strip() == '':
+        return default
+    return verdi.strip().lower() in ('1', 'true', 'yes', 'on', 'ja')
+
+
+DEBUG = _env_bool('DEBUG', False)
 
 # SECRET_KEY signerer sesjonscookies, CSRF-tokens og MFA trust-cookies. Kjører
 # produksjon på en kjent nøkkel, kan sesjoner og MFA-cookies forfalskes.
@@ -339,9 +355,9 @@ else:
 # Bruk django-ratelimit. Grensene ligger to steder: innlogging og MFA i
 # accounts/views.py (N4), alle andre endepunkter i core/ratelimit.py (S3).
 RATELIMIT_VIEW = 'accounts.views.ratelimited_view'
-# Nød-bryter: sett RATELIMIT_ENABLE=False i miljøvariabler for å slå av rate-limiting
+# Nød-bryter: sett RATELIMIT_ENABLE=false i miljøvariabler for å slå av rate-limiting
 # uten å deploye (f.eks. ved event der mange kobler seg på samme wifi).
-RATELIMIT_ENABLE = os.environ.get('RATELIMIT_ENABLE', 'True') == 'True'
+RATELIMIT_ENABLE = _env_bool('RATELIMIT_ENABLE', True)
 
 # Fall åpent hvis cachen ikke svarer. Pakkens default er å svare 429 på alt i
 # den situasjonen; her ville det stanset pasientregistrering under vakt fordi
@@ -380,7 +396,7 @@ EMAIL_HOST = os.environ.get('EMAIL_HOST', '')
 EMAIL_PORT = int(os.environ.get('EMAIL_PORT', '587'))
 EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER', '')
 EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD', '')
-EMAIL_USE_TLS = os.environ.get('EMAIL_USE_TLS', 'True') == 'True'
+EMAIL_USE_TLS = _env_bool('EMAIL_USE_TLS', True)
 
 # Uten denne arver smtplib Pythons globale socket-timeout, som er None —
 # altså uendelig. AdminEmailHandler sender *synkront, i requestens egen tråd*.

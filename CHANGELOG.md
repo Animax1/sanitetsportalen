@@ -4,6 +4,24 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-13 — Rate-limiting var av i prod: `RATELIMIT_ENABLE=true` ble lest som False
+
+Funnet av konfigsjekken på server-status, første kvelden den var oppe: kortet sa
+`RATELIMIT_ENABLE: False`, Railway sa `true`. `settings.py` leste variabelen med
+`== 'True'` — stor T — mens README, runbook og Railway skrev `true`. Dermed har
+rate-limitingen på innlogging, MFA og API-ene vært **av** i prod så lenge
+variabelen har stått slik.
+
+- `_env_bool(navn, default)` i `settings.py` leser boolske variabler uavhengig
+  av store og små bokstaver (`1/true/yes/on/ja` er ja, alt annet nei, tom eller
+  manglende gir default). Brukes for `DEBUG`, `RATELIMIT_ENABLE` og
+  `EMAIL_USE_TLS` — alle tre hadde samme feil. `DEBUG=true` ga False, som var
+  ufarlig; `EMAIL_USE_TLS=true` ga False, som ville skrudd av TLS mot SMTP
+  (brukes bare lokalt).
+- `myproject/tests_env_bool.py` låser regelen.
+- Ingen migrasjon. Etter deploy skal konfigsjekken vise `RATELIMIT_ENABLE: True`
+  uten at noe endres i Railway.
+
 ## 2026-09-13 — Server-status: ni nye mål på /portal-admin/server-status/
 
 Ingen migrasjon. Gjennomgangen av dashbordet etter reserve 3 fant at det målte

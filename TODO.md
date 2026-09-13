@@ -1482,6 +1482,7 @@ Funnene under er allerede kartlagt, så jobben er avgrenset når den skal gjøre
       database (svartid, tilkoblinger), vaktbildet, tregeste stier, konfigsjekk,
       innlogging siste time, cron-jobbenes siste kjøring, e-posttransport. Feature-flagg-kortet
       og flagg-endepunktet er fjernet. Se CHANGELOG.
+      - [x] Første funn: `RATELIMIT_ENABLE=true` ble lest som False (13. sep. 2026, se CHANGELOG).
       - [ ] **Krever Andre:** etter deploy, åpne `/portal-admin/server-status/` i prod
             og se at konfigsjekk-kortet sier «alt OK» og at offsite står grønt. Cron-radene
             står «Aldri» til hver jobb har kjørt én gang etter deployen — sjekk igjen
