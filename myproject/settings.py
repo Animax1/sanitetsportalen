@@ -170,7 +170,14 @@ DATABASES = {
 # Samme mønster som SECRET_KEY-sjekken over: en feilkonfigurasjon i prod skal
 # stoppe oppstarten høylytt og med én gang. Sjekken henger på
 # `RAILWAY_ENVIRONMENT` og ikke på `DEBUG` — utenfor Railway er SQLite lov.
+#
+# **Ett unntak, og det er navngitt:** `verifiser_backup` lager en engangsbase for
+# å laste backupfilene inn i den og telle radene. Den kjører underprosesser med
+# `PORTAL_ENGANGSBASE=1`, og en flyktig SQLite-fil er nettopp det den vil ha —
+# den skal aldri bli portalens base, og slettes når kommandoen er ferdig.
+# Flagget settes av den ene kommandoen og skal aldri stå på en tjeneste.
 if (os.environ.get('RAILWAY_ENVIRONMENT')
+        and not os.environ.get('PORTAL_ENGANGSBASE')
         and 'sqlite' in DATABASES['default'].get('ENGINE', '')):
     raise ImproperlyConfigured(
         'DATABASE_URL mangler eller er ugyldig — Django falt tilbake til '

@@ -346,6 +346,29 @@ opp på `/portal-admin/backup/`. Kommandoen rører ikke basen.
 Svarer den «Kunne ikke dekryptere: feil OFFSITE_BACKUP_KEY», er nøkkelen i Railway en
 annen enn den fila ble kryptert med. Sjekk mot passordbehandleren.
 
+### Er backupen ekte? (`verifiser_backup`)
+
+En backup ingen har gjenopprettet er en hypotese. Denne kommandoen laster filene
+som faktisk ligger på volumet inn i en **engangsbase**, og sammenligner radene
+mot det filene inneholder. Den rører ingenting: alt skjer i en flyktig
+SQLite-fil i en midlertidig mappe, som slettes etterpå.
+
+```powershell
+railway ssh --service web -- python manage.py verifiser_backup
+railway ssh --service web -- python manage.py verifiser_backup --full
+```
+
+Den første tar modulfilene i rekkefølge, den andre den hele databasefila alene.
+Svarer den «N modell(er) kom tilbake med nøyaktig samme antall rader», er
+filene gjenopprettbare. Svarer den «avvik», er de det ikke — og da vet du det
+**før** du trenger dem.
+
+Advarselen «inneholder ingen rader» er verdt å lese: enten er modulen tom, eller
+så ble fila tatt før dataene fantes. En tom fil er ikke en bestått prøve.
+
+Kjør den **etter første backup i en ny vakt**, og gjerne som en del av
+kontrollen under. Den tar noen sekunder.
+
 ### Gjenoppretting fra kommandolinja
 
 `hent_offsite` henter fila. **`gjenopprett` er den som rører basen** (13. sep. 2026) —

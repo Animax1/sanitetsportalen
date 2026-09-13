@@ -4,6 +4,52 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-13 — Backup fase 6: `verifiser_backup`
+
+En backup ingen har gjenopprettet er en hypotese. Suiten har hatt en test som
+gjenoppretter alle filene i rekkefølge siden fase 3, men den bruker syntetiske
+data og svarer på om *koden* virker. `verifiser_backup` tar **filene som
+faktisk ligger på volumet**, laster dem inn i en engangsbase, og sammenligner
+radene mot det filene inneholder — modell for modell.
+
+Den rører ingenting. Alt skjer i en flyktig SQLite-fil i en midlertidig mappe
+som slettes etterpå, og backupfilene kopieres dit først, så
+pre-restore-øyeblikksbildene gjenopprettingen lager havner i søpla og ikke
+blant de ekte backupene.
+
+**Den kaller `gjenopprett`, ikke `restore_backup`.** Da er det kommandoen man
+faktisk ville kjørt i en katastrofe som er prøvd, ikke en nabo til den.
+
+To ting den lærte underveis, begge om å ikke lyve:
+
+- **En tom fil er ikke en bestått prøve.** Første kjøring sa «6 modeller kom
+  tilbake» om et sett der arkivfilene ikke inneholdt en eneste rad. Nå står det
+  hvor mange objekter hver fil har, og en tom fil får en egen advarsel: enten er
+  modulen tom, eller så ble fila tatt før dataene fantes.
+- **Gjenopprettingen skriver sin egen auditrad**, og i den hele fila er
+  `audit.AuditLog` med i slettelista. Basen skal altså ha én rad *mer* enn fila,
+  og det er riktig. Sammenlignet strengt meldte prøven avvik på noe som
+  fungerte akkurat som det skulle — og en prøve som roper ulv blir ikke lest
+  neste gang.
+
+`PORTAL_ENGANGSBASE=1` er en ny, navngitt åpning i `settings.py`: sjekken som
+ellers nekter SQLite på Railway slipper engangsbasen gjennom, så kommandoen kan
+kjøres **der filene er**, uten en ekstra databaseserver og uten å lage baser ved
+siden av produksjonsdata. Flagget settes av den ene kommandoen og skal aldri stå
+på en tjeneste.
+
+Testene kjører ekte underprosesser mot en ekte engangsbase — tregere enn resten
+av suiten, og det er poenget: det er nettopp underprosessen og filstien som skal
+prøves. Én av dem ødelegger en fil med vilje og krever at prøven ser det; uten
+den ville «alt kom tilbake» bare betydd «noe kom tilbake».
+
+Runbooken §8b sier når kommandoen skal kjøres: etter første backup i en ny vakt.
+
+Verifisert: 2618 tester grønne på SQLite og PostgreSQL 16, og kommandoen kjørt
+mot ekte filer — normalveien, den hele fila, en ødelagt fil og en tom.
+
+---
+
 ## 2026-09-13 — Backup fase 5: gjenoppretting fra kommandolinja
 
 `manage.py gjenopprett` finnes nå. Veien fantes ikke før: `hent_offsite` henter

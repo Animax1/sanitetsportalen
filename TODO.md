@@ -426,11 +426,21 @@ bindende: 1 før 2, fordi backupen speiler hvor modellene bor.
             Runbooken §8b har fått hele katastrofeprosedyren, inkludert at
             `purge_old_logs` og `kollaps_arkiv` skal kjøres rett etterpå.
             2608 tester grønne på SQLite og PostgreSQL.
-      - [ ] **Fase 6 — `verifiser_backup`.** Engangsbase som
-            `verifiser_migrasjoner`, laster de nyeste filene i rekkefølge og
-            skriver radtall — altså på kommando, mot ekte data, når som helst.
-            Selve *testen* fra `BACKUP.md` §3.6 er levert i fase 3
-            (`AlleFileneGjenopprettesTests`), og kjørt mot PostgreSQL.
+      - [x] **Fase 6 — `verifiser_backup` (13. sep. 2026).** Laster filene
+            som faktisk ligger på volumet inn i en engangs-SQLite-base og
+            sammenligner radene mot det filene inneholder, modell for modell.
+            Rører ingenting: basen og mappa slettes etterpå, og filene kopieres
+            dit først så pre-restore-øyeblikksbildene ikke havner blant de ekte
+            backupene. `--full`, `--modul`, `--behold`.
+            Kaller `gjenopprett`, ikke `restore_backup` — da er det veien man
+            faktisk ville brukt i en katastrofe som er prøvd.
+            **En tom fil gir advarsel**, ikke grønt: «alt kom tilbake» skal
+            ikke stå for en modul som ikke hadde noe å komme tilbake med.
+            Auditraden gjenopprettingen selv skriver telles ikke som avvik.
+            `PORTAL_ENGANGSBASE=1` er en navngitt åpning i `settings.py`-sjekken
+            som ellers krever PostgreSQL på Railway — så kommandoen kan kjøres
+            der filene er. Runbooken §8b sier når den skal kjøres.
+            2618 tester grønne på SQLite og PostgreSQL.
       - [ ] **Fase 7 — oppbevaringstidene i bucketen `sanitetsportalen`**
             (`PLAN_BACKUP_OMLEGGING.md` §7, **krever Andre**). Regelen står i dag på **730 dager med scope «alle objekter
             i bucketen»**, bekreftet 13. sep. Den må derfor snevres inn til prefikset

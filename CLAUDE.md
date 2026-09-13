@@ -298,7 +298,16 @@ som rører basen** (`--list`, `--siste <modul>`, `--hent <objekt>`, `--full`,
 der det ikke er noen å logge inn som. `--ja` er nødvendig og ikke bekvemt:
 `railway ssh -- <kommando>` har ingen terminal, så et spørsmål ville hengt.
 **Auditraden skrives av `restore_backup`, ikke av viewet**, slik at begge
-inngangene etterlater nøyaktig én rad med hvem og hvorfra. S3 mockes i
+inngangene etterlater nøyaktig én rad med hvem og hvorfra.
+
+**`verifiser_backup` laster filene som ligger på volumet inn i en engangsbase**
+og sammenligner radene mot det filene inneholder — suiten svarer på om koden
+virker, denne på om *innholdet* gjør det. Engangsbasen er en flyktig SQLite-fil
+i en midlertidig mappe, og `PORTAL_ENGANGSBASE=1` er den ene, navngitte
+åpningen i `settings.py`-sjekken som ellers krever PostgreSQL på Railway.
+Filene kopieres dit først, så pre-restore-øyeblikksbildene havner i søpla.
+Kommandoen kaller `gjenopprett`, ikke `restore_backup`: da er det veien man
+faktisk ville brukt som er prøvd, ikke en nabo til den. S3 mockes i
 `core/tests_offsite.py` ved å bytte ut `_klient`. Nøkkelen skal også ligge i en
 passordbehandler — uten den er bucketen uleselig, og det er meningen.
 
