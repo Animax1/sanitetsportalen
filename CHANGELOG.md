@@ -4,6 +4,40 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-13 — Prodtest av sikkerhetsrundene: fire funn rettet
+
+Ingen migrasjon. Andrés prodtest på staging av runde 1 og 2 ga 39 OK og 0 FEIL i
+scriptet, og fire ting på sidene:
+
+- **Fanikonet er merket på blått igjen** (`logo.svg`, samme fil som PWA-ikonet).
+  Den lyse utgaven uten bakgrunn fra 12. sep. er tatt bort («Jeg bruker mørk modus
+  og det er en mørk blå bakgrunn som var der før. Jeg vil ha det slik det var.»).
+  `Clear-Site-Data` står på 302-svaret fra «Logg ut» og var riktig — det er
+  innloggingssiden DevTools viser etterpå.
+- **Sentralbordet ved første besøk** (3.1): «Laster…» sto tomt. Oppstarten var fire
+  kall på rad uten feilhåndtering — feilet ett, tegnet ingen noe, og pollingen ble
+  aldri satt. `oppstart()` tegner nå listene uansett («Kunne ikke hente lista —
+  prøver igjen om 30 sekunder» til første henting lykkes; tom og ikke hentet er to
+  ulike ting), og `setInterval` står i `finally`.
+- **Bilen: «venter på dekning» først etter 3 sekunder** (3.4). Trykket legges i
+  køen før det sendes, og meldingen kom opp i det halve sekundet sendingen tok —
+  også med full dekning. `visUsendt()` venter til eldste rad i køen er
+  `USENDT_VENTETID_MS` gammel, og kommer tilbake av seg selv når fristen er ute.
+- **Korps-føreren uten badge** (4.1): admin koblet fra hennes egen mannskapsrad, og
+  sida sa «Mannskapsregisteret er tomt» — meldingen leste lista over dem hun får
+  *sette* (tom uten badge), ikke registeret hun *ser* (alle korps). Nå leser den
+  registeret (`registeretErTomt`), og sida sier hvorfor hun ikke får redigere:
+  «Kontoen din er ikke knyttet til et korps. Du ser alle korps, men kan bare føre
+  ditt eget» (`mangler_badge`). Varselet fantes bare for `les`.
+- **E-postkoblingen er leder og global admin** (M5, snevret): `skriv_full` lagrer
+  e-posten uten å koble, som korps-føreren. Den som bemanner skal ikke velge
+  hvilken konto som blir hvem; merket sier at kontoen finnes, og lederen kobler.
+  `tests_registre` og `tests_sikkerhet_runde1` bruker `skriv_leder` der de
+  forutsatte kobling.
+
+Tester: `oppdrag/tests_prodtest_13sep.py` (oppstarten og fristen, i node) og
+`vaktliste/tests_prodtest_13sep.py` (badge-varselet, koblingen, `registeretErTomt`).
+
 ## 2026-09-13 — Sikkerhetsgjennomgangen, runde 2: 9 funn rettet
 
 Ingen migrasjon. Numrene viser til `docs/SIKKERHETSGJENNOMGANG_2026-09-13.md`.

@@ -110,7 +110,9 @@ bare `koblingsrad`. Bilen kan hente og endre ethvert oppdrag den har vært på i
 den flytter en badge, men `_koble_paa_epost` kjører for alle med `kan_fore_korps`: en
 `skriv_handling`-bruker kan skrive e-posten til en hvilken som helst ledig portalkonto på
 en person i eget korps, og kontoen arver korpset. **Fiks:** autokoble bare for admin og
-`kan_skrive_alt`; ellers lagre e-posten uten kobling.
+`kan_skrive_alt`; ellers lagre e-posten uten kobling. *Snevret samme kveld etter prodtest
+4.1 til `kan_lede` — leder og global admin — på Andrés ord («Fiks alt inkludert
+kobling»).*
 
 ### M6. Enhetskontoer ser hele flåtens aktive oppdrag gjennom enhetslista
 `oppdrag/views.py:142-203`. `enheter_view` er `les` uten enhetskonto-sjekk: bilen får

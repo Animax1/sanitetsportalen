@@ -109,6 +109,12 @@ def _tilgangskontekst(user):
         # En tom liste uten forklaring ser ut som en vakt ingen har satt opp.
         'ser_alle_korps': services.ser_alle_korps(user),
         'mitt_korps_navn': korps.navn if korps else '',
+        # Korps-føreren ser alle korps, men fører bare sitt eget — og uten
+        # badge fører hun ingen. Da må sida si det (André, 13. sep. 2026:
+        # «nå kan jeg ikke redigere noen av mine mannskaper»). Admin og
+        # `skriv_full`+ står utenfor badgen.
+        'mangler_badge': (korps is None and not services.kan_skrive_alt(user)
+                          and nivaa_for(user, 'vaktliste') == 'skriv_handling'),
     }
 
 

@@ -133,6 +133,14 @@
       vaktlista koble kontoen til mannskapsraden din.
     </div>
     {% endif %}
+  {% elif mangler_badge %}
+    {# Korps-føreren uten badge (13. sep. 2026): hun ser alle korps, men kan ikke føre noen. #}
+    <div id="vl-korpsfilter" class="alert alert-warning py-2">
+      <i class="bi bi-person-x me-1"></i><strong>Kontoen din er ikke knyttet
+      til et korps.</strong> Du ser alle korps, men kan bare føre ditt eget —
+      og uten kobling i mannskapsregisteret kan du ikke redigere noen. Be den
+      som administrerer vaktlista koble kontoen til mannskapsraden din.
+    </div>
   {% endif %}
 
   <div id="vl-mangler-mannskap" class="alert alert-warning d-none">

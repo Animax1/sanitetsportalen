@@ -220,15 +220,46 @@ function skjulFeil() {
 }
 
 
+//: Så lenge en stempling får være underveis før skjermen sier «venter på
+//: dekning». Trykket legges i køen før det sendes, og meldingen kom derfor
+//: opp i det halve sekundet sendingen tok — også med full dekning (André,
+//: 13. sep. 2026: «3 sekunder delay?»).
+const USENDT_VENTETID_MS = 3000;
+let usendtTimer = null;
+
+
+function usendtAlder(ko, naaMs) {
+  // Alderen på den eldste raden i køen, i ms. En rad uten lesbar tid regnes
+  // som gammel nok — meldingen skal heller komme for tidlig enn aldri.
+  let eldst = 0;
+  for (const rad of ko) {
+    const t = Date.parse(rad.klienttid);
+    const alder = Number.isFinite(t) ? naaMs - t : Infinity;
+    if (alder > eldst) eldst = alder;
+  }
+  return eldst;
+}
+
+
 function visUsendt() {
   // Egen, roligere tone enn `visFeil`: dette er ikke en feil, det er en
   // stempling som venter på dekning. Men den MÅ synes — §6: en knapp som ser
   // ut til å ha virket, men ikke har det, er verre enn en som feiler synlig.
-  const antall = koLes().length;
+  const ko = koLes();
+  const antall = ko.length;
   const el = document.getElementById('enhet-usendt');
   if (!el) return;
+  if (usendtTimer) { clearTimeout(usendtTimer); usendtTimer = null; }
   if (!antall) {
     el.classList.add('d-none');
+    return;
+  }
+  const alder = usendtAlder(ko, Date.now());
+  if (alder < USENDT_VENTETID_MS) {
+    // Sendingen kan fortsatt lykkes. Kom tilbake når fristen er ute — går
+    // køen tom før det, skjuler `renderAlt()` meldingen som før.
+    el.classList.add('d-none');
+    usendtTimer = setTimeout(visUsendt, USENDT_VENTETID_MS - alder);
     return;
   }
   el.textContent = antall === 1

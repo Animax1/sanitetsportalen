@@ -298,8 +298,7 @@ async function lastListe(id) {
   const velger = document.getElementById('vaktliste-velger');
   if (velger) velger.value = String(id);
 
-  document.getElementById('vl-mangler-mannskap')
-    ?.classList.toggle('d-none', (aktivListe.mannskap || []).length > 0);
+  tegnManglerMannskap();
 
   fyllNedtrekk();
   tegn();
@@ -316,7 +315,25 @@ async function lastRegister() {
   register = (await res.json()).data;
   register.alle_mannskap = register.mannskap;
   brukKorpsfilter();
+  tegnManglerMannskap();
   tegn();
+}
+
+
+function registeretErTomt(reg) {
+  // **Registeret, ikke lista i vakta.** `aktivListe.mannskap` er dem
+  // brukeren får *sette* (`mannskap_brukeren_kan_sette`) — for korps-føreren
+  // uten badge er den tom, mens registeret hun *ser* har alle korps. Sida sa
+  // «Mannskapsregisteret er tomt» til henne (André, 13. sep. 2026), og det
+  // var det ikke. Til registeret er hentet, vet vi ingenting: ingen melding.
+  if (!reg || !Array.isArray(reg.alle_mannskap || reg.mannskap)) return false;
+  return (reg.alle_mannskap || reg.mannskap).length === 0;
+}
+
+
+function tegnManglerMannskap() {
+  document.getElementById('vl-mangler-mannskap')
+    ?.classList.toggle('d-none', !registeretErTomt(register));
 }
 
 

@@ -166,22 +166,24 @@ class AlleSiderLenkerTilManifestetTests(TestCase):
 
 
 class FanikonOgVisPassordTests(TestCase):
-    """Fanen og «vis passord» på innloggingssiden var svarte (André, 12. sep.
-    2026). Fanikonet er en lys utgave av merket uten bakgrunn — merket på
-    blått ble en mørk flekk i en mørk fanelinje — og «vis passord» er
-    portalens egen, lyse knapp, ikke nettleserens svarte øye."""
+    """«Vis passord» på innloggingssiden var svart (André, 12. sep. 2026), og
+    er portalens egen, lyse knapp, ikke nettleserens svarte øye.
 
-    def test_fanikonet_er_lyst_og_uten_bakgrunn(self):
-        svg = (Path(settings.BASE_DIR) / 'static/img/favicon.svg').read_text(encoding='utf-8')
-        self.assertNotIn('<rect', svg, 'ingen bakgrunnsflate — fanelinjen er bakgrunnen')
-        self.assertIn('fill="#ffffff"', svg, 'skjoldet er hvitt')
-        farger = set(re.findall(r'#[0-9a-fA-F]{6}', svg))
-        self.assertEqual(farger, {'#0f3460', '#8fb3f0', '#ffffff'}, farger)
+    Fanikonet er **merket på blått**, samme fil som PWA-ikonet. En lys utgave
+    uten bakgrunn (`favicon.svg`) ble prøvd samme dag og tatt tilbake 13. sep.
+    («Jeg bruker mørk modus og det er en mørk blå bakgrunn som var der før.
+    Jeg vil ha det slik det var.»)."""
 
-    def test_fanen_bruker_fanikonet_og_merket_staar_i_manifestet(self):
+    def test_fanen_bruker_merket_paa_blaatt(self):
         partial = (Path(settings.BASE_DIR) / 'templates/partials/_ikoner.html').read_text(encoding='utf-8')
-        self.assertIn("rel=\"icon\" href=\"{% static 'img/favicon.svg' %}\"", partial)
-        self.assertIn('img/logo.svg', [i[0] for i in IKONER], 'PWA-ikonet er fortsatt merket på blått')
+        self.assertIn("rel=\"icon\" href=\"{% static 'img/logo.svg' %}\"", partial)
+        self.assertNotIn('favicon.svg', partial)
+        self.assertFalse((Path(settings.BASE_DIR) / 'static/img/favicon.svg').exists(),
+                         'den lyse utgaven er tatt bort — ellers blir den liggende uten leser')
+        svg = (Path(settings.BASE_DIR) / 'static/img/logo.svg').read_text(encoding='utf-8')
+        self.assertIn('<rect', svg, 'bakgrunnsflaten er det André vil ha tilbake')
+        self.assertIn('fill="#0f3460"', svg)
+        self.assertIn('img/logo.svg', [i[0] for i in IKONER], 'PWA-ikonet er merket på blått')
 
     def test_innloggingssiden_har_egen_vis_passord_knapp(self):
         res = Client().get('/accounts/login/')

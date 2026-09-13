@@ -18,7 +18,8 @@ SW_JS = JS_DIR / 'vaktliste-sw.js'
 @override_settings(SECURE_SSL_REDIRECT=False, RATELIMIT_ENABLE=False)
 class AutokoblingKreverUtdelerTests(TestCase):
     """M5: e-postkoblingen flytter en badge, og bare den som kan dele ut
-    badger utløser den."""
+    badger utløser den. Først `skriv_full`+; snevret til leder og admin
+    samme kveld (`tests_prodtest_13sep.py`)."""
 
     def setUp(self):
         self.korps = Korps.objects.create(navn='Haugesund', kortnavn='HGSD')
@@ -27,7 +28,7 @@ class AutokoblingKreverUtdelerTests(TestCase):
         self.korpsbruker = _bruker('kb_s', 'skriv_handling')
         Mannskap.objects.create(navn='Fører', korps=self.korps, user=self.korpsbruker)
         self.c_kb = _klient(self.korpsbruker)
-        self.c_vl = _klient(_bruker('vl_s', 'skriv_full'))
+        self.c_vl = _klient(_bruker('vl_s', 'skriv_leder'))
 
     def _opprett(self, klient, navn):
         return klient.post('/vaktliste/api/mannskap/', content_type='application/json',
@@ -41,8 +42,8 @@ class AutokoblingKreverUtdelerTests(TestCase):
         self.assertIsNone(d['user_id'])
         self.assertTrue(d['konto_finnes'], 'merket sier at kontoen finnes — admin kobler')
 
-    def test_vaktlederen_kobler_som_foer(self):
-        d = self._opprett(self.c_vl, 'Kari via vaktleder').json()['data']
+    def test_lederen_kobler_som_foer(self):
+        d = self._opprett(self.c_vl, 'Kari via leder').json()['data']
         self.assertEqual(d['user_id'], self.kari.pk)
 
     def test_redigering_kobler_heller_ikke_for_korpsforeren(self):

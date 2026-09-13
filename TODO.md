@@ -1483,12 +1483,17 @@ Funnene under er allerede kartlagt, så jobben er avgrenset når den skal gjøre
             inn rapporten.
 - [x] **Statisk sikkerhetsgjennomgang (13. sep. 2026)** — `docs/SIKKERHETSGJENNOMGANG_2026-09-13.md`.
       - [x] Runde 1 (H1, H2, H4, M1–M11, L2, L3, L5, L10, L11) — 13. sep. 2026, se CHANGELOG
-            - [ ] **Krever Andre før push til main:** `SECRET_KEY` i Railway (prod og staging) må
-                  være minst 50 tegn — kortere stopper oppstarten nå (L10). Sjekk lengden i Variables.
+            - [x] `SECRET_KEY` i Railway er minst 50 tegn (L10) — André sjekket prod 13. sep. (prodtest 8.1 OK).
       - [x] Runde 2 (H3 vendor CDN + CSP, M12–M16, L1, L13, L14) — 13. sep. 2026, se CHANGELOG.
             M14: brukernavn-røpingen er tettet; låsen er fortsatt global per konto (bevisst — den
             er vernet som ikke hviler på cachen). Utestengelse av andre ved å gjette mot navnet
             deres står under «senere».
+      - [x] Prodtest av runde 1 og 2 på staging (13. sep. 2026): scriptet 39 OK / 0 FEIL.
+            Fire funn på sidene rettet samme kveld — fanikonet tilbake på blått, sentralbordets
+            oppstart, 3 s før «venter på dekning», korps-føreren uten badge — og
+            e-postkoblingen snevret til leder og admin. Se CHANGELOG.
+            - [ ] **Krever Andre:** test de fem på staging (artifacten), så «Backup tatt — push til
+                  main», og prodtest 8.2/8.3 etter deployen.
       - [ ] Senere: L6, L8, L12, L17, L18, L22
 - [x] **Server-status utvidet (13. sep. 2026).** Minne nå + topp, offsite, disk,
       database (svartid, tilkoblinger), vaktbildet, tregeste stier, konfigsjekk,

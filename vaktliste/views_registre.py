@@ -339,8 +339,10 @@ def _koble_paa_epost(request, person):
         return False
     # Koblingen flytter en badge — kontoen arver korpset. Korps-føreren
     # kunne ellers velge hvilken ledig konto som blir hvem i eget korps ved å
-    # skrive e-posten dens (13. sep. 2026, M5). Bare den som kan dele ut.
-    if not (er_global_admin(request.user) or services.kan_skrive_alt(request.user)):
+    # skrive e-posten dens (13. sep. 2026, M5). Først `skriv_full`+; samme
+    # kveld snevret til **leder og global admin** (André: «Fiks alt inkludert
+    # kobling») — den som setter opp vakta, ikke den som bemanner den.
+    if not services.kan_lede(request.user):
         return False
     konto = (_koblbare_kontoer(CustomUser)
              .filter(email__iexact=person.epost, mannskap__isnull=True)
@@ -473,7 +475,7 @@ def mannskap_view(request):
     # (12. sep. 2026); alle andre kobler gjennom e-posten under.
     admin = er_global_admin(request.user)
     if data.get('user_id') and not admin:
-        return _nektet('Kontokobling for hånd er global admin. Legg inn e-posten, så kobles kontoen av seg selv.')
+        return _nektet('Kontokobling for hånd er global admin. Legg inn e-posten, så kobles kontoen av seg selv når en vaktleder lagrer.')
     if data.get('user_id') and _er_adminkonto(_int(data.get('user_id'))):
         return _feil(ADMINKONTO_MELDING)
     try:

@@ -423,9 +423,13 @@ fase 3–7 gjenstår — se `docs/BESLUTNING_VAKTLISTE.md`, som er besluttet i s
   flytter en badge — kontoen arver korpset, og dermed hva den kontoen får redigere. Alle
   andre kobler gjennom **`Mannskap.epost`**: finnes en aktiv, ledig portalkonto med samme
   e-post, kobles den av seg selv ved lagring (`views_registre._koble_paa_epost`) — men
-  **bare når den som lagrer er admin eller `skriv_full`+** (13. sep. 2026): koblingen
-  flytter en badge, og korps-føreren kunne ellers velge hvilken konto som blir hvem i
-  eget korps. Hun lagrer e-posten; merket sier at kontoen finnes.
+  **bare når den som lagrer er `skriv_leder` eller global admin** (13. sep. 2026, M5 —
+  først `skriv_full`+, snevret samme kveld: «Fiks alt inkludert kobling»): koblingen
+  flytter en badge, og den som bemanner skal ikke velge hvilken konto som blir hvem.
+  Alle andre lagrer e-posten; merket sier at kontoen finnes, og lederen kobler.
+  **Korps-føreren uten badge** ser alle korps, men fører ingen — sida sier det
+  (`mangler_badge`), og «Mannskapsregisteret er tomt» leser registeret hun *ser*
+  (`registeretErTomt`), ikke lista over dem hun får sette.
   **Adminkontoer er aldri mannskap** (12. sep. 2026: «Den er utenfor.») —
   `_koblbare_kontoer()` er det ene stedet som sier hvem som kan kobles, og e-postmerket,
   autokoblingen og kontolista leser alle derfra; kobling for hånd til en adminkonto gir
@@ -762,8 +766,8 @@ Noen frittstående sider (`403.html`, `mfa_setup.html`, `mfa_verify.html`, innlo
 laster ingen av dem — de har egen `<style>`-blokk og må overstyre selv.
 
 **Hver mal med eget `<head>` tar med `partials/_ikoner.html`** — manifest, fanikon
-(`favicon.svg`, lys utgave uten bakgrunn — merket på blått var en mørk flekk i fanen),
-apple-touch-icon og `theme-color`. Manifestet er en view (`core/manifest.py`, uten
+(`logo.svg`, merket på blått — en lys utgave uten bakgrunn ble prøvd 12. sep. 2026 og tatt
+tilbake dagen etter), apple-touch-icon og `theme-color`. Manifestet er en view (`core/manifest.py`, uten
 innlogging), ikke en statisk fil, fordi ikonstiene må gjennom `{% static %}`: WhiteNoise
 hasher navnene. Merket i `static/img/logo.svg` er et skjold med en person i, bevisst uten
 kors og uten rødt; PNG-ene rendres med `python scripts/lag_ikoner.py` (Playwright), aldri
@@ -800,8 +804,8 @@ Ti moduler i `static/js/` (ingen bundler), fordelt på fem sider — pasientside
 | `patients-admin.js` | pasientsiden, **kun admin** | Registeradmin, sesjonstimeout, vaktavslutning/-gjenåpning, vaktarkiv |
 | `statistikk.js` | **kun** `/statistikk/` | Pasientstatistikk (Chart.js), arkivmodus, kildefanene |
 | `statistikk-oppdrag.js` | `/statistikk/`, **kun** med oppdragstilgang | Oppdragsfanen. Kall hit fra `statistikk.js` går gjennom `_kallOppdrag('navn')` |
-| `oppdrag-sentral.js` | `/oppdrag/`, kontoer uten enhet | Sentralbordet: enhetsliste, oppdragsliste, tidslinje, lokasjonsadmin |
-| `oppdrag-enhet.js` | `/oppdrag/`, enhetskontoer | Enhetsskjermen: «neste» og statusens andre knapp (Avbryt/Behandlet på sted) mot de navngitte stemplingsendepunktene, offline-køen i `localStorage`, antall-knappene, og **lydvarselet** for ventende oppdrag (`lydTerskler()` leser `OPPDRAG_LYDVARSEL` fra tabellen `Lydvarsel`, hentet på nytt hvert 5. min; `skalPipe()`, `lydTikk()` hvert 5. s; Web Audio, **alltid på** — vekket av det første trykket på siden, `lydErKlar()`; `nyeOppdrag()` + `pipNytt()` for nytt oppdrag om admin ikke har slått det av; tida fra bilens `varslet_at`, og et usendt trykk i køen teller som svart). Serveren sender `neste_overgang`/`alternativ_overgang` per rad; kjeden og alternativene følger med som data kun for å projisere neste steg mens noe ligger usendt |
+| `oppdrag-sentral.js` | `/oppdrag/`, kontoer uten enhet | Sentralbordet: enhetsliste, oppdragsliste, tidslinje, lokasjonsadmin. `oppstart()` tegner listene uansett hva første henting ga (`LASTEFEIL` til den lykkes), og pollingen settes i `finally` |
+| `oppdrag-enhet.js` | `/oppdrag/`, enhetskontoer | Enhetsskjermen: «neste» og statusens andre knapp (Avbryt/Behandlet på sted) mot de navngitte stemplingsendepunktene, offline-køen i `localStorage` (og «venter på dekning» først når eldste rad er 3 s gammel — `usendtAlder`, `USENDT_VENTETID_MS`), antall-knappene, og **lydvarselet** for ventende oppdrag (`lydTerskler()` leser `OPPDRAG_LYDVARSEL` fra tabellen `Lydvarsel`, hentet på nytt hvert 5. min; `skalPipe()`, `lydTikk()` hvert 5. s; Web Audio, **alltid på** — vekket av det første trykket på siden, `lydErKlar()`; `nyeOppdrag()` + `pipNytt()` for nytt oppdrag om admin ikke har slått det av; tida fra bilens `varslet_at`, og et usendt trykk i køen teller som svart). Serveren sender `neste_overgang`/`alternativ_overgang` per rad; kjeden og alternativene følger med som data kun for å projisere neste steg mens noe ligger usendt |
 | `vaktliste.js` | **kun** `/vaktliste/` | Hele vaktlistesiden: **én fane per ressursgruppe**, hver ressurs er et regneark med redigering i raden, «Oversikt» er utskriftslista, «Mannskap» er personellregisteret, og roller, grupper, korps og kompetanser administreres i modaler på siden |
 
 **`data-action` + `data-hendelse` er to lyttere, og bare én skal fyre.** Klikk­delegeringen

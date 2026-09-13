@@ -772,7 +772,9 @@ class EpostkoblingTests(TestCase):
 
     def setUp(self):
         self.korps = Korps.objects.create(navn='Haugesund', kortnavn='HGSD')
-        self.vaktleder = _bruker('vl', 'skriv_full')
+        # Koblingen er leder og admin (13. sep. 2026) — `skriv_full` lagrer
+        # e-posten uten å koble, se `tests_prodtest_13sep.py`.
+        self.vaktleder = _bruker('vl', 'skriv_leder')
         self.admin = _bruker('adm', admin=True)
         self.c_vl = _klient(self.vaktleder)
         self.c_adm = _klient(self.admin)

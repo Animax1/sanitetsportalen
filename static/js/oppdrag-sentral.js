@@ -21,6 +21,11 @@ let enhetsadmin = [];
 // nær null selv med mange pålogget.
 let etagEnheter = null;
 let etagOppdrag = null;
+//: Om første henting har lykkes. Til da viser listene «kunne ikke hente»,
+//: ikke «ingen enheter på vakt» — tom og ikke hentet er to ulike ting
+//: (André, 13. sep. 2026: plassholderne sto tomme ved første besøk).
+let enheterHentet = false;
+let oppdragHentet = false;
 
 // **Besetningen er vaktlistas data, lånt inn** (§6 i vaktlistenotatet).
 // Oppdragsmodulen importerer ikke vaktlista i Python — koblingen ligger her,
@@ -1697,6 +1702,7 @@ async function lastEnheter() {
   if (!res.ok) return false;
   etagEnheter = res.headers.get('ETag');
   enheter = (await res.json()).data || [];
+  enheterHentet = true;
 
   // **Bufferet tømmes bare når noe faktisk endret seg** — etter 304-sjekken,
   // ikke før. Tømte vi det på hver runde, ville et åpent panel stått på
@@ -1719,6 +1725,7 @@ async function lastOppdrag() {
   if (!res.ok) return false;
   etagOppdrag = res.headers.get('ETag');
   oppdragsliste = (await res.json()).data || [];
+  oppdragHentet = true;
   return true;
 }
 
@@ -1770,11 +1777,50 @@ function visManglendeOppsett() {
 }
 
 
+//: Plassholderen mens første henting mangler. Sida poller hvert 30. sekund,
+//: så meldingen sier hva som skjer videre i stedet for å stå på «Laster…».
+const LASTEFEIL = 'Kunne ikke hente lista — prøver igjen om 30 sekunder.';
+
+
+async function _trygt(laster) {
+  // Et kall som kaster (ingen nett, avbrutt) skal ikke ta med seg resten av
+  // runden — og heller ikke oppstarten, som setter pollingen etterpå.
+  try {
+    return await laster();
+  } catch (e) {
+    return false;
+  }
+}
+
+
 async function lastAlt() {
-  const [nyeEnheter, nyeOppdrag] = await Promise.all([lastEnheter(), lastOppdrag()]);
+  const [nyeEnheter, nyeOppdrag] = await Promise.all([_trygt(lastEnheter), _trygt(lastOppdrag)]);
   if (nyeEnheter) renderEnheter();
   if (nyeOppdrag) renderOppdrag();
   if (nyeEnheter) fyllNedtrekk();
+  visManglendeOppsett();
+}
+
+
+function _visLastefeil(id) {
+  const el = document.getElementById(id);
+  if (el) el.innerHTML = '<div class="tom-melding">' + LASTEFEIL + '</div>';
+}
+
+
+async function oppstart() {
+  // Første besøk (André, 13. sep. 2026): «Laster…» sto tomt. Oppstarten var
+  // fire kall på rad uten feilhåndtering — feilet ett, tegnet ingen noe, og
+  // pollingen ble aldri satt. Nå får listene innhold uansett hva hentingen
+  // ga: det de har, eller LASTEFEIL til første henting lykkes. Tom og ikke
+  // hentet er to ulike ting — «Ingen enheter på vakt» før svaret er kommet
+  // hadde vært en løgn. Tegnefunksjonene selv kjenner ikke skillet: de
+  // tegner det som ligger i `enheter`/`oppdragsliste`.
+  await _trygt(lastLokasjoner);
+  await lastAlt();
+  if (enheterHentet) renderEnheter(); else _visLastefeil('enhetsliste');
+  if (oppdragHentet) renderOppdrag(); else _visLastefeil('oppdragsliste');
+  fyllNedtrekk();
   visManglendeOppsett();
 }
 
@@ -1921,18 +1967,22 @@ async function slettArkiv(id) {
 
 
 document.addEventListener('DOMContentLoaded', async () => {
-  await lastLokasjoner();
-  await lastAlt();
-  renderEnheter();
-  renderOppdrag();
-  fyllNedtrekk();
-  visManglendeOppsett();
-  // Samme kadens som pasientlista. ETag gjør at et poll uten endring koster
-  // en 304 uten kropp.
-  setInterval(lastAlt, 30000);
-  // «12 min siden» eldes uten at serveren sier noe — lista svarer 304 når
-  // ingenting er endret. Én tegning i minuttet holder tallene ærlige.
-  setInterval(() => { renderOppdrag(); renderEnheter(); }, 60000);
+  try {
+    await oppstart();
+  } finally {
+    // Pollingen settes uansett hvordan oppstarten gikk — det er den som
+    // henter lista når nettet er tilbake.
+    // Samme kadens som pasientlista. ETag gjør at et poll uten endring koster
+    // en 304 uten kropp.
+    setInterval(lastAlt, 30000);
+    // «12 min siden» eldes uten at serveren sier noe — lista svarer 304 når
+    // ingenting er endret. Én tegning i minuttet holder tallene ærlige.
+    // — men ikke over LASTEFEIL: en liste som ikke er hentet har ingen tall.
+    setInterval(() => {
+      if (oppdragHentet) renderOppdrag();
+      if (enheterHentet) renderEnheter();
+    }, 60000);
+  }
 });
 
 

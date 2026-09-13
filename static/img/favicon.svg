@@ -1,7 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
-  <title>Sanitetsportalen</title>
-  <path d="M256 40 L436 104 V256 C436 364 362 448 256 492 C150 448 76 364 76 256 V104 Z"
-        fill="#ffffff" stroke="#8fb3f0" stroke-width="28" stroke-linejoin="round"/>
-  <circle cx="256" cy="212" r="52" fill="#0f3460"/>
-  <path d="M156 376 C156 300 356 300 356 376 Z" fill="#0f3460"/>
-</svg>
