@@ -335,6 +335,11 @@ def _koble_paa_epost(request, person):
     from accounts.models import CustomUser
     if person.user_id or not person.epost:
         return False
+    # Koblingen flytter en badge — kontoen arver korpset. Korps-føreren
+    # kunne ellers velge hvilken ledig konto som blir hvem i eget korps ved å
+    # skrive e-posten dens (13. sep. 2026, M5). Bare den som kan dele ut.
+    if not (er_global_admin(request.user) or services.kan_skrive_alt(request.user)):
+        return False
     konto = (_koblbare_kontoer(CustomUser)
              .filter(email__iexact=person.epost, mannskap__isnull=True)
              .first())

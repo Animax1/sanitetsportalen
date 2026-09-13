@@ -27,7 +27,7 @@ from core.auth_decorators import er_global_admin, har_tilgang, modul_kreves
 
 from . import choices, verdier
 from .models import Enhetstype, Lokasjon, Lydvarsel, Problemstilling
-from .views_common import etag_for, json_body
+from .views_common import er_enhetskonto, etag_for, json_body
 
 
 def _feil(melding, status=400):
@@ -125,6 +125,9 @@ def _kan_lede(request):
     # Global admin står utenfor modulaksen og får `skriv_full` av
     # `nivaa_for` — leder-trinnet må nevnes eksplisitt, som `kan_lede` i
     # vaktlista gjør.
+    # En enhetskonto setter ikke opp verdimengdene, uansett nivå (M6).
+    if er_enhetskonto(request.user):
+        return False
     return er_global_admin(request.user) or har_tilgang(request.user, 'oppdrag', 'skriv_leder')
 
 

@@ -1482,7 +1482,9 @@ Funnene under er allerede kartlagt, så jobben er avgrenset når den skal gjøre
       - [ ] **Krever Andre:** kjør scriptet mot staging med admin-, leser- og enhetskonto og lim
             inn rapporten.
 - [x] **Statisk sikkerhetsgjennomgang (13. sep. 2026)** — `docs/SIKKERHETSGJENNOMGANG_2026-09-13.md`.
-      - [ ] Runde 1 (H1, H2, H4, M1–M11, L2, L3, L5, L10, L11) — små endringer, ingen migrasjon
+      - [x] Runde 1 (H1, H2, H4, M1–M11, L2, L3, L5, L10, L11) — 13. sep. 2026, se CHANGELOG
+            - [ ] **Krever Andre før push til main:** `SECRET_KEY` i Railway (prod og staging) må
+                  være minst 50 tegn — kortere stopper oppstarten nå (L10). Sjekk lengden i Variables.
       - [ ] Runde 2 (H3 vendor CDN + CSP, M12–M16, L1, L13, L14)
       - [ ] Senere: L6, L8, L12, L17, L18, L22
 - [x] **Server-status utvidet (13. sep. 2026).** Minne nå + topp, offsite, disk,

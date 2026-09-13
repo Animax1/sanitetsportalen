@@ -34,6 +34,7 @@ from django.utils import timezone
 from django.views.decorators.http import require_http_methods
 
 from core.auth_decorators import admin_required
+from core.klientip import klient_ip
 from audit.models import AuditLog
 
 from .middleware import metrics_store
@@ -501,7 +502,7 @@ def _list_active_sessions():
 def _audit_session_kill(request, table_name, record_id, note):
     """Loggfør tvungen utlogging i AuditLog."""
     try:
-        ip = request.META.get('REMOTE_ADDR') or None
+        ip = klient_ip(request)
         AuditLog.objects.create(
             table_name=table_name,
             record_id=record_id,

@@ -2,6 +2,7 @@
 
 Skilt ut fra ``views.py`` i N13.3.
 """
+from core.klientip import klient_ip
 import hashlib
 import json as _jmod
 import logging
@@ -31,7 +32,7 @@ def _log_audit(request, action, detail):
         field_name=action,
         new_value=detail,
         user=request.user if request.user.is_authenticated else None,
-        ip=request.META.get('REMOTE_ADDR'),
+        ip=klient_ip(request),
     )
 
 

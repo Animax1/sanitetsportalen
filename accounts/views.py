@@ -40,14 +40,12 @@ from .passord_reset import (
 from .passord import lag_midlertidig_passord
 from .backends import finn_konto
 from .models import CustomUser, LoginEvent
+from core.klientip import klient_ip, ratelimit_nokkel
 
 
 def _get_client_ip(request):
-    """Hent klientens IP-adresse fra request."""
-    x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
-    if x_forwarded_for:
-        return x_forwarded_for.split(',')[0].strip()
-    return request.META.get('REMOTE_ADDR')
+    """Klientens IP — `core.klientip`, samme svar som audit og rate-limit."""
+    return klient_ip(request)
 
 
 def _registrer_aktiv_sesjon(user, session_key):
@@ -366,12 +364,20 @@ def login_view(request):
         # samme konto, og en angriper kunne mangedoblet forsøksbudsjettet
         # sitt ved å variere store bokstaver.
         if _er_rate_limited(request, 'login:username', _brukernavn_nokkel, '10/5m') \
-                or _er_rate_limited(request, 'login:ip', 'ip', '50/5m'):
+                or _er_rate_limited(request, 'login:ip', ratelimit_nokkel, '50/5m'):
             return ratelimited_view(request)
 
         form = LoginForm(request.POST)
-        username = request.POST.get('username', '').strip()
-        password = request.POST.get('password', '')
+        if not form.is_valid():
+            # Et brukernavn over 64 tegn ville gitt `DataError` på
+            # PostgreSQL i `LoginEvent`-raden — altså 500 fra uinnlogget
+            # (13. sep. 2026, M2). Samme melding som feil passord: skjemaet
+            # skal ikke røpe noe det ikke røper ellers.
+            return render(request, 'accounts/login.html', {
+                'form': form, 'error': 'Feil brukernavn eller passord.', 'next_url': next_url,
+            })
+        username = form.cleaned_data['username'].strip()
+        password = form.cleaned_data['password']
 
         # Samme oppslag som `authenticate` bruker. Sto tidligere som et
         # nøyaktig treff, og da var kontolåsen hullete: skrev man
@@ -392,11 +398,18 @@ def login_view(request):
         else:
             user = authenticate(request, username=username, password=password)
             if user is not None and user.is_active:
-                # Tilbakestill feilede forsøk
-                user.failed_login_attempts = 0
-                user.locked_until = None
+                # Telleren nullstilles først når begge faktorene er bevist
+                # (13. sep. 2026, M1): for en konto med MFA skjer det i
+                # `_handle_mfa_verify`. Nullstilte passordsteget den, kunne
+                # den som hadde passordet gjette fire koder, logge inn på
+                # nytt og få fire nye. `locked_until` står til den går ut.
                 user.last_login_at = timezone.now()
-                user.save(update_fields=['failed_login_attempts', 'locked_until', 'last_login_at'])
+                felter = ['last_login_at']
+                if not user.mfa_required:
+                    user.failed_login_attempts = 0
+                    user.locked_until = None
+                    felter += ['failed_login_attempts', 'locked_until']
+                user.save(update_fields=felter)
                 LoginEvent.objects.create(
                     user=user, username_attempt=username, success=True,
                     ip=ip, user_agent=user_agent, event_type=LoginEvent.EVENT_LOGIN,
@@ -450,7 +463,7 @@ def _handle_mfa_setup(request, next_url):
     next_url = safe_redirect_url(request, request.session.get('mfa_next_url'), next_url)
 
     try:
-        user = CustomUser.objects.get(pk=user_id)
+        user = CustomUser.objects.get(pk=user_id, is_active=True)
     except CustomUser.DoesNotExist:
         request.session.pop('mfa_setup_user_id', None)
         return redirect('accounts:login')
@@ -528,7 +541,7 @@ def _handle_mfa_verify(request, next_url):
     next_url = safe_redirect_url(request, request.session.get('mfa_next_url'), next_url)
 
     try:
-        user = CustomUser.objects.get(pk=user_id)
+        user = CustomUser.objects.get(pk=user_id, is_active=True)
     except CustomUser.DoesNotExist:
         request.session.pop('mfa_verify_user_id', None)
         return redirect('accounts:login')
@@ -590,9 +603,10 @@ def _handle_mfa_verify(request, next_url):
                        else LoginEvent.EVENT_MFA_VERIFY_SUCCESS)
 
             # Nullstill telleren — brukeren har bevist begge faktorer.
-            if user.failed_login_attempts:
+            if user.failed_login_attempts or user.locked_until:
                 user.failed_login_attempts = 0
-                user.save(update_fields=['failed_login_attempts'])
+                user.locked_until = None
+                user.save(update_fields=['failed_login_attempts', 'locked_until'])
 
             request.session.pop('mfa_verify_user_id', None)
             request.session.pop('mfa_next_url', None)
@@ -634,9 +648,19 @@ def logout_view(request):
     GET-utlogging fra sin egen ``LogoutView`` av samme grunn.
 
     Malene bruker et lite skjema med CSRF-token i stedet for ``<a href>``.
+
+    ``Clear-Site-Data`` (13. sep. 2026, sikkerhetsgjennomgangen H4): service
+    workeren på `/vaktliste/` legger vaktlista og mannskapsregisteret i
+    nettleserens Cache Storage for offline drift, og offline-køene ligger i
+    localStorage. Ingenting av det er bundet til sesjonen. På en delt
+    drifts-PC skal «Logg ut» være det som rydder — headeren sletter Cache
+    Storage, localStorage og workeren i ett, i alle nettlesere som støtter
+    den. Cookies røres ikke: MFA-trust-cookien er ment å overleve.
     """
     logout(request)
-    return redirect('accounts:login')
+    svar = redirect('accounts:login')
+    svar['Clear-Site-Data'] = '"cache", "storage"'
+    return svar
 
 
 @login_required
@@ -682,9 +706,12 @@ def change_password_view(request):
             request.user.must_change_password = False
             request.user.save(update_fields=['password', 'must_change_password'])
 
-            current_session_key = request.session.session_key
-            _invalidate_other_sessions(request.user, current_session_key)
+            # `update_session_auth_hash` roterer sesjonsnøkkelen. Ble
+            # `current_session_key` skrevet før, pekte den på en nøkkel som
+            # ikke fantes, og neste innlogging fra en annen enhet drepte
+            # ingenting (13. sep. 2026, M11).
             update_session_auth_hash(request, request.user)
+            _invalidate_other_sessions(request.user, request.session.session_key)
 
             messages.success(request, 'Passordet er oppdatert.')
             return redirect('/')
@@ -862,6 +889,7 @@ def _ta_enhet_av_vakt(user):
     return True
 
 
+@never_cache
 @admin_required
 def user_create_view(request):
     """Opprett ny bruker — med invitasjon, eller med midlertidig passord.
@@ -964,7 +992,7 @@ def glemt_passord_view(request):
 
     if request.method == 'POST':
         if _er_rate_limited(request, 'reset:epost', _epost_nokkel, '3/10m') \
-                or _er_rate_limited(request, 'reset:ip', 'ip', '20/10m'):
+                or _er_rate_limited(request, 'reset:ip', ratelimit_nokkel, '20/10m'):
             return ratelimited_view(request)
 
         form = GlemtPassordForm(request.POST)
@@ -1054,6 +1082,7 @@ def invitasjon_view(request, token):
     })
 
 
+@never_cache
 @admin_required
 def user_detail_view(request, pk):
     """Vis og rediger brukerdetaljer."""
@@ -1073,6 +1102,13 @@ def user_detail_view(request, pk):
             form = AdminUserEditForm(request.POST, instance=user)
             tilgang_form = ModulTilgangForm(request.POST, bruker=user)
             if form.is_valid() and tilgang_form.is_valid():
+                # Sletting og frys sperrer «deg selv» og «siste admin»;
+                # redigering gjorde det ikke (13. sep. 2026, M7). Uten
+                # Django-admin i prod finnes ingen nødutgang.
+                sperre = _kan_degraderes(user, request.user, form.cleaned_data.get('role'), rolle_for)
+                if sperre:
+                    messages.error(request, sperre)
+                    return redirect('accounts:user_detail', pk=pk)
                 form.save()
 
                 # Rolleendring ble ikke loggført i det hele tatt: frysing og
@@ -1251,6 +1287,22 @@ def user_detail_view(request, pk):
         'kan_slettes': kan_slettes,
         'slette_sperre': slette_sperre,
     })
+
+
+def _kan_degraderes(target, actor, ny_rolle, rolle_for=None):
+    """Begrunnelse for å nekte, eller '' — når «Rediger» tar admin-rollen fra
+    noen. Samme to sperrer som sletting: ikke deg selv, ikke siste admin.
+    `rolle_for` er rollen før skjemaet: `ModelForm.is_valid()` har alt
+    skrevet den nye på instansen."""
+    gammel = rolle_for if rolle_for is not None else target.role
+    if gammel != 'admin' or ny_rolle == 'admin':
+        return ''
+    if target.pk == actor.pk:
+        return 'Du kan ikke ta admin-rollen fra din egen konto.'
+    andre = CustomUser.objects.filter(role='admin', is_active=True).exclude(pk=target.pk).count()
+    if andre == 0:
+        return 'Dette er den siste aktive administratoren og kan ikke degraderes.'
+    return ''
 
 
 def _kan_slettes(target, actor):

@@ -99,6 +99,9 @@ class DatabaseFallbackTests(SimpleTestCase):
         lastet = self._last_uten(
             'RAILWAY_ENVIRONMENT',
             DEBUG='False',
+            # Med DEBUG=False krever settings 50+ tegn (13. sep. 2026, L10);
+            # den lokale .env-nøkkelen er kortere.
+            SECRET_KEY='x' * 60,
             DATABASE_URL='sqlite:///tmp/offline.sqlite3')
         self.assertIn('sqlite', lastet.DATABASES['default']['ENGINE'])
         self.assertFalse(lastet.DEBUG, 'testen kjørte ikke i den formen den beskriver')

@@ -7,6 +7,7 @@ Signals for pasient-app.
   core.notifications.notify(). Både ny mottaker og forrige eier varsles
   ved flytting, kun ny mottaker ved første tildeling.
 """
+from core.klientip import klient_ip
 import logging
 
 from django.db.models.signals import pre_save, post_save, post_delete
@@ -33,11 +34,7 @@ def _get_user_and_ip():
         user = getattr(request, 'user', None)
         if user and not user.is_authenticated:
             user = None
-        x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
-        if x_forwarded_for:
-            ip = x_forwarded_for.split(',')[0].strip()
-        else:
-            ip = request.META.get('REMOTE_ADDR')
+        ip = klient_ip(request)
     return user, ip
 
 

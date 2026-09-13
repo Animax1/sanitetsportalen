@@ -23,6 +23,18 @@ const VERSJON = 'vl-sw-3';
 const SKALL = `${VERSJON}-skall`;
 const DATA = `${VERSJON}-data`;
 const CDN = ['https://cdn.jsdelivr.net', 'https://unpkg.com'];
+// Datakopien serveres ikke etter dette (13. sep. 2026, H4): en vakt varer
+// ikke lenger, og en kopi av mannskapsregisteret skal ikke ligge klar til
+// den som åpner sida uten nett uker senere. Logg ut rydder alt uansett.
+const MAKS_ALDER_MS = 24 * 60 * 60 * 1000;
+
+
+function erForGammel(lagretIso, naaMs) {
+  // Ren funksjon, testes i node. Mangler tida, regnes kopien som gammel.
+  const t = Date.parse(lagretIso || '');
+  if (Number.isNaN(t)) return true;
+  return naaMs - t > MAKS_ALDER_MS;
+}
 
 
 function avgjor(url, metode, modus, egenOrigin) {
@@ -81,7 +93,8 @@ async function nettForst(req, cacheNavn) {
     return svar;
   } catch (e) {
     const kopi = await cache.match(req);
-    if (kopi) return somKopi(kopi);
+    if (kopi && !erForGammel(kopi.headers.get('X-Vl-Lagret'), Date.now())) return somKopi(kopi);
+    if (kopi) await cache.delete(req);
     throw e;
   }
 }

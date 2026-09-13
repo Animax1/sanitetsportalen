@@ -404,6 +404,14 @@ def audit_log_list_view(request):
     })
 
 
+def _csv_trygg(verdi):
+    """Excel tolker celler som begynner med `=`, `+`, `-`, `@`, tab eller CR
+    som formler — og verdiene her er brukerinnskrevne (13. sep. 2026, M9).
+    Et innledende apostrof gjør cella til tekst."""
+    verdi = verdi or ''
+    return "'" + verdi if verdi[:1] in ('=', '+', '-', '@', '\t', '\r') else verdi
+
+
 @admin_required
 @require_GET
 # S3: 5000 rader per kall, uten grense på antall kall. En admin som
@@ -460,8 +468,8 @@ def audit_log_csv_export_view(request):
             row.record_id,
             row.action,
             row.field_name or '',
-            row.old_value or '',
-            row.new_value or '',
+            _csv_trygg(row.old_value),
+            _csv_trygg(row.new_value),
             row.user.username if row.user else '',
             row.ip or '',
         ])

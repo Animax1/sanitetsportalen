@@ -12,9 +12,11 @@ from . import choices, services
 def json_body(request):
     """Parse JSON-kroppen, eller returner tom dict."""
     try:
-        return json.loads(request.body)
+        data = json.loads(request.body)
     except (json.JSONDecodeError, ValueError):
         return {}
+    # `[]`, `"x"` og `null` er gyldig JSON og ga 500 på første `.get()` (M8).
+    return data if isinstance(data, dict) else {}
 
 
 def etag_for(rader) -> str:

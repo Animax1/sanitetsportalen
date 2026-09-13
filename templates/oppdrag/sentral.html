@@ -316,12 +316,12 @@
     kanLede: {% if kan_lede %}true{% else %}false{% endif %},
     erAdmin: {% if er_global_admin %}true{% else %}false{% endif %}
   };
-  window.OPPDRAG_AVREIST_TIL = {{ avreist_til|safe }};
-  window.OPPDRAG_STATUS_NAVN = {{ status_navn|safe }};
-  window.OPPDRAG_PROBLEMSTILLINGER_FOR = {{ problemstillinger_for|safe }};
-  window.OPPDRAG_MED_ANTALL = {{ med_antall|safe }};
-  window.OPPDRAG_ENHETSTYPER = {{ enhetstyper|safe }};
-  window.OPPDRAG_LYDVARSEL = {{ lydvarsel|safe }};
+  window.OPPDRAG_AVREIST_TIL = {{ avreist_til }};
+  window.OPPDRAG_STATUS_NAVN = {{ status_navn }};
+  window.OPPDRAG_PROBLEMSTILLINGER_FOR = {{ problemstillinger_for }};
+  window.OPPDRAG_MED_ANTALL = {{ med_antall }};
+  window.OPPDRAG_ENHETSTYPER = {{ enhetstyper }};
+  window.OPPDRAG_LYDVARSEL = {{ lydvarsel }};
 </script>
 <script src="{% static 'js/portal-utils.js' %}"></script>
 <script src="{% static 'js/oppdrag-sentral.js' %}"></script>

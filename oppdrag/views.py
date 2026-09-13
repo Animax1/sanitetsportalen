@@ -22,6 +22,7 @@ from django.shortcuts import render
 from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_http_methods
 
+from core.jsdata import js_json
 from core.auth_decorators import er_global_admin, har_tilgang, modul_kreves
 from core.idempotency import bygg_nokkel, forkast, fullfor, reserver
 from core.ratelimit import rate_limit
@@ -50,7 +51,7 @@ def index_view(request):
     if er_enhetskonto(request.user):
         # Bilen setter antall pasienter på problemstillingene som bærer et
         # (André, 12. sep. 2026) — hvilke det er, er data fra tabellen.
-        med_antall = json.dumps(verdier.med_antall())
+        med_antall = js_json(verdier.med_antall())
         # Kjeden sendes med som data. Skjermen bruker den **kun** til å regne
         # ut hva neste knapp skal hete mens en stempling ligger usendt i køen
         # — uten den ville knappen dødd ved første trykk uten dekning, og hele
@@ -63,20 +64,20 @@ def index_view(request):
         }
         return render(request, 'oppdrag/enhet.html', {
             'enhet': request.user.enhet,
-            'neste_kjede': json.dumps(neste),
-            'status_navn': json.dumps(choices.STATUS_NAVN),
+            'neste_kjede': js_json(neste),
+            'status_navn': js_json(choices.STATUS_NAVN),
             # Stedene ved «Avreist» og grovsorteringens tre verdier — data
             # til knappene, som kjeden. Én kilde: `choices`.
-            'avreist_til': json.dumps(list(choices.AVREIST_TIL)),
-            'grovsortering': json.dumps(list(choices.GROVSORTERING)),
+            'avreist_til': js_json(list(choices.AVREIST_TIL)),
+            'grovsortering': js_json(list(choices.GROVSORTERING)),
             'med_antall': med_antall,
             # Den andre knappen per status (12. sep. 2026), til projeksjonen
             # mens et trykk ligger usendt — samme grunn som kjeden.
-            'alternativ': json.dumps({s: a[0] for s, a in services.ALTERNATIV.items()}),
-            'alternativ_navn': json.dumps({a[0]: a[1] for a in services.ALTERNATIV.values()}),
+            'alternativ': js_json({s: a[0] for s, a in services.ALTERNATIV.items()}),
+            'alternativ_navn': js_json({a[0]: a[1] for a in services.ALTERNATIV.values()}),
             # Lydvarselets terskler og om nytt oppdrag skal pipe (12. sep.
             # 2026) — data fra tabellen, hentet på nytt hvert femte minutt.
-            'bilinnstillinger': json.dumps(verdier.bilinnstillinger()),
+            'bilinnstillinger': js_json(verdier.bilinnstillinger()),
         })
 
     return render(request, 'oppdrag/sentral.html', {
@@ -100,16 +101,16 @@ def index_view(request):
         # som bærer et antall — skjemaet bygger nedtrekket om når hastegraden
         # endres (André, 12. sep. 2026). Én kilde: tabellene, gjennom
         # `verdier`. Klienten henter dem på nytt når noen redigerer dem.
-        'problemstillinger_for': json.dumps(verdier.problemstillinger_per_hastegrad()),
-        'med_antall': json.dumps(verdier.med_antall()),
-        'enhetstyper': json.dumps([[t.pk, t.navn] for t in verdier.enhetstyper()]),
+        'problemstillinger_for': js_json(verdier.problemstillinger_per_hastegrad()),
+        'med_antall': js_json(verdier.med_antall()),
+        'enhetstyper': js_json([[t.pk, t.navn] for t in verdier.enhetstyper()]),
         # Sentralbordet uthever ventende oppdrag forbi første lydterskel
         # (André, 12. sep. 2026: «Det bør og komme en utheving hos operatør»).
-        'lydvarsel': json.dumps(verdier.lydvarsel()),
+        'lydvarsel': js_json(verdier.lydvarsel()),
         # Til «Før status» i detaljvisningen (§9): stedene ved «Avreist» og
         # statusnavnene. Samme kilde som enhetsskjermen: `choices`.
-        'avreist_til': json.dumps(list(choices.AVREIST_TIL)),
-        'status_navn': json.dumps(choices.STATUS_NAVN),
+        'avreist_til': js_json(list(choices.AVREIST_TIL)),
+        'status_navn': js_json(choices.STATUS_NAVN),
         'hastegrader': choices.HASTEGRAD,
     })
 
@@ -139,6 +140,14 @@ def _aktivt_oppdrag_felter(rad):
     }
 
 
+def _synlig_for_bilen(request, oppdrag):
+    """Lista utelater oppdraget 30 minutter etter Ledig — «en bil som blir
+    stående ulåst». Detalj-, stemplings-, grovsorterings- og antall-endepunktet
+    må følge samme regel, ellers kan bilen hente og endre alt den har vært på
+    i vakta (13. sep. 2026, M4)."""
+    return oppdrag in services.synlige_for_enhet(request.user.enhet, oppdrag.vakt)
+
+
 @never_cache
 @modul_kreves('oppdrag', 'les', svar='json')
 @require_http_methods(['GET'])
@@ -149,6 +158,10 @@ def enheter_view(request):
     oppdragene hver gang — se `services.enhet_status` for hvorfor det ikke
     lagres.
     """
+    # Bilen ser sine egne oppdrag, ikke flåtens (13. sep. 2026, M6):
+    # enhetsskjermen bruker ikke dette endepunktet.
+    if er_enhetskonto(request.user):
+        return JsonResponse({'status': 'error', 'message': 'Ingen tilgang'}, status=403)
     vakt = hent_aktiv_vakt()
 
     # `?alle=1` tar med pensjonerte enheter. Ressursoversikten på tavla skal
@@ -471,6 +484,8 @@ def oppdrag_detalj_view(request, pk):
         kobling = services.koblingsrad(oppdrag, request.user.enhet)
         if kobling is None:
             return JsonResponse({'status': 'error', 'message': 'Ingen tilgang'}, status=403)
+        if not _synlig_for_bilen(request, oppdrag):
+            return JsonResponse({'status': 'error', 'message': 'Oppdrag ikke funnet'}, status=404)
 
     if request.method == 'GET':
         andre = []
@@ -561,6 +576,8 @@ def flytt_view(request, pk):
     Statusen står. Meldingene den første enheten rakk å sende blir stående med
     `meldt_av` intakt: de skjedde.
     """
+    if er_enhetskonto(request.user):
+        return JsonResponse({'status': 'error', 'message': 'Ingen tilgang'}, status=403)
     try:
         oppdrag = Oppdrag.objects.get(pk=pk, vakt=hent_aktiv_vakt())
     except Oppdrag.DoesNotExist:
@@ -803,6 +820,9 @@ def grovsortering_view(request, pk, verdi):
         return JsonResponse(
             {'status': 'error', 'message': 'Oppdraget tilhører en annen enhet.'},
             status=403)
+    if not _synlig_for_bilen(request, oppdrag):
+        return JsonResponse(
+            {'status': 'error', 'message': 'Oppdrag ikke funnet'}, status=404)
     oppdrag.grovsortering = verdi
     oppdrag.save(update_fields=['grovsortering', 'updated_at'])
     return JsonResponse({'status': 'ok', 'data': oppdrag_til_dict(
@@ -839,6 +859,9 @@ def antall_view(request, pk, antall):
         return JsonResponse(
             {'status': 'error', 'message': 'Oppdraget tilhører en annen enhet.'},
             status=403)
+    if not _synlig_for_bilen(request, oppdrag):
+        return JsonResponse(
+            {'status': 'error', 'message': 'Oppdrag ikke funnet'}, status=404)
     if not verdier.baerer_antall(oppdrag.problemstilling):
         return JsonResponse(
             {'status': 'error', 'message': f'«{oppdrag.problemstilling}» bærer ikke et antall.'},
@@ -904,6 +927,9 @@ def stempling_view(request, pk, overgang, sted=None):
         return JsonResponse(
             {'status': 'error', 'message': 'Oppdraget tilhører en annen enhet.'},
             status=403)
+    if not _synlig_for_bilen(request, oppdrag):
+        return JsonResponse(
+            {'status': 'error', 'message': 'Oppdrag ikke funnet'}, status=404)
     # **Bilen melder Ledig bare fra Leverer og Behandlet** (André, 12. sep.
     # 2026: «Etter avreist kan du ikke slå deg ledig før du har levert»). I
     # Rykker ut heter utgangen Avbryt, i Fremme Behandlet på sted. Sentralen

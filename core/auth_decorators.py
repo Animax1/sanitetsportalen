@@ -155,7 +155,10 @@ def nivaa_for(user, modul_slug):
     if not getattr(user, 'is_authenticated', False):
         return None
     if er_global_admin(user):
-        return 'skriv_full'
+        # Toppen av stigen, ikke `skriv_full` (13. sep. 2026, M10): med
+        # `skriv_full` måtte hvert `skriv_leder`-kallsted huske
+        # `er_global_admin(...) or`, og én glemt `or` var et 403 for admin.
+        return max(NIVAA_HIERARKI, key=NIVAA_HIERARKI.get)
     if not _modul_er_aktiv(user, modul_slug):
         return None
     return _tilganger(user).get(modul_slug)

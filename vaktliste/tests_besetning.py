@@ -285,12 +285,23 @@ class BesetningTests(TilgangsBasis):
         self.assertEqual('Ambulanse 1', d['ressurs_navn'])
 
     # ── Gaten ────────────────────────────────────────────────────────────
-    def test_alle_med_les_i_vaktliste_ser_besetningen(self):
+    def test_de_som_ser_alle_korps_ser_besetningen(self):
         self._skift(self.p_hgsd)
-        for navn, c in (('les', self.c_leser), ('korpsfører', self.c_kb),
+        for navn, c in (('korpsfører', self.c_kb),
                         ('skriv_full', self.c_vl), ('admin', self.c_adm)):
             with self.subTest(konto=navn):
                 self.assertEqual(200, self._hent(c).status_code)
+
+    def test_bare_les_ser_ikke_andre_korps_her_heller(self):
+        """Svaret bærer telefon og ISSI for alle på bilen. `les` ser bare sitt
+        eget korps på `/vaktliste/`, og skal ikke kunne iterere `<pk>` her og
+        få alle (13. sep. 2026, M3). Med `oppdrag:les` er hun sentralbordet,
+        og da er spørsmålet «er bilen klar»."""
+        from accounts.models import ModulTilgang
+        self._skift(self.p_hgsd)
+        self.assertEqual(403, self._hent(self.c_leser).status_code)
+        ModulTilgang.objects.create(bruker=self.leser, modul_slug='oppdrag', nivaa='les')
+        self.assertEqual(200, self._hent(_klient(self.leser)).status_code)
 
     def test_uten_vaktlistetilgang_er_det_stengt(self):
         """Komposisjonsregelen (rollemodellen §5): en operatør med

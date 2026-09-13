@@ -14,6 +14,8 @@ oppdrag, ikke vaktas arkiv.
 """
 from __future__ import annotations
 
+from core.klientip import klient_ip
+
 import logging
 
 from django.http import JsonResponse
@@ -46,7 +48,7 @@ def _logg_audit(request, handling, detalj):
         field_name=handling,
         new_value=detalj,
         user=request.user if request.user.is_authenticated else None,
-        ip=request.META.get('REMOTE_ADDR'),
+        ip=klient_ip(request),
     )
 
 

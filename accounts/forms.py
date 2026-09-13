@@ -353,8 +353,10 @@ class AdminUserEditForm(forms.ModelForm):
 
     class Meta:
         model = CustomUser
+        # `is_active` er med vilje ikke her (13. sep. 2026, M7): frys/tø er
+        # veien som logges, dreper sesjoner og tar enheten av vakt.
         fields = [
-            'fullt_navn', 'email', 'role', 'is_active', 'mfa_required',
+            'fullt_navn', 'email', 'role', 'mfa_required',
             'er_delt_konto',
         ]
         widgets = {

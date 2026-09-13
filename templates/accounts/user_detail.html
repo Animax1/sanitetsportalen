@@ -50,10 +50,6 @@
               {{ form.role }}
               <div class="text-muted" style="font-size:0.78rem;">{{ form.role.help_text }}</div>
             </div>
-            <div class="mb-2 form-check">
-              {{ form.is_active }}
-              <label class="form-check-label" for="{{ form.is_active.id_for_label }}" style="color:#cbd5e1;">Aktiv konto</label>
-            </div>
             <div class="mb-3 form-check">
               {{ form.mfa_required }}
               <label class="form-check-label" for="{{ form.mfa_required.id_for_label }}" style="color:#cbd5e1;">Krev to-faktor (MFA)</label>

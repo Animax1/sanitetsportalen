@@ -33,6 +33,7 @@ import hashlib
 import logging
 import os
 import secrets
+from pathlib import Path
 
 from django.conf import settings
 from django.utils import timezone
@@ -181,10 +182,14 @@ def hent(objekt: str):
         objekt = PREFIKS + objekt
     if not objekt.endswith(SUFFIKS):
         objekt += SUFFIKS
+    filnavn = objekt[len(PREFIKS):-len(SUFFIKS)]
+    # Objektnavnet bestemmer stien fila skrives til (13. sep. 2026, L3): en
+    # kompromittert bucket skal ikke være en vei ut av BACKUP_DIR.
+    if not filnavn or '/' in filnavn or '\\' in filnavn or filnavn != Path(filnavn).name:
+        raise ValueError(f'Objektnavnet «{objekt}» er ikke et filnavn.')
     svar = _klient().get_object(Bucket=k['bucket'], Key=objekt)
     blob = svar['Body'].read()
     raa = dekrypter(blob, k['nokkel'])
-    filnavn = objekt[len(PREFIKS):-len(SUFFIKS)]
     sti = get_backup_dir() / filnavn
     with open(sti, 'wb') as f:
         f.write(raa)

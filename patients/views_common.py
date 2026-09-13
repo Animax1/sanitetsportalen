@@ -17,9 +17,11 @@ from datetime import datetime
 def _json_body(request):
     """Parse JSON-body fra request, returner tom dict ved feil."""
     try:
-        return json.loads(request.body)
+        data = json.loads(request.body)
     except (json.JSONDecodeError, ValueError):
         return {}
+    # `[]`, `"x"` og `null` er gyldig JSON og ga 500 på første `.get()` (M8).
+    return data if isinstance(data, dict) else {}
 
 
 def _ensure_pabegynt_not_before_inntid(patient):

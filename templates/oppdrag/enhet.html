@@ -73,14 +73,14 @@
   // knapp skal hete mens en stempling ligger usendt — uten den ville knappen
   // dødd ved første trykk uten dekning. Når nettet er der, gjelder fortsatt
   // serverens `neste_overgang` per rad.
-  window.OPPDRAG_NESTE = {{ neste_kjede|safe }};
-  window.OPPDRAG_STATUSNAVN = {{ status_navn|safe }};
-  window.OPPDRAG_AVREIST_TIL = {{ avreist_til|safe }};
-  window.OPPDRAG_GROVSORTERING = {{ grovsortering|safe }};
-  window.OPPDRAG_MED_ANTALL = {{ med_antall|safe }};
-  window.OPPDRAG_ALTERNATIV = {{ alternativ|safe }};
-  window.OPPDRAG_ALTERNATIV_NAVN = {{ alternativ_navn|safe }};
-  window.OPPDRAG_BILINNSTILLINGER = {{ bilinnstillinger|safe }};
+  window.OPPDRAG_NESTE = {{ neste_kjede }};
+  window.OPPDRAG_STATUSNAVN = {{ status_navn }};
+  window.OPPDRAG_AVREIST_TIL = {{ avreist_til }};
+  window.OPPDRAG_GROVSORTERING = {{ grovsortering }};
+  window.OPPDRAG_MED_ANTALL = {{ med_antall }};
+  window.OPPDRAG_ALTERNATIV = {{ alternativ }};
+  window.OPPDRAG_ALTERNATIV_NAVN = {{ alternativ_navn }};
+  window.OPPDRAG_BILINNSTILLINGER = {{ bilinnstillinger }};
 </script>
 <script src="{% static 'js/portal-utils.js' %}"></script>
 <script src="{% static 'js/oppdrag-enhet.js' %}"></script>

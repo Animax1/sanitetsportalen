@@ -56,6 +56,11 @@ if not DEBUG:
             'SECRET_KEY er satt til en kjent eksempelverdi. Bytt den til en '
             'lang tilfeldig streng før oppstart med DEBUG=False.'
         )
+    if len(SECRET_KEY) < 50:
+        raise ImproperlyConfigured(
+            f'SECRET_KEY er {len(SECRET_KEY)} tegn. Den skal være minst 50 — '
+            'meldingen over har sagt det lenge, men sjekket det ikke (13. sep. 2026).'
+        )
 elif not SECRET_KEY:
     SECRET_KEY = 'dev-only-ikke-bruk-i-prod-changeme123!'
 
@@ -65,7 +70,7 @@ elif not SECRET_KEY:
 
 # Sikker default: tillat kun localhost hvis miljøvariabel mangler.
 # I produksjon settes ALLOWED_HOSTS via Railway Variables.
-ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', '.localhost,127.0.0.1').split(',')
+ALLOWED_HOSTS = [h.strip() for h in os.environ.get('ALLOWED_HOSTS', '.localhost,127.0.0.1').split(',') if h.strip()]
 
 CSRF_TRUSTED_ORIGINS_RAW = os.environ.get('CSRF_TRUSTED_ORIGINS', '')
 CSRF_TRUSTED_ORIGINS = [o.strip() for o in CSRF_TRUSTED_ORIGINS_RAW.split(',') if o.strip()]

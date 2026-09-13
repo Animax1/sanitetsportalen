@@ -336,7 +336,10 @@ def patient_detail_view(request, pk):
     Django-admin. Det er derfor ikke slettemekanismen appen faktisk bruker.
     """
     try:
-        patient = Patient.objects.get(pk=pk)
+        # Scopet til aktiv vakt (13. sep. 2026, L2): etter arkivering og
+        # gjenåpning finnes pasienter i andre vakter, og de skal ikke kunne
+        # redigeres eller slettes via pk.
+        patient = Patient.objects.get(pk=pk, vakt=hent_aktiv_vakt())
     except Patient.DoesNotExist:
         return JsonResponse({'error': 'Pasient ikke funnet'}, status=404)
 

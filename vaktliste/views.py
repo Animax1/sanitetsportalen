@@ -53,7 +53,7 @@ from django.utils import timezone
 from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_http_methods
 
-from core.auth_decorators import er_global_admin, modul_kreves
+from core.auth_decorators import er_global_admin, har_tilgang, modul_kreves
 from core.ratelimit import rate_limit
 
 from . import choices, fil, services
@@ -65,9 +65,11 @@ from .models import (Belastningsgrenser, Korps, Mannskap, Ressurs, Utsending,
 
 def _json_body(request):
     try:
-        return json.loads(request.body)
+        data = json.loads(request.body)
     except (json.JSONDecodeError, ValueError):
         return {}
+    # `[]`, `"x"` og `null` er gyldig JSON og ga 500 på første `.get()` (M8).
+    return data if isinstance(data, dict) else {}
 
 
 def _feil(melding, status=400):
@@ -673,6 +675,13 @@ def besetning_view(request, pk):
     404 betyr «enheten er ikke koblet til en ressurs i denne vakta» — noe
     annet enn «ingen på vakt», og de to skal ikke se like ut for operatøren.
     """
+    # Svaret bærer telefon og ISSI for alle på bilen, uansett korps. En
+    # `les`-bruker som på `/vaktliste/` bare ser sitt eget korps skal ikke
+    # kunne iterere `<pk>` her og få alle (13. sep. 2026, M3). Sentralbordet
+    # har `oppdrag:les`; den som ser alle korps har det fra før.
+    if not (services.ser_alle_korps(request.user)
+            or har_tilgang(request.user, 'oppdrag', 'les')):
+        return _feil('Besetningen viser alle korps, og du ser bare ditt eget.', status=403)
     data = services.besetning(pk)
     if data is not None:
         return JsonResponse({'status': 'ok', 'data': data})

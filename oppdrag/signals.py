@@ -16,6 +16,8 @@ de radene kan ikke fjernes uten å røre auditsporet.
 """
 from __future__ import annotations
 
+from core.klientip import klient_ip
+
 import logging
 
 from django.db.models.signals import post_delete, post_save, pre_save
@@ -58,9 +60,7 @@ def _bruker_og_ip():
         bruker = getattr(request, 'user', None)
         if bruker and not bruker.is_authenticated:
             bruker = None
-        videresendt = request.META.get('HTTP_X_FORWARDED_FOR')
-        ip = (videresendt.split(',')[0].strip() if videresendt
-              else request.META.get('REMOTE_ADDR'))
+        ip = klient_ip(request)
     return bruker, ip
 
 

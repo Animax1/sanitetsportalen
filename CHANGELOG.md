@@ -4,6 +4,49 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-13 — Sikkerhetsgjennomgangen, runde 1: 19 funn rettet
+
+Ingen migrasjon. Numrene viser til `docs/SIKKERHETSGJENNOMGANG_2026-09-13.md`.
+
+- **H1 — data inn i `<script>` escapes.** `core/jsdata.js_json()` bytter `<`, `>`
+  og `&` med `\u003c`/`\u003e`/`\u0026` som Djangos `json_script`; de fjorten
+  variablene på `/oppdrag/` går gjennom den, og malene har ikke lenger `|safe`.
+  Et problemstillingsnavn kan ikke lukke skriptet.
+- **H2 — klient-IP ett sted.** `core/klientip.klient_ip()` tar *siste* ledd i
+  `X-Forwarded-For` (Railway er én betrodd proxy), validerer det, og faller
+  tilbake til `REMOTE_ADDR`. Brukt av innloggingsloggen, alle tre audit-signalene,
+  begge arkivviewene, sesjonsverktøyet og — som `ratelimit_nokkel` — bøttene
+  `login:ip` og `reset:ip`, som fram til nå talte på proxyens adresse.
+- **H4 — «Logg ut» rydder drifts-PC-en.** `logout_view` sender
+  `Clear-Site-Data: "cache", "storage"` (Cache Storage, localStorage og
+  service-workeren i ett; cookies røres ikke). Workeren serverer heller ikke en
+  datakopi eldre enn 24 timer (`erForGammel`), og sletter den.
+- **M1** — riktig passord nullstiller ikke kontolåsen for kontoer med MFA; det
+  skjer først når koden er bestått. **M2** — innloggingsskjemaet valideres før
+  noe skrives (et brukernavn over 64 tegn ga 500 på PostgreSQL). **L5** —
+  MFA-stegene krever aktiv konto. **M11** — `current_session_key` skrives etter
+  at passordbyttet har rotert sesjonen. **L11** — sidene med midlertidig passord
+  har `never_cache`.
+- **M7** — «Rediger» kan ikke ta admin-rollen fra deg selv (`_kan_degraderes`),
+  og `is_active` er ute av skjemaet: frys/tø er veien som logges og dreper
+  sesjoner.
+- **M3** — besetningsendepunktet krever at man ser alle korps eller har
+  `oppdrag:les`; en ren `vaktliste:les` får 403. **M5** — e-postkoblingen
+  utløses bare av admin og `skriv_full`+; korps-føreren lagrer e-posten, og
+  merket sier at kontoen finnes.
+- **M4** — bilens detalj-, stemplings-, grovsorterings- og antall-endepunkt
+  følger 30-minuttersvinduet (`_synlig_for_bilen`). **M6** — enhetskontoer får
+  403 på enhetslista, flytting og verdimengdene.
+- **M8** — de tre JSON-parserne gir tom dict for gyldig JSON som ikke er et
+  objekt. **M9** — audit-CSV prefikser `=`, `+`, `-`, `@`, tab og CR med `'`.
+  **M10** — `nivaa_for(admin)` er toppen av stigen (`skriv_leder`), ikke
+  `skriv_full`. **L2** — `patient_detail_view` er scopet til aktiv vakt.
+  **L3** — `offsite.hent` avviser objektnavn med katalogskilletegn før S3
+  kalles. **L10** — `ALLOWED_HOSTS` strippes, og `SECRET_KEY` under 50 tegn
+  stopper oppstarten når `DEBUG=False`.
+- 46 nye tester i `*/tests_sikkerhet_runde1.py`; `tests_besetning` oppdatert
+  til den nye regelen.
+
 ## 2026-09-13 — Sikkerhetsgjennomgang: rapport
 
 `docs/SIKKERHETSGJENNOMGANG_2026-09-13.md`. Statisk gjennomgang i fire deler, hvert
