@@ -4,6 +4,66 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-13 — Backup fase 1: `Backupplan`, og klokka ut av trafikken
+
+Første kode i omleggingen (`docs/PLAN_BACKUP_OMLEGGING.md` fase 1).
+
+**`core.Backupplan` erstatter `ModuleBackupConfig`.** Tre moduser — av, ved
+endring, alltid — og intervallet settes **fritt i minutter, timer eller døgn**,
+der det før var et nedtrekk med sju faste valg. Enheten lagres slik den ble
+valgt: «3 døgn» skal ikke leses tilbake som «4320 minutter». `behold` er cap på
+filer på volumet, og gjelder like mye for moduler som for hele basen når den
+kommer. En standardplan modulene arver gjør tre tall av atten.
+
+**Modusen «alltid» er ny og er poenget med runden.** «Ved endring» skriver ikke
+når innholdet står stille, og er dermed *stum*: ingen ny fil kan bety «ingenting
+har endret seg» eller «jobben er død». `create_backup` fikk `hopp_over_like`, så
+«alltid» skriver uansett og et hull i rekka er en synlig feil. I tillegg bærer
+planen nå **to** tidsstempler — `sist_sjekket_at` ved hver vurdering,
+`sist_fil_at` bare når noe faktisk ble skrevet — og det er de to som gjør at
+«stille» og «stoppet» kan skilles i alle moduser.
+
+**Klokka er flyttet ut av trafikken og inn i en tråd.** Fram til nå var
+`BackupSchedulerMiddleware` den eneste utløseren, så uten forespørsler ble det
+ingen backup — og mellom vaktene står portalen stille. Tråden starter fra
+`CoreConfig.ready()` og tikker hvert minutt uavhengig av trafikk, med jitter så
+gunicorn-arbeiderne ikke banker samtidig, samme radlås som før, og opprydding av
+foreldreløse filer ved oppstart. Middlewaren står igjen som reservenett gjennom
+samme funksjon.
+
+**Og den er en tråd, ikke en cron-tjeneste, fordi volumet bare kan henge på én
+tjeneste.** En cron-tjeneste som tok backup ville skrevet fila til sitt eget
+flyktige containerfilsystem og etterlatt en `Backup`-rad uten fil — og
+`core.arkiv.har_backup_etter()` spør bare etter raden, så **kollapssperra ville
+åpnet seg på spøkelsesbackuper**. Det var flaks at `db_backup` aldri ble satt
+opp i Railway (bekreftet av André: bare `purge_old_logs` og `kollaps_arkiv`
+kjører). `db_backup` er tatt ut av `CRON_JOBBER` uten erstatning — server-status
+viste «Aldri» for en jobb som aldri kom, og et varsel som alltid står rødt lærer
+deg å ikke se på dashbordet. `CLAUDE.md` er rettet fra tre cron-jobber til to.
+
+**Én regel til det gikk å ta feil av:** forfall måles mot `sist_sjekket_at`, ikke
+mot `sist_fil_at`. Målt mot siste fil ville en plan i «ved endring» vært forfalt
+ved hvert eneste tikk etter første «uendret» — altså serialisert hele modulen
+hvert minutt for å bekrefte stillstand. Intervallet sier hvor ofte vi ser etter,
+ikke hvor ofte vi lykkes.
+
+`backup_kjor` er ny manuell inngang (`--status`, `--alle`, `--modul`), og
+`klokke.vakthund()` melder planer som ikke er vurdert på tre ganger intervallet
+— svaret på at en tråd ikke er synlig i Railways grensesnitt slik en cron-jobb
+er. Flata for den kommer i fase 2.
+
+Migrasjonen er delt i **tre** (skjema, data, skjema) framfor å tømme triggerkøen,
+så `cannot ALTER TABLE … because it has pending trigger events` ikke kan oppstå.
+Eksisterende rader settes til «egen plan» og beholder oppførselen sin: å la dem
+arve standarden ville endret hvor ofte prod tar backup uten at noen ba om det.
+
+Verifisert: 2557 tester grønne på SQLite og på PostgreSQL 16,
+`verifiser_migrasjoner` OK, og en oppgraderingssimulering mot ekte PostgreSQL
+der fire rader i historisk form — inkludert en modul admin hadde slått av — ble
+migrert fram og kom ut med oppførselen i behold.
+
+---
+
 ## 2026-09-13 — Backup-planen versjon 3: klokka blir en tråd, ikke en cron-jobb
 
 Ingen kodeendring. På spørsmål om cron er den ideelle klokka ble fire alternativer veid,

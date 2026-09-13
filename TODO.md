@@ -328,23 +328,26 @@ bindende: 1 før 2, fordi backupen speiler hvor modellene bor.
       [`docs/PLAN_BACKUP_OMLEGGING.md`](./docs/PLAN_BACKUP_OMLEGGING.md)** — versjon 2,
       13. sep. 2026, med Andrés fem svar innarbeidet. Fase 1–6 kan kjøres **før** punkt 1
       over, jf. `PLAN_REKKEFOLGE_2026-09.md`.
-      - [ ] **Fase 1 — plan og klokke.** `core.Backupplan` erstatter `ModuleBackupConfig`:
-            tre moduser (av / ved endring / alltid), **intervall satt fritt i minutter,
-            timer eller døgn**, cap på antall filer, og en standardplan modulene arver.
-            `sist_sjekket_at` ved siden av `sist_fil_at`, så stille skilles fra stoppet.
-            **Klokka blir en tidsstyrt tråd i web-prosessen**, ikke en cron-tjeneste:
-            et Railway-volum kan bare henge på én tjeneste, og en cron-tjeneste uten
-            `/data` ville skrevet filene til et flyktig containerfilsystem og laget
-            `Backup`-rader uten filer — som `core.arkiv.har_backup_etter()` ikke skiller
-            fra ekte, så **kollapssperra ville åpnet seg på spøkelsesbackuper**. Det var
-            flaks at `db_backup` aldri ble satt opp. I dag tas det ingen backup uten
-            trafikk, så prod har aldri hatt en klokkedrevet backup. `backup_kjor` beholdes
-            som manuell inngang, `db_backup` går **ut** av `CRON_JOBBER` uten erstatning,
-            og `CLAUDE.md` rettes fra tre cron-jobber til to.
-            **Verifiser først** at et Railway-volum fortsatt bare kan henge på én
-            tjeneste — hele valget av klokke hviler på det.
-            Datamigrasjonen rører data og skjema i samme transaksjon:
-            `SET CONSTRAINTS`-mønsteret **og** en prøve i `core/migrasjonsprover.py`.
+      - [x] **Fase 1 — plan og klokke (13. sep. 2026).** `core.Backupplan`
+            erstatter `ModuleBackupConfig`: tre moduser (av / ved endring /
+            alltid), **intervall satt fritt i minutter, timer eller døgn**, cap
+            på antall filer, og en standardplan modulene arver. `sist_sjekket_at`
+            ved siden av `sist_fil_at`, så stille skilles fra stoppet.
+            **Klokka er en tråd i web-prosessen** (`core/backup/klokke.py`), ikke
+            en cron-tjeneste: Railway-volumet kan bare henge på én tjeneste, og
+            en cron-tjeneste uten `/data` ville laget `Backup`-rader uten filer —
+            som `har_backup_etter()` ikke skiller fra ekte, så kollapssperra
+            ville åpnet seg på dem. `backup_kjor` er manuell inngang,
+            `db_backup` ute av `CRON_JOBBER`, `CLAUDE.md` rettet til to
+            cron-jobber. Vakthund i `klokke.vakthund()` (flate i fase 2).
+            2557 tester grønne på SQLite **og** PostgreSQL, og en
+            oppgraderingssimulering med rader i historisk form mot ekte
+            PostgreSQL — migrasjonene er delt i tre (skjema, data, skjema), så
+            triggerkø-fella ikke kan oppstå.
+            - [ ] **Krever Andre:** bekreft i Railway at et volum fortsatt bare
+                  kan henge på én tjeneste. Hele valget av klokke hviler på det;
+                  åpner plattformen for flere, er en cron-tjeneste brukbar igjen
+                  (men tråden er fortsatt enklere).
       - [ ] **Fase 2 — én side.** Standardplan, «verste tilfelle nå» målt mot siste
             vellykkede offsite-kopi, diskbruk på volumet, inline fillister, «Ta backup av
             alle nå», «Gjenopprett siste», bekreftelse i dialog. **Vakthund:** er en plan

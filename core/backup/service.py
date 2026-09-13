@@ -108,15 +108,21 @@ def _build_filename(slug: str, kind: str) -> str:
 
 
 def create_backup(slug: str, kind: str = KIND_MANUAL,
-                  user=None, note: str = ''):
+                  user=None, note: str = '', hopp_over_like: bool | None = None):
     """Lag en backup for modulen ``slug``.
 
-    For ``kind=KIND_AUTO``: hvis innholdet er identisk med siste
-    auto-backup for modulen, hoppes lagring over og None returneres.
-    For andre typer (manual/pre_restore/pre_reset) lagres alltid.
+    ``hopp_over_like`` styrer hash-skippet: er innholdet identisk med forrige
+    auto-backup, skrives ingen fil og None returneres. Utelates argumentet,
+    gjelder det for ``kind=KIND_AUTO`` og ikke for de andre — som før
+    13. sep. 2026.
 
-    Returnerer Backup-instansen, eller None hvis auto-backup ble hoppet
-    over.
+    Klokka sender det eksplisitt, fordi planens modus bestemmer: «ved endring»
+    hopper over, **«alltid» gjør det ikke**. Den siste finnes nettopp for at en
+    fil skal bli skrevet selv når ingenting har endret seg, slik at et hull i
+    rekka av filer er en synlig feil. Uten dette argumentet ville «alltid» vært
+    umulig å skille fra «ved endring» i utfall.
+
+    Returnerer Backup-instansen, eller None hvis skrivingen ble hoppet over.
     """
     if kind not in VALID_KINDS:
         raise ValueError(f'Ugyldig kind: {kind!r}. Må være en av {VALID_KINDS}')
@@ -130,8 +136,10 @@ def create_backup(slug: str, kind: str = KIND_MANUAL,
 
     raw, content_hash = _serialize_with_handler(handler)
 
-    # Hash-skip kun for auto-backups.
-    if kind == KIND_AUTO:
+    if hopp_over_like is None:
+        hopp_over_like = kind == KIND_AUTO
+
+    if hopp_over_like:
         last = (
             Backup.objects
             .filter(module_slug=slug, kind=KIND_AUTO)

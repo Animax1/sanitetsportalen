@@ -18,6 +18,11 @@ backups/
 *.lock
 .DS_Store
 
+# Virtuelt miljø. CLAUDE.md ber deg lage `.venv` i rota, og uten denne linja
+# blir hele miljøet med i `git add -A`.
+.venv/
+venv/
+
 
 vendor/
 # Tredjepartsbibliotekene i static/vendor/ SKAL med (13. sep. 2026, H3):

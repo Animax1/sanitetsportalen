@@ -144,9 +144,9 @@ class SisteKjoringRegistreresTests(TestCase):
     def test_tilkoblingsfeil_registreres_som_feil(self):
         from core.kommando import lesbar_dbfeil, siste_kjoringer
         with self.assertRaises(CommandError):
-            with lesbar_dbfeil('ingen backup ble tatt', navn='db_backup'):
+            with lesbar_dbfeil('ingen logger ble slettet', navn='purge_old_logs'):
                 raise OperationalError(PSYCOPG_TEKST)
-        k = siste_kjoringer()['db_backup']
+        k = siste_kjoringer()['purge_old_logs']
         self.assertFalse(k['ok'])
         self.assertIn('password authentication failed', k['melding'])
 

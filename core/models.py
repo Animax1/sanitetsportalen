@@ -7,6 +7,7 @@ Inneholder:
 from __future__ import annotations
 
 from django.conf import settings
+from django.core.validators import MinValueValidator
 from django.db import models
 
 
@@ -134,75 +135,204 @@ class ModuleSettings(models.Model):
             )
 
 
-class ModuleBackupConfig(models.Model):
-    """Per-modul backup-konfigurasjon.
+class Backupplan(models.Model):
+    """Hvor ofte, hvordan og hvor mange — for én modul eller for hele basen.
 
-    Erstatter den gamle singleton-modellen ``patients.BackupConfig``.
-    Hver registrerte modul kan ha sin egen backup-konfigurasjon med
-    eget intervall, max-antall og av/på-bryter. Configs uten matchende
-    backup-handler ignoreres av scheduleren.
+    Én rad per registrert backup-handler, pluss ``full`` for hele databasen og
+    ``standard``, som er malen modulene arver. Erstatter
+    ``ModuleBackupConfig`` (13. sep. 2026), som hadde intervallet som et
+    nedtrekk med sju faste valg og ingen måte å si «skriv en fil uansett».
 
-    Data-migrering: ved oppgradering kopieres den eksisterende
-    ``patients.BackupConfig.interval_minutes``-verdien til en ny rad
-    med ``module_slug='patients'``.
+    **Tre moduser, og skillet mellom de to aktive er verdt å forstå:**
+    ``ved_endring`` serialiserer og sammenligner hash — er innholdet likt
+    forrige fil, skrives ingenting. Den er effektiv, men *stum*: ingen ny fil
+    kan bety «ingenting har endret seg» eller «jobben er død», og de to ser
+    like ut utenfra. ``alltid`` skriver uansett, og er dermed en puls der et
+    hull i rekka er en synlig feil.
+
+    Derfor har raden **to** tidsstempler: ``sist_sjekket_at`` settes ved hver
+    vurdering, ``sist_fil_at`` bare når det faktisk ble skrevet noe. Uten det
+    første ville «stille» og «stoppet» vært umulig å skille, uansett modus.
+
+    **Intervallet lagres som verdi + enhet, ikke som minutter.** Setter du
+    «3 døgn» og får «4320 minutter» tilbake neste gang siden åpnes, må du
+    regne for å lese din egen innstilling. ``intervall_min`` regner det ut når
+    klokka trenger det.
+
+    **Arv er ikke en snarvei, det er poenget.** Med seks modulfiler er
+    forskjellen på å vedlikeholde tre tall og atten. ``folger_standard``
+    gjelder bare modulene; ``standard`` og ``full`` styrer alltid seg selv.
+    Bare modus, intervall og cap arves — tidsstemplene hører til raden selv.
     """
-    INTERVAL_CHOICES = [
-        (0,    'Av'),
-        (5,    'Hvert 5. minutt'),
-        (15,   'Hvert 15. minutt'),
-        (30,   'Hvert 30. minutt'),
-        (60,   'Hver time'),
-        (360,  'Hver 6. time'),
-        (1440, 'Hver 24. time'),
+
+    MODUS_AV = 'av'
+    MODUS_VED_ENDRING = 'ved_endring'
+    MODUS_ALLTID = 'alltid'
+    MODUS_VALG = [
+        (MODUS_AV, 'Av'),
+        (MODUS_VED_ENDRING, 'Ved endring'),
+        (MODUS_ALLTID, 'Alltid'),
     ]
 
-    module_slug = models.CharField(
-        max_length=64,
-        unique=True,
-        verbose_name='Modul-slug',
-        help_text='Matcher slug på en registrert backup-handler.',
+    ENHET_MINUTT = 'minutt'
+    ENHET_TIME = 'time'
+    ENHET_DOGN = 'dogn'
+    ENHET_VALG = [
+        (ENHET_MINUTT, 'minutter'),
+        (ENHET_TIME, 'timer'),
+        (ENHET_DOGN, 'døgn'),
+    ]
+    #: Enhet → minutter. Eneste stedet omregningen står.
+    ENHET_MINUTTER = {ENHET_MINUTT: 1, ENHET_TIME: 60, ENHET_DOGN: 1440}
+
+    #: Malen modulene arver. Er ikke en backup-handler og tas aldri backup av.
+    STANDARD_SLUG = 'standard'
+    #: Hele databasen. Har egen plan, arver aldri standarden.
+    FULL_SLUG = 'full'
+    #: Sluggene som styrer seg selv.
+    EGENRÅDIGE = (STANDARD_SLUG, FULL_SLUG)
+
+    #: Startverdier for slugger som ikke skal følge standarden.
+    #: Arkivene endres én gang per arrangement — å serialisere hele
+    #: arkivtabellen hvert 10. minutt for å finne ut at ingenting skjedde, er
+    #: å bruke CPU på å bekrefte stillstand.
+    OPPSTARTSVERDIER = {
+        STANDARD_SLUG: (MODUS_VED_ENDRING, 10, ENHET_MINUTT, 50, False),
+        FULL_SLUG:     (MODUS_ALLTID,      24, ENHET_TIME,    7, False),
+        'arkiv':         (MODUS_VED_ENDRING, 6, ENHET_TIME,  20, False),
+        'oppdrag_arkiv': (MODUS_VED_ENDRING, 6, ENHET_TIME,  20, False),
+    }
+
+    slug = models.CharField(
+        max_length=64, unique=True, verbose_name='Slug',
+        help_text='Modul-slug, «full» for hele databasen, eller «standard» for malen.',
     )
-    enabled = models.BooleanField(
-        default=True,
-        verbose_name='Backup aktivert',
-        help_text='Hvis avkrysset kjøres automatisk backup på intervallet under.',
+    folger_standard = models.BooleanField(
+        default=True, verbose_name='Følger standardplanen',
+        help_text='Av for å gi denne modulen egne innstillinger.',
     )
-    interval_minutes = models.IntegerField(
-        choices=INTERVAL_CHOICES,
-        default=60,
-        verbose_name='Backup-intervall',
-        help_text='Hvor ofte automatisk backup skal kjøres.',
+    modus = models.CharField(
+        max_length=16, choices=MODUS_VALG, default=MODUS_VED_ENDRING,
+        verbose_name='Modus',
     )
-    max_backups = models.IntegerField(
-        default=50,
-        verbose_name='Maks antall backuper',
+    intervall_verdi = models.PositiveIntegerField(
+        default=1, validators=[MinValueValidator(1)],
+        verbose_name='Intervall',
+    )
+    intervall_enhet = models.CharField(
+        max_length=8, choices=ENHET_VALG, default=ENHET_TIME,
+        verbose_name='Enhet',
+    )
+    behold = models.PositiveIntegerField(
+        default=50, validators=[MinValueValidator(1)],
+        verbose_name='Behold filer',
         help_text=(
-            'Eldste backuper slettes automatisk slik at totalt antall ikke '
-            'overstiger denne verdien. Pre-restore-snapshots telles ikke.'
+            'Eldste filer på Railway-volumet slettes når antallet overstiges. '
+            'Gjelder ikke kopiene hos Scaleway — de styres av bucketens '
+            'livssyklusregel. Pre-restore-snapshots telles ikke.'
         ),
     )
-    last_run_at = models.DateTimeField(
-        null=True, blank=True,
-        verbose_name='Sist kjørt',
-    )
+    sist_sjekket_at = models.DateTimeField(
+        null=True, blank=True, verbose_name='Sist vurdert')
+    sist_fil_at = models.DateTimeField(
+        null=True, blank=True, verbose_name='Siste fil')
+    sist_resultat = models.CharField(
+        max_length=200, blank=True, default='', verbose_name='Siste resultat')
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        verbose_name = 'Modul-backup-konfigurasjon'
-        verbose_name_plural = 'Modul-backup-konfigurasjoner'
-        ordering = ['module_slug']
+        verbose_name = 'Backupplan'
+        verbose_name_plural = 'Backupplaner'
+        ordering = ['slug']
 
     def __str__(self) -> str:
-        return f'{self.module_slug} ({"av" if not self.enabled else self.get_interval_minutes_display()})'
+        if self.modus == self.MODUS_AV:
+            return f'{self.slug} (av)'
+        return f'{self.slug} ({self.get_modus_display().lower()}, {self.intervall_tekst()})'
+
+    # ── Intervall ────────────────────────────────────────────────────────────
+
+    @property
+    def intervall_min(self) -> int:
+        """Intervallet i minutter. Minst 1 — et intervall på 0 ville betydd
+        «kjør ved hvert tikk», og den betydningen har ``modus`` allerede."""
+        return max(1, self.intervall_verdi * self.ENHET_MINUTTER.get(
+            self.intervall_enhet, 1))
+
+    #: Determinativ og entallsform per enhet. «Time» er felleskjønn og får
+    #: «hver»; «minutt» og «døgn» er intetkjønn og får «hvert». Å utlede det
+    #: av flertallsformen i ``ENHET_VALG`` ga «hver døgn» og «hvert 6. time».
+    ENHET_ENTALL = {
+        ENHET_MINUTT: ('hvert', 'minutt'),
+        ENHET_TIME: ('hver', 'time'),
+        ENHET_DOGN: ('hvert', 'døgn'),
+    }
+
+    def intervall_tekst(self) -> str:
+        """«hver time», «hvert 10. minutt», «hvert 3. døgn»."""
+        determinativ, ord = self.ENHET_ENTALL.get(
+            self.intervall_enhet, ('hvert', self.intervall_enhet))
+        if self.intervall_verdi == 1:
+            return f'{determinativ} {ord}'
+        return f'{determinativ} {self.intervall_verdi}. {ord}'
+
+    # ── Arv ──────────────────────────────────────────────────────────────────
+
+    @property
+    def arver(self) -> bool:
+        """Om raden henter modus, intervall og cap fra standardplanen."""
+        return self.folger_standard and self.slug not in self.EGENRÅDIGE
+
+    def gjeldende(self) -> 'Backupplan':
+        """Raden som faktisk bestemmer — seg selv, eller standardplanen.
+
+        Finnes ingen standardrad ennå (en helt fersk base før første tikk),
+        er svaret raden selv. Å opprette den her ville gjort en lesning til en
+        skriving, og denne kalles fra visninger.
+        """
+        if not self.arver:
+            return self
+        standard = type(self).objects.filter(slug=self.STANDARD_SLUG).first()
+        return standard or self
+
+    @property
+    def modus_effektiv(self) -> str:
+        return self.gjeldende().modus
+
+    @property
+    def intervall_min_effektiv(self) -> int:
+        return self.gjeldende().intervall_min
+
+    @property
+    def behold_effektiv(self) -> int:
+        return self.gjeldende().behold
+
+    @property
+    def skriver_alltid(self) -> bool:
+        """«Alltid» betyr at hash-skippet slås av for denne planen."""
+        return self.modus_effektiv == self.MODUS_ALLTID
+
+    # ── Oppslag ──────────────────────────────────────────────────────────────
 
     @classmethod
-    def get_or_default(cls, slug: str):
-        """Hent config for slug, eller opprett med defaults.
+    def hent(cls, slug: str) -> 'Backupplan':
+        """Hent planen for slugen, opprett med riktige startverdier ved behov.
 
-        Brukt av admin-UI og scheduler. Idempotent.
+        Idempotent. Kalles av klokka når den ser en handler uten plan — at
+        registeret er fasit og ikke tabellen, er grunnen til at en nyregistrert
+        modul får dekning uten at noen åpner en adminside først.
         """
-        obj, _ = cls.objects.get_or_create(module_slug=slug)
+        modus, verdi, enhet, behold, folger = cls.OPPSTARTSVERDIER.get(
+            slug, (cls.MODUS_VED_ENDRING, 10, cls.ENHET_MINUTT, 50, True))
+        obj, _ = cls.objects.get_or_create(slug=slug, defaults={
+            'modus': modus, 'intervall_verdi': verdi, 'intervall_enhet': enhet,
+            'behold': behold, 'folger_standard': folger,
+        })
         return obj
+
+    @classmethod
+    def standardplanen(cls) -> 'Backupplan':
+        return cls.hent(cls.STANDARD_SLUG)
 
 
 class Notification(models.Model):

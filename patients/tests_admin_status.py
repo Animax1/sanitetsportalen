@@ -730,12 +730,15 @@ class UtvidetStatusTests(TestCase):
         from core.kommando import registrer_kjoring
         from .admin_status import _get_cron
         c = _get_cron()
-        self.assertEqual(set(c), {'db_backup', 'purge_old_logs', 'kollaps_arkiv'})
-        self.assertIsNone(c['db_backup'])
-        registrer_kjoring('db_backup', True)
+        # To jobber, ikke tre: `db_backup` sto her uten å være satt opp i
+        # Railway, og backup er ikke lenger en cron-jobb i det hele tatt —
+        # klokka er en tråd i web-prosessen, som eier volumet.
+        self.assertEqual(set(c), {'purge_old_logs', 'kollaps_arkiv'})
+        self.assertIsNone(c['purge_old_logs'])
+        registrer_kjoring('purge_old_logs', True)
         c = _get_cron()
-        self.assertTrue(c['db_backup']['ok'])
-        self.assertIsNotNone(c['db_backup']['timer_siden'])
+        self.assertTrue(c['purge_old_logs']['ok'])
+        self.assertIsNotNone(c['purge_old_logs']['timer_siden'])
 
     def test_epost_transport(self):
         from .admin_status import _get_epost

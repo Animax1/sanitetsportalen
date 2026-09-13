@@ -510,23 +510,21 @@ def backup_admin_overview_view(request):
     siste-kjørt-tid og antall backuper på disk.
     """
     from core.backup import all_handlers
-    from core.models import ModuleBackupConfig
+    from core.models import Backupplan
     from patients.models import Backup
 
     handlers = all_handlers()
-    # Sørg for at det finnes en konfig per registrert modul.
-    for h in handlers:
-        ModuleBackupConfig.get_or_default(h.slug)
-
+    # Registeret er fasit for hvilke moduler som finnes, ikke plantabellen —
+    # en nyregistrert modul skal ha dekning uten at noen åpner denne siden.
+    Backupplan.standardplanen()
     rows = []
     for h in handlers:
-        cfg = ModuleBackupConfig.objects.get(module_slug=h.slug)
-        backup_count = Backup.objects.filter(module_slug=h.slug).count()
+        plan = Backupplan.hent(h.slug)
         rows.append({
             'slug': h.slug,
             'display_name': h.display_name or h.slug,
-            'config': cfg,
-            'backup_count': backup_count,
+            'config': plan,
+            'backup_count': Backup.objects.filter(module_slug=h.slug).count(),
         })
 
     from core import offsite
@@ -541,8 +539,8 @@ def backup_admin_overview_view(request):
 def backup_admin_module_view(request, slug: str):
     """Per-modul backup-side: rediger konfig + se backup-liste."""
     from core.backup import all_handlers, get_handler
-    from core.forms import ModuleBackupConfigForm
-    from core.models import ModuleBackupConfig
+    from core.forms import BackupplanForm
+    from core.models import Backupplan
     from patients.models import Backup
 
     handler = get_handler(slug)
@@ -550,10 +548,10 @@ def backup_admin_module_view(request, slug: str):
         messages.error(request, f'Ingen backup-handler registrert for «{slug}».')
         return redirect('core:backup_admin_overview')
 
-    cfg = ModuleBackupConfig.get_or_default(slug)
+    cfg = Backupplan.hent(slug)
 
     if request.method == 'POST':
-        form = ModuleBackupConfigForm(request.POST, instance=cfg)
+        form = BackupplanForm(request.POST, instance=cfg)
         if form.is_valid():
             form.save()
             messages.success(
@@ -562,7 +560,7 @@ def backup_admin_module_view(request, slug: str):
             )
             return redirect('core:backup_admin_module', slug=slug)
     else:
-        form = ModuleBackupConfigForm(instance=cfg)
+        form = BackupplanForm(instance=cfg)
 
     backups = (
         Backup.objects
@@ -587,7 +585,7 @@ def backup_admin_module_view(request, slug: str):
 def backup_admin_run_view(request, slug: str):
     """Trigger en manuell backup for modulen NÅ."""
     from core.backup import KIND_MANUAL, create_backup, enforce_cap, get_handler
-    from core.models import ModuleBackupConfig
+    from core.models import Backupplan
 
     handler = get_handler(slug)
     if handler is None:
@@ -599,8 +597,8 @@ def backup_admin_run_view(request, slug: str):
             slug=slug, kind=KIND_MANUAL, user=request.user,
             note=f'Manuelt startet av {request.user.username}',
         )
-        cfg = ModuleBackupConfig.get_or_default(slug)
-        purged = enforce_cap(slug, cfg.max_backups)
+        plan = Backupplan.hent(slug)
+        purged = enforce_cap(slug, plan.behold_effektiv)
         if backup is None:
             # Burde aldri skje for manual, men vi er defensive.
             messages.info(request, 'Ingen ny backup ble lagret.')

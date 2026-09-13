@@ -3,10 +3,11 @@
 
 **En død database skal gi én linje, ikke to hundre.**
 
-Portalen har tre cron-jobber — `purge_old_logs`, `kollaps_arkiv` og
-`db_backup` — og de har ingen bruker som ser på dem mens de kjører. Den
-eneste som noen gang leser utskriften, er den som lurer på hvorfor jobben er
-rød. Et rått `OperationalError` gir da fire stablede tracebacks der den ene
+Portalen har to cron-jobber — `purge_old_logs` og `kollaps_arkiv` — og de har
+ingen bruker som ser på dem mens de kjører. Den eneste som noen gang leser
+utskriften, er den som lurer på hvorfor jobben er rød. Hjelperen brukes også av
+`backup_kjor`, som ikke er en cron-jobb, men som kjøres uten tilsyn på samme
+måte når den startes med `railway ssh`. Et rått `OperationalError` gir da fire stablede tracebacks der den ene
 setningen som betyr noe — «password authentication failed» — står omtrent på
 linje 140, mellom to identiske kopier av seg selv.
 
@@ -15,7 +16,7 @@ jobben er fortsatt rød og Railway melder den fortsatt som feilet. Vi skjuler
 ingenting: den underliggende teksten fra psycopg2 står i meldingen, med vert
 og årsak.
 
-**Hvorfor det er én funksjon og ikke tre.** 30. aug. 2026 falt to av de tre
+**Hvorfor det er én funksjon og ikke én per jobb.** 30. aug. 2026 falt to av
 jobbene på samme avviste passord i staging, og feilsøkingen begynte med å
 lese to nesten identiske tracebacks for å finne ut at de sa det samme. Skrev
 vi meldingen i hver kommando, ville den tredje før eller siden fått en annen
@@ -78,7 +79,18 @@ def lesbar_dbfeil(jobb, navn=None):
             registrer_kjoring(navn, True, '')
 
 
-CRON_JOBBER = ('db_backup', 'purge_old_logs', 'kollaps_arkiv')
+#: Jobbene Railway Cron faktisk kjører. Dashbordet på
+#: `/portal-admin/server-status/` viser «Aldri» for en jobb som står her uten
+#: å være satt opp — og et varsel som alltid står rødt lærer deg å ikke se på
+#: dashbordet.
+#:
+#: `db_backup` sto her fram til 13. sep. 2026 uten å være satt opp i Railway.
+#: Den er ikke erstattet av `backup_kjor`: backup er ikke lenger en cron-jobb,
+#: fordi Railway-volumet bare kan henge på én tjeneste og en cron-tjeneste uten
+#: det ville skrevet filene til et flyktig containerfilsystem. Klokka er en
+#: tråd i web-prosessen; se `core/backup/klokke.py`. Helsa til den vises som
+#: sin egen linje på server-status, ikke som en cron-jobb.
+CRON_JOBBER = ('purge_old_logs', 'kollaps_arkiv')
 
 
 def registrer_kjoring(navn, ok, melding=''):
@@ -95,7 +107,7 @@ def registrer_kjoring(navn, ok, melding=''):
 
 
 def siste_kjoringer():
-    """{navn: {tid, ok, melding} | None} for de tre jobbene."""
+    """{navn: {tid, ok, melding} | None} for cron-jobbene."""
     import json
     from patients.models import AppSetting
     ut = {}

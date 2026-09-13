@@ -884,11 +884,21 @@ egen base i stedet for prøvebasen.
 
 ### Cron-jobbene (core/kommando.py)
 
-Tre jobber kjøres av Railway Cron: `purge_old_logs`, `kollaps_arkiv` og
-`db_backup`. Ingen har en bruker som ser på mens de kjører, så **alle tre
-pakker arbeidet i `lesbar_dbfeil('hva som ikke ble gjort')`** — en
-`OperationalError` blir da til én lesbar linje med årsak og råd, i stedet for
-fire stablede tracebacks. Jobben avslutter fortsatt med kode 1.
+**To** jobber kjøres av Railway Cron: `purge_old_logs` og `kollaps_arkiv`.
+Ingen har en bruker som ser på mens de kjører, så **begge pakker arbeidet i
+`lesbar_dbfeil('hva som ikke ble gjort')`** — en `OperationalError` blir da til
+én lesbar linje med årsak og råd, i stedet for fire stablede tracebacks. Jobben
+avslutter fortsatt med kode 1.
+
+**Backup er ikke en cron-jobb** (13. sep. 2026). `db_backup` sto i
+`CRON_JOBBER` uten å være satt opp i Railway, og er fjernet uten erstatning:
+**et Railway-volum kan bare henge på én tjeneste**, og `/data` henger på
+web-tjenesten. En cron-tjeneste som tok backup ville skrevet fila til sitt eget
+flyktige containerfilsystem, opprettet `Backup`-raden, og forsvunnet med fila —
+og `core.arkiv.har_backup_etter()` spør bare etter raden, så kollapssperra
+ville åpnet seg på spøkelsesbackuper. De to jobbene som står der rører bare
+databasen og trenger derfor ikke volumet. Klokka er `core/backup/klokke.py`,
+en tråd i web-prosessen; `backup_kjor` er den manuelle inngangen.
 
 **`DATABASE_URL` må peke på PostgreSQL når `RAILWAY_ENVIRONMENT` er satt.**
 `dj_database_url.config()` faller ellers stille tilbake til en SQLite-fil i

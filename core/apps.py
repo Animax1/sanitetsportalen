@@ -34,3 +34,11 @@ class CoreConfig(AppConfig):
 
     def ready(self):
         post_migrate.connect(_ensure_module_settings_defaults, sender=self)
+
+        # Backup-klokka (13. sep. 2026). Starter ikke under test, migrate eller
+        # engangskommandoer — `klokke.skal_starte()` er det ene stedet den
+        # avgjørelsen tas. Den ligger her og ikke i en cron-tjeneste fordi
+        # Railway-volumet bare kan henge på én tjeneste, og det er denne; se
+        # `core/backup/klokke.py`.
+        from core.backup.klokke import start_klokke
+        start_klokke()

@@ -61,49 +61,76 @@ class ModuleSettingsForm(forms.ModelForm):
         return enabled
 
 
-class ModuleBackupConfigForm(forms.ModelForm):
-    """Skjema for ModuleBackupConfig — admin redigerer interval/cap/enabled."""
+class BackupplanForm(forms.ModelForm):
+    """Skjema for én backupplan — modus, intervall og cap.
+
+    Intervallet er **to felter**, tall og enhet, og ikke et nedtrekk med faste
+    valg slik det var fram til 13. sep. 2026. Det var nettopp de faste valgene
+    som gjorde at «hvert 10. minutt» og «hver tredje dag» ikke fantes.
+
+    Grensene er vide med vilje: 1 til 1000 filer, og et hvilket som helst
+    positivt intervall. Konsekvensen av et tett intervall vises i
+    grensesnittet som antall filer i døgnet — **varsle, ikke avvis**, som
+    vaktlistas belastningstall. Den som setter fem minutter under en stor vakt,
+    vet som regel hvorfor.
+    """
 
     class Meta:
-        from core.models import ModuleBackupConfig as _MBC
-        model = _MBC
-        fields = ['enabled', 'interval_minutes', 'max_backups']
+        from core.models import Backupplan as _BP
+        model = _BP
+        fields = ['folger_standard', 'modus', 'intervall_verdi',
+                  'intervall_enhet', 'behold']
         widgets = {
-            'enabled': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
-            'interval_minutes': forms.Select(attrs={'class': 'form-select'}),
-            'max_backups': forms.NumberInput(attrs={
-                'class': 'form-control',
-                'min': 1,
-                'max': 1000,
-                'step': 1,
+            'folger_standard': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+            'modus': forms.Select(attrs={'class': 'form-select'}),
+            'intervall_verdi': forms.NumberInput(attrs={
+                'class': 'form-control', 'min': 1, 'max': 10000, 'step': 1,
+            }),
+            'intervall_enhet': forms.Select(attrs={'class': 'form-select'}),
+            'behold': forms.NumberInput(attrs={
+                'class': 'form-control', 'min': 1, 'max': 1000, 'step': 1,
             }),
         }
         labels = {
-            'enabled': 'Automatisk backup aktivert',
-            'interval_minutes': 'Backup-intervall',
-            'max_backups': 'Maks antall backuper',
-        }
-        help_texts = {
-            'enabled': (
-                'Hvis avkrysset kjøres backup automatisk på intervallet under. '
-                'Hvis ikke avkrysset må admin starte backup manuelt.'
-            ),
-            'max_backups': (
-                'Eldste backuper slettes når dette antallet overstiges. '
-                'Pre-restore-snapshots telles ikke.'
-            ),
+            'folger_standard': 'Følg standardplanen',
+            'modus': 'Modus',
+            'intervall_verdi': 'Intervall',
+            'intervall_enhet': 'Enhet',
+            'behold': 'Behold filer på volumet',
         }
 
-    def clean_max_backups(self):
-        value = self.cleaned_data['max_backups']
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Standardplanen og hele databasen styrer alltid seg selv. Å vise
+        # avkrysningsboksen for dem ville tilbudt et valg som ikke finnes.
+        from core.models import Backupplan
+        instans = kwargs.get('instance') or self.instance
+        if instans is not None and instans.slug in Backupplan.EGENRÅDIGE:
+            self.fields.pop('folger_standard', None)
+
+        # `PositiveIntegerField.formfield()` setter `min_value=0`, og det
+        # vinner over `min` i widgetens attrs. Uten dette lover nettleseren at
+        # 0 er lov, og feltet avvises først av `clean_` — altså en tur til
+        # serveren for å få vite noe skjemaet visste.
+        for navn in ('intervall_verdi', 'behold'):
+            if navn in self.fields:
+                self.fields[navn].min_value = 1
+                self.fields[navn].widget.attrs['min'] = 1
+
+    def clean_intervall_verdi(self):
+        verdi = self.cleaned_data['intervall_verdi']
+        if verdi < 1:
+            raise forms.ValidationError('Intervallet må være minst 1.')
+        if verdi > 10000:
+            raise forms.ValidationError('Intervallet kan ikke overstige 10000.')
+        return verdi
+
+    def clean_behold(self):
+        value = self.cleaned_data['behold']
         if value < 1:
-            raise forms.ValidationError(
-                'Maks antall backuper må være minst 1.'
-            )
+            raise forms.ValidationError('Antall filer må være minst 1.')
         if value > 1000:
-            raise forms.ValidationError(
-                'Maks antall backuper kan ikke overstige 1000.'
-            )
+            raise forms.ValidationError('Antall filer kan ikke overstige 1000.')
         return value
 
 

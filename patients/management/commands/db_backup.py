@@ -1,6 +1,15 @@
-"""Kjør en automatisk backup. Brukes av Railway cron-service.
+"""Utgått: tar backup av *bare* pasientmodulen, gjennom det nedlagte
+`patients/backup_service.py` og singletonen `patients.BackupConfig`.
 
-Eksempel: python manage.py db_backup
+**Ikke bruk denne.** Navnet lover hele databasen, og den gjør noe annet. Den
+sto i `CRON_JOBBER` fram til 13. sep. 2026 uten noen gang å ha vært satt opp
+som cron-tjeneste i Railway — og det var flaks: et Railway-volum kan bare henge
+på én tjeneste, så en cron-tjeneste uten `/data` ville skrevet fila til et
+flyktig containerfilsystem og etterlatt en `Backup`-rad uten fil.
+
+Bruk `python manage.py backup_kjor` i stedet. Denne fila slettes sammen med
+`patients.BackupConfig` når den migrasjonen tas (fase 8 i
+`docs/PLAN_BACKUP_OMLEGGING.md`).
 """
 from django.core.management.base import BaseCommand
 from django.utils import timezone
@@ -21,7 +30,7 @@ class Command(BaseCommand):
         # Én lesbar linje i cron-loggen — se core/kommando.py. **Og den
         # viktigste av de tre å oppdage:** en backup som ikke ble tatt, blir
         # savnet den dagen man trenger den, ikke den dagen den feilet.
-        with lesbar_dbfeil('ingen backup ble tatt', navn='db_backup'):
+        with lesbar_dbfeil('ingen backup ble tatt'):
             self._kjor(opts)
 
     def _kjor(self, opts):

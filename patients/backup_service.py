@@ -34,7 +34,7 @@ BACKUP_EXCLUDE = ['patients.Backup', 'patients.BackupConfig', 'patients.VaktArki
 
 # Beholdes for bakoverkompatibilitet, men brukes ikke aktivt — cap erstatter
 # tidsbasert retention. Fra Fase 4 styres oppryddingen av
-# ModuleBackupConfig.max_backups (default 50).
+# Backupplan.behold (default 50).
 RETENTION_HOURS = 72
 
 # Default cap for legacy-kall som ikke spesifiserer noe.
@@ -67,12 +67,12 @@ def restore_backup(backup, user=None) -> None:
 def purge_old_backups() -> int:
     """Bakoverkompatibel: håndhev cap for patients-modulen.
 
-    Bruker default-capen (50). Auto-backup-flyten i scheduleren bruker
-    config.max_backups direkte og kaller ikke denne funksjonen.
+    Bruker default-capen (50). Klokka bruker planens egen `behold`
+    direkte og kaller ikke denne funksjonen.
     """
-    from core.models import ModuleBackupConfig
-    cfg = ModuleBackupConfig.objects.filter(module_slug='patients').first()
-    cap = cfg.max_backups if cfg else _DEFAULT_CAP
+    from core.models import Backupplan
+    plan = Backupplan.objects.filter(slug='patients').first()
+    cap = plan.behold_effektiv if plan else _DEFAULT_CAP
     return _core_enforce_cap('patients', cap)
 
 

@@ -62,21 +62,28 @@
             <div class="small text-muted">{{ row.slug }}</div>
           </td>
           <td>
-            {% if row.config.enabled %}
+            {% if row.config.modus_effektiv == 'av' %}
+              <span class="badge bg-secondary">
+                <i class="bi bi-pause-circle me-1"></i>Av
+              </span>
+            {% elif row.config.modus_effektiv == 'alltid' %}
               <span class="badge bg-success">
-                <i class="bi bi-check-circle me-1"></i>Aktiv
+                <i class="bi bi-record-circle me-1"></i>Alltid
               </span>
             {% else %}
-              <span class="badge bg-secondary">
-                <i class="bi bi-pause-circle me-1"></i>Inaktiv
+              <span class="badge bg-success">
+                <i class="bi bi-check-circle me-1"></i>Ved endring
               </span>
             {% endif %}
+            {% if row.config.arver %}
+              <span class="badge bg-secondary ms-1">følger standard</span>
+            {% endif %}
           </td>
-          <td>{{ row.config.get_interval_minutes_display }}</td>
-          <td>{{ row.config.max_backups }}</td>
+          <td>{{ row.config.gjeldende.intervall_tekst }}</td>
+          <td>{{ row.config.behold_effektiv }}</td>
           <td>
-            {% if row.config.last_run_at %}
-              {{ row.config.last_run_at|date:"d.m.Y H:i" }}
+            {% if row.config.sist_fil_at %}
+              {{ row.config.sist_fil_at|date:"d.m.Y H:i" }}
             {% else %}
               <span class="text-muted">Aldri</span>
             {% endif %}

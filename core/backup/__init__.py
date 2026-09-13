@@ -7,6 +7,8 @@ Hovedeksport:
 - ``create_backup(slug, kind, user, note)`` — lag en backup
 - ``restore_backup(backup, user)`` — gjenopprett en backup
 - ``enforce_cap(slug, max_backups)`` — håndhev cap på antall backups
+- ``klokke`` — tråden som utløser automatisk backup (se modulens docstring for
+  hvorfor det ikke er en cron-tjeneste)
 - Konstanter: ``KIND_AUTO``, ``KIND_MANUAL``, ``KIND_PRE_RESTORE``,
   ``KIND_PRE_RESET``
 """
@@ -18,6 +20,8 @@ from .handlers import (
     registrer_alle_moduler,
     register,
 )
+from . import klokke
+from .klokke import kjor_forfalte, kjor_plan, start_klokke, vakthund
 from .service import (
     KIND_AUTO,
     KIND_MANUAL,
@@ -45,7 +49,12 @@ __all__ = [
     'enforce_cap',
     'get_backup_dir',
     'get_handler',
+    'kjor_forfalte',
+    'kjor_plan',
+    'klokke',
     'registrer_alle_moduler',
     'register',
     'restore_backup',
+    'start_klokke',
+    'vakthund',
 ]

@@ -8,15 +8,22 @@ from collections import deque
 
 from django.conf import settings
 
-from .backup_scheduler import maybe_run_backup
+
 
 
 class BackupSchedulerMiddleware:
-    """Trigger sjekk av automatisk backup ved hver request.
+    """Reservenett for backup-klokka — ikke lenger hovedutløseren.
 
-    Throttlet internt til maks én sjekk per 60 sekund per prosess, og selve
-    backup-operasjonen kjører i bakgrunnstråd – så request-latency påvirkes
-    ikke merkbart.
+    Fram til 13. sep. 2026 var denne middlewaren det *eneste* som utløste
+    automatisk backup, og det betydde at klokka var trafikk: kom det ingen
+    forespørsel, ble det ingen backup. Mellom vaktene står portalen stille, og
+    da sto backupen stille også.
+
+    Nå tikker `core.backup.klokke` i en egen tråd, uavhengig av trafikk. Denne
+    står igjen for det tilfellet at tråden ikke kom opp, og går gjennom den
+    samme `kjor_forfalte()` — det skal ikke finnes to oppførsler å feilsøke.
+    Throttlet til én sjekk per tikk-intervall per prosess, og arbeidet gjøres i
+    en bakgrunnstråd, så svartiden er upåvirket.
     """
 
     def __init__(self, get_response):
@@ -26,7 +33,8 @@ class BackupSchedulerMiddleware:
         response = self.get_response(request)
         # Kjør ETTER respons slik at brukeren ikke merker noe
         try:
-            maybe_run_backup()
+            from core.backup.klokke import kanskje_kjor
+            kanskje_kjor()
         except Exception:
             # Backup skal aldri ta ned appen
             pass

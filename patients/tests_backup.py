@@ -111,15 +111,16 @@ class BackupServiceTests(TestCase):
         self.assertNotIn(102, pnr_list, 'Pasient B skal ikke finnes etter restore')
 
     def test_purge_enforces_cap(self):
-        """purge_old_backups (Fase 4) håndhever ModuleBackupConfig.max_backups.
+        """purge_old_backups håndhever `Backupplan.behold`.
 
         Tids-basert retention er erstattet med count-basert cap. Vi setter
         cap til 1 og lager 3 backuper — de 2 eldste skal slettes.
         """
-        from core.models import ModuleBackupConfig
-        cfg = ModuleBackupConfig.get_or_default('patients')
-        cfg.max_backups = 1
-        cfg.save()
+        from core.models import Backupplan
+        plan = Backupplan.hent('patients')
+        plan.folger_standard = False
+        plan.behold = 1
+        plan.save()
 
         with patch.dict(os.environ, {'BACKUP_DIR': str(self.backup_dir)}):
             create_backup(kind='manual', user=self.admin)
