@@ -325,23 +325,25 @@ bindende: 1 før 2, fordi backupen speiler hvor modellene bor.
       med test som laster en fil i gammel form. `patients/backup_service.py` og
       `RETENTION_HOURS` legges ned i samme runde.
 - [ ] **2. Backupene på nytt grunnlag** (§4 i notatet). **Planen er skrevet ut i
-      [`docs/PLAN_BACKUP_OMLEGGING.md`](./docs/PLAN_BACKUP_OMLEGGING.md)** (13. sep. 2026)
-      etter Andrés bestilling: modulløsningen er tungvint, han vil ha fritt intervall og
-      valget mellom konsekvent lagring og lagring ved endring, det samme for hele basen,
-      og en instruks for oppbevaringstidene i Scaleway. Fasene under er notatets §9; fase
-      1–5 kan kjøres **før** punkt 1 over, jf. `PLAN_REKKEFOLGE_2026-09.md`.
+      [`docs/PLAN_BACKUP_OMLEGGING.md`](./docs/PLAN_BACKUP_OMLEGGING.md)** — versjon 2,
+      13. sep. 2026, med Andrés fem svar innarbeidet. Fase 1–6 kan kjøres **før** punkt 1
+      over, jf. `PLAN_REKKEFOLGE_2026-09.md`.
       - [ ] **Fase 1 — plan og klokke.** `core.Backupplan` erstatter `ModuleBackupConfig`:
-            tre moduser (av / ved endring / alltid), **fritt intervall** i stedet for
-            nedtrekket med sju valg, standardplan modulene arver, og `sist_sjekket_at` ved
-            siden av `sist_fil_at` så stille skilles fra stoppet. Ny kommando
-            `backup_kjor` som Railway-cron er klokka — **i dag tas det ingen backup uten
-            trafikk**, fordi middlewaren er eneste utløser. Datamigrasjonen rører data og
-            skjema i samme transaksjon: `SET CONSTRAINTS`-mønsteret **og** en prøve i
-            `core/migrasjonsprover.py`.
-      - [ ] **Fase 2 — én side.** Standardplan, inline fillister, «Ta backup av alle nå»,
-            «Gjenopprett siste», bekreftelse i dialog. Modul- og gjenopprettingssidene
-            legges ned. I dag er en gjenoppretting fem steg og en backup av alt fire
-            runder.
+            tre moduser (av / ved endring / alltid), **intervall satt fritt i minutter,
+            timer eller døgn**, cap på antall filer, og en standardplan modulene arver.
+            `sist_sjekket_at` ved siden av `sist_fil_at`, så stille skilles fra stoppet.
+            Ny kommando `backup_kjor` som Railway-cron blir klokka — **i dag tas det ingen
+            backup uten trafikk**, og `db_backup` står ikke i Railway, så prod har aldri
+            hatt en klokkedrevet backup. `CRON_JOBBER` bytter `db_backup` mot
+            `backup_kjor` allerede her, ellers lyver server-status en fase til.
+            `CLAUDE.md` sier tre cron-jobber; det er to, og det rettes.
+            Datamigrasjonen rører data og skjema i samme transaksjon:
+            `SET CONSTRAINTS`-mønsteret **og** en prøve i `core/migrasjonsprover.py`.
+      - [ ] **Fase 2 — én side.** Standardplan, «verste tilfelle nå» målt mot siste
+            vellykkede offsite-kopi, diskbruk på volumet, inline fillister, «Ta backup av
+            alle nå», «Gjenopprett siste», bekreftelse i dialog. Modul- og
+            gjenopprettingssidene legges ned. I dag er en gjenoppretting fem steg og en
+            backup av alt fire runder.
       - [ ] **Fase 3 — handlerne og utledet slettelista.** `vaktliste`-handler (største
             udekkede datamengde i dag) og `portal`-handler med `core.Vakt`;
             `get_restore_models()` utledes topologisk fra `apps`, med test som krever at
@@ -351,27 +353,37 @@ bindende: 1 før 2, fordi backupen speiler hvor modellene bor.
       - [ ] **Fase 4 — hel backup** (`docs/BACKUP.md` §1): alt unntatt sesjoner,
             contenttypes, permissions og backup-metadata. Gjenoppretting er
             `flush` + `loaddata`, ikke en slettelista — **og du blir logget ut**, fordi
-            sesjonene ligger i basen. `gjenopprett_full` er veien i tom base. Eget prefiks
-            `full/` offsite. **Ingen nedlastingsknapp** for denne fila: den bærer
-            passordhasher og MFA-hemmeligheter.
-      - [ ] **Fase 5 — `verifiser_backup`.** Engangsbase som `verifiser_migrasjoner`,
+            sesjonene ligger i basen. Eget prefiks `full/` offsite. Standard: alltid,
+            hver 24. time, cap 7. **Fase 7 må være gjort først** (se der).
+      - [ ] **Fase 5 — `gjenopprett`-kommandoen.** `--list`, `--ja` (nødvendig under
+            `railway ssh`, som ikke har interaktiv terminal), `--full` og `--hent` som
+            henter fra Scaleway og gjenoppretter i ett. **I dag finnes ingen
+            CLI-gjenoppretting** — `hent_offsite` henter og dekrypterer, men siste halvdel
+            av veien er kun nettleser.
+      - [ ] **Fase 6 — `verifiser_backup`.** Engangsbase som `verifiser_migrasjoner`,
             laster de nyeste filene i rekkefølge og skriver radtall. Pluss testen fra
             `BACKUP.md` §3.6, kjørt mot PostgreSQL minst én gang — SQLite har ingen
             utsatte fremmednøkler, og det er dem testen finnes for.
-      - [ ] **Fase 6 — oppbevaringstidene i Scaleway** (`PLAN_BACKUP_OMLEGGING.md` §7,
-            **krever Andre**): den eksisterende 730-dagersregelen snevres inn til prefikset
+      - [ ] **Fase 7 — oppbevaringstidene i Scaleway** (`PLAN_BACKUP_OMLEGGING.md` §7,
+            **krever Andre**). Regelen står i dag på **730 dager med scope «alle objekter
+            i bucketen»**, bekreftet 13. sep. Den må derfor snevres inn til prefikset
             `backups/` **før** en ny regel på `full/` med 90 dager legges til — to regler
-            som treffer samme objekt er et sted å gjette. Kontrolleres med
-            `get-bucket-lifecycle-configuration`, og kortet på `/portal-admin/backup/`
-            leser det samme kallet.
-      - [ ] **Fase 7 — rydding:** `db_backup`, `patients/backup_service.py`,
+            som treffer samme objekt er et sted å gjette. **Skal gjøres før fase 4 er i
+            prod**, ellers lander de første hele backupene under 730-dagersregelen, og
+            90 dager er en personvernbeslutning, ikke en preferanse. Portalens IAM-nøkkel
+            kan lese bucket-oppsettet, men ikke skrive det — gjøres i konsollen.
+            Kontrolleres med `get-bucket-lifecycle-configuration`, og kortet på
+            `/portal-admin/backup/` gjør samme kall.
+      - [ ] **Fase 8 — rydding:** `db_backup`, `patients/backup_service.py`,
             `patients.BackupConfig`, `RETENTION_HOURS`. Krever migrasjon. Slås sammen med
             det løse punktet «Rydd bort død backup-legacy» lenger ned.
-      - [ ] **Krever Andre — før fase 4 og 6:** de fem spørsmålene i notatets §10
-            (standardintervall, intervall for hel backup, nedlasting av hel fil,
-            **om `db_backup` faktisk står som cron-tjeneste i Railway** — `CLAUDE.md` sier
-            tre jobber, tabellen øverst her lister to — og hva livssyklusregelen i
-            bucketen står på i dag).
+      - [ ] **Krever Andre — før fase 4:** skal den hele backupfila kunne **lastes ned**
+            fra nettleseren? Anbefaling nei (§8.1 i notatet): den bærer passordhasher og
+            TOTP-hemmeligheter for alle kontoer, og katastrofeveien går uansett gjennom
+            containeren uten å innom en klientmaskin. Gjenoppretting fra grensesnittet er
+            upåvirket av svaret.
+      - [ ] **Krever Andre — før fase 7:** bucketnavnet, til instruksen og runbooken.
+
 - [ ] **3. Dokumentrunden — når 1 og 2 er levert.** Én runde, ikke stykkevis, og den tar
       med seg **alt fra 11.–13. september** (sikkerhetsrundene, server-status, reserve og
       offline, offsite, flere enheter per oppdrag, ISSI og besetning, audit i vaktlista,

@@ -4,6 +4,44 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-13 — Backup-planen versjon 2: svarene innarbeidet
+
+Ingen kodeendring. André svarte på de fem spørsmålene, og planen er skrevet om.
+
+**Intervallet settes fritt i minutter, timer eller døgn**, med enheten lagret slik den ble
+valgt — «3 døgn» skal ikke leses tilbake som «4320 minutter». Cap på antall filer gjelder
+både moduler og hel database, med standard: moduler ved endring hvert 10. minutt og cap
+50, arkivene hver 6. time, hel base alltid hver 24. time og cap 7.
+
+**Tilpasning til den enkelte vakt løses med modusen, ikke med to intervaller.** «Ved
+endring» med kort intervall er vaktadaptiv av seg selv: under vakt endres dataene hele
+tiden og det skrives en fil hvert intervall, mellom vaktene skrives ingenting. To
+intervaller med automatisk omslag ble vurdert og lagt bort — `Vakt.er_aktiv` står på til
+noen avslutter vakta, vaktlistas driftsflagg ville vært feil vei i avhengighetene, og en
+manuell vaktbryter er den man glemmer å slå av.
+
+**Siden viser hva som faktisk står på spill:** «verste tilfelle nå» per modul, målt mot
+siste *vellykkede offsite-kopi* og ikke mot siste fil på volumet. Er volumet borte, er det
+bare bucketen som teller, og en linje som leser volumet ville vist fire minutter mens den
+virkelige avstanden var to dager.
+
+**Gjenoppretting får en CLI-vei.** Den finnes ikke i dag: `hent_offsite` henter og
+dekrypterer, men skriver «gjenopprett fra /portal-admin/backup/». Ny `gjenopprett`-kommando
+med `--list`, `--full`, `--hent` og `--ja` — flagget er nødvendig, ikke bekvemt, fordi
+`railway ssh` kjører uten interaktiv terminal.
+
+**To fakta fra André som endrer planen:** `db_backup` står **ikke** i Railway, så prod har
+aldri hatt en klokkedrevet backup — alt som er tatt, er utløst av web-trafikk. Og
+livssyklusregelen i bucketen står på 730 dager med scope «alle objekter», så den må
+snevres inn til `backups/` før 90-dagersregelen på `full/` legges til, og det må skje før
+den første hele backupen lastes opp.
+
+Ett spørsmål står igjen: skal den hele fila kunne lastes ned fra nettleseren. Anbefaling
+nei — nedlasting og gjenoppretting er ulike ting, og bare den ene flytter portalens
+legitimasjon til en laptop.
+
+---
+
 ## 2026-09-13 — Backup-omleggingen planlagt: `docs/PLAN_BACKUP_OMLEGGING.md`
 
 Ingen kodeendring. Bestillingen var at modulenes backup og gjenoppretting er tungvint, at
