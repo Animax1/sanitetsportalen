@@ -200,9 +200,9 @@ automatisk redeploy (~60s).
 | `WEB_THREADS`      | `4`     | Øk til `6` hvis P95 fortsatt høy etter `WEB_WORKERS=2` |
 | `WEB_MAX_REQUESTS` | `1000`  | La stå. Worker-recycle etter 1000 requests (beskytter mot minnelekkasjer) |
 
-**Observabilitet**: Admin-rollen kan åpne `/admin/server-status/` for
-å se P50/P95 responstid, RPS, minnebruk, aktive sesjoner og toggle
-feature-flags — uten redeploy. Se `RUNBOOK_VAKT.md` for konkrete
+**Observabilitet**: Admin-rollen kan åpne `/portal-admin/server-status/` for
+å se P50/P95 responstid, RPS, tregeste stier, minne, disk, database, aktive
+sesjoner, backup og offsite, vaktbildet, konfigsjekk, innlogging og cron. Se `RUNBOOK_VAKT.md` for konkrete
 terskler og tiltak.
 
 #### Valgfrie – superbruker ved første deploy
@@ -213,16 +213,6 @@ Brukes kun ved første deploy for å auto-opprette admin. Fjern etterpå.
 |-------------------------------|-------------|
 | `DJANGO_SUPERUSER_USERNAME`   | Brukernavn for initial admin |
 | `DJANGO_SUPERUSER_PASSWORD`   | Initialt passord (må byttes ved første innlogging) |
-
-#### Feature-flags
-
-Disse styres **ikke** via miljøvariabler, men via admin-dashbordet
-(`/admin/server-status/`) og lagres i `AppSetting`-tabellen. Endringer
-trer i kraft umiddelbart uten redeploy:
-
-| Nøkkel                         | Default | Beskrivelse |
-|--------------------------------|---------|-------------|
-| `feature.live_stats_enabled`   | `false` | Planlagt funksjon — ikke implementert ennå. Default er `false` til funksjonen lander. |
 
 ### Steg 5 – Generer domene
 
@@ -362,9 +352,8 @@ De tidligere `/api/backup/`-endepunktene i pasientmodulen er fjernet (august 202
 
 | Metode   | URL                                   | Beskrivelse                          |
 |----------|---------------------------------------|--------------------------------------|
-| GET      | `/admin/server-status/`               | HTML-dashbord: metrics, RAM, sesjoner, feature-flags |
-| GET      | `/admin/server-status/json/`          | Samme data som JSON (for polling)    |
-| POST     | `/admin/server-status/flag/`          | Sett feature-flag (whitelistede nøkler) |
+| GET      | `/portal-admin/server-status/`        | HTML-dashbord: metrics, RAM, disk, database, sesjoner, backup, vaktbildet, konfigsjekk |
+| GET      | `/portal-admin/server-status/json/`   | Samme data som JSON (for polling)    |
 | GET      | `/admin/`                             | Django-admin (database-administrasjon) |
 
 ---

@@ -95,10 +95,10 @@ formål, ikke en videreføring av det slettede, og stien er ledig.
 
 **Oppdatering august 2026:** To ting å ta hensyn til hvis dette startes.
 
-- **Live-stats-flagget finnes allerede** som `feature.live_stats_enabled` i
-  `patients/admin_status.py:40–41`, med default `'false'` nettopp fordi funksjonen ikke er
-  bygget. Flytt defaulten til `'true'` i samme commit som leverer fase 2 — kommentaren i
-  koden ber eksplisitt om det.
+- **Live-stats-flagget er fjernet** (13. sep. 2026). `feature.live_stats_enabled` lå i
+  `patients/admin_status.py` med default `'false'` fordi funksjonen ikke var bygget, og
+  kortet på server-status var støy. Trengs en bryter når fase 2 bygges, lag den da — i
+  `AppSetting`, som portalinnstillingene.
 - **A2 avhenger av audit-loggen** for å utlede tildelingstidspunkt. Da bør N2 være løst
   først, ellers dekker A2 kun førstehjelper og ikke helsepersonell. Og F2 må settes opp
   med en retention som er lengre enn analysevinduet — det nytter ikke å regne på data

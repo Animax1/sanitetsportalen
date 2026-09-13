@@ -4,7 +4,7 @@ Erstatter den ene tingen `/django-admin/` kunne som portalen ikke dekket:
 å korrigere en driftsverdi manuelt. Nøklene som bor her etter deploy 2 av
 vakt-scopingen er ``aktiv_vakt_id``, tellerne per vakt
 (``next_patient_nr_vakt_<id>``, ``next_oppdrag_nr_vakt_<id>``),
-``session_timeout_hours`` og feature-flagg. ``active_year`` og ``event_name``
+``session_timeout_hours``. ``active_year`` og ``event_name``
 er borte — vakta bærer begge (`core.Vakt`).
 
 Dette er bevisst en nødoperasjon og ikke en UI-flate. Verdiene endres sjelden,

@@ -7,7 +7,6 @@ from django.urls import reverse
 from accounts.models import CustomUser
 
 from .middleware import metrics_store, _MetricsStore
-from .models import AppSetting
 from accounts.test_helpers import gi_standardtilgang
 
 
@@ -273,83 +272,7 @@ class AdminStatusTilgangTests(TestCase):
         self.assertIn('metrics_5min', data)
         self.assertIn('metrics_1min', data)
         self.assertIn('worker_config', data)
-        self.assertIn('feature_flags', data)
-
-
-@override_settings(SECURE_SSL_REDIRECT=False)
-class FeatureFlagTests(TestCase):
-    """Tester at feature-flagg kan settes og hentes."""
-
-    def setUp(self):
-        self.client = Client()
-        self.admin = CustomUser.objects.create_user(
-            username='admin1', password='testpass123', role='admin', must_change_password=False,
-        )
-        gi_standardtilgang(self.admin, 'admin')
-        self.lead = CustomUser.objects.create_user(
-            username='lead1', password='testpass123', role='bruker', must_change_password=False,
-        )
-        gi_standardtilgang(self.lead, 'leder')
-
-    def test_flagg_default_er_false(self):
-        # Live-statistikk er ikke implementert, så default skal være 'false'
-        # for å unngå at dashbordet viser 'true' for en funksjon som ikke finnes.
-        from .admin_status import FLAG_LIVE_STATS_DEFAULT
-        self.assertEqual(FLAG_LIVE_STATS_DEFAULT, 'false')
-        # Sanity-check: AppSetting.get returnerer den vi sender inn når nøkkel mangler
-        val = AppSetting.get('feature.live_stats_enabled', FLAG_LIVE_STATS_DEFAULT)
-        self.assertEqual(val, 'false')
-
-    def test_status_payload_rapporterer_false_som_default(self):
-        # Verifiser at JSON-endepunktet faktisk leverer 'false' når ingen AppSetting-rad finnes
-        AppSetting.objects.filter(key='feature.live_stats_enabled').delete()
-        self.client.force_login(self.admin)
-        resp = self.client.get('/portal-admin/server-status/json/')
-        self.assertEqual(resp.status_code, 200)
-        flags = resp.json().get('feature_flags', {})
-        self.assertEqual(flags.get('feature.live_stats_enabled'), 'false')
-
-    def test_admin_kan_sette_flagg(self):
-        self.client.force_login(self.admin)
-        resp = self.client.post('/portal-admin/server-status/flag/', {
-            'key': 'feature.live_stats_enabled',
-            'value': 'false',
-        })
-        self.assertEqual(resp.status_code, 200)
-        self.assertTrue(resp.json()['ok'])
-        self.assertEqual(
-            AppSetting.get('feature.live_stats_enabled'),
-            'false',
-        )
-
-    def test_lead_kan_ikke_sette_flagg(self):
-        self.client.force_login(self.lead)
-        resp = self.client.post('/portal-admin/server-status/flag/', {
-            'key': 'feature.live_stats_enabled',
-            'value': 'false',
-        })
-        self.assertEqual(resp.status_code, 403)
-
-    def test_ukjent_flagg_avvises(self):
-        self.client.force_login(self.admin)
-        resp = self.client.post('/portal-admin/server-status/flag/', {
-            'key': 'random.unknown.flag',
-            'value': 'true',
-        })
-        self.assertEqual(resp.status_code, 400)
-
-    def test_ugyldig_verdi_avvises(self):
-        self.client.force_login(self.admin)
-        resp = self.client.post('/portal-admin/server-status/flag/', {
-            'key': 'feature.live_stats_enabled',
-            'value': 'maybe',
-        })
-        self.assertEqual(resp.status_code, 400)
-
-    def test_get_ikke_tillatt(self):
-        self.client.force_login(self.admin)
-        resp = self.client.get('/portal-admin/server-status/flag/')
-        self.assertEqual(resp.status_code, 405)
+        self.assertIn('konfig', data)
 
 
 @override_settings(SECURE_SSL_REDIRECT=False)

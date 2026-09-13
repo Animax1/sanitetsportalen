@@ -40,7 +40,6 @@ urlpatterns = [
     # Server-status admin (global URL, ingen namespace)
     path('portal-admin/server-status/',                    _admin_status.admin_status_view,      name='admin_server_status'),
     path('portal-admin/server-status/json/',               _admin_status.admin_status_json,      name='admin_server_status_json'),
-    path('portal-admin/server-status/flag/',               _admin_status.admin_set_flag,         name='admin_set_flag'),
     path('portal-admin/server-status/sessions/',           _admin_status.admin_sessions_list,    name='admin_sessions_list'),
     path('portal-admin/server-status/sessions/kill/',      _admin_status.admin_session_kill,     name='admin_session_kill'),
     path('portal-admin/server-status/sessions/kill-all/',  _admin_status.admin_session_kill_all, name='admin_session_kill_all'),

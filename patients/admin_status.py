@@ -10,7 +10,6 @@ Gir admin innsyn i live serverbelastning:
   venter
 - Konfigsjekk (DEBUG, HTTPS, rate-limit, cache, e-post, offsite, versjon),
   innloggingsfeil siste time, cron-jobbenes siste kjøring
-- Feature-flag-kontroll (fremtidig bruk)
 
 Alle innhenterne skal tåle at delen de leser er nede — kortet viser feilen,
 siden viser resten. Et statusdashbord som selv gir 500 når databasen er
@@ -38,16 +37,7 @@ from core.auth_decorators import admin_required
 from audit.models import AuditLog
 
 from .middleware import metrics_store
-from .models import AppSetting, Backup
-
-
-# Feature-flag nøkler
-# MERK: Live-statistikk-funksjonen er IKKE implementert. Default er derfor
-# 'false' så dashbordet ikke gir inntrykk av at noe er aktivt når det ikke er det.
-# Når funksjonen bygges, flytt defaulten tilbake til 'true' i samme commit som
-# leverer funksjonen, slik at de ikke kommer ut av sync.
-FLAG_LIVE_STATS = 'feature.live_stats_enabled'
-FLAG_LIVE_STATS_DEFAULT = 'false'
+from .models import Backup
 
 
 def _get_memory_mb():
@@ -251,7 +241,6 @@ def _get_konfig_sjekk():
     reglene. Reglene gjelder prod: lokalt vil DEBUG og HTTPS stå «feil»,
     og det er riktig."""
     from core.versjon import hent_versjon
-    from django.core.cache import caches
     epost = _epost_transport()
     ver = hent_versjon()
     rader = [
@@ -442,9 +431,6 @@ def _build_status_payload():
         'innlogging': _get_innlogging(),
         'cron': _get_cron(),
         'epost': _get_epost(),
-        'feature_flags': {
-            FLAG_LIVE_STATS: AppSetting.get(FLAG_LIVE_STATS, FLAG_LIVE_STATS_DEFAULT),
-        },
     }
 
 
@@ -609,22 +595,3 @@ def admin_session_kill_all(request):
         note=f'force_logout_all count={deleted} by={request.user.username}',
     )
     return JsonResponse({'ok': True, 'deleted': deleted})
-
-
-@admin_required
-@require_http_methods(['POST'])
-def admin_set_flag(request):
-    """Endre feature-flag. Body: key, value."""
-    key = request.POST.get('key', '').strip()
-    value = request.POST.get('value', '').strip()
-
-    # Kun kjente flagg kan endres via dette endepunktet
-    allowed_keys = {FLAG_LIVE_STATS}
-    if key not in allowed_keys:
-        return JsonResponse({'ok': False, 'error': 'Ukjent flagg'}, status=400)
-
-    if value not in ('true', 'false'):
-        return JsonResponse({'ok': False, 'error': 'Ugyldig verdi'}, status=400)
-
-    AppSetting.set(key, value)
-    return JsonResponse({'ok': True, 'key': key, 'value': value})

@@ -35,6 +35,12 @@ serveren, men ikke det serveren er til for, og at ett tall var galt.
   10. sekund.
 - Hver innhenter tåler at delen den leser er nede — kortet viser feilen, siden
   viser resten. Payloadnøkkelen `memory_mb` er byttet ut med `memory.naa/topp`.
+- **Feature-flagg-kortet er fjernet**, med `feature.live_stats_enabled`,
+  endepunktet `/portal-admin/server-status/flag/` og testene (André: «Den
+  trenger vi ikke»). Funksjonen det skulle styre ble aldri bygget. Runbook §6
+  står som «utgått» så §7 og oppover peker riktig.
+- Verdiene i konfigsjekken brekker inne i kortet (`overflow-wrap: anywhere`,
+  høyrestilt) i stedet for å gå utenfor — gjelder alle `status-row`-verdier.
 
 ## 2026-09-13 — Runbook §8b: offsite-backup — oppsett, kontroll og gjenoppretting
 

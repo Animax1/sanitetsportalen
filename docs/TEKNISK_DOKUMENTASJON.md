@@ -225,7 +225,6 @@ Kjente nøkler i bruk:
 | `event_name` | Arrangementsnavnet (legacy-nøkkel) |
 | `event_name_<år>` | Arrangementsnavn per år, f.eks. `event_name_2026` |
 | `session_timeout_hours` | Sesjonslevetid i timer (1–24); default 8 |
-| `feature.live_stats_enabled` | Feature-flagg for live-statistikk (`'true'`/`'false'`; default `'false'`). Funksjonen er ikke implementert ennå — default flyttes til `'true'` når koden lander. Styres via admin server-status. |
 
 ### 4.7 `patients.Backup`
 
@@ -528,9 +527,8 @@ passordbytte og `LoginEvent`-logging — alle sikringene ligger på
 
 | Metode | Path | Rolle | Beskrivelse |
 |---|---|---|---|
-| GET | `/portal-admin/server-status/` | `admin` | HTML-dashbord: metrics (p50/p95/max/errors), tregeste stier, RAM nå/topp, disk, database, aktive sesjoner, siste backup + offsite, vaktbildet, konfigsjekk, innlogging, cron, e-post, feature-flags, worker-config |
+| GET | `/portal-admin/server-status/` | `admin` | HTML-dashbord: metrics (p50/p95/max/errors), tregeste stier, RAM nå/topp, disk, database, aktive sesjoner, siste backup + offsite, vaktbildet, konfigsjekk, innlogging, cron, e-post, worker-config |
 | GET | `/portal-admin/server-status/json/` | `admin` | Maskinlesbart JSON-snapshot av samme data (for automatisering og ekstern overvåkning) |
-| POST | `/portal-admin/server-status/flag/` | `admin` | Oppdaterer en feature-flag i `AppSetting`. Krever CSRF-token og `admin`-rolle. Body: `key` og `value` (form-encoded) |
 
 ---
 
@@ -799,9 +797,8 @@ Observability-laget er et lett, selvstendig rammeverk for teknisk telemetri. Det
 - `RequestMetricsMiddleware` – samler per-request-telemetri i en in-memory ringbuffer.
 - `/portal-admin/server-status/` – HTML-dashbord for administratoren.
 - `/portal-admin/server-status/json/` – tilsvarende snapshot i JSON for automatisering og overvåkning.
-- `AppSetting`-baserte feature-flags – brytere som admin kan justere uten deploy.
 
-Alle komponenter er isolert til `patients`-appen og har ingen eksterne avhengigheter utover `psutil`.
+Alle komponenter er isolert til `patients`-appen og har ingen eksterne avhengigheter.
 
 ### 8A.2 RequestMetricsMiddleware
 
@@ -848,7 +845,6 @@ Dashbordet viser følgende paneler:
 | Innlogging siste time | Feilede og vellykkede innlogginger, brukernavn/IP-er bak feilene, avviste MFA-koder | `LoginEvent` |
 | Cron-jobber | Siste kjøring av `db_backup`, `purge_old_logs`, `kollaps_arkiv` — tid, ok/feil, melding | `AppSetting['cron.<navn>']` via `core.kommando.siste_kjoringer()` |
 | E-post | Transport (AHASend/SMTP/konsoll), siste vellykkede og feilede utsending | `settings.EMAIL_BACKEND`, `Utsending` |
-| Feature-flags | Alle nøkler med prefiks `feature.` og deres verdi | `AppSetting`-tabellen |
 | Worker-config | `WEB_WORKERS`, `WEB_THREADS`, `WEB_MAX_REQUESTS` og PID | Env-variabler og `os.getpid()` |
 
 Dashbordet polles hvert 10. sekund fra JSON-endepunktet; requestene til
@@ -868,12 +864,11 @@ Returnerer nøyaktig samme data som HTML-dashbordet, men i maskinlesbart JSON-fo
 
 Endepunktet krever fortsatt `admin`-rolle og innlogget sesjon – det er **ikke** et åpent metrics-endepunkt.
 
-### 8A.5 Feature-flag-systemet via AppSetting
+### 8A.5 Feature-flag-systemet — fjernet
 
-Feature-flags er lagret som vanlige rader i `AppSetting`-tabellen. Konvensjonen er at nøkler som starter med prefikset `feature.` er flagg. Eksempler:
+Flagget `feature.live_stats_enabled` og endepunktet `/portal-admin/server-status/flag/` ble fjernet 13. sep. 2026. Funksjonen det skulle styre ble aldri bygget, og et kort for et flagg uten funksjon var støy på dashbordet. Trengs en bryter senere, er `AppSetting` fortsatt stedet — se portalinnstillingene for mønsteret.
 
-| Nøkkel | Default | Formål |
-|---|---|---|
+---|---|---|
 | `feature.live_stats_enabled` | `'false'` | Planlagt: skal skru live-statistikk-fanen inn/ut uten deploy. Funksjonen er ikke implementert ennå; default holdes på `'false'` for ikke å villede dashbordet. |
 
 Verdiene er alltid tekst (`AppSetting.value` er `TextField`). En praktisk hjelpefunksjon `is_feature_enabled(key, default='false')` i `patients/stats_cache.py` tolker `'true'`/`'false'` case-insensitivt.

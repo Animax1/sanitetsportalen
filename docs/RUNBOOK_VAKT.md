@@ -89,7 +89,7 @@ Les av **P95** (Responstid siste 5 min → P95) på dashbordet. Dette er det vik
 | 300–500 ms | 0 | **Gult.** Observer. Hvis vedvarer > 15 min, gjør nedbremsing (steg 3). |
 | 500–1000 ms | 0 eller 1–2 | **Oransje.** Oppgrader til 2 workers (steg 4). |
 | > 1000 ms | ≥ 3 | **Rødt.** Oppgrader til 2 workers + 6 threads (steg 5). |
-| Systemet tregt etter alle tiltak | Vedvarende 5xx | **Kritisk.** Skru av live-statistikk (steg 6) og/eller nødbrems rate-limit (steg 7). |
+| Systemet tregt etter alle tiltak | Vedvarende 5xx | **Kritisk.** Nødbrems rate-limit (steg 7). |
 
 ---
 
@@ -99,8 +99,7 @@ Hvis P95 ligger på 300–500 ms vedvarende, reduser polling-trykket:
 
 1. Be brukere lukke faner de ikke aktivt trenger
 2. Be leads lukke statistikk-fanen mellom oppslag
-3. Hvis du har live-statistikk implementert: skru den av via dashbord → "Feature-flagg" → "Live statistikk" → `false`
-4. **Logg ut inaktive brukere via dashbordet** (steg 3b). Hver aktiv sesjon koster minne og polling – å frigjøre glemt-innloggede faner gir umiddelbar effekt uten redeploy.
+3. **Logg ut inaktive brukere via dashbordet** (steg 3b). Hver aktiv sesjon koster minne og polling – å frigjøre glemt-innloggede faner gir umiddelbar effekt uten redeploy.
 
 Ingen redeploy trengs.
 
@@ -246,15 +245,10 @@ Total samtidig request-kapasitet: 2 × 6 = 12. RAM ~400–450 MB.
 
 ---
 
-## 6. Skru av live-statistikk (feature-flag)
+## 6. Utgått
 
-**Når:** Under høy last og du vil redusere polling-trafikk umiddelbart.
-
-1. Admin-dashbord → "Feature-flagg"-kortet
-2. Send en POST til `/portal-admin/server-status/flag/` med `key=feature.live_stats_enabled`, `value=false` (eller bruk UI-knapp hvis lagt til senere)
-3. Effekt: live-statistikk-fanen (hvis bygget) skjules for ikke-admin-brukere umiddelbart ved neste request. Ingen redeploy.
-
-**Revert:** samme flagg → `true`.
+Dette var «skru av live-statistikk (feature-flag)». Flagget ble fjernet 13. sep. 2026 —
+funksjonen ble aldri bygget. Nummeret står igjen så §7 og oppover peker riktig.
 
 ---
 
@@ -428,7 +422,6 @@ Som absolutt siste utvei hvis systemet er utilgjengelig:
 1. Sett variabler tilbake til default hvis du endret noe:
    - `WEB_THREADS` → fjern (default 4)
    - `RATELIMIT_ENABLE` → `true`
-   - Feature-flag `feature.live_stats_enabled` → `false` (default; funksjonen er ikke implementert ennå)
 2. Hvis du oppgraderte til Pro-plan: Settings → Plan → nedgrader til Hobby (proratert billing)
 3. Noter erfaringer i en kort logg (dato, antall pasienter, peak-tall, eventuelle tiltak)
 

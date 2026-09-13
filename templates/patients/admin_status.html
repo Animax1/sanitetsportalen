@@ -14,12 +14,12 @@
   .status-ok { color: #86efac; }
   .status-warn { color: #fbbf24; }
   .status-crit { color: #fca5a5; }
-  .status-row { display: flex; justify-content: space-between; padding: 0.25rem 0; border-bottom: 1px dashed var(--portal-border); font-size: 0.88rem; }
+  .status-row { display: flex; justify-content: space-between; gap: 0.75rem; padding: 0.25rem 0; border-bottom: 1px dashed var(--portal-border); font-size: 0.88rem; min-width: 0; }
   .status-row:last-child { border-bottom: none; }
   .status-row .label { color: var(--portal-text-muted); }
-  .status-row .val { color: var(--portal-text); font-family: ui-monospace, monospace; }
-  .flag-toggle { display: flex; align-items: center; gap: 0.5rem; margin-top: 0.5rem; }
-  .flag-toggle button { font-size: 0.8rem; padding: 0.25rem 0.75rem; }
+  .status-row .label { flex: 0 1 auto; }
+  .status-row .val { color: var(--portal-text); font-family: ui-monospace, monospace; text-align: right; min-width: 0; overflow-wrap: anywhere; }
+  .status-card { min-width: 0; overflow: hidden; }
   pre.json-preview { background: var(--portal-surface-2); padding: 0.75rem; border-radius: 6px; font-size: 0.75rem; max-height: 300px; overflow: auto; color: #cbd5e1; }
   .refresh-indicator { font-size: 0.75rem; color: var(--portal-text-muted); }
   .refresh-indicator .dot { display: inline-block; width: 8px; height: 8px; background: #86efac; border-radius: 50%; margin-right: 0.3rem; animation: pulse 1.5s infinite; }
@@ -143,16 +143,6 @@
       <div class="sub" id="backup-details">–</div>
       <div class="status-row" style="margin-top:0.5rem;"><span class="label">Offsite (Scaleway)</span><span class="val" id="offsite-status">–</span></div>
       <div class="sub" id="offsite-details">–</div>
-    </div>
-
-    <!-- Feature flags -->
-    <div class="status-card">
-      <h3>Feature-flagg</h3>
-      <div class="status-row">
-        <span class="label">Live statistikk <em style="font-size:0.75rem;color:var(--portal-text-muted);font-style:italic;">(planlagt)</em></span>
-        <span class="val" id="flag-live-stats">–</span>
-      </div>
-      <div class="sub" style="margin-top:0.5rem;">Flagg for fremtidig live-statistikk-fane. Funksjonen er ikke implementert ennå — default er derfor <code>false</code>. Endring trer i kraft ved neste request (ingen restart).</div>
     </div>
 
     <!-- Vaktbildet -->
@@ -387,10 +377,6 @@ const ADMIN_URLS = {
     renderCron(d.cron || {});
     renderEpost(d.epost || {});
 
-    const flags = d.feature_flags || {};
-    document.getElementById('flag-live-stats').textContent =
-      flags['feature.live_stats_enabled'] || 'false';
-
     // Oppdater JSON-preview
     document.getElementById('json-preview').textContent =
       JSON.stringify(d, null, 2);
@@ -532,7 +518,7 @@ const ADMIN_URLS = {
     document.getElementById('konfig-rader').innerHTML = rader.length ? rader.map(r =>
       '<div class="status-row"><span class="label">' + escapeHtml(r.nokkel) + '</span><span class="val ' +
       (r.ok ? 'status-ok' : 'status-crit') + '" title="' + escapeHtml(r.verdi) + '">' +
-      (r.ok ? '✓ ' : '✗ ') + escapeHtml(String(r.verdi).length > 28 ? String(r.verdi).slice(0, 26) + '…' : r.verdi) +
+      (r.ok ? '✓ ' : '✗ ') + escapeHtml(r.verdi) +
       '</span></div>').join('') : '<div class="sub">–</div>';
     const sum = document.getElementById('konfig-sum');
     const feil = rader.filter(r => !r.ok).length;

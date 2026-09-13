@@ -1480,7 +1480,8 @@ Funnene under er allerede kartlagt, så jobben er avgrenset når den skal gjøre
 
 - [x] **Server-status utvidet (13. sep. 2026).** Minne nå + topp, offsite, disk,
       database (svartid, tilkoblinger), vaktbildet, tregeste stier, konfigsjekk,
-      innlogging siste time, cron-jobbenes siste kjøring, e-posttransport. Se CHANGELOG.
+      innlogging siste time, cron-jobbenes siste kjøring, e-posttransport. Feature-flagg-kortet
+      og flagg-endepunktet er fjernet. Se CHANGELOG.
       - [ ] **Krever Andre:** etter deploy, åpne `/portal-admin/server-status/` i prod
             og se at konfigsjekk-kortet sier «alt OK» og at offsite står grønt. Cron-radene
             står «Aldri» til hver jobb har kjørt én gang etter deployen — sjekk igjen
