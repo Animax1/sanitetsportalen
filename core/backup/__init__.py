@@ -44,6 +44,7 @@ from .service import (
     enforce_cap,
     get_backup_dir,
     restore_backup,
+    slug_fra_filnavn,
 )
 
 def register_handlers() -> None:
@@ -83,6 +84,7 @@ __all__ = [
     'registrer_alle_moduler',
     'register',
     'restore_backup',
+    'slug_fra_filnavn',
     'start_klokke',
     'utled_restore_models',
     'vakthund',

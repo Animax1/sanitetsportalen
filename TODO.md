@@ -411,11 +411,21 @@ bindende: 1 før 2, fordi backupen speiler hvor modellene bor.
                   `full/` (fase 7). Uten den lander de første hele backupene
                   under 730-dagersregelen, og 90 dager er en
                   personvernbeslutning.
-      - [ ] **Fase 5 — `gjenopprett`-kommandoen.** `--list`, `--ja` (nødvendig under
-            `railway ssh`, som ikke har interaktiv terminal), `--full` og `--hent` som
-            henter fra Scaleway og gjenoppretter i ett. **I dag finnes ingen
-            CLI-gjenoppretting** — `hent_offsite` henter og dekrypterer, men siste halvdel
-            av veien er kun nettleser.
+      - [x] **Fase 5 — `gjenopprett`-kommandoen (13. sep. 2026).** `--list`,
+            `--siste <modul>` (hopper over pre-restore-øyeblikksbildene),
+            `--hent <objekt>` som henter fra Scaleway og gjenoppretter i ett,
+            `--full` som **kreves** for hele basen, og `--ja`. Flagget er
+            nødvendig og ikke bekvemt: `railway ssh -- <kommando>` har ingen
+            interaktiv terminal, så et spørsmål ville hengt til noe ga opp —
+            i en katastrofe. Kommandoen sier det i stedet for å vente.
+            **Auditraden er flyttet fra viewet inn i `restore_backup`**, med en
+            `kilde`-tekst: sto den i viewet, ville katastrofeveien vært den
+            eneste som ikke etterlot seg et spor. Begge inngangene gir nøyaktig
+            én rad. `slug_fra_filnavn` bor nå ved siden av `_build_filename`,
+            så formen på filnavnet har ett sted å endres.
+            Runbooken §8b har fått hele katastrofeprosedyren, inkludert at
+            `purge_old_logs` og `kollaps_arkiv` skal kjøres rett etterpå.
+            2608 tester grønne på SQLite og PostgreSQL.
       - [ ] **Fase 6 — `verifiser_backup`.** Engangsbase som
             `verifiser_migrasjoner`, laster de nyeste filene i rekkefølge og
             skriver radtall — altså på kommando, mot ekte data, når som helst.

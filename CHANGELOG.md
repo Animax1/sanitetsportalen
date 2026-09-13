@@ -4,6 +4,49 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-13 — Backup fase 5: gjenoppretting fra kommandolinja
+
+`manage.py gjenopprett` finnes nå. Veien fantes ikke før: `hent_offsite` henter
+og dekrypterer fila, men rører ikke databasen — siste linje den skrev var
+«gjenopprett fra /portal-admin/backup/». I en tom base, som er akkurat der man
+er når man trenger den, er det ingen å logge inn som. Katastrofeveien gikk
+altså gjennom en nettleser uten bruker.
+
+`--list` viser filene på volumet, `--siste <modul>` tar den nyeste og hopper
+over pre-restore-øyeblikksbildene (de er tilstanden man nettopp gikk bort fra),
+og `--hent <objekt>` henter fra Scaleway og gjenoppretter i ett. Samme funksjon
+som knappen kaller: samme pre-restore-øyeblikksbilde, samme auditrad.
+
+**`--ja` er nødvendig, ikke bekvemt.** `railway ssh -- <kommando>` kjører uten
+interaktiv terminal, så et `input()` ville hengt til noe ga opp — uten at det
+sto hvorfor, i en katastrofe. Kommandoen ser etter terminalen og sier hva som
+mangler i stedet for å vente. **`--full` kreves** når fila er hele databasen:
+slugen leses av filnavnet, så flagget er teknisk overflødig, men brukere,
+passord og MFA skal ikke kunne erstattes av en skrivefeil.
+
+**Auditraden er flyttet fra viewet inn i `restore_backup`**, med en kilde-tekst
+(«grensesnittet» / «kommandolinja»). Sto den i viewet, ville katastrofeveien
+vært den eneste gjenopprettingen som ikke etterlot seg et spor. Begge
+inngangene gir nå nøyaktig én rad — verifisert av en test som ville fanget både
+den manglende og en dobbel.
+
+`slug_fra_filnavn` er flyttet til `core.backup.service`, ved siden av
+`_build_filename` som bygger navnet. Den sto i `core/offsite.py` og leste en
+form som defineres et annet sted; nå blir begge feil samtidig om formen endres,
+i stedet for hver for seg.
+
+Runbooken §8b har fått hele katastrofeprosedyren: den korte veien gjennom den
+hele fila, den lange gjennom modulfilene i bindende rekkefølge (portal først,
+fordi alt peker på vakta), og at `purge_old_logs` og `kollaps_arkiv` skal kjøres
+rett etterpå — backupen har egen slettefrist, og det som var slettet i basen
+skal ikke komme tilbake.
+
+Verifisert: 2608 tester grønne på SQLite og PostgreSQL 16, og kommandoen er
+kjørt mot en ekte base: sperrene slår ut som de skal, gjenopprettingen henter
+dataene tilbake, og auditraden står med kilde.
+
+---
+
 ## 2026-09-13 — Backup fase 4: hele databasen i én fil
 
 Katastrofekopien finnes nå. `core/backup/full.py` dumper alt i databasen unntatt

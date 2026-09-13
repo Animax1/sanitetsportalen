@@ -338,18 +338,67 @@ railway ssh --service web -- python manage.py hent_offsite --list
 railway ssh --service web -- python manage.py hent_offsite <filnavnet fra lista>
 ```
 
-Den første lister filene i bucketen, nyeste først. Den andre henter fila, dekrypterer
-den med `OFFSITE_BACKUP_KEY`, og legger den i backup-mappa på volumet med en rad — så
-den dukker opp under modulens backup-side (`/portal-admin/backup/<modul>/`) og kan
-gjenopprettes derfra som enhver annen backup. Kommandoen rører ikke basen ellers.
+Den første lister filene i bucketen, nyeste først — både modulfilene under `backups/`
+og de hele under `full/`. Den andre henter fila, dekrypterer den med
+`OFFSITE_BACKUP_KEY`, og legger den i backup-mappa på volumet med en rad, så den dukker
+opp på `/portal-admin/backup/`. Kommandoen rører ikke basen.
 
 Svarer den «Kunne ikke dekryptere: feil OFFSITE_BACKUP_KEY», er nøkkelen i Railway en
 annen enn den fila ble kryptert med. Sjekk mot passordbehandleren.
 
-**Ved fullt bortfall av Railway** (ny tjeneste, tom base): sett opp portalen på nytt,
-sett de seks variablene, kjør migrasjonene, og hent så filene modul for modul med
-`hent_offsite` før du gjenoppretter fra backup-siden. Arkivmodulene (`arkiv`,
-`oppdrag_arkiv`) gjenopprettes før modulene de hører til.
+### Gjenoppretting fra kommandolinja
+
+`hent_offsite` henter fila. **`gjenopprett` er den som rører basen** (13. sep. 2026) —
+og den finnes nettopp fordi veien gjennom nettleseren ikke duger i en tom base: der er
+det ingen å logge inn som.
+
+```powershell
+railway ssh --service web -- python manage.py gjenopprett --list
+railway ssh --service web -- python manage.py gjenopprett --siste vaktliste --ja
+railway ssh --service web -- python manage.py gjenopprett --hent <objekt> --ja
+```
+
+| Flagg | Hva det gjør |
+|---|---|
+| `--list` | Filene som ligger på volumet, nyeste først |
+| `--siste <modul>` | Den nyeste fila for modulen. Hopper over pre-restore-øyeblikksbildene |
+| `--hent <objekt>` | Henter fra Scaleway og gjenoppretter i ett |
+| `--full` | **Kreves** når fila er hele databasen |
+| `--ja` | Ikke spør |
+
+**`--ja` er ikke bekvemmelighet.** `railway ssh -- <kommando>` kjører uten interaktiv
+terminal, så et spørsmål ville hengt til noe ga opp — i en katastrofe. Uten flagget
+sier kommandoen det med rene ord i stedet for å vente.
+
+Kommandoen skriver hva som slettes før den gjør det, tar et
+pre-restore-øyeblikksbilde, og legger én auditrad med kilden «kommandolinja».
+
+### Ved fullt bortfall av Railway
+
+Ny tjeneste, tom base. **Den korte veien er den hele fila:**
+
+```powershell
+railway ssh --service web -- python manage.py migrate
+railway ssh --service web -- python manage.py hent_offsite --list
+railway ssh --service web -- python manage.py gjenopprett --hent <full/-objektet> --full --ja
+railway ssh --service web -- python manage.py purge_old_logs
+railway ssh --service web -- python manage.py kollaps_arkiv
+```
+
+De to siste er ikke valgfrie: backupen har egen slettefrist, og det som var slettet i
+basen skal ikke komme tilbake (`docs/BACKUP.md` §2). Alle logger inn på nytt med
+passordene som gjaldt da backupen ble tatt.
+
+**Mangler den hele fila**, tas modulfilene i rekkefølge — og rekkefølgen er bindende,
+fordi alt peker på vakta:
+
+```
+portal → patients → arkiv → oppdrag → oppdrag_arkiv → vaktliste
+```
+
+`portal` bærer `core.Vakt`. Tas den ikke først, feiler de andre med
+«Key (vakt_id)=(1) is not present in table core_vakt». Deretter `create_admin` og
+kontoene for hånd, siden modulfilene ikke inneholder brukere.
 
 ---
 

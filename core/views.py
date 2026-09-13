@@ -603,7 +603,6 @@ def backup_admin_restore_view(request, slug: str, pk: int):
     from core.backup import get_handler, restore_backup
     from core.forms import BackupRestoreConfirmForm
     from patients.models import Backup
-    from audit.models import AuditLog
 
     handler = get_handler(slug)
     if handler is None:
@@ -616,21 +615,13 @@ def backup_admin_restore_view(request, slug: str, pk: int):
         form = BackupRestoreConfirmForm(request.POST, expected_slug=slug)
         if form.is_valid():
             try:
-                restore_backup(backup, user=request.user)
+                # Auditraden skrives av tjenesten, ikke her: gjenoppretting har
+                # to innganger, og katastrofeveien går gjennom kommandolinja.
+                restore_backup(backup, user=request.user,
+                               kilde='grensesnittet')
             except Exception as exc:  # noqa: BLE001
                 messages.error(request, f'Gjenoppretting feilet: {exc}')
                 return redirect('core:backup_admin')
-
-            AuditLog.objects.create(
-                table_name=f'{slug}_backup_restore',
-                record_id=backup.pk,
-                action='UPDATE',
-                user=request.user,
-                app_label='core',
-                field_name='restore',
-                old_value='',
-                new_value=backup.filename,
-            )
             messages.success(
                 request,
                 f'Modul «{handler.display_name or slug}» gjenopprettet '

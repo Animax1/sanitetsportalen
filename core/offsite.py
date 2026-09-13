@@ -225,14 +225,10 @@ def hent(objekt: str):
 
 
 def _slug_fra_filnavn(filnavn: str) -> str:
-    # backup-<slug>-<kind>-<tidsstempel>.json.gz. Tidsstempelet har selv
-    # bindestreker, så let etter typen (som aldri har det) og ta alt foran.
-    from core.backup.service import VALID_KINDS
-    deler = filnavn.removeprefix('backup-').split('-')
-    for i in range(len(deler) - 1, 0, -1):
-        if deler[i] in VALID_KINDS:
-            return '-'.join(deler[:i])
-    return ''
+    """Modulen en fil hører til. Parseren bor ved siden av `_build_filename` i
+    `core.backup.service`, så formen på filnavnet har ett sted å endres."""
+    from core.backup.service import slug_fra_filnavn
+    return slug_fra_filnavn(filnavn)
 
 
 def status() -> dict:

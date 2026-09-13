@@ -292,7 +292,13 @@ oppbevaringstid:** `backups/` for modulfilene (730 dager) og `full/` for den
 hele (90 dager) — fristene kan bare skilles i bucketen hvis filene ligger på
 hver sin sti, fordi livssyklusreglene filtrerer på prefiks. `hent_offsite --list`
 / `hent_offsite <filnavn>` henter, dekrypterer og legger fila i `BACKUP_DIR` med
-en `Backup`-rad; prefikset utledes av slugen i filnavnet. S3 mockes i
+en `Backup`-rad; prefikset utledes av slugen i filnavnet. **`gjenopprett` er den
+som rører basen** (`--list`, `--siste <modul>`, `--hent <objekt>`, `--full`,
+`--ja`) — den finnes fordi veien gjennom nettleseren ikke duger i en tom base,
+der det ikke er noen å logge inn som. `--ja` er nødvendig og ikke bekvemt:
+`railway ssh -- <kommando>` har ingen terminal, så et spørsmål ville hengt.
+**Auditraden skrives av `restore_backup`, ikke av viewet**, slik at begge
+inngangene etterlater nøyaktig én rad med hvem og hvorfra. S3 mockes i
 `core/tests_offsite.py` ved å bytte ut `_klient`. Nøkkelen skal også ligge i en
 passordbehandler — uten den er bucketen uleselig, og det er meningen.
 

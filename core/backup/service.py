@@ -107,6 +107,24 @@ def _build_filename(slug: str, kind: str) -> str:
     return f'backup-{slug}-{kind}-{ts}.json.gz'
 
 
+def slug_fra_filnavn(filnavn: str) -> str:
+    """Hvilken modul en backupfil hører til, lest av navnet.
+
+    Speilvendingen av `_build_filename`, og ligger derfor her: endres formen på
+    filnavnet ett sted, skal begge bli feil samtidig og ikke hver for seg.
+
+    Formen er `backup-<slug>-<kind>-<tidsstempel>.json.gz`. Tidsstempelet har
+    selv bindestreker, og slugen kan ha det (`oppdrag_arkiv` har understrek,
+    men en framtidig modul kan ha bindestrek). Derfor letes det etter *typen*,
+    som aldri har bindestrek, og alt foran den er slugen.
+    """
+    deler = filnavn.removeprefix('backup-').split('-')
+    for i in range(len(deler) - 1, 0, -1):
+        if deler[i] in VALID_KINDS:
+            return '-'.join(deler[:i])
+    return ''
+
+
 def create_backup(slug: str, kind: str = KIND_MANUAL,
                   user=None, note: str = '', hopp_over_like: bool | None = None):
     """Lag en backup for modulen ``slug``.
@@ -242,17 +260,50 @@ def _inspect_payload(handler, raw: bytes, filename: str) -> list[str]:
         return []
 
 
-def restore_backup(backup, user=None) -> None:
+def _logg_gjenoppretting(backup, user, kilde: str) -> None:
+    """Én auditrad per gjenoppretting: hvem, hvilken fil, og hvor fra.
+
+    Ligger i tjenesten og ikke i viewet (13. sep. 2026) fordi gjenoppretting
+    har to innganger: knappen og `manage.py gjenopprett`. Sto loggingen i
+    viewet, ville katastrofeveien — den som går gjennom `railway ssh` i en tom
+    base — vært den eneste som ikke etterlot seg et spor.
+
+    De lastede radene logges **ikke** hver for seg; signalene er stengt under
+    `loaddata` (`audit.utils.ikke_under_loaddata`). Denne ene raden er
+    oppføringen.
+    """
+    try:
+        from audit.models import AuditLog
+        AuditLog.objects.create(
+            table_name=f'{backup.module_slug}_backup_restore',
+            record_id=backup.pk,
+            action='UPDATE',
+            user=user,
+            app_label='core',
+            field_name='restore',
+            old_value=kilde,
+            new_value=backup.filename,
+        )
+    except Exception:   # noqa: BLE001 — en logg som tar ned gjenopprettingen
+        logger.exception('core.backup: kunne ikke logge gjenopprettingen av %s',
+                         backup.filename)
+
+
+def restore_backup(backup, user=None, kilde: str = '') -> None:
     """Gjenopprett en backup for modulen den tilhører.
 
     Steg:
     1. Lag en pre_restore-backup av nåværende tilstand (sikkerhetsnett).
     2. Slett eksisterende rader i restore_models (FK-trygg rekkefølge).
     3. Kall loaddata på den lagrede JSON-fila.
+    4. Skriv én auditrad om at det skjedde.
 
     Hele restore (steg 2-3) kjører i én transaksjon. Feiler noe ruller
     alt tilbake. pre_restore-backupen i steg 1 er allerede commitet og
     forblir på disk uansett.
+
+    ``kilde`` er en kort tekst om hvor gjenopprettingen ble startet fra
+    («grensesnittet», «kommandolinja»), og havner i auditraden.
     """
     handler = get_handler(backup.module_slug)
     if handler is None:
@@ -302,6 +353,7 @@ def restore_backup(backup, user=None) -> None:
             if tmp_path.exists():
                 tmp_path.unlink()
 
+    _logg_gjenoppretting(backup, user, kilde)
     logger.info(
         'core.backup: restored modul=%s fra %s av bruker=%s',
         backup.module_slug, backup.filename,

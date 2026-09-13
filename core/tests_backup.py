@@ -1769,7 +1769,14 @@ class SignalerFyrerIkkeUnderLoaddataTests(TestCase):
             'Disse lagringssignalene mangler @ikke_under_loaddata og vil '
             'fyre under `loaddata`:\n  ' + '\n  '.join(manglende))
 
-    def test_gjenoppretting_skriver_ingen_auditrader(self) -> None:
+    def test_gjenoppretting_skriver_en_rad_og_ikke_en_per_pasient(self) -> None:
+        """Sporet skal si at noen gjenopprettet noe — ikke ramse opp hva fila
+        inneholdt.
+
+        Fem pasienter inn gir **én** rad, ikke fem eller femten. Uten
+        `raw`-vakten ga en gjenoppretting av tusen pasienter tusen
+        «endret»-rader uten en bruker som hadde endret noe.
+        """
         from patients.models import Patient
 
         with patch.dict(os.environ, {'BACKUP_DIR': str(self.backup_dir)}):
@@ -1781,10 +1788,12 @@ class SignalerFyrerIkkeUnderLoaddataTests(TestCase):
             Patient.objects.all().delete()
 
             for_restore = AuditLog.objects.count()
-            restore_backup(backup)
+            restore_backup(backup, kilde='test')
 
         self.assertEqual(Patient.objects.count(), 5)
         self.assertEqual(
-            AuditLog.objects.count(), for_restore,
-            'Gjenopprettingen skal ikke skrive auditrader for hver lastede '
-            'rad. Selve handlingen logges av viewet, med hvem som gjorde den.')
+            AuditLog.objects.count(), for_restore + 1,
+            'Gjenopprettingen skal skrive nøyaktig én rad: at den skjedde.')
+        rad = AuditLog.objects.order_by('-created_at').first()
+        self.assertEqual(rad.field_name, 'restore')
+        self.assertEqual(rad.new_value, backup.filename)
