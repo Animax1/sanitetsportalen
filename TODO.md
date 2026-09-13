@@ -338,6 +338,7 @@ Pasienter har Excel, oppdrag går på nødnett. Det som skal overleve at Railway
       - [ ] **André:** IAM-applikasjon med policy (ObjectStorageObjectsWrite/Read,
             BucketsRead, ikke delete), API-nøkkel, `OFFSITE_BACKUP_KEY` i passordbehandler,
             de seks variablene på prod-tjenesten.
+      - [x] Runbook §8b (13. sep.): oppsett, kontroll, gjenoppretting.
       - [ ] **Prøv gjenopprettingen én gang** i prod-containeren når variablene står:
             `railway ssh --service web -- python manage.py hent_offsite --list`, hent én
             fil, og se at den dukker opp under /portal-admin/backup/.

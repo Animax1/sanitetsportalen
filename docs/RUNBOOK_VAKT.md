@@ -280,6 +280,85 @@ Symptomer: P95 stiger samtidig i alle endepunkter, 5xx med database errors i log
 
 ---
 
+## 8b. Offsite-backup til Scaleway — oppsett, kontroll og gjenoppretting
+
+Fra 13. sep. 2026 lastes hver ny backup-fil opp til Scaleway Object Storage, kryptert
+før den forlater Railway. Volumet på Railway er første sikkerhetsnett; bucketen er det
+som overlever at Railway er borte. Se `docs/TEKNISK_DOKUMENTASJON.md` §11 og
+`docs/PERSONVERN_DOKUMENTASJON.md` A.2.
+
+### Oppsett (gjøres én gang, bare i prod)
+
+**Hos Scaleway** (allerede gjort 13. sep. 2026): bucket i Amsterdam (nl-ams), One Zone,
+privat, SSE på, versjonering av, lifecycle 730 dager for objekter og 7 dager for
+uferdige multipart-opplastinger. IAM-applikasjon `sanitetsportalen-backup` med policy
+`ObjectStorageObjectsWrite` + `ObjectStorageObjectsRead` + `ObjectStorageBucketsRead` —
+**ikke** sletterett — og en API-nøkkel på den.
+
+**Krypteringsnøkkelen** lages lokalt og legges i passordbehandleren *før* den settes i
+Railway. Uten den er bucketen uleselig — det er meningen, men da må den finnes utenfor
+Railway også:
+
+```powershell
+python -c "import secrets; print(secrets.token_urlsafe(32))"
+```
+
+**Variablene på prod-tjenesten i Railway** (Variables). Staging skal ikke ha dem.
+
+| Variabel | Verdi |
+|---|---|
+| `OFFSITE_S3_BUCKET` | bucketnavnet |
+| `OFFSITE_S3_REGION` | `nl-ams` |
+| `OFFSITE_S3_ENDPOINT` | `https://s3.nl-ams.scw.cloud` |
+| `OFFSITE_S3_ACCESS_KEY` | access key fra IAM-nøkkelen |
+| `OFFSITE_S3_SECRET_KEY` | secret key fra IAM-nøkkelen |
+| `OFFSITE_BACKUP_KEY` | krypteringsnøkkelen fra passordbehandleren |
+
+Tjenesten starter på nytt av seg selv når variablene lagres.
+
+### Kontroll etter oppsett, og før hver vakt
+
+1. Åpne `/portal-admin/backup/`. Kortet **«Offsite-kopi (Scaleway)»** øverst skal si
+   «Aktiv» med bucketnavnet. Sier det «Ikke konfigurert», står det hvilke variabler
+   som mangler.
+2. Ta en manuell backup av én modul fra samme side. Last siden på nytt: kortet skal
+   si «1 fil lastet opp» (eller ett mer enn før) med tidspunkt og filnavn.
+3. I Scaleway-konsollen: bucketen → mappa `backups/` → fila ligger der med endelsen
+   `.enc`. Innholdet er chiffertekst; det er riktig.
+4. Sier kortet **«Siste opplasting feilet»**, står feilen under i rødt. De vanligste:
+   feil endpoint eller region, en nøkkel uten skriverett på bucketen, feil bucketnavn.
+   Backupen på volumet er tatt uansett — rett variabelen og ta en ny manuell backup.
+
+Under vakt går opplastingen av seg selv: hver gang auto-backupen skriver en ny fil,
+går den opp. Ingen endringer = ingen fil = ingen opplasting.
+
+### Gjenoppretting fra bucketen
+
+Prøv dette **én gang mens alt er friskt** — poenget er å ha sett at nøkkelen låser
+opp det bucketen inneholder, før dagen det gjelder.
+
+Fra Railway-terminalen (krever Railway CLI innlogget på prosjektet):
+
+```powershell
+railway ssh --service web -- python manage.py hent_offsite --list
+railway ssh --service web -- python manage.py hent_offsite <filnavnet fra lista>
+```
+
+Den første lister filene i bucketen, nyeste først. Den andre henter fila, dekrypterer
+den med `OFFSITE_BACKUP_KEY`, og legger den i backup-mappa på volumet med en rad — så
+den dukker opp under modulens backup-side (`/portal-admin/backup/<modul>/`) og kan
+gjenopprettes derfra som enhver annen backup. Kommandoen rører ikke basen ellers.
+
+Svarer den «Kunne ikke dekryptere: feil OFFSITE_BACKUP_KEY», er nøkkelen i Railway en
+annen enn den fila ble kryptert med. Sjekk mot passordbehandleren.
+
+**Ved fullt bortfall av Railway** (ny tjeneste, tom base): sett opp portalen på nytt,
+sett de seks variablene, kjør migrasjonene, og hent så filene modul for modul med
+`hent_offsite` før du gjenoppretter fra backup-siden. Arkivmodulene (`arkiv`,
+`oppdrag_arkiv`) gjenopprettes før modulene de hører til.
+
+---
+
 ## 9. Hvis alt annet feiler: last-shed
 
 Som absolutt siste utvei hvis systemet er utilgjengelig:
@@ -296,7 +375,8 @@ Som absolutt siste utvei hvis systemet er utilgjengelig:
 ### 10a. Avlesning og bevaring
 
 1. Gå gjennom admin-dashbord – noter peak P95, peak RPS, peak memory og antall samtidige sesjoner
-2. Last ned siste backup fra Railway Volume (`/data/backups/`) som ekstern kopi
+2. Sjekk at kortet «Offsite-kopi (Scaleway)» på `/portal-admin/backup/` viser en
+   opplasting fra i dag uten feil (§8b). Fila på Railway Volume er da alt utenfor Railway
 3. Verifiser at ingen 5xx-feil ligger uten forklaring (admin-dashbord → Metrikk-kort → errors_5xx)
 4. **Arkiver vakta — begge modulene.** Arkiveringen ligger to steder inntil de slås
    sammen, og det er lett å ta den ene og tro man er ferdig:
@@ -410,6 +490,7 @@ Forventet effekt med Redis aktivt: konsistent rate-limiting på tvers av workers
 | Admin server-status | `https://<din-app>.railway.app/portal-admin/server-status/` |
 | Railway-dashbord | [https://railway.app](https://railway.app) |
 | Railway Volume backups | Railway → Volumes → Browse |
+| Offsite-backup (Scaleway) | `/portal-admin/backup/` (kortet øverst) · konsollen: console.scaleway.com → Object Storage · §8b |
 | Brukeradmin | `https://<din-app>.railway.app/portal-admin/brukere/` |
 | Innloggingslogg | `https://<din-app>.railway.app/portal-admin/innloggingslogg/` |
 | Reserve | `docs/TEKNISK_DOKUMENTASJON.md` §11 |

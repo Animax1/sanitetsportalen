@@ -4,6 +4,12 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-13 — Runbook §8b: offsite-backup — oppsett, kontroll og gjenoppretting
+
+Dokumentasjon. Oppsettet hos Scaleway og i Railway, kontrollen før hver vakt,
+og gjenopprettingen med `hent_offsite`, inn i `docs/RUNBOOK_VAKT.md` som §8b.
+10a og lenketabellen peker dit.
+
 ## 2026-09-13 — Reserve 3: backupene ut av Railway, til Scaleway
 
 Én migrasjon, `core/0007` (`OffsiteKopi`). To nye avhengigheter: `boto3` og
