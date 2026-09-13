@@ -1267,7 +1267,7 @@ drift**, og den dekkes av to ting:
   trykket skjedde. Køen sendes når serveren svarer igjen.
 
 `python manage.py import_offline_data` står igjen som **importverktøy** for den
-gamle appens SQLite-filer — se `docs/DATAIMPORT_FRA_GAMMEL_PROD.md`.
+gamle appens SQLite-filer — se `docs/archived/DATAIMPORT_FRA_GAMMEL_PROD.md` (utført 22. aug. 2026).
 
 ---
 

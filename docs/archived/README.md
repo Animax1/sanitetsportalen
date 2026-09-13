@@ -35,6 +35,16 @@ hvorfor.
 |---|---|
 | [`FORBEDRINGER.md`](./FORBEDRINGER.md) | Forbedringsrunden fra mai 2026. Punktene som fortsatt sto åpne gikk videre til august-gjennomgangen, og derfra til [`../../TODO.md`](../../TODO.md) — som er den aktive arbeidslista |
 
+## Utførte prosedyrer (arkivert 13. sep. 2026)
+
+Engangsarbeid som er gjort. Beholdt fordi de forklarer hvordan, og hva som ble
+kontrollert.
+
+| Dokument | Hva det er | Hva det etterlot seg |
+|---|---|---|
+| [`DATAIMPORT_FRA_GAMMEL_PROD.md`](./DATAIMPORT_FRA_GAMMEL_PROD.md) | Planen for å få årets pasientdata fra den gamle Pasientregistreringsappen inn i portalen (14. aug. 2026) | Utført 22. aug. 2026: 273 pasienter, 12 førstehjelpere, 6 helsepersonell, alle kontroller grønne — se TODO under «Dataimport fra gammel prod». `import_offline_data` er kommandoen som ble brukt, og den finnes fortsatt |
+| [`OPPSETT_KOLLAPS_CRON.md`](./OPPSETT_KOLLAPS_CRON.md) | Oppsettet av `kollaps_arkiv` som cron-jobb i Railway | Jobben står i `production` (`0 4 1 * *`) siden 22. aug. 2026, tørrkjørt 23. aug. Dokumentet ba selv om å bli slettet når jobben var oppe; det er arkivert i stedet, fordi sperrene det beskriver (backup etter arkivet, audit per kollaps) er verdt å ha et sted |
+
 ---
 
 ## To dokumenter ble slettet, ikke arkivert

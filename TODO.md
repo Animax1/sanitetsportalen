@@ -58,8 +58,8 @@ ingen av dem gir feilmelding — de er bare stille inaktive.
             Svar: «Ingen arkiv eldre enn 730 dager som ikke allerede er kollapset.»
             Ventet — arkivene er fra 2026. Første skarpe kjøring 1. sept. har dermed
             ingenting å slette, og tørrkjøringen har bekreftet at kommandoen starter
-            og leser databasen riktig. `docs/OPPSETT_KOLLAPS_CRON.md` **er ditt** — du
-            sletter det selv når du er trygg på jobben
+            og leser databasen riktig. `docs/OPPSETT_KOLLAPS_CRON.md` ble arkivert
+            13. sep. 2026 (`docs/archived/`) — jobben har gått siden 22. aug.
 
 - [x] **Portalen står i `production` (22. aug. 2026).** Gjennomført i denne rekkefølgen:
   1. Dataimporten fra den gamle appen — 273 pasienter, se CHANGELOG
@@ -344,6 +344,9 @@ bindende: 1 før 2, fordi backupen speiler hvor modellene bor.
             backup 90 dager, modulfilene 730 dager offsite), A.10, A.11/A.6 (fil på e-post,
             offline drift)
       - [ ] `CLAUDE.md` — backup-avsnittet og hvor modellene bor
+      - [ ] `docs/DEPLOY_GUIDE.md` — heter fortsatt «Pasientregistreringssystem»; portal-
+            domenet, AHASend-variablene, offsite-variablene, `requirements.txt` med hasher.
+            Punktet lenger ned under dokumentgjennomgangen slås sammen med dette
 - [ ] **4. De mindre** (§3 i notatet), når man er i nærheten: brukeradmin importerer
       pasientregistrene (3.1), `/portal-admin/` samlet i én URL-fil (3.2), skimene
       (3.3), `core/views.py` delt (3.7). 3.5 (`VaktArkiv`) skal **ikke** ryddes —
@@ -512,6 +515,16 @@ Kodegjennomgangen fra 12.–13. august 2026 fant 28 punkter (N1–N13, S1–S7, 
 forbindelser. Tas opp igjen kun hvis `WEB_WORKERS` settes til 4 eller mer.
 
 ## Ideer / backlog
+
+### Datteroppdrag — én hendelse, flere pasienter — se `docs/FORSLAG_DATTEROPPDRAG.md`
+
+- [ ] **Idé, ikke besluttet** (13. sep. 2026). Et oppdrag kan deles i datteroppdrag, ett
+      per pasient, med egen bil, grovsortering og tidslinje; `Oppdrag.forelder`, dybde
+      låst til ett nivå, pasientantall bare på bladene, arkivet får `forelder_nummer` bare
+      når satt. Gir hendelsestidslinje, ressursbruk og spredning per hendelse i
+      statistikken. To–tre kvelder.
+      - [ ] **Krever Andre — før koden:** hva skjer med morens bil når den første
+            datteren lages — blir den på moren, eller flyttes den? (§7 i notatet)
 
 ### Brukere, e-post og roller — se `docs/BESLUTNING_BRUKERE_OG_EPOST.md`
 
@@ -851,7 +864,7 @@ skal ligge der.
         `/pasienter/api/stats/live/` er upåvirket — den er et nytt endepunkt med et
         faktisk formål, ikke en videreføring av det slettede.
 
-### Dataimport fra gammel prod — se `docs/DATAIMPORT_FRA_GAMMEL_PROD.md`
+### Dataimport fra gammel prod — se `docs/archived/DATAIMPORT_FRA_GAMMEL_PROD.md`
 
 - [x] **Importert 22. aug. 2026: 273 pasienter, 12 nye førstehjelpere, 6 nye
       helsepersonell.** Alle kontroller grønne — antall, triage-fordeling, koblinger,

@@ -96,3 +96,4 @@ Skrives i én runde, ikke stykkevis, og tar med seg alt fra 11.–13. september:
 | `docs/RUNBOOK_VAKT.md` | §8b utvidet med hel backup og prosedyren i §4 over; henvisning til `sikkerhetssjekk.py` (§14 finnes) |
 | `docs/PERSONVERN_DOKUMENTASJON.md` | A.2: Scaleway-raden sier «hele databasen», ikke «modulenes data»; A.9: én rad for hel backup (90 dager) og tydelig frist for modulfilene offsite (730 dager); A.10: krypteringen, vendor-bibliotekene, `Clear-Site-Data`; A.11 og A.6: vaktlista som fil på e-post og offline drift på drifts-PC-en (det står alt i TODO under «Reserve og offline») |
 | `CLAUDE.md` | Backup-avsnittet: seks handlere, hel backup, hvor modellene bor |
+| `docs/DEPLOY_GUIDE.md` | Heter fortsatt «Pasientregistreringssystem». Portal-domenet, AHASend- og offsite-variablene, `requirements.txt` med hasher |

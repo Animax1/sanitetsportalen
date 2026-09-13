@@ -4,6 +4,20 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-13 — Forslag: datteroppdrag, og `docs/` ryddet
+
+Ingen kodeendring. `docs/FORSLAG_DATTEROPPDRAG.md` er et idénotat (ikke besluttet):
+ett oppdrag deles i datteroppdrag, ett per pasient — `Oppdrag.forelder` med dybde låst
+til ett nivå, pasientantall bare på bladene, `forelder_nummer` i arkivet bare når satt.
+Hva det gir i loggen og statistikken, hva det koster, og det ene spørsmålet
+sentralbordet må svare på først. Står i TODO under «Ideer».
+
+`docs/` gjennomgått: `DATAIMPORT_FRA_GAMMEL_PROD.md` (utført 22. aug.) og
+`OPPSETT_KOLLAPS_CRON.md` (jobben har gått siden 22. aug.) er flyttet til
+`docs/archived/` med indekslinjer, og lenkene til dem oppdatert. Beslutningsnotatene
+blir stående — de forklarer hvorfor. `DEPLOY_GUIDE.md` og `TEKNISK_DOKUMENTASJON.md` er
+utdaterte, men aktive, og står i dokumentrunden i TODO.
+
 ## 2026-09-13 — Backup-planen: `docs/BACKUP.md`
 
 Ingen kodeendring. Besluttet: **to lag med hver sin frist** — en hel backup (alt unntatt

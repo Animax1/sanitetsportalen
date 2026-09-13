@@ -2,7 +2,7 @@
 
 Kommandoen ble skrevet for offline-pakken (lagt ned 13. sep. 2026, se
 CHANGELOG) og lever videre som importverktøy: den gamle appens filer *er*
-det formatet, se docs/DATAIMPORT_FRA_GAMMEL_PROD.md.
+det formatet, se docs/archived/DATAIMPORT_FRA_GAMMEL_PROD.md (utført 22. aug. 2026).
 
 Kjør med: python manage.py test patients.tests_offline
 """
