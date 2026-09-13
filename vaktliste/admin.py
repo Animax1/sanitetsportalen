@@ -1,7 +1,7 @@
 """Django-admin for vaktlistemodulen — **utviklerverktøy, ikke portalens flate.**
 
 Fase 1 la registrene her og skrev at Django-admin var «riktig hjem» for dem.
-Det var feil: `/django-admin/` er kun rutet når `DEBUG` eller `OFFLINE_MODE`
+Det var feil: `/django-admin/` er kun rutet når `DEBUG`
 er på (S1 — den omgår rate-limiting, kontosperre, MFA-tvang og `LoginEvent`).
 I produksjon fantes det dermed ingen vei til å opprette et korps eller et
 mannskap i det hele tatt.

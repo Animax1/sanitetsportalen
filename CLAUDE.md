@@ -433,7 +433,7 @@ fase 3–7 gjenstår — se `docs/BESLUTNING_VAKTLISTE.md`, som er besluttet i s
   transaksjonen ubrukelig: sesjonslagringen feiler på vei ut, og brukeren får en naken
   400-side i stedet for feilmeldingen viewet formulerte.
 - **Registrene administreres på `/vaktliste/`, ikke i Django-admin.** Den
-  flaten er kun rutet under `DEBUG`/`OFFLINE_MODE` (S1), så `vaktliste/admin.py` er et
+  flaten er kun rutet under `DEBUG` (S1), så `vaktliste/admin.py` er et
   utviklerverktøy — et register som *bare* finnes der, finnes ikke for brukeren.
   `SjekkAtIngenPekerPaaDjangoAdminTests` skanner alle maler for lenker dit.
 - **Mannskapet er en fane på planleggingssiden; korps og kompetanser ligger i
@@ -834,8 +834,7 @@ fire stablede tracebacks. Jobben avslutter fortsatt med kode 1.
 den flyktige containeren, og da ville `purge_old_logs` talt null rader,
 skrevet «Slettet 0 audit-logger» og avsluttet med kode 0 — en grønn jobb som
 aldri håndhever A.9. Sjekken står i `settings.py` og henger på
-`RAILWAY_ENVIRONMENT`, ikke på `DEBUG`: offline-modus kjører `DEBUG=False` på
-en laptop og *skal* bruke SQLite.
+`RAILWAY_ENVIRONMENT`, ikke på `DEBUG`: utenfor Railway er SQLite lov.
 
 Sett variabelen som referansen `${{Postgres.DATABASE_URL}}`, ikke som en
 kopiert verdi — en kopi blir stående igjen når passordet roteres, og da
@@ -849,14 +848,13 @@ Settes i `.env` lokalt. Nøkler å kjenne til:
 |----------|--------|
 | `SECRET_KEY` | Kryptografisk Django-nøkkel |
 | `DEBUG` | `True` lokalt, `False` i prod |
-| `OFFLINE_MODE` | `True` for feltbruk uten TLS (ALDRI på Railway) |
 | `RATELIMIT_ENABLE` | Nød-bryter for rate-limiting |
 | `REDIS_URL` | Aktiverer Redis-cache (ellers LocMemCache) |
 | `BACKUP_DIR` | Sti til backup-mappe (Railway: `/data/backups`) |
 | `LOG_LEVEL` | Loggnivå for rot-loggeren (default `INFO`) |
 | `ADMINS` | Mottakere av feilvarsel, format `Navn:epost`, komma-separert |
 | `AHASEND_API_KEY` + `AHASEND_ACCOUNT_ID` | AHASends HTTP-API v2 (`core/mail_backends.py`). **Dette er transporten i prod** — Railway sperrer utgående SMTP på alle porter |
-| `EMAIL_HOST` m.fl. | SMTP for feilvarsel. Brukes kun lokalt og i offline-modus |
+| `EMAIL_HOST` m.fl. | SMTP for feilvarsel. Brukes kun lokalt |
 | `EMAIL_TIMEOUT` | Tidsgrense for utsending, default 10 s. Må aldri være `None` |
 
 ## Deployment

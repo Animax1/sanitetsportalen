@@ -53,6 +53,9 @@ REVIEWED_INTERPOLATIONS = {
     '_stempelknapper(vp)': 'markup bygget lokalt av en bygger som selv skannes her',
     'naar(vp.av_vakt_at)': 'markup bygget lokalt, klokkeslettet escapet inni',
     'naar(vp.mott_at)': 'markup bygget lokalt, klokkeslettet escapet inni',
+    # Offline drift (13. sep. 2026): kø-merket på stempeltida.
+    'koKlasse': 'hardkodet CSS-klasse fra en ternær på `vp.i_ko`',
+    "vp.i_ko ? ' title=\"Venter på å bli sendt\"' : ''": 'hardkodet attributt fra en ternær',
     "angre('angreMott', 'Angre møtt')":
         'markup bygget lokalt, id-en escapet inni',
     "angre('angreAvVakt', 'Angre av vakt')":

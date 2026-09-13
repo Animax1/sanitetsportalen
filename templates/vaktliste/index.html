@@ -62,6 +62,15 @@
     {% endcomment %}
     <span id="vaktliste-status" class="vl-status"></span>
     {% comment %}
+      «Klar for offline» (13. sep. 2026): vises av `_tegnOfflineKlar()` når
+      service workeren styrer siden og lista ligger i kopi — sjekket, ikke
+      antatt. Drifts-PC-en skal kunne se at den er dekket før nettet ryker.
+    {% endcomment %}
+    <span id="vl-offline-klar" class="vl-offline-klar d-none"
+          title="Siden og siste liste ligger lokalt. Svarer ikke serveren, vises kopien, og møtt/av vakt legges i kø.">
+      <i class="bi bi-cloud-check"></i> Klar for offline
+    </span>
+    {% comment %}
       Korpsvelgeren (11. sep. 2026), bare for den som ser alle korps. Den gjør
       i nettleseren det serveren gjør for korps-brukeren: viser ett korps i
       alle fanene. Fylles av `lastListe()`; regelen er `_synligePoster()`.
@@ -162,6 +171,8 @@
   </div>
 
   <div id="vl-feil" class="alert alert-danger d-none"></div>
+  {# Offline drift (13. sep. 2026): frakoblet, utgått innlogging, eller kø. Tegnes av `tegnOffline()`. #}
+  <div id="vl-offline" class="alert alert-warning py-2 d-none"></div>
 
   <div id="vl-panel"></div>
 

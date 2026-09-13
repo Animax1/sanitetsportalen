@@ -4,6 +4,31 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-13 — Reserve 2 og 4: offline drift på /vaktliste/, gammel offline-modus lagt ned
+
+Ingen migrasjon. Deployes til staging først; testes i Chrome/Edge på PC.
+
+- **Service worker for `/vaktliste/`** (`static/js/vaktliste-sw.js`, servert av
+  `/vaktliste/sw.js`): holder siden, stilene, skriptene og siste svar fra
+  vaktliste-API-et lokalt. Svarer ikke serveren, vises kopien, med banner «viser
+  lista slik den var kl …». Innloggingssiden lagres aldri som kopi.
+- **Møtt/av vakt i kø** når serveren ikke svarer: stemplingen vises som satt
+  (merket), legges i `localStorage` med tida trykket skjedde, og sendes i
+  rekkefølge hvert 15. sekund og når nettet kommer tilbake. Serveren tar
+  tidspunktet fra køen (`stempling/` leser `tidspunkt` i kroppen;
+  `services.vurder_klienttid` klipper urimelige). Et trykk serveren avviser
+  fjernes med beskjed.
+- **Utgått innlogging** stopper køen og sier fra i banneret; den sendes etter
+  ny innlogging i en annen fane.
+- **«Klar for offline»** i vaktlinja når workeren styrer siden og lista ligger i
+  kopi — sjekket, ikke antatt.
+- **Den gamle offline-modusen er lagt ned:** `OFFLINE_MODE`, CSRF åpen for LAN,
+  `ALLOWED_HOSTS=*`, Django-admin under offline, `create_offline_users`,
+  `.env.offline.example`, `OFFLINE_PASSORD.md` og USB-pakken. Django-admin
+  rutes nå bare under `DEBUG`. `import_offline_data` står igjen som
+  importverktøy for den gamle appens SQLite. Dokumentasjonen (teknisk §11,
+  personvern A.11, runbook) er skrevet om til den nye reserven.
+
 ## 2026-09-13 — Reserve 1b: intervallsending mens lista er i drift
 
 Én migrasjon, `vaktliste/0017` (`Utsending.innhold_sha256`, ny utløser

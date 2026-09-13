@@ -36,7 +36,7 @@ django_project/
 │   ├── backup_scheduler.py – In-process-scheduler (BackupSchedulerMiddleware)
 │   ├── middleware.py        – BackupSchedulerMiddleware + SecurityHeadersMiddleware
 │   ├── signals.py  – Audit-logging av feltendringer
-│   └── tests*.py   – Kjernetester, backuptester, schedulertester, offline-tester
+│   └── tests*.py   – Kjernetester, backuptester, schedulertester, dataimport-tester
 ├── statistikk/     – Statistikkmodulen (/statistikk/), skilt ut fra patients aug. 2026
 ├── static/         – CSS og JavaScript
 └── templates/      – HTML-maler
@@ -258,7 +258,7 @@ python manage.py test patients accounts audit -v 2
 | scheduler              | 8      | In-process backup-scheduler                     |
 | security headers       | 5      | CSP, HSTS, X-Frame-Options m.fl.                |
 | patients core          | 58     | Filter, rolle, CRUD, statistikk                 |
-| offline                | 34     | SQLite-isolasjon, import av offline-data        |
+| dataimport             | ~25    | import_offline_data fra den gamle appens SQLite |
 | admin server-status    | 19     | Metrics-ringbuffer, dashbord, feature-flags     |
 | stats-cache + ETag     | 14     | Cache-TTL, ETag/304, invalidering               |
 | statistikk             | 17     | Modultilgang, flyttede endepunkt, videresending  |

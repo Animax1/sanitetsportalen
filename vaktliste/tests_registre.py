@@ -519,7 +519,7 @@ class MannskapApiTests(TestCase):
 class SjekkAtIngenPekerPaaDjangoAdminTests(TestCase):
     """Ingen mal skal sende brukeren til `/django-admin/`.
 
-    Flaten er kun rutet under `DEBUG`/`OFFLINE_MODE` (S1). En mal som ber
+    Flaten er kun rutet under `DEBUG` (S1). En mal som ber
     brukeren gå dit, peker på en dør som ikke finnes i produksjon — og det var
     nøyaktig feilen vaktlistemodulen hadde gjennom fase 1 og 2.
     """

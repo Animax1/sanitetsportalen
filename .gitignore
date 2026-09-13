@@ -19,16 +19,7 @@ backups/
 .DS_Store
 
 
-# Offline-modus
-OFFLINE_PASSORD.md
-offline.sqlite3
-.env.offline
 vendor/
-usb_package_builder/build/
-usb_package_builder/output/
-start_offline.bat
-OFFLINE_PASSWORD.md
-start_offline_deprecated.bat
 
 
 #CLAUDE

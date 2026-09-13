@@ -1,0 +1,124 @@
+/* Service worker for /vaktliste/ — offline drift (13. sep. 2026).
+ *
+ * Holder siden, stilene, skriptene og siste svar fra vaktliste-API-et lokalt,
+ * så drifts-PC-en kan vise lista og stemple møtt/av vakt når serveren ikke
+ * svarer. Stemplingene selv legges i kø av vaktliste.js — workeren rører
+ * ingen POST.
+ *
+ * Tre regler, og `avgjor()` er det ene stedet de står:
+ *   - API-GET under /vaktliste/api/: nettet først, kopien når nettet feiler.
+ *     Kopien får headeren X-Vl-Kopi med tida den ble lagret, så siden kan si
+ *     «viser lista slik den var kl 12:04».
+ *   - Siden selv (/vaktliste/): nettet først, kopien når nettet feiler. Bare
+ *     et svar som ikke er en omdirigering lagres — en utgått sesjon gir
+ *     innloggingssiden, og den skal ikke bli «vaktlista».
+ *   - Statiske filer og CDN (Bootstrap, ikoner): kopien først, nettet i
+ *     bakgrunnen. Filnavnene er hashet av WhiteNoise, så en gammel kopi er
+ *     aldri feil versjon.
+ *
+ * Serveres av vaktliste.views.sw_view, ikke fra /static/ — en worker styrer
+ * bare stier under sin egen.
+ */
+const VERSJON = 'vl-sw-3';
+const SKALL = `${VERSJON}-skall`;
+const DATA = `${VERSJON}-data`;
+const CDN = ['https://cdn.jsdelivr.net', 'https://unpkg.com'];
+
+
+function avgjor(url, metode, modus, egenOrigin) {
+  // -> 'api' | 'side' | 'statisk' | null. Ren funksjon, testes i node.
+  if (metode !== 'GET') return null;
+  let u;
+  try { u = new URL(url); } catch (e) { return null; }
+  if (u.origin === egenOrigin) {
+    if (u.pathname === '/vaktliste/sw.js') return null;
+    if (u.pathname.startsWith('/vaktliste/api/')) {
+      // Fila og utsendingen er ikke noe å vise offline.
+      if (/\/fil\/$/.test(u.pathname)) return null;
+      return 'api';
+    }
+    if (modus === 'navigate') {
+      return u.pathname === '/vaktliste/' ? 'side' : null;
+    }
+    if (u.pathname.startsWith('/static/')) return 'statisk';
+    return null;
+  }
+  return CDN.includes(u.origin) ? 'statisk' : null;
+}
+
+
+function kanLagres(svar) {
+  // Ikke omdirigeringer (innlogging), ikke feil, ikke delvise svar.
+  return !!svar && svar.ok && !svar.redirected && svar.status === 200;
+}
+
+
+function medLagretTid(svar, naaIso) {
+  // Klon med tida lagt på, så kopien vet hvor gammel den er når den serveres.
+  const h = new Headers(svar.headers);
+  h.set('X-Vl-Lagret', naaIso);
+  return svar.arrayBuffer().then((kropp) =>
+    new Response(kropp, { status: svar.status, statusText: svar.statusText, headers: h }));
+}
+
+
+function somKopi(svar) {
+  const h = new Headers(svar.headers);
+  h.set('X-Vl-Kopi', h.get('X-Vl-Lagret') || '');
+  return svar.arrayBuffer().then((kropp) =>
+    new Response(kropp, { status: svar.status, statusText: svar.statusText, headers: h }));
+}
+
+
+async function nettForst(req, cacheNavn) {
+  const cache = await caches.open(cacheNavn);
+  try {
+    const svar = await fetch(req);
+    if (kanLagres(svar)) {
+      const lagret = await medLagretTid(svar.clone(), new Date().toISOString());
+      await cache.put(req, lagret);
+    }
+    return svar;
+  } catch (e) {
+    const kopi = await cache.match(req);
+    if (kopi) return somKopi(kopi);
+    throw e;
+  }
+}
+
+
+async function kopiForst(req, cacheNavn) {
+  const cache = await caches.open(cacheNavn);
+  const kopi = await cache.match(req);
+  const henting = fetch(req).then((svar) => {
+    if (svar && (svar.ok || svar.type === 'opaque')) cache.put(req, svar.clone());
+    return svar;
+  }).catch(() => null);
+  if (kopi) return kopi;
+  const svar = await henting;
+  if (svar) return svar;
+  throw new Error('Ingen kopi og ikke nett');
+}
+
+
+self.addEventListener('install', (e) => {
+  e.waitUntil(self.skipWaiting());
+});
+
+
+self.addEventListener('activate', (e) => {
+  e.waitUntil((async () => {
+    const navn = await caches.keys();
+    await Promise.all(navn.filter((n) => n.startsWith('vl-sw-') && !n.startsWith(VERSJON))
+                          .map((n) => caches.delete(n)));
+    await self.clients.claim();
+  })());
+});
+
+
+self.addEventListener('fetch', (e) => {
+  const valg = avgjor(e.request.url, e.request.method, e.request.mode, self.location.origin);
+  if (valg === 'api') e.respondWith(nettForst(e.request, DATA));
+  else if (valg === 'side') e.respondWith(nettForst(e.request, SKALL));
+  else if (valg === 'statisk') e.respondWith(kopiForst(e.request, SKALL));
+});

@@ -83,8 +83,7 @@ urlpatterns = [
 #   /portal-admin/server-status/     drift
 # AppSetting redigeres med `python manage.py appsetting` (nødoperasjon).
 #
-# Lokalt (DEBUG) og i offline-modus beholdes flaten som utviklerverktøy. Begge
-# er miljøer uten reell eksponering: offline-modus har hard sperre mot å kjøre
-# på Railway (settings.py).
-if settings.DEBUG or getattr(settings, 'OFFLINE_MODE', False):
+# Lokalt (DEBUG) beholdes flaten som utviklerverktøy. Offline-modusen som
+# også rutet den ble lagt ned 13. sep. 2026.
+if settings.DEBUG:
     urlpatterns.insert(1, path('django-admin/', admin.site.urls))

@@ -21,9 +21,6 @@ DEBUG = os.environ.get('DEBUG', 'False') == 'True'
 # Tidligere hadde variabelen en hardkodet fallback som slo inn stilltiende hvis
 # miljøvariabelen manglet. Nå feiler oppstarten i stedet — høylytt og med én
 # gang — når DEBUG er av. Fallbacken beholdes kun for lokal utvikling.
-#
-# Merk at offline-modus også kjører DEBUG=False; .env.offline.example setter
-# derfor en egen nøkkel som skal byttes ved hvert event.
 _PLACEHOLDER_SECRET_KEYS = {
     'change-me-in-production',
     'dev-only-ikke-bruk-i-prod-changeme123!',
@@ -46,20 +43,9 @@ if not DEBUG:
 elif not SECRET_KEY:
     SECRET_KEY = 'dev-only-ikke-bruk-i-prod-changeme123!'
 
-# Offline-modus: kjoeres paa event-laptop uten TLS-terminerende proxy.
-# Skrur av HTTPS-tvang og HSTS, men beholder DEBUG=False slik at stack-traces
-# og statiske filer fortsatt er produksjonsklare. Sett OFFLINE_MODE=True i
-# .env.offline.example for offline-bruk.
-OFFLINE_MODE = os.environ.get('OFFLINE_MODE', 'False') == 'True'
-
-# Ekstra paranoia: OFFLINE_MODE skal ALDRI kunne aktiveres i prod-miljøet på
-# Railway. Hvis variabelen ved et uhell settes der, krasjer appen ved oppstart
-# i stedet for å kjøre uten HTTPS-tvang og HSTS.
-if OFFLINE_MODE and os.environ.get('RAILWAY_ENVIRONMENT'):
-    raise ImproperlyConfigured(
-        "OFFLINE_MODE kan ikke brukes på Railway. "
-        "Fjern OFFLINE_MODE-variabelen fra Railway Variables."
-    )
+# Den gamle offline-modusen (`OFFLINE_MODE`: laptop uten TLS, egen SQLite,
+# CSRF åpen for LAN) ble lagt ned 13. sep. 2026. Reserven er vaktlista som
+# fil på e-post og offline drift i nettleseren — se TEKNISK_DOKUMENTASJON §11.
 
 # Sikker default: tillat kun localhost hvis miljøvariabel mangler.
 # I produksjon settes ALLOWED_HOSTS via Railway Variables.
@@ -67,36 +53,6 @@ ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', '.localhost,127.0.0.1').split(',
 
 CSRF_TRUSTED_ORIGINS_RAW = os.environ.get('CSRF_TRUSTED_ORIGINS', '')
 CSRF_TRUSTED_ORIGINS = [o.strip() for o in CSRF_TRUSTED_ORIGINS_RAW.split(',') if o.strip()]
-
-# I offline-modus kjører vi DEBUG=False uten HTTPS, men trenger fortsatt at
-# Django godtar POST-requests fra localhost og hele LAN-rangen til lead-PC-en.
-# Detekterer LAN-IP automatisk og legger til typiske private subnets samt
-# alle hosts i ALLOWED_HOSTS som http-origins.
-if OFFLINE_MODE:
-    import socket
-    _offline_origins = {'http://127.0.0.1:8000', 'http://localhost:8000'}
-    # Auto-detekter primær LAN-IP
-    try:
-        _s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        _s.connect(('10.255.255.255', 1))
-        _lan_ip = _s.getsockname()[0]
-        _s.close()
-        _offline_origins.add(f'http://{_lan_ip}:8000')
-    except Exception:
-        pass
-    # Legg til alle ALLOWED_HOSTS-oppføringer som http-origins
-    for _host in ALLOWED_HOSTS:
-        _host = _host.strip().lstrip('.')
-        if _host and _host not in ('localhost', '127.0.0.1'):
-            _offline_origins.add(f'http://{_host}:8000')
-    # Wildcard-pattern for hele 192.168.x.x og 10.x.x.x i offline-modus
-    # (Django støtter wildcard i CSRF_TRUSTED_ORIGINS fra 4.0+)
-    _offline_origins.add('http://192.168.*.*:8000')
-    _offline_origins.add('http://10.*.*.*:8000')
-    CSRF_TRUSTED_ORIGINS = list(set(CSRF_TRUSTED_ORIGINS) | _offline_origins)
-    # Tillat også alle hosts i offline (LAN er klientens nett, ingen DNS-rebinding-risiko)
-    if '*' not in ALLOWED_HOSTS:
-        ALLOWED_HOSTS = ALLOWED_HOSTS + ['*']
 
 # ── Applikasjoner ────────────────────────────────────────────────────────────
 INSTALLED_APPS = [
@@ -190,10 +146,9 @@ DATABASES = {
 # A.9 — en feil som først oppdages den dagen noen spør hvorfor det ligger
 # fire år med logger i basen.
 #
-# Samme mønster som SECRET_KEY-sjekken over og OFFLINE_MODE-sjekken under:
-# en feilkonfigurasjon i prod skal stoppe oppstarten høylytt og med én gang.
-# Sjekken henger på `RAILWAY_ENVIRONMENT` og ikke på `DEBUG`, fordi
-# offline-modus kjører `DEBUG=False` på en laptop og *skal* bruke SQLite.
+# Samme mønster som SECRET_KEY-sjekken over: en feilkonfigurasjon i prod skal
+# stoppe oppstarten høylytt og med én gang. Sjekken henger på
+# `RAILWAY_ENVIRONMENT` og ikke på `DEBUG` — utenfor Railway er SQLite lov.
 if (os.environ.get('RAILWAY_ENVIRONMENT')
         and 'sqlite' in DATABASES['default'].get('ENGINE', '')):
     raise ImproperlyConfigured(
@@ -293,9 +248,9 @@ STORAGES = {
 }
 
 # ── Sikkerhet ────────────────────────────────────────────────────────────────
-# HTTPS er kun aktuelt i produksjon (Railway). I offline-modus eller under
-# utvikling med DEBUG=True er det HTTP, og cookies/redirects maa tilpasses.
-_HTTPS_ENABLED = (not DEBUG) and (not OFFLINE_MODE)
+# HTTPS er kun aktuelt i produksjon (Railway). Under utvikling med DEBUG=True
+# er det HTTP, og cookies/redirects maa tilpasses.
+_HTTPS_ENABLED = not DEBUG
 
 # Cookies
 SESSION_COOKIE_SECURE = _HTTPS_ENABLED

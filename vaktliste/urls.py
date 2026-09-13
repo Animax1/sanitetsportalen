@@ -13,6 +13,9 @@ from . import views, views_registre
 
 urlpatterns = [
     path('', views.index_view, name='vaktliste_index'),
+    # Service workeren for offline drift (13. sep. 2026). Må ligge under
+    # `/vaktliste/` — en worker styrer bare stier under sin egen.
+    path('sw.js', views.sw_view, name='vaktliste_sw'),
 
     # **Registersiden er lagt ned (30. aug. 2026).** Mannskapet er en fane på
     # planleggingssiden, korps og kompetanser ligger i «Innstillinger». Et

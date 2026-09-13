@@ -43,6 +43,7 @@ spørring i samme forespørsel, typisk sesjonslagringen, og brukeren får en nak
 from __future__ import annotations
 
 import json
+from pathlib import Path
 
 from django.db import IntegrityError, transaction
 from django.http import JsonResponse
@@ -884,10 +885,13 @@ def send_fil_view(request, pk):
 def stempling_view(request, pk, handling):
     """Møtt, av vakt, og angring av begge. Ett endepunkt per navngitt overgang.
 
-    **Kroppen leses ikke.** Knappen vet hvilken overgang den utfører, og
-    serveren utleder ingenting av gjeldende tilstand — nøyaktig som
-    `oppdrag.views.stempling_view`. Reglene selv ligger som data i
-    `services.STEMPLINGER`.
+    **Kroppen bærer bare `tidspunkt`, og den er valgfri.** Knappen vet
+    hvilken overgang den utfører, og serveren utleder ingenting av gjeldende
+    tilstand — nøyaktig som `oppdrag.views.stempling_view`. Reglene selv
+    ligger som data i `services.STEMPLINGER`. Tidspunktet kom 13. sep. 2026
+    med offline drift: en stempling som lå i kø på drifts-PC-en skal få tida
+    trykket skjedde, ikke tida nettet kom tilbake — `services.vurder_klienttid`
+    sier når klienttida er til å stole på.
 
     Tre porter, og de svarer på hver sin ting:
 
@@ -917,7 +921,14 @@ def stempling_view(request, pk, handling):
             'Innsjekken er stengt. Sett vaktlista i drift først — da åpnes '
             'møtt og av vakt.', status=409)
 
-    ok, melding = services.stemple(vp, handling)
+    klienttid = None
+    raa = _json_body(request).get('tidspunkt') if request.body else None
+    if raa:
+        klienttid = parse_datetime(str(raa))
+        if klienttid is None:
+            return _feil('Ugyldig tidspunkt.')
+
+    ok, melding = services.stemple(vp, handling, naa=services.vurder_klienttid(klienttid))
     if not ok:
         return _feil(melding)
     vp.save(update_fields=['mott_at', 'av_vakt_at', 'updated_at'])
@@ -926,6 +937,32 @@ def stempling_view(request, pk, handling):
         'status': 'ok',
         'data': _vaktpost_til_dict(vp, services.foreldrekart()),
     })
+
+
+@require_http_methods(['GET'])
+def sw_view(request):
+    """Service workeren for `/vaktliste/` — offline drift (13. sep. 2026).
+
+    Serveres fra en view, ikke fra `/static/`, fordi en service worker bare
+    kan styre stier under sin egen: lå den under `/static/js/`, dekket den
+    ingenting. Ingen innlogging: registreringen skjer fra den innloggede
+    siden, men en utgått sesjon skal ikke gi en workeren som er en
+    innloggingsside. Fila bærer ingen data.
+
+    `Cache-Control: no-cache` så nettleseren sjekker for ny versjon ved hver
+    sidelasting, og en egen CSP: workeren henter Bootstrap fra CDN-en for å
+    legge det i cachen, og sidens `connect-src 'self'` ville stoppet det.
+    """
+    from django.conf import settings as _settings
+    from django.http import HttpResponse
+    sti = Path(_settings.BASE_DIR) / 'static' / 'js' / 'vaktliste-sw.js'
+    svar = HttpResponse(sti.read_text(encoding='utf-8'),
+                        content_type='application/javascript; charset=utf-8')
+    svar['Cache-Control'] = 'no-cache'
+    svar['Service-Worker-Allowed'] = '/vaktliste/'
+    svar['Content-Security-Policy'] = (
+        "default-src 'self'; connect-src 'self' https://cdn.jsdelivr.net https://unpkg.com")
+    return svar
 
 
 @modul_kreves('vaktliste', 'les', svar='json')

@@ -1,4 +1,8 @@
-"""Tester for offline-pakken: create_offline_users og import_offline_data.
+"""Tester for `import_offline_data` — dataimport fra den gamle appens SQLite.
+
+Kommandoen ble skrevet for offline-pakken (lagt ned 13. sep. 2026, se
+CHANGELOG) og lever videre som importverktøy: den gamle appens filer *er*
+det formatet, se docs/DATAIMPORT_FRA_GAMMEL_PROD.md.
 
 Kjør med: python manage.py test patients.tests_offline
 """
@@ -128,89 +132,12 @@ def _build_offline_sqlite(path, patients, behandlere=None, helsepersonell=None):
     conn.close()
 
 
-def _call_create_offline_users(*args):
-    """Kjør create_offline_users-kommandoen og returner stdout som streng."""
-    from django.core.management import call_command
-    out = StringIO()
-    call_command('create_offline_users', *args, stdout=out)
-    return out.getvalue()
-
-
 def _call_import_offline_data(path, **kwargs):
     """Kjør import_offline_data-kommandoen og returner stdout som streng."""
     from django.core.management import call_command
     out = StringIO()
     call_command('import_offline_data', str(path), stdout=out, **kwargs)
     return out.getvalue()
-
-
-# ── Tester for create_offline_users ──────────────────────────────────────────
-
-@override_settings(SECURE_SSL_REDIRECT=False, RATELIMIT_ENABLE=False)
-class CreateOfflineUsersTests(TestCase):
-    """Tester for management-kommandoen create_offline_users."""
-
-    def test_create_offline_users_creates_both(self):
-        """Kommandoen skal opprette admin-offline og vakt-offline med rett rolle."""
-        _call_create_offline_users()
-
-        admin = CustomUser.objects.get(username='admin-offline')
-        vakt = CustomUser.objects.get(username='vakt-offline')
-
-        self.assertEqual(admin.role, 'admin')
-        self.assertEqual(vakt.role, 'bruker')
-        self.assertFalse(admin.must_change_password)
-        self.assertFalse(admin.mfa_required)
-        self.assertFalse(vakt.must_change_password)
-        self.assertFalse(vakt.mfa_required)
-
-    def test_create_offline_users_is_idempotent(self):
-        """Kommandoen kan kjøres to ganger uten å lage duplikater."""
-        _call_create_offline_users()
-        _call_create_offline_users()
-
-        antall_admin = CustomUser.objects.filter(username='admin-offline').count()
-        antall_vakt = CustomUser.objects.filter(username='vakt-offline').count()
-        self.assertEqual(antall_admin, 1)
-        self.assertEqual(antall_vakt, 1)
-
-    def test_create_offline_users_rotate_changes_password(self):
-        """Med --rotate skal passordet endres slik at det gamle ikke lenger virker."""
-        # Første kjøring – noter passordet via check_password
-        _call_create_offline_users()
-        user = CustomUser.objects.get(username='admin-offline')
-        old_hash = user.password
-
-        # Roter
-        _call_create_offline_users('--rotate')
-        user.refresh_from_db()
-
-        # Hash skal ha endret seg
-        self.assertNotEqual(user.password, old_hash,
-                            'Passordhash skal endres etter --rotate')
-
-    def test_password_file_written_and_format_ok(self):
-        """OFFLINE_PASSORD.md skal skrives og inneholde riktig innhold."""
-        from django.conf import settings
-        pw_file = Path(settings.BASE_DIR) / 'OFFLINE_PASSORD.md'
-
-        # Sørg for at filen ikke finnes fra før
-        if pw_file.exists():
-            pw_file.unlink()
-
-        _call_create_offline_users()
-
-        self.assertTrue(pw_file.exists(), 'OFFLINE_PASSORD.md skal eksistere')
-        innhold = pw_file.read_text(encoding='utf-8')
-
-        self.assertIn('# Offline-passord', innhold)
-        self.assertIn('admin-offline', innhold)
-        self.assertIn('vakt-offline', innhold)
-        self.assertIn('Generert:', innhold)
-        self.assertIn('| Brukernavn | Rolle | Passord |', innhold)
-
-        # Rydder opp etter testen
-        pw_file.unlink(missing_ok=True)
 
 
 # ── Tester for import_offline_data ───────────────────────────────────────────

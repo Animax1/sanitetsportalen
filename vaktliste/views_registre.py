@@ -6,8 +6,8 @@ navnet — det var alfabetisk i praksis, med et tallfelt i skjemaet som pris.
 
 **Hvorfor denne fila finnes.** Fase 1 la registrene i `vaktliste/admin.py` og
 skrev at «Django-admin er uansett riktig hjem for `Korps`, `Kompetanse` og
-`Ressursrolle`». Det var feil: `/django-admin/` er kun rutet når `DEBUG` eller
-`OFFLINE_MODE` er på (S1 — den er en parallell innloggingsflate som omgår
+`Ressursrolle`». Det var feil: `/django-admin/` er kun rutet når `DEBUG`
+er på (S1 — den er en parallell innloggingsflate som omgår
 rate-limiting, kontosperre, MFA-tvang og `LoginEvent`). I produksjon fantes det
 dermed ingen vei til å opprette et korps eller et mannskap, og
 planleggingssiden hadde en nedtrekksliste som aldri kunne fylles.

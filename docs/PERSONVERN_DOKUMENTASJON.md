@@ -502,20 +502,20 @@ Lagringstidene er fastsatt etter GDPR art. 5(1)(e): opplysningene skal ikke oppb
 
 ---
 
-## A.11 Offline-modus og personvern
+## A.11 Reserve ved bortfall av portalen og personvern
 
-Systemet støtter en **offline-modus** for bruk under nettverksutfall. Dette innebærer:
+Den gamle offline-modusen (lokal SQLite-kopi av pasientdata på en laptop) ble lagt ned
+13. sep. 2026. Reserven er nå avgrenset til **vaktlista**:
 
 | Aspekt | Beskrivelse |
 |---|---|
-| Lokal database | Egne SQLite-database (`offline.sqlite3`) på lokal maskin |
-| Lokale brukere | Genereres automatisk med egne passord (`admin-offline`, `vakt-offline`) ved oppstart av offline-modus |
-| Passord-håndtering | Offline-passord dokumenteres i `OFFLINE_PASSORD.md` – lagres lokalt, ikke i kodearkiv (git) |
-| Import ved reetablering | Etter nettverksutfall importeres pasientdata til produksjonsdatabasen via `python manage.py import_offline_data` |
+| Vaktlista som fil på e-post | Én HTML-fil med navn, korps, rolle, skift, telefon og ISSI — ikke e-post, notat eller merknad. Sendes ukryptert til en fast mottakerliste satt av global admin, ved «Sett i drift», på knapp og på intervall mens lista er i drift. Hver utsending logges (hvem, når, hvilke adresser). Fila sier selv «slett etter vakta». Vurdering: alminnelige personopplysninger, se `docs/BESLUTNING_VAKTLISTE.md` §12 |
+| Offline drift på drifts-PC-en | Nettleseren holder siden og siste vaktliste lokalt (service worker). Møtt/av vakt legges i kø når serveren ikke svarer og sendes når den svarer igjen. Kopien inneholder de samme opplysningene som fila, i nettleserens cache på den PC-en |
+| Pasientdata | Ingen lokal kopi. Ved bortfall føres pasienter på papir/Excel etter organisasjonens rutine |
 
-> **Personvernrisiko ved offline-bruk:** `offline.sqlite3`-filen inneholder personopplysninger om pasienter. Filen **må slettes fra offline-enheten** etter at dataene er importert til produksjonsdatabasen og bruken er avsluttet. Enheten der offline-filen oppbevares, skal behandles med samme krav til informasjonssikkerhet som produksjonssystemet. Tap eller uautorisert tilgang til enheten utgjør et potensielt brudd på personopplysningssikkerheten som skal håndteres i henhold til prosedyren i A.12.
-
----
+> **Personvernrisiko:** fila og nettleserkopien inneholder personopplysninger om mannskapet.
+> Mottakere skal slette fila etter vakta, og drifts-PC-en skal behandles med samme krav til
+> informasjonssikkerhet som produksjonssystemet. Tap av enheten håndteres etter A.12.
 
 ## A.12 Risikovurdering – sammendrag
 
@@ -818,7 +818,7 @@ E-post: andre.eritsland@gmail.com
 - [ ] Verifiser at brute-force-lås og rate-limiting fungerer (5 feilede pålogginger gir blokkering i 15 min)
 - [ ] Bekreft at sesjonstimeout er satt korrekt for vakten
 - [ ] Sjekk at Railway-tjenesten kjører og at siste backup er vellykket
-- [ ] Dersom offline-modus skal benyttes: klargjør offline-enhet, verifiser at `OFFLINE_PASSORD.md` er tilgjengelig lokalt
+- [ ] Sjekk at mottakerlista for vaktlista på e-post er riktig, og at drifts-PC-en viser «Klar for offline»
 
 ---
 

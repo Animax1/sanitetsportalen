@@ -291,6 +291,35 @@ STEMPLINGER = {
 }
 
 
+#: Klienttid eldre enn dette forkastes — en stempling som har ligget i køen
+#: et døgn er ikke lenger et tidspunkt man kan stole på.
+KLIENTTID_MAKS_ALDER_SEK = 24 * 3600
+#: Litt slingringsmonn framover: PC-klokker går feil med sekunder, ikke timer.
+KLIENTTID_MAKS_FRAMTID_SEK = 120
+
+
+def vurder_klienttid(klienttid, naa=None):
+    """Tidspunktet en stempling skal få (offline drift, 13. sep. 2026).
+
+    Drifts-PC-en legger møtt/av vakt i kø når serveren ikke svarer, og sender
+    dem når den svarer igjen. Da er det trykket som er hendelsen, ikke
+    mottaket: Kari møtte 08:04, ikke 09:30 da nettet kom tilbake. Klienttiden
+    brukes derfor når den er rimelig — ikke i framtiden ut over
+    klokkeslingring, ikke eldre enn et døgn — og ellers servertid. Samme
+    regel som bilens stemplinger i oppdragsmodulen, uten `forsinket`-flagget:
+    vaktlista har ikke et felt å bære det i, og avviket ses av auditloggen.
+    """
+    naa = naa or timezone.now()
+    if klienttid is None:
+        return naa
+    if timezone.is_naive(klienttid):
+        klienttid = timezone.make_aware(klienttid)
+    avstand = (naa - klienttid).total_seconds()
+    if avstand < -KLIENTTID_MAKS_FRAMTID_SEK or avstand > KLIENTTID_MAKS_ALDER_SEK:
+        return naa
+    return min(klienttid, naa)
+
+
 def stemple(vaktpost, handling, naa=None):
     """Utfør én navngitt stempling. Returnerer ``(ok, feilmelding)``.
 

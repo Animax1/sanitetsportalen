@@ -98,7 +98,7 @@ class DatabaseFallbackTests(SimpleTestCase):
         """
         lastet = self._last_uten(
             'RAILWAY_ENVIRONMENT',
-            DEBUG='False', OFFLINE_MODE='True',
+            DEBUG='False',
             DATABASE_URL='sqlite:///tmp/offline.sqlite3')
         self.assertIn('sqlite', lastet.DATABASES['default']['ENGINE'])
         self.assertFalse(lastet.DEBUG, 'testen kjørte ikke i den formen den beskriver')

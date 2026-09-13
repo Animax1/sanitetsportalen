@@ -286,7 +286,8 @@ Som absolutt siste utvei hvis systemet er utilgjengelig:
 
 1. Meld fra til brukerne at de må registrere manuelt på papir
 2. Redeploy med `DEBUG=true` midlertidig for bedre feilmeldinger i logs
-3. Bruk offline-pakken på USB (se `OFFLINE_GUIDE.md`) som backup-registreringssystem
+3. Vaktlista: drifts-PC-en har siste liste lokalt (service worker) og stempler møtt/av vakt i kø;
+   fila på e-post er reserven om PC-en også faller. Pasienter på Excel, oppdrag på nødnett.
 
 ---
 
@@ -411,7 +412,7 @@ Forventet effekt med Redis aktivt: konsistent rate-limiting på tvers av workers
 | Railway Volume backups | Railway → Volumes → Browse |
 | Brukeradmin | `https://<din-app>.railway.app/portal-admin/brukere/` |
 | Innloggingslogg | `https://<din-app>.railway.app/portal-admin/innloggingslogg/` |
-| Offline-guide | `OFFLINE_GUIDE.md` i repoet |
+| Reserve | `docs/TEKNISK_DOKUMENTASJON.md` §11 |
 | Deploy-guide | `DEPLOY_GUIDE.md` i repoet |
 
 ---

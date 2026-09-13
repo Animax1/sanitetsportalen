@@ -1149,3 +1149,16 @@
   .vl-varselantall, .vl-advarsel { color: #000 !important; }
   .vl-advarsel::after { content: ' (!)'; }
 }
+
+/* ── Offline drift (13. sep. 2026) ─────────────────────────────────────── */
+/* «Klar for offline» i vaktlinja: dempet, ikke et varsel — det er tilstanden
+ * man vil ha. Banneret `#vl-offline` bruker Bootstraps alert-klasser. */
+.vl-offline-klar {
+  font-size: 0.8rem;
+  color: var(--vl-ok);
+  white-space: nowrap;
+}
+/* Et stempel som står i kø vises som satt, men merket: serveren har det
+ * ikke ennå. */
+.vl-i-ko { opacity: 0.75; }
+.vl-i-ko::after { content: " ·"; color: var(--vl-varsel); }

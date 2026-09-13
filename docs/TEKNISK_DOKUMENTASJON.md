@@ -19,7 +19,6 @@ Pasientregistreringssystemet er en nettbasert applikasjon for sanntids registrer
 | Backend-rammeverk | Django | >=5.2 | Webapplikasjon, ORM, admin |
 | Database (produksjon) | PostgreSQL | Railway-administrert | Persistent lagring av alle data |
 | Database (utvikling) | SQLite | Innebygd | Lokal testing, ingen oppsett nødvendig |
-| Database (offline) | SQLite (`offline.sqlite3`) | Innebygd | Offline-modus ved nettverksutfall |
 | Database-driver | psycopg2-binary | >=2.9 | Kobling Django–Postgres |
 | Database-URL-parsing | dj-database-url | >=2.1 | Tolker `DATABASE_URL`-miljøvariabelen |
 | WSGI-server | Gunicorn | >=21.2 | Produksjonsserver (default 1 worker × 4 tråder, parametrisert) |
@@ -523,8 +522,7 @@ De gamle stiene `/accounts/users/*` svarer med permanent redirect (301) til de n
 `/django-admin/` er **ikke montert i produksjon** (S1). Django sin innebygde admin er en
 parallell innloggingsflate som omgår rate-limiting, kontosperre, MFA-tvang, tvungent
 passordbytte og `LoginEvent`-logging — alle sikringene ligger på
-`accounts.views.login_view`. Flaten monteres kun når `DEBUG=True` eller `OFFLINE_MODE=True`,
-altså som lokalt utviklerverktøy.
+`accounts.views.login_view`. Flaten monteres kun når `DEBUG=True`, altså som lokalt utviklerverktøy.
 
 ### 5.11 Admin server-status (observability)
 
@@ -1246,33 +1244,24 @@ Siden polls automatisk hvert 30. sekund for å holde pasientlisten og behandlerl
 
 ---
 
-## 11. Offline-modus
+## 11. Reserve når portalen er nede
 
-Offline-modus gir mulighet til å kjøre systemet lokalt uten tilgang til Railway-produksjonsmiljøet, f.eks. ved nettverksutfall under et arrangement.
+Den gamle offline-modusen — egen SQLite på en laptop, `OFFLINE_MODE`, egne brukere,
+USB-pakke og tilbakesynkronisering — ble lagt ned 13. sep. 2026. Den dekket et
+scenario som ikke finnes: det deployes ikke under vakt, og pasienter har Excel mens
+oppdrag går på nødnett. Det som skal overleve at Railway er nede, er **vaktlista i
+drift**, og den dekkes av to ting:
 
-### 11.1 Oppsett
+- **Vaktlista som fil på e-post** (`vaktliste/fil.py`): én selvstendig HTML-fil,
+  sendt ved «Sett i drift», på knapp, og på intervall mens lista er i drift.
+  Mottakere settes under portalinnstillingene. Se `docs/BESLUTNING_VAKTLISTE.md` §12.
+- **Offline drift på `/vaktliste/`** (`static/js/vaktliste-sw.js`, servert av
+  `vaktliste.views.sw_view`): en service worker holder siden og siste liste lokalt,
+  og møtt/av vakt legges i kø på drifts-PC-en når serveren ikke svarer, med tida
+  trykket skjedde. Køen sendes når serveren svarer igjen.
 
-- **Egen database:** `offline.sqlite3` i prosjektmappen – separat fra produksjons-Postgres.
-- **Egen konfigurasjonsfil:** `.env.offline` – inneholder `DATABASE_URL=sqlite:///offline.sqlite3` og lokale innstillinger. En eksempelfil finnes som `.env.offline.example` i repoet.
-- **Oppstartsskript:** `start_offline.bat` (Windows) starter Django med `.env.offline`.
-
-### 11.2 Brukerprovisjonering
-
-`python manage.py create_offline_users` (fra `accounts/management/commands/`) oppretter forhåndsdefinerte offline-brukere:
-- `admin-offline` (admin-rolle)
-- `vakt-offline` (read_write-rolle)
-
-Passordene lagres i `OFFLINE_PASSORD.md` lokalt – filen er ikke i git (`.gitignore`).
-
-### 11.3 Tilbakesynkronisering til produksjon
-
-Etter at nettverkstilgangen er gjenopprettet, importeres data fra offline-databasen til produksjon:
-
-```bash
-python manage.py import_offline_data
-```
-
-Kommandoen (`patients/management/commands/import_offline_data.py`) leser pasienter fra `offline.sqlite3` og skriver dem til produksjons-Postgres. Duplikathåndtering (basert på `pasientnummer`) er innebygd.
+`python manage.py import_offline_data` står igjen som **importverktøy** for den
+gamle appens SQLite-filer — se `docs/DATAIMPORT_FRA_GAMMEL_PROD.md`.
 
 ---
 
@@ -1480,8 +1469,7 @@ Totalt **178 tester** fordelt på følgende filer (145 opprinnelige + 19 admin s
 | `BackupRestoreTests` | Gjenoppretting, pre_restore-snapshot, selvreferanse-ekskludering |
 | `SchedulerThrottleTests` | 60-sekunders throttle per prosess |
 | `SchedulerLockTests` | Database-lås forhindrer parallell backup på tvers av workers |
-| `OfflineIsolationTests` | Offline SQLite-db er isolert fra prod |
-| `ImportOfflineDataTests` | import_offline_data-kommandoen skriver korrekt til prod-DB |
+| `ImportOfflineDataTests` | import_offline_data (dataimport fra gammel prod) skriver korrekt til prod-DB |
 
 ---
 
