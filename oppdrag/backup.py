@@ -42,23 +42,11 @@ class OppdragBackupHandler(BaseBackupHandler):
         'oppdrag.OppdragArkiv',
         'oppdrag.ArkivertOppdrag',
     ]
-    restore_models = [
-        # Barn først. Statusmelding og Enhetsbytte peker på Oppdrag, Oppdrag
-        # peker på Enhet og Lokasjon.
-        'oppdrag.Statusmelding',
-        'oppdrag.Enhetsbytte',
-        'oppdrag.Enhetshendelse',
-        # Koblingsraden (flere enheter, 11. sep. 2026) står mellom meldingen
-        # som peker på den og oppdraget den peker på.
-        'oppdrag.Oppdragsenhet',
-        'oppdrag.Oppdrag',
-        'oppdrag.Lokasjon',
-        'oppdrag.Enhet',
-        # Verdimengdene (12. sep. 2026). Enhet peker på Enhetstype, så typen
-        # kommer etter enheten i barn-først-rekkefølgen.
-        'oppdrag.Enhetstype',
-        'oppdrag.Problemstilling',
-    ]
+    # `restore_models` utledes av `apps` minus `exclude` (13. sep. 2026).
+    # Den håndskrevne lista sto her og manglet `Lydvarsel` — gjeldspunkt 3.4:
+    # radene ble stående igjen etter en gjenoppretting, uten at noe sa fra.
+    # Feilen var ikke uoppmerksomhet, men at lista kunne være ufullstendig og
+    # likevel se komplett ut.
     # FK-er ut av modulens eget datasett. Med `natural_foreign` lagres de som
     # brukernavn, og er kontoen slettet feiler HELE gjenopprettingen med
     # DeserializationError — altså akkurat når man trenger backupen. Ingen av
@@ -86,10 +74,7 @@ class OppdragArkivBackupHandler(BaseBackupHandler):
 
     apps = ['oppdrag.OppdragArkiv', 'oppdrag.ArkivertOppdrag']
     exclude = []
-    restore_models = [
-        'oppdrag.ArkivertOppdrag',
-        'oppdrag.OppdragArkiv',
-    ]
+    # Slettelista utledes: ArkivertOppdrag har FK til OppdragArkiv.
     # Brukernavnet ligger frosset i `importert_av_navn`, så FK-en utelates —
     # se ArkivBackupHandler i patients/backup.py.
     strip_fields = {'oppdrag.OppdragArkiv': ['importert_av']}

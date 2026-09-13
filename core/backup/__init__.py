@@ -19,8 +19,10 @@ from .handlers import (
     get_handler,
     registrer_alle_moduler,
     register,
+    utled_restore_models,
 )
 from . import klokke
+from .portal import PortalBackupHandler, register_handlers
 from .klokke import (
     kjor_forfalte,
     kjor_plan,
@@ -43,6 +45,7 @@ from .service import (
 
 __all__ = [
     'BaseBackupHandler',
+    'PortalBackupHandler',
     'KIND_AUTO',
     'KIND_MANUAL',
     'KIND_PRE_RESET',
@@ -58,10 +61,12 @@ __all__ = [
     'kjor_forfalte',
     'kjor_plan',
     'klokke',
+    'register_handlers',
     'registrer_alle_moduler',
     'register',
     'restore_backup',
     'start_klokke',
+    'utled_restore_models',
     'vakthund',
     'varsle_stoppet_klokke',
 ]

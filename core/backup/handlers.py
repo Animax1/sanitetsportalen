@@ -71,8 +71,21 @@ class BaseBackupHandler:
         return list(self.exclude)
 
     def get_restore_models(self) -> list[str]:
-        """Returner modeller som skal slettes før loaddata. Default: self.restore_models."""
-        return list(self.restore_models)
+        """Modellene som skal tømmes før ``loaddata``, barn først.
+
+        **Utledes fra ``apps`` og ``exclude`` når ``restore_models`` er tom**
+        (13. sep. 2026). Fram til da måtte hver handler vedlikeholde lista for
+        hånd, og det er den feilen gjeldspunkt 3.4 beskriver: `Lydvarsel` var
+        med i oppdragsdumpen, men glemt i slettelista, så radene ble stående
+        igjen etter en gjenoppretting. Feilen var ikke uoppmerksomhet — det var
+        at lista kunne være ufullstendig uten at noe sa fra.
+
+        ``restore_models`` beholdes som overstyring for tilfellene der
+        rekkefølgen ikke lar seg utlede.
+        """
+        if self.restore_models:
+            return list(self.restore_models)
+        return utled_restore_models(self.collect_apps(), self.collect_exclude())
 
     def inspect_restore_payload(self, objects: list[dict]) -> list[str]:
         """Se over fixturen før den lastes. Returner en liste med advarsler.
@@ -105,6 +118,87 @@ class BaseBackupHandler:
 
     def __str__(self) -> str:
         return f'<BackupHandler slug={self.slug!r}>'
+
+
+def utled_restore_models(app_labels: list[str], exclude: list[str]) -> list[str]:
+    """Modellene i ``app_labels`` minus ``exclude``, sortert barn før foreldre.
+
+    En modell som peker på en annen må tømmes først, ellers avviser databasen
+    slettingen (PROTECT) eller tar med seg rader ingen ba om (CASCADE). Det er
+    en topologisk sortering: kanten «A før B» finnes når A har en fremmednøkkel
+    til B.
+
+    To ting som må håndteres, og som begge finnes i denne kodebasen:
+
+    - **Selvreferanser** (`Kompetanse.bygger_paa`, `Statusmelding.erstatter`)
+      hoppes over. Å slette alle radene i én modell tar dem uansett samlet, og
+      en kant fra en node til seg selv ville gjort grafen usorterbar.
+    - **Sykler** mellom to modeller kan ikke sorteres. Da legges restene bakerst
+      i alfabetisk rekkefølge og det logges — en ufullstendig rekkefølge er
+      bedre enn å kaste, siden dette kalles midt i en gjenoppretting. Handleren
+      kan overstyre med ``restore_models`` når det skjer.
+
+    Bare fremmednøkler *innenfor* settet teller. En FK ut av modulen — til
+    `core.Vakt`, eller til en bruker — er ikke vår å tømme.
+    """
+    from django.apps import apps as django_apps
+
+    ekskludert = {e.lower() for e in exclude}
+    modeller = {}
+    for oppforing in app_labels:
+        # `dumpdata` tar både «app» og «app.Modell», og begge formene brukes:
+        # arkivhandlerne oppgir enkeltmodeller nettopp fordi de deler app med
+        # den aktive dataen. Utledningen må lese lista på samme måte som
+        # serialiseringen gjør, ellers beskriver de to ulike datasett.
+        if '.' in oppforing:
+            kandidater = [django_apps.get_model(oppforing)]
+        else:
+            kandidater = list(
+                django_apps.get_app_config(oppforing).get_models())
+        for modell in kandidater:
+            etikett = modell._meta.label
+            if etikett.lower() in ekskludert:
+                continue
+            modeller[etikett] = modell
+
+    # Kant A → B: A må tømmes før B.
+    etter = {e: set() for e in modeller}
+    inngrad = {e: 0 for e in modeller}
+    for etikett, modell in modeller.items():
+        for felt in modell._meta.get_fields():
+            if not getattr(felt, 'concrete', False):
+                continue
+            if not (getattr(felt, 'many_to_one', False)
+                    or getattr(felt, 'one_to_one', False)):
+                continue
+            mal = felt.related_model._meta.label
+            if mal == etikett or mal not in modeller:
+                continue
+            if mal not in etter[etikett]:
+                etter[etikett].add(mal)
+                inngrad[mal] += 1
+
+    klare = sorted(e for e, n in inngrad.items() if n == 0)
+    ut = []
+    while klare:
+        etikett = klare.pop(0)
+        ut.append(etikett)
+        for mal in sorted(etter[etikett]):
+            inngrad[mal] -= 1
+            if inngrad[mal] == 0:
+                klare.append(mal)
+        klare.sort()
+
+    rest = sorted(e for e in modeller if e not in ut)
+    if rest:
+        import logging
+        logging.getLogger(__name__).warning(
+            'core.backup: sirkulære fremmednøkler i %s — %s sorteres ikke og '
+            'legges bakerst. Sett `restore_models` på handleren.',
+            ', '.join(app_labels), ', '.join(rest),
+        )
+        ut.extend(rest)
+    return ut
 
 
 class _Registry:

@@ -1294,3 +1294,290 @@ class RestorePayloadInspectionTests(TestCase):
                 raise RuntimeError('noe gikk galt')
 
         self.assertEqual(_inspect_payload(Sprengt(), b'[]', 'x.gz'), [])
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Slettelista må dekke dumpen
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+@override_settings(SECURE_SSL_REDIRECT=False, RATELIMIT_ENABLE=False)
+class SlettelistaDekkerDumpenTests(TestCase):
+    """En modell som er med i dumpen, må også være med i slettelista.
+
+    Er den ikke det, blir radene stående igjen etter en gjenoppretting: de
+    andre modellene tømmes og lastes på nytt, mens denne beholder det som var
+    der fra før. Utfallet er en base som ser gjenopprettet ut og ikke er det.
+
+    Det er gjeldspunkt 3.4 (`Lydvarsel` i oppdragsdumpen, glemt i lista), og
+    poenget med denne testen er at feilen ikke kan komme tilbake gjennom en ny
+    modell eller en ny modul. Fra 13. sep. 2026 utledes lista, så testen skal
+    passere av seg selv — den finnes for å fange den dagen noen setter
+    `restore_models` for hånd igjen.
+    """
+
+    def setUp(self) -> None:
+        registrer_alle_moduler()
+
+    def test_hver_handler_dekker_alle_modellene_den_dumper(self) -> None:
+        from django.core import management
+        import io
+
+        for handler in all_handlers():
+            with self.subTest(slug=handler.slug):
+                buf = io.StringIO()
+                management.call_command(
+                    'dumpdata', *handler.collect_apps(),
+                    exclude=handler.collect_exclude(), format='json',
+                    indent=None, stdout=buf,
+                )
+                i_dumpen = {o['model'].lower() for o in json.loads(buf.getvalue())}
+                i_lista = {m.lower() for m in handler.get_restore_models()}
+                self.assertEqual(
+                    i_dumpen - i_lista, set(),
+                    f'{handler.slug}: disse modellene dumpes, men tømmes ikke '
+                    f'før loaddata — radene blir stående igjen etter en '
+                    f'gjenoppretting.',
+                )
+
+    def test_lydvarsel_er_dekket(self) -> None:
+        """Gjeldspunkt 3.4, navngitt: den ene modellen den håndskrevne lista
+        manglet."""
+        self.assertIn('oppdrag.Lydvarsel',
+                      get_handler('oppdrag').get_restore_models())
+
+    def test_utledningen_setter_barn_for_foreldre(self) -> None:
+        from core.backup import utled_restore_models
+
+        rekkefolge = utled_restore_models(['vaktliste'], [])
+        plass = {m: i for i, m in enumerate(rekkefolge)}
+        # Vaktpost peker på Ressurs, Ressurs peker på Vaktliste.
+        self.assertLess(plass['vaktliste.Vaktpost'], plass['vaktliste.Ressurs'])
+        self.assertLess(plass['vaktliste.Ressurs'], plass['vaktliste.Vaktliste'])
+
+    def test_selvreferanse_gir_ikke_evig_lokke(self) -> None:
+        """`Kompetanse.bygger_paa` og `Statusmelding.erstatter` peker på sin
+        egen modell. En kant fra en node til seg selv ville gjort grafen
+        usorterbar, og resultatet er en tom liste framfor en feil."""
+        from core.backup import utled_restore_models
+
+        self.assertIn('vaktliste.Kompetanse', utled_restore_models(['vaktliste'], []))
+        self.assertIn('oppdrag.Statusmelding', utled_restore_models(['oppdrag'], []))
+
+    def test_apps_kan_peke_paa_enkeltmodeller(self) -> None:
+        """Arkivhandlerne oppgir modeller, ikke apper, fordi de deler app med
+        den aktive dataen. Utledningen må lese lista som `dumpdata` gjør."""
+        from core.backup import utled_restore_models
+
+        self.assertEqual(
+            utled_restore_models(['patients.VaktArkiv', 'patients.ArkivertPasient'], []),
+            ['patients.ArkivertPasient', 'patients.VaktArkiv'],
+        )
+
+    def test_fk_ut_av_settet_teller_ikke(self) -> None:
+        """`Vaktliste.vakt` peker på `core.Vakt`, som ikke er vår å tømme."""
+        from core.backup import utled_restore_models
+
+        self.assertNotIn('core.Vakt', utled_restore_models(['vaktliste'], []))
+
+
+@override_settings(SECURE_SSL_REDIRECT=False, RATELIMIT_ENABLE=False)
+class PortalBackupTests(TestCase):
+    """Portalfila: vakta og moduloppsettet.
+
+    Uten den kan ingen modulfil gjenopprettes i en tom base — pasienter,
+    oppdrag og vaktlister peker på `core.Vakt` med et heltall.
+    """
+
+    def setUp(self) -> None:
+        registrer_alle_moduler()
+        self.backup_dir = _prepare_backup_dir()
+
+    def test_vakta_er_med_i_dumpen(self) -> None:
+        vakt_for_year(2026)
+        with patch.dict(os.environ, {'BACKUP_DIR': str(self.backup_dir)}):
+            backup = create_backup(slug='portal', kind=KIND_MANUAL)
+            innhold = gzip.open(self.backup_dir / backup.filename, 'rb').read()
+        modeller = {o['model'] for o in json.loads(innhold)}
+        self.assertIn('core.vakt', modeller)
+        self.assertIn('core.modulesettings', modeller)
+
+    def test_backup_metadata_er_ikke_med(self) -> None:
+        """Å laste `Backupplan` tilbake fra en backup ville gjenopplive rader
+        for filer som ikke finnes."""
+        from core.models import Backupplan
+
+        vakt_for_year(2026)
+        Backupplan.standardplanen()
+        with patch.dict(os.environ, {'BACKUP_DIR': str(self.backup_dir)}):
+            backup = create_backup(slug='portal', kind=KIND_MANUAL)
+            innhold = gzip.open(self.backup_dir / backup.filename, 'rb').read()
+        modeller = {o['model'] for o in json.loads(innhold)}
+        for uonsket in ('core.backupplan', 'core.offsitekopi', 'core.notification'):
+            with self.subTest(modell=uonsket):
+                self.assertNotIn(uonsket, modeller)
+
+    def test_rundtur_gjenoppretter_vakta(self) -> None:
+        from core.models import Vakt
+
+        with patch.dict(os.environ, {'BACKUP_DIR': str(self.backup_dir)}):
+            vakt = vakt_for_year(2026)
+            navn = vakt.navn
+            backup = create_backup(slug='portal', kind=KIND_MANUAL)
+
+            Vakt.objects.all().delete()
+            self.assertEqual(Vakt.objects.count(), 0)
+
+            restore_backup(backup)
+
+        self.assertEqual(Vakt.objects.count(), 1)
+        gjenopprettet = Vakt.objects.first()
+        self.assertEqual(gjenopprettet.navn, navn)
+        self.assertEqual(gjenopprettet.pk, vakt.pk,
+                         'Primærnøkkelen må overleve — modulfilene peker på '
+                         'vakta med et heltall.')
+
+    def test_modulesettings_uten_bruker(self) -> None:
+        """`updated_by` strippes: med natural_foreign ville en slettet konto
+        tatt hele gjenopprettingen med seg."""
+        from core.models import ModuleSettings
+
+        vakt_for_year(2026)
+        bruker = CustomUser.objects.create_user(
+            username='slettes', password='x', must_change_password=False)
+        ms = ModuleSettings.objects.first() or ModuleSettings.objects.create(slug='patients')
+        ms.updated_by = bruker
+        ms.save()
+
+        with patch.dict(os.environ, {'BACKUP_DIR': str(self.backup_dir)}):
+            backup = create_backup(slug='portal', kind=KIND_MANUAL)
+            innhold = gzip.open(self.backup_dir / backup.filename, 'rb').read()
+            bruker.delete()
+            restore_backup(backup)   # skal ikke kaste
+
+        for o in json.loads(innhold):
+            if o['model'] == 'core.modulesettings':
+                self.assertNotIn('updated_by', o['fields'])
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Gjenoppretting av alle filene, i rekkefølge
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+@override_settings(SECURE_SSL_REDIRECT=False, RATELIMIT_ENABLE=False)
+class AlleFileneGjenopprettesTests(TestCase):
+    """Den prøven som avgjør om backupen er en backup (`BACKUP.md` §3.6).
+
+    En dump som ser riktig ut, men ikke lar seg laste tilbake, er ingenting
+    verdt — og forskjellen viser seg bare når man faktisk laster den. Fram til
+    portalhandleren kom 13. sep. 2026, feilet dette: `core.Vakt` lå ikke i noen
+    fil, og pasienter, oppdrag og vaktlister peker alle på den med et heltall.
+    Målt mot ekte PostgreSQL feilet alle tre modulfilene med
+    «Key (vakt_id)=(1) is not present in table core_vakt».
+
+    Rekkefølgen er bindende: **portal først**, deretter modulene.
+    """
+
+    REKKEFOLGE = ['portal', 'patients', 'arkiv', 'oppdrag', 'oppdrag_arkiv',
+                  'vaktliste']
+
+    def setUp(self) -> None:
+        registrer_alle_moduler()
+        self.backup_dir = _prepare_backup_dir()
+
+    def _seed(self):
+        from datetime import timedelta
+
+        from oppdrag.models import Enhet, Lokasjon, Oppdrag
+        from patients.models import Forstehjelper, Patient
+        from vaktliste.models import (
+            Korps, Mannskap, Ressurs, Ressursgruppe, Vaktliste, Vaktpost,
+        )
+
+        vakt = vakt_for_year(2026)
+        fh = Forstehjelper.objects.create(name='Ola')
+        for nr in (1, 2, 3):
+            Patient.objects.create(pasientnummer=nr, vakt=vakt,
+                                   problemstilling='Test', forstehjelper=fh)
+        lok = Lokasjon.objects.create(navn='Scene')
+        enhet = Enhet.objects.create(navn='Bil 1')
+        Oppdrag.objects.create(vakt=vakt, oppdragsnummer=1, enhet=enhet,
+                               problemstilling='Udefinert', hastegrad='Gul',
+                               lokasjon=lok)
+        korps = Korps.objects.create(navn='Testkorps')
+        mannskap = Mannskap.objects.create(navn='Kari', korps=korps,
+                                           telefon='99887766', issi='0401234')
+        liste = Vaktliste.objects.create(vakt=vakt)
+        ressurs = Ressurs.objects.create(
+            vaktliste=liste, navn='Bil A',
+            gruppe=Ressursgruppe.objects.first(), enhet=enhet)
+        Vaktpost.objects.create(ressurs=ressurs, mannskap=mannskap,
+                                fra_tid=timezone.now(),
+                                til_tid=timezone.now() + timedelta(hours=8))
+        return vakt
+
+    def _tall(self):
+        from oppdrag.models import Enhet, Oppdrag
+        from patients.models import Patient
+        from vaktliste.models import Mannskap, Ressurs, Vaktpost
+        from core.models import Vakt
+
+        return {
+            'vakt': Vakt.objects.count(),
+            'pasient': Patient.objects.count(),
+            'oppdrag': Oppdrag.objects.count(),
+            'enhet': Enhet.objects.count(),
+            'mannskap': Mannskap.objects.count(),
+            'ressurs': Ressurs.objects.count(),
+            'vaktpost': Vaktpost.objects.count(),
+        }
+
+    def _tom_alt(self):
+        """Tøm i barn-først-rekkefølge, vakta til slutt — den er det alt
+        henger på, og PROTECT stopper den ellers."""
+        from django.apps import apps as django_apps
+
+        from core.models import Vakt
+
+        for slug in self.REKKEFOLGE:
+            for etikett in get_handler(slug).get_restore_models():
+                if etikett == 'core.Vakt':
+                    continue
+                django_apps.get_model(etikett).objects.all().delete()
+        Vakt.objects.all().delete()
+
+    def test_alle_seks_filene_kan_lastes_i_rekkefolge(self) -> None:
+        with patch.dict(os.environ, {'BACKUP_DIR': str(self.backup_dir)}):
+            self._seed()
+            fasit = self._tall()
+
+            filer = {}
+            for slug in self.REKKEFOLGE:
+                filer[slug] = create_backup(slug=slug, kind=KIND_MANUAL)
+
+            self._tom_alt()
+            self.assertEqual(self._tall()['pasient'], 0, 'basen skal være tom nå')
+
+            for slug in self.REKKEFOLGE:
+                with self.subTest(slug=slug):
+                    restore_backup(filer[slug])
+
+        self.assertEqual(self._tall(), fasit)
+
+    def test_vakta_er_med_saa_modulfilene_finner_den(self) -> None:
+        """Uten `core.Vakt` i en fil feiler modulfilene på fremmednøkkelen —
+        det var hullet `docs/TEKNISK_GJELD.md` §4 beskriver."""
+        with patch.dict(os.environ, {'BACKUP_DIR': str(self.backup_dir)}):
+            vakt = self._seed()
+            portalfil = create_backup(slug='portal', kind=KIND_MANUAL)
+            raa = gzip.open(self.backup_dir / portalfil.filename, 'rb').read()
+
+        pekere = {o['pk'] for o in json.loads(raa) if o['model'] == 'core.vakt'}
+        self.assertIn(vakt.pk, pekere)
+
+    def test_rekkefolgen_er_dokumentert_i_alle_handlerne(self) -> None:
+        """Alle seks slugene skal finnes som registrerte handlere — er en av
+        dem borte, er rekkefølgen over en løgn."""
+        registrerte = {h.slug for h in all_handlers()}
+        self.assertEqual(set(self.REKKEFOLGE), registrerte)

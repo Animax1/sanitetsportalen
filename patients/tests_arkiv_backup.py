@@ -82,7 +82,10 @@ class ArkivHandlerRegistreringTests(ArkivBackupTestMixin, TestCase):
     def test_arkiv_handler_er_registrert(self):
         handler = get_handler('arkiv')
         self.assertIsNotNone(handler)
-        self.assertEqual(handler.display_name, 'Vaktarkiv')
+        # Het «Vaktarkiv» fram til 13. sep. 2026. Navnet sa ikke hva modulen
+        # er — den bærer arkiverte *pasientregistreringer*, mens oppdrag har
+        # sitt eget arkiv ved siden av.
+        self.assertEqual(handler.display_name, 'Pasientregistreringsarkiv')
 
     def test_arkiv_handler_dekker_begge_modellene(self):
         handler = get_handler('arkiv')

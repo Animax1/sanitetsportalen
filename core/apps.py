@@ -35,6 +35,12 @@ class CoreConfig(AppConfig):
     def ready(self):
         post_migrate.connect(_ensure_module_settings_defaults, sender=self)
 
+        # Portalens egen backup-handler: `core.Vakt` og moduloppsettet.
+        # Uten den kan ingen av modulfilene gjenopprettes i en tom base, fordi
+        # de peker på vakta med et heltall.
+        from core.backup.portal import register_handlers as registrer_portal
+        registrer_portal()
+
         # Backup-klokka (13. sep. 2026). Starter ikke under test, migrate eller
         # engangskommandoer — `klokke.skal_starte()` er det ene stedet den
         # avgjørelsen tas. Den ligger her og ikke i en cron-tjeneste fordi

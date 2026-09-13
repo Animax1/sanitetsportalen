@@ -4,6 +4,46 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-13 — Backup fase 3: vaktlista dekket, og slettelista utledes
+
+**Vaktlistemodulen hadde ingen backup i det hele tatt.** Korps, mannskap med
+telefon, e-post og ISSI, kompetanser, ressursgrupper og -roller, ressursene,
+vaktpostene, vaktlistene og belastningsgrensene lå utenfor alle fire filer siden
+appen gikk i prod 11. september. Det er samme feil oppdragsmodulen hadde fram
+til sin fase 7, og den er ikke synlig noe sted før dagen man trenger filene.
+`vaktliste/backup.py` dekker den nå, med bruker-FK-ene strippet — `Mannskap.user`
+er domenedata lederen setter på nytt, mens en slettet konto ville tatt hele
+gjenopprettingen med seg.
+
+**Portalfila er ny og er den de andre hviler på.** `core.Vakt` og
+`ModuleSettings` i én fil, først i rekkefølgen. `Backupplan`, `OffsiteKopi` og
+`Notification` er utelatt: de to første er metadata *om* backup, og å laste dem
+tilbake ville gjenopplive rader for filer som ikke finnes.
+
+**Slettelista utledes nå topologisk** fra `apps` minus `exclude`, barn før
+foreldre, og de fire håndskrevne listene er slettet. Utledningen traff alle fire
+og fant den ene kjente feilen: **`Lydvarsel` — gjeldspunkt 3.4 — er dekket uten
+at noen måtte huske den.** `SlettelistaDekkerDumpenTests` håndhever at hver
+modell som dumpes også tømmes, så feilen ikke kan komme tilbake gjennom en ny
+modell eller en ny modul. Én ting måtte håndteres underveis: `apps`-lista kan
+peke på enkeltmodeller og ikke bare apper, slik arkivhandlerne gjør, og
+utledningen må lese lista på samme måte som `dumpdata` gjør.
+
+**Gjenoppretting i tom base er bevist, ikke påstått.** Alle seks filene lastet i
+rekkefølge i en fersk PostgreSQL-base — portal → patients → arkiv → oppdrag →
+oppdrag_arkiv → vaktliste — og hver rad kom tilbake. Motprøven er like viktig:
+uten portalfila feiler alle tre modulfilene med «Key (vakt_id)=(1) is not present
+in table core_vakt», som er nøyaktig hullet `docs/TEKNISK_GJELD.md` §4 beskrev.
+`AlleFileneGjenopprettesTests` gjør den samme øvelsen i suiten, så den blir
+stående.
+
+Modulen `arkiv` heter nå **«Pasientregistreringsarkiv»**. «Vaktarkiv» sa ikke
+hva den er, og oppdrag har sitt eget arkiv ved siden av.
+
+Verifisert: 2582 tester grønne på SQLite og PostgreSQL 16.
+
+---
+
 ## 2026-09-13 — Backup fase 2: alt på én side
 
 `/portal-admin/backup/` er nå hele backup-flaten. Oversikten, én side per modul

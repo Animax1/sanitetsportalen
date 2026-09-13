@@ -366,12 +366,24 @@ bindende: 1 før 2, fordi backupen speiler hvor modellene bor.
               kommentar i Django og rendres som tekst på siden. Den sto både i
               den nye malen og i `user_form.html` fra før.
               `FlerlinjesMalkommentarTests` skanner nå alle maler.
-      - [ ] **Fase 3 — handlerne og utledet slettelista.** `vaktliste`-handler (største
-            udekkede datamengde i dag) og `portal`-handler med `core.Vakt`;
-            `get_restore_models()` utledes topologisk fra `apps`, med test som krever at
-            hver modell i dumpen er dekket. **3.4 (`Lydvarsel`) faller ut av seg selv** —
-            og kan ikke oppstå igjen. Modulen `arkiv` døpes om til
+      - [x] **Fase 3 — handlerne og utledet slettelista (13. sep. 2026).**
+            `vaktliste`-handler (modulen sto **helt uten dekning** siden appen
+            gikk i prod 11. sep. — korps, mannskap med telefon, e-post og ISSI,
+            ressurser og vaktposter) og `portal`-handler med `core.Vakt` og
+            `ModuleSettings`. `get_restore_models()` utledes nå topologisk fra
+            `apps` minus `exclude`, og de fire håndskrevne listene er slettet.
+            Utledningen traff alle fire og fant den ene kjente feilen:
+            **`Lydvarsel` (gjeldspunkt 3.4) er dekket, uten at noen måtte huske
+            den.** `SlettelistaDekkerDumpenTests` håndhever at hver modell som
+            dumpes også tømmes. Modulen `arkiv` heter nå
             «Pasientregistreringsarkiv».
+            **Gjenoppretting i tom base er bevist**, ikke påstått: alle seks
+            filene lastet i rekkefølge i en fersk PostgreSQL-base, alle rader
+            tilbake. Og motprøven — uten portalfila feiler alle tre modulfilene
+            med «Key (vakt_id)=(1) is not present in table core_vakt», som er
+            nøyaktig hullet `TEKNISK_GJELD.md` §4 beskrev.
+            `AlleFileneGjenopprettesTests` gjør den samme øvelsen i suiten.
+            2582 tester grønne på SQLite og PostgreSQL.
       - [ ] **Fase 4 — hel backup** (`docs/BACKUP.md` §1): alt unntatt sesjoner,
             contenttypes, permissions og backup-metadata. Gjenoppretting er
             `flush` + `loaddata`, ikke en slettelista — **og du blir logget ut**, fordi
@@ -382,10 +394,11 @@ bindende: 1 før 2, fordi backupen speiler hvor modellene bor.
             henter fra Scaleway og gjenoppretter i ett. **I dag finnes ingen
             CLI-gjenoppretting** — `hent_offsite` henter og dekrypterer, men siste halvdel
             av veien er kun nettleser.
-      - [ ] **Fase 6 — `verifiser_backup`.** Engangsbase som `verifiser_migrasjoner`,
-            laster de nyeste filene i rekkefølge og skriver radtall. Pluss testen fra
-            `BACKUP.md` §3.6, kjørt mot PostgreSQL minst én gang — SQLite har ingen
-            utsatte fremmednøkler, og det er dem testen finnes for.
+      - [ ] **Fase 6 — `verifiser_backup`.** Engangsbase som
+            `verifiser_migrasjoner`, laster de nyeste filene i rekkefølge og
+            skriver radtall — altså på kommando, mot ekte data, når som helst.
+            Selve *testen* fra `BACKUP.md` §3.6 er levert i fase 3
+            (`AlleFileneGjenopprettesTests`), og kjørt mot PostgreSQL.
       - [ ] **Fase 7 — oppbevaringstidene i bucketen `sanitetsportalen`**
             (`PLAN_BACKUP_OMLEGGING.md` §7, **krever Andre**). Regelen står i dag på **730 dager med scope «alle objekter
             i bucketen»**, bekreftet 13. sep. Den må derfor snevres inn til prefikset

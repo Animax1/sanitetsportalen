@@ -19,8 +19,8 @@ class PatientsBackupHandler(BaseBackupHandler):
       og sessions røres aldri.
     - ``exclude`` fjerner Backup og BackupConfig fra dump for å unngå
       selvreferanse (backupen som lages skal ikke være med i innholdet).
-    - ``restore_models`` lister opp modellene som skal slettes før
-      ``loaddata`` kjøres, i FK-trygg rekkefølge (barn først).
+    - slettelista før ``loaddata`` utledes av ``apps`` og ``exclude``
+      (``BaseBackupHandler.get_restore_models``), barn før foreldre.
     """
     slug = 'patients'
     display_name = 'Pasientregistrering'
@@ -38,15 +38,10 @@ class PatientsBackupHandler(BaseBackupHandler):
         'patients.VaktArkiv',
         'patients.ArkivertPasient',
     ]
-    restore_models = [
-        # Slett-rekkefølge: barn -> foreldre. Patient har FK til Forstehjelper
-        # og Helsepersonell, så Patient må slettes først.
-        # Arkivmodellene er IKKE her — de røres aldri av pasient-restore.
-        'patients.Patient',
-        'patients.Forstehjelper',
-        'patients.Helsepersonell',
-        'patients.AppSetting',
-    ]
+    # `restore_models` er ikke satt: rekkefølgen utledes av `apps` minus
+    # `exclude`, barn før foreldre. Arkivmodellene står i `exclude` og er
+    # derfor heller ikke med i slettelista — de røres aldri av en
+    # pasient-restore.
 
     def inspect_restore_payload(self, objects):
         """Se over kliniske felt i fixturen mot whitelisten i choices.py.
@@ -110,15 +105,11 @@ class ArkivBackupHandler(BaseBackupHandler):
     pasientrader, eller rader uten sitt arkiv, er ikke gjenopprettbart.
     """
     slug = 'arkiv'
-    display_name = 'Vaktarkiv'
+    display_name = 'Pasientregistreringsarkiv'
 
     apps = ['patients.VaktArkiv', 'patients.ArkivertPasient']
     exclude = []
-    restore_models = [
-        # Barn først: ArkivertPasient har FK til VaktArkiv.
-        'patients.ArkivertPasient',
-        'patients.VaktArkiv',
-    ]
+    # Slettelista utledes: ArkivertPasient har FK til VaktArkiv og kommer først.
     # ``importert_av`` peker på CustomUser, som ikke er med i denne dumpen.
     # Med natural_foreign lagres den som brukernavnet, og er kontoen slettet
     # feiler HELE gjenopprettingen med DeserializationError — altså akkurat
