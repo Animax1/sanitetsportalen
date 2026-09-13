@@ -323,13 +323,27 @@ bindende: 1 før 2, fordi backupen speiler hvor modellene bor.
             strippet.
       - [ ] Modulen `arkiv` døpes om til «Pasientregistreringsarkiv» i grensesnittet.
       - [ ] `Lydvarsel` inn i `restore_models` i `oppdrag/backup.py` (3.4).
-      - [ ] **Krever Andre — beslutning:** hel backup (brukere, MFA, tilganger, audit- og
-            innloggingslogg) i tillegg til modulfilene? André heller mot ja (13. sep.).
-            Krever egen, kortere slettefrist på den fila og et avsnitt i
-            personverndokumentasjonens A.9. Se svaret i chatten 13. sep. for vurderingen.
-- [ ] **3. Runbook: gjenoppretting i tom base**, inkludert kontoene hvis de ikke er med
-      (`create_admin`, opprett kontoer og tilganger for hånd), og at `purge_old_logs` og
-      `kollaps_arkiv` kjøres rett etter gjenoppretting.
+      - [ ] **Hel backup — besluttet 13. sep. 2026** (`docs/BACKUP.md` §1): alt i
+            databasen unntatt sesjoner, kryptert, eget prefiks offsite, **90 dager** og
+            få filer. Modulfilene beholdes med 730 dager. Bare global admin, gjenoppretting
+            med `{"confirm": true}`.
+      - [ ] Testen som mangler: gjenoppretting av **alle** filene i en tom database,
+            modulfilene i rekkefølge og den hele fila alene (`BACKUP.md` §3.6).
+      - [ ] Livssyklusregel på bucketen for `full/`-prefikset (90 dager) — **krever
+            Andre** i Scaleway-konsollen når koden er ute.
+- [ ] **3. Dokumentrunden — når 1 og 2 er levert.** Én runde, ikke stykkevis, og den tar
+      med seg **alt fra 11.–13. september** (sikkerhetsrundene, server-status, reserve og
+      offline, offsite, flere enheter per oppdrag, ISSI og besetning, audit i vaktlista,
+      lyd og bilens utganger). Lista over hva som mangler hvor står i `docs/BACKUP.md` §5:
+      - [ ] `docs/TEKNISK_DOKUMENTASJON.md` — appene etter flyttingen, backup i to lag,
+            sikkerhetslaget etter rundene
+      - [ ] `README.md` — arkitektur, backup, sikkerhet, `requirements.in`
+      - [ ] `docs/RUNBOOK_VAKT.md` — §8b med hel backup og gjenoppretting i tom base
+            (`BACKUP.md` §4), inkludert `purge_old_logs` + `kollaps_arkiv` rett etterpå
+      - [ ] `docs/PERSONVERN_DOKUMENTASJON.md` — A.2 (Scaleway: hele databasen), A.9 (hel
+            backup 90 dager, modulfilene 730 dager offsite), A.10, A.11/A.6 (fil på e-post,
+            offline drift)
+      - [ ] `CLAUDE.md` — backup-avsnittet og hvor modellene bor
 - [ ] **4. De mindre** (§3 i notatet), når man er i nærheten: brukeradmin importerer
       pasientregistrene (3.1), `/portal-admin/` samlet i én URL-fil (3.2), skimene
       (3.3), `core/views.py` delt (3.7). 3.5 (`VaktArkiv`) skal **ikke** ryddes —

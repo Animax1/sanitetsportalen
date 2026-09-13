@@ -4,6 +4,17 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-13 — Backup-planen: `docs/BACKUP.md`
+
+Ingen kodeendring. Besluttet: **to lag med hver sin frist** — en hel backup (alt unntatt
+sesjoner, kryptert, 90 dager, få filer) som katastrofekopi, og modulfilene som i dag med
+730 dager, fordi kollapsen krever dem. Portalfil med `Vakt` og innstillingene,
+`vaktliste`-handler, og en test som gjenoppretter alle filene i en tom database.
+Slettefristene er begrunnet mot A.9 (egen kategori, forholdsmessig, slettingen kjøres
+på nytt etter gjenoppretting). Rekkefølgen er bindende: flyttingen ut av `patients`
+først. Dokumentrunden etterpå tar med alt fra 11.–13. september — lista over hva som
+mangler hvor står i §5, og i `TODO.md`.
+
 ## 2026-09-13 — Teknisk gjeld kartlagt: `docs/TEKNISK_GJELD.md`
 
 Ingen kodeendring. På spørsmål om hva backupene faktisk inneholder, og hvordan appen
