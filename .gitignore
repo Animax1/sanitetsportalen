@@ -20,6 +20,8 @@ backups/
 
 
 vendor/
+# Tredjepartsbibliotekene i static/vendor/ SKAL med (13. sep. 2026, H3):
+!static/vendor/
 
 
 #CLAUDE

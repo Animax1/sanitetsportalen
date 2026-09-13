@@ -34,6 +34,18 @@ class VendorFilerTests(SimpleTestCase):
             if rel.endswith(('.css', '.js')):
                 self.assertNotIn('sourceMappingURL', p.read_text(encoding='utf-8'), rel)
 
+    def test_filene_er_sporet_av_git(self):
+        """`.gitignore` hadde `vendor/`, og første deploy av H3 gikk uten
+        filene: manifestet manglet dem, og alle sider ga 500. Filer som ikke er
+        i git finnes ikke i bygget."""
+        import subprocess
+        ut = subprocess.run(['git', 'ls-files', 'static/vendor'], capture_output=True, text=True, cwd=ROT)
+        if ut.returncode != 0:
+            self.skipTest('ingen git her')
+        sporet = set(ut.stdout.split())
+        for rel in self.FILER:
+            self.assertIn(f'static/{rel}', sporet, f'{rel} er ikke sporet av git — sjekk .gitignore')
+
     def test_malene_laster_dem_gjennom_static(self):
         import glob
         brukt = set()

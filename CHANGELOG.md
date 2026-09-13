@@ -40,6 +40,10 @@ Ingen migrasjon. Numrene viser til `docs/SIKKERHETSGJENNOMGANG_2026-09-13.md`.
   går gjennom alt under `/portal-admin/`, `/varsler/`, `/api/varsler/` og
   `/min-profil/` med anonym og vanlig bruker.
 - 19 nye tester i `*/tests_sikkerhet_runde2.py`.
+- **Rettelse samme dag:** `.gitignore` hadde `vendor/`, så bibliotekfilene ble aldri
+  commitet, og første deploy til staging ga 500 på alle sider («Missing staticfiles
+  manifest entry»). `!static/vendor/` i `.gitignore`, og en test som krever at filene
+  er sporet av git.
 
 ## 2026-09-13 — Sikkerhetsgjennomgangen, runde 1: 19 funn rettet
 
