@@ -4,6 +4,16 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-13 — Sikkerhetsgjennomgang: rapport
+
+`docs/SIKKERHETSGJENNOMGANG_2026-09-13.md`. Statisk gjennomgang i fire deler, hvert
+funn verifisert mot koden. Ingen kritiske. Fire høye: lagret JS-injeksjon gjennom
+verdimengdene i oppdrag (`json.dumps` + `|safe`, og CSP-vertslista slipper det gjennom),
+klient-IP lest på tre ulike måter (rate-limit per IP teller på proxyen, auditsporets IP
+er klientstyrt), CDN uten SRI, og service-workerens kopi av mannskapsregisteret som
+ingenting rydder ved utlogging. Seksten middels, 22 lave, og en foreslått rekkefølge i
+tre runder. Ingen kode er endret i denne commiten.
+
 ## 2026-09-13 — Sikkerhetssjekk utenfra: `scripts/sikkerhetssjekk.py`
 
 Et script som kjøres fra en PC mot staging (runbook §14). Bare standardbiblioteket.
