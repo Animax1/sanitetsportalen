@@ -1,7 +1,7 @@
 # Plan: backup-løsningen lagt om
 
-Status: **plan, 13. september 2026, versjon 2 — Andrés fem svar innarbeidet.**
-Ingenting er bygget. Denne planen skal være klar før noe iverksettes.
+Status: **plan, 13. september 2026, versjon 3 — alle svar innarbeidet.**
+Ingenting er bygget. Planen er ferdig og har ingen åpne punkter; se §11.
 
 Bestillingen: modulenes backup og gjenoppretting er tungvint, intervallet skal kunne
 settes fritt i minutter, timer og dager for å kunne tilpasses den enkelte vakt og holde
@@ -47,6 +47,11 @@ Tre følger av det:
   `/portal-admin/server-status/` viser **«Aldri»** for en jobb som aldri kommer til å
   kjøre. Et varsel som alltid står rødt lærer deg å ikke se på dashbordet.
 - `CLAUDE.md` påstår at tre jobber kjøres av Railway Cron. Det er feil, og rettes.
+
+Og én ting til, som først ble synlig da jeg lette etter et bedre alternativ til cron:
+**det var flaks at jobben aldri ble satt opp.** Se §3.2 — en backup-jobb i en egen
+cron-tjeneste ville skrevet filene til feil sted, og `kollaps_arkiv` ville åpnet sperren
+sin på dem.
 
 **1.3 `restore_models` vedlikeholdes for hånd.** Hver handler lister modellene som skal
 slettes før `loaddata`, i barn-først-rekkefølge. Glemmer du én, blir radene stående igjen
@@ -193,35 +198,112 @@ siste fil på volumet. Er volumet borte, er det bare bucketen som teller. En lin
 leser volumet ville vist fire minutter mens den virkelige avstanden var to dager fordi
 opplastingene har feilet siden i forgårs.
 
-## 3. Klokka: en tikk som ikke avhenger av trafikk
+## 3. Klokka: hvorfor ikke en cron-tjeneste
 
-Ny kommando `python manage.py backup_kjor`, satt opp som Railway Cron-tjeneste ved siden
-av de to som står der:
+Du spurte om cron er den ideelle veien, eller om noe annet er bedre. Svaret ble nei etter
+at jeg så på hvor filene faktisk skrives — og det er verdt å lese begrunnelsen, for den
+gjelder bare backup og ikke de to jobbene som allerede står der.
 
+### 3.1 De fire alternativene
+
+| | Mekanisme | Virker uten trafikk | Har volumet | Kostnad |
+|---|---|---|---|---|
+| A | Egen Railway Cron-tjeneste | Ja | **Nei** | En containerstart hvert 5. minutt |
+| B | **Tidsstyrt tråd i web-prosessen** | Ja | **Ja** | Ingen |
+| C | Middleware, som i dag | Nei | Ja | Ingen |
+| D | Cron-tjeneste som kaller et endepunkt i web | Ja | Ja (web gjør jobben) | Containerstart + et nytt endepunkt å sikre |
+
+**Anbefaling: B**, med C som reservenett. Grunnen står i 3.2.
+
+### 3.2 Hvorfor cron-tjenesten faller: volumet kan bare henge på én tjeneste
+
+Et Railway-volum monteres på **én** tjeneste. `/data` henger på web-tjenesten, og det er
+der `BACKUP_DIR=/data/backups` peker. En cron-tjeneste som kjører `backup_kjor` ville
+derfor:
+
+1. serialisert modulen riktig,
+2. skrevet `.json.gz`-fila til **sitt eget, flyktige containerfilsystem**,
+3. opprettet `Backup`-raden i databasen,
+4. og forsvunnet med fila da containeren avsluttet.
+
+Resultatet er en rad som påstår at det finnes en backup, og ingen fil. Verre enn som så:
+`core.arkiv.har_backup_etter()` — sperra som skal hindre at et arkiv kollapser uten at
+slettingen er gjenopprettbar — **spør bare etter raden**, ikke etter fila:
+
+```python
+return Backup.objects.filter(module_slug=..., created_at__gt=tidspunkt).exists()
 ```
-backup_kjor   python manage.py backup_kjor   */5 * * * *
+
+Så en cron-tjeneste uten volum ville produsert spøkelsesbackuper som åpner
+kollapssperra. Det er den ene feilen i dette systemet som ikke kan rettes etterpå.
+
+**Derfor virker de to jobbene som står der i dag, og backup ville ikke gjort det:**
+`purge_old_logs` og `kollaps_arkiv` rører bare databasen. De skriver ingen filer, så de
+trenger ikke volumet. Backup gjør begge deler, og det er hele forskjellen.
+
+> **Verifiser før bygging:** at et Railway-volum fortsatt bare kan henge på én tjeneste.
+> Skulle plattformen ha åpnet for flere, blir A brukbar igjen — men B er fortsatt enklere,
+> og anbefalingen står.
+
+Offsite-opplastingen alene ville overlevd i A, siden den går rett til Scaleway. Men da er
+volumet ikke lenger «første nett», gjenoppretting fra grensesnittet finner ingen fil, og
+hver gjenoppretting må begynne med `hent_offsite`. Det er å bytte bort sikkerhetsnettet for
+en klokke.
+
+### 3.3 Tråden, konkret
+
+En daemon-tråd startet fra `CoreConfig.ready()`, som våkner hvert 60. sekund, spør
+databasen hva som er forfalt, og kjører det:
+
+```python
+def _klokke():
+    time.sleep(random.uniform(0, 30))        # spre workerne
+    while True:
+        try:
+            kjor_forfalte()
+        except Exception:
+            logger.exception('backup-klokka: feil i tikk')   # tråden skal aldri dø
+        time.sleep(TIKK_SEKUNDER)            # 60
 ```
 
-Kommandoen spør databasen hva som er forfalt og kjører det. **Intervallene ligger i basen,
-ikke i cron-uttrykket.** Det er hele poenget: du endrer «hver time» til «hvert 20. minutt»
-i portalen, uten å røre Railway og uten en deploy.
+Fem detaljer som betyr noe:
 
-Tre ting den arver fra resten av portalen:
+- **Den starter ikke under test, `migrate` eller `collectstatic`.** Samme grep som
+  `settings.py` alt bruker for backup-planleggeren og `FilutsendingMiddleware`.
+- **Én tråd per gunicorn-worker er greit.** `select_for_update(nowait=True)` på planraden
+  avgjør hvem som får kjøre, akkurat som i dag. Jitteren foran løkka gjør at de ikke
+  banker på samme sekund.
+- **Web-tjenesten står oppe mellom vaktene.** Lavkostnad-modus er 1 worker og Redis
+  frakoblet (runbooken §1b), ikke en pauset tjeneste. Klokka går altså hele året.
+- **Tråden dør med prosessen.** Blir den drept midt i en skriving, ligger det igjen en
+  halv `.json.gz` uten `Backup`-rad. Den er ufarlig, men ryddes ved oppstart: filer i
+  `BACKUP_DIR` uten rad eldre enn en time slettes.
+- **`backup_kjor`-kommandoen beholdes** selv om ingen cron-tjeneste kaller den. Den er
+  veien til å kjøre en runde for hånd (`railway ssh --service web -- python manage.py
+  backup_kjor`), og finnes hvis vi senere vil ha A likevel.
 
-- `lesbar_dbfeil('ingen backup ble tatt', navn='backup_kjor')` — én lesbar linje i
-  cron-loggen i stedet for fire tracebacks, og `AppSetting['cron.backup_kjor']` skrevet
-  både når det gikk og når det ikke gikk, så server-status viser den.
-- `select_for_update(nowait=True)` på planraden som i dag, så to tikker som overlapper
-  ikke lager to filer.
-- `CRON_JOBBER` bytter `db_backup` mot `backup_kjor` **i fase 1**, ikke i oppryddingen —
-  ellers står dashbordet og lyver en fase lenger.
+`db_backup` fjernes fra `CRON_JOBBER`, og erstattes **ikke** — backup er ikke lenger en
+cron-jobb. Lista blir to, som virkeligheten.
 
-**Middlewaren blir stående som reservenett**, skrevet om til å kalle samme funksjon.
-Faller cron-tjenesten ut, tar trafikken over; står portalen stille, tar cron det. Begge går
-gjennom den samme låsen, så det koster ingenting å ha begge.
+### 3.4 Hvordan vi vet at klokka lever
 
-> **Sjekk ved oppsett:** hva Railway tillater som minste cron-intervall. Det tallet blir
-> gulvet for oppløsningen i §2.2 og skal stå i feltteksten. Ikke anta `*/5`.
+Dette er det eneste reelle ankepunktet mot B: en cron-tjeneste er synlig i Railways
+grensesnitt, mens en tråd ikke er synlig noe sted. Svaret er at **dataene sier det selv**,
+og det er et bedre signal enn en grønn hake i et dashbord:
+
+- `sist_sjekket_at` oppdateres ved hvert tikk, uansett modus (§2.1).
+- **Vakthund:** er `sist_sjekket_at` for en plan eldre enn tre ganger intervallet, står det
+  rødt på `/portal-admin/backup/` og på `/portal-admin/server-status/`, og det opprettes et
+  `Notification` til global admin. Deduplisert, så det kommer ett varsel og ikke ett i
+  minuttet.
+
+Tre ganger intervallet, ikke én, fordi en deploy eller en restart legitimt hopper over et
+tikk eller to.
+
+> **Mulig senere, ikke nå:** en cron-tjeneste som *bare* er vakthund. Den rører ingen filer
+> — den leser `sist_sjekket_at` og sender e-post hvis noe har stoppet — så den trenger ikke
+> volumet, og den overlever at web-tjenesten ligger nede, som vakthunden inne i portalen
+> ikke gjør. Cron er altså riktig verktøy for å *sjekke*, og feil verktøy for å *gjøre*.
 
 ## 4. Modulløsningen forenklet
 
@@ -394,7 +476,7 @@ en sletting.
 
 ### 7.1 I konsollen
 
-1. Logg inn på Scaleway → **Object Storage** → bucketen (Amsterdam, `nl-ams`).
+1. Logg inn på Scaleway → **Object Storage** → bucketen **`sanitetsportalen`** (Amsterdam, `nl-ams`).
 2. Fanen **Lifecycle rules**.
 3. **Åpne den eksisterende 730-dagersregelen og sett scope til prefiks `backups/`**
    i stedet for «alle objekter». Lagre. Ingenting endres for filene som ligger der —
@@ -418,7 +500,7 @@ tre reglene må være med i samme kall:
 ```bash
 aws s3api put-bucket-lifecycle-configuration \
   --endpoint-url https://s3.nl-ams.scw.cloud \
-  --bucket <bucketnavn> \
+  --bucket sanitetsportalen \
   --lifecycle-configuration '{
     "Rules": [
       {"ID": "moduler-730", "Status": "Enabled",
@@ -444,7 +526,7 @@ begrunnelsen bak S7 i CHANGELOG, og den gjelder her.
 
 ```bash
 aws s3api get-bucket-lifecycle-configuration \
-  --endpoint-url https://s3.nl-ams.scw.cloud --bucket <bucketnavn>
+  --endpoint-url https://s3.nl-ams.scw.cloud --bucket sanitetsportalen
 ```
 
 Svaret skal vise nøyaktig de tre reglene. **Og kortet på `/portal-admin/backup/` gjør det
@@ -488,26 +570,49 @@ Fire ting er verdt å merke seg:
 - **Grensesnittet kan gjenopprette begge deler**, hel base inkludert, med advarselen fra
   §5.2 i dialogen.
 
-### 8.1 Nedlasting er ikke det samme som gjenoppretting
+### 8.1 Nedlasting fjernes helt — også for modulfilene
 
-Svaret ditt handlet om gjenoppretting, og der er vi enige: begge veier, både CLI og UI.
-Spørsmålet mitt gjaldt **nedlasting** — knappen som legger fila i nedlastingsmappa på
-maskinen du sitter ved. De to er ulike ting, og skillet er hvor fila havner:
+**Avklart 13. sep.:** backupfilene skal ikke finnes noe annet sted enn hos Scaleway eller
+på Railway. Det er strengere enn det jeg foreslo, som bare gjaldt den hele fila, og det er
+det strengere som gjelder: **nedlastingsknappen fjernes for alle filer**, ikke bare for
+`full`.
 
-| | Hvor dataene ender | Vurdering |
+Det koster ingenting, for det var bare én ting knappen ble brukt til — å se hva som er
+inni en fil — og den jobben gjør `verifiser_backup` (§9) bedre, på serveren, uten å flytte
+noe.
+
+Skillet det hviler på:
+
+| | Hvor dataene ender | Etter omleggingen |
 |---|---|---|
-| Gjenoppretting (UI eller CLI) | Blir på serveren | Ja, begge veier |
-| Nedlasting av **modulfil** | På din maskin | Beholdes som i dag |
-| Nedlasting av **hel fil** | På din maskin | **Anbefaler nei** |
+| Gjenoppretting fra grensesnittet | Blir på serveren | Ja |
+| Gjenoppretting fra Railway CLI | Blir på serveren | Ja |
+| Nedlasting av modulfil | På din maskin | **Fjernes** |
+| Nedlasting av hel fil | På din maskin | Bygges aldri |
 
-Den hele fila bærer passordhasher og TOTP-hemmeligheter for alle kontoer. Én knapp flytter
-hele portalens legitimasjon til en laptop, og derfra til sikkerhetskopien av laptopen.
-Trenger du fila lokalt, finnes den i Scaleway-konsollen, og da er det en bevisst handling.
+Den hele fila bærer passordhasher og TOTP-hemmeligheter for alle kontoer. Én knapp ville
+flyttet hele portalens legitimasjon til en laptop, og derfra til sikkerhetskopien av
+laptopen. Men argumentet er like gyldig for pasientfila: en `.json.gz` med hele
+pasientregisteret i nedlastingsmappa er en helseopplysningsdump utenfor portalens kontroll,
+og den står ikke i behandlingsprotokollen.
 
-Og for katastrofeveien trengs den ikke: ny Postgres → `migrate` → `gjenopprett --hent
---full` inne i containeren. Fila er aldri innom en klientmaskin.
+### 8.2 Hvor filene da faktisk ligger
 
-**Dette er det ene punktet jeg ber deg bekrefte før fase 4.**
+Tre steder, og det er verdt å slå fast presist siden du spurte om vi forstår hverandre:
+
+| Sted | Hva som ligger der | Form |
+|---|---|---|
+| **Railway-volumet**, `/data/backups` på web-tjenesten | De nyeste filene, så mange som `behold` sier | `.json.gz`, ukryptert |
+| **Scaleway**, bucket `sanitetsportalen` | Alle filene, til livssyklusregelen tar dem | `.enc`, AES-256-GCM |
+| **Railways egen Postgres-backup** | Hele basen, plattformens eget opplegg | Railways format, utenfor vår kontroll |
+
+Én presisering: **filene ligger på volumet, ikke i Postgres.** Databasen holder bare
+metadataraden — filnavn, størrelse, hash, hvem som tok den. Selve innholdet er en fil.
+Det er derfor §3.2 handler om hvem som har volumet montert.
+
+Railways egen Postgres-backup er et fjerde nett vi ikke styrer, og som bare finnes så lenge
+tjenesten gjør det. Den teller ikke i «verste tilfelle»-linja (§2.5), fordi vi ikke kan se
+den fra portalen.
 
 ## 9. Kontroll og verifisering
 
@@ -515,8 +620,9 @@ Og for katastrofeveien trengs den ikke: ny Postgres → `migrate` → `gjenoppre
 
 - **«Sist sjekket» ved siden av «siste fil»** (§2.1) — skiller stille fra stoppet.
 - **«Verste tilfelle nå»** (§2.5) — målt mot siste vellykkede offsite-kopi.
-- **`/portal-admin/server-status/`** viser `backup_kjor` blant cron-jobbene, med tid og
-  ok/feil, som de to andre.
+- **`/portal-admin/server-status/`** får en egen linje for **backup-klokka** — sist tikk,
+  og rødt når vakthunden slår ut. Den står *ikke* blant cron-jobbene, for den er ikke en
+  cron-jobb lenger; lista der blir `purge_old_logs` og `kollaps_arkiv`, som i Railway.
 - **`python manage.py verifiser_backup`** — ny kommando, og den viktigste i planen. Den
   lager en engangsdatabase slik `verifiser_migrasjoner` alt gjør, kjører `migrate`, laster
   den nyeste fila for hver modul i riktig rekkefølge (portal → patients → arkiv → oppdrag →
@@ -536,13 +642,13 @@ Hver fase er et eget commit-sett med grønne tester. Fase 1–2 kan deployes ute
 
 | # | Innhold | Anslag |
 |---|---|---|
-| 1 | `Backupplan` med tre moduser, intervall i minutt/time/døgn og cap; datamigrasjon fra `ModuleBackupConfig`; `backup_kjor` med `lesbar_dbfeil`; `CRON_JOBBER` bytter `db_backup` → `backup_kjor`; middlewaren skrevet om til samme funksjon; `CLAUDE.md` rettet fra tre til tre *andre* cron-jobber | 1 kveld |
-| 2 | Én side: standardplan, «verste tilfelle»-linja, diskbruk, inline fillister, «Ta backup av alle nå», «Gjenopprett siste», bekreftelse i dialog. Modulsidene legges ned | 1–2 kvelder |
+| 1 | `Backupplan` med tre moduser, intervall i minutt/time/døgn og cap; datamigrasjon fra `ModuleBackupConfig`; **klokketråden** fra `CoreConfig.ready()` med jitter, oppstartsrydding av foreldreløse filer og `backup_kjor` som manuell inngang; middlewaren skrevet om til samme funksjon; `db_backup` **ut** av `CRON_JOBBER`; `CLAUDE.md` rettet til to cron-jobber | 1–2 kvelder |
+| 2 | Én side: standardplan, «verste tilfelle»-linja, diskbruk (`_get_disk()` finnes alt), inline fillister, «Ta backup av alle nå», «Gjenopprett siste», bekreftelse i dialog. **Vakthunden** (§3.4) med `Notification` til global admin. Modulsidene og nedlastingsknappene legges ned | 1–2 kvelder |
 | 3 | `vaktliste`- og `portal`-handler; `get_restore_models()` utledet topologisk + testen som krever dekning; 3.4 faller ut av seg selv; `arkiv` døpes om til «Pasientregistreringsarkiv» | 1 kveld |
 | 4 | Hel backup: handler, `flush` + `loaddata`, prefikset `full/`, dialogen som sier at du blir logget ut | 1 kveld |
 | 5 | `gjenopprett`-kommandoen med `--list`, `--ja`, `--full` og `--hent` (§8) | ½ kveld |
 | 6 | `verifiser_backup` + testen fra `BACKUP.md` §3.6, kjørt mot PostgreSQL | 1 kveld |
-| 7 | Livssyklusreglene i Scaleway (§7, **krever André**) og kortet som leser dem | ½ kveld |
+| 7 | Livssyklusreglene i bucketen `sanitetsportalen` (§7, **krever André**) og kortet som leser dem | ½ kveld |
 | 8 | Rydding: `db_backup`, `patients/backup_service.py`, `patients.BackupConfig`, `RETENTION_HOURS`. Krever migrasjon | ½ kveld |
 
 **Rekkefølgekrav:** fase 7 (livssyklusreglene) skal være gjort **før** fase 4 er i prod, så
@@ -561,9 +667,12 @@ navnetabellen som skrives der dekker også `full`-fila. Fase 1–6 kan derfor kj
 flyttingen, som `PLAN_REKKEFOLGE_2026-09.md` legger opp til — `portal`-handleren tar
 `AppSetting` med når den kommer.
 
-## 11. Avklart og gjenstående
+**Det som skal verifiseres før fase 1 skrives:** at et Railway-volum fortsatt bare kan
+henge på én tjeneste (§3.2). Hele valget av klokke hviler på det.
 
-**Avklart av André 13. sep. 2026:**
+## 11. Avklart — alt er nå besluttet
+
+**Første runde, 13. sep. 2026:**
 
 1. Intervall settes fritt i minutter, timer og døgn, med «ved endring» og «av» som moduser.
    Cap på antall backuper for både moduler og hel database. → §2.2, §2.3
@@ -573,11 +682,13 @@ flyttingen, som `PLAN_REKKEFOLGE_2026-09.md` legger opp til — `portal`-handler
    kjører. → §1.2
 5. Livssyklusregelen står i dag på 730 dager med scope «alle objekter i bucketen». → §7
 
-**Gjenstår før fase 4:**
+**Andre runde, samme dag:**
 
-- **Nedlasting av den hele backupfila fra nettleseren — ja eller nei?** Anbefaling: nei,
-  begrunnelsen står i §8.1. Gjenoppretting er upåvirket uansett svar.
+6. **Backupfilene skal ikke finnes andre steder enn hos Scaleway eller på Railway.**
+   Nedlastingsknappen fjernes for alle filer, ikke bare for den hele. → §8.1, §8.2
+7. **Klokka blir en tråd i web-prosessen, ikke en cron-tjeneste** — volumet kan bare henge
+   på én tjeneste, og en cron-tjeneste uten volum ville laget spøkelsesbackuper som åpner
+   kollapssperra. → §3
+8. **Bucketen heter `sanitetsportalen`.** → §7
 
-**Gjenstår før fase 7 (Scaleway):**
-
-- Bucketnavnet, for instruksen og for runbooken.
+Ingenting står åpent. Planen kan iverksettes fra fase 1.

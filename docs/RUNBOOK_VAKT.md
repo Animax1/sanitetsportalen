@@ -283,7 +283,7 @@ som overlever at Railway er borte. Se `docs/TEKNISK_DOKUMENTASJON.md` §11 og
 
 ### Oppsett (gjøres én gang, bare i prod)
 
-**Hos Scaleway** (allerede gjort 13. sep. 2026): bucket i Amsterdam (nl-ams), One Zone,
+**Hos Scaleway** (allerede gjort 13. sep. 2026): bucketen `sanitetsportalen` i Amsterdam (nl-ams), One Zone,
 privat, SSE på, versjonering av, lifecycle 730 dager for objekter og 7 dager for
 uferdige multipart-opplastinger. IAM-applikasjon `sanitetsportalen-backup` med policy
 `ObjectStorageObjectsWrite` + `ObjectStorageObjectsRead` + `ObjectStorageBucketsRead` —

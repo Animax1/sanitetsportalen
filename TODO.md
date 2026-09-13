@@ -332,17 +332,27 @@ bindende: 1 før 2, fordi backupen speiler hvor modellene bor.
             tre moduser (av / ved endring / alltid), **intervall satt fritt i minutter,
             timer eller døgn**, cap på antall filer, og en standardplan modulene arver.
             `sist_sjekket_at` ved siden av `sist_fil_at`, så stille skilles fra stoppet.
-            Ny kommando `backup_kjor` som Railway-cron blir klokka — **i dag tas det ingen
-            backup uten trafikk**, og `db_backup` står ikke i Railway, så prod har aldri
-            hatt en klokkedrevet backup. `CRON_JOBBER` bytter `db_backup` mot
-            `backup_kjor` allerede her, ellers lyver server-status en fase til.
-            `CLAUDE.md` sier tre cron-jobber; det er to, og det rettes.
+            **Klokka blir en tidsstyrt tråd i web-prosessen**, ikke en cron-tjeneste:
+            et Railway-volum kan bare henge på én tjeneste, og en cron-tjeneste uten
+            `/data` ville skrevet filene til et flyktig containerfilsystem og laget
+            `Backup`-rader uten filer — som `core.arkiv.har_backup_etter()` ikke skiller
+            fra ekte, så **kollapssperra ville åpnet seg på spøkelsesbackuper**. Det var
+            flaks at `db_backup` aldri ble satt opp. I dag tas det ingen backup uten
+            trafikk, så prod har aldri hatt en klokkedrevet backup. `backup_kjor` beholdes
+            som manuell inngang, `db_backup` går **ut** av `CRON_JOBBER` uten erstatning,
+            og `CLAUDE.md` rettes fra tre cron-jobber til to.
+            **Verifiser først** at et Railway-volum fortsatt bare kan henge på én
+            tjeneste — hele valget av klokke hviler på det.
             Datamigrasjonen rører data og skjema i samme transaksjon:
             `SET CONSTRAINTS`-mønsteret **og** en prøve i `core/migrasjonsprover.py`.
       - [ ] **Fase 2 — én side.** Standardplan, «verste tilfelle nå» målt mot siste
             vellykkede offsite-kopi, diskbruk på volumet, inline fillister, «Ta backup av
-            alle nå», «Gjenopprett siste», bekreftelse i dialog. Modul- og
-            gjenopprettingssidene legges ned. I dag er en gjenoppretting fem steg og en
+            alle nå», «Gjenopprett siste», bekreftelse i dialog. **Vakthund:** er en plan
+            ikke sjekket på tre ganger intervallet, står det rødt og det opprettes et
+            `Notification` til global admin — det er slik vi ser at tråden lever.
+            **Nedlastingsknappene fjernes helt**, også for modulfilene (André 13. sep.:
+            filene skal ikke finnes andre steder enn hos Scaleway eller på Railway). Modul-
+            og gjenopprettingssidene legges ned. I dag er en gjenoppretting fem steg og en
             backup av alt fire runder.
       - [ ] **Fase 3 — handlerne og utledet slettelista.** `vaktliste`-handler (største
             udekkede datamengde i dag) og `portal`-handler med `core.Vakt`;
@@ -364,8 +374,8 @@ bindende: 1 før 2, fordi backupen speiler hvor modellene bor.
             laster de nyeste filene i rekkefølge og skriver radtall. Pluss testen fra
             `BACKUP.md` §3.6, kjørt mot PostgreSQL minst én gang — SQLite har ingen
             utsatte fremmednøkler, og det er dem testen finnes for.
-      - [ ] **Fase 7 — oppbevaringstidene i Scaleway** (`PLAN_BACKUP_OMLEGGING.md` §7,
-            **krever Andre**). Regelen står i dag på **730 dager med scope «alle objekter
+      - [ ] **Fase 7 — oppbevaringstidene i bucketen `sanitetsportalen`**
+            (`PLAN_BACKUP_OMLEGGING.md` §7, **krever Andre**). Regelen står i dag på **730 dager med scope «alle objekter
             i bucketen»**, bekreftet 13. sep. Den må derfor snevres inn til prefikset
             `backups/` **før** en ny regel på `full/` med 90 dager legges til — to regler
             som treffer samme objekt er et sted å gjette. **Skal gjøres før fase 4 er i
@@ -377,12 +387,8 @@ bindende: 1 før 2, fordi backupen speiler hvor modellene bor.
       - [ ] **Fase 8 — rydding:** `db_backup`, `patients/backup_service.py`,
             `patients.BackupConfig`, `RETENTION_HOURS`. Krever migrasjon. Slås sammen med
             det løse punktet «Rydd bort død backup-legacy» lenger ned.
-      - [ ] **Krever Andre — før fase 4:** skal den hele backupfila kunne **lastes ned**
-            fra nettleseren? Anbefaling nei (§8.1 i notatet): den bærer passordhasher og
-            TOTP-hemmeligheter for alle kontoer, og katastrofeveien går uansett gjennom
-            containeren uten å innom en klientmaskin. Gjenoppretting fra grensesnittet er
-            upåvirket av svaret.
-      - [ ] **Krever Andre — før fase 7:** bucketnavnet, til instruksen og runbooken.
+      **Alt er avklart** (13. sep. 2026, to runder — se notatets §11). Bucketen heter
+      `sanitetsportalen`. Planen kan iverksettes fra fase 1.
 
 - [ ] **3. Dokumentrunden — når 1 og 2 er levert.** Én runde, ikke stykkevis, og den tar
       med seg **alt fra 11.–13. september** (sikkerhetsrundene, server-status, reserve og

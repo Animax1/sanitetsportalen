@@ -4,6 +4,47 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-13 — Backup-planen versjon 3: klokka blir en tråd, ikke en cron-jobb
+
+Ingen kodeendring. På spørsmål om cron er den ideelle klokka ble fire alternativer veid,
+og svaret er nei — av en grunn som først ble synlig da filene ble fulgt til der de
+skrives.
+
+**Et Railway-volum kan bare henge på én tjeneste.** `/data` henger på web-tjenesten. En
+cron-tjeneste som kjørte `backup_kjor` ville serialisert riktig, skrevet fila til sitt eget
+flyktige containerfilsystem, opprettet `Backup`-raden, og forsvunnet med fila. Raden ville
+blitt stående og påstått at det finnes en backup. Og `core.arkiv.har_backup_etter()` —
+sperra som skal hindre at et arkiv kollapser uten at slettingen er gjenopprettbar — spør
+bare etter raden, ikke etter fila. **Kollapssperra ville altså åpnet seg på
+spøkelsesbackuper.** Det var flaks at `db_backup` aldri ble satt opp i Railway.
+
+De to jobbene som faktisk står der, rører bare databasen og trenger ikke volumet. Det er
+hele forskjellen.
+
+Klokka blir derfor en daemon-tråd startet fra `CoreConfig.ready()`, i prosessen som
+faktisk eier volumet: ett tikk i minuttet, jitter så workerne ikke banker samtidig, samme
+radlås som før, og den starter ikke under test eller `migrate`. Web-tjenesten står oppe
+mellom vaktene — lavkostnad-modus er én worker uten Redis, ikke en pauset tjeneste — så
+klokka går hele året. `backup_kjor` beholdes som manuell inngang, `db_backup` går ut av
+`CRON_JOBBER` uten erstatning, og `CLAUDE.md` rettes fra tre cron-jobber til to.
+
+Innvendingen mot en tråd er at den ikke er synlig noe sted. Svaret er en vakthund: er en
+plan ikke sjekket på tre ganger intervallet, står det rødt på begge adminsidene og det
+opprettes et varsel. Cron er riktig verktøy for å *sjekke* og feil verktøy for å *gjøre* —
+en ren vakthund-cron kan komme senere, siden den bare leser databasen og dermed overlever
+at web-tjenesten ligger nede.
+
+**Nedlasting fjernes helt**, også for modulfilene: filene skal ikke finnes andre steder enn
+hos Scaleway eller på Railway. Knappen ble bare brukt til å se hva som er inni en fil, og
+den jobben gjør `verifiser_backup` bedre, på serveren. Argumentet mot å laste ned den hele
+fila — passordhasher og TOTP-hemmeligheter til en laptop — er like gyldig for pasientfila,
+som er en helseopplysningsdump utenfor portalens kontroll.
+
+Bucketen heter `sanitetsportalen`, og står nå i instruksen og runbooken. Planen har ingen
+åpne punkter.
+
+---
+
 ## 2026-09-13 — Backup-planen versjon 2: svarene innarbeidet
 
 Ingen kodeendring. André svarte på de fem spørsmålene, og planen er skrevet om.
