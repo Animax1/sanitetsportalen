@@ -4,6 +4,18 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-13 — Teknisk gjeld kartlagt: `docs/TEKNISK_GJELD.md`
+
+Ingen kodeendring. På spørsmål om hva backupene faktisk inneholder, og hvordan appen
+henger sammen, ble appene, modellene, importene på kryss, middlewaren og rutene gått
+gjennom. Notatet beskriver rammeverk-pluss-moduler-tanken, den store gjelden —
+`patients` er den gamle monolitten, og `core` avhenger av den (`AppSetting`, `Backup`,
+`hent_aktiv_vakt`, CSP, `healthz`, server-status) — åtte mindre punkter, og hullene i
+backupen: `core.Vakt` ligger ikke i noen fil (gjenoppretting i tom base feiler),
+vaktlista har ingen handler, og «Vaktarkiv» skal hete «Pasientregistreringsarkiv».
+Arbeidslista står i `TODO.md` under «Teknisk gjeld», med bindende rekkefølge:
+flyttingen først, backupene etterpå.
+
 ## 2026-09-13 — Prodtest av sikkerhetsrundene: fire funn rettet
 
 Ingen migrasjon. Andrés prodtest på staging av runde 1 og 2 ga 39 OK og 0 FEIL i

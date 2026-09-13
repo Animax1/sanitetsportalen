@@ -305,6 +305,36 @@ ingen av dem gir feilmelding — de er bare stille inaktive.
 
 ## Pågående / neste
 
+### Teknisk gjeld — kartlagt 13. sep. 2026
+
+Underlaget er `docs/TEKNISK_GJELD.md`; det forklarer hvorfor. Rekkefølgen her er
+bindende: 1 før 2, fordi backupen speiler hvor modellene bor.
+
+- [ ] **1. Flytt det portalvide ut av `patients` og inn i `core`** (§2 i notatet):
+      `AppSetting`, `Backup`, `BackupConfig`, `hent_aktiv_vakt`, CSP-/metrikk-/backup-
+      middlewaren, `healthz` og server-status. Tabellnavnene beholdes (tilstandsmigrasjon,
+      ingen datamigrasjon). Backupfilene bærer modellnavn — lasteren får en navnetabell
+      med test som laster en fil i gammel form. `patients/backup_service.py` og
+      `RETENTION_HOURS` legges ned i samme runde.
+- [ ] **2. Backupene på nytt grunnlag** (§4 i notatet), etter 1:
+      - [ ] `core.Vakt` inn i backupen (portalfil sammen med innstillingene), og en test som
+            gjenoppretter **alle** filene i en tom database — den finnes ikke i dag.
+      - [ ] `vaktliste`-handler etter samme mønster som `oppdrag`, med bruker-FK-er
+            strippet.
+      - [ ] Modulen `arkiv` døpes om til «Pasientregistreringsarkiv» i grensesnittet.
+      - [ ] `Lydvarsel` inn i `restore_models` i `oppdrag/backup.py` (3.4).
+      - [ ] **Krever Andre — beslutning:** hel backup (brukere, MFA, tilganger, audit- og
+            innloggingslogg) i tillegg til modulfilene? André heller mot ja (13. sep.).
+            Krever egen, kortere slettefrist på den fila og et avsnitt i
+            personverndokumentasjonens A.9. Se svaret i chatten 13. sep. for vurderingen.
+- [ ] **3. Runbook: gjenoppretting i tom base**, inkludert kontoene hvis de ikke er med
+      (`create_admin`, opprett kontoer og tilganger for hånd), og at `purge_old_logs` og
+      `kollaps_arkiv` kjøres rett etter gjenoppretting.
+- [ ] **4. De mindre** (§3 i notatet), når man er i nærheten: brukeradmin importerer
+      pasientregistrene (3.1), `/portal-admin/` samlet i én URL-fil (3.2), skimene
+      (3.3), `core/views.py` delt (3.7). 3.5 (`VaktArkiv`) skal **ikke** ryddes —
+      signaturen. 3.6 og 3.8 tas underveis, ikke som egne runder.
+
 ### Reserve og offline — besluttet 12. sep. 2026
 
 Bakgrunn: ingen deploy under vakt. Da dekker et speil til staging nesten ingenting
