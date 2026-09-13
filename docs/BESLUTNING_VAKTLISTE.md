@@ -507,3 +507,32 @@ og er ingen endring. Klokka går fra forrige *forsøk*, så en e-posttjeneste so
 gir ett forsøk per intervall, ikke ett per minutt. Portalen har ingen egen klokke —
 sjekken henger på trafikken, som backup-planleggeren, og under vakt er det alltid
 trafikk.
+
+---
+
+## 13. Reserven, del 2: offline drift på drifts-PC-en (13. sep. 2026)
+
+Fila i §12 er reserven om alt faller. Det som skal virke *mens* Railway er nede, er
+innsjekken på drifts-PC-en — og den trenger ikke en server, den trenger lista og et sted
+å legge trykkene.
+
+- **Service worker på `/vaktliste/`** holder siden, stilene, skriptene og siste svar fra
+  API-et. Nettet først; kopien når nettet feiler. Innloggingssiden lagres aldri: en
+  utgått sesjon gir en omdirigering, og en omdirigering er ikke vaktlista.
+- **Køen** er i `localStorage`, ett trykk per rad, med tida trykket skjedde. Står noe i
+  kø, går alt i kø — «av vakt» krever «møtt», og et trykk som sniker forbi køen bryter
+  rekkefølgen. Sendes hvert 15. sekund og når nettet kommer tilbake; et trykk serveren
+  avviser fjernes med beskjed, for det er ikke noe å prøve igjen.
+- **Serveren tar tidspunktet fra køen**, ikke klokka ved mottak: Kari møtte 08:04, ikke
+  09:30 da nettet kom. Klienttid brukes når den er rimelig (ikke i framtiden ut over
+  klokkeslingring, ikke eldre enn et døgn), ellers servertid — samme regel som bilens
+  stemplinger i oppdragsmodulen.
+- **Utgått innlogging** kan ikke løses offline (innloggingssiden er ikke i kopi, og
+  skal ikke være det). Køen stopper og banneret sier fra; ny innlogging i en annen fane
+  sender det som venter.
+- **«Klar for offline»** i vaktlinja er sjekket, ikke antatt: workeren styrer siden *og*
+  lista ligger i kopi.
+
+Mobil og ledelse trenger ikke dette: de har live som i dag og fila fra §12. Den gamle
+offline-modusen — laptop med egen SQLite, `OFFLINE_MODE`, USB-pakke — ble lagt ned
+samme dag; den dekket et scenario som ikke finnes.

@@ -322,14 +322,12 @@ Pasienter har Excel, oppdrag går på nødnett. Det som skal overleve at Railway
             endring, via `FilutsendingMiddleware`.
       - [ ] **Personverndokumentasjonen:** utleveringen inn i A.2/A.6, formål
             «reserve ved bortfall av portalen».
-- [ ] **2. Offline drift på `/vaktliste/`, for PC-en som fører drift.** Service worker
-      holder siden og siste liste lokalt; møtt/av vakt legges i kø når serveren ikke
-      svarer og sendes når den svarer igjen — samme mønster som enhetsskjermens
-      offline-kø i oppdrag. Serveren tar tidspunktet fra køen, ikke klokka ved mottak.
-      Markør «Klar for offline» i vaktlinja når kopien ligger der; banner med antall
-      ventende stemplinger hvis innloggingen gikk ut imens. Mobil og ledelse får live som
-      i dag og fila fra punkt 1 som reserve — de trenger ikke offline drift. Ett til to
-      dager, testes i Chrome/Edge på PC.
+- [x] **2. Offline drift på `/vaktliste/`** (13. sep. 2026): service worker
+      (`vaktliste-sw.js`), kø for møtt/av vakt i `localStorage` med klienttid,
+      `services.vurder_klienttid`, banner og «Klar for offline». Testes i Chrome/Edge på
+      PC på staging.
+      - [ ] **Bekreft på staging:** kopien vises med flymodus, køen sendes når nettet
+            kommer tilbake, og tida på stempelet er trykket, ikke mottaket.
 - [ ] **3. Backupene ut av Railway, til Scaleway Object Storage.** Bucket i Amsterdam,
       klasse Standard One Zone (€0,00803/GB/mnd; opplasting gratis, 75 GB ut gratis per
       måned — våre volumer er under 1 GB). S3-protokollen, `boto3`.
@@ -350,10 +348,10 @@ Pasienter har Excel, oppdrag går på nødnett. Det som skal overleve at Railway
       - Personverndokumentasjonen får Scaleway som databehandler. **Krever Andre:**
         konto, bucket, nøkkelpar og databehandleravtale.
       Ca. en halv dag kode.
-- [ ] **4. Fjerne den gamle offline-arkitekturen** når punkt 2 er i drift:
-      `OFFLINE_MODE`-grenene i settings, CSRF-unntakene for private nett, Django-admin
-      rutet under offline, `OFFLINE_GUIDE.md` og USB-pakken. En halv dag, mest sletting
-      og tester som bekrefter at rutene er borte.
+- [x] **4. Den gamle offline-arkitekturen er fjernet** (13. sep. 2026, samtidig med 2
+      etter Andrés valg): `OFFLINE_MODE`, CSRF for LAN, Django-admin under offline,
+      `create_offline_users`, `.env.offline.example`, `OFFLINE_PASSORD.md`, USB-pakken.
+      `import_offline_data` beholdt som dataimport fra gammel prod.
 
 Rekkefølgen er 1, 2, 3, 4. Speiling til staging er **tatt ut** — den ble vurdert og
 forkastet fordi det ikke deployes under vakt.
