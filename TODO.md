@@ -319,6 +319,13 @@ ingen av dem gir feilmelding — de er bare stille inaktive.
 - [x] **`myproject/tests_cache_config.py`: opprydningen sto inne i `with`-blokken**,
       så settings-modulen ble lastet tilbake med `REDIS_URL` fortsatt satt.
       Nå `addCleanup`.
+- [x] **Gjerde rundt testkommandoen** (`core/tests_testkommandoen.py`). Hver
+      toppnivåpakke med `test*.py` må stå i kommandoen i CLAUDE.md, og kommandoen
+      må ikke navngi noe som ikke finnes. Den utelot `myproject` i lang tid, og
+      feilen ble funnet fordi et testtall ikke stemte — flaks, ikke mekanisme.
+- [x] **`SignalerFyrerIkkeUnderLoaddataTests` finner appene selv.** Den scannet
+      tre apper skrevet for hånd og ville ikke sett `core/signals.py`. Globber nå
+      `*/signals.py`, med `VAKTEN_UNNTATT` for det ene bevisste unntaket.
 - [ ] **Uforklart enkeltfeil i suiten.** Første kjøring med `myproject` inkludert
       endte `FAILED (failures=1)`; jeg fanget ikke hvilken test, og den har ikke
       reprodusert på fire fulle kjøringer etterpå. Opprydningsfeilen over er en
@@ -328,7 +335,7 @@ ingen av dem gir feilmelding — de er bare stille inaktive.
       Den kjente slektningen er vinduskanten i rate-limit-testene (se
       «Rate-limit-tester må tåle vinduskanten» i CLAUDE.md) — den er fikset der
       den er funnet, men mønsteret kan finnes flere steder.
-- [ ] **Portalinnstillingene og modulbryteren auditlogges ikke.** Funnet mens
+- [x] **Portalinnstillingene og modulbryteren auditlogges ikke.** *Levert 14. sep. 2026* — `core/signals.py`. Funnet mens
       André spurte om «logges ingenting fra core?». Svaret er nesten nei, og det
       er ikke nytt av flyttingen — det har vært slik hele tiden:
 
@@ -365,7 +372,7 @@ bindende: 1 før 2, fordi backupen speiler hvor modellene bor.
 > og statistikk-utvidelsen står etter dokumentrunden og etter første skarpe vakt med
 > oppdragsmodulen.
 
-- [ ] **1. Flytt det portalvide ut av `patients` og inn i `core`** (§2 i notatet).
+- [x] **1. Flytt det portalvide ut av `patients` og inn i `core`** (§2 i notatet). *Levert 14. sep. 2026 — alle fire faser.*
       **Planen er skrevet ut i
       [`docs/PLAN_FLYTTING_TIL_CORE.md`](./docs/PLAN_FLYTTING_TIL_CORE.md)**
       (14. sep. 2026, fire faser). **Alt avklart** (notatets §7): audit-loggens
@@ -442,7 +449,7 @@ bindende: 1 før 2, fordi backupen speiler hvor modellene bor.
       med test som laster en fil i gammel form. *`patients/backup_service.py`,
       `RETENTION_HOURS` og `patients.BackupConfig` er alt borte (fase 8, 14. sep. 2026),
       så denne runden er blitt mindre.*
-- [ ] **2. Backupene på nytt grunnlag** (§4 i notatet). **Planen er skrevet ut i
+- [x] **2. Backupene på nytt grunnlag** (§4 i notatet). *Levert 14. sep. 2026 — alle åtte faser.* **Planen er skrevet ut i
       [`docs/PLAN_BACKUP_OMLEGGING.md`](./docs/PLAN_BACKUP_OMLEGGING.md)** — versjon 2,
       13. sep. 2026, med Andrés fem svar innarbeidet. Fase 1–6 kan kjøres **før** punkt 1
       over, jf. `PLAN_REKKEFOLGE_2026-09.md`.

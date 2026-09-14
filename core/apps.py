@@ -35,6 +35,13 @@ class CoreConfig(AppConfig):
     def ready(self):
         post_migrate.connect(_ensure_module_settings_defaults, sender=self)
 
+        # Audit for portalens egne tabeller (14. sep. 2026). `AppSetting`,
+        # `ModuleSettings` og `Vakt` sto uten i det hele tatt: å slå av en
+        # modul for alle, eller flytte sesjonstimeouten, etterlot ingen spor.
+        # Se `core/signals.py` — særlig `NOKLER_UTEN_AUDIT`, som holder
+        # pasient- og oppdragstellerne ute av loggen.
+        from . import signals  # noqa: F401
+
         # Portalens egen backup-handler: `core.Vakt` og moduloppsettet.
         # Uten den kan ingen av modulfilene gjenopprettes i en tom base, fordi
         # de peker på vakta med et heltall.

@@ -240,6 +240,39 @@ Alle endepunkter er JSON-API-er beskyttet med `@login_required` + rollesjekk. Re
 
 Feltendringer logges automatisk via Django-signal i `audit/signals.py`. `RequestAuditMiddleware` lagrer request i thread-local slik at signaler kan hente bruker og IP uten å ta imot `request`-objektet direkte. Legg aldri til manuell audit-kode — signalet tar seg av det.
 
+**Portalens egne tabeller logges av `core/signals.py`** (14. sep. 2026):
+`AppSetting`, `ModuleSettings` og `Vakt`. De sto uten audit i det hele tatt fram til da —
+å slå av en modul for *alle*, eller flytte sesjonstimeouten, etterlot ingenting, mens hvert
+feltbytte på en pasient ble logget minutiøst. Feil vei rundt: jo mer inngripende
+handlingen var, jo mindre spor satte den.
+
+**`AppSetting` trenger en unntaksliste, og telleren er grunnen.** Tabellen er nøkkel/verdi
+og blander to ting: innstillinger et *menneske* har bestemt, og tellere *maskinen* har
+talt. `patients.services.next_patient_nr()` teller opp raden ved **hver
+pasientregistrering** (og `oppdrag.services` per oppdrag) — uten unntaket får du én
+auditrad per pasient, `next_patient_nr_vakt_7: 41 → 42`, blandet inn mellom de ekte
+pasientradene på nøyaktig de vaktene der loggen betyr mest. `cron.*` er med i lista også,
+men den er den *svake* grunnen: fem rader i måneden, og de vises bedre på
+`/portal-admin/server-status/`.
+
+Regelen står i `nokkel_logges()` — **logg det et menneske har bestemt, ikke det maskinen
+har talt** — som egen funksjon og ikke en `if` inne i mottakeren, så den lar seg prøve.
+`NOKLER_UTEN_AUDIT` er **prefikser**, fordi begge tellerne bærer vakt-ID i nøkkelen; en
+eksakt liste ville virket i test og lekket ved neste vakt. Og den er en **unntaksliste**:
+en ny nøkkel logges som standard, fordi en teller for mye er støy mens en innstilling for
+lite er et hull man oppdager et år senere.
+
+`AppSetting.key` er tekst-PK mens `AuditLog.record_id` er `BigIntegerField`, så nøkkelen
+går i `field_name` (`max_length=64`, nøyaktig som `key`) og `record_id` står 0. Det er
+også den lesbare formen. Her blir `EKSPLISITT_MAPPING` i `audit/signals.py` virksom for
+første gang: tabellnavnet er fortsatt `patients_appsetting`, så uten den ville radene
+stått som «patients».
+
+**Vaktene mot `loaddata` finnes ved å lete, ikke ved å stå i en liste.**
+`SignalerFyrerIkkeUnderLoaddataTests` scannet `('oppdrag', 'patients', 'vaktliste')`
+skrevet for hånd, og ville ikke sett `core/signals.py` den dagen den kom. Den globber nå
+`*/signals.py`; unntak står i `VAKTEN_UNNTATT` med begrunnelse.
+
 ### Backup-system
 
 Backup er **per modul**, ikke én samlet dump — pluss én hel databasebackup ved

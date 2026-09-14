@@ -4,6 +4,68 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-14 — Portalens egne tabeller auditlogges, og to lister som måtte finne selv
+
+**`core/signals.py`: `AppSetting`, `ModuleSettings` og `Vakt`.** Hullet André
+fant ved å spørre «logges ingenting fra core?». Svaret var nesten nei, og det
+var ikke nytt av flyttingen — det hadde stått slik hele tiden. Portalen logget
+hvert feltbytte på en pasient minutiøst, mens «noen slo av pasientmodulen for
+alle» og «noen flyttet sesjonstimeouten fra 8 til 720 timer» ikke etterlot noe.
+Feil vei rundt: jo mer inngripende handlingen var, jo mindre spor satte den.
+
+**Den vanskelige halvdelen var å la være å logge.** `AppSetting` er
+nøkkel/verdi og blander innstillinger et menneske har bestemt med tellere
+maskinen har talt.
+
+Jeg ga først André cron-linjene som eksempel. Det var det svakeste — fem rader
+i måneden, knapt et problem. Da jeg gikk etter tallene i stedet for min egen
+påstand, fant jeg det som faktisk betyr noe: `next_patient_nr_vakt_<id>`
+telles opp ved **hver pasientregistrering**, og `next_oppdrag_nr_vakt_<id>` per
+oppdrag. Uten unntaket gir en vakt med hundre pasienter hundre auditrader som
+ingen har gjort, blandet inn mellom de ekte pasientradene — på nøyaktig de
+vaktene der loggen betyr mest.
+
+Regelen står som én navngitt funksjon, `nokkel_logges()`: **logg det et
+menneske har bestemt, ikke det maskinen har talt.** Prefikser og ikke eksakte
+navn, fordi tellerne bærer vakt-ID — en eksakt liste ville virket i test og
+lekket ved neste vakt. Og det er en **unntaksliste**: en ny nøkkel logges som
+standard, fordi en teller for mye er støy mens en innstilling for lite er et
+hull man oppdager et år senere.
+
+Verdiene logges, e-postmottakerne inkludert (Andrés avgjørelse): «hvem ble lagt
+til» er hele spørsmålet man stiller, og oppbevaringen er den `purge_old_logs`
+alt håndhever — ingen ny mekanisme, ingen ny frist.
+
+`EKSPLISITT_MAPPING` i `audit/signals.py` blir virksom for første gang her.
+Fram til nå merket den ingen rader, fordi ingen skrev tabellnavnene — noe jeg
+skrev i TODO da jeg oppdaget det, framfor å la den se ut som den gjorde jobb.
+
+**To lister som lette på steder i stedet for å finne dem — samme lærdom, samme dag.**
+
+`SignalerFyrerIkkeUnderLoaddataTests` håndhever at hvert lagringssignal har
+`@ikke_under_loaddata`. Den scannet `('oppdrag', 'patients', 'vaktliste')`
+skrevet for hånd — så `core/signals.py` ville gått rett forbi den dagen den ble
+skrevet, mens testen sa «alle lagringssignaler» og målte tre apper. Den globber
+nå `*/signals.py`, med `VAKTEN_UNNTATT` for det ene tilfellet som med vilje står
+uten (`audit.fyll_app_label` kortslutter på tomt felt).
+
+Og `core/tests_testkommandoen.py` (ny) gjør det samme for testkommandoen i
+CLAUDE.md: hver toppnivåpakke med `test*.py` må stå i den, og kommandoen må ikke
+navngi noe som ikke finnes. Den utelot `myproject` i lang tid uten at noe sa
+fra, og feilen ble funnet fordi et testtall ikke stemte — det er flaks, ikke en
+mekanisme, og flaks kan man ikke planlegge to ganger.
+
+Begge testene har en sperrehake mot seg selv: finner oppdagelsen nesten
+ingenting, feiler den framfor å gå grønn mens den måler tomhet.
+
+Tester: `core/tests_signaler.py` (16) og `core/tests_testkommandoen.py` (4).
+Fem mutasjoner prøvd, alle fanget — tellerne fjernet fra unntakslista,
+unntakslista snudd til inkluderingsliste, `pre_save` som ikke spør basen om
+raden finnes, `myproject` fjernet fra kommandoen igjen, og en app som ikke
+finnes lagt til.
+
+---
+
 ## 2026-09-14 — To funn fra staging: CSP blokkerte lydbæreren, modaler holdt på fokus
 
 Begge meldt av André ved verifisering på staging, og begge var ekte feil bak en

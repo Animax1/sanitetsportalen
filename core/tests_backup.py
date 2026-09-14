@@ -1746,25 +1746,51 @@ class SignalerFyrerIkkeUnderLoaddataTests(TestCase):
         registrer_alle_moduler()
         self.backup_dir = _prepare_backup_dir()
 
+    #: Mottakere som med vilje står uten vakten, med begrunnelse.
+    #: Unntaksliste og ikke en tillatelse — den skal ikke vokse.
+    VAKTEN_UNNTATT = {
+        # `fyll_app_label` fyller bare et tomt felt, og en rad fra en fixture
+        # har alt sitt `app_label` med fra dumpen — så den kortslutter på
+        # første linje. Vakten ville ikke endret noe, og å sette den ville
+        # antydet at mottakeren gjør arbeid den ikke gjør.
+        'audit/signals.py: AuditLog (pre_save)',
+    }
+
     def test_alle_lagringssignaler_har_vakten(self) -> None:
-        """Statisk: en ny mottaker skal ikke kunne glemme den."""
+        """Statisk: en ny mottaker skal ikke kunne glemme den.
+
+        **Apper finnes ved å lete, ikke ved å stå i en liste** (14. sep.
+        2026). Fram til da sto `('oppdrag', 'patients', 'vaktliste')` skrevet
+        her for hånd, og `core/signals.py` gikk rett forbi den dagen den ble
+        skrevet — regelen sa «alle lagringssignaler» og målte tre apper.
+        Samme feil som testkommandoen i CLAUDE.md, som utelot `myproject` og
+        sto slik i lang tid uten at noe sa fra. En liste over hvor man skal
+        lete er alltid et sted færre enn der koden faktisk er.
+        """
         import re
         from pathlib import Path
 
         from django.conf import settings
 
+        filer = sorted(Path(settings.BASE_DIR).glob('*/signals.py'))
+        self.assertGreaterEqual(
+            len(filer), 4,
+            'fant nesten ingen signals.py — glob-en leter feil sted, og da '
+            'går testen grønn uten å måle noe')
+
         manglende = []
-        for navn in ('oppdrag', 'patients', 'vaktliste'):
-            sti = Path(settings.BASE_DIR) / navn / 'signals.py'
-            if not sti.exists():
-                continue
+        for sti in filer:
+            navn = sti.parent.name
             tekst = sti.read_text(encoding='utf-8')
             for treff in re.finditer(
                     r'@receiver\((pre_save|post_save), sender=(\w+)\)\n(.*?)def ',
                     tekst, re.S):
-                if 'ikke_under_loaddata' not in treff.group(3):
-                    manglende.append(f'{navn}/signals.py: {treff.group(2)} '
-                                     f'({treff.group(1)})')
+                if 'ikke_under_loaddata' in treff.group(3):
+                    continue
+                rad = f'{navn}/signals.py: {treff.group(2)} ({treff.group(1)})'
+                if rad in self.VAKTEN_UNNTATT:
+                    continue
+                manglende.append(rad)
         self.assertEqual(
             manglende, [],
             'Disse lagringssignalene mangler @ikke_under_loaddata og vil '
