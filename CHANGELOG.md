@@ -4,6 +4,39 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-14 — Migrasjonsprøve for Backupplan, før prod
+
+Før omleggingen går til prod: en prøve som kjører `core/0008`–`0010` mot ekte
+PostgreSQL **med rader i basen**, i den historiske formen.
+
+Det er den ene tingen verken suiten eller `makemigrations --check` svarer på.
+Djangos testbase lages ved å kjøre migrasjonene mot en *tom* base, så
+dataskrittet i `0009` finner ingenting å oversette, skriver ingenting, og går
+grønt uten å ha gjort noe. Feilen som tok ned release-fasen 30. august krevde
+PostgreSQL **og** rader — og en backup-omlegging som crash-looper release-fasen
+er den verst tenkelige tida å oppdage det på.
+
+Prøven seeder de seks tilstandene som betyr noe: en modul som er på, en som
+står av via `enabled=False`, en som står av via `interval_minutes=0` (to måter
+å si det samme, og begge finnes), og intervaller som går opp i timer, døgn og
+ikke i det hele tatt. Den sjekker oversettelsen, at ingen rad forsvant, at
+`behold` overlevde omdøpingen, at standardplanen ble opprettet, og at de gamle
+kolonnene faktisk er borte etter steg 3.
+
+**Og den viktigste påstanden: ingen eksisterende rad arver standardplanen.**
+Gjorde de det, ville oppgraderingen endret hvor ofte prod tar backup uten at
+noen ba om det — og det ville vist seg som en fil som ikke kom.
+
+*Funn underveis, om prod snarere enn om koden:* første utkast av prøven
+kolliderte på `patients`, fordi `core/0002` og `0005` selv oppretter de radene.
+Prod har dem altså allerede — seedet av migrasjoner, noen av dem siden redigert
+i grensesnittet — og seeden bruker nå `ON CONFLICT DO UPDATE` for å ligne på
+det.
+
+3 av 3 prøver grønne mot PostgreSQL 16.
+
+---
+
 ## 2026-09-14 — Backup fase 8: den gamle veien er stengt
 
 Siste fase i backupomleggingen, og den eneste som bare fjerner ting. Tre

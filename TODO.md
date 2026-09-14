@@ -475,6 +475,13 @@ bindende: 1 før 2, fordi backupen speiler hvor modellene bor.
             at rekkefølgen skal være skrevet i stedet for et sammentreff i grafen.*
             2630 tester grønne på SQLite og PostgreSQL. **Backupomleggingen er dermed
             ferdig — alle åtte fasene er levert.**
+      - [x] **Migrasjonsprøve for `core/0008`–`0010`** (14. sep. 2026, før prod).
+            `0009` skriver data, og et dataskritt mot en tom base skriver ingenting —
+            suiten kunne derfor ikke si om release-fasen overlever prods rader. Prøven
+            seeder den historiske formen, inkludert begge måtene å si «av» på, og krever
+            at ingen eksisterende rad arver standardplanen: gjorde de det, ville
+            oppgraderingen endret hvor ofte prod tar backup uten at noen ba om det.
+            3 av 3 prøver grønne.
       **Alt er avklart** (13. sep. 2026, to runder — se notatets §11). Bucketen heter
       `sanitetsportalen`. Planen kan iverksettes fra fase 1.
 

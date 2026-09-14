@@ -195,6 +195,89 @@ def _sjekk_oppdrag_0011(c):
     assert c.fetchone()[0] == 0, 'melding pekt på feil oppdrags koblingsrad'
 
 
+# ── core.0008–0010 (Backupplan) ──────────────────────────────────────────────
+
+def _seed_backupplan(c):
+    """Radene prod faktisk har i `core_modulebackupconfig`.
+
+    Det er hele poenget med prøven: i en tom base finner `0009` ingenting å
+    oversette, skriver ingenting, og går grønt uten å ha gjort noe. Her står
+    de fem tilstandene som betyr noe — en modul som er på, en som står `av`
+    med `enabled=False`, en som står av med `interval_minutes=0` (de to er
+    ulike måter å si det samme på, og begge finnes), et intervall som går
+    opp i timer, og ett som ikke gjør det.
+    """
+    rader = [
+        # slug,            enabled, minutter, behold
+        ('patients',       True,    60,       50),
+        ('arkiv',          True,    360,      20),
+        ('oppdrag',        False,   60,       50),   # av via enabled
+        ('oppdrag_arkiv',  True,    0,        20),   # av via intervall
+        ('vaktliste',      True,    45,       30),   # går ikke opp i timer
+        ('dogn',           True,    1440,     7),
+    ]
+    # `ON CONFLICT`, ikke ren `INSERT`: migrasjonene `0002` og `0005` oppretter
+    # selv radene for «patients» og «arkiv», så de står der alt når basen er
+    # satt til `0007`. Det er også slik prod ser ut — seedede rader, noen av
+    # dem etterpå redigert i grensesnittet — og prøven skal ligne på prod.
+    for slug, enabled, minutter, behold in rader:
+        c.execute("""INSERT INTO core_modulebackupconfig
+                     (module_slug, enabled, interval_minutes, max_backups,
+                      last_run_at, updated_at)
+                     VALUES (%s, %s, %s, %s, now(), now())
+                     ON CONFLICT (module_slug) DO UPDATE
+                     SET enabled = EXCLUDED.enabled,
+                         interval_minutes = EXCLUDED.interval_minutes,
+                         max_backups = EXCLUDED.max_backups""",
+                  [slug, enabled, minutter, behold])
+
+
+def _sjekk_backupplan(c):
+    """Oversettelsen, og at ingen rad ble borte eller endret oppførsel."""
+    c.execute("""SELECT slug, modus, intervall_verdi, intervall_enhet,
+                        behold, folger_standard
+                 FROM core_backupplan ORDER BY slug""")
+    rader = {r[0]: r[1:] for r in c.fetchall()}
+
+    # Standardplanen skal være opprettet — uten den har «følger standarden»
+    # ingenting å følge, og hver ny modul ville fått en plan uten mal.
+    assert 'standard' in rader, f'standardplanen mangler: {sorted(rader)}'
+
+    # **Eksisterende rader skal beholde oppførselen sin.** Arver de standarden
+    # ved oppgraderingen, endrer vi hvor ofte prod tar backup uten at noen ba
+    # om det — og det ville vist seg som en fil som ikke kom.
+    for slug in ('patients', 'arkiv', 'oppdrag', 'oppdrag_arkiv', 'vaktliste',
+                 'dogn'):
+        assert slug in rader, f'{slug} forsvant i migrasjonen: {sorted(rader)}'
+        assert rader[slug][4] is False, f'{slug} arver standarden uten å ha bedt om det'
+
+    # Modus: `enabled=False` og `interval_minutes=0` er to måter å si «av».
+    assert rader['patients'][0] == 'ved_endring', rader['patients']
+    assert rader['oppdrag'][0] == 'av', rader['oppdrag']
+    assert rader['oppdrag_arkiv'][0] == 'av', rader['oppdrag_arkiv']
+
+    # Enheten er den groveste som gjengir minuttallet nøyaktig.
+    assert rader['patients'][1:3] == (1, 'time'), rader['patients']
+    assert rader['arkiv'][1:3] == (6, 'time'), rader['arkiv']
+    assert rader['vaktliste'][1:3] == (45, 'minutt'), rader['vaktliste']
+    assert rader['dogn'][1:3] == (1, 'dogn'), rader['dogn']
+
+    # En rad som står av må likevel bære et intervall, ellers har feltet
+    # ingen verdi å vise den dagen noen skrur den på igjen.
+    assert rader['oppdrag_arkiv'][1] >= 1, rader['oppdrag_arkiv']
+
+    # `behold` er en omdøping, ikke en ny kolonne — verdiene skal stå igjen.
+    assert rader['arkiv'][3] == 20, rader['arkiv']
+    assert rader['dogn'][3] == 7, rader['dogn']
+
+    # Og de gamle kolonnene skal være borte (steg 3 av 3).
+    c.execute("""SELECT column_name FROM information_schema.columns
+                 WHERE table_name = 'core_backupplan'""")
+    kolonner = {r[0] for r in c.fetchall()}
+    assert 'enabled' not in kolonner, kolonner
+    assert 'interval_minutes' not in kolonner, kolonner
+
+
 #: Registeret. Nøkkelen er «app.migrasjonsnavn», som i `MigrationLoader`.
 PROVER: dict[str, Migrasjonsprove] = {
     p.migrasjon: p for p in (
@@ -204,6 +287,13 @@ PROVER: dict[str, Migrasjonsprove] = {
             beskrivelse='Ressursgrupper seedes, rollene viftes ut per gruppe',
             seed=_seed_0007,
             sjekk=_sjekk_0007,
+        ),
+        Migrasjonsprove(
+            migrasjon='core.0009_backupplan_data',
+            foregaaende='0007_offsitekopi',
+            beskrivelse='ModuleBackupConfig blir Backupplan, med rader i basen',
+            seed=_seed_backupplan,
+            sjekk=_sjekk_backupplan,
         ),
         Migrasjonsprove(
             migrasjon='oppdrag.0011_fyll_oppdragsenhet',
