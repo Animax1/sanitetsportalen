@@ -4,6 +4,68 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-14 — To notater: DPIA-vurderingen og vaktlisteutbedringene (ingen kode)
+
+To samtaler skrevet ned. Ingen kodeendring — begge notatene finnes for at beslutningene
+skal kunne tas med åpne øyne, og TODO peker til dem.
+
+### `docs/NOTAT_DPIA_OG_FRITEKST.md`
+
+Utløst av Andrés spørsmål om AMK-adresse kan legges i `Oppdrag.fritekst`, og av at
+fritekst aldri slettes fra historikken.
+
+**Ett premiss måtte rettes:** «vi slipper DPIA fordi vi har personverndokumentasjon» er
+ikke det A.12 sier, og ville heller ikke holdt — da kunne enhver behandling dokumentert seg
+ut av art. 35. A.12 bygger på tre andre ben: ingen direkte identifikatorer, ikke stor skala,
+ingen profilering. **Skalaen holder, og en adresse endrer den ikke.** Men A.12 har selv
+skrevet utløseren — «særlig dersom nye moduler tar inn direkte identifikatorer» — så
+vurderingen er allerede forpliktet til å tas opp igjen i akkurat dette tilfellet.
+
+**Og luken er større enn DPIA-spørsmålet:** A.12 er en *sikkerhets*risikovurdering. Den
+måler sannsynlighet for og konsekvens av brudd — risiko sett fra systemets side. Art.
+35(7)(c) spør noe annet: hva skjer med pasienten hvis det går galt? Det spørsmålet stilles
+ikke noe sted i dokumentet. Samme slags feil som `rullTilFeil()` rettet samme dag:
+vurderingen er gjort, bare ikke fra det ståstedet den skulle.
+
+Kartlagt i samme slengen — **hvor fritekst faktisk lever**: skjult for bilen straks
+oppdraget er `Ledig`, hele oppdraget borte etter 30 min, aldri arkivert, aldri verdilogget
+— og **stående for alltid i KOs historikk**, pluss 730/90 dager i backupfilene. Beskyttelsen
+er bygget helt og holdent mot bilen. En slettefrist er derfor reell beskyttelse mot at noen
+leser historikken tre måneder senere, men den er **ikke** en sletterett; det skal stå
+skrevet, ikke oppdages senere.
+
+**Den viktigste enkeltadvarselen:** adressen må ikke legges i `Lokasjon`. `Lokasjon.navn`
+fryses som `ArkivertOppdrag.lokasjon_navn` og inngår i **SHA-signaturen** — en adresse lagt
+der er låst i 24 måneder ved konstruksjon og kan ikke fjernes uten at arkivet melder
+tukling. Det tilsynelatende ryddige nedtrekket er den farligste plasseringen.
+
+To ting er merket for **primærkildesjekk** framfor å gjettes på: Datatilsynets liste over
+behandlinger som alltid krever DPIA, og WP248-kriteriene i gjeldende form.
+
+### `docs/FORSLAG_VAKTLISTE_UTBEDRINGER.md`
+
+De tre ønskene fra 14. sep. sto punktvis i TODO, hver for seg. Notatet finnes fordi de
+henger sammen på en måte som ikke synes da:
+
+**To av tre trenger dagruppering, og de ber om den på hvert sitt sted** — «Oversikt» vil ha
+dagen ytterst, gruppefanene vil ha dagoverskrifter i planleggingstabellen. I dag finnes
+dagen bare i `_blokkerMedDager()`. Bygges de hver for seg, får portalen to dagrupperinger
+som kan komme i utakt — og det er en stillegående utakt: to lister som grupperer dagen ulikt
+ser begge riktige ut hver for seg. Anbefalingen er én funksjon, to kallsteder, og at
+midnattsvalget dermed tas én gang.
+
+Midnatt er også allerede i spill: rapportmodulen har avklart at **timer** splittes ved
+midnatt, mens oversikten spør om *tilstedeværelse*, ikke timer. De to kan lande ulikt — men
+da skal det stå hvorfor, ellers leses forskjellen som en feil.
+
+Den tredje, «fjern Sett i drift», deler ingen kode med de to andre og kan tas parallelt.
+Men knappen gjør **fire** ting, og to av dem mister hjemmet sitt hvis drift bare utledes:
+`satt_i_drift_av` mister mening, og e-postutløseren forsvinner. Det peker mot «automatisk
+med unntak» framfor rent utledet — den som møter 30 minutter før vaktstart skal fortsatt
+kunne stemple.
+
+---
+
 ## 2026-09-14 — 400 ved bemanning av ledig plass: nedtrekket tilbød et umulig valg
 
 **Meldt fra staging (André):**

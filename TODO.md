@@ -95,6 +95,16 @@ ingen av dem gir feilmelding — de er bare stille inaktive.
       Står fortsatt som `[fyll inn organisasjonsnavn]`. Dokumentet er
       behandlingsprotokollen overfor tilsynsmyndighet.
 
+- [ ] **Avklar hvem som er behandlingsansvarlig** (14. sep. 2026). A.1 legger ansvaret på
+      André som privatperson, ikke på organisasjonen som gjennomfører vaktene. Det er en
+      avgjørelse utenfor kodebasen, og den påvirker DPIA-vurderingen, hjemmelen i
+      art. 9(2)(h) og hvem som håndterer innsynskrav og avviksmelding. Behandlingsansvar
+      følger virkeligheten, ikke papiret: bestemmer foreningen formål og midler, er de
+      ansvarlig uansett hva dokumentet sier. Begrunnelsen står i
+      [`docs/NOTAT_DPIA_OG_FRITEKST.md`](./docs/NOTAT_DPIA_OG_FRITEKST.md) §5.
+      Dokumentet flagger det selv som noe for den årlige revisjonen; vurderingen er at
+      det bør opp før adresse legges inn i oppdragsmodulen
+
 - [x] **Merget til prod 29. aug. 2026** (`eb79e9d`). Ni commits: vakt-scopingens
       deploy 2, oppdragsmodulens fase 6 og 7, backup-scheduler-fiksen og
       vaktlistenotatet. Backup av prod tatt av André før pushen — migrasjonene
@@ -304,6 +314,10 @@ ingen av dem gir feilmelding — de er bare stille inaktive.
       arkivknapper å krysse av ved vaktslutt.
 
 ## Pågående / neste
+
+*De tre vaktlisteønskene under henger sammen — to av dem trenger samme dagruppering.
+Sammenhengen, rekkefølgen og de åpne valgene står i
+[`docs/FORSLAG_VAKTLISTE_UTBEDRINGER.md`](./docs/FORSLAG_VAKTLISTE_UTBEDRINGER.md).*
 
 ### Vaktlista: minimerbare ressurser i gruppefanene — ønsket 14. sep. 2026
 
@@ -932,10 +946,43 @@ står i [`CHANGELOG.md`](./CHANGELOG.md). Tre punkter gjenstår:
 
 - [ ] Fyll inn organisasjonsnavn i A.4 — se «Krever Andre» øverst
 - [x] Cron-jobb for `kollaps_arkiv` satt opp — se «Krever Andre» øverst
-- [ ] **Skriftlig DPIA-vurdering.** Uten journalplikt, med pseudonymiserte data og
-      begrenset omfang er art. 35 trolig ikke utløst. Det som trengs er en kort skriftlig
-      begrunnelse for *at* en DPIA ikke er nødvendig — ikke en full DPIA. Vurderingen hører
-      hjemme i personverndokumentasjonen når den er skrevet. Ikke påbegynt
+- [x] **Skriftlig DPIA-vurdering.** Den står i A.12, «DPIA (art. 35) – vurdert som ikke
+      påkrevd». **Men punktet under er ikke det samme, og erstatter det ikke.**
+
+#### DPIA, fritekst og adresse — se [`docs/NOTAT_DPIA_OG_FRITEKST.md`](./docs/NOTAT_DPIA_OG_FRITEKST.md)
+
+*Utløst 14. sep. 2026 av spørsmålet om AMK-adresse kan legges i `Oppdrag.fritekst`.
+Notatet bærer begrunnelsene; her står bare arbeidet.*
+
+**Premisset som måtte rettes:** dokumentasjon fritar ikke for DPIA. A.12 bygger ikke på at
+vi har dokumentasjon, men på tre andre ben — ingen direkte identifikatorer, ikke stor
+skala, ingen profilering. Det tyngste (skala) holder. Det første gjør ikke det hvis adresse
+legges inn, og **A.12 har selv skrevet utløseren**: «særlig dersom nye moduler tar inn
+direkte identifikatorer».
+
+- [ ] **Avklar behandlingsansvaret.** A.1 legger det på André som privatperson, ikke på
+      organisasjonen. Behandlingsansvar følger virkeligheten, ikke papiret — bestemmer
+      foreningen formål og midler, er de ansvarlig uansett hva dokumentet sier. Påvirker
+      alle svarene under, og bør derfor tas først. Se «Krever Andre» øverst
+- [ ] **Slettefrist på `Oppdrag.fritekst`.** Feltet slettes aldri fra historikken hos KO i
+      dag; beskyttelsen som finnes er bygget helt mot bilen. A.12 har det som åpen
+      restrisiko. To deler: serveren utelater teksten når fristen er passert, og en feiing
+      (i `purge_old_logs`) tømmer feltet for alvor. Frist som `AppSetting`, nedtelling i
+      historikkraden — og bare når det faktisk står tekst der
+- [ ] **Avgjør: klokka fra `historikk_fra`, eller fra siste `Ledig`?** Et oppdrag med
+      `trenger_ressurs` når aldri historikken og beholder fritekst for alltid
+- [ ] **Adressefeltet: eget felt, ikke i fritekst — og aldri i `Lokasjon`.**
+      `Lokasjon.navn` fryses i `ArkivertOppdrag.lokasjon_navn`, som inngår i
+      SHA-signaturen: en adresse lagt der er låst i 24 måneder ved konstruksjon
+- [ ] **Skriv om A.6-argumentet** hvis adressen kommer inn. «Oppdraget har ingenting, og
+      re-identifisering krever kunnskap utenfra» holder ikke når kunnskapen utenfra ligger
+      i raden
+- [ ] **Skriv art. 35(7)(c) — risiko for de registrertes rettigheter.** A.12 er en
+      *sikkerhets*risikovurdering: den måler sannsynlighet og konsekvens av brudd, altså
+      risiko sett fra systemets side. Hva som skjer med pasienten hvis det går galt, er
+      ikke spurt om noe sted. Nyttig i seg selv, og halve jobben hvis en DPIA senere kreves
+- [ ] **Sjekk mot primærkilde:** Datatilsynets liste over behandlinger som alltid krever
+      DPIA, og WP248-kriteriene i gjeldende form. Notatet gjetter ikke på dem
 
 ### Forbedringsbacklog
 
