@@ -839,6 +839,26 @@ forbindelser. Tas opp igjen kun hvis `WEB_WORKERS` settes til 4 eller mer.
 
 ## Ideer / backlog
 
+### Rapportmodul — se [`docs/FORSLAG_RAPPORTMODUL.md`](./docs/FORSLAG_RAPPORTMODUL.md)
+
+**Forslag, ikke besluttet** (14. sep. 2026). En `/rapport/`-modul med to deler:
+
+- [ ] **Del 1: timeregnskap og betaling.** *Anbefales.* Timer per mannskap, korps og
+      rolle, med kr/time og sum per korps. Mye finnes alt —
+      `vaktliste.services.belastning_per_person()` regner timene, og `Vaktpost.probono`
+      bærer allerede skillet «går, men telles ikke i timene».
+      **Krever en avgjørelse først:** plan eller faktisk som fakturagrunnlag (§2.2), og om
+      rapporter skal **fryses** (§2.4). Uten frysing er ikke et fakturagrunnlag
+      etterprøvbart et år senere — da er dette et arkiv, ikke en visning.
+- [ ] **Del 2: generert vaktrapport.** *Tallene anbefales, LLM-tolkningen frarådes i
+      første omgang.* En LLM er en ny databehandler, og
+      `PERSONVERN_DOKUMENTASJON.md` A.8 sier i dag «ingen overføring utenfor EU/EØS».
+      «Uten navn» er dessuten ikke anonymt — én pasient i én kategori på et navngitt
+      arrangement er identifiserende. Forslaget: portalen lager tallene, og den som vil ha
+      prosa tar det utenfor portalen.
+
+Fem åpne spørsmål til André står i §5 i notatet.
+
 ### Datteroppdrag — én hendelse, flere pasienter — se `docs/FORSLAG_DATTEROPPDRAG.md`
 
 - [ ] **Idé, ikke besluttet** (13. sep. 2026). Et oppdrag kan deles i datteroppdrag, ett

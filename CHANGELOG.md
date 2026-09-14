@@ -4,6 +4,48 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-14 — Forslag: rapportmodul (ingen kode)
+
+`docs/FORSLAG_RAPPORTMODUL.md`, skrevet på Andrés spørsmål om en `/rapport/`-modul som
+henter fra vaktlista og statistikken. **Ingen kode er skrevet** — dette er grunnlag for
+en beslutning.
+
+**Del 1, timeregnskap med kroner per korps: anbefales.** Mye finnes allerede —
+`belastning_per_person()` regner timene, og `Vaktpost.probono` bærer skillet «går, men
+telles ikke i timene», med kommentaren «summen er det organisasjonen betaler for».
+Betalingstanken var altså inne i modellen før noen planla den.
+
+Den viktigste innsikten i notatet: **tall som brukes til penger må fryses.** I dag er
+vaktlistedata operative og kan rettes fritt. Som fakturagrunnlag må de slutte å bevege
+seg — ellers retter noen et skift i mars, og fjorårets faktura stemmer ikke lenger med
+det portalen viser. Portalen har mønsteret to ganger (`core.arkiv`), så dette er ikke nytt
+arbeid, men det gjør del 1 større enn «en tabell med timer».
+
+**Del 2, LLM-tolkning: frarådes i første omgang**, og begrunnelsen er ikke teknisk:
+
+- En språkmodell er en **ny databehandler**. `PERSONVERN_DOKUMENTASJON.md` A.8 sier i dag
+  «ingen overføring av personopplysninger til land utenfor EU/EØS» — verifisert mot
+  dokumentet, ikke husket
+- **«Uten navn» er ikke anonymt.** Én rød pasient med hjertestans kl. 14:32 på et navngitt
+  arrangement er sannsynligvis nøyaktig én person. Det som beskytter er små tall, ikke
+  fravær av navn
+- **Tolkningen er den delen leseren ikke kan etterprøve.** Rapporten leses av noen som
+  ikke var der — det er poenget med den — og da kan de heller ikke se at tolkningen er
+  feil. Tallene er signert; en setning er det ikke
+
+Forslaget er å skille rapporten fra tolkningen: portalen lager tallene, og den som vil ha
+prosa tar det utenfor portalen under eget ansvar. Da slipper portalen å stå i
+behandlerkjeden for noe den ikke trenger å stå i.
+
+Fem åpne spørsmål står i §5. Del 1 kan begynne uten at del 2 er avgjort, og det er en
+fordel: timeregnskapet har verdi alene og tvinger ikke fram en personvernbeslutning før
+dere er klare til å ta den.
+
+Hver påstand i notatet er verifisert mot koden — funksjonsnavn, felter, filstier og
+A.8-formuleringen.
+
+---
+
 ## 2026-09-14 — Tallgjerdet: dokumentene kan ikke lenger lyve om antall
 
 Det ene av tre åpne punkter som var verdt å lukke. De to andre —
