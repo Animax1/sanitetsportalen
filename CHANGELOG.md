@@ -4,6 +4,36 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-14 — Minimerbare ressurser ført i TODO (ingen kode)
+
+**André:** minimerbare lag/ambulanser i gruppefanene, dagruppering som i Oversikt, og alle
+minimert som standard.
+
+Problemet er konkret: en fane med ti ambulanser er i dag ti regneark under hverandre.
+Gruppefanen har allerede bemanningskurven øverst, og den *er* oversikten over gruppa —
+kortene under er detaljen. Med alt sammenslått blir fanen «kurve + hvilke biler finnes»,
+som er den riktige første visningen.
+
+**Dagrupperingen avdekket en reell forskjell mellom de to flatene.** Oversikt har
+`_blokkerMedDager()` og setter dagoverskrifter; planleggingstabellen har ingen — den
+viser radene i serverens rekkefølge (`Vaktpost.Meta.ordering = ['fra_tid',
+'mannskap__navn']`), altså sortert men uten dagskille. Samme funksjon bør kunne brukes
+begge steder.
+
+Tre ting ført opp som må avklares før noen bygger:
+
+- **Hvor lever sammenslått/utvidet?** `tegnFaner()` og `mkRessurs()` bygger markupen på
+  nytt ved hvert panelbytte — samme grunn til at `gateKnapper()` ikke kan gate dem.
+  Tilstanden må ligge utenfor markupen; `erDempet` i `oppdrag-enhet.js` er presedensen.
+- **Alltid minimert, eller bare når det er mer enn én?** En vakt med én ambulanse gir et
+  klikk hver gang for å se det eneste som er der. `_blokkerMedDager()` har presedensen for
+  det motsatte valget — dagoverskrifter vises bare når vakta har mer enn én dag. Ført som
+  spørsmål, ikke som innvending: Andrés ordlyd er «alle minimert som standard».
+- **Åpnes kortet automatisk når man må inn i det?** Ellers leder «Rediger ressurs» til noe
+  man ikke ser.
+
+---
+
 ## 2026-09-14 — To vaktlisteønsker ført i TODO (ingen kode)
 
 **«Sett i drift» skal bort — drift skal følge vakta** (André). Problemet den løser er

@@ -305,6 +305,48 @@ ingen av dem gir feilmelding — de er bare stille inaktive.
 
 ## Pågående / neste
 
+### Vaktlista: minimerbare ressurser i gruppefanene — ønsket 14. sep. 2026
+
+**André:** «i hver ressursfane skal en kunne minimere lag/ambulanse osv. Og at det også der
+siles på samme måte som oversikt. Og at alle ressursene i ressursgruppen er minimert som
+standard.»
+
+Tre ting, og de henger sammen: en fane med ti ambulanser er i dag ti regneark under
+hverandre, og man scroller forbi ni for å komme til den tiende.
+
+- [ ] **Minimerbart kort per ressurs.** `mkRessurs()` bygger kortet; overskriften har alt
+      navn, korpsmerke, enhetsmerke og redigeringsknapp. Sammenslått viser den de samme
+      merkene pluss en telling — antall skift, antall bemannede, ledige — så man ser hva
+      som er der uten å åpne.
+- [ ] **Alle minimert som standard.** Gruppefanen har bemanningskurven øverst
+      (`mkGruppekurve`), og den *er* oversikten over gruppa. Kortene under er detaljen.
+      Med alt sammenslått blir fanen «kurve + hvilke biler finnes», som er den riktige
+      første visningen.
+- [ ] **Dagruppering i planleggingstabellen, som i Oversikt.** Her er forskjellen i dag:
+      `_posterFor()` gir radene i serverens rekkefølge (`Vaktpost.Meta.ordering =
+      ['fra_tid', 'mannskap__navn']`) — sortert, men **uten dagoverskrifter**. Oversikt har
+      `_blokkerMedDager()`. Samme funksjon bør kunne brukes begge steder.
+
+#### Tre ting som må avklares
+
+- [ ] **Hvor lever sammenslått/utvidet?** `tegnFaner()` og `mkRessurs()` bygger markupen på
+      nytt ved hvert panelbytte — det er samme grunn til at `gateKnapper()` ikke kan gate
+      dem (`CLAUDE.md`). Tilstanden må derfor ligge utenfor markupen: et sett på
+      modulnivå, eller `localStorage` hvis den skal overleve en sidelasting.
+      Presedensen finnes i `erDempet` i `oppdrag-enhet.js`, som husker per enhet.
+- [ ] **Alltid minimert, eller bare når det er mer enn én?** En vakt med **én** ambulanse
+      gir et klikk hver gang for å se det eneste som er der. `_blokkerMedDager()` har
+      presedensen for det motsatte valget: dagoverskrifter vises «bare når vakten faktisk
+      har mer enn én dag — en endagsvakt ser ut som før». Samme resonnement kunne gjelde
+      her. **Andrés ordlyd er «alle … minimert som standard», så dette er et spørsmål, ikke
+      en innvending.**
+- [ ] **Åpnes kortet automatisk når man må inn i det?** Klikker man «Rediger ressurs» eller
+      følger en lenke til en bestemt bil, bør kortet åpne seg. Ellers leder handlingen til
+      noe man ikke ser.
+
+*Utskrift er ikke berørt: `vl-utskrift` og `@media print` hører til Oversikt, ikke til
+gruppefanene.*
+
 ### Vaktlista: snu «Oversikt» til dag først, ressurs etterpå — ønsket 14. sep. 2026
 
 **André:** «oversikten [skal] bare vise hvem som er på vakt og hvilken ressurs de er på på
