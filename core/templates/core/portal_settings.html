@@ -42,55 +42,11 @@
     </div>
   </div>
 
-  <div class="card mb-3">
-    <div class="card-header"><strong>Vaktlista på e-post</strong></div>
-    <div class="card-body">
-      <label class="form-label" for="vaktliste_fil_mottakere">Mottakere</label>
-      <textarea id="vaktliste_fil_mottakere" name="vaktliste_fil_mottakere"
-                class="form-control" rows="3"
-                placeholder="Én adresse per linje">{{ vaktliste_fil_mottakere }}</textarea>
-      <div class="form-text">
-        Vaktlista sendes hit som en selvstendig HTML-fil — reserven når
-        portalen er nede. Fila inneholder navn, korps, rolle, skift, telefon
-        og ISSI. Hold lista kort: hver adresse er en kopi som blir liggende.
-      </div>
-      <div class="form-check mt-3">
-        <input class="form-check-input" type="checkbox" id="vaktliste_fil_ved_drift"
-               name="vaktliste_fil_ved_drift" value="1"
-               {% if vaktliste_fil_ved_drift %}checked{% endif %}>
-        <label class="form-check-label" for="vaktliste_fil_ved_drift">
-          Send automatisk når en vaktliste settes i drift
-        </label>
-      </div>
-      <div class="form-text">
-        Vaktleder kan alltid sende på knapp fra «Innstillinger» på vaktlista.
-        Hver utsending logges.
-      </div>
-
-      <hr>
-      <label class="form-label" for="vaktliste_fil_intervall_min">Send på nytt mens lista er i drift</label>
-      <div class="input-group" style="max-width:220px;">
-        <span class="input-group-text">hvert</span>
-        <input type="number" id="vaktliste_fil_intervall_min" name="vaktliste_fil_intervall_min"
-               class="form-control" min="0" max="{{ vaktliste_fil_maks_intervall }}"
-               value="{{ vaktliste_fil_intervall_min }}">
-        <span class="input-group-text">min</span>
-      </div>
-      <div class="form-text">
-        0 slår det av. Sendingen henger på trafikken i portalen og treffer
-        innen et minutt etter intervallet. Klokka går fra forrige utsending,
-        uansett hva som utløste den.
-      </div>
-      <div class="form-check mt-2">
-        <input class="form-check-input" type="checkbox" id="vaktliste_fil_bare_endret"
-               name="vaktliste_fil_bare_endret" value="1"
-               {% if vaktliste_fil_bare_endret %}checked{% endif %}>
-        <label class="form-check-label" for="vaktliste_fil_bare_endret">
-          Bare hvis vaktlista er endret siden forrige utsending
-        </label>
-      </div>
-    </div>
-  </div>
+  {% comment %}
+  Modulenes egne innstillinger. Hver malbit eies av modulen som har feltene;
+  `core` vet bare at det finnes noen. Se `core/portalinnstillinger.py`.
+  {% endcomment %}
+  {% for fragment in innstillingsfragmenter %}{% include fragment %}{% endfor %}
 
   <button type="submit" class="btn btn-primary">Lagre innstillinger</button>
 </form>

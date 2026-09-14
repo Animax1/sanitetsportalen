@@ -368,9 +368,31 @@ venstresida er borte og høyresida finnes.
 `patients_appsetting` og `patients_backup` → `core`. Uten dem ville hver framtidig
 auditrad stått som «patients». Gamle rader endres ikke; bruddet er datert.
 
-`KJENTE_UNNTAK` i testen er en **sperrehake, ikke en tillatelse**: `admin_status` og
-portalinnstillingene importerer fortsatt `vaktliste` og `oppdrag`. Lista skal aldri vokse,
-og en importvei som ryddes skal ut av den.
+**`KJENTE_UNNTAK` er tom, og skal forbli det.** Den sto med fem rader en dag:
+`admin_status` hentet modultall ved å importere `vaktliste` og `oppdrag`, og
+portalinnstillingene importerte `vaktliste.fil` for å tegne, validere og lagre modulens
+egne felter. Begge er nå registre etter samme idiom som `core/stats.py`:
+
+| Register | Hva modulen melder inn | Fra |
+|---|---|---|
+| `core/driftstatus.py` | Tall til `/portal-admin/server-status/` (`vaktbilde`, `epost`) | `<app>/driftstatus.py` |
+| `core/portalinnstillinger.py` | Felter på `/portal-admin/innstillinger/` — `mal`, `kontekst()`, `valider()`, `lagre()` | `<app>/portalinnstillinger.py` |
+
+**Nøklene og malbiten er modulens, ikke registerets.** Vaktlista leverer
+`vaktlister_i_drift`, oppdrag leverer `oppdrag`, og hver tegner sine egne felter fra en
+mal i sin egen app — de skal ikke presses inn i ett skjema for å se like ut. Samme
+arbeidsdeling som i `core.arkiv`.
+
+**Driftsstatus fanger hver handler for seg** (`samle()`): et dashbord som gir 500 fordi
+én modul har en treg spørring, er borte akkurat når man trenger det. Feilen havner i
+`error`, vasket med `_scrub_secrets`, og de andre kortene tegnes. Standardnøklene
+(`vaktlister_i_drift`, `siste_utsending`, `oppdrag`) settes i `core`, ikke i handlerne —
+er en modul av, skal kortet vise «–» og ikke forsvinne.
+
+**Portalinnstillingene validerer alt før noe lagres.** `valider()` og `lagre()` er delt i
+to nettopp fordi navnet skrives på `Vakt` og resten i `AppSetting`, uten transaksjon
+mellom seg: en modul som nekter skal stoppe hele innsendingen, også portalens egne felter.
+`core/tests_registre.py` prøver begge egenskapene med oppdiktede handlere.
 
 ### Arkivmønster (core/arkiv/)
 

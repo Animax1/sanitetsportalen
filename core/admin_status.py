@@ -186,52 +186,35 @@ def _get_vaktbilde():
     vaktlister som er i drift, siste utsending av vaktlistefila, og hvor
     mange oppdrag som venter på tavla. Statusen sier «serveren svarer»;
     dette sier om det er noe å svare *for*."""
+    from core.driftstatus import samle
+
     ut = {}
+    vakt = None
     try:
         from core.vakt import hent_aktiv_vakt
         vakt = hent_aktiv_vakt()
-        ut['aktiv_vakt'] = {'id': vakt.pk, 'navn': vakt.navn, 'startet': vakt.startet.isoformat()}
+        ut['aktiv_vakt'] = {'id': vakt.pk, 'navn': vakt.navn,
+                            'startet': vakt.startet.isoformat()}
     except Exception as exc:
         ut['aktiv_vakt'] = None
         ut['error'] = _scrub_secrets(str(exc))[:200]
-    try:
-        from vaktliste import choices as vl_choices
-        from vaktliste.models import Utsending, Vaktliste
-        ut['vaktlister_i_drift'] = [
-            {'id': v.pk, 'vakt': v.vakt.navn,
-             'siden': v.satt_i_drift_at.isoformat() if v.satt_i_drift_at else None}
-            for v in Vaktliste.objects.filter(status=vl_choices.DRIFT).select_related('vakt')
-        ]
-        u = Utsending.objects.order_by('-created_at').first()
-        ut['siste_utsending'] = None if u is None else {
-            'tid': u.created_at.isoformat(),
-            'minutter_siden': int((timezone.now() - u.created_at).total_seconds() / 60),
-            'utloest': u.utloest,
-            'antall_mottakere': len([m for m in (u.mottakere or '').replace(';', ',').split(',') if m.strip()]),
-            'ok': not u.feil,
-            'feil': (u.feil or '')[:200],
-        }
-    except Exception as exc:
-        ut['vaktlister_i_drift'] = []
-        ut['siste_utsending'] = None
-        ut['error'] = _scrub_secrets(str(exc))[:200]
-    try:
-        from oppdrag import choices as op_choices
-        from oppdrag.models import Oppdrag
-        vakt_id = (ut.get('aktiv_vakt') or {}).get('id')
-        tavla = Oppdrag.objects.filter(vakt_id=vakt_id, historikk_fra__isnull=True)
-        ventende = tavla.filter(status=op_choices.VENTER, trenger_ressurs=False)
-        eldste = ventende.order_by('created_at').first()
-        ut['oppdrag'] = {
-            'paa_tavla': tavla.count(),
-            'ventende': ventende.count(),
-            'trenger_ressurs': tavla.filter(trenger_ressurs=True).count(),
-            'eldste_ventende_minutter': (int((timezone.now() - eldste.created_at).total_seconds() / 60)
-                                         if eldste else None),
-        }
-    except Exception as exc:
-        ut['oppdrag'] = None
-        ut['error'] = _scrub_secrets(str(exc))[:200]
+
+    # **Modulenes tall kommer gjennom registeret, ikke gjennom en import.**
+    # Fram til 14. sep. 2026 sto `from vaktliste.models import ...` og
+    # `from oppdrag.models import ...` her. Se `core/driftstatus.py` for
+    # hvorfor retningen betyr noe.
+    #
+    # Standardverdiene står her og ikke i handlerne: er en modul slått av
+    # eller ikke registrert, skal kortet vise «–» og ikke forsvinne. Nøklene
+    # er de klienten leser, og de skal finnes uansett.
+    ut.setdefault('vaktlister_i_drift', [])
+    ut.setdefault('siste_utsending', None)
+    ut.setdefault('oppdrag', None)
+
+    verdier, feil = samle('vaktbilde', vakt)
+    ut.update(verdier)
+    if feil:
+        ut['error'] = feil
     return ut
 
 
@@ -296,16 +279,13 @@ def _get_epost():
     """Transport + siste utsending av vaktlistefila, som er den e-posten
     portalen sender som betyr noe. Ingen prøvesending — et statuskort som
     sender e-post hvert 10. sekund er ikke et statuskort."""
+    from core.driftstatus import samle
+
     ut = _epost_transport()
-    try:
-        from vaktliste.models import Utsending
-        siste_ok = Utsending.objects.filter(feil='').order_by('-created_at').first()
-        siste = Utsending.objects.order_by('-created_at').first()
-        ut['siste_ok_at'] = siste_ok.created_at.isoformat() if siste_ok else None
-        ut['siste_feil'] = (siste.feil[:200] if siste and siste.feil else None)
-        ut['siste_feil_at'] = siste.created_at.isoformat() if siste and siste.feil else None
-    except Exception as exc:
-        ut['error'] = _scrub_secrets(str(exc))[:200]
+    verdier, feil = samle('epost')
+    ut.update(verdier)
+    if feil:
+        ut['error'] = feil
     return ut
 
 

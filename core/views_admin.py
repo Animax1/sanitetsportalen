@@ -10,6 +10,7 @@ from __future__ import annotations
 import csv
 
 from django.contrib import messages
+from django.core.exceptions import ValidationError
 from django.core.paginator import Paginator
 from django.db.models import Q
 from django.http import HttpResponse, HttpResponsePermanentRedirect
@@ -51,85 +52,79 @@ def portal_settings_view(request):
     ligger her: en timeout på 0 timer ville logget ut alle umiddelbart.
     """
     from core.models import AppSetting
+    from core.portalinnstillinger import all_handlers
+    from core.vakt import hent_aktiv_vakt
 
-    from django.core.exceptions import ValidationError
-    from vaktliste import fil as vaktliste_fil
+    # **Modulenes felter kommer gjennom registeret**, ikke gjennom en import
+    # av modulen (14. sep. 2026). Fram til da sto `from vaktliste import fil`
+    # her, med modulens validering og lagring midt i rammeverkets view. Se
+    # `core/portalinnstillinger.py`.
+    handlere = all_handlers()
 
     if request.method == 'POST':
-        raa = (request.POST.get('session_timeout_hours') or '').strip()
-        # Vaktlista på e-post (12. sep. 2026): mottakerne valideres før noe
-        # lagres, av samme grunn som timeouten — en avvist innsending skal
-        # ikke lagre halve skjemaet.
+        feil = False
+
+        # ── Alt valideres, ingenting lagres ──────────────────────────────
+        # Navnet skrives på `Vakt` og resten i `AppSetting`; ingen transaksjon
+        # binder dem, så denne todelingen er det eneste som hindrer at en
+        # avvist innsending lagrer halve skjemaet. Hver handler får si sitt
+        # før noen skriver.
         try:
-            mottakere = vaktliste_fil.valider_mottakere(
-                request.POST.get('vaktliste_fil_mottakere') or '')
-        except ValidationError as exc:
-            messages.error(request, exc.messages[0])
-            mottakere = None
-        ved_drift = '1' if request.POST.get('vaktliste_fil_ved_drift') else '0'
-        # Intervallet (13. sep. 2026): 0 = av, ellers minutter mellom
-        # utsendinger mens lista er i drift. Tomt felt leses som 0.
-        bare_endret = '1' if request.POST.get('vaktliste_fil_bare_endret') else '0'
-        intervall_raa = (request.POST.get('vaktliste_fil_intervall_min') or '0').strip()
-        try:
-            intervall = int(intervall_raa)
-            if not 0 <= intervall <= vaktliste_fil.MAKS_INTERVALL_MIN:
-                raise ValueError
-        except (TypeError, ValueError):
-            messages.error(request, f'Intervallet må være et helt tall mellom 0 og '
-                                    f'{vaktliste_fil.MAKS_INTERVALL_MIN} minutter.')
-            intervall = None
-        try:
-            timer = int(raa)
+            timer = int((request.POST.get('session_timeout_hours') or '').strip())
         except (TypeError, ValueError):
             messages.error(request, 'Sesjonstimeout må være et helt tall.')
+            feil = True
         else:
-            if mottakere is None or intervall is None:
-                pass
-            elif not 1 <= timer <= 24:
+            if not 1 <= timer <= 24:
                 messages.error(
                     request, 'Sesjonstimeout må være mellom 1 og 24 timer.')
-            else:
-                # Arrangementsnavnet ER den aktive vaktas navn siden deploy 2
-                # — én kilde. Skrives først etter at timeouten er validert,
-                # slik at en avvist innsending ikke lagrer halve skjemaet.
-                from core.vakt import hent_aktiv_vakt
-                nytt_navn = (request.POST.get('event_name') or '').strip()
-                vakt = hent_aktiv_vakt()
-                if not nytt_navn:
-                    messages.error(request, 'Vakta må ha et navn.')
-                elif (Vakt.objects.filter(navn=nytt_navn)
-                      .exclude(pk=vakt.pk).exists()):
-                    messages.error(
-                        request,
-                        f'En annen vakt heter allerede «{nytt_navn}». '
-                        f'Legg på en dato eller velg et annet navn.')
-                else:
-                    vakt.navn = nytt_navn
-                    vakt.save(update_fields=['navn'])
-                    AppSetting.set('session_timeout_hours', timer)
-                    AppSetting.set(vaktliste_fil.MOTTAKERE_NOKKEL, '\n'.join(mottakere))
-                    AppSetting.set(vaktliste_fil.VED_DRIFT_NOKKEL, ved_drift)
-                    AppSetting.set(vaktliste_fil.INTERVALL_NOKKEL, intervall)
-                    AppSetting.set(vaktliste_fil.BARE_ENDRET_NOKKEL, bare_endret)
-                    messages.success(request, 'Portalinnstillingene er lagret.')
-                    return redirect('portaladmin:portal_settings')
+                feil = True
+
+        # Arrangementsnavnet ER den aktive vaktas navn siden deploy 2 — én
+        # kilde.
+        vakt = hent_aktiv_vakt()
+        nytt_navn = (request.POST.get('event_name') or '').strip()
+        if not nytt_navn:
+            messages.error(request, 'Vakta må ha et navn.')
+            feil = True
+        elif Vakt.objects.filter(navn=nytt_navn).exclude(pk=vakt.pk).exists():
+            messages.error(
+                request,
+                f'En annen vakt heter allerede «{nytt_navn}». '
+                f'Legg på en dato eller velg et annet navn.')
+            feil = True
+
+        modulverdier = {}
+        for handler in handlere:
+            try:
+                modulverdier[handler.slug] = handler.valider(request.POST)
+            except ValidationError as exc:
+                messages.error(request, exc.messages[0])
+                feil = True
+
+        # ── Så lagres alt ────────────────────────────────────────────────
+        if not feil:
+            vakt.navn = nytt_navn
+            vakt.save(update_fields=['navn'])
+            AppSetting.set('session_timeout_hours', timer)
+            for handler in handlere:
+                handler.lagre(modulverdier[handler.slug])
+            messages.success(request, 'Portalinnstillingene er lagret.')
+            return redirect('portaladmin:portal_settings')
 
     try:
         timer = int(AppSetting.get('session_timeout_hours', 8))
     except (TypeError, ValueError):
         timer = 8
 
-    from core.vakt import hent_aktiv_vakt
-    return render(request, 'core/portal_settings.html', {
+    kontekst = {
         'event_name': hent_aktiv_vakt().navn,
         'session_timeout_hours': timer,
-        'vaktliste_fil_mottakere': '\n'.join(vaktliste_fil.mottakere()),
-        'vaktliste_fil_ved_drift': vaktliste_fil.sendes_ved_drift(),
-        'vaktliste_fil_intervall_min': vaktliste_fil.intervall_minutter(),
-        'vaktliste_fil_bare_endret': vaktliste_fil.bare_ved_endring(),
-        'vaktliste_fil_maks_intervall': vaktliste_fil.MAKS_INTERVALL_MIN,
-    })
+        'innstillingsfragmenter': [h.mal for h in handlere if h.mal],
+    }
+    for handler in handlere:
+        kontekst.update(handler.kontekst())
+    return render(request, 'core/portal_settings.html', kontekst)
 
 
 # ─────────────────────────────────────────────────────────────────────────────

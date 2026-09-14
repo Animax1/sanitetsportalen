@@ -36,27 +36,18 @@ TILLATT = {
     ('core/modules.py', 'vaktliste.module'),
 }
 
-#: **Sperrehake, ikke tillatelse.** Disse er gjeld, ikke design.
+#: **Tom siden 14. sep. 2026, og skal forbli det.**
 #:
-#: Begge er *sider* og ikke rammeverk: server-status-dashbordet viser tall per
-#: modul, og portalinnstillingene skriver vaktlistas e-postmottakere. Koblingen
-#: fantes før flyttingen også — men da lå filene i `patients`, så den leste som
-#: «modul → modul» og ikke som «rammeverk → modul».
+#: Sto her en dag med fem rader: `admin_status` hentet modultall ved å
+#: importere `vaktliste` og `oppdrag`, og portalinnstillingene importerte
+#: `vaktliste.fil` for å tegne, validere og lagre modulens egne felter.
+#: Begge er nå registre — `core/driftstatus.py` og
+#: `core/portalinnstillinger.py` — etter samme idiom som `core/stats.py`.
 #:
-#: Riktig løsning er den statistikkappen alt bruker: et register modulene
-#: melder seg inn i, slik at `core` ikke navngir noen av dem (`core/stats.py`,
-#: samme idiom som `core.backup` og `core.arkiv`). Det er en egen jobb med egen
-#: risiko, og den skal ikke ri på en flytterunde — se `TODO.md`.
-#:
-#: Lista skal **aldri vokse**. Nye brudd feiler; disse står oppført til noen
-#: rydder dem.
-KJENTE_UNNTAK = {
-    ('core/admin_status.py', 'oppdrag'),
-    ('core/admin_status.py', 'oppdrag.models'),
-    ('core/admin_status.py', 'vaktliste'),
-    ('core/admin_status.py', 'vaktliste.models'),
-    ('core/views_admin.py', 'vaktliste'),
-}
+#: Lista blir stående tom framfor å slettes, som et sted å skrive et unntak
+#: ned hvis et noen gang må tas. Et unntak som *må* tas, skal stå med
+#: begrunnelse; et som bare snek seg inn, skal feile.
+KJENTE_UNNTAK: set[tuple[str, str]] = set()
 
 
 def _importer(sti: Path) -> list[str]:
@@ -96,7 +87,8 @@ class CoreImportererIngenModulTests(SimpleTestCase):
         """Et unntak som er ryddet skal ut av lista.
 
         Uten denne ville `KJENTE_UNNTAK` blitt en liste over ting som *en gang*
-        var galt, og da slutter den å si noe om koden slik den er nå.
+        var galt, og da slutter den å si noe om koden slik den er nå. Lista er
+        tom i dag; testen står for den dagen noen legger noe i den.
         """
         rot = Path(settings.BASE_DIR)
         doede = []

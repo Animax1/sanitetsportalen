@@ -25,3 +25,9 @@ class OppdragConfig(AppConfig):
 
         from .backup import register_handlers as register_backup_handlers
         register_backup_handlers()
+
+        # Driftsdashbordet (14. sep. 2026). Tallene fra tavla hentes gjennom
+        # registeret, ikke ved at `core` importerer oppdragsmodulen. Se
+        # `core/driftstatus.py`.
+        from .driftstatus import register_handlers as register_driftstatus
+        register_driftstatus()

@@ -353,12 +353,14 @@ bindende: 1 før 2, fordi backupen speiler hvor modellene bor.
             modulregisteret. `core/tests_avhengighetsretning.py` låser det med AST.
       - [x] **CLAUDE.md rettet** (14. sep. 2026): «Tilgangskontroll»-bolken beskrev
             fortsatt `accounts/decorators.py` som et skim som beholdes. Fila er slettet.
-      - [ ] **Rammeverket henter fortsatt tall fra to moduler.** `admin_status.py` og
-            portalinnstillingene importerer `vaktliste` og `oppdrag` (dashbordets
-            modultall, og vaktlistas e-postmottakere). Koblingen er eldre enn flyttingen,
-            men ble synlig av den. Riktig løsning er et register modulene melder seg inn
-            i, som `core/stats.py` — egen jobb, egen risiko. De fem importene står i
-            `KJENTE_UNNTAK` som en sperrehake til noen tar den.
+      - [x] **Rammeverket henter ikke lenger noe fra modulene** (14. sep. 2026).
+            `core/driftstatus.py` og `core/portalinnstillinger.py`, begge etter idiomet
+            fra `core/stats.py`. `KJENTE_UNNTAK` er tom, og `core` importerer en modul
+            kun i modulregisteret — som skal navngi dem. Payloaden på server-status er
+            bit for bit den samme, og JS-en er ikke rørt. `core/tests_registre.py`
+            prøver de to egenskapene som ikke vises i den glade stien: at én død modul
+            ikke tar med seg dashbordet, og at en modul som nekter stopper hele
+            innsendingen av portalinnstillingene.
       - [x] **Fase 4 — ryddingen** (14. sep. 2026). `/portal-admin/` samlet i
             `core/urls_admin.py` med navnerommet `portaladmin` (3.2 — 21 ruter fra tre
             filer, 131 referanser skiftet prefiks), `core/views.py` delt i

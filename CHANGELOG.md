@@ -4,6 +4,50 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-14 — To registre til: `core` kjenner ingen modul ved navn lenger
+
+`KJENTE_UNNTAK` er tom. Den sto med fem rader i går kveld — de eneste stedene
+rammeverket fortsatt importerte en modul — og begge er nå registre etter samme
+idiom som `core/stats.py` fra i fjor.
+
+**`core/driftstatus.py`.** Server-status viste hvilke vaktlister som var i
+drift og hvor mange oppdrag som sto på tavla, ved å importere `vaktliste.models`
+og `oppdrag.models`. Nå melder modulene seg inn fra `apps.ready()`.
+
+Payloaden er **bit for bit den samme** — nøklene klienten leser er uendret, og
+JS-en er ikke rørt. Det som endret seg er hvem som regner dem ut.
+
+To egenskaper det var verdt å skrive tester for:
+
+- **Én død modul tar ikke med seg dashbordet.** `samle()` fanger hver handler
+  for seg; feilen havner i `error` med modulnavnet foran, vasket med
+  `_scrub_secrets`, og de andre kortene tegnes. Et dashbord som selv gir 500
+  fordi vaktlista har en treg spørring, er borte akkurat når man trenger det.
+- **Standardnøklene settes i `core`, ikke i handlerne.** Er en modul av eller
+  ikke registrert, skal kortet vise «–» og ikke forsvinne fra siden.
+
+**`core/portalinnstillinger.py`.** Den vanskeligere av de to: portalens
+innstillingsside hadde vaktlistas fire e-postfelter — markup, validering og
+lagring — midt inne i rammeverkets view og mal. Nå registrerer modulen
+`mal`, `kontekst()`, `valider()` og `lagre()`, og malbiten bor i
+`vaktliste/templates/`.
+
+`valider()` og `lagre()` er **delt i to med vilje**. Vaktas navn skrives på
+`Vakt`, resten i `AppSetting`, og ingen transaksjon binder dem — todelingen er
+det eneste som hindrer at en avvist innsending lagrer halve skjemaet. Viewet
+validerer alle handlere *og* portalens egne felter før én eneste skriving skjer.
+`core/tests_registre.py` prøver det med en handler som alltid nekter, og krever
+at vaktas navn står urørt etterpå.
+
+*Én test måtte rettes underveis, og det var testen som tok feil:* jeg antok at
+`_scrub_secrets` vasker vilkårlige ord. Den vasker credentials i URL-er, som er
+det den er til for. Prøven bruker nå en ekte connection-streng og krever
+`[scrubbed]@` i svaret.
+
+2699 tester grønne på SQLite og PostgreSQL 16.
+
+---
+
 ## 2026-09-14 — Flytting fase 4: adminflaten samlet, `core/views.py` delt, skimet slettet
 
 Siste fase i flytterunden. Ingen migrasjon.
