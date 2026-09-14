@@ -318,7 +318,12 @@ bindende: 1 før 2, fordi backupen speiler hvor modellene bor.
 > og statistikk-utvidelsen står etter dokumentrunden og etter første skarpe vakt med
 > oppdragsmodulen.
 
-- [ ] **1. Flytt det portalvide ut av `patients` og inn i `core`** (§2 i notatet):
+- [ ] **1. Flytt det portalvide ut av `patients` og inn i `core`** (§2 i notatet).
+      **Planen er skrevet ut i
+      [`docs/PLAN_FLYTTING_TIL_CORE.md`](./docs/PLAN_FLYTTING_TIL_CORE.md)**
+      (14. sep. 2026, fire faser). Venter på tre svar i notatets §7: audit-loggens
+      `app_label` etter flyttingen, rekkefølgen på fase 3/4, og deploy-takt.
+      Kortversjonen av det gamle punktet under står igjen som underlag:
       `AppSetting`, `Backup`, `hent_aktiv_vakt`, CSP-/metrikk-/backup-
       middlewaren, `healthz` og server-status. Tabellnavnene beholdes (tilstandsmigrasjon,
       ingen datamigrasjon). Backupfilene bærer modellnavn — lasteren får en navnetabell

@@ -4,6 +4,42 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-14 — Neste post planlagt: det portalvide ut av `patients`
+
+`docs/PLAN_FLYTTING_TIL_CORE.md`. Trinn 2 i `PLAN_REKKEFOLGE_2026-09.md`, nå
+som backupomleggingen er ferdig og prod har en gjenopprettbar backup foran den
+migrasjonen som rører modellene.
+
+**Lista har krympet siden kartleggingen 13. sep.** `BackupConfig`,
+`backup_service.py` og `RETENTION_HOURS` er slettet i fase 8, `Lydvarsel`-hullet
+falt ut da slettelista ble utledet, og `core.Vakt` fikk sin portalfil i fase 3.
+Igjen står `AppSetting`, `Backup`, `hent_aktiv_vakt`, tre middlewarer,
+`/healthz/` og server-status — 34 produksjonsfiler og 30 testfiler, nesten alt
+importlinjer.
+
+To funn planleggingen ga, som ikke sto i kartleggingen:
+
+- **Tabellnavnene skal beholdes, og argumentet er nedetid.** Railway kjører
+  release-fasen *før* den bytter container, så mellom `migrate` og byttet står
+  gammel kode og serverer mot nytt skjema. En omdøpt `patients_appsetting` ville
+  gitt 500 på tilnærmet hver forespørsel i det vinduet — tabellen bærer pekeren
+  til aktiv vakt. Kartleggingen anbefalte også å beholde, men på kosmetisk
+  grunnlag.
+- **Audit-loggens `app_label` utledes av tabellnavnet** (`split('_', 1)[0]`).
+  Beholder vi navnene, står hver framtidig auditrad for portalinnstillingene som
+  «patients» selv når modellen bor i `core` — forvirringen flyttet fra kodetreet
+  til loggen. Tre veier ut, anbefaling i notatets §3.2, og valget er Andrés fordi
+  det handler om hva han ser i filteret.
+
+**Fella som styrer faserekkefølgen:** backupfilene bærer modellnavnet
+(`"model": "patients.appsetting"`), og en fil tatt før flyttingen lar seg ikke
+laste etterpå — `loaddata` svarer «Unknown model». Filene lever 730 dager
+offsite. Navnetabellen bygges derfor i **fase 1**, der den er en no-op, slik at
+den er i prod og prøvd før fase 2 fyller den. Gjøres de sammen, oppdages en feil
+i tabellen den dagen noen gjenoppretter.
+
+---
+
 ## 2026-09-14 — Prefiksrutingen låst: `full/` kan ikke bli `backups/` i stillhet
 
 André, etter deployen: «Hele databasen heter `backup-full-auto-…`, mens modulene
