@@ -8,6 +8,16 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 Legg endringen øverst i CHANGELOG (ny `## YYYY-MM-DD`-seksjon ved behov), og kryss av / flytt
 relevante punkter i TODO. Dette skal gjøres som del av samme commit, ikke etterpå.
 
+**Oppgi alltid commit-SHA-en ved push** (André, 14. sep. 2026): «når du pusher ting så vil
+jeg ha bygg nr jeg kommer til å se på staging/prod». Sju tegn holder — `ce365b5` — og det
+skal stå for *hver* gren som ble pushet, ikke bare den siste. Det er nummeret som står i
+Railway-deployen, og uten det må den som verifiserer gjette om det hun ser på er det som
+nettopp gikk ut.
+
+**Et åpent punkt skal aldri stå som barn under et avkrysset punkt.** Krysses en forelder
+av, løftes de uavkryssede barna ut til en synlig bolk først. To punkter havnet der 14. sep.
+2026, og et punkt under noe ferdig er et punkt ingen leser igjen.
+
 ## Commands
 
 ```powershell

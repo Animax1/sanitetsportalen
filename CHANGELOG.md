@@ -4,6 +4,23 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-14 — Arbeidsflyt: byggnummer ved push, og åpne punkter som ikke får gjemme seg
+
+To regler i `CLAUDE.md`, begge fra ting som gikk galt i dag.
+
+**Commit-SHA ved hver push.** André: «når du pusher ting så vil jeg ha bygg nr
+jeg kommer til å se på staging/prod». Sju tegn, for hver gren som ble pushet.
+Det er nummeret som står i Railway-deployen, og uten det må den som verifiserer
+gjette om det hun ser på er det som nettopp gikk ut.
+
+**Et åpent punkt skal aldri stå som barn under et avkrysset punkt.** Da jeg
+krysset av gjeldspunkt 1 og 2, ble to uavkryssede barn stående under dem —
+`accounts` → `oppdrag.Enhet`, og den uforklarte enkeltfeilen. De var «i TODO» i
+bokstavelig forstand og usynlige i praksis. Løftet til en egen bolk øverst, med
+en peker igjen der de lå.
+
+---
+
 ## 2026-09-14 — Service workeren til `vl-sw-5`, og utkastingen fikk en test
 
 Bumpet foran prod-deployen. `activate` sletter alle `vl-sw-`-cacher som ikke

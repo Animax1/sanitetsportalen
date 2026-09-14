@@ -329,6 +329,18 @@ ingen av dem gir feilmelding — de er bare stille inaktive.
 - [x] **Service workeren bumpet til `vl-sw-5`** foran prod-deployen, så den
       gamle udelte `vaktliste.js` ryddes fra skallcachen. Utkastingen fikk
       samtidig sin første test (`skalKastes()`).
+#### Åpne punkter — de to som ikke er lukket
+
+*Samlet her med vilje: begge lå opprinnelig som uavkryssede barn under avkryssede
+foreldre, og et punkt som står under noe ferdig er et punkt ingen leser igjen.*
+
+- [ ] **Kontoopprettelsen lager en `oppdrag.Enhet`.** Funnet 14. sep. 2026, ikke i
+      gjeldskartet. Kontotypen «bil» validerer enhetsnavnet i `accounts/forms.py` og
+      oppretter/gjenoppliver raden i `accounts/views.py`. Samme slags kobling som 3.1,
+      men en annen form: det er *selve opprettelsen* som får en sideeffekt i en modul,
+      ikke et skjema ved siden av. Hører hjemme i `core/kontokobling.py` med en
+      lagringskrok — men det er kirurgi i brukeropprettelsen, og den skal ikke gjøres
+      i forbifarten. Står i `KJENTE_UNNTAK_RAMMEVERK`, som ikke skal vokse.
 - [ ] **Uforklart enkeltfeil i suiten.** Første kjøring med `myproject` inkludert
       endte `FAILED (failures=1)`; jeg fanget ikke hvilken test, og den har ikke
       reprodusert på fire fulle kjøringer etterpå. Opprydningsfeilen over er en
@@ -414,12 +426,10 @@ bindende: 1 før 2, fordi backupen speiler hvor modellene bor.
             `core/kontokobling.py`; `PasientRolleForm` og malbiten bor i
             pasientmodulen. `handling` må være unik, og registeret avviser to handlere
             som deler den. Avhengighetstesten dekker nå `accounts` og `audit` også.
-      - [ ] **Kontoopprettelsen lager en `oppdrag.Enhet`.** Funnet 14. sep. 2026, ikke i
-            gjeldskartet. Kontotypen «bil» validerer enhetsnavnet i `accounts/forms.py`
-            og oppretter/gjenoppliver raden i `accounts/views.py`. Samme slags kobling
-            som 3.1, men en annen form: det er *selve opprettelsen* som får en sideeffekt
-            i en modul. Hører hjemme i `core/kontokobling.py` med en lagringskrok, men
-            det er kirurgi i brukeropprettelsen. Står i `KJENTE_UNNTAK_RAMMEVERK`.
+      - [→] **Kontoopprettelsen lager en `oppdrag.Enhet`** — *flyttet opp til
+            «Åpne punkter» øverst i seksjonen, 14. sep. 2026.* Den lå her som et
+            uavkrysset barn under et avkrysset punkt, og det er et punkt som
+            forsvinner.
       - [x] **Rammeverket henter ikke lenger noe fra modulene** (14. sep. 2026).
             `core/driftstatus.py` og `core/portalinnstillinger.py`, begge etter idiomet
             fra `core/stats.py`. `KJENTE_UNNTAK` er tom, og `core` importerer en modul
