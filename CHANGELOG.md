@@ -4,6 +4,41 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-14 — Backup fase 7: oppbevaringstidene, og et kort som leser dem tilbake
+
+Fristene offsite håndheves av **Scaleway, ikke av oss**. Portalens IAM-nøkkel
+har ikke sletterett, og `enforce_cap` rører bare volumet — livssyklusreglene i
+bucketen er dermed den eneste mekanismen som noen gang sletter en offsite-kopi.
+
+André satte reglene i konsollen 14. sep. 2026: `backups/` 730 dager for
+modulfilene, `full/` 90 dager for den hele databasen. Regelen sto til da på
+«alle objekter i bucketen», og måtte snevres inn til `backups/` **før** regelen
+på `full/` ble lagt til: to regler som treffer samme objekt er et sted å gjette.
+
+**Kortet på `/portal-admin/backup/` leser nå reglene tilbake fra bucketen** og
+sammenligner dem med beslutningen (`core.offsite.livssyklus()`,
+`FORVENTET_DAGER`). Det er ikke pynt. Sammenligningen er på **nøyaktig**
+prefiks, fordi den feilen man faktisk gjør er `/full` i stedet for `full/` — en
+regel som ser riktig ut i konsollen og treffer ingenting. Da blir filene
+liggende for alltid, og det eneste som sier fra er at noen leser
+`get-bucket-lifecycle-configuration` for hånd. Nå står avviket i rødt ved siden
+av backupene, hver gang noen er på siden.
+
+Fem tilstander kortet skiller mellom, fordi de har ulik årsak og ulikt svar:
+regelen mangler, regelen står på feil prefiks, regelen er slått av, regelen har
+feil antall dager, og bucketen har ingen regler i det hele tatt
+(`NoSuchLifecycleConfiguration` — «filene blir liggende for alltid», ikke en
+lesefeil). Mangler nøkkelen `ObjectStorageBucketsRead`, står det «ukjent» med
+årsaken, ikke et falskt grønt.
+
+`livssyklus()` **kaster aldri**, og cacher svaret i fem minutter: et kort som
+selv gir feil når nettverket er nede, er borte akkurat når man trenger det, og
+et S3-kall per sidelasting er et kall for mye.
+
+2627 tester grønne på SQLite og PostgreSQL 16.
+
+---
+
 ## 2026-09-13 — Backup fase 6: `verifiser_backup`
 
 En backup ingen har gjenopprettet er en hypotese. Suiten har hatt en test som

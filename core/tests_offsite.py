@@ -192,3 +192,113 @@ class HentingTests(_MedBackupDir):
         with self.assertRaises(CommandError) as cm:
             call_command('hent_offsite', 'finnes-ikke.json.gz', stdout=StringIO())
         self.assertIn('Henting feilet', str(cm.exception))
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Oppbevaringen i bucketen (livssyklusreglene)
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+@override_settings(OFFSITE_S3_BUCKET='sanitetsportalen',
+                   OFFSITE_S3_ACCESS_KEY='a', OFFSITE_S3_SECRET_KEY='b',
+                   OFFSITE_BACKUP_KEY='hemmelig')
+class LivssyklusTests(SimpleTestCase):
+    """Reglene leses fra bucketen, ikke fra det vi tror vi satte.
+
+    Scaleway sletter offsite-kopiene; portalens IAM-nøkkel har ikke sletterett,
+    og `enforce_cap` rører bare volumet. Livssyklusreglene er altså den eneste
+    mekanismen som fjerner en offsite-kopi — og en regel som stille slutter å
+    treffe, er en oppbevaringstid som stille blir uendelig.
+    """
+
+    def _med_regler(self, regler):
+        class Klient:
+            def get_bucket_lifecycle_configuration(self, **_):
+                return {'Rules': regler}
+        return patch('core.offsite._klient', return_value=Klient())
+
+    def _les(self, regler):
+        with self._med_regler(regler):
+            return offsite.livssyklus(bruk_cache=False)
+
+    @staticmethod
+    def _regel(prefiks, dager, aktiv=True, id_='r'):
+        return {'ID': id_, 'Status': 'Enabled' if aktiv else 'Disabled',
+                'Filter': {'Prefix': prefiks}, 'Expiration': {'Days': dager}}
+
+    def test_riktig_oppsett_gir_ingen_avvik(self) -> None:
+        svar = self._les([self._regel('backups/', 730),
+                          self._regel('full/', 90)])
+        self.assertTrue(svar['kjent'])
+        self.assertEqual(svar['avvik'], [])
+
+    def test_prefiks_med_skraastrek_foran_treffer_ingenting(self) -> None:
+        """Den stilleste feilen i hele oppsettet: `/full` ser riktig ut i
+        konsollen, men objektnøklene heter `full/…`, så regelen sletter aldri
+        noe."""
+        svar = self._les([self._regel('backups/', 730),
+                          self._regel('/full', 90)])
+        self.assertEqual(len(svar['avvik']), 1)
+        self.assertIn('«/full»', svar['avvik'][0])
+        self.assertIn('nøyaktig', svar['avvik'][0])
+
+    def test_manglende_regel_meldes(self) -> None:
+        svar = self._les([self._regel('backups/', 730)])
+        self.assertIn('full/', svar['avvik'][0])
+        self.assertIn('for alltid', svar['avvik'][0])
+
+    def test_feil_antall_dager_meldes(self) -> None:
+        svar = self._les([self._regel('backups/', 730),
+                          self._regel('full/', 730)])
+        self.assertIn('730 dager', svar['avvik'][0])
+        self.assertIn('skal være 90', svar['avvik'][0])
+
+    def test_avslaatt_regel_meldes(self) -> None:
+        svar = self._les([self._regel('backups/', 730),
+                          self._regel('full/', 90, aktiv=False)])
+        self.assertIn('slått av', svar['avvik'][0])
+
+    def test_bucket_uten_regler_er_verre_enn_en_lesefeil(self) -> None:
+        """Ingen regler betyr at ingenting noen gang slettes — en
+        oppbevaringstid ingen har bestemt."""
+        class Klient:
+            def get_bucket_lifecycle_configuration(self, **_):
+                feil = Exception('ingen regler')
+                feil.response = {'Error': {'Code': 'NoSuchLifecycleConfiguration'}}
+                raise feil
+
+        with patch('core.offsite._klient', return_value=Klient()):
+            svar = offsite.livssyklus(bruk_cache=False)
+        self.assertTrue(svar['kjent'])
+        self.assertEqual(len(svar['avvik']), 2)
+
+    def test_manglende_leserett_sier_hva_som_mangler(self) -> None:
+        class Klient:
+            def get_bucket_lifecycle_configuration(self, **_):
+                feil = Exception('nei')
+                feil.response = {'Error': {'Code': 'AccessDenied'}}
+                raise feil
+
+        with patch('core.offsite._klient', return_value=Klient()):
+            svar = offsite.livssyklus(bruk_cache=False)
+        self.assertFalse(svar['kjent'])
+        self.assertIn('ObjectStorageBucketsRead', svar['feil'])
+
+    def test_kaster_aldri(self) -> None:
+        """Et kort som selv gir feil er borte akkurat når man trenger det."""
+        class Klient:
+            def get_bucket_lifecycle_configuration(self, **_):
+                raise RuntimeError('nettverket er nede')
+
+        with patch('core.offsite._klient', return_value=Klient()):
+            svar = offsite.livssyklus(bruk_cache=False)
+        self.assertFalse(svar['kjent'])
+        self.assertIn('nettverket er nede', svar['feil'])
+
+
+class LivssyklusUtenKonfigTests(SimpleTestCase):
+    def test_inert_uten_variablene(self) -> None:
+        svar = offsite.livssyklus(bruk_cache=False)
+        self.assertFalse(svar['kjent'])
+        self.assertEqual(svar['regler'], [])
+        self.assertEqual(svar['avvik'], [])

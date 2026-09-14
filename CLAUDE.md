@@ -290,7 +290,13 @@ lar seg ikke komprimere, mens gzip på dumpdata-JSON gir 5–15 % av rå større
 AES-256-GCM, format `SPBK1`+nonce+chiffer. **To prefikser, ett per
 oppbevaringstid:** `backups/` for modulfilene (730 dager) og `full/` for den
 hele (90 dager) — fristene kan bare skilles i bucketen hvis filene ligger på
-hver sin sti, fordi livssyklusreglene filtrerer på prefiks. `hent_offsite --list`
+hver sin sti, fordi livssyklusreglene filtrerer på prefiks. **Fristene håndheves
+av Scaleway, ikke av oss** — nøkkelen har ikke sletterett, og `enforce_cap` rører
+bare volumet — så `offsite.livssyklus()` leser reglene *tilbake* fra bucketen og
+`_avvik()` sammenligner dem med `FORVENTET_DAGER` på **nøyaktig** prefiks;
+`/full` er ikke `full/`, og en regel som treffer ingenting er en oppbevaringstid
+som stille ble uendelig. Avviket står på `/portal-admin/backup/`; funksjonen
+kaster aldri og cacher i fem minutter. `hent_offsite --list`
 / `hent_offsite <filnavn>` henter, dekrypterer og legger fila i `BACKUP_DIR` med
 en `Backup`-rad; prefikset utledes av slugen i filnavnet. **`gjenopprett` er den
 som rører basen** (`--list`, `--siste <modul>`, `--hent <objekt>`, `--full`,

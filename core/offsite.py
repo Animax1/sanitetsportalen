@@ -231,6 +231,131 @@ def _slug_fra_filnavn(filnavn: str) -> str:
     return slug_fra_filnavn(filnavn)
 
 
+# ── Oppbevaring i bucketen ───────────────────────────────────────────────────
+#
+# Fristene håndheves av Scaleway, ikke av oss: portalens IAM-nøkkel har ikke
+# sletterett, og `enforce_cap` rører bare volumet. Det betyr at
+# livssyklusreglene er den *eneste* mekanismen som sletter en offsite-kopi — og
+# at en regel som stille slutter å treffe, er en oppbevaringstid som stille blir
+# uendelig.
+
+#: Det beslutningen sier (`docs/BACKUP.md` §1). Avvik fra dette vises på
+#: `/portal-admin/backup/`, for en dokumentert frist som ikke er reell er det
+#: alvorligste avviket vi kan ha.
+FORVENTET_DAGER = {PREFIKS: 730, PREFIKS_FULL: 90}
+
+_LIVSSYKLUS_CACHE = 'offsite:livssyklus'
+_LIVSSYKLUS_TTL = 300
+
+
+def livssyklus(bruk_cache: bool = True) -> dict:
+    """Oppbevaringsreglene slik **bucketen** rapporterer dem.
+
+    Ikke slik vi tror de er satt: hele poenget er at svaret kommer fra Scaleway.
+    En regel med feil prefiks — `/full` i stedet for `full/` — ser riktig ut i
+    konsollen og treffer ingenting, og filene blir liggende for alltid uten at
+    noe sier fra.
+
+    Leses med `ObjectStorageBucketsRead`, som portalens nøkkel har. Den kan
+    ikke *skrive* bucket-oppsettet, og det er riktig slik: en portal som kunne
+    forkorte sin egen oppbevaringsregel, ville ikke vært en sperre.
+
+    Kaster aldri. Et kort som selv gir feil er borte akkurat når man trenger
+    det, så alt som går galt havner i `feil` og vises som «ukjent».
+    """
+    from django.core.cache import cache
+
+    if bruk_cache:
+        try:
+            lagret = cache.get(_LIVSSYKLUS_CACHE)
+            if lagret is not None:
+                return lagret
+        except Exception:   # noqa: BLE001 — død cache skal ikke ta ned kortet
+            pass
+
+    svar = _les_livssyklus()
+
+    if bruk_cache:
+        try:
+            cache.set(_LIVSSYKLUS_CACHE, svar, _LIVSSYKLUS_TTL)
+        except Exception:   # noqa: BLE001
+            pass
+    return svar
+
+
+def _les_livssyklus() -> dict:
+    if not er_konfigurert():
+        return {'kjent': False, 'feil': '', 'regler': [], 'avvik': []}
+
+    k = konfig()
+    try:
+        raa = _klient().get_bucket_lifecycle_configuration(
+            Bucket=k['bucket']).get('Rules', []) or []
+    except Exception as exc:   # noqa: BLE001
+        navn = exc.__class__.__name__
+        kode = getattr(exc, 'response', {}).get('Error', {}).get('Code', '')
+        if kode == 'NoSuchLifecycleConfiguration':
+            # Ikke en lesefeil: bucketen har ingen regler. Da slettes ingenting
+            # noen gang, og det er en oppbevaringstid ingen har bestemt.
+            return {'kjent': True, 'feil': '', 'regler': [],
+                    'avvik': [f'Ingen livssyklusregel for «{p}» — filene der '
+                              f'blir liggende for alltid.'
+                              for p in FORVENTET_DAGER]}
+        if kode in ('AccessDenied', 'Forbidden'):
+            return {'kjent': False, 'regler': [], 'avvik': [],
+                    'feil': 'Nøkkelen mangler ObjectStorageBucketsRead, så '
+                            'reglene kan ikke leses herfra. Se dem i konsollen.'}
+        logger.warning('core.offsite: kunne ikke lese livssyklusreglene: %s', exc)
+        return {'kjent': False, 'regler': [], 'avvik': [],
+                'feil': f'{navn}: {exc}'[:200]}
+
+    regler = []
+    for rad in raa:
+        prefiks = (rad.get('Filter') or {}).get('Prefix')
+        if prefiks is None:
+            prefiks = rad.get('Prefix', '')
+        regler.append({
+            'id': rad.get('ID', ''),
+            'prefiks': prefiks,
+            'dager': (rad.get('Expiration') or {}).get('Days'),
+            'aktiv': rad.get('Status') == 'Enabled',
+        })
+
+    return {'kjent': True, 'feil': '', 'regler': regler,
+            'avvik': _avvik(regler)}
+
+
+def _avvik(regler: list[dict]) -> list[str]:
+    """Hva som ikke stemmer med beslutningen, i klartekst.
+
+    Sammenligningen er på **nøyaktig** prefiks. `/full` og `full` er ikke
+    `full/`, og forskjellen er at regelen treffer alt eller ingenting.
+    """
+    ut = []
+    for prefiks, dager in FORVENTET_DAGER.items():
+        treff = [r for r in regler
+                 if r['prefiks'] == prefiks and r['dager'] is not None]
+        if not treff:
+            nesten = [r['prefiks'] for r in regler
+                      if r['prefiks'] and r['prefiks'].strip('/') == prefiks.strip('/')
+                      and r['prefiks'] != prefiks]
+            if nesten:
+                ut.append(f'Regelen for «{prefiks}» står som «{nesten[0]}» og '
+                          f'treffer ingenting. Prefikset må være nøyaktig '
+                          f'«{prefiks}».')
+            else:
+                ut.append(f'Ingen livssyklusregel for «{prefiks}» — filene der '
+                          f'blir liggende for alltid.')
+            continue
+        regel = treff[0]
+        if not regel['aktiv']:
+            ut.append(f'Regelen for «{prefiks}» er slått av.')
+        elif regel['dager'] != dager:
+            ut.append(f'«{prefiks}» står på {regel["dager"]} dager, '
+                      f'men skal være {dager}.')
+    return ut
+
+
 def status() -> dict:
     """Til oversikten: konfigurert, siste opplasting, siste feil, antall."""
     from core.models import OffsiteKopi
@@ -243,4 +368,5 @@ def status() -> dict:
         'antall': OffsiteKopi.objects.filter(feil='').count(),
         'siste_ok': siste_ok,
         'siste_feil': siste if siste is not None and siste.feil else None,
+        'livssyklus': livssyklus(),
     }

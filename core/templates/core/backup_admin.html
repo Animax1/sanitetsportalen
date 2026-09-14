@@ -282,6 +282,46 @@ Målt mot siste kopi som ville overlevd at Railway forsvant.
           {{ offsite.siste_feil.created_at|date:"d.m.Y H:i" }}: {{ offsite.siste_feil.feil }}
         </div>
       {% endif %}
+
+      {% comment %}
+      ── Oppbevaring ──
+      Lest fra bucketen, ikke fra det vi tror vi satte. Scaleway sletter
+      offsite-kopiene; portalens nøkkel har ikke sletterett, så
+      livssyklusreglene er den eneste mekanismen som gjør det. En regel med
+      feil prefiks ser riktig ut i konsollen og treffer ingenting.
+      {% endcomment %}
+      <div class="bk-meta mt-2">
+        Oppbevaring i bucketen:
+        {% if not offsite.livssyklus.kjent %}
+          <span class="text-warning">ukjent</span>
+          {% if offsite.livssyklus.feil %}
+            <div class="small text-warning">{{ offsite.livssyklus.feil }}</div>
+          {% endif %}
+        {% else %}
+          {% for r in offsite.livssyklus.regler %}
+            {% if r.dager %}
+              <code>{{ r.prefiks|default:"(alt)" }}</code>
+              {{ r.dager }} dager{% if not r.aktiv %} <span class="text-warning">(av)</span>{% endif %}{% if not forloop.last %} · {% endif %}
+            {% endif %}
+          {% empty %}
+            <span class="text-danger">ingen regler</span>
+          {% endfor %}
+        {% endif %}
+      </div>
+      {% if offsite.livssyklus.avvik %}
+        <div class="alert alert-danger py-2 mt-2 mb-0">
+          <strong><i class="bi bi-exclamation-triangle me-1"></i>Oppbevaringen
+          stemmer ikke med beslutningen.</strong>
+          {% for a in offsite.livssyklus.avvik %}
+            <div class="small">{{ a }}</div>
+          {% endfor %}
+          <div class="small mt-1">
+            Rettes i Scaleway-konsollen — portalens nøkkel kan lese
+            bucket-oppsettet, men ikke skrive det. Se
+            <code>docs/PLAN_BACKUP_OMLEGGING.md</code> §7.
+          </div>
+        </div>
+      {% endif %}
     {% endif %}
 
     <hr style="border-color: var(--portal-border);">

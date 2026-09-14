@@ -284,8 +284,14 @@ som overlever at Railway er borte. Se `docs/TEKNISK_DOKUMENTASJON.md` §11 og
 ### Oppsett (gjøres én gang, bare i prod)
 
 **Hos Scaleway** (allerede gjort 13. sep. 2026): bucketen `sanitetsportalen` i Amsterdam (nl-ams), One Zone,
-privat, SSE på, versjonering av, lifecycle 730 dager for objekter og 7 dager for
-uferdige multipart-opplastinger. IAM-applikasjon `sanitetsportalen-backup` med policy
+privat, SSE på, versjonering av, og 7 dagers frist for uferdige
+multipart-opplastinger. **Oppbevaringen er delt i to prefikser** (14. sep. 2026):
+`backups/` 730 dager for modulfilene, `full/` 90 dager for den hele databasen. Regelen
+sto først på «alle objekter i bucketen», og måtte snevres inn til `backups/` *før*
+regelen på `full/` ble lagt til — to regler som treffer samme objekt er et sted å gjette.
+Prefikset må skrives **nøyaktig** som `backups/` og `full/`: `/full` ser riktig ut i
+konsollen og treffer ingenting, og da blir filene liggende for alltid.
+IAM-applikasjon `sanitetsportalen-backup` med policy
 `ObjectStorageObjectsWrite` + `ObjectStorageObjectsRead` + `ObjectStorageBucketsRead` —
 **ikke** sletterett — og en API-nøkkel på den.
 
@@ -322,6 +328,13 @@ Tjenesten starter på nytt av seg selv når variablene lagres.
 4. Sier kortet **«Siste opplasting feilet»**, står feilen under i rødt. De vanligste:
    feil endpoint eller region, en nøkkel uten skriverett på bucketen, feil bucketnavn.
    Backupen på volumet er tatt uansett — rett variabelen og ta en ny manuell backup.
+5. Samme kort viser **«Oppbevaring i bucketen»**, lest fra Scaleway ved hver visning
+   (cachet fem minutter). Det skal stå `backups/` 730 dager · `full/` 90 dager. Stemmer
+   det ikke, står avviket i rødt med hva som er galt — regelen mangler, står på feil
+   prefiks, er slått av, eller har feil antall dager. **Dette er ikke pynt:** portalens
+   nøkkel har ikke sletterett, så livssyklusreglene er den eneste mekanismen som noen
+   gang sletter en offsite-kopi. Rettes i konsollen; portalen kan lese bucket-oppsettet,
+   men ikke skrive det. Står det «ukjent», mangler nøkkelen `ObjectStorageBucketsRead`.
 
 Under vakt går opplastingen av seg selv: hver gang auto-backupen skriver en ny fil,
 går den opp. Ingen endringer = ingen fil = ingen opplasting.

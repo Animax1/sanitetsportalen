@@ -407,10 +407,8 @@ bindende: 1 før 2, fordi backupen speiler hvor modellene bor.
                   modulenes. `audit.utils.ikke_under_loaddata` er vakten, og
                   `SignalerFyrerIkkeUnderLoaddataTests` krever den på alle
                   mottakere.
-            - [ ] **Krever Andre før dette er i prod:** livssyklusregelen på
-                  `full/` (fase 7). Uten den lander de første hele backupene
-                  under 730-dagersregelen, og 90 dager er en
-                  personvernbeslutning.
+            - [x] **Krever Andre før dette er i prod:** livssyklusregelen på
+                  `full/` (fase 7). Satt av André 14. sep. 2026 — se fase 7.
       - [x] **Fase 5 — `gjenopprett`-kommandoen (13. sep. 2026).** `--list`,
             `--siste <modul>` (hopper over pre-restore-øyeblikksbildene),
             `--hent <objekt>` som henter fra Scaleway og gjenoppretter i ett,
@@ -441,16 +439,24 @@ bindende: 1 før 2, fordi backupen speiler hvor modellene bor.
             som ellers krever PostgreSQL på Railway — så kommandoen kan kjøres
             der filene er. Runbooken §8b sier når den skal kjøres.
             2618 tester grønne på SQLite og PostgreSQL.
-      - [ ] **Fase 7 — oppbevaringstidene i bucketen `sanitetsportalen`**
-            (`PLAN_BACKUP_OMLEGGING.md` §7, **krever Andre**). Regelen står i dag på **730 dager med scope «alle objekter
-            i bucketen»**, bekreftet 13. sep. Den må derfor snevres inn til prefikset
-            `backups/` **før** en ny regel på `full/` med 90 dager legges til — to regler
-            som treffer samme objekt er et sted å gjette. **Skal gjøres før fase 4 er i
-            prod**, ellers lander de første hele backupene under 730-dagersregelen, og
-            90 dager er en personvernbeslutning, ikke en preferanse. Portalens IAM-nøkkel
-            kan lese bucket-oppsettet, men ikke skrive det — gjøres i konsollen.
-            Kontrolleres med `get-bucket-lifecycle-configuration`, og kortet på
-            `/portal-admin/backup/` gjør samme kall.
+      - [x] **Fase 7 — oppbevaringstidene i bucketen `sanitetsportalen`**
+            (14. sep. 2026, `PLAN_BACKUP_OMLEGGING.md` §7). Regelen sto på **730 dager
+            med scope «alle objekter i bucketen»**, og ble snevret inn til prefikset
+            `backups/` **før** regelen på `full/` med 90 dager ble lagt til — to regler
+            som treffer samme objekt er et sted å gjette. Satt av André i konsollen:
+            portalens IAM-nøkkel kan lese bucket-oppsettet, men ikke skrive det, og en
+            portal som kunne forkorte sin egen oppbevaringsregel ville ikke vært en sperre.
+            - [x] **Kortet leser reglene tilbake fra bucketen**
+                  (`core.offsite.livssyklus()`, `FORVENTET_DAGER`), ikke fra det vi tror
+                  vi satte. Fristene håndheves av Scaleway — portalen har ikke sletterett,
+                  og `enforce_cap` rører bare volumet — så livssyklusreglene er den
+                  **eneste** mekanismen som sletter en offsite-kopi. Sammenligningen er på
+                  **nøyaktig** prefiks, fordi feilen man faktisk gjør er `/full` i stedet
+                  for `full/`: en regel som ser riktig ut i konsollen og treffer
+                  ingenting. Avvik står i rødt ved siden av backupene — mangler, feil
+                  prefiks, slått av, feil antall dager, eller ingen regler i det hele tatt.
+                  `livssyklus()` kaster aldri og cacher i fem minutter.
+            2627 tester grønne på SQLite og PostgreSQL.
       - [ ] **Fase 8 — rydding:** `db_backup`, `patients/backup_service.py`,
             `patients.BackupConfig`, `RETENTION_HOURS`. Krever migrasjon. Slås sammen med
             det løse punktet «Rydd bort død backup-legacy» lenger ned.
@@ -506,7 +512,8 @@ Pasienter har Excel, oppdrag går på nødnett. Det som skal overleve at Railway
       `core/offsite.py`, `OffsiteKopi`, `core/0007`, `hent_offsite`). Kryptert før
       opplasting (AES-256-GCM), henger på ny fil fra `create_backup`, kaster aldri, status
       på /portal-admin/backup/. Bucket i Amsterdam, One Zone, SSE på, versjonering av,
-      lifecycle 730 dager / multipart 7 dager — satt av André. DPA:
+      lifecycle 730 dager / multipart 7 dager — satt av André; delt i to prefikser
+      14. sep. 2026 (`backups/` 730, `full/` 90), se fase 7 over. DPA:
       https://www-uploads.scaleway.com/DPA_2024_ENG_b0abb5cc26.pdf
       - [ ] **André:** IAM-applikasjon med policy (ObjectStorageObjectsWrite/Read,
             BucketsRead, ikke delete), API-nøkkel, `OFFSITE_BACKUP_KEY` i passordbehandler,
