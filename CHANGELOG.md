@@ -4,6 +4,52 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-14 — Tallgjerdet: dokumentene kan ikke lenger lyve om antall
+
+Det ene av tre åpne punkter som var verdt å lukke. De to andre —
+`accounts` → `oppdrag.Enhet` og `style-src 'unsafe-inline'` — ble gjennomgått og
+**bevisst latt stå**; begrunnelsene står i `docs/TEKNISK_DOKUMENTASJON.md` kap. 15.
+
+**`core/tallfasit.py` (ny)** regner ut antall ruter (totalt og per prefiks), backup-
+handlere, moduler, statistikk-kilder og JS-filer fra koden.
+`python manage.py tallfasit` skriver dem ut — den som skal oppdatere et dokument
+trenger å vite hva det riktige tallet er, og da må utregningen finnes utenfor testen.
+
+**`TallpaastanderTests` krever at dokumentene stemmer.** Tretten påstander er registrert
+i README, CLAUDE.md, deploy-guiden og teknisk dokumentasjon.
+
+Dette dekker den halvdelen av dokumentråte som oppstår **uten at noen gjør noe galt**:
+«178 tester totalt» var sant da det ble skrevet, og «16 endepunkter» var sant da det var
+alt som fantes. Legger noen til en rute, feiler testen til dokumentet følger etter.
+
+**Påstandene registreres eksplisitt, ikke gjettes ut av prosaen.** Et mønster som lette
+etter «\<tall\> endepunkter» hvor som helst ville truffet setninger som ikke er påstander
+om totalen — og en test med falske funn blir slått av, ikke fulgt. Regexen må dessuten
+treffe nøyaktig ett sted; flere treff er enten duplisert påstand eller et for løst
+mønster, og testen skiller de to feilene i meldingen.
+
+**Gjerdet fant en feil før det var ferdig skrevet, og den var min:** kapittel 5 oppga 8
+ruter under «`/varsler/`, `/api/`, m.fl.» Det riktige er 13 — jeg hadde glemt `/healthz/`,
+`robots.txt`, manifestet, «min profil» og videresendingen fra `/api/`. Nøyaktig den sorten
+feil tallgjerdet finnes for.
+
+Tre mutasjoner prøvd, alle fanget:
+
+| Mutasjon | Meldingen |
+|---|---|
+| Dokumentet påstår feil tall | «totalt antall ruter står som '99', men koden har 123» |
+| Koden får en ny rute, dokumentet står stille | «står som '123', men koden har 124» |
+| Fasiten går i stykker | Sperrehaken sier «fant nesten ingen ruter» — i stedet for at alle rader feiler og leses som «dokumentene er gale» |
+
+Den midterste er poenget: **drift fanges av seg selv**, uten at noen må huske å telle.
+
+`docs/TEKNISK_DOKUMENTASJON.md` kap. 15.8 er skrevet om og viser nå åpent hvor lite
+gjerdet ville fanget av dokumentrunden: to av fem funn. De tre andre — nedlastings-
+oppskriften, `TypeError`-signaturen og feil regex — er påstander om *innhold*, og de
+løses av at noen leser diffen.
+
+---
+
 ## 2026-09-14 — Dokumentrunden del 3: resten av teknisk dokumentasjon
 
 André: «Hvis teknisk dokumentasjon ikke er ferdig gjennomgått så må vi gjøre det.» Riktig

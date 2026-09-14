@@ -1070,6 +1070,23 @@ fordelt på de tre.
 JS-oppførsel testes ved å kjøre funksjonene i node, se `patients/js_test_utils.py`. Ikke
 skriv nye tester som bare grep-er etter kodelinjer i JS-filer.
 
+**Tall i dokumentene håndheves av `core/tallfasit.py`** (14. sep. 2026). Antall ruter,
+backup-handlere, moduler og JS-filer regnes ut fra koden, og
+`TallpaastanderTests` krever at dokumentene stemmer. Kjør `python manage.py tallfasit` for
+å se de riktige tallene.
+
+Påstandene **registreres eksplisitt** i `PAASTANDER`, ikke gjettes ut av prosaen: et
+mønster som lette etter «\<tall\> endepunkter» hvor som helst ville truffet setninger som
+ikke er påstander om totalen, og en test med falske funn blir slått av. Hver rad er et
+bevisst valg om at akkurat det tallet skal holdes i live. Regexen må treffe **nøyaktig
+ett** sted — flere treff er enten duplisert påstand eller et for løst mønster, og testen
+sier fra om begge.
+
+Regelen fanger **tall, ikke mening**: at kapittel 5 dokumenterte 16 av 123 endepunkter
+fanges, at de 16 hadde feil tilgangskrav gjør det ikke. Den grensen er skrevet i
+`core/tests_dokumentråte.py`, sammen med den andre kjente luken — et avsnitt som erklærer
+seg historisk tier hele regelen til neste kapittel.
+
 **Skillet går på hva assertionen påstår, ikke på om fila leses** (14. sep. 2026,
 gjeldspunkt 3.8). Å lese kilden for å *finne* en funksjon, eller for å håndheve en regel
 som ikke har noen kjøretid — «ingen mal peker på et CDN», «hver bygger escaper» — er

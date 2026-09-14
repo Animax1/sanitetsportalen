@@ -329,7 +329,29 @@ ingen av dem gir feilmelding — de er bare stille inaktive.
 - [x] **Service workeren bumpet til `vl-sw-5`** foran prod-deployen, så den
       gamle udelte `vaktliste.js` ryddes fra skallcachen. Utkastingen fikk
       samtidig sin første test (`skalKastes()`).
-#### Åpne punkter — de to som ikke er lukket
+#### Åpne punkter
+
+*Gjennomgått 14. sep. 2026 på Andrés spørsmål om hva vi tjener på å løse dem. De to
+første er **bevisst latt stå** — begrunnelsene i `docs/TEKNISK_DOKUMENTASJON.md` kap. 15.7
+og 15.6. Det tredje er delvis løst.*
+
+- [ ] **`accounts` → `oppdrag.Enhet`.** Vurdert og utsatt: kroken må bidra med et felt i
+      opprettelsesskjemaet *og* kroke seg på både oppretting og sletting, og
+      brukeropprettelsen er den mest sikkerhetsfølsomme flyten i portalen. Men det
+      avgjørende argumentet er et annet: **du kan ikke tegne et godt grensesnitt fra ett
+      eksempel.** Ta den den dagen en modul nummer to trenger en kontotype — da er det to
+      tilfeller å abstrahere fra, og jobben gjøres én gang riktig.
+- [ ] **`style-src 'unsafe-inline'`.** 271 inline stiler (176 i maler, 95 i JS-bygget
+      markup). **Nonce hjelper ikke** — et CSP-nonce dekker `<style>`-elementer, men ikke
+      `style=`-attributter; det er derfor CSP 3 måtte innføre `style-src-attr`.
+      Restrisikoen er lavere enn den ser ut: CSS-eksfiltrasjon går gjennom
+      `background-image`, fonter eller `@import`, og **alle tre er allerede låst til
+      `'self'`** av `img-src`, `font-src` og `style-src`. Det som står igjen er
+      defacement. Ryddes gradvis: fjern inline-stilene i en mal når den likevel skrives om.
+- [x] **Tallgjerdet i dokumentasjonen** *(levert 14. sep. 2026)* — `core/tallfasit.py` og
+      `TallpaastanderTests`. Fanget en feil i kap. 5 før det var ferdig skrevet.
+      At gjerdet ikke kan lese *mening* består, og er dokumentert i kap. 15.8 med en
+      tabell over hvor lite det ville fanget av dokumentrunden.
 
 *Samlet her med vilje: begge lå opprinnelig som uavkryssede barn under avkryssede
 foreldre, og et punkt som står under noe ferdig er et punkt ingen leser igjen.*

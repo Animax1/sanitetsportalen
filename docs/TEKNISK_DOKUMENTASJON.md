@@ -476,7 +476,7 @@ for sti, view in sorted(gaa(get_resolver())):
 | `/portal-admin/` | 21 | `core/urls_admin.py` | Hele adminflaten. Navnerom `portaladmin` |
 | `/accounts/` | 9 | `accounts/urls.py` | Innlogging, MFA, passord |
 | `/statistikk/` | 5 | `statistikk/urls.py` | Full statistikk per kilde |
-| `/varsler/`, `/api/`, m.fl. | 8 | `core/urls.py` | Dashbord, varsler, profil, manifest, `/healthz/` |
+| `/varsler/`, `/api/`, rot | 13 | `core/urls.py` | Dashbord, varsler (3 sider + 4 API), «min profil», manifest, `robots.txt`, `/healthz/` og videresendingen fra `/api/` |
 
 **Noen stier er rene videresendinger** fra flater som har flyttet, og de er med i
 tallene over. De står der fordi et bokmerke eller en lenke i en e-post ikke skal gi 404
@@ -1985,17 +1985,35 @@ opprettelsen* som får sideeffekten, ikke et skjema ved siden av. Den hører hje
 `core/kontokobling.py` med en lagringskrok, men det er kirurgi i brukeropprettelsen.
 **Lista skal ikke vokse.**
 
-### 15.8 Gjerdet mot dokumentråte har en luke
+### 15.8 Gjerdet mot dokumentråte fanger form, ikke mening
 
-`core/tests_dokumentråte.py` fanger at en filsti, en kommando eller et slettet symbol
-fortsatt finnes. Den kan **ikke** lese mening: en påstand som er feil på innholdet går
-rett gjennom, og det var nettopp den sorten feil dokumentrunden 14. sep. 2026 fant mest
-av.
+`core/tests_dokumentråte.py` fanger tre ting: at en filsti finnes, at en `manage.py`-
+kommando finnes, og — fra 14. sep. 2026 — at **tall i dokumentene stemmer med tall regnet
+ut fra koden** (`core/tallfasit.py`, `python manage.py tallfasit`).
 
-Dessuten: et avsnitt som erklærer seg historisk med `> **Historisk**` gjør regelen stille
-til neste kapittel. Luken er nødvendig — historiske avsnitt *skal* kunne nevne slettede
-navn — men den skiller ikke mellom «dette beskriver fortida» og «jeg vil ha ro». Den
-løses av at noen leser diffen.
+Det siste dekker den halvdelen av dokumentråte som oppstår **uten at noen gjør noe galt**:
+«178 tester totalt» var sant da det ble skrevet, og «16 endepunkter» var sant da det var
+alt som fantes. Legger noen til en rute, feiler testen til dokumentet følger etter.
+
+**To kjente grenser, og begge er bevisste:**
+
+**Den kan ikke lese mening.** Det er verdt å se hvor lite den ville fanget av
+dokumentrunden 14. sep. 2026:
+
+| Funn | Fanget? |
+|---|---|
+| A.10 beskrev en rollemodell slettet i deploy 2 | Ja — symbollista |
+| Kap. 5 dokumenterte 16 av 123 endepunkter | Ja — tallgjerdet, fra nå |
+| Deploy-guiden ba deg laste ned en backupfil | **Nei** |
+| 8B viste en signatur som ville gitt `TypeError` | **Nei** |
+| `_scrub_secrets` gjengitt med feil regex | **Nei** |
+
+**Et avsnitt som erklærer seg historisk tier regelen til neste kapittel.** Luken er
+nødvendig — historiske avsnitt *skal* kunne nevne slettede navn — men den skiller ikke
+mellom «dette beskriver fortida» og «jeg vil ha ro». Den ble oppdaget ved at
+«ikke gjennomgått»-markører fra første dokumentrunde slo av kontrollen for fem kapitler.
+
+Begge løses av at noen leser diffen, ikke av at testen blir strengere.
 
 ### 15.9 Arkivfunksjonalitet — statistikk beregnes, ikke lagres
 

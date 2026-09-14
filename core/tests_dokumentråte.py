@@ -206,6 +206,112 @@ class KommandoerTests(SimpleTestCase):
         self.assertGreater(antall, 10, f'fant bare {antall} kommandoer')
 
 
+class TallpaastanderTests(SimpleTestCase):
+    """Tall i dokumentene skal stemme med tall regnet ut fra koden.
+
+    **Dette er den ene klassen som fanger noe annet enn døde navn.** De øvrige
+    reglene her ser at en filsti eller en kommando fortsatt finnes; denne ser
+    at en *påstand* fortsatt er sann.
+
+    Den finnes fordi dokumentrunden 14. sep. 2026 fant to påstander av nettopp
+    denne sorten, og ingen av dem var noens feil: «178 tester totalt» var sant
+    da det ble skrevet, og «16 endepunkter» var sant den gangen det var alt som
+    fantes. Tall råtner av seg selv.
+
+    **Påstandene registreres eksplisitt, ikke gjettes ut av prosaen.** Et
+    mønster som lette etter «<tall> endepunkter» hvor som helst ville truffet
+    setninger som ikke er påstander om totalen, og en test med falske funn blir
+    slått av. Hver rad her er et bevisst valg om at *dette* tallet skal holdes
+    i live.
+
+    **Grensen er verdt å vite:** dette fanger tall, ikke mening. At kapittel 5
+    dokumenterte 16 av 123 endepunkter fanges nå; at de 16 hadde feil
+    tilgangskrav gjør det ikke. Se klassens naboer og modulens docstring.
+    """
+
+    #: (dokument, regex med én gruppe, nøkkel i `fasit()`, hva raden gjelder)
+    #:
+    #: Regexen skal treffe **nøyaktig ett** sted. Treffer den flere, sier
+    #: testen fra — da er påstanden enten duplisert eller mønsteret for løst.
+    PAASTANDER = [
+        ('docs/TEKNISK_DOKUMENTASJON.md', r'Portalen har \*\*(\d+) endepunkter\*\*',
+         'ruter_totalt', 'totalt antall ruter'),
+        ('docs/TEKNISK_DOKUMENTASJON.md', r'\| `/pasienter/` \| (\d+) \|',
+         'ruter_pasienter', 'ruter under /pasienter/'),
+        ('docs/TEKNISK_DOKUMENTASJON.md', r'\| `/oppdrag/` \| (\d+) \|',
+         'ruter_oppdrag', 'ruter under /oppdrag/'),
+        ('docs/TEKNISK_DOKUMENTASJON.md', r'\| `/vaktliste/` \| (\d+) \|',
+         'ruter_vaktliste', 'ruter under /vaktliste/'),
+        ('docs/TEKNISK_DOKUMENTASJON.md', r'\| `/portal-admin/` \| (\d+) \|',
+         'ruter_portal-admin', 'ruter under /portal-admin/'),
+        ('docs/TEKNISK_DOKUMENTASJON.md', r'\| `/accounts/` \| (\d+) \|',
+         'ruter_accounts', 'ruter under /accounts/'),
+        ('docs/TEKNISK_DOKUMENTASJON.md', r'\| `/statistikk/` \| (\d+) \|',
+         'ruter_statistikk', 'ruter under /statistikk/'),
+        ('docs/TEKNISK_DOKUMENTASJON.md', r'(\d+) ruter, alle i `core/urls_admin\.py`',
+         'ruter_portal-admin', 'ruter i adminflaten'),
+        ('docs/TEKNISK_DOKUMENTASJON.md', r'(\d+) filer i `static/js/`',
+         'js_filer', 'JS-filer'),
+        ('docs/TEKNISK_DOKUMENTASJON.md', r'(\w+) handlere i registeret:',
+         'backup_handlere', 'backup-handlere'),
+        ('CLAUDE.md', r'(\w+) handlere i dag:',
+         'backup_handlere', 'backup-handlere'),
+        ('README.md', r'\*\*To lag\.\*\* (\w+) handlere:',
+         'backup_handlere', 'backup-handlere'),
+        ('docs/DEPLOY_GUIDE.md', r'\| \*\*Modulfiler\*\* \| (\w+) handlere',
+         'backup_handlere', 'backup-handlere'),
+    ]
+
+    def test_hver_registrert_paastand_stemmer(self):
+        from core.tallfasit import fasit, som_tall
+
+        f = fasit()
+        feil = []
+        for dok, moenster, noekkel, hva in self.PAASTANDER:
+            tekst = _les(dok)
+            treff = re.findall(moenster, tekst)
+            if not treff:
+                feil.append(f'{dok}: fant ikke påstanden om {hva} '
+                            f'(mønster: {moenster}) — er den omformulert eller borte?')
+                continue
+            if len(treff) > 1:
+                feil.append(f'{dok}: påstanden om {hva} treffer {len(treff)} steder — '
+                            f'enten duplisert, eller mønsteret er for løst')
+                continue
+            paastaatt = som_tall(treff[0])
+            if paastaatt is None:
+                feil.append(f'{dok}: «{treff[0]}» er ikke et tall jeg kjenner '
+                            f'({hva}) — legg det i TALLORD')
+            elif paastaatt != f[noekkel]:
+                feil.append(f'{dok}: {hva} står som {treff[0]!r}, men koden har '
+                            f'{f[noekkel]}')
+        self.assertEqual(
+            feil, [],
+            'Tall i dokumentene stemmer ikke med koden:\n  ' + '\n  '.join(feil)
+            + '\n\nKjør `python manage.py tallfasit` for å se de riktige tallene.')
+
+    def test_fasiten_gir_tall_som_gir_mening(self):
+        """Sperrehake mot testen over.
+
+        Regner `fasit()` feil — for eksempel null ruter fordi URL-oppslaget
+        endret form — ville testen over feilet på *alle* rader og blitt lest
+        som «dokumentene er gale». Denne sier i stedet at fasiten er gal.
+        """
+        from core.tallfasit import fasit
+
+        f = fasit()
+        self.assertGreater(f['ruter_totalt'], 50, 'fant nesten ingen ruter')
+        self.assertGreater(f['backup_handlere'], 3, 'fant nesten ingen handlere')
+        self.assertGreater(f['js_filer'], 10, 'fant nesten ingen JS-filer')
+        self.assertEqual(
+            f['backup_handlere'], f['backup_modulfiler'] + 1,
+            'modulfilene pluss den hele skal være alle handlerne')
+        self.assertEqual(
+            f['ruter_totalt'],
+            sum(v for k, v in f.items() if k.startswith('ruter_') and k != 'ruter_totalt'),
+            'summen av prefiksene skal være totalen — ellers faller ruter mellom')
+
+
 class SlettedeSymbolerTests(SimpleTestCase):
     """Navn som er fjernet fra koden skal ikke stå som om de finnes.
 
