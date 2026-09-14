@@ -19,7 +19,15 @@
  * Serveres av vaktliste.views.sw_view, ikke fra /static/ — en worker styrer
  * bare stier under sin egen.
  */
-const VERSJON = 'vl-sw-4';
+// Bumpes når en gammel kopi skal kastes, ikke ved hver endring: `activate`
+// sletter alle `vl-sw-`-cacher som ikke bærer denne strengen. Til `vl-sw-5`
+// 14. sep. 2026, fordi `vaktliste.js` ble delt i fem filer — den gamle
+// samlefila lå igjen i skallcachen som død vekt på hver drifts-PC som hadde
+// vært innom. **Prisen er datakopien**: den slettes med, så en PC som mister
+// nettet rett etter en bump står uten offline-liste til den har lastet én
+// gang online. Derfor ikke ved hver endring — filnavnene er hashet av
+// WhiteNoise, så en ny fil hentes uansett uten at versjonen røres.
+const VERSJON = 'vl-sw-5';
 const SKALL = `${VERSJON}-skall`;
 const DATA = `${VERSJON}-data`;
 // Bibliotekene ligger under /static/ (13. sep. 2026, H3) — ingen CDN å hente.
@@ -120,11 +128,25 @@ self.addEventListener('install', (e) => {
 });
 
 
+function skalKastes(navn) {
+  // Ren funksjon, testes i node — som `avgjor()` og `erForGammel()`.
+  //
+  // Prefiks og ikke likhet, fordi hver versjon har to cacher (`-skall` og
+  // `-data`). Og bare våre egne: workeren deler origin med resten av
+  // portalen, så `caches.keys()` kan inneholde noe vi ikke eier.
+  return navn.startsWith('vl-sw-') && !navn.startsWith(VERSJON);
+}
+
+
+async function ryddGamleCacher() {
+  const navn = await caches.keys();
+  await Promise.all(navn.filter(skalKastes).map((n) => caches.delete(n)));
+}
+
+
 self.addEventListener('activate', (e) => {
   e.waitUntil((async () => {
-    const navn = await caches.keys();
-    await Promise.all(navn.filter((n) => n.startsWith('vl-sw-') && !n.startsWith(VERSJON))
-                          .map((n) => caches.delete(n)));
+    await ryddGamleCacher();
     await self.clients.claim();
   })());
 });

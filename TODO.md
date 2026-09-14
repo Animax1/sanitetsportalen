@@ -326,6 +326,9 @@ ingen av dem gir feilmelding — de er bare stille inaktive.
 - [x] **`SignalerFyrerIkkeUnderLoaddataTests` finner appene selv.** Den scannet
       tre apper skrevet for hånd og ville ikke sett `core/signals.py`. Globber nå
       `*/signals.py`, med `VAKTEN_UNNTATT` for det ene bevisste unntaket.
+- [x] **Service workeren bumpet til `vl-sw-5`** foran prod-deployen, så den
+      gamle udelte `vaktliste.js` ryddes fra skallcachen. Utkastingen fikk
+      samtidig sin første test (`skalKastes()`).
 - [ ] **Uforklart enkeltfeil i suiten.** Første kjøring med `myproject` inkludert
       endte `FAILED (failures=1)`; jeg fanget ikke hvilken test, og den har ikke
       reprodusert på fire fulle kjøringer etterpå. Opprydningsfeilen over er en

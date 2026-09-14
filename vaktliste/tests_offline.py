@@ -256,3 +256,60 @@ class KoenJsTests(SimpleTestCase):
         self.assertIn('Innloggingen har gått ut', l[3])
         self.assertIn('alert-danger', l[4])
         self.assertIn('Personen står ikke som møtt', l[4])
+
+
+class SwUtkastingTests(SimpleTestCase):
+    """`activate` skal kaste de gamle cachene når `VERSJON` bumpes.
+
+    Bumpen er **grunnen** til at versjonen finnes — `vl-sw-5` ble satt 14. sep.
+    2026 fordi `vaktliste.js` ble delt i fem filer, og samlefila lå igjen som
+    død vekt i skallcachen på hver drifts-PC som hadde vært innom. Fram til da
+    var utkastingen udekket, altså den ene oppførselen bumpen hviler på.
+
+    **Regelen er skilt ut som `skalKastes()`** og ikke en anonym `filter` inne
+    i lytteren, av samme grunn som `avgjor()` og `klikkSkalKjore()`: en regel
+    som ikke lar seg kalle, lar seg ikke prøve. Mitt første forsøk her kopierte
+    kroppen inn i testen som en streng — da måler testen kopien sin, og går
+    grønn uansett hva workeren gjør.
+    """
+
+    HARNESS = ((SW_JS, ('skalKastes',)),)
+
+    def setUp(self):
+        if not node_available():
+            self.skipTest('node er ikke tilgjengelig')
+        # `VERSJON` er en toppnivåkonstant og må med i harnessen.
+        versjon = [l for l in read_js(SW_JS).splitlines()
+                   if l.startswith('const VERSJON')][0]
+        self.harness = versjon + '\n' + build_harness(self.HARNESS)
+
+    def _kastes(self, *navn):
+        ut = run_node(self.harness, 'console.log(JSON.stringify([%s].filter(skalKastes)));'
+                      % ', '.join(repr(n) for n in navn))
+        # Svaret står først; harnessen skriver «OK» på siste linje.
+        return json.loads(ut.strip().splitlines()[0])
+
+    def test_forrige_versjon_kastes(self):
+        self.assertEqual(
+            self._kastes('vl-sw-4-skall', 'vl-sw-4-data'),
+            ['vl-sw-4-skall', 'vl-sw-4-data'])
+
+    def test_gjeldende_versjon_staar(self):
+        """Kastes den gjeldende, tømmer workeren seg selv ved hver oppstart —
+        og offline-drift slutter å virke uten at noe feiler."""
+        self.assertEqual(self._kastes('vl-sw-5-skall', 'vl-sw-5-data'), [])
+
+    def test_fremmede_cacher_rores_ikke(self):
+        """Workeren deler origin med resten av portalen; `caches.keys()` kan
+        inneholde noe den ikke eier."""
+        self.assertEqual(self._kastes('noe-helt-annet', 'django-cache'), [])
+
+    def test_tosifret_versjon_forveksles_ikke(self):
+        """`startsWith` er et prefiks. `vl-sw-40` er ikke `vl-sw-4`, og en
+        cache fra en helt annen versjon skal kastes, ikke bli stående."""
+        self.assertEqual(self._kastes('vl-sw-40-skall'), ['vl-sw-40-skall'])
+
+    def test_versjonen_leses_fra_fila_og_ikke_fra_testen(self):
+        """Sperrehake: forsvinner `VERSJON` i en refaktorering, måler prøvene
+        over en streng testen selv fant på."""
+        self.assertIn("const VERSJON = 'vl-sw-", read_js(SW_JS))

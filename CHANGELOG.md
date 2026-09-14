@@ -4,6 +4,32 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-14 — Service workeren til `vl-sw-5`, og utkastingen fikk en test
+
+Bumpet foran prod-deployen. `activate` sletter alle `vl-sw-`-cacher som ikke
+bærer gjeldende versjon, og fram til nå lå den gamle, udelte `vaktliste.js`
+igjen i skallcachen på hver drifts-PC som hadde vært innom — død vekt, ikke
+feil versjon, siden WhiteNoise hasher filnavnene og sida hentes nett-først.
+
+**Prisen står i koden**: datakopien slettes med, så en PC som mister nettet
+rett etter en bump står uten offline-liste til den har lastet én gang online.
+Derfor ikke ved hver endring — en ny fil hentes uansett uten at versjonen røres.
+
+**Utkastingen var udekket, altså den ene oppførselen bumpen hviler på.**
+Regelen er nå `skalKastes()`, skilt ut som navngitt funksjon ved siden av
+`avgjor()` og `erForGammel()`.
+
+*Mitt første forsøk var feil, og det står i testens docstring:* jeg kopierte
+`filter`-kroppen inn i testen som en streng. Da måler testen sin egen kopi og
+går grønn uansett hva workeren gjør — nøyaktig synden gjeldspunkt 3.8 handlet
+om, begått samme dag som jeg ryddet den. Funksjonen ble skilt ut i stedet.
+
+Fem tester, tre mutasjoner fanget: likhet i stedet for prefiks (da overlever
+både `-skall` og `-data`), `vl-sw-`-sjekken droppet (da slettes cacher
+workeren ikke eier), og versjonen ikke bumpet.
+
+---
+
 ## 2026-09-14 — Portalens egne tabeller auditlogges, og to lister som måtte finne selv
 
 **`core/signals.py`: `AppSetting`, `ModuleSettings` og `Vakt`.** Hullet André
