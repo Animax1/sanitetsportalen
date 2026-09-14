@@ -144,7 +144,13 @@ class DokumenteneFinnesTests(SimpleTestCase):
 class FilstierTests(SimpleTestCase):
     """Hver `sti/til/fil.py` i backticks skal finnes."""
 
+    #: To mønstre, og det andre finnes fordi det første ikke var nok.
+    #:
+    #: `patients/middleware._MetricsStore` sto i en tabellcelle **uten**
+    #: backticks og gikk rett forbi da modulen flyttet til `core`. Stier uten
+    #: backticks er like døde som stier med.
     MØNSTER = re.compile(r'`([a-z_][a-z_0-9]*/[a-z_0-9./-]*\.(?:py|js|md|html|toml|json|in|txt))`')
+    MØNSTER_NAKEN = re.compile(r'(?<![`\w/])([a-z_][a-z_0-9]*(?:/[a-z_0-9-]+)+\.(?:py|js))\b')
 
     def test_hver_filsti_finnes(self):
         feil = []
@@ -152,7 +158,8 @@ class FilstierTests(SimpleTestCase):
             linjer = _les(dok).splitlines()
             historiske = _historiske_linjer(linjer)
             for i, linje in enumerate(linjer):
-                for sti in set(self.MØNSTER.findall(linje)):
+                funn = set(self.MØNSTER.findall(linje)) | set(self.MØNSTER_NAKEN.findall(linje))
+                for sti in funn:
                     if sti in STIER_UNNTATT or _finnes(sti):
                         continue
                     # En slettet fil kan nevnes i setningen som sier at den er
@@ -170,6 +177,11 @@ class FilstierTests(SimpleTestCase):
         mens den måler ingenting."""
         antall = sum(len(set(self.MØNSTER.findall(_les(d)))) for d in DOKUMENTER)
         self.assertGreater(antall, 50, f'fant bare {antall} filstier — mønsteret treffer feil')
+
+    def test_ogsaa_stier_uten_backticks(self):
+        """Sperrehake for det andre mønsteret, som lett kan slutte å treffe."""
+        antall = sum(len(set(self.MØNSTER_NAKEN.findall(_les(d)))) for d in DOKUMENTER)
+        self.assertGreater(antall, 5, f'fant bare {antall} nakne stier')
 
 
 class KommandoerTests(SimpleTestCase):

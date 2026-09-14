@@ -4,6 +4,70 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-14 — Dokumentrunden del 3: resten av teknisk dokumentasjon
+
+André: «Hvis teknisk dokumentasjon ikke er ferdig gjennomgått så må vi gjøre det.» Riktig
+innvending — **halvveis verifisert dokumentasjon er verre enn tydelig uverifisert**, fordi
+merket forsvinner ved neste redigering og det uetterprøvde da ser ut som resten. Kapittel
+5, 8A–8E og 13–16 er nå gjennomgått, og alle markørene er borte.
+
+**Kapittel 5 dokumenterte 16 av 123 endepunkter**, med tilgangskrav oppgitt som `admin`,
+`lead`, `read_write`. Strukturen er endret med vilje: en håndskrevet liste over 123
+endepunkter råtner fra dagen den skrives. Nå står **konvensjonene og tilgangsmønsteret**
+fullstendig, med et kart over hvor endepunktene bor og en kodesnutt som skriver ut den
+autoritative lista — **verifisert ved å kjøre den ordrett**.
+
+Det viktigste som manglet: **dekoratøren gater lesing, viewet gater skriving.** Det er
+grunnen til at et skriveendepunkt kan se ut til å kreve bare `les`, og uten den
+forklaringen leser tabellen som et hull i sikkerheten.
+
+**Kapittel 8B dokumenterte en signatur som ikke finnes.**
+`@cached_stats_response(ttl=15, key_prefix=...)` ville gitt `TypeError` — parameteren
+heter `cache_key` og kommer først. Verre: påstanden om at nøkkelen bygges av «aktivt år og
+rollen som ber om dataene» var feil i begge retninger. Den lovet en isolasjon per rolle
+som ikke finnes, og skjulte kravet som faktisk gjelder — at **kallstedet** må legge slug
+og vakt-ID i nøkkelen selv.
+
+**`_scrub_secrets` var gjengitt feil.** Den dokumenterte regexen krevde `bruker:passord@`;
+den ekte krever ikke kolon, og treffer derfor også `redis://token@host`. Fem kodelinjer
+er nå verifisert ordrett mot kilden.
+
+**8A hadde en hengende tabellrest** fra en sletting som ble gjort i overskriften og ikke i
+kroppen: avsnittet sa «fjernet 13. sep.» og beskrev deretter flagget som om det fantes,
+med en `is_feature_enabled()` som ikke er skrevet. Det er den vanligste formen for
+dokumentråte.
+
+**Kapittel 13 viste til `PUT /api/backup-config/` og `POST /api/reset-active-year/`** —
+ingen av dem finnes, og den siste beskrev en nullstilling av «aktivt år» som
+vakt-modellen erstattet.
+
+**Kapittel 14 oppga «178 tester».** Nå er det 2 751. Kapittelet er skrevet om til
+prinsipper som holder — hvorfor `myproject` skal med, hvorfor migrasjonsprøver mot ekte
+PostgreSQL ikke kan erstattes av suiten, skillet mellom å lese kildekode og å påstå at en
+kodelinje står der, vinduskanten i rate-limit — pluss **tretten testklasser som håndhever
+regler om kodebasen**. Alle tretten er verifisert å eksistere.
+
+**Kapittel 15 fikk tre nye kjente begrensninger**, alle ærlige: `style-src` tillater
+fortsatt `unsafe-inline`, `accounts` → `oppdrag.Enhet` står igjen i
+`KJENTE_UNNTAK_RAMMEVERK`, og gjerdet mot dokumentråte har en luke som ikke kan lukkes
+uten å gjøre historiske avsnitt umulige.
+
+**Gjerdet er utvidet til å lese stier uten backticks.** `patients/middleware._MetricsStore`
+sto i en tabellcelle og slapp forbi da modulen flyttet — stier uten backticks er like døde
+som stier med.
+
+**Og gjerdet tok meg selv, to ganger.** Først på `manage.py show_urls`, som jeg skrev inn
+med et forbehold om django-extensions — men et forbehold i teksten er ikke godt nok når
+kommandoen ikke virker. Så avdekket det at **mine egne «ikke gjennomgått»-markører tiet
+regelen for hele kapitler**, fordi en seksjonsmarkør gjelder til neste overskrift. Det er
+et argument mot slike markører i seg selv, og de er nå borte.
+
+*To av mine egne mutasjonsforsøk traff ingenting fordi jeg muterte tekst som ikke sto der
+— feilen var i mutasjonen, ikke i testen. Det står her fordi «mutasjonen ble ikke fanget»
+og «mutasjonen ble aldri utført» ser helt like ut i en logg.*
+
+---
+
 ## 2026-09-14 — Dokumentrunden del 2, og den uforklarte feilen fikk et navn
 
 Gjeldspunkt 3 er ferdig: alle seks dokumenter gjennomgått mot koden, pluss et gjerde

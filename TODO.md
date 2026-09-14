@@ -633,8 +633,9 @@ bindende: 1 før 2, fordi backupen speiler hvor modellene bor.
       med seg **alt fra 11.–13. september** (sikkerhetsrundene, server-status, reserve og
       offline, offsite, flere enheter per oppdrag, ISSI og besetning, audit i vaktlista,
       lyd og bilens utganger). Lista over hva som mangler hvor står i `docs/BACKUP.md` §5:
-      - [ ] `docs/TEKNISK_DOKUMENTASJON.md` — appene etter flyttingen, backup i to lag,
-            sikkerhetslaget etter rundene
+      - [x] `docs/TEKNISK_DOKUMENTASJON.md` *(14. sep. 2026, to runder)* — **hele dokumentet**
+            gjennomgått. Kap. 5 dokumenterte 16 av 123 endepunkter; 8B hadde en signatur som
+            ville gitt `TypeError`; 14 oppga «178 tester». Ingen «ikke gjennomgått»-markører igjen
       - [x] `README.md` *(14. sep. 2026)* — skrevet om som inngangsdør. Beskrev en rollemodell som ikke finnes
       - [x] `docs/RUNBOOK_VAKT.md` — §8b var alt gjort; nytt §8c (rollback) lagt til
       - [ ] ~~§8b med hel backup og gjenoppretting i tom base~~
@@ -1748,17 +1749,23 @@ ikke før, for da ville den bare måttet gjøres om igjen.
 
 Funnene under er allerede kartlagt, så jobben er avgrenset når den skal gjøres.
 
-- [ ] **`docs/TEKNISK_DOKUMENTASJON.md`** (1776 linjer) — merket «April 2026», og har ikke
-      fulgt med på fire måneders refaktorering. Målgruppen er en teknisk etterfølger som
-      overtar drift, så feil her koster mest når den koster.
-      - Heter fortsatt «Pasientregistreringssystemet», ikke Sanitetsportalen
-      - `patients/views.py` er delt i fem moduler (N13.3) — alle henvisninger dit er døde
-      - `core/backup/` med handler-registry og `core/arkiv/` er ikke beskrevet
-      - Modulregistryet (`core/modules.py`, `ModuleSettings`) mangler
-      - **Alternativet er å merke den ærlig** som «beskriver systemet per april 2026» og
-        la CLAUDE.md være den levende oversikten. Å la den stå som oppdatert uten å være
-        det er det dårligste valget
-
+- [x] **`docs/TEKNISK_DOKUMENTASJON.md` — LEVERT 14. sep. 2026**, i to runder. Alle
+      punktene under er gjort, og funnene var verre enn kartlagt:
+      - [x] Heter nå Sanitetsportalen, og kap. 1 beskriver fire moduler i stedet for én app
+      - [x] Alle døde stier rettet (ti stykker), inkludert `core/views.py` og modulene som
+            flyttet til `core`
+      - [x] `core/backup/`, `core/arkiv/` og de sju registrene er beskrevet (kap. 3.4, 8)
+      - [x] Modulregisteret og den ekte nivåstigen står i kap. 4.2 og 6.3
+      - **Ikke kartlagt på forhånd, funnet underveis:** kap. 5 dokumenterte 16 av 123
+        endepunkter med slettede roller som tilgangskrav; 8B viste en dekoratørsignatur som
+        ville gitt `TypeError` og løy om cache-nøkkelen; `_scrub_secrets` var gjengitt med
+        feil regex; 8A hadde en hengende tabellrest fra en halvgjort sletting; 13 pekte på
+        to endepunkter som ikke finnes; 14 oppga «178 tester».
+      - **Alternativet — å merke dokumentet ærlig og la CLAUDE.md være den levende
+        oversikten — ble prøvd og forkastet.** Markørene ble satt i første runde, og André
+        avviste dem: halvveis verifisert dokumentasjon er verre enn tydelig uverifisert,
+        fordi merket forsvinner ved neste redigering. De tiet dessuten
+        `core/tests_dokumentråte.py` for hele kapitler.
 - [ ] **`docs/RUNBOOK_VAKT.md`** (469 linjer) — leses under vakt, på papir eller egen
       skjerm. En feil URL her oppdages i verste øyeblikk.
       - Seks forekomster av `https://<din-app>.railway.app/...` (linje 10, 61, 400, 403,
