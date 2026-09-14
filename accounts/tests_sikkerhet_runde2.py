@@ -119,6 +119,21 @@ class RateLimitPaaBrukeradminTests(TestCase):
         # testklasser — tøm etterpå også, ellers arver neste klasse 429.
         self.addCleanup(cache.clear)
 
+    #: **Dobbelt av grensen, pluss én.** Grensa er `10/m`, og det holder ikke
+    #: å sende tolv.
+    #:
+    #: `django_ratelimit._get_window` legger vinduskanten et fast antall
+    #: sekunder inn i hvert minutt, jittret per nøkkel med `crc32`. Treffer de
+    #: tolv forsøkene den kanten, deles de i to bøtter — og ingen av dem når
+    #: ti. Testen feilet da omtrent én kjøring av seksti, og gikk grønt ved
+    #: neste forsøk: den klassiske feilen som lærer deg å kjøre om igjen i
+    #: stedet for å lese.
+    #:
+    #: Med 2 × 10 + 1 forsøk må den ene siden av en hvilken som helst
+    #: oppdeling ha minst elleve, og 429 er garantert uansett når i minuttet
+    #: testen kjører. (Funnet og rettet 14. sep. 2026.)
+    FORSOK = 2 * 10 + 1
+
     def test_sletting_strupes(self):
         adm = CustomUser.objects.create_user(username='adm_rl', password='x', role='admin',
                                              must_change_password=False)
@@ -126,5 +141,5 @@ class RateLimitPaaBrukeradminTests(TestCase):
         offer = CustomUser.objects.create_user(username='offer', password='x', must_change_password=False)
         c = Client(); c.force_login(adm)
         koder = [c.post(reverse('portaladmin:user_delete', kwargs={'pk': offer.pk}), {'bekreft': 'feil'}).status_code
-                 for _ in range(12)]
+                 for _ in range(self.FORSOK)]
         self.assertIn(429, koder)

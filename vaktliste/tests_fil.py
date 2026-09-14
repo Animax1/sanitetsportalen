@@ -424,12 +424,19 @@ class FilutsendingMiddlewareTests(FilBasis):
         self.assertFalse(middleware._kjorer)
 
     def test_middlewaren_er_registrert_men_ikke_under_test(self):
+        """Leses av `settings`, ikke av `settings.py` som tekst (14. sep. 2026).
+
+        Testen sammenlignet før mot en literal linje i kildefila. Den gikk i
+        stykker av et linjeskift og sa ingenting om hva Django faktisk kjører
+        med — `MIDDLEWARE_I_DRIFT` er lista før test-strippingen, altså den
+        prod har.
+        """
         from django.conf import settings as s
+
+        self.assertIn('vaktliste.middleware.FilutsendingMiddleware',
+                      s.MIDDLEWARE_I_DRIFT, 'skal stå registrert i drift')
         self.assertNotIn('vaktliste.middleware.FilutsendingMiddleware', s.MIDDLEWARE,
                          'tas ut under test, som backup-planleggeren')
-        from pathlib import Path
-        kilde = (Path(s.BASE_DIR) / 'myproject' / 'settings.py').read_text(encoding='utf-8')
-        self.assertIn("'vaktliste.middleware.FilutsendingMiddleware',\n", kilde)
 
 
 class IntervallInnstillingeneTests(FilBasis):

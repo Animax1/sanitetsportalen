@@ -847,14 +847,65 @@ class MalensGatingTests(TestCase):
         self.assertIsNotNone(m)
         self.assertNotIn('vl-krev', m.group(0))
 
-    def test_ingen_naken_fjern_ressurs_knapp(self):
-        """Sletting skal bare finnes inne i «Rediger ressurs». Bygges den
-        tilbake i kortets topp, er vi tilbake til ett feilklikk fra å rive
-        bort hele bemanningen."""
-        from patients.js_test_utils import VAKTLISTE_JS, read_js
-        kilde = read_js(VAKTLISTE_JS)
-        self.assertNotIn('fjernRessurs', kilde)
-        self.assertIn('slettRessurs', kilde)
+    def test_ingen_naken_slett_knapp_i_ressurskortet(self):
+        """Sletting skal bare finnes inne i «Rediger ressurs».
+
+        CASCADE tar skiftene: bygges knappen tilbake i kortets topp, er vi ett
+        feilklikk fra å rive bort hele bemanningen på en ressurs.
+
+        Testen lette før etter funksjonsnavnet `fjernRessurs` i kilden
+        (14. sep. 2026, gjeldspunkt 3.8). Det var en **omdøpingssjekk**, ikke
+        en regel: den ville gått grønn om noen la en `data-action="slettRessurs"`
+        rett i kortet, og rødt om funksjonen ble hetende noe annet uten at noe
+        var galt. Her tegnes kortet, og markupen spørres.
+        """
+        from patients.js_test_utils import (
+            PORTAL_UTILS_JS, VAKTLISTE_JS, build_harness, node_available, run_node,
+        )
+
+        if not node_available():
+            self.skipTest('node er ikke tilgjengelig')
+
+        harness = build_harness((
+            (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue', 'trustedHtml',
+                               '_escHtml', 'klokke')),
+            (VAKTLISTE_JS, ('mkRessurs', '_radklasse', '_stempelknapper',
+                            'kanStemple', 'iDrift', '_rolleValg',
+                            'rollerForGruppe', '_fyllValgFor', '_varighet',
+                            '_planrad', '_plancellene', '_driftrad',
+                            'kanBemannePlass', '_mittKorpsId', '_synligePoster',
+                            '_dagnokkel', '_dagoverskrift', '_probonoMerke',
+                            '_blokklinje', '_tidsblokker', '_blokkerMedDager',
+                            '_posterFor', '_tilstede', '_sumTimer', '_skifttimer',
+                            '_tall', '_telling', '_utvalgstekst', '_skiftrekkefolge',
+                            '_tidsspenn', '_iso16', '_d', '_kl', '_dag',
+                            '_sammeDag', '_nivaa', '_erAdmin', 'kanSkriveAlt',
+                            'kanLede', 'kanBemanne', 'kanRoreRad')),
+        ))
+        # Admin, så *alle* knappene bygges — er den ikke der for admin, er den
+        # ikke der for noen.
+        ut = run_node(harness, """
+            globalThis.window = { MODUL_TILGANG: { admin: true } };
+            globalThis.DAGER = ['søn','man','tir','ons','tor','fre','lør'];
+            globalThis.MND = ['jan','feb','mar','apr','mai','jun','jul','aug','sep','okt','nov','des'];
+            globalThis.utskriftRessurs = null; globalThis.korpsfilter = null;
+            globalThis.aktivListe = {
+              vaktliste: {id: 1, vakt_navn: 'Vakta', status_navn: 'Planlegging', i_drift: false},
+              ressurser: [], vaktposter: [], mannskap: [], roller: [],
+              grupper: [], korps: [], enheter: [],
+            };
+            console.log(mkRessurs({
+              id: 1, navn: 'Ambulanse 1', ikon: 'truck',
+              gruppe_navn: 'Ambulanse', korps_navn: '', enhet_navn: '',
+            }));
+        """)
+        self.assertNotIn('slettRessurs', ut,
+                         'sletting skal ikke tegnes i selve ressurskortet')
+        self.assertIn('data-action="apneRessurs"', ut,
+                      'blyanten skal derimot være der — den er veien inn')
+
+        # Og speilet: knappen *finnes*, inne i modalen.
+        self.assertIn('data-action="slettRessurs"', self._mal())
 
 
 class KorpsPaaPlassenTests(TilgangsBasis):

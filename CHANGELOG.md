@@ -4,6 +4,48 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-14 — Gjeldspunkt 3.8: fem tester som målte kode, ikke oppførsel
+
+Gjeldskartet sa «en del eldre tester grep-er etter kodelinjer». Da jeg gikk
+gjennom dem, var de fleste treffene **legitime**: XSS-skannerne leser kilden
+for å *finne* en bygger før de kjører den, CSP-testene måler rendret utdata, og
+regler som «ingen mal peker på et CDN» har ingen kjøretid å måle. Skillet går
+på hva assertionen påstår, ikke på om fila leses.
+
+Fem påsto implementasjonstekst, og de er skrevet om:
+
+| Var | Er nå |
+|---|---|
+| `assertIn("if (metode !== 'GET')", sw.js)` | `avgjor()` kjøres for POST, PUT, PATCH, DELETE, HEAD, OPTIONS |
+| `assertIn('mannskap.sort(', kilde)` | Rekkefølgen i svaret, med rader uten rolle og navn i motsatt rekkefølge inn |
+| `assertIn("classList.toggle('active-mine'", js)` | `toggleBoardMine()` kalles mot et minimalt DOM, to ganger |
+| `assertNotIn('fjernRessurs', kilde)` | `mkRessurs()` tegnes, og markupen spørres |
+| `assertIn("'…Middleware',\n", settings_py)` | `settings.MIDDLEWARE_I_DRIFT` |
+
+Tre av dem ble **bedre**, ikke bare mindre skjøre. Service worker-testen dekket
+før bare POST — nå PUT, PATCH og DELETE også, som den literale linja aldri
+sjekket. Sorteringstesten kjører nå mot begge databasene og ville fanget et
+databasealfabet som slapp gjennom. Og `fjernRessurs`-sjekken var en
+*omdøpingssjekk*: den ville gått grønn om noen la en `data-action="slettRessurs"`
+rett i kortet.
+
+Hver av dem er prøvd mot feilen den skal fange, ikke bare kjørt grønn.
+
+**Og så fant suiten en ekte flake — den jeg noterte som uavklart i går.**
+`RateLimitPaaBrukeradminTests.test_sletting_strupes` feilet én gang av mange og
+gikk grønt ved neste kjøring. Årsaken er ikke «flaky test» som forklaring, men
+`django_ratelimit._get_window`: den legger vinduskanten et fast antall sekunder
+inn i hvert minutt, jittret per nøkkel med `crc32`. Tolv forsøk mot `10/m` som
+straddler den kanten deles i to bøtter der ingen når ti — altså ingen 429, og
+testen faller.
+
+Forsøkene er nå **2 × grensen + 1**. Da må den ene siden av en hvilken som helst
+oppdeling bryte grensa, uansett når i minuttet testen kjører. Naboen i
+`core/tests_ratelimit.py` hadde samme svakhet mot `10/5m` og er rettet likt.
+Regelen står i `CLAUDE.md`.
+
+---
+
 ## 2026-09-14 — Gjeldspunkt 3.1: kontoappen kjenner ingen modul ved navn
 
 `accounts/forms.py` importerte `patients.models` for å tegne kortet

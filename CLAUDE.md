@@ -990,7 +990,29 @@ Brukerdata som settes inn med `innerHTML` **skal** escapes — `escHtmlValue()` 
 og leser `statistikk.js`, `patients-admin.js` og `statistikk-oppdrag.js` — byggerne er
 fordelt på de tre.
 
-JS-oppførsel testes ved å kjøre funksjonene i node, se `patients/js_test_utils.py`. Ikke skriv nye tester som bare grep-er etter kodelinjer i JS-filer.
+JS-oppførsel testes ved å kjøre funksjonene i node, se `patients/js_test_utils.py`. Ikke
+skriv nye tester som bare grep-er etter kodelinjer i JS-filer.
+
+**Skillet går på hva assertionen påstår, ikke på om fila leses** (14. sep. 2026,
+gjeldspunkt 3.8). Å lese kilden for å *finne* en funksjon, eller for å håndheve en regel
+som ikke har noen kjøretid — «ingen mal peker på et CDN», «hver bygger escaper» — er
+riktig. Å påstå at en literal kodelinje står der, er ikke: den går i stykker av en
+omskriving som gjør det samme, og **går grønn** når noen skriver det samme feil et annet
+sted. Fem slike ble skrevet om denne dagen; mønsteret de fikk:
+
+| I stedet for | Skriv |
+|---|---|
+| `assertIn("if (metode !== 'GET')", kilde)` | Kjør `avgjor()` for hver metode og krev `null` |
+| `assertIn('mannskap.sort(', kilde)` | Krev rekkefølgen i svaret, med data som avslører databasens alfabet |
+| `assertIn("classList.toggle('active-mine'", js)` | Kall funksjonen mot et minimalt DOM og se at klassen kommer og går |
+| `assertNotIn('fjernRessurs', kilde)` | Tegn kortet og krev at sletteknappen ikke er i markupen |
+| `assertIn("'…Middleware',\n", settings_py)` | `assertIn(..., settings.MIDDLEWARE_I_DRIFT)` |
+
+**Rate-limit-tester må tåle vinduskanten.** `django_ratelimit._get_window` legger kanten
+et fast antall sekunder inn i hver periode, jittret per nøkkel. Tolv forsøk mot `10/m` som
+straddler den deles i to bøtter der ingen når ti — testen feiler da omtrent én kjøring av
+seksti. Bruk **2 × grensen + 1** forsøk, så bryter den ene siden uansett hvor oppdelingen
+faller.
 
 ## Migrasjoner
 

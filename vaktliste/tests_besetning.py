@@ -150,12 +150,37 @@ class BesetningTests(TilgangsBasis):
         """`rolle` er nullbar, og SQLite (dev) og PostgreSQL (prod) plasserer
         NULL i hver sin ende. En liste som står ulikt lokalt og i drift er en
         feil man aldri ser før den betyr noe — derfor sorteres den i Python,
-        på felter som alltid har en verdi.
+        på felter som **alltid** har en verdi.
+
+        Testen leste før kildekoden til `besetning` og krevde at `mannskap.sort(`
+        sto der (14. sep. 2026, gjeldspunkt 3.8). Det målte *hvordan*, ikke
+        *hva*: en omskriving til `sorted()` ville brutt den uten at noe var
+        galt, og en `order_by` lagt til *etter* sorteringen ville sluppet
+        gjennom. Her prøves rekkefølgen — med og uten rolle, i en innsettings-
+        rekkefølge som er stikk motsatt av den forventede, så et hvilket som
+        helst databasealfabet som slipper gjennom blir synlig.
         """
-        import inspect
-        kilde = inspect.getsource(services.besetning)
-        self.assertNotIn("order_by('rolle__navn'", kilde)
-        self.assertIn('mannskap.sort(', kilde)
+        # Motsatt av forventet rekkefølge inn: Ø før B, og den
+        # tilstedeværende sist. To av dem står **uten rolle** — det er den
+        # nullbare kolonnen basene er uenige om.
+        uten_rolle = self._skift(Mannskap.objects.create(navn='Øystein', korps=self.hgsd))
+        uten_rolle.rolle = None
+        uten_rolle.save(update_fields=['rolle'])
+
+        self._skift(Mannskap.objects.create(navn='Bo', korps=self.hgsd))
+        kari = self._skift(self.p_hgsd, mott_at=self.na)      # tilstede
+        kari.rolle = None
+        kari.save(update_fields=['rolle'])
+
+        rader = self._hent().json()['data']['mannskap']
+        self.assertEqual([m['navn'] for m in rader],
+                         ['Kari', 'Bo', 'Øystein'],
+                         'tilstede først, så alfabetisk — uansett rolle og '
+                         'uansett hvilken ende basen legger NULL i')
+        # Og rollen følger personen, ikke rekkefølgen.
+        etter_navn = {m['navn']: m['rolle'] for m in rader}
+        self.assertEqual(etter_navn['Kari'], '')
+        self.assertEqual(etter_navn['Bo'], self.rolle.navn)
 
     # ── Ukoblet mot ubemannet ────────────────────────────────────────────
     def test_ukoblet_enhet_gir_404(self):

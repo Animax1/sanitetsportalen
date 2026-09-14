@@ -1747,6 +1747,14 @@ Funnene under er allerede kartlagt, så jobben er avgrenset når den skal gjøre
       uansett.
 - [x] Rydd bort død backup-legacy — gjort 14. sep. 2026 som fase 8 i
       `docs/PLAN_BACKUP_OMLEGGING.md`. Se punktet der.
+- [x] **3.8 — tester som målte kode, ikke oppførsel** (14. sep. 2026). Fem skrevet om;
+      resten av treffene var legitime (XSS-skannere som *finner* en bygger, regler uten
+      kjøretid). Tre ble bedre, ikke bare mindre skjøre. Mønsteret står i `CLAUDE.md`.
+      - [x] **Ekte flake funnet og rettet:** `test_sletting_strupes` feilet én gang av
+            mange. `django_ratelimit._get_window` legger vinduskanten et fast antall
+            sekunder inn i hvert minutt, jittret per nøkkel — tolv forsøk mot `10/m` som
+            straddler den, deles i to bøtter der ingen når ti. Forsøkene er nå
+            2 × grensen + 1.
 - [ ] Flytte sesjonsdelen til en admin-side
 - [ ] Testene er massive, kan vi komprimere dem? (kjøretiden er løst: 500 s → 15 s via
       PASSWORD_HASHERS under test. Gjenstår evt. å redusere *antall* tester)

@@ -137,10 +137,25 @@ class WorkerensRegelJsTests(SimpleTestCase):
         """)
         self.assertEqual(json.loads(ut.strip().splitlines()[0]), [True, False, False, False, False])
 
-    def test_workeren_rorer_ingen_post(self):
-        kilde = SW_JS.read_text(encoding='utf-8')
-        self.assertNotIn("method === 'POST'", kilde)
-        self.assertIn("if (metode !== 'GET') return null;", kilde)
+    def test_workeren_rorer_ingenting_som_ikke_er_get(self):
+        """Regelen kjøres, ikke leses (14. sep. 2026, gjeldspunkt 3.8).
+
+        Testen sammenlignet før mot den literale linja `if (metode !== 'GET')
+        return null;`. Den ville gått i stykker av en omskriving som gjorde
+        nøyaktig det samme — og, verre, gått **grønn** hvis noen skrev
+        `metode === 'POST'` et annet sted i fila og latt PUT slippe gjennom.
+
+        Her prøves hver metode som ikke er GET. Det er den regelen som betyr
+        noe: en stempling som havner i cachen og spilles av igjen, er en
+        dobbeltføring på en vaktliste.
+        """
+        ut = run_node(self.harness, """
+            const o = 'https://portal.example';
+            const m = ['POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS'];
+            console.log(JSON.stringify(
+              m.map(x => avgjor(o + '/vaktliste/api/vaktlister/3/', x, 'cors', o))));
+        """)
+        self.assertEqual(json.loads(ut.strip().splitlines()[0]), [None] * 6)
 
 
 class KoenJsTests(SimpleTestCase):

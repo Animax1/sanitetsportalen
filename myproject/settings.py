@@ -239,6 +239,11 @@ if _RUNNING_TESTS:
     # Intervallsendingen av vaktlista ut av samme grunn: en bakgrunnstråd som
     # sender e-post midt i en test som ikke handler om det. Den testes direkte
     # i vaktliste/tests_fil.py.
+    #: Lista slik den er i drift, før de to tas ut. Finnes fordi testene skal
+    #: kunne spørre «står middlewaren registrert?» uten å lese denne fila som
+    #: tekst — en `assertIn` mot kildekoden går i stykker av et linjeskift, og
+    #: sier ingenting om hva Django faktisk kjører med. (14. sep. 2026, 3.8.)
+    MIDDLEWARE_I_DRIFT = list(MIDDLEWARE)
     MIDDLEWARE = [m for m in MIDDLEWARE
                   if m not in ('core.middleware.BackupSchedulerMiddleware',
                                'vaktliste.middleware.FilutsendingMiddleware')]

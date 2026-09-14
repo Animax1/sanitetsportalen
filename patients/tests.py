@@ -2601,9 +2601,48 @@ class AktivMineMarkeringTests(TestCase):
         )
 
     def test_js_setter_klassen_paa_den_knappen(self):
-        js = self._les('static', 'js', 'patients-table.js')
-        self.assertIn("getElementById('btn-board-mine')", js)
-        self.assertIn("classList.toggle('active-mine'", js)
+        """Funksjonen **kjøres**, ikke leses (14. sep. 2026, gjeldspunkt 3.8).
+
+        Testen sammenlignet før mot to literale kodelinjer. Det målte at
+        strengene sto i fila — ikke at klassen havnet på knappen. En omskriving
+        til `querySelector('#btn-board-mine')` ville brutt den uten at noe var
+        galt, og en `toggle` som satte klassen på feil element ville sluppet
+        gjennom.
+
+        Her kalles `toggleBoardMine()` mot et minimalt DOM, to ganger: klassen
+        skal på ved første trykk og av ved andre. Det er koblingen mot
+        `test_selektoren_treffer_tavleknappen` som gjør paret komplett — den
+        sier at CSS-en treffer klassen, denne at klassen kommer.
+        """
+        from patients.js_test_utils import (
+            TABLE_JS, build_harness, node_available, run_node,
+        )
+
+        if not node_available():
+            self.skipTest('node er ikke tilgjengelig')
+
+        harness = build_harness(((TABLE_JS, ('toggleBoardMine',)),))
+        ut = run_node(harness, """
+            const klasser = new Set();
+            const knapp = { classList: {
+              toggle: (navn, paa) => { paa ? klasser.add(navn) : klasser.delete(navn); },
+            } };
+            globalThis.document = { getElementById: id =>
+              (id === 'btn-board-mine' ? knapp : null) };
+            globalThis.renderBoard = async () => {};
+            globalThis.boardMineFilter = false;
+
+            (async () => {
+              await toggleBoardMine();
+              const etter_paa = [...klasser];
+              await toggleBoardMine();
+              console.log(JSON.stringify([etter_paa, [...klasser]]));
+            })();
+        """)
+        paa, av = json.loads(ut.strip().splitlines()[-1])
+        self.assertEqual(paa, ['active-mine'],
+                         'klassen skal settes på #btn-board-mine ved første trykk')
+        self.assertEqual(av, [], 'og tas av ved det andre')
 
 
 class FlerlinjesMalkommentarTests(TestCase):

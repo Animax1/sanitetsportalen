@@ -208,7 +208,11 @@ class RateLimitEndepunktTests(TestCase):
                 'new_password1': 'NyttPassord123!',
                 'new_password2': 'NyttPassord123!',
             })
-            for _ in range(15)
+            # 2 × 10 + 1: grensa er `10/5m`, og vinduskanten ligger et fast
+            # antall sekunder inn i hver femminutters-periode. Deles forsøkene
+            # av den, må den ene siden fortsatt bryte grensa. Samme rettelse
+            # som i `accounts/tests_sikkerhet_runde2.py` (14. sep. 2026).
+            for _ in range(2 * 10 + 1)
         ]
         self.assertIn(429, [s.status_code for s in svar])
 
