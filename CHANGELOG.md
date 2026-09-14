@@ -4,6 +4,45 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-14 — Dokumentrunden, del 1: deploy-guide, runbook og README
+
+Gjeldspunkt 3. Tre av seks dokumenter; de to store og gjerdet står igjen.
+
+**`docs/DEPLOY_GUIDE.md` var verre enn utdatert — den motsa en sikkerhetsbeslutning.**
+Kapittel 5 sa «en backup skal kun inneholde pasientdata – aldri brukere, passord eller
+audit-logg», og ga så en oppskrift på å **laste ned backupfila** for å kontrollere det.
+Begge deler er feil: den hele databasebackupen inneholder brukere, MFA-hemmeligheter og
+logg med vilje, og backupfiler skal ikke lastes ned i det hele tatt. Hadde noen fulgt
+oppskriften, hadde de lagt en helseopplysningsdump i nedlastingsmappa mens de trodde de
+gjorde en sikkerhetskontroll. Erstattet med `verifiser_backup`.
+
+Den beskrev også `BACKUP_APPS` og `BackupConfig.interval_minutes` — begreper som ikke
+finnes — og manglet AHASend, offsite, cron-tjenestene, hash-låste avhengigheter og
+staging-flyten. Nytt **kapittel 10, rollback**, sto ikke på lista: en redeploy i Railway
+ruller ikke tilbake databasen, så release-loggen må leses først.
+
+**`docs/RUNBOOK_VAKT.md`: to av tre punkter på lista var alt gjort.** §8b dekket allerede
+hel backup, tom base og den bindende rekkefølgen, og §14 med `scripts/sikkerhetssjekk.py`
+fantes. Lista var utdatert, ikke dokumentet. Det som manglet var **§8c, «Deployen knakk —
+rull tilbake»**, som ingen hadde ført opp. §1 har fått et punkt om ingen deploy fra
+sjekklista til vakta er over, med byggnummeret notert.
+
+**`README.md` var den mest villedende av dem alle.** Den beskrev rollemodellen
+`read_only`/`read_write`/`lead_view`/`lead` og fem `kan_redigere_*`-flagg på
+`CustomUser` — **ingen av delene finnes**, de ble slettet i deploy 2 og 3. En leser bygget
+altså feil mental modell av hele tilgangsstyringen. Den påsto også «178 tester totalt»
+(nå 2 744) og at backup «inneholder kun pasientdata (`BACKUP_APPS=['patients']`)».
+
+Skrevet om som **inngangsdør, ikke kopi**: en tabell over hvor ting står, korrekt
+arkitektur med de sju registrene, den ekte tilgangsmodellen, og pekere til deploy-guiden i
+stedet for en duplisert Railway-oppskrift som ville drevet fra hverandre. Testtallet er
+tatt ut — et tall der råtner fra dagen det skrives.
+
+Hver påstand i deploy-guiden og README er maskinelt verifisert mot koden: kommandoer,
+filstier, miljøvariabler, interne lenker, og `Procfile`-linjene ordrett.
+
+---
+
 ## 2026-09-14 — Arbeidsflyt: byggnummer ved push, og åpne punkter som ikke får gjemme seg
 
 To regler i `CLAUDE.md`, begge fra ting som gikk galt i dag.

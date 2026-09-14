@@ -13,6 +13,8 @@ Konkrete handlingsregler når pasientregistreringssystemet er under belastning.
 4. Sjekk at dashbordet oppdaterer seg (grønn pulserende prikk, "Oppdaterer hvert 10. sek")
 5. Bekreft at "Siste backup" er < 30 min gammel
 6. Noter start-tidspunkt og bakgrunns-rps som baseline (typisk 0.1–0.3 req/s ved oppstart)
+7. **Ingen deploy fra nå til vakta er over.** Noter byggnummeret i footeren, så du vet hva
+   som kjører hvis noe ser rart ut. Må du likevel deploye: §8c
 
 ### 1b. Driftsmodus — lavkostnad mellom vakter, vakt-modus før vakt
 
@@ -435,6 +437,70 @@ portal → patients → arkiv → oppdrag → oppdrag_arkiv → vaktliste
 `portal` bærer `core.Vakt`. Tas den ikke først, feiler de andre med
 «Key (vakt_id)=(1) is not present in table core_vakt». Deretter `create_admin` og
 kontoene for hånd, siden modulfilene ikke inneholder brukere.
+
+---
+
+## 8c. Deployen knakk — rull tilbake
+
+*Lagt til 14. sep. 2026. Runbooken dekket last, skalering, databaseproblemer og
+gjenoppretting fra backup, men ikke det enkleste og mest sannsynlige: en dårlig commit i
+prod. Railway auto-deployer fra `main`, så en feil er ute på noen minutter.*
+
+**Ikke deploy under vakt.** Dette kapittelet er for når det likevel har skjedd.
+
+### Steg 1: Er det deployen?
+
+Sammenlign **byggnummeret i footeren** nederst på siden med commit-en du sist pushet.
+Stemmer de, og begynte feilen ved den deployen, er det den. Står footeren på forrige bygg,
+er problemet et annet — gå til §8 eller §2.
+
+`/portal-admin/server-status/` viser samme bygg, sammen med minne og tregeste stier.
+
+### Steg 2: Rull tilbake i Railway
+
+1. Web-tjenesten → **Deployments**
+2. Finn siste deploy som virket
+3. **⋮** → **Redeploy**
+
+Det bygger den commit-en på nytt. Raskeste vei tilbake, ingen kode, ingen CLI.
+
+### Steg 3: Men sjekk migrasjonen først
+
+**En redeploy ruller ikke tilbake databasen.** Kjørte release-fasen en migrasjon som
+endret skjemaet, står basen igjen i ny form mens koden er gammel — og da får du en annen
+feil enn den du startet med.
+
+Se i **Deployments**-loggen fra den dårlige deployen, release-steget:
+
+| Hva loggen viser | Hva du gjør |
+|---|---|
+| Ingen migrasjon kjørte | Redeploy er nok |
+| `Applying …` på en ren tilstandsmigrasjon | Redeploy er nok — ingen SQL kjørte |
+| `Applying …` som endret skjemaet | Rull migrasjonen tilbake *før* redeploy |
+
+Tilbakerulling av en reversibel migrasjon:
+
+```powershell
+railway ssh --service web -- python manage.py migrate <app> <forrige_migrasjonsnavn>
+```
+
+Er den ikke reversibel, er backupen veien tilbake — §8b, «Gjenoppretting fra
+kommandolinja». Ta et pre-restore-øyeblikksbilde først; `gjenopprett` gjør det selv.
+
+### Steg 4: Eller rett framover i stedet
+
+Er portalen **oppe, men feil**, er en ny commit som retter feilen som regel tryggere enn
+et tilbakerull — særlig hvis migrasjonen har skrevet data. Rull tilbake når portalen er
+**nede**.
+
+### Hvorfor dette står her
+
+Staging (`rollemodell`) fanger det meste, og gjorde det 14. sep. 2026: CSP-en som
+blokkerte lydvarselet på iOS sto grønt i 2 744 tester og ble bare funnet ved å klikke.
+Men staging fanger ikke alt, og forskjellen mellom staging og prod — ekte data, ekte last,
+offsite-variablene som bare finnes i prod — er nettopp der de gjenværende feilene bor.
+
+Se også `docs/DEPLOY_GUIDE.md` §10.
 
 ---
 

@@ -637,14 +637,15 @@ bindende: 1 før 2, fordi backupen speiler hvor modellene bor.
       lyd og bilens utganger). Lista over hva som mangler hvor står i `docs/BACKUP.md` §5:
       - [ ] `docs/TEKNISK_DOKUMENTASJON.md` — appene etter flyttingen, backup i to lag,
             sikkerhetslaget etter rundene
-      - [ ] `README.md` — arkitektur, backup, sikkerhet, `requirements.in`
-      - [ ] `docs/RUNBOOK_VAKT.md` — §8b med hel backup og gjenoppretting i tom base
+      - [x] `README.md` *(14. sep. 2026)* — skrevet om som inngangsdør. Beskrev en rollemodell som ikke finnes
+      - [x] `docs/RUNBOOK_VAKT.md` — §8b var alt gjort; nytt §8c (rollback) lagt til
+      - [ ] ~~§8b med hel backup og gjenoppretting i tom base~~
             (`BACKUP.md` §4), inkludert `purge_old_logs` + `kollaps_arkiv` rett etterpå
       - [ ] `docs/PERSONVERN_DOKUMENTASJON.md` — A.2 (Scaleway: hele databasen), A.9 (hel
             backup 90 dager, modulfilene 730 dager offsite), A.10, A.11/A.6 (fil på e-post,
             offline drift)
       - [ ] `CLAUDE.md` — backup-avsnittet og hvor modellene bor
-      - [ ] `docs/DEPLOY_GUIDE.md` — heter fortsatt «Pasientregistreringssystem»; portal-
+      - [x] `docs/DEPLOY_GUIDE.md` *(14. sep. 2026)* — nytt navn, AHASend, offsite, cron, hasher, rollback. ~~heter fortsatt «Pasientregistreringssystem»; portal-~~
             domenet, AHASend-variablene, offsite-variablene, `requirements.txt` med hasher.
             Punktet lenger ned under dokumentgjennomgangen slås sammen med dette
 - [ ] **4. De mindre** (§3 i notatet), når man er i nærheten: brukeradmin importerer
