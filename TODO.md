@@ -351,6 +351,8 @@ bindende: 1 før 2, fordi backupen speiler hvor modellene bor.
             `core/health.py`, `core/admin_status.py`. `core` importerer nå en modul på
             fem steder i produksjonskode mot rundt tjue før runden, og fire av dem er
             modulregisteret. `core/tests_avhengighetsretning.py` låser det med AST.
+      - [x] **CLAUDE.md rettet** (14. sep. 2026): «Tilgangskontroll»-bolken beskrev
+            fortsatt `accounts/decorators.py` som et skim som beholdes. Fila er slettet.
       - [ ] **Rammeverket henter fortsatt tall fra to moduler.** `admin_status.py` og
             portalinnstillingene importerer `vaktliste` og `oppdrag` (dashbordets
             modultall, og vaktlistas e-postmottakere). Koblingen er eldre enn flyttingen,

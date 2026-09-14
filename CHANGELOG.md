@@ -51,6 +51,11 @@ formen `from accounts.decorators import`. `accounts/views.py` brukte den
 relative, `from .decorators import`, og slapp unna i et år med testen grønn.
 En regel som bare dekker halve syntaksen måler noe annet enn den later som.
 
+**Etterslep rettet samme dag:** «Tilgangskontroll»-bolken i `CLAUDE.md` beskrev
+fortsatt `accounts/decorators.py` som et skim som beholdes fordi en test
+verifiserer det. Fila er slettet. En arkitekturbeskrivelse som peker på noe som
+ikke finnes, er verre enn ingen beskrivelse — den neste leter etter fila.
+
 2691 tester grønne på SQLite og PostgreSQL 16.
 
 ---

@@ -56,9 +56,15 @@ En modul vises kun hvis `ModuleSettings.enabled=True` **og** brukeren har en
 
 ### Tilgangskontroll
 
-Importér alltid fra `core.auth_decorators`. `accounts/decorators.py` er en ren
-re-eksport-shim som beholdes fordi `core/tests.py` verifiserer at den fortsatt virker —
-ingen produksjonskode importerer fra den lenger (N11).
+Importér alltid fra `core.auth_decorators`. **`accounts/decorators.py` er slettet**
+(14. sep. 2026, gjeldspunkt 3.3): den var en ren re-eksport av `admin_required`, og den
+eneste leseren var testen som verifiserte at den virket.
+
+*Og slettingen avdekket at regelen sto brutt.* Testen som håndhevet N11 lette bare etter
+den absolutte formen `from accounts.decorators import`. `accounts/views.py` brukte den
+relative, `from .decorators import`, og slapp unna i et år med testen grønn — en regel som
+bare dekker halve syntaksen måler noe annet enn den later som. Testen i `core/tests.py`
+dekker nå begge.
 
 **Tre kategorier, ikke én.** Se `docs/BESLUTNING_ROLLEMODELLEN.md`:
 
