@@ -4,6 +4,90 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-14 — 400 ved bemanning av ledig plass: nedtrekket tilbød et umulig valg
+
+**Meldt fra staging (André):**
+
+```
+PUT https://testportal.sanitet.net/vaktliste/api/vaktposter/88/  →  400 (Bad Request)
+endreVaktpost @ vaktliste-offline.js
+```
+
+…og etterpå: *«Jeg fikk feilen i konsoll på f12, så ingenting i nettleseren ellers.»*
+
+Det er **to feil i én melding**, og de er verdt å skille:
+
+### 1. Serveren gjorde riktig; grensesnittet spurte om noe umulig
+
+`Vaktpost` har `UniqueConstraint(ressurs, mannskap, fra_tid)`. Nedtrekket for en ledig
+plass ble bygget av `_fyllValgFor()`, som listet **hele** mannskapsregisteret uten å se på
+hvem som alt sto på den ressursen til den starttiden. Valgte man en av dem, avviste
+viewet med «Personen står allerede på denne ressursen fra dette tidspunktet» — riktig
+svar på et spørsmål som aldri skulle vært stilt.
+
+Det bryter portalens egen regel: **«en knapp som fører til en vegg er verre enn ingen
+knapp.»** Regelen sto skrevet om `window.MODUL_TILGANG` og gjelder like fullt her.
+
+`opptattPaaPlassen(vp, poster)` er ny og filtrerer nedtrekket. Den ligger som **egen
+funksjon**, ikke som en `filter` inne i byggeren, av samme grunn som `klikkSkalKjore()`:
+en regel som ikke lar seg kalle, lar seg ikke prøve. Fire ledd, og hvert av dem er en
+egen feil å gjøre — raden selv teller ikke, ledige plasser (`mannskap_id === null`)
+sperrer ingen, annen ressurs er fritt fram, annen starttid er en annen rad. Alle fire er
+mutasjonsprøvd.
+
+Kilden er `alle_vaktposter` — alt serveren sendte — ikke `vaktposter`, som er det
+korpsfilteret slapp gjennom. Skranken er en databasekjensgjerning uavhengig av hvem som
+ser raden. Det lekker ingenting: filteret kan bare *fjerne* valg, aldri vise et navn.
+**Restrisikoen står igjen** — serveren filtrerer i tillegg sitt eget svar, så en
+korps-bruker kan fortsatt treffe veggen. Da vises meldingen, og den rulles nå fram.
+
+**Merk hva den *ikke* gjør:** den sperrer ikke overlapp på tvers av ressurser. Å stå på
+KO og på bilen samtidig er bevisst tillatt (`test_overlapp_paa_tvers_av_ressurser_stoppes_ikke`),
+og er ført opp for seg i TODO.
+
+### 2. Feilmeldingen ble skrevet utenfor skjermen
+
+`endreVaktpost()` kalte `visPanelfeil()` som den skulle, og `#vl-feil` sto i malen. Men
+banneret ligger rett over `#vl-panel`, altså **øverst på sida**, mens nedtrekket som ble
+avvist kan stå tretti rader ned i et regneark som ruller. Meldingen ble skrevet — bare
+der ingen så den.
+
+En feilmelding ingen ser er verre enn ingen feilmelding: brukeren tror lagringen gikk
+igjennom, mens raden ruller tilbake til lagret verdi uten forklaring. `rullTilFeil()`
+bringer banneret fram med `block: 'nearest'` — ruller minst mulig, så et banner som alt
+står i bildet ikke får sida til å hoppe. Uten `scrollIntoView` (eldre nettleser) vises
+meldingen som før; rullingen er en forbedring, ikke en forutsetning.
+
+*Dette punktet ble ikke funnet av en test — det ble funnet fordi André sa hva han
+**ikke** så. Verdt å merke seg: suiten kan bekrefte at en melding skrives, men ikke at
+noen leser den.*
+
+### Hva som med vilje **ikke** ble rørt
+
+`apneRedigerVaktpost()` fyller sitt nedtrekk fra hele registeret på samme måte, og kan
+derfor treffe samme skranke. Det ble stående, av to grunner:
+
+- **Vinduet kan endre `fra_tid` i samme lagring.** Et filter regnet ut da vinduet ble
+  åpnet gjelder den *gamle* starttiden; flytter man skiftet til et tidspunkt der plassen
+  er ledig, ville en gyldig person vært borte fra lista. Å skjule et lovlig valg er en
+  vanskeligere feil å oppdage enn en 400 med melding.
+- **Veggen er skiltet der.** `lagreVaktpost()` viser avslaget med `_visFeil(...)` inne i
+  vinduet, altså der brukeren ser. Det var nettopp dét som manglet i raden.
+
+### Nye tester
+
+`vaktliste/tests_dobbeltbooking.py` — ti tester i to klasser. Seks mot filtreringsregelen
+(fire mutasjoner fanget), fire mot banneret (tre mutasjoner fanget: fjernet kall,
+`'nearest'` → `'start'`, fjernet `typeof`-vakt).
+
+De seks eksisterende harness-listene som når `_fyllValgFor` fikk `opptattPaaPlassen` lagt
+til. **Det er prisen for at harnessene navngir funksjoner eksplisitt** — en ny hjelper
+brukt av en testet funksjon gir `ReferenceError` i tolv tester før noen har skrevet en
+linje ny test. Prisen er bevisst: alternativet er å laste hele fila, som har
+toppnivå-avhengigheter til DOM-en.
+
+---
+
 ## 2026-09-14 — Minimerbare ressurser ført i TODO (ingen kode)
 
 **André:** minimerbare lag/ambulanser i gruppefanene, dagruppering som i Oversikt, og alle

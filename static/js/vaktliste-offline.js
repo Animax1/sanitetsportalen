@@ -236,6 +236,19 @@ function visPanelfeil(melding) {
   if (!el) return;
   el.textContent = melding;
   el.classList.remove('d-none');
+  rullTilFeil(el);
+}
+
+
+function rullTilFeil(el) {
+  // **Banneret ligger øverst på sida, feltet som ble avvist gjør det ikke.**
+  // Et regneark med tretti rader ruller, og da står meldingen utenfor
+  // skjermen i det øyeblikket den skrives — André meldte 14. sep. 2026 at
+  // 400-svaret bare var synlig i konsollen. `block: 'nearest'` ruller minst
+  // mulig: står banneret alt i bildet, flytter ingenting på seg.
+  if (typeof el?.scrollIntoView !== 'function') return false;   // eldre nettleser
+  el.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  return true;
 }
 
 

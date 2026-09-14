@@ -226,7 +226,7 @@ class VaktlisteEscapingOppforselTests(SimpleTestCase):
                            '_escHtml', 'klokke')),
         (VAKTLISTE_JS, ('mkRessurs', '_radklasse', '_stempelknapper',
                         'kanStemple', 'iDrift', '_rolleValg',
-                        'rollerForGruppe', '_fyllValgFor', '_varighet',
+                        'rollerForGruppe', '_fyllValgFor', 'opptattPaaPlassen', '_varighet',
                         'mkRolleRad', 'mkOversikt', 'mkUtskriftsverktoy', '_utvalgstekst', '_skiftrekkefolge',
                         '_planrad', '_plancellene', '_tidsblokker', '_blokklinje', '_blokkerMedDager', 'kanBemannePlass',
                         '_mittKorpsId', '_synligePoster',
@@ -1804,7 +1804,7 @@ class FanenErGruppaTests(SimpleTestCase):
         (VAKTLISTE_JS, ('tegnFaner', '_fanerad', '_mannskapsfane', '_mittKorpsId',
                         '_synligePoster', 'iDrift', '_tilstede', 'mkGruppe',
                         'mkRessurs', '_radklasse', '_stempelknapper', 'kanStemple',
-                        '_rolleValg', '_skiftrekkefolge', '_fyllValgFor',
+                        '_rolleValg', '_skiftrekkefolge', '_fyllValgFor', 'opptattPaaPlassen',
                         '_varighet', '_skifttimer', '_tall', '_planrad', '_plancellene',
                         '_tidsblokker', '_blokklinje', '_blokkerMedDager',
                         'kanBemannePlass', '_dagnokkel', '_dagoverskrift',
@@ -2159,7 +2159,7 @@ class EnkeltgruppeTests(SimpleTestCase):
         (VAKTLISTE_JS, ('mkGruppe', 'mkRessurs', '_radklasse',
                         '_stempelknapper', 'kanStemple', 'iDrift',
                         '_rolleValg', '_plassKorps', '_skiftrekkefolge',
-                        '_fyllValgFor', '_varighet', '_skifttimer', '_tall',
+                        '_fyllValgFor', 'opptattPaaPlassen', '_varighet', '_skifttimer', '_tall',
                         '_planrad', '_plancellene', '_tidsblokker', '_blokklinje', '_blokkerMedDager', 'kanBemannePlass',
                         '_mittKorpsId', '_synligePoster',
                         '_dagnokkel', '_dagoverskrift', '_probonoMerke',
@@ -3053,7 +3053,7 @@ class TidsblokkerTests(SimpleTestCase):
 
     HARNESS = (
         (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue')),
-        (VAKTLISTE_JS, ('mkOversikt', 'mkUtskriftsverktoy', '_utvalgstekst', '_tidsblokker', '_blokklinje', '_blokkerMedDager', 'kanBemannePlass', '_mittKorpsId', '_synligePoster', '_dagnokkel', '_dagoverskrift', '_probonoMerke', '_telling', '_driftrad', '_plancellene', '_planrad', '_rolleValg', '_fyllValgFor', '_plassKorps', '_varighet', '_skifttimer', '_tall', '_iso16', '_radklasse', '_stempelknapper', 'kanStemple', 'iDrift', 'kanSkriveAlt', '_nivaa', '_erAdmin', '_skiftrekkefolge', '_sumTimer', '_d', '_kl', '_dag', '_sammeDag', '_tidsspenn', '_vaktspenn', '_ressurserIGruppe', '_grupperMedRessurser', 'kanRoreRad')),
+        (VAKTLISTE_JS, ('mkOversikt', 'mkUtskriftsverktoy', '_utvalgstekst', '_tidsblokker', '_blokklinje', '_blokkerMedDager', 'kanBemannePlass', '_mittKorpsId', '_synligePoster', '_dagnokkel', '_dagoverskrift', '_probonoMerke', '_telling', '_driftrad', '_plancellene', '_planrad', '_rolleValg', '_fyllValgFor', 'opptattPaaPlassen', '_plassKorps', '_varighet', '_skifttimer', '_tall', '_iso16', '_radklasse', '_stempelknapper', 'kanStemple', 'iDrift', 'kanSkriveAlt', '_nivaa', '_erAdmin', '_skiftrekkefolge', '_sumTimer', '_d', '_kl', '_dag', '_sammeDag', '_tidsspenn', '_vaktspenn', '_ressurserIGruppe', '_grupperMedRessurser', 'kanRoreRad')),
     )
     VINDU = ("globalThis.window = { MODUL_TILGANG: { admin: true } };\n"
              "globalThis.DAGER = ['søn','man','tir','ons','tor','fre','lør'];\n"
@@ -3604,7 +3604,7 @@ class MittKorpsTests(SimpleTestCase):
         (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue')),
         (VAKTLISTE_JS, ('mkMittKorps', '_mittKorpsId', '_synligePoster',
                         'kanBemannePlass', 'kanSkriveAlt', '_nivaa', '_erAdmin',
-                        '_fyllValgFor', '_probonoMerke', '_tidsblokker',
+                        '_fyllValgFor', 'opptattPaaPlassen', '_probonoMerke', '_tidsblokker',
                         '_blokkerMedDager', '_dagnokkel', '_dagoverskrift',
                         '_blokklinje', '_telling', '_skiftrekkefolge',
                         '_varighet', '_skifttimer', '_tall', '_d', '_kl',

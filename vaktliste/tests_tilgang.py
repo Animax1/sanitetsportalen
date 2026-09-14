@@ -871,7 +871,7 @@ class MalensGatingTests(TestCase):
                                '_escHtml', 'klokke')),
             (VAKTLISTE_JS, ('mkRessurs', '_radklasse', '_stempelknapper',
                             'kanStemple', 'iDrift', '_rolleValg',
-                            'rollerForGruppe', '_fyllValgFor', '_varighet',
+                            'rollerForGruppe', '_fyllValgFor', 'opptattPaaPlassen', '_varighet',
                             '_planrad', '_plancellene', '_driftrad',
                             'kanBemannePlass', '_mittKorpsId', '_synligePoster',
                             '_dagnokkel', '_dagoverskrift', '_probonoMerke',

@@ -461,6 +461,20 @@ ha et nytt hjem:
 livssyklus … lista kan fortsatt endres, for folk uteblir og bytter». Endringen rører ikke
 den begrunnelsen; den rører bare hvem som åpner døra.*
 
+### Vaktlista: nedtrekket i «Rediger skift» — bevisst ufiltrert (14. sep. 2026)
+
+*Ingen oppgave, men et notat så ingen «retter» det uten å lese begrunnelsen.*
+
+Radens nedtrekk filtrerer nå bort dem som alt står på ressursen til samme starttid
+(`opptattPaaPlassen()`, se CHANGELOG). Vinduet «Rediger skift» gjør det **ikke**, fordi
+det kan endre `fra_tid` i samme lagring: et filter regnet ut da vinduet ble åpnet gjelder
+den gamle tiden, og ville skjult et lovlig valg. Veggen er skiltet der i stedet —
+`lagreVaktpost()` viser avslaget inne i vinduet.
+
+- [ ] **Skal det filtreres når tiden ikke er endret?** Krever at nedtrekket tegnes på nytt
+      når `vaktpost-fra` endres. Billig, men det er en ny kobling mellom to felter i samme
+      skjema, og den må testes for seg. Ikke gjort — ført som spørsmål.
+
 ### Vaktlista: overlappende skift — funnet 14. sep. 2026
 
 *Funnet mens vi diskuterte rapportmodulen, men punktene hører hjemme i vaktlista og er

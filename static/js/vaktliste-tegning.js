@@ -342,14 +342,48 @@ function _iso16(iso) {
 }
 
 
+function opptattPaaPlassen(vp, poster) {
+  // **Hvem kan ikke settes på denne plassen?** De som alt står på samme
+  // ressurs til samme starttid.
+  //
+  // Databasen har en unik-skranke på `(ressurs, mannskap, fra_tid)`, og
+  // nedtrekket tilbød fram til 14. sep. 2026 *alle* i registeret. Valgte man
+  // en som alt sto der, svarte serveren 400 «Personen står allerede på denne
+  // ressursen fra dette tidspunktet» — altså et valg som ikke kunne gjennom­
+  // føres, tilbudt som om det kunne. Portalens egen regel sier det motsatte:
+  // **en knapp som fører til en vegg er verre enn ingen knapp.**
+  //
+  // Egen funksjon, ikke en `filter` inne i byggeren, av samme grunn som
+  // `klikkSkalKjore()`: en regel som ikke lar seg kalle, lar seg ikke prøve.
+  const ut = new Set();
+  (poster || []).forEach((p) => {
+    if (p.id === vp.id) return;                     // raden selv teller ikke
+    if (p.mannskap_id == null) return;              // ledige plasser sperrer ingen
+    if (p.ressurs_id !== vp.ressurs_id) return;     // annen ressurs er fritt fram
+    if (p.fra_tid !== vp.fra_tid) return;           // annen starttid er en annen rad
+    ut.add(p.mannskap_id);
+  });
+  return ut;
+}
+
+
 function _fyllValgFor(vp, kanRedigere) {
   // Å fylle plassen er én feltendring, ikke en flytting mellom to tabeller —
   // det er hele grunnen til at en ledig plass er en `Vaktpost` uten person.
   if (!kanRedigere) return '<span class="vl-ledigtekst">Ledig plass</span>';
+  // `alle_vaktposter` er alt serveren sendte; `vaktposter` er det korpsfilteret
+  // slapp gjennom. Skranken er en databasekjensgjerning uavhengig av hvem som
+  // ser raden, så den ufiltrerte lista er riktig kilde — samme idiom som
+  // `mkMittKorps()`. (Serveren filtrerer i tillegg sitt eget svar, så en
+  // korps-bruker kan fortsatt treffe veggen. Da vises meldingen, som nå rulles
+  // fram — se `rullTilFeil()`.)
+  const opptatt = opptattPaaPlassen(vp, aktivListe.alle_vaktposter || aktivListe.vaktposter);
   const valg = ['<option value="">— ledig plass —</option>'].concat(
-    (aktivListe.mannskap || []).map((m) =>
-      `<option value="${escHtmlValue(m.id)}">${escapeHtml(m.navn + ' — ' + m.korps_navn)}</option>`
-    )).join('');
+    (aktivListe.mannskap || [])
+      .filter((m) => !opptatt.has(m.id))
+      .map((m) =>
+        `<option value="${escHtmlValue(m.id)}">${escapeHtml(m.navn + ' — ' + m.korps_navn)}</option>`
+      )).join('');
   return `<select class="vl-celle vl-fyll" data-action="endreVaktpost" data-hendelse="change"
                   data-felt="mannskap_id" data-id="${escHtmlValue(vp.id)}">${valg}</select>`;
 }
