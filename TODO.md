@@ -305,6 +305,40 @@ ingen av dem gir feilmelding — de er bare stille inaktive.
 
 ## Pågående / neste
 
+### Vaktlista: overlappende skift — funnet 14. sep. 2026
+
+*Funnet mens vi diskuterte rapportmodulen, men punktene hører hjemme i vaktlista og er
+uavhengige av om rapporten noen gang bygges.*
+
+- [ ] **`overlapp`-tellingen finnes ikke, men docstringen lover den.**
+      `vaktliste/services._hviletider()` sier «Overlappet i seg selv fanges av
+      `overlapp`-tellingen». Det er ingen `overlapp`-nøkkel i belastningsraden. Det som
+      faktisk skjer er at `korteste_hvile` blir `0.0` og raden flagges som **kort hvile** —
+      altså vises et overlapp som et hvileproblem, og planleggeren får ikke vite hva det
+      egentlig er. Enten skriv tellingen, eller rett docstringen; den kan ikke bli stående
+      som den er.
+- [ ] **Legg `overlapp` i `belastning_per_person()`.** Antall overlappende timer per
+      person, ved siden av `korteste_hvile`. Billig, og det er den opplysningen
+      vaktlederen trenger for å rette før lista låses.
+- [ ] **Vurder en sperre, men ikke i databasen.** `test_overlapp_paa_tvers_av_ressurser_stoppes_ikke`
+      dokumenterer at dette er bevisst: «noen ganger står man på to lister». Å sperre det
+      i basen krever `ExclusionConstraint`, som **ikke finnes i SQLite** — da er suiten
+      grønn lokalt mens prod oppfører seg annerledes, nøyaktig fella fra 30. aug. 2026.
+      Riktig sted å nekte er ved **frysing** av en liste som skal bli fakturagrunnlag, ikke
+      ved planlegging der overlappet bare er informasjon.
+
+**Hvorfor dette betyr noe utover planleggingen:** et overlapp blåser opp timesummen.
+Målt 14. sep. 2026 — skift 12:00–20:00 (8 t) og 16:00–22:00 (6 t) på samme person gir
+`timer = 14.0`, mens personen var til stede i 10 timer. I dag er det harmløst, fordi
+ingen betaler etter tallet. Se `docs/FORSLAG_RAPPORTMODUL.md`.
+
+- [ ] **Timer har ingen dagdimensjon.** `_timer()` er ren varighet; fredag 20:00 → lørdag
+      04:00 gir 8,0 timer uten at koden har noe begrep om hvilken dag de tilhører.
+      Spørsmålet er ubesvart i koden fordi ingenting har stilt det. Bemanningskurven har
+      presedensen — den bøtter per time og markerer midnatt (`vl-dogn`) — så regelen
+      «fredag 23:59 er fredag, lørdag 00:00 er lørdag» (André, 14. sep. 2026) betyr at et
+      skift **splittes ved midnatt**. Trengs først hvis noe skal vise timer *per dag*.
+
 ### Funn fra staging-verifiseringen 14. sep. 2026
 
 - [x] **CSP blokkerte den stille lydbæreren.** `media-src 'self' blob:` lagt til i

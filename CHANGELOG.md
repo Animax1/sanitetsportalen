@@ -4,6 +4,41 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-14 — Vaktlista: overlappende skift ført i TODO (ingen kode)
+
+Funnet mens rapportmodulen ble diskutert, men punktene hører hjemme i vaktlista og er
+uavhengige av om rapporten noen gang bygges.
+
+**Docstringen lover en telling som ikke finnes.** `vaktliste/services._hviletider()` sier
+«Overlappet i seg selv fanges av `overlapp`-tellingen». Det er ingen `overlapp`-nøkkel i
+belastningsraden. Det som faktisk skjer er at `korteste_hvile` blir `0.0` og raden flagges
+som **kort hvile** — altså vises et overlapp som et hvileproblem, og planleggeren får ikke
+vite hva det egentlig er.
+
+**Og et overlapp blåser opp timesummen.** Målt: skift 12:00–20:00 (8 t) og 16:00–22:00
+(6 t) på samme person gir `timer = 14.0`, mens personen var til stede i 10 timer. I dag er
+det harmløst fordi ingen betaler etter tallet — det er et planleggingsvarsel. Som
+fakturagrunnlag er det fire timer noen betaler for uten at noen var der.
+
+**Timer har ingen dagdimensjon.** `_timer()` er ren varighet; fredag 20:00 → lørdag 04:00
+gir 8,0 timer uten at koden har noe begrep om hvilken dag de tilhører. Spørsmålet var
+ubesvart i koden fordi ingenting hadde stilt det. Bemanningskurven har presedensen — den
+bøtter per time og markerer midnatt (`vl-dogn`) — så Andrés regel «fredag 23:59 er fredag,
+lørdag 00:00 er lørdag» betyr at et skift **splittes ved midnatt**.
+
+**En sperre hører ikke hjemme i databasen.**
+`test_overlapp_paa_tvers_av_ressurser_stoppes_ikke` dokumenterer at dagens oppførsel er
+bevisst: «noen ganger står man på to lister». Å sperre det i basen krever
+`ExclusionConstraint`, som **ikke finnes i SQLite** — da ville suiten vært grønn lokalt
+mens prod oppførte seg annerledes, nøyaktig fella fra 30. aug. 2026. Riktig sted å nekte er
+ved **frysing** av en liste som skal bli fakturagrunnlag, ikke ved planlegging der
+overlappet bare er informasjon.
+
+Ingen kode skrevet. `docs/FORSLAG_RAPPORTMODUL.md` er ikke oppdatert ennå — diskusjonen
+pågår.
+
+---
+
 ## 2026-09-14 — Forslag: rapportmodul (ingen kode)
 
 `docs/FORSLAG_RAPPORTMODUL.md`, skrevet på Andrés spørsmål om en `/rapport/`-modul som
