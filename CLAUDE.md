@@ -1089,7 +1089,15 @@ sted. Fem slike ble skrevet om denne dagen; mønsteret de fikk:
 et fast antall sekunder inn i hver periode, jittret per nøkkel. Tolv forsøk mot `10/m` som
 straddler den deles i to bøtter der ingen når ti — testen feiler da omtrent én kjøring av
 seksti. Bruk **2 × grensen + 1** forsøk, så bryter den ene siden uansett hvor oppdelingen
-faller.
+faller: duebolprinsippet, ikke flaks.
+
+**Regelen er en funksjon, `nok_til_a_bryte(grense)` i `core/tests_ratelimit.py`**, og ikke
+et tall man skriver av. Den ble brutt tre steder samtidig etter at jeg trodde jeg hadde
+rettet den: `test_opprett_pasient_strupes` (65 mot 60/m), `test_full_stats_strupes` (35 mot
+30) og `test_auditlog_eksport_strupes` (15 mot 10). Den første var «den uforklarte
+enkeltfeilen» som gikk igjen i suiten i flere dager — den ble først fanget da en full
+kjøring ble tatt vare på med `tee` i stedet for å bli grep-et bort. **Behold loggen fra
+hver full kjøring.**
 
 ## Migrasjoner
 

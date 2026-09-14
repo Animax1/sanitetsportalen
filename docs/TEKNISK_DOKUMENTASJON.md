@@ -1,14 +1,41 @@
-# Teknisk dokumentasjon – Pasientregistreringssystemet
+# Teknisk dokumentasjon – Sanitetsportalen
 
-> **Versjon:** April 2026 (revidert)  
-> **Målgruppe:** Teknisk etterfølger (utvikler / IT-konsulent) som overtar drift eller videreutvikling.  
-> **Status:** Revidert utgave – observability-lag, stats-cache/ETag, Redis-backend og Gunicorn workers/threads-konfigurasjon er dokumentert.
+> **Versjon:** 14. september 2026
+> **Målgruppe:** Teknisk etterfølger (utvikler / IT-konsulent) som overtar drift eller videreutvikling.
+> **Status:** Gjennomgått mot koden i dokumentrunden 14. sep. 2026 — appene etter at det
+> portalvide flyttet til `core`, backup i to lag, og sikkerhetslaget etter rundene
+> 11.–13. september.
+>
+> **Dokumentet het «Pasientregistreringssystemet» fram til nå, og beskrev tre apper.**
+> Portalen har seks: pasientregistrering er én av fire brukervendte moduler.
+>
+> **Kapitler som ikke er gjennomgått i denne runden** — 5 (API-referanse), 8A–8E
+> (observability, cache, workers) og 13–16 — er merket der de står. De var korrekte da de
+> ble skrevet; de er ikke etterprøvd nå, og der er `CLAUDE.md` den ferskeste kilden.
 
 ---
 
 ## 1. Sammendrag
 
-Pasientregistreringssystemet er en nettbasert applikasjon for sanntids registrering og sporing av pasienter ved legesentre, sanitetsoppdrag og andre tidsbegrensede medisinske arrangementer. Appen gir personell mulighet til å opprette pasientposter, følge triagering (Rød/Gul/Grønn), spore behandlingsforløp fra ankomst til utskriving og generere statistikk over pasientstrømmen. Systemet er bygget med Django 5.2+, PostgreSQL som produksjonsdatabase og vanlig JavaScript uten rammeverk på klientsiden. Det deployeres på Railway-plattformen og benytter MFA (TOTP), rollebasert tilgangsstyring og audit-logging i tråd med GDPR-krav for helseopplysninger.
+Sanitetsportalen er en nettbasert applikasjon for sanitetsvakt og beredskap ved
+arrangementer. Den er bygget som et **rammeverk med moduler**, ikke som én applikasjon:
+`core` er portalen, og hver modul melder seg inn i den.
+
+Fire brukervendte moduler i dag:
+
+| Modul | Hva den gjør |
+|---|---|
+| **Pasientregistrering** (`patients`) | Registrering og sporing av pasienter, triagering (Rød/Gul/Grønn), forløp fra ankomst til utskriving |
+| **Oppdrag** (`oppdrag`) | Sentralbord og enhetsskjerm: utrykningsoppdrag, statusmeldinger, enhetshåndtering |
+| **Vaktliste** (`vaktliste`) | Mannskap, korps, ressurser og skift; innsjekk i drift |
+| **Statistikk** (`statistikk`) | Tall fra modulene. Eier ingen data selv |
+
+Django 5.2, PostgreSQL i produksjon (SQLite lokalt), vanlig JavaScript uten rammeverk og
+uten bundler. Deployes på Railway. MFA (TOTP), tilgangsstyring per modul og audit-logging
+på feltnivå, i tråd med GDPR-krav for helseopplysninger.
+
+**Alt henger på en `Vakt`.** Pasienter og oppdrag scopes til den vakta som er aktiv, og
+`core.vakt.hent_aktiv_vakt()` er det ene stedet som svarer på hvilken det er.
 
 ---
 
@@ -47,70 +74,122 @@ Pasientregistreringssystemet er en nettbasert applikasjon for sanntids registrer
 ### 3.1 Komponentdiagram
 
 ```
-  Nettleser (Bootstrap 5 + Tabulator + Chart.js + patients-*.js)
+  Nettleser (Bootstrap 5 + Tabulator + Chart.js — alt fra static/vendor/, ingen CDN)
        |
        | HTTPS (TLS 1.2+)
        v
-  Railway Gateway (edge-proxy, terminerer TLS, setter X-Forwarded-Proto: https)
+  Railway Gateway (terminerer TLS, setter X-Forwarded-Proto og X-Forwarded-For)
        |
        | HTTP (intern)
        v
-  Gunicorn (1 worker, 4 tråder, port $PORT)
+  Gunicorn (workers/threads styrt av WEB_WORKERS/WEB_THREADS)
        |
        v
-  Django 5.2+ WSGI-app
-   ├── SecurityMiddleware
-   ├── MemoryLoggingMiddleware  (logger RSS og responstid for tunge requests)
-   ├── WhiteNoiseMiddleware  (serverer /static/ direkte)
-   ├── SessionMiddleware
-   ├── CommonMiddleware
-   ├── CsrfViewMiddleware
-   ├── AuthenticationMiddleware
-   ├── OTPMiddleware (django-otp)
-   ├── MessageMiddleware
-   ├── XFrameOptionsMiddleware
-   ├── RequestAuditMiddleware  (lagrer request i thread-local)
-   ├── MustChangePasswordMiddleware
-   ├── DynamicSessionTimeoutMiddleware
-   ├── BackupSchedulerMiddleware  (in-process cron for automatisk backup)
-   ├── RequestMetricsMiddleware   (observability: ringbuffer 500 samples, p50/p95/max/errors)
-   └── SecurityHeadersMiddleware  (CSP, Referrer-Policy, Permissions-Policy)
+  Django 5.2 WSGI-app — middleware i denne rekkefølgen:
+   ├── SecurityMiddleware                       (django)
+   ├── core.MemoryLoggingMiddleware             RSS og responstid for tunge requests
+   ├── WhiteNoiseMiddleware                     serverer /static/ med hashede navn
+   ├── SessionMiddleware                        (django)
+   ├── CommonMiddleware                         (django)
+   ├── CsrfViewMiddleware                       (django)
+   ├── AuthenticationMiddleware                 (django)
+   ├── OTPMiddleware                            (django-otp)
+   ├── MessageMiddleware                        (django)
+   ├── XFrameOptionsMiddleware                  (django)
+   ├── audit.RequestAuditMiddleware             request i thread-local, så signaler får bruker og IP
+   ├── accounts.MustChangePasswordMiddleware
+   ├── accounts.DynamicSessionTimeoutMiddleware
+   ├── core.BackupSchedulerMiddleware           reservenett for backup-klokka
+   ├── vaktliste.FilutsendingMiddleware         intervallsending av vaktlista på e-post
+   ├── core.SecurityHeadersMiddleware           CSP, Referrer-Policy, Permissions-Policy
+   └── core.RequestMetricsMiddleware            ringbuffer for p50/p95/max
        |
-       ├── accounts-app  (innlogging, MFA, brukeradmin, LoginEvent)
-       ├── patients-app  (pasient-API, behandlere, helsepersonell, innstillinger, statistikk, backup)
-       └── audit-app     (AuditLog-modell, purge-kommando, check_ssl)
+       ├── core        rammeverket: register, Vakt, backup, arkiv, adminflate
+       ├── accounts    kontoer, ModulTilgang, MFA, innlogging
+       ├── audit       AuditLog og purge
+       ├── patients    pasientregistrering + arkiv
+       ├── oppdrag     sentralbord, enhetsskjerm + arkiv
+       ├── vaktliste   mannskap, ressurser, skift, offline drift
+       └── statistikk  /statistikk/ — henter fra registeret, eier ingen data
        |
        v
-  PostgreSQL (Railway-administrert, AES-256 at rest, TLS 1.2+ i transitt)
-  Railway Volume /data/backups  (JSON-backup-filer)
+  PostgreSQL (Railway, AES-256 at rest, TLS i transitt)
+  Railway Volume /data/backups          gzip-komprimerte JSON-filer
+       |                                 klokketråd i web-prosessen skriver hit
+       v
+  Scaleway Object Storage (nl-ams)      kryptert kopi, AES-256-GCM
+       backups/  modulfilene, 730 dager
+       full/     hele databasen, 90 dager
        |
        v
-  LocMemCache  (in-process, rate-limit-tellere)
+  Cache: LocMemCache, eller Redis når REDIS_URL er satt (vakt-modus)
 ```
+
+**De to middlewarene som er klokker, ikke vakter.** `BackupSchedulerMiddleware` og
+`FilutsendingMiddleware` bruker trafikken som tidtaker. Begge tas ut under test
+(`settings.py`), og backupens egentlige klokke er en **tråd** i web-prosessen —
+middlewaren er reservenettet, og det eneste stedet som kan varsle om at tråden har
+stoppet. Et varsel om at klokka er død, sendt av klokka, kommer aldri fram.
 
 ### 3.2 Request-flyt
 
-1. Nettleseren sender en HTTPS-forespørsel til Railway-domenet.
-2. Railway-gatewayen terminerer TLS og videresender forespørselen til Gunicorn med `X-Forwarded-Proto: https`. Django er konfigurert med `SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')` (`settings.py`, linje 118) slik at Django tolker dette riktig.
-3. Gunicorn mottar forespørselen og sender den gjennom Django-middleware-kjeden.
-3b. `MemoryLoggingMiddleware` registrerer RSS-minne og starter timer; logger til `memory`-loggeren ved avslutning hvis request tok >200ms eller økte RSS med >1MB.
-4. `OTPMiddleware` sjekker om brukeren har gjennomgått OTP-verifisering.
-5. `RequestAuditMiddleware` legger request-objektet i thread-local slik at audit-signaler kan hente bruker og IP uten å sende request eksplisitt.
-6. `MustChangePasswordMiddleware` omdirigerer til passordbytte-siden dersom `must_change_password=True`.
-7. `DynamicSessionTimeoutMiddleware` leser `session_timeout_hours` fra `AppSetting` og setter sesjonens levetid per forespørsel.
-8. `BackupSchedulerMiddleware` sjekker (throttlet til 60 sek per prosess) om et automatisk backup-intervall er passert og starter i så fall backup i en bakgrunnstråd etter at requesten er returnert.
-9. `RequestMetricsMiddleware` tidsstempler requesten ved inngang, måler varighet ved utgang og skriver samplet (path, method, status, duration_ms) inn i en thread-safe ringbuffer med 500 plasser. Loggen inneholder ingen pasientdata.
-10. `SecurityHeadersMiddleware` setter `Content-Security-Policy`, `Referrer-Policy` og `Permissions-Policy` på alle responser.
-11. Django-viewet behandler forespørselen, utfører databaseoperasjoner via ORM og returnerer svar (HTML eller JSON).
-12. Audit-signaler (`patients/signals.py`) trigges automatisk av ORM ved `pre_save`, `post_save` og `post_delete` på `Patient`.
+1. Nettleseren sender HTTPS til Railway-domenet.
+2. Gatewayen terminerer TLS og videresender med `X-Forwarded-Proto: https`. Django er
+   konfigurert med `SECURE_PROXY_SSL_HEADER` slik at dette tolkes riktig.
+3. Middleware-kjeden over kjøres i rekkefølge.
+4. **Klient-IP leses aldri direkte fra `REMOTE_ADDR`** i applikasjonskoden — den er
+   proxyen i produksjon. `core.klientip.klient_ip(request)` er det ene stedet: siste ledd
+   i `X-Forwarded-For`, det Railway selv la til, validert. *Første* ledd er klientens egen
+   påstand og kan forfalskes.
+5. Viewet gates av `core.auth_decorators` — `admin_required`, `modul_kreves` eller
+   `har_tilgang`. Et udekorert view under en modul er en feil som `patients/tests_modul_dekorator.py` fanger.
+6. Audit-signaler i `<app>/signals.py` fyrer på `pre_save`/`post_save`/`post_delete` og
+   henter bruker og IP fra thread-local. Alle lagringssignaler har `@ikke_under_loaddata`,
+   ellers ville en gjenoppretting skrevet en auditrad per lastede rad.
+7. Data som skal inn i et `<script>`-element går gjennom `core.jsdata.js_json()`, aldri
+   `json.dumps` + `|safe`: `json.dumps` escaper ikke `<`, og et navn med `</script>`
+   lukker skriptet.
 
 ### 3.3 Applikasjoner
 
-| App | Ansvar |
-|---|---|
-| `accounts` | `CustomUser`-modell, innloggingsflyt (3-steg med MFA), MFA-håndtering (TOTP, backup-koder, trust-cookies), passordbytte, brukeradmin-panel, rate-limiting, sesjon-invalidering, `LoginEvent`-logging |
-| `patients` | `Patient`-, `Forstehjelper`-, `Helsepersonell`-, `AppSetting`-, `Backup`- og `BackupConfig`-modeller, JSON-API for pasient-CRUD, førstehjelper-CRUD, backup-API, statistikk-beregning (`services.py`), arkivliste, backup-scheduler-middleware, sikkerhetstopptekster-middleware |
-| `audit` | `AuditLog`-modell for alle feltendringer på pasienter, `RequestAuditMiddleware`, `purge_old_logs`-kommando, `check_ssl`-kommando |
+**Retningen er enveis: modulene kjenner `core`, `core` kjenner ingen modul.**
+`accounts` og `audit` regnes som rammeverk. Håndheves av
+`core/tests_avhengighetsretning.py`, som leser importene med AST.
+
+| App | Rolle | Ansvar |
+|---|---|---|
+| `core` | Rammeverk | Modulregisteret, `Vakt` (portalens scope), `AppSetting`, `Backup`, `Backupplan`, `ModuleSettings`. All backup- og arkivlogikk. Adminflaten under `/portal-admin/`. CSP, metrikker, helsesjekk, server-status |
+| `accounts` | Rammeverk | `CustomUser`, `ModulTilgang`, innloggingsflyt med MFA, brukeradmin, rate-limiting, `LoginEvent` |
+| `audit` | Rammeverk | `AuditLog`, `RequestAuditMiddleware`, `purge_old_logs`, `check_ssl` |
+| `patients` | Modul | `Patient`, `Forstehjelper`, `Helsepersonell`, `VaktArkiv`, `ArkivertPasient`. JSON-API delt i fire view-moduler |
+| `oppdrag` | Modul | `Oppdrag`, `Statusmelding`, `Enhet`, `Lokasjon`, `Problemstilling`, `OppdragArkiv`. Sentralbord og enhetsskjerm |
+| `vaktliste` | Modul | `Korps`, `Mannskap`, `Ressurs`, `Vaktpost`, `Vaktliste`, `Kompetanse`. Offline drift med service worker |
+| `statistikk` | Modul | `/statistikk/`. Henter fra `core.stats`-registeret og **navngir ingen kildemodul** |
+
+### 3.4 Registrene — hvordan en modul melder seg inn
+
+En modul registrerer seg fra `apps.ready()`. `core` spør aldri etter en modul ved navn;
+det er derfor rammeverket kan kjøre uten en eneste modul, og derfor en ny modul ikke
+krever endringer i `core`.
+
+| Register | Modulen melder inn | Fra |
+|---|---|---|
+| `core/modules.py` | Selve modulen og hvilke tilgangsnivåer den bruker | `<app>/module.py` |
+| `core/backup/` | Hva som skal med i backupfila | `<app>/backup.py` |
+| `core/arkiv/` | Hva som går inn i arkivets SHA-payload | `<app>/arkiv.py` |
+| `core/stats.py` | Tall til `/statistikk/` | `<app>/statistikk.py` |
+| `core/driftstatus.py` | Tall til `/portal-admin/server-status/` | `<app>/driftstatus.py` |
+| `core/portalinnstillinger.py` | Modulens felter i portalinnstillingene | `<app>/portalinnstillinger.py` |
+| `core/kontokobling.py` | Modulens kort i brukeradmin | `<app>/kontokobling.py` |
+
+De tre siste kom 14. sep. 2026. Fram til da hentet `core` disse tallene ved å importere
+`vaktliste` og `oppdrag` direkte — altså med retningen snudd.
+
+**Hver innhenter fanger sine egne feil.** Et dashbord som gir 500 fordi én modul har en
+treg spørring, er borte akkurat når man trenger det. Portalinnstillingene validerer
+derimot *alle* handlere før noen lagrer: navnet skrives på `Vakt` og resten i
+`AppSetting`, uten transaksjon mellom seg, så en modul som nekter skal stoppe hele
+innsendingen.
 
 ---
 
@@ -125,11 +204,11 @@ Basert på `AbstractBaseUser` + `PermissionsMixin`. Definert i `accounts/models.
 | `id` | BigAutoField | Intern primærnøkkel | PK, auto |
 | `username` | CharField(64) | Brukernavn | `UNIQUE`, påkrevd |
 | `email` | EmailField(120) | E-post (valgfritt) | `NULL` tillatt; unik hvis satt (`UniqueConstraint` med betingelse) |
-| `role` | CharField(20) | Brukerrolle | Choices: `admin`, `lead`, `lead_view`, `read_write`, `read_only`; default `read_only` |
+| `role` | CharField(20) | **Kontotype, ikke tilgangsnivå** | Choices: `admin`, `bruker`; default `bruker`. Feltet krympet i deploy 2 — de fire verdiene som beskrev tilgang er borte, sammen med `has_role_at_least`, `role_required`, `write_required` og `stats_required`. Tilgang ligger i `ModulTilgang` (4.2) |
 | `is_active` | BooleanField | Aktiv konto | Default `True` |
 | `is_staff` | BooleanField | Django Admin-tilgang | Default `False` |
 | `must_change_password` | BooleanField | Tving passordbytte | Default `True` (settes `False` etter bytte) |
-| `mfa_required` | BooleanField | Krev TOTP-MFA | Default `False`; settes `True` av data-migrasjon for admin/lead |
+| `mfa_required` | BooleanField | Krev TOTP-MFA | Default `False` |
 | `failed_login_attempts` | IntegerField | Antall mislykkede forsøk siden sist reset | Default `0` |
 | `locked_until` | DateTimeField | Konto låst til dette tidspunktet | `NULL` betyr ikke låst |
 | `created_at` | DateTimeField | Opprettet | Auto, `auto_now_add` |
@@ -138,7 +217,34 @@ Basert på `AbstractBaseUser` + `PermissionsMixin`. Definert i `accounts/models.
 
 `USERNAME_FIELD = 'username'`. Passordet lagres som en Django-hash — i dag PBKDF2-HMAC-SHA256. Argon2 er **ikke** installert; det krever `argon2-cffi` i `requirements.txt`.
 
-### 4.2 `accounts.LoginEvent`
+### 4.2 `accounts.ModulTilgang`
+
+**Dette er tilgangsstyringen.** Én rad per modul brukeren har tilgang til.
+
+| Feltnavn | Type | Beskrivelse |
+|---|---|---|
+| `bruker` | ForeignKey → CustomUser | |
+| `modul_slug` | CharField | Modulens slug, som i `core/modules.py` |
+| `nivaa` | CharField | `les`, `les_alle`, `skriv_handling`, `skriv_full`, `skriv_leder` |
+
+**Fravær av rad er ingen tilgang** — det finnes ingen `'ingen'`-verdi å lagre, og en
+konto uten rader ser ingenting. Det er ikke en bivirkning, det er den trygge
+standardtilstanden: en ny konto må aktivt få tilgang.
+
+Nivåene er en **ordnet stige**, og `har_tilgang(bruker, slug, nivaa)` svarer på om
+brukeren er på eller over trinnet. **Ukjent nivånavn gir `False`, ikke `True`** — en
+skrivefeil i en dekoratør skal stenge døra, ikke åpne den. Global admin får toppen av
+stigen fra `nivaa_for`; fram til 13. sep. 2026 fikk den `skriv_full`, og da måtte hvert
+`skriv_leder`-kallsted huske `er_global_admin(...) or`.
+
+**Hver modul deklarerer hvilke nivåer den bruker** (`Module.nivaaer`) og kan gi dem sin
+egen etikett (`Module.nivaa_navn`). Det trengs fordi samme nivå betyr ulike ting:
+`skriv_handling` er «stempling» i oppdrag og «fører sitt eget korps» i vaktlista. En
+global liste hadde begge feil samtidig — den skjulte `skriv_handling` for
+oppdragsmodulen, som er den nivået ble laget for, og tilbød `skriv_full` på statistikk,
+der skriving ikke finnes.
+
+### 4.3 `accounts.LoginEvent`
 
 Audit-tabell for innloggingshendelser og MFA-hendelser. Definert i `accounts/models.py`.
 
@@ -207,48 +313,101 @@ Inaktive forstehjelpere vises ikke i dropdown-menyer, men beholdes i databasen f
 
 Brukes som FK-referanse (`helsepersonell_ref`) fra `Patient` med `on_delete=PROTECT`. Inaktive helsepersonell vises ikke i dropdown-menyer.
 
-### 4.6 `patients.AppSetting`
+### 4.6 `core.Vakt` — portalens scope
 
-Nøkkel-verdi-konfigurasjonstabellen. `key` er primærnøkkelen.
+**Alt annet henger på denne.** Pasienter og oppdrag scopes til en vakt, og
+`core.vakt.hent_aktiv_vakt()` er det ene stedet som svarer på hvilken som er aktiv.
+
+| Feltnavn | Type | Beskrivelse |
+|---|---|---|
+| `navn` | CharField(255) | «Landsskytterstevnet 2026». **Unikt** — to vakter med samme navn lar seg ikke skille i statistikken |
+| `year` | IntegerField | Utledet, men lagret: sesongstatistikken grupperer på år |
+| `startet` | DateTimeField | |
+| `avsluttet` | DateTimeField | `NULL` mens vakta pågår |
+| `er_aktiv` | BooleanField | |
+
+**Én aktiv vakt om gangen**, pekt på av `AppSetting['aktiv_vakt_id']` — ikke av `er_aktiv`
+alene. Flere samtidige vakter ville krevd et vaktvalg i hver eneste visning, og en feil i
+det valget er en pasient registrert på feil vakt. Modellen sperrer det ikke for
+framtiden; grensesnittet forutsetter én.
+
+Modellen erstattet `year` som avgrensning (`docs/BESLUTNING_VAKT_SOM_SCOPE.md`). Den
+ligger i `core` fordi **begge** modulene scopes på den; i `patients` ville den gitt
+`oppdrag → patients` for noe som ikke er pasientdata.
+
+### 4.7 `core.AppSetting`
+
+Nøkkel-verdi for det portalvide. `key` er primærnøkkelen.
+
+> **`db_table = 'patients_appsetting'`, og det er med vilje.** Modellen flyttet fra
+> `patients` til `core` 14. sep. 2026 som en ren tilstandsmigrasjon. Railway kjører
+> release-fasen *før* containerbyttet, så mellom `migrate` og byttet står gammel kode og
+> serverer mot nytt skjema — en omdøpt tabell ville gitt 500 på tilnærmet hver
+> forespørsel i det vinduet, fordi denne tabellen bærer pekeren til aktiv vakt. Fjernes
+> `db_table`, lager Django en ny, tom tabell ved siden av den fulle.
+>
+> **Backupfilene bærer modellnavn**, så `core.backup.GAMLE_MODELLNAVN` oversetter
+> `patients.appsetting` → `core.appsetting` ved innlasting. Uten den ville hver fil tatt
+> før flyttingen svart «Invalid model identifier» — og de ligger 730 dager offsite.
 
 | Feltnavn | Type | Beskrivelse |
 |---|---|---|
 | `key` | CharField(64) | Nøkkel (PK) |
-| `value` | TextField | Verdi (alltid lagret som tekst) |
+| `value` | TextField | Verdi, alltid tekst |
 
-Kjente nøkler i bruk:
+Kjente nøkler:
 
-| Nøkkel | Beskrivelse |
-|---|---|
-| `next_patient_nr` | Neste ledige pasientnummer (atomisk inkrement med `select_for_update`) |
-| `active_year` | Aktivt år for filtrering og nye pasienter |
-| `event_name` | Arrangementsnavnet (legacy-nøkkel) |
-| `event_name_<år>` | Arrangementsnavn per år, f.eks. `event_name_2026` |
-| `session_timeout_hours` | Sesjonslevetid i timer (1–24); default 8 |
+| Nøkkel | Beskrivelse | Auditlogges? |
+|---|---|---|
+| `aktiv_vakt_id` | Peker på gjeldende `Vakt` | Ja |
+| `session_timeout_hours` | Sesjonslevetid i timer (1–24), default 8 | Ja |
+| `oppdrag_lyd_aktiv`, `oppdrag_lyd_nytt`, `oppdrag_krev_grov_avreist` | Bilinnstillinger | Ja |
+| `vaktliste.fil.*` | Mottakere og intervall for vaktlista på e-post | Ja |
+| `next_patient_nr_vakt_<id>` | Pasientteller, atomisk med `select_for_update` | **Nei** |
+| `next_oppdrag_nr_vakt_<id>` | Oppdragsteller | **Nei** |
+| `cron.<jobbnavn>` | Siste kjøring av en cron-jobb | **Nei** |
 
-### 4.7 `patients.Backup`
+**De tre siste er unntatt audit med vilje** (`core/signals.py`, `NOKLER_UTEN_AUDIT`).
+Telleren skrives ved *hver* pasientregistrering — uten unntaket ville en vakt med hundre
+pasienter gitt hundre auditrader ingen har laget, blandet inn mellom de ekte. Regelen er
+«logg det et menneske har bestemt, ikke det maskinen har talt», og lista er en
+**unntaksliste**: en ny nøkkel logges som standard.
 
-Loggfører alle backup-operasjoner. Definert i `patients/models.py`.
+### 4.8 `core.Backup` og `core.Backupplan`
 
-| Feltnavn | Type | Beskrivelse | Constraints |
-|---|---|---|---|
-| `id` | BigAutoField | PK | Auto |
-| `filename` | CharField | Filnavn på backupfilen (uten sti) | – |
-| `kind` | CharField | Type backup | Choices: `manual`, `auto`, `pre_reset`, `pre_restore` |
-| `size_bytes` | IntegerField | Filstørrelse i bytes | – |
-| `created_at` | DateTimeField | Opprettet | `auto_now_add` |
-| `created_by` | ForeignKey → CustomUser | Brukeren som startet backup | `NULL` tillatt; `SET_NULL` |
-| `note` | TextField | Valgfritt notat | Blank tillatt |
-
-### 4.8 `patients.BackupConfig`
-
-Singleton-konfigurasjon (pk=1) for automatisk backup-planlegging.
+`Backup` er metadata om en fil på volumet. `db_table = 'patients_backup'`, samme
+begrunnelse som 4.7.
 
 | Feltnavn | Type | Beskrivelse |
 |---|---|---|
-| `id` | IntegerField | Alltid 1 (singleton) |
-| `interval_minutes` | IntegerField | Intervall i minutter mellom automatiske backuper |
-| `last_run_at` | DateTimeField | Tidspunkt for siste gjennomførte automatiske backup |
+| `filename` | CharField | Filnavn uten sti |
+| `kind` | CharField | `manual`, `auto`, `pre_reset`, `pre_restore` |
+| `module_slug` | CharField | Hvilken handler som lagde den. **Slugen er hele forskjellen på en pasientfil og en hel database** |
+| `size_bytes` | IntegerField | |
+| `created_at` / `created_by` | | `SET_NULL` på bruker |
+| `note` | TextField | |
+
+`Backupplan` er **én rad per modul** — den erstattet singletonen `patients.BackupConfig`,
+som var ett intervall for hele portalen:
+
+| Feltnavn | Type | Beskrivelse |
+|---|---|---|
+| `slug` | CharField | Modulens slug, eller `standard`/`full` |
+| `folger_standard` | BooleanField | Default `True`. `full` og `standard` styrer alltid seg selv |
+| `modus` | CharField | `av`, `ved_endring`, `alltid`. Default `ved_endring` |
+| `intervall_verdi` / `intervall_enhet` | | Tall + `minutt`/`time`/`dogn`. Default 1 time |
+| `behold` | IntegerField | Cap på filer **på volumet**, default 50. Offsite styres av bucketen |
+| `sist_sjekket_at` | DateTimeField | Ved hver vurdering |
+| `sist_fil_at` | DateTimeField | Bare når noe faktisk ble skrevet |
+
+**To tidsstempler, og begge trengs.** Uten `sist_sjekket_at` er «ingenting har endret
+seg» umulig å skille fra «jobben er død».
+
+**Registeret er fasit for hvilke moduler som finnes, ikke plantabellen.** En modul uten
+plan får en med standardverdier første gang klokka ser handleren. Leste vi tabellen
+direkte, ville en nyregistrert modul stått uten backup til noen tilfeldigvis åpnet
+`/portal-admin/backup/` — og for et arkiv betyr manglende backup at kollapsen nekter å
+kjøre, altså en feil som først viser seg to år senere.
 
 ### 4.9 `audit.AuditLog`
 
@@ -272,6 +431,8 @@ To DB-indekser er definert: `(table_name, record_id)` og `(created_at)` for effe
 ---
 
 ## 5. API-referanse
+> *Ikke gjennomgått i dokumentrunden 14. sep. 2026. Filstier er rettet, men innholdet er ikke etterprøvd mot koden. `CLAUDE.md` er ferskere.*
+
 
 Alle API-endepunkter returnerer JSON. `Content-Type: application/json` sendes alltid for skriveoperasjoner. CSRF-token sendes som `X-CSRFToken`-header (leses fra `csrftoken`-cookie). Alle endepunkter krever innlogget sesjon; uautoriserte forespørsler omdirigeres til `GET /accounts/login/` (302) eller returnerer 403 JSON der det er hensiktsmessig.
 
@@ -361,7 +522,7 @@ Utfører soft-delete: setter `is_active=False`. Pasienten forsvinner fra standar
 
 **Rolle:** Alle innloggede brukere.
 
-**ETag-støtte:** Endepunktet beregner en SHA-256-hash av førstehjelper-listen og sender `ETag`-headeren. Klienten lagrer ETag og sender `If-None-Match` ved neste kall. Hvis listen er uendret, returneres 304 Not Modified uten kropp. Kombinert med `Cache-Control: private, must-revalidate` og `@never_cache` gir dette effektiv validering uten unødvendig dataoverføring. Implementert i `patients/views_registre.py` og `patients-stats.js`.
+**ETag-støtte:** Endepunktet beregner en SHA-256-hash av førstehjelper-listen og sender `ETag`-headeren. Klienten lagrer ETag og sender `If-None-Match` ved neste kall. Hvis listen er uendret, returneres 304 Not Modified uten kropp. Kombinert med `Cache-Control: private, must-revalidate` og `@never_cache` gir dette effektiv validering uten unødvendig dataoverføring. Implementert i `patients/views_registre.py` og `patients-admin.js`.
 
 **Respons:** JSON-array: `[{"id": 1, "name": "Ola Nordmann", "is_active": true}, ...]`. Sortert: aktive først, deretter alfabetisk.
 
@@ -407,7 +568,7 @@ Blokkeres med 409 Conflict hvis førstehjelperen er knyttet til én eller flere 
 
 #### `GET /api/full-stats/`
 
-**Rolle:** `admin`, `lead`, `lead_view`. Returnerer 403 for andre.
+**Tilgang:** `les` på `statistikk` *og* `les` på kildemodulen. Arkiv-endepunktet krever i tillegg global admin. Returnerer 403 ellers.
 
 Returnerer full statistikk inkludert krysstabeller, Chi-square-tester (scipy) og Kruskal-Wallis-tester per triage, transport og problemstilling.
 
@@ -589,9 +750,21 @@ Nivåene er en ordnet stige:
 | Nivå | Betyr |
 |---|---|
 | *(ingen rad)* | Modulen er usynlig, og URL-en gir 403 |
-| `les` | Kan se modulens data |
-| `skriv_handling` | Kan utløse navngitte overganger (stemplinger) uten å lese request-kroppen. **Tomt i dag** — tas i bruk med oppdragsmodulen |
+| `les` | Kan se modulens data — i vaktlista: **bare sitt eget korps** |
+| `les_alle` | Vaktlista: ser alle korps. Deklareres kun der |
+| `skriv_handling` | Navngitte overganger uten å lese request-kroppen. **I bruk siden oppdragsmodulen** (bilens stemplinger) og i vaktlista (fører sitt eget korps) |
 | `skriv_full` | Kan redigere felter |
+| `skriv_leder` | Kan sette opp — oppretter og fjerner det de andre redigerer |
+
+**`skriv_leder` (30. aug. 2026)** deklareres av vaktlista og, fra 12. sep. 2026, av
+oppdragsmodulen. Skillet mot `skriv_full` er *hva slags skade en feil gjør*: den som
+bemanner setter folk på plasser og kan rette tilbake; den som setter opp fjerner en
+ressurs, og bemanningen forsvinner med den. Uten trinnet måtte de to deles ut samlet,
+eller oppsettet bli global admin — og da kunne ikke en vaktleder lage sin egen vaktliste
+uten å få brukeradmin, backup og arkiv på kjøpet.
+
+**Hver modul deklarerer hvilke nivåer den bruker** (`Module.nivaaer`) og gir dem sin egen
+etikett (`Module.nivaa_navn`) — se 4.2. **Ukjent nivånavn gir `False`, ikke `True`.**
 
 Håndhevet med `@modul_kreves('patients', 'skriv_full')` fra `core/auth_decorators.py`.
 `patients/tests_modul_dekorator.py` går gjennom `urlpatterns` og krever at hvert view under
@@ -600,10 +773,17 @@ den lukkes ikke av en manuell gjennomgang.
 
 `ModuleSettings.enabled=False` gir 403 for alle andre enn global admin.
 
-**`CustomUser.role` er under avvikling.** De fem verdiene har ingen virkning på
-modultilgang lenger; feltet krymper til `admin`/`bruker` i deploy 2. De fem
-`kan_redigere_*`-flaggene har ingen virkning i det hele tatt, og står kun til deploy 3 slik
-at en rollback har noe å bygge radene fra.
+**`CustomUser.role` er kontotype, ikke tilgangsnivå.** Avviklingen er fullført: feltet
+krympet til `admin`/`bruker` i deploy 2, sammen med `has_role_at_least`, `role_required`,
+`write_required` og `stats_required`. De fem `kan_redigere_*`-flaggene ble slettet i
+deploy 3.
+
+Skal en ny modul gates, trengs **ingen kolonne** på `CustomUser` — en `ModulTilgang`-rad
+er hele mekanismen. Det var nettopp det flaggene gjorde galt: de la tilgang i skjemaet i
+stedet for i data, og en modul som ikke hadde noe flagg kunne ikke gates i det hele tatt.
+
+*Tester lager brukere med `accounts.test_helpers.gi_standardtilgang(bruker, profil)`, og
+profilen oppgis eksplisitt — en test som glemmer kallet tester 403-stien uten å vite det.*
 
 Frontend gater på `window.MODUL_TILGANG` (satt av malen), ikke på rollen, og skjuler
 `.write-only` og `.admin-only` via `applyRoleVisibility()` i `patients-utils.js`.
@@ -684,13 +864,28 @@ SECURE_HSTS_PRELOAD = True
 
 ### 7.6 Sikkerhetsheadere
 
-`SecurityHeadersMiddleware` (`patients/middleware.py`) setter følgende headere på alle responser:
+`SecurityHeadersMiddleware` (`core/middleware.py` — flyttet fra `patients` 14. sep. 2026)
+setter følgende på alle responser:
 
-| Header | Verdi |
-|---|---|
-| `Content-Security-Policy` | `script-src 'self' 'nonce-…'` uten verter — bibliotekene ligger under `static/vendor/` (13. sep. 2026) |
-| `Referrer-Policy` | `same-origin` |
-| `Permissions-Policy` | `camera=(), microphone=(), geolocation=()` |
+| Direktiv / header | Verdi | Merknad |
+|---|---|---|
+| `default-src` | `'self'` | |
+| `script-src` | `'self' 'nonce-…'` | **Ingen vertsnavn** (13. sep. 2026). Bootstrap, ikonene, Tabulator og Chart.js ligger under `static/vendor/`. Med `cdn.jsdelivr.net` i lista kunne én HTML-injeksjon lastet en vilkårlig npm-pakke, nonce eller ei |
+| `style-src` | `'self' 'unsafe-inline'` | **Kjent avvik.** Markup har ~50 inline style-attributter; står som åpent punkt i `TODO.md` |
+| `img-src` | `'self' data:` | QR-koder rendres som data-URL |
+| `font-src` | `'self' data:` | |
+| `media-src` | `'self' blob:` | **14. sep. 2026.** `_stilleLydbaerer()` i `oppdrag-enhet.js` bygger en stum WAV som Blob — uten den demper iOS' ringebryter lydvarselet, fordi Web Audio alene regnes som «ambient». `default-src` dekker ikke `blob:`, så direktivet må stå eksplisitt. Å slakke `default-src` i stedet ville sluppet blob-er inn i alt som arver |
+| `connect-src` | `'self'` | |
+| `frame-ancestors` | `'none'` | |
+| `base-uri`, `form-action` | `'self'` | |
+| `object-src` | `'none'` | |
+| `Referrer-Policy` | `same-origin` | |
+| `Permissions-Policy` | `camera=(), microphone=(), geolocation=()` | |
+
+**Nonce, ikke `unsafe-inline`.** Når CSP inneholder et nonce, *ignorerer* nettleseren
+`'unsafe-inline'` for samme direktiv — det finnes ingen mellomting. Hver inline `<script>`
+må ha riktig nonce, og inline event-handlere (`onclick=`) dekkes ikke av nonce i det hele
+tatt; de er flyttet til `data-action`-delegering.
 
 I tillegg settes:
 
@@ -720,75 +915,185 @@ Fire validatorer er aktivert i `settings.py`:
 ### 7.9 Input/output-sikkerhet
 
 - CSRF-beskyttelse på alle mutasjoner.
-- XSS-beskyttelse via auto-escape i templates + manuell escaping i JavaScript: `escapeHtml()`/`_escHtml` i pasientskjemaet (`patients-forms.js`) og arkivvisningen (`patients-stats.js`), og `escHtmlValue()` i statistikk-tabellene.
+- XSS-beskyttelse via auto-escape i templates + manuell escaping i JavaScript: `escapeHtml()`/`_escHtml` i pasientskjemaet (`patients-forms.js`) og i admin-visningene (`patients-admin.js`), og `escHtmlValue()` i statistikk-tabellene (`statistikk.js`, `statistikk-oppdrag.js`).
   - `escHtmlValue()` skiller «ikke satt» (`null`/`undefined`) fra falsy verdier, slik at tallet 0 vises i tabellceller i stedet for å bli tom streng. Det er grunnen til at den finnes ved siden av de to eldre hjelperne.
   - `trustedHtml()` markerer markup koden bygger selv (signifikans-merker i `renderTester`, prosentbjelker i `mkObsTable`). `cellHtml()` slipper klarerte celler gjennom og escaper alt annet, så unntaket blir et bevisst valg per celle.
   - `patients/tests_xss_stats.py` kjører byggerne i node mot HTML-holdige feltverdier, og har i tillegg en statisk vaktpost som krever at hver `${...}` i byggerne er escapet eller står på en gjennomgått unntaksliste med begrunnelse.
 - SQL-injection-beskyttelse via Django ORM (ingen raw SQL).
 - Ingen path traversal i backup-filnavn – filnavn genereres server-side.
 - Generisk feilmelding ved backup-restore (lekker ikke interne detaljer).
+- **Data inn i et `<script>`-element går gjennom `core.jsdata.js_json()`**, aldri
+  `json.dumps` + `|safe`. `json.dumps` escaper ikke `<`, så et arrangementsnavn eller et
+  mannskapsnavn som inneholder `</script>` lukker skriptet og gjør resten til markup.
+
+### 7.9b Klient-IP (`core/klientip.py`, 13. sep. 2026)
+
+**`klient_ip(request)` er det ene stedet IP-en leses:** siste ledd i `X-Forwarded-For` —
+det Railway selv la til — validert, ellers `REMOTE_ADDR`. **Første ledd er klientens egen
+påstand** og kan settes fritt av den som ringer.
+
+Innloggingsloggen, audit-signalene, arkivene og rate-limit-bøttene per IP bruker den.
+`REMOTE_ADDR` direkte er proxyen i produksjon, altså samme adresse for alle — en
+rate-limit-bøtte på den ville strupt hele portalen når én bruker gjettet passord.
+
+### 7.9c Avhengigheter låst med hasher
+
+`requirements.in` er ønskene, `requirements.txt` er det `pip-compile --generate-hashes
+--strip-extras` løste dem til, og det er den Railway installerer. Uten hasher kan en
+kompromittert pakke på PyPI bytte innhold under samme versjonsnummer uten at noe i
+prosjektet merker det.
 
 ### 7.10 Audit
 
-- Hver pasientendring logges på feltnivå (`AuditLog`).
+- Hver pasientendring logges på feltnivå (`AuditLog`). Feltlista utledes fra modellen
+  selv, så et nytt felt kan ikke falle utenfor loggen stilltiende.
+- Oppdrag, mannskap, skift, ressurser og vaktlistestatus logges på samme måte.
+- **Portalens egne tabeller siden 14. sep. 2026** (`core/signals.py`): `AppSetting`,
+  `ModuleSettings` og `Vakt`. Å slå av en modul for *alle*, eller flytte sesjonstimeouten,
+  satte tidligere ingen spor. Tellere (`next_patient_nr_vakt_*`) og cron-status er
+  unntatt — se 4.7.
+- Fritekstfelter (`Oppdrag.fritekst`, `Mannskap.notat`, `Vaktpost.merknad`) logges som
+  **endret, men uten verdier**: raden sier at feltet ble rørt, av hvem og når.
 - Innlogging, MFA-hendelser og passordbytte logges som `LoginEvent`.
-- Backup-opprettelse, gjenoppretting, nedlasting og sletting logges.
+- Backup-opprettelse, gjenoppretting og sletting logges. **Gjenopprettingen logges av
+  `restore_backup` selv**, ikke av viewet, slik at både nettleseren og kommandolinja
+  etterlater nøyaktig én rad med hvem og hvorfra.
+- *«Nedlasting» sto i denne lista fram til 14. sep. 2026. Funksjonen finnes ikke og skal
+  ikke finnes — se 8.8.*
 
 ---
 
-## 8. Automatisk backup-system
+## 8. Backup-systemet
 
-### 8.1 Oversikt
+*Skrevet om 14. sep. 2026. Kapittelet beskrev fram til nå singletonen
+`patients.BackupConfig`, konstanten `BACKUP_EXCLUDE` og en restore som «kun rører
+pasientdata». Alle tre er borte — den første slettet i `patients/0017`.*
 
-Systemet tilbyr automatisk, periodisk backup av pasientdata uten behov for en ekstern cron-tjeneste eller separat Railway-service. Backup kjøres in-process via `BackupSchedulerMiddleware`.
+### 8.1 To lag, og de svarer på hvert sitt spørsmål
 
-### 8.2 BackupConfig (singleton)
+| Lag | Spørsmål det svarer på |
+|---|---|
+| **Modulfiler** (seks) | «Pasientlista ble slettet ved et uhell — kan jeg få den tilbake uten å røre noe annet?» |
+| **Hel database** (`full`) | «Railway-prosjektet er borte — kan jeg reise portalen på nytt et annet sted?» |
 
-`BackupConfig` (pk=1) i `patients`-appen lagrer konfigurasjon for automatisk backup:
+Sju handlere i registeret:
 
-- `interval_minutes`: Antall minutter mellom automatiske backuper.
-- `last_run_at`: Tidspunkt for siste vellykkede automatiske backup.
+| Slug | Fil | Innhold |
+|---|---|---|
+| `portal` | `core/backup/portal.py` | `core.Vakt`, `ModuleSettings`, `AppSetting`. **Først i gjenopprettingsrekkefølgen** |
+| `patients` | `patients/backup.py` | Pasientdata. Arkivmodellene eksplisitt ekskludert |
+| `arkiv` | `patients/backup.py` | `VaktArkiv` + `ArkivertPasient` |
+| `oppdrag` | `oppdrag/backup.py` | Oppdrag, statusmeldinger, enheter, lokasjoner, verdimengdene |
+| `oppdrag_arkiv` | `oppdrag/backup.py` | `OppdragArkiv` + `ArkivertOppdrag`. Er også **sperren** foran kollaps |
+| `vaktliste` | `vaktliste/backup.py` | Korps, mannskap, kompetanser, ressurser, vaktposter, vaktlister |
+| `full` | `core/backup/full.py` | **Hele databasen** unntatt sesjoner, contenttypes, rettighetsrader, Django-admins logg og backup-metadata |
 
-Konfigurasjonen kan leses og oppdateres via `GET/PUT /api/backup-config/` (kun `admin`).
+Gjenoppretting i tom base går i rekkefølge — **portal → patients → arkiv → oppdrag →
+oppdrag_arkiv → vaktliste** — fordi alt peker på vakta med et heltall. Tas ikke `portal`
+først, feiler de andre med «Key (vakt_id)=(1) is not present in table core_vakt».
+`AlleFileneGjenopprettesTests` håndhever at rekkefølgen virker.
 
-### 8.3 Backup-modellen
+**Den hele fila er selvbærende, og det er poenget.** Den inneholder brukere,
+passord-hasher, MFA-hemmeligheter og audit-logg, fordi en tom base ikke har noen å logge
+inn som. Modulfilene strippes derimot for FK-er ut av eget datasett (`strip_fields`): med
+`natural_foreign` lagres de som brukernavn, og er kontoen slettet feiler hele
+gjenopprettingen — altså akkurat når man trenger backupen.
 
-`Backup`-modellen (se seksjon 4.7) loggfører alle backup-operasjoner med:
+### 8.2 `core.Backupplan` styrer hva som skjer når
 
-- `filename`: Filnavnet (uten sti) til backup-filen lagret på Railway Volume.
-- `kind`: Type backup – `manual`, `auto`, `pre_reset` eller `pre_restore`.
-- `size_bytes`: Filstørrelse.
+Se 4.8 for feltene. Tre moduser (`av`, `ved_endring`, `alltid`), fritt intervall, og
+`behold` som cap **på volumet**. Oppbevaringen offsite er noe helt annet og styres av
+bucketens livssyklusregler.
 
-### 8.4 BackupSchedulerMiddleware
+### 8.3 Klokka er en tråd, ikke en cron-jobb
 
-`patients.middleware.BackupSchedulerMiddleware` kjøres som siste middleware i kjeden og implementerer in-process cron:
+`core/backup/klokke.py` starter en tråd i web-prosessen. **Et Railway-volum kan bare
+henge på én tjeneste**, og `/data` henger på web-tjenesten. En cron-tjeneste som tok
+backup ville skrevet fila til sitt eget flyktige containerfilsystem, opprettet
+`Backup`-raden, og forsvunnet med fila — og `core.arkiv.har_backup_etter()` spør bare
+etter raden. Kollapssperra ville dermed åpnet seg på spøkelsesbackuper, og slettet
+radnivået i et arkiv uten dekning.
 
-1. **Throttle per prosess:** Mellom hver request-syklus venter middlewaren minimum 60 sekunder (per prosess, via en prosess-lokal `threading.Event`). Dette forhindrer unødvendig databasekommunikasjon ved høy trafikk.
-2. **Running-lås per prosess:** En prosess-lokal lås (`threading.Lock`) sikrer at kun én bakgrunnstråd per worker-prosess kjører backup om gangen.
-3. **Database-lås (multi-worker-safety):** Når backup skal kjøres, hentes `BackupConfig` med `select_for_update(nowait=True)`. Dersom en annen Gunicorn-worker allerede holder låsen, kastes `OperationalError` og backup hoppes over for denne forespørselen. Dette gjør systemet trygt for multi-worker-oppsett selv om 1 worker er anbefalt konfigurasjon.
-4. **Bakgrunnstråd:** Backup-logikken kjøres i en `threading.Thread` etter at Django-responsen er returnert til klienten, slik at backupet ikke forsinker brukerens forespørsel.
+`BackupSchedulerMiddleware` står igjen som reservenett gjennom samme `kjor_forfalte()`.
+Den er også det eneste stedet som kan varsle om at tråden har stoppet — et varsel om at
+klokka er død, sendt av klokka, kommer aldri fram.
 
-### 8.5 Hva som inkluderes og ekskluderes
+### 8.4 Slettelista utledes, den skrives ikke
 
-- **`BACKUP_APPS = ['patients']`** – kun pasientdata inkluderes.
-- **`BACKUP_EXCLUDE = ['patients.Backup', 'patients.BackupConfig']`** – disse ekskluderes for å unngå selvreferanse ved restore.
-- Passord-hasher, audit-logg, sesjoner og `LoginEvent` inkluderes **ikke** i backup.
+`get_restore_models()` regner ut lista topologisk fra `apps` minus `exclude`, barn før
+foreldre. Den håndskrevne lista var et gjeldspunkt: `Lydvarsel` var med i dumpen, glemt i
+slettelista, og radene ble stående igjen etter en gjenoppretting.
+`SlettelistaDekkerDumpenTests` håndhever at hver modell som dumpes også tømmes.
 
-### 8.6 Restore-semantikk
+### 8.5 `@ikke_under_loaddata` er ikke valgfritt
 
-- Restore rører **kun** pasientdata (modeller i `patients`-appen, ekskludert `Backup` og `BackupConfig`).
-- Brukere, audit-logg, sesjoner og LoginEvent-historikk berøres **ikke**.
-- Før restore lages automatisk en `pre_restore`-backup av gjeldende tilstand.
-- Restore-feil gir generisk feilmelding til bruker (ingen interne detaljer lekkes).
+Django sender `raw=True` når `loaddata` skriver en rad. Uten vakten fyrer audit-signalene
+under en gjenoppretting: de leser relaterte objekter som kanskje ikke er lastet ennå
+(«Mannskap matching query does not exist» midt i en gjenoppretting), og de skriver en
+auditrad per lastede rad. Selve gjenopprettingen logges av `restore_backup`, med hvem som
+gjorde den og hvorfra.
 
-### 8.7 Lagring og retention
+`SignalerFyrerIkkeUnderLoaddataTests` leser alle `*/signals.py` og krever vakten. Den
+scannet en håndskrevet liste over tre apper fram til 14. sep. 2026, og ville ikke sett
+`core/signals.py` den dagen den ble skrevet.
 
-- Backup-filer lagres på Railway Volume under `/data/backups`.
-- `purge_old_backups` sletter automatisk backup-filer eldre enn **72 timer**. Kjøres som del av backup-syklusen.
+### 8.6 Offsite til Scaleway
+
+`create_backup` kaller `offsite.meld_ny_backup(backup, path)` etter at fila er skrevet.
+Funksjonen er **inert** uten `OFFSITE_S3_BUCKET`, nøklene og `OFFSITE_BACKUP_KEY`, og
+**kaster aldri**: volumet er første nett, og feilen står i `OffsiteKopi.feil` og på
+`/portal-admin/backup/`.
+
+**Komprimeres først, krypteres så.** Rekkefølgen er ikke vilkårlig — chiffertekst lar seg
+ikke komprimere, mens gzip på dumpdata-JSON gir 5–15 % av rå størrelse. AES-256-GCM,
+format `SPBK1` + nonce + chiffertekst.
+
+**To prefikser, ett per oppbevaringstid:** `backups/` (730 dager) og `full/` (90 dager).
+Fristene kan bare skilles i bucketen hvis filene ligger på hver sin sti, fordi
+livssyklusreglene filtrerer på prefiks.
+
+**Fristene håndheves av Scaleway, ikke av oss.** Nøkkelen har ikke sletterett, og
+`enforce_cap` rører bare volumet. `offsite.livssyklus()` leser derfor reglene *tilbake*
+fra bucketen, og `_avvik()` sammenligner dem med `FORVENTET_DAGER` på **nøyaktig**
+prefiks: `/full` er ikke `full/`, og en regel som treffer ingenting er en oppbevaringstid
+som stille ble uendelig.
+
+### 8.7 Kommandolinja
+
+| Kommando | Hva den gjør |
+|---|---|
+| `backup_kjor` | Manuell kjøring av klokkas arbeid |
+| `hent_offsite --list` / `hent_offsite <fil>` | Henter og dekrypterer fra bucketen til volumet. **Rører ikke basen** |
+| `gjenopprett --list`/`--siste <modul>`/`--hent <objekt>`/`--full`/`--ja` | **Den som rører basen.** Finnes fordi veien gjennom nettleseren ikke duger i en tom base |
+| `verifiser_backup` [`--full`] | Laster filene inn i en engangsbase og sammenligner radene |
+
+**`--ja` er nødvendig, ikke bekvemt:** `railway ssh -- <kommando>` har ingen terminal, så
+et spørsmål ville hengt — i en katastrofe.
+
+`verifiser_backup` kaller `gjenopprett`, ikke `restore_backup`: da er det veien man
+faktisk ville brukt som er prøvd, ikke en nabo til den. Engangsbasen er en flyktig
+SQLite-fil, og `PORTAL_ENGANGSBASE=1` er den ene navngitte åpningen i `settings.py`-sjekken
+som ellers krever PostgreSQL på Railway.
+
+### 8.8 Det finnes ingen nedlastingsknapp
+
+Heller ikke for modulfilene. En `.json.gz` med hele pasientregisteret i nedlastingsmappa
+er en helseopplysningsdump utenfor portalens kontroll, og den hele fila bærer i tillegg
+passordhasher og TOTP-hemmeligheter. Kontroll av innhold gjøres med `verifiser_backup`.
+
+### 8.9 Ingen vei utenom `core/backup/`
+
+`core/backup/service.py`, `db_backup`-kommandoen og `patients.BackupConfig` er slettet
+(14. sep. 2026). Proxyen lot en modul ta backup **uten å oppgi slug**, og slugen er hele
+forskjellen på en pasientfil og en hel database. Enhver modul, pasientmodulen inkludert,
+registrerer en handler og kaller `core.backup.create_backup(slug=...)`.
+`patients/tests_backup.py` håndhever at de tre ikke kommer tilbake.
 
 ---
 
 ## 8A. Observability og drift
+> *Ikke gjennomgått i dokumentrunden 14. sep. 2026. Filstier er rettet, men innholdet er ikke etterprøvd mot koden. `CLAUDE.md` er ferskere.*
+
 
 ### 8A.1 Oversikt
 
@@ -802,7 +1107,7 @@ Alle komponenter er isolert til `patients`-appen og har ingen eksterne avhengigh
 
 ### 8A.2 RequestMetricsMiddleware
 
-Definert i `patients/middleware.py` som `RequestMetricsMiddleware`. Lagrer en thread-safe ringbuffer med de siste 500 requestene. Hver sample inneholder:
+Definert i `core/middleware.py` som `RequestMetricsMiddleware`. Lagrer en thread-safe ringbuffer med de siste 500 requestene. Hver sample inneholder:
 
 | Felt | Beskrivelse |
 |---|---|
@@ -871,19 +1176,21 @@ Flagget `feature.live_stats_enabled` og endepunktet `/portal-admin/server-status
 ---|---|---|
 | `feature.live_stats_enabled` | `'false'` | Planlagt: skal skru live-statistikk-fanen inn/ut uten deploy. Funksjonen er ikke implementert ennå; default holdes på `'false'` for ikke å villede dashbordet. |
 
-Verdiene er alltid tekst (`AppSetting.value` er `TextField`). En praktisk hjelpefunksjon `is_feature_enabled(key, default='false')` i `patients/stats_cache.py` tolker `'true'`/`'false'` case-insensitivt.
+Verdiene er alltid tekst (`AppSetting.value` er `TextField`). En praktisk hjelpefunksjon `is_feature_enabled(key, default='false')` i `core/stats_cache.py` tolker `'true'`/`'false'` case-insensitivt.
 
 **Endring via dashbordet:** `POST /portal-admin/server-status/flag/` med `key=feature.live_stats_enabled&value=false`. Endepunktet krever CSRF-token og `admin`-rolle. Oppdateringen logges i `AuditLog`.
 
 ---
 
 ## 8B. Stats-cache og ETag/304
+> *Ikke gjennomgått i dokumentrunden 14. sep. 2026. Filstier er rettet, men innholdet er ikke etterprøvd mot koden. `CLAUDE.md` er ferskere.*
+
 
 ### 8B.1 Formål
 
 `/api/stats/` og `/api/full-stats/` gjør betydelig arbeid (aggregeringer og i tilfellet `full_stats_view` også scipy-tester). Når flere brukere har statistikkfanen åpen samtidig, vil de samme beregningene kjøres for hver klient. Stats-cache-modulen reduserer dette til én beregning per TTL-vindu og tilbyr i tillegg `If-None-Match`/304 på klientsiden slik at nettleseren slipper å laste ned ubrukt respons-body.
 
-### 8B.2 Modulen `patients/stats_cache.py`
+### 8B.2 Modulen `core/stats_cache.py`
 
 Hovedkomponenten er dekoratøren:
 
@@ -936,6 +1243,8 @@ Resultat: når dataene er uendret, returneres et tomt 304-svar i stedet for full
 ---
 
 ## 8C. Cache-backend (LocMemCache vs Redis)
+> *Ikke gjennomgått i dokumentrunden 14. sep. 2026. Filstier er rettet, men innholdet er ikke etterprøvd mot koden. `CLAUDE.md` er ferskere.*
+
 
 Django's `CACHES`-konfigurasjon i `myproject/settings.py` velger backend ved oppstart basert på `REDIS_URL`-miljøvariabelen:
 
@@ -971,9 +1280,9 @@ else:
 ### 8C.2 Hvilke komponenter bruker cache
 
 1. **`django-ratelimit`** — lagrer tellere per IP og brukernavn. Med LocMemCache + 2 workers blir grensen effektivt doblet (hver worker har sin egen teller).
-2. **`patients/stats_cache.py`** — cacher `/api/stats/` (15s TTL) og `/api/full-stats/` (60s TTL). Med LocMemCache + 2 workers regnes statistikken to ganger.
-3. **Cache-helsesjekk i `patients/admin_status.py`** — `_get_cache_health()` skriver, leser og sletter en probe-nøkkel for å verifisere at backenden funker. Resultatet vises på admin-dashbordet (Cache-backend-kort).
-4. **RequestMetrics i `patients/middleware.py`** — Bruker Redis direkte (via `redis`-biblioteket, ikke `cache.set/get`-API-et) til å aggregere request-metrikker på tvers av workere når `REDIS_URL` er satt. I lavkostnad-modus (LocMem) brukes lokal deque per prosess. Se 8E for detaljer.
+2. **`core/stats_cache.py`** — cacher `/api/stats/` (15s TTL) og `/api/full-stats/` (60s TTL). Med LocMemCache + 2 workers regnes statistikken to ganger.
+3. **Cache-helsesjekk i `core/admin_status.py`** — `_get_cache_health()` skriver, leser og sletter en probe-nøkkel for å verifisere at backenden funker. Resultatet vises på admin-dashbordet (Cache-backend-kort).
+4. **RequestMetrics i `core/middleware.py`** — Bruker Redis direkte (via `redis`-biblioteket, ikke `cache.set/get`-API-et) til å aggregere request-metrikker på tvers av workere når `REDIS_URL` er satt. I lavkostnad-modus (LocMem) brukes lokal deque per prosess. Se 8E for detaljer.
 
 ### 8C.3 Failsafe ved Redis-nedetid
 
@@ -982,9 +1291,9 @@ Django's innebygde RedisCache (innført i Django 4.0) har **ikke** en innebygd `
 Delvis avhjelping:
 
 - **`django-ratelimit`** failopener av seg selv når cache-backenden kaster — requesten slippes gjennom uten å telles. Dette er innebygd i biblioteket.
-- **Stats-cache** (`patients/stats_cache.py`) er pakket inn i try/except slik at endepunktet går tilbake til å regne statistikken direkte ved cache-feil. Både `cache.get`, `cache.set` og `cache.delete` er beskyttet, så feil i én operasjon stopper aldri request-flyten.
+- **Stats-cache** (`core/stats_cache.py`) er pakket inn i try/except slik at endepunktet går tilbake til å regne statistikken direkte ved cache-feil. Både `cache.get`, `cache.set` og `cache.delete` er beskyttet, så feil i én operasjon stopper aldri request-flyten.
 - **Brukerlåsing** (5 feil passord → `locked_until`) går mot DB og er IKKE påvirket av cache-feil.
-- **Cache-helsesjekken** (`_get_cache_health()` i `patients/admin_status.py`) fanger alle exceptions og rapporterer `healthy=false` med `error`-streng på admin-dashbordet i stedet for å la feilen propagere.
+- **Cache-helsesjekken** (`_get_cache_health()` i `core/admin_status.py`) fanger alle exceptions og rapporterer `healthy=false` med `error`-streng på admin-dashbordet i stedet for å la feilen propagere.
 
 Resultat ved Redis-utfall: noen få requests kan få 500-feil under selve utfallet, men sikkerhets-mekanismene som går mot DB står. Railway restarter Redis-tjenesten automatisk hvis den krasjer, og fallback til LocMemCache kan tvinges fram ved å fjerne `REDIS_URL`-variabelen (krever redeploy så Django re-evaluerer `CACHES`-blokken).
 
@@ -1024,6 +1333,8 @@ Dette er en defensiv layer; ingen kjent bug i `redis-py` lekker passordet i exce
 ---
 
 ## 8D. Gunicorn workers og threads
+> *Ikke gjennomgått i dokumentrunden 14. sep. 2026. Filstier er rettet, men innholdet er ikke etterprøvd mot koden. `CLAUDE.md` er ferskere.*
+
 
 Deploy-konfigurasjonen styres av tre miljøvariabler i `Procfile` (se også seksjon 12):
 
@@ -1056,7 +1367,7 @@ Trådantall over 6 gir lite ekstra gevinst med dagens spørrings-mønster og kan
 Delt state mellom workers er nødvendig for tre ting:
 
 1. **Rate-limiting (`django-ratelimit`)** — Uten Redis vil hver worker ha sine egne tellere. Med 2 workers blir effektiv grense per IP/bruker fordoblet, med 3 workers tredoblet osv. Kritisk for innloggings-endepunktet (default `5/m`).
-2. **Stats-cache (`patients/stats_cache.py`)** — Uten Redis vil hver worker regne statistikken sin egen gang og produsere ulike ETag-er. Klienter får da ikke 304-respons konsistent, og DB-belastningen øker proporsjonalt med worker-antall.
+2. **Stats-cache (`core/stats_cache.py`)** — Uten Redis vil hver worker regne statistikken sin egen gang og produsere ulike ETag-er. Klienter får da ikke 304-respons konsistent, og DB-belastningen øker proporsjonalt med worker-antall.
 3. **Konsistens i admin-dashbord** — Cache-backend-kortet leser `CACHE_BACKEND_NAME` fra settings og forventer at alle workers ser samme tilstand.
 
 ### 8D.4 RequestMetrics ved flere workers (løst via Redis-aggregering)
@@ -1079,6 +1390,8 @@ Hvis env-verdiene avviker fra observert prosessantall, har deployen ikke restart
 ---
 
 ## 8E. Multi-worker-design og lavkostnad-modus
+> *Ikke gjennomgått i dokumentrunden 14. sep. 2026. Filstier er rettet, men innholdet er ikke etterprøvd mot koden. `CLAUDE.md` er ferskere.*
+
 
 Kodebasen kjøres i to ulike driftsmodus styrt av én env-variabel: `REDIS_URL`. Å slå av/på Redis krever ingen kodeændringer — alt skifter automatisk basert på om variabelen er satt.
 
@@ -1092,7 +1405,7 @@ Kodebasen kjøres i to ulike driftsmodus styrt av én env-variabel: `REDIS_URL`.
 Umiddelbare endringer ved bytte mellom modusene:
 
 - Cache-bytte: settings re-evalueres ved Django-oppstart (krever redeploy/restart)
-- `_redis_is_available()` i `patients/middleware.py` leser `settings.CACHE_BACKEND_NAME` runtime og styrer dermed metrikk-aggregering på hver request
+- `_redis_is_available()` i `core/middleware.py` leser `settings.CACHE_BACKEND_NAME` runtime og styrer dermed metrikk-aggregering på hver request
 - Admin-dashbordet (`/api/admin-status/`) viser tydelig hvilken backend som er aktiv og om aggregering er live (felter `cache_health.backend` og `metrics_5min.source`)
 
 Prosedyre for bytte mellom modusene er dokumentert i `RUNBOOK_VAKT.md` §4.
@@ -1103,7 +1416,7 @@ Prosedyre for bytte mellom modusene er dokumentert i `RUNBOOK_VAKT.md` §4.
 |---|---|---|---|
 | Django cache (stats, rate-limit) | `settings.CACHES` | Delt via Redis i vakt-modus, per-prosess i lavkostnad | `KEY_PREFIX='pasientregistrering'` isolerer mot andre tjenester på samme Redis |
 | Audit thread-local (current user) | `audit/utils.py` | Per-tråd (riktig) | `threading.local()` er semantisk per tråd — hver request får ren kontekst |
-| Backup-scheduler `_is_running` | `patients/backup_scheduler.py` | Per-prosess (in-memory bool) | DB-lås (`select_for_update(nowait=True)`) er den ekte beskyttelsen — selv om to workere mener begge "jeg starter backup", er det DB-låsen som faktisk slipper bare én gjennom |
+| Backup-scheduler `_is_running` | `core/backup/klokke.py` | Per-prosess (in-memory bool) | DB-lås (`select_for_update(nowait=True)`) er den ekte beskyttelsen — selv om to workere mener begge "jeg starter backup", er det DB-låsen som faktisk slipper bare én gjennom |
 | Request-metrikker (lokal deque) | `patients/middleware._MetricsStore._samples` | Per-prosess (siste 500 samples per worker) | Brukes som fallback. Ved aggregering bidrar hver worker til Redis-listen i tillegg — se 8E.3 |
 | Request-metrikker (Redis-liste) | Redis nøkkel `metrics:requests` (KEY_PREFIX prefikset av Django) | Delt | `LTRIM` holder maks 5000 entries; `EXPIRE` rydder hvis listen er ubrukt |
 | Sessions | Database (`django.contrib.sessions.backends.db`) | Delt | Postgres som backend — ingen worker-avhengig state |
@@ -1176,9 +1489,13 @@ Rekkefølgen i `MIDDLEWARE`-listen i `settings.py` er kritisk. Under vises rekke
 | 11 | `audit.middleware.RequestAuditMiddleware` | Lagrer request i thread-local for audit-signaler |
 | 12 | `accounts.middleware.MustChangePasswordMiddleware` | Tvangsomdirigering ved krav om passordbytte |
 | 13 | `accounts.middleware.DynamicSessionTimeoutMiddleware` | Dynamisk sesjonslevetid fra AppSetting |
-| 14 | `patients.middleware.BackupSchedulerMiddleware` | In-process cron for automatisk backup |
-| 15 | `patients.middleware.SecurityHeadersMiddleware` | CSP, Referrer-Policy, Permissions-Policy |
-| 16 | `patients.middleware.RequestMetricsMiddleware` | Observability: ringbuffer med siste 500 requestmålinger (p50/p95/max/errors) |
+| 14 | `core.middleware.BackupSchedulerMiddleware` | **Reservenett** for backup-klokka, som er en tråd — se 8.3 |
+| 15 | `vaktliste.middleware.FilutsendingMiddleware` | Intervallsending av vaktlista på e-post (13. sep. 2026). Samme prinsipp: trafikken er klokka |
+| 16 | `core.middleware.SecurityHeadersMiddleware` | CSP, Referrer-Policy, Permissions-Policy |
+| 17 | `core.middleware.RequestMetricsMiddleware` | Observability: ringbuffer med siste 500 requestmålinger (p50/p95/max/errors) |
+
+**De to klokkene tas ut under test** (`settings.py`), og `MIDDLEWARE_I_DRIFT` bevarer
+driftslista slik at tester kan påstå noe om den uten å lese `settings.py` som tekst.
 
 `MemoryLoggingMiddleware` plasseres tidlig (etter SecurityMiddleware, før WhiteNoise) slik at den måler hele request inkludert statisk-fil-servering. `BackupSchedulerMiddleware` plasseres nær slutten slik at request allerede er ferdig behandlet når backup startes i bakgrunnstråd. `SecurityHeadersMiddleware` plasseres like før `RequestMetricsMiddleware` slik at sikkerhetsheadere settes på alle responser. `RequestMetricsMiddleware` plasseres sist slik at den måler den endelige responsen med alle headere inkludert.
 
@@ -1188,42 +1505,88 @@ Rekkefølgen i `MIDDLEWARE`-listen i `settings.py` er kritisk. Under vises rekke
 
 ### 10.1 Arkitektur
 
-Frontend er en SPA-lignende enkeltside-applikasjon i vanlig JavaScript (ingen React, Vue eller Angular). Siden rendres av Django-templaten `templates/patients/index.html`, som laster fire moduler fra `static/js/`:
+Vanlig JavaScript, **ingen rammeverk og ingen bundler**. 22 filer i `static/js/`, fordelt
+på fem sider: pasientsiden, `/statistikk/`, `/vaktliste/` og de to grensesnittene under
+`/oppdrag/`.
 
 | Modul | Lastes | Ansvar |
 |---|---|---|
-| `patients-utils.js` | alltid | CSRF-fetch, `withSubmitGuard`, escaping-hjelpere, delt tilstand |
-| `patients-table.js` | alltid | Tabulator-grid og tavlevisning |
-| `patients-forms.js` | alltid | Registrerings- og redigeringsskjema |
-| `patients-app.js` | alltid | Oppstart, faneskift, auto-refresh, lastere for navneregistrene |
-| `patients-stats.js` | admin/lead/lead_view | Statistikkfanen, arkiv, admin-handlinger |
+| `portal-utils.js` | **alle sider** | CSRF-fetch (`apiFetch`), `withSubmitGuard`, escaping, `fmtMin`, `data-action`-delegeringen, fokusvakten for modaler |
+| `patients-utils.js` | pasientsiden, alltid | Tilgangssynlighet, delt tilstand, skjemahjelpere |
+| `patients-table.js` | pasientsiden, alltid | Tabulator-grid og tavle |
+| `patients-forms.js` | pasientsiden, alltid | Registrerings- og redigeringsskjema |
+| `patients-app.js` | pasientsiden, alltid | Oppstart, faneskift, auto-refresh |
+| `patients-admin.js` | pasientsiden, **kun admin** | Registeradmin, sesjonstimeout, vaktavslutning, vaktarkiv |
+| `statistikk.js` | **kun** `/statistikk/` | Pasientstatistikk (Chart.js), arkivmodus, kildefanene |
+| `statistikk-oppdrag.js` | `/statistikk/`, kun med oppdragstilgang | Oppdragsfanen |
+| `oppdrag-sentral-*.js` (fire) | `/oppdrag/`, kontoer **uten** enhet | Sentralbordet |
+| `oppdrag-enhet.js` | `/oppdrag/`, **enhetskontoer** | Bilens skjerm, offline-kø, lydvarsel |
+| `vaktliste-*.js` (fem) | **kun** `/vaktliste/` | Hele vaktlistesiden |
+| `vaktliste-sw.js` | service worker på `/vaktliste/sw.js` | Offline drift |
 
-`patients-stats.js` er omtrent like stor som de fire andre til sammen (41,5 kB mot 41,2 kB) og lastes derfor kun for roller med statistikktilgang (F7). En `read_only`-bruker laster 49 % av admin-bundlen.
+**To sider er delt i flere filer** (14. sep. 2026): `vaktliste.js` var 3 801 linjer og
+`oppdrag-sentral.js` 1 991. Uten bundler deler filene **ett globalt navnerom**, så
+delingen er billig — men den gjør tre feil mulige som ikke fantes før: en funksjon som
+faller mellom to filer, en som dupliseres (den sist lastede vinner i stillhet), og en mal
+som kommer i utakt med lasterekkefølgen. `core/tests_js_splitt.py` håndhever alle tre.
 
-Bootstrappen lå tidligere i `patients-stats.js`. Betinget lasting av den fila uten å flytte oppstarten først ville tatt ned hele appen for `read_only` og `read_write` — tabellen, faneskiftet og auto-refresh startet derfra. Regelen er nå: alt de to rollene kan nå, ligger i en alltid-lastet modul, og kall den andre veien går via `_kall('navn')`. `JsModulLastingTests` håndhever begge deler.
+**Regelen for rekkefølgen er ikke «all tilstand i den første fila».** `let`/`const` på
+toppnivå er skript-scopede og deles mellom filene, så det ville vært et krav ingen holder.
+Den ekte regelen er: **alt som *kjører* på toppnivå står i den siste fila** — i praksis
+`DOMContentLoaded`-krokene. Kjører en tidlig fil noe, kan den lese en binding som ikke er
+nådd, og siden dør på en `ReferenceError` før noe er tegnet.
 
-Monolitten `static/js/script.js` ble delt opp i disse fire i mai 2026 og slettet 13. aug. 2026 (N9). Referanser til den i eldre dokumenter er historiske.
+**Grensesnittet gates på `window.MODUL_TILGANG`, ikke på rollen.** Globalen settes av
+malen fra brukerens faktiske `ModulTilgang`-rader. Gjør vi det ikke, viser vi knapper som
+fører til 403 — og en knapp som fører til en vegg er verre enn ingen knapp. *Den gamle
+`window.USER_ROLE` er borte sammen med rollemodellen den leste.*
 
-**JS-testing:** det finnes ingen JS-testrunner. `patients/js_test_utils.py` klipper ut enkeltfunksjoner og kjører dem i node med stubbet miljø. Brukes av `patients/tests_xss_stats.py` (escaping) og `DoubleClickGuardTests` (dobbeltklikk-vernet). Testene hoppes over hvis node ikke finnes.
+**`patients-utils.js` kan ikke lastes utenfor pasientsiden.** Den gjør arbeid på toppnivå
+— `Chart.defaults` og `new bootstrap.Modal(...)` — og kaster på en side uten
+pasientskjemaene. Trenger en ny modulside en helper derfra, skal helperen **flyttes** til
+`portal-utils.js`, ikke kopieres. `JsModulLastingTests` håndhever det.
 
-Brukerens rolle (`window.USER_ROLE`) injiseres i templaten og leses av JavaScript for å styre elementsynlighet via CSS-klasser.
+**Alt en ikke-admin kan nå på pasientsiden må ligge i en alltid-lastet modul.** Kall fra
+alltid-lastet kode til `patients-admin.js` går gjennom `_kall('navn')`, som sjekker at
+funksjonen finnes.
+
+**Alle biblioteker ligger under `static/vendor/`**, ikke på CDN (13. sep. 2026) —
+Bootstrap, ikonene, Tabulator og Chart.js. Chart.js lastes kun på `/statistikk/`.
+
+**Brukerdata som settes inn med `innerHTML` skal escapes:** `escHtmlValue()` i tabeller
+(tallsikker — skiller «ikke satt» fra `0`), `escapeHtml()`/`_escHtml()` ellers. Markup
+koden bygger selv merkes med `trustedHtml()`, slik at unntaket er et bevisst valg per
+celle.
+
+**JS-testing:** det finnes ingen JS-testrunner. `patients/js_test_utils.py` klipper ut
+enkeltfunksjoner og kjører dem i node med stubbet miljø. Testene hoppes over hvis node
+ikke finnes. **Ikke skriv tester som bare grep-er etter kodelinjer** — skillet går på hva
+assertionen påstår: å lese kilden for å *finne* en funksjon er greit, å påstå at en
+literal kodelinje står der er det ikke. Den går i stykker av en omskriving som gjør det
+samme, og går grønn når noen skriver det samme feil et annet sted.
+
+*Monolitten `static/js/script.js` ble delt opp i mai 2026 og slettet 13. aug. 2026 (N9).
+Referanser til den i eldre dokumenter er historiske.*
 
 ### 10.2 Navigasjon og faner
 
-Siden har tre faner:
+Pasientsiden har disse fanene:
 - **Tabelloversikt** – Tabulator-grid med pasientliste og filtre
 - **Tavle** – Kanban-lignende oversikt over aktive pasienter
-- **Statistikk** – Diagrammer basert på `/api/stats/` og `/api/full-stats/` (kun synlig for `admin`, `lead`, `lead_view`)
-- **Innstillinger** – Arrangementsnavn, behandlere, sesjonstimeout, arkivliste, backup-administrasjon (synlighet avhenger av rolle)
+- **Innstillinger** – Arrangementsnavn, registre, sesjonstimeout, arkivliste, backup (synlighet avhenger av tilgangsnivå)
+
+*Statistikken er en egen side, `/statistikk/`, siden august 2026 — ikke en fane her. Den
+gates på `les` i den modulen, og viser kun de kildene brukeren har `les` på i
+kildemodulen.*
 
 Fanenavigasjonen er implementert med `data-tab`-attributter og delegert event-lytting (ingen URLer endres).
 
-I `templates/base.html` er det i tillegg to nav-lenker som kun vises for `admin`:
+Portalmenyen viser **Server-status** (`/portal-admin/server-status/`) kun for global
+admin, betinget i malen slik at lenken ikke finnes i DOMen for andre.
 
-- **Server-status** – åpner `/portal-admin/server-status/` i samme fane.
-- **Django-admin** – åpner `/admin/` i ny fane (`target="_blank"`), primaert for feilsøking og direkte tilgang til Django standard admin.
-
-Lenkene er betinget av `USER_ROLE == 'admin'` i templaten og er ikke synlige i DOMen for andre roller.
+**Django-admin rutes kun under `DEBUG`** (S1). Flaten er et utviklerverktøy, ikke en
+brukerflate: et register som *bare* finnes der, finnes ikke for brukeren.
+`SjekkAtIngenPekerPaaDjangoAdminTests` skanner alle maler for lenker dit.
 
 ### 10.3 Auto-refresh
 
@@ -1235,7 +1598,7 @@ Siden polls automatisk hvert 30. sekund for å holde pasientlisten og behandlerl
 
 ### 10.4 ETag-støtte for førstehjelper-listen
 
-`loadForstehjelpere()` i `patients-stats.js` bruker `If-None-Match`-headeren med en lagret ETag. Serveren beregner ETag som SHA-256-hash av førstehjelper-listens innhold og returnerer 304 Not Modified hvis listen er uendret. Dette reduserer unødvendig nettverkstrafikk ved polling.
+`loadForstehjelpere()` i `patients-admin.js` bruker `If-None-Match`-headeren med en lagret ETag. Serveren beregner ETag som SHA-256-hash av førstehjelper-listens innhold og returnerer 304 Not Modified hvis listen er uendret. Dette reduserer unødvendig nettverkstrafikk ved polling.
 
 ### 10.5 CSRF i API-kall
 
@@ -1366,6 +1729,8 @@ Se `DEPLOY_GUIDE.md` (seksjon "Audit-retensjon") for full oppsett.
 ---
 
 ## 13. Vedlikehold og drift
+> *Ikke gjennomgått i dokumentrunden 14. sep. 2026. Filstier er rettet, men innholdet er ikke etterprøvd mot koden. `CLAUDE.md` er ferskere.*
+
 
 ### 13.1 Backup og gjenoppretting
 
@@ -1430,6 +1795,8 @@ Ved redeploy på Railway:
 ---
 
 ## 14. Testing
+> *Ikke gjennomgått i dokumentrunden 14. sep. 2026. Filstier er rettet, men innholdet er ikke etterprøvd mot koden. `CLAUDE.md` er ferskere.*
+
 
 ### 14.1 Kjøre tester
 
@@ -1447,11 +1814,11 @@ Totalt **178 tester** fordelt på følgende filer (145 opprinnelige + 19 admin s
 | `accounts/tests.py` + `accounts/tests_mfa.py` | 22 | Auth, MFA-oppsett, MFA-verifisering, backup-koder, trust-cookie, sesjon-invalidering, rate-limit |
 | `patients/tests.py` | 58 | Filter, tidsstempling, behandler-FK, årsarkiv, tilgangskontroll, obs-stempling, utskrevet-stempling, lead_view, reset aktivt år |
 | `patients/tests_backup.py` | 18 | Backup-opprettelse, gjenoppretting, tilgangskontroll, purge, pre_reset/pre_restore |
-| `patients/tests_scheduler.py` | 8 | In-process scheduler, throttle, database-lås |
+| `core/tests_backup.py` | 8 | In-process scheduler, throttle, database-lås |
 | `patients/tests_offline.py` | 34 | SQLite-isolasjon, create_offline_users, import_offline_data |
 | `patients/tests_security_headers.py` | 5 | CSP, Referrer-Policy, Permissions-Policy |
-| `patients/tests_server_status.py` | 19 | Admin server-status: tilgangskontroll (admin vs. andre roller), metrics-endepunkt, JSON-endepunkt, feature-flag-POST (CSRF + admin), RAM-rapportering, sesjonstelling |
-| `patients/tests_stats_cache.py` | 14 | Stats-cache: TTL (15s/60s), cache-nøkkel per år, SHA-256 ETag-stabilitet, `If-None-Match` → 304, cache-bypass, `sort_keys` på JSON-serialisering, feature-flag av/på |
+| `core/tests_admin_status.py` | 19 | Admin server-status: tilgangskontroll (admin vs. andre roller), metrics-endepunkt, JSON-endepunkt, feature-flag-POST (CSRF + admin), RAM-rapportering, sesjonstelling |
+| `core/tests_stats_cache.py` | 14 | Stats-cache: TTL (15s/60s), cache-nøkkel per år, SHA-256 ETag-stabilitet, `If-None-Match` → 304, cache-bypass, `sort_keys` på JSON-serialisering, feature-flag av/på |
 
 ### 14.3 Testdekning – sentrale testklasser
 
@@ -1480,6 +1847,8 @@ Totalt **178 tester** fordelt på følgende filer (145 opprinnelige + 19 admin s
 ---
 
 ## 15. Kjente begrensninger og fremtidig arbeid
+> *Ikke gjennomgått i dokumentrunden 14. sep. 2026. Filstier er rettet, men innholdet er ikke etterprøvd mot koden. `CLAUDE.md` er ferskere.*
+
 
 ### 15.1 LocMemCache og rate-limiting (LØST når Redis er aktivert)
 
@@ -1516,6 +1885,8 @@ Implementert (GDPR fase 3.1, aug. 2026): radene kollapser til frosne aggregater 
 ---
 
 ## 16. Feilsøkingsguide
+> *Ikke gjennomgått i dokumentrunden 14. sep. 2026. Filstier er rettet, men innholdet er ikke etterprøvd mot koden. `CLAUDE.md` er ferskere.*
+
 
 ### 16.1 HTTP 500 på innloggingssiden
 
@@ -1598,11 +1969,14 @@ Implementert (GDPR fase 3.1, aug. 2026): radene kollapser til frosne aggregater 
 **Revisjonshistorikk (april 2026):**
 - Observability-lag lagt til: `RequestMetricsMiddleware`, `/admin/server-status/`, JSON-endepunkt og feature-flag-POST.
 - `AppSetting` brukes nå også som feature-flag-store (`feature.live_stats_enabled`).
-- `patients/stats_cache.py` og dekoratøren `cached_stats_response` med SHA-256 weak ETag og If-None-Match/304.
+- `core/stats_cache.py` og dekoratøren `cached_stats_response` med SHA-256 weak ETag og If-None-Match/304.
 - Gunicorn parametrisert med `WEB_WORKERS`, `WEB_THREADS`, `WEB_MAX_REQUESTS` og `--max-requests-jitter 50`.
 - Testantall økt fra 145 til 178.
 
 ## Tillegg: Fase 3 — Sanitetsportal (mai 2026)
+
+> **Historisk (mai 2026).** Beskriver tilstanden da fasen ble levert, og er beholdt fordi begrunnelsene fortsatt forklarer *hvorfor*. **Detaljene er overtatt av senere arbeid** — særlig `ModuleBackupConfig`, som er erstattet av `core.Backupplan` (se 4.8 og kap. 8), og modulregisteret, som har fått fire registre til (se 3.4). Er dette og et tidligere kapittel uenige, vinner det tidligere kapittelet.
+
 
 Pasientregistrering er flyttet til `/pasienter/` og portal-skallet
 serveres på `/`. Tre ekstra apper bygger ut admin-funksjonalitet:
@@ -1619,7 +1993,7 @@ serveres på `/`. Tre ekstra apper bygger ut admin-funksjonalitet:
 - `core.views_portal`:
   - `portal_dashboard_view` på `/`
   - `profile_view` på `/min-profil/`
-- `core.views_admin` (14. sep. 2026 — `core/views.py` var 830 linjer og 24 views):
+- `core.views_admin` (14. sep. 2026 — `core/views_portal.py` / `views_admin.py` / `views_backup.py` / `views_varsler.py` var 830 linjer og 24 views):
   - `portal_settings_view` på `/portal-admin/innstillinger/`
   - `module_admin_list_view` / `module_admin_edit_view` på
     `/portal-admin/moduler/[<slug>/]`
@@ -1666,6 +2040,9 @@ core osv.) basert på `table_name`-prefiks. `pre_save`-signal i
   tester, totalt 460.
 
 ## Tillegg: Fase 4 — Per-modul backup (mai 2026)
+
+> **Historisk (mai 2026).** Beskriver tilstanden da fasen ble levert, og er beholdt fordi begrunnelsene fortsatt forklarer *hvorfor*. **Detaljene er overtatt av senere arbeid** — særlig `ModuleBackupConfig`, som er erstattet av `core.Backupplan` (se 4.8 og kap. 8), og modulregisteret, som har fått fire registre til (se 3.4). Er dette og et tidligere kapittel uenige, vinner det tidligere kapittelet.
+
 
 Fase 4 modulariserer backup-løsningen. Hver modul kan ha egen av/på,
 intervall og max-antall, og restore er tilgjengelig fra portal-admin
@@ -1737,6 +2114,9 @@ samtidig. Throttling: maks én DB-sjekk per 60 sekund per prosess.
 
 
 ## Fase 5: Bruker‑Førstehjelper‑kobling + varsel‑bjelle
+
+> **Historisk (mai 2026).** Beskriver tilstanden da fasen ble levert, og er beholdt fordi begrunnelsene fortsatt forklarer *hvorfor*. **Detaljene er overtatt av senere arbeid** — særlig `ModuleBackupConfig`, som er erstattet av `core.Backupplan` (se 4.8 og kap. 8), og modulregisteret, som har fått fire registre til (se 3.4). Er dette og et tidligere kapittel uenige, vinner det tidligere kapittelet.
+
 
 ### Generisk varsel‑system
 

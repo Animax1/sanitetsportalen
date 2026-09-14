@@ -4,6 +4,61 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-14 — Dokumentrunden del 2, og den uforklarte feilen fikk et navn
+
+Gjeldspunkt 3 er ferdig: alle seks dokumenter gjennomgått mot koden, pluss et gjerde
+som gjør mekanisk dokumentråte til en rød test.
+
+**Personvernprotokollen dokumenterte en annen tilgangsmekanisme enn den som finnes.**
+A.10 listet `read_only`, `read_write`, `lead_view`, `lead` og `admin` med hver sine
+rettigheter i en matrise. **De fire første ble slettet i deploy 2.** Det er alvorligere
+her enn i README: dette er dokumentet man legger fram ved en DPA-gjennomgang. Samme feil
+sto i A.6 (`role` som «tilgangsnivå») og i sjekklista C.1, der man ble bedt om å
+verifisere roller som ikke finnes. Den ekte modellen er dessuten *strengere* — en konto
+uten `ModulTilgang`-rader ser ingenting — så fortellingen var også unødig svak.
+
+**A.2: bucketen hos Scaleway inneholder nå autentiseringsdata.** Da hel databasebackup
+ble lagt til, endret innholdet seg materielt: passord-hasher, TOTP-hemmeligheter og
+audit-logg. Protokollen sa fortsatt «modulenes data». Ført inn med de tre tiltakene
+risikoen håndteres med — kryptering med en nøkkel Scaleway ikke har, 90 dagers frist mot
+modulfilenes 730, og en IAM-nøkkel uten sletterett. Den korte fristen var en riktig
+avgjørelse som ikke var dokumentert som en avgjørelse.
+
+Endringsloggen hoppet fra 29. august til i dag, og versjonshodet sto på «1.8» mens siste
+oppføring var v1.10. **Hullet er beskrevet framfor etterdatert** — en endringslogg som
+fylles inn i ettertid er verdiløs nettopp som endringslogg.
+
+**Teknisk dokumentasjon:** tittelen sa «Pasientregistreringssystemet» og kapittel 3
+beskrev tre apper. Portalen har seks. Kapittel 3, 4, 6, 7, 8, 9 og 10 er skrevet om —
+registrene, den ekte nivåstigen, CSP slik den er i dag, backup i to lag, og JS-en etter
+delingen. **Ti døde filstier** rettet. Kapitler som *ikke* er gjennomgått er merket der
+de står, i stedet for å se like ferske ut som resten.
+
+**`core/tests_dokumentråte.py` (ny).** Dokumentasjon har ingen testsuite, og det er
+dagens feilmodus. Testen krever at hver filsti, hver `manage.py`-kommando og hvert
+slettet symbol dokumentene navngir, stemmer med koden. Den fant umiddelbart tre ting jeg
+hadde oversett — blant dem en rad i personvernprotokollens A.13 som fortsatt påsto at
+«backup ekskluderer sensitive data» fordi `BACKUP_APPS` var satt til `['patients']`.
+
+Fire mutasjoner prøvd, tre fanget. **Den fjerde slapp gjennom og står skrevet i testen:**
+skriver man `> **Historisk**` over en påstand, tier regelen til neste kapittel. Det er en
+bevisst luke som er lett å misbruke, og den løses av at noen leser diffen — ikke av at
+testen blir strengere.
+
+**Og den uforklarte enkeltfeilen fikk endelig et navn.** Den het
+`core.tests_ratelimit.RateLimitEndepunktTests.test_opprett_pasient_strupes`, og fanget
+seg selv i det øyeblikket en full PostgreSQL-kjøring ble tatt vare på med `tee` i stedet
+for grep-et bort — nøyaktig det jeg skrev i evalueringen at jeg skulle gjøre annerledes.
+
+Årsaken er vinduskanten i `django_ratelimit`, altså samme rotårsak jeg rettet tidligere
+samme dag: 65 forsøk mot `60/m` deles i to bøtter der ingen når 60. **Den var brutt tre
+steder, ikke ett** — også `test_full_stats_strupes` (35 mot 30) og
+`test_auditlog_eksport_strupes` (15 mot 10). Regelen er derfor nå funksjonen
+`nok_til_a_bryte(grense)` med begrunnelsen i docstringen, ikke tre tall man skriver av.
+Bekreftet med 30 kjøringer på PostgreSQL uten én feil.
+
+---
+
 ## 2026-09-14 — Dokumentrunden, del 1: deploy-guide, runbook og README
 
 Gjeldspunkt 3. Tre av seks dokumenter; de to store og gjerdet står igjen.

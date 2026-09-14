@@ -42,12 +42,41 @@ Databehandleravtale (DPA) er inngått i samsvar med GDPR artikkel 28. Data lagre
 | Felt | Opplysning |
 |---|---|
 | Navn | Scaleway SAS |
-| Rolle | Databehandler (Object Storage for krypterte sikkerhetskopier av modulenes data, fra 13. sep. 2026) |
+| Rolle | Databehandler (Object Storage for krypterte sikkerhetskopier, fra 13. sep. 2026) |
 | Avtalegrunnlag | Scaleway Data Processing Agreement, https://www-uploads.scaleway.com/DPA_2024_ENG_b0abb5cc26.pdf |
 | Databehandlingsregion | nl-ams (Amsterdam, Nederland, EU), One Zone |
-| Innhold | De per-modul-backupene portalen selv lager, **kryptert før de forlater Railway** (AES-256-GCM, nøkkel som Scaleway ikke har). Scaleway ser bare chiffertekst. I tillegg Scaleways egen kryptering på disk (SSE) |
-| Sletting | Livssyklusregel på bucketen: objekter slettes etter 730 dager, samme frist som arkivkollapsen (A.9) |
-| Tilgang | Egen IAM-applikasjon med skrive- og leserett på objekter, uten sletterett. Bucketen er privat, uten versjonering |
+| Innhold | **To slag filer, se tabellen under.** Alle **kryptert før de forlater Railway** (AES-256-GCM, nøkkel som Scaleway ikke har). Scaleway ser bare chiffertekst. I tillegg Scaleways egen kryptering på disk (SSE) |
+| Sletting | Livssyklusregler per prefiks: `backups/` 730 dager, `full/` 90 dager. Se A.9 |
+| Tilgang | Egen IAM-applikasjon med skrive- og leserett på objekter, **uten sletterett**. Bucketen er privat, uten versjonering |
+
+**Hva som faktisk ligger i bucketen** (utvidet 14. sep. 2026 — fram til da lå bare
+modulfilene der):
+
+| Prefiks | Innhold | Personopplysninger | Frist |
+|---|---|---|---|
+| `backups/` | Seks modulfiler: `portal`, `patients`, `arkiv`, `oppdrag`, `oppdrag_arkiv`, `vaktliste` | Modulenes egne data — helseopplysninger i `patients` og `arkiv`, mannskapsdata i `vaktliste`. **Ikke** brukerkontoer, ikke audit-logg | 730 dager |
+| `full/` | Hele databasen i én fil | **Alt i A.6**, inkludert brukerkontoer med passord-hasher, TOTP-hemmeligheter, innloggingshendelser og audit-logg | 90 dager |
+
+> **Den hele fila inneholder autentiseringsdata, og det er en bevisst utvidelse.**
+> Fram til 14. sep. 2026 inneholdt bucketen kun modulenes data. Den hele fila må være
+> selvbærende for å kunne gjenopprettes i en tom base — der finnes det ingen konto å logge
+> inn som — og derfor er brukere, MFA-hemmeligheter og logg med. Utelatt er kun sesjoner,
+> contenttypes, rettighetsrader, Django-admins egen logg og portalens backup-metadata.
+>
+> **Risikoen er håndtert i tre lag, ikke ved å la være:** fila krypteres med AES-256-GCM
+> før opplasting med en nøkkel Scaleway ikke har og som også finnes i en passordbehandler
+> utenfor Railway; oppbevaringstiden er **90 dager** mot modulfilenes 730, fordi
+> autentiseringsdata ikke skal ligge i to år; og IAM-nøkkelen har ikke sletterett, så en
+> kompromittert portal kan ikke slette sikkerhetskopiene.
+>
+> **Fristene håndheves av Scaleway, ikke av portalen.** Portalen leser reglene tilbake fra
+> bucketen og viser avvik på `/portal-admin/backup/`. Prefikset må skrives nøyaktig:
+> `/full` er ikke `full/`, og en regel som treffer ingenting er en oppbevaringstid som
+> stille ble uendelig.
+>
+> **Backupfilene finnes ikke andre steder.** Portalen har ingen nedlastingsfunksjon, heller
+> ikke for modulfilene — en `.json.gz` med hele pasientregisteret utenfor portalens
+> kontroll er en spredning ingen har vurdert.
 
 **Tjenester driftet av Railway Corp. på vegne av behandlingsansvarlig:**
 
@@ -64,7 +93,9 @@ Applikasjonen kjøres i to driftsmoduser (se TEKNISK_DOKUMENTASJON.md kapittel 8
 
 > **Vakt-modus:** Redis aktiveres manuelt før hver vakt (se RUNBOOK_VAKT.md §1c) og pauses etter vakten (§10b). Kun i denne perioden behandles cache-data via Redis-tjenesten i Railway-prosjektet.
 
-> **Railway databasebackup:** Abonnementet oppgraderes i forkant av det årlige arrangementet, og plattformens automatiske databasebackup er aktiv i denne perioden (omtrent én måned i året). Resten av året kjører prosjektet på hobby-abonnement uten plattformbackup. Til forskjell fra applikasjonens egen modul-backup — som kun inneholder `patients`-data — omfatter Railways backup **hele databasen**: brukerkontoer med passord-hasher, audit-logg, innloggingshendelser, varsler og arkiv. Lagringstid og sletting styres av Railways plattformvilkår, ikke av applikasjonen. Se A.9.
+> **Railway databasebackup:** Abonnementet oppgraderes i forkant av det årlige arrangementet, og plattformens automatiske databasebackup er aktiv i denne perioden (omtrent én måned i året). Resten av året kjører prosjektet på hobby-abonnement uten plattformbackup. Railways backup omfatter **hele databasen**: brukerkontoer med passord-hasher, audit-logg, innloggingshendelser, varsler og arkiv. Lagringstid og sletting styres av Railways plattformvilkår, ikke av applikasjonen. Se A.9.
+
+> *Merknad 14. sep. 2026:* denne teksten sa tidligere at applikasjonens egen backup «kun inneholder `patients`-data». Det er ikke lenger riktig på noen av punktene — portalen har seks modulfiler og i tillegg en hel databasebackup med samme innhold som Railways. Forskjellen er ikke lenger *hva* som sikkerhetskopieres, men *hvem som har nøkkelen*: portalens egne filer er kryptert med en nøkkel verken Railway eller Scaleway har.
 
 > **Underbehandlere:** Railway Corp. kan benytte egne underleverandører (bl.a. skyleverandører som Google Cloud eller AWS) for å levere infrastrukturtjenestene (inkludert Redis når denne er aktiv). Behandlingsansvarlig skal kontrollere at Railways DPA dekker slike underbehandlere i samsvar med GDPR art. 28(2)–(4). Se sjekkliste i avsnitt A.13.
 
@@ -174,7 +205,8 @@ Følgende opplysninger lagres om **appbrukere** (basert på `CustomUser`-modelle
 |---|---|---|
 | `username` | Brukernavn (innloggingsnavn) | Vanlig personopplysning |
 | `email` | E-postadresse (valgfritt) | Vanlig personopplysning |
-| `role` | Tilgangsnivå: `admin`, `lead`, `lead_view`, `read_write`, `read_only` | Vanlig personopplysning |
+| `role` | **Kontotype**, ikke tilgangsnivå: `admin` eller `bruker` | Vanlig personopplysning |
+| `ModulTilgang` (egen tabell) | Én rad per modul brukeren har tilgang til, med nivå. Dette er den faktiske tilgangsstyringen — se A.10. Ingen rad betyr ingen tilgang | Vanlig personopplysning |
 | `last_login_at` | Tidspunkt siste vellykkede innlogging | Vanlig personopplysning |
 | `created_at` / `updated_at` | Systemtidsstempler | Vanlig personopplysning |
 
@@ -393,10 +425,9 @@ Lagringstidene er fastsatt etter GDPR art. 5(1)(e): opplysningene skal ikke oppb
 | Arkiv-metadata og aggregert statistikk (`OppdragArkiv`) | Ingen fast grense | Manuell sletting av admin | Aggregater uten radnivå; grunnlag for flerårig erfaringslæring |
 | Arkiverte pasientrader (`ArkivertPasient`) | **24 måneder**, deretter kollaps til aggregert statistikk | Automatisk – `kollaps_arkiv` via Railway Cron | Dekker to hele sesonger, slik at årets vakt kan sammenlignes med fjorårets i planleggingen. Deretter er formålet uttømt og radnivået slettes permanent |
 | Arkiv-metadata og aggregert statistikk (`VaktArkiv`) | Ingen fast grense | Manuell sletting av admin | Aggregater uten radnivå; grunnlag for flerårig erfaringslæring |
-| Backup-filer – modul `patients` (aktiv vaktdata) | Antallsbegrenset: de nyeste **50** beholdes, eldre slettes automatisk | Automatisk (`ModuleBackupConfig.max_backups`) | Teknisk gjenoppretting |
-| Backup-filer – modul `arkiv` (vaktarkivet) | Antallsbegrenset: de nyeste **20** beholdes. Kjøres én gang i døgnet | Automatisk (`ModuleBackupConfig.max_backups`) | Arkivet endres kun ved arkivering av en vakt, og identisk innhold gir ingen ny fil |
-| Backup-filer – modul `oppdrag` (aktiv oppdragsdata) | Antallsbegrenset, standard **50** | Automatisk (`ModuleBackupConfig.max_backups`) | Teknisk gjenoppretting; samme regime som `patients` |
-| Backup-filer – modul `oppdrag_arkiv` (oppdragsarkivet) | Antallsbegrenset, standard **50** | Automatisk (`ModuleBackupConfig.max_backups`) | Dekningen kollapsen krever: sletting av radnivå skal være gjenopprettbar |
+| Backup-filer på Railway-volumet – alle moduler | Antallsbegrenset: de nyeste **50** beholdes som standard, eldre slettes automatisk | Automatisk (`core.Backupplan.behold`, satt per modul) | Teknisk gjenoppretting. Antallsbasert og ikke tidsbasert: det som betyr noe er at det finnes nok kopier til å gå tilbake forbi en feil, ikke hvor gamle de er |
+| Backup-filer offsite – modulfilene (`backups/`) | **730 dager (2 år)** | Scaleway livssyklusregel | Samme frist som arkivkollapsen og audit-loggen. Portalens nøkkel har ikke sletterett, så fristen kan bare håndheves av bucketen |
+| Backup-filer offsite – hele databasen (`full/`) | **90 dager** | Scaleway livssyklusregel | Kortere med vilje: fila inneholder passord-hasher, TOTP-hemmeligheter og audit-logg (A.2), og autentiseringsdata skal ikke ligge i to år. 90 dager dekker gjenoppretting etter et bortfall, som er formålet |
 | Railway databasebackup | Styres av Railways plattformvilkår | Railway (databehandler) | Kun aktiv i den perioden abonnementet er oppgradert, ca. én måned i året |
 | Mannskapsregister (`Mannskap`) | Så lenge personen er aktiv frivillig; pensjoneres (`er_aktiv=False`) ved avgang og slettes manuelt når ingen vaktposter refererer | Manuell (admin) | Berettiget interesse opphører når personen slutter; historiske vaktposter (fase 2) krever PROTECT inntil arkivering |
 | Korps/kompetanse/rolle-registre (vaktliste) | Ingen fast grense | Manuell | Organisasjonsoppsett uten personopplysninger |
@@ -437,7 +468,25 @@ Lagringstidene er fastsatt etter GDPR art. 5(1)(e): opplysningene skal ikke oppb
 > glemme det andre. Den håndteres med et punkt i `docs/RUNBOOK_VAKT.md` §10a, som leses
 > ved vaktslutt.
 
-> **Merk om backup-retention:** Applikasjonens backup-opprydding er **antallsbasert**, ikke tidsbasert. Konstanten `RETENTION_HOURS = 72` finnes fortsatt i koden, men er ikke i bruk — den er erstattet av `ModuleBackupConfig.max_backups` (standard 50). Tidligere versjoner av dette dokumentet oppga «72 timer, deretter automatisk slettet», noe som ikke stemte med implementasjonen.
+> **Merk om backup-retention (revidert 14. sep. 2026):** De to lagene styres av hver sin
+> mekanisme, og det er et poeng at de ikke er samme tall.
+>
+> **På Railway-volumet** er oppryddingen **antallsbasert**: `core.Backupplan.behold`,
+> standard 50, satt per modul. Spørsmålet der er «har jeg nok kopier til å gå tilbake
+> forbi feilen», ikke «hvor gammel er den eldste».
+>
+> **Offsite hos Scaleway** er den **tidsbasert**, og håndheves av bucketens
+> livssyklusregler — ikke av portalen. Det er ikke en forenkling: IAM-nøkkelen portalen
+> bruker har *ikke* sletterett, nettopp for at en kompromittert portal ikke skal kunne
+> slette sikkerhetskopiene. Konsekvensen er at fristen bare finnes ett sted, i bucketens
+> oppsett, og at en feilskrevet regel er en oppbevaringstid som stille blir uendelig.
+> Portalen leser derfor reglene *tilbake* fra Scaleway og viser avvik på
+> `/portal-admin/backup/`.
+>
+> *Historikk:* dokumentet oppga tidligere «72 timer, deretter automatisk slettet»
+> (`RETENTION_HOURS`), som aldri stemte med implementasjonen, og deretter
+> `ModuleBackupConfig.max_backups`. Begge er nå slettet fra koden — `RETENTION_HOURS` og
+> `patients.BackupConfig` 14. sep. 2026.
 
 > **Merk om backup-innhold:** Applikasjonens backup er delt i fire uavhengige moduler:
 >
@@ -468,7 +517,9 @@ Lagringstidene er fastsatt etter GDPR art. 5(1)(e): opplysningene skal ikke oppb
 | Rate-limiting | Dobbel rate-limit: maks 10 forsøk per brukernavn / 50 forsøk per IP i 5 minutter. Nødbryter: `RATELIMIT_ENABLE`-miljøvariabel |
 | Sesjon-invalidering | Sesjoner ugyldiggjøres ved passord- eller MFA-bytte |
 | Sesjonstimeout | Standard 8 timer, admin-justerbar mellom 1 og 24 timer |
-| Rollebasert tilgangskontroll (RBAC) | 5 roller med granulerte rettigheter: `read_only`, `read_write`, `lead_view`, `lead`, `admin` (se tabell nedenfor) |
+| Tilgangskontroll per modul | Tilgang gis som rader, ikke som roller: `ModulTilgang(bruker, modul_slug, nivaa)`. **Fravær av rad er ingen tilgang** — det finnes ingen «ingen»-verdi å lagre, så en konto uten rader ser ingenting. Nivåene er en ordnet stige, og hver modul deklarerer hvilke av dem den bruker (se tabell nedenfor). `CustomUser.role` er kontotype (`admin`/`bruker`), ikke tilgangsnivå |
+| Hvert endepunkt er gatet, og det håndheves | `patients/tests_modul_dekorator.py` går gjennom `urlpatterns` og krever at hvert view under en modul er dekorert; unntak må stå i lista der med begrunnelse. Risikoen ved dekoratør framfor middleware er en glemt dekoratør, og en manuell gjennomgang holder bare til neste endepunkt. Ukjent nivånavn i en dekoratør gir **False**, ikke True — en skrivefeil skal stenge døra |
+| Grensesnittet gates på samme data | Knapper vises ut fra brukerens faktiske nivåer, ikke ut fra kontotypen. En knapp som fører til 403 er verre enn ingen knapp, fordi den inviterer til forsøk |
 | CSRF-beskyttelse | Django CSRF-middleware aktivert på alle tilstandsendrende forespørsler |
 | Content-Security-Policy | Aktiv via `SecurityHeadersMiddleware`; begrenser hvilke ressurser nettleseren kan laste. `script-src` bruker nonce per request og tillater ikke `unsafe-inline` — inline skript kan dermed ikke injiseres og kjøres. `style-src` tillater fortsatt `unsafe-inline` (kjent avvik, står som åpent punkt i `TODO.md`) |
 | Sikre informasjonskapsler | Cookies satt med `Secure`, `HttpOnly` og `SameSite=Lax`-flagg |
@@ -478,8 +529,15 @@ Lagringstidene er fastsatt etter GDPR art. 5(1)(e): opplysningene skal ikke oppb
 | Permissions-policy | `camera=(), microphone=(), geolocation=()` |
 | XSS-beskyttelse | Auto-escape i Djangos template-motor. I JavaScript escapes brukerdata manuelt: `escapeHtml()`/`_escHtml` i pasientskjemaet og arkivvisningen, `escHtmlValue()` i statistikk-tabellene. Markup som koden bygger selv (signifikans-merker, prosentbjelker) må merkes eksplisitt med `trustedHtml()` for å slippe gjennom, slik at unntakene er synlige per celle. `patients/tests_xss_stats.py` kjører tabell-byggerne i node og krever i tillegg at hver interpolasjon i dem er escapet eller står på en gjennomgått unntaksliste. I andre lag valideres alle kliniske felt mot en serverside-whitelist (`patients/choices.py`) før lagring — også ved offline-import |
 | SQL-injection-beskyttelse | Django ORM benyttes; ingen rå SQL-spørringer |
-| Audit-logging | Alle pasient-endringer logges på felt-nivå (bruker, IP, tidspunkt, tabell, felt, gammel/ny verdi). Feltlista utledes fra modellen selv, slik at et nytt felt ikke kan falle utenfor loggen stilltiende; en test feiler hvis et felt verken spores eller er eksplisitt unntatt. Innloggingsforsøk logges med IP og user-agent (LoginEvent). Backup-hendelser (opprettelse, restore, nedlasting, sletting) logges |
-| Backup og gjenoppretting | Automatisk backup in-process via `BackupSchedulerMiddleware` (ingen separat tjeneste). Backup lagres som gzip-komprimert JSON på Railway Volume `/data/backups`. Opprydding er antallsbasert: de nyeste 50 per modul beholdes (`ModuleBackupConfig.max_backups`). Pre-restore snapshot lages før gjenoppretting for mulig rollback |
+| Audit-logging | Alle pasient-endringer logges på felt-nivå (bruker, IP, tidspunkt, tabell, felt, gammel/ny verdi). Feltlista utledes fra modellen selv, slik at et nytt felt ikke kan falle utenfor loggen stilltiende; en test feiler hvis et felt verken spores eller er eksplisitt unntatt. Innloggingsforsøk logges med IP og user-agent (LoginEvent). Backup-hendelser (opprettelse, gjenoppretting, sletting) logges — gjenopprettingen av `restore_backup` selv, slik at både nettleseren og kommandolinja etterlater nøyaktig én rad med hvem og hvorfra. «Nedlasting» sto i denne lista fram til 14. sep. 2026; funksjonen finnes ikke og skal ikke finnes. **Portalens egne innstillinger logges fra samme dato** (`core/signals.py`): endring av sesjonstimeout, e-postmottakere og av/på-bryteren for en hel modul. Tellere og cron-status er unntatt — loggen skal si hva et menneske bestemte, ikke hva maskinen talte |
+| Backup og gjenoppretting | Automatisk backup kjøres av en **klokketråd i web-prosessen** (`core/backup/klokke.py`), ikke av en cron-tjeneste: Railway-volumet kan bare henge på én tjeneste, og en cron-jobb ville skrevet fila til sitt eget flyktige filsystem og forsvunnet med den. Filene lagres gzip-komprimert på `/data/backups`. Opprydding på volumet er antallsbasert (`core.Backupplan.behold`, standard 50 per modul); offsite styres av bucketens livssyklusregler (A.9). Pre-restore-øyeblikksbilde lages før hver gjenoppretting |
+| Kryptering av sikkerhetskopier ut av Railway | Hver fil **komprimeres først og krypteres så** (AES-256-GCM, format `SPBK1` + nonce + chiffertekst) før den forlater Railway. Rekkefølgen er ikke vilkårlig: chiffertekst lar seg ikke komprimere. Nøkkelen (`OFFSITE_BACKUP_KEY`) finnes i Railway og i en passordbehandler utenfor — **ikke** hos Scaleway, som derfor bare ser chiffertekst |
+| Ingen nedlasting av sikkerhetskopier | Portalen har **ingen nedlastingsfunksjon** for backupfiler, heller ikke for modulfilene. En `.json.gz` med hele pasientregisteret i en nedlastingsmappe er en spredning utenfor portalens kontroll, og den hele fila bærer i tillegg passord-hasher og TOTP-hemmeligheter. Kontroll av innhold skjer med `verifiser_backup`, som laster filene inn i en flyktig engangsbase uten å flytte dem |
+| Ingen eksterne skript- eller stilkilder | `script-src` er `'self'` + nonce, **uten vertsnavn**. Bootstrap, ikonene, Tabulator og Chart.js serveres fra portalen selv (`static/vendor/`), ikke fra CDN: med en CDN-vert i lista kunne én HTML-injeksjon lastet en vilkårlig pakke, nonce eller ei. En test håndhever at ingen mal peker på et CDN |
+| Låste avhengigheter | `requirements.txt` er generert med `pip-compile --generate-hashes`, og det er den som installeres i produksjon. Uten hasher kan en kompromittert pakke på PyPI bytte innhold under samme versjonsnummer |
+| Én kilde for klient-IP | `core/klientip.py` er det eneste stedet IP-en leses: siste ledd i `X-Forwarded-For` — det Railway la til — validert, ellers `REMOTE_ADDR`. Første ledd er klientens egen påstand. Innloggingslogg, audit, arkiv og rate-limit-bøtter bruker alle denne |
+| Sletting av lokale data ved utlogging | «Logg ut» sender `Clear-Site-Data: "cache", "storage"`. På en delt drifts-PC med offline-vaktliste ryddes Cache Storage, localStorage og service workeren i én operasjon, slik at neste bruker ikke arver forrige brukers lokale kopi av mannskapslista |
+| Ingen lokal kopi eldre enn ett døgn | Service workeren for offline drift nekter å servere en datakopi som er mer enn 24 timer gammel. En vakt varer ikke lenger, og en kopi av mannskapsregisteret skal ikke ligge klar for den som åpner siden uker senere |
 | Generisk feilhåndtering | Restore-feil gir generisk feilmelding til bruker – interne stacktraces lekkes ikke |
 | Cache-isolasjon | I **lavkostnad-modus** brukes Djangos `LocMemCache` (lokal til hver Gunicorn-worker), og ingen cache-data forlater prosessen. I **vakt-modus** benytter Redis key-prefiks `pasientregistrering:` og dedikert tjeneste i Railway-prosjektet, med tilgang kun via internt Railway-nettverk (ikke offentlig). Ingen pasient-PII lagres i cachen i noen modus — kun aggregater, rate-limit-tellere og metrikk-samples uten PII |
 | Auto-fallback ved Redis-utfall | Hvis Redis blir utilgjengelig under vakt-modus, fortsetter applikasjonen å fungere. Metrikk-aggregeringen (#15) skriver lokalt først (per-prosess `deque`) og supplerer Redis kun best-effort med kort socket-timeout (2 s); ved feil faller `snapshot()` automatisk tilbake til lokal kilde. Cache-helsesjekken oppdager utilgjengelig Redis og rapporterer i admin-dashbordet uten å eksponere internt feil-traceback |
@@ -489,21 +547,54 @@ Lagringstidene er fastsatt etter GDPR art. 5(1)(e): opplysningene skal ikke oppb
 | Hard-fail på manglende `SECRET_KEY` | Applikasjonen nekter å starte med `DEBUG=False` hvis `SECRET_KEY` mangler eller er satt til en kjent eksempelverdi. Hindrer at produksjon kjører på en offentlig kjent nøkkel, som ville latt sesjonscookies og MFA trust-cookies forfalskes |
 | MFA-gjenoppretting | Admin kan nullstille MFA for bruker; hendelsen loggføres som `mfa_reset_by_admin` |
 
-**Rollematrise:**
+**Tilgangsmodellen (revidert 14. sep. 2026).**
 
-| Rolle | Lese pasienter | Skrive pasienter | Statistikk | Admin-funksjoner | Endre andres passord |
-|---|---|---|---|---|---|
-| `read_only` | ✓ | – | – | – | – |
-| `read_write` | ✓ | ✓ | – | – | – |
-| `lead_view` | ✓ | – | ✓ | – | – |
-| `lead` | ✓ | ✓ | ✓ | – | – |
-| `admin` | ✓ | ✓ | ✓ | ✓ | ✓ |
+> Dette dokumentet beskrev fram til nå fem roller — `read_only`, `read_write`,
+> `lead_view`, `lead`, `admin` — med en matrise over hva hver av dem kunne. **De fire
+> første finnes ikke**, og ble fjernet i deploy 2 sammen med `has_role_at_least`,
+> `role_required`, `write_required` og `stats_required`. Beskrivelsen var altså ikke bare
+> foreldet: den dokumenterte en annen tilgangsmekanisme enn den som håndhever tilgangen.
+
+**Tre kategorier, ikke én** (se `docs/BESLUTNING_ROLLEMODELLEN.md`):
+
+1. **Global admin** (`role == 'admin'`) — brukeradmin, backup, moduloppsett, audit, arkiv
+   og alt irreversibelt. Står utenfor modulaksen og trenger ingen rader
+2. **Modulbasert** — `ModulTilgang(bruker, modul_slug, nivaa)`, én rad per modul
+3. **Globalt uten admin** — innlogging, min profil, passordbytte, MFA
+
+**Nivåstigen:**
+
+| Nivå | Betyr | Personvernkonsekvens |
+|---|---|---|
+| `les` | Ser modulens data. I vaktlista: **bare sitt eget korps** | Minste tilgang som gir innsyn |
+| `les_alle` | Vaktlista: ser alle korps. Deklareres kun der | Utvider innsyn på tvers av korps |
+| `skriv_handling` | Navngitte overganger (stemplinger). **Leser ikke request-kroppen** | Kan ikke endre vilkårlige felter, bare utløse definerte tilstandsskift |
+| `skriv_full` | Kan redigere felter | |
+| `skriv_leder` | Kan sette opp — oppretter og fjerner det de andre redigerer | |
+
+**Hver modul deklarerer hvilke nivåer som gjelder for den**, og gir dem sin egen etikett:
+`skriv_handling` er «stempling» i oppdrag og «fører sitt eget korps» i vaktlista. Uten
+etiketten deles nivået ut i god tro med feil modul i hodet — og det er en tilgangsfeil,
+ikke en tekstfeil.
+
+| Modul | Nivåer den tilbyr |
+|---|---|
+| `patients` | `les`, `skriv_full` |
+| `oppdrag` | `les`, `skriv_handling`, `skriv_full`, `skriv_leder` |
+| `vaktliste` | `les`, `les_alle`, `skriv_handling`, `skriv_full`, `skriv_leder` |
+| `statistikk` | `les` |
+| `core`, `accounts` | `les`, `skriv_full` |
+
+**Statistikkmodulen komponerer tilgang, den eier den ikke.** Den viser kun kilder
+brukeren har minst `les` på i *kildemodulen* — ellers ville aggregatene gitt avledet
+innsyn i data brukeren ikke har tilgang til. Arkiv-statistikken har i tillegg en egen
+gate på global admin.
 
 ### Organisatoriske tiltak
 
 | Tiltak | Beskrivelse |
 |---|---|
-| Rollebasert tilgangsstyring | Fem rollenivåer som begrenser tilgang til det nødvendige (se rollematrise ovenfor) |
+| Tilgangsstyring etter behov | Tilgang deles ut per modul og nivå, ikke som en samlet rolle (se tilgangsmodellen ovenfor). En ny konto starter uten noen tilgang, og hver utvidelse er en bevisst handling som logges |
 | Databehandleravtale | DPA signert med Railway; EU-region bekreftet |
 | Behandlingsprotokoll | Dette dokumentet vedlikeholdes og oppdateres ved endringer |
 | Tilbakekalling av tilgang | Brukerkontoer deaktiveres umiddelbart når tilgang ikke lenger er nødvendig |
@@ -523,9 +614,31 @@ Den gamle offline-modusen (lokal SQLite-kopi av pasientdata på en laptop) ble l
 | Offline drift på drifts-PC-en | Nettleseren holder siden og siste vaktliste lokalt (service worker). Møtt/av vakt legges i kø når serveren ikke svarer og sendes når den svarer igjen. Kopien inneholder de samme opplysningene som fila, i nettleserens cache på den PC-en |
 | Pasientdata | Ingen lokal kopi. Ved bortfall føres pasienter på papir/Excel etter organisasjonens rutine |
 
+**To tekniske begrensninger på den lokale kopien** (13. sep. 2026), som er grunnen til at
+risikoen under er vurdert som håndterbar og ikke bare akseptert:
+
+| Tiltak | Virkning |
+|---|---|
+| **Ingen datakopi eldre enn 24 timer** | Service workeren nekter å servere en lagret liste som er mer enn ett døgn gammel, og sletter den i stedet. En vakt varer ikke lenger, og et mannskapsregister skal ikke ligge klart for den som åpner siden uker senere |
+| **«Logg ut» rydder maskinen** | Utlogging sender `Clear-Site-Data: "cache", "storage"`, som tømmer Cache Storage, localStorage og service workeren i én operasjon. På en delt drifts-PC arver ikke neste bruker forrige brukers lokale kopi |
+
+Workeren lagrer dessuten **aldri en omdirigering**: en utløpt sesjon gir innloggingssiden,
+og den skal ikke bli stående som «vaktlista». Og den rører ingen POST — stemplinger går i
+kø i klienten, ikke gjennom cachen.
+
 > **Personvernrisiko:** fila og nettleserkopien inneholder personopplysninger om mannskapet.
 > Mottakere skal slette fila etter vakta, og drifts-PC-en skal behandles med samme krav til
 > informasjonssikkerhet som produksjonssystemet. Tap av enheten håndteres etter A.12.
+>
+> **E-postfila er det svakeste leddet, og det er en bevisst avveining.** Den sendes
+> ukryptert, og portalen har ingen kontroll over mottakerens innboks eller over hvor lenge
+> den blir liggende. Alternativet — ingen reserve — ble vurdert som verre: uten lista på
+> papir eller skjerm vet ingen hvem som er på vakt når serveren er nede, og det er en
+> beredskapssvikt. Risikoen begrenses ved at mottakerlista settes av global admin og ikke
+> av den enkelte, at hver utsending logges med adresser og tidspunkt, at fila ikke
+> inneholder e-post, notat eller merknad, og at den selv sier at den skal slettes.
+
+---
 
 ## A.12 Risikovurdering – sammendrag
 
@@ -580,7 +693,7 @@ Følgende sikkerhetsmessige tiltak ble gjennomført i forbindelse med klargjøri
 | Tiltak | Beskrivelse |
 |---|---|
 | Django 5.2+ oppgradering | Oppgradering fra Django 5.1.x for å lukke 9 kjente CVE-er i rammeverket |
-| Backup ekskluderer sensitive data | `BACKUP_APPS` er satt til `['patients']` – backup inkluderer ikke `CustomUser`, `AuditLog`, `LoginEvent` eller sesjoner |
+| Backup ekskluderer sensitive data | *(Tiltaket slik det var i april 2026: `BACKUP_APPS` var satt til `['patients']`, og backup inkluderte ikke `CustomUser`, `AuditLog`, `LoginEvent` eller sesjoner.)* **Overtatt av senere arbeid — se A.2 og A.9.** Innstillingen er fjernet, og portalen tar nå både seks modulfiler og én hel databasebackup. Den hele fila **inneholder** brukere, passord-hasher, MFA-hemmeligheter og audit-logg, med vilje: den må være selvbærende for å kunne gjenopprettes i en tom base. Beskyttelsen er flyttet fra *utelatelse* til *kryptering* (AES-256-GCM med en nøkkel verken Railway eller Scaleway har), kortere frist (90 dager mot 730) og en lagringsnøkkel uten sletterett |
 | Generisk feilmelding ved restore | Restore-operasjoner returnerer generisk feilmelding ved feil; interne stacktraces lekkes ikke til brukergrensesnittet |
 | `ALLOWED_HOSTS` sikker default | Default er endret fra `*` til `.localhost,127.0.0.1`; produksjonsmiljø setter eksplisitt verdi |
 | Content-Security-Policy | Lagt til via `SecurityHeadersMiddleware` |
@@ -820,11 +933,11 @@ E-post: andre.eritsland@gmail.com
 ## C.1 Sjekkliste før hvert event
 
 - [ ] **Bekreft at alle med tilgang har signert taushetserklæring** (eller har taushetsplikt som autorisert helsepersonell). Dette bærer det rettslige grunnlaget etter art. 9(3) – se A.4
-- [ ] Verifiser at alle aktive brukere har korrekte roller (admin, lead, lead_view, read_write, read_only)
+- [ ] Verifiser at alle aktive brukere har riktig tilgang: kontotype (`admin`/`bruker`) **og** modultilgangene under «Brukere» i portaladmin. Gjennomgangen gjelder radene, ikke kontotypen — en konto uten rader ser ingenting, og det er den trygge tilstanden
 - [ ] Deaktiver eller slett brukerkontoer som ikke skal ha tilgang til dette arrangementet
 - [ ] Endre aktivt år / event-navn i appinnstillinger (AppSetting)
-- [ ] Verifiser at MFA er aktivert og satt opp for alle brukere med rolle `admin` og `lead`
-- [ ] Test innlogging med minst én bruker fra hver rolle
+- [ ] Verifiser at MFA er aktivert og satt opp for alle med kontotype `admin`, og for alle med `skriv_leder` på en modul
+- [ ] Test innlogging med minst én bruker per tilgangsnivå som faktisk er i bruk denne vakta
 - [ ] Verifiser at brute-force-lås og rate-limiting fungerer (5 feilede pålogginger gir blokkering i 15 min)
 - [ ] Bekreft at sesjonstimeout er satt korrekt for vakten
 - [ ] Sjekk at Railway-tjenesten kjører og at siste backup er vellykket
@@ -944,10 +1057,46 @@ Dette dokumentet er utarbeidet og godkjent av behandlingsansvarlig.
 
 ---
 
-*Dokument: PERSONVERN_DOKUMENTASJON.md – versjon 1.8 – sist oppdatert 29. august 2026*
+*Dokument: PERSONVERN_DOKUMENTASJON.md – versjon 1.11 – sist oppdatert 14. september 2026*
 
 **Endringslogg:**
 
+- **v1.11 (14.09.2026):** **Gjennomgang mot faktisk kode, del av dokumentrunden.** Tre
+  materielle rettelser og ett dokumentert hull.
+
+  **A.10 beskrev en tilgangsmodell som ikke finnes.** Rollematrisen listet `read_only`,
+  `read_write`, `lead_view`, `lead` og `admin` med hver sine rettigheter. **De fire
+  første ble fjernet i deploy 2**, sammen med `has_role_at_least`, `role_required`,
+  `write_required` og `stats_required`. Protokollen dokumenterte altså ikke en foreldet
+  utgave av mekanismen, men en *annen* mekanisme enn den som faktisk håndhever tilgang.
+  Erstattet med den ekte modellen: `ModulTilgang(bruker, modul_slug, nivaa)`, fem nivåer
+  i en ordnet stige, og hver modul deklarerer hvilke den bruker. Samme feil rettet i A.6
+  (`role` er kontotype, ikke tilgangsnivå — `admin` eller `bruker`) og i sjekklista C.1.
+
+  **A.2: bucketen hos Scaleway inneholder nå hele databasen, ikke bare modulenes data.**
+  Den hele fila bærer brukerkontoer med passord-hasher, TOTP-hemmeligheter,
+  innloggingshendelser og audit-logg — den må være selvbærende for å kunne gjenopprettes
+  i en tom base. Utvidelsen er ført inn med hva som ligger under hvert prefiks, og med
+  de tre tiltakene risikoen håndteres med: kryptering med en nøkkel Scaleway ikke har,
+  **90 dagers** frist mot modulfilenes 730, og en IAM-nøkkel uten sletterett.
+
+  **A.9: retensjonstabellen viste til mekanismer som er slettet.** `RETENTION_HOURS` og
+  `ModuleBackupConfig.max_backups` er borte fra koden (14. sep. 2026); oppryddingen på
+  volumet styres av `core.Backupplan.behold`. Nye rader for begge offsite-fristene, og
+  en merknad om at de håndheves av bucketens livssyklusregler og ikke av portalen —
+  IAM-nøkkelen har ikke sletterett, så fristen finnes bare ett sted.
+
+  **A.10 ellers:** krypteringen av sikkerhetskopier, at det ikke finnes noen
+  nedlastingsfunksjon (og at «nedlasting» sto i audit-lista for en funksjon som ikke
+  finnes), at ingen skript lastes fra CDN, hash-låste avhengigheter, én kilde for
+  klient-IP, `Clear-Site-Data` ved utlogging, og 24-timersgrensen på den lokale kopien.
+  **A.11:** de to tekniske begrensningene på offline-kopien, og en åpen avveining om
+  at e-postfila er det svakeste leddet — bevisst valgt framfor ingen reserve.
+
+  **Hullet:** dette dokumentets endringslogg hoppet fra 29. august til i dag, mens
+  Scaleway-avsnittet ble skrevet 13. september. Versjonshodet sto dessuten på «1.8» mens
+  siste oppføring var v1.10. Begge rettet; endringen fra 13. september er beskrevet
+  under A.2 og i punktet over, ikke som en egen etterdatert oppføring.
 - **v1.10 (29.08.2026):** **A.6:** ny seksjon for mannskapsdata — vaktlistemodulens
   fase 1 fører et globalt register over egne frivillige (navn, korps, kompetanser,
   telefon, valgfri kontokobling), med berettiget interesse som grunnlag. Kostbehov/

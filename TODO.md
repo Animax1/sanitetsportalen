@@ -341,15 +341,13 @@ foreldre, og et punkt som står under noe ferdig er et punkt ingen leser igjen.*
       ikke et skjema ved siden av. Hører hjemme i `core/kontokobling.py` med en
       lagringskrok — men det er kirurgi i brukeropprettelsen, og den skal ikke gjøres
       i forbifarten. Står i `KJENTE_UNNTAK_RAMMEVERK`, som ikke skal vokse.
-- [ ] **Uforklart enkeltfeil i suiten.** Første kjøring med `myproject` inkludert
-      endte `FAILED (failures=1)`; jeg fanget ikke hvilken test, og den har ikke
-      reprodusert på fire fulle kjøringer etterpå. Opprydningsfeilen over er en
-      **uverifisert** hypotese — ikke skriv den av som løst uten å ha sett den
-      igjen. Neste gang: kjør med `2>&1 | tee` og behold logg, og vurder
-      `--shuffle` for å gjøre rekkefølgeavhengighet reproduserbar med et seed.
-      Den kjente slektningen er vinduskanten i rate-limit-testene (se
-      «Rate-limit-tester må tåle vinduskanten» i CLAUDE.md) — den er fikset der
-      den er funnet, men mønsteret kan finnes flere steder.
+- [x] **Uforklart enkeltfeil i suiten — LØST 14. sep. 2026.** Den het
+      `core.tests_ratelimit.RateLimitEndepunktTests.test_opprett_pasient_strupes`, og
+      fanget seg selv da en full PostgreSQL-kjøring ble tatt vare på med `tee` i stedet
+      for grep-et bort. Årsak: vinduskanten i `django_ratelimit`, samme som den jeg
+      rettet tidligere samme dag — 65 forsøk mot `60/m` deles i to bøtter der ingen når
+      60. **Den var brutt tre steder**, ikke ett; regelen er nå funksjonen
+      `nok_til_a_bryte(grense)`. Bekreftet med 30 kjøringer på PostgreSQL uten feil.
 - [x] **Portalinnstillingene og modulbryteren auditlogges ikke.** *Levert 14. sep. 2026* — `core/signals.py`. Funnet mens
       André spurte om «logges ingenting fra core?». Svaret er nesten nei, og det
       er ikke nytt av flyttingen — det har vært slik hele tiden:

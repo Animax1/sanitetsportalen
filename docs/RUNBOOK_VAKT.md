@@ -614,7 +614,7 @@ Koden støtter allerede Redis. Aktivering krever **kun** å opprette tjenesten p
 **Slik fungerer fallback:** Hvis `REDIS_URL` ikke er satt (lokal utvikling, eller Redis-tjenesten er fjernet), faller systemet automatisk tilbake til LocMemCache. Ingen feilmeldinger, ingen krasj.
 
 **Hvis Redis går ned midt i en vakt:** Django sin innebygde `RedisCache` har IKKE en innebygd `IGNORE_EXCEPTIONS`-option (det var en `django-redis`-feature). Vi har derfor app-spesifikke try/except rundt cache-operasjoner som tråkker tyngst:
-- `patients/stats_cache.py` fanger alle cache-feil og regner statistikk direkte ved utfall
+- `core/stats_cache.py` fanger alle cache-feil og regner statistikk direkte ved utfall
 - `django-ratelimit` failopener av seg selv ved cache-feil (slipper requests gjennom)
 - `_get_cache_health()` rapporterer `healthy=false` på admin-dashbord uten å kaste
 - `RequestMetricsMiddleware` har bred try/except rundt både Redis-skriving og -lesing — faller stille tilbake til lokal deque

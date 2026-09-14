@@ -39,6 +39,30 @@ def _statuser(kall, antall):
     return [kall().status_code for _ in range(antall)]
 
 
+def nok_til_a_bryte(grense: int) -> int:
+    """Hvor mange forsøk som **garantert** bryter en grense på ``grense``/min.
+
+    Svaret er ``2 * grense + 1``, og grunnen står i `django_ratelimit.core`:
+
+        w = ts - (ts % period) + (zlib.crc32(value) % period)
+
+    Vinduskanten ligger et fast antall sekunder inn i hver periode, **jitret
+    per nøkkel**. En serie forsøk som straddler den kanten deles derfor i to
+    bøtter, og med bare litt over grensen når ingen av dem fram — testen feiler
+    da omtrent én kjøring av seksti, på en annen maskin enn din.
+
+    Med ``2 * grense + 1`` må én av de to bøttene ha minst ``grense + 1``
+    uansett hvor delingen faller. Duebolprinsippet, ikke flaks.
+
+    **Regelen er en funksjon og ikke tre tall** fordi den ble brutt tre steder
+    samtidig: `test_opprett_pasient_strupes` (65 forsøk mot 60/m),
+    `test_full_stats_strupes` (35 mot 30) og `test_auditlog_eksport_strupes`
+    (15 mot 10). Den første var den uforklarte enkeltfeilen som gikk igjen i
+    suiten i flere dager før den ble fanget med logg 14. sep. 2026.
+    """
+    return 2 * grense + 1
+
+
 @override_settings(SECURE_SSL_REDIRECT=False, RATELIMIT_ENABLE=True)
 class RateLimitKjerneTests(TestCase):
     """Egenskapene ved selve dekoratøren, uten en ekte URL i veien."""
@@ -176,7 +200,8 @@ class RateLimitEndepunktTests(TestCase):
 
     def test_opprett_pasient_strupes(self):
         c = self._klient(self.skriver)
-        statuser = _statuser(lambda: self._opprett(c), 65)
+        # Endepunktet har rate='60/m'.
+        statuser = _statuser(lambda: self._opprett(c), nok_til_a_bryte(60))
         self.assertEqual(statuser[0], 201)
         self.assertIn(429, statuser)
 
@@ -194,7 +219,8 @@ class RateLimitEndepunktTests(TestCase):
     def test_full_stats_strupes(self):
         c = self._klient(self.admin)
         statuser = _statuser(
-            lambda: c.get('/statistikk/api/kilde/patients/full-stats/'), 35)
+            lambda: c.get('/statistikk/api/kilde/patients/full-stats/'),
+            nok_til_a_bryte(30))   # rate='30/m'
         self.assertEqual(statuser[0], 200)
         self.assertIn(429, statuser)
 
@@ -281,7 +307,8 @@ class RateLimitEndepunktTests(TestCase):
     def test_auditlog_eksport_strupes(self):
         c = self._klient(self.admin)
         statuser = _statuser(
-            lambda: c.get('/portal-admin/auditlog/eksport.csv'), 15,
+            lambda: c.get('/portal-admin/auditlog/eksport.csv'),
+            nok_til_a_bryte(10),   # rate='10/m'
         )
         self.assertEqual(statuser[0], 200)
         self.assertIn(429, statuser)

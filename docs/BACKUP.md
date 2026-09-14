@@ -55,6 +55,8 @@ det står i A.9 — og det gjør det ikke tydelig i dag. Det rettes i dokumentru
 
 Rekkefølgen er bindende, fordi backupen speiler hvor modellene bor.
 
+> **Levert 14. sep. 2026.** Begge punktene er gjennomført; avsnittet står igjen fordi rekkefølgen og begrunnelsen forklarer hvorfor ting ble som de ble. Navnene under beskriver tilstanden *før* flyttingen — `BackupConfig` er slettet, og `AppSetting`, `Backup` og `hent_aktiv_vakt` bor nå i `core`.
+
 1. **Flyttingen** (`TEKNISK_GJELD.md` §2): `AppSetting`, `Backup`, `BackupConfig`,
    `hent_aktiv_vakt`, middlewaren, `healthz` og server-status ut av `patients` og inn i
    `core`. Tabellnavnene beholdes. Lasteren får en navnetabell så eldre filer med
