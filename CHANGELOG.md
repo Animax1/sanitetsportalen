@@ -4,6 +4,95 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-14 — To funn fra staging: CSP blokkerte lydbæreren, modaler holdt på fokus
+
+Begge meldt av André ved verifisering på staging, og begge var ekte feil bak en
+melding som så ut som støy.
+
+**`media-src 'self' blob:` lagt til i CSP** (`core/middleware.py`). Konsollen sa:
+
+    Loading media from 'blob:…' violates … "default-src 'self'". Note that
+    'media-src' was not explicitly set, so 'default-src' is used as a fallback.
+
+Det som ble blokkert er `_stilleLydbaerer()` i `oppdrag-enhet.js` — den stumme,
+loopende WAV-en som finnes fordi iOS ellers regner Web Audio som «ambient» og
+demper lydvarselet med ringebryteren. `default-src 'self'` dekker ikke `blob:`.
+
+**Symptomet skjulte alvoret.** Oppdraget lastet, siden virket, og feilen sto
+bare i konsollen — men på iOS betyr den at bilen ikke piper når telefonen står
+på lydløs, altså nøyaktig det tilfellet lydbæreren er bygd for. En advarsel på
+en side som ellers oppfører seg er ikke det samme som en advarsel uten
+konsekvens.
+
+Direktivet er smalt med vilje: `'self' blob:`, ingen verter, og `default-src`
+er **ikke** slakket. En blob-URL kan bare lages av skript på vårt eget origin,
+så den som kan lage en har allerede skriptkjøring — utvidelsen flytter ingen
+grense som betyr noe. Å svare med `default-src 'self' blob:` ville derimot
+sluppet blob-er inn i hvert direktiv som arver.
+
+**`slippFokusFoerSkjul()` i `portal-utils.js`.** Bootstrap 5.3 setter
+`aria-hidden="true"` på modalen når den lukkes, men flytter ikke fokus ut
+først; lukker du med krysset, står fokus igjen på `.btn-close` inne i det som
+nettopp ble skjult, og nettleseren **nekter** å sette attributtet:
+
+    Blocked aria-hidden on an element because its descendant retained focus.
+
+Konsekvensen er reell i begge ender: modalen blir liggende eksponert for
+skjermlesere etter at den visuelt er borte, og den som navigerer med tastatur
+mister fokuspunktet sitt i samme øyeblikk.
+
+`hide.bs.modal` bobler, så **én** lytter i fila alle sidene laster dekker hver
+modal i portalen. Alternativet Bootstrap selv peker på, `inert`, måtte vært
+satt og fjernet per vindu — samme feil gjentatt ett sted per modal. Funksjonen
+er navngitt og ikke anonym av samme grunn som `klikkSkalKjore()`: en `if` inne
+i en lytter lar seg ikke kjøre i en test.
+
+Tester: `patients/tests_security_headers.MediaSrcSlipperLydbaerenTests` (fem,
+inkludert én som krever at kilden *fortsatt* lager blob-en — et direktiv som
+verner om ingenting er verre enn ingen regel) og `core/tests_modalfokus.py`
+(seks). Tre mutasjoner prøvd, alle fanget: media-src fjernet, `hide` byttet til
+`hidden`, og `contains`-sjekken fjernet slik at fokus rives vekk uansett hvor
+det står.
+
+---
+
+**Og et tredje funn, som kom av å telle testene:** kjøringen ga 2 687 der
+forrige fulle kjøring ga 2 709. Differansen var ikke tester som forsvant —
+**testkommandoen i CLAUDE.md utelot appen `myproject`**, 32 tester på
+databasevalg, cache, `_env_bool`, statiske filer og migrasjoner. Det er vaktene
+rundt «`DATABASE_URL` må være PostgreSQL på Railway» og rundt den `_env_bool`
+som hadde rate-limitingen av i prod til 13. sep. Den som fulgte dokumentasjonen
+kjørte dem aldri. Kommandoen er rettet.
+
+At alt annet *er* med, er verifisert og ikke antatt: en AST-telling av
+testmetoder per app stemmer eksakt med det kjøreren rapporterer for seks av
+sju apper (`vaktliste` avviker med 54, som er arv fra basisklasser), og alle
+98 testfiler samles inn.
+
+**`myproject/tests_cache_config.py` hadde en ekte feil i opprydningen.**
+`finally: importlib.reload(...)` sto *inne* i `with mock.patch.dict(...)`, med
+kommentaren «Reload tilbake uten REDIS_URL så andre tester ikke påvirkes» — men
+inne i blokken er `REDIS_URL` fortsatt satt, så modulen ble lastet tilbake med
+den oppdiktede Redis-verten. Koden gjorde det motsatte av det kommentaren sa,
+og det er den verste sorten: den som leser slutter å se etter.
+
+Nå `addCleanup`, som kjører uansett utfall og etter at `with` er ute. Å bare
+flytte `finally` utenfor ville vært verre enn før — en feilende assertion ville
+hoppet over opprydningen helt.
+
+**To mutasjoner mot den nye påstanden slapp gjennom**, og det står i koden:
+opprydningen i *neste* test i klassen reparerer modulen før noen ser den gal,
+så bare den siste testen alfabetisk kan lekke ut av klassen. Påstanden er
+beholdt fordi den er gratis og sier at opprydningen gjorde jobben — men den er
+ikke et gjerde rundt mønsteret, og kommentaren sier nå det i stedet for å la
+den se sterkere ut enn den er.
+
+**Én ting står uløst.** Den kjøringen som først tok med `myproject` endte
+`FAILED (failures=1)`. Jeg fanget ikke hvilken test det var, og den har ikke
+kommet tilbake på fire fulle kjøringer etterpå. Den er *ikke* forklart av
+opprydningsfeilen over — det er en hypotese jeg ikke har bevist. Se TODO.
+
+
 ## 2026-09-14 — Gjeldspunkt 3.6: de to store JS-filene delt
 
 `vaktliste.js` var 3 801 linjer, `oppdrag-sentral.js` 1 991. Nå fem og fire.

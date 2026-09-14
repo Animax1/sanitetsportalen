@@ -131,6 +131,21 @@ _CSP_DIRECTIVES = [
     "style-src 'self' 'unsafe-inline'",
     "img-src 'self' data:",
     "font-src 'self' data:",
+    # ── media-src: blob: for den stille lydbæreren (14. sep. 2026) ──────────
+    #
+    # `_stilleLydbaerer()` i `oppdrag-enhet.js` bygger en stum WAV i minnet og
+    # spiller den i loop, fordi iOS ellers regner Web Audio som «ambient» og
+    # demper lydvarselet med ringebryteren. Den bygges som en Blob, og
+    # `default-src 'self'` dekker **ikke** `blob:` — så CSP blokkerte den i
+    # stillhet. På iOS betyr det at bilen ikke piper når telefonen står på
+    # lydløs, altså nøyaktig tilfellet lydbæreren finnes for; i konsollen sto
+    # det som en advarsel mens oppdraget lastet som normalt.
+    #
+    # `blob:` her utvider ingen angrepsflate som betyr noe: en blob-URL kan
+    # bare lages av skript på vårt eget origin, så den som kan lage en har
+    # allerede skriptkjøring. Direktivet er likevel eksplisitt og smalt —
+    # `'self' blob:` og ingen verter — framfor å slakke på `default-src`.
+    "media-src 'self' blob:",
     "connect-src 'self'",
     "frame-ancestors 'none'",
     "base-uri 'self'",

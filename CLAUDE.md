@@ -29,8 +29,12 @@ python manage.py create_admin --username admin --password "bytt-meg"
 # Kjøre lokalt
 python manage.py runserver           # http://127.0.0.1:8000/
 
-# Tester – hele suiten
-python manage.py test patients accounts audit core statistikk oppdrag vaktliste -v 2
+# Tester – hele suiten. **`myproject` skal med** (14. sep. 2026): den bærer 32
+# tester på databasevalg, cache, `_env_bool`, statiske filer og migrasjoner —
+# altså vaktene rundt «DATABASE_URL må være PostgreSQL på Railway» og den
+# `_env_bool` som hadde rate-limitingen av i prod. Lista her utelot den, så den
+# som fulgte dokumentasjonen kjørte dem aldri.
+python manage.py test patients accounts audit core statistikk oppdrag vaktliste myproject -v 2
 
 # Én enkelt test
 python manage.py test patients.tests.PatientAPITest.test_create_patient -v 2
@@ -150,6 +154,19 @@ en test som glemmer kallet tester 403-stien uten å vite det.
 `X-Forwarded-For` — det Railway la til — validert, ellers `REMOTE_ADDR`. Første ledd er
 klientens påstand. Innloggingsloggen, audit-signalene, arkivene og rate-limit-bøttene per
 IP (`ratelimit_nokkel`) bruker den; `REMOTE_ADDR` direkte er proxyen i prod.
+
+**CSP-ens `media-src` er `'self' blob:`** (14. sep. 2026). `_stilleLydbaerer()` i
+`oppdrag-enhet.js` bygger en stum WAV som Blob — uten den demper iOS' ringebryter
+lydvarselet, fordi Web Audio alene regnes som «ambient». `default-src 'self'` dekker ikke
+`blob:`, så direktivet må stå eksplisitt; å slakke `default-src` i stedet ville sluppet
+blob-er inn i alt som arver. Feilen var *stille der det telte*: siden virket, oppdraget
+lastet, og bare konsollen sa fra — mens bilen ikke pep.
+
+**Modaler slipper fokus før Bootstrap skjuler dem** — `slippFokusFoerSkjul()` i
+`portal-utils.js`, én lytter på `hide.bs.modal` (den bobler) for hele portalen. Bootstrap
+5.3 setter `aria-hidden` uten å flytte fokus ut, og da *nekter* nettleseren å sette
+attributtet: modalen blir liggende eksponert for skjermlesere etter at den visuelt er
+borte. `inert` måtte vært satt per vindu; dette er ett sted.
 
 **Data inn i et `<script>`-element går gjennom `js_json()`**, aldri `json.dumps` + `|safe`:
 `json.dumps` escaper ikke `<`, og et navn med `</script>` lukker skriptet.

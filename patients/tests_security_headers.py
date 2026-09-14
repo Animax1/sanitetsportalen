@@ -156,3 +156,45 @@ class CspNonceTests(TestCase):
             + '\n  '.join(sorted(uten))
             + '\n\nLegg til nonce="{{ csp_nonce }}".'
         ))
+
+
+@override_settings(SECURE_SSL_REDIRECT=False, RATELIMIT_ENABLE=False)
+class MediaSrcSlipperLydbaerenTests(TestCase):
+    """CSP må slippe `blob:` for media (14. sep. 2026, funnet i staging).
+
+    `_stilleLydbaerer()` i `oppdrag-enhet.js` bygger en stum WAV som Blob og
+    spiller den i loop, fordi iOS ellers demper Web Audio med ringebryteren.
+    `default-src 'self'` dekker ikke `blob:`, så den ble blokkert — og på iOS
+    betyr det at bilen ikke piper når telefonen står på lydløs, altså akkurat
+    tilfellet lydbæreren finnes for. Feilen var *stille* i den forstand som
+    betyr noe: oppdraget lastet, siden virket, og bare konsollen sa fra.
+    """
+
+    def _direktiver(self):
+        resp = Client().get('/accounts/login/')
+        return {d.strip().split(' ')[0]: d.strip()
+                for d in resp.headers['Content-Security-Policy'].split(';') if d.strip()}
+
+    def test_media_src_er_satt_eksplisitt(self):
+        """Uten et eget direktiv faller media tilbake på `default-src`."""
+        self.assertIn('media-src', self._direktiver())
+
+    def test_media_src_slipper_blob(self):
+        self.assertIn('blob:', self._direktiver()['media-src'])
+
+    def test_media_src_slipper_ikke_verter(self):
+        """Smalt med vilje: `blob:` er vårt eget origin, en vert er ikke det."""
+        self.assertEqual(self._direktiver()['media-src'], "media-src 'self' blob:")
+
+    def test_default_src_ble_ikke_slakket(self):
+        """Den late løsningen — `default-src 'self' blob:` — ville sluppet
+        blob-er inn i *alle* direktiver som arver, `script-src` unntatt fordi
+        det er satt. Vi utvidet ett direktiv, ikke bunnen."""
+        self.assertEqual(self._direktiver()['default-src'], "default-src 'self'")
+
+    def test_lydbaeren_bruker_fortsatt_en_blob(self):
+        """Regelen over er verdiløs hvis kilden slutter å lage blob-en — da
+        står direktivet igjen og verner om ingenting."""
+        from patients.js_test_utils import OPPDRAG_ENHET_JS, read_js
+        kilde = read_js(OPPDRAG_ENHET_JS)
+        self.assertIn('URL.createObjectURL', kilde)

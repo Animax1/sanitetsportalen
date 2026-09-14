@@ -249,3 +249,34 @@ document.addEventListener('click', (e) => {
 
   handler(_handlerArgument(el));
 });
+
+
+// ── Fokus ut av modalen før den skjules (14. sep. 2026) ─────────────────────
+//
+// Bootstrap 5.3 setter `aria-hidden="true"` på modalen når den lukkes, men
+// flytter ikke fokus ut av den først. Lukker du med krysset, står fokus
+// fortsatt på `.btn-close` *inne i* det som nettopp ble skjult for
+// skjermlesere — og nettleseren melder fra:
+//
+//   Blocked aria-hidden on an element because its descendant retained focus.
+//
+// Det er ikke bare støy i konsollen: en skjermleserbruker mister da
+// fokuspunktet sitt i det modalen lukkes, og lander ingen steder.
+//
+// `hide.bs.modal` bobler, så én lytter her dekker hver modal på hver side —
+// og det er poenget med å legge den i fila alle sidene laster. Alternativet
+// Bootstrap peker på, `inert`, måtte vært satt og fjernet per modal, altså
+// samme feil gjentatt ett sted per vindu.
+// Navngitt og ikke anonym, av samme grunn som `klikkSkalKjore()`: en `if`
+// inne i en lytter lar seg ikke kjøre i en test.
+function slippFokusFoerSkjul(modal, aktiv) {
+  if (!modal || !aktiv) return false;
+  if (!modal.contains(aktiv)) return false;
+  if (typeof aktiv.blur !== 'function') return false;
+  aktiv.blur();
+  return true;
+}
+
+document.addEventListener('hide.bs.modal', (e) => {
+  slippFokusFoerSkjul(e.target, document.activeElement);
+});

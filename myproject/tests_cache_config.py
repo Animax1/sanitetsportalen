@@ -56,54 +56,88 @@ class SettingsReloadWithRedisURLTests(TestCase):
     Vi laster settings-modulen på nytt med en patched env-variabel og
     sjekker at CACHES-dict-en faktisk peker på RedisCache-backenden.
     Dette tester valg-logikken uten å kreve en kjørende Redis-server.
+
+    **Gjenopprettingen må skje utenfor `mock.patch.dict`** (funnet 14. sep.
+    2026). Sto den i et `finally` *inne* i `with`-blokken, kjørte den mens
+    `REDIS_URL` fortsatt var satt — så «reload tilbake uten REDIS_URL» lot
+    modulen stå igjen pekende på en oppdiktet Redis-vert. Kommentaren sa det
+    motsatte av det koden gjorde, og det er den verste sorten: den som leser
+    den slutter å se etter.
+
+    `_reload_utenfor_patchen()` er derfor ett sted, og alle tre testene går
+    gjennom den. `django.conf.settings` rører den ikke — den er fanget ved
+    oppstart — men modulobjektet deles av alt som importerer det, og en
+    testfil skal ikke etterlate global tilstand den selv har funnet på.
     """
 
+    def _reload_utenfor_patchen(self):
+        """Last settings på nytt nå som patchen er ute av miljøet — og sjekk
+        at det faktisk virket.
+
+        Registreres med `addCleanup`, ikke som `finally` inne i `with`: et
+        `finally` der kjørte mens `REDIS_URL` fortsatt sto, og et `finally`
+        flyttet utenfor ville blitt hoppet over av en feilende assertion.
+        `addCleanup` kjører uansett utfall, og etter at `with` er avsluttet.
+
+        **Påstanden under vokter smalere enn den ser ut til, og det er verdt
+        å vite.** Jeg prøvde to mutasjoner mot den, og begge slapp gjennom:
+        en streif-reload inne i `with`, og hele `addCleanup`-en fjernet fra
+        én test. Grunnen er den samme i begge tilfeller — opprydningen i
+        *neste* test i klassen reparerer modulen før noen rekker å se den
+        gal. Det er altså bare den siste testen alfabetisk som kan lekke ut
+        av klassen i det hele tatt.
+
+        Påstanden står likevel: den sier at opprydningen gjorde jobben sin,
+        og den koster ingenting. Men den er ikke et gjerde rundt mønsteret —
+        gjerdet er at koden og kommentaren nå sier det samme.
+        """
+        from myproject import settings as settings_module
+        importlib.reload(settings_module)
+        assert settings_module.CACHE_BACKEND_NAME == 'locmem', (
+            'settings-modulen ble stående igjen med '
+            f'{settings_module.CACHE_BACKEND_NAME!r} — reloaden skjedde mens '
+            'REDIS_URL fortsatt var satt'
+        )
+
     def test_redis_url_velger_redis_backend(self):
+        self.addCleanup(self._reload_utenfor_patchen)
         fake_url = 'redis://fake-host:6379/0'
         with mock.patch.dict(os.environ, {'REDIS_URL': fake_url}, clear=False):
             from myproject import settings as settings_module
             reloaded = importlib.reload(settings_module)
-            try:
-                self.assertEqual(
-                    reloaded.CACHES['default']['BACKEND'],
-                    'django.core.cache.backends.redis.RedisCache',
-                )
-                self.assertEqual(reloaded.CACHES['default']['LOCATION'], fake_url)
-                self.assertEqual(reloaded.CACHE_BACKEND_NAME, 'redis')
-                self.assertEqual(
-                    reloaded.CACHES['default']['KEY_PREFIX'], 'pasientregistrering'
-                )
-                # Django's innebygde RedisCache aksepterer ikke IGNORE_EXCEPTIONS
-                # i OPTIONS — sjekk at vi IKKE feilaktig sender det videre.
-                opts = reloaded.CACHES['default'].get('OPTIONS', {})
-                self.assertNotIn('IGNORE_EXCEPTIONS', opts)
-            finally:
-                # Reload tilbake uten REDIS_URL så andre tester ikke påvirkes
-                importlib.reload(settings_module)
+            self.assertEqual(
+                reloaded.CACHES['default']['BACKEND'],
+                'django.core.cache.backends.redis.RedisCache',
+            )
+            self.assertEqual(reloaded.CACHES['default']['LOCATION'], fake_url)
+            self.assertEqual(reloaded.CACHE_BACKEND_NAME, 'redis')
+            self.assertEqual(
+                reloaded.CACHES['default']['KEY_PREFIX'], 'pasientregistrering'
+            )
+            # Django's innebygde RedisCache aksepterer ikke IGNORE_EXCEPTIONS
+            # i OPTIONS — sjekk at vi IKKE feilaktig sender det videre.
+            opts = reloaded.CACHES['default'].get('OPTIONS', {})
+            self.assertNotIn('IGNORE_EXCEPTIONS', opts)
 
     def test_tom_redis_url_velger_locmem(self):
         """REDIS_URL='' (tom streng) skal IKKE aktivere Redis."""
+        self.addCleanup(self._reload_utenfor_patchen)
         with mock.patch.dict(os.environ, {'REDIS_URL': ''}, clear=False):
             from myproject import settings as settings_module
             reloaded = importlib.reload(settings_module)
-            try:
-                self.assertEqual(
-                    reloaded.CACHES['default']['BACKEND'],
-                    'django.core.cache.backends.locmem.LocMemCache',
-                )
-                self.assertEqual(reloaded.CACHE_BACKEND_NAME, 'locmem')
-            finally:
-                importlib.reload(settings_module)
+            self.assertEqual(
+                reloaded.CACHES['default']['BACKEND'],
+                'django.core.cache.backends.locmem.LocMemCache',
+            )
+            self.assertEqual(reloaded.CACHE_BACKEND_NAME, 'locmem')
 
     def test_whitespace_redis_url_velger_locmem(self):
         """REDIS_URL='   ' (kun whitespace) skal også falle tilbake."""
+        self.addCleanup(self._reload_utenfor_patchen)
         with mock.patch.dict(os.environ, {'REDIS_URL': '   '}, clear=False):
             from myproject import settings as settings_module
             reloaded = importlib.reload(settings_module)
-            try:
-                self.assertEqual(reloaded.CACHE_BACKEND_NAME, 'locmem')
-            finally:
-                importlib.reload(settings_module)
+            self.assertEqual(reloaded.CACHE_BACKEND_NAME, 'locmem')
 
 
 class CacheHealthHelperTests(TestCase):

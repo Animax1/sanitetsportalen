@@ -305,6 +305,53 @@ ingen av dem gir feilmelding — de er bare stille inaktive.
 
 ## Pågående / neste
 
+### Funn fra staging-verifiseringen 14. sep. 2026
+
+- [x] **CSP blokkerte den stille lydbæreren.** `media-src 'self' blob:` lagt til i
+      `core/middleware.py`. Meldte seg som en konsolladvarsel på en side som ellers
+      virket — men på iOS betyr den at bilen ikke piper med ringebryteren på lydløs,
+      altså akkurat det `_stilleLydbaerer()` finnes for. Se CHANGELOG.
+- [x] **Modalene holdt på fokus når de ble skjult.** `slippFokusFoerSkjul()` i
+      `portal-utils.js`, én lytter på `hide.bs.modal` for hele portalen.
+- [x] **Testkommandoen i CLAUDE.md utelot `myproject`** — 32 tester på
+      databasevalg, cache, `_env_bool`, statiske filer og migrasjoner ble aldri
+      kjørt av den som fulgte dokumentasjonen. Rettet.
+- [x] **`myproject/tests_cache_config.py`: opprydningen sto inne i `with`-blokken**,
+      så settings-modulen ble lastet tilbake med `REDIS_URL` fortsatt satt.
+      Nå `addCleanup`.
+- [ ] **Uforklart enkeltfeil i suiten.** Første kjøring med `myproject` inkludert
+      endte `FAILED (failures=1)`; jeg fanget ikke hvilken test, og den har ikke
+      reprodusert på fire fulle kjøringer etterpå. Opprydningsfeilen over er en
+      **uverifisert** hypotese — ikke skriv den av som løst uten å ha sett den
+      igjen. Neste gang: kjør med `2>&1 | tee` og behold logg, og vurder
+      `--shuffle` for å gjøre rekkefølgeavhengighet reproduserbar med et seed.
+      Den kjente slektningen er vinduskanten i rate-limit-testene (se
+      «Rate-limit-tester må tåle vinduskanten» i CLAUDE.md) — den er fikset der
+      den er funnet, men mønsteret kan finnes flere steder.
+- [ ] **Portalinnstillingene og modulbryteren auditlogges ikke.** Funnet mens
+      André spurte om «logges ingenting fra core?». Svaret er nesten nei, og det
+      er ikke nytt av flyttingen — det har vært slik hele tiden:
+
+      | Hva | Logges? |
+      |---|---|
+      | `core.AppSetting` — sesjonstimeout, e-postmottakere, lydbrytere, `oppdrag_krev_grov_avreist` | **Nei** |
+      | `core.ModuleSettings` — modul av/på for alle | **Nei** |
+      | `core.Vakt` — navn, start, avsluttet | **Nei** |
+      | `core.Backupplan` | Ja (`core_backupplan`) |
+      | Backup tatt / gjenopprettet | Ja (`backup`, `<slug>_backup_restore`) |
+
+      Ingen app utenom `audit` har signal på en `core`-modell — det finnes ingen
+      `core/signals.py`. Å slå av en modul for alle, flytte sesjonstimeouten eller
+      endre hvem som får vaktlista på e-post etterlater altså ingen spor.
+      Mekanismen finnes ferdig (`vaktliste/signals.py` er mønsteret, med
+      `@ikke_under_loaddata`); dette er å ta den i bruk, ikke å bygge noe.
+
+      Merk samtidig at `EKSPLISITT_MAPPING`-radene for `patients_appsetting` og
+      `patients_backup` er **inerte i dag**: ingen kode skriver de tabellnavnene.
+      De er satt på forhånd, som `GAMLE_MODELLNAVN`, og blir først virksomme når
+      punktet over gjøres. Det er verdt å vite før man leter etter radene i loggen.
+
+
 ### Teknisk gjeld — kartlagt 13. sep. 2026
 
 Underlaget er `docs/TEKNISK_GJELD.md`; det forklarer hvorfor. Rekkefølgen her er
