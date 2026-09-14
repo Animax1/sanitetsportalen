@@ -33,7 +33,7 @@ from core.auth_decorators import admin_required
 from .forms import (
     LoginForm, ChangePasswordForm, AdminUserCreateForm, AdminUserEditForm,
     GlemtPassordForm, ModulTilgangForm,
-    PasientRolleForm, SettPassordForm,
+    SettPassordForm,
 )
 from .invitasjon import kan_inviteres, les_token, send_invitasjon
 from .passord_reset import (
@@ -1116,7 +1116,14 @@ def user_detail_view(request, pk):
     user = get_object_or_404(CustomUser, pk=pk)
     form = AdminUserEditForm(instance=user)
     tilgang_form = ModulTilgangForm(bruker=user)
-    link_form = PasientRolleForm(user)
+    # **Modulenes koblinger kommer gjennom registeret** (14. sep. 2026).
+    # Fram til da importerte `accounts.forms` `patients.models` direkte —
+    # kontoappen kjente altså én modul ved navn. Se `core/kontokobling.py`.
+    from core.kontokobling import (
+        all_handlers as kontokoblingshandlere,
+        for_handling as kontokoblingshandler,
+    )
+    kontokoblinger = {h.slug: h.skjema(user) for h in kontokoblingshandlere()}
     temp_password = None
     recent_events = LoginEvent.objects.filter(user=user).order_by('-created_at')[:20]
 
@@ -1170,11 +1177,16 @@ def user_detail_view(request, pk):
                     messages.success(request, 'Bruker oppdatert.')
                 return redirect('portaladmin:user_detail', pk=pk)
 
-        elif action == 'link_patient_role':
-            link_form = PasientRolleForm(user, request.POST)
-            if link_form.is_valid():
-                link_form.save()
-                messages.success(request, 'Pasient-rolle oppdatert.')
+        elif kontokoblingshandler(action) is not None:
+            # Handlingsnavnet peker på nøyaktig én modul — registeret avviser
+            # to handlere som deler det, for da ville den ene lagret den
+            # andres skjema.
+            handler = kontokoblingshandler(action)
+            skjema = handler.skjema(user, request.POST)
+            kontokoblinger[handler.slug] = skjema
+            if skjema.is_valid():
+                skjema.save()
+                messages.success(request, handler.suksessmelding)
                 return redirect('portaladmin:user_detail', pk=pk)
 
         elif action == 'send_invitasjon':
@@ -1307,7 +1319,8 @@ def user_detail_view(request, pk):
         'target_user': user,
         'form': form,
         'tilgang_form': tilgang_form,
-        'link_form': link_form,
+        'kontokoblinger': kontokoblinger,
+        'kontokoblingsfragmenter': [h.mal for h in kontokoblingshandlere() if h.mal],
         'temp_password': temp_password,
         'recent_events': recent_events,
         'has_totp_device': has_totp_device,

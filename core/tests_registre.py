@@ -20,7 +20,7 @@ from __future__ import annotations
 from django.core.exceptions import ValidationError
 from django.test import Client, SimpleTestCase, TestCase, override_settings
 
-from core import driftstatus, portalinnstillinger
+from core import driftstatus, kontokobling, portalinnstillinger
 
 
 class _Sprekker(driftstatus.BaseDriftstatusHandler):
@@ -198,3 +198,59 @@ class PortalinnstillingerValidererForLagringTests(TestCase):
         self.assertContains(resp, 'vaktliste_fil_mottakere')
         self.assertIn('vaktliste/portalinnstillinger.html',
                       [t.name for t in resp.templates])
+
+
+class _Kobler(kontokobling.BaseKontokoblingHandler):
+    slug = 'kobler'
+    handling = 'koble_noe'
+    mal = ''
+
+    def skjema(self, user, data=None):
+        from django import forms
+
+        class Skjema(forms.Form):
+            felt = forms.CharField(required=False)
+
+            def save(self):
+                return None
+
+        return Skjema(data) if data is not None else Skjema()
+
+
+class KontokoblingsregisteretTests(SimpleTestCase):
+    """Registeret som tok `accounts` ut av pasientmodulen (14. sep. 2026)."""
+
+    def setUp(self) -> None:
+        self.modul = kontokobling
+        self._sikret = kontokobling.all_handlers()
+        kontokobling.clear_registry()
+        self.addCleanup(self._gjenopprett)
+
+    def _gjenopprett(self) -> None:
+        self.modul.clear_registry()
+        for h in self._sikret:
+            self.modul.register(h)
+
+    def test_handlingsnavnet_peker_pa_handleren(self) -> None:
+        self.modul.register(_Kobler())
+        self.assertEqual(self.modul.for_handling('koble_noe').slug, 'kobler')
+        self.assertIsNone(self.modul.for_handling('finnes-ikke'))
+
+    def test_to_moduler_kan_ikke_dele_handlingsnavn(self) -> None:
+        """**Den ene feilen registeret må stoppe.** Viewet finner handleren på
+        `action`-navnet; delte to moduler det, ville den ene lagret den andres
+        skjema — og brukeren sett «lagret» over noe helt annet."""
+        class Tyv(_Kobler):
+            slug = 'tyv'
+
+        self.modul.register(_Kobler())
+        with self.assertRaises(ValueError) as ctx:
+            self.modul.register(Tyv())
+        self.assertIn('koble_noe', str(ctx.exception))
+
+    def test_handler_uten_handling_avvises(self) -> None:
+        class UtenHandling(self.modul.BaseKontokoblingHandler):
+            slug = 'x'
+
+        with self.assertRaises(ValueError):
+            self.modul.register(UtenHandling())

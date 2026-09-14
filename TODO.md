@@ -353,6 +353,16 @@ bindende: 1 før 2, fordi backupen speiler hvor modellene bor.
             modulregisteret. `core/tests_avhengighetsretning.py` låser det med AST.
       - [x] **CLAUDE.md rettet** (14. sep. 2026): «Tilgangskontroll»-bolken beskrev
             fortsatt `accounts/decorators.py` som et skim som beholdes. Fila er slettet.
+      - [x] **3.1 — kontoappen kjenner ingen modul ved navn** (14. sep. 2026).
+            `core/kontokobling.py`; `PasientRolleForm` og malbiten bor i
+            pasientmodulen. `handling` må være unik, og registeret avviser to handlere
+            som deler den. Avhengighetstesten dekker nå `accounts` og `audit` også.
+      - [ ] **Kontoopprettelsen lager en `oppdrag.Enhet`.** Funnet 14. sep. 2026, ikke i
+            gjeldskartet. Kontotypen «bil» validerer enhetsnavnet i `accounts/forms.py`
+            og oppretter/gjenoppliver raden i `accounts/views.py`. Samme slags kobling
+            som 3.1, men en annen form: det er *selve opprettelsen* som får en sideeffekt
+            i en modul. Hører hjemme i `core/kontokobling.py` med en lagringskrok, men
+            det er kirurgi i brukeropprettelsen. Står i `KJENTE_UNNTAK_RAMMEVERK`.
       - [x] **Rammeverket henter ikke lenger noe fra modulene** (14. sep. 2026).
             `core/driftstatus.py` og `core/portalinnstillinger.py`, begge etter idiomet
             fra `core/stats.py`. `KJENTE_UNNTAK` er tom, og `core` importerer en modul

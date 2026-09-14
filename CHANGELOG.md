@@ -4,6 +4,39 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-14 — Gjeldspunkt 3.1: kontoappen kjenner ingen modul ved navn
+
+`accounts/forms.py` importerte `patients.models` for å tegne kortet
+«Pasientregistrering» på brukersiden — kontoappen kjente altså én modul ved
+navn. `core/kontokobling.py` er det tredje registeret på like mange timer, og
+`PasientRolleForm` med malbiten sin bor nå i pasientmodulen.
+
+**Koblingen er domenedata, ikke tilgang.** Den setningen står i kodetreet nå,
+der den hører hjemme. Radioen satte en gang også `kan_redigere_pasienter`, og
+sammenblandingen gjorde det umulig å være koblet som førstehjelper uten å ha
+skrivetilgang. Samme skille som `Mannskap.user` i vaktlista.
+
+`handling` — verdien i skjemaets skjulte `action` — må være **unik**, og
+registeret avviser to handlere som deler den: viewet finner handleren på det
+navnet, så to moduler med samme handling ville latt den ene lagre den andres
+skjema, med «lagret» over noe helt annet.
+
+**Et funn gjeldskartet ikke hadde:** `accounts` har en kobling til i samme
+klasse. Velger admin kontotypen «bil», valideres enhetsnavnet i `forms.py` og
+`oppdrag.Enhet`-raden opprettes — eller hentes fram igjen, om den er
+pensjonert — i `views.py`. Det er samme slags avhengighet, men en annen form:
+her er det *selve kontoopprettelsen* som får en sideeffekt i en modul, ikke et
+skjema ved siden av kontoen. Å flytte den er kirurgi i brukeropprettelsen, og
+hører ikke hjemme i samme runde som alt annet.
+
+Avhengighetstesten dekker derfor nå **`accounts` og `audit` også** — de er
+rammeverk de også (`TEKNISK_GJELD.md` §1) — med `KJENTE_UNNTAK_RAMMEVERK` som
+sperrehake på de to `Enhet`-importene. `core`s egen liste står fortsatt tom.
+
+2704 tester grønne.
+
+---
+
 ## 2026-09-14 — To registre til: `core` kjenner ingen modul ved navn lenger
 
 `KJENTE_UNNTAK` er tom. Den sto med fem rader i går kveld — de eneste stedene

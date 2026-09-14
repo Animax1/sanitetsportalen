@@ -20,3 +20,10 @@ class PatientsConfig(AppConfig):
             register_handlers as register_stats_handlers,
         )
         register_stats_handlers()
+
+        # Kontokoblingen (14. sep. 2026). Kortet «Pasientregistrering» på
+        # brukersiden er modulens, og registreres derfor herfra — `accounts`
+        # skal ikke importere `patients.models` for å tegne det. Se
+        # `core/kontokobling.py`.
+        from .kontokobling import register_handlers as register_kontokobling
+        register_kontokobling()

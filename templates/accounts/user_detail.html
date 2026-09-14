@@ -192,23 +192,11 @@
     </div>
   </div>
 
-  <!-- Pasientregistrering: rolle -->
-  <div class="card mb-3">
-    <div class="card-header"><strong><i class="bi bi-person-badge me-2"></i>Pasientregistrering</strong></div>
-    <div class="card-body">
-      <form method="post">
-        {% csrf_token %}
-        <input type="hidden" name="action" value="link_patient_role">
-        {% for radio in link_form.pasient_rolle %}
-        <div class="form-check mb-2">
-          {{ radio.tag }}
-          <label class="form-check-label" for="{{ radio.id_for_label }}" style="color:#cbd5e1;">{{ radio.choice_label }}</label>
-        </div>
-        {% endfor %}
-        <button type="submit" class="btn btn-sm btn-primary mt-2">Lagre</button>
-      </form>
-    </div>
-  </div>
+  {% comment %}
+  Modulenes egne koblinger til kontoen. Hver malbit eies av modulen som har
+  radene; `accounts` vet bare at det finnes noen. Se `core/kontokobling.py`.
+  {% endcomment %}
+  {% for fragment in kontokoblingsfragmenter %}{% include fragment %}{% endfor %}
 
   <!-- Siste innloggingshendelser -->
   <div class="card">

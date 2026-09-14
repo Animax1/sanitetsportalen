@@ -1,0 +1,29 @@
+{% comment %}
+Pasientmodulens kort på /portal-admin/brukere/<pk>/: er kontoen førstehjelper,
+helsepersonell, eller ingen av delene.
+
+Malbiten bor i **modulen**, ikke i `accounts`: markupen kjenner feltene, og
+feltene er pasientmodulens. Den inkluderes gjennom registeret i
+`core/kontokobling.py`, og skjemaet slås opp på modulens egen slug.
+
+**Koblingen er domenedata, ikke tilgang.** Tilgang settes i matrisen
+modul × nivå lenger opp på siden.
+
+Flyttet hit 14. sep. 2026 — fram til da sto den i `accounts`.
+{% endcomment %}
+  <div class="card mb-3">
+    <div class="card-header"><strong><i class="bi bi-person-badge me-2"></i>Pasientregistrering</strong></div>
+    <div class="card-body">
+      <form method="post">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="link_patient_role">
+        {% for radio in kontokoblinger.patients.pasient_rolle %}
+        <div class="form-check mb-2">
+          {{ radio.tag }}
+          <label class="form-check-label" for="{{ radio.id_for_label }}" style="color:#cbd5e1;">{{ radio.choice_label }}</label>
+        </div>
+        {% endfor %}
+        <button type="submit" class="btn btn-sm btn-primary mt-2">Lagre</button>
+      </form>
+    </div>
+  </div>

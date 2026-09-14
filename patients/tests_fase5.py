@@ -166,10 +166,16 @@ class AssignmentNotificationSignalTests(TestCase):
 
 @override_settings(SECURE_SSL_REDIRECT=False, RATELIMIT_ENABLE=False)
 class PasientRolleFormTests(TestCase):
-    """Tester for PasientRolleForm i accounts."""
+    """Tester for `PasientRolleForm`.
+
+    Skjemaet bodde i `accounts/forms.py` fram til 14. sep. 2026 og flyttet hit
+    sammen med koblingsregisteret (`docs/TEKNISK_GJELD.md` §3.1) — kontoappen
+    skal ikke kjenne pasientmodulen ved navn. Testene står fortsatt i
+    pasientmodulen, som de alltid har gjort: det er radene her som kobles.
+    """
 
     def setUp(self):
-        from accounts.forms import PasientRolleForm
+        from patients.kontokobling import PasientRolleForm
         self.FormCls = PasientRolleForm
         self.user = CustomUser.objects.create_user(
             username='kari', password='pw', must_change_password=False,

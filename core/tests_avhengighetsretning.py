@@ -49,6 +49,27 @@ TILLATT = {
 #: begrunnelse; et som bare snek seg inn, skal feile.
 KJENTE_UNNTAK: set[tuple[str, str]] = set()
 
+#: `accounts` og `audit` er også rammeverk (`TEKNISK_GJELD.md` §1), og måles
+#: derfor med samme målestokk — men de har sin egen liste, fordi `core`s skal
+#: stå tom og disse ikke gjør det ennå.
+#:
+#: **Kontoopprettelsen lager en `oppdrag.Enhet`.** Velger admin kontotypen
+#: «bil», valideres enhetsnavnet i `accounts/forms.py` og raden opprettes (og
+#: hentes fram igjen, om den er pensjonert) i `accounts/views.py`.
+#:
+#: Dette er samme slags kobling som kortet «Pasientregistrering» var, og
+#: `core/kontokobling.py` er mekanismen den hører hjemme i — men det er en
+#: annen form: kortet er et skjema ved siden av kontoen, dette er *selve
+#: kontoopprettelsen* som får en sideeffekt i en modul. Å flytte den betyr
+#: kirurgi i brukeropprettelsen, og det skal ikke skje i samme runde som alt
+#: annet. Se `TODO.md`.
+#:
+#: Lista skal **aldri vokse**.
+KJENTE_UNNTAK_RAMMEVERK: set[tuple[str, str]] = {
+    ('accounts/forms.py', 'oppdrag.models'),
+    ('accounts/views.py', 'oppdrag.models'),
+}
+
 
 def _importer(sti: Path) -> list[str]:
     tre = ast.parse(sti.read_text(encoding='utf-8'), filename=str(sti))
@@ -82,6 +103,43 @@ class CoreImportererIngenModulTests(SimpleTestCase):
             '`core` nederst, modulene over. Hører det som importeres hjemme '
             'i portalen, skal det flyttes til `core`; hører det hjemme i '
             'modulen, skal `core` ikke trenge det:\n  ' + '\n  '.join(funn)))
+
+    def test_accounts_og_audit_maales_med_samme_malestokk(self) -> None:
+        """`accounts` og `audit` er rammeverk de også (`TEKNISK_GJELD.md` §1).
+
+        Kontoappen importerte `patients.models` fram til 14. sep. 2026, for å
+        tegne kortet «Pasientregistrering» på brukersiden — og ingen test
+        hindret at det ble to moduler i morgen. Nå går kortet gjennom
+        `core/kontokobling.py`, og regelen står skrevet.
+        """
+        rot = Path(settings.BASE_DIR)
+        funn = []
+        for app in ('accounts', 'audit'):
+            for sti in sorted(Path(rot, app).rglob('*.py')):
+                if 'migrations' in sti.parts or sti.name.startswith('tests'):
+                    continue
+                relativ = str(sti.relative_to(rot))
+                for modul in _importer(sti):
+                    if modul.split('.')[0] not in MODULAPPER:
+                        continue
+                    if (relativ, modul) in KJENTE_UNNTAK_RAMMEVERK:
+                        continue
+                    funn.append(f'{relativ}: {modul}')
+
+        self.assertEqual(funn, [], (
+            'Kontoappen importerer en modul. Hva en konto *betyr* hos en modul '
+            'er modulens sak — se `core/kontokobling.py`:\n  '
+            + '\n  '.join(funn)))
+
+    def test_rammeverkets_sperrehake_krymper_bare(self) -> None:
+        """Som testen under, for den andre lista."""
+        rot = Path(settings.BASE_DIR)
+        doede = [f'{relativ}: {modul}'
+                 for relativ, modul in sorted(KJENTE_UNNTAK_RAMMEVERK)
+                 if modul not in _importer(Path(rot, relativ))]
+        self.assertEqual(doede, [], (
+            'Disse står som kjente unntak, men importen finnes ikke lenger. '
+            'Ta dem ut av lista:\n  ' + '\n  '.join(doede)))
 
     def test_sperrehaken_krymper_bare(self) -> None:
         """Et unntak som er ryddet skal ut av lista.

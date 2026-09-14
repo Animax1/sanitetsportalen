@@ -56,6 +56,10 @@ En modul vises kun hvis `ModuleSettings.enabled=True` **og** brukeren har en
 
 ### Tilgangskontroll
 
+**Kontoappen kjenner ingen modul ved navn.** Hva en konto *betyr* hos en modul —
+førstehjelper, helsepersonell, bil — er modulens sak, og meldes inn gjennom
+`core/kontokobling.py`. Se «Avhengighetsretningen».
+
 Importér alltid fra `core.auth_decorators`. **`accounts/decorators.py` er slettet**
 (14. sep. 2026, gjeldspunkt 3.3): den var en ren re-eksport av `admin_required`, og den
 eneste leseren var testen som verifiserte at den virket.
@@ -377,6 +381,19 @@ egne felter. Begge er nå registre etter samme idiom som `core/stats.py`:
 |---|---|---|
 | `core/driftstatus.py` | Tall til `/portal-admin/server-status/` (`vaktbilde`, `epost`) | `<app>/driftstatus.py` |
 | `core/portalinnstillinger.py` | Felter på `/portal-admin/innstillinger/` — `mal`, `kontekst()`, `valider()`, `lagre()` | `<app>/portalinnstillinger.py` |
+| `core/kontokobling.py` | Kort på `/portal-admin/brukere/<pk>/` — `handling`, `mal`, `skjema()` | `<app>/kontokobling.py` |
+
+**Regelen gjelder `accounts` og `audit` også** — de er rammeverk (`TEKNISK_GJELD.md` §1).
+Kontoappen importerte `patients.models` for å tegne kortet «Pasientregistrering»; det går
+nå gjennom `core/kontokobling.py`, og **koblingen er domenedata, ikke tilgang** — samme
+skille som `Mannskap.user` i vaktlista. `handling` (verdien i skjemaets `action`) må være
+unik: viewet finner handleren på den, og delte to moduler den, ville den ene lagret den
+andres skjema. Registeret avviser det.
+
+`KJENTE_UNNTAK_RAMMEVERK` har to rader igjen: kontoopprettelsen lager en `oppdrag.Enhet`
+når kontotypen er «bil». Samme slags kobling, men en annen form — det er *selve
+opprettelsen* som får en sideeffekt i en modul, ikke et skjema ved siden av. Lista skal
+aldri vokse.
 
 **Nøklene og malbiten er modulens, ikke registerets.** Vaktlista leverer
 `vaktlister_i_drift`, oppdrag leverer `oppdrag`, og hver tegner sine egne felter fra en
