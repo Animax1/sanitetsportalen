@@ -4,6 +4,40 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-14 — To vaktlisteønsker ført i TODO (ingen kode)
+
+**«Sett i drift» skal bort — drift skal følge vakta** (André). Problemet den løser er
+ekte: glemmer noen å trykke, kan ingen stemple møtt ved vaktstart, altså nøyaktig når det
+betyr noe og når alle har mest å gjøre.
+
+Men knappen gjør **fire ting, ikke én** (`drift_view`): setter status, setter
+`satt_i_drift_at`, setter `satt_i_drift_av`, og **sender vaktlista på e-post** når admin
+har slått det på. To av dem mister sitt hjem hvis knappen forsvinner — `satt_i_drift_av`
+mister mening, og e-postutløseren må flyttes til en klokke. Begge er ført opp.
+
+Designspørsmålet er om drift skal **utledes** eller **klokkesettes**. Utledet er mest i
+portalens ånd — presedensen er `Vaktpost.er_tilstede`, «utledes, aldri lagres; to kilder
+til samme sannhet går i utakt første gang noe feiler halvveis». Og kantene som må avklares:
+den som møter tidlig, og den som glemte å stemple av.
+
+**«Oversikt» skal siles etter dag først, så ressurs** (André). Dagen finnes allerede som
+begrep — `_blokkerMedDager()` setter en dagoverskrift *inne i* hver ressurs — så dette er
+en omstrukturering, ikke et nytt begrep.
+
+Lesemodellen er det som endrer seg. I dag svarer lista på «hvem står på denne bilen, og
+når»; begrunnelsen i `CLAUDE.md` var «den som leser den står ved bilen». Snudd svarer den
+på **«hvem er på vakt i dag, og hvor»** — spørsmålet den som møter om morgenen faktisk
+stiller.
+
+Ett spørsmål må avgjøres: **hvor havner et skift som krysser midnatt?** I dag files det
+under startdagen (`_dagnokkel(fra_tid)`). Med dag ytterst blir det et reelt valg — bare
+startdagen betyr at den som ser på lørdag morgen ikke ser Kari, selv om hun er på vakt.
+Merk spenningen mot rapportmodulen: for **timer** er det avklart at skift splittes ved
+midnatt, men for **oversikten** er spørsmålet hvem som er til stede, ikke hvor mange timer
+som skal faktureres. De to kan lande ulikt — men da bevisst.
+
+---
+
 ## 2026-09-14 — Rapportnotatet skrevet ferdig (ingen kode)
 
 `docs/FORSLAG_RAPPORTMODUL.md` er revidert etter diskusjonen med André. Fortsatt et

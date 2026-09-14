@@ -305,6 +305,120 @@ ingen av dem gir feilmelding — de er bare stille inaktive.
 
 ## Pågående / neste
 
+### Vaktlista: snu «Oversikt» til dag først, ressurs etterpå — ønsket 14. sep. 2026
+
+**André:** «oversikten [skal] bare vise hvem som er på vakt og hvilken ressurs de er på på
+dag … ikke silt etter ressurs først og så dag, men faktisk silt etter dag så ressurs».
+
+**Dagen finnes allerede som begrep**, den er bare på feil nivå. `_blokkerMedDager()` i
+`static/js/vaktliste-tegning.js` setter en dagoverskrift *inne i* hver ressurs, og bare
+når vakta har mer enn én dag. Nøkkelen er `_dagnokkel(blokk.fra_tid)` — altså **skiftets
+starttidspunkt**.
+
+Dagens struktur:
+
+```
+Ambulanse A          ← ressurs
+  fredag             ← dag
+    fre 20:00–04:00  ← tidsblokk
+      Kari, Per      ← mannskap
+Ambulanse B
+  fredag
+    ...
+```
+
+Ønsket struktur:
+
+```
+fredag               ← dag
+  Ambulanse A        ← ressurs
+    Kari, Per
+  Ambulanse B
+    ...
+lørdag
+  ...
+```
+
+**Hvorfor det er riktig:** lesemodellen endrer seg. I dag svarer lista på «hvem står på
+denne bilen, og når» — det var begrunnelsen som sto i `CLAUDE.md`: «den som leser den står
+ved bilen». Snudd svarer den på **«hvem er på vakt i dag, og hvor»**, som er spørsmålet den
+som møter om morgenen faktisk stiller.
+
+#### Ett spørsmål som må avgjøres
+
+- [ ] **Hvor havner et skift som krysser midnatt?** I dag filer `_dagnokkel(fra_tid)` det
+      under **startdagen** — «fre. 20:00 – lør. 04:00» står bare under fredag. Med dagen
+      som ytterste nivå blir det et reelt valg:
+      - **Bare startdagen:** Den som ser på lørdag morgen ser ikke Kari, selv om hun *er*
+        på vakt da. Lista svarer da ikke på spørsmålet den er snudd for å svare på.
+      - **Begge dager:** Kari står under både fredag og lørdag. Riktigere for «hvem er på
+        vakt nå», men samme person telles to ganger hvis noen summerer radene.
+
+      Merk spenningen mot rapportmodulen: for **timer** er det avklart at skift splittes
+      ved midnatt (`FORSLAG_RAPPORTMODUL.md` §2.2). For **oversikten** er splitting ikke
+      like opplagt — der er spørsmålet hvem som er til stede, ikke hvor mange timer som
+      skal faktureres. De to kan lande ulikt, men da skal det være bevisst.
+
+- [ ] **Beholdes summene per ressurs?** I dag viser ressursoverskriften antall skift,
+      antall bemannede og timer (`_telling`, `_sumTimer`). Med dag ytterst blir de per
+      dag per ressurs — eller de forsvinner. Avklares.
+
+- [ ] **Ressursfilteret** (`utskriftRessurs`) beholdes uansett; det silter på ressurs og
+      er uavhengig av nivårekkefølgen.
+
+*`@media print`-reglene i `vaktliste.css` må gås gjennom med den nye strukturen — en
+dagoverskrift som havner nederst på et ark uten radene under seg er en utskrift ingen kan
+bruke.*
+
+### Vaktlista: fjern «Sett i drift», la drift følge vakta — ønsket 14. sep. 2026
+
+**André:** «fjern i drift-knappen og heller ha det slik at når vaktlisten starter så er den
+automatisk i drift».
+
+**Problemet den løser er ekte:** glemmer noen å trykke, kan ingen stemple møtt ved
+vaktstart — altså nøyaktig når det betyr noe, og nøyaktig når alle har mest å gjøre.
+Innsjekken er stengt fordi noen glemte en knapp, ikke fordi noen bestemte det.
+
+**Men knappen gjør fire ting, ikke én** (`vaktliste/views.drift_view`), og alle fire må
+ha et nytt hjem:
+
+| I dag | Hva som skjer hvis drift utledes |
+|---|---|
+| `status = DRIFT` | Utledes av om «nå» er innenfor vaktas spenn — se under |
+| `satt_i_drift_at` | Blir vaktas starttidspunkt. Uproblematisk |
+| **`satt_i_drift_av`** | **Mister mening.** I dag kan man svare på «hvem åpnet innsjekken». Ingen åpner den lenger |
+| **Sender vaktlista på e-post** (`fil.sendes_ved_drift()`) | **Utløseren forsvinner.** Må flyttes til en klokke |
+
+#### Designspørsmålet: utledet eller klokkesatt?
+
+- [ ] **Utledet er mest i portalens ånd.** Presedensen er `Vaktpost.er_tilstede`:
+      «utledes, aldri lagres — to kilder til samme sannhet går i utakt første gang noe
+      feiler halvveis». `i_drift` kunne på samme vis regnes av `Vakt.startet` og
+      `Vaktliste.planlagt_slutt`. Ingen ny klokke, ingen ny tilstand.
+- [ ] **Klokkesatt** ville beholdt `status` som felt, satt av
+      `vaktliste.middleware.FilutsendingMiddleware` eller en søster til den — trafikken
+      som tidtaker, som backupklokka. Beholder auditsporet og e-postutløseren, men
+      innfører en tredje klokke.
+
+#### Kantene som må avklares før noe bygges
+
+- [ ] **Hva med den som møter tidlig?** Utledes drift strengt av klokka, kan ingen stemple
+      møtt 30 minutter før vaktstart. Det skjer ofte.
+- [ ] **Og den som glemte å stemple av?** Stenger innsjekken automatisk ved
+      `planlagt_slutt`, mister man muligheten til å rette etterpå.
+- [ ] **Overstyring bør trolig beholdes**, selv om knappen fjernes fra normalflyten: en
+      vakt som starter sent, eller en liste som må åpnes for en rettelse. Da er
+      spørsmålet om det blir «automatisk med unntak» framfor «manuelt».
+- [ ] **E-postutsendingen ved drift** må flyttes, ellers slutter reserven å bli sendt.
+      `fil.send_planlagte()` og `FilutsendingMiddleware` finnes alt og er riktig sted.
+- [ ] **Auditsporet.** Drift inn og ut logges på feltnivå i dag (`vaktliste/signals.py`).
+      Utledes tilstanden, er det ingenting å logge — og det er riktig, for da har ingen
+      gjort noe. Men det skal være et bevisst fravalg, ikke et tap man oppdager senere.
+
+*Verdt å merke: dagens design er begrunnet i notatet — «drift er en innsjekk-port, ikke en
+livssyklus … lista kan fortsatt endres, for folk uteblir og bytter». Endringen rører ikke
+den begrunnelsen; den rører bare hvem som åpner døra.*
+
 ### Vaktlista: overlappende skift — funnet 14. sep. 2026
 
 *Funnet mens vi diskuterte rapportmodulen, men punktene hører hjemme i vaktlista og er
