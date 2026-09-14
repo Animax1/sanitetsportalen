@@ -48,6 +48,82 @@ VALID_KINDS = {KIND_AUTO, KIND_MANUAL, KIND_PRE_RESTORE, KIND_PRE_RESET}
 PROTECTED_KINDS = {KIND_PRE_RESTORE}
 
 
+# ── Modeller som har flyttet mellom apper ────────────────────────────────────
+#
+# **En backupfil bærer modellnavnet.** `dumpdata` skriver
+# `{"model": "patients.appsetting", ...}`, og `loaddata` slår navnet opp i
+# app-registeret. Flytter en modell fra én app til en annen, endres etiketten —
+# og en fil tatt før flyttingen svarer da «Unknown model» i stedet for å laste.
+#
+# Det er ikke en teoretisk ulempe. Modulfilene ligger **730 dager** hos
+# Scaleway og den hele fila 90; en backup vi ikke kan gjenopprette er ingen
+# backup. Uten denne tabellen ville hver flytting gjort hele arkivet av eldre
+# filer ubrukelig i det øyeblikket koden ble deployet, uten at noe sa fra —
+# filene lastes jo opp som før.
+#
+# Tabellen er **tom i dag** (14. sep. 2026). Den settes på plass nå, før
+# `docs/PLAN_FLYTTING_TIL_CORE.md` fase 2 fyller den, nettopp fordi røret da er
+# prøvd i prod før det trengs. Fylles den i samme deploy som flyttingen, er det
+# den dagen noen gjenoppretter at man finner ut om den var riktig.
+#
+# Nøkkel og verdi er `app_label.modellnavn` med små bokstaver, som i fila.
+GAMLE_MODELLNAVN: dict[str, str] = {
+    # 'patients.appsetting': 'core.appsetting',      # fase 2
+    # 'patients.backup': 'core.backup',              # fase 2
+}
+
+
+def oversett_modellnavn(raw: bytes) -> bytes:
+    """Bytt ut modellnavn som har flyttet, slik at eldre filer lastes.
+
+    Bare den øverste `model`-nøkkelen røres. Fremmednøkler skrives som
+    naturlige nøkler (`natural_foreign`), altså som verdier og ikke som
+    modellnavn, så det finnes ikke flere steder etiketten kan stå.
+
+    **Rask vei først:** er ingen av de gamle navnene å finne i bytene i det
+    hele tatt, returneres fila urørt uten at JSON-en parses. Med en tom tabell
+    koster funksjonen ingenting, og en hel databasefil skal ikke serialiseres
+    fram og tilbake for en oppslagstabell som ikke har noe å si.
+
+    Porten er ufølsom for store bokstaver, som oppslaget under. `dumpdata`
+    skriver alltid små (`_meta.label_lower`), så det gjelder bare en fil noen
+    har vært inne i for hånd — men da er alternativet at navnet slipper forbi
+    uoversatt og feiler i `loaddata` med «Unknown model», altså nøyaktig det
+    tabellen finnes for å hindre. Prisen er én `bytes.lower()` av fila, og bare
+    når tabellen har rader; treffer porten, parses fila likevel.
+
+    Kaster aldri. Er fila ødelagt, skal den feile i `loaddata`, med den
+    feilmeldingen — ikke her, med en annen.
+    """
+    if not GAMLE_MODELLNAVN:
+        return raw
+    lav = raw.lower()
+    if not any(gammelt.encode('utf-8') in lav for gammelt in GAMLE_MODELLNAVN):
+        return raw
+
+    try:
+        objekter = json.loads(raw.decode('utf-8'))
+        if not isinstance(objekter, list):
+            return raw
+    except Exception as feil:   # noqa: BLE001 — se docstring
+        logger.warning('core.backup: kunne ikke lese fila for navnebytte: %s', feil)
+        return raw
+
+    byttet = 0
+    for objekt in objekter:
+        if not isinstance(objekt, dict):
+            continue
+        nytt = GAMLE_MODELLNAVN.get(str(objekt.get('model', '')).lower())
+        if nytt:
+            objekt['model'] = nytt
+            byttet += 1
+
+    if not byttet:
+        return raw
+    logger.info('core.backup: oversatte %d modellnavn fra en eldre fil', byttet)
+    return json.dumps(objekter).encode('utf-8')
+
+
 def get_backup_dir() -> Path:
     """Returnerer Path til backup-mappen, opprett ved behov."""
     path = Path(os.environ.get('BACKUP_DIR', settings.BASE_DIR / 'backups'))
@@ -329,6 +405,11 @@ def restore_backup(backup, user=None, kilde: str = '') -> None:
 
     with gzip.open(path, 'rb') as f:
         raw = f.read()
+
+    # **Før alt annet:** en fil kan være eldre enn siste gang en modell flyttet
+    # mellom apper. Oversettelsen står her og ikke rett før `loaddata`, slik at
+    # kontrollen under ser dagens modellnavn — ellers måtte den kjenne begge.
+    raw = oversett_modellnavn(raw)
 
     # Se over innholdet før det lastes. loaddata går utenom all
     # applikasjonsvalidering, så dette er eneste stedet vi får sjekket hva

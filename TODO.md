@@ -321,8 +321,24 @@ bindende: 1 før 2, fordi backupen speiler hvor modellene bor.
 - [ ] **1. Flytt det portalvide ut av `patients` og inn i `core`** (§2 i notatet).
       **Planen er skrevet ut i
       [`docs/PLAN_FLYTTING_TIL_CORE.md`](./docs/PLAN_FLYTTING_TIL_CORE.md)**
-      (14. sep. 2026, fire faser). Venter på tre svar i notatets §7: audit-loggens
-      `app_label` etter flyttingen, rekkefølgen på fase 3/4, og deploy-takt.
+      (14. sep. 2026, fire faser). **Alt avklart** (notatets §7): audit-loggens
+      `app_label` mappes til `core` for de flyttede tabellene, faserekkefølgen står, og
+      deploy-takten er som i backupomleggingen. `accounts/decorators.py` (3.3) tas med i
+      fase 4.
+      - [x] **Fase 1 — navnetabellen** (14. sep. 2026). `oversett_modellnavn()` og
+            `GAMLE_MODELLNAVN` i `core/backup/service.py`, tom i dag. En backupfil bærer
+            modellnavnet, så en fil tatt før en flytting lastes ikke etterpå — og
+            modulfilene ligger 730 dager offsite. Røret settes på plass før fase 2 fyller
+            det, så oversettelsen er prøvd i prod før den trengs. Testene kjører den mot
+            en oppdiktet flytting, med motprøve.
+      - [ ] **Fase 2 — `AppSetting` og `Backup` til `core`**, `db_table` beholdt
+            (tilstandsmigrasjon; en omdøping ville gitt 500 i vinduet mellom `migrate` og
+            containerbyttet). Navnetabellen får sine to rader, og `EKSPLISITT_MAPPING` i
+            `audit/signals.py` får tabellene sine.
+      - [ ] **Fase 3 — `hent_aktiv_vakt`, middleware, `healthz`, server-status.**
+            Ingen migrasjon.
+      - [ ] **Fase 4 — portalfila tar `AppSetting`**, `/portal-admin/` samlet (3.2),
+            `core/views.py` delt (3.7), `accounts/decorators.py` slettet (3.3).
       Kortversjonen av det gamle punktet under står igjen som underlag:
       `AppSetting`, `Backup`, `hent_aktiv_vakt`, CSP-/metrikk-/backup-
       middlewaren, `healthz` og server-status. Tabellnavnene beholdes (tilstandsmigrasjon,

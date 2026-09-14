@@ -4,6 +4,49 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-14 — Flytting fase 1: navnetabellen, satt på plass før den trengs
+
+`core.backup.oversett_modellnavn()` og `GAMLE_MODELLNAVN`. Tabellen er **tom**,
+så fasen endrer ingenting i dag. Det er hele poenget.
+
+En backupfil bærer modellnavnet — `{"model": "patients.appsetting", …}` — og
+`loaddata` slår det opp i app-registeret. Flytter modellen til `core`, svarer en
+fil tatt før flyttingen «Invalid model identifier» i stedet for å laste. Og
+modulfilene ligger 730 dager hos Scaleway. Uten tabellen ville hver flytting
+gjort hele arkivet av eldre filer ubrukelig i det øyeblikket koden ble deployet,
+uten at noe sa fra: filene lastes jo opp som før.
+
+Røret settes derfor på plass nå, før fase 2 fyller det. Gjøres de sammen, er
+deployen som flytter modellene også den som først prøver oversettelsen — og
+feiler den, viser det seg den dagen noen gjenoppretter.
+
+Oversettelsen står **før** `_inspect_payload`, ikke rett før `loaddata`, slik at
+kontrollen ser dagens modellnavn og slipper å kjenne begge.
+
+**Rask vei:** er ingen av navnene å finne i bytene, returneres fila *identisk*
+uten at JSON-en parses — testet med `assertIs`, ikke `assertEqual`, fordi en hel
+databasefil ikke skal serialiseres fram og tilbake for en tabell som ikke har
+noe å si.
+
+Testene kjører mekanismen mot en **oppdiktet** flytting (`gammelapp.patient` →
+`patients.patient`), siden den ekte ikke har skjedd ennå — med motprøven: uten
+tabellen feiler nøyaktig samme fil med «Invalid model identifier:
+gammelapp.patient», og gjenopprettingen rulles tilbake.
+
+*Testen fant én inkonsistens i første utkast:* oppslaget var ufølsomt for store
+bokstaver, men den raske veien var det ikke — et navn med store bokstaver ville
+sluppet forbi uoversatt og feilet i `loaddata`, altså nøyaktig det tabellen
+finnes for å hindre. Porten er nå like ufølsom, og prisen (én `bytes.lower()`)
+betales bare når tabellen har rader.
+
+Avklart samtidig: audit-loggens `app_label` mappes til `core` for de flyttede
+tabellene i fase 2, rekkefølgen på fasene står, og `accounts/decorators.py`
+slettes i fase 4.
+
+2644 tester grønne på SQLite og PostgreSQL 16.
+
+---
+
 ## 2026-09-14 — Neste post planlagt: det portalvide ut av `patients`
 
 `docs/PLAN_FLYTTING_TIL_CORE.md`. Trinn 2 i `PLAN_REKKEFOLGE_2026-09.md`, nå

@@ -145,7 +145,7 @@ Hver fase er et eget commit-sett med grønne tester, og kan deployes for seg.
 
 | # | Innhold | Anslag |
 |---|---|---|
-| 1 | **Navnetabellen i lasteren**, med test som laster en fil i gammel form. Tabellen er **tom i dag**, så fasen endrer ingenting — den setter røret på plass og beviser at det virker, før det trengs | ½ kveld |
+| 1 | **Navnetabellen i lasteren**, med test som laster en fil i gammel form. Tabellen er **tom i dag**, så fasen endrer ingenting — den setter røret på plass og beviser at det virker, før det trengs | ½ kveld — **gjort 14. sep. 2026** |
 | 2 | **`AppSetting` og `Backup` til `core`**, `db_table` beholdt, tilstandsmigrasjon. Navnetabellen får sine to rader. Alle 34+30 filene retter importen | 1–2 kvelder |
 | 3 | **`hent_aktiv_vakt`, middlewaren, `healthz`, server-status til `core`.** Ingen migrasjon i det hele tatt — ren kodeflytting. Middlewarestiene i `settings.py` og de fem rutene i `myproject/urls.py` følger med | 1 kveld |
 | 4 | **Portalfila tar `AppSetting`** (den hører hjemme der, ikke i pasientfila). Ryddingen som faller ut av seg selv: `/portal-admin/` samlet i én URL-fil (3.2), `core/views.py` delt (3.7) | 1 kveld |
@@ -173,13 +173,18 @@ navnetabellen virker i praksis.
 - **Omdøping av tabellene.** Se §3.1. Kan gjøres senere, i et varslet vindu, hvis det
   noen gang blir verdt det.
 
-## 7. Hva jeg trenger svar på før fase 2
+## 7. Avklart (14. sep. 2026)
 
-1. **§3.2 — audit-loggens `app_label`.** Anbefalingen er å mappe nye rader til `core`,
-   med et datert brudd i filteret. Er du enig, eller vil du heller ha en sammenhengende
-   historikk med feil etikett?
-2. **Rekkefølgen fase 3 og 4.** De er begge trygge (ingen migrasjon), og jeg har lagt
-   dem etter modellene fordi hver importlinje da bare røres én gang. Har du en grunn til
-   å ta strukturen først, sier du fra.
-3. **Deploy-takt.** Backupomleggingen gikk fase for fase til `rollemodell` og så til
-   `main`. Samme her, eller vil du ha alle fire samlet til slutt?
+1. **Audit-loggens `app_label`: vei 2.** Nye rader for de flyttede tabellene mappes til
+   `core` gjennom `EKSPLISITT_MAPPING`. Filteret blir riktig framover, og bruddet er
+   datert: et søk på «patients» finner rader fra før flyttingen, «core» finner dem
+   etter. Gjøres i fase 2, i samme commit som modellene, så etiketten skifter nøyaktig
+   der tabellen skifter eier.
+2. **Rekkefølgen står** (André: «gjør det som er i henhold til best practice»).
+   Modellene i fase 2, koden i fase 3, portalfila og ryddingen i fase 4 — da røres hver
+   importlinje bare én gang, og den ene fasen med migrasjon står alene.
+3. **Deploy-takt som før:** fase for fase, til `rollemodell` og `main` samtidig, med
+   suiten grønn på begge databaser før hver push.
+
+Tatt med etter avklaringen: **`accounts/decorators.py`** (3.3) slettes i fase 4 sammen
+med testen som er dens eneste leser. Ingen produksjonskode importerer fra den.

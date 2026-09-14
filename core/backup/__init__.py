@@ -34,17 +34,19 @@ from .klokke import (
     varsle_stoppet_klokke,
 )
 from .service import (
+    create_backup,
+    enforce_cap,
+    GAMLE_MODELLNAVN,
+    get_backup_dir,
     KIND_AUTO,
     KIND_MANUAL,
     KIND_PRE_RESET,
     KIND_PRE_RESTORE,
+    oversett_modellnavn,
     PROTECTED_KINDS,
-    VALID_KINDS,
-    create_backup,
-    enforce_cap,
-    get_backup_dir,
     restore_backup,
     slug_fra_filnavn,
+    VALID_KINDS,
 )
 
 def register_handlers() -> None:
@@ -62,6 +64,8 @@ def register_handlers() -> None:
 
 
 __all__ = [
+    'GAMLE_MODELLNAVN',
+    'oversett_modellnavn',
     'BaseBackupHandler',
     'FullBackupHandler',
     'PortalBackupHandler',
