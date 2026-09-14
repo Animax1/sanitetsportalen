@@ -373,9 +373,11 @@ class OppdragImportererIkkeVaktlista(SimpleTestCase):
     def test_sentralbordet_henter_endepunktet_selv(self):
         """Speilet av testen over: retningen holdes ikke bare ved at noe
         *mangler*, men ved at koblingen finnes der den skal."""
-        js = Path(settings.BASE_DIR, 'static', 'js',
-                  'oppdrag-sentral.js').read_text(encoding='utf-8')
-        self.assertIn('/vaktliste/api/enhet/', js)
+        from patients.js_test_utils import OPPDRAG_SENTRAL_JS, read_js
+
+        # Sentralbordet er delt i fire filer siden 14. sep. 2026;
+        # `read_js` skjøter dem, så det er samme spørsmål som før.
+        self.assertIn('/vaktliste/api/enhet/', read_js(OPPDRAG_SENTRAL_JS))
 
 
 class BesetningspanelTests(SimpleTestCase):

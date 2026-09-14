@@ -931,5 +931,20 @@
   og kaster på en side uten pasientskjemaene. Se CLAUDE.md.
 {% endcomment %}
 <script src="{% static 'js/portal-utils.js' %}"></script>
-<script src="{% static 'js/vaktliste.js' %}"></script>
+{% comment %}
+Delt i fem 14. sep. 2026 (gjeldspunkt 3.6). Ingen bundler, så rekkefølgen her
+er lasterekkefølgen — og **kjernen må først**: alle `let`/`const` på toppnivå
+står der, og de er skript-scopede. En fil som leste dem før kjernen var kjørt,
+ville truffet en temporal dead zone.
+
+Ingenting annet kjører på toppnivå (én `DOMContentLoaded`-krok i registeret,
+som uansett fyrer etter at alle fem er lastet), så resten av rekkefølgen er
+lesbarhet og ikke en regel. `VaktlisteFileneDekkerAltTests` håndhever begge
+deler.
+{% endcomment %}
+<script src="{% static 'js/vaktliste-kjerne.js' %}"></script>
+<script src="{% static 'js/vaktliste-tegning.js' %}"></script>
+<script src="{% static 'js/vaktliste-handlinger.js' %}"></script>
+<script src="{% static 'js/vaktliste-offline.js' %}"></script>
+<script src="{% static 'js/vaktliste-register.js' %}"></script>
 {% endblock %}

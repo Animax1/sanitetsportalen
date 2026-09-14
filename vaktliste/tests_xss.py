@@ -193,7 +193,8 @@ class VaktlisteEscapingKildeTests(SimpleTestCase):
         lastet = re.findall(r"<script\b[^>]*js/([A-Za-z0-9_.-]+\.js)", mal)
         self.assertNotIn('patients-utils.js', lastet)
         self.assertIn('portal-utils.js', lastet)
-        self.assertIn('vaktliste.js', lastet)
+        self.assertIn('vaktliste-kjerne.js', lastet,
+                      'sidens JS er delt i fem siden 14. sep. 2026 — kjernen først')
 
     def test_alle_interpolasjoner_er_escapet_eller_gjennomgatt(self):
         src = read_js(VAKTLISTE_JS)
@@ -516,7 +517,8 @@ class RegistersidenEscapingKildeTests(SimpleTestCase):
         lastet = re.findall(r"<script\b[^>]*js/([A-Za-z0-9_.-]+\.js)", mal)
         self.assertNotIn('patients-utils.js', lastet)
         self.assertIn('portal-utils.js', lastet)
-        self.assertIn('vaktliste.js', lastet)
+        self.assertIn('vaktliste-kjerne.js', lastet,
+                      'sidens JS er delt i fem siden 14. sep. 2026 — kjernen først')
 
     def test_alle_interpolasjoner_er_escapet_eller_gjennomgatt(self):
         src = read_js(VAKTLISTE_JS)

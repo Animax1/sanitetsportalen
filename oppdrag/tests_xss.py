@@ -14,6 +14,7 @@ import re
 from django.test import SimpleTestCase
 
 from patients.js_test_utils import (
+    js_navn,
     OPPDRAG_ENHET_JS, OPPDRAG_SENTRAL_JS, PORTAL_UTILS_JS, build_harness,
     extract_function, node_available, read_js, run_node,
 )
@@ -195,7 +196,7 @@ class OppdragEscapingKildeTests(SimpleTestCase):
         for fil, byggere in HTML_BUILDERS_PER_FIL.items():
             src = read_js(fil)
             for navn in byggere:
-                with self.subTest(fil=fil.name, navn=navn):
+                with self.subTest(fil=js_navn(fil), navn=navn):
                     self.assertIn(f'function {navn}(', src)
 
     def test_sidene_laster_ikke_patients_utils(self):
@@ -224,7 +225,7 @@ class OppdragEscapingKildeTests(SimpleTestCase):
                         continue
                     if uttrykk in REVIEWED_INTERPOLATIONS:
                         continue
-                    uescapet.append(f'{fil.name} {navn}(): ${{{uttrykk}}}')
+                    uescapet.append(f"{js_navn(fil)} {navn}(): ${{{uttrykk}}}")
 
         self.assertEqual(uescapet, [], (
             'Uescapede interpolasjoner i oppdrag-byggerne:\n  '

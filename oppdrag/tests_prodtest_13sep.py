@@ -13,7 +13,8 @@ from django.test import SimpleTestCase
 from oppdrag.tests_offline_ko import FORSPILL
 from oppdrag.tests_runde_d import _konst
 from patients.js_test_utils import (
-    OPPDRAG_ENHET_JS, OPPDRAG_SENTRAL_JS, build_harness, node_available, run_node,
+    OPPDRAG_ENHET_JS, OPPDRAG_SENTRAL_JS, build_harness, node_available,
+    read_js, run_node,
 )
 
 
@@ -117,7 +118,7 @@ class SentralbordetsOppstartTests(SimpleTestCase):
     def test_domcontentloaded_setter_pollingen_i_finally(self):
         """Den delen kan ikke kjøres i node uten DOM — men regelen er at
         `setInterval` står i `finally`, og den leses her."""
-        src = OPPDRAG_SENTRAL_JS.read_text(encoding='utf-8')
+        src = read_js(OPPDRAG_SENTRAL_JS)
         start = src.index("document.addEventListener('DOMContentLoaded'")
         blokk = src[start:src.index('});', start)]
         self.assertIn('try {', blokk)

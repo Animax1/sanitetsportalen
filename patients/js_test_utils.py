@@ -31,9 +31,26 @@ APP_JS = JS_DIR / 'patients-app.js'
 ADMIN_JS = JS_DIR / 'patients-admin.js'
 STATISTIKK_JS = JS_DIR / 'statistikk.js'
 STATISTIKK_OPPDRAG_JS = JS_DIR / 'statistikk-oppdrag.js'
-OPPDRAG_SENTRAL_JS = JS_DIR / 'oppdrag-sentral.js'
+#: Sentralbordet er fire filer siden 14. sep. 2026 — se `VAKTLISTE_JS`.
+OPPDRAG_SENTRAL_JS = (
+    JS_DIR / 'oppdrag-sentral-kjerne.js',
+    JS_DIR / 'oppdrag-sentral-oppdrag.js',
+    JS_DIR / 'oppdrag-sentral-admin.js',
+    JS_DIR / 'oppdrag-sentral-lasting.js',
+)
 OPPDRAG_ENHET_JS = JS_DIR / 'oppdrag-enhet.js'
-VAKTLISTE_JS = JS_DIR / 'vaktliste.js'
+#: **Vaktlistesiden er fem filer siden 14. sep. 2026** (gjeldspunkt 3.6).
+#: Konstanten er derfor en tuppel, og `read_js()` skjøter dem sammen i
+#: lasterekkefølge — så alt som leste `VAKTLISTE_JS` før, leser det samme nå.
+#: Rekkefølgen er den samme som `<script>`-taggene i malen, og
+#: `VaktlisteFileneDekkerAltTests` krever at de to holdes like.
+VAKTLISTE_JS = (
+    JS_DIR / 'vaktliste-kjerne.js',
+    JS_DIR / 'vaktliste-tegning.js',
+    JS_DIR / 'vaktliste-handlinger.js',
+    JS_DIR / 'vaktliste-offline.js',
+    JS_DIR / 'vaktliste-register.js',
+)
 
 
 def node_available():
@@ -42,7 +59,27 @@ def node_available():
 
 
 def read_js(path):
+    """Kildekoden til én fil — eller til flere, skjøtet i rekkefølge.
+
+    Tuppelen finnes for sider som er delt i flere filer uten bundler
+    (`VAKTLISTE_JS`). De deler ett globalt navnerom i nettleseren, så for
+    alt som leser kilden er de én fil — og da skal de være det her også.
+    """
+    if isinstance(path, (tuple, list)):
+        return '\n\n'.join(Path(p).read_text(encoding='utf-8') for p in path)
     return Path(path).read_text(encoding='utf-8')
+
+
+def js_navn(sti):
+    """Lesbart navn for en JS-kilde, enten den er én fil eller flere.
+
+    Sidene uten bundler er delt i flere filer (14. sep. 2026), og en test som
+    skriver `sti.name` i en `subTest`-etikett skal ikke måtte vite hvilken av
+    delene den snakker om.
+    """
+    if isinstance(sti, (tuple, list)):
+        return ' + '.join(Path(p).name for p in sti)
+    return Path(sti).name
 
 
 def extract_function(source, name):

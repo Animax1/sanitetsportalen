@@ -4,6 +4,55 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-14 — Gjeldspunkt 3.6: de to store JS-filene delt
+
+`vaktliste.js` var 3 801 linjer, `oppdrag-sentral.js` 1 991. Nå fem og fire.
+
+**Jeg rådet fra denne**, og står ved begrunnelsen: uten bundler er en deling
+ren flytting av tekst, og refaktorering uten anledning innfører feil uten å
+løse noe. André ba om den likevel, og da er den hans avgjørelse. Så den er
+gjort med et sikkerhetsnett foran, ikke etter.
+
+**Sikkerhetsnettet først.** Før en linje ble flyttet, tok jeg en fasit over de
+182 + 95 toppnivåfunksjonene og de 25 + 22 toppnivåbindingene. Etter delingen:
+samme antall, ingen mangler, ingen dubletter.
+
+Delingen følger seksjonsmarkørene som alt sto i filene:
+
+| Fil | Innhold |
+|---|---|
+| `vaktliste-kjerne.js` | Tilstand, tilgang, tid, henting, korpsvelger, nedtrekk |
+| `vaktliste-tegning.js` | Tegning og byggere |
+| `vaktliste-handlinger.js` | Handlinger og ressursroller |
+| `vaktliste-offline.js` | Offline-køen |
+| `vaktliste-register.js` | Mannskapsregisteret, korps og kompetanser |
+
+**Den viktigste innsikten gjelder rekkefølgen, og jeg tok først feil om den.**
+Jeg skrev i malen at «all toppnivå-tilstand står i kjernen». Det stemte ikke —
+`STEMPLINGER`, `offlineTilstand` og ni andre lå i senere filer — og et krav
+ingen holder er verre enn ingen. `let`/`const` på toppnivå er *skript-scopede*,
+altså delt mellom filene, og en temporal dead zone treffes bare hvis noe
+**kjører** før bindingen er nådd.
+
+Den ekte regelen er derfor: **alt som kjører på toppnivå står i den siste
+fila** — i praksis `DOMContentLoaded`-krokene. `core/tests_js_splitt.py`
+håndhever den, sammen med at ingen funksjon er duplisert, at malens
+`<script>`-rekkefølge stemmer med testenes, at de gamle samlefilene er borte,
+og at ingen del er over 1 800 linjer. Uten den siste kunne én fil vokst tilbake
+til 3 800 mens de andre sto tomme, med alt annet grønt.
+
+Alle tre feilklassene er **prøvd mot mutasjoner**: en duplisert funksjon, et
+kall lagt på toppnivå i kjernen, og to `<script>`-tagger byttet om. Alle tre
+faller.
+
+`VAKTLISTE_JS` og `OPPDRAG_SENTRAL_JS` i `js_test_utils` er nå **tupler**, og
+`read_js()` skjøter dem. Det var grepet som holdt 62 testreferanser uendret —
+for alt som leser kilden er de fortsatt én fil, som de er i nettleseren.
+
+2709 tester grønne på SQLite og PostgreSQL 16.
+
+---
+
 ## 2026-09-14 — Gjeldspunkt 3.8: fem tester som målte kode, ikke oppførsel
 
 Gjeldskartet sa «en del eldre tester grep-er etter kodelinjer». Da jeg gikk

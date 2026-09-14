@@ -12,7 +12,9 @@ from django.test import SimpleTestCase
 from django.utils import timezone
 
 from patients.js_test_utils import (
-    JS_DIR, PORTAL_UTILS_JS, VAKTLISTE_JS, build_harness, node_available, run_node)
+    JS_DIR, PORTAL_UTILS_JS, VAKTLISTE_JS, build_harness, node_available,
+    read_js, run_node,
+)
 
 from . import services
 from .models import Vaktpost
@@ -90,7 +92,7 @@ class ServiceWorkerViewTests(TilgangsBasis):
         html = self.c_vl.get('/vaktliste/').content.decode()
         self.assertIn('id="vl-offline"', html)
         self.assertIn('id="vl-offline-klar"', html)
-        js = VAKTLISTE_JS.read_text(encoding='utf-8')
+        js = read_js(VAKTLISTE_JS)
         self.assertIn("serviceWorker.register('/vaktliste/sw.js')", js)
 
 

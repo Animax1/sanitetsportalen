@@ -324,5 +324,14 @@
   window.OPPDRAG_LYDVARSEL = {{ lydvarsel }};
 </script>
 <script src="{% static 'js/portal-utils.js' %}"></script>
-<script src="{% static 'js/oppdrag-sentral.js' %}"></script>
+{% comment %}
+Delt i fire 14. sep. 2026 (gjeldspunkt 3.6). Ingen bundler, så rekkefølgen her
+er lasterekkefølgen. To regler, begge håndhevet av `JsSplittenErKompletTests`:
+kjernen først (all toppnivå-tilstand), og alt som *kjører* på toppnivå sist —
+`DOMContentLoaded`-kroken leser bindinger fra alle de andre.
+{% endcomment %}
+<script src="{% static 'js/oppdrag-sentral-kjerne.js' %}"></script>
+<script src="{% static 'js/oppdrag-sentral-oppdrag.js' %}"></script>
+<script src="{% static 'js/oppdrag-sentral-admin.js' %}"></script>
+<script src="{% static 'js/oppdrag-sentral-lasting.js' %}"></script>
 {% endblock %}

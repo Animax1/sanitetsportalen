@@ -1747,6 +1747,15 @@ Funnene under er allerede kartlagt, så jobben er avgrenset når den skal gjøre
       uansett.
 - [x] Rydd bort død backup-legacy — gjort 14. sep. 2026 som fase 8 i
       `docs/PLAN_BACKUP_OMLEGGING.md`. Se punktet der.
+- [x] **3.6 — de to store JS-filene delt** (14. sep. 2026). `vaktliste.js` 3 801 → fem
+      filer, `oppdrag-sentral.js` 1 991 → fire, langs seksjonsmarkørene som alt sto der.
+      Fasit over funksjoner og bindinger tatt **før** flyttingen; ingen mangler, ingen
+      dubletter. `core/tests_js_splitt.py` håndhever at det holder.
+      - [x] **Regelen for rekkefølgen er «alt som kjører på toppnivå står sist»**, ikke
+            «all tilstand først» — `let`/`const` er skript-scopede og deles mellom filene.
+            Jeg skrev først det siste i malen, og det var feil.
+      - [x] Prøvd mot tre mutasjoner: duplisert funksjon, toppnivåkall i kjernen, og
+            ombyttede `<script>`-tagger. Alle faller.
 - [x] **3.8 — tester som målte kode, ikke oppførsel** (14. sep. 2026). Fem skrevet om;
       resten av treffene var legitime (XSS-skannere som *finner* en bygger, regler uten
       kjøretid). Tre ble bedre, ikke bare mindre skjøre. Mønsteret står i `CLAUDE.md`.
