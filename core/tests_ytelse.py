@@ -16,7 +16,7 @@ from django.urls import reverse
 from accounts.models import CustomUser
 from audit.models import AuditLog
 from patients.models import Patient, Forstehjelper
-from patients.services import vakt_for_year
+from core.vakt import vakt_for_year
 from accounts.test_helpers import gi_standardtilgang
 
 
@@ -28,16 +28,16 @@ class DeltRedisKlientTests(TestCase):
     """
 
     def setUp(self):
-        from patients.middleware import _reset_shared_redis_client
+        from core.middleware import _reset_shared_redis_client
         _reset_shared_redis_client()
 
     def tearDown(self):
-        from patients.middleware import _reset_shared_redis_client
+        from core.middleware import _reset_shared_redis_client
         _reset_shared_redis_client()
 
     @override_settings(REDIS_URL='redis://localhost:6379/0')
     def test_klienten_bygges_kun_en_gang(self):
-        from patients.middleware import _get_shared_redis_client
+        from core.middleware import _get_shared_redis_client
 
         with patch('redis.Redis.from_url') as fake_from_url:
             fake_from_url.return_value = object()
@@ -54,20 +54,20 @@ class DeltRedisKlientTests(TestCase):
 
     @override_settings(REDIS_URL='')
     def test_uten_redis_url_gir_none(self):
-        from patients.middleware import _get_shared_redis_client
+        from core.middleware import _get_shared_redis_client
         self.assertIsNone(_get_shared_redis_client())
 
     @override_settings(REDIS_URL='redis://localhost:6379/0')
     def test_feil_ved_oppkobling_gir_none_og_kaster_ikke(self):
         """Død Redis skal degradere til lokal deque, ikke velte requesten."""
-        from patients.middleware import _get_shared_redis_client
+        from core.middleware import _get_shared_redis_client
 
         with patch('redis.Redis.from_url', side_effect=OSError('nede')):
             self.assertIsNone(_get_shared_redis_client())
 
     @override_settings(REDIS_URL='redis://localhost:6379/0')
     def test_metrics_store_bruker_den_delte_klienten(self):
-        from patients.middleware import _MetricsStore, _get_shared_redis_client
+        from core.middleware import _MetricsStore, _get_shared_redis_client
 
         with patch('redis.Redis.from_url') as fake_from_url:
             fake_from_url.return_value = object()

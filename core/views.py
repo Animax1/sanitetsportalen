@@ -214,7 +214,7 @@ def portal_settings_view(request):
                 # Arrangementsnavnet ER den aktive vaktas navn siden deploy 2
                 # — én kilde. Skrives først etter at timeouten er validert,
                 # slik at en avvist innsending ikke lagrer halve skjemaet.
-                from patients.services import hent_aktiv_vakt
+                from core.vakt import hent_aktiv_vakt
                 nytt_navn = (request.POST.get('event_name') or '').strip()
                 vakt = hent_aktiv_vakt()
                 if not nytt_navn:
@@ -241,7 +241,7 @@ def portal_settings_view(request):
     except (TypeError, ValueError):
         timer = 8
 
-    from patients.services import hent_aktiv_vakt
+    from core.vakt import hent_aktiv_vakt
     return render(request, 'core/portal_settings.html', {
         'event_name': hent_aktiv_vakt().navn,
         'session_timeout_hours': timer,

@@ -1,7 +1,6 @@
 """URL-konfigurasjon for patients-appen."""
 from django.urls import path, re_path
 from django.shortcuts import redirect
-from . import admin_status
 from . import views_arkiv, views_patients, views_registre
 
 urlpatterns = [

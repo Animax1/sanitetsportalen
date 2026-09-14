@@ -6,7 +6,7 @@ og permanent sletting.
 
 Kjør med: python manage.py test accounts.tests_user_admin
 """
-from patients.services import vakt_for_year
+from core.vakt import vakt_for_year
 from django.contrib.sessions.backends.db import SessionStore
 from django.contrib.sessions.models import Session
 from django.test import TestCase, Client, override_settings

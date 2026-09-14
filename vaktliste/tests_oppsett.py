@@ -100,7 +100,7 @@ class PlanlagtVaktTests(TestCase):
             AppSetting.objects.get(key='aktiv_vakt_id').value,
             str(self.aktiv.pk))
 
-        from patients.services import hent_aktiv_vakt
+        from core.vakt import hent_aktiv_vakt
         self.assertEqual(hent_aktiv_vakt().pk, self.aktiv.pk)
 
     def test_aaret_utledes_av_starttiden_ikke_av_i_dag(self):
@@ -451,7 +451,7 @@ class ApiTests(TestCase):
         self.assertEqual(res.status_code, 201)
         self.assertFalse(res.json()['data']['er_aktiv_vakt'])
 
-        from patients.services import hent_aktiv_vakt
+        from core.vakt import hent_aktiv_vakt
         self.assertEqual(hent_aktiv_vakt().pk, self.aktiv.pk)
 
     def test_post_tar_med_planlagt_slutt(self):

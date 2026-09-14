@@ -32,7 +32,7 @@ from django.db import transaction
 
 from patients.choices import validate_patient_choice_fields
 from patients.models import Patient, Forstehjelper, Helsepersonell
-from patients.services import hent_aktiv_vakt, vakt_for_year
+from core.vakt import hent_aktiv_vakt, vakt_for_year
 from audit.models import AuditLog
 
 

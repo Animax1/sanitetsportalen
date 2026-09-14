@@ -13,7 +13,7 @@ from datetime import timedelta
 
 from django.test import Client, TestCase, override_settings
 
-from patients.services import vakt_for_year
+from core.vakt import vakt_for_year
 from django.utils import timezone
 
 from accounts.models import CustomUser, ModulTilgang

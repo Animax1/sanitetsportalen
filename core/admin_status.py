@@ -188,7 +188,7 @@ def _get_vaktbilde():
     dette sier om det er noe å svare *for*."""
     ut = {}
     try:
-        from patients.services import hent_aktiv_vakt
+        from core.vakt import hent_aktiv_vakt
         vakt = hent_aktiv_vakt()
         ut['aktiv_vakt'] = {'id': vakt.pk, 'navn': vakt.navn, 'startet': vakt.startet.isoformat()}
     except Exception as exc:

@@ -16,7 +16,7 @@ from core.models import Vakt
 from core.validators import current_local_year
 from patients.models import Patient, VaktArkiv
 from core.models import AppSetting
-from patients.services import hent_aktiv_vakt, vakt_for_year
+from core.vakt import hent_aktiv_vakt, vakt_for_year
 from patients.test_helpers import sett_aktiv_vakt
 
 AAR = 2098

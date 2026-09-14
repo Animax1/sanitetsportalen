@@ -7,7 +7,7 @@ from unittest.mock import patch
 
 from django.test import TestCase, override_settings
 
-from patients.services import vakt_for_year
+from core.vakt import vakt_for_year
 
 from audit.models import AuditLog
 from core.validators import current_local_year
@@ -138,7 +138,7 @@ class LokaltAarTests(TestCase):
     def test_hent_aktiv_vakt_bruker_lokalt_aar(self):
         """Fallbacken i `hent_aktiv_vakt` (ingen peker, ingen vakter) skal
         lage vakta for lokalt år, ikke containerens UTC-år."""
-        from patients.services import hent_aktiv_vakt
+        from core.vakt import hent_aktiv_vakt
 
         with self._frys('2026-12-31T23:30:00'):
             self.assertEqual(hent_aktiv_vakt().year, 2027)

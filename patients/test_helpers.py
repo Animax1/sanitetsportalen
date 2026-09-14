@@ -6,7 +6,7 @@ veien testene skal sette scope på — å peke `aktiv_vakt_id` for hånd i hver
 testfil ville gitt like mange varianter som filer.
 """
 from core.models import AppSetting
-from patients.services import vakt_for_year
+from core.vakt import vakt_for_year
 
 
 def sett_aktiv_vakt(year=2098):

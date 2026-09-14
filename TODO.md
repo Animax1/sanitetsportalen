@@ -346,8 +346,17 @@ bindende: 1 før 2, fordi backupen speiler hvor modellene bor.
                   (alle rader intakt, ingen tom tabell ved siden av), og en fil tatt med
                   prod-koden gjenopprettet med den nye (navnetabellen oversatte 2 rader).
             2647 tester grønne på SQLite og PostgreSQL, 3 migrasjonsprøver OK.
-      - [ ] **Fase 3 — `hent_aktiv_vakt`, middleware, `healthz`, server-status.**
-            Ingen migrasjon.
+      - [x] **Fase 3 — `hent_aktiv_vakt`, middleware, `healthz`, server-status**
+            (14. sep. 2026). Ingen migrasjon. `core/vakt.py`, `core/middleware.py`,
+            `core/health.py`, `core/admin_status.py`. `core` importerer nå en modul på
+            fem steder i produksjonskode mot rundt tjue før runden, og fire av dem er
+            modulregisteret. `core/tests_avhengighetsretning.py` låser det med AST.
+      - [ ] **Rammeverket henter fortsatt tall fra to moduler.** `admin_status.py` og
+            portalinnstillingene importerer `vaktliste` og `oppdrag` (dashbordets
+            modultall, og vaktlistas e-postmottakere). Koblingen er eldre enn flyttingen,
+            men ble synlig av den. Riktig løsning er et register modulene melder seg inn
+            i, som `core/stats.py` — egen jobb, egen risiko. De fem importene står i
+            `KJENTE_UNNTAK` som en sperrehake til noen tar den.
       - [ ] **Fase 4 — portalfila tar `AppSetting`**, `/portal-admin/` samlet (3.2),
             `core/views.py` delt (3.7), `accounts/decorators.py` slettet (3.3).
       Kortversjonen av det gamle punktet under står igjen som underlag:

@@ -18,7 +18,7 @@ from django.urls import reverse
 from accounts.models import CustomUser
 from core.models import Notification
 from patients.models import Patient, Forstehjelper, Helsepersonell
-from patients.services import vakt_for_year
+from core.vakt import vakt_for_year
 from accounts.test_helpers import gi_standardtilgang
 
 

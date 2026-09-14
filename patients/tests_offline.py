@@ -17,7 +17,7 @@ from django.test import TestCase, override_settings
 from accounts.models import CustomUser
 from audit.models import AuditLog
 from patients.models import Patient, Forstehjelper, Helsepersonell
-from patients.services import vakt_for_year
+from core.vakt import vakt_for_year
 
 
 # ── Hjelpefunksjon – bygg mini offline-SQLite ────────────────────────────────

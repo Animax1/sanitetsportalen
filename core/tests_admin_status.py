@@ -703,7 +703,7 @@ class UtvidetStatusTests(TestCase):
         from django.utils import timezone
         from oppdrag import choices
         from oppdrag.models import Enhet, Lokasjon, Oppdrag
-        from patients.services import hent_aktiv_vakt
+        from core.vakt import hent_aktiv_vakt
         from vaktliste.models import Vaktliste
         from vaktliste import choices as vl
         from .admin_status import _get_vaktbilde

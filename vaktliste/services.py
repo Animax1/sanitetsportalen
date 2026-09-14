@@ -727,7 +727,7 @@ def besetning(enhet_id, naa=None):
     aktive vaktas. Og dekker ingen skift akkurat nå, sendes **neste skift**
     med, så svaret er «ingen nå, Kari og Ola fra 16:00» og ikke bare «ingen».
     """
-    from patients.services import hent_aktiv_vakt
+    from core.vakt import hent_aktiv_vakt
     from .models import Vaktpost
 
     naa = naa or timezone.now()

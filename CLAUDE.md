@@ -331,6 +331,41 @@ pasientfil og en hel database. Enhver modul, pasientmodulen inkludert,
 registrerer en handler og kaller `core.backup.create_backup(slug=...)`.
 `patients/tests_backup.py` håndhever at de tre ikke kommer tilbake.
 
+### Avhengighetsretningen (core/tests_avhengighetsretning.py)
+
+**`core` er rammeverket og skal kunne kjøre uten en eneste modul.** Retningen var snudd
+fram til 14. sep. 2026: `core.backup`, `core.arkiv` og `core.offsite` importerte alle
+`patients.models`, fordi `AppSetting` og `Backup` bodde der. Ingenting gikk i stykker av
+det — derfor sto det i et år, og derfor holdes det nå av en test og ikke av en intensjon.
+
+| Hva | Hvor | Merk |
+|---|---|---|
+| Portalinnstillingene | `core.AppSetting` | `db_table = 'patients_appsetting'` |
+| Backup-metadata | `core.Backup` | `db_table = 'patients_backup'` |
+| Portalens scope | `core.vakt.hent_aktiv_vakt`, `vakt_for_year` | |
+| CSP, metrikker, backupklokka | `core/middleware.py` | |
+| `/healthz/`, server-status | `core/health.py`, `core/admin_status.py` | |
+
+**Tabellnavnene ble beholdt med vilje.** Railway kjører release-fasen *før* den bytter
+container, så mellom `migrate` og byttet står gammel kode og serverer mot nytt skjema. En
+omdøpt `patients_appsetting` ville gitt 500 på tilnærmet hver forespørsel i det vinduet,
+fordi tabellen bærer pekeren til aktiv vakt. Fjernes `db_table`, lager Django en ny, tom
+tabell ved siden av den fulle.
+
+**Backupfilene bærer modellnavn**, så `core.backup.GAMLE_MODELLNAVN` oversetter
+`patients.appsetting` → `core.appsetting` ved innlasting. Uten den ville hver fil tatt før
+flyttingen svart «Invalid model identifier» — og de ligger 730 dager offsite. Tabellen
+fylles **i samme commit** som en modell flytter, og `core/tests_modellnavn.py` krever at
+venstresida er borte og høyresida finnes.
+
+**`audit/signals.py` utleder `app_label` av tabellnavnet**, så `EKSPLISITT_MAPPING` har
+`patients_appsetting` og `patients_backup` → `core`. Uten dem ville hver framtidig
+auditrad stått som «patients». Gamle rader endres ikke; bruddet er datert.
+
+`KJENTE_UNNTAK` i testen er en **sperrehake, ikke en tillatelse**: `admin_status` og
+portalinnstillingene importerer fortsatt `vaktliste` og `oppdrag`. Lista skal aldri vokse,
+og en importvei som ryddes skal ut av den.
+
 ### Arkivmønster (core/arkiv/)
 
 Frysing, integritetssjekk og kollaps er modul-agnostisk. Hver modul som arkiverer data registrerer en `BaseArkivHandler` (fra `apps.ready()`), på samme måte som backup-handlerne.
@@ -793,9 +828,10 @@ kildemodul. Registeret er `core/stats.py`, samme idiom som `core.backup` og `cor
 hver modul melder inn en `BaseStatistikkHandler` fra `apps.ready()`. To kilder i dag,
 `patients/statistikk.py` og `oppdrag/statistikk.py`.
 
-`hent_aktiv_vakt` er den ene importen fra en modul som står igjen, og den handler ikke om
-tall: den er portalens scope, delt av alle moduler, og ble liggende i pasientmodulen fordi
-`AppSetting`-pekeren gjør det. `StatistikkappenNavngirIngenKilde` leser importene med AST
+`hent_aktiv_vakt` bor i **`core.vakt`** (flyttet dit 14. sep. 2026, sammen med
+`vakt_for_year`): den er portalens scope, delt av alle moduler, og lå i pasientmodulen
+fordi `AppSetting`-pekeren gjorde det — så hver modul måtte importere *pasienter* for å
+vite hvilken vakt den var i. `StatistikkappenNavngirIngenKilde` leser importene med AST
 og håndhever resten.
 
 Ett endepunkt **per kilde**, ikke ett samlet: en fane som ikke er åpnet skal ikke koste
@@ -994,7 +1030,7 @@ gikk og når det ikke gikk — `core.kommando.registrer_kjoring()` kaster aldri.
 jobben har kjørt én gang. En ny cron-jobb skal ha navnet sitt i `CRON_JOBBER`
 og sende det inn, ellers finnes den ikke for dashbordet.
 
-### Server-status (patients/admin_status.py)
+### Server-status (core/admin_status.py)
 
 `/portal-admin/server-status/` polles hvert 10. sekund fra `…/json/`, og
 `_build_status_payload()` er én dict med én innhenter per kort. **Hver

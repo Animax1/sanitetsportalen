@@ -26,7 +26,7 @@ from core.jsdata import js_json
 from core.auth_decorators import er_global_admin, har_tilgang, modul_kreves
 from core.idempotency import bygg_nokkel, forkast, fullfor, reserver
 from core.ratelimit import rate_limit
-from patients.services import hent_aktiv_vakt
+from core.vakt import hent_aktiv_vakt
 
 from . import choices, services, verdier
 from .choices import validate_oppdrag_choice_fields

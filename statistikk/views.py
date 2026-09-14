@@ -33,7 +33,7 @@ from core.stats_cache import cached_stats_response
 # `core`, men funksjonen ble liggende i pasientmodulen fordi `AppSetting`
 # (pekeren `aktiv_vakt_id`) gjør det. Oppdragsmodulen importerer den fra samme
 # sted. Å flytte den hører til den ryddejobben, ikke til statistikkregisteret.
-from patients.services import hent_aktiv_vakt
+from core.vakt import hent_aktiv_vakt
 
 
 # §5: **modulen komponerer tilgang, den eier den ikke.** Den viser kun kilder

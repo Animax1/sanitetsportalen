@@ -16,7 +16,7 @@ from audit.models import AuditLog
 from patients.models import Patient
 from core.models import Backup
 from core.backup import create_backup as _core_create_backup, enforce_cap
-from patients.services import vakt_for_year
+from core.vakt import vakt_for_year
 from accounts.test_helpers import gi_standardtilgang
 
 

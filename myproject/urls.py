@@ -17,8 +17,8 @@ from django.urls import path, include
 
 from core.manifest import manifest_view
 from core.robots import robots_txt
-from patients.health import healthz
-from patients import admin_status as _admin_status
+from core.health import healthz
+from core import admin_status as _admin_status
 
 urlpatterns = [
     # Health-endepunkt (forbedring #2) — INGEN auth, brukes av Railway

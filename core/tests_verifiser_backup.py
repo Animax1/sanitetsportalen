@@ -23,7 +23,7 @@ from django.core.management.base import CommandError
 from django.test import TestCase, override_settings
 
 from core.backup import KIND_MANUAL, create_backup, registrer_alle_moduler
-from patients.services import vakt_for_year
+from core.vakt import vakt_for_year
 
 TEST_BACKUP_DIR = Path('/tmp/test-backups-verifiser')
 

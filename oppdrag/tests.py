@@ -39,7 +39,7 @@ def _oppdrag(enhet, *, status=choices.VENTER, lokasjon=None, fritekst='', vakt=N
     """
     from oppdrag.services import neste_oppdragsnummer
     from patients.test_helpers import sett_aktiv_vakt
-    from patients.services import hent_aktiv_vakt
+    from core.vakt import hent_aktiv_vakt
     if vakt is None:
         vakt = hent_aktiv_vakt()
     return Oppdrag.objects.create(

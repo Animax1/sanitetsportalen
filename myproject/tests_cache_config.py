@@ -110,7 +110,7 @@ class CacheHealthHelperTests(TestCase):
     """Tester _get_cache_health() i admin_status.py."""
 
     def test_health_helper_rapporterer_healthy_ok(self):
-        from patients.admin_status import _get_cache_health
+        from core.admin_status import _get_cache_health
         result = _get_cache_health()
         self.assertEqual(result['backend'], 'locmem')
         self.assertTrue(result['healthy'])
@@ -149,7 +149,7 @@ class CacheHealthHelperTests(TestCase):
 
     def test_health_helper_fanger_exception(self):
         """Hvis cache.set kaster, skal helperen returnere healthy=False uten å re-raise."""
-        from patients import admin_status as admin_status_module
+        from core import admin_status as admin_status_module
         with mock.patch.object(
             admin_status_module.cache, 'set', side_effect=RuntimeError('redis nede')
         ):
@@ -160,7 +160,7 @@ class CacheHealthHelperTests(TestCase):
 
     def test_health_helper_scrubber_credentials(self):
         """Hvis exception inneholder en URL med passord, skal det scrubbes før retur."""
-        from patients import admin_status as admin_status_module
+        from core import admin_status as admin_status_module
         leaky = 'Failed: redis://default:hemmelig123@redis.host:6379/0 unreachable'
         with mock.patch.object(
             admin_status_module.cache, 'set', side_effect=RuntimeError(leaky)
@@ -175,23 +175,23 @@ class ScrubSecretsTests(TestCase):
     """Direkte enhetstester for _scrub_secrets-helperen."""
 
     def test_scrubber_redis_url(self):
-        from patients.admin_status import _scrub_secrets
+        from core.admin_status import _scrub_secrets
         text = 'Connection failed: redis://default:topsecret@host:6379/0'
         self.assertNotIn('topsecret', _scrub_secrets(text))
         self.assertIn('[scrubbed]', _scrub_secrets(text))
 
     def test_scrubber_postgres_url(self):
-        from patients.admin_status import _scrub_secrets
+        from core.admin_status import _scrub_secrets
         text = 'DB error: postgres://user:pass123@db.host:5432/mydb'
         self.assertNotIn('pass123', _scrub_secrets(text))
 
     def test_scrubber_holder_paa_resten(self):
         """Scrubber skal ikke endre tekst uten URL-credentials."""
-        from patients.admin_status import _scrub_secrets
+        from core.admin_status import _scrub_secrets
         text = 'Vanlig feilmelding uten URL'
         self.assertEqual(_scrub_secrets(text), text)
 
     def test_scrubber_taaler_tom_streng(self):
-        from patients.admin_status import _scrub_secrets
+        from core.admin_status import _scrub_secrets
         self.assertEqual(_scrub_secrets(''), '')
         self.assertEqual(_scrub_secrets(None), None)

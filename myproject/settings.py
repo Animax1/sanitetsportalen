@@ -110,12 +110,12 @@ MIDDLEWARE = [
     'audit.middleware.RequestAuditMiddleware',
     'accounts.middleware.MustChangePasswordMiddleware',
     'accounts.middleware.DynamicSessionTimeoutMiddleware',
-    'patients.middleware.BackupSchedulerMiddleware',
+    'core.middleware.BackupSchedulerMiddleware',
     # Intervallsending av vaktlista som fil (13. sep. 2026) — samme klokke
     # som backup-planleggeren: trafikken driver den.
     'vaktliste.middleware.FilutsendingMiddleware',
-    'patients.middleware.SecurityHeadersMiddleware',
-    'patients.middleware.RequestMetricsMiddleware',
+    'core.middleware.SecurityHeadersMiddleware',
+    'core.middleware.RequestMetricsMiddleware',
 ]
 
 ROOT_URLCONF = 'myproject.urls'
@@ -240,7 +240,7 @@ if _RUNNING_TESTS:
     # sender e-post midt i en test som ikke handler om det. Den testes direkte
     # i vaktliste/tests_fil.py.
     MIDDLEWARE = [m for m in MIDDLEWARE
-                  if m not in ('patients.middleware.BackupSchedulerMiddleware',
+                  if m not in ('core.middleware.BackupSchedulerMiddleware',
                                'vaktliste.middleware.FilutsendingMiddleware')]
 
 # ── Internasjonalisering ──────────────────────────────────────────────────────

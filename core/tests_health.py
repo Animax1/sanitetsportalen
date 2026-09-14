@@ -57,7 +57,7 @@ class HealthzTests(TestCase):
 
     def test_healthz_returnerer_503_ved_db_feil(self):
         """Hvis DB-tilkobling feiler skal endepunktet svare 503 'error'."""
-        with patch('patients.health._check_db', return_value=(False, None, 'OperationalError')):
+        with patch('core.health._check_db', return_value=(False, None, 'OperationalError')):
             resp = self.client.get('/healthz/')
         self.assertEqual(resp.status_code, 503)
         body = resp.json()
@@ -66,7 +66,7 @@ class HealthzTests(TestCase):
 
     def test_healthz_returnerer_200_degraded_ved_cache_feil(self):
         """Cache-feil skal gi 'degraded' men HTTP 200 (appen er fortsatt brukbar)."""
-        with patch('patients.health._check_cache',
+        with patch('core.health._check_cache',
                    return_value=(False, None, 'ConnectionError')):
             resp = self.client.get('/healthz/')
         self.assertEqual(resp.status_code, 200,
@@ -90,7 +90,7 @@ class HealthzTests(TestCase):
     def test_healthz_lekker_ikke_credentials_ved_cache_feil(self):
         """Selv ved exception med credentials i meldingen, skal ikke disse vises."""
         # Simuler en cache-feil der exception-typen ikke inneholder credentials
-        with patch('patients.health._check_cache',
+        with patch('core.health._check_cache',
                    return_value=(False, None, 'ConnectionError')):
             resp = self.client.get('/healthz/')
         body = resp.json()
@@ -119,7 +119,7 @@ class HealthzMiddlewareIsolationTests(TestCase):
 
     def test_healthz_ekskluderes_fra_metrics_store(self):
         """RequestMetricsMiddleware skal ikke registrere health-checks."""
-        from patients.middleware import metrics_store
+        from core.middleware import metrics_store
         # Reset til tom state
         metrics_store._samples.clear()
 

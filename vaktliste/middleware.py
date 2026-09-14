@@ -1,6 +1,6 @@
 """Intervallsending av vaktlista som fil (13. sep. 2026).
 
-Samme mønster som `patients.middleware.BackupSchedulerMiddleware`: portalen
+Samme mønster som `core.middleware.BackupSchedulerMiddleware`: portalen
 har ingen egen klokke, så sjekken henger på trafikken — etter en respons,
 maks én gang i minuttet per prosess, og selve sendingen i en bakgrunnstråd
 slik at ingen venter på AHASend. Under en vakt er det alltid trafikk; utenom

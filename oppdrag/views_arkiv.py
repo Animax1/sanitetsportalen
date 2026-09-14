@@ -24,7 +24,7 @@ from django.views.decorators.http import require_http_methods
 from core.arkiv import verifiser
 from core.auth_decorators import er_global_admin, modul_kreves
 from core.ratelimit import rate_limit
-from patients.services import hent_aktiv_vakt
+from core.vakt import hent_aktiv_vakt
 
 from .arkiv import OppdragArkivHandler, arkiver_vakt
 from .models import Oppdrag, OppdragArkiv

@@ -10,7 +10,7 @@ from django.urls import reverse
 
 from accounts.models import CustomUser, ModulTilgang
 from core.models import AppSetting
-from patients.services import hent_aktiv_vakt
+from core.vakt import hent_aktiv_vakt
 
 
 def _bruker(navn, rolle='bruker', nivaa='skriv_full'):

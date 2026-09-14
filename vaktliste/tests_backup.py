@@ -29,7 +29,7 @@ from core.backup import (
     registrer_alle_moduler,
     restore_backup,
 )
-from patients.services import vakt_for_year
+from core.vakt import vakt_for_year
 from vaktliste.models import (
     Korps,
     Kompetanse,

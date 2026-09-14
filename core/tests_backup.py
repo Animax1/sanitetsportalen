@@ -54,7 +54,7 @@ from core.models import Backupplan
 from patients.backup import PatientsBackupHandler, register_handlers
 from patients.models import Forstehjelper, Helsepersonell, Patient
 from core.models import AppSetting, Backup
-from patients.services import vakt_for_year
+from core.vakt import vakt_for_year
 from accounts.test_helpers import gi_standardtilgang
 
 

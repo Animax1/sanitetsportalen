@@ -157,7 +157,7 @@ class GammelFilLastesTests(TestCase):
 
     def test_fil_med_gammelt_modellnavn_gjenopprettes(self) -> None:
         from patients.models import Patient
-        from patients.services import vakt_for_year
+        from core.vakt import vakt_for_year
 
         vakt = vakt_for_year(2026)
         Patient.objects.create(pasientnummer=42, vakt=vakt,
@@ -192,7 +192,7 @@ class GammelFilLastesTests(TestCase):
         aldri ble kalt — `loaddata` ville jo lastet en fil den forsto."""
         from django.core.serializers.base import DeserializationError
         from patients.models import Patient
-        from patients.services import vakt_for_year
+        from core.vakt import vakt_for_year
 
         vakt = vakt_for_year(2026)
         Patient.objects.create(pasientnummer=42, vakt=vakt, problemstilling='X')

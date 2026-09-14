@@ -12,7 +12,7 @@ from __future__ import annotations
 
 from datetime import timedelta
 
-from patients.services import vakt_for_year
+from core.vakt import vakt_for_year
 from django.test import TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone

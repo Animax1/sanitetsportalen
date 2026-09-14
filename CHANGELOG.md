@@ -4,6 +4,41 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-14 — Flytting fase 3: scopet, middlewaren, helsesjekken og dashbordet
+
+Ingen migrasjon — ren kodeflytting.
+
+- **`core/vakt.py`**: `hent_aktiv_vakt` og `vakt_for_year`. De lå i
+  `patients/services.py` fordi `AppSetting`-pekeren gjorde det, og da måtte
+  oppdragsmodulen, vaktlista og statistikken importere *pasientmodulen* for å
+  vite hvilken vakt de var i. Ingen av de to rører pasientdata.
+- **`core/middleware.py`**: CSP-headerne, metrikkene og backupklokka. Ingen av
+  dem er pasientspesifikke, og `settings.MIDDLEWARE` pekte dermed på en modul
+  som kunne tas ut.
+- **`core/health.py`** og **`core/admin_status.py`** med testene sine.
+
+**Gevinsten, målt:** `core` importerer nå en modul på **fem** steder i
+produksjonskode, mot rundt tjue før runden. Fire av dem er modulregisteret, som
+skal navngi modulene sine — det er det et register er.
+
+`core/tests_avhengighetsretning.py` låser det med AST, samme idiom som
+`OppdragImportererIkkeVaktlista`. Uten en test er dette en intensjon, og
+retningen snek seg feil vei én gang før.
+
+**Et funn flyttingen gjorde synlig, og som er ekte gjeld:** `admin_status.py`
+og portalinnstillingene importerer `vaktliste` og `oppdrag` — dashbordet viser
+tall per modul, og innstillingene skriver vaktlistas e-postmottakere.
+Koblingen fantes før flyttingen også, men da lå filene i `patients`, så den
+leste som «modul → modul» og ikke som «rammeverk → modul». Riktig løsning er
+den statistikkappen alt bruker: et register modulene melder seg inn i. Det er
+en egen jobb med egen risiko og skal ikke ri på en flytterunde, så de fem
+importene står i `KJENTE_UNNTAK` — en **sperrehake**: lista skal aldri vokse,
+og en test krever at en importvei som ryddes tas ut av den.
+
+2652 tester grønne på SQLite og PostgreSQL 16 (2684 med `myproject`).
+
+---
+
 ## 2026-09-14 — Flytting fase 2: `AppSetting` og `Backup` til `core`
 
 De to portalvide modellene har aldri vært pasientdata. De lå i `patients` fordi

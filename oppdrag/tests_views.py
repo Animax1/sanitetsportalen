@@ -46,7 +46,7 @@ class OppdragBasis(TestCase):
 
     def _oppdrag(self, enhet=None, vakt=None, **kwargs):
         from oppdrag.services import neste_oppdragsnummer
-        from patients.services import vakt_for_year
+        from core.vakt import vakt_for_year
         if isinstance(vakt, int):
             vakt = vakt_for_year(vakt)
         vakt = vakt or self.vakt

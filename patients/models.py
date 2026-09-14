@@ -157,7 +157,7 @@ class Patient(models.Model):
         og fremst tester og shell-bruk, som ellers måtte kjenne scopet.
         """
         if self.vakt_id is None:
-            from .services import hent_aktiv_vakt  # noqa: WPS433 — sykel ved modul-last
+            from core.vakt import hent_aktiv_vakt  # noqa: WPS433 — sykel ved modul-last
             self.vakt = hent_aktiv_vakt()
         super().save(*args, **kwargs)
 
