@@ -4,6 +4,60 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-14 — Rapportnotatet skrevet ferdig (ingen kode)
+
+`docs/FORSLAG_RAPPORTMODUL.md` er revidert etter diskusjonen med André. Fortsatt et
+forslag — ingen kode skrevet.
+
+**Jeg tok feil i første utkast, og det står nå i notatet.** Jeg frarådet LLM-tolkning med
+eksempelet «én rød pasient, hjertestans, kl. 14:32». André ba meg se på hva
+statistikkmodulen faktisk sender. **Eksempelet finnes ikke i dataene** — payloaden er
+aggregater, uten radnivå, uten ID-er, uten klokkeslett per hendelse, og `fritekst`,
+`notat` og `merknad` går ingen steder.
+
+Det endrer jussen, ikke bare risikovurderingen: GDPR gjelder ikke anonyme data
+(fortalepunkt 26), så A.8 er ikke i spill. Jeg hoppet over det spørsmålet og gikk rett til
+«ny databehandler». Feil rekkefølge, og skrevet ned så neste leser slipper å gjøre samme
+feil.
+
+**Andrés forslag om å ekskludere risikoproblemstillinger framfor å undertrykke små celler
+er bedre**, og notatet forklarer hvorfor de ikke løser samme problem: undertrykking retter
+seg mot *identifiserbarhet*, ekskludering mot *skade*. Verdimengden i `patients/choices.py`
+avgjør saken — «Mistanke overgrep» og «Psykiatri» står side om side med «Skade ankel/fot».
+Én av hver har samme identifiserbarhet og helt ulik konsekvens.
+
+Ekskludering er dessuten bedre for små vakter, som er normaltilfellet: en vakt med tolv
+pasienter ville fått nesten alle celler undertrykt under en `n < 5`-regel — formelt trygt
+og praktisk verdiløst.
+
+**Den avklarende innsikten: filteret gjelder bare maskinen.** I portalen trengs verken
+undertrykking eller ekskludering — den som ser rapporten har allerede `les` på
+kildemodulen og kan åpne pasientlista. Filteret hører hjemme på payloaden som *forlater*
+portalen. Det løser også regneproblemet: menneskerapporten er komplett, maskinpayloaden er
+redusert, og ingen leser maskinpayloaden som en rapport.
+
+**Filteret må feile lukket**, og det er motsatt av `NOKLER_UTEN_AUDIT` i `core/signals.py`
+— av nøyaktig samme resonnement. Merkes kategorier som skal *ekskluderes*, slipper en
+glemt ny kategori ut. Merkes de som er *godkjent for utsending*, ekskluderes en glemt ny
+til noen aktivt godkjenner den. En auditliste skal feile mot mer logging; et
+personvernfilter mot mindre deling.
+
+**Notatet er skrevet med to varianter**, etter Andrés ønske: variant A uten LLM er et
+komplett produkt alene, variant B legger tolkningen på toppen. Stegene 1–4 i anbefalt
+rekkefølge krever ingen personvernbeslutning i det hele tatt.
+
+**Midnatt er avklart:** rapporten skal vise både per dag og totalt, så skift som krysser
+splittes — 4 timer på fredag, 4 på lørdag. Bemanningskurven gjør det allerede
+(`vl-dogn`), så alternativet ville gitt to flater i samme portal med ulike tall.
+
+**Leverandør: Scaleway Generative APIs anbefales**, først og fremst fordi Scaleway SAS
+allerede står i A.2 med signert DPA. Zero retention som standard, franske datasentre, ingen
+amerikansk morselskap og dermed ingen CLOUD Act-eksponering. Mistral er nærmeste
+alternativ, men zero retention ligger bak Scale-planen. **Merket i notatet som ikke
+verifisert mot primærkilden** — Scaleways domene var blokkert av egress-proxyen.
+
+---
+
 ## 2026-09-14 — Vaktlista: overlappende skift ført i TODO (ingen kode)
 
 Funnet mens rapportmodulen ble diskutert, men punktene hører hjemme i vaktlista og er

@@ -884,14 +884,26 @@ forbindelser. Tas opp igjen kun hvis `WEB_WORKERS` settes til 4 eller mer.
       **Krever en avgjørelse først:** plan eller faktisk som fakturagrunnlag (§2.2), og om
       rapporter skal **fryses** (§2.4). Uten frysing er ikke et fakturagrunnlag
       etterprøvbart et år senere — da er dette et arkiv, ikke en visning.
-- [ ] **Del 2: generert vaktrapport.** *Tallene anbefales, LLM-tolkningen frarådes i
-      første omgang.* En LLM er en ny databehandler, og
-      `PERSONVERN_DOKUMENTASJON.md` A.8 sier i dag «ingen overføring utenfor EU/EØS».
-      «Uten navn» er dessuten ikke anonymt — én pasient i én kategori på et navngitt
-      arrangement er identifiserende. Forslaget: portalen lager tallene, og den som vil ha
-      prosa tar det utenfor portalen.
+- [ ] **Del 2A: rapport uten LLM.** *Anbefales, og er et komplett produkt alene.* Tall,
+      tabeller og et malbasert sammendrag fra `core.stats`. Ingen ny databehandler, ingen
+      endring i personvernprotokollen, ingen filtrering nødvendig — den som ser rapporten
+      har allerede tilgang til kildedataene.
+- [ ] **Del 2B: LLM-tolkning.** *Gjennomførbart.* Første utkast frarådet det på feil
+      grunnlag; payloaden fra `core.stats` er aggregater uten radnivå, ID-er, klokkeslett
+      eller fritekst, så GDPR er trolig ikke i spill (fortalepunkt 26). Krever:
+      **kategorifilter som feiler lukket**, «Generer rapport»-knapp, forhåndsvisning av
+      payload, EU-hostet modell med DPA og zero retention, merking som maskingenerert, og
+      audit av hvert kall.
+- [ ] **Kategorifilteret.** Ekskluder risikoproblemstillinger (Andrés forslag, bedre enn
+      undertrykking av små celler — se §3.4). Må merke hva som er **godkjent for
+      utsending**, ikke hva som skal ekskluderes: en glemt ny kategori skal falle ut, ikke
+      slippe ut. Forutsetter at pasientmodulens problemstillinger flyttes fra
+      `choices.py` til en tabell, slik oppdrag gjorde i `0019`–`0021`.
+- [ ] **Verifiser Scaleway Generative APIs mot primærkilden** før beslutning — zero
+      retention i avtaleteksten, og underbehandlerlista. Anbefalt fordi Scaleway SAS
+      allerede står i A.2 med signert DPA.
 
-Fem åpne spørsmål til André står i §5 i notatet.
+Fem åpne spørsmål til André står i §6 i notatet.
 
 ### Datteroppdrag — én hendelse, flere pasienter — se `docs/FORSLAG_DATTEROPPDRAG.md`
 
