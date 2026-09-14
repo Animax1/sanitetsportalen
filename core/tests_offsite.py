@@ -302,3 +302,77 @@ class LivssyklusUtenKonfigTests(SimpleTestCase):
         self.assertFalse(svar['kjent'])
         self.assertEqual(svar['regler'], [])
         self.assertEqual(svar['avvik'], [])
+
+
+class PrefiksRutingTests(TestCase):
+    """Hvilken mappe i bucketen en fil havner i — og dermed hvor lenge den lever.
+
+    `prefiks_for()` sammenligner mot strengen `'full'` direkte, ikke mot
+    `Backupplan.FULL_SLUG`, for å slippe å importere modeller inn i
+    `offsite.py`. Avveiningen er grei, men den etterlater slugen skrevet to
+    steder som må endres samtidig.
+
+    **Og de to feiler ulikt.** Døper noen om den hele fila i modellen uten å
+    røre `offsite.py`, går ingenting i stykker med det samme: filene lastes
+    opp som før, bare til `backups/` i stedet for `full/`. Da lever hele
+    databasen — med passordhasher og TOTP-hemmeligheter — i 730 dager i stedet
+    for 90, og det er en personvernbeslutning som ble endret av en
+    navneendring. Ingenting feiler, ingen logg sier fra, og kortet på
+    backup-siden ser riktig ut: reglene *står* jo som de skal, det er filene
+    som ligger feil sted.
+    """
+
+    def test_den_hele_fila_folger_konstanten(self) -> None:
+        from core.models import Backupplan
+
+        self.assertEqual(
+            offsite.prefiks_for(Backupplan.FULL_SLUG), offsite.PREFIKS_FULL,
+            'Slugen for hele databasen er endret ett sted og ikke det andre. '
+            'Filene ville havnet under backups/ og fått 730 dagers '
+            'oppbevaring i stedet for 90.')
+
+    def test_alle_andre_moduler_gaar_til_backups(self) -> None:
+        """Registeret er fasit, ikke en liste i denne testen — en ny modul
+        skal ikke kunne legge seg under 90-dagersregelen ubemerket."""
+        from core.backup import all_handlers, registrer_alle_moduler
+        from core.models import Backupplan
+
+        registrer_alle_moduler()
+        slugger = [h.slug for h in all_handlers()]
+        self.assertIn(Backupplan.FULL_SLUG, slugger, 'hel-handleren er ikke registrert')
+
+        for slug in slugger:
+            with self.subTest(slug=slug):
+                forventet = (offsite.PREFIKS_FULL if slug == Backupplan.FULL_SLUG
+                             else offsite.PREFIKS)
+                self.assertEqual(offsite.prefiks_for(slug), forventet)
+
+    def test_filnavnet_leser_tilbake_til_samme_prefiks(self) -> None:
+        """Ett navn, to lesere, og de må bli enige.
+
+        Opplastingen får slugen som argument; hentingen leser den ut av
+        filnavnet (`hent_offsite <filnavn>`). Blir de uenige — en framtidig
+        slug som forvirrer `slug_fra_filnavn` — lastes fila opp ett sted og
+        letes etter et annet, og det oppdages den dagen man skal gjenopprette.
+        """
+        from core.backup import all_handlers, registrer_alle_moduler
+        from core.backup.service import _build_filename, slug_fra_filnavn
+
+        registrer_alle_moduler()
+        for handler in all_handlers():
+            for kind in (KIND_AUTO, KIND_MANUAL, 'pre_restore', 'pre_reset'):
+                with self.subTest(slug=handler.slug, kind=kind):
+                    filnavn = _build_filename(handler.slug, kind)
+                    self.assertEqual(slug_fra_filnavn(filnavn), handler.slug)
+                    self.assertTrue(
+                        offsite.objektnavn(filnavn, handler.slug).startswith(
+                            offsite.prefiks_for(slug_fra_filnavn(filnavn))))
+
+    def test_de_to_prefiksene_utelukker_hverandre(self) -> None:
+        """`backups/` skal ikke være et forstavelse av `full/` eller omvendt —
+        da ville én livssyklusregel truffet begge, og fristene ikke latt seg
+        skille."""
+        self.assertFalse(offsite.PREFIKS_FULL.startswith(offsite.PREFIKS))
+        self.assertFalse(offsite.PREFIKS.startswith(offsite.PREFIKS_FULL))
+        self.assertEqual(set(offsite.FORVENTET_DAGER), set(offsite.ALLE_PREFIKS),
+                         'en frist uten prefiks, eller et prefiks uten frist')

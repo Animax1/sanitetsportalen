@@ -4,6 +4,46 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-14 — Prefiksrutingen låst: `full/` kan ikke bli `backups/` i stillhet
+
+André, etter deployen: «Hele databasen heter `backup-full-auto-…`, mens modulene
+heter `backup-<modul>-…`. Vil det fungere med `full/` og `backups/`?»
+
+Ja — det er to ulike prefikser. `backup-` er del av *filnavnet*, og bærer slugen
+så `slug_fra_filnavn()` kan lese den tilbake når man henter. `full/` og
+`backups/` er *objektnavnet*, altså mappa, og det er den livssyklusreglene
+filtrerer på. De to har ingenting med hverandre å gjøre.
+
+Men spørsmålet pekte på noe ekte: `prefiks_for()` sammenligner mot strengen
+`'full'` direkte, ikke mot `Backupplan.FULL_SLUG`. Avveiningen er grei — den
+slipper å importere modeller inn i `offsite.py` — men den etterlater slugen
+skrevet to steder som må endres samtidig.
+
+**Og de to feiler ulikt.** Døper noen om den hele fila i modellen uten å røre
+`offsite.py`, går ingenting i stykker med det samme: filene lastes opp som før,
+bare til `backups/`. Da lever hele databasen — med passordhasher og
+TOTP-hemmeligheter — i 730 dager i stedet for 90. Ingenting feiler, ingen logg
+sier fra, og kortet på backup-siden ser riktig ut: reglene *står* jo som de
+skal, det er filene som ligger feil sted. En personvernbeslutning endret av en
+navneendring.
+
+`PrefiksRutingTests` låser fire ting: at `prefiks_for(FULL_SLUG)` gir `full/`,
+at hver **registrert** handler (registeret er fasit, ikke en liste i testen)
+ruter dit den skal, at filnavnet leser tilbake til samme prefiks som
+opplastingen brukte — opplastingen får slugen som argument, hentingen leser den
+av navnet, og blir de uenige lastes fila opp ett sted og letes etter et annet —
+og at de to prefiksene ikke er forstavelser av hverandre, for da ville én regel
+truffet begge og fristene ikke latt seg skille.
+
+*Prøvd mot feilen de påstår å fange*, ikke bare kjørt grønne: med slugen endret
+i `offsite.py` faller to av dem med «filene ville havnet under backups/ og fått
+730 dagers oppbevaring i stedet for 90», og med `PREFIKS_FULL` satt til
+`backups/full/` faller overlapp-testen.
+
+2634 tester grønne på SQLite og PostgreSQL 16.
+
+---
+
 ## 2026-09-14 — Migrasjonsprøve for Backupplan, før prod
 
 Før omleggingen går til prod: en prøve som kjører `core/0008`–`0010` mot ekte

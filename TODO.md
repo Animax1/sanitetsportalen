@@ -475,6 +475,15 @@ bindende: 1 før 2, fordi backupen speiler hvor modellene bor.
             at rekkefølgen skal være skrevet i stedet for et sammentreff i grafen.*
             2630 tester grønne på SQLite og PostgreSQL. **Backupomleggingen er dermed
             ferdig — alle åtte fasene er levert.**
+      - [x] **Prefiksrutingen låst** (14. sep. 2026, etter Andrés spørsmål om
+            filnavnene). `prefiks_for()` sammenligner mot strengen `'full'`, ikke mot
+            `Backupplan.FULL_SLUG` — greit nok (slipper modellimport i `offsite.py`),
+            men slugen står da to steder. Et navnebytte ett sted ville ikke feilet:
+            den hele fila hadde bare havnet under `backups/` og fått 730 dagers
+            oppbevaring i stedet for 90, uten at noe sa fra. `PrefiksRutingTests`
+            låser konstanten, hele registeret, rundturen filnavn → slug → prefiks,
+            og at de to prefiksene ikke er forstavelser av hverandre. Prøvd mot
+            begge mutasjonene.
       - [x] **Migrasjonsprøve for `core/0008`–`0010`** (14. sep. 2026, før prod).
             `0009` skriver data, og et dataskritt mot en tom base skriver ingenting —
             suiten kunne derfor ikke si om release-fasen overlever prods rader. Prøven
