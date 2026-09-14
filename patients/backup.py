@@ -17,8 +17,8 @@ class PatientsBackupHandler(BaseBackupHandler):
     SIKKERHET:
     - ``apps`` inkluderer kun ``patients``-modeller — accounts, audit
       og sessions røres aldri.
-    - ``exclude`` fjerner Backup og BackupConfig fra dump for å unngå
-      selvreferanse (backupen som lages skal ikke være med i innholdet).
+    - ``exclude`` fjerner ``Backup`` fra dumpen for å unngå selvreferanse
+      (backupen som lages skal ikke være med i innholdet).
     - slettelista før ``loaddata`` utledes av ``apps`` og ``exclude``
       (``BaseBackupHandler.get_restore_models``), barn før foreldre.
     """
@@ -27,9 +27,8 @@ class PatientsBackupHandler(BaseBackupHandler):
 
     apps = ['patients']
     exclude = [
-        # Backup og BackupConfig skal ikke være med i sin egen dump.
+        # Backupen skal ikke være med i sin egen dump.
         'patients.Backup',
-        'patients.BackupConfig',
         # Arkivet håndteres av ArkivBackupHandler og skal aldri endres av en
         # pasient-restore. Begge modellene må ekskluderes: tidligere var kun
         # VaktArkiv utelatt mens ArkivertPasient ble med, altså barna uten

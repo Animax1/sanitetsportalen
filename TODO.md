@@ -319,11 +319,12 @@ bindende: 1 før 2, fordi backupen speiler hvor modellene bor.
 > oppdragsmodulen.
 
 - [ ] **1. Flytt det portalvide ut av `patients` og inn i `core`** (§2 i notatet):
-      `AppSetting`, `Backup`, `BackupConfig`, `hent_aktiv_vakt`, CSP-/metrikk-/backup-
+      `AppSetting`, `Backup`, `hent_aktiv_vakt`, CSP-/metrikk-/backup-
       middlewaren, `healthz` og server-status. Tabellnavnene beholdes (tilstandsmigrasjon,
       ingen datamigrasjon). Backupfilene bærer modellnavn — lasteren får en navnetabell
-      med test som laster en fil i gammel form. `patients/backup_service.py` og
-      `RETENTION_HOURS` legges ned i samme runde.
+      med test som laster en fil i gammel form. *`patients/backup_service.py`,
+      `RETENTION_HOURS` og `patients.BackupConfig` er alt borte (fase 8, 14. sep. 2026),
+      så denne runden er blitt mindre.*
 - [ ] **2. Backupene på nytt grunnlag** (§4 i notatet). **Planen er skrevet ut i
       [`docs/PLAN_BACKUP_OMLEGGING.md`](./docs/PLAN_BACKUP_OMLEGGING.md)** — versjon 2,
       13. sep. 2026, med Andrés fem svar innarbeidet. Fase 1–6 kan kjøres **før** punkt 1
@@ -457,9 +458,23 @@ bindende: 1 før 2, fordi backupen speiler hvor modellene bor.
                   prefiks, slått av, feil antall dager, eller ingen regler i det hele tatt.
                   `livssyklus()` kaster aldri og cacher i fem minutter.
             2627 tester grønne på SQLite og PostgreSQL.
-      - [ ] **Fase 8 — rydding:** `db_backup`, `patients/backup_service.py`,
-            `patients.BackupConfig`, `RETENTION_HOURS`. Krever migrasjon. Slås sammen med
-            det løse punktet «Rydd bort død backup-legacy» lenger ned.
+      - [x] **Fase 8 — rydding (14. sep. 2026).** `db_backup`,
+            `patients/backup_service.py`, `patients.BackupConfig` og `RETENTION_HOURS` er
+            **slettet**; migrasjonen er `patients/0017`. Dermed finnes det én vei inn til
+            backup, og den krever en slug: `core.backup.create_backup(slug=...)`.
+            Proxyen var ikke bare død kode — den lot et kallsted ta backup uten å nevne
+            hvilken modul, og slugen er hele forskjellen på en pasientfil og en hel
+            database. `db_backup` het som om den tok hele databasen og tok pasientmodulen.
+            `RETENTION_HOURS = 72` ble aldri lest; oppryddingen er antallsbasert
+            (`Backupplan.behold`), og oppbevaringen offsite er bucketens livssyklusregel.
+            `LegacyBackupErBorteTests` håndhever at de tre ikke kommer tilbake — hver av
+            dem ville kommet tilbake som en bekvemmelighet, ikke som en feil noen så.
+            Migrasjonen avhenger av `core/0002`, som leser den gamle tabellen i et
+            `RunPython`-steg. *Prøvd uten avhengigheten: Django la dem i riktig rekkefølge
+            likevel, fordi `core/0002` selv peker på `patients/0005`. Kanten står der for
+            at rekkefølgen skal være skrevet i stedet for et sammentreff i grafen.*
+            2630 tester grønne på SQLite og PostgreSQL. **Backupomleggingen er dermed
+            ferdig — alle åtte fasene er levert.**
       **Alt er avklart** (13. sep. 2026, to runder — se notatets §11). Bucketen heter
       `sanitetsportalen`. Planen kan iverksettes fra fase 1.
 
@@ -1644,13 +1659,8 @@ Funnene under er allerede kartlagt, så jobben er avgrenset når den skal gjøre
       `/oppdrag/api/arkiv/<pk>/`. Alle er admin-only, uten auto-refresh, og leser rader
       som ikke endres, så eksponeringen er lav. Én linje per view når noen er i filene
       uansett.
-- [ ] Rydd bort død backup-legacy: modellen `patients.BackupConfig` (singleton som
-      ingenting leser lenger) og management-kommandoen `db_backup` som gater på den.
-      Krever migrasjon, derfor egen oppgave. **Tas som fase 7 i
-      `docs/PLAN_BACKUP_OMLEGGING.md`** — `db_backup` er verre enn død kode: den står i
-      `CRON_JOBBER` og heter som om den tar hele databasen, men går gjennom
-      `patients/backup_service.py` og tar bare pasientmodulen, på et intervall ingen
-      flate redigerer.
+- [x] Rydd bort død backup-legacy — gjort 14. sep. 2026 som fase 8 i
+      `docs/PLAN_BACKUP_OMLEGGING.md`. Se punktet der.
 - [ ] Flytte sesjonsdelen til en admin-side
 - [ ] Testene er massive, kan vi komprimere dem? (kjøretiden er løst: 500 s → 15 s via
       PASSWORD_HASHERS under test. Gjenstår evt. å redusere *antall* tester)

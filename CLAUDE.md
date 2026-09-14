@@ -323,11 +323,13 @@ med hele pasientregisteret i nedlastingsmappa er en helseopplysningsdump utenfor
 portalens kontroll, og den hele fila bærer i tillegg passordhasher og
 TOTP-hemmeligheter.
 
-Logikken ligger i `core/backup/`. `patients/backup_service.py` er en tynn proxy
-som beholder et bakoverkompatibelt API for `views_patients.py` og eldre tester;
-`db_backup`-kommandoen er utgått og slettes sammen med `patients.BackupConfig`.
-Nye moduler skal registrere en handler og kalle
-`core.backup.create_backup(slug=...)` direkte.
+**All logikk ligger i `core/backup/`, og det finnes ingen vei utenom.**
+`patients/backup_service.py`, `db_backup`-kommandoen og singletonen
+`patients.BackupConfig` er slettet (14. sep. 2026, `patients/0017`) — proxyen
+lot en modul ta backup uten å oppgi slug, og slugen er hele forskjellen på en
+pasientfil og en hel database. Enhver modul, pasientmodulen inkludert,
+registrerer en handler og kaller `core.backup.create_backup(slug=...)`.
+`patients/tests_backup.py` håndhever at de tre ikke kommer tilbake.
 
 ### Arkivmønster (core/arkiv/)
 
@@ -964,7 +966,8 @@ Ingen har en bruker som ser på mens de kjører, så **begge pakker arbeidet i
 avslutter fortsatt med kode 1.
 
 **Backup er ikke en cron-jobb** (13. sep. 2026). `db_backup` sto i
-`CRON_JOBBER` uten å være satt opp i Railway, og er fjernet uten erstatning:
+`CRON_JOBBER` uten å være satt opp i Railway, og ble fjernet uten erstatning
+(kommandoen selv er slettet 14. sep. 2026):
 **et Railway-volum kan bare henge på én tjeneste**, og `/data` henger på
 web-tjenesten. En cron-tjeneste som tok backup ville skrevet fila til sitt eget
 flyktige containerfilsystem, opprettet `Backup`-raden, og forsvunnet med fila —

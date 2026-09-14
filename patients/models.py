@@ -343,28 +343,6 @@ class ArkivertPasient(models.Model):
         return f'Pasient #{self.pasientnummer} (arkiv: {self.arkiv_id})'
 
 
-class BackupConfig(models.Model):
-    """Singleton-modell med backup-innstillinger (én rad)."""
-    INTERVAL_CHOICES = [
-        (0,    'Av'),
-        (30,   'Hver 30. min'),
-        (60,   'Hver time'),
-        (360,  'Hver 6. time'),
-        (1440, 'Hver 24. time'),
-    ]
-    interval_minutes = models.IntegerField(choices=INTERVAL_CHOICES, default=60)
-    last_run_at      = models.DateTimeField(null=True, blank=True)
-    updated_at       = models.DateTimeField(auto_now=True)
-
-    class Meta:
-        verbose_name = 'Backup-konfigurasjon'
-
-    @classmethod
-    def get(cls):
-        obj, _ = cls.objects.get_or_create(pk=1)
-        return obj
-
-
 class Backup(models.Model):
     """Metadata om en backup-fil. Selve filen ligger på disk/volume."""
     KIND_CHOICES = [

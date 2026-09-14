@@ -14,9 +14,27 @@ from patients.test_helpers import sett_aktiv_vakt
 from accounts.models import CustomUser, LoginEvent
 from audit.models import AuditLog
 from patients.models import Patient, Backup
-from patients.backup_service import create_backup, purge_old_backups
+from core.backup import create_backup as _core_create_backup, enforce_cap
 from patients.services import vakt_for_year
 from accounts.test_helpers import gi_standardtilgang
+
+
+
+def create_backup(**kwargs):
+    """Pasientmodulens backup, som viewene tar den.
+
+    Fanst som `patients.backup_service.create_backup` fram til 14. sep. 2026.
+    Proxyen er borte; slugen oppgis nå eksplisitt, og den er hele forskjellen
+    på en pasientfil og en hel database.
+    """
+    return _core_create_backup(slug='patients', **kwargs)
+
+
+def purge_old_backups() -> int:
+    """Håndhev `Backupplan.behold` for pasientmodulen."""
+    from core.models import Backupplan
+    plan = Backupplan.objects.filter(slug='patients').first()
+    return enforce_cap('patients', plan.behold_effektiv if plan else 50)
 
 
 # Hjelpefunksjon for å sette backup-mappe til temp-dir under testing
@@ -27,7 +45,7 @@ def _test_backup_dir(tmp_path):
 
 @override_settings(SECURE_SSL_REDIRECT=False, RATELIMIT_ENABLE=False)
 class BackupServiceTests(TestCase):
-    """Tester for backup_service.py – oppretting, restore og purge."""
+    """Oppretting, gjenoppretting og cap for pasientmodulens backup."""
 
     def setUp(self):
         # Opprett admin-bruker for tester som trenger det
@@ -79,10 +97,8 @@ class BackupServiceTests(TestCase):
             original = create_backup(kind='manual', user=self.admin)
             count_before = Backup.objects.count()
 
-            restore_backup_fn = __import__(
-                'patients.backup_service', fromlist=['restore_backup']
-            ).restore_backup
-            restore_backup_fn(original, user=self.admin)
+            from core.backup import restore_backup
+            restore_backup(original, user=self.admin)
 
         # Det skal nå finnes én ekstra backup av typen pre_restore
         pre_restore_backups = Backup.objects.filter(kind='pre_restore')
@@ -102,7 +118,7 @@ class BackupServiceTests(TestCase):
             Patient.objects.create(pasientnummer=102, vakt=vakt_for_year(2026), problemstilling='Pasient B')
 
             # Gjenopprett
-            from patients.backup_service import restore_backup
+            from core.backup import restore_backup
             restore_backup(backup, user=self.admin)
 
         # Etter restore: A skal finnes, B skal ikke finnes
@@ -136,7 +152,11 @@ class BackupServiceTests(TestCase):
         )
 
     def test_purge_keeps_recent_backups(self):
-        """purge_old_backups skal ikke slette ferske backups (<72 timer)."""
+        """Under capen slettes ingenting.
+
+        Oppryddingen er antallsbasert, ikke tidsbasert: den gamle
+        `RETENTION_HOURS = 72` ble aldri lest, og er borte (14. sep. 2026).
+        Det er `Backupplan.behold` som avgjør, og standard er 50."""
         with patch.dict(os.environ, {'BACKUP_DIR': str(self.backup_dir)}):
             backup = create_backup(kind='manual', user=self.admin)
             purged = purge_old_backups()
@@ -222,7 +242,7 @@ class BackupServiceTests(TestCase):
             Patient.objects.create(pasientnummer=201, vakt=vakt_for_year(2026), problemstilling='A')
             backup = create_backup(kind='manual', user=self.admin)
 
-            from patients.backup_service import restore_backup
+            from core.backup import restore_backup
             restore_backup(backup, user=self.admin)
 
         # Brukere bevart (alle originale, inkludert self.admin og other_user)
@@ -388,3 +408,41 @@ class BackupContentHashSkipTests(TestCase):
 
         self.assertIsNotNone(ny, 'Ny auto-backup skal lagres når siste mangler hash')
         self.assertNotEqual(ny.content_hash, '')
+
+
+class LegacyBackupErBorteTests(TestCase):
+    """Fase 8 (14. sep. 2026): de tre veiene rundt `core.backup` er stengt.
+
+    Testen finnes fordi hver av dem ville kommet tilbake som en bekvemmelighet,
+    ikke som en feil noen la merke til:
+
+    - **`patients/backup_service.py`** lot en modul ta backup uten å oppgi
+      slug. Slugen er hele forskjellen på en pasientfil og en hel database, og
+      et kall som ikke nevner den har ingen måte å ta feil på synlig vis.
+    - **`db_backup`** het som om den tok hele databasen, og tok pasientmodulen.
+      Den sto i `CRON_JOBBER` uten å være satt opp i Railway.
+    - **`patients.BackupConfig`** var ett intervall for hele portalen, valgt
+      fra fem faste verdier. `core.Backupplan` er per modul, med fritt
+      intervall — to steder å sette det samme er ett sted å lese feil.
+    """
+
+    def test_proxymodulen_finnes_ikke(self) -> None:
+        import importlib
+        with self.assertRaises(ModuleNotFoundError):
+            importlib.import_module('patients.backup_service')
+
+    def test_db_backup_kommandoen_finnes_ikke(self) -> None:
+        from django.core.management import get_commands
+        self.assertNotIn('db_backup', get_commands())
+
+    def test_backupconfig_modellen_finnes_ikke(self) -> None:
+        from django.apps import apps as django_apps
+        with self.assertRaises(LookupError):
+            django_apps.get_model('patients', 'BackupConfig')
+
+    def test_create_backup_krever_slug(self) -> None:
+        """Uten et påkrevd førsteargument ville et glemt `slug=` tatt backup
+        av «noe», og det er ikke en tilstand en katastrofekopi får være i."""
+        from core.backup import create_backup as core_create_backup
+        with self.assertRaises(TypeError):
+            core_create_backup(kind='manual')

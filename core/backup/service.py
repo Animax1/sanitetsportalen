@@ -9,7 +9,9 @@ Hash-skip: Hvis innholdet er identisk med siste auto-backup for samme
 modul, hoppes filskriving og DB-rad over (sjekkes via ``content_hash``).
 
 Cap: Etter hver vellykket skriving slettes eldste backuper for modulen
-slik at totalt antall ikke overstiger ``ModuleBackupConfig.max_backups``.
+slik at totalt antall ikke overstiger ``Backupplan.behold``. Capen gjelder
+**filene på volumet**; hvor lenge kopien lever offsite styres av bucketens
+livssyklusregel, og er noe helt annet.
 Pre-restore-backuper er IKKE inkludert i cap-håndteringen — de er et
 sikkerhetsnett.
 """

@@ -649,7 +649,7 @@ Hver fase er et eget commit-sett med grønne tester. Fase 1–2 kan deployes ute
 | 5 | `gjenopprett`-kommandoen med `--list`, `--ja`, `--full` og `--hent` (§8) | ½ kveld |
 | 6 | `verifiser_backup` + testen fra `BACKUP.md` §3.6, kjørt mot PostgreSQL | 1 kveld |
 | 7 | Livssyklusreglene i bucketen `sanitetsportalen` (§7) og kortet som leser dem | ½ kveld — **gjort 14. sep. 2026** |
-| 8 | Rydding: `db_backup`, `patients/backup_service.py`, `patients.BackupConfig`, `RETENTION_HOURS`. Krever migrasjon | ½ kveld |
+| 8 | Rydding: `db_backup`, `patients/backup_service.py`, `patients.BackupConfig`, `RETENTION_HOURS`. Krever migrasjon | ½ kveld — **gjort 14. sep. 2026** (`patients/0017`) |
 
 **Rekkefølgekrav:** fase 7 (livssyklusreglene) skal være gjort **før** fase 4 er i prod, så
 den første hele backupen ikke lander under 730-dagersregelen. Se §7.1. *Oppfylt: André

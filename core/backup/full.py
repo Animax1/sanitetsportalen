@@ -43,7 +43,6 @@ UTELATTE_MODELLER = [
     'auth.Permission',
     'admin.LogEntry',
     'patients.Backup',
-    'patients.BackupConfig',
     'core.OffsiteKopi',
     'core.Backupplan',
 ]

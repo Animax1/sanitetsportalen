@@ -4,6 +4,52 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-14 — Backup fase 8: den gamle veien er stengt
+
+Siste fase i backupomleggingen, og den eneste som bare fjerner ting. Tre
+levninger fra før `core.backup` er slettet, og migrasjonen er `patients/0017`.
+
+**`patients/backup_service.py`** var en tynn proxy som het seg å være
+bakoverkompatibilitet. Problemet var ikke at den var død kode — den ble brukt,
+av vaktavslutningen og av testene. Problemet var signaturen: `create_backup()`
+uten slug, med «patients» bakt inn. Etter fase 4 er slugen hele forskjellen på
+en pasientfil og en hel database, og et kall som ikke nevner den har ingen måte
+å ta feil på synlig vis. `core.backup.create_backup(slug=...)` krever den som
+førsteargument, og det er nå den eneste veien inn.
+
+**`db_backup`** het som om den tok hele databasen og tok pasientmodulen. Den
+sto i `CRON_JOBBER` til 13. sep. uten noen gang å ha vært satt opp i Railway —
+og det var flaks, for et volum kan bare henge på én tjeneste, så en
+cron-tjeneste uten `/data` ville skrevet fila til et flyktig filsystem og
+etterlatt en `Backup`-rad uten fil. Klokka er en tråd i web-prosessen
+(`core/backup/klokke.py`), og `backup_kjor` er den manuelle inngangen.
+
+**`patients.BackupConfig`** var én singleton for hele portalen: ett intervall,
+valgt fra fem faste verdier. `core.Backupplan` er per modul, med tre moduser og
+fritt intervall. Verdiene ble kopiert over allerede 13. sep. av
+`core/0002_modulebackupconfig`, så det er ingen data å ta vare på her.
+
+**`RETENTION_HOURS = 72`** ble aldri lest av noe. Oppryddingen er
+antallsbasert (`Backupplan.behold`, cap på filer *på volumet*), og hvor lenge
+kopien lever offsite er bucketens livssyklusregel — to helt forskjellige ting.
+En konstant som beskriver en tredje, ikke-eksisterende regel er verre enn ingen.
+
+`LegacyBackupErBorteTests` håndhever at ingen av de tre kommer tilbake, og at
+`create_backup` fortsatt krever slug. Testen finnes fordi hver av dem ville
+kommet tilbake som en bekvemmelighet, ikke som en feil noen la merke til.
+
+**Om migrasjonen:** den avhenger av `core/0002`, som gjør
+`apps.get_model('patients', 'BackupConfig')` i et `RunPython`-steg. Prøvd uten
+avhengigheten: Django la dem i riktig rekkefølge likevel, fordi `core/0002`
+selv peker på `patients/0005`. Kanten står der for at rekkefølgen skal være
+skrevet i stedet for et sammentreff i grafen. Ren skjemaendring — ingen
+`RunPython`, ingen triggerkø, ingen prøve i `core/migrasjonsprover.py`.
+
+2630 tester grønne på SQLite og PostgreSQL 16. **Backupomleggingen er ferdig:
+alle åtte fasene er levert.**
+
+---
+
 ## 2026-09-14 — Backup fase 7: oppbevaringstidene, og et kort som leser dem tilbake
 
 Fristene offsite håndheves av **Scaleway, ikke av oss**. Portalens IAM-nøkkel

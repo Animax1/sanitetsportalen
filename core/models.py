@@ -44,11 +44,10 @@ class ModuleSettings(models.Model):
     (``Module.is_core=True``) kan ikke deaktiveres — det håndheves i admin
     via ``ModuleSettingsAdmin``.
 
-    Backup-flagget er reservert for fremtidig bruk: ``BackupSchedulerMiddleware``
-    leser i dag fra ``BACKUP_APPS`` i ``patients/backup_service.py``. Når Fase 3b
-    eller senere fase implementerer modul-styrt backup, vil den lese fra
-    ``ModuleSettings.backup_enabled`` i stedet. Frem til da har feltet ingen
-    effekt utover dokumentasjon i admin.
+    ``backup_enabled`` har ingen effekt: hva som blir tatt backup av avgjøres
+    av backup-registeret (hvilke moduler som har en handler) og av
+    ``core.Backupplan`` (om, og hvor ofte). Å la feltet også kunne slå av
+    backup ville gitt to steder å se etter når en fil mangler.
     """
 
     slug = models.CharField(

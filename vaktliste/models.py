@@ -445,7 +445,7 @@ class Belastningsgrenser(models.Model):
     da skal lista si det høyt framfor å tvinge planleggeren til å lyve om
     tidene for å komme videre.
 
-    Én rad, som `patients.BackupConfig` — grensene gjelder alle vaktlister.
+    Én rad — grensene gjelder alle vaktlister.
     Per vakt ville vært en annen beslutning: da måtte hver ny liste svare på
     et spørsmål vaktlederen sjelden har grunnlag for å svare annerledes på
     enn sist.

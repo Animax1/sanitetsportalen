@@ -29,11 +29,10 @@ django_project/
 ├── accounts/       – Brukerhåndtering, roller, MFA, innlogging, LoginEvent
 ├── audit/          – AuditLog-modell og middleware
 ├── patients/       – Pasientregistrering (hoved-app)
-│   ├── models.py   – Patient, Behandler, Helsepersonell, AppSetting, Backup, BackupConfig
-│   ├── views.py    – REST-API (JSON), inkl. 6 backup-endepunkter
+│   ├── models.py   – Patient, Forstehjelper, Helsepersonell, AppSetting, Backup
+│   ├── views_*.py  – REST-API (JSON), delt i fem moduler
 │   ├── services.py – Statistikk og filtrering
-│   ├── backup_service.py   – Backup/restore-logikk
-│   ├── backup_scheduler.py – In-process-scheduler (BackupSchedulerMiddleware)
+│   ├── backup.py   – Modulens backup-handler (logikken ligger i core/backup/)
 │   ├── middleware.py        – BackupSchedulerMiddleware + SecurityHeadersMiddleware
 │   ├── signals.py  – Audit-logging av feltendringer
 │   └── tests*.py   – Kjernetester, backuptester, schedulertester, dataimport-tester
@@ -66,8 +65,10 @@ django_project/
 - **Behandler** – name, is_active; FK med `PROTECT` bevarer historikk
 - **Helsepersonell** – name, is_active
 - **AppSetting** – nøkkel-verdi for konfigurasjon (event_name, next_patient_nr, session_timeout_hours)
-- **Backup** – filename, kind (manual/auto/pre_reset/pre_restore), size_bytes, created_at, created_by, note
-- **BackupConfig** – singleton (pk=1), interval_minutes, last_run_at
+- **Backup** – filename, kind (manual/auto/pre_reset/pre_restore), size_bytes, created_at, created_by, note, module_slug
+
+Backupplanen ligger i `core.Backupplan`, én rad per modul (modus, intervall, cap).
+`patients.BackupConfig` — én singleton for hele portalen — er slettet 14. sep. 2026.
 
 ### Roller
 
@@ -290,12 +291,13 @@ Følgende innstillinger er aktive når `DEBUG=False`:
 
 - Backup inneholder **kun pasientdata** (`BACKUP_APPS=['patients']`)
 - Ekskluderer passord-hasher, audit-logg, sesjoner og LoginEvent
-- Ekskluderer `Backup`- og `BackupConfig`-modeller (unngår selvreferanse)
+- Ekskluderer `Backup`-modellen (unngår selvreferanse)
 - Restore rører **ikke** brukere, audit-logg eller sesjoner
 - Pre-restore snapshot lages automatisk før gjenoppretting
 - Filnavn genereres server-side (ingen path traversal mulig)
 - Generisk feilmelding ved restore (lekker ikke interne detaljer)
-- Automatisk sletting etter 72 timer
+- Opprydding er antallsbasert (`Backupplan.behold`), ikke tidsbasert — hvor lenge
+  kopien lever offsite styres av livssyklusregelen i Scaleway-bucketen
 
 ### Sesjonstimeout
 

@@ -493,8 +493,8 @@ def avslutt_vakt_view(request):
 
     vakt = hent_aktiv_vakt()
     # Lag pre-reset backup før sletting
-    from .backup_service import create_backup
-    create_backup(kind='pre_reset', user=request.user,
+    from core.backup import create_backup
+    create_backup(slug='patients', kind='pre_reset', user=request.user,
                   note=f'Før avslutning av vakta «{vakt.navn}»')
 
     with transaction.atomic():

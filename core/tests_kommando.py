@@ -88,11 +88,11 @@ class LesbarDbfeilTests(SimpleTestCase):
 
 @override_settings(SECURE_SSL_REDIRECT=False, RATELIMIT_ENABLE=False)
 class CronjobbeneBrukerDenTests(TestCase):
-    """Alle tre, ikke to.
+    """Begge, ikke bare én.
 
-    Den som blir glemt er den som feiler uleselig den dagen det haster — og
-    for `db_backup` er «den dagen» per definisjon en dag noe alt har gått
-    galt.
+    Den som blir glemt er den som feiler uleselig den dagen det haster. Det
+    var tre her til 14. sep. 2026; `db_backup` er slettet, og backup er ikke
+    lenger en cron-jobb i det hele tatt — se `core/backup/klokke.py`.
     """
 
     def _krev_lesbar(self, kommando, maal, forventet_tekst):
@@ -117,12 +117,6 @@ class CronjobbeneBrukerDenTests(TestCase):
             # den første spørringen etter at handlerne er funnet.
             'patients.management.commands.kollaps_arkiv.Command._kjor_modul',
             'ingen arkiv ble kollapset')
-
-    def test_db_backup(self):
-        self._krev_lesbar(
-            'db_backup',
-            'patients.models.BackupConfig.get',
-            'ingen backup ble tatt')
 
 
 class SisteKjoringRegistreresTests(TestCase):
