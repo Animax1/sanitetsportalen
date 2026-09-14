@@ -27,8 +27,9 @@ class PatientsBackupHandler(BaseBackupHandler):
 
     apps = ['patients']
     exclude = [
-        # Backupen skal ikke være med i sin egen dump.
-        'patients.Backup',
+        # `Backup` og `AppSetting` flyttet til `core` 14. sep. 2026 og er
+        # dermed ikke lenger i `apps` i det hele tatt. Ingen `exclude`-rad
+        # trengs for dem — lista utledes av `apps` minus `exclude`.
         # Arkivet håndteres av ArkivBackupHandler og skal aldri endres av en
         # pasient-restore. Begge modellene må ekskluderes: tidligere var kun
         # VaktArkiv utelatt mens ArkivertPasient ble med, altså barna uten

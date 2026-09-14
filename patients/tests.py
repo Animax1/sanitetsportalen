@@ -15,7 +15,8 @@ from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 
 from accounts.models import CustomUser
-from patients.models import Patient, Forstehjelper, Helsepersonell, AppSetting
+from patients.models import Patient, Forstehjelper, Helsepersonell
+from core.models import AppSetting
 from patients.services import (
     apply_list_filter, stamp_pabegynt_if_needed,
     stamp_obs_times_if_needed, stamp_utskrevet_if_needed,

@@ -45,7 +45,7 @@ def arkiver_vakt(vakt, notat, user, *, tomm=True):
     tester som sammenligner arkivet med det som lå der.
     """
     from . import services  # noqa: WPS433 — services importerer ikke arkiv, men holdes lokal
-    from patients.models import AppSetting  # noqa: WPS433
+    from core.models import AppSetting  # noqa: WPS433
 
     with transaction.atomic():
         oppdragene = list(

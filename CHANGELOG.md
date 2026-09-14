@@ -4,6 +4,56 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-14 — Flytting fase 2: `AppSetting` og `Backup` til `core`
+
+De to portalvide modellene har aldri vært pasientdata. De lå i `patients` fordi
+den var første app og det ikke fantes noe annet sted — og resultatet var at
+**rammeverket avhang av modulen**: `core.backup`, `core.arkiv` og `core.offsite`
+importerte alle `patients.models`.
+
+`core/0011` + `patients/0018`, begge `SeparateDatabaseAndState` med tom
+`database_operations`. **Ingen SQL i det hele tatt.** `db_table` er bundet til
+`patients_appsetting` og `patients_backup`, og det er et valg: Railway kjører
+release-fasen *før* den bytter container, så en omdøpt tabell ville gitt 500 på
+tilnærmet hver forespørsel i vinduet mellom `migrate` og byttet — `AppSetting`
+bærer pekeren til aktiv vakt.
+
+**En felle planen hadde plassert feil.** `AppSetting` lå i pasientbackupen fordi
+pasienthandleren dumper `apps = ['patients']` og fikk modellen med på kjøpet.
+Portalfila lister modellene sine ved navn, og planen la den raden i fase 4. Det
+ville latt portalinnstillingene — aktiv vakt, lydvarslene, e-postmottakerne —
+ligge utenfor **alle** backupfiler mellom de to deployene, uten at noe sa fra.
+`core.AppSetting` er derfor lagt i portalfila i samme commit som flyttingen.
+
+**Audit-loggen** (Andrés valg, vei 2): `EKSPLISITT_MAPPING` får
+`patients_appsetting` og `patients_backup` → `core`. Uten dem ville utledningen
+lest «patients» av tabellnavnet og merket hver framtidig rad med feil modul —
+forvirringen flyttet fra kodetreet til loggen. Gamle rader endres ikke; bruddet
+er datert.
+
+Navnetabellen fra fase 1 fikk sine to rader, og **hele kjeden er prøvd mot ekte
+PostgreSQL**, ikke bare i suiten:
+
+- **Oppgraderingssimulering:** en base migrert med koden som står i prod i dag,
+  seedet med innstillinger, backuprader og pasienter, så migrert med den nye.
+  Alle rader intakt, FK-en til brukeren intakt, tabellnavnene uendret — og
+  ingen tom `core_appsetting` ved siden av den fulle.
+- **Gammel fil, ny kode:** en backup tatt med prod-koden bærer
+  `patients.appsetting`. Gjenopprettet med den nye logger den «oversatte 2
+  modellnavn fra en eldre fil», og radene kommer tilbake som `core.AppSetting`.
+  Det er den prøven som svarer på om de 730 dagene med offsite-filer fortsatt er
+  gjenopprettbare.
+
+39 filer fikk nye importlinjer. To former skriptet ikke fanget, og som testene
+gjorde: en flerlinjes import i parentes, og ett `apps.get_model('patients',
+'AppSetting')` i `verifiser_vakt`. De samme oppslagene i *historiske*
+migrasjoner står urørt med vilje — de løses mot tilstanden der modellen fortsatt
+bodde i `patients`.
+
+2647 tester grønne på SQLite og PostgreSQL 16, 3 migrasjonsprøver OK.
+
+---
+
 ## 2026-09-14 — Flytting fase 1: navnetabellen, satt på plass før den trengs
 
 `core.backup.oversett_modellnavn()` og `GAMLE_MODELLNAVN`. Tabellen er **tom**,

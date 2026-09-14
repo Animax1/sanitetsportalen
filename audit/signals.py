@@ -22,6 +22,18 @@ from .models import AuditLog
 # dem her slik at admin kan filtrere på modul.
 EKSPLISITT_MAPPING: dict[str, str] = {
     'backup': 'patients',
+    # `AppSetting` og `Backup` flyttet fra `patients` til `core` 14. sep. 2026,
+    # men **tabellnavnene ble beholdt** (se modellene i `core/models.py` for
+    # hvorfor). Uten disse to radene ville utledningen under lest «patients» av
+    # tabellnavnet og merket hver framtidig auditrad med feil modul — altså
+    # nøyaktig den forvirringen flyttingen skulle fjerne, flyttet fra kodetreet
+    # til loggen.
+    #
+    # **Gamle rader endres ikke.** Et søk på «patients» finner rader fra før
+    # flyttingen, «core» finner dem etter. Bruddet er datert og forklarlig; en
+    # etikett som er varig feil blir aldri lettere å forstå.
+    'patients_appsetting': 'core',
+    'patients_backup': 'core',
 }
 
 

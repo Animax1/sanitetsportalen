@@ -42,19 +42,50 @@ PRØVETABELL = {'gammelapp.patient': 'patients.patient'}
 TEST_BACKUP_DIR = Path('/tmp/test-backups-modellnavn')
 
 
-class TabellenErTomTests(SimpleTestCase):
-    """Så lenge ingen modell har flyttet, skal mekanismen ikke gjøre noe."""
+class TabellenInneholderFlyttingeneTests(SimpleTestCase):
+    """Hver rad i tabellen skal peke på en modell som finnes i dag.
 
-    def test_tabellen_er_tom_til_fase_2(self) -> None:
-        self.assertEqual(GAMLE_MODELLNAVN, {},
-                         'Er tabellen fylt, skal `PLAN_FLYTTING_TIL_CORE.md` '
-                         'fase 2 være gjennomført — og denne testen endres.')
+    En rad med skrivefeil i høyresida er verre enn ingen rad: fila oversettes,
+    og feiler så i `loaddata` med et navn ingen har sett før. Og en rad der
+    venstresida fortsatt finnes, betyr at flyttingen ikke er gjennomført.
+    """
+
+    def test_de_to_flyttede_modellene_star_der(self) -> None:
+        """14. sep. 2026, fase 2. Fjernes en av dem, blir eldre offsite-filer
+        uleselige i stillhet — og de lever 730 dager."""
+        self.assertEqual(GAMLE_MODELLNAVN, {
+            'patients.appsetting': 'core.appsetting',
+            'patients.backup': 'core.backup',
+        })
+
+    def test_hoyresida_peker_pa_modeller_som_finnes(self) -> None:
+        from django.apps import apps as django_apps
+
+        for gammelt, nytt in GAMLE_MODELLNAVN.items():
+            with self.subTest(gammelt=gammelt):
+                django_apps.get_model(nytt)      # kaster LookupError ved feil
+
+    def test_venstresida_finnes_ikke_lenger(self) -> None:
+        """Står begge, har ingenting flyttet — og oversettelsen ville byttet et
+        navn som fortsatt er gyldig."""
+        from django.apps import apps as django_apps
+
+        for gammelt in GAMLE_MODELLNAVN:
+            with self.subTest(gammelt=gammelt):
+                with self.assertRaises(LookupError):
+                    django_apps.get_model(gammelt)
 
     def test_uten_oppslag_returneres_bytene_urort(self) -> None:
         """Identitet, ikke bare likhet: den raske veien skal ikke parse JSON-en
         og bygge den opp igjen. En hel databasefil er ikke liten."""
         raa = b'[{"model": "patients.patient", "pk": 1, "fields": {}}]'
         self.assertIs(oversett_modellnavn(raa), raa)
+
+    def test_en_ekte_gammel_fil_oversettes(self) -> None:
+        """Uten `patch.dict` — den ekte tabellen, slik den står i dag."""
+        raa = b'[{"model": "patients.appsetting", "pk": "aktiv_vakt_id", "fields": {}}]'
+        ut = json.loads(oversett_modellnavn(raa).decode('utf-8'))
+        self.assertEqual(ut[0]['model'], 'core.appsetting')
 
     def test_fil_uten_treff_rores_ikke_selv_med_tabell(self) -> None:
         raa = b'[{"model": "oppdrag.oppdrag", "pk": 1, "fields": {}}]'

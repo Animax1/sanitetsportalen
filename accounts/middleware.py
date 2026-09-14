@@ -45,7 +45,7 @@ class DynamicSessionTimeoutMiddleware:
     def __call__(self, request):
         if request.user.is_authenticated:
             try:
-                from patients.models import AppSetting
+                from core.models import AppSetting
                 hours = int(AppSetting.get('session_timeout_hours', 8))
                 hours = max(1, min(24, hours))
                 request.session.set_expiry(hours * 3600)

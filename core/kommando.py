@@ -99,7 +99,7 @@ def registrer_kjoring(navn, ok, melding=''):
     import json
     from django.utils import timezone
     try:
-        from patients.models import AppSetting
+        from core.models import AppSetting
         AppSetting.set(f'cron.{navn}', json.dumps(
             {'tid': timezone.now().isoformat(), 'ok': bool(ok), 'melding': (melding or '')[:300]}))
     except Exception:   # noqa: BLE001
@@ -109,7 +109,7 @@ def registrer_kjoring(navn, ok, melding=''):
 def siste_kjoringer():
     """{navn: {tid, ok, melding} | None} for cron-jobbene."""
     import json
-    from patients.models import AppSetting
+    from core.models import AppSetting
     ut = {}
     for navn in CRON_JOBBER:
         raa = AppSetting.get(f'cron.{navn}', '')

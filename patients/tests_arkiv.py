@@ -22,7 +22,8 @@ import json
 from django.test import TestCase, Client, override_settings
 from django.contrib.auth import get_user_model
 
-from patients.models import Patient, AppSetting, Forstehjelper, VaktArkiv, ArkivertPasient
+from patients.models import Patient, Forstehjelper, VaktArkiv, ArkivertPasient
+from core.models import AppSetting
 from patients.services import (
     arkiver_aktiv_vakt,
     compute_arkiv_stats,

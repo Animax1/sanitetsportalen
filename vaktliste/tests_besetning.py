@@ -31,7 +31,7 @@ from patients.js_test_utils import (
 from django.utils import timezone
 
 from oppdrag.models import Enhet
-from patients.models import AppSetting
+from core.models import AppSetting
 
 from . import choices, services
 from .models import Mannskap, Vaktpost

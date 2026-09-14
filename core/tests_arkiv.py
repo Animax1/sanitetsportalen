@@ -25,7 +25,8 @@ from core.arkiv import (
     verifiser,
 )
 from core.arkiv.handlers import _Registry
-from patients.models import ArkivertPasient, Backup, VaktArkiv
+from patients.models import ArkivertPasient, VaktArkiv
+from core.models import Backup
 from accounts.test_helpers import gi_standardtilgang
 
 

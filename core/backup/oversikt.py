@@ -34,7 +34,7 @@ def verste_tilfelle() -> dict:
     from core import offsite
     from core.backup import all_handlers
     from core.models import OffsiteKopi
-    from patients.models import Backup
+    from core.models import Backup
 
     har_offsite = offsite.er_konfigurert()
     na = timezone.now()
@@ -123,7 +123,7 @@ def modulrader(plan_form_klasse=None) -> list[dict]:
 
     from core.backup import all_handlers
     from core.models import Backupplan
-    from patients.models import Backup
+    from core.models import Backup
 
     Backupplan.standardplanen()
     tall = {
@@ -162,7 +162,7 @@ def helrad(plan_form_klasse=None) -> dict | None:
 
     from core.backup import get_handler
     from core.models import Backupplan
-    from patients.models import Backup
+    from core.models import Backup
 
     handler = get_handler(Backupplan.FULL_SLUG)
     if handler is None:

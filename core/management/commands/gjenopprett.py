@@ -92,7 +92,7 @@ class Command(BaseCommand):
     def _finn_backup(self, valg):
         """Backup-raden som skal gjenopprettes, uansett hvordan den ble pekt ut."""
         from core.backup import get_backup_dir, get_handler, slug_fra_filnavn
-        from patients.models import Backup
+        from core.models import Backup
 
         if valg['hent']:
             from core import offsite

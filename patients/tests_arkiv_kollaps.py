@@ -16,7 +16,8 @@ from django.utils import timezone
 
 from audit.models import AuditLog
 from core.backup import KIND_MANUAL, create_backup, get_handler
-from patients.models import AppSetting, ArkivertPasient, Patient, VaktArkiv
+from patients.models import ArkivertPasient, Patient, VaktArkiv
+from core.models import AppSetting
 from patients.services import (
     arkiver_aktiv_vakt,
     compute_arkiv_full_stats,

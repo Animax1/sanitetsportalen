@@ -5,7 +5,7 @@ med `year=`. Begge deler er borte: scopet er vakta. Denne hjelperen er den ene
 veien testene skal sette scope på — å peke `aktiv_vakt_id` for hånd i hver
 testfil ville gitt like mange varianter som filer.
 """
-from patients.models import AppSetting
+from core.models import AppSetting
 from patients.services import vakt_for_year
 
 

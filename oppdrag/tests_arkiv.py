@@ -14,7 +14,7 @@ from io import StringIO
 
 from accounts.models import CustomUser, ModulTilgang
 from core.arkiv import get_handler, kollaps, verifiser
-from patients.models import Backup
+from core.models import Backup
 from patients.services import vakt_for_year
 from patients.test_helpers import sett_aktiv_vakt
 

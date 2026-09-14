@@ -171,7 +171,7 @@ def portal_settings_view(request):
     ``AppSetting`` er en generisk nøkkel/verdi-tabell uten validering, så den
     ligger her: en timeout på 0 timer ville logget ut alle umiddelbart.
     """
-    from patients.models import AppSetting
+    from core.models import AppSetting
 
     from django.core.exceptions import ValidationError
     from vaktliste import fil as vaktliste_fil
@@ -602,7 +602,7 @@ def backup_admin_restore_view(request, slug: str, pk: int):
     """Gjenopprett én backup, bak en bekreftelse som sier hva som skjer."""
     from core.backup import get_handler, restore_backup
     from core.forms import BackupRestoreConfirmForm
-    from patients.models import Backup
+    from core.models import Backup
 
     handler = get_handler(slug)
     if handler is None:
@@ -671,7 +671,7 @@ def _berorte_rader(handler) -> list[dict]:
 def backup_admin_delete_view(request, slug: str, pk: int):
     """Slett én enkelt backup-fil + DB-rad."""
     from core.backup import get_backup_dir
-    from patients.models import Backup
+    from core.models import Backup
 
     backup = get_object_or_404(Backup, pk=pk, module_slug=slug)
     path = get_backup_dir() / backup.filename

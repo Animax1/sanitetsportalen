@@ -22,7 +22,7 @@ for hånd — og ingen hadde skrevet ned den prosedyren.
 | `sessions.Session` | Innlogginger som uansett er utløpt, og som ville gitt gamle økter tilbake |
 | `contenttypes.ContentType`, `auth.Permission` | Gjenskapes av `migrate`. Lastes de på nytt, kolliderer primærnøklene — og `natural_foreign` gjør at alt som peker på dem finner fram uansett |
 | `admin.LogEntry` | Django-admin er av i prod (S1) |
-| `patients.Backup`, `core.OffsiteKopi`, `core.Backupplan` | Metadata *om* backupfiler. Å laste dem tilbake ville gjenopplive rader for filer som ikke finnes |
+| `core.Backup`, `core.OffsiteKopi`, `core.Backupplan` | Metadata *om* backupfiler. Å laste dem tilbake ville gjenopplive rader for filer som ikke finnes |
 
 **Appene listes ikke opp for hånd.** `collect_apps()` regner dem ut fra
 app-registeret ved hvert kall, så en ny modul er med fra den dagen den finnes.
@@ -42,7 +42,7 @@ UTELATTE_APPER = {'sessions', 'contenttypes', 'staticfiles', 'messages'}
 UTELATTE_MODELLER = [
     'auth.Permission',
     'admin.LogEntry',
-    'patients.Backup',
+    'core.Backup',
     'core.OffsiteKopi',
     'core.Backupplan',
 ]

@@ -175,7 +175,7 @@ class Command(BaseCommand):
                     next_nr += 1
 
                 from patients.services import _pasientnr_nokkel
-                from patients.models import AppSetting
+                from core.models import AppSetting
                 nokkel = _pasientnr_nokkel(vakt)
                 gjeldende = AppSetting.get(nokkel, None)
                 if gjeldende is None or int(gjeldende) < next_nr:

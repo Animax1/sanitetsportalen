@@ -320,7 +320,7 @@ def bilinnstillinger_view(request):
             return _feil('Send `aktive` som {hastegrad: true/false}.')
         for hastegrad, paa in aktive.items():
             Lydvarsel.objects.update_or_create(hastegrad=hastegrad, defaults={'aktiv': bool(paa)})
-    from patients.models import AppSetting
+    from core.models import AppSetting
     for felt, nokkel in (('nytt_oppdrag', verdier.LYD_NYTT_NOKKEL),
                          ('lyd_aktiv', verdier.LYD_AKTIV_NOKKEL),
                          ('krev_grov_avreist', verdier.KREV_GROV_AVREIST_NOKKEL)):

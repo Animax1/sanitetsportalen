@@ -537,3 +537,98 @@ class OffsiteKopi(models.Model):
     @property
     def gikk(self) -> bool:
         return not self.feil
+
+
+# ── Flyttet fra `patients` 14. sep. 2026 ─────────────────────────────────────
+#
+# Begge er portalvide og har aldri vært pasientdata. De lå i `patients` fordi
+# den var første app og det ikke fantes noe annet sted — se
+# `docs/PLAN_FLYTTING_TIL_CORE.md`.
+#
+# **`db_table` er bundet til det gamle navnet, og det er et valg, ikke en
+# forglemmelse.** Railway kjører release-fasen *før* den bytter container, så
+# mellom `migrate` og byttet står gammel kode og serverer mot nytt skjema. En
+# omdøpt `patients_appsetting` ville gitt 500 på tilnærmet hver forespørsel i
+# det vinduet, fordi tabellen bærer pekeren til aktiv vakt. Prisen er at
+# tabellen heter `patients_*` i `core`; den er kosmetisk.
+#
+# Fjernes `db_table`, lager Django en *ny*, tom tabell ved siden av den fulle —
+# en feil som ser ut som «alle innstillingene forsvant».
+
+class AppSetting(models.Model):
+    """Applikasjonsinnstillinger (nøkkel-verdi-par).
+
+    Portalvid: aktiv vakt, lydvarselbryterne i oppdrag, e-postmottakerne for
+    vaktlistefila, sesjonstimeout, og siste kjøring av cron-jobbene.
+    """
+
+    key = models.CharField(max_length=64, primary_key=True, verbose_name='Nøkkel')
+    value = models.TextField(verbose_name='Verdi')
+
+    class Meta:
+        db_table = 'patients_appsetting'      # se kommentaren over
+        verbose_name = 'Appinnstilling'
+        verbose_name_plural = 'Appinnstillinger'
+
+    def __str__(self):
+        return f'{self.key} = {self.value}'
+
+    @classmethod
+    def get(cls, key, default=None):
+        """Hent verdi for nøkkel, eller standard-verdi."""
+        try:
+            return cls.objects.get(key=key).value
+        except cls.DoesNotExist:
+            return default
+
+    @classmethod
+    def set(cls, key, value):
+        """Sett verdi for nøkkel (opprett eller oppdater)."""
+        obj, _ = cls.objects.update_or_create(
+            key=key,
+            defaults={'value': str(value)},
+        )
+        return obj
+
+
+class Backup(models.Model):
+    """Metadata om en backup-fil. Selve filen ligger på disk/volume."""
+    KIND_CHOICES = [
+        ('auto',        'Automatisk'),
+        ('manual',      'Manuell'),
+        ('pre_restore', 'Før gjenoppretting'),
+        ('pre_reset',   'Før nullstilling av år'),
+    ]
+    filename    = models.CharField(max_length=255, unique=True)
+    kind        = models.CharField(max_length=20, choices=KIND_CHOICES)
+    size_bytes  = models.BigIntegerField()
+    created_at  = models.DateTimeField(auto_now_add=True)
+    created_by  = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='backups_created',
+    )
+    note        = models.CharField(max_length=200, blank=True, default='')
+    content_hash = models.CharField(
+        max_length=64, blank=True, default='',
+        help_text='SHA256 over ukomprimert JSON-innhold. '
+                  'Brukes til å hoppe over identiske auto-backups.',
+    )
+    module_slug = models.CharField(
+        max_length=64,
+        default='patients',
+        db_index=True,
+        help_text='Hvilken modul backupen tilhører. Brukes av core.backup '
+                  'for per-modul-cap og restore-rutting.',
+    )
+
+    class Meta:
+        db_table = 'patients_backup'          # se kommentaren over
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['kind', '-created_at'], name='backup_kind_created_idx'),
+            models.Index(fields=['module_slug', '-created_at'],
+                         name='backup_module_created_idx'),
+        ]
+
+    def __str__(self):
+        return f'{self.filename} ({self.get_kind_display()})'

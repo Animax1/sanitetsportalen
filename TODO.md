@@ -331,10 +331,21 @@ bindende: 1 før 2, fordi backupen speiler hvor modellene bor.
             modulfilene ligger 730 dager offsite. Røret settes på plass før fase 2 fyller
             det, så oversettelsen er prøvd i prod før den trengs. Testene kjører den mot
             en oppdiktet flytting, med motprøve.
-      - [ ] **Fase 2 — `AppSetting` og `Backup` til `core`**, `db_table` beholdt
-            (tilstandsmigrasjon; en omdøping ville gitt 500 i vinduet mellom `migrate` og
-            containerbyttet). Navnetabellen får sine to rader, og `EKSPLISITT_MAPPING` i
-            `audit/signals.py` får tabellene sine.
+      - [x] **Fase 2 — `AppSetting` og `Backup` til `core`** (14. sep. 2026,
+            `core/0011` + `patients/0018`). `SeparateDatabaseAndState` med tom
+            `database_operations` — ingen SQL. `db_table` beholdt; en omdøping ville gitt
+            500 i vinduet mellom `migrate` og containerbyttet, fordi `AppSetting` bærer
+            pekeren til aktiv vakt. Navnetabellen fikk sine to rader, og
+            `EKSPLISITT_MAPPING` i `audit/signals.py` fikk tabellene sine.
+            - [x] **Flyttet fram fra fase 4:** `core.AppSetting` inn i portalfila.
+                  Pasienthandleren dumper `apps = ['patients']` og fikk modellen med på
+                  kjøpet; portalfila lister sine ved navn. Ventet vi, ville
+                  portalinnstillingene ligget utenfor **alle** backupfiler mellom de to
+                  deployene, uten at noe sa fra.
+            - [x] **Prøvd mot ekte PostgreSQL:** oppgraderingssimulering fra prod-koden
+                  (alle rader intakt, ingen tom tabell ved siden av), og en fil tatt med
+                  prod-koden gjenopprettet med den nye (navnetabellen oversatte 2 rader).
+            2647 tester grønne på SQLite og PostgreSQL, 3 migrasjonsprøver OK.
       - [ ] **Fase 3 — `hent_aktiv_vakt`, middleware, `healthz`, server-status.**
             Ingen migrasjon.
       - [ ] **Fase 4 — portalfila tar `AppSetting`**, `/portal-admin/` samlet (3.2),

@@ -17,7 +17,7 @@ from django.test import SimpleTestCase, TestCase, override_settings
 from core import offsite
 from core.backup import KIND_AUTO, KIND_MANUAL, create_backup, get_backup_dir
 from core.models import OffsiteKopi
-from patients.models import Backup
+from core.models import Backup
 
 KONFIG = dict(OFFSITE_S3_BUCKET='sanitet-backup', OFFSITE_S3_ACCESS_KEY='ak',
               OFFSITE_S3_SECRET_KEY='sk', OFFSITE_BACKUP_KEY='hemmelig-nøkkel-42')

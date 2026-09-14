@@ -29,9 +29,8 @@ from core.backup import (
     get_handler,
     restore_backup,
 )
-from patients.models import (
-    AppSetting, ArkivertPasient, Patient, VaktArkiv,
-)
+from core.models import AppSetting
+from patients.models import ArkivertPasient, Patient, VaktArkiv
 from patients.services import arkiver_aktiv_vakt, vakt_for_year
 from accounts.test_helpers import gi_standardtilgang
 from patients.test_helpers import sett_aktiv_vakt

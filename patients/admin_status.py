@@ -38,7 +38,7 @@ from core.klientip import klient_ip
 from audit.models import AuditLog
 
 from .middleware import metrics_store
-from .models import Backup
+from core.models import Backup
 
 
 def _get_memory_mb():

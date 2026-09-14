@@ -197,12 +197,12 @@ class AppSettingCommandTests(TestCase):
         return ut.getvalue()
 
     def test_set_oppretter_ny_noekkel(self):
-        from patients.models import AppSetting
+        from core.models import AppSetting
         self._kjor('--set', 'test_noekkel', 'verdi1')
         self.assertEqual(AppSetting.objects.get(key='test_noekkel').value, 'verdi1')
 
     def test_set_endrer_eksisterende(self):
-        from patients.models import AppSetting
+        from core.models import AppSetting
         AppSetting.objects.create(key='test_noekkel', value='gammel')
         ut = self._kjor('--set', 'test_noekkel', 'ny')
         self.assertEqual(AppSetting.objects.get(key='test_noekkel').value, 'ny')
@@ -210,7 +210,7 @@ class AppSettingCommandTests(TestCase):
         self.assertIn('ny', ut)
 
     def test_get_viser_verdi(self):
-        from patients.models import AppSetting
+        from core.models import AppSetting
         AppSetting.objects.create(key='test_noekkel', value='verdi42')
         self.assertIn('verdi42', self._kjor('--get', 'test_noekkel'))
 
@@ -220,7 +220,7 @@ class AppSettingCommandTests(TestCase):
             self._kjor('--get', 'finnes_ikke')
 
     def test_list_viser_alle(self):
-        from patients.models import AppSetting
+        from core.models import AppSetting
         AppSetting.objects.create(key='aaa', value='1')
         AppSetting.objects.create(key='bbb', value='2')
         ut = self._kjor('--list')
@@ -228,7 +228,7 @@ class AppSettingCommandTests(TestCase):
         self.assertIn('bbb', ut)
 
     def test_delete_fjerner_noekkel(self):
-        from patients.models import AppSetting
+        from core.models import AppSetting
         AppSetting.objects.create(key='slettmeg', value='1')
         self._kjor('--delete', 'slettmeg')
         self.assertFalse(AppSetting.objects.filter(key='slettmeg').exists())

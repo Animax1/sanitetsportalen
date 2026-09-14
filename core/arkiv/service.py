@@ -107,7 +107,7 @@ def har_backup_etter(handler, tidspunkt) -> bool:
     if not handler.backup_slug:
         return False
 
-    from patients.models import Backup
+    from core.models import Backup
     return Backup.objects.filter(
         module_slug=handler.backup_slug,
         created_at__gt=tidspunkt,

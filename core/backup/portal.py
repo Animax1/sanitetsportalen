@@ -36,7 +36,13 @@ class PortalBackupHandler(BaseBackupHandler):
     slug = 'portal'
     display_name = 'Portal (vakter og moduloppsett)'
 
-    apps = ['core.Vakt', 'core.ModuleSettings']
+    #: `AppSetting` kom hit 14. sep. 2026, i **samme** deploy som modellen
+    #: flyttet fra `patients` — ikke en fase senere, som planen først sa.
+    #: Pasientfila dumpet `apps = ['patients']` og fikk innstillingene med på
+    #: kjøpet; portalfila lister modellene sine ved navn. Ventet vi, ville
+    #: portalinnstillingene — aktiv vakt, lydvarslene, e-postmottakerne — ligget
+    #: utenfor **alle** backupfiler i mellomtiden, uten at noe sa fra.
+    apps = ['core.Vakt', 'core.ModuleSettings', 'core.AppSetting']
     exclude = []
 
     #: `ModuleSettings.updated_by` er sporet av hvem som slo modulen av eller

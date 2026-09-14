@@ -14,7 +14,7 @@ from django.utils import timezone
 from audit.models import AuditLog
 from patients.js_test_utils import (
     PORTAL_UTILS_JS, VAKTLISTE_JS, build_harness, node_available, run_node)
-from patients.models import AppSetting
+from core.models import AppSetting
 
 from . import fil, services
 from .models import Mannskap, Utsending, Vaktpost

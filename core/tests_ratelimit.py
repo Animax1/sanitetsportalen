@@ -24,7 +24,7 @@ from django.test import Client, RequestFactory, TestCase, override_settings
 
 from accounts.models import CustomUser
 from core.ratelimit import er_rate_limited, rate_limit
-from patients.models import AppSetting
+from core.models import AppSetting
 from accounts.test_helpers import gi_standardtilgang
 
 

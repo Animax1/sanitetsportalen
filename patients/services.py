@@ -27,7 +27,8 @@ from core.validators import (  # noqa: F401
     validate_patient_time_fields,
     validate_time_string,
 )
-from .models import Patient, AppSetting, Forstehjelper, VaktArkiv, ArkivertPasient
+from .models import Patient, Forstehjelper, VaktArkiv, ArkivertPasient
+from core.models import AppSetting
 
 
 # ── Hjelpefunksjoner ─────────────────────────────────────────────────────────

@@ -110,7 +110,7 @@ def neste_oppdragsnummer(vakt) -> int:
     en eksisterende rad — og at en slettet AppSetting-rad ikke er en
     permanent feil.
     """
-    from patients.models import AppSetting  # noqa: WPS433
+    from core.models import AppSetting  # noqa: WPS433
 
     with transaction.atomic():
         nokkel = _nummer_nokkel(vakt)

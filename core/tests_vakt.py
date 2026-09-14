@@ -14,7 +14,8 @@ from django.utils import timezone
 from accounts.models import CustomUser, ModulTilgang
 from core.models import Vakt
 from core.validators import current_local_year
-from patients.models import AppSetting, Patient, VaktArkiv
+from patients.models import Patient, VaktArkiv
+from core.models import AppSetting
 from patients.services import hent_aktiv_vakt, vakt_for_year
 from patients.test_helpers import sett_aktiv_vakt
 

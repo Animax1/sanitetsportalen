@@ -30,7 +30,7 @@ class Command(BaseCommand):
         Vakt = apps.get_model('core', 'Vakt')
         Patient = apps.get_model('patients', 'Patient')
         VaktArkiv = apps.get_model('patients', 'VaktArkiv')
-        AppSetting = apps.get_model('patients', 'AppSetting')
+        AppSetting = apps.get_model('core', 'AppSetting')
         Oppdrag = apps.get_model('oppdrag', 'Oppdrag')
 
         self.funn = 0

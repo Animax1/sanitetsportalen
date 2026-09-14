@@ -299,7 +299,7 @@ class LastBackupInfoTests(TestCase):
 
     def test_med_backup_returnerer_found_true(self):
         from .admin_status import _get_last_backup_info
-        from .models import Backup
+        from core.models import Backup
         Backup.objects.create(
             filename='backup_2026-04-26_120000.json.gz',
             kind='auto',
@@ -315,7 +315,7 @@ class LastBackupInfoTests(TestCase):
 
     def test_henter_nyeste_av_flere(self):
         from .admin_status import _get_last_backup_info
-        from .models import Backup
+        from core.models import Backup
         # Opprett flere backups; siste skal vinne
         Backup.objects.create(filename='gammel.json.gz', kind='auto', size_bytes=100)
         Backup.objects.create(filename='midt.json.gz', kind='manual', size_bytes=200)
@@ -326,7 +326,7 @@ class LastBackupInfoTests(TestCase):
 
     def test_status_payload_inneholder_backup_info(self):
         # End-to-end: backup-info skal komme med i JSON-responsen
-        from .models import Backup
+        from core.models import Backup
         Backup.objects.create(filename='end2end.json.gz', kind='auto', size_bytes=999)
         self.client.force_login(self.admin)
         resp = self.client.get('/portal-admin/server-status/json/')

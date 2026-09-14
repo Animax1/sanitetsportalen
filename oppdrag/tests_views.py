@@ -12,7 +12,7 @@ from django.test import Client, TestCase, override_settings
 from django.utils import timezone
 
 from accounts.models import CustomUser, ModulTilgang
-from patients.models import AppSetting
+from core.models import AppSetting
 
 from oppdrag import choices, services
 from oppdrag.models import Enhet, Enhetshendelse, Lokasjon, Oppdrag, Statusmelding

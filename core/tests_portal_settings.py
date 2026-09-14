@@ -9,7 +9,7 @@ from django.test import Client, TestCase, override_settings
 from django.urls import reverse
 
 from accounts.models import CustomUser, ModulTilgang
-from patients.models import AppSetting
+from core.models import AppSetting
 from patients.services import hent_aktiv_vakt
 
 

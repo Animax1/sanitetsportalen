@@ -107,7 +107,7 @@ class GrovsorteringKrevesTests(StemplingBasis):
         self.assertEqual(self._stemple(o2, 'ledig').status_code, 200)
 
     def test_avreist_krever_bare_naar_admin_sier_det(self):
-        from patients.models import AppSetting
+        from core.models import AppSetting
         o = self._oppdrag()
         self._til(o, 'rykker_ut', 'fremme', 'avreist')
         AppSetting.set(verdier.KREV_GROV_AVREIST_NOKKEL, '1')

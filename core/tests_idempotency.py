@@ -13,7 +13,8 @@ from django.test import Client, TestCase, override_settings
 
 from accounts.models import CustomUser
 from core.idempotency import bygg_nokkel, forkast, fullfor, reserver
-from patients.models import AppSetting, Patient
+from patients.models import Patient
+from core.models import AppSetting
 from accounts.test_helpers import gi_standardtilgang
 
 

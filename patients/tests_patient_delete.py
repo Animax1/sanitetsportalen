@@ -14,7 +14,8 @@ import json
 from django.test import TestCase, Client, override_settings
 from django.contrib.auth import get_user_model
 
-from patients.models import Patient, AppSetting
+from patients.models import Patient
+from core.models import AppSetting
 from patients.services import _pasientnr_nokkel, recycle_patient_nr_if_last
 from patients.test_helpers import sett_aktiv_vakt
 from accounts.test_helpers import gi_standardtilgang

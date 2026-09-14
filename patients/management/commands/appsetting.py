@@ -22,7 +22,7 @@ Bruk::
 """
 from django.core.management.base import BaseCommand, CommandError
 
-from patients.models import AppSetting
+from core.models import AppSetting
 
 
 class Command(BaseCommand):

@@ -112,7 +112,7 @@ KREV_GROV_AVREIST_NOKKEL = 'oppdrag_krev_grov_avreist'
 
 
 def _bryter(nokkel, standard='1') -> bool:
-    from patients.models import AppSetting
+    from core.models import AppSetting
     return AppSetting.get(nokkel, standard) == '1'
 
 

@@ -194,7 +194,7 @@ def hent(objekt: str):
     `Backup`-rad hvis den mangler (fila kan komme fra en annen Railway-base).
     Returnerer (Backup, sti)."""
     from core.backup import get_backup_dir
-    from patients.models import Backup
+    from core.models import Backup
     k = konfig()
     # Filnavnet alene holder: prefikset utledes av slugen i navnet, så
     # `hent_offsite backup-full-...` finner fila under `full/` uten at man må

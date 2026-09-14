@@ -26,7 +26,7 @@ from core.backup import (
     registrer_alle_moduler,
     restore_backup,
 )
-from patients.models import Backup
+from core.models import Backup
 from patients.services import vakt_for_year
 
 TEST_BACKUP_DIR = Path('/tmp/test-backups-gjenopprett')

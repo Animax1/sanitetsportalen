@@ -21,7 +21,8 @@ from core.idempotency import bygg_nokkel, forkast, fullfor, reserver
 from core.ratelimit import rate_limit
 
 from .choices import validate_patient_choice_fields
-from .models import Patient, AppSetting, Forstehjelper, Helsepersonell
+from .models import Patient, Forstehjelper, Helsepersonell
+from core.models import AppSetting
 from .services import (
     kan_slette_selv, slettbare_pasient_ider,
     next_patient_nr,

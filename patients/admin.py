@@ -1,7 +1,8 @@
 """Django Admin-registrering for patients-appen."""
 from django.contrib import admin
 
-from .models import Patient, AppSetting, Forstehjelper
+from .models import Patient, Forstehjelper
+from core.models import AppSetting
 
 
 @admin.register(Forstehjelper)

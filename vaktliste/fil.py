@@ -47,19 +47,19 @@ MAKS_INTERVALL_MIN = 24 * 60
 
 def mottakere() -> list[str]:
     """Adressene admin har satt, én per linje eller kommaseparert."""
-    from patients.models import AppSetting
+    from core.models import AppSetting
     raa = AppSetting.get(MOTTAKERE_NOKKEL, '') or ''
     return [a for a in (x.strip() for x in re.split(r'[,\n;]', raa)) if a]
 
 
 def sendes_ved_drift() -> bool:
-    from patients.models import AppSetting
+    from core.models import AppSetting
     return AppSetting.get(VED_DRIFT_NOKKEL, '1') == '1'
 
 
 def intervall_minutter() -> int:
     """Hvor ofte lista sendes på nytt mens den er i drift. 0 = aldri."""
-    from patients.models import AppSetting
+    from core.models import AppSetting
     try:
         return max(0, int(AppSetting.get(INTERVALL_NOKKEL, '0') or 0))
     except (TypeError, ValueError):
@@ -67,7 +67,7 @@ def intervall_minutter() -> int:
 
 
 def bare_ved_endring() -> bool:
-    from patients.models import AppSetting
+    from core.models import AppSetting
     return AppSetting.get(BARE_ENDRET_NOKKEL, '1') == '1'
 
 

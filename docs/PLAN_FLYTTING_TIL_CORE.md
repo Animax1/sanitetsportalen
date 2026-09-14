@@ -146,9 +146,15 @@ Hver fase er et eget commit-sett med grønne tester, og kan deployes for seg.
 | # | Innhold | Anslag |
 |---|---|---|
 | 1 | **Navnetabellen i lasteren**, med test som laster en fil i gammel form. Tabellen er **tom i dag**, så fasen endrer ingenting — den setter røret på plass og beviser at det virker, før det trengs | ½ kveld — **gjort 14. sep. 2026** |
-| 2 | **`AppSetting` og `Backup` til `core`**, `db_table` beholdt, tilstandsmigrasjon. Navnetabellen får sine to rader. Alle 34+30 filene retter importen | 1–2 kvelder |
+| 2 | **`AppSetting` og `Backup` til `core`**, `db_table` beholdt, tilstandsmigrasjon. Navnetabellen får sine to rader. Alle 34+30 filene retter importen | 1–2 kvelder — **gjort 14. sep. 2026** |
 | 3 | **`hent_aktiv_vakt`, middlewaren, `healthz`, server-status til `core`.** Ingen migrasjon i det hele tatt — ren kodeflytting. Middlewarestiene i `settings.py` og de fem rutene i `myproject/urls.py` følger med | 1 kveld |
-| 4 | **Portalfila tar `AppSetting`** (den hører hjemme der, ikke i pasientfila). Ryddingen som faller ut av seg selv: `/portal-admin/` samlet i én URL-fil (3.2), `core/views.py` delt (3.7) | 1 kveld |
+| 4 | Ryddingen som faller ut av seg selv: `/portal-admin/` samlet i én URL-fil (3.2), `core/views.py` delt (3.7), `accounts/decorators.py` slettet (3.3). *Portalfila tok `AppSetting` alt i fase 2 — se under* | 1 kveld |
+
+**Rettelse etter fase 2 (14. sep. 2026):** portalfilas `AppSetting`-rad sto her i fase 4,
+og det var feil. Pasienthandleren dumper `apps = ['patients']` og fikk modellen med på
+kjøpet; portalfila lister sine ved navn. Med raden i fase 4 ville portalinnstillingene
+ligget utenfor **alle** backupfiler mellom de to deployene, uten at noe sa fra. Den ble
+derfor tatt i fase 2, i samme commit som modellen flyttet.
 
 **Fase 1 først er poenget.** Navnetabellen er en no-op til fase 2 fyller den, og da er
 den alt i prod og prøvd. Gjøres de sammen, er deployen som flytter modellene også den

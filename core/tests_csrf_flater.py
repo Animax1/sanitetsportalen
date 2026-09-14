@@ -35,7 +35,7 @@ from django.test import Client, SimpleTestCase, TestCase, override_settings
 
 from accounts.models import CustomUser, ModulTilgang
 from oppdrag.models import Enhet, Lokasjon
-from patients.models import AppSetting
+from core.models import AppSetting
 
 
 def _maler():

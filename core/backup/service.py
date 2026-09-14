@@ -68,8 +68,11 @@ PROTECTED_KINDS = {KIND_PRE_RESTORE}
 #
 # Nøkkel og verdi er `app_label.modellnavn` med små bokstaver, som i fila.
 GAMLE_MODELLNAVN: dict[str, str] = {
-    # 'patients.appsetting': 'core.appsetting',      # fase 2
-    # 'patients.backup': 'core.backup',              # fase 2
+    # Flyttet 14. sep. 2026 (`PLAN_FLYTTING_TIL_CORE.md` fase 2). Filene som
+    # ligger offsite fra før den datoen bærer de gamle etikettene, og de lever
+    # i 730 dager — radene her er det som gjør dem gjenopprettbare.
+    'patients.appsetting': 'core.appsetting',
+    'patients.backup': 'core.backup',
 }
 
 
@@ -228,7 +231,7 @@ def create_backup(slug: str, kind: str = KIND_MANUAL,
         raise ValueError(f'Ingen registrert backup-handler for modul {slug!r}.')
 
     # Lazy-import for å unngå sirkulær avhengighet ved app-loading.
-    from patients.models import Backup
+    from core.models import Backup
 
     raw, content_hash = _serialize_with_handler(handler)
 
@@ -284,7 +287,7 @@ def enforce_cap(slug: str, max_backups: int) -> int:
     if max_backups <= 0:
         return 0
 
-    from patients.models import Backup
+    from core.models import Backup
 
     qs = (
         Backup.objects

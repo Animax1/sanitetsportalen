@@ -24,7 +24,7 @@ from django.utils import timezone
 from accounts.models import CustomUser, ModulTilgang
 from core.models import Vakt
 from oppdrag.models import Enhet
-from patients.models import AppSetting
+from core.models import AppSetting
 
 from . import choices, services
 from .test_helpers import (KO, LAG, MANNSKAPSBIL, SAMLEPLASS, gruppe,

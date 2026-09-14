@@ -309,7 +309,7 @@ def rydd_foreldrelose() -> int:
     akkurat nå ikke skal ryddes bort under føttene på seg selv.
     """
     from core.backup import get_backup_dir
-    from patients.models import Backup
+    from core.models import Backup
 
     try:
         mappe = get_backup_dir()
