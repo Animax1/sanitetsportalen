@@ -29,7 +29,7 @@ from core.ratelimit import er_rate_limited as core_er_rate_limited
 from audit.models import AuditLog
 from core.url_safety import safe_redirect_url
 
-from .decorators import admin_required
+from core.auth_decorators import admin_required
 from .forms import (
     LoginForm, ChangePasswordForm, AdminUserCreateForm, AdminUserEditForm,
     GlemtPassordForm, ModulTilgangForm,
@@ -973,7 +973,7 @@ def user_create_view(request):
                         f'invitasjonen kunne ikke sendes. Send den på nytt '
                         f'fra brukersiden, eller sett et passord manuelt.',
                     )
-                return redirect('accounts:user_detail', pk=user.pk)
+                return redirect('portaladmin:user_detail', pk=user.pk)
 
             temp_password = lag_midlertidig_passord()
             user.set_password(temp_password)
@@ -1135,7 +1135,7 @@ def user_detail_view(request, pk):
                 sperre = _kan_degraderes(user, request.user, form.cleaned_data.get('role'), rolle_for)
                 if sperre:
                     messages.error(request, sperre)
-                    return redirect('accounts:user_detail', pk=pk)
+                    return redirect('portaladmin:user_detail', pk=pk)
                 form.save()
 
                 # Rolleendring ble ikke loggført i det hele tatt: frysing og
@@ -1168,14 +1168,14 @@ def user_detail_view(request, pk):
                     )
                 else:
                     messages.success(request, 'Bruker oppdatert.')
-                return redirect('accounts:user_detail', pk=pk)
+                return redirect('portaladmin:user_detail', pk=pk)
 
         elif action == 'link_patient_role':
             link_form = PasientRolleForm(user, request.POST)
             if link_form.is_valid():
                 link_form.save()
                 messages.success(request, 'Pasient-rolle oppdatert.')
-                return redirect('accounts:user_detail', pk=pk)
+                return redirect('portaladmin:user_detail', pk=pk)
 
         elif action == 'send_invitasjon':
             # Ny lenke på forespørsel. Den gamle dør ikke av at en ny lages —
@@ -1197,7 +1197,7 @@ def user_detail_view(request, pk):
                     'Invitasjonen kunne ikke sendes. Sjekk e-postoppsettet, '
                     'eller sett et passord manuelt.',
                 )
-            return redirect('accounts:user_detail', pk=pk)
+            return redirect('portaladmin:user_detail', pk=pk)
 
         elif action == 'logg_ut':
             # Avslutt sesjonene uten å røre kontoen. Til forskjell fra «frys»
@@ -1212,7 +1212,7 @@ def user_detail_view(request, pk):
                     request,
                     'Du kan ikke logge ut deg selv herfra — bruk Logg ut i menyen.',
                 )
-                return redirect('accounts:user_detail', pk=pk)
+                return redirect('portaladmin:user_detail', pk=pk)
 
             _invalidate_all_sessions(user)
             _log_user_admin_action(
@@ -1224,7 +1224,7 @@ def user_detail_view(request, pk):
                 f'«{user.username}» er logget ut. Neste pålogging går gjennom '
                 f'hele innloggingen på nytt.',
             )
-            return redirect('accounts:user_detail', pk=pk)
+            return redirect('portaladmin:user_detail', pk=pk)
 
         elif action == 'freeze':
             # Frys = deaktiver kontoen OG slett aktive sesjoner i samme
@@ -1232,7 +1232,7 @@ def user_detail_view(request, pk):
             # bruker fortsette å jobbe til cookien utløper.
             if user.pk == request.user.pk:
                 messages.error(request, 'Du kan ikke fryse din egen konto.')
-                return redirect('accounts:user_detail', pk=pk)
+                return redirect('portaladmin:user_detail', pk=pk)
 
             user.is_active = False
             user.save(update_fields=['is_active'])
@@ -1248,7 +1248,7 @@ def user_detail_view(request, pk):
                 + ('Enheten er tatt av vakt. ' if tatt_av_vakt else '')
                 + 'Bruk «Tø konto» for å reversere.',
             )
-            return redirect('accounts:user_detail', pk=pk)
+            return redirect('portaladmin:user_detail', pk=pk)
 
         elif action == 'thaw':
             user.is_active = True
@@ -1261,14 +1261,14 @@ def user_detail_view(request, pk):
                 request,
                 f'Kontoen til «{user.username}» er tødd. Brukeren kan logge inn med samme passord.',
             )
-            return redirect('accounts:user_detail', pk=pk)
+            return redirect('portaladmin:user_detail', pk=pk)
 
         elif action == 'unlock':
             user.failed_login_attempts = 0
             user.locked_until = None
             user.save(update_fields=['failed_login_attempts', 'locked_until'])
             messages.success(request, f'Kontoen til «{user.username}» er låst opp.')
-            return redirect('accounts:user_detail', pk=pk)
+            return redirect('portaladmin:user_detail', pk=pk)
 
         elif action == 'reset_password':
             temp_password = lag_midlertidig_passord()
@@ -1297,7 +1297,7 @@ def user_detail_view(request, pk):
                 request,
                 f'MFA nullstilt for «{user.username}» — de må sette opp på nytt ved neste pålogging.',
             )
-            return redirect('accounts:user_detail', pk=pk)
+            return redirect('portaladmin:user_detail', pk=pk)
 
     # Sjekk om brukeren har MFA-enheter (for å vise/skjule nullstill-knapp)
     has_totp_device = TOTPDevice.objects.filter(user=user, confirmed=True).exists()
@@ -1386,7 +1386,7 @@ def user_delete_view(request, pk):
     tillatt, begrunnelse = _kan_slettes(user, request.user)
     if not tillatt:
         messages.error(request, begrunnelse)
-        return redirect('accounts:user_detail', pk=pk)
+        return redirect('portaladmin:user_detail', pk=pk)
 
     bekreftelse = (request.POST.get('confirm_username') or '').strip()
     if bekreftelse != user.username:
@@ -1394,7 +1394,7 @@ def user_delete_view(request, pk):
             request,
             'Brukernavnet du skrev stemmer ikke. Kontoen er ikke slettet.',
         )
-        return redirect('accounts:user_detail', pk=pk)
+        return redirect('portaladmin:user_detail', pk=pk)
 
     username = user.username
 
@@ -1423,4 +1423,4 @@ def user_delete_view(request, pk):
     }.get(enhet_utfall, '')
     messages.success(
         request, f'Brukeren «{username}» er slettet permanent.{halen}')
-    return redirect('accounts:user_list')
+    return redirect('portaladmin:user_list')

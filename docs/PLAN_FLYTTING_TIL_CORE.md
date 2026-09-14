@@ -1,6 +1,8 @@
 # Plan: det portalvide ut av `patients` og inn i `core`
 
-Status: **forslag, 14. september 2026.** Neste post etter backupomleggingen, jf.
+Status: **gjennomført 14. september 2026.** Alle fire fasene er levert og ligger på `rollemodell` (staging). Notatet står til flyttingen er i prod.
+
+Opprinnelig status: **forslag, 14. september 2026.** Neste post etter backupomleggingen, jf.
 `PLAN_REKKEFOLGE_2026-09.md` trinn 2. Underlaget er `TEKNISK_GJELD.md` §2 og §3,
 kontrollert mot koden 14. sep. — og den har flyttet seg siden kartleggingen, så
 tallene under er dagens. Slettes når flyttingen er gjennomført.
@@ -148,7 +150,7 @@ Hver fase er et eget commit-sett med grønne tester, og kan deployes for seg.
 | 1 | **Navnetabellen i lasteren**, med test som laster en fil i gammel form. Tabellen er **tom i dag**, så fasen endrer ingenting — den setter røret på plass og beviser at det virker, før det trengs | ½ kveld — **gjort 14. sep. 2026** |
 | 2 | **`AppSetting` og `Backup` til `core`**, `db_table` beholdt, tilstandsmigrasjon. Navnetabellen får sine to rader. Alle 34+30 filene retter importen | 1–2 kvelder — **gjort 14. sep. 2026** |
 | 3 | **`hent_aktiv_vakt`, middlewaren, `healthz`, server-status til `core`.** Ingen migrasjon i det hele tatt — ren kodeflytting. Middlewarestiene i `settings.py` og de fem rutene i `myproject/urls.py` følger med | 1 kveld — **gjort 14. sep. 2026** |
-| 4 | Ryddingen som faller ut av seg selv: `/portal-admin/` samlet i én URL-fil (3.2), `core/views.py` delt (3.7), `accounts/decorators.py` slettet (3.3). *Portalfila tok `AppSetting` alt i fase 2 — se under* | 1 kveld |
+| 4 | Ryddingen som faller ut av seg selv: `/portal-admin/` samlet i én URL-fil (3.2), `core/views.py` delt (3.7), `accounts/decorators.py` slettet (3.3). *Portalfila tok `AppSetting` alt i fase 2 — se under* | 1 kveld — **gjort 14. sep. 2026** |
 
 **Rettelse etter fase 2 (14. sep. 2026):** portalfilas `AppSetting`-rad sto her i fase 4,
 og det var feil. Pasienthandleren dumper `apps = ['patients']` og fikk modellen med på

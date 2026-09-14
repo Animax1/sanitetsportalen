@@ -45,7 +45,7 @@ class AdminUserCreateEmailTests(TestCase):
         self.client.force_login(self.admin)
 
     def test_oppretting_uten_epost(self):
-        resp = self.client.post(reverse('accounts:user_create'), {
+        resp = self.client.post(reverse('portaladmin:user_create'), {
             'kontotype': 'person',
             'username': 'utenepost',
             'email': '',
@@ -65,7 +65,7 @@ class AdminUserCreateEmailTests(TestCase):
         """
         from django.core import mail
 
-        resp = self.client.post(reverse('accounts:user_create'), {
+        resp = self.client.post(reverse('portaladmin:user_create'), {
             'kontotype': 'person',
             'username': 'medepost',
             'email': '  post@eksempel.no  ',
@@ -81,7 +81,7 @@ class AdminUserCreateEmailTests(TestCase):
     def test_to_brukere_uten_epost_kolliderer_ikke(self):
         """unique_email_if_set skal tillate flere NULL samtidig."""
         for navn in ['tom1', 'tom2']:
-            resp = self.client.post(reverse('accounts:user_create'), {
+            resp = self.client.post(reverse('portaladmin:user_create'), {
                 'kontotype': 'person',
                 'username': navn, 'email': '', 'role': 'bruker',
             })
@@ -113,7 +113,7 @@ class MfaRequiredEditTests(TestCase):
         self.assertIn('mfa_required', AdminUserEditForm(instance=self.target).fields)
 
     def test_kan_sla_paa_mfa(self):
-        url = reverse('accounts:user_detail', kwargs={'pk': self.target.pk})
+        url = reverse('portaladmin:user_detail', kwargs={'pk': self.target.pk})
         resp = self.client.post(url, {
             'action': 'edit', 'role': 'bruker',
             'is_active': 'on', 'mfa_required': 'on',
@@ -127,7 +127,7 @@ class MfaRequiredEditTests(TestCase):
         self.target.mfa_required = True
         self.target.save(update_fields=['mfa_required'])
 
-        url = reverse('accounts:user_detail', kwargs={'pk': self.target.pk})
+        url = reverse('portaladmin:user_detail', kwargs={'pk': self.target.pk})
         resp = self.client.post(url, {
             'action': 'edit', 'role': 'bruker', 'is_active': 'on',
         })
@@ -136,7 +136,7 @@ class MfaRequiredEditTests(TestCase):
         self.assertFalse(self.target.mfa_required)
 
     def test_template_viser_mfa_avkrysning(self):
-        url = reverse('accounts:user_detail', kwargs={'pk': self.target.pk})
+        url = reverse('portaladmin:user_detail', kwargs={'pk': self.target.pk})
         resp = self.client.get(url)
         self.assertContains(resp, 'name="mfa_required"')
 
@@ -160,7 +160,7 @@ class FreezeThawPortalTests(TestCase):
         self.client.force_login(self.admin)
 
     def _post(self, action, pk=None):
-        url = reverse('accounts:user_detail', kwargs={'pk': pk or self.target.pk})
+        url = reverse('portaladmin:user_detail', kwargs={'pk': pk or self.target.pk})
         return self.client.post(url, {'action': action})
 
     def test_frys_deaktiverer_og_sletter_sesjoner(self):
@@ -226,7 +226,7 @@ class UserDeleteTests(TestCase):
         self.client.force_login(self.admin)
 
     def _slett(self, pk, bekreftelse):
-        url = reverse('accounts:user_delete', kwargs={'pk': pk})
+        url = reverse('portaladmin:user_delete', kwargs={'pk': pk})
         return self.client.post(url, {'confirm_username': bekreftelse})
 
     def test_sletting_med_riktig_bekreftelse(self):
@@ -244,7 +244,7 @@ class UserDeleteTests(TestCase):
         self.assertTrue(CustomUser.objects.filter(pk=self.target.pk).exists())
 
     def test_get_gir_405(self):
-        url = reverse('accounts:user_delete', kwargs={'pk': self.target.pk})
+        url = reverse('portaladmin:user_delete', kwargs={'pk': self.target.pk})
         self.assertEqual(self.client.get(url).status_code, 405)
 
     def test_kan_ikke_slette_seg_selv(self):
@@ -299,7 +299,7 @@ class UserDeleteTests(TestCase):
         self.assertTrue(CustomUser.objects.filter(pk=self.target.pk).exists())
 
     def test_detaljside_viser_slettesperre_for_egen_konto(self):
-        url = reverse('accounts:user_detail', kwargs={'pk': self.admin.pk})
+        url = reverse('portaladmin:user_detail', kwargs={'pk': self.admin.pk})
         resp = self.client.get(url)
         self.assertContains(resp, 'kan ikke slette din egen konto')
 
@@ -333,7 +333,7 @@ class KontotypeBilTests(TestCase):
             'metode': 'passord',
         }
         data.update(felt)
-        return self.client.post(reverse('accounts:user_create'), data)
+        return self.client.post(reverse('portaladmin:user_create'), data)
 
     def test_kontoen_og_enheten_lages_i_samme_steg(self):
         from oppdrag.models import Enhet
@@ -460,7 +460,7 @@ class MatriseNivaaerTests(TestCase):
         self.assertNotIn('skriv_handling', valg)
 
     def test_skjemaet_viser_skriv_handling_for_oppdrag(self):
-        html = self.client.get(reverse('accounts:user_create')).content.decode()
+        html = self.client.get(reverse('portaladmin:user_create')).content.decode()
         self.assertIn('skriv_handling', html)
 
     def test_nivaa_brukeren_har_staar_i_lista_selv_om_det_ikke_tilbys(self):
@@ -507,7 +507,7 @@ class EnhetFolgerKontoenTests(TestCase):
 
     def _slett(self, bruker):
         return self.client.post(
-            reverse('accounts:user_delete', kwargs={'pk': bruker.pk}),
+            reverse('portaladmin:user_delete', kwargs={'pk': bruker.pk}),
             {'confirm_username': bruker.username})
 
     def _gi_oppdrag(self):
@@ -560,7 +560,7 @@ class EnhetFolgerKontoenTests(TestCase):
         self._gi_oppdrag()
         self._slett(self.bil)
 
-        resp = self.client.post(reverse('accounts:user_create'), {
+        resp = self.client.post(reverse('portaladmin:user_create'), {
             'username': 'haugesund56', 'fullt_navn': '', 'email': '',
             'role': 'bruker', 'kontotype': 'enhet',
             'enhetsnavn': 'Haugesund 56', 'metode': 'passord',
@@ -579,7 +579,7 @@ class EnhetFolgerKontoenTests(TestCase):
 
     def test_navn_pa_enhet_i_tjeneste_er_fortsatt_opptatt(self):
         """Gjenbruken gjelder kun pensjonerte, ukoblede rader."""
-        resp = self.client.post(reverse('accounts:user_create'), {
+        resp = self.client.post(reverse('portaladmin:user_create'), {
             'username': 'ny_bil', 'fullt_navn': '', 'email': '',
             'role': 'bruker', 'kontotype': 'enhet',
             'enhetsnavn': 'Haugesund 56', 'metode': 'passord',
@@ -591,7 +591,7 @@ class EnhetFolgerKontoenTests(TestCase):
     def test_frysing_tar_enheten_av_vakt(self):
         """En frosset konto kan ikke logge inn, så bilen kan ikke melde."""
         self.client.post(
-            reverse('accounts:user_detail', kwargs={'pk': self.bil.pk}),
+            reverse('portaladmin:user_detail', kwargs={'pk': self.bil.pk}),
             {'action': 'freeze'})
 
         self.enhet.refresh_from_db()

@@ -325,7 +325,7 @@ class MFAAdminResetTests(TestCase):
 
     def test_mfa_reset_by_admin_clears_devices_and_cookies(self):
         """Admin skal kunne nullstille MFA – sletter enheter og logg."""
-        url = reverse('accounts:user_detail', kwargs={'pk': self.target.pk})
+        url = reverse('portaladmin:user_detail', kwargs={'pk': self.target.pk})
         resp = self.client.post(url, {'action': 'reset_mfa'})
         self.assertRedirects(resp, url)
         # Alle TOTP-enheter skal være slettet

@@ -90,7 +90,7 @@ helseopplysningsdump utenfor portalens kontroll.
       {{ tikk_sekunder }}. sekund i web-prosessen, uavhengig av trafikk.
     </p>
   </div>
-  <form method="post" action="{% url 'core:backup_admin_run_alle' %}" class="ms-auto"
+  <form method="post" action="{% url 'portaladmin:backup_admin_run_alle' %}" class="ms-auto"
         data-confirm="Ta backup av alle moduler nå?">
     {% csrf_token %}
     <button type="submit" class="btn btn-success btn-sm">
@@ -157,7 +157,7 @@ med. Derfor eget kort, ikke en rad blant modulene.
       oppbevaring — modulfilene ligger i 730.
     </div>
 
-    <form method="post" action="{% url 'core:backup_admin_plan' slug=hel.slug %}"
+    <form method="post" action="{% url 'portaladmin:backup_admin_plan' slug=hel.slug %}"
           class="row g-2 align-items-end mb-3">
       {% csrf_token %}
       {% include "core/partials/_backupplan_felter.html" with form=hel.form %}
@@ -169,7 +169,7 @@ med. Derfor eget kort, ikke en rad blant modulene.
     </form>
 
     <div class="d-flex gap-2 flex-wrap mb-3">
-      <form method="post" action="{% url 'core:backup_admin_run' slug=hel.slug %}"
+      <form method="post" action="{% url 'portaladmin:backup_admin_run' slug=hel.slug %}"
             data-confirm="Ta en hel databasebackup nå?">
         {% csrf_token %}
         <button type="submit" class="btn btn-outline-success btn-sm">
@@ -193,10 +193,10 @@ med. Derfor eget kort, ikke en rad blant modulene.
             <td class="bk-filnavn">{{ b.filename }}</td>
             <td>{{ b.size_bytes|filesizeformat }}</td>
             <td class="text-end">
-              <a href="{% url 'core:backup_admin_restore' slug=hel.slug pk=b.pk %}"
+              <a href="{% url 'portaladmin:backup_admin_restore' slug=hel.slug pk=b.pk %}"
                  class="btn btn-outline-danger btn-sm py-0">Gjenopprett alt</a>
               <form method="post" class="d-inline"
-                    action="{% url 'core:backup_admin_delete' slug=hel.slug pk=b.pk %}"
+                    action="{% url 'portaladmin:backup_admin_delete' slug=hel.slug pk=b.pk %}"
                     data-confirm="Slette {{ b.filename }}?">
                 {% csrf_token %}
                 <button type="submit" class="btn btn-outline-danger btn-sm py-0">Slett</button>
@@ -364,7 +364,7 @@ Det er forskjellen på å vedlikeholde tre tall og atten.
     </span>
   </div>
   <div class="bk-kropp">
-    <form method="post" action="{% url 'core:backup_admin_plan' slug=standard.slug %}"
+    <form method="post" action="{% url 'portaladmin:backup_admin_plan' slug=standard.slug %}"
           class="row g-2 align-items-end">
       {% csrf_token %}
       {% include "core/partials/_backupplan_felter.html" with form=standard_form %}
@@ -421,7 +421,7 @@ Det er forskjellen på å vedlikeholde tre tall og atten.
         · slug <code>{{ rad.slug }}</code>
       </div>
 
-      <form method="post" action="{% url 'core:backup_admin_plan' slug=rad.slug %}"
+      <form method="post" action="{% url 'portaladmin:backup_admin_plan' slug=rad.slug %}"
             class="row g-2 align-items-end mb-3">
         {% csrf_token %}
         {% include "core/partials/_backupplan_felter.html" with form=rad.form %}
@@ -443,7 +443,7 @@ Det er forskjellen på å vedlikeholde tre tall og atten.
       </form>
 
       <div class="d-flex gap-2 flex-wrap mb-3">
-        <form method="post" action="{% url 'core:backup_admin_run' slug=rad.slug %}"
+        <form method="post" action="{% url 'portaladmin:backup_admin_run' slug=rad.slug %}"
               data-confirm="Ta backup av {{ rad.navn }} nå?">
           {% csrf_token %}
           <button type="submit" class="btn btn-outline-success btn-sm">
@@ -451,7 +451,7 @@ Det er forskjellen på å vedlikeholde tre tall og atten.
           </button>
         </form>
         {% if rad.filer %}
-        <a href="{% url 'core:backup_admin_restore' slug=rad.slug pk=rad.filer.0.pk %}"
+        <a href="{% url 'portaladmin:backup_admin_restore' slug=rad.slug pk=rad.filer.0.pk %}"
            class="btn btn-outline-warning btn-sm">
           <i class="bi bi-arrow-counterclockwise me-1"></i>Gjenopprett siste
         </a>
@@ -475,10 +475,10 @@ Det er forskjellen på å vedlikeholde tre tall og atten.
               <td class="bk-filnavn">{{ b.filename }}</td>
               <td>{{ b.size_bytes|filesizeformat }}</td>
               <td class="text-end">
-                <a href="{% url 'core:backup_admin_restore' slug=rad.slug pk=b.pk %}"
+                <a href="{% url 'portaladmin:backup_admin_restore' slug=rad.slug pk=b.pk %}"
                    class="btn btn-outline-warning btn-sm py-0">Gjenopprett</a>
                 <form method="post" class="d-inline"
-                      action="{% url 'core:backup_admin_delete' slug=rad.slug pk=b.pk %}"
+                      action="{% url 'portaladmin:backup_admin_delete' slug=rad.slug pk=b.pk %}"
                       data-confirm="Slette {{ b.filename }}?">
                   {% csrf_token %}
                   <button type="submit" class="btn btn-outline-danger btn-sm py-0">Slett</button>

@@ -241,42 +241,51 @@ class BakoverkompatibilitetTests(TestCase):
         self.assertIs(p_val, validate_patient_time_fields)
         self.assertIs(p_str, validate_time_string)
 
-    def test_accounts_decorators_re_eksporterer(self):
-        """Shimen krympet i deploy 2, men `admin_required` skal virke.
+    def test_shimen_er_borte(self):
+        """`accounts/decorators.py` er slettet (14. sep. 2026, gjeldspunkt 3.3).
 
-        Det er den eneste rollebaserte dekoratøren som står igjen; resten tok
-        rolleverdier som ikke finnes lenger.
+        Den var en ren re-eksport av `admin_required`, og den eneste leseren
+        var testen som verifiserte at den virket. En fil som bare finnes for
+        sin egen test, finnes ikke for koden — og den er en åpen dør tilbake
+        til den gamle importvanen.
         """
-        from accounts.decorators import admin_required as a_admin  # noqa: F401
-        self.assertIs(a_admin, admin_required)
+        import importlib
+        with self.assertRaises(ModuleNotFoundError):
+            importlib.import_module('accounts.decorators')
 
-    def test_produksjonskode_importerer_ikke_fra_shimen(self):
+    def test_ingen_importerer_fra_den_slettede_shimen(self):
         """Regelen i CLAUDE.md skal ikke brytes av kodebasen selv (N11).
 
-        Shimen beholdes for bakoverkompatibilitet — testen over verifiserer at
-        den fortsatt virker — men produksjonskode skal importere direkte fra
-        `core.auth_decorators`. Tre filer gjorde ikke det, og en regel som
-        kodebasen bryter tre steder er verre enn ingen regel.
+        Testen står igjen etter at shimen ble slettet: en import herfra gir nå
+        `ModuleNotFoundError` ved oppstart, men den feilen peker på fila og
+        ikke på regelen. Denne sier hvorfor.
         """
         from pathlib import Path
         from django.conf import settings
 
         base = Path(settings.BASE_DIR)
         unntak = {
-            base / 'accounts' / 'decorators.py',   # selve shimen
-            base / 'core' / 'tests.py',            # tester at shimen virker
+            base / 'core' / 'tests.py',            # nevner navnet i klartekst
         }
 
         syndere = []
-        for app in ('accounts', 'audit', 'core', 'patients', 'myproject'):
+        for app in ('accounts', 'audit', 'core', 'patients', 'oppdrag',
+                    'vaktliste', 'statistikk', 'myproject'):
             for py in (base / app).rglob('*.py'):
                 if py in unntak or py.name.startswith('test'):
                     continue
-                if 'from accounts.decorators import' in py.read_text(encoding='utf-8'):
+                kilde = py.read_text(encoding='utf-8')
+                # **Begge formene.** Til 14. sep. 2026 lette denne bare etter
+                # den absolutte, og `accounts/views.py` brukte den relative —
+                # så regelen sto brutt inne i selve appen den gjaldt, i et år,
+                # med testen grønn. En regel som bare dekker halve syntaksen
+                # måler noe annet enn den later som.
+                if ('from accounts.decorators import' in kilde
+                        or 'from .decorators import' in kilde):
                     syndere.append(str(py.relative_to(base)))
 
         self.assertEqual(sorted(syndere), [], (
-            'Disse importerer fra bakoverkompatibilitets-shimen:\n  '
+            'Disse importerer fra den slettede shimen:\n  '
             + '\n  '.join(sorted(syndere))
             + '\n\nBytt til `from core.auth_decorators import ...` — samme objekter.'
         ))
@@ -532,10 +541,10 @@ class PasientAppPaaNyURLTests(TestCase):
         self.assertEqual(r('api_patients_list'), '/pasienter/api/patients/')
 
     def test_url_navn_for_admin_status_loeses_riktig(self):
-        """reverse('admin_server_status') skal gi /portal-admin/server-status/."""
+        """reverse('portaladmin:admin_server_status') skal gi /portal-admin/server-status/."""
         from django.urls import reverse as r
         self.assertEqual(
-            r('admin_server_status'),
+            r('portaladmin:admin_server_status'),
             '/portal-admin/server-status/',
         )
 
@@ -983,7 +992,7 @@ class ModuleAdminUITests(TestCase):
 
     def test_modulliste_url_loeses(self):
         self.assertEqual(
-            reverse('core:module_admin_list'),
+            reverse('portaladmin:module_admin_list'),
             '/portal-admin/moduler/',
         )
 
@@ -1001,7 +1010,7 @@ class ModuleAdminUITests(TestCase):
 
         self.client.force_login(self.admin)
         resp = self.client.post(
-            reverse('core:module_admin_edit', kwargs={'slug': non_core.slug}),
+            reverse('portaladmin:module_admin_edit', kwargs={'slug': non_core.slug}),
             {'enabled': 'on', 'backup_enabled': 'on', 'note': 'Test-notat'},
         )
         # Redirect etter suksess
@@ -1035,7 +1044,7 @@ class ModuleAdminUITests(TestCase):
     def test_redigering_404_for_ukjent_slug(self):
         self.client.force_login(self.admin)
         resp = self.client.get(
-            reverse('core:module_admin_edit', kwargs={'slug': 'finnes-ikke'}),
+            reverse('portaladmin:module_admin_edit', kwargs={'slug': 'finnes-ikke'}),
         )
         self.assertEqual(resp.status_code, 404)
 

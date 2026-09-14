@@ -115,7 +115,7 @@ class RedigerAdminTests(TestCase):
         self.c = Client(); self.c.force_login(self.admin)
 
     def _rediger(self, bruker, rolle):
-        return self.c.post(reverse('accounts:user_detail', kwargs={'pk': bruker.pk}),
+        return self.c.post(reverse('portaladmin:user_detail', kwargs={'pk': bruker.pk}),
                            {'action': 'edit', 'role': rolle})
 
     def test_ikke_seg_selv(self):
@@ -143,7 +143,7 @@ class RedigerAdminTests(TestCase):
         from accounts.forms import AdminUserEditForm
         self.assertNotIn('is_active', AdminUserEditForm(instance=self.admin).fields)
         annen = CustomUser.objects.create_user(username='b_r', password='x', must_change_password=False)
-        self.c.post(reverse('accounts:user_detail', kwargs={'pk': annen.pk}),
+        self.c.post(reverse('portaladmin:user_detail', kwargs={'pk': annen.pk}),
                     {'action': 'edit', 'role': 'bruker', 'is_active': ''})
         annen.refresh_from_db()
         self.assertTrue(annen.is_active, 'frys/tø er veien')
@@ -151,9 +151,9 @@ class RedigerAdminTests(TestCase):
     def test_midlertidig_passord_caches_ikke(self):
         """L11."""
         annen = CustomUser.objects.create_user(username='b_nc', password='x', must_change_password=False)
-        res = self.c.get(reverse('accounts:user_detail', kwargs={'pk': annen.pk}))
+        res = self.c.get(reverse('portaladmin:user_detail', kwargs={'pk': annen.pk}))
         self.assertIn('no-store', res.get('Cache-Control', ''))
-        res = self.c.get(reverse('accounts:user_create'))
+        res = self.c.get(reverse('portaladmin:user_create'))
         self.assertIn('no-store', res.get('Cache-Control', ''))
 
 

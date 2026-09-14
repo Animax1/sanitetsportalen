@@ -118,7 +118,7 @@ class InvitasjonFlytTests(TestCase):
             'metode': 'invitasjon',
         }
         data.update(felt)
-        return self.client.post(reverse('accounts:user_create'), data)
+        return self.client.post(reverse('portaladmin:user_create'), data)
 
     def test_invitasjon_sendes_og_kontoen_har_ikke_passord(self):
         resp = self._opprett()
@@ -222,7 +222,7 @@ class InvitasjonFlytTests(TestCase):
         mail.outbox.clear()
 
         svar = self.client.post(
-            reverse('accounts:user_detail', args=[ny.pk]),
+            reverse('portaladmin:user_detail', args=[ny.pk]),
             {'action': 'send_invitasjon'},
         )
         self.assertEqual(svar.status_code, 302)
@@ -270,7 +270,7 @@ class EksisterendeKontoerTests(TestCase):
         allerede fantes — altså alle.
         """
         svar = self.klient.post(
-            reverse('accounts:user_detail', args=[self.admin.pk]),
+            reverse('portaladmin:user_detail', args=[self.admin.pk]),
             {
                 'action': 'edit',
                 'fullt_navn': 'Andre Eritsland',
@@ -297,7 +297,7 @@ class EksisterendeKontoerTests(TestCase):
         self.admin.save()
 
         svar = self.klient.post(
-            reverse('accounts:user_detail', args=[self.admin.pk]),
+            reverse('portaladmin:user_detail', args=[self.admin.pk]),
             {
                 'action': 'edit',
                 'fullt_navn': '',
@@ -319,7 +319,7 @@ class EksisterendeKontoerTests(TestCase):
         )
         gi_standardtilgang(bil, 'skriver')
         svar = self.klient.post(
-            reverse('accounts:user_detail', args=[bil.pk]),
+            reverse('portaladmin:user_detail', args=[bil.pk]),
             {
                 'action': 'edit', 'fullt_navn': '', 'email': '',
                 'role': 'bruker', 'is_active': 'on',
@@ -356,7 +356,7 @@ class TvungenUtloggingTests(TestCase):
         self.adminklient.force_login(self.admin)
 
     def _bruker_er_innlogget(self, klient):
-        return klient.get(reverse('accounts:user_list')).status_code != 200
+        return klient.get(reverse('portaladmin:user_list')).status_code != 200
 
     def test_utlogging_avslutter_sesjonen_men_beholder_kontoen(self):
         brukerklient = Client()
@@ -365,7 +365,7 @@ class TvungenUtloggingTests(TestCase):
         ))
 
         svar = self.adminklient.post(
-            reverse('accounts:user_detail', args=[self.bruker.pk]),
+            reverse('portaladmin:user_detail', args=[self.bruker.pk]),
             {'action': 'logg_ut'},
         )
         self.assertEqual(svar.status_code, 302)
@@ -382,7 +382,7 @@ class TvungenUtloggingTests(TestCase):
     def test_kan_logge_inn_igjen_med_en_gang(self):
         """Forskjellen fra «frys»: kontoen er urørt."""
         self.adminklient.post(
-            reverse('accounts:user_detail', args=[self.bruker.pk]),
+            reverse('portaladmin:user_detail', args=[self.bruker.pk]),
             {'action': 'logg_ut'},
         )
         paa_nytt = Client()
@@ -392,12 +392,12 @@ class TvungenUtloggingTests(TestCase):
 
     def test_admin_kan_ikke_logge_ut_seg_selv_herfra(self):
         svar = self.adminklient.post(
-            reverse('accounts:user_detail', args=[self.admin.pk]),
+            reverse('portaladmin:user_detail', args=[self.admin.pk]),
             {'action': 'logg_ut'},
         )
         self.assertEqual(svar.status_code, 302)
         self.assertEqual(
-            self.adminklient.get(reverse('accounts:user_list')).status_code, 200,
+            self.adminklient.get(reverse('portaladmin:user_list')).status_code, 200,
             'admin ble logget ut av sin egen handling',
         )
 
@@ -407,7 +407,7 @@ class TvungenUtloggingTests(TestCase):
         brukerklient.login(username='frivillig', password='BrukerPass123!')
 
         self.adminklient.post(
-            reverse('accounts:user_detail', args=[self.bruker.pk]),
+            reverse('portaladmin:user_detail', args=[self.bruker.pk]),
             {
                 'action': 'edit', 'fullt_navn': '', 'email': '',
                 'role': 'bruker', 'is_active': 'on', 'mfa_required': 'on',
@@ -431,7 +431,7 @@ class TvungenUtloggingTests(TestCase):
         brukerklient.login(username='frivillig', password='BrukerPass123!')
 
         self.adminklient.post(
-            reverse('accounts:user_detail', args=[self.bruker.pk]),
+            reverse('portaladmin:user_detail', args=[self.bruker.pk]),
             {
                 'action': 'edit', 'fullt_navn': 'Ny Navnesen', 'email': '',
                 'role': 'bruker', 'is_active': 'on',
@@ -456,7 +456,7 @@ class MfaVedOpprettingTests(TestCase):
         self.klient.force_login(self.admin)
 
     def test_mfa_kan_settes_ved_oppretting(self):
-        self.klient.post(reverse('accounts:user_create'), {
+        self.klient.post(reverse('portaladmin:user_create'), {
             'username': 'med.mfa',
             'fullt_navn': 'Med Mfa',
             'email': 'medmfa@eksempel.no',
@@ -470,7 +470,7 @@ class MfaVedOpprettingTests(TestCase):
         )
 
     def test_mfa_kan_ikke_kreves_paa_delt_konto_ved_oppretting(self):
-        svar = self.klient.post(reverse('accounts:user_create'), {
+        svar = self.klient.post(reverse('portaladmin:user_create'), {
             'username': 'bil10',
             'fullt_navn': '',
             'email': '',

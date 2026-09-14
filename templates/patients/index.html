@@ -93,7 +93,7 @@
         <li><a class="dropdown-item" href="{% url 'core:profile' %}" style="color:#e5e7eb;"><i class="bi bi-person-circle me-2"></i>Min profil</a></li>
         <li><a class="dropdown-item" href="{% url 'accounts:change_password' %}" style="color:#e5e7eb;"><i class="bi bi-key me-2"></i>Endre passord</a></li>
         {% if er_global_admin %}
-        <li><a class="dropdown-item" href="{% url 'accounts:user_list' %}" style="color:#e5e7eb;"><i class="bi bi-people me-2"></i>Administrer brukere</a></li>
+        <li><a class="dropdown-item" href="{% url 'portaladmin:user_list' %}" style="color:#e5e7eb;"><i class="bi bi-people me-2"></i>Administrer brukere</a></li>
         {% endif %}
         <li><hr class="dropdown-divider" style="border-color:#334155;margin:0;"></li>
         <li>
@@ -232,7 +232,7 @@
         Arrangementsnavn og sesjonstimeout gjelder hele portalen og settes
         samlet ett sted.
       </p>
-      <a href="{% url 'core:portal_settings' %}" class="btn btn-outline-primary btn-sm">
+      <a href="{% url 'portaladmin:portal_settings' %}" class="btn btn-outline-primary btn-sm">
         <i class="bi bi-box-arrow-up-right me-1"></i>Åpne portalinnstillinger
       </a>
     </div>
@@ -263,7 +263,7 @@
         Backup styres samlet for hele portalen, med eget intervall og egen
         oppbevaring per modul — pasientdata og vaktarkiv hver for seg.
       </p>
-      <a href="{% url 'core:backup_admin' %}" class="btn btn-outline-primary btn-sm">
+      <a href="{% url 'portaladmin:backup_admin' %}" class="btn btn-outline-primary btn-sm">
         <i class="bi bi-box-arrow-up-right me-1"></i>Åpne backup-administrasjon
       </a>
     </div>

@@ -536,7 +536,7 @@ class NivaaEtikettTests(TestCase):
 
     def test_min_profil_viser_samme_etikett_som_matrisen(self):
         """Kortet skal si det samme som skjemaet der tilgangen ble delt ut."""
-        from core.views import modultilganger_for_visning
+        from core.views_portal import modultilganger_for_visning
         bruker = CustomUser.objects.create_user(
             username='m3', password='x', must_change_password=False)
         ModulTilgang.objects.create(

@@ -14,7 +14,7 @@ ekstra rollesjekk) vil naturlig skrives på samme form. Lå brukeradministrasjon
 fortsatt under ``/accounts/``, ville en regel for ``/portal-admin/*`` stille
 gått utenom nettopp den flaten som oppretter kontoer og deler ut admin-rollen.
 
-URL-*navnene* er uendret (``accounts:user_list`` osv.) slik at maler og tester
+URL-*navnene* er uendret (``portaladmin:user_list`` osv.) slik at maler og tester
 ikke berøres av flyttingen.
 """
 from django.urls import path
@@ -42,11 +42,6 @@ urlpatterns = [
          name='invitasjon'),
 
     # ── Administrasjon (admin) ───────────────────────────────────────────
-    path('portal-admin/brukere/', views.user_list_view, name='user_list'),
-    path('portal-admin/brukere/ny/', views.user_create_view, name='user_create'),
-    path('portal-admin/brukere/<int:pk>/', views.user_detail_view, name='user_detail'),
-    path('portal-admin/brukere/<int:pk>/slett/', views.user_delete_view, name='user_delete'),
-    path('portal-admin/innloggingslogg/', views.login_event_list_view, name='login_event_list'),
 
     # ── Permanente redirects fra de gamle stiene ─────────────────────────
     # Bokmerker og lenker i eldre dokumentasjon skal fortsatt virke.

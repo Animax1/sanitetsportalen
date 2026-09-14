@@ -88,14 +88,14 @@ class BrukeradminUrlFlyttingTests(TestCase):
 
     def test_url_navn_peker_paa_ny_sti(self):
         """Malene bruker {% url %}, så navnet må gi den nye stien."""
-        self.assertEqual(reverse('accounts:user_list'), '/portal-admin/brukere/')
-        self.assertEqual(reverse('accounts:user_create'), '/portal-admin/brukere/ny/')
+        self.assertEqual(reverse('portaladmin:user_list'), '/portal-admin/brukere/')
+        self.assertEqual(reverse('portaladmin:user_create'), '/portal-admin/brukere/ny/')
         self.assertEqual(
-            reverse('accounts:user_detail', kwargs={'pk': 7}),
+            reverse('portaladmin:user_detail', kwargs={'pk': 7}),
             '/portal-admin/brukere/7/',
         )
         self.assertEqual(
-            reverse('accounts:user_delete', kwargs={'pk': 7}),
+            reverse('portaladmin:user_delete', kwargs={'pk': 7}),
             '/portal-admin/brukere/7/slett/',
         )
 
@@ -154,35 +154,35 @@ class LoginEventListTests(TestCase):
 
     def test_krever_admin(self):
         self.client.force_login(self.annen)
-        resp = self.client.get(reverse('accounts:login_event_list'))
+        resp = self.client.get(reverse('portaladmin:login_event_list'))
         self.assertNotEqual(resp.status_code, 200)
 
     def test_viser_alle_hendelser(self):
-        resp = self.client.get(reverse('accounts:login_event_list'))
+        resp = self.client.get(reverse('portaladmin:login_event_list'))
         self.assertEqual(resp.status_code, 200)
         self.assertEqual(resp.context['total_count'], 3)
 
     def test_filter_paa_brukernavn(self):
-        resp = self.client.get(reverse('accounts:login_event_list'), {'q': 'ukjent'})
+        resp = self.client.get(reverse('portaladmin:login_event_list'), {'q': 'ukjent'})
         self.assertEqual(resp.context['total_count'], 1)
 
     def test_filter_paa_ip(self):
-        resp = self.client.get(reverse('accounts:login_event_list'), {'q': '10.0.0.1'})
+        resp = self.client.get(reverse('portaladmin:login_event_list'), {'q': '10.0.0.1'})
         self.assertEqual(resp.context['total_count'], 2)
 
     def test_filter_paa_feilede(self):
-        resp = self.client.get(reverse('accounts:login_event_list'), {'result': 'fail'})
+        resp = self.client.get(reverse('portaladmin:login_event_list'), {'result': 'fail'})
         self.assertEqual(resp.context['total_count'], 2)
 
     def test_filter_paa_hendelsestype(self):
-        resp = self.client.get(reverse('accounts:login_event_list'), {
+        resp = self.client.get(reverse('portaladmin:login_event_list'), {
             'event_type': LoginEvent.EVENT_MFA_VERIFY_FAILED,
         })
         self.assertEqual(resp.context['total_count'], 1)
 
     def test_hendelse_uten_konto_vises(self):
         """Forsøk på et brukernavn som ikke finnes er nettopp det man vil se."""
-        resp = self.client.get(reverse('accounts:login_event_list'))
+        resp = self.client.get(reverse('portaladmin:login_event_list'))
         self.assertContains(resp, 'ukjent_konto')
 
 

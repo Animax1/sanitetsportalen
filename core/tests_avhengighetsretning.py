@@ -55,7 +55,7 @@ KJENTE_UNNTAK = {
     ('core/admin_status.py', 'oppdrag.models'),
     ('core/admin_status.py', 'vaktliste'),
     ('core/admin_status.py', 'vaktliste.models'),
-    ('core/views.py', 'vaktliste'),
+    ('core/views_admin.py', 'vaktliste'),
 }
 
 

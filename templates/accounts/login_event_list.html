@@ -92,7 +92,7 @@
     <button type="submit" class="btn btn-primary btn-sm">
       <i class="bi bi-funnel me-1"></i>Bruk filter
     </button>
-    <a href="{% url 'accounts:login_event_list' %}" class="btn btn-outline-light btn-sm">
+    <a href="{% url 'portaladmin:login_event_list' %}" class="btn btn-outline-light btn-sm">
       <i class="bi bi-x-lg me-1"></i>Nullstill
     </a>
   </div>
@@ -118,7 +118,7 @@
       <td><code>{{ evt.username_attempt }}</code></td>
       <td>
         {% if evt.user %}
-          <a href="{% url 'accounts:user_detail' evt.user.pk %}">{{ evt.user.username }}</a>
+          <a href="{% url 'portaladmin:user_detail' evt.user.pk %}">{{ evt.user.username }}</a>
         {% else %}
           <span class="text-muted" title="Kontoen finnes ikke lenger, eller brukernavnet traff ingen konto">–</span>
         {% endif %}

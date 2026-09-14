@@ -114,7 +114,7 @@ class CsvFormelTests(TestCase):
     """M9: en verdi som begynner med `=` skal ikke bli en formel i Excel."""
 
     def test_csv_trygg(self):
-        from core.views import _csv_trygg
+        from core.views_admin import _csv_trygg
         for farlig in ('=1+1', '+1', '-1', '@SUM', '\tx', '\rx'):
             self.assertEqual(_csv_trygg(farlig), "'" + farlig, farlig)
         self.assertEqual(_csv_trygg('Kari'), 'Kari')

@@ -150,7 +150,7 @@ class BrukernavnNormaliseringTests(TestCase):
         self.klient.force_login(self.admin)
 
     def test_brukernavn_lagres_med_smaa_bokstaver(self):
-        self.klient.post(reverse('accounts:user_create'), {
+        self.klient.post(reverse('portaladmin:user_create'), {
             'username': '  Kari.Nordmann  ',
             'fullt_navn': 'Kari Nordmann',
             'email': 'kari@eksempel.no',

@@ -183,16 +183,16 @@
           </a></li>
           {% if request.user.role == 'admin' %}
           <li><hr class="dropdown-divider" style="border-color:var(--portal-border)"></li>
-          <li><a class="dropdown-item" href="{% url 'accounts:user_list' %}" style="color:var(--portal-text)">
+          <li><a class="dropdown-item" href="{% url 'portaladmin:user_list' %}" style="color:var(--portal-text)">
             <i class="bi bi-people me-2"></i>Administrer brukere
           </a></li>
-          <li><a class="dropdown-item" href="{% url 'core:module_admin_list' %}" style="color:var(--portal-text)">
+          <li><a class="dropdown-item" href="{% url 'portaladmin:module_admin_list' %}" style="color:var(--portal-text)">
             <i class="bi bi-toggles me-2"></i>Modulinnstillinger
           </a></li>
-          <li><a class="dropdown-item" href="{% url 'core:audit_log_list' %}" style="color:var(--portal-text)">
+          <li><a class="dropdown-item" href="{% url 'portaladmin:audit_log_list' %}" style="color:var(--portal-text)">
             <i class="bi bi-journal-text me-2"></i>Revisjonslogg
           </a></li>
-          <li><a class="dropdown-item" href="{% url 'core:backup_admin' %}" style="color:var(--portal-text)">
+          <li><a class="dropdown-item" href="{% url 'portaladmin:backup_admin' %}" style="color:var(--portal-text)">
             <i class="bi bi-cloud-arrow-up me-2"></i>Backup
           </a></li>
           {% endif %}
@@ -225,25 +225,25 @@
     {% endif %}
   {% endfor %}
   {% if request.user.is_authenticated and request.user.role == 'admin' %}
-    <a href="{% url 'accounts:user_list' %}" {% if '/portal-admin/brukere' in request.path %}class="active"{% endif %}>
+    <a href="{% url 'portaladmin:user_list' %}" {% if '/portal-admin/brukere' in request.path %}class="active"{% endif %}>
       <i class="bi bi-people me-1"></i>Brukere
     </a>
-    <a href="{% url 'admin_server_status' %}" {% if '/portal-admin/server-status' in request.path %}class="active"{% endif %}>
+    <a href="{% url 'portaladmin:admin_server_status' %}" {% if '/portal-admin/server-status' in request.path %}class="active"{% endif %}>
       <i class="bi bi-speedometer2 me-1"></i>Server-status
     </a>
-    <a href="{% url 'core:module_admin_list' %}" {% if '/portal-admin/moduler' in request.path %}class="active"{% endif %}>
+    <a href="{% url 'portaladmin:module_admin_list' %}" {% if '/portal-admin/moduler' in request.path %}class="active"{% endif %}>
       <i class="bi bi-toggles me-1"></i>Moduler
     </a>
-    <a href="{% url 'core:portal_settings' %}" {% if '/portal-admin/innstillinger' in request.path %}class="active"{% endif %}>
+    <a href="{% url 'portaladmin:portal_settings' %}" {% if '/portal-admin/innstillinger' in request.path %}class="active"{% endif %}>
       <i class="bi bi-sliders me-1"></i>Innstillinger
     </a>
-    <a href="{% url 'core:audit_log_list' %}" {% if '/portal-admin/auditlog' in request.path %}class="active"{% endif %}>
+    <a href="{% url 'portaladmin:audit_log_list' %}" {% if '/portal-admin/auditlog' in request.path %}class="active"{% endif %}>
       <i class="bi bi-journal-text me-1"></i>Revisjonslogg
     </a>
-    <a href="{% url 'accounts:login_event_list' %}" {% if '/portal-admin/innloggingslogg' in request.path %}class="active"{% endif %}>
+    <a href="{% url 'portaladmin:login_event_list' %}" {% if '/portal-admin/innloggingslogg' in request.path %}class="active"{% endif %}>
       <i class="bi bi-box-arrow-in-right me-1"></i>Innloggingslogg
     </a>
-    <a href="{% url 'core:backup_admin' %}" {% if '/portal-admin/backup' in request.path %}class="active"{% endif %}>
+    <a href="{% url 'portaladmin:backup_admin' %}" {% if '/portal-admin/backup' in request.path %}class="active"{% endif %}>
       <i class="bi bi-cloud-arrow-up me-1"></i>Backup
     </a>
   {% endif %}

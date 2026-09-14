@@ -28,7 +28,7 @@ class PortalInnstillingerTests(TestCase):
         self.admin = _bruker('ps_admin', rolle='admin', nivaa=None)
         self.client = Client()
         self.client.force_login(self.admin)
-        self.url = reverse('core:portal_settings')
+        self.url = reverse('portaladmin:portal_settings')
 
     def test_admin_ser_siden(self):
         resp = self.client.get(self.url)
@@ -108,13 +108,13 @@ class PortalAdminNavTests(TestCase):
 
     #: Navngitte ruter som skal ha en lenke i admin-navigasjonen.
     ADMIN_SIDER = (
-        'accounts:user_list',
-        'admin_server_status',
-        'core:module_admin_list',
-        'core:portal_settings',
-        'core:audit_log_list',
-        'accounts:login_event_list',
-        'core:backup_admin',
+        'portaladmin:user_list',
+        'portaladmin:admin_server_status',
+        'portaladmin:module_admin_list',
+        'portaladmin:portal_settings',
+        'portaladmin:audit_log_list',
+        'portaladmin:login_event_list',
+        'portaladmin:backup_admin',
     )
 
     def setUp(self):
@@ -122,7 +122,7 @@ class PortalAdminNavTests(TestCase):
         self.client.force_login(_bruker('nav_admin', rolle='admin', nivaa=None))
 
     def test_alle_admin_sider_har_nav_lenke(self):
-        html = self.client.get(reverse('core:portal_settings')).content.decode('utf-8')
+        html = self.client.get(reverse('portaladmin:portal_settings')).content.decode('utf-8')
         mangler = [n for n in self.ADMIN_SIDER if f'href="{reverse(n)}"' not in html]
         self.assertEqual(mangler, [], (
             'Admin-sider uten lenke i navigasjonen:\n  ' + '\n  '.join(mangler)

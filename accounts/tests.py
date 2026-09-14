@@ -387,7 +387,7 @@ class BulkAksjoneneErFjernetTests(TestCase):
         self.client.force_login(self.admin)
 
     def test_knappene_er_borte_fra_brukerlista(self):
-        resp = self.client.get(reverse('accounts:user_list'))
+        resp = self.client.get(reverse('portaladmin:user_list'))
         self.assertEqual(resp.status_code, 200)
         self.assertNotContains(resp, 'grant_pasienter_to_leads')
         self.assertNotContains(resp, 'revoke_pasienter_from_all')
@@ -397,7 +397,7 @@ class BulkAksjoneneErFjernetTests(TestCase):
         foer = set(ModulTilgang.objects.values_list('bruker_id', 'modul_slug', 'nivaa'))
         for action in ('grant_pasienter_to_leads', 'revoke_pasienter_from_all'):
             with self.subTest(action=action):
-                self.client.post(reverse('accounts:user_list'), {'action': action})
+                self.client.post(reverse('portaladmin:user_list'), {'action': action})
         self.assertEqual(
             set(ModulTilgang.objects.values_list('bruker_id', 'modul_slug', 'nivaa')),
             foer,
@@ -426,7 +426,7 @@ class ModulTilgangMatriseTests(TestCase):
         self.client.force_login(self.admin)
 
     def _detalj(self):
-        return reverse('accounts:user_detail', kwargs={'pk': self.target.pk})
+        return reverse('portaladmin:user_detail', kwargs={'pk': self.target.pk})
 
     def test_matrisen_genereres_fra_registeret(self):
         """Ikke en hardkodet liste: nye moduler skal dukke opp av seg selv."""
@@ -520,11 +520,11 @@ class ModulTilgangMatriseTests(TestCase):
 
     def test_matrisen_vises_paa_opprettingsskjemaet(self):
         """Par. 10.3: uten den lander den nyinviterte i en tom portal."""
-        resp = self.client.get(reverse('accounts:user_create'))
+        resp = self.client.get(reverse('portaladmin:user_create'))
         self.assertContains(resp, 'name="modul_patients"')
 
     def test_ny_bruker_far_tilgangen_med_en_gang(self):
-        self.client.post(reverse('accounts:user_create'), {
+        self.client.post(reverse('portaladmin:user_create'), {
             'kontotype': 'person',
             'username': 'ny_med_tilgang', 'role': 'bruker',
             'metode': 'midlertidig', 'modul_patients': 'skriv_full',

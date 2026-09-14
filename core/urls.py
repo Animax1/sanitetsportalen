@@ -14,113 +14,55 @@ myproject/urls.py.
 from django.shortcuts import redirect
 from django.urls import path, re_path
 
-from . import views
+from . import views_admin, views_portal, views_varsler
 
 app_name = 'core'
 
 urlpatterns = [
     # Portal-forside (krever innlogging)
-    path('', views.portal_dashboard_view, name='portal_dashboard'),
+    path('', views_portal.portal_dashboard_view, name='portal_dashboard'),
 
     # Min profil (alle innloggede brukere)
-    path('min-profil/', views.profile_view, name='profile'),
+    path('min-profil/', views_portal.profile_view, name='profile'),
 
-    # ── Admin-UI (Fase 3b) ──────────────────────────────────────────────────
-    # Plasseres under /portal-admin/ for å skille tydelig fra /django-admin/.
-    path(
-        'portal-admin/innstillinger/',
-        views.portal_settings_view,
-        name='portal_settings',
-    ),
-    path(
-        'portal-admin/moduler/',
-        views.module_admin_list_view,
-        name='module_admin_list',
-    ),
-    path(
-        'portal-admin/moduler/<slug:slug>/',
-        views.module_admin_edit_view,
-        name='module_admin_edit',
-    ),
-    path(
-        'portal-admin/auditlog/',
-        views.audit_log_list_view,
-        name='audit_log_list',
-    ),
-    path(
-        'portal-admin/auditlog/eksport.csv',
-        views.audit_log_csv_export_view,
-        name='audit_log_csv_export',
-    ),
-
-    # ── Backup-admin ────────────────────────────────────────────────────────
-    # Én side (13. sep. 2026). De spesifikke stiene står FØR `<slug>`-stiene,
-    # ellers ville «plan» og «kjor» blitt lest som modul-slugger.
-    path(
-        'portal-admin/backup/',
-        views.backup_admin_view,
-        name='backup_admin',
-    ),
-    path(
-        'portal-admin/backup/plan/<slug:slug>/',
-        views.backup_admin_plan_view,
-        name='backup_admin_plan',
-    ),
-    path(
-        'portal-admin/backup/kjor/',
-        views.backup_admin_run_view,
-        name='backup_admin_run_alle',
-    ),
-    path(
-        'portal-admin/backup/kjor/<slug:slug>/',
-        views.backup_admin_run_view,
-        name='backup_admin_run',
-    ),
-    path(
-        'portal-admin/backup/<slug:slug>/restore/<int:pk>/',
-        views.backup_admin_restore_view,
-        name='backup_admin_restore',
-    ),
-    path(
-        'portal-admin/backup/<slug:slug>/slett/<int:pk>/',
-        views.backup_admin_delete_view,
-        name='backup_admin_delete',
-    ),
+    # ── Admin-UI ────────────────────────────────────────────────────────────
+    # Rutene under /portal-admin/ flyttet til `core/urls_admin.py` 14. sep.
+    # 2026, og inkluderes derfra i `myproject/urls.py`. Se gjeldspunkt 3.2.
 
     # ── Fase 5: Varsler ─────────────────────────────────────────────────────
     path(
         'varsler/',
-        views.notification_list_view,
+        views_varsler.notification_list_view,
         name='notification_list',
     ),
     path(
         'varsler/<int:pk>/lest/',
-        views.notification_mark_read_view,
+        views_varsler.notification_mark_read_view,
         name='notification_mark_read',
     ),
     path(
         'varsler/marker-alle-lest/',
-        views.notification_mark_all_read_view,
+        views_varsler.notification_mark_all_read_view,
         name='notification_mark_all_read',
     ),
     path(
         'api/varsler/ulest-antall/',
-        views.notification_unread_count_view,
+        views_varsler.notification_unread_count_view,
         name='notification_unread_count',
     ),
     path(
         'api/varsler/',
-        views.notification_api_list_view,
+        views_varsler.notification_api_list_view,
         name='notification_api_list',
     ),
     path(
         'api/varsler/<int:pk>/lest/',
-        views.notification_api_mark_read_view,
+        views_varsler.notification_api_mark_read_view,
         name='notification_api_mark_read',
     ),
     path(
         'api/varsler/marker-alle-lest/',
-        views.notification_api_mark_all_read_view,
+        views_varsler.notification_api_mark_all_read_view,
         name='notification_api_mark_all_read',
     ),
 
@@ -131,7 +73,7 @@ urlpatterns = [
     # lenger har en aktiv route.
 
     # /api/<alt> → /pasienter/api/<alt>
-    re_path(r'^api/.*$', views.legacy_root_redirect, name='legacy_api'),
+    re_path(r'^api/.*$', views_admin.legacy_root_redirect, name='legacy_api'),
 
     # /admin/server-status/<alt> → /portal-admin/server-status/<alt>
     re_path(

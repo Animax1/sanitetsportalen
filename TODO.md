@@ -357,8 +357,23 @@ bindende: 1 før 2, fordi backupen speiler hvor modellene bor.
             men ble synlig av den. Riktig løsning er et register modulene melder seg inn
             i, som `core/stats.py` — egen jobb, egen risiko. De fem importene står i
             `KJENTE_UNNTAK` som en sperrehake til noen tar den.
-      - [ ] **Fase 4 — portalfila tar `AppSetting`**, `/portal-admin/` samlet (3.2),
-            `core/views.py` delt (3.7), `accounts/decorators.py` slettet (3.3).
+      - [x] **Fase 4 — ryddingen** (14. sep. 2026). `/portal-admin/` samlet i
+            `core/urls_admin.py` med navnerommet `portaladmin` (3.2 — 21 ruter fra tre
+            filer, 131 referanser skiftet prefiks), `core/views.py` delt i
+            `views_portal`/`views_admin`/`views_backup`/`views_varsler` (3.7), og
+            `accounts/decorators.py` slettet (3.3).
+            - [x] **`core/tests_malenes_urler.py`:** hver `{% url %}` i hver mal skal la
+                  seg slå opp. Django feiler på en ukjent rute først når malen *rendres*,
+                  så en tagg i en gren ingen test rendrer kan være død i måneder.
+                  Fant fem med det samme.
+            - [x] **`core/tests_urls_admin.py`:** hele kartet låst til literale verdier
+                  **med navnerom**, og hver GET-side rendret. Snapshotet mitt sammenlignet
+                  `pattern.name` — altså uten navnerom — og sa «identisk» mens hver
+                  `{% url 'accounts:…' %}` var død.
+            - [x] **Funn:** testen som håndhevet «ingen importerer fra skimet» lette bare
+                  etter den absolutte formen. `accounts/views.py` brukte den relative og
+                  slapp unna i et år, med testen grønn.
+            2691 tester grønne på SQLite og PostgreSQL.
       Kortversjonen av det gamle punktet under står igjen som underlag:
       `AppSetting`, `Backup`, `hent_aktiv_vakt`, CSP-/metrikk-/backup-
       middlewaren, `healthz` og server-status. Tabellnavnene beholdes (tilstandsmigrasjon,

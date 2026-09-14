@@ -750,7 +750,7 @@ class UtvidetStatusTests(TestCase):
     def test_json_endepunktet_baerer_de_nye_kortene(self):
         self.client.login(username='admin1', password='testpass123')
         with override_settings(SECURE_SSL_REDIRECT=False):
-            r = self.client.get(reverse('admin_server_status_json'))
+            r = self.client.get(reverse('portaladmin:admin_server_status_json'))
         self.assertEqual(r.status_code, 200)
         d = r.json()
         self.assertIn('naa', d['memory'])
@@ -760,7 +760,7 @@ class UtvidetStatusTests(TestCase):
     def test_siden_har_de_nye_kortene(self):
         self.client.login(username='admin1', password='testpass123')
         with override_settings(SECURE_SSL_REDIRECT=False):
-            html = self.client.get(reverse('admin_server_status')).content.decode()
+            html = self.client.get(reverse('portaladmin:admin_server_status')).content.decode()
         for id_ in ('memory', 'memory-peak', 'db-latency', 'db-conns', 'disk-used', 'offsite-status',
                     'vakt-navn', 'vakt-drift', 'vakt-oppdrag', 'tregeste', 'konfig-rader', 'konfig-versjon',
                     'login-failed', 'cron-rader', 'epost-transport'):

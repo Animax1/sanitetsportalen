@@ -3,7 +3,7 @@
 {% block content %}
 <div style="max-width:760px">
   <div class="d-flex align-items-center mb-3">
-    <a href="{% url 'accounts:user_list' %}" class="btn btn-outline-secondary btn-sm me-3">
+    <a href="{% url 'portaladmin:user_list' %}" class="btn btn-outline-secondary btn-sm me-3">
       <i class="bi bi-arrow-left"></i>
     </a>
     <h4 class="mb-0"><i class="bi bi-person me-2"></i>{{ target_user.username }}</h4>
@@ -251,7 +251,7 @@
         pasienter og i vaktarkivet, og handlingen føres i revisjonsloggen. Skal tilgangen kun
         stanses midlertidig, bruk <strong>Frys konto</strong> i stedet.
       </p>
-      <form method="post" action="{% url 'accounts:user_delete' target_user.pk %}"
+      <form method="post" action="{% url 'portaladmin:user_delete' target_user.pk %}"
             data-confirm="Slette {{ target_user.username }} permanent? Dette kan ikke angres." >
         {% csrf_token %}
         <label class="form-label small">

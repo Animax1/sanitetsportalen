@@ -125,6 +125,6 @@ class RateLimitPaaBrukeradminTests(TestCase):
         gi_standardtilgang(adm, 'admin')
         offer = CustomUser.objects.create_user(username='offer', password='x', must_change_password=False)
         c = Client(); c.force_login(adm)
-        koder = [c.post(reverse('accounts:user_delete', kwargs={'pk': offer.pk}), {'bekreft': 'feil'}).status_code
+        koder = [c.post(reverse('portaladmin:user_delete', kwargs={'pk': offer.pk}), {'bekreft': 'feil'}).status_code
                  for _ in range(12)]
         self.assertIn(429, koder)

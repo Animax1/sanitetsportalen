@@ -4,6 +4,57 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-14 — Flytting fase 4: adminflaten samlet, `core/views.py` delt, skimet slettet
+
+Siste fase i flytterunden. Ingen migrasjon.
+
+**`/portal-admin/` er ett sted** (gjeldspunkt 3.2). De 21 rutene lå i tre
+filer — `myproject/urls.py`, `core/urls.py` og `accounts/urls.py` — og ingen
+kunne se hele adminflaten uten å lete tre steder. Nå: `core/urls_admin.py`,
+inkludert fra prosjektet.
+
+**Og her var det en felle jeg gikk i.** Jeg tok et snapshot av rutekartet før
+samlingen og sammenlignet etterpå: 21 ruter, identiske stier, identiske navn.
+Men `pattern.name` er navnet **uten navnerom**, og `accounts` og `core` har
+hver sin `app_name`. Kartet var «identisk» mens hver
+`{% url 'accounts:user_list' %}` i malene var død. Viewtestene fanget det —
+tre tester som tilfeldigvis rendret de riktige sidene.
+
+To ting kom ut av det:
+
+- **Adminflaten har nå ett navnerom, `portaladmin`.** 131 referanser i 25
+  filer skiftet prefiks. Det samme skjermbildet het `accounts:user_list` eller
+  `core:backup_admin` avhengig av hvilken app som tilfeldigvis eide viewet;
+  nå er det flaten som bestemmer navnet.
+- **`core/tests_malenes_urler.py`** leser hver `{% url %}` i hver mal og
+  krever at navnet lar seg slå opp. Django feiler på en ukjent rute først når
+  malen *rendres*, så en tagg inne i en `{% if %}` som bare vises for én rolle
+  kan være død i måneder med suiten grønn. Testen fant fem med det samme:
+  server-status-rutene hadde aldri hatt navnerom, så omskrivingen min traff
+  dem ikke.
+- **`core/tests_urls_admin.py`** låser hele kartet til literale verdier *med*
+  navnerom, og rendrer hver GET-side under `/portal-admin/`. Lista er utledet
+  av kartet, så en ny adminside dekkes i det øyeblikket ruta legges inn.
+
+**`core/views.py` er delt i fire** (gjeldspunkt 3.7): `views_portal`
+(dashbord, min profil), `views_admin` (innstillinger, moduler, auditlogg),
+`views_backup` og `views_varsler`. 830 linjer og 24 views om alt fra backup til
+varsler — samme grep `patients/views.py` fikk i N13.3.
+
+**`accounts/decorators.py` er slettet** (gjeldspunkt 3.3). Den var en ren
+re-eksport av `admin_required`, og den eneste leseren var testen som
+verifiserte at den virket.
+
+*Og slettingen avdekket at regelen sto brutt:* testen som skulle håndheve
+«ingen produksjonskode importerer fra skimet» lette bare etter den absolutte
+formen `from accounts.decorators import`. `accounts/views.py` brukte den
+relative, `from .decorators import`, og slapp unna i et år med testen grønn.
+En regel som bare dekker halve syntaksen måler noe annet enn den later som.
+
+2691 tester grønne på SQLite og PostgreSQL 16.
+
+---
+
 ## 2026-09-14 — Flytting fase 3: scopet, middlewaren, helsesjekken og dashbordet
 
 Ingen migrasjon — ren kodeflytting.

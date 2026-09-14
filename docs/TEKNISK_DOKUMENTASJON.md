@@ -1616,13 +1616,21 @@ serveres på `/`. Tre ekstra apper bygger ut admin-funksjonalitet:
   app-start.
 - `core.forms.ModuleSettingsForm`: validerer at kjernemoduler ikke
   kan deaktiveres.
-- `core.views`:
+- `core.views_portal`:
   - `portal_dashboard_view` på `/`
   - `profile_view` på `/min-profil/`
+- `core.views_admin` (14. sep. 2026 — `core/views.py` var 830 linjer og 24 views):
+  - `portal_settings_view` på `/portal-admin/innstillinger/`
   - `module_admin_list_view` / `module_admin_edit_view` på
     `/portal-admin/moduler/[<slug>/]`
   - `audit_log_list_view` / `audit_log_csv_export_view` på
     `/portal-admin/auditlog/[eksport.csv]`
+- `core.views_backup` — backup-admin på `/portal-admin/backup/...`
+- `core.views_varsler` — varsler på `/varsler/...`
+
+Alle rutene under `/portal-admin/` er samlet i `core/urls_admin.py` med
+navnerommet `portaladmin` (14. sep. 2026, gjeldspunkt 3.2). De lå i tre filer,
+med to ulike navnerom for samme flate.
 
 ### `accounts` — utvidet med 5 permission-flagg (Fase 3a)
 
