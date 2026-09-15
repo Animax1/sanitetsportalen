@@ -4,6 +4,66 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-15 — Planleggerfanen: åtte beslutninger, og en rettelse av mitt eget notat
+
+Gjennomgang av `docs/FORSLAG_PLANLEGGERFANE.md` med André. Ingenting er bygget — dette er
+underlaget som gjør at det *kan* bygges uten å ta de samme avgjørelsene om igjen.
+
+### Rettelsen først
+
+Notatets §3.3 hevdet at planleggeren «bør følge rapportmodulens midnattsregel, fordi det er
+*timer* som telles», og at de to reglene derfor sto i konflikt. **Det var feil.** Splitting
+ved midnatt endrer ikke en totalsum — fredag 20:00 til lørdag 04:00 er åtte timer uansett
+hvilken dag de føres på. Regelen betyr bare noe når timene **brytes ned per dag**.
+
+Det gjorde spørsmålet i §5 feilstilt: det fantes ingen konflikt å løse, bare et valg om
+hvilken dag dagslinja fører timene på. Avsnittet er skrevet om, med feilen stående, fordi
+et notat som stille retter seg selv ikke lærer den neste leseren noe.
+
+### Beslutningene (André)
+
+| # | Spørsmål | Svar |
+|---|---|---|
+| 1 | Hva er timetallet? | **Tak som varsler**, ikke inngangsverdi (avgjort tidligere) |
+| 2 | Tak per dag? | **Nei — ett tak for hele vakta**, pluss en dagslinje uten egne tak |
+| 3 | Skal generatoren fylle plassene? | **Nei, bare tomme plasser** |
+| 4 | Ny generering over eksisterende? | **Erstatt tomme — behold de korpsreserverte og alle bemannede** |
+| 5 | Teller taket ledige eller bemannede? | **Begge, side om side** |
+| 6 | Kopieres taket av `kopier_oppsett`? | **Ja** |
+| 7 | Hvilken midnattsregel? | **Startdagen**, som resten av vaktlisteflaten |
+| 8 | Overlapp-punktet? | **Først** |
+
+Tre av dem er verdt begrunnelsen sin:
+
+**Beslutning 3 holder tilgangsmodellen utenfor en løkke.** En generator som bare lager
+tomme plasser er `skriv_full` og ferdig med det; en som fyller må bære
+`kan_sette_vaktpost()` — badge *og* reservasjon — inn i hver eneste rad den lager. Og den
+holder linja fra `kopier_oppsett`: en liste ingen har sagt ja til ser ferdig ut.
+
+**Beslutning 4 skiller utkast fra løfte.** En tom plass uten reservasjon er generatorens
+eget utkast, og å skrive over det koster ingenting. En tom plass reservert til et korps er
+noe noen har sagt «denne er deres» om — korpset ser den i «Mitt korps» og planlegger mot
+den. Reservasjonen leses av `services.reservert_korps()`, ikke av feltet, fordi plassens
+`korps` overstyrer ressursens og tom verdi betyr «som ressursen».
+
+**Beslutning 5, fordi hvert tall alene lyver litt.** «Satt opp» er behovet — det
+planleggingen handler om — men ingen betaler for en tom plass. «Bemannet» er nærmest
+kostnad, men står på null når lista er halvt satt opp. Avstanden mellom dem er dessuten
+selve arbeidslista: 312 mot 244 er 68 timer som mangler folk.
+
+### Regelen som nå skal stå tre steder
+
+**Planlegging fører skiftet på startdagen; fakturering splitter ved midnatt.** Den står i
+`CLAUDE.md` (for `_dagnokkel()`) og i planleggernotatet; `docs/FORSLAG_RAPPORTMODUL.md`
+§2.2 er det tredje stedet, og er ført opp i TODO. Forskjellen er bevisst og skal ikke
+«rettes» — spørsmålene er ulike: «hvem er på vakt den dagen» mot «hvor mange timer skal
+betales for det døgnet».
+
+**Endret:** `docs/FORSLAG_PLANLEGGERFANE.md` (§3.2–§3.4 og §4 skrevet om, §5 er nå
+avklarte spørsmål, ny §6 med beslutningene, §7 er rekkefølgen), `TODO.md`.
+
+---
+
 ## 2026-09-15 — «Avbrutt» og «trenger ny ressurs» var ett spørsmål, og måtte være to
 
 **Meldt fra staging (André):**
