@@ -22,6 +22,7 @@ SQLite.
 | drifte en vakt, eller rydde opp når noe knekker | [`docs/RUNBOOK_VAKT.md`](docs/RUNBOOK_VAKT.md) |
 | forstå hvordan koden henger sammen | [`docs/TEKNISK_DOKUMENTASJON.md`](docs/TEKNISK_DOKUMENTASJON.md) |
 | endre kode | [`CLAUDE.md`](CLAUDE.md) — reglene og hvorfor de finnes |
+| endre kode i én modul | modulens egen `CLAUDE.md`: [`patients/`](patients/CLAUDE.md), [`oppdrag/`](oppdrag/CLAUDE.md), [`vaktliste/`](vaktliste/CLAUDE.md), [`statistikk/`](statistikk/CLAUDE.md). Rota gjelder der også |
 | vite hva som skal gjøres | [`TODO.md`](TODO.md) |
 | vite hva som *er* gjort | [`CHANGELOG.md`](CHANGELOG.md) |
 | forstå personvernsiden | [`docs/PERSONVERN_DOKUMENTASJON.md`](docs/PERSONVERN_DOKUMENTASJON.md) |

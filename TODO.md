@@ -2233,6 +2233,24 @@ Funnene under er allerede kartlagt, så jobben er avgrenset når den skal gjøre
 
 ### Løse punkter
 
+- [x] **CLAUDE.md delt i rot + én fil per modul** (15. sep. 2026). Fila var 1 433 linjer,
+      og 651 av dem gjaldt én modul om gangen — vaktlista alene 489. Nå: rota (859
+      linjer) bærer rammeverket, og `patients/`, `oppdrag/`, `vaktliste/` og `statistikk/`
+      har hver sin, som lastes når noen arbeider i mappa.
+      - [x] **Modulfilene måtte inn i `DOKUMENTER`** i `core/tests_dokumentråte.py`.
+            Uten det ville delingen stille ha slått av sti-, kommando- og
+            symbolkontrollen for nettopp den dokumentasjonen som råtner fortest
+      - [x] `core/tests_claude_md.py` håndhever de tre feilene delingen gjør mulige:
+            modulfil utenfor dokumentråte-lista, modulfil ingen peker på, og et
+            modulavsnitt som vokser tilbake i rota. Fem mutasjoner prøvd, alle røde
+      - Merk grensen: testen ser at fila er delt, ikke at *innholdet* står riktig sted.
+        En vaktlisteregel skrevet i rota fanges bare hvis den får en overskrift med
+        `(vaktliste/)` i
+- [x] **Mutasjonstesting har fått en proporsjonalitetsregel** (15. sep. 2026, André).
+      Tungt på tjenestelaget og rammeverket, middels på views og de JS-funksjonene som
+      *avgjør* noe, lett på byggere, ingenting på CSS og tekst. Bakgrunnen er at det ble
+      brukt tretten mutanter på et tidsfelt og to på en tilgangsport.
+      Står i `CLAUDE.md` sammen med de tre måtene en mutant lyver på — alle tre sett her.
 - [ ] **Rate-limit arkivstatistikken.** Tre endepunkter kjører nå samme tunge beregning
       som live-statistikken uten å ha fått en bøtte i S3:
       `/statistikk/api/kilde/<slug>/arkiv/<pk>/full-stats/` (flyttet dit i fase 6),

@@ -44,6 +44,16 @@ ROT = Path(settings.BASE_DIR)
 DOKUMENTER = [
     'README.md',
     'CLAUDE.md',
+    # Modulfilene (15. sep. 2026). De **må** stå her: da CLAUDE.md ble delt,
+    # flyttet nær halvparten av stiene, kommandoene og symbolene ut av fila
+    # denne testen leste — og delingen ville i stillhet ha slått av regelen
+    # for nettopp den dokumentasjonen som råtner fortest, den som beskriver
+    # én modul. `core/tests_claude_md.py` håndhever at nye modulfiler kommer
+    # med hit.
+    'patients/CLAUDE.md',
+    'oppdrag/CLAUDE.md',
+    'vaktliste/CLAUDE.md',
+    'statistikk/CLAUDE.md',
     'docs/DEPLOY_GUIDE.md',
     'docs/RUNBOOK_VAKT.md',
     'docs/TEKNISK_DOKUMENTASJON.md',

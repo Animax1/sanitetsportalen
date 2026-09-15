@@ -4,6 +4,87 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-15 — CLAUDE.md delt, og mutasjonstestingen har fått et budsjett
+
+**Bedt om (André), to punkter fra forrige økt:** «CLAUDE.md skal splittes i rot +
+per-modul-filer» og «hold mutasjonstesting proporsjonal — tungt på services, lett på UI».
+
+### 1. Fila var blitt en modulhåndbok med et rammeverk foran
+
+1 433 linjer, og 651 av dem — nær halvparten — gjaldt én modul om gangen: vaktlista
+alene 489, oppdrag 105, statistikk 44. Alt sammen ble lest inn hver gang, også når arbeidet gjaldt en
+skrivefeil i `accounts/`.
+
+| Fil | Linjer | Innhold |
+|---|---|---|
+| `CLAUDE.md` | 1 433 → 859 | Arbeidsflyt, rammeverk, tilgangsmodell, backup, arkiv, audit, frontend, migrasjoner, drift |
+| `patients/CLAUDE.md` | 17 | API-mønsteret og viewdelingen |
+| `oppdrag/CLAUDE.md` | 109 | Statusmaskinen, verdimengdene, bilens utganger |
+| `vaktliste/CLAUDE.md` | 493 | Korps, skift, drift, planleggeren, offline |
+| `statistikk/CLAUDE.md` | 48 | Kilderegisteret og de to gatene |
+
+**Regelen for hva som står hvor følger koden:** ligger den i `core/` eller gjelder den
+alle, står den i rota; ligger den i en app, står den i appens fil. Teksten er flyttet
+ordrett — dette er en deling, ikke en omskriving.
+
+**Det som *må* vites før man rører en modul, ble værende i rota.** Modulfilene lastes når
+noen arbeider i mappa, ikke alltid, så avhengighetsretningen, tilgangsnivåene og «hvert
+view under en modul skal være dekorert» kan ikke bo hos modulen. Avhengighetsavsnittet har
+derfor fått ett nytt avsnitt: at modul-til-modul går én vei, at `oppdrag` ikke importerer
+vaktlista, og at statistikkappen ikke navngir noen kilde — med detaljene hos modulene.
+
+### Den farligste feilen var stille, og den er det testen er til for
+
+`core/tests_dokumentråte.py` leser en liste over dokumenter og kontrollerer at hver filsti,
+hver `manage.py`-kommando og hvert slettet symbol i dem fortsatt stemmer. Lista inneholdt
+`CLAUDE.md`. **I det øyeblikket nær halvparten av innholdet flyttet ut, ville kontrollen
+stilltiende ha sluttet å gjelde for dem** — og det er nettopp modulbeskrivelsene som råtner
+fortest, fordi de nevner flest navn. Modulfilene står nå i `DOKUMENTER`.
+
+`core/tests_claude_md.py` (ny) håndhever de tre feilene delingen gjør mulige, etter samme
+mønster som `core/tests_js_splitt.py` gjorde for JS-delingen:
+
+| Regel | Hva den fanger |
+|---|---|
+| Hver `*/CLAUDE.md` står i `DOKUMENTER` | At en ny modulfil slipper unna dokumentråte-kontrollen |
+| Tabellen «Hvor dokumentasjonen bor» og filene på disk stemmer begge veier | En modulfil ingen peker på, og en rad som peker på ingenting |
+| Ingen modul med egen fil har et avsnitt i rota | At avsnittet vokser tilbake, og regelen finnes to steder |
+| Rota under 1 000 linjer | Røykvarsler for at delingen opphever seg selv |
+
+**Fem mutasjoner prøvd, alle røde** — men den femte overlevde først, og på en måte som er
+verdt å skrive ned: jeg hadde endret ingressen i `vaktliste/CLAUDE.md` uten å fjerne ordet
+regelen faktisk ser etter. Mutanten traff ikke regelen, og et «OK» fra den ville ha
+bekreftet en dekning som ikke fantes. Rettet mutant: rød.
+
+**Grensen testen ikke ser:** at fila er delt, ikke at innholdet står riktig sted. En
+vaktlisteregel skrevet i rota fanges bare hvis den får en overskrift med `(vaktliste/)` i.
+Det er samme grense som resten av dokumentverktøyet har — tall og navn lar seg måle, mening
+ikke.
+
+### 2. Mutasjonstesting: budsjettet følger hva en overlevende mutant koster
+
+Anledningen var tretten mutanter på et `datetime-local`-felt og to på en tilgangsport.
+Regelen står nå i `CLAUDE.md`, som en stige fra tungt til ingenting: tjenestelaget og
+rammeverket (tilgang, arkiv, backup, offsite, migrasjoner) tungt, views og de
+JS-funksjonene som *avgjør* noe — `avgjor()`, `kanBemannePlass()`, `lydSkalSpille()`,
+`klikkSkalKjore()` — middels, byggere og tegning lett, CSS og tekst ingenting.
+**Målestokken er hva brukeren ville sett:** ser hun feilen med det samme, holder én mutant
+på regelen som avgjør; ser hun den aldri, hører innsatsen hjemme der.
+
+Med regelen følger **de tre måtene en mutant lyver på**, alle tre sett i dette prosjektet
+og alle tre spredt i eldre CHANGELOG-oppføringer der ingen leter: at søk-og-erstatt traff
+et annet sted enn du tror, at mutanten var en no-op, og at testen kaller hjelperen selv så
+kallstedet kan fjernes. Pluss den fjerde, som ikke er mutantens feil — at fikstureringen
+ikke bar prod-formen, slik `_dagbolker()` overlevde fordi testskiftene sto i norsk tid og
+ORM-en gir UTC.
+
+**Endret:** `CLAUDE.md`, `patients/CLAUDE.md`, `oppdrag/CLAUDE.md`, `vaktliste/CLAUDE.md`,
+`statistikk/CLAUDE.md` (alle fire nye), `core/tests_claude_md.py` (ny, 6 tester),
+`core/tests_dokumentråte.py`, `README.md`, `TODO.md`. Ingen kodeendring — hele suiten
+(3 024 tester) grønn.
+
+---
+
 ## 2026-09-15 — «Ny vaktliste»: tidsfeltene som i planleggeren
 
 **Bedt om (André):**
