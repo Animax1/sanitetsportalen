@@ -96,7 +96,8 @@ def enheter_til_liste(oppdrag, meldinger=None) -> list:
 
 
 def oppdrag_til_dict(oppdrag, *, for_enhet: bool = False,
-                     status_tidspunkt=None, koblingsrad=None, meldinger=None) -> dict:
+                     status_tidspunkt=None, koblingsrad=None, meldinger=None,
+                     avbrutt_av=None) -> dict:
     """Serialiser ett oppdrag.
 
     ``for_enhet=True`` **utelater fritekst når oppdraget er avsluttet**. Det er
@@ -117,6 +118,11 @@ def oppdrag_til_dict(oppdrag, *, for_enhet: bool = False,
 
     ``meldinger`` sendes videre til `enheter_til_liste` av samme grunn som
     ``status_tidspunkt``: lista skal ikke koste én spørring per rad.
+
+    ``avbrutt_av`` er navnene på enhetene som trykket «Avbryt» (15. sep. 2026,
+    André: «trykker en bil avbryt så må det vises»). Sendes den ikke, slås den
+    opp for dette ene oppdraget; lista sender den ferdig, av samme grunn som
+    over.
     """
     status = koblingsrad.status if koblingsrad is not None else oppdrag.status
     data = {
@@ -147,6 +153,13 @@ def oppdrag_til_dict(oppdrag, *, for_enhet: bool = False,
         'trenger_ressurs': oppdrag.trenger_ressurs,
         'trenger_ressurs_siden': (oppdrag.trenger_ressurs_siden.isoformat()
                                   if oppdrag.trenger_ressurs_siden else None),
+        # **«Avbrutt» og «trenger ny ressurs» er to ulike beskjeder**, og var
+        # én fram til 15. sep. 2026: avbrøt en bil et oppdrag en annen alt
+        # hadde løst, sto det «trenger ny ressurs» på et ferdig oppdrag.
+        # Nå sier flagget bare om noen må sendes, og dette feltet hvem som
+        # avbrøt — uavhengig av hverandre.
+        'avbrutt_av': (list(avbrutt_av) if avbrutt_av is not None
+                       else services.avbrutt_av(oppdrag)),
     }
     skjul_fritekst = for_enhet and status == choices.TERMINAL
     data['fritekst'] = '' if skjul_fritekst else oppdrag.fritekst

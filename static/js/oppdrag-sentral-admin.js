@@ -30,6 +30,12 @@ function renderHistorikk() {
     const fritekstBlokk = o.fritekst
       ? `<div class="oppdrag-fritekst">${escapeHtml(o.fritekst)}</div>`
       : '';
+    // **Avbrytelsen følger med i historikken** (15. sep. 2026). Et oppdrag
+    // der en bil avbrøt, men en annen løste det, ryddes bort av seg selv —
+    // og da er historikken det eneste stedet avbrytelsen kan leses.
+    const avbruttMerke = (o.avbrutt_av || []).length
+      ? `<div class="oppdrag-avbrutt"><i class="bi bi-x-octagon-fill me-1"></i>Avbrutt av ${escapeHtml((o.avbrutt_av || []).join(', '))}</div>`
+      : '';
     // Alle bilene, ikke bare den primære — historikken viste én til
     // 12. sep. 2026.
     const enhetsnavn = (o.enheter || []).map((e) => e.enhet_navn).join(', ') || o.enhet_navn;
@@ -50,6 +56,7 @@ function renderHistorikk() {
       <div class="oppdrag-meta mt-1">
         ${escapeHtml(enhetsnavn)} · ${escapeHtml(o.lokasjon_navn)} · ferdig ${escapeHtml(klokke(o.historikk_fra))}
       </div>
+      ${avbruttMerke}
       ${fritekstBlokk}
       ${slett}
     </div>`;

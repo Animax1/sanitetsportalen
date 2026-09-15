@@ -81,6 +81,21 @@
 .enhet-brikke-mangler { color: #fde68a; font-weight: 600; }
 .enhet-brikke-mangler .bi { color: #f59e0b; }
 
+/* «Avbrutt av Bil B» (15. sep. 2026). **Dempet, ikke alarmerende** — en
+ * avbrytelse er en opplysning om hva som skjedde, mens «trenger ny ressurs»
+ * er et krav om at noen gjør noe nå. Fikk de samme fargen, ville den ene
+ * lært operatøren å overse den andre. */
+.enhet-brikke-avbrutt { color: var(--portal-text-muted, #94a3b8); font-weight: 600; }
+.enhet-brikke-avbrutt .bi { color: #94a3b8; }
+
+/* Samme merke i historikklista, der oppdraget havner når en annen bil løste
+ * det — og der avbrytelsen ellers ikke kunne leses uten å åpne oppdraget. */
+.oppdrag-avbrutt {
+  color: var(--portal-text-muted, #94a3b8);
+  font-size: 0.85rem;
+  margin-top: 0.2rem;
+}
+
 /* «Trenger ny ressurs» skal bli tydeligere jo lenger det står (André,
  * 12. sep. 2026). Tre trinn: første fem minutter en gul kant, så en
  * oransje og fyldigere rad, og etter et kvarter rødt med puls. Klassen

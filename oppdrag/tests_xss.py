@@ -63,6 +63,9 @@ REVIEWED_INTERPOLATIONS = {
     'tittel': 'hardkodet title-attributt fra en ternær',
     'dempet': 'hardkodet CSS-klasse fra en ternær',
     'manglerKlasse': 'hardkodet CSS-klasse fra en ternær og `_manglerTrinn()`, som velger blant tre faste ord',
+    # «Avbrutt av Bil B» i historikklista (15. sep. 2026): markup bygget to
+    # linjer over, med enhetsnavnene escapet inni. Tom streng uten avbrytelse.
+    'avbruttMerke': 'markup bygget lokalt, enhetsnavnene escapet inni',
     # Verdimengdene (12. sep. 2026): raden bygges av fragmenter som selv er
     # bygget med escHtmlValue/escapeHtml to linjer over, og av faste attributter
     # fra ternærer.

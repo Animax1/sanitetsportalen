@@ -445,9 +445,10 @@ def start_oppdrag(oppdrag, *, bruker=None, tidspunkt=None,
         # ikke var ledig, blir det stående på tavla som «trenger ny
         # ressurs» i stedet for å ryddes til historikken. Flagget settes
         # *før* lukkingen, så `utledet_status` ser det.
-        andre_aktive = (forrige.enheter.exclude(pk=pagaende.pk)
-                        .exclude(status=choices.LEDIG).exists())
-        if not andre_aktive:
+        # **Samme regel som ved Avbryt** (15. sep. 2026): en bil som rykket
+        # videre fra et oppdrag noen andre alt hadde løst, etterlater ikke et
+        # oppdrag som trenger ny ressurs.
+        if trenger_ny_ressurs(forrige, utenom_rad=pagaende):
             forrige.trenger_ressurs = True
             forrige.trenger_ressurs_siden = naa
             forrige.save(update_fields=['trenger_ressurs', 'trenger_ressurs_siden', 'updated_at'])
@@ -459,6 +460,71 @@ def start_oppdrag(oppdrag, *, bruker=None, tidspunkt=None,
 
     return sett_status(oppdrag, choices.RYKKER_UT, bruker=bruker,
                        tidspunkt=naa, forsinket=forsinket, enhet=rad.enhet)
+
+
+def avbrutt_av(oppdrag) -> list[str]:
+    """Navnene på enhetene som trykket «Avbryt» på oppdraget, i rekkefølge."""
+    return [h.enhet.navn for h in
+            oppdrag.enhetshendelser.filter(type=Enhetshendelse.AVBRUTT)
+            .select_related('enhet').order_by('tidspunkt')]
+
+
+def avbrutt_av_bulk(oppdrag_ider) -> dict:
+    """Samme, for en hel liste — ett spørsmål, ikke ett per rad.
+
+    Samme grunn som `Statusmelding.objects.gjeldende_bulk`: sentralbordet
+    tegner tavla ved hver polling, og et oppslag per oppdrag blir N spørringer
+    hvert tiende sekund.
+    """
+    ut: dict = {}
+    rader = (Enhetshendelse.objects
+             .filter(oppdrag_id__in=list(oppdrag_ider), type=Enhetshendelse.AVBRUTT)
+             .select_related('enhet').order_by('tidspunkt'))
+    for h in rader:
+        ut.setdefault(h.oppdrag_id, []).append(h.enhet.navn)
+    return ut
+
+
+#: Statusene som betyr at en enhet **løste** oppdraget. Nås en av dem, trengs
+#: ingen ny ressurs — uansett hva de andre bilene gjorde etterpå.
+#:
+#: `Ledig` står ikke her, og det er hele poenget: en bil er ledig både når hun
+#: er ferdig og når hun avbrøt. Leses `Ledig` som «ferdig», blir de to det
+#: samme — se `trenger_ny_ressurs()`.
+LOSER_OPPDRAGET = (choices.BEHANDLET, choices.LEVERER)
+
+
+def noen_loste_oppdraget(oppdrag) -> bool:
+    """Har noen enhet nådd Behandlet eller Leverer på dette oppdraget?
+
+    Leses av statusmeldingene og ikke av koblingsradene, fordi raden går
+    videre til `Ledig` etterpå: `behandle_paa_sted` skriver Behandlet og Ledig
+    med samme tidspunkt, så raden ender ledig selv om jobben ble gjort.
+
+    En korreksjon erstatter tidspunktet, ikke hendelsen, så `.exists()` er
+    riktig spørsmål — `gjeldende()` ville svart det samme og kostet mer.
+    """
+    return Statusmelding.objects.filter(
+        oppdrag=oppdrag, status__in=LOSER_OPPDRAGET).exists()
+
+
+def trenger_ny_ressurs(oppdrag, *, utenom_rad) -> bool:
+    """Står oppdraget igjen uten noen som tar det?
+
+    **Buggen dette retter** (André, 15. sep. 2026): «akutt oppdrag, to enheter
+    varsles. Ene bilen behandler på stedet, andre bil slo avbrutt. Da står det
+    trenger ressurs selv om oppdraget er løst.»
+
+    Regelen var «finnes det andre enheter som ikke er ledige» — og den kan
+    ikke skille en bil som ble ledig fordi hun *ble ferdig* fra en som ble
+    ledig fordi hun *avbrøt*. Begge deler er `Ledig` på koblingsraden.
+
+    To spørsmål må stilles, ikke ett: er noen fortsatt på vei, **og** var noen
+    framme. Er svaret nei på begge, trengs en ny ressurs.
+    """
+    andre_aktive = (oppdrag.enheter.exclude(pk=utenom_rad.pk)
+                    .exclude(status=choices.LEDIG).exists())
+    return not andre_aktive and not noen_loste_oppdraget(oppdrag)
 
 
 @transaction.atomic
@@ -481,9 +547,7 @@ def avbryt_oppdrag(oppdrag, *, bruker=None, tidspunkt=None,
         raise UlovligOvergang('Enheten er ikke varslet på oppdraget.')
     if rad.status != choices.RYKKER_UT:
         raise UlovligOvergang('Avbryt finnes bare i Rykker ut.')
-    andre_aktive = (oppdrag.enheter.exclude(pk=rad.pk)
-                    .exclude(status=choices.LEDIG).exists())
-    if not andre_aktive:
+    if trenger_ny_ressurs(oppdrag, utenom_rad=rad):
         oppdrag.trenger_ressurs = True
         oppdrag.trenger_ressurs_siden = naa
         oppdrag.save(update_fields=['trenger_ressurs', 'trenger_ressurs_siden', 'updated_at'])

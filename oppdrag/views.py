@@ -339,12 +339,18 @@ def oppdrag_liste_view(request):
                       .prefetch_related('enheter__enhet').order_by('-created_at'))
             gjeldende = Statusmelding.objects.gjeldende_bulk([o.pk for o in qs])
             status_tid = status_tidspunkt_for(qs, gjeldende)
+            avbrutt = services.avbrutt_av_bulk([o.pk for o in qs])
             data = [oppdrag_til_dict(o, status_tidspunkt=status_tid.get(o.pk),
-                                     meldinger=gjeldende[o.pk])
+                                     meldinger=gjeldende[o.pk],
+                                     avbrutt_av=avbrutt.get(o.pk, []))
                     for o in qs]
             # Tidspunktet er med i ETag-en: «Rett tid» endrer det uten å røre
             # statusen, og «12 min i Fremme» skal ikke drukne i en 304.
-            etag_rader = [(r['id'], r['status'], r['enhet_id'], r['status_tidspunkt'])
+            # Avbrytelsene er med i ETag-en: en bil som avbryter på et oppdrag
+            # noen alt har løst endrer verken status eller tidspunkt, og merket
+            # ville da drukne i en 304.
+            etag_rader = [(r['id'], r['status'], r['enhet_id'], r['status_tidspunkt'],
+                           tuple(r['avbrutt_av']))
                           for r in data]
 
         etag = etag_for(etag_rader)
@@ -1144,8 +1150,12 @@ def historikk_liste_view(request):
                 | Q(lokasjon__navn__icontains=sok)
                 | Q(enhet__navn__icontains=sok))
 
+    # Bulk her også: historikken kan være hele vakta, og `oppdrag_til_dict`
+    # slår ellers opp avbrytelsene én gang per rad.
+    rader = list(qs)
+    avbrutt = services.avbrutt_av_bulk([o.pk for o in rader])
     return JsonResponse({'status': 'ok', 'data': [
-        oppdrag_til_dict(o) for o in qs]})
+        oppdrag_til_dict(o, avbrutt_av=avbrutt.get(o.pk, [])) for o in rader]})
 
 
 # ── Korreksjoner ─────────────────────────────────────────────────────────────

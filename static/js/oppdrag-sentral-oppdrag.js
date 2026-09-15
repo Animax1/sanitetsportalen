@@ -150,8 +150,18 @@ function _enhetsmatrise(o) {
       <i class="bi bi-exclamation-triangle-fill"></i>
       <span>Trenger ny ressurs · ${escHtmlValue(_manglerMinutter(o))} min</span>
     </span>` : '';
+  // **«Avbrutt» er ikke «trenger ny ressurs»** (André, 15. sep. 2026). Avbrøt
+  // en bil et oppdrag en annen alt hadde løst, sto det fram til da «trenger ny
+  // ressurs» på et ferdig oppdrag; nå sier flagget bare om noen må sendes, og
+  // dette merket hvem som avbrøt. Begge kan stå samtidig, og da er de to
+  // opplysninger — hvem som falt fra, og at noen må ut.
+  const avbrutt = (o.avbrutt_av || []).length
+    ? `<span class="enhet-brikke enhet-brikke-avbrutt">
+      <i class="bi bi-x-octagon-fill"></i>
+      <span>Avbrutt av ${escapeHtml((o.avbrutt_av || []).join(', '))}</span>
+    </span>` : '';
   const synlige = o.trenger_ressurs ? rader.filter((e) => e.status !== 'ledig') : rader;
-  return mangler + synlige.map((e) => {
+  return mangler + avbrutt + synlige.map((e) => {
     const statusTid = e.status_tidspunkt ? ` · ${tidSiden(e.status_tidspunkt)}` : '';
     const sted = e.sted_navn ? ` → ${e.sted_navn}` : '';
     const meta = `${e.status_navn}${sted}${statusTid}`;

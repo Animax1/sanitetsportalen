@@ -4,6 +4,82 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-15 — «Avbrutt» og «trenger ny ressurs» var ett spørsmål, og måtte være to
+
+**Meldt fra staging (André):**
+
+> «Akutt oppdrag opprettes, to enheter varsles. Ene bilen behandler på stedet, andre bil
+> slo avbrutt. Da står det trenger ressurs selv om oppdraget er løst — og trykker en bil
+> avbryt så må det vises.»
+
+### Feilen
+
+Regelen sto som ett spørsmål: *finnes det andre enheter som ikke er ledige?* Den kan ikke
+skille en bil som ble ledig fordi hun **ble ferdig** fra en som ble ledig fordi hun
+**avbrøt** — begge deler er `Ledig` på koblingsraden.
+
+Så: Bil A behandlet på stedet og ble ledig. Bil B avbrøt. Ingen andre var «aktive», og
+oppdraget ble merket «trenger ny ressurs» — et krav om handling på et ferdig oppdrag.
+Reprodusert som test før noe ble rørt.
+
+`trenger_ny_ressurs()` stiller nå **begge** spørsmålene: er noen fortsatt på vei, *og* var
+noen framme. `LOSER_OPPDRAGET` er `(Behandlet, Leverer)` — og `Ledig` står bevisst ikke
+der, siden det er nettopp den statusen som er tvetydig.
+
+Svaret leses av **statusmeldingene, ikke koblingsradene**: `behandle_paa_sted` sender raden
+videre til `Ledig` med samme tidspunkt, så raden bærer ikke lenger spor av at jobben ble
+gjort.
+
+**Samme feil sto i `start_oppdrag`** — en bil som rykker videre fra et oppdrag noen andre
+alt hadde løst, etterlot det samme feilmerket. Begge kallsteder bruker nå funksjonen.
+
+### Andre halvdel: avbrytelsen må vises
+
+Feilrettingen gjør dette *viktigere*, ikke mindre viktig: før ble et slikt oppdrag stående
+på tavla (med feil merke); nå ryddes det bort av seg selv. Uten et merke ville rettingen
+gjort avbrytelsen usynlig i stedet for feilmerket.
+
+`avbrutt_av` står nå i svaret — på tavla, i detaljen og i historikken — og tegnes som et
+eget merke i enhetsmatrisen. **Dempet, ikke alarmerende:** en avbrytelse er en opplysning
+om hva som skjedde, mens «trenger ny ressurs» er et krav om handling nå. Fikk de samme
+farge, ville den ene lært operatøren å overse den andre. Begge kan stå samtidig, og da er
+de to opplysninger.
+
+Merket er med i **ETag-en**. En bil som avbryter på et oppdrag noen alt har løst endrer
+verken status eller tidspunkt, så uten det ville merket druknet i en 304.
+
+*Valgt form: merke i lista, ingen sperre (André). Restrisikoen er at et løst oppdrag ryddes
+til historikken med det samme, så operatøren kan gå glipp av merket live — det står i
+historikklista, men ikke på tavla.*
+
+### Tester
+
+`oppdrag/tests_avbrutt.py` — 22 tester. **Ni mutasjoner prøvd, alle fanget** etter at to av
+mine egne tester ble rettet:
+
+- Bulk-testen hadde bare **én** avbrytelse, så rekkefølgen kunne ikke vises — en bulk som
+  sorterte feil vei gikk grønn.
+- ETag-testen avbrøt siste bil, og da endret oppdragets *status* seg uansett. Den målte
+  altså ikke det den påsto. Isolert nå: en annen bil står fortsatt i Fremme, så status og
+  tidspunkt er like før og etter, og merket er det eneste som skiller svarene.
+
+En tredje test hadde dødkode (`... if False else None`) fra en halvferdig formulering og
+påsto dermed nesten ingenting. Skrevet om til Andrés scenario helt ut.
+
+### Notat: planleggerfane — `docs/FORSLAG_PLANLEGGERFANE.md`
+
+Andrés andre punkt. Timetallet er avklart som **et tak som varsler**, ikke en inngangsverdi
+generatoren regner fra — samme linje som `Belastningsgrenser`.
+
+Notatet peker på at det meste finnes: `_sumTimer`, `mkGruppekurve`, `_vaktensSpenn`,
+`belastning_per_person`, og — viktigst — at «å generere et skift» er å opprette `Vaktpost`
+uten `mannskap`, som modellen alt er bygget for. Tre feller er navngitt: `bulk_create`
+ville tømt auditsporet (`kopier_oppsett` gikk i den fella), den doble regelen må gjelde
+også når maskinen setter plasser, og **overlapp-punktet i TODO bør løses først** — et tak
+som telles feil er verre enn ikke noe tak.
+
+---
+
 ## 2026-09-15 — Vaktlista: dagen ytterst i «Oversikt», og sammenslåtte ressurskort
 
 To av de tre ønskene fra 14. sep. er levert. Drift-automatikken står igjen og tas for seg.

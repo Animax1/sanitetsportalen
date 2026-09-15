@@ -514,6 +514,7 @@ Fem ting det er verdt å kjenne før man rører modulen:
 | `fritekst` logges som endret, men **uten verdier** | `signals.FELT_UTEN_VERDILOGGING` |
 | «Historikk» rydder tavla, **arkivet fryser og lukker vakta** | `Oppdrag.historikk_fra` vs. `oppdrag/arkiv.py` |
 | Bilen rykker videre → oppdraget **trenger ny ressurs**, ikke ferdig | `Oppdrag.trenger_ressurs` + `trenger_ressurs_siden`, `services.start_oppdrag` |
+| «Trenger ny ressurs» spør **to** ting: er noen på vei, *og* var noen framme | `services.trenger_ny_ressurs()` |
 | Lista sorteres på hastegrad, så nummer; ferdige nederst | `_sorterOppdrag()` i `oppdrag-sentral.js` |
 | Bilen melder Ledig bare fra Leverer og Behandlet; Avbryt i Rykker ut, Behandlet på sted i Fremme | `services.BILEN_KAN_LEDIG_FRA`, `ALTERNATIV`, `avbryt_oppdrag` |
 | Bilen ser bare det lista viser (30 min etter Ledig) — også på detalj, stempling, grovsortering og antall; og aldri flåten, flytting eller verdimengdene | `views._synlig_for_bilen`, `er_enhetskonto`-sjekkene |
@@ -580,6 +581,23 @@ hun så aldri pasienten), oppdraget til «trenger ny ressurs» og en `Enhetshend
 `utledet_av_statuser` rangerer med `choices.AKTIVITET`, ikke `KJEDEN.index`, fordi
 Behandlet ikke står i kjeden. Arkivraden har `behandlet_at`, som står i SHA-payloaden
 **bare når satt** — eldre arkiv har ingen slik nøkkel i signaturen sin.
+
+**«Avbrutt» og «trenger ny ressurs» er to ulike beskjeder** (15. sep. 2026). Regelen sto
+som ett spørsmål — «finnes det andre enheter som ikke er ledige» — og den kan ikke skille en
+bil som ble ledig fordi hun *ble ferdig* fra en som ble ledig fordi hun *avbrøt*: begge er
+`Ledig` på koblingsraden. Behandlet Bil A på stedet og Bil B avbrøt, sto det «trenger ny
+ressurs» på et ferdig oppdrag. `services.trenger_ny_ressurs()` spør nå begge, og
+`LOSER_OPPDRAGET` er `(Behandlet, Leverer)` — **`Ledig` står bevisst ikke der**. Svaret
+leses av **statusmeldingene, ikke koblingsradene**: `behandle_paa_sted` sender raden videre
+til `Ledig`, så raden bærer ikke spor av at jobben ble gjort. Både `avbryt_oppdrag` og
+`start_oppdrag` bruker funksjonen; feilen sto begge steder.
+
+**Avbrytelsen vises som eget merke** (`avbrutt_av` i svaret, `services.avbrutt_av_bulk` for
+lista — tavla polles hvert tiende sekund). Merket er **dempet, ikke alarmerende**: en
+avbrytelse sier hva som skjedde, «trenger ny ressurs» krever handling nå, og samme farge
+ville lært operatøren å overse den ene. Begge kan stå samtidig. **Merket er med i ETag-en** —
+en bil som avbryter på et oppdrag noen alt har løst endrer verken status eller tidspunkt, og
+det ville ellers druknet i en 304.
 
 Den er den første modulen som tar `skriv_handling` i bruk: bilen får smale, navngitte
 stemplingsendepunkter, ikke en feltwhitelist inne i en generell `PUT`. Og skillet mellom de

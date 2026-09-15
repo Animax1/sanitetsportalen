@@ -501,6 +501,27 @@ den gamle tiden, og ville skjult et lovlig valg. Veggen er skiltet der i stedet 
       når `vaktpost-fra` endres. Billig, men det er en ny kobling mellom to felter i samme
       skjema, og den må testes for seg. Ikke gjort — ført som spørsmål.
 
+### Planleggerfane i vaktlista — se [`docs/FORSLAG_PLANLEGGERFANE.md`](./docs/FORSLAG_PLANLEGGERFANE.md)
+
+**André, 15. sep. 2026:** «En planlegger-fane i /vaktlisten … generere skift og sette de opp
+på enheter/ressurser. En kan sette inn total timer og da jobbe overordnet med hvor mange en
+kan ha på vakt.»
+
+**Avklart:** timetallet er et **tak som varsler**, ikke en inngangsverdi generatoren regner
+fra — samme linje som `Belastningsgrenser`. Resten står i notatet, med seks åpne spørsmål.
+
+- [ ] **Løs overlapp-punktet under først.** Et tak som telles feil er verre enn ikke noe
+      tak: overlappende skift blåser opp timesummen, og budsjettet brukes da opp av timer
+      ingen jobber.
+- [ ] **Avklar hvilken midnattsregel planleggerens timer følger.** Oversikten teller hele
+      skift på startdagen; rapportmodulen splitter ved midnatt. To tall som ser like ut og
+      ikke er det er verre enn ett upresist tall.
+- [ ] **Budsjettlinja og bildet av vakta** — leser bare det som finnes, og gir verdi uten
+      generatoren.
+- [ ] **Generatoren til slutt**, i sin enkleste form: N ledige plasser, fra–til, rolle.
+      **Ingen `bulk_create`** — den hopper over auditsignalene; `kopier_oppsett` gikk i den
+      fella.
+
 ### Vaktlista: overlappende skift — funnet 14. sep. 2026
 
 *Funnet mens vi diskuterte rapportmodulen, men punktene hører hjemme i vaktlista og er
