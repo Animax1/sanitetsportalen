@@ -742,6 +742,65 @@ function _planleggerStandardvindu(fraTid, plasser) {
 }
 
 
+function planleggerLesTilbake() {
+  // **Planleggeren leser oppsettet tilbake fra vaktlista** (André, 15. sep.
+  // 2026: «når en har lagt grunnlag og vil redigere så er det ikke lenger i
+  // planlegger — det må vel gå ann å huske dem og la en redigere der?»).
+  //
+  // Den husker ikke det du skrev; den leser hva som **står**. Det er en
+  // viktigere forskjell enn den ser ut: en husket kladd og virkeligheten
+  // glir fra hverandre i det øyeblikket noen retter et skift i regnearket,
+  // og da ville et trykk på «Lag grunnlaget» rullet den rettelsen tilbake.
+  //
+  // Én rad per ressurs, og vinduene er ressursens plasser gruppert på
+  // tidene: seks plasser 14–22 og to 22–06 leses tilbake som to vinduer med
+  // seks og to. Det var slik de ble skrevet, så det er slik de leses.
+  const perRessurs = new Map();
+  (aktivListe?.vaktposter || []).forEach((vp) => {
+    if (!vp.fra_tid || !vp.til_tid) return;
+    const nokkel = `${vp.fra_tid}|${vp.til_tid}`;
+    let vinduer = perRessurs.get(vp.ressurs_id);
+    if (!vinduer) { vinduer = new Map(); perRessurs.set(vp.ressurs_id, vinduer); }
+    const rad = vinduer.get(nokkel);
+    if (rad) { rad.plasser += 1; return; }
+    vinduer.set(nokkel, { fra: vp.fra_tid, til: vp.til_tid, plasser: 1 });
+  });
+
+  return (aktivListe?.ressurser || []).map((r) => {
+    const funnet = [...(perRessurs.get(r.id) || new Map()).values()]
+      .sort((a, b) => String(a.fra).localeCompare(String(b.fra)))
+      .map((v) => ({ id: planleggerNesteId++, ...v }));
+    return {
+      id: planleggerNesteId++,
+      // `ressurs_id` gjør raden til en redigering på serveren: den retter
+      // ressursen som står, framfor å lage «Lag 4» ved siden av «Lag 1».
+      ressurs_id: r.id,
+      navn: r.navn,
+      gruppe_id: r.gruppe_id,
+      antall: 1,
+      // **En ressurs uten skift får ett standardvindu**, ikke null. Uten det
+      // ville raden vært ugyldig for serveren i det øyeblikket den ble
+      // tegnet — og en bil man nettopp opprettet i ressursfanen kunne aldri
+      // fått skiftene sine herfra.
+      vinduer: funnet.length ? funnet : [_planleggerStandardvindu()],
+    };
+  });
+}
+
+
+function planleggerSikreLinjer() {
+  // **Står det ingenting i oppsettet, leses det tilbake fra lista.** Regelen
+  // står som én funksjon fordi den har flere inngangsdører: fanen man åpner,
+  // vaktlista man bytter til, og genereringen som nettopp ble utført og
+  // tømte kladden.
+  //
+  // Har du skrevet noe, røres det ikke — et halvskrevet oppsett er ditt til
+  // du trykker, og det skal ikke overskrives av en omtegning.
+  if (!aktivListe || (planleggerlinjer && planleggerlinjer.length)) return;
+  planleggerlinjer = planleggerLesTilbake();
+}
+
+
 function planleggerTegnTall() {
   // **Oppdater tallene, ikke panelet** (André, 15. sep. 2026: «frustrerende
   // vanskelig å redigere med tastatur på tidsrom, jeg kan bare ta inn ett tall
@@ -895,10 +954,19 @@ async function apneGenerer() {
   planleggerfasit = d.data;
   const el = document.getElementById('generer-fasit');
   if (el) el.innerHTML = _genererFasit(d.data);
-  const erstattBoks = document.getElementById('generer-erstatt');
-  if (erstattBoks) erstattBoks.checked = false;
   _skjulFeil('generer-feil');
   _apneModal('genererModal');
+}
+
+
+function _genererRadmerke(r) {
+  // **Raden sier hva som skjer med den, ikke bare hva den heter.** En
+  // generering over et oppsett som alt er laget rører de fleste radene lite
+  // eller ingenting, og en tabell der alle radene ser like ut ville skjult
+  // nettopp den ene som endrer seg.
+  if (!r.finnes) return 'ny ressurs';
+  if (!r.plasser && !r.fjernes) return 'uendret';
+  return 'rettes';
 }
 
 
@@ -907,18 +975,27 @@ function _genererFasit(fasit) {
     <tr>
       <td class="vl-navn">${escapeHtml(r.navn)}</td>
       <td>${escapeHtml(r.gruppe)}</td>
+      <td class="vl-meta">${escapeHtml(_genererRadmerke(r))}</td>
       <td>${escHtmlValue(r.skift)}</td>
       <td>${escHtmlValue(r.plasser)}</td>
+      <td>${escHtmlValue(r.fjernes)}</td>
       <td>${escapeHtml(_tall(r.timer))} t</td>
     </tr>`).join('');
+  // **Fjerningen står som sitt eget tall, ikke i en fotnote.** Å redigere et
+  // vindu fra seks plasser til fire sletter to — det er riktig, og det er det
+  // eneste i hele planleggeren som fjerner noe. Da skal det stå i setningen
+  // man leser før man trykker.
+  const fjernes = fasit.fjernes ? `
+      Ryddes bort: <strong>${escHtmlValue(fasit.fjernes)}</strong> plasser som
+      fortsatt står som <strong>planlagt</strong>.` : '';
   return `
     <p class="mb-2">Dette lages: <strong>${escHtmlValue(fasit.ressurser)}</strong>
-      ressurser, <strong>${escHtmlValue(fasit.plasser)}</strong> tomme plasser,
-      <strong>${escapeHtml(_tall(fasit.timer))} t</strong>.</p>
+      nye ressurser, <strong>${escHtmlValue(fasit.plasser)}</strong> nye tomme
+      plasser, <strong>${escapeHtml(_tall(fasit.timer))} t</strong>.${fjernes}</p>
     <div class="vl-tabellramme">
       <table class="vl-tabell">
-        <thead><tr><th>Navn</th><th>Gruppe</th><th>Skift</th>
-          <th>Plasser</th><th>Timer</th></tr></thead>
+        <thead><tr><th>Navn</th><th>Gruppe</th><th></th><th>Skift</th>
+          <th>Nye plasser</th><th>Fjernes</th><th>Timer</th></tr></thead>
         <tbody>${rader}</tbody>
       </table>
     </div>`;
@@ -928,20 +1005,21 @@ function _genererFasit(fasit) {
 async function lagreGenerer() {
   _skjulFeil('generer-feil');
   await withSubmitGuard('generer-knapp', async () => {
-    const erstatt = !!document.getElementById('generer-erstatt')?.checked;
     const res = await apiFetch(
       `/vaktliste/api/vaktlister/${aktivListe.vaktliste.id}/generer/`,
-      { method: 'POST', body: JSON.stringify({
-        linjer: planleggerlinjer, erstatt_kladd: erstatt }) });
+      { method: 'POST', body: JSON.stringify({ linjer: planleggerlinjer }) });
     const d = await res.json().catch(() => ({}));
     if (!res.ok || d.status !== 'ok') {
       _visFeil('generer-feil', d.message || 'Kunne ikke lage grunnlaget.');
       return;
     }
     _lukkModal('genererModal');
-    // **Oppsettet tømmes etter en generering.** Det er utført; stod det
-    // igjen, ville neste trykk laget alt en gang til — og «Lag 4, 5, 6» ved
-    // siden av «Lag 1, 2, 3» er ikke noe noen ber om to ganger.
+    // **Oppsettet tømmes, og leses tilbake fra lista** (15. sep. 2026).
+    // Kladden er utført, og det som står i basen er nå fasit — `tegnPanel()`
+    // kaller `planleggerSikreLinjer()`, som bygger radene på nytt av
+    // ressursene som faktisk finnes. Da peker hver rad på sin ressurs, og et
+    // andre trykk retter den framfor å lage «Lag 4, 5, 6» ved siden av
+    // «Lag 1, 2, 3».
     planleggerlinjer = [];
     planleggerfasit = null;
     belastning = null;

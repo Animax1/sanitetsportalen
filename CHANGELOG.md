@@ -4,6 +4,77 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-15 — Planleggeren: budsjettet manglet, og oppsettet ble glemt
+
+**Meldt fra staging (André):**
+
+> «1. tak på vaktene og timene er ikke synlige når du oppretter ny vaktliste og går inn i
+> planlegger.
+> 2. når en har lagt grunnlag og vil redigere så er det ikke lenger i "planlegger" det må
+> vel gå ann å huske dem og la en redigere der?»
+
+### 1. Budsjettlinja ble aldri hentet
+
+`mkBudsjett()` gir tom streng uten `belastning`, og `visFane()` hentet den bare for
+belastningsfanen. Planleggeren sto utenfor regelen, så taket og timene var **usynlige
+nettopp der de skal styre arbeidet** — og synlige bare i fanen som rapporterer i etterkant.
+Ingenting feilet; linja bare manglet.
+
+Regelen står nå som **én funksjon**, `faneTrengerBelastning(id)`, fordi den har to lesere:
+fanevalget i `visFane()` og korpsvelgeren i `velgKorps()`, som nullstiller tallene og
+henter dem på nytt.
+
+### 2. Planleggeren leser oppsettet tilbake fra vaktlista
+
+Etter en generering tømte klienten `planleggerlinjer`, med den begrunnelsen at et andre
+trykk ellers ville laget «Lag 4, 5, 6» ved siden av «Lag 1, 2, 3». Begrunnelsen var riktig;
+løsningen var feil sted å løse den.
+
+**Planleggeren husker ikke det du skrev — den leser hva som står.** Det er en viktigere
+forskjell enn den ser ut: en husket kladd og virkeligheten glir fra hverandre i det
+øyeblikket noen retter et skift i regnearket, og da ville et trykk på «Lag grunnlaget»
+rullet den rettelsen tilbake.
+
+| Nytt | Hva det gjør |
+|---|---|
+| `planleggerLesTilbake()` | Én rad per ressurs, vinduene gruppert på plassenes tider. Seks plasser 14–22 leses tilbake som ett vindu med seks |
+| `planleggerSikreLinjer()` | Står det ingenting i oppsettet, leses det tilbake. Har du skrevet noe, røres det ikke |
+| `linje.ressurs_id` | Gjør raden til en **redigering** på serveren |
+| `services._beholdt_og_kladd()` | Ressursens plasser delt i to: de som står, og kladden som lages på nytt |
+| `services._nye_plasser()` | Hvor mange hvert vindu faktisk oppretter |
+
+**«Plasser» er vinduets hele bemanning, ikke et påslag.** Står det fire 14–22, skal det
+være fire etterpå — også når to av dem har navn på seg. De som står telles fra, og bare
+differansen lages. Uten fratrekket ville en ressurs man redigerte to ganger vokst for hver
+gang, og tallet i feltet sluttet å bety det det sier. Beholdningen forbrukes **per vindu**,
+ellers ville to like vinduer i samme rad begge trukket fra de samme plassene.
+
+**Gruppa og navnet følger ressursen, ikke linja.** Raden som står viser navnet der
+nedtrekket ellers står, og knappen heter «Ta ut» — å fjerne en ressurs er en sletting, og
+den ligger bak de to bekreftelsene i «Rediger ressurs».
+
+**`erstatt_kladd` er fjernet.** Bryteren ryddet kladd på hele lista, også på ressurser
+oppsettet ikke nevnte. Nå er raden som peker på ressursen den eneste som rører den, og en
+ressurs utenfor oppsettet lar generatoren være i fred.
+
+**Bekreftelsen viser endringen, panelet viser oppsettet.** Sammendraget teller bare nye
+ressurser og nye plasser, og har fått `fjernes` ved siden: å redigere et vindu fra seks
+plasser til fire sletter to, og det er det eneste i hele planleggeren som fjerner noe.
+
+### Mutasjonsprøvd
+
+Atten mutanter. Den ene som overlevde første runde er verdt å merke seg: testene kalte
+`planleggerSikreLinjer()` selv, så `tegnPanel()` kunne slutte å kalle den uten at noe ble
+rødt — altså nøyaktig feilen André meldte. `PlanleggerenTegnesMedOppsettetTests` tegner nå
+panelet med den ekte `tegnPanel()`.
+
+**Endret:** `vaktliste/services.py`, `vaktliste/views.py`,
+`static/js/vaktliste-kjerne.js`, `-tegning.js`, `-oversikt.js`, `-handlinger.js`,
+`templates/vaktliste/index.html`, `static/css/vaktliste.css`,
+`vaktliste/tests_planlegger.py`, `vaktliste/tests_xss.py`, `CLAUDE.md`.
+
+---
+
 ## 2026-09-15 — Planleggeren: tidsfeltene lot seg ikke skrive i
 
 **Meldt fra staging (André):**

@@ -556,9 +556,19 @@ Se beslutning 15–17 i notatet.
       dato» var en følge av det samme. Se CHANGELOG.
 - [x] **Planleggeren** (15. sep. 2026) — **flyttet fram fra sist**. Egen fane bak
       `kan_lede`, `services.generer_grunnlag`, `POST …/generer/` med `?forhaandsvis`.
-      Én rad per ressurs med ett eller flere skiftvinduer; `skiftlengde` tom = ett skift,
-      et tall = del vinduet rygg mot rygg. Plassene fødes som **planlagt kladd**, og
-      `erstatt_kladd` rører bare det `services.er_planlagt()` kaller kladd. Se CHANGELOG.
+      Én rad per ressurs med ett eller flere skiftvinduer; **ett vindu er ett skift**
+      (`skiftlengde` fjernet samme dag), og plassene hører til vinduet. Plassene fødes som
+      **planlagt kladd**. Se CHANGELOG.
+- [x] **Budsjettlinja ble aldri hentet i planleggeren** (meldt fra staging 15. sep. 2026:
+      «tak på vaktene og timene er ikke synlige når du oppretter ny vaktliste»).
+      `visFane()` hentet `belastning` bare for belastningsfanen; regelen står nå som
+      `faneTrengerBelastning(id)`, som også korpsvelgeren leser. Se CHANGELOG.
+- [x] **Planleggeren leser oppsettet tilbake fra vaktlista** (meldt fra staging 15. sep.
+      2026: «når en har lagt grunnlag og vil redigere så er det ikke lenger i
+      planlegger»). Én rad per ressurs med `ressurs_id`, vinduene gruppert på plassenes
+      tider; et andre trykk **retter** framfor å lage «Lag 4, 5, 6». «Plasser» er
+      vinduets hele bemanning, så de som står telles fra. `erstatt_kladd` er fjernet —
+      bare kladden på de ressursene oppsettet nevner røres. Se CHANGELOG.
 - [ ] **Bildet av vakta:** bemanningskurvene per gruppe ved siden av hverandre over
       `_vaktensSpenn()`, så hull og topper er synlige mens man legger inn.
       **Verdt å vurdere på nytt:** kurvene finnes alt per gruppefane, og verdien var «se

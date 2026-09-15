@@ -140,6 +140,31 @@ def _linjens_skift(linje):
     return ut
 
 
+def _nye_plasser(rad):
+    """Hvor mange plasser hvert vindu i raden faktisk vil opprette.
+
+    **«Plasser» i planleggeren er vinduets hele bemanning, ikke et påslag.**
+    Står det seks 14–22, skal det være seks etterpå — også når to av dem
+    allerede har navn på seg. De som står, telles derfor fra, og bare
+    differansen lages. Uten det ville en ressurs man redigerte to ganger
+    vokst for hver gang, og tallet i feltet sluttet å bety det det sier.
+
+    **Beholdningen forbrukes per vindu** (`igjen`), ikke slås opp på nytt:
+    to vinduer med nøyaktig samme tider i samme rad ville ellers begge fått
+    trekke fra de samme plassene, og til sammen laget for få.
+
+    Returnerer ``[(fra, til, antall_nye), …]`` i vinduenes rekkefølge.
+    """
+    igjen = dict(rad.get('beholdt') or {})
+    ut = []
+    for fra, til, plasser in rad['skift']:
+        staar = igjen.get((fra, til), 0)
+        brukt = min(staar, plasser)
+        igjen[(fra, til)] = staar - brukt
+        ut.append((fra, til, plasser - brukt))
+    return ut
+
+
 def _sammendrag(plan):
     """Tallene for en plan: ressurser, plasser og timer, totalt og per rad.
 
@@ -148,23 +173,34 @@ def _sammendrag(plan):
     *nye* tilstanden: navnene i svaret ble «Lag 4, 5, 6» fordi Lag 1–3 nå sto
     der. Sammendraget skal si hva som ble laget, ikke hva som ville blitt
     laget en gang til.
+
+    **Tallene er endringen, ikke sluttsummen.** `plasser` er de som lages og
+    `fjernes` de kladdplassene som ryddes bort — det er de to tallene en
+    bekreftelsesdialog må vise. En rad som allerede står slik den skal, viser
+    null i begge, og det er riktig svar: ingenting skjer med den.
     """
     def _plasser(rad):
-        return sum(plasser for _, _, plasser in rad['skift'])
+        return sum(nye for _, _, nye in _nye_plasser(rad))
 
     def _timesum(rad):
-        return round(sum(_timer(fra, til) * plasser
-                         for fra, til, plasser in rad['skift']), 2)
+        return round(sum(_timer(fra, til) * nye
+                         for fra, til, nye in _nye_plasser(rad)), 2)
 
     return {
-        'ressurser': len(plan),
+        # **Bare de nye ressursene telles.** Raden som peker på en ressurs
+        # som alt står, oppretter ingen — «2 ressurser» om en generering som
+        # bare flytter tidene på to biler ville vært en løgn om hva som skjer.
+        'ressurser': sum(1 for p in plan if p['ressurs'] is None),
         'plasser': sum(_plasser(p) for p in plan),
+        'fjernes': sum(p.get('kladd', 0) for p in plan),
         'timer': round(sum(_timesum(p) for p in plan), 2),
         'linjer': [{
             'navn': p['navn'],
             'gruppe': p['gruppe'].navn,
+            'finnes': p['ressurs'] is not None,
             'skift': len(p['skift']),
             'plasser': _plasser(p),
+            'fjernes': p.get('kladd', 0),
             'timer': _timesum(p),
         } for p in plan],
     }
@@ -181,11 +217,45 @@ def forhaandsvis_grunnlag(vaktliste, linjer):
     return _sammendrag(_planlegg(vaktliste, linjer))
 
 
+def _beholdt_og_kladd(ressurs):
+    """Ressursens plasser delt i to: de som står, og kladden som ryddes bort.
+
+    **Kladden er generatorens eget utkast** (`er_planlagt`): tom, uten korps,
+    ikke åpnet for alle. Den kan lages på nytt fra oppsettet, og må kunne det
+    — ellers var det ikke mulig å *redusere* et vindu fra seks plasser til
+    fire. Alt annet er et løfte til noen: en plass med navn på, en satt av til
+    et korps, en åpnet for alle. De står, og telles derfor som beholdt.
+
+    Returnerer ``(beholdt, kladd)`` der `beholdt` er antall per ``(fra, til)``.
+    """
+    beholdt = {}
+    kladd = 0
+    for vp in ressurs.vaktposter.all():
+        if vp.mannskap_id is None and er_planlagt(vp):
+            kladd += 1
+            continue
+        beholdt[(vp.fra_tid, vp.til_tid)] = beholdt.get(
+            (vp.fra_tid, vp.til_tid), 0) + 1
+    return beholdt, kladd
+
+
 def _planlegg(vaktliste, linjer):
     """Oppsettet oversatt til ressurser og skiftvinduer, uten å røre basen.
 
     Returnerer én rad per ressurs som skal finnes etterpå, med navnet den får,
-    vinduene den skal ha, og om den fantes fra før.
+    vinduene den skal ha, og om den fantes fra før (`ressurs`).
+
+    **En linje med `ressurs_id` redigerer en ressurs som alt står** (André,
+    15. sep. 2026: «når en har lagt grunnlag og vil redigere så er det ikke
+    lenger i planlegger»). Planleggeren leser oppsettet tilbake fra vaktlista,
+    så et andre trykk på «Lag grunnlaget» retter det som ble laget i stedet
+    for å lage «Lag 4, 5, 6» ved siden av «Lag 1, 2, 3».
+
+    **Gruppa og navnet følger ressursen, ikke linja.** Å flytte en bil til en
+    annen gruppe eller døpe den om er redigering av ressursen og hører hjemme
+    i «Rediger ressurs», der sletting og enhetskobling alt ligger. Leste vi
+    dem fra linja, ville planleggeren vært en andre vei inn til de samme
+    feltene — og den som er to steder kommer i utakt.
     """
     from .models import Ressurs, Ressursgruppe
 
@@ -205,7 +275,36 @@ def _planlegg(vaktliste, linjer):
             vaktliste=vaktliste, gruppe_id=gid).count()
 
     plan = []
+    sett_ressurs = set()
     for linje in linjer:
+        skift = _linjens_skift(linje)
+
+        ressurs_id = linje.get('ressurs_id')
+        if ressurs_id is not None:
+            ressurs = Ressurs.objects.filter(
+                pk=ressurs_id, vaktliste=vaktliste
+            ).select_related('gruppe').first()
+            if ressurs is None:
+                raise Planleggerfeil(
+                    'Ressursen finnes ikke lenger på denne vaktlista.')
+            # **Én linje per ressurs.** To linjer på samme ressurs ville latt
+            # den andre rydde bort kladden den første nettopp lagde, og
+            # resultatet avhengt av rekkefølgen.
+            if ressurs.pk in sett_ressurs:
+                raise Planleggerfeil(
+                    f'«{ressurs.navn}» står to ganger i oppsettet.')
+            sett_ressurs.add(ressurs.pk)
+            beholdt, kladd = _beholdt_og_kladd(ressurs)
+            plan.append({
+                'gruppe': ressurs.gruppe,
+                'navn': ressurs.navn,
+                'skift': skift,
+                'ressurs': ressurs,
+                'beholdt': beholdt,
+                'kladd': kladd,
+            })
+            continue
+
         gruppe = grupper.get(linje.get('gruppe_id'))
         if gruppe is None:
             raise Planleggerfeil('Ukjent ressursgruppe.')
@@ -226,16 +325,21 @@ def _planlegg(vaktliste, linjer):
                     f'«{gruppe.navn}» finnes i ett eksemplar, og står '
                     f'allerede på denne vaktlista.')
 
-        skift = _linjens_skift(linje)
         for _ in range(antall):
             navn = _neste_navn(gruppe, brukte_navn, finnes_i_gruppa)
             plan.append({
                 'gruppe': gruppe,
                 'navn': navn,
                 'skift': skift,
+                'ressurs': None,
+                'beholdt': {},
+                'kladd': 0,
             })
 
-    totalt = sum(plasser for p in plan for _, _, plasser in p['skift'])
+    # **Grensen måles på det som skal lages**, ikke på tallene i feltene: en
+    # rad som allerede står med sine seks plasser lager ingen, og skal ikke
+    # telle mot taket hver gang noen retter et klokkeslett.
+    totalt = sum(nye for p in plan for _, _, nye in _nye_plasser(p))
     if totalt > MAKS_PLASSER_TOTALT:
         raise Planleggerfeil(
             f'Oppsettet ville laget {totalt} plasser. Grensen er '
@@ -267,11 +371,13 @@ def _neste_navn(gruppe, brukte_navn, finnes_i_gruppa):
     return navn
 
 
-def generer_grunnlag(vaktliste, linjer, *, erstatt_kladd=False):
-    """Opprett ressursene og de tomme plassene oppsettet beskriver.
+def generer_grunnlag(vaktliste, linjer):
+    """Opprett — eller rett opp — ressursene og de tomme plassene oppsettet
+    beskriver.
 
     Dette er planleggerens hele jobb: fra en tom liste til et skjelett som kan
-    fordeles og spisses i fanene som alt finnes.
+    fordeles og spisses i fanene som alt finnes, og tilbake hit igjen når
+    grunnlaget skal rettes.
 
     **Plassene fødes som planlagt kladd** (notatets beslutning 10): ikke
     reservert til noe korps, ikke åpnet for alle, og dermed usynlig for
@@ -279,14 +385,23 @@ def generer_grunnlag(vaktliste, linjer, *, erstatt_kladd=False):
     oppsett ferdig ut for alle korps i det øyeblikket generatoren kjører —
     samme grunn til at `kopier_oppsett` aldri tar personene med.
 
-    **`erstatt_kladd` rører bare det `er_planlagt()` kaller kladd**
-    (beslutning 4 og 11). Plasser reservert til et korps, plasser åpne for
-    alle, og **alle** bemannede står. En tom plass uten reservasjon er
-    generatorens eget utkast; en som er delt ut er et løfte til noen.
+    **Bare kladden på de ressursene oppsettet nevner røres** (beslutning 4 og
+    11, strammet 15. sep. 2026). Plasser reservert til et korps, plasser åpne
+    for alle, og **alle** bemannede står — en tom plass uten reservasjon er
+    generatorens eget utkast, en som er delt ut er et løfte til noen. Og en
+    ressurs som *ikke* står i oppsettet lar generatoren være i fred: å fjerne
+    en ressurs er en sletting, og den hører hjemme bak de to bekreftelsene i
+    «Rediger ressurs». Den gamle `erstatt_kladd`-bryteren, som ryddet kladd på
+    hele lista, er borte med samme begrunnelse: den rørte ting oppsettet ikke
+    nevnte.
 
     **Ingen `bulk_create`.** Den hopper over auditsignalene, og en generering
     som lager hundre plasser er nettopp stedet noen vil gripe etter den —
     `kopier_oppsett` gikk i den fella 12. sep. 2026.
+
+    **Alt i én `transaction.atomic()`**, fordi slettingen kommer før
+    skrivingen: en feil halvveis ville ellers etterlatt lista tommere enn før
+    man trykket.
 
     Returnerer det samme som `forhaandsvis_grunnlag`, pluss `slettet`.
     """
@@ -295,23 +410,22 @@ def generer_grunnlag(vaktliste, linjer, *, erstatt_kladd=False):
     plan = _planlegg(vaktliste, linjer)
     slettet = 0
     with transaction.atomic():
-        if erstatt_kladd:
-            for vp in Vaktpost.objects.filter(
-                    ressurs__vaktliste=vaktliste, mannskap__isnull=True
-            ).select_related('ressurs'):
-                if er_planlagt(vp):
-                    vp.delete()
-                    slettet += 1
-
         for rad in plan:
-            ressurs = Ressurs.objects.create(
-                vaktliste=vaktliste,
-                navn=rad['navn'],
-                gruppe=rad['gruppe'],
-                rekkefolge=neste_rekkefolge(vaktliste),
-            )
-            for fra, til, plasser in rad['skift']:
-                for _ in range(plasser):
+            ressurs = rad['ressurs']
+            if ressurs is None:
+                ressurs = Ressurs.objects.create(
+                    vaktliste=vaktliste,
+                    navn=rad['navn'],
+                    gruppe=rad['gruppe'],
+                    rekkefolge=neste_rekkefolge(vaktliste),
+                )
+            else:
+                for vp in ressurs.vaktposter.all():
+                    if vp.mannskap_id is None and er_planlagt(vp):
+                        vp.delete()
+                        slettet += 1
+            for fra, til, nye in _nye_plasser(rad):
+                for _ in range(nye):
                     Vaktpost.objects.create(
                         ressurs=ressurs, fra_tid=fra, til_tid=til)
 

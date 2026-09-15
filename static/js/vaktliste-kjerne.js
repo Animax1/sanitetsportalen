@@ -167,6 +167,20 @@ function kanPlanlegge() {
 }
 
 
+function faneTrengerBelastning(id) {
+  // **To faner leser de samme tallene, og regelen står ett sted.**
+  // Belastningsfanen tegner varslene, planleggeren tegner budsjettlinja
+  // øverst — begge av `belastning`, som hentes først når noen ber om den.
+  //
+  // Sto planleggeren utenfor, var taket og timene usynlige nettopp der de
+  // skal styre arbeidet, og synlige bare i fanen som rapporterer i etterkant.
+  // Det var tilstanden på en ny vaktliste til 15. sep. 2026: `mkBudsjett()`
+  // ga tom streng fordi `belastning` aldri ble hentet, og linja manglet uten
+  // at noe feilet.
+  return id === BELASTNING || id === PLANLEGGER;
+}
+
+
 function kanSetteTak() {
   // **Serveren svarer, klienten spør ikke selv.** Taket settes i den samme
   // PUT-en som vaktas spenn og er derfor `skriv_leder` — men det er
@@ -370,6 +384,12 @@ async function lastListe(id) {
   fyllNedtrekk();
   tegn();
   tegnOffline();
+  // **Står man i en fane som lever av tallene, hentes de på nytt med én gang.**
+  // Linja over nullstiller dem fordi de er utdaterte i det et skift endres —
+  // men uten hentingen står belastningsfanen på «Regner…» og budsjettlinja i
+  // planleggeren forsvinner, helt til man bytter fane og tilbake. Det er
+  // nettopp etter en lagring man ser etter det nye tallet.
+  if (faneTrengerBelastning(aktivFane)) lastBelastning();
 }
 
 
@@ -531,7 +551,7 @@ function velgKorps() {
   // Tallene regnes på serveren og må hentes på nytt for det valgte korpset;
   // fanen henter dem selv når den åpnes.
   belastning = null;
-  if (aktivFane === BELASTNING) lastBelastning();
+  if (faneTrengerBelastning(aktivFane)) lastBelastning();
   tegn();
 }
 

@@ -185,7 +185,7 @@ function visFane(id) {
   // Registeret hentes først når noen faktisk ber om det. Det er globalt og
   // uavhengig av vaktlista, så det koster ingenting å utsette.
   if (id === MANNSKAP && !register) { lastRegister(); }
-  if (id === BELASTNING && !belastning) { lastBelastning(); }
+  if (faneTrengerBelastning(id) && !belastning) { lastBelastning(); }
   tegnFaner();
   tegnPanel();
 }
@@ -330,7 +330,15 @@ function tegnPanel() {
 
   if (aktivFane === OVERSIKT) { el.innerHTML = mkOversikt(); return; }
   if (aktivFane === BELASTNING) { el.innerHTML = mkBelastning(); return; }
-  if (aktivFane === PLANLEGGER) { el.innerHTML = mkPlanlegger(); return; }
+  if (aktivFane === PLANLEGGER) {
+    // **Oppsettet leses tilbake her, ikke i byggeren.** `mkPlanlegger()` skal
+    // kunne kalles uten å endre noe; tilstanden settes på vei inn i panelet,
+    // og da gjelder det uansett hvilken vei man kom — fanevalg, listebytte
+    // eller omtegning etter en generering.
+    planleggerSikreLinjer();
+    el.innerHTML = mkPlanlegger();
+    return;
+  }
   if (aktivFane === TILSTEDE) { el.innerHTML = mkTilstede(); return; }
   if (aktivFane === IKKE_PLASSERT) { el.innerHTML = mkIkkePlassert(); return; }
   if (aktivFane === MITT_KORPS) { el.innerHTML = mkMittKorps(); return; }

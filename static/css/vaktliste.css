@@ -1303,6 +1303,13 @@
 .vl-pl-eneste { align-self: center; padding-bottom: 0.4rem; }
 
 /*
+  Navnet på en rad som peker på en ressurs som alt står. Det står der
+  gruppenedtrekket ellers ville stått, og skal lese som en overskrift — formen
+  er hele forklaringen på at raden retter noe framfor å lage noe.
+*/
+.vl-pl-navn { align-self: center; padding-bottom: 0.4rem; font-weight: 600; }
+
+/*
   «Legg til ressurs» står mellom radene og «Lag grunnlaget», og skal lese som
   neste steg i arbeidet — ikke som en handling i et kort. Derfor står den fritt
   på flata, med luft over og under.

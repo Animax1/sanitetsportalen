@@ -38,6 +38,7 @@ HTML_BUILDERS = (
     # nøyaktig det hullet denne lista finnes for — det skjedde for
     # budsjettlinja samme dag.
     'mkPlanlegger', '_planleggerLinje', '_planleggerVindu', '_genererFasit',
+    '_planleggerHode',
     'mkTilstede',
     '_rolleValg',
     '_fyllValgFor',
@@ -57,6 +58,11 @@ REVIEWED_INTERPOLATIONS = {
                   'eller en fast tekst for grupper i ett eksemplar',
     'fasit': 'markup bygget lokalt: escapet antall skift, eller en fast tekst',
     'slett': 'markup bygget lokalt, indeksene escapet inni',
+    # Planleggeren leser oppsettet tilbake (15. sep. 2026).
+    'staarTekst': 'markup bygget lokalt, antallet escapet inni — eller tom streng',
+    '_planleggerHode(linje)':
+        'markup fra en bygger som selv skannes her (radhodet: navn eller nedtrekk)',
+    'fjernes': 'markup bygget lokalt, antallet escapet inni — eller tom streng',
     # Budsjettlinja og dagslinja (15. sep. 2026).
     'b': 'markup bygget lokalt i samme funksjon, tallet escapet inni',
     'tak': 'markup fra `_budsjettpost`, som selv skannes her — eller tom streng',
@@ -2713,6 +2719,7 @@ class MannskapsfanenTests(SimpleTestCase):
                         '_sorterMannskap', 'kanRedigerePerson',
                         'tegnPanel', 'apneVakt', '_apneModal',
                         '_skjulFeil', '_nivaa', 'visFane', '_erAdmin',
+                        'faneTrengerBelastning', 'planleggerSikreLinjer',
                         'kanSkriveAlt', 'kanSkriveNoe', 'kanLede')),
     )
     VINDU = ("globalThis.ressursApen = new Map();\n"
@@ -3254,6 +3261,8 @@ class PlanleggerfanenTests(SimpleTestCase):
         (PORTAL_UTILS_JS, ('hendelseArgumenter', '_handlerArgument',
                            'klikkSkalKjore')),
         (VAKTLISTE_JS, ('mkPlanlegger', '_planleggerLinje', '_planleggerVindu',
+                        '_planleggerHode', '_planleggerStaar',
+                        'planleggerLesTilbake', 'planleggerSikreLinjer',
                         '_planleggerVindutall', '_planleggerLinjetall',
                         '_gruppeFor',
                         '_planleggerRegnestykke', 'planleggerTotal',
@@ -3796,6 +3805,318 @@ class PlanleggerfanenTests(SimpleTestCase):
         self.assertLess(ut.index('satt opp'), ut.index('Oppsett'),
                         'budsjettet står over oppsettet')
 
+    # ── Oppsettet leses tilbake fra lista ────────────────────────────────
+    #
+    # André, 15. sep. 2026: «når en har lagt grunnlag og vil redigere så er
+    # det ikke lenger i planlegger — det må vel gå ann å huske dem og la en
+    # redigere der?»
+    #
+    # **Planleggeren husker ikke det du skrev; den leser hva som står.** En
+    # husket kladd og virkeligheten glir fra hverandre i det øyeblikket noen
+    # retter et skift i regnearket, og da ville et trykk på «Lag grunnlaget»
+    # rullet den rettelsen tilbake.
+
+    def _tilbake(self, ressurser, vaktposter, *, linjer=None, marker=False):
+        import json
+        liste = {
+            'vaktliste': {'id': 1, 'startet': '2026-10-02T12:00:00+02:00',
+                          'timetak': None},
+            'grupper': [{'id': self.LAG, 'navn': 'Lag', 'flere_enheter': True},
+                        {'id': self.SAMLEPLASS, 'navn': 'Samleplass',
+                         'flere_enheter': False}],
+            'ressurser': ressurser,
+            'vaktposter': vaktposter,
+        }
+        hale = ('console.log(mkPlanlegger());' if marker
+                else 'console.log(JSON.stringify(planleggerlinjer));')
+        return run_node(self.harness,
+                        "globalThis.window = { MODUL_TILGANG: "
+                        "{ vaktliste: 'skriv_leder', admin: false } };\n"
+                        + f"""
+            globalThis.aktivListe = {json.dumps(liste)};
+            globalThis.belastning = null;
+            globalThis.planleggerNesteId = 1;
+            globalThis.planleggerlinjer = {json.dumps(linjer or [])};
+            planleggerSikreLinjer();
+            {hale}
+        """)
+
+    def _plass(self, ressurs_id, fra, til):
+        return {'ressurs_id': ressurs_id, 'fra_tid': fra, 'til_tid': til}
+
+    RES1 = {'id': 11, 'navn': 'Lag 1', 'gruppe_id': 1}
+
+    def test_ressursen_blir_en_rad_som_peker_paa_den(self):
+        """`ressurs_id` er hele forskjellen: uten den lager et andre trykk
+        «Lag 2» ved siden av «Lag 1»."""
+        import json
+        ut = self._tilbake([self.RES1], [
+            self._plass(11, self.FRE14, self.FRE22)])
+        linjer = json.loads(ut.replace('OK', '').strip().splitlines()[0])
+        self.assertEqual(1, len(linjer))
+        self.assertEqual(11, linjer[0]['ressurs_id'])
+        self.assertEqual('Lag 1', linjer[0]['navn'])
+        self.assertEqual(self.LAG, linjer[0]['gruppe_id'])
+
+    def test_like_plasser_samles_til_ett_vindu_med_antall(self):
+        """Seks plasser 14–22 ble skrevet som ett vindu med seks, og leses
+        tilbake som det. Var de seks vinduer, ville raden vært uleselig."""
+        import json
+        ut = self._tilbake([self.RES1], [
+            self._plass(11, self.FRE14, self.FRE22) for _ in range(6)])
+        vinduer = json.loads(ut.replace('OK', '').strip().splitlines()[0])[0]['vinduer']
+        self.assertEqual(1, len(vinduer))
+        self.assertEqual(6, vinduer[0]['plasser'])
+
+    def test_ulike_tider_blir_ulike_vinduer_i_kronologisk_rekkefolge(self):
+        """**Rekkefølgen er starttidas, ikke sluttidas.** Vinduene leses som en
+        vakt man går gjennom ovenfra og ned, og «Nytt skiftvindu» begynner der
+        det forrige sluttet — da må det forrige være det som begynte først.
+
+        Mutasjonsprøvd 15. sep. 2026: dataene sorterte likt på begge felter, og
+        en sortering på `til` gikk grønn. Det lange vinduet her begynner
+        *først* og slutter *sist*, så de to reglene gir hver sin rekkefølge."""
+        import json
+        ut = self._tilbake([self.RES1], [
+            self._plass(11, self.FRE15, self.LOR03),
+            self._plass(11, self.FRE14, self.SON14),
+            self._plass(11, self.FRE15, self.LOR03),
+        ])
+        vinduer = json.loads(ut.replace('OK', '').strip().splitlines()[0])[0]['vinduer']
+        self.assertEqual([self.FRE14, self.FRE15],
+                         [v['fra'] for v in vinduer],
+                         'sortert på starttid, ikke sluttid')
+        self.assertEqual([1, 2], [v['plasser'] for v in vinduer])
+
+    def test_ressurs_uten_skift_far_et_standardvindu(self):
+        """Ellers ville raden vært ugyldig for serveren i det øyeblikket den
+        ble tegnet — og en bil man nettopp opprettet i ressursfanen kunne
+        aldri fått skiftene sine herfra."""
+        import json
+        ut = self._tilbake([self.RES1], [])
+        linjer = json.loads(ut.replace('OK', '').strip().splitlines()[0])
+        self.assertEqual(1, len(linjer[0]['vinduer']))
+
+    def test_et_paabegynt_oppsett_overskrives_ikke(self):
+        """Har du skrevet noe, er det ditt til du trykker."""
+        import json
+        egen = [self._linje(self.LAG, 1, 4, (self.FRE14, self.FRE22))]
+        ut = self._tilbake([self.RES1], [
+            self._plass(11, self.FRE14, self.FRE22)], linjer=egen)
+        linjer = json.loads(ut.replace('OK', '').strip().splitlines()[0])
+        self.assertEqual(1, len(linjer))
+        self.assertIsNone(linjer[0].get('ressurs_id'))
+
+    def test_id_ene_er_unike_paa_tvers_av_rader_og_vinduer(self):
+        """`data-id` er adressen delegeringen skriver til. Kolliderer to,
+        skriver et tastetrykk i feil rad."""
+        import json
+        ut = self._tilbake(
+            [self.RES1, {'id': 12, 'navn': 'Lag 2', 'gruppe_id': 1}],
+            [self._plass(11, self.FRE14, self.FRE22),
+             self._plass(12, self.FRE14, self.FRE22),
+             self._plass(12, self.LOR15, self.SON03)])
+        linjer = json.loads(ut.replace('OK', '').strip().splitlines()[0])
+        ider = [l['id'] for l in linjer] + [v['id'] for l in linjer
+                                            for v in l['vinduer']]
+        self.assertEqual(len(ider), len(set(ider)), ider)
+
+    # ── Raden som står ser annerledes ut enn raden som lages ─────────────
+
+    def test_raden_som_staar_viser_navnet_og_ikke_gruppenedtrekket(self):
+        """Formen er hele forklaringen på hva raden gjør. Med et gruppevalg
+        ville man trodd man kunne flytte bilen herfra — og serveren leser
+        gruppa fra ressursen, så valget hadde ikke gjort noe."""
+        ut = self._tilbake([self.RES1], [
+            self._plass(11, self.FRE14, self.FRE22)], marker=True)
+        self.assertIn('Lag 1', ut)
+        self.assertIn('står på lista', ut)
+        self.assertNotIn('data-felt="gruppe_id"', ut)
+        self.assertNotIn('data-felt="antall"', ut)
+
+    def test_raden_som_staar_tas_ut_av_oppsettet_ikke_slettes(self):
+        """Å fjerne en ressurs er en sletting, og den ligger bak de to
+        bekreftelsene i «Rediger ressurs». Knappen her tar raden ut."""
+        ut = self._tilbake([self.RES1], [
+            self._plass(11, self.FRE14, self.FRE22)], marker=True)
+        self.assertIn('Ta ut', ut)
+        self.assertIn('blir stående', ut)
+
+    def test_en_ny_rad_har_fortsatt_gruppe_og_antall(self):
+        ut = self._vis([self._linje(self.LAG, 3, 4, (self.FRE14, self.FRE22))])
+        self.assertIn('data-felt="gruppe_id"', ut)
+        self.assertIn('data-felt="antall"', ut)
+        self.assertNotIn('står på lista', ut)
+
+    def test_panelet_sier_hvor_mange_rader_som_rettes(self):
+        ut = self._tilbake([self.RES1], [
+            self._plass(11, self.FRE14, self.FRE22)], marker=True)
+        self.assertIn('blir <strong>rettet</strong>', ut)
+
+    def test_uten_staaende_rader_staar_setningen_ikke(self):
+        ut = self._vis([self._linje(self.LAG, 1, 4, (self.FRE14, self.FRE22))])
+        self.assertNotIn('blir <strong>rettet</strong>', ut)
+
+    def test_tidsfeltene_i_en_staaende_rad_kan_redigeres(self):
+        """Raden skal være redigerbar, ikke bare synlig — det var hele
+        bestillingen."""
+        ut = self._tilbake([self.RES1], [
+            self._plass(11, self.FRE14, self.FRE22)], marker=True)
+        self.assertIn('data-felt="fra"', ut)
+        self.assertIn('data-felt="til"', ut)
+        self.assertIn('data-felt="plasser"', ut)
+
+
+
+class GenererbekreftelsenTests(SimpleTestCase):
+    """Dialogen viser **endringen**, panelet viser oppsettet.
+
+    To ulike spørsmål: panelet sier hva lista skal *være*, dialogen hva som
+    *skjer*. En generering over et oppsett som alt er laget rører de fleste
+    radene lite eller ingenting, og en tabell der alle radene ser like ut ville
+    skjult nettopp den ene som endrer seg.
+    """
+
+    HARNESS = (
+        (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue')),
+        (VAKTLISTE_JS, ('_genererFasit', '_genererRadmerke', '_tall')),
+    )
+
+    def setUp(self):
+        if not node_available():
+            self.skipTest('node er ikke tilgjengelig')
+        self.harness = build_harness(self.HARNESS)
+
+    def _vis(self, fasit):
+        import json
+        return run_node(self.harness, f"""
+            console.log(_genererFasit({json.dumps(fasit)}));
+        """)
+
+    def _rad(self, **felt):
+        rad = {'navn': 'Lag 1', 'gruppe': 'Lag', 'finnes': False, 'skift': 1,
+               'plasser': 4, 'fjernes': 0, 'timer': 32.0}
+        rad.update(felt)
+        return rad
+
+    def _fasit(self, rader, **felt):
+        fasit = {'ressurser': sum(1 for r in rader if not r['finnes']),
+                 'plasser': sum(r['plasser'] for r in rader),
+                 'fjernes': sum(r['fjernes'] for r in rader),
+                 'timer': sum(r['timer'] for r in rader), 'linjer': rader}
+        fasit.update(felt)
+        return fasit
+
+    def test_ny_ressurs_merkes_som_ny(self):
+        ut = self._vis(self._fasit([self._rad()]))
+        self.assertIn('ny ressurs', ut)
+
+    def test_ressurs_som_rettes_merkes_som_det(self):
+        ut = self._vis(self._fasit([self._rad(finnes=True, plasser=2)]))
+        self.assertIn('rettes', ut)
+        self.assertNotIn('ny ressurs', ut)
+
+    def test_ressurs_uten_endring_merkes_uendret(self):
+        """Den raden er det viktigste av de tre merkene: uten den ser en
+        generering som ikke gjør noe ut som en generering som gjør alt."""
+        ut = self._vis(self._fasit(
+            [self._rad(finnes=True, plasser=0, fjernes=0, timer=0)]))
+        self.assertIn('uendret', ut)
+        self.assertNotIn('rettes', ut)
+
+    def test_fjerningen_staar_i_setningen_man_leser(self):
+        """Å redigere et vindu fra seks plasser til fire sletter to. Det er det
+        eneste i hele planleggeren som fjerner noe, så det skal stå der man
+        leser før man trykker — ikke i en fotnote."""
+        ut = self._vis(self._fasit([self._rad(finnes=True, fjernes=6)]))
+        self.assertIn('Ryddes bort', ut)
+        self.assertIn('<strong>6</strong>', ut)
+
+    def test_ingenting_fjernes_gir_ingen_setning_om_fjerning(self):
+        ut = self._vis(self._fasit([self._rad()]))
+        self.assertNotIn('Ryddes bort', ut)
+
+    def test_navn_escapes(self):
+        ut = self._vis(self._fasit(
+            [self._rad(navn='<img src=x onerror=alert(1)>')]))
+        self.assertNotIn('<img src=x', ut)
+        self.assertIn('&lt;img', ut)
+
+
+class PlanleggerenTegnesMedOppsettetTests(SimpleTestCase):
+    """**Tilstanden settes på vei inn i panelet, ikke i byggeren.**
+
+    `tegnPanel()` kaller `planleggerSikreLinjer()` før `mkPlanlegger()`, så
+    oppsettet leses tilbake uansett hvilken vei man kom — fanevalg, listebytte
+    eller omtegningen etter en generering.
+
+    Mutasjonsprøvd 15. sep. 2026: de andre testene kaller
+    `planleggerSikreLinjer()` selv, så `tegnPanel()` kunne slutte å kalle den
+    uten at noe ble rødt — og da var planleggeren tom igjen etter en
+    generering, som er nøyaktig det André meldte fra staging.
+
+    Egen klasse fordi harnesset må ha den **ekte** `tegnPanel()`. De andre
+    planleggertestene stubber den for å telle omtegninger, og en uttrukket
+    funksjon skygger for `globalThis`.
+    """
+
+    HARNESS = (
+        (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue')),
+        (VAKTLISTE_JS, ('tegnPanel', 'mkPlanlegger', '_planleggerLinje',
+                        '_planleggerVindu', '_planleggerHode',
+                        '_planleggerStaar', 'planleggerLesTilbake',
+                        'planleggerSikreLinjer', '_planleggerStandardvindu',
+                        '_planleggerVindutall', '_planleggerLinjetall',
+                        '_planleggerRegnestykke', 'planleggerTotal',
+                        '_vindutallTekst', '_gruppeFor',
+                        'mkBudsjett', 'mkDagslinje', '_budsjettpost',
+                        '_dagtekst', '_d', '_iso16', '_tall', 'kanSetteTak',
+                        'kanPlanlegge', 'kanLede', '_nivaa', '_erAdmin')),
+    )
+
+    def setUp(self):
+        if not node_available():
+            self.skipTest('node er ikke tilgjengelig')
+        self.harness = build_harness(self.HARNESS)
+
+    def test_panelet_leser_tilbake_naar_det_tegnes(self):
+        import json
+        liste = {
+            'vaktliste': {'id': 1, 'startet': '2026-10-02T12:00:00+02:00',
+                          'timetak': None},
+            'grupper': [{'id': 1, 'navn': 'Lag', 'flere_enheter': True}],
+            'ressurser': [{'id': 11, 'navn': 'Lag 1', 'gruppe_id': 1}],
+            'vaktposter': [{'ressurs_id': 11,
+                            'fra_tid': '2026-10-02T14:00:00+02:00',
+                            'til_tid': '2026-10-02T22:00:00+02:00'}],
+        }
+        ut = run_node(self.harness,
+                      "globalThis.window = { MODUL_TILGANG: "
+                      "{ vaktliste: 'skriv_leder', admin: false } };\n"
+                      + f"""
+            globalThis.aktivListe = {json.dumps(liste)};
+            globalThis.belastning = null;
+            globalThis.planleggerNesteId = 1;
+            globalThis.planleggerlinjer = [];
+            globalThis.aktivFane = 'planlegger';
+            globalThis.MANNSKAP = 'mannskap';
+            globalThis.OVERSIKT = 'oversikt';
+            globalThis.BELASTNING = 'belastning';
+            globalThis.PLANLEGGER = 'planlegger';
+            globalThis.TILSTEDE = 'tilstede';
+            globalThis.IKKE_PLASSERT = 'ikke-plassert';
+            globalThis.MITT_KORPS = 'mitt-korps';
+            const panel = {{ innerHTML: '' }};
+            globalThis.document = {{ getElementById: (id) =>
+                (id === 'vl-panel' ? panel : null) }};
+            tegnPanel();
+            assert(/Lag 1/.test(panel.innerHTML), 'ressursen sto ikke i panelet');
+            assert(planleggerlinjer.length === 1, 'oppsettet ble ikke lest tilbake');
+            assert(planleggerlinjer[0].ressurs_id === 11,
+                   'raden peker ikke paa ressursen');
+        """)
+        self.assertIn('OK', ut)
+
 
 class PlanleggingsfanenTests(SimpleTestCase):
     """Belastningstabellen (§8b).
@@ -3810,7 +4131,8 @@ class PlanleggingsfanenTests(SimpleTestCase):
         (VAKTLISTE_JS, ('mkBelastning', 'mkBudsjett', 'mkDagslinje',
                         '_budsjettpost', '_dagtekst', '_d', 'kanSetteTak',
                         '_tall', '_kolonneandeler', 'kanLede',
-                        '_nivaa', '_erAdmin', 'visFane')),
+                        '_nivaa', '_erAdmin', 'visFane', 'lastListe',
+                        'faneTrengerBelastning', 'planleggerSikreLinjer')),
     )
     VINDU = "globalThis.window = { MODUL_TILGANG: { admin: true } };\n"
 
@@ -4154,6 +4476,95 @@ class PlanleggingsfanenTests(SimpleTestCase):
             globalThis.belastning = {personer: [], sammendrag: {}, grenser: {}};
             visFane('belastning');
             assert(hentet === 1, 'hentet paa nytt selv om de alt laa der');
+        """)
+        self.assertIn('OK', ut)
+
+    def test_planleggeren_henter_de_samme_tallene(self):
+        """**Budsjettlinja står øverst i planleggeren**, og tegnes av
+        `mkBudsjett()` — som gir tom streng uten `belastning`.
+
+        Den sto utenfor denne regelen én kjøring, og da var taket og timene
+        usynlige på en ny vaktliste (André, 15. sep. 2026: «tak på vaktene og
+        timene er ikke synlige når du oppretter ny vaktliste og går inn i
+        planlegger»). Ingenting feilet — linja bare manglet."""
+        ut = run_node(self.harness, self.VINDU + """
+            globalThis.belastning = null;
+            globalThis.register = null;
+            globalThis.aktivListe = null;
+            globalThis.MANNSKAP = 'mannskap';
+            globalThis.BELASTNING = 'belastning';
+            globalThis.PLANLEGGER = 'planlegger';
+            globalThis.aktivFane = 'oversikt';
+            let hentet = 0;
+            globalThis.lastBelastning = () => { hentet += 1; };
+            globalThis.lastRegister = () => {};
+            globalThis.tegnFaner = () => {};
+            globalThis.tegnPanel = () => {};
+
+            visFane('planlegger');
+            assert(hentet === 1, 'planleggeren hentet ikke tallene: ' + hentet);
+        """)
+        self.assertIn('OK', ut)
+
+    # `aktivListe` og `belastning` er `let` på toppnivå i kjernefila. En
+    # uttrukket funksjon som skriver til dem trenger derfor en binding i
+    # modulen — `globalThis.aktivListe` er *ikke* den bindingen, og en naken
+    # tilordning i en ESM-modul gir `ReferenceError`. `var` i preamblet
+    # heises til toppen og er det nærmeste vi kommer skriptets eget scope.
+    LASTLISTE_PREAMBLE = (
+        'var aktivListe, belastning, aktivFane, korpsfilter;\n'
+        "globalThis.BELASTNING = 'belastning';\n"
+        "globalThis.PLANLEGGER = 'planlegger';\n")
+
+    def _lastListe(self, fane):
+        return run_node(self.harness, f"""
+            aktivFane = '{fane}';
+            belastning = {{personer: []}};
+            globalThis.offlineTilstand = {{}};
+            globalThis.apiFetch = async () => ({{
+                ok: true, status: 200,
+                headers: {{ get: () => null }},
+                json: async () => ({{ data: {{ vaktliste: {{ id: 1 }},
+                                              vaktposter: [] }} }}),
+            }});
+            globalThis.document = {{ getElementById: () => null }};
+            let hentet = 0;
+            globalThis.lastBelastning = () => {{ hentet += 1; }};
+            for (const n of ['_sesjonUtgaatt', '_projiserKo', 'fyllKorpsvelger',
+                             'brukKorpsfilter', 'tegnManglerMannskap',
+                             'fyllNedtrekk', 'tegn', 'tegnOffline',
+                             'planleggerSikreLinjer']) {{
+                globalThis[n] = () => {{}};
+            }}
+
+            await lastListe(1);
+            console.log('HENTET=' + hentet);
+        """, preamble=self.VINDU + self.LASTLISTE_PREAMBLE)
+
+    def test_tallene_hentes_paa_nytt_naar_lista_lastes(self):
+        """`lastListe()` nullstiller `belastning` fordi tallene er utdaterte i
+        det et skift endres. Uten hentingen etterpå står belastningsfanen på
+        «Regner…» og budsjettlinja i planleggeren forsvinner — helt til man
+        bytter fane og tilbake. Og det er nettopp etter en lagring man ser
+        etter det nye tallet."""
+        for fane in ('belastning', 'planlegger'):
+            with self.subTest(fane=fane):
+                self.assertIn('HENTET=1', self._lastListe(fane))
+
+    def test_lista_henter_ikke_tallene_for_en_fane_som_ikke_bruker_dem(self):
+        self.assertIn('HENTET=0', self._lastListe('oversikt'))
+
+    def test_regelen_dekker_begge_fanene_og_ikke_de_andre(self):
+        """Regelen står som én funksjon fordi den har to lesere: fanevalget og
+        korpsvelgeren, som nullstiller tallene og henter dem på nytt."""
+        ut = run_node(self.harness, self.VINDU + """
+            globalThis.BELASTNING = 'belastning';
+            globalThis.PLANLEGGER = 'planlegger';
+            assert(faneTrengerBelastning('belastning'), 'belastning');
+            assert(faneTrengerBelastning('planlegger'), 'planlegger');
+            assert(!faneTrengerBelastning('oversikt'), 'oversikt');
+            assert(!faneTrengerBelastning('mannskap'), 'mannskap');
+            assert(!faneTrengerBelastning(7), 'en gruppefane');
         """)
         self.assertIn('OK', ut)
 

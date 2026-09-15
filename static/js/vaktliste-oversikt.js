@@ -807,8 +807,36 @@ function _planleggerVindu(linje, vindu) {
 }
 
 
-function _planleggerLinje(linje) {
-  const t = _planleggerLinjetall(linje);
+function _planleggerStaar(linje) {
+  // **En rad som peker på en ressurs redigerer den**, og ser derfor annerledes
+  // ut enn en rad som lager en ny: navnet står der nedtrekket ellers står.
+  //
+  // Formen er hele forklaringen på hva raden gjør. Med et gruppenedtrekk på
+  // en rad som alt har en ressurs, ville man trodd man kunne flytte bilen til
+  // en annen gruppe herfra — og serveren leser gruppa fra ressursen, så
+  // valget hadde ikke gjort noe. Omdøping og gruppebytte hører hjemme i
+  // «Rediger ressurs», der sletting og enhetskobling alt ligger.
+  return linje.ressurs_id != null;
+}
+
+
+function _planleggerHode(linje) {
+  if (_planleggerStaar(linje)) {
+    const gruppe = _gruppeFor(linje.gruppe_id);
+    const gruppenavn = gruppe ? gruppe.navn : '';
+    return `
+        <span class="vl-navn vl-pl-navn">${escapeHtml(linje.navn || '')}</span>
+        <span class="vl-meta vl-pl-eneste">
+          <i class="bi bi-check2-circle me-1"></i>${escapeHtml(gruppenavn)} · står på lista
+        </span>
+        <span class="vl-pl-spacer"></span>
+        <button type="button" class="btn btn-sm btn-outline-secondary"
+                data-action="planleggerFjernLinje" data-id="${escHtmlValue(linje.id)}"
+                title="Ta raden ut av oppsettet. Ressursen og plassene blir stående.">
+          <i class="bi bi-eye-slash me-1"></i>Ta ut
+        </button>`;
+  }
+
   const grupper = (aktivListe.grupper || []).map((g) => {
     const valgt = String(g.id) === String(linje.gruppe_id) ? ' selected' : '';
     return `<option value="${escHtmlValue(g.id)}"${valgt}>${escapeHtml(g.navn)}</option>`;
@@ -829,12 +857,8 @@ function _planleggerLinje(linje) {
                  value="${escHtmlValue(linje.antall)}"
                  data-action="planleggerSettLinje" data-hendelse="change"
                  data-felt="antall" data-id="${escHtmlValue(linje.id)}"></label>`;
-  const vinduer = (linje.vinduer || [])
-    .map((v) => _planleggerVindu(linje, v)).join('');
 
   return `
-    <div class="vl-kort vl-pl-linje">
-      <div class="vl-pl-topp">
         <label class="vl-meta">Gruppe
           <select class="form-select form-select-sm"
                   data-action="planleggerSettLinje" data-hendelse="change"
@@ -844,8 +868,18 @@ function _planleggerLinje(linje) {
         <button type="button" class="btn btn-sm btn-outline-secondary"
                 data-action="planleggerFjernLinje" data-id="${escHtmlValue(linje.id)}">
           <i class="bi bi-trash me-1"></i>Fjern
-        </button>
-      </div>
+        </button>`;
+}
+
+
+function _planleggerLinje(linje) {
+  const t = _planleggerLinjetall(linje);
+  const vinduer = (linje.vinduer || [])
+    .map((v) => _planleggerVindu(linje, v)).join('');
+
+  return `
+    <div class="vl-kort vl-pl-linje">
+      <div class="vl-pl-topp">${_planleggerHode(linje)}</div>
       <div class="vl-pl-vinduer">${vinduer}</div>
       <div class="vl-pl-bunn">
         <button type="button" class="btn btn-sm btn-outline-secondary"
@@ -912,11 +946,18 @@ function mkPlanlegger() {
       sluttet.
     </div></div>`;
 
+  // **Tallene er oppsettet, ikke endringen.** Panelet viser hva lista skal
+  // være når du er ferdig; hva som faktisk blir laget og fjernet står i
+  // bekreftelsen, som er stedet beslutningen tas. Sto endringen her, ville
+  // «tomme plasser» talt ned mot null etter hvert som du genererte — og et
+  // tall som går mot null mens oppsettet blir større er ikke til å lese.
+  const staaende = (planleggerlinjer || []).filter(_planleggerStaar).length;
+
   const oppsummering = planleggerlinjer.length ? `
     <div class="vl-kort vl-belastningshode">
       <div class="vl-noekkeltall">
         <div><b data-plantall="ressurser">${escHtmlValue(total.ressurser)}</b><span class="vl-meta">ressurser</span></div>
-        <div><b data-plantall="plasser">${escHtmlValue(total.plasser)}</b><span class="vl-meta">tomme plasser</span></div>
+        <div><b data-plantall="plasser">${escHtmlValue(total.plasser)}</b><span class="vl-meta">plasser</span></div>
         <div><b data-plantall="timer">${escapeHtml(_tall(total.timer))} t</b><span class="vl-meta">til sammen</span></div>
       </div>
       <span class="vl-pl-spacer"></span>
@@ -943,11 +984,16 @@ function mkPlanlegger() {
       </button>
     </div>`;
 
+  const staarTekst = staaende ? `
+      <span class="vl-meta">${escHtmlValue(staaende)} av radene står allerede
+        på lista og blir <strong>rettet</strong>, ikke laget på nytt.</span>` : '';
+
   return mkBudsjett() + `
     <div class="vl-kort vl-kort-topp">
       <span class="vl-kort-tittel">Oppsett</span>
       <span class="vl-meta">Én rad per ressurs. Plassene fødes som
         <strong>planlagt</strong> — usynlige for korpsene til du deler dem ut.</span>
+      ${staarTekst}
     </div>` + utenStart + linjer + tomt + leggTil + oppsummering;
 }
 

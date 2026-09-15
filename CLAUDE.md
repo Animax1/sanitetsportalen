@@ -1027,8 +1027,8 @@ plassene — klare til å fordeles og spisses i fanene som alt virker.
 | **«Legg til ressurs» står mellom siste rad og «Lag grunnlaget»** | André: «for nå er det lett å tro at man bare lager en ressurs og så er man ferdig». I hodet leste den som «start her»; mellom radene og knappen leser den som «legg til én til», og panelets rekkefølge blir den man arbeider i |
 | **Feltendringer oppdaterer tallene på plass; strukturendringer tegner på nytt** | `tegnPanel()` bygger panelet med `innerHTML`, så feltet man står i erstattes og fokus forsvinner. `datetime-local` melder `change` per segment, så man mistet feltet etter hvert tall (André: «jeg kan bare ta inn ett tall om gangen»). `planleggerTegnTall()` setter `textContent` på `[data-vindutall]`, `[data-linjetall]` og `[data-plantall]`. Gruppevalget er unntaket — raden skifter form, og et nedtrekk er man ferdig med |
 | **Plassene fødes som planlagt kladd** | `er_planlagt()` — usynlig for korpsene til lederen deler dem ut. Samme grunn som at `kopier_oppsett` aldri tar personene |
-| **`erstatt_kladd` rører bare kladden** | Korpsreserverte, `alle_korps` og **alle** bemannede står. Reservasjonen leses av `reservert_korps()`, ikke av feltet — ellers slettes en hel bils plasser fordi ressursen bærer korpset |
-| **Ingen `bulk_create`, alt i én `transaction.atomic()`** | Signalene, og: `erstatt_kladd` sletter før den skriver, så en feil halvveis ville etterlatt lista tommere enn før man trykket |
+| **Bare kladden på de ressursene oppsettet nevner røres** | Korpsreserverte, `alle_korps` og **alle** bemannede står. Reservasjonen leses av `reservert_korps()`, ikke av feltet — ellers slettes en hel bils plasser fordi ressursen bærer korpset. En ressurs *utenfor* oppsettet lar generatoren være i fred: å fjerne en ressurs er en sletting, og den ligger bak de to bekreftelsene i «Rediger ressurs». Den gamle `erstatt_kladd`-bryteren, som ryddet kladd på hele lista, er borte 15. sep. 2026 av samme grunn |
+| **Ingen `bulk_create`, alt i én `transaction.atomic()`** | Signalene, og: genereringen sletter kladd før den skriver, så en feil halvveis ville etterlatt lista tommere enn før man trykket |
 | **`?forhaandsvis` regnes av samme kode** | Samme endepunkt, `_planlegg` + `_sammendrag`. En forhåndsvisning som regner på egen hånd viser før eller siden noe annet enn det som skjer |
 
 **Feltet heter «plasser per skift», ikke «antall folk».** André beskriver Haugesund 56 som
@@ -1045,6 +1045,35 @@ avviser noe.
 `_linjens_skift()` for å tegne regnestykket mens man skriver; `apneGenerer()` henter
 serverens forhåndsvisning før bekreftelsen. `PlanleggerfanenTests` måler at de to sier det
 samme på Andrés egne eksempler.
+
+**Planleggeren leser oppsettet tilbake fra vaktlista** (15. sep. 2026 — André: «når en har
+lagt grunnlag og vil redigere så er det ikke lenger i planlegger»). Den **husker ikke det
+du skrev; den leser hva som står** — en husket kladd og virkeligheten glir fra hverandre i
+det øyeblikket noen retter et skift i regnearket, og da ville et trykk på «Lag grunnlaget»
+rullet den rettelsen tilbake.
+
+| Regel | Hvor |
+|---|---|
+| Én rad per ressurs, vinduene gruppert på plassenes tider | `planleggerLesTilbake()` |
+| Står det ingenting i oppsettet, leses det tilbake — har du skrevet noe, røres det ikke | `planleggerSikreLinjer()`, kalt av `tegnPanel()` |
+| `ressurs_id` gjør raden til en **redigering**; gruppa og navnet følger ressursen | `services._planlegg` |
+| «Plasser» er vinduets hele bemanning, ikke et påslag — de som står telles fra | `services._nye_plasser()` |
+| Beholdningen forbrukes **per vindu** | to like vinduer i samme rad ville ellers begge trukket fra de samme plassene |
+| Panelet viser oppsettet, bekreftelsen viser endringen | `_sammendrag` teller nye ressurser og nye plasser, og `fjernes` ved siden |
+
+**Tilstanden settes på vei inn i panelet, ikke i byggeren.** `mkPlanlegger()` skal kunne
+kalles uten å endre noe. Mutasjonsprøvd 15. sep. 2026: testene kalte `planleggerSikreLinjer()`
+selv, så `tegnPanel()` kunne slutte å kalle den uten at noe ble rødt — og da var
+planleggeren tom igjen etter en generering, altså nøyaktig feilen den skulle rette.
+`PlanleggerenTegnesMedOppsettetTests` har egen harness med den **ekte** `tegnPanel()`,
+fordi de andre planleggertestene stubber den for å telle omtegninger.
+
+**Budsjettlinja og belastningsfanen leser de samme tallene**, og regelen står som én
+funksjon: `faneTrengerBelastning(id)` i `vaktliste-kjerne.js`. Den har to lesere —
+fanevalget i `visFane()` og korpsvelgeren i `velgKorps()`. Sto planleggeren utenfor, var
+taket og timene usynlige nettopp der de skal styre arbeidet, og synlige bare i fanen som
+rapporterer i etterkant; det var tilstanden på en ny vaktliste til 15. sep. 2026, uten at
+noe feilet.
 
 ### Statistikk-modulen (statistikk/)
 

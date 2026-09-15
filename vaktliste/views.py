@@ -781,6 +781,11 @@ def _planleggerlinjer(data):
             lest.append({'fra': fra, 'til': til,
                          'plasser': vindu.get('plasser')})
         ut.append({
+            # **`ressurs_id` gjør linja til en redigering** (15. sep. 2026):
+            # planleggeren leser oppsettet tilbake fra vaktlista, så et andre
+            # trykk retter det som ble laget i stedet for å lage det på nytt.
+            # Gruppa og navnet følger da ressursen — se `services._planlegg`.
+            'ressurs_id': _int(raa.get('ressurs_id')),
             'gruppe_id': _int(raa.get('gruppe_id')),
             'antall': _int(raa.get('antall')) or 1,
             'vinduer': lest,
@@ -804,7 +809,9 @@ def generer_view(request, pk):
     lage før knappen trykkes, og svaret regnes av nøyaktig samme kode. En
     generator man må kontrollere etterpå er ikke raskere enn å skrive radene.
 
-    `erstatt_kladd` rører bare det `services.er_planlagt()` kaller kladd —
+    **En linje med `ressurs_id` retter en ressurs som alt står** (André, 15.
+    sep. 2026: «når en har lagt grunnlag og vil redigere så er det ikke lenger
+    i planlegger»). Bare kladden på de ressursene oppsettet nevner røres —
     plasser som er delt ut, til ett korps eller til alle, og alle bemannede,
     står. Se `generer_grunnlag`.
     """
@@ -822,8 +829,7 @@ def generer_view(request, pk):
         if data.get('forhaandsvis'):
             svar = services.forhaandsvis_grunnlag(vl, linjer)
         else:
-            svar = services.generer_grunnlag(
-                vl, linjer, erstatt_kladd=bool(data.get('erstatt_kladd')))
+            svar = services.generer_grunnlag(vl, linjer)
     except services.Planleggerfeil as feil:
         return _feil(str(feil))
     return JsonResponse({'status': 'ok', 'data': svar})

@@ -344,8 +344,18 @@ class GrunnlagTests(TilgangsBasis):
             self.assertIsNone(vp.rolle_id)
 
 
-class ErstattKladdTests(TilgangsBasis):
-    """Beslutning 4 og 11: en ny generering rører **bare** kladden."""
+class RedigeringTests(TilgangsBasis):
+    """En linje med `ressurs_id` **retter** en ressurs som alt står.
+
+    André, 15. sep. 2026: «når en har lagt grunnlag og vil redigere så er det
+    ikke lenger i planlegger — det må vel gå ann å huske dem og la en redigere
+    der?» Planleggeren leser oppsettet tilbake fra vaktlista, så et andre
+    trykk retter det som ble laget framfor å lage «Lag 4, 5, 6» ved siden av
+    «Lag 1, 2, 3».
+
+    Beslutning 4 og 11 gjelder fortsatt, og er strammet: en generering rører
+    **bare kladden på de ressursene oppsettet nevner**.
+    """
 
     def setUp(self):
         super().setUp()
@@ -354,19 +364,26 @@ class ErstattKladdTests(TilgangsBasis):
             vaktliste=self.vl2, navn='Lag 1', gruppe=gruppe('Lag'))
 
     def _plass(self, **felt):
-        return Vaktpost.objects.create(
-            ressurs=self.res, fra_tid=kl(2, 14), til_tid=kl(2, 22), **felt)
+        felt.setdefault('fra_tid', kl(2, 14))
+        felt.setdefault('til_tid', kl(2, 22))
+        return Vaktpost.objects.create(ressurs=self.res, **felt)
 
-    def _linje(self):
-        return {'gruppe_id': gruppe('Lag').pk, 'antall': 1,
-                'vinduer': [{'fra': kl(3, 14), 'til': kl(3, 22),
-                             'skiftlengde': None, 'plasser': 1}]}
+    def _linje(self, fra=None, til=None, plasser=1, ressurs=True):
+        """Linja peker på `self.res` med mindre noe annet sies."""
+        linje = {'vinduer': [{'fra': fra or kl(3, 14), 'til': til or kl(3, 22),
+                              'plasser': plasser}]}
+        if ressurs:
+            linje['ressurs_id'] = self.res.pk
+        else:
+            linje.update({'gruppe_id': gruppe('Lag').pk, 'antall': 1})
+        return linje
 
-    def _generer(self):
-        return services.generer_grunnlag(
-            self.vl2, [self._linje()], erstatt_kladd=True)
+    def _generer(self, *linjer):
+        return services.generer_grunnlag(self.vl2, list(linjer) or [self._linje()])
 
-    def test_kladd_erstattes(self):
+    # ── Kladden er generatorens eget utkast ──────────────────────────────
+
+    def test_kladd_paa_ressursen_erstattes(self):
         """En tom plass uten reservasjon er generatorens eget utkast, og å
         skrive over sitt eget utkast koster ingenting."""
         kladd = self._plass()
@@ -404,9 +421,22 @@ class ErstattKladdTests(TilgangsBasis):
         self._generer()
         self.assertTrue(Vaktpost.objects.filter(pk=bemannet.pk).exists())
 
-    def test_uten_erstatt_slettes_ingenting(self):
-        kladd = self._plass()
-        svar = services.generer_grunnlag(self.vl2, [self._linje()])
+    # ── «Bare de ressursene oppsettet nevner» ────────────────────────────
+
+    def test_kladd_paa_en_ressurs_utenfor_oppsettet_roeres_ikke(self):
+        """**Strammingen 15. sep. 2026.** Den gamle `erstatt_kladd`-bryteren
+        ryddet kladd på hele lista — også på ressurser genereringen ikke
+        nevnte. Nå er raden som peker på ressursen den eneste som rører den,
+        og å ta en rad ut av oppsettet betyr «la den være», ikke «slett den».
+        Å fjerne en ressurs er en sletting, og den ligger bak de to
+        bekreftelsene i «Rediger ressurs»."""
+        annen = Ressurs.objects.create(
+            vaktliste=self.vl2, navn='Lag 2', gruppe=gruppe('Lag'))
+        kladd = Vaktpost.objects.create(
+            ressurs=annen, fra_tid=kl(2, 14), til_tid=kl(2, 22))
+        self.assertTrue(services.er_planlagt(kladd),
+                        'plassen må være kladd, ellers måler testen ingenting')
+        svar = self._generer()
         self.assertEqual(0, svar['slettet'])
         self.assertTrue(Vaktpost.objects.filter(pk=kladd.pk).exists())
 
@@ -426,11 +456,137 @@ class ErstattKladdTests(TilgangsBasis):
         self._generer()
         self.assertTrue(Vaktpost.objects.filter(pk=annen.pk).exists())
 
+    def test_ressurs_paa_en_annen_vaktliste_avvises(self):
+        """`ressurs_id` er ikke en nøkkel man får følge ut av lista."""
+        with self.assertRaises(services.Planleggerfeil):
+            services.generer_grunnlag(self.vl2, [{
+                'ressurs_id': self.res_fri.pk,
+                'vinduer': [{'fra': kl(3, 14), 'til': kl(3, 22),
+                             'plasser': 1}]}])
+
+    def test_ukjent_ressurs_avvises(self):
+        with self.assertRaises(services.Planleggerfeil):
+            services.generer_grunnlag(self.vl2, [{
+                'ressurs_id': 99999,
+                'vinduer': [{'fra': kl(3, 14), 'til': kl(3, 22),
+                             'plasser': 1}]}])
+
+    def test_samme_ressurs_to_ganger_avvises(self):
+        """Den andre linja ville ryddet bort kladden den første nettopp lagde,
+        og resultatet avhengt av rekkefølgen."""
+        with self.assertRaises(services.Planleggerfeil):
+            self._generer(self._linje(), self._linje())
+
+    # ── «Plasser» er vinduets hele bemanning ─────────────────────────────
+
+    def test_ressursen_lages_ikke_paa_nytt(self):
+        """Hele poenget: et andre trykk retter, det dupliserer ikke."""
+        self._plass()
+        svar = self._generer()
+        self.assertEqual(1, Ressurs.objects.filter(vaktliste=self.vl2).count())
+        self.assertEqual(0, svar['ressurser'],
+                         'ingen nye ressurser — raden retter den som står')
+        self.assertTrue(svar['linjer'][0]['finnes'])
+
+    def test_bemannede_plasser_telles_fra(self):
+        """**«Plasser» er vinduets hele bemanning, ikke et påslag.** Står det
+        fire 14–22, skal det være fire etterpå — også når to av dem har navn
+        på seg. Uten fratrekket ville en ressurs man redigerte to ganger
+        vokst for hver gang."""
+        self._plass(mannskap=self.p_hgsd)
+        self._plass(mannskap=self.p_karmoy)
+        svar = self._generer(self._linje(kl(2, 14), kl(2, 22), plasser=4))
+        self.assertEqual(2, svar['plasser'], 'bare differansen lages')
+        self.assertEqual(4, Vaktpost.objects.filter(ressurs=self.res).count())
+
+    def test_ingen_nye_naar_vinduet_alt_er_fullt(self):
+        """En rad som står slik den skal, endrer ingenting — og sier det."""
+        self._plass(mannskap=self.p_hgsd)
+        svar = self._generer(self._linje(kl(2, 14), kl(2, 22), plasser=1))
+        self.assertEqual(0, svar['plasser'])
+        self.assertEqual(0, svar['fjernes'])
+        self.assertEqual(1, Vaktpost.objects.filter(ressurs=self.res).count())
+
+    def test_flere_bemannede_enn_plasser_fjerner_ingen(self):
+        """Generatoren sletter aldri noe som er delt ut. Blir tallet mindre
+        enn det som står, lages det null — og de tre blir stående."""
+        # Tre plasser som står: to med navn på, én reservert til et korps.
+        # Ulike personer, fordi en person ikke kan stå to ganger på samme
+        # ressurs til samme tid — skranken i basen sier det.
+        self._plass(mannskap=self.p_hgsd)
+        self._plass(mannskap=self.p_karmoy)
+        self._plass(korps=self.hgsd)
+        svar = self._generer(self._linje(kl(2, 14), kl(2, 22), plasser=1))
+        self.assertEqual(0, svar['plasser'])
+        self.assertEqual(3, Vaktpost.objects.filter(ressurs=self.res).count())
+
+    def test_faerre_plasser_rydder_bort_kladden(self):
+        """Å redigere et vindu fra seks til fire *skal* fjerne to. Det er det
+        eneste i hele planleggeren som fjerner noe, og derfor står `fjernes`
+        som sitt eget tall i bekreftelsen."""
+        for _ in range(6):
+            self._plass()
+        svar = self._generer(self._linje(kl(2, 14), kl(2, 22), plasser=4))
+        self.assertEqual(6, svar['fjernes'])
+        self.assertEqual(4, svar['plasser'])
+        self.assertEqual(4, Vaktpost.objects.filter(ressurs=self.res).count())
+
+    def test_to_like_vinduer_deler_ikke_paa_de_samme_beholdte(self):
+        """**Beholdningen forbrukes per vindu.** Slås den opp på nytt for
+        hvert vindu, trekker to like vinduer fra de samme plassene — og til
+        sammen lages det for få."""
+        self._plass(mannskap=self.p_hgsd)
+        svar = services.generer_grunnlag(self.vl2, [{
+            'ressurs_id': self.res.pk,
+            'vinduer': [{'fra': kl(2, 14), 'til': kl(2, 22), 'plasser': 2},
+                        {'fra': kl(2, 14), 'til': kl(2, 22), 'plasser': 2}]}])
+        self.assertEqual(3, svar['plasser'], '4 ønsket, 1 sto fra før')
+        self.assertEqual(4, Vaktpost.objects.filter(ressurs=self.res).count())
+
+    def test_tidene_kan_flyttes(self):
+        """Kladden lages på nytt av vinduene, så et rettet klokkeslett slår
+        igjennom."""
+        self._plass()
+        self._generer(self._linje(kl(3, 8), kl(3, 16)))
+        tider = set(Vaktpost.objects.filter(ressurs=self.res)
+                    .values_list('fra_tid', 'til_tid'))
+        self.assertEqual({(kl(3, 8), kl(3, 16))}, tider)
+
+    def test_nye_plasser_er_kladd(self):
+        """Beslutning 10: de fødes usynlige for korpsene."""
+        self._generer()
+        for vp in Vaktpost.objects.filter(ressurs=self.res):
+            self.assertTrue(services.er_planlagt(vp))
+
+    def test_grensen_maales_paa_det_som_lages(self):
+        """En rad som allerede står med sine plasser lager ingen, og skal
+        ikke telle mot taket hver gang noen retter et klokkeslett.
+
+        Måles grensen på tallene i feltene, ville en stor vaktliste blitt
+        umulig å redigere i planleggeren i det øyeblikket den var satt opp —
+        og feilmeldingen ville bedt deg sjekke tidene og antallet, som begge
+        var riktige."""
+        from unittest.mock import patch
+        self._plass(mannskap=self.p_hgsd)
+        self._plass(mannskap=self.p_karmoy)
+        with patch.object(services, 'MAKS_PLASSER_TOTALT', 1):
+            svar = self._generer(self._linje(kl(2, 14), kl(2, 22), plasser=3))
+        self.assertEqual(1, svar['plasser'], '2 sto fra før, 1 lages')
+
+        with patch.object(services, 'MAKS_PLASSER_TOTALT', 1):
+            with self.assertRaises(services.Planleggerfeil):
+                self._generer(self._linje(kl(3, 14), kl(3, 22), plasser=2))
+
+    def test_ressurs_uten_vindu_avvises_ogsaa_med_ressurs_id(self):
+        with self.assertRaises(services.Planleggerfeil):
+            services.generer_grunnlag(
+                self.vl2, [{'ressurs_id': self.res.pk, 'vinduer': []}])
+
     def test_slettet_kladd_kommer_tilbake_naar_skrivingen_feiler(self):
-        """**Transaksjonen er ikke pynt her.** `erstatt_kladd` sletter først
-        og skriver så; feiler skrivingen halvveis uten savepoint, står man
-        igjen med en liste der kladden er borte og ingenting kom i stedet —
-        altså verre enn før man trykket.
+        """**Transaksjonen er ikke pynt her.** Genereringen sletter kladd før
+        den skriver; feiler skrivingen halvveis uten savepoint, står man igjen
+        med en liste der kladden er borte og ingenting kom i stedet — altså
+        verre enn før man trykket.
 
         Mutasjonsprøvd: `transaction.atomic()` lot seg fjerne uten at noe ble
         rødt, fordi all validering skjer i `_planlegg` *før* skrivingen. Det
@@ -447,11 +603,13 @@ class ErstattKladdTests(TilgangsBasis):
                 raise RuntimeError('basen falt ut midt i skrivingen')
             return ekte(*args, **kwargs)
 
-        linjer = [self._linje(), self._linje()]
+        # Den første linja rydder kladden, de to neste oppretter ressurser —
+        # og den andre opprettelsen er den som ryker.
+        linjer = [self._linje(), self._linje(ressurs=False),
+                  self._linje(ressurs=False)]
         with patch.object(Ressurs.objects, 'create', side_effect=feiler):
             with self.assertRaises(RuntimeError):
-                services.generer_grunnlag(self.vl2, linjer,
-                                          erstatt_kladd=True)
+                services.generer_grunnlag(self.vl2, linjer)
 
         self.assertTrue(Vaktpost.objects.filter(pk=kladd.pk).exists(),
                         'kladden skal stå der som før')
@@ -530,6 +688,38 @@ class PlanleggerApiTests(TilgangsBasis):
                 res = self._kall(self.c_leder, **kropp)
                 self.assertEqual(400, res.status_code)
                 self.assertTrue(res.json()['message'])
+
+    def test_ressurs_id_gaar_hele_veien_gjennom_viewet(self):
+        """Feltet må leses av `_planleggerlinjer`, ikke bare av `services`.
+        Faller det på gulvet i viewet, lager et andre trykk «Lag 2» ved siden
+        av «Lag 1» — nøyaktig feilen redigeringen finnes for."""
+        res = Ressurs.objects.create(
+            vaktliste=self.vl2, navn='Lag 1', gruppe=gruppe('Lag'))
+        Vaktpost.objects.create(
+            ressurs=res, fra_tid=kl(2, 14), til_tid=kl(2, 22))
+
+        svar = self._kall(self.c_leder, linjer=[{
+            'ressurs_id': res.pk,
+            'vinduer': [{'fra': kl(3, 14).isoformat(),
+                         'til': kl(3, 22).isoformat(), 'plasser': 3}]}])
+        self.assertEqual(200, svar.status_code)
+        data = svar.json()['data']
+        self.assertEqual(0, data['ressurser'], 'ingen ny ressurs')
+        self.assertEqual(3, data['plasser'])
+        self.assertEqual(1, data['fjernes'], 'den gamle kladdplassen ryddes')
+        self.assertTrue(data['linjer'][0]['finnes'])
+        self.assertEqual(
+            1, Ressurs.objects.filter(vaktliste=self.vl2).count(),
+            'ressursen skal rettes, ikke dupliseres')
+        self.assertEqual(3, Vaktpost.objects.filter(ressurs=res).count())
+
+    def test_ukjent_ressurs_id_gir_400_ikke_500(self):
+        res = self._kall(self.c_leder, linjer=[{
+            'ressurs_id': 999999,
+            'vinduer': [{'fra': kl(2, 14).isoformat(),
+                         'til': kl(2, 22).isoformat(), 'plasser': 1}]}])
+        self.assertEqual(400, res.status_code)
+        self.assertTrue(res.json()['message'])
 
     def test_ukjent_vaktliste_gir_404(self):
         res = self.c_leder.post(

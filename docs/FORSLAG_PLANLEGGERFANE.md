@@ -311,6 +311,25 @@ den er å trekke tilbake noe som er delt ut.
 tilstander: en tabell må vedlikeholdes når tilstand fem kommer, en funksjon
 trenger det ikke.
 
+### 11b. Genereringen rører bare de ressursene oppsettet nevner
+
+*Strammet 15. sep. 2026, da planleggeren ble en redigeringsflate (§18).*
+
+Beslutning 4 og 11 svarte på **hvilke plasser** som kan erstattes. Da
+planleggeren begynte å lese oppsettet tilbake, kom et annet spørsmål: **hvilke
+ressurser?**
+
+`erstatt_kladd` var en bryter i bekreftelsesdialogen som ryddet kladd på **hele
+lista** — også på ressurser oppsettet ikke nevnte. Med tilbakelesingen står
+alle ressursene i oppsettet som standard, så bryteren gjorde ingenting nytt; det
+eneste den kunne gjøre, var å rydde bort kladd på en ressurs man hadde tatt
+*ut* av oppsettet. Det er stikk i strid med hva «ta ut» betyr.
+
+Regelen er derfor: **raden som peker på ressursen er den eneste som rører den.**
+En ressurs utenfor oppsettet lar generatoren være i fred. Å fjerne en ressurs er
+en sletting, og den ligger bak de to bekreftelsene i «Rediger ressurs» — ett
+sted, ikke to.
+
 ### 12. Budsjettlinja bor i den fanen som alt finnes
 
 *Tatt under byggingen 15. sep. 2026.*
@@ -427,6 +446,41 @@ Feltet heter derfor «plasser per skift», og **regnestykket står under raden**
 6 skift = 12 plasser, 96 t». Oversettelsen fra hvordan man snakker om bemanning til hva
 modellen lagrer skal være synlig før man trykker, ikke etterpå.
 
+### 18. Planleggeren leser oppsettet tilbake, den husker det ikke
+
+*Tatt 15. sep. 2026, meldt fra staging.*
+
+> «Når en har lagt grunnlag og vil redigere så er det ikke lenger i "planlegger"
+> — det må vel gå ann å huske dem og la en redigere der?» (André)
+
+Etter en generering tømte klienten oppsettet, med den begrunnelsen at et andre
+trykk ellers ville laget «Lag 4, 5, 6» ved siden av «Lag 1, 2, 3». Begrunnelsen
+var riktig; løsningen var feil sted å løse den.
+
+**Å huske kladden er den dårligere av de to formene.** En husket kladd og
+virkeligheten glir fra hverandre i det øyeblikket noen retter et skift i
+regnearket — og da ville et trykk på «Lag grunnlaget» rullet den rettelsen
+tilbake, uten at noen ba om det. Planleggeren leser derfor **hva som står**: én
+rad per ressurs, vinduene gruppert på plassenes tider.
+
+Raden bærer `ressurs_id`, og det gjør den til en **redigering** på serveren.
+Gruppa og navnet følger ressursen og ikke linja: å flytte en bil til en annen
+gruppe eller døpe den om hører hjemme i «Rediger ressurs», der sletting og
+enhetskobling alt ligger. Den som er to steder kommer i utakt.
+
+**«Plasser» er vinduets hele bemanning, ikke et påslag.** Står det fire 14–22,
+skal det være fire etterpå — også når to av dem har navn på seg. De som står
+telles fra, og bare differansen lages. Uten fratrekket ville en ressurs man
+redigerte to ganger vokst for hver gang, og tallet i feltet sluttet å bety det
+det sier.
+
+**Panelet viser oppsettet, bekreftelsen viser endringen.** To ulike spørsmål, og
+to steder å svare på dem: panelet sier hva lista skal *være*, dialogen hva som
+*skjer* — hvor mange nye plasser som lages, og hvor mange planlagte som ryddes
+bort. Å redigere et vindu fra seks plasser til fire sletter to, og det er det
+eneste i hele planleggeren som fjerner noe; da skal det stå i setningen man
+leser før man trykker.
+
 ---
 
 ## 7. Anbefalt rekkefølge
@@ -449,6 +503,11 @@ modellen lagrer skal være synlig før man trykker, ikke etterpå.
    *Rekkefølgen ble snudd med vilje: notatet hadde generatoren sist, «i sin enkleste
    form». Den er ikke en fotnote til budsjettlinja — den er funksjonen André bestilte,
    og budsjettlinja er et verktøy inne i den.*
+
+   **Fire runder med tilbakemelding fra staging samme dag** formet den ferdig:
+   feltene som ikke lot seg fylle ut, «antall» og «skiftlengde» som forvirret,
+   knappens plassering, tastaturet i tidsfeltene — og til slutt beslutning 11b og
+   18, som gjorde den om fra et engangsskjema til flaten grunnlaget redigeres i.
 5. **Bildet av vakta** — kurvene ved siden av hverandre over felles spenn. Står igjen, og
    er verdt å vurdere på nytt nå: verdien var «se hull og topper mens du legger inn», og
    det er først med generatoren på plass at man vet hva man vil se etter.
