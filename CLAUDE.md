@@ -218,6 +218,18 @@ vi knapper som fører til 403 — og en knapp som fører til en vegg er verre en
 Ordet «bruker» i grensesnittet betyr *ikke* «vanlig tilgang» — kontoen ser ingenting før
 den har en `ModulTilgang`-rad.
 
+**`is_superuser` og `is_staff` er Djangos, ikke portalens** (15. sep. 2026). De gater
+bare `/django-admin/`, som er rutet av i produksjon (S1), og settes **kun** av
+`manage.py create_admin`. Å gjøre noen til administrator i brukeradministrasjonen setter
+dem *ikke*, og skal ikke gjøre det — portaltilgang er `role == 'admin'` og `ModulTilgang`.
+
+Det gjør superbrukerkontoen til noe annet enn «en administrator til»: den er den ene man
+kommer tilbake inn med. `_kan_degraderes()` og `_kan_slettes()` sperrer derfor begge på
+`target.is_superuser`. **«Siste admin»-sperra dekker den ikke** — er det tre
+administratorer, kan superbrukeren degraderes uten at noe protesterer, og da er nødutgangen
+borte mens portalen ser helt normal ut. **Frysing står igjen med vilje:** grensen går ved om
+handlingen lar seg reversere, og «Tø konto» står ved siden av.
+
 De fem `kan_redigere_*`-flaggene er **borte** (deploy 3). Skal en ny modul gates, trengs
 ingen kolonne på `CustomUser` — en `ModulTilgang`-rad er hele mekanismen. Det var nettopp
 det flaggene gjorde galt: de la tilgang i skjemaet i stedet for i data, og en modul som
@@ -423,7 +435,14 @@ bare volumet — så `offsite.livssyklus()` leser reglene *tilbake* fra bucketen
 `_avvik()` sammenligner dem med `FORVENTET_DAGER` på **nøyaktig** prefiks;
 `/full` er ikke `full/`, og en regel som treffer ingenting er en oppbevaringstid
 som stille ble uendelig. Avviket står på `/portal-admin/backup/`; funksjonen
-kaster aldri og cacher i fem minutter. `hent_offsite --list`
+kaster aldri og cacher i fem minutter. **Prefikset leses av `_prefiks()`, som kjenner tre
+former** (15. sep. 2026): `Filter.Prefix`, `Filter.And.Prefix` — den S3 bruker når regelen
+kombinerer prefiks med en tag eller en størrelsesgrense — og det gamle `Prefix` på toppnivå.
+Vi leste to av dem, og meldte «filene blir liggende for alltid» om en regel som sto helt
+riktig. Det er den verste sorten feilmelding: den peker på en ekte fare på et tidspunkt der
+faren ikke finnes, og lærer den som leser den å overse kortet. Feilteksten bærer nå også
+**koden Scaleway faktisk svarte** — sto det «mangler ObjectStorageBucketsRead» uansett, var
+en riktig satt nøkkel og en feil i vår egen kode umulig å skille fra hverandre. `hent_offsite --list`
 / `hent_offsite <filnavn>` henter, dekrypterer og legger fila i `BACKUP_DIR` med
 en `Backup`-rad; prefikset utledes av slugen i filnavnet. **`gjenopprett` er den
 som rører basen** (`--list`, `--siste <modul>`, `--hent <objekt>`, `--full`,

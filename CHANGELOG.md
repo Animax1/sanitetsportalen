@@ -4,6 +4,70 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-15 — Superbrukeren er nødutgangen, og Scaleway-kortet løy
+
+To korte punkter fra samme runde som vaktliste-porten over.
+
+### `is_superuser` kan ikke fratas admin-rollen
+
+**André:** «`is_superuser` må være immun mot å bli nedgradert fra administrator. Ser at når
+noen blir gjort administrator så blir de ikke gjort til `is_superuser`, som er slik det skal
+være.»
+
+Observasjonen er riktig, og den er verdt å skrive ned: **`is_superuser` og `is_staff` betyr
+ingenting for portalen.** De gater `/django-admin/`, som er rutet av i produksjon (S1).
+Portaltilgang er `role == 'admin'` og `ModulTilgang`. Flaggene settes bare av
+`manage.py create_admin`, og skal ikke følge med når noen forfremmes.
+
+Nettopp derfor er kontoen noe annet enn «en administrator til»: den er den ene man kommer
+tilbake inn med. **Og «siste admin»-sperra dekket den ikke** — er det tre administratorer,
+kunne superbrukeren degraderes uten at noe protesterte, og da var nødutgangen borte mens
+portalen så helt normal ut.
+
+`_kan_degraderes()` sperrer nå på `target.is_superuser`. **Og `_kan_slettes()` gjør det
+samme,** selv om det ikke sto i bestillingen: en regel som sperrer degradering, men slipper
+sletting, verner ingenting — sletting tar kontoen og ikke bare rollen, og er i tillegg
+endelig. **Frysing står igjen med vilje.** Grensen går ved om handlingen lar seg reversere,
+og «Tø konto» står ved siden av.
+
+Fire mutanter, alle røde — blant dem «sperra treffer alle admins», som ville gjort hver
+administrator udegraderbar. Den retningen er like gal, bare stillere.
+
+### Scaleway-kortet meldte avvik som ikke fantes
+
+**André:** «Bug med lifecycle-tilbakemeldingen fra Scaleway. Permissions skal være korrekt,
+er feilen i koden?»
+
+Ja, i hvert fall delvis. `_les_livssyklus()` leste prefikset fra `Filter.Prefix` og det
+gamle `Prefix` på toppnivå — men **ikke fra `Filter.And.Prefix`**, som er formen S3 sender
+når en regel kombinerer prefiks med en tag eller en størrelsesgrense. Da leste vi tomt
+prefiks, og `_avvik()` meldte «ingen livssyklusregel for `backups/` — filene der blir
+liggende for alltid» om en regel som sto helt riktig i bucketen.
+
+**Det er den verste sorten feilmelding:** den peker på en ekte fare, på et tidspunkt der
+faren ikke finnes, og lærer den som leser den å overse kortet. De tre formene leses nå av
+`_prefiks()`, med en sperrehake som krever at «ingen prefiks» fortsatt er et avvik — leses
+det som «treffer alt», ville enhver regel sett riktig ut og kortet sluttet å måle noe.
+
+**Og feilteksten sier nå hva Scaleway faktisk svarte.** Den sa «nøkkelen mangler
+ObjectStorageBucketsRead» uansett hvilken kode som kom tilbake, og da er en riktig satt
+nøkkel og en feil i vår egen kode umulig å skille fra hverandre — begge ser ut som et
+rettighetsproblem, og man leter på feil sted. Koden og meldinga står nå i teksten, vasket
+for nøkler.
+
+**Er det fortsatt galt på staging, er det nå mulig å se hvorfor** — kortet sier koden.
+
+**Én test ble degenerert underveis, og det er verdt å merke seg:** vaskingen prøves mot
+klassens fikstur, der `secret_key` er `'b'`. Da består testen — eller feiler — på om
+bokstaven «b» tilfeldigvis står i feilteksten («Object»), ikke på om vaskingen virker. Den
+har nå en realistisk nøkkel. En sannhet om ett tegn er ikke en sannhet om en nøkkel.
+
+**Endret:** `accounts/views.py`, `core/offsite.py`,
+`accounts/tests_sikkerhet_runde1.py` (+6 tester), `core/tests_offsite.py` (+5 tester),
+`CLAUDE.md`. Ingen migrasjon. Hele suiten (3 067 tester) grønn.
+
+---
+
 ## 2026-09-15 — Korps-føreren bemanner, hun setter ikke opp
 
 **Meldt fra staging (André):**

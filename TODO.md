@@ -2233,6 +2233,19 @@ Funnene under er allerede kartlagt, så jobben er avgrenset når den skal gjøre
 
 ### Løse punkter
 
+- [x] **`is_superuser` er immun mot degradering og sletting** (15. sep. 2026, André).
+      «Siste admin»-sperra dekket den ikke: med tre administratorer kunne nødutgangen
+      forsvinne uten at noe protesterte. Frysing står igjen — den lar seg reversere.
+      Fire mutanter, alle røde.
+      - Bekreftet samtidig: `is_staff` og `is_superuser` betyr **ingenting** for
+        portalen, bare for `/django-admin/` som er av i prod (S1). Står nå i `CLAUDE.md`
+- [x] **Scaleway-lifecycle: avvik som ikke fantes** (15. sep. 2026, meldt av André).
+      `Filter.And.Prefix` ble ikke lest, så en riktig regel ble meldt som «filene blir
+      liggende for alltid». Feilteksten sa dessuten «mangler ObjectStorageBucketsRead»
+      uansett hvilken kode Scaleway svarte. Fem mutanter, alle røde.
+      - [ ] **Verifiser på staging/prod at kortet nå er grønt.** Er det fortsatt rødt,
+            står den ekte feilkoden i meldinga — den avgjør om det er rettigheter eller
+            kode
 - [x] **`/vaktliste/`: korps-føreren kunne opprette skift og flytte tider** (15. sep.
       2026, meldt fra staging). `skriv_handling` gikk rett på `kan_sette_vaktpost()` —
       altså badgen — mens `CLAUDE.md` sa at å opprette en plass var `skriv_full`.

@@ -1331,12 +1331,28 @@ def user_detail_view(request, pk):
 
 def _kan_degraderes(target, actor, ny_rolle, rolle_for=None):
     """Begrunnelse for å nekte, eller '' — når «Rediger» tar admin-rollen fra
-    noen. Samme to sperrer som sletting: ikke deg selv, ikke siste admin.
+    noen. Tre sperrer: ikke en superbruker, ikke deg selv, ikke siste admin.
     `rolle_for` er rollen før skjemaet: `ModelForm.is_valid()` har alt
     skrevet den nye på instansen."""
     gammel = rolle_for if rolle_for is not None else target.role
     if gammel != 'admin' or ny_rolle == 'admin':
         return ''
+    # **Superbrukeren er nødutgangen** (André, 15. sep. 2026: «is_superuser må
+    # være immun mot å bli nedgradert fra administrator»).
+    #
+    # `is_superuser` settes bare av `create_admin`, og **skal ikke følge med
+    # når noen gjøres til administrator** — det er André sin observasjon, og
+    # den er riktig: portaltilgang er `role == 'admin'` og `ModulTilgang`,
+    # mens `is_superuser` og `is_staff` bare betyr noe i Django-admin, som er
+    # rutet av i produksjon (S1). Flagget er altså ikke en rolle, men den ene
+    # kontoen man kommer tilbake inn med når noe har gått galt.
+    #
+    # «Siste admin»-sperra under dekker ikke dette: er det tre administratorer,
+    # kan superbrukeren degraderes uten at noe protesterer, og da er
+    # nødutgangen borte mens portalen ser helt normal ut.
+    if target.is_superuser:
+        return ('Denne kontoen er portalens superbruker og kan ikke fratas '
+                'admin-rollen. Superbrukeren settes med `manage.py create_admin`.')
     if target.pk == actor.pk:
         return 'Du kan ikke ta admin-rollen fra din egen konto.'
     andre = CustomUser.objects.filter(role='admin', is_active=True).exclude(pk=target.pk).count()
@@ -1361,6 +1377,14 @@ def _kan_slettes(target, actor):
     """
     if target.pk == actor.pk:
         return False, 'Du kan ikke slette din egen konto.'
+
+    # **En regel som sperrer degradering, men slipper sletting, verner
+    # ingenting** (15. sep. 2026). Sletting tar kontoen og ikke bare rollen,
+    # så veien tilbake inn er like borte — og den er i tillegg endelig.
+    # Samme begrunnelse som sperra i `_kan_degraderes`.
+    if target.is_superuser:
+        return False, ('Denne kontoen er portalens superbruker og kan ikke '
+                       'slettes herfra.')
 
     if target.role == 'admin':
         andre_admins = CustomUser.objects.filter(

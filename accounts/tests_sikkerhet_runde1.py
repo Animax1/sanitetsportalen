@@ -172,3 +172,77 @@ class PassordbytteOgSesjonsnokkelTests(TestCase):
         self.assertEqual(res.status_code, 302, res.content)
         u.refresh_from_db()
         self.assertEqual(u.current_session_key, c.session.session_key)
+
+
+@override_settings(SECURE_SSL_REDIRECT=False, RATELIMIT_ENABLE=False)
+class SuperbrukerenErNodutgangenTests(TestCase):
+    """`is_superuser` kan ikke fratas admin-rollen (André, 15. sep. 2026).
+
+    **Hvorfor flagget, og ikke rollen.** `is_superuser` og `is_staff` betyr
+    ingenting for portalen: tilgang er `role == 'admin'` og `ModulTilgang`,
+    og de to Django-flaggene gjelder bare `/django-admin/`, som er rutet av i
+    produksjon (S1). De settes derfor bare av `manage.py create_admin`, og
+    **følger bevisst ikke med** når noen gjøres til administrator gjennom
+    brukeradministrasjonen — det var André sin observasjon, og den er riktig.
+
+    Det gjør kontoen til noe annet enn «en administrator til»: den er den ene
+    man kommer tilbake inn med. «Siste admin»-sperra dekker den ikke — er det
+    tre administratorer, kan superbrukeren degraderes uten at noe protesterer,
+    og da er nødutgangen borte mens portalen ser helt normal ut.
+    """
+
+    def setUp(self):
+        self.super = CustomUser.objects.create_user(
+            username='rot', password='x', role='admin',
+            must_change_password=False, is_staff=True, is_superuser=True)
+        gi_standardtilgang(self.super, 'admin')
+        self.admin = CustomUser.objects.create_user(
+            username='adm_s', password='x', role='admin',
+            must_change_password=False)
+        gi_standardtilgang(self.admin, 'admin')
+        self.c = Client()
+        self.c.force_login(self.admin)
+
+    def test_superbrukeren_beholder_admin_selv_om_det_finnes_andre(self):
+        """Den ene testen «siste admin» ikke ville fanget: her *er* det en
+        admin igjen, så den gamle sperra sier ja."""
+        self.c.post(reverse('portaladmin:user_detail',
+                            kwargs={'pk': self.super.pk}),
+                    {'action': 'edit', 'role': 'bruker'})
+        self.super.refresh_from_db()
+        self.assertEqual(self.super.role, 'admin')
+
+    def test_hjelperen_sier_hvorfor(self):
+        from accounts.views import _kan_degraderes
+        grunn = _kan_degraderes(self.super, self.admin, 'bruker', 'admin')
+        self.assertIn('superbruker', grunn.lower())
+
+    def test_en_vanlig_admin_kan_fortsatt_degraderes(self):
+        """Den andre retningen. Sperrer flagget for mye, blir hver admin
+        udegraderbar — og det ville vært like galt, bare stillere."""
+        from accounts.views import _kan_degraderes
+        self.assertEqual(
+            _kan_degraderes(self.admin, self.super, 'bruker', 'admin'), '')
+
+    def test_den_slettes_ikke_heller(self):
+        """En regel som sperrer degradering, men slipper sletting, verner
+        ingenting: sletting tar kontoen og ikke bare rollen."""
+        from accounts.views import _kan_slettes
+        kan, grunn = _kan_slettes(self.super, self.admin)
+        self.assertFalse(kan)
+        self.assertIn('superbruker', grunn.lower())
+
+        res = self.c.post(reverse('portaladmin:user_delete',
+                                  kwargs={'pk': self.super.pk}))
+        self.assertTrue(CustomUser.objects.filter(pk=self.super.pk).exists())
+        self.assertIn(res.status_code, (302, 403))
+
+    def test_frysing_staar_igjen_med_vilje(self):
+        """**Grensen er om handlingen lar seg reversere.** Frysing er det —
+        «Tø konto» står ved siden av — og en annen administrator kan alltid
+        tine kontoen. Degradering og sletting er det ikke."""
+        self.c.post(reverse('portaladmin:user_detail',
+                            kwargs={'pk': self.super.pk}), {'action': 'freeze'})
+        self.super.refresh_from_db()
+        self.assertFalse(self.super.is_active)
+        self.assertEqual(self.super.role, 'admin', 'rollen står, kontoen er tint tilbake')

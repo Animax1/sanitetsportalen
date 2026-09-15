@@ -302,18 +302,24 @@ def _les_livssyklus() -> dict:
                               f'blir liggende for alltid.'
                               for p in FORVENTET_DAGER]}
         if kode in ('AccessDenied', 'Forbidden'):
+            # **Koden står i meldinga, ikke bare tolkningen av den**
+            # (15. sep. 2026). Teksten sa «nøkkelen mangler
+            # ObjectStorageBucketsRead» uansett hva Scaleway faktisk svarte, og
+            # da er en riktig satt nøkkel og en feil i vår egen kode umulig å
+            # skille fra hverandre: begge ser ut som et rettighetsproblem.
+            # Kortet skal si hva som ble spurt om og hva som kom tilbake.
             return {'kjent': False, 'regler': [], 'avvik': [],
-                    'feil': 'Nøkkelen mangler ObjectStorageBucketsRead, så '
-                            'reglene kan ikke leses herfra. Se dem i konsollen.'}
+                    'feil': f'Scaleway svarte «{kode}» på lesing av '
+                            f'livssyklusreglene. Har nøkkelen '
+                            f'ObjectStorageBucketsRead? '
+                            f'({_vask(str(exc))})'}
         logger.warning('core.offsite: kunne ikke lese livssyklusreglene: %s', exc)
         return {'kjent': False, 'regler': [], 'avvik': [],
                 'feil': f'{navn}: {exc}'[:200]}
 
     regler = []
     for rad in raa:
-        prefiks = (rad.get('Filter') or {}).get('Prefix')
-        if prefiks is None:
-            prefiks = rad.get('Prefix', '')
+        prefiks = _prefiks(rad)
         regler.append({
             'id': rad.get('ID', ''),
             'prefiks': prefiks,
@@ -323,6 +329,38 @@ def _les_livssyklus() -> dict:
 
     return {'kjent': True, 'feil': '', 'regler': regler,
             'avvik': _avvik(regler)}
+
+
+def _vask(melding: str) -> str:
+    """Feilteksten uten nøkler, kortet ned. Den vises i nettleseren."""
+    k = konfig()
+    for hemmelig in (k.get('access_key'), k.get('secret_key')):
+        if hemmelig:
+            melding = melding.replace(hemmelig, '***')
+    return melding[:160]
+
+
+def _prefiks(rad: dict) -> str:
+    """Prefikset regelen filtrerer på, uansett hvilken form S3 sender det i.
+
+    **Tre former, og vi leste to** (15. sep. 2026). En regel med *bare* et
+    prefiks kommer som `Filter.Prefix`; den gamle API-versjonen la det på
+    toppnivå; men en regel som kombinerer prefiks med noe annet — en tag, en
+    størrelsesgrense — pakker alt i `Filter.And`, og da er `Filter.Prefix`
+    fraværende.
+
+    Uten den tredje formen leste vi tomt prefiks, og `_avvik()` meldte «ingen
+    livssyklusregel for backups/ — filene der blir liggende for alltid» om en
+    regel som sto helt riktig i bucketen. Det er den verste sorten feilmelding:
+    den peker på en ekte fare, på et tidspunkt der faren ikke finnes, og lærer
+    den som leser den å overse kortet.
+    """
+    f = rad.get('Filter') or {}
+    for kandidat in (f.get('Prefix'), (f.get('And') or {}).get('Prefix'),
+                     rad.get('Prefix')):
+        if kandidat is not None:
+            return kandidat
+    return ''
 
 
 def _avvik(regler: list[dict]) -> list[str]:

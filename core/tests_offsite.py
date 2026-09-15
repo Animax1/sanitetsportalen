@@ -284,6 +284,92 @@ class LivssyklusTests(SimpleTestCase):
         self.assertFalse(svar['kjent'])
         self.assertIn('ObjectStorageBucketsRead', svar['feil'])
 
+    def test_prefiks_i_en_and_blokk_leses(self) -> None:
+        """**Feilen André meldte, mest sannsynlig** (15. sep. 2026).
+
+        En regel som kombinerer prefiks med noe annet — en tag, en
+        størrelsesgrense — pakker alt i `Filter.And`, og da er `Filter.Prefix`
+        fraværende. Vi leste tomt prefiks og meldte «ingen livssyklusregel for
+        backups/ — filene der blir liggende for alltid» om en regel som sto
+        helt riktig i bucketen.
+
+        Det er den verste sorten feilmelding: den peker på en ekte fare, på et
+        tidspunkt der faren ikke finnes, og lærer den som leser den å overse
+        kortet.
+        """
+        svar = self._les([
+            {'ID': 'a', 'Status': 'Enabled',
+             'Filter': {'And': {'Prefix': 'backups/',
+                                'ObjectSizeGreaterThan': 1}},
+             'Expiration': {'Days': 730}},
+            {'ID': 'b', 'Status': 'Enabled',
+             'Filter': {'And': {'Prefix': 'full/',
+                                'Tags': [{'Key': 'k', 'Value': 'v'}]}},
+             'Expiration': {'Days': 90}},
+        ])
+        self.assertEqual(svar['avvik'], [], svar)
+
+    def test_prefiks_paa_toppnivaa_leses_fortsatt(self) -> None:
+        """Den gamle API-formen. Nye former skal ikke koste de gamle."""
+        svar = self._les([
+            {'ID': 'a', 'Status': 'Enabled', 'Prefix': 'backups/',
+             'Expiration': {'Days': 730}},
+            {'ID': 'b', 'Status': 'Enabled', 'Prefix': 'full/',
+             'Expiration': {'Days': 90}},
+        ])
+        self.assertEqual(svar['avvik'], [], svar)
+
+    def test_en_and_blokk_uten_prefiks_er_fortsatt_et_avvik(self) -> None:
+        """Sperrehake: leses «ingen prefiks» som «treffer alt», ville enhver
+        regel sett riktig ut og kortet sluttet å måle noe."""
+        svar = self._les([
+            {'ID': 'a', 'Status': 'Enabled',
+             'Filter': {'And': {'Tags': [{'Key': 'k', 'Value': 'v'}]}},
+             'Expiration': {'Days': 730}},
+        ])
+        self.assertEqual(len(svar['avvik']), 2, svar)
+
+    def test_feilmeldingen_sier_hva_scaleway_faktisk_svarte(self) -> None:
+        """Teksten sa «nøkkelen mangler ObjectStorageBucketsRead» uansett hva
+        som kom tilbake. Da er en riktig satt nøkkel og en feil i vår egen kode
+        umulig å skille fra hverandre — begge ser ut som et rettighetsproblem,
+        og man leter på feil sted. Det var André sitt spørsmål: «permissions
+        skal være korrekt, er feilen i koden?»"""
+        class Klient:
+            def get_bucket_lifecycle_configuration(self, **_):
+                feil = Exception('ikke lov for deg')
+                feil.response = {'Error': {'Code': 'Forbidden'}}
+                raise feil
+
+        with patch('core.offsite._klient', return_value=Klient()):
+            svar = offsite.livssyklus(bruk_cache=False)
+        self.assertIn('Forbidden', svar['feil'])
+        self.assertIn('ikke lov for deg', svar['feil'])
+
+    @override_settings(OFFSITE_S3_SECRET_KEY='SCWxxxxHEMMELIGxxxx9999')
+    def test_feilmeldingen_baerer_ingen_noekler(self) -> None:
+        """Den vises i nettleseren, og boto3 legger gjerne hele forespørselen
+        i teksten.
+
+        **Nøkkelen settes realistisk her med vilje.** Klassens vanlige
+        fikstur har `secret_key='b'`, og da består testen — eller feiler — på
+        om bokstaven «b» tilfeldigvis står i feilteksten («Object»), ikke på
+        om vaskingen virker. En sannhet om ett tegn er ikke en sannhet om en
+        nøkkel.
+        """
+        hemmelig = 'SCWxxxxHEMMELIGxxxx9999'
+
+        class Klient:
+            def get_bucket_lifecycle_configuration(self, **_):
+                feil = Exception(f'auth failed for {hemmelig}')
+                feil.response = {'Error': {'Code': 'AccessDenied'}}
+                raise feil
+
+        with patch('core.offsite._klient', return_value=Klient()):
+            svar = offsite.livssyklus(bruk_cache=False)
+        self.assertNotIn(hemmelig, svar['feil'])
+        self.assertIn('***', svar['feil'], 'den skal faktisk ha vasket noe')
+
     def test_kaster_aldri(self) -> None:
         """Et kort som selv gir feil er borte akkurat når man trenger det."""
         class Klient:
