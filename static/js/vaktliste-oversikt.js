@@ -750,6 +750,16 @@ function planleggerTotal() {
 }
 
 
+function _vindutallTekst(t) {
+  // Teksten under skiftvinduet, som ren tekst. **Ingen markup**, fordi den
+  // også settes med `textContent` når tallene oppdateres uten omtegning —
+  // se `planleggerTegnTall()`. To former av samme tekst ville kommet i utakt.
+  return t.gyldig
+    ? `${_tall(t.spenn)} t · ${_tall(t.timer)} t i alt`
+    : 'ugyldig tidsrom';
+}
+
+
 function _gruppeFor(id) {
   return (aktivListe?.grupper || []).find((g) => String(g.id) === String(id))
       || null;
@@ -762,9 +772,7 @@ function _planleggerVindu(linje, vindu) {
   // vinduet (Haugesund 56, 8 timer på og 8 av). Ett felt med to betydninger
   // er her enklere enn to kontroller som utelukker hverandre.
   const t = _planleggerVindutall(vindu);
-  const fasit = t.gyldig
-    ? `${escapeHtml(_tall(t.spenn))} t · ${escapeHtml(_tall(t.timer))} t i alt`
-    : '<span class="vl-advarsel">ugyldig tidsrom</span>';
+  const fasitklasse = t.gyldig ? '' : ' vl-advarsel';
   // Det første vinduet kan ikke fjernes — en ressurs uten skiftvindu er
   // ingenting, og serveren avviser det. En knapp som fører til en vegg er
   // verre enn ingen knapp.
@@ -792,7 +800,8 @@ function _planleggerVindu(linje, vindu) {
                value="${escHtmlValue(vindu.plasser)}"
                data-action="planleggerSettVindu" data-hendelse="change"
                data-felt="plasser" data-id="${escHtmlValue(vindu.id)}"></label>
-      <span class="vl-meta vl-pl-vindutall">${fasit}</span>
+      <span class="vl-meta vl-pl-vindutall${fasitklasse}"
+            data-vindutall="${escHtmlValue(vindu.id)}">${escapeHtml(_vindutallTekst(t))}</span>
       ${slett}
     </div>`;
 }
@@ -843,7 +852,8 @@ function _planleggerLinje(linje) {
                 data-action="planleggerNyttVindu" data-id="${escHtmlValue(linje.id)}">
           <i class="bi bi-plus-lg me-1"></i>Nytt skiftvindu
         </button>
-        <span class="vl-meta vl-pl-regnestykke">${escapeHtml(_planleggerRegnestykke(linje, t))}</span>
+        <span class="vl-meta vl-pl-regnestykke"
+              data-linjetall="${escHtmlValue(linje.id)}">${escapeHtml(_planleggerRegnestykke(linje, t))}</span>
       </div>
     </div>`;
 }
@@ -905,9 +915,9 @@ function mkPlanlegger() {
   const oppsummering = planleggerlinjer.length ? `
     <div class="vl-kort vl-belastningshode">
       <div class="vl-noekkeltall">
-        <div><b>${escHtmlValue(total.ressurser)}</b><span class="vl-meta">ressurser</span></div>
-        <div><b>${escHtmlValue(total.plasser)}</b><span class="vl-meta">tomme plasser</span></div>
-        <div><b>${escapeHtml(_tall(total.timer))} t</b><span class="vl-meta">til sammen</span></div>
+        <div><b data-plantall="ressurser">${escHtmlValue(total.ressurser)}</b><span class="vl-meta">ressurser</span></div>
+        <div><b data-plantall="plasser">${escHtmlValue(total.plasser)}</b><span class="vl-meta">tomme plasser</span></div>
+        <div><b data-plantall="timer">${escapeHtml(_tall(total.timer))} t</b><span class="vl-meta">til sammen</span></div>
       </div>
       <span class="vl-pl-spacer"></span>
       <button type="button" class="btn btn-primary" id="planlegger-knapp"

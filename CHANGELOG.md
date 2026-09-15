@@ -4,6 +4,44 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-15 — Planleggeren: tidsfeltene lot seg ikke skrive i
+
+**Meldt fra staging (André):**
+
+> «Her er det frustrerende vanskelig å redigere med tastatur på tidsrom, jeg kan bare ta
+> inn ett tall om gangen.»
+
+Årsaken var min egen: hver `change` kalte `tegnPanel()`, som bygger hele panelet på nytt
+med `innerHTML`. Da **erstattes feltet man står i**, og fokus og markør forsvinner med det.
+`datetime-local` melder `change` per segment, så feltet forsvant etter hvert tall man skrev.
+
+### Regelen som mangler
+
+**Feltendringer oppdaterer tallene på plass; strukturendringer tegner på nytt.**
+
+`planleggerTegnTall()` setter `textContent` på `[data-vindutall]`, `[data-linjetall]` og
+`[data-plantall]` — tallet under vinduet, regnestykket under raden, og totalen nederst.
+Advarselen for et bakvendt tidsrom settes med `classList.toggle`, ikke med ny markup.
+
+**Gruppevalget er unntaket** og tegner fortsatt på nytt: «Antall» finnes ikke for grupper i
+ett eksemplar, så raden skifter form — og et nedtrekk er man ferdig med når man har valgt,
+så omtegningen koster ingen markør.
+
+Teksten under vinduet bygges av `_vindutallTekst()`, som er **ren tekst uten markup**:
+samme funksjon brukes av byggeren og av oppdateringen, så de to formene ikke kan komme i
+utakt.
+
+### Mutasjonsprøvd
+
+Fem mutanter, og den ene som overlevde er verdt å merke seg: testen min sjekket bare
+*totalen*, så et vindutall som frøs gikk grønn. Den måler nå alle tre nivåene, og at
+advarselsklassen faktisk settes.
+
+**Endret:** `static/js/vaktliste-oversikt.js`, `static/js/vaktliste-handlinger.js`,
+`vaktliste/tests_xss.py` (+4 tester), `CLAUDE.md`.
+
+---
+
 ## 2026-09-15 — Planleggeren: «Legg til ressurs» flyttet ned
 
 **Meldt fra staging (André):**

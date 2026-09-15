@@ -52,6 +52,7 @@ ESCAPING_CALLS = ('escHtmlValue(', 'cellHtml(', '_escHtml(', 'escapeHtml(')
 REVIEWED_INTERPOLATIONS = {
     # Planleggeren (15. sep. 2026).
     'vinduer': 'markup fra `_planleggerVindu`, som selv skannes her',
+    'fasitklasse': 'hardkodet CSS-klasse fra en ternær',
     'antallFelt': 'markup bygget lokalt: antallsfeltet med id-en escapet inni, '
                   'eller en fast tekst for grupper i ett eksemplar',
     'fasit': 'markup bygget lokalt: escapet antall skift, eller en fast tekst',
@@ -3258,6 +3259,7 @@ class PlanleggerfanenTests(SimpleTestCase):
                         '_planleggerRegnestykke', 'planleggerTotal',
                         'planleggerSettLinje', 'planleggerSettVindu',
                         'planleggerNyLinje', 'planleggerNyttVindu',
+                        'planleggerTegnTall', '_vindutallTekst',
                         'planleggerFjernLinje', 'planleggerFjernVindu',
                         '_planleggerFinnLinje', '_planleggerFinnVindu',
                         '_planleggerStandardvindu', 'visPanelfeil',
@@ -3359,7 +3361,11 @@ class PlanleggerfanenTests(SimpleTestCase):
             globalThis.planleggerNesteId = 1;
             globalThis.planleggerlinjer = [];
             globalThis.planleggerfasit = null;
-            globalThis.tegnPanel = () => {{}};
+            // Telleren gjør regelen målbar: feltendringer skal *ikke*
+            // tegne panelet på nytt, fordi `innerHTML` bytter ut feltet man
+            // står i og fokus forsvinner med det.
+            globalThis.omtegninger = 0;
+            globalThis.tegnPanel = () => {{ globalThis.omtegninger += 1; }};
             globalThis.visPanelfeil = (m) => {{ throw new Error(m); }};
 
             // Plukk ut attributtene et felt faktisk bærer, og kall handleren
@@ -3382,6 +3388,86 @@ class PlanleggerfanenTests(SimpleTestCase):
                 HANDLERE[handling](...hendelseArgumenter(el));
             }}
             {oppsett}
+        """)
+
+    def test_tidsfelt_tegner_ikke_panelet_paa_nytt(self):
+        """André, 15. sep. 2026: «frustrerende vanskelig å redigere med
+        tastatur på tidsrom, jeg kan bare ta inn ett tall om gangen».
+
+        Hver `change` kalte `tegnPanel()`, som bygger panelet på nytt med
+        `innerHTML` — da erstattes feltet man står i, og fokus og markør
+        forsvinner. `datetime-local` melder `change` per segment, så feltet
+        forsvant etter hvert tall."""
+        self._skriv("""
+            planleggerNyLinje();
+            const foer = omtegninger;
+            skriv('planleggerSettVindu', 'fra', '2026-10-03T15:00');
+            skriv('planleggerSettVindu', 'til', '2026-10-04T03:00');
+            skriv('planleggerSettVindu', 'plasser', '6');
+            skriv('planleggerSettLinje', 'antall', '3');
+            assert(omtegninger === foer,
+                   'panelet ble tegnet ' + (omtegninger - foer) + ' gang(er)');
+        """)
+
+    def test_gruppevalget_tegner_panelet_paa_nytt(self):
+        """Motprøven. Gruppa er en **strukturendring** — «Antall» finnes ikke
+        for grupper i ett eksemplar, så raden skifter form. Et nedtrekk er man
+        dessuten ferdig med når man har valgt, så omtegningen koster ingen
+        markør."""
+        self._skriv(f"""
+            planleggerNyLinje();
+            const foer = omtegninger;
+            skriv('planleggerSettLinje', 'gruppe_id', '{self.SAMLEPLASS}');
+            assert(omtegninger === foer + 1,
+                   'gruppevalget skal tegne panelet, ble ' + (omtegninger - foer));
+        """)
+
+    def test_tallene_oppdateres_paa_plass(self):
+        """Uten omtegning må tallene oppdateres av `planleggerTegnTall()`,
+        ellers står de på det de var mens man skriver.
+
+        **Alle tre nivåene måles**: tallet under vinduet, regnestykket under
+        raden, og totalen nederst. Mutasjonsprøvd — en test som bare sjekket
+        totalen lot vindutallet fryse uten at noe ble rødt."""
+        self._skriv("""
+            const noder = {};
+            globalThis.document = { querySelector: (sel) => {
+                if (!noder[sel]) noder[sel] = {
+                    textContent: 'urørt', classList: { toggle: () => {} } };
+                return noder[sel];
+            } };
+            planleggerNyLinje();
+            const vid = planleggerlinjer[0].vinduer[0].id;
+            const lid = planleggerlinjer[0].id;
+            skriv('planleggerSettVindu', 'plasser', '6');
+
+            const vindu = noder['[data-vindutall="' + vid + '"]'];
+            assert(vindu && /48 t i alt/.test(vindu.textContent),
+                   'vindutallet ble «' + (vindu && vindu.textContent) + '»');
+
+            const rad = noder['[data-linjetall="' + lid + '"]'];
+            assert(rad && /6 plasser/.test(rad.textContent),
+                   'regnestykket ble «' + (rad && rad.textContent) + '»');
+
+            const sum = noder['[data-plantall="plasser"]'];
+            assert(sum && sum.textContent === '6',
+                   'summen ble «' + (sum && sum.textContent) + '»');
+        """)
+
+    def test_ugyldig_tidsrom_merkes_uten_omtegning(self):
+        """Advarselsklassen settes av `classList.toggle`, ikke av ny markup —
+        ellers ville et bakvendt vindu krevd en omtegning for å vises."""
+        self._skriv("""
+            const vekslet = [];
+            globalThis.document = { querySelector: () => ({
+                textContent: '',
+                classList: { toggle: (k, paa) => vekslet.push([k, paa]) },
+            }) };
+            planleggerNyLinje();
+            skriv('planleggerSettVindu', 'til', '2020-01-01T00:00');
+            const siste = vekslet[vekslet.length - 1];
+            assert(siste && siste[0] === 'vl-advarsel' && siste[1] === true,
+                   'ventet vl-advarsel=true, fikk ' + JSON.stringify(siste));
         """)
 
     def test_feltene_lar_seg_fylle_ut(self):

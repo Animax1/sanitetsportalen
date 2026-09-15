@@ -540,6 +540,10 @@ Se beslutning 15–17 i notatet.
       PUT som vaktas spenn, og én forespørsel kan ikke ha to tilgangsnivåer inni seg
       (beslutning 13). Gjort samtidig med punktet over — en «budsjettlinje» uten et
       budsjett er halve funksjonen.
+- [x] **Tidsfeltene i planleggeren lot seg ikke skrive i** (meldt fra staging 15. sep.
+      2026). Hver `change` tegnet panelet på nytt, så feltet man sto i ble erstattet —
+      og `datetime-local` melder `change` per segment. Feltendringer oppdaterer nå
+      tallene på plass; strukturendringer tegner på nytt. Se CHANGELOG.
 - [x] **«Legg til ressurs» flyttet ned, mellom siste rad og «Lag grunnlaget»** (meldt
       fra staging 15. sep. 2026). I hodet leste den som «start her».
 - [x] **Plassene flyttet fra ressursen til skiftvinduet, og `skiftlengde` fjernet**

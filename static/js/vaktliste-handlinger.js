@@ -742,6 +742,46 @@ function _planleggerStandardvindu(fraTid, plasser) {
 }
 
 
+function planleggerTegnTall() {
+  // **Oppdater tallene, ikke panelet** (André, 15. sep. 2026: «frustrerende
+  // vanskelig å redigere med tastatur på tidsrom, jeg kan bare ta inn ett tall
+  // om gangen»).
+  //
+  // Hver `change` kalte `tegnPanel()`, som bygger panelet på nytt med
+  // `innerHTML`. Da erstattes feltet du står i, og fokus og markør forsvinner
+  // med det — og `datetime-local` melder `change` per segment, så du mistet
+  // feltet etter hvert tall du skrev.
+  //
+  // **Regelen: feltendringer oppdaterer tallene på plass, strukturendringer
+  // tegner på nytt.** Å legge til eller fjerne en rad flytter markupen, og
+  // det er et knappetrykk man er ferdig med — der er omtegning riktig.
+  if (typeof document === 'undefined') return;
+  (planleggerlinjer || []).forEach((linje) => {
+    (linje.vinduer || []).forEach((vindu) => {
+      const el = document.querySelector(`[data-vindutall="${vindu.id}"]`);
+      if (!el) return;
+      const t = _planleggerVindutall(vindu);
+      el.textContent = _vindutallTekst(t);
+      el.classList.toggle('vl-advarsel', !t.gyldig);
+    });
+    const rad = document.querySelector(`[data-linjetall="${linje.id}"]`);
+    if (rad) {
+      rad.textContent = _planleggerRegnestykke(
+        linje, _planleggerLinjetall(linje));
+    }
+  });
+
+  const total = planleggerTotal();
+  const sett = (navn, verdi) => {
+    const el = document.querySelector(`[data-plantall="${navn}"]`);
+    if (el) el.textContent = verdi;
+  };
+  sett('ressurser', String(total.ressurser));
+  sett('plasser', String(total.plasser));
+  sett('timer', `${_tall(total.timer)} t`);
+}
+
+
 function _planleggerFinnLinje(id) {
   return (planleggerlinjer || []).find((l) => l.id === id) || null;
 }
@@ -813,7 +853,10 @@ function planleggerSettLinje(id, felt, verdi) {
   if (!linje) return;
   linje[felt] = felt === 'gruppe_id' ? Number(verdi) : verdi;
   planleggerfasit = null;
-  tegnPanel();
+  // **Gruppa er en strukturendring**: «Antall» finnes ikke for grupper i ett
+  // eksemplar, så raden skifter form. Nedtrekket er man dessuten ferdig med
+  // når man har valgt, så omtegningen koster ingen markør.
+  if (felt === 'gruppe_id') tegnPanel(); else planleggerTegnTall();
 }
 
 
@@ -831,7 +874,7 @@ function planleggerSettVindu(id, felt, verdi) {
     vindu[felt] = d && !Number.isNaN(d.getTime()) ? d.toISOString() : null;
   }
   planleggerfasit = null;
-  tegnPanel();
+  planleggerTegnTall();
 }
 
 
