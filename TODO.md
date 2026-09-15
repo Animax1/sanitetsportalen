@@ -2233,6 +2233,12 @@ Funnene under er allerede kartlagt, så jobben er avgrenset når den skal gjøre
 
 ### Løse punkter
 
+- [x] **Superbrukeren er én konto, og flagget er eksklusivt til bootstrap** (15. sep.
+      2026, André). Rollen låses i skjemaet med `disabled` (nedtrekket tegnes grått *og*
+      innsendt verdi forkastes), `create_admin` avviser superbruker nummer to, og en
+      AST-skanner krever at ingen kode skriver `.role` direkte. Sju mutanter, alle røde.
+      - [ ] **Gjenstår: ut i prod.** `main` står på `7435dec` og har ingen av rundene —
+            der kan en administrator fortsatt degradere superbrukeren
 - [x] **`is_superuser` er immun mot degradering og sletting** (15. sep. 2026, André).
       «Siste admin»-sperra dekket den ikke: med tre administratorer kunne nødutgangen
       forsvinne uten at noe protesterte. Frysing står igjen — den lar seg reversere.

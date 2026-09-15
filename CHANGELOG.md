@@ -4,6 +4,48 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-15 — Superbrukeren er én konto, ikke en kategori
+
+**André, etter forrige runde:** «`is_superuser` skal ikke kunne demotes fra sin
+`role = admin`, siden is superuser er og skal være eksklusivt til bootstrap-kontoen.»
+
+Sperren mot degradering kom noen timer tidligere, men den var lagt i viewet alene — og
+kravet er strengere enn det. **«Eksklusivt til bootstrap-kontoen» er en invariant, ikke en
+sperre på ett endepunkt.** Tre hull sto igjen, og de er ulike:
+
+| Hull | Hva som sto galt |
+|---|---|
+| Nedtrekket lot seg velge i | Skjemaet tegnet «Bruker» som et gyldig valg på superbrukeren, og viewet avviste innsendingen etterpå. Det er en kontroll som fører til en vegg — regelen fra CLAUDE.md, brutt av rettelsen på forrige punkt |
+| `create_admin` laget superbruker nummer to | Kommandoen er idempotent på *brukernavn*. Kjørt med et nytt navn laget den én superbruker til, og da verner sperrene mot degradering og sletting en nødutgang det finnes flere av — altså ingenting |
+| Ingenting stoppet en ny kodesti | Sperrene lå i skjemaet og i viewet. `bruker.role = 'bruker'` i et framtidig endepunkt går utenom begge, uten at én test blir rød |
+
+**Rollen låses nå med Djangos `disabled`**, som gjør to ting i én: feltet tegnes grått, og
+innsendt verdi forkastes til fordel for instansens. `_kan_degraderes()` og `_kan_slettes()`
+står igjen som andre lag — forsvinner låsen, skal noe fortsatt stoppe det.
+
+**`create_admin` avviser en superbruker til**, og sier hvem som har plassen. Den er fortsatt
+idempotent på samme brukernavn: blir andre kjøring en feil, knekker den deployen den skulle
+hjelpe. Sperra leser `is_superuser`, ikke `role` — leste den rollen, kunne bootstrap aldri
+kjørt på en portal som alt hadde en administrator.
+
+**Og `RollenSettesBareGjennomSkjemaeneTests` leter etter nye veier** i stedet for å vedlikeholde
+en liste noen må huske. Den går gjennom kodebasen med AST og krever at ingen skriver `.role`
+direkte; i dag finnes ingen slik skriving, og unntakslista er tom. Det er den samme sorten
+regel som vakten mot `loaddata`: den som kommer til å bryte invarianten neste gang, har ikke
+lest denne changeloggen.
+
+**Sju mutanter, alle røde** — blant dem «en ny kodesti skriver `role` direkte», som er den
+eneste av dem som beskriver en feil ingen har gjort ennå.
+
+**Endret:** `accounts/forms.py`, `accounts/management/commands/create_admin.py`,
+`accounts/tests_sikkerhet_runde1.py` (+10 tester), `CLAUDE.md`. Ingen migrasjon.
+Hele suiten (3 077 tester) grønn.
+
+**NB — dette ligger på `rollemodell`, ikke på `main`.** Prod (`7435dec`) har ingen av de to
+rundene, og der kan en administrator fortsatt degradere superbrukeren.
+
+---
+
 ## 2026-09-15 — Superbrukeren er nødutgangen, og Scaleway-kortet løy
 
 To korte punkter fra samme runde som vaktliste-porten over.

@@ -224,8 +224,18 @@ bare `/django-admin/`, som er rutet av i produksjon (S1), og settes **kun** av
 dem *ikke*, og skal ikke gjøre det — portaltilgang er `role == 'admin'` og `ModulTilgang`.
 
 Det gjør superbrukerkontoen til noe annet enn «en administrator til»: den er den ene man
-kommer tilbake inn med. `_kan_degraderes()` og `_kan_slettes()` sperrer derfor begge på
-`target.is_superuser`. **«Siste admin»-sperra dekker den ikke** — er det tre
+kommer tilbake inn med. **Flagget er eksklusivt til bootstrap-kontoen** (André, 15. sep.
+2026), og det holdes av fire ting som hver dekker sin vei:
+
+| Hvor | Hva den stopper |
+|---|---|
+| `AdminUserEditForm` låser `role` med `disabled` | Nedtrekket tegnes grått, **og** Django forkaster innsendt verdi. Et valg som gir feilmelding er en kontroll som fører til en vegg |
+| `_kan_degraderes()` og `_kan_slettes()` | Andre lag. Forsvinner låsen i skjemaet, skal noe fortsatt stoppe det |
+| `create_admin` avviser superbruker nummer to | Kommandoen er idempotent på *brukernavn*, så den laget én til for hvert nye navn — og da er bootstrap-kontoen en kategori, ikke en konto |
+| `RollenSettesBareGjennomSkjemaeneTests` | Ingen kode skriver `.role` direkte. Et nytt endepunkt som gjør det, går utenom alle lagene over uten at noe blir rødt |
+
+Den siste er den som holder de tre andre i live: sperrene verner nøyaktig de veiene som
+finnes i dag, og en ny vei er usynlig for dem. **«Siste admin»-sperra dekker den ikke** — er det tre
 administratorer, kan superbrukeren degraderes uten at noe protesterer, og da er nødutgangen
 borte mens portalen ser helt normal ut. **Frysing står igjen med vilje:** grensen går ved om
 handlingen lar seg reversere, og «Tø konto» står ved siden av.

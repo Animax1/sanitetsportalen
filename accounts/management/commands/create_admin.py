@@ -3,7 +3,7 @@
 Idempotent: kan trygt kjøres ved hver oppstart. Oppretter admin hvis brukeren
 ikke finnes, ellers går den stille ut uten feil.
 """
-from django.core.management.base import BaseCommand
+from django.core.management.base import BaseCommand, CommandError
 from accounts.models import CustomUser
 
 
@@ -28,6 +28,22 @@ class Command(BaseCommand):
                 )
             )
             return
+
+        # **Superbrukeren er eksklusiv til bootstrap-kontoen** (André, 15. sep.
+        # 2026). Kommandoen er idempotent på *brukernavn*, så den ville laget
+        # en superbruker til hver gang den ble kjørt med et nytt navn — og da
+        # er «bootstrap-kontoen» ikke lenger én konto, men en kategori. Da
+        # betyr heller ikke sperrene mot degradering og sletting det de skal:
+        # de verner en nødutgang det finnes flere av.
+        annen = CustomUser.objects.filter(is_superuser=True).first()
+        if annen is not None:
+            raise CommandError(
+                f'Portalen har allerede en superbruker: «{annen.username}». '
+                f'Superbrukeren er bootstrap-kontoen, og det skal være én. '
+                f'Trenger du en administrator til, opprett den i '
+                f'brukeradministrasjonen; skal bootstrap-kontoen byttes, må '
+                f'«{annen.username}» fjernes først.'
+            )
 
         user = CustomUser.objects.create_superuser(
             username=username,

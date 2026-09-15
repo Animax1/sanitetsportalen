@@ -4,7 +4,7 @@ Hvert testnavn peker på funnet i `docs/SIKKERHETSGJENNOMGANG_2026-09-13.md`.
 """
 from datetime import timedelta
 
-from django.test import Client, TestCase, override_settings
+from django.test import Client, SimpleTestCase, TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
 from django_otp.plugins.otp_totp.models import TOTPDevice
@@ -246,3 +246,139 @@ class SuperbrukerenErNodutgangenTests(TestCase):
         self.super.refresh_from_db()
         self.assertFalse(self.super.is_active)
         self.assertEqual(self.super.role, 'admin', 'rollen står, kontoen er tint tilbake')
+
+    # ── Rollen er låst i skjemaet, ikke bare i viewet ────────────────────
+    def test_rollevalget_er_laast_paa_superbrukeren(self):
+        """**Et nedtrekk man kan velge i og som så gir en feilmelding, er en
+        kontroll som fører til en vegg.** Django-feltets `disabled` gjør to
+        ting i én: nedtrekket tegnes grått, og innsendt verdi forkastes."""
+        from accounts.forms import SUPERBRUKER_LAAST, AdminUserEditForm
+        skjema = AdminUserEditForm(instance=self.super)
+        self.assertTrue(skjema.fields['role'].disabled)
+        self.assertEqual(skjema.fields['role'].help_text, SUPERBRUKER_LAAST)
+
+    def test_en_vanlig_admin_har_valget_i_behold(self):
+        """Den andre retningen: låses feltet for alle, kan ingen degraderes."""
+        from accounts.forms import AdminUserEditForm
+        self.assertFalse(AdminUserEditForm(instance=self.admin).fields['role'].disabled)
+
+    def test_skjemaet_forkaster_innsendt_rolle(self):
+        """Laget under viewets sperre. Fjernes `_kan_degraderes`, skal
+        skjemaet fortsatt stå — og omvendt."""
+        from accounts.forms import AdminUserEditForm
+        skjema = AdminUserEditForm({'role': 'bruker'}, instance=self.super)
+        self.assertTrue(skjema.is_valid(), skjema.errors)
+        self.assertEqual(skjema.cleaned_data['role'], 'admin')
+
+    def test_nytt_skjema_har_valget(self):
+        """`disabled` settes på en *lagret* superbruker. Uten `instance.pk`
+        ville opprettelsesskjemaet kunne miste rollevalget sitt."""
+        from accounts.forms import AdminUserEditForm
+        self.assertFalse(AdminUserEditForm().fields['role'].disabled)
+
+
+class SuperbrukerenErEnKontoTests(TestCase):
+    """`create_admin` lager ikke superbruker nummer to (15. sep. 2026).
+
+    Kommandoen er idempotent på *brukernavn*, så den laget en superbruker til
+    hver gang den ble kjørt med et nytt navn. Da er «bootstrap-kontoen» ikke
+    lenger én konto, men en kategori — og sperrene mot degradering og sletting
+    verner en nødutgang det finnes flere av, altså ingenting.
+    """
+
+    def _kjor(self, navn):
+        from io import StringIO
+
+        from django.core.management import call_command
+        ut = StringIO()
+        call_command('create_admin', username=navn, password='hemmelig-123',
+                     stdout=ut, stderr=ut)
+        return ut.getvalue()
+
+    def test_den_forste_opprettes(self):
+        self._kjor('rot1')
+        u = CustomUser.objects.get(username='rot1')
+        self.assertTrue(u.is_superuser)
+        self.assertEqual(u.role, 'admin')
+
+    def test_den_andre_avvises_med_navnet_paa_den_forste(self):
+        from django.core.management.base import CommandError
+        self._kjor('rot1')
+        with self.assertRaises(CommandError) as ctx:
+            self._kjor('rot2')
+        self.assertIn('rot1', str(ctx.exception), 'skal si hvem som har plassen')
+        self.assertFalse(CustomUser.objects.filter(username='rot2').exists())
+
+    def test_samme_navn_er_fortsatt_idempotent(self):
+        """Kommandoen kjøres ved oppstart. Blir den en feil ved andre kjøring,
+        knekker den deployen den skulle hjelpe."""
+        self._kjor('rot1')
+        ut = self._kjor('rot1')
+        self.assertIn('finnes allerede', ut)
+
+    def test_vanlige_administratorer_er_ikke_i_veien(self):
+        """Sperra gjelder superbrukere, ikke admins. Leser den `role`, kan
+        bootstrap aldri kjøres på en portal som alt har en administrator."""
+        CustomUser.objects.create_user(username='adm_v', password='x',
+                                       role='admin', must_change_password=False)
+        self._kjor('rot1')
+        self.assertTrue(CustomUser.objects.get(username='rot1').is_superuser)
+
+
+class RollenSettesBareGjennomSkjemaeneTests(SimpleTestCase):
+    """Ingen kode skriver `role` utenom skjemaene og `create_superuser`.
+
+    **Sperrene over ligger i skjemaet og i viewet.** De verner nøyaktig den
+    veien som finnes i dag. Skriver noen `user.role = 'bruker'` i et nytt
+    endepunkt — en importjobb, en invitasjon, en opprydding — går den utenom
+    begge, og superbrukeren kan degraderes igjen uten at én test blir rød.
+
+    Det er samme sort regel som `SignalerFyrerIkkeUnderLoaddataTests`: den
+    leter, den leser ikke en liste noen må huske å vedlikeholde.
+    """
+
+    #: Skrivinger som er lov, med begrunnelse. Lista skal ikke vokse uten at
+    #: noen har tenkt på superbrukeren.
+    UNNTATT: dict[str, str] = {}
+
+    def test_ingen_skriver_role_utenfor_skjemaene(self):
+        import ast
+        from pathlib import Path
+
+        from django.conf import settings
+
+        rot = Path(settings.BASE_DIR)
+        funn = []
+        for sti in sorted(rot.glob('*/**/*.py')):
+            rel = sti.relative_to(rot).as_posix()
+            if ('/migrations/' in rel or '/tests' in rel or rel.startswith('.')
+                    or '/site-packages/' in rel or rel in self.UNNTATT):
+                continue
+            try:
+                tre = ast.parse(sti.read_text(encoding='utf-8'))
+            except (SyntaxError, UnicodeDecodeError):
+                continue
+            for node in ast.walk(tre):
+                if not isinstance(node, ast.Assign):
+                    continue
+                for mal in node.targets:
+                    if isinstance(mal, ast.Attribute) and mal.attr == 'role':
+                        funn.append(f'{rel}:{node.lineno}')
+        self.assertEqual(
+            funn, [],
+            'Disse stedene skriver `.role` direkte, utenom skjemaene:\n  '
+            + '\n  '.join(funn)
+            + '\n\nSuperbrukeren kan da degraderes uten å gå gjennom '
+              'AdminUserEditForm eller _kan_degraderes. Gå gjennom skjemaet, '
+              'eller før stedet opp i UNNTATT med begrunnelse.')
+
+    def test_vi_leter_faktisk_i_filer(self):
+        """Sperrehake: treffer globben ingenting, går testen over grønn mens
+        den måler nøyaktig null."""
+        from pathlib import Path
+
+        from django.conf import settings
+        rot = Path(settings.BASE_DIR)
+        antall = len([s for s in rot.glob('*/**/*.py')
+                      if '/migrations/' not in s.as_posix()])
+        self.assertGreater(antall, 50, f'fant bare {antall} filer')

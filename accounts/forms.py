@@ -133,6 +133,15 @@ class SettPassordForm(forms.Form):
         return p2
 
 
+#: Teksten som står i stedet for rollevalget på bootstrap-kontoen.
+#: Egen konstant fordi den har tre lesere: skjemaet, malen og testen.
+SUPERBRUKER_LAAST = (
+    'Dette er portalens superbruker (bootstrap-kontoen). Rollen er låst — '
+    'den er nødutgangen inn i portalen hvis noe går galt, og kan bare endres '
+    'med «manage.py» på serveren.'
+)
+
+
 class AdminUserCreateForm(forms.ModelForm):
     """Skjema for admin til å opprette ny bruker.
 
@@ -398,6 +407,19 @@ class AdminUserEditForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
         self.fields['email'].required = False
         self.fields['fullt_navn'].required = False
+        # **Rollen låses på superbrukeren** (André, 15. sep. 2026:
+        # «is_superuser er og skal være eksklusivt til bootstrap-kontoen»).
+        #
+        # `disabled` gjør to ting i én: nedtrekket tegnes grått, og Django
+        # **forkaster innsendt verdi** og bruker instansens i stedet. Et
+        # nedtrekk man kan velge i og som så gir en feilmelding, er en
+        # kontroll som fører til en vegg — regelen fra CLAUDE.md.
+        #
+        # Viewets `_kan_degraderes()` står igjen som andre lag: forsvinner
+        # denne linja, skal noe fortsatt stoppe degraderingen.
+        if self.instance and self.instance.pk and self.instance.is_superuser:
+            self.fields['role'].disabled = True
+            self.fields['role'].help_text = SUPERBRUKER_LAAST
 
     def clean_email(self):
         email = (self.cleaned_data.get('email') or '').strip()
