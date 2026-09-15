@@ -888,7 +888,7 @@ class MalensGatingTests(TestCase):
             globalThis.window = { MODUL_TILGANG: { admin: true } };
             globalThis.DAGER = ['søn','man','tir','ons','tor','fre','lør'];
             globalThis.MND = ['jan','feb','mar','apr','mai','jun','jul','aug','sep','okt','nov','des'];
-            globalThis.utskriftRessurs = null; globalThis.korpsfilter = null;
+            globalThis.utskriftDag = null; globalThis.korpsfilter = null;
             globalThis.aktivListe = {
               vaktliste: {id: 1, vakt_navn: 'Vakta', status_navn: 'Planlegging', i_drift: false},
               ressurser: [], vaktposter: [], mannskap: [], roller: [],

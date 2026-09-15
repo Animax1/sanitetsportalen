@@ -49,7 +49,11 @@ let korpsfilter = null;
 // Utskriftsutvalget (12. sep. 2026): ressurs-ID når «Oversikt» skal vise
 // én ressurs, ellers `null` for hele vakten. Korpset styres av korpsvelgeren
 // over — de to utvalgene kombineres.
-let utskriftRessurs = null;
+//: **Utskriftsutvalget er en dag, ikke en ressurs** (André, 15. sep. 2026).
+//: `null` er hele vakta; ellers en `_dagnokkel()`-streng. Ressursvalget ga
+//: mening da arket var gruppert på ressurs — nå er dagen ytterste nivå, og
+//: «Ambulanse 1» ville vært et snitt på tvers av det arket er bygget rundt.
+let utskriftDag = null;
 let personsok = '';              // fritekstfilter på mannskapstabellen
 let personSortKol = 'korps';     // 'navn' | 'korps' | 'telefon'
 let personSortStigende = true;
@@ -422,27 +426,38 @@ function fyllKorpsvelger() {
 
 function velgUtskrift() {
   const el = document.getElementById('vl-utskriftsvalg');
-  const valgt = el && el.value ? Number(el.value) : null;
-  utskriftRessurs = Number.isFinite(valgt) ? valgt : null;
+  utskriftDag = el && el.value ? el.value : null;
   tegnPanel();
 }
 
 
 function _utvalgstekst() {
-  // Det arket sier om seg selv: korpset og/eller ressursen det er avgrenset
-  // til. Tomt når det er hele vakten. Korpset er velgerens for den som ser
-  // alle, badgen for korps-brukeren — samme regel som «Mitt korps».
+  // Det arket sier om seg selv: korpset og/eller dagen det er avgrenset til.
+  // Tomt når det er hele vakten. Korpset er velgerens for den som ser alle,
+  // badgen for korps-brukeren — samme regel som «Mitt korps».
   const deler = [];
   const korpsId = _mittKorpsId();
   if (korpsId != null) {
     const k = (aktivListe.korps || []).find((x) => x.id === korpsId);
     if (k) deler.push(k.navn);
   }
-  if (utskriftRessurs != null) {
-    const r = (aktivListe.ressurser || []).find((x) => x.id === utskriftRessurs);
-    if (r) deler.push(r.navn);
+  if (utskriftDag != null) {
+    // Teksten hentes fra en post på dagen, ikke av nøkkelen: `_dagtekst()`
+    // er det ene stedet som formulerer «Fredag 4. sep», og to formuleringer
+    // av samme dato ville før eller siden skrevet den ulikt.
+    const vp = (aktivListe.vaktposter || []).find((x) => _dagnokkel(x.fra_tid) === utskriftDag);
+    if (vp) deler.push(_dagtekst(vp.fra_tid));
   }
   return deler.join(' · ');
+}
+
+
+function _utskriftsdager() {
+  // Dagene arket kan avgrenses til. **Én dag gir ingen valg** — da er «hele
+  // vakten» og «den ene dagen» samme ark, og et nedtrekk med ett valg er en
+  // kontroll som ikke gjør noe.
+  const dager = _grupperPaaDag(aktivListe.vaktposter || []);
+  return dager.length > 1 ? dager : [];
 }
 
 
@@ -450,24 +465,25 @@ function mkUtskriftsverktoy() {
   // Velgeren og knappen over utskriftslista. Skjules på papiret
   // (`.vl-utskriftsverktoy` i @media print) — det som står der er utvalget,
   // og det står i arkhodet. Tegnes på nytt med panelet, så det valgte
-  // merkes fra `utskriftRessurs`, ikke fra hva `<select>` husker.
-  // Bare ressurser som har skift i det som vises — en tom ressurs tegnes
-  // ikke i lista, og skal ikke kunne velges til et tomt ark.
-  const harSkift = new Set((aktivListe.vaktposter || []).map((vp) => vp.ressurs_id));
-  const grupper = _grupperMedRessurser().map((g) => {
-    const valg = _ressurserIGruppe(g.id).filter((r) => harSkift.has(r.id)).map((r) => {
-      const merke = r.id === utskriftRessurs ? ' selected' : '';
-      return `<option value="${escHtmlValue(r.id)}"${merke}>${escapeHtml(r.navn)}</option>`;
-    }).join('');
-    return valg ? `<optgroup label="${escHtmlValue(g.navn)}">${valg}</optgroup>` : '';
+  // merkes fra `utskriftDag`, ikke fra hva `<select>` husker.
+  // **Dagene, ikke ressursene** (André, 15. sep. 2026): «vi beholder hele
+  // vakten, men fjerner ressursene og bytter med dag. Går vakta én dag får du
+  // ikke flere valg; går den over flere dager får du den enkelte dag.»
+  const dager = _utskriftsdager();
+  const valg = dager.map((dag) => {
+    const merke = dag.nokkel === utskriftDag ? ' selected' : '';
+    return `<option value="${escHtmlValue(dag.nokkel)}"${merke}>${escapeHtml(_dagtekst(dag.fra_tid))}</option>`;
   }).join('');
-  return `
-    <div class="vl-utskriftsverktoy d-flex align-items-center gap-2 flex-wrap mb-2">
+  // **Ingen velger på en endagsvakt.** Ett valg i et nedtrekk er en kontroll
+  // som ikke gjør noe; knappen står igjen alene.
+  const velger = dager.length ? `
       <label class="vl-meta mb-0" for="vl-utskriftsvalg">Vis</label>
       <select id="vl-utskriftsvalg" class="form-select form-select-sm w-auto"
               data-action="velgUtskrift" data-hendelse="change">
-        <option value="">Hele vakten</option>${grupper}
-      </select>
+        <option value="">Hele vakten</option>${valg}
+      </select>` : '';
+  return `
+    <div class="vl-utskriftsverktoy d-flex align-items-center gap-2 flex-wrap mb-2">${velger}
       <button type="button" class="btn btn-outline-secondary btn-sm" data-action="skrivUt">
         <i class="bi bi-printer me-1"></i>Skriv ut
       </button>

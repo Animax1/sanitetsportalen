@@ -428,7 +428,10 @@ som møter om morgenen faktisk stiller.
 - [x] **Beholdes summene per ressurs?** Ja — de er nå per dag per ressurs, og totalen for
       hele vakta står fortsatt i arkhodet.
 
-- [x] **Ressursfilteret** (`utskriftRessurs`) beholdt; det silter på ressurs og
+- [x] **Ressursfilteret er byttet ut med et dagfilter** (André, 15. sep. 2026, etter
+      staging): «vi beholder hele vakten, men fjerner ressursene og bytter med dag». En
+      endagsvakt får ingen velger. Punktet under er derfor foreldet:
+- [x] ~~**Ressursfilteret** (`utskriftRessurs`) beholdt;~~ det silter på ressurs og
       er uavhengig av nivårekkefølgen.
 
 *`@media print`-reglene i `vaktliste.css` må gås gjennom med den nye strukturen — en

@@ -1319,8 +1319,11 @@ function mkOversikt() {
   // brukeren); ressursen velges her. Arket skal kunne henges opp på bilen
   // eller gis til ett korps, og da er resten av vakten bare sider å bla forbi.
   const verktoy = mkUtskriftsverktoy();
+  // **Utvalget er en dag** (15. sep. 2026). Filtreringen står her og ikke i
+  // dagbolkene, så tallene i arkhodet følger utvalget: skriver man ut lørdag,
+  // skal hodet si lørdagens timer og ikke hele vaktas.
   const poster = (aktivListe.vaktposter || [])
-    .filter((vp) => utskriftRessurs == null || vp.ressurs_id === utskriftRessurs);
+    .filter((vp) => utskriftDag == null || _dagnokkel(vp.fra_tid) === utskriftDag);
   if (!poster.length) {
     return `${verktoy}<div class="vl-kort"><div class="vl-tom">Ingen er satt opp ennå.</div></div>`;
   }
@@ -1379,7 +1382,6 @@ function mkOversikt() {
 
   const ressursdeler = (kart) => _grupperMedRessurser().flatMap((g) =>
     _ressurserIGruppe(g.id)
-      .filter((r) => utskriftRessurs == null || r.id === utskriftRessurs)
       .filter((r) => (kart.get(r.id) || []).length)
       .map((r) => {
         const egne = kart.get(r.id);

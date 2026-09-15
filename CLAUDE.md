@@ -771,6 +771,13 @@ fase 3–7 gjenstår — se `docs/BESLUTNING_VAKTLISTE.md`, som er besluttet i s
   derfor **de skiftene den får**, og bruker `_blokkrader` — en dagrad inni kortet ville
   gjentatt tittelen rett over. **`_blokkerMedDager()` er nå bare «Mitt korps»**, som har én
   tabell på tvers av ressursene og altså ingen seksjon å legge dagen i.
+- **Utskriftsvelgeren avgrenser til en dag, ikke til en ressurs** (15. sep. 2026).
+  `utskriftDag` er en `_dagnokkel()`-streng eller `null` for hele vakta. Ressursvalget ga
+  mening da arket var gruppert på ressurs; etter snuingen ville «Ambulanse 1» vært et snitt
+  på tvers av det arket er bygget rundt. **En endagsvakt får ingen velger i det hele tatt** —
+  ett valg i et nedtrekk er en kontroll som ikke gjør noe; utskriftsknappen står igjen alene.
+  Filtreringen skjer **før** tallene regnes, så arkhodet sier den valgte dagens timer og
+  ikke hele vaktas.
 - **En ressurs uten skift hører til ingen dag, og får bolken «Uten skift».** Uten den ville
   kortet med «Opprett vakt» ikke finnes noe sted, og ingen kunne satt opp den første vakta
   på en ny bil. Bolken vises bare når noen faktisk står uten skift.

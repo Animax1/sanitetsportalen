@@ -123,6 +123,32 @@ nøyaktig det hullet den lista finnes for.
 
 Sju nye tester, fire mutasjoner prøvd — alle fanget etter at kilden ble rettet.
 
+### Og én gang til: velgeren over utskriftslista
+
+**André:** *«Vi beholder «hele vakten» men fjerner ressursene fra det nedtrekksvinduet og
+bytter med dag. Så går vakten 1 dag så får du ikke flere valg; går den over flere dager får
+du den enkelte dag.»*
+
+Ressursvalget var riktig da arket var gruppert på ressurs. Etter snuingen var «Ambulanse 1»
+et snitt på tvers av det arket er bygget rundt — man valgte én akse i en liste sortert på en
+annen. `utskriftRessurs` er erstattet av `utskriftDag` (en `_dagnokkel()`-streng, eller
+`null` for hele vakta).
+
+- **En endagsvakt får ingen velger.** Ett valg i et nedtrekk er en kontroll som ikke gjør
+  noe — «hele vakten» og «den ene dagen» er samme ark. Utskriftsknappen står igjen alene.
+- **Filtreringen skjer før tallene regnes.** Skriver man ut lørdag, sier arkhodet lørdagens
+  timer og ikke hele vaktas. Ligger filteret i dagbolkene i stedet, blir hodet stående og
+  beskrive noe annet enn arket under det.
+- **Et valg som ikke finnes lenger gir et tomt ark**, ikke en feil — lista kan ha blitt
+  lastet på nytt siden man valgte.
+
+**To av mine egne tester målte feil etter endringen**, og det er verdt å merke seg hvorfor:
+dagnavnene står nå *også* i velgeren, som kommer først i markupen. Et søk på «Lørdag 5. sep»
+traff da verktøylinja, og sliced hele arket i stedet for lørdagsbolken — testen var fortsatt
+grønn, men målte noe annet enn den påsto. Assertionene slicer nå på `<h2 class="vl-dagtittel">`.
+
+Fire mutasjoner prøvd, alle fanget.
+
 ### Tester
 
 Elleve nye i to klasser (`DagenErYtterstTests`, `SammenslaatteRessurserTests`), og den
