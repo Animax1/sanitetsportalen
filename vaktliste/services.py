@@ -86,55 +86,30 @@ class Planleggerfeil(ValueError):
     """Noe i oppsettet lar seg ikke generere. Meldingen går til brukeren."""
 
 
-#: Sperre mot et vindu på et år delt i minuttskift — ikke en regel om hvor
-#: mange skift en vakt kan ha. Tallet er romslig med vilje: en helgevakt på 48
-#: timer i timesskift er 48, og det skal gå. Treffer man taket, er det en
-#: skrivefeil i tidene.
-MAKS_SKIFT_PER_VINDU = 200
-
-#: Samme slags sperre for hele oppsettet. En generering som lager mer enn
+#: Sperre for hele oppsettet. En generering som lager mer enn
 #: dette er ikke et grunnlag, det er et uhell man må rydde opp i for hånd.
 MAKS_PLASSER_TOTALT = 2000
 
 
-def _vinduets_skift(fra, til, skiftlengde_timer):
-    """Skiftvinduene ett vindu deles i, som ``[(fra, til), …]``.
+def _linjens_skift(linje):
+    """Skiftene for **én** ressurs i linja, som ``[(fra, til, plasser), …]``.
 
-    Tom `skiftlengde_timer` gir **ett** skift som dekker hele vinduet — det er
-    Sola 56, som går 15–03 i ett strekk.
+    **Ett skiftvindu er ett skift.** Feltet `skiftlengde`, som delte vinduet i
+    bolker, er borte (André, 15. sep. 2026: «har vi noe behov for
+    skiftlengde?» → nei). Den var en *skjult multiplikator*: den lagde seks
+    skift ut av ett vindu, du så dem aldri, og alle seks fikk samme antall
+    plasser — altså nettopp det som ikke lot seg uttrykke da plassene ble
+    flyttet til vinduet. En rotasjon settes opp som de skiftene den er, og
+    «Nytt skiftvindu» begynner der det forrige sluttet.
 
-    Et tall deler vinduet i bolker rygg mot rygg — det er Haugesund 56, som er
-    tildelt kontinuerlig vakt fra fredag 14 til søndag 14 og bemannes åtte
-    timer på, åtte av.
+    **Plassene hører til vinduet, ikke til ressursen** (samme dag: «noen
+    ganger ønsker man å ha mindre og mer plasser på enkelte skift visse deler
+    av døgnet»). Samleplassen kan da ha seks plasser 14–22 og to 22–06 — det
+    er én ressurs med to vinduer, ikke to samleplasser.
 
-    **Den siste bolken kortes av, den strekkes ikke forbi vinduet.** Deles 20
-    timer i åttetimersskift, blir det 8 + 8 + 4 og ikke 8 + 8 + 8: et skift
-    som varer lenger enn vakta er noe ingen har bedt om, og det ville dukket
-    opp som et brudd på skiftlengdegrensa uten at noen hadde satt det opp.
-    """
-    if fra is None or til is None or til <= fra:
-        raise Planleggerfeil('Skiftvinduet må slutte etter at det begynner.')
-    if not skiftlengde_timer:
-        return [(fra, til)]
-    if skiftlengde_timer <= 0:
-        raise Planleggerfeil('Skiftlengden må være et positivt antall timer.')
-
-    ut = []
-    start = fra
-    steg = timedelta(hours=skiftlengde_timer)
-    while start < til:
-        if len(ut) >= MAKS_SKIFT_PER_VINDU:
-            raise Planleggerfeil(
-                f'Vinduet gir over {MAKS_SKIFT_PER_VINDU} skift med den '
-                f'skiftlengden. Sjekk tidene.')
-        slutt = min(start + steg, til)
-        ut.append((start, slutt))
-        start = slutt
-    return ut
-
-
-def _linjens_plasser(linje):
-    """Skiftvinduene for **én** ressurs i linja, flatet ut.
+    Linja sier *hva* (gruppe, hvor mange enheter), vinduet sier *når og hvor
+    mange*. Lå plassene på linja, måtte man opprettet en ressurs til for å
+    endre bemanningen om natta.
 
     Hver ressurs i linja får de samme vinduene — «tre firemanns lag fra 14–22»
     betyr at alle tre går 14–22.
@@ -144,8 +119,24 @@ def _linjens_plasser(linje):
         raise Planleggerfeil('Hver ressurs må ha minst ett skiftvindu.')
     ut = []
     for vindu in vinduer:
-        ut.extend(_vinduets_skift(
-            vindu.get('fra'), vindu.get('til'), vindu.get('skiftlengde')))
+        fra, til = vindu.get('fra'), vindu.get('til')
+        if fra is None or til is None or til <= fra:
+            raise Planleggerfeil('Skiftvinduet må slutte etter at det begynner.')
+        # **Parsingen står her, ikke i viewet.** Viewet gjorde `_int(...) or
+        # 1`, og da ble et eksplisitt `0` stille til 1 — en regel som later
+        # som den avviser noe. Tomt felt er «én plass», null er en feil.
+        raa = vindu.get('plasser')
+        if raa in (None, ''):
+            plasser = 1
+        else:
+            try:
+                plasser = int(raa)
+            except (TypeError, ValueError):
+                raise Planleggerfeil(
+                    'Antall plasser må være et helt tall.')
+        if plasser < 1:
+            raise Planleggerfeil('Hvert skiftvindu må ha minst én plass.')
+        ut.append((fra, til, plasser))
     return ut
 
 
@@ -158,19 +149,23 @@ def _sammendrag(plan):
     der. Sammendraget skal si hva som ble laget, ikke hva som ville blitt
     laget en gang til.
     """
+    def _plasser(rad):
+        return sum(plasser for _, _, plasser in rad['skift'])
+
+    def _timesum(rad):
+        return round(sum(_timer(fra, til) * plasser
+                         for fra, til, plasser in rad['skift']), 2)
+
     return {
         'ressurser': len(plan),
-        'plasser': sum(len(p['skift']) * p['plasser'] for p in plan),
-        'timer': round(sum(
-            _timer(fra, til) * p['plasser']
-            for p in plan for fra, til in p['skift']), 2),
+        'plasser': sum(_plasser(p) for p in plan),
+        'timer': round(sum(_timesum(p) for p in plan), 2),
         'linjer': [{
             'navn': p['navn'],
             'gruppe': p['gruppe'].navn,
             'skift': len(p['skift']),
-            'plasser': len(p['skift']) * p['plasser'],
-            'timer': round(sum(_timer(fra, til) for fra, til in p['skift'])
-                           * p['plasser'], 2),
+            'plasser': _plasser(p),
+            'timer': _timesum(p),
         } for p in plan],
     }
 
@@ -216,11 +211,8 @@ def _planlegg(vaktliste, linjer):
             raise Planleggerfeil('Ukjent ressursgruppe.')
 
         antall = int(linje.get('antall') or 1)
-        plasser = int(linje.get('plasser') or 1)
         if antall < 1:
             raise Planleggerfeil('Antall ressurser må være minst én.')
-        if plasser < 1:
-            raise Planleggerfeil('Hver ressurs må ha minst én plass.')
 
         # **Noen grupper finnes i ett eksemplar.** Samme regel som
         # `ressurser_view`, og den må stå her også: en generator som lager
@@ -234,17 +226,16 @@ def _planlegg(vaktliste, linjer):
                     f'«{gruppe.navn}» finnes i ett eksemplar, og står '
                     f'allerede på denne vaktlista.')
 
-        skift = _linjens_plasser(linje)
+        skift = _linjens_skift(linje)
         for _ in range(antall):
             navn = _neste_navn(gruppe, brukte_navn, finnes_i_gruppa)
             plan.append({
                 'gruppe': gruppe,
                 'navn': navn,
-                'plasser': plasser,
                 'skift': skift,
             })
 
-    totalt = sum(len(p['skift']) * p['plasser'] for p in plan)
+    totalt = sum(plasser for p in plan for _, _, plasser in p['skift'])
     if totalt > MAKS_PLASSER_TOTALT:
         raise Planleggerfeil(
             f'Oppsettet ville laget {totalt} plasser. Grensen er '
@@ -319,8 +310,8 @@ def generer_grunnlag(vaktliste, linjer, *, erstatt_kladd=False):
                 gruppe=rad['gruppe'],
                 rekkefolge=neste_rekkefolge(vaktliste),
             )
-            for fra, til in rad['skift']:
-                for _ in range(rad['plasser']):
+            for fra, til, plasser in rad['skift']:
+                for _ in range(plasser):
                     Vaktpost.objects.create(
                         ressurs=ressurs, fra_tid=fra, til_tid=til)
 

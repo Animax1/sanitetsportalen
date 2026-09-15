@@ -724,7 +724,7 @@ async function opprettVaktpost() {
 let planleggerNesteId = 1;
 
 
-function _planleggerStandardvindu(fraTid) {
+function _planleggerStandardvindu(fraTid, plasser) {
   // **Vaktas start, ikke `new Date()`.** En oktobervakt planlegges i august,
   // og et forhåndsutfylt «nå» ville måttet rettes hver gang. Samme regel som
   // «Opprett vakt» i ressurstabellen.
@@ -734,8 +734,11 @@ function _planleggerStandardvindu(fraTid) {
   // å la dagens dato stå der og se ut som et valg noen har tatt.
   const fra = _d(fraTid) || _d(aktivListe?.vaktliste?.startet) || new Date();
   const til = new Date(fra.getTime() + 8 * 3600000);
+  // **Plassene hører til vinduet** (15. sep. 2026), så samleplassen kan ha
+  // seks på dagtid og to om natta. Et nytt vindu arver forrige vindus antall:
+  // det vanlige er at de er like, og det uvanlige er ett tastetrykk unna.
   return { id: planleggerNesteId++, fra: fra.toISOString(),
-           til: til.toISOString(), skiftlengde: '' };
+           til: til.toISOString(), plasser: plasser ?? 2 };
 }
 
 
@@ -763,7 +766,6 @@ function planleggerNyLinje() {
     id: planleggerNesteId++,
     gruppe_id: grupper[0].id,
     antall: 1,
-    plasser: 2,
     vinduer: [_planleggerStandardvindu()],
   });
   planleggerfasit = null;
@@ -786,9 +788,8 @@ function planleggerNyttVindu(id) {
   // Det nye vinduet begynner der det forrige sluttet: Sola 56 har to vakter
   // på ulike dager, og «dagen etter, samme tid» er det man som regel mener.
   const forrige = linje.vinduer[linje.vinduer.length - 1];
-  const nytt = _planleggerStandardvindu(forrige?.til);
-  nytt.skiftlengde = forrige?.skiftlengde ?? '';
-  linje.vinduer.push(nytt);
+  linje.vinduer.push(
+    _planleggerStandardvindu(forrige?.til, forrige?.plasser));
   planleggerfasit = null;
   tegnPanel();
 }
@@ -820,11 +821,11 @@ function planleggerSettVindu(id, felt, verdi) {
   const vindu = _planleggerFinnVindu(id)?.vindu;
   if (!vindu) return;
   // Tidsfeltene kommer som lokal «2026-10-02T14:00» og lagres som ISO, slik
-  // serveren vil ha dem. Skiftlengden lagres rå: tom streng betyr «hele
-  // vinduet», og en `Number('')` ville gjort den til null — altså et skift
-  // på null timer.
-  if (felt === 'skiftlengde') {
-    vindu.skiftlengde = verdi;
+  // serveren vil ha dem. Plasstallet lagres rått — serveren eier regelen om
+  // hva som er et gyldig antall, og en `Number('')` her ville gjort et tomt
+  // felt til null underveis mens man skriver.
+  if (felt === 'plasser') {
+    vindu.plasser = verdi;
   } else {
     const d = verdi ? new Date(verdi) : null;
     vindu[felt] = d && !Number.isNaN(d.getTime()) ? d.toISOString() : null;

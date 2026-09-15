@@ -1295,6 +1295,12 @@
 
 /* Regnestykket er poenget med raden, så det tåler å være litt tyngre. */
 .vl-pl-regnestykke { font-weight: 600; }
+
+/*
+  «Finnes i ett eksemplar» står der «Antall» ellers ville stått, og skal lese
+  som en opplysning — ikke som et felt man har glemt å fylle ut.
+*/
+.vl-pl-eneste { align-self: center; padding-bottom: 0.4rem; }
 .vl-pl-vindutall { white-space: nowrap; }
 
 @media print {

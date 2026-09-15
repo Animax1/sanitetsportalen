@@ -1021,8 +1021,9 @@ plassene — klare til å fordeles og spisses i fanene som alt virker.
 | Regel | Hvorfor |
 |---|---|
 | **Ressursen er subjektet, skiftvinduene hører til den** | Sola 56 har to adskilte 12-timersvakter (fre./lør. 15–03). Var linja vinduet, hadde hun blitt to ulike biler |
-| **`skiftlengde` er det ene feltet som skiller formene** | Tom = ett skift som dekker vinduet; et tall deler vinduet rygg mot rygg. Haugesund 56 går kontinuerlig fre. 14 → søn. 14 med 8 |
-| **Siste bolk kortes av, den strekkes ikke** | 20 t i åttetimersskift er 8 + 8 + 4. Et skift som varer lenger enn vakta ville dukket opp som et brudd på skiftlengdegrensa uten at noen satte det opp |
+| **Ett skiftvindu er ett skift** | `skiftlengde`, som delte vinduet i bolker, er fjernet 15. sep. 2026 (André: «har vi noe behov for skiftlengde?»). En rotasjon settes opp som de skiftene den er; «Nytt skiftvindu» begynner der det forrige sluttet |
+| **Plassene hører til vinduet, ikke til ressursen** | André: «noen ganger ønsker man å ha mindre og mer plasser på enkelte skift visse deler av døgnet.» Samleplassen kan ha seks 14–22 og to 22–06 — én ressurs med to vinduer. Det var også grunnen til at `skiftlengde` måtte gå: den ga alle sine genererte skift samme antall |
+| **«Antall» finnes ikke for grupper i ett eksemplar** | Samleplass og KO (`flere_enheter=False`). Det kan bare være én, serveren avviser alt annet, og en kontroll som ikke gjør noe er en kontroll man lurer på |
 | **Plassene fødes som planlagt kladd** | `er_planlagt()` — usynlig for korpsene til lederen deler dem ut. Samme grunn som at `kopier_oppsett` aldri tar personene |
 | **`erstatt_kladd` rører bare kladden** | Korpsreserverte, `alle_korps` og **alle** bemannede står. Reservasjonen leses av `reservert_korps()`, ikke av feltet — ellers slettes en hel bils plasser fordi ressursen bærer korpset |
 | **Ingen `bulk_create`, alt i én `transaction.atomic()`** | Signalene, og: `erstatt_kladd` sletter før den skriver, så en feil halvveis ville etterlatt lista tommere enn før man trykket |
@@ -1030,11 +1031,16 @@ plassene — klare til å fordeles og spisses i fanene som alt virker.
 
 **Feltet heter «plasser per skift», ikke «antall folk».** André beskriver Haugesund 56 som
 «4 stk fordelt på 2 lag»; bilen har to seter, og de fire er bemanningspoolen. Regnestykket
-står under raden — «2 plasser × 6 skift = 12 plasser, 96 t» — nettopp for at den
-oversettelsen skal være synlig før man trykker.
+står under raden — «6 skift × 1 ressurs = 12 plasser, 96 t» — nettopp for at den
+oversettelsen skal være synlig før man trykker. Plassene står ikke som et ledd der, fordi
+de kan være ulike fra vindu til vindu: hvert vindu viser sitt eget tall, raden summen.
 
-**Klientens tall er et anslag, serverens er fasit.** `_planleggerSkift()` speiler
-`_vinduets_skift()` for å tegne regnestykket mens man skriver; `apneGenerer()` henter
+**Parsingen av `plasser` står i `services._linjens_skift()`, ikke i viewet.** Viewet gjorde
+`_int(...) or 1`, og da ble et eksplisitt `0` stille til 1 — en regel som later som den
+avviser noe.
+
+**Klientens tall er et anslag, serverens er fasit.** `_planleggerVindutall()` speiler
+`_linjens_skift()` for å tegne regnestykket mens man skriver; `apneGenerer()` henter
 serverens forhåndsvisning før bekreftelsen. `PlanleggerfanenTests` måler at de to sier det
 samme på Andrés egne eksempler.
 

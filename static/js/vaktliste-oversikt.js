@@ -698,45 +698,42 @@ function mkDagslinje(dager) {
 // Feltene bruker nå samme idiom som cellene i ressurstabellen — `data-felt` +
 // `data-id` — og ID-en er en stabil teller og ikke en indeks: `splice()` ville
 // ellers flyttet adressen til alle radene under den man fjernet.
-function _planleggerSkift(vindu) {
-  // Speiler `services._vinduets_skift()`: tom skiftlengde gir ett skift, et
-  // tall deler vinduet i bolker rygg mot rygg og korter av den siste.
+function _planleggerVindutall(vindu) {
+  // Ett vindu er ett skift (`skiftlengde` er borte, 15. sep. 2026), så det
+  // som gjenstår er spennet og plassene.
   //
   // **Regnet her bare for å vise tallet mens man skriver.** Fasiten er
   // serverens forhåndsvisning — `planleggerfasit` — og den hentes før noe
   // genereres. To steder å regne er ett sted å komme i utakt, så dette er
-  // bevisst den *uforpliktende* siden: den sier «omtrent så mange», serveren
-  // sier hva som faktisk blir laget.
+  // bevisst den *uforpliktende* siden.
   const fra = _d(vindu.fra);
   const til = _d(vindu.til);
-  if (!fra || !til || til <= fra) return { skift: 0, timer: 0 };
-  const spennTimer = (til.getTime() - fra.getTime()) / 3600000;
-  const lengde = Number(vindu.skiftlengde);
-  if (!vindu.skiftlengde || !Number.isFinite(lengde) || lengde <= 0) {
-    return { skift: 1, timer: spennTimer };
-  }
-  return { skift: Math.ceil(spennTimer / lengde), timer: spennTimer };
+  const plasser = Math.max(1, Number(vindu.plasser) || 1);
+  if (!fra || !til || til <= fra) return { gyldig: false, plasser, timer: 0 };
+  const spenn = (til.getTime() - fra.getTime()) / 3600000;
+  return { gyldig: true, plasser, timer: spenn * plasser, spenn };
 }
 
 
 function _planleggerLinjetall(linje) {
-  // Summen for én linje: skift, plasser og timer — «2 plasser × 6 skift =
-  // 12 plasser, 96 t». Tallet står under raden fordi André tenker i folk
+  // Summen for én linje. Tallet står under raden fordi André tenker i folk
   // («4 stk fordelt på 2 lag») mens modellen trenger plasser per skift, og
   // den oversettelsen skal være synlig før man trykker.
   const antall = Math.max(1, Number(linje.antall) || 1);
-  const plasser = Math.max(1, Number(linje.plasser) || 1);
   let skift = 0;
+  let plasser = 0;
   let timer = 0;
   (linje.vinduer || []).forEach((v) => {
-    const t = _planleggerSkift(v);
-    skift += t.skift;
+    const t = _planleggerVindutall(v);
+    if (!t.gyldig) return;
+    skift += 1;
+    plasser += t.plasser;
     timer += t.timer;
   });
   return {
-    skift,
-    plasser: skift * plasser * antall,
-    timer: timer * plasser * antall,
+    skift: skift * antall,
+    plasser: plasser * antall,
+    timer: timer * antall,
   };
 }
 
@@ -753,14 +750,20 @@ function planleggerTotal() {
 }
 
 
+function _gruppeFor(id) {
+  return (aktivListe?.grupper || []).find((g) => String(g.id) === String(id))
+      || null;
+}
+
+
 function _planleggerVindu(linje, vindu) {
   // **Skiftlengden står som et eget felt, ikke som et valg mellom to
   // former.** Tom = ett skift (Sola 56, 15–03 i ett strekk), et tall = del
   // vinduet (Haugesund 56, 8 timer på og 8 av). Ett felt med to betydninger
   // er her enklere enn to kontroller som utelukker hverandre.
-  const t = _planleggerSkift(vindu);
-  const fasit = t.skift
-    ? `${escapeHtml(_tall(t.skift))} skift`
+  const t = _planleggerVindutall(vindu);
+  const fasit = t.gyldig
+    ? `${escapeHtml(_tall(t.spenn))} t · ${escapeHtml(_tall(t.timer))} t i alt`
     : '<span class="vl-advarsel">ugyldig tidsrom</span>';
   // Det første vinduet kan ikke fjernes — en ressurs uten skiftvindu er
   // ingenting, og serveren avviser det. En knapp som fører til en vegg er
@@ -784,11 +787,11 @@ function _planleggerVindu(linje, vindu) {
                step="300" value="${escHtmlValue(_iso16(vindu.til))}"
                data-action="planleggerSettVindu" data-hendelse="change"
                data-felt="til" data-id="${escHtmlValue(vindu.id)}"></label>
-      <label class="vl-meta">Skiftlengde (t)
+      <label class="vl-meta">Plasser
         <input type="number" class="form-control form-control-sm" min="1" step="1"
-               placeholder="hele vinduet" value="${escHtmlValue(vindu.skiftlengde ?? '')}"
+               value="${escHtmlValue(vindu.plasser)}"
                data-action="planleggerSettVindu" data-hendelse="change"
-               data-felt="skiftlengde" data-id="${escHtmlValue(vindu.id)}"></label>
+               data-felt="plasser" data-id="${escHtmlValue(vindu.id)}"></label>
       <span class="vl-meta vl-pl-vindutall">${fasit}</span>
       ${slett}
     </div>`;
@@ -801,6 +804,22 @@ function _planleggerLinje(linje) {
     const valgt = String(g.id) === String(linje.gruppe_id) ? ' selected' : '';
     return `<option value="${escHtmlValue(g.id)}"${valgt}>${escapeHtml(g.navn)}</option>`;
   }).join('');
+
+  // **«Antall» finnes ikke for grupper som finnes i ett eksemplar** (André,
+  // 15. sep. 2026: «for samleplass og KO ble antall forvirrende»). Det kan
+  // bare være én, serveren avviser alt annet, og en kontroll som ikke gjør
+  // noe er en kontroll man lurer på.
+  const gruppe = _gruppeFor(linje.gruppe_id);
+  const enEneste = gruppe && gruppe.flere_enheter === false;
+  const antallFelt = enEneste ? `
+        <div class="vl-meta vl-pl-eneste">
+          <i class="bi bi-1-circle me-1"></i>Finnes i ett eksemplar
+        </div>` : `
+        <label class="vl-meta">Antall
+          <input type="number" class="form-control form-control-sm" min="1" step="1"
+                 value="${escHtmlValue(linje.antall)}"
+                 data-action="planleggerSettLinje" data-hendelse="change"
+                 data-felt="antall" data-id="${escHtmlValue(linje.id)}"></label>`;
   const vinduer = (linje.vinduer || [])
     .map((v) => _planleggerVindu(linje, v)).join('');
 
@@ -811,16 +830,7 @@ function _planleggerLinje(linje) {
           <select class="form-select form-select-sm"
                   data-action="planleggerSettLinje" data-hendelse="change"
                   data-felt="gruppe_id" data-id="${escHtmlValue(linje.id)}">${grupper}</select></label>
-        <label class="vl-meta">Antall
-          <input type="number" class="form-control form-control-sm" min="1" step="1"
-                 value="${escHtmlValue(linje.antall)}"
-                 data-action="planleggerSettLinje" data-hendelse="change"
-                 data-felt="antall" data-id="${escHtmlValue(linje.id)}"></label>
-        <label class="vl-meta">Plasser per skift
-          <input type="number" class="form-control form-control-sm" min="1" step="1"
-                 value="${escHtmlValue(linje.plasser)}"
-                 data-action="planleggerSettLinje" data-hendelse="change"
-                 data-felt="plasser" data-id="${escHtmlValue(linje.id)}"></label>
+        ${antallFelt}
         <span class="vl-pl-spacer"></span>
         <button type="button" class="btn btn-sm btn-outline-secondary"
                 data-action="planleggerFjernLinje" data-id="${escHtmlValue(linje.id)}">
@@ -840,14 +850,18 @@ function _planleggerLinje(linje) {
 
 
 function _planleggerRegnestykke(linje, t) {
-  // «2 plasser × 6 skift × 1 ressurs = 12 plasser, 96 t». Skrevet ut som et
-  // regnestykke og ikke bare som summen: den som leser skal kunne se hvilket
-  // ledd som er feil når tallet ikke stemmer med det hun tenkte.
+  // «2 skift × 1 ressurs = 12 plasser, 96 t». Skrevet ut som et regnestykke
+  // og ikke bare som summen: den som leser skal kunne se hvilket ledd som er
+  // feil når tallet ikke stemmer med det hun tenkte.
+  //
+  // **Plassene står ikke som et ledd lenger**, fordi de kan være ulike fra
+  // vindu til vindu. Hvert vindu viser sitt eget tall; raden viser summen.
   const antall = Math.max(1, Number(linje.antall) || 1);
-  const plasser = Math.max(1, Number(linje.plasser) || 1);
   if (!t.skift) return 'Fyll ut et gyldig tidsrom.';
-  const ledd = `${_tall(plasser)} plasser × ${_tall(t.skift)} skift`
-    + (antall > 1 ? ` × ${_tall(antall)} ressurser` : '');
+  const skiftord = t.skift === 1 ? 'skift' : 'skift';
+  const ledd = antall > 1
+    ? `${_tall(t.skift / antall)} ${skiftord} × ${_tall(antall)} ressurser`
+    : `${_tall(t.skift)} ${skiftord}`;
   return `${ledd} = ${_tall(t.plasser)} plasser, ${_tall(t.timer)} t`;
 }
 
@@ -883,8 +897,9 @@ function mkPlanlegger() {
   const tomt = planleggerlinjer.length ? '' : `
     <div class="vl-kort"><div class="vl-tom">
       Legg til en ressurs for å begynne. Et lag på fire som går 14–22 er én
-      rad; en ambulanse som går kontinuerlig fra fredag til søndag er én rad
-      med skiftlengde 8.
+      rad med ett skiftvindu. En samleplass med seks på dagtid og to om natta
+      er én rad med to vinduer — og et nytt vindu begynner der det forrige
+      sluttet.
     </div></div>`;
 
   const oppsummering = planleggerlinjer.length ? `

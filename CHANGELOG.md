@@ -4,6 +4,55 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-15 — Planleggeren: plassene flyttet til vinduet, skiftlengde fjernet
+
+**Meldt fra staging (André):**
+
+> «Fungerte veldig fint for ressurser som deler like tider. For samleplass og KO ble
+> «antall» forvirrende, «skiftlengde» er og forvirrende. Noen ganger ønsker man å ha
+> mindre og mer plasser på enkelte skift visse deler av døgnet.» … «Har vi noe behov for
+> skiftlengde?»
+
+### Tre tilbakemeldinger som viste seg å være én
+
+**Plassene hører til vinduet, ikke til ressursen.** Samleplassen kan ha seks plasser
+14–22 og to 22–06 — det er **én** samleplass med to vinduer, ikke to samleplasser. Linja
+sier nå *hva* (gruppe, hvor mange enheter), vinduet sier *når og hvor mange*.
+
+**Og det er grunnen til at `skiftlengde` måtte gå.** Den var en *skjult multiplikator*:
+den lagde seks skift ut av ett vindu, du så dem aldri, og alle seks fikk samme antall
+plasser — altså nøyaktig det som ikke lot seg uttrykke etter flyttingen. En rotasjon settes
+nå opp som de skiftene den er, og «Nytt skiftvindu» begynner der det forrige sluttet og
+arver antallet, så Haugesund 56 er seks klikk. André valgte å fjerne den helt framfor å
+erstatte den med en «del opp»-knapp.
+
+**«Antall» finnes ikke for Samleplass og KO.** `flere_enheter=False` betyr at det bare kan
+være én; serveren avviste alt annet fra før, men feltet sto der og lot som om det var et
+valg. Nå står det «Finnes i ett eksemplar» i stedet.
+
+### En feil funnet på veien
+
+`plasser: 0` ble stille til `1`. Viewet gjorde `_int(...) or 1` **før** services fikk se
+verdien, så regelen «hvert skiftvindu må ha minst én plass» kunne aldri fyre på et
+eksplisitt null. Parsingen er flyttet til `services._linjens_skift()`, som eier regelen;
+viewet sender råverdien videre.
+
+### Mutasjonsprøvd
+
+Åtte mutanter, sju drept med en gang: plassene lest fra linja igjen, null stille til én,
+alle vinduer med første vindus antall, timesummen uten plasser, antallsfeltet vist/skjult
+for alle, og klienten som teller per linje i stedet for per vindu.
+
+Den ene som overlevde var «nytt vindu arver ikke forrige vindus antall» — en oppførsel jeg
+valgte bevisst og ikke testet. Den har en test nå.
+
+**Endret:** `vaktliste/services.py`, `vaktliste/views.py`,
+`static/js/vaktliste-oversikt.js`, `static/js/vaktliste-handlinger.js`,
+`static/css/vaktliste.css`, `vaktliste/tests_planlegger.py`, `vaktliste/tests_xss.py`,
+`CLAUDE.md`.
+
+---
+
 ## 2026-09-15 — Planleggeren: feltene lot seg ikke fylle ut
 
 **Meldt fra staging (André):**

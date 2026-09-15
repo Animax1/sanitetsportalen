@@ -52,6 +52,8 @@ ESCAPING_CALLS = ('escHtmlValue(', 'cellHtml(', '_escHtml(', 'escapeHtml(')
 REVIEWED_INTERPOLATIONS = {
     # Planleggeren (15. sep. 2026).
     'vinduer': 'markup fra `_planleggerVindu`, som selv skannes her',
+    'antallFelt': 'markup bygget lokalt: antallsfeltet med id-en escapet inni, '
+                  'eller en fast tekst for grupper i ett eksemplar',
     'fasit': 'markup bygget lokalt: escapet antall skift, eller en fast tekst',
     'slett': 'markup bygget lokalt, indeksene escapet inni',
     # Budsjettlinja og dagslinja (15. sep. 2026).
@@ -3251,7 +3253,8 @@ class PlanleggerfanenTests(SimpleTestCase):
         (PORTAL_UTILS_JS, ('hendelseArgumenter', '_handlerArgument',
                            'klikkSkalKjore')),
         (VAKTLISTE_JS, ('mkPlanlegger', '_planleggerLinje', '_planleggerVindu',
-                        '_planleggerSkift', '_planleggerLinjetall',
+                        '_planleggerVindutall', '_planleggerLinjetall',
+                        '_gruppeFor',
                         '_planleggerRegnestykke', 'planleggerTotal',
                         'planleggerSettLinje', 'planleggerSettVindu',
                         'planleggerNyLinje', 'planleggerNyttVindu',
@@ -3270,6 +3273,7 @@ class PlanleggerfanenTests(SimpleTestCase):
 
     LAG = 1
     AMBULANSE = 2
+    SAMLEPLASS = 3
 
     def _vis(self, linjer, *, leder=True):
         import json
@@ -3280,8 +3284,12 @@ class PlanleggerfanenTests(SimpleTestCase):
         liste = {
             'vaktliste': {'id': 1, 'startet': '2026-10-02T12:00:00+02:00',
                           'timetak': None},
-            'grupper': [{'id': self.LAG, 'navn': 'Lag'},
-                        {'id': self.AMBULANSE, 'navn': 'Ambulanse'}],
+            'grupper': [{'id': self.LAG, 'navn': 'Lag',
+                         'flere_enheter': True},
+                        {'id': self.AMBULANSE, 'navn': 'Ambulanse',
+                         'flere_enheter': True},
+                        {'id': self.SAMLEPLASS, 'navn': 'Samleplass',
+                         'flere_enheter': False}],
         }
         return run_node(self.harness, vindu + f"""
             globalThis.aktivListe = {json.dumps(liste)};
@@ -3292,9 +3300,18 @@ class PlanleggerfanenTests(SimpleTestCase):
         """)
 
     def _linje(self, gruppe, antall, plasser, *vinduer):
-        return {'gruppe_id': gruppe, 'antall': antall, 'plasser': plasser,
-                'vinduer': [{'fra': f, 'til': t, 'skiftlengde': s}
-                            for f, t, s in vinduer]}
+        """Plassene ligger på **vinduet** (15. sep. 2026). Hjelperen tar dem
+        som ett argument fordi de fleste oppsett har samme antall hele veien;
+        `_ulikt()` er formen når de varierer."""
+        return {'id': 900 + gruppe, 'gruppe_id': gruppe, 'antall': antall,
+                'vinduer': [{'id': 950 + i, 'fra': f, 'til': t,
+                             'plasser': plasser}
+                            for i, (f, t) in enumerate(vinduer)]}
+
+    def _ulikt(self, gruppe, *vinduer):
+        return {'id': 901, 'gruppe_id': gruppe, 'antall': 1,
+                'vinduer': [{'id': 960 + i, 'fra': f, 'til': t, 'plasser': pl}
+                            for i, (f, t, pl) in enumerate(vinduer)]}
 
     # Andrés tre eksempler, som ISO-tider i norsk sommertid.
     FRE14 = '2026-10-02T14:00:00+02:00'
@@ -3326,8 +3343,12 @@ class PlanleggerfanenTests(SimpleTestCase):
         liste = {
             'vaktliste': {'id': 1, 'startet': '2026-10-02T14:00:00+02:00',
                           'timetak': None},
-            'grupper': [{'id': self.LAG, 'navn': 'Lag'},
-                        {'id': self.AMBULANSE, 'navn': 'Ambulanse'}],
+            'grupper': [{'id': self.LAG, 'navn': 'Lag',
+                         'flere_enheter': True},
+                        {'id': self.AMBULANSE, 'navn': 'Ambulanse',
+                         'flere_enheter': True},
+                        {'id': self.SAMLEPLASS, 'navn': 'Samleplass',
+                         'flere_enheter': False}],
         }
         return run_node(self.harness,
                         "globalThis.window = { MODUL_TILGANG: "
@@ -3368,10 +3389,11 @@ class PlanleggerfanenTests(SimpleTestCase):
         ut = self._skriv("""
             planleggerNyLinje();
             skriv('planleggerSettLinje', 'antall', '3');
-            skriv('planleggerSettLinje', 'plasser', '4');
+            skriv('planleggerSettVindu', 'plasser', '4');
             const l = planleggerlinjer[0];
             assert(String(l.antall) === '3', 'antall ble ' + l.antall);
-            assert(String(l.plasser) === '4', 'plasser ble ' + l.plasser);
+            assert(String(l.vinduer[0].plasser) === '4',
+                   'plasser ble ' + l.vinduer[0].plasser);
             console.log(mkPlanlegger());
         """)
         self.assertIn('value="3"', ut)
@@ -3382,17 +3404,17 @@ class PlanleggerfanenTests(SimpleTestCase):
             planleggerNyLinje();
             skriv('planleggerSettVindu', 'fra', '2026-10-03T15:00');
             skriv('planleggerSettVindu', 'til', '2026-10-04T03:00');
-            skriv('planleggerSettVindu', 'skiftlengde', '8');
+            skriv('planleggerSettVindu', 'plasser', '6');
             const v = planleggerlinjer[0].vinduer[0];
             assert(v.fra !== null, 'fra ble null');
             assert(v.til !== null, 'til ble null');
-            assert(v.skiftlengde === '8', 'skiftlengde ble ' + v.skiftlengde);
+            assert(v.plasser === '6', 'plasser ble ' + v.plasser);
             console.log(mkPlanlegger());
         """)
         self.assertIn('value="2026-10-03T15:00"', ut)
         self.assertIn('value="2026-10-04T03:00"', ut)
-        # 15:00–03:00 er tolv timer; delt i åtte blir det to skift (8 + 4).
-        self.assertIn('2 skift', ut)
+        # 15:00–03:00 er tolv timer; seks plasser gir 72 t.
+        self.assertIn('72 t', ut)
 
     def test_gruppevalget_lagres_som_tall(self):
         """FK-en må være et tall — serveren slår opp gruppa på den."""
@@ -3440,7 +3462,8 @@ class PlanleggerfanenTests(SimpleTestCase):
         som et valg noen har tatt framfor et fravær."""
         import json
         liste = {'vaktliste': {'id': 1, 'startet': None, 'timetak': None},
-                 'grupper': [{'id': self.LAG, 'navn': 'Lag'}]}
+                 'grupper': [{'id': self.LAG, 'navn': 'Lag',
+                              'flere_enheter': True}]}
         ut = run_node(self.harness,
                       "globalThis.window = { MODUL_TILGANG: "
                       "{ vaktliste: 'skriv_leder', admin: false } };\n"
@@ -3468,6 +3491,19 @@ class PlanleggerfanenTests(SimpleTestCase):
         """)
         self.assertIn('value="2026-10-02T14:00"', ut)
 
+    def test_nytt_vindu_arver_forrige_vindus_antall_plasser(self):
+        """Det vanlige er at vinduene har samme antall; det uvanlige er ett
+        tastetrykk unna. Arvet ikke det nye vinduet, måtte man skrevet tallet
+        på nytt for hvert skift i en rotasjon."""
+        self._skriv("""
+            planleggerNyLinje();
+            skriv('planleggerSettVindu', 'plasser', '6');
+            planleggerNyttVindu(planleggerlinjer[0].id);
+            const v = planleggerlinjer[0].vinduer;
+            assert(String(v[1].plasser) === '6',
+                   'nytt vindu fikk ' + v[1].plasser + ', ventet 6');
+        """)
+
     def test_nytt_vindu_begynner_der_det_forrige_sluttet(self):
         """Sola 56 har to vakter på ulike dager; «rett etter forrige» er det
         man som regel mener."""
@@ -3489,28 +3525,69 @@ class PlanleggerfanenTests(SimpleTestCase):
         """En tom flate med bare en knapp forteller ikke hva knappen lager."""
         ut = self._vis([])
         self.assertIn('Legg til ressurs', ut)
-        self.assertIn('skiftlengde 8', ut)
+        self.assertIn('to vinduer', ut)
 
     def test_tre_firemannslag_gir_tolv_plasser(self):
         ut = self._vis([self._linje(self.LAG, 3, 4,
-                                    (self.FRE14, self.FRE22, ''))])
+                                    (self.FRE14, self.FRE22))])
         self.assertIn('12 plasser', ut)
         self.assertIn('96 t', ut)
 
-    def test_atte_timers_rotasjon_gir_seks_skift(self):
-        """Haugesund 56: fre. 14 → søn. 14 er 48 timer, delt i åtte."""
-        ut = self._vis([self._linje(self.AMBULANSE, 1, 2,
-                                    (self.FRE14, self.SON14, 8))])
+    def test_rotasjonen_settes_opp_som_de_skiftene_den_er(self):
+        """Haugesund 56, fre. 14 → søn. 14 i åttetimersskift: seks vinduer.
+
+        `skiftlengde` er borte (André, 15. sep. 2026: «har vi noe behov for
+        skiftlengde?» → nei). Den var en skjult multiplikator der alle de
+        genererte skiftene fikk samme antall plasser — nettopp det som ikke
+        lot seg uttrykke da plassene ble flyttet til vinduet."""
+        vinduer = [(f'2026-10-{2 + (14 + 8 * i) // 24:02d}'
+                    f'T{(14 + 8 * i) % 24:02d}:00:00+02:00',
+                    f'2026-10-{2 + (14 + 8 * (i + 1)) // 24:02d}'
+                    f'T{(14 + 8 * (i + 1)) % 24:02d}:00:00+02:00')
+                   for i in range(6)]
+        ut = self._vis([self._linje(self.AMBULANSE, 1, 2, *vinduer)])
         self.assertIn('6 skift', ut)
         self.assertIn('12 plasser', ut)
         self.assertIn('96 t', ut)
+
+    def test_ulikt_antall_plasser_paa_ulike_vinduer(self):
+        """André: «noen ganger ønsker man å ha mindre og mer plasser på
+        enkelte skift visse deler av døgnet.» Seks 14–22 og to 22–06 er
+        **én** samleplass."""
+        ut = self._vis([self._ulikt(
+            self.SAMLEPLASS,
+            (self.FRE14, self.FRE22, 6),
+            (self.FRE22, '2026-10-03T06:00:00+02:00', 2))])
+        self.assertIn('8 plasser', ut)
+        self.assertIn('64 t', ut, '6 × 8 t + 2 × 8 t')
+
+    def test_antall_skjules_for_grupper_i_ett_eksemplar(self):
+        """André: «for samleplass og KO ble antall forvirrende». Det kan bare
+        være én, serveren avviser alt annet, og en kontroll som ikke gjør noe
+        er en kontroll man lurer på."""
+        ut = self._vis([self._linje(self.SAMLEPLASS, 1, 4,
+                                    (self.FRE14, self.FRE22))])
+        self.assertIn('ett eksemplar', ut)
+        self.assertNotIn('data-felt="antall"', ut)
+
+    def test_antall_staar_for_grupper_det_kan_vaere_flere_av(self):
+        ut = self._vis([self._linje(self.LAG, 3, 4, (self.FRE14, self.FRE22))])
+        self.assertIn('data-felt="antall"', ut)
+        self.assertNotIn('ett eksemplar', ut)
+
+    def test_skiftlengde_finnes_ikke_lenger(self):
+        """Motprøven: feltet skal være borte, ikke bare omdøpt."""
+        ut = self._vis([self._linje(self.LAG, 1, 4,
+                                    (self.FRE14, self.FRE22))])
+        self.assertNotIn('skiftlengde', ut)
+        self.assertNotIn('Skiftlengde', ut)
 
     def test_to_adskilte_vinduer_er_en_ressurs(self):
         """Sola 56. Hadde raden vært vinduet, ville hun blitt to biler —
         og da hadde tallet sagt to ressurser."""
         ut = self._vis([self._linje(self.AMBULANSE, 1, 2,
-                                    (self.FRE15, self.LOR03, ''),
-                                    (self.LOR15, self.SON03, ''))])
+                                    (self.FRE15, self.LOR03),
+                                    (self.LOR15, self.SON03))])
         self.assertIn('4 plasser', ut)
         self.assertIn('48 t', ut)
         self.assertIn('>1<', ut, 'én ressurs')
@@ -3520,11 +3597,16 @@ class PlanleggerfanenTests(SimpleTestCase):
         tall som `GrunnlagTests.test_hele_oppsettet_i_en_omgang` måler på
         serversiden. Kommer de to i utakt, er det her det vises."""
         ut = self._vis([
-            self._linje(self.LAG, 3, 4, (self.FRE14, self.FRE22, '')),
-            self._linje(self.AMBULANSE, 1, 2, (self.FRE14, self.SON14, 8)),
+            self._linje(self.LAG, 3, 4, (self.FRE14, self.FRE22)),
             self._linje(self.AMBULANSE, 1, 2,
-                        (self.FRE15, self.LOR03, ''),
-                        (self.LOR15, self.SON03, '')),
+                        *[(f'2026-10-{2 + (14 + 8 * i) // 24:02d}'
+                           f'T{(14 + 8 * i) % 24:02d}:00:00+02:00',
+                           f'2026-10-{2 + (14 + 8 * (i + 1)) // 24:02d}'
+                           f'T{(14 + 8 * (i + 1)) % 24:02d}:00:00+02:00')
+                          for i in range(6)]),
+            self._linje(self.AMBULANSE, 1, 2,
+                        (self.FRE15, self.LOR03),
+                        (self.LOR15, self.SON03)),
         ])
         # Summen står **nederst**, i kortet med generer-knappen: man leser
         # radene, og så står totalen der man avslutter. Testen leser derfor
@@ -3535,65 +3617,52 @@ class PlanleggerfanenTests(SimpleTestCase):
         self.assertIn('>28<', sum_kort)
         self.assertIn('240 t', sum_kort)
 
-    def test_siste_bolk_telles_med_selv_om_den_er_kort(self):
-        """20 timer i åttetimersskift er 8 + 8 + 4 — tre skift, ikke to.
-
-        Mutasjonsprøvd 15. sep. 2026: `Math.ceil` lot seg bytte mot `floor`
-        uten at noe ble rødt, fordi alle eksemplene mine gikk opp i hele
-        skift (48/8 og 8/8). Serveren har samme prøve
-        (`SkiftvinduTests.test_siste_bolk_kortes_av_den_strekkes_ikke`), og
-        de to skal si det samme."""
-        ut = self._vis([self._linje(
-            self.AMBULANSE, 1, 2,
-            (self.FRE14, '2026-10-03T10:00:00+02:00', 8))])
-        self.assertIn('3 skift', ut)
-        self.assertIn('6 plasser', ut)
-
-    def test_tom_skiftlengde_er_ett_skift_ikke_null(self):
-        """Feltet står tomt for Sola 56, som går 15–03 i ett strekk. En
-        `Number('')` ville gitt null — altså et skift på null timer."""
+    def test_ett_vindu_er_ett_skift(self):
         ut = self._vis([self._linje(self.AMBULANSE, 1, 2,
-                                    (self.FRE15, self.LOR03, ''))])
+                                    (self.FRE15, self.LOR03))])
         self.assertIn('1 skift', ut)
 
     def test_ugyldig_tidsrom_sier_fra_framfor_aa_vise_null(self):
         """Et bakvendt vindu skal si hva som er galt, ikke stå med «0
         plasser» som om det var et svar."""
         ut = self._vis([self._linje(self.LAG, 1, 4,
-                                    (self.FRE22, self.FRE14, ''))])
+                                    (self.FRE22, self.FRE14))])
         self.assertIn('ugyldig tidsrom', ut)
         self.assertNotIn('Lag grunnlaget', ut.split('ugyldig tidsrom')[0])
 
     def test_regnestykket_viser_leddene_ikke_bare_summen(self):
         """Den som leser skal kunne se hvilket ledd som er feil når tallet
-        ikke stemmer med det hun tenkte."""
+        ikke stemmer med det hun tenkte.
+
+        **Plassene er ikke et ledd lenger**, fordi de kan være ulike fra
+        vindu til vindu — hvert vindu viser sitt eget tall, raden summen."""
         ut = self._vis([self._linje(self.LAG, 3, 4,
-                                    (self.FRE14, self.FRE22, ''))])
-        self.assertIn('4 plasser × 1 skift × 3 ressurser', ut)
+                                    (self.FRE14, self.FRE22))])
+        self.assertIn('1 skift × 3 ressurser = 12 plasser, 96 t', ut)
 
     def test_antall_paa_en_utelates_fra_regnestykket(self):
         """«× 1 ressurser» er et ledd som ikke gjør noe, og det er nettopp
         de leddene som gjør et regnestykke vanskelig å lese."""
         ut = self._vis([self._linje(self.AMBULANSE, 1, 2,
-                                    (self.FRE14, self.SON14, 8))])
-        self.assertNotIn('ressurser', ut.split('= ')[0].split('plasser ×')[-1])
+                                    (self.FRE15, self.LOR03))])
+        self.assertIn('1 skift = 2 plasser, 24 t', ut)
 
     def test_genererknappen_staar_bare_naar_det_finnes_et_oppsett(self):
         self.assertNotIn('apneGenerer', self._vis([]))
         self.assertIn('apneGenerer', self._vis(
-            [self._linje(self.LAG, 1, 4, (self.FRE14, self.FRE22, ''))]))
+            [self._linje(self.LAG, 1, 4, (self.FRE14, self.FRE22))]))
 
     def test_forste_vindu_kan_ikke_fjernes(self):
         """En ressurs uten skiftvindu er ingenting. Serveren avviser det
         også, men en knapp som fører til en vegg er verre enn ingen knapp."""
         ut = self._vis([self._linje(self.LAG, 1, 4,
-                                    (self.FRE14, self.FRE22, ''))])
+                                    (self.FRE14, self.FRE22))])
         self.assertNotIn('planleggerFjernVindu', ut)
 
     def test_andre_vindu_kan_fjernes(self):
         ut = self._vis([self._linje(self.AMBULANSE, 1, 2,
-                                    (self.FRE15, self.LOR03, ''),
-                                    (self.LOR15, self.SON03, ''))])
+                                    (self.FRE15, self.LOR03),
+                                    (self.LOR15, self.SON03))])
         self.assertIn('planleggerFjernVindu', ut)
 
     def test_budsjettlinja_staar_i_denne_fanen(self):
@@ -3603,7 +3672,8 @@ class PlanleggerfanenTests(SimpleTestCase):
         liste = {
             'vaktliste': {'id': 1, 'startet': '2026-10-02T12:00:00+02:00',
                           'timetak': 400},
-            'grupper': [{'id': self.LAG, 'navn': 'Lag'}],
+            'grupper': [{'id': self.LAG, 'navn': 'Lag',
+                         'flere_enheter': True}],
         }
         plan = {'timetak': 400, 'satt_opp': 312.0, 'bemannet': 244.0,
                 'probono': 0.0, 'igjen': 88.0, 'over_taket': False,

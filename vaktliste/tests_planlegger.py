@@ -12,11 +12,19 @@ for vaktlisten. Så skal vi kunne fordele vaktene og etterhvert spisse de inn.»
 | Oppsett | Blir |
 |---|---|
 | 3 lag à 4 plasser, fre. 14–22 | 3 ressurser, 12 plasser, 96 t |
-| Haugesund 56: 2 plasser, fre. 14 → søn. 14, 8 t rotasjon | 6 skift × 2 = 12 plasser, 96 t |
-| Sola 56: 2 plasser, to vinduer fre./lør. 15–03 | 2 skift × 2 = 4 plasser, 48 t |
+| Haugesund 56: seks vinduer à 8 t, 2 plasser hvert | 12 plasser, 96 t |
+| Sola 56: to vinduer fre./lør. 15–03, 2 plasser | 4 plasser, 48 t |
 
 Det siste er grunnen til at **ressursen er subjektet og vinduene hører til
 den**: var linja enheten, hadde Sola 56 blitt to ulike biler.
+
+**Ett vindu er ett skift** (15. sep. 2026). `skiftlengde`, som delte vinduet i
+bolker, er fjernet — den var en skjult multiplikator der alle de genererte
+skiftene fikk samme antall plasser, og det er nettopp det som ikke lot seg
+uttrykke da plassene ble flyttet til vinduet.
+
+**Plassene hører til vinduet**, ikke til ressursen: samleplassen kan ha seks
+14–22 og to 22–06.
 """
 import json
 from datetime import datetime, timedelta
@@ -40,71 +48,70 @@ def kl(dag, time, minutt=0):
                     tzinfo=OSLO).astimezone(dt_timezone.utc)
 
 
-class SkiftvinduTests(SimpleTestCase):
-    """`_vinduets_skift` — det ene feltet som skiller Andrés to ambulanser."""
+class SkiftvinduValideringTests(TilgangsBasis):
+    """Vinduets egne krav. `SkiftvinduTests` målte rotasjonen, som er borte."""
 
-    def test_tom_skiftlengde_gir_ett_skift(self):
-        """Sola 56 går 15–03 i ett strekk."""
-        skift = services._vinduets_skift(kl(2, 15), kl(3, 3), None)
-        self.assertEqual([(kl(2, 15), kl(3, 3))], skift)
+    def _skift(self, fra, til, plasser=2):
+        return services._linjens_skift({'vinduer': [
+            {'fra': fra, 'til': til, 'plasser': plasser}]})
 
-    def test_rotasjonen_deler_vinduet_rygg_mot_rygg(self):
-        """Haugesund 56: fre. 14 → søn. 14 er 48 timer, delt i åtte."""
-        skift = services._vinduets_skift(kl(2, 14), kl(4, 14), 8)
-        self.assertEqual(6, len(skift))
-        self.assertEqual(kl(2, 14), skift[0][0])
-        self.assertEqual(kl(4, 14), skift[-1][1])
-        for forrige, neste in zip(skift, skift[1:]):
-            self.assertEqual(forrige[1], neste[0], 'ingen hull, ingen overlapp')
+    def test_ett_vindu_er_ett_skift(self):
+        """Regelen etter at `skiftlengde` ble fjernet: et vindu deles ikke."""
+        skift = self._skift(kl(2, 14), kl(4, 14))
+        self.assertEqual(1, len(skift), '48 timer er fortsatt ett skift')
+        self.assertEqual((kl(2, 14), kl(4, 14), 2), skift[0])
 
-    def test_siste_bolk_kortes_av_den_strekkes_ikke(self):
-        """20 timer i åttetimersskift er 8 + 8 + 4, ikke 8 + 8 + 8. Et skift
-        som varer lenger enn vakta er noe ingen har bedt om — og det ville
-        dukket opp som et brudd på skiftlengdegrensa uten at noen satte det
-        opp."""
-        skift = services._vinduets_skift(kl(2, 0), kl(2, 20), 8)
-        self.assertEqual(3, len(skift))
-        self.assertEqual(kl(2, 20), skift[-1][1])
-        self.assertEqual(timedelta(hours=4), skift[-1][1] - skift[-1][0])
+    def test_plassene_foelger_vinduet(self):
+        self.assertEqual(6, self._skift(kl(2, 14), kl(2, 22), 6)[0][2])
 
-    def test_skiftlengde_lik_vinduet_gir_ett_skift(self):
-        skift = services._vinduets_skift(kl(2, 14), kl(2, 22), 8)
-        self.assertEqual(1, len(skift))
+    def test_ulike_vinduer_kan_ha_ulikt_antall(self):
+        """André: «noen ganger ønsker man å ha mindre og mer plasser på
+        enkelte skift visse deler av døgnet.»"""
+        skift = services._linjens_skift({'vinduer': [
+            {'fra': kl(2, 14), 'til': kl(2, 22), 'plasser': 6},
+            {'fra': kl(2, 22), 'til': kl(3, 6), 'plasser': 2},
+        ]})
+        self.assertEqual([6, 2], [pl for _, _, pl in skift])
 
     def test_bakvendt_vindu_avvises(self):
         with self.assertRaises(services.Planleggerfeil):
-            services._vinduets_skift(kl(3, 3), kl(2, 15), None)
+            self._skift(kl(3, 3), kl(2, 15))
 
     def test_null_lengde_vindu_avvises(self):
         with self.assertRaises(services.Planleggerfeil):
-            services._vinduets_skift(kl(2, 15), kl(2, 15), None)
+            self._skift(kl(2, 15), kl(2, 15))
 
-    def test_negativ_skiftlengde_avvises(self):
+    def test_vindu_uten_tid_avvises(self):
         with self.assertRaises(services.Planleggerfeil):
-            services._vinduets_skift(kl(2, 14), kl(2, 22), -8)
+            self._skift(None, kl(2, 22))
 
-    def test_altfor_mange_skift_avvises_framfor_aa_skrives(self):
-        """Et vindu på et år delt i minuttskift. Sperren er mot en skrivefeil
-        i tidene, ikke en regel om hvor mange skift en vakt kan ha."""
+    def test_null_plasser_avvises(self):
         with self.assertRaises(services.Planleggerfeil):
-            services._vinduets_skift(kl(2, 0), kl(2, 0) + timedelta(days=365),
-                                     0.01)
+            self._skift(kl(2, 14), kl(2, 22), 0)
 
-    def test_femogfyrti_timer_i_timesskift_gaar_greit(self):
-        """Motprøven til den over: en helgevakt i timesskift skal ikke
-        stoppes. Uten denne kunne taket senkes til 10 uten at noe ble rødt."""
-        skift = services._vinduets_skift(kl(2, 0), kl(3, 21), 1)
-        self.assertEqual(45, len(skift))
+    def test_ressurs_uten_vindu_avvises(self):
+        with self.assertRaises(services.Planleggerfeil):
+            services._linjens_skift({'vinduer': []})
 
 
 class GrunnlagTests(TilgangsBasis):
     """`generer_grunnlag` mot basen — Andrés tre eksempler."""
 
     def _lag(self, gruppenavn, antall, plasser, *vinduer):
+        """**Plassene ligger på vinduet** (15. sep. 2026). Hjelperen tar dem
+        fortsatt som ett argument fordi de fleste oppsettene har samme antall
+        hele veien; `_ulike()` under er formen når de varierer."""
         return {'gruppe_id': gruppe(gruppenavn).pk, 'antall': antall,
-                'plasser': plasser,
-                'vinduer': [{'fra': f, 'til': t, 'skiftlengde': s}
+                'vinduer': [{'fra': f, 'til': t, 'skiftlengde': s,
+                             'plasser': plasser}
                             for f, t, s in vinduer]}
+
+    def _ulike(self, gruppenavn, *vinduer):
+        """Ett vindu per rad, med sitt eget antall plasser."""
+        return {'gruppe_id': gruppe(gruppenavn).pk, 'antall': 1,
+                'vinduer': [{'fra': f, 'til': t, 'skiftlengde': s,
+                             'plasser': pl}
+                            for f, t, s, pl in vinduer]}
 
     def _ny_liste(self):
         """En **tom** liste. `TilgangsBasis` har alt ressurser på `self.vl`,
@@ -129,15 +136,37 @@ class GrunnlagTests(TilgangsBasis):
     def test_haugesund_56_gaar_atte_timers_rotasjon(self):
         """Kontinuerlig vakt fre. 14 → søn. 14, bemannet av to lag som går
         åtte på og åtte av. Bilen har **to plasser** — de fire er
-        bemanningspoolen, ikke seter."""
+        bemanningspoolen, ikke seter.
+
+        Etter at `skiftlengde` ble fjernet settes rotasjonen opp som de seks
+        skiftene den er. «Nytt skiftvindu» begynner der det forrige sluttet,
+        så det er seks klikk — og nå kan natta settes til færre plasser."""
         vl = self._ny_liste()
+        vinduer = [(kl(2, 14) + timedelta(hours=8 * i),
+                    kl(2, 14) + timedelta(hours=8 * (i + 1)), None)
+                   for i in range(6)]
         svar = services.generer_grunnlag(
-            vl, [self._lag('Ambulanse', 1, 2, (kl(2, 14), kl(4, 14), 8))])
+            vl, [self._lag('Ambulanse', 1, 2, *vinduer)])
         self.assertEqual(1, svar['ressurser'])
         self.assertEqual(12, svar['plasser'], '6 skift × 2 plasser')
         self.assertEqual(96.0, svar['timer'])
         tider = sorted(set(self._poster(vl).values_list('fra_tid', flat=True)))
         self.assertEqual(6, len(tider), 'seks skiftvinduer')
+
+    def test_samleplassen_kan_ha_faerre_plasser_om_natta(self):
+        """Bestillingen bak flyttingen (André, 15. sep. 2026). Seks 14–22 og
+        to 22–06 er **én** samleplass med to vinduer."""
+        vl = self._ny_liste()
+        svar = services.generer_grunnlag(vl, [self._ulike(
+            'Samleplass',
+            (kl(2, 14), kl(2, 22), None, 6),
+            (kl(2, 22), kl(3, 6), None, 2))])
+        self.assertEqual(1, svar['ressurser'])
+        self.assertEqual(8, svar['plasser'])
+        self.assertEqual(64.0, svar['timer'], '6 × 8 t + 2 × 8 t')
+        self.assertEqual(['Samleplass'],
+                         list(Ressurs.objects.filter(vaktliste=vl)
+                              .values_list('navn', flat=True)))
 
     def test_sola_56_faar_to_adskilte_tolvtimersvakter(self):
         """**To vinduer på én ressurs**, ikke to biler. Det er hele grunnen
@@ -157,7 +186,10 @@ class GrunnlagTests(TilgangsBasis):
         vl = self._ny_liste()
         svar = services.generer_grunnlag(vl, [
             self._lag('Lag', 3, 4, (kl(2, 14), kl(2, 22), None)),
-            self._lag('Ambulanse', 1, 2, (kl(2, 14), kl(4, 14), 8)),
+            self._lag('Ambulanse', 1, 2,
+                      *[(kl(2, 14) + timedelta(hours=8 * i),
+                         kl(2, 14) + timedelta(hours=8 * (i + 1)), None)
+                        for i in range(6)]),
             self._lag('Ambulanse', 1, 2,
                       (kl(2, 15), kl(3, 3), None),
                       (kl(3, 15), kl(4, 3), None)),
@@ -273,21 +305,23 @@ class GrunnlagTests(TilgangsBasis):
         with self.assertRaises(services.Planleggerfeil):
             services.generer_grunnlag(
                 vl, [{'gruppe_id': gruppe('Lag').pk, 'antall': 1,
-                      'plasser': 4, 'vinduer': []}])
+                      'vinduer': []}])
 
     def test_ukjent_gruppe_avvises(self):
         vl = self._ny_liste()
         with self.assertRaises(services.Planleggerfeil):
             services.generer_grunnlag(
-                vl, [{'gruppe_id': 999999, 'antall': 1, 'plasser': 1,
+                vl, [{'gruppe_id': 999999, 'antall': 1,
                       'vinduer': [{'fra': kl(2, 14), 'til': kl(2, 22),
-                                   'skiftlengde': None}]}])
+                                   'skiftlengde': None, 'plasser': 1}]}])
 
     def test_altfor_stort_oppsett_avvises_framfor_aa_skrives(self):
+        """Sperra er mot et uhell man må rydde opp i for hånd, ikke en regel
+        om hvor stor en vakt kan være."""
         vl = self._ny_liste()
         with self.assertRaises(services.Planleggerfeil):
             services.generer_grunnlag(
-                vl, [self._lag('Lag', 50, 50, (kl(2, 0), kl(3, 0), 1))])
+                vl, [self._lag('Lag', 50, 50, (kl(2, 0), kl(3, 0), None))])
         self.assertEqual(0, Ressurs.objects.filter(vaktliste=vl).count())
 
     def test_ressursene_faar_fanerekkefolge_i_den_rekkefolgen_de_kom(self):
@@ -324,9 +358,9 @@ class ErstattKladdTests(TilgangsBasis):
             ressurs=self.res, fra_tid=kl(2, 14), til_tid=kl(2, 22), **felt)
 
     def _linje(self):
-        return {'gruppe_id': gruppe('Lag').pk, 'antall': 1, 'plasser': 1,
+        return {'gruppe_id': gruppe('Lag').pk, 'antall': 1,
                 'vinduer': [{'fra': kl(3, 14), 'til': kl(3, 22),
-                             'skiftlengde': None}]}
+                             'skiftlengde': None, 'plasser': 1}]}
 
     def _generer(self):
         return services.generer_grunnlag(
@@ -434,9 +468,10 @@ class PlanleggerApiTests(TilgangsBasis):
 
     def _kall(self, klient, **kropp):
         kropp.setdefault('linjer', [{
-            'gruppe_id': gruppe('Lag').pk, 'antall': 1, 'plasser': 2,
+            'gruppe_id': gruppe('Lag').pk, 'antall': 1,
             'vinduer': [{'fra': kl(2, 14).isoformat(),
-                         'til': kl(2, 22).isoformat(), 'skiftlengde': None}]}])
+                         'til': kl(2, 22).isoformat(), 'skiftlengde': None,
+                         'plasser': 2}]}])
         return klient.post(
             f'/vaktliste/api/vaktlister/{self.vl2.pk}/generer/',
             data=json.dumps(kropp), content_type='application/json')
@@ -480,11 +515,16 @@ class PlanleggerApiTests(TilgangsBasis):
                                            'vinduer': []}]}),
             ('vindu uten tid', {'linjer': [{'gruppe_id': gruppe('Lag').pk,
                                             'vinduer': [{'fra': '', 'til': ''}]}]}),
-            ('ulesbar skiftlengde', {'linjer': [{
+            ('ulesbart antall plasser', {'linjer': [{
                 'gruppe_id': gruppe('Lag').pk,
                 'vinduer': [{'fra': kl(2, 14).isoformat(),
                              'til': kl(2, 22).isoformat(),
-                             'skiftlengde': 'åtte'}]}]}),
+                             'plasser': 'fire'}]}]}),
+            ('null plasser', {'linjer': [{
+                'gruppe_id': gruppe('Lag').pk,
+                'vinduer': [{'fra': kl(2, 14).isoformat(),
+                             'til': kl(2, 22).isoformat(),
+                             'plasser': 0}]}]}),
         ):
             with self.subTest(tilfelle=navn):
                 res = self._kall(self.c_leder, **kropp)

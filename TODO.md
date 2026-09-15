@@ -540,6 +540,10 @@ Se beslutning 15–17 i notatet.
       PUT som vaktas spenn, og én forespørsel kan ikke ha to tilgangsnivåer inni seg
       (beslutning 13). Gjort samtidig med punktet over — en «budsjettlinje» uten et
       budsjett er halve funksjonen.
+- [x] **Plassene flyttet fra ressursen til skiftvinduet, og `skiftlengde` fjernet**
+      (meldt fra staging 15. sep. 2026). Samleplassen kan ha seks 14–22 og to 22–06.
+      Rotasjonen settes opp som de skiftene den er; «Antall» skjules for grupper som
+      finnes i ett eksemplar. Se CHANGELOG.
 - [x] **Feltene i planleggeren lot seg ikke fylle ut** (meldt fra staging 15. sep.
       2026). Delegeringen sender `(id, felt, verdi)` bare til elementer med `data-felt`;
       feltene hadde `data-arg`, så verdien kom aldri fram. Bug-1-meldingen om «dagens

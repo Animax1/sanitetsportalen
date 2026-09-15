@@ -771,22 +771,18 @@ def _planleggerlinjer(data):
             if fra is None or til is None:
                 raise services.Planleggerfeil(
                     'Skiftvinduet mangler fra- eller til-tidspunkt.')
-            # **Tom skiftlengde er ett skift, ikke null timer.** Feltet står
-            # tomt for Sola 56, som går 15–03 i ett strekk.
-            raa_lengde = vindu.get('skiftlengde')
-            if raa_lengde in (None, ''):
-                lengde = None
-            else:
-                try:
-                    lengde = float(raa_lengde)
-                except (TypeError, ValueError):
-                    raise services.Planleggerfeil(
-                        'Skiftlengden må være et antall timer.')
-            lest.append({'fra': fra, 'til': til, 'skiftlengde': lengde})
+            # **Ett vindu er ett skift**, og **plassene hører til vinduet**
+            # (15. sep. 2026): samleplassen kan ha seks 14–22 og to 22–06, og
+            # det er én ressurs med to vinduer — ikke to samleplasser. Feltet
+            # `skiftlengde`, som delte vinduet i bolker, er fjernet.
+            # Rå verdi videre: `services._linjens_skift()` eier regelen, og
+            # et `_int(...) or 1` her ville gjort et eksplisitt `0` til 1 før
+            # den fikk se det.
+            lest.append({'fra': fra, 'til': til,
+                         'plasser': vindu.get('plasser')})
         ut.append({
             'gruppe_id': _int(raa.get('gruppe_id')),
             'antall': _int(raa.get('antall')) or 1,
-            'plasser': _int(raa.get('plasser')) or 1,
             'vinduer': lest,
         })
     return ut
