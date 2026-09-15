@@ -825,9 +825,11 @@ class MalensGatingTests(TestCase):
         sjekker tilgangen selv. Se `NyRessursIFanerekkaTests`.
         """
         import re
-        m = re.search(
-            r'<button[^>]*data-bs-target="' + re.escape('#nyVaktlisteModal') + r'"',
-            self._mal(), re.S)
+        # Knappen åpner vinduet gjennom `apneNyVaktliste()` fra 15. sep. 2026,
+        # ikke gjennom `data-bs-toggle`: tidsfeltene fylles ut før vinduet
+        # vises. Gaten er den samme klassen som før.
+        m = re.search(r'<button[^>]*data-action="apneNyVaktliste"[^>]*>',
+                      self._mal(), re.S)
         self.assertIsNotNone(m, 'fant ikke «Ny vaktliste»-knappen')
         self.assertIn('vl-krev-leder', m.group(0))
 

@@ -4775,6 +4775,269 @@ class TidsblokkerTests(SimpleTestCase):
         """)
 
 
+class NyVaktlisteTidsfelteneTests(SimpleTestCase):
+    """Tidsfeltene i «Ny vaktliste» oppfører seg som planleggerens.
+
+    André, 15. sep. 2026: «lik tidsfelt som vi har i planleggeren når en skal
+    lage ny vaktliste. Der er det mismatch og den i ny vaktliste er litt
+    knotete.»
+
+    **`type` og `step` var like fra før.** Det som manglet var alt det andre
+    som gjør planleggerens felter behagelige: de står aldri tomme, det ene
+    følger det andre, og spennet leses tilbake mens man skriver. Et tomt
+    `datetime-local` må tastes inn segment for segment uten noe å nudge på —
+    det er det «knotete» betyr.
+    """
+
+    HARNESS = (
+        (VAKTLISTE_JS, ('apneNyVaktliste', '_nesteHeleTime', '_settTidsfelt',
+                        '_varighetstekst', 'nyVaktSpenntekst',
+                        'nyVaktTegnSpenn', 'nyVaktStartEndret',
+                        'nyVaktSluttEndret', '_tidFraFelt', '_skjulFeil',
+                        '_iso16', '_d', '_tall')),
+    )
+    # `nyVaktSluttRort` er `let` på toppnivå. En uttrukket funksjon som
+    # skriver til den trenger en binding i modulen — `globalThis.…` er ikke
+    # den bindingen, og en naken tilordning i ESM gir `ReferenceError`.
+    PREAMBLE = ('var nyVaktSluttRort;\n'
+                'globalThis.NY_VAKT_SPENN_MS = 8 * 3600000;\n')
+
+    DOM = """
+        const felter = {
+          'ny-vakt-navn': {value: 'noe gammelt'},
+          'ny-vakt-start': {value: ''},
+          'ny-vakt-slutt': {value: ''},
+          'ny-vakt-spenn': {textContent: '', classList: {toggle() {}}},
+          'ny-vakt-feil': {classList: {add() {}, remove() {}}, textContent: ''},
+        };
+        globalThis.document = {getElementById: (id) => felter[id] || null};
+        let apnet = null;
+        globalThis._apneModal = (id) => { apnet = id; };
+    """
+
+    def setUp(self):
+        if not node_available():
+            self.skipTest('node er ikke tilgjengelig')
+        self.harness = build_harness(self.HARNESS)
+
+    def _kjor(self, snippet):
+        return run_node(self.harness, self.DOM + snippet,
+                        preamble=self.PREAMBLE)
+
+    # ── Feltene står aldri tomme ─────────────────────────────────────────
+
+    def test_begge_feltene_er_fylt_ut_naar_vinduet_apnes(self):
+        ut = self._kjor("""
+            apneNyVaktliste();
+            assert(apnet === 'nyVaktlisteModal', 'vinduet ble ikke åpnet');
+            assert(/^\\d{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}$/
+                     .test(felter['ny-vakt-start'].value),
+                   'start: «' + felter['ny-vakt-start'].value + '»');
+            assert(/^\\d{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}$/
+                     .test(felter['ny-vakt-slutt'].value),
+                   'slutt: «' + felter['ny-vakt-slutt'].value + '»');
+        """)
+        self.assertIn('OK', ut)
+
+    def test_starten_settes_til_en_hel_time(self):
+        """`new Date()` gir 21:37, og med `step="300"` er nærmeste lovlige
+        verdi 21:35 — et tall ingen har ment, og som må rettes først."""
+        ut = self._kjor("""
+            apneNyVaktliste();
+            const minutter = felter['ny-vakt-start'].value.slice(-2);
+            assert(minutter === '00', 'minutter: ' + minutter);
+        """)
+        self.assertIn('OK', ut)
+
+    def test_hele_timen_er_den_neste_ikke_den_inneverende(self):
+        """Et tidspunkt som alt er passert leser som noe man har glemt å
+        rette."""
+        ut = self._kjor("""
+            const naa = new Date(2026, 9, 3, 21, 37, 12);
+            const t = _nesteHeleTime(naa);
+            assert(t.getHours() === 22, 'time: ' + t.getHours());
+            assert(t.getMinutes() === 0 && t.getSeconds() === 0, 'ikke hel');
+            assert(t.getTime() > naa.getTime(), 'ligger bakover i tid');
+        """)
+        self.assertIn('OK', ut)
+
+    def test_vinduet_tommer_navnet_ved_apning(self):
+        ut = self._kjor("""
+            apneNyVaktliste();
+            assert(felter['ny-vakt-navn'].value === '',
+                   'navn: «' + felter['ny-vakt-navn'].value + '»');
+        """)
+        self.assertIn('OK', ut)
+
+    # ── Slutten følger starten, til noen rører den ───────────────────────
+
+    def test_slutten_folger_starten(self):
+        """Samme idé som at et nytt skiftvindu begynner der det forrige
+        sluttet: det vanlige er å flytte hele vakta."""
+        ut = self._kjor("""
+            apneNyVaktliste();
+            felter['ny-vakt-start'].value = '2026-10-03T14:00';
+            nyVaktStartEndret();
+            assert(felter['ny-vakt-slutt'].value === '2026-10-03T22:00',
+                   'slutt: ' + felter['ny-vakt-slutt'].value);
+        """)
+        self.assertIn('OK', ut)
+
+    def test_slutten_slutter_aa_folge_naar_noen_har_rort_den(self):
+        """Har du skrevet «søndag 14:00», skal en rettelse av startdatoen
+        ikke dra sluttiden med seg — da hadde feltet spist det du skrev."""
+        ut = self._kjor("""
+            apneNyVaktliste();
+            felter['ny-vakt-slutt'].value = '2026-10-05T14:00';
+            nyVaktSluttEndret();
+            felter['ny-vakt-start'].value = '2026-10-03T14:00';
+            nyVaktStartEndret();
+            assert(felter['ny-vakt-slutt'].value === '2026-10-05T14:00',
+                   'slutten ble overskrevet: ' + felter['ny-vakt-slutt'].value);
+        """)
+        self.assertIn('OK', ut)
+
+    def test_tomt_sluttfelt_teller_ikke_som_rort(self):
+        """Rydder man feltet, skal følgingen begynne å virke igjen framfor å
+        la det stå tomt for godt."""
+        ut = self._kjor("""
+            apneNyVaktliste();
+            felter['ny-vakt-slutt'].value = '2026-10-05T14:00';
+            nyVaktSluttEndret();
+            felter['ny-vakt-slutt'].value = '';
+            nyVaktSluttEndret();
+            felter['ny-vakt-start'].value = '2026-10-03T14:00';
+            nyVaktStartEndret();
+            assert(felter['ny-vakt-slutt'].value === '2026-10-03T22:00',
+                   'slutt: ' + felter['ny-vakt-slutt'].value);
+        """)
+        self.assertIn('OK', ut)
+
+    def test_en_ny_apning_glemmer_at_slutten_var_rort(self):
+        """Flagget hører til vinduet man står i, ikke til sida."""
+        ut = self._kjor("""
+            apneNyVaktliste();
+            felter['ny-vakt-slutt'].value = '2026-10-05T14:00';
+            nyVaktSluttEndret();
+            apneNyVaktliste();
+            felter['ny-vakt-start'].value = '2026-10-03T14:00';
+            nyVaktStartEndret();
+            assert(felter['ny-vakt-slutt'].value === '2026-10-03T22:00',
+                   'slutt: ' + felter['ny-vakt-slutt'].value);
+        """)
+        self.assertIn('OK', ut)
+
+    def test_en_halvskrevet_start_flytter_ingenting(self):
+        """`datetime-local` melder `change` per segment og gir tom verdi til
+        alle er fylt ut. Uten sjekken ville sluttfeltet blitt tømt mens man
+        skrev."""
+        ut = self._kjor("""
+            apneNyVaktliste();
+            const foer = felter['ny-vakt-slutt'].value;
+            felter['ny-vakt-start'].value = '';
+            nyVaktStartEndret();
+            assert(felter['ny-vakt-slutt'].value === foer,
+                   'slutten ble rørt: ' + felter['ny-vakt-slutt'].value);
+        """)
+        self.assertIn('OK', ut)
+
+    # ── Spennet leses tilbake ────────────────────────────────────────────
+
+    def test_spennet_staar_under_feltene(self):
+        ut = self._kjor("""
+            apneNyVaktliste();
+            felter['ny-vakt-start'].value = '2026-10-02T14:00';
+            felter['ny-vakt-slutt'].value = '2026-10-04T20:00';
+            nyVaktTegnSpenn();
+            assert(/2 d 6 t/.test(felter['ny-vakt-spenn'].textContent),
+                   'spenn: ' + felter['ny-vakt-spenn'].textContent);
+        """)
+        self.assertIn('OK', ut)
+
+    def test_korte_vakter_skrives_i_timer(self):
+        ut = self._kjor("""
+            assert(_varighetstekst(8 * 3600000) === '8 t', _varighetstekst(8 * 3600000));
+            assert(_varighetstekst(8.5 * 3600000) === '8,5 t',
+                   _varighetstekst(8.5 * 3600000));
+        """)
+        self.assertIn('OK', ut)
+
+    def test_hele_dogn_skrives_uten_timerest(self):
+        """«2 d 0 t» leser som om noe mangler."""
+        ut = self._kjor("""
+            assert(_varighetstekst(48 * 3600000) === '2 d', _varighetstekst(48 * 3600000));
+        """)
+        self.assertIn('OK', ut)
+
+    def test_bakvendt_spenn_sier_fra_framfor_aa_vise_et_tall(self):
+        """Serveren avviser det uansett; dette er beskjeden om at man ikke er
+        ferdig. Gult, ikke rødt — som et ugyldig skiftvindu."""
+        ut = self._kjor("""
+            felter['ny-vakt-start'].value = '2026-10-04T20:00';
+            felter['ny-vakt-slutt'].value = '2026-10-02T14:00';
+            assert(/må slutte etter/.test(nyVaktSpenntekst()), nyVaktSpenntekst());
+            let merket = null;
+            felter['ny-vakt-spenn'].classList.toggle = (k, paa) => { merket = [k, paa]; };
+            nyVaktTegnSpenn();
+            assert(merket && merket[0] === 'vl-advarsel' && merket[1] === true,
+                   'ikke merket: ' + JSON.stringify(merket));
+        """)
+        self.assertIn('OK', ut)
+
+    def test_uferdig_utfylling_ber_om_resten(self):
+        ut = self._kjor("""
+            felter['ny-vakt-start'].value = '2026-10-04T20:00';
+            felter['ny-vakt-slutt'].value = '';
+            assert(/Fyll ut/.test(nyVaktSpenntekst()), nyVaktSpenntekst());
+        """)
+        self.assertIn('OK', ut)
+
+    # ── Malen ────────────────────────────────────────────────────────────
+
+    def test_vinduet_apnes_av_js_ikke_av_bootstrap(self):
+        """Feltene skal fylles ut før vinduet vises — et skjema som fyller
+        seg selv etter at man ser det, ser ut som om noe rettet det man
+        skrev."""
+        from pathlib import Path
+        from django.conf import settings
+        mal = (Path(settings.BASE_DIR) / 'templates' / 'vaktliste'
+               / 'index.html').read_text(encoding='utf-8')
+        self.assertNotIn('data-bs-target="#nyVaktlisteModal"', mal)
+        self.assertIn('data-action="apneNyVaktliste"', mal)
+
+    def test_feltene_melder_sin_egen_hendelse(self):
+        """`data-hendelse="change"` er den andre lytteren i
+        `portal-utils.js`; uten den ville klikkdelegeringen kalt handleren
+        når man åpner velgeren."""
+        from pathlib import Path
+        from django.conf import settings
+        mal = (Path(settings.BASE_DIR) / 'templates' / 'vaktliste'
+               / 'index.html').read_text(encoding='utf-8')
+        import re
+        for felt, handling in (('ny-vakt-start', 'nyVaktStartEndret'),
+                               ('ny-vakt-slutt', 'nyVaktSluttEndret')):
+            with self.subTest(felt=felt):
+                tagg = re.search(r'<input[^>]*id="%s"[^>]*>' % felt, mal)
+                self.assertIsNotNone(tagg, f'fant ikke feltet {felt}')
+                self.assertIn(f'data-action="{handling}"', tagg.group(0))
+                self.assertIn('data-hendelse="change"', tagg.group(0))
+
+    def test_steget_er_fem_minutter_som_i_planleggeren(self):
+        """Det ene som *var* likt fra før, og som skal forbli det: piltasten
+        og velgeren hopper fem minutter, ikke ett."""
+        import re
+        from pathlib import Path
+        from django.conf import settings
+        mal = (Path(settings.BASE_DIR) / 'templates' / 'vaktliste'
+               / 'index.html').read_text(encoding='utf-8')
+        for felt in ('ny-vakt-start', 'ny-vakt-slutt'):
+            with self.subTest(felt=felt):
+                tagg = re.search(r'<input[^>]*id="%s"[^>]*>' % felt, mal)
+                self.assertIsNotNone(tagg, f'fant ikke feltet {felt}')
+                self.assertIn('step="300"', tagg.group(0))
+                self.assertIn('type="datetime-local"', tagg.group(0))
+
+
 class NyVaktlisteSporOmSluttenTests(SimpleTestCase):
     """«Ny vaktliste» spør om slutten, ikke bare starten (11. sep. 2026).
 

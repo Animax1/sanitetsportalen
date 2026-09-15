@@ -563,6 +563,11 @@ Se beslutning 15–17 i notatet.
       «tak på vaktene og timene er ikke synlige når du oppretter ny vaktliste»).
       `visFane()` hentet `belastning` bare for belastningsfanen; regelen står nå som
       `faneTrengerBelastning(id)`, som også korpsvelgeren leser. Se CHANGELOG.
+- [x] **Tidsfeltene i «Ny vaktliste» som i planleggeren** (André, 15. sep. 2026: «lik
+      tidsfelt som vi har i planleggeren … den i ny vaktliste er litt knotete»). `type` og
+      `step` var like fra før; det som manglet var prefyllingen, at slutten følger starten
+      til noen rører den, og spennet under feltene. Vinduet åpnes nå av
+      `apneNyVaktliste()` og ikke av `data-bs-toggle`. Se CHANGELOG.
 - [x] **Planleggeren leser oppsettet tilbake fra vaktlista** (meldt fra staging 15. sep.
       2026: «når en har lagt grunnlag og vil redigere så er det ikke lenger i
       planlegger»). Én rad per ressurs med `ressurs_id`, vinduene gruppert på plassenes

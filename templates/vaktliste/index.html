@@ -101,7 +101,7 @@
       JS skjuler knappen, se vaktliste.js::gateKnapper().
     {% endcomment %}
     <button type="button" class="btn btn-primary btn-sm vl-krev-leder d-none"
-            data-bs-toggle="modal" data-bs-target="#nyVaktlisteModal">
+            data-action="apneNyVaktliste">
       <i class="bi bi-plus-lg me-1"></i>Ny vaktliste
     </button>
   </div>
@@ -214,9 +214,22 @@
           `:invalid`. Legger noen til Bootstraps `was-validated` på et skjema
           med tidsfelt, blir de radene røde uten at noe er galt.
         {% endcomment %}
+        {% comment %}
+          **Feltene står aldri tomme** (André, 15. sep. 2026: «lik tidsfelt
+          som vi har i planleggeren … den i ny vaktliste er litt knotete»).
+          `type` og `step` var like fra før; det som manglet var det som gjør
+          planleggerens felter behagelige. Et tomt `datetime-local` må tastes
+          inn segment for segment uten noe å nudge på.
+
+          Start settes til neste hele time, slutten følger starten til noen
+          rører den, og spennet står under — se `apneNyVaktliste()`. Vinduet
+          åpnes derfor av JS og ikke av `data-bs-toggle`: feltene skal være
+          utfylt før det vises.
+        {% endcomment %}
         <div class="mb-3">
           <label class="form-label" for="ny-vakt-start">Starter</label>
-          <input type="datetime-local" step="300" id="ny-vakt-start" class="form-control">
+          <input type="datetime-local" step="300" id="ny-vakt-start" class="form-control"
+                 data-action="nyVaktStartEndret" data-hendelse="change">
         </div>
         {% comment %}
           Slutten spørres om her, ikke bare i «Innstillinger». Uten den
@@ -225,7 +238,9 @@
         {% endcomment %}
         <div class="mb-3">
           <label class="form-label" for="ny-vakt-slutt">Slutter (planlagt)</label>
-          <input type="datetime-local" step="300" id="ny-vakt-slutt" class="form-control">
+          <input type="datetime-local" step="300" id="ny-vakt-slutt" class="form-control"
+                 data-action="nyVaktSluttEndret" data-hendelse="change">
+          <div class="form-text" id="ny-vakt-spenn"></div>
           <div class="form-text">Kan endres senere under «Innstillinger».</div>
         </div>
         <div class="mb-3">

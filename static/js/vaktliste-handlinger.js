@@ -39,6 +39,124 @@ function _tidFraFelt(id) {
 }
 
 
+// ── «Ny vaktliste»: tidsfeltene som i planleggeren ───────────────────────
+//
+// André, 15. sep. 2026: «lik tidsfelt som vi har i planleggeren når en skal
+// lage ny vaktliste. Der er det mismatch og den i ny vaktliste er litt
+// knotete.»
+//
+// **`type` og `step` var like fra før.** Det som manglet var alt det andre
+// som gjør planleggerens felter behagelige: de står aldri tomme, det ene
+// følger det andre, og spennet leses tilbake mens man skriver. Et tomt
+// `datetime-local` må tastes inn segment for segment uten noe å nudge på,
+// og det er det «knotete» betyr.
+
+//: Har noen rørt sluttfeltet selv? Så lenge ingen har det, følger slutten
+//: starten — se `nyVaktStartEndret()`.
+let nyVaktSluttRort = false;
+
+//: Standardspennet for en ny vakt. **Tallet er ikke poenget, følgingen er
+//: det** — et spenn som holder seg mens man retter starten. Åtte timer er
+//: samme verdi som planleggerens standardvindu, så de to feltene oppfører
+//: seg likt også når man bare ser på dem.
+const NY_VAKT_SPENN_MS = 8 * 3600000;
+
+
+function _nesteHeleTime(naa) {
+  // **En vakt begynner på en hel time.** `new Date()` gir 21:37, og med
+  // `step="300"` er nærmeste lovlige verdi 21:35 — et tall ingen har ment,
+  // og som man må rette før man kommer videre.
+  //
+  // Planleggeren slipper spørsmålet fordi den har vaktas start å bygge på
+  // (`_planleggerStandardvindu`). Her *er* feltet vaktas start, så det
+  // finnes ikke noe bedre anker enn neste hele time.
+  const d = new Date(naa ? naa.getTime() : Date.now());
+  d.setMinutes(0, 0, 0);
+  d.setHours(d.getHours() + 1);
+  return d;
+}
+
+
+function _settTidsfelt(id, dato) {
+  const el = document.getElementById(id);
+  if (el) el.value = dato ? _iso16(dato.toISOString()) : '';
+}
+
+
+function _varighetstekst(ms) {
+  // «2 d 6 t», ikke «54 t». Planleggeren skriver bare timer fordi et skift
+  // er kort nok til at tallet leses; en vakt går over dager, og et tosifret
+  // timetall sier ikke om man traff riktig dato.
+  const timer = ms / 3600000;
+  if (timer < 24) return `${_tall(timer)} t`;
+  const dager = Math.floor(timer / 24);
+  const rest = timer - dager * 24;
+  return rest ? `${dager} d ${_tall(rest)} t` : `${dager} d`;
+}
+
+
+function nyVaktSpenntekst() {
+  // **Spennet leses tilbake mens man skriver**, som tallet under et
+  // skiftvindu i planleggeren. Det er den ene tilbakemeldingen som fanger
+  // den vanligste tastefeilen her: riktig klokkeslett på feil dato.
+  const start = _d(_tidFraFelt('ny-vakt-start'));
+  const slutt = _d(_tidFraFelt('ny-vakt-slutt'));
+  if (!start || !slutt) return 'Fyll ut begge tidspunktene.';
+  if (slutt <= start) return 'Vakten må slutte etter at den begynner.';
+  return `Vakten varer ${_varighetstekst(slutt.getTime() - start.getTime())}.`;
+}
+
+
+function nyVaktTegnSpenn() {
+  const el = document.getElementById('ny-vakt-spenn');
+  if (!el) return;
+  const tekst = nyVaktSpenntekst();
+  el.textContent = tekst;
+  // Samme merking som et ugyldig skiftvindu: gult, ikke rødt. Serveren
+  // avviser det uansett — dette er en beskjed om at man ikke er ferdig.
+  el.classList.toggle('vl-advarsel', tekst.startsWith('Vakten må'));
+}
+
+
+function nyVaktStartEndret() {
+  // **Slutten følger starten, men bare til noen har rørt den.** Samme idé
+  // som at et nytt skiftvindu begynner der det forrige sluttet: det vanlige
+  // er å flytte hele vakta, og det uvanlige er ett felt unna.
+  //
+  // Har du alt skrevet «søndag 14:00», skal en rettelse av startdatoen ikke
+  // dra sluttiden med seg — da hadde feltet spist det du nettopp skrev.
+  const start = _d(_tidFraFelt('ny-vakt-start'));
+  if (start && !nyVaktSluttRort) {
+    _settTidsfelt('ny-vakt-slutt', new Date(start.getTime() + NY_VAKT_SPENN_MS));
+  }
+  nyVaktTegnSpenn();
+}
+
+
+function nyVaktSluttEndret() {
+  // Et tomt felt teller ikke som rørt: rydder man det, skal følgingen
+  // begynne å virke igjen framfor å la feltet stå tomt for godt.
+  nyVaktSluttRort = !!_tidFraFelt('ny-vakt-slutt');
+  nyVaktTegnSpenn();
+}
+
+
+function apneNyVaktliste() {
+  // **Vinduet åpnes av JS, ikke av `data-bs-toggle`.** Feltene skal fylles
+  // ut før det vises — et skjema som fyller seg selv etter at man ser det,
+  // ser ut som om noe rettet det man skrev.
+  _skjulFeil('ny-vakt-feil');
+  const navn = document.getElementById('ny-vakt-navn');
+  if (navn) navn.value = '';
+  const start = _nesteHeleTime();
+  _settTidsfelt('ny-vakt-start', start);
+  _settTidsfelt('ny-vakt-slutt', new Date(start.getTime() + NY_VAKT_SPENN_MS));
+  nyVaktSluttRort = false;
+  nyVaktTegnSpenn();
+  _apneModal('nyVaktlisteModal');
+}
+
+
 async function opprettVaktliste() {
   _skjulFeil('ny-vakt-feil');
   await withSubmitGuard('ny-vakt-knapp', async () => {

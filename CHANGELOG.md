@@ -4,6 +4,41 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-15 — «Ny vaktliste»: tidsfeltene som i planleggeren
+
+**Bedt om (André):**
+
+> «Etterpå når det er i orden så vil jeg ha lik tidsfelt som vi har i planleggeren når en
+> skal lage ny vaktliste. Der er det mismatch og den i ny vaktliste er litt knotete.»
+
+**`type` og `step` var like fra før** — begge er `datetime-local` med `step="300"`. Det som
+manglet, var alt det andre som gjør planleggerens felter behagelige. Et tomt
+`datetime-local` må tastes inn segment for segment uten noe å nudge på, og det er det
+«knotete» betyr.
+
+| Regel | Hvorfor |
+|---|---|
+| **Feltene står aldri tomme** | `apneNyVaktliste()` fyller dem ut *før* vinduet vises. Derfor åpnes vinduet nå av JS og ikke av `data-bs-toggle`: et skjema som fyller seg selv etter at man ser det, ser ut som om noe rettet det man skrev |
+| **Starten settes til neste hele time** | `new Date()` gir 21:37, og med `step="300"` er nærmeste lovlige verdi 21:35 — et tall ingen har ment. Planleggeren slipper spørsmålet fordi den har vaktas start å bygge på; her *er* feltet vaktas start |
+| **Slutten følger starten, til noen rører den** | Samme idé som at et nytt skiftvindu begynner der det forrige sluttet. Har du skrevet «søndag 14:00», skal en rettelse av startdatoen ikke dra sluttiden med seg — da hadde feltet spist det du nettopp skrev. Et tomt sluttfelt teller ikke som rørt |
+| **Spennet leses tilbake under feltene** | «Vakten varer 2 d 6 t.» Som tallet under et skiftvindu i planleggeren, og den ene tilbakemeldingen som fanger den vanligste tastefeilen her: riktig klokkeslett på feil dato |
+
+`_varighetstekst()` skriver «2 d 6 t», ikke «54 t»: planleggeren skriver bare timer fordi
+et skift er kort nok til at tallet leses, men en vakt går over dager, og et tosifret
+timetall sier ikke om man traff riktig dato. Hele døgn skrives uten timerest — «2 d 0 t»
+leser som om noe mangler.
+
+Et bakvendt spenn merkes **gult, ikke rødt**, som et ugyldig skiftvindu: serveren avviser
+det uansett (`opprett_planlagt_vakt` hadde regelen fra før), så dette er en beskjed om at
+man ikke er ferdig.
+
+**Mutasjonsprøvd** — tretten mutanter på de fire reglene.
+
+**Endret:** `static/js/vaktliste-handlinger.js`, `templates/vaktliste/index.html`,
+`vaktliste/tests_xss.py` (+17 tester), `vaktliste/tests_tilgang.py`, `CLAUDE.md`.
+
+---
+
 ## 2026-09-15 — Planleggeren: budsjettet manglet, og oppsettet ble glemt
 
 **Meldt fra staging (André):**

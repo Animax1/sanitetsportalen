@@ -875,6 +875,24 @@ fase 3–7 gjenstår — se `docs/BESLUTNING_VAKTLISTE.md`, som er besluttet i s
   fra- og til-feltet med **vaktas start**, ikke `new Date()`: en oktobervakt
   planlegges i august. Et eldre skift på 08:03 vises og leses tilbake som før;
   `step` styrer bare hva velgeren tilbyr, og ingenting leser `checkValidity()`.
+- **Et tidsfelt står aldri tomt** (15. sep. 2026 — André: «lik tidsfelt som vi
+  har i planleggeren … den i ny vaktliste er litt knotete»). `type` og `step`
+  var like fra før; det som skilte «Ny vaktliste» fra planleggeren var at
+  feltene startet tomme, og et tomt `datetime-local` må tastes inn segment for
+  segment uten noe å nudge på. `apneNyVaktliste()` fyller dem ut **før**
+  vinduet vises — derfor åpnes det av JS og ikke av `data-bs-toggle`; et skjema
+  som fyller seg selv etterpå ser ut som om noe rettet det man skrev.
+  **Starten settes til neste hele time** (`_nesteHeleTime()`): `new Date()` gir
+  21:37, og nærmeste lovlige verdi med `step="300"` er 21:35, et tall ingen har
+  ment. Planleggeren slipper spørsmålet fordi den har vaktas start å bygge på;
+  her *er* feltet vaktas start. **Slutten følger starten til noen rører den**
+  (`nyVaktSluttRort`) — samme idé som at et nytt skiftvindu begynner der det
+  forrige sluttet, men en rettelse av startdatoen skal ikke spise et sluttidspunkt
+  man alt har skrevet. Et tomt sluttfelt teller ikke som rørt. **Spennet leses
+  tilbake under feltene** (`nyVaktSpenntekst()`), som tallet under et skiftvindu:
+  det er den ene tilbakemeldingen som fanger riktig klokkeslett på feil dato.
+  `_varighetstekst()` skriver «2 d 6 t» og ikke «54 t» — et skift er kort nok
+  til at timetallet leses, en vakt er det ikke — og hele døgn uten timerest.
 - **Tid vises med dag når skiftet krysser et døgn.** `_tidsspenn()` i
   `vaktliste.js` nevner dagen én gang innenfor ett døgn og to ganger ellers —
   «20:00–04:00» alene sier ikke at skiftet går over midnatt, og arrangementer
