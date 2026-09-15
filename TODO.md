@@ -2233,6 +2233,22 @@ Funnene under er allerede kartlagt, så jobben er avgrenset når den skal gjøre
 
 ### Løse punkter
 
+- [x] **`/vaktliste/`: korps-føreren kunne opprette skift og flytte tider** (15. sep.
+      2026, meldt fra staging). `skriv_handling` gikk rett på `kan_sette_vaktpost()` —
+      altså badgen — mens `CLAUDE.md` sa at å opprette en plass var `skriv_full`.
+      Hun kunne opprette skift med frie tidspunkt og femti tomme plasser, og endre
+      `fra_tid`/`til_tid`, `merknad` og `probono` på dem som sto.
+      - [x] Regelen er nå to lister med én leser hver — `SKIFT_OPPSETTFELTER` og
+            `RESSURS_OPPSETTFELTER` gjennom `services.oppsettfelter()` — framfor en
+            `if` per felt spredt på to endepunkter
+      - [x] `ressurs_detalj_view` har to terskler: navnet på badge, resten på `kan_lede`
+      - [x] Klienten siler før den sender (`bareTillatteFelter`), ellers ville et
+            personbytte hun har lov til gitt 403
+      - [x] 28 mutanter, ingen overlevende. Fire overlevde først: to fordi
+            fikstureringen manglet `korps_id`, to fordi kallstedet ikke var prøvd
+      - **Åpent spørsmål til André:** `merknad` og `probono` ble låst sammen med tidene,
+        fordi «det eneste» ble lest strengt. Skal korps-føreren kunne skrive merknad på
+        sine egne rader («kommer 17:30»), er det én linje å løsne
 - [x] **CLAUDE.md delt i rot + én fil per modul** (15. sep. 2026). Fila var 1 433 linjer,
       og 651 av dem gjaldt én modul om gangen — vaktlista alene 489. Nå: rota (859
       linjer) bærer rammeverket, og `patients/`, `oppdrag/`, `vaktliste/` og `statistikk/`

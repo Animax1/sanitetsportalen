@@ -970,6 +970,60 @@ def kan_rore_vaktpost(user, vaktpost) -> bool:
     return kan_bemanne_plass(user, vaktpost.ressurs, vaktpost)
 
 
+#: Feltene på et skift som **setter det opp**, framfor å bemanne det.
+#:
+#: André, 15. sep. 2026: «Det eneste de skal få lov til er å legge inn folk,
+#: rolle, og redigere ressursens navn — men ikke gruppe, reservering, enhet i
+#: oppdragsmodulen og sletting.» Tidene er vaktas rammer for én plass;
+#: `probono` og `merknad` er utsagn om hva skiftet *er*, ikke om hvem som står
+#: der. Reservasjonen og «åpen for alle» er å dele ut, og sto her fra før —
+#: de to var bare skrevet som hver sin `if` ute i viewet.
+#:
+#: **`antall` er med fordi opprettelsen tar den:** én forespørsel kunne lage
+#: femti tomme plasser, og å sette opp behovet er nettopp det korps-føreren
+#: ikke skal gjøre.
+SKIFT_OPPSETTFELTER = ('fra_tid', 'til_tid', 'korps_id', 'alle_korps',
+                       'probono', 'merknad', 'antall')
+
+#: Det samme på en ressurs. **Navnet står bevisst ikke her:** det er det ene
+#: korps-føreren skal kunne rette, og reservasjonen, gruppa og
+#: enhetskoblingen er det hun ikke skal røre.
+RESSURS_OPPSETTFELTER = ('gruppe_id', 'korps_id', 'enhet_id', 'rekkefolge')
+
+
+def oppsettfelter(data, felter) -> list[str]:
+    """Hvilke av `felter` står i denne forespørselen?
+
+    **Egen funksjon, og listene er konstanter, fordi begge har to lesere** —
+    opprettelsen og redigeringen av et skift, PUT og DELETE på en ressurs.
+    Spurte hvert endepunkt for seg med sine egne `if`-er, ville det ene før
+    eller siden husket tidene og glemt `probono`. Det er samme grunn til at
+    `reservert_korps()` og `kan_sette_vaktpost()` finnes: en regel med to
+    lesere skrives én gang.
+
+    Ikke `data.keys() & set(felter)` — rekkefølgen er listas, så feilmeldingen
+    nevner feltene i samme rekkefølge hver gang.
+    """
+    return [f for f in felter if f in data]
+
+
+def kan_sette_opp_skift(user) -> bool:
+    """Får brukeren opprette et skift, flytte tidene, eller dele plassen ut?
+
+    Et kall videre til `kan_skrive_alt`, og det finnes for at beslutningen
+    skal ha et sted å bo — som `kan_stemple`. Skillet er det samme som ellers
+    i modulen: **å bemanne er å fylle en plass noen andre har satt opp.** Den
+    som fører sitt eget korps setter hvem og i hvilken rolle; tidene, hvor
+    mange plasser det er, og hvem de er satt av til, er vaktas rammer.
+
+    Fram til 15. sep. 2026 sa dokumentasjonen dette («å opprette en ledig
+    plass er `skriv_full`»), mens koden bare sjekket `kan_sette_vaktpost` —
+    altså badgen. En korps-fører kunne opprette skift med frie tidspunkt og
+    femti tomme plasser på sin egen ressurs, og flytte tidene på dem som sto.
+    """
+    return kan_skrive_alt(user)
+
+
 def _timer(fra, til):
     """Timer mellom to tidspunkt, eller ``0.0`` hvis spennet ikke gir mening."""
     if fra is None or til is None or til <= fra:

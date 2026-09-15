@@ -891,12 +891,17 @@ class ProbonoTests(TilgangsBasis):
         self.assertEqual(res.status_code, 200, res.content)
         self.assertFalse(Vaktpost.objects.get(pk=vp_id).probono)
 
-    def test_korpsforeren_kan_sette_det_paa_sitt_eget(self):
-        """«Kan settes av alle som har tilgang» — samme port som merknaden."""
+    def test_korpsforeren_setter_det_ikke(self):
+        """**Snudd 15. sep. 2026.** Probono sto «samme port som merknaden», og
+        merknaden er nå oppsett — men begrunnelsen står på egne ben her:
+        probono er et utsagn om hva vakta *koster*, og det tallet leses av
+        budsjettlinja for hele lista. Den som fører sitt eget korps skal ikke
+        kunne flytte totalen for alle.
+        """
         res = self.c_kb.put(f'/vaktliste/api/vaktposter/{self.betalt.pk}/',
                             data={'probono': True}, content_type='application/json')
-        self.assertEqual(res.status_code, 200, res.content)
-        self.assertTrue(Vaktpost.objects.get(pk=self.betalt.pk).probono)
+        self.assertEqual(res.status_code, 403, res.content)
+        self.assertFalse(Vaktpost.objects.get(pk=self.betalt.pk).probono)
 
     def test_leseren_setter_ingenting(self):
         res = self.c_leser.put(f'/vaktliste/api/vaktposter/{self.betalt.pk}/',

@@ -4,6 +4,96 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-15 — Korps-føreren bemanner, hun setter ikke opp
+
+**Meldt fra staging (André):**
+
+> «På /vaktliste/ så kan skrive: eget korps, ser alle — opprette vakter og redigere tider.
+> Det må de ikke få lov til. Det eneste de skal få lov til er å legge inn folk, rolle, og
+> redigere ressursens navn, men ikke gruppe, reservering, enhet i oppdragsmodulen og
+> sletting.»
+
+### Hullet sto i dokumentasjonen som lukket
+
+`CLAUDE.md` sa det allerede: «å *opprette* en ledig plass er `skriv_full`, å *fylle* den
+krever badge og reservasjon». Koden sjekket bare badgen. `vaktposter_view` gikk rett på
+`kan_sette_vaktpost()`, så `skriv_handling` kunne opprette skift med frie tidspunkt — og
+med `antall` inntil femti tomme plasser — på hver ressurs reservert til korpset hennes.
+`vaktpost_detalj_view` hadde egne `if`-er for `korps_id` og `alle_korps`, mens
+`fra_tid`/`til_tid`, `merknad` og `probono` gikk rett gjennom.
+
+**Det er den typen hull som overlever lengst:** ingen får en feilmelding, dokumentasjonen
+leser riktig, og regelen står tre steder som hver dekker sin del av den.
+
+### Regelen er to lister, ikke en `if` per felt
+
+| Nytt | Hva det er |
+|---|---|
+| `services.SKIFT_OPPSETTFELTER` | `fra_tid`, `til_tid`, `korps_id`, `alle_korps`, `probono`, `merknad`, `antall` |
+| `services.RESSURS_OPPSETTFELTER` | `gruppe_id`, `korps_id`, `enhet_id`, `rekkefolge` — **navnet står bevisst ikke der** |
+| `services.oppsettfelter(data, felter)` | Hvilke av dem står i kroppen |
+| `services.kan_sette_opp_skift(user)` | Kall videre til `kan_skrive_alt`, som `kan_stemple`. Beslutningen skal ha et sted |
+
+Listene er konstanter fordi de har **to lesere hver** — opprettelsen og redigeringen av et
+skift, PUT og DELETE på en ressurs. Med en `if` per felt i hvert view ville det ene før
+eller siden husket tidene og glemt `probono`; det var akkurat det som hadde skjedd.
+
+**`ressurs_detalj_view` har nå to terskler i ett endepunkt:** navnet krever badge og
+reservasjon, alt annet krever `kan_lede`. Bilen heter «Sola 56», ikke «Ambulanse 2», og den
+som står ved bilen er den som vet det — mens gruppe, reservasjon og enhetskobling er
+beslutninger om *hvem ressursen er til for*, og de flytter tilgangen til seg selv.
+
+**Sletting av et skift ble strengere, også for fylte rader.** Sperren sto bare på de ledige,
+fordi et hull i bemanningen ikke skal kunne skjules ved å slette raden som viste det. Det
+argumentet gjelder ordrett på en fylt rad: sletter korps-føreren skiftet framfor å melde
+forfall, forsvinner plassen og ikke bare personen. Hun tømmer raden i stedet, og da står
+behovet.
+
+### Klienten måtte siles, ikke bare gates
+
+**Ett felt hun ikke får sette, velter hele forespørselen** — med vilje, så en halvlagret rad
+ikke finnes. Vinduene sendte alltid alle feltene, så uten siling ville et personbytte hun
+har lov til gitt 403. `bareTillatteFelter()` i `vaktliste-kjerne.js` siler før sending, med
+listene speilet fra `services` og holdt like av `SkiftetsOppsettfelterTests`.
+
+Og markupen måtte si det samme: «Opprett vakt» og tidsfeltene i regnearket sto på
+`kanBemanne()` — badgen — så de førte til en vegg. **Tidene vises fortsatt, som tekst:** et
+felt man kan skrive i og ikke lagre er verre enn en tekst, for det ser ut som om endringen
+gikk igjennom.
+
+### Seks tester sa det gamle, og ble skrevet om framfor slettet
+
+Policyen endret seg, så testene som håndhevet den var ikke feil — de var utdaterte. Hver
+enkelt er snudd og har beholdt sitt poeng: `test_korpsbruker_bemanner_sin_egen_ressurs` ble
+`test_korpsbruker_oppretter_ikke_skift_men_fyller_dem`, med begge halvdelene i samme test,
+fordi hver for seg leser de som om hun enten har alt eller ingenting.
+
+### Mutasjonstesting: 28 mutanter, og fire overlevde først
+
+Etter regelen fra i dag: tungt lag, så hver gren og hver sperre. Seksten på serveren, alle
+røde med én gang. Tolv på klienten, der fire overlevde — og alle fire var kjente feller fra
+bolken vi skrev noen timer tidligere:
+
+- **To var fikstureringens feil.** Testraden manglet `korps_id`, og `kanRoreRad()` leser
+  personens korps på en fylt rad. Raden var altså uredigerbar av en helt annen grunn enn
+  den testen målte, og cellene ble tegnet som tekst uansett hva mutanten gjorde. En
+  sperrehake står nå ved siden av og krever at raden faktisk *er* hennes.
+- **To var kallstedet, ikke funksjonen.** `bareTillatteFelter()` var prøvd for seg, så
+  kallet lot seg fjerne fra begge lagrefunksjonene uten at noe ble rødt — altså nøyaktig
+  feilen silingen fantes for. `VinduetSenderBareDetHunFaarSetteTests` kjører nå
+  `lagreVaktpost()` og `lagreRessurs()` mot en stubbet DOM og leser hva som faktisk ble
+  lagt i forespørselen.
+
+Etter rettingene: **28 mutanter, ingen overlevende.**
+
+**Endret:** `vaktliste/services.py`, `vaktliste/views.py`,
+`static/js/vaktliste-{kjerne,tegning,handlinger,offline}.js`,
+`templates/vaktliste/index.html`, `vaktliste/tests_tilgang.py` (+25 tester),
+`vaktliste/tests_belastning.py`, `vaktliste/tests_xss.py`, `vaktliste/CLAUDE.md`.
+Ingen migrasjon. Hele suiten (3 057 tester) grønn.
+
+---
+
 ## 2026-09-15 — CLAUDE.md delt, og mutasjonstestingen har fått et budsjett
 
 **Bedt om (André), to punkter fra forrige økt:** «CLAUDE.md skal splittes i rot +

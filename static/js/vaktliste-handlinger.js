@@ -253,6 +253,11 @@ function apneRessurs(id) {
   _settValg('ressurs-korps', aktivListe.korps || [], r.korps_id, 'Ureservert');
   _settValg('ressurs-enhet', aktivListe.enheter || [], r.enhet_id, 'Ingen');
 
+  // **Vinduet viser det hun får gjøre.** For korps-føreren er navnet hele
+  // vinduet: gruppa, reservasjonen og enhetskoblingen er beslutninger om hvem
+  // ressursen er *til for*, og de flytter tilgangen til seg selv.
+  _laasRessursoppsett(!kanLede());
+
   const antall = _posterFor(id).length;
   const tekst = document.getElementById('ressurs-slett-tekst');
   if (tekst) {
@@ -261,6 +266,17 @@ function apneRessurs(id) {
       : 'Ressursen har ingen skift på seg.';
   }
   bootstrap.Modal.getOrCreateInstance(modal).show();
+}
+
+
+function _laasRessursoppsett(laast) {
+  // Nedtrekkene deaktiveres framfor å skjules: står bilen reservert til
+  // Haugesund, er det verdt å se — det er nettopp derfor hun får rette navnet
+  // på den. Et deaktivert felt sendes uansett ikke.
+  ['ressurs-gruppe', 'ressurs-korps', 'ressurs-enhet'].forEach((id) => {
+    const el = document.getElementById(id);
+    if (el) el.disabled = laast;
+  });
 }
 
 
@@ -289,12 +305,12 @@ async function lagreRessurs() {
 
     const res = await apiFetch(`/vaktliste/api/ressurser/${id}/`, {
       method: 'PUT',
-      body: JSON.stringify({
+      body: JSON.stringify(bareTillatteFelter({
         navn,
         gruppe_id: document.getElementById('ressurs-gruppe')?.value || null,
         korps_id: document.getElementById('ressurs-korps')?.value || null,
         enhet_id: document.getElementById('ressurs-enhet')?.value || null,
-      }),
+      }, RESSURS_OPPSETTFELTER, kanLede())),
     });
     const d = await res.json().catch(() => ({}));
     if (!res.ok || d.status !== 'ok') {

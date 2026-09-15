@@ -46,10 +46,12 @@ fase 3–7 gjenstår — se `docs/BESLUTNING_VAKTLISTE.md`, som er besluttet i s
   og `register.mannskap` i `brukKorpsfilter()`, så byggerne følger med uten å vite om
   den. Planleggingstallene regnes på serveren og får `?korps=` — bare honorert for den
   som ser alle; for korps-brukeren ville parameteret vært en dør rundt badgen.
-- **Tre terskler, og skillet er hva slags utsagn nivået får avgi.** Badge + reservasjon bemanner. `skriv_full` deler
-  *ut*: ressurser, reservasjoner, nye vakter og verdimengdene — kunne korps-brukeren
-  opprette et korps eller omreservere KO, ville badgen sluttet å avgrense noe. Sletting av
-  en vaktliste er global admin.
+- **Tre terskler, og skillet er hva slags utsagn nivået får avgi.** Badge + reservasjon
+  bemanner — og *bare* bemanner: hvem, og i hvilken rolle (se «Å bemanne er å fylle en
+  plass noen andre har satt opp» under). `skriv_full` setter opp og deler
+  *ut*: skift og tider, ressurser, reservasjoner, nye vakter og verdimengdene — kunne
+  korps-brukeren opprette et korps eller omreservere KO, ville badgen sluttet å avgrense
+  noe. Sletting av en vaktliste er global admin.
 - **`Mannskap.korps_id` og `Mannskap.user_id` er unntatt badgen.** Flytting sjekkes mot
   *begge* korps, og kontokobling **for hånd er global admin** (12. sep. 2026) fordi den
   flytter en badge — kontoen arver korpset, og dermed hva den kontoen får redigere. Alle
@@ -107,10 +109,46 @@ fase 3–7 gjenstår — se `docs/BESLUTNING_VAKTLISTE.md`, som er besluttet i s
   universale plasser på tvers av ressursene; `kanBemannePlass()` i JS speiler serveren
   plass for plass, og `_korpsKropp()` oversetter nedtrekkets tre tilstander til to felt.
 - **En ledig plass er en `Vaktpost` uten `mannskap`.** Planlegging begynner med
-  behovet, og «å fylle plassen» er én feltendring. Å *opprette* en ledig plass er
-  `skriv_full` (vaktleder setter behovet), å *fylle* den krever badge og
+  behovet, og «å fylle plassen» er én feltendring. Å *opprette* et skift er
+  `skriv_full` (vaktleder setter behovet), å *fylle* det krever badge og
   reservasjon som ellers — de to spørsmålene er `services.kan_sette_vaktpost()`
   og `services.kan_rore_vaktpost()`, og de må ikke slås sammen.
+- **Å bemanne er å fylle en plass noen andre har satt opp** (15. sep. 2026, André:
+  «Det eneste de skal få lov til er å legge inn folk, rolle, og redigere ressursens
+  navn — men ikke gruppe, reservering, enhet i oppdragsmodulen og sletting»).
+  Korps-føreren setter **hvem** og **i hvilken rolle**, og retter **ressursens navn**.
+  Tidene, antallet plasser, reservasjonen, `alle_korps`, `probono`, merknaden og
+  sletting er oppsett — `services.kan_sette_opp_skift()`, som er et kall videre til
+  `kan_skrive_alt` og finnes for at beslutningen skal ha et sted, som `kan_stemple`.
+
+  **Regelen står som to lister, ikke som en `if` per felt:**
+  `services.SKIFT_OPPSETTFELTER` og `RESSURS_OPPSETTFELTER`, lest av
+  `services.oppsettfelter(data, felter)`. Fram til da sto `korps_id` og `alle_korps`
+  som hver sin `if` ute i viewene, mens `fra_tid`/`til_tid` gikk rett gjennom — og
+  det var hullet: dokumentasjonen sa «å opprette en ledig plass er `skriv_full`»
+  mens koden bare sjekket badgen. En regel med to lesere skrives én gang.
+
+  **Ett felt hun ikke får sette, velter hele forespørselen** — med vilje, så en
+  halvlagret rad ikke finnes. Derfor må klienten sile *før* den sender:
+  `bareTillatteFelter()` i `vaktliste-kjerne.js`, med listene speilet fra `services`
+  og holdt like av `SkiftetsOppsettfelterTests`. Uten silingen ville et personbytte
+  korps-føreren har lov til gitt 403, fordi vinduet alltid sendte alle feltene.
+
+  **Og markupen må si det samme:** «Opprett vakt» og tidsfeltene i regnearket sto på
+  `kanBemanne()` — altså badgen — så knappene førte til en vegg. De står nå på
+  `kanSetteOppSkift()`. Tidene *vises* fortsatt, som tekst: et felt man kan skrive i
+  og ikke lagre er verre enn en tekst, for det ser ut som om endringen gikk igjennom.
+- **`ressurs_detalj_view` har to terskler i ett endepunkt.** Navnet krever badge og
+  reservasjon (`kan_bemanne_ressurs`) — bilen heter «Sola 56», ikke «Ambulanse 2», og
+  den som står ved bilen er den som vet det. Gruppe, reservasjon, enhetskobling,
+  rekkefølge og sletting krever `kan_lede`: de er beslutninger om *hvem ressursen er
+  til for*, og flyttes de, flytter de tilgangen til seg selv.
+- **Sletting av et skift er `skriv_full`, også når raden er fylt** (15. sep. 2026).
+  Sperren sto bare på de ledige, fordi et hull i bemanningen ikke skal kunne skjules
+  ved å slette raden som viste det. Argumentet gjelder ordrett på en fylt rad: sletter
+  korps-føreren skiftet framfor å melde forfall, forsvinner plassen og ikke bare
+  personen, og lista ser dekket ut. Hun tømmer raden i stedet (`mannskap_id: null`),
+  og da står behovet.
 - **Vaktas lengde: start på `Vakt.startet`, slutt på `Vaktliste.planlagt_slutt`.**
   `Vakt.avsluttet` betyr «vakta ble avsluttet» — en hendelse — og kan ikke bære
   et anslag man flytter på. Spennet er det bemanningskurven tegnes over.

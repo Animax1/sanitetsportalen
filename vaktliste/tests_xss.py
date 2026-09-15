@@ -305,7 +305,7 @@ class VaktlisteEscapingOppforselTests(SimpleTestCase):
                         '_mannskapsfane', '_tilstede', '_posterFor',
                         '_ikkePlassert', '_tidsspenn', '_vaktspenn',
                         '_bemanningPerTime', '_iso16', '_d', '_kl', '_dag',
-                        '_sammeDag', '_nivaa', '_erAdmin', 'kanSkriveAlt',
+                        '_sammeDag', '_nivaa', '_erAdmin', 'kanSkriveAlt', 'kanSetteOppSkift',
                         'kanLede', 'kanBemanne', 'kanRoreRad')),
     )
 
@@ -616,7 +616,7 @@ class RegistersidenEscapingOppforselTests(SimpleTestCase):
         (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue', 'trustedHtml', '_escHtml')),
         (VAKTLISTE_JS, ('mkMannskap', 'mkVerdiliste', '_personKolonne',
                         '_passerPersonsok', '_sorterMannskap', '_nivaa',
-                        '_erAdmin', 'kanSkriveAlt', 'kanSkriveNoe',
+                        '_erAdmin', 'kanSkriveAlt', 'kanSetteOppSkift', 'kanSkriveNoe',
                         'kanRedigerePerson')),
     )
 
@@ -1906,7 +1906,7 @@ class FanenErGruppaTests(SimpleTestCase):
                         '_plassKorps', '_bemanningPerTime', 'rollerForGruppe',
                         '_iso16', '_posterFor', '_ikkePlassert',
                         '_ressurserIGruppe', '_grupperMedRessurser', '_d', '_kl',
-                        '_dag', '_nivaa', '_erAdmin', 'kanSkriveAlt', 'kanLede',
+                        '_dag', '_nivaa', '_erAdmin', 'kanSkriveAlt', 'kanSetteOppSkift', 'kanLede',
                         'kanBemanne', 'gruppaHarPlass', 'kanRoreRad')),
     )
     VINDU = ("globalThis.ressursApen = new Map();\n"
@@ -2263,7 +2263,7 @@ class EnkeltgruppeTests(SimpleTestCase):
                         '_bemanningPerTime', 'rollerForGruppe', '_iso16',
                         '_posterFor', '_ressurserIGruppe',
                         '_grupperMedRessurser', '_d', '_kl', '_dag',
-                        '_nivaa', '_erAdmin', 'kanSkriveAlt', 'kanLede',
+                        '_nivaa', '_erAdmin', 'kanSkriveAlt', 'kanSetteOppSkift', 'kanLede',
                         'kanBemanne', 'gruppaHarPlass', 'kanRoreRad')),
     )
     VINDU = ("globalThis.ressursApen = new Map();\n"
@@ -2720,7 +2720,7 @@ class MannskapsfanenTests(SimpleTestCase):
                         'tegnPanel', 'apneVakt', '_apneModal',
                         '_skjulFeil', '_nivaa', 'visFane', '_erAdmin',
                         'faneTrengerBelastning', 'planleggerSikreLinjer',
-                        'kanSkriveAlt', 'kanSkriveNoe', 'kanLede')),
+                        'kanSkriveAlt', 'kanSetteOppSkift', 'kanSkriveNoe', 'kanLede')),
     )
     VINDU = ("globalThis.ressursApen = new Map();\n"
              "globalThis.window = { MODUL_TILGANG: { admin: true } };\n"
@@ -3075,7 +3075,7 @@ class DriftflatenTests(SimpleTestCase):
     HARNESS = (
         (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue')),
         (VAKTLISTE_JS, ('_stempelknapper', '_radklasse', 'kanStemple',
-                        'iDrift', 'kanSkriveAlt', '_nivaa', '_erAdmin',
+                        'iDrift', 'kanSkriveAlt', 'kanSetteOppSkift', '_nivaa', '_erAdmin',
                         'mkTilstede', '_tilstede', '_kl', '_d', '_dag',
                         '_tidsspenn', '_sammeDag')),
     )
@@ -4585,7 +4585,7 @@ class TidsblokkerTests(SimpleTestCase):
 
     HARNESS = (
         (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue')),
-        (VAKTLISTE_JS, ('mkOversikt', '_grupperPaaDag', 'mkUtskriftsverktoy', '_utskriftsdager', '_utvalgstekst', '_tidsblokker', '_blokklinje', '_blokkerMedDager', '_blokkrader', 'kanBemannePlass', '_mittKorpsId', '_synligePoster', '_dagnokkel', '_dagoverskrift', '_dagtekst', '_probonoMerke', '_telling', '_driftrad', '_plancellene', '_planrad', '_rolleValg', '_fyllValgFor', 'opptattPaaPlassen', '_plassKorps', '_varighet', '_skifttimer', '_tall', '_iso16', '_radklasse', '_stempelknapper', 'kanStemple', 'iDrift', 'kanSkriveAlt', '_nivaa', '_erAdmin', '_skiftrekkefolge', '_sumTimer', '_d', '_kl', '_dag', '_sammeDag', '_tidsspenn', '_vaktspenn', '_ressurserIGruppe', '_grupperMedRessurser', 'kanRoreRad')),
+        (VAKTLISTE_JS, ('mkOversikt', '_grupperPaaDag', 'mkUtskriftsverktoy', '_utskriftsdager', '_utvalgstekst', '_tidsblokker', '_blokklinje', '_blokkerMedDager', '_blokkrader', 'kanBemannePlass', '_mittKorpsId', '_synligePoster', '_dagnokkel', '_dagoverskrift', '_dagtekst', '_probonoMerke', '_telling', '_driftrad', '_plancellene', '_planrad', '_rolleValg', '_fyllValgFor', 'opptattPaaPlassen', '_plassKorps', '_varighet', '_skifttimer', '_tall', '_iso16', '_radklasse', '_stempelknapper', 'kanStemple', 'iDrift', 'kanSkriveAlt', 'kanSetteOppSkift', '_nivaa', '_erAdmin', '_skiftrekkefolge', '_sumTimer', '_d', '_kl', '_dag', '_sammeDag', '_tidsspenn', '_vaktspenn', '_ressurserIGruppe', '_grupperMedRessurser', 'kanRoreRad')),
     )
     VINDU = ("globalThis.ressursApen = new Map();\n"
              "globalThis.window = { MODUL_TILGANG: { admin: true } };\n"
@@ -5544,7 +5544,7 @@ class MittKorpsTests(SimpleTestCase):
     HARNESS = (
         (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue')),
         (VAKTLISTE_JS, ('mkMittKorps', '_mittKorpsId', '_synligePoster',
-                        'kanBemannePlass', 'kanSkriveAlt', '_nivaa', '_erAdmin',
+                        'kanBemannePlass', 'kanSkriveAlt', 'kanSetteOppSkift', '_nivaa', '_erAdmin',
                         '_fyllValgFor', 'opptattPaaPlassen', '_probonoMerke', '_tidsblokker',
                         '_blokkerMedDager', '_blokkrader', '_dagnokkel', '_dagoverskrift', '_dagtekst',
                         '_blokklinje', '_telling', '_skiftrekkefolge',
@@ -5828,7 +5828,7 @@ class EgenPersonPaaAndresPlassJsTests(SimpleTestCase):
 
     HARNESS = (
         (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue')),
-        (VAKTLISTE_JS, ('kanRoreRad', 'kanBemannePlass', 'kanSkriveAlt', '_nivaa', '_erAdmin')),
+        (VAKTLISTE_JS, ('kanRoreRad', 'kanBemannePlass', 'kanSkriveAlt', 'kanSetteOppSkift', '_nivaa', '_erAdmin')),
     )
 
     def setUp(self):

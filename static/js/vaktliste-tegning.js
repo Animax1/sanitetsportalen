@@ -729,7 +729,7 @@ function _plancellene(vp, r, kanRore) {
   const tid = (felt) => {
     const merke = _d(vp[felt])
       ? `<span class="vl-dagmerke">${escapeHtml(_dag(vp[felt]))}</span>` : '';
-    const innhold = kanRore
+    const innhold = kanSetteOppSkift()
       ? `<input type="datetime-local" step="300" class="vl-celle"
                 value="${escHtmlValue(_iso16(vp[felt]))}"
                 data-action="endreVaktpost" data-hendelse="change"
@@ -738,7 +738,10 @@ function _plancellene(vp, r, kanRore) {
     return `<div class="vl-tidcelle">${innhold}${merke}</div>`;
   };
 
-  const merknad = kanRore
+  // Tidene og merknaden leses av alle som ser raden, men settes av den som
+  // setter opp vakta. Et felt man kan skrive i og ikke lagre er verre enn en
+  // tekst: det ser ut som om endringen gikk igjennom.
+  const merknad = kanSetteOppSkift()
     ? `<input type="text" class="vl-celle" maxlength="255"
               value="${escHtmlValue(vp.merknad || '')}" placeholder="—"
               data-action="endreVaktpost" data-hendelse="change"
@@ -836,7 +839,10 @@ function mkRessurs(r, apen = true, egne = null) {
            </button>`
         : '');
 
-  const settKnapp = kanRore
+  // **«Opprett vakt» er å sette opp behovet**, ikke å fylle det (André,
+  // 15. sep. 2026). Knappen sto på `kanRore` — altså badgen — og da kunne
+  // korps-føreren lage skift med frie tidspunkt på sin egen ressurs.
+  const settKnapp = kanSetteOppSkift()
     ? `<button class="btn btn-sm btn-primary" type="button"
                data-action="apneVaktpost" data-id="${escHtmlValue(r.id)}">
          <i class="bi bi-plus-lg me-1"></i>Opprett vakt
@@ -854,7 +860,10 @@ function mkRessurs(r, apen = true, egne = null) {
   // **Sletting ligger bak «Rediger», ikke i toppen.** En naken «Fjern
   // ressurs» ved siden av «Sett på vakt» gjør det for lett å rive bort hele
   // bilen med bemanningen på — CASCADE tar skiftene.
-  const redigerKnapp = kanLede()
+  // **Vinduet åpnes av den som kan bemanne ressursen**, fordi navnet er det
+  // ene hun får rette (15. sep. 2026). Hva vinduet *viser*, avgjøres inne i
+  // det: gruppe, reservasjon, enhetskobling og sletting er lederens.
+  const redigerKnapp = kanBemanne(r)
     ? `<button class="btn btn-sm btn-outline-secondary" type="button"
                data-action="apneRessurs" data-id="${escHtmlValue(r.id)}">
          <i class="bi bi-pencil me-1"></i>Rediger

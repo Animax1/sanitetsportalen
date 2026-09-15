@@ -159,6 +159,41 @@ function kanLede() {
 }
 
 
+// **Feltene som setter opp et skift, speilet fra `services`.** Listene holdes
+// like av `SkiftetsOppsettfelterTests` — går de i utakt, sender klienten noe
+// serveren avviser, eller skjuler noe hun har lov til.
+const SKIFT_OPPSETTFELTER = ['fra_tid', 'til_tid', 'korps_id', 'alle_korps',
+                             'probono', 'merknad', 'antall'];
+const RESSURS_OPPSETTFELTER = ['gruppe_id', 'korps_id', 'enhet_id', 'rekkefolge'];
+
+
+function kanSetteOppSkift() {
+  // Speiler `services.kan_sette_opp_skift`. Å opprette skift, flytte tidene,
+  // dele plassen ut eller fjerne den er å *sette opp* vakta; den som fører
+  // sitt eget korps setter hvem og i hvilken rolle (André, 15. sep. 2026).
+  return kanSkriveAlt();
+}
+
+
+function bareTillatteFelter(kropp, oppsettfelter, harLov) {
+  // **Et felt hun ikke får sette, velter hele forespørselen.** Serveren
+  // avviser innsendingen som helhet — med vilje, så en halvlagret rad ikke
+  // finnes — så et vindu som alltid sender alle feltene ville gitt 403 på et
+  // personbytte korps-føreren faktisk har lov til. Vinduet sender derfor det
+  // hun får sette, og skjuler resten.
+  //
+  // Regelen står her og ikke i hvert vindu: to vinduer, to lister, samme
+  // spørsmål — og det ene ville før eller siden husket tidene og glemt
+  // probono. Samme grunn til at `services.oppsettfelter()` finnes.
+  if (harLov) return kropp;
+  const ut = {};
+  Object.keys(kropp).forEach((k) => {
+    if (!oppsettfelter.includes(k)) ut[k] = kropp[k];
+  });
+  return ut;
+}
+
+
 function kanPlanlegge() {
   // **Samme terskel som å sette vaktas rammer**: `skriv_leder` og global
   // admin. Planleggeren lager grunnlaget for hele lista, ikke ett korps' del

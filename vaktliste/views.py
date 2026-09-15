@@ -1126,7 +1126,11 @@ def sw_view(request):
 @require_http_methods(['PUT', 'DELETE'])
 @rate_limit(group='vaktliste:ressurs-skriv', rate='120/m', method=['PUT', 'DELETE'])
 def ressurs_detalj_view(request, pk):
-    """Rediger eller fjern en ressurs. `skriv_leder`/admin — se `ressurser_view`.
+    """Rediger eller fjern en ressurs.
+
+    **To terskler i ett endepunkt** (15. sep. 2026): navnet krever badge og
+    reservasjon (`kan_bemanne_ressurs`), alt annet — gruppe, reservasjon,
+    enhetskobling, rekkefølge og sletting — krever `kan_lede`.
 
     **DELETE krever `{"confirm": true}`**, som sletting av en vaktliste. Det er
     ikke en bekreftelsesdialog flyttet til serveren — dialogen står i
@@ -1134,16 +1138,25 @@ def ressurs_detalj_view(request, pk):
     slette-URL som virker på et bart kall er en URL noe annet kan treffe ved
     et uhell, og CASCADE tar alle skiftene med seg.
     """
-    if not services.kan_lede(request.user):
-        return _nektet()
-
     try:
         ressurs = (Ressurs.objects
                    .select_related('korps', 'enhet', 'gruppe').get(pk=pk))
     except Ressurs.DoesNotExist:
         return _feil('Ressurs ikke funnet', status=404)
 
+    # **Inngangsporten er den doble regelen, ikke `kan_lede`** (André, 15. sep.
+    # 2026: «redigere ressursens navn, men ikke gruppe, reservering, enhet i
+    # oppdragsmodulen og sletting»). Navnet er det ene korps-føreren skal kunne
+    # rette — bilen heter «Sola 56», ikke «Ambulanse 2» — og det er en
+    # retting hun ser konsekvensen av med én gang. Alt annet på ressursen er
+    # oppsett, og står i `RESSURS_OPPSETTFELTER`.
+    if not services.kan_bemanne_ressurs(request.user, ressurs):
+        return _nektet()
+
     if request.method == 'DELETE':
+        # CASCADE tar skiftene, og det er ikke en handling man angrer.
+        if not services.kan_lede(request.user):
+            return _nektet('Ressurser fjernes av den som satte dem opp.')
         if not _json_body(request).get('confirm'):
             return _feil('Bekreftelse mangler. Send {"confirm": true}.')
         # CASCADE tar vaktpostene. Det er riktig her: fjernes bilen fra
@@ -1152,6 +1165,12 @@ def ressurs_detalj_view(request, pk):
         return JsonResponse({'status': 'ok'})
 
     data = _json_body(request)
+
+    sperret = services.oppsettfelter(data, services.RESSURS_OPPSETTFELTER)
+    if sperret and not services.kan_lede(request.user):
+        return _nektet('Gruppe, reservasjon og enhetskobling settes av den '
+                       'som setter opp vakta: ' + ', '.join(sperret))
+
     if 'navn' in data:
         navn = (data.get('navn') or '').strip()
         if not navn:
@@ -1213,7 +1232,15 @@ def vaktposter_view(request, pk):
         except Mannskap.DoesNotExist:
             return _feil('Ukjent mannskap.')
 
-    # Regelen står i services, som én funksjon — se modul-docstringen.
+    # **Å opprette et skift er å sette opp vakta, ikke å bemanne den**
+    # (André, 15. sep. 2026). Porten sto på `kan_sette_vaktpost` — altså
+    # badgen — og da kunne korps-føreren lage skift med frie tidspunkt, og
+    # femti tomme plasser med `antall`, på sin egen ressurs. Å *fylle* en
+    # plass er et annet spørsmål, og det stilles i `vaktpost_detalj_view`.
+    if not services.kan_sette_opp_skift(request.user):
+        return _nektet('Skift settes opp av den som setter opp vakta.')
+    # Badgen sjekkes fortsatt på paret: den doble regelen gjelder også når
+    # den som setter opp er lederen selv, og det er her den leses.
     if not services.kan_sette_vaktpost(request.user, ressurs, mannskap):
         return _nektet()
 
@@ -1240,13 +1267,11 @@ def vaktposter_view(request, pk):
     # **Reservasjonen på plassen.** Oppgis den ikke, arver plassen ressursens
     # — `NULL` betyr «som ressursen», ikke «ingen». Å sette den er å dele ut,
     # og krever `skriv_full` som all annen utdeling.
+    # Utdelingen er dekket av porten øverst — `korps_id` og `alle_korps` står
+    # i `SKIFT_OPPSETTFELTER`, og den som kommer hit har `skriv_full`.
     korps_id = _int(data.get('korps_id')) if 'korps_id' in data else None
-    if korps_id is not None and not services.kan_skrive_alt(request.user):
-        return _nektet('Reservasjonen settes av den som deler ut.')
-    # Tildelt alle korps er også å dele ut. Vinner over korps_id.
+    # Tildelt alle korps vinner over korps_id.
     alle_korps = bool(data.get('alle_korps'))
-    if alle_korps and not services.kan_skrive_alt(request.user):
-        return _nektet('Tildelingen settes av den som deler ut.')
     if alle_korps:
         korps_id = None
 
@@ -1303,16 +1328,28 @@ def vaktpost_detalj_view(request, pk):
         return _nektet()
 
     if request.method == 'DELETE':
-        # Å fjerne en **ledig** plass er å fjerne et behov vaktleder satte
-        # opp. Korps-brukeren fyller plasser, hun avlyser dem ikke — kunne
-        # hun det, ville et hull i bemanningen kunne skjules ved å slette
-        # raden som viste det.
-        if vaktpost.mannskap_id is None and not services.kan_skrive_alt(request.user):
-            return _nektet('Ledige plasser fjernes av den som satte dem opp.')
+        # **Å fjerne et skift er å fjerne et behov vaktleder satte opp** — og
+        # fra 15. sep. 2026 gjelder det raden uansett om den er fylt. Sperren
+        # sto bare på de ledige, med den begrunnelsen at et hull i bemanningen
+        # ikke skal kunne skjules ved å slette raden som viste det. Nøyaktig
+        # samme argument gjelder en fylt rad: sletter korps-føreren skiftet i
+        # stedet for å melde forfall, forsvinner plassen og ikke bare personen.
+        # Hun tømmer raden i stedet (`mannskap_id: null`), og da står behovet.
+        if not services.kan_sette_opp_skift(request.user):
+            return _nektet('Skift fjernes av den som satte dem opp.')
         vaktpost.delete()
         return JsonResponse({'status': 'ok'})
 
     data = _json_body(request)
+
+    # **Tidene, utdelingen, probono og merknaden er oppsett, ikke bemanning.**
+    # Én port for hele lista, framfor én `if` per felt: de to som sto her
+    # dekket `korps_id` og `alle_korps`, mens `fra_tid`/`til_tid` gikk rett
+    # gjennom — og det var hullet André meldte. Se `services.oppsettfelter`.
+    sperret = services.oppsettfelter(data, services.SKIFT_OPPSETTFELTER)
+    if sperret and not services.kan_sette_opp_skift(request.user):
+        return _nektet('Tider og utdeling settes av den som setter opp vakta: '
+                       + ', '.join(sperret))
 
     # **Å fylle en ledig plass er den ene skrivingen som endrer hvem regelen
     # gjelder for.** Sjekken over gjaldt raden slik den står nå; her sjekkes
@@ -1333,11 +1370,8 @@ def vaktpost_detalj_view(request, pk):
 
     var_planlagt = services.er_planlagt(vaktpost)
     if 'korps_id' in data:
-        # Å endre hvem plassen er satt av til, er å dele ut på nytt — samme
-        # terskel som å reservere hele ressursen. Kunne korps-brukeren gjøre
-        # det, kunne hun tildelt seg selv en plass på samleplassen.
-        if not services.kan_skrive_alt(request.user):
-            return _nektet('Reservasjonen settes av den som deler ut.')
+        # Å endre hvem plassen er satt av til, er å dele ut på nytt. Dekket av
+        # porten over — `korps_id` står i `SKIFT_OPPSETTFELTER`.
         vaktpost.korps_id = _int(data['korps_id'])
     if 'rolle_id' in data:
         vaktpost.rolle_id = _int(data['rolle_id'])
@@ -1348,9 +1382,7 @@ def vaktpost_detalj_view(request, pk):
     if 'probono' in data:
         vaktpost.probono = bool(data.get('probono'))
     if 'alle_korps' in data:
-        # Å tildele alle er å dele ut — samme port som reservasjonen.
-        if not services.kan_skrive_alt(request.user):
-            return _nektet('Tildelingen settes av den som deler ut.')
+        # Å tildele alle er å dele ut — dekket av porten over.
         vaktpost.alle_korps = bool(data.get('alle_korps'))
         if vaktpost.alle_korps:
             vaktpost.korps_id = None

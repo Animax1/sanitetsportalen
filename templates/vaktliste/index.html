@@ -551,8 +551,9 @@
         </div>
         <div id="ressurs-feil" class="text-danger small d-none"></div>
 
-        <hr>
-        <div class="vl-farlig">
+        {# Sletting tar skiftene med seg (CASCADE) og er lederens alene. #}
+        <hr class="vl-krev-leder d-none">
+        <div class="vl-farlig vl-krev-leder d-none">
           <strong class="d-block mb-1">Fjern ressursen</strong>
           <span class="vl-meta d-block mb-2" id="ressurs-slett-tekst"></span>
           <button type="button" class="btn btn-outline-danger btn-sm"
@@ -671,8 +672,11 @@
           </button>
         </div>
 
-        <hr>
-        <div class="vl-farlig">
+        {# Å fjerne skiftet er å fjerne behovet vaktleder satte opp, og fra #}
+        {# 15. sep. 2026 gjelder det også en fylt rad: melder korps-føreren #}
+        {# forfall ved å slette, forsvinner plassen og ikke bare personen. #}
+        <hr class="vl-krev-full d-none">
+        <div class="vl-farlig vl-krev-full d-none">
           <strong class="d-block mb-1">Fjern skiftet</strong>
           <span class="vl-meta d-block mb-2">
             Raden forsvinner fra vaktlista. Skal plassen bestå uten person,

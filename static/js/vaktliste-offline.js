@@ -293,7 +293,32 @@ function apneRedigerVaktpost(id) {
   const probono = document.getElementById('vaktpost-probono');
   if (probono) probono.checked = !!vp.probono;
 
+  // **Oppsettet vises, men lar seg ikke endre.** Tidene er det man må se for
+  // å vite hvilket skift man fyller — å skjule dem ville gjort vinduet
+  // ubrukelig — så de står låst framfor å være borte. Sletting og duplisering
+  // er derimot handlinger, og en knapp som fører til 403 er verre enn ingen.
+  _laasOppsettfelter(!kanSetteOppSkift());
+
   bootstrap.Modal.getOrCreateInstance(modal).show();
+}
+
+
+function _laasOppsettfelter(laast) {
+  // Egen funksjon, ikke en løkke inne i `apneRedigerVaktpost()`: en anonym
+  // `if` i et vindu lar seg ikke kjøre i en test, og dette er en tilgangsregel.
+  ['vaktpost-fra', 'vaktpost-til', 'vaktpost-merknad'].forEach((id) => {
+    const el = document.getElementById(id);
+    if (el) el.readOnly = laast;
+  });
+  // `<select>` og avkryssing har ingen `readOnly` — der er `disabled` det
+  // eneste som virker, og et deaktivert felt sendes uansett ikke.
+  ['vaktpost-korps', 'vaktpost-probono'].forEach((id) => {
+    const el = document.getElementById(id);
+    if (el) el.disabled = laast;
+  });
+  // Sletting og duplisering står i `.vl-krev-full` i malen og gates av
+  // `gateKnapper()` ved sidelasting. Vindusmarkupen tegnes ikke på nytt, så
+  // den ene gangen holder — det er byggerne som ikke kan gates slik.
 }
 
 
@@ -340,14 +365,17 @@ async function lagreVaktpost() {
   await withSubmitGuard('vaktpost-knapp', async () => {
     const fra = _tidFraFelt('vaktpost-fra');
     const til = _tidFraFelt('vaktpost-til');
-    if (!fra || !til) {
+    // Kravet gjelder den som *setter* tidene. For korps-føreren er feltene
+    // lest opp, ikke fylt ut, og et tomt felt hun ikke rører skal ikke
+    // stoppe et personbytte.
+    if (kanSetteOppSkift() && (!fra || !til)) {
       _visFeil('vaktpost-feil', 'Skiftet må ha både fra- og til-tidspunkt.');
       return;
     }
 
     const res = await apiFetch(`/vaktliste/api/vaktposter/${id}/`, {
       method: 'PUT',
-      body: JSON.stringify({
+      body: JSON.stringify(bareTillatteFelter({
         mannskap_id: document.getElementById('vaktpost-mannskap')?.value || null,
         ..._korpsKropp('korps_id', document.getElementById('vaktpost-korps')?.value || ''),
         rolle_id: document.getElementById('vaktpost-rolle')?.value || null,
@@ -355,7 +383,7 @@ async function lagreVaktpost() {
         probono: !!document.getElementById('vaktpost-probono')?.checked,
         fra_tid: fra,
         til_tid: til,
-      }),
+      }, SKIFT_OPPSETTFELTER, kanSetteOppSkift())),
     });
     const d = await res.json().catch(() => ({}));
     if (!res.ok || d.status !== 'ok') {

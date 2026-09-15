@@ -24,6 +24,8 @@ De to reglene som bærer fasen:
 2. **To felter er unntatt badgen** — `korps_id` og `user_id` handler ikke om
    personen, men om hvem som rår over henne.
 """
+import json
+import re
 from datetime import timedelta
 
 from django.test import Client, SimpleTestCase, TestCase, override_settings
@@ -317,9 +319,29 @@ class DobbelRegelTests(TilgangsBasis):
     de faktisk står i veien for noen — gjennom HTTP.
     """
 
-    def test_korpsbruker_bemanner_sin_egen_ressurs(self):
-        res = self._sett_paa(self.c_kb, self.res_hgsd, self.p_hgsd)
-        self.assertEqual(res.status_code, 201)
+    def test_korpsbruker_oppretter_ikke_skift_men_fyller_dem(self):
+        """**Snudd 15. sep. 2026** (André): «Det eneste de skal få lov til er
+        å legge inn folk, rolle, og redigere ressursens navn.»
+
+        Å opprette skiftet er å sette opp vakta — tidene, antallet, hvem
+        plassen er satt av til. Å fylle den er å bemanne. Begge halvdelene
+        står i samme test med vilje: hver for seg leser de som om
+        korps-føreren enten har alt eller ingenting, og skillet mellom de to
+        er nettopp det regelen handler om.
+        """
+        self.assertEqual(
+            self._sett_paa(self.c_kb, self.res_hgsd, self.p_hgsd).status_code, 403)
+        self.assertEqual(Vaktpost.objects.count(), 0,
+                         'ingen rad skal ha blitt opprettet')
+
+        # Vaktlederen setter opp behovet; ressursen er reservert HGSD, så
+        # plassen er hennes å fylle (`reservert_korps` arver fra ressursen).
+        vp = self._vaktpost(self.res_hgsd, None)
+        res = self.c_kb.put(f'/vaktliste/api/vaktposter/{vp.pk}/',
+                            data={'mannskap_id': self.p_hgsd.pk},
+                            content_type='application/json')
+        self.assertEqual(res.status_code, 200, res.content)
+        self.assertEqual(Vaktpost.objects.get(pk=vp.pk).mannskap, self.p_hgsd)
 
     def test_korpsbruker_nektes_annet_korps_sin_ressurs(self):
         res = self._sett_paa(self.c_kb, self.res_karmoy, self.p_hgsd)
@@ -359,12 +381,27 @@ class DobbelRegelTests(TilgangsBasis):
             ressurs=ressurs, mannskap=mannskap,
             fra_tid=self.na, til_tid=self.na + timedelta(hours=8))
 
-    def test_korpsbruker_endrer_sitt_eget_skift(self):
+    def test_korpsbruker_endrer_person_men_ikke_tider(self):
+        """Skillet går mellom *hvem som står der* og *hva skiftet er*.
+
+        Tidene er vaktas rammer for én plass: flytter korps-føreren dem, har
+        hun endret behovet vaktlederen satte opp, og ingen ser at det skjedde.
+        Hun bytter person på raden i stedet.
+        """
         vp = self._vaktpost(self.res_hgsd, self.p_hgsd)
-        res = self.c_kb.put(f'/vaktliste/api/vaktposter/{vp.pk}/',
-                            data={'til_tid': self._iso(12)},
+        sti = f'/vaktliste/api/vaktposter/{vp.pk}/'
+
+        res = self.c_kb.put(sti, data={'til_tid': self._iso(12)},
                             content_type='application/json')
-        self.assertEqual(res.status_code, 200)
+        self.assertEqual(res.status_code, 403, res.content)
+        vp.refresh_from_db()
+        self.assertEqual(vp.til_tid, self.na + timedelta(hours=8),
+                         'tidene skal stå urørt')
+
+        # Men raden er hennes: å ta personen av den er bemanning.
+        self.assertEqual(
+            self.c_kb.put(sti, data={'mannskap_id': None},
+                          content_type='application/json').status_code, 200)
 
     def test_korpsbruker_nektes_annet_korps_sitt_skift(self):
         """Regelen leses fra raden som *finnes*. Leste vi ressursen fra
@@ -566,7 +603,7 @@ class GrensesnittetsGatingTests(SimpleTestCase):
         if not node_available():
             self.skipTest('node er ikke tilgjengelig')
         self.h_plan = build_harness((
-            (VAKTLISTE_JS, ('_nivaa', '_erAdmin', 'kanSkriveAlt', 'kanLede',
+            (VAKTLISTE_JS, ('_nivaa', '_erAdmin', 'kanSkriveAlt', 'kanSetteOppSkift', 'kanLede',
                             'kanSkriveNoe', 'kanBemanne',
                             'kanRedigerePerson')),
         ))
@@ -741,12 +778,29 @@ class LedigPlassTilgangTests(TilgangsBasis):
         self.assertEqual(res.status_code, 403)
         self.assertTrue(Vaktpost.objects.filter(pk=pk).exists())
 
-    def test_korpsbruker_kan_fjerne_sitt_eget_fylte_skift(self):
-        """Å ta sin egen person av lista er noe annet enn å avlyse plassen."""
+    def test_korpsbruker_tommer_raden_i_stedet_for_aa_slette_den(self):
+        """**Snudd 15. sep. 2026.** Å ta sin egen person av lista er noe annet
+        enn å avlyse plassen — og det er nettopp derfor sletting ikke lenger er
+        veien til det.
+
+        Sperren sto bare på de *ledige* plassene, med den begrunnelsen at et
+        hull i bemanningen ikke skal kunne skjules ved å slette raden som viste
+        det. Argumentet gjelder ordrett på en fylt rad også: sletter hun
+        skiftet framfor å melde forfall, forsvinner plassen og ikke bare
+        personen, og vaktlederen ser en vaktliste som ser dekket ut.
+        """
         pk = self._plass(self.c_vl, self.res_hgsd,
                          mannskap_id=self.p_hgsd.pk).json()['data']['id']
+        sti = f'/vaktliste/api/vaktposter/{pk}/'
+
+        self.assertEqual(self.c_kb.delete(sti).status_code, 403)
+        self.assertTrue(Vaktpost.objects.filter(pk=pk).exists())
+
+        # Veien hun skal gå: raden blir stående som et ubesatt behov.
         self.assertEqual(
-            self.c_kb.delete(f'/vaktliste/api/vaktposter/{pk}/').status_code, 200)
+            self.c_kb.put(sti, data={'mannskap_id': None},
+                          content_type='application/json').status_code, 200)
+        self.assertIsNone(Vaktpost.objects.get(pk=pk).mannskap_id)
 
 
 @override_settings(SECURE_SSL_REDIRECT=False, RATELIMIT_ENABLE=False)
@@ -881,7 +935,7 @@ class MalensGatingTests(TestCase):
                             '_posterFor', '_tilstede', '_sumTimer', '_skifttimer',
                             '_tall', '_telling', '_utvalgstekst', '_skiftrekkefolge',
                             '_tidsspenn', '_iso16', '_d', '_kl', '_dag',
-                            '_sammeDag', '_nivaa', '_erAdmin', 'kanSkriveAlt',
+                            '_sammeDag', '_nivaa', '_erAdmin', 'kanSkriveAlt', 'kanSetteOppSkift',
                             'kanLede', 'kanBemanne', 'kanRoreRad')),
         ))
         # Admin, så *alle* knappene bygges — er den ikke der for admin, er den
@@ -996,10 +1050,12 @@ class KorpsPaaPlassenTests(TilgangsBasis):
         fortsatt grønn.
         """
         pk = self._ledig(self.c_vl, self.res_hgsd).json()['data']['id']
-        # Hun får fylle den — beviser at porten slipper henne inn.
+        # Hun får fylle den — beviser at porten slipper henne inn. Beviset var
+        # `merknad` til 15. sep. 2026; den er nå oppsett, og en test som prøver
+        # porten med et felt porten selv stenger, måler ingenting.
         self.assertEqual(
             self.c_kb.put(f'/vaktliste/api/vaktposter/{pk}/',
-                          data={'merknad': 'min'},
+                          data={'mannskap_id': self.p_hgsd.pk},
                           content_type='application/json').status_code, 200)
         # Men ikke skrive om hvem den er satt av til.
         res = self.c_kb.put(f'/vaktliste/api/vaktposter/{pk}/',
@@ -1359,11 +1415,18 @@ class EgenPersonPaaAndresPlassTests(TilgangsBasis):
         self.assertEqual(res.status_code, 201, res.content)
         return res.json()['data']['id']
 
-    def test_korpsbrukeren_faar_redigere_raden(self):
+    def test_merknaden_er_oppsett_og_ikke_hennes(self):
+        """**Snudd 15. sep. 2026.** Merknaden sier hva skiftet *er*, ikke hvem
+        som står der, og André satte grensen ved «folk og rolle».
+
+        At hun får ta i raden står fortsatt — testen under bytter person på
+        nettopp denne raden.
+        """
         pk = self._egen_paa_karmoys_plass()
         res = self.c_kb.put(f'/vaktliste/api/vaktposter/{pk}/',
                             data={'merknad': 'Kommer 17:30'}, content_type='application/json')
-        self.assertEqual(res.status_code, 200, res.content)
+        self.assertEqual(res.status_code, 403, res.content)
+        self.assertEqual(Vaktpost.objects.get(pk=pk).merknad, '')
 
     def test_hun_kan_bytte_til_en_annen_av_egne(self):
         pk = self._egen_paa_karmoys_plass()
@@ -1482,3 +1545,451 @@ class NedtrekketTilbyrBareDemManFaarSetteTests(TilgangsBasis):
             forventet = {m.pk for m in Mannskap.objects.all()
                          if services.kan_redigere_mannskap(bruker, m)}
             self.assertEqual(fikk, forventet, bruker.username)
+
+
+@override_settings(SECURE_SSL_REDIRECT=False, RATELIMIT_ENABLE=False)
+class RessursnavnetErHennesTests(TilgangsBasis):
+    """Ett endepunkt, to terskler (André, 15. sep. 2026).
+
+    «Det eneste de skal få lov til er å legge inn folk, rolle, og redigere
+    ressursens navn — men ikke gruppe, reservering, enhet i oppdragsmodulen og
+    sletting.»
+
+    **Hvorfor navnet er den ene som slipper:** det er en retting man ser
+    konsekvensen av med én gang, på en ressurs som alt er satt av til korpset.
+    Bilen heter «Sola 56», ikke «Ambulanse 2», og den som står ved bilen er den
+    som vet det. Gruppa, reservasjonen og enhetskoblingen er derimot
+    beslutninger om *hvem ressursen er til for* — flyttes de, flytter de
+    tilgangen til seg selv.
+    """
+
+    def _put(self, klient, ressurs, **felter):
+        return klient.put(f'/vaktliste/api/ressurser/{ressurs.pk}/',
+                          data=felter, content_type='application/json')
+
+    def test_korpsforeren_gir_sin_egen_ressurs_nytt_navn(self):
+        res = self._put(self.c_kb, self.res_hgsd, navn='Sola 56')
+        self.assertEqual(res.status_code, 200, res.content)
+        self.res_hgsd.refresh_from_db()
+        self.assertEqual(self.res_hgsd.navn, 'Sola 56')
+
+    def test_hun_rorer_ikke_gruppe_reservasjon_eller_rekkefolge(self):
+        """Hvert felt for seg: en port som dekker tre felter, kan dekke to."""
+        for felt, verdi in (('gruppe_id', gruppe(KO).pk),
+                            ('korps_id', self.karmoy.pk),
+                            ('enhet_id', None),
+                            ('rekkefolge', 1)):
+            with self.subTest(felt=felt):
+                res = self._put(self.c_kb, self.res_hgsd, **{felt: verdi})
+                self.assertEqual(res.status_code, 403, res.content)
+        self.res_hgsd.refresh_from_db()
+        self.assertEqual(self.res_hgsd.korps_id, self.hgsd.pk)
+        self.assertEqual(self.res_hgsd.gruppe_id, gruppe(LAG).pk)
+
+    def test_navnet_folger_med_ned_naar_noe_annet_er_sperret(self):
+        """Én forespørsel, ett svar. Sender hun navn *og* gruppe, skal hele
+        innsendingen avvises — ikke halvparten lagres. Samme regel som
+        portalinnstillingene: en modul som nekter stopper hele skjemaet."""
+        res = self._put(self.c_kb, self.res_hgsd, navn='Sola 56',
+                        gruppe_id=gruppe(KO).pk)
+        self.assertEqual(res.status_code, 403, res.content)
+        self.res_hgsd.refresh_from_db()
+        self.assertEqual(self.res_hgsd.navn, 'Lag HGSD', 'navnet skal stå urørt')
+
+    def test_hun_navngir_ikke_et_annet_korps_sin_ressurs(self):
+        res = self._put(self.c_kb, self.res_karmoy, navn='Min nå')
+        self.assertEqual(res.status_code, 403)
+        self.res_karmoy.refresh_from_db()
+        self.assertEqual(self.res_karmoy.navn, 'Lag Karmøy')
+
+    def test_en_ureservert_ressurs_er_ikke_et_fristed(self):
+        """KO er ureservert, og det betyr vaktlederens bord — ikke fritt fram.
+        Samme regel som `kan_bemanne_ressurs` har for bemanning."""
+        res = self._put(self.c_kb, self.res_fri, navn='Mitt KO')
+        self.assertEqual(res.status_code, 403)
+
+    def test_hun_sletter_ikke_ressursen(self):
+        """CASCADE tar skiftene, og det er ikke en handling man angrer."""
+        res = self.c_kb.delete(f'/vaktliste/api/ressurser/{self.res_hgsd.pk}/',
+                               data={'confirm': True},
+                               content_type='application/json')
+        self.assertEqual(res.status_code, 403)
+        self.assertTrue(Ressurs.objects.filter(pk=self.res_hgsd.pk).exists())
+
+    def test_leseren_rorer_ingenting(self):
+        self.assertEqual(self._put(self.c_leser, self.res_hgsd,
+                                   navn='Nei').status_code, 403)
+
+    def test_lederen_setter_fortsatt_opp_alt(self):
+        """Den andre retningen. Snevres porten for mye inn, mister lederen
+        knappene — og det ville vært like galt, bare stillere."""
+        res = self._put(self.c_leder, self.res_hgsd, navn='Sola 56',
+                        gruppe_id=gruppe(KO).pk, korps_id=self.karmoy.pk)
+        self.assertEqual(res.status_code, 200, res.content)
+        self.res_hgsd.refresh_from_db()
+        self.assertEqual(self.res_hgsd.navn, 'Sola 56')
+        self.assertEqual(self.res_hgsd.korps_id, self.karmoy.pk)
+
+
+class OppsettfelteneTests(SimpleTestCase):
+    """Listene er regelen, så de prøves som en regel og ikke bare gjennom HTTP.
+
+    En endepunkts-test ser at *ett* felt er stengt. Den ser ikke at et nytt
+    felt havnet utenfor lista — og et felt som ikke står der, er et felt uten
+    port.
+    """
+
+    def test_bemanningsfeltene_staar_ikke_i_skiftets_oppsett(self):
+        """Hvem og hvilken rolle er nettopp det korps-føreren skal gjøre."""
+        for felt in ('mannskap_id', 'rolle_id'):
+            self.assertNotIn(felt, services.SKIFT_OPPSETTFELTER)
+
+    def test_navnet_staar_ikke_i_ressursens_oppsett(self):
+        self.assertNotIn('navn', services.RESSURS_OPPSETTFELTER)
+
+    def test_tidene_utdelingen_og_antallet_er_oppsett(self):
+        for felt in ('fra_tid', 'til_tid', 'korps_id', 'alle_korps',
+                     'probono', 'merknad', 'antall'):
+            self.assertIn(felt, services.SKIFT_OPPSETTFELTER)
+
+    def test_den_finner_bare_det_som_faktisk_staar_i_kroppen(self):
+        funn = services.oppsettfelter(
+            {'mannskap_id': 3, 'til_tid': 'x'}, services.SKIFT_OPPSETTFELTER)
+        self.assertEqual(funn, ['til_tid'])
+
+    def test_tom_kropp_gir_tom_liste(self):
+        self.assertEqual(
+            services.oppsettfelter({}, services.SKIFT_OPPSETTFELTER), [])
+
+    def test_en_verdi_som_er_none_teller_som_oppgitt(self):
+        """`{'korps_id': None}` er å *fjerne* reservasjonen, ikke å la den
+        være. Sjekkes det på verdien framfor på nøkkelen, er den vei rundt
+        porten åpen."""
+        self.assertEqual(
+            services.oppsettfelter({'korps_id': None},
+                                   services.SKIFT_OPPSETTFELTER), ['korps_id'])
+
+    def test_rekkefolgen_er_listas(self):
+        """Feilmeldingen nevner feltene, og den skal lese likt hver gang."""
+        kropp = {'merknad': 'x', 'fra_tid': 'a', 'probono': True}
+        self.assertEqual(
+            services.oppsettfelter(kropp, services.SKIFT_OPPSETTFELTER),
+            ['fra_tid', 'probono', 'merknad'])
+
+
+@override_settings(SECURE_SSL_REDIRECT=False, RATELIMIT_ENABLE=False)
+class SkiftetsOppsettfelterTests(SimpleTestCase):
+    """Klientens lister og serverens skal si det samme.
+
+    **To kopier av samme regel, og ingen av dem feiler når de glir fra
+    hverandre** — det er den slags feil dette prosjektet har fanget før, i
+    `STEMPLINGER`. Glir de fra hverandre her, får det to former, og begge er
+    stille:
+
+    - **Klienten sender for mye.** Serveren avviser *hele* forespørselen, så
+      korps-føreren får 403 på et personbytte hun har lov til. Det ser ut som
+      om tilgangen er borte.
+    - **Klienten skjuler for mye.** Feltet finnes, hun har lov, men knappen er
+      ikke der. Ingen melder det som en feil — man tror det er meningen.
+    """
+
+    def setUp(self):
+        from patients.js_test_utils import (
+            VAKTLISTE_JS, build_harness, node_available, read_js)
+        if not node_available():
+            self.skipTest('node er ikke tilgjengelig')
+        self.kilde = read_js(VAKTLISTE_JS)
+        self.h = build_harness((
+            (VAKTLISTE_JS, ('_nivaa', '_erAdmin', 'kanSkriveAlt',
+                            'kanSetteOppSkift', 'kanLede', 'bareTillatteFelter')),
+        ))
+
+    def _vindu(self, nivaa='', *, admin=False):
+        """Stub av det malen setter, pluss de to listene.
+
+        `build_harness` klipper ut *funksjoner*; konstanter på toppnivå
+        følger ikke med. De leses derfor ut av JS-kilden og skrives inn her —
+        altså nettopp de verdiene nettleseren ville brukt, ikke et sett
+        skrevet av for hånd i testen.
+        """
+        import json
+        return (
+            f"globalThis.window = {{ MODUL_TILGANG: "
+            f"{{ vaktliste: '{nivaa}', admin: {str(admin).lower()} }} }};\n"
+            f"const SKIFT_OPPSETTFELTER = "
+            f"{json.dumps(self._liste('SKIFT_OPPSETTFELTER'))};\n"
+            f"const RESSURS_OPPSETTFELTER = "
+            f"{json.dumps(self._liste('RESSURS_OPPSETTFELTER'))};\n")
+
+    def _liste(self, navn):
+        """Leser konstanten ut av JS-kilden og gir den som en Python-liste.
+
+        Kilden leses for å *finne* verdien, ikke for å påstå at en kodelinje
+        står der — skillet fra gjeldspunkt 3.8.
+        """
+        import json
+        import re
+        m = re.search(navn + r'\s*=\s*(\[[^\]]*\])', self.kilde)
+        self.assertIsNotNone(m, f'fant ikke {navn} i JS-kilden')
+        return json.loads(m.group(1).replace("'", '"'))
+
+    def test_skiftets_liste_er_den_samme_i_js_og_python(self):
+        self.assertEqual(self._liste('SKIFT_OPPSETTFELTER'),
+                         list(services.SKIFT_OPPSETTFELTER))
+
+    def test_ressursens_liste_er_den_samme_i_js_og_python(self):
+        self.assertEqual(self._liste('RESSURS_OPPSETTFELTER'),
+                         list(services.RESSURS_OPPSETTFELTER))
+
+    def test_korpsforeren_sender_bare_bemanningen(self):
+        """Den ene grunnen funksjonen finnes: et personbytte skal gå gjennom."""
+        from patients.js_test_utils import run_node
+        run_node(self.h, self._vindu('skriv_handling') + """
+            const kropp = {mannskap_id: 4, rolle_id: 2, fra_tid: 'a',
+                           til_tid: 'b', merknad: 'x', probono: true,
+                           korps_id: 9, alle_korps: true};
+            const ut = bareTillatteFelter(kropp, SKIFT_OPPSETTFELTER,
+                                          kanSetteOppSkift());
+            assert(JSON.stringify(Object.keys(ut).sort())
+                   === JSON.stringify(['mannskap_id', 'rolle_id']),
+                   'bare hvem og rolle: ' + JSON.stringify(ut));
+        """)
+
+    def test_lederen_sender_alt(self):
+        """Den andre retningen. Siler den for mye, mister lederen tidene —
+        og det ville vært like galt, bare stillere."""
+        from patients.js_test_utils import run_node
+        run_node(self.h, self._vindu('skriv_full') + """
+            const kropp = {mannskap_id: 4, fra_tid: 'a', probono: true};
+            const ut = bareTillatteFelter(kropp, SKIFT_OPPSETTFELTER,
+                                          kanSetteOppSkift());
+            assert(Object.keys(ut).length === 3, 'alt skal med');
+        """)
+
+    def test_navnet_slipper_gjennom_paa_ressursen(self):
+        from patients.js_test_utils import run_node
+        run_node(self.h, self._vindu('skriv_handling') + """
+            const ut = bareTillatteFelter(
+                {navn: 'Sola 56', gruppe_id: 2, korps_id: 3, enhet_id: 4},
+                RESSURS_OPPSETTFELTER, kanLede());
+            assert(JSON.stringify(Object.keys(ut)) === JSON.stringify(['navn']),
+                   'bare navnet: ' + JSON.stringify(ut));
+        """)
+
+    def test_en_verdi_som_er_null_siles_ogsaa(self):
+        """`{korps_id: null}` er å *fjerne* reservasjonen. Siles det på
+        verdien framfor på nøkkelen, sendes den og velter innsendingen."""
+        from patients.js_test_utils import run_node
+        run_node(self.h, self._vindu('skriv_handling') + """
+            const ut = bareTillatteFelter({mannskap_id: 1, korps_id: null},
+                                          SKIFT_OPPSETTFELTER,
+                                          kanSetteOppSkift());
+            assert(!('korps_id' in ut), 'null skal siles: ' + JSON.stringify(ut));
+        """)
+
+    def test_kanSetteOppSkift_folger_stigen(self):
+        from patients.js_test_utils import run_node
+        for nivaa, ventet in (('les', 'false'), ('les_alle', 'false'),
+                              ('skriv_handling', 'false'),
+                              ('skriv_full', 'true'), ('skriv_leder', 'true')):
+            with self.subTest(nivaa=nivaa):
+                run_node(self.h, self._vindu(nivaa) + f"""
+                    assert(kanSetteOppSkift() === {ventet}, '{nivaa}');
+                """)
+
+
+class RegnearketViserDetHunFaarGjoreTests(SimpleTestCase):
+    """Markupen skal si det samme som serveren (15. sep. 2026).
+
+    **En knapp som fører til 403 er verre enn ingen knapp** — regelen står i
+    CLAUDE.md, og den ble brutt her: «Opprett vakt» og tidsfeltene i
+    regnearket sto på `kanBemanne()`, altså badgen, mens serveren nå krever
+    `skriv_full`. Testen tegner kortet og ser etter knappen, framfor å lete
+    etter et kall i kilden — den formen går i stykker av en omskriving som
+    gjør det samme, og grønn når noen skriver feil et annet sted.
+    """
+
+    #: Samme harness som escaping-testene. `mkRessurs` drar med seg halve
+    #: tegningsfila, og to håndskrevne kopier av den lista ville gått i utakt.
+    @property
+    def HARNESS(self):
+        from vaktliste.tests_xss import VaktlisteEscapingOppforselTests
+        return VaktlisteEscapingOppforselTests.HARNESS
+
+    def setUp(self):
+        from patients.js_test_utils import build_harness, node_available
+        if not node_available():
+            self.skipTest('node er ikke tilgjengelig')
+        self.harness = build_harness(self.HARNESS)
+
+    def _tegn(self, nivaa, *, ressurs_korps=1, mitt_korps=1):
+        import json
+
+        from patients.js_test_utils import run_node
+        liste = json.dumps({
+            'vaktliste': {'id': 1, 'vakt_navn': 'Vakta',
+                          'status_navn': 'Planlegging', 'i_drift': False},
+            'grupper': [{'id': 1, 'navn': 'Lag', 'ikon': 'people'}],
+            'ressurser': [{'id': 1, 'navn': 'Lag 1', 'gruppe_id': 1,
+                           'korps_id': ressurs_korps}],
+            # **`korps_id` må stå her.** `kanRoreRad()` leser personens korps
+            # på en fylt rad, og uten feltet er raden uredigerbar for alle
+            # unntatt `skriv_full` — da tegnes cellene som tekst uansett, og
+            # en test av *hvem som får felter* måler ingenting. Funnet ved
+            # mutasjonstesting 15. sep. 2026.
+            'vaktposter': [{'id': 9, 'ressurs_id': 1, 'mannskap_id': 5,
+                            'navn': 'Kari', 'korps_navn': 'HGSD',
+                            'korps_id': 1,
+                            'korps_kort': 'HGSD', 'rolle': '',
+                            'fra_tid': '2026-10-03T08:00:00Z',
+                            'til_tid': '2026-10-03T16:00:00Z'}],
+            'mannskap': [], 'roller': [], 'korps': [], 'enheter': [],
+        })
+        return run_node(self.harness, (
+            "globalThis.ressursApen = new Map();\n"
+            f"globalThis.window = {{ MODUL_TILGANG: {{ vaktliste: '{nivaa}', "
+            "admin: false } };\n"
+            f"globalThis.window.MITT_KORPS_ID = {mitt_korps};\n"
+            "globalThis.DAGER = ['søn','man','tir','ons','tor','fre','lør'];\n"
+            "globalThis.MND = ['jan','feb','mar','apr','mai','jun',"
+            "'jul','aug','sep','okt','nov','des'];\n"
+            "globalThis.utskriftDag = null; globalThis.korpsfilter = null;\n"
+            f"globalThis.aktivListe = {liste};\n"
+            "console.log(mkRessurs(aktivListe.ressurser[0]));\n"))
+
+    def test_korpsforeren_far_ingen_opprett_vakt_knapp(self):
+        self.assertNotIn('Opprett vakt', self._tegn('skriv_handling'))
+
+    def test_vaktlederen_far_den(self):
+        """Den andre retningen: gates det for hardt, mister lederen knappen."""
+        self.assertIn('Opprett vakt', self._tegn('skriv_full'))
+
+    def test_tidene_staar_som_tekst_for_korpsforeren(self):
+        """Et felt man kan skrive i og ikke lagre er verre enn en tekst: det
+        ser ut som om endringen gikk igjennom."""
+        ut = self._tegn('skriv_handling')
+        self.assertNotIn('datetime-local', ut)
+        self.assertIn('10:00', ut, 'tiden skal fortsatt kunne leses')
+        self.assertNotIn('data-felt="merknad"', ut, 'merknaden er oppsett')
+
+    def test_raden_er_hennes_selv_om_tidene_ikke_er_det(self):
+        """Sperrehake mot testen over. Er raden uredigerbar av en helt annen
+        grunn — feil korps i fikstureringen — tegnes cellene som tekst
+        uansett, og «ingen tidsfelter» måler ingenting."""
+        ut = self._tegn('skriv_handling')
+        self.assertIn('apneRedigerVaktpost', ut,
+                      'hun skal komme til raden for å bytte person')
+
+    def test_tidene_er_felter_for_vaktlederen(self):
+        self.assertIn('datetime-local', self._tegn('skriv_full'))
+
+    def test_hun_kommer_til_rediger_for_aa_endre_navnet(self):
+        """Navnet er det ene hun får rette på ressursen, så vinduet må åpnes."""
+        self.assertIn('apneRessurs', self._tegn('skriv_handling'))
+
+    def test_men_ikke_paa_et_annet_korps_sin_ressurs(self):
+        self.assertNotIn('apneRessurs',
+                         self._tegn('skriv_handling', ressurs_korps=2))
+
+
+class VinduetSenderBareDetHunFaarSetteTests(SimpleTestCase):
+    """Kallstedet, ikke bare funksjonen (15. sep. 2026).
+
+    `bareTillatteFelter()` er prøvd for seg i `SkiftetsOppsettfelterTests`. Det
+    er ikke nok: **fjernes kallet fra `lagreVaktpost()`, går de testene
+    fortsatt grønt** — og da sender vinduet tidene, serveren avviser hele
+    innsendingen, og korps-føreren får 403 på et personbytte hun har lov til.
+    Mutasjonstesting fant nøyaktig det, på begge vinduene.
+
+    Regelen fra mutasjonsbolken i `CLAUDE.md`, ordrett: muter kallstedet, ikke
+    bare funksjonen, og la minst én test gå gjennom den ekte inngangen.
+    """
+
+    def setUp(self):
+        from patients.js_test_utils import (
+            VAKTLISTE_JS, build_harness, node_available)
+        if not node_available():
+            self.skipTest('node er ikke tilgjengelig')
+        self.harness = build_harness((
+            (VAKTLISTE_JS, ('lagreVaktpost', 'lagreRessurs', '_tidFraFelt',
+                            '_korpsKropp', 'bareTillatteFelter',
+                            'kanSetteOppSkift', 'kanSkriveAlt', 'kanLede',
+                            '_nivaa', '_erAdmin')),
+        ))
+
+    #: Den minste DOM-en de to funksjonene faktisk rører. Feltene svarer med
+    #: en verdi hver, så et felt som *ikke* skal sendes likevel har noe å sende
+    #: — ellers ville testen gått grønn fordi feltet var tomt.
+    STUBB = """
+        const felter = {
+          'vaktpost-mannskap': '5', 'vaktpost-rolle': '2',
+          'vaktpost-korps': '9', 'vaktpost-merknad': 'noe',
+          'vaktpost-fra': '2026-10-03T08:00', 'vaktpost-til': '2026-10-03T16:00',
+          'vaktpost-probono': 'x',
+          'ressurs-navn': 'Sola 56', 'ressurs-gruppe': '3',
+          'ressurs-korps': '4', 'ressurs-enhet': '5',
+          'vaktpostModal': '', 'ressursModal': '',
+        };
+        globalThis.sendt = null;
+        globalThis.document = { getElementById: (id) => {
+          if (id === 'vaktpostModal') return { dataset: { vaktpost: '9' } };
+          if (id === 'ressursModal') return { dataset: { ressurs: '1' } };
+          if (!(id in felter)) return null;
+          return { value: felter[id], checked: true };
+        } };
+        globalThis.withSubmitGuard = async (id, fn) => fn();
+        globalThis.apiFetch = async (url, opts) => {
+          globalThis.sendt = JSON.parse(opts.body);
+          return { ok: true, json: async () => ({ status: 'ok' }) };
+        };
+        globalThis._skjulFeil = () => {};
+        globalThis._visFeil = (id, m) => { globalThis.feil = m; };
+        globalThis._lukkModal = () => {};
+        globalThis.lastListe = async () => {};
+        globalThis.aktivListe = { vaktliste: { id: 1 } };
+    """
+
+    def _kjor(self, nivaa, kall):
+        from patients.js_test_utils import VAKTLISTE_JS, read_js, run_node
+        # Konstantene følger ikke med `build_harness`, som klipper ut
+        # funksjoner. De leses ut av kilden — altså verdiene nettleseren ville
+        # brukt, ikke et sett skrevet av for hånd i testen.
+        kilde = read_js(VAKTLISTE_JS)
+        konstanter = ''.join(
+            'const %s = %s;\n' % (navn, re.search(navn + r'\s*=\s*(\[[^\]]*\])',
+                                                  kilde).group(1))
+            for navn in ('SKIFT_OPPSETTFELTER', 'RESSURS_OPPSETTFELTER'))
+        return run_node(self.harness, (
+            f"globalThis.window = {{ MODUL_TILGANG: {{ vaktliste: '{nivaa}', "
+            "admin: false } };\n" + konstanter + self.STUBB
+            + f"await {kall};\nconsole.log(JSON.stringify(sendt));\n"))
+
+    def _sendt(self, nivaa, kall):
+        """Kroppen vinduet faktisk la i forespørselen.
+
+        Linja som *er* JSON, ikke hele utskriften: harness-en skriver «OK» til
+        slutt, og en test som `json.loads`-er alt feiler på noe som ikke er det
+        den måler.
+        """
+        for linje in self._kjor(nivaa, kall).splitlines():
+            if linje.startswith('{'):
+                return json.loads(linje)
+        self.fail('vinduet sendte ingen forespørsel')
+
+    def test_skiftvinduet_sender_bare_hvem_og_rolle(self):
+        sendt = self._sendt('skriv_handling', 'lagreVaktpost()')
+        self.assertEqual(sorted(sendt), ['mannskap_id', 'rolle_id'], sendt)
+
+    def test_skiftvinduet_sender_alt_for_vaktlederen(self):
+        sendt = self._sendt('skriv_full', 'lagreVaktpost()')
+        for felt in ('fra_tid', 'til_tid', 'merknad', 'probono'):
+            self.assertIn(felt, sendt)
+
+    def test_ressursvinduet_sender_bare_navnet(self):
+        sendt = self._sendt('skriv_handling', 'lagreRessurs()')
+        self.assertEqual(list(sendt), ['navn'], sendt)
+
+    def test_ressursvinduet_sender_alt_for_lederen(self):
+        sendt = self._sendt('skriv_leder', 'lagreRessurs()')
+        for felt in ('navn', 'gruppe_id', 'korps_id', 'enhet_id'):
+            self.assertIn(felt, sendt)
