@@ -246,6 +246,18 @@ function tegnFaner() {
     antall: belastning ? belastning.sammendrag.personer : null,
   });
 
+  // **Planleggeren, for dem som setter opp vakta.** Den står etter
+  // «Planlegging» fordi rekkefølgen i fanerekka er den man arbeider i:
+  // først lager man grunnlaget, så ser man hva det koster. At den er sist av
+  // de to er altså ikke en rangering — det er at man kommer tilbake til
+  // tallene oftere enn til generatoren.
+  if (kanPlanlegge()) {
+    faner.push({
+      id: PLANLEGGER, navn: 'Planlegger', ikon: 'magic',
+      antall: null,
+    });
+  }
+
   // **«Tilstede nå» finnes bare i drift.** I planlegging er den tom per
   // definisjon — ingen er stemplet — og en fane som alltid sier null er en
   // fane man slutter å se.
@@ -318,6 +330,7 @@ function tegnPanel() {
 
   if (aktivFane === OVERSIKT) { el.innerHTML = mkOversikt(); return; }
   if (aktivFane === BELASTNING) { el.innerHTML = mkBelastning(); return; }
+  if (aktivFane === PLANLEGGER) { el.innerHTML = mkPlanlegger(); return; }
   if (aktivFane === TILSTEDE) { el.innerHTML = mkTilstede(); return; }
   if (aktivFane === IKKE_PLASSERT) { el.innerHTML = mkIkkePlassert(); return; }
   if (aktivFane === MITT_KORPS) { el.innerHTML = mkMittKorps(); return; }

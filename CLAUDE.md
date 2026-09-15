@@ -921,15 +921,19 @@ Oppdragsmodulen importerer **ikke** vaktlista; `oppdrag-sentral.js` henter
 regner ut timer, skift, lengste skift, korteste hvile og **overlapp** per person;
 `Belastningsgrenser` (én rad) bærer grensene varslene måles mot.
 
-**Vaktas budsjett står øverst i samme fane** (15. sep. 2026,
+**Vaktas budsjett står øverst i «Planlegger»** (15. sep. 2026,
 `docs/FORSLAG_PLANLEGGERFANE.md` steg 2–3): `services.planleggingstall()` gir
 `satt_opp`, `bemannet` og `probono` **side om side**, fordi hvert av dem alene lyver litt
 — ingen betaler for en tom plass, og «bemannet» står på null når lista er halvt satt opp.
 Avstanden mellom de to første er arbeidslista. `Vaktliste.timetak` er **denne** vaktas
 budsjett (`Belastningsgrenser` er organisasjonens og gjelder alle), `igjen` måles mot
 **satt opp** og ikke mot bemannet, og `_dagbolker()` bryter ned per dag uten egne tak.
-Fanen ble **ikke** ny: den heter allerede «Planlegging», og «Planlegger» ved siden av
-hadde skilt seg fra den med én bokstav.
+
+**Linja sto først i «Planlegging», og ble flyttet samme dag.** Jeg leste «en planlegger»
+som «planleggingstall» og la budsjettet i belastningsfanen; André: «Jeg ba om en
+planlegger … Den skal bare admin og leder ha tilgang til. For den genererer grunnlaget på
+alt.» Det er to ulike ting: **«Planlegging» er lista regnet sammen** (`les`, hva den
+koster dem som står der), **«Planlegger» er stedet grunnlaget lages** (`kan_lede`).
 
 - **Taket settes i `vaktliste_detalj_view`s PUT, sammen med start og planlagt slutt, og
   er derfor `skriv_leder`** — ikke `skriv_full`. Rekkevidden er den samme (hele vakta,
@@ -1008,6 +1012,31 @@ begge veier og rører ingen stempler.
 - **Klienten har én `data-action` per overgang**, ikke én generisk:
   klikkdelegeringen i `portal-utils.js` sender ett argument. `STEMPLINGER` i
   `vaktliste.js` og i `services.py` holdes like av `StemplingsnavnTests`.
+
+**Planleggeren lager grunnlaget for vaktlista** (15. sep. 2026, `services.generer_grunnlag`,
+`POST api/vaktlister/<pk>/generer/`, `kan_lede`). Du sier «tre firemannslag 14–22, én
+ambulanse 15–03, én på åttetimers rotasjon», og etterpå finnes ressursene og de tomme
+plassene — klare til å fordeles og spisses i fanene som alt virker.
+
+| Regel | Hvorfor |
+|---|---|
+| **Ressursen er subjektet, skiftvinduene hører til den** | Sola 56 har to adskilte 12-timersvakter (fre./lør. 15–03). Var linja vinduet, hadde hun blitt to ulike biler |
+| **`skiftlengde` er det ene feltet som skiller formene** | Tom = ett skift som dekker vinduet; et tall deler vinduet rygg mot rygg. Haugesund 56 går kontinuerlig fre. 14 → søn. 14 med 8 |
+| **Siste bolk kortes av, den strekkes ikke** | 20 t i åttetimersskift er 8 + 8 + 4. Et skift som varer lenger enn vakta ville dukket opp som et brudd på skiftlengdegrensa uten at noen satte det opp |
+| **Plassene fødes som planlagt kladd** | `er_planlagt()` — usynlig for korpsene til lederen deler dem ut. Samme grunn som at `kopier_oppsett` aldri tar personene |
+| **`erstatt_kladd` rører bare kladden** | Korpsreserverte, `alle_korps` og **alle** bemannede står. Reservasjonen leses av `reservert_korps()`, ikke av feltet — ellers slettes en hel bils plasser fordi ressursen bærer korpset |
+| **Ingen `bulk_create`, alt i én `transaction.atomic()`** | Signalene, og: `erstatt_kladd` sletter før den skriver, så en feil halvveis ville etterlatt lista tommere enn før man trykket |
+| **`?forhaandsvis` regnes av samme kode** | Samme endepunkt, `_planlegg` + `_sammendrag`. En forhåndsvisning som regner på egen hånd viser før eller siden noe annet enn det som skjer |
+
+**Feltet heter «plasser per skift», ikke «antall folk».** André beskriver Haugesund 56 som
+«4 stk fordelt på 2 lag»; bilen har to seter, og de fire er bemanningspoolen. Regnestykket
+står under raden — «2 plasser × 6 skift = 12 plasser, 96 t» — nettopp for at den
+oversettelsen skal være synlig før man trykker.
+
+**Klientens tall er et anslag, serverens er fasit.** `_planleggerSkift()` speiler
+`_vinduets_skift()` for å tegne regnestykket mens man skriver; `apneGenerer()` henter
+serverens forhåndsvisning før bekreftelsen. `PlanleggerfanenTests` måler at de to sier det
+samme på Andrés egne eksempler.
 
 ### Statistikk-modulen (statistikk/)
 

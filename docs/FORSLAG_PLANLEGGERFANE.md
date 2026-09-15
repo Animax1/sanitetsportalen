@@ -368,6 +368,65 @@ som er en dårligere beskjed enn ingen beskjed. Hennes egne timer står i «Mitt
 Merk at `skriv_handling` og oppover **ser** alle korps (12. sep. 2026), så for
 korps-føreren er summen ikke ny opplysning — hun får linja.
 
+### 15. Planleggeren er en egen fane, og den lager grunnlaget
+
+*André, 15. sep. 2026, etter å ha sett steg 2 på staging:*
+
+> «Litt usikker på om vi har skjønt hverandre. Du har lagt det inn i «planlegging»-fanen.
+> Jeg ba om en **planlegger**. Den skal bare admin og leder ha tilgang til. For den
+> genererer grunnlaget på alt. Vi skal kunne legge inn skift f.eks. tre firemanns lag fra
+> kl. 14–22 og en ambulanse fra 15–03 mens en ambulanse går 8 timer rotasjon. Den skal
+> sette opp planen som lager grunnlaget for vaktlisten. Så skal vi kunne fordele vaktene
+> og etterhvert spisse de inn slik som vi kan gjøre per i dag.»
+
+**Beslutning 12 var feil, og feilen var min.** Hans opprinnelige melding nevnte generering
+først og timetallet sist; dette notatet snudde det, gjorde taket til hovedsaken og
+generatoren til «steg 5, i sin enkleste form». Da budsjettlinja kom på staging, lå den i
+fanen «Planlegging» — som er noe annet:
+
+| Fane | Spørsmål | Hvem |
+|---|---|---|
+| **Planlegging** | Hva koster lista dem som står i den? | `les` |
+| **Planlegger** | Hva skal lista bestå av? | `kan_lede` |
+
+Budsjettlinja og dagslinja er flyttet til «Planlegger»: «sette inn total timer og jobbe
+overordnet» er lederens verktøy, og den som bemanner sitt eget korps har ikke bruk for
+vaktas budsjett. Regnestykket (`planleggingstall`, `_dagbolker`, taket på `Vaktliste`) var
+uavhengig av flata og fulgte med uendret — det var bare plasseringen som var feil.
+
+### 16. Ressursen er subjektet, skiftvinduene hører til den
+
+Andrés to ambulanser har ulik form, og det er formen som bestemmer datamodellen i
+skjemaet:
+
+| Enhet | Oppsett | Blir |
+|---|---|---|
+| **Haugesund 56** | 2 plasser, fre. 14 → søn. 14, skiftlengde 8 | 6 skift × 2 = 12 plasser, 96 t |
+| **Sola 56** | 2 plasser, **to vinduer**: fre. og lør. 15–03 | 2 skift × 2 = 4 plasser, 48 t |
+| **Lagene** | 3 ressurser, 4 plasser, fre. 14–22 | 12 plasser, 96 t |
+
+Sola 56 er grunnen. Hennes to vakter er **adskilte** — det er ikke en periode som deles,
+og det er ikke to biler. Var raden i skjemaet et skiftvindu framfor en ressurs, hadde hun
+blitt «Ambulanse 1» og «Ambulanse 2».
+
+**`skiftlengde` er det ene feltet som skiller de to formene.** Tom betyr ett skift som
+dekker vinduet; et tall deler vinduet i bolker rygg mot rygg. Ett felt med to betydninger
+er her enklere enn to kontroller som utelukker hverandre.
+
+**Den siste bolken kortes av, den strekkes ikke.** 20 timer i åttetimersskift er 8 + 8 + 4.
+Et skift som varer lenger enn vakta er noe ingen har bedt om — og det ville dukket opp som
+et brudd på skiftlengdegrensa uten at noen satte det opp.
+
+### 17. «Plasser per skift», ikke «antall folk»
+
+André beskriver Haugesund 56 som «4 stk fordelt på 2 lag som går 8 timer på og 8 timer av».
+Modellen trenger **2** — bilen har to seter, og de fire er bemanningspoolen som fyller
+tolv skiftplasser over 48 timer.
+
+Feltet heter derfor «plasser per skift», og **regnestykket står under raden**: «2 plasser ×
+6 skift = 12 plasser, 96 t». Oversettelsen fra hvordan man snakker om bemanning til hva
+modellen lagrer skal være synlig før man trykker, ikke etterpå.
+
 ---
 
 ## 7. Anbefalt rekkefølge
@@ -383,8 +442,13 @@ korps-føreren er summen ikke ny opplysning — hun får linja.
    *De to ble gjort i samme omgang med vilje: en «budsjettlinje» uten et budsjett er
    halve funksjonen, og taket er ett felt pluss én linje i `kopier_oppsett`. Å dele dem
    ville betydd å bygge linja to ganger.*
-4. **Bildet av vakta** — kurvene ved siden av hverandre over felles spenn.
-5. **Generatoren til slutt**, i sin enkleste form: N tomme plasser, fra–til, rolle
-   (beslutning 3), født som kladd (10), og med erstatningsregelen fra beslutning 4 og 11:
-   den rører bare det `er_planlagt()` kaller kladd. Den kan bli smartere senere; den kan
-   ikke bli mindre farlig.
+4. ✅ **Planleggeren** *(gjort 15. sep. 2026 — flyttet fram fra steg 5)*. Egen fane bak
+   `kan_lede`, `services.generer_grunnlag`, `POST …/generer/` med `?forhaandsvis`.
+   Beslutning 3, 4, 10, 11, 15, 16 og 17 landet her.
+
+   *Rekkefølgen ble snudd med vilje: notatet hadde generatoren sist, «i sin enkleste
+   form». Den er ikke en fotnote til budsjettlinja — den er funksjonen André bestilte,
+   og budsjettlinja er et verktøy inne i den.*
+5. **Bildet av vakta** — kurvene ved siden av hverandre over felles spenn. Står igjen, og
+   er verdt å vurdere på nytt nå: verdien var «se hull og topper mens du legger inn», og
+   det er først med generatoren på plass at man vet hva man vil se etter.

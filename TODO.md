@@ -522,26 +522,44 @@ byggingen: budsjettlinja bor i fanen **«Planlegging»** som alt finnes; taket e
 **`skriv_leder`**; og budsjettallene sendes **bare til den som ser alle korps**, fordi de er
 hele vaktas og ellers ville vært et aggregat over skift man ikke får se.
 
-Rekkefølgen under er notatets §7. **Steg 1–3 er gjort** (15. sep. 2026); kurvene og
-generatoren står igjen.
+Rekkefølgen under er notatets §7. **Steg 1–4 er gjort** (15. sep. 2026); bare kurvene
+side om side står igjen.
+
+**Rekkefølgen ble snudd underveis.** Notatet hadde generatoren sist, «i sin enkleste
+form» — men den er ikke en fotnote til budsjettlinja, den er funksjonen som ble bestilt.
+Se beslutning 15–17 i notatet.
 
 - [x] **Løs overlapp-punktet under først.** Gjort 15. sep. 2026 — se CHANGELOG.
 - [x] **Budsjettlinja og dagslinja** (15. sep. 2026). Står øverst i fanen
-      «Planlegging», over «Per person» — ikke i en ny fane ved siden av den, som ville
-      hett «Planlegger» og skilt seg fra den med én bokstav (beslutning 12).
-      Se CHANGELOG.
+      **«Planlegger»**. Lå først i «Planlegging»; André: «Jeg ba om en planlegger …
+      Den skal bare admin og leder ha tilgang til.» De to fanene svarer på ulike
+      spørsmål — «Planlegging» er hva lista koster dem som står i den (`les`),
+      «Planlegger» er hva lista skal bestå av (`kan_lede`). Beslutning 15.
 - [x] **Taket som felt på `Vaktliste`**, kopiert av `kopier_oppsett`. Satt med
       **`skriv_leder`**, ikke `skriv_full` som notatet først skisserte: det settes i samme
       PUT som vaktas spenn, og én forespørsel kan ikke ha to tilgangsnivåer inni seg
       (beslutning 13). Gjort samtidig med punktet over — en «budsjettlinje» uten et
       budsjett er halve funksjonen.
+- [x] **Planleggeren** (15. sep. 2026) — **flyttet fram fra sist**. Egen fane bak
+      `kan_lede`, `services.generer_grunnlag`, `POST …/generer/` med `?forhaandsvis`.
+      Én rad per ressurs med ett eller flere skiftvinduer; `skiftlengde` tom = ett skift,
+      et tall = del vinduet rygg mot rygg. Plassene fødes som **planlagt kladd**, og
+      `erstatt_kladd` rører bare det `services.er_planlagt()` kaller kladd. Se CHANGELOG.
 - [ ] **Bildet av vakta:** bemanningskurvene per gruppe ved siden av hverandre over
       `_vaktensSpenn()`, så hull og topper er synlige mens man legger inn.
-- [ ] **Generatoren til slutt**, i sin enkleste form: N **tomme** plasser, fra–til, rolle,
-      født som **planlagt kladd**. Ved ny generering erstattes bare det
-      `services.er_planlagt()` kaller kladd — plasser reservert til et korps, plasser åpne
-      for alle (`alle_korps`) og **alle** bemannede beholdes. **Ingen `bulk_create`** — den
-      hopper over auditsignalene; `kopier_oppsett` gikk i den fella.
+      **Verdt å vurdere på nytt:** kurvene finnes alt per gruppefane, og verdien var «se
+      hull og topper mens du legger inn» — det er først nå, med generatoren på plass, man
+      vet hva man vil se etter.
+- [ ] **XSS-skanneren ser bare `${…}` inne i template-literaler, ikke `+`-konkatenering.**
+      Funnet 15. sep. 2026 mens planleggerbyggerne ble registrert: `mkPlanlegger()` og
+      `mkBelastning()` avslutter begge med `hode + \`…\` + linjer + tomt`, og de
+      konkatenerte leddene går forbi `REVIEWED_INTERPOLATIONS` uten et ord. Verdiene der
+      er lokalt bygget markup i begge tilfeller, så det er ikke et hull i dag — men
+      regelen dekker mindre enn den ser ut til å gjøre, og det er nøyaktig sorten feil
+      `accounts/decorators.py` hadde (en test som bare dekket halve syntaksen, grønn i et
+      år). Utvid skanneren til å følge `+`-uttrykk, eller skriv byggerne om til ett
+      template-literal.
+
 - [ ] **Skriv midnattsregelen inn i `docs/FORSLAG_RAPPORTMODUL.md` §2.2 også.** Den står i
       `CLAUDE.md` for `_dagnokkel()` og i planleggernotatets §3.3; rapportmodulen er det
       tredje stedet noen leser den, og den som leser bare der må se at forskjellen er

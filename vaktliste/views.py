@@ -742,6 +742,97 @@ def besetning_view(request, pk):
                  status=404)
 
 
+# ── Planleggeren (15. sep. 2026) ─────────────────────────────────────────────
+
+
+def _planleggerlinjer(data):
+    """Oppsettet fra klienten, med tidene lest og validert.
+
+    Formen er **ressurs → vinduer**, ikke en flat liste linjer: Sola 56 har to
+    adskilte 12-timersvakter, og var linja enheten og ikke ressursen, ville
+    hun blitt til to ulike biler.
+    """
+    linjer = data.get('linjer')
+    if not isinstance(linjer, list):
+        raise services.Planleggerfeil('Oppsettet mangler.')
+    ut = []
+    for raa in linjer:
+        if not isinstance(raa, dict):
+            raise services.Planleggerfeil('Ugyldig linje i oppsettet.')
+        vinduer = raa.get('vinduer')
+        if not isinstance(vinduer, list) or not vinduer:
+            raise services.Planleggerfeil(
+                'Hver ressurs må ha minst ett skiftvindu.')
+        lest = []
+        for vindu in vinduer:
+            if not isinstance(vindu, dict):
+                raise services.Planleggerfeil('Ugyldig skiftvindu.')
+            fra, til = _tid(vindu.get('fra')), _tid(vindu.get('til'))
+            if fra is None or til is None:
+                raise services.Planleggerfeil(
+                    'Skiftvinduet mangler fra- eller til-tidspunkt.')
+            # **Tom skiftlengde er ett skift, ikke null timer.** Feltet står
+            # tomt for Sola 56, som går 15–03 i ett strekk.
+            raa_lengde = vindu.get('skiftlengde')
+            if raa_lengde in (None, ''):
+                lengde = None
+            else:
+                try:
+                    lengde = float(raa_lengde)
+                except (TypeError, ValueError):
+                    raise services.Planleggerfeil(
+                        'Skiftlengden må være et antall timer.')
+            lest.append({'fra': fra, 'til': til, 'skiftlengde': lengde})
+        ut.append({
+            'gruppe_id': _int(raa.get('gruppe_id')),
+            'antall': _int(raa.get('antall')) or 1,
+            'plasser': _int(raa.get('plasser')) or 1,
+            'vinduer': lest,
+        })
+    return ut
+
+
+@never_cache
+@modul_kreves('vaktliste', 'les', svar='json')
+@require_http_methods(['POST'])
+@rate_limit(group='vaktliste:generer', rate='30/m', method='POST')
+def generer_view(request, pk):
+    """Lag grunnlaget for vaktlista: ressursene og de tomme plassene.
+
+    **`skriv_leder` og global admin** (André, 15. sep. 2026: «Den skal bare
+    admin og leder ha tilgang til. For den genererer grunnlaget på alt»). Det
+    er samme terskel som resten av vaktas rammer — spennet, taket — og av
+    samme grunn: dette gjelder hele lista, ikke ett korps' del av den.
+
+    **`?forhaandsvis=1` skriver ingenting.** Klienten viser hva oppsettet vil
+    lage før knappen trykkes, og svaret regnes av nøyaktig samme kode. En
+    generator man må kontrollere etterpå er ikke raskere enn å skrive radene.
+
+    `erstatt_kladd` rører bare det `services.er_planlagt()` kaller kladd —
+    plasser som er delt ut, til ett korps eller til alle, og alle bemannede,
+    står. Se `generer_grunnlag`.
+    """
+    if not services.kan_lede(request.user):
+        return _nektet()
+
+    try:
+        vl = Vaktliste.objects.select_related('vakt').get(pk=pk)
+    except Vaktliste.DoesNotExist:
+        return _feil('Vaktliste ikke funnet', status=404)
+
+    data = _json_body(request)
+    try:
+        linjer = _planleggerlinjer(data)
+        if data.get('forhaandsvis'):
+            svar = services.forhaandsvis_grunnlag(vl, linjer)
+        else:
+            svar = services.generer_grunnlag(
+                vl, linjer, erstatt_kladd=bool(data.get('erstatt_kladd')))
+    except services.Planleggerfeil as feil:
+        return _feil(str(feil))
+    return JsonResponse({'status': 'ok', 'data': svar})
+
+
 # ── Planleggingstall (fase 5) ────────────────────────────────────────────────
 
 @never_cache

@@ -57,6 +57,12 @@ urlpatterns = [
     # grensene varslene måler mot er organisasjonens og gjelder alle.
     path('api/vaktlister/<int:pk>/belastning/', views.belastning_view,
          name='vaktliste_api_belastning'),
+    # Planleggeren (15. sep. 2026): oppsettet som lager grunnlaget for lista.
+    # `{"forhaandsvis": true}` i kroppen skriver ingenting — det er samme
+    # endepunkt, fordi forhåndsvisningen skal regnes av samme kode som gjør
+    # jobben. Et eget endepunkt ville vært to steder å komme i utakt.
+    path('api/vaktlister/<int:pk>/generer/', views.generer_view,
+         name='vaktliste_api_generer'),
     path('api/grenser/', views.grenser_view, name='vaktliste_api_grenser'),
 
     # Drift (fase 4). Retningen og overgangen står i URL-en, ikke i kroppen:

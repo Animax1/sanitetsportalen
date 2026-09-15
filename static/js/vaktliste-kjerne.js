@@ -54,6 +54,13 @@ let korpsfilter = null;
 //: mening da arket var gruppert på ressurs — nå er dagen ytterste nivå, og
 //: «Ambulanse 1» ville vært et snitt på tvers av det arket er bygget rundt.
 let utskriftDag = null;
+//: Planleggerens oppsett: én rad per ressurs, med ett eller flere skiftvinduer.
+//: **Ressursen er subjektet.** Sola 56 har to adskilte 12-timersvakter, og var
+//: raden vinduet, ville hun blitt til to ulike biler.
+let planleggerlinjer = [];
+//: Svaret fra `?forhaandsvis` — hva oppsettet vil lage. Nullstilles ved hver
+//: endring, så et gammelt tall aldri står under et nytt oppsett.
+let planleggerfasit = null;
 let personsok = '';              // fritekstfilter på mannskapstabellen
 let personSortKol = 'korps';     // 'navn' | 'korps' | 'telefon'
 let personSortStigende = true;
@@ -80,6 +87,12 @@ const OVERSIKT = 'oversikt';
 const MANNSKAP = 'mannskap';
 const TILSTEDE = 'tilstede';
 const BELASTNING = 'belastning';
+// **Planleggeren er ikke «Planlegging»** (André, 15. sep. 2026: «Jeg ba om en
+// planlegger … For den genererer grunnlaget på alt»). «Planlegging» er lista
+// regnet sammen — hva den koster dem som står der. Planleggeren er stedet
+// grunnlaget *lages*: ressursene og de tomme plassene, før noen er satt opp.
+// Bare `skriv_leder` og global admin ser den.
+const PLANLEGGER = 'planlegger';
 const IKKE_PLASSERT = 'ikke-plassert';
 // «Mitt korps» (11. sep. 2026): plassene korpset har ansvar for, på tvers
 // av ressursene — sine tildelte, og de som er tildelt alle.
@@ -143,6 +156,14 @@ function kanLede() {
   // vaktlister, endrer vaktas lengde, lager roller og grupper. Speiler
   // `services.kan_lede`.
   return _erAdmin() || _nivaa() === 'skriv_leder';
+}
+
+
+function kanPlanlegge() {
+  // **Samme terskel som å sette vaktas rammer**: `skriv_leder` og global
+  // admin. Planleggeren lager grunnlaget for hele lista, ikke ett korps' del
+  // av den — André: «Den skal bare admin og leder ha tilgang til.»
+  return kanLede();
 }
 
 

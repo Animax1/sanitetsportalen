@@ -1249,6 +1249,54 @@
 .vl-dagtall { display: flex; flex-direction: column; }
 .vl-dagtall b { font-size: 1.15rem; line-height: 1.2; }
 
+/*
+  ── Planleggeren (15. sep. 2026) ────────────────────────────────────────
+
+  Oppsettet er skjemarader, ikke en tabell: hver ressurs har et varierende
+  antall skiftvinduer under seg, og en tabell med sammenslåtte celler leses
+  dårligere enn kort som brytes.
+
+  Feltene ligger i `<label>`-er med `flex-direction: column`, så etiketten
+  står over feltet og raden brytes ved smal skjerm framfor å klemme
+  `datetime-local`-feltene under gulvbredden nettleseren gir dem — samme
+  problem som `RessurstabellensBreddeTests` vokter i ressurstabellen.
+*/
+.vl-pl-topp,
+.vl-pl-bunn,
+.vl-pl-vindu {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.vl-pl-topp { margin-bottom: 0.75rem; }
+.vl-pl-bunn { margin-top: 0.75rem; align-items: center; }
+
+.vl-pl-topp label,
+.vl-pl-vindu label { display: flex; flex-direction: column; gap: 0.15rem; }
+
+/* Tidsfeltene trenger gulvbredden si; tallfeltene skal ikke ta den. */
+.vl-pl-vindu input[type="datetime-local"] { min-width: 13rem; }
+.vl-pl-topp input[type="number"],
+.vl-pl-vindu input[type="number"] { max-width: 9rem; }
+.vl-pl-topp select { min-width: 10rem; }
+
+.vl-pl-spacer { flex-grow: 1; }
+
+/* Vinduene rykkes inn, så det er synlig at de hører til ressursen over. */
+.vl-pl-vinduer {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding-left: 0.75rem;
+  border-left: 2px solid var(--border-color, rgba(255, 255, 255, 0.12));
+}
+
+/* Regnestykket er poenget med raden, så det tåler å være litt tyngre. */
+.vl-pl-regnestykke { font-weight: 600; }
+.vl-pl-vindutall { white-space: nowrap; }
+
 @media print {
   .vl-varselantall, .vl-advarsel { color: #000 !important; }
   .vl-advarsel::after { content: ' (!)'; }

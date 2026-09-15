@@ -21,7 +21,7 @@ HTML_BUILDERS = (
     'fyllVelger',
     'mkRolleRad',
     '_fyll',
-    'tegnFaner', '_fanerad', '_mannskapsfane', 'iDrift', '_tilstede',
+    'tegnFaner', 'kanPlanlegge', '_fanerad', '_mannskapsfane', 'iDrift', '_tilstede',
     'mkRessurs', '_planrad', '_plancellene', '_blokklinje', '_dagoverskrift', '_probonoMerke',
     # Dagbolkene i gruppefanen (15. sep. 2026). En ny bygger som skanneren
     # ikke leser er nøyaktig det hullet denne lista finnes for.
@@ -34,6 +34,10 @@ HTML_BUILDERS = (
     # være her, og da var escaping-regelen stille av for dem — suiten var
     # grønn fordi skanneren ikke leste dem, ikke fordi de var riktige.
     'mkBudsjett', 'mkDagslinje', '_budsjettpost',
+    # Planleggeren (15. sep. 2026). En ny bygger som skanneren ikke leser er
+    # nøyaktig det hullet denne lista finnes for — det skjedde for
+    # budsjettlinja samme dag.
+    'mkPlanlegger', '_planleggerLinje', '_planleggerVindu', '_genererFasit',
     'mkTilstede',
     '_rolleValg',
     '_fyllValgFor',
@@ -46,6 +50,10 @@ HTML_BUILDERS = (
 ESCAPING_CALLS = ('escHtmlValue(', 'cellHtml(', '_escHtml(', 'escapeHtml(')
 
 REVIEWED_INTERPOLATIONS = {
+    # Planleggeren (15. sep. 2026).
+    'vinduer': 'markup fra `_planleggerVindu`, som selv skannes her',
+    'fasit': 'markup bygget lokalt: escapet antall skift, eller en fast tekst',
+    'slett': 'markup bygget lokalt, indeksene escapet inni',
     # Budsjettlinja og dagslinja (15. sep. 2026).
     'b': 'markup bygget lokalt i samme funksjon, tallet escapet inni',
     'tak': 'markup fra `_budsjettpost`, som selv skannes her — eller tom streng',
@@ -284,7 +292,7 @@ class VaktlisteEscapingOppforselTests(SimpleTestCase):
                         '_timesteg', '_ressurserIGruppe',
                         '_grupperMedRessurser',
                         '_posterPerGruppe', '_vaktensSpenn',
-                        'mkIkkePlassert', 'tegnFaner', '_fanerad',
+                        'mkIkkePlassert', 'tegnFaner', 'kanPlanlegge', '_fanerad',
                         '_mannskapsfane', '_tilstede', '_posterFor',
                         '_ikkePlassert', '_tidsspenn', '_vaktspenn',
                         '_bemanningPerTime', '_iso16', '_d', '_kl', '_dag',
@@ -394,6 +402,7 @@ class VaktlisteEscapingOppforselTests(SimpleTestCase):
             globalThis.MANNSKAP = 'mannskap';
             globalThis.TILSTEDE = 'tilstede';
             globalThis.BELASTNING = 'belastning';
+            globalThis.PLANLEGGER = 'planlegger';
             globalThis.belastning = null;
             globalThis.register = null;
             globalThis.utskriftDag = null; globalThis.korpsfilter = null;
@@ -421,6 +430,7 @@ class VaktlisteEscapingOppforselTests(SimpleTestCase):
             globalThis.MANNSKAP = 'mannskap';
             globalThis.TILSTEDE = 'tilstede';
             globalThis.BELASTNING = 'belastning';
+            globalThis.PLANLEGGER = 'planlegger';
             globalThis.belastning = null;
             globalThis.register = null;
             globalThis.utskriftDag = null; globalThis.korpsfilter = null;
@@ -1780,7 +1790,7 @@ class NyRessursIFanerekkaTests(SimpleTestCase):
 
     HARNESS = (
         (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue')),
-        (VAKTLISTE_JS, ('tegnFaner', '_fanerad', '_mannskapsfane',
+        (VAKTLISTE_JS, ('tegnFaner', 'kanPlanlegge', '_fanerad', '_mannskapsfane',
                         '_mittKorpsId', '_synligePoster',
                         'iDrift', '_tilstede', '_posterFor',
                         '_ikkePlassert', '_ressurserIGruppe',
@@ -1806,6 +1816,7 @@ class NyRessursIFanerekkaTests(SimpleTestCase):
             "globalThis.MANNSKAP = 'mannskap';\n"
             "globalThis.TILSTEDE = 'tilstede';\n"
             "globalThis.BELASTNING = 'belastning';\n"
+            "globalThis.PLANLEGGER = 'planlegger';\n"
             "globalThis.belastning = null;\n"
             "globalThis.register = null;\n"
             "globalThis.aktivListe = {grupper: [{id: 3, navn: 'Ambulanse',"
@@ -1843,6 +1854,23 @@ class NyRessursIFanerekkaTests(SimpleTestCase):
     def test_leseren_ser_den_ikke(self):
         self.assertNotIn('Ny ressurs', self._tegn('les'))
 
+    def test_planleggerfanen_er_ledernes(self):
+        """André, 15. sep. 2026: «Den skal bare admin og leder ha tilgang
+        til. For den genererer grunnlaget på alt.»
+
+        Mutasjonsprøvd: porten i `tegnFaner()` lot seg fjerne uten at noe ble
+        rødt — ingen test spurte om fanen var *borte* for de andre. En fane
+        som fører til 403 er verre enn ingen fane."""
+        for nivaa in ('les', 'skriv_handling', 'skriv_full'):
+            with self.subTest(nivaa=nivaa):
+                ut = self._tegn(nivaa)
+                self.assertIn('Ambulanse', ut, 'resten av rekka står')
+                self.assertNotIn('Planlegger', ut)
+        for navn, kall in (('skriv_leder', lambda: self._tegn('skriv_leder')),
+                           ('admin', lambda: self._tegn('', admin=True))):
+            with self.subTest(konto=navn):
+                self.assertIn('Planlegger', kall())
+
 
 class FanenErGruppaTests(SimpleTestCase):
     """Fanen er ressursgruppa, ikke den enkelte ressursen.
@@ -1855,7 +1883,7 @@ class FanenErGruppaTests(SimpleTestCase):
 
     HARNESS = (
         (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue')),
-        (VAKTLISTE_JS, ('tegnFaner', '_fanerad', '_mannskapsfane', '_mittKorpsId',
+        (VAKTLISTE_JS, ('tegnFaner', 'kanPlanlegge', '_fanerad', '_mannskapsfane', '_mittKorpsId',
                         '_synligePoster', 'iDrift', '_tilstede', 'mkGruppe', '_gruppedagbolker', '_grupperPaaDag', 'ressursErApen',
                         'mkRessurs', '_sumTimer', '_radklasse', '_stempelknapper', 'kanStemple',
                         '_rolleValg', '_skiftrekkefolge', '_fyllValgFor', 'opptattPaaPlassen',
@@ -1885,6 +1913,7 @@ class FanenErGruppaTests(SimpleTestCase):
             "globalThis.MANNSKAP = 'mannskap';\n"
             "globalThis.TILSTEDE = 'tilstede';\n"
             "globalThis.BELASTNING = 'belastning';\n"
+            "globalThis.PLANLEGGER = 'planlegger';\n"
             "globalThis.belastning = null;\n"
             "globalThis.register = null;\n")
 
@@ -2688,11 +2717,15 @@ class MannskapsfanenTests(SimpleTestCase):
              "globalThis.MANNSKAP = 'mannskap';\n"
              "globalThis.TILSTEDE = 'tilstede';\n"
              "globalThis.BELASTNING = 'belastning';\n"
+             "globalThis.PLANLEGGER = 'planlegger';\n"
+            "globalThis.PLANLEGGER = 'planlegger';\n"
              "globalThis.belastning = null;\n"
             "globalThis.BELASTNING = 'belastning';\n"
+            "globalThis.PLANLEGGER = 'planlegger';\n"
             "globalThis.belastning = null;\n"
             "globalThis.TILSTEDE = 'tilstede';\n"
             "globalThis.BELASTNING = 'belastning';\n"
+            "globalThis.PLANLEGGER = 'planlegger';\n"
             "globalThis.belastning = null;\n"
              "globalThis.OVERSIKT = 'oversikt';\n"
              "globalThis.IKKE_PLASSERT = 'ikke-plassert';\n"
@@ -3199,6 +3232,215 @@ class DriftflatenTests(SimpleTestCase):
         self.assertIn('&lt;img', ut)
 
 
+class PlanleggerfanenTests(SimpleTestCase):
+    """Planleggeren: fanen som lager grunnlaget (15. sep. 2026).
+
+    André: «Jeg ba om en planlegger. Den skal bare admin og leder ha tilgang
+    til. For den genererer grunnlaget på alt … tre firemanns lag fra kl. 14–22
+    og en ambulanse fra 15–03 mens en ambulanse går 8 timer rotasjon.»
+
+    **Klientens tall er et anslag, serverens er fasit.** Regnestykket under
+    hver rad tegnes mens man skriver; `apneGenerer()` henter serverens
+    forhåndsvisning før bekreftelsen. Testene her måler at anslaget stemmer
+    med serveren på Andrés egne eksempler — kommer de i utakt, er det her det
+    skal vises.
+    """
+
+    HARNESS = (
+        (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue')),
+        (VAKTLISTE_JS, ('mkPlanlegger', '_planleggerLinje', '_planleggerVindu',
+                        '_planleggerSkift', '_planleggerLinjetall',
+                        '_planleggerRegnestykke', 'planleggerTotal',
+                        'mkBudsjett', 'mkDagslinje', '_budsjettpost',
+                        '_dagtekst', '_d', '_iso16', '_tall', 'kanSetteTak',
+                        'kanPlanlegge', 'kanLede', '_nivaa', '_erAdmin')),
+    )
+
+    def setUp(self):
+        if not node_available():
+            self.skipTest('node er ikke tilgjengelig')
+        self.harness = build_harness(self.HARNESS)
+
+    LAG = 1
+    AMBULANSE = 2
+
+    def _vis(self, linjer, *, leder=True):
+        import json
+        vindu = ("globalThis.window = { MODUL_TILGANG: "
+                 + ("{ vaktliste: 'skriv_leder', admin: false }" if leder
+                    else "{ vaktliste: 'skriv_full', admin: false }")
+                 + " };\n")
+        liste = {
+            'vaktliste': {'id': 1, 'startet': '2026-10-02T12:00:00+02:00',
+                          'timetak': None},
+            'grupper': [{'id': self.LAG, 'navn': 'Lag'},
+                        {'id': self.AMBULANSE, 'navn': 'Ambulanse'}],
+        }
+        return run_node(self.harness, vindu + f"""
+            globalThis.aktivListe = {json.dumps(liste)};
+            globalThis.belastning = null;
+            globalThis.planleggerlinjer = {json.dumps(linjer)};
+            console.log(mkPlanlegger());
+        """)
+
+    def _linje(self, gruppe, antall, plasser, *vinduer):
+        return {'gruppe_id': gruppe, 'antall': antall, 'plasser': plasser,
+                'vinduer': [{'fra': f, 'til': t, 'skiftlengde': s}
+                            for f, t, s in vinduer]}
+
+    # Andrés tre eksempler, som ISO-tider i norsk sommertid.
+    FRE14 = '2026-10-02T14:00:00+02:00'
+    FRE15 = '2026-10-02T15:00:00+02:00'
+    FRE22 = '2026-10-02T22:00:00+02:00'
+    LOR03 = '2026-10-03T03:00:00+02:00'
+    LOR15 = '2026-10-03T15:00:00+02:00'
+    SON03 = '2026-10-04T03:00:00+02:00'
+    SON14 = '2026-10-04T14:00:00+02:00'
+
+    def test_bare_leder_og_admin_ser_fanen(self):
+        """`skriv_full` bemanner; planleggeren lager grunnlaget for hele
+        lista, og det er lederens bord."""
+        ut = self._vis([], leder=False)
+        self.assertIn('for vaktledere og administratorer', ut)
+        self.assertNotIn('Legg til ressurs', ut)
+
+    def test_tom_planlegger_sier_hvordan_man_begynner(self):
+        """En tom flate med bare en knapp forteller ikke hva knappen lager."""
+        ut = self._vis([])
+        self.assertIn('Legg til ressurs', ut)
+        self.assertIn('skiftlengde 8', ut)
+
+    def test_tre_firemannslag_gir_tolv_plasser(self):
+        ut = self._vis([self._linje(self.LAG, 3, 4,
+                                    (self.FRE14, self.FRE22, ''))])
+        self.assertIn('12 plasser', ut)
+        self.assertIn('96 t', ut)
+
+    def test_atte_timers_rotasjon_gir_seks_skift(self):
+        """Haugesund 56: fre. 14 → søn. 14 er 48 timer, delt i åtte."""
+        ut = self._vis([self._linje(self.AMBULANSE, 1, 2,
+                                    (self.FRE14, self.SON14, 8))])
+        self.assertIn('6 skift', ut)
+        self.assertIn('12 plasser', ut)
+        self.assertIn('96 t', ut)
+
+    def test_to_adskilte_vinduer_er_en_ressurs(self):
+        """Sola 56. Hadde raden vært vinduet, ville hun blitt to biler —
+        og da hadde tallet sagt to ressurser."""
+        ut = self._vis([self._linje(self.AMBULANSE, 1, 2,
+                                    (self.FRE15, self.LOR03, ''),
+                                    (self.LOR15, self.SON03, ''))])
+        self.assertIn('4 plasser', ut)
+        self.assertIn('48 t', ut)
+        self.assertIn('>1<', ut, 'én ressurs')
+
+    def test_hele_oppsettet_summeres(self):
+        """Alle tre linjene sammen: 5 ressurser, 28 plasser, 240 t — samme
+        tall som `GrunnlagTests.test_hele_oppsettet_i_en_omgang` måler på
+        serversiden. Kommer de to i utakt, er det her det vises."""
+        ut = self._vis([
+            self._linje(self.LAG, 3, 4, (self.FRE14, self.FRE22, '')),
+            self._linje(self.AMBULANSE, 1, 2, (self.FRE14, self.SON14, 8)),
+            self._linje(self.AMBULANSE, 1, 2,
+                        (self.FRE15, self.LOR03, ''),
+                        (self.LOR15, self.SON03, '')),
+        ])
+        # Summen står **nederst**, i kortet med generer-knappen: man leser
+        # radene, og så står totalen der man avslutter. Testen leser derfor
+        # det kortet og ikke hele svaret — «5» og «28» finnes også i
+        # regnestykkene over.
+        sum_kort = ut[ut.rindex('vl-belastningshode'):]
+        self.assertIn('>5<', sum_kort)
+        self.assertIn('>28<', sum_kort)
+        self.assertIn('240 t', sum_kort)
+
+    def test_siste_bolk_telles_med_selv_om_den_er_kort(self):
+        """20 timer i åttetimersskift er 8 + 8 + 4 — tre skift, ikke to.
+
+        Mutasjonsprøvd 15. sep. 2026: `Math.ceil` lot seg bytte mot `floor`
+        uten at noe ble rødt, fordi alle eksemplene mine gikk opp i hele
+        skift (48/8 og 8/8). Serveren har samme prøve
+        (`SkiftvinduTests.test_siste_bolk_kortes_av_den_strekkes_ikke`), og
+        de to skal si det samme."""
+        ut = self._vis([self._linje(
+            self.AMBULANSE, 1, 2,
+            (self.FRE14, '2026-10-03T10:00:00+02:00', 8))])
+        self.assertIn('3 skift', ut)
+        self.assertIn('6 plasser', ut)
+
+    def test_tom_skiftlengde_er_ett_skift_ikke_null(self):
+        """Feltet står tomt for Sola 56, som går 15–03 i ett strekk. En
+        `Number('')` ville gitt null — altså et skift på null timer."""
+        ut = self._vis([self._linje(self.AMBULANSE, 1, 2,
+                                    (self.FRE15, self.LOR03, ''))])
+        self.assertIn('1 skift', ut)
+
+    def test_ugyldig_tidsrom_sier_fra_framfor_aa_vise_null(self):
+        """Et bakvendt vindu skal si hva som er galt, ikke stå med «0
+        plasser» som om det var et svar."""
+        ut = self._vis([self._linje(self.LAG, 1, 4,
+                                    (self.FRE22, self.FRE14, ''))])
+        self.assertIn('ugyldig tidsrom', ut)
+        self.assertNotIn('Lag grunnlaget', ut.split('ugyldig tidsrom')[0])
+
+    def test_regnestykket_viser_leddene_ikke_bare_summen(self):
+        """Den som leser skal kunne se hvilket ledd som er feil når tallet
+        ikke stemmer med det hun tenkte."""
+        ut = self._vis([self._linje(self.LAG, 3, 4,
+                                    (self.FRE14, self.FRE22, ''))])
+        self.assertIn('4 plasser × 1 skift × 3 ressurser', ut)
+
+    def test_antall_paa_en_utelates_fra_regnestykket(self):
+        """«× 1 ressurser» er et ledd som ikke gjør noe, og det er nettopp
+        de leddene som gjør et regnestykke vanskelig å lese."""
+        ut = self._vis([self._linje(self.AMBULANSE, 1, 2,
+                                    (self.FRE14, self.SON14, 8))])
+        self.assertNotIn('ressurser', ut.split('= ')[0].split('plasser ×')[-1])
+
+    def test_genererknappen_staar_bare_naar_det_finnes_et_oppsett(self):
+        self.assertNotIn('apneGenerer', self._vis([]))
+        self.assertIn('apneGenerer', self._vis(
+            [self._linje(self.LAG, 1, 4, (self.FRE14, self.FRE22, ''))]))
+
+    def test_forste_vindu_kan_ikke_fjernes(self):
+        """En ressurs uten skiftvindu er ingenting. Serveren avviser det
+        også, men en knapp som fører til en vegg er verre enn ingen knapp."""
+        ut = self._vis([self._linje(self.LAG, 1, 4,
+                                    (self.FRE14, self.FRE22, ''))])
+        self.assertNotIn('planleggerFjernVindu', ut)
+
+    def test_andre_vindu_kan_fjernes(self):
+        ut = self._vis([self._linje(self.AMBULANSE, 1, 2,
+                                    (self.FRE15, self.LOR03, ''),
+                                    (self.LOR15, self.SON03, ''))])
+        self.assertIn('planleggerFjernVindu', ut)
+
+    def test_budsjettlinja_staar_i_denne_fanen(self):
+        """Flyttet hit fra «Planlegging» 15. sep. 2026: «sette inn total
+        timer og jobbe overordnet» er planleggerens verktøy."""
+        import json
+        liste = {
+            'vaktliste': {'id': 1, 'startet': '2026-10-02T12:00:00+02:00',
+                          'timetak': 400},
+            'grupper': [{'id': self.LAG, 'navn': 'Lag'}],
+        }
+        plan = {'timetak': 400, 'satt_opp': 312.0, 'bemannet': 244.0,
+                'probono': 0.0, 'igjen': 88.0, 'over_taket': False,
+                'dager': []}
+        ut = run_node(self.harness,
+                      "globalThis.window = { MODUL_TILGANG: "
+                      "{ vaktliste: 'skriv_leder', admin: false } };\n"
+                      + f"""
+            globalThis.aktivListe = {json.dumps(liste)};
+            globalThis.belastning = {json.dumps({'planlegging': plan, 'kan_sette_tak': True})};
+            globalThis.planleggerlinjer = [];
+            console.log(mkPlanlegger());
+        """)
+        self.assertIn('satt opp', ut)
+        self.assertLess(ut.index('satt opp'), ut.index('Oppsett'),
+                        'budsjettet står over oppsettet')
+
+
 class PlanleggingsfanenTests(SimpleTestCase):
     """Belastningstabellen (§8b).
 
@@ -3416,9 +3658,15 @@ class PlanleggingsfanenTests(SimpleTestCase):
         ]
         self.assertIn('Satt opp per dag', self._budsjett({'dager': dager}))
 
-    def test_budsjettlinja_staar_over_per_person(self):
-        """Vaktas tall først, den enkeltes under. Motsatt rekkefølge ville
-        begravet totalen under en persontabell som kan bli lang."""
+    def test_budsjettlinja_staar_ikke_i_denne_fanen(self):
+        """**Flyttet til «Planlegger» 15. sep. 2026.** Den sto først her;
+        André: «Jeg ba om en planlegger … Den skal bare admin og leder ha
+        tilgang til.» Vaktas budsjett er lederens verktøy, og denne fanen er
+        `les` — lista regnet sammen, for alle som ser den.
+
+        Testen står igjen som en **motprøve**: kommer linja tilbake hit ved
+        en refaktorering, er den synlig for et nivå den ikke skal være
+        synlig for."""
         import json
         data = {'personer': [self.RAD], 'sammendrag': self.SAM,
                 'planlegging': self.PLAN, 'kan_sette_tak': True,
@@ -3427,7 +3675,8 @@ class PlanleggingsfanenTests(SimpleTestCase):
             globalThis.belastning = {json.dumps(data)};
             console.log(mkBelastning());
         """)
-        self.assertLess(ut.index('satt opp'), ut.index('Per person'))
+        self.assertNotIn('satt opp', ut)
+        self.assertIn('Per person', ut, 'resten av fanen står som før')
 
     def test_overlappskolonnen_staar_ikke_naar_ingen_er_dobbeltbooket(self):
         """Samme regel som Faktisk-kolonnen: i den normale lista er
@@ -3535,6 +3784,7 @@ class PlanleggingsfanenTests(SimpleTestCase):
             globalThis.register = null;
             globalThis.MANNSKAP = 'mannskap';
             globalThis.BELASTNING = 'belastning';
+            globalThis.PLANLEGGER = 'planlegger';
             globalThis.aktivFane = 'oversikt';
             let hentet = 0;
             globalThis.lastBelastning = () => { hentet += 1; };

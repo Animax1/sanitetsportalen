@@ -886,6 +886,39 @@
   De sperrer ingenting. Settes de urimelig høyt, forsvinner varslene — og det
   er en beslutning noen har tatt, ikke en feil portalen skal hindre.
 {% endcomment %}
+<div class="modal fade" id="genererModal" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Lag grunnlaget</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Lukk"></button>
+      </div>
+      <div class="modal-body">
+        <div id="generer-fasit"></div>
+        <div class="form-check mt-3">
+          <input class="form-check-input" type="checkbox" id="generer-erstatt">
+          <label class="form-check-label" for="generer-erstatt">
+            Fjern plasser som fortsatt står som <strong>planlagt</strong> først
+          </label>
+        </div>
+        <div class="form-text">
+          <i class="bi bi-info-circle me-1"></i>Avkryssing rydder bort
+          <strong>bare</strong> tomme plasser som ennå ikke er delt ut. Plasser
+          som er satt av til et korps, plasser som er åpne for alle, og
+          <strong>alle</strong> plasser med navn på, blir stående — også på
+          ressurser denne genereringen ikke rører.
+        </div>
+        <div id="generer-feil" class="text-danger small d-none mt-2"></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Avbryt</button>
+        <button type="button" class="btn btn-primary" id="generer-knapp"
+                data-action="lagreGenerer">Lag grunnlaget</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div class="modal fade" id="timetakModal" tabindex="-1">
   <div class="modal-dialog">
     <div class="modal-content">

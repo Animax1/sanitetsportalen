@@ -4,6 +4,120 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-15 — Planleggeren: fanen som lager grunnlaget
+
+**Meldt fra staging (André):**
+
+> «Litt usikker på om vi har skjønt hverandre. Du har lagt det inn i «planlegging»-fanen.
+> Jeg ba om en **planlegger**. Den skal bare admin og leder ha tilgang til. For den
+> genererer grunnlaget på alt. Vi skal kunne legge inn skift f.eks. tre firemanns lag fra
+> kl. 14–22 og en ambulanse fra 15–03 mens en ambulanse går 8 timer rotasjon.»
+
+### Misforståelsen, og hvor den kom fra
+
+Hans opprinnelige melding nevnte generering først og timetallet sist. Notatet jeg skrev på
+grunnlag av den snudde rekkefølgen: taket ble hovedsaken, og generatoren ble «steg 5, i sin
+enkleste form — N plasser på én ressurs». Det er ikke det han ba om.
+
+**«Planlegging» og «Planlegger» er to ulike fanér med to ulike spørsmål:**
+
+| Fane | Spørsmål | Hvem |
+|---|---|---|
+| Planlegging | Hva koster lista dem som står i den? | `les` |
+| **Planlegger** | Hva skal lista bestå av? | `kan_lede` |
+
+Budsjettlinja og dagslinja er flyttet til «Planlegger» — «sette inn total timer og jobbe
+overordnet» er lederens verktøy. Regnestykket var uavhengig av flata og fulgte med
+uendret; det var bare plasseringen som var feil.
+
+### Ressursen er subjektet, skiftvinduene hører til den
+
+Andrés to ambulanser har ulik form, og Sola 56 bestemte datamodellen i skjemaet:
+
+| Enhet | Oppsett | Blir |
+|---|---|---|
+| Haugesund 56 | 2 plasser, fre. 14 → søn. 14, skiftlengde 8 | 6 skift × 2 = **12 plasser, 96 t** |
+| Sola 56 | 2 plasser, **to vinduer**: fre. og lør. 15–03 | 2 skift × 2 = **4 plasser, 48 t** |
+| Lagene | 3 ressurser, 4 plasser, fre. 14–22 | **12 plasser, 96 t** |
+
+Sola 56 er grunnen: hennes to vakter er **adskilte** — ikke en periode som deles, og ikke
+to biler. Var raden i skjemaet et skiftvindu framfor en ressurs, hadde hun blitt til
+«Ambulanse 1» og «Ambulanse 2».
+
+**`skiftlengde` er det ene feltet som skiller formene.** Tom = ett skift som dekker
+vinduet; et tall deler vinduet rygg mot rygg. Den siste bolken **kortes av, den strekkes
+ikke**: 20 timer i åttetimersskift er 8 + 8 + 4, og et skift som varer lenger enn vakta
+ville dukket opp som et brudd på skiftlengdegrensa uten at noen satte det opp.
+
+### «Plasser per skift», ikke «antall folk»
+
+André beskriver Haugesund 56 som «4 stk fordelt på 2 lag som går 8 på og 8 av». Modellen
+trenger **2** — bilen har to seter, og de fire er bemanningspoolen som fyller tolv
+skiftplasser over 48 timer. Feltet heter derfor «plasser per skift», og regnestykket står
+under raden: «2 plasser × 6 skift = 12 plasser, 96 t». Oversettelsen fra hvordan man
+snakker om bemanning til hva modellen lagrer skal være synlig **før** man trykker.
+
+### Det som holder genereringen trygg
+
+- **Plassene fødes som planlagt kladd** — usynlige for korpsene til lederen deler dem ut.
+  Uten det ser et halvferdig oppsett ferdig ut i det øyeblikket knappen trykkes.
+- **`erstatt_kladd` rører bare kladden.** Korpsreserverte, `alle_korps` og **alle**
+  bemannede står. Reservasjonen leses av `reservert_korps()`, ikke av feltet — leses
+  feltet direkte, slettes en hel bils plasser fordi ressursen bærer korpset.
+- **Ingen `bulk_create`, alt i én `transaction.atomic()`.** Ikke bare for signalenes
+  skyld: `erstatt_kladd` sletter før den skriver, så en feil halvveis ville etterlatt
+  lista tommere enn før man trykket.
+- **`?forhaandsvis` regnes av samme kode** (`_planlegg` + `_sammendrag`), på samme
+  endepunkt. En forhåndsvisning som regner på egen hånd viser før eller siden noe annet
+  enn det som skjer.
+- **Grupper i ett eksemplar** (`flere_enheter`) avvises også her. En generator som lager
+  «Samleplass 2» er akkurat den feilen flagget finnes for.
+
+### Mutasjonstesting: 24 mutanter, og tre bommer verdt å skrive ned
+
+**En mutasjon traff feil funksjon.** `if not services.kan_lede(request.user):` står også i
+`vaktliste_detalj_view`, og `replace(..., 1)` tok den første — så porten jeg trodde jeg
+prøvde var en annen. Et «OK» fra en mutasjon som ikke traff er verre enn ingen mutasjon:
+den *bekrefter* en dekning som ikke finnes.
+
+**To mutanter var no-ops.** `start = start + steg if False else slutt` er identisk med
+`start = slutt`. Overlevelse betyr ingenting da.
+
+**To fant ekte hull:**
+- `erstatt_kladd` uten scope til vaktlista overlevde, fordi testen la «plassen på den
+  andre lista» på en ressurs som var reservert til Haugesund — altså beholdt uansett. Den
+  ligger nå på en ureservert ressurs, med en assertion om at den faktisk *er* kladd.
+- `transaction.atomic()` lot seg fjerne, fordi all validering skjer i `_planlegg` *før*
+  skrivingen. Det som manglet var en feil underveis: en test patcher nå
+  `Ressurs.objects.create` til å feile på andre kall, og krever at den slettede kladden
+  står der etterpå.
+
+På klientsiden overlevde `Math.ceil` → `Math.floor`, fordi alle eksemplene mine gikk opp i
+hele skift (48/8, 8/8). Og porten på selve fanen lot seg fjerne — ingen test spurte om
+fanen var *borte* for `skriv_full`. Begge har tester nå.
+
+### Ellers
+
+**Skanneren leste ikke de nye byggerne** — igjen. `mkPlanlegger`, `_planleggerLinje`,
+`_planleggerVindu` og `_genererFasit` sto én kjøring uten å være i `HTML_BUILDERS`. Det er
+andre gang på én dag.
+
+**Og skanneren har et hull som er verdt å kjenne:** den ser bare `${…}` inne i
+template-literaler. `mkPlanlegger()` og `mkBelastning()` avslutter begge med
+`hode + \`…\` + linjer + tomt`, og de konkatenerte leddene går forbi registeret uten et
+ord. Verdiene er lokalt bygget markup i begge tilfeller, så det er ikke et hull i dag —
+men regelen dekker mindre enn den ser ut til. Ført opp i TODO; det er samme sort feil som
+`accounts/decorators.py` hadde, der en test som bare dekket halve syntaksen sto grønn i
+et år.
+
+**Endret:** `vaktliste/services.py`, `vaktliste/views.py`, `vaktliste/urls.py`,
+`static/js/vaktliste-{kjerne,tegning,oversikt,handlinger}.js`,
+`static/css/vaktliste.css`, `templates/vaktliste/index.html`,
+`vaktliste/tests_planlegger.py` (ny, 42 tester), `vaktliste/tests_xss.py` (+16 tester),
+`docs/FORSLAG_PLANLEGGERFANE.md`, `docs/TEKNISK_DOKUMENTASJON.md`, `CLAUDE.md`, `TODO.md`.
+
+---
+
 ## 2026-09-15 — Vaktas budsjett: steg 2 og 3 mot planleggerfanen
 
 `docs/FORSLAG_PLANLEGGERFANE.md` §7, steg 2 og 3. **Gjort i samme omgang med vilje:** en

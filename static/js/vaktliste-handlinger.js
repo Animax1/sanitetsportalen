@@ -712,6 +712,175 @@ async function opprettVaktpost() {
 }
 
 
+// ── Planleggeren (15. sep. 2026) ─────────────────────────────────────────
+//
+// Oppsettet ligger i `planleggerlinjer` og lagres ikke før man trykker «Lag
+// grunnlaget». Det er med vilje: et halvskrevet oppsett er en kladd i hodet
+// på den som skriver det, ikke data noen andre skal se.
+
+function _planleggerStandardvindu() {
+  // **Vaktas start, ikke `new Date()`.** En oktobervakt planlegges i august,
+  // og et forhåndsutfylt «nå» ville måttet rettes hver gang. Samme regel som
+  // «Opprett vakt» i ressurstabellen.
+  const start = aktivListe?.vaktliste?.startet || null;
+  const fra = _d(start) || new Date();
+  const til = new Date(fra.getTime() + 8 * 3600000);
+  return { fra: fra.toISOString(), til: til.toISOString(), skiftlengde: '' };
+}
+
+
+function planleggerNyLinje() {
+  const grupper = aktivListe?.grupper || [];
+  if (!grupper.length) {
+    visPanelfeil('Det finnes ingen ressursgrupper å velge. Legg dem inn under «Innstillinger».');
+    return;
+  }
+  planleggerlinjer.push({
+    gruppe_id: grupper[0].id,
+    antall: 1,
+    plasser: 2,
+    vinduer: [_planleggerStandardvindu()],
+  });
+  planleggerfasit = null;
+  tegnPanel();
+}
+
+
+function planleggerFjernLinje(arg) {
+  const i = Number(arg);
+  if (!Number.isInteger(i)) return;
+  planleggerlinjer.splice(i, 1);
+  planleggerfasit = null;
+  tegnPanel();
+}
+
+
+function planleggerNyttVindu(arg) {
+  const linje = planleggerlinjer[Number(arg)];
+  if (!linje) return;
+  // Det nye vinduet begynner der det forrige sluttet: Sola 56 har to vakter
+  // på ulike dager, og «dagen etter, samme tid» er det man som regel mener.
+  const forrige = linje.vinduer[linje.vinduer.length - 1];
+  const fra = _d(forrige?.til) || new Date();
+  const til = new Date(fra.getTime() + 8 * 3600000);
+  linje.vinduer.push({ fra: fra.toISOString(), til: til.toISOString(),
+                       skiftlengde: forrige?.skiftlengde ?? '' });
+  planleggerfasit = null;
+  tegnPanel();
+}
+
+
+function planleggerFjernVindu(arg) {
+  const [li, vi] = String(arg).split(':').map(Number);
+  const linje = planleggerlinjer[li];
+  if (!linje || linje.vinduer.length <= 1) return;
+  linje.vinduer.splice(vi, 1);
+  planleggerfasit = null;
+  tegnPanel();
+}
+
+
+function planleggerSettLinje(arg, verdi) {
+  const [li, felt] = String(arg).split(':');
+  const linje = planleggerlinjer[Number(li)];
+  if (!linje) return;
+  linje[felt] = felt === 'gruppe_id' ? Number(verdi) : verdi;
+  planleggerfasit = null;
+  tegnPanel();
+}
+
+
+function planleggerSettVindu(arg, verdi) {
+  const [li, vi, felt] = String(arg).split(':');
+  const vindu = planleggerlinjer[Number(li)]?.vinduer?.[Number(vi)];
+  if (!vindu) return;
+  // Tidsfeltene kommer som lokal «2026-10-02T14:00» og lagres som ISO, slik
+  // serveren vil ha dem. Skiftlengden lagres rå: tom streng betyr «hele
+  // vinduet», og en `Number('')` ville gjort den til null — altså et skift
+  // på null timer.
+  if (felt === 'skiftlengde') {
+    vindu.skiftlengde = verdi;
+  } else {
+    const d = verdi ? new Date(verdi) : null;
+    vindu[felt] = d && !Number.isNaN(d.getTime()) ? d.toISOString() : null;
+  }
+  planleggerfasit = null;
+  tegnPanel();
+}
+
+
+async function apneGenerer() {
+  // **Serveren regner fasiten før vinduet åpnes.** Tallene i radene er
+  // klientens anslag, gode nok mens man skriver; det som står i
+  // bekreftelsen skal være det som faktisk blir laget.
+  skjulPanelfeil();
+  const res = await apiFetch(
+    `/vaktliste/api/vaktlister/${aktivListe.vaktliste.id}/generer/`,
+    { method: 'POST', body: JSON.stringify({
+      linjer: planleggerlinjer, forhaandsvis: true }) });
+  const d = await res.json().catch(() => ({}));
+  if (!res.ok || d.status !== 'ok') {
+    visPanelfeil(d.message || 'Oppsettet lar seg ikke generere.');
+    return;
+  }
+  planleggerfasit = d.data;
+  const el = document.getElementById('generer-fasit');
+  if (el) el.innerHTML = _genererFasit(d.data);
+  const erstattBoks = document.getElementById('generer-erstatt');
+  if (erstattBoks) erstattBoks.checked = false;
+  _skjulFeil('generer-feil');
+  _apneModal('genererModal');
+}
+
+
+function _genererFasit(fasit) {
+  const rader = (fasit.linjer || []).map((r) => `
+    <tr>
+      <td class="vl-navn">${escapeHtml(r.navn)}</td>
+      <td>${escapeHtml(r.gruppe)}</td>
+      <td>${escHtmlValue(r.skift)}</td>
+      <td>${escHtmlValue(r.plasser)}</td>
+      <td>${escapeHtml(_tall(r.timer))} t</td>
+    </tr>`).join('');
+  return `
+    <p class="mb-2">Dette lages: <strong>${escHtmlValue(fasit.ressurser)}</strong>
+      ressurser, <strong>${escHtmlValue(fasit.plasser)}</strong> tomme plasser,
+      <strong>${escapeHtml(_tall(fasit.timer))} t</strong>.</p>
+    <div class="vl-tabellramme">
+      <table class="vl-tabell">
+        <thead><tr><th>Navn</th><th>Gruppe</th><th>Skift</th>
+          <th>Plasser</th><th>Timer</th></tr></thead>
+        <tbody>${rader}</tbody>
+      </table>
+    </div>`;
+}
+
+
+async function lagreGenerer() {
+  _skjulFeil('generer-feil');
+  await withSubmitGuard('generer-knapp', async () => {
+    const erstatt = !!document.getElementById('generer-erstatt')?.checked;
+    const res = await apiFetch(
+      `/vaktliste/api/vaktlister/${aktivListe.vaktliste.id}/generer/`,
+      { method: 'POST', body: JSON.stringify({
+        linjer: planleggerlinjer, erstatt_kladd: erstatt }) });
+    const d = await res.json().catch(() => ({}));
+    if (!res.ok || d.status !== 'ok') {
+      _visFeil('generer-feil', d.message || 'Kunne ikke lage grunnlaget.');
+      return;
+    }
+    _lukkModal('genererModal');
+    // **Oppsettet tømmes etter en generering.** Det er utført; stod det
+    // igjen, ville neste trykk laget alt en gang til — og «Lag 4, 5, 6» ved
+    // siden av «Lag 1, 2, 3» er ikke noe noen ber om to ganger.
+    planleggerlinjer = [];
+    planleggerfasit = null;
+    belastning = null;
+    await lastListe(aktivListe.vaktliste.id);
+  });
+}
+
+
 function apneTimetak() {
   if (!aktivListe) return;
   _skjulFeil('timetak-feil');

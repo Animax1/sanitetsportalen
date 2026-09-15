@@ -685,6 +685,210 @@ function mkDagslinje(dager) {
 }
 
 
+function _planleggerSkift(vindu) {
+  // Speiler `services._vinduets_skift()`: tom skiftlengde gir ett skift, et
+  // tall deler vinduet i bolker rygg mot rygg og korter av den siste.
+  //
+  // **Regnet her bare for å vise tallet mens man skriver.** Fasiten er
+  // serverens forhåndsvisning — `planleggerfasit` — og den hentes før noe
+  // genereres. To steder å regne er ett sted å komme i utakt, så dette er
+  // bevisst den *uforpliktende* siden: den sier «omtrent så mange», serveren
+  // sier hva som faktisk blir laget.
+  const fra = _d(vindu.fra);
+  const til = _d(vindu.til);
+  if (!fra || !til || til <= fra) return { skift: 0, timer: 0 };
+  const spennTimer = (til.getTime() - fra.getTime()) / 3600000;
+  const lengde = Number(vindu.skiftlengde);
+  if (!vindu.skiftlengde || !Number.isFinite(lengde) || lengde <= 0) {
+    return { skift: 1, timer: spennTimer };
+  }
+  return { skift: Math.ceil(spennTimer / lengde), timer: spennTimer };
+}
+
+
+function _planleggerLinjetall(linje) {
+  // Summen for én linje: skift, plasser og timer — «2 plasser × 6 skift =
+  // 12 plasser, 96 t». Tallet står under raden fordi André tenker i folk
+  // («4 stk fordelt på 2 lag») mens modellen trenger plasser per skift, og
+  // den oversettelsen skal være synlig før man trykker.
+  const antall = Math.max(1, Number(linje.antall) || 1);
+  const plasser = Math.max(1, Number(linje.plasser) || 1);
+  let skift = 0;
+  let timer = 0;
+  (linje.vinduer || []).forEach((v) => {
+    const t = _planleggerSkift(v);
+    skift += t.skift;
+    timer += t.timer;
+  });
+  return {
+    skift,
+    plasser: skift * plasser * antall,
+    timer: timer * plasser * antall,
+  };
+}
+
+
+function planleggerTotal() {
+  return (planleggerlinjer || []).reduce((sum, linje) => {
+    const t = _planleggerLinjetall(linje);
+    return {
+      ressurser: sum.ressurser + Math.max(1, Number(linje.antall) || 1),
+      plasser: sum.plasser + t.plasser,
+      timer: sum.timer + t.timer,
+    };
+  }, { ressurser: 0, plasser: 0, timer: 0 });
+}
+
+
+function _planleggerVindu(li, vi, vindu) {
+  // **Skiftlengden står som et eget felt, ikke som et valg mellom to
+  // former.** Tom = ett skift (Sola 56, 15–03 i ett strekk), et tall = del
+  // vinduet (Haugesund 56, 8 timer på og 8 av). Ett felt med to betydninger
+  // er her enklere enn to kontroller som utelukker hverandre.
+  const t = _planleggerSkift(vindu);
+  const fasit = t.skift
+    ? `${escapeHtml(_tall(t.skift))} skift`
+    : '<span class="vl-advarsel">ugyldig tidsrom</span>';
+  const slett = (vindu && (vi > 0))
+    ? `<button type="button" class="btn btn-sm btn-outline-secondary"
+               data-action="planleggerFjernVindu" data-arg="${escHtmlValue(li + ':' + vi)}"
+               title="Fjern skiftvinduet">
+         <i class="bi bi-x-lg"></i>
+       </button>`
+    : '';
+  return `
+    <div class="vl-pl-vindu">
+      <label class="vl-meta">Fra
+        <input type="datetime-local" class="form-control form-control-sm"
+               step="300" value="${escHtmlValue(_iso16(vindu.fra))}"
+               data-action="planleggerSettVindu" data-hendelse="change"
+               data-arg="${escHtmlValue(li + ':' + vi + ':fra')}"></label>
+      <label class="vl-meta">Til
+        <input type="datetime-local" class="form-control form-control-sm"
+               step="300" value="${escHtmlValue(_iso16(vindu.til))}"
+               data-action="planleggerSettVindu" data-hendelse="change"
+               data-arg="${escHtmlValue(li + ':' + vi + ':til')}"></label>
+      <label class="vl-meta">Skiftlengde (t)
+        <input type="number" class="form-control form-control-sm" min="1" step="1"
+               placeholder="hele vinduet" value="${escHtmlValue(vindu.skiftlengde ?? '')}"
+               data-action="planleggerSettVindu" data-hendelse="change"
+               data-arg="${escHtmlValue(li + ':' + vi + ':skiftlengde')}"></label>
+      <span class="vl-meta vl-pl-vindutall">${fasit}</span>
+      ${slett}
+    </div>`;
+}
+
+
+function _planleggerLinje(linje, li) {
+  const t = _planleggerLinjetall(linje);
+  const grupper = (aktivListe.grupper || []).map((g) => {
+    const valgt = String(g.id) === String(linje.gruppe_id) ? ' selected' : '';
+    return `<option value="${escHtmlValue(g.id)}"${valgt}>${escapeHtml(g.navn)}</option>`;
+  }).join('');
+  const vinduer = (linje.vinduer || [])
+    .map((v, vi) => _planleggerVindu(li, vi, v)).join('');
+
+  return `
+    <div class="vl-kort vl-pl-linje">
+      <div class="vl-pl-topp">
+        <label class="vl-meta">Gruppe
+          <select class="form-select form-select-sm"
+                  data-action="planleggerSettLinje" data-hendelse="change"
+                  data-arg="${escHtmlValue(li + ':gruppe_id')}">${grupper}</select></label>
+        <label class="vl-meta">Antall
+          <input type="number" class="form-control form-control-sm" min="1" step="1"
+                 value="${escHtmlValue(linje.antall)}"
+                 data-action="planleggerSettLinje" data-hendelse="change"
+                 data-arg="${escHtmlValue(li + ':antall')}"></label>
+        <label class="vl-meta">Plasser per skift
+          <input type="number" class="form-control form-control-sm" min="1" step="1"
+                 value="${escHtmlValue(linje.plasser)}"
+                 data-action="planleggerSettLinje" data-hendelse="change"
+                 data-arg="${escHtmlValue(li + ':plasser')}"></label>
+        <span class="vl-pl-spacer"></span>
+        <button type="button" class="btn btn-sm btn-outline-secondary"
+                data-action="planleggerFjernLinje" data-arg="${escHtmlValue(li)}">
+          <i class="bi bi-trash me-1"></i>Fjern
+        </button>
+      </div>
+      <div class="vl-pl-vinduer">${vinduer}</div>
+      <div class="vl-pl-bunn">
+        <button type="button" class="btn btn-sm btn-outline-secondary"
+                data-action="planleggerNyttVindu" data-arg="${escHtmlValue(li)}">
+          <i class="bi bi-plus-lg me-1"></i>Nytt skiftvindu
+        </button>
+        <span class="vl-meta vl-pl-regnestykke">${escapeHtml(_planleggerRegnestykke(linje, t))}</span>
+      </div>
+    </div>`;
+}
+
+
+function _planleggerRegnestykke(linje, t) {
+  // «2 plasser × 6 skift × 1 ressurs = 12 plasser, 96 t». Skrevet ut som et
+  // regnestykke og ikke bare som summen: den som leser skal kunne se hvilket
+  // ledd som er feil når tallet ikke stemmer med det hun tenkte.
+  const antall = Math.max(1, Number(linje.antall) || 1);
+  const plasser = Math.max(1, Number(linje.plasser) || 1);
+  if (!t.skift) return 'Fyll ut et gyldig tidsrom.';
+  const ledd = `${_tall(plasser)} plasser × ${_tall(t.skift)} skift`
+    + (antall > 1 ? ` × ${_tall(antall)} ressurser` : '');
+  return `${ledd} = ${_tall(t.plasser)} plasser, ${_tall(t.timer)} t`;
+}
+
+
+function mkPlanlegger() {
+  // **Planleggeren lager grunnlaget for vaktlista** (André, 15. sep. 2026).
+  // Du sier «tre firemannslag 14–22, én ambulanse 15–03, én på åttetimers
+  // rotasjon», og etterpå finnes ressursene og de tomme plassene — klare til
+  // å fordeles og spisses i fanene som alt virker.
+  //
+  // Budsjettlinja står her, ikke i «Planlegging»: «sette inn total timer og
+  // jobbe overordnet» er planleggerens verktøy, og den som bemanner sitt eget
+  // korps har ikke bruk for vaktas budsjett.
+  if (!kanPlanlegge()) {
+    return '<div class="vl-kort"><div class="vl-tom">Planleggeren er for '
+         + 'vaktledere og administratorer.</div></div>';
+  }
+
+  const total = planleggerTotal();
+  const linjer = (planleggerlinjer || [])
+    .map((l, i) => _planleggerLinje(l, i)).join('');
+
+  const tomt = planleggerlinjer.length ? '' : `
+    <div class="vl-kort"><div class="vl-tom">
+      Legg til en ressurs for å begynne. Et lag på fire som går 14–22 er én
+      rad; en ambulanse som går kontinuerlig fra fredag til søndag er én rad
+      med skiftlengde 8.
+    </div></div>`;
+
+  const oppsummering = planleggerlinjer.length ? `
+    <div class="vl-kort vl-belastningshode">
+      <div class="vl-noekkeltall">
+        <div><b>${escHtmlValue(total.ressurser)}</b><span class="vl-meta">ressurser</span></div>
+        <div><b>${escHtmlValue(total.plasser)}</b><span class="vl-meta">tomme plasser</span></div>
+        <div><b>${escapeHtml(_tall(total.timer))} t</b><span class="vl-meta">til sammen</span></div>
+      </div>
+      <span class="vl-pl-spacer"></span>
+      <button type="button" class="btn btn-primary" id="planlegger-knapp"
+              data-action="apneGenerer">
+        <i class="bi bi-magic me-1"></i>Lag grunnlaget
+      </button>
+    </div>` : '';
+
+  return mkBudsjett() + `
+    <div class="vl-kort vl-kort-topp">
+      <span class="vl-kort-tittel">Oppsett</span>
+      <span class="vl-meta">Én rad per ressurs. Plassene fødes som
+        <strong>planlagt</strong> — usynlige for korpsene til du deler dem ut.</span>
+      <span class="vl-pl-spacer"></span>
+      <button type="button" class="btn btn-sm btn-outline-secondary"
+              data-action="planleggerNyLinje">
+        <i class="bi bi-plus-lg me-1"></i>Legg til ressurs
+      </button>
+    </div>` + linjer + tomt + oppsummering;
+}
+
+
 function mkBelastning() {
   // **Belastningen før vakten, ikke bemanningen** (§8b). Bemanningskurvene
   // svarer på «er plassene fylt»; denne svarer på «hva koster det dem som
@@ -727,7 +931,12 @@ function mkBelastning() {
        </button>`
     : '';
 
-  const hode = mkBudsjett() + `
+  // **Budsjettlinja står i «Planlegger», ikke her** (15. sep. 2026). Den
+  // ble først lagt i denne fanen; André: «Jeg ba om en planlegger … Den skal
+  // bare admin og leder ha tilgang til.» Vaktas budsjett er lederens
+  // verktøy, og denne fanen er `les` — lista regnet sammen, for alle som ser
+  // den.
+  const hode = `
     <div class="vl-kort vl-belastningshode">
       <div class="vl-noekkeltall">
         <div><b>${escHtmlValue(s.personer)}</b><span class="vl-meta">personer</span></div>

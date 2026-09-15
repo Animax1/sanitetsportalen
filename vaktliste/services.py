@@ -9,6 +9,8 @@ huske badgen og glemme reservasjonen.
 """
 from __future__ import annotations
 
+from datetime import timedelta
+
 from django.db import transaction
 from django.utils import timezone
 
@@ -62,6 +64,269 @@ def opprett_planlagt_vakt(navn, startet=None, planlagt_slutt=None):
             er_aktiv=False,
         )
         return Vaktliste.objects.create(vakt=vakt, planlagt_slutt=planlagt_slutt)
+
+
+# ── Planleggeren: grunnlaget for vaktlista (15. sep. 2026) ───────────────────
+#
+# André: «Planleggerfanen lar en generere skift og sette de opp på
+# enheter/ressurser … tre firemanns lag fra kl 14-22 og en ambulanse fra 15-03
+# mens en ambulanse går 8 timer rotasjon. Den skal sette opp planen som lager
+# grunnlaget for vaktlisten.»
+#
+# **Ressursen er subjektet, vinduene hører til den.** Sola 56 får to adskilte
+# 12-timersvakter (fre. og lør. 15–03); Haugesund 56 får ett vindu på 48 timer
+# delt i åttetimersskift. Var linja enheten og ikke ressursen, ville Sola 56
+# blitt til to ulike biler.
+#
+# **`skiftlengde` er det ene feltet som skiller de to.** Tom betyr ett skift
+# som dekker vinduet; et tall deler vinduet i bolker rygg mot rygg.
+
+
+class Planleggerfeil(ValueError):
+    """Noe i oppsettet lar seg ikke generere. Meldingen går til brukeren."""
+
+
+#: Sperre mot et vindu på et år delt i minuttskift — ikke en regel om hvor
+#: mange skift en vakt kan ha. Tallet er romslig med vilje: en helgevakt på 48
+#: timer i timesskift er 48, og det skal gå. Treffer man taket, er det en
+#: skrivefeil i tidene.
+MAKS_SKIFT_PER_VINDU = 200
+
+#: Samme slags sperre for hele oppsettet. En generering som lager mer enn
+#: dette er ikke et grunnlag, det er et uhell man må rydde opp i for hånd.
+MAKS_PLASSER_TOTALT = 2000
+
+
+def _vinduets_skift(fra, til, skiftlengde_timer):
+    """Skiftvinduene ett vindu deles i, som ``[(fra, til), …]``.
+
+    Tom `skiftlengde_timer` gir **ett** skift som dekker hele vinduet — det er
+    Sola 56, som går 15–03 i ett strekk.
+
+    Et tall deler vinduet i bolker rygg mot rygg — det er Haugesund 56, som er
+    tildelt kontinuerlig vakt fra fredag 14 til søndag 14 og bemannes åtte
+    timer på, åtte av.
+
+    **Den siste bolken kortes av, den strekkes ikke forbi vinduet.** Deles 20
+    timer i åttetimersskift, blir det 8 + 8 + 4 og ikke 8 + 8 + 8: et skift
+    som varer lenger enn vakta er noe ingen har bedt om, og det ville dukket
+    opp som et brudd på skiftlengdegrensa uten at noen hadde satt det opp.
+    """
+    if fra is None or til is None or til <= fra:
+        raise Planleggerfeil('Skiftvinduet må slutte etter at det begynner.')
+    if not skiftlengde_timer:
+        return [(fra, til)]
+    if skiftlengde_timer <= 0:
+        raise Planleggerfeil('Skiftlengden må være et positivt antall timer.')
+
+    ut = []
+    start = fra
+    steg = timedelta(hours=skiftlengde_timer)
+    while start < til:
+        if len(ut) >= MAKS_SKIFT_PER_VINDU:
+            raise Planleggerfeil(
+                f'Vinduet gir over {MAKS_SKIFT_PER_VINDU} skift med den '
+                f'skiftlengden. Sjekk tidene.')
+        slutt = min(start + steg, til)
+        ut.append((start, slutt))
+        start = slutt
+    return ut
+
+
+def _linjens_plasser(linje):
+    """Skiftvinduene for **én** ressurs i linja, flatet ut.
+
+    Hver ressurs i linja får de samme vinduene — «tre firemanns lag fra 14–22»
+    betyr at alle tre går 14–22.
+    """
+    vinduer = linje.get('vinduer') or []
+    if not vinduer:
+        raise Planleggerfeil('Hver ressurs må ha minst ett skiftvindu.')
+    ut = []
+    for vindu in vinduer:
+        ut.extend(_vinduets_skift(
+            vindu.get('fra'), vindu.get('til'), vindu.get('skiftlengde')))
+    return ut
+
+
+def _sammendrag(plan):
+    """Tallene for en plan: ressurser, plasser og timer, totalt og per rad.
+
+    **Regnes av planen, ikke av basen.** `generer_grunnlag` kalte først
+    `forhaandsvis_grunnlag` på nytt etter skrivingen, og da planla den mot den
+    *nye* tilstanden: navnene i svaret ble «Lag 4, 5, 6» fordi Lag 1–3 nå sto
+    der. Sammendraget skal si hva som ble laget, ikke hva som ville blitt
+    laget en gang til.
+    """
+    return {
+        'ressurser': len(plan),
+        'plasser': sum(len(p['skift']) * p['plasser'] for p in plan),
+        'timer': round(sum(
+            _timer(fra, til) * p['plasser']
+            for p in plan for fra, til in p['skift']), 2),
+        'linjer': [{
+            'navn': p['navn'],
+            'gruppe': p['gruppe'].navn,
+            'skift': len(p['skift']),
+            'plasser': len(p['skift']) * p['plasser'],
+            'timer': round(sum(_timer(fra, til) for fra, til in p['skift'])
+                           * p['plasser'], 2),
+        } for p in plan],
+    }
+
+
+def forhaandsvis_grunnlag(vaktliste, linjer):
+    """Hva en generering ville laget — uten å skrive noe.
+
+    **Samme kode regner ut svaret som den som skriver det** (`_planlegg` og
+    `_sammendrag`), og det er hele poenget med at den finnes: en
+    forhåndsvisning som regner på egen hånd er en forhåndsvisning som før
+    eller siden viser noe annet enn det som skjer.
+    """
+    return _sammendrag(_planlegg(vaktliste, linjer))
+
+
+def _planlegg(vaktliste, linjer):
+    """Oppsettet oversatt til ressurser og skiftvinduer, uten å røre basen.
+
+    Returnerer én rad per ressurs som skal finnes etterpå, med navnet den får,
+    vinduene den skal ha, og om den fantes fra før.
+    """
+    from .models import Ressurs, Ressursgruppe
+
+    if not linjer:
+        raise Planleggerfeil('Oppsettet er tomt.')
+
+    grupper = {g.pk: g for g in Ressursgruppe.objects.all()}
+    # Navnetelleren må kjenne både det som står i basen og det de tidligere
+    # linjene i *denne* innsendingen kommer til å lage — ellers gir to linjer
+    # på samme gruppe to ressurser som heter det samme.
+    brukte_navn = set(
+        Ressurs.objects.filter(vaktliste=vaktliste)
+        .values_list('navn', flat=True))
+    finnes_i_gruppa = {}
+    for gid in grupper:
+        finnes_i_gruppa[gid] = Ressurs.objects.filter(
+            vaktliste=vaktliste, gruppe_id=gid).count()
+
+    plan = []
+    for linje in linjer:
+        gruppe = grupper.get(linje.get('gruppe_id'))
+        if gruppe is None:
+            raise Planleggerfeil('Ukjent ressursgruppe.')
+
+        antall = int(linje.get('antall') or 1)
+        plasser = int(linje.get('plasser') or 1)
+        if antall < 1:
+            raise Planleggerfeil('Antall ressurser må være minst én.')
+        if plasser < 1:
+            raise Planleggerfeil('Hver ressurs må ha minst én plass.')
+
+        # **Noen grupper finnes i ett eksemplar.** Samme regel som
+        # `ressurser_view`, og den må stå her også: en generator som lager
+        # «Samleplass 2» er akkurat den feilen `flere_enheter` finnes for.
+        if not gruppe.flere_enheter:
+            if antall > 1:
+                raise Planleggerfeil(
+                    f'«{gruppe.navn}» finnes i ett eksemplar.')
+            if finnes_i_gruppa[gruppe.pk]:
+                raise Planleggerfeil(
+                    f'«{gruppe.navn}» finnes i ett eksemplar, og står '
+                    f'allerede på denne vaktlista.')
+
+        skift = _linjens_plasser(linje)
+        for _ in range(antall):
+            navn = _neste_navn(gruppe, brukte_navn, finnes_i_gruppa)
+            plan.append({
+                'gruppe': gruppe,
+                'navn': navn,
+                'plasser': plasser,
+                'skift': skift,
+            })
+
+    totalt = sum(len(p['skift']) * p['plasser'] for p in plan)
+    if totalt > MAKS_PLASSER_TOTALT:
+        raise Planleggerfeil(
+            f'Oppsettet ville laget {totalt} plasser. Grensen er '
+            f'{MAKS_PLASSER_TOTALT} — sjekk tidene og antallet.')
+    return plan
+
+
+def _neste_navn(gruppe, brukte_navn, finnes_i_gruppa):
+    """«Lag 1», «Lag 2» … det første navnet som ikke er i bruk.
+
+    **Teller forbi hull.** Står «Lag 1» og «Lag 3» fra før, blir den neste
+    «Lag 2» og ikke «Lag 4» — nummeret er en etikett, ikke en ID, og et hull
+    i rekka er noe man har laget ved å slette noe.
+
+    Grupper som finnes i ett eksemplar får gruppenavnet bart: «Samleplass»,
+    ikke «Samleplass 1».
+    """
+    if not gruppe.flere_enheter:
+        navn = gruppe.navn
+        brukte_navn.add(navn)
+        finnes_i_gruppa[gruppe.pk] = finnes_i_gruppa.get(gruppe.pk, 0) + 1
+        return navn
+    n = 1
+    while f'{gruppe.navn} {n}' in brukte_navn:
+        n += 1
+    navn = f'{gruppe.navn} {n}'
+    brukte_navn.add(navn)
+    finnes_i_gruppa[gruppe.pk] = finnes_i_gruppa.get(gruppe.pk, 0) + 1
+    return navn
+
+
+def generer_grunnlag(vaktliste, linjer, *, erstatt_kladd=False):
+    """Opprett ressursene og de tomme plassene oppsettet beskriver.
+
+    Dette er planleggerens hele jobb: fra en tom liste til et skjelett som kan
+    fordeles og spisses i fanene som alt finnes.
+
+    **Plassene fødes som planlagt kladd** (notatets beslutning 10): ikke
+    reservert til noe korps, ikke åpnet for alle, og dermed usynlig for
+    korps-brukerne til lederen deler dem ut. Uten det ser et halvferdig
+    oppsett ferdig ut for alle korps i det øyeblikket generatoren kjører —
+    samme grunn til at `kopier_oppsett` aldri tar personene med.
+
+    **`erstatt_kladd` rører bare det `er_planlagt()` kaller kladd**
+    (beslutning 4 og 11). Plasser reservert til et korps, plasser åpne for
+    alle, og **alle** bemannede står. En tom plass uten reservasjon er
+    generatorens eget utkast; en som er delt ut er et løfte til noen.
+
+    **Ingen `bulk_create`.** Den hopper over auditsignalene, og en generering
+    som lager hundre plasser er nettopp stedet noen vil gripe etter den —
+    `kopier_oppsett` gikk i den fella 12. sep. 2026.
+
+    Returnerer det samme som `forhaandsvis_grunnlag`, pluss `slettet`.
+    """
+    from .models import Ressurs, Vaktpost
+
+    plan = _planlegg(vaktliste, linjer)
+    slettet = 0
+    with transaction.atomic():
+        if erstatt_kladd:
+            for vp in Vaktpost.objects.filter(
+                    ressurs__vaktliste=vaktliste, mannskap__isnull=True
+            ).select_related('ressurs'):
+                if er_planlagt(vp):
+                    vp.delete()
+                    slettet += 1
+
+        for rad in plan:
+            ressurs = Ressurs.objects.create(
+                vaktliste=vaktliste,
+                navn=rad['navn'],
+                gruppe=rad['gruppe'],
+                rekkefolge=neste_rekkefolge(vaktliste),
+            )
+            for fra, til in rad['skift']:
+                for _ in range(rad['plasser']):
+                    Vaktpost.objects.create(
+                        ressurs=ressurs, fra_tid=fra, til_tid=til)
+
+    svar = _sammendrag(plan)
+    svar['slettet'] = slettet
+    return svar
 
 
 def neste_rekkefolge(vaktliste) -> int:

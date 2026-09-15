@@ -443,7 +443,7 @@ deploy 2. Begge deler er rettet, men **strukturen er endret med vilje**: se 5.0.
 
 ### 5.0 Hva dette kapittelet er, og ikke er
 
-Portalen har **123 endepunkter** (utenom Django-admin, som bare rutes under `DEBUG`).
+Portalen har **124 endepunkter** (utenom Django-admin, som bare rutes under `DEBUG`).
 En håndskrevet liste over alle sammen ville rotnet fra dagen den ble skrevet — nøyaktig
 slik den gamle lista gjorde, med 16 oppføringer og ingen som merket at resten manglet.
 
@@ -472,7 +472,7 @@ for sti, view in sorted(gaa(get_resolver())):
 |---|---|---|---|
 | `/pasienter/` | 17 | `patients/urls.py` | Pasient-CRUD, registre, arkiv, vaktstyring |
 | `/oppdrag/` | 31 | `oppdrag/urls.py` | Sentralbord, enhetsskjerm, stemplinger, verdimengder |
-| `/vaktliste/` | 27 | `vaktliste/urls.py` | Ressurser, vaktposter, mannskap, drift, service worker |
+| `/vaktliste/` | 28 | `vaktliste/urls.py` | Ressurser, vaktposter, mannskap, drift, service worker |
 | `/portal-admin/` | 21 | `core/urls_admin.py` | Hele adminflaten. Navnerom `portaladmin` |
 | `/accounts/` | 9 | `accounts/urls.py` | Innlogging, MFA, passord |
 | `/statistikk/` | 5 | `statistikk/urls.py` | Full statistikk per kilde |
@@ -602,7 +602,7 @@ skanner nå hver `{% url %}` i hver mal.
 
 ### 5.6 Oppdrag og vaktliste
 
-Disse to er de største flatene (31 og 27 ruter) og dokumenteres i sine egne
+Disse to er de største flatene (31 og 28 ruter) og dokumenteres i sine egne
 beslutningsnotater — `docs/BESLUTNING_OPPDRAGSMODULEN.md` og
 `docs/BESLUTNING_VAKTLISTE.md` — som forklarer *hvorfor* endepunktene ser ut som de gjør.
 `CLAUDE.md` har reglene som gjelder når man rører dem.
@@ -2003,7 +2003,7 @@ dokumentrunden 14. sep. 2026:
 | Funn | Fanget? |
 |---|---|
 | A.10 beskrev en rollemodell slettet i deploy 2 | Ja — symbollista |
-| Kap. 5 dokumenterte 16 av 123 endepunkter | Ja — tallgjerdet, fra nå |
+| Kap. 5 dokumenterte 16 av 124 endepunkter | Ja — tallgjerdet, fra nå |
 | Deploy-guiden ba deg laste ned en backupfil | **Nei** |
 | 8B viste en signatur som ville gitt `TypeError` | **Nei** |
 | `_scrub_secrets` gjengitt med feil regex | **Nei** |
