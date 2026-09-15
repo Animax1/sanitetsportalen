@@ -190,6 +190,28 @@
 }
 
 /* ── Oversiktsfanen ───────────────────────────────────────────────────── */
+/*
+   **Dagen er ytterste nivå** (15. sep. 2026). Dagtittelen må derfor veie
+   tydelig mer enn ressurstittelen under den — står de likt, leser man arket
+   som en flat liste og mister nivået som ble innført.
+*/
+.vl-dagbolk {
+  margin-bottom: 1.8rem;
+}
+
+.vl-dagbolk:last-child {
+  margin-bottom: 0;
+}
+
+.vl-dagtittel {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text-main);
+  border-bottom: 3px solid var(--text-main);
+  padding-bottom: 0.25rem;
+  margin: 0 0 0.7rem;
+}
+
 .vl-korpsgruppe {
   margin-bottom: 1.1rem;
 }
@@ -203,6 +225,38 @@
   border-bottom: 2px solid var(--border-color);
   padding-bottom: 0.3rem;
   margin-bottom: 0.4rem;
+}
+
+/* ── Sammenslåtte ressurskort ─────────────────────────────────────────── */
+/*
+   En fane med ti ambulanser var ti regneark under hverandre, og man rullet
+   forbi ni for å komme til den tiende. Gruppefanen har bemanningskurven
+   øverst, og den *er* oversikten over gruppa — kortene under er detaljen.
+*/
+.vl-vippe {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  padding: 0 0.15rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.vl-vippe:hover {
+  color: var(--text-main);
+}
+
+.vl-kort-sammenslatt {
+  padding-bottom: 0.6rem;
+}
+
+/* Tallene i stedet for tabellen: «3 skift · 5 mannskap · 2 ledige · 24 t».
+   Kortet skal si hva som er der uten at man åpner det — ellers er et
+   sammenslått kort bare en skjult rad. */
+.vl-sammendrag {
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  padding: 0.1rem 0.15rem 0;
 }
 
 /* ── Registersiden ────────────────────────────────────────────────────── */
@@ -670,6 +724,19 @@
   /* En korpsgruppe skal helst ikke deles over to ark. */
   .vl-korpsgruppe {
     break-inside: avoid;
+  }
+
+  /*
+     **En dagoverskrift alene nederst på et ark er en side ingen kan bruke.**
+     `break-after: avoid` holder tittelen sammen med det første som kommer
+     under den. Hele dagbolken får IKKE `break-inside: avoid` — en dag med
+     tolv ressurser er lengre enn et ark, og da ville regelen enten blitt
+     ignorert eller skjøvet en halv tom side foran seg.
+  */
+  .vl-dagtittel {
+    break-after: avoid;
+    color: #000 !important;
+    border-bottom-color: #000 !important;
   }
 
   .portal-content {

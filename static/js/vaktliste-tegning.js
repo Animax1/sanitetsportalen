@@ -504,7 +504,10 @@ function mkGruppe(gruppe) {
   // spørsmålet «hvem har møtt?», og da skal stemplene stå øverst; kurven er
   // fortsatt der, for den som vil se resten av vakten, men under.
   const kurve = mkGruppekurve(gruppe);
-  const kort = ressurser.map(mkRessurs).join('');
+  // **`map(mkRessurs)` ville sendt indeksen som `apen`.** Den formen sto her
+  // og var harmløs så lenge byggeren tok ett argument; den sluttet å være det
+  // i det øyeblikket den tok to.
+  const kort = ressurser.map((r) => mkRessurs(r, ressursErApen(r))).join('');
   return hode + (iDrift() ? kort + kurve : kurve + kort);
 }
 
@@ -717,7 +720,26 @@ function _plancellene(vp, r, kanRore) {
 }
 
 
-function mkRessurs(r) {
+function ressursErApen(r) {
+  // **Standarden er gruppas, valget er brukerens.** Har hun trykket på
+  // kortet, gjelder det hun valgte; ellers er en gruppe med flere enheter
+  // sammenslått og en gruppe med én åpen.
+  //
+  // André ba om «alle minimert som standard», og snevret det 15. sep. 2026 til
+  // «bare når gruppa har mer enn én»: en vakt med én ambulanse ville ellers
+  // kostet et klikk hver gang for å se det eneste som er der.
+  // `_blokkerMedDager()` hadde presedensen for samme resonnement — men gikk
+  // motsatt vei samme dag, og det er verdt å merke seg at de to nå skiller
+  // lag: dagoverskriften koster én linje, et sammenslått kort koster et klikk.
+  if (ressursApen.has(r.id)) return ressursApen.get(r.id);
+  return _ressurserIGruppe(r.gruppe_id).length <= 1;
+}
+
+
+function mkRessurs(r, apen = true) {
+  // `apen` er gruppas avgjørelse, ikke ressursens — `mkGruppe()` vet hvor
+  // mange søsken kortet har. Standardverdien `true` er for de stedene som
+  // tegner ett kort alene; de har ingen gruppe å spørre.
   const poster = _posterFor(r.id);
   const kanRore = kanBemanne(r);
   // Per rad, ikke per ressurs: egen person på andres plass er egen rad
@@ -772,6 +794,26 @@ function mkRessurs(r) {
   // sammenligner på tvers av dem, og alt redigeres der det står. Under
   // drift står stempelet først i raden — resten er som før (André, 12. sep.
   // 2026). Se `_driftrad()`.
+  // **Sammenslått: hodet, tallene og knappene — ikke tabellen.** Knappene blir
+  // stående nettopp for at et sammenslått kort ikke skal være en blindvei:
+  // «Rediger», «Roller» og «Opprett vakt» virker uten å åpne det først.
+  const blokker = _tidsblokker(poster);
+  const ledige = poster.filter((vp) => vp.ledig).length;
+  // Bygget med `+`, ikke i en template-literal: XSS-skanneren leser hvert
+  // `${}` i byggerne, og et tall den ikke kan se er escapet er et funn den må
+  // avvise. Samme grep som `_blokklinje()`.
+  const deler = [_telling(poster, blokker.length)];
+  if (ledige) deler.push(ledige + (ledige === 1 ? ' ledig' : ' ledige'));
+  deler.push(_tall(_sumTimer(poster)) + ' t');
+  const sammendrag = poster.length ? deler.join(' · ') : 'Ingen satt opp ennå';
+  const vippe = `
+          <button type="button" class="vl-vippe" data-action="veksleRessurs"
+                  data-id="${escHtmlValue(r.id)}"
+                  aria-expanded="${escHtmlValue(apen ? 'true' : 'false')}"
+                  title="${escHtmlValue(apen ? 'Slå sammen' : 'Vis skiftene')}">
+            <i class="bi bi-chevron-${escHtmlValue(apen ? 'down' : 'right')}"></i>
+          </button>`;
+
   const drift = iDrift();
   // **Blokker, ikke bare rader.** Skift med samme fra–til samles under én
   // blokklinje som bærer tiden, timene og antallet — se `_tidsblokker()`.
@@ -780,7 +822,7 @@ function mkRessurs(r) {
                               : _planrad(vp, r, kanRoreRad(vp, r, kanRore)));
   const kolonner = drift ? 10 : 9;
   const kropp = poster.length
-    ? _blokkerMedDager(_tidsblokker(poster), kolonner, rad)
+    ? _blokkerMedDager(blokker, kolonner, rad)
     : `<tr><td colspan="${escHtmlValue(kolonner)}" class="vl-tom">Ingen satt opp ennå.</td></tr>`;
 
   // Tabellhodet heves ut hit framfor å stå som en ternær med to
@@ -816,10 +858,20 @@ function mkRessurs(r) {
             </tr>
           </thead>`;
 
+  const tabell = apen ? `
+      <div class="vl-tabellramme">
+        <table class="${tabellklasse}">
+          ${tabellhode}
+          <tbody>${kropp}</tbody>
+        </table>
+      </div>` : `
+      <div class="vl-sammendrag">${escapeHtml(sammendrag)}</div>`;
+
   return `
-    <div class="vl-kort">
+    <div class="vl-kort${escHtmlValue(apen ? '' : ' vl-kort-sammenslatt')}">
       <div class="vl-kort-topp">
         <div class="d-flex align-items-center gap-2 flex-wrap">
+          ${vippe}
           <span class="vl-kort-tittel">
             <i class="bi bi-${escHtmlValue(r.ikon)} me-1"></i>${escapeHtml(r.navn)}
           </span>
@@ -829,12 +881,7 @@ function mkRessurs(r) {
         </div>
         <div class="d-flex gap-2">${knapper}</div>
       </div>
-      <div class="vl-tabellramme">
-        <table class="${tabellklasse}">
-          ${tabellhode}
-          <tbody>${kropp}</tbody>
-        </table>
-      </div>
+      ${tabell}
     </div>`;
 }
 
@@ -1092,24 +1139,58 @@ function _telling(poster, skift) {
 
 
 function _dagnokkel(iso) {
-  // Lokal dato som nøkkel — «hvilken dag» er et spørsmål om lokal tid, og
-  // et skift som starter 00:30 lørdag er lørdagens, ikke fredagens.
+  // **Den ene regelen for hvilken dag et skift hører til: startdagen.**
+  // Lokal dato — «hvilken dag» er et spørsmål om lokal tid, og et skift som
+  // starter 00:30 lørdag er lørdagens, ikke fredagens. «fre. 20:00 – lør.
+  // 04:00» står under fredag (André, 15. sep. 2026), også etter at
+  // «Oversikt» fikk dagen ytterst.
+  //
+  // **Nullpolstret, fordi nøkkelen sorteres.** `2026-8-15` og `2026-8-4`
+  // sorterer feil vei som tekst; `2026-09-15` og `2026-09-04` gjør ikke det.
+  // `_grupperPaaDag()` sorterer på nøkkelen framfor å hvile på at den som
+  // kaller har sortert — samme grunn som `_hviletider()` sorterer selv.
   const d = _d(iso);
-  return d ? `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}` : '';
+  if (!d) return '';
+  const to = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${to(d.getMonth() + 1)}-${to(d.getDate())}`;
 }
 
 
-function _dagoverskrift(iso, kolonner) {
-  // «Fredag 2. okt» over blokkene når vakten spenner over flere dager
-  // (prosjektleder, 11. sep. 2026: «starttid definerer hvilken dag»). Lang
-  // ukedag, fordi linja er en overskrift og ikke et merke; lista er lokal så
-  // byggerne kan kjøres uten mer enn `MND` fra sida.
+function _grupperPaaDag(poster) {
+  // Skiftene samlet per dag, i kronologisk rekkefølge. Brukes av «Oversikt»,
+  // der dagen er ytterste nivå; `_blokkerMedDager()` gjør det samme inne i
+  // en tabell. Begge spør `_dagnokkel()`, så de kan ikke svare ulikt på
+  // hvilken dag et skift hører til.
+  const indeks = new Map();
+  (poster || []).forEach((vp) => {
+    const nokkel = _dagnokkel(vp.fra_tid);
+    if (!indeks.has(nokkel)) indeks.set(nokkel, { nokkel, fra_tid: vp.fra_tid, poster: [] });
+    indeks.get(nokkel).poster.push(vp);
+  });
+  return [...indeks.values()].sort((a, b) => (a.nokkel < b.nokkel ? -1 : a.nokkel > b.nokkel ? 1 : 0));
+}
+
+
+function _dagtekst(iso) {
+  // «Fredag 2. okt». Lang ukedag, fordi dette er en overskrift og ikke et
+  // merke; lista er lokal så byggerne kan kjøres uten mer enn `MND` fra sida.
+  // Heves ut av `_dagoverskrift()` fordi «Oversikt» trenger den samme teksten
+  // uten `<tr>` rundt — to formuleringer av samme dato ville før eller siden
+  // skrevet dagen ulikt på de to flatene.
   const DAGER_LANGE = ['Søndag', 'Mandag', 'Tirsdag', 'Onsdag', 'Torsdag',
                        'Fredag', 'Lørdag'];
   const d = _d(iso);
   if (!d) return '';
   const mnd = (globalThis.MND || [])[d.getMonth()] || '';
-  const tekst = `${DAGER_LANGE[d.getDay()]} ${d.getDate()}. ${mnd}`;
+  return `${DAGER_LANGE[d.getDay()]} ${d.getDate()}. ${mnd}`;
+}
+
+
+function _dagoverskrift(iso, kolonner) {
+  // Dagraden inne i en tabell (prosjektleder, 11. sep. 2026: «starttid
+  // definerer hvilken dag»).
+  const tekst = _dagtekst(iso);
+  if (!tekst) return '';
   return `
         <tr class="vl-dag">
           <td colspan="${escHtmlValue(kolonner)}">${escapeHtml(tekst)}</td>
@@ -1117,17 +1198,30 @@ function _dagoverskrift(iso, kolonner) {
 }
 
 
+function _blokkrader(blokker, kolonner, radbygger) {
+  // Blokkene uten dagoverskrifter. «Oversikt» bruker denne, fordi dagen der
+  // står som overskrift *over* tabellen — en dagrad inni ville sagt det samme
+  // to ganger på rad.
+  return blokker.map((blokk) =>
+    _blokklinje(blokk, kolonner) + blokk.poster.map(radbygger).join('')).join('');
+}
+
+
 function _blokkerMedDager(blokker, kolonner, radbygger) {
-  // Blokkene, med en dagoverskrift der dagen skifter — men bare når vakten
-  // faktisk har mer enn én dag. En endagsvakt ser ut som før: én overskrift
-  // over alt sier ingenting.
-  const dager = new Set(blokker.map((b) => _dagnokkel(b.fra_tid)));
+  // Blokkene, med en dagoverskrift der dagen skifter — **også når vakten bare
+  // varer én dag** (André, 15. sep. 2026: «alltid»).
+  //
+  // Fram til da sto overskriften bare på flerdagsvakter, med begrunnelsen at
+  // «én overskrift over alt sier ingenting». Det er fortsatt sant om selve
+  // linja, men den koster lite, og regelen kostet mer: planleggeren måtte
+  // vite at fraværet av en dagrad *betydde* noe, og en tabell som skifter
+  // form når vakta forlenges er en tabell man må lære to ganger.
   let forrige = null;
   return blokker.map((blokk) => {
     const dag = _dagnokkel(blokk.fra_tid);
-    const overskrift = dager.size > 1 && dag !== forrige ? _dagoverskrift(blokk.fra_tid, kolonner) : '';
+    const overskrift = dag !== forrige ? _dagoverskrift(blokk.fra_tid, kolonner) : '';
     forrige = dag;
-    return overskrift + _blokklinje(blokk, kolonner) + blokk.poster.map(radbygger).join('');
+    return overskrift + _blokkrader([blokk], kolonner, radbygger);
   }).join('');
 }
 
@@ -1181,15 +1275,33 @@ function mkOversikt() {
     korpsnavn[k.id] = k.kortnavn || k.navn;
   });
 
-  const perRessurs = new Map();
-  (aktivListe.ressurser || []).forEach((r) => perRessurs.set(r.id, []));
-  poster.forEach((vp) => {
-    if (perRessurs.has(vp.ressurs_id)) perRessurs.get(vp.ressurs_id).push(vp);
-  });
+  // **Dagen er ytterste nivå** (André, 14. sep. 2026): «oversikten skal bare
+  // vise hvem som er på vakt og hvilken ressurs de er på, på dag — ikke silt
+  // etter ressurs først og så dag».
+  //
+  // **Lesemodellen er en annen enn før.** Fram til nå svarte lista på «hvem
+  // står på denne bilen, og når» — den som leser sto ved bilen. Snudd svarer
+  // den på «hvem er på vakt i dag, og hvor», som er det den som møter om
+  // morgenen spør om. Begge er gyldige; dette er et valg om hvem arket er for.
+  //
+  // Et skift som krysser midnatt står under **startdagen**, ikke under begge
+  // og ikke splittet (André, 15. sep. 2026) — `_dagnokkel()` er regelen.
+  // Merk at rapportmodulen har landet motsatt for *timer* (§2.2 der):
+  // fakturagrunnlag splittes ved midnatt. Det er ikke en motsigelse — der er
+  // spørsmålet hvor mange timer, her er det hvem som er til stede — men
+  // forskjellen er bevisst og skal ikke «rettes».
+  const perRessursDag = (dagposter) => {
+    const kart = new Map();
+    (aktivListe.ressurser || []).forEach((r) => kart.set(r.id, []));
+    dagposter.forEach((vp) => {
+      if (kart.has(vp.ressurs_id)) kart.get(vp.ressurs_id).push(vp);
+    });
+    return kart;
+  };
 
   // Rekkefølgen er gruppas, så ressursens — samme som fanene. Ressurser uten
-  // skift utelates: en tom tabell på papiret er en linje man må lese for å se
-  // at det ikke står noe der.
+  // skift *den dagen* utelates: en tom tabell på papiret er en linje man må
+  // lese for å se at det ikke står noe der.
   // **Tiden står på blokklinja, ikke i raden** (11. sep. 2026). Skift med
   // samme fra–til samles i `_tidsblokker()`, og linja over dem bærer spennet,
   // timene og antallet. Raden under er hvem — navn, korps, rolle, merknad.
@@ -1210,21 +1322,24 @@ function mkOversikt() {
         </tr>`;
   };
 
-  const deler = _grupperMedRessurser().flatMap((g) =>
+  const ressursdeler = (kart) => _grupperMedRessurser().flatMap((g) =>
     _ressurserIGruppe(g.id)
       .filter((r) => utskriftRessurs == null || r.id === utskriftRessurs)
-      .filter((r) => (perRessurs.get(r.id) || []).length)
+      .filter((r) => (kart.get(r.id) || []).length)
       .map((r) => {
-        const egne = perRessurs.get(r.id);
+        const egne = kart.get(r.id);
         const blokker = _tidsblokker(egne);
-        const rader = _blokkerMedDager(blokker, 4, rad);
+        // `_blokkrader`, ikke `_blokkerMedDager`: dagen står i overskriften
+        // over tabellen, og en dagrad inni ville gjentatt den.
+        const rader = _blokkrader(blokker, 4, rad);
         const ledige = egne.filter((vp) => vp.ledig).length;
         const rest = ledige
           ? ` <span class="vl-meta">· ${escHtmlValue(ledige)} ${escapeHtml(ledige === 1 ? 'ledig' : 'ledige')}</span>` : '';
         // **Et skift er en vakttid, mannskap er de som går den** (André,
         // 11. sep. 2026). Tallene er derfor blokkene og de bemannede radene,
-        // ikke radene. Summen per ressurs er det man ellers legger sammen
-        // for hånd når man skal si hvor mye bilen er bemannet.
+        // ikke radene. Summene er **per dag per ressurs** etter snuingen —
+        // det er det tallet som står under overskriften de hører til. Summen
+        // for hele vakta står fortsatt i arkhodet.
         const tall = _telling(egne, blokker.length);
         const timer = `${escapeHtml(_tall(_sumTimer(egne)))} t`;
         return `
@@ -1247,6 +1362,15 @@ function mkOversikt() {
         </div>
       </div>`;
       }));
+
+  // **Dagbolken er en `<section>` med sin egen overskrift.** Utskriften har
+  // `break-inside: avoid` på den der det får plass — en dagoverskrift alene
+  // nederst på et ark er en side ingen kan bruke.
+  const deler = _grupperPaaDag(poster).map((dag) => `
+      <section class="vl-dagbolk">
+        <h2 class="vl-dagtittel">${escapeHtml(_dagtekst(dag.fra_tid))}</h2>
+        ${ressursdeler(perRessursDag(dag.poster)).join('')}
+      </section>`);
 
   const tittel = aktivListe.vaktliste.vakt_navn;
   const spenn = _vaktspenn();

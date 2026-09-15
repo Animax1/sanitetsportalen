@@ -328,35 +328,40 @@ standard.»
 Tre ting, og de henger sammen: en fane med ti ambulanser er i dag ti regneark under
 hverandre, og man scroller forbi ni for å komme til den tiende.
 
-- [ ] **Minimerbart kort per ressurs.** `mkRessurs()` bygger kortet; overskriften har alt
+- [x] **Minimerbart kort per ressurs.** `mkRessurs()` bygger kortet; overskriften har alt
       navn, korpsmerke, enhetsmerke og redigeringsknapp. Sammenslått viser den de samme
       merkene pluss en telling — antall skift, antall bemannede, ledige — så man ser hva
       som er der uten å åpne.
-- [ ] **Alle minimert som standard.** Gruppefanen har bemanningskurven øverst
+- [x] **Minimert som standard — men bare når gruppa har mer enn én** (avklart
+      15. sep. 2026). Opprinnelig ordlyd og begrunnelse: Gruppefanen har bemanningskurven øverst
       (`mkGruppekurve`), og den *er* oversikten over gruppa. Kortene under er detaljen.
       Med alt sammenslått blir fanen «kurve + hvilke biler finnes», som er den riktige
       første visningen.
-- [ ] **Dagruppering i planleggingstabellen, som i Oversikt.** Her er forskjellen i dag:
-      `_posterFor()` gir radene i serverens rekkefølge (`Vaktpost.Meta.ordering =
-      ['fra_tid', 'mannskap__navn']`) — sortert, men **uten dagoverskrifter**. Oversikt har
-      `_blokkerMedDager()`. Samme funksjon bør kunne brukes begge steder.
+- [x] **Dagruppering i planleggingstabellen.** ⚠️ **Punktet var feil da det ble skrevet:**
+      `mkRessurs()` har kalt `_blokkerMedDager()` hele tiden, og
+      `test_planleggingstabellen_har_dagrader_der_oversikten_har_titler` håndhever det —
+      planleggingstabellen *hadde* dagoverskrifter. Det som faktisk manglet var at de bare
+      sto på flerdagsvakter. Rettet 15. sep. 2026: overskriften vises nå alltid.
 
 #### Tre ting som må avklares
 
-- [ ] **Hvor lever sammenslått/utvidet?** `tegnFaner()` og `mkRessurs()` bygger markupen på
+- [x] **Hvor lever sammenslått/utvidet?** `ressursApen` (Map) i `vaktliste-kjerne.js`,
+      ikke `localStorage` — begrunnelsene står i CHANGELOG 15. sep. 2026. Vurderingen var: `tegnFaner()` og `mkRessurs()` bygger markupen på
       nytt ved hvert panelbytte — det er samme grunn til at `gateKnapper()` ikke kan gate
       dem (`CLAUDE.md`). Tilstanden må derfor ligge utenfor markupen: et sett på
       modulnivå, eller `localStorage` hvis den skal overleve en sidelasting.
       Presedensen finnes i `erDempet` i `oppdrag-enhet.js`, som husker per enhet.
-- [ ] **Alltid minimert, eller bare når det er mer enn én?** En vakt med **én** ambulanse
+- [x] **Alltid minimert, eller bare når det er mer enn én?** Avklart 15. sep. 2026:
+      bare når gruppa har mer enn én. Vurderingen var: En vakt med **én** ambulanse
       gir et klikk hver gang for å se det eneste som er der. `_blokkerMedDager()` har
       presedensen for det motsatte valget: dagoverskrifter vises «bare når vakten faktisk
       har mer enn én dag — en endagsvakt ser ut som før». Samme resonnement kunne gjelde
       her. **Andrés ordlyd er «alle … minimert som standard», så dette er et spørsmål, ikke
       en innvending.**
-- [ ] **Åpnes kortet automatisk når man må inn i det?** Klikker man «Rediger ressurs» eller
-      følger en lenke til en bestemt bil, bør kortet åpne seg. Ellers leder handlingen til
-      noe man ikke ser.
+- [x] **Åpnes kortet automatisk når man må inn i det?** Løst ved design: knappene blir
+      stående i hodet på et sammenslått kort, så «Rediger» og «Roller» virker uten å åpne
+      det først. `apneVaktpost()` åpner kortet — ellers lagrer man et skift og ser
+      ingenting skje.
 
 *Utskrift er ikke berørt: `vl-utskrift` og `@media print` hører til Oversikt, ikke til
 gruppefanene.*
@@ -402,7 +407,8 @@ som møter om morgenen faktisk stiller.
 
 #### Ett spørsmål som må avgjøres
 
-- [ ] **Hvor havner et skift som krysser midnatt?** I dag filer `_dagnokkel(fra_tid)` det
+- [x] **Hvor havner et skift som krysser midnatt?** Avklart 15. sep. 2026: **bare
+      startdagen**, som `_dagnokkel()` alltid har gjort. Vurderingen var: I dag filer `_dagnokkel(fra_tid)` det
       under **startdagen** — «fre. 20:00 – lør. 04:00» står bare under fredag. Med dagen
       som ytterste nivå blir det et reelt valg:
       - **Bare startdagen:** Den som ser på lørdag morgen ser ikke Kari, selv om hun *er*
@@ -415,11 +421,10 @@ som møter om morgenen faktisk stiller.
       like opplagt — der er spørsmålet hvem som er til stede, ikke hvor mange timer som
       skal faktureres. De to kan lande ulikt, men da skal det være bevisst.
 
-- [ ] **Beholdes summene per ressurs?** I dag viser ressursoverskriften antall skift,
-      antall bemannede og timer (`_telling`, `_sumTimer`). Med dag ytterst blir de per
-      dag per ressurs — eller de forsvinner. Avklares.
+- [x] **Beholdes summene per ressurs?** Ja — de er nå per dag per ressurs, og totalen for
+      hele vakta står fortsatt i arkhodet.
 
-- [ ] **Ressursfilteret** (`utskriftRessurs`) beholdes uansett; det silter på ressurs og
+- [x] **Ressursfilteret** (`utskriftRessurs`) beholdt; det silter på ressurs og
       er uavhengig av nivårekkefølgen.
 
 *`@media print`-reglene i `vaktliste.css` må gås gjennom med den nye strukturen — en

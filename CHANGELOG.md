@@ -4,6 +4,96 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-15 — Vaktlista: dagen ytterst i «Oversikt», og sammenslåtte ressurskort
+
+To av de tre ønskene fra 14. sep. er levert. Drift-automatikken står igjen og tas for seg.
+
+### Først: en feil i mitt eget notat
+
+TODO sa at planleggingstabellen «viser radene i serverens rekkefølge, sortert men **uten
+dagskille**», og at dagrupperingen derfor måtte bygges der. Det var galt — `mkRessurs()`
+har kalt `_blokkerMedDager()` hele tiden, og en test håndhevet det. Feilen betydde at
+arbeidet så større ut enn det var; den er rettet i TODO.
+
+### Dagen er én regel, to visninger
+
+`_dagnokkel()` er det ene stedet som avgjør hvilken dag et skift hører til, og svaret er
+**startdagen**: «fre. 20:00 – lør. 04:00» står under fredag. Ikke under begge dager, ikke
+splittet ved midnatt (André, 15. sep. 2026).
+
+**Merk spenningen mot rapportmodulen, som er bevisst:** der splittes skift ved midnatt
+(`FORSLAG_RAPPORTMODUL.md` §2.2), fordi spørsmålet er hvor mange timer som skal betales.
+Her er spørsmålet hvem som er til stede. De to skal ikke «rettes» mot hverandre.
+
+Nøkkelen er nå **nullpolstret** (`2026-09-04`), fordi `_grupperPaaDag()` sorterer på den og
+`2026-9-15 < 2026-9-4` som tekst. Hjelperen sorterer selv framfor å hvile på at den som
+kaller har sortert — samme grunn som `_hviletider()`.
+
+### «Oversikt» snudd: dag ytterst, ressurs under
+
+Før svarte arket på «hvem står på denne bilen, og når» — begrunnelsen i `CLAUDE.md` var at
+den som leser står ved bilen. Nå svarer det på **«hvem er på vakt i dag, og hvor»**, som er
+det den som møter om morgenen spør om. Begge er gyldige; dette er et valg om hvem arket er
+for, og `CLAUDE.md` er skrevet om i samme commit.
+
+En ressurs med skift to dager står nå i begge dagbolkene. Det er prisen for snuingen, og
+den er riktig her. Summene per ressurs er dermed **per dag**; totalen i arkhodet er
+fortsatt for hele vakta.
+
+`_blokkrader()` er skilt ut av `_blokkerMedDager()`: «Oversikt» har dagen som overskrift
+over tabellen, og en dagrad inni ville sagt det samme to ganger på rad.
+
+**Utskrift:** `.vl-dagtittel` har `break-after: avoid` — en dagoverskrift alene nederst på
+et ark er en side ingen kan bruke. Hele dagbolken får *ikke* `break-inside: avoid`: en dag
+med tolv ressurser er lengre enn et ark, og regelen ville enten blitt ignorert eller
+skjøvet en halv tom side foran seg.
+
+### Dagoverskriften vises nå alltid
+
+Også på en endagsvakt (André: «alltid»). Den gamle regelen — bare på flerdagsvakter — hadde
+en reell kostnad: planleggeren måtte vite at *fraværet* av en dagrad betydde noe, og
+tabellen skiftet form når vakta ble forlenget.
+
+### Sammenslåtte ressurskort
+
+En fane med ti ambulanser var ti regneark under hverandre. Kortene er nå sammenslåtte som
+standard — men **bare når gruppa har mer enn én ressurs** (André snevret det 15. sep.): en
+vakt med én ambulanse ville ellers kostet et klikk hver gang for å se det eneste som er der.
+
+Tre valg det er verdt å kunne begrunne:
+
+- **Tilstanden ligger i `ressursApen` i `vaktliste-kjerne.js`, ikke i DOM-en.** `mkRessurs()`
+  bygges på nytt ved hvert panelbytte — samme grunn til at `gateKnapper()` ikke kan gate den.
+- **Map, ikke Set.** Fraværende nøkkel betyr «som standarden». Et Set kunne ikke skilt «ikke
+  rørt» fra «utvidet for hånd», og et kort man åpnet ville slått seg sammen igjen neste gang
+  noen la til en bil i gruppa.
+- **Ikke `localStorage`.** En sidelasting er et nytt blikk på vakta; et kort man slo sammen i
+  går skal ikke være skjult når man kommer tilbake for å planlegge.
+
+**Et sammenslått kort er ingen blindvei:** «Rediger», «Roller» og «Opprett vakt» blir
+stående i hodet, og sammendraget sier hva som er der — «1 skift · 1 mannskap · 1 ledig ·
+16 t». `apneVaktpost()` åpner kortet, ellers lagrer man et skift og ser ingenting skje.
+
+**En latent feil ble synlig:** `ressurser.map(mkRessurs)` sendte indeksen som andre
+argument. Det var harmløst så lenge byggeren tok ett argument, og sluttet å være det i det
+øyeblikket den tok to — bil nummer null hadde stått lukket og resten åpne.
+
+### Tester
+
+Elleve nye i to klasser (`DagenErYtterstTests`, `SammenslaatteRessurserTests`), og den
+gamle dagoverskrift-bolken er skrevet om mot den nye strukturen. **Elleve mutasjoner
+prøvd, alle fanget.**
+
+En av dem avslørte en svak assertion hos meg: `ut.count('vl-dagbolk')` teller også
+`vl-dagbolk-x`, så en omdøpt klasse slapp gjennom. Assertionene teller nå `class="..."`
+eksakt.
+
+To ting ble rettet underveis fordi eksisterende gjerder fanget dem: escaping-skanneren
+avviste sammendraget bygget som template-literal (skrevet om med `+`, som `_blokklinje()`
+gjør), og et søk-og-erstatt i testfilene traff en JS-streng i stedet for en harness-liste.
+
+---
+
 ## 2026-09-14 — To notater: DPIA-vurderingen og vaktlisteutbedringene (ingen kode)
 
 To samtaler skrevet ned. Ingen kodeendring — begge notatene finnes for at beslutningene

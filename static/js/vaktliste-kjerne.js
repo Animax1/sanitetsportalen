@@ -56,6 +56,21 @@ let personSortStigende = true;
 let redigererPerson = null;      // id-en som redigeres, eller null for «ny»
 let redigererVerdi = null;
 let aktivVerdiregister = 'korps';  // hvilket register verdivinduet står i
+//: **Sammenslåtte ressurskort** (André, 14. sep. 2026). `tegnFaner()` og
+//: `mkRessurs()` bygger markupen på nytt ved hvert panelbytte — det er samme
+//: grunn til at `gateKnapper()` ikke kan gate dem — så tilstanden kan ikke bo
+//: i DOM-en. Presedensen er `erDempet` i `oppdrag-enhet.js`.
+//:
+//: **Map, ikke Set**, fordi standarden avhenger av gruppa: fraværende nøkkel
+//: betyr «som standarden», og standarden er sammenslått bare når gruppa har
+//: mer enn én ressurs (André, 15. sep. 2026). Et Set kunne ikke skilt «ikke
+//: rørt» fra «utvidet for hånd», og et kort man åpnet ville slått seg sammen
+//: igjen neste gang noen la til en bil i gruppa.
+//:
+//: Ikke `localStorage`: en sidelasting er et nytt blikk på vakta, og et kort
+//: man slo sammen i går skal ikke være skjult når man kommer tilbake for å
+//: planlegge.
+const ressursApen = new Map();
 
 const OVERSIKT = 'oversikt';
 const MANNSKAP = 'mannskap';

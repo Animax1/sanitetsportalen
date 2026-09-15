@@ -224,9 +224,22 @@ async function slettRessurs() {
 
 
 
+function veksleRessurs(id) {
+  // Sammenslå eller vis igjen. Tilstanden ligger i `ressursApen` og ikke i
+  // DOM-en, fordi panelet tegnes på nytt ved hvert faneskift.
+  const ressurs = aktivListe?.ressurser.find((r) => r.id === id);
+  if (!ressurs) return;
+  ressursApen.set(id, !ressursErApen(ressurs));
+  tegnPanel();
+}
+
+
 function apneVaktpost(ressursId) {
   const ressurs = aktivListe?.ressurser.find((r) => r.id === ressursId);
   if (!ressurs) return;
+  // **Kortet åpnes når man skal legge noe i det.** Ellers lagrer man et skift
+  // og ser ingenting skje — knappen står jo i hodet på et sammenslått kort.
+  ressursApen.set(ressursId, true);
   _skjulFeil('ny-vaktpost-feil');
   document.getElementById('ny-vaktpost-tittel').textContent =
     `Opprett vakt — ${ressurs.navn}`;

@@ -5,7 +5,8 @@ og tre ønsker fra André som ennå ikke er bygget. Punktvis står ønskene i `T
 notatet finnes fordi **de henger sammen på måter som ikke synes når de leses hver for seg**,
 og fordi rekkefølgen man bygger dem i avgjør om vi ender med én regel eller tre.
 
-Ingenting her er besluttet. Notatet skal gjøre valgene synlige, ikke ta dem.
+~~Ingenting her er besluttet.~~ **Avgjort 15. sep. 2026** — se §6 nederst. To av de tre er
+levert samme dag; drift-automatikken står igjen.
 
 ---
 
@@ -37,11 +38,15 @@ To av de tre ønskene handler om dagruppering, og de ber om den **på hvert sitt
 | Snu «Oversikt» | Dag som **ytterste** nivå, ressurs under | Utskriftslista |
 | Minimerbare ressurser | Dagoverskrifter **inne i** planleggingstabellen | Gruppefanene |
 
-I dag finnes dagen bare ett sted: `_blokkerMedDager()` i `static/js/vaktliste-tegning.js`,
-som setter en dagoverskrift inne i hver ressurs i Oversikt, og bare når vakta har mer enn én
-dag. Planleggingstabellen har ingenting — `_posterFor()` gir radene i serverens rekkefølge
-(`Vaktpost.Meta.ordering = ['fra_tid', 'mannskap__navn']`), altså sortert, men uten
-dagskille.
+> ⚠️ **Avsnittet under sto med en feil, og den er verdt å se.** Påstanden om at
+> planleggingstabellen «har ingenting» er gal: `mkRessurs()` har kalt `_blokkerMedDager()`
+> hele tiden, og en test håndhevet det. Feilen gjorde at arbeidet så større ut enn det var —
+> det som faktisk manglet var at overskriften bare sto på flerdagsvakter. Rettet 15. sep.
+> 2026. Selve konklusjonen — at dagen må være **én** regel — holdt.
+
+I dag finnes dagen bare ett sted: `_dagnokkel()` i `static/js/vaktliste-tegning.js`, brukt
+av `_blokkerMedDager()`, som setter en dagoverskrift inne i hver ressurs — i Oversikt *og* i
+planleggingstabellen — men bare når vakta har mer enn én dag.
 
 **Bygges de to hver for seg, får portalen to dagrupperinger som kan komme i utakt.** Det er
 samme klasse feil som `reservert_korps()` finnes for å hindre i tilgangsmodellen: leses en
@@ -156,17 +161,38 @@ E-postutsendingen har allerede et riktig sted å flytte til: `fil.send_planlagte
 
 ---
 
+## 6. Avgjørelsene (15. sep. 2026)
+
+André svarte på alle fire. Svarene står her fordi et notat som bare stiller spørsmål blir
+lest én gang.
+
+| Spørsmål | Svar | Konsekvens |
+|---|---|---|
+| Skift over midnatt i «Oversikt» | **Bare startdagen** | `_dagnokkel()` uendret. Bevisst ulikt rapportmodulen, som splitter ved midnatt for timer |
+| Dagoverskrift på endagsvakt | **Alltid** | Bryter med den gamle regelen; begrunnelsen var at fraværet av en dagrad ellers må *bety* noe |
+| Sammenslåtte kort som standard | **Bare når gruppa har mer enn én** | Snevret fra «alle». Én ambulanse ville kostet et klikk for å se det eneste som er der |
+| «Sett i drift» | **Automatisk, med overstyring beholdt** | `satt_i_drift_av` og auditsporet overlever; e-postutløseren flyttes til `FilutsendingMiddleware` |
+
+**Levert 15. sep. 2026:** dagrupperingen, «Oversikt» snudd, sammenslåtte ressurskort.
+Detaljene og de tre valgene bak `ressursApen` står i `CHANGELOG.md`.
+
+**Står igjen:** drift-automatikken (§3.3). Den deler ingen kode med de tre andre.
+
+---
+
 ## 5. Åpne punkter samlet
 
 Alle står også i `TODO.md`, der arbeidet krysses av. Samlet her for å kunne besvares i én
 omgang:
 
-- [ ] **Midnatt i oversikten:** startdagen, eller begge dager? (§2)
-- [ ] **Skal dagrupperingen vises på endagsvakter?** `_blokkerMedDager()` sier nei i dag.
-- [ ] **Minimert som standard også når gruppa har én ressurs?** (§3.1)
-- [ ] **Overlever sammenslått/utvidet en sidelasting?** (§3.1)
-- [ ] **Åpnes et sammenslått kort automatisk når man må inn i det** — «Rediger ressurs»?
-- [ ] **Beholdes summene per ressurs i snudd Oversikt?** (§3.2)
-- [ ] **Drift: utledet, eller automatisk med unntak?** (§3.3)
+- [x] **Midnatt i oversikten:** startdagen. (§6)
+- [x] **Skal dagrupperingen vises på endagsvakter?** Ja, alltid. (§6)
+- [x] **Minimert som standard også når gruppa har én ressurs?** Nei. (§6)
+- [x] **Overlever sammenslått/utvidet en sidelasting?** Nei — `ressursApen` er en Map i
+      minnet, ikke `localStorage`. En sidelasting er et nytt blikk på vakta.
+- [x] **Åpnes et sammenslått kort automatisk når man må inn i det?** Knappene blir
+      stående i hodet, så det trengs ikke. `apneVaktpost()` åpner kortet.
+- [x] **Beholdes summene per ressurs i snudd Oversikt?** Ja, per dag per ressurs.
+- [x] **Drift: utledet, eller automatisk med unntak?** Automatisk med overstyring. (§6)
 - [ ] **Hva skjer med `satt_i_drift_av` og auditsporet** hvis drift utledes? Et bevisst
       fravalg, ikke et tap man oppdager senere.

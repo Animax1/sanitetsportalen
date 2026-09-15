@@ -93,6 +93,11 @@ REVIEWED_INTERPOLATIONS = {
     'hvileklasse': 'hardkodet CSS-klasse fra en ternær',
     'lengsteklasse': 'hardkodet CSS-klasse fra en ternær',
     'tabellhode': 'markup bygget lokalt: to faste kolonneoppsett, ingen data',
+    # Sammenslåtte ressurskort (15. sep. 2026): vippeknappen og tabellen —
+    # eller sammendraget i stedet for den — bygges begge i `mkRessurs()`
+    # rett over, med id, tilstand og tall escapet inni.
+    'vippe': 'markup bygget lokalt, id og tilstand escapet inni',
+    'tabell': 'markup bygget lokalt: tabellen, eller sammendraget som escapes inni',
     'kolonner': 'to bruk, begge uten data: colspan-tallet i mkRessurs og '
                 'colgroup-markupen i mkBelastning, begge bygget lokalt',
     'navn': 'ternær: escapet personnavn, eller «Ledig plass» som markup',
@@ -129,6 +134,12 @@ REVIEWED_INTERPOLATIONS = {
     'bunn': 'markup bygget lokalt, datoene escapet inni',
     "deler.join('')": 'markup bygget lokalt i samme funksjon',
     'rader': 'markup bygget lokalt av byggere som selv skannes her',
+    # Dagbolkene i «Oversikt» (15. sep. 2026): ressurstabellene for én dag,
+    # bygget av `ressursdeler()` i samme funksjon. Radene inni går gjennom
+    # `rad()` og `_blokkrader`, som begge skannes her; dagtittelen ved siden
+    # av er escapet med `escapeHtml(_dagtekst(...))`.
+    "ressursdeler(perRessursDag(dag.poster)).join('')":
+        'markup bygget lokalt i samme funksjon',
     # `_dag()` bygger «lør 3. okt» av tall fra et Date-objekt og to
     # hardkodede lister. Ingen brukerdata passerer gjennom den — en ugyldig
     # dato gir tom streng, ikke uescapet innhold.
@@ -224,13 +235,13 @@ class VaktlisteEscapingOppforselTests(SimpleTestCase):
     HARNESS = (
         (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue', 'trustedHtml',
                            '_escHtml', 'klokke')),
-        (VAKTLISTE_JS, ('mkRessurs', '_radklasse', '_stempelknapper',
+        (VAKTLISTE_JS, ('mkRessurs', 'ressursErApen', '_radklasse', '_stempelknapper',
                         'kanStemple', 'iDrift', '_rolleValg',
                         'rollerForGruppe', '_fyllValgFor', 'opptattPaaPlassen', '_varighet',
-                        'mkRolleRad', 'mkOversikt', 'mkUtskriftsverktoy', '_utvalgstekst', '_skiftrekkefolge',
-                        '_planrad', '_plancellene', '_tidsblokker', '_blokklinje', '_blokkerMedDager', 'kanBemannePlass',
+                        'mkRolleRad', 'mkOversikt', '_grupperPaaDag', 'mkUtskriftsverktoy', '_utvalgstekst', '_skiftrekkefolge',
+                        '_planrad', '_plancellene', '_tidsblokker', '_blokklinje', '_blokkerMedDager', '_blokkrader', 'kanBemannePlass',
                         '_mittKorpsId', '_synligePoster',
-                        '_dagnokkel', '_dagoverskrift', '_probonoMerke',
+                        '_dagnokkel', '_dagoverskrift', '_dagtekst', '_probonoMerke',
                         '_sumTimer', '_skifttimer', '_tall', '_telling',
                         '_mkEnKurve', 'mkGruppekurve', '_posterIGruppe',
                         'mkGruppe', '_plassKorps', '_tegnforklaring',
@@ -249,7 +260,8 @@ class VaktlisteEscapingOppforselTests(SimpleTestCase):
     #: stubbes — og med admin, slik at *alle* knappene bygges. Escaping-testene
     #: skal se mest mulig markup; hvem som får se hva er `tests_tilgang.py`
     #: sitt bord.
-    VINDU = ("globalThis.window = { MODUL_TILGANG: { admin: true } };\n"
+    VINDU = ("globalThis.ressursApen = new Map();\n"
+             "globalThis.window = { MODUL_TILGANG: { admin: true } };\n"
              "globalThis.DAGER = ['søn','man','tir','ons','tor','fre','lør'];\n"
              "globalThis.MND = ['jan','feb','mar','apr','mai','jun',"
              "'jul','aug','sep','okt','nov','des'];\n")
@@ -555,7 +567,8 @@ class RegistersidenEscapingOppforselTests(SimpleTestCase):
 
     #: Tabellen skriver treff-telleren i DOM-en og leser sorteringstilstanden,
     #: så begge stubbes. Node har verken `window` eller `document`.
-    VINDU = ("globalThis.window = { MODUL_TILGANG: { admin: true } };\n"
+    VINDU = ("globalThis.ressursApen = new Map();\n"
+             "globalThis.window = { MODUL_TILGANG: { admin: true } };\n"
              "globalThis.document = { getElementById: () => null };\n"
              "globalThis.personsok = ''; globalThis.personSortKol = 'korps';\n"
              "globalThis.personSortStigende = true;\n")
@@ -704,7 +717,8 @@ class TidsvisningTests(SimpleTestCase):
                         '_vaktensSpenn', '_varighet', '_skifttimer',
                         '_tall')),
     )
-    VINDU = ("globalThis.DAGER = ['søn','man','tir','ons','tor','fre','lør'];\n"
+    VINDU = ("globalThis.ressursApen = new Map();\n"
+             "globalThis.DAGER = ['søn','man','tir','ons','tor','fre','lør'];\n"
              "globalThis.MND = ['jan','feb','mar','apr','mai','jun',"
              "'jul','aug','sep','okt','nov','des'];\n")
 
@@ -1367,15 +1381,16 @@ class OversiktUtenKurveTests(SimpleTestCase):
 
     HARNESS = (
         (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue')),
-        (VAKTLISTE_JS, ('mkOversikt', 'mkUtskriftsverktoy', '_utvalgstekst', '_skiftrekkefolge', '_d', '_kl',
-                        '_tidsblokker', '_blokklinje', '_blokkerMedDager', 'kanBemannePlass',
+        (VAKTLISTE_JS, ('mkOversikt', '_grupperPaaDag', 'mkUtskriftsverktoy', '_utvalgstekst', '_skiftrekkefolge', '_d', '_kl',
+                        '_tidsblokker', '_blokklinje', '_blokkerMedDager', '_blokkrader', 'kanBemannePlass',
                         '_mittKorpsId', '_synligePoster',
-                        '_dagnokkel', '_dagoverskrift', '_probonoMerke', '_sumTimer',
+                        '_dagnokkel', '_dagoverskrift', '_dagtekst', '_probonoMerke', '_sumTimer',
                         '_varighet', '_skifttimer', '_tall', '_telling',
                         '_dag', '_sammeDag', '_tidsspenn', '_vaktspenn',
                         '_ressurserIGruppe', '_grupperMedRessurser')),
     )
-    VINDU = ("globalThis.DAGER = ['søn','man','tir','ons','tor','fre','lør'];\n"
+    VINDU = ("globalThis.ressursApen = new Map();\n"
+             "globalThis.DAGER = ['søn','man','tir','ons','tor','fre','lør'];\n"
              "globalThis.MND = ['jan','feb','mar','apr','mai','jun',"
              "'jul','aug','sep','okt','nov','des'];\n")
 
@@ -1419,7 +1434,8 @@ class KurvePerGruppeTests(SimpleTestCase):
                         '_ressurserIGruppe', '_tegnforklaring',
                         '_timesteg', '_tidsblokker', '_tidsspenn', '_sammeDag', '_skiftrekkefolge')),
     )
-    VINDU = ("globalThis.DAGER = ['søn','man','tir','ons','tor','fre','lør'];\n"
+    VINDU = ("globalThis.ressursApen = new Map();\n"
+             "globalThis.DAGER = ['søn','man','tir','ons','tor','fre','lør'];\n"
              "globalThis.MND = ['jan','feb','mar','apr','mai','jun',"
              "'jul','aug','sep','okt','nov','des'];\n")
 
@@ -1519,7 +1535,8 @@ class TimeaksenTests(SimpleTestCase):
         (VAKTLISTE_JS, ('_d', '_kl', '_dag', '_vaktensSpenn',
                         '_bemanningPerTime', '_mkEnKurve', '_timesteg', '_tidsblokker', '_tidsspenn', '_sammeDag', '_skiftrekkefolge')),
     )
-    VINDU = ("globalThis.DAGER = ['søn','man','tir','ons','tor','fre','lør'];\n"
+    VINDU = ("globalThis.ressursApen = new Map();\n"
+             "globalThis.DAGER = ['søn','man','tir','ons','tor','fre','lør'];\n"
              "globalThis.MND = ['jan','feb','mar','apr','mai','jun',"
              "'jul','aug','sep','okt','nov','des'];\n")
 
@@ -1646,7 +1663,8 @@ class GruppekurveIFanenTests(SimpleTestCase):
                         '_tegnforklaring', '_posterIGruppe',
                         '_ressurserIGruppe', 'mkGruppekurve', '_tidsblokker', '_tidsspenn', '_sammeDag', '_skiftrekkefolge')),
     )
-    VINDU = ("globalThis.DAGER = ['søn','man','tir','ons','tor','fre','lør'];\n"
+    VINDU = ("globalThis.ressursApen = new Map();\n"
+             "globalThis.DAGER = ['søn','man','tir','ons','tor','fre','lør'];\n"
              "globalThis.MND = ['jan','feb','mar','apr','mai','jun',"
              "'jul','aug','sep','okt','nov','des'];\n")
     LISTE = """
@@ -1802,12 +1820,12 @@ class FanenErGruppaTests(SimpleTestCase):
     HARNESS = (
         (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue')),
         (VAKTLISTE_JS, ('tegnFaner', '_fanerad', '_mannskapsfane', '_mittKorpsId',
-                        '_synligePoster', 'iDrift', '_tilstede', 'mkGruppe',
-                        'mkRessurs', '_radklasse', '_stempelknapper', 'kanStemple',
+                        '_synligePoster', 'iDrift', '_tilstede', 'mkGruppe', 'ressursErApen',
+                        'mkRessurs', '_sumTimer', '_radklasse', '_stempelknapper', 'kanStemple',
                         '_rolleValg', '_skiftrekkefolge', '_fyllValgFor', 'opptattPaaPlassen',
                         '_varighet', '_skifttimer', '_tall', '_planrad', '_plancellene',
-                        '_tidsblokker', '_blokklinje', '_blokkerMedDager',
-                        'kanBemannePlass', '_dagnokkel', '_dagoverskrift',
+                        '_tidsblokker', '_blokklinje', '_blokkerMedDager', '_blokkrader',
+                        'kanBemannePlass', '_dagnokkel', '_dagoverskrift', '_dagtekst',
                         '_probonoMerke', '_tidsspenn', '_telling', '_sammeDag',
                         '_driftrad', 'mkGruppekurve', '_mkEnKurve',
                         '_tegnforklaring', '_timesteg',
@@ -1818,7 +1836,8 @@ class FanenErGruppaTests(SimpleTestCase):
                         '_dag', '_nivaa', '_erAdmin', 'kanSkriveAlt', 'kanLede',
                         'kanBemanne', 'gruppaHarPlass', 'kanRoreRad')),
     )
-    VINDU = ("globalThis.window = { MODUL_TILGANG: { admin: true } };\n"
+    VINDU = ("globalThis.ressursApen = new Map();\n"
+             "globalThis.window = { MODUL_TILGANG: { admin: true } };\n"
              "globalThis.DAGER = ['søn','man','tir','ons','tor','fre','lør'];\n"
              "globalThis.MND = ['jan','feb','mar','apr','mai','jun',"
              "'jul','aug','sep','okt','nov','des'];\n"
@@ -2026,15 +2045,16 @@ class UtskriftslistaTests(SimpleTestCase):
 
     HARNESS = (
         (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue')),
-        (VAKTLISTE_JS, ('mkOversikt', 'mkUtskriftsverktoy', '_utvalgstekst', '_skiftrekkefolge', '_d', '_kl',
-                        '_tidsblokker', '_blokklinje', '_blokkerMedDager', 'kanBemannePlass',
+        (VAKTLISTE_JS, ('mkOversikt', '_grupperPaaDag', 'mkUtskriftsverktoy', '_utvalgstekst', '_skiftrekkefolge', '_d', '_kl',
+                        '_tidsblokker', '_blokklinje', '_blokkerMedDager', '_blokkrader', 'kanBemannePlass',
                         '_mittKorpsId', '_synligePoster',
-                        '_dagnokkel', '_dagoverskrift', '_probonoMerke', '_sumTimer',
+                        '_dagnokkel', '_dagoverskrift', '_dagtekst', '_probonoMerke', '_sumTimer',
                         '_varighet', '_skifttimer', '_tall', '_telling',
                         '_dag', '_sammeDag', '_tidsspenn', '_vaktspenn',
                         '_ressurserIGruppe', '_grupperMedRessurser')),
     )
-    VINDU = ("globalThis.DAGER = ['søn','man','tir','ons','tor','fre','lør'];\n"
+    VINDU = ("globalThis.ressursApen = new Map();\n"
+             "globalThis.DAGER = ['søn','man','tir','ons','tor','fre','lør'];\n"
              "globalThis.MND = ['jan','feb','mar','apr','mai','jun',"
              "'jul','aug','sep','okt','nov','des'];\n")
 
@@ -2156,13 +2176,13 @@ class EnkeltgruppeTests(SimpleTestCase):
 
     HARNESS = (
         (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue')),
-        (VAKTLISTE_JS, ('mkGruppe', 'mkRessurs', '_radklasse',
+        (VAKTLISTE_JS, ('mkGruppe', 'ressursErApen', 'mkRessurs', '_sumTimer', '_radklasse',
                         '_stempelknapper', 'kanStemple', 'iDrift',
                         '_rolleValg', '_plassKorps', '_skiftrekkefolge',
                         '_fyllValgFor', 'opptattPaaPlassen', '_varighet', '_skifttimer', '_tall',
-                        '_planrad', '_plancellene', '_tidsblokker', '_blokklinje', '_blokkerMedDager', 'kanBemannePlass',
+                        '_planrad', '_plancellene', '_tidsblokker', '_blokklinje', '_blokkerMedDager', '_blokkrader', 'kanBemannePlass',
                         '_mittKorpsId', '_synligePoster',
-                        '_dagnokkel', '_dagoverskrift', '_probonoMerke',
+                        '_dagnokkel', '_dagoverskrift', '_dagtekst', '_probonoMerke',
                         '_tidsspenn', '_sammeDag', 'mkGruppekurve', '_telling',
                         '_posterIGruppe', '_mkEnKurve', '_tegnforklaring',
                         '_timesteg', '_vaktensSpenn',
@@ -2172,7 +2192,8 @@ class EnkeltgruppeTests(SimpleTestCase):
                         '_nivaa', '_erAdmin', 'kanSkriveAlt', 'kanLede',
                         'kanBemanne', 'gruppaHarPlass', 'kanRoreRad')),
     )
-    VINDU = ("globalThis.window = { MODUL_TILGANG: { admin: true } };\n"
+    VINDU = ("globalThis.ressursApen = new Map();\n"
+             "globalThis.window = { MODUL_TILGANG: { admin: true } };\n"
              "globalThis.DAGER = ['søn','man','tir','ons','tor','fre','lør'];\n"
              "globalThis.MND = ['jan','feb','mar','apr','mai','jun',"
              "'jul','aug','sep','okt','nov','des'];\n")
@@ -2261,6 +2282,154 @@ class EnkeltgruppeTests(SimpleTestCase):
         ut = self._gruppe({'id': 2, 'navn': 'Ambulanse', 'ikon': 'truck'},
                           ressurs)
         self.assertIn('Ny Ambulanse', ut)
+
+
+class SammenslaatteRessurserTests(SimpleTestCase):
+    """Ressurskortene kan slås sammen i gruppefanen (André, 14. sep. 2026).
+
+    *«i hver ressursfane skal en kunne minimere lag/ambulanse osv. Og at alle
+    ressursene i ressursgruppen er minimert som standard.»* — snevret
+    15. sep. 2026 til **bare når gruppa har mer enn én**: en vakt med én
+    ambulanse ville ellers kostet et klikk hver gang for å se det eneste som
+    er der.
+
+    En fane med ti ambulanser var ti regneark under hverandre. Gruppefanen har
+    bemanningskurven øverst, og den *er* oversikten over gruppa — kortene under
+    er detaljen.
+    """
+
+    HARNESS = EnkeltgruppeTests.HARNESS
+    VINDU = EnkeltgruppeTests.VINDU
+
+    #: To ambulanser og én samleplass, med skift på Bil A.
+    LISTE = """
+        globalThis.utskriftRessurs = null; globalThis.korpsfilter = null;
+        globalThis.ressursApen = new Map();
+        globalThis.rollerForGruppe = () => [];
+        globalThis.aktivListe = {
+          vaktliste: {startet: '2026-10-03T08:00:00',
+                      planlagt_slutt: '2026-10-03T20:00:00', i_drift: false},
+          grupper: [{id: 1, navn: 'Samleplass', ikon: 'hospital', flere_enheter: false},
+                    {id: 2, navn: 'Ambulanse', ikon: 'truck', flere_enheter: true}],
+          ressurser: [
+            {id: 10, navn: 'Samleplass', gruppe_id: 1, gruppe_navn: 'Samleplass', ikon: 'hospital'},
+            {id: 20, navn: 'Bil A', gruppe_id: 2, gruppe_navn: 'Ambulanse', ikon: 'truck'},
+            {id: 21, navn: 'Bil B', gruppe_id: 2, gruppe_navn: 'Ambulanse', ikon: 'truck'}],
+          roller: [], mannskap: [], korps: [],
+          vaktposter: [
+            {id: 1, ressurs_id: 20, ledig: false, navn: 'Kari', korps_kort: 'HGSD',
+             rolle: '', merknad: '', fra_tid: '2026-10-03T08:00:00',
+             til_tid: '2026-10-03T16:00:00'},
+            {id: 2, ressurs_id: 20, ledig: true, navn: '', korps_kort: '',
+             rolle: '', merknad: '', fra_tid: '2026-10-03T08:00:00',
+             til_tid: '2026-10-03T16:00:00'}]};
+    """
+
+    def setUp(self):
+        if not node_available():
+            self.skipTest('node er ikke tilgjengelig')
+        self.harness = build_harness(self.HARNESS)
+
+    def _kjor(self, snippet):
+        return run_node(self.harness, self.VINDU + self.LISTE + snippet)
+
+    # ── Standarden ───────────────────────────────────────────────────────
+    def test_gruppe_med_en_ressurs_staar_apen(self):
+        """Samleplassen er alene i gruppa si — ingenting å bla forbi."""
+        self._kjor("""
+            const r = aktivListe.ressurser.find((x) => x.id === 10);
+            assert(ressursErApen(r) === true, 'den ene skal staa aapen');
+        """)
+
+    def test_gruppe_med_flere_ressurser_staar_sammenslaatt(self):
+        self._kjor("""
+            const a = aktivListe.ressurser.find((x) => x.id === 20);
+            const b = aktivListe.ressurser.find((x) => x.id === 21);
+            assert(ressursErApen(a) === false, 'Bil A skal vaere sammenslaatt');
+            assert(ressursErApen(b) === false, 'Bil B skal vaere sammenslaatt');
+        """)
+
+    def test_valget_vinner_over_standarden_begge_veier(self):
+        """**Map, ikke Set.** Fraværende nøkkel betyr «som standarden»; et Set
+        kunne ikke skilt «ikke rørt» fra «utvidet for hånd», og et kort man
+        åpnet ville slått seg sammen igjen når noen la til en bil i gruppa."""
+        self._kjor("""
+            const a = aktivListe.ressurser.find((x) => x.id === 20);
+            const alene = aktivListe.ressurser.find((x) => x.id === 10);
+            ressursApen.set(20, true);
+            assert(ressursErApen(a) === true, 'aapnet for haand skal staa aapent');
+            ressursApen.set(10, false);
+            assert(ressursErApen(alene) === false, 'lukket for haand skal staa lukket');
+        """)
+
+    # ── Hva kortet viser ─────────────────────────────────────────────────
+    def test_sammenslaatt_kort_har_ingen_tabell(self):
+        ut = self._kjor("""
+            console.log(mkRessurs(aktivListe.ressurser.find((x) => x.id === 20), false));
+        """)
+        self.assertNotIn('<table', ut)
+        self.assertNotIn('Kari', ut)
+
+    def test_sammenslaatt_kort_sier_hva_som_er_der(self):
+        """Et sammenslått kort uten tall er bare en skjult rad. Skiftene,
+        mannskapet, de ledige plassene og timene skal stå i hodet."""
+        ut = self._kjor("""
+            console.log(mkRessurs(aktivListe.ressurser.find((x) => x.id === 20), false));
+        """)
+        self.assertIn('1 skift', ut)
+        self.assertIn('1 mannskap', ut)
+        self.assertIn('1 ledig', ut)
+        # 16 t, ikke 8: begge plassene på blokka teller, også den ledige.
+        # Det er samme sum som ressursoverskriften i «Oversikt» viser.
+        self.assertIn('16 t', ut)
+
+    def test_tomt_kort_sier_at_det_er_tomt(self):
+        ut = self._kjor("""
+            console.log(mkRessurs(aktivListe.ressurser.find((x) => x.id === 21), false));
+        """)
+        self.assertIn('Ingen satt opp', ut)
+
+    def test_sammenslaatt_kort_er_ingen_blindvei(self):
+        """**Knappene blir stående.** «Rediger», «Roller» og «Opprett vakt»
+        skal virke uten å åpne kortet først — ellers er sammenslåingen et
+        ekstra klikk foran alt man skulle gjøre."""
+        ut = self._kjor("""
+            console.log(mkRessurs(aktivListe.ressurser.find((x) => x.id === 20), false));
+        """)
+        self.assertIn('apneVaktpost', ut)
+        self.assertIn('apneRessurs', ut)
+        self.assertIn('apneRoller', ut)
+
+    def test_apent_kort_tegner_tabellen(self):
+        ut = self._kjor("""
+            console.log(mkRessurs(aktivListe.ressurser.find((x) => x.id === 20), true));
+        """)
+        self.assertIn('<table', ut)
+        self.assertIn('Kari', ut)
+
+    def test_vippa_sier_hvilken_vei_den_gaar(self):
+        """`aria-expanded` og pila skal følge tilstanden — en pil som peker
+        samme vei uansett er en pil man slutter å lese."""
+        apen = self._kjor("console.log(mkRessurs(aktivListe.ressurser[1], true));")
+        lukket = self._kjor("console.log(mkRessurs(aktivListe.ressurser[1], false));")
+        self.assertIn('aria-expanded="true"', apen)
+        self.assertIn('bi-chevron-down', apen)
+        self.assertIn('aria-expanded="false"', lukket)
+        self.assertIn('bi-chevron-right', lukket)
+
+    # ── Gruppa avgjør, ikke kortet ───────────────────────────────────────
+    def test_gruppa_slaar_sammen_kortene_sine(self):
+        """**`map(mkRessurs)` ville sendt indeksen som `apen`** — bil nummer
+        null hadde stått lukket og resten åpne. Formen sto her og var harmløs
+        så lenge byggeren tok ett argument."""
+        ut = self._kjor("console.log(mkGruppe(aktivListe.grupper[1]));")
+        self.assertEqual(ut.count('<table'), 0, 'begge ambulansene skal vaere sammenslaatt')
+        self.assertIn('Bil A', ut)
+        self.assertIn('Bil B', ut)
+
+    def test_gruppa_med_en_ressurs_tegner_tabellen(self):
+        ut = self._kjor("console.log(mkGruppe(aktivListe.grupper[0]));")
+        self.assertIn('<table', ut)
 
 
 class NyRessursSkjemaetTests(SimpleTestCase):
@@ -2390,7 +2559,8 @@ class MannskapsfanenTests(SimpleTestCase):
                         '_skjulFeil', '_nivaa', 'visFane', '_erAdmin',
                         'kanSkriveAlt', 'kanSkriveNoe', 'kanLede')),
     )
-    VINDU = ("globalThis.window = { MODUL_TILGANG: { admin: true } };\n"
+    VINDU = ("globalThis.ressursApen = new Map();\n"
+             "globalThis.window = { MODUL_TILGANG: { admin: true } };\n"
              "globalThis.MANNSKAP = 'mannskap';\n"
              "globalThis.TILSTEDE = 'tilstede';\n"
              "globalThis.BELASTNING = 'belastning';\n"
@@ -2610,7 +2780,7 @@ class NyVaktpostFyllerDatoenTests(SimpleTestCase):
 
     HARNESS = (
         (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue')),
-        (VAKTLISTE_JS, ('apneVaktpost', '_settTid', '_iso16', '_d',
+        (VAKTLISTE_JS, ('apneVaktpost', 'ressursErApen', '_settTid', '_iso16', '_d',
                         '_fyll', '_skjulFeil', '_vaktpostModusSkifte',
                         'rollerForGruppe', '_plussTimer')),
     )
@@ -2622,6 +2792,10 @@ class NyVaktpostFyllerDatoenTests(SimpleTestCase):
 
     OPPSETT = """
         globalThis.utskriftRessurs = null; globalThis.korpsfilter = null;
+        // `ressursApen` er en toppnivå-const, ikke en funksjon, så
+        // `build_harness` kan ikke klippe den ut — den stubbes som de andre
+        // modulglobalene. `apneVaktpost` åpner kortet den legger et skift i.
+        globalThis.ressursApen = new Map();
         globalThis.aktivListe = {
           vaktliste: {id: 3, startet: '2026-10-03T08:00:00'},
           ressurser: [{id: 10, navn: 'Bil A', gruppe_id: 2}],
@@ -3053,9 +3227,10 @@ class TidsblokkerTests(SimpleTestCase):
 
     HARNESS = (
         (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue')),
-        (VAKTLISTE_JS, ('mkOversikt', 'mkUtskriftsverktoy', '_utvalgstekst', '_tidsblokker', '_blokklinje', '_blokkerMedDager', 'kanBemannePlass', '_mittKorpsId', '_synligePoster', '_dagnokkel', '_dagoverskrift', '_probonoMerke', '_telling', '_driftrad', '_plancellene', '_planrad', '_rolleValg', '_fyllValgFor', 'opptattPaaPlassen', '_plassKorps', '_varighet', '_skifttimer', '_tall', '_iso16', '_radklasse', '_stempelknapper', 'kanStemple', 'iDrift', 'kanSkriveAlt', '_nivaa', '_erAdmin', '_skiftrekkefolge', '_sumTimer', '_d', '_kl', '_dag', '_sammeDag', '_tidsspenn', '_vaktspenn', '_ressurserIGruppe', '_grupperMedRessurser', 'kanRoreRad')),
+        (VAKTLISTE_JS, ('mkOversikt', '_grupperPaaDag', 'mkUtskriftsverktoy', '_utvalgstekst', '_tidsblokker', '_blokklinje', '_blokkerMedDager', '_blokkrader', 'kanBemannePlass', '_mittKorpsId', '_synligePoster', '_dagnokkel', '_dagoverskrift', '_dagtekst', '_probonoMerke', '_telling', '_driftrad', '_plancellene', '_planrad', '_rolleValg', '_fyllValgFor', 'opptattPaaPlassen', '_plassKorps', '_varighet', '_skifttimer', '_tall', '_iso16', '_radklasse', '_stempelknapper', 'kanStemple', 'iDrift', 'kanSkriveAlt', '_nivaa', '_erAdmin', '_skiftrekkefolge', '_sumTimer', '_d', '_kl', '_dag', '_sammeDag', '_tidsspenn', '_vaktspenn', '_ressurserIGruppe', '_grupperMedRessurser', 'kanRoreRad')),
     )
-    VINDU = ("globalThis.window = { MODUL_TILGANG: { admin: true } };\n"
+    VINDU = ("globalThis.ressursApen = new Map();\n"
+             "globalThis.window = { MODUL_TILGANG: { admin: true } };\n"
              "globalThis.DAGER = ['søn','man','tir','ons','tor','fre','lør'];\n"
              "globalThis.MND = ['jan','feb','mar','apr','mai','jun',"
              "'jul','aug','sep','okt','nov','des'];\n")
@@ -3546,32 +3721,29 @@ class ProbonoOgDagoverskrifterTests(SimpleTestCase):
         """)
         self.assertIn('vl-probono', ut)
 
-    # ── Dagoverskrifter ──────────────────────────────────────────────────
-    def test_endagsvakt_har_ingen_dagoverskrift(self):
-        """Alle Andrés skift begynner 4. sep.: én dag, ingen overskrift."""
-        self.assertNotIn('vl-dag"', self._oversikt())
-
-    def test_flerdagsvakt_faar_en_overskrift_per_dag(self):
-        ut = self._oversikt("""
-            aktivListe.vaktposter.push({id: 9, ressurs_id: 10, ledig: false, navn: 'Nina',
-              korps_kort: 'HGSD', rolle: '', merknad: '',
-              fra_tid: '2026-09-05T08:00:00', til_tid: '2026-09-05T16:00:00'});
-        """)
-        samleplass = ut[ut.index('<h3>Samleplass'):ut.index('<h3>Ambulanse 1')]
-        self.assertEqual(samleplass.count('class="vl-dag"'), 2)
-        self.assertIn('Fredag 4. sep', samleplass)
-        self.assertIn('Lørdag 5. sep', samleplass)
-        self.assertLess(samleplass.index('Fredag'), samleplass.index('Lørdag'))
-
+    # ── Dagen som nøkkel ─────────────────────────────────────────────────
     def test_starttiden_bestemmer_dagen(self):
         """Et skift 17:00–03:00 er fredagens, selv om det slutter lørdag —
-        og et som begynner 00:30 lørdag er lørdagens."""
+        og et som begynner 00:30 lørdag er lørdagens. **Bekreftet på nytt
+        15. sep. 2026**, da «Oversikt» fikk dagen ytterst: André valgte
+        startdagen framfor begge dager og framfor splitting ved midnatt."""
         run_node(self.harness, """
             assert(_dagnokkel('2026-09-04T17:00:00') === _dagnokkel('2026-09-04T23:59:00'),
                    'samme dag');
             assert(_dagnokkel('2026-09-04T17:00:00') !== _dagnokkel('2026-09-05T00:30:00'),
                    'over midnatt er neste dag');
             assert(_dagnokkel(null) === '', 'ugyldig gir tom noekkel');
+        """)
+
+    def test_noekkelen_sorterer_som_dato(self):
+        """Nøkkelen sorteres av `_grupperPaaDag`, så den må være nullpolstret:
+        `2026-9-15` < `2026-9-4` som tekst, og da kom 15. før 4."""
+        run_node(self.harness, """
+            const fjerde = _dagnokkel('2026-09-04T17:00:00');
+            const femtende = _dagnokkel('2026-09-15T17:00:00');
+            assert(fjerde < femtende, fjerde + ' skal sortere foer ' + femtende);
+            assert(_dagnokkel('2026-09-04T00:00:00') < _dagnokkel('2026-10-01T00:00:00'),
+                   'september foer oktober');
         """)
 
     def test_overskriften_bare_der_dagen_skifter(self):
@@ -3590,10 +3762,146 @@ class ProbonoOgDagoverskrifterTests(SimpleTestCase):
         self.assertEqual(ut.count('class="vl-dag"'), 2)
         self.assertEqual(ut.count('class="vl-blokk"'), 3)
 
-    def test_ressurstabellen_i_planlegging_faar_ogsaa_dager(self):
-        """Ikke bare utskriftslista: den man planlegger i."""
-        kropp = extract_function(read_js(VAKTLISTE_JS), 'mkRessurs')
-        self.assertIn('_blokkerMedDager(', kropp)
+    def test_endagsvakt_faar_ogsaa_dagoverskrift(self):
+        """**Snudd 15. sep. 2026** (André: «alltid»). Fram til da sto
+        overskriften bare på flerdagsvakter, og da måtte planleggeren vite at
+        *fraværet* av en dagrad betydde noe."""
+        ut = run_node(self.harness, self.VINDU + """
+            globalThis.utskriftRessurs = null; globalThis.korpsfilter = null;
+            globalThis.aktivListe = {vaktliste: {i_drift: false}};
+            const rad = () => '';
+            const blokker = _tidsblokker([
+              {fra_tid: '2026-09-04T17:00:00', til_tid: '2026-09-04T22:00:00', navn: 'A'},
+              {fra_tid: '2026-09-04T22:00:00', til_tid: '2026-09-04T23:00:00', navn: 'B'},
+            ]);
+            console.log(_blokkerMedDager(blokker, 4, rad));
+        """)
+        self.assertEqual(ut.count('class="vl-dag"'), 1)
+        self.assertIn('Fredag 4. sep', ut)
+
+
+class DagenErYtterstTests(SimpleTestCase):
+    """«Oversikt» snudd: dag ytterst, ressurs under (André, 14.–15. sep. 2026).
+
+    *«oversikten [skal] bare vise hvem som er på vakt og hvilken ressurs de er
+    på på dag … ikke silt etter ressurs først og så dag, men faktisk silt etter
+    dag så ressurs.»*
+
+    **Lesemodellen er en annen.** Før svarte lista på «hvem står på denne
+    bilen, og når» — den som leste sto ved bilen. Nå svarer den på «hvem er på
+    vakt i dag, og hvor», som er det den som møter om morgenen spør om.
+    """
+
+    HARNESS = VaktlisteEscapingOppforselTests.HARNESS
+    VINDU = TidsblokkerTests.VINDU
+    LISTE = TidsblokkerTests.LISTE
+
+    #: Nina står på samleplassen lørdag; resten av Andrés rader er fredag.
+    LORDAG = """
+        aktivListe.vaktposter.push({id: 9, ressurs_id: 10, ledig: false, navn: 'Nina',
+          korps_kort: 'HGSD', rolle: '', merknad: '',
+          fra_tid: '2026-09-05T08:00:00', til_tid: '2026-09-05T16:00:00'});
+    """
+
+    def setUp(self):
+        if not node_available():
+            self.skipTest('node er ikke tilgjengelig')
+        self.harness = build_harness(self.HARNESS)
+
+    def _oversikt(self, ekstra=''):
+        return run_node(self.harness, self.VINDU + self.LISTE + ekstra
+                        + "console.log(mkOversikt());")
+
+    def test_dagen_staar_over_ressursen(self):
+        """Kjernen i snuingen: dagtittelen kommer før ressursoverskriften."""
+        ut = self._oversikt()
+        self.assertLess(ut.index('class="vl-dagtittel"'), ut.index('<h3>Samleplass'),
+                        'dagen skal staa ytterst, ressursen under')
+
+    def test_endagsvakt_faar_ogsaa_en_dagtittel(self):
+        """Andrés rader er alle 4. sep. Overskriften står likevel — André,
+        15. sep. 2026: «alltid»."""
+        ut = self._oversikt()
+        self.assertEqual(ut.count('class="vl-dagtittel"'), 1)
+        self.assertIn('Fredag 4. sep', ut)
+
+    def test_hver_dag_faar_sin_bolk_i_kronologisk_rekkefolge(self):
+        ut = self._oversikt(self.LORDAG)
+        self.assertEqual(ut.count('class="vl-dagbolk"'), 2)
+        self.assertIn('Fredag 4. sep', ut)
+        self.assertIn('Lørdag 5. sep', ut)
+        self.assertLess(ut.index('Fredag 4. sep'), ut.index('Lørdag 5. sep'))
+
+    def test_ressursen_gjentas_under_hver_dag_den_har_skift(self):
+        """Samleplassen har skift begge dager og skal stå i begge bolkene —
+        det er nettopp det snuingen koster, og det er riktig her."""
+        ut = self._oversikt(self.LORDAG)
+        self.assertEqual(ut.count('<h3>Samleplass'), 2)
+
+    def test_dagbolken_viser_bare_sin_egen_dags_skift(self):
+        """Nina står lørdag. Hun skal ikke dukke opp i fredagsbolken."""
+        ut = self._oversikt(self.LORDAG)
+        fredag = ut[ut.index('Fredag 4. sep'):ut.index('Lørdag 5. sep')]
+        self.assertNotIn('Nina', fredag)
+        self.assertIn('Nina', ut[ut.index('Lørdag 5. sep'):])
+
+    def test_skift_over_midnatt_staar_bare_under_startdagen(self):
+        """Andrés samleplass-skift går 17:00 fredag til 03:00 lørdag. Det
+        står under fredag, **ikke** under begge og ikke splittet (André,
+        15. sep. 2026). Merk at rapportmodulen har landet motsatt for timer;
+        forskjellen er bevisst."""
+        ut = self._oversikt(self.LORDAG)
+        lordag = ut[ut.index('Lørdag 5. sep'):]
+        self.assertNotIn('17:00', lordag)
+
+    def test_ingen_dagrader_inne_i_tabellen(self):
+        """Dagen står i overskriften over tabellen. En `vl-dag`-rad inni ville
+        sagt det samme to ganger på rad — derfor `_blokkrader` her."""
+        self.assertNotIn('class="vl-dag"', self._oversikt(self.LORDAG))
+
+    def test_arkhodet_summerer_fortsatt_hele_vakta(self):
+        """Summene per ressurs er per dag etter snuingen; totalen er ikke."""
+        ut = self._oversikt(self.LORDAG)
+        arkhode = ut[ut.index('vl-arkhode'):ut.index('class="vl-dagbolk"')]
+        self.assertIn('t', arkhode)
+        self.assertIn('skift', arkhode)
+
+    def test_grupperingen_sorterer_selv(self):
+        """**Hjelperen skal ikke hvile på at den som kaller har sortert.**
+        Serveren sender `fra_tid` stigende i dag, men `mkOversikt` filtrerer
+        og korpsvelgeren kan gripe inn — og uten den egne sorteringen målte
+        testen bare serverens rekkefølge. Samme grunn som `_hviletider()`
+        sorterer selv (`CLAUDE.md`)."""
+        run_node(self.harness, """
+            const dager = _grupperPaaDag([
+              {id: 1, fra_tid: '2026-09-15T08:00:00'},
+              {id: 2, fra_tid: '2026-09-04T08:00:00'},
+              {id: 3, fra_tid: '2026-10-01T08:00:00'},
+              {id: 4, fra_tid: '2026-09-04T20:00:00'},
+            ]);
+            assert(dager.length === 3, 'tre dager, fikk ' + dager.length);
+            const rekke = dager.map((d) => d.nokkel).join(' ');
+            assert(rekke === '2026-09-04 2026-09-15 2026-10-01', 'rekkefolge: ' + rekke);
+            assert(dager[0].poster.length === 2, 'de to 4. sep. samles');
+        """)
+
+    def test_planleggingstabellen_har_dagrader_der_oversikten_har_titler(self):
+        """**De to flatene grupperer på samme dag, men viser den ulikt.**
+        Planleggingstabellen er ett regneark per ressurs, så dagen hører
+        hjemme som en rad inni; utskriftslista har dagen som nivå over.
+        Begge spør `_dagnokkel()`, så de kan ikke svare ulikt på *hvilken* dag
+        et skift hører til.
+
+        Erstatter en eldre test som bare lette etter `_blokkerMedDager(` i
+        kilden til `mkRessurs` — den gikk grønn uten at noe ble tegnet."""
+        ut = run_node(self.harness, self.VINDU + self.LISTE + self.LORDAG + """
+            globalThis.rollerForGruppe = () => [];
+            console.log(mkRessurs({id: 10, navn: 'Samleplass', gruppe_id: 1,
+                                   gruppe_navn: 'Samleplass', ikon: 'hospital'}));
+        """)
+        self.assertEqual(ut.count('class="vl-dag"'), 2)
+        self.assertIn('Fredag 4. sep', ut)
+        self.assertIn('Lørdag 5. sep', ut)
 
 
 class MittKorpsTests(SimpleTestCase):
@@ -3605,13 +3913,14 @@ class MittKorpsTests(SimpleTestCase):
         (VAKTLISTE_JS, ('mkMittKorps', '_mittKorpsId', '_synligePoster',
                         'kanBemannePlass', 'kanSkriveAlt', '_nivaa', '_erAdmin',
                         '_fyllValgFor', 'opptattPaaPlassen', '_probonoMerke', '_tidsblokker',
-                        '_blokkerMedDager', '_dagnokkel', '_dagoverskrift',
+                        '_blokkerMedDager', '_blokkrader', '_dagnokkel', '_dagoverskrift', '_dagtekst',
                         '_blokklinje', '_telling', '_skiftrekkefolge',
                         '_varighet', '_skifttimer', '_tall', '_d', '_kl',
                         '_dag', '_sammeDag', '_tidsspenn', '_korpsKropp',
                         '_plassKorps', '_sumTimer')),
     )
-    VINDU = ("globalThis.DAGER = ['søn','man','tir','ons','tor','fre','lør'];\n"
+    VINDU = ("globalThis.ressursApen = new Map();\n"
+             "globalThis.DAGER = ['søn','man','tir','ons','tor','fre','lør'];\n"
              "globalThis.MND = ['jan','feb','mar','apr','mai','jun',"
              "'jul','aug','sep','okt','nov','des'];\n"
              "globalThis.korpsfilter = null;\n")
