@@ -685,6 +685,19 @@ function mkDagslinje(dager) {
 }
 
 
+// **Linjer og vinduer har stabile klient-ID-er, ikke indekser** (15. sep. 2026).
+//
+// Første utgave adresserte feltene med `data-arg="0:1:fra"` og tok imot
+// `(arg, verdi)`. Den signaturen finnes ikke: klikk- og change-delegeringen i
+// `portal-utils.js` sender **ett** argument — med mindre elementet bærer
+// `data-felt`, og da sender den `(id, felt, verdi)`. Så `verdi` var alltid
+// `undefined`, hvert tastetrykk skrev `undefined` inn i tilstanden, og feltet
+// ble blankt ved neste tegning. Regelen står i `CLAUDE.md`; jeg skrev koden
+// som om den ikke gjorde det.
+//
+// Feltene bruker nå samme idiom som cellene i ressurstabellen — `data-felt` +
+// `data-id` — og ID-en er en stabil teller og ikke en indeks: `splice()` ville
+// ellers flyttet adressen til alle radene under den man fjernet.
 function _planleggerSkift(vindu) {
   // Speiler `services._vinduets_skift()`: tom skiftlengde gir ett skift, et
   // tall deler vinduet i bolker rygg mot rygg og korter av den siste.
@@ -740,7 +753,7 @@ function planleggerTotal() {
 }
 
 
-function _planleggerVindu(li, vi, vindu) {
+function _planleggerVindu(linje, vindu) {
   // **Skiftlengden står som et eget felt, ikke som et valg mellom to
   // former.** Tom = ett skift (Sola 56, 15–03 i ett strekk), et tall = del
   // vinduet (Haugesund 56, 8 timer på og 8 av). Ett felt med to betydninger
@@ -749,9 +762,12 @@ function _planleggerVindu(li, vi, vindu) {
   const fasit = t.skift
     ? `${escapeHtml(_tall(t.skift))} skift`
     : '<span class="vl-advarsel">ugyldig tidsrom</span>';
-  const slett = (vindu && (vi > 0))
+  // Det første vinduet kan ikke fjernes — en ressurs uten skiftvindu er
+  // ingenting, og serveren avviser det. En knapp som fører til en vegg er
+  // verre enn ingen knapp.
+  const slett = linje.vinduer[0] !== vindu
     ? `<button type="button" class="btn btn-sm btn-outline-secondary"
-               data-action="planleggerFjernVindu" data-arg="${escHtmlValue(li + ':' + vi)}"
+               data-action="planleggerFjernVindu" data-id="${escHtmlValue(vindu.id)}"
                title="Fjern skiftvinduet">
          <i class="bi bi-x-lg"></i>
        </button>`
@@ -762,31 +778,31 @@ function _planleggerVindu(li, vi, vindu) {
         <input type="datetime-local" class="form-control form-control-sm"
                step="300" value="${escHtmlValue(_iso16(vindu.fra))}"
                data-action="planleggerSettVindu" data-hendelse="change"
-               data-arg="${escHtmlValue(li + ':' + vi + ':fra')}"></label>
+               data-felt="fra" data-id="${escHtmlValue(vindu.id)}"></label>
       <label class="vl-meta">Til
         <input type="datetime-local" class="form-control form-control-sm"
                step="300" value="${escHtmlValue(_iso16(vindu.til))}"
                data-action="planleggerSettVindu" data-hendelse="change"
-               data-arg="${escHtmlValue(li + ':' + vi + ':til')}"></label>
+               data-felt="til" data-id="${escHtmlValue(vindu.id)}"></label>
       <label class="vl-meta">Skiftlengde (t)
         <input type="number" class="form-control form-control-sm" min="1" step="1"
                placeholder="hele vinduet" value="${escHtmlValue(vindu.skiftlengde ?? '')}"
                data-action="planleggerSettVindu" data-hendelse="change"
-               data-arg="${escHtmlValue(li + ':' + vi + ':skiftlengde')}"></label>
+               data-felt="skiftlengde" data-id="${escHtmlValue(vindu.id)}"></label>
       <span class="vl-meta vl-pl-vindutall">${fasit}</span>
       ${slett}
     </div>`;
 }
 
 
-function _planleggerLinje(linje, li) {
+function _planleggerLinje(linje) {
   const t = _planleggerLinjetall(linje);
   const grupper = (aktivListe.grupper || []).map((g) => {
     const valgt = String(g.id) === String(linje.gruppe_id) ? ' selected' : '';
     return `<option value="${escHtmlValue(g.id)}"${valgt}>${escapeHtml(g.navn)}</option>`;
   }).join('');
   const vinduer = (linje.vinduer || [])
-    .map((v, vi) => _planleggerVindu(li, vi, v)).join('');
+    .map((v) => _planleggerVindu(linje, v)).join('');
 
   return `
     <div class="vl-kort vl-pl-linje">
@@ -794,27 +810,27 @@ function _planleggerLinje(linje, li) {
         <label class="vl-meta">Gruppe
           <select class="form-select form-select-sm"
                   data-action="planleggerSettLinje" data-hendelse="change"
-                  data-arg="${escHtmlValue(li + ':gruppe_id')}">${grupper}</select></label>
+                  data-felt="gruppe_id" data-id="${escHtmlValue(linje.id)}">${grupper}</select></label>
         <label class="vl-meta">Antall
           <input type="number" class="form-control form-control-sm" min="1" step="1"
                  value="${escHtmlValue(linje.antall)}"
                  data-action="planleggerSettLinje" data-hendelse="change"
-                 data-arg="${escHtmlValue(li + ':antall')}"></label>
+                 data-felt="antall" data-id="${escHtmlValue(linje.id)}"></label>
         <label class="vl-meta">Plasser per skift
           <input type="number" class="form-control form-control-sm" min="1" step="1"
                  value="${escHtmlValue(linje.plasser)}"
                  data-action="planleggerSettLinje" data-hendelse="change"
-                 data-arg="${escHtmlValue(li + ':plasser')}"></label>
+                 data-felt="plasser" data-id="${escHtmlValue(linje.id)}"></label>
         <span class="vl-pl-spacer"></span>
         <button type="button" class="btn btn-sm btn-outline-secondary"
-                data-action="planleggerFjernLinje" data-arg="${escHtmlValue(li)}">
+                data-action="planleggerFjernLinje" data-id="${escHtmlValue(linje.id)}">
           <i class="bi bi-trash me-1"></i>Fjern
         </button>
       </div>
       <div class="vl-pl-vinduer">${vinduer}</div>
       <div class="vl-pl-bunn">
         <button type="button" class="btn btn-sm btn-outline-secondary"
-                data-action="planleggerNyttVindu" data-arg="${escHtmlValue(li)}">
+                data-action="planleggerNyttVindu" data-id="${escHtmlValue(linje.id)}">
           <i class="bi bi-plus-lg me-1"></i>Nytt skiftvindu
         </button>
         <span class="vl-meta vl-pl-regnestykke">${escapeHtml(_planleggerRegnestykke(linje, t))}</span>
@@ -851,8 +867,18 @@ function mkPlanlegger() {
   }
 
   const total = planleggerTotal();
-  const linjer = (planleggerlinjer || [])
-    .map((l, i) => _planleggerLinje(l, i)).join('');
+  const linjer = (planleggerlinjer || []).map(_planleggerLinje).join('');
+
+  // **Uten starttid på vakta har standardvinduene ingenting å bygge på.**
+  // Da faller de tilbake til nå, og «dagens dato» ser ut som et valg noen har
+  // tatt framfor et fravær. Beskjeden står over oppsettet og peker dit man
+  // retter det.
+  const utenStart = _d(aktivListe?.vaktliste?.startet) ? '' : `
+    <div class="vl-kort"><div class="vl-tom">
+      <i class="bi bi-exclamation-triangle me-1"></i>Vakten har ingen
+      <strong>starttid</strong>. Skiftvinduene fylles derfor ut med dagens dato.
+      Sett starten under «Innstillinger» først, så treffer de.
+    </div></div>`;
 
   const tomt = planleggerlinjer.length ? '' : `
     <div class="vl-kort"><div class="vl-tom">
@@ -885,7 +911,7 @@ function mkPlanlegger() {
               data-action="planleggerNyLinje">
         <i class="bi bi-plus-lg me-1"></i>Legg til ressurs
       </button>
-    </div>` + linjer + tomt + oppsummering;
+    </div>` + utenStart + linjer + tomt + oppsummering;
 }
 
 

@@ -3248,9 +3248,16 @@ class PlanleggerfanenTests(SimpleTestCase):
 
     HARNESS = (
         (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue')),
+        (PORTAL_UTILS_JS, ('hendelseArgumenter', '_handlerArgument',
+                           'klikkSkalKjore')),
         (VAKTLISTE_JS, ('mkPlanlegger', '_planleggerLinje', '_planleggerVindu',
                         '_planleggerSkift', '_planleggerLinjetall',
                         '_planleggerRegnestykke', 'planleggerTotal',
+                        'planleggerSettLinje', 'planleggerSettVindu',
+                        'planleggerNyLinje', 'planleggerNyttVindu',
+                        'planleggerFjernLinje', 'planleggerFjernVindu',
+                        '_planleggerFinnLinje', '_planleggerFinnVindu',
+                        '_planleggerStandardvindu', 'visPanelfeil',
                         'mkBudsjett', 'mkDagslinje', '_budsjettpost',
                         '_dagtekst', '_d', '_iso16', '_tall', 'kanSetteTak',
                         'kanPlanlegge', 'kanLede', '_nivaa', '_erAdmin')),
@@ -3279,6 +3286,7 @@ class PlanleggerfanenTests(SimpleTestCase):
         return run_node(self.harness, vindu + f"""
             globalThis.aktivListe = {json.dumps(liste)};
             globalThis.belastning = null;
+            globalThis.planleggerNesteId = 1;
             globalThis.planleggerlinjer = {json.dumps(linjer)};
             console.log(mkPlanlegger());
         """)
@@ -3296,6 +3304,179 @@ class PlanleggerfanenTests(SimpleTestCase):
     LOR15 = '2026-10-03T15:00:00+02:00'
     SON03 = '2026-10-04T03:00:00+02:00'
     SON14 = '2026-10-04T14:00:00+02:00'
+
+    # ── Feltene skal faktisk kunne fylles ut (meldt fra staging) ──────────
+
+    def _skriv(self, oppsett):
+        """Kjør et helt redigeringsforløp gjennom **delegeringens egen**
+        argumentbygger.
+
+        **Dette er testen som manglet.** De andre her kaller `mkPlanlegger()`
+        og leser markupen — de så aldri at handlerne hadde feil signatur.
+        André fra staging: «jeg får ikke fylt feltene, de gir meg blankt på
+        alle». Årsaken var at `portal-utils.js` sender **ett** argument med
+        mindre elementet bærer `data-felt`, og handlerne mine tok `(arg,
+        verdi)`. `verdi` var alltid `undefined`.
+
+        `oppsett` er JS som gjør redigeringene; testen plukker attributtene
+        ut av den ekte markupen og sender dem gjennom `hendelseArgumenter()`,
+        så argumentene bygges nøyaktig som i nettleseren.
+        """
+        import json
+        liste = {
+            'vaktliste': {'id': 1, 'startet': '2026-10-02T14:00:00+02:00',
+                          'timetak': None},
+            'grupper': [{'id': self.LAG, 'navn': 'Lag'},
+                        {'id': self.AMBULANSE, 'navn': 'Ambulanse'}],
+        }
+        return run_node(self.harness,
+                        "globalThis.window = { MODUL_TILGANG: "
+                        "{ vaktliste: 'skriv_leder', admin: false } };\n"
+                        + f"""
+            globalThis.aktivListe = {json.dumps(liste)};
+            globalThis.belastning = null;
+            globalThis.planleggerNesteId = 1;
+            globalThis.planleggerlinjer = [];
+            globalThis.planleggerfasit = null;
+            globalThis.tegnPanel = () => {{}};
+            globalThis.visPanelfeil = (m) => {{ throw new Error(m); }};
+
+            // Plukk ut attributtene et felt faktisk bærer, og kall handleren
+            // slik delegeringen ville gjort det.
+            function felt(markup, handling, feltnavn) {{
+                const m = markup.match(new RegExp(
+                    '<(input|select)[^>]*data-action="' + handling +
+                    '"[^>]*data-felt="' + feltnavn + '"[^>]*data-id="([0-9]+)"'));
+                if (!m) throw new Error('fant ikke ' + handling + '/' + feltnavn);
+                return {{ dataset: {{ action: handling, felt: feltnavn, id: m[2] }} }};
+            }}
+            // Oppslaget er en lokal tabell og ikke `globalThis`: i harnessen
+            // er funksjonene modul-scopede, mens de i nettleseren er globale.
+            // Det testen måler er **argumentene**, som bygges av delegeringens
+            // egen `hendelseArgumenter()` — ikke hvordan navnet slås opp.
+            const HANDLERE = {{ planleggerSettLinje, planleggerSettVindu }};
+            function skriv(handling, feltnavn, verdi) {{
+                const el = felt(mkPlanlegger(), handling, feltnavn);
+                el.value = verdi;
+                HANDLERE[handling](...hendelseArgumenter(el));
+            }}
+            {oppsett}
+        """)
+
+    def test_feltene_lar_seg_fylle_ut(self):
+        """Regresjonen, målt gjennom delegeringens egen argumentbygger."""
+        ut = self._skriv("""
+            planleggerNyLinje();
+            skriv('planleggerSettLinje', 'antall', '3');
+            skriv('planleggerSettLinje', 'plasser', '4');
+            const l = planleggerlinjer[0];
+            assert(String(l.antall) === '3', 'antall ble ' + l.antall);
+            assert(String(l.plasser) === '4', 'plasser ble ' + l.plasser);
+            console.log(mkPlanlegger());
+        """)
+        self.assertIn('value="3"', ut)
+        self.assertIn('value="4"', ut)
+
+    def test_tidsfeltene_beholder_verdien_de_far(self):
+        ut = self._skriv("""
+            planleggerNyLinje();
+            skriv('planleggerSettVindu', 'fra', '2026-10-03T15:00');
+            skriv('planleggerSettVindu', 'til', '2026-10-04T03:00');
+            skriv('planleggerSettVindu', 'skiftlengde', '8');
+            const v = planleggerlinjer[0].vinduer[0];
+            assert(v.fra !== null, 'fra ble null');
+            assert(v.til !== null, 'til ble null');
+            assert(v.skiftlengde === '8', 'skiftlengde ble ' + v.skiftlengde);
+            console.log(mkPlanlegger());
+        """)
+        self.assertIn('value="2026-10-03T15:00"', ut)
+        self.assertIn('value="2026-10-04T03:00"', ut)
+        # 15:00–03:00 er tolv timer; delt i åtte blir det to skift (8 + 4).
+        self.assertIn('2 skift', ut)
+
+    def test_gruppevalget_lagres_som_tall(self):
+        """FK-en må være et tall — serveren slår opp gruppa på den."""
+        self._skriv(f"""
+            planleggerNyLinje();
+            skriv('planleggerSettLinje', 'gruppe_id', '{self.AMBULANSE}');
+            assert(planleggerlinjer[0].gruppe_id === {self.AMBULANSE},
+                   'gruppe_id ble ' + typeof planleggerlinjer[0].gruppe_id);
+        """)
+
+    def test_feltene_baerer_data_felt_saa_delegeringen_sender_verdien(self):
+        """**Regelen, ikke bare virkningen.** `hendelseArgumenter()` sender
+        `(id, felt, verdi)` kun når elementet har `data-felt`; ellers ett
+        argument. Et felt som mister attributtet blir stille blankt igjen."""
+        ut = self._skriv("planleggerNyLinje(); console.log(mkPlanlegger());")
+        import re
+        felter = re.findall(r'data-action="(planleggerSett\w+)"[^>]*', ut)
+        self.assertTrue(felter, 'fant ingen redigeringsfelter')
+        for treff in re.finditer(
+                r'<(?:input|select)[^>]*data-action="planleggerSett\w+"[^>]*>', ut):
+            with self.subTest(felt=treff.group(0)[:80]):
+                self.assertIn('data-felt=', treff.group(0))
+                self.assertIn('data-id=', treff.group(0))
+
+    def test_aa_fjerne_en_rad_flytter_ikke_adressen_til_de_andre(self):
+        """**ID-er, ikke indekser.** Med indekser pekte radene under den man
+        fjernet plutselig på naboen, og neste tastetrykk skrev i feil rad."""
+        self._skriv("""
+            planleggerNyLinje();
+            planleggerNyLinje();
+            planleggerNyLinje();
+            const foer = planleggerlinjer.map((l) => l.id);
+            planleggerFjernLinje(foer[0]);
+            const etter = planleggerlinjer.map((l) => l.id);
+            // **Hele lista, ikke bare lengden og den siste.** Første utgave
+            // av denne testen gikk grønn mot `const i = id`, fordi ID-ene
+            // (1, 3, 5) og indeksene falt slik at «den siste» ble den samme
+            // uansett hvilken rad som forsvant. Mutasjonsprøvd.
+            assert(etter.join(',') === foer.slice(1).join(','),
+                   'sto igjen ' + etter.join(',') + ', ventet ' + foer.slice(1).join(','));
+        """)
+
+    def test_uten_starttid_paa_vakta_sier_panelet_fra(self):
+        """Standardvinduene faller tilbake til nå, og «dagens dato» ser ut
+        som et valg noen har tatt framfor et fravær."""
+        import json
+        liste = {'vaktliste': {'id': 1, 'startet': None, 'timetak': None},
+                 'grupper': [{'id': self.LAG, 'navn': 'Lag'}]}
+        ut = run_node(self.harness,
+                      "globalThis.window = { MODUL_TILGANG: "
+                      "{ vaktliste: 'skriv_leder', admin: false } };\n"
+                      + f"""
+            globalThis.aktivListe = {json.dumps(liste)};
+            globalThis.belastning = null;
+            globalThis.planleggerNesteId = 1;
+            globalThis.planleggerlinjer = [];
+            console.log(mkPlanlegger());
+        """)
+        self.assertIn('ingen', ut)
+        self.assertIn('starttid', ut)
+
+    def test_med_starttid_staar_beskjeden_ikke(self):
+        self.assertNotIn('starttid', self._vis([]))
+
+    def test_standardvinduet_begynner_paa_vaktas_start(self):
+        """Bug 1 fra staging: «når jeg har satt dato for vakten … begynner de
+        på dagens dato». Standardvinduet var riktig; feltet ble tømt av
+        bug 2, og en tom `datetime-local` åpner på dagens dato. Testen låser
+        likevel regelen, siden den er lett å miste."""
+        ut = self._skriv("""
+            planleggerNyLinje();
+            console.log(mkPlanlegger());
+        """)
+        self.assertIn('value="2026-10-02T14:00"', ut)
+
+    def test_nytt_vindu_begynner_der_det_forrige_sluttet(self):
+        """Sola 56 har to vakter på ulike dager; «rett etter forrige» er det
+        man som regel mener."""
+        ut = self._skriv("""
+            planleggerNyLinje();
+            planleggerNyttVindu(planleggerlinjer[0].id);
+            console.log(mkPlanlegger());
+        """)
+        self.assertIn('value="2026-10-02T22:00"', ut)
 
     def test_bare_leder_og_admin_ser_fanen(self):
         """`skriv_full` bemanner; planleggeren lager grunnlaget for hele
@@ -3433,6 +3614,7 @@ class PlanleggerfanenTests(SimpleTestCase):
                       + f"""
             globalThis.aktivListe = {json.dumps(liste)};
             globalThis.belastning = {json.dumps({'planlegging': plan, 'kan_sette_tak': True})};
+            globalThis.planleggerNesteId = 1;
             globalThis.planleggerlinjer = [];
             console.log(mkPlanlegger());
         """)

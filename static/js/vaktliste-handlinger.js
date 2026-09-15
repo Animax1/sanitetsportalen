@@ -718,14 +718,38 @@ async function opprettVaktpost() {
 // grunnlaget». Det er med vilje: et halvskrevet oppsett er en kladd i hodet
 // på den som skriver det, ikke data noen andre skal se.
 
-function _planleggerStandardvindu() {
+//: Teller for klient-ID-er på linjer og vinduer. Se kommentaren over
+//: `_planleggerSkift()`: indekser flytter seg når man fjerner en rad, og
+//: `data-id` skal peke på den samme raden før og etter.
+let planleggerNesteId = 1;
+
+
+function _planleggerStandardvindu(fraTid) {
   // **Vaktas start, ikke `new Date()`.** En oktobervakt planlegges i august,
   // og et forhåndsutfylt «nå» ville måttet rettes hver gang. Samme regel som
   // «Opprett vakt» i ressurstabellen.
-  const start = aktivListe?.vaktliste?.startet || null;
-  const fra = _d(start) || new Date();
+  //
+  // Har vakta ingen starttid, finnes det ikke noe bedre å falle tilbake på
+  // enn nå — men da sier panelet fra (`_planleggerUtenStart()`), i stedet for
+  // å la dagens dato stå der og se ut som et valg noen har tatt.
+  const fra = _d(fraTid) || _d(aktivListe?.vaktliste?.startet) || new Date();
   const til = new Date(fra.getTime() + 8 * 3600000);
-  return { fra: fra.toISOString(), til: til.toISOString(), skiftlengde: '' };
+  return { id: planleggerNesteId++, fra: fra.toISOString(),
+           til: til.toISOString(), skiftlengde: '' };
+}
+
+
+function _planleggerFinnLinje(id) {
+  return (planleggerlinjer || []).find((l) => l.id === id) || null;
+}
+
+
+function _planleggerFinnVindu(id) {
+  for (const linje of planleggerlinjer || []) {
+    const treff = (linje.vinduer || []).find((v) => v.id === id);
+    if (treff) return { linje, vindu: treff };
+  }
+  return null;
 }
 
 
@@ -736,6 +760,7 @@ function planleggerNyLinje() {
     return;
   }
   planleggerlinjer.push({
+    id: planleggerNesteId++,
     gruppe_id: grupper[0].id,
     antall: 1,
     plasser: 2,
@@ -746,43 +771,44 @@ function planleggerNyLinje() {
 }
 
 
-function planleggerFjernLinje(arg) {
-  const i = Number(arg);
-  if (!Number.isInteger(i)) return;
+function planleggerFjernLinje(id) {
+  const i = (planleggerlinjer || []).findIndex((l) => l.id === id);
+  if (i < 0) return;
   planleggerlinjer.splice(i, 1);
   planleggerfasit = null;
   tegnPanel();
 }
 
 
-function planleggerNyttVindu(arg) {
-  const linje = planleggerlinjer[Number(arg)];
+function planleggerNyttVindu(id) {
+  const linje = _planleggerFinnLinje(id);
   if (!linje) return;
   // Det nye vinduet begynner der det forrige sluttet: Sola 56 har to vakter
   // på ulike dager, og «dagen etter, samme tid» er det man som regel mener.
   const forrige = linje.vinduer[linje.vinduer.length - 1];
-  const fra = _d(forrige?.til) || new Date();
-  const til = new Date(fra.getTime() + 8 * 3600000);
-  linje.vinduer.push({ fra: fra.toISOString(), til: til.toISOString(),
-                       skiftlengde: forrige?.skiftlengde ?? '' });
+  const nytt = _planleggerStandardvindu(forrige?.til);
+  nytt.skiftlengde = forrige?.skiftlengde ?? '';
+  linje.vinduer.push(nytt);
   planleggerfasit = null;
   tegnPanel();
 }
 
 
-function planleggerFjernVindu(arg) {
-  const [li, vi] = String(arg).split(':').map(Number);
-  const linje = planleggerlinjer[li];
-  if (!linje || linje.vinduer.length <= 1) return;
-  linje.vinduer.splice(vi, 1);
+function planleggerFjernVindu(id) {
+  const treff = _planleggerFinnVindu(id);
+  if (!treff || treff.linje.vinduer.length <= 1) return;
+  treff.linje.vinduer.splice(treff.linje.vinduer.indexOf(treff.vindu), 1);
   planleggerfasit = null;
   tegnPanel();
 }
 
 
-function planleggerSettLinje(arg, verdi) {
-  const [li, felt] = String(arg).split(':');
-  const linje = planleggerlinjer[Number(li)];
+function planleggerSettLinje(id, felt, verdi) {
+  // **Tre argumenter, fordi feltet bærer `data-felt`.** Se kommentaren over
+  // `_planleggerSkift()` i `vaktliste-oversikt.js`: delegeringen sender
+  // `(id, felt, verdi)` bare for elementer med `data-felt`, og ett argument
+  // ellers. Første utgave tok `(arg, verdi)` og fikk aldri verdien.
+  const linje = _planleggerFinnLinje(id);
   if (!linje) return;
   linje[felt] = felt === 'gruppe_id' ? Number(verdi) : verdi;
   planleggerfasit = null;
@@ -790,9 +816,8 @@ function planleggerSettLinje(arg, verdi) {
 }
 
 
-function planleggerSettVindu(arg, verdi) {
-  const [li, vi, felt] = String(arg).split(':');
-  const vindu = planleggerlinjer[Number(li)]?.vinduer?.[Number(vi)];
+function planleggerSettVindu(id, felt, verdi) {
+  const vindu = _planleggerFinnVindu(id)?.vindu;
   if (!vindu) return;
   // Tidsfeltene kommer som lokal «2026-10-02T14:00» og lagres som ISO, slik
   // serveren vil ha dem. Skiftlengden lagres rå: tom streng betyr «hele

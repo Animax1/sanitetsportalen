@@ -1176,6 +1176,22 @@ verdi, sendte en tom PUT, og tegnet panelet på nytt, så lista forsvant idet de
 `klikkSkalKjore()` er regelen, og den ligger som en egen funksjon nettopp fordi en anonym
 `if` inne i en lytter ikke lar seg kjøre i en test.
 
+**Og delegeringen sender `(id, felt, verdi)` bare til elementer med `data-felt`** —
+`hendelseArgumenter()`. Alt annet får **ett** argument. Planleggerfeltene ble skrevet med
+`data-arg="0:1:fra"` og handlere som tok `(arg, verdi)`; `verdi` var alltid `undefined`,
+hvert tastetrykk skrev `undefined` inn i tilstanden, og feltet ble blankt ved neste
+tegning (meldt fra staging 15. sep. 2026 — «jeg får ikke fylt feltene»). Regelen sto
+allerede her; koden ble skrevet som om den ikke gjorde det.
+
+**En test som bare leser markupen ser ikke dette.** `PlanleggerfanenTests._skriv()` plukker
+attributtene ut av den ekte markupen og sender dem gjennom `hendelseArgumenter()`, så
+argumentene bygges nøyaktig som i nettleseren. Det er den formen en test av et
+redigeringsfelt må ha.
+
+**Adressen i `data-id` skal være en stabil ID, ikke en indeks.** `splice()` flytter ellers
+adressen til hver rad under den man fjernet, og neste tastetrykk skriver i feil rad.
+Planleggerens linjer og vinduer får derfor en klient-ID fra `planleggerNesteId`.
+
 **`patients-utils.js` kan ikke lastes utenfor pasientsiden.** Den gjør arbeid på toppnivå
 — `Chart.defaults` og `new bootstrap.Modal(document.getElementById('newModal'))` — og
 kaster på en side uten pasientskjemaene. Trenger en ny modulside en helper derfra, skal

@@ -4,6 +4,59 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-15 — Planleggeren: feltene lot seg ikke fylle ut
+
+**Meldt fra staging (André):**
+
+> «1) Når jeg har satt dato for vakten og åpner tidsrom skiftene skal starte, så begynner
+> de på dagens dato og ikke vaktens starttidspunkt. 2) Og den er mer kritisk: jeg får ikke
+> fylt feltene, de gir meg blankt på alle — antall, plasser per skift, fra, til.»
+
+### Én feil, ikke to
+
+Delegeringen i `portal-utils.js` sender **ett** argument — med mindre elementet bærer
+`data-felt`, og da sender `hendelseArgumenter()` `(id, felt, verdi)`. Planleggerfeltene
+ble skrevet med `data-arg="0:1:fra"` og handlere som tok `(arg, verdi)`. `verdi` var
+derfor alltid `undefined`: hvert tastetrykk skrev `undefined` inn i tilstanden, og feltet
+ble blankt ved neste tegning.
+
+**Bug 1 var en følge av bug 2.** Standardvinduet var riktig hele tiden — målt: med vaktas
+start 2. okt. 14:00 fylles feltet med `2026-10-02T14:00`. Men bug 2 tømte feltet ved første
+berøring, og en tom `datetime-local` åpner på dagens dato.
+
+**Regelen sto allerede i `CLAUDE.md`**, i avsnittet om `data-action` + `data-hendelse`.
+Jeg skrev koden som om den ikke gjorde det.
+
+### Fikset
+
+Feltene bruker nå samme idiom som cellene i ressurstabellen — `data-felt` + `data-id` — og
+adressen er en **stabil klient-ID**, ikke en indeks: `splice()` ville ellers flyttet
+adressen til hver rad under den man fjernet, og neste tastetrykk skrevet i feil rad.
+
+I tillegg: har vakta **ingen starttid**, faller standardvinduene tilbake til nå, og da sier
+panelet fra. «Dagens dato» uten forklaring ser ut som et valg noen har tatt framfor et
+fravær.
+
+### Testen som manglet, og hvorfor de gamle ikke så det
+
+De fjorten testene fra i dag kalte `mkPlanlegger()` og leste markupen. Ingen av dem rørte
+handlerne, så en feil signatur var usynlig.
+
+`PlanleggerfanenTests._skriv()` plukker nå attributtene ut av den **ekte** markupen og
+sender dem gjennom delegeringens egen `hendelseArgumenter()` — argumentene bygges nøyaktig
+som i nettleseren. Fire mutanter prøvd mot den: den opprinnelige signaturen, et felt uten
+`data-felt`, indeks i stedet for ID, og `new Date()` i standardvinduet. Alle fanges.
+
+**Og én av de nye testene gikk grønn ved flaks.** «Å fjerne en rad flytter ikke adressen
+til de andre» sjekket bare lengden og den siste ID-en — med ID-ene 1, 3, 5 falt indeksene
+slik at den siste ble den samme uansett hvilken rad som forsvant. Den krever nå hele
+ID-lista.
+
+**Endret:** `static/js/vaktliste-oversikt.js`, `static/js/vaktliste-handlinger.js`,
+`vaktliste/tests_xss.py` (+10 tester), `CLAUDE.md`.
+
+---
+
 ## 2026-09-15 — Planleggeren: fanen som lager grunnlaget
 
 **Meldt fra staging (André):**
