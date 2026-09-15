@@ -173,7 +173,10 @@ lest én gang.
 | Sammenslåtte kort som standard | **Bare når gruppa har mer enn én** | Snevret fra «alle». Én ambulanse ville kostet et klikk for å se det eneste som er der |
 | «Sett i drift» | **Automatisk, med overstyring beholdt** | `satt_i_drift_av` og auditsporet overlever; e-postutløseren flyttes til `FilutsendingMiddleware` |
 
-**Levert 15. sep. 2026:** dagrupperingen, «Oversikt» snudd, sammenslåtte ressurskort.
+**Levert 15. sep. 2026:** dagrupperingen, «Oversikt» snudd, sammenslåtte ressurskort — og,
+etter tilbakemelding fra staging samme dag, **dagen som ytterste nivå i gruppefanene også**
+(André: «i ressursgruppene må det være likt som oversikt, ressurser per dag»). De to
+planleggingsflatene leses nå likt; `_blokkerMedDager()` er bare «Mitt korps» igjen.
 Detaljene og de tre valgene bak `ressursApen` står i `CHANGELOG.md`.
 
 **Står igjen:** drift-automatikken (§3.3). Den deler ingen kode med de tre andre.

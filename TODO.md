@@ -328,6 +328,10 @@ standard.»
 Tre ting, og de henger sammen: en fane med ti ambulanser er i dag ti regneark under
 hverandre, og man scroller forbi ni for å komme til den tiende.
 
+- [x] **Dagen ytterst i gruppefanen også** (André, 15. sep. 2026, etter staging: «i
+      ressursgruppene må det være likt som oversikt — ressurser per dag»). De to
+      planleggingsflatene leses nå likt. Ressurser uten skift får bolken «Uten skift», så
+      «Opprett vakt» fortsatt finnes et sted.
 - [x] **Minimerbart kort per ressurs.** `mkRessurs()` bygger kortet; overskriften har alt
       navn, korpsmerke, enhetsmerke og redigeringsknapp. Sammenslått viser den de samme
       merkene pluss en telling — antall skift, antall bemannede, ledige — så man ser hva

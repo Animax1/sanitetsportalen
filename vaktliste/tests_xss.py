@@ -23,6 +23,9 @@ HTML_BUILDERS = (
     '_fyll',
     'tegnFaner', '_fanerad', '_mannskapsfane', 'iDrift', '_tilstede',
     'mkRessurs', '_planrad', '_plancellene', '_blokklinje', '_dagoverskrift', '_probonoMerke',
+    # Dagbolkene i gruppefanen (15. sep. 2026). En ny bygger som skanneren
+    # ikke leser er nøyaktig det hullet denne lista finnes for.
+    '_gruppedagbolker',
     'mkMittKorps', '_plassKorps',
     '_stempelknapper',
     '_driftrad',
@@ -97,6 +100,11 @@ REVIEWED_INTERPOLATIONS = {
     # eller sammendraget i stedet for den — bygges begge i `mkRessurs()`
     # rett over, med id, tilstand og tall escapet inni.
     'vippe': 'markup bygget lokalt, id og tilstand escapet inni',
+    # Gruppefanens dagbolker: kortene er `mkRessurs()`, som selv skannes her,
+    # og dagtittelen ved siden av er escapet med `escapeHtml(_dagtekst(...))`.
+    'kort': 'markup fra `mkRessurs()`, som selv skannes her',
+    "tomme.map((r) => mkRessurs(r, ressursErApen(r), [])).join('')":
+        'markup fra `mkRessurs()`, som selv skannes her',
     'tabell': 'markup bygget lokalt: tabellen, eller sammendraget som escapes inni',
     'kolonner': 'to bruk, begge uten data: colspan-tallet i mkRessurs og '
                 'colgroup-markupen i mkBelastning, begge bygget lokalt',
@@ -244,7 +252,7 @@ class VaktlisteEscapingOppforselTests(SimpleTestCase):
                         '_dagnokkel', '_dagoverskrift', '_dagtekst', '_probonoMerke',
                         '_sumTimer', '_skifttimer', '_tall', '_telling',
                         '_mkEnKurve', 'mkGruppekurve', '_posterIGruppe',
-                        'mkGruppe', '_plassKorps', '_tegnforklaring',
+                        'mkGruppe', '_gruppedagbolker', '_plassKorps', '_tegnforklaring',
                         '_timesteg', '_ressurserIGruppe',
                         '_grupperMedRessurser',
                         '_posterPerGruppe', '_vaktensSpenn',
@@ -1820,7 +1828,7 @@ class FanenErGruppaTests(SimpleTestCase):
     HARNESS = (
         (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue')),
         (VAKTLISTE_JS, ('tegnFaner', '_fanerad', '_mannskapsfane', '_mittKorpsId',
-                        '_synligePoster', 'iDrift', '_tilstede', 'mkGruppe', 'ressursErApen',
+                        '_synligePoster', 'iDrift', '_tilstede', 'mkGruppe', '_gruppedagbolker', '_grupperPaaDag', 'ressursErApen',
                         'mkRessurs', '_sumTimer', '_radklasse', '_stempelknapper', 'kanStemple',
                         '_rolleValg', '_skiftrekkefolge', '_fyllValgFor', 'opptattPaaPlassen',
                         '_varighet', '_skifttimer', '_tall', '_planrad', '_plancellene',
@@ -2176,7 +2184,7 @@ class EnkeltgruppeTests(SimpleTestCase):
 
     HARNESS = (
         (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue')),
-        (VAKTLISTE_JS, ('mkGruppe', 'ressursErApen', 'mkRessurs', '_sumTimer', '_radklasse',
+        (VAKTLISTE_JS, ('mkGruppe', '_gruppedagbolker', '_grupperPaaDag', 'ressursErApen', 'mkRessurs', '_sumTimer', '_radklasse',
                         '_stempelknapper', 'kanStemple', 'iDrift',
                         '_rolleValg', '_plassKorps', '_skiftrekkefolge',
                         '_fyllValgFor', 'opptattPaaPlassen', '_varighet', '_skifttimer', '_tall',
@@ -2416,6 +2424,94 @@ class SammenslaatteRessurserTests(SimpleTestCase):
         self.assertIn('bi-chevron-down', apen)
         self.assertIn('aria-expanded="false"', lukket)
         self.assertIn('bi-chevron-right', lukket)
+
+    # ── Dagen ytterst også i gruppefanen ─────────────────────────────────
+    #: Bil A får et skift dagen etter, så to dager finnes i gruppa.
+    DAG_TO = """
+        aktivListe.vaktposter.push({id: 3, ressurs_id: 20, ledig: false, navn: 'Nina',
+          korps_kort: 'HGSD', rolle: '', merknad: '',
+          fra_tid: '2026-10-04T08:00:00', til_tid: '2026-10-04T16:00:00'});
+    """
+
+    def _ambulansefanen(self, ekstra=''):
+        return self._kjor(ekstra + "console.log(mkGruppe(aktivListe.grupper[1]));")
+
+    def test_dagen_staar_over_ressurskortene(self):
+        """**André, 15. sep. 2026:** «i ressursgruppene må det være likt som
+        oversikt — ressurser per dag». Fanen var en stabel ressurskort med
+        dagrader inni; nå er den en stabel dager med ressurskort inni."""
+        ut = self._ambulansefanen()
+        self.assertIn('class="vl-dagtittel"', ut)
+        self.assertLess(ut.index('class="vl-dagtittel"'), ut.index('Bil A'),
+                        'dagen skal staa over kortene')
+
+    def test_ressursen_gjentas_under_hver_dag_den_har_skift(self):
+        ut = self._ambulansefanen(self.DAG_TO)
+        # Tre seksjoner: to dager pluss «Uten skift» for Bil B, som ikke har noen.
+        self.assertEqual(ut.count('class="vl-dagbolk"'), 3)
+        self.assertEqual(ut.count('class="vl-dagtittel vl-utenskift"'), 1)
+        self.assertEqual(ut.count('>Bil A'), 2, 'Bil A har skift begge dager')
+        self.assertEqual(ut.count('>Bil B'), 1, 'Bil B staar bare under «Uten skift»')
+
+    def test_dagbolken_viser_bare_sin_egen_dags_skift(self):
+        ut = self._kjor(self.DAG_TO + """
+            ressursApen.set(20, true);
+            console.log(mkGruppe(aktivListe.grupper[1]));
+        """)
+        forste = ut[:ut.index('Søndag 4. okt')]
+        self.assertIn('Kari', forste)
+        self.assertNotIn('Nina', forste)
+        self.assertIn('Nina', ut[ut.index('Søndag 4. okt'):])
+
+    def test_ressurs_uten_skift_naas_fortsatt(self):
+        """**Bil B har ingen skift og hører til ingen dag.** Uten en egen bolk
+        ville kortet med «Opprett vakt» ikke finnes noe sted, og ingen kunne
+        satt opp den første vakta på en ny bil."""
+        ut = self._ambulansefanen()
+        self.assertIn('Uten skift', ut)
+        uten = ut[ut.index('Uten skift'):]
+        self.assertIn('Bil B', uten)
+        self.assertIn('apneVaktpost', uten)
+
+    def test_ingen_bolk_naar_alle_har_skift(self):
+        """«Uten skift» skal ikke stå tom — en overskrift uten noe under seg er
+        en linje man leser for å se at det ikke står noe der."""
+        ut = self._kjor("""
+            aktivListe.vaktposter.push({id: 3, ressurs_id: 21, ledig: false, navn: 'Ola',
+              korps_kort: 'HGSD', rolle: '', merknad: '',
+              fra_tid: '2026-10-03T08:00:00', til_tid: '2026-10-03T16:00:00'});
+            console.log(mkGruppe(aktivListe.grupper[1]));
+        """)
+        self.assertNotIn('Uten skift', ut)
+
+    def test_sammenslaaingen_gjelder_ressursen_paa_tvers_av_dagene(self):
+        """Vippa sitter på bilen, ikke på bilen-den-dagen. Å slå sammen Bil A
+        under fredag og se den åpen under lørdag ville vært to tilstander for
+        én ting."""
+        ut = self._kjor(self.DAG_TO + """
+            ressursApen.set(20, false);
+            console.log(mkGruppe(aktivListe.grupper[1]));
+        """)
+        self.assertEqual(ut.count('<table'), 0)
+        apen = self._kjor(self.DAG_TO + """
+            ressursApen.set(20, true);
+            console.log(mkGruppe(aktivListe.grupper[1]));
+        """)
+        self.assertEqual(apen.count('<table'), 2, 'aapen i begge dagbolkene')
+
+    def test_rekkefolgen_er_ressursenes_ikke_postenes(self):
+        """Fanerekka skal ikke hoppe fra dag til dag etter hvem som
+        tilfeldigvis har det første skiftet den dagen."""
+        # `unshift`: Bil Bs skift skal ligge **først** i lista serveren sendte,
+        # ellers er rekkefølgen garantert av innsettingen og ikke av regelen.
+        ut = self._kjor("""
+            aktivListe.vaktposter.unshift({id: 3, ressurs_id: 21, ledig: false, navn: 'Ola',
+              korps_kort: 'HGSD', rolle: '', merknad: '',
+              fra_tid: '2026-10-03T06:00:00', til_tid: '2026-10-03T12:00:00'});
+            console.log(mkGruppe(aktivListe.grupper[1]));
+        """)
+        self.assertLess(ut.index('>Bil A'), ut.index('>Bil B'),
+                        'Bil B har det tidligste skiftet, men Bil A staar foerst')
 
     # ── Gruppa avgjør, ikke kortet ───────────────────────────────────────
     def test_gruppa_slaar_sammen_kortene_sine(self):
@@ -3885,23 +3981,23 @@ class DagenErYtterstTests(SimpleTestCase):
             assert(dager[0].poster.length === 2, 'de to 4. sep. samles');
         """)
 
-    def test_planleggingstabellen_har_dagrader_der_oversikten_har_titler(self):
-        """**De to flatene grupperer på samme dag, men viser den ulikt.**
-        Planleggingstabellen er ett regneark per ressurs, så dagen hører
-        hjemme som en rad inni; utskriftslista har dagen som nivå over.
-        Begge spør `_dagnokkel()`, så de kan ikke svare ulikt på *hvilken* dag
-        et skift hører til.
+    def test_ressurskortet_har_ingen_dagrader(self):
+        """**Snudd 15. sep. 2026** (André: «i ressursgruppene må det være likt
+        som oversikt — ressurser per dag»).
 
-        Erstatter en eldre test som bare lette etter `_blokkerMedDager(` i
-        kilden til `mkRessurs` — den gikk grønn uten at noe ble tegnet."""
+        Fram til da var gruppefanen en stabel ressurskort med dagrader inni,
+        mens «Oversikt» hadde dagen som nivå over. Nå er dagen ytterste nivå
+        begge steder, og kortet tegner den ene dagens skift. En `vl-dag`-rad
+        inni ville gjentatt seksjonstittelen rett over.
+
+        «Mitt korps» er den tredje flaten og beholder dagrader — den har én
+        tabell på tvers av ressursene, så dagen har ingen seksjon å stå i."""
         ut = run_node(self.harness, self.VINDU + self.LISTE + self.LORDAG + """
             globalThis.rollerForGruppe = () => [];
             console.log(mkRessurs({id: 10, navn: 'Samleplass', gruppe_id: 1,
                                    gruppe_navn: 'Samleplass', ikon: 'hospital'}));
         """)
-        self.assertEqual(ut.count('class="vl-dag"'), 2)
-        self.assertIn('Fredag 4. sep', ut)
-        self.assertIn('Lørdag 5. sep', ut)
+        self.assertNotIn('class="vl-dag"', ut)
 
 
 class MittKorpsTests(SimpleTestCase):

@@ -78,6 +78,51 @@ stående i hodet, og sammendraget sier hva som er der — «1 skift · 1 mannska
 argument. Det var harmløst så lenge byggeren tok ett argument, og sluttet å være det i det
 øyeblikket den tok to — bil nummer null hadde stått lukket og resten åpne.
 
+### Samme dag, etter tilbakemelding fra staging
+
+**André:** *«Ser initielt greit ut på oversikt, men i ressursgruppene så må det være likt
+som oversikt — ressurser per dag. Minimer-knappen er fin.»*
+
+Gruppefanen var fortsatt en stabel ressurskort med dagrader inni, mens «Oversikt» hadde
+fått dagen som nivå over. Nå er dagen ytterste nivå **begge steder**:
+
+```
+Fane «Ambulanse»
+  bemanningskurven
+  Fredag 3. okt
+    Bil A   (kort, minimerbart)
+    Bil B
+  Lørdag 4. okt
+    Bil A
+  Uten skift
+    Bil C
+```
+
+Tre ting fulgte av snuingen:
+
+- **`mkRessurs(r, apen, egne)` tegner de skiftene den får.** Dagbolken sender sin egen dags
+  skift, så ett kort dekker én dag — og kortet bruker `_blokkrader`, siden en dagrad inni
+  ville gjentatt tittelen rett over. `_blokkerMedDager()` er dermed bare «Mitt korps» igjen;
+  den flata har én tabell på tvers av ressursene og altså ingen seksjon å legge dagen i.
+- **«Uten skift» er en egen bolk.** En ressurs uten skift hører til ingen dag, og uten
+  bolken ville kortet med «Opprett vakt» ikke funnes noe sted — ingen kunne satt opp den
+  første vakta på en ny bil. Bolken vises bare når noen faktisk står der.
+- **Vippa sitter på ressursen, ikke på ressursen-den-dagen.** En bil som står i to
+  dagbolker slås sammen begge steder; to tilstander for én ting ville vært verre enn ingen.
+
+**En mutasjon avslørte at en garanti var en tilfeldighet.** Rekkefølgen i dagbolken skal
+være ressursenes, ikke skiftenes — men skiftene ble samlet per ressurs først, så
+rekkefølgen fulgte av *hvordan lista ble bygget* og ikke av regelen. Å fjerne regelen
+endret ingenting, og testen gikk grønn. `_gruppedagbolker()` leser nå skiftene i serverens
+rekkefølge og filtrerer ressurslista, slik at regelen faktisk bærer — og mutasjonen
+feiler. Testen måtte også legge skiftet **først** i lista (`unshift`), ellers var det
+innsettingsrekkefølgen som ble målt.
+
+Den nye byggeren er lagt i `HTML_BUILDERS`: en markup-bygger XSS-skanneren ikke leser er
+nøyaktig det hullet den lista finnes for.
+
+Sju nye tester, fire mutasjoner prøvd — alle fanget etter at kilden ble rettet.
+
 ### Tester
 
 Elleve nye i to klasser (`DagenErYtterstTests`, `SammenslaatteRessurserTests`), og den

@@ -504,11 +504,57 @@ function mkGruppe(gruppe) {
   // spørsmålet «hvem har møtt?», og da skal stemplene stå øverst; kurven er
   // fortsatt der, for den som vil se resten av vakten, men under.
   const kurve = mkGruppekurve(gruppe);
+  const kort = _gruppedagbolker(ressurser);
+  return hode + (iDrift() ? kort + kurve : kurve + kort);
+}
+
+
+function _gruppedagbolker(ressurser) {
+  // **Dagen ytterst, som i «Oversikt»** (André, 15. sep. 2026). Fanen var en
+  // stabel ressurskort med dagrader inni; nå er den en stabel dager med
+  // ressurskort inni. De to flatene leses da likt, og den som planlegger ser
+  // hele dagen på tvers av bilene uten å lese ni tabeller for å finne den.
+  //
   // **`map(mkRessurs)` ville sendt indeksen som `apen`.** Den formen sto her
   // og var harmløs så lenge byggeren tok ett argument; den sluttet å være det
-  // i det øyeblikket den tok to.
-  const kort = ressurser.map((r) => mkRessurs(r, ressursErApen(r))).join('');
-  return hode + (iDrift() ? kort + kurve : kurve + kort);
+  // i det øyeblikket den tok flere.
+  // Skiftene leses i **serverens** rekkefølge (`fra_tid`), ikke ressurs for
+  // ressurs. Samlet per ressurs ville rekkefølgen i dagbolken vært garantert
+  // av hvordan lista ble bygget, ikke av regelen under — og en mutasjon som
+  // fjernet regelen ville gått grønn.
+  const idn = new Set(ressurser.map((r) => r.id));
+  const alle = (aktivListe.vaktposter || []).filter((vp) => idn.has(vp.ressurs_id));
+  const bolker = _grupperPaaDag(alle).map((dag) => {
+    const perRessurs = new Map();
+    dag.poster.forEach((vp) => {
+      if (!perRessurs.has(vp.ressurs_id)) perRessurs.set(vp.ressurs_id, []);
+      perRessurs.get(vp.ressurs_id).push(vp);
+    });
+    // Rekkefølgen er ressursenes, ikke postenes — fanerekka skal ikke hoppe
+    // fra dag til dag etter hvem som tilfeldigvis har det første skiftet.
+    const kort = ressurser
+      .filter((r) => perRessurs.has(r.id))
+      .map((r) => mkRessurs(r, ressursErApen(r), perRessurs.get(r.id)))
+      .join('');
+    return `
+      <section class="vl-dagbolk">
+        <h3 class="vl-dagtittel">${escapeHtml(_dagtekst(dag.fra_tid))}</h3>
+        ${kort}
+      </section>`;
+  });
+
+  // **En ressurs uten skift hører ikke til noen dag, og må likevel nås.**
+  // Uten denne bolken kunne ingen sette opp den første vakta på en ny bil —
+  // kortet med «Opprett vakt» ville ikke finnes noe sted.
+  const tomme = ressurser.filter((r) => !_posterFor(r.id).length);
+  if (tomme.length) {
+    bolker.push(`
+      <section class="vl-dagbolk">
+        <h3 class="vl-dagtittel vl-utenskift">Uten skift</h3>
+        ${tomme.map((r) => mkRessurs(r, ressursErApen(r), [])).join('')}
+      </section>`);
+  }
+  return bolker.join('');
 }
 
 
@@ -736,11 +782,16 @@ function ressursErApen(r) {
 }
 
 
-function mkRessurs(r, apen = true) {
+function mkRessurs(r, apen = true, egne = null) {
   // `apen` er gruppas avgjørelse, ikke ressursens — `mkGruppe()` vet hvor
   // mange søsken kortet har. Standardverdien `true` er for de stedene som
   // tegner ett kort alene; de har ingen gruppe å spørre.
-  const poster = _posterFor(r.id);
+  //
+  // `egne` er skiftene kortet skal vise. **Dagbolken sender sin egen dags
+  // skift** (André, 15. sep. 2026: «i ressursgruppene må det være likt som
+  // oversikt — ressurser per dag»), så ett kort dekker én dag. Uten den
+  // tegnes alle ressursens skift.
+  const poster = egne || _posterFor(r.id);
   const kanRore = kanBemanne(r);
   // Per rad, ikke per ressurs: egen person på andres plass er egen rad
   // (`kanRoreRad`), og en ledig plass satt av til korpset er hennes å fylle.
@@ -821,8 +872,12 @@ function mkRessurs(r, apen = true) {
   const rad = (vp) => (drift ? _driftrad(vp, r, kanRoreRad(vp, r, kanRore))
                               : _planrad(vp, r, kanRoreRad(vp, r, kanRore)));
   const kolonner = drift ? 10 : 9;
+  // `_blokkrader`, ikke `_blokkerMedDager`: **i gruppefanen er dagen en
+  // seksjonsoverskrift, aldri en rad.** En dagrad inni kortet ville gjentatt
+  // tittelen rett over det. «Mitt korps» er den andre flaten og beholder
+  // dagrader, fordi den har én tabell på tvers av ressursene.
   const kropp = poster.length
-    ? _blokkerMedDager(blokker, kolonner, rad)
+    ? _blokkrader(blokker, kolonner, rad)
     : `<tr><td colspan="${escHtmlValue(kolonner)}" class="vl-tom">Ingen satt opp ennå.</td></tr>`;
 
   // Tabellhodet heves ut hit framfor å stå som en ternær med to

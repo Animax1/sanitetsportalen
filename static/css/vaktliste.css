@@ -212,6 +212,14 @@
   margin: 0 0 0.7rem;
 }
 
+/* Gruppefanen bruker samme dagtittel, men som `h3` inne i panelet. Skriftgrada
+   arves fra klassen, ikke fra taggen — ellers hadde de to flatene sagt samme
+   ting med ulik vekt. «Uten skift» er ikke en dag, og dempes deretter. */
+.vl-dagtittel.vl-utenskift {
+  color: var(--text-muted);
+  border-bottom-color: var(--border-color);
+}
+
 .vl-korpsgruppe {
   margin-bottom: 1.1rem;
 }

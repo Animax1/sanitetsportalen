@@ -760,12 +760,24 @@ fase 3–7 gjenstår — se `docs/BESLUTNING_VAKTLISTE.md`, som er besluttet i s
   skift havner midt blant de lange.
 - **`_dagnokkel()` er den ene regelen for hvilken dag et skift hører til: startdagen.**
   «fre. 20:00 – lør. 04:00» står under fredag — ikke under begge dager, ikke splittet
-  (André, 15. sep. 2026). `_grupperPaaDag()` bruker den i «Oversikt», der dagen er
-  ytterste nivå; `_blokkerMedDager()` bruker den inne i planleggingstabellen, der dagen er
-  en rad. **Merk at rapportmodulen har landet motsatt for timer** (`FORSLAG_RAPPORTMODUL.md`
-  §2.2, splitting ved midnatt): der er spørsmålet hvor mange timer, her er det hvem som er
-  til stede. Forskjellen er bevisst og skal ikke «rettes».
+  (André, 15. sep. 2026). **Merk at rapportmodulen har landet motsatt for timer**
+  (`FORSLAG_RAPPORTMODUL.md` §2.2, splitting ved midnatt): der er spørsmålet hvor mange
+  timer, her er det hvem som er til stede. Forskjellen er bevisst og skal ikke «rettes».
   Nøkkelen er nullpolstret fordi den sorteres — `2026-9-15` < `2026-9-4` som tekst.
+- **Dagen er ytterste nivå på begge planleggingsflatene** (15. sep. 2026 — André: «i
+  ressursgruppene må det være likt som oversikt, ressurser per dag»). `_grupperPaaDag()`
+  brukes av «Oversikt» *og* av `_gruppedagbolker()` i gruppefanen; i begge er dagen en
+  seksjonsoverskrift og ressurskortene står under den. `mkRessurs(r, apen, egne)` tegner
+  derfor **de skiftene den får**, og bruker `_blokkrader` — en dagrad inni kortet ville
+  gjentatt tittelen rett over. **`_blokkerMedDager()` er nå bare «Mitt korps»**, som har én
+  tabell på tvers av ressursene og altså ingen seksjon å legge dagen i.
+- **En ressurs uten skift hører til ingen dag, og får bolken «Uten skift».** Uten den ville
+  kortet med «Opprett vakt» ikke finnes noe sted, og ingen kunne satt opp den første vakta
+  på en ny bil. Bolken vises bare når noen faktisk står uten skift.
+- **Rekkefølgen i dagbolken er ressursenes, ikke skiftenes.** `_gruppedagbolker()` leser
+  skiftene i serverens rekkefølge (`fra_tid`) og filtrerer så *ressurslista* — samles de per
+  ressurs først, er rekkefølgen garantert av hvordan lista ble bygget og ikke av regelen,
+  og en mutasjon som fjerner regelen går grønn. Det skjedde 15. sep. 2026.
 - **Dagoverskriften vises alltid, også på en endagsvakt** (15. sep. 2026). Fram til da sto
   den bare når vakta spente over mer enn én dag; da måtte planleggeren vite at *fraværet*
   av en dagrad betydde noe, og tabellen skiftet form når vakta ble forlenget.
@@ -776,8 +788,10 @@ fase 3–7 gjenstår — se `docs/BESLUTNING_VAKTLISTE.md`, som er besluttet i s
   fraværende nøkkel betyr «som standarden», så et kort man åpnet ikke slår seg sammen igjen
   når noen legger til en bil i gruppa. Knappene blir stående i hodet på et sammenslått
   kort, og `apneVaktpost()` åpner kortet — ellers lagrer man et skift og ser ingenting
-  skje. `mkGruppe()` må kalle `mkRessurs(r, ressursErApen(r))`; `map(mkRessurs)` sender
-  indeksen som `apen`.
+  skje. **Vippa sitter på ressursen, ikke på ressursen-den-dagen**: en bil som står i to
+  dagbolker slås sammen begge steder, ellers hadde én ting hatt to tilstander.
+  `map(mkRessurs)` sender indeksen som `apen` — den formen var harmløs til byggeren tok
+  flere argumenter.
 - **Hver enhet er sin egen `Ressurs` inne i gruppa** — bil A, bil B og bil C er tre
   rader i fanen «Ambulanse», hver med egne skift og egen `enhet`-kobling. Modellen var
   riktig fra første stund, men veien dit var usynlig: knappen lå sist i fanerekka og het
