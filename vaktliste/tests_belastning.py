@@ -16,13 +16,15 @@ To ting bæres av testene her:
 Tallene regnes i `services`, ikke i viewet: et view skal ikke kunne svare på
 hva «korteste hvile» betyr.
 """
-from datetime import timedelta
+from datetime import datetime, timedelta
+from datetime import timezone as dt_timezone
+from zoneinfo import ZoneInfo
 
 from django.test import SimpleTestCase, override_settings
 from django.utils import timezone
 
 from . import services
-from .models import Belastningsgrenser, Vaktpost
+from .models import Belastningsgrenser, Vaktliste, Vaktpost
 from .tests_tilgang import TilgangsBasis, _bruker, _klient
 
 
@@ -449,6 +451,346 @@ class BelastningApiTests(TilgangsBasis):
 
 
 @override_settings(SECURE_SSL_REDIRECT=False, RATELIMIT_ENABLE=False)
+class DagbolkerTests(SimpleTestCase):
+    """`_dagbolker` uten en database.
+
+    **Funnet ved mutasjonstesting 15. sep. 2026** — nøyaktig samme felle som
+    `HviletidTests` dokumenterer: `sorted()` lot seg fjerne uten at noe ble
+    rødt, fordi `Vaktpost.Meta.ordering` alt sorterer på `fra_tid`. Testene
+    gjennom basen målte modellens ordering, ikke hjelperens. Derfor er dette
+    en egen funksjon, og derfor prøves den med lister kalleren ikke har
+    sortert.
+    """
+
+    class FalsktSkift:
+        def __init__(self, fra, timer=8):
+            self.fra_tid = fra
+            self.til_tid = fra + timedelta(hours=timer)
+
+    def _kl(self, dag, time, minutt=0, timer=8):
+        """Et skift på en fast **norsk** klokkeslett, båret som **UTC**.
+
+        Konverteringen er ikke pynt. Django lagrer og leverer aware
+        datetimes i UTC, så det hjelperen faktisk får inn er 22:30 den 1.
+        oktober — ikke 00:30 den 2. Bar de falske skiftene norsk tid, ville
+        `.date()` alt gitt riktig dag, og mutanten som dropper
+        `timezone.localtime()` overlevde. Den gjorde det, til dette ble
+        rettet.
+        """
+        naiv = datetime(2026, 10, dag, time, minutt,
+                        tzinfo=ZoneInfo('Europe/Oslo'))
+        return self.FalsktSkift(naiv.astimezone(dt_timezone.utc), timer)
+
+    def test_usortert_inndata_gir_kronologiske_dager(self):
+        """M-funn: regelen, ikke modellens ordering."""
+        bolker = services._dagbolker(
+            [self._kl(4, 8), self._kl(2, 8), self._kl(3, 8)])
+        self.assertEqual(['2026-10-02', '2026-10-03', '2026-10-04'],
+                         [b['nokkel'] for b in bolker])
+
+    def test_timene_summeres_per_dag(self):
+        bolker = services._dagbolker(
+            [self._kl(2, 8, timer=8), self._kl(2, 20, timer=4),
+             self._kl(3, 8, timer=6)])
+        self.assertEqual([12.0, 6.0], [b['timer'] for b in bolker])
+
+    def test_nattskift_hoerer_til_startdagen(self):
+        """«fre. 20:00 – lør. 04:00» står under fredag. Beslutning 7."""
+        bolker = services._dagbolker([self._kl(2, 20, timer=8)])
+        self.assertEqual(1, len(bolker))
+        self.assertEqual('2026-10-02', bolker[0]['nokkel'])
+        self.assertEqual(8.0, bolker[0]['timer'])
+
+    def test_dagen_regnes_i_norsk_tid_ikke_i_utc(self):
+        """**Et skift som begynner 00:30 norsk tid.** I sommertid er det
+        22:30 UTC dagen før, så `date()` rett på tidspunktet ville lagt det
+        på 1. oktober i stedet for 2.
+
+        Feilen er usynlig for alle skift som begynner på dagtid — altså de
+        fleste — og viser seg bare på nattevakter. Mutanten som byttet
+        `timezone.localtime(...)` mot tidspunktet selv overlevde til denne
+        testen fantes."""
+        bolker = services._dagbolker([self._kl(2, 0, 30, timer=6)])
+        self.assertEqual('2026-10-02', bolker[0]['nokkel'])
+
+    def test_skift_uten_starttid_hoppes_over(self):
+        tomt = self._kl(2, 8)
+        tomt.fra_tid = None
+        self.assertEqual([], services._dagbolker([tomt]))
+
+    def test_tom_liste_gir_ingen_dager(self):
+        self.assertEqual([], services._dagbolker([]))
+
+
+class BudsjettallTests(TilgangsBasis):
+    """`planleggingstall()` — vaktas budsjett, ikke den enkeltes belastning.
+
+    `docs/FORSLAG_PLANLEGGERFANE.md` §6. Tre tall side om side fordi hvert av
+    dem alene lyver litt, og en dagslinje uten egne tak.
+    """
+
+    def setUp(self):
+        super().setUp()
+        self.start = timezone.now().replace(
+            hour=8, minute=0, second=0, microsecond=0)
+
+    def _skift(self, fra_time, timer, *, mannskap=None, ressurs=None, **felt):
+        return Vaktpost.objects.create(
+            ressurs=ressurs or self.res_hgsd, mannskap=mannskap,
+            fra_tid=self.start + timedelta(hours=fra_time),
+            til_tid=self.start + timedelta(hours=fra_time + timer),
+            **felt)
+
+    def _tall(self):
+        return services.planleggingstall(self.vl)
+
+    def test_uten_tak_er_igjen_ingenting_og_ikke_null(self):
+        """«0 timer igjen» er en beskjed om at budsjettet er brukt opp;
+        «ingen tak satt» er fraværet av et budsjett. De to skal ikke se
+        like ut."""
+        self._skift(0, 8)
+        tall = self._tall()
+        self.assertIsNone(tall['timetak'])
+        self.assertIsNone(tall['igjen'])
+        self.assertFalse(tall['over_taket'])
+
+    def test_ledige_plasser_teller_i_satt_opp_men_ikke_i_bemannet(self):
+        """Avstanden mellom dem er arbeidslista: her mangler åtte timer
+        folk."""
+        self._skift(0, 8, mannskap=self.p_hgsd)
+        self._skift(12, 8)                      # ledig plass
+        tall = self._tall()
+        self.assertEqual(16.0, tall['satt_opp'])
+        self.assertEqual(8.0, tall['bemannet'])
+
+    def test_probono_staar_for_seg_og_teller_i_ingen_av_de_to(self):
+        """Taket er det organisasjonen betaler for. Samme regel som
+        `_sumTimer()` og `belastning_per_person` alt sto på — men tallet
+        vises, så summen ikke utelater noe i stillhet."""
+        self._skift(0, 8, mannskap=self.p_hgsd)
+        self._skift(12, 6, mannskap=self.p_hgsd, probono=True)
+        tall = self._tall()
+        self.assertEqual(8.0, tall['satt_opp'])
+        self.assertEqual(8.0, tall['bemannet'])
+        self.assertEqual(6.0, tall['probono'])
+
+    def test_igjen_maales_mot_satt_opp_ikke_mot_bemannet(self):
+        """Planlegging handler om behovet. Et budsjett som først fylles når
+        navnene er på plass sier «du har alt igjen» på en liste som er
+        ferdig satt opp."""
+        self.vl.timetak = 100
+        self.vl.save(update_fields=['timetak'])
+        self._skift(0, 8, mannskap=self.p_hgsd)
+        self._skift(12, 8)                      # ledig
+        self.assertEqual(84.0, self._tall()['igjen'])
+
+    def test_over_taket_flagges_men_ingenting_avvises(self):
+        """«Varsler, de sperrer ikke.» Skiftet står der etterpå."""
+        self.vl.timetak = 10
+        self.vl.save(update_fields=['timetak'])
+        vp = self._skift(0, 12, mannskap=self.p_hgsd)
+        tall = self._tall()
+        self.assertTrue(tall['over_taket'])
+        self.assertEqual(-2.0, tall['igjen'])
+        self.assertTrue(Vaktpost.objects.filter(pk=vp.pk).exists())
+
+    def test_paa_taket_er_ikke_over_det(self):
+        self.vl.timetak = 8
+        self.vl.save(update_fields=['timetak'])
+        self._skift(0, 8, mannskap=self.p_hgsd)
+        tall = self._tall()
+        self.assertFalse(tall['over_taket'])
+        self.assertEqual(0.0, tall['igjen'])
+
+    def test_dagslinja_foerer_skiftet_paa_startdagen(self):
+        """Beslutning 7: fre. 20:00 → lør. 04:00 står under fredag, ikke
+        splittet. Rapportmodulen splitter ved midnatt, og forskjellen er
+        bevisst — splitting endrer ikke en totalsum, bare nedbrytingen."""
+        natt = self.start.replace(hour=20)
+        Vaktpost.objects.create(
+            ressurs=self.res_hgsd, mannskap=self.p_hgsd,
+            fra_tid=natt, til_tid=natt + timedelta(hours=8))
+        dager = self._tall()['dager']
+        self.assertEqual(1, len(dager), 'ett skift, én dag — ikke to')
+        self.assertEqual(8.0, dager[0]['timer'], 'hele skiftet på startdagen')
+        self.assertEqual(timezone.localtime(natt).date().isoformat(),
+                         dager[0]['nokkel'])
+
+    def test_dagene_kommer_i_kronologisk_rekkefoelge(self):
+        """Sist opprettet først i basen; lista skal likevel begynne på dag
+        én. Skiftene settes inn baklengs, så rekkefølgen ikke kan komme av
+        innsettingen."""
+        self._skift(48, 4, mannskap=self.p_hgsd)
+        self._skift(24, 6, mannskap=self.p_hgsd)
+        self._skift(0, 8, mannskap=self.p_hgsd)
+        nokler = [d['nokkel'] for d in self._tall()['dager']]
+        self.assertEqual(sorted(nokler), nokler)
+        self.assertEqual([8.0, 6.0, 4.0],
+                         [d['timer'] for d in self._tall()['dager']])
+
+    def test_dagene_har_ingen_egne_tak(self):
+        """Beslutning 2: ett tak for hele vakta. Et tak per dag ville
+        sperret det man faktisk gjør — flytte timer mellom dagene mens
+        totalen står."""
+        self.vl.timetak = 100
+        self.vl.save(update_fields=['timetak'])
+        self._skift(0, 8, mannskap=self.p_hgsd)
+        for dag in self._tall()['dager']:
+            self.assertNotIn('timetak', dag)
+            self.assertNotIn('igjen', dag)
+
+    def test_probono_teller_ikke_i_dagslinja_heller(self):
+        """Dagslinja bryter ned `satt_opp`, så den må hoppe over det samme.
+        Ellers summerer dagene til noe annet enn tallet rett over dem."""
+        self._skift(0, 8, mannskap=self.p_hgsd)
+        self._skift(2, 6, mannskap=self.p_hgsd, probono=True)
+        tall = self._tall()
+        self.assertEqual(tall['satt_opp'],
+                         sum(d['timer'] for d in tall['dager']))
+
+    def test_tallene_er_hele_vaktas_og_filtreres_aldri_paa_korps(self):
+        """Taket gjelder lista, så tallene må gjøre det også — et «satt opp»
+        som bare teller ett korps kan ikke sammenlignes med et tak for alle.
+        Viewet gater i stedet på `ser_alle_korps`."""
+        self._skift(0, 8, mannskap=self.p_hgsd, ressurs=self.res_hgsd)
+        self._skift(0, 5, mannskap=self.p_karmoy, ressurs=self.res_karmoy)
+        self.assertEqual(13.0, self._tall()['satt_opp'])
+
+
+class BudsjettApiTests(TilgangsBasis):
+    """Budsjettallene i belastningssvaret, og taket gjennom PUT-en."""
+
+    def setUp(self):
+        super().setUp()
+        na = timezone.now()
+        Vaktpost.objects.create(
+            ressurs=self.res_hgsd, mannskap=self.p_hgsd,
+            fra_tid=na, til_tid=na + timedelta(hours=10))
+
+    def _hent(self, klient):
+        return klient.get(
+            f'/vaktliste/api/vaktlister/{self.vl.pk}/belastning/')
+
+    def _sett_tak(self, klient, verdi):
+        import json
+        return klient.put(
+            f'/vaktliste/api/vaktlister/{self.vl.pk}/',
+            data=json.dumps({'timetak': verdi}),
+            content_type='application/json')
+
+    def test_den_som_ser_alle_korps_faar_budsjettallene(self):
+        for navn, c in (('skriv_full', self.c_vl), ('admin', self.c_adm)):
+            with self.subTest(konto=navn):
+                data = self._hent(c).json()['data']
+                self.assertIsNotNone(data['planlegging'])
+                self.assertEqual(10.0, data['planlegging']['satt_opp'])
+
+    def test_les_med_badge_faar_dem_ikke(self):
+        """Tallene er hele vaktas. For en `les` med badge ville de vært et
+        aggregat over skift hun ikke får se — avledet innsyn, samme regel
+        som statistikkmodulen bruker."""
+        self.assertIsNone(self._hent(self.c_leser).json()['data']['planlegging'])
+
+    def test_korpsfoereren_ser_alle_korps_og_faar_dem(self):
+        """`skriv_handling` og oppover ser alle korps (12. sep. 2026), så
+        summen er ikke ny opplysning for henne."""
+        self.assertIsNotNone(self._hent(self.c_kb).json()['data']['planlegging'])
+
+    def test_skriv_leder_setter_taket(self):
+        res = self._sett_tak(self.c_leder, 400)
+        self.assertEqual(200, res.status_code)
+        self.vl.refresh_from_db()
+        self.assertEqual(400, self.vl.timetak)
+        self.assertEqual(400, res.json()['data']['timetak'])
+
+    def test_alt_under_skriv_leder_faar_ikke_sette_taket(self):
+        """Taket er tallet *alle* varsler på lista måles mot — samme
+        rekkevidde som vaktas spenn, og derfor samme gate: `skriv_leder`.
+
+        **`skriv_full` står også utenfor**, og det er verdt å teste
+        eksplisitt: planleggernotatets §4 skisserte `skriv_full`, og retten
+        ble snevret 15. sep. 2026 fordi taket settes i samme PUT som spennet.
+        Én forespørsel med to ulike tilgangsnivåer inni er en regel ingen
+        klarer å lese riktig."""
+        for navn, c in (('korpsfører', self.c_kb), ('skriv_full', self.c_vl)):
+            with self.subTest(konto=navn):
+                self.assertEqual(403, self._sett_tak(c, 400).status_code)
+                self.vl.refresh_from_db()
+                self.assertIsNone(self.vl.timetak)
+
+    def test_tomt_felt_fjerner_taket(self):
+        """Et tallfelt som tømmes sender `''` eller `null`, og begge skal
+        bety «ingen tak» — ikke null timer, som ville vært et budsjett brukt
+        opp før noen er satt opp."""
+        for tomt in (None, ''):
+            with self.subTest(verdi=repr(tomt)):
+                self.vl.timetak = 400
+                self.vl.save(update_fields=['timetak'])
+                self.assertEqual(200, self._sett_tak(self.c_leder, tomt).status_code)
+                self.vl.refresh_from_db()
+                self.assertIsNone(self.vl.timetak)
+
+    def test_soepel_avvises_med_melding_og_ikke_500(self):
+        for verdi in ('fire hundre', '12,5', [1]):
+            with self.subTest(verdi=repr(verdi)):
+                res = self._sett_tak(self.c_leder, verdi)
+                self.assertEqual(400, res.status_code)
+                self.assertIn('timer', res.json()['message'])
+
+    def test_negativt_tak_avvises(self):
+        res = self._sett_tak(self.c_leder, -10)
+        self.assertEqual(400, res.status_code)
+
+    def test_taket_roerer_ikke_spennet(self):
+        """PUT-en tar begge, og en innsending med bare det ene skal la det
+        andre stå. `update_fields` gjorde tidligere alltid `planlagt_slutt`."""
+        slutt = timezone.now() + timedelta(hours=20)
+        self.vl.planlagt_slutt = slutt
+        self.vl.save(update_fields=['planlagt_slutt'])
+        self._sett_tak(self.c_leder, 400)
+        self.vl.refresh_from_db()
+        self.assertEqual(slutt, self.vl.planlagt_slutt)
+        self.assertEqual(400, self.vl.timetak)
+
+
+class TaketKopieresTests(TilgangsBasis):
+    """Beslutning 6: taket følger med til neste vakt, personene gjør ikke."""
+
+    def _ny_liste(self):
+        # Gjennom tjenesten, ikke for hånd: `opprett_planlagt_vakt` er den
+        # ene veien inn, og en test som bygger raden selv ville sluttet å
+        # måle det den vil måle den dagen opprettelsen får en regel til.
+        return services.opprett_planlagt_vakt('Oktobervakta')
+
+    def test_taket_foelger_med(self):
+        self.vl.timetak = 400
+        self.vl.save(update_fields=['timetak'])
+        ny = self._ny_liste()
+        services.kopier_oppsett(self.vl, ny)
+        ny.refresh_from_db()
+        self.assertEqual(400, ny.timetak)
+
+    def test_uten_tak_settes_ingenting(self):
+        ny = self._ny_liste()
+        services.kopier_oppsett(self.vl, ny)
+        ny.refresh_from_db()
+        self.assertIsNone(ny.timetak)
+
+    def test_personene_foelger_fortsatt_ikke_med(self):
+        """Motprøven. En liste ingen har sagt ja til ser ferdig ut — og et
+        tak som kopieres må ikke dra med seg navn."""
+        na = timezone.now()
+        Vaktpost.objects.create(
+            ressurs=self.res_hgsd, mannskap=self.p_hgsd,
+            fra_tid=na, til_tid=na + timedelta(hours=8))
+        self.vl.timetak = 400
+        self.vl.save(update_fields=['timetak'])
+        ny = self._ny_liste()
+        services.kopier_oppsett(self.vl, ny)
+        self.assertEqual(
+            0, Vaktpost.objects.filter(ressurs__vaktliste=ny).count())
+
+
 class GrenseApiTests(TilgangsBasis):
 
     def _sett(self, klient, **kropp):

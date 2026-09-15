@@ -311,16 +311,78 @@ den er å trekke tilbake noe som er delt ut.
 tilstander: en tabell må vedlikeholdes når tilstand fem kommer, en funksjon
 trenger det ikke.
 
+### 12. Budsjettlinja bor i den fanen som alt finnes
+
+*Tatt under byggingen 15. sep. 2026.*
+
+Skissen sa «fanen ligger ved siden av «Oversikt» og «Mannskap»». Det finnes
+**allerede** en slik fane, og den heter **«Planlegging»** (belastningsfanen, §8b).
+Å legge en ny ved siden av ville gitt to faner som heter «Planlegging» og
+«Planlegger» — en bokstavs forskjell, og den som leter etter tallene sine må prøve
+begge.
+
+Budsjettlinja og dagslinja står derfor **øverst i «Planlegging»**, over «Per person».
+Rekkefølgen er ikke tilfeldig: vaktas tall først, den enkeltes under. Motsatt ville
+begravet totalen under en persontabell som kan bli lang.
+
+Kurvene (§7 steg 4) og generatoren (steg 5) hører hjemme samme sted.
+
+### 13. Taket er `skriv_leder`, ikke `skriv_full`
+
+*Rettelse av §4, tatt under byggingen 15. sep. 2026.*
+
+Skissen sa «Å sette det er `skriv_full`, som alt annet oppsett på en vaktliste». Det
+holdt ikke mot koden. Taket settes i **samme PUT** som vaktas start og planlagte
+slutt (`vaktliste_detalj_view`), og den er `skriv_leder` med en begrunnelse som
+gjelder ord for ord her også:
+
+> spennet gjelder hele vakta, ikke ett korps' del av den
+
+Tre grunner til at det skal følge spennet:
+
+1. **Samme rekkevidde.** Taket er tallet *alle* varsler på lista måles mot.
+2. **Samme feltfamilie.** Start, slutt og tak er vaktas rammer, og de settes sammen.
+3. **Én forespørsel kan ikke ha to tilgangsnivåer inni seg.** En PUT der `startet`
+   krever `skriv_leder` og `timetak` krever `skriv_full` er en regel ingen klarer å
+   lese riktig — og den som skal håndheve den må skrive den to ganger.
+
+Det gjør taket til per-vakt-søsteren av `Belastningsgrenser`, som også er
+`skriv_leder`. Forskjellen mellom dem er rekkevidden, ikke hvem som bestemmer.
+
+### 14. Budsjettallene sendes bare til den som ser alle korps
+
+*Tatt under byggingen 15. sep. 2026.*
+
+Tallene er **hele vaktas** og filtreres aldri på korps — taket gjelder lista, så et
+«satt opp» som bare teller ett korps ville stått ved siden av et tak for alle, og de
+to kan ikke sammenlignes.
+
+Men da kan de heller ikke sendes til alle: for en `les` med badge ville summen vært et
+**aggregat over skift hun ikke får se**. Det er samme regel statistikkmodulen bruker —
+aggregater gir avledet innsyn, og skal gates der dataene bor. `belastning_view` sender
+derfor `planlegging: null` til henne, og klienten tegner ingen linje.
+
+**Ingen tom ramme.** Å tegne linja uten tall ville sagt «her er noe du ikke får se»,
+som er en dårligere beskjed enn ingen beskjed. Hennes egne timer står i «Mitt korps».
+
+Merk at `skriv_handling` og oppover **ser** alle korps (12. sep. 2026), så for
+korps-føreren er summen ikke ny opplysning — hun får linja.
+
 ---
 
 ## 7. Anbefalt rekkefølge
 
-1. **Løs `overlapp`-punktet i TODO** (beslutning 8). Et tak som telles feil er verre enn
-   ikke noe tak.
-2. **Budsjettlinja og dagslinja** — de leser bare det som finnes, og gir verdi uten
-   generatoren. Her lander beslutning 2, 5, 7 og 9.
-3. **Taket på `Vaktliste`**, med `kopier_oppsett` (beslutning 6). Én migrasjon, ett felt,
-   `skriv_full`.
+1. ✅ **Løs `overlapp`-punktet i TODO** (beslutning 8) *(gjort 15. sep. 2026)*. Et tak
+   som telles feil er verre enn ikke noe tak.
+2. ✅ **Budsjettlinja og dagslinja** *(gjort 15. sep. 2026)* — de leser bare det som
+   finnes, og gir verdi uten generatoren. Her landet beslutning 2, 5, 7, 9, 12 og 14.
+3. ✅ **Taket på `Vaktliste`**, med `kopier_oppsett` (beslutning 6) *(gjort samtidig med
+   steg 2)*. Ett nullbart heltallsfelt, ren skjemamigrasjon, satt med **`skriv_leder`**
+   (beslutning 13 — skissen sa `skriv_full`).
+
+   *De to ble gjort i samme omgang med vilje: en «budsjettlinje» uten et budsjett er
+   halve funksjonen, og taket er ett felt pluss én linje i `kopier_oppsett`. Å dele dem
+   ville betydd å bygge linja to ganger.*
 4. **Bildet av vakta** — kurvene ved siden av hverandre over felles spenn.
 5. **Generatoren til slutt**, i sin enkleste form: N tomme plasser, fra–til, rolle
    (beslutning 3), født som kladd (10), og med erstatningsregelen fra beslutning 4 og 11:

@@ -712,6 +712,42 @@ async function opprettVaktpost() {
 }
 
 
+function apneTimetak() {
+  if (!aktivListe) return;
+  _skjulFeil('timetak-feil');
+  // **Tomt felt når det ikke er satt noe tak**, ikke null. Feltet skal lese
+  // som «ingen tak» (placeholderen sier det), og en null der ville vært et
+  // budsjett brukt opp før noen er satt opp.
+  const tak = aktivListe.vaktliste.timetak;
+  _settVerdi('timetak-felt', tak === null || tak === undefined ? '' : tak);
+  _apneModal('timetakModal');
+}
+
+
+async function lagreTimetak() {
+  _skjulFeil('timetak-feil');
+  await withSubmitGuard('timetak-knapp', async () => {
+    const el = document.getElementById('timetak-felt');
+    const raa = el ? el.value.trim() : '';
+    const res = await apiFetch(
+      `/vaktliste/api/vaktlister/${aktivListe.vaktliste.id}/`,
+      { method: 'PUT', body: JSON.stringify({ timetak: raa === '' ? null : raa }) });
+    const d = await res.json().catch(() => ({}));
+    if (!res.ok || d.status !== 'ok') {
+      _visFeil('timetak-feil', d.message || 'Kunne ikke lagre taket.');
+      return;
+    }
+    _lukkModal('timetakModal');
+    // **Begge må hentes på nytt.** `aktivListe.vaktliste` bærer taket til
+    // neste gang vinduet åpnes, og `belastning` bærer tallene det måles mot
+    // — oppdateres bare den ene, står linja og vinduet og sier hver sin ting.
+    aktivListe.vaktliste.timetak = d.data.timetak;
+    belastning = null;
+    await lastBelastning();
+  });
+}
+
+
 function apneGrenser() {
   if (!belastning) return;
   _skjulFeil('grenser-feil');

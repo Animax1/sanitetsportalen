@@ -30,6 +30,10 @@ HTML_BUILDERS = (
     '_stempelknapper',
     '_driftrad',
     'mkBelastning',
+    # Budsjettlinja og dagslinja (15. sep. 2026). De sto én kjøring uten å
+    # være her, og da var escaping-regelen stille av for dem — suiten var
+    # grønn fordi skanneren ikke leste dem, ikke fordi de var riktige.
+    'mkBudsjett', 'mkDagslinje', '_budsjettpost',
     'mkTilstede',
     '_rolleValg',
     '_fyllValgFor',
@@ -42,6 +46,19 @@ HTML_BUILDERS = (
 ESCAPING_CALLS = ('escHtmlValue(', 'cellHtml(', '_escHtml(', 'escapeHtml(')
 
 REVIEWED_INTERPOLATIONS = {
+    # Budsjettlinja og dagslinja (15. sep. 2026).
+    'b': 'markup bygget lokalt i samme funksjon, tallet escapet inni',
+    'tak': 'markup fra `_budsjettpost`, som selv skannes her — eller tom streng',
+    'igjen': 'markup fra `_budsjettpost`, som selv skannes her — eller tom streng',
+    'manglerPost': 'markup fra `_budsjettpost`, som selv skannes her — eller tom streng',
+    'knapp': 'markup bygget lokalt, ingen data i seg',
+    'celler': 'dagceller bygget lokalt, timer og dagtekst escapet inni',
+    "_budsjettpost(p.satt_opp, 'satt opp')":
+        'markup fra en bygger som selv skannes her',
+    "_budsjettpost(p.bemannet, 'bemannet')":
+        'markup fra en bygger som selv skannes her',
+    'mkDagslinje(p.dager)': 'markup fra en bygger som selv skannes her',
+    "harTak ? 'Endre tak' : 'Sett tak'": 'hardkodet knappetekst fra en ternær',
     '_plancellene(vp, r, kanRore)': 'markup fra en bygger som selv skannes her (regnearkradens celler, 12. sep. 2026)',
     'probono': 'tall utledet i JS',
     'probonoDel': 'markup bygget rett over, tallene escapet inni',
@@ -3192,7 +3209,9 @@ class PlanleggingsfanenTests(SimpleTestCase):
 
     HARNESS = (
         (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue')),
-        (VAKTLISTE_JS, ('mkBelastning', '_tall', '_kolonneandeler', 'kanLede',
+        (VAKTLISTE_JS, ('mkBelastning', 'mkBudsjett', 'mkDagslinje',
+                        '_budsjettpost', '_dagtekst', '_d', 'kanSetteTak',
+                        '_tall', '_kolonneandeler', 'kanLede',
                         '_nivaa', '_erAdmin', 'visFane')),
     )
     VINDU = "globalThis.window = { MODUL_TILGANG: { admin: true } };\n"
@@ -3276,6 +3295,139 @@ class PlanleggingsfanenTests(SimpleTestCase):
         ut = self._vis([{**self.RAD, 'korteste_hvile': None}])
         self.assertIn('—', ut)
         self.assertNotIn('0 t</span>', ut)
+
+    # ── Budsjettlinja og dagslinja (15. sep. 2026) ────────────────────────
+
+    PLAN = {'timetak': None, 'satt_opp': 312.0, 'bemannet': 244.0,
+            'probono': 0.0, 'igjen': None, 'over_taket': False, 'dager': []}
+
+    def _budsjett(self, plan=None, *, kan_sette_tak=True):
+        """Bare budsjettlinja, uten resten av fanen."""
+        import json
+        data = {'personer': [self.RAD], 'sammendrag': self.SAM,
+                'planlegging': None if plan is None else {**self.PLAN, **plan},
+                'kan_sette_tak': kan_sette_tak,
+                'grenser': {'maks_skift_timer': 12, 'min_hvile_timer': 8}}
+        return run_node(self.harness, self.VINDU + f"""
+            globalThis.belastning = {json.dumps(data)};
+            console.log(mkBudsjett());
+        """)
+
+    def test_uten_budsjettall_finnes_linja_ikke(self):
+        """Serveren sender `planlegging: null` til den som ikke ser alle
+        korps. En tom ramme ville sagt «her er noe du ikke får se», som er
+        en dårligere beskjed enn ingen beskjed."""
+        # `run_node` skriver alltid «OK» til slutt, så «ingenting tegnet»
+        # er den linja alene — ikke en tom streng.
+        self.assertEqual('OK', self._budsjett(None).strip())
+
+    def test_satt_opp_og_bemannet_staar_side_om_side(self):
+        """Beslutning 5. Hvert tall alene lyver litt: ingen betaler for en
+        tom plass, og «bemannet» står på null når lista er halvt satt opp."""
+        ut = self._budsjett({})
+        self.assertIn('satt opp', ut)
+        self.assertIn('bemannet', ut)
+        self.assertIn('312 t', ut)
+        self.assertIn('244 t', ut)
+
+    def test_avstanden_mellom_dem_er_arbeidslista(self):
+        """68 timer som mangler folk — en subtraksjon leseren ellers måtte
+        gjøre i hodet."""
+        ut = self._budsjett({})
+        self.assertIn('mangler folk', ut)
+        self.assertIn('68 t', ut)
+
+    def test_ingenting_mangler_naar_alt_er_bemannet(self):
+        ut = self._budsjett({'satt_opp': 244.0, 'bemannet': 244.0})
+        self.assertNotIn('mangler folk', ut)
+
+    def test_uten_tak_staar_verken_tak_eller_igjen(self):
+        """«Igjen» uten et tak er meningsløst, og de to andre tallene står
+        like godt alene."""
+        ut = self._budsjett({})
+        self.assertNotIn('>tak<', ut)
+        self.assertNotIn('igjen', ut)
+
+    def test_med_tak_staar_begge(self):
+        ut = self._budsjett({'timetak': 400, 'igjen': 88.0})
+        self.assertIn('400 t', ut)
+        self.assertIn('88 t', ut)
+        self.assertIn('igjen', ut)
+
+    def test_over_taket_merkes_gult_og_sier_over_taket(self):
+        """«Varsler, det sperrer ikke» — merket er gult (`vl-advarsel`),
+        ikke rødt, og teksten bytter fra «igjen» til «over taket» så et
+        negativt tall ikke leses som en regnefeil."""
+        ut = self._budsjett({'timetak': 300, 'igjen': -12.0,
+                             'over_taket': True})
+        self.assertIn('vl-advarsel', ut)
+        self.assertIn('over taket', ut)
+        self.assertNotIn('>igjen<', ut)
+
+    def test_probono_staar_bare_naar_det_finnes(self):
+        """Posten finnes for at summen ikke skal utelate noe i stillhet
+        (beslutning 9). Står den på null, utelater den ingenting."""
+        self.assertNotIn('probono', self._budsjett({}))
+        self.assertIn('probono', self._budsjett({'probono': 16.0}))
+
+    def test_knappen_staar_bare_for_den_som_kan_sette_taket(self):
+        """Serveren svarer `kan_sette_tak`; klienten regner den ikke ut av
+        `MODUL_TILGANG`. Ellers kan knappen og endepunktet komme i utakt —
+        og en knapp som fører til en vegg er verre enn ingen knapp."""
+        self.assertIn('apneTimetak', self._budsjett({}))
+        self.assertNotIn('apneTimetak',
+                         self._budsjett({}, kan_sette_tak=False))
+
+    def test_knappeteksten_sier_om_det_finnes_et_tak_fra_foer(self):
+        self.assertIn('Sett tak', self._budsjett({}))
+        self.assertIn('Endre tak', self._budsjett({'timetak': 400}))
+
+    def test_dagslinja_staar_ikke_paa_en_endagsvakt(self):
+        """Én dag er ingen nedbryting — bare totalen skrevet to ganger."""
+        en_dag = [{'nokkel': '2026-10-02', 'fra_tid': '2026-10-02T08:00:00',
+                   'timer': 312.0}]
+        self.assertNotIn('vl-dagslinje', self._budsjett({'dager': en_dag}))
+
+    def test_dagslinja_viser_en_celle_per_dag_i_serverens_rekkefoelge(self):
+        """Dagene kommer sortert fra serveren, og byggeren skal ikke sortere
+        på nytt — to steder å sortere er ett sted å komme i utakt.
+
+        Cellene leses i den rekkefølgen de står i markupen, ikke bare som
+        «finnes i svaret»: en bygger som snudde lista ville ellers gått
+        grønn."""
+        dager = [
+            {'nokkel': '2026-10-02', 'fra_tid': '2026-10-02T08:00:00', 'timer': 128.0},
+            {'nokkel': '2026-10-03', 'fra_tid': '2026-10-03T08:00:00', 'timer': 152.0},
+            {'nokkel': '2026-10-04', 'fra_tid': '2026-10-04T08:00:00', 'timer': 32.0},
+        ]
+        ut = self._budsjett({'dager': dager})
+        self.assertIn('vl-dagslinje', ut)
+        self.assertEqual(3, ut.count('vl-dagtall'))
+        self.assertEqual([ut.index('128 t'), ut.index('152 t'), ut.index('32 t')],
+                         sorted([ut.index('128 t'), ut.index('152 t'),
+                                 ut.index('32 t')]))
+
+    def test_dagslinja_sier_hvilket_tall_den_bryter_ned(self):
+        """Uten etiketten måtte leseren gjette om dagene summerer til «satt
+        opp» eller til «bemannet»."""
+        dager = [
+            {'nokkel': '2026-10-02', 'fra_tid': '2026-10-02T08:00:00', 'timer': 160.0},
+            {'nokkel': '2026-10-03', 'fra_tid': '2026-10-03T08:00:00', 'timer': 152.0},
+        ]
+        self.assertIn('Satt opp per dag', self._budsjett({'dager': dager}))
+
+    def test_budsjettlinja_staar_over_per_person(self):
+        """Vaktas tall først, den enkeltes under. Motsatt rekkefølge ville
+        begravet totalen under en persontabell som kan bli lang."""
+        import json
+        data = {'personer': [self.RAD], 'sammendrag': self.SAM,
+                'planlegging': self.PLAN, 'kan_sette_tak': True,
+                'grenser': {'maks_skift_timer': 12, 'min_hvile_timer': 8}}
+        ut = run_node(self.harness, self.VINDU + f"""
+            globalThis.belastning = {json.dumps(data)};
+            console.log(mkBelastning());
+        """)
+        self.assertLess(ut.index('satt opp'), ut.index('Per person'))
 
     def test_overlappskolonnen_staar_ikke_naar_ingen_er_dobbeltbooket(self):
         """Samme regel som Faktisk-kolonnen: i den normale lista er
@@ -3692,7 +3844,9 @@ class BelastningstabellensBreddeTests(SimpleTestCase):
 
     HARNESS = (
         (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue')),
-        (VAKTLISTE_JS, ('mkBelastning', '_tall', '_kolonneandeler', 'kanLede',
+        (VAKTLISTE_JS, ('mkBelastning', 'mkBudsjett', 'mkDagslinje',
+                        '_budsjettpost', '_dagtekst', '_d', 'kanSetteTak',
+                        '_tall', '_kolonneandeler', 'kanLede',
                         '_nivaa', '_erAdmin')),
     )
     RAD = PlanleggingsfanenTests.RAD

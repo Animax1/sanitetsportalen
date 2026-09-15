@@ -595,6 +595,96 @@ function _kolonneandeler(vekter) {
 }
 
 
+function _budsjettpost(tall, etikett, klasse = '') {
+  // Klassen kommer fra kallstedet og er hardkodet der, men den går inn i et
+  // `class`-attributt — og en verdi i et attributt escapes, uansett hvor
+  // sikker man er på hvor den kom fra. Det er billigere enn å måtte lese
+  // kallstedene på nytt neste gang noen legger til et argument.
+  const b = klasse
+    ? `<b class="${escHtmlValue(klasse)}">${escapeHtml(_tall(tall))} t</b>`
+    : `<b>${escapeHtml(_tall(tall))} t</b>`;
+  return `<div>${b}<span class="vl-meta">${escapeHtml(etikett)}</span></div>`;
+}
+
+
+function mkBudsjett() {
+  // Vaktas budsjett: taket, det som er satt opp, og timene per dag.
+  // `docs/FORSLAG_PLANLEGGERFANE.md` §6.
+  //
+  // **Står bare for den som ser alle korps.** Tallene er hele vaktas, fordi
+  // taket er det — serveren sender `planlegging: null` til alle andre, og
+  // da finnes ikke linja. Å tegne en tom ramme i stedet ville sagt «her er
+  // noe du ikke får se», som er en dårligere beskjed enn ingen beskjed.
+  const p = belastning && belastning.planlegging;
+  if (!p) return '';
+
+  // **Taket først eller ikke i det hele tatt.** Uten et tak er «Igjen»
+  // meningsløst, og de to andre tallene står like godt alene.
+  const harTak = p.timetak !== null && p.timetak !== undefined;
+  const tak = harTak ? _budsjettpost(p.timetak, 'tak') : '';
+  // `over_taket` regnes på serveren, der taket bor — ikke her. To steder å
+  // sammenligne er ett sted for mye, samme grunn som for `langt_skift`.
+  const igjen = harTak
+    ? _budsjettpost(p.igjen, p.over_taket ? 'over taket' : 'igjen',
+                    p.over_taket ? 'vl-advarsel' : '')
+    : '';
+  // **Probono vises bare når det finnes.** Posten er der for at summen ikke
+  // skal utelate noe i stillhet (beslutning 9); står den på null, utelater
+  // den ingenting, og da er den bare en post til å lese forbi.
+  const probono = p.probono > 0 ? _budsjettpost(p.probono, 'probono') : '';
+
+  const knapp = kanSetteTak()
+    ? `<button class="btn btn-sm btn-outline-secondary" type="button"
+               data-action="apneTimetak">
+         <i class="bi bi-cash-coin me-1"></i>${harTak ? 'Endre tak' : 'Sett tak'}
+       </button>`
+    : '';
+
+  // **«Mangler folk» er avstanden mellom de to første**, og den er selve
+  // arbeidslista: 312 satt opp mot 244 bemannet er 68 timer uten navn.
+  // Regnes her fordi den ikke er en ny opplysning, bare en subtraksjon
+  // leseren ellers måtte gjøre i hodet.
+  const mangler = Math.round((p.satt_opp - p.bemannet) * 100) / 100;
+  const manglerPost = mangler > 0
+    ? _budsjettpost(mangler, 'mangler folk') : '';
+
+  return `
+    <div class="vl-kort vl-belastningshode">
+      <div class="vl-noekkeltall">
+        ${tak}
+        ${_budsjettpost(p.satt_opp, 'satt opp')}
+        ${_budsjettpost(p.bemannet, 'bemannet')}
+        ${manglerPost}
+        ${probono}
+        ${igjen}
+      </div>
+      ${mkDagslinje(p.dager)}
+      ${knapp}
+    </div>`;
+}
+
+
+function mkDagslinje(dager) {
+  // **Timene per dag, uten egne tak** (beslutning 2). Dagene sier hvilken
+  // dag som bærer vekten; grensa er fortsatt én, for hele vakta.
+  //
+  // **Overskriften sier «satt opp per dag» med vilje.** Linja bryter ned
+  // `satt_opp`, ikke `bemannet`, og uten etiketten måtte leseren gjette
+  // hvilket av de to tallene over den summerer til.
+  if (!dager || dager.length < 2) return '';
+  const celler = dager.map((d) => `
+    <div class="vl-dagtall">
+      <b>${escapeHtml(_tall(d.timer))} t</b>
+      <span class="vl-meta">${escapeHtml(_dagtekst(d.fra_tid))}</span>
+    </div>`).join('');
+  return `
+    <div class="vl-dagslinje">
+      <span class="vl-meta vl-dagslinje-merke">Satt opp per dag</span>
+      ${celler}
+    </div>`;
+}
+
+
 function mkBelastning() {
   // **Belastningen før vakten, ikke bemanningen** (§8b). Bemanningskurvene
   // svarer på «er plassene fylt»; denne svarer på «hva koster det dem som
@@ -637,7 +727,7 @@ function mkBelastning() {
        </button>`
     : '';
 
-  const hode = `
+  const hode = mkBudsjett() + `
     <div class="vl-kort vl-belastningshode">
       <div class="vl-noekkeltall">
         <div><b>${escHtmlValue(s.personer)}</b><span class="vl-meta">personer</span></div>

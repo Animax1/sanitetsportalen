@@ -507,8 +507,8 @@ den gamle tiden, og ville skjult et lovlig valg. Veggen er skiltet der i stedet 
 på enheter/ressurser. En kan sette inn total timer og da jobbe overordnet med hvor mange en
 kan ha på vakt.»
 
-**Elleve avklarte spørsmål** (notatets §6): åtte fra gjennomgangen 15. sep. 2026, og tre
-til da koden ble lest før byggingen begynte. Kort:
+**Fjorten avklarte spørsmål** (notatets §6): åtte fra gjennomgangen 15. sep. 2026, tre til
+da koden ble lest før byggingen begynte, og tre under byggingen selv. Kort:
 timetallet er et **tak som varsler**; **ett tak for hele vakta**, med en dagslinje uten egne
 tak; timer føres på **startdagen**, ikke splittet ved midnatt (det er rapportmodulens regel,
 og forskjellen er bevisst); generatoren lager **bare tomme plasser**; ny generering
@@ -517,18 +517,24 @@ budsjettlinja viser **satt opp og bemannet side om side**; taket **kopieres** av
 `kopier_oppsett`; og **overlapp-punktet løses først**. Og de tre siste: **probono teller
 ikke mot taket, men vises for seg**; genererte plasser **fødes som planlagt kladd**; og
 **«åpen for alle»-plasser overlever** en ny generering — regelen blir da at generatoren
-bare rører det `services.er_planlagt()` kaller kladd.
+bare rører det `services.er_planlagt()` kaller kladd. Og de tre siste, tatt under
+byggingen: budsjettlinja bor i fanen **«Planlegging»** som alt finnes; taket er
+**`skriv_leder`**; og budsjettallene sendes **bare til den som ser alle korps**, fordi de er
+hele vaktas og ellers ville vært et aggregat over skift man ikke får se.
 
-Rekkefølgen under er notatets §7. Ingenting er bygget.
+Rekkefølgen under er notatets §7. **Steg 1–3 er gjort** (15. sep. 2026); kurvene og
+generatoren står igjen.
 
 - [x] **Løs overlapp-punktet under først.** Gjort 15. sep. 2026 — se CHANGELOG.
-- [ ] **Budsjettlinja og dagslinja.** «Tak: 400 t · Satt opp: 312 t · Bemannet: 244 t ·
-      Igjen: 88 t · Probono: 16 t», og under den «fre. 128 t · lør. 152 t · søn. 32 t». Begge leser bare
-      det som finnes (`_sumTimer()`, `_grupperPaaDag()`), og gir verdi uten generatoren.
-      Avstanden mellom «satt opp» og «bemannet» er selve arbeidslista.
-- [ ] **Taket som felt på `Vaktliste`**, satt med `skriv_full`, og kopiert av
-      `kopier_oppsett` til neste vakt. Det gjelder *denne* vakta — `Belastningsgrenser` er
-      organisasjonens og gjelder alle.
+- [x] **Budsjettlinja og dagslinja** (15. sep. 2026). Står øverst i fanen
+      «Planlegging», over «Per person» — ikke i en ny fane ved siden av den, som ville
+      hett «Planlegger» og skilt seg fra den med én bokstav (beslutning 12).
+      Se CHANGELOG.
+- [x] **Taket som felt på `Vaktliste`**, kopiert av `kopier_oppsett`. Satt med
+      **`skriv_leder`**, ikke `skriv_full` som notatet først skisserte: det settes i samme
+      PUT som vaktas spenn, og én forespørsel kan ikke ha to tilgangsnivåer inni seg
+      (beslutning 13). Gjort samtidig med punktet over — en «budsjettlinje» uten et
+      budsjett er halve funksjonen.
 - [ ] **Bildet av vakta:** bemanningskurvene per gruppe ved siden av hverandre over
       `_vaktensSpenn()`, så hull og topper er synlige mens man legger inn.
 - [ ] **Generatoren til slutt**, i sin enkleste form: N **tomme** plasser, fra–til, rolle,

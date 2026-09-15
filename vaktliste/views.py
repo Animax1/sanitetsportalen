@@ -160,6 +160,7 @@ def _vaktliste_til_dict(vl):
         'startet': vl.vakt.startet.isoformat() if vl.vakt.startet else None,
         'planlagt_slutt': (vl.planlagt_slutt.isoformat()
                            if vl.planlagt_slutt else None),
+        'timetak': vl.timetak,
         'er_aktiv_vakt': vl.vakt.er_aktiv,
         'notat': vl.notat,
         'arkivert_at': vl.arkivert_at.isoformat() if vl.arkivert_at else None,
@@ -354,10 +355,18 @@ def vaktliste_detalj_view(request, pk):
     svar. Faner uten data er fortsatt faner, så alt hentes samlet framfor ett
     kall per ressurs.
 
-    PUT endrer vaktas lengde — start og planlagt slutt. Det er `skriv_leder`:
-    spennet gjelder hele vakta, ikke ett korps' del av den, det er grunnlaget
-    bemanningskurven tegnes over, og et skift som faller utenfor et flyttet
-    spenn er ikke noe bemanneren kan se komme.
+    PUT endrer vaktas rammer — start, planlagt slutt og timetaket. Det er
+    `skriv_leder`: de gjelder hele vakta, ikke ett korps' del av den, spennet
+    er grunnlaget bemanningskurven tegnes over, og et skift som faller
+    utenfor et flyttet spenn er ikke noe bemanneren kan se komme.
+
+    **Timetaket er `skriv_leder` av samme grunn**, ikke `skriv_full` som
+    planleggernotatets §4 først skisserte (15. sep. 2026). Det er et tall
+    *alle* varsler på lista måles mot, det hører til samme feltfamilie som
+    spennet, og det settes i samme PUT — én forespørsel med to ulike
+    tilgangsnivåer inni er en regel ingen klarer å lese riktig. Samme
+    plassering som `Belastningsgrenser`, som også er `skriv_leder`;
+    forskjellen mellom dem er rekkevidden, ikke hvem som bestemmer.
 
     DELETE er **global admin**. Å slette en vaktliste river hele oppsettet og
     alle skiftene på det; det hører til samme kategori som resten av det
@@ -394,6 +403,23 @@ def vaktliste_detalj_view(request, pk):
             # spenn ville gitt en kurve som ikke kan tegnes.
             return _feil('Vakta må slutte etter at den begynner.')
 
+        # **Tomt felt betyr «ingen tak», ikke null.** Et nedtrekk eller et
+        # tallfelt som tømmes sender `''` eller `null`, og begge skal fjerne
+        # taket. Null timer ville derimot vært et budsjett som er brukt opp
+        # før noen er satt opp, og lista hadde stått gul fra første skift.
+        timetak = vl.timetak
+        if 'timetak' in data:
+            raa = data.get('timetak')
+            if raa in (None, ''):
+                timetak = None
+            else:
+                try:
+                    timetak = int(raa)
+                except (TypeError, ValueError):
+                    return _feil('Timetaket må være et helt antall timer.')
+                if timetak < 0:
+                    return _feil('Timetaket kan ikke være negativt.')
+
         with transaction.atomic():
             if 'startet' in data:
                 vl.vakt.startet = start
@@ -401,9 +427,15 @@ def vaktliste_detalj_view(request, pk):
                 # mens den planlegges, og `year` er portalens scope-nøkkel.
                 vl.vakt.year = timezone.localtime(start).year
                 vl.vakt.save(update_fields=['startet', 'year'])
+            felter = []
             if 'planlagt_slutt' in data:
                 vl.planlagt_slutt = slutt
-                vl.save(update_fields=['planlagt_slutt'])
+                felter.append('planlagt_slutt')
+            if 'timetak' in data:
+                vl.timetak = timetak
+                felter.append('timetak')
+            if felter:
+                vl.save(update_fields=felter)
 
         vl.refresh_from_db()
         return JsonResponse({'status': 'ok', 'data': _vaktliste_til_dict(vl)})
@@ -739,10 +771,23 @@ def belastning_view(request, pk):
                 if services.ser_alle_korps(request.user) else None)
     rader = services.belastning_per_person(
         vl, grenser, user=request.user, korps_id=korps_id)
+    # **Budsjettallene følger med her, uten et eget kall.** Fanen henter
+    # allerede dette svaret, og to runder til serveren for tall som tegnes
+    # ved siden av hverandre er én for mye.
+    #
+    # **Men bare til den som ser alle korps** (15. sep. 2026). Tallene er
+    # hele vaktas, fordi taket er det — og for en `les` med badge ville de
+    # vært et aggregat over skift hun ikke får se. Det er samme regel som
+    # statistikkmodulen bruker: aggregater gir avledet innsyn, og skal gates
+    # der dataene bor.
+    planlegging = (services.planleggingstall(vl)
+                   if services.ser_alle_korps(request.user) else None)
     return JsonResponse({'status': 'ok', 'data': {
         'personer': rader,
         'sammendrag': services.belastning_sammendrag(
             vl, rader, user=request.user, korps_id=korps_id),
+        'planlegging': planlegging,
+        'kan_sette_tak': services.kan_lede(request.user),
         'grenser': {
             'maks_skift_timer': grenser.maks_skift_timer,
             'min_hvile_timer': grenser.min_hvile_timer,

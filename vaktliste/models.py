@@ -402,6 +402,24 @@ class Vaktliste(BaseTimeStampedModel):
         null=True, blank=True,
         verbose_name='Planlagt slutt',
         help_text='Når vakta er tenkt å være over. Styrer bemanningskurven.')
+    # **Timetaket er denne vaktas budsjett** (15. sep. 2026,
+    # `docs/FORSLAG_PLANLEGGERFANE.md` beslutning 1–2). Ett tall for hele
+    # lista, ikke ett per dag: et tak per dag ville sperret det man faktisk
+    # gjør — flytte timer mellom dagene mens totalen står.
+    #
+    # **Det varsler, det sperrer ikke.** Ingenting avvises fordi summen
+    # passerer taket; planleggeren ser et gult merke og tar stilling. Samme
+    # linje som `Belastningsgrenser`, og forskjellen mot den er rekkevidden:
+    # grensene er organisasjonens og gjelder alle lister, taket er *denne*
+    # vaktas.
+    #
+    # **Hele timer.** «Tak: 400 t» er formen dette settes i; et tak på 37,5
+    # timer for en hel vakt er en presisjon ingen har, og et heltall sparer
+    # oss for et desimalfelt som må avrundes likt to steder.
+    timetak = models.PositiveIntegerField(
+        null=True, blank=True,
+        verbose_name='Timetak',
+        help_text='Budsjett i timer for hele vakta. Varsler, sperrer ikke.')
     # **Arkivert, ikke slettet** (André, 12. sep. 2026: «lagre/arkivere
     # vaktlista for å hente den igjen ved feil»). En arkivert liste er ute
     # av velgeren, men alt står — og global admin henter den tilbake.

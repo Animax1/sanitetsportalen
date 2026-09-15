@@ -146,6 +146,17 @@ function kanLede() {
 }
 
 
+function kanSetteTak() {
+  // **Serveren svarer, klienten spør ikke selv.** Taket settes i den samme
+  // PUT-en som vaktas spenn og er derfor `skriv_leder` — men det er
+  // serveren som eier den regelen, og `belastning.kan_sette_tak` er dens
+  // svar. Regnet vi den ut her av `MODUL_TILGANG`, ville knappen og
+  // endepunktet kunne komme i utakt, og da er vi tilbake til en knapp som
+  // fører til en vegg.
+  return !!(belastning && belastning.kan_sette_tak);
+}
+
+
 function kanSkriveNoe() {
   return kanSkriveAlt() || _nivaa() === 'skriv_handling';
 }

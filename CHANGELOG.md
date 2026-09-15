@@ -4,6 +4,94 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-15 — Vaktas budsjett: steg 2 og 3 mot planleggerfanen
+
+`docs/FORSLAG_PLANLEGGERFANE.md` §7, steg 2 og 3. **Gjort i samme omgang med vilje:** en
+«budsjettlinje» uten et budsjett er halve funksjonen, og taket er ett felt pluss én linje i
+`kopier_oppsett`. Å dele dem ville betydd å bygge linja to ganger.
+
+### Tre beslutninger til, tatt fordi koden sa noe annet enn notatet
+
+**12. Linja bor i fanen som alt finnes.** Skissen sa «fanen ligger ved siden av «Oversikt»
+og «Mannskap»» — men det finnes allerede en slik fane, og den heter **«Planlegging»**. En
+ny ved siden av ville gitt to faner med én bokstavs forskjell, og den som leter etter
+tallene sine måtte prøve begge. Budsjettlinja står derfor øverst i «Planlegging», over «Per
+person»: vaktas tall først, den enkeltes under — motsatt ville begravet totalen under en
+persontabell som kan bli lang.
+
+**13. Taket er `skriv_leder`, ikke `skriv_full`.** Notatets §4 sa `skriv_full`. Det holdt
+ikke mot koden: taket settes i **samme PUT** som vaktas start og planlagte slutt, og den er
+`skriv_leder` med en begrunnelse som gjelder ord for ord her også — «spennet gjelder hele
+vakta, ikke ett korps' del av den». Taket er tallet *alle* varsler på lista måles mot. Og
+en PUT der `startet` krever ett nivå og `timetak` et annet er en regel ingen klarer å lese
+riktig. Det gjør taket til per-vakt-søsteren av `Belastningsgrenser`, som også er
+`skriv_leder`; forskjellen er rekkevidden, ikke hvem som bestemmer.
+
+**14. Tallene sendes bare til den som ser alle korps.** De er hele vaktas og filtreres
+aldri — taket gjelder lista, så et «satt opp» for ett korps kunne ikke sammenlignes med
+det. Men da kan de heller ikke sendes til alle: for en `les` med badge ville summen vært et
+aggregat over skift hun ikke får se. Samme regel som statistikkmodulen bruker.
+`belastning_view` sender `planlegging: null`, og klienten tegner ingen linje — **ingen tom
+ramme**, for den ville sagt «her er noe du ikke får se», som er en dårligere beskjed enn
+ingen beskjed. Hennes egne timer står i «Mitt korps».
+
+### Tallene
+
+`services.planleggingstall()` gir **tre tall side om side**, fordi hvert av dem alene lyver
+litt: «satt opp» er behovet, men ingen betaler for en tom plass; «bemannet» er nærmest
+kostnad, men står på null når lista er halvt satt opp; «probono» vises for seg så summen
+ikke utelater noe i stillhet (beslutning 9), og bare når det finnes noe å vise.
+
+Avstanden mellom de to første er **selve arbeidslista**, så den regnes ut og står der:
+312 satt opp mot 244 bemannet er 68 timer som mangler folk.
+
+**`igjen` måles mot «satt opp»**, ikke mot «bemannet»: planlegging handler om behovet, og
+et budsjett som først fylles når navnene er på plass sier «du har alt igjen» på en liste
+som er ferdig satt opp. Går man over, blir tallet gult og etiketten bytter fra «igjen» til
+«over taket» — et negativt tall under «igjen» leses som en regnefeil. **Ingenting avvises.**
+
+**Dagslinja** bryter ned «satt opp» per dag, uten egne tak (beslutning 2), og sier det i
+overskriften: «Satt opp per dag». Uten etiketten måtte leseren gjette hvilket av de to
+tallene over den dagene summerer til. Den står ikke på en endagsvakt — én dag er ingen
+nedbryting, bare totalen skrevet to ganger.
+
+### To mutanter som fant ekte hull
+
+**Rekkefølgen var garantert av modellen, ikke av regelen** — nøyaktig samme felle som
+`_hviletider()` dokumenterer, og som traff oss 14. sep. også. `sorted()` lot seg fjerne
+uten at noe ble rødt, fordi `Vaktpost.Meta.ordering` alt sorterer på `fra_tid`, så testene
+gjennom basen målte modellens ordering. Dagbolkene er nå en egen funksjon, `_dagbolker()`,
+prøvd med lister kalleren *ikke* har sortert.
+
+**`timezone.localtime()` lot seg fjerne**, og testen min kunne ikke se det: de falske
+skiftene bar norsk tid, mens ORM-en leverer UTC — da var `.date()` alt riktig. Rettet i
+testen, ikke i koden. Feilen den vokter er verdt å kjenne: et skift som begynner 00:30
+norsk tid er 22:30 UTC dagen før, så uten `localtime()` havner hver eneste nattevakt på
+feil dag. Usynlig for alt som begynner på dagtid.
+
+### Ellers
+
+**Skanneren leste ikke de nye byggerne.** `mkBudsjett`, `mkDagslinje` og `_budsjettpost`
+sto én kjøring uten å være i `HTML_BUILDERS`, og da var escaping-regelen stille av for dem
+— suiten var grønn fordi ingen så etter, ikke fordi koden var riktig. En ny bygger som
+skanneren ikke leser er nøyaktig det hullet den lista finnes for.
+
+`kanSetteTak()` leser **serverens** `kan_sette_tak`, ikke `MODUL_TILGANG`: regnet klienten
+den ut selv, kunne knappen og endepunktet komme i utakt, og en knapp som fører til en vegg
+er verre enn ingen knapp.
+
+Migrasjonen (`vaktliste/0018`) er ren skjemaendring uten `RunPython`, så den har ingen
+triggerkø å tømme.
+
+**Endret:** `vaktliste/models.py` + `migrations/0018_vaktliste_timetak.py`,
+`vaktliste/services.py`, `vaktliste/views.py`, `static/js/vaktliste-oversikt.js`,
+`static/js/vaktliste-kjerne.js`, `static/js/vaktliste-handlinger.js`,
+`static/css/vaktliste.css`, `templates/vaktliste/index.html`,
+`vaktliste/tests_belastning.py` (+29 tester), `vaktliste/tests_xss.py` (+14 tester),
+`docs/FORSLAG_PLANLEGGERFANE.md`, `TODO.md`, `CLAUDE.md`.
+
+---
+
 ## 2026-09-15 — Overlappet har fått et navn: steg 1 mot planleggerfanen
 
 Første kodesteg fra `docs/FORSLAG_PLANLEGGERFANE.md` §7. Punktet sto i TODO fra

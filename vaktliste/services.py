@@ -100,11 +100,19 @@ def neste_grupperekkefolge() -> int:
 
 
 def kopier_oppsett(fra_vaktliste, til_vaktliste):
-    """Kopier ressursene — med gruppe, reservasjon, enhet og rekkefølge.
+    """Kopier ressursene — med gruppe, reservasjon, enhet og rekkefølge —
+    og timetaket.
 
     **Aldri personene.** Å kopiere folk ville satt dem opp på en vakt de ikke
     har sagt ja til, og en liste ingen har sagt ja til er verre enn en tom
     liste: den ser ferdig ut.
+
+    **Taket følger med** (15. sep. 2026, planleggernotatets beslutning 6).
+    Det ligger nærmere ressursene enn personene: det er en egenskap ved
+    *arrangementet* man setter opp på nytt. Og det er ufarlig å ta feil her,
+    i motsetning til personene — et tak som følger med og ikke stemmer gir et
+    gult varsel man retter på fem sekunder, mens et navn på en vakt ingen har
+    sagt ja til er en liste som ser ferdig ut.
 
     Returnerer antall kopierte ressurser.
     """
@@ -122,6 +130,11 @@ def kopier_oppsett(fra_vaktliste, til_vaktliste):
             rekkefolge=r.rekkefolge,
         )
         antall += 1
+    # Skrives bare når det finnes noe å skrive: en `save()` uten endring
+    # ville laget en auditrad om at ingenting skjedde.
+    if fra_vaktliste.timetak is not None:
+        til_vaktliste.timetak = fra_vaktliste.timetak
+        til_vaktliste.save(update_fields=['timetak'])
     return antall
 
 
@@ -744,6 +757,103 @@ def belastning_per_person(vaktliste, grenser=None, user=None, korps_id=None):
 
     rader.sort(key=lambda r: (-r['timer'], r['navn'].lower()))
     return rader
+
+
+def _dagbolker(skift):
+    """Timene per dag, ført på skiftets **startdag**, kronologisk.
+
+    Egen funksjon og ikke en løkke inne i `planleggingstall`, av samme grunn
+    som `_hviletider()`: da kan regelen prøves med en liste kalleren *ikke*
+    har sortert. Funnet ved mutasjonstesting 15. sep. 2026 — `sorted()` lot
+    seg fjerne uten at noe ble rødt, fordi `Vaktpost.Meta.ordering` alt
+    sorterer på `fra_tid`, så testene gjennom basen målte modellens ordering
+    og ikke hjelperens.
+
+    **Dagen regnes i lokal tid.** `date()` rett på tidspunktet gir UTC, og
+    et skift som begynner 00:30 norsk tid ville da havnet på dagen før — i
+    vintertid 23:30 UTC, i sommertid 22:30. Feilen er usynlig for alle skift
+    som begynner på dagtid, altså de fleste, og viser seg bare på nattskift.
+
+    **Startdagen, ikke splittet ved midnatt** (planleggernotatets beslutning
+    7). «fre. 20:00 – lør. 04:00» er åtte timer under fredag. Rapportmodulen
+    splitter, og forskjellen er bevisst: splitting endrer ikke en totalsum,
+    bare hvilken dag timene føres på — og spørsmålene er ulike.
+    """
+    dager = {}
+    for vp in skift:
+        if vp.fra_tid is None:
+            continue
+        nokkel = timezone.localtime(vp.fra_tid).date().isoformat()
+        rad = dager.setdefault(
+            nokkel, {'nokkel': nokkel, 'fra_tid': vp.fra_tid.isoformat(),
+                     'timer': 0.0})
+        rad['timer'] += _timer(vp.fra_tid, vp.til_tid)
+    return [{**d, 'timer': round(d['timer'], 2)}
+            for d in sorted(dager.values(), key=lambda d: d['nokkel'])]
+
+
+def planleggingstall(vaktliste):
+    """Vaktas budsjett: taket, det som er satt opp, og timene per dag.
+
+    `docs/FORSLAG_PLANLEGGERFANE.md` §6. Svarer på «hvor mye vakt har jeg
+    satt opp, og hvor mye er igjen av budsjettet» — ikke på hva det koster
+    den enkelte, som er `belastning_per_person`.
+
+    **Hele vakta, aldri filtrert på korps.** Taket gjelder lista, så tallene
+    må gjøre det også: et «satt opp» som bare teller ett korps ville stått
+    ved siden av et tak for alle, og de to kan ikke sammenlignes. Viewet
+    sender derfor bare disse tallene til den som **ser alle korps** — for
+    `les` med badge ville summen vært et aggregat over skift hun ikke får
+    se, altså avledet innsyn.
+
+    **Tre tall, ikke ett** (beslutning 5 og 9), fordi hvert av dem alene
+    lyver litt:
+
+    | Tall | Hva det er | Hvorfor ikke alene |
+    |---|---|---|
+    | `satt_opp` | Alle plasser, ledige inkludert | Ingen betaler for en tom plass |
+    | `bemannet` | Bare plasser med mannskap | Står på null når lista er halvt satt opp |
+    | `probono` | Skiftene organisasjonen ikke betaler for | Utelates fra de to over, som i `_sumTimer()` |
+
+    Avstanden mellom `satt_opp` og `bemannet` er dessuten arbeidslista: 312
+    mot 244 er 68 timer som mangler folk.
+
+    **`igjen` måles mot `satt_opp`**, ikke mot `bemannet`: planlegging
+    handler om behovet, og et budsjett som først fylles når navnene er på
+    plass sier «du har alt igjen» på en liste som er ferdig satt opp.
+
+    **Dagslinja fører skiftet på startdagen** (beslutning 7), som
+    `_dagnokkel()` i `vaktliste-tegning.js` og resten av vaktlisteflaten.
+    Rapportmodulen splitter ved midnatt, og det er en bevisst forskjell:
+    splitting endrer ikke en totalsum, bare hvilken dag timene føres på — og
+    spørsmålene er ulike. Trenger man time-for-time-bildet, er svaret
+    bemanningskurven.
+
+    Dagene har **ingen egne tak**. Et tak per dag ville sperret det man
+    faktisk gjør: flytte timer mellom dagene mens totalen står.
+    """
+    from .models import Vaktpost
+    poster = list(Vaktpost.objects.filter(ressurs__vaktliste=vaktliste))
+
+    def _sum(utvalg):
+        return round(sum(_timer(vp.fra_tid, vp.til_tid) for vp in utvalg), 2)
+
+    betalte = [vp for vp in poster if not vp.probono]
+    satt_opp = _sum(betalte)
+    timetak = vaktliste.timetak
+
+    return {
+        'timetak': timetak,
+        'satt_opp': satt_opp,
+        'bemannet': _sum([vp for vp in betalte if vp.mannskap_id is not None]),
+        'probono': _sum([vp for vp in poster if vp.probono]),
+        # `None` når det ikke er satt noe tak — ikke 0. «0 timer igjen» er en
+        # beskjed om at budsjettet er brukt opp; «ingen tak satt» er fraværet
+        # av et budsjett, og de to skal ikke se like ut.
+        'igjen': None if timetak is None else round(timetak - satt_opp, 2),
+        'over_taket': timetak is not None and satt_opp > timetak,
+        'dager': _dagbolker(betalte),
+    }
 
 
 def belastning_sammendrag(vaktliste, rader, user=None, korps_id=None):

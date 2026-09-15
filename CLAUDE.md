@@ -918,8 +918,28 @@ Oppdragsmodulen importerer **ikke** vaktlista; `oppdrag-sentral.js` henter
   PostgreSQL (prod) plasserer NULL i hver sin ende.
 
 **Planleggingstall (fase 5) varsler, de sperrer ikke.** `services`
-regner ut timer, skift, lengste skift og korteste hvile per person;
+regner ut timer, skift, lengste skift, korteste hvile og **overlapp** per person;
 `Belastningsgrenser` (én rad) bærer grensene varslene måles mot.
+
+**Vaktas budsjett står øverst i samme fane** (15. sep. 2026,
+`docs/FORSLAG_PLANLEGGERFANE.md` steg 2–3): `services.planleggingstall()` gir
+`satt_opp`, `bemannet` og `probono` **side om side**, fordi hvert av dem alene lyver litt
+— ingen betaler for en tom plass, og «bemannet» står på null når lista er halvt satt opp.
+Avstanden mellom de to første er arbeidslista. `Vaktliste.timetak` er **denne** vaktas
+budsjett (`Belastningsgrenser` er organisasjonens og gjelder alle), `igjen` måles mot
+**satt opp** og ikke mot bemannet, og `_dagbolker()` bryter ned per dag uten egne tak.
+Fanen ble **ikke** ny: den heter allerede «Planlegging», og «Planlegger» ved siden av
+hadde skilt seg fra den med én bokstav.
+
+- **Taket settes i `vaktliste_detalj_view`s PUT, sammen med start og planlagt slutt, og
+  er derfor `skriv_leder`** — ikke `skriv_full`. Rekkevidden er den samme (hele vakta,
+  ikke ett korps' del), og én forespørsel kan ikke ha to tilgangsnivåer inni seg.
+- **Budsjettallene sendes bare til den som `ser_alle_korps`.** De filtreres aldri på
+  korps — taket gjelder lista — så for en `les` med badge ville de vært et aggregat over
+  skift hun ikke får se. `belastning_view` sender `planlegging: null`, og klienten tegner
+  ingenting; en tom ramme ville sagt «her er noe du ikke får se».
+- **`kanSetteTak()` leser serverens `kan_sette_tak`**, ikke `MODUL_TILGANG`. Regnes den
+  ut i klienten, kan knappen og endepunktet komme i utakt.
 
 - **Grensene er organisasjonens**, ikke portalens — derfor data og ikke tall i
   en `if`. `skriv_leder` flytter dem: det endrer hva *alle* vaktlister varsler
@@ -927,13 +947,25 @@ regner ut timer, skift, lengste skift og korteste hvile per person;
 - **Ingenting avvises.** Noen ganger må noen ta et langt skift, og da skal
   lista si det høyt. Fargen er gul (`--vl-varsel`), ikke rød.
 - **Overlappende skift gir hvile 0**, ikke et negativt tall — et negativt tall
-  i en «korteste hvile»-kolonne ser ut som en regnefeil.
+  i en «korteste hvile»-kolonne ser ut som en regnefeil. **Null der betyr to ulike ting**
+  (skift som henger sammen, og skift som overlapper), og det er derfor
+  `_overlappstimer()` finnes ved siden av: sum minus union, så
+  `timer - overlapp` er faktisk tilstedeværelse. **Summen korrigeres ikke, den
+  navngis** — et tall som stille retter seg selv ville skjult dobbeltbookingen.
+  Probono teller med her selv om den ikke teller i `timer`: kroppen skiller ikke på lønn.
+  Overlappet har **ingen grense å måle mot**, med vilje — én person kan ikke stå to
+  steder uansett hva `Belastningsgrenser` sier.
 - **Faktisk tid regnes bare av ferdige skift** (både `mott_at` og
   `av_vakt_at`). Et pågående skift ville gitt et tall som endrer seg mens man
   ser på det.
 - `_hviletider()` **sorterer selv**, selv om `Vaktpost.Meta.ordering` gjør det
   også: en hjelper skal ikke hvile på at den som kaller den har sortert. Uten
-  den egne sorteringen målte testene modellens ordering.
+  den egne sorteringen målte testene modellens ordering. **`_dagbolker()` er skilt ut av
+  `planleggingstall()` av nøyaktig samme grunn** (15. sep. 2026, funnet på nytt ved
+  mutasjonstesting) — og den regner dagen i **lokal tid**: et skift som begynner 00:30
+  norsk tid er 22:30 UTC dagen før, så `.date()` rett på tidspunktet legger hver eneste
+  nattevakt på feil dag. En test med falske skift må derfor bære **UTC**, som ORM-en
+  gjør; bærer den norsk tid, går mutanten grønn.
 
 **Drift (fase 4) er en innsjekk-port, ikke en livssyklus.** `Vaktliste.status`
 har to verdier, og `drift` betyr én ting: møtt/av vakt er åpen. Overgangen går

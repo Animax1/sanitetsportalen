@@ -1220,6 +1220,35 @@
   font-weight: 600;
 }
 
+/*
+  ── Budsjettlinja og dagslinja (15. sep. 2026) ──────────────────────────
+
+  Dagslinja tar hele bredden under nøkkeltallene, ikke en plass ved siden av
+  dem: den er en *nedbryting* av «satt opp», og et tall som står i samme rad
+  som det det bryter ned leses som enda et sidestilt nøkkeltall.
+
+  `flex-basis: 100%` framfor en egen rad i markupen, slik at hodet forblir
+  én `flex`-container — da kan knappen fortsatt flyte dit det er plass.
+*/
+.vl-dagslinje {
+  flex-basis: 100%;
+  display: flex;
+  align-items: baseline;
+  gap: 1.25rem;
+  flex-wrap: wrap;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--border-color, rgba(255, 255, 255, 0.12));
+}
+
+.vl-dagslinje-merke { flex-basis: 100%; }
+
+/*
+  Dagtallene er mindre enn nøkkeltallene over dem. Samme størrelse ville
+  gjort dem til seks likestilte tall der tre er totalen og tre er delene.
+*/
+.vl-dagtall { display: flex; flex-direction: column; }
+.vl-dagtall b { font-size: 1.15rem; line-height: 1.2; }
+
 @media print {
   .vl-varselantall, .vl-advarsel { color: #000 !important; }
   .vl-advarsel::after { content: ' (!)'; }
