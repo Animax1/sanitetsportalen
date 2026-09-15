@@ -4,6 +4,30 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-15 — Planleggeren: «Legg til ressurs» flyttet ned
+
+**Meldt fra staging (André):**
+
+> «Legg til ressurs bør ligge mellom sist opprettet ressurs og lag grunnlag for
+> forståelsen skyld. For nå er det lett å tro at man bare lager en ressurs og så er man
+> ferdig.»
+
+Knappen sto i hodet, over radene. Der leser den som **«start her»** — og har du laget den
+ene raden, er det neste du ser generer-knappen. Mellom radene og «Lag grunnlaget» leser den
+som **«legg til én til»**, og rekkefølgen i panelet blir den man arbeider i: sett opp, legg
+til flere, lag grunnlaget.
+
+Den står også når oppsettet er tomt; ellers kommer man aldri i gang.
+
+Tre mutanter prøvd: knappen tilbake i hodet, knappen etter generer-knappen, og knappen
+borte på et tomt oppsett. Alle fanges — plasseringen er en regel nå, ikke en tilfeldighet i
+markupen.
+
+**Endret:** `static/js/vaktliste-oversikt.js`, `static/css/vaktliste.css`,
+`vaktliste/tests_xss.py` (+2 tester), `CLAUDE.md`.
+
+---
+
 ## 2026-09-15 — Planleggeren: plassene flyttet til vinduet, skiftlengde fjernet
 
 **Meldt fra staging (André):**

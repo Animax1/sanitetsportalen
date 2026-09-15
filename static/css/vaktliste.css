@@ -1301,6 +1301,13 @@
   som en opplysning — ikke som et felt man har glemt å fylle ut.
 */
 .vl-pl-eneste { align-self: center; padding-bottom: 0.4rem; }
+
+/*
+  «Legg til ressurs» står mellom radene og «Lag grunnlaget», og skal lese som
+  neste steg i arbeidet — ikke som en handling i et kort. Derfor står den fritt
+  på flata, med luft over og under.
+*/
+.vl-pl-legg-til { margin: 0.75rem 0 1rem; }
 .vl-pl-vindutall { white-space: nowrap; }
 
 @media print {

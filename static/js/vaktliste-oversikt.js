@@ -916,17 +916,29 @@ function mkPlanlegger() {
       </button>
     </div>` : '';
 
+  // **«Legg til ressurs» står mellom siste ressurs og «Lag grunnlaget»**
+  // (André, 15. sep. 2026: «for nå er det lett å tro at man bare lager en
+  // ressurs og så er man ferdig»).
+  //
+  // Den sto først i hodet, over radene. Der leser den som «start her» — og
+  // når du har laget den ene raden, er neste ting du ser generer-knappen.
+  // Mellom radene og knappen leser den i stedet som «legg til én til», og
+  // rekkefølgen i panelet blir den man arbeider i: sett opp, legg til flere,
+  // og til slutt lag grunnlaget.
+  const leggTil = `
+    <div class="vl-pl-legg-til">
+      <button type="button" class="btn btn-outline-secondary"
+              data-action="planleggerNyLinje">
+        <i class="bi bi-plus-lg me-1"></i>Legg til ressurs
+      </button>
+    </div>`;
+
   return mkBudsjett() + `
     <div class="vl-kort vl-kort-topp">
       <span class="vl-kort-tittel">Oppsett</span>
       <span class="vl-meta">Én rad per ressurs. Plassene fødes som
         <strong>planlagt</strong> — usynlige for korpsene til du deler dem ut.</span>
-      <span class="vl-pl-spacer"></span>
-      <button type="button" class="btn btn-sm btn-outline-secondary"
-              data-action="planleggerNyLinje">
-        <i class="bi bi-plus-lg me-1"></i>Legg til ressurs
-      </button>
-    </div>` + utenStart + linjer + tomt + oppsummering;
+    </div>` + utenStart + linjer + tomt + leggTil + oppsummering;
 }
 
 

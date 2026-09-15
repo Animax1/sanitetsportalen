@@ -3647,6 +3647,24 @@ class PlanleggerfanenTests(SimpleTestCase):
                                     (self.FRE15, self.LOR03))])
         self.assertIn('1 skift = 2 plasser, 24 t', ut)
 
+    def test_legg_til_staar_mellom_siste_ressurs_og_generer(self):
+        """André, 15. sep. 2026: «for nå er det lett å tro at man bare lager
+        en ressurs og så er man ferdig».
+
+        Knappen sto i hodet, over radene, og leste som «start her». Mellom
+        radene og «Lag grunnlaget» leser den som «legg til én til», og
+        rekkefølgen i panelet blir den man arbeider i."""
+        ut = self._vis([self._linje(self.LAG, 1, 4,
+                                    (self.FRE14, self.FRE22))])
+        self.assertLess(ut.index('vl-pl-linje'), ut.index('planleggerNyLinje'),
+                        'knappen skal stå etter ressursradene')
+        self.assertLess(ut.index('planleggerNyLinje'), ut.index('apneGenerer'),
+                        'og før «Lag grunnlaget»')
+
+    def test_legg_til_staar_ogsaa_naar_oppsettet_er_tomt(self):
+        """Uten den kommer man aldri i gang."""
+        self.assertIn('planleggerNyLinje', self._vis([]))
+
     def test_genererknappen_staar_bare_naar_det_finnes_et_oppsett(self):
         self.assertNotIn('apneGenerer', self._vis([]))
         self.assertIn('apneGenerer', self._vis(
