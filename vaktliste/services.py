@@ -600,7 +600,13 @@ def _hviletider(skift):
     **Overlappende skift gir hvile 0, ikke en negativ verdi.** To lister på
     samme tid er noe planleggeren skal se, og et negativt tall i en
     «korteste hvile»-kolonne ser ut som en regnefeil framfor et varsel.
-    Overlappet i seg selv fanges av `overlapp`-tellingen.
+    Overlappet i seg selv fanges av `_overlappstimer()`.
+
+    **Null her betyr to ulike ting, og det er med vilje.** Skift som henger
+    sammen (08–16 og 16–20) gir null hvile, og det er sant. Overlappende
+    skift gir også null. Kolonnen kan ikke skille dem — det er nettopp
+    derfor `overlapp` er sitt eget tall, og ikke noe man skal lese ut av
+    denne.
     """
     ordnet = sorted(skift, key=lambda vp: vp.fra_tid)
     ut = []
@@ -610,6 +616,55 @@ def _hviletider(skift):
         else:
             ut.append(_timer(forrige.til_tid, neste.fra_tid))
     return ut
+
+
+def _overlappstimer(skift):
+    """Hvor mange timer av en persons skift som er dobbeltbooket.
+
+    **Definisjonen er «sum minus union».** 12–20 og 16–22 er 8 + 6 = 14 timer
+    skift, mens personen er til stede fra 12 til 22 — ti timer. Differansen,
+    fire, er overlappet. Da gjelder også `timer - overlapp = faktisk
+    tilstedeværelse`, som er det tallet vaktlederen egentlig spør etter.
+
+    Punktet sto i `TODO.md` fra 14. sep. 2026: `_hviletider()` lovet denne
+    tellingen i docstringen sin, men den fantes ikke. Det som skjedde i
+    stedet var at `korteste_hvile` ble 0.0 og raden ble flagget som **kort
+    hvile** — altså ble et dobbeltbooket mannskap vist som et hvileproblem,
+    og planleggeren fikk aldri vite hva det egentlig var.
+
+    **Probono teller med, i motsetning til i `timer`.** Summen er det
+    organisasjonen betaler for og hopper derfor over probono; et overlapp er
+    en beskjed om at én person står to steder samtidig, og kroppen skiller
+    ikke på lønn. Samme resonnement som `lengste_skift` og `korteste_hvile`.
+
+    Regnet i sekunder og rundet **én gang** til slutt. Summeres avrundede
+    timetall hver for seg, kan to skift som ikke overlapper gi 0.01 — og et
+    varsel som fyrer på en avrundingsfeil er et varsel man slår av.
+    """
+    spenn = sorted((vp.fra_tid, vp.til_tid) for vp in skift
+                   if vp.fra_tid and vp.til_tid and vp.til_tid > vp.fra_tid)
+    # `< 2` er en snarvei, ikke en regel: ett skift gir sum lik union og
+    # dermed null uansett. Det som *må* stå her er vakten mot `spenn[0]` på
+    # en tom liste. (Mutasjonsprøvd 15. sep. 2026: `< 1` overlever fordi den
+    # er ekvivalent, `< 0` gir IndexError og fanges.)
+    if len(spenn) < 2:
+        return 0.0
+    sekunder = sum((til - fra).total_seconds() for fra, til in spenn)
+    # Unionen: slå sammen spenn som berører hverandre, og legg sammen
+    # lengdene av de sammenslåtte.
+    union = 0.0
+    start, slutt = spenn[0]
+    for fra, til in spenn[1:]:
+        # `>` og `>=` gir samme sum her — berører spennene hverandre nøyaktig,
+        # blir de enten ett segment eller to som til sammen er like lange.
+        # Mutanten overlever, og den er ekvivalent, ikke et hull i testene.
+        if fra > slutt:
+            union += (slutt - start).total_seconds()
+            start, slutt = fra, til
+        else:
+            slutt = max(slutt, til)
+    union += (slutt - start).total_seconds()
+    return round((sekunder - union) / 3600, 2)
 
 
 def belastning_per_person(vaktliste, grenser=None, user=None, korps_id=None):
@@ -663,6 +718,8 @@ def belastning_per_person(vaktliste, grenser=None, user=None, korps_id=None):
         faktisk = [_timer(vp.mott_at, vp.av_vakt_at) for vp in skift
                    if vp.mott_at and vp.av_vakt_at and not vp.probono]
 
+        overlapp = _overlappstimer(skift)
+
         rader.append({
             'mannskap_id': person.pk,
             'navn': person.navn,
@@ -672,11 +729,17 @@ def belastning_per_person(vaktliste, grenser=None, user=None, korps_id=None):
             'probono_skift': sum(1 for vp in skift if vp.probono),
             'lengste_skift': max(timer) if timer else 0.0,
             'korteste_hvile': min(hvile) if hvile else None,
+            'overlapp': overlapp,
             'faktiske_timer': round(sum(faktisk), 2) if faktisk else None,
             # Varslene regnes her og ikke i klienten: grensene ligger i
             # basen, og to steder å sammenligne dem er ett sted for mye.
             'langt_skift': bool(timer) and max(timer) > grenser.maks_skift_timer,
             'kort_hvile': bool(hvile) and min(hvile) < grenser.min_hvile_timer,
+            # **Ingen grense å måle mot, og det er riktig.** Et langt skift
+            # og en kort hvile er vurderinger — organisasjonen setter hvor
+            # grensen går. Et overlapp er en planleggingsfeil: personen kan
+            # ikke stå to steder, uansett hva grensene sier.
+            'har_overlapp': overlapp > 0,
         })
 
     rader.sort(key=lambda r: (-r['timer'], r['navn'].lower()))
@@ -700,6 +763,11 @@ def belastning_sammendrag(vaktliste, rader, user=None, korps_id=None):
         'ledige_plasser': ledige,
         'lange_skift': sum(1 for r in rader if r['langt_skift']),
         'korte_hviler': sum(1 for r in rader if r['kort_hvile']),
+        # Både timene og hodene: «4 t» sier hvor mye budsjettet er blåst opp,
+        # «1 person» sier hvor mange rader man må rette. Ett av dem alene
+        # gjør det andre til et regnestykke leseren må gjøre selv.
+        'overlapp': round(sum(r['overlapp'] for r in rader), 2),
+        'overlappende_personer': sum(1 for r in rader if r['har_overlapp']),
     }
 
 

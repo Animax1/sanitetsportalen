@@ -92,6 +92,14 @@ REVIEWED_INTERPOLATIONS = {
     'ingenVarsler': 'hardkodet tekst fra en ternær',
     'grenseknapp': 'markup bygget lokalt, ingen data i seg',
     'faktiskHode': 'hardkodet overskrift fra en ternær',
+    # Overlappskolonnen (15. sep. 2026), samme form som Faktisk-kolonnen over.
+    'overlappHode': 'hardkodet overskrift fra en ternær',
+    'overlapp': 'tom streng eller <td> med `overlappTall`, som er escapet over',
+    'overlappTall': 'markup bygget lokalt: escapet tall, eller streken',
+    'overlappVarsel': 'markup fra varsel(), som escaper teksten den får',
+    'bredder': '<col>-markup bygget lokalt, hver andel escapet inni',
+    '_tall(s.overlapp)': 'går inn som ren tekst til varsel(), som escaper '
+                         'hele strengen',
     'faktiskTall': 'tallet escapet, eller en hardkodet strek',
     'hvileklasse': 'hardkodet CSS-klasse fra en ternær',
     'lengsteklasse': 'hardkodet CSS-klasse fra en ternær',
@@ -3184,8 +3192,8 @@ class PlanleggingsfanenTests(SimpleTestCase):
 
     HARNESS = (
         (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue')),
-        (VAKTLISTE_JS, ('mkBelastning', '_tall', 'kanLede', '_nivaa',
-                        '_erAdmin', 'visFane')),
+        (VAKTLISTE_JS, ('mkBelastning', '_tall', '_kolonneandeler', 'kanLede',
+                        '_nivaa', '_erAdmin', 'visFane')),
     )
     VINDU = "globalThis.window = { MODUL_TILGANG: { admin: true } };\n"
 
@@ -3196,10 +3204,11 @@ class PlanleggingsfanenTests(SimpleTestCase):
 
     RAD = {'mannskap_id': 1, 'navn': 'Kari', 'korps_kort': 'HGSD',
            'antall_skift': 2, 'timer': 14.0, 'lengste_skift': 8.0,
-           'korteste_hvile': 10.0, 'faktiske_timer': None,
-           'langt_skift': False, 'kort_hvile': False}
+           'korteste_hvile': 10.0, 'overlapp': 0.0, 'faktiske_timer': None,
+           'langt_skift': False, 'kort_hvile': False, 'har_overlapp': False}
     SAM = {'personer': 1, 'skift': 2, 'timer': 14.0, 'ledige_plasser': 0,
-           'lange_skift': 0, 'korte_hviler': 0}
+           'lange_skift': 0, 'korte_hviler': 0,
+           'overlapp': 0.0, 'overlappende_personer': 0}
 
     def _vis(self, personer=None, sammendrag=None, *, nivaa='admin'):
         import json
@@ -3267,6 +3276,87 @@ class PlanleggingsfanenTests(SimpleTestCase):
         ut = self._vis([{**self.RAD, 'korteste_hvile': None}])
         self.assertIn('—', ut)
         self.assertNotIn('0 t</span>', ut)
+
+    def test_overlappskolonnen_staar_ikke_naar_ingen_er_dobbeltbooket(self):
+        """Samme regel som Faktisk-kolonnen: i den normale lista er
+        overlappet null for alle, og en kolonne full av nuller stjeler
+        bredde fra dem som betyr noe."""
+        ut = self._vis()
+        self.assertNotIn('<th>Overlapp</th>', ut)
+
+    def test_overlappskolonnen_kommer_naar_noen_er_dobbeltbooket(self):
+        """**Tallet leses ut av `<tbody>`, ikke ut av hele svaret.**
+        Mutasjonsprøvd 15. sep. 2026: en `overlappTall` som alltid ga streken
+        overlevde, fordi «4 t» også står i varselet i hodet. En assertion som
+        treffer et annet sted enn den mener, måler ikke det den sier."""
+        ut = self._vis([{**self.RAD, 'overlapp': 4.0, 'har_overlapp': True}],
+                       {'overlapp': 4.0, 'overlappende_personer': 1})
+        self.assertIn('<th>Overlapp</th>', ut)
+        kropp = ut[ut.index('<tbody>'):ut.index('</tbody>')]
+        self.assertIn('4 t', kropp, 'tallet skal stå i raden, ikke bare i varselet')
+        self.assertIn('vl-advarsel', kropp)
+
+    def test_overlappsvarselet_sier_timer_og_ikke_en_grense(self):
+        """Et langt skift måles mot organisasjonens grense; et overlapp er
+        en planleggingsfeil uansett hva grensene sier. Teksten sier derfor
+        timene, ikke en terskel."""
+        ut = self._vis([{**self.RAD, 'overlapp': 4.0, 'har_overlapp': True}],
+                       {'overlapp': 4.0, 'overlappende_personer': 1})
+        self.assertNotIn('Ingen varsler', ut)
+        # Leses ut av varselblokka, ikke ut av hele svaret: «4 t» står i
+        # raden også, og en assertion mot hele strengen ville gått grønn
+        # selv om varselet mistet tallet sitt. (Mutasjonsprøvd.)
+        varsler = ut[ut.index('vl-varsler'):ut.index('vl-tabell-belastning')]
+        self.assertIn('dobbeltbooket', varsler)
+        self.assertIn('4 t', varsler, 'varselet sier timene, ikke en terskel')
+        self.assertNotIn('over 12 t', varsler.split('dobbeltbooket')[-1])
+
+    def test_raden_uten_overlapp_faar_strek_naar_kolonnen_staar(self):
+        """Null er det normale her, og en kolonne full av nuller drukner
+        den ene raden som faktisk har et tall."""
+        ut = self._vis([{**self.RAD, 'overlapp': 4.0, 'har_overlapp': True},
+                        {**self.RAD, 'mannskap_id': 2, 'navn': 'Ola'}],
+                       {'personer': 2, 'overlapp': 4.0,
+                        'overlappende_personer': 1})
+        olas_rad = ut[ut.index('Ola'):]
+        self.assertIn('—', olas_rad)
+
+    def test_kolonneandelene_summerer_til_hundre_i_alle_fire_former(self):
+        """To valgfrie kolonner gir fire former. Med `table-layout: fixed`
+        gir en `<colgroup>` med feil antall `<col>` ingen feilmelding —
+        nettleseren deler bare resten likt — så regelen må måles.
+
+        Teller `<th>`-ene i stedet for å skrive av et forventet tall:
+        skrives tallet av, går testen grønn den dagen en kolonne legges til
+        i hodet og glemmes i andelene."""
+        import re
+        for faktisk in (False, True):
+            for overlapp in (False, True):
+                with self.subTest(faktisk=faktisk, overlapp=overlapp):
+                    rad = {**self.RAD,
+                           'faktiske_timer': 12.0 if faktisk else None,
+                           'overlapp': 4.0 if overlapp else 0.0,
+                           'har_overlapp': overlapp}
+                    ut = self._vis([rad], {'overlappende_personer':
+                                           1 if overlapp else 0})
+                    tabell = ut[ut.index('vl-tabell-belastning'):]
+                    andeler = [int(a) for a in
+                               re.findall(r'width:\s*(\d+)%', tabell)]
+                    kolonner = tabell.count('<th>')
+                    self.assertEqual(kolonner, len(andeler),
+                                     f'én andel per kolonne, fikk {andeler}')
+                    self.assertEqual(100, sum(andeler),
+                                     f'andelene skal summere til 100, fikk {andeler}')
+
+    def test_navnekolonnen_er_fortsatt_den_bredeste(self):
+        """Andelene regnes nå ut, og en normalisering som gikk galt ville
+        gitt seks like kolonner uten å feile. Navnet trenger mest plass."""
+        import re
+        ut = self._vis()
+        tabell = ut[ut.index('vl-tabell-belastning'):]
+        andeler = [int(a) for a in re.findall(r'width:\s*(\d+)%', tabell)]
+        self.assertEqual(andeler[0], max(andeler))
+        self.assertGreater(andeler[0], min(andeler) * 2)
 
     def test_faktisk_kolonne_bare_naar_noe_er_stemplet(self):
         """En kolonne med bare streker stjeler bredde fra dem som betyr noe."""
@@ -3602,8 +3692,8 @@ class BelastningstabellensBreddeTests(SimpleTestCase):
 
     HARNESS = (
         (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue')),
-        (VAKTLISTE_JS, ('mkBelastning', '_tall', 'kanLede', '_nivaa',
-                        '_erAdmin')),
+        (VAKTLISTE_JS, ('mkBelastning', '_tall', '_kolonneandeler', 'kanLede',
+                        '_nivaa', '_erAdmin')),
     )
     RAD = PlanleggingsfanenTests.RAD
     SAM = PlanleggingsfanenTests.SAM

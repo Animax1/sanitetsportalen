@@ -64,6 +64,103 @@ class HviletidTests(SimpleTestCase):
         self.assertEqual([0.0], self._hvile((0, 8), (8, 4)))
 
 
+class OverlappstimerTests(SimpleTestCase):
+    """`_overlappstimer` uten en database.
+
+    Punktet sto i TODO fra 14. sep. 2026: docstringen i `_hviletider()`
+    lovet tellingen, og den fantes ikke. Planleggerfanen er den første
+    funksjonen som *bruker* timesummen til noe (et tak), og et tak som
+    telles feil er verre enn ikke noe tak.
+    """
+
+    class FalsktSkift:
+        def __init__(self, fra, timer):
+            self.fra_tid = timezone.now().replace(
+                hour=0, minute=0, second=0, microsecond=0) + timedelta(hours=fra)
+            self.til_tid = self.fra_tid + timedelta(hours=timer)
+
+    def _overlapp(self, *spenn):
+        return services._overlappstimer([self.FalsktSkift(*s) for s in spenn])
+
+    def test_ingen_skift_gir_null(self):
+        self.assertEqual(0.0, self._overlapp())
+
+    def test_ett_skift_kan_ikke_overlappe_seg_selv(self):
+        self.assertEqual(0.0, self._overlapp((0, 8)))
+
+    def test_skift_med_hull_mellom_gir_null(self):
+        self.assertEqual(0.0, self._overlapp((0, 8), (12, 4)))
+
+    def test_skift_som_henger_sammen_gir_null(self):
+        """08–16 og 16–20 berører hverandre, men deler ingen time.
+        Går denne i null, ville hvert eneste doble skift gitt varsel."""
+        self.assertEqual(0.0, self._overlapp((8, 8), (16, 4)))
+
+    def test_maalt_eksempel_fra_todo(self):
+        """12:00–20:00 og 16:00–22:00 gir 14 timer skift der personen sto
+        i 10. Differansen er de fire timene tellingen skal finne."""
+        self.assertEqual(4.0, self._overlapp((12, 8), (16, 6)))
+
+    def test_summen_minus_overlappet_er_tilstedevaerelsen(self):
+        """Invarianten regelen er skrevet for, målt i stedet for antatt."""
+        skift = [self.FalsktSkift(12, 8), self.FalsktSkift(16, 6)]
+        sum_timer = sum(services._timer(vp.fra_tid, vp.til_tid) for vp in skift)
+        tilstede = services._timer(skift[0].fra_tid, skift[1].til_tid)
+        self.assertEqual(tilstede, sum_timer - services._overlappstimer(skift))
+
+    def test_helt_sammenfallende_skift_teller_hele_lengden(self):
+        self.assertEqual(8.0, self._overlapp((0, 8), (0, 8)))
+
+    def test_skift_inni_et_annet_teller_det_korte(self):
+        """10–14 ligger helt inne i 08–20. Unionen er fortsatt tolv timer,
+        så overlappet er de fire. En union som ble satt til det *siste*
+        skiftets slutt ville krympet her."""
+        self.assertEqual(4.0, self._overlapp((8, 12), (10, 4)))
+
+    def test_tre_skift_med_et_hull_imellom(self):
+        """Hullet skal ikke slå to adskilte klynger sammen: 00–08 og 04–08
+        overlapper i fire, 20–24 står for seg."""
+        self.assertEqual(4.0, self._overlapp((0, 8), (4, 4), (20, 4)))
+
+    def test_usortert_inndata_gir_samme_svar(self):
+        self.assertEqual(self._overlapp((12, 8), (16, 6)),
+                         self._overlapp((16, 6), (12, 8)))
+
+    def test_skift_uten_gyldig_spenn_hoppes_over(self):
+        tomt = self.FalsktSkift(0, 8)
+        tomt.til_tid = None
+        self.assertEqual(0.0, services._overlappstimer(
+            [tomt, self.FalsktSkift(0, 8)]))
+
+    def test_rundes_en_gang_saa_et_varsel_ikke_fyrer_paa_avrunding(self):
+        """Tre skift som ikke overlapper, men som gir 0.01 hvis hvert
+        timetall rundes for seg: 02:53–07:27, 07:27–14:40 og 16:56–21:01.
+
+        Tilfellet er **funnet, ikke oppdiktet** — søkt fram blant tilfeldige
+        skiftoppsett fordi jeg først skrev ned at avrundingen «gir 0.01»
+        uten å ha målt det. Den første varianten jeg prøvde ga −0.03, altså
+        et negativt overlapp, som er sin egen slags tull. Denne gir et
+        positivt tall, og et positivt tall er det som faktisk slår på
+        `har_overlapp` og setter et varsel på en rad der ingen står to
+        steder."""
+        def kl(t, m, timer, minutter):
+            fra = timezone.now().replace(hour=t, minute=m, second=0, microsecond=0)
+            skift = self.FalsktSkift(0, 0)
+            skift.fra_tid = fra
+            skift.til_tid = fra + timedelta(hours=timer, minutes=minutter)
+            return skift
+
+        skift = [kl(2, 53, 4, 34), kl(7, 27, 7, 13), kl(16, 56, 4, 5)]
+        self.assertEqual(0.0, services._overlappstimer(skift))
+        # Og vis hva den naive formen ville gitt, så testen ikke bare er
+        # «null er null»: summen av avrundede timetall minus den avrundede
+        # unionen er ikke null.
+        naiv = round(sum(services._timer(s.fra_tid, s.til_tid) for s in skift)
+                     - (services._timer(skift[0].fra_tid, skift[1].til_tid)
+                        + services._timer(skift[2].fra_tid, skift[2].til_tid)), 2)
+        self.assertEqual(0.01, naiv, 'tilfellet skal faktisk utløse avrundingen')
+
+
 class BelastningsberegningTests(TilgangsBasis):
     """Regnestykket. Ingen HTTP — reglene skal kunne prøves for seg."""
 
@@ -223,6 +320,90 @@ class BelastningsberegningTests(TilgangsBasis):
 
 
 @override_settings(SECURE_SSL_REDIRECT=False, RATELIMIT_ENABLE=False)
+class OverlappIRadenTests(TilgangsBasis):
+    """Overlappet gjennom `belastning_per_person` og sammendraget.
+
+    Skilt fra `OverlappstimerTests` med vilje: den måler regelen, denne
+    måler at raden og sammendraget faktisk bærer den videre. Blir feltet
+    fjernet fra dicten, går regelen fortsatt grønn.
+    """
+
+    def setUp(self):
+        super().setUp()
+        self.start = timezone.now().replace(minute=0, second=0, microsecond=0)
+
+    def _skift(self, person, fra_time, timer, ressurs=None, **felt):
+        return Vaktpost.objects.create(
+            ressurs=ressurs or self.res_hgsd, mannskap=person,
+            fra_tid=self.start + timedelta(hours=fra_time),
+            til_tid=self.start + timedelta(hours=fra_time + timer),
+            **felt)
+
+    def test_uten_overlapp_er_feltet_null_og_flagget_av(self):
+        self._skift(self.p_hgsd, 0, 8)
+        self._skift(self.p_hgsd, 12, 4)
+        rad, = services.belastning_per_person(self.vl)
+        self.assertEqual(0.0, rad['overlapp'])
+        self.assertFalse(rad['har_overlapp'])
+
+    def test_dobbeltbooking_paa_tvers_av_ressurser_telles(self):
+        """Det målte tilfellet fra TODO: 14 timer skift, 10 på stedet."""
+        self._skift(self.p_hgsd, 12, 8, ressurs=self.res_hgsd)
+        self._skift(self.p_hgsd, 16, 6, ressurs=self.res_fri)
+        rad, = services.belastning_per_person(self.vl)
+        self.assertEqual(14.0, rad['timer'])
+        self.assertEqual(4.0, rad['overlapp'])
+        self.assertTrue(rad['har_overlapp'])
+
+    def test_overlapp_og_kort_hvile_er_to_ulike_beskjeder(self):
+        """Begge står. `korteste_hvile` blir 0 av et overlapp og kan ikke
+        skille det fra to skift som henger sammen — det er derfor
+        `overlapp` finnes ved siden av, og ikke i stedet for."""
+        self._skift(self.p_hgsd, 0, 8, ressurs=self.res_hgsd)
+        self._skift(self.p_hgsd, 4, 8, ressurs=self.res_fri)
+        rad, = services.belastning_per_person(self.vl)
+        self.assertEqual(0.0, rad['korteste_hvile'])
+        self.assertTrue(rad['kort_hvile'])
+        self.assertEqual(4.0, rad['overlapp'])
+
+    def test_skift_som_henger_sammen_gir_kort_hvile_uten_overlapp(self):
+        """Motprøven til den over: null hvile, men ingenting dobbeltbooket.
+        Uten denne kunne `overlapp` vært et alias for `kort_hvile`."""
+        self._skift(self.p_hgsd, 0, 8)
+        self._skift(self.p_hgsd, 8, 4)
+        rad, = services.belastning_per_person(self.vl)
+        self.assertEqual(0.0, rad['korteste_hvile'])
+        self.assertTrue(rad['kort_hvile'])
+        self.assertEqual(0.0, rad['overlapp'])
+        self.assertFalse(rad['har_overlapp'])
+
+    def test_probono_teller_i_overlappet_selv_om_det_ikke_teller_i_timene(self):
+        """Summen er det organisasjonen betaler for; et overlapp er at én
+        person står to steder. Kroppen skiller ikke på lønn."""
+        self._skift(self.p_hgsd, 12, 8, ressurs=self.res_hgsd)
+        self._skift(self.p_hgsd, 16, 6, ressurs=self.res_fri, probono=True)
+        rad, = services.belastning_per_person(self.vl)
+        self.assertEqual(8.0, rad['timer'], 'probono-timene teller ikke')
+        self.assertEqual(4.0, rad['overlapp'], 'men overlappet gjør det')
+
+    def test_sammendraget_summerer_timer_og_teller_hoder(self):
+        self._skift(self.p_hgsd, 12, 8, ressurs=self.res_hgsd)
+        self._skift(self.p_hgsd, 16, 6, ressurs=self.res_fri)
+        self._skift(self.p_karmoy, 0, 8, ressurs=self.res_fri)
+        self._skift(self.p_karmoy, 4, 4, ressurs=self.res_hgsd)
+        rader = services.belastning_per_person(self.vl)
+        sammendrag = services.belastning_sammendrag(self.vl, rader)
+        self.assertEqual(8.0, sammendrag['overlapp'], '4 timer på hver')
+        self.assertEqual(2, sammendrag['overlappende_personer'])
+
+    def test_sammendraget_er_null_naar_ingen_er_dobbeltbooket(self):
+        self._skift(self.p_hgsd, 0, 8)
+        rader = services.belastning_per_person(self.vl)
+        sammendrag = services.belastning_sammendrag(self.vl, rader)
+        self.assertEqual(0.0, sammendrag['overlapp'])
+        self.assertEqual(0, sammendrag['overlappende_personer'])
+
+
 class BelastningApiTests(TilgangsBasis):
 
     def setUp(self):

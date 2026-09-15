@@ -507,21 +507,23 @@ den gamle tiden, og ville skjult et lovlig valg. Veggen er skiltet der i stedet 
 på enheter/ressurser. En kan sette inn total timer og da jobbe overordnet med hvor mange en
 kan ha på vakt.»
 
-**Alle åtte spørsmålene er avklart** i gjennomgangen 15. sep. 2026 (notatets §6). Kort:
+**Elleve avklarte spørsmål** (notatets §6): åtte fra gjennomgangen 15. sep. 2026, og tre
+til da koden ble lest før byggingen begynte. Kort:
 timetallet er et **tak som varsler**; **ett tak for hele vakta**, med en dagslinje uten egne
 tak; timer føres på **startdagen**, ikke splittet ved midnatt (det er rapportmodulens regel,
 og forskjellen er bevisst); generatoren lager **bare tomme plasser**; ny generering
 **erstatter tomme plasser, men beholder de korpsreserverte og alle bemannede**;
 budsjettlinja viser **satt opp og bemannet side om side**; taket **kopieres** av
-`kopier_oppsett`; og **overlapp-punktet løses først**.
+`kopier_oppsett`; og **overlapp-punktet løses først**. Og de tre siste: **probono teller
+ikke mot taket, men vises for seg**; genererte plasser **fødes som planlagt kladd**; og
+**«åpen for alle»-plasser overlever** en ny generering — regelen blir da at generatoren
+bare rører det `services.er_planlagt()` kaller kladd.
 
 Rekkefølgen under er notatets §7. Ingenting er bygget.
 
-- [ ] **Løs overlapp-punktet under først.** Et tak som telles feil er verre enn ikke noe
-      tak: overlappende skift blåser opp timesummen, og budsjettet brukes da opp av timer
-      ingen jobber.
+- [x] **Løs overlapp-punktet under først.** Gjort 15. sep. 2026 — se CHANGELOG.
 - [ ] **Budsjettlinja og dagslinja.** «Tak: 400 t · Satt opp: 312 t · Bemannet: 244 t ·
-      Igjen: 88 t», og under den «fre. 128 t · lør. 152 t · søn. 32 t». Begge leser bare
+      Igjen: 88 t · Probono: 16 t», og under den «fre. 128 t · lør. 152 t · søn. 32 t». Begge leser bare
       det som finnes (`_sumTimer()`, `_grupperPaaDag()`), og gir verdi uten generatoren.
       Avstanden mellom «satt opp» og «bemannet» er selve arbeidslista.
 - [ ] **Taket som felt på `Vaktliste`**, satt med `skriv_full`, og kopiert av
@@ -529,11 +531,11 @@ Rekkefølgen under er notatets §7. Ingenting er bygget.
       organisasjonens og gjelder alle.
 - [ ] **Bildet av vakta:** bemanningskurvene per gruppe ved siden av hverandre over
       `_vaktensSpenn()`, så hull og topper er synlige mens man legger inn.
-- [ ] **Generatoren til slutt**, i sin enkleste form: N **tomme** plasser, fra–til, rolle.
-      Ved ny generering erstattes tomme plasser uten reservasjon; tomme plasser reservert
-      til et korps og **alle** bemannede beholdes — reservasjonen leses av
-      `services.reservert_korps()`, ikke av feltet. **Ingen `bulk_create`** — den hopper
-      over auditsignalene; `kopier_oppsett` gikk i den fella.
+- [ ] **Generatoren til slutt**, i sin enkleste form: N **tomme** plasser, fra–til, rolle,
+      født som **planlagt kladd**. Ved ny generering erstattes bare det
+      `services.er_planlagt()` kaller kladd — plasser reservert til et korps, plasser åpne
+      for alle (`alle_korps`) og **alle** bemannede beholdes. **Ingen `bulk_create`** — den
+      hopper over auditsignalene; `kopier_oppsett` gikk i den fella.
 - [ ] **Skriv midnattsregelen inn i `docs/FORSLAG_RAPPORTMODUL.md` §2.2 også.** Den står i
       `CLAUDE.md` for `_dagnokkel()` og i planleggernotatets §3.3; rapportmodulen er det
       tredje stedet noen leser den, og den som leser bare der må se at forskjellen er
@@ -544,16 +546,15 @@ Rekkefølgen under er notatets §7. Ingenting er bygget.
 *Funnet mens vi diskuterte rapportmodulen, men punktene hører hjemme i vaktlista og er
 uavhengige av om rapporten noen gang bygges.*
 
-- [ ] **`overlapp`-tellingen finnes ikke, men docstringen lover den.**
-      `vaktliste/services._hviletider()` sier «Overlappet i seg selv fanges av
-      `overlapp`-tellingen». Det er ingen `overlapp`-nøkkel i belastningsraden. Det som
-      faktisk skjer er at `korteste_hvile` blir `0.0` og raden flagges som **kort hvile** —
-      altså vises et overlapp som et hvileproblem, og planleggeren får ikke vite hva det
-      egentlig er. Enten skriv tellingen, eller rett docstringen; den kan ikke bli stående
-      som den er.
-- [ ] **Legg `overlapp` i `belastning_per_person()`.** Antall overlappende timer per
-      person, ved siden av `korteste_hvile`. Billig, og det er den opplysningen
-      vaktlederen trenger for å rette før lista låses.
+- [x] **`overlapp`-tellingen er skrevet** (15. sep. 2026). `services._overlappstimer()`
+      regner sum minus union, så `timer - overlapp` er faktisk tilstedeværelse.
+      Docstringen i `_hviletider()` peker nå på den, og sier hvorfor null der betyr to
+      ulike ting (skift som henger sammen, og skift som overlapper).
+- [x] **`overlapp` og `har_overlapp` ligger i `belastning_per_person()`**, `overlapp` og
+      `overlappende_personer` i sammendraget, og tabellen har fått en Overlapp-kolonne som
+      bare står når noen faktisk er dobbeltbooket — pluss et varsel i hodet. **Overlappet
+      har ingen grense å måle mot, med vilje:** et langt skift er en vurdering
+      organisasjonen gjør, men én person kan ikke stå to steder uansett hva grensene sier.
 - [ ] **Vurder en sperre, men ikke i databasen.** `test_overlapp_paa_tvers_av_ressurser_stoppes_ikke`
       dokumenterer at dette er bevisst: «noen ganger står man på to lister». Å sperre det
       i basen krever `ExclusionConstraint`, som **ikke finnes i SQLite** — da er suiten
@@ -563,15 +564,28 @@ uavhengige av om rapporten noen gang bygges.*
 
 **Hvorfor dette betyr noe utover planleggingen:** et overlapp blåser opp timesummen.
 Målt 14. sep. 2026 — skift 12:00–20:00 (8 t) og 16:00–22:00 (6 t) på samme person gir
-`timer = 14.0`, mens personen var til stede i 10 timer. I dag er det harmløst, fordi
-ingen betaler etter tallet. Se `docs/FORSLAG_RAPPORTMODUL.md`.
+`timer = 14.0`, mens personen var til stede i 10 timer. Tallet er fortsatt 14 — summen
+er ikke endret, den er **navngitt**: `overlapp` sier at fire av dem er dobbeltbooket, og
+planleggeren retter det framfor at tallet stille korrigerer seg selv. «Varsler, de sperrer
+ikke» gjelder her også. Se `docs/FORSLAG_RAPPORTMODUL.md`.
 
 - [ ] **Timer har ingen dagdimensjon.** `_timer()` er ren varighet; fredag 20:00 → lørdag
       04:00 gir 8,0 timer uten at koden har noe begrep om hvilken dag de tilhører.
-      Spørsmålet er ubesvart i koden fordi ingenting har stilt det. Bemanningskurven har
-      presedensen — den bøtter per time og markerer midnatt (`vl-dogn`) — så regelen
-      «fredag 23:59 er fredag, lørdag 00:00 er lørdag» (André, 14. sep. 2026) betyr at et
-      skift **splittes ved midnatt**. Trengs først hvis noe skal vise timer *per dag*.
+      Trengs først når noe skal vise timer *per dag* — og det gjør planleggerens dagslinje.
+
+      **Svaret er ikke ett, og det er avklart 15. sep. 2026** (planleggernotatet §3.3,
+      beslutning 7). Dette punktet sto tidligere som «altså splittes skiftet ved midnatt»,
+      og det var for kjapt:
+
+      | Spørsmål | Regel |
+      |---|---|
+      | Hvem er på vakt den dagen? (vaktlista, planleggerens dagslinje) | **Startdagen** — `_dagnokkel()` |
+      | Hvor mange timer skal betales for det døgnet? (rapportmodulen) | **Splittes ved midnatt** |
+
+      Forskjellen er bevisst. Splitting endrer ikke en totalsum — fredag 20:00 til lørdag
+      04:00 er åtte timer uansett — den endrer bare hvilken dag de føres på, og da må
+      valget følge hva tallet skal svare på. Trenger man time-for-time-bildet, er svaret
+      bemanningskurven, som bøtter per time og tegner midnatt som egen strek (`vl-dogn`).
 
 ### Funn fra staging-verifiseringen 14. sep. 2026
 

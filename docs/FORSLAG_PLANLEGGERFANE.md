@@ -126,7 +126,8 @@ ikke etter. *Avgjort 15. sep. 2026 (beslutning 8): først.*
 
 Fanen ligger ved siden av «Oversikt» og «Mannskap», og har fire deler:
 
-**1. Budsjettlinja.** «Tak: 400 t · Satt opp: 312 t · Bemannet: 244 t · Igjen: 88 t». Gult
+**1. Budsjettlinja.** «Tak: 400 t · Satt opp: 312 t · Bemannet: 244 t · Igjen: 88 t ·
+Probono: 16 t». Gult
 merke når taket passeres. Taket lagres på `Vaktliste` — det gjelder *denne* vakta, i
 motsetning til `Belastningsgrenser`, som er organisasjonens og gjelder alle. Å sette det er
 `skriv_full`, som alt annet oppsett på en vaktliste.
@@ -147,8 +148,9 @@ alt for at spennet er felles).
 
 ## 5. Avklarte spørsmål
 
-De seks spørsmålene denne skissen åpnet med er besvart 15. sep. 2026. Svarene står som
-beslutninger i §6; her er kartet fra spørsmål til svar:
+De seks spørsmålene denne skissen åpnet med er besvart 15. sep. 2026, og **tre til kom til**
+da koden ble lest før byggingen (beslutning 9–11 i §6). Svarene står som beslutninger i §6;
+her er kartet fra spørsmål til svar:
 
 | Spørsmål (opprinnelig §5) | Svar |
 |---|---|
@@ -260,6 +262,55 @@ Et tak som telles feil er verre enn ikke noe tak. Så lenge to overlappende skif
 person gir 14 timer der personen sto 10, spiser budsjettet timer ingen jobber — og
 planleggeren er den første funksjonen som *bruker* det tallet til noe.
 
+### 9. Probono teller ikke mot taket, men vises for seg
+
+Både `_sumTimer()` i JS og `belastning_per_person()` utelater probono fra
+timesummene i dag. Budsjettlinja følger samme regel — taket er det
+organisasjonen betaler for — og får en egen post: «Probono: N t».
+
+**Hvorfor posten må stå der:** et tall som utelater noe uten å si det, er et
+tall noen kommer til å bestride, og da har man ikke lenger et budsjett man kan
+vise til. «Mitt korps» har alt løst det samme problemet på samme måte —
+bemannet, å dekke, åpent for alle og probono ved siden av hverandre.
+
+*Dette spørsmålet sto ikke i notatets første utgave i det hele tatt. Det ble
+funnet ved å lese `_sumTimer()` før byggingen begynte, og det er grunnen til at
+gjennomgangen var verdt en time: notatet beskrev et tall som allerede hadde en
+regel jeg ikke hadde lest.*
+
+### 10. Genererte plasser fødes som **planlagt** — lederens kladd
+
+`services.er_planlagt()` er tilstanden: ikke reservert til et korps, ikke åpnet
+for alle, og usynlig for korps-brukerne. Generatoren lager plassene der, og du
+deler dem ut når oppsettet er ferdig.
+
+**Hvorfor:** uten det ser et halvferdig oppsett ferdig ut for alle korps i det
+øyeblikket generatoren kjører — samme feil som `kopier_oppsett` unngår ved aldri
+å ta personene med. Og «planlagt går én vei» er alt håndhevet, så en plass du
+har delt ut kan ikke falle tilbake til å bli generatorens bytte.
+
+### 11. «Åpen for alle»-plasser overlever en ny generering
+
+Beslutning 4 nevnte to tilstander. Koden har **fire**, og `alle_korps` er den
+som falt utenfor:
+
+| Tilstand | Ved ny generering |
+|---|---|
+| Planlagt (`er_planlagt()`) — generatorens kladd | **Erstattes** |
+| Reservert til et korps | Beholdes |
+| Åpen for alle (`alle_korps`) | Beholdes |
+| Bemannet | Beholdes — alltid |
+
+`alle_korps` er også en utdeling: korpsene ser plassen i «Mitt korps», den har
+sin egen timekolonne der («åpent for alle»), og de planlegger mot den. Å slette
+den er å trekke tilbake noe som er delt ut.
+
+**Med beslutning 10 blir regelen én setning:** *generatoren rører bare det
+`er_planlagt()` kaller kladd.* Alt som er delt ut — til ett korps eller til alle
+— står. Det er den formen regelen skal skrives i, ikke som en tabell over fire
+tilstander: en tabell må vedlikeholdes når tilstand fem kommer, en funksjon
+trenger det ikke.
+
 ---
 
 ## 7. Anbefalt rekkefølge
@@ -267,10 +318,11 @@ planleggeren er den første funksjonen som *bruker* det tallet til noe.
 1. **Løs `overlapp`-punktet i TODO** (beslutning 8). Et tak som telles feil er verre enn
    ikke noe tak.
 2. **Budsjettlinja og dagslinja** — de leser bare det som finnes, og gir verdi uten
-   generatoren. Her lander beslutning 2, 5 og 7.
+   generatoren. Her lander beslutning 2, 5, 7 og 9.
 3. **Taket på `Vaktliste`**, med `kopier_oppsett` (beslutning 6). Én migrasjon, ett felt,
    `skriv_full`.
 4. **Bildet av vakta** — kurvene ved siden av hverandre over felles spenn.
 5. **Generatoren til slutt**, i sin enkleste form: N tomme plasser, fra–til, rolle
-   (beslutning 3), med erstatningsregelen fra beslutning 4. Den kan bli smartere senere;
-   den kan ikke bli mindre farlig.
+   (beslutning 3), født som kladd (10), og med erstatningsregelen fra beslutning 4 og 11:
+   den rører bare det `er_planlagt()` kaller kladd. Den kan bli smartere senere; den kan
+   ikke bli mindre farlig.

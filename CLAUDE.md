@@ -1069,11 +1069,15 @@ Alle temaene er mørke, så **enhver Bootstrap-klasse for dempet tekst må overs
 malen kan se den. `MorkTekstPaaMorkBakgrunnTests` løser `{% extends %}` og `{% static %}`
 og håndhever det.
 
-Sytten filer i `static/js/` (ingen bundler), fordelt på fem sider — pasientsiden,
+23 filer i `static/js/` (ingen bundler), fordelt på fem sider — pasientsiden,
 `/statistikk/`, `/vaktliste/` og de to grensesnittene under `/oppdrag/`.
 
 **To av sidene er delt i flere filer** (14. sep. 2026, gjeldspunkt 3.6): `vaktliste.js`
-var 3 801 linjer og `oppdrag-sentral.js` 1 991. Uten bundler deler filene **ett globalt
+var 3 801 linjer og `oppdrag-sentral.js` 1 991. **Delingen har en nedre grense som
+håndheves:** `test_hver_del_er_mindre_enn_den_var` krever at hver del er under 1 800
+linjer, ellers kunne én fil vokst tilbake til 3 800 mens de andre sto tomme og alle de
+andre reglene fortsatt vært grønne. Den sa fra 15. sep. 2026, og `vaktliste-oversikt.js`
+ble skilt ut av tegningsfila. Uten bundler deler filene **ett globalt
 navnerom**, så delingen er billig — men den gjør tre feil mulige som ikke fantes før: en
 funksjon som faller mellom to filer, en som dupliseres (den sist lastede vinner i
 stillhet), og en mal som kommer i utakt med lasterekkefølgen.
@@ -1101,7 +1105,7 @@ de er i nettleseren.
 | `statistikk-oppdrag.js` | `/statistikk/`, **kun** med oppdragstilgang | Oppdragsfanen. Kall hit fra `statistikk.js` går gjennom `_kallOppdrag('navn')` |
 | `oppdrag-sentral-*.js` (fire: kjerne, oppdrag, admin, lasting) | `/oppdrag/`, kontoer uten enhet | Sentralbordet: enhetsliste, oppdragsliste, tidslinje, lokasjonsadmin. `oppstart()` tegner listene uansett hva første henting ga (`LASTEFEIL` til den lykkes), og pollingen settes i `finally` |
 | `oppdrag-enhet.js` | `/oppdrag/`, enhetskontoer | Enhetsskjermen: «neste» og statusens andre knapp (Avbryt/Behandlet på sted) mot de navngitte stemplingsendepunktene, offline-køen i `localStorage` (og «venter på dekning» først når eldste rad er 3 s gammel — `usendtAlder`, `USENDT_VENTETID_MS`), antall-knappene, og **lydvarselet** for ventende oppdrag (`lydTerskler()` leser `OPPDRAG_LYDVARSEL` fra tabellen `Lydvarsel`, hentet på nytt hvert 5. min; `skalPipe()`, `lydTikk()` hvert 5. s; Web Audio, **alltid på** — vekket av det første trykket på siden, `lydErKlar()`; `nyeOppdrag()` + `pipNytt()` for nytt oppdrag om admin ikke har slått det av; tida fra bilens `varslet_at`, og et usendt trykk i køen teller som svart). Serveren sender `neste_overgang`/`alternativ_overgang` per rad; kjeden og alternativene følger med som data kun for å projisere neste steg mens noe ligger usendt |
-| `vaktliste-*.js` (fem: kjerne, tegning, handlinger, offline, register) | **kun** `/vaktliste/` | Hele vaktlistesiden: **én fane per ressursgruppe**, hver ressurs er et regneark med redigering i raden, «Oversikt» er utskriftslista, «Mannskap» er personellregisteret, og roller, grupper, korps og kompetanser administreres i modaler på siden |
+| `vaktliste-*.js` (seks: kjerne, tegning, oversikt, handlinger, offline, register) | **kun** `/vaktliste/` | Hele vaktlistesiden: **én fane per ressursgruppe**, hver ressurs er et regneark med redigering i raden, «Oversikt» er utskriftslista, «Mannskap» er personellregisteret, og roller, grupper, korps og kompetanser administreres i modaler på siden. **Skjøten mellom `tegning` og `oversikt` går mellom regnearket og oppsummeringene** (15. sep. 2026): fanene, ressurskortene og radene man redigerer i ligger i den første; bemanningskurvene, utskriftslista, belastningen, «Tilstede nå» og «Mitt korps» leser de samme skiftene og svarer på noe annet |
 
 **`data-action` + `data-hendelse` er to lyttere, og bare én skal fyre.** Klikk­delegeringen
 i `portal-utils.js` treffer *alle* `[data-action]`. Et element som melder sin egen hendelse

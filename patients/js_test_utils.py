@@ -39,7 +39,9 @@ OPPDRAG_SENTRAL_JS = (
     JS_DIR / 'oppdrag-sentral-lasting.js',
 )
 OPPDRAG_ENHET_JS = JS_DIR / 'oppdrag-enhet.js'
-#: **Vaktlistesiden er fem filer siden 14. sep. 2026** (gjeldspunkt 3.6).
+#: **Vaktlistesiden er seks filer** — fem siden 14. sep. 2026 (gjeldspunkt 3.6),
+#: og `vaktliste-oversikt.js` skilt ut fra tegningsfila 15. sep. 2026 da den
+#: passerte 1 800 linjer.
 #: Konstanten er derfor en tuppel, og `read_js()` skjøter dem sammen i
 #: lasterekkefølge — så alt som leste `VAKTLISTE_JS` før, leser det samme nå.
 #: Rekkefølgen er den samme som `<script>`-taggene i malen, og
@@ -47,6 +49,7 @@ OPPDRAG_ENHET_JS = JS_DIR / 'oppdrag-enhet.js'
 VAKTLISTE_JS = (
     JS_DIR / 'vaktliste-kjerne.js',
     JS_DIR / 'vaktliste-tegning.js',
+    JS_DIR / 'vaktliste-oversikt.js',
     JS_DIR / 'vaktliste-handlinger.js',
     JS_DIR / 'vaktliste-offline.js',
     JS_DIR / 'vaktliste-register.js',

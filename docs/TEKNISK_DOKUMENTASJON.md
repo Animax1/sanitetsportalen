@@ -1510,7 +1510,7 @@ driftslista slik at tester kan påstå noe om den uten å lese `settings.py` som
 
 ### 10.1 Arkitektur
 
-Vanlig JavaScript, **ingen rammeverk og ingen bundler**. 22 filer i `static/js/`, fordelt
+Vanlig JavaScript, **ingen rammeverk og ingen bundler**. 23 filer i `static/js/`, fordelt
 på fem sider: pasientsiden, `/statistikk/`, `/vaktliste/` og de to grensesnittene under
 `/oppdrag/`.
 

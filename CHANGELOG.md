@@ -4,6 +4,110 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-15 — Overlappet har fått et navn: steg 1 mot planleggerfanen
+
+Første kodesteg fra `docs/FORSLAG_PLANLEGGERFANE.md` §7. Punktet sto i TODO fra
+14. sep. 2026 og var ført opp som det som måtte løses **før** planleggeren: et tak som
+telles feil er verre enn ikke noe tak.
+
+### Docstringen lovet en telling som ikke fantes
+
+`vaktliste/services._hviletider()` sa «Overlappet i seg selv fanges av
+`overlapp`-tellingen». Det var ingen `overlapp`-nøkkel i belastningsraden. Det som
+faktisk skjedde var at `korteste_hvile` ble `0.0` og raden ble flagget som **kort
+hvile** — altså ble et dobbeltbooket mannskap vist som et hvileproblem, og planleggeren
+fikk aldri vite hva det egentlig var.
+
+### `_overlappstimer()`: sum minus union
+
+12:00–20:00 og 16:00–22:00 er 8 + 6 = 14 timer skift, mens personen er til stede fra 12
+til 22 — ti timer. Differansen, fire, er overlappet. Definisjonen er valgt fordi den gir
+invarianten `timer - overlapp = faktisk tilstedeværelse`, og den er målt i en test framfor
+antatt i en kommentar.
+
+**Summen står fortsatt på 14.** Den er ikke korrigert, den er **navngitt**: raden sier at
+fire av timene er dobbeltbooket, og vaktlederen retter det. Et tall som stille korrigerer
+seg selv ville skjult nettopp den feilen vi ville vise — «varsler, de sperrer ikke».
+
+**Probono teller med her, i motsetning til i `timer`.** Summen er det organisasjonen
+betaler for; et overlapp er at én person står to steder, og kroppen skiller ikke på lønn.
+Samme resonnement som `lengste_skift` og `korteste_hvile` alt sto på.
+
+**Rundet én gang, til slutt.** Summeres avrundede timetall hver for seg, kommer
+differansen ut som 0.01 for skift som ikke overlapper — og et varsel som fyrer på en
+avrundingsfeil er et varsel man slår av. Testen bruker et **funnet** tilfelle
+(02:53–07:27, 07:27–14:40, 16:56–21:01), søkt fram blant tilfeldige oppsett, fordi den
+første varianten jeg skrev ned ga −0,03 og altså ikke viste det jeg påsto den viste.
+
+### I grensesnittet
+
+Ny **Overlapp**-kolonne i belastningstabellen, som bare står når noen faktisk er
+dobbeltbooket — samme regel som Faktisk-kolonnen: en kolonne full av nuller stjeler bredde
+fra dem som betyr noe. Pluss et varsel i hodet: «1 dobbeltbooket — 4 t».
+
+**Varselet sier timene, ikke en terskel.** Et langt skift måles mot organisasjonens
+grense, fordi det er en vurdering noen har gjort. To skift på samme person samtidig er en
+planleggingsfeil uansett hva grensene sier, så det har ingen grense å måle mot.
+
+**`<colgroup>` regnes nå ut.** To valgfrie kolonner gir fire former, og fire håndskrevne
+blokker er fire steder å glemme når kolonne nummer ni kommer — med `table-layout: fixed`
+gir feil antall `<col>` ingen feilmelding, bare en tabell som er litt gal.
+`_kolonneandeler()` normaliserer vektene til hele prosenter og fordeler resten etter
+størrelse, ikke etter rekkefølge. Testen teller `<th>`-ene framfor å skrive av et
+forventet tall.
+
+### Mutasjonsprøvd
+
+Ni mutanter, sju drept med en gang. To overlevde og var **ekvivalente** (`len(spenn) < 1`
+og `fra >= slutt` gir samme svar) — begge er nå notert i koden, slik at neste leser ikke
+leter etter et hull som ikke finnes.
+
+To mutanter avslørte ekte svake assertions, og begge av samme sort: testen traff et annet
+sted i svaret enn den mente. «4 t» står både i varselet og i raden, så en `assertIn` mot
+hele utdata gikk grønn når cella alltid ga streken, og når varselet mistet tallet sitt.
+Begge leser nå ut av sin egen blokk (`<tbody>`, `vl-varsler`).
+
+### Beslutning 9–11 i planleggernotatet
+
+Tre spørsmål notatet ikke stilte, funnet ved å lese koden før byggingen begynte:
+
+- **Probono teller ikke mot taket, men vises for seg.** `_sumTimer()` utelot dem allerede;
+  en budsjettlinje som utelater noe uten å si det er et tall noen vil bestride.
+- **Genererte plasser fødes som planlagt kladd** (`services.er_planlagt()`), usynlig for
+  korps-brukerne til de deles ut.
+- **«Åpen for alle»-plasser overlever en ny generering**, som de korpsreserverte. Med
+  beslutning 10 blir regelen én setning: generatoren rører bare det `er_planlagt()` kaller
+  kladd.
+
+### Og en fil som måtte deles
+
+De nye linjene dyttet `vaktliste-tegning.js` over 1 800, og
+`test_hver_del_er_mindre_enn_den_var` sa fra. Det er nettopp den regelen som gjør
+JS-delingen fra 14. sep. verdt noe: uten den kunne én fil vokst tilbake til 3 800 linjer
+mens de andre sto tomme, og alle de andre reglene vært grønne hele veien.
+
+`vaktliste-oversikt.js` er skilt ut, og skjøten er ikke vilkårlig: **alt over den tegner
+regnearket** — fanene, ressurskortene og radene man redigerer i — og **alt under leser de
+samme skiftene og svarer på noe annet**: bemanningskurvene, utskriftslista, belastningen,
+«Tilstede nå», «Mitt korps». De to sidene deler `_posterFor()`, `_sumTimer()` og
+`_skifttimer()`, som blir stående i tegningsfila.
+
+941 og 921 linjer. `VAKTLISTE_JS` og `<script>`-taggene i malen holdes like av
+`VaktlisteFileneDekkerAltTests`, og ingenting i den nye fila kjører på toppnivå.
+
+**CLAUDE.md sa «Sytten filer i `static/js/`».** Det var 23. Tallet sto ikke i
+`PAASTANDER`, så `TallpaastanderTests` kunne ikke se det — den vokter
+`TEKNISK_DOKUMENTASJON.md`, som var riktig helt til denne delingen og ble rettet av testen
+med en gang. Et tall ingen test leser, råtner; begge er rettet nå.
+
+**Endret:** `vaktliste/services.py`, `static/js/vaktliste-tegning.js`,
+`static/js/vaktliste-oversikt.js` (ny), `templates/vaktliste/index.html`,
+`patients/js_test_utils.py`, `vaktliste/tests_belastning.py` (+19 tester),
+`vaktliste/tests_xss.py` (+6 tester), `docs/FORSLAG_PLANLEGGERFANE.md`,
+`docs/TEKNISK_DOKUMENTASJON.md`, `CLAUDE.md`, `TODO.md`.
+
+---
+
 ## 2026-09-15 — Planleggerfanen: åtte beslutninger, og en rettelse av mitt eget notat
 
 Gjennomgang av `docs/FORSLAG_PLANLEGGERFANE.md` med André. Ingenting er bygget — dette er
