@@ -163,7 +163,7 @@ function kanLede() {
 // like av `SkiftetsOppsettfelterTests` — går de i utakt, sender klienten noe
 // serveren avviser, eller skjuler noe hun har lov til.
 const SKIFT_OPPSETTFELTER = ['fra_tid', 'til_tid', 'korps_id', 'alle_korps',
-                             'probono', 'merknad', 'antall'];
+                             'probono', 'antall'];
 const RESSURS_OPPSETTFELTER = ['gruppe_id', 'korps_id', 'enhet_id', 'rekkefolge'];
 
 

@@ -1415,18 +1415,36 @@ class EgenPersonPaaAndresPlassTests(TilgangsBasis):
         self.assertEqual(res.status_code, 201, res.content)
         return res.json()['data']['id']
 
-    def test_merknaden_er_oppsett_og_ikke_hennes(self):
-        """**Snudd 15. sep. 2026.** Merknaden sier hva skiftet *er*, ikke hvem
-        som står der, og André satte grensen ved «folk og rolle».
+    def test_merknaden_folger_raden_og_er_hennes(self):
+        """**Snudd to ganger, og landingen er verdt å skrive ned.**
 
-        At hun får ta i raden står fortsatt — testen under bytter person på
-        nettopp denne raden.
+        15. sep. låste jeg merknaden sammen med tidene, fordi «det eneste de
+        skal få lov til» ble lest strengt. André tok den ut igjen dagen etter,
+        og det er riktig sted å trekke grensen: «Kommer 17:30» er en beskjed om
+        *denne raden*, og den som setter personen på plassen er den som vet
+        det. Tidene er vaktas rammer; merknaden er ikke det.
+
+        Hun når bare radene som er hennes — porten er `kan_rore_vaktpost`, som
+        for person og rolle.
         """
         pk = self._egen_paa_karmoys_plass()
         res = self.c_kb.put(f'/vaktliste/api/vaktposter/{pk}/',
                             data={'merknad': 'Kommer 17:30'}, content_type='application/json')
-        self.assertEqual(res.status_code, 403, res.content)
-        self.assertEqual(Vaktpost.objects.get(pk=pk).merknad, '')
+        self.assertEqual(res.status_code, 200, res.content)
+        self.assertEqual(Vaktpost.objects.get(pk=pk).merknad, 'Kommer 17:30')
+
+    def test_men_ikke_paa_en_annens_rad(self):
+        """Merknaden ble løsnet, ikke gjort fri. Porten står."""
+        res = self.c_vl.post(
+            f'/vaktliste/api/ressurser/{self.res_karmoy.pk}/vaktposter/',
+            data={'fra_tid': self._iso(0), 'til_tid': self._iso(8),
+                  'mannskap_id': self.p_karmoy.pk},
+            content_type='application/json')
+        pk = res.json()['data']['id']
+        self.assertEqual(
+            self.c_kb.put(f'/vaktliste/api/vaktposter/{pk}/',
+                          data={'merknad': 'min nå'},
+                          content_type='application/json').status_code, 403)
 
     def test_hun_kan_bytte_til_en_annen_av_egne(self):
         pk = self._egen_paa_karmoys_plass()
@@ -1680,8 +1698,9 @@ class OppsettfelteneTests(SimpleTestCase):
     """
 
     def test_bemanningsfeltene_staar_ikke_i_skiftets_oppsett(self):
-        """Hvem og hvilken rolle er nettopp det korps-føreren skal gjøre."""
-        for felt in ('mannskap_id', 'rolle_id'):
+        """Hvem, hvilken rolle — og merknaden, som er en beskjed om raden og
+        ikke om vaktas rammer (André, 16. sep. 2026)."""
+        for felt in ('mannskap_id', 'rolle_id', 'merknad'):
             self.assertNotIn(felt, services.SKIFT_OPPSETTFELTER)
 
     def test_navnet_staar_ikke_i_ressursens_oppsett(self):
@@ -1689,7 +1708,7 @@ class OppsettfelteneTests(SimpleTestCase):
 
     def test_tidene_utdelingen_og_antallet_er_oppsett(self):
         for felt in ('fra_tid', 'til_tid', 'korps_id', 'alle_korps',
-                     'probono', 'merknad', 'antall'):
+                     'probono', 'antall'):
             self.assertIn(felt, services.SKIFT_OPPSETTFELTER)
 
     def test_den_finner_bare_det_som_faktisk_staar_i_kroppen(self):
@@ -1711,10 +1730,10 @@ class OppsettfelteneTests(SimpleTestCase):
 
     def test_rekkefolgen_er_listas(self):
         """Feilmeldingen nevner feltene, og den skal lese likt hver gang."""
-        kropp = {'merknad': 'x', 'fra_tid': 'a', 'probono': True}
+        kropp = {'antall': 2, 'fra_tid': 'a', 'probono': True}
         self.assertEqual(
             services.oppsettfelter(kropp, services.SKIFT_OPPSETTFELTER),
-            ['fra_tid', 'probono', 'merknad'])
+            ['fra_tid', 'probono', 'antall'])
 
 
 @override_settings(SECURE_SSL_REDIRECT=False, RATELIMIT_ENABLE=False)
@@ -1791,8 +1810,8 @@ class SkiftetsOppsettfelterTests(SimpleTestCase):
             const ut = bareTillatteFelter(kropp, SKIFT_OPPSETTFELTER,
                                           kanSetteOppSkift());
             assert(JSON.stringify(Object.keys(ut).sort())
-                   === JSON.stringify(['mannskap_id', 'rolle_id']),
-                   'bare hvem og rolle: ' + JSON.stringify(ut));
+                   === JSON.stringify(['mannskap_id', 'merknad', 'rolle_id']),
+                   'hvem, rolle og merknad: ' + JSON.stringify(ut));
         """)
 
     def test_lederen_sender_alt(self):
@@ -1863,7 +1882,7 @@ class RegnearketViserDetHunFaarGjoreTests(SimpleTestCase):
         self.harness = build_harness(self.HARNESS)
 
     def _tegn(self, nivaa, *, ressurs_korps=1, mitt_korps=1,
-              plass_korps=None):
+              plass_korps=None, rad_korps=1):
         import json
 
         from patients.js_test_utils import run_node
@@ -1880,7 +1899,7 @@ class RegnearketViserDetHunFaarGjoreTests(SimpleTestCase):
             # mutasjonstesting 15. sep. 2026.
             'vaktposter': [{'id': 9, 'ressurs_id': 1, 'mannskap_id': 5,
                             'navn': 'Kari', 'korps_navn': 'HGSD',
-                            'korps_id': 1,
+                            'korps_id': rad_korps,
                             'reservert_korps_id': plass_korps,
                             'korps_kort': 'HGSD', 'rolle': '',
                             'fra_tid': '2026-10-03T08:00:00Z',
@@ -1912,7 +1931,8 @@ class RegnearketViserDetHunFaarGjoreTests(SimpleTestCase):
         ut = self._tegn('skriv_handling')
         self.assertNotIn('datetime-local', ut)
         self.assertIn('10:00', ut, 'tiden skal fortsatt kunne leses')
-        self.assertNotIn('data-felt="merknad"', ut, 'merknaden er oppsett')
+        self.assertIn('data-felt="merknad"', ut,
+                      'merknaden følger raden og er hennes')
 
     def test_raden_er_hennes_selv_om_tidene_ikke_er_det(self):
         """Sperrehake mot testen over. Er raden uredigerbar av en helt annen
@@ -1932,6 +1952,25 @@ class RegnearketViserDetHunFaarGjoreTests(SimpleTestCase):
     def test_men_ikke_paa_et_annet_korps_sin_ressurs(self):
         self.assertNotIn('apneRessurs',
                          self._tegn('skriv_handling', ressurs_korps=2))
+
+    def test_en_annens_rad_vises_som_tekst(self):
+        """**Funnet ved mutasjonstesting 16. sep. 2026.** Merknaden ble løsnet
+        for korps-føreren, og da lot `_plancellene` seg mutere til å gi *alle*
+        et skrivbart felt uten at noe ble rødt — ingen test spurte hva den som
+        ikke får røre raden ser.
+
+        Raden følger personen: en fra et annet korps er deres rad, også på en
+        ressurs som er hennes. Da skal cellene være tekst, ikke felter som
+        avvises ved lagring.
+        """
+        ut = self._tegn('skriv_handling', rad_korps=2)
+        self.assertNotIn('data-felt="merknad"', ut)
+        self.assertNotIn('data-action="apneRedigerVaktpost"', ut)
+
+    def test_hennes_egen_rad_har_merknadsfelt(self):
+        """Sperrehake mot testen over: er raden uredigerbar av en annen grunn,
+        måler «ingen felter» ingenting."""
+        self.assertIn('data-felt="merknad"', self._tegn('skriv_handling'))
 
     def test_en_ureservert_ressurs_med_hennes_plass_gir_knappen(self):
         """**Feilen som gjorde navneretten nesten ubrukelig** (16. sep. 2026).
@@ -2031,9 +2070,10 @@ class VinduetSenderBareDetHunFaarSetteTests(SimpleTestCase):
                 return json.loads(linje)
         self.fail('vinduet sendte ingen forespørsel')
 
-    def test_skiftvinduet_sender_bare_hvem_og_rolle(self):
+    def test_skiftvinduet_sender_bare_bemanningen(self):
         sendt = self._sendt('skriv_handling', 'lagreVaktpost()')
-        self.assertEqual(sorted(sendt), ['mannskap_id', 'rolle_id'], sendt)
+        self.assertEqual(sorted(sendt),
+                         ['mannskap_id', 'merknad', 'rolle_id'], sendt)
 
     def test_skiftvinduet_sender_alt_for_vaktlederen(self):
         sendt = self._sendt('skriv_full', 'lagreVaktpost()')
@@ -2073,7 +2113,7 @@ class LaaseneVirkerPaaAlleFeltformeneTests(SimpleTestCase):
 
     #: Feltene i skiftvinduet som er oppsett. `vaktpost-fra` og `-til` er
     #: `datetime-local`; det er de to som gjorde regelen nødvendig.
-    LAASTE = ('vaktpost-fra', 'vaktpost-til', 'vaktpost-merknad',
+    LAASTE = ('vaktpost-fra', 'vaktpost-til',
               'vaktpost-korps', 'vaktpost-probono')
 
     def setUp(self):
@@ -2120,6 +2160,15 @@ class LaaseneVirkerPaaAlleFeltformeneTests(SimpleTestCase):
         for felt in self.LAASTE:
             with self.subTest(felt=felt):
                 self.assertFalse(tilstand[felt][0])
+
+    def test_merknaden_laases_ikke(self):
+        """Den følger raden, ikke oppsettet (André, 16. sep. 2026). Låses den
+        med, mister korps-føreren den ene beskjeden hun skal kunne gi."""
+        tilstand = self._tilstand(
+            '_laasOppsettfelter(true)',
+            ('vaktpost-merknad', 'vaktpost-fra'))
+        self.assertFalse(tilstand['vaktpost-merknad'][0])
+        self.assertTrue(tilstand['vaktpost-fra'][0], 'tidene skal fortsatt låses')
 
     def test_ressursvinduets_nedtrekk_laases_med_disabled(self):
         felter = ('ressurs-gruppe', 'ressurs-korps', 'ressurs-enhet')

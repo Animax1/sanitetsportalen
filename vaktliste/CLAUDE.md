@@ -116,10 +116,18 @@ fase 3–7 gjenstår — se `docs/BESLUTNING_VAKTLISTE.md`, som er besluttet i s
 - **Å bemanne er å fylle en plass noen andre har satt opp** (15. sep. 2026, André:
   «Det eneste de skal få lov til er å legge inn folk, rolle, og redigere ressursens
   navn — men ikke gruppe, reservering, enhet i oppdragsmodulen og sletting»).
-  Korps-føreren setter **hvem** og **i hvilken rolle**, og retter **ressursens navn**.
-  Tidene, antallet plasser, reservasjonen, `alle_korps`, `probono`, merknaden og
-  sletting er oppsett — `services.kan_sette_opp_skift()`, som er et kall videre til
-  `kan_skrive_alt` og finnes for at beslutningen skal ha et sted, som `kan_stemple`.
+  Korps-føreren setter **hvem**, **i hvilken rolle** og **merknaden** på raden, og
+  retter **ressursens navn**. Tidene, antallet plasser, reservasjonen, `alle_korps`,
+  `probono` og sletting er oppsett — `services.kan_sette_opp_skift()`, som er et kall
+  videre til `kan_skrive_alt` og finnes for at beslutningen skal ha et sted, som
+  `kan_stemple`.
+
+  **Merknaden sto blant oppsettfeltene ett døgn, og André tok den ut igjen** (16. sep.
+  2026). «Det eneste de skal få lov til» ble lest strengt, og det var feil sted å trekke
+  grensen: «Kommer 17:30» er en beskjed om *denne raden*, og den som setter personen på
+  plassen er den som vet det. Den følger derfor `kan_rore_vaktpost`, som person og rolle —
+  hun når bare radene som er hennes. **`probono` ble stående**, og det er et annet
+  spørsmål: det sier hva vakta *koster*, og tallet leses av budsjettlinja for hele lista.
 
   **Regelen står som to lister, ikke som en `if` per felt:**
   `services.SKIFT_OPPSETTFELTER` og `RESSURS_OPPSETTFELTER`, lest av

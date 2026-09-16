@@ -738,10 +738,12 @@ function _plancellene(vp, r, kanRore) {
     return `<div class="vl-tidcelle">${innhold}${merke}</div>`;
   };
 
-  // Tidene og merknaden leses av alle som ser raden, men settes av den som
-  // setter opp vakta. Et felt man kan skrive i og ikke lagre er verre enn en
-  // tekst: det ser ut som om endringen gikk igjennom.
-  const merknad = kanSetteOppSkift()
+  // **Merknaden følger raden, ikke oppsettet** (André, 16. sep. 2026):
+  // «kommer 17:30» er en beskjed om den som står der, og den som setter
+  // personen på plassen er den som vet det. Tidene over er vaktas rammer og
+  // settes av den som setter opp — der er et felt man kan skrive i og ikke
+  // lagre verre enn en tekst, for det ser ut som om endringen gikk igjennom.
+  const merknad = kanRore
     ? `<input type="text" class="vl-celle" maxlength="255"
               value="${escHtmlValue(vp.merknad || '')}" placeholder="—"
               data-action="endreVaktpost" data-hendelse="change"

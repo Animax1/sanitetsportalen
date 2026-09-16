@@ -4,6 +4,42 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-16 — Merknaden følger raden, ikke oppsettet
+
+**André:** «Merknad skal ikke låses for korps-føreren.»
+
+15. sep. låste jeg den sammen med tidene, fordi «det eneste de skal få lov til er å legge
+inn folk, rolle» ble lest strengt. Det var feil sted å trekke grensen. **Merknaden er en
+beskjed om raden** — «Kommer 17:30», «kjører selv» — og den som setter personen på plassen
+er den som vet det. Tidene er vaktas rammer; merknaden er ikke det.
+
+Den følger derfor samme port som person og rolle, `kan_rore_vaktpost`, og hun når bare
+radene som er hennes. **`probono` ble stående**, og det er et annet spørsmål: det sier hva
+vakta *koster*, og tallet leses av budsjettlinja for hele lista — den som fører sitt eget
+korps skal ikke kunne flytte totalen for alle.
+
+Sju tester bar den gamle regelen og er snudd tilbake. At grensen flyttet seg to ganger på
+ett døgn står i `services.SKIFT_OPPSETTFELTER` med begge begrunnelsene: hvorfor merknaden
+gikk inn, og hvorfor den kom ut. En liste uten den historikken inviterer til at noen
+flytter den tredje gang.
+
+### Mutasjonstesting fant et hull merknaden avslørte
+
+Seks mutanter, og **den sjette overlevde**: `const merknad = kanRore` lot seg bytte med
+`true` uten at noe ble rødt. Ingen test spurte hva den som *ikke* får røre raden ser — og
+svaret hadde da blitt et skrivbart felt som avvises ved lagring, altså nøyaktig feilen
+`readOnly`-glippen dagen før handlet om.
+
+Hullet fantes fordi alle testene av regnearket sto på hennes egen rad. Nå tegnes også en rad
+som tilhører et annet korps, med en sperrehake ved siden av: er raden uredigerbar av en
+annen grunn, måler «ingen felter» ingenting. Etter rettingen: **seks mutanter, ingen
+overlevende.**
+
+**Endret:** `vaktliste/services.py`, `static/js/vaktliste-{kjerne,tegning,offline}.js`,
+`vaktliste/tests_tilgang.py` (+4 tester, 7 snudd), `vaktliste/CLAUDE.md`. Ingen migrasjon.
+
+---
+
 ## 2026-09-16 — En lås som ikke låste, og en navnerett som var stengt
 
 To glipper i gårsdagens tilgangsrunde, meldt fra staging.

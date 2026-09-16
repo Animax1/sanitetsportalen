@@ -320,7 +320,9 @@ function _laasOppsettfelter(laast) {
   // `disabled` er det ene attributtet som virker på alle feltformene, og
   // det gjør nøyaktig det André ba om: feltet lar seg ikke trykke på.
   // Verdien leses fortsatt av JS, så visningen er i behold.
-  ['vaktpost-fra', 'vaktpost-til', 'vaktpost-merknad',
+  // `vaktpost-merknad` står **ikke** her: merknaden er en beskjed om raden,
+  // og følger person og rolle (André, 16. sep. 2026).
+  ['vaktpost-fra', 'vaktpost-til',
    'vaktpost-korps', 'vaktpost-probono'].forEach((id) => {
     const el = document.getElementById(id);
     if (el) el.disabled = laast;

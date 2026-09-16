@@ -2233,6 +2233,10 @@ Funnene under er allerede kartlagt, så jobben er avgrenset når den skal gjøre
 
 ### Løse punkter
 
+- [x] **Merknaden låses ikke for korps-føreren** (16. sep. 2026, André). Den følger
+      raden, ikke oppsettet — samme port som person og rolle. `probono` ble stående:
+      det tallet leses av budsjettlinja for hele lista. Seks mutanter; den siste
+      avslørte at ingen test spurte hva den som ikke får røre raden ser.
 - [x] **Låsen på tidsfeltene låste ikke** (16. sep. 2026, meldt fra staging).
       `readOnly` har ingen virkning på `datetime-local` — velgeren åpnet seg på iPhone,
       verdien endret seg, og endringen ble filtrert bort ved lagring. Låste felter bruker

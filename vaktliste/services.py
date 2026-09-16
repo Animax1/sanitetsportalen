@@ -1000,16 +1000,26 @@ def kan_rore_vaktpost(user, vaktpost) -> bool:
 #:
 #: André, 15. sep. 2026: «Det eneste de skal få lov til er å legge inn folk,
 #: rolle, og redigere ressursens navn — men ikke gruppe, reservering, enhet i
-#: oppdragsmodulen og sletting.» Tidene er vaktas rammer for én plass;
-#: `probono` og `merknad` er utsagn om hva skiftet *er*, ikke om hvem som står
-#: der. Reservasjonen og «åpen for alle» er å dele ut, og sto her fra før —
-#: de to var bare skrevet som hver sin `if` ute i viewet.
+#: oppdragsmodulen og sletting.» Tidene er vaktas rammer for én plass, og
+#: reservasjonen og «åpen for alle» er å dele ut — de to sto her fra før, bare
+#: skrevet som hver sin `if` ute i viewet.
+#:
+#: **`merknad` sto her ett døgn, og André tok den ut igjen** (16. sep. 2026).
+#: Jeg leste «det eneste» strengt og låste den sammen med tidene. Det var feil
+#: sted å trekke grensen: merknaden er en beskjed om *denne raden* — «kommer
+#: 17:30», «kjører selv» — og den som setter personen på plassen er den som
+#: vet det. Den følger derfor samme port som person og rolle,
+#: `kan_rore_vaktpost`, og hun når bare de radene som er hennes.
+#:
+#: **`probono` ble stående**, og det er et annet spørsmål: det sier hva vakta
+#: *koster*, og tallet leses av budsjettlinja for hele lista. Den som fører
+#: sitt eget korps skal ikke kunne flytte totalen for alle.
 #:
 #: **`antall` er med fordi opprettelsen tar den:** én forespørsel kunne lage
 #: femti tomme plasser, og å sette opp behovet er nettopp det korps-føreren
 #: ikke skal gjøre.
 SKIFT_OPPSETTFELTER = ('fra_tid', 'til_tid', 'korps_id', 'alle_korps',
-                       'probono', 'merknad', 'antall')
+                       'probono', 'antall')
 
 #: Det samme på en ressurs. **Navnet står bevisst ikke her:** det er det ene
 #: korps-føreren skal kunne rette, og reservasjonen, gruppa og
