@@ -4,6 +4,93 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-16 — Pulje 2, andre halvdel: passiv vakt, «avvente» og kvittert avbrytelse
+
+Resten av pulje 2 i én runde, etter spesifikasjonen André ga samme dag. Tre ting som
+henger sammen, og én migrasjon — `oppdrag/0026`, **rene tillegg, null `RunPython`**, så
+release-fasen er trygg.
+
+### Flaggene står på enhetstypen, ikke på enheten
+
+«Kan gå passiv vakt» og «kan avvente» er egenskaper ved *slaget* ressurs — spesialressurser
+går bakvakt, ambulanser gjør det ikke — så de er to felter på `Enhetstype`
+(`kan_passiv_vakt`, `kan_avvente`). Sto de på hver enhet, måtte de settes på nytt for hver
+bil som opprettes, og en glemt avkryssing ville sett ut som en bevisst beslutning.
+
+**To separate flagg, ikke ett.** Å avvente et oppdrag og å sove i bakvakt er to ulike ting,
+og en ressurs kan gjøre det ene uten det andre. Ett felles flagg ville koblet dem for alltid
+og vært umulig å skille i ettertid uten en datamigrasjon.
+
+### Passiv vakt er ikke «av vakt»
+
+Hun kan varsles, og hun teller i beredskapen — hun holder en 24/7-vakt gjennom hele
+arrangementet. Poenget med moduset er å **dokumentere** hvor mange timer og hvor mange
+oppdrag som falt i tida hun helst skulle sovet. Derfor er grensesnittet dempet: et merke på
+ressurskortet, og `Lege 02 (passiv vakt)` på brikka når hun står på et oppdrag. Er hun
+aktiv, står det ingenting ekstra — en merking av det normale er en merking ingen leser.
+
+Svaret ligger to steder, og begge trengs:
+
+- **`Oppdragsenhet.varslet_modus`** — modusen **frosset** i det hun ble varslet. Leste vi
+  enhetens `passiv_vakt` når statistikken ble regnet ut, ville et oppdrag hun kjørte i
+  passiv vakt hoppet over til «aktiv» i det hun gikk aktiv neste morgen, og dokumentasjonen
+  vært verdiløs.
+- **`Vaktmodusperiode`** — hvor lenge hun sto slik, inkludert timene ingenting skjedde. Som
+  er akkurat de timene man vil dokumentere. `sett_vaktmodus()` lukker den åpne perioden og
+  åpner en ny, er idempotent, og en databasesperre (`en_apen_vaktmodus_per_enhet`) holder
+  at det aldri finnes to åpne perioder for samme enhet i samme vakt. En åpen periode
+  summeres **fram til nå** — ellers viste vakta som pågår null.
+
+### «Avvente» er en beskjed, ikke en status
+
+En varslet spesialressurs kan svare at hun ikke rykker ut nå. Hun **blir stående varslet**
+på oppdraget, og operatøren kan trykke «Rykk ut» senere; begge deler står i loggen
+(`Enhetshendelse.AVVENTER`). Derfor teller hun **ikke** som «noen er på vei» i
+`trenger_ny_ressurs`: står hun avventende alene, skal det stå «trenger ny ressurs» — som er
+hele grunnen til at spørsmålet stilles. Det var André sitt svar på spørsmål 2, og det er
+den eneste lesningen som gir mening for en ressurs som vanligvis rykker ut som ekstra enhet.
+
+### Avbrutt-merket kvitteres nå
+
+Det forsvant aldri av seg selv, og et merke som blir stående gjennom vakta er et merke man
+slutter å se. To veier ut: operatøren trykker «Kvitter» i merket, eller **en ny enhet
+varsles** — `varsle_enhet` kvitterer, fordi det å sende noen ny *er* svaret på
+avbrytelsen. (`kvittert_at`/`kvittert_av` på `Enhetshendelse`; `avbrutt_av` og
+`avbrutt_av_bulk` filtrerer på ukvittert.)
+
+### Arkivet og statistikken
+
+`ArkivertOppdrag.varslet_modus` står i SHA-payloaden **bare når den er satt**, nøyaktig som
+`behandlet_at`: rader for enheter uten passiv vakt — de fleste — får samme payload som før,
+og eldre signaturer verifiserer uendret. Statistikken har `enheter_passiv`, `passiv_timer`
+og `oppdrag_i_passiv`. De to første er live-tall og finnes ikke i arkivet (som
+`enheter_pa_vakt`); det tredje overlever arkiveringen, fordi stempelet ligger på radene.
+
+### 21 mutanter — og én av dem var en ekte feil
+
+Alle 21 røde. Én av dem fant en **kodefeil, ikke et testhull**, og det er verdt å skrive
+ned hvordan:
+
+> **Broen i `Oppdrag.save()` stemplet ikke modusen.** Den lager den *første* koblingsraden
+> for et oppdrag opprettet med `enhet` satt — `varsle_enhet` lager de neste. Uten stempelet
+> der talte `oppdrag_i_passiv` bare enheter som ble lagt til *etterpå*, altså aldri det
+> vanlige tilfellet. Mutanten «broen stempler ikke modusen» var grønn da jeg skrev den, og
+> det var svaret: koden gjorde allerede det mutanten skulle gjøre.
+
+Det er nettopp den sorten feil mutasjonstesting finnes for. Regelen sto riktig ett sted og
+manglet i det andre, begge stiene var dekket av tester, og begge testene var grønne — fordi
+ingen av dem gikk gjennom den ene inngangen der feltet manglet.
+
+**Endret:** `oppdrag/models.py` (+`Vaktmodusperiode`, fem felter),
+`oppdrag/migrations/0026_…` (rene tillegg), `oppdrag/services.py`, `oppdrag/views.py`,
+`oppdrag/views_common.py`, `oppdrag/urls.py` (+3 ruter), `oppdrag/arkiv.py`,
+`oppdrag/statistikk.py`, `static/js/oppdrag-sentral-{kjerne,oppdrag,admin}.js`,
+`static/css/oppdrag.css`, `oppdrag/tests_passiv_avvente.py` (ny, 38 tester),
+`oppdrag/CLAUDE.md`, `docs/TEKNISK_DOKUMENTASJON.md` (rutetallene).
+Hele suiten (3 165 tester) grønn.
+
+---
+
 ## 2026-09-16 — Pulje 2, første halvdel: «ledig siden» og varselbjella
 
 To av de tre små i oppdragsmodulen. Ingen av dem rører statusmaskinen eller skjemaet;

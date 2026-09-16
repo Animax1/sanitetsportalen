@@ -87,6 +87,20 @@
  * lært operatøren å overse den andre. */
 .enhet-brikke-avbrutt { color: var(--portal-text-muted, #94a3b8); font-weight: 600; }
 .enhet-brikke-avbrutt .bi { color: #94a3b8; }
+/* «Avventer» er dempet som avbrutt-merket, ikke alarmerende: den som avventer
+   har gitt beskjed. «Trenger ny ressurs» er det eneste som skal rope. */
+.enhet-brikke-avventer { color: var(--portal-text-muted, #94a3b8); font-weight: 600; }
+.enhet-brikke-avventer .bi { color: #94a3b8; }
+/* Passiv vakt på ressurskortet: et merke, ikke en advarsel. Enheten er på
+   vakt — hun sover. */
+.enhet-passivmerke {
+  font-size: 0.75rem;
+  padding: 0.05rem 0.4rem;
+  border-radius: 999px;
+  border: 1px solid var(--portal-text-muted, #94a3b8);
+  color: var(--portal-text-muted, #94a3b8);
+  margin-left: 0.35rem;
+}
 
 /* Samme merke i historikklista, der oppdraget havner når en annen bil løste
  * det — og der avbrytelsen ellers ikke kunne leses uten å åpne oppdraget. */

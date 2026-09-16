@@ -241,11 +241,17 @@ function _enhetskort(e) {
       const apner = kanSeBesetning()
         ? `data-action="visBesetning" data-id="${escHtmlValue(e.id)}"` : '';
       const besetning = mkBesetning(e.id);
+      // **Passiv-merket vises bare der det betyr noe** (André, 16. sep.
+      // 2026): enhetstypen må tillate passiv vakt. «Aktiv» skrives ikke —
+      // det er normaltilstanden, og et merke på hver ambulanse er støy.
+      // Merket er dempet, ikke en advarsel: enheten *er* på vakt, hun sover.
+      const passiv = (e.kan_passiv_vakt && e.passiv_vakt)
+        ? '<span class="enhet-passivmerke">passiv vakt</span>' : '';
       return `
       <div class="enhet-kort${klikkbar}" ${apner}>
         <span class="status-prikk status-${escHtmlValue(e.status)}"></span>
         <div class="flex-grow-1">
-          <div class="enhet-navn">${escapeHtml(e.navn)}</div>
+          <div class="enhet-navn">${escapeHtml(e.navn)}${trustedHtml(passiv)}</div>
           <div class="enhet-meta">${escapeHtml(meta)}</div>
           ${oppdragslinje}
         </div>
@@ -374,3 +380,54 @@ async function _settVakt(id, paVakt) {
 
 async function taAvVakt(id) { await _settVakt(id, false); }
 async function settPaaVakt(id) { await _settVakt(id, true); }
+
+
+async function _settVaktmodus(id, passiv) {
+  // **Passiv er ikke «av vakt»** (André, 16. sep. 2026), og derfor et eget
+  // endepunkt: «kan ikke få nye oppdrag» er noe helt annet enn «ligger og
+  // sover, men kommer».
+  const res = await apiFetch(`/oppdrag/api/enheter/${id}/vaktmodus/`, {
+    method: 'POST',
+    body: JSON.stringify({ passiv }),
+  });
+  const d = await res.json().catch(() => ({}));
+  if (!res.ok || d.status !== 'ok') {
+    alert(d.message || 'Kunne ikke endre vaktmodus.');
+    return;
+  }
+  etagEnheter = null;   // tving ny henting, ellers svarer serveren 304
+  await lastAlt();
+}
+
+async function settPassivVakt(id) { await _settVaktmodus(id, true); }
+async function settAktivVakt(id) { await _settVaktmodus(id, false); }
+
+
+async function avventOppdrag(arg) {
+  // `arg` er «<oppdrag>:<enhet>» — klikkdelegeringen sender ett argument.
+  const [oppdragId, enhetId] = String(arg).split(':');
+  const res = await apiFetch(
+    `/oppdrag/api/oppdrag/${oppdragId}/avvent/${enhetId}/`, { method: 'POST' });
+  const d = await res.json().catch(() => ({}));
+  if (!res.ok || d.status !== 'ok') {
+    alert(d.message || 'Kunne ikke sette avventer.');
+    return;
+  }
+  etagOppdrag = null;
+  await lastAlt();
+}
+
+
+async function kvitterAvbrutt(oppdragId) {
+  // Den andre veien — å sende en ny enhet — kvitterer av seg selv på
+  // serveren. Denne finnes for tilfellet der ingen skal sendes.
+  const res = await apiFetch(
+    `/oppdrag/api/oppdrag/${oppdragId}/kvitter-avbrutt/`, { method: 'POST' });
+  const d = await res.json().catch(() => ({}));
+  if (!res.ok || d.status !== 'ok') {
+    alert(d.message || 'Kunne ikke kvittere.');
+    return;
+  }
+  etagOppdrag = null;
+  await lastAlt();
+}

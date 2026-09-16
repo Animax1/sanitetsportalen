@@ -155,19 +155,47 @@ function _enhetsmatrise(o) {
   // ressurs» på et ferdig oppdrag; nå sier flagget bare om noen må sendes, og
   // dette merket hvem som avbrøt. Begge kan stå samtidig, og da er de to
   // opplysninger — hvem som falt fra, og at noen må ut.
+  // **Merket står til noen har tatt stilling** (André, 15. sep. 2026: «det må
+  // vises, og at det må løses av operatør»). Den andre veien — å sende en ny
+  // enhet — kvitterer av seg selv på serveren; knappen her er for tilfellet
+  // der ingen skal sendes. Den står *i* merket, der problemet vises, framfor
+  // i et vindu man må åpne.
+  //
+  // `globalThis.OPPDRAG_TILGANG?.` og ikke det bare navnet: `_enhetsmatrise`
+  // tegnes også der tilgangsobjektet ikke er satt, og en `ReferenceError`
+  // her ville tatt ned hele oppdragslista — ikke bare skjult én knapp.
+  const kvitter = globalThis.OPPDRAG_TILGANG?.kanSkrive
+    ? `<button type="button" class="btn btn-link btn-sm p-0 ms-2 enhet-brikke-kvitter"
+               data-action="kvitterAvbrutt" data-id="${escHtmlValue(o.id)}">Kvitter</button>`
+    : '';
   const avbrutt = (o.avbrutt_av || []).length
     ? `<span class="enhet-brikke enhet-brikke-avbrutt">
       <i class="bi bi-x-octagon-fill"></i>
       <span>Avbrutt av ${escapeHtml((o.avbrutt_av || []).join(', '))}</span>
+      ${kvitter}
+    </span>` : '';
+  // **«Avventer» er en tredje beskjed** (André, 16. sep. 2026): avbrutt sier
+  // hva som skjedde, «trenger ny ressurs» krever handling nå, og avventer sier
+  // at noen har svart — bare ikke ja. Dempet som avbrutt-merket, ikke
+  // alarmerende: den som avventer har gitt beskjed.
+  const avventer = (o.avventer_av || []).length
+    ? `<span class="enhet-brikke enhet-brikke-avventer">
+      <i class="bi bi-pause-circle-fill"></i>
+      <span>Avventer: ${escapeHtml((o.avventer_av || []).join(', '))}</span>
     </span>` : '';
   const synlige = o.trenger_ressurs ? rader.filter((e) => e.status !== 'ledig') : rader;
-  return mangler + avbrutt + synlige.map((e) => {
+  return mangler + avbrutt + avventer + synlige.map((e) => {
     const statusTid = e.status_tidspunkt ? ` · ${tidSiden(e.status_tidspunkt)}` : '';
     const sted = e.sted_navn ? ` → ${e.sted_navn}` : '';
     const meta = `${e.status_navn}${sted}${statusTid}`;
+    // **«Lege 02 (passiv vakt)»** (André, 16. sep. 2026). Modusen er den som
+    // sto da hun ble varslet, ikke den hun står i nå — serveren fryser den
+    // på koblingsraden. Aktiv vises ikke: «Aktiv» på en ambulanse er støy,
+    // og tomt felt betyr «dette spørsmålet gjaldt ikke henne».
+    const modus = e.varslet_modus === 'passiv' ? ' (passiv vakt)' : '';
     return `<span class="enhet-brikke">
       <span class="status-prikk status-${escHtmlValue(e.status)}"></span>
-      <span>${escapeHtml(e.enhet_navn)}</span>
+      <span>${escapeHtml(e.enhet_navn + modus)}</span>
       <span class="oppdrag-meta">${escapeHtml(meta)}</span>
     </span>`;
   }).join('');
@@ -407,7 +435,7 @@ function mkEnhetsrader(o) {
       ? ` ${klokke(e.status_tidspunkt)} · ${tidSiden(e.status_tidspunkt)}` : '';
     const sted = e.sted_navn ? ` → ${e.sted_navn}` : '';
     const meta = `${e.status_navn}${sted}${statusTid}`;
-    const knapper = OPPDRAG_TILGANG.kanSkrive ? _enhetsknapper(e, flere) : '';
+    const knapper = OPPDRAG_TILGANG.kanSkrive ? _enhetsknapper(e, flere, o.id) : '';
     return `
       <div class="enhet-rad" id="enhet-rad-${escHtmlValue(e.enhet_id)}">
         <span class="status-prikk status-${escHtmlValue(e.status)}"></span>
@@ -419,7 +447,7 @@ function mkEnhetsrader(o) {
 }
 
 
-function _enhetsknapper(e, flere) {
+function _enhetsknapper(e, flere, oppdragId) {
   // Bare knappene som kan brukes: «Ta av» mens hun venter og ikke er den
   // siste, «Gjenåpne» når hun er ledig, «Før status» ellers. En knapp som
   // alltid feiler er verre enn ingen.
@@ -435,7 +463,25 @@ function _enhetsknapper(e, flere) {
     ut.push(`<button type="button" class="btn btn-outline-danger btn-sm"
                      data-action="taAvEnhet" data-id="${escHtmlValue(e.enhet_id)}">Ta av</button>`);
   }
+  // **«Avvent» er ikke «ta av»** (André, 16. sep. 2026). Hun blir stående
+  // varslet, så «Rykk ut» er fortsatt tilgjengelig, og begge deler står i
+  // loggen. Knappen vises bare før hun har rykket ut, og bare der
+  // enhetstypen tillater det — `kanAvvente()` leser enhetslista, for
+  // koblingsraden kjenner ikke typen.
+  if (e.status === 'venter' && kanAvvente(e.enhet_id)) {
+    ut.push(`<button type="button" class="btn btn-outline-secondary btn-sm"
+                     data-action="avventOppdrag" data-arg="${escHtmlValue(oppdragId + ':' + e.enhet_id)}">Avvent</button>`);
+  }
   return ut.join('');
+}
+
+
+function kanAvvente(enhetId) {
+  // Flagget bor på enhetstypen og følger med i enhetslista; koblingsraden på
+  // oppdraget kjenner bare enheten. Ett sted å slå det opp, så en knapp og et
+  // endepunkt ikke svarer ulikt.
+  const treff = (enheter || []).find((e) => e.id === enhetId);
+  return !!(treff && treff.kan_avvente);
 }
 
 

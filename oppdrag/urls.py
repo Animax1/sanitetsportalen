@@ -16,6 +16,8 @@ urlpatterns = [
     path('api/enheter/', views.enheter_view, name='oppdrag_api_enheter'),
     path('api/enheter/<int:pk>/', views.enhet_detalj_view, name='oppdrag_api_enhet_detalj'),
     path('api/enheter/<int:pk>/vakt/', views.enhet_vakt_view, name='oppdrag_api_enhet_vakt'),
+    path('api/enheter/<int:pk>/vaktmodus/', views.enhet_vaktmodus_view,
+         name='oppdrag_api_enhet_vaktmodus'),
     # Verdimengdene (12. sep. 2026): lokasjoner, enhetstyper og
     # problemstillinger, tre tabeller med samme tre endepunkter. Rekkefølgen
     # settes med hele lista — se `views_verdier`.
@@ -43,6 +45,10 @@ urlpatterns = [
     # til, DELETE tar henne av mens hun venter. Under den: sentralbordets
     # føring av *hennes* status (§9) — samme form som bilens stempling, men
     # med enheten i URL-en og tidspunktet i kroppen — og gjenåpning av «Ledig».
+    path('api/oppdrag/<int:pk>/avvent/<int:enhet_pk>/', views.avvent_view,
+         name='oppdrag_api_avvent'),
+    path('api/oppdrag/<int:pk>/kvitter-avbrutt/', views.kvitter_avbrutt_view,
+         name='oppdrag_api_kvitter_avbrutt'),
     path('api/oppdrag/<int:pk>/enheter/<int:enhet_pk>/', views.oppdragsenhet_view,
          name='oppdrag_api_oppdragsenhet'),
     path('api/oppdrag/<int:pk>/enheter/<int:enhet_pk>/status/<str:overgang>/<str:sted>/',

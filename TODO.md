@@ -2237,9 +2237,16 @@ Funnene under er allerede kartlagt, så jobben er avgrenset når den skal gjøre
       `Ledig`-melding per enhet, scopet til vakta, bulk. Tolv mutanter på denne og bjella.
 - [x] **Varselbjelle til enhetskontoen ved nytt oppdrag** (16. sep. 2026). Nummer,
       hastegrad, klokkeslett — ikke problemstillingen. Merkes lest når hun rykker ut.
-- [ ] **Pulje 2 gjenstår:** avbrutt-kvittering (trenger migrasjon), aktiv/passiv vakt
-      (`Enhet.kan_passiv_vakt`, `Oppdragsenhet.varslet_modus`, `Vaktmodusperiode`) og
-      «avvente» (`Enhet.kan_avvente` + `Enhetshendelse.AVVENTER`). Spesifisert 16. sep.
+- [x] **Aktiv/passiv vakt** (16. sep. 2026, André). Flaggene står på `Enhetstype`
+      (`kan_passiv_vakt`, `kan_avvente`) — det er en egenskap ved slaget ressurs, ikke ved
+      bilen. Modusen fryses på `Oppdragsenhet.varslet_modus` ved varsling, og timene
+      dokumenteres av `Vaktmodusperiode`. Passiv enhet kan varsles og teller i beredskapen.
+- [x] **«Avvente» på et oppdrag** (16. sep. 2026). `Enhetshendelse.AVVENTER` — enheten blir
+      stående varslet, operatøren kan trykke «Rykk ut» senere, og hun teller ikke som «på
+      vei», så et oppdrag med bare en avventende enhet melder «trenger ny ressurs».
+- [x] **Avbrutt-merket kvitteres** (16. sep. 2026). `kvittert_at`/`kvittert_av`, og en ny
+      varsling kvitterer automatisk. 21 mutanter, alle røde — én av dem avslørte at broen i
+      `Oppdrag.save()` ikke stemplet modusen på den første koblingsraden.
 - [x] **Vaktlistevelgeren byttet ikke liste før neste klikk** (16. sep. 2026, meldt fra
       staging som «treg»). `data-hendelse="change"` manglet, så handlingen fyrte på klikk
       med den gamle verdien. En skanner krever nå hendelsen på hvert `<select>`/`<textarea>`

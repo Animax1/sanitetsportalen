@@ -311,6 +311,11 @@ class GjeldendeBulkTests(OppdragStatsBasis):
             oppdrag = self._oppdrag()
             self._stempel(oppdrag, choices.RYKKER_UT, 2)
 
-        with self.assertNumQueries(4):
-            # oppdrag + koblingsrader + statusmeldinger + Enhet-tellingen
+        with self.assertNumQueries(6):
+            # oppdrag + koblingsrader + statusmeldinger + to Enhet-tellinger
+            # (på vakt, og av dem passive) + vaktmodusperiodene.
+            #
+            # **Budsjettet er konstant, ikke lavt.** Poenget er at det ikke
+            # vokser med antall oppdrag; to tellinger og én periodelesing er
+            # tre faste spørringer, og endepunktet caches i 60 sekunder.
             oppdrag_stats(self.vakt)

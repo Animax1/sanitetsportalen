@@ -80,7 +80,7 @@ def arkiver_vakt(vakt, notat, user, *, tomm=True):
         # én bil per oppdrag er nøyaktig det det alltid har vært.
         rader = []
         for oppdrag in oppdragene:
-            for enhetsnavn, status, gjeldende in _per_enhet(oppdrag, meldinger[oppdrag.pk]):
+            for enhetsnavn, status, gjeldende, modus in _per_enhet(oppdrag, meldinger[oppdrag.pk]):
                 per_status = {m.status: m for m in gjeldende}
                 felter = {
                     felt: (per_status[status_].tidspunkt if status_ in per_status else None)
@@ -90,6 +90,7 @@ def arkiver_vakt(vakt, notat, user, *, tomm=True):
                     arkiv=arkiv,
                     oppdragsnummer=oppdrag.oppdragsnummer,
                     enhet_navn=enhetsnavn,
+                    varslet_modus=modus,
                     lokasjon_navn=oppdrag.lokasjon.navn if oppdrag.lokasjon else '',
                     problemstilling=oppdrag.problemstilling or '',
                     hastegrad=oppdrag.hastegrad or '',
@@ -119,18 +120,24 @@ def arkiver_vakt(vakt, notat, user, *, tomm=True):
 
 
 def _per_enhet(oppdrag, gjeldende):
-    """``[(enhetsnavn, status, meldinger), ...]`` — én per koblingsrad.
+    """``[(enhetsnavn, status, meldinger, modus), ...]`` — én per koblingsrad.
 
     Delt med `statistikk.rader_for_vakt`, så arkivet og live-tallene deler
     én oppfatning av hva en rad er. Uten koblingsrader (kan ikke skje etter
     `0011`) faller den tilbake til oppdragets egen enhet.
+
+    `modus` er vaktmodusen som ble frosset da enheten ble varslet (16. sep.
+    2026) — tom for alle som ikke har passiv vakt, og for rader fra før
+    feltet fantes.
     """
     rader = list(oppdrag.enheter.all())
     if not rader:
-        return [(oppdrag.enhet.navn if oppdrag.enhet else '', oppdrag.status, gjeldende)]
+        return [(oppdrag.enhet.navn if oppdrag.enhet else '',
+                 oppdrag.status, gjeldende, '')]
     return [
         (rad.enhet.navn, rad.status,
-         [m for m in gjeldende if m.oppdragsenhet_id == rad.pk])
+         [m for m in gjeldende if m.oppdragsenhet_id == rad.pk],
+         rad.varslet_modus)
         for rad in rader
     ]
 
@@ -173,6 +180,12 @@ class OppdragArkivHandler(BaseArkivHandler):
                 'automatiske_statuser': list(rad.automatiske_statuser or []),
                 'antall_forsinket': rad.antall_forsinket,
             }
+            # **`varslet_modus` står i payloaden bare når den er satt**
+            # (16. sep. 2026), nøyaktig som `behandlet_at`: eldre arkiv — og
+            # nye rader for enheter uten passiv vakt, som er de fleste — får
+            # samme payload som før, og signaturene verifiserer uendret.
+            if rad.varslet_modus:
+                data['varslet_modus'] = rad.varslet_modus
             for status, felt in _STATUSFELT.items():
                 verdi = getattr(rad, felt)
                 # `behandlet_at` kom 12. sep. 2026, etter at arkiv fantes med

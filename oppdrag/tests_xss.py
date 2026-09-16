@@ -144,6 +144,12 @@ REVIEWED_INTERPOLATIONS = {
     'vaktKlasse': 'hardkodet CSS-klasse fra en ternær',
     'vaktHandling': 'hardkodet handlingsnavn fra en ternær',
     'vaktTekst': 'hardkodet knappetekst fra en ternær',
+    # Aktiv/passiv vakt (16. sep. 2026), samme form som de tre over:
+    # verdiene settes av en ternær i byggeren og kommer ikke fra data.
+    'modusHandling': 'hardkodet handlingsnavn fra en ternær',
+    'modusTekst': 'hardkodet knappetekst fra en ternær',
+    'modusKnapp': 'markup bygget i funksjonen, av de to over',
+    'kvitter': 'markup bygget lokalt, oppdrags-id escapet inni',
     'vaktKnapp': 'markup bygget lokalt, id escapet inni',
     'adminKnapp': 'markup bygget lokalt, id escapet inni',
     'radKlasse': 'hardkodet CSS-klasse fra en ternær',

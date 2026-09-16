@@ -75,6 +75,19 @@ class Enhet(BaseTimeStampedModel):
         verbose_name='På vakt',
         help_text='Enheter som ikke er på vakt kan ikke få nye oppdrag.',
     )
+    # **Passiv vakt er ikke «av vakt»** (André, 16. sep. 2026). Enheten har en
+    # 24/7-vakt gjennom arrangementet; passiv er bakvakt — hun sover, men kan
+    # varsles. Derfor et eget felt ved siden av `pa_vakt`, ikke en tredje
+    # verdi i det: «kan ikke få nye oppdrag» er noe helt annet enn «ligger og
+    # sover, men kommer».
+    #
+    # Feltet er *tilstanden nå*. Historikken — timene — ligger i
+    # `Vaktmodusperiode`, fordi et boolsk felt aldri kan svare på «hvor lenge».
+    passiv_vakt = models.BooleanField(
+        default=False, verbose_name='Passiv vakt',
+        help_text='Bakvakt: enheten kan varsles, men står ikke klar. '
+                  'Krever at enhetstypen tillater det.',
+    )
     # Typen grupperer enhetene i sentralbordet, ambulansene først (André,
     # 12. sep. 2026). Tom som standard: kontoskjemaet vet ikke hva bilen er,
     # og et gjett ville stått som fasit til noen la merke til det. PROTECT:
@@ -106,6 +119,23 @@ class Enhetstype(BaseTimeStampedModel):
         default=True, verbose_name='Aktiv',
         help_text='Inaktive typer tilbys ikke i enhetspanelet, men enheter som har dem beholder dem.')
     rekkefolge = models.IntegerField(default=100, verbose_name='Rekkefølge')
+    # **Flaggene bor på typen, ikke på enheten** (André, 16. sep. 2026: «når vi
+    # lager gruppene som spesialressurs eller ambulanse»). Da arver hver enhet
+    # dem av seg selv, og «Lege 03» opprettet midt i arrangementet har dem med
+    # én gang. Per enhet måtte noen husket det hver gang.
+    #
+    # **To flagg, ikke ett.** «Kan stå passiv» og «kan avvente» har oftest
+    # samme svar, men ikke alltid: en frivillig enhet som alltid er aktiv kan
+    # godt ha lov til å si nei. Ett flagg ville tvunget fram passiv vakt for
+    # noen som ikke har det, bare for å la dem avvente.
+    kan_passiv_vakt = models.BooleanField(
+        default=False, verbose_name='Kan stå i passiv vakt',
+        help_text='Bakvakt gjennom hele arrangementet. Enheter av denne typen '
+                  'kan settes aktiv/passiv, og passiv tid dokumenteres.')
+    kan_avvente = models.BooleanField(
+        default=False, verbose_name='Kan avvente et oppdrag',
+        help_text='Operatøren kan sette enheten til «avventer» når hun sier på '
+                  'nødnett at hun ikke kan ta oppdraget nå.')
 
     class Meta:
         verbose_name = 'Enhetstype'
@@ -114,6 +144,55 @@ class Enhetstype(BaseTimeStampedModel):
 
     def __str__(self) -> str:
         return self.navn
+
+
+class Vaktmodusperiode(BaseTimeStampedModel):
+    """Én sammenhengende periode der en enhet sto aktiv eller passiv.
+
+    **Et boolsk felt kan ikke svare på «hvor lenge»** (André, 16. sep. 2026:
+    «da kan vi logge antall oppdrag og timer brukt i passiv tid når en helst
+    skulle sovet»). `Enhet.passiv_vakt` sier hva tilstanden er *nå*; vipper
+    noen bryteren klokka 03, er gårsdagen borte uten denne tabellen.
+
+    Audit-loggen redder det ikke. Den ville fanget hver endring, men slettes
+    etter to år — og viktigere: en rapport som må rekonstrueres ved å spille
+    av en revisjonslogg er ikke en rapport.
+
+    **Scopet til vakta**, som alt annet i modulen: timene gjelder *dette*
+    arrangementet. `til` står tom mens perioden løper, og skranken under
+    sikrer at det bare finnes én åpen om gangen per enhet og vakt — to åpne
+    perioder er et regnestykke som teller de samme timene to ganger.
+    """
+
+    AKTIV = 'aktiv'
+    PASSIV = 'passiv'
+    MODUS = ((AKTIV, 'Aktiv vakt'), (PASSIV, 'Passiv vakt'))
+
+    enhet = models.ForeignKey(
+        Enhet, on_delete=models.PROTECT, related_name='vaktmodusperioder',
+        verbose_name='Enhet')
+    vakt = models.ForeignKey(
+        'core.Vakt', on_delete=models.PROTECT, related_name='vaktmodusperioder',
+        verbose_name='Vakt')
+    modus = models.CharField(max_length=8, choices=MODUS, verbose_name='Modus')
+    fra = models.DateTimeField(default=timezone.now, verbose_name='Fra')
+    til = models.DateTimeField(null=True, blank=True, verbose_name='Til')
+    satt_av = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True,
+        on_delete=models.SET_NULL, related_name='+', verbose_name='Satt av')
+
+    class Meta:
+        verbose_name = 'Vaktmodusperiode'
+        verbose_name_plural = 'Vaktmodusperioder'
+        ordering = ['fra']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['enhet', 'vakt'], condition=models.Q(til__isnull=True),
+                name='en_apen_vaktmodus_per_enhet'),
+        ]
+
+    def __str__(self) -> str:
+        return f'{self.enhet} {self.modus} fra {self.fra}'
 
 
 class Problemstilling(BaseTimeStampedModel):
@@ -344,9 +423,20 @@ class Oppdrag(BaseTimeStampedModel):
         ny = self._state.adding
         super().save(*args, **kwargs)
         if ny and self.enhet_id and not self.enheter.exists():
+            # **Modusen stemples her også** (16. sep. 2026). Den *første*
+            # enheten på et oppdrag får koblingsraden sin herfra, ikke fra
+            # `varsle_enhet` — så uten dette ville «oppdrag i passiv tid» bare
+            # talt enhetene som ble varslet i tillegg, og aldri den som fikk
+            # oppdraget. Funnet av en test som arkiverte og leste tallet
+            # tilbake.
+            #
+            # Lokal import: `services` importerer denne modulen, og regelen
+            # skal stå ett sted — skrives den ut for hånd her, finnes den to.
+            from .services import gjeldende_modus
             Oppdragsenhet.objects.create(
                 oppdrag=self, enhet_id=self.enhet_id, status=self.status,
-                varslet_av=self.opprettet_av, rekkefolge=0)
+                varslet_av=self.opprettet_av, rekkefolge=0,
+                varslet_modus=gjeldende_modus(self.enhet))
 
     @property
     def er_avsluttet(self) -> bool:
@@ -396,6 +486,21 @@ class Oppdragsenhet(BaseTimeStampedModel):
         settings.AUTH_USER_MODEL, null=True, blank=True,
         on_delete=models.SET_NULL, related_name='varslede_enheter',
         verbose_name='Varslet av')
+    # **Modusen fryses ved varsling** (16. sep. 2026). To grunner, og den
+    # andre er den som biter først:
+    #
+    # 1. «Hvor mange oppdrag kom i passiv tid» kan bare svares eksakt her.
+    #    Leses `Enhet.passiv_vakt` i ettertid, teller man dagens tilstand.
+    # 2. Merket «Lege 02 (passiv vakt)» på et oppdrag fra tre timer siden
+    #    ville skiftet tekst i det noen vipper bryteren. Samme grunn som at
+    #    `importert_av` fryses som navn i arkivet.
+    #
+    # Tom streng for alt som ble varslet før feltet fantes — og for enheter
+    # uten passiv vakt i det hele tatt, som er de fleste.
+    varslet_modus = models.CharField(
+        max_length=8, blank=True, default='',
+        choices=(('aktiv', 'Aktiv vakt'), ('passiv', 'Passiv vakt')),
+        verbose_name='Vaktmodus ved varsling')
     # Den først varslede er «primær» — se `Oppdrag.primaer`.
     rekkefolge = models.PositiveSmallIntegerField(default=0, verbose_name='Rekkefølge')
 
@@ -431,6 +536,12 @@ class Enhetshendelse(BaseTimeStampedModel):
     TATT_AV = 'tatt_av'
     RYKKET_VIDERE = 'rykket_videre'
     AVBRUTT = 'avbrutt'
+    # **«Avvente» er en hendelse, ikke en status** (André, 16. sep. 2026).
+    # Koblingsraden blir stående i `Venter`, så operatøren kan trykke «Rykk
+    # ut» på henne senere og begge deler står i loggen. En ny *status* ville
+    # krevd en kolonne i `ArkivertOppdrag` og en beslutning om SHA-payloaden;
+    # en hendelse rører ikke signaturen i det hele tatt.
+    AVVENTER = 'avventer'
     TYPER = (
         (TATT_AV, 'Tatt av oppdraget'),
         # Bilen rykket ut på et annet oppdrag mens dette sto uferdig
@@ -439,6 +550,9 @@ class Enhetshendelse(BaseTimeStampedModel):
         # Bilen trykket «Avbryt» i Rykker ut (12. sep. 2026): hun er ledig,
         # oppdraget står som «trenger ny ressurs».
         (AVBRUTT, 'Avbrøt oppdraget'),
+        # Operatøren satte enheten til «avventer» — hun sa på nødnett at hun
+        # ikke kan ta oppdraget nå (16. sep. 2026).
+        (AVVENTER, 'Avventer oppdraget'),
     )
 
     oppdrag = models.ForeignKey(
@@ -450,6 +564,17 @@ class Enhetshendelse(BaseTimeStampedModel):
     av = models.ForeignKey(
         settings.AUTH_USER_MODEL, null=True, blank=True,
         on_delete=models.SET_NULL, related_name='+')
+    # **Kvittering på en avbrytelse** (André, 15. sep. 2026: «trykker en bil
+    # avbryt så må det vises, og at det må løses av operatør»). Merket står
+    # til noen har tatt stilling — enten ved å sende en ny enhet, som
+    # kvitterer av seg selv, eller ved å kvittere manuelt når ingen skal
+    # sendes. Per hendelse og ikke per oppdrag: avbryter to biler, er det to
+    # ting å ta stilling til, og hvem som gjorde det er verdt å vite.
+    kvittert_at = models.DateTimeField(
+        null=True, blank=True, verbose_name='Kvittert')
+    kvittert_av = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True,
+        on_delete=models.SET_NULL, related_name='+', verbose_name='Kvittert av')
 
     class Meta:
         ordering = ['tidspunkt']
@@ -682,6 +807,13 @@ class ArkivertOppdrag(models.Model):
 
     # Frosne tekster. FK-ene ville ikke overlevd at en enhet pensjoneres og
     # slettes, eller at en lokasjon fjernes fra lista.
+    # **Modusen følger med i arkivet** (16. sep. 2026). Uten den ville
+    # «oppdrag i passiv tid» forsvunnet i det vakta ble arkivert — altså
+    # nøyaktig når rapporten skrives. Den står i SHA-payloaden **bare når
+    # satt**, som `behandlet_at`, så eldre arkiv verifiserer uendret.
+    varslet_modus = models.CharField(
+        max_length=8, blank=True, default='',
+        verbose_name='Vaktmodus ved varsling')
     enhet_navn = models.CharField(max_length=64, blank=True, default='',
                                   verbose_name='Enhet (navn)')
     lokasjon_navn = models.CharField(max_length=120, blank=True, default='',

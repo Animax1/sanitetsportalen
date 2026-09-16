@@ -150,12 +150,14 @@ def rader_for_vakt(vakt):
     # antall oppdrag telles distinkt i `_stats_fra_rader`.
     rader = []
     for oppdrag in oppdragene:
-        for enhetsnavn, status, gjeldende in _per_enhet(oppdrag, meldinger[oppdrag.pk]):
+        for enhetsnavn, status, gjeldende, modus in _per_enhet(oppdrag, meldinger[oppdrag.pk]):
             rader.append({
                 'oppdragsnummer': oppdrag.oppdragsnummer,
                 'hastegrad': oppdrag.hastegrad,
                 'problemstilling': oppdrag.problemstilling,
                 'enhet': enhetsnavn,
+                # Modusen som ble frosset ved varsling — se `_per_enhet`.
+                'varslet_modus': modus,
                 'lokasjon': oppdrag.lokasjon.navn if oppdrag.lokasjon else '(ingen)',
                 'status': status,
                 'opprettet': oppdrag.created_at,
@@ -182,6 +184,10 @@ def rader_for_arkiv(arkiv):
             'hastegrad': rad.hastegrad,
             'problemstilling': rad.problemstilling,
             'enhet': rad.enhet_navn,
+            # Arkivraden bærer modusen, så «oppdrag i passiv tid» overlever
+            # arkiveringen — ellers forsvant tallet nøyaktig når rapporten
+            # skrives.
+            'varslet_modus': rad.varslet_modus,
             'lokasjon': rad.lokasjon_navn or '(ingen)',
             'status': rad.sluttstatus,
             'opprettet': rad.opprettet_at,
@@ -193,13 +199,43 @@ def rader_for_arkiv(arkiv):
 
 def oppdrag_stats(vakt):
     """Full statistikk for oppdragene i én vakt."""
+    paa_vakt = Enhet.objects.filter(er_aktiv=True, pa_vakt=True)
     return _stats_fra_rader(
         rader_for_vakt(vakt),
         # Enhetene er ikke scopet på vakt — de er oppsett, ikke vaktdata.
         # Tallet beskriver beredskapen akkurat nå, og finnes derfor bare for
         # den aktive vakta.
-        enheter_pa_vakt=Enhet.objects.filter(er_aktiv=True, pa_vakt=True).count(),
+        enheter_pa_vakt=paa_vakt.count(),
+        # **Passiv teller med i beredskapen** (André, 16. sep. 2026): enheten
+        # har en 24/7-vakt gjennom arrangementet. Men da betyr
+        # `enheter_pa_vakt` «aktiv eller passiv», og et tall der de to ikke
+        # lar seg skille dokumenterer ikke at noen sov. Derfor står passiv
+        # som eget ledd ved siden av, ikke trukket fra.
+        enheter_passiv=paa_vakt.filter(passiv_vakt=True).count(),
+        passiv_timer=passiv_timer_for(vakt),
     )
+
+
+def passiv_timer_for(vakt) -> float:
+    """Timer enheter har stått i passiv vakt i denne vakta.
+
+    **Dette er hele grunnen til at `Vaktmodusperiode` finnes** (André, 16. sep.
+    2026: «timer brukt i passiv tid når en helst skulle sovet»). Et boolsk
+    felt på enheten sier hva som gjelder nå; vipper noen bryteren klokka 03,
+    er gårsdagen borte uten tabellen.
+
+    Åpne perioder telles fram til nå — vakta pågår, og timene er påløpt.
+    """
+    from .models import Vaktmodusperiode
+
+    naa = timezone.now()
+    sekunder = 0.0
+    for rad in Vaktmodusperiode.objects.filter(
+            vakt=vakt, modus=Vaktmodusperiode.PASSIV):
+        slutt = rad.til or naa
+        if slutt > rad.fra:
+            sekunder += (slutt - rad.fra).total_seconds()
+    return round(sekunder / 3600, 2)
 
 
 def arkiv_stats(arkiv):
@@ -207,7 +243,8 @@ def arkiv_stats(arkiv):
     return _stats_fra_rader(rader_for_arkiv(arkiv))
 
 
-def _stats_fra_rader(rader, *, enheter_pa_vakt=None):
+def _stats_fra_rader(rader, *, enheter_pa_vakt=None, enheter_passiv=None,
+                     passiv_timer=None):
     """Tallene, regnet på nøytrale rader fra vakta eller fra et arkiv.
 
     **En rad er én enhets innsats på ett oppdrag** (11. sep. 2026). Det som
@@ -299,6 +336,16 @@ def _stats_fra_rader(rader, *, enheter_pa_vakt=None):
             # `None` for et arkiv: beredskapen «akkurat nå» finnes ikke for en
             # vakt som er over, og et tall der ville vært oppdiktet.
             'enheter_pa_vakt': enheter_pa_vakt,
+            # Passiv er *en del av* tallet over, ikke ved siden av det.
+            # `None` for et arkiv, av samme grunn.
+            'enheter_passiv': enheter_passiv,
+            'passiv_timer': passiv_timer,
+            # **Oppdrag som kom i passiv tid** — regnet av modusen som ble
+            # frosset på koblingsraden ved varsling, ikke av enhetens
+            # tilstand nå. Tallet gjelder også for et arkiv: det ligger i
+            # radene, ikke i nåtiden.
+            'oppdrag_i_passiv': sum(
+                1 for r in rader if r.get('varslet_modus') == 'passiv'),
             'responstid': _sd(responstider),
             'ventetid': _sd(ventetider),
             'utrykningstid': _sd(utrykningstider),

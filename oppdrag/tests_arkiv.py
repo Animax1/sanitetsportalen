@@ -301,6 +301,12 @@ class ArkivStatsMatcherTests(ArkivBasis):
         live_sum = dict(live['summary'])
         frosset_sum = dict(frosset['summary'])
         self.assertIsNone(frosset_sum.pop('enheter_pa_vakt'))
+        # Passiv beredskap og passive timer er «akkurat nå»-tall, som
+        # `enheter_pa_vakt`: de finnes ikke for en vakt som er over.
+        self.assertIsNone(frosset_sum.pop('enheter_passiv'))
+        self.assertIsNone(frosset_sum.pop('passiv_timer'))
+        live_sum.pop('enheter_passiv')
+        live_sum.pop('passiv_timer')
         live_sum.pop('enheter_pa_vakt')
         self.assertEqual(live_sum, frosset_sum)
 

@@ -182,6 +182,11 @@ def enheter_view(request):
             'id': e.pk,
             'navn': e.navn,
             'pa_vakt': e.pa_vakt,
+            # Merket vises bare der det betyr noe: en ambulanse har ingen
+            # passiv vakt, og «Aktiv» på henne ville vært støy.
+            'kan_passiv_vakt': services.kan_passiv_vakt(e),
+            'kan_avvente': services.kan_avvente(e),
+            'passiv_vakt': e.passiv_vakt,
             'er_aktiv': e.er_aktiv,
             'username': getattr(e.user, 'username', '') or '',
             'type': e.enhetstype_id,
@@ -214,7 +219,7 @@ def enheter_view(request):
     etag = etag_for([
         (r['id'], r['status'], r['antall_ventende'], r['aktivt_oppdrag_id'],
          r['pa_vakt'], r['er_aktiv'], r['status_tidspunkt'], r['type'],
-         r['ledig_siden'])
+         r['ledig_siden'], r['passiv_vakt'])
         for r in data
     ])
     if request.META.get('HTTP_IF_NONE_MATCH') == etag:
@@ -255,6 +260,87 @@ def enhet_detalj_view(request, pk):
     return JsonResponse({'status': 'ok', 'data': {
         'id': enhet.pk, 'type': enhet.enhetstype_id,
         'type_navn': enhet.enhetstype.navn if enhet.enhetstype else ''}})
+
+
+@modul_kreves('oppdrag', 'skriv_full', svar='json')
+@require_http_methods(['POST'])
+@rate_limit(group='oppdrag:vaktmodus', rate='60/m', method='POST')
+def enhet_vaktmodus_view(request, pk):
+    """Sett enheten i aktiv eller passiv vakt (André, 16. sep. 2026).
+
+    **Passiv er ikke «av vakt».** Enheten har en 24/7-vakt gjennom
+    arrangementet; passiv er bakvakt — hun sover, men kan varsles. Derfor et
+    eget endepunkt ved siden av `enhet_vakt_view`, ikke en tredje verdi i det:
+    «kan ikke få nye oppdrag» er noe helt annet enn «ligger og sover».
+
+    Drift, ikke oppsett — samme terskel som å ta en bil av vakt.
+    """
+    try:
+        enhet = Enhet.objects.select_related('enhetstype').get(pk=pk, er_aktiv=True)
+    except Enhet.DoesNotExist:
+        return JsonResponse(
+            {'status': 'error', 'message': 'Enhet ikke funnet'}, status=404)
+
+    passiv = bool(json_body(request).get('passiv'))
+    try:
+        services.sett_vaktmodus(
+            enhet, passiv=passiv, vakt=hent_aktiv_vakt(), bruker=request.user)
+    except ValueError as feil:
+        return JsonResponse({'status': 'error', 'message': str(feil)}, status=400)
+    return JsonResponse({'status': 'ok', 'data': {
+        'id': enhet.pk, 'navn': enhet.navn, 'passiv_vakt': enhet.passiv_vakt}})
+
+
+@modul_kreves('oppdrag', 'skriv_full', svar='json')
+@require_http_methods(['POST'])
+@rate_limit(group='oppdrag:avvent', rate='60/m', method='POST')
+def avvent_view(request, pk, enhet_pk):
+    """Operatøren setter enheten til «avventer» på oppdraget.
+
+    Hun blir stående varslet — «Rykk ut» er fortsatt tilgjengelig, og begge
+    deler står i loggen. Se `services.avvent_oppdrag`.
+    """
+    try:
+        oppdrag = (Oppdrag.objects.select_related('enhet', 'lokasjon')
+                   .get(pk=pk, vakt=hent_aktiv_vakt()))
+    except Oppdrag.DoesNotExist:
+        return JsonResponse(
+            {'status': 'error', 'message': 'Oppdrag ikke funnet'}, status=404)
+    try:
+        enhet = Enhet.objects.select_related('enhetstype').get(pk=enhet_pk)
+    except Enhet.DoesNotExist:
+        return JsonResponse(
+            {'status': 'error', 'message': 'Enhet ikke funnet'}, status=404)
+    try:
+        services.avvent_oppdrag(oppdrag, enhet, bruker=request.user)
+    except ValueError as feil:
+        return JsonResponse({'status': 'error', 'message': str(feil)}, status=400)
+    except services.UlovligOvergang as feil:
+        return JsonResponse({'status': 'error', 'message': str(feil)}, status=409)
+    oppdrag.refresh_from_db()
+    return JsonResponse({'status': 'ok', 'data': oppdrag_til_dict(oppdrag)})
+
+
+@modul_kreves('oppdrag', 'skriv_full', svar='json')
+@require_http_methods(['POST'])
+@rate_limit(group='oppdrag:kvitter', rate='60/m', method='POST')
+def kvitter_avbrutt_view(request, pk):
+    """Operatøren kvitterer ut avbrytelsene på oppdraget.
+
+    Den andre veien — å sende en ny enhet — kvitterer av seg selv i
+    `services.varsle_enhet`. Denne finnes for tilfellet der ingen skal
+    sendes: merket skal ikke bli stående for alltid på et oppdrag noen har
+    tatt stilling til.
+    """
+    try:
+        oppdrag = (Oppdrag.objects.select_related('enhet', 'lokasjon')
+                   .get(pk=pk, vakt=hent_aktiv_vakt()))
+    except Oppdrag.DoesNotExist:
+        return JsonResponse(
+            {'status': 'error', 'message': 'Oppdrag ikke funnet'}, status=404)
+    services.kvitter_avbrutt(oppdrag, bruker=request.user)
+    oppdrag.refresh_from_db()
+    return JsonResponse({'status': 'ok', 'data': oppdrag_til_dict(oppdrag)})
 
 
 @modul_kreves('oppdrag', 'skriv_full', svar='json')
@@ -351,17 +437,21 @@ def oppdrag_liste_view(request):
             gjeldende = Statusmelding.objects.gjeldende_bulk([o.pk for o in qs])
             status_tid = status_tidspunkt_for(qs, gjeldende)
             avbrutt = services.avbrutt_av_bulk([o.pk for o in qs])
+            avventer = services.avventer_av_bulk([o.pk for o in qs])
             data = [oppdrag_til_dict(o, status_tidspunkt=status_tid.get(o.pk),
                                      meldinger=gjeldende[o.pk],
-                                     avbrutt_av=avbrutt.get(o.pk, []))
+                                     avbrutt_av=avbrutt.get(o.pk, []),
+                                     avventer_av=avventer.get(o.pk, []))
                     for o in qs]
             # Tidspunktet er med i ETag-en: «Rett tid» endrer det uten å røre
             # statusen, og «12 min i Fremme» skal ikke drukne i en 304.
             # Avbrytelsene er med i ETag-en: en bil som avbryter på et oppdrag
             # noen alt har løst endrer verken status eller tidspunkt, og merket
             # ville da drukne i en 304.
+            # Avventingen er med av samme grunn: operatøren setter «avventer»
+            # uten at status eller tidspunkt endrer seg.
             etag_rader = [(r['id'], r['status'], r['enhet_id'], r['status_tidspunkt'],
-                           tuple(r['avbrutt_av']))
+                           tuple(r['avbrutt_av']), tuple(r['avventer_av']))
                           for r in data]
 
         etag = etag_for(etag_rader)
@@ -1165,8 +1255,10 @@ def historikk_liste_view(request):
     # slår ellers opp avbrytelsene én gang per rad.
     rader = list(qs)
     avbrutt = services.avbrutt_av_bulk([o.pk for o in rader])
+    avventer = services.avventer_av_bulk([o.pk for o in rader])
     return JsonResponse({'status': 'ok', 'data': [
-        oppdrag_til_dict(o, avbrutt_av=avbrutt.get(o.pk, [])) for o in rader]})
+        oppdrag_til_dict(o, avbrutt_av=avbrutt.get(o.pk, []),
+                         avventer_av=avventer.get(o.pk, [])) for o in rader]})
 
 
 # ── Korreksjoner ─────────────────────────────────────────────────────────────

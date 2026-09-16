@@ -852,7 +852,7 @@ class SentralbordetsMatriseTests(TestCase):
             (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue', 'trustedHtml', '_escHtml', 'klokke')),
             (OPPDRAG_SENTRAL_JS, ('renderOppdrag', 'venterForbiTerskel', 'lydTerskler', '_enhetsmatrise', '_grovMerke',
                                   'hastegradKlasse', 'tidSiden', 'mkEnhetsvalg',
-                                  'mkEnhetsrader', '_enhetsknapper', '_varsleValg',
+                                  'mkEnhetsrader', '_enhetsknapper', 'kanAvvente', '_varsleValg',
                                   '_lovligeOverganger', 'tidslinjeHtml', '_problemMedAntall', '_medAntall', '_grupperEnheter', '_typeRekkefolge', '_enhetskort',
                                   '_sorterOppdrag', '_manglerTrinn', '_manglerMinutter')),
         ))
@@ -1159,6 +1159,10 @@ class ArkivOgStatistikkMedFlereEnheterTests(FlereEnheterBasis):
         frosset = arkiv_stats(arkiv)
         live_sum = dict(live['summary']); live_sum.pop('enheter_pa_vakt')
         frosset_sum = dict(frosset['summary']); frosset_sum.pop('enheter_pa_vakt')
+        # «Akkurat nå»-tall, som over.
+        for noekkel in ('enheter_passiv', 'passiv_timer'):
+            live_sum.pop(noekkel)
+            self.assertIsNone(frosset_sum.pop(noekkel))
         self.assertEqual(live_sum, frosset_sum)
         for nokkel in ('per_hastegrad', 'per_problemstilling', 'per_lokasjon', 'per_enhet',
                        'status_naa', 'responstid_per_hastegrad', 'responstid_per_enhet',
@@ -1209,7 +1213,7 @@ class DetaljvinduetTegnesPaaNyttTests(TestCase):
             self.skipTest('node er ikke tilgjengelig')
         self.harness = build_harness((
             (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue', 'trustedHtml', '_escHtml', 'klokke')),
-            (OPPDRAG_SENTRAL_JS, ('visOppdrag', 'mkEnhetsrader', '_enhetsknapper', '_varsleValg',
+            (OPPDRAG_SENTRAL_JS, ('visOppdrag', 'mkEnhetsrader', '_enhetsknapper', 'kanAvvente', '_varsleValg',
                                   'tidslinjeHtml', 'hastegradKlasse', 'tidSiden')),
         ))
 

@@ -126,3 +126,69 @@ Den er den første modulen som tar `skriv_handling` i bruk: bilen får smale, na
 stemplingsendepunkter, ikke en feltwhitelist inne i en generell `PUT`. Og skillet mellom de
 to grensesnittene er **ikke nivået** — det er om kontoen er knyttet til en `Enhet`. Å knytte
 en konto til en enhet gir ingen tilgang; det er domenedata, som `Forstehjelper.user`.
+
+**Aktiv og passiv vakt, og «avvente» (16. sep. 2026, André).** Tre begreper som henger
+sammen, og som alle tre er *flagget på enhetstypen*, ikke på enheten:
+
+| Hvor | Felt | Betyr |
+|---|---|---|
+| `Enhetstype` | `kan_passiv_vakt` | Gruppa kan settes i passiv vakt i det hele tatt |
+| `Enhetstype` | `kan_avvente` | Gruppa kan melde «avventer» på et oppdrag |
+| `Enhet` | `passiv_vakt` | Står hun i passiv vakt *nå* |
+| `Oppdragsenhet` | `varslet_modus` | Modusen **frosset** i det hun ble varslet |
+| `Vaktmodusperiode` | `modus`, `fra`, `til` | Hvor lenge hun sto slik |
+
+**Flagget står på typen fordi det er en egenskap ved *slaget* ressurs, ikke ved bilen.**
+Spesialressurser (lege, psykososialt) går bakvakt; ambulanser gjør det ikke. Sto flagget
+på hver enhet, måtte det settes på nytt for hver bil som opprettes, og en glemt avkryssing
+ville sett ut som en bevisst beslutning. To *separate* flagg, ikke ett: å avvente et
+oppdrag og å sove i bakvakt er to ulike ting, og en ressurs kan gjøre det ene uten det
+andre.
+
+**Passiv vakt er ikke «av vakt».** Hun *kan* varsles, hun *teller* i beredskapen — hun
+holder en 24/7-vakt gjennom hele arrangementet. Passiv tid er der for å **dokumentere**
+hvor mange timer og hvor mange oppdrag som falt i tida hun helst skulle sovet. Derfor er
+grensesnittet dempet: et merke på ressurskortet, og `Lege 02 (passiv vakt)` på brikka når
+hun står på et oppdrag. Er hun aktiv, står det ingenting ekstra.
+
+**Modusen fryses ved varsling, den utledes ikke.** `varsle_enhet` stempler
+`gjeldende_modus(enhet)` på koblingsraden. Leste vi enhetens `passiv_vakt` når statistikken
+ble regnet ut, ville et oppdrag hun kjørte i passiv vakt hoppet over til «aktiv» i det hun
+gikk aktiv neste morgen — og hele poenget med å dokumentere passiv tid ville vært borte.
+**Broen i `Oppdrag.save()` stempler den også**: den lager den *første* koblingsraden for et
+oppdrag opprettet med `enhet` satt, og uten stempelet der talte `oppdrag_i_passiv` bare
+enheter som ble lagt til etterpå. (Funnet av en mutant, ikke av en test — se CHANGELOG.)
+
+**`Vaktmodusperiode` er den andre halvparten av svaret.** Stempelet sier hva som gjaldt for
+*ett oppdrag*; perioden sier hvor mange *timer* hun sto passiv, også de timene ingenting
+skjedde — som er akkurat de timene man vil dokumentere. `sett_vaktmodus()` lukker den åpne
+perioden og åpner en ny, er idempotent (samme modus to ganger skriver ingenting), og en
+databasesperre (`en_apen_vaktmodus_per_enhet`) holder at det aldri finnes to åpne perioder
+for samme enhet i samme vakt. `statistikk.passiv_timer_for(vakt)` summerer dem, og en åpen
+periode regnes **fram til nå** — ellers ville vakta som pågår vist null.
+
+**«Avvente» er en beskjed, ikke en status.** En spesialressurs som varsles kan svare at hun
+ikke rykker ut nå (`Enhetshendelse.AVVENTER`) — hun **blir stående varslet** på oppdraget,
+og operatøren kan trykke «Rykk ut» senere. Begge deler står i loggen. Derfor teller hun
+**ikke** som «noen er på vei» i `trenger_ny_ressurs`: står hun avventende alene på
+oppdraget, skal det stå «trenger ny ressurs», som er hele grunnen til at spørsmålet stilles.
+`avventende_enhet_ider()` leser siste hendelse per enhet, så en enhet som avventet og
+deretter rykket ut ikke blir stående merket. `avventer_av_bulk()` finnes fordi tavla polles
+hvert tiende sekund, samme grunn som `avbrutt_av_bulk`.
+
+**Avbrutt-merket kvitteres** (`kvittert_at`/`kvittert_av` på `Enhetshendelse`). Det forsvant
+aldri av seg selv før, og et merke som blir stående gjennom vakta er et merke man slutter å
+se. To veier ut: operatøren trykker «Kvitter» i merket, eller **en ny enhet varsles** —
+`varsle_enhet` kvitterer, fordi det å sende noen ny *er* svaret på avbrytelsen. `avbrutt_av`
+og `avbrutt_av_bulk` filtrerer på `kvittert_at__isnull=True`.
+
+**Arkivet bærer modusen** (`ArkivertOppdrag.varslet_modus`), og den står i SHA-payloaden
+**bare når den er satt** — nøyaktig som `behandlet_at`. Rader for enheter uten passiv vakt,
+som er de fleste, får samme payload som før, og eldre signaturer verifiserer uendret.
+Statistikken har `enheter_passiv`, `passiv_timer` og `oppdrag_i_passiv`; de to første er
+**live-tall** og finnes ikke i arkivet (som `enheter_pa_vakt`), mens det tredje overlever
+arkiveringen fordi stempelet ligger på radene.
+
+`enhet_vaktmodus_view`, `avvent_view` og `kvitter_avbrutt_view` krever alle `skriv_full`:
+de sier noe om beredskapen, ikke om ett oppdrags framdrift, og de er derfor operatørens —
+ikke bilens `skriv_handling`.

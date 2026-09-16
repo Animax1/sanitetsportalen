@@ -17,7 +17,8 @@ from django.utils import timezone
 from core.notifications import notify
 
 from . import choices
-from .models import Enhetsbytte, Enhetshendelse, Oppdrag, Oppdragsenhet, Statusmelding
+from .models import (Enhetsbytte, Enhetshendelse, Oppdrag, Oppdragsenhet,
+                     Statusmelding, Vaktmodusperiode)
 
 logger = logging.getLogger(__name__)
 
@@ -534,10 +535,177 @@ def ledig_siden_bulk(enheter, vakt=None) -> dict:
     return ut
 
 
+def gjeldende_modus(enhet) -> str:
+    """«aktiv», «passiv» eller tom streng.
+
+    Tom for enheter uten passiv vakt i det hele tatt — som er de fleste. Da
+    står det ingenting i merket, og `varslet_modus` sier «dette spørsmålet
+    gjaldt ikke henne», ikke «hun var aktiv».
+    """
+    if not kan_passiv_vakt(enhet):
+        return ''
+    return (Vaktmodusperiode.PASSIV if enhet.passiv_vakt
+            else Vaktmodusperiode.AKTIV)
+
+
+def kan_passiv_vakt(enhet) -> bool:
+    """Tillater enhetstypen passiv vakt?
+
+    Flagget bor på typen, ikke på enheten (André, 16. sep. 2026), så «Lege 03»
+    opprettet midt i arrangementet arver det av seg selv. En enhet **uten**
+    type arver ingenting — det er riktig standard, men verdt å kjenne: en
+    konto opprettet som «bil» får ingen type, og må få den satt.
+    """
+    return bool(enhet.enhetstype_id and enhet.enhetstype.kan_passiv_vakt)
+
+
+def kan_avvente(enhet) -> bool:
+    """Tillater enhetstypen at operatøren setter «avventer»?
+
+    Eget flagg, ikke en avledning av `kan_passiv_vakt`: en frivillig enhet
+    som alltid er aktiv kan godt ha lov til å si nei.
+    """
+    return bool(enhet.enhetstype_id and enhet.enhetstype.kan_avvente)
+
+
+@transaction.atomic
+def sett_vaktmodus(enhet, *, passiv: bool, vakt, bruker=None) -> bool:
+    """Sett enheten i aktiv eller passiv vakt. True hvis noe endret seg.
+
+    **Både tilstanden og perioden skrives, og det er hele poenget.**
+    `Enhet.passiv_vakt` svarer på hva som gjelder nå; `Vaktmodusperiode`
+    svarer på hvor lenge. Skrives bare det første, finnes ikke timene — og de
+    kan ikke fylles inn med tilbakevirkende kraft.
+
+    Idempotent: settes samme modus to ganger, skjer ingenting. Ellers ville
+    to klikk på samme knapp delt perioden i to og sett ut som et vaktbytte.
+    """
+    if not kan_passiv_vakt(enhet):
+        raise ValueError(f'«{enhet.navn}» har en enhetstype uten passiv vakt.')
+    ny = Vaktmodusperiode.PASSIV if passiv else Vaktmodusperiode.AKTIV
+    apen = (Vaktmodusperiode.objects
+            .filter(enhet=enhet, vakt=vakt, til__isnull=True).first())
+    if apen is not None and apen.modus == ny:
+        return False
+    naa = timezone.now()
+    if apen is not None:
+        apen.til = naa
+        apen.save(update_fields=['til', 'updated_at'])
+    Vaktmodusperiode.objects.create(
+        enhet=enhet, vakt=vakt, modus=ny, fra=naa, satt_av=bruker)
+    enhet.passiv_vakt = passiv
+    enhet.save(update_fields=['passiv_vakt', 'updated_at'])
+    return True
+
+
+def avventende_enhet_ider(oppdrag) -> set:
+    """Enhetene som står som «avventer» på oppdraget **nå**.
+
+    Avventingen varer til hun rykker ut: har koblingsraden forlatt `Venter`,
+    er hendelsen historikk. Det er derfor avvente ikke trenger en egen
+    tilstand å nullstille — og en tilstand som må nullstilles er en tilstand
+    som blir stående når noe feiler halvveis.
+    """
+    avventer = set(
+        oppdrag.enhetshendelser.filter(type=Enhetshendelse.AVVENTER)
+        .values_list('enhet_id', flat=True))
+    if not avventer:
+        return set()
+    venter = set(oppdrag.enheter.filter(status=choices.VENTER)
+                 .values_list('enhet_id', flat=True))
+    return avventer & venter
+
+
+@transaction.atomic
+def avvent_oppdrag(oppdrag, enhet, *, bruker=None, tidspunkt=None) -> Enhetshendelse:
+    """Operatøren setter enheten til «avventer» (André, 15. sep. 2026).
+
+    «Ved utalarmering til spesialressurser kan operatøren trykke avvente hvis
+    ressursen sier på nødnett at de ikke kan ta oppdraget.»
+
+    **Hun blir stående varslet.** Koblingsraden røres ikke, så operatøren kan
+    trykke «Rykk ut» på henne senere, og begge deler står i loggen. Det er
+    forskjellen på dette og å ta henne av oppdraget.
+
+    **Og oppdraget kan bli stående uten ressurs.** Avventer hun mens en bil er
+    på vei, skjer ingenting; er hun alene, trengs en ny —
+    `trenger_ny_ressurs()` svarer på begge, som den gjorde for «avbrutt».
+    """
+    if not kan_avvente(enhet):
+        raise ValueError(f'«{enhet.navn}» har en enhetstype uten avventing.')
+    rad = koblingsrad(oppdrag, enhet)
+    if rad is None:
+        raise UlovligOvergang('Enheten er ikke varslet på oppdraget.')
+    if rad.status != choices.VENTER:
+        raise UlovligOvergang('Avvente finnes bare før enheten har rykket ut.')
+    naa = tidspunkt or timezone.now()
+    hendelse = Enhetshendelse.objects.create(
+        oppdrag=oppdrag, enhet=enhet, type=Enhetshendelse.AVVENTER,
+        tidspunkt=naa, av=bruker)
+    if trenger_ny_ressurs(oppdrag, utenom_rad=rad):
+        oppdrag.trenger_ressurs = True
+        oppdrag.trenger_ressurs_siden = naa
+        oppdrag.save(update_fields=['trenger_ressurs', 'trenger_ressurs_siden',
+                                    'updated_at'])
+    return hendelse
+
+
+def avventer_av_bulk(oppdrag_ider) -> dict:
+    """Hvem som avventer, for en hel liste — to spørsmål, ikke to per rad.
+
+    Samme grunn som `avbrutt_av_bulk`: tavla tegnes ved hver polling, og
+    `avventende_enhet_ider()` gjør to oppslag i seg selv. Kalt per rad ble det
+    2N spørringer hvert tiende sekund — fanget av
+    `OppdragslistaStatustidspunktTests`, som er nettopp den vakten.
+    """
+    ider = list(oppdrag_ider)
+    if not ider:
+        return {}
+    hendelser = list(Enhetshendelse.objects
+                     .filter(oppdrag_id__in=ider, type=Enhetshendelse.AVVENTER)
+                     .values_list('oppdrag_id', 'enhet_id'))
+    if not hendelser:
+        return {}
+    # Avventingen varer til hun rykker ut, så bare radene som fortsatt står i
+    # `Venter` teller — se `avventende_enhet_ider`.
+    navn = {
+        (o, e): n for o, e, n in
+        Oppdragsenhet.objects.filter(oppdrag_id__in=ider, status=choices.VENTER)
+        .values_list('oppdrag_id', 'enhet_id', 'enhet__navn')
+    }
+    ut: dict = {}
+    for oppdrag_id, enhet_id in hendelser:
+        treff = navn.get((oppdrag_id, enhet_id))
+        if treff is not None:
+            ut.setdefault(oppdrag_id, []).append(treff)
+    for rader in ut.values():
+        rader.sort()
+    return ut
+
+
+def kvitter_avbrutt(oppdrag, *, bruker=None) -> int:
+    """Merk oppdragets ukvitterte avbrytelser som besvart. Antall rader.
+
+    To veier inn, og begge er «operatøren har tatt stilling»: hun sender en ny
+    enhet (`varsle_enhet` kaller hit), eller hun kvitterer manuelt fordi ingen
+    skal sendes.
+    """
+    return (oppdrag.enhetshendelser
+            .filter(type=Enhetshendelse.AVBRUTT, kvittert_at__isnull=True)
+            .update(kvittert_at=timezone.now(), kvittert_av=bruker))
+
+
 def avbrutt_av(oppdrag) -> list[str]:
-    """Navnene på enhetene som trykket «Avbryt» på oppdraget, i rekkefølge."""
+    """Navnene på enhetene som avbrøt og **ikke er kvittert**, i rekkefølge.
+
+    Merket skal stå til noen har tatt stilling (André, 15. sep. 2026: «det må
+    vises, og at det må løses av operatør»). Kvitteringen skjer enten ved at
+    en ny enhet varsles, eller manuelt når ingen skal sendes — se
+    `kvitter_avbrutt`.
+    """
     return [h.enhet.navn for h in
-            oppdrag.enhetshendelser.filter(type=Enhetshendelse.AVBRUTT)
+            oppdrag.enhetshendelser.filter(type=Enhetshendelse.AVBRUTT,
+                                           kvittert_at__isnull=True)
             .select_related('enhet').order_by('tidspunkt')]
 
 
@@ -550,7 +718,8 @@ def avbrutt_av_bulk(oppdrag_ider) -> dict:
     """
     ut: dict = {}
     rader = (Enhetshendelse.objects
-             .filter(oppdrag_id__in=list(oppdrag_ider), type=Enhetshendelse.AVBRUTT)
+             .filter(oppdrag_id__in=list(oppdrag_ider), type=Enhetshendelse.AVBRUTT,
+                     kvittert_at__isnull=True)
              .select_related('enhet').order_by('tidspunkt'))
     for h in rader:
         ut.setdefault(h.oppdrag_id, []).append(h.enhet.navn)
@@ -594,8 +763,15 @@ def trenger_ny_ressurs(oppdrag, *, utenom_rad) -> bool:
     To spørsmål må stilles, ikke ett: er noen fortsatt på vei, **og** var noen
     framme. Er svaret nei på begge, trengs en ny ressurs.
     """
-    andre_aktive = (oppdrag.enheter.exclude(pk=utenom_rad.pk)
-                    .exclude(status=choices.LEDIG).exists())
+    # **Den som avventer er ikke på vei** (16. sep. 2026). Hun står i
+    # `Venter` som alle andre varslede, og uten dette leddet ville en
+    # avventing skjult behovet i stedet for å vise det — altså det motsatte
+    # av hva knappen finnes for.
+    avventende = avventende_enhet_ider(oppdrag)
+    andre_aktive = any(
+        rad.enhet_id not in avventende
+        for rad in oppdrag.enheter.exclude(pk=utenom_rad.pk)
+                          .exclude(status=choices.LEDIG))
     return not andre_aktive and not noen_loste_oppdraget(oppdrag)
 
 
@@ -663,7 +839,15 @@ def varsle_enhet(oppdrag, enhet, *, bruker=None) -> Oppdragsenhet:
         raise ValueError(f'«{enhet.navn}» er alt varslet på oppdraget.')
     neste = (oppdrag.enheter.aggregate(models.Max('rekkefolge'))['rekkefolge__max'] or 0) + 1
     rad = Oppdragsenhet.objects.create(
-        oppdrag=oppdrag, enhet=enhet, varslet_av=bruker, rekkefolge=neste)
+        oppdrag=oppdrag, enhet=enhet, varslet_av=bruker, rekkefolge=neste,
+        # **Modusen fryses her.** Leses `Enhet.passiv_vakt` i ettertid, teller
+        # man dagens tilstand — og merket på et gammelt oppdrag ville skiftet
+        # tekst i det noen vipper bryteren.
+        varslet_modus=gjeldende_modus(enhet))
+    # **Ressursen er her, så avbrytelsen er besvart** (André, 15. sep. 2026:
+    # «det må løses av operatør»). Å sende en ny enhet *er* å ta stilling;
+    # å kreve et klikk i tillegg ville lært operatøren å klikke det bort.
+    kvitter_avbrutt(oppdrag, bruker=bruker)
     felter = ['status', 'updated_at']
     if oppdrag.trenger_ressurs:
         # Ressursen er her. Flagget nullstilles før utledningen.

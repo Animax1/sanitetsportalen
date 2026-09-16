@@ -83,6 +83,13 @@ def enheter_til_liste(oppdrag, meldinger=None) -> list:
         ut.append({
             'enhet_id': rad.enhet_id,
             'enhet_navn': rad.enhet.navn,
+            # **Modusen slik den var da hun ble varslet** (André, 16. sep.
+            # 2026: «når de får tildelt oppdrag skal det vises f.eks. Lege02
+            # (passiv vakt)»). Frosset ved varslingen, ikke lest fra enheten
+            # nå — ellers ville merket på et gammelt oppdrag skiftet tekst i
+            # det noen vipper bryteren. Tom for alle som ikke har passiv vakt,
+            # og da vises ingenting: «Aktiv» på en ambulanse er støy.
+            'varslet_modus': rad.varslet_modus,
             'status': rad.status,
             'status_navn': rad.get_status_display(),
             'status_tidspunkt': siste.tidspunkt.isoformat() if siste else None,
@@ -97,7 +104,7 @@ def enheter_til_liste(oppdrag, meldinger=None) -> list:
 
 def oppdrag_til_dict(oppdrag, *, for_enhet: bool = False,
                      status_tidspunkt=None, koblingsrad=None, meldinger=None,
-                     avbrutt_av=None) -> dict:
+                     avbrutt_av=None, avventer_av=None) -> dict:
     """Serialiser ett oppdrag.
 
     ``for_enhet=True`` **utelater fritekst når oppdraget er avsluttet**. Det er
@@ -160,6 +167,13 @@ def oppdrag_til_dict(oppdrag, *, for_enhet: bool = False,
         # avbrøt — uavhengig av hverandre.
         'avbrutt_av': (list(avbrutt_av) if avbrutt_av is not None
                        else services.avbrutt_av(oppdrag)),
+        # **«Avventer» er en tredje beskjed** (16. sep. 2026), og den er igjen
+        # noe annet: avbrutt sier hva som *skjedde*, trenger-ressurs krever
+        # handling nå, avventer sier at noen har svart — bare ikke ja.
+        # Sendes ferdig av lista (`avventer_av_bulk`), av samme grunn som
+        # `avbrutt_av`: slås den opp her, koster tavla to spørringer per rad.
+        'avventer_av': (list(avventer_av) if avventer_av is not None
+                        else services.avventer_av_bulk([oppdrag.pk]).get(oppdrag.pk, [])),
     }
     skjul_fritekst = for_enhet and status == choices.TERMINAL
     data['fritekst'] = '' if skjul_fritekst else oppdrag.fritekst

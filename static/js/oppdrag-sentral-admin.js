@@ -519,6 +519,17 @@ function renderEnhetsadmin() {
       ? `<button class="btn btn-sm ${vaktKlasse}" data-action="${vaktHandling}" data-id="${escHtmlValue(e.id)}">${vaktTekst}</button>`
       : '';
 
+    // **Aktiv/passiv står ved siden av på/av vakt, ikke i stedet for**
+    // (André, 16. sep. 2026). Passiv er bakvakt — hun kan varsles — mens «av
+    // vakt» betyr at hun ikke kan få oppdrag i det hele tatt. Knappen vises
+    // bare der enhetstypen tillater passiv vakt; på en ambulanse ville den
+    // vært en kontroll uten mening.
+    const modusHandling = e.passiv_vakt ? 'settAktivVakt' : 'settPassivVakt';
+    const modusTekst = e.passiv_vakt ? 'Aktiv vakt' : 'Passiv vakt';
+    const modusKnapp = (e.er_aktiv && e.kan_passiv_vakt)
+      ? `<button class="btn btn-sm btn-outline-secondary" data-action="${modusHandling}" data-id="${escHtmlValue(e.id)}">${modusTekst}</button>`
+      : '';
+
     const koblingTekst = e.username
       ? `Logger inn som ${e.username}`
       : 'Ingen konto knyttet';
@@ -547,6 +558,7 @@ function renderEnhetsadmin() {
         <div class="${koblingKlasse}">${escapeHtml(koblingTekst)}</div>
       </div>
       ${typeNedtrekk}
+      ${modusKnapp}
       ${vaktKnapp}
     </div>`;
   }).join(''));
