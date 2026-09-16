@@ -732,6 +732,26 @@ ved å sammenligne hva `statistikk.js` kaller mot hva den faktisk laster.
 CSRF-sikret fetch-wrapper brukes for alle API-kall. Tabulator for pasientgrid, Chart.js for
 statistikk — og Chart.js lastes **kun** på `/statistikk/`.
 
+**`trustedHtml()` er ikke en escaper — den er et merkelapp-objekt** (16. sep. 2026).
+Den returnerer `{__trustedHtml: '…'}`, som `cellHtml()` pakker ut i en Tabulator-celle. I en
+**mal-streng** blir objektet til `[object Object]` — og `trustedHtml('')` er et objekt like
+fullt, så den *tomme* grenen viser det også. Feilen rammer da hver rad, ikke bare den ene
+som skulle hatt markup, og ser derfor ut som noe helt annet enn den er. To ganger i prod:
+«Rett tid» viste ingenting fra fase 3 til 11. sep. 2026, og hvert enhetskort i
+ressurslista sto som «Haugesund 56[object Object]» 16. sep. Etter den første ble advarselen
+skrevet som en kommentar ved det ene kallstedet — og **en advarsel som bare finnes der
+feilen alt er rettet, advarer ingen.** Skal egenbygd markup inn i en mal-streng,
+interpolér strengen **rått** og før uttrykket opp i modulens XSS-skanner.
+`core/tests_js_regler.py` håndhever det for alle filene.
+
+**XSS-skannerne leser bare mal-strenger med en tagg i** (`_markuplitteraler()`), og en
+bygger som ikke står i lista sier fra selv. Begge deler er lært av samme feil: `_enhetskort`
+ble hoistet ut av `renderEnheter` og falt ut av skanningen med det samme — ni byggere sto
+utenfor uten at noe var rødt. En håndholdt liste forfaller i stillhet, og **en skanner som
+melder grønt om en dekning den ikke har, er verre enn ingen skanner.** En nøstet mal-streng
+inne i en `${...}` er samme slags blindsone: regexen stopper på den første `}`, så
+escapingen inni ligger utenfor. Hoist den ut i en `const` — `notat` i `renderArkiv`.
+
 Brukerdata som settes inn med `innerHTML` **skal** escapes — `escHtmlValue()` i tabeller (tallsikker), `escapeHtml()`/`_escHtml()` ellers. Markup koden bygger selv merkes med `trustedHtml()`. `patients/tests_xss_stats.py` håndhever dette,
 og leser `statistikk.js`, `patients-admin.js` og `statistikk-oppdrag.js` — byggerne er
 fordelt på de tre.

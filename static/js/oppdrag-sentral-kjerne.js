@@ -245,13 +245,19 @@ function _enhetskort(e) {
       // 2026): enhetstypen må tillate passiv vakt. «Aktiv» skrives ikke —
       // det er normaltilstanden, og et merke på hver ambulanse er støy.
       // Merket er dempet, ikke en advarsel: enheten *er* på vakt, hun sover.
+      // **En streng, ikke `trustedHtml(...)`.** Den pakker verdien i
+      // `{__trustedHtml: …}` for `cellHtml()` i en Tabulator-celle; i en
+      // mal-streng blir objektet til «[object Object]» — på *hvert* kort, for
+      // `trustedHtml('')` er et objekt like fullt. Meldt fra staging 16. sep.
+      // 2026. Samme felle tok «Rett tid» 11. sep.; `tests_xss.py` håndhever
+      // den nå for alle filene, i stedet for én kommentar per kallsted.
       const passiv = (e.kan_passiv_vakt && e.passiv_vakt)
         ? '<span class="enhet-passivmerke">passiv vakt</span>' : '';
       return `
       <div class="enhet-kort${klikkbar}" ${apner}>
         <span class="status-prikk status-${escHtmlValue(e.status)}"></span>
         <div class="flex-grow-1">
-          <div class="enhet-navn">${escapeHtml(e.navn)}${trustedHtml(passiv)}</div>
+          <div class="enhet-navn">${escapeHtml(e.navn)}${passiv}</div>
           <div class="enhet-meta">${escapeHtml(meta)}</div>
           ${oppdragslinje}
         </div>

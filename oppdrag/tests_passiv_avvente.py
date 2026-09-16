@@ -19,9 +19,13 @@ noe:**
 """
 from __future__ import annotations
 
+import json
 from datetime import timedelta
 
-from django.test import Client, TestCase, override_settings
+from django.test import Client, SimpleTestCase, TestCase, override_settings
+
+from patients.js_test_utils import (
+    OPPDRAG_SENTRAL_JS, PORTAL_UTILS_JS, build_harness, node_available, run_node)
 from django.utils import timezone
 
 from accounts.models import CustomUser, ModulTilgang
@@ -488,3 +492,65 @@ class FlaggeneKanKryssesAvTests(PassivBasis):
                                    {'kan_avvente': True}).status_code, 403)
         self.ambulanse.refresh_from_db()
         self.assertFalse(self.ambulanse.kan_avvente)
+
+
+class PassivmerketTegnesTests(SimpleTestCase):
+    """**Meldt fra staging 16. sep. 2026 (André):** «i /oppdrag i ressurser-listen
+    vises enhver enhet med navnet på enheten og `[object Object]` på alle
+    enhetene uavhengig av hva flagget sier.»
+
+    Årsaken var `${trustedHtml(passiv)}` i `_enhetskort()`. `trustedHtml()`
+    pakker verdien i `{__trustedHtml: '…'}` for `cellHtml()` i en Tabulator-
+    celle — den er **ikke** en escaper for en mal-streng, og i en mal-streng
+    blir objektet til `[object Object]`. På *hvert* kort, også de tomme, fordi
+    `trustedHtml('')` er et objekt like fullt.
+
+    Samme felle tok «Rett tid» fra fase 3 til 11. sep. 2026. Den sto
+    dokumentert i en kommentar ved *det* kallstedet, 500 linjer unna i en annen
+    fil — og en advarsel som bare finnes der feilen alt er rettet, advarer
+    ingen. Regelen står nå i `tests_xss.py`, der den håndheves for alle filene.
+    """
+
+    HARNESS = (
+        (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue', 'trustedHtml', 'klokke')),
+        (OPPDRAG_SENTRAL_JS, ('_enhetskort', 'mkBesetning', 'kanSeBesetning', '_grovMerke',
+                              '_problemMedAntall', 'hastegradKlasse', 'tidSiden')),
+    )
+
+    def setUp(self):
+        if not node_available():
+            self.skipTest('node er ikke tilgjengelig')
+        self.harness = build_harness(self.HARNESS)
+
+    def _kort(self, **felter):
+        data = {'id': 1, 'navn': 'Lege 02', 'status': 'ledig', 'status_navn': 'Ledig',
+                'kan_passiv_vakt': False, 'passiv_vakt': False}
+        data.update(felter)
+        return run_node(self.harness, f"""
+            globalThis.window = {{}};
+            globalThis.besetninger = {{}}; globalThis.apenBesetning = null;
+            console.log(_enhetskort({json.dumps(data)}));
+        """)
+
+    def test_ingen_enhet_viser_object_object(self):
+        """Feilen André så. Den traff alle kortene, ikke bare de passive."""
+        for felter in ({}, {'kan_passiv_vakt': True},
+                       {'kan_passiv_vakt': True, 'passiv_vakt': True}):
+            with self.subTest(felter=felter):
+                self.assertNotIn('[object Object]', self._kort(**felter))
+
+    def test_merket_staar_bare_naar_typen_tillater_det_og_hun_er_passiv(self):
+        """Regelen merket bærer. «Aktiv» skrives ikke — det er normalen, og et
+        merke på hver ambulanse er støy man slutter å se."""
+        self.assertIn('passiv vakt',
+                      self._kort(kan_passiv_vakt=True, passiv_vakt=True))
+        self.assertNotIn('passiv vakt',
+                         self._kort(kan_passiv_vakt=True, passiv_vakt=False))
+        self.assertNotIn('passiv vakt',
+                         self._kort(kan_passiv_vakt=False, passiv_vakt=True),
+                         'flagget på typen er det som avgjør, ikke tilstanden alene')
+
+    def test_navnet_escapes_fortsatt(self):
+        kort = self._kort(navn='<img src=x onerror=alert(1)>')
+        self.assertNotIn('<img', kort)
+        self.assertIn('&lt;img', kort)

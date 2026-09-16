@@ -4,6 +4,70 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-16 — «[object Object]» på hver enhet: én linje, tre lag
+
+**Meldt fra staging (André):** «I /oppdrag i «ressurser»-listen vises enhver enhet med
+navnet på enheten og `[object Object]` — på alle enhetene, uavhengig av hva flagget sier.»
+
+### Feilen
+
+```js
+<div class="enhet-navn">${escapeHtml(e.navn)}${trustedHtml(passiv)}</div>
+```
+
+`trustedHtml()` er **ikke en escaper**. Den returnerer `{__trustedHtml: '…'}`, en merkelapp
+`cellHtml()` pakker ut når en Tabulator-celle skal ta imot markup vi har bygget selv. I en
+mal-streng blir objektet til `[object Object]`.
+
+Og det forklarer «uavhengig av flagget»: `trustedHtml('')` er et objekt like fullt, så den
+*tomme* grenen viste det også. Passivmerket var borte og teksten sto på hvert eneste kort —
+altså så feilen ut som noe helt annet enn den var.
+
+Reprodusert i node før noe ble rørt, som fire røde tester.
+
+### Lag 2: ingen test så kortet
+
+`_enhetskort` var ikke i `HTML_BUILDERS_PER_FIL`. Den ble hoistet ut av `renderEnheter` en
+gang i fjor, og **lista fulgte ikke med** — fra da av var hvert enhetskort på tavla
+uskannet. Åtte andre byggere sto utenfor på samme vis. Ingen av dem hadde uescapet
+brukerdata, så ingenting smalt; men skanneren meldte grønt om en dekning den ikke hadde, og
+det er verre enn en rød test.
+
+En håndholdt liste forfaller i stillhet. `test_ingen_bygger_staar_utenfor_skanningen`
+sammenligner den nå med kilden, så neste utklipping sier fra selv.
+
+### Lag 3: skanneren anbefalte fella
+
+Feilmeldingen sa: «Pakk verdien i escapeHtml() **eller trustedHtml() hvis det er markup du
+har bygget selv**». Det er riktig for en Tabulator-celle og galt for en mal-streng, og det
+er råd jeg fulgte. Teksten sier nå det motsatte, med grunnen.
+
+Samme felle tok «Rett tid» fra fase 3 til 11. sep. 2026. Advarselen ble den gang skrevet som
+en kommentar ved det ene kallstedet — 500 linjer unna, i en annen fil. Fem dager senere gikk
+jeg i den samme. **En advarsel som bare finnes der feilen alt er rettet, advarer ingen.**
+Regelen står nå i `core/tests_js_regler.py`, der den gjelder alle filene i `static/js/`.
+
+### Ti mutanter — og to overlevde først
+
+- **Å ta escapingen ut av `data-id="${escHtmlValue(meldingId)}"` overlevde.**
+  `REVIEWED_INTERPOLATIONS` er nøklet på uttrykkets *tekst*, så `meldingId` godkjent fordi
+  den står i en `getElementById`-streng var samtidig godkjent i en ekte attributt.
+  Godkjenningen smittet fra en selektor over på markup. Skanneren leser nå bare mal-strenger
+  **med en tagg i** (`_markuplitteraler()`) — og da trenger ingen av DOM-id-ene å stå i lista
+  i det hele tatt.
+- **Å peke regelen mot et navn som ikke finnes overlevde.** `trustedHtml` → `trustedHtmlXX`
+  *inne i mønsteret* ga en regel som er grønn for alltid. Navnet står nå ett sted
+  (`HJELPER`), begge mønstrene bygges av det, og sperrehaken krever at de slår ut på en
+  kjent-dårlig bit kode. **En vakt som ikke kan bli rød, vokter ingenting.**
+
+**Endret:** `static/js/oppdrag-sentral-kjerne.js` (feilen), `-oppdrag.js` (én id escapet),
+`-lasting.js` (nøstet mal-streng hoistet ut), `oppdrag/tests_xss.py` (ni byggere inn,
+markup-skillet, to nye vakter), `core/tests_js_regler.py` (ny),
+`oppdrag/tests_passiv_avvente.py` (+3), `CLAUDE.md`. Suiten: 3 180 grønne på 109 sekunder
+med den delte kommandoen.
+
+---
+
 ## 2026-09-16 — Puljene skrives ned, og to testregler som koster en time i uka
 
 **André:** «Ligger puljene som vi har planlagt i noe notat? For jeg syns hver arbeid du

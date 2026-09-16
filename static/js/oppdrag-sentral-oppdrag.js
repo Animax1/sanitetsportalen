@@ -787,7 +787,7 @@ function visRettTid(meldingId) {
     <input type="datetime-local" class="form-control form-control-sm w-auto"
            id="rett-tid-verdi" value="${lokal}">
     <button type="button" class="btn btn-sm btn-primary"
-            id="rett-tid-lagre" data-action="lagreRettTid" data-id="${meldingId}">Lagre</button>
+            id="rett-tid-lagre" data-action="lagreRettTid" data-id="${escHtmlValue(meldingId)}">Lagre</button>
     <button type="button" class="btn btn-sm btn-outline-secondary"
             data-action="avbrytRettTid">Avbryt</button>
     <span id="rett-tid-feil" class="text-danger small"></span>`);

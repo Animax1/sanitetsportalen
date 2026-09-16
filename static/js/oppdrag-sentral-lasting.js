@@ -179,6 +179,12 @@ function renderArkiv() {
     const kollaps = a.kollapset
       ? '<span class="oppdrag-meta">· radene er slettet, kun tall igjen</span>'
       : '';
+    // Hoistet ut av mal-strengen, som `oppdragslinje` i `_enhetskort`: en
+    // nøstet mal-streng inne i en `${...}` er usynlig for XSS-skanneren —
+    // regexen dens stopper på den første `}`, så den ser et avkuttet uttrykk
+    // og ikke escapingen inni. Notatet escapes fortsatt her.
+    const notat = a.notat
+      ? `<div class="oppdrag-fritekst">${escapeHtml(a.notat)}</div>` : '';
     return `
     <div class="oppdrag-rad">
       <div class="d-flex align-items-center gap-2 flex-wrap">
@@ -189,7 +195,7 @@ function renderArkiv() {
         ${escapeHtml(a.vakt_navn)} · arkivert av ${escapeHtml(a.importert_av)}
         ${kollaps}
       </div>
-      ${a.notat ? `<div class="oppdrag-fritekst">${escapeHtml(a.notat)}</div>` : ''}
+      ${notat}
       <div class="mt-2 d-flex gap-2">
         <button class="btn btn-sm btn-outline-primary" type="button"
                 data-action="visArkivStatistikk" data-id="${escHtmlValue(a.id)}">Vis statistikk</button>

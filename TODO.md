@@ -2263,6 +2263,10 @@ tilgangshull og data først, funksjonalitet i midten, utseende sist.
       - [x] Avbrutt-merket kvitteres, manuelt eller ved ny varsling
       - [x] «Akutt oppdrag, to enheter varsles — står trenger ressurs selv om oppdraget er
             løst». Løst 15. sep. 2026; `LOSER_OPPDRAGET` er `(Behandlet, Leverer)`
+      - [x] **Bug fra staging:** «[object Object]» på hver enhet i ressurslista
+            (16. sep. 2026). `trustedHtml()` i en mal-streng — den returnerer et objekt
+            for `cellHtml()`. Tre lag: feilen, at `_enhetskort` aldri var i XSS-skannerens
+            liste, og at skannerens egen feilmelding anbefalte fella. Ti mutanter
       - [ ] **Krever Andre:** verifiseringslista på staging, sju punkter — se CHANGELOG
             for 16. sep., «Pulje 2, andre halvdel»
 

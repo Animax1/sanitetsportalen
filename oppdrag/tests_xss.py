@@ -24,6 +24,16 @@ from patients.js_test_utils import (
 HTML_BUILDERS_PER_FIL = {
     OPPDRAG_SENTRAL_JS: (
         'renderEnheter',
+        # **Kortet ble hoistet ut av `renderEnheter` og falt ut av skanningen
+        # med det samme** (funnet 16. sep. 2026, da `[object Object]` sto på
+        # hver enhet i prod uten at noe var rødt). En utklipping flytter
+        # markupen; lista her fulgte ikke etter.
+        # `_manglendeByggereTests` under holder at det ikke kan gjenta seg.
+        '_enhetskort',
+        # De åtte andre som sto utenfor samme dag. Ingen av dem hadde
+        # uescapet brukerdata — hullet var i dekningen, ikke i escapingen.
+        'fyllProblemstillinger', 'visFoerStatus', 'visRedigerOppdrag',
+        'visRettTid', '_lydvarselSkjema', 'fyllNedtrekk', 'renderArkiv',
         # Vaktlistas data, lånt inn (§6 i vaktlistenotatet). Navn og rolle er
         # fritekst fra et annet moduls register, og escapes her som alt annet.
         'mkBesetning',
@@ -52,6 +62,7 @@ HTML_BUILDERS_PER_FIL = {
         '_antallRad',
         'renderVentende', 'skalPipe', 'ventetSekunder', '_lydTerskler', 'lydTerskler',
         'renderAvsluttet',
+        '_varsledeRad',
     ),
 }
 
@@ -159,6 +170,31 @@ REVIEWED_INTERPOLATIONS = {
     'kvitter': 'markup bygget lokalt, oppdrags-id escapet inni',
     'vaktKnapp': 'markup bygget lokalt, id escapet inni',
     'adminKnapp': 'markup bygget lokalt, id escapet inni',
+    # ── De ni byggerne som kom inn under skanneren 16. sep. 2026 ──
+    # Hver av dem er lest før den ble ført opp; ingen hadde uescapet
+    # brukerdata. Hullet var i dekningen, ikke i escapingen.
+    'passiv': 'markup bygget lokalt av en ternær — ingen data i den',
+    'klokke(siden)': 'vår egen tidsformatering, «14:32», av et ISO-tidspunkt',
+    'tidSiden(siden)': 'vår egen tidsformatering, «12 min»',
+    '_lokalNaa()': 'vår egen datetime-local-formatering av klokka nå',
+    'lokal': 'verdien fra _lokalNaa(), samme sak',
+    # DOM-id-er i `getElementById`/`querySelectorAll`-strenger står ikke her:
+    # `_markuplitteraler()` leser bare mal-strenger med en tagg i, så de når
+    # aldri skanneren. Det er med vilje — se den funksjonens docstring.
+    'statusvalg': 'options bygget lokalt, status og navn escapet inni',
+    'stedvalg': 'options bygget lokalt, nøkkel og tekst escapet inni',
+    'lokvalg': 'options bygget lokalt, id og navn escapet inni',
+    'stedSkjult': 'hardkodet hidden-attributt fra en ternær',
+    'kollaps': 'markup bygget lokalt, ingen data i den',
+    "kopier('nytt-hastegrad', o.hastegrad)": 'options kopiert fra DOM-en, som selv ble bygget escapet',
+    "p === ny ? ' selected' : ''": 'hardkodet selected-attributt fra en ternær',
+    "op.value === valgt ? ' selected' : ''": 'hardkodet selected-attributt fra en ternær',
+    "l.id === o.lokasjon_id ? ' selected' : ''": 'hardkodet selected-attributt fra en ternær',
+    "paa ? ' checked' : ''": 'hardkodet checked-attributt fra en ternær',
+    "d.lyd_aktiv !== false ? ' checked' : ''": 'hardkodet checked-attributt fra en ternær',
+    "d.nytt_oppdrag ? ' checked' : ''": 'hardkodet checked-attributt fra en ternær',
+    "d.krev_grov_avreist ? ' checked' : ''": 'hardkodet checked-attributt fra en ternær',
+    'notat': 'markup bygget lokalt, notatet escapet inni',
     'radKlasse': 'hardkodet CSS-klasse fra en ternær',
     'koblingKlasse': 'hardkodet CSS-klasse fra en ternær',
     'valgt': 'hardkodet selected-attributt fra en ternær',
@@ -207,6 +243,48 @@ def _uten_kommentarer(kilde: str) -> str:
 class OppdragEscapingKildeTests(SimpleTestCase):
     """Statisk gjennomgang: hver `${...}` escapes, eller står oppført her."""
 
+    #: Funksjoner som *ser* ut som byggere for `_byggerkandidater()`, men
+    #: ikke er det. Hver rad er et bevisst valg, ikke en opprydding.
+    IKKE_BYGGERE = {
+        # Bygger en DOM-id eller en URL i en mal-streng, ikke markup.
+        'hastegradEndret', 'visBesetning', 'avventOppdrag',
+    }
+
+    def _byggerkandidater(self, src):
+        """Funksjoner i `src` som interpolerer noe inn i markup.
+
+        Grovt med vilje: en mal-streng som inneholder en tagg og en `${...}`.
+        Falske treff føres opp i `IKKE_BYGGERE` med begrunnelse — det er
+        billigere enn å gå glipp av en ekte bygger.
+        """
+        funn = set()
+        for navn in re.findall(r'^function (\w+)\(', src, re.M):
+            kropp = extract_function(src, navn)
+            if re.search(r'`[^`]*<\w+[^`]*\$\{', kropp, re.S):
+                funn.add(navn)
+        return funn
+
+    def test_ingen_bygger_staar_utenfor_skanningen(self):
+        """**Hullet som slapp `[object Object]` ut i prod** (16. sep. 2026).
+
+        `_enhetskort` ble hoistet ut av `renderEnheter` en gang i fjor. Lista
+        over byggere fulgte ikke med, og fra da av var *hvert enhetskort på
+        tavla* uskannet — sammen med åtte andre byggere. Ingen av dem hadde
+        uescapet brukerdata, så ingenting smalt; men skanneren meldte grønt om
+        en dekning den ikke hadde, og det er verre enn en rød test.
+
+        En liste som vedlikeholdes for hånd, forfaller i stillhet. Denne
+        sammenligner lista med kilden, så neste utklipping sier fra selv.
+        """
+        for fil, byggere in HTML_BUILDERS_PER_FIL.items():
+            with self.subTest(fil=js_navn(fil)):
+                mangler = (self._byggerkandidater(read_js(fil))
+                           - set(byggere) - self.IKKE_BYGGERE)
+                self.assertEqual(sorted(mangler), [], (
+                    f'{js_navn(fil)}: disse bygger markup uten å bli skannet.\n'
+                    'Legg dem i HTML_BUILDERS_PER_FIL, eller i IKKE_BYGGERE '
+                    'med en begrunnelse hvis de bygger en DOM-id eller en URL.'))
+
     def test_byggerne_finnes(self):
         """Vern mot at testen blir tom fordi en funksjon er omdøpt."""
         for fil, byggere in HTML_BUILDERS_PER_FIL.items():
@@ -229,26 +307,64 @@ class OppdragEscapingKildeTests(SimpleTestCase):
                 self.assertNotIn('patients-utils.js', mal)
                 self.assertIn('portal-utils.js', mal)
 
+    @staticmethod
+    def _markuplitteraler(body):
+        """Mal-strengene i `body` som faktisk er markup — de med en tagg i.
+
+        **Skillet er nødvendig, og det manglet** (16. sep. 2026, funnet ved
+        mutasjonstesting). `REVIEWED_INTERPOLATIONS` er nøklet på uttrykkets
+        tekst alene, så `meldingId` ført opp fordi den står i en
+        `getElementById(\`tidslinje-rad-${meldingId}\`)` ble samtidig godkjent
+        i `data-id="${meldingId}"` — en ekte attributt, i ekte markup. Mutanten
+        som tok escapingen ut av den attributten overlevde.
+
+        Ved å bare lese mal-strenger som inneholder en tagg, trenger ingen av
+        DOM-id-ene å stå i lista i det hele tatt, og godkjenningen kan ikke
+        lenger smitte fra en selektor over på markup.
+        """
+        return [lit for lit in re.findall(r'`[^`]*`', body, re.S)
+                if re.search(r'<\w', lit)]
+
+    def test_ingen_bygger_har_en_noestet_malstreng(self):
+        """En mal-streng inne i en `${...}` er usynlig for skanneren: regexen
+        stopper på den første `}`, og escapingen inni ligger i blindsonen.
+        Hoist den ut i en `const` først — `notat` i `renderArkiv` er mønsteret.
+        """
+        funn = []
+        for fil, byggere in HTML_BUILDERS_PER_FIL.items():
+            src = read_js(fil)
+            for navn in byggere:
+                body = _uten_kommentarer(extract_function(src, navn))
+                if re.search(r'\$\{[^}]*`', body):
+                    funn.append(f'{js_navn(fil)} {navn}()')
+        self.assertEqual(funn, [], (
+            'Nøstet mal-streng i en bygger:\n  ' + '\n  '.join(funn)
+            + '\n\nHoist den ut i en egen const før mal-strengen.'))
+
     def test_alle_interpolasjoner_er_escapet_eller_gjennomgatt(self):
         uescapet = []
         for fil, byggere in HTML_BUILDERS_PER_FIL.items():
             src = read_js(fil)
             for navn in byggere:
                 body = _uten_kommentarer(extract_function(src, navn))
-                for uttrykk in re.findall(r'\$\{([^}]*)\}', body):
-                    uttrykk = uttrykk.strip()
-                    if uttrykk.startswith(ESCAPING_CALLS):
-                        continue
-                    if uttrykk in REVIEWED_INTERPOLATIONS:
-                        continue
-                    uescapet.append(f"{js_navn(fil)} {navn}(): ${{{uttrykk}}}")
+                for lit in self._markuplitteraler(body):
+                    for uttrykk in re.findall(r'\$\{([^}]*)\}', lit):
+                        uttrykk = uttrykk.strip()
+                        if uttrykk.startswith(ESCAPING_CALLS):
+                            continue
+                        if uttrykk in REVIEWED_INTERPOLATIONS:
+                            continue
+                        uescapet.append(f"{js_navn(fil)} {navn}(): ${{{uttrykk}}}")
 
         self.assertEqual(uescapet, [], (
             'Uescapede interpolasjoner i oppdrag-byggerne:\n  '
             + '\n  '.join(uescapet)
-            + '\n\nPakk verdien i escapeHtml() (eller trustedHtml() hvis det er '
-              'markup du har bygget selv), eller legg uttrykket i '
-              'REVIEWED_INTERPOLATIONS i denne fila med en begrunnelse.'
+            + '\n\nPakk verdien i escapeHtml(). Er det markup du har bygget '
+              'selv, interpolér strengen RÅTT og legg uttrykket i '
+              'REVIEWED_INTERPOLATIONS i denne fila med en begrunnelse.\n'
+              'trustedHtml() er IKKE svaret her: den returnerer et objekt for '
+              'cellHtml(), og blir «[object Object]» i en mal-streng. '
+              'Se core/tests_js_regler.py.'
         ))
 
 
