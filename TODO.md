@@ -812,8 +812,27 @@ tilgangshull og data først, funksjonalitet i midten, utseende sist.
 
 - [ ] **Pulje 3 — vaktlista, bruk og utseende.** Ingen av dem rører tilgang eller data, og
       de kan tas i én runde. Ikke startet.
-      - [ ] **Sett korps og rolle på flere skift samtidig.** I dag ett og ett, og en
-            vaktliste settes opp med tjue like skift
+      - [ ] **Sett rolle på flere skift samtidig — til vurdering, ikke bestilt**
+            (brutt 16. sep. 2026: «Det fungerer forsåvidt når det gjelder korps og du går
+            inn på rediger ressurs og setter korps der»).
+            - **Korps er alt løst, og det var halve punktet.** `Ressurs.korps` er
+              standarden for *alle* plassene på ressursen (`services.reservert_korps`), så
+              «Rediger ressurs» er bulkoperasjonen. `Vaktpost.korps` overstyrer per plass
+              og brukes der en samleplass deles mellom korps — det er unntaket, ikke
+              normalen.
+            - **Det som gjenstår er rollen.** Den finnes bare per plass; det er ingen
+              standardrolle på ressursen å arve. Tjue like skift betyr fortsatt tjue valg
+              i nedtrekket.
+            - **Tre spørsmål hvis det tas opp igjen**, så tenkningen ikke gjøres på nytt:
+              hvordan velges radene (avkryssing per rad, avkryssing på blokklinja, eller
+              begge — blokken er bare «huk av disse» med ett klikk); skal «Sett» være én
+              forespørsel eller én per rad (én er atomisk, men feiler helt hvis én rad er
+              utenfor tilgangen din); og korps-føreren når bare radene hun kan røre, så
+              utvalget må sile *før* innsending, ikke svare 403 etterpå.
+            - **Vurder først om en standardrolle på ressursen løser det billigere.** Er
+              «Lag 1» alltid én lagleder og tre lagsmedlemmer, er det oppsettet som
+              gjentar seg — ikke en handling man gjør om igjen. Planleggeren lager alt
+              plassene; den kunne gitt dem roller.
       - [ ] **De faste fanene skal se annerledes ut enn ressursgruppefanene.** I dag ser
             «Oversikt» og «Ambulanse» like ut, og de er to ulike slags ting
 

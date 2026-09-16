@@ -4,6 +4,27 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-16 — Punkt 3 brutt: korpsdelen var alt løst
+
+**André:** «Bryt dette og bare sett det i TODO for noe å vurdere senere. Det fungerer
+forsåvidt når det gjelder korps og du går inn på rediger ressurs og setter korps der.»
+
+Han har rett, og det er verdt å skrive ned *hvorfor* — punktet var formulert som «sett
+korps og rolle på flere skift samtidig», og halve det er en funksjon som har vært der hele
+tiden: `Ressurs.korps` er standarden for **alle** plassene på ressursen
+(`services.reservert_korps`), så «Rediger ressurs» *er* bulkoperasjonen for korps.
+`Vaktpost.korps` overstyrer per plass, og finnes for samleplassen som deles mellom korps —
+unntaket, ikke normalen.
+
+Det som faktisk gjenstår er **rollen**, som bare finnes per plass. Ingen kode skrevet;
+punktet står i TODO med de tre åpne spørsmålene og et forslag om å se på en standardrolle
+på ressursen først — er «Lag 1» alltid én lagleder og tre lagsmedlemmer, er det oppsettet
+som gjentar seg, ikke en handling man gjør om igjen.
+
+**Endret:** `TODO.md`. Ingen kodeendring.
+
+---
+
 ## 2026-09-16 — Pulje 3A og 3B ut i prod
 
 Sju commits, `64f62a3` → `5b9ac15`, alle verifisert på staging av André:
