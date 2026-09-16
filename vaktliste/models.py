@@ -55,6 +55,7 @@ from __future__ import annotations
 
 from django.conf import settings
 from django.db import models
+from django.db.models import F
 from django.db.models.functions import Lower
 
 from core.models import BaseTimeStampedModel
@@ -698,9 +699,31 @@ class Vaktpost(BaseTimeStampedModel):
     class Meta:
         verbose_name = 'Vaktpost'
         verbose_name_plural = 'Vaktposter'
-        ordering = ['fra_tid', 'mannskap__navn']
-        # NB: ledige plasser (mannskap=NULL) sorteres først innenfor samme
-        # starttid — de er det som gjenstår, og skal være lette å se.
+        # **Tid, så rollens rangering, så navn** (André, 16. sep. 2026):
+        # «det er en enhet/lag som har i synkende rekkefølge lagsmedlem,
+        # lagleder, lagsmedlem, hospitant. Når jeg justerer på førstenevnte så
+        # flyttes den ikke i enheten etter sin rolle.» Laget sto i
+        # innsettingsrekkefølge, og da må man lese hver rad for å finne
+        # lederen. Rangeringen fra `Ressursrolle.rekkefolge` er nettopp det
+        # tallet som skal styre dette — uten dette leddet er den bare en
+        # sortering av nedtrekket.
+        #
+        # **NULL-plasseringen står eksplisitt, og det er ikke pynt.**
+        # PostgreSQL (prod) legger NULL sist i stigende sortering, SQLite
+        # (dev) legger dem først. Uten `nulls_*` svarer de to basene ulikt, og
+        # en rekkefølge man har verifisert lokalt er en annen i drift. Den
+        # gamle kommentaren her påsto at ledige plasser sto først «innenfor
+        # samme starttid» — sant i SQLite, aldri i prod.
+        #
+        # - En rad **uten rolle** hører nederst: rangeringen er hele poenget,
+        #   og en rolleløs rad sier ingenting om hvor den hører hjemme.
+        # - En **ledig** plass står først blant sine egne, som før: de er det
+        #   som gjenstår, og skal være lette å se.
+        ordering = [
+            'fra_tid',
+            F('rolle__rekkefolge').asc(nulls_last=True),
+            F('mannskap__navn').asc(nulls_first=True),
+        ]
         constraints = [
             # Samme person, samme ressurs, samme starttid er en dobbeltføring.
             # Overlapp på tvers av ressurser stoppes bevisst *ikke*: noen

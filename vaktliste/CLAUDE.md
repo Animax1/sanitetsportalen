@@ -416,6 +416,20 @@ fase 3–7 gjenstår — se `docs/BESLUTNING_VAKTLISTE.md`, som er besluttet i s
     ingen ba om. Serveren krever **nøyaktig** gruppas roller — et delvis sett ville gitt
     noen rader nye tall og latt resten stå, og det er også den eneste måten å oppdage at
     klienten og serveren ser ulike lister.
+- **Radene i en ressurs sorteres på tid, så rollens rangering, så navn**
+  (`Vaktpost.Meta.ordering`, 16. sep. 2026 — André: «en enhet/lag som har i synkende
+  rekkefølge lagsmedlem, lagleder, lagsmedlem, hospitant … flyttes ikke i enheten etter sin
+  rolle»). Laget sto i innsettingsrekkefølge, og da må man lese hver rad for å finne
+  lederen. Uten dette leddet var `Ressursrolle.rekkefolge` bare en sortering av
+  *nedtrekket* — den styrte ikke radene den beskriver. **Tida vinner over rollen:** en
+  hospitant som møter 08 står før en lagleder som møter 16, ellers slutter lista å være
+  kronologisk.
+  - **`nulls_last`/`nulls_first` står eksplisitt, og det er ikke pynt.** PostgreSQL (prod)
+    legger NULL sist i stigende sortering, SQLite (dev) legger dem først. Den gamle
+    kommentaren her påsto at ledige plasser sto først «innenfor samme starttid» — sant i
+    SQLite, aldri i prod, og udekket av noen test. En rad uten rolle hører nederst; en
+    ledig plass står først blant sine egne.
+  - Klienten sorterer **ikke** (`_posterFor()` filtrerer), så rekkefølgen er serverens.
 - **Navn endres i raden, med `_redigeringsrad()` — én form for hele modulen** (16. sep.
   2026, André: «Det bør gå relativt automatisk ved endring av rollenavn, se andre navn i
   enheten»). Rollen hadde **ingen** redigering: man måtte slette og opprette, og

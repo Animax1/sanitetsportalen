@@ -4,6 +4,55 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-16 — Laget sorteres etter rolle, ikke etter når radene ble laget
+
+**André:** «Det er en enhet/lag som har i synkende rekkefølge: lagsmedlem, lagleder,
+lagsmedlem, hospitant. Når jeg justerer på førstenevnte så flyttes den ikke i enheten etter
+sin rolle.»
+
+Reprodusert med hans egne fire plasser: `Lagsmedlem, Lagleder, Lagsmedlem, Hospitant` — ren
+innsettingsrekkefølge. Etter: `Lagleder, Lagsmedlem, Lagsmedlem, Hospitant`.
+
+### Rangeringen styrte nedtrekket, ikke radene den beskriver
+
+`Ressursrolle.rekkefolge` kom samme dag (punkt 6) og sorterte rollelista. Men
+`Vaktpost.Meta.ordering` var `['fra_tid', 'mannskap__navn']` — rollen var ikke med i det
+hele tatt. Rangeringen var altså riktig der man *velger* rollen og uten virkning der man
+*ser* den. Klienten sorterer ikke (`_posterFor()` filtrerer bare), så rekkefølgen er
+serverens.
+
+**Tida vinner fortsatt over rollen.** En hospitant som møter 08 står før en lagleder som
+møter 16 — ellers slutter lista å være kronologisk, og det er tida man planlegger etter.
+
+### Og en påstand i koden som bare var sann i dev
+
+Kommentaren over `ordering` sa at ledige plasser sorteres først innenfor samme starttid.
+Det stemmer i **SQLite**, som legger NULL først i stigende sortering — og aldri i
+**PostgreSQL**, som legger dem sist. Regelen var udekket av noen test, så ingen hadde sett
+at dev og prod svarte hver sitt.
+
+Sorteringen bærer nå `nulls_last`/`nulls_first` eksplisitt:
+
+- **En rad uten rolle hører nederst.** Rangeringen er hele poenget, og en rolleløs rad sier
+  ingenting om hvor den hører hjemme.
+- **En ledig plass står først blant sine egne** — den gamle intensjonen, nå på det nivået
+  der den fortsatt betyr noe, og nå lik i begge basene.
+
+Fem mutanter, alle røde — deriblant begge NULL-plasseringene, som var det som manglet
+dekning i utgangspunktet.
+
+### Og et spørsmål som viste seg å være besvart
+
+«Rollene må gjelde for hele ressursgruppe og ikke egne roller per enhet.» Det gjør de:
+`Ressursrolle.gruppe` peker på gruppa, og rollevinduet sier det selv — «Rollene gjelder
+alle ressurser i gruppa «Lag», ikke bare Lag 1». Vinduet *åpnes* fra en ressurs, og det er
+nok til at det kan leses som ressursens; teksten står der nettopp derfor.
+
+**Endret:** `vaktliste/models.py`, `vaktliste/migrations/0020_vaktpost_sortering.py` (ny,
+bare `Meta`), `vaktliste/tests_registre.py` (+4), `vaktliste/CLAUDE.md`.
+
+---
+
 ## 2026-09-16 — Roller kan endelig døpes om, og modulen har én form for det
 
 **André:** «Det bør gå relativt automatisk ved endring av rollenavn, se andre navn i

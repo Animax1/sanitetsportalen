@@ -1380,3 +1380,75 @@ class NavneredigeringJsTests(SimpleTestCase):
         antall, feil = json.loads(ut.strip().splitlines()[0])
         self.assertEqual(antall, 0, 'ingen forespørsel sendes')
         self.assertIn('navn', feil)
+
+
+@override_settings(SECURE_SSL_REDIRECT=False, RATELIMIT_ENABLE=False)
+class RadeneFoelgerRollerangeringenTests(TestCase):
+    """**Meldt fra staging 16. sep. 2026 (André):** «Det er en enhet/lag som
+    har i synkende rekkefølge: lagsmedlem, lagleder, lagsmedlem, hospitant.
+    Når jeg justerer på førstenevnte så flyttes den ikke i enheten etter sin
+    rolle.»
+
+    Laget sto i **innsettingsrekkefølge**, og da må man lese hver rad for å
+    finne lederen. Rangeringen fra `Ressursrolle.rekkefolge` (punkt 6) var
+    bare en sortering av *nedtrekket* — den styrte ikke radene den beskriver.
+
+    Klienten sorterer ikke: `_posterFor()` filtrerer, og kortet tegner det den
+    får. Rekkefølgen er derfor serverens, og regelen hører hjemme i
+    `Vaktpost.Meta.ordering`.
+    """
+
+    def setUp(self):
+        self.g = gruppe(LAG)
+        self.vl = services.opprett_planlagt_vakt('Vakta')
+        self.ressurs = lag_ressurs(vaktliste=self.vl, navn='Lag 1', gruppe=self.g)
+        self.roller = {
+            navn: Ressursrolle.objects.create(navn=navn, gruppe=self.g,
+                                              rekkefolge=(i + 1) * 10)
+            for i, navn in enumerate(('Lagleder', 'Lagsmedlem', 'Hospitant'))}
+        self.fra = timezone.now().replace(microsecond=0)
+        self.til = self.fra + timedelta(hours=8)
+
+    def _plass(self, rolle=None, person=None, fra=None):
+        return Vaktpost.objects.create(
+            ressurs=self.ressurs, fra_tid=fra or self.fra, til_tid=self.til,
+            rolle=self.roller[rolle] if rolle else None, mannskap=person)
+
+    def _roller(self):
+        return [vp.rolle.navn if vp.rolle else '—'
+                for vp in Vaktpost.objects.filter(ressurs=self.ressurs)]
+
+    def test_andres_lag_sorteres_etter_rolle(self):
+        for navn in ('Lagsmedlem', 'Lagleder', 'Lagsmedlem', 'Hospitant'):
+            self._plass(navn)
+        self.assertEqual(self._roller(),
+                         ['Lagleder', 'Lagsmedlem', 'Lagsmedlem', 'Hospitant'])
+
+    def test_tiden_vinner_over_rollen(self):
+        """Rangeringen gjelder **innenfor** et skift. En hospitant som møter
+        kl. 08 står før en lagleder som møter kl. 16 — ellers ville lista
+        sluttet å være kronologisk, og det er tida man planlegger etter."""
+        self._plass('Lagleder', fra=self.fra + timedelta(hours=8))
+        self._plass('Hospitant')
+        self.assertEqual(self._roller(), ['Hospitant', 'Lagleder'])
+
+    def test_en_rad_uten_rolle_havner_nederst(self):
+        """**Eksplisitt, ikke tilfeldig.** PostgreSQL legger NULL sist i
+        stigende sortering, SQLite legger dem først — uten `nulls_last` ville
+        dev og prod svart hver sitt, og en rekkefølge verifisert lokalt vært
+        en annen i drift."""
+        self._plass(None)
+        self._plass('Lagleder')
+        self.assertEqual(self._roller(), ['Lagleder', '—'])
+
+    def test_ledig_plass_staar_foerst_blant_sine_egne(self):
+        """Den gamle regelen — ledige plasser er lette å se — gjelder nå
+        *innenfor* rollen, som er der den fortsatt betyr noe. Også denne sto
+        udekket og bare tilfeldigvis sann i SQLite."""
+        person = Mannskap.objects.create(
+            navn='Kari', korps=Korps.objects.create(navn='Haugesund'))
+        self._plass('Lagsmedlem', person=person)
+        self._plass('Lagsmedlem')
+        rader = list(Vaktpost.objects.filter(ressurs=self.ressurs))
+        self.assertIsNone(rader[0].mannskap, 'den ledige først')
+        self.assertEqual(rader[1].mannskap, person)
