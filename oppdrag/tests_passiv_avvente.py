@@ -422,3 +422,69 @@ class ModusenIArkivetTests(PassivBasis):
         self._kjor(self._oppdrag(self.bil), self.bil)
         arkiv = self._arkiver()
         self.assertEqual(arkiv_stats(arkiv)['summary']['oppdrag_i_passiv'], 1)
+
+
+class FlaggeneKanKryssesAvTests(PassivBasis):
+    """**Uten denne veien finnes ikke funksjonen for André.**
+
+    Flaggene sto på `Enhetstype` med riktig standard og riktig lesing, og alt
+    over her var grønt — men ingen skjerm kunne sette dem. En funksjon som bare
+    lar seg skru på fra et skall er ikke levert; den er skrevet.
+
+    De hører hjemme i «Valglister» sammen med resten av enhetstypene, ikke i
+    enhetspanelet: panelet setter *hvilken* type en bil har, dette setter hva
+    typen betyr.
+    """
+
+    def setUp(self):
+        super().setUp()
+        import json as _json
+        self.dump = _json.dumps
+        self.leder = CustomUser.objects.create_user(
+            username='leder_pv', password='x', must_change_password=False)
+        ModulTilgang.objects.create(
+            bruker=self.leder, modul_slug='oppdrag', nivaa='skriv_leder')
+        self.lederklient = Client()
+        self.lederklient.force_login(self.leder)
+
+    def _put(self, klient, pk, kropp):
+        return klient.put(f'/oppdrag/api/enhetstyper/{pk}/',
+                          data=self.dump(kropp), content_type='application/json')
+
+    def test_lista_baerer_begge_flaggene(self):
+        rad = next(r for r in self.klient.get('/oppdrag/api/enhetstyper/').json()['data']
+                   if r['id'] == self.spesial.pk)
+        self.assertEqual((rad['kan_passiv_vakt'], rad['kan_avvente']), (True, True))
+
+    def test_lederen_skrur_dem_av_og_paa_hver_for_seg(self):
+        """Hver for seg — et felles kall ville skjult at de er to felter."""
+        self.assertEqual(self._put(self.lederklient, self.ambulanse.pk,
+                                   {'kan_passiv_vakt': True}).status_code, 200)
+        self.ambulanse.refresh_from_db()
+        self.assertTrue(self.ambulanse.kan_passiv_vakt)
+        self.assertFalse(self.ambulanse.kan_avvente, 'det andre flagget står urørt')
+
+        self.assertEqual(self._put(self.lederklient, self.spesial.pk,
+                                   {'kan_avvente': False}).status_code, 200)
+        self.spesial.refresh_from_db()
+        self.assertFalse(self.spesial.kan_avvente)
+        self.assertTrue(self.spesial.kan_passiv_vakt)
+
+    def test_endringen_slaar_gjennom_paa_enheten_med_det_samme(self):
+        """Flagget leses gjennom typen, ikke kopieres til enheten — så en
+        endring gjelder alle bilene i gruppa uten et vedlikeholdsskritt."""
+        self.assertFalse(services.kan_avvente(self.bil))
+        self._put(self.lederklient, self.ambulanse.pk, {'kan_avvente': True})
+        # Hentet på nytt, som serveren gjør ved hver polling: `self.bil` bærer
+        # en bufret `enhetstype` fra `setUp`, og å lese den ville målt Djangos
+        # objektbuffer i stedet for regelen.
+        self.assertTrue(services.kan_avvente(Enhet.objects.get(pk=self.bil.pk)))
+
+    def test_operatoren_setter_ikke_opp_typene(self):
+        """`skriv_full` styrer beredskapen; å bestemme hva en *gruppe*
+        ressurser har lov til er oppsett, og det er `skriv_leder`. Samme
+        skille som i vaktlista mellom å bemanne og å opprette."""
+        self.assertEqual(self._put(self.klient, self.ambulanse.pk,
+                                   {'kan_avvente': True}).status_code, 403)
+        self.ambulanse.refresh_from_db()
+        self.assertFalse(self.ambulanse.kan_avvente)

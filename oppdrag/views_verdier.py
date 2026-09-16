@@ -81,6 +81,12 @@ class Lokasjoner(Verdimengde):
 class Enhetstyper(Verdimengde):
     model = Enhetstype
     entall = 'enhetstypen'
+    # **De to flaggene settes her, ikke på den enkelte enheten** (16. sep.
+    # 2026): «kan gå passiv vakt» og «kan avvente» er egenskaper ved *slaget*
+    # ressurs — spesialressurser går bakvakt, ambulanser gjør det ikke. Sto de
+    # på hver enhet, måtte de settes på nytt for hver bil, og en glemt
+    # avkryssing ville sett ut som en bevisst beslutning.
+    ekstra = {'kan_passiv_vakt': bool, 'kan_avvente': bool}
 
     def i_bruk(self, rad):
         return rad.enheter.count()

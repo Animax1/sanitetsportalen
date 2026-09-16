@@ -2247,6 +2247,9 @@ Funnene under er allerede kartlagt, så jobben er avgrenset når den skal gjøre
 - [x] **Avbrutt-merket kvitteres** (16. sep. 2026). `kvittert_at`/`kvittert_av`, og en ny
       varsling kvitterer automatisk. 21 mutanter, alle røde — én av dem avslørte at broen i
       `Oppdrag.save()` ikke stemplet modusen på den første koblingsraden.
+- [x] **Typeflaggene krysses av i «Valglister» → Enhetstyper** (16. sep. 2026). De sto
+      riktig i modellen uten at noen skjerm kunne sette dem. Ni mutanter; den siste
+      avslørte en assertion som fant strengen sin i nabofeltet.
 - [x] **Vaktlistevelgeren byttet ikke liste før neste klikk** (16. sep. 2026, meldt fra
       staging som «treg»). `data-hendelse="change"` manglet, så handlingen fyrte på klikk
       med den gamle verdien. En skanner krever nå hendelsen på hvert `<select>`/`<textarea>`

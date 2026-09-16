@@ -81,13 +81,34 @@ Det er nettopp den sorten feil mutasjonstesting finnes for. Regelen sto riktig e
 manglet i det andre, begge stiene var dekket av tester, og begge testene var grønne — fordi
 ingen av dem gikk gjennom den ene inngangen der feltet manglet.
 
+### Og flaggene måtte kunne krysses av
+
+Flaggene sto på `Enhetstype` med riktig standard og riktig lesing, alle 21 mutantene var
+røde — og **ingen skjerm kunne sette dem**. En funksjon som bare lar seg skru på fra et
+skall er ikke levert; den er skrevet. De ligger nå i «Valglister» → Enhetstyper, gjennom
+`Verdimengde.ekstra`, som er den samme mekanismen `kategori` og `med_antall` bruker.
+
+Ni mutanter til på den veien. Åtte røde med det samme; den niende avslørte en assertion jeg
+hadde skrevet for løst:
+
+> Testen krevde strengen `data-action="settTypeflagg" data-hendelse="change"` *ett sted* i
+> markupen — og den sto i begge nedtrekkene. Fjernet man hendelsen fra det ene, fant
+> assertionen den fortsatt i det andre og gikk grønn. Uten hendelsen fyrer handlingen på
+> *klikket* som åpner nedtrekket, med den gamle verdien: nøyaktig feilen som gjorde
+> vaktlistevelgeren «treg» dagen før.
+
+Rettelsen var å skrive **regelen** i stedet for treffet: hvert `<select>` i en verdirad som
+bærer `data-action` må også bære `data-hendelse="change"` og `data-felt`. Den dekker
+problemstillingsfeltene på kjøpet, og den neste som legges til.
+
 **Endret:** `oppdrag/models.py` (+`Vaktmodusperiode`, fem felter),
 `oppdrag/migrations/0026_…` (rene tillegg), `oppdrag/services.py`, `oppdrag/views.py`,
 `oppdrag/views_common.py`, `oppdrag/urls.py` (+3 ruter), `oppdrag/arkiv.py`,
 `oppdrag/statistikk.py`, `static/js/oppdrag-sentral-{kjerne,oppdrag,admin}.js`,
-`static/css/oppdrag.css`, `oppdrag/tests_passiv_avvente.py` (ny, 38 tester),
-`oppdrag/CLAUDE.md`, `docs/TEKNISK_DOKUMENTASJON.md` (rutetallene).
-Hele suiten (3 165 tester) grønn.
+`static/css/oppdrag.css`, `oppdrag/views_verdier.py`,
+`oppdrag/tests_passiv_avvente.py` (ny, 42 tester), `oppdrag/tests_runde_e.py` (+3),
+`oppdrag/tests_xss.py`, `oppdrag/CLAUDE.md`, `docs/TEKNISK_DOKUMENTASJON.md` (rutetallene).
+Hele suiten (3 172 tester) grønn.
 
 ---
 

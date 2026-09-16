@@ -73,6 +73,13 @@ REVIEWED_INTERPOLATIONS = {
     "v === r.kategori ? ' selected' : ''": 'hardkodet attributt fra en ternær',
     "r.med_antall ? '' : ' selected'": 'hardkodet attributt fra en ternær',
     "r.med_antall ? ' selected' : ''": 'hardkodet attributt fra en ternær',
+    # Typeflaggene (16. sep. 2026): samme form som `med_antall` over — en
+    # boolsk kolonne velger mellom to hardkodede strenger, og verdien fra
+    # databasen når aldri markupen.
+    "r.kan_passiv_vakt ? '' : ' selected'": 'hardkodet attributt fra en ternær',
+    "r.kan_passiv_vakt ? ' selected' : ''": 'hardkodet attributt fra en ternær',
+    "r.kan_avvente ? '' : ' selected'": 'hardkodet attributt fra en ternær',
+    "r.kan_avvente ? ' selected' : ''": 'hardkodet attributt fra en ternær',
     "(siste || r.fast) ? ' disabled' : ''": 'hardkodet attributt fra en ternær',
     "(forste || r.fast) ? ' disabled' : ''": 'hardkodet attributt fra en ternær',
     "n <= 1 ? ' disabled' : ''": 'hardkodet attributt fra en ternær',

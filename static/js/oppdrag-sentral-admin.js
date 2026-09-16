@@ -362,6 +362,23 @@ function _verdirad(slug, r, forste, siste) {
   const opp = `<button class="btn btn-sm btn-outline-secondary" data-action="flyttVerdi" data-arg="${arg('opp')}" title="Flytt opp"${(forste || r.fast) ? ' disabled' : ''}><i class="bi bi-chevron-up"></i></button>`;
   const ned = `<button class="btn btn-sm btn-outline-secondary" data-action="flyttVerdi" data-arg="${arg('ned')}" title="Flytt ned"${(siste || r.fast) ? ' disabled' : ''}><i class="bi bi-chevron-down"></i></button>`;
   let ekstra = '';
+  if (slug === 'enhetstyper') {
+    // **Flaggene hører til typen, ikke til bilen** (16. sep. 2026): de sier
+    // hva slags ressurs dette er, og en glemt avkryssing per enhet ville sett
+    // ut som en beslutning. To separate nedtrekk, fordi å avvente et oppdrag
+    // og å sove i bakvakt er to ulike ting.
+    ekstra = `
+      <select class="form-select form-select-sm verdi-flagg" aria-label="Kan gå passiv vakt"
+              data-action="settTypeflagg" data-hendelse="change" data-felt="kan_passiv_vakt" data-id="${escHtmlValue(r.id)}">
+        <option value="0"${r.kan_passiv_vakt ? '' : ' selected'}>Alltid aktiv</option>
+        <option value="1"${r.kan_passiv_vakt ? ' selected' : ''}>Kan gå passiv</option>
+      </select>
+      <select class="form-select form-select-sm verdi-flagg" aria-label="Kan avvente"
+              data-action="settTypeflagg" data-hendelse="change" data-felt="kan_avvente" data-id="${escHtmlValue(r.id)}">
+        <option value="0"${r.kan_avvente ? '' : ' selected'}>Rykker ut</option>
+        <option value="1"${r.kan_avvente ? ' selected' : ''}>Kan avvente</option>
+      </select>`;
+  }
   if (slug === 'problemstillinger' && !r.fast) {
     const kategorivalg = PROBLEM_KATEGORIER.map(([v, n]) =>
       `<option value="${escHtmlValue(v)}"${v === r.kategori ? ' selected' : ''}>${escapeHtml(n)}</option>`).join('');
@@ -467,6 +484,23 @@ async function settVerdifelt(id, felt, verdi) {
                        { method: 'PUT', body: JSON.stringify(kropp) }, 'Kunne ikke endre.')) {
     await lastVerdier('problemstillinger');
     renderVerdiadmin();
+  }
+}
+
+
+async function settTypeflagg(id, felt, verdi) {
+  // Egen handler og ikke `settVerdifelt` med en slug i argumentet:
+  // `hendelseArgumenter()` sender `(id, felt, verdi)` og gjør `data-id` om
+  // til et tall, så slugen har ingen vei inn. To ID-er kan være like i to
+  // verdimengder, og en handler som gjettet ville skrevet i feil tabell.
+  const kropp = { [felt]: verdi === '1' };
+  if (await _verdiKall(`/oppdrag/api/enhetstyper/${id}/`,
+                       { method: 'PUT', body: JSON.stringify(kropp) }, 'Kunne ikke endre.')) {
+    await lastVerdier('enhetstyper');
+    renderVerdiadmin();
+    // Tavla grupperer på type og viser passivmerket, så den skal se det med
+    // det samme — ikke ved neste polling ti sekunder ut i framtida.
+    await lastEnheter();
   }
 }
 

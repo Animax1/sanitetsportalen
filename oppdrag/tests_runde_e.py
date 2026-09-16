@@ -6,6 +6,7 @@ lokasjoner og grupperinger.» Og: «bilen må sette antall pasienter ikke
 operatøren … hvis den er blank så må det stå 1 pasient».
 """
 import json
+import re
 
 from django.db import connection
 from django.db.migrations.executor import MigrationExecutor
@@ -263,6 +264,77 @@ class VerdiadminJsTests(SimpleTestCase):
         self.assertIn('&lt;b&gt;Scene&lt;/b&gt;', vanlig)
         self.assertIn('2 i bruk', vanlig)
         self.assertIn('slettVerdi', vanlig)
+
+    def test_enhetstyperaden_har_de_to_flaggene_og_lokasjonsraden_ikke(self):
+        """Flaggene bor på typen (16. sep. 2026), og «Valglister» er det ene
+        stedet de kan krysses av. Tegnes de ikke, finnes funksjonen ikke for
+        den som skal bruke den — uansett hvor riktig serveren svarer."""
+        ut = run_node(self.harness, """
+            globalThis.window = { OPPDRAG_TILGANG: { erAdmin: true } };
+            console.log(_verdirad('enhetstyper',
+              {id: 4, navn: 'Spesialressurs', er_aktiv: true, fast: false, i_bruk: 2,
+               kan_passiv_vakt: true, kan_avvente: false}, false, false));
+            console.log('---');
+            console.log(_verdirad('lokasjoner',
+              {id: 7, navn: 'Scene', er_aktiv: true, fast: false, i_bruk: 0}, false, false));
+        """)
+        type_, lokasjon = ut.split('---')
+        self.assertIn('data-felt="kan_passiv_vakt"', type_)
+        self.assertIn('data-felt="kan_avvente"', type_)
+        self.assertIn('<option value="1" selected>Kan gå passiv', type_)
+        self.assertIn('<option value="0" selected>Rykker ut', type_,
+                      'det avslåtte flagget står avslått, ikke tomt')
+        self.assertNotIn('settTypeflagg', lokasjon, 'en lokasjon går ikke passiv vakt')
+
+    def test_hvert_nedtrekk_i_verdiraden_melder_sin_egen_hendelse(self):
+        """**Regelen, ikke ett treff.** Første utgave av testen over krevde
+        strengen `data-action=… data-hendelse="change"` ett sted i markupen, og
+        den sto i begge nedtrekkene — så flagget kunne miste hendelsen sin uten
+        at noe ble rødt (funnet ved mutasjonstesting 16. sep. 2026).
+
+        Uten hendelsen fyrer `klikkSkalKjore()` handlingen på *klikket* som
+        åpner nedtrekket, med den gamle verdien. Nøyaktig feilen som gjorde
+        vaktlistevelgeren «treg» dagen før.
+        """
+        ut = run_node(self.harness, """
+            globalThis.window = { OPPDRAG_TILGANG: { erAdmin: true } };
+            console.log(_verdirad('enhetstyper',
+              {id: 4, navn: 'Spesialressurs', er_aktiv: true, fast: false, i_bruk: 0,
+               kan_passiv_vakt: true, kan_avvente: true}, false, false));
+            console.log(_verdirad('problemstillinger',
+              {id: 5, navn: 'Transport', er_aktiv: true, fast: false, i_bruk: 0,
+               kategori: 'begge', med_antall: true}, false, false));
+        """)
+        tagger = re.findall(r'<select\b[^>]*>', ut)
+        self.assertGreaterEqual(len(tagger), 4, 'to flagg og to problemstillingsfelt')
+        for tag in tagger:
+            with self.subTest(tag=tag):
+                if 'data-action' not in tag:
+                    continue
+                self.assertIn('data-hendelse="change"', tag)
+                self.assertIn('data-felt="', tag,
+                              'uten `data-felt` sender delegeringen ett argument, ikke tre')
+
+    def test_typeflagget_sendes_som_boolsk_til_enhetstypen(self):
+        """«1» og «0» er nedtrekkets verdier; serveren normaliserer med
+        `bool`, og `bool('0')` er True. Oversettelsen må skje her."""
+        ut = run_node(self.harness + build_harness(
+            ((OPPDRAG_SENTRAL_JS, ('settTypeflagg',)),)), """
+            const kall = [];
+            globalThis.apiFetch = async (url, valg) => { kall.push([url, JSON.parse(valg.body)]);
+              return { ok: true, json: async () => ({ status: 'ok', data: [] }) }; };
+            globalThis.lastVerdier = async () => {};
+            globalThis.lastEnheter = async () => { kall.push(['enheter', null]); };
+            globalThis.document = { getElementById: () => null, querySelectorAll: () => [] };
+            await settTypeflagg(4, 'kan_avvente', '1');
+            await settTypeflagg(4, 'kan_passiv_vakt', '0');
+            console.log(JSON.stringify(kall));
+        """)
+        kall = json.loads(ut.strip().splitlines()[0])
+        self.assertEqual(kall[0], ['/oppdrag/api/enhetstyper/4/', {'kan_avvente': True}])
+        self.assertEqual(kall[2], ['/oppdrag/api/enhetstyper/4/', {'kan_passiv_vakt': False}])
+        self.assertEqual([k[0] for k in kall].count('enheter'), 2,
+                         'tavla grupperer på type og viser passivmerket')
 
     def test_flytt_sender_hele_lista_med_de_to_byttet(self):
         ut = run_node(self.harness, """

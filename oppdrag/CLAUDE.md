@@ -189,6 +189,14 @@ Statistikken har `enheter_passiv`, `passiv_timer` og `oppdrag_i_passiv`; de to f
 **live-tall** og finnes ikke i arkivet (som `enheter_pa_vakt`), mens det tredje overlever
 arkiveringen fordi stempelet ligger på radene.
 
+**Flaggene krysses av i «Valglister» → Enhetstyper**, gjennom `Verdimengde.ekstra` —
+samme mekanisme som `kategori` og `med_antall` på en problemstilling. Å *sette opp* hva en
+gruppe ressurser har lov til er `skriv_leder`, mens `skriv_full` styrer beredskapen: samme
+skille som i vaktlista mellom å bemanne og å opprette. Klienten har en egen handler,
+`settTypeflagg`, og **ikke** `settVerdifelt` med en slug i argumentet — `hendelseArgumenter()`
+sender `(id, felt, verdi)` og gjør `data-id` om til et tall, så slugen har ingen vei inn, og
+to ID-er kan være like i to verdimengder.
+
 `enhet_vaktmodus_view`, `avvent_view` og `kvitter_avbrutt_view` krever alle `skriv_full`:
 de sier noe om beredskapen, ikke om ett oppdrags framdrift, og de er derfor operatørens —
 ikke bilens `skriv_handling`.
