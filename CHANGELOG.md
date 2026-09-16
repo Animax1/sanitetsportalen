@@ -4,6 +4,57 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-16 — Pulje 3 punkt 5: fanerekka er to slags ting, og sto som én
+
+**André:** «De faste fanene skal se annerledes ut enn ressursgruppefanene. I dag ser
+«Oversikt» og «Ambulanse» like ut, og de er to ulike slags ting.»
+
+### Først en feil som gjorde oppgaven umulig
+
+Fanerekka så slik ut med to grupper:
+
+```
+Oversikt · Mannskap · Ambulanse · Mitt korps · Lag · Timeoversikt · …
+```
+
+**«Mitt korps» sto inne i gruppeblokka.** Rekka ble bygget med `push` og så
+`splice(2, 0, …)` for «Mitt korps» og `splice(1, 0, …)` for «Mannskap» — men indeks 2 var
+regnet mot en liste som ennå ikke hadde fått «Mannskap». Med én gruppe så det riktig ut;
+med to landet den midt inni.
+
+Ingen test så det, fordi **ingen test leste rekkefølgen** — bare at hver fane fantes. Og
+to slags faner kan ikke gis hvert sitt utseende så lenge de står om hverandre, så dette
+måtte rettes før utseendet ga mening.
+
+### Tre bolker i stedet for indeksregning
+
+```
+Oversikt · Mannskap │ Ambulanse · Lag · + Ny ressurs │ Mitt korps · Timeoversikt · Planlegger · Ikke plassert
+```
+
+«Ny ressurs» flyttet inn i gruppebolken — den lager en ressurs, og ressursene er det
+bolken handler om.
+
+### Utseendet: form, ikke farge
+
+Gruppefanene får fylt flate, tydeligere kant og halvfet skrift. **Ikke en ny farge:** i
+denne modulen varsler gult, grønt er tilstede og blått er valgt. En farge til ville vært
+et signal som konkurrerte med dem. Formen var ledig.
+
+Skillene tegnes bare når det finnes grupper — en strek mot ingenting er en strek man lurer
+på.
+
+### Sju mutanter, alle røde
+
+Blant dem den som setter flettingen tilbake. `FanerekkaHarToBolkerTests` pinner hele rekka
+i sin helhet, så en ny fane lagt til feil sted blir rød der i stedet for å bli oppdaget på
+staging.
+
+**Endret:** `static/js/vaktliste-tegning.js`, `static/css/vaktliste.css`,
+`vaktliste/tests_belastning.py` (+4), `vaktliste/tests_xss.py`, `vaktliste/CLAUDE.md`.
+
+---
+
 ## 2026-09-16 — Punkt 3 brutt: korpsdelen var alt løst
 
 **André:** «Bryt dette og bare sett det i TODO for noe å vurdere senere. Det fungerer

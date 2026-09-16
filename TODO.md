@@ -833,8 +833,6 @@ tilgangshull og data først, funksjonalitet i midten, utseende sist.
               «Lag 1» alltid én lagleder og tre lagsmedlemmer, er det oppsettet som
               gjentar seg — ikke en handling man gjør om igjen. Planleggeren lager alt
               plassene; den kunne gitt dem roller.
-      - [ ] **De faste fanene skal se annerledes ut enn ressursgruppefanene.** I dag ser
-            «Oversikt» og «Ambulanse» like ut, og de er to ulike slags ting
 
 - [ ] **Pulje 4 — trenger en avklaring fra André før noe kan spesifiseres.** Begge er
       reelle ønsker; ingen av dem har en entydig lesning ennå.

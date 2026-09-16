@@ -349,6 +349,20 @@ fase 3–7 gjenstår — se `docs/BESLUTNING_VAKTLISTE.md`, som er besluttet i s
 - **Et endepunkt uten flate finnes ikke for brukeren.** `/api/grupper/` sto en dag uten
   UI, og da kunne ingen lage en gruppe som ikke var seedet — samme feil som Django-admin
   ga oss i fase 1. Manageren ligger i «Innstillinger».
+- **Fanerekka er tre bolker, ikke én liste** (16. sep. 2026, punkt 5 — André: «de faste
+  fanene skal se annerledes ut enn ressursgruppefanene»): faste visninger foran,
+  gruppefanene i midten med «Ny ressurs», faste visninger bak, med en `.vl-faneskille`
+  mellom. Gruppefanene bærer `.vl-fane-gruppe` — fylt flate og tydeligere kant, **ikke en
+  ny farge**: gult varsler, grønt er tilstede og blått er valgt, så en farge til ville
+  konkurrert med signaler som alt betyr noe.
+  - **De sto flettet i hverandre.** Rekka ble bygget med `push` og så `splice(2, …)` for
+    «Mitt korps» og `splice(1, …)` for «Mannskap» — men indeks 2 var regnet mot en liste
+    som ennå ikke hadde fått «Mannskap», så «Mitt korps» landet *inne* i gruppeblokka så
+    snart det fantes to grupper: `Ambulanse · Mitt korps · Lag`. Ingen test så det, fordi
+    ingen leste **rekkefølgen** — bare at hver fane fantes. To slags faner kan ikke gis
+    hvert sitt utseende så lenge de står om hverandre.
+  - `FanerekkaHarToBolkerTests` pinner hele rekka i sin helhet. En ny fane lagt til feil
+    sted blir rød der, ikke oppdaget på staging.
 - **Fanen er ressursgruppa, ikke ressursen.** «Ambulanse» er alle ambulansene
   på vakta, med hver bil som sitt eget kort inni (`mkGruppe`). Én fane per bil
   ga ti faner på en vakt med ti biler, og ingen plass der man så dem i

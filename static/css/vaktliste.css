@@ -100,6 +100,45 @@
   color: var(--text-main);
 }
 
+/*
+  ── To slags faner (16. sep. 2026, pulje 3 punkt 5) ───────────────────────
+
+  André: «De faste fanene skal se annerledes ut enn ressursgruppefanene. I dag
+  ser Oversikt og Ambulanse like ut, og de er to ulike slags ting.»
+
+  **Forskjellen er hva fanen er:** de faste er måter å *lese* lista på —
+  Oversikt, Timeoversikt, Ikke plassert — mens gruppefanene er stedene man
+  *arbeider*, én per ressursgruppe, og de kommer og går med oppsettet.
+
+  Skillet er en fylt flate og en tydeligere kant, ikke en ny farge: fargene i
+  modulen betyr alt noe (gult varsler, grønt er tilstede, blått er valgt), og
+  en farge til ville vært et signal som konkurrerte med dem. Formen er ledig.
+*/
+.vl-fane-gruppe {
+  background: var(--surface-1);
+  border-color: color-mix(in srgb, var(--text-muted) 45%, transparent);
+  color: var(--text-main);
+  font-weight: 600;
+}
+
+.vl-fane-gruppe:hover {
+  border-color: var(--text-muted);
+}
+
+/*
+  Streken mellom bolkene. `aria-hidden`, fordi den ikke sier noe en
+  skjermleser ikke får av rekkefølgen — og `flex: 0 0 auto` så den ikke
+  strekkes når rekka brytes over to linjer.
+*/
+.vl-faneskille {
+  flex: 0 0 auto;
+  align-self: stretch;
+  width: 1px;
+  min-height: 1.4rem;
+  margin: 0 0.15rem;
+  background: var(--border-color);
+}
+
 .vl-fane.active {
   background: var(--header-bg) !important;
   color: #fff !important;

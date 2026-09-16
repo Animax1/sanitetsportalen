@@ -16,6 +16,7 @@ To ting bæres av testene her:
 Tallene regnes i `services`, ikke i viewet: et view skal ikke kunne svare på
 hva «korteste hvile» betyr.
 """
+import json
 from datetime import datetime, timedelta
 from datetime import timezone as dt_timezone
 from zoneinfo import ZoneInfo
@@ -983,3 +984,121 @@ class FanenHeterTimeoversiktTests(SimpleTestCase):
             with self.subTest(status=navn):
                 self.assertNotIn(f'>{navn}<', markup,
                                  f'«{navn}» er en statusverdi og kan ikke være et fanenavn')
+
+
+class FanerekkaHarToBolkerTests(SimpleTestCase):
+    """**De faste visningene og ressursgruppene er to ulike slags ting**
+    (André, 16. sep. 2026, pulje 3 punkt 5): «Oversikt og Ambulanse ser like
+    ut, og de er to ulike slags ting.»
+
+    Og de sto **flettet i hverandre**. Rekka ble bygget med `push` og så
+    `splice(2, …)` for «Mitt korps» — men indeks 2 var regnet mot en liste som
+    ennå ikke hadde fått «Mannskap» fra `splice(1, …)`, så «Mitt korps» landet
+    *inne* i gruppeblokka så snart det fantes to grupper:
+    `Ambulanse · Mitt korps · Lag`.
+
+    Ingen test så det, fordi ingen test leste **rekkefølgen** — bare at hver
+    fane fantes. To slags faner kan ikke gis hvert sitt utseende så lenge de
+    står om hverandre, så dette måtte rettes før utseendet ga mening.
+    """
+
+    FUNKSJONER = ('tegnFaner', 'kanPlanlegge', '_fanerad', '_mannskapsfane',
+                  'iDrift', '_tilstede', '_ikkePlassert', '_grupperMedRessurser',
+                  '_ressurserIGruppe', '_posterFor', 'kanLede', '_erAdmin',
+                  '_nivaa', '_mittKorpsId', '_synligePoster')
+
+    def setUp(self):
+        from patients.js_test_utils import (
+            OPPDRAG_SENTRAL_JS, PORTAL_UTILS_JS, VAKTLISTE_JS,  # noqa: F401
+            build_harness, node_available, run_node)
+        if not node_available():
+            self.skipTest('node er ikke tilgjengelig')
+        self.harness = build_harness((
+            (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue')),
+            (VAKTLISTE_JS, self.FUNKSJONER),
+        ))
+
+    def _markup(self, korps='1'):
+        from patients.js_test_utils import run_node
+        return run_node(self.harness, f"""
+            globalThis.window = {{ MODUL_TILGANG: {{ vaktliste: 'skriv_leder' }},
+                                  MITT_KORPS_ID: {korps} }};
+            globalThis.aktivFane = 'oversikt';
+            globalThis.OVERSIKT='oversikt'; globalThis.MANNSKAP='mannskap';
+            globalThis.TILSTEDE='tilstede'; globalThis.BELASTNING='belastning';
+            globalThis.PLANLEGGER='planlegger'; globalThis.IKKE_PLASSERT='ikke-plassert';
+            globalThis.MITT_KORPS='mitt-korps';
+            globalThis.belastning=null; globalThis.register=null;
+            globalThis.utskriftDag=null; globalThis.korpsfilter=null;
+            globalThis.aktivListe = {{
+              vaktliste: {{id:1, vakt_navn:'V', status_navn:'Planlegging', i_drift:false}},
+              grupper: [{{id:1, navn:'Ambulanse', ikon:'truck'}},
+                        {{id:2, navn:'Lag', ikon:'people'}}],
+              ressurser: [{{id:1, navn:'A1', gruppe_id:1}}, {{id:2, navn:'L1', gruppe_id:2}}],
+              vaktposter: [], alle_vaktposter: [], mannskap: [], korps: [] }};
+            const el = {{ innerHTML: '' }};
+            globalThis.document = {{ getElementById: () => el, querySelectorAll: () => [] }};
+            tegnFaner();
+            console.log(JSON.stringify(el.innerHTML));
+        """)
+
+    def _rekke(self, markup):
+        """Fanenavnene i rekkefølge, med `│` der et skille står."""
+        import re as _re
+        ut = []
+        for m in _re.finditer(r'vl-faneskille|</i>([^<]+)', markup):
+            ut.append('│' if m.group(0).startswith('vl-faneskille')
+                      else m.group(1).strip())
+        return ut
+
+    def test_gruppefanene_staar_samlet_og_ingen_fast_fane_er_inni(self):
+        """**Feilen, direkte.** «Mitt korps» sto mellom «Ambulanse» og «Lag»."""
+        rekke = self._rekke(json.loads(self._markup().strip().splitlines()[0]))
+        forste, siste = rekke.index('│'), len(rekke) - 1 - rekke[::-1].index('│')
+        inni = rekke[forste + 1:siste]
+        self.assertEqual(inni, ['Ambulanse', 'Lag', 'Ny ressurs'],
+                         'bare gruppene og knappen som lager en til')
+        self.assertNotIn('Mitt korps', inni)
+
+    def test_hele_rekka_i_rekkefolge(self):
+        """Rekkefølgen er hele poenget, så den pinnes i sin helhet. En ny fane
+        lagt til feil sted blir rød her, ikke oppdaget på staging."""
+        rekke = self._rekke(json.loads(self._markup().strip().splitlines()[0]))
+        self.assertEqual(rekke, [
+            'Oversikt', 'Mannskap',
+            '│', 'Ambulanse', 'Lag', 'Ny ressurs', '│',
+            'Mitt korps', 'Timeoversikt', 'Planlegger', 'Ikke plassert'])
+
+    def test_bare_gruppefanene_baerer_gruppeklassen(self):
+        """Utseendet André ba om. «Ny ressurs» hører til bolken og bærer den
+        også — den lager en ressurs, og ressursene er det bolken handler om."""
+        markup = json.loads(self._markup().strip().splitlines()[0])
+        import re as _re
+        med = [_re.search(r'</i>([^<]+)', k).group(1).strip()
+               for k in _re.findall(r'<button class="vl-fane vl-fane-gruppe[^>]*>.*?</button>',
+                                    markup, _re.S)]
+        self.assertEqual(sorted(med), ['Ambulanse', 'Lag', 'Ny ressurs'])
+
+    def test_uten_grupper_staar_ingen_skiller(self):
+        """Et skille mot ingenting er en strek man lurer på."""
+        from patients.js_test_utils import run_node
+        ut = run_node(self.harness, """
+            globalThis.window = { MODUL_TILGANG: { vaktliste: 'les' } };
+            globalThis.aktivFane='oversikt'; globalThis.OVERSIKT='oversikt';
+            globalThis.MANNSKAP='mannskap'; globalThis.TILSTEDE='tilstede';
+            globalThis.BELASTNING='belastning'; globalThis.PLANLEGGER='planlegger';
+            globalThis.IKKE_PLASSERT='ikke-plassert'; globalThis.MITT_KORPS='mitt-korps';
+            globalThis.belastning=null; globalThis.register=null;
+            globalThis.utskriftDag=null; globalThis.korpsfilter=null;
+            globalThis.aktivListe = {
+              vaktliste:{id:1, vakt_navn:'V', status_navn:'Planlegging', i_drift:false},
+              grupper: [], ressurser: [], vaktposter: [], alle_vaktposter: [],
+              mannskap: [], korps: [] };
+            const el = { innerHTML: '' };
+            globalThis.document = { getElementById: () => el, querySelectorAll: () => [] };
+            tegnFaner();
+            console.log(JSON.stringify(el.innerHTML));
+        """)
+        markup = json.loads(ut.strip().splitlines()[0])
+        self.assertNotIn('vl-faneskille', markup)
+        self.assertNotIn('vl-fane-gruppe', markup)

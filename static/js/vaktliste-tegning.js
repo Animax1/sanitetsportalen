@@ -228,25 +228,53 @@ function tegnFaner() {
     return;
   }
 
-  const faner = [{ id: OVERSIKT, navn: 'Oversikt', ikon: 'list-ul', antall: null }];
+  // ── Tre bolker, ikke én liste med `splice` ────────────────────────────
+  //
+  // **De faste visningene og ressursgruppene er to ulike slags ting** (André,
+  // 16. sep. 2026, pulje 3 punkt 5): «Oversikt» og «Ambulanse» så like ut, og
+  // det ene er en måte å lese lista på mens det andre er stedet man arbeider.
+  //
+  // De sto dessuten *flettet* i hverandre. Rekkefølgen ble bygget med
+  // `push` og så `splice(2, …)` for «Mitt korps» og `splice(1, …)` for
+  // «Mannskap» — men indeks 2 ble regnet mot en liste som ennå ikke hadde
+  // fått «Mannskap», så «Mitt korps» landet *inne* i gruppeblokka så snart
+  // det fantes to grupper: «Ambulanse · Mitt korps · Lag». To slags faner kan
+  // ikke gis hvert sitt utseende så lenge de står om hverandre, så bolkene
+  // bygges nå hver for seg og skjøtes til slutt.
+  const foran = [
+    { id: OVERSIKT, navn: 'Oversikt', ikon: 'list-ul', antall: null },
+    _mannskapsfane(),
+  ];
+
   // **Én fane per gruppe.** «Ambulanse» er alle ambulansene, ikke én av dem.
-  _grupperMedRessurser().forEach((g) => {
-    const ressurser = _ressurserIGruppe(g.id);
-    faner.push({
-      id: String(g.id), navn: g.navn, ikon: g.ikon,
-      antall: ressurser.reduce((n, r) => n + _posterFor(r.id).length, 0),
+  const gruppefaner = _grupperMedRessurser().map((g) => ({
+    id: String(g.id), navn: g.navn, ikon: g.ikon, slag: 'gruppe',
+    antall: _ressurserIGruppe(g.id)
+      .reduce((n, r) => n + _posterFor(r.id).length, 0),
+  }));
+
+  const bak = [];
+
+  // **«Mitt korps»** (11. sep. 2026): plassene korpset har ansvar for, på
+  // tvers av ressursene. Tallet er det som gjenstår å dekke. Finnes bare
+  // når det er et korps å vise — badgen, eller korpsvelgeren.
+  if (_mittKorpsId() != null) {
+    const mine = _synligePoster(
+      aktivListe.alle_vaktposter || aktivListe.vaktposter, _mittKorpsId());
+    bak.push({
+      id: MITT_KORPS, navn: 'Mitt korps', ikon: 'people-fill',
+      antall: mine.filter((vp) => vp.ledig).length,
     });
-  });
+  }
+
   // **Fanen heter «Timeoversikt»** (André, 16. sep. 2026). Den het
   // «Planlegging», og det navnet var opptatt: `Vaktliste.status` har verdien
   // «Planlegging» ved siden av «I drift», så merket øverst på siden og fanen
   // sa det samme ordet om to helt ulike ting. Nå sier navnet hva den viser —
   // timer per person — og «Planlegging» betyr bare status.
   //
-  // Tallene er lista regnet sammen (§8b), ikke en ny kilde. Fanen står ved
-  // siden av «Oversikt» fordi det er samme spørsmål sett fra en annen kant:
-  // oversikten er hvem som står hvor, denne er hva det koster dem.
-  faner.push({
+  // Tallene er lista regnet sammen (§8b), ikke en ny kilde.
+  bak.push({
     id: BELASTNING, navn: 'Timeoversikt', ikon: 'graph-up',
     antall: belastning ? belastning.sammendrag.personer : null,
   });
@@ -257,54 +285,42 @@ function tegnFaner() {
   // de to er altså ikke en rangering — det er at man kommer tilbake til
   // tallene oftere enn til generatoren.
   if (kanPlanlegge()) {
-    faner.push({
-      id: PLANLEGGER, navn: 'Planlegger', ikon: 'magic',
-      antall: null,
-    });
+    bak.push({ id: PLANLEGGER, navn: 'Planlegger', ikon: 'magic', antall: null });
   }
 
   // **«Tilstede nå» finnes bare i drift.** I planlegging er den tom per
   // definisjon — ingen er stemplet — og en fane som alltid sier null er en
   // fane man slutter å se.
   if (iDrift()) {
-    faner.push({
+    bak.push({
       id: TILSTEDE, navn: 'Tilstede nå', ikon: 'person-check',
       antall: _tilstede().length,
     });
   }
 
-  faner.push({
+  bak.push({
     id: IKKE_PLASSERT, navn: 'Ikke plassert', ikon: 'person-dash',
     antall: _ikkePlassert().length,
   });
 
-  // **«Mitt korps»** (11. sep. 2026): plassene korpset har ansvar for, på
-  // tvers av ressursene. Tallet er det som gjenstår å dekke. Finnes bare
-  // når det er et korps å vise — badgen, eller korpsvelgeren.
-  if (_mittKorpsId() != null) {
-    const mine = _synligePoster(aktivListe.alle_vaktposter || aktivListe.vaktposter, _mittKorpsId());
-    faner.splice(2, 0, {
-      id: MITT_KORPS, navn: 'Mitt korps', ikon: 'people-fill',
-      antall: mine.filter((vp) => vp.ledig).length,
-    });
-  }
-
-  // **Mannskap er en ekte fane, ikke en lenke.** Den var en lenke ut til
-  // /vaktliste/registre/, og et klikk kostet deg plassen i planleggingen —
-  // mens mannskap og ressurser er nettopp de to man veksler mellom.
-  faner.splice(1, 0, _mannskapsfane());
-
-  // «Ny ressurs» sist. Bygges her og ikke i malen fordi den skal stå etter
-  // faner som kommer fra data; `gateKnapper()` rekker ikke over markup som
-  // tegnes på nytt ved hvert panelbytte, så tilgangen sjekkes her.
+  // «Ny ressurs» hører til gruppebolken, ikke til enden av rekka: den lager
+  // en ressurs, og ressursene er det bolken handler om. `gateKnapper()`
+  // rekker ikke over markup som tegnes på nytt ved hvert panelbytte, så
+  // tilgangen sjekkes her.
   const nyRessurs = kanLede()
-    ? `<button class="vl-fane vl-fane-ny" type="button"
+    ? `<button class="vl-fane vl-fane-gruppe vl-fane-ny" type="button"
                data-action="apneNyRessurs">
          <i class="bi bi-plus-lg me-1"></i>Ny ressurs
        </button>`
     : '';
 
-  el.innerHTML = _fanerad(faner, nyRessurs);
+  // Skillene står bare der det faktisk er noe på begge sider — et skille mot
+  // ingenting er en strek man lurer på.
+  const skille = '<span class="vl-faneskille" aria-hidden="true"></span>';
+  const gruppebolk = _fanerad(gruppefaner, nyRessurs);
+  el.innerHTML = _fanerad(foran, '')
+    + (gruppebolk ? skille + gruppebolk + skille : '')
+    + _fanerad(bak, '');
 }
 
 
@@ -313,7 +329,10 @@ function _fanerad(faner, hale) {
     const aktiv = f.id === aktivFane ? ' active' : '';
     const antall = f.antall === null ? ''
       : `<span class="vl-antall">${escHtmlValue(f.antall)}</span>`;
-    return `<button class="vl-fane${aktiv}" data-action="visFane" data-arg="${escHtmlValue(f.id)}">`
+    // Gruppefanene merkes så de kan se ut som det de er — stedene man
+    // arbeider, til forskjell fra de faste måtene å lese lista på.
+    const slag = f.slag === 'gruppe' ? ' vl-fane-gruppe' : '';
+    return `<button class="vl-fane${slag}${aktiv}" data-action="visFane" data-arg="${escHtmlValue(f.id)}">`
          + `<i class="bi bi-${escHtmlValue(f.ikon)} me-1"></i>${escapeHtml(f.navn)}${antall}</button>`;
   }).join('') + hale;
 }

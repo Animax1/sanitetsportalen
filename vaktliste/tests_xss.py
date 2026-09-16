@@ -55,6 +55,8 @@ HTML_BUILDERS = (
 ESCAPING_CALLS = ('escHtmlValue(', 'cellHtml(', '_escHtml(', 'escapeHtml(')
 
 REVIEWED_INTERPOLATIONS = {
+    # Fanerekka delt i bolker (16. sep. 2026, pulje 3 punkt 5).
+    'slag': 'hardkodet CSS-klasse fra en ternær',
     # Rollerekkefølgen (16. sep. 2026, pulje 3 punkt 6). Begge er markup
     # bygget i funksjonen, med rolle-id escapet inni.
     'opp': 'markup bygget lokalt, rolle-id escapet inni',
