@@ -4,6 +4,37 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-16 — Hvorfor «pålogget» ikke betyr «til stede»
+
+**André:** «I /server-status/ ser du hvem som er pålogget, men de trenger ikke være faktisk
+aktive og bruke nettsiden — det kan være en fane.»
+
+Han har rett, og grunnen lot seg måle i stedet for å gjettes:
+
+- `SESSION_SAVE_EVERY_REQUEST = True` — sesjonen fornyes ved **hver** forespørsel.
+- Portalen poller av seg selv hvert **5.–30. sekund**: lydvarselet 5 s, offline-køen 15 s,
+  tavla og auto-refresh 30 s.
+
+En glemt fane holder derfor sesjonen fersk i åtte timer, helt uten et menneske. `expire_date`
+er ikke et dårlig mål på tilstedeværelse — det er **ikke et mål på det i det hele tatt**.
+
+Det avgjør også spørsmålet som sto åpent i TODO («hva er aktiv — siste forespørsel eller
+siste skriving?»): **ingen av dem.** Siste forespørsel er polling. Siste skriving er for
+strengt — en vaktleder som leser lista i en time arbeider.
+
+**Forslaget som står igjen: la pollingen bære svaret.** Fana snakker med serveren uansett;
+la den sende hvor lenge siden brukeren sist rørte siden. Ingen ny polling, ett felt på en
+forespørsel som alt går — og det er det ene tallet som svarer på spørsmålet.
+
+Ingen kode skrevet. Funnet og forslaget står i TODO, sammen med det som må avgjøres før
+noen bygger: om en inaktiv sesjon skal logges ut automatisk, eller bare vises. Automatikk
+midt i en vakt er en risiko — bilen som ikke har rørt skjermen på en time er fortsatt på
+vakt.
+
+**Endret:** `TODO.md`. Ingen kodeendring.
+
+---
+
 ## 2026-09-16 — Pulje 3 punkt 5: fanerekka er to slags ting, og sto som én
 
 **André:** «De faste fanene skal se annerledes ut enn ressursgruppefanene. I dag ser

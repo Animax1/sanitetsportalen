@@ -840,10 +840,28 @@ tilgangshull og data først, funksjonalitet i midten, utseende sist.
             plassene på én ressurs, eller en navngitt gruppe mannskap som følges ad
             gjennom flere skift? De to er helt ulike modeller, og den andre trenger en ny
             tabell
-      - [ ] **Logge ut inaktive sesjoner, og se hvem som faktisk er pålogget.** Portalen
-            har sesjonstimeout i dag; ønsket her er en *oversikt* og en måte å kaste noen
-            ut på. Spørsmålet som må avgjøres først: hva er «aktiv» — siste forespørsel,
-            eller siste handling som skrev noe?
+      - [ ] **Vis faktisk aktivitet per sesjon på `/portal-admin/server-status/`.**
+            **Avklart 16. sep. 2026 (André):** «I /server-status/ ser du hvem som er
+            pålogget, men de trenger ikke være faktisk aktive og bruke nettsiden — det kan
+            være en fane. Den vil jeg gjerne kunne se.»
+            Lista over påloggede finnes alt (`_list_active_sessions`), med utlogging per
+            sesjon. Det den mangler er *om noen er der*.
+            - **`expire_date` duger ikke, og grunnen er målt:**
+              `SESSION_SAVE_EVERY_REQUEST = True` fornyer sesjonen ved **hver** forespørsel,
+              og portalen poller av seg selv hvert 5.–30. sekund (lydvarselet 5 s,
+              offline-køen 15 s, tavla og auto-refresh 30 s). En glemt fane holder derfor
+              sesjonen «fersk» i åtte timer. Det er nøyaktig det André så.
+            - **«Siste forespørsel» er dermed ubrukelig, og «siste skriving» for strengt** —
+              en vaktleder som leser lista i en time arbeider, uten å skrive noe.
+            - **Forslag: la pollingen bære svaret.** Fana snakker med serveren hvert 5.–30.
+              sekund uansett; la den sende hvor lenge siden brukeren sist rørte siden
+              (`pointerdown`/`keydown`/`visibilitychange`). Da kan lista si «aktiv nå»,
+              «inaktiv i 40 min» eller «fane i bakgrunnen siden 09:12» — og det er det ene
+              tallet som faktisk svarer på spørsmålet. Ingen ny polling, ett felt på en
+              forespørsel som alt går.
+            - **Vurder samtidig:** skal en inaktiv sesjon logges ut *automatisk* etter en
+              grense, eller bare vises så admin kan gjøre det? Automatikk midt i en vakt er
+              en risiko — bilen som ikke har rørt skjermen på en time er fortsatt på vakt.
 
 ### Løse punkter
 
