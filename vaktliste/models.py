@@ -240,15 +240,53 @@ class Ressursrolle(BaseTimeStampedModel):
         help_text='Inaktive roller skjules i nedtrekkslister, men beholdes '
                   'på vaktposter som allerede bruker dem.',
     )
+    #: **Rangering, ikke alfabet** (André, 16. sep. 2026, pulje 3 punkt 6):
+    #: «rollene sorteres meningsfullt — leder øverst, hospitant nederst».
+    #: Alfabetisk satte «Hospitant» over «Lagleder», og et nedtrekk der den
+    #: vanligste rollen ligger midt i lista koster et blikk hver gang.
+    #:
+    #: **Som data, ikke som en liste i koden.** Rollene seedes ikke med faste
+    #: navn — de kom fra det som fantes ved migrasjon `0007` — så en
+    #: hardkodet rangering ville truffet noen installasjoner og ikke andre.
+    #: Samme begrunnelse som `Ressursgruppe.rekkefolge` fikk 30. aug. 2026:
+    #: en vaktleder som trenger rekkefølgen i kveld kan ikke vente på en
+    #: utrulling.
+    rekkefolge = models.IntegerField(
+        default=100, verbose_name='Rekkefølge',
+        help_text='Styrer rekkefølgen i nedtrekket. Settes automatisk til '
+                  'opprettelsesrekkefølgen.')
 
     class Meta:
         verbose_name = 'Ressursrolle'
         verbose_name_plural = 'Ressursroller'
-        ordering = ['gruppe__rekkefolge', Lower('navn')]
+        # Navnet avgjør bare uavgjort — to roller med samme rekkefølge er en
+        # vilkårlig rekkefølge, og vilkårlig skal i det minste være stabil.
+        ordering = ['gruppe__rekkefolge', 'rekkefolge', Lower('navn')]
         constraints = [
             models.UniqueConstraint(
                 fields=['gruppe', 'navn'], name='unikt_rollenavn_per_gruppe'),
         ]
+
+    def save(self, *args, **kwargs):
+        """En ny rolle havner **sist i sin gruppe**.
+
+        Her og ikke i viewet, fordi rollene opprettes av den generiske
+        `_register_views`-fabrikken i `views_registre` — den kjenner bare
+        tekstfelter (`ekstra_felt`), og et heltall måtte fått et unntak inni
+        den. Da ville regelen stått i fabrikken for alle tre verdimengdene,
+        mens bare én av dem har rekkefølge.
+
+        Den som legger til «Hospitant» skal ikke måtte finne på et tall, og
+        sist er riktig gjetning: rekkefølgen er en rangering man justerer
+        etterpå, ikke noe man kan når man skriver navnet.
+        """
+        if self._state.adding and self.rekkefolge == 100 and self.gruppe_id:
+            hoyest = (Ressursrolle.objects
+                      .filter(gruppe_id=self.gruppe_id)
+                      .order_by('-rekkefolge')
+                      .values_list('rekkefolge', flat=True).first())
+            self.rekkefolge = (hoyest or 0) + 10
+        super().save(*args, **kwargs)
 
     def __str__(self) -> str:
         return self.navn

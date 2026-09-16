@@ -96,6 +96,9 @@ urlpatterns = [
     path('api/grupper/', views.grupper_view, name='vaktliste_api_grupper'),
     path('api/grupper/<int:pk>/', views.gruppe_detalj_view,
          name='vaktliste_api_gruppe_detalj'),
+    # Rekkefølgen før detaljruta: et fritt ledd der ville fanget «rekkefolge».
+    path('api/roller/rekkefolge/', views.roller_rekkefolge_view,
+         name='vaktliste_api_roller_rekkefolge'),
     path('api/roller/', views_registre.roller_view, name='vaktliste_api_roller'),
     path('api/roller/<int:pk>/', views_registre.rolle_detalj_view,
          name='vaktliste_api_rolle_detalj'),

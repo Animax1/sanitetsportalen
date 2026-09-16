@@ -449,27 +449,71 @@ function tegnRoller() {
   const gruppeId = Number(document.getElementById('rollerModal')?.dataset.gruppe);
   const roller = ((aktivListe && aktivListe.roller) || [])
     .filter((r) => r.gruppe_id === gruppeId);
-  el.innerHTML = roller.length ? roller.map(mkRolleRad).join('')
+  // **Rekkefølgen tegnes, den utledes ikke i byggeren.** `mkRolleRad` får
+  // vite om raden er først og sist, så opp/ned kan slås av i endene i stedet
+  // for å hoppe. Serveren sender lista i rangert rekkefølge (16. sep. 2026).
+  el.innerHTML = roller.length
+    ? roller.map((r, i) => mkRolleRad(r, i === 0, i === roller.length - 1)).join('')
     : '<div class="vl-tom">Ingen roller i denne gruppa ennå.</div>';
 }
 
 
-function mkRolleRad(r) {
+function mkRolleRad(r, forste, siste) {
   // «I bruk» står i lista: en rolle man kan slette uten å vite hvor mange
   // skift som peker på den, sletter man for lett.
   const bruk = r.i_bruk
     ? `<span class="vl-meta">${escHtmlValue(r.i_bruk)} i bruk</span>`
     : '<span class="vl-meta">ubrukt</span>';
+  // **Rangering, ikke alfabet** (André, 16. sep. 2026, pulje 3 punkt 6):
+  // «leder øverst, hospitant nederst». Knappene ligger der, men er avslått i
+  // endene — en rad som hopper i høyde når den kommer først er verre enn en
+  // knapp som ikke gjør noe.
+  const opp = `<button class="btn btn-sm btn-outline-secondary" type="button"
+               title="Flytt opp" aria-label="Flytt opp"
+               data-action="flyttRolle" data-arg="${escHtmlValue(r.id + ':opp')}"${forste ? ' disabled' : ''}><i class="bi bi-chevron-up"></i></button>`;
+  const ned = `<button class="btn btn-sm btn-outline-secondary" type="button"
+               title="Flytt ned" aria-label="Flytt ned"
+               data-action="flyttRolle" data-arg="${escHtmlValue(r.id + ':ned')}"${siste ? ' disabled' : ''}><i class="bi bi-chevron-down"></i></button>`;
   return `
     <div class="vl-rad">
       <span class="vl-navn">${escapeHtml(r.navn)}</span>
       <div class="d-flex align-items-center gap-2">
+        <span class="btn-group">${opp}${ned}</span>
         ${bruk}
         <button class="btn btn-sm btn-outline-danger" type="button"
                 title="Slett rollen" aria-label="Slett rollen"
                 data-action="slettRolle" data-id="${escHtmlValue(r.id)}"><i class="bi bi-trash"></i></button>
       </div>
     </div>`;
+}
+
+
+async function flyttRolle(arg) {
+  // «id:opp» / «id:ned» — klikkdelegeringen sender ett argument.
+  const [raa, retning] = String(arg).split(':');
+  const id = Number(raa);
+  const gruppeId = Number(document.getElementById('rollerModal')?.dataset.gruppe);
+  const ider = ((aktivListe && aktivListe.roller) || [])
+    .filter((r) => r.gruppe_id === gruppeId).map((r) => r.id);
+  const i = ider.indexOf(id);
+  const j = retning === 'opp' ? i - 1 : i + 1;
+  if (i < 0 || j < 0 || j >= ider.length) return;
+  [ider[i], ider[j]] = [ider[j], ider[i]];
+
+  // **Hele lista, ikke «opp» på én rad.** To kall som krysser hverandre ville
+  // byttet to par og etterlatt en rekkefølge ingen ba om. Samme idiom som
+  // verdimengdene i oppdragsmodulen.
+  const res = await apiFetch('/vaktliste/api/roller/rekkefolge/', {
+    method: 'PUT', body: JSON.stringify({ gruppe_id: gruppeId, ider }),
+  });
+  const d = await res.json().catch(() => ({}));
+  if (!res.ok || d.status !== 'ok') {
+    _visFeil('rolle-feil', d.message || 'Kunne ikke flytte rollen.');
+    return;
+  }
+  _skjulFeil('rolle-feil');
+  await _lastRegisterOgListe();
+  tegnRoller();
 }
 
 
@@ -547,14 +591,38 @@ function mkGruppeRad(g) {
         <button class="btn btn-sm btn-outline-danger" type="button"
                 title="Slett gruppa" aria-label="Slett gruppa"
                 data-action="slettGruppe" data-id="${escHtmlValue(g.id)}"><i class="bi bi-trash"></i></button>`;
+  // **Gruppene kunne opprettes og slettes, men ikke endres** (André,
+  // 16. sep. 2026, pulje 3 punkt 4). Serveren har støttet PUT hele tiden;
+  // det manglet en knapp. Og en gruppe *i bruk* kunne verken slettes eller
+  // skjules — `er_aktiv` fantes i modellen, ble respektert i nedtrekkene, og
+  // hadde ingen vei inn. Det er den verste sorten hull: mekanismen virker,
+  // så ingenting feiler, den er bare uoppnåelig.
+  const endre = `
+        <button class="btn btn-sm btn-outline-secondary" type="button"
+                title="Endre navn og ikon" aria-label="Endre navn og ikon"
+                data-action="endreGruppe" data-id="${escHtmlValue(g.id)}"><i class="bi bi-pencil"></i></button>`;
+  const aktiv = g.er_aktiv
+    ? `<button class="btn btn-sm btn-outline-secondary" type="button"
+               data-action="settGruppeAktiv" data-arg="${escHtmlValue(g.id + ':0')}">Deaktiver</button>`
+    : `<button class="btn btn-sm btn-outline-success" type="button"
+               data-action="settGruppeAktiv" data-arg="${escHtmlValue(g.id + ':1')}">Aktiver</button>`;
+  // Den inaktive gruppa dempes, som mannskapsregisteret gjør det. Uten det
+  // ser en deaktivert gruppe nøyaktig ut som en aktiv, og «hvorfor står den
+  // ikke i nedtrekket?» blir et spørsmål ingen kan svare på ved å se.
+  const dempet = g.er_aktiv ? '' : ' vl-inaktiv';
+  const inaktivMerke = g.er_aktiv ? ''
+    : '<span class="vl-merkelapp">inaktiv</span>';
   return `
-    <div class="vl-rad">
+    <div class="vl-rad${escHtmlValue(dempet)}">
       <span class="vl-navn">
         <i class="bi bi-${escHtmlValue(g.ikon)} me-2"></i>${escapeHtml(g.navn)}
       </span>
       <div class="d-flex align-items-center gap-2">
+        ${inaktivMerke}
         ${ett}
         ${bruk}
+        ${endre}
+        ${aktiv}
         ${slett}
       </div>
     </div>`;
@@ -588,13 +656,65 @@ async function opprettGruppe() {
 }
 
 
+async function _gruppeKall(id, kropp, feiltekst) {
+  // Én vei ut for begge endringene: PUT, les feilen, tegn på nytt.
+  const res = await apiFetch(`/vaktliste/api/grupper/${id}/`, {
+    method: 'PUT', body: JSON.stringify(kropp),
+  });
+  const d = await res.json().catch(() => ({}));
+  if (!res.ok || d.status !== 'ok') {
+    _visFeil('gruppe-feil', d.message || feiltekst);
+    return false;
+  }
+  _skjulFeil('gruppe-feil');
+  await lastListe(aktivListe.vaktliste.id);
+  tegnGrupper();
+  return true;
+}
+
+
+async function endreGruppe(id) {
+  const g = (aktivListe.grupper || []).find((x) => x.id === id);
+  if (!g) return;
+  const navn = (prompt('Nytt navn på gruppa:', g.navn) || '').trim();
+  if (!navn) return;
+  // Ikonet spørres om etter navnet, og tomt svar beholder det gamle: den
+  // som bare vil rette en skrivefeil i navnet skal ikke måtte skrive
+  // «ambulance» på nytt for å slippe unna.
+  const ikon = prompt('Ikon (Bootstrap-navn uten «bi-»), tomt beholder dagens:', g.ikon);
+  if (ikon === null) return;
+  const kropp = { navn };
+  if (ikon.trim()) kropp.ikon = ikon.trim();
+  await _gruppeKall(id, kropp, 'Kunne ikke endre gruppa.');
+}
+
+
+async function settGruppeAktiv(arg) {
+  // «id:0» / «id:1» — klikkdelegeringen sender ett argument.
+  const [id, paa] = String(arg).split(':');
+  await _gruppeKall(Number(id), { er_aktiv: paa === '1' },
+                    'Kunne ikke endre gruppa.');
+}
+
+
 async function slettGruppe(id) {
   const gruppe = (aktivListe.grupper || []).find((g) => g.id === id);
   if (!gruppe) return;
   if (!confirm(`Slette gruppa «${gruppe.navn}»?`)) return;
 
-  const res = await apiFetch(`/vaktliste/api/grupper/${id}/`, { method: 'DELETE' });
-  const d = await res.json().catch(() => ({}));
+  let res = await apiFetch(`/vaktliste/api/grupper/${id}/`, { method: 'DELETE' });
+  let d = await res.json().catch(() => ({}));
+  // **409 er «rollene følger med», ikke et avslag** (16. sep. 2026). Serveren
+  // nevner hvor mange, og den som svarer ja sender bekreftelsen. Det er
+  // serveren som teller rollene — klienten har dem ikke, og et tall den
+  // gjettet ville vært feil akkurat når det betydde noe.
+  if (res.status === 409) {
+    if (!confirm(`${d.message || ''}\n\nSlette likevel?`)) return;
+    res = await apiFetch(`/vaktliste/api/grupper/${id}/`, {
+      method: 'DELETE', body: JSON.stringify({ confirm: true }),
+    });
+    d = await res.json().catch(() => ({}));
+  }
   if (!res.ok) { _visFeil('gruppe-feil', d.message || 'Kunne ikke slette.'); return; }
   _skjulFeil('gruppe-feil');
   await lastListe(aktivListe.vaktliste.id);

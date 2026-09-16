@@ -584,7 +584,23 @@ def gruppe_detalj_view(request, pk):
 
     if request.method == 'DELETE':
         if gruppe.ressurser.exists():
-            return _feil('Gruppa er i bruk. Deaktiver den i stedet.')
+            return _feil(
+                f'«{gruppe.navn}» er i bruk av {gruppe.ressurser.count()} '
+                'ressurs(er) og kan ikke slettes. Deaktiver den i stedet — da '
+                'forsvinner den fra nedtrekkene, men står igjen der den brukes.')
+        # **Rollene følger med, og det skal sies høyt** (André, 16. sep. 2026).
+        # `Ressursrolle.gruppe` er `CASCADE`, mens `Ressurs.gruppe` er
+        # `PROTECT`: en gruppe uten ressurser *kan* slettes, og tok da rollene
+        # sine med seg uten et ord. «Lagleder» og «Sjåfør» er oppsett noen har
+        # skrevet inn, og de er borte for godt.
+        #
+        # Bekreftelsen kreves bare når det faktisk finnes roller — et
+        # ekstra klikk på en tom gruppe er en vane man slutter å lese.
+        roller = gruppe.roller.count()
+        if roller and not _json_body(request).get('confirm'):
+            return _feil(
+                f'«{gruppe.navn}» har {roller} rolle(r) som slettes sammen med '
+                'den. Bekreft for å fortsette.', status=409)
         gruppe.delete()
         return JsonResponse({'status': 'ok'})
 
@@ -610,6 +626,49 @@ def gruppe_detalj_view(request, pk):
         return _feil(f'«{gruppe.navn}» finnes allerede.')
 
     return JsonResponse({'status': 'ok', 'data': _gruppe_til_dict(gruppe)})
+
+
+@modul_kreves('vaktliste', 'les', svar='json')
+@require_http_methods(['PUT'])
+@rate_limit(group='vaktliste:rollerekkefolge', rate='60/m', method='PUT')
+def roller_rekkefolge_view(request):
+    """Sett rekkefølgen på rollene i én gruppe. `skriv_leder`/admin.
+
+    **Hele lista, ikke «opp» per rad** (samme idiom som verdimengdene i
+    oppdragsmodulen). To «opp»-kall som krysser hverandre bytter to par og
+    etterlater en rekkefølge ingen ba om; én forespørsel med den rekkefølgen
+    klienten viser er atomisk og lar seg gjenta uten skade.
+
+    **Bare roller i den oppgitte gruppa.** Uten avgrensningen kunne en liste
+    med ID-er fra en annen gruppe skrevet tall inn der, og rekkefølgen er per
+    gruppe — «Lagleder» på ambulansen og på samleplassen er to rader.
+    """
+    if not services.kan_lede(request.user):
+        return _nektet()
+
+    data = _json_body(request)
+    gruppe_id = _int(data.get('gruppe_id'))
+    ider = data.get('ider')
+    if not gruppe_id or not isinstance(ider, list):
+        return _feil('Oppgi «gruppe_id» og «ider» som en liste.')
+
+    roller = {r.pk: r for r in Ressursrolle.objects.filter(gruppe_id=gruppe_id)}
+    if {_int(i) for i in ider} != set(roller):
+        # **Hele gruppa, ikke et utvalg.** Et delvis sett ville gitt noen rader
+        # nye tall og latt resten stå — og da er rekkefølgen en blanding av to
+        # oppfatninger. Feilen er også den eneste måten å oppdage at klienten
+        # og serveren ser ulike lister.
+        return _feil('Lista må inneholde nøyaktig rollene i gruppa.')
+
+    with transaction.atomic():
+        for plass, rolle_id in enumerate(ider, start=1):
+            rolle = roller[_int(rolle_id)]
+            rolle.rekkefolge = plass * 10
+            rolle.save(update_fields=['rekkefolge'])
+
+    return JsonResponse({'status': 'ok', 'data': [
+        _rolle_til_dict(r) for r in
+        Ressursrolle.objects.filter(gruppe_id=gruppe_id)]})
 
 
 def _enheter():

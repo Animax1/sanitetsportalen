@@ -4,6 +4,74 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-16 — Pulje 3B: ressursgruppene kan endres, og rollene rangeres
+
+To punkter fra pulje 3. Begge viste seg å være **manglende flate over en mekanisme som
+alt virket** — den sorten hull der ingenting feiler, fordi funksjonen bare er uoppnåelig.
+
+### Punkt 4: gruppene
+
+André: «de som er i bruk på vaktlister nå må jo få bli.» Databasen var enig fra før —
+`Ressurs.gruppe` er `PROTECT` — så halve svaret sto der. Det som manglet:
+
+- **Redigering i det hele tatt.** Serveren har støttet `PUT` siden gruppene ble en tabell;
+  klienten kunne bare opprette og slette. En gruppe kunne altså ikke omdøpes.
+- **`er_aktiv` hadde ingen vei inn.** Feltet fantes fra 30. aug. 2026, nedtrekkene
+  respekterte det, og ingen skjerm kunne sette det. En gruppe i bruk kunne derfor verken
+  slettes eller skjules.
+- **`Ressursrolle.gruppe` er `CASCADE`.** En gruppe *uten* ressurser lar seg slette — og
+  tok rollene sine med seg **uten et ord**. «Lagleder» og «Sjåfør» er oppsett noen har
+  skrevet inn. Funnet ved å lese `on_delete` på begge sidene, ikke ved at noe feilet.
+  Nå: 409 med antallet, og `{"confirm": true}` for å fortsette — men bare når det
+  *finnes* roller. Et ekstra klikk på en tom gruppe er en vane man slutter å lese, og da
+  er bekreftelsen verdiløs den gangen den betyr noe.
+
+De seks seedede gruppene har aldri vært vernet, så «også de seks» krevde ingen endring.
+
+### Punkt 6: rollene rangeres
+
+«Leder øverst, hospitant nederst.» Alfabetisk satte «Hospitant» over «Lagleder», og et
+nedtrekk der den vanligste rollen ligger midt i lista koster et blikk hver gang.
+
+**Rangeringen er data, ikke en liste i koden.** Rollene seedes ikke med faste navn — de kom
+fra det som fantes ved migrasjon `0007` — så en hardkodet rangering ville truffet noen
+installasjoner og ikke andre. Migrasjon `0019` legger til `rekkefolge` og sprer dagens
+alfabetiske rekkefølge utover med ti, så ingenting *flytter* seg; den gjør bare rekkefølgen
+til noe som kan endres.
+
+**Migrasjonen er skjema først, data etterpå** — den trygge retningen. Regelen om
+PostgreSQLs triggerkø gjelder migrasjoner som skriver rader og *deretter* endrer skjema;
+her kommer `AddField` først og skrivingen sist, så verken `SET CONSTRAINTS ALL IMMEDIATE`
+eller `atomic = False` trengs. Det står i migrasjonens egen docstring.
+
+To detaljer verdt å nevne:
+
+- **«Ny rolle havner sist» ligger i `Ressursrolle.save()`**, ikke i et view. Rollene
+  opprettes av den generiske registerfabrikken, som bare kjenner *tekstfelter*
+  (`ekstra_felt` gjør `.strip()` på vei inn) — et heltall måtte fått et unntak inni
+  fabrikken, og da sto regelen der for alle tre verdimengdene mens bare én har den.
+- **Omsorteringen sender hele lista**, ikke «opp» per rad. To kall som krysser hverandre
+  bytter to par og etterlater en rekkefølge ingen ba om. Serveren krever **nøyaktig**
+  gruppas roller: et delvis sett ville gitt noen rader nye tall og latt resten stå.
+
+### Tolv mutanter, og den ene som «overlevde» var min egen feil
+
+Mutanten for tilgangsporten på gruppene satte `pass` rett etter `def` — som ikke gjør noe
+i det hele tatt, siden kroppen fortsetter under. **Felle nummer to i lista over måter en
+mutant lyver på**, og den ga et falskt «OK» på nøyaktig den sjekken jeg ville prøve.
+Skrevet om til å slå ut selve `if`-en: rød.
+
+Alle tolv røde. Én test måtte skrives om — `test_verdimengdene_sorteres_alfabetisk` var
+sann for `Ressursrolle` til i dag, og er nå delt i to: de to andre registrene sorterer
+fortsatt alfabetisk, rollen sorterer på rangering med navnet som uavgjort.
+
+**Endret:** `vaktliste/models.py`, `vaktliste/migrations/0019_rollerekkefolge.py` (ny),
+`vaktliste/views.py`, `vaktliste/views_registre.py`, `vaktliste/urls.py`,
+`static/js/vaktliste-handlinger.js`, `vaktliste/tests_registre.py` (+18),
+`vaktliste/tests.py`, `vaktliste/tests_xss.py`, `vaktliste/CLAUDE.md`.
+
+---
+
 ## 2026-09-16 — Pulje 3A: «Oversikt» ble en faktisk oversikt
 
 **André, pulje 3 punkt 2:** «Ressursfanen som heter Oversikt viser mye av det som allerede

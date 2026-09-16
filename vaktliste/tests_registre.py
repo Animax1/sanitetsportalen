@@ -10,15 +10,20 @@ gjør — det er den eneste veien som beviser at flaten finnes.
 mal som ber brukeren gå til `/django-admin/` sender henne til en dør som ikke
 finnes i prod.
 """
+import json
 from datetime import timedelta
 
-from django.test import Client, TestCase, override_settings
+from django.test import Client, SimpleTestCase, TestCase, override_settings
+
+from patients.js_test_utils import (
+    PORTAL_UTILS_JS, VAKTLISTE_JS, build_harness, node_available, run_node)
 from django.utils import timezone
 
 from accounts.models import CustomUser, ModulTilgang
 
 from . import services
-from .models import Kompetanse, Korps, Mannskap, Ressursrolle, Vaktpost
+from .models import (Kompetanse, Korps, Mannskap, Ressursgruppe,
+                     Ressursrolle, Vaktpost)
 from .test_helpers import (AMBULANSE, LAG, SAMLEPLASS, gruppe,
                           lag_ressurs, lag_rolle)
 
@@ -380,6 +385,87 @@ class RessursgruppeApiTests(TestCase):
     def test_ubrukt_gruppe_kan_slettes(self):
         pk = self.leder.post('/vaktliste/api/grupper/', data={'navn': 'Feil'},
                              content_type='application/json').json()['data']['id']
+        self.assertEqual(
+            self.leder.delete(f'/vaktliste/api/grupper/{pk}/').status_code, 200)
+
+    # ── Punkt 4 i pulje 3 (André, 16. sep. 2026) ─────────────────────────
+
+    def _ny(self, navn='Førstehjelpstelt'):
+        return self.leder.post('/vaktliste/api/grupper/', data={'navn': navn},
+                               content_type='application/json').json()['data']['id']
+
+    def _put(self, pk, kropp, klient=None):
+        return (klient or self.leder).put(
+            f'/vaktliste/api/grupper/{pk}/', data=json.dumps(kropp),
+            content_type='application/json')
+
+    def test_gruppa_kan_endres_navn_og_ikon(self):
+        """**Serveren har støttet det hele tiden; det manglet en knapp**
+        (16. sep. 2026). Punktet André meldte var «ressursgrupper skal kunne
+        endres og slettes, også de seks som seedes» — og de seks har aldri
+        vært vernet, så det som faktisk manglet var redigeringen."""
+        pk = self._ny()
+        res = self._put(pk, {'navn': 'Sanitetstelt', 'ikon': 'tent'})
+        self.assertEqual(res.status_code, 200, res.content)
+        rad = res.json()['data']
+        self.assertEqual((rad['navn'], rad['ikon']), ('Sanitetstelt', 'tent'))
+
+    def test_de_seks_seedede_kan_endres_som_alle_andre(self):
+        """Ingen av dem er «fast» slik «Udefinert» er i oppdragsmodulen.
+        Det er et bevisst skille: der sperrer `sett_status` på navnet, her
+        bærer ingen kode et gruppenavn."""
+        res = self._put(gruppe(AMBULANSE).pk, {'navn': 'Ambulanser'})
+        self.assertEqual(res.status_code, 200, res.content)
+        self.assertEqual(res.json()['data']['navn'], 'Ambulanser')
+
+    def test_gruppa_kan_deaktiveres_ogsaa_naar_den_er_i_bruk(self):
+        """**Veien ut for en gruppe man ikke vil se mer** (André: «de som er
+        i bruk på vaktlister nå må jo få bli»). Sletting er stengt, men
+        `er_aktiv` skal kunne settes — den skjuler gruppa i nedtrekkene og
+        beholder den der den brukes. Feltet og virkningen fantes fra 30. aug.
+        2026; det var ingen vei til å sette det."""
+        vl = services.opprett_planlagt_vakt('Vakta')
+        lag_ressurs(vaktliste=vl, navn='Ambulanse 1', gruppe=gruppe(AMBULANSE))
+        res = self._put(gruppe(AMBULANSE).pk, {'er_aktiv': False})
+        self.assertEqual(res.status_code, 200, res.content)
+        self.assertFalse(res.json()['data']['er_aktiv'])
+        self.assertEqual(
+            self.leder.delete(f'/vaktliste/api/grupper/{gruppe(AMBULANSE).pk}/').status_code,
+            400, 'og sletting er fortsatt stengt')
+
+    def test_bemanneren_endrer_ikke_grupper(self):
+        pk = self._ny()
+        self.assertEqual(self._put(pk, {'navn': 'X'}, self.bemanner).status_code, 403)
+
+    def test_rollene_foelger_med_i_slettingen_og_det_sies_hoeyt(self):
+        """**`Ressursrolle.gruppe` er CASCADE, `Ressurs.gruppe` er PROTECT.**
+
+        En gruppe uten ressurser lar seg altså slette — og tok rollene sine
+        med seg uten et ord. «Lagleder» og «Sjåfør» er oppsett noen har
+        skrevet inn, og de var borte for godt. Funnet 16. sep. 2026 ved å lese
+        `on_delete` på begge sidene, ikke ved at noe feilet.
+        """
+        pk = self._ny()
+        Ressursrolle.objects.create(gruppe_id=pk, navn='Teltleder')
+        Ressursrolle.objects.create(gruppe_id=pk, navn='Assistent')
+
+        res = self.leder.delete(f'/vaktliste/api/grupper/{pk}/')
+        self.assertEqual(res.status_code, 409, res.content)
+        self.assertIn('2 rolle', res.json()['message'])
+        self.assertTrue(Ressursgruppe.objects.filter(pk=pk).exists(),
+                        'ingenting slettet uten bekreftelse')
+
+        res = self.leder.delete(f'/vaktliste/api/grupper/{pk}/',
+                                data=json.dumps({'confirm': True}),
+                                content_type='application/json')
+        self.assertEqual(res.status_code, 200, res.content)
+        self.assertFalse(Ressursgruppe.objects.filter(pk=pk).exists())
+        self.assertFalse(Ressursrolle.objects.filter(gruppe_id=pk).exists())
+
+    def test_en_gruppe_uten_roller_slettes_uten_bekreftelse(self):
+        """Et ekstra klikk på en tom gruppe er en vane man slutter å lese,
+        og da er bekreftelsen verdiløs den gangen den betyr noe."""
+        pk = self._ny()
         self.assertEqual(
             self.leder.delete(f'/vaktliste/api/grupper/{pk}/').status_code, 200)
 
@@ -847,3 +933,282 @@ class EpostkoblingTests(TestCase):
             self.c_vl.get('/vaktliste/api/mannskap/')
         self.assertEqual(len(tre), len(seks), 'antall spørringer skal ikke vokse med radene')
 
+
+
+class GrupperadenJsTests(SimpleTestCase):
+    """Raden i «Ressursgrupper» — punkt 4 i pulje 3 (André, 16. sep. 2026).
+
+    **`mkGruppeRad` var ikke prøvd i det hele tatt** før dette. Den bygger
+    markup, og den bygger den fra et gruppenavn som er fritekst fra basen, så
+    den hørte hjemme i XSS-skanneren også — den er lagt inn der samtidig.
+    """
+
+    HARNESS = (
+        (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue')),
+        (VAKTLISTE_JS, ('mkGruppeRad', 'settGruppeAktiv', '_gruppeKall', 'slettGruppe')),
+    )
+
+    def setUp(self):
+        if not node_available():
+            self.skipTest('node er ikke tilgjengelig')
+        self.harness = build_harness(self.HARNESS)
+
+    def _rad(self, **felter):
+        g = {'id': 3, 'navn': 'Ambulanse', 'ikon': 'truck', 'i_bruk': 0,
+             'flere_enheter': True, 'er_aktiv': True}
+        g.update(felter)
+        return run_node(self.harness,
+                        f'console.log(mkGruppeRad({json.dumps(g)}));')
+
+    def test_raden_har_baade_endre_og_deaktiver(self):
+        """De to knappene som manglet. Uten «Endre» kunne en gruppe ikke
+        omdøpes i det hele tatt; uten «Deaktiver» hadde `er_aktiv` ingen vei
+        inn, selv om nedtrekkene respekterte den."""
+        rad = self._rad()
+        self.assertIn('data-action="endreGruppe"', rad)
+        self.assertIn('data-action="settGruppeAktiv"', rad)
+        self.assertIn('>Deaktiver<', rad)
+
+    def test_en_inaktiv_gruppe_ser_inaktiv_ut(self):
+        """En deaktivert gruppe som ser ut som en aktiv gjør «hvorfor står
+        den ikke i nedtrekket?» til et spørsmål ingen kan svare på ved å se."""
+        rad = self._rad(er_aktiv=False)
+        self.assertIn('vl-inaktiv', rad)
+        self.assertIn('inaktiv</span>', rad)
+        self.assertIn('>Aktiver<', rad)
+        self.assertNotIn('>Deaktiver<', rad)
+
+    def test_sletteknappen_er_borte_naar_gruppa_er_i_bruk(self):
+        """Serveren nekter uansett; en knapp som fører til en vegg er verre
+        enn ingen knapp. «Deaktiver» står igjen som veien ut."""
+        rad = self._rad(i_bruk=4)
+        self.assertNotIn('slettGruppe', rad)
+        self.assertIn('4 i bruk', rad)
+        self.assertIn('settGruppeAktiv', rad, 'veien ut skal fortsatt stå der')
+
+    def test_gruppenavnet_escapes(self):
+        rad = self._rad(navn='<b>Lag</b>', ikon='" onload="alert(1)')
+        self.assertNotIn('<b>Lag</b>', rad)
+        self.assertIn('&lt;b&gt;', rad)
+        self.assertNotIn('onload="alert(1)"', rad)
+
+    def test_deaktivering_sender_boolsk_ikke_streng(self):
+        """«0»/«1» er knappens verdi; serveren gjør `bool(...)`, og
+        `bool('0')` er True. Oversettelsen må skje i klienten — samme felle
+        som typeflaggene i oppdragsmodulen gikk i samme dag."""
+        ut = run_node(self.harness, """
+            const kall = [];
+            globalThis.apiFetch = async (url, valg) => {
+              kall.push([url, JSON.parse(valg.body)]);
+              return { ok: true, status: 200, json: async () => ({ status: 'ok' }) }; };
+            globalThis.aktivListe = { vaktliste: { id: 1 } };
+            globalThis.lastListe = async () => {};
+            globalThis.tegnGrupper = () => {};
+            globalThis._visFeil = () => {}; globalThis._skjulFeil = () => {};
+            await settGruppeAktiv('3:0');
+            await settGruppeAktiv('3:1');
+            console.log(JSON.stringify(kall));
+        """)
+        kall = json.loads(ut.strip().splitlines()[0])
+        self.assertEqual(kall[0], ['/vaktliste/api/grupper/3/', {'er_aktiv': False}])
+        self.assertEqual(kall[1], ['/vaktliste/api/grupper/3/', {'er_aktiv': True}])
+
+    def test_409_ved_sletting_spor_en_gang_til_og_sender_bekreftelsen(self):
+        """**Rollene følger med, og serveren teller dem.** Klienten har dem
+        ikke, så et tall den gjettet ville vært feil akkurat når det betydde
+        noe. 409 er derfor «bekreft», ikke «nei»."""
+        ut = run_node(self.harness, """
+            const kall = [];
+            let forste = true;
+            globalThis.apiFetch = async (url, valg) => {
+              kall.push([url, valg.method, valg.body ? JSON.parse(valg.body) : null]);
+              if (forste) { forste = false;
+                return { ok: false, status: 409,
+                         json: async () => ({ message: 'har 2 rolle(r)' }) }; }
+              return { ok: true, status: 200, json: async () => ({ status: 'ok' }) }; };
+            globalThis.confirm = (t) => { globalThis.spurt = t; return true; };
+            globalThis.aktivListe = { vaktliste: { id: 1 },
+                                      grupper: [{ id: 3, navn: 'Telt' }] };
+            globalThis.lastListe = async () => {};
+            globalThis.tegnGrupper = () => {};
+            globalThis._visFeil = () => {}; globalThis._skjulFeil = () => {};
+            await slettGruppe(3);
+            console.log(JSON.stringify(kall));
+            console.log(JSON.stringify(globalThis.spurt));
+        """)
+        linjer = ut.strip().splitlines()
+        kall = json.loads(linjer[0])
+        self.assertEqual(len(kall), 2, 'to forsøk: uten og med bekreftelse')
+        self.assertIsNone(kall[0][2], 'første gang uten kropp')
+        self.assertEqual(kall[1][2], {'confirm': True})
+        self.assertIn('2 rolle(r)', json.loads(linjer[1]),
+                      'spørsmålet bærer serverens tall, ikke et klienten fant på')
+
+    def test_nei_paa_bekreftelsen_sletter_ingenting(self):
+        ut = run_node(self.harness, """
+            const kall = [];
+            globalThis.apiFetch = async (url, valg) => {
+              kall.push(valg.method);
+              return { ok: false, status: 409, json: async () => ({ message: 'x' }) }; };
+            // **To spørsmål, ikke ett.** `slettGruppe` spør «Slette gruppa?»
+            // før den prøver; 409-bekreftelsen er det andre. En stub som sa
+            // nei til begge ville aldri nådd det som prøves her.
+            let svar = [true, false];
+            globalThis.confirm = () => svar.shift();
+            globalThis.aktivListe = { vaktliste: { id: 1 },
+                                      grupper: [{ id: 3, navn: 'Telt' }] };
+            globalThis.lastListe = async () => {};
+            globalThis.tegnGrupper = () => {};
+            globalThis._visFeil = () => {}; globalThis._skjulFeil = () => {};
+            await slettGruppe(3);
+            console.log(JSON.stringify(kall));
+        """)
+        self.assertEqual(json.loads(ut.strip().splitlines()[0]), ['DELETE'],
+                         'bare det første forsøket')
+
+
+@override_settings(SECURE_SSL_REDIRECT=False, RATELIMIT_ENABLE=False)
+class RollerekkefolgeApiTests(TestCase):
+    """Rangeringen av roller — pulje 3 punkt 6 (André, 16. sep. 2026).
+
+    «Rollene sorteres meningsfullt — leder øverst, hospitant nederst.»
+    Rekkefølgen er **data og ikke en liste i koden**: rollene seedes ikke med
+    faste navn (de kom fra det som fantes ved migrasjon `0007`), så en
+    hardkodet rangering ville truffet noen installasjoner og ikke andre.
+    """
+
+    def setUp(self):
+        self.leder = _klient(_bruker('leder_rr', 'skriv_leder'))
+        self.bemanner = _klient(_bruker('bemanner_rr', 'skriv_full'))
+        self.g = gruppe(AMBULANSE)
+        self.annen = gruppe(LAG)
+        self.hospitant = Ressursrolle.objects.create(navn='Hospitant', gruppe=self.g)
+        self.lagleder = Ressursrolle.objects.create(navn='Lagleder', gruppe=self.g)
+        self.sjafor = Ressursrolle.objects.create(navn='Sjåfør', gruppe=self.g)
+
+    def _flytt(self, ider, gruppe_id=None, klient=None):
+        return (klient or self.leder).put(
+            '/vaktliste/api/roller/rekkefolge/',
+            data=json.dumps({'gruppe_id': gruppe_id or self.g.pk, 'ider': ider}),
+            content_type='application/json')
+
+    def _navn(self):
+        return [r.navn for r in Ressursrolle.objects.filter(gruppe=self.g)]
+
+    def test_lista_settes_i_den_rekkefolgen_som_sendes(self):
+        res = self._flytt([self.lagleder.pk, self.sjafor.pk, self.hospitant.pk])
+        self.assertEqual(res.status_code, 200, res.content)
+        self.assertEqual(self._navn(), ['Lagleder', 'Sjåfør', 'Hospitant'])
+
+    def test_svaret_baerer_den_nye_rekkefolgen(self):
+        """Klienten tegner på nytt fra svaret; gjør den en ny henting i
+        stedet, ser man den gamle rekkefølgen et halvt sekund."""
+        res = self._flytt([self.sjafor.pk, self.hospitant.pk, self.lagleder.pk])
+        self.assertEqual([r['navn'] for r in res.json()['data']],
+                         ['Sjåfør', 'Hospitant', 'Lagleder'])
+
+    def test_bemanneren_omsorterer_ikke(self):
+        """Å rangere rollene er oppsett — det endrer hva *alle* ser i
+        nedtrekket, ikke hva som står på én rad."""
+        self.assertEqual(
+            self._flytt([self.lagleder.pk, self.sjafor.pk, self.hospitant.pk],
+                        klient=self.bemanner).status_code, 403)
+
+    def test_et_delvis_sett_avvises(self):
+        """**Hele gruppa, ikke et utvalg.** Et delvis sett ville gitt noen
+        rader nye tall og latt resten stå — og da er rekkefølgen en blanding
+        av to oppfatninger. Feilen er også den eneste måten å oppdage at
+        klienten og serveren ser ulike lister."""
+        res = self._flytt([self.lagleder.pk, self.sjafor.pk])
+        self.assertEqual(res.status_code, 400)
+        self.assertEqual(self._navn(), ['Hospitant', 'Lagleder', 'Sjåfør'],
+                         'ingenting flyttet')
+
+    def test_en_rolle_fra_en_annen_gruppe_avvises(self):
+        """Rekkefølgen er per gruppe. Uten avgrensningen kunne en liste med
+        ID-er fra en annen gruppe skrevet tall inn der."""
+        fremmed = Ressursrolle.objects.create(navn='Utenfor', gruppe=self.annen)
+        res = self._flytt([self.lagleder.pk, self.sjafor.pk, fremmed.pk])
+        self.assertEqual(res.status_code, 400)
+        fremmed.refresh_from_db()
+        self.assertEqual(fremmed.rekkefolge, 10, 'den fremmede står urørt')
+
+    def test_tullete_kropp_gir_400_ikke_500(self):
+        for kropp in ({'gruppe_id': self.g.pk}, {'ider': []},
+                      {'gruppe_id': self.g.pk, 'ider': 'x'}):
+            with self.subTest(kropp=kropp):
+                res = self.leder.put('/vaktliste/api/roller/rekkefolge/',
+                                     data=json.dumps(kropp),
+                                     content_type='application/json')
+                self.assertEqual(res.status_code, 400)
+
+
+class RollerekkefolgeJsTests(SimpleTestCase):
+    """Opp/ned-knappene i rollevinduet."""
+
+    HARNESS = (
+        (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue')),
+        (VAKTLISTE_JS, ('mkRolleRad', 'flyttRolle')),
+    )
+
+    def setUp(self):
+        if not node_available():
+            self.skipTest('node er ikke tilgjengelig')
+        self.harness = build_harness(self.HARNESS)
+
+    def test_knappene_er_avslaatt_i_endene(self):
+        """De ligger der, men er avslått — en rad som hopper i høyde når den
+        kommer først er verre enn en knapp som ikke gjør noe."""
+        ut = run_node(self.harness, """
+            const r = {id: 7, navn: 'Lagleder', i_bruk: 0};
+            console.log(JSON.stringify([mkRolleRad(r, true, false),
+                                        mkRolleRad(r, false, true),
+                                        mkRolleRad(r, false, false)]));
+        """)
+        forst, sist, midt = json.loads(ut.strip().splitlines()[0])
+        self.assertIn('data-arg="7:opp" disabled', forst)
+        self.assertNotIn('data-arg="7:ned" disabled', forst)
+        self.assertIn('data-arg="7:ned" disabled', sist)
+        self.assertNotIn('disabled', midt, 'midt i lista går begge veier')
+
+    def test_flyttingen_sender_hele_lista_med_de_to_byttet(self):
+        """Ikke «opp» på én rad: to kall som krysser hverandre ville byttet to
+        par og etterlatt en rekkefølge ingen ba om."""
+        ut = run_node(self.harness, """
+            const kall = [];
+            globalThis.apiFetch = async (url, valg) => {
+              kall.push([url, JSON.parse(valg.body)]);
+              return { ok: true, json: async () => ({ status: 'ok' }) }; };
+            globalThis.document = { getElementById: () => ({ dataset: { gruppe: '2' } }) };
+            globalThis.aktivListe = { roller: [
+              {id: 1, gruppe_id: 2}, {id: 2, gruppe_id: 2}, {id: 3, gruppe_id: 2},
+              {id: 9, gruppe_id: 5}] };
+            globalThis._lastRegisterOgListe = async () => {};
+            globalThis.tegnRoller = () => {};
+            globalThis._visFeil = () => {}; globalThis._skjulFeil = () => {};
+            await flyttRolle('3:opp');
+            await flyttRolle('1:opp');   // først: ingenting sendes
+            console.log(JSON.stringify(kall));
+        """)
+        kall = json.loads(ut.strip().splitlines()[0])
+        self.assertEqual(kall, [['/vaktliste/api/roller/rekkefolge/',
+                                 {'gruppe_id': 2, 'ider': [1, 3, 2]}]])
+
+    def test_bare_gruppas_egne_roller_er_med(self):
+        """Rolle 9 hører til en annen gruppe og skal ikke havne i lista —
+        serveren avviser den, men klienten skal ikke sende den heller."""
+        ut = run_node(self.harness, """
+            const kall = [];
+            globalThis.apiFetch = async (url, valg) => {
+              kall.push(JSON.parse(valg.body)); 
+              return { ok: true, json: async () => ({ status: 'ok' }) }; };
+            globalThis.document = { getElementById: () => ({ dataset: { gruppe: '2' } }) };
+            globalThis.aktivListe = { roller: [
+              {id: 1, gruppe_id: 2}, {id: 2, gruppe_id: 2}, {id: 9, gruppe_id: 5}] };
+            globalThis._lastRegisterOgListe = async () => {};
+            globalThis.tegnRoller = () => {};
+            globalThis._visFeil = () => {}; globalThis._skjulFeil = () => {};
+            await flyttRolle('2:opp');
+            console.log(JSON.stringify(kall));
+        """)
+        self.assertEqual(json.loads(ut.strip().splitlines()[0])[0]['ider'], [2, 1])

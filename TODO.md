@@ -814,13 +814,8 @@ tilgangshull og data først, funksjonalitet i midten, utseende sist.
       de kan tas i én runde. Ikke startet.
       - [ ] **Sett korps og rolle på flere skift samtidig.** I dag ett og ett, og en
             vaktliste settes opp med tjue like skift
-      - [ ] **Ressursgrupper skal kunne endres og slettes**, også de seks som seedes.
-            Merk: en gruppe i bruk må oppføre seg som enhetstypene i oppdrag — 409 med
-            råd om å deaktivere, ikke en sletting som river ressurser med seg
       - [ ] **De faste fanene skal se annerledes ut enn ressursgruppefanene.** I dag ser
             «Oversikt» og «Ambulanse» like ut, og de er to ulike slags ting
-      - [ ] **Rollene sorteres meningsfullt** — leder øverst, hospitant nederst, ikke
-            alfabetisk
 
 - [ ] **Pulje 4 — trenger en avklaring fra André før noe kan spesifiseres.** Begge er
       reelle ønsker; ingen av dem har en entydig lesning ennå.

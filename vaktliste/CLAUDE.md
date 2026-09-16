@@ -399,7 +399,38 @@ fase 3–7 gjenstår — se `docs/BESLUTNING_VAKTLISTE.md`, som er besluttet i s
 - **`Kompetanse.bygger_paa` er en stige.** Har personen AFØR, skjules VFØR og
   GFØR i alle lister — `services.synlige_kompetanser()`. Ringer stoppes ved
   skriving; en ring som likevel finnes gir avkortet kjede, ikke evig løkke.
-- **Verdimengdene sorteres alfabetisk — det finnes ingen `rekkefolge` å
+- **`Ressursrolle` har en rangering, og den er data** (16. sep. 2026, André: «rollene
+  sorteres meningsfullt — leder øverst, hospitant nederst»). Alfabetisk satte «Hospitant»
+  over «Lagleder». `rekkefolge` + `Meta.ordering = [gruppe__rekkefolge, rekkefolge,
+  Lower(navn)]`; navnet avgjør bare uavgjort. **Ikke en liste i koden:** rollene seedes
+  ikke med faste navn — de kom fra det som fantes ved migrasjon `0007` — så en hardkodet
+  rangering ville truffet noen installasjoner og ikke andre. Samme begrunnelse
+  `Ressursgruppe` fikk 30. aug.
+  - **En ny rolle havner sist, og regelen ligger i `Ressursrolle.save()`.** Rollene
+    opprettes av den generiske registerfabrikken i `views_registre`, som bare kjenner
+    tekstfelter (`ekstra_felt` gjør `.strip()`); et heltall måtte fått et unntak inni
+    fabrikken, og da sto regelen der for alle tre verdimengdene mens bare én har den.
+    Telleren er **per gruppe** — «Sjåfør» på ambulansen og på laget er to rader.
+  - **Omsorteringen sender hele lista** (`PUT api/roller/rekkefolge/`, `kan_lede`), ikke
+    «opp» per rad: to kall som krysser hverandre bytter to par og etterlater en rekkefølge
+    ingen ba om. Serveren krever **nøyaktig** gruppas roller — et delvis sett ville gitt
+    noen rader nye tall og latt resten stå, og det er også den eneste måten å oppdage at
+    klienten og serveren ser ulike lister.
+- **Ressursgruppene kan endres, deaktiveres og slettes** (16. sep. 2026, punkt 4). Serveren
+  har støttet PUT hele tiden; det manglet knapper. Tre regler:
+  - **En gruppe i bruk slettes ikke** (André: «de som er i bruk på vaktlister nå må jo få
+    bli») — `Ressurs.gruppe` er `PROTECT`, og viewet svarer med hvor mange ressurser det
+    gjelder og peker på `er_aktiv` som veien ut.
+  - **`er_aktiv` hadde ingen vei inn.** Feltet fantes fra 30. aug., nedtrekkene respekterte
+    det (`gruppaHarPlass`, og ressursens egen gruppe beholdes), og ingen skjerm kunne sette
+    det. Det er den verste sorten hull: mekanismen virker, så ingenting feiler, den er bare
+    uoppnåelig.
+  - **`Ressursrolle.gruppe` er `CASCADE`.** En gruppe *uten* ressurser lar seg slette — og
+    tok rollene sine med seg uten et ord. Sletting av en slik gruppe gir nå 409 med
+    antallet, og krever `{"confirm": true}`. Bekreftelsen kreves **bare når det finnes
+    roller**: et ekstra klikk på en tom gruppe er en vane man slutter å lese, og da er
+    bekreftelsen verdiløs den gangen den betyr noe.
+- **De øvrige verdimengdene sorteres alfabetisk — det finnes ingen `rekkefolge` å
   vedlikeholde.** `Ressurs` er unntaket, fordi der styrer den fanerekkefølgen, og
   der settes den automatisk til opprettelsesrekkefølgen. Sorteringen bruker
   `Lower(...)`: uten den er «alfabetisk» databasens alfabet, og SQLite (dev) og

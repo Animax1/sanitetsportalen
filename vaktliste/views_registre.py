@@ -101,6 +101,13 @@ def verdi_til_dict(model, rad, *, ekstra_felt=(), stige=False, gruppe=False):
     }
     for felt in ekstra_felt:
         ut[felt] = getattr(rad, felt)
+    # **Rekkefølgen sendes når modellen har en** (16. sep. 2026). Bare
+    # `Ressursrolle` har det; `ekstra_felt` duger ikke, for den leser feltene
+    # som tekst (`.strip()`) på vei inn. Et `hasattr` her framfor et flagg til:
+    # fabrikken har alt fire, og det femte ville vært ett for mange å holde i
+    # hodet for noe som er utledbart.
+    if hasattr(rad, 'rekkefolge'):
+        ut['rekkefolge'] = rad.rekkefolge
     if stige:
         ut['bygger_paa_id'] = rad.bygger_paa_id
         ut['bygger_paa_navn'] = rad.bygger_paa.navn if rad.bygger_paa else ''

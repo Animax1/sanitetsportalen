@@ -14,7 +14,7 @@ from audit.models import AuditLog
 from core.modules import get_module, get_visible_modules
 
 from .models import Kompetanse, Korps, Mannskap, Ressursrolle
-from .test_helpers import gruppe
+from .test_helpers import LAG, gruppe
 from .signals import SKJULT, TABELLNAVN
 
 User = get_user_model()
@@ -39,22 +39,57 @@ class RegisterTests(TestCase):
         valg (`Lower(...)`) og gjelder i enhver base. Det andre er databasens
         kollasjon, og den er ulik i SQLite og PostgreSQL — en test på det ville
         målt hvilken base som kjørte testen, ikke hva koden gjør.
+
+        **`Ressursrolle` er unntatt fra 16. sep. 2026** — se testen under.
         """
-        # Rollen henger under en gruppe fra 30. aug. 2026, og sorteres derfor
-        # på gruppa først. Innenfor én gruppe gjelder den samme regelen, og
-        # det er den som testes her.
-        felles = {Ressursrolle: {'gruppe': gruppe()}}
-        for model in (Korps, Kompetanse, Ressursrolle):
+        for model in (Korps, Kompetanse):
             with self.subTest(model=model.__name__):
-                ekstra = felles.get(model, {})
-                model.objects.create(navn='Stavanger', **ekstra)
-                model.objects.create(navn='bokn', **ekstra)   # liten forbokstav
-                model.objects.create(navn='Karmøy', **ekstra)
+                model.objects.create(navn='Stavanger')
+                model.objects.create(navn='bokn')   # liten forbokstav
+                model.objects.create(navn='Karmøy')
                 self.assertEqual(
                     [r.navn for r in model.objects.all()],
                     ['bokn', 'Karmøy', 'Stavanger'],
                     'alfabetisk, og uavhengig av forbokstav')
                 model.objects.all().delete()
+
+    def test_rollene_sorteres_paa_rangering_ikke_alfabet(self):
+        """**André, 16. sep. 2026 (pulje 3 punkt 6):** «rollene sorteres
+        meningsfullt — leder øverst, hospitant nederst».
+
+        Alfabetisk satte «Hospitant» over «Lagleder», og et nedtrekk der den
+        vanligste rollen ligger midt i lista koster et blikk hver gang. Rollen
+        er den ene verdimengden med en *rangering* — «Sjåfør» og «Lagleder» er
+        ikke to like alternativer.
+
+        Navnet avgjør fortsatt uavgjort: to roller med samme tall er en
+        vilkårlig rekkefølge, og vilkårlig skal i det minste være stabil.
+        """
+        g = gruppe()
+        Ressursrolle.objects.create(navn='Hospitant', gruppe=g, rekkefolge=30)
+        Ressursrolle.objects.create(navn='Lagleder', gruppe=g, rekkefolge=10)
+        Ressursrolle.objects.create(navn='Sjåfør', gruppe=g, rekkefolge=20)
+        self.assertEqual(
+            [r.navn for r in Ressursrolle.objects.all()],
+            ['Lagleder', 'Sjåfør', 'Hospitant'],
+            'rangeringen, ikke alfabetet — alfabetisk ville gitt Hospitant først')
+
+    def test_en_ny_rolle_havner_sist_i_sin_gruppe(self):
+        """Den som skriver «Hospitant» skal ikke måtte finne på et tall, og
+        sist er riktig gjetning: rangeringen justeres etterpå.
+
+        Regelen ligger i `Ressursrolle.save()` fordi rollene opprettes av den
+        generiske registerfabrikken, som bare kjenner tekstfelter.
+        """
+        g, annen = gruppe(), gruppe(LAG)
+        Ressursrolle.objects.create(navn='Lagleder', gruppe=g, rekkefolge=10)
+        ny = Ressursrolle.objects.create(navn='Hospitant', gruppe=g)
+        self.assertEqual(ny.rekkefolge, 20)
+        # **Per gruppe, ikke globalt.** «Sjåfør» på ambulansen og på laget er
+        # to rader med hver sin rangering; en global teller ville gitt den
+        # andre gruppa et hull på første rolle.
+        forste_i_annen = Ressursrolle.objects.create(navn='Lagleder', gruppe=annen)
+        self.assertEqual(forste_i_annen.rekkefolge, 10)
 
     def test_kompetanse_og_rolle_er_egne_registre(self):
         """Kompetansen følger personen, rollen følger vaktposten (fase 2).

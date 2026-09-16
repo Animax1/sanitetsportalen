@@ -20,6 +20,10 @@ from patients.js_test_utils import (
 HTML_BUILDERS = (
     'fyllVelger',
     'mkRolleRad',
+    # Grupperaden (16. sep. 2026, pulje 3 punkt 4): den bygger markup fra et
+    # gruppenavn og et ikonnavn, begge fritekst fra basen, og sto utenfor
+    # skanneren fram til knappene ble lagt til.
+    'mkGruppeRad',
     '_fyll',
     'tegnFaner', 'kanPlanlegge', '_fanerad', '_mannskapsfane', 'iDrift', '_tilstede',
     'mkRessurs', '_planrad', '_plancellene', '_blokklinje', '_dagoverskrift', '_probonoMerke',
@@ -51,6 +55,17 @@ HTML_BUILDERS = (
 ESCAPING_CALLS = ('escHtmlValue(', 'cellHtml(', '_escHtml(', 'escapeHtml(')
 
 REVIEWED_INTERPOLATIONS = {
+    # Rollerekkefølgen (16. sep. 2026, pulje 3 punkt 6). Begge er markup
+    # bygget i funksjonen, med rolle-id escapet inni.
+    'opp': 'markup bygget lokalt, rolle-id escapet inni',
+    'ned': 'markup bygget lokalt, rolle-id escapet inni',
+    "forste ? ' disabled' : ''": 'hardkodet attributt fra en ternær',
+    "siste ? ' disabled' : ''": 'hardkodet attributt fra en ternær',
+    # Grupperaden (16. sep. 2026, pulje 3 punkt 4). Alle tre er markup
+    # bygget i funksjonen; gruppas navn og ikon escapes der de settes inn.
+    'inaktivMerke': 'hardkodet merkelapp fra en ternær',
+    'ett': 'hardkodet merkelapp fra en ternær',
+    'endre': 'markup bygget lokalt, gruppe-id escapet inni',
     # Oversikten som talltabell (16. sep. 2026, pulje 3 punkt 2). Alle tre er
     # tall eller markup bygget i funksjonen; ingen brukerdata passerer.
     'ledigcelle': 'markup bygget lokalt, tallet escapet inni',
