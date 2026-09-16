@@ -2231,8 +2231,79 @@ Funnene under er allerede kartlagt, så jobben er avgrenset når den skal gjøre
         ikke av applikasjonen, på samme måte som Railway-backupen i A.2
       - Bump versjonsnummer og dato når noe endres
 
+### Puljene fra Andrés gjennomgang 16. sep. 2026
+
+**Lista på sytten punkter ble prioritert i fire puljer, og sto ingen steder før 16. sep.**
+Det var feil: den levde bare i samtalen, og `TODO.md` sier selv i toppen at et punkt som
+ikke står her, ikke blir gjort. Nå står den her, og puljer som er levert krysses av med
+dato som alt annet.
+
+Rekkefølgen er valgt etter **hva en feil koster**, ikke etter hvor lett punktet er:
+tilgangshull og data først, funksjonalitet i midten, utseende sist.
+
+- [x] **Pulje 1 — hull og feil** (16. sep. 2026, bygg `ce365b5`, i prod)
+      - [x] `/vaktliste/`: «les alle / skriv eget korps» kunne opprette skift og redigere
+            tider. Porten går nå på oppsettfeltene, ikke på innsendingen
+      - [x] `is_superuser` immun mot nedgradering fra `role = 'admin'` — fire lag, se
+            «Tilgangskontroll» i `CLAUDE.md`
+      - [x] Scaleway meldte «filene blir liggende for alltid» om en regel som sto riktig.
+            `_prefiks()` leste ikke `Filter.And.Prefix`. Feilteksten bærer nå Scaleways
+            egen kode
+      - [x] Spørsmålet om `is_staff`: den gater bare `/django-admin/`, som er rutet av i
+            prod. Svaret er skrevet inn i `CLAUDE.md`
+      - [ ] **Krever Andre:** bekreft i prod at Scaleway-kortet på
+            `/portal-admin/backup/` står grønt. Står det fortsatt rødt, er den ekte
+            feilkoden nå med i meldingen
+
+- [x] **Pulje 2 — oppdragsmodulen** (16. sep. 2026, bygg `5ef0aa7`, på staging)
+      - [x] «Ledig siden» i ressursdelen
+      - [x] Varselbjelle til enhetskontoen ved nytt oppdrag
+      - [x] Aktiv/passiv vakt, med flaggene på `Enhetstype`
+      - [x] «Avvente» på et varslet oppdrag
+      - [x] Avbrutt-merket kvitteres, manuelt eller ved ny varsling
+      - [x] «Akutt oppdrag, to enheter varsles — står trenger ressurs selv om oppdraget er
+            løst». Løst 15. sep. 2026; `LOSER_OPPDRAGET` er `(Behandlet, Leverer)`
+      - [ ] **Krever Andre:** verifiseringslista på staging, sju punkter — se CHANGELOG
+            for 16. sep., «Pulje 2, andre halvdel»
+
+- [ ] **Pulje 3 — vaktlista, bruk og utseende.** Ingen av dem rører tilgang eller data, og
+      de kan tas i én runde. Ikke startet.
+      - [ ] **«Planlegging» heter «Timeoversikt»**, og siles på korps for den som ikke er
+            leder — samme sil som «Oversikt» allerede har
+      - [ ] **«Oversikt» har for mange kolonner.** Behold tid, timer, totalt, plasser og
+            ledige; resten ut
+      - [ ] **Sett korps og rolle på flere skift samtidig.** I dag ett og ett, og en
+            vaktliste settes opp med tjue like skift
+      - [ ] **Ressursgrupper skal kunne endres og slettes**, også de seks som seedes.
+            Merk: en gruppe i bruk må oppføre seg som enhetstypene i oppdrag — 409 med
+            råd om å deaktivere, ikke en sletting som river ressurser med seg
+      - [ ] **De faste fanene skal se annerledes ut enn ressursgruppefanene.** I dag ser
+            «Oversikt» og «Ambulanse» like ut, og de er to ulike slags ting
+      - [ ] **Rollene sorteres meningsfullt** — leder øverst, hospitant nederst, ikke
+            alfabetisk
+
+- [ ] **Pulje 4 — trenger en avklaring fra André før noe kan spesifiseres.** Begge er
+      reelle ønsker; ingen av dem har en entydig lesning ennå.
+      - [ ] **«Må kunne fordele til hele enheten/laget».** Hva er et *lag* her — alle
+            plassene på én ressurs, eller en navngitt gruppe mannskap som følges ad
+            gjennom flere skift? De to er helt ulike modeller, og den andre trenger en ny
+            tabell
+      - [ ] **Logge ut inaktive sesjoner, og se hvem som faktisk er pålogget.** Portalen
+            har sesjonstimeout i dag; ønsket her er en *oversikt* og en måte å kaste noen
+            ut på. Spørsmålet som må avgjøres først: hva er «aktiv» — siste forespørsel,
+            eller siste handling som skrev noe?
+
 ### Løse punkter
 
+- [ ] **`core/tests_verifiser_backup.py` er 47 sekunder — en firedel av hele suiten**
+      (målt 16. sep. 2026). Den starter `migrate` i en underprosess per test, som er
+      riktig for det den prøver, men prisen betales av hver eneste kjøring. Vurder et
+      tag-skille så den bare kjøres når backupkoden endres. **Ikke bare slett den:** den
+      er den ene testen som svarer på om *innholdet* i backupfilene duger.
+- [ ] **`core/tests_backup.py` tåler ikke `--parallel`.** Testene skriver ekte filer til
+      én backupmappe og rører det globale handlerregisteret. Feilen kommer ut som
+      «cannot pickle 'traceback' object», som ikke ligner det den er. Så lenge den står,
+      må `core` kjøres serielt for seg — se kommandoblokka i `CLAUDE.md`.
 - [x] **«Ledig siden» i ressursdelen** (16. sep. 2026, André). Siste gjeldende
       `Ledig`-melding per enhet, scopet til vakta, bulk. Tolv mutanter på denne og bjella.
 - [x] **Varselbjelle til enhetskontoen ved nytt oppdrag** (16. sep. 2026). Nummer,

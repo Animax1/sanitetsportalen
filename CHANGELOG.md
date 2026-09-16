@@ -4,6 +4,54 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-16 — Puljene skrives ned, og to testregler som koster en time i uka
+
+**André:** «Ligger puljene som vi har planlagt i noe notat? For jeg syns hver arbeid du
+gjør tar enormt lang tid.»
+
+Svaret på det første var **nei**, og det er en feil i seg selv. Lista på sytten punkter var
+prioritert i fire puljer som bare fantes i samtalen — mens `TODO.md` sier i sin egen topp at
+et punkt som ikke står der, ikke blir gjort. Pulje 1 og 2 var levert og krysset av; pulje 3
+og 4 ville forsvunnet med sesjonen. Alle fire står nå under «Puljene fra Andrés gjennomgang
+16. sep. 2026», med det som gjenstår og de to avklaringene pulje 4 venter på.
+
+### Og så det andre spørsmålet, som var det viktigere
+
+Tidsstemplene på mutasjonsskriptene lot seg lese som en logg, og den forteller dette:
+
+| Hva | Målt |
+|---|---|
+| `manage.py test oppdrag` | **38 s** |
+| `oppdrag.tests_passiv_avvente` (som dekker mutantene) | **5 s** |
+| Mutanter kjørt over økta | **~100** |
+
+Nesten alle kjørte **hele appen**. Ett skript alene — 21 mutanter mot `oppdrag` — brukte
+tretten minutter på å gi et svar 42 tester kunne gitt på to. Over hundre mutanter er
+forskjellen i størrelsesorden **en klokketime**, brukt på å kjøre tester som ikke kunne bli
+røde av mutasjonen uansett.
+
+Begrunnelsen jeg hadde for det var fella «mutanten traff et annet sted enn du tror» — som
+står i denne fila. Men den fella løses ved å **lese diffen til mutanten**, ikke ved å kjøre
+560 urelaterte tester. Regelen står nå i mutasjonsavsnittet.
+
+### Suiten kan deles
+
+190 sekunder serielt, **~106 delt** på fire kjerner. `core` må stå for seg:
+`core/tests_backup.py` skriver ekte backupfiler til én mappe og rører det globale
+handlerregisteret, så fire arbeidere kolliderer. Feilen kommer ut som «cannot pickle
+'traceback' object», som ikke ligner det den er — derfor er den skrevet ned, både i
+kommandoblokka og som et punkt.
+
+Og mens jeg målte: **`core/tests_verifiser_backup.py` er 47 sekunder alene** — en firedel av
+hele suiten, fordi den starter `migrate` i en underprosess per test. Det er riktig for det
+den prøver, og den skal ikke slettes; den er den ene testen som svarer på om *innholdet* i
+backupfilene duger. Men prisen betales av hver kjøring, og et tag-skille er ført opp.
+
+**Endret:** `TODO.md` (puljene + to målte punkter), `CLAUDE.md` (målrettet mutasjonskjøring,
+delt suite). Ingen kodeendring.
+
+---
+
 ## 2026-09-16 — Pulje 2, andre halvdel: passiv vakt, «avvente» og kvittert avbrytelse
 
 Resten av pulje 2 i én runde, etter spesifikasjonen André ga samme dag. Tre ting som

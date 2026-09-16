@@ -46,6 +46,14 @@ python manage.py runserver           # http://127.0.0.1:8000/
 # som fulgte dokumentasjonen kjørte dem aldri.
 python manage.py test patients accounts audit core statistikk oppdrag vaktliste myproject -v 2
 
+# Samme suite, men delt. **190 s → ~106 s** (målt 16. sep. 2026, fire kjerner).
+# `core` må stå for seg: `core/tests_backup.py` skriver ekte backupfiler til én
+# mappe og rører det globale handlerregisteret, så fire arbeidere kolliderer —
+# feilen kommer ut som «cannot pickle 'traceback' object», som ikke ligner det
+# den er. Alt annet tåler `--parallel` fint.
+python manage.py test patients accounts audit statistikk oppdrag vaktliste myproject -v 1 --parallel 4
+python manage.py test core -v 1
+
 # Én enkelt test
 python manage.py test patients.tests.PatientAPITest.test_create_patient -v 2
 
@@ -60,6 +68,14 @@ python manage.py migrate
 Det finnes ingen mutasjonsverktøy i kjøringen, og poenget er ikke en prosentsats — det er
 å svare på ett spørsmål om gangen: *hadde noen merket det om denne regelen forsvant?*
 Antall mutanter og hva som overlevde føres i CHANGELOG sammen med endringen.
+
+**Kjør de testene som dekker mutanten, ikke hele appen.** Målt 16. sep. 2026:
+`manage.py test oppdrag` er 38 sekunder, `oppdrag.tests_passiv_avvente` er 5. Med 21
+mutanter blir det tretten minutter mot to, for nøyaktig samme svar — og over en økt med
+hundre mutanter er forskjellen en klokketime. Fristelsen er å kjøre alt som en forsikring
+mot at «mutanten traff et annet sted enn du tror», men den fella løses ved å **lese diffen
+til mutanten**, ikke ved å kjøre 560 urelaterte tester. Hele suiten kjøres én gang, på
+slutten.
 
 **Innsatsen skal stå i forhold til hva en overlevende mutant koster**, ikke til hvor mye
 kode som ble rørt. En feil i `services` legger seg i data og oppdages av ingen; en feil i
