@@ -270,6 +270,25 @@ function kanBemanne(ressurs) {
 }
 
 
+function _laasFelter(ider, laast, hintId) {
+  // **Ett sted, fordi begge vinduene låser.** Låsen er tre ting samtidig —
+  // `disabled` som gjør feltet urørlig, `.vl-laast` som gjør det synlig låst,
+  // og hintet som sier hvorfor — og et vindu som husker to av dem ser ut som
+  // om det virker.
+  //
+  // `disabled` er det ene attributtet som virker på alle feltformene;
+  // `readOnly` gjør ingenting på `datetime-local` (16. sep. 2026).
+  ider.forEach((id) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.disabled = laast;
+    el.classList.toggle('vl-laast', laast);
+  });
+  const hint = document.getElementById(hintId);
+  if (hint) hint.classList.toggle('d-none', !laast);
+}
+
+
 function kanGiNyttNavn(ressurs) {
   // Speiler `services.kan_gi_nytt_navn`. Bredere enn `kanBemanne()` med vilje:
   // «Ny ressurs» spør bare om navn og gruppe, så en fersk ressurs er

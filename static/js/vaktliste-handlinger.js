@@ -270,13 +270,11 @@ function apneRessurs(id) {
 
 
 function _laasRessursoppsett(laast) {
-  // Nedtrekkene deaktiveres framfor å skjules: står bilen reservert til
-  // Haugesund, er det verdt å se — det er nettopp derfor hun får rette navnet
-  // på den. Et deaktivert felt sendes uansett ikke.
-  ['ressurs-gruppe', 'ressurs-korps', 'ressurs-enhet'].forEach((id) => {
-    const el = document.getElementById(id);
-    if (el) el.disabled = laast;
-  });
+  // Nedtrekkene låses framfor å skjules: står bilen reservert til Haugesund,
+  // er det verdt å se — det er nettopp derfor hun får rette navnet på den.
+  // Navnet står ikke i lista; det er det ene hun får endre.
+  _laasFelter(['ressurs-gruppe', 'ressurs-korps', 'ressurs-enhet'],
+              laast, 'ressurs-laast-hint');
 }
 
 

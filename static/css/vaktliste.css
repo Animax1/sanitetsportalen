@@ -1334,3 +1334,41 @@
  * ikke ennå. */
 .vl-i-ko { opacity: 0.75; }
 .vl-i-ko::after { content: " ·"; color: var(--vl-varsel); }
+
+/* ── Låste felter i vinduene (16. sep. 2026) ──────────────────────────── */
+/* André: «De feltene i rediger skift og rediger ressurs som korps-fører ikke
+ * kan endre bør endre farge i feltet til noe som tydeliggjør at den er låst.
+ * Fortsatt lesbar.»
+ *
+ * `disabled` alene løser ikke dette — det gjør det verre. Bootstrap demper
+ * deaktiverte felter, og nettleseren demper dem én gang til; Safari ignorerer
+ * i tillegg `color` på et deaktivert felt og leser `-webkit-text-fill-color`.
+ * Resultatet var et felt som verken så låst ut eller var godt å lese.
+ *
+ * Låst skal leses som *låst*, og fortsatt leses: dempet flate, stiplet kant,
+ * full tekstkontrast. **Stiplet framfor en ny farge**, fordi fargene i
+ * modulen alt betyr noe — gult varsler, grønt er tilstede — og en tredje
+ * farge ville måttet læres. En strek man ser forskjell på i gråtoner
+ * fungerer også for den som ikke skiller farger.
+ *
+ * Fargen alene sier heller ikke *hvorfor*. Derfor står `.vl-laast-hint` i
+ * vinduet ved siden av, og den vises av samme funksjon som låser feltene. */
+.vl-laast,
+.vl-laast:disabled {
+  background-color: var(--surface-3);
+  border-style: dashed;
+  border-color: var(--text-soft);
+  cursor: not-allowed;
+  /* Begge trengs: `opacity` er Bootstraps demping, `-webkit-text-fill-color`
+     er Safaris. Uten den siste står teksten lysegrå på iPhone uansett hva
+     `color` sier. */
+  opacity: 1;
+  color: var(--text-main);
+  -webkit-text-fill-color: var(--text-main);
+}
+
+.vl-laast-hint {
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  margin-bottom: 0.75rem;
+}

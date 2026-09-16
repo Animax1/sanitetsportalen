@@ -755,6 +755,12 @@ sted. Fem slike ble skrevet om denne dagen; mønsteret de fikk:
 | `assertNotIn('fjernRessurs', kilde)` | Tegn kortet og krev at sletteknappen ikke er i markupen |
 | `assertIn("'…Middleware',\n", settings_py)` | `assertIn(..., settings.MIDDLEWARE_I_DRIFT)` |
 
+**Og leser du kilden, strip kommentarene først.** En test som krevde
+`-webkit-text-fill-color` i en CSS-regel gikk grønn etter at deklarasjonen var fjernet —
+strengen sto også i kommentaren som forklarte hvorfor den trengtes (16. sep. 2026, funnet
+ved mutasjonstesting). En regel som leser sin egen prosa måler at noen har skrevet om
+begrunnelsen, ikke at koden gjør det den sier.
+
 **Rate-limit-tester må tåle vinduskanten.** `django_ratelimit._get_window` legger kanten
 et fast antall sekunder inn i hver periode, jittret per nøkkel. Tolv forsøk mot `10/m` som
 straddler den deles i to bøtter der ingen når ti — testen feiler da omtrent én kjøring av

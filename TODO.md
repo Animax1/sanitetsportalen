@@ -2233,6 +2233,11 @@ Funnene under er allerede kartlagt, så jobben er avgrenset når den skal gjøre
 
 ### Løse punkter
 
+- [x] **Låste felter ser låste ut og er fortsatt lesbare** (16. sep. 2026, André).
+      `.vl-laast` med stiplet kant og full tekstkontrast — `disabled` alene gjorde teksten
+      lysere, og Safari ignorerer `color` på deaktiverte felter. Hvert vindu har en linje
+      som sier hvem som setter feltene, vist av samme funksjon som låser dem.
+      Åtte mutanter; den siste avslørte en test som leste sin egen kommentar.
 - [x] **Merknaden låses ikke for korps-føreren** (16. sep. 2026, André). Den følger
       raden, ikke oppsettet — samme port som person og rolle. `probono` ble stående:
       det tallet leses av budsjettlinja for hele lista. Seks mutanter; den siste

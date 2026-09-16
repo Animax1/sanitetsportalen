@@ -2122,28 +2122,56 @@ class LaaseneVirkerPaaAlleFeltformeneTests(SimpleTestCase):
         if not node_available():
             self.skipTest('node er ikke tilgjengelig')
         self.harness = build_harness((
-            (VAKTLISTE_JS, ('_laasOppsettfelter', '_laasRessursoppsett')),
+            (VAKTLISTE_JS, ('_laasFelter', '_laasOppsettfelter',
+                            '_laasRessursoppsett')),
         ))
 
+    #: Hintene som forklarer hvorfor feltene er låst, per vindu.
+    HINT = {'_laasOppsettfelter': 'vaktpost-laast-hint',
+            '_laasRessursoppsett': 'ressurs-laast-hint'}
+
     def _kjor(self, kall, felter):
+        """Kjør låsen mot et minimalt DOM, og les av hva den gjorde.
+
+        `classList` stubbes som et ekte sett, ikke som en teller: regelen er
+        at klassen skal *komme og gå* med låsen, og en stub som bare husker
+        siste kall ville sagt ja til en funksjon som aldri fjerner den.
+        """
         import json
 
         from patients.js_test_utils import run_node
+        hint = self.HINT[kall.split('(')[0]]
         return run_node(self.harness, f"""
             const felter = {json.dumps(list(felter))};
             const el = {{}};
-            felter.forEach((id) => {{ el[id] = {{ disabled: false, readOnly: false }}; }});
+            const lagElement = () => {{
+              const klasser = new Set();
+              return {{
+                disabled: false, readOnly: false,
+                classList: {{
+                  toggle: (navn, paa) => (paa ? klasser.add(navn)
+                                              : klasser.delete(navn)),
+                  contains: (navn) => klasser.has(navn),
+                }},
+              }};
+            }};
+            felter.forEach((id) => {{ el[id] = lagElement(); }});
+            el['{hint}'] = lagElement();
             globalThis.document = {{ getElementById: (id) => el[id] || null }};
             {kall};
             console.log(JSON.stringify(felter.map((id) =>
-                [id, el[id].disabled, el[id].readOnly])));
+                [id, el[id].disabled, el[id].readOnly,
+                 el[id].classList.contains('vl-laast')])
+                .concat([['hint', el['{hint}'].classList.contains('d-none'),
+                          false, false]])));
         """)
 
     def _tilstand(self, kall, felter):
         import json
         for linje in self._kjor(kall, felter).splitlines():
             if linje.startswith('['):
-                return {navn: (av, ro) for navn, av, ro in json.loads(linje)}
+                return {navn: (av, ro, kl)
+                        for navn, av, ro, kl in json.loads(linje)}
         self.fail('ingen utskrift fra node')
 
     def test_skiftvinduets_felter_laases_med_disabled(self):
@@ -2170,6 +2198,43 @@ class LaaseneVirkerPaaAlleFeltformeneTests(SimpleTestCase):
         self.assertFalse(tilstand['vaktpost-merknad'][0])
         self.assertTrue(tilstand['vaktpost-fra'][0], 'tidene skal fortsatt låses')
 
+    def test_laaste_felter_far_klassen_som_farger_dem(self):
+        """André, 16. sep. 2026: «De feltene korps-fører ikke kan endre bør
+        endre farge i feltet til noe som tydeliggjør at den er låst. Fortsatt
+        lesbar.»
+
+        `disabled` alene gjør det motsatte: Bootstrap demper feltet, og
+        nettleseren demper det én gang til. `.vl-laast` gir det stiplet kant,
+        dempet flate og **full tekstkontrast** tilbake.
+        """
+        tilstand = self._tilstand('_laasOppsettfelter(true)', self.LAASTE)
+        for felt in self.LAASTE:
+            with self.subTest(felt=felt):
+                self.assertTrue(tilstand[felt][2], f'{felt} mangler .vl-laast')
+
+    def test_klassen_gaar_av_igjen(self):
+        """Den kommer og går med låsen. En stub som bare husket siste kall
+        ville sagt ja til en funksjon som aldri fjerner den."""
+        tilstand = self._tilstand('_laasOppsettfelter(false)', self.LAASTE)
+        for felt in self.LAASTE:
+            with self.subTest(felt=felt):
+                self.assertFalse(tilstand[felt][2])
+
+    def test_hintet_forklarer_hvorfor(self):
+        """**Fargen sier at feltet er låst, ikke hvorfor** — og en stiplet kant
+        uten forklaring leser som en feil. Hintet vises av samme funksjon som
+        låser: to steder å huske på ville før eller siden gitt låste felter
+        uten et ord om hvem som setter dem."""
+        laast = self._tilstand('_laasOppsettfelter(true)', self.LAASTE)
+        self.assertFalse(laast['hint'][0], 'hintet skal vises når noe er låst')
+        aapen = self._tilstand('_laasOppsettfelter(false)', self.LAASTE)
+        self.assertTrue(aapen['hint'][0], 'og være borte når alt er åpent')
+
+    def test_ressursvinduet_har_sitt_eget_hint(self):
+        felter = ('ressurs-gruppe', 'ressurs-korps', 'ressurs-enhet')
+        self.assertFalse(
+            self._tilstand('_laasRessursoppsett(true)', felter)['hint'][0])
+
     def test_ressursvinduets_nedtrekk_laases_med_disabled(self):
         felter = ('ressurs-gruppe', 'ressurs-korps', 'ressurs-enhet')
         tilstand = self._tilstand('_laasRessursoppsett(true)', felter)
@@ -2183,3 +2248,46 @@ class LaaseneVirkerPaaAlleFeltformeneTests(SimpleTestCase):
         tilstand = self._tilstand('_laasRessursoppsett(true)', felter)
         self.assertFalse(tilstand['ressurs-navn'][0])
         self.assertTrue(tilstand['ressurs-gruppe'][0])
+
+    def test_hintene_finnes_i_malen(self):
+        """**En klasse ingen elementer har, gjør ingenting** — og `_laasFelter`
+        tier helt når `getElementById` gir `null`. Uten denne kunne hintet bli
+        borte fra malen uten at én test ble rød, og låste felter ville stått
+        uforklart.
+        """
+        from pathlib import Path
+
+        from django.conf import settings
+        mal = (Path(settings.BASE_DIR) / 'templates' / 'vaktliste'
+               / 'index.html').read_text(encoding='utf-8')
+        for hint in self.HINT.values():
+            with self.subTest(hint=hint):
+                self.assertIn(f'id="{hint}"', mal)
+
+    def test_klassen_er_definert_i_stilarket(self):
+        """Samme sort hull fra den andre siden: JS-en kan sette en klasse som
+        ikke finnes i CSS-en, og da er feltet like grått som før.
+
+        Regelen har ingen kjøretid — den kan bare leses av kilden. Det er den
+        formen `CLAUDE.md` tillater: å lete etter en definisjon, ikke å påstå
+        at en literal kodelinje står et sted.
+        """
+        import re
+        from pathlib import Path
+
+        from django.conf import settings
+        raa = (Path(settings.BASE_DIR) / 'static' / 'css'
+               / 'vaktliste.css').read_text(encoding='utf-8')
+        # **Kommentarene strippes først, og det er ikke pedanteri.**
+        # Mutasjonsprøvd 16. sep. 2026: fjernet jeg selve deklarasjonen, gikk
+        # testen grønn — fordi `-webkit-text-fill-color` også står i
+        # kommentaren som forklarer hvorfor den trengs. En regel som leser sin
+        # egen prosa måler at noen har skrevet om den, ikke at den finnes.
+        css = re.sub(r'/\*.*?\*/', '', raa, flags=re.S)
+        self.assertIn('.vl-laast', css)
+        self.assertIn('.vl-laast-hint', css)
+        # Safari leser `-webkit-text-fill-color` på et deaktivert felt og
+        # ignorerer `color`. Uten den står teksten lysegrå på iPhone uansett
+        # — altså «låst, men ikke lesbar», som er det motsatte av bestillingen.
+        laastregel = css[css.index('.vl-laast,'):]
+        self.assertIn('-webkit-text-fill-color:', laastregel[:400])

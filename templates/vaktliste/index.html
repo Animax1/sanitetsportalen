@@ -529,6 +529,10 @@
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Lukk"></button>
       </div>
       <div class="modal-body">
+        <p id="ressurs-laast-hint" class="vl-laast-hint d-none">
+          <i class="bi bi-lock-fill me-1"></i>De stiplede feltene bestemmer hvem
+          ressursen er til for, og settes av vaktleder. Navnet kan du rette.
+        </p>
         <div class="mb-3">
           <label class="form-label" for="ressurs-navn">Navn</label>
           <input type="text" id="ressurs-navn" class="form-control" maxlength="120">
@@ -624,6 +628,13 @@
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Lukk"></button>
       </div>
       <div class="modal-body">
+        {# Fargen sier at feltet er låst; hintet sier hvorfor. Vises av #}
+        {# `_laasFelter()`, samme funksjon som låser — to steder å huske på #}
+        {# ville før eller siden gitt låste felter uten forklaring. #}
+        <p id="vaktpost-laast-hint" class="vl-laast-hint d-none">
+          <i class="bi bi-lock-fill me-1"></i>De stiplede feltene er vaktas
+          rammer og settes av vaktleder. Du fyller plassen og skriver merknad.
+        </p>
         <div class="mb-3">
           <label class="form-label" for="vaktpost-mannskap">Mannskap</label>
           <select id="vaktpost-mannskap" class="form-select"></select>

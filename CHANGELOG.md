@@ -4,6 +4,46 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-16 — Et låst felt skal se låst ut, og fortsatt kunne leses
+
+**André:** «De feltene i rediger skift og rediger ressurs som korps-fører ikke kan endre bør
+endre farge i feltet til noe som tydeliggjør at den er låst. Fortsatt lesbar.»
+
+Enig — og `disabled` alene gjorde det motsatte av begge deler. Bootstrap demper deaktiverte
+felter, nettleseren demper dem én gang til, og **Safari ignorerer `color` på et deaktivert
+felt** og leser `-webkit-text-fill-color` i stedet. Resultatet var et felt som verken så
+låst ut eller var godt å lese — særlig på iPhone, som er der dette ble meldt begge ganger.
+
+`.vl-laast` gir stiplet kant, dempet flate og **full tekstkontrast tilbake**. Stiplet
+framfor en ny farge, av to grunner: fargene i modulen betyr alt noe (gult varsler, grønt er
+tilstede), og en strek man ser forskjell på i gråtoner fungerer også for den som ikke
+skiller farger.
+
+**Fargen sier at feltet er låst, ikke hvorfor.** En stiplet kant uten forklaring leser som
+en feil, så hvert vindu har nå én linje som sier hvem som setter feltene — og den vises av
+*samme funksjon* som låser dem. `_laasFelter()` i `vaktliste-kjerne.js` gjør alle tre
+tingene: `disabled`, klassen, hintet. Et vindu som husket to av dem ville sett ut som om det
+virket.
+
+### Mutasjonstesting: åtte mutanter, og den siste var en test som leste sin egen prosa
+
+Sju bet med én gang. Den åttende — «Safari-regelen fjernet fra stilarket» — overlevde, og
+grunnen er verdt å skrive ned: testen krevde `-webkit-text-fill-color` i regelen, og den
+strengen står **også i kommentaren** som forklarer hvorfor den trengs. Fjernet man
+deklarasjonen, sto prosaen igjen og testen gikk grønn.
+
+Det er en ny variant av «skillet går på hva assertionen påstår»: en regel som leser sin egen
+begrunnelse måler at noen har skrevet om kommentaren, ikke at koden gjør det den sier.
+Testen stripper nå kommentarer før den søker, og krever deklarasjonen med kolon. Regelen
+står i `CLAUDE.md` ved siden av de fem andre mønstrene. Etter rettingen: **åtte mutanter,
+ingen overlevende.**
+
+**Endret:** `static/css/vaktliste.css`, `static/js/vaktliste-{kjerne,offline,handlinger}.js`,
+`templates/vaktliste/index.html`, `vaktliste/tests_tilgang.py` (+6 tester),
+`vaktliste/CLAUDE.md`, `CLAUDE.md`. Ingen migrasjon. Hele suiten (3 096 tester) grønn.
+
+---
+
 ## 2026-09-16 — Merknaden følger raden, ikke oppsettet
 
 **André:** «Merknad skal ikke låses for korps-føreren.»

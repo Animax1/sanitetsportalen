@@ -155,6 +155,19 @@ fase 3–7 gjenstår — se `docs/BESLUTNING_VAKTLISTE.md`, som er besluttet i s
   feltet: man tror man har gjort noe, og ser etterpå at man ikke har.
   `LaaseneVirkerPaaAlleFeltformeneTests` håndhever at `_laasOppsettfelter()` og
   `_laasRessursoppsett()` bruker `disabled`.
+
+  **Og et låst felt skal se låst ut uten å bli uleselig** (André, 16. sep. 2026).
+  `disabled` alene gjør det motsatte: Bootstrap demper feltet, nettleseren demper det én
+  gang til, og **Safari ignorerer `color` på et deaktivert felt** — den leser
+  `-webkit-text-fill-color`. `.vl-laast` gir stiplet kant, dempet flate og full
+  tekstkontrast tilbake. Stiplet framfor en ny farge, fordi fargene i modulen alt betyr
+  noe (gult varsler, grønt er tilstede) og en strek leses også i gråtoner.
+
+  **Låsen er tre ting samtidig, og derfor én funksjon:** `_laasFelter()` i
+  `vaktliste-kjerne.js` setter `disabled`, klassen og hintet som sier *hvorfor*. Et vindu
+  som husket to av dem ville sett ut som om det virket. Hintene (`vaktpost-laast-hint`,
+  `ressurs-laast-hint`) står i malen, og en test krever at de finnes — `_laasFelter()`
+  tier helt når `getElementById` gir `null`.
 - **`ressurs_detalj_view` har to terskler i ett endepunkt.** Navnet krever
   `services.kan_gi_nytt_navn()` — bilen heter «Sola 56», ikke «Ambulanse 2», og den som
   står ved bilen er den som vet det. Gruppe, reservasjon, enhetskobling, rekkefølge og

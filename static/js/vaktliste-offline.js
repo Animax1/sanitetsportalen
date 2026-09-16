@@ -306,30 +306,16 @@ function apneRedigerVaktpost(id) {
 function _laasOppsettfelter(laast) {
   // Egen funksjon, ikke en løkke inne i `apneRedigerVaktpost()`: en anonym
   // `if` i et vindu lar seg ikke kjøre i en test, og dette er en tilgangsregel.
-  // **`readOnly` virker ikke på `datetime-local`** (meldt fra staging
-  // 16. sep. 2026 — «på iPhone kan man trykke på tid/datoen og justere den,
-  // men får ingen tilgang når man prøver å få det gjennom»).
   //
-  // HTML-standarden lar `readonly` gjelde felter man taster fritt i. På
-  // `date`, `time`, `datetime-local`, `color`, `file` og avkryssinger er
-  // attributtet **uten virkning**: velgeren åpner seg, segmentene lar seg
-  // dra, og verdien endrer seg på skjermen. Så ble endringen filtrert bort
-  // ved lagring, og feltet sto der det sto. Det er verre enn å ikke kunne
-  // røre den — man tror man har gjort noe, og ser etterpå at man ikke har.
+  // `vaktpost-merknad` står **ikke** her: merknaden er en beskjed om raden, og
+  // følger person og rolle (André, 16. sep. 2026).
   //
-  // `disabled` er det ene attributtet som virker på alle feltformene, og
-  // det gjør nøyaktig det André ba om: feltet lar seg ikke trykke på.
-  // Verdien leses fortsatt av JS, så visningen er i behold.
-  // `vaktpost-merknad` står **ikke** her: merknaden er en beskjed om raden,
-  // og følger person og rolle (André, 16. sep. 2026).
-  ['vaktpost-fra', 'vaktpost-til',
-   'vaktpost-korps', 'vaktpost-probono'].forEach((id) => {
-    const el = document.getElementById(id);
-    if (el) el.disabled = laast;
-  });
   // Sletting og duplisering står i `.vl-krev-full` i malen og gates av
   // `gateKnapper()` ved sidelasting. Vindusmarkupen tegnes ikke på nytt, så
   // den ene gangen holder — det er byggerne som ikke kan gates slik.
+  _laasFelter(['vaktpost-fra', 'vaktpost-til',
+               'vaktpost-korps', 'vaktpost-probono'],
+              laast, 'vaktpost-laast-hint');
 }
 
 
