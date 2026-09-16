@@ -110,6 +110,10 @@ MIDDLEWARE = [
     'audit.middleware.RequestAuditMiddleware',
     'accounts.middleware.MustChangePasswordMiddleware',
     'accounts.middleware.DynamicSessionTimeoutMiddleware',
+    # **Etter autentiseringen, før arbeidet** (16. sep. 2026): den trenger
+    # `request.user` og `request.session`, og den skal notere at noen var her
+    # også når viewet under svarer med en feil.
+    'core.middleware.BrukerAktivitetMiddleware',
     'core.middleware.BackupSchedulerMiddleware',
     # Intervallsending av vaktlista som fil (13. sep. 2026) — samme klokke
     # som backup-planleggeren: trafikken driver den.

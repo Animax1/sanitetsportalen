@@ -50,9 +50,55 @@ function getCsrfToken() {
   return '';
 }
 
+// ════════════════════════════════════════════════════════
+// ER DET ET MENNESKE HER?
+// ════════════════════════════════════════════════════════
+//
+// **«Pålogget» sier ingenting om tilstedeværelse** (André, 16. sep. 2026: «de
+// trenger ikke være faktisk aktive og bruke nettsiden — det kan være en
+// fane»). `SESSION_SAVE_EVERY_REQUEST` fornyer sesjonen ved hver forespørsel,
+// og portalen poller seg selv hvert 5.–30. sekund. En glemt fane holder
+// derfor sesjonen fersk i åtte timer, helt uten et menneske.
+//
+// **Løsningen er å la pollingen bære svaret.** Fana snakker med serveren
+// uansett; den sender nå hvor lenge siden brukeren sist rørte siden. Ingen ny
+// trafikk, ett felt på en forespørsel som alt går.
+//
+// Startverdien er sidelastingen: å åpne siden *er* en handling.
+let sisteInteraksjon = Date.now();
+
+//: Hendelsene som teller som «et menneske gjorde noe». `scroll` er **ikke**
+//: med: den fyres av treghetsrulling på mobil lenge etter at fingeren er
+//: borte, og av en side som laster inn. `visibilitychange` er med fordi det å
+//: hente fram fana er en handling — det er nettopp da man kommer tilbake.
+const INTERAKSJONER = ['pointerdown', 'keydown', 'wheel', 'touchstart'];
+
+function merkInteraksjon() {
+  sisteInteraksjon = Date.now();
+}
+
+function sekunderSidenInteraksjon(naa) {
+  // Eget navn, ikke en linje inne i `apiFetch`: regelen skal kunne kjøres i
+  // en test uten å gå gjennom nettverket.
+  return Math.max(0, Math.round(((naa ?? Date.now()) - sisteInteraksjon) / 1000));
+}
+
+if (typeof document !== 'undefined' && document.addEventListener) {
+  INTERAKSJONER.forEach((h) => document.addEventListener(h, merkInteraksjon,
+                                                         { passive: true, capture: true }));
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) merkInteraksjon();
+  });
+}
+
+
 async function apiFetch(url, options = {}) {
   const method = (options.method || 'GET').toUpperCase();
   const headers = { ...(options.headers || {}) };
+
+  // Sekunder, ikke et tidspunkt: da slipper serveren å stole på klientens
+  // klokke, som kan stå hvor som helst på en delt drifts-PC.
+  headers['X-Portal-Inaktiv'] = String(sekunderSidenInteraksjon());
 
   if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(method)) {
     headers['X-CSRFToken'] = getCsrfToken();

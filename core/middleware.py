@@ -13,8 +13,10 @@ import secrets
 import threading
 import time
 from collections import deque
+from datetime import datetime, timedelta
 
 from django.conf import settings
+from django.utils import timezone
 
 # `resource` finnes kun på Unix. Produksjon (Railway) og offline-Linux har den,
 # men lokal utvikling og testkjøring på Windows har det ikke — og siden denne
@@ -534,3 +536,92 @@ class RequestMetricsMiddleware:
             pass
 
         return response
+
+
+# ── Er det et menneske i den fana? ──────────────────────────────────────────
+
+#: Nøkkelen i sesjonen. Den leses av `_list_active_sessions`, som alt dekoder
+#: sesjonsdataene — derfor ingen ny tabell.
+SISTE_INTERAKSJON = 'siste_interaksjon'
+
+#: Klienten sender sekunder siden brukeren sist rørte siden. Timer er ikke et
+#: tall vi trenger presisjon i, og en fane som har stått i to døgn skal ikke
+#: kunne skrive et absurd tall inn i sesjonen.
+MAKS_INAKTIV_S = 48 * 60 * 60
+
+
+class BrukerAktivitetMiddleware:
+    """Noterer når et menneske sist gjorde noe i denne sesjonen.
+
+    **«Pålogget» er ikke «til stede»** (André, 16. sep. 2026: «de trenger ikke
+    være faktisk aktive og bruke nettsiden — det kan være en fane»).
+    `SESSION_SAVE_EVERY_REQUEST = True` fornyer sesjonen ved hver forespørsel,
+    og portalen poller seg selv hvert 5.–30. sekund — lydvarselet 5 s,
+    offline-køen 15 s, tavla og auto-refresh 30 s. En glemt fane holder derfor
+    sesjonen fersk i åtte timer uten at noen er der, og `expire_date` er ikke
+    et dårlig mål på tilstedeværelse; det er ikke et mål på det i det hele tatt.
+
+    **Svaret kommer fra fana, ikke fra trafikken.** `apiFetch` sender
+    `X-Portal-Inaktiv` med sekunder siden siste `pointerdown`/`keydown`/
+    `wheel`/`touchstart`, og her regnes det om til et tidspunkt. **Sekunder og
+    ikke et tidspunkt**: da slipper vi å stole på klientens klokke, som kan
+    stå hvor som helst på en delt drifts-PC.
+
+    **En forespørsel uten headeren regnes som en handling.** Det er
+    sidelastinger, skjemainnsendinger og alt som ikke går gjennom `apiFetch` —
+    altså nettopp det et menneske gjør. Polling *har* headeren, og det er den
+    som skal kunne se gammel ut.
+
+    Skriver bare når verdien flytter seg merkbart: sesjonen lagres uansett ved
+    hver forespørsel, men å markere den endret ved hvert femte sekund ville
+    gjort hver poll til en skriving med nytt innhold.
+    """
+
+    #: Under dette skrives ingenting. Ett minutt er finere enn lista trenger.
+    OPPLOSNING_S = 60
+
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        try:
+            self._noter(request)
+        except Exception:      # noqa: BLE001 — aldri velte en forespørsel
+            pass
+        return self.get_response(request)
+
+    def _noter(self, request):
+        if not getattr(request, 'session', None):
+            return
+        if not getattr(request, 'user', None) or not request.user.is_authenticated:
+            return
+
+        naa = timezone.now()
+        tidspunkt = naa - timedelta(seconds=les_inaktiv(request))
+        forrige = request.session.get(SISTE_INTERAKSJON)
+        if forrige:
+            try:
+                if abs((naa - datetime.fromisoformat(forrige)).total_seconds()
+                       - (naa - tidspunkt).total_seconds()) < self.OPPLOSNING_S:
+                    return
+            except ValueError:
+                pass
+        request.session[SISTE_INTERAKSJON] = tidspunkt.isoformat()
+
+
+def les_inaktiv(request) -> int:
+    """Sekunder siden siste interaksjon, slik klienten oppgir dem.
+
+    Egen funksjon fordi den bærer tre beslutninger som hver for seg er en
+    mulig feil: manglende header betyr **null** (en forespørsel vi ikke kan
+    klassifisere er en handling), ugyldig tekst betyr null (en klient som
+    sender søppel skal ikke kunne skjule seg), og et negativt eller absurd
+    tall klippes (ellers kan en fane skrive seg selv inn i framtida).
+    """
+    raa = request.META.get('HTTP_X_PORTAL_INAKTIV')
+    if raa is None:
+        return 0
+    try:
+        return max(0, min(int(raa), MAKS_INAKTIV_S))
+    except (TypeError, ValueError):
+        return 0

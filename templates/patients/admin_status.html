@@ -32,6 +32,13 @@
   .session-item .username { color: var(--portal-text); font-weight: 600; word-break: break-all; }
   .session-item .role { color: var(--portal-text-muted); font-size: 0.78rem; }
   .session-item .meta { color: var(--portal-text-muted); font-size: 0.78rem; }
+  /* Aktivitet: «aktiv nå» skal kunne leses i en kolonne man skummer. Farge
+     bærer ikke betydningen alene — teksten sier det samme. */
+  .session-item .aktivitet { font-size: 0.78rem; white-space: nowrap; flex: 0 0 auto; }
+  .session-item .akt-aktiv { color: #22c55e; font-weight: 600; }
+  .session-item .akt-rolig { color: var(--portal-text-muted); }
+  .session-item .akt-borte { color: #f59e0b; }
+  .session-item .akt-ukjent { color: var(--portal-text-muted); font-style: italic; }
   .session-item .self-tag { color: #86efac; font-size: 0.75rem; font-weight: 600; }
   .btn-kill { font-size: 0.78rem; padding: 0.2rem 0.6rem; background: #b91c1c; color: white; border: none; border-radius: 4px; cursor: pointer; }
   .btn-kill:hover:not(:disabled) { background: #dc2626; }
@@ -636,13 +643,40 @@ const ADMIN_URLS = {
             <span class="username">${escapeHtml(s.username)}</span>
             <span class="role">${escapeHtml(s.role || 'bruker')}</span>
           </div>
+          <span class="aktivitet ${escapeHtml(aktivitetsklasse(s.inaktiv_s))}">${escapeHtml(aktivitetstekst(s.inaktiv_s))}</span>
           <button class="btn-kill" data-key="${escapeHtml(s.session_key)}" data-username="${escapeHtml(s.username)}" type="button">Logg ut</button>
         </div>
       `).join('');
-      status.textContent = lastSessions.length + ' påloggede brukere vises';
+      // **Begge tallene.** «Pålogget» er ikke «til stede», og André trenger å
+      // se begge: hvor mange sesjoner som finnes, og hvor mange av dem det
+      // faktisk sitter noen bak.
+      const aktive = lastSessions.filter(s => s.inaktiv_s != null && s.inaktiv_s < 300).length;
+      status.textContent = lastSessions.length + ' påloggede · ' + aktive + ' aktive nå';
     } catch (err) {
       list.innerHTML = '<div class="sessions-empty">Kunne ikke hente sesjoner: ' + escapeHtml(err.message) + '</div>';
     }
+  }
+
+  // **Aktivitet som tekst, ikke et tall i sekunder** (16. sep. 2026). Den som
+  // ser på lista spør «sitter det noen der?», ikke «hvor mange sekunder».
+  // Grensene er valgt etter hva pollingen betyr: fana snakker med serveren
+  // hvert 5.–30. sekund uansett, så under fem minutter er et menneske som
+  // nettopp gjorde noe.
+  function aktivitetstekst(sek) {
+    if (sek == null) return 'ukjent';
+    if (sek < 300) return 'aktiv nå';
+    if (sek < 3600) return 'inaktiv ' + Math.round(sek / 60) + ' min';
+    const t = Math.floor(sek / 3600);
+    return 'inaktiv ' + t + (t === 1 ? ' time' : ' timer');
+  }
+
+  function aktivitetsklasse(sek) {
+    // «ukjent» dempes som en inaktiv: en sesjon vi ikke vet noe om skal ikke
+    // se like trygg ut som en vi vet er i bruk.
+    if (sek == null) return 'akt-ukjent';
+    if (sek < 300) return 'akt-aktiv';
+    if (sek < 3600) return 'akt-rolig';
+    return 'akt-borte';
   }
 
   async function killSession(sessionKey, username, btn) {

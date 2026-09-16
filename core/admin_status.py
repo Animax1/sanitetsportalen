@@ -27,6 +27,8 @@ from datetime import datetime, timedelta
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.contrib.sessions.models import Session
+
+from core.middleware import SISTE_INTERAKSJON
 from django.core.cache import cache
 from django.http import JsonResponse
 from django.shortcuts import render
@@ -464,6 +466,26 @@ def admin_status_json(request):
 # ── Sesjonshåndtering ─────────────────────────────────────────────────────────────────
 # Lar admin se og avslutte aktive brukersesjoner under høy last.
 
+def _inaktiv_sekunder(data, naa):
+    """Sekunder siden brukeren sist rørte siden — `None` om vi ikke vet.
+
+    **`None` og ikke 0.** En sesjon fra før `BrukerAktivitetMiddleware` fantes,
+    eller en klient som aldri har kalt `apiFetch`, har ingen verdi — og «vet
+    ikke» må kunne skilles fra «aktiv nå». Skrev vi 0, ville hver gammel sesjon
+    sett ut som om noen satt der.
+    """
+    raa = data.get(SISTE_INTERAKSJON)
+    if not raa:
+        return None
+    try:
+        sist = datetime.fromisoformat(raa)
+    except (TypeError, ValueError):
+        return None
+    if timezone.is_naive(sist):
+        return None
+    return max(0, int((naa - sist).total_seconds()))
+
+
 def _list_active_sessions():
     """Returner liste over aktive sesjoner med (kun) brukernavn og rolle.
 
@@ -497,12 +519,17 @@ def _list_active_sessions():
         user = users_by_id.get(uid)
         if not user:
             continue
+        # **Alle påloggede vises, også de inaktive** (André, 16. sep. 2026:
+        # «jeg må fortsatt se alle som er innlogget»). Aktiviteten er en
+        # *kolonne*, ikke et filter — en fane som har stått i to timer er
+        # nettopp den man leter etter, og et filter ville skjult den.
         sessions.append({
             'session_key': sess.session_key,
             'user_id': user.id,
             'username': user.username,
             'role': getattr(user, 'role', '') or '',
             'expire_date': sess.expire_date.isoformat(),
+            'inaktiv_s': _inaktiv_sekunder(data, now),
         })
     # Sorter alfabetisk på brukernavn for stabilt UI
     sessions.sort(key=lambda s: s['username'].lower())

@@ -912,6 +912,27 @@ gikk og når det ikke gikk — `core.kommando.registrer_kjoring()` kaster aldri.
 jobben har kjørt én gang. En ny cron-jobb skal ha navnet sitt i `CRON_JOBBER`
 og sende det inn, ellers finnes den ikke for dashbordet.
 
+### Er det et menneske i den fana? (core/middleware.BrukerAktivitetMiddleware)
+
+**«Pålogget» er ikke «til stede»** (André, 16. sep. 2026). `SESSION_SAVE_EVERY_REQUEST`
+fornyer sesjonen ved **hver** forespørsel, og portalen poller seg selv hvert 5.–30. sekund —
+lydvarselet 5 s, offline-køen 15 s, tavla og auto-refresh 30 s. En glemt fane holder derfor
+sesjonen fersk i åtte timer uten at noen er der, og `expire_date` er ikke et *dårlig* mål på
+tilstedeværelse; det er ikke et mål på det i det hele tatt.
+
+**Fana bærer svaret selv.** `apiFetch` sender `X-Portal-Inaktiv` med sekunder siden siste
+`pointerdown`/`keydown`/`wheel`/`touchstart`, og middlewaren regner det om til et tidspunkt
+i sesjonen (`SISTE_INTERAKSJON`). Ingen ny trafikk og ingen ny tabell — feltet henger på en
+forespørsel som alt går, og `_list_active_sessions` dekoder alt sesjonen.
+
+| Valg | Hvorfor |
+|---|---|
+| **Sekunder, ikke et tidspunkt** | Da slipper serveren å stole på klientens klokke, som kan stå hvor som helst på en delt drifts-PC |
+| **Manglende header = 0** | Sidelastinger og skjemainnsendinger går ikke gjennom `apiFetch`, og *de* er handlinger. Pollingen har headeren, og det er den som skal kunne se gammel ut |
+| **`None` og ikke 0 for «vet ikke»** | En sesjon fra før middlewaren fantes må kunne skilles fra «aktiv nå» — ellers ser hver gammel sesjon ut som om noen sitter der |
+| **`scroll` teller ikke** | Treghetsrulling på mobil fyrer lenge etter at fingeren er borte |
+| **Aktiviteten er en kolonne, ikke et filter** | «Jeg må fortsatt se alle som er innlogget» (André). En fane som har stått i to timer er nettopp den man leter etter |
+
 ### Server-status (core/admin_status.py)
 
 `/portal-admin/server-status/` polles hvert 10. sekund fra `…/json/`, og

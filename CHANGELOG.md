@@ -4,6 +4,54 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-16 — Sesjonslista viser nå om det sitter noen der
+
+**André:** «Enig med polling for å vise hvem som er aktiv nå — og så må jeg fortsatt se alle
+som er innlogget.»
+
+Begge deler. **Aktiviteten er en kolonne, ikke et filter:** en fane som har stått i to timer
+er nettopp den man leter etter, og et filter ville skjult den. Linja under lista sier begge
+tallene — «7 påloggede · 3 aktive nå».
+
+### Fana bærer svaret selv
+
+`apiFetch` sender `X-Portal-Inaktiv` med sekunder siden siste
+`pointerdown`/`keydown`/`wheel`/`touchstart`. `BrukerAktivitetMiddleware` regner om til et
+tidspunkt i sesjonen. **Ingen ny trafikk og ingen ny tabell** — feltet henger på en
+forespørsel som alt går, og `_list_active_sessions` dekoder alt sesjonsdataene.
+
+Fire valg som hver kunne vært en stille feil:
+
+- **Sekunder, ikke et tidspunkt.** Da slipper serveren å stole på klientens klokke, som kan
+  stå hvor som helst på en delt drifts-PC.
+- **Manglende header = 0, altså «en handling».** Sidelastinger og skjemainnsendinger går
+  ikke gjennom `apiFetch`, og *de* er nettopp det et menneske gjør. Pollingen har headeren,
+  og det er den som skal kunne se gammel ut.
+- **`None` og ikke 0 for «vet ikke».** En sesjon fra før middlewaren fantes må kunne skilles
+  fra «aktiv nå» — ellers ser hver gammel sesjon ut som om noen sitter der.
+- **`scroll` teller ikke som interaksjon.** Treghetsrulling på mobil fyrer lenge etter at
+  fingeren er borte, og ville gjort en glemt fane «aktiv» i et halvt minutt av seg selv.
+
+Serveren klipper dessuten verdien: negativt blir null, og taket er 48 timer. To sperrer i
+stedet for én er billigere enn å finne ut hvilken som sviktet.
+
+### Ti mutanter, alle røde
+
+Blant dem «manglende header blir ukjent i stedet for en handling» og «klienten måler fra
+feil punkt» — de to som ville gjort hele kolonnen feil uten å se ødelagt ut.
+
+### Og ett punkt droppet
+
+«Må kunne fordele til hele enheten/laget» er ute av TODO — André: «jeg skjønner den ikke».
+Den sto med to mulige lesninger og ingen av dem var hans; et punkt ingen kan forklare er
+et punkt som blir liggende og se ut som gjeld.
+
+**Endret:** `core/middleware.py`, `core/admin_status.py`, `static/js/portal-utils.js`,
+`templates/patients/admin_status.html`, `myproject/settings.py`,
+`core/tests_brukeraktivitet.py` (ny, 14 tester), `CLAUDE.md`, `TODO.md`.
+
+---
+
 ## 2026-09-16 — Hvorfor «pålogget» ikke betyr «til stede»
 
 **André:** «I /server-status/ ser du hvem som er pålogget, men de trenger ikke være faktisk

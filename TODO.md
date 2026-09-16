@@ -810,8 +810,10 @@ dato som alt annet.
 Rekkefølgen er valgt etter **hva en feil koster**, ikke etter hvor lett punktet er:
 tilgangshull og data først, funksjonalitet i midten, utseende sist.
 
-- [ ] **Pulje 3 — vaktlista, bruk og utseende.** Ingen av dem rører tilgang eller data, og
-      de kan tas i én runde. Ikke startet.
+- [ ] **Pulje 3 — vaktlista, bruk og utseende.** Fem av seks levert 16. sep. 2026
+      (se CHANGELOG): Timeoversikt, «Oversikt» som talltabell, redigerbare ressursgrupper,
+      fanerekka i to bolker og rollerangeringen. Det ene som står igjen er lagt bort til
+      vurdering:
       - [ ] **Sett rolle på flere skift samtidig — til vurdering, ikke bestilt**
             (brutt 16. sep. 2026: «Det fungerer forsåvidt når det gjelder korps og du går
             inn på rediger ressurs og setter korps der»).
@@ -833,35 +835,6 @@ tilgangshull og data først, funksjonalitet i midten, utseende sist.
               «Lag 1» alltid én lagleder og tre lagsmedlemmer, er det oppsettet som
               gjentar seg — ikke en handling man gjør om igjen. Planleggeren lager alt
               plassene; den kunne gitt dem roller.
-
-- [ ] **Pulje 4 — trenger en avklaring fra André før noe kan spesifiseres.** Begge er
-      reelle ønsker; ingen av dem har en entydig lesning ennå.
-      - [ ] **«Må kunne fordele til hele enheten/laget».** Hva er et *lag* her — alle
-            plassene på én ressurs, eller en navngitt gruppe mannskap som følges ad
-            gjennom flere skift? De to er helt ulike modeller, og den andre trenger en ny
-            tabell
-      - [ ] **Vis faktisk aktivitet per sesjon på `/portal-admin/server-status/`.**
-            **Avklart 16. sep. 2026 (André):** «I /server-status/ ser du hvem som er
-            pålogget, men de trenger ikke være faktisk aktive og bruke nettsiden — det kan
-            være en fane. Den vil jeg gjerne kunne se.»
-            Lista over påloggede finnes alt (`_list_active_sessions`), med utlogging per
-            sesjon. Det den mangler er *om noen er der*.
-            - **`expire_date` duger ikke, og grunnen er målt:**
-              `SESSION_SAVE_EVERY_REQUEST = True` fornyer sesjonen ved **hver** forespørsel,
-              og portalen poller av seg selv hvert 5.–30. sekund (lydvarselet 5 s,
-              offline-køen 15 s, tavla og auto-refresh 30 s). En glemt fane holder derfor
-              sesjonen «fersk» i åtte timer. Det er nøyaktig det André så.
-            - **«Siste forespørsel» er dermed ubrukelig, og «siste skriving» for strengt** —
-              en vaktleder som leser lista i en time arbeider, uten å skrive noe.
-            - **Forslag: la pollingen bære svaret.** Fana snakker med serveren hvert 5.–30.
-              sekund uansett; la den sende hvor lenge siden brukeren sist rørte siden
-              (`pointerdown`/`keydown`/`visibilitychange`). Da kan lista si «aktiv nå»,
-              «inaktiv i 40 min» eller «fane i bakgrunnen siden 09:12» — og det er det ene
-              tallet som faktisk svarer på spørsmålet. Ingen ny polling, ett felt på en
-              forespørsel som alt går.
-            - **Vurder samtidig:** skal en inaktiv sesjon logges ut *automatisk* etter en
-              grense, eller bare vises så admin kan gjøre det? Automatikk midt i en vakt er
-              en risiko — bilen som ikke har rørt skjermen på en time er fortsatt på vakt.
 
 ### Løse punkter
 
