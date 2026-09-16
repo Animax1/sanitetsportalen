@@ -4,6 +4,31 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-16 — Pulje 3A og 3B ut i prod
+
+Sju commits, `64f62a3` → `5b9ac15`, alle verifisert på staging av André:
+
+| Bygg | Hva |
+|---|---|
+| `4cc042a` | «Planlegging»-fanen heter «Timeoversikt» |
+| `3325c8d` | «Oversikt» ble en faktisk oversikt — tid, timer, plasser, besatt, ledige, totalt |
+| `55c5fb8` | Ressursgruppene kan endres og deaktiveres; rollene rangeres |
+| `d8d08c4` | Regresjonstester for rollerekkefølgen |
+| `d2af252` | Roller kan døpes om, med én form for navneendring i modulen |
+| `f3c1aa4` | Laget sorteres etter rolle, ikke etter når radene ble laget |
+| `5b9ac15` | Tidskolonnen i «Oversikt» er en celle igjen |
+
+**To migrasjoner, og bare én rører data.** `0020` endrer bare `Meta.ordering`.
+`0019` legger til `Ressursrolle.rekkefolge` og sprer dagens alfabetiske rekkefølge utover
+med ti — **skjema først, data etterpå**, altså den trygge retningen: regelen om
+PostgreSQLs triggerkø gjelder migrasjoner som skriver rader og *deretter* endrer skjema.
+
+Ingenting flytter seg av migrasjonen. Rollene står som før til noen bruker pilene.
+
+Suiten grønn på `5b9ac15`: 3 225 tester.
+
+---
+
 ## 2026-09-16 — «Kolonnen tid viser seg annerledes, samt linjen er ujevn»
 
 **Meldt fra staging (André)** om «Oversikt»-fanen jeg bygget noen timer før. Cella hadde
