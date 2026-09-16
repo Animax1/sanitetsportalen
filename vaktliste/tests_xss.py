@@ -4132,9 +4132,16 @@ class PlanleggingsfanenTests(SimpleTestCase):
                         '_budsjettpost', '_dagtekst', '_d', 'kanSetteTak',
                         '_tall', '_kolonneandeler', 'kanLede',
                         '_nivaa', '_erAdmin', 'visFane', 'lastListe',
-                        'faneTrengerBelastning', 'planleggerSikreLinjer')),
+                        'faneTrengerBelastning', 'planleggerSikreLinjer',
+                        'huskListe')),
     )
-    VINDU = "globalThis.window = { MODUL_TILGANG: { admin: true } };\n"
+    # `huskListe` kalles av `lastListe` og trenger en butikk å skrive til.
+    # Node har ingen `localStorage`; uten stubben kaster den, og funksjonen
+    # svelger det — men da ville testene her målt en kodesti som feiler
+    # stille, og det er ikke den de er til for.
+    VINDU = ("globalThis.window = { MODUL_TILGANG: { admin: true } };\n"
+             "globalThis.localStorage = { getItem: () => null, setItem: () => {} };\n"
+             "const SISTE_LISTE_NOKKEL = 'vaktliste:siste';\n")
 
     def setUp(self):
         if not node_available():

@@ -4,6 +4,66 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-16 — Velgeren var ikke treg, den fyrte på feil hendelse
+
+**Meldt fra staging (André):** «Når jeg skifter vaktliste tar det lang tid før fanene og
+vaktene oppdateres. Det er og forvirrende at om jeg er på en vaktliste og går ut av
+/vaktliste/, så går jeg tilbake til den som er øverst på listen.»
+
+### Det var ikke treghet — det skjedde ingenting
+
+`<select id="vaktliste-velger" data-action="byttVaktliste">` manglet
+`data-hendelse="change"`. Klikkdelegeringen i `portal-utils.js` treffer *alle*
+`[data-action]`, mens `change`-lytteren bare treffer dem som oppgir hendelsen sin. To ting
+skjedde derfor samtidig:
+
+- **Klikket som åpnet nedtrekket** kalte `byttVaktliste()` med verdien som alt sto der —
+  altså en full henting og omtegning av lista man allerede så, hver gang man åpnet
+  velgeren. Det er stutteren man kjenner mens man prøver å velge.
+- **Selve valget gjorde ingenting.** Lista byttet først ved *neste* klikk på velgeren.
+
+Regelen sto allerede i `CLAUDE.md`, og `klikkSkalKjore()` finnes nettopp for den. Markupen
+ble bare skrevet som om den ikke gjorde det — samme sort feil som planleggerfeltene 15.
+sep. `VelgerenFyrerPaaEndringTests` skanner nå alle maler: et `<select>` eller `<textarea>`
+med `data-action` skal oppgi hendelsen sin. `<input>` er utenfor med vilje — en knapp er et
+`<input>` også, og der *er* klikk riktig hendelse. Én synder i dag, og det var denne; de to
+andre nedtrekkene hadde det riktig.
+
+### Og sida husker hvilken liste du sto på
+
+`lastVaktlister()` tok `vaktlister[0].id`, hver gang. Nå leser `forsteListe()` den siste
+fra `localStorage` og **sjekker den mot lista serveren faktisk sendte** — en vaktliste kan
+være slettet, eller tilgangen borte, siden sist, og da er øverst riktig, som første gang.
+Uten den sjekken ville sida bedt om en ID serveren svarer 404 på, og stått tom uten å si
+hvorfor.
+
+Minnet er **per nettleser, ikke per konto**: det er en bekvemmelighet, ikke en innstilling,
+og «Logg ut» sender `Clear-Site-Data`, som rydder den på en delt drifts-PC. Lagringen
+kaster i privat modus, så begge kallene står i `try/catch`.
+
+### Sju mutanter, og de to som overlevde var kallstedene
+
+`forsteListe()` og `huskListe()` var prøvd for seg. Det holdt ikke: **begge kallene lot seg
+fjerne uten at én test ble rød** — `lastVaktlister()` kunne gå tilbake til `vaktlister[0]`,
+og `lastListe()` kunne slutte å lagre. Da husker sida ingenting mens testene bekrefter en
+dekning som ikke finnes. Felle nummer tre fra mutasjonsbolken, igjen.
+
+`MinnetBrukesFraDeEkteInngangeneTests` kjører nå de ekte inngangene mot stubbet `apiFetch`
+og `localStorage`, og leser hvilken ID oppstarten ba om og hva lastingen lagret. Etter
+rettingen: **sju mutanter, ingen overlevende.**
+
+**Og en testfelle til, verdt å kjenne:** `try/catch`-en rundt `localStorage` svelger
+`ReferenceError` like villig som en blokkert butikk. `build_harness` klipper ut funksjoner,
+ikke konstanter, så `SISTE_LISTE_NOKKEL` fantes ikke i node — og testen falt tilbake på
+«øverst» og *så ut* som om funksjonen ikke husket noe, mens den i virkeligheten ikke fant
+navnet sitt. Nøkkelen leses nå ut av kilden.
+
+**Endret:** `templates/vaktliste/index.html`, `static/js/vaktliste-kjerne.js`,
+`vaktliste/tests_tilgang.py` (+9 tester), `vaktliste/tests_xss.py`, `vaktliste/CLAUDE.md`.
+Ingen migrasjon. Hele suiten (3 108 tester) grønn.
+
+---
+
 ## 2026-09-16 — Porten gjaldt innsendingen, ikke endringen
 
 **Meldt fra staging (André):** «Kan rapportere bug at de med les alle / skriv eget korps

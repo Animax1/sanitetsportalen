@@ -83,6 +83,20 @@ fase 3–7 gjenstår — se `docs/BESLUTNING_VAKTLISTE.md`, som er besluttet i s
   backup — og sammenligner `Utsending.innhold_sha256` mot den sist *sendte*; klokka går
   fra forrige *forsøk*. Middlewaren tas ut under test i `settings.py`, som
   backup-planleggeren.
+- **Vaktlistevelgeren må ha `data-hendelse="change"`** (16. sep. 2026). Uten den fyrer
+  klikkdelegeringen i `portal-utils.js` på *klikk* — med verdien som alt sto der — og
+  ikke når man velger. Symptomet var «treg»: hvert forsøk på å åpne nedtrekket hentet
+  lista man allerede så, og byttet skjedde først ved neste klikk på velgeren.
+  `VelgerenFyrerPaaEndringTests` skanner malene: et `<select>` eller `<textarea>` med
+  `data-action` skal alltid oppgi hendelsen sin. `<input>` er utenfor med vilje — en
+  knapp er et `<input>` også, og der *er* klikk riktig hendelse.
+- **Sida kommer tilbake til lista man sto på**, ikke til den øverste
+  (`forsteListe()`/`huskListe()`, `localStorage`). ID-en sjekkes mot lista serveren
+  faktisk sendte: en vaktliste kan være slettet, eller tilgangen borte, siden sist — og
+  da er øverst riktig, som første gang. **Per nettleser, ikke per konto:** det er en
+  bekvemmelighet, ikke en innstilling, og «Logg ut» sender `Clear-Site-Data`, som rydder
+  den på en delt drifts-PC. Lagringen kaster i privat modus, så begge kallene står i
+  `try/catch` — en glemt liste er en bagatell, en side som dør på oppstart er det ikke.
 - **Offline drift på `/vaktliste/`** (13. sep. 2026, notatet §13): service workeren
   `static/js/vaktliste-sw.js` serveres av `vaktliste.views.sw_view` på `/vaktliste/sw.js`
   (en worker styrer bare stier under sin egen; uten innlogging, unntatt i

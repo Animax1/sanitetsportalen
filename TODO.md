@@ -2233,6 +2233,13 @@ Funnene under er allerede kartlagt, så jobben er avgrenset når den skal gjøre
 
 ### Løse punkter
 
+- [x] **Vaktlistevelgeren byttet ikke liste før neste klikk** (16. sep. 2026, meldt fra
+      staging som «treg»). `data-hendelse="change"` manglet, så handlingen fyrte på klikk
+      med den gamle verdien. En skanner krever nå hendelsen på hvert `<select>`/`<textarea>`
+      med `data-action`.
+- [x] **Sida husker hvilken vaktliste man sto på** (16. sep. 2026, André). `localStorage`,
+      validert mot lista serveren sendte. Sju mutanter; de to som overlevde først var
+      kallstedene, ikke funksjonene.
 - [x] **Merknad på en ledig plass ga 403 for korps-føreren** (16. sep. 2026, meldt fra
       staging). Vinduet sender hele skjemaet, så `mannskap_id: null` sto i kroppen og
       utløste `skriv_full`-regelen for «la plassen stå tom» — på en endring som ikke

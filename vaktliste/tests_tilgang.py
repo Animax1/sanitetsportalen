@@ -2336,3 +2336,250 @@ class LaaseneVirkerPaaAlleFeltformeneTests(SimpleTestCase):
         # — altså «låst, men ikke lesbar», som er det motsatte av bestillingen.
         laastregel = css[css.index('.vl-laast,'):]
         self.assertIn('-webkit-text-fill-color:', laastregel[:400])
+
+
+class VelgerenFyrerPaaEndringTests(SimpleTestCase):
+    """Et `<select data-action>` uten `data-hendelse` fyrer på feil hendelse.
+
+    **Meldt fra staging 16. sep. 2026:** «når jeg skifter vaktliste tar det
+    lang tid før fanene og vaktene oppdateres.»
+
+    Det var ikke treghet. Klikkdelegeringen i `portal-utils.js` treffer *alle*
+    `[data-action]`, mens `change`-lytteren bare treffer dem som sier
+    `data-hendelse="change"`. Vaktlistevelgeren sa det ikke, og da skjedde to
+    ting samtidig:
+
+    - **Klikket som åpnet nedtrekket** kalte `byttVaktliste()` med den verdien
+      som alt sto der — altså en full henting av lista man allerede så, hver
+      gang man åpnet velgeren.
+    - **Valget gjorde ingenting.** Lista byttet først ved neste klikk på
+      velgeren, som leste den nye verdien.
+
+    Symptomet var «treg»; årsaken var at ingenting skjedde. Regelen har ingen
+    kjøretid å prøve — den bor i markupen — så testen leser malene.
+    """
+
+    #: Elementer som melder sin egen hendelse. `<input>` er utelatt med vilje:
+    #: en knapp er et `<input>` også, og der *er* klikk riktig hendelse.
+    EGEN_HENDELSE = ('select', 'textarea')
+
+    def _maler(self):
+        from pathlib import Path
+
+        from django.conf import settings
+        rot = Path(settings.BASE_DIR)
+        return sorted(set(rot.glob('templates/**/*.html'))
+                      | set(rot.glob('*/templates/**/*.html')))
+
+    def test_hvert_nedtrekk_med_handling_melder_sin_egen_hendelse(self):
+        import re
+
+        moenster = re.compile(
+            r'<(?:' + '|'.join(self.EGEN_HENDELSE) + r')\b[^>]*?>', re.S)
+        funn = []
+        for sti in self._maler():
+            tekst = sti.read_text(encoding='utf-8')
+            for m in moenster.finditer(tekst):
+                tagg = m.group(0)
+                if 'data-action' in tagg and 'data-hendelse' not in tagg:
+                    linje = tekst[:m.start()].count('\n') + 1
+                    funn.append(f'{sti.name}:{linje}')
+        self.assertEqual(
+            funn, [],
+            'Disse melder sin egen hendelse, men mangler '
+            '`data-hendelse="change"`:\n  ' + '\n  '.join(funn)
+            + '\n\nUten den fyrer handlingen på klikk med den gamle verdien, '
+              'og ikke når noen velger. Se klikkSkalKjore() i portal-utils.js.')
+
+    def test_vi_finner_faktisk_nedtrekk(self):
+        """Sperrehake: treffer mønsteret ingenting, går testen over grønn mens
+        den måler null."""
+        import re
+
+        moenster = re.compile(r'<select\b[^>]*?>', re.S)
+        antall = sum(len(moenster.findall(s.read_text(encoding='utf-8')))
+                     for s in self._maler())
+        self.assertGreater(antall, 10, f'fant bare {antall} nedtrekk')
+
+
+class SisteVaktlisteHuskesTests(SimpleTestCase):
+    """Sida skal komme tilbake til lista man sto på (André, 16. sep. 2026).
+
+    «Det er forvirrende at om jeg er på en vaktliste og går ut av
+    /vaktliste/, så går jeg tilbake til den som er øverst på listen.»
+    """
+
+    def setUp(self):
+        from patients.js_test_utils import (
+            VAKTLISTE_JS, build_harness, node_available)
+        if not node_available():
+            self.skipTest('node er ikke tilgjengelig')
+        self.harness = build_harness((
+            (VAKTLISTE_JS, ('forsteListe', 'huskListe')),
+        ))
+
+    #: Minste `localStorage` de to funksjonene rører. Skrevet ut som JS
+    #: framfor bygget med strengtriks: en stub som er vanskelig å lese, er en
+    #: stub man ikke ser feilen i — og den feilen ser da ut som kodens.
+    BUTIKK = """
+        globalThis.localStorage = {
+          lagret: LAGRET,
+          getItem() { return this.lagret; },
+          setItem(navn, verdi) { this.lagret = String(verdi); },
+        };
+    """
+    BUTIKK_KASTER = """
+        globalThis.localStorage = {
+          getItem() { throw new Error('sidedata blokkert'); },
+          setItem() { throw new Error('sidedata blokkert'); },
+        };
+    """
+
+    def _kjor(self, kode, *, lagret='null', kaster=False):
+        """Kjør mot en stubbet `localStorage`.
+
+        **Nøkkelen leses ut av kilden.** `build_harness` klipper ut funksjoner,
+        ikke konstanter på toppnivå — og `try/catch`-en rundt `localStorage`
+        svelger `ReferenceError` like villig som en blokkert butikk. Uten
+        denne linja falt testen tilbake på «øverst» og *så ut* som om
+        funksjonen ikke husket noe, mens den i virkeligheten ikke fant navnet
+        sitt. Verdien er altså den nettleseren bruker, ikke en skrevet av for
+        hånd.
+        """
+        import re
+
+        from patients.js_test_utils import VAKTLISTE_JS, read_js, run_node
+        m = re.search(r"SISTE_LISTE_NOKKEL\s*=\s*('[^']*')", read_js(VAKTLISTE_JS))
+        self.assertIsNotNone(m, 'fant ikke SISTE_LISTE_NOKKEL i kilden')
+        butikk = (self.BUTIKK_KASTER if kaster
+                  else self.BUTIKK.replace('LAGRET', lagret))
+        return run_node(
+            self.harness,
+            f'const SISTE_LISTE_NOKKEL = {m.group(1)};\n' + butikk + kode)
+
+    def test_den_man_sto_paa_velges(self):
+        self._kjor("""
+            const lister = [{id: 7}, {id: 3}, {id: 9}];
+            assert(forsteListe(lister) === 3, 'skal huske 3');
+        """, lagret="'3'")
+
+    def test_oeverst_naar_ingenting_er_husket(self):
+        self._kjor("""
+            assert(forsteListe([{id: 7}, {id: 3}]) === 7, 'oeverst');
+        """)
+
+    def test_oeverst_naar_den_huskede_er_borte(self):
+        """En vaktliste kan være slettet, eller tilgangen borte, siden sist.
+        Uten sjekken mot lista ville sida hentet en ID serveren svarer 404 på,
+        og stått tom uten å si hvorfor."""
+        self._kjor("""
+            assert(forsteListe([{id: 7}, {id: 3}]) === 7, 'faller tilbake');
+        """, lagret="'99'")
+
+    def test_en_blokkert_lagring_tar_ikke_ned_sida(self):
+        """Privat modus og blokkerte sidedata kaster på `localStorage`. En
+        glemt liste er en bagatell; en side som dør på oppstart er det ikke."""
+        self._kjor("""
+            assert(forsteListe([{id: 7}]) === 7, 'faller tilbake');
+            huskListe(7);
+        """, kaster=True)
+
+    def test_den_huskes_naar_man_bytter(self):
+        self._kjor("""
+            huskListe(5);
+            assert(forsteListe([{id: 1}, {id: 5}]) === 5, 'husket 5');
+        """)
+
+
+class MinnetBrukesFraDeEkteInngangeneTests(SimpleTestCase):
+    """Kallstedene, ikke bare funksjonene (16. sep. 2026).
+
+    `forsteListe()` og `huskListe()` er prøvd for seg i
+    `SisteVaktlisteHuskesTests`. **Det er ikke nok:** mutasjonstesting viste at
+    begge kallene lot seg fjerne uten at én test ble rød —
+    `lastVaktlister()` kunne gå tilbake til `vaktlister[0].id`, og
+    `lastListe()` kunne slutte å lagre. Da husker sida ingenting, og de andre
+    testene står grønne og bekrefter en dekning som ikke finnes.
+
+    Regelen fra mutasjonsbolken i `CLAUDE.md`, ordrett: muter kallstedet, ikke
+    bare funksjonen, og la minst én test gå gjennom den ekte inngangen.
+    """
+
+    def setUp(self):
+        from patients.js_test_utils import (
+            VAKTLISTE_JS, build_harness, node_available)
+        if not node_available():
+            self.skipTest('node er ikke tilgjengelig')
+        # `lastListe` er *ikke* med i det første harnesset: da kan den stubbes
+        # som en spion, og testen måler hvilken ID inngangen ba om.
+        self.h_lister = build_harness((
+            (VAKTLISTE_JS, ('lastVaktlister', 'forsteListe')),
+        ))
+        self.h_liste = build_harness((
+            (VAKTLISTE_JS, ('lastListe', 'huskListe')),
+        ))
+
+    def _nokkel(self):
+        import re
+
+        from patients.js_test_utils import VAKTLISTE_JS, read_js
+        m = re.search(r"SISTE_LISTE_NOKKEL\s*=\s*('[^']*')", read_js(VAKTLISTE_JS))
+        self.assertIsNotNone(m)
+        return m.group(1)
+
+    def test_oppstarten_ber_om_lista_man_sto_paa(self):
+        from patients.js_test_utils import run_node
+
+        ut = run_node(self.h_lister, f"""
+            const SISTE_LISTE_NOKKEL = {self._nokkel()};
+            globalThis.localStorage = {{
+              lagret: '3', getItem() {{ return this.lagret; }}, setItem() {{}},
+            }};
+            let vaktlister = [];
+            globalThis.bedtOm = null;
+            globalThis.lastListe = async (id) => {{ globalThis.bedtOm = id; }};
+            globalThis.fyllVelger = () => {{}};
+            globalThis.apiFetch = async () => ({{
+              ok: true, json: async () => ({{ data: [{{id: 7}}, {{id: 3}}] }}),
+            }});
+            globalThis.document = {{ getElementById: () => null }};
+            await lastVaktlister();
+            console.log(String(bedtOm));
+        """)
+        self.assertIn('3', ut.splitlines(),
+                      'oppstarten skal be om den huskede lista, ikke den øverste')
+
+    def test_lastingen_husker_lista_den_hentet(self):
+        from patients.js_test_utils import run_node
+
+        ut = run_node(self.h_liste, f"""
+            const SISTE_LISTE_NOKKEL = {self._nokkel()};
+            globalThis.localStorage = {{
+              lagret: null,
+              getItem() {{ return this.lagret; }},
+              setItem(n, v) {{ this.lagret = String(v); }},
+            }};
+            let aktivListe = null;
+            let belastning = null;
+            let aktivFane = 'oversikt';
+            globalThis.offlineTilstand = {{}};
+            globalThis.apiFetch = async () => ({{
+              ok: true,
+              headers: {{ get: () => null }},
+              json: async () => ({{ data: {{ vaktposter: [] }} }}),
+            }});
+            globalThis._sesjonUtgaatt = () => false;
+            globalThis._projiserKo = () => {{}};
+            globalThis.fyllKorpsvelger = () => {{}};
+            globalThis.brukKorpsfilter = () => {{}};
+            globalThis.tegnManglerMannskap = () => {{}};
+            globalThis.fyllNedtrekk = () => {{}};
+            globalThis.tegn = () => {{}};
+            globalThis.tegnOffline = () => {{}};
+            globalThis.faneTrengerBelastning = () => false;
+            globalThis.document = {{ getElementById: () => null }};
+            await lastListe(42);
+            console.log(String(localStorage.lagret));
+        """)
+        self.assertIn('42', ut.splitlines(),
+                      'lastingen skal lagre lista den nettopp hentet')

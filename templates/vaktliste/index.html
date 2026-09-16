@@ -51,8 +51,12 @@
 
   <div class="vl-vaktvelger mb-3">
     <label class="vl-meta mb-0" for="vaktliste-velger">Planlegger</label>
+    {# `data-hendelse="change"` er ikke pynt: uten den fyrer delegeringen i #}
+    {# portal-utils.js paa *klikk* — med den gamle verdien — og ikke naar du #}
+    {# velger. Lista byttet foerst ved neste klikk paa velgeren, og det leste #}
+    {# som at sida var treg. Se `klikkSkalKjore()`. #}
     <select id="vaktliste-velger" class="form-select form-select-sm"
-            data-action="byttVaktliste"></select>
+            data-action="byttVaktliste" data-hendelse="change"></select>
     {% comment %}
       Statusmerket sier hvilken form lista er i — planlegging eller drift —
       og det skal synes uten å åpne noe (André, 12. sep. 2026). Døra som

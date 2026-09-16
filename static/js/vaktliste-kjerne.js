@@ -391,6 +391,39 @@ function _vaktspenn() {
 
 // ── Henting ──────────────────────────────────────────────────────────────
 
+//: Hvilken vaktliste man sto på sist. Per nettleser, ikke per konto — det er
+//: en bekvemmelighet, ikke en innstilling, og «Logg ut» sender
+//: `Clear-Site-Data` som rydder den på en delt drifts-PC.
+const SISTE_LISTE_NOKKEL = 'vaktliste:siste';
+
+
+function huskListe(id) {
+  // Kaster i privat modus og der sidedata er blokkert. En glemt liste er en
+  // bagatell; en side som dør på oppstart er det ikke.
+  try {
+    localStorage.setItem(SISTE_LISTE_NOKKEL, String(id));
+  } catch (e) { /* ingen lagring — vi lever med å glemme */ }
+}
+
+
+function forsteListe(lister) {
+  // **Den man sto på sist, hvis den fortsatt finnes** (André, 16. sep. 2026:
+  // «det er forvirrende at om jeg er på en vaktliste og går ut av
+  // /vaktliste/, så går jeg tilbake til den som er øverst på listen»).
+  //
+  // Den lagrede ID-en sjekkes mot lista som faktisk kom fra serveren: en
+  // vaktliste kan være slettet, eller tilgangen borte, siden sist. Da er
+  // øverst riktig — og det er også svaret første gang, når ingenting er
+  // husket.
+  let siste = null;
+  try {
+    siste = Number(localStorage.getItem(SISTE_LISTE_NOKKEL));
+  } catch (e) { siste = null; }
+  if (siste && lister.some((vl) => vl.id === siste)) return siste;
+  return lister[0].id;
+}
+
+
 async function lastVaktlister() {
   const res = await apiFetch('/vaktliste/api/vaktlister/');
   if (!res.ok) return;
@@ -399,7 +432,7 @@ async function lastVaktlister() {
 
   document.getElementById('vl-tom')?.classList.toggle('d-none', vaktlister.length > 0);
   if (vaktlister.length) {
-    await lastListe(vaktlister[0].id);
+    await lastListe(forsteListe(vaktlister));
   } else {
     // **Uten vaktliste er registeret det eneste man kan gjøre noe med** — og
     // det er også det man må gjøre først: korps før mannskap, mannskap før
@@ -444,6 +477,9 @@ async function lastListe(id) {
   belastning = null;
   const velger = document.getElementById('vaktliste-velger');
   if (velger) velger.value = String(id);
+  // Husk her og ikke i `byttVaktliste()`: da dekkes også de andre veiene inn
+  // i en liste — en nyopprettet vaktliste, og «Kopier oppsett».
+  huskListe(id);
 
   tegnManglerMannskap();
 
