@@ -604,7 +604,7 @@ class GrensesnittetsGatingTests(SimpleTestCase):
             self.skipTest('node er ikke tilgjengelig')
         self.h_plan = build_harness((
             (VAKTLISTE_JS, ('_nivaa', '_erAdmin', 'kanSkriveAlt', 'kanSetteOppSkift', 'kanLede',
-                            'kanSkriveNoe', 'kanBemanne',
+                            'kanSkriveNoe', 'kanBemanne', 'kanGiNyttNavn',
                             'kanRedigerePerson')),
         ))
         # Registeret er samme fil fra 30. aug. 2026 — mannskapsfanen flyttet
@@ -936,7 +936,7 @@ class MalensGatingTests(TestCase):
                             '_tall', '_telling', '_utvalgstekst', '_skiftrekkefolge',
                             '_tidsspenn', '_iso16', '_d', '_kl', '_dag',
                             '_sammeDag', '_nivaa', '_erAdmin', 'kanSkriveAlt', 'kanSetteOppSkift',
-                            'kanLede', 'kanBemanne', 'kanRoreRad')),
+                            'kanLede', 'kanBemanne', 'kanGiNyttNavn', 'kanRoreRad')),
         ))
         # Admin, så *alle* knappene bygges — er den ikke der for admin, er den
         # ikke der for noen.
@@ -1602,9 +1602,49 @@ class RessursnavnetErHennesTests(TilgangsBasis):
         self.res_karmoy.refresh_from_db()
         self.assertEqual(self.res_karmoy.navn, 'Lag Karmøy')
 
+    def test_en_plass_satt_av_til_korpset_gjor_ressursen_hennes_aa_navngi(self):
+        """**Feilen som gjorde navneretten nesten ubrukelig** (16. sep. 2026,
+        meldt fra staging: «de må få endre navn på ressursen, det ble fjernet
+        ser jeg»).
+
+        «Ny ressurs» spør bare om navn og gruppe, så en fersk ressurs står
+        **ureservert** — og reservasjonen settes i «Rediger», som er lederens.
+        Leste navneretten ressursens reservasjon alene, slapp den bare gjennom
+        de bilene lederen alt hadde delt ut, og knappen var i praksis borte.
+
+        Reservasjonen finnes på to nivåer, og plassen teller: en samleplass
+        kan stå ureservert og likevel ha fire plasser som er Haugesunds.
+        """
+        Vaktpost.objects.create(
+            ressurs=self.res_fri, korps=self.hgsd,
+            fra_tid=self.na, til_tid=self.na + timedelta(hours=8))
+        res = self._put(self.c_kb, self.res_fri, navn='Samleplass nord')
+        self.assertEqual(res.status_code, 200, res.content)
+        self.res_fri.refresh_from_db()
+        self.assertEqual(self.res_fri.navn, 'Samleplass nord')
+
+    def test_men_hun_deler_den_fortsatt_ikke_ut(self):
+        """Navneretten er bredere enn før; den skal ikke dra oppsettet med seg."""
+        Vaktpost.objects.create(
+            ressurs=self.res_fri, korps=self.hgsd,
+            fra_tid=self.na, til_tid=self.na + timedelta(hours=8))
+        res = self._put(self.c_kb, self.res_fri, korps_id=self.hgsd.pk)
+        self.assertEqual(res.status_code, 403, res.content)
+        self.res_fri.refresh_from_db()
+        self.assertIsNone(self.res_fri.korps_id)
+
+    def test_en_plass_til_et_annet_korps_gir_ingenting(self):
+        """Den andre retningen: leser regelen «har ressursen plasser i det
+        hele tatt», er enhver bemannet ressurs fritt vilt."""
+        Vaktpost.objects.create(
+            ressurs=self.res_fri, korps=self.karmoy,
+            fra_tid=self.na, til_tid=self.na + timedelta(hours=8))
+        self.assertEqual(
+            self._put(self.c_kb, self.res_fri, navn='Min').status_code, 403)
+
     def test_en_ureservert_ressurs_er_ikke_et_fristed(self):
-        """KO er ureservert, og det betyr vaktlederens bord — ikke fritt fram.
-        Samme regel som `kan_bemanne_ressurs` har for bemanning."""
+        """KO er ureservert **og uten plasser til korpset** — da er det
+        vaktlederens bord, ikke fritt fram."""
         res = self._put(self.c_kb, self.res_fri, navn='Mitt KO')
         self.assertEqual(res.status_code, 403)
 
@@ -1822,7 +1862,8 @@ class RegnearketViserDetHunFaarGjoreTests(SimpleTestCase):
             self.skipTest('node er ikke tilgjengelig')
         self.harness = build_harness(self.HARNESS)
 
-    def _tegn(self, nivaa, *, ressurs_korps=1, mitt_korps=1):
+    def _tegn(self, nivaa, *, ressurs_korps=1, mitt_korps=1,
+              plass_korps=None):
         import json
 
         from patients.js_test_utils import run_node
@@ -1840,6 +1881,7 @@ class RegnearketViserDetHunFaarGjoreTests(SimpleTestCase):
             'vaktposter': [{'id': 9, 'ressurs_id': 1, 'mannskap_id': 5,
                             'navn': 'Kari', 'korps_navn': 'HGSD',
                             'korps_id': 1,
+                            'reservert_korps_id': plass_korps,
                             'korps_kort': 'HGSD', 'rolle': '',
                             'fra_tid': '2026-10-03T08:00:00Z',
                             'til_tid': '2026-10-03T16:00:00Z'}],
@@ -1890,6 +1932,19 @@ class RegnearketViserDetHunFaarGjoreTests(SimpleTestCase):
     def test_men_ikke_paa_et_annet_korps_sin_ressurs(self):
         self.assertNotIn('apneRessurs',
                          self._tegn('skriv_handling', ressurs_korps=2))
+
+    def test_en_ureservert_ressurs_med_hennes_plass_gir_knappen(self):
+        """**Feilen som gjorde navneretten nesten ubrukelig** (16. sep. 2026).
+        En fersk ressurs er ureservert — «Ny ressurs» spør bare om navn og
+        gruppe — så `kanBemanne()` alene skjulte knappen på nesten alt."""
+        ut = self._tegn('skriv_handling', ressurs_korps=None, plass_korps=1)
+        self.assertIn('apneRessurs', ut)
+
+    def test_en_ureservert_ressurs_uten_hennes_plasser_gir_ingen(self):
+        """Den andre retningen: leses regelen «ressursen har plasser», er
+        enhver bemannet ressurs fritt vilt."""
+        ut = self._tegn('skriv_handling', ressurs_korps=None, plass_korps=2)
+        self.assertNotIn('apneRessurs', ut)
 
 
 class VinduetSenderBareDetHunFaarSetteTests(SimpleTestCase):
@@ -1993,3 +2048,89 @@ class VinduetSenderBareDetHunFaarSetteTests(SimpleTestCase):
         sendt = self._sendt('skriv_leder', 'lagreRessurs()')
         for felt in ('navn', 'gruppe_id', 'korps_id', 'enhet_id'):
             self.assertIn(felt, sendt)
+
+
+class LaaseneVirkerPaaAlleFeltformeneTests(SimpleTestCase):
+    """`readOnly` virker ikke på `datetime-local` (16. sep. 2026).
+
+    **Meldt fra staging:** «på iPhone kan man trykke på tid/datoen og justere
+    den, men får ingen tilgang når man prøver å få det gjennom.»
+
+    HTML-standarden lar `readonly` gjelde felter man taster fritt i. På
+    `date`, `time`, `datetime-local`, `color`, `file` og avkryssinger er
+    attributtet **uten virkning**: velgeren åpner seg, segmentene lar seg dra,
+    og verdien endrer seg på skjermen. Endringen ble så filtrert bort ved
+    lagring, og feltet sto der det sto.
+
+    **Det er verre enn å ikke kunne røre feltet**: man tror man har gjort noe,
+    og oppdager etterpå at man ikke har. En lås som ser ut som en lås, men
+    ikke er det, er den dårligste av de tre tilstandene.
+
+    Testen leser *attributtet vi setter*, ikke nettleserens oppførsel — den
+    kan ingen enhetstest måle. Den regelen den håndhever er derfor: **på et
+    felt vi låser, bruker vi `disabled`.**
+    """
+
+    #: Feltene i skiftvinduet som er oppsett. `vaktpost-fra` og `-til` er
+    #: `datetime-local`; det er de to som gjorde regelen nødvendig.
+    LAASTE = ('vaktpost-fra', 'vaktpost-til', 'vaktpost-merknad',
+              'vaktpost-korps', 'vaktpost-probono')
+
+    def setUp(self):
+        from patients.js_test_utils import (
+            VAKTLISTE_JS, build_harness, node_available)
+        if not node_available():
+            self.skipTest('node er ikke tilgjengelig')
+        self.harness = build_harness((
+            (VAKTLISTE_JS, ('_laasOppsettfelter', '_laasRessursoppsett')),
+        ))
+
+    def _kjor(self, kall, felter):
+        import json
+
+        from patients.js_test_utils import run_node
+        return run_node(self.harness, f"""
+            const felter = {json.dumps(list(felter))};
+            const el = {{}};
+            felter.forEach((id) => {{ el[id] = {{ disabled: false, readOnly: false }}; }});
+            globalThis.document = {{ getElementById: (id) => el[id] || null }};
+            {kall};
+            console.log(JSON.stringify(felter.map((id) =>
+                [id, el[id].disabled, el[id].readOnly])));
+        """)
+
+    def _tilstand(self, kall, felter):
+        import json
+        for linje in self._kjor(kall, felter).splitlines():
+            if linje.startswith('['):
+                return {navn: (av, ro) for navn, av, ro in json.loads(linje)}
+        self.fail('ingen utskrift fra node')
+
+    def test_skiftvinduets_felter_laases_med_disabled(self):
+        tilstand = self._tilstand('_laasOppsettfelter(true)', self.LAASTE)
+        for felt in self.LAASTE:
+            with self.subTest(felt=felt):
+                self.assertTrue(tilstand[felt][0],
+                                f'{felt} må låses med disabled — readOnly gjør '
+                                f'ingenting på datetime-local og avkryssinger')
+
+    def test_tidsfeltene_slippes_opp_igjen(self):
+        """Sperrehake: låser den alltid, mister vaktlederen feltene sine."""
+        tilstand = self._tilstand('_laasOppsettfelter(false)', self.LAASTE)
+        for felt in self.LAASTE:
+            with self.subTest(felt=felt):
+                self.assertFalse(tilstand[felt][0])
+
+    def test_ressursvinduets_nedtrekk_laases_med_disabled(self):
+        felter = ('ressurs-gruppe', 'ressurs-korps', 'ressurs-enhet')
+        tilstand = self._tilstand('_laasRessursoppsett(true)', felter)
+        for felt in felter:
+            with self.subTest(felt=felt):
+                self.assertTrue(tilstand[felt][0])
+
+    def test_navnefeltet_roeres_ikke(self):
+        """Navnet er det ene hun får rette — låses det med, er vinduet tomt."""
+        felter = ('ressurs-navn', 'ressurs-gruppe')
+        tilstand = self._tilstand('_laasRessursoppsett(true)', felter)
+        self.assertFalse(tilstand['ressurs-navn'][0])
+        self.assertTrue(tilstand['ressurs-gruppe'][0])

@@ -4,6 +4,64 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-16 — En lås som ikke låste, og en navnerett som var stengt
+
+To glipper i gårsdagens tilgangsrunde, meldt fra staging.
+
+### `readOnly` virker ikke på `datetime-local`
+
+**André:** «Når en per skift trykker på rediger, så ser jeg at i det minste på iPhone kan
+man trykke på tid/datoen og justere den. Men får ingen tilgang når man prøver å få det
+gjennom. Ikke mulighet til å bare ikke la det i det hele tatt få trykke på den?»
+
+Jeg låste tidsfeltene i skiftvinduet med `readOnly`. **Det attributtet har ingen virkning på
+`datetime-local`** — HTML-standarden lar `readonly` gjelde felter man taster fritt i, og på
+`date`, `time`, `datetime-local`, `color`, `file` og avkryssinger gjør det ingenting.
+Velgeren åpnet seg, segmentene lot seg dra, tallet endret seg på skjermen — og ble så
+filtrert bort av `bareTillatteFelter()` ved lagring.
+
+**Det er verre enn å ikke kunne røre feltet.** Man tror man har gjort noe, og oppdager
+etterpå at man ikke har. En lås som *ser ut* som en lås, men ikke er det, er den dårligste
+av de tre tilstandene — dårligere enn et åpent felt og dårligere enn et stengt.
+
+`disabled` er det ene attributtet som virker på alle feltformene, og gjør nøyaktig det som
+ble bedt om: feltet lar seg ikke trykke på. Verdien leses fortsatt av JS, så visningen står.
+
+`LaaseneVirkerPaaAlleFeltformeneTests` håndhever regelen for begge vinduene. **Testen leser
+attributtet vi setter, ikke nettleserens oppførsel** — den kan ingen enhetstest måle. Det
+den håndhever er derfor regelen som følger av den: *på et felt vi låser, bruker vi
+`disabled`.*
+
+### Navneretten var stengt av en detalj i «Ny ressurs»
+
+**André:** «Og så må de få endre navn på ressursen, det ble fjernet ser jeg.»
+
+Den ble ikke fjernet — den ble aldri nåbar. Porten sto på `kan_bemanne_ressurs`, altså
+ressursens egen reservasjon. Men **«Ny ressurs» spør bare om navn og gruppe**, med den
+begrunnelsen at reservasjonen hører til plassen og koblingen til enheten, og begge settes i
+«Rediger». En fersk ressurs er derfor **ureservert** — og «Rediger» er lederens.
+
+Resultatet: regelen slapp bare gjennom de bilene lederen alt hadde reservert til korpset, og
+knappen var borte akkurat der korps-føreren står. Et hull som ikke slipper noen inn, men som
+ser ferdig ut i koden.
+
+`services.kan_gi_nytt_navn()` spør nå om hun kan bemanne ressursen **eller noen av plassene
+på den** — samme to nivåer som `reservert_korps()` alltid har hatt: en samleplass kan stå
+ureservert og likevel ha fire plasser som er Haugesunds. Navneretten er dermed bredere enn
+bemanningsretten på ressursnivå, og det er med vilje. **Den drar ikke oppsettet med seg:**
+gruppe, reservasjon, enhetskobling og sletting leser `kan_lede` hver for seg, og en test
+krever at hun fortsatt ikke kan reservere ressursen hun nettopp fikk navngi.
+
+**Ni mutanter, alle røde.** Den som er verdt å nevne: «navneretten teller plasser, ikke
+korps» — leses regelen som «har ressursen plasser i det hele tatt», er enhver bemannet
+ressurs fritt vilt.
+
+**Endret:** `vaktliste/services.py`, `vaktliste/views.py`,
+`static/js/vaktliste-{kjerne,tegning,offline}.js`, `vaktliste/tests_tilgang.py`
+(+9 tester), `vaktliste/tests_xss.py`, `vaktliste/CLAUDE.md`. Ingen migrasjon.
+
+---
+
 ## 2026-09-15 — Superbrukeren er én konto, ikke en kategori
 
 **André, etter forrige runde:** «`is_superuser` skal ikke kunne demotes fra sin

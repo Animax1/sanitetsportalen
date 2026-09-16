@@ -2233,6 +2233,14 @@ Funnene under er allerede kartlagt, så jobben er avgrenset når den skal gjøre
 
 ### Løse punkter
 
+- [x] **Låsen på tidsfeltene låste ikke** (16. sep. 2026, meldt fra staging).
+      `readOnly` har ingen virkning på `datetime-local` — velgeren åpnet seg på iPhone,
+      verdien endret seg, og endringen ble filtrert bort ved lagring. Låste felter bruker
+      nå `disabled`, som virker på alle feltformene.
+- [x] **Navneretten på ressursen var i praksis stengt** (16. sep. 2026). Porten leste
+      ressursens reservasjon, men «Ny ressurs» spør bare om navn og gruppe, så en fersk
+      ressurs er ureservert. `services.kan_gi_nytt_navn()` leser nå plassene også.
+      Ni mutanter, alle røde.
 - [x] **Superbrukeren er én konto, og flagget er eksklusivt til bootstrap** (15. sep.
       2026, André). Rollen låses i skjemaet med `disabled` (nedtrekket tegnes grått *og*
       innsendt verdi forkastes), `create_admin` avviser superbruker nummer to, og en

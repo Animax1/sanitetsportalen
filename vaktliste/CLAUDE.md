@@ -138,11 +138,29 @@ fase 3–7 gjenstår — se `docs/BESLUTNING_VAKTLISTE.md`, som er besluttet i s
   `kanBemanne()` — altså badgen — så knappene førte til en vegg. De står nå på
   `kanSetteOppSkift()`. Tidene *vises* fortsatt, som tekst: et felt man kan skrive i
   og ikke lagre er verre enn en tekst, for det ser ut som om endringen gikk igjennom.
-- **`ressurs_detalj_view` har to terskler i ett endepunkt.** Navnet krever badge og
-  reservasjon (`kan_bemanne_ressurs`) — bilen heter «Sola 56», ikke «Ambulanse 2», og
-  den som står ved bilen er den som vet det. Gruppe, reservasjon, enhetskobling,
-  rekkefølge og sletting krever `kan_lede`: de er beslutninger om *hvem ressursen er
-  til for*, og flyttes de, flytter de tilgangen til seg selv.
+
+  **Et låst felt i et vindu låses med `disabled`, aldri med `readOnly`** (16. sep. 2026,
+  meldt fra staging). HTML-standarden lar `readonly` gjelde felter man taster fritt i; på
+  `date`, `time`, `datetime-local`, `color`, `file` og avkryssinger er attributtet **uten
+  virkning**. Velgeren åpnet seg på iPhone, segmentene lot seg dra, verdien endret seg på
+  skjermen — og ble så filtrert bort ved lagring. Det er verre enn å ikke kunne røre
+  feltet: man tror man har gjort noe, og ser etterpå at man ikke har.
+  `LaaseneVirkerPaaAlleFeltformeneTests` håndhever at `_laasOppsettfelter()` og
+  `_laasRessursoppsett()` bruker `disabled`.
+- **`ressurs_detalj_view` har to terskler i ett endepunkt.** Navnet krever
+  `services.kan_gi_nytt_navn()` — bilen heter «Sola 56», ikke «Ambulanse 2», og den som
+  står ved bilen er den som vet det. Gruppe, reservasjon, enhetskobling, rekkefølge og
+  sletting krever `kan_lede`: de er beslutninger om *hvem ressursen er til for*, og
+  flyttes de, flytter de tilgangen til seg selv.
+- **Navneretten leser plassene, ikke bare ressursen** (16. sep. 2026). Porten sto på
+  `kan_bemanne_ressurs` ett døgn og var i praksis stengt: **«Ny ressurs» spør bare om navn
+  og gruppe**, så en fersk ressurs er ureservert, og reservasjonen settes i «Rediger» —
+  som er lederens. Regelen slapp derfor bare gjennom de bilene lederen alt hadde delt ut,
+  og knappen var borte akkurat der korps-føreren står. `kan_gi_nytt_navn()` spør derfor
+  om hun kan bemanne ressursen **eller noen av plassene på den** — samme to nivåer som
+  `reservert_korps()`: en samleplass kan stå ureservert og likevel ha fire plasser som er
+  Haugesunds. Å navngi er fortsatt ikke å dele ut; oppsettfeltene leser `kan_lede` hver
+  for seg.
 - **Sletting av et skift er `skriv_full`, også når raden er fylt** (15. sep. 2026).
   Sperren sto bare på de ledige, fordi et hull i bemanningen ikke skal kunne skjules
   ved å slette raden som viste det. Argumentet gjelder ordrett på en fylt rad: sletter

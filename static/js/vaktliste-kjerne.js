@@ -270,6 +270,18 @@ function kanBemanne(ressurs) {
 }
 
 
+function kanGiNyttNavn(ressurs) {
+  // Speiler `services.kan_gi_nytt_navn`. Bredere enn `kanBemanne()` med vilje:
+  // «Ny ressurs» spør bare om navn og gruppe, så en fersk ressurs er
+  // ureservert, og reservasjonen settes i «Rediger» — som er lederens. Leste
+  // navneretten ressursens reservasjon alene, ville knappen nesten aldri stått
+  // der. En plass satt av til korpset gjør ressursen hennes å navngi.
+  if (kanBemanne(ressurs)) return true;
+  return (aktivListe?.vaktposter || []).some(
+    (vp) => vp.ressurs_id === ressurs.id && kanBemannePlass(vp, ressurs));
+}
+
+
 function kanStemple() {
   // Speiler `services.kan_stemple`. **Avklaring 11.3: ikke korps-føreren.**
   // Hun setter opp sine egne folk, men «Tilstede nå» er brannsikkerhet, og

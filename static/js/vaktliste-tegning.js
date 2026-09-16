@@ -863,7 +863,7 @@ function mkRessurs(r, apen = true, egne = null) {
   // **Vinduet åpnes av den som kan bemanne ressursen**, fordi navnet er det
   // ene hun får rette (15. sep. 2026). Hva vinduet *viser*, avgjøres inne i
   // det: gruppe, reservasjon, enhetskobling og sletting er lederens.
-  const redigerKnapp = kanBemanne(r)
+  const redigerKnapp = kanGiNyttNavn(r)
     ? `<button class="btn btn-sm btn-outline-secondary" type="button"
                data-action="apneRessurs" data-id="${escHtmlValue(r.id)}">
          <i class="bi bi-pencil me-1"></i>Rediger

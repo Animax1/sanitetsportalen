@@ -1144,13 +1144,17 @@ def ressurs_detalj_view(request, pk):
     except Ressurs.DoesNotExist:
         return _feil('Ressurs ikke funnet', status=404)
 
-    # **Inngangsporten er den doble regelen, ikke `kan_lede`** (André, 15. sep.
+    # **Inngangsporten er navneretten, ikke `kan_lede`** (André, 15. sep.
     # 2026: «redigere ressursens navn, men ikke gruppe, reservering, enhet i
     # oppdragsmodulen og sletting»). Navnet er det ene korps-føreren skal kunne
     # rette — bilen heter «Sola 56», ikke «Ambulanse 2» — og det er en
     # retting hun ser konsekvensen av med én gang. Alt annet på ressursen er
     # oppsett, og står i `RESSURS_OPPSETTFELTER`.
-    if not services.kan_bemanne_ressurs(request.user, ressurs):
+    #
+    # Porten sto på `kan_bemanne_ressurs` ett døgn, og var i praksis stengt:
+    # en ny ressurs er ureservert, så regelen slapp bare gjennom de bilene
+    # lederen alt hadde delt ut. Se `services.kan_gi_nytt_navn`.
+    if not services.kan_gi_nytt_navn(request.user, ressurs):
         return _nektet()
 
     if request.method == 'DELETE':

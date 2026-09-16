@@ -306,7 +306,7 @@ class VaktlisteEscapingOppforselTests(SimpleTestCase):
                         '_ikkePlassert', '_tidsspenn', '_vaktspenn',
                         '_bemanningPerTime', '_iso16', '_d', '_kl', '_dag',
                         '_sammeDag', '_nivaa', '_erAdmin', 'kanSkriveAlt', 'kanSetteOppSkift',
-                        'kanLede', 'kanBemanne', 'kanRoreRad')),
+                        'kanLede', 'kanBemanne', 'kanGiNyttNavn', 'kanRoreRad')),
     )
 
     #: Byggerne spør om tilgang fra fase 3. Node har ingen `window`, så den
@@ -1907,7 +1907,7 @@ class FanenErGruppaTests(SimpleTestCase):
                         '_iso16', '_posterFor', '_ikkePlassert',
                         '_ressurserIGruppe', '_grupperMedRessurser', '_d', '_kl',
                         '_dag', '_nivaa', '_erAdmin', 'kanSkriveAlt', 'kanSetteOppSkift', 'kanLede',
-                        'kanBemanne', 'gruppaHarPlass', 'kanRoreRad')),
+                        'kanBemanne', 'kanGiNyttNavn', 'gruppaHarPlass', 'kanRoreRad')),
     )
     VINDU = ("globalThis.ressursApen = new Map();\n"
              "globalThis.window = { MODUL_TILGANG: { admin: true } };\n"
@@ -2264,7 +2264,7 @@ class EnkeltgruppeTests(SimpleTestCase):
                         '_posterFor', '_ressurserIGruppe',
                         '_grupperMedRessurser', '_d', '_kl', '_dag',
                         '_nivaa', '_erAdmin', 'kanSkriveAlt', 'kanSetteOppSkift', 'kanLede',
-                        'kanBemanne', 'gruppaHarPlass', 'kanRoreRad')),
+                        'kanBemanne', 'kanGiNyttNavn', 'gruppaHarPlass', 'kanRoreRad')),
     )
     VINDU = ("globalThis.ressursApen = new Map();\n"
              "globalThis.window = { MODUL_TILGANG: { admin: true } };\n"

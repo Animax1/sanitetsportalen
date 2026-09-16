@@ -917,6 +917,32 @@ def kan_bemanne_plass(user, ressurs, vaktpost=None) -> bool:
     return kan_fore_korps(user, korps_id)
 
 
+def kan_gi_nytt_navn(user, ressurs) -> bool:
+    """Får brukeren rette navnet på denne ressursen?
+
+    **Et bredere spørsmål enn `kan_bemanne_ressurs`, og det må det være**
+    (16. sep. 2026). «Ny ressurs» spør bare om navn og gruppe, så en fersk
+    ressurs står **ureservert** — reservasjonen settes i «Rediger», som er
+    lederens. Leste navneretten ressursens reservasjon alene, ville
+    korps-føreren nesten aldri sett knappen: hun fikk rette de bilene lederen
+    alt hadde delt ut til henne, og det er ikke dem hun står ved.
+
+    Ressursen er hennes å navngi hvis hun kan bemanne den, **eller** hvis noen
+    av plassene på den er satt av til korpset hennes. Det er samme tolkning
+    `reservert_korps()` har: reservasjonen finnes på to nivåer, og en
+    samleplass kan stå ureservert og likevel ha fire plasser som er
+    Haugesunds.
+
+    **Navnet er fortsatt det eneste som følger med.** Gruppe, reservasjon,
+    enhetskobling og sletting leser `kan_lede` hver for seg i viewet — å
+    kunne rette et navn er ikke å kunne dele ut ressursen.
+    """
+    if kan_bemanne_ressurs(user, ressurs):
+        return True
+    return any(kan_bemanne_plass(user, ressurs, vp)
+               for vp in ressurs.vaktposter.all())
+
+
 def kan_sette_vaktpost(user, ressurs, mannskap, vaktpost=None) -> bool:
     """Begge halvdelene av regelen: badgen på personen, og reservasjonen.
 
