@@ -458,7 +458,82 @@ function tegnRoller() {
 }
 
 
+//: **Redigering skjer i raden, ikke i et vindu på et vindu** (16. sep. 2026).
+//: Rollevinduet er alt en modal; en modal nummer to over den er en stabel man
+//: mister oversikten i. `null` betyr «ingen rad redigeres».
+//:
+//: Tilstanden ligger her og ikke i DOM-en, av samme grunn som `ressursApen`:
+//: lista bygges på nytt ved hver lagring, og en `<input>` i markupen ville
+//: forsvunnet med den.
+let rolleRedigeres = null;
+let gruppeRedigeres = null;
+
+
+function _redigeringsrad(id, navn, lagre, avbryt) {
+    // **Én form for alle navneendringene i modulen** (16. sep. 2026). Rollen
+    // hadde ingen redigering i det hele tatt — man måtte slette og opprette,
+    // og det tar vaktpostene som står på rollen med seg. Gruppa fikk en
+    // `prompt()` tidligere samme dag; det er oppdragsmodulens idiom, og to
+    // former for samme handling i samme modul er to kilder som glir fra
+    // hverandre.
+    return `
+    <div class="vl-rad">
+      <div class="input-group input-group-sm">
+        <input type="text" class="form-control" maxlength="120"
+               id="rediger-navn-${escHtmlValue(id)}"
+               value="${escHtmlValue(navn)}" aria-label="Nytt navn">
+        <button class="btn btn-primary" type="button"
+                data-action="${escHtmlValue(lagre)}" data-id="${escHtmlValue(id)}">Lagre</button>
+        <button class="btn btn-outline-secondary" type="button"
+                data-action="${escHtmlValue(avbryt)}">Avbryt</button>
+      </div>
+    </div>`;
+}
+
+
+function _nyttNavn(id) {
+    return (document.getElementById(`rediger-navn-${id}`)?.value || '').trim();
+}
+
+
+function startRedigerRolle(id) {
+    rolleRedigeres = id;
+    tegnRoller();
+    document.getElementById(`rediger-navn-${id}`)?.focus();
+}
+
+
+function avbrytRedigerRolle() {
+    rolleRedigeres = null;
+    tegnRoller();
+}
+
+
+async function lagreRolle(id) {
+    const navn = _nyttNavn(id);
+    if (!navn) { _visFeil('rolle-feil', 'Rollen må ha et navn.'); return; }
+    const res = await apiFetch(`/vaktliste/api/roller/${id}/`, {
+      method: 'PUT', body: JSON.stringify({ navn }),
+    });
+    const d = await res.json().catch(() => ({}));
+    if (!res.ok || d.status !== 'ok') {
+      _visFeil('rolle-feil', d.message || 'Kunne ikke endre navnet.');
+      return;
+    }
+    _skjulFeil('rolle-feil');
+    rolleRedigeres = null;
+    // **`_lastRegisterOgListe`, ikke bare lista.** Rollenavnet står i
+    // nedtrekket på hver rad i regnearket også; hentes bare rollelista, viser
+    // skiftene det gamle navnet til neste sidelasting.
+    await _lastRegisterOgListe();
+    tegnRoller();
+}
+
+
 function mkRolleRad(r, forste, siste) {
+  if (rolleRedigeres === r.id) {
+    return _redigeringsrad(r.id, r.navn, 'lagreRolle', 'avbrytRedigerRolle');
+  }
   // «I bruk» står i lista: en rolle man kan slette uten å vite hvor mange
   // skift som peker på den, sletter man for lett.
   const bruk = r.i_bruk
@@ -480,6 +555,9 @@ function mkRolleRad(r, forste, siste) {
       <div class="d-flex align-items-center gap-2">
         <span class="btn-group">${opp}${ned}</span>
         ${bruk}
+        <button class="btn btn-sm btn-outline-secondary" type="button"
+                title="Endre navn" aria-label="Endre navn"
+                data-action="startRedigerRolle" data-id="${escHtmlValue(r.id)}"><i class="bi bi-pencil"></i></button>
         <button class="btn btn-sm btn-outline-danger" type="button"
                 title="Slett rollen" aria-label="Slett rollen"
                 data-action="slettRolle" data-id="${escHtmlValue(r.id)}"><i class="bi bi-trash"></i></button>
@@ -578,6 +656,9 @@ function tegnGrupper() {
 
 
 function mkGruppeRad(g) {
+  if (gruppeRedigeres === g.id) {
+    return _redigeringsrad(g.id, g.navn, 'lagreGruppe', 'avbrytRedigerGruppe');
+  }
   // «I bruk» er antall ressurser på gruppa. En gruppe man kan slette uten å
   // vite hvor mange biler som står i den, sletter man for lett — og
   // `PROTECT` ville uansett stoppet det, men da som en feilmelding framfor
@@ -600,7 +681,7 @@ function mkGruppeRad(g) {
   const endre = `
         <button class="btn btn-sm btn-outline-secondary" type="button"
                 title="Endre navn og ikon" aria-label="Endre navn og ikon"
-                data-action="endreGruppe" data-id="${escHtmlValue(g.id)}"><i class="bi bi-pencil"></i></button>`;
+                data-action="startRedigerGruppe" data-id="${escHtmlValue(g.id)}"><i class="bi bi-pencil"></i></button>`;
   const aktiv = g.er_aktiv
     ? `<button class="btn btn-sm btn-outline-secondary" type="button"
                data-action="settGruppeAktiv" data-arg="${escHtmlValue(g.id + ':0')}">Deaktiver</button>`
@@ -673,19 +754,24 @@ async function _gruppeKall(id, kropp, feiltekst) {
 }
 
 
-async function endreGruppe(id) {
-  const g = (aktivListe.grupper || []).find((x) => x.id === id);
-  if (!g) return;
-  const navn = (prompt('Nytt navn på gruppa:', g.navn) || '').trim();
-  if (!navn) return;
-  // Ikonet spørres om etter navnet, og tomt svar beholder det gamle: den
-  // som bare vil rette en skrivefeil i navnet skal ikke måtte skrive
-  // «ambulance» på nytt for å slippe unna.
-  const ikon = prompt('Ikon (Bootstrap-navn uten «bi-»), tomt beholder dagens:', g.ikon);
-  if (ikon === null) return;
-  const kropp = { navn };
-  if (ikon.trim()) kropp.ikon = ikon.trim();
-  await _gruppeKall(id, kropp, 'Kunne ikke endre gruppa.');
+function startRedigerGruppe(id) {
+  gruppeRedigeres = id;
+  tegnGrupper();
+  document.getElementById(`rediger-navn-${id}`)?.focus();
+}
+
+
+function avbrytRedigerGruppe() {
+  gruppeRedigeres = null;
+  tegnGrupper();
+}
+
+
+async function lagreGruppe(id) {
+  const navn = _nyttNavn(id);
+  if (!navn) { _visFeil('gruppe-feil', 'Gruppa må ha et navn.'); return; }
+  gruppeRedigeres = null;
+  await _gruppeKall(id, { navn }, 'Kunne ikke endre gruppa.');
 }
 
 

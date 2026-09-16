@@ -957,7 +957,11 @@ class GrupperadenJsTests(SimpleTestCase):
         g = {'id': 3, 'navn': 'Ambulanse', 'ikon': 'truck', 'i_bruk': 0,
              'flere_enheter': True, 'er_aktiv': True}
         g.update(felter)
+        # **`gruppeRedigeres` er en `let` på toppnivå, og `build_harness`
+        # henter bare funksjoner.** Uten linja under dør noden på en
+        # `ReferenceError` — samme felle som `SISTE_LISTE_NOKKEL` 16. sep.
         return run_node(self.harness,
+                        'globalThis.gruppeRedigeres = null;\n'
                         f'console.log(mkGruppeRad({json.dumps(g)}));')
 
     def test_raden_har_baade_endre_og_deaktiver(self):
@@ -965,7 +969,7 @@ class GrupperadenJsTests(SimpleTestCase):
         omdøpes i det hele tatt; uten «Deaktiver» hadde `er_aktiv` ingen vei
         inn, selv om nedtrekkene respekterte den."""
         rad = self._rad()
-        self.assertIn('data-action="endreGruppe"', rad)
+        self.assertIn('data-action="startRedigerGruppe"', rad)
         self.assertIn('data-action="settGruppeAktiv"', rad)
         self.assertIn('>Deaktiver<', rad)
 
@@ -1211,6 +1215,7 @@ class RollerekkefolgeJsTests(SimpleTestCase):
         """De ligger der, men er avslått — en rad som hopper i høyde når den
         kommer først er verre enn en knapp som ikke gjør noe."""
         ut = run_node(self.harness, """
+            globalThis.rolleRedigeres = null;
             const r = {id: 7, navn: 'Lagleder', i_bruk: 0};
             console.log(JSON.stringify([mkRolleRad(r, true, false),
                                         mkRolleRad(r, false, true),
@@ -1263,3 +1268,115 @@ class RollerekkefolgeJsTests(SimpleTestCase):
             console.log(JSON.stringify(kall));
         """)
         self.assertEqual(json.loads(ut.strip().splitlines()[0])[0]['ider'], [2, 1])
+
+
+class NavneredigeringJsTests(SimpleTestCase):
+    """**Én form for navneendring i hele modulen** (André, 16. sep. 2026):
+    «Det bør gå relativt automatisk ved endring av rollenavn, se andre navn i
+    enheten (altså ambulanse, lag osv).»
+
+    Rollen hadde **ingen** redigering — man måtte slette og opprette, og
+    `Vaktpost.rolle` er `PROTECT`/i bruk, så en rolle med skift på seg kunne
+    ikke engang slettes. En omdøping var altså umulig.
+
+    Gruppa fikk en `prompt()` tidligere samme dag. Det er oppdragsmodulens
+    idiom; vaktlista redigerer verdimengder i et skjema. To former for samme
+    handling i samme modul er to kilder som glir fra hverandre, så begge
+    bruker nå `_redigeringsrad()`.
+    """
+
+    HARNESS = (
+        (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue')),
+        (VAKTLISTE_JS, ('mkRolleRad', 'mkGruppeRad', '_redigeringsrad',
+                        '_nyttNavn', 'lagreRolle', 'startRedigerRolle',
+                        'avbrytRedigerRolle')),
+    )
+    #: `let`-bindingene byggerne leser. `build_harness` henter bare funksjoner.
+    TILSTAND = ('globalThis.rolleRedigeres = null;\n'
+                'globalThis.gruppeRedigeres = null;\n')
+
+    def setUp(self):
+        if not node_available():
+            self.skipTest('node er ikke tilgjengelig')
+        self.harness = build_harness(self.HARNESS)
+
+    def test_raden_som_redigeres_blir_et_felt_med_navnet_i(self):
+        ut = run_node(self.harness, self.TILSTAND + """
+            globalThis.rolleRedigeres = 7;
+            console.log(mkRolleRad({id: 7, navn: 'Lagsmedlem', i_bruk: 3},
+                                   false, false));
+        """)
+        self.assertIn('value="Lagsmedlem"', ut, 'navnet står i feltet')
+        self.assertIn('data-action="lagreRolle" data-id="7"', ut)
+        self.assertIn('data-action="avbrytRedigerRolle"', ut)
+        self.assertNotIn('slettRolle', ut, 'ingen sletteknapp mens man redigerer')
+
+    def test_bare_den_ene_raden_blir_et_felt(self):
+        """Redigerer man «Lagsmedlem», skal «Sjåfør» stå som den er."""
+        ut = run_node(self.harness, self.TILSTAND + """
+            globalThis.rolleRedigeres = 7;
+            console.log(mkRolleRad({id: 8, navn: 'Sjåfør', i_bruk: 0},
+                                   false, false));
+        """)
+        self.assertNotIn('<input', ut)
+        self.assertIn('data-action="startRedigerRolle" data-id="8"', ut)
+
+    def test_gruppa_bruker_samme_form(self):
+        ut = run_node(self.harness, self.TILSTAND + """
+            globalThis.gruppeRedigeres = 3;
+            console.log(mkGruppeRad({id: 3, navn: 'Ambulanse', ikon: 'truck',
+                                     i_bruk: 2, flere_enheter: true, er_aktiv: true}));
+        """)
+        self.assertIn('value="Ambulanse"', ut)
+        self.assertIn('data-action="lagreGruppe" data-id="3"', ut)
+        self.assertNotIn('settGruppeAktiv', ut, 'knappene viker for feltet')
+
+    def test_navnet_escapes_i_feltet(self):
+        """Verdien står i et attributt — attributt-XSS, ikke tekst-XSS."""
+        ut = run_node(self.harness, self.TILSTAND + """
+            globalThis.rolleRedigeres = 7;
+            console.log(mkRolleRad({id: 7, navn: '" onfocus="alert(1)', i_bruk: 0},
+                                   false, false));
+        """)
+        self.assertNotIn('onfocus="alert(1)"', ut)
+
+    def test_lagring_sender_navnet_og_henter_hele_registeret(self):
+        """**`_lastRegisterOgListe`, ikke bare rollelista.** Rollenavnet står i
+        nedtrekket på hver rad i regnearket også; hentes bare rollelista, viser
+        skiftene det gamle navnet til neste sidelasting."""
+        ut = run_node(self.harness, self.TILSTAND + """
+            const kall = [];
+            globalThis.rolleRedigeres = 7;
+            globalThis.apiFetch = async (url, valg) => {
+              kall.push([url, valg.method, JSON.parse(valg.body)]);
+              return { ok: true, json: async () => ({ status: 'ok' }) }; };
+            globalThis.document = { getElementById: () => ({ value: '  Lagsmedlem  ' }) };
+            globalThis._lastRegisterOgListe = async () => { kall.push(['register']); };
+            globalThis.tegnRoller = () => {};
+            globalThis._visFeil = () => {}; globalThis._skjulFeil = () => {};
+            await lagreRolle(7);
+            console.log(JSON.stringify(kall));
+            console.log(JSON.stringify(globalThis.rolleRedigeres));
+        """)
+        linjer = ut.strip().splitlines()
+        kall = json.loads(linjer[0])
+        self.assertEqual(kall[0], ['/vaktliste/api/roller/7/', 'PUT',
+                                   {'navn': 'Lagsmedlem'}])
+        self.assertEqual(kall[1], ['register'], 'hele registeret hentes')
+        self.assertIsNone(json.loads(linjer[1]), 'redigeringen lukkes etterpå')
+
+    def test_tomt_navn_lagres_ikke(self):
+        ut = run_node(self.harness, self.TILSTAND + """
+            const kall = [];
+            globalThis.apiFetch = async () => { kall.push(1); return { ok: true }; };
+            globalThis.document = { getElementById: () => ({ value: '   ' }) };
+            globalThis._lastRegisterOgListe = async () => {};
+            globalThis.tegnRoller = () => {};
+            globalThis._visFeil = (_, t) => { globalThis.feil = t; };
+            globalThis._skjulFeil = () => {};
+            await lagreRolle(7);
+            console.log(JSON.stringify([kall.length, globalThis.feil]));
+        """)
+        antall, feil = json.loads(ut.strip().splitlines()[0])
+        self.assertEqual(antall, 0, 'ingen forespørsel sendes')
+        self.assertIn('navn', feil)

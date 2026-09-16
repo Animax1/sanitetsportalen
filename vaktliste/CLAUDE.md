@@ -416,6 +416,20 @@ fase 3–7 gjenstår — se `docs/BESLUTNING_VAKTLISTE.md`, som er besluttet i s
     ingen ba om. Serveren krever **nøyaktig** gruppas roller — et delvis sett ville gitt
     noen rader nye tall og latt resten stå, og det er også den eneste måten å oppdage at
     klienten og serveren ser ulike lister.
+- **Navn endres i raden, med `_redigeringsrad()` — én form for hele modulen** (16. sep.
+  2026, André: «Det bør gå relativt automatisk ved endring av rollenavn, se andre navn i
+  enheten»). Rollen hadde **ingen** redigering: man måtte slette og opprette, og
+  `Vaktpost.rolle` gjør en rolle i bruk uslettelig — en omdøping var altså umulig. Gruppa
+  fikk en `prompt()` tidligere samme dag, som er *oppdragsmodulens* idiom; to former for
+  samme handling i samme modul er to kilder som glir fra hverandre.
+  - **Redigering i raden, ikke i et vindu på et vindu.** Rollevinduet er alt en modal.
+  - **Tilstanden (`rolleRedigeres`, `gruppeRedigeres`) ligger i JS, ikke i DOM-en** — samme
+    grunn som `ressursApen`: lista bygges på nytt ved hver lagring, og en `<input>` i
+    markupen ville forsvunnet med den. De er `let` på toppnivå, så en node-test må sette
+    dem selv (`build_harness` henter bare funksjoner).
+  - **Lagring kaller `_lastRegisterOgListe()`, ikke bare rollelista.** Rollenavnet står i
+    nedtrekket på hver rad i regnearket også; hentes bare lista, viser skiftene det gamle
+    navnet til neste sidelasting.
 - **Ressursgruppene kan endres, deaktiveres og slettes** (16. sep. 2026, punkt 4). Serveren
   har støttet PUT hele tiden; det manglet knapper. Tre regler:
   - **En gruppe i bruk slettes ikke** (André: «de som er i bruk på vaktlister nå må jo få

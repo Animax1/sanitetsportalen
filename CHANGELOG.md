@@ -4,6 +4,52 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-16 — Roller kan endelig døpes om, og modulen har én form for det
+
+**André:** «Det bør gå relativt automatisk ved endring av rollenavn, se andre navn i
+enheten (altså ambulanse, lag osv).»
+
+### Det fantes ingen omdøping av roller
+
+Rollevinduet hadde bare «slett». Og siden `Vaktpost.rolle` gjør en rolle *i bruk*
+uslettelig, var en omdøping ikke bare tungvint — den var **umulig** for enhver rolle som
+faktisk sto på et skift. Det forklarer også hvorfor André endte med å slette og opprette:
+det var den eneste veien.
+
+Serveren har støttet `PUT` hele tiden. Dette er tredje gang på én dag at punktet viser seg
+å være **manglende flate over en mekanisme som virker** — gruppene og `er_aktiv` var de to
+andre.
+
+### Og jeg hadde nettopp innført en annen form for det samme
+
+Gruppa fikk en `prompt()` noen timer før. Det er **oppdragsmodulens** idiom; vaktlista
+redigerer verdimengder i et skjema (korps og kompetanser har «Rediger»). To former for
+samme handling i samme modul er to kilder som glir fra hverandre — nøyaktig det
+`CLAUDE.md` advarer mot for regler, og det gjelder grensesnitt også.
+
+Begge bruker nå `_redigeringsrad()`: raden blir et felt med navnet i, med «Lagre» og
+«Avbryt». **I raden, ikke i et vindu på et vindu** — rollevinduet er alt en modal, og en
+modal nummer to over den er en stabel man mister oversikten i.
+
+### To detaljer som ville vært stille feil
+
+- **Tilstanden ligger i JS, ikke i DOM-en.** Lista bygges på nytt ved hver lagring; en
+  `<input>` i markupen ville forsvunnet med den. Samme grunn som `ressursApen`.
+- **Lagring henter hele registeret, ikke bare rollelista.** Rollenavnet står i nedtrekket
+  på hver rad i regnearket også — hentes bare lista, viser skiftene det gamle navnet til
+  neste sidelasting. Mutanten som tok `_lastRegisterOgListe()` bort er rød.
+
+Og en kjenning: de nye `let`-bindingene hentes ikke av `build_harness`, som bare tar
+funksjoner. Fire tester døde på en `ReferenceError` før snuttene satte dem selv — samme
+felle som `SISTE_LISTE_NOKKEL` gikk i tidligere samme dag.
+
+Åtte mutanter, alle røde.
+
+**Endret:** `static/js/vaktliste-handlinger.js`, `vaktliste/tests_registre.py` (+6),
+`vaktliste/CLAUDE.md`.
+
+---
+
 ## 2026-09-16 — «Endret en rolle til hospitant og nå står den øverst»
 
 **Meldt fra staging (André).** Symptomet er ekte, og årsaken er den alfabetiske
