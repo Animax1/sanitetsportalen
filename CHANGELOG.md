@@ -4,6 +4,57 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-16 — «Kolonnen tid viser seg annerledes, samt linjen er ujevn»
+
+**Meldt fra staging (André)** om «Oversikt»-fanen jeg bygget noen timer før. Cella hadde
+fått `.vl-blokktid` — en klasse laget for et `<span>` på en blokklinje, med
+`display: inline-block`, `font-weight: 700` og `margin-right`. På en `<td>` tar
+`inline-block` cella ut av kolonnesporet, og marginen skyver innholdet.
+
+Regelen står i `vaktliste/CLAUDE.md` og er håndhevet av en test som heter
+`TabellcellersLayoutTests`. Den så det ikke — **av to grunner**, og begge er verdt å
+skrive ned.
+
+### 1. Byggerlista var håndholdt
+
+Testen leste `<td class="…">` fra seks navngitte byggere. `blokkrad` i den nye «Oversikt»
+sto utenfor. **Tredje gang på ett døgn** at en håndholdt byggerliste er svaret på «hvorfor
+var ingenting rødt» — etter `_enhetskort` i XSS-skanneren og de ni byggerne der. Nå leses
+hele kilden.
+
+### 2. Svartelista manglet nettopp den verdien
+
+`FARLIGE` var `flex`, `grid`, `inline-flex`, `inline-grid`, `block` — og ikke
+`inline-block`. Så da lista ble utvidet til å finne klassen, sa regelen fortsatt at den var
+grei.
+
+Enhver `display` som ikke er `table-cell` tar cella ut av kolonnesporet. En svarteliste må
+være **komplett** for å virke, og den var det ikke. Den er nå en **hvitliste** —
+`table-cell`, eller ingen `display` — som er komplett av seg selv.
+
+### Og navnet jeg først valgte var opptatt
+
+`.vl-tidcelle` finnes fra før, med `display: flex`, på en `<div>` *inne* i regnearkets
+tidskolonne — helt riktig der, for den er ikke cella. Testen fanget kollisjonen i samme
+kjøring. «Oversikt» har nå sin egen `.vl-oversikt-tid` uten `display` og uten margin.
+
+### Fem mutanter — og tre av dem overlevde først
+
+Alle tre var mutasjoner på **testen**, ikke på koden: hvitlista kunne slakkes,
+byggerlista snevres inn, og sperrehaken tømmes, uten at noe ble rødt. Regelen lot seg bare
+prøve mot den *ekte* CSS-en, og der er den grønn så snart koden er riktig.
+
+Sjekken er derfor skilt ut som `_funn(css, klasser)` og prøves mot en **kjent-dårlig**
+CSS-snutt for hele familien av verdier, og dekningen pinnes med to klasser som bare finnes
+i den nye byggeren. Den gamle «fant vi noen klasser i det hele tatt»-testen er fjernet:
+den nye er strengere, og en test med én assertion overlever alltid at assertionen fjernes
+med mindre noe tester testen.
+
+**Endret:** `static/js/vaktliste-oversikt.js`, `static/css/vaktliste.css`,
+`vaktliste/tests_xss.py`, `vaktliste/CLAUDE.md`.
+
+---
+
 ## 2026-09-16 — Laget sorteres etter rolle, ikke etter når radene ble laget
 
 **André:** «Det er en enhet/lag som har i synkende rekkefølge: lagsmedlem, lagleder,

@@ -261,8 +261,18 @@ fase 3–7 gjenstår — se `docs/BESLUTNING_VAKTLISTE.md`, som er besluttet i s
 - **En `<td>` må forbli en `table-cell`.** `display: flex` direkte på en celle tar den ut
   av tabellens boksmodell, og alt etter den forskyves i forhold til overskriftene —
   `table-layout: fixed` hjelper ikke. Legg layouten på et element *inne* i cella.
-  `TabellcellersLayoutTests` leser hvilke klasser som står på `<td>`-ene i `mkRessurs()`
-  og håndhever regelen for dem alle.
+  `TabellcellersLayoutTests` leser klassene som står på `<td>` **hvor som helst** i
+  modulens JS og håndhever regelen for dem alle.
+  - **Hvitliste, ikke svarteliste** (16. sep. 2026): en `<td>` får ha `display: table-cell`
+    eller ingen `display`. Lista sto som fem *farlige* verdier og manglet `inline-block` —
+    nøyaktig den `.vl-blokktid` har. En svarteliste må være komplett for å virke; en
+    hvitliste er det av seg selv.
+  - **Byggerne finnes ved å lete, ikke ved å stå i en liste.** Den håndholdte lista nevnte
+    seks byggere, og «Oversikt»-tabellen sto utenfor. Samme forfall som XSS-skanneren hadde
+    samme dag.
+  - **En klasse som er laget for et element *inne* i cella skal ikke settes på cella.**
+    `.vl-tidcelle` har `display: flex` og hører til en `<div>` i regnearkets tidskolonne;
+    «Oversikt» har sin egen `.vl-oversikt-tid` uten `display`.
 - **Et skift redigeres i et vindu, ikke ved å settes opp på nytt.**
   `apneRedigerVaktpost()` endrer mannskap, rolle, tider og merknad i én PUT;
   serveren sjekker den doble regelen på nytt mot personen som skal inn. Å

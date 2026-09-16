@@ -1199,23 +1199,34 @@ class TabellcellersLayoutTests(SimpleTestCase):
     av samme test.
     """
 
-    #: Verdier som tar elementet ut av tabellens boksmodell.
-    FARLIGE = ('flex', 'grid', 'inline-flex', 'inline-grid', 'block')
+    #: **Hvitliste, ikke svarteliste** (16. sep. 2026). Lista sto som fem
+    #: farlige verdier — `flex`, `grid`, `inline-flex`, `inline-grid`, `block`
+    #: — og manglet `inline-block`. Det var nøyaktig den verdien `.vl-blokktid`
+    #: hadde, og nøyaktig den som ga André symptomet testen er navngitt etter.
+    #:
+    #: Enhver `display` som ikke er `table-cell` tar cella ut av kolonnesporet.
+    #: En svarteliste over det som bryter må derfor være komplett for å virke,
+    #: og den var det ikke — mens hvitlista er komplett av seg selv.
+    LOVLIGE = ('table-cell',)
 
     def _celleklasser(self):
-        """Klassene som står på `<td>` i ressurstabellen — radene bygges av
-        tre byggere siden 11. sep. 2026, og alle tre leses."""
-        src = read_js(VAKTLISTE_JS)
-        klasser = set()
-        # `mkMannskap` er med fra 11. sep. 2026: `.vlr-komp` hadde nettopp
-        # denne feilen, og testen fant den ikke fordi den bare leste
-        # ressurstabellen.
-        for navn in ('mkRessurs', '_planrad', '_plancellene', '_driftrad', '_blokklinje',
-                     'mkMannskap'):
-            for treff in re.findall(r'<td class="([^"$]*)"',
-                                    extract_function(src, navn)):
-                klasser.update(treff.split())
-        return klasser
+        """Klassene som står på en `<td>` **hvor som helst** i vaktlistas JS.
+
+        **Lista var håndholdt til 16. sep. 2026, og forfalt i stillhet.**
+        Den nevnte seks byggere; `blokkrad` i den nye «Oversikt» sto utenfor,
+        fikk `.vl-blokktid` på cella — en klasse laget for et `<span>`, med
+        `display: inline-block` — og André meldte det samme symptomet som
+        ga testen navnet sitt: «kolonnen tid viser seg annerledes enn de
+        andre kolonnene, samt linjen er ujevn».
+
+        Det er tredje gang på ett døgn at en håndholdt byggerliste er svaret
+        på «hvorfor var ingenting rødt». Nå leses hele kilden, så en ny
+        bygger er dekket i det den skrives.
+        """
+        return {klasse
+                for treff in re.findall(r'<td class="([^"$]*)"',
+                                        read_js(VAKTLISTE_JS))
+                for klasse in treff.split()}
 
     def _css(self):
         from pathlib import Path
@@ -1223,26 +1234,76 @@ class TabellcellersLayoutTests(SimpleTestCase):
         return (Path(settings.BASE_DIR) / 'static' / 'css'
                 / 'vaktliste.css').read_text(encoding='utf-8')
 
-    def test_celleklassene_finnes_i_stilarket(self):
-        """Grunnlaget for testen under: finner den ingen klasser, måler den
-        ingenting og går grønn på tom luft."""
-        self.assertTrue(self._celleklasser(), 'fant ingen td-klasser')
+    def _funn(self, css, klasser):
+        """`[(klasse, display), ...]` for celler med ulovlig `display`.
 
-    def test_ingen_celleklasse_bryter_tabellen(self):
-        css = self._css()
-        for klasse in sorted(self._celleklasser()):
+        **Skilt ut som funksjon 16. sep. 2026** — mutasjonsprøven viste at
+        regelen bare lot seg prøve mot den *ekte* CSS-en, og der er den grønn
+        så snart koden er riktig. Tre mutanter på selve testen overlevde:
+        hvitlista kunne slakkes, byggerlista snevres inn, og sperrehaken
+        tømmes, uten at noe ble rødt. En vakt som ikke kan bli rød, vokter
+        ingenting.
+        """
+        funn = []
+        for klasse in sorted(klasser):
             # Regelblokka der klassen står *alene* som selektor — altså
             # regelen som treffer selve `<td>`-en, ikke `.klasse > .noe`.
             for m in re.finditer(
                     r'(?m)^\.' + re.escape(klasse) + r'\s*\{([^}]*)\}', css):
                 display = re.search(r'display:\s*([\w-]+)', m.group(1))
-                if not display:
-                    continue
+                if display and display.group(1) not in self.LOVLIGE:
+                    funn.append((klasse, display.group(1)))
+        return funn
+
+    def test_regelen_kjenner_igjen_sin_egen_feil(self):
+        """**Sperrehaken.** Mates regelen en celle med `display: inline-block`
+        — nøyaktig det `.vl-blokktid` hadde da André meldte «kolonnen tid
+        viser seg annerledes enn de andre kolonnene» — skal den slå ut.
+
+        Den prøver hele familien, ikke bare den ene verdien: en hvitliste som
+        stille fikk et medlem til ville ellers gått grønn.
+        """
+        for verdi in ('inline-block', 'block', 'flex', 'grid', 'inline',
+                      'contents', 'inline-flex'):
+            with self.subTest(display=verdi):
+                self.assertEqual(
+                    self._funn('.vl-prove {\n  display: %s;\n}' % verdi,
+                               {'vl-prove'}),
+                    [('vl-prove', verdi)],
+                    f'display: {verdi} på en <td> skal fanges')
+        self.assertEqual(
+            self._funn('.vl-prove {\n  display: table-cell;\n}', {'vl-prove'}), [],
+            'table-cell er den ene lovlige')
+        self.assertEqual(
+            self._funn('.vl-prove {\n  color: red;\n}', {'vl-prove'}), [],
+            'ingen display er også greit')
+
+    def test_skanningen_dekker_byggere_den_gamle_lista_ikke_nevnte(self):
+        """**Dekningen, ikke bare regelen.**
+
+        Denne erstatter `test_celleklassene_finnes_i_stilarket`, som bare
+        krevde at skanningen fant *noe*. To navngitte klasser er strengere —
+        finner skanningen ingenting, blir denne rød først — og den gamle lot
+        seg dessuten ikke mutere meningsfullt: en test med én assertion
+        overlever alltid at assertionen fjernes, med mindre noe tester testen.
+
+        Lista sto håndholdt med seks byggere til 16. sep. 2026, og `blokkrad`
+        i «Oversikt» sto utenfor — derfor var ingenting rødt da cella der fikk
+        `.vl-blokktid`. Klassene under bygges *bare* der, så snevres
+        skanningen inn igjen, blir denne rød.
+        """
+        klasser = self._celleklasser()
+        for klasse in ('vl-oversikt-tid', 'vl-ledigtall'):
+            with self.subTest(klasse=klasse):
+                self.assertIn(klasse, klasser)
+
+    def test_ingen_celleklasse_bryter_tabellen(self):
+        for klasse, verdi in self._funn(self._css(), self._celleklasser()):
                 with self.subTest(klasse=klasse):
-                    self.assertNotIn(
-                        display.group(1), self.FARLIGE,
+                    self.assertIn(
+                        verdi, self.LOVLIGE,
                         f'.{klasse} står på en <td> og setter '
-                        f'display: {display.group(1)} — cella slutter da å '
+                        f'display: {verdi} — cella slutter da å '
                         f'være en table-cell, og kolonnene etter den '
                         f'forskyves i forhold til overskriftene. Legg '
                         f'layouten på et element inne i cella i stedet.')
@@ -4750,7 +4811,7 @@ class TidsblokkerTests(SimpleTestCase):
         linja nå *er* raden i stedet for en overskrift over flere rader.
         """
         ut = self._oversikt()
-        self.assertEqual(ut.count('class="vl-blokktid"'), 4)
+        self.assertEqual(ut.count('class="vl-oversikt-tid"'), 4)
 
     def test_tiden_skrives_en_gang_per_blokk(self):
         """Tre skift på samleplassen begynner 17:00 — men 17:00 står to

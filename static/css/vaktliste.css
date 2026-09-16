@@ -1385,6 +1385,30 @@
   finne dem. Merkingen er lav-kontrast med vilje — den skal trekke blikket,
   ikke rope.
 */
+/*
+  Tidscella i «Oversikt». **Egen klasse, ikke `.vl-blokktid`** (16. sep. 2026):
+  den er laget for et `<span>` på en blokklinje og bærer `display: inline-block`
+  og `margin-right`. Satt på en `<td>` tar `inline-block` cella ut av
+  kolonnesporet, og marginen skyver innholdet — André meldte det som «kolonnen
+  tid viser seg annerledes enn de andre kolonnene, samt linjen er ujevn».
+
+  Her står bare det typografiske: stor forbokstav på «fre 4. sep …», og tall
+  som står i kolonne. Ingen `display`, ingen margin — cella får være en celle.
+
+  **Og ikke `.vl-tidcelle`, som er opptatt.** Den står på en `<div>` *inne* i
+  regnearkets tidskolonne og har `display: flex` — helt riktig der, for den er
+  ikke cella. Første forsøk her gjenbrukte navnet, og testen fanget kollisjonen
+  med det samme.
+*/
+.vl-oversikt-tid {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.vl-oversikt-tid::first-letter {
+  text-transform: uppercase;
+}
+
 .vl-oversiktstabell .vl-navn .vl-meta {
   display: block;
   font-size: 0.82em;

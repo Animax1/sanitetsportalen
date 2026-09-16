@@ -467,7 +467,7 @@ function mkOversikt() {
         <tr class="${escHtmlValue(ledige ? 'vl-har-ledige' : '')}">
           <td class="vl-navn">${escapeHtml(ressurs.navn)}
             <span class="vl-meta">${escapeHtml(gruppe.navn)}</span></td>
-          <td class="vl-blokktid">${escapeHtml(_tidsspenn(blokk))}</td>
+          <td class="vl-oversikt-tid">${escapeHtml(_tidsspenn(blokk))}</td>
           <td class="vl-timer">${escapeHtml(_varighet(blokk))}</td>
           <td class="vl-timer">${escHtmlValue(plasser)}</td>
           <td class="vl-timer">${escHtmlValue(besatt)}</td>
