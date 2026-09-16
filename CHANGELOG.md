@@ -4,6 +4,33 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-16 — Pulje 2 og de tre rundene etter ut i prod
+
+André: «Kan vi pushe det vi har gjort til main?» Seks commits, `11c068b` → `a7239c5`:
+
+| Bygg | Hva |
+|---|---|
+| `38f32cc` | Pulje 2, første halvdel — «ledig siden» og varselbjella |
+| `031ac97` | Pulje 2, andre halvdel — passiv vakt, «avvente», kvittert avbrytelse |
+| `5ef0aa7` | Typeflaggene kan krysses av i «Valglister» |
+| `e4369f2` | Puljene skrevet ned, målrettet mutasjonskjøring, delt testsuite |
+| `b6f66df` | «[object Object]» på hver enhet — og de tre lagene under |
+| `a7239c5` | TODO ryddet, to vakter som holder den ryddig |
+
+**Én migrasjon, `oppdrag/0026`, og den er rene tillegg** — to felter på `Enhetstype`, ett
+på `Enhet`, `Oppdragsenhet` og `ArkivertOppdrag`, pluss tabellen `Vaktmodusperiode`. **Null
+`RunPython`/`RunSQL`**, så regelen om PostgreSQLs triggerkø er ikke i spill og release-fasen
+er trygg. Ingen eksisterende rad endres.
+
+Og funksjonen er **inert til noen slår den på**: passiv vakt og «avvente» krever at flagget
+settes på enhetstypen i «Valglister». Gjøres ikke det, oppfører oppdragsmodulen seg nøyaktig
+som før deployen. Det er den beste formen en prod-endring kan ha — den kan verifiseres i ro,
+og den kan ikke overraske noen som ikke har bedt om den.
+
+Suiten grønn på `a7239c5`: 3 184 tester.
+
+---
+
 ## 2026-09-16 — TODO var mer arkiv enn arbeidsliste
 
 **André:** «Hva kan vi gjøre med TODO for å optimalisere?» Målt først, ryddet etterpå.

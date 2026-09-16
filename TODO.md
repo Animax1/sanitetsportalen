@@ -81,14 +81,14 @@ ingen av dem gir feilmelding — de er bare stille inaktive.
       Er kortet fortsatt rødt, bærer meldinga nå **koden Scaleway faktisk svarte** — og
       den avgjør om det er rettigheter eller vår kode.
 
-- [ ] **Verifiser pulje 2 på staging** (bygg `b6f66df`). Sju punkter, i CHANGELOG under
-      «Pulje 2, andre halvdel» 16. sep. 2026 — kort versjon: sett flaggene på
+- [ ] **Verifiser pulje 2 i prod** (bygg `a7239c5`, deployet 16. sep. 2026). Sju punkter,
+      i CHANGELOG under «Pulje 2, andre halvdel» — kort versjon: sett flaggene på
       «Spesialressurs» i Valglister, sett en lege passiv, varsle henne, og se at brikka
-      sier «(passiv vakt)» også etter at hun er satt aktiv igjen.
-
-- [ ] **Godkjenn pulje 2 for prod.** `main` står på `11c068b` og har pulje 1, men ikke
-      pulje 2, dokumentrunden eller `[object Object]`-rettelsen. Ingenting går til `main`
-      uten at du sier fra.
+      sier «(passiv vakt)» også etter at hun er satt aktiv igjen. Og: at hver enhet i
+      ressurslista viser rent navn, uten `[object Object]`.
+      Migrasjon `0026` er rene tillegg — to felter på `Enhetstype`, ett på `Enhet`,
+      `Oppdragsenhet` og `ArkivertOppdrag`, og tabellen `Vaktmodusperiode`. Ingen
+      eksisterende rad endres, og ingenting av det vises før flaggene er krysset av.
 
 - [ ] **André: Scaleway IAM-applikasjon.** Policy med
       ObjectStorageObjectsWrite/Read og BucketsRead — **ikke delete**, fristene skal
