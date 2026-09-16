@@ -4,6 +4,29 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-16 — Resten av pulje 3 og sesjonsaktiviteten ut i prod
+
+Fire commits, `d16b6f6` → `0405a17`, verifisert på staging:
+
+| Bygg | Hva |
+|---|---|
+| `bbc13cd` | Punkt 3 brutt — korpsdelen var alt løst av `Ressurs.korps` |
+| `1499b49` | Fanerekka i to bolker; «Mitt korps» sto inne i gruppeblokka |
+| `4e03b17` | Funnet: «pålogget» er ikke «til stede», og hvorfor |
+| `0405a17` | Sesjonslista viser om det sitter noen der |
+
+**Ingen migrasjoner.** Release-fasen rører ikke skjemaet, så deployen er bare et
+containerbytte.
+
+Én ting å vite om første oppstart: sesjonene som alt er i gang har ingen
+`siste_interaksjon`, og viser derfor **«ukjent»** til eieren gjør noe. Det er med vilje —
+«vet ikke» skal kunne skilles fra «aktiv nå», og alternativet hadde vært å la hver gammel
+sesjon se ut som om noen satt der.
+
+Suiten grønn på `0405a17`: 3 243 tester.
+
+---
+
 ## 2026-09-16 — Sesjonslista viser nå om det sitter noen der
 
 **André:** «Enig med polling for å vise hvem som er aktiv nå — og så må jeg fortsatt se alle
