@@ -72,6 +72,25 @@ null = «Uten type») grupperer tavla og «Nytt oppdrag» i typenes rekkefølge,
 innenfor gruppa (`_grupperEnheter()` i JS; serveren sorterer på `Lower(navn)`), og settes
 i enhetspanelet (`PUT api/enheter/<pk>/` med `type` = ID, `skriv_full`).
 
+**Ressurslista viser «ledig siden»** (16. sep. 2026, André). En ledig enhet har ingen aktiv
+koblingsrad, så `status_tidspunkt` er tomt og statusen sto som et ord uten tid — mens
+operatøren som skal sende noen vil vite hvem som har stått lengst. `services.ledig_siden_bulk()`
+leser siste **gjeldende** `Ledig`-melding per enhet, **i denne vakta**: uten scopet ville
+fjorårets arrangement stått der som om det var i dag. Bulk, som `avbrutt_av_bulk` — lista
+pollet hvert tiende sekund. Feltet sendes bare når enheten faktisk *er* ledig, står i
+ETag-en, og klienten viser det gjennom samme `status_tidspunkt || ledig_siden` som alle de
+andre statusene: to måter å vise «siden når» er én for mye.
+
+**Enhetskontoen får en rad i varselbjella når hun varsles** (16. sep. 2026):
+`services.varsle_bjelle()`, med nummer, hastegrad og klokkeslett — **ikke
+problemstillingen**, som er helseopplysning og ikke hører hjemme i en varselrad som blir
+stående i 30 dager. **Nøkkelen bærer oppdrags-ID-en** (`bjellenokkel()`), fordi `notify()`
+dedupliserer på `kind` i 24 timer: med en fast verdi ville oppdrag nummer to blitt svelget,
+og det er nettopp det andre oppdraget hun trenger å se. `les_bjellevarselet()` merker raden
+lest når hun rykker ut — ellers hoper bjella seg opp gjennom vakta. Begge kaster aldri, og
+begge har `transaction.atomic()` rundt seg: `varsle_enhet` kan kjøre inne i en transaksjon,
+og en databasefeil fanget uten savepoint etterlater den ubrukelig.
+
 **Bilens utganger (12. sep. 2026):** «Behandlet på sted» (`BEHANDLET`) er en sidegren
 fra Fremme rett til Ledig — `KJEDEN` er fortsatt lineær, `neste_i_kjeden` gir Ledig etter
 Leverer og Behandlet, og `alternativ_for()` gir den andre knappen (Avbryt i Rykker ut,

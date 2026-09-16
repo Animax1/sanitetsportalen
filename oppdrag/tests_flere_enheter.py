@@ -875,6 +875,37 @@ class SentralbordetsMatriseTests(TestCase):
                " {enhet_id: 2, enhet_navn: '<b>KARM</b>', status: 'venter',"
                " status_navn: 'Venter', status_tidspunkt: null}]}")
 
+    # ── «Ledig siden» i ressurskortet ────────────────────────────────────
+    LEDIG_ENHET = ("{id: 1, navn: 'HGSD 56', pa_vakt: true, er_aktiv: true,"
+                   " status: 'ledig', status_navn: 'Ledig', antall_ventende: 0,"
+                   " status_tidspunkt: null, LEDIGSIDEN}")
+
+    def _kort(self, ledig_siden):
+        # `_enhetskort` spør om besetning og bygger den; begge er andre
+        # regler enn den vi måler her, og stubbes bort.
+        return self._kjor(f"""
+            globalThis.kanSeBesetning = () => false;
+            globalThis.mkBesetning = () => '';
+            const e = {self.LEDIG_ENHET.replace('LEDIGSIDEN', ledig_siden)};
+            console.log(_enhetskort(e));
+        """)
+
+    def test_en_ledig_enhet_viser_naar_hun_ble_ledig(self):
+        """André, 15. sep. 2026. En ledig enhet har ingen aktiv koblingsrad,
+        så `status_tidspunkt` er tomt og statusen sto som et ord uten tid —
+        og operatøren som skal sende noen vil vite hvem som har stått lengst.
+        """
+        ut = self._kort("ledig_siden: '2026-08-28T20:00:00Z'")
+        self.assertIn('Ledig', ut)
+        self.assertRegex(ut, r'\d{2}:\d{2}')
+
+    def test_uten_tidspunkt_staar_bare_ordet(self):
+        """Sperrehake: en enhet som aldri har vært på oppdrag har ikke vært
+        ledig *siden* noe, og et klokkeslett der ville vært et gjett."""
+        ut = self._kort('ledig_siden: null')
+        self.assertIn('Ledig', ut)
+        self.assertNotRegex(ut, r'\d{2}:\d{2}')
+
     def test_lista_viser_en_brikke_per_enhet_og_escaper(self):
         ut = self._kjor(f"""
             globalThis.oppdragsliste = [{self.OPPDRAG}];
@@ -1427,3 +1458,235 @@ class TidslinjeMedVarsletOgAngreTests(TestCase):
         self.assertEqual(ut.count('data-action="angreStatus"'), 1, 'bare siste melding kan angres')
         self.assertIn('data-action="angreStatus" data-id="1"', ut)
         self.assertLess(ut.index('Rykker ut'), ut.index('Fremme'))
+
+
+class LedigSidenTests(FlereEnheterBasis):
+    """«Ledig siden» i ressursdelen (André, 15. sep. 2026).
+
+    «I /oppdrag/ kan vi se i ressurser-delen tidsstempel med når det ble slått
+    ledig.» Operatøren som skal sende noen vil vite hvem som har stått lengst,
+    og det tallet finnes bare i statusmeldingene — enheten har ingen
+    statuskolonne, og skal ikke ha det (`services.enhet_status`).
+    """
+
+    def _ledig(self, enhet, *, timer):
+        """Kjør en enhet gjennom et oppdrag og meld henne ledig.
+
+        Går gjennom `sett_status`, ikke rett i basen: det er den veien
+        tidspunktet faktisk blir til, og en test som skriver raden selv ville
+        ikke merket om overgangen sluttet å skrive den.
+        """
+        naa = timezone.now() - timedelta(hours=timer)
+        o = self._oppdrag(enhet)
+        services.sett_status(o, choices.RYKKER_UT, tidspunkt=naa, enhet=enhet)
+        services.sett_status(o, choices.FREMME, tidspunkt=naa, enhet=enhet)
+        services.sett_status(o, choices.BEHANDLET, tidspunkt=naa, enhet=enhet)
+        services.sett_status(o, choices.LEDIG, tidspunkt=naa, enhet=enhet)
+        return o
+
+    def test_siste_ledigmelding_vinner(self):
+        self._ledig(self.a, timer=5)
+        self._ledig(self.a, timer=1)
+        kart = services.ledig_siden_bulk([self.a], self.vakt)
+        self.assertAlmostEqual(
+            (timezone.now() - kart[self.a.pk]).total_seconds(), 3600, delta=30)
+
+    def test_en_enhet_uten_oppdrag_staar_ikke_i_kartet(self):
+        """Hun er ledig, men ikke *siden* noe. Et tidspunkt ville vært et
+        gjett, og «siden vaktstart» er noe annet enn «ble slått ledig»."""
+        self.assertEqual(services.ledig_siden_bulk([self.c], self.vakt), {})
+
+    def test_hver_enhet_faar_sitt_eget(self):
+        self._ledig(self.a, timer=4)
+        self._ledig(self.b, timer=2)
+        kart = services.ledig_siden_bulk([self.a, self.b], self.vakt)
+        self.assertLess(kart[self.a.pk], kart[self.b.pk])
+
+    def test_en_korrigert_ledigmelding_teller_ikke(self):
+        """Retter operatøren tidspunktet, er det det rettede som gjelder —
+        samme regel som `Statusmelding.gjeldende()`. Leses den overstyrte
+        raden, viser ressurslista et tidspunkt operatøren nettopp fjernet."""
+        # **Rettelsen flytter tidspunktet bakover, ikke framover.** Flyttes
+        # det framover, vinner den korrigerte raden uansett fordi den er
+        # nyest — og testen kan ikke skille «vi hoppet over den overstyrte»
+        # fra «vi tok den seneste». Funnet ved mutasjonstesting 16. sep. 2026.
+        o = self._ledig(self.a, timer=2)
+        gammel = Statusmelding.objects.filter(
+            oppdrag=o, status=choices.LEDIG).order_by('created_at').last()
+        Statusmelding.objects.create(
+            oppdrag=o, oppdragsenhet=gammel.oppdragsenhet,
+            status=choices.LEDIG, tidspunkt=timezone.now() - timedelta(hours=6),
+            korrigerer=gammel)
+        kart = services.ledig_siden_bulk([self.a], self.vakt)
+        self.assertAlmostEqual(
+            (timezone.now() - kart[self.a.pk]).total_seconds(), 21600, delta=30,
+            msg='den overstyrte raden skal ikke telle')
+
+    def test_en_ledigmelding_fra_en_annen_vakt_lekker_ikke(self):
+        """**Vakta er portalens scope**, også her. Uten filteret ville
+        ressurslista vist «ledig siden» fra fjorårets arrangement — et
+        tidspunkt som ser ut som i dag og er tolv måneder gammelt.
+
+        Funnet ved mutasjonstesting 16. sep. 2026: ingen test hadde en enhet
+        som var ledig i en *annen* vakt, så filteret lot seg fjerne.
+        """
+        from core.models import Vakt
+
+        gammel_vakt = Vakt.objects.create(
+            navn='I fjor', year=AAR - 1,
+            startet=timezone.now() - timedelta(days=365), er_aktiv=False)
+        naa = timezone.now() - timedelta(days=365)
+        o = Oppdrag.objects.create(
+            vakt=gammel_vakt, enhet=self.a, problemstilling='Pustevansker',
+            hastegrad='Akutt', lokasjon=self.lokasjon,
+            oppdragsnummer=services.neste_oppdragsnummer(gammel_vakt))
+        for status in (choices.RYKKER_UT, choices.FREMME,
+                       choices.BEHANDLET, choices.LEDIG):
+            services.sett_status(o, status, tidspunkt=naa, enhet=self.a)
+
+        # Sperrehake: raden finnes, den skal bare ikke telle for denne vakta.
+        self.assertIn(self.a.pk, services.ledig_siden_bulk([self.a], gammel_vakt))
+        self.assertEqual(services.ledig_siden_bulk([self.a], self.vakt), {})
+
+    def test_tom_liste_koster_ingen_spoerring(self):
+        with self.assertNumQueries(0):
+            self.assertEqual(services.ledig_siden_bulk([], self.vakt), {})
+
+    def test_hele_lista_i_faa_spoerringer(self):
+        """Ressurslista pollet hvert tiende sekund. Ett oppslag per enhet
+        ville vært N spørringer — det er hele grunnen til at funksjonen er
+        bulk, og uten en test er den regelen en intensjon."""
+        self._ledig(self.a, timer=3)
+        self._ledig(self.b, timer=2)
+        with self.assertNumQueries(2):
+            services.ledig_siden_bulk([self.a, self.b, self.c], self.vakt)
+
+
+class LedigSidenIRessurslistaTests(SentralbordBasis):
+    """Feltet slik sentralbordet får det."""
+
+    def _rader(self):
+        res = self.ks.get('/oppdrag/api/enheter/')
+        self.assertEqual(res.status_code, 200, res.content)
+        return {r['navn']: r for r in res.json()['data']}
+
+    def test_en_ledig_enhet_med_historikk_faar_tidspunktet(self):
+        naa = timezone.now() - timedelta(hours=1)
+        o = self._oppdrag(self.a)
+        for status in (choices.RYKKER_UT, choices.FREMME,
+                       choices.BEHANDLET, choices.LEDIG):
+            services.sett_status(o, status, tidspunkt=naa, enhet=self.a)
+        self.assertIsNotNone(self._rader()['Haugesund 56']['ledig_siden'])
+
+    def test_en_enhet_paa_oppdrag_har_ingen(self):
+        """Står hun på et oppdrag, er «ledig siden» forrige gang hun var det
+        — et tall som ser ut som nåtid og ikke er det."""
+        # Hun må ha **vært** ledig først. Uten det er feltet tomt uansett
+        # hva regelen gjør, og testen måler ingenting — funnet ved
+        # mutasjonstesting 16. sep. 2026.
+        naa = timezone.now() - timedelta(hours=3)
+        forrige = self._oppdrag(self.a)
+        for status in (choices.RYKKER_UT, choices.FREMME,
+                       choices.BEHANDLET, choices.LEDIG):
+            services.sett_status(forrige, status, tidspunkt=naa, enhet=self.a)
+        self.assertIsNotNone(self._rader()['Haugesund 56']['ledig_siden'],
+                             'sperrehake: hun skal ha et tidspunkt å miste')
+
+        o = self._oppdrag(self.a)
+        services.sett_status(o, choices.RYKKER_UT, enhet=self.a)
+        self.assertIsNone(self._rader()['Haugesund 56']['ledig_siden'])
+
+    def test_etagen_endrer_seg_naar_tidspunktet_gjoer_det(self):
+        """Uten feltet i ETag-en ville en rettet ledigtid druknet i en 304 —
+        samme grunn som avbrutt-merket måtte inn i den (15. sep. 2026)."""
+        forst = self.ks.get('/oppdrag/api/enheter/')['ETag']
+        naa = timezone.now() - timedelta(hours=1)
+        o = self._oppdrag(self.a)
+        for status in (choices.RYKKER_UT, choices.FREMME,
+                       choices.BEHANDLET, choices.LEDIG):
+            services.sett_status(o, status, tidspunkt=naa, enhet=self.a)
+        self.assertNotEqual(forst, self.ks.get('/oppdrag/api/enheter/')['ETag'])
+
+
+class VarselbjellaTests(FlereEnheterBasis):
+    """Bilen får en rad i bjella når hun varsles (André, 15. sep. 2026).
+
+    «En bruker som er koblet til en enhet i /oppdrag/ som får et oppdrag skal
+    få varsel på varselbjella med tidsstempel og hastegrad, intet mer.»
+    """
+
+    def setUp(self):
+        super().setUp()
+        from accounts.models import CustomUser, ModulTilgang
+        self.bilbruker = CustomUser.objects.create_user(
+            username='bil56', password='x', must_change_password=False)
+        ModulTilgang.objects.create(
+            bruker=self.bilbruker, modul_slug='oppdrag', nivaa='skriv_handling')
+        self.a.user = self.bilbruker
+        self.a.save(update_fields=['user'])
+
+    def _varsler(self):
+        from core.models import Notification
+        return list(Notification.objects.filter(user=self.bilbruker)
+                    .order_by('created_at'))
+
+    def test_hun_faar_en_rad_med_nummer_hastegrad_og_tid(self):
+        o = self._oppdrag(self.b)
+        services.varsle_enhet(o, self.a)
+        varsler = self._varsler()
+        self.assertEqual(len(varsler), 1)
+        self.assertIn(str(o.oppdragsnummer), varsler[0].title)
+        self.assertIn('Akutt', varsler[0].message)
+        self.assertRegex(varsler[0].message, r'\d{2}:\d{2}')
+
+    def test_problemstillingen_staar_ikke_i_varselet(self):
+        """«Intet mer» er ikke bare knapphet. Varselraden blir stående i 30
+        dager, og problemstillingen er en helseopplysning — den hører ikke
+        hjemme i en bjelle."""
+        o = self._oppdrag(self.b)
+        Oppdrag.objects.filter(pk=o.pk).update(problemstilling='Brystsmerter')
+        o.refresh_from_db()
+        services.varsle_enhet(o, self.a)
+        rad = self._varsler()[0]
+        self.assertNotIn('Brystsmerter', rad.title + rad.message)
+
+    def test_oppdrag_nummer_to_svelges_ikke(self):
+        """`notify()` dedupliserer på `kind` i 24 timer. Med en fast verdi
+        ville det andre oppdraget forsvunnet — og det er nettopp det man
+        trenger å se."""
+        for _ in range(2):
+            services.varsle_enhet(self._oppdrag(self.b), self.a)
+        self.assertEqual(len(self._varsler()), 2)
+
+    def test_en_enhet_uten_konto_varsles_ikke(self):
+        services.varsle_enhet(self._oppdrag(self.a), self.c)
+        self.assertEqual(self._varsler(), [])
+
+    def test_varselet_merkes_lest_naar_hun_rykker_ut(self):
+        """Uten dette hoper bjella seg opp gjennom vakta."""
+        o = self._oppdrag(self.b)
+        services.varsle_enhet(o, self.a)
+        self.assertFalse(self._varsler()[0].is_read)
+        services.start_oppdrag(o, enhet=self.a)
+        self.assertTrue(self._varsler()[0].is_read)
+
+    def test_et_annet_oppdrags_varsel_staar_igjen(self):
+        """Nøkkelen bærer oppdrags-ID-en, så «lest» gjelder det ene."""
+        o1 = self._oppdrag(self.b)
+        o2 = self._oppdrag(self.b)
+        services.varsle_enhet(o1, self.a)
+        services.varsle_enhet(o2, self.a)
+        services.start_oppdrag(o1, enhet=self.a)
+        uleste = [v for v in self._varsler() if not v.is_read]
+        self.assertEqual(len(uleste), 1)
+        self.assertIn(str(o2.oppdragsnummer), uleste[0].title)
+
+    def test_en_bjelle_som_feiler_stopper_ikke_varslingen(self):
+        """En bil uten bjellerad er et savn; en varsling som velter
+        utrykningen er en feil."""
+        from unittest.mock import patch
+        o = self._oppdrag(self.b)
+        with patch('oppdrag.services.notify', side_effect=RuntimeError('nede')):
+            rad = services.varsle_enhet(o, self.a)
+        self.assertIsNotNone(rad.pk, 'enheten skal være varslet likevel')
+        self.assertEqual(self._varsler(), [])

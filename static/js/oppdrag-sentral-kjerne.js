@@ -212,8 +212,13 @@ function _enhetskort(e) {
       // Statusen med klokkeslett og tid siden: «Fremme 14:32 · 12 min».
       // Prosjektleder, 11. sep. 2026 — «på statusen så må tidsstemplet og
       // vise». Ledig har ingen melding bak seg, så der står bare ordet.
-      const statusTid = e.status_tidspunkt
-        ? ` ${klokke(e.status_tidspunkt)} · ${tidSiden(e.status_tidspunkt)}` : '';
+      // **«Ledig siden» fyller tomrommet** (André, 15. sep. 2026): en ledig
+      // enhet har ingen aktiv koblingsrad, så `status_tidspunkt` er tomt og
+      // statusen sto som et ord uten tid. Operatøren som skal sende noen vil
+      // vite hvem som har stått lengst. Samme form som de andre statusene,
+      // klokkeslett og tid siden — to måter å vise «siden når» er én for mye.
+      const siden = e.status_tidspunkt || e.ledig_siden;
+      const statusTid = siden ? ` ${klokke(siden)} · ${tidSiden(siden)}` : '';
       // «Avreist → Sykehus» — hvor bilen dro skal synes her også.
       const sted = e.sted_navn ? ` → ${e.sted_navn}` : '';
       const meta = e.antall_ventende

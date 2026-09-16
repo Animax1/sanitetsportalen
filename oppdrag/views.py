@@ -173,6 +173,9 @@ def enheter_view(request):
     if request.GET.get('alle') != '1':
         qs = qs.filter(er_aktiv=True)
     enheter = list(qs)
+    # **«Ledig siden» hentes i ett spørsmål for hele lista** — lista pollet
+    # hvert tiende sekund, og ett oppslag per enhet ville vært N spørringer.
+    ledig_siden = services.ledig_siden_bulk(enheter, vakt)
 
     data = [
         {
@@ -193,6 +196,13 @@ def enheter_view(request):
             # 2026): «det handler om å kjapt skaffe oversikt». Nummer,
             # hastegrad, problemstilling og *når* statusen ble satt — uten
             # å åpne oppdraget. Tomt når enheten er ledig.
+            # **Bare for den som faktisk er ledig.** Står hun på et oppdrag,
+            # er «ledig siden» forrige gang hun var det — et tall som ser ut
+            # som nåtid og ikke er det.
+            'ledig_siden': (
+                ledig_siden.get(e.pk).isoformat()
+                if info['status'] == choices.LEDIG and ledig_siden.get(e.pk)
+                else None),
             **_aktivt_oppdrag_felter(info['koblingsrad']),
         }
         for e, info in ((e, services.enhet_status(e, vakt)) for e in enheter)
@@ -203,7 +213,8 @@ def enheter_view(request):
     # tavla er en bil ingen husker å sette inn igjen.
     etag = etag_for([
         (r['id'], r['status'], r['antall_ventende'], r['aktivt_oppdrag_id'],
-         r['pa_vakt'], r['er_aktiv'], r['status_tidspunkt'], r['type'])
+         r['pa_vakt'], r['er_aktiv'], r['status_tidspunkt'], r['type'],
+         r['ledig_siden'])
         for r in data
     ])
     if request.META.get('HTTP_IF_NONE_MATCH') == etag:

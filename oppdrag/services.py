@@ -6,13 +6,20 @@ knapp som ikke vises er ikke en knapp som ikke kan trykkes.
 """
 from __future__ import annotations
 
+import logging
 from datetime import timedelta
 
 from django.db import models, transaction
 from django.utils import timezone
 
+# **Én vei, og den går gjennom `core`.** `core.notifications` er rammeverket,
+# ikke en annen modul — samme retning som `core.backup` og `core.arkiv`.
+from core.notifications import notify
+
 from . import choices
 from .models import Enhetsbytte, Enhetshendelse, Oppdrag, Oppdragsenhet, Statusmelding
+
+logger = logging.getLogger(__name__)
 
 # ── Statusmaskinen ───────────────────────────────────────────────────────────
 #
@@ -458,8 +465,73 @@ def start_oppdrag(oppdrag, *, bruker=None, tidspunkt=None,
             oppdrag=forrige, enhet=rad.enhet, type=Enhetshendelse.RYKKET_VIDERE,
             tidspunkt=naa, av=bruker, detalj=f'#{oppdrag.oppdragsnummer}')
 
+    les_bjellevarselet(oppdrag, rad)
     return sett_status(oppdrag, choices.RYKKER_UT, bruker=bruker,
                        tidspunkt=naa, forsinket=forsinket, enhet=rad.enhet)
+
+
+def les_bjellevarselet(oppdrag, rad) -> None:
+    """Merk bjelleraden lest når bilen rykker ut på oppdraget.
+
+    **Uten dette hoper bjella seg opp gjennom vakta.** Varselet har gjort
+    jobben sin i det hun trykker «Rykker ut» — hun har sett oppdraget — og
+    et ulest-tall som bare vokser blir et tall ingen ser på.
+
+    Kaster aldri, av samme grunn som `varsle_bjelle`: et ulest varsel er et
+    savn, en utrykning som stopper er en feil."""
+    from core.models import Notification
+
+    bruker_id = getattr(rad.enhet, 'user_id', None)
+    if bruker_id is None:
+        return
+    try:
+        with transaction.atomic():
+            (Notification.objects
+             .filter(user_id=bruker_id, kind=bjellenokkel(oppdrag), is_read=False)
+             .update(is_read=True, read_at=timezone.now()))
+    except Exception:   # noqa: BLE001 — se docstringen
+        logger.warning('oppdrag: kunne ikke merke bjellevarselet lest for %s',
+                       rad.enhet_id, exc_info=True)
+
+
+def ledig_siden_bulk(enheter, vakt=None) -> dict:
+    """Når hver enhet sist ble meldt **Ledig** i denne vakta.
+
+    André, 15. sep. 2026: «I /oppdrag/ kan vi se i ressurser-delen tidsstempel
+    med når det ble slått ledig.» Operatøren som skal sende noen, vil vite hvem
+    som har stått lengst — og det tallet finnes bare i statusmeldingene.
+
+    **Bulk, som `avbrutt_av_bulk`:** ressurslista tegnes ved hver polling, og
+    ett oppslag per enhet ville vært N spørringer hvert tiende sekund.
+
+    **Korreksjoner teller.** Retter operatøren tidspunktet for `Ledig`, er det
+    det rettede som gjelder — samme regel som `Statusmelding.gjeldende()`. De
+    overstyrte radene hentes i sitt eget spørsmål framfor å utledes av
+    utvalget: en korreksjon kan i prinsippet ligge utenfor det vi nettopp
+    hentet, og en `overstyrte`-liste som bare kjenner sine egne rader ville
+    lest det gamle tidspunktet uten å si fra.
+    """
+    ider = [getattr(e, 'pk', e) for e in enheter]
+    if not ider:
+        return {}
+    qs = Statusmelding.objects.filter(
+        status=choices.LEDIG, oppdragsenhet__enhet_id__in=ider)
+    if vakt is not None:
+        qs = qs.filter(oppdrag__vakt=vakt)
+    rader = list(qs.values_list('pk', 'oppdragsenhet__enhet_id', 'tidspunkt'))
+    if not rader:
+        return {}
+    overstyrte = set(
+        Statusmelding.objects
+        .filter(korrigerer_id__in=[pk for pk, _, _ in rader])
+        .values_list('korrigerer_id', flat=True))
+    ut: dict = {}
+    for pk, enhet_id, tidspunkt in rader:
+        if pk in overstyrte:
+            continue
+        if enhet_id not in ut or tidspunkt > ut[enhet_id]:
+            ut[enhet_id] = tidspunkt
+    return ut
 
 
 def avbrutt_av(oppdrag) -> list[str]:
@@ -604,7 +676,49 @@ def varsle_enhet(oppdrag, enhet, *, bruker=None) -> Oppdragsenhet:
         oppdrag.historikk_av = None
         felter += ['historikk_fra', 'historikk_av']
     oppdrag.save(update_fields=felter)
+    varsle_bjelle(oppdrag, rad)
     return rad
+
+
+#: Varseltypen enhetskontoen får i bjella. **Oppdrags-ID-en er en del av
+#: nøkkelen**, fordi `core.notifications.notify()` dedupliserer på `kind` i 24
+#: timer: med en fast verdi ville oppdrag nummer to blitt svelget, og det er
+#: nettopp det andre oppdraget hun trenger å se.
+def bjellenokkel(oppdrag) -> str:
+    return f'oppdrag_varslet:{oppdrag.pk}'
+
+
+def varsle_bjelle(oppdrag, rad) -> None:
+    """Varselbjella hos enhetskontoen når hun får et oppdrag.
+
+    André, 15. sep. 2026: «En bruker som er koblet til en enhet i /oppdrag/ som
+    får et oppdrag skal få varsel på varselbjella med tidsstempel og hastegrad,
+    intet mer.» Teksten er derfor nummeret og hastegraden — ikke
+    problemstillingen, som er helseopplysning og ikke hører hjemme i en
+    varselrad som blir stående i 30 dager.
+
+    **Kaster aldri.** En bil uten bjellerad er et savn; en varsling som velter
+    utrykningen er en feil. Og `transaction.atomic()` rundt kallet er ikke
+    pynt: `varsle_enhet` kan kjøre inne i en transaksjon, og en databasefeil
+    fanget uten savepoint etterlater den ubrukelig — samme felle som
+    unik-skrankene i vaktlista.
+    """
+    bruker = getattr(rad.enhet, 'user', None)
+    if bruker is None:
+        return
+    try:
+        with transaction.atomic():
+            notify(
+                bruker,
+                module_slug='oppdrag',
+                kind=bjellenokkel(oppdrag),
+                title=f'Oppdrag #{oppdrag.oppdragsnummer}',
+                message=f'{oppdrag.hastegrad} · {timezone.localtime(rad.varslet_at).strftime("%H:%M")}',
+                url='/oppdrag/',
+            )
+    except Exception:   # noqa: BLE001 — se docstringen
+        logger.warning('oppdrag: kunne ikke varsle bjella for %s', rad.enhet_id,
+                       exc_info=True)
 
 
 def ta_av_enhet(oppdrag, enhet, *, bruker=None) -> None:

@@ -2233,6 +2233,13 @@ Funnene under er allerede kartlagt, så jobben er avgrenset når den skal gjøre
 
 ### Løse punkter
 
+- [x] **«Ledig siden» i ressursdelen** (16. sep. 2026, André). Siste gjeldende
+      `Ledig`-melding per enhet, scopet til vakta, bulk. Tolv mutanter på denne og bjella.
+- [x] **Varselbjelle til enhetskontoen ved nytt oppdrag** (16. sep. 2026). Nummer,
+      hastegrad, klokkeslett — ikke problemstillingen. Merkes lest når hun rykker ut.
+- [ ] **Pulje 2 gjenstår:** avbrutt-kvittering (trenger migrasjon), aktiv/passiv vakt
+      (`Enhet.kan_passiv_vakt`, `Oppdragsenhet.varslet_modus`, `Vaktmodusperiode`) og
+      «avvente» (`Enhet.kan_avvente` + `Enhetshendelse.AVVENTER`). Spesifisert 16. sep.
 - [x] **Vaktlistevelgeren byttet ikke liste før neste klikk** (16. sep. 2026, meldt fra
       staging som «treg»). `data-hendelse="change"` manglet, så handlingen fyrte på klikk
       med den gamle verdien. En skanner krever nå hendelsen på hvert `<select>`/`<textarea>`

@@ -4,6 +4,65 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-16 — Pulje 2, første halvdel: «ledig siden» og varselbjella
+
+To av de tre små i oppdragsmodulen. Ingen av dem rører statusmaskinen eller skjemaet;
+avbrutt-kvitteringen kommer for seg, fordi den trenger en migrasjon.
+
+### «Ledig siden» i ressursdelen
+
+En ledig enhet har ingen aktiv koblingsrad, så `status_tidspunkt` er tomt og statusen sto
+som et ord uten tid. Operatøren som skal sende noen vil vite hvem som har stått lengst.
+
+`services.ledig_siden_bulk()` leser siste **gjeldende** `Ledig`-melding per enhet i denne
+vakta. Tre ting er verdt å nevne, og alle tre ble funnet av mutasjonstesting:
+
+- **Korreksjoner teller.** Retter operatøren tidspunktet, er det det rettede som gjelder.
+- **Vakta er scope.** Uten filteret ville fjorårets arrangement stått der som om det var
+  i dag.
+- **Feltet sendes bare når hun faktisk er ledig.** Står hun på et oppdrag, er «ledig siden»
+  forrige gang — et tall som ser ut som nåtid og ikke er det.
+
+Klienten viser det gjennom samme uttrykk som alle de andre statusene
+(`status_tidspunkt || ledig_siden`), med klokkeslett og tid siden. To måter å vise «siden
+når» ville vært én for mye.
+
+### Varselbjella
+
+Nummer, hastegrad og klokkeslett — **ikke problemstillingen**. «Intet mer» er ikke bare
+knapphet: varselraden blir stående i 30 dager, og problemstillingen er en helseopplysning.
+
+**Nøkkelen bærer oppdrags-ID-en**, fordi `notify()` dedupliserer på `kind` i 24 timer. Med
+en fast verdi ville oppdrag nummer to blitt svelget, og det er nettopp det andre oppdraget
+hun trenger å se. Varselet merkes lest når hun rykker ut — ellers hoper bjella seg opp
+gjennom vakta, og et ulest-tall som bare vokser er et tall ingen ser på.
+
+Begge kaster aldri: en bil uten bjellerad er et savn, en varsling som velter utrykningen er
+en feil. Og begge har `transaction.atomic()` rundt seg — `varsle_enhet` kan kjøre inne i en
+transaksjon, og en databasefeil fanget uten savepoint etterlater den ubrukelig.
+
+### Tolv mutanter, og tre overlevde først
+
+Alle tre var testhull, ikke kodefeil — og **to av dem var fikstureringen igjen**:
+
+- **Korreksjonen flyttet tidspunktet framover.** Da vinner den korrigerte raden uansett,
+  fordi den er nyest, og testen kunne ikke skille «vi hoppet over den overstyrte» fra «vi
+  tok den seneste». Rettelsen flytter nå bakover.
+- **Enheten hadde aldri vært ledig** før hun rykket ut, så feltet var tomt uansett hva
+  regelen gjorde. Nå kjøres hun gjennom ett oppdrag først, med en sperrehake som krever at
+  hun har et tidspunkt å miste.
+- **Ingen test hadde en enhet som var ledig i en annen vakt**, så vaktfilteret lot seg
+  fjerne.
+
+Det er tredje gang denne uka at «fikstureringen bar ikke prod-formen» er svaret. Regelen
+står i `CLAUDE.md`; den fortjener å bli lest før neste test skrives, ikke etter.
+
+**Endret:** `oppdrag/services.py`, `oppdrag/views.py`,
+`static/js/oppdrag-sentral-kjerne.js`, `oppdrag/tests_flere_enheter.py` (+19 tester),
+`oppdrag/CLAUDE.md`. Ingen migrasjon. Hele suiten (3 127 tester) grønn.
+
+---
+
 ## 2026-09-16 — Velgeren var ikke treg, den fyrte på feil hendelse
 
 **Meldt fra staging (André):** «Når jeg skifter vaktliste tar det lang tid før fanene og
