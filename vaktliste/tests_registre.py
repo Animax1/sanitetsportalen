@@ -1133,6 +1133,57 @@ class RollerekkefolgeApiTests(TestCase):
         fremmed.refresh_from_db()
         self.assertEqual(fremmed.rekkefolge, 10, 'den fremmede står urørt')
 
+    def test_omdoping_flytter_ikke_rollen(self):
+        """**Meldt fra staging 16. sep. 2026 (André):** «Jeg endret en rolle
+        fra lagsmedlem og til hospitant og nå står den øverst.»
+
+        Det var den *alfabetiske* sorteringen, og den er nettopp det punkt 6
+        avskaffer — meldingen kom mens staging fortsatt kjørte bygget før
+        rangeringen. Men symptomet fortjener en test som holder det borte:
+        med rangering skal navnet ikke lenger kunne flytte en rolle, og det er
+        hele forskjellen på en rangering og et alfabet.
+
+        `Hospitant` sorterer foran alle tre alfabetisk, så en rekkefølge som
+        stille faller tilbake på navnet blir rød her.
+        """
+        self._flytt([self.lagleder.pk, self.sjafor.pk, self.hospitant.pk])
+        res = self.leder.put(
+            f'/vaktliste/api/roller/{self.sjafor.pk}/',
+            data=json.dumps({'navn': 'Aaaaardvark'}),
+            content_type='application/json')
+        self.assertEqual(res.status_code, 200, res.content)
+        self.assertEqual(self._navn(), ['Lagleder', 'Aaaaardvark', 'Hospitant'],
+                         'navnet flytter ingenting — rangeringen står')
+        self.sjafor.refresh_from_db()
+        self.assertEqual(self.sjafor.rekkefolge, 20, 'tallet er urørt')
+
+    def test_nedtrekket_beholder_serverens_rekkefolge(self):
+        """**Den ene måten rangeringen kunne blitt veltet i stillhet.**
+
+        Serveren sorterer, og `rollerForGruppe()` i klienten *filtrerer* bare.
+        Begynner den å sortere selv — alfabetisk, som alt annet i modulen —
+        ville rangeringen vært riktig i basen og feil på skjermen, altså
+        nøyaktig symptomet André meldte, men uten at noen servertest ble rød.
+        """
+        from patients.js_test_utils import (PORTAL_UTILS_JS, VAKTLISTE_JS,
+                                            build_harness, node_available, run_node)
+        if not node_available():
+            self.skipTest('node er ikke tilgjengelig')
+        self._flytt([self.lagleder.pk, self.sjafor.pk, self.hospitant.pk])
+        roller = self.leder.get('/vaktliste/api/roller/').json()['data']
+        harness = build_harness((
+            (PORTAL_UTILS_JS, ('escapeHtml',)),
+            (VAKTLISTE_JS, ('rollerForGruppe',)),
+        ))
+        ut = run_node(harness, f"""
+            globalThis.aktivListe = {{ roller: {json.dumps(roller)} }};
+            console.log(JSON.stringify(
+              rollerForGruppe({self.g.pk}, null).map((r) => r.navn)));
+        """)
+        self.assertEqual(json.loads(ut.strip().splitlines()[0]),
+                         ['Lagleder', 'Sjåfør', 'Hospitant'],
+                         'klienten skal vise serverens rekkefølge, ikke sin egen')
+
     def test_tullete_kropp_gir_400_ikke_500(self):
         for kropp in ({'gruppe_id': self.g.pk}, {'ider': []},
                       {'gruppe_id': self.g.pk, 'ider': 'x'}):

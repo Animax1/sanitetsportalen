@@ -4,6 +4,35 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-16 — «Endret en rolle til hospitant og nå står den øverst»
+
+**Meldt fra staging (André).** Symptomet er ekte, og årsaken er den alfabetiske
+sorteringen: «Hospitant» går foran «Lagleder», «Lagsmedlem» og «Sjåfør». Det er nøyaktig
+det punkt 6 avskaffer — meldingen kom mens staging fortsatt kjørte `3325c8d`, bygget før
+rangeringen. Rettelsen ligger i `55c5fb8`.
+
+**Reprodusert før noe ble sagt**, i stedet for å anta: en omdøping i dagens kode lar
+`rekkefolge` stå urørt, og rollen blir der den er.
+
+### Men symptomet fortjente sine egne tester
+
+Det er to måter rangeringen kan velte tilbake til alfabetet, og begge ville sett ut som
+nøyaktig denne meldingen:
+
+- **`Meta.ordering` mister `rekkefolge`,** eller får navnet foran den. Testen døper om en
+  rolle til noe som sorterer først alfabetisk, og krever at den blir stående.
+- **Klienten sorterer selv.** `rollerForGruppe()` *filtrerer* bare, og alt annet i modulen
+  sorterer alfabetisk — en `.sort()` lagt til i god tro ville gitt riktig rekkefølge i
+  basen og feil på skjermen, uten at én servertest ble rød. Testen kjører funksjonen mot
+  serverens faktiske svar.
+
+Tre mutanter, alle røde.
+
+**Endret:** `vaktliste/tests_registre.py` (+2). Ingen kodeendring — rettelsen var alt
+pushet.
+
+---
+
 ## 2026-09-16 — Pulje 3B: ressursgruppene kan endres, og rollene rangeres
 
 To punkter fra pulje 3. Begge viste seg å være **manglende flate over en mekanisme som
