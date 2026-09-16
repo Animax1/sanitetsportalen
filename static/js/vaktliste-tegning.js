@@ -237,17 +237,22 @@ function tegnFaner() {
       antall: ressurser.reduce((n, r) => n + _posterFor(r.id).length, 0),
     });
   });
-  // **Planleggingstallene er lista regnet sammen** (§8b), ikke en ny kilde.
-  // Fanen står ved siden av «Oversikt» fordi det er samme spørsmål sett fra
-  // en annen kant: oversikten er hvem som står hvor, denne er hva det koster
-  // dem.
+  // **Fanen heter «Timeoversikt»** (André, 16. sep. 2026). Den het
+  // «Planlegging», og det navnet var opptatt: `Vaktliste.status` har verdien
+  // «Planlegging» ved siden av «I drift», så merket øverst på siden og fanen
+  // sa det samme ordet om to helt ulike ting. Nå sier navnet hva den viser —
+  // timer per person — og «Planlegging» betyr bare status.
+  //
+  // Tallene er lista regnet sammen (§8b), ikke en ny kilde. Fanen står ved
+  // siden av «Oversikt» fordi det er samme spørsmål sett fra en annen kant:
+  // oversikten er hvem som står hvor, denne er hva det koster dem.
   faner.push({
-    id: BELASTNING, navn: 'Planlegging', ikon: 'graph-up',
+    id: BELASTNING, navn: 'Timeoversikt', ikon: 'graph-up',
     antall: belastning ? belastning.sammendrag.personer : null,
   });
 
   // **Planleggeren, for dem som setter opp vakta.** Den står etter
-  // «Planlegging» fordi rekkefølgen i fanerekka er den man arbeider i:
+  // «Timeoversikt» fordi rekkefølgen i fanerekka er den man arbeider i:
   // først lager man grunnlaget, så ser man hva det koster. At den er sist av
   // de to er altså ikke en rangering — det er at man kommer tilbake til
   // tallene oftere enn til generatoren.

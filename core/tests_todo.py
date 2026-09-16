@@ -110,6 +110,26 @@ class TodoForfallerIkkeTests(SimpleTestCase):
         self.assertIn(ANDRE_SEKSJON, TODO.read_text(encoding='utf-8'),
                       'seksjonen den andre testen peker på må finnes')
 
+    def test_ingen_avkryssede_punkter_i_det_hele_tatt(self):
+        """**Konsekvensen av at CHANGELOG er arkivets sannhet.**
+
+        Er et punkt gjort, står historien i CHANGELOG og punktet skal bort.
+        Et `[x]` her er derfor alltid feil — og det er dessuten forutsetningen
+        for regelen over: finnes ingen avkryssede foreldre, kan ingenting
+        begraves under dem.
+
+        Den fanget meg innen timen. Punkt 1 i pulje 3 ble levert 16. sep. 2026,
+        og jeg krysset det av — i en fil hvis egen topp sier at ferdige punkter
+        slettes, i en regel jeg hadde skrevet samme dag. Vanen sitter i
+        fingrene lenge etter at regelen er bestemt; det er nettopp det tester er
+        til for.
+        """
+        funn = [f'  linje {nr}: {tekst[:70]}'
+                for nr, _inn, merke, _seksjon, tekst in _punkter() if merke == 'x']
+        self.assertEqual(funn, [], (
+            'Avkryssede punkter i TODO.md:\n' + '\n'.join(funn)
+            + '\n\nSlett dem. Historien hører hjemme i CHANGELOG.'))
+
     def test_ingen_ferdig_seksjon(self):
         """CHANGELOG er arkivets sannhet (André, 16. sep. 2026). En
         «Ferdig»-seksjon i arbeidslista er en andre sannhet med en annen vri —

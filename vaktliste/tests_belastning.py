@@ -907,3 +907,79 @@ class ProbonoTests(TilgangsBasis):
         res = self.c_leser.put(f'/vaktliste/api/vaktposter/{self.betalt.pk}/',
                                data={'probono': True}, content_type='application/json')
         self.assertEqual(res.status_code, 403)
+
+
+class FanenHeterTimeoversiktTests(SimpleTestCase):
+    """**Fanen het «Planlegging», og det navnet var opptatt** (André,
+    16. sep. 2026, pulje 3).
+
+    `Vaktliste.status` har verdien «Planlegging» ved siden av «I drift», og
+    den står som et merke øverst på siden. Fanen og merket sa altså samme ord
+    om to helt ulike ting: den ene er *hva lista koster i timer*, den andre er
+    *om innsjekk er åpen*. «Timeoversikt» sier hva fanen viser.
+
+    **Testen finnes fordi ingen test sa noe om navnet.** Omdøpingen var grønn
+    før den ble skrevet — jeg kunne kalt fanen hva som helst, og det er
+    nøyaktig den slags stillhet som lot «Planlegging» bety to ting i første
+    omgang.
+
+    Og den prøver **regelen**, ikke bare strengen: fanenavnet må ikke kollidere
+    med en statusverdi. Et framtidig navnebytte som gjeninnfører kollisjonen
+    blir rødt, uansett hvilket ord det er.
+    """
+
+    def setUp(self):
+        from patients.js_test_utils import (VAKTLISTE_JS, PORTAL_UTILS_JS,
+                                            build_harness, node_available)
+        if not node_available():
+            self.skipTest('node er ikke tilgjengelig')
+        self.harness = build_harness((
+            (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue')),
+            (VAKTLISTE_JS, ('tegnFaner', 'kanPlanlegge', '_fanerad',
+                            '_mannskapsfane', 'iDrift', '_tilstede',
+                            '_ikkePlassert', '_grupperMedRessurser',
+                            '_ressurserIGruppe', '_posterFor', 'kanLede', '_erAdmin', '_nivaa', '_mittKorpsId')),
+        ))
+
+    def _faner(self):
+        import json as _json
+
+        from patients.js_test_utils import run_node
+        ut = run_node(self.harness, """
+            globalThis.window = { MODUL_TILGANG: { vaktliste: 'skriv_leder' } };
+            globalThis.aktivFane = 'oversikt';
+            globalThis.OVERSIKT = 'oversikt'; globalThis.MANNSKAP = 'mannskap';
+            globalThis.TILSTEDE = 'tilstede'; globalThis.BELASTNING = 'belastning';
+            globalThis.PLANLEGGER = 'planlegger';
+            globalThis.IKKE_PLASSERT = 'ikke-plassert';
+            globalThis.MITT_KORPS = 'mitt-korps';
+            globalThis.belastning = null; globalThis.register = null;
+            globalThis.utskriftDag = null; globalThis.korpsfilter = null;
+            globalThis.aktivListe = {
+              vaktliste: { id: 1, vakt_navn: 'Vakta',
+                           status_navn: 'Planlegging', i_drift: false },
+              grupper: [], ressurser: [], vaktposter: [], mannskap: [] };
+            const el = { innerHTML: '' };
+            globalThis.document = { getElementById: () => el };
+            tegnFaner();
+            console.log(JSON.stringify(el.innerHTML));
+        """)
+        # `run_node` legger på en «OK»-linje til slutt, så JSON-en er den første.
+        return _json.loads(ut.strip().splitlines()[0])
+
+    def test_fanen_heter_timeoversikt(self):
+        markup = self._faner()
+        self.assertIn('Timeoversikt', markup)
+
+    def test_fanenavnene_kolliderer_ikke_med_en_statusverdi(self):
+        """Regelen, ikke ordet. `Vaktliste.status` sine etiketter er opptatt:
+        brukes en av dem som fanenavn, sier to ting på skjermen samme ord om
+        ulike begreper — og det var hele feilen som ble rettet."""
+        from . import choices
+        markup = self._faner()
+        statusnavn = set(choices.STATUS_NAVN.values())
+        self.assertTrue(statusnavn, 'statusverdiene må finnes, ellers måler testen ingenting')
+        for navn in statusnavn:
+            with self.subTest(status=navn):
+                self.assertNotIn(f'>{navn}<', markup,
+                                 f'«{navn}» er en statusverdi og kan ikke være et fanenavn')

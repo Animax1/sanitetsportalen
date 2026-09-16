@@ -446,11 +446,22 @@ Avstanden mellom de to første er arbeidslista. `Vaktliste.timetak` er **denne**
 budsjett (`Belastningsgrenser` er organisasjonens og gjelder alle), `igjen` måles mot
 **satt opp** og ikke mot bemannet, og `_dagbolker()` bryter ned per dag uten egne tak.
 
-**Linja sto først i «Planlegging», og ble flyttet samme dag.** Jeg leste «en planlegger»
+**Linja sto først i «Timeoversikt», og ble flyttet samme dag.** Jeg leste «en planlegger»
 som «planleggingstall» og la budsjettet i belastningsfanen; André: «Jeg ba om en
 planlegger … Den skal bare admin og leder ha tilgang til. For den genererer grunnlaget på
-alt.» Det er to ulike ting: **«Planlegging» er lista regnet sammen** (`les`, hva den
+alt.» Det er to ulike ting: **«Timeoversikt» er lista regnet sammen** (`les`, hva den
 koster dem som står der), **«Planlegger» er stedet grunnlaget lages** (`kan_lede`).
+
+**Fanen het «Planlegging» til 16. sep. 2026**, og navnet var opptatt: `Vaktliste.status`
+har verdien «Planlegging» ved siden av «I drift», og den står som et merke øverst på siden.
+Fanen og merket sa altså samme ord om to ulike begreper — hva lista *koster i timer*, og om
+innsjekk er *åpen*. Regelen står som en test (`FanenHeterTimeoversiktTests`): **et fanenavn
+kan ikke være en statusetikett.** Den prøver regelen og ikke ordet, så en framtidig
+omdøping som gjeninnfører kollisjonen blir rød uansett hvilket ord det er.
+
+*Bare fanen ble omdøpt.* `choices.STATUS_VALG` har fortsatt «Planlegging» som statusverdi,
+og migrasjonene bærer den — et søk-og-erstatt over ordet ville døpt om statusen, som er noe
+helt annet.
 
 - **Taket settes i `vaktliste_detalj_view`s PUT, sammen med start og planlagt slutt, og
   er derfor `skriv_leder`** — ikke `skriv_full`. Rekkevidden er den samme (hele vakta,

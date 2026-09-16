@@ -4,6 +4,64 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-16 — Pulje 3A: «Planlegging»-fanen heter «Timeoversikt»
+
+**André, pulje 3 punkt 1:** fanen skal hete «Timeoversikt», og siles på korps for den som
+ikke er leder.
+
+### Halve punktet var alt gjort
+
+`belastning_per_person()` kaller `synlige_vaktposter(poster, user)`, og
+`KorpsvelgerTests.test_parameteret_er_ingen_dor_for_korps_brukeren` viser at en `les` med
+badge bare ser sitt eget korps — også når hun sender `?korps=` for et annet. Silingen var
+altså på plass og dekket. Det som gjensto var navnet.
+
+Verdt å si høyt: jeg fant det ved å **lese testen**, ikke bare koden. At kallet står i fila
+sier ikke at det virker — det er samme skille som mellom en statisk regel og en
+migrasjonsprøve.
+
+### Og navnet var opptatt
+
+`Vaktliste.status` har verdien «Planlegging» ved siden av «I drift», og den står som et
+merke øverst på siden. Fanen og merket sa samme ord om to ulike begreper: hva lista *koster
+i timer*, og om innsjekk er *åpen*. «Timeoversikt» sier hva fanen viser, og «Planlegging»
+betyr nå bare status.
+
+**Et søk-og-erstatt over ordet ville vært feil.** «Planlegging» står i `choices.py` som
+statusverdi, i `0002_oppsett` som migrert choice, og i fem tester som `status_navn`. Bare
+fanens ene linje skulle endres — samme familie som mutantfella «den traff et annet sted enn
+du tror», bare på forhånd.
+
+### Testen manglet, og det var derfor kollisjonen kunne oppstå
+
+Omdøpingen var **grønn før testen ble skrevet**: ingen test sa noe om fanenavnet, så det
+kunne vært hva som helst. `FanenHeterTimeoversiktTests` prøver nå **regelen** og ikke ordet
+— *et fanenavn kan ikke være en statusetikett* — så en framtidig omdøping som gjeninnfører
+kollisjonen blir rød uansett hvilket ord det er.
+
+Fire mutanter, alle røde, deriblant den som tømmer `STATUS_NAVN` så regelen ikke lenger har
+noe å måle mot.
+
+### Og en regel som fanget meg innen timen
+
+Punktet ble levert, og jeg **krysset det av** i TODO — i en fil hvis egen topp sier at
+ferdige punkter slettes, etter en regel jeg skrev samme formiddag. Testen fanget det ikke,
+fordi den bare forbød åpne punkter *under* avkryssede.
+
+Den forbyr nå `[x]` i det hele tatt. Det er den riktige formen på beslutningen — er
+historien i CHANGELOG, er et avkrysset punkt en andre kilde — og det er dessuten
+forutsetningen for den første regelen: finnes ingen avkryssede foreldre, kan ingenting
+begraves under dem.
+
+Vanen sitter i fingrene lenge etter at regelen er bestemt. Det er nøyaktig det tester er
+til for, og det er tredje gang på to dager at svaret har vært å gjøre en intensjon til noe
+som kan bli rødt.
+
+**Endret:** `static/js/vaktliste-tegning.js`, `vaktliste/tests_belastning.py` (+2),
+`core/tests_todo.py` (+1), `vaktliste/CLAUDE.md`.
+
+---
+
 ## 2026-09-16 — Pulje 2 og de tre rundene etter ut i prod
 
 André: «Kan vi pushe det vi har gjort til main?» Seks commits, `11c068b` → `a7239c5`:
