@@ -129,6 +129,15 @@ fase 3–7 gjenstår — se `docs/BESLUTNING_VAKTLISTE.md`, som er besluttet i s
   hun når bare radene som er hennes. **`probono` ble stående**, og det er et annet
   spørsmål: det sier hva vakta *koster*, og tallet leses av budsjettlinja for hele lista.
 
+  **Og porten på `mannskap_id` gjelder overgangen, ikke innsendingen** (16. sep. 2026).
+  Vinduet sender hele skjemaet, så feltet står i kroppen også når ingen har rørt
+  nedtrekket. På en **ledig plass** er det `null` over `null` — og
+  `kan_sette_vaktpost(..., mannskap=None)` er `skriv_full`, fordi *å la en plass stå tom*
+  er å sette opp et behov. Regelen er riktig; den fyrte bare på en endring som ikke
+  skjedde, og korps-føreren fikk 403 på å skrive «mangler sjåfør» i en plass hun har lov
+  til å fylle. Viewet sammenligner derfor `ny_id != vaktpost.mannskap_id` først: **en
+  skriving som ikke endrer noe, trenger ingen tillatelse til å endre det.**
+
   **Regelen står som to lister, ikke som en `if` per felt:**
   `services.SKIFT_OPPSETTFELTER` og `RESSURS_OPPSETTFELTER`, lest av
   `services.oppsettfelter(data, felter)`. Fram til da sto `korps_id` og `alle_korps`

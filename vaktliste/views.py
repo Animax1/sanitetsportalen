@@ -1367,9 +1367,26 @@ def vaktpost_detalj_view(request, pk):
                          .filter(pk=ny_id).first())
             if ny_person is None:
                 return _feil('Ukjent mannskap.')
-        if not services.kan_sette_vaktpost(
-                request.user, vaktpost.ressurs, ny_person, vaktpost=vaktpost):
-            return _nektet()
+        # **Porten gjelder overgangen, ikke innsendingen** (16. sep. 2026,
+        # meldt fra staging: «de med les alle / skriv eget korps kan ikke
+        # skrive merknad hvis det står ledig plass»).
+        #
+        # Vinduet sender hele skjemaet, så `mannskap_id` står i kroppen også
+        # når ingen har rørt nedtrekket. På en ledig plass betyr det `null`
+        # over `null` — og `kan_sette_vaktpost(..., mannskap=None)` er
+        # `skriv_full`, fordi *å la en plass stå tom* er å sette opp et behov.
+        # Regelen er riktig; den fyrte bare på en endring som ikke skjedde.
+        # Korps-føreren fikk 403 på å skrive «mangler sjåfør» i en plass hun
+        # har lov til å fylle.
+        #
+        # **En skriving som ikke endrer noe, trenger ingen tillatelse til å
+        # endre det.** Sammenligningen går på ID og ikke på objektet: den
+        # slipper å laste `vaktpost.mannskap`, og `_int('')` gir `None`, som
+        # er nøyaktig det et tomt nedtrekk sender.
+        if ny_id != vaktpost.mannskap_id:
+            if not services.kan_sette_vaktpost(
+                    request.user, vaktpost.ressurs, ny_person, vaktpost=vaktpost):
+                return _nektet()
         vaktpost.mannskap = ny_person
 
     var_planlagt = services.er_planlagt(vaktpost)

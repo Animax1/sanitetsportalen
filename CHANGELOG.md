@@ -4,6 +4,54 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-16 — Porten gjaldt innsendingen, ikke endringen
+
+**Meldt fra staging (André):** «Kan rapportere bug at de med les alle / skriv eget korps
+ikke kan skrive merknad hvis det står ledig plass. Bør de ha tilgang der når det står ledig
+plass for å skrive merknad?»
+
+**Ja** — og dagens oppførsel var ikke engang et bevisst nei. Den var en regel som fyrte på
+en endring som ikke skjedde.
+
+### Mekanismen
+
+Skiftvinduet sender hele skjemaet, så `mannskap_id` står i kroppen også når ingen har rørt
+nedtrekket. På en ledig plass betyr det **`null` over `null`** — og
+`kan_sette_vaktpost(..., mannskap=None)` er `skriv_full`, med god grunn: *å la en plass stå
+tom* er å sette opp et behov, og korps-føreren bestemmer ikke hvor mange plasser det skal
+være.
+
+Regelen er riktig. Den sto bare på feil side av spørsmålet: den sjekket **innsendingen**
+framfor **overgangen**. Viewet sammenligner nå `ny_id != vaktpost.mannskap_id` først. **En
+skriving som ikke endrer noe, trenger ingen tillatelse til å endre det.**
+
+### Og svaret på spørsmålet er ja
+
+«Mangler sjåfør, ringer rundt» hører hjemme nettopp på en tom plass, og korps-føreren er den
+som vet det. Plassen er alt hennes å *fylle* — reservasjonen sier så — og merknaden følger
+raden etter gårsdagens avklaring. Da er den hennes å skrive på.
+
+Det hun fortsatt ikke kan: opprette plassen, fjerne den, flytte tidene eller endre hvem den
+er satt av til. Hun kan altså **merke et behov, ikke finne på eller fjerne ett.**
+
+### Fire mutanter, tre røde — og den fjerde er ekvivalent
+
+Den fjerde byttet `ny_id != vaktpost.mannskap_id` med `ny_id is not None`, altså «sjekk bare
+når noen settes inn». Den overlevde, og **det betyr ingenting**: de to er
+oppførselsmessig like her. Forskjellen kan bare oppstå når noen tømmes ut av en rad, og
+inngangsporten for en fylt rad er `kan_redigere_mannskap(user, vaktpost.mannskap)` — nøyaktig
+det samme uttrykket `egen_staar_der` leser. Slipper hun inn i raden, passerer hun også
+`kan_sette_vaktpost`.
+
+Det er felle nummer to fra mutasjonsbolken i `CLAUDE.md`: *den var en no-op*. Ført opp her
+framfor å skrives en test rundt — en test som «fanger» en ekvivalent mutant, fanger
+ingenting og ser ut som dekning.
+
+**Endret:** `vaktliste/views.py`, `vaktliste/tests_tilgang.py` (+3 tester),
+`vaktliste/CLAUDE.md`. Ingen migrasjon. Hele suiten (3 099 tester) grønn.
+
+---
+
 ## 2026-09-16 — Et låst felt skal se låst ut, og fortsatt kunne leses
 
 **André:** «De feltene i rediger skift og rediger ressurs som korps-fører ikke kan endre bør

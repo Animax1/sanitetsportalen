@@ -770,6 +770,51 @@ class LedigPlassTilgangTests(TilgangsBasis):
                             content_type='application/json')
         self.assertEqual(res.status_code, 403)
 
+    def test_korpsbruker_skriver_merknad_paa_en_ledig_plass(self):
+        """**Meldt fra staging 16. sep. 2026:** «de med les alle / skriv eget
+        korps kan ikke skrive merknad hvis det står ledig plass.»
+
+        Vinduet sender hele skjemaet, så `mannskap_id` sto i kroppen også når
+        ingen hadde rørt nedtrekket. På en ledig plass er det `null` over
+        `null` — og `kan_sette_vaktpost(..., mannskap=None)` er `skriv_full`,
+        fordi *å la en plass stå tom* er å sette opp et behov. Regelen var
+        riktig; den fyrte bare på en endring som ikke skjedde.
+
+        «Mangler sjåfør, ringer rundt» hører hjemme nettopp på en tom plass,
+        og hun er den som vet det. Plassen er hennes å fylle, så den er hennes
+        å skrive på.
+        """
+        pk = self._plass(self.c_vl, self.res_hgsd).json()['data']['id']
+        res = self.c_kb.put(f'/vaktliste/api/vaktposter/{pk}/',
+                            data={'mannskap_id': None, 'rolle_id': None,
+                                  'merknad': 'Mangler sjåfør'},
+                            content_type='application/json')
+        self.assertEqual(res.status_code, 200, res.content)
+        vp = Vaktpost.objects.get(pk=pk)
+        self.assertEqual(vp.merknad, 'Mangler sjåfør')
+        self.assertIsNone(vp.mannskap_id, 'plassen skal fortsatt være ledig')
+
+    def test_hun_faar_fortsatt_ikke_tomme_en_plass_hun_ikke_fylte(self):
+        """Porten gjelder overgangen, og den står. En annens person på en
+        plass satt av til henne er fortsatt deres rad."""
+        pk = self._plass(self.c_vl, self.res_hgsd,
+                         mannskap_id=self.p_karmoy.pk).json()['data']['id']
+        res = self.c_kb.put(f'/vaktliste/api/vaktposter/{pk}/',
+                            data={'mannskap_id': None},
+                            content_type='application/json')
+        self.assertEqual(res.status_code, 403, res.content)
+        self.assertEqual(Vaktpost.objects.get(pk=pk).mannskap, self.p_karmoy)
+
+    def test_en_ledig_plass_som_ikke_er_hennes_er_fortsatt_stengt(self):
+        """Inngangsporten står uendret: dette retter når
+        `kan_sette_vaktpost` fyrer, ikke hvem som slipper inn i raden."""
+        pk = self._plass(self.c_vl, self.res_karmoy).json()['data']['id']
+        res = self.c_kb.put(f'/vaktliste/api/vaktposter/{pk}/',
+                            data={'mannskap_id': None, 'merknad': 'min'},
+                            content_type='application/json')
+        self.assertEqual(res.status_code, 403, res.content)
+        self.assertEqual(Vaktpost.objects.get(pk=pk).merknad, '')
+
     def test_korpsbruker_kan_ikke_avlyse_en_ledig_plass(self):
         """Hun fyller plasser, hun avlyser dem ikke — kunne hun det, ville et
         hull i bemanningen kunne skjules ved å slette raden som viste det."""

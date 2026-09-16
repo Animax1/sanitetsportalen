@@ -2233,6 +2233,11 @@ Funnene under er allerede kartlagt, så jobben er avgrenset når den skal gjøre
 
 ### Løse punkter
 
+- [x] **Merknad på en ledig plass ga 403 for korps-føreren** (16. sep. 2026, meldt fra
+      staging). Vinduet sender hele skjemaet, så `mannskap_id: null` sto i kroppen og
+      utløste `skriv_full`-regelen for «la plassen stå tom» — på en endring som ikke
+      skjedde. Viewet sjekker nå overgangen, ikke innsendingen. Fire mutanter: tre røde,
+      den fjerde ekvivalent (og ført opp som det).
 - [x] **Låste felter ser låste ut og er fortsatt lesbare** (16. sep. 2026, André).
       `.vl-laast` med stiplet kant og full tekstkontrast — `disabled` alene gjorde teksten
       lysere, og Safari ignorerer `color` på deaktiverte felter. Hvert vindu har en linje
