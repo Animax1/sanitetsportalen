@@ -1372,3 +1372,47 @@
   font-size: 0.85rem;
   margin-bottom: 0.75rem;
 }
+
+/*
+  ── «Oversikt» som talltabell (16. sep. 2026, pulje 3 punkt 2) ────────────
+
+  André: «Den viser mye av det som allerede er i de respektive
+  ressursfanene. Må være en faktisk oversikt.» Radene er blokker, ikke
+  personer, og kolonnene er tid, timer, plasser, besatt, ledige og totalt.
+
+  **Fargen brukes bare på de radene som har ledige plasser.** En oversikt
+  leses for å finne hullene; er alt like dempet, må man lese hver rad for å
+  finne dem. Merkingen er lav-kontrast med vilje — den skal trekke blikket,
+  ikke rope.
+*/
+.vl-oversiktstabell .vl-navn .vl-meta {
+  display: block;
+  font-size: 0.82em;
+}
+
+.vl-oversiktstabell tr.vl-har-ledige td {
+  background: color-mix(in srgb, var(--bs-warning, #ffc107) 7%, transparent);
+}
+
+.vl-ledigtall {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  color: var(--bs-warning, #ffc107);
+}
+
+/*
+  Sumraden er tabellens fasit, og skal kunne leses uten å telle oppover.
+  `border-top` og ikke en farge: på papiret er fargen borte uansett, og en
+  strek overlever utskrift.
+*/
+.vl-oversiktstabell tr.vl-sumrad td {
+  border-top: 2px solid var(--border-color, #334155) !important;
+  font-weight: 700;
+}
+
+@media print {
+  /* Gult på papir blir grått og uleselig; streken bærer merkingen i stedet. */
+  .vl-oversiktstabell tr.vl-har-ledige td { background: transparent !important; }
+  .vl-ledigtall { color: #000 !important; font-weight: 700; }
+}

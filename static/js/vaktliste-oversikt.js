@@ -411,11 +411,6 @@ function mkOversikt() {
     return `${verktoy}<div class="vl-kort"><div class="vl-tom">Ingen er satt opp ennå.</div></div>`;
   }
 
-  const korpsnavn = {};
-  (aktivListe.korps || []).forEach((k) => {
-    korpsnavn[k.id] = k.kortnavn || k.navn;
-  });
-
   // **Dagen er ytterste nivå** (André, 14. sep. 2026): «oversikten skal bare
   // vise hvem som er på vakt og hvilken ressurs de er på, på dag — ikke silt
   // etter ressurs først og så dag».
@@ -440,68 +435,71 @@ function mkOversikt() {
     return kart;
   };
 
-  // Rekkefølgen er gruppas, så ressursens — samme som fanene. Ressurser uten
-  // skift *den dagen* utelates: en tom tabell på papiret er en linje man må
-  // lese for å se at det ikke står noe der.
-  // **Tiden står på blokklinja, ikke i raden** (11. sep. 2026). Skift med
-  // samme fra–til samles i `_tidsblokker()`, og linja over dem bærer spennet,
-  // timene og antallet. Raden under er hvem — navn, korps, rolle, merknad.
-  // Kolonnen «Tid» er borte fordi den sto med samme verdi fire ganger.
-  const rad = (vp) => {
-    // Korpset i lista: personens når raden er fylt, plassens reservasjon
-    // når den er ledig. Det er det samme skillet som i ressurstabellen, og
-    // av samme grunn.
-    const korps = vp.ledig
-      ? (vp.alle_korps ? 'Åpen for alle' : (korpsnavn[vp.reservert_korps_id] || 'Planlagt'))
-      : (vp.korps_kort || '');
+  // ── Radene er **blokker, ikke personer** (André, 16. sep. 2026) ─────────
+  //
+  // «Ressursfanen som heter Oversikt viser mye av det som allerede er i de
+  // respektive ressursfanene. Må være en faktisk oversikt.» Fram til nå sto
+  // hver person på sin egen linje med navn, korps, rolle og merknad — altså
+  // nøyaktig de fire kolonnene man alt hadde lest i gruppefanen. Arket ble
+  // langt, og det svarte ikke på det en oversikt skal svare på: **hvor mange
+  // plasser finnes, hvor mange er fylt, og hva koster det i timer.**
+  //
+  // Navnene er ikke borte — de står i gruppefanen, som er den man arbeider i,
+  // og utskrifts-CSS-en er generisk, så et navneark skrives ut derfra.
+  //
+  // Én rad per ressurs per tidsblokk. Blokken er alt definert av
+  // `_tidsblokker()`: skift med *samme* fra–til, ikke overlappende.
+  const blokkrad = (ressurs, gruppe, blokk) => {
+    const plasser = blokk.poster.length;
+    const besatt = blokk.poster.filter((vp) => !vp.ledig).length;
+    const ledige = plasser - besatt;
+    // **`_sumTimer` og ikke `timer × plasser`.** Probono-skift teller null
+    // (11. sep. 2026: timene går, men de er ikke organisasjonens), og et
+    // skift uten gyldig spenn teller null. Regner man i stedet lengden ganger
+    // antallet, er totalen et annet tall enn budsjettlinja og enn
+    // `belastning_per_person` — tre steder som skal si det samme.
+    const totalt = _sumTimer(blokk.poster);
+    // Tomme celler framfor «0»: en kolonne full av nuller er støy man leser
+    // forbi, og det er nettopp de som *ikke* er null man leter etter.
+    const ledigcelle = ledige
+      ? `<td class="vl-ledigtall">${escHtmlValue(ledige)}</td>` : '<td>—</td>';
     return `
-        <tr class="${escHtmlValue(vp.ledig ? 'vl-ledig' : '')}">
-          <td class="vl-navn">${escapeHtml(vp.ledig ? '— ledig —' : vp.navn)}${_probonoMerke(vp)}</td>
-          <td>${escapeHtml(korps || '—')}</td>
-          <td>${escapeHtml(vp.rolle || '—')}</td>
-          <td>${escapeHtml(vp.merknad || '')}</td>
+        <tr class="${escHtmlValue(ledige ? 'vl-har-ledige' : '')}">
+          <td class="vl-navn">${escapeHtml(ressurs.navn)}
+            <span class="vl-meta">${escapeHtml(gruppe.navn)}</span></td>
+          <td class="vl-blokktid">${escapeHtml(_tidsspenn(blokk))}</td>
+          <td class="vl-timer">${escapeHtml(_varighet(blokk))}</td>
+          <td class="vl-timer">${escHtmlValue(plasser)}</td>
+          <td class="vl-timer">${escHtmlValue(besatt)}</td>
+          ${ledigcelle}
+          <td class="vl-timer">${escapeHtml(_tall(totalt))} t</td>
         </tr>`;
   };
 
+  const sumrad = (dagposter) => {
+    const plasser = dagposter.length;
+    const besatt = dagposter.filter((vp) => !vp.ledig).length;
+    const ledige = plasser - besatt;
+    return `
+        <tr class="vl-sumrad">
+          <td class="vl-navn">Sum</td>
+          <td></td>
+          <td></td>
+          <td class="vl-timer">${escHtmlValue(plasser)}</td>
+          <td class="vl-timer">${escHtmlValue(besatt)}</td>
+          <td class="vl-timer">${ledige ? escHtmlValue(ledige) : '—'}</td>
+          <td class="vl-timer">${escapeHtml(_tall(_sumTimer(dagposter)))} t</td>
+        </tr>`;
+  };
+
+  // Rekkefølgen er gruppas, så ressursens — samme som fanene. Ressurser uten
+  // skift *den dagen* utelates: en tom rad på papiret er en linje man må
+  // lese for å se at det ikke står noe der.
   const ressursdeler = (kart) => _grupperMedRessurser().flatMap((g) =>
     _ressurserIGruppe(g.id)
       .filter((r) => (kart.get(r.id) || []).length)
-      .map((r) => {
-        const egne = kart.get(r.id);
-        const blokker = _tidsblokker(egne);
-        // `_blokkrader`, ikke `_blokkerMedDager`: dagen står i overskriften
-        // over tabellen, og en dagrad inni ville gjentatt den.
-        const rader = _blokkrader(blokker, 4, rad);
-        const ledige = egne.filter((vp) => vp.ledig).length;
-        const rest = ledige
-          ? ` <span class="vl-meta">· ${escHtmlValue(ledige)} ${escapeHtml(ledige === 1 ? 'ledig' : 'ledige')}</span>` : '';
-        // **Et skift er en vakttid, mannskap er de som går den** (André,
-        // 11. sep. 2026). Tallene er derfor blokkene og de bemannede radene,
-        // ikke radene. Summene er **per dag per ressurs** etter snuingen —
-        // det er det tallet som står under overskriften de hører til. Summen
-        // for hele vakta står fortsatt i arkhodet.
-        const tall = _telling(egne, blokker.length);
-        const timer = `${escapeHtml(_tall(_sumTimer(egne)))} t`;
-        return `
-      <div class="vl-korpsgruppe">
-        <h3>${escapeHtml(r.navn)}
-          <span class="vl-meta">${escapeHtml(g.navn)} ·
-            ${escapeHtml(tall)} · ${timer}</span>${rest}
-        </h3>
-        <div class="vl-tabellramme">
-        <table class="vl-tabell vl-utskrift">
-          <colgroup>
-            <col style="width: 34%"><col style="width: 14%"><col style="width: 22%">
-            <col style="width: 30%">
-          </colgroup>
-          <thead>
-            <tr><th>Navn</th><th>Korps</th><th>Rolle</th><th>Merknad</th></tr>
-          </thead>
-          <tbody>${rader}</tbody>
-        </table>
-        </div>
-      </div>`;
-      }));
+      .flatMap((r) => _tidsblokker(kart.get(r.id)).map(
+        (blokk) => blokkrad(r, g, blokk))));
 
   // **Dagbolken er en `<section>` med sin egen overskrift.** Utskriften har
   // `break-inside: avoid` på den der det får plass — en dagoverskrift alene
@@ -509,7 +507,22 @@ function mkOversikt() {
   const deler = _grupperPaaDag(poster).map((dag) => `
       <section class="vl-dagbolk">
         <h2 class="vl-dagtittel">${escapeHtml(_dagtekst(dag.fra_tid))}</h2>
-        ${ressursdeler(perRessursDag(dag.poster)).join('')}
+        <div class="vl-tabellramme">
+        <table class="vl-tabell vl-utskrift vl-oversiktstabell">
+          <colgroup>
+            <col style="width: 28%"><col style="width: 20%"><col style="width: 10%">
+            <col style="width: 10%"><col style="width: 10%"><col style="width: 10%">
+            <col style="width: 12%">
+          </colgroup>
+          <thead>
+            <tr>
+              <th>Ressurs</th><th>Tid</th><th>Timer</th>
+              <th>Plasser</th><th>Besatt</th><th>Ledige</th><th>Totalt</th>
+            </tr>
+          </thead>
+          <tbody>${ressursdeler(perRessursDag(dag.poster)).join('')}${sumrad(dag.poster)}</tbody>
+        </table>
+        </div>
       </section>`);
 
   const tittel = aktivListe.vaktliste.vakt_navn;

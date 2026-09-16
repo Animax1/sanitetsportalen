@@ -812,8 +812,6 @@ tilgangshull og data først, funksjonalitet i midten, utseende sist.
 
 - [ ] **Pulje 3 — vaktlista, bruk og utseende.** Ingen av dem rører tilgang eller data, og
       de kan tas i én runde. Ikke startet.
-      - [ ] **«Oversikt» har for mange kolonner.** Behold tid, timer, totalt, plasser og
-            ledige; resten ut
       - [ ] **Sett korps og rolle på flere skift samtidig.** I dag ett og ett, og en
             vaktliste settes opp med tjue like skift
       - [ ] **Ressursgrupper skal kunne endres og slettes**, også de seks som seedes.

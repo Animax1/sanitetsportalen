@@ -452,6 +452,25 @@ planlegger … Den skal bare admin og leder ha tilgang til. For den genererer gr
 alt.» Det er to ulike ting: **«Timeoversikt» er lista regnet sammen** (`les`, hva den
 koster dem som står der), **«Planlegger» er stedet grunnlaget lages** (`kan_lede`).
 
+**«Oversikt» er en talltabell, ikke en personliste** (16. sep. 2026, André: «Den viser mye
+av det som allerede er i de respektive ressursfanene. Må være en faktisk oversikt»). Én rad
+per **ressurs per tidsblokk**, med kolonnene Ressurs, Tid, Timer, Plasser, Besatt, Ledige og
+Totalt, og en sumrad per dag. Navn, korps, rolle og merknad sto her til da — altså nøyaktig
+de fire kolonnene man alt hadde lest i gruppefanen.
+
+Tre ting er verdt å kjenne:
+
+- **Totalt bruker `_sumTimer`, ikke `timer × plasser`.** Probono-skift teller null (11. sep.
+  2026), og et skift uten gyldig spenn teller null. Regner man i stedet lengden ganger
+  antallet, blir totalen et annet tall enn budsjettlinja og enn `belastning_per_person` —
+  tre steder som skal si det samme.
+- **Sumraden teller de ledige plassenes timer med.** De er planlagt, og et budsjettall som
+  stille utelot dem ville sett rimelig ut og vært for lavt. Regelen sto udekket til en
+  mutant fant den.
+- **Personopplysningene er ikke borte, de har flyttet dit de gjelder.** Reservasjonen på en
+  ledig plass (`_plassKorps`) og probono-merkelappen prøves nå i gruppefanen. Utskrift av et
+  navneark skjer derfra — utskrifts-CSS-en er generisk og skriver ut den fanen man står i.
+
 **Fanen het «Planlegging» til 16. sep. 2026**, og navnet var opptatt: `Vaktliste.status`
 har verdien «Planlegging» ved siden av «I drift», og den står som et merke øverst på siden.
 Fanen og merket sa altså samme ord om to ulike begreper — hva lista *koster i timer*, og om

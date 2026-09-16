@@ -51,6 +51,11 @@ HTML_BUILDERS = (
 ESCAPING_CALLS = ('escHtmlValue(', 'cellHtml(', '_escHtml(', 'escapeHtml(')
 
 REVIEWED_INTERPOLATIONS = {
+    # Oversikten som talltabell (16. sep. 2026, pulje 3 punkt 2). Alle tre er
+    # tall eller markup bygget i funksjonen; ingen brukerdata passerer.
+    'ledigcelle': 'markup bygget lokalt, tallet escapet inni',
+    "ledige ? escHtmlValue(ledige) : '—'": 'tall fra en ternær, escapet i den ene grenen',
+    'sumrad(dag.poster)': 'markup fra sumrad(), som ligger inne i mkOversikt og skannes med den',
     # Planleggeren (15. sep. 2026).
     'vinduer': 'markup fra `_planleggerVindu`, som selv skannes her',
     'fasitklasse': 'hardkodet CSS-klasse fra en ternær',
@@ -361,7 +366,7 @@ class VaktlisteEscapingOppforselTests(SimpleTestCase):
         ''')
         self.assertNotIn('onload="alert(1)"', ut)
 
-    def test_mannskapsnavn_i_oversikten_escapes(self):
+    def test_personnavn_naar_ikke_inn_i_oversikten(self):
         ut = run_node(self.harness, self.VINDU + f'''
             globalThis.utskriftDag = null; globalThis.korpsfilter = null;
             globalThis.utskriftDag = null; globalThis.korpsfilter = null;
@@ -376,8 +381,14 @@ class VaktlisteEscapingOppforselTests(SimpleTestCase):
                     'til_tid': '2026-10-03T16:00:00Z'}])};
             console.log(mkOversikt());
         ''')
+        # **To ting på én gang** (16. sep. 2026). Personnavn står ikke lenger
+        # i oversikten — den teller plasser — så den farligste strengen i
+        # datasettet skal ikke være der i det hele tatt. Skulle en personrad
+        # snike seg inn igjen, fanger `assertNotIn('<script>x')` at den i det
+        # minste ikke er uescapet. Ressursnavnet, som *er* der og også er
+        # fritekst, dekkes av `test_ressursnavn_i_overskriften_escapes`.
         self.assertNotIn('<script>x', ut)
-        self.assertIn('&lt;script&gt;', ut)
+        self.assertNotIn('&lt;script&gt;', ut, 'navnet skal ikke med i det hele tatt')
 
     def test_ressursnavn_i_overskriften_escapes(self):
         """Overskriften er ressursens navn fra 30. aug. 2026 — lista er
@@ -2196,36 +2207,55 @@ class UtskriftslistaTests(SimpleTestCase):
         """)
 
     def test_lista_er_gruppert_paa_ressurs(self):
-        """Den som leser lista står ved bilen og spør «hvem er her?».
-        Korpset er et kjennetegn ved personen, ikke et sted."""
+        """Ressursen er fortsatt aksen — men som **rad**, ikke overskrift
+        (16. sep. 2026). Oversikten viste navn, korps, rolle og merknad per
+        person, altså nøyaktig de kolonnene man alt hadde lest i gruppefanen;
+        André: «Må være en faktisk oversikt.»"""
         ut = self._ut()
         for navn in ('Samleplass', 'Ambulanse 1', 'Ambulanse 2'):
             with self.subTest(ressurs=navn):
-                self.assertIn(f'<h3>{navn}', ut)
+                self.assertIn(f'<td class="vl-navn">{navn}', ut)
 
     def test_ressursene_kommer_i_gruppenes_rekkefolge(self):
+        """Samme rekkefølge som fanene, nå som radrekkefølge."""
         ut = self._ut()
-        self.assertLess(ut.index('<h3>Samleplass'), ut.index('<h3>Ambulanse 1'))
-        self.assertLess(ut.index('<h3>Ambulanse 1'), ut.index('<h3>Ambulanse 2'))
+        self.assertLess(ut.index('>Samleplass'), ut.index('>Ambulanse 1'))
+        self.assertLess(ut.index('>Ambulanse 1'), ut.index('>Ambulanse 2'))
 
-    def test_korpset_er_en_kolonne_ikke_en_overskrift(self):
-        ut = self._ut()
-        self.assertIn('<th>Korps</th>', ut)
-        self.assertNotIn('<h3>Haugesund', ut)
+    def test_oversikten_teller_plasser_i_stedet_for_aa_liste_personer(self):
+        """**Punkt 2 i pulje 3** (André, 16. sep. 2026): «Den viser mye av det
+        som allerede er i de respektive ressursfanene. Må være en faktisk
+        oversikt» — tid, timer, totalt, plasser, ledig og besatt.
 
-    def test_ledig_plass_viser_korpset_den_er_satt_av_til(self):
-        """En ledig plass har ingen person, men kan være reservert. Uten dette
-        står de reserverte plassene som «—» og reservasjonen er usynlig der
-        den skal brukes.
-
-        **KARM finnes bare på de ledige plassene** — de bemannede radene er
-        HGSD. Det er med vilje: en test som lette etter HGSD ville vært grønn
-        uansett, siden de bemannede radene bærer det. Funnet ved
-        mutasjonstesting.
+        Korpskolonnen er derfor borte herfra. Den sto der fordi lista var en
+        personliste, og korpset er et kjennetegn ved personen; i en tabell
+        over *plasser* hører det ikke hjemme. Hvem som står hvor, med korps og
+        rolle, leses i gruppefanen — og skrives ut derfra, for utskrifts-CSS-en
+        er generisk.
         """
         ut = self._ut()
-        self.assertIn('KARM', ut)
-        self.assertIn('HGSD', ut, 'og personens eget korps står der fortsatt')
+        for kolonne in ('Ressurs', 'Tid', 'Timer', 'Plasser', 'Besatt',
+                        'Ledige', 'Totalt'):
+            with self.subTest(kolonne=kolonne):
+                self.assertIn(f'<th>{kolonne}</th>', ut)
+        self.assertNotIn('<th>Korps</th>', ut)
+        self.assertNotIn('<th>Merknad</th>', ut)
+        self.assertNotIn('<h3>Haugesund', ut, 'korpset var aldri en overskrift')
+
+    def test_ledige_plasser_telles_i_sin_egen_kolonne(self):
+        """Den ledige plassen er nå et **tall**, ikke en rad.
+
+        Reservasjonen — hvilket korps plassen er satt av til — sto her til
+        16. sep. 2026, og er flyttet til gruppefanen sammen med resten av
+        personopplysningene. Den prøves der av
+        `ReservasjonenVisesIGruppefanenTests`; uten den flyttingen hadde
+        `_plassKorps()` mistet sin eneste dekning, og en reservasjon ingen ser
+        er en reservasjon som ikke virker.
+        """
+        ut = self._ut()
+        self.assertIn('<th>Ledige</th>', ut)
+        self.assertIn('vl-har-ledige', ut, 'raden med ledige plasser er merket')
+        self.assertNotIn('— ledig —', ut, 'ingen personrader igjen')
 
     def test_ressurs_uten_skift_tas_ikke_med(self):
         ut = run_node(self.harness, self.VINDU + self.LISTE + """
@@ -4682,32 +4712,68 @@ class TidsblokkerTests(SimpleTestCase):
         self.assertEqual(ut.count('lør'), 1)
 
     # ── Oversikten ───────────────────────────────────────────────────────
-    def test_oversikten_har_ingen_tidskolonne_lenger(self):
-        """Kolonnen sto med samme verdi fire ganger. Tiden står på blokklinja."""
-        ut = self._oversikt()
-        self.assertNotIn('<th>Tid</th>', ut)
-        self.assertIn('vl-blokk', ut)
+    def test_oversikten_har_tidskolonnen_tilbake(self):
+        """**Regelen snudde, og det er verdt å skrive ned hvorfor.**
 
-    def test_en_blokklinje_per_spenn_per_ressurs(self):
-        """Samleplassen har to spenn, hver ambulanse ett: fire linjer."""
-        self.assertEqual(self._oversikt().count('class="vl-blokk"'), 4)
+        Til 16. sep. 2026 sto det motsatte her: «Oversikten har ingen
+        tidskolonne lenger», fordi kolonnen gjentok samme verdi på hver
+        personrad og tiden hørte hjemme på blokklinja over dem.
+
+        Personradene er borte (André: «Må være en faktisk oversikt»), og da er
+        raden *selv* blokken. Tiden er ikke lenger en gjentakelse — den er det
+        raden handler om. Blokklinja finnes fortsatt, men i gruppefanen, der
+        personradene bor.
+        """
+        ut = self._oversikt()
+        self.assertIn('<th>Tid</th>', ut)
+        self.assertNotIn('vl-blokk"', ut, 'ingen blokklinje over personrader her')
+
+    def test_en_rad_per_spenn_per_ressurs(self):
+        """Samleplassen har to spenn, hver ambulanse ett: fire rader.
+
+        Dette er den samme regelen som før — ett spenn, én linje — bare at
+        linja nå *er* raden i stedet for en overskrift over flere rader.
+        """
+        ut = self._oversikt()
+        self.assertEqual(ut.count('class="vl-blokktid"'), 4)
 
     def test_tiden_skrives_en_gang_per_blokk(self):
-        """Tre rader på samleplassen begynner 17:00 — men 17:00 står to
-        ganger der, én per blokk, ikke tre. Det er hele poenget."""
+        """Tre skift på samleplassen begynner 17:00 — men 17:00 står to
+        ganger, én per blokk, ikke tre. Poenget overlevde omskrivingen:
+        blokken er fortsatt enheten, den er bare blitt en rad."""
         ut = self._oversikt()
-        samleplass = ut[ut.index('<h3>Samleplass'):ut.index('<h3>Ambulanse 1')]
+        samleplass = ut[ut.index('>Samleplass'):ut.index('>Ambulanse 1')]
         self.assertEqual(samleplass.count('17:00'), 2)
 
-    def test_ressursen_summerer_timene(self):
-        """10 + 10 + 5,25 på samleplassen: «25,3 t» i overskriften, med komma.
-        To *skift* — vakttidene — ikke tre rader; og ingen mannskap, siden
-        alle tre plassene er ledige."""
+    def test_sumraden_er_dagens_fasit(self):
+        """**Sumraden var udekket til 16. sep. 2026** — funnet ved
+        mutasjonstesting: den lot seg endre til å summere bare de *besatte*
+        timene uten at noe ble rødt.
+
+        Det er nettopp den feilen som ikke ville blitt oppdaget i bruk. Et
+        budsjettall som stille utelater de ledige plassene ser helt rimelig
+        ut — det er bare for lavt, og man planlegger etter det.
+
+        Andrés fredag: samleplassen har 1 + 2 ledige plasser (5,3 t og 20 t),
+        de to ambulansene én besatt hver (10 t). Fem plasser, to besatte, tre
+        ledige, 45,3 timer i alt.
+        """
         ut = self._oversikt()
-        samleplass = ut[ut.index('<h3>Samleplass'):ut.index('<h3>Ambulanse 1')]
-        self.assertIn('2 skift · 25,3 t', samleplass)
-        self.assertNotIn('0 mannskap', samleplass)
-        self.assertIn('3 ledige', samleplass)
+        sumrad = ut[ut.index('vl-sumrad'):]
+        self.assertIn('>5<', sumrad, 'plasser')
+        self.assertIn('>2<', sumrad, 'besatt')
+        self.assertIn('>3<', sumrad, 'ledige')
+        self.assertIn('>45,3 t<', sumrad,
+                      'timene teller de ledige plassene med — de er planlagt')
+
+    def test_totalkolonnen_summerer_blokkens_timer(self):
+        """10 + 10 på den lange blokka, 5,25 på den korte — summert per rad i
+        «Totalt», ikke i en overskrift. Og formatet er fortsatt komma:
+        «20 t» og «5,3 t»."""
+        ut = self._oversikt()
+        samleplass = ut[ut.index('>Samleplass'):ut.index('>Ambulanse 1')]
+        self.assertIn('>5,3 t<', samleplass, 'den korte blokka')
+        self.assertIn('>20 t<', samleplass, 'den lange: to plasser à 10 t')
 
     def test_arkhodet_summerer_hele_vakta(self):
         """25,25 + 10 + 10 = 45,25 → «45,3 t». Skiftene er de ulike vakttidene
@@ -4733,10 +4799,17 @@ class TidsblokkerTests(SimpleTestCase):
         self.assertIn('[2 skift · 4 mannskap]', ut)
         self.assertIn('[1 skift]', ut, 'bare ledige: mannskap utelates')
 
-    def test_ledige_plasser_beholder_sin_rad(self):
+    def test_ledige_plasser_telles_og_merkes(self):
+        """Ledige plasser hadde hver sin rad til 16. sep. 2026. Nå er de et
+        tall i sin egen kolonne, og raden merkes — for det er de radene man
+        leter etter i en oversikt.
+
+        Samleplassen har tre ledige fordelt på to blokker: 1 + 2.
+        """
         ut = self._oversikt()
-        self.assertIn('— ledig —', ut)
-        self.assertIn('KARM', ut, 'reservasjonen står fortsatt på raden')
+        samleplass = ut[ut.index('>Samleplass'):ut.index('>Ambulanse 1')]
+        self.assertEqual(samleplass.count('vl-ledigtall'), 2, 'begge blokkene har ledige')
+        self.assertIn('vl-har-ledige', samleplass)
 
     # ── Driftraden ───────────────────────────────────────────────────────
     def test_driftraden_er_regnearket_med_stempelet_foran(self):
@@ -5327,16 +5400,32 @@ class ProbonoOgDagoverskrifterTests(SimpleTestCase):
         """)
         self.assertIn('8 t', ut)
 
-    def test_merket_staar_ved_navnet_i_oversikten(self):
-        ut = self._oversikt("aktivListe.vaktposter[3].probono = true;\n")
-        self.assertIn('Kari <span class="vl-merkelapp vl-probono">Probono</span>', ut)
-        self.assertNotIn('Ola <span', ut)
+    def test_merkelappen_staar_ikke_i_oversikten_lenger(self):
+        """Merkelappen hører til personen, og personene er ute av oversikten
+        (16. sep. 2026). Den prøves fortsatt der den bor — i ressursraden,
+        av `test_probonomerket_staar_i_raden` — så regelen har ikke mistet
+        dekning; den har flyttet dit den gjelder.
 
-    def test_ressursens_sum_hopper_over_probono(self):
-        """Ambulanse 1: Karis skift på 10 t er probono → «0 t» i overskriften."""
+        Her er det **timene** som bærer probono, gjennom `Totalt` (testen
+        over). Denne står igjen for å holde de to fra hverandre: sniker en
+        personrad seg inn i oversikten igjen, er punkt 2 i pulje 3 reversert.
+        """
         ut = self._oversikt("aktivListe.vaktposter[3].probono = true;\n")
-        amb1 = ut[ut.index('<h3>Ambulanse 1'):ut.index('<h3>Ambulanse 2')]
-        self.assertIn('1 mannskap · 0 t', amb1)
+        self.assertNotIn('vl-merkelapp', ut)
+        self.assertNotIn('>Kari<', ut, 'ingen personnavn i en talloversikt')
+
+    def test_totalkolonnen_hopper_over_probono(self):
+        """Ambulanse 1: Karis skift på 10 t er probono → «0 t» i «Totalt».
+
+        **Den viktigste av de omskrevne testene** (16. sep. 2026): regelen —
+        probono-timer er ikke organisasjonens (11. sep.) — måtte følge med da
+        summen flyttet fra en overskrift til en kolonne. En totalsum som
+        stille begynte å telle probono ville ingen oppdaget, og den skal
+        stemme med budsjettlinja og med `belastning_per_person`.
+        """
+        ut = self._oversikt("aktivListe.vaktposter[3].probono = true;\n")
+        amb1 = ut[ut.index('>Ambulanse 1'):ut.index('>Ambulanse 2')]
+        self.assertIn('>0 t<', amb1)
 
     def test_driftraden_baerer_merket(self):
         ut = run_node(self.harness, self.VINDU + """
@@ -5450,9 +5539,11 @@ class DagenErYtterstTests(SimpleTestCase):
         return f'<h2 class="vl-dagtittel">{tekst}'
 
     def test_dagen_staar_over_ressursen(self):
-        """Kjernen i snuingen: dagtittelen kommer før ressursoverskriften."""
+        """Kjernen i snuingen (14. sep. 2026): dagtittelen kommer før
+        ressursen. Regelen overlevde omskrivingen til en talloversikt
+        16. sep. — ressursen er en rad nå, men dagen er fortsatt ytterst."""
         ut = self._oversikt()
-        self.assertLess(ut.index('class="vl-dagtittel"'), ut.index('<h3>Samleplass'),
+        self.assertLess(ut.index('class="vl-dagtittel"'), ut.index('>Samleplass'),
                         'dagen skal staa ytterst, ressursen under')
 
     def test_endagsvakt_faar_ogsaa_en_dagtittel(self):
@@ -5474,16 +5565,30 @@ class DagenErYtterstTests(SimpleTestCase):
 
     def test_ressursen_gjentas_under_hver_dag_den_har_skift(self):
         """Samleplassen har skift begge dager og skal stå i begge bolkene —
-        det er nettopp det snuingen koster, og det er riktig her."""
+        det er nettopp det snuingen koster, og det er riktig her. Ressursen
+        er en rad fra 16. sep. 2026, men regelen er den samme."""
         ut = self._oversikt(self.LORDAG)
-        self.assertEqual(ut.count('<h3>Samleplass'), 2)
+        skille = ut.index(self._tittel('Lørdag 5. sep'))
+        # **Per bolk, ikke totalt.** Samleplassen har *to* blokker fredag, så
+        # et samlet radtall ville vært tre og sagt ingenting om hvilke dager
+        # den står under. Det er tilstedeværelsen i hver bolk som er regelen.
+        self.assertIn('<td class="vl-navn">Samleplass', ut[:skille])
+        self.assertIn('<td class="vl-navn">Samleplass', ut[skille:])
 
     def test_dagbolken_viser_bare_sin_egen_dags_skift(self):
-        """Nina står lørdag. Hun skal ikke dukke opp i fredagsbolken."""
+        """Ninas skift står lørdag. Det skal ikke telle med i fredagsbolken.
+
+        Navnene er ute av oversikten (16. sep. 2026), så regelen prøves på
+        **ressursen hennes**: Ambulanse 2 har bare lørdagens skift, og skal
+        derfor bare stå i lørdagsbolken.
+        """
         ut = self._oversikt(self.LORDAG)
-        fredag = ut[ut.index(self._tittel('Fredag 4. sep')):ut.index(self._tittel('Lørdag 5. sep'))]
-        self.assertNotIn('Nina', fredag)
-        self.assertIn('Nina', ut[ut.index(self._tittel('Lørdag 5. sep')):])
+        skille = ut.index(self._tittel('Lørdag 5. sep'))
+        fredag, lordag = ut[:skille], ut[skille:]
+        # Ninas skift er 08:00–16:00 på samleplassen lørdag. Blokka hennes
+        # skal bare finnes i lørdagsbolken — fredag har sine egne to spenn.
+        self.assertNotIn('08:00', fredag)
+        self.assertIn('08:00', lordag)
 
     def test_skift_over_midnatt_staar_bare_under_startdagen(self):
         """Andrés samleplass-skift går 17:00 fredag til 03:00 lørdag. Det
@@ -5749,11 +5854,14 @@ class UtskriftsutvalgTests(SimpleTestCase):
 
     # ── Hva arket blir ───────────────────────────────────────────────────
     def test_valgt_dag_gir_bare_den_dagen(self):
+        """Dagutvalget siler skiftene før tabellen bygges, så tallene i
+        arkhodet følger utvalget. Personnavnene er ute av oversikten
+        (16. sep. 2026), så det som telles er **bolkene** — én dag, én
+        dagbolk — og fredagens skift skal være silt bort."""
         ut = self._oversikt(self.LORDAG
                             + f"globalThis.utskriftDag = '{self.LORDAGSNOKKEL}';\n")
         self.assertEqual(ut.count('class="vl-dagbolk"'), 1)
-        self.assertIn('Nina', ut)
-        self.assertNotIn('Kari', ut)
+        self.assertNotIn('Kari', ut, 'fredagens skift er silt bort')
 
     def test_summene_i_arkhodet_foelger_utvalget(self):
         """Skriver man ut lørdag, skal hodet si lørdagens timer — ikke hele

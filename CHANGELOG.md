@@ -4,6 +4,64 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-16 — Pulje 3A: «Oversikt» ble en faktisk oversikt
+
+**André, pulje 3 punkt 2:** «Ressursfanen som heter Oversikt viser mye av det som allerede
+er i de respektive ressursfanene. Må være en faktisk oversikt. Derfor nevnte jeg de ordene
+som tid, timer, totalt, plasser ledig og besatt.»
+
+### Hva den var, og hva den er
+
+Fanen listet **hver person** med navn, korps, rolle og merknad, gruppert på ressurs under
+hver dag — nøyaktig de fire kolonnene man alt hadde lest i gruppefanen. Arket ble langt, og
+det svarte ikke på det en oversikt skal svare på.
+
+Nå: én rad per **ressurs per tidsblokk**, med Ressurs, Tid, Timer, Plasser, Besatt, Ledige
+og Totalt — og en sumrad per dag. Rader med ledige plasser er dempet merket, fordi en
+oversikt leses for å finne hullene.
+
+### Tre regler tabellen bærer
+
+- **`Totalt` bruker `_sumTimer`, ikke `timer × plasser`.** Probono-skift teller null
+  (11. sep. 2026: timene går, men de er ikke organisasjonens). Regner man lengden ganger
+  antallet, blir totalen et annet tall enn budsjettlinja og enn `belastning_per_person`.
+- **Sumraden teller de ledige plassenes timer med.** De er planlagt.
+- **Dagen er fortsatt ytterst** (14. sep. 2026), og et skift over midnatt står under
+  startdagen. Snuingen overlevde omskrivingen.
+
+### Nitten tester bar den gamle formen — og ble skrevet om, ikke slettet
+
+Det er den tyngste delen av jobben og den viktigste. Hver test beholdt poenget sitt:
+
+| Testen sa | Nå |
+|---|---|
+| «Oversikten har **ingen** tidskolonne» | «Oversikten **har** tidskolonnen tilbake» — med begrunnelsen for at regelen snudde: kolonnen gjentok seg på hver personrad, nå *er* raden blokken |
+| Ressursen er en `<h3>` | Ressursen er en rad, og rekkefølgen er fortsatt gruppas |
+| Probono-merket står ved navnet | Probono bæres av `Totalt`; merkelappen prøves der personene bor |
+| Ledig plass viser reservert korps | Ledige er et tall; reservasjonen prøves i gruppefanen, så `_plassKorps()` ikke mister sin eneste dekning |
+| Mannskapsnavnet escapes | Navnet skal ikke være der **i det hele tatt** — og ressursnavnet, som er der, dekkes av sin egen test |
+
+To av dem tok jeg først feil på, fordi jeg gjettet på fiksturen i stedet for å lese den:
+Nina står på samleplassen, ikke på Ambulanse 2, og samleplassen har *to* blokker fredag, så
+et samlet radtall sier ingenting om hvilke dager den står under. Begge er nå skrevet mot det
+fiksturen faktisk inneholder.
+
+### Ti mutanter, og den ene som overlevde var sumraden
+
+Sumraden lot seg endre til å summere bare de **besatte** timene uten at noe ble rødt — den
+var tabellens fasit og helt udekket. Det er nettopp den feilen som ikke ville blitt oppdaget
+i bruk: et budsjettall som stille utelater de ledige plassene ser rimelig ut, det er bare
+for lavt, og man planlegger etter det.
+
+Etter at testen kom: alle ti røde, inkludert begge de to stedene `ledige` regnes ut (de sto
+med identisk kode i rad og sumrad, så mutanten måtte gjøres entydig først — fella «den traff
+et annet sted enn du tror»).
+
+**Endret:** `static/js/vaktliste-oversikt.js`, `static/css/vaktliste.css`,
+`vaktliste/tests_xss.py` (19 omskrevet, +1), `vaktliste/CLAUDE.md`.
+
+---
+
 ## 2026-09-16 — Pulje 3A: «Planlegging»-fanen heter «Timeoversikt»
 
 **André, pulje 3 punkt 1:** fanen skal hete «Timeoversikt», og siles på korps for den som
