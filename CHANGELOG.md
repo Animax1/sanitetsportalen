@@ -4,6 +4,72 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-16 — TODO var mer arkiv enn arbeidsliste
+
+**André:** «Hva kan vi gjøre med TODO for å optimalisere?» Målt først, ryddet etterpå.
+
+### Diagnosen
+
+| Funn | Tall |
+|---|---|
+| Linjer som beskrev **ferdig** arbeid | **1 316 av 2 495 (53 %)** |
+| Linjer som beskrev åpent arbeid | 858 |
+| Åpne punkter begravd under et avkrysset punkt | **23** |
+| — av dem: punkter som ventet på André | **6** |
+| Tester som håndhevet noe i TODO | **0** |
+
+Regelen mot begravde punkter sto i `CLAUDE.md` fra 14. sep. 2026, skrevet da det var
+**to**. To dager senere var det 23 — og **to av dem la jeg der dagen før**, i en fil jeg
+leser hver økt. Prosaen hindret ingenting, fordi ingenting ble rødt. Det er samme lærdom som
+avhengighetsretningen: en intensjon er ikke en regel.
+
+De seks som ventet på André er det som gjorde det dyrt. Blant dem verifiseringen av
+Scaleway-kortet og staging-lista fra 16. sep. — altså nøyaktig det han var bedt om å gjøre,
+plassert der han ikke ser det.
+
+### Avgjørelsen: ferdige punkter slettes
+
+André: «Vi sletter. Du skal jo legge inn hva du gjorde i CHANGELOG, og det som står i TODO
+og det som ble gjort kan bli to ting med forskjellig vri. **CHANGELOG blir arkivets
+sannhet.**»
+
+Det er den riktige delingen, og den avvikler en dobbeltføring vi ikke hadde lagt merke til:
+et TODO-punkt beskriver *hva som skal gjøres*, en CHANGELOG-oppføring *hva som ble gjort og
+hvorfor*. Å beholde begge er to kilder som glir fra hverandre.
+
+**2 495 → 869 linjer.** 206 avkryssede blokker slettet.
+
+### De 23 er skrevet om, ikke flyttet
+
+Et begravd barn henter ofte meningen sin fra forelderen som ble avkrysset. «Prøv
+gjenopprettingen én gang» sier ingenting uten at man vet at det handler om Scaleway. Hvert
+av dem er derfor skrevet om til å stå alene. To forsvant underveis:
+
+- **Ett var utdatert.** «Gjenstår: ut i prod — `main` står på `7435dec`» hadde vært sant til
+  superbruker-runden gikk ut. `main` står på `11c068b` og har den. Punktet var både usynlig
+  og feil, og det er ingen tilfeldighet at de to henger sammen.
+- **To var duplikater** av hverandre — begge ba om verifisering av Scaleway-kortet, fra hver
+  sin runde. Slått sammen.
+
+### To vakter, og en presisering av hva «Krever Andre» betyr
+
+`core/tests_todo.py`: ingen åpne punkter under avkryssede, og alt merket «Krever Andre» skal
+stå i toppseksjonen.
+
+Den andre regelen tvang fram en avklaring med én gang. Et punkt under datteroppdrag-ideen —
+«hva skjer med morens bil når den første datteren lages?» — var merket «Krever Andre», men
+blokkerer ingenting: ideen er ikke påbegynt. **«Krever Andre» må bety «blokkerer nå»**,
+ellers fylles toppen av fila med ting han ikke kan handle på, og da slutter han å stole på
+den. Punktet heter nå «Åpent valg, besvares når ideen tas opp», med begrunnelsen i teksten.
+
+Og som i `core/tests_js_regler.py`: en sperrehake som krever at mønstrene kjenner igjen sin
+egen feil. En vakt som ikke kan bli rød, vokter ingenting.
+
+**Endret:** `TODO.md` (2 495 → 869 linjer), `core/tests_todo.py` (ny, 4 tester),
+`CLAUDE.md` (sletting framfor avkryssing, og at CHANGELOG skrives for `grep`).
+
+---
+
 ## 2026-09-16 — «[object Object]» på hver enhet: én linje, tre lag
 
 **Meldt fra staging (André):** «I /oppdrag i «ressurser»-listen vises enhver enhet med

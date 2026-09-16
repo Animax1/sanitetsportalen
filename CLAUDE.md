@@ -5,8 +5,18 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Arbeidsflyt ved commit/push
 
 **Før enhver endring som skal commites og pushes: oppdater `CHANGELOG.md` og `TODO.md` i forkant.**
-Legg endringen øverst i CHANGELOG (ny `## YYYY-MM-DD`-seksjon ved behov), og kryss av / flytt
-relevante punkter i TODO. Dette skal gjøres som del av samme commit, ikke etterpå.
+Legg endringen øverst i CHANGELOG (ny `## YYYY-MM-DD`-seksjon ved behov). Dette skal gjøres
+som del av samme commit, ikke etterpå.
+
+**Et ferdig punkt i TODO krysses ikke av — det slettes** (André, 16. sep. 2026):
+«CHANGELOG blir arkivets sannhet.» Ellers står samme historie to steder med hver sin vri, og
+arbeidslista fylles av arbeid som er gjort — 16. sep. beskrev **53 % av `TODO.md`** ferdige
+saker, og det åpne var 858 linjer inne i 2 495.
+
+**Skriv CHANGELOG for søket, ikke for gjennomlesingen.** Den er 10 000+ linjer og leses
+aldri i sin helhet — den `grep`-es. Ta derfor med symptomordene og Andrés egne
+formuleringer: «to enheter varsles» og «[object Object]» var søkbare nettopp fordi de sto
+der ordrett. Det er forskjellen på et arkiv og et oppslagsverk.
 
 **Oppgi alltid commit-SHA-en ved push** (André, 14. sep. 2026): «når du pusher ting så vil
 jeg ha bygg nr jeg kommer til å se på staging/prod». Sju tegn holder — `ce365b5` — og det
@@ -14,9 +24,17 @@ skal stå for *hver* gren som ble pushet, ikke bare den siste. Det er nummeret s
 Railway-deployen, og uten det må den som verifiserer gjette om det hun ser på er det som
 nettopp gikk ut.
 
-**Et åpent punkt skal aldri stå som barn under et avkrysset punkt.** Krysses en forelder
-av, løftes de uavkryssede barna ut til en synlig bolk først. To punkter havnet der 14. sep.
-2026, og et punkt under noe ferdig er et punkt ingen leser igjen.
+**Et åpent punkt skal aldri stå som barn under et avkrysset punkt.** Regelen sto her fra
+14. sep. 2026, da det var **to**. 16. sep. var det **23** — seks av dem ting som ventet på
+André, altså usynlige i den ene fila som skal fortelle ham hva han må gjøre, og to av dem
+lagt der dagen før av meg. Prosaen hindret ingenting, fordi ingenting ble rødt.
+`core/tests_todo.py` håndhever den nå, sammen med at alt merket «Krever Andre» står i
+toppseksjonen. Løftes et barn ut, skal det **skrives om så det står på egne bein** — et
+barn henter ofte meningen sin fra forelderen.
+
+**«Krever Andre» betyr «blokkerer nå».** Et åpent valg inne i en upåbegynt idé er ikke det;
+det besvares når ideen tas opp. Merkes slikt likevel, fylles toppen av fila med ting han
+ikke kan gjøre noe med — og da slutter han å stole på den.
 
 ## Commands
 
