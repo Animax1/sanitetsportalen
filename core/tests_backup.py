@@ -33,6 +33,7 @@ from accounts.models import CustomUser
 from audit.models import AuditLog
 from core.backup import (
     BaseBackupHandler,
+    GJENOPPRETTINGSREKKEFOLGE,
     KIND_AUTO,
     KIND_MANUAL,
     KIND_PRE_RESTORE,
@@ -47,8 +48,12 @@ from core.backup import (
     get_backup_dir,
     get_handler,
     register,
+    rekkefolge_avvik,
+    rekkefolge_bindinger,
     restore_backup,
+    UTEN_BINDING,
 )
+from core.backup import rekkefolge
 from core.forms import BackupRestoreConfirmForm, BackupplanForm
 from core.models import Backupplan
 from patients.backup import PatientsBackupHandler, register_handlers
@@ -1480,13 +1485,12 @@ class AlleFileneGjenopprettesTests(TestCase):
     Rekkefølgen er bindende: **portal først**, deretter modulene.
     """
 
-    #: `backlog` står sist, og **plasseringen er vilkårlig** — modulen er den
-    #: eneste uten peker til `core.Vakt`, så den har ingen forutsetning om at
-    #: portalfila er lastet først. De andre har det, og for dem er rekkefølgen
-    #: bindende. `ko` hører til de bindende: `Logglinje.vakt` er en
-    #: heltallspeker uten natural key, som alt annet som er scopet til vakta.
-    REKKEFOLGE = ['portal', 'patients', 'arkiv', 'oppdrag', 'oppdrag_arkiv',
-                  'vaktliste', 'ko', 'backlog']
+    #: Hentet fra `core.backup.rekkefolge`, ikke skrevet av. Sto lista her,
+    #: var den den femte håndskrevne kopien av samme rekkefølge — og de fire
+    #: andre gikk i utakt da `ko` kom (17. sep. 2026). De frie modulene henges
+    #: på slutten: de har ingen forutsetning, så plasseringen er vilkårlig, og
+    #: `avvik()` krever at de faktisk er frie.
+    REKKEFOLGE = list(GJENOPPRETTINGSREKKEFOLGE) + list(UTEN_BINDING)
 
     def setUp(self) -> None:
         registrer_alle_moduler()
@@ -1553,7 +1557,7 @@ class AlleFileneGjenopprettesTests(TestCase):
                 django_apps.get_model(etikett).objects.all().delete()
         Vakt.objects.all().delete()
 
-    def test_alle_seks_filene_kan_lastes_i_rekkefolge(self) -> None:
+    def test_alle_modulfilene_kan_lastes_i_rekkefolge(self) -> None:
         with patch.dict(os.environ, {'BACKUP_DIR': str(self.backup_dir)}):
             self._seed()
             fasit = self._tall()
@@ -1591,6 +1595,114 @@ class AlleFileneGjenopprettesTests(TestCase):
         modulfiler = {h.slug for h in all_handlers()
                       if h.slug != Backupplan.FULL_SLUG}
         self.assertEqual(set(self.REKKEFOLGE), modulfiler)
+
+    def test_rekkefolgen_holder_det_modellene_krever(self) -> None:
+        """Den skrevne rekkefølgen mot kantene utledet av modellene.
+
+        Testen over sier at *alle* er med; denne sier at de står i en
+        rekkefølge som faktisk lar seg laste. Det er to forskjellige feil, og
+        bare den siste tar `vaktliste.Ressurs.enhet`: den peker på
+        `oppdrag.Enhet` med et heltall, og den bindingen sto ikke skrevet noe
+        sted før 17. sep. 2026.
+        """
+        self.assertEqual(
+            rekkefolge_avvik(), [],
+            'Gjenopprettingsrekkefølgen holder ikke det modellene krever:\n  '
+            + '\n  '.join(rekkefolge_avvik()))
+
+    def test_bindingene_utledes_og_er_ikke_tomme(self) -> None:
+        """Sperrehake mot testen over.
+
+        `avvik()` er grønn både når rekkefølgen er riktig og når `bindinger()`
+        ikke finner noe i det hele tatt — en utledning som returnerte tomme
+        mengder ville gjort hele regelen virkningsløs uten å bli rød. Derfor
+        kreves de to kantene vi vet finnes, og de er valgt med hensikt: den
+        ene er en `ForeignKey` til vakta, den andre en peker mellom to
+        moduler, og en utledning som bare så den ene ville gått grønn på en
+        halv regel.
+        """
+        krav = rekkefolge_bindinger()
+        self.assertIn('portal', krav.get('patients', set()),
+                      'Patient.vakt peker på portalfila')
+        self.assertIn('oppdrag', krav.get('vaktliste', set()),
+                      'Ressurs.enhet peker på oppdragsmodulen')
+        self.assertIn(
+            'portal', krav.get('vaktliste', set()),
+            'Vaktliste.vakt er en OneToOneField — og den er grunnen til at '
+            'utledningen ikke kan nøye seg med many_to_one. Et filter på '
+            'ForeignKey alene meldte vaktliste fri mens den er bundet, '
+            'nettopp den pekeren dokumentene begrunner rekkefølgen med')
+        self.assertEqual(
+            krav.get('portal'), set(),
+            'portalfila peker ikke ut av seg selv — den er den alle peker på')
+
+
+class RekkefolgeavviketOppdagesTests(SimpleTestCase):
+    """At `avvik()` faktisk sier fra — prøvd med feil rekkefølge, ikke med rett.
+
+    `AlleFileneGjenopprettesTests` kjører den mot fasiten, og en funksjon som
+    alltid returnerte `[]` ville gått grønn der. Her byttes konstantene ut med
+    former som er gale på hver sin måte, og hver av dem skal gi nøyaktig ett
+    svar. Det er forskjellen på å prøve at regelen *holder* og at den *virker*.
+    """
+
+    def setUp(self) -> None:
+        registrer_alle_moduler()
+
+    def test_en_modul_foer_den_den_peker_paa(self) -> None:
+        """`vaktliste` før `oppdrag` er lovlig etter den gamle begrunnelsen."""
+        feil = ['portal', 'patients', 'arkiv', 'vaktliste', 'oppdrag',
+                'oppdrag_arkiv', 'ko']
+        with patch.object(rekkefolge, 'GJENOPPRETTINGSREKKEFOLGE', tuple(feil)):
+            avvik = rekkefolge.avvik()
+        self.assertTrue(avvik, 'byttet om på to moduler uten at noe sa fra')
+        self.assertIn('vaktliste står før oppdrag', ' '.join(avvik))
+
+    def test_en_bundet_modul_erklaert_fri(self) -> None:
+        """Lista over frie moduler er ikke et sted man skriver seg inn."""
+        uten_ko = tuple(s for s in rekkefolge.GJENOPPRETTINGSREKKEFOLGE
+                        if s != 'ko')
+        with patch.object(rekkefolge, 'GJENOPPRETTINGSREKKEFOLGE', uten_ko), \
+                patch.object(rekkefolge, 'UTEN_BINDING', ('backlog', 'ko')):
+            avvik = rekkefolge.avvik()
+        self.assertTrue(avvik, 'ko peker på portalfila og kan ikke stå fri')
+        self.assertIn('ko: står som fri', ' '.join(avvik))
+
+    def test_en_registrert_modul_som_ikke_er_plassert(self) -> None:
+        """Modul nummer ni skal ikke kunne lande uten å bli plassert."""
+        with patch.object(rekkefolge, 'UTEN_BINDING', ()):
+            avvik = rekkefolge.avvik()
+        self.assertTrue(avvik, 'backlog sto uplassert uten at noe sa fra')
+        self.assertIn('backlog: registrert som modulfil', ' '.join(avvik))
+
+    def test_en_strippet_peker_er_ingen_binding(self) -> None:
+        """Strippes pekeren, forsvinner rekkefølgekravet med den.
+
+        Grenen har ingen bruker i dag: hvert felt i `strip_fields` peker på en
+        konto, og ingen modulfil eier kontoene. En mutant som fjernet
+        strippsjekken overlevde derfor (17. sep. 2026), og en gren uten prøve
+        er en gren som er riktig ved et uhell. `Ressurs.enhet` er den ekte
+        kandidaten til å bli strippet en dag — så den er det som prøves.
+        """
+        h = get_handler('vaktliste')
+        med_strip = dict(h.get_strip_fields())
+        med_strip['vaktliste.ressurs'] = ['enhet']
+        with patch.object(type(h), 'get_strip_fields',
+                          lambda self: dict(med_strip)):
+            krav = rekkefolge.bindinger()
+        self.assertNotIn(
+            'oppdrag', krav['vaktliste'],
+            'enhet-pekeren er strippet ut av dumpen, så oppdragsfila trenger '
+            'ikke lastes først — kravet skal falle bort med den')
+        self.assertIn('portal', krav['vaktliste'],
+                      'vakta peker den fortsatt på')
+
+    def test_en_slug_som_ikke_finnes(self) -> None:
+        """En modul som fjernes skal ikke bli stående i rekkefølgen."""
+        with patch.object(rekkefolge, 'GJENOPPRETTINGSREKKEFOLGE',
+                          rekkefolge.GJENOPPRETTINGSREKKEFOLGE + ('spoekelse',)):
+            avvik = rekkefolge.avvik()
+        self.assertIn('spoekelse: står i rekkefølgen', ' '.join(avvik))
 
 
 # ─────────────────────────────────────────────────────────────────────────────

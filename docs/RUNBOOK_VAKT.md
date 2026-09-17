@@ -431,12 +431,16 @@ passordene som gjaldt da backupen ble tatt.
 fordi alt peker på vakta:
 
 ```
-portal → patients → arkiv → oppdrag → oppdrag_arkiv → vaktliste
+portal → patients → arkiv → oppdrag → oppdrag_arkiv → vaktliste → ko
 ```
 
 `portal` bærer `core.Vakt`. Tas den ikke først, feiler de andre med
-«Key (vakt_id)=(1) is not present in table core_vakt». Deretter `create_admin` og
-kontoene for hånd, siden modulfilene ikke inneholder brukere.
+«Key (vakt_id)=(1) is not present in table core_vakt». **Og `oppdrag` må tas før
+`vaktliste`**: `Ressurs.enhet` peker på `oppdrag.Enhet` med et heltall, så motsatt
+rekkefølge feiler med «vaktliste_ressurs.enhet_id contains a value '1' that does not
+have a corresponding value in oppdrag_enhet.id». `backlog` står utenfor og kan tas
+når som helst — den peker ingen steder. Deretter `create_admin` og kontoene for hånd,
+siden modulfilene ikke inneholder brukere.
 
 ---
 

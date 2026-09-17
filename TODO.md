@@ -375,6 +375,22 @@ bindende: 1 før 2, fordi backupen speiler hvor modellene bor.
       `oppdrag/arkiv`, `vaktliste/besetning`. **Registrer dem i `TEMAER` i samme commit
       som du merker entriene**, aldri foran — testen håndhever rekkefølgen.
 
+- [ ] **Rota har 657 tegn igjen av taket på 65 500.** `CLAUDE.md` er 64 843 tegn etter
+      KO pulje 2 og avstemmingen 17. sep. Neste modul som trenger et avsnitt i rota
+      sprenger den, og da står man med valget midt i en annen oppgave. Det som skal
+      flyttes er avsnitt som beskriver **én** modul — regelen fila selv setter — og den
+      eneste kandidaten som er igjen er backup-tabellen med ni rader, der hver rad
+      forklarer sin egen modul. Vurderes før neste pulje, ikke under den.
+
+- [ ] **Samme feilklasse som gjenopprettingsrekkefølgen, andre steder.** Rekkefølgen sto
+      skrevet ut fire steder og tre gikk i utakt uten at noe ble rødt, fordi
+      `core/tallfasit.py` dekker tall og ikke ordnede påstander. Gå gjennom dokumentene
+      etter andre påstander som er **utledbare men ikke utledet**: nivåstigen (`les` <
+      `les_alle` < …) står i rota, i matrisen og i minst to modulfiler; lasterekkefølgen
+      for de delte JS-filene står i både rota og malene. Mønsteret er
+      `core/backup/rekkefolge.py`: fasit i kode, og en test som leter etter setningen i
+      stedet for å ha en liste over hvor den står.
+
 - [ ] **Strukturér `oppdrag/CLAUDE.md`.** 17 275 tegn under **én** overskrift — samme
       flate vegg vaktlista hadde, bare mindre, og den eneste fila som står i
       `UTEN_SEKSJONER_I_DAG` i `core/tests_claude_md.py`. Statusmaskinen, verdimengdene,

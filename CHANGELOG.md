@@ -4,6 +4,80 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-17 — Gjenopprettingsrekkefølgen står i kode, ikke i fire dokumenter  `#core/backup` `#core/dokumentasjon`
+
+Avstemming etter at KO pulje 2 og backlog-kommentarene ble flettet på `rollemodell`.
+Mergen var ren og suiten grønn — **3 485 tester** — og det var nettopp derfor
+gjennomgangen var verdt noe: begge feilene under sto bak grønne vakter.
+
+### Tre av fire dokumenter mistet `ko` i gjenopprettingsrekkefølgen
+
+Rekkefølgen sto skrevet ut for hånd fire steder. Da `ko` fikk backup-handler ble ett av
+dem oppdatert og tre stående — og det oppdaterte var ikke `docs/RUNBOOK_VAKT.md`, altså
+den ene fila man har foran seg *mens* man gjenoppretter. `core/tallfasit.py` sa ingenting,
+fordi den teller handlere, og antallet var riktig i alle fire hele tiden. Det var
+rekkefølgen som ikke var dekket.
+
+Fasiten ligger nå i `core/backup/rekkefolge.py` — `GJENOPPRETTINGSREKKEFOLGE` og
+`UTEN_BINDING` — av samme grunn som `core/tallfasit.py` er en modul og ikke en test: den
+som skal rette et dokument må kunne spørre om svaret. `AlleFileneGjenopprettesTests`
+henter lista derfra i stedet for å ha sin egen femte kopi, og
+`GjenopprettingsrekkefolgenIDokumenteneTests` leter etter **enhver** pilkjede som starter
+på `portal` i hvert dokument. En håndskrevet liste over hvor setningen står ville hatt
+nøyaktig samme svakhet som den den erstatter: den femte kopien er usynlig for den.
+
+### Og begrunnelsen dokumentene ga var for smal
+
+Alle fire sa én ting: «fordi alt peker på vakta med et heltall». Det er sant, og det er
+ikke alt. `vaktliste.Ressurs.enhet` peker på `oppdrag.Enhet`, også med et heltall, siden
+`Enhet` ikke har noen natural key. Den som leste den oppgitte grunnen og stokket om,
+ville lagt `vaktliste` rett etter `portal` — lovlig etter teksten. Prøvd, og det feiler:
+
+```
+IntegrityError: vaktliste_ressurs.enhet_id contains a value '1' that does not have a
+corresponding value in oppdrag_enhet.id
+```
+
+`bindinger()` utleder derfor kantene fra modellene i stedet for å gjenta en påstand, og
+`avvik()` sier fra når rekkefølgen ikke holder dem. Da er rekkefølgen ikke bare riktig,
+men **kontrollert** riktig — og forskjellen viser seg først den dagen noen gjenoppretter.
+
+**Utledningen min var selv for smal i første forsøk.** Et filter på `many_to_one` alene
+gikk forbi `vaktliste.Vaktliste.vakt`, som er en `OneToOneField` — altså nettopp den
+pekeren dokumentene begrunner rekkefølgen med. Utledningen meldte `vaktliste` fri mens
+den er bundet. Egen test på den kanten nå, med begrunnelsen i assertion-meldinga.
+
+### `Modulfiler`-raden i deploy-guiden har talt feil siden den ble skrevet
+
+Raden navngir modulfilene og sier hvor mange det er. Den har sagt «Sju» om seks, «Åtte»
+om sju og «Ni» om åtte — fordi påstanden var registrert mot `backup_handlere` i
+`PAASTANDER`, og `full` står i raden under. Tre av oss har rettet tallet oppover etter tur
+fordi testen ba om det. **En vakt som håndhever feil tall er verre enn ingen vakt:** den
+gjør det gale til noe man ikke får lov å rette. Raden sier nå `Åtte handlere`, og
+påstanden peker på `backup_modulfiler`.
+
+### Mutasjonstesting
+
+**15 mutanter**, tungt lag (backup og gjenoppretting). Én overlevde først: `f.name in
+felt_uten` i `bindinger()` kunne fjernes uten at noe ble rødt, fordi hvert felt i
+`strip_fields` i dag peker på en konto og ingen modulfil eier kontoene. Grenen er riktig,
+men var riktig ved et uhell — `test_en_strippet_peker_er_ingen_binding` prøver den med
+`Ressurs.enhet`, som er den ekte kandidaten til å bli strippet en dag. Drept etter det.
+
+En mutant traff ikke i det hele tatt (feil søkestreng mot `CLAUDE.md`) og ble meldt som
+«kunne ikke mutere» i stedet for som overlevende. Det er mutantløgn nummer to, og den
+eneste grunnen til at den ikke ble et falskt «OK» er at skriptet skiller de to tilfellene.
+
+Fire tester til: `test_en_modul_foer_den_den_peker_paa`, `test_en_bundet_modul_erklaert_fri`,
+`test_en_registrert_modul_som_ikke_er_plassert`, `test_en_slug_som_ikke_finnes` — alle med
+konstantene byttet ut, fordi `avvik()` mot fasiten er grønn også for en funksjon som
+alltid returnerer `[]`.
+
+`test_alle_seks_filene_kan_lastes_i_rekkefolge` het fortsatt «seks» mens den lastet åtte.
+Heter nå `test_alle_modulfilene_kan_lastes_i_rekkefolge`.
+
+---
+
 ## 2026-09-17 — KO pulje 2: loggen  `#ko/loggen`
 
 Logglinjer, retting som ny rad, sletteinngangen, polling med `?siden=`, ni kuraterte

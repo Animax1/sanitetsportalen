@@ -7,6 +7,8 @@ Hovedeksport:
 - ``create_backup(slug, kind, user, note)`` — lag en backup
 - ``restore_backup(backup, user)`` — gjenopprett en backup
 - ``enforce_cap(slug, max_backups)`` — håndhev cap på antall backups
+- ``GJENOPPRETTINGSREKKEFOLGE`` — rekkefølgen modulfilene tas i, i en tom base
+  (se ``rekkefolge``-modulens docstring for hvorfor den ligger i kode)
 - ``klokke`` — tråden som utløser automatisk backup (se modulens docstring for
   hvorfor det ikke er en cron-tjeneste)
 - Konstanter: ``KIND_AUTO``, ``KIND_MANUAL``, ``KIND_PRE_RESTORE``,
@@ -22,6 +24,13 @@ from .handlers import (
     utled_restore_models,
 )
 from . import klokke
+from .rekkefolge import (
+    avvik as rekkefolge_avvik,
+    bindinger as rekkefolge_bindinger,
+    GJENOPPRETTINGSREKKEFOLGE,
+    som_pilsetning,
+    UTEN_BINDING,
+)
 from .full import FullBackupHandler
 from .full import register_handlers as _register_full
 from .portal import PortalBackupHandler
@@ -65,6 +74,11 @@ def register_handlers() -> None:
 
 __all__ = [
     'GAMLE_MODELLNAVN',
+    'GJENOPPRETTINGSREKKEFOLGE',
+    'UTEN_BINDING',
+    'rekkefolge_avvik',
+    'rekkefolge_bindinger',
+    'som_pilsetning',
     'oversett_modellnavn',
     'BaseBackupHandler',
     'FullBackupHandler',

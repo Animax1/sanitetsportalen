@@ -934,9 +934,19 @@ Ni handlere i registeret:
 | `full` | `core/backup/full.py` | **Hele databasen** unntatt sesjoner, contenttypes, rettighetsrader, Django-admins logg og backup-metadata |
 
 Gjenoppretting i tom base går i rekkefølge — **portal → patients → arkiv → oppdrag →
-oppdrag_arkiv → vaktliste → ko** — fordi alt peker på vakta med et heltall. Tas ikke `portal`
-først, feiler de andre med «Key (vakt_id)=(1) is not present in table core_vakt».
-`AlleFileneGjenopprettesTests` håndhever at rekkefølgen virker.
+oppdrag_arkiv → vaktliste → ko**. Tas ikke `portal` først, feiler de andre med
+«Key (vakt_id)=(1) is not present in table core_vakt», fordi alt utenom `backlog` peker på
+vakta med et heltall.
+
+**Men vakta er ikke den eneste bindingen, og det sto ikke skrevet noe sted før 17. sep.
+2026.** `vaktliste.Ressurs.enhet` peker på `oppdrag.Enhet` — også et heltall, siden `Enhet`
+ikke har noen natural key. Tas `vaktliste` før `oppdrag`, feiler lastingen med
+«vaktliste_ressurs.enhet_id contains a value '1' that does not have a corresponding value in
+oppdrag_enhet.id». Den som leste den gamle begrunnelsen og stokket om, ville lagt `vaktliste`
+rett etter `portal`.
+
+Fasiten står i `core.backup.GJENOPPRETTINGSREKKEFOLGE`; `bindinger()` i samme modul utleder
+kantene fra modellene, og `AlleFileneGjenopprettesTests` krever at rekkefølgen holder dem.
 
 **Den hele fila er selvbærende, og det er poenget.** Den inneholder brukere,
 passord-hasher, MFA-hemmeligheter og audit-logg, fordi en tom base ikke har noen å logge
@@ -1916,7 +1926,7 @@ men **en regel om kodebasen**. De feiler når noen bryter en beslutning uten å 
 | `DataOgSkjemaISammeTransaksjonTests` | En migrasjon som skriver rader og så endrer skjema må tømme PostgreSQLs triggerkø |
 | `SlettelistaDekkerDumpenTests` | Hver modell som dumpes i en backup må også tømmes ved gjenoppretting |
 | `SignalerFyrerIkkeUnderLoaddataTests` | Hvert lagringssignal har `@ikke_under_loaddata`. Leter i **alle** `*/signals.py`, ikke en håndskrevet liste |
-| `AlleFileneGjenopprettesTests` | Rekkefølgen portal → patients → arkiv → oppdrag → oppdrag_arkiv → vaktliste virker i en tom base |
+| `AlleFileneGjenopprettesTests` | Rekkefølgen portal → patients → arkiv → oppdrag → oppdrag_arkiv → vaktliste → ko virker i en tom base, og kantene den bygger på utledes av modellene |
 | `ArkivSignaturLaastTests` | Arkivsignaturene er låst til literale hex-verdier. Feiler de etter en refaktorering, er det refaktoreringen som er feil |
 | `JsModulLastingTests` | Ingen side kaller en funksjon fra en modul den ikke laster |
 | `MorkTekstPaaMorkBakgrunnTests` | Hver Bootstrap-klasse for dempet tekst er overstyrt der malen kan se den |

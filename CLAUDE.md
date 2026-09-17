@@ -442,8 +442,15 @@ siden av. Hver modul registrerer en `BaseBackupHandler` i `core.backup`-register
 | `full` | `core/backup/full.py` | **Hele databasen** unntatt sesjoner, contenttypes, permissions og backup-metadata. Brukere, MFA og logg er med. Eget prefiks og egen frist offsite |
 
 Gjenoppretting i tom base går i rekkefølge: **portal → patients → arkiv →
-oppdrag → oppdrag_arkiv → vaktliste**, eller `full` alene.
-`AlleFileneGjenopprettesTests` håndhever at det virker.
+oppdrag → oppdrag_arkiv → vaktliste → ko**, eller `full` alene. **Fasiten er
+`core.backup.GJENOPPRETTINGSREKKEFOLGE`, ikke denne setningen** — den sto
+skrevet ut fire steder, og da `ko` kom ble tre av dem stående uten den.
+**To ting binder, ikke én:** alt utenom `backlog` peker på vakta med et
+heltall, *og* `vaktliste.Ressurs.enhet` peker på `oppdrag.Enhet`. Den som
+stokker om på bare den første grunnen legger `vaktliste` rett etter `portal` —
+lovlig etter teksten, og en `IntegrityError` i praksis.
+`AlleFileneGjenopprettesTests` håndhever både rekkefølgen og at kantene
+utledes av modellene og ikke gjentas for hånd.
 
 **`restore_models` skrives ikke for hånd.** `get_restore_models()` utleder lista
 topologisk fra `apps` minus `exclude`, barn før foreldre. Den håndskrevne lista

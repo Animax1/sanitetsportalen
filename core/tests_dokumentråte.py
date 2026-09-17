@@ -274,8 +274,14 @@ class TallpaastanderTests(SimpleTestCase):
          'backup_handlere', 'backup-handlere'),
         ('README.md', r'\*\*To lag\.\*\* (\w+) handlere:',
          'backup_handlere', 'backup-handlere'),
+        # **Raden teller modulfiler, ikke alle handlerne** — den navngir dem,
+        # og `full` står i raden under. Påstanden var registrert mot
+        # `backup_handlere` fra den ble skrevet, så raden har sagt «Sju» om
+        # seks, «Åtte» om sju og «Ni» om åtte, og hver av oss har rettet den
+        # oppover fordi testen ba om det. En vakt som håndhever feil tall er
+        # verre enn ingen: den gjør det gale til noe man ikke får lov å rette.
         ('docs/DEPLOY_GUIDE.md', r'\| \*\*Modulfiler\*\* \| (\w+) handlere',
-         'backup_handlere', 'backup-handlere'),
+         'backup_modulfiler', 'modulfiler i backup'),
     ]
 
     def test_hver_registrert_paastand_stemmer(self):
@@ -326,6 +332,60 @@ class TallpaastanderTests(SimpleTestCase):
             f['ruter_totalt'],
             sum(v for k, v in f.items() if k.startswith('ruter_') and k != 'ruter_totalt'),
             'summen av prefiksene skal være totalen — ellers faller ruter mellom')
+
+
+class GjenopprettingsrekkefolgenIDokumenteneTests(SimpleTestCase):
+    """Rekkefølgen dokumentene skriver ut skal være den koden krever.
+
+    **Dette er `TallpaastanderTests` for noe som ikke er et tall.** Rekkefølgen
+    sto skrevet ut for hånd fire steder. Da `ko` fikk backup 17. sep. 2026 ble
+    ett av dem oppdatert og tre stående — og det oppdaterte var ikke
+    `RUNBOOK_VAKT.md`, altså nettopp den fila man har foran seg mens man
+    gjenoppretter. Antall handlere var korrekt i alle fire hele tiden, fordi
+    det tallet *var* dekket. Rekkefølgen var ikke.
+
+    **Setningene finnes ved å lete, ikke ved å stå i en liste.** Regelen leter
+    etter enhver pilkjede som starter på `portal` i hvert dokument. En
+    håndskrevet liste over hvor setningen står ville hatt nøyaktig samme
+    svakhet som den den erstatter: den femte kopien er usynlig for den.
+    """
+
+    #: Dokumenter som med vilje skriver en rekkefølge som var riktig den
+    #: gangen. En datert plan er et referat, ikke en instruks — å oppdatere
+    #: den ville vært å skrive om hva som ble besluttet.
+    DATERTE_PLANER = {
+        'docs/BACKUP.md': 'planen fra 13. sep. 2026; setningen står i §3.6 om '
+                          'testen som den gang manglet',
+    }
+
+    def test_hver_pilkjede_er_den_koden_krever(self):
+        import re
+
+        from core.backup import registrer_alle_moduler, som_pilsetning
+
+        registrer_alle_moduler()
+        fasit = som_pilsetning()
+        moenster = re.compile(r'portal(?:\s*→\s*`?[a-z_]+`?)+')
+
+        feil, funnet_i = [], []
+        for dok in DOKUMENTER:
+            if dok in self.DATERTE_PLANER:
+                continue
+            tekst = re.sub(r'\s+', ' ', _les(dok))
+            for treff in moenster.findall(tekst):
+                ren = treff.replace('`', '')
+                funnet_i.append(dok)
+                if ren != fasit:
+                    feil.append(f'{dok}: «{ren}» — koden krever «{fasit}»')
+        self.assertEqual(
+            feil, [],
+            'Gjenopprettingsrekkefølgen står feil i dokumentene:\n  '
+            + '\n  '.join(feil)
+            + '\n\nFasiten er core.backup.GJENOPPRETTINGSREKKEFOLGE.')
+        self.assertTrue(
+            funnet_i,
+            'fant ikke rekkefølgen i noe dokument — er setningen omformulert '
+            'bort, står regelen og måler ingenting')
 
 
 class SlettedeSymbolerTests(SimpleTestCase):
