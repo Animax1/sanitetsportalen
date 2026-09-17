@@ -33,6 +33,13 @@ def _klient(bruker):
     return c
 
 
+def _type(navn='Bug'):
+    """Typen migrasjon `0002` seeder. Slås opp framfor å lages, slik at en
+    seeding som slutter å virke blir synlig — samme grep som
+    `vaktliste.test_helpers.gruppe()`."""
+    return Innspilltype.objects.get(navn=navn)
+
+
 class ModuldeklarasjonenTests(SimpleTestCase):
 
     def test_modulen_er_registrert(self):
@@ -62,7 +69,7 @@ class AngrefristenTests(TestCase):
         self.forfatter = _bruker('forfatter')
         self.andre = _bruker('andre')
         self.innspill = Innspill.objects.create(
-            type=Innspilltype.BUG, tittel='Noe er galt',
+            type=_type(), tittel='Noe er galt',
             opprettet_av=self.forfatter, opprettet_av_navn='forfatter')
 
     def test_forfatteren_kan_endre_med_en_gang(self):
@@ -124,7 +131,7 @@ class TilgangTests(TestCase):
         self.leder = _gi(_bruker('leder'), 'skriv_leder')
 
     def _meld_inn(self, klient, **kw):
-        kropp = {'type': 'bug', 'tittel': 'Noe er galt'}
+        kropp = {'type': _type().pk, 'tittel': 'Noe er galt'}
         kropp.update(kw)
         return klient.post('/backlog/api/innspill/', data=json.dumps(kropp),
                            content_type='application/json')
@@ -232,10 +239,12 @@ class FilterTests(TestCase):
     def setUp(self):
         self.bruker = _gi(_bruker('leser'), 'les')
         self.c = _klient(self.bruker)
-        Innspill.objects.create(type=Innspilltype.BUG, tittel='Bug, uløst',
+        self.bug = _type('Bug')
+        self.onske = _type('Ønske')
+        Innspill.objects.create(type=self.bug, tittel='Bug, uløst',
                                 modul_slug='vaktliste')
-        Innspill.objects.create(type=Innspilltype.ONSKE, tittel='Ønske, uløst')
-        Innspill.objects.create(type=Innspilltype.BUG, tittel='Bug, løst', lost=True)
+        Innspill.objects.create(type=self.onske, tittel='Ønske, uløst')
+        Innspill.objects.create(type=self.bug, tittel='Bug, løst', lost=True)
 
     def _titler(self, sporring=''):
         svar = self.c.get('/backlog/api/innspill/' + sporring)
@@ -246,7 +255,8 @@ class FilterTests(TestCase):
         self.assertEqual(len(self._titler()), 3)
 
     def test_filter_paa_type(self):
-        self.assertEqual(self._titler('?type=bug'), {'Bug, uløst', 'Bug, løst'})
+        self.assertEqual(self._titler(f'?type={self.bug.pk}'),
+                         {'Bug, uløst', 'Bug, løst'})
 
     def test_filter_paa_lost(self):
         self.assertEqual(self._titler('?lost=0'), {'Bug, uløst', 'Ønske, uløst'})
@@ -256,7 +266,7 @@ class FilterTests(TestCase):
         self.assertEqual(self._titler('?modul=vaktliste'), {'Bug, uløst'})
 
     def test_filtrene_kombineres(self):
-        self.assertEqual(self._titler('?type=bug&lost=0'), {'Bug, uløst'})
+        self.assertEqual(self._titler(f'?type={self.bug.pk}&lost=0'), {'Bug, uløst'})
 
     def test_ugyldig_verdi_gir_400_og_ikke_hele_lista(self):
         """**Et filter som stille viser feil mengde er verre enn ingen
@@ -270,3 +280,190 @@ class FilterTests(TestCase):
     def test_ukjent_filternavn_ignoreres(self):
         """En lenke fra en gammel fane skal vise lista, ikke en feilmelding."""
         self.assertEqual(len(self._titler('?sortering=noe')), 3)
+
+
+@override_settings(SECURE_SSL_REDIRECT=False, RATELIMIT_ENABLE=False)
+class TypeneAdministreresTests(TestCase):
+    """Backloginnstillinger — typene er admin-styrt (André, 17. sep. 2026:
+    «Kan ikke admin få legge til flere typer?»)."""
+
+    def setUp(self):
+        self.leser = _gi(_bruker('leser'), 'les')
+        self.skriver = _gi(_bruker('skriver'), 'skriv_full')
+        self.leder = _gi(_bruker('leder'), 'skriv_leder')
+        self.sjef = _bruker('sjef', role='admin')
+
+    def test_migrasjonen_seeder_de_to_standardtypene(self):
+        """Seedingen er en migrasjon, ikke noe viewet lager ved første besøk —
+        en tom base skal ha noe å velge mellom fra første innlogging."""
+        self.assertEqual(
+            list(Innspilltype.objects.order_by('rekkefolge')
+                 .values_list('navn', flat=True)),
+            ['Bug', 'Ønske'])
+
+    def test_les_ser_typene_men_lager_ingen(self):
+        c = _klient(self.leser)
+        self.assertEqual(c.get('/backlog/api/typer/').status_code, 200)
+        svar = c.post('/backlog/api/typer/', data=json.dumps({'navn': 'Spørsmål'}),
+                      content_type='application/json')
+        self.assertEqual(svar.status_code, 403)
+        self.assertEqual(Innspilltype.objects.count(), 2)
+
+    def test_skriv_full_lager_heller_ingen(self):
+        """Å sette opp verdimengden er `skriv_leder`, som i oppdragsmodulen —
+        den som melder inn endrer ikke hva *alle* får velge mellom."""
+        svar = _klient(self.skriver).post(
+            '/backlog/api/typer/', data=json.dumps({'navn': 'Spørsmål'}),
+            content_type='application/json')
+        self.assertEqual(svar.status_code, 403)
+
+    def test_skriv_leder_legger_til_en_type(self):
+        svar = _klient(self.leder).post(
+            '/backlog/api/typer/', data=json.dumps({'navn': 'Spørsmål'}),
+            content_type='application/json')
+        self.assertEqual(svar.status_code, 201)
+        ny = Innspilltype.objects.get(navn='Spørsmål')
+        self.assertTrue(ny.er_aktiv)
+        self.assertGreater(ny.rekkefolge, _type('Ønske').rekkefolge,
+                           'en ny type havner sist')
+
+    def test_duplikat_navn_avvises_uansett_store_bokstaver(self):
+        """«Bug» og «bug» er samme type for et menneske, og to rader som ser
+        like ut i et nedtrekk er verre enn en feilmelding."""
+        svar = _klient(self.leder).post(
+            '/backlog/api/typer/', data=json.dumps({'navn': 'bug'}),
+            content_type='application/json')
+        self.assertEqual(svar.status_code, 400)
+        self.assertEqual(Innspilltype.objects.count(), 2)
+
+    def test_en_deaktivert_type_kan_ikke_velges_paa_nytt_innspill(self):
+        bug = _type()
+        bug.er_aktiv = False
+        bug.save()
+        svar = _klient(self.skriver).post(
+            '/backlog/api/innspill/',
+            data=json.dumps({'type': bug.pk, 'tittel': 'Noe'}),
+            content_type='application/json')
+        self.assertEqual(svar.status_code, 400)
+        self.assertEqual(Innspill.objects.count(), 0)
+
+    def test_en_deaktivert_type_blir_staaende_paa_dem_som_har_den(self):
+        """Det er hele forskjellen på å deaktivere og å slette."""
+        bug = _type()
+        Innspill.objects.create(type=bug, tittel='Gammelt innspill')
+        bug.er_aktiv = False
+        bug.save()
+        rader = json.loads(
+            _klient(self.leser).get('/backlog/api/innspill/').content)['data']
+        self.assertEqual(rader[0]['type_navn'], 'Bug')
+
+    def test_en_type_i_bruk_kan_ikke_slettes_og_svaret_sier_veien_ut(self):
+        """**`PROTECT` → 409 med rådet.** «Kan ikke slettes» alene etterlater
+        brukeren uten en vei videre, og da er neste trekk å slette innspillene
+        i stedet — altså å miste det sperren fantes for å verne."""
+        bug = _type()
+        Innspill.objects.create(type=bug, tittel='Noe')
+        svar = _klient(self.sjef).delete(
+            f'/backlog/api/typer/{bug.pk}/', data=json.dumps({'confirm': True}),
+            content_type='application/json')
+        self.assertEqual(svar.status_code, 409)
+        self.assertIn('Deaktiver', json.loads(svar.content)['message'])
+        self.assertTrue(Innspilltype.objects.filter(pk=bug.pk).exists())
+
+    def test_sletting_krever_global_admin_og_bekreftelse(self):
+        """To sperrer som stopper hver sin ting: nivået stopper den som ikke
+        skal slette, `confirm` stopper et kall som treffer URL-en uten å mene
+        det."""
+        ubrukt = Innspilltype.objects.create(navn='Ubrukt')
+
+        self.assertEqual(_klient(self.leder).delete(
+            f'/backlog/api/typer/{ubrukt.pk}/',
+            data=json.dumps({'confirm': True}),
+            content_type='application/json').status_code, 403)
+
+        self.assertEqual(_klient(self.sjef).delete(
+            f'/backlog/api/typer/{ubrukt.pk}/').status_code, 400)
+
+        self.assertTrue(Innspilltype.objects.filter(pk=ubrukt.pk).exists())
+
+        self.assertEqual(_klient(self.sjef).delete(
+            f'/backlog/api/typer/{ubrukt.pk}/',
+            data=json.dumps({'confirm': True}),
+            content_type='application/json').status_code, 200)
+        self.assertFalse(Innspilltype.objects.filter(pk=ubrukt.pk).exists())
+
+    def test_navnet_kan_endres(self):
+        bug = _type()
+        svar = _klient(self.leder).put(
+            f'/backlog/api/typer/{bug.pk}/', data=json.dumps({'navn': 'Feil'}),
+            content_type='application/json')
+        self.assertEqual(svar.status_code, 200)
+        bug.refresh_from_db()
+        self.assertEqual(bug.navn, 'Feil')
+
+
+@override_settings(SECURE_SSL_REDIRECT=False, RATELIMIT_ENABLE=False)
+class VarselVedNyttInnspillTests(TestCase):
+    """§ André 17. sep. 2026: «Varsel til admin er fint.»
+
+    **Mottakerne er de som kan løse, ikke alle som kan lese.** En bjelle som
+    pling-er for folk som ikke kan gjøre noe, er en bjelle man slår av.
+    """
+
+    def setUp(self):
+        from core.models import Notification
+        self.Notification = Notification
+        self.skriver = _gi(_bruker('skriver'), 'skriv_full')
+        self.leder = _gi(_bruker('leder'), 'skriv_leder')
+        self.leser = _gi(_bruker('leser'), 'les')
+        self.sjef = _bruker('sjef', role='admin')
+
+    def _meld_inn(self, klient, tittel='Noe er galt'):
+        return klient.post(
+            '/backlog/api/innspill/',
+            data=json.dumps({'type': _type().pk, 'tittel': tittel}),
+            content_type='application/json')
+
+    def _varslede(self):
+        return set(self.Notification.objects
+                   .filter(module_slug='backlog')
+                   .values_list('user__username', flat=True))
+
+    def test_lederen_og_admin_varsles(self):
+        self._meld_inn(_klient(self.skriver))
+        self.assertEqual(self._varslede(), {'leder', 'sjef'})
+
+    def test_den_som_melder_inn_varsles_ikke_om_sitt_eget(self):
+        """Et varsel om noe man nettopp skrev er den korteste veien til å
+        slutte å lese varsler."""
+        self._meld_inn(_klient(self.leder))
+        self.assertNotIn('leder', self._varslede())
+
+    def test_den_som_bare_leser_varsles_ikke(self):
+        self._meld_inn(_klient(self.skriver))
+        self.assertNotIn('leser', self._varslede())
+
+    def test_varselet_baerer_tittelen(self):
+        """Det er tittelen som avgjør om man går og ser nå eller i morgen."""
+        self._meld_inn(_klient(self.skriver), tittel='Nedtrekket lukker seg')
+        varsel = self.Notification.objects.filter(user=self.leder).first()
+        self.assertIsNotNone(varsel)
+        self.assertIn('Nedtrekket lukker seg', varsel.message)
+        self.assertIn('skriver', varsel.message)
+        self.assertEqual(varsel.url, '/backlog/')
+
+    def test_to_ulike_innspill_gir_to_varsler(self):
+        """`notify()` dedupliserer på meldingen, ikke på typen — ellers ville
+        innspill nummer to i samme døgn forsvunnet."""
+        self._meld_inn(_klient(self.skriver), tittel='Første')
+        self._meld_inn(_klient(self.skriver), tittel='Andre')
+        self.assertEqual(
+            self.Notification.objects.filter(user=self.leder).count(), 2)
+
+    def test_et_varsel_som_feiler_stopper_ikke_innmeldingen(self):
+        """**Varselet er en sideeffekt, ikke en del av innmeldingen.**"""
+        from unittest.mock import patch
+        with patch('backlog.varsler.notify', side_effect=RuntimeError('nede')):
+            svar = self._meld_inn(_klient(self.skriver))
+        self.assertEqual(svar.status_code, 201)
+        self.assertEqual(Innspill.objects.count(), 1)

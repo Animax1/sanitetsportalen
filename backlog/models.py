@@ -21,24 +21,61 @@ from __future__ import annotations
 
 from django.conf import settings
 from django.db import models
+from django.db.models.functions import Lower
 
 
-class Innspilltype(models.TextChoices):
-    """Bug eller ønske.
+class Innspilltype(models.Model):
+    """Bug, ønske — og det admin ellers finner ut at det trengs.
 
-    **`choices` og ikke en tabell**, i motsetning til `vaktliste.Ressursgruppe`
-    og oppdragsmodulens verdimengder. Skillet er om verdimengden er
-    *organisasjonens* eller *portalens*: en vaktleder kan trenge en dronegruppe
-    i kveld og kan ikke vente på en utrulling, mens «er dette en feil eller et
-    ønske» er et strukturelt skille som ikke endrer seg med arrangementet.
+    **Dette var `choices` i én dag** (17. sep. 2026). Begrunnelsen var at «er
+    dette en feil eller et ønske» er et strukturelt skille som ikke endrer seg
+    med arrangementet, i motsetning til `vaktliste.Ressursgruppe`. André snudde
+    det samme dag: «Kan ikke admin få legge til flere typer?»
 
-    Trengs en tredje verdi en dag — «spørsmål», «teknisk gjeld» — er det en
-    migrasjon på én linje. Blir de mange og skiftende, er `Verdimengde` i
-    oppdragsmodulen mønsteret å flytte til.
+    Og han har rett i at det er samme mønster som de andre verdimengdene: et
+    behov som melder seg — «spørsmål», «teknisk gjeld», «dokumentasjon» — skal
+    ikke vente på en utrulling. Mønsteret er `oppdrag.views_verdier`:
+    **navn, `er_aktiv` og `rekkefolge`, slettes bare når ingen bruker den.**
+
+    `er_aktiv` er viktigere enn sletting: en type som har vært i bruk kan ikke
+    fjernes uten å ta innspillene med seg (`PROTECT`), og da er «skjul den fra
+    nedtrekket» det svaret man faktisk vil ha.
     """
 
-    BUG = 'bug', 'Bug'
-    ONSKE = 'onske', 'Ønske'
+    navn = models.CharField(max_length=40, unique=True, verbose_name='Navn')
+    er_aktiv = models.BooleanField(
+        default=True,
+        verbose_name='Aktiv',
+        help_text='Inaktive typer kan ikke velges på nye innspill, men blir '
+                  'stående på dem som alt har den.',
+    )
+    rekkefolge = models.IntegerField(
+        default=100,
+        verbose_name='Rekkefølge',
+        help_text='Styrer rekkefølgen i nedtrekket. Settes automatisk til '
+                  'opprettelsesrekkefølgen.',
+    )
+
+    class Meta:
+        verbose_name = 'Innspilltype'
+        verbose_name_plural = 'Innspilltyper'
+        ordering = ['rekkefolge', Lower('navn')]
+
+    def __str__(self):
+        return self.navn
+
+    def save(self, *args, **kwargs):
+        """En ny type havner sist.
+
+        Regelen ligger her og ikke i viewet fordi den har to lesere — skjemaet
+        og en framtidig import — og en regel med to lesere skrives én gang.
+        Telleren er `Max` + 10, ikke `count()`: slettes en rad, ville `count()`
+        gitt et tall som alt er i bruk.
+        """
+        if self.pk is None and self.rekkefolge == 100:
+            siste = Innspilltype.objects.aggregate(m=models.Max('rekkefolge'))['m']
+            self.rekkefolge = (siste or 0) + 10
+        super().save(*args, **kwargs)
 
 
 class Innspill(models.Model):
@@ -49,10 +86,14 @@ class Innspill(models.Model):
     huskeliste man stryker i. Lista filtreres på det i stedet.
     """
 
-    type = models.CharField(
-        max_length=16,
-        choices=Innspilltype.choices,
-        db_index=True,
+    #: **`PROTECT`, ikke `CASCADE`.** Slettes en type som er i bruk, ville
+    #: innspillene forsvinne med den — og et innspill er nettopp det som ikke
+    #: skal kunne forsvinne stille. Viewet svarer 409 med antallet og peker på
+    #: `er_aktiv` som veien ut, samme svar som oppdragsmodulens verdimengder.
+    type = models.ForeignKey(
+        'backlog.Innspilltype',
+        on_delete=models.PROTECT,
+        related_name='innspill',
         verbose_name='Type',
     )
     tittel = models.CharField(
@@ -127,4 +168,4 @@ class Innspill(models.Model):
         ordering = ['-opprettet_at', '-pk']
 
     def __str__(self):
-        return f'{self.get_type_display()}: {self.tittel}'
+        return f'{self.type}: {self.tittel}'

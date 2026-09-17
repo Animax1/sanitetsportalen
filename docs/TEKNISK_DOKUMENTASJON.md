@@ -445,7 +445,7 @@ deploy 2. Begge deler er rettet, men **strukturen er endret med vilje**: se 5.0.
 
 ### 5.0 Hva dette kapittelet er, og ikke er
 
-Portalen har **135 endepunkter** (utenom Django-admin, som bare rutes under `DEBUG`).
+Portalen har **137 endepunkter** (utenom Django-admin, som bare rutes under `DEBUG`).
 En håndskrevet liste over alle sammen ville rotnet fra dagen den ble skrevet — nøyaktig
 slik den gamle lista gjorde, med 16 oppføringer og ingen som merket at resten manglet.
 
@@ -479,7 +479,7 @@ for sti, view in sorted(gaa(get_resolver())):
 | `/accounts/` | 9 | `accounts/urls.py` | Innlogging, MFA, passord |
 | `/statistikk/` | 5 | `statistikk/urls.py` | Full statistikk per kilde |
 | `/ko/` | 2 | `ko/urls.py` | Situasjonsbildet (skallet) og sidebaren over hvem som har KO oppe |
-| `/backlog/` | 5 | `backlog/urls.py` | Endringsønsker og bugs: lista med filtre, innmelding, løst/gjenåpne |
+| `/backlog/` | 7 | `backlog/urls.py` | Endringsønsker og bugs: lista med filtre, innmelding, løst/gjenåpne, og typene i «Backloginnstillinger» |
 | `/varsler/`, `/api/`, rot | 13 | `core/urls.py` | Dashbord, varsler (3 sider + 4 API), «min profil», manifest, `robots.txt`, `/healthz/` og videresendingen fra `/api/` |
 
 **Noen stier er rene videresendinger** fra flater som har flyttet, og de er med i

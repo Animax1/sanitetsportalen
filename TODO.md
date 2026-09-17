@@ -570,17 +570,10 @@ status og modul. Modulens egne regler står i [`backlog/CLAUDE.md`](./backlog/CL
       `backlog` i dag, så bare global admin ser modulen. Tre nivåer i matrisen: «ser
       backloggen», «melder inn, retter sitt eget», «leder backloggen, setter løst».
 
-- [ ] **VURDER: skal admin varsles når noe meldes inn?** `core.notifications.notify()`
-      finnes og dedupliserer innen 24 timer, så det er få linjer. Men en backlog som
-      pling-er for hvert innspill blir en bjelle man slår av — og da mister varselet
-      verdien også den gangen det haster. Avgjøres etter at modulen har vært i bruk en
-      vakt eller to, ikke før.
-
-- [ ] **VURDER: trengs flere typer enn bug og ønske?** `Innspilltype` er `choices` med
-      vilje — «er dette en feil eller et ønske» er et strukturelt skille, ikke noe et
-      arrangement endrer. Blir «spørsmål» eller «teknisk gjeld» et behov, er det en
-      migrasjon på én linje; blir de mange og skiftende, er `Verdimengde` i
-      oppdragsmodulen mønsteret å flytte til.
+- [ ] **VURDER: skal typene kunne omsorteres?** `rekkefolge` finnes på `Innspilltype` og
+      settes automatisk til opprettelsesrekkefølgen, men det er ingen flate for å endre
+      den. Gjøres det, skal hele lista sendes i én PUT (`oppdrag`-mønsteret) og ikke «flytt
+      opp» per rad: to trykk som krysser hverandre i nettet gir en rekkefølge ingen ba om.
 
 ### KO-modulen — se [`docs/FORSLAG_KO.md`](./docs/FORSLAG_KO.md)
 

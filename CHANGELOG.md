@@ -4,6 +4,86 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-17 — Backlog: typene styres av admin, varsel til dem som kan løse, «Rediger»  `#backlog/modulen`
+
+Tre ting etter at modulen gikk på staging, alle fra André.
+
+### «Kan ikke admin få legge til flere typer?»
+
+**Jo, og begrunnelsen min for `choices` var for smal.** Jeg skrev at «er dette en feil eller
+et ønske» er et strukturelt skille som ikke endrer seg med arrangementet — men behovet som
+melder seg, «spørsmål», «teknisk gjeld», «dokumentasjon», skal ikke vente på en utrulling,
+like lite som en dronegruppe i vaktlista skal det.
+
+`Innspilltype` er nå en tabell etter mønsteret i `oppdrag/views_verdier.py`: navn,
+`er_aktiv`, `rekkefolge`, og sletting **bare når ingen bruker raden**. Administreres i
+**«Backloginnstillinger»** på siden, av `skriv_leder` — samme nivå som setter opp
+verdimengdene i oppdrag.
+
+**`er_aktiv` er viktigere enn sletting.** En type i bruk kan ikke fjernes uten å ta
+innspillene med seg (`PROTECT`), og da er «skjul den fra nedtrekket» det svaret man faktisk
+vil ha:
+
+- filteret viser **alle** typene — en deaktivert type må kunne filtreres fram
+- skjemaet viser **bare de aktive** — den skal ikke kunne velges på noe nytt
+- serveren håndhever det siste i `_hent_aktiv_type()`, ikke bare klienten
+
+**409-svaret bærer rådet, ikke bare avslaget:** «Deaktiver den i stedet — da forsvinner den
+fra nedtrekket, men blir stående på dem som alt har den.» «Kan ikke slettes» alene
+etterlater brukeren uten en vei videre, og da er neste trekk å slette innspillene.
+
+**Migrasjonen er delt i tre** (`0002`–`0004`), og det er ikke pynt. `0003` fyller FK-en med
+data; `0004` fjerner den gamle kolonnen. Står de i samme migrasjon, er det en skriving
+etterfulgt av `ALTER TABLE` i én transaksjon — fella som tok ned deployen 30. aug. 2026 med
+«pending trigger events». Å dele migrasjonen i to er den tredje av de tre dokumenterte
+veiene ut. `0002` seeder Bug og Ønske, så en tom base har noe å velge mellom fra første
+innlogging.
+
+### «Varsel til admin er fint»
+
+`varsler.meld_nytt_innspill()`. **Mottakerne er de som kan løse, ikke alle som kan lese** —
+kontoene med `skriv_leder` på `backlog`, pluss global admin. En bjelle som pling-er for folk
+som ikke kan gjøre noe, er en bjelle man slår av, og da varsler den ikke den gangen det
+haster. Innsenderen varsles ikke om sitt eget, av samme grunn.
+
+Teksten bærer **tittelen**, ikke bare «nytt innspill»: det er tittelen som avgjør om man går
+og ser nå eller i morgen. `notify()` dedupliserer på *meldingen* siste 24 timer, så to ulike
+innspill gir to varsler mens et dobbelttrykk gir ett.
+
+**Varselet er en sideeffekt, ikke en del av innmeldingen** — `meld_nytt_innspill()` kaster
+aldri, og en test pakker `notify` i en `side_effect=RuntimeError` og krever 201 likevel.
+
+### «Endre «rett» til «rediger», mye tydeligere språk»
+
+«Rett» leser som en korrigering av noe som er galt; det man som regel gjør er å legge til
+det man glemte. Knappen heter **«Rediger»**, vinduene heter **«Nytt innspill»** og
+**«Rediger innspill»**, og nivåetiketten i matrisen sier «melder inn, redigerer sitt eget».
+Hjelpetekstene er skrevet om: «Valgfritt, men hjelper mye: hva du gjorde, hva du forventet,
+og hva som faktisk skjedde.»
+
+### Ni mutanter til, alle drept
+
+Fem på typeadministrasjonen (deaktivert type kan likevel velges, typeporten fjernet,
+sletting uten global admin, `confirm`-kravet fjernet, duplikatsjekk uten `iexact`) og fire
+på varslene (innsenderen varsles om sitt eget, alle med tilgang varsles i stedet for bare
+de som kan løse, tittelen ut av meldingen slik at dedup slår inn, og **kallstedet** fjernet
+fra viewet — den siste er regel 3 i `CLAUDE.md`: muter kallstedet, ikke bare funksjonen).
+
+Tallene fulgte med: 135 → 137 endepunkter, `/backlog/` fra 5 til 7 ruter.
+
+**Og backfillen ble prøvd mot ekte rader, ikke bare mot en tom testbase.**
+Djangos testbase lages ved å kjøre migrasjonene mot en *tom* base — et dataskritt uten data
+skriver ingenting, og `fyll()` i `0003` ville stått udekket. Kjørt manuelt mot en
+engangsbase: migrer alt, rull `backlog` tilbake til `0001` (som samtidig prøver
+reversibiliteten), legg inn tre rader i den gamle formen, migrer fram. `bug` → «Bug»,
+`onske` → «Ønske», og den ukjente kodeverdien `sporsmal` **beholdt meningen sin** som en ny
+type i stedet for å tvinges inn i «Bug» — det er `get_or_create` i `fyll()` som gjør det,
+og den grenen er hele grunnen til at den står der.
+
+Suite: 3 355 tester, grønn.
+
+---
+
 ## 2026-09-17 — Ny modul: `/backlog/` — endringsønsker og bugs  `#backlog/modulen` `#core/tilgang`
 
 **André:** «Da blir modulen en backlog i systemet i stedet for innspill spredt i chatter.»

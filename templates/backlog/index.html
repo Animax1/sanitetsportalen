@@ -28,10 +28,16 @@
 
   <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
     <h1 class="h4 mb-0"><i class="bi bi-list-check me-2"></i>Backlog</h1>
-    <button type="button" class="btn btn-sm btn-primary d-none" id="backlog-ny-knapp"
-            data-action="backlogApneNy">
-      <i class="bi bi-plus-lg me-1"></i>Meld inn
-    </button>
+    <div class="d-flex gap-2">
+      <button type="button" class="btn btn-sm btn-outline-secondary d-none"
+              id="backlog-innstillinger-knapp" data-action="backlogApneInnstillinger">
+        <i class="bi bi-sliders me-1"></i>Backloginnstillinger
+      </button>
+      <button type="button" class="btn btn-sm btn-primary d-none" id="backlog-ny-knapp"
+              data-action="backlogApneNy">
+        <i class="bi bi-plus-lg me-1"></i>Nytt innspill
+      </button>
+    </div>
   </div>
 
   {% comment %}
@@ -79,7 +85,7 @@
   <div class="modal-dialog modal-lg">
     <div class="modal-content" style="background:var(--portal-surface);border-color:var(--portal-border);">
       <div class="modal-header">
-        <h2 class="modal-title h6" id="backlog-modal-tittel">Meld inn</h2>
+        <h2 class="modal-title h6" id="backlog-modal-tittel">Nytt innspill</h2>
         <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"
                 aria-label="Lukk"></button>
       </div>
@@ -91,18 +97,18 @@
         <div class="mb-3">
           <label class="form-label" for="backlog-felt-tittel">Tittel</label>
           <input type="text" id="backlog-felt-tittel" class="form-control" maxlength="200">
-          <div class="form-text">Én setning. Det du ville sagt i chatten.</div>
+          <div class="form-text">Én setning som beskriver saken. Det du ville sagt i chatten.</div>
         </div>
         <div class="mb-3">
           <label class="form-label" for="backlog-felt-modul">Gjelder modul</label>
           <select id="backlog-felt-modul" class="form-select">
-            <option value="">Ikke én bestemt</option>
+            <option value="">Gjelder ikke én bestemt modul</option>
           </select>
         </div>
         <div class="mb-3">
           <label class="form-label" for="backlog-felt-beskrivelse">Beskrivelse</label>
           <textarea id="backlog-felt-beskrivelse" class="form-control" rows="5"></textarea>
-          <div class="form-text">Valgfritt. Hva du gjorde, hva du forventet, hva som skjedde.</div>
+          <div class="form-text">Valgfritt, men hjelper mye: hva du gjorde, hva du forventet, og hva som faktisk skjedde.</div>
         </div>
         <div id="backlog-modal-feil" class="text-danger small d-none"></div>
       </div>
@@ -110,6 +116,42 @@
         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Avbryt</button>
         <button type="button" class="btn btn-primary" id="backlog-lagre-knapp"
                 data-action="backlogLagre">Lagre</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% comment %}
+  Backloginnstillinger — typene. Lista og skjemaet i **samme vindu**, slik at
+  man ser hva som finnes mens man legger til. Samme form som vaktlistas
+  «Innstillinger» og oppdragsmodulens «Valglister».
+{% endcomment %}
+<div class="modal fade" id="backlog-innstillinger-modal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content" style="background:var(--portal-surface);border-color:var(--portal-border);">
+      <div class="modal-header">
+        <h2 class="modal-title h6">Backloginnstillinger</h2>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"
+                aria-label="Lukk"></button>
+      </div>
+      <div class="modal-body">
+        <h3 class="h6 mb-2">Typer</h3>
+        <p class="form-text mt-0">
+          Typene man kan velge mellom når et innspill meldes inn. En type som er
+          i bruk kan ikke slettes — deaktiver den i stedet, så forsvinner den
+          fra nedtrekket men blir stående på innspillene som alt har den.
+        </p>
+        <div id="backlog-typeliste" class="mb-3"></div>
+        <div class="input-group">
+          <input type="text" id="backlog-ny-type" class="form-control"
+                 placeholder="Ny type, f.eks. «Spørsmål»" maxlength="40">
+          <button type="button" class="btn btn-primary" id="backlog-ny-type-knapp"
+                  data-action="backlogLagreType">Legg til</button>
+        </div>
+        <div id="backlog-innstillinger-feil" class="text-danger small d-none mt-2"></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Lukk</button>
       </div>
     </div>
   </div>

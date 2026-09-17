@@ -24,7 +24,7 @@ ANGREFRIST = timedelta(hours=1)
 
 
 def kan_endres(innspill, bruker, naa=None) -> bool:
-    """Får denne brukeren rette eller slette innspillet nå?
+    """Får denne brukeren redigere eller slette innspillet nå?
 
     Tre vilkår, og alle tre må holde:
 

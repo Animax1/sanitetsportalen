@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import json
 
+from django.db.models import ProtectedError
 from django.http import JsonResponse
 from django.shortcuts import render
 from django.utils import timezone
@@ -29,6 +30,7 @@ from core.jsdata import js_json
 from core.ratelimit import rate_limit
 
 from . import services
+from . import varsler
 from .models import Innspill, Innspilltype
 
 
@@ -50,6 +52,29 @@ def _nektet():
     return JsonResponse({'status': 'error', 'message': 'Ingen tilgang'}, status=403)
 
 
+def _int(verdi):
+    """ID fra klienten. Et nedtrekk med «Ingen valgt» sender `''`, ikke `null`,
+    og den strengen i et FK-filter gir `ValueError` — altså 500 der brukeren
+    skulle fått «velg en type». Samme grep som `vaktliste.views._int()`."""
+    try:
+        return int(verdi)
+    except (TypeError, ValueError):
+        return None
+
+
+def _hent_aktiv_type(verdi):
+    """Typen, hvis den finnes **og** er aktiv. `None` ellers.
+
+    En deaktivert type kan ikke velges på et nytt innspill — det er hele
+    poenget med `er_aktiv`. Den blir stående på dem som alt har den, så lista
+    beholder meningen sin.
+    """
+    pk = _int(verdi)
+    if pk is None:
+        return None
+    return Innspilltype.objects.filter(pk=pk, er_aktiv=True).first()
+
+
 def _til_dict(innspill, bruker, naa):
     """Én rad, med `kan_endres` regnet ut på **serveren**.
 
@@ -59,8 +84,8 @@ def _til_dict(innspill, bruker, naa):
     """
     return {
         'id': innspill.pk,
-        'type': innspill.type,
-        'type_navn': innspill.get_type_display(),
+        'type': innspill.type_id,
+        'type_navn': innspill.type.navn,
         'tittel': innspill.tittel,
         'beskrivelse': innspill.beskrivelse,
         'modul_slug': innspill.modul_slug,
@@ -71,6 +96,17 @@ def _til_dict(innspill, bruker, naa):
         'lost_at': innspill.lost_at.isoformat() if innspill.lost_at else '',
         'kan_endres': services.kan_endres(innspill, bruker, naa),
     }
+
+
+def _typeliste(bare_aktive=False):
+    """Typene, som klienten trenger dem. `i_bruk` er antallet innspill, og det
+    er tallet 409-svaret ved sletting peker på."""
+    qs = Innspilltype.objects.all()
+    if bare_aktive:
+        qs = qs.filter(er_aktiv=True)
+    return [{'id': t.pk, 'navn': t.navn, 'er_aktiv': t.er_aktiv,
+             'rekkefolge': t.rekkefolge, 'i_bruk': t.innspill.count()}
+            for t in qs]
 
 
 # ── Siden ────────────────────────────────────────────────────────────────────
@@ -94,8 +130,7 @@ def index_view(request):
         'er_global_admin': er_global_admin(request.user),
         'moduler_json': js_json(
             [{'slug': s, 'navn': n} for s, n in services.valgbare_moduler()]),
-        'typer_json': js_json(
-            [{'verdi': v, 'navn': n} for v, n in Innspilltype.choices]),
+        'typer_json': js_json(_typeliste()),
     })
 
 
@@ -120,13 +155,14 @@ def innspill_view(request):
     if request.method == 'POST':
         return _opprett(request)
 
-    qs = Innspill.objects.select_related('opprettet_av', 'lost_av')
+    qs = Innspill.objects.select_related('type', 'opprettet_av', 'lost_av')
 
     type_ = request.GET.get('type')
     if type_:
-        if type_ not in Innspilltype.values:
+        type_id = _int(type_)
+        if type_id is None or not Innspilltype.objects.filter(pk=type_id).exists():
             return _feil(f'Ukjent type: {type_}')
-        qs = qs.filter(type=type_)
+        qs = qs.filter(type_id=type_id)
 
     lost = request.GET.get('lost')
     if lost is not None and lost != '':
@@ -154,9 +190,9 @@ def _opprett(request):
     if not tittel:
         return _feil('Tittel må fylles ut')
 
-    type_ = (data.get('type') or '').strip()
-    if type_ not in Innspilltype.values:
-        return _feil('Velg om det er en bug eller et ønske')
+    type_ = _hent_aktiv_type(data.get('type'))
+    if type_ is None:
+        return _feil('Velg en type')
 
     modul_slug = (data.get('modul_slug') or '').strip()
     if not services.gyldig_modul_slug(modul_slug):
@@ -170,6 +206,9 @@ def _opprett(request):
         opprettet_av=request.user,
         opprettet_av_navn=request.user.username,
     )
+    # **Varselet er en sideeffekt, ikke en del av innmeldingen.** `meld_nytt_innspill`
+    # kaster aldri — et innspill skal ikke gå tapt fordi bjella feilet.
+    varsler.meld_nytt_innspill(innspill)
     return JsonResponse(
         {'status': 'ok', 'data': _til_dict(innspill, request.user, timezone.now())},
         status=201)
@@ -209,9 +248,9 @@ def innspill_detalj_view(request, pk):
     if 'beskrivelse' in data:
         innspill.beskrivelse = (data.get('beskrivelse') or '').strip()
     if 'type' in data:
-        type_ = (data.get('type') or '').strip()
-        if type_ not in Innspilltype.values:
-            return _feil('Velg om det er en bug eller et ønske')
+        type_ = _hent_aktiv_type(data.get('type'))
+        if type_ is None:
+            return _feil('Velg en type')
         innspill.type = type_
     if 'modul_slug' in data:
         modul_slug = (data.get('modul_slug') or '').strip()
@@ -256,3 +295,85 @@ def lost_view(request, pk, *, lost):
     innspill.save()
     return JsonResponse(
         {'status': 'ok', 'data': _til_dict(innspill, request.user, timezone.now())})
+
+
+# ── Backloginnstillinger: typene ─────────────────────────────────────────────
+#
+# Samme mønster som oppdragsmodulens verdimengder (`oppdrag/views_verdier.py`):
+# lista for `les`, opprett og endre for `skriv_leder`, sletting for global admin
+# med `{"confirm": true}` — og **`PROTECT` → 409 med rådet om å deaktivere**.
+#
+# Rådet er det som gjør sperren nyttig. «Kan ikke slettes» alene etterlater
+# brukeren uten en vei videre, og da er neste trekk å slette innspillene i
+# stedet — altså å miste det sperren fantes for å verne.
+
+@never_cache
+@modul_kreves('backlog', 'les', svar='json')
+@require_http_methods(['GET', 'POST'])
+@rate_limit(group='backlog:typer', rate='30/m', method='POST')
+def typer_view(request):
+    """GET: alle typene. POST: ny type."""
+    if request.method == 'GET':
+        return JsonResponse({'status': 'ok', 'data': _typeliste()})
+
+    if not har_tilgang(request.user, 'backlog', 'skriv_leder'):
+        return _nektet()
+
+    navn = (_json_body(request).get('navn') or '').strip()
+    if not navn:
+        return _feil('Navn må fylles ut')
+    if Innspilltype.objects.filter(navn__iexact=navn).exists():
+        # `iexact`: «Bug» og «bug» er samme type for et menneske, og to rader
+        # som ser like ut i et nedtrekk er verre enn en feilmelding.
+        return _feil(f'«{navn}» finnes allerede')
+
+    type_ = Innspilltype.objects.create(navn=navn[:40])
+    return JsonResponse({'status': 'ok', 'data': {
+        'id': type_.pk, 'navn': type_.navn, 'er_aktiv': type_.er_aktiv,
+        'rekkefolge': type_.rekkefolge, 'i_bruk': 0}}, status=201)
+
+
+@never_cache
+@modul_kreves('backlog', 'skriv_leder', svar='json')
+@require_http_methods(['PUT', 'DELETE'])
+def type_detalj_view(request, pk):
+    """PUT: navn og `er_aktiv`. DELETE: bare når ingen bruker typen.
+
+    **Slettingen krever global admin og `confirm`.** To sperrer, og de stopper
+    hver sin ting: nivået stopper den som ikke skal slette noe, `confirm`
+    stopper et kall som treffer URL-en uten å mene det. De er ikke samme sperre.
+    """
+    type_ = Innspilltype.objects.filter(pk=pk).first()
+    if type_ is None:
+        return _feil('Typen finnes ikke', status=404)
+
+    if request.method == 'DELETE':
+        if not er_global_admin(request.user):
+            return _nektet()
+        if not _json_body(request).get('confirm'):
+            return _feil('Sletting må bekreftes')
+        try:
+            type_.delete()
+        except ProtectedError:
+            brukt = type_.innspill.count()
+            return JsonResponse({'status': 'error', 'message': (
+                f'«{type_.navn}» er i bruk på {brukt} innspill og kan ikke '
+                f'slettes. Deaktiver den i stedet — da forsvinner den fra '
+                f'nedtrekket, men blir stående på dem som alt har den.'
+            )}, status=409)
+        return JsonResponse({'status': 'ok'})
+
+    data = _json_body(request)
+    if 'navn' in data:
+        navn = (data.get('navn') or '').strip()
+        if not navn:
+            return _feil('Navn må fylles ut')
+        if Innspilltype.objects.filter(navn__iexact=navn).exclude(pk=pk).exists():
+            return _feil(f'«{navn}» finnes allerede')
+        type_.navn = navn[:40]
+    if 'er_aktiv' in data:
+        type_.er_aktiv = bool(data.get('er_aktiv'))
+    type_.save()
+    return JsonResponse({'status': 'ok', 'data': {
+        'id': type_.pk, 'navn': type_.navn, 'er_aktiv': type_.er_aktiv,
+        'rekkefolge': type_.rekkefolge, 'i_bruk': type_.innspill.count()}})

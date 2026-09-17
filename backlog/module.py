@@ -11,8 +11,8 @@ oversettelsen bevarer rekkefølgen hans:
 | Hans | Portalens | Hva den får gjøre |
 |---|---|---|
 | les | `les` | Ser lista og filtrene |
-| les/skriv | `skriv_full` | Melder inn, og retter sitt eget innen fristen |
-| les/skriv full | `skriv_leder` | Setter løst og gjenåpner |
+| les/skriv | `skriv_full` | Melder inn, og redigerer sitt eget innen fristen |
+| les/skriv full | `skriv_leder` | Setter løst, gjenåpner, styrer typene |
 
 `skriv_handling` er hoppet over med vilje. Nivået er «navngitte overganger som
 **ikke leser request-kroppen**», og å melde inn et innspill er nettopp å lese
@@ -52,7 +52,7 @@ BacklogModule = Module(
     nivaaer=('les', 'skriv_full', 'skriv_leder'),
     nivaa_navn=(
         ('les', 'Lese: ser backloggen'),
-        ('skriv_full', 'Skrive: melder inn, retter sitt eget'),
+        ('skriv_full', 'Skrive: melder inn, redigerer sitt eget'),
         ('skriv_leder', 'Skrive full: leder backloggen, setter løst'),
     ),
 )

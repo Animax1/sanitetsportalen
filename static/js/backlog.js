@@ -60,8 +60,13 @@ function backlogTidspunkt(iso) {
     + ' ' + p(d.getHours()) + ':' + p(d.getMinutes());
 }
 
+// **Fargen følger navnet, ikke ID-en.** Typene er admin-styrte rader nå, så
+// det finnes ingen fast kodeverdi å slå opp. «Bug» er rød fordi den er en feil;
+// alt annet er nøytralt — en ny type admin finner på skal ikke arve en farge
+// som betyr noe den ikke er.
 function backlogTypemerke(rad) {
-  const klasse = rad.type === 'bug' ? 'text-bg-danger' : 'text-bg-info';
+  const erBug = (rad.type_navn || '').toLowerCase() === 'bug';
+  const klasse = erBug ? 'text-bg-danger' : 'text-bg-info';
   return '<span class="badge ' + klasse + '">' + escapeHtml(rad.type_navn) + '</span>';
 }
 
@@ -87,7 +92,7 @@ function backlogKort(rad) {
   }
   if (rad.kan_endres) {
     knapper += ' <button type="button" class="btn btn-sm btn-outline-primary"'
-      + ' data-action="backlogApneRediger" data-id="' + rad.id + '">Rett</button>'
+      + ' data-action="backlogApneRediger" data-id="' + rad.id + '">Rediger</button>'
       + ' <button type="button" class="btn btn-sm btn-outline-danger"'
       + ' data-action="backlogSlett" data-id="' + rad.id + '">Slett</button>';
   }
@@ -178,7 +183,7 @@ function backlogFeil(melding) {
 
 function backlogApneNy() {
   backlogRedigerer = null;
-  document.getElementById('backlog-modal-tittel').textContent = 'Meld inn';
+  document.getElementById('backlog-modal-tittel').textContent = 'Nytt innspill';
   document.getElementById('backlog-felt-tittel').value = '';
   document.getElementById('backlog-felt-beskrivelse').value = '';
   document.getElementById('backlog-felt-modul').value = '';
@@ -192,7 +197,7 @@ function backlogApneRediger(id) {
   const rad = backlogRader.find(r => r.id === id);
   if (!rad) return;
   backlogRedigerer = id;
-  document.getElementById('backlog-modal-tittel').textContent = 'Rett innspill';
+  document.getElementById('backlog-modal-tittel').textContent = 'Rediger innspill';
   document.getElementById('backlog-felt-tittel').value = rad.tittel;
   document.getElementById('backlog-felt-beskrivelse').value = rad.beskrivelse;
   document.getElementById('backlog-felt-modul').value = rad.modul_slug || '';
@@ -230,10 +235,112 @@ function backlogSettLost(id) { _backlogPost('/backlog/api/innspill/' + id + '/lo
 function backlogGjenapne(id) { _backlogPost('/backlog/api/innspill/' + id + '/gjenapne/'); }
 
 async function backlogSlett(id) {
-  if (!confirm('Slette innspillet? Det kan ikke angres.')) return;
+  if (!confirm('Slette innspillet? Dette kan ikke angres.')) return;
   const res = await apiFetch('/backlog/api/innspill/' + id + '/', {method: 'DELETE'});
   const svar = await res.json();
   if (svar.status === 'ok') backlogLast();
+}
+
+// ── Backloginnstillinger: typene ───────────────────────────────────────────
+
+function backlogInnstillingerFeil(melding) {
+  const boks = document.getElementById('backlog-innstillinger-feil');
+  if (!boks) return;
+  boks.textContent = melding || '';
+  boks.classList.toggle('d-none', !melding);
+}
+
+// **Teksten sier hva som kan gjøres med raden, ikke bare hva den er.** «I bruk
+// på 4» alene er et tall; «kan ikke slettes» er svaret på spørsmålet man
+// faktisk stiller når sletteknappen ikke er der.
+function backlogTypestatus(t) {
+  const deler = [];
+  if (!t.er_aktiv) deler.push('deaktivert');
+  if (t.i_bruk) deler.push('i bruk på ' + t.i_bruk + (t.i_bruk === 1 ? ' innspill' : ' innspill'));
+  return deler.join(' · ');
+}
+
+function backlogTyperad(t) {
+  const status = backlogTypestatus(t);
+  const statusHtml = status
+    ? ' <span class="small text-muted">(' + escapeHtml(status) + ')</span>'
+    : '';
+  let knapper = '<button type="button" class="btn btn-sm btn-outline-secondary"'
+    + ' data-action="backlogVippType" data-id="' + t.id + '">'
+    + (t.er_aktiv ? 'Deaktiver' : 'Aktiver') + '</button>';
+  // Sletting er global admin, og bare når ingen bruker typen. Knappen tegnes
+  // ikke ellers — serveren svarer 409 uansett, men en knapp som fører til en
+  // feilmelding er en knapp som fører til en vegg.
+  if ((window.MODUL_TILGANG || {}).admin && !t.i_bruk) {
+    knapper += ' <button type="button" class="btn btn-sm btn-outline-danger"'
+      + ' data-action="backlogSlettType" data-id="' + t.id + '">Slett</button>';
+  }
+  return '<div class="d-flex justify-content-between align-items-center gap-2 py-1">'
+    + '<span>' + escapeHtml(t.navn) + statusHtml + '</span>'
+    + '<span class="text-nowrap">' + knapper + '</span></div>';
+}
+
+function backlogTegnTyper(typer) {
+  const boks = document.getElementById('backlog-typeliste');
+  if (!boks) return;
+  boks.innerHTML = (typer || []).map(backlogTyperad).join('')
+    || '<p class="text-muted small mb-0">Ingen typer. Legg til én under.</p>';
+}
+
+async function backlogLastTyper() {
+  const res = await apiFetch('/backlog/api/typer/');
+  const svar = await res.json();
+  if (svar.status !== 'ok') return;
+  window.BACKLOG_TYPER = svar.data;
+  backlogTegnTyper(svar.data);
+  backlogFyllNedtrekk();
+}
+
+function backlogApneInnstillinger() {
+  backlogInnstillingerFeil('');
+  document.getElementById('backlog-ny-type').value = '';
+  backlogLastTyper();
+  bootstrap.Modal.getOrCreateInstance(
+    document.getElementById('backlog-innstillinger-modal')).show();
+}
+
+async function backlogLagreType() {
+  const felt = document.getElementById('backlog-ny-type');
+  const navn = (felt.value || '').trim();
+  if (!navn) { backlogInnstillingerFeil('Skriv et navn først'); return; }
+  await withSubmitGuard('backlog-ny-type-knapp', async () => {
+    const res = await apiFetch('/backlog/api/typer/',
+      {method: 'POST', body: JSON.stringify({navn: navn})});
+    const svar = await res.json();
+    if (svar.status !== 'ok') { backlogInnstillingerFeil(svar.message); return; }
+    felt.value = '';
+    backlogInnstillingerFeil('');
+    backlogLastTyper();
+  });
+}
+
+async function backlogVippType(id) {
+  const t = (window.BACKLOG_TYPER || []).find(x => x.id === id);
+  if (!t) return;
+  const res = await apiFetch('/backlog/api/typer/' + id + '/',
+    {method: 'PUT', body: JSON.stringify({er_aktiv: !t.er_aktiv})});
+  const svar = await res.json();
+  if (svar.status !== 'ok') { backlogInnstillingerFeil(svar.message); return; }
+  backlogInnstillingerFeil('');
+  backlogLastTyper();
+  backlogLast();
+}
+
+async function backlogSlettType(id) {
+  const t = (window.BACKLOG_TYPER || []).find(x => x.id === id);
+  if (!t) return;
+  if (!confirm('Slette typen «' + t.navn + '»? Dette kan ikke angres.')) return;
+  const res = await apiFetch('/backlog/api/typer/' + id + '/',
+    {method: 'DELETE', body: JSON.stringify({confirm: true})});
+  const svar = await res.json();
+  if (svar.status !== 'ok') { backlogInnstillingerFeil(svar.message); return; }
+  backlogInnstillingerFeil('');
+  backlogLastTyper();
 }
 
 // ── Oppstart ────────────────────────────────────────────────────────────────
@@ -243,11 +350,15 @@ function backlogFyllNedtrekk() {
   const moduler = window.BACKLOG_MODULER || [];
   const filterType = document.getElementById('backlog-filter-type');
   const feltType = document.getElementById('backlog-felt-type');
+  filterType.innerHTML = '<option value="">Alle</option>';
+  feltType.innerHTML = '';
   typer.forEach(t => {
-    filterType.insertAdjacentHTML('beforeend',
-      '<option value="' + escapeHtml(t.verdi) + '">' + escapeHtml(t.navn) + '</option>');
-    feltType.insertAdjacentHTML('beforeend',
-      '<option value="' + escapeHtml(t.verdi) + '">' + escapeHtml(t.navn) + '</option>');
+    const o = '<option value="' + t.id + '">' + escapeHtml(t.navn) + '</option>';
+    // **Filteret viser alle typene, skjemaet bare de aktive.** En deaktivert
+    // type må kunne filtreres fram — innspillene som har den finnes fortsatt —
+    // men den skal ikke kunne velges på noe nytt.
+    filterType.insertAdjacentHTML('beforeend', o);
+    if (t.er_aktiv) feltType.insertAdjacentHTML('beforeend', o);
   });
   const filterModul = document.getElementById('backlog-filter-modul');
   const feltModul = document.getElementById('backlog-felt-modul');
@@ -262,5 +373,7 @@ document.addEventListener('DOMContentLoaded', () => {
   backlogFyllNedtrekk();
   const knapp = document.getElementById('backlog-ny-knapp');
   if (knapp && backlogKanMeldeInn()) knapp.classList.remove('d-none');
+  const innst = document.getElementById('backlog-innstillinger-knapp');
+  if (innst && backlogKanLose()) innst.classList.remove('d-none');
   backlogLast();
 });

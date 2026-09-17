@@ -13,6 +13,8 @@ som går vakt — og det er derfor den er liten.
 | Regel | Hvor |
 |---|---|
 | Angrefristen — én time, forfatterens egen | `services.kan_endres()` |
+| Typene, som admin styrer | `models.Innspilltype`, `views.typer_view` |
+| Hvem som varsles om et nytt innspill | `varsler.meld_nytt_innspill()` |
 | Hva slags modul et innspill kan gjelde | `services.gyldig_modul_slug()` — utledet av registeret |
 | De tre nivåene og hva de betyr her | `module.py` |
 | Løst og gjenåpnet | `views.lost_view`, to navngitte stier |
@@ -30,6 +32,10 @@ portalfila er lastet først, fordi den peker på vakta med et heltall.
 ## Angrefristen måles fra opprettelsen, ikke fra siste endring
 
 André: «Forfatteren kan rette og slette sitt innlegg innen 1 time etter den kom.»
+
+I grensesnittet heter handlingen **«Rediger»**, ikke «Rett» (André, 17. sep. 2026: «mye
+tydeligere språk»). «Rett» leser som en korrigering av noe som er galt; det man som
+regel gjør er å legge til det man glemte.
 
 Fra endringstidspunktet ville hver retting forlenget fristen, og et innspill kunne holdes
 redigerbart i det uendelige ved å røre det hver time — da er ikke fristen en frist.
@@ -54,8 +60,8 @@ en knapp brukeren har lov til å trykke på.
 | Hans | Portalens | Hva den får gjøre |
 |---|---|---|
 | les | `les` | Ser lista og filtrene |
-| les/skriv | `skriv_full` | Melder inn, og retter sitt eget innen fristen |
-| les/skriv full | `skriv_leder` | Setter løst og gjenåpner |
+| les/skriv | `skriv_full` | Melder inn, og redigerer sitt eget innen fristen |
+| les/skriv full | `skriv_leder` | Setter løst, gjenåpner, og styrer typene i «Backloginnstillinger» |
 
 `skriv_handling` er **hoppet over med vilje**. Nivået er «navngitte overganger som ikke
 leser request-kroppen», og å melde inn et innspill er nettopp å lese kroppen. Å bruke det
@@ -74,15 +80,50 @@ den som filtrerte ville lest det som at det ikke finnes noen uløste. Et ukjent
 filter*navn* ignoreres derimot — en lenke fra en gammel fane skal vise lista, ikke en
 feilmelding.
 
-## Typen er `choices`, ikke en tabell
+## Typen er en tabell — og var `choices` i én dag
 
-I motsetning til `vaktliste.Ressursgruppe` og oppdragsmodulens verdimengder. Skillet er om
-verdimengden er **organisasjonens** eller **portalens**: en vaktleder kan trenge en
-dronegruppe i kveld og kan ikke vente på en utrulling, mens «er dette en feil eller et
-ønske» er et strukturelt skille som ikke endrer seg med arrangementet.
+Jeg valgte `choices` med den begrunnelsen at «er dette en feil eller et ønske» er et
+strukturelt skille som ikke endrer seg med arrangementet. André snudde det samme dag: «Kan
+ikke admin få legge til flere typer?»
 
-Trengs en tredje verdi en dag, er det en migrasjon på én linje. Blir de mange og skiftende,
-er `Verdimengde` i oppdragsmodulen mønsteret å flytte til.
+Han har rett, og begrunnelsen min var for smal. Behovet som melder seg — «spørsmål»,
+«teknisk gjeld», «dokumentasjon» — skal ikke vente på en utrulling, like lite som en
+dronegruppe i vaktlista skal det. Mønsteret er `oppdrag/views_verdier.py`: **navn,
+`er_aktiv`, `rekkefolge`, og sletting bare når ingen bruker raden.**
+
+**`er_aktiv` er viktigere enn sletting.** En type som har vært i bruk kan ikke fjernes uten
+å ta innspillene med seg (`PROTECT`), og da er «skjul den fra nedtrekket» det svaret man
+faktisk vil ha. Derfor:
+
+- filteret viser **alle** typene — en deaktivert type må kunne filtreres fram, innspillene
+  som har den finnes fortsatt
+- skjemaet viser **bare de aktive** — den skal ikke kunne velges på noe nytt
+- serveren håndhever det siste i `_hent_aktiv_type()`, ikke bare klienten
+
+**409-svaret bærer rådet, ikke bare avslaget.** «Kan ikke slettes» alene etterlater brukeren
+uten en vei videre, og da er neste trekk å slette innspillene i stedet — altså å miste det
+sperren fantes for å verne.
+
+**Migrasjonen er delt i tre** (`0002`–`0004`), og det er ikke pynt: `0003` fyller FK-en med
+data, og `0004` fjerner den gamle kolonnen. Står de i samme migrasjon, er det en skriving
+etterfulgt av `ALTER TABLE` i én transaksjon — fella som tok ned deployen 30. aug. 2026. Å
+dele migrasjonen i to er den tredje av de tre dokumenterte veiene ut.
+
+## Varselet går til dem som kan løse, ikke til alle som kan lese
+
+`varsler.meld_nytt_innspill()`. Mottakerne er kontoene med `skriv_leder` på `backlog`,
+pluss global admin — som står utenfor modulaksen og har toppen av stigen uansett.
+
+**En bjelle som pling-er for folk som ikke kan gjøre noe, er en bjelle man slår av** — og da
+varsler den ikke den gangen det haster. **Innsenderen varsles ikke om sitt eget**, av samme
+grunn.
+
+Teksten bærer **tittelen**, ikke bare «nytt innspill»: det er tittelen som avgjør om man går
+og ser nå eller i morgen. Og `notify()` dedupliserer på *meldingen* siste 24 timer, så to
+ulike innspill gir to varsler mens et dobbelttrykk gir ett.
+
+**Varselet er en sideeffekt, ikke en del av innmeldingen.** `meld_nytt_innspill()` kaster
+aldri — et innspill skal ikke gå tapt fordi bjella feilet.
 
 ## Ingen feltnivå-audit, og begrunnelsen står her
 
