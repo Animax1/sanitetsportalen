@@ -271,3 +271,56 @@ class SidebarenTests(TestCase):
         self._logg_inn_som(bruker)
         Session.objects.update(expire_date=timezone.now() - timedelta(days=1))
         self.assertEqual(tilstede(), [])
+
+
+@override_settings(SECURE_SSL_REDIRECT=False, RATELIMIT_ENABLE=False)
+class SidenHarIngenFanerTests(TestCase):
+    """Flatene skal stå ved siden av hverandre, ikke bak hverandre.
+
+    **Regelen har ingen kjøretid** — den bor i markupen — så den prøves ved å
+    rendre det ekte viewet og se på svaret, ikke ved å lese malfila. Da fanges
+    også en fane som kommer inn via et inkludert partial.
+
+    Pulje 1 la de fire flatene i `nav-tabs`. Det er feil form her: tre av fire
+    trengs for å fullføre **én** handling (hør, før linja, se hvem som er
+    ledig, send), og en skjult fane er dessuten en fane man ikke vet har endret
+    seg — siden poller, så andres logglinjer og nye oppdrag lander i en rute
+    ingen ser på. Se `ko/CLAUDE.md`.
+    """
+
+    def setUp(self):
+        self.client = Client()
+        bruker = _bruker('operator')
+        _gi_ko(bruker, 'skriv_full')
+        self.client.force_login(bruker)
+
+    def _markup(self) -> str:
+        svar = self.client.get('/ko/')
+        self.assertEqual(svar.status_code, 200)
+        return svar.content.decode()
+
+    def test_ingen_fanemekanikk_i_markupen(self):
+        markup = self._markup()
+        for spor in ('nav-tabs', 'data-bs-toggle="tab"', 'tab-pane',
+                     'role="tablist"'):
+            with self.subTest(spor=spor):
+                self.assertNotIn(
+                    spor, markup,
+                    f'{spor} er tilbake på /ko/ — flatene skal stå ved siden '
+                    f'av hverandre. En ny flate legges i en av kolonnene, '
+                    f'aldri som en fane til')
+
+    def test_loggen_og_tavla_staar_samtidig(self):
+        """Det er *dette* fraværet av faner skal gi, og derfor det som prøves.
+
+        En test som bare nektet `nav-tabs` ville gått grønn om noen skjulte
+        flatene med en annen mekanisme — et `d-none` og en egen knapp gjør
+        samme skade uten å hete det samme.
+        """
+        markup = self._markup()
+        self.assertIn('id="ko-logg-form"', markup, 'skrivefeltet mangler')
+        self.assertIn('id="ko-logg-liste"', markup, 'loggstrømmen mangler')
+        self.assertIn('Ressursoversikt', markup, 'tavla mangler')
+        self.assertIn('Oppdrag og hendelser', markup, 'oppdragsflata mangler')
+        self.assertNotIn('d-none', markup.split('id="ko-logg-form"')[0][-400:],
+                         'noe skjuler loggen ved lasting')

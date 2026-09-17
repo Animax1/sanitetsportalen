@@ -582,7 +582,9 @@ status og modul. Modulens egne regler står i [`backlog/CLAUDE.md`](./backlog/CL
 ### KO-modulen — se [`docs/FORSLAG_KO.md`](./docs/FORSLAG_KO.md)
 
 **Notatet er fortsatt et forslag** (17. sep. 2026), men **pulje 1 er bygget**: modulen er
-registrert, `/ko/` finnes med de fire flatene og sidebaren, og `ModulTilgang('ko')` virker.
+registrert, `/ko/` finnes med sidebaren, og `ModulTilgang('ko')` virker. **Siden har ingen
+faner** — flatene står i to kolonner, og hendelser er en gruppering av oppdragslista og ikke
+en femte flate (§7, rettet 17. sep. 2026 etter André).
 Modulens egne regler står i [`ko/CLAUDE.md`](./ko/CLAUDE.md). `/oppdrag/` snevres inn til
 enhetens egen skjerm, og **sentralbordet flytter til KO** — en flytting av
 `oppdrag-sentral-*.js`, ikke en kopi. Puljene står i §10.
@@ -596,8 +598,9 @@ og ni kuraterte systemhendelser i `ko/systemlinjer.py`.*
 
 - [ ] **Historikkflate: lese tidligere vakters logg.** Nivået finnes alt
       (`skriv_leder`, `ko/module.py`) og linjene overlever vaktarkiveringen, så dette er
-      en flate og ikke en datamodell. Hører til pulje 3, der hendelsesoversikten uansett
-      trenger en «velg vakt»-kontroll.
+      en flate og ikke en datamodell. Den kan tas alene når som helst; billigst sammen
+      med den puljen som uansett trenger en «velg vakt»-kontroll, og det er nå pulje 5
+      (hendelser) etter omstokkingen 17. sep. 2026.
 
       **Vinduet som betyr noe er de tre ukene etter vakta**, ikke året etter: §4.2 sier
       loggen er «i praksis et dokument man leser etter et arrangement der noe gikk galt»,
@@ -611,10 +614,55 @@ og ni kuraterte systemhendelser i `ko/systemlinjer.py`.*
       av flere samtidig rundt et bord. Rendres server-side fra de samme `_til_dict`-radene,
       slik at papiret og skjermen sier det samme.
 
-- [ ] **Pulje 3 — hendelser.** `Hendelse`, nummerserien, linje → hendelse, oversikten,
-      lukking med 409 og `confirm`. Krever loggen.
+- [ ] **Pulje 3 — ressursoversikten.** Projeksjonen i §3.1, KO-ført status for dem som ikke
+      stempler selv, og rutingflagget på `Ressursgruppe`. **Flyttet fram fra 4 til 3**
+      17. sep. 2026: den er uavhengig av alt annet, og den er den flata operatøren
+      faktisk sitter og ser på. Ligger øverst i venstre kolonne (§7).
 
-      - [ ] **Åpent valg, besvares før pulje 3 (hendelser):** skal en lukket hendelse kunne
+      - [ ] **Vaktlistas stemplinger inn i loggen — vurderes her, ikke før.** Utelatt
+            bevisst i pulje 2 (`ko/systemlinjer.py`): «Lag 3 gikk av vakt» er ekte
+            situasjonsinformasjon, men per-person-stempling på hver vaktpost ville druknet
+            loggen ved hvert vaktskifte. Løftes det, skal det være **ressursen** som går
+            av og på vakt, ikke personen — og da trenger lag-begrepet det hjemmet denne puljen
+            gir det.
+
+- [ ] **Pulje 4 — sentralbordet flyttes.** `oppdrag-sentral-*.js` blir KO sine,
+      `oppdrag-enhet.js` blir hele `/oppdrag/`, og `Oppdrag` får den nullbare FK-en
+      `hendelse`. Den største, og den eneste som rører `/oppdrag/`.
+
+      **Den blokkerer nå hendelser** (flyttet fram fra 5 til 4, 17. sep. 2026). Etter
+      §7 er en hendelse en *gruppering av oppdragslista*, ikke en egen flate — og en
+      gruppering av noe som ikke er der ennå lar seg ikke prøve. Blir denne lang, er
+      det ressursoversikten som er levert i mellomtiden, og den er nyttig alene.
+
+      - [ ] **Systemlinjer som trenger *intensjon* må dytte, ikke leses av et signal.**
+            Løftet i pulje 2 går med signaler på `oppdrag`-modellene, og forbeholdet står
+            i `ko/systemlinjer.py`: et signal ser raden, ikke hvorfor. «Avbrutt fordi
+            ingen svarte» og «avbrutt fordi pasienten gikk hjem» er samme rad. Trengs
+            skillet, bygges et push-register i `core` etter mønsteret fra
+            `core/driftstatus.py` — og denne puljen er uansett den som rører
+            `oppdrag/`, så det er da det er billig.
+
+      - [ ] **FK-en er den ene kanten som går oppover, og den må navngis.** `KJENTE_UNNTAK`
+            i [`ko/tests_avhengighet.py`](./ko/tests_avhengighet.py) er stedet — men merk at
+            en FK med strengreferanse (`'ko.Hendelse'`) ikke krever en Python-import, så
+            unntaket trengs bare hvis noe i `oppdrag/` faktisk importerer `ko`.
+
+      - [ ] **Tuplene i `patients/js_test_utils.py` og `<script>`-rekkefølgen i malen følger
+            med filene**, og 1 800-linjersgrensa gjelder uendret. Flyttes filene uten
+            tuplene, leser `read_js()` en side som ikke lastes lenger — og skanningen blir
+            grønn på feil kilde.
+
+- [ ] **Pulje 5 — hendelser.** `Hendelse`, nummerserien, linje → hendelse, lukking med
+      409 og `confirm`. **Ikke en egen flate:** en gruppering av oppdragslista fra
+      pulje 4, med en bryter på lista (§7). `Oppdrag.hendelse` er grupperingen, og
+      §4.6-sperra krever at operatøren ser hendelsens åpne oppdrag i det hun lukker
+      den — to flater ville lagt nettopp den opplysningen der hun ikke står.
+
+      Krever loggen **og** oppdragslista, og er derfor flyttet fra 3 til 5
+      (17. sep. 2026).
+
+      - [ ] **Åpent valg, besvares før denne puljen:** skal en lukket hendelse kunne
             åpnes igjen? Sannsynligvis ja, som en ny logglinje — men det er en operativ
             avgjørelse.
 
@@ -631,39 +679,6 @@ og ni kuraterte systemhendelser i `ko/systemlinjer.py`.*
             Formen står **ett sted** i KO: `_oppdrag()` i `ko/systemlinjer.py`. Det er
             derfor systemlinjene lagres som kode + data og ikke som ferdig tekst — hele
             historikken skifter form når den funksjonen endres, uten en migrasjon.
-
-- [ ] **Pulje 4 — ressursoversikten.** Projeksjonen i §3.1, KO-ført status for dem som ikke
-      stempler selv, og rutingflagget på `Ressursgruppe`. Uavhengig av 2 og 3; kan bytte
-      plass med dem.
-
-      - [ ] **Vaktlistas stemplinger inn i loggen — vurderes her, ikke før.** Utelatt
-            bevisst i pulje 2 (`ko/systemlinjer.py`): «Lag 3 gikk av vakt» er ekte
-            situasjonsinformasjon, men per-person-stempling på hver vaktpost ville druknet
-            loggen ved hvert vaktskifte. Løftes det, skal det være **ressursen** som går
-            av og på vakt, ikke personen — og da trenger lag-begrepet det hjemmet pulje 4
-            gir det.
-
-- [ ] **Pulje 5 — sentralbordet flyttes.** `oppdrag-sentral-*.js` blir KO sine,
-      `oppdrag-enhet.js` blir hele `/oppdrag/`, og `Oppdrag` får den nullbare FK-en
-      `hendelse`. Den største, og den eneste som rører `/oppdrag/`.
-
-      - [ ] **Systemlinjer som trenger *intensjon* må dytte, ikke leses av et signal.**
-            Løftet i pulje 2 går med signaler på `oppdrag`-modellene, og forbeholdet står
-            i `ko/systemlinjer.py`: et signal ser raden, ikke hvorfor. «Avbrutt fordi
-            ingen svarte» og «avbrutt fordi pasienten gikk hjem» er samme rad. Trengs
-            skillet, bygges et push-register i `core` etter mønsteret fra
-            `core/driftstatus.py` — og pulje 5 er uansett den puljen som rører
-            `oppdrag/`, så det er da det er billig.
-
-      - [ ] **FK-en er den ene kanten som går oppover, og den må navngis.** `KJENTE_UNNTAK`
-            i [`ko/tests_avhengighet.py`](./ko/tests_avhengighet.py) er stedet — men merk at
-            en FK med strengreferanse (`'ko.Hendelse'`) ikke krever en Python-import, så
-            unntaket trengs bare hvis noe i `oppdrag/` faktisk importerer `ko`.
-
-      - [ ] **Tuplene i `patients/js_test_utils.py` og `<script>`-rekkefølgen i malen følger
-            med filene**, og 1 800-linjersgrensa gjelder uendret. Flyttes filene uten
-            tuplene, leser `read_js()` en side som ikke lastes lenger — og skanningen blir
-            grønn på feil kilde.
 
 - [ ] **Pulje 6 — chat og filter.** Admin-bryter for uformelle linjer (som er logglinjer
       uten hendelse, ikke en egen tabell), og filter per operatør husket i nettleseren.

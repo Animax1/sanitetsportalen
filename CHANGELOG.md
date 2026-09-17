@@ -4,6 +4,81 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-17 — KO uten faner: flatene står ved siden av hverandre  `#ko/skallet`
+
+André, om skallet: «Å ha de som 4 faner med ressursoversikt, oppdragsliste, logg og
+hendelser er dårlig ux. Det må faktisk fikses.» Og: knappen for å føre en logglinje het
+«Før» — «virker som et dårlig oversatt ord til norsk». Den heter **«Ny»** nå.
+
+### Hvorfor faner var feil form her
+
+En fane er riktig når flatene er *alternativer* — man gjør det ene eller det andre. KOs
+flater brukes i **én** bevegelse: sambandet sier noe, du fører linja, du ser hvem som er
+ledig, og du sender. Tre av fire trengs for å fullføre én handling, og hver fane koster et
+bytte som mister det du leste.
+
+Den andre kostnaden er verre, og den gjør ikke vondt før det haster: **en skjult fane er en
+fane du ikke vet har endret seg.** Siden poller (§7.1), så en annen operatørs logglinje, et
+nytt oppdrag eller en ressurs som nettopp ble opptatt lander i en rute ingen ser på. Et
+merke sier *at* noe skjedde, ikke *hva* — enda et klikk midt i sambandstrafikk, mens hele
+grunnen til at KO finnes er at situasjonsbildet skal være i ett blikk. Det er også derfor
+vaktsentraler, ICS-tavler og stripbord er samtidige paneler: statusbildet skjules ikke.
+
+**Notatet sa aldri «faner».** §7 sto som «fire flater, én side», og pulje 1 leste det som
+`nav-tabs`. Det er verdt å merke seg for neste notat: «én side» og «én skjerm» er ikke det
+samme, og ordet som manglet var *samtidig*.
+
+### Formen nå: to kolonner, tre flater
+
+Venstre: ressursoversikten øverst (den skannes hele tiden), oppdrag under (der man handler).
+Høyre: loggen som fast panel med skrivefeltet øverst, og sidebaren over seg. Loggen er smal,
+skrives konstant og leses konstant — den hører hjemme som et panel, ikke bak en fane.
+Sidebaren fikk ikke beholde sin egen kolonne: den er en håndfull navn, og en tredje kolonne
+ville tatt bredde fra loggen på nøyaktig de skjermene KO brukes på.
+
+**Under `xl` stables kolonnene, og det er akseptert og ikke løst.** KO brukes på en skjerm i
+et kommandopunkt, og en telefon kan uansett ikke vise en ressurstavle. Kommer kravet om
+mobil, er det en egen oppgave — og svaret er ikke faner.
+
+### Hendelser er en gruppering, ikke en flate — og det flytter to puljer
+
+Fire flater ble tre, og den som forsvant er «Hendelser». `Oppdrag.hendelse` er en nullbar FK
+(§3.3): hendelsen *er* grupperingen. Og §4.6 sperrer lukking med 409 når hendelsen har åpne
+oppdrag — operatøren må altså se hendelsens oppdrag i det hun lukker den, og to flater ville
+lagt nøyaktig den opplysningen i den fana hun ikke står i. Grupperingen blir en bryter på
+lista: de fleste oppdrag har `hendelse = NULL`, og en permanent «Uten hendelse»-bøtte med
+mesteparten av radene er et tegn på at grupperingen ikke duger som hovedakse.
+
+Det endrer rekkefølgen på puljene, og endringen følger av formen og ikke av en preferanse:
+
+| Var | Er | Hvorfor |
+|---|---|---|
+| 3 — hendelser | **3 — ressursoversikten** | Uavhengig av alt annet, og den flata operatøren faktisk sitter og ser på. Kommer to puljer tidligere |
+| 4 — ressursoversikten | **4 — sentralbordet flyttes** | Blokkerer nå hendelser |
+| 5 — sentralbordet flyttes | **5 — hendelser** | En gruppering av en liste som ikke er der ennå, lar seg ikke prøve |
+
+Prisen står i TODO: pulje 4 var «den største» og er nå også den som blokkerer. Blir den
+lang, er ressursoversikten levert i mellomtiden, og den er nyttig alene.
+
+### Hvorfor nå og ikke i pulje 5
+
+Tre av fire flater er fortsatt tomme. Å rette formen nå er å flytte fire kort i en mal; å
+rette den etter pulje 5 er å bygge om tre fylte skjermer, hver med sin polling og sin
+tilstand. **Den billigste dagen å rette en layout på er den siste dagen den er tom.**
+
+### Testen, og hvorfor den har to halvdeler
+
+`SidenHarIngenFanerTests` rendrer det ekte viewet — ikke malfila, så en fane som kommer inn
+via et partial fanges også. Den nekter `nav-tabs`, `tab-pane`, `role="tablist"` og
+`data-bs-toggle="tab"`, **og** krever at loggen og tavla faktisk står samtidig. Bare den
+første ville gått grønn om noen skjulte en flate med `d-none` og en egen knapp i stedet —
+samme skade, annet navn.
+
+**3 mutanter** (lett lag: markup som bærer en regel). Fanen satt inn igjen, tavla omdøpt,
+loggen skjult med `d-none` ved lasting. Alle drept.
+
+---
+
 ## 2026-09-17 — Gjenopprettingsrekkefølgen står i kode, ikke i fire dokumenter  `#core/backup` `#core/dokumentasjon`
 
 Avstemming etter at KO pulje 2 og backlog-kommentarene ble flettet på `rollemodell`.

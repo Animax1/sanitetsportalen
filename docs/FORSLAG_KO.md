@@ -325,15 +325,47 @@ tredje serie er en tredje ting å forveksle. En kvittering til den som registrer
 
 ## 7. Grensesnittet
 
-Fire flater, én side:
+> **Rettet 17. sep. 2026, etter André.** Notatet sa «fire flater, én side», og pulje 1 leste
+> det som fire faner. Det var feil form, og retting nå er billig fordi tre av de fire
+> flatene fortsatt er tomme — i pulje 5 ville det vært en ombygging av tre fylte skjermer.
 
-| Flate | Innhold |
-|---|---|
-| **Ressursoversikt** | Tavla fra §3.1 — enheter og alt annet som bemannes |
-| **Oppdragsliste** | Sentralbordet, flyttet fra `/oppdrag/` |
-| **Logg / chat** | Strømmen, med «Ny hendelse» på en linje |
-| **Hendelser** | Pågående hendelser, hver med sine linjer og sine oppdrag |
-| *Sidebar* | Vis/skjul, påloggede med KO-tilgang |
+**Ingen faner.** En fane er riktig når flatene er *alternativer*: man gjør det ene eller det
+andre. KOs flater brukes i **én** bevegelse — sambandet sier noe, du fører linja, du ser
+hvem som er ledig, og du sender. Tre av fire trengs for å fullføre én handling, og hver
+fane koster et bytte som mister det du leste.
+
+Den andre kostnaden er verre, og den er lett å overse fordi den ikke gjør vondt før det
+haster: **en skjult fane er en fane du ikke vet har endret seg.** Siden poller (§7.1), så
+en annen operatørs logglinje, et nytt oppdrag eller en ressurs som nettopp ble opptatt
+lander i en rute ingen ser på. Et merke på fanen sier *at* noe skjedde, ikke *hva* — enda
+et klikk midt i sambandstrafikk, mens hele grunnen til at KO finnes er at situasjonsbildet
+skal være i ett blikk. Det er også derfor ekte utrykningsflater — vaktsentraler, ICS-tavler,
+stripbord — er samtidige paneler og aldri faner: statusbildet skjules ikke.
+
+**To kolonner, tre flater:**
+
+| Hvor | Flate | Innhold |
+|---|---|---|
+| Venstre, øverst | **Ressursoversikt** | Tavla fra §3.1 — enheter og alt annet som bemannes. Den skannes hele tiden, og ligger derfor der øyet faller |
+| Venstre, under | **Oppdrag og hendelser** | Sentralbordet, flyttet fra `/oppdrag/`. Hendelser er en **gruppering av denne lista**, ikke en egen flate |
+| Høyre | **Logg / chat** | Strømmen, med skrivefeltet øverst. Fast panel: smal, skrives konstant, leses konstant |
+| Høyre, over loggen | *Sidebar* | Vis/skjul, påloggede med KO-tilgang. En håndfull navn — den trenger ingen egen kolonne, og en tredje kolonne ville tatt bredde fra loggen |
+
+**Hendelser slått sammen med oppdragslista er den ene endringen som også er en
+forenkling.** `Oppdrag.hendelse` er en nullbar FK (§3.3) — hendelsen *er* grupperingen — og
+§4.6 sperrer lukking med 409 når hendelsen har åpne oppdrag. Operatøren må altså se
+hendelsens oppdrag i det hun lukker den, og to flater ville lagt nøyaktig den opplysningen
+i den fana hun ikke står i. Grupperingen er derfor en bryter på lista: de fleste oppdrag har
+`hendelse = NULL`, og en permanent «Uten hendelse»-bøtte med mesteparten av radene er et
+tegn på at grupperingen ikke duger som hovedakse.
+
+**Under `xl` stables kolonnene, og det er akseptert og ikke løst.** KO brukes på en skjerm i
+et kommandopunkt; en telefon kan uansett ikke vise en ressurstavle. Kommer kravet om mobil,
+er det en egen oppgave — og svaret er ikke faner.
+
+`ko/tests.py::SidenHarIngenFanerTests` håndhever begge deler: ingen fanemekanikk i markupen,
+*og* at loggen og tavla faktisk står samtidig. Bare den første ville gått grønn om noen
+skjulte en flate med `d-none` og en egen knapp i stedet.
 
 **Sentralbordkoden flyttes, ikke kopieres.** `oppdrag-sentral-*.js` (fire filer) blir KO
 sine; `oppdrag-enhet.js` blir hele `/oppdrag/`. Regelen om at hver del skal være under
@@ -450,15 +482,31 @@ til del av pasientjournalen, og det er nettopp det grensen i §4.4 unngår.
 Den minste KO som er nyttig på én ekte vakt er hendelser, logg og ressursoversikt. Chat,
 filtre og statistikk er forbedringer *av* det bildet og legges oppå uten å rive noe.
 
+> **Rekkefølgen er justert 17. sep. 2026** som følge av §7: hendelser er ikke lenger en egen
+> flate, men en gruppering av oppdragslista, og må derfor komme *etter* den.
+
 | Pulje | Innhold | Hvorfor den rekkefølgen |
 |---|---|---|
-| **1 — Skallet** ✅ | Modulen registrert, `ModulTilgang('ko')`, side med de fire flatene, sidebar | Tilgangen må virke før noe legges bak den |
-| **2 — Loggen** | Logglinjer, retting, sletteinngang, polling med `?siden=` | Alt annet skriver inn i den |
-| **3 — Hendelser** | `Hendelse`, nummerserie, linje → hendelse, oversikt, lukking med 409 | Krever loggen |
-| **4 — Ressursoversikten** | Projeksjonen i §3.1, KO-ført status, rutingflagget | Uavhengig av 2 og 3; kan bytte plass |
-| **5 — Sentralbordet flyttes** | `oppdrag-sentral-*.js` → KO, `Oppdrag.hendelse` | Den største, og den eneste som rører `/oppdrag/` |
+| **1 — Skallet** ✅ | Modulen registrert, `ModulTilgang('ko')`, siden, sidebar | Tilgangen må virke før noe legges bak den |
+| **2 — Loggen** ✅ | Logglinjer, retting, sletteinngang, polling med `?siden=`, ni systemhendelser, oppbevaring | Alt annet skriver inn i den |
+| **3 — Ressursoversikten** | Projeksjonen i §3.1, KO-ført status, rutingflagget | **Byttet med hendelser 17. sep. 2026.** Se under |
+| **4 — Sentralbordet flyttes** | `oppdrag-sentral-*.js` → KO, oppdragslista inn i venstre kolonne | Den eneste som rører `/oppdrag/`. Må stå før hendelser, som grupperer den |
+| **5 — Hendelser** | `Hendelse`, nummerserie, linje → hendelse, gruppering av oppdragslista, lukking med 409 | Er en gruppering *av* pulje 4, og kan ikke bygges før lista den grupperer er her |
 | **6 — Chat og filter** | Admin-bryter, uformelle linjer, filter per operatør | Forbedringer |
 | **7 — Statistikk** | Kilde i `core/stats.py`, tallene i §8 | Trenger data fra en ekte vakt først |
+
+**Hvorfor 3 og 5 byttet plass.** Så lenge «Hendelser» var en egen fane, kunne den bygges
+uten oppdragslista — den hadde sin egen tomme skjerm å fylle. Nå er den en **gruppering av
+oppdragslista** (§7), og en gruppering av noe som ikke er der ennå er en skjerm som ikke lar
+seg prøve: `Oppdrag.hendelse` ville fått en FK uten en flate som viser den, og §4.6-sperra
+(«409 når hendelsen har åpne oppdrag») ville vært umulig å vise operatøren.
+
+Rekkefølgen er altså ikke en preferanse — den følger av formen. Og gevinsten er at
+ressursoversikten, som er den flata en operatør faktisk sitter og ser på, kommer **to puljer
+tidligere** enn før.
+
+Prisen skal stå: pulje 4 var «den største» og er nå også den som blokkerer. Blir den lang,
+er det ressursoversikten (pulje 3) som er levert i mellomtiden, og den er nyttig alene.
 
 `/park/` får sitt eget notat og kommer etter. Flagget i §3.2 hører til der, men er nevnt her
 fordi det er samme valg.

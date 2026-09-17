@@ -5,9 +5,28 @@
 > gjelder her også. Regelen for hva som står hvor: ligger koden i en app, står regelen
 > her; gjelder den alle, står den i rota.
 
-Pulje 1 levert (skallet: modulen registrert, `/ko/` med de fire flatene, sidebaren) og
-**pulje 2** (loggen). Pulje 3–7 gjenstår — se `docs/FORSLAG_KO.md` §10, som er et
-**forslag**, ikke besluttet.
+Pulje 1 levert (skallet: modulen registrert, `/ko/`, sidebaren) og **pulje 2** (loggen).
+Pulje 3–7 gjenstår — se `docs/FORSLAG_KO.md` §10, som er et **forslag**, ikke besluttet.
+
+**Siden har ingen faner, og det er en regel og ikke en smakssak** (André, 17. sep. 2026).
+Pulje 1 la de fire flatene i `nav-tabs`. En fane er riktig når flatene er *alternativer* —
+man gjør det ene eller det andre. KOs flater brukes i **én** bevegelse: sambandet sier noe,
+du fører linja, du ser hvem som er ledig, og du sender. Tre av fire trengs for å fullføre
+én handling.
+
+Den andre kostnaden er verre enn byttet: **en skjult fane er en fane du ikke vet har endret
+seg.** Siden poller, så en annen operatørs logglinje, et nytt oppdrag eller en ressurs som
+nettopp ble opptatt lander i en rute ingen ser på. Et merke sier *at* noe skjedde, ikke
+*hva*, og det er enda et klikk midt i sambandstrafikk — mens hele grunnen til at KO finnes
+er at situasjonsbildet skal være i ett blikk.
+
+Formen er derfor **to kolonner**: tavla og oppdragene til venstre, loggen som fast panel
+til høyre med sidebaren over seg. Loggen er smal og skrives konstant; den hører hjemme som
+et panel. En ny flate legges *i* en av kolonnene, aldri som en femte fane.
+
+**Under `xl` stables kolonnene**, og da er loggen under oppdragene. Det er ikke løst, det
+er akseptert: KO brukes på en skjerm i et kommandopunkt, og en telefon kan uansett ikke
+vise en ressurstavle. Kommer kravet om mobil, er det en egen oppgave — ikke en fane.
 
 **`/oppdrag/` er enhetsverktøyet, `/ko/` er situasjonsverktøyet.** Én bil, én
 statusmaskin, én stempling om gangen — mot hva skjer på arrangementet, hvem er hvor, hva

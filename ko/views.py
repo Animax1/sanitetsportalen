@@ -16,10 +16,14 @@ logg uten å slå opp hva som sto i den. Her betyr det dessuten at de to
 tilgangsnivåene ligger på hver sin dekoratør, i stedet for i en `if` inne i et
 delt view.
 
-**De tre gjenstående flatene er tomme, og de sier det selv.** En
-«Oppdragsliste»-fane som bare er blank ser ødelagt ut — særlig mens
-sentralbordet fortsatt står på `/oppdrag/` og flyttes først i pulje 5. Hver tom
-flate bærer derfor én linje om hva som kommer og hvor tingen bor i dag.
+**De gjenstående flatene er tomme, og de sier det selv.** Et «Oppdrag»-kort
+som bare er blankt ser ødelagt ut — særlig mens sentralbordet fortsatt står på
+`/oppdrag/` og flyttes først i pulje 5. Hver tom flate bærer derfor én linje om
+hva som kommer og hvor tingen bor i dag.
+
+**Flatene er kolonner, ikke faner** (17. sep. 2026). Se `ko/CLAUDE.md`: tre av
+fire trengs for å fullføre én handling, og en skjult fane er en fane du ikke vet
+har endret seg.
 
 **Loggen er scopet til aktiv vakt**, og det er ikke bare et filter: `les`
 betyr «denne vakta». Tidligere vakters logg er `skriv_leder` og får sin egen

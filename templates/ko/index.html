@@ -4,11 +4,28 @@
 {% block title %}KO – Sanitetsportalen{% endblock %}
 
 {% comment %}
-  **Pulje 2: loggen.** Fire flater og en sidebar; loggen er fylt, de tre andre
-  kommer i pulje 3–5. Se docs/FORSLAG_KO.md §4 og §7.
+  **Pulje 2: loggen.** Se docs/FORSLAG_KO.md §4 og §7.
 
-  Hver tom flate sier hva som kommer og hvor tingen bor i dag. En blank fane
-  ser ødelagt ut — særlig «Oppdragsliste», som beskriver noe som *finnes*, bare
+  **Ingen faner.** Skallet i pulje 1 la de fire flatene i `nav-tabs`, og det var
+  feil form (André, 17. sep. 2026). En fane er riktig når flatene er
+  *alternativer* — man gjør det ene eller det andre. KOs flater brukes i **én**
+  bevegelse: sambandet sier noe, du fører linja, du ser hvem som er ledig, og du
+  sender. Tre av fire flater trengs for å fullføre én handling, og hver fane
+  koster et bytte som mister det du leste.
+
+  Den andre kostnaden er verre: **en skjult fane er en fane du ikke vet har
+  endret seg.** Siden poller (§7.1), så en annen operatørs logglinje, et nytt
+  oppdrag eller en ressurs som nettopp ble opptatt lander i en rute du ikke ser.
+  Et merke forteller *at* noe skjedde, ikke *hva* — og da er det enda et klikk
+  midt i sambandstrafikk. Hele grunnen til at KO finnes er at situasjonsbildet
+  skal være i ett blikk.
+
+  Formen er derfor: **tavla og oppdragene til venstre, loggen som fast
+  kolonne til høyre.** Loggen er smal (tekstlinjer), skrives konstant og leses
+  konstant — den hører hjemme som et panel, ikke bak en fane.
+
+  Hver tom flate sier hva som kommer og hvor tingen bor i dag. En blank flate
+  ser ødelagt ut — særlig «Oppdrag», som beskriver noe som *finnes*, bare
   på /oppdrag/ til pulje 5 flytter den.
 
   Ingen egen CSS-fil: portal.css overstyrer allerede .text-muted og .form-text
@@ -43,163 +60,89 @@
   </div>
 
   <div class="alert alert-secondary py-2 px-3 small mb-3" role="note">
-    <strong>Loggen virker.</strong> Ressursoversikt, oppdragsliste og hendelser
-    fylles i senere puljer. Sentralbordet ligger fortsatt på
-    <a href="/oppdrag/">/oppdrag/</a> til det flyttes hit.
+    <strong>Loggen virker.</strong> Tavla og oppdragene fylles i senere puljer.
+    Sentralbordet ligger fortsatt på <a href="/oppdrag/">/oppdrag/</a> til det
+    flyttes hit.
   </div>
 
   <div class="row g-3">
-    <div class="col-12 col-xl-9">
 
-      <ul class="nav nav-tabs mb-3" role="tablist">
-        <li class="nav-item" role="presentation">
-          <button class="nav-link active" id="ko-fane-ressurser" data-bs-toggle="tab"
-                  data-bs-target="#ko-flate-ressurser" type="button" role="tab"
-                  aria-controls="ko-flate-ressurser" aria-selected="true">
+    {% comment %}
+      Venstre: flatene man handler i. Tavla øverst — den skannes hele tiden,
+      oppdragene er der man gjør noe. Rekkefølgen følger §7, ikke
+      puljerekkefølgen: dette er slik operatøren leser skjermen.
+    {% endcomment %}
+    <div class="col-12 col-xl-8">
+
+      <div class="card mb-3">
+        <div class="card-header py-2">
+          <span class="small fw-semibold">
             <i class="bi bi-grid-3x3 me-1"></i>Ressursoversikt
-          </button>
-        </li>
-        <li class="nav-item" role="presentation">
-          <button class="nav-link" id="ko-fane-oppdrag" data-bs-toggle="tab"
-                  data-bs-target="#ko-flate-oppdrag" type="button" role="tab"
-                  aria-controls="ko-flate-oppdrag" aria-selected="false">
-            <i class="bi bi-truck me-1"></i>Oppdragsliste
-          </button>
-        </li>
-        <li class="nav-item" role="presentation">
-          <button class="nav-link" id="ko-fane-logg" data-bs-toggle="tab"
-                  data-bs-target="#ko-flate-logg" type="button" role="tab"
-                  aria-controls="ko-flate-logg" aria-selected="false">
-            <i class="bi bi-list-ul me-1"></i>Logg
-          </button>
-        </li>
-        <li class="nav-item" role="presentation">
-          <button class="nav-link" id="ko-fane-hendelser" data-bs-toggle="tab"
-                  data-bs-target="#ko-flate-hendelser" type="button" role="tab"
-                  aria-controls="ko-flate-hendelser" aria-selected="false">
-            <i class="bi bi-exclamation-diamond me-1"></i>Hendelser
-          </button>
-        </li>
-      </ul>
-
-      <div class="tab-content">
-        {% comment %}
-          Rekkefølgen på flatene følger §7, ikke puljerekkefølgen: dette er
-          slik operatøren leser skjermen, og den skal ikke stokkes om når
-          innholdet kommer.
-        {% endcomment %}
-        <div class="tab-pane fade show active" id="ko-flate-ressurser" role="tabpanel"
-             aria-labelledby="ko-fane-ressurser" tabindex="0">
-          <div class="card">
-            <div class="card-body">
-              <h2 class="h6 mb-2">Ressursoversikt</h2>
-              <p class="text-muted small mb-0">
-                Tavla over hvem som er på vakt og hvor de står. KO eier ikke
-                ressursene — bildet settes sammen av vaktlista, av
-                oppdragsmodulens statuser for dem som stempler selv, og av
-                KO-ført status for dem som ikke gjør det. Kommer i pulje 4.
-              </p>
-            </div>
-          </div>
+          </span>
         </div>
-
-        <div class="tab-pane fade" id="ko-flate-oppdrag" role="tabpanel"
-             aria-labelledby="ko-fane-oppdrag" tabindex="0">
-          <div class="card">
-            <div class="card-body">
-              <h2 class="h6 mb-2">Oppdragsliste</h2>
-              <p class="text-muted small mb-0">
-                Sentralbordet <strong>flytter hit</strong> fra
-                <a href="/oppdrag/">/oppdrag/</a> i pulje 5 — en flytting, ikke
-                en kopi: to skjermer som viser de samme oppdragene ville før
-                eller siden blitt uenige under en vakt. Til da fører du
-                oppdragene der.
-              </p>
-            </div>
-          </div>
+        <div class="card-body">
+          <p class="text-muted small mb-0">
+            Tavla over hvem som er på vakt og hvor de står. KO eier ikke
+            ressursene — bildet settes sammen av vaktlista, av
+            oppdragsmodulens statuser for dem som stempler selv, og av
+            KO-ført status for dem som ikke gjør det. Kommer i pulje 4.
+          </p>
         </div>
+      </div>
 
-        {% comment %}
-          Loggen (§4). Skrivefeltet står **øverst**, ikke nederst: linja
-          skrives mens noe skjer, og feltet skal være der uten at man må rulle
-          forbi fire hundre linjer for å finne det.
+      {% comment %}
+        **Oppdrag og hendelser er én flate, ikke to** (17. sep. 2026). En
+        hendelse er en gruppering av oppdrag — `Oppdrag.hendelse` er en
+        nullbar FK (§3.3) — og §4.6 sperrer lukking med 409 når hendelsen har
+        åpne oppdrag. Operatøren må altså se hendelsens oppdrag i det hun
+        lukker den. To flater ville lagt nøyaktig den opplysningen hun trenger
+        i den fana hun ikke står i.
 
-          Beholderen under har rullingen, ikke lista — en liste bygget med
-          `innerHTML` mister bredden sin om rullingen legges på den selv
-          (CLAUDE.md).
-        {% endcomment %}
-        <div class="tab-pane fade" id="ko-flate-logg" role="tabpanel"
-             aria-labelledby="ko-fane-logg" tabindex="0">
-          <div class="card mb-3" id="ko-logg-skjema">
-            <div class="card-body py-2">
-              <form id="ko-logg-form" autocomplete="off">
-                <div class="d-flex gap-2 align-items-start flex-wrap">
-                  <div class="flex-grow-1" style="min-width:240px;">
-                    <label class="visually-hidden" for="ko-logg-tekst">Ny linje</label>
-                    <textarea id="ko-logg-tekst" class="form-control" rows="2"
-                              maxlength="{{ ko_maks_tekst }}"
-                              placeholder="Hva skjedde? Skriv det du ville sagt på samband."></textarea>
-                  </div>
-                  <div style="width:140px;">
-                    <label class="visually-hidden" for="ko-logg-tid">Tidspunkt</label>
-                    <input type="time" id="ko-logg-tid" class="form-control"
-                           aria-describedby="ko-logg-tid-hjelp">
-                    <div class="form-text" id="ko-logg-tid-hjelp">Blank = nå</div>
-                  </div>
-                  <button type="submit" class="btn btn-primary" id="ko-logg-send">
-                    <i class="bi bi-plus-lg me-1"></i>Før
-                  </button>
-                </div>
-                <div class="form-text mt-1">
-                  Ikke skriv navn, adresse, fødselsnummer eller telefon. Loggen
-                  dekker det som skjer utenfor samleplass og sykestue; pasienten
-                  blir pasient i <a href="/pasienter/">/pasienter/</a>.
-                </div>
-                <div class="text-danger small mt-1 d-none" id="ko-logg-feil" role="alert"></div>
-              </form>
-            </div>
-          </div>
-
-          <div class="card">
-            <div class="card-header py-2 d-flex justify-content-between align-items-center">
-              <span class="small fw-semibold">
-                <i class="bi bi-list-ul me-1"></i>Logg
-                <span class="text-muted" id="ko-logg-vakt"></span>
-              </span>
-              <span class="small text-muted" id="ko-logg-antall"></span>
-            </div>
-            <div class="card-body p-0">
-              <div id="ko-logg-liste" style="max-height:60vh; overflow-y:auto;">
-                <p class="text-muted small p-3 mb-0">Laster …</p>
-              </div>
-            </div>
-          </div>
+        Grupperingen er en bryter på lista, ikke en egen flate: de fleste
+        oppdrag har `hendelse = NULL`, og en permanent «Uten hendelse»-bøtte
+        med mesteparten av radene er et tegn på at grupperingen ikke duger som
+        hovedakse.
+      {% endcomment %}
+      <div class="card">
+        <div class="card-header py-2">
+          <span class="small fw-semibold">
+            <i class="bi bi-truck me-1"></i>Oppdrag og hendelser
+          </span>
         </div>
-
-        <div class="tab-pane fade" id="ko-flate-hendelser" role="tabpanel"
-             aria-labelledby="ko-fane-hendelser" tabindex="0">
-          <div class="card">
-            <div class="card-body">
-              <h2 class="h6 mb-2">Hendelser</h2>
-              <p class="text-muted small mb-0">
-                En hendelse begynner når noen sier noe over samband, kan leve i
-                tjue minutter før en ressurs sendes, og kan bli avsluttet uten
-                at noen rykket ut. Egen nummerserie per vakt. Kommer i pulje 3,
-                og krever loggen.
-              </p>
-            </div>
-          </div>
+        <div class="card-body">
+          <p class="text-muted small mb-2">
+            Sentralbordet <strong>flytter hit</strong> fra
+            <a href="/oppdrag/">/oppdrag/</a> i pulje 5 — en flytting, ikke en
+            kopi: to skjermer som viser de samme oppdragene ville før eller
+            siden blitt uenige under en vakt. Til da fører du oppdragene der.
+          </p>
+          <p class="text-muted small mb-0">
+            Hendelser kommer i pulje 3 og legger seg <em>oppå</em> denne lista
+            som en gruppering med eget nummer per vakt, ikke som en egen flate.
+            En hendelse kan leve i tjue minutter før en ressurs sendes, og kan
+            avsluttes uten at noen rykket ut.
+          </p>
         </div>
       </div>
     </div>
 
     {% comment %}
-      Sidebaren (§5.3). Den svarer på «hvem har KO oppe», ikke på «hvem dekker
-      samband nå» — pålogget er ikke til stede, og derfor står tida siden
-      siste tastetrykk som en egen kolonne.
+      Høyre: rekka man leser i. Loggen står her som et fast panel og ikke bak
+      en fane — den skrives mens noe skjer, og skrivefeltet er **øverst** slik
+      at man slipper å rulle forbi fire hundre linjer for å finne det.
+
+      Beholderen under har rullingen, ikke lista — en liste bygget med
+      `innerHTML` mister bredden sin om rullingen legges på den selv
+      (CLAUDE.md).
+
+      Sidebaren (§5.3) ligger i samme rekke og ikke i en egen kolonne: den er
+      en håndfull navn, og en tredje kolonne ville tatt bredde fra loggen på
+      nøyaktig de skjermene KO brukes på. Den svarer på «hvem har KO oppe»,
+      ikke på «hvem dekker samband nå» — pålogget er ikke til stede, og derfor
+      står tida siden siste tastetrykk som en egen kolonne.
     {% endcomment %}
-    <div class="col-12 col-xl-3" id="ko-sidebar">
-      <div class="card">
+    <div class="col-12 col-xl-4">
+      <div class="card mb-3" id="ko-sidebar">
         <div class="card-header py-2">
           <span class="small fw-semibold">
             <i class="bi bi-people me-1"></i>Har KO oppe
@@ -208,6 +151,51 @@
         <div class="card-body py-2">
           <div id="ko-tilstede" class="small">
             <span class="text-muted">Laster …</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="card mb-3" id="ko-logg-skjema">
+        <div class="card-body py-2">
+          <form id="ko-logg-form" autocomplete="off">
+            <div class="d-flex gap-2 align-items-start flex-wrap">
+              <div class="flex-grow-1" style="min-width:240px;">
+                <label class="visually-hidden" for="ko-logg-tekst">Ny linje</label>
+                <textarea id="ko-logg-tekst" class="form-control" rows="2"
+                          maxlength="{{ ko_maks_tekst }}"
+                          placeholder="Hva skjedde? Skriv det du ville sagt på samband."></textarea>
+              </div>
+              <div style="width:140px;">
+                <label class="visually-hidden" for="ko-logg-tid">Tidspunkt</label>
+                <input type="time" id="ko-logg-tid" class="form-control"
+                       aria-describedby="ko-logg-tid-hjelp">
+                <div class="form-text" id="ko-logg-tid-hjelp">Blank = nå</div>
+              </div>
+              <button type="submit" class="btn btn-primary" id="ko-logg-send">
+                <i class="bi bi-plus-lg me-1"></i>Ny
+              </button>
+            </div>
+            <div class="form-text mt-1">
+              Ikke skriv navn, adresse, fødselsnummer eller telefon. Loggen
+              dekker det som skjer utenfor samleplass og sykestue; pasienten
+              blir pasient i <a href="/pasienter/">/pasienter/</a>.
+            </div>
+            <div class="text-danger small mt-1 d-none" id="ko-logg-feil" role="alert"></div>
+          </form>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header py-2 d-flex justify-content-between align-items-center">
+          <span class="small fw-semibold">
+            <i class="bi bi-list-ul me-1"></i>Logg
+            <span class="text-muted" id="ko-logg-vakt"></span>
+          </span>
+          <span class="small text-muted" id="ko-logg-antall"></span>
+        </div>
+        <div class="card-body p-0">
+          <div id="ko-logg-liste" style="max-height:60vh; overflow-y:auto;">
+            <p class="text-muted small p-3 mb-0">Laster …</p>
           </div>
         </div>
       </div>
