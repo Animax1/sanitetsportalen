@@ -21,7 +21,7 @@ from django.conf import settings
 from django.test import SimpleTestCase
 
 #: Modulappene. `core` skal kunne kjøre uten en eneste av dem.
-MODULAPPER = {'patients', 'oppdrag', 'vaktliste', 'statistikk'}
+MODULAPPER = {'patients', 'oppdrag', 'vaktliste', 'statistikk', 'ko'}
 
 #: Importer som skal være der, med begrunnelse.
 #:
@@ -30,6 +30,7 @@ MODULAPPER = {'patients', 'oppdrag', 'vaktliste', 'statistikk'}
 #: uten den ville portalen ikke visst hvilke moduler som finnes. Den står
 #: inne i en funksjon, ikke på toppnivå, nettopp for å unngå importsykelen.
 TILLATT = {
+    ('core/modules.py', 'ko.module'),
     ('core/modules.py', 'oppdrag.module'),
     ('core/modules.py', 'patients.module'),
     ('core/modules.py', 'statistikk.module'),

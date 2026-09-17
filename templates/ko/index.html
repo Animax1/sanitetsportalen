@@ -1,0 +1,186 @@
+{% extends "core/base_portal.html" %}
+{% load static %}
+
+{% block title %}KO – Sanitetsportalen{% endblock %}
+
+{% comment %}
+  **Skallet (pulje 1).** Fire flater og en sidebar, og ingen av flatene har
+  innhold ennå. Se docs/FORSLAG_KO.md §7 og §10.
+
+  Hver tom flate sier hva som kommer og hvor tingen bor i dag. En blank fane
+  ser ødelagt ut — særlig «Oppdragsliste», som beskriver noe som *finnes*, bare
+  på /oppdrag/ til pulje 5 flytter den.
+
+  Ingen egen CSS-fil: portal.css overstyrer allerede .text-muted og .form-text
+  for mørk bakgrunn, og alt annet her er Bootstrap-klasser base_portal temer.
+  Et nytt modulstilark måtte definert de fire variablene base_portal ikke
+  aliaser (CLAUDE.md), og det er en kostnad uten en regel å bære.
+{% endcomment %}
+
+{% block content %}
+
+{% comment %}
+  Modultilgang, ikke rolle (CLAUDE.md). Skallet har ingen knapper å gate ennå,
+  men mønsteret settes her slik at pulje 2 ikke må finne det opp — og slik at
+  den første knappen ikke blir den som også må innføre gaten.
+{% endcomment %}
+<script nonce="{{ csp_nonce }}">
+  window.MODUL_TILGANG = {
+    ko: "{{ modul_nivaa }}",
+    admin: {{ er_global_admin|yesno:"true,false" }}
+  };
+</script>
+
+<div class="container-fluid px-3 px-md-4 py-3">
+
+  <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
+    <h1 class="h4 mb-0"><i class="bi bi-broadcast-pin me-2"></i>KO</h1>
+    <button type="button" class="btn btn-sm btn-outline-secondary"
+            id="ko-sidebar-knapp" data-action="koVisSidebar"
+            aria-expanded="true" aria-controls="ko-sidebar">
+      <i class="bi bi-people me-1"></i>Hvem er pålogget
+    </button>
+  </div>
+
+  <div class="alert alert-secondary py-2 px-3 small mb-3" role="note">
+    <strong>Skallet.</strong> Modulen er satt opp og tilgangen virker, men
+    flatene fylles i senere puljer. Sentralbordet ligger fortsatt på
+    <a href="/oppdrag/">/oppdrag/</a> til det flyttes hit.
+  </div>
+
+  <div class="row g-3">
+    <div class="col-12 col-xl-9">
+
+      <ul class="nav nav-tabs mb-3" role="tablist">
+        <li class="nav-item" role="presentation">
+          <button class="nav-link active" id="ko-fane-ressurser" data-bs-toggle="tab"
+                  data-bs-target="#ko-flate-ressurser" type="button" role="tab"
+                  aria-controls="ko-flate-ressurser" aria-selected="true">
+            <i class="bi bi-grid-3x3 me-1"></i>Ressursoversikt
+          </button>
+        </li>
+        <li class="nav-item" role="presentation">
+          <button class="nav-link" id="ko-fane-oppdrag" data-bs-toggle="tab"
+                  data-bs-target="#ko-flate-oppdrag" type="button" role="tab"
+                  aria-controls="ko-flate-oppdrag" aria-selected="false">
+            <i class="bi bi-truck me-1"></i>Oppdragsliste
+          </button>
+        </li>
+        <li class="nav-item" role="presentation">
+          <button class="nav-link" id="ko-fane-logg" data-bs-toggle="tab"
+                  data-bs-target="#ko-flate-logg" type="button" role="tab"
+                  aria-controls="ko-flate-logg" aria-selected="false">
+            <i class="bi bi-list-ul me-1"></i>Logg
+          </button>
+        </li>
+        <li class="nav-item" role="presentation">
+          <button class="nav-link" id="ko-fane-hendelser" data-bs-toggle="tab"
+                  data-bs-target="#ko-flate-hendelser" type="button" role="tab"
+                  aria-controls="ko-flate-hendelser" aria-selected="false">
+            <i class="bi bi-exclamation-diamond me-1"></i>Hendelser
+          </button>
+        </li>
+      </ul>
+
+      <div class="tab-content">
+        {% comment %}
+          Rekkefølgen på flatene følger §7, ikke puljerekkefølgen: dette er
+          slik operatøren leser skjermen, og den skal ikke stokkes om når
+          innholdet kommer.
+        {% endcomment %}
+        <div class="tab-pane fade show active" id="ko-flate-ressurser" role="tabpanel"
+             aria-labelledby="ko-fane-ressurser" tabindex="0">
+          <div class="card">
+            <div class="card-body">
+              <h2 class="h6 mb-2">Ressursoversikt</h2>
+              <p class="text-muted small mb-0">
+                Tavla over hvem som er på vakt og hvor de står. KO eier ikke
+                ressursene — bildet settes sammen av vaktlista, av
+                oppdragsmodulens statuser for dem som stempler selv, og av
+                KO-ført status for dem som ikke gjør det. Kommer i pulje 4.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div class="tab-pane fade" id="ko-flate-oppdrag" role="tabpanel"
+             aria-labelledby="ko-fane-oppdrag" tabindex="0">
+          <div class="card">
+            <div class="card-body">
+              <h2 class="h6 mb-2">Oppdragsliste</h2>
+              <p class="text-muted small mb-0">
+                Sentralbordet <strong>flytter hit</strong> fra
+                <a href="/oppdrag/">/oppdrag/</a> i pulje 5 — en flytting, ikke
+                en kopi: to skjermer som viser de samme oppdragene ville før
+                eller siden blitt uenige under en vakt. Til da fører du
+                oppdragene der.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div class="tab-pane fade" id="ko-flate-logg" role="tabpanel"
+             aria-labelledby="ko-fane-logg" tabindex="0">
+          <div class="card">
+            <div class="card-body">
+              <h2 class="h6 mb-2">Logg</h2>
+              <p class="text-muted small mb-0">
+                Én logg med alle linjer — det som blir sagt, kommentarer inne i
+                en hendelse, og de systemhendelsene som løftes inn. Den skal
+                være fullstendig og kjedelig. Kommer i pulje 2, og to valg må
+                besvares først: hvor lenge loggen oppbevares, og hvilke
+                systemhendelser som løftes inn i den.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div class="tab-pane fade" id="ko-flate-hendelser" role="tabpanel"
+             aria-labelledby="ko-fane-hendelser" tabindex="0">
+          <div class="card">
+            <div class="card-body">
+              <h2 class="h6 mb-2">Hendelser</h2>
+              <p class="text-muted small mb-0">
+                En hendelse begynner når noen sier noe over samband, kan leve i
+                tjue minutter før en ressurs sendes, og kan bli avsluttet uten
+                at noen rykket ut. Egen nummerserie per vakt. Kommer i pulje 3,
+                og krever loggen.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    {% comment %}
+      Sidebaren (§5.3). Den svarer på «hvem har KO oppe», ikke på «hvem dekker
+      samband nå» — pålogget er ikke til stede, og derfor står tida siden
+      siste tastetrykk som en egen kolonne.
+    {% endcomment %}
+    <div class="col-12 col-xl-3" id="ko-sidebar">
+      <div class="card">
+        <div class="card-header py-2">
+          <span class="small fw-semibold">
+            <i class="bi bi-people me-1"></i>Har KO oppe
+          </span>
+        </div>
+        <div class="card-body py-2">
+          <div id="ko-tilstede" class="small">
+            <span class="text-muted">Laster …</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block extra_scripts %}
+{% comment %}
+  portal-utils.js, ikke patients-utils.js: sistnevnte gjør arbeid på toppnivå
+  og kaster på en side uten pasientskjemaene. Se CLAUDE.md.
+{% endcomment %}
+<script src="{% static 'js/portal-utils.js' %}"></script>
+<script src="{% static 'js/ko.js' %}"></script>
+{% endblock %}

@@ -87,14 +87,14 @@ python manage.py runserver           # http://127.0.0.1:8000/
 # altså vaktene rundt «DATABASE_URL må være PostgreSQL på Railway» og den
 # `_env_bool` som hadde rate-limitingen av i prod. Lista her utelot den, så den
 # som fulgte dokumentasjonen kjørte dem aldri.
-python manage.py test patients accounts audit core statistikk oppdrag vaktliste myproject -v 2
+python manage.py test patients accounts audit core statistikk oppdrag vaktliste ko myproject -v 2
 
 # Samme suite, men delt. **190 s → ~106 s** (målt 16. sep. 2026, fire kjerner).
 # `core` må stå for seg: `core/tests_backup.py` skriver ekte backupfiler til én
 # mappe og rører det globale handlerregisteret, så fire arbeidere kolliderer —
 # feilen kommer ut som «cannot pickle 'traceback' object», som ikke ligner det
 # den er. Alt annet tåler `--parallel` fint.
-python manage.py test patients accounts audit statistikk oppdrag vaktliste myproject -v 1 --parallel 4
+python manage.py test patients accounts audit statistikk oppdrag vaktliste ko myproject -v 1 --parallel 4
 python manage.py test core -v 1
 
 # Én enkelt test
@@ -171,6 +171,7 @@ eller gjelder den alle, står den her; ligger den i en app, står den i appens e
 | `oppdrag/CLAUDE.md` | `oppdrag/` | Statusmaskinen, verdimengdene, bilens utganger, historikk mot arkiv |
 | `vaktliste/CLAUDE.md` | `vaktliste/` | Korps og reservasjoner, skift, drift, planleggeren, offline |
 | `statistikk/CLAUDE.md` | `statistikk/` | Kilderegisteret og de to gatene |
+| `ko/CLAUDE.md` | `ko/` | Retningen oppover, projeksjonen, sidebaren, nivåene per pulje |
 
 **Modulfilene lastes ikke alltid, og det er hele poenget — men det koster noe.** Rota leses
 hver gang; en modulfil når noen faktisk arbeider i mappa. Derfor står **det som må vites før
@@ -699,8 +700,8 @@ Alle temaene er mørke, så **enhver Bootstrap-klasse for dempet tekst må overs
 malen kan se den. `MorkTekstPaaMorkBakgrunnTests` løser `{% extends %}` og `{% static %}`
 og håndhever det.
 
-23 filer i `static/js/` (ingen bundler), fordelt på fem sider — pasientsiden,
-`/statistikk/`, `/vaktliste/` og de to grensesnittene under `/oppdrag/`.
+24 filer i `static/js/` (ingen bundler), fordelt på seks sider — pasientsiden,
+`/statistikk/`, `/vaktliste/`, `/ko/` og de to grensesnittene under `/oppdrag/`.
 
 **To av sidene er delt i flere filer** (14. sep. 2026, gjeldspunkt 3.6): `vaktliste.js`
 var 3 801 linjer og `oppdrag-sentral.js` 1 991. **Delingen har en nedre grense som

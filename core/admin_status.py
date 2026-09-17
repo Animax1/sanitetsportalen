@@ -28,7 +28,6 @@ from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.contrib.sessions.models import Session
 
-from core.middleware import SISTE_INTERAKSJON
 from django.core.cache import cache
 from django.http import JsonResponse
 from django.shortcuts import render
@@ -37,6 +36,7 @@ from django.views.decorators.http import require_http_methods
 
 from core.auth_decorators import admin_required
 from core.klientip import klient_ip
+from core.sesjoner import aktive_sesjoner
 from audit.models import AuditLog
 
 from .middleware import metrics_store
@@ -466,71 +466,28 @@ def admin_status_json(request):
 # ── Sesjonshåndtering ─────────────────────────────────────────────────────────────────
 # Lar admin se og avslutte aktive brukersesjoner under høy last.
 
-def _inaktiv_sekunder(data, naa):
-    """Sekunder siden brukeren sist rørte siden — `None` om vi ikke vet.
-
-    **`None` og ikke 0.** En sesjon fra før `BrukerAktivitetMiddleware` fantes,
-    eller en klient som aldri har kalt `apiFetch`, har ingen verdi — og «vet
-    ikke» må kunne skilles fra «aktiv nå». Skrev vi 0, ville hver gammel sesjon
-    sett ut som om noen satt der.
-    """
-    raa = data.get(SISTE_INTERAKSJON)
-    if not raa:
-        return None
-    try:
-        sist = datetime.fromisoformat(raa)
-    except (TypeError, ValueError):
-        return None
-    if timezone.is_naive(sist):
-        return None
-    return max(0, int((naa - sist).total_seconds()))
-
-
 def _list_active_sessions():
-    """Returner liste over aktive sesjoner med (kun) brukernavn og rolle.
+    """Adminflatens projeksjon av `core.sesjoner.aktive_sesjoner()`.
 
-    Sesjoner som ikke er knyttet til en bruker (anonyme) hoppes over.
-    Sesjoner med slettet bruker hoppes over (orphan).
+    Loopen som dekoder sesjonstabellen bor i `core/sesjoner.py` siden
+    17. sep. 2026, fordi KO-sidebaren trenger den samme (`FORSLAG_KO.md` §5.3)
+    og to kopier er to kilder som glir fra hverandre. **Projeksjonen er
+    fortsatt adminflatens egen**, og det er meningen: `session_key` er
+    håndtaket `admin_session_kill` avslutter en sesjon med, og det hører bare
+    hjemme her.
     """
-    User = get_user_model()
-    now = timezone.now()
-    active_qs = Session.objects.filter(expire_date__gt=now)
-    sessions = []
-    # Bygg user_id-liste i én queryset for å unngå N+1
-    user_ids = []
-    decoded_per_session = []
-    for sess in active_qs:
-        try:
-            data = sess.get_decoded()
-        except Exception:
-            continue
-        uid = data.get('_auth_user_id')
-        if not uid:
-            continue
-        try:
-            uid_int = int(uid)
-        except (TypeError, ValueError):
-            continue
-        user_ids.append(uid_int)
-        decoded_per_session.append((sess, uid_int))
-
-    users_by_id = {u.id: u for u in User.objects.filter(id__in=user_ids)}
-    for sess, uid in decoded_per_session:
-        user = users_by_id.get(uid)
-        if not user:
-            continue
+    sessions = [{
+        'session_key': rad['session_key'],
+        'user_id': bruker.id,
+        'username': bruker.username,
+        'role': getattr(bruker, 'role', '') or '',
+        'expire_date': rad['expire_date'],
         # **Alle påloggede vises, også de inaktive** (André, 16. sep. 2026:
         # «jeg må fortsatt se alle som er innlogget»). Aktiviteten er en
         # *kolonne*, ikke et filter — en fane som har stått i to timer er
         # nettopp den man leter etter, og et filter ville skjult den.
-        sessions.append({
-            'session_key': sess.session_key,
-            'user_id': user.id,
-            'username': user.username,
-            'role': getattr(user, 'role', '') or '',
-            'expire_date': sess.expire_date.isoformat(),
-            'inaktiv_s': _inaktiv_sekunder(data, now),
-        })
+        'inaktiv_s': rad['inaktiv_s'],
+    } for bruker, rad in aktive_sesjoner()]
     # Sorter alfabetisk på brukernavn for stabilt UI
     sessions.sort(key=lambda s: s['username'].lower())
     return sessions

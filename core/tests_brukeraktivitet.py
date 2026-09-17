@@ -21,7 +21,8 @@ from django.test import Client, SimpleTestCase, TestCase, override_settings
 from django.utils import timezone
 
 from accounts.models import CustomUser
-from core.admin_status import _inaktiv_sekunder, _list_active_sessions
+from core.admin_status import _list_active_sessions
+from core.sesjoner import inaktiv_sekunder as _inaktiv_sekunder
 from core.middleware import MAKS_INAKTIV_S, SISTE_INTERAKSJON, les_inaktiv
 
 

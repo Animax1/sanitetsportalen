@@ -89,6 +89,7 @@ INSTALLED_APPS = [
     'statistikk',
     'oppdrag',
     'vaktliste',
+    'ko',
     'audit',
     'django_otp',
     'django_otp.plugins.otp_totp',

@@ -1,7 +1,12 @@
 # Forslag: KO-modulen — situasjonsbildet, loggen og hendelsene
 
 Status: **forslag, ikke besluttet.** Skrevet 17. september 2026 etter en gjennomgang med
-André 16.–17. sep., der rammene ble lagt. Ingenting er bygget. Arbeidslista er `TODO.md`.
+André 16.–17. sep., der rammene ble lagt. Arbeidslista er `TODO.md`.
+
+> **Pulje 1 er bygget** (17. sep. 2026) — skallet: modulen registrert, `/ko/` med de fire
+> flatene, sidebaren, og `ModulTilgang('ko')`. Modulens egne regler står i `ko/CLAUDE.md`,
+> og historien i `CHANGELOG.md`. Resten av notatet er fortsatt forslag. **To ting viste seg
+> feil under bygging**, og rettelsene står i §3.3 og §5.3 der de hører hjemme.
 
 **Dette notatet erstatter `FORSLAG_DATTEROPPDRAG.md`**, som er arkivert samme dag. Den
 foreslo å gruppere flere pasienter under et moroppdrag med `Oppdrag.forelder`, og forkastet
@@ -116,9 +121,17 @@ Egen modell i `ko`. Ikke et polymorft superoppdrag, og ikke `Oppdrag.forelder` �
 motsatt, slik at `oppdrag` ikke trenger å kjenne `ko`.
 
 > **Avhengighetsretningen:** `ko → vaktliste` og `ko → oppdrag`. Ingen av dem kjenner `ko`.
-> KO blir øverste lag. `core/tests_avhengighetsretning.py` skal håndheve begge kantene med
-> AST, som `OppdragImportererIkkeVaktlista` gjør i dag. FK-en fra `Oppdrag` til hendelsen
-> er unntaket som må navngis og begrunnes der.
+> KO blir øverste lag.
+>
+> **Rettet under bygging (17. sep. 2026):** testen bor i `ko/tests_avhengighet.py`, ikke i
+> `core/tests_avhengighetsretning.py`. Det er den *importerte* som mister uavhengigheten
+> sin, og derfor dens egen kant å forsvare — samme grunn som `OppdragImportererIkkeVaktlista`
+> bor i `vaktliste/`. `core/tests_avhengighetsretning.py` har fått `ko` i `MODULAPPER` og
+> `core/modules.py` → `ko.module` som eneste tillatte import, som for de andre modulene.
+>
+> Og et hakk til: en FK fra `Oppdrag` til hendelsen krever ikke en Python-import av `ko` —
+> `models.ForeignKey('ko.Hendelse', ...)` er en strengreferanse. Unntaket i `KJENTE_UNNTAK`
+> trengs først hvis noe i `oppdrag/` faktisk *importerer* `ko`.
 
 ## 4. Loggen og hendelsene
 
@@ -263,8 +276,23 @@ Personlige kontoer er dem som har tilgang til data på tvers av ett oppdrag: `/p
 
 ### 5.3 Sidebaren
 
-Vis/skjul-lista over påloggede med `/ko/`-tilgang er `_list_active_sessions` filtrert på
-`ModulTilgang('ko')`, med `inaktiv_s`-kolonnen fra 16. sep. Nesten ferdig.
+Vis/skjul-lista over påloggede med `/ko/`-tilgang, med `inaktiv_s`-kolonnen fra 16. sep.
+
+> **Rettet under bygging (17. sep. 2026).** Setningen over sa «`_list_active_sessions`
+> filtrert på `ModulTilgang('ko')`», og begge halvdelene var feil:
+>
+> 1. **Filteret utelot global admin.** Hun har ingen `ModulTilgang`-rader og likevel
+>    tilgang til alt — altså nettopp den som sitter i KO og administrerer portalen. Hun
+>    ville sett alle andre og ikke seg selv, og lista hadde sett helt riktig ut. Spørsmålet
+>    er «har denne kontoen lesetilgang til `ko`», og det er `har_tilgang`-semantikk, ikke
+>    en tabellspørring. Ligger nå i `ko/tilstede.py`.
+> 2. **Adminradene kan ikke gjenbrukes som de er.** De bærer `session_key`, som er
+>    håndtaket `admin_session_kill` **avslutter** en sesjon med. KO har sin egen, smale
+>    projeksjon; sesjonsloopen de deler ligger i `core/sesjoner.py`.
+>
+> Og ett valg til som setningen ikke tar: **én rad per person, ikke per sesjon.**
+> Adminlista lister sesjoner fordi den skal kunne avslutte én av dem. Denne svarer på hvem
+> som er der, og samme operatør med KO på PC-en og på telefonen er én person.
 
 Den svarer på «hvem har KO oppe», **ikke** på «hvem dekker samband nå» — pålogget er ikke
 til stede, og det er allerede dokumentert i `CLAUDE.md`. Blir det siste et behov, er det en
@@ -424,7 +452,7 @@ filtre og statistikk er forbedringer *av* det bildet og legges oppå uten å riv
 
 | Pulje | Innhold | Hvorfor den rekkefølgen |
 |---|---|---|
-| **1 — Skallet** | Modulen registrert, `ModulTilgang('ko')`, tom side med de fire flatene, sidebar | Tilgangen må virke før noe legges bak den |
+| **1 — Skallet** ✅ | Modulen registrert, `ModulTilgang('ko')`, side med de fire flatene, sidebar | Tilgangen må virke før noe legges bak den |
 | **2 — Loggen** | Logglinjer, retting, sletteinngang, polling med `?siden=` | Alt annet skriver inn i den |
 | **3 — Hendelser** | `Hendelse`, nummerserie, linje → hendelse, oversikt, lukking med 409 | Krever loggen |
 | **4 — Ressursoversikten** | Projeksjonen i §3.1, KO-ført status, rutingflagget | Uavhengig av 2 og 3; kan bytte plass |

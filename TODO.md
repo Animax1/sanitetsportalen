@@ -357,6 +357,13 @@ bindende: 1 før 2, fordi backupen speiler hvor modellene bor.
             backup 90 dager, modulfilene 730 dager offsite), A.10, A.11/A.6 (fil på e-post,
             offline drift)
       - [ ] `CLAUDE.md` — backup-avsnittet og hvor modellene bor
+- [ ] **`CLAUDE.md` i rota er fire linjer fra taket** (996 av `ROT_GRENSE = 1000`,
+      17. sep. 2026). Grensa i `core/tests_claude_md.py` er ikke et budsjett, den er en
+      røykvarsler for at delingen rot/modulfil er i ferd med å oppheve seg selv — men
+      fire linjer betyr at *neste* rammeverksregel ikke får plass uten at noen tar et
+      valg. To veier: flytt et avsnitt som egentlig er én moduls til modulfila, eller hev
+      grensa bevisst. Det som ikke duger er å hente plassen ved å slette noe nyttig.
+
 - [ ] **4. De mindre** (§3 i notatet), når man er i nærheten: brukeradmin importerer
       pasientregistrene (3.1), `/portal-admin/` samlet i én URL-fil (3.2), skimene
       (3.3), `core/views.py` delt (3.7). 3.5 (`VaktArkiv`) skal **ikke** ryddes —
@@ -490,30 +497,85 @@ Fem åpne spørsmål til André står i §6 i notatet.
 
 ### KO-modulen — se [`docs/FORSLAG_KO.md`](./docs/FORSLAG_KO.md)
 
-**Forslag, ikke besluttet** (17. sep. 2026). Situasjonsbildet: ressursoversikt, oppdragsliste,
-logg/chat og hendelser, med sidebar over påloggede med KO-tilgang. `/oppdrag/` snevres inn
-til enhetens egen skjerm, og **sentralbordet flytter til KO** — en flytting av
-`oppdrag-sentral-*.js`, ikke en kopi. Notatet har sju foreslåtte puljer i §10.
+**Notatet er fortsatt et forslag** (17. sep. 2026), men **pulje 1 er bygget**: modulen er
+registrert, `/ko/` finnes med de fire flatene og sidebaren, og `ModulTilgang('ko')` virker.
+Modulens egne regler står i [`ko/CLAUDE.md`](./ko/CLAUDE.md). `/oppdrag/` snevres inn til
+enhetens egen skjerm, og **sentralbordet flytter til KO** — en flytting av
+`oppdrag-sentral-*.js`, ikke en kopi. Puljene står i §10.
 
 Forslaget erstatter datteroppdrag, som er arkivert: grupperingen hører hjemme i en
 `Hendelse` som finnes *før* oppdraget og også dekker lag. Begrunnelsen står i §9.3.
 
-- [ ] **Bygg KO etter puljene i §10.** Skallet og tilgangen først, så loggen, så hendelsene.
-      De tre spørsmålene under besvares underveis, hver før sin pulje.
+- [ ] **Pulje 2 — loggen.** Logglinjer, retting som ny rad, den ene sletteinngangen,
+      polling med `?siden=<id>`. Alt annet skriver inn i den. De to åpne valgene under
+      må besvares først.
 
       - [ ] **Åpent valg, besvares før pulje 2 (loggen):** hvor lenge oppbevares KO-loggen,
             og arkiveres den? `NOTAT_DPIA_OG_FRITEKST.md` §7 slår fast at fritekst bevisst
             *ikke* arkiveres — et felt i arkivets SHA-signatur er låst i 24 måneder ved
             konstruksjon. KO-loggen er i all hovedsak fritekst, og sletteinngangen i §4.4
-            har samme konflikt.
+            har samme konflikt. **Bygges loggen først, er svaret allerede gitt av
+            konstruksjonen.**
 
       - [ ] **Åpent valg, besvares før pulje 2:** hvilke systemhendelser løftes inn i
             loggen? Lista skal være eksplisitt og begrunnet, som `NOKLER_UTEN_AUDIT`.
             Dette er selve designarbeidet i loggdelen, ikke en detalj.
 
+      - [ ] **KO må registrere en backup-handler i samme pulje som den får sin første
+            tabell.** Vaktlistemodulen sto uten backup i det hele tatt fra den gikk i prod
+            til 13. sep. 2026, og det ble oppdaget ved en gjennomgang og ikke av noe rødt.
+            For KO-loggen er innsatsen høyere: den er i praksis dokumentet man leser etter
+            et arrangement der noe gikk galt. Handleren registreres fra `apps.ready()`, og
+            slugen må inn i gjenopprettingsrekkefølgen.
+
+      - [ ] **`ko` må deklarere skrivenivået sitt i samme commit som endepunktene som gir
+            det mening.** `Module.nivaaer` er `('les',)` i dag, med vilje — se `ko/module.py`.
+            Et nivå som deles ut før det finnes, trer stille i kraft den dagen puljen lander.
+
+- [ ] **Pulje 3 — hendelser.** `Hendelse`, nummerserien, linje → hendelse, oversikten,
+      lukking med 409 og `confirm`. Krever loggen.
+
       - [ ] **Åpent valg, besvares før pulje 3 (hendelser):** skal en lukket hendelse kunne
             åpnes igjen? Sannsynligvis ja, som en ny logglinje — men det er en operativ
             avgjørelse.
+
+      - [ ] **Hendelsestelleren må inn i `NOKLER_UTEN_AUDIT`-prefiksene** (`core/signals.py`)
+            i samme commit som den skrives. `next_hendelse_nr_vakt_<pk>` er en teller
+            maskinen teller, ikke noe et menneske har bestemt — uten prefikset får du én
+            auditrad per hendelse, midt blant de ekte radene på nøyaktig de vaktene der
+            loggen betyr mest. Det er fella pasienttelleren gikk i.
+
+      - [ ] **Oppdragsnummeret bør bli `O45` samtidig som hendelsene får `H12`** (§6).
+            Alene er `#45` utvetydig; i en logg der begge står på nabolinjer er det ikke
+            det, og det er i loggen de møtes.
+
+- [ ] **Pulje 4 — ressursoversikten.** Projeksjonen i §3.1, KO-ført status for dem som ikke
+      stempler selv, og rutingflagget på `Ressursgruppe`. Uavhengig av 2 og 3; kan bytte
+      plass med dem.
+
+- [ ] **Pulje 5 — sentralbordet flyttes.** `oppdrag-sentral-*.js` blir KO sine,
+      `oppdrag-enhet.js` blir hele `/oppdrag/`, og `Oppdrag` får den nullbare FK-en
+      `hendelse`. Den største, og den eneste som rører `/oppdrag/`.
+
+      - [ ] **FK-en er den ene kanten som går oppover, og den må navngis.** `KJENTE_UNNTAK`
+            i [`ko/tests_avhengighet.py`](./ko/tests_avhengighet.py) er stedet — men merk at
+            en FK med strengreferanse (`'ko.Hendelse'`) ikke krever en Python-import, så
+            unntaket trengs bare hvis noe i `oppdrag/` faktisk importerer `ko`.
+
+      - [ ] **Tuplene i `patients/js_test_utils.py` og `<script>`-rekkefølgen i malen følger
+            med filene**, og 1 800-linjersgrensa gjelder uendret. Flyttes filene uten
+            tuplene, leser `read_js()` en side som ikke lastes lenger — og skanningen blir
+            grønn på feil kilde.
+
+- [ ] **Pulje 6 — chat og filter.** Admin-bryter for uformelle linjer (som er logglinjer
+      uten hendelse, ikke en egen tabell), og filter per operatør husket i nettleseren.
+      Én regel uansett løsning: **et filter skal aldri skjule noe stille** — «viser 2 av 5
+      grupper» skal stå i bildet hele tiden.
+
+- [ ] **Pulje 7 — statistikk.** `ko` melder seg inn i kilderegisteret i `core/stats.py`.
+      Trenger data fra en ekte vakt først. **Ordvalget er det eneste som hindrer feilen:**
+      «registreringer», ikke «pasienter», på alt som krysser registergrensene — ingen leser
+      metodikken før de siterer tallet.
 
 - [ ] **Delt konto skal bare kunne ha `ModulTilgang` til `oppdrag`.** `er_delt_konto` finnes
       og styrer e-post, MFA og selvbetjent reset; den avgrenser ikke modultilgang. Håndheves

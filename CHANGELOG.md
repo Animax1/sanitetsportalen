@@ -4,6 +4,82 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-17 — KO-modulen, pulje 1: skallet
+
+**`/ko/` finnes.** Modulen er registrert, siden har de fire flatene fra `FORSLAG_KO.md` §7,
+sidebaren over hvem som har KO oppe virker, og `ModulTilgang('ko')` slipper folk inn. Ingen
+data, ingen modeller, ingen migrasjon. Puljen er først fordi **tilgangen må virke før noe
+legges bak den** — og da er det tilgangen som må prøves, ikke at siden rendrer.
+
+Nye filer: `ko/module.py`, `ko/views.py`, `ko/urls.py`, `ko/tilstede.py`, `ko/models.py`
+(tom, med begrunnelse), `ko/CLAUDE.md`, `templates/ko/index.html`, `static/js/ko.js`,
+`core/sesjoner.py`. Ruter: `/ko/` og `/ko/api/tilstede/`.
+
+**Modulen deklarerer bare `les`, og det er et valg og ikke en forglemmelse.** Notatets §5.1
+nevner fire nivåer; skallet har ingen skriveendepunkter. Et nivå som ikke gir noe er lett å
+dele ut i god tro — nøyaktig feilen den globale nivålista gjorde mot `statistikk`, som står
+dokumentert i `core/modules.py`. Her er den verre enn der: `statistikk` har aldri fått
+skriving, så et utdelt `skriv_full` ble liggende dødt. Et `skriv_full` på `ko` i dag ville
+ligget i basen og **trådt stille i kraft** den dagen pulje 2 landet, uten at noen tok den
+avgjørelsen da. Hver pulje legger til sitt nivå i samme commit som nivået får mening.
+Avklart med André 17. sep.
+
+**Tre innvendinger mot notatet, meldt før koden:**
+
+| Notatet sa | Det som ble bygget | Hvorfor |
+|---|---|---|
+| Sidebaren er «`_list_active_sessions` filtrert på `ModulTilgang('ko')`» | `har_tilgang`-semantikk i mengdeform, `ko/tilstede.py` | **Global admin har ingen `ModulTilgang`-rader.** Filteret ville utelatt nettopp den som sitter i KO og administrerer portalen — hun ville sett alle andre og ikke seg selv, og lista hadde sett helt riktig ut |
+| (usagt) Radene er adminradene | Egen, smal projeksjon uten `session_key` | `session_key` er håndtaket `admin_session_kill` **avslutter** en sesjon med. Et felt hvis eneste bruk er destruktiv skal ikke ligge i et svar enhver operatør henter hvert 30. sekund og vente på at noen finner ut hva det er |
+| «Tom side med de fire flatene» | Hver flate sier hva som kommer, i hvilken pulje, og hvor tingen bor i dag | En blank «Oppdragsliste» ser ødelagt ut mens sentralbordet fortsatt står på `/oppdrag/`. Samme regel som «en knapp som fører til en vegg», fra den andre siden: **en flate som ikke forklarer seg, leses som en feil** |
+
+**Sesjonsloopen flyttet til `core/sesjoner.py`** fordi den nå har to lesere. Adminflatens
+`_list_active_sessions` bygger på den og beholder sin egen projeksjon (`session_key`,
+`role`); KO har sin. Primitivet er delt, projeksjonen er ikke — og det er hele poenget med
+fila. `_inaktiv_sekunder` heter nå `core.sesjoner.inaktiv_sekunder`.
+
+**Sidebaren viser én rad per person, ikke per sesjon.** Adminlista på server-status lister
+*sesjoner*, fordi den skal kunne avslutte én av dem. Denne svarer på hvem som er der, og
+samme operatør med KO på PC-en og på telefonen er én person. `inaktiv_s` blir den ferskeste
+av fanene: står den ene urørt i to timer mens den andre brukes, er personen til stede. En
+delt konto er merket «delt» — «Enhet 2» og «Kari Nordmann» betyr fundamentalt ulike ting,
+og blir lista noen gang lest i en personalsak er den forskjellen alt (§4.5).
+
+**Avhengighetsretningen er håndhevet fra dag én**, ikke fra den dagen KO får en modell.
+`ko/tests_avhengighet.py` leser importene med AST og krever at ingen modul under KO
+importerer den — `ko` → `vaktliste` og `ko` → `oppdrag`, aldri motsatt. Testen bor i `ko/`
+av samme grunn som `OppdragImportererIkkeVaktlista` bor i `vaktliste/`: det er den
+importerte som mister uavhengigheten sin. `core/tests_avhengighetsretning.py` har `ko` i
+`MODULAPPER`, og `core/modules.py` → `ko.module` er den ene tillatte importen.
+
+**16 mutanter, alle drept — men tre av dem var grønne til testene ble skrevet.**
+Den dyreste: fjernes `modul_slug=SLUG` fra spørringen i `_har_ko_tilgang_ider`, overlevde
+mutanten, fordi den eneste testen som prøvde en konto uten KO-tilgang brukte en konto uten
+*noen* rader. Den faller ut uansett. Feilen mutanten slapp gjennom er at **hvem som helst
+med tilgang til én modul ville stått oppført som til stede i KO**. De to andre var
+`_laveste()` — `min` → `max`, og `None` som vinner — som begge ville fått lista til å melde
+fravær om noen som satt der. Mutantene gikk på tilgangsfilteret (tungt lag), portene i
+viewene og de to JS-funksjonene som *avgjør* noe: `koInaktivTekst()` og `koKontomerke()`.
+`koTegnTilstede()` er tegning og ble ikke mutert, jf. tabellen i `CLAUDE.md`.
+
+**Tallene i dokumentene fulgte med:** 128 → 130 endepunkter, `/ko/` er et kjent prefiks i
+`core/tallfasit.py` med egen rad i `PAASTANDER`, 23 → 24 JS-filer, fire → fem brukervendte
+moduler, og `ko` står i testkommandoen i `CLAUDE.md` (`TestkommandoenDekkerAltTests` ville
+ellers sagt fra). `ko/CLAUDE.md` er ført opp i `DOKUMENTER` og i tabellen «Hvor
+dokumentasjonen bor».
+
+**Modulen er synlig i nav og på dashbordet fra pulje 1** (avklart med André). Uten en dør i
+menyen kan man ikke verifisere at tilgangen virker uten å skrive `/ko/` manuelt, og det er
+nettopp det puljen finnes for. `ensure_defaults_exist()` slår modulen på automatisk
+(`ModuleSettings.enabled=True`); den kan slås av på `/portal-admin/moduler/`.
+
+**Rota er nå 996 av 1 000 linjer** (`ROT_GRENSE` i `core/tests_claude_md.py`). Fire linjer
+igjen er et punkt i `TODO.md`, ikke et problem i dag — men neste rammeverksregel får ikke
+plass uten at noen tar et valg.
+
+Suite: 3 275 tester, grønn.
+
+---
+
 ## 2026-09-17 — Planforslag for KO-modulen, og datteroppdrag forkastet
 
 Ingen kodeendring. `docs/FORSLAG_KO.md` er et planforslag (ikke besluttet) etter en

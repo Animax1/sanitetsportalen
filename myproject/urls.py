@@ -53,6 +53,11 @@ urlpatterns = [
     path('oppdrag/', include('oppdrag.urls')),
     path('vaktliste/', include('vaktliste.urls')),
 
+    # KO — situasjonsbildet (17. sep. 2026). Samme grunn til aa staa foer
+    # core, og modulen ligger *over* oppdrag og vaktliste: den leser dem,
+    # de kjenner ikke den. Se docs/FORSLAG_KO.md §3.3.
+    path('ko/', include('ko.urls')),
+
     # Sanitetsportal-skall (dashboard + legacy-redirects)
     # Mountet på '' så portal-dashboardet ligger på /.
     path('', include('core.urls')),
