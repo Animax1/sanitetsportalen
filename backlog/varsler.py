@@ -23,8 +23,9 @@ from core.notifications import notify
 
 logger = logging.getLogger(__name__)
 
-#: Varseltypen. Brukes til dedup og et framtidig filter i bjella.
+#: Varseltypene. Brukes til dedup og et framtidig filter i bjella.
 KIND = 'backlog_nytt_innspill'
+KIND_KOMMENTAR = 'backlog_ny_kommentar'
 
 
 def _mottakere(unntatt):
@@ -69,4 +70,52 @@ def meld_nytt_innspill(innspill) -> int:
         return antall
     except Exception:
         logger.exception('backlog: kunne ikke varsle om innspill %s', innspill.pk)
+        return 0
+
+
+def _tradens_folk(innspill, unntatt):
+    """Kontoene som har skrevet i tråden — forfatteren og de som har kommentert.
+
+    **Ikke «alle som kan lese», og ikke «alle som kan løse».** En kommentar er
+    en replikk i en samtale, og den angår dem som er i samtalen. Varsler man
+    bredere, blir tråden til støy for folk som ikke har spurt om noe; varsler
+    man smalere — bare forfatteren — går et svar fra forfatteren aldri tilbake
+    til den som spurte.
+    """
+    from accounts.models import CustomUser
+
+    ider = {innspill.opprettet_av_id}
+    ider |= set(innspill.kommentarer.values_list('opprettet_av_id', flat=True))
+    ider -= {None, getattr(unntatt, 'pk', None)}
+    return CustomUser.objects.filter(pk__in=ider)
+
+
+def meld_ny_kommentar(kommentar) -> int:
+    """Varsle dem som er i tråden. Returnerer antall varsler som ble opprettet.
+
+    Kaster aldri, av samme grunn som `meld_nytt_innspill`: kommentaren er
+    skrevet, og den skal ikke gå tapt fordi bjella feilet.
+    """
+    try:
+        innspill = kommentar.innspill
+        antall = 0
+        for bruker in _tradens_folk(innspill, kommentar.opprettet_av):
+            varsel = notify(
+                bruker,
+                module_slug='backlog',
+                kind=KIND_KOMMENTAR,
+                title=f'Ny kommentar: {innspill.tittel}'[:120],
+                # Teksten er med fordi den ofte *er* hele varselet — «hvilken
+                # nettleser?» besvares uten å åpne siden. `notify()`
+                # dedupliserer på meldingen, så to ulike kommentarer gir to
+                # varsler mens et dobbelttrykk gir ett.
+                message=f'{kommentar.opprettet_av_navn or "ukjent"}: '
+                        f'{kommentar.tekst}'[:500],
+                url='/backlog/',
+            )
+            if varsel is not None:
+                antall += 1
+        return antall
+    except Exception:
+        logger.exception('backlog: kunne ikke varsle om kommentar %s', kommentar.pk)
         return 0

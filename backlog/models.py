@@ -169,3 +169,51 @@ class Innspill(models.Model):
 
     def __str__(self):
         return f'{self.type}: {self.tittel}'
+
+
+class Kommentar(models.Model):
+    """En kommentar på ett innspill. Tråden under saken.
+
+    **Kommentarer kan skrives også på en løst sak.** Det er et bevisst avvik fra
+    regelen om at et løst innspill ikke kan redigeres: å skrive «rettet i bygg
+    f3b279d» *er* svaret, og det skrives etter at flagget er satt. Å stenge
+    tråden ved lukking ville gjort det umulig å notere hvordan saken ble løst
+    akkurat der noen ville lett etter det.
+
+    **`CASCADE` på innspillet**, fordi en kommentar uten saken sin er en
+    setning uten sammenheng. Sperren mot å miste dem ligger et annet sted:
+    `services.kan_slettes()` nekter å slette et innspill andre har kommentert.
+    """
+
+    innspill = models.ForeignKey(
+        'backlog.Innspill',
+        on_delete=models.CASCADE,
+        related_name='kommentarer',
+        verbose_name='Innspill',
+    )
+    tekst = models.TextField(verbose_name='Kommentar')
+
+    opprettet_av = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name='backlog_kommentarer',
+        verbose_name='Skrevet av',
+    )
+    #: Frosset, av samme grunn som på innspillet: en tråd der avsenderen
+    #: forsvinner er verdiløs akkurat når den leses.
+    opprettet_av_navn = models.CharField(
+        max_length=150, blank=True, default='', verbose_name='Skrevet av (navn)')
+    opprettet_at = models.DateTimeField(auto_now_add=True, verbose_name='Skrevet')
+    endret_at = models.DateTimeField(auto_now=True, verbose_name='Sist endret')
+
+    class Meta:
+        verbose_name = 'Kommentar'
+        verbose_name_plural = 'Kommentarer'
+        # **Eldste først.** En tråd leses ovenfra og ned; nyeste først ville
+        # gjort svaret til å stå over spørsmålet.
+        ordering = ['opprettet_at', 'pk']
+
+    def __str__(self):
+        return f'{self.opprettet_av_navn}: {self.tekst[:40]}'

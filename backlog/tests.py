@@ -12,7 +12,7 @@ from django.utils import timezone
 
 from accounts.models import CustomUser, ModulTilgang
 from backlog import services
-from backlog.models import Innspill, Innspilltype
+from backlog.models import Innspill, Innspilltype, Kommentar
 from core.modules import get_module
 
 
@@ -467,3 +467,235 @@ class VarselVedNyttInnspillTests(TestCase):
             svar = self._meld_inn(_klient(self.skriver))
         self.assertEqual(svar.status_code, 201)
         self.assertEqual(Innspill.objects.count(), 1)
+
+
+@override_settings(SECURE_SSL_REDIRECT=False, RATELIMIT_ENABLE=False)
+class KommentarerTests(TestCase):
+    """Tråden under én sak (André, 17. sep. 2026)."""
+
+    def setUp(self):
+        self.leser = _gi(_bruker('leser'), 'les')
+        self.skriver = _gi(_bruker('skriver'), 'skriv_full')
+        self.annen = _gi(_bruker('annen'), 'skriv_full')
+        self.leder = _gi(_bruker('leder'), 'skriv_leder')
+        self.innspill = Innspill.objects.create(
+            type=_type(), tittel='Noe er galt',
+            opprettet_av=self.skriver, opprettet_av_navn='skriver')
+        self.sti = f'/backlog/api/innspill/{self.innspill.pk}/kommentarer/'
+
+    def _skriv(self, klient, tekst='Hvilken nettleser?'):
+        return klient.post(self.sti, data=json.dumps({'tekst': tekst}),
+                           content_type='application/json')
+
+    def test_les_ser_traaden_men_skriver_ikke_i_den(self):
+        """Den som bare ser backloggen er en tilskuer, ikke en deltaker."""
+        c = _klient(self.leser)
+        self.assertEqual(c.get(self.sti).status_code, 200)
+        self.assertEqual(self._skriv(c).status_code, 403)
+        self.assertEqual(Kommentar.objects.count(), 0)
+
+    def test_skriv_full_kommenterer(self):
+        svar = self._skriv(_klient(self.annen))
+        self.assertEqual(svar.status_code, 201)
+        k = Kommentar.objects.get()
+        self.assertEqual(k.innspill, self.innspill)
+        self.assertEqual(k.opprettet_av_navn, 'annen',
+                         'navnet skal fryses på raden')
+
+    def test_tom_kommentar_avvises(self):
+        self.assertEqual(self._skriv(_klient(self.annen), '   ').status_code, 400)
+        self.assertEqual(Kommentar.objects.count(), 0)
+
+    def test_traaden_er_aapen_ogsaa_paa_en_lost_sak(self):
+        """**Bevisst avvik fra redigeringsregelen.** «Rettet i bygg f3b279d»
+        *er* svaret, og det skrives etter at flagget er satt."""
+        self.innspill.lost = True
+        self.innspill.save()
+        self.assertEqual(self._skriv(_klient(self.leder), 'Rettet i f3b279d').status_code,
+                         201)
+
+    def test_eldste_kommentar_foerst(self):
+        """En tråd leses ovenfra og ned; nyeste først ville gjort svaret til å
+        stå over spørsmålet."""
+        self._skriv(_klient(self.annen), 'Første')
+        self._skriv(_klient(self.skriver), 'Andre')
+        rader = json.loads(_klient(self.leser).get(self.sti).content)['data']
+        self.assertEqual([r['tekst'] for r in rader], ['Første', 'Andre'])
+
+    def test_forfatteren_redigerer_og_sletter_sin_egen(self):
+        self._skriv(_klient(self.annen))
+        pk = Kommentar.objects.get().pk
+        c = _klient(self.annen)
+        self.assertEqual(c.put(f'/backlog/api/kommentarer/{pk}/',
+                               data=json.dumps({'tekst': 'Rettet'}),
+                               content_type='application/json').status_code, 200)
+        self.assertEqual(Kommentar.objects.get().tekst, 'Rettet')
+        self.assertEqual(c.delete(f'/backlog/api/kommentarer/{pk}/').status_code, 200)
+        self.assertEqual(Kommentar.objects.count(), 0)
+
+    def test_en_annen_kan_ikke_redigere_kommentaren(self):
+        self._skriv(_klient(self.annen))
+        pk = Kommentar.objects.get().pk
+        svar = _klient(self.skriver).put(
+            f'/backlog/api/kommentarer/{pk}/', data=json.dumps({'tekst': 'Kapret'}),
+            content_type='application/json')
+        self.assertEqual(svar.status_code, 403)
+
+    def test_etter_fristen_er_kommentaren_laast(self):
+        self._skriv(_klient(self.annen))
+        k = Kommentar.objects.get()
+        Kommentar.objects.filter(pk=k.pk).update(
+            opprettet_at=timezone.now() - timedelta(hours=2))
+        self.assertEqual(
+            _klient(self.annen).delete(f'/backlog/api/kommentarer/{k.pk}/').status_code,
+            403)
+
+    def test_en_lost_sak_laaser_ikke_kommentaren(self):
+        """**Avviket, målt.** `kan_endres` nekter på et løst innspill fordi en
+        omskriving gjør svaret uforståelig. En kommentar er ikke spørsmålet —
+        en skrivefeil rettet av forfatteren ti minutter senere velter
+        ingenting."""
+        self._skriv(_klient(self.annen))
+        self.innspill.lost = True
+        self.innspill.save()
+        k = Kommentar.objects.get()
+        self.assertTrue(services.kan_endre_kommentar(k, self.annen))
+        self.assertFalse(services.kan_endres(self.innspill, self.skriver))
+
+    def test_antallet_staar_paa_raden(self):
+        self._skriv(_klient(self.annen), 'En')
+        self._skriv(_klient(self.annen), 'To')
+        rad = json.loads(
+            _klient(self.leser).get('/backlog/api/innspill/').content)['data'][0]
+        self.assertEqual(rad['antall_kommentarer'], 2)
+
+
+@override_settings(SECURE_SSL_REDIRECT=False, RATELIMIT_ENABLE=False)
+class SlettingMedKommentarerTests(TestCase):
+    """**Sletting er strengere enn redigering, og kommentarene er grunnen.**
+
+    Har noen andre skrevet i tråden, er saken ikke lenger et utkast — den er en
+    samtale, og `CASCADE` ville tatt den andres setning med seg uten et ord.
+    """
+
+    def setUp(self):
+        self.skriver = _gi(_bruker('skriver'), 'skriv_full')
+        self.annen = _gi(_bruker('annen'), 'skriv_full')
+        self.innspill = Innspill.objects.create(
+            type=_type(), tittel='Noe er galt',
+            opprettet_av=self.skriver, opprettet_av_navn='skriver')
+        self.sti = f'/backlog/api/innspill/{self.innspill.pk}/'
+
+    def _kommenter(self, bruker, tekst='Hvilken nettleser?'):
+        return Kommentar.objects.create(
+            innspill=self.innspill, tekst=tekst,
+            opprettet_av=bruker, opprettet_av_navn=bruker.username)
+
+    def test_uten_kommentarer_kan_forfatteren_slette(self):
+        self.assertEqual(
+            _klient(self.skriver).delete(self.sti).status_code, 200)
+
+    def test_egne_kommentarer_hindrer_ikke(self):
+        """Har man bare svart seg selv, er det fortsatt ens eget."""
+        self._kommenter(self.skriver)
+        self.assertEqual(
+            _klient(self.skriver).delete(self.sti).status_code, 200)
+
+    def test_en_annens_kommentar_hindrer_sletting_med_409(self):
+        self._kommenter(self.annen)
+        svar = _klient(self.skriver).delete(self.sti)
+        self.assertEqual(svar.status_code, 409)
+        self.assertIn('kommentert', json.loads(svar.content)['message'])
+        self.assertEqual(Innspill.objects.count(), 1)
+        self.assertEqual(Kommentar.objects.count(), 1)
+
+    def test_men_redigering_gaar_fortsatt(self):
+        """Den som vil bort fra en sak andre har engasjert seg i, redigerer
+        den — hun sletter den ikke."""
+        self._kommenter(self.annen)
+        svar = _klient(self.skriver).put(
+            self.sti, data=json.dumps({'tittel': 'Presisert'}),
+            content_type='application/json')
+        self.assertEqual(svar.status_code, 200)
+        self.assertEqual(Innspill.objects.get().tittel, 'Presisert')
+
+    def test_knappen_forsvinner_fra_raden(self):
+        """`kan_slettes` er sitt eget svar i API-et, ikke `kan_endres` — en
+        sletteknapp som gir 409 er en knapp som fører til en vegg."""
+        rad = json.loads(_klient(self.skriver)
+                         .get('/backlog/api/innspill/').content)['data'][0]
+        self.assertTrue(rad['kan_slettes'])
+        self._kommenter(self.annen)
+        rad = json.loads(_klient(self.skriver)
+                         .get('/backlog/api/innspill/').content)['data'][0]
+        self.assertTrue(rad['kan_endres'])
+        self.assertFalse(rad['kan_slettes'])
+
+
+@override_settings(SECURE_SSL_REDIRECT=False, RATELIMIT_ENABLE=False)
+class VarselVedKommentarTests(TestCase):
+    """**Varselet går til tråden, ikke til alle som kan løse.**
+
+    En kommentar er en replikk i en samtale, og den angår dem som er i
+    samtalen. Varsler man bredere, blir tråden til støy for folk som ikke har
+    spurt om noe; varsler man smalere — bare forfatteren — går et svar fra
+    forfatteren aldri tilbake til den som spurte.
+    """
+
+    def setUp(self):
+        from core.models import Notification
+        self.Notification = Notification
+        self.skriver = _gi(_bruker('skriver'), 'skriv_full')
+        self.annen = _gi(_bruker('annen'), 'skriv_full')
+        self.tredje = _gi(_bruker('tredje'), 'skriv_full')
+        self.leder = _gi(_bruker('leder'), 'skriv_leder')
+        self.innspill = Innspill.objects.create(
+            type=_type(), tittel='Noe er galt',
+            opprettet_av=self.skriver, opprettet_av_navn='skriver')
+        self.sti = f'/backlog/api/innspill/{self.innspill.pk}/kommentarer/'
+
+    def _skriv(self, bruker, tekst='Hvilken nettleser?'):
+        return _klient(bruker).post(self.sti, data=json.dumps({'tekst': tekst}),
+                                    content_type='application/json')
+
+    def _varslede(self, kind='backlog_ny_kommentar'):
+        return set(self.Notification.objects.filter(kind=kind)
+                   .values_list('user__username', flat=True))
+
+    def test_forfatteren_varsles_naar_noen_kommenterer(self):
+        self._skriv(self.annen)
+        self.assertEqual(self._varslede(), {'skriver'})
+
+    def test_den_som_kommenterer_varsles_ikke_om_sitt_eget(self):
+        self._skriv(self.skriver)
+        self.assertEqual(self._varslede(), set())
+
+    def test_hele_traaden_varsles_paa_neste_replikk(self):
+        """Svarer forfatteren, skal den som spurte få det — ellers går svaret
+        aldri tilbake."""
+        self._skriv(self.annen)
+        self._skriv(self.tredje)
+        self.Notification.objects.all().delete()
+        self._skriv(self.skriver, 'Chrome')
+        self.assertEqual(self._varslede(), {'annen', 'tredje'})
+
+    def test_lederen_varsles_ikke_uten_aa_vaere_i_traaden(self):
+        """Han fikk varselet da saken ble meldt inn. Et varsel per replikk i
+        hver tråd ville vært en bjelle man slår av."""
+        self._skriv(self.annen)
+        self.assertNotIn('leder', self._varslede())
+
+    def test_teksten_er_med_i_varselet(self):
+        """Den *er* ofte hele varselet — «hvilken nettleser?» besvares uten å
+        åpne siden."""
+        self._skriv(self.annen, 'Hvilken nettleser?')
+        varsel = self.Notification.objects.filter(user=self.skriver).first()
+        self.assertIn('Hvilken nettleser?', varsel.message)
+        self.assertIn('annen', varsel.message)
+
+    def test_et_varsel_som_feiler_stopper_ikke_kommentaren(self):
+        from unittest.mock import patch
+        with patch('backlog.varsler.notify', side_effect=RuntimeError('nede')):
+            svar = self._skriv(self.annen)
+        self.assertEqual(svar.status_code, 201)
+        self.assertEqual(Kommentar.objects.count(), 1)

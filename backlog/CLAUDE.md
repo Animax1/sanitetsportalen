@@ -15,6 +15,8 @@ som går vakt — og det er derfor den er liten.
 | Angrefristen — én time, forfatterens egen | `services.kan_endres()` |
 | Typene, som admin styrer | `models.Innspilltype`, `views.typer_view` |
 | Hvem som varsles om et nytt innspill | `varsler.meld_nytt_innspill()` |
+| Hvem som varsles om en kommentar | `varsler.meld_ny_kommentar()` — tråden, ikke alle |
+| Når en sak ikke lenger kan slettes | `services.kan_slettes()` |
 | Hva slags modul et innspill kan gjelde | `services.gyldig_modul_slug()` — utledet av registeret |
 | De tre nivåene og hva de betyr her | `module.py` |
 | Løst og gjenåpnet | `views.lost_view`, to navngitte stier |
@@ -135,3 +137,31 @@ En auditrad ville båret det samme ett sted til, og bare den ene av de to ville 
 
 Viser det seg feil, er det billig å rette: mønsteret ligger i `vaktliste/signals.py`, og
 vakten `@ikke_under_loaddata` må da med fra første signal.
+
+
+## Kommentarer: tre valg spørsmålet tvinger fram
+
+**Tråden er åpen også på en løst sak.** Det er et bevisst avvik fra at et løst innspill
+ikke kan redigeres. `kan_endres` nekter der fordi et løst innspill er et *spørsmål noen har
+svart på*, og en omskriving gjør svaret uforståelig. Men «rettet i bygg `f3b279d`» **er**
+svaret, og det skrives etter at flagget er satt — stengte vi tråden ved lukking, ble det
+umulig å notere hvordan saken ble løst akkurat der noen ville lett etter det.
+
+Av samme grunn har `kan_endre_kommentar` **to vilkår, ikke tre**: forfatteren og fristen,
+uten `lost`. En kommentar er ikke spørsmålet; den er en setning i tråden, og en skrivefeil
+rettet av forfatteren ti minutter senere velter ingenting. Grensen selv deles —
+`_innen_fristen()` — fordi en grense skrevet to steder er to grenser som glir fra hverandre
+ved neste justering.
+
+**Sletting er strengere enn redigering, og kommentarene er grunnen.** Har noen *andre*
+skrevet i tråden, er saken ikke lenger et utkast — den er en samtale, og `CASCADE` ville
+tatt den andres setning med seg uten et ord. `services.kan_slettes()` er derfor sitt eget
+svar, og det følger med hver rad i API-et: en sletteknapp som gir 409 er en knapp som fører
+til en vegg. Egne kommentarer teller ikke — har man bare svart seg selv, er det fortsatt
+ens eget.
+
+**Varselet går til tråden, ikke til alle som kan løse.** Forfatteren og de som har
+kommentert, minus den som skriver nå. Varsler man bredere, blir tråden til støy for folk som
+ikke har spurt om noe; varsler man smalere — bare forfatteren — går et svar fra forfatteren
+aldri tilbake til den som spurte. Lederen fikk sitt varsel da saken ble meldt inn; et varsel
+per replikk i hver tråd ville vært en bjelle man slår av.

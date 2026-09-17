@@ -463,6 +463,15 @@ FK-er ut av modulens eget datasett strippes (`strip_fields`): med
 gjenopprettingen — altså akkurat når man trenger backupen. Den hele fila
 strippes **ikke**: brukerne er med i den, så den er selvbærende.
 
+**`BrukerpekereStrippesEllerBegrunnesTests` utleder hvilke FK-er dette gjelder**
+(17. sep. 2026), i stedet for å stole på at hver handler husker. Regelen er ikke
+«alt må strippes» — å beholde pekeren er gyldig når koblingen er verdt mer enn
+gjenopprettbarheten — men valget skal være **tatt**, og stå enten i
+`strip_fields` eller i `IKKE_STRIPPET` med en begrunnelse. Testen kom av at en
+mutant som fjernet en strippet peker overlevde, og den fant fire ustrippede
+pekere i moduler arbeidet ikke gjaldt. Det er den verste sorten overlevende:
+feilen viser seg bare den dagen man trenger backupen.
+
 **Klokka er en tråd i web-prosessen** (`core/backup/klokke.py`), ikke en
 cron-jobb: et Railway-volum kan bare henge på én tjeneste, og `/data` henger på
 web-tjenesten. Se «Cron-jobbene» under for hva en cron-tjeneste uten volum ville

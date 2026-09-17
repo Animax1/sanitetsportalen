@@ -31,7 +31,7 @@ from core.ratelimit import rate_limit
 
 from . import services
 from . import varsler
-from .models import Innspill, Innspilltype
+from .models import Innspill, Innspilltype, Kommentar
 
 
 # ── Hjelpere ─────────────────────────────────────────────────────────────────
@@ -95,6 +95,11 @@ def _til_dict(innspill, bruker, naa):
         'lost_av': innspill.lost_av_navn,
         'lost_at': innspill.lost_at.isoformat() if innspill.lost_at else '',
         'kan_endres': services.kan_endres(innspill, bruker, naa),
+        # **`kan_slettes` er sitt eget svar, ikke `kan_endres`.** Har andre
+        # kommentert, kan saken redigeres men ikke slettes — og en sletteknapp
+        # som gir 403 er verre enn ingen sletteknapp.
+        'kan_slettes': services.kan_slettes(innspill, bruker, naa),
+        'antall_kommentarer': innspill.kommentarer.count(),
     }
 
 
@@ -155,7 +160,10 @@ def innspill_view(request):
     if request.method == 'POST':
         return _opprett(request)
 
-    qs = Innspill.objects.select_related('type', 'opprettet_av', 'lost_av')
+    qs = (Innspill.objects.select_related('type', 'opprettet_av', 'lost_av')
+      # Uten dette ble telleren én spørring per rad — og lista polles ikke,
+      # men den lastes ved hvert filterbytte.
+      .prefetch_related('kommentarer'))
 
     type_ = request.GET.get('type')
     if type_:
@@ -236,6 +244,11 @@ def innspill_detalj_view(request, pk):
         return _nektet()
 
     if request.method == 'DELETE':
+        if not services.kan_slettes(innspill, request.user):
+            return JsonResponse({'status': 'error', 'message': (
+                'Andre har kommentert denne saken, så den kan ikke slettes. '
+                'Rediger den i stedet, eller be om at den settes løst.'
+            )}, status=409)
         innspill.delete()
         return JsonResponse({'status': 'ok'})
 
@@ -377,3 +390,88 @@ def type_detalj_view(request, pk):
     return JsonResponse({'status': 'ok', 'data': {
         'id': type_.pk, 'navn': type_.navn, 'er_aktiv': type_.er_aktiv,
         'rekkefolge': type_.rekkefolge, 'i_bruk': type_.innspill.count()}})
+
+
+# ── Kommentarer ──────────────────────────────────────────────────────────────
+
+def _kommentar_til_dict(kommentar, bruker, naa):
+    return {
+        'id': kommentar.pk,
+        'tekst': kommentar.tekst,
+        'opprettet_av': kommentar.opprettet_av_navn,
+        'opprettet_at': kommentar.opprettet_at.isoformat()
+                        if kommentar.opprettet_at else '',
+        'kan_endres': services.kan_endre_kommentar(kommentar, bruker, naa),
+    }
+
+
+@never_cache
+@modul_kreves('backlog', 'les', svar='json')
+@require_http_methods(['GET', 'POST'])
+@rate_limit(group='backlog:kommentarer', rate='60/m', method='POST')
+def kommentarer_view(request, pk):
+    """GET: tråden. POST: ny kommentar.
+
+    **Lesing er `les`, skriving er `skriv_full`** — samme skille som på
+    innspillet selv. Den som bare ser backloggen er en tilskuer, ikke en
+    deltaker.
+
+    **Tråden er åpen også på en løst sak.** Å skrive «rettet i bygg f3b279d»
+    *er* svaret, og det skrives etter at flagget er satt — se `models.Kommentar`.
+    """
+    innspill = Innspill.objects.filter(pk=pk).first()
+    if innspill is None:
+        return _feil('Innspillet finnes ikke', status=404)
+
+    naa = timezone.now()
+    if request.method == 'GET':
+        return JsonResponse({'status': 'ok', 'data': [
+            _kommentar_til_dict(k, request.user, naa)
+            for k in innspill.kommentarer.select_related('opprettet_av')]})
+
+    if not har_tilgang(request.user, 'backlog', 'skriv_full'):
+        return _nektet()
+
+    tekst = (_json_body(request).get('tekst') or '').strip()
+    if not tekst:
+        return _feil('Skriv noe før du lagrer')
+
+    kommentar = Kommentar.objects.create(
+        innspill=innspill,
+        tekst=tekst,
+        opprettet_av=request.user,
+        opprettet_av_navn=request.user.username,
+    )
+    # Sideeffekt, som ved innmelding: `meld_ny_kommentar` kaster aldri.
+    varsler.meld_ny_kommentar(kommentar)
+    return JsonResponse(
+        {'status': 'ok', 'data': _kommentar_til_dict(kommentar, request.user, naa)},
+        status=201)
+
+
+@never_cache
+@modul_kreves('backlog', 'skriv_full', svar='json')
+@require_http_methods(['PUT', 'DELETE'])
+def kommentar_detalj_view(request, pk):
+    """Rediger eller slett sin egen kommentar, innen fristen.
+
+    **403 og ikke 404 når fristen er ute** — raden finnes, og brukeren ser den
+    i tråden; et 404 ville sagt at den var borte.
+    """
+    kommentar = Kommentar.objects.filter(pk=pk).first()
+    if kommentar is None:
+        return _feil('Kommentaren finnes ikke', status=404)
+    if not services.kan_endre_kommentar(kommentar, request.user):
+        return _nektet()
+
+    if request.method == 'DELETE':
+        kommentar.delete()
+        return JsonResponse({'status': 'ok'})
+
+    tekst = (_json_body(request).get('tekst') or '').strip()
+    if not tekst:
+        return _feil('Skriv noe før du lagrer')
+    kommentar.tekst = tekst
+    kommentar.save()
+    return JsonResponse({'status': 'ok', 'data': _kommentar_til_dict(
+        kommentar, request.user, timezone.now())})

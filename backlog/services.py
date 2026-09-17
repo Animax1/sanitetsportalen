@@ -49,11 +49,56 @@ def kan_endres(innspill, bruker, naa=None) -> bool:
         return False
     if innspill.lost:
         return False
-    if innspill.opprettet_at is None:
-        # Ulagret rad. Ingen frist å måle mot, og ingenting å rette.
+    return _innen_fristen(innspill.opprettet_at, naa)
+
+
+def _innen_fristen(opprettet_at, naa) -> bool:
+    """Den delte halvdelen av angrefristen. Ett sted, to lesere.
+
+    `kan_endres` og `kan_endre_kommentar` skiller seg på ett vilkår hver, men
+    grensen er den samme — og en grense skrevet to steder er to grenser som
+    glir fra hverandre ved neste justering.
+    """
+    if opprettet_at is None:
         return False
-    naa = naa or timezone.now()
-    return naa - innspill.opprettet_at <= ANGREFRIST
+    return (naa or timezone.now()) - opprettet_at <= ANGREFRIST
+
+
+def kan_endre_kommentar(kommentar, bruker, naa=None) -> bool:
+    """Får denne brukeren redigere eller slette kommentaren nå?
+
+    **To vilkår, ikke tre** — og den som mangler er den om at saken er løst.
+    `kan_endres` nekter å redigere et løst innspill fordi et løst innspill er
+    et *spørsmål noen har svart på*, og en omskriving gjør svaret uforståelig.
+    En kommentar er ikke spørsmålet; den er en setning i tråden, og en
+    skrivefeil rettet av forfatteren ti minutter senere velter ingenting.
+
+    Avviket står skrevet fordi det ellers ser ut som en forglemmelse.
+    """
+    if kommentar is None or bruker is None:
+        return False
+    if not getattr(bruker, 'is_authenticated', False):
+        return False
+    if kommentar.opprettet_av_id != bruker.pk:
+        return False
+    return _innen_fristen(kommentar.opprettet_at, naa)
+
+
+def kan_slettes(innspill, bruker, naa=None) -> bool:
+    """Får denne brukeren slette innspillet nå?
+
+    **Sletting er strengere enn redigering, og kommentarene er grunnen.**
+    Har noen *andre* skrevet i tråden, er saken ikke lenger et utkast — den er
+    en samtale, og `CASCADE` ville tatt den andres setning med seg uten et ord.
+    Den som vil bort fra en sak andre har engasjert seg i, redigerer den eller
+    ber om at den settes løst.
+
+    Egne kommentarer teller ikke: har man bare svart seg selv, er det fortsatt
+    ens eget.
+    """
+    if not kan_endres(innspill, bruker, naa):
+        return False
+    return not innspill.kommentarer.exclude(opprettet_av_id=bruker.pk).exists()
 
 
 def gyldig_modul_slug(slug: str) -> bool:
