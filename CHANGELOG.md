@@ -4,6 +4,32 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-17 — De to valgene som blokkerer KO pulje 2, opp i toppen  `#core/dokumentasjon` `#ko/skallet`
+
+Ingen kodeendring. De to åpne valgene om KO-loggen lå som barn under «Pulje 2 — loggen»,
+og der var de riktig plassert så lenge pulje 2 var en idé ingen hadde tatt opp:
+**«Krever Andre» betyr «blokkerer nå»**, og et valg inne i en upåbegynt idé gjør ikke det.
+
+Nå tas pulje 2 opp, og da blokkerer de. De står derfor i toppseksjonen, som er den ene
+lista André skal kunne stole på — og de er **skrevet om så de står på egne bein**, jf.
+regelen i `CLAUDE.md`: et barn henter ofte meningen sin fra forelderen, og et punkt som
+bare gir mening under overskriften det ble løftet fra, er et punkt ingen kan handle på.
+
+De to:
+
+- **Hvor lenge oppbevares KO-loggen, og skal den arkiveres?** Konflikten er innebygget:
+  `NOTAT_DPIA_OG_FRITEKST.md` §7 sier at fritekst bevisst ikke arkiveres, mens et felt i
+  et arkivs SHA-signatur er låst i 24 måneder ved konstruksjon — og §4.4 krever samtidig
+  én smal sletteinngang. **Bygges loggen først, er svaret allerede gitt av konstruksjonen.**
+- **Hvilke systemhendelser løftes inn i loggen?** Kuratert, ikke automatisk: «Enhet 3 satt
+  til på stedet» hører hjemme der, «Enhetstype fikk nytt navn» gjør ikke. Lista skal være
+  eksplisitt og begrunnet, som `NOKLER_UTEN_AUDIT`.
+
+Det tredje valget — om en lukket hendelse skal kunne åpnes igjen — blir stående under
+pulje 3, fordi det er der det blokkerer.
+
+---
+
 ## 2026-09-17 — 97 entries merket: fra 200 grep-treff til 5 oppslag  `#core/dokumentasjon`
 
 Mekanismen kom tidligere i dag; dette er merkingen som gjør den til noe. **13.–17. sep. er

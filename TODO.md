@@ -131,6 +131,39 @@ ingen av dem gir feilmelding — de er bare stille inaktive.
       til hver jobb har kjørt én gang etter deployen — sjekk igjen dagen etter at de tre
       viser ✓.
 
+- [ ] **KO-loggen: hvor lenge oppbevares den, og skal den arkiveres?**
+      **Blokkerer KO pulje 2** (`docs/FORSLAG_KO.md` §11.3), som er neste pulje ut.
+
+      KO-loggen er menneskeskrevet fritekst om det som skjer utenfor samleplass og
+      sykestue — «mann, ca. 60, kollapset ved scene sør 21:14». Den er indirekte
+      identifiserende og inneholder helseopplysninger uansett hvor godt opplæringen
+      holder.
+
+      **Konflikten er innebygget og kan ikke ryddes opp i etterpå.**
+      `docs/NOTAT_DPIA_OG_FRITEKST.md` §7 slår fast at fritekst bevisst *ikke* arkiveres.
+      Men et felt som inngår i et arkivs SHA-signatur er låst i 24 måneder ved
+      konstruksjon, og kan ikke fjernes uten at arkivet melder tukling. Samtidig krever
+      §4.4 én smal, logget **sletteinngang** for den kvelden noen skriver et navn — og
+      «append-only» og «fjern personopplysninger» står i direkte konflikt.
+
+      **Bygges loggen først, er svaret allerede gitt av konstruksjonen.** Derfor før koden,
+      ikke under. Tre spørsmål å svare på: (1) hvor lenge skal linjene ligge, (2) skal de
+      med i et arkiv i det hele tatt, og (3) hva skjer med en slettet linje i et arkiv som
+      alt er signert.
+
+- [ ] **KO-loggen: hvilke systemhendelser skal løftes inn i den?**
+      **Blokkerer KO pulje 2** (`docs/FORSLAG_KO.md` §11.1). Dette er selve designarbeidet
+      i loggdelen, ikke en detalj.
+
+      Hendelsesloggen er **ikke** audit-loggen: `audit/` er automatisk, teknisk og finnes
+      for sikkerhet; denne er menneskeskrevet og leses etter et arrangement der noe gikk
+      galt. Systemhendelser løftes derfor inn **kuratert, ikke automatisk**. «Enhet 3 satt
+      til på stedet» hører hjemme der; «Enhetstype fikk nytt navn» gjør ikke.
+
+      Lista skal være eksplisitt og begrunnet, som `NOKLER_UTEN_AUDIT` i `core/signals.py`.
+      Spørsmålet til deg er hvilke hendelser du vil se i loggen når du leser den i
+      etterkant — jeg kan lage et forslag å reagere på, men valget er operativt.
+
 - [ ] **Kjør `scripts/sikkerhetssjekk.py` mot staging** med admin-, leser- og
       enhetskonto, og lim inn rapporten. Runbook §14. Den prøver portalen *utenfra*, som
       suiten aldri gjør.
@@ -543,16 +576,7 @@ Forslaget erstatter datteroppdrag, som er arkivert: grupperingen hører hjemme i
       polling med `?siden=<id>`. Alt annet skriver inn i den. De to åpne valgene under
       må besvares først.
 
-      - [ ] **Åpent valg, besvares før pulje 2 (loggen):** hvor lenge oppbevares KO-loggen,
-            og arkiveres den? `NOTAT_DPIA_OG_FRITEKST.md` §7 slår fast at fritekst bevisst
-            *ikke* arkiveres — et felt i arkivets SHA-signatur er låst i 24 måneder ved
-            konstruksjon. KO-loggen er i all hovedsak fritekst, og sletteinngangen i §4.4
-            har samme konflikt. **Bygges loggen først, er svaret allerede gitt av
-            konstruksjonen.**
-
-      - [ ] **Åpent valg, besvares før pulje 2:** hvilke systemhendelser løftes inn i
-            loggen? Lista skal være eksplisitt og begrunnet, som `NOKLER_UTEN_AUDIT`.
-            Dette er selve designarbeidet i loggdelen, ikke en detalj.
+      De to valgene som blokkerer står i «Krever Andre» øverst i fila.
 
       - [ ] **KO må registrere en backup-handler i samme pulje som den får sin første
             tabell.** Vaktlistemodulen sto uten backup i det hele tatt fra den gikk i prod
