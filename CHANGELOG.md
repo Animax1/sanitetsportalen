@@ -4,7 +4,69 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
-## 2026-09-17 — Vaktlistefila fikk seksjoner, og vakten fikk noe å peke på
+## 2026-09-17 — Søkeord i CHANGELOG, så arkivet kan slås opp i  `#core/dokumentasjon`
+
+**André:** «Hensikten med slike søkeord er jo at da slipper du lese hele changelog som er
+gigantisk.» Han hadde rett, og jeg svarte først på feil problem.
+
+**Det er to behov, ikke ett:**
+
+| Behov | Virket før? |
+|---|---|
+| **Følge en peker** — «regelen viser til CHANGELOG 16. sep.» | Ja. 281 overskrifter, **null duplikate titler**, ett `grep` |
+| **Ramse opp et tema** — «hva har skjedd med planleggeren?» | **Nei** |
+
+**Målt, og verre enn antatt.** Arkivet er 11 651 linjer og 650 000 tegn. «Rolle» gir **84**
+entries som nevner ordet og **seks** som handler om det. «Korps» 51 mot fire. «Offline» 35
+mot to. `CLAUDE.md` sier at CHANGELOG `grep`-es og ikke leses, og det stemmer så lenge du
+kjenner symptomet — «[object Object]» var søkbart fordi det sto der ordrett. Det holder
+ikke når spørsmålet er et tema; da er arkivet i praksis stengt for den som ikke alt vet
+hvor hun skal se.
+
+**Formen er `` `#<app>/<tema>` `` i overskriftslinja**, ikke på en linje under: ett `grep`
+skal gi dato, tittel og tema samtidig. Står søkeordet for seg selv, får du en naken streng
+og må slå opp en gang til.
+
+**App-halvdelen utledes, tema-halvdelen registreres.** Appen er en ekte Django-app og
+validerer seg selv, så en ny modul er dekket fra dagen den finnes. Temaene står i `TEMAER`
+i `core/changelog.py` — et vokabular uten register er en håndholdt liste, og de forfaller
+i stillhet: `#vaktliste/planlegger` og `#vaktliste/planlegging` ville vært to temaer ingen
+la merke til at var ett, og det ene ville svart med halvparten.
+
+**To regler som peker hver sin vei**, i `core/tests_changelog.py`:
+
+- Hvert søkeord i bruk er registrert — fanger skrivefeilen.
+- Hvert registrert søkeord er i bruk — speilet, og den som betydde noe her.
+
+**Den andre regelen tok min egen første versjon.** Jeg registrerte tjue temaer og hadde
+merket fire; testen meldte seksten døde. Det er ikke pedanteri: `--temaer` ville vist
+seksten rader med null, og et søk som svarer med ett treff der det finnes fem får deg til
+å tro du har sett alt. Samme feilklasse som en skanner som melder grønt om en dekning den
+ikke har. **Vokabularet skal vokse med merkingen, ikke foran den** — og testen håndhever
+rekkefølgen.
+
+Fire entries er merket. Resten er ført i `TODO.md` med utkastet til temaer, og med
+rekkefølgen: ta 13.–17. sep. først, der oppslagene faktisk gjøres.
+
+**For halen bakover finnes kommandoen nå:**
+
+```powershell
+python manage.py changelog                  # alle 281 titlene — 281 linjer mot 11 651
+python manage.py changelog --temaer         # vokabularet, med antall per tema
+python manage.py changelog --tema ko/skallet
+python manage.py changelog --app vaktliste
+python manage.py changelog --umerkede       # hva som gjenstår
+```
+
+Sperrehaker: parseren må finne over 200 entries, titlene må være unike (pekeren skal ikke
+være tvetydig), halen må leses ut av overskriften **og** en tittel uten søkeord må fortsatt
+gi hele tittelen — ellers ville de 277 umerkede mistet navnet sitt i parsingen.
+
+Suite: 3 296 tester, grønn.
+
+---
+
+## 2026-09-17 — Vaktlistefila fikk seksjoner, og vakten fikk noe å peke på  `#core/dokumentasjon` `#vaktliste/planlegging`
 
 **Oppgaven var «del `vaktliste/CLAUDE.md`», og den ble ikke løst slik.** Tre funn i
 rekkefølge, og hvert av dem snudde planen:
@@ -62,7 +124,7 @@ Suite: 3 288 tester, grønn.
 
 ---
 
-## 2026-09-17 — Rota kartlegger, modulfila forklarer — og vaktene måler tegn
+## 2026-09-17 — Rota kartlegger, modulfila forklarer — og vaktene måler tegn  `#core/dokumentasjon`
 
 Ingen kodeendring, bare dokumentasjon og de testene som holder den i live.
 
@@ -125,7 +187,7 @@ Suite: 3 278 tester, grønn.
 
 ---
 
-## 2026-09-17 — KO-modulen, pulje 1: skallet
+## 2026-09-17 — KO-modulen, pulje 1: skallet  `#ko/skallet` `#core/tilgang`
 
 **`/ko/` finnes.** Modulen er registrert, siden har de fire flatene fra `FORSLAG_KO.md` §7,
 sidebaren over hvem som har KO oppe virker, og `ModulTilgang('ko')` slipper folk inn. Ingen
@@ -201,7 +263,7 @@ Suite: 3 275 tester, grønn.
 
 ---
 
-## 2026-09-17 — Planforslag for KO-modulen, og datteroppdrag forkastet
+## 2026-09-17 — Planforslag for KO-modulen, og datteroppdrag forkastet  `#ko/skallet`
 
 Ingen kodeendring. `docs/FORSLAG_KO.md` er et planforslag (ikke besluttet) etter en
 gjennomgang med André 16.–17. sep.: **KO-modulen** — situasjonsbildet med ressursoversikt,

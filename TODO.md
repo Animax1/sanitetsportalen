@@ -357,6 +357,32 @@ bindende: 1 før 2, fordi backupen speiler hvor modellene bor.
             backup 90 dager, modulfilene 730 dager offsite), A.10, A.11/A.6 (fil på e-post,
             offline drift)
       - [ ] `CLAUDE.md` — backup-avsnittet og hvor modellene bor
+- [ ] **Merk CHANGELOG-entriene med søkeord.** Mekanismen står (`core/changelog.py`,
+      `manage.py changelog`, `core/tests_changelog.py`), men bare **4 av 281** entries er
+      merket. Til de er det, svarer et temasøk med færre treff enn det finnes — og det er
+      verre enn ingen merking: du tror du har sett alt.
+
+      **Målt problem** (17. sep. 2026): CHANGELOG er 11 651 linjer. «Rolle» gir 84 entries
+      som nevner ordet og seks som handler om det; «korps» 51 mot fire; «offline» 35 mot
+      to. Overskriften duger til å *følge en peker* — 281 titler, ingen duplikater — men
+      ikke til å *ramse opp et tema*.
+
+      **Ta 13.–17. sep. først** (~95 entries). Det er der oppslagene gjøres, og det dekker
+      alle temaene. For halen bakover finnes `manage.py changelog`, som skriver ut 281
+      titler i stedet for 11 651 linjer, og `--umerkede` viser hva som gjenstår.
+
+      **Merk med en eksplisitt tittel-til-tema-tabell, ikke nøkkelordsgjetting** — og la
+      skriptet kreve at hver tittel i tabellen finnes, så en skrivefeil blir rød og ikke
+      en stille ikke-merking.
+
+      Temaene under er utkastet, med entries som allerede finnes for hvert. **Registrer
+      dem i `TEMAER` i samme commit som du merker entriene**, aldri foran:
+      - `vaktliste/`: `tilgang`, `roller`, `drift`, `belastning`, `offline`, `besetning`
+      - `oppdrag/`: `statusmaskin`, `enhetsskjerm`, `sentralbord`, `verdimengder`, `arkiv`
+      - `patients/`: `registrering`, `arkiv`, `registre`
+      - `statistikk/`: `kilder`
+      - `core/`: `backup`, `drift`, og to som mangler bøtte i dag — `audit` og `sikkerhet`
+
 - [ ] **Strukturér `oppdrag/CLAUDE.md`.** 17 275 tegn under **én** overskrift — samme
       flate vegg vaktlista hadde, bare mindre, og den eneste fila som står i
       `UTEN_SEKSJONER_I_DAG` i `core/tests_claude_md.py`. Statusmaskinen, verdimengdene,
