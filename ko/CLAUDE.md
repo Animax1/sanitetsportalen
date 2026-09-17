@@ -20,13 +20,38 @@ nettopp ble opptatt lander i en rute ingen ser på. Et merke sier *at* noe skjed
 *hva*, og det er enda et klikk midt i sambandstrafikk — mens hele grunnen til at KO finnes
 er at situasjonsbildet skal være i ett blikk.
 
-Formen er derfor **to kolonner**: tavla og oppdragene til venstre, loggen som fast panel
-til høyre med sidebaren over seg. Loggen er smal og skrives konstant; den hører hjemme som
-et panel. En ny flate legges *i* en av kolonnene, aldri som en femte fane.
+**Formen er tre kolonner: `Logg │ Ressurser │ Oppdrag`** (André, 17. sep. 2026: «Logg skal
+være den sentrale delen. Ressursoversikt henger sammen med oppdragslisten. PC er hoved
+måten en bruker dette på.»). Forholdet er 4 : 3 : 5, og de to siste er sentralbordets eget
+`col-lg-4` + `col-lg-8` litt strammet — det er den blokka pulje 4 flytter hit.
 
-**Under `xl` stables kolonnene**, og da er loggen under oppdragene. Det er ikke løst, det
-er akseptert: KO brukes på en skjerm i et kommandopunkt, og en telefon kan uansett ikke
-vise en ressurstavle. Kommer kravet om mobil, er det en egen oppgave — ikke en fane.
+**Rekkefølgen er arbeidsflyten fra venstre mot høyre:** du hører noe, fører linja, ser hvem
+som er ledig, og sender. Loggen står derfor først, der øyet lander, og ikke i midten —
+loggen i midten ville splittet paret som hører sammen, og den hyppigste handlingen på
+skjermen er nettopp å matche en ledig ressurs mot et ventende oppdrag. «Sentral» er her
+lest som *primær og permanent*, ikke som *midterste kolonne*, og det valget er
+`SidenHarIngenFanerTests` sin rekkefølgeprøve.
+
+**Sida ruller ikke — kolonnene gjør det.** Det er forskjellen på en konsoll og en
+nettside: de tre flatene står på samme sted hele vakta, uansett hvor mye som er i dem.
+Rulles sida, flytter skrivefeltet seg idet tavla får en rad til. Høyden **måles** av
+`koKonsollhoyde()` og regnes ikke ut av en `calc()` med et fast tall — over konsollen står
+header, nav og eventuelle meldinger, og alle tre kan brekke til to linjer. Gulvet
+(`KO_MIN_HOYDE`) er en regel og ikke en margin: uten det gir et kort vindu tre ubrukelige
+rullefelt, og da er det bedre at sida ruller.
+
+**Sidebaren er et nedtrekk, ikke en kolonne.** «Hvem har KO oppe» er en håndfull navn man
+kikker på; en fjerde kolonne ville tatt bredde fra oppdragslista, som trenger den mest.
+Knappen har `data-bs-toggle="dropdown"` og **ingen** `data-action` — to lyttere på samme
+klikk er fella `klikkSkalKjore()` finnes for.
+
+**Under `xl` stables kolonnene**, loggen først, og høyden slippes så sida ruller normalt.
+Det er ikke løst, det er akseptert: KO brukes på en skjerm i et kommandopunkt, og en
+telefon kan uansett ikke vise en ressurstavle. Kommer kravet om mobil, er det en egen
+oppgave — og svaret er ikke faner.
+
+**Tre kolonner er taket.** Det er også hvorfor hendelser ikke kan bli en fjerde region:
+den er en gruppering av oppdragslista (§7), og layouten og puljeplanen peker samme vei.
 
 **`/oppdrag/` er enhetsverktøyet, `/ko/` er situasjonsverktøyet.** Én bil, én
 statusmaskin, én stempling om gangen — mot hva skjer på arrangementet, hvem er hvor, hva

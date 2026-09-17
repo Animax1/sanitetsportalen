@@ -375,9 +375,11 @@ bindende: 1 før 2, fordi backupen speiler hvor modellene bor.
       `oppdrag/arkiv`, `vaktliste/besetning`. **Registrer dem i `TEMAER` i samme commit
       som du merker entriene**, aldri foran — testen håndhever rekkefølgen.
 
-- [ ] **Rota har 657 tegn igjen av taket på 65 500.** `CLAUDE.md` er 64 843 tegn etter
-      KO pulje 2 og avstemmingen 17. sep. Neste modul som trenger et avsnitt i rota
-      sprenger den, og da står man med valget midt i en annen oppgave. Det som skal
+- [ ] **Rota har ~170 tegn igjen av taket på 65 500.** Den traff taket 17. sep. under
+      konsollayouten og ble komprimert på stedet — det holdt denne gangen, men neste
+      avsnitt gjør det ikke. `CLAUDE.md` er 64 843 tegn etter
+      Neste modul som trenger et avsnitt i rota sprenger den, og da står man med valget
+      midt i en annen oppgave. Det som skal
       flyttes er avsnitt som beskriver **én** modul — regelen fila selv setter — og den
       eneste kandidaten som er igjen er backup-tabellen med ni rader, der hver rad
       forklarer sin egen modul. Vurderes før neste pulje, ikke under den.
@@ -623,6 +625,11 @@ bygget; det flyttet til `/park/`-punktet nederst, der det hører hjemme.*
       situasjonsinformasjon, men per-person-stempling på hver vaktpost ville druknet
       loggen ved hvert vaktskifte. Løftes det, skal det være **ressursen** som går av og
       på vakt, ikke personen — og ressursen er nå noe tavla kjenner.
+
+- [ ] **KO på smal skjerm er akseptert, ikke løst.** Under `xl` stables de tre kolonnene,
+      loggen først, og sida ruller normalt. Det duger til en som kikker, ikke til en som
+      fører. Blir mobil et ekte krav, er det en egen oppgave — og svaret er **ikke** faner:
+      da er det heller loggen alene, med tavla som et nedtrekk ved siden av sidebaren.
 
 - [ ] **Merknad på en KO-ført status.** Ikke bygget, og det var et scope-valg: §3.1 ber om
       `(ressurs, status, tidspunkt, ført av hvem)` og ikke mer. Men «Ute av drift» uten en

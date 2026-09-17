@@ -4,6 +4,88 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-17 — KO som konsoll: tre kolonner, og sida ruller ikke  `#ko/skallet`
+
+André, etter å ha sett pulje 3: «Logg skal være den sentrale delen. Ressursoversikt henger
+sammen med oppdragslisten. PC er hoved måten en bruker dette på. Hva tenker du er den
+ideelle ux løsningen?»
+
+### Det avgjørende funnet lå i sentralbordet
+
+`templates/oppdrag/sentral.html` er i dag `col-lg-4` Ressurser + `col-lg-8` Oppdragsliste,
+side om side. Paringen André beskriver er altså ikke en hypotese — den står i prod, virker,
+og er nøyaktig den blokka pulje 4 skal flytte inn i KO. En annen arrangering nå hadde betydd
+at pulje 4 måtte slåss mot den.
+
+### Formen: `Logg │ Ressurser │ Oppdrag`, 4 : 3 : 5
+
+**Rekkefølgen er arbeidsflyten fra venstre mot høyre:** du hører noe, fører linja, ser hvem
+som er ledig, og sender. Loggen står først, der øyet lander i en latinsk lesning.
+
+**«Sentral» er lest som *primær og permanent*, ikke som *midterste kolonne*** — og det er
+et valg jeg skrev ned framfor å gjette på. Loggen bokstavelig i midten gir
+`Ressurser │ Logg │ Oppdrag`, og da splittes paret som hører sammen, mens den hyppigste
+handlingen på skjermen — matche en ledig ressurs mot et ventende oppdrag — spenner over hele
+bredden. Rekkefølgen håndheves nå av en test, så neste omstokking må være bevisst.
+
+### Sida ruller ikke — kolonnene gjør det
+
+Det er forskjellen på en konsoll og en nettside. Rulles sida, flytter skrivefeltet seg idet
+tavla får en rad til, og operatøren treffer feil felt midt i sambandstrafikk. **Dette var en
+ekte feil i det jeg pushet tidligere samme dag:** `max-height: 45vh` på tavla og `60vh` på
+loggen betyr at *sida* ruller.
+
+Høyden **måles** (`koKonsollhoyde()`) og regnes ikke ut av en `calc()` med et fast tall: over
+konsollen står portalheaderen, navigasjonen og eventuelle meldinger, og alle tre kan brekke
+til to linjer. Et fast tall ville vært riktig på én skjerm og galt på alle andre. Gulvet
+`KO_MIN_HOYDE` er en regel og ikke en margin — uten det gir et kort vindu tre ubrukelige
+rullefelt samtidig, og da er det bedre at sida ruller.
+
+### `.portal-content` var kappet til 1400 px, og det ville drept hele formen
+
+Funnet i den rendrede sida, ikke i CSS-en: `base_portal.html` setter
+`max-width: 1400px` på innholdet. Riktig for en leseflate — en tekstlinje på 1900 px er vond
+å følge — men for en konsoll betyr det at tre kolonner deler 1400 px **uansett hvor stor
+skjermen er**. En 2560-skjerm ville vært nøyaktig like trang som en laptop: 466 / 350 / 583.
+
+Sluppet fri i `ko.css` med `body:has(.ko-konsoll)`, altså i sidas eget ark og ikke som en ny
+blokk i `base_portal`. Faller `:has()` bort, er resultatet den gamle bredden — trang, ikke
+ødelagt.
+
+### Sidebaren er et nedtrekk, ikke en kolonne
+
+«Hvem har KO oppe» er en håndfull navn man kikker på, ikke noe man overvåker. Knappen har
+`data-bs-toggle="dropdown"` og **ingen** `data-action`: begge ville fyrt på samme klikk, og
+det er nettopp fella `klikkSkalKjore()` i `portal-utils.js` finnes for. Sparingen fra pulje 1
+står — ingen polling av en liste ingen ser på — bare snudd: lista er lukket som standard og
+hentes når nedtrekket åpnes.
+
+### Nytt stilark, uten fargevariabler
+
+`static/css/ko.css` (femte ark). Regelen i rota om at et nytt modulark må definere de fire
+`base_portal` ikke aliaser, gjelder et ark som **bruker** dem — dette er ren layout, og fire
+variabler ingen regel refererer til er død kode som i tillegg lyver om å være i bruk.
+
+### Mutasjonstesting
+
+**4 mutanter, alle drept:** gulvet i høyderegelen fjernet, kolonneklassen omdøpt,
+`data-action` tilbake ved siden av `data-bs-toggle`, og — den som betydde noe —
+**kolonnene faktisk byttet om**. Den første omdøpingen traff bare tilstedeværelsesprøven;
+rekkefølgeprøven krevde en ekte ombytting for å bli rød, og den ble det.
+
+Fire node-prøver på `koKonsollhoyde()`, inkludert at gulvet holder når regnestykket blir
+negativt.
+
+### En tabbe i verktøyet, igjen
+
+Første forsøk på å skrive malen brukte en **ukvotert** heredoc (`<<PY` og ikke `<<'PY'`), så
+bash kjørte backtick-uttrykkene inne i den norske prosaen som kommandoer. Skriptet meldte
+«ok» og malen parset — den var bare tømt for halve innholdet. Rullet tilbake med
+`git checkout` og skrev om via en skriptfil i stedet. **Samme lærdom som i går: tell
+resultatet, ikke returkoden.**
+
+---
+
 ## 2026-09-17 — KO pulje 3: ressursbildet  `#ko/ressursbildet`
 
 Tavla over hvem som er på vakt og hvor de står — `docs/FORSLAG_KO.md` §3.1. Flyttet fram

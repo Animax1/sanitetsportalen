@@ -681,7 +681,7 @@ Det finnes **ingen** eksplisitt invalidering — cachen utløper på TTL. De kor
 
 ### Frontend
 
-**Tre stilark, og de dekker hver sine sider.** Å legge en regel i feil fil ser ut som en
+**Fem stilark, og de dekker hver sine sider.** Å legge en regel i feil fil ser ut som en
 virkningsløs endring, ikke som en feil:
 
 | Fil | Lastes av | Variabler |
@@ -690,6 +690,14 @@ virkningsløs endring, ikke som en feil:
 | `static/css/portal.css` | alt som arver `core/templates/core/base_portal.html` | `--portal-text-muted` m.fl. |
 | `static/css/statistikk.css` | **kun** `templates/statistikk/index.html` | definerer selv de fire `base_portal` mangler |
 | `static/css/vaktliste.css` | **kun** `templates/vaktliste/index.html` | samme — `statistikk.css` er mønsteret |
+| `static/css/ko.css` | **kun** `templates/ko/index.html` | **ingen** — ren layout, se fila |
+
+**Regelen gjelder et ark som *bruker* dem.** `ko.css` er ren layout, og fire variabler ingen
+regel refererer til er død kode som lyver om å være i bruk. Kommer en farget regel dit, går
+de fire inn i samme commit.
+
+**`.portal-content` er kappet til 1400 px** — riktig for en leseflate, galt for en konsoll.
+Overstyres i sidas eget ark (`body:has(...)`), aldri med en ny blokk i `base_portal`.
 
 Noen frittstående sider (`403.html`, `mfa_setup.html`, `mfa_verify.html`, innlogging)
 laster ingen av dem — de har egen `<style>`-blokk og må overstyre selv.

@@ -1,0 +1,97 @@
+/* ════════════════════════════════════════════════════════════════════════════
+   KO — konsollayouten. Lastes **kun** av templates/ko/index.html.
+
+   **Ingen fargevariabler her, og det er et valg.** Regelen i CLAUDE.md sier at
+   et nytt modulstilark må definere de fire `base_portal` ikke aliaser
+   (`--text-muted`, `--text-soft`, `--surface-3`, `--header-bg`) — men den
+   gjelder et ark som *bruker* dem. Denne fila er ren layout: høyder, rulling
+   og kolonnebredder. Å skrive inn fire variabler ingen regel refererer til
+   ville vært død kode, og verre: en ny leser ville trodd de var i bruk.
+   Kommer en farget regel hit en dag, skal de fire inn i samme commit.
+
+   **Formen er besluttet 17. sep. 2026 av André:** loggen er den sentrale
+   delen, ressursoversikten henger sammen med oppdragslisten, og PC er
+   hovedflata. Se docs/FORSLAG_KO.md §7 for hvorfor rekkefølgen er
+   Logg → Ressurser → Oppdrag og ikke Ressurser → Logg → Oppdrag.
+   ════════════════════════════════════════════════════════════════════════════ */
+
+/* **Bredden slippes fri på KO-sida, og bare der.** `base_portal.html` kapper
+   `.portal-content` til 1400 px, som er riktig for en leseflate: en tekstlinje
+   på 1900 px er vond å følge. En konsoll er det motsatte — tre kolonner som
+   deler 1400 px gir 466 / 350 / 583, og da brekker enhetsbrikkene i
+   oppdragslista uansett hvor stor skjermen er. Kappet ville altså gjort en
+   2560-skjerm nøyaktig like trang som en laptop.
+
+   `:has()` framfor en ny blokk i `base_portal.html`: regelen gjelder én side,
+   og da skal den stå i den sidas eget ark. Faller `:has()` bort, er resultatet
+   den gamle bredden — trang, ikke ødelagt. */
+body:has(.ko-konsoll) .portal-content {
+  max-width: none;
+}
+
+/* **Sida skal ikke rulle — kolonnene skal.** Det er forskjellen på en konsoll
+   og en nettside: de tre flatene skal stå på samme sted hele vakta, uansett
+   hvor mye som er i dem. Rulles sida, flytter loggfeltet seg idet tavla får en
+   rad til, og operatøren treffer feil.
+
+   Høyden settes av `koSettKonsollhoyde()` i ko.js, ikke av en `calc()` med et
+   fast tall: over konsollen står header, nav og eventuelle meldinger, og alle
+   tre kan brekke til to linjer. `70vh` er reserven om JS-en aldri kjører —
+   for lite, men ikke ødelagt. */
+.ko-konsoll {
+  display: flex;
+  gap: 0.75rem;
+  align-items: stretch;
+  height: var(--ko-hoyde, 70vh);
+}
+
+/* `min-height: 0` og `min-width: 0` er ikke pynt: uten dem nekter en
+   flex-boks å bli mindre enn innholdet sitt, og da ruller sida likevel —
+   akkurat den feilen layouten finnes for å hindre. */
+.ko-kolonne {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  min-width: 0;
+}
+
+/* 4 : 3 : 5. Forholdet mellom de to siste er sentralbordets eget (`col-lg-4` +
+   `col-lg-8` i templates/oppdrag/sentral.html), litt strammet — det er den
+   blokka pulje 4 flytter hit, og den skal kjenne seg igjen. */
+.ko-kolonne-logg { flex: 0 0 33.33%; }
+.ko-kolonne-ressurser { flex: 0 0 25%; }
+.ko-kolonne-oppdrag { flex: 1 1 auto; }
+
+.ko-kolonne > .card {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.ko-rull {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  min-height: 0;
+}
+
+/* Under 1400 px blir oppdragslista trang: enhetsbrikkene («Trenger ny ressurs
+   · 12 min», «Avbrutt av …») begynner å brekke i tre linjer. Loggen gir da fra
+   seg bredde — den tåler det, for en loggsetning er kort. */
+@media (max-width: 1399.98px) {
+  .ko-kolonne-logg { flex: 0 0 28%; }
+  .ko-kolonne-ressurser { flex: 0 0 24%; }
+}
+
+/* Under 1200 px er tre kolonner ikke mulig, og da er stabling riktig svar —
+   ikke faner (se ko/CLAUDE.md). Loggen først, fordi den er den sentrale
+   delen. Høyden slippes samtidig: på en smal skjerm *skal* sida rulle, og en
+   låst høyde ville gitt tre bittesmå rullefelt inne i hverandre. */
+@media (max-width: 1199.98px) {
+  .ko-konsoll {
+    display: block;
+    height: auto;
+  }
+  .ko-kolonne { margin-bottom: 0.75rem; }
+  .ko-rull { max-height: 60vh; }
+}

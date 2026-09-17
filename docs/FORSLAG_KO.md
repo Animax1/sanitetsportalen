@@ -348,14 +348,35 @@ et klikk midt i sambandstrafikk, mens hele grunnen til at KO finnes er at situas
 skal være i ett blikk. Det er også derfor ekte utrykningsflater — vaktsentraler, ICS-tavler,
 stripbord — er samtidige paneler og aldri faner: statusbildet skjules ikke.
 
-**To kolonner, tre flater:**
+**Tre kolonner, tre flater** (formen besluttet av André 17. sep. 2026: «Logg skal være den
+sentrale delen. Ressursoversikt henger sammen med oppdragslisten. PC er hoved måten en
+bruker dette på.»):
 
-| Hvor | Flate | Innhold |
+| Kolonne | Flate | Innhold |
 |---|---|---|
-| Venstre, øverst | **Ressursoversikt** | Tavla fra §3.1 — enheter og alt annet som bemannes. Den skannes hele tiden, og ligger derfor der øyet faller |
-| Venstre, under | **Oppdrag og hendelser** | Sentralbordet, flyttet fra `/oppdrag/`. Hendelser er en **gruppering av denne lista**, ikke en egen flate |
-| Høyre | **Logg / chat** | Strømmen, med skrivefeltet øverst. Fast panel: smal, skrives konstant, leses konstant |
-| Høyre, over loggen | *Sidebar* | Vis/skjul, påloggede med KO-tilgang. En håndfull navn — den trenger ingen egen kolonne, og en tredje kolonne ville tatt bredde fra loggen |
+| Venstre, 4/12 | **Logg / chat** | Strømmen, med skrivefeltet øverst. Den sentrale delen: bredeste kolonne, den eneste med et skrivefelt |
+| Midten, 3/12 | **Ressursoversikt** | Tavla fra §3.1 — enheter og alt annet som bemannes |
+| Høyre, 5/12 | **Oppdrag og hendelser** | Sentralbordet, flyttet fra `/oppdrag/`. Hendelser er en **gruppering av denne lista**, ikke en egen flate |
+| *Nedtrekk i toppen* | *Sidebar* | Påloggede med KO-tilgang. En håndfull navn — en fjerde kolonne ville tatt bredde fra oppdragslista, som trenger den mest |
+
+**Rekkefølgen er arbeidsflyten fra venstre mot høyre:** du hører noe, fører linja, ser hvem
+som er ledig, og sender. Loggen står derfor først, der øyet lander i en latinsk lesning, og
+ikke i midten. «Sentral» er lest som *primær og permanent*, ikke som *midterste kolonne* —
+en logg i midten ville splittet paret som hører sammen, og den hyppigste handlingen på
+skjermen er nettopp å matche en ledig ressurs mot et ventende oppdrag.
+
+**Forholdet 3 : 5 mellom de to siste er sentralbordets eget**, `col-lg-4` + `col-lg-8` i
+`templates/oppdrag/sentral.html`, litt strammet. Det er den blokka pulje 4 flytter hit, og
+den skal kjenne seg igjen.
+
+**Sida ruller ikke — kolonnene gjør det.** De tre flatene står på samme sted hele vakta,
+uansett hvor mye som er i dem; rulles sida, flytter skrivefeltet seg idet tavla får en rad
+til. Høyden måles i JS, fordi headeren og navigasjonen over konsollen kan brekke til to
+linjer. Og `.portal-content` sitt tak på 1400 px slippes for denne sida: tre kolonner som
+deler 1400 px gir 466 / 350 / 583 uansett hvor stor skjermen er.
+
+**Under `xl` stables kolonnene**, loggen først. Det er akseptert og ikke løst — KO brukes på
+en skjerm i et kommandopunkt, og svaret på mobil er uansett ikke faner.
 
 **Hendelser slått sammen med oppdragslista er den ene endringen som også er en
 forenkling.** `Oppdrag.hendelse` er en nullbar FK (§3.3) — hendelsen *er* grupperingen — og
@@ -369,9 +390,10 @@ tegn på at grupperingen ikke duger som hovedakse.
 et kommandopunkt; en telefon kan uansett ikke vise en ressurstavle. Kommer kravet om mobil,
 er det en egen oppgave — og svaret er ikke faner.
 
-`ko/tests.py::SidenHarIngenFanerTests` håndhever begge deler: ingen fanemekanikk i markupen,
-*og* at loggen og tavla faktisk står samtidig. Bare den første ville gått grønn om noen
-skjulte en flate med `d-none` og en egen knapp i stedet.
+`ko/tests.py::SidenHarIngenFanerTests` håndhever fire ting: ingen fanemekanikk i markupen,
+at loggen og tavla faktisk står samtidig, at de tre kolonnene finnes **i arbeidsflytens
+rekkefølge**, og at sidebarknappen ikke har `data-action` ved siden av `data-bs-toggle`.
+Den første alene ville gått grønn om noen skjulte en flate med `d-none` og en egen knapp.
 
 **Sentralbordkoden flyttes, ikke kopieres.** `oppdrag-sentral-*.js` (fire filer) blir KO
 sine; `oppdrag-enhet.js` blir hele `/oppdrag/`. Regelen om at hver del skal være under

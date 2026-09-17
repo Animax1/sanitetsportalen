@@ -21,7 +21,9 @@ const KO_TILSTEDE_MS = 30000;
 // de lange fraværene kolonnen finnes for.
 const KO_AKTIV_GRENSE_S = 120;
 
-let koSidebarSynlig = true;
+// Nedtrekket er lukket når sida lastes. Var `true` i pulje 1, da lista var en
+// egen kolonne som sto åpen.
+let koSidebarSynlig = false;
 
 // **Regelen, ikke formateringen.** Egen funksjon fordi den avgjør noe: hva
 // lista *påstår* om en person. `null` er «vet ikke» og skal aldri bli «0» —
@@ -81,14 +83,59 @@ async function koHentTilstede() {
   }
 }
 
-function koVisSidebar() {
-  koSidebarSynlig = !koSidebarSynlig;
-  const sidebar = document.getElementById('ko-sidebar');
-  const knapp = document.getElementById('ko-sidebar-knapp');
-  if (sidebar) sidebar.classList.toggle('d-none', !koSidebarSynlig);
-  if (knapp) knapp.setAttribute('aria-expanded', koSidebarSynlig ? 'true' : 'false');
-  if (koSidebarSynlig) koHentTilstede();
+// **Sidebaren er et Bootstrap-nedtrekk, ikke en kolonne** (17. sep. 2026).
+// Knappen har derfor `data-bs-toggle="dropdown"` og **ingen** `data-action`:
+// begge lytterne ville fyrt på samme klikk, og det er fella `klikkSkalKjore()`
+// i portal-utils.js finnes for. Bootstrap eier åpningen; vi eier bare hva som
+// hentes når den er åpen.
+//
+// Sparingen fra pulje 1 står: ingen polling av en liste ingen ser på. Den er
+// bare snudd — før var lista synlig som standard og kunne slås av, nå er den
+// lukket og hentes når den åpnes.
+function koSidebarLyttere() {
+  const nedtrekk = document.getElementById('ko-sidebar-knapp');
+  if (!nedtrekk) return;
+  const rot = nedtrekk.closest('.dropdown') || nedtrekk;
+  rot.addEventListener('show.bs.dropdown', () => {
+    koSidebarSynlig = true;
+    koHentTilstede();
+  });
+  rot.addEventListener('hide.bs.dropdown', () => { koSidebarSynlig = false; });
 }
+
+// ── Konsollhøyden ───────────────────────────────────────────────────────────
+//
+// **Sida skal ikke rulle — kolonnene skal.** Det er forskjellen på en konsoll
+// og en nettside: de tre flatene står på samme sted hele vakta, uansett hvor
+// mye som er i dem. Rulles sida, flytter skrivefeltet seg idet tavla får en rad
+// til, og operatøren treffer feil felt midt i sambandstrafikk.
+//
+// Høyden **måles**, den regnes ikke ut av en `calc()` med et fast tall: over
+// konsollen står portalheaderen, navigasjonen og eventuelle meldinger, og alle
+// tre kan brekke til to linjer på en smal skjerm. Et fast tall ville vært
+// riktig på én skjerm og galt på alle andre.
+
+// Luft under konsollen, så footeren ikke klistrer seg inntil.
+const KO_BUNNMARG = 16;
+
+// **Gulvet er en regel, ikke en forsiktighetsmargin.** Uten det gir et kort
+// vindu — eller en header som brakk i tre linjer — en konsoll på nitti piksler,
+// og da er alle tre kolonnene ubrukelige samtidig. Da er det bedre at sida
+// ruller: det ser rart ut, men alt er lesbart.
+const KO_MIN_HOYDE = 360;
+
+function koKonsollhoyde(toppOffset, vindushoyde) {
+  return Math.max(vindushoyde - toppOffset - KO_BUNNMARG, KO_MIN_HOYDE);
+}
+
+function koSettKonsollhoyde() {
+  const konsoll = document.querySelector('.ko-konsoll');
+  if (!konsoll) return;
+  const topp = konsoll.getBoundingClientRect().top;
+  konsoll.style.setProperty(
+    '--ko-hoyde', koKonsollhoyde(topp, window.innerHeight) + 'px');
+}
+
 
 // ════════════════════════════════════════════════════════════════════════════
 // LOGGEN (pulje 2) — docs/FORSLAG_KO.md §4
@@ -520,14 +567,19 @@ async function koSettRessursstatus(id, felt, verdi) {
 // ════════════════════════════════════════════════════════════════════════════
 
 document.addEventListener('DOMContentLoaded', () => {
-  koHentTilstede();
+  koSettKonsollhoyde();
+  // Ny måling ved endret vindusstørrelse. `resize` dekker også at headeren
+  // brekker til to linjer, som er den ekte grunnen målingen finnes.
+  window.addEventListener('resize', koSettKonsollhoyde);
+  koSidebarLyttere();
   koHentRessurser();
   // Tavla polles alltid — den står i venstre kolonne og er aldri skjult. Det
   // er forskjellen fra sidebaren, som kan slås av og da ikke skal pollen.
   setInterval(koHentRessurser, KO_RESSURSER_MS);
   setInterval(() => {
-    // Ikke poll en sidebar ingen ser på. Det er den ene sparingen som betyr
-    // noe her: flere operatører sitter på samme side hele vakta.
+    // Ikke poll en liste ingen ser på. Det er den ene sparingen som betyr noe
+    // her: flere operatører sitter på samme side hele vakta. Nedtrekket er
+    // lukket som standard, så dette er nå det normale tilfellet.
     if (koSidebarSynlig) koHentTilstede();
   }, KO_TILSTEDE_MS);
 

@@ -310,6 +310,35 @@ class SidenHarIngenFanerTests(TestCase):
                     f'av hverandre. En ny flate legges i en av kolonnene, '
                     f'aldri som en fane til')
 
+    def test_de_tre_flatene_staar_som_kolonner(self):
+        """Konsollformen (17. sep. 2026): tre kolonner, ikke faner og ikke
+        stabling på PC. Rekkefølgen er operatørens arbeidsflyt fra venstre —
+        logg, ressurser, oppdrag — og den skal ikke stokkes om uten at noen
+        tar stilling til den."""
+        markup = self._markup()
+        for klasse in ('ko-konsoll', 'ko-kolonne-logg', 'ko-kolonne-ressurser',
+                       'ko-kolonne-oppdrag'):
+            with self.subTest(klasse=klasse):
+                self.assertIn(klasse, markup)
+        rekkefolge = [markup.index(k) for k in
+                      ('ko-kolonne-logg', 'ko-kolonne-ressurser',
+                       'ko-kolonne-oppdrag')]
+        self.assertEqual(rekkefolge, sorted(rekkefolge),
+                         'kolonnene står ikke i arbeidsflytens rekkefølge')
+
+    def test_sidebaren_tar_ikke_en_kolonne(self):
+        """«Hvem har KO oppe» er et nedtrekk fra knappen i toppen.
+
+        Og knappen har **ikke** `data-action` ved siden av `data-bs-toggle`:
+        to lyttere på samme klikk er fella `klikkSkalKjore()` finnes for.
+        """
+        markup = self._markup()
+        knapp = markup[markup.index('id="ko-sidebar-knapp"') - 200:
+                       markup.index('id="ko-sidebar-knapp"') + 200]
+        self.assertIn('data-bs-toggle="dropdown"', knapp)
+        self.assertNotIn('data-action', knapp)
+        self.assertIn('dropdown-menu', markup)
+
     def test_loggen_og_tavla_staar_samtidig(self):
         """Det er *dette* fraværet av faner skal gi, og derfor det som prøves.
 
@@ -321,6 +350,6 @@ class SidenHarIngenFanerTests(TestCase):
         self.assertIn('id="ko-logg-form"', markup, 'skrivefeltet mangler')
         self.assertIn('id="ko-logg-liste"', markup, 'loggstrømmen mangler')
         self.assertIn('Ressursoversikt', markup, 'tavla mangler')
-        self.assertIn('Oppdrag og hendelser', markup, 'oppdragsflata mangler')
+        self.assertIn('Oppdragsliste', markup, 'oppdragsflata mangler')
         self.assertNotIn('d-none', markup.split('id="ko-logg-form"')[0][-400:],
                          'noe skjuler loggen ved lasting')

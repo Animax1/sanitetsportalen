@@ -34,6 +34,10 @@
   aliaser (CLAUDE.md), og det er en kostnad uten en regel å bære.
 {% endcomment %}
 
+{% block extra_head %}
+<link rel="stylesheet" href="{% static 'css/ko.css' %}">
+{% endblock %}
+
 {% block content %}
 
 {% comment %}
@@ -50,115 +54,53 @@
 
 <div class="container-fluid px-3 px-md-4 py-3">
 
-  <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
-    <h1 class="h4 mb-0"><i class="bi bi-broadcast-pin me-2"></i>KO</h1>
-    <button type="button" class="btn btn-sm btn-outline-secondary"
-            id="ko-sidebar-knapp" data-action="koVisSidebar"
-            aria-expanded="true" aria-controls="ko-sidebar">
-      <i class="bi bi-people me-1"></i>Hvem er pålogget
-    </button>
-  </div>
-
-  <div class="alert alert-secondary py-2 px-3 small mb-3" role="note">
-    <strong>Loggen og tavla virker.</strong> Oppdragene fylles i pulje 4 —
-    sentralbordet ligger fortsatt på <a href="/oppdrag/">/oppdrag/</a> til det
-    flyttes hit.
-  </div>
-
-  <div class="row g-3">
-
-    {% comment %}
-      Venstre: flatene man handler i. Tavla øverst — den skannes hele tiden,
-      oppdragene er der man gjør noe. Rekkefølgen følger §7, ikke
-      puljerekkefølgen: dette er slik operatøren leser skjermen.
-    {% endcomment %}
-    <div class="col-12 col-xl-8">
-
+  <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-2">
+    <h1 class="h5 mb-0"><i class="bi bi-broadcast-pin me-2"></i>KO</h1>
+    <div class="d-flex align-items-center gap-2">
+      <span class="small text-muted" id="ko-ressurser-vakt"></span>
       {% comment %}
-        Tavla (§3.1). **En projeksjon, ikke et register** — KO eier ingen av
-        ressursene. Beholderen har rullingen, ikke lista: en liste bygget med
-        `innerHTML` mister bredden sin om rullingen legges på den selv
-        (CLAUDE.md).
+        **Sidebaren er et nedtrekk, ikke en kolonne** (17. sep. 2026). «Hvem har
+        KO oppe» er en håndfull navn man kikker på, ikke noe man overvåker — og
+        en fjerde kolonne ville tatt bredde fra oppdragslista, som trenger den
+        mest.
+
+        `data-bs-toggle="dropdown"` **uten** `data-action`: begge ville fyrt på
+        samme klikk, og det er nettopp fella `klikkSkalKjore()` i
+        portal-utils.js finnes for. Bootstrap melder `show.bs.dropdown` og
+        `hide.bs.dropdown`, og ko.js henger seg på dem i stedet.
       {% endcomment %}
-      <div class="card mb-3">
-        <div class="card-header py-2 d-flex justify-content-between align-items-center">
-          <span class="small fw-semibold">
-            <i class="bi bi-grid-3x3 me-1"></i>Ressursoversikt
-          </span>
-          <span class="small text-muted" id="ko-ressurser-vakt"></span>
-        </div>
-        <div class="card-body p-0">
-          <div id="ko-ressurser" style="max-height:45vh; overflow-y:auto;">
-            <p class="text-muted small p-3 mb-0">Laster …</p>
-          </div>
-        </div>
-      </div>
-
-      {% comment %}
-        **Oppdrag og hendelser er én flate, ikke to** (17. sep. 2026). En
-        hendelse er en gruppering av oppdrag — `Oppdrag.hendelse` er en
-        nullbar FK (§3.3) — og §4.6 sperrer lukking med 409 når hendelsen har
-        åpne oppdrag. Operatøren må altså se hendelsens oppdrag i det hun
-        lukker den. To flater ville lagt nøyaktig den opplysningen hun trenger
-        i den fana hun ikke står i.
-
-        Grupperingen er en bryter på lista, ikke en egen flate: de fleste
-        oppdrag har `hendelse = NULL`, og en permanent «Uten hendelse»-bøtte
-        med mesteparten av radene er et tegn på at grupperingen ikke duger som
-        hovedakse.
-      {% endcomment %}
-      <div class="card">
-        <div class="card-header py-2">
-          <span class="small fw-semibold">
-            <i class="bi bi-truck me-1"></i>Oppdrag og hendelser
-          </span>
-        </div>
-        <div class="card-body">
-          <p class="text-muted small mb-2">
-            Sentralbordet <strong>flytter hit</strong> fra
-            <a href="/oppdrag/">/oppdrag/</a> i pulje 5 — en flytting, ikke en
-            kopi: to skjermer som viser de samme oppdragene ville før eller
-            siden blitt uenige under en vakt. Til da fører du oppdragene der.
-          </p>
-          <p class="text-muted small mb-0">
-            Hendelser kommer i pulje 3 og legger seg <em>oppå</em> denne lista
-            som en gruppering med eget nummer per vakt, ikke som en egen flate.
-            En hendelse kan leve i tjue minutter før en ressurs sendes, og kan
-            avsluttes uten at noen rykket ut.
-          </p>
-        </div>
-      </div>
-    </div>
-
-    {% comment %}
-      Høyre: rekka man leser i. Loggen står her som et fast panel og ikke bak
-      en fane — den skrives mens noe skjer, og skrivefeltet er **øverst** slik
-      at man slipper å rulle forbi fire hundre linjer for å finne det.
-
-      Beholderen under har rullingen, ikke lista — en liste bygget med
-      `innerHTML` mister bredden sin om rullingen legges på den selv
-      (CLAUDE.md).
-
-      Sidebaren (§5.3) ligger i samme rekke og ikke i en egen kolonne: den er
-      en håndfull navn, og en tredje kolonne ville tatt bredde fra loggen på
-      nøyaktig de skjermene KO brukes på. Den svarer på «hvem har KO oppe»,
-      ikke på «hvem dekker samband nå» — pålogget er ikke til stede, og derfor
-      står tida siden siste tastetrykk som en egen kolonne.
-    {% endcomment %}
-    <div class="col-12 col-xl-4">
-      <div class="card mb-3" id="ko-sidebar">
-        <div class="card-header py-2">
-          <span class="small fw-semibold">
-            <i class="bi bi-people me-1"></i>Har KO oppe
-          </span>
-        </div>
-        <div class="card-body py-2">
+      <div class="dropdown">
+        <button type="button" class="btn btn-sm btn-outline-secondary dropdown-toggle"
+                id="ko-sidebar-knapp" data-bs-toggle="dropdown"
+                aria-expanded="false">
+          <i class="bi bi-people me-1"></i>Hvem er pålogget
+        </button>
+        <div class="dropdown-menu dropdown-menu-end p-2" id="ko-sidebar"
+             style="min-width:280px;">
+          <div class="small fw-semibold text-muted mb-1">Har KO oppe</div>
           <div id="ko-tilstede" class="small">
             <span class="text-muted">Laster …</span>
           </div>
         </div>
       </div>
+    </div>
+  </div>
 
+  {% comment %}
+    **Konsollen: tre kolonner, og sida ruller ikke — kolonnene gjør det.**
+    Rekkefølgen er operatørens arbeidsflyt fra venstre mot høyre: du hører noe,
+    fører linja, ser hvem som er ledig, og sender. Se `static/css/ko.css` og
+    `docs/FORSLAG_KO.md` §7.
+  {% endcomment %}
+  <div class="ko-konsoll">
+
+    <div class="ko-kolonne ko-kolonne-logg">
+      {% comment %}
+        Loggen er **den sentrale delen** (André, 17. sep. 2026) — bredeste
+        kolonne, og den eneste med et skrivefelt. Feltet står **øverst**: linja
+        skrives mens noe skjer, og man skal ikke måtte rulle forbi fire hundre
+        linjer for å finne det.
+      {% endcomment %}
       <div class="card mb-3" id="ko-logg-skjema">
         <div class="card-body py-2">
           <form id="ko-logg-form" autocomplete="off">
@@ -188,7 +130,6 @@
           </form>
         </div>
       </div>
-
       <div class="card">
         <div class="card-header py-2 d-flex justify-content-between align-items-center">
           <span class="small fw-semibold">
@@ -198,9 +139,52 @@
           <span class="small text-muted" id="ko-logg-antall"></span>
         </div>
         <div class="card-body p-0">
-          <div id="ko-logg-liste" style="max-height:60vh; overflow-y:auto;">
+          <div id="ko-logg-liste" class="ko-rull">
             <p class="text-muted small p-3 mb-0">Laster …</p>
           </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="ko-kolonne ko-kolonne-ressurser">
+      {% comment %}
+        Tavla (§3.1). **En projeksjon, ikke et register.** Den står ved siden av
+        oppdragslista fordi de to svarer på matchingen sammen: hvem er ledig, og
+        hva venter. Det er også formen sentralbordet alt har (`col-lg-4` +
+        `col-lg-8`), og den blokka flytter hit i pulje 4.
+      {% endcomment %}
+      <div class="card">
+        <div class="card-header py-2">
+          <span class="small fw-semibold">
+            <i class="bi bi-grid-3x3 me-1"></i>Ressursoversikt
+          </span>
+        </div>
+        <div class="card-body p-0">
+          <div id="ko-ressurser" class="ko-rull">
+            <p class="text-muted small p-3 mb-0">Laster …</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="ko-kolonne ko-kolonne-oppdrag">
+      <div class="card">
+        <div class="card-header py-2">
+          <span class="small fw-semibold">
+            <i class="bi bi-truck me-1"></i>Oppdragsliste
+          </span>
+        </div>
+        <div class="card-body ko-rull">
+          <p class="text-muted small mb-2">
+            Sentralbordet <strong>flytter hit</strong> fra
+            <a href="/oppdrag/">/oppdrag/</a> i pulje 4 — en flytting, ikke en
+            kopi: to skjermer som viser de samme oppdragene ville før eller
+            siden blitt uenige under en vakt. Til da fører du oppdragene der.
+          </p>
+          <p class="text-muted small mb-0">
+            Hendelser kommer i pulje 5 og legger seg <em>oppå</em> denne lista
+            som en gruppering med eget nummer per vakt, ikke som en egen flate.
+          </p>
         </div>
       </div>
     </div>

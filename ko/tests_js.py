@@ -539,3 +539,42 @@ class RessursEscapingTests(SimpleTestCase):
         ut = self._tegn(fort_av_ko=True)
         self.assertIn('koSettRessursstatus', ut)
         self.assertIn('ført av KO', ut)
+
+
+@unittest.skipUnless(node_available(), 'node er ikke tilgjengelig')
+class KonsollhoydenTests(SimpleTestCase):
+    """Høyden på konsollen er en **regel**, ikke formatering.
+
+    Den avgjør om sida ruller eller kolonnene gjør det, og gulvet avgjør om en
+    kort skjerm gir tre ubrukelige rullefelt eller en side som ruller. Begge
+    deler er usynlige i en test som bare leser CSS-en.
+    """
+
+    HARNESS = ((KO_JS, ('koKonsollhoyde',)),)
+    PREAMBLE = 'const KO_BUNNMARG = 16;\nconst KO_MIN_HOYDE = 360;\n'
+
+    def setUp(self):
+        self.harness = build_harness(self.HARNESS)
+
+    def _kall(self, topp, vindu):
+        return int(run_node(
+            self.harness, f'console.log(koKonsollhoyde({topp}, {vindu}));',
+            preamble=self.PREAMBLE).splitlines()[0])
+
+    def test_fyller_resten_av_vinduet(self):
+        """1080 px skjerm, konsollen begynner 240 px ned: 1080 - 240 - 16."""
+        self.assertEqual(self._kall(240, 1080), 824)
+
+    def test_en_hoeyere_header_gir_lavere_konsoll(self):
+        """Det er hele grunnen til at høyden måles og ikke regnes ut av et
+        fast tall: headeren, navigasjonen og meldingene kan alle brekke."""
+        self.assertEqual(self._kall(300, 1080), 764)
+
+    def test_gulvet_holder_naar_vinduet_er_kort(self):
+        """Uten gulvet gir et kort vindu en konsoll på nitti piksler, og da er
+        alle tre kolonnene ubrukelige samtidig. Da er det bedre at sida ruller:
+        det ser rart ut, men alt er lesbart."""
+        self.assertEqual(self._kall(300, 400), 360)
+
+    def test_gulvet_holder_ogsaa_naar_regnestykket_blir_negativt(self):
+        self.assertEqual(self._kall(900, 500), 360)
