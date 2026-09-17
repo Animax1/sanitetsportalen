@@ -59,6 +59,17 @@ løftes inn i den, og om en lukket hendelse kan åpnes igjen. De står som «Åp
 ikke under «Krever Andre» — modulen er upåbegynt, og seksjonen øverst er det som blokkerer
 *nå*.
 
+**To regler inn i `CLAUDE.md`.** Den første er lærdommen over, som regel: *sjekk om
+begrepet finnes før du designer det, og les koden før du hevder noe om den* — egen kort
+seksjon foran «Commands», med de seks funnene som belegg.
+
+Den andre er et hull som ble synlig da promptmalen for en ny KO-sesjon skulle skrives:
+**`rollemodell` er staging, `main` er prod, og det sto ingen steder i `CLAUDE.md`.** Bare i
+`docs/DEPLOY_GUIDE.md` §9 — en fil som ikke lastes med mindre noen åpner den. Samtidig sa
+SHA-avsnittet i `CLAUDE.md` allerede «bygg nr jeg kommer til å se på staging/prod», altså
+brukte et begrep fila aldri innfører. En ny sesjon kunne lese hele `CLAUDE.md` og likevel
+ikke vite hvor den skulle pushe.
+
 Ryddet med: `docs/PLAN_REKKEFOLGE_2026-09.md` (trinn 5 strøket, banner om at trinn 1–4 er
 gjennomført), `docs/FORSLAG_RAPPORTMODUL.md` (peker nå på `FORSLAG_KO.md` som eksempel på
 `FORSLAG_*`), `core/tests_todo.py` (docstringen pekte på datteroppdrag-punktet som mønster

@@ -24,6 +24,13 @@ skal stå for *hver* gren som ble pushet, ikke bare den siste. Det er nummeret s
 Railway-deployen, og uten det må den som verifiserer gjette om det hun ser på er det som
 nettopp gikk ut.
 
+**To grener, to miljøer** (`docs/DEPLOY_GUIDE.md` §9): `rollemodell` er staging,
+`main` er produksjon, og Railway auto-deployer fra begge. Arbeidet går på en egen gren,
+derfra til `rollemodell`, og til `main` **bare når André har sagt fra**. Regelen sto bare i
+deploy-guiden til 17. sep. 2026 — altså i en fil som ikke lastes med mindre noen åpner den,
+mens avsnittet rett over allerede sa «staging/prod» som om det var kjent. Byggnummeret i
+footeren skal stemme med commit-en som ble pushet; det er slik verifiseringen gjøres.
+
 **Et åpent punkt skal aldri stå som barn under et avkrysset punkt.** Regelen sto her fra
 14. sep. 2026, da det var **to**. 16. sep. var det **23** — seks av dem ting som ventet på
 André, altså usynlige i den ene fila som skal fortelle ham hva han må gjøre, og to av dem
@@ -35,6 +42,24 @@ barn henter ofte meningen sin fra forelderen.
 **«Krever Andre» betyr «blokkerer nå».** Et åpent valg inne i en upåbegynt idé er ikke det;
 det besvares når ideen tas opp. Merkes slikt likevel, fylles toppen av fila med ting han
 ikke kan gjøre noe med — og da slutter han å stole på den.
+
+## Før du designer noe nytt
+
+**Sjekk om begrepet finnes før du designer det, og les koden før du hevder noe om den.**
+I KO-gjennomgangen 17. sep. 2026 var seks av tingene som «manglet» allerede bygget:
+`vaktliste.Ressurs.enhet` (koblingen til oppdragsmodulen, inne siden fase 6),
+`CustomUser.er_delt_konto`, `vaktliste.Ressursgruppe` — hvis egen docstring lister
+«samleplass, ambulanse, mannskapsbil, lag» og nevner KO — flaggene på `oppdrag.Enhetstype`,
+`oppdrag.services.neste_oppdragsnummer()` og `_list_active_sessions`. To anbefalinger sto
+feil helt til modellene faktisk ble lest.
+
+Det samme mønsteret har gått igjen fem ganger før: en «manglende funksjon» viste seg å være
+en **manglende flate over en mekanisme som virket**. Et `grep` koster sekunder. Et forslag
+bygget på en antakelse koster en pulje — og verre, det legger en ny tabell ved siden av en
+som allerede finnes, og da har portalen to sannheter om samme ting.
+
+Det gjelder påstander i prosa også: skriver du at noe «ikke finnes» eller «må bygges», skal
+det være kontrollert mot koden i samme økt, ikke husket.
 
 ## Commands
 
