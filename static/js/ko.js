@@ -1,5 +1,5 @@
 // ════════════════════════════════════════════════════════════════════════════
-// KO — situasjonsbildet. Pulje 1 (sidebaren) og pulje 2 (loggen).
+// KO — situasjonsbildet. Pulje 1 (sidebaren), 2 (loggen), 3 (ressursbildet).
 //
 // Lastes kun av /ko/. Fortsatt **én fil**: 1 800-linjersgrensa i
 // core/tests_js_splitt.py gjelder de delte modulene, og denne er langt under
@@ -345,6 +345,172 @@ async function koFjern(id) {
 
 
 // ════════════════════════════════════════════════════════════════════════════
+// Ressursbildet (pulje 3, §3.1) — tavla over hvem som er på vakt og hvor de er.
+//
+// **KO eier ikke ressursene.** Serveren setter bildet sammen av tre kilder;
+// her tegnes det bare. Det ene valget som ligger i klienten er om
+// statusknappene skal finnes på en rad, og det er en regel — se
+// `koKanStyreRessurs()`.
+// ════════════════════════════════════════════════════════════════════════════
+
+// 20 sekunder. Tavla endrer seg oftere enn sidebaren (en status kan skifte
+// midt i en samtale) og sjeldnere enn loggen (som skrives mens man ser på).
+const KO_RESSURSER_MS = 20000;
+
+// Statusene KO fører. Rekkefølgen er knapperekkefølgen, og den er
+// **operatørens** og ikke alfabetisk: «Ledig» først fordi det er den man
+// trykker for å melde noen tilbake i tjeneste, og den gjør man oftest.
+const KO_STATUSER = [
+  { verdi: 'ledig', navn: 'Ledig', klasse: 'success' },
+  { verdi: 'opptatt', navn: 'Opptatt', klasse: 'warning' },
+  { verdi: 'pause', navn: 'Pause', klasse: 'info' },
+  { verdi: 'ute_av_drift', navn: 'Ute av drift', klasse: 'danger' },
+];
+
+let koRessursbilde = { vaktliste: null, grupper: [] };
+
+// **Regelen, ikke tegningen.** Knappene skal finnes bare når begge er sanne:
+// brukeren kan skrive, *og* det er KO som fører statusen for ressursen. Den
+// andre halvdelen er lett å glemme, og da tegner vi knapper på en koblet bil —
+// serveren avviser dem, og operatøren står med en knapp som fører til en vegg.
+function koKanStyreRessurs(ressurs) {
+  return Boolean(koKanSkrive() && ressurs && ressurs.fort_av_ko);
+}
+
+// Fargen bærer en påstand om hvem som kan sendes, så den er en regel og ikke
+// pynt. Ukjent status gir `secondary` og ikke grønt: en verdi vi ikke kjenner
+// skal aldri se ledig ut.
+function koStatusklasse(ressurs) {
+  if (!ressurs.status) return 'secondary';
+  if (ressurs.fort_av_ko) {
+    const treff = KO_STATUSER.find((s) => s.verdi === ressurs.status);
+    return treff ? treff.klasse : 'secondary';
+  }
+  return ressurs.status === 'ledig' ? 'success' : 'warning';
+}
+
+// «2 av 3 møtt» — og tallet er ikke pynt heller: en ressurs med skift men uten
+// noen møtt er nettopp den man tror man har.
+function koBemanningstekst(ressurs) {
+  if (!ressurs.antall) return 'ingen på skift nå';
+  return ressurs.tilstede + ' av ' + ressurs.antall + ' møtt';
+}
+
+function koRessursKnapper(ressurs) {
+  if (!koKanStyreRessurs(ressurs)) return '';
+  let ut = '<div class="btn-group btn-group-sm mt-1" role="group"'
+    + ' aria-label="Sett status">';
+  for (const s of KO_STATUSER) {
+    const aktiv = ressurs.status === s.verdi
+      ? 'btn-' + s.klasse
+      : 'btn-outline-' + s.klasse;
+    ut += '<button type="button" class="btn ' + aktiv + '"'
+      + ' data-action="koSettRessursstatus"'
+      + ' data-id="' + escapeHtml(ressurs.id) + '"'
+      + ' data-felt="status"'
+      + ' data-verdi="' + escapeHtml(s.verdi) + '">'
+      + escapeHtml(s.navn) + '</button>';
+  }
+  return ut + '</div>';
+}
+
+function koRessursHtml(ressurs) {
+  const mannskap = ressurs.mannskap.length
+    ? ressurs.mannskap.map((m) => escapeHtml(m.navn)
+        + (m.tilstede ? '' : ' <span class="text-muted">(ikke møtt)</span>')).join(', ')
+    : '<span class="text-muted">—</span>';
+  // **Kilden til statusen står i bildet** (§3.1): «bilen sa det» mot «KO førte
+  // det» er hele skillet den tredje kilden finnes for, og det skal ikke måtte
+  // utledes av at en rad tilfeldigvis har knapper.
+  const kilde = ressurs.fort_av_ko
+    ? '<span class="text-muted small">ført av KO'
+      + (ressurs.status_satt_av ? ' · ' + escapeHtml(ressurs.status_satt_av) : '')
+      + '</span>'
+    : '<span class="text-muted small">melder selv</span>';
+  const venter = ressurs.antall_ventende
+    ? ' <span class="text-muted small">(' + escapeHtml(ressurs.antall_ventende)
+      + ' venter)</span>'
+    : '';
+  return '<li class="list-group-item py-2">'
+    + '<div class="d-flex justify-content-between align-items-start gap-2">'
+    + '<div><span class="fw-semibold">' + escapeHtml(ressurs.navn) + '</span>'
+    + (ressurs.korps ? ' <span class="text-muted small">'
+        + escapeHtml(ressurs.korps) + '</span>' : '')
+    + '<div class="small">' + mannskap + '</div>'
+    + '<div class="small text-muted">' + escapeHtml(koBemanningstekst(ressurs))
+    + '</div></div>'
+    + '<div class="text-end">'
+    + '<span class="badge text-bg-' + koStatusklasse(ressurs) + '">'
+    + escapeHtml(ressurs.status_navn || 'ukjent') + '</span>' + venter
+    + '<div>' + kilde + '</div>'
+    + '</div></div>'
+    + koRessursKnapper(ressurs)
+    + '</li>';
+}
+
+function koTegnRessurser() {
+  const boks = document.getElementById('ko-ressurser');
+  if (!boks) return;
+  const merke = document.getElementById('ko-ressurser-vakt');
+  if (merke) {
+    merke.textContent = koRessursbilde.vaktliste
+      ? koRessursbilde.vaktliste.vakt_navn
+        + (koRessursbilde.vaktliste.i_drift ? ' · i drift' : '')
+      : '';
+  }
+  if (!koRessursbilde.vaktliste) {
+    // **Ukoblet og tomt skal ikke se likt ut.** Ingen vaktliste er et oppsett
+    // som mangler; en tom liste er en vakt uten ressurser. Samme skille
+    // `vaktliste.services.besetning()` gjør.
+    boks.innerHTML = '<p class="text-muted small p-3 mb-0">Ingen vaktliste i drift'
+      + ' og ingen aktiv vakt. Sett en liste i drift i'
+      + ' <a href="/vaktliste/">vaktlista</a>.</p>';
+    return;
+  }
+  if (!koRessursbilde.grupper.length) {
+    boks.innerHTML = '<p class="text-muted small p-3 mb-0">Ingen ressurser i'
+      + ' denne vaktlista.</p>';
+    return;
+  }
+  let ut = '';
+  for (const g of koRessursbilde.grupper) {
+    ut += '<div class="px-3 pt-2 pb-1 small fw-semibold text-muted">'
+      + escapeHtml(g.navn) + '</div>'
+      + '<ul class="list-group list-group-flush">'
+      + g.ressurser.map(koRessursHtml).join('')
+      + '</ul>';
+  }
+  boks.innerHTML = ut;
+}
+
+async function koHentRessurser() {
+  try {
+    const svar = await apiFetch('/ko/api/ressurser/');
+    if (!svar.ok) return;
+    const json = await svar.json();
+    koRessursbilde = json.data || { vaktliste: null, grupper: [] };
+    koTegnRessurser();
+  } catch (e) {
+    // En tavle som feiler skal ikke ta med seg loggen. Samme valg som
+    // sidebaren gjør — det forrige bildet blir stående, og det er riktigere
+    // enn et tomt: det sier i det minste hva som var sant sist.
+  }
+}
+
+async function koSettRessursstatus(id, felt, verdi) {
+  const svar = await apiFetch('/ko/api/ressurser/' + encodeURIComponent(id)
+    + '/status/', {
+    method: 'POST',
+    body: JSON.stringify({ status: verdi }),
+  });
+  if (!svar.ok) return;
+  const json = await svar.json();
+  koRessursbilde = json.data || koRessursbilde;
+  koTegnRessurser();
+}
+
+
+// ════════════════════════════════════════════════════════════════════════════
 // OPPSTART
 //
 // **Alt som kjører på toppnivå står her, nederst.** Regelen er skrevet for de
@@ -355,6 +521,10 @@ async function koFjern(id) {
 
 document.addEventListener('DOMContentLoaded', () => {
   koHentTilstede();
+  koHentRessurser();
+  // Tavla polles alltid — den står i venstre kolonne og er aldri skjult. Det
+  // er forskjellen fra sidebaren, som kan slås av og da ikke skal pollen.
+  setInterval(koHentRessurser, KO_RESSURSER_MS);
   setInterval(() => {
     // Ikke poll en sidebar ingen ser på. Det er den ene sparingen som betyr
     // noe her: flere operatører sitter på samme side hele vakta.

@@ -614,17 +614,28 @@ og ni kuraterte systemhendelser i `ko/systemlinjer.py`.*
       av flere samtidig rundt et bord. Rendres server-side fra de samme `_til_dict`-radene,
       slik at papiret og skjermen sier det samme.
 
-- [ ] **Pulje 3 — ressursoversikten.** Projeksjonen i §3.1, KO-ført status for dem som ikke
-      stempler selv, og rutingflagget på `Ressursgruppe`. **Flyttet fram fra 4 til 3**
-      17. sep. 2026: den er uavhengig av alt annet, og den er den flata operatøren
-      faktisk sitter og ser på. Ligger øverst i venstre kolonne (§7).
+*Pulje 3 (ressursoversikten) er levert 17. sep. 2026 — se CHANGELOG. Projeksjonen, den
+tredje kilden (`ko.Ressursstatus`) og tavla i venstre kolonne. Rutingflagget er **ikke**
+bygget; det flyttet til `/park/`-punktet nederst, der det hører hjemme.*
 
-      - [ ] **Vaktlistas stemplinger inn i loggen — vurderes her, ikke før.** Utelatt
-            bevisst i pulje 2 (`ko/systemlinjer.py`): «Lag 3 gikk av vakt» er ekte
-            situasjonsinformasjon, men per-person-stempling på hver vaktpost ville druknet
-            loggen ved hvert vaktskifte. Løftes det, skal det være **ressursen** som går
-            av og på vakt, ikke personen — og da trenger lag-begrepet det hjemmet denne puljen
-            gir det.
+- [ ] **Vaktlistas stemplinger inn i loggen — vurderes nå, lag-begrepet har fått et hjem.**
+      Utelatt bevisst i pulje 2 (`ko/systemlinjer.py`): «Lag 3 gikk av vakt» er ekte
+      situasjonsinformasjon, men per-person-stempling på hver vaktpost ville druknet
+      loggen ved hvert vaktskifte. Løftes det, skal det være **ressursen** som går av og
+      på vakt, ikke personen — og ressursen er nå noe tavla kjenner.
+
+- [ ] **Merknad på en KO-ført status.** Ikke bygget, og det var et scope-valg: §3.1 ber om
+      `(ressurs, status, tidspunkt, ført av hvem)` og ikke mer. Men «Ute av drift» uten en
+      grunn er den statusen man må ringe for å forstå, og operatøren skriver grunnen i
+      loggen uansett. Vurder et kort fritekstfelt på raden — og da med samme forbehold som
+      resten av KO-loggen: det er fritekst, det arkiveres ikke, og det må inn i
+      oppbevaringsfristen.
+
+- [ ] **Tavla viser ikke hvor ressursen *er*.** «Hvor de står» i §3.1 er i dag besvart med
+      hvem som er på skift, ikke med en lokasjon. `oppdrag.Lokasjon` er verdimengden som
+      finnes, og en KO-ført lokasjon ville vært den samme konstruksjonen som statusen.
+      Vent til pulje 4: sentralbordet bærer lokasjonen på oppdraget, og de to skal ikke
+      svare hver sitt om hvor bilen er.
 
 - [ ] **Pulje 4 — sentralbordet flyttes.** `oppdrag-sentral-*.js` blir KO sine,
       `oppdrag-enhet.js` blir hele `/oppdrag/`, og `Oppdrag` får den nullbare FK-en
@@ -699,7 +710,9 @@ og ni kuraterte systemhendelser i `ko/systemlinjer.py`.*
       lokasjon, utfall, ingen stempling, ingen pålogging. Egen modell, egen kilde i
       statistikken, ingen kobling til `/pasienter/`. Vaktnøkkel som admin kan generere og
       trekke tilbake, og endepunktet er **skrive-bare**. Rutingflagget på `Ressursgruppe`
-      (`FORSLAG_KO.md` §3.2) hører til her.
+      (`FORSLAG_KO.md` §3.2) hører til her, og ble bevisst **ikke** bygget i pulje 3:
+      uten `/park/` er det en bryter med én stilling, og at det korrelerer med «hvem
+      stempler selv» er tilfeldig — den utledes av `Ressurs.enhet`.
 
 ### Brukere, e-post og roller — se `docs/BESLUTNING_BRUKERE_OG_EPOST.md`
 

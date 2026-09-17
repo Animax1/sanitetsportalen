@@ -96,6 +96,12 @@ på ID. Det er ikke et problem, men det er et sted en spørring kan gi feil svar
 
 ### 3.2 Ruting: hvem bruker `/oppdrag/`, hvem bruker `/park/`
 
+> **Ikke bygget i pulje 3, med vilje (17. sep. 2026).** Flagget avgjør `/oppdrag/` mot
+> `/park/`, og `/park/` finnes ikke — bygget nå er det en bryter med én stilling. Tavla
+> trenger det heller ikke: spørsmålet *der* er «hvem stempler selv», og det utledes av
+> `Ressurs.enhet`. At de to korrelerer i dag gjør dem ikke til samme spørsmål. Flagget
+> følger `/park/`-notatet.
+
 Flagget hører hjemme på **`Ressursgruppe`**, ved siden av `flere_enheter` og `er_aktiv`.
 
 Det kan ikke ligge på `Enhetstype`: et lag har ingen `Enhet` i det hele tatt — det er hele
@@ -489,7 +495,7 @@ filtre og statistikk er forbedringer *av* det bildet og legges oppå uten å riv
 |---|---|---|
 | **1 — Skallet** ✅ | Modulen registrert, `ModulTilgang('ko')`, siden, sidebar | Tilgangen må virke før noe legges bak den |
 | **2 — Loggen** ✅ | Logglinjer, retting, sletteinngang, polling med `?siden=`, ni systemhendelser, oppbevaring | Alt annet skriver inn i den |
-| **3 — Ressursoversikten** | Projeksjonen i §3.1, KO-ført status, rutingflagget | **Byttet med hendelser 17. sep. 2026.** Se under |
+| **3 — Ressursoversikten** ✅ | Projeksjonen i §3.1, KO-ført status | **Byttet med hendelser 17. sep. 2026**, og levert samme dag. Rutingflagget er ikke med — se §3.2 |
 | **4 — Sentralbordet flyttes** | `oppdrag-sentral-*.js` → KO, oppdragslista inn i venstre kolonne | Den eneste som rører `/oppdrag/`. Må stå før hendelser, som grupperer den |
 | **5 — Hendelser** | `Hendelse`, nummerserie, linje → hendelse, gruppering av oppdragslista, lukking med 409 | Er en gruppering *av* pulje 4, og kan ikke bygges før lista den grupperer er her |
 | **6 — Chat og filter** | Admin-bryter, uformelle linjer, filter per operatør | Forbedringer |

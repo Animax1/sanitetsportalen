@@ -153,6 +153,12 @@ KO_LOGG_BYGGERE = (
     # felt rett inn i overskriften, skal skanneren se det.
     'koTegnLogg',
     'koTegnTilstede',
+    # Ressursbildet (pulje 3). Tavla viser mannskapsnavn og ressursnavn —
+    # data ført av mennesker i vaktlista, altså nøyaktig det escapingen
+    # finnes for.
+    'koRessursHtml',
+    'koRessursKnapper',
+    'koTegnRessurser',
 )
 
 #: Uttrykk som interpoleres uten `escapeHtml`, med begrunnelse.
@@ -163,6 +169,13 @@ KO_GJENNOMGATT = {
     'omraade': 'markup bygget to linjer over, ansvarsområdet escapet der',
     'hvem': 'markup bygget av en ternær; forfatternavnet escapet i den ene grenen',
     'av': 'markup bygget to linjer over, navnet escapet der',
+    # Ressursbildet
+    'mannskap': 'liste bygget to linjer over; hvert navn escapet der',
+    'kilde': 'markup fra en ternær; navnet escapet i den ene grenen',
+    'venter': 'markup bygget to linjer over, tallet escapet der',
+    's.klasse': 'Bootstrap-klasse fra KO_STATUSER, en konstant i fila — ikke '
+                'data. Kommer den en dag fra serveren, skal denne raden bort',
+    'g.ressurser': 'ferdig markup fra koRessursHtml, som skannes for seg',
 }
 
 
@@ -371,3 +384,158 @@ class LoggReglerTests(SimpleTestCase):
         linje = json.dumps({'fjernet': True, 'kilde': 'operator', 'delt_konto': True})
         self.assertEqual(self._kall(f'koLinjeMerke({linje})', {'ko': 'les'}),
                          '"fjernet"')
+
+
+# ════════════════════════════════════════════════════════════════════════════
+# RESSURSBILDET (pulje 3)
+# ════════════════════════════════════════════════════════════════════════════
+
+RESSURS_PREAMBLE = (
+    'const KO_STATUSER = ['
+    '{verdi: "ledig", navn: "Ledig", klasse: "success"},'
+    '{verdi: "opptatt", navn: "Opptatt", klasse: "warning"},'
+    '{verdi: "pause", navn: "Pause", klasse: "info"},'
+    '{verdi: "ute_av_drift", navn: "Ute av drift", klasse: "danger"}];\n'
+)
+
+
+@unittest.skipUnless(node_available(), 'node er ikke tilgjengelig')
+class RessursreglerTests(SimpleTestCase):
+    """De to funksjonene på tavla som **avgjør** noe.
+
+    `CLAUDE.md` plasserer JS-regler på middels: regelen invertert, ett ledd i
+    `&&` fjernet, kallstedet fjernet. Byggerne rundt dem er lett lag og dekkes
+    av skanneren og escaping-prøven.
+    """
+
+    HARNESS = (
+        (PORTAL_UTILS_JS, ('escapeHtml',)),
+        (KO_JS, ('koKanSkrive', 'koKanStyreRessurs', 'koStatusklasse',
+                 'koBemanningstekst')),
+    )
+
+    def setUp(self):
+        self.harness = build_harness(self.HARNESS)
+
+    def _kall(self, uttrykk, nivaa='skriv_full'):
+        return run_node(
+            self.harness, f'console.log(JSON.stringify({uttrykk}));',
+            preamble=f'const window = {{MODUL_TILGANG: {{ko: "{nivaa}"}}}};\n'
+                     + RESSURS_PREAMBLE).splitlines()[0]
+
+    def test_begge_ledd_maa_holde(self):
+        """**Ett ledd i `&&` fjernet er hele feilen.** Tegner vi knapper på en
+        koblet bil, avviser serveren dem — og en knapp som fører til en vegg er
+        verre enn ingen knapp (`CLAUDE.md`)."""
+        lag = '{fort_av_ko: true}'
+        bil = '{fort_av_ko: false}'
+        self.assertEqual(self._kall(f'koKanStyreRessurs({lag})'), 'true')
+        self.assertEqual(self._kall(f'koKanStyreRessurs({bil})'), 'false',
+                         'bilen melder selv og skal ikke ha knapper')
+        self.assertEqual(self._kall(f'koKanStyreRessurs({lag})', nivaa='les'),
+                         'false', 'les skal se tavla, ikke føre på den')
+
+    def test_uten_ressurs_er_svaret_nei(self):
+        for tomt in ('null', 'undefined'):
+            with self.subTest(verdi=tomt):
+                self.assertEqual(self._kall(f'koKanStyreRessurs({tomt})'), 'false')
+
+    def test_ukjent_status_ser_aldri_ledig_ut(self):
+        """Fargen bærer en påstand om hvem som kan sendes. En verdi vi ikke
+        kjenner skal være grå, ikke grønn."""
+        self.assertEqual(
+            self._kall('koStatusklasse({fort_av_ko: true, status: "tull"})'),
+            '"secondary"')
+        self.assertEqual(
+            self._kall('koStatusklasse({fort_av_ko: true, status: ""})'),
+            '"secondary"')
+        self.assertEqual(
+            self._kall('koStatusklasse({fort_av_ko: true, status: "ledig"})'),
+            '"success"')
+        self.assertEqual(
+            self._kall('koStatusklasse({fort_av_ko: true, status: "ute_av_drift"})'),
+            '"danger"')
+
+    def test_bilens_farge_kommer_fra_oppdragsstatusen(self):
+        """Den andre kilden har sin egen verdimengde — `ledig` er den eneste
+        som betyr «kan sendes»."""
+        self.assertEqual(
+            self._kall('koStatusklasse({fort_av_ko: false, status: "ledig"})'),
+            '"success"')
+        self.assertEqual(
+            self._kall('koStatusklasse({fort_av_ko: false, status: "rykker_ut"})'),
+            '"warning"')
+
+    def test_ingen_paa_skift_er_ikke_null_av_null(self):
+        """«0 av 0 møtt» leses som en bemanningssvikt. Ingen skift er noe
+        annet, og skal si noe annet."""
+        self.assertEqual(
+            self._kall('koBemanningstekst({antall: 0, tilstede: 0})'),
+            '"ingen på skift nå"')
+        self.assertEqual(
+            self._kall('koBemanningstekst({antall: 3, tilstede: 1})'),
+            '"1 av 3 møtt"')
+
+
+@unittest.skipUnless(node_available(), 'node er ikke tilgjengelig')
+class RessursEscapingTests(SimpleTestCase):
+    """Mannskapsnavn og ressursnavn er brukerdata ført i vaktlista."""
+
+    HARNESS = (
+        (PORTAL_UTILS_JS, ('escapeHtml',)),
+        (KO_JS, ('koKanSkrive', 'koKanStyreRessurs', 'koStatusklasse',
+                 'koBemanningstekst', 'koRessursKnapper', 'koRessursHtml')),
+    )
+
+    ONDSKAP = '<img src=x onerror=alert(1)>'
+
+    def setUp(self):
+        self.harness = build_harness(self.HARNESS)
+
+    def _ressurs(self, **overstyr):
+        base = {
+            'id': 1, 'navn': 'Lag 3', 'korps': 'HGSD', 'fort_av_ko': True,
+            'mannskap': [], 'antall': 0, 'tilstede': 0,
+            'status': 'ledig', 'status_navn': 'Ledig',
+            'status_satt_av': '', 'status_satt_at': None,
+        }
+        base.update(overstyr)
+        return json.dumps(base)
+
+    def _tegn(self, **overstyr):
+        return run_node(
+            self.harness,
+            f'console.log(koRessursHtml({self._ressurs(**overstyr)}));',
+            preamble='const window = {MODUL_TILGANG: {ko: "skriv_full"}};\n'
+                     + RESSURS_PREAMBLE)
+
+    def test_ressursnavnet_escapes(self):
+        ut = self._tegn(navn=self.ONDSKAP)
+        self.assertNotIn('<img', ut)
+        self.assertIn('&lt;img', ut)
+
+    def test_mannskapsnavnet_escapes(self):
+        ut = self._tegn(mannskap=[{'navn': self.ONDSKAP, 'rolle': '',
+                                   'tilstede': True}], antall=1, tilstede=1)
+        self.assertNotIn('<img', ut)
+        self.assertIn('&lt;img', ut)
+
+    def test_den_som_satte_statusen_escapes(self):
+        """Brukernavnet er data admin skriver, og det fryses på raden."""
+        ut = self._tegn(status_satt_av=self.ONDSKAP)
+        self.assertNotIn('<img', ut)
+        self.assertIn('&lt;img', ut)
+
+    def test_bilen_faar_ingen_knapper_gjennom_den_ekte_inngangen(self):
+        """**Muter kallstedet, ikke bare funksjonen** (`CLAUDE.md`): testene
+        over kaller `koKanStyreRessurs` direkte, og da kunne `koRessursHtml`
+        sluttet å kalle den uten at noe ble rødt."""
+        ut = self._tegn(fort_av_ko=False, status='rykker_ut',
+                        status_navn='Rykker ut')
+        self.assertNotIn('koSettRessursstatus', ut)
+        self.assertIn('melder selv', ut)
+
+    def test_laget_faar_knapper_gjennom_den_ekte_inngangen(self):
+        ut = self._tegn(fort_av_ko=True)
+        self.assertIn('koSettRessursstatus', ut)
+        self.assertIn('ført av KO', ut)

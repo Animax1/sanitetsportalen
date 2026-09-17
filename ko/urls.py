@@ -22,4 +22,10 @@ urlpatterns = [
     path('api/logg/ny/', views.logg_skriv_view, name='ko_api_logg_ny'),
     path('api/logg/<int:pk>/rett/', views.logg_rett_view, name='ko_api_logg_rett'),
     path('api/logg/<int:pk>/fjern/', views.logg_fjern_view, name='ko_api_logg_fjern'),
+    # Ressursbildet (pulje 3). Lesing er hele tavla; skriving er **én**
+    # ressurs, og bare den KO fører for — `services.sett_ressursstatus`
+    # avviser en som melder selv, så koblede biler ikke kan få to sannheter.
+    path('api/ressurser/', views.ressurser_view, name='ko_api_ressurser'),
+    path('api/ressurser/<int:pk>/status/', views.ressurs_status_view,
+         name='ko_api_ressurs_status'),
 ]

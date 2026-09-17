@@ -61,8 +61,17 @@ class KoBackupHandler(BaseBackupHandler):
     #: `korrigerer` og `rot` strippes heller ikke — de peker innad i settet, og
     #: uten dem ville en rettet linje kommet tilbake som to linjer som begge
     #: gjelder.
+    #: `Ressursstatus.satt_av` strippes av samme grunn, og `satt_av_navn`
+    #: står igjen som fasit. Merk at `ressurs` **ikke** strippes: den peker
+    #: inn i `vaktliste`, altså ut av dette datasettet — men uten den er raden
+    #: meningsløs, og en KO-status uten ressursen sin er ikke et spor. Prisen
+    #: er at `vaktliste` må gjenopprettes før `ko`; det er allerede regelen
+    #: (`core.backup.GJENOPPRETTINGSREKKEFOLGE`), og `rekkefolge.bindinger()`
+    #: utleder kanten av nettopp denne FK-en i stedet for å stole på at den
+    #: står nevnt her.
     strip_fields = {
         'ko.Logglinje': ['forfatter', 'fjernet_av'],
+        'ko.Ressursstatus': ['satt_av'],
     }
 
 

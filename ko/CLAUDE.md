@@ -5,8 +5,8 @@
 > gjelder her også. Regelen for hva som står hvor: ligger koden i en app, står regelen
 > her; gjelder den alle, står den i rota.
 
-Pulje 1 levert (skallet: modulen registrert, `/ko/`, sidebaren) og **pulje 2** (loggen).
-Pulje 3–7 gjenstår — se `docs/FORSLAG_KO.md` §10, som er et **forslag**, ikke besluttet.
+Pulje 1 levert (skallet: modulen registrert, `/ko/`, sidebaren), **pulje 2** (loggen) og
+**pulje 3** (ressursbildet). Pulje 4–7 gjenstår — se `docs/FORSLAG_KO.md` §10, som er et **forslag**, ikke besluttet.
 
 **Siden har ingen faner, og det er en regel og ikke en smakssak** (André, 17. sep. 2026).
 Pulje 1 la de fire flatene i `nav-tabs`. En fane er riktig når flatene er *alternativer* —
@@ -46,6 +46,8 @@ og kan bli avsluttet uten at noen rykket ut.
 | **Hvilke systemhendelser som løftes inn, og hvorfor** | `ko/systemlinjer.py` |
 | Løftet selv | `ko/signals.py` |
 | Backup, opprydding, innstilling | `ko/backup.py`, `ko/opprydding.py`, `ko/portalinnstillinger.py` |
+| Ressursbildet — projeksjonen og den tredje kilden | `ko/services.py`, `ko/models.py` (`Ressursstatus`) |
+| KO-førte statuser, og hvorfor de er kode | `ko/choices.py` |
 
 ## Retningen: KO er øverste lag
 
@@ -215,3 +217,52 @@ igjen: sjekk om oppdragsmodulen har begrepet før du designer det inn i KO.
 hendelse kan åpnes igjen. Det står i `TODO.md`. Logglinja har med vilje **ingen FK til en
 hendelse ennå**: den legges til i pulje 3, sammen med regelen om at en linje kan knyttes
 til en hendelse i etterkant.
+
+## Ressursbildet (pulje 3, `FORSLAG_KO.md` §3.1)
+
+**KO eier ikke ressursene.** Tavla er en projeksjon av tre kilder, og bare den tredje er
+vår:
+
+| Hva | Hvor det leses |
+|---|---|
+| Hvem finnes og hvem er på skift nå | `vaktliste.Ressurs` + `Vaktpost` |
+| Status for dem som stempler selv | `oppdrag.services.enhet_status`, via `Ressurs.enhet` |
+| Status for dem som ikke gjør det | `ko.Ressursstatus` — ført av operatøren |
+
+**Hvem som fører utledes av `Ressurs.enhet`, ikke av et flagg.** Er den satt, eier
+oppdragsmodulen statusen; er den `NULL`, finnes det ingen som kan melde, og da er det KO.
+Et eget flagg ville vært en andre sannhet om det samme, og de to ville stått i strid den
+dagen noen koblet en enhet uten å rydde flagget. `_fort_av_ko()` er regelen, og den ligger
+som egen funksjon nettopp fordi den avgjør noe.
+
+**Rutingflagget i §3.2 er et annet spørsmål.** Det avgjør `/oppdrag/` mot `/park/`, og
+`/park/` finnes ikke. Bygget nå ville det vært en bryter med én stilling, og korrelasjonen
+med «hvem stempler selv» er tilfeldig. Det hører til `/park/`-notatet, og står i TODO der.
+
+**Tabellen er nåtilstand, ikke historikk — én rad per ressurs.** Hver føring skriver i
+stedet en systemlinje (`ressurs_status`), og det er den som svarer på «hvor lenge sto lag 3
+ute av drift». To kilder til samme historikk går i utakt første gang noe feiler halvveis,
+og da er det den lagrede som lyver: den ser autoritativ ut. De to skrives i **samme
+transaksjon**, og rekkefølgen er ikke likegyldig — en status uten linja si er en endring
+som aldri skjedde.
+
+**Fravær av rad er «Ledig».** Utledet, ikke lagret, av nøyaktig samme grunn som
+`oppdrag.services.enhet_status`: en lagret standard måtte settes for hver ressurs i hver
+vaktliste, og da er spørsmålet «hvem glemte å sette den» i stedet for «hvem er ledig».
+
+**Verdimengden er kode og ikke en tabell** — `ko/choices.py`. Regelen står i
+`oppdrag/choices.py`: *faglige verdimengder i kode, arrangementsdata i databasen.* «Ledig»,
+«Opptatt», «Pause» og «Ute av drift» er språket operatøren og tavla deler; det skifter ikke
+med arrangementet slik en dronegruppe eller et scenenavn gjør. En tabell ville dessuten
+gjort fargene på tavla til data, og da kan ingen si hva en gul rad betyr.
+
+**Hvilken vaktliste tavla viser er `vaktliste.services.vaktliste_i_bruk()`** — den i drift,
+ellers den aktive vaktas. Den ligger der og ikke her fordi det er vaktlistas regel, og
+`besetning()` har **ikke** fått den: den spør om *én enhet* og må lete i alle lister i
+drift, mens tavla spør globalt. Et forsøk på å slå de to sammen (17. sep. 2026) brøt
+nettopp den forskjellen, og suiten var grønn — ingen test hadde to lister i drift samtidig.
+
+**Grensesnittet gater på to ting, ikke én.** `koKanStyreRessurs()` krever både at brukeren
+kan skrive *og* at KO fører statusen for ressursen. Uten den andre halvdelen tegnes knapper
+på en koblet bil, serveren avviser dem, og operatøren står med en knapp som fører til en
+vegg.

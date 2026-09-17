@@ -1341,6 +1341,49 @@ def belastning_sammendrag(vaktliste, rader, user=None, korps_id=None):
     }
 
 
+def vaktliste_i_bruk():
+    """Vaktlista som gjelder **nå** — den i drift, ellers den aktive vaktas.
+
+    Regelen er André sin, 12. sep. 2026 («koblingen fungerer ikke»): scopet var
+    portalens aktive vakt alene, og da fant sentralbordet ingenting mens
+    vaktlista som faktisk kjørte lå på en annen vakt. En liste satt i drift er
+    den som gjelder, uansett hvilken vakt portalen står på.
+
+    **Den ligger her og ikke i hver leser.** `besetning()` hadde den inline, og
+    KOs ressursoversikt trengte nøyaktig den samme — to kopier av samme regel
+    er to kilder som glir fra hverandre, og de ville glidd på den ene dagen det
+    betyr noe: under en vakt der de to flatene sa hvert sitt om hvem som var på
+    bilen.
+
+    **Dette er det globale spørsmålet, ikke `besetning()` sitt.** Den spør om
+    *én enhet* og må derfor lete i alle lister i drift — en liste i drift der
+    enheten ikke er koblet skal ikke komme i veien for en der hun er. De to
+    deler prioriteringen og ikke spørringen, og et forsøk på å slå dem sammen
+    (17. sep. 2026) brøt nettopp den forskjellen uten at noen test ble rød.
+
+    **Flere lister kan stå i drift samtidig** — ingenting hindrer det, og
+    `driftstatus.py` regner med det. Da vinner den som sist ble satt i drift.
+    Rekkefølgen er oppgitt og ikke overlatt til basen: et ressursbilde som
+    bytter innhold mellom to pollinger er verre enn ett som viser feil liste,
+    fordi det siste lar seg se.
+
+    Returnerer `None` når ingen liste er i drift **og** den aktive vakta ikke
+    har noen liste. `hent_aktiv_vakt()` er aldri `None` — den reparerer
+    pekeren og lager vakta om den mangler — så det er vaktlista som kan mangle
+    her, ikke vakta.
+    """
+    from core.vakt import hent_aktiv_vakt
+    from .models import Vaktliste
+
+    i_drift = (Vaktliste.objects.filter(status=choices.DRIFT)
+               .select_related('vakt')
+               .order_by('-satt_i_drift_at', '-pk').first())
+    if i_drift is not None:
+        return i_drift
+    return (Vaktliste.objects.filter(vakt=hent_aktiv_vakt())
+            .select_related('vakt').first())
+
+
 def besetning(enhet_id, naa=None):
     """Hvem som er på bilen nå — navn, rolle og innsjekkstatus.
 
@@ -1371,6 +1414,11 @@ def besetning(enhet_id, naa=None):
     naa = naa or timezone.now()
     vakt = hent_aktiv_vakt()
 
+    # **Ressurs-scopet, ikke globalt** — og forskjellen fra `vaktliste_i_bruk()`
+    # er verdt å kjenne: her spørres det om *denne enheten*, så en liste i drift
+    # der enheten ikke er koblet skal ikke komme i veien for en der hun er.
+    # Et forsøk på å slå de to sammen (17. sep. 2026) gjorde nettopp det, og
+    # suiten var grønn — ingen test hadde to lister i drift samtidig.
     kandidater = (Ressurs.objects
                   .filter(enhet_id=enhet_id)
                   .select_related('vaktliste__vakt'))

@@ -4,6 +4,92 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-17 — KO pulje 3: ressursbildet  `#ko/ressursbildet`
+
+Tavla over hvem som er på vakt og hvor de står — `docs/FORSLAG_KO.md` §3.1. Flyttet fram
+fra pulje 4 samme dag, fordi den er uavhengig av alt annet og er den flata operatøren
+faktisk sitter og ser på.
+
+### En projeksjon, ikke et register
+
+KO eier ingen ressurser. Tavla settes sammen av tre kilder, og bare den tredje er ny:
+vaktlista svarer på hvem som finnes og hvem som er på skift nå,
+`oppdrag.services.enhet_status` på statusen til dem som stempler selv, og
+`ko.Ressursstatus` på statusen til dem som ikke gjør det.
+
+**Hvem som fører utledes av `Ressurs.enhet`, ikke av et flagg.** Er den satt, eier
+oppdragsmodulen statusen; er den `NULL` — et lag har ingen `Enhet` i det hele tatt, det er
+hele poenget med at de ikke logger inn — er det KO. Et flagg ville vært en andre sannhet om
+det samme, og de to ville stått i strid den dagen noen koblet en enhet uten å rydde flagget.
+
+**Rutingflagget i §3.2 er ikke bygget, og det er et valg.** Det avgjør `/oppdrag/` mot
+`/park/`, og `/park/` finnes ikke — bygget nå er det en bryter med én stilling. At det
+korrelerer med «hvem stempler selv» er tilfeldig, ikke det samme spørsmålet. Flyttet til
+`/park/`-punktet i TODO, der det allerede sto.
+
+### Tabellen er nåtilstand, historikken er loggen
+
+Én rad per ressurs, oppdatert og ikke påført. Hver føring skriver i stedet en systemlinje —
+den tiende koden, `ressurs_status`, og den første som **ikke** løftes av et signal: dette er
+KOs egen handling, så tjenesten skriver linja direkte. To kilder til samme historikk går i
+utakt første gang noe feiler halvveis, og da er det den lagrede som lyver.
+
+De to skrives i samme transaksjon. `test_ingen_rad_uten_linje` er prøven på det, og den er
+verdt å ha: en status uten linja si er en endring som aldri skjedde.
+
+**Fravær av rad er «Ledig»** — utledet, ikke lagret, av samme grunn som
+`oppdrag.services.enhet_status` gir det samme svaret ved vaktstart. En lagret standard måtte
+settes for hver ressurs i hver vaktliste, og da er spørsmålet «hvem glemte å sette den».
+
+**Verdimengden er kode** (`ko/choices.py`): Ledig, Opptatt, Pause, Ute av drift. Regelen
+står i `oppdrag/choices.py` og gjelder her — *faglige verdimengder i kode, arrangementsdata
+i databasen*. Og de er **ikke** oppdragsstatusene: et lag uten oppdrag er ikke «venter», det
+står på post. Å gjenbruke den ene ville tvunget operatøren til å lyve om den andre.
+
+### Den feilen jeg nesten skrev inn
+
+«Lista i drift vinner» (André, 12. sep. 2026) sto inline i `vaktliste.services.besetning()`,
+og tavla trengte det samme. Jeg trakk den ut i `vaktliste_i_bruk()` og lot `besetning()`
+bruke den — **og det var galt.** Flere vaktlister kan stå i drift samtidig, ingenting hindrer
+det, og `driftstatus.py` regner med det. `besetning()` spør om *én enhet* og må lete i alle
+listene i drift; tavla spør globalt og skal ha én. Sammenslåingen gjorde at en enhet koblet i
+den andre driftslista ble usynlig for sentralbordet.
+
+**Hele suiten var grønn** — 1 756 tester i `vaktliste` og `oppdrag` — fordi ingen test har to
+lister i drift samtidig. Rullet tilbake: `vaktliste_i_bruk()` er KOs globale spørsmål,
+`besetning()` beholder sin ressurs-scopede spørring, og begge bærer nå en kommentar om at de
+deler *prioriteringen* og ikke spørringen. Den globale er dessuten gjort deterministisk
+(`-satt_i_drift_at`): et ressursbilde som bytter innhold mellom to pollinger er verre enn ett
+som viser feil liste, fordi det siste lar seg se.
+
+### Vakten fra i formiddag tok kanten selv
+
+`ko.Ressursstatus.ressurs` peker inn i `vaktliste`, og `rekkefolge.bindinger()` — skrevet
+noen timer før — meldte straks `ko → {portal, vaktliste}` og bekreftet at `ko` alt står
+etter `vaktliste` i gjenopprettingsrekkefølgen. Hadde den stått før, ville `avvik()` blitt
+rød. Det er første gang den nye vakten svarer på et spørsmål ingen stilte den.
+
+### Mutasjonstesting
+
+**17 mutanter, alle drept.** Tungt lag på tjenestelaget og portene, middels på de to
+JS-funksjonene som avgjør noe, ingenting på markup.
+
+Sperra mot å føre status på en koblet bil, statusvalideringen, `_fort_av_ko` invertert,
+transaksjonen fjernet, skiftets sluttid ignorert, tilgangsnivået senket fra `skriv_full` til
+`les`, vaktliste-scopet fjernet fra ressursoppslaget, drift som ikke slår aktiv vakt,
+systemlinja som ikke skrives, `er_gyldig` som alltid svarer ja, standardstatusen byttet,
+`strip_fields` uten `satt_av`, koden ute av `KODER` — og på klienten: ett ledd i
+`koKanStyreRessurs` fjernet, **kallstedet** for knappene fjernet (ikke bare funksjonen),
+ukjent status farget grønn, escaping av mannskapsnavn fjernet.
+
+**En feil jeg gjorde i mitt eget verktøy er verdt å skrive ned:** JS-blokka ble satt inn med
+en `assert` på en kort streng og en `replace` på en lengre som ikke matchet. Assert-en gikk,
+replace-en var en no-op, og skriptet meldte «ok». Det er mutantløgn nummer to rettet mot meg
+selv, og det ble bare oppdaget fordi jeg talte linjer i fila etterpå i stedet for å tro på
+meldingen. **Tell resultatet, ikke returkoden.**
+
+---
+
 ## 2026-09-17 — KO uten faner: flatene står ved siden av hverandre  `#ko/skallet`
 
 André, om skallet: «Å ha de som 4 faner med ressursoversikt, oppdragsliste, logg og

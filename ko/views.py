@@ -285,3 +285,54 @@ def logg_fjern_view(request, pk):
         ip=klient_ip(request),
     )
     return JsonResponse({'status': 'ok', 'antall': antall})
+
+
+# ── Ressursbildet (§3.1) ─────────────────────────────────────────────────────
+
+
+@never_cache
+@modul_kreves('ko', 'les', svar='json')
+@require_http_methods(['GET'])
+@rate_limit(group='ko:ressurser', rate='120/m', method='GET')
+def ressurser_view(request):
+    """Tavla. Polles som sidebaren, og bremsen er satt deretter.
+
+    `les` og ikke mer: tavla er situasjonsbildet, og den som ikke får se hvem
+    som er på vakt kan ikke lese loggen heller — linjene handler om dem.
+    """
+    return JsonResponse({'status': 'ok', 'data': services.ressursbildet()})
+
+
+@modul_kreves('ko', 'skriv_full', svar='json')
+@require_http_methods(['POST'])
+@rate_limit(group='ko:ressurs_status', rate='120/m', method='POST')
+def ressurs_status_view(request, pk):
+    """Før en status på en ressurs som ikke stempler selv.
+
+    `skriv_full` og ikke `skriv_handling`: nivået under leser ikke
+    request-kroppen, og statusen *er* kroppen. Se tilgangsstigen i rota.
+
+    **404 og ikke 400 for en ressurs utenfor lista i bruk.** Tavla viser bare
+    den lista, så en ID utenfor den er enten en gammel fane eller noen som
+    gjetter — og begge skal få samme svar som for en ID som ikke finnes.
+    """
+    from vaktliste.models import Ressurs
+    from vaktliste.services import vaktliste_i_bruk
+
+    liste = vaktliste_i_bruk()
+    if liste is None:
+        return _feil('Ingen vaktliste er i drift.', status=404)
+    try:
+        ressurs = (Ressurs.objects
+                   .select_related('gruppe', 'vaktliste__vakt')
+                   .get(pk=pk, vaktliste=liste))
+    except Ressurs.DoesNotExist:
+        return _feil('Ressurs ikke funnet', status=404)
+
+    data = _json_body(request)
+    try:
+        services.sett_ressursstatus(
+            ressurs, data.get('status'), bruker=request.user)
+    except services.Ugyldig as feil:
+        return _feil(str(feil))
+    return JsonResponse({'status': 'ok', 'data': services.ressursbildet()})
