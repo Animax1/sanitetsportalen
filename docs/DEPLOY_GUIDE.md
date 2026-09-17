@@ -159,7 +159,7 @@ Kontoen må bytte passord ved første innlogging.
 
 | Lag | Hva | Hvor |
 |---|---|---|
-| **Modulfiler** | Åtte handlere: `portal`, `patients`, `arkiv`, `oppdrag`, `oppdrag_arkiv`, `vaktliste`, `backlog` – én per modul | Volumet, og offsite under `backups/` |
+| **Modulfiler** | Ni handlere: `portal`, `patients`, `arkiv`, `oppdrag`, `oppdrag_arkiv`, `vaktliste`, `ko`, `backlog` – én per modul | Volumet, og offsite under `backups/` |
 | **Hel database** | `full` – alt unntatt sesjoner, contenttypes, permissions og backup-metadata | Volumet, og offsite under `full/` |
 
 **Den hele fila inneholder brukere, passordhasher, MFA-hemmeligheter og audit-logg, med

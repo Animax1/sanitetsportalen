@@ -1,13 +1,13 @@
 // ════════════════════════════════════════════════════════════════════════════
-// KO — situasjonsbildet. Pulje 1: skallet.
+// KO — situasjonsbildet. Pulje 1 (sidebaren) og pulje 2 (loggen).
 //
-// Lastes kun av /ko/. Én fil, fordi det er én ting den gjør: sidebaren over
-// hvem som har KO oppe (docs/FORSLAG_KO.md §5.3). Flatene er tomme markup i
-// malen og trenger ingen kode ennå.
+// Lastes kun av /ko/. Fortsatt **én fil**: 1 800-linjersgrensa i
+// core/tests_js_splitt.py gjelder de delte modulene, og denne er langt under
+// den. Deles den en dag, er regelen at alt som *kjører* på toppnivå står i den
+// siste fila — derfor ligger den ene `DOMContentLoaded`-kroken nederst her
+// allerede, som i de delte modulene.
 //
-// Krever portal-utils.js (apiFetch, escapeHtml). Alt som *kjører* på toppnivå
-// står nederst, som i de delte modulene — leser en tidlig linje en binding
-// som ikke er nådd, dør siden på en ReferenceError før noe er tegnet.
+// Krever portal-utils.js (apiFetch, escapeHtml, data-action-delegeringen).
 // ════════════════════════════════════════════════════════════════════════════
 
 // 30 sekunder. Lista svarer på hvem som sitter der, ikke på hva de gjør, og
@@ -90,6 +90,269 @@ function koVisSidebar() {
   if (koSidebarSynlig) koHentTilstede();
 }
 
+// ════════════════════════════════════════════════════════════════════════════
+// LOGGEN (pulje 2) — docs/FORSLAG_KO.md §4
+//
+// Én strøm med alle linjer: menneskeskrevne og de systemhendelsene som løftes
+// inn (ko/systemlinjer.py). Den skal være **fullstendig og kjedelig** — den
+// eneste fella er å begynne å skjule ting i loggen for å gjøre den ryddig, for
+// da er den ikke lenger fasit.
+// ════════════════════════════════════════════════════════════════════════════
+
+// 15 sekunder. Loggen er det eneste på sida som endrer seg i sekunder: to
+// operatører fører samtidig, og en linje som kommer et halvt minutt for sent
+// er en linje man rekker å skrive på nytt. Bremsen er 240/m, altså to
+// størrelsesordener over dette.
+const KO_LOGG_MS = 15000;
+
+// **`?siden=<id>` og ikke full henting** (§7.1). Arbeidet i KO er påføringer,
+// og polling skalerer fint så lenge nesten alt er nye rader. WebSockets er
+// bevisst ikke tatt i bruk: et stort infrahopp på Railway med synkron Django,
+// uten en gevinst som forsvarer det.
+let koSisteId = 0;
+
+// Linjene vi har tegnet, nøklet på `rot` — kjedens første ledd. **Ikke på
+// `id`**: en retting er en ny rad med ny id som skal *erstatte* den gamle på
+// den gamle plassen, ikke legge seg nederst. Serveren sorterer på det samme.
+let koLinjer = new Map();
+
+// **Returnerer en boolsk verdi, ikke det siste leddet i en `||`-kjede.**
+// `t.admin` er `undefined` når nøkkelen mangler, og en avgjørelsesfunksjon som
+// svarer «undefined» på «har hun lov?» er en funksjon man ikke kan stole på i
+// en `=== false` eller i en test. Falsy holdt i praksis; det er ikke det samme
+// som å være riktig.
+function koKanSkrive() {
+  const t = window.MODUL_TILGANG || {};
+  return Boolean(t.ko === 'skriv_full' || t.ko === 'skriv_leder' || t.admin);
+}
+
+// **Fjerning er `skriv_leder`, og knappen tegnes deretter.** Grensesnittet
+// gater på `window.MODUL_TILGANG` og ikke på rollen (CLAUDE.md) — en knapp som
+// fører til 403 er verre enn ingen knapp.
+function koKanFjerne() {
+  const t = window.MODUL_TILGANG || {};
+  return Boolean(t.ko === 'skriv_leder' || t.admin);
+}
+
+// Regelen, ikke formateringen: hva linja *påstår* om sin egen opprinnelse.
+// Egen funksjon fordi den avgjør noe — se `klikkSkalKjore()` i portal-utils.js
+// for hvorfor slike regler skilles ut.
+function koLinjeMerke(linje) {
+  if (linje.fjernet) return 'fjernet';
+  if (linje.kilde === 'system') return 'system';
+  if (linje.delt_konto) return 'delt';
+  return '';
+}
+
+function koKlokke(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return '';
+  return String(d.getHours()).padStart(2, '0') + ':'
+    + String(d.getMinutes()).padStart(2, '0');
+}
+
+// **En fjernet linje viser at den er fjernet, ikke ingenting.** Et hull i
+// loggen er verre enn en tømt linje: da vet ingen at det sto noe der (§4.4).
+function koLinjeTekst(linje) {
+  if (linje.fjernet) {
+    const av = linje.fjernet_av ? ' av ' + escapeHtml(linje.fjernet_av) : '';
+    return '<em class="text-muted">Innholdet er fjernet' + av
+      + ', ' + escapeHtml(koKlokke(linje.fjernet_at)) + '.</em>';
+  }
+  return escapeHtml(linje.tekst);
+}
+
+function koLinjeKnapper(linje) {
+  if (linje.kilde === 'system' || linje.fjernet) return '';
+  let ut = '';
+  if (koKanSkrive()) {
+    ut += '<button type="button" class="btn btn-link btn-sm p-0 me-2"'
+      + ' data-action="koRett" data-id="' + escapeHtml(linje.id) + '">Rett</button>';
+  }
+  if (koKanFjerne()) {
+    ut += '<button type="button" class="btn btn-link btn-sm p-0 text-danger"'
+      + ' data-action="koFjern" data-id="' + escapeHtml(linje.id) + '">Fjern</button>';
+  }
+  return ut;
+}
+
+function koLinjeHtml(linje) {
+  const merke = koLinjeMerke(linje);
+  const merkeHtml = merke
+    ? ' <span class="badge text-bg-secondary">' + escapeHtml(merke) + '</span>'
+    : '';
+  const rettet = linje.korrigerer
+    ? ' <span class="text-muted small">(rettet)</span>'
+    : '';
+  const omraade = linje.ansvarsomraade
+    ? ' <span class="text-muted small">· ' + escapeHtml(linje.ansvarsomraade) + '</span>'
+    : '';
+  const hvem = linje.kilde === 'system'
+    ? '<span class="text-muted">system</span>'
+    : escapeHtml(linje.forfatter);
+  return '<li class="list-group-item py-2" data-rot="' + escapeHtml(linje.rot) + '">'
+    + '<div class="d-flex justify-content-between align-items-start gap-2">'
+    + '<div><span class="fw-semibold me-2">' + escapeHtml(koKlokke(linje.tidspunkt))
+    + '</span>' + koLinjeTekst(linje) + rettet + '</div>'
+    + '<div class="text-nowrap small">' + koLinjeKnapper(linje) + '</div>'
+    + '</div>'
+    + '<div class="small text-muted">' + hvem + merkeHtml + omraade + '</div>'
+    + '</li>';
+}
+
+function koTegnLogg() {
+  const boks = document.getElementById('ko-logg-liste');
+  if (!boks) return;
+  const rader = Array.from(koLinjer.values());
+  // Samme sortering som serveren: kjedens første ledd, så id. Klienten kan få
+  // linjer i to omganger, og rekkefølgen skal ikke avhenge av når de kom.
+  rader.sort((a, b) => (a.rot - b.rot) || (a.id - b.id));
+  const antall = document.getElementById('ko-logg-antall');
+  if (antall) antall.textContent = rader.length + ' linjer';
+  if (rader.length === 0) {
+    boks.innerHTML = '<p class="text-muted small p-3 mb-0">Ingen linjer ennå.</p>';
+    return;
+  }
+  boks.innerHTML = '<ul class="list-group list-group-flush">'
+    + rader.map(koLinjeHtml).join('') + '</ul>';
+}
+
+async function koHentLogg() {
+  try {
+    const res = await apiFetch('/ko/api/logg/?siden=' + koSisteId);
+    const data = await res.json();
+    (data.data || []).forEach(linje => {
+      koLinjer.set(linje.rot, linje);
+      if (linje.id > koSisteId) koSisteId = linje.id;
+    });
+    // **Fjernede linjer kommer aldri gjennom `?siden=`**: sletteinngangen
+    // endrer en rad i stedet for å legge til en ny, så den har ingen ny id.
+    // Uten denne løkka ville teksten blitt stående på hver annen operatørs
+    // skjerm til hun lastet siden på nytt.
+    (data.fjernede || []).forEach(id => {
+      koLinjer.forEach(linje => {
+        if (linje.id === id && !linje.fjernet) {
+          linje.fjernet = true;
+          linje.tekst = '';
+        }
+      });
+    });
+    const vakt = document.getElementById('ko-logg-vakt');
+    if (vakt && data.vakt) vakt.textContent = '· ' + data.vakt;
+    koTegnLogg();
+  } catch (e) {
+    // En logg som ikke svarer skal ikke tømme skjermen: linjene som alt står
+    // der er fortsatt sanne. Feilen vises bare når det ikke står noe.
+    const boks = document.getElementById('ko-logg-liste');
+    if (boks && koLinjer.size === 0) {
+      boks.innerHTML = '<p class="text-muted small p-3 mb-0">Fikk ikke kontakt.</p>';
+    }
+  }
+}
+
+function koLoggFeil(melding) {
+  const boks = document.getElementById('ko-logg-feil');
+  if (!boks) return;
+  boks.textContent = melding || '';
+  boks.classList.toggle('d-none', !melding);
+}
+
+// Klokkeslettet fra `<input type="time">` er «21:14» uten dato. Dagens dato
+// legges på her. Krysser vakta midnatt, ville «00:05» skrevet klokka 00:10 blitt
+// riktig, mens «23:58» skrevet 00:02 havnet et døgn fram — serveren avviser det
+// som «fram i tid», og operatøren får en feilmelding i stedet for en linje på
+// feil dag. Det er riktig vei å ta feil på.
+function koTidspunktISO(verdi) {
+  if (!verdi) return null;
+  const biter = verdi.split(':');
+  if (biter.length < 2) return null;
+  const d = new Date();
+  d.setHours(Number(biter[0]), Number(biter[1]), 0, 0);
+  return d.toISOString();
+}
+
+async function koSkriv() {
+  const felt = document.getElementById('ko-logg-tekst');
+  const tidfelt = document.getElementById('ko-logg-tid');
+  if (!felt) return;
+  koLoggFeil('');
+  const res = await apiFetch('/ko/api/logg/ny/', {
+    method: 'POST',
+    body: JSON.stringify({
+      tekst: felt.value,
+      tidspunkt: koTidspunktISO(tidfelt ? tidfelt.value : ''),
+    }),
+  });
+  const data = await res.json();
+  if (!res.ok) {
+    koLoggFeil(data.message || 'Linja ble ikke lagret.');
+    return;
+  }
+  felt.value = '';
+  if (tidfelt) tidfelt.value = '';
+  koLinjer.set(data.data.rot, data.data);
+  if (data.data.id > koSisteId) koSisteId = data.data.id;
+  koTegnLogg();
+}
+
+async function koRett(id) {
+  const linje = Array.from(koLinjer.values()).find(l => l.id === id);
+  if (!linje) return;
+  const tekst = window.prompt('Rett linja. Den gamle blir stående som historikk.',
+                              linje.tekst);
+  if (tekst === null) return;
+  const res = await apiFetch('/ko/api/logg/' + id + '/rett/', {
+    method: 'POST',
+    body: JSON.stringify({ tekst: tekst }),
+  });
+  const data = await res.json();
+  if (!res.ok) {
+    koLoggFeil(data.message || 'Rettingen gikk ikke gjennom.');
+    // 409 betyr at noen andre rettet den først, og da er det den nye
+    // versjonen som gjelder — hent den før operatøren prøver igjen på et
+    // grunnlag som ikke finnes lenger.
+    if (res.status === 409) koHentLogg();
+    return;
+  }
+  koLinjer.set(data.data.rot, data.data);
+  if (data.data.id > koSisteId) koSisteId = data.data.id;
+  koTegnLogg();
+}
+
+async function koFjern(id) {
+  // **`confirm` kreves også server-side.** Dette er den ene handlingen i
+  // modulen som ikke lar seg angre: teksten finnes etterpå bare i en backupfil
+  // ingen har en knapp til.
+  if (!window.confirm(
+      'Fjern innholdet i linja?\n\n'
+      + 'Rada blir stående med «fjernet av deg», men teksten er borte for '
+      + 'godt. Bruk dette når noen har skrevet en personopplysning som ikke '
+      + 'skal stå der.')) {
+    return;
+  }
+  const res = await apiFetch('/ko/api/logg/' + id + '/fjern/', {
+    method: 'POST',
+    body: JSON.stringify({ confirm: true }),
+  });
+  const data = await res.json();
+  if (!res.ok) {
+    koLoggFeil(data.message || 'Linja ble ikke fjernet.');
+    return;
+  }
+  koHentLogg();
+}
+
+
+// ════════════════════════════════════════════════════════════════════════════
+// OPPSTART
+//
+// **Alt som kjører på toppnivå står her, nederst.** Regelen er skrevet for de
+// delte modulene (CLAUDE.md), men den gjelder like fullt i én fil: kjører en
+// tidlig linje noe, kan den lese en binding som ikke er nådd, og siden dør på
+// en ReferenceError før noe er tegnet.
+// ════════════════════════════════════════════════════════════════════════════
+
 document.addEventListener('DOMContentLoaded', () => {
   koHentTilstede();
   setInterval(() => {
@@ -97,4 +360,23 @@ document.addEventListener('DOMContentLoaded', () => {
     // noe her: flere operatører sitter på samme side hele vakta.
     if (koSidebarSynlig) koHentTilstede();
   }, KO_TILSTEDE_MS);
+
+  const skjema = document.getElementById('ko-logg-form');
+  if (skjema) {
+    skjema.addEventListener('submit', (e) => {
+      e.preventDefault();
+      // `withSubmitGuard` og ikke en egen flagg-variabel: dobbelttrykk under
+      // en hendelse er regelen og ikke unntaket, og to like linjer i loggen er
+      // en feil man ikke oppdager før man leser den i etterkant.
+      withSubmitGuard('ko-logg-send', koSkriv);
+    });
+  }
+
+  // Skjemaet skjules for den som bare har `les`. Serveren svarer 403 uansett,
+  // men et skrivefelt som ikke kan sende er en vegg man går inn i.
+  const boks = document.getElementById('ko-logg-skjema');
+  if (boks && !koKanSkrive()) boks.classList.add('d-none');
+
+  koHentLogg();
+  setInterval(koHentLogg, KO_LOGG_MS);
 });

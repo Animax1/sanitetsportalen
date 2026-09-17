@@ -54,7 +54,7 @@ modulfilene der):
 
 | Prefiks | Innhold | Personopplysninger | Frist |
 |---|---|---|---|
-| `backups/` | Seks modulfiler: `portal`, `patients`, `arkiv`, `oppdrag`, `oppdrag_arkiv`, `vaktliste` | Modulenes egne data — helseopplysninger i `patients` og `arkiv`, mannskapsdata i `vaktliste`. **Ikke** brukerkontoer, ikke audit-logg | 730 dager |
+| `backups/` | Åtte modulfiler: `portal`, `patients`, `arkiv`, `oppdrag`, `oppdrag_arkiv`, `vaktliste`, `ko`, `backlog` | Modulenes egne data — helseopplysninger i `patients`, `arkiv` og `ko`, mannskapsdata i `vaktliste`. **Ikke** brukerkontoer, ikke audit-logg | 730 dager |
 | `full/` | Hele databasen i én fil | **Alt i A.6**, inkludert brukerkontoer med passord-hasher, TOTP-hemmeligheter, innloggingshendelser og audit-logg | 90 dager |
 
 > **Den hele fila inneholder autentiseringsdata, og det er en bevisst utvidelse.**
@@ -342,6 +342,29 @@ Registrene `Korps`, `Kompetanse` og `VaktRolle` er organisasjonsoppsett uten
 personopplysninger. Vaktposter (hvem som var på vakt hvor, med tider) kommer i
 modulens fase 2 og føres inn her da.
 
+### KO-loggen (`ko.Logglinje`)
+
+Hendelsesloggen i KO-modulen (KO pulje 2, 17. september 2026). Den dekker **det som skjer
+utenfor samleplass og sykestue**; blir personen pasient, registreres hun i
+pasientmodulen. Loggen er **ikke** audit-loggen: `audit/` er automatisk, på feltnivå og
+finnes for sikkerhet, mens denne er menneskeskrevet og i praksis dokumentet man leser
+etter et arrangement der noe gikk galt.
+
+| Felt | Innhold | Kategori |
+|---|---|---|
+| `tekst` | **Fritekst** skrevet av en operatør: «mann, ca. 60, kollapset ved scene sør» | **Særlig kategori (art. 9)** – helseopplysning, indirekte identifiserende |
+| `tidspunkt` / `registrert_at` | Når det skjedde, og når linja ble skrevet | Vanlig personopplysning |
+| `forfatter` / `forfatter_navn` / `forfatter_delt_konto` | Hvem som førte linja, frosset på raden | Vanlig personopplysning (appbruker) |
+| `ansvarsomraade` | Hva operatøren gjorde – samband, ressurser, logg | Vanlig personopplysning (appbruker) |
+| `kilde` / `systemkode` / `systemdata` | Løftede systemhendelser: kallesignal, oppdragsnummer, statusnavn | Ikke særlig kategori – bygget av verdimengder, ingen fritekst |
+| `korrigerer` / `rot` | Korreksjonskjeden – retting skjer som ny rad, aldri ved å endre | Ikke personopplysning |
+| `fjernet_at` / `fjernet_av` / `fjernet_av_navn` | Sletteinngangen: hvem tømte innholdet, og når | Vanlig personopplysning (appbruker) |
+
+**Opplæringen er at direkte identifiserende opplysninger ikke skrives i `tekst`.** Det er
+den sterkeste formen for dataminimering som finnes, og den reduserer risikoen reelt — men
+designet antar at opplæring forvitrer under press, og har derfor en sletteinngang. Se A.9
+for oppbevaringstid, sletteinngangen og forbeholdet om backupene.
+
 ### Varsler (Notification)
 
 `core.Notification` gir beskjed i portalen når en bruker tildeles eller fratas ansvar for en pasient.
@@ -432,9 +455,48 @@ Lagringstidene er fastsatt etter GDPR art. 5(1)(e): opplysningene skal ikke oppb
 | Mannskapsregister (`Mannskap`) | Så lenge personen er aktiv frivillig; pensjoneres (`er_aktiv=False`) ved avgang og slettes manuelt når ingen vaktposter refererer | Manuell (admin) | Berettiget interesse opphører når personen slutter; historiske vaktposter (fase 2) krever PROTECT inntil arkivering |
 | Korps/kompetanse/rolle-registre (vaktliste) | Ingen fast grense | Manuell | Organisasjonsoppsett uten personopplysninger |
 | Varsler (`Notification`) | 30 dager | Automatisk – `purge_old_logs` via Railway Cron | Rent driftsvarsel uten dokumentasjonsverdi etter vakten |
+| **KO-loggen (`ko.Logglinje`)** | **730 dager (2 år)**, justerbart 30–3650 av global admin | Automatisk – `purge_old_logs` via Railway Cron, gjennom `core.opprydding` | Menneskeskrevet fritekst om det som skjer utenfor samleplass og sykestue. Samme frist som revisjonsloggen og arkivkollapsen. **Arkiveres bevisst ikke** – se merknaden under |
 | Audit-logger (`AuditLog`, `LoginEvent`) | **2 år (730 dager)** | Automatisk – `purge_old_logs` via Railway Cron | Hendelsesoppklaring og revisjon. Uten journalplikt er lengre oppbevaring ikke hjemlet |
 | Sesjondata | 8 timer (justerbart 1–24) | Automatisk | Begrenses til nødvendig varighet per vakt |
 | Brukerkontoer | Slettes manuelt når tilgang ikke lenger er nødvendig | Manuell | Lagringsbegrensning, art. 5(1)(e) |
+
+> **Merk om KO-loggen (17. september 2026, KO pulje 2):** Loggen er i all hovedsak
+> fritekst. Opplæringen er at direkte identifiserende opplysninger – navn, adresse,
+> fødselsnummer, telefon – ikke skrives i feltet, og det reduserer risikoen reelt. To ting
+> følger likevel, og begge er tatt hensyn til i konstruksjonen:
+>
+> **«Ingen direkte identifiserende» er ikke «ikke personopplysninger».** «Mann, ca. 60,
+> kollapset ved scene sør 21:14» er indirekte identifiserende på et arrangement med kjent
+> deltakerliste, og det er helseopplysninger uansett. Loggen har derfor **samme
+> tilgangsnivå som pasientdata**, ikke et lettere, og tidligere vakters logg krever
+> `skriv_leder` – en ny operatør på vakt har ingen operativ grunn til å lese fjorårets
+> linjer.
+>
+> **Opplæring forvitrer under press.** En travel kveld skriver noen et navn. Det finnes
+> derfor **én smal, logget sletteinngang** som tømmer innholdet i en linje og lar rada stå
+> («fjernet av André, 22:10»). Handlingen krever `skriv_leder` og bekreftelse, og skriver
+> en auditrad – **uten** den fjernede teksten, av samme grunn som `notat` i vaktlista står
+> som `(skjult)`: lå teksten i auditloggen, ville den ligget der i 730 dager og inngangen
+> vært et skuespill.
+>
+> **Loggen arkiveres bevisst ikke.** `ArkivertPasient` og `ArkivertOppdrag` fryses med en
+> SHA-signatur, og et felt som inngår i signaturen er låst i 24 måneder ved konstruksjon –
+> det kan ikke fjernes uten at arkivet melder tukling. Sletteinngangen over og et signert
+> arkiv utelukker hverandre, og valget falt på sletteinngangen. Samme begrunnelse som
+> `Oppdrag.fritekst`, som heller ikke arkiveres.
+>
+> **Fristen er ikke en sletterett, og det skal stå skrevet.** KO-loggen inngår i
+> modulbackupen `ko` (`backups/`, 730 dager) og i den hele fila (`full/`, 90 dager). En
+> linje som fjernes med sletteinngangen, eller som slettes når fristen løper ut, ligger
+> fortsatt i disse filene til bucketens livssyklusregler sletter dem. Fristen på den
+> levende raden er ekte beskyttelse mot «noen leser loggen tre måneder senere»; den er
+> ikke mer enn det. Samme forbehold som `docs/NOTAT_DPIA_OG_FRITEKST.md` §6 tar for
+> `Oppdrag.fritekst`.
+>
+> **Fristen er en `AppSetting` (`ko.logg_dager`), ikke en miljøvariabel.** Endringer
+> auditlogges, verdien er synlig på `/portal-admin/innstillinger/`, og web- og
+> cron-tjenesten leser den samme raden. En miljøvariabel ville gitt en oppbevaringstid som
+> kan endres uten spor og settes ulikt på to tjenester.
 
 > **Merk om audit-logg-retention:** Perioden var tidligere oppgitt som 10 år, begrunnet i journalrettslige hensyn. Da journalplikten ikke gjelder for dette systemet (se A.4), er den begrunnelsen bortfalt, og perioden er satt til 2 år i tråd med det `purge_old_logs` faktisk håndhever. Kommandoen kjøres av Railway Cron.
 

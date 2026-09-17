@@ -36,16 +36,28 @@ class ModuldeklarasjonenTests(SimpleTestCase):
         self.assertIsNotNone(modul, 'ko står ikke i core/modules.py')
         self.assertEqual(modul.url, '/ko/')
 
-    def test_bare_les_er_deklarert_i_pulje_1(self):
+    def test_nivaaene_er_dem_puljene_har_gitt_mening(self):
         """**Et nivå som ikke gir noe er lett å dele ut i god tro.**
 
-        Skallet har ingen skriveendepunkter. Ble `skriv_full` deklarert nå,
-        kunne det deles ut i dag og **tre stille i kraft** den dagen pulje 2
-        landet — uten at noen tok den avgjørelsen da. Feiler denne testen fordi
-        en pulje har lagt til sitt nivå, skal listen her oppdateres i samme
-        commit som endepunktene som gir nivået mening.
+        Pulje 1 deklarerte bare `les`, fordi skallet ikke hadde et eneste
+        skriveendepunkt: et `skriv_full` delt ut da ville ligget i basen og
+        **trådt stille i kraft** den dagen loggen landet, uten at noen tok den
+        avgjørelsen da. Pulje 2 la til `skriv_full` (fører loggen) og
+        `skriv_leder` (sletteinngangen og tidligere vakter) i samme commit som
+        endepunktene som gir dem mening.
+
+        Feiler denne fordi en pulje har lagt til sitt nivå, skal lista her
+        oppdateres — i den commiten, ikke etterpå.
         """
-        self.assertEqual(get_module('ko').nivaaer, ('les',))
+        self.assertEqual(get_module('ko').nivaaer,
+                         ('les', 'skriv_full', 'skriv_leder'))
+
+    def test_skriv_handling_er_ikke_deklarert(self):
+        """Det finnes ingen navngitt overgang i KO — og da skal nivået ikke
+        tilbys. `skriv_handling` leser ikke request-kroppen; å føre en
+        logglinje gjør nettopp det. Nivået ville sett ut som «får skrive
+        litt», og vært en tilgang uten et endepunkt bak seg."""
+        self.assertNotIn('skriv_handling', get_module('ko').nivaaer)
 
     def test_hvert_deklarert_nivaa_har_en_etikett(self):
         """`skriv_handling` betyr «stempling» i oppdrag og «fører sitt eget

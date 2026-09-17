@@ -131,39 +131,6 @@ ingen av dem gir feilmelding — de er bare stille inaktive.
       til hver jobb har kjørt én gang etter deployen — sjekk igjen dagen etter at de tre
       viser ✓.
 
-- [ ] **KO-loggen: hvor lenge oppbevares den, og skal den arkiveres?**
-      **Blokkerer KO pulje 2** (`docs/FORSLAG_KO.md` §11.3), som er neste pulje ut.
-
-      KO-loggen er menneskeskrevet fritekst om det som skjer utenfor samleplass og
-      sykestue — «mann, ca. 60, kollapset ved scene sør 21:14». Den er indirekte
-      identifiserende og inneholder helseopplysninger uansett hvor godt opplæringen
-      holder.
-
-      **Konflikten er innebygget og kan ikke ryddes opp i etterpå.**
-      `docs/NOTAT_DPIA_OG_FRITEKST.md` §7 slår fast at fritekst bevisst *ikke* arkiveres.
-      Men et felt som inngår i et arkivs SHA-signatur er låst i 24 måneder ved
-      konstruksjon, og kan ikke fjernes uten at arkivet melder tukling. Samtidig krever
-      §4.4 én smal, logget **sletteinngang** for den kvelden noen skriver et navn — og
-      «append-only» og «fjern personopplysninger» står i direkte konflikt.
-
-      **Bygges loggen først, er svaret allerede gitt av konstruksjonen.** Derfor før koden,
-      ikke under. Tre spørsmål å svare på: (1) hvor lenge skal linjene ligge, (2) skal de
-      med i et arkiv i det hele tatt, og (3) hva skjer med en slettet linje i et arkiv som
-      alt er signert.
-
-- [ ] **KO-loggen: hvilke systemhendelser skal løftes inn i den?**
-      **Blokkerer KO pulje 2** (`docs/FORSLAG_KO.md` §11.1). Dette er selve designarbeidet
-      i loggdelen, ikke en detalj.
-
-      Hendelsesloggen er **ikke** audit-loggen: `audit/` er automatisk, teknisk og finnes
-      for sikkerhet; denne er menneskeskrevet og leses etter et arrangement der noe gikk
-      galt. Systemhendelser løftes derfor inn **kuratert, ikke automatisk**. «Enhet 3 satt
-      til på stedet» hører hjemme der; «Enhetstype fikk nytt navn» gjør ikke.
-
-      Lista skal være eksplisitt og begrunnet, som `NOKLER_UTEN_AUDIT` i `core/signals.py`.
-      Spørsmålet til deg er hvilke hendelser du vil se i loggen når du leser den i
-      etterkant — jeg kan lage et forslag å reagere på, men valget er operativt.
-
 - [ ] **Kjør `scripts/sikkerhetssjekk.py` mot staging** med admin-, leser- og
       enhetskonto, og lim inn rapporten. Runbook §14. Den prøver portalen *utenfra*, som
       suiten aldri gjør.
@@ -586,22 +553,26 @@ enhetens egen skjerm, og **sentralbordet flytter til KO** — en flytting av
 Forslaget erstatter datteroppdrag, som er arkivert: grupperingen hører hjemme i en
 `Hendelse` som finnes *før* oppdraget og også dekker lag. Begrunnelsen står i §9.3.
 
-- [ ] **Pulje 2 — loggen.** Logglinjer, retting som ny rad, den ene sletteinngangen,
-      polling med `?siden=<id>`. Alt annet skriver inn i den. De to åpne valgene under
-      må besvares først.
+*Pulje 2 (loggen) er levert 17. sep. 2026 — se CHANGELOG. De to valgene som blokkerte
+er besvart: 730 dager som en `AppSetting` (ikke en Railway-variabel), ingen SHA-signatur,
+og ni kuraterte systemhendelser i `ko/systemlinjer.py`.*
 
-      De to valgene som blokkerer står i «Krever Andre» øverst i fila.
+- [ ] **Historikkflate: lese tidligere vakters logg.** Nivået finnes alt
+      (`skriv_leder`, `ko/module.py`) og linjene overlever vaktarkiveringen, så dette er
+      en flate og ikke en datamodell. Hører til pulje 3, der hendelsesoversikten uansett
+      trenger en «velg vakt»-kontroll.
 
-      - [ ] **KO må registrere en backup-handler i samme pulje som den får sin første
-            tabell.** Vaktlistemodulen sto uten backup i det hele tatt fra den gikk i prod
-            til 13. sep. 2026, og det ble oppdaget ved en gjennomgang og ikke av noe rødt.
-            For KO-loggen er innsatsen høyere: den er i praksis dokumentet man leser etter
-            et arrangement der noe gikk galt. Handleren registreres fra `apps.ready()`, og
-            slugen må inn i gjenopprettingsrekkefølgen.
+      **Vinduet som betyr noe er de tre ukene etter vakta**, ikke året etter: §4.2 sier
+      loggen er «i praksis et dokument man leser etter et arrangement der noe gikk galt»,
+      og det leses dager til uker etter. Årsgamle logger er sekundærbruken.
 
-      - [ ] **`ko` må deklarere skrivenivået sitt i samme commit som endepunktene som gir
-            det mening.** `Module.nivaaer` er `('les',)` i dag, med vilje — se `ko/module.py`.
-            Et nivå som deles ut før det finnes, trer stille i kraft den dagen puljen lander.
+      `les` gir aktiv vakt og skal fortsette å gjøre det — en ny operatør på vakt i kveld
+      har ingen operativ grunn til å lese fjorårets helseopplysninger (André, 17. sep.).
+
+- [ ] **Utskrift av loggen.** §4.2 sier den skal være «utskrivbar», og det er ikke bygget.
+      Det er ikke pynt: skal loggen leses i en gjennomgang etter et arrangement, leses den
+      av flere samtidig rundt et bord. Rendres server-side fra de samme `_til_dict`-radene,
+      slik at papiret og skjermen sier det samme.
 
 - [ ] **Pulje 3 — hendelser.** `Hendelse`, nummerserien, linje → hendelse, oversikten,
       lukking med 409 og `confirm`. Krever loggen.
@@ -620,13 +591,32 @@ Forslaget erstatter datteroppdrag, som er arkivert: grupperingen hører hjemme i
             Alene er `#45` utvetydig; i en logg der begge står på nabolinjer er det ikke
             det, og det er i loggen de møtes.
 
+            Formen står **ett sted** i KO: `_oppdrag()` i `ko/systemlinjer.py`. Det er
+            derfor systemlinjene lagres som kode + data og ikke som ferdig tekst — hele
+            historikken skifter form når den funksjonen endres, uten en migrasjon.
+
 - [ ] **Pulje 4 — ressursoversikten.** Projeksjonen i §3.1, KO-ført status for dem som ikke
       stempler selv, og rutingflagget på `Ressursgruppe`. Uavhengig av 2 og 3; kan bytte
       plass med dem.
 
+      - [ ] **Vaktlistas stemplinger inn i loggen — vurderes her, ikke før.** Utelatt
+            bevisst i pulje 2 (`ko/systemlinjer.py`): «Lag 3 gikk av vakt» er ekte
+            situasjonsinformasjon, men per-person-stempling på hver vaktpost ville druknet
+            loggen ved hvert vaktskifte. Løftes det, skal det være **ressursen** som går
+            av og på vakt, ikke personen — og da trenger lag-begrepet det hjemmet pulje 4
+            gir det.
+
 - [ ] **Pulje 5 — sentralbordet flyttes.** `oppdrag-sentral-*.js` blir KO sine,
       `oppdrag-enhet.js` blir hele `/oppdrag/`, og `Oppdrag` får den nullbare FK-en
       `hendelse`. Den største, og den eneste som rører `/oppdrag/`.
+
+      - [ ] **Systemlinjer som trenger *intensjon* må dytte, ikke leses av et signal.**
+            Løftet i pulje 2 går med signaler på `oppdrag`-modellene, og forbeholdet står
+            i `ko/systemlinjer.py`: et signal ser raden, ikke hvorfor. «Avbrutt fordi
+            ingen svarte» og «avbrutt fordi pasienten gikk hjem» er samme rad. Trengs
+            skillet, bygges et push-register i `core` etter mønsteret fra
+            `core/driftstatus.py` — og pulje 5 er uansett den puljen som rører
+            `oppdrag/`, så det er da det er billig.
 
       - [ ] **FK-en er den ene kanten som går oppover, og den må navngis.** `KJENTE_UNNTAK`
             i [`ko/tests_avhengighet.py`](./ko/tests_avhengighet.py) er stedet — men merk at

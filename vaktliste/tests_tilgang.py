@@ -874,14 +874,21 @@ class LedernivaaetsPlassIStigenTests(TestCase):
 
     #: Modulene som har definert hva `skriv_leder` betyr hos dem. Vaktlista
     #: (30. aug. 2026: setter opp vakta), oppdrag (12. sep. 2026: setter opp
-    #: verdimengdene) og backlog (17. sep. 2026: avgjør hva som er løst). Et
-    #: nytt trinn er additivt — men bare der det er forklart, og etiketten er
+    #: verdimengdene), backlog (17. sep. 2026: avgjør hva som er løst) og KO
+    #: (17. sep. 2026: sletteinngangen i loggen og tidligere vakter). Et nytt
+    #: trinn er additivt — men bare der det er forklart, og etiketten er
     #: forklaringen.
     #:
-    #: **Tre moduler, tre betydninger, og det er hele poenget med `nivaa_navn`.**
-    #: «Setter opp vakta», «setter opp verdimengdene» og «leder backloggen» er
-    #: ikke samme fullmakt; det er bare samme trinn på stigen.
-    MED_LEDER = {'vaktliste', 'oppdrag', 'backlog'}
+    #: **Fire moduler, fire betydninger, og det er hele poenget med
+    #: `nivaa_navn`.** «Setter opp vakta», «setter opp verdimengdene», «leder
+    #: backloggen» og «fjerner en logglinje» er ikke samme fullmakt; det er
+    #: bare samme trinn på stigen.
+    #:
+    #: KO er den første der skillet mot `skriv_full` ikke handler om *oppsett
+    #: mot drift*, men om **hva som lar seg angre**: den som fører loggen kan
+    #: rette tilbake, fordi en retting er en ny rad som peker på den gamle.
+    #: Den som fjerner en linje tømmer innholdet for godt.
+    MED_LEDER = {'vaktliste', 'oppdrag', 'backlog', 'ko'}
 
     def test_bare_modulene_som_har_forklart_nivaaet_tilbyr_det(self):
         """Matrisen tilbyr de nivåene modulen deklarerer og ingen andre. Kom

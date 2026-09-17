@@ -445,7 +445,7 @@ deploy 2. Begge deler er rettet, men **strukturen er endret med vilje**: se 5.0.
 
 ### 5.0 Hva dette kapittelet er, og ikke er
 
-Portalen har **137 endepunkter** (utenom Django-admin, som bare rutes under `DEBUG`).
+Portalen har **141 endepunkter** (utenom Django-admin, som bare rutes under `DEBUG`).
 En håndskrevet liste over alle sammen ville rotnet fra dagen den ble skrevet — nøyaktig
 slik den gamle lista gjorde, med 16 oppføringer og ingen som merket at resten manglet.
 
@@ -478,7 +478,7 @@ for sti, view in sorted(gaa(get_resolver())):
 | `/portal-admin/` | 21 | `core/urls_admin.py` | Hele adminflaten. Navnerom `portaladmin` |
 | `/accounts/` | 9 | `accounts/urls.py` | Innlogging, MFA, passord |
 | `/statistikk/` | 5 | `statistikk/urls.py` | Full statistikk per kilde |
-| `/ko/` | 2 | `ko/urls.py` | Situasjonsbildet (skallet) og sidebaren over hvem som har KO oppe |
+| `/ko/` | 6 | `ko/urls.py` | Situasjonsbildet, sidebaren over hvem som har KO oppe, og loggen (les, skriv, rett, fjern) |
 | `/backlog/` | 7 | `backlog/urls.py` | Endringsønsker og bugs: lista med filtre, innmelding, løst/gjenåpne, og typene i «Backloginnstillinger» |
 | `/varsler/`, `/api/`, rot | 13 | `core/urls.py` | Dashbord, varsler (3 sider + 4 API), «min profil», manifest, `robots.txt`, `/healthz/` og videresendingen fra `/api/` |
 
@@ -919,7 +919,7 @@ pasientdata». Alle tre er borte — den første slettet i `patients/0017`.*
 | **Modulfiler** (seks) | «Pasientlista ble slettet ved et uhell — kan jeg få den tilbake uten å røre noe annet?» |
 | **Hel database** (`full`) | «Railway-prosjektet er borte — kan jeg reise portalen på nytt et annet sted?» |
 
-Åtte handlere i registeret:
+Ni handlere i registeret:
 
 | Slug | Fil | Innhold |
 |---|---|---|
@@ -929,10 +929,12 @@ pasientdata». Alle tre er borte — den første slettet i `patients/0017`.*
 | `oppdrag` | `oppdrag/backup.py` | Oppdrag, statusmeldinger, enheter, lokasjoner, verdimengdene |
 | `oppdrag_arkiv` | `oppdrag/backup.py` | `OppdragArkiv` + `ArkivertOppdrag`. Er også **sperren** foran kollaps |
 | `vaktliste` | `vaktliste/backup.py` | Korps, mannskap, kompetanser, ressurser, vaktposter, vaktlister |
+| `ko` | `ko/backup.py` | KO-loggen. **Backup, ikke arkiv** — loggen fryses aldri med signatur |
+| `backlog` | `backlog/backup.py` | Innspill. Eneste modulfil uten plass i rekkefølgen |
 | `full` | `core/backup/full.py` | **Hele databasen** unntatt sesjoner, contenttypes, rettighetsrader, Django-admins logg og backup-metadata |
 
 Gjenoppretting i tom base går i rekkefølge — **portal → patients → arkiv → oppdrag →
-oppdrag_arkiv → vaktliste** — fordi alt peker på vakta med et heltall. Tas ikke `portal`
+oppdrag_arkiv → vaktliste → ko** — fordi alt peker på vakta med et heltall. Tas ikke `portal`
 først, feiler de andre med «Key (vakt_id)=(1) is not present in table core_vakt».
 `AlleFileneGjenopprettesTests` håndhever at rekkefølgen virker.
 

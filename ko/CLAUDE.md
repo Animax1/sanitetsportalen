@@ -5,8 +5,9 @@
 > gjelder her også. Regelen for hva som står hvor: ligger koden i en app, står regelen
 > her; gjelder den alle, står den i rota.
 
-Pulje 1 levert (skallet: modulen registrert, `/ko/` med de fire flatene, sidebaren).
-Pulje 2–7 gjenstår — se `docs/FORSLAG_KO.md` §10, som er et **forslag**, ikke besluttet.
+Pulje 1 levert (skallet: modulen registrert, `/ko/` med de fire flatene, sidebaren) og
+**pulje 2** (loggen). Pulje 3–7 gjenstår — se `docs/FORSLAG_KO.md` §10, som er et
+**forslag**, ikke besluttet.
 
 **`/oppdrag/` er enhetsverktøyet, `/ko/` er situasjonsverktøyet.** Én bil, én
 statusmaskin, én stempling om gangen — mot hva skjer på arrangementet, hvem er hvor, hva
@@ -18,9 +19,14 @@ og kan bli avsluttet uten at noen rykket ut.
 |---|---|
 | Hvem har KO oppe (sidebaren) | `ko/tilstede.py` |
 | Sesjonsloopen den bygger på | `core/sesjoner.py` — delt med adminflaten |
-| Modulens nivåer | `ko/module.py` — **bare `les` i pulje 1** |
-| Siden og de to endepunktene | `ko/views.py`, `ko/urls.py` |
-| Sidebaren i nettleseren | `static/js/ko.js` |
+| Modulens nivåer | `ko/module.py` — `les`, `skriv_full`, `skriv_leder` fra pulje 2 |
+| Siden og endepunktene | `ko/views.py`, `ko/urls.py` |
+| Sidebaren og loggen i nettleseren | `static/js/ko.js` |
+| Logglinja og «nyeste i kjeden vinner» | `ko/models.py` |
+| Reglene: tid, tekst, retting, sletting, frist | `ko/services.py` |
+| **Hvilke systemhendelser som løftes inn, og hvorfor** | `ko/systemlinjer.py` |
+| Løftet selv | `ko/signals.py` |
+| Backup, opprydding, innstilling | `ko/backup.py`, `ko/opprydding.py`, `ko/portalinnstillinger.py` |
 
 ## Retningen: KO er øverste lag
 
@@ -74,21 +80,119 @@ en person.
 
 ## Nivåene legges til når de betyr noe
 
-`Module.nivaaer` er `('les',)` i pulje 1. Skallet har ingen skriveendepunkter, og et nivå
-som ikke gir noe er lett å dele ut i god tro — det er feilen den globale nivålista gjorde
-mot `statistikk`, dokumentert i `core/modules.py`.
+`Module.nivaaer` var `('les',)` i pulje 1. Skallet hadde ingen skriveendepunkter, og et
+nivå som ikke gir noe er lett å dele ut i god tro — det er feilen den globale nivålista
+gjorde mot `statistikk`, dokumentert i `core/modules.py`. Her hadde den vært verre enn der:
+`statistikk` har aldri fått skriving, så et utdelt `skriv_full` ble bare liggende dødt,
+mens et `skriv_full` delt ut på `ko` i pulje 1 ville ligget i basen og **trådt stille i
+kraft** den dagen loggen landet.
 
-Her er den verre enn der. `statistikk` har aldri fått skriving, så et utdelt `skriv_full`
-ble bare liggende dødt. Et `skriv_full` delt ut på `ko` i dag ville ligget i basen og
-**trådt stille i kraft** den dagen pulje 2 landet, uten at noen tok den avgjørelsen da.
-Hver pulje legger derfor til sitt eget nivå i samme commit som nivået får mening — og et
-nytt trinn er additivt, så matrisen tilbyr bare det modulen faktisk deklarerer.
+Pulje 2 la til `skriv_full` og `skriv_leder` i samme commit som endepunktene som gir dem
+mening, og delte dem der **skaden er ulik**:
 
-## Det som ikke er bygget, og hvorfor det ikke skal gjettes på
+| Nivå | Kan | Hvorfor skillet går her |
+|---|---|---|
+| `les` | Se loggen for **aktiv vakt** | «Denne vakta» er ikke et filter, det er nivåets betydning |
+| `skriv_full` | Føre linjer, rette sine egne og andres | En retting er en ny rad som peker på den gamle — ingenting går tapt, og feil kan rettes tilbake |
+| `skriv_leder` | Sletteinngangen, og tidligere vakters logg | En fjernet linje finnes etterpå bare i en backupfil ingen har en knapp til |
 
-Loggen (pulje 2) og `Hendelse` (pulje 3) har **åpne valg som skal besvares før koden**,
-ikke under — de står i `TODO.md`. Ett av dem er ikke en detalj: `NOTAT_DPIA_OG_FRITEKST.md`
-§7 slår fast at fritekst bevisst *ikke* arkiveres, mens et felt som inngår i arkivets
-SHA-signatur er låst i 24 måneder ved konstruksjon. KO-loggen er i all hovedsak fritekst,
-og sletteinngangen i §4.4 har nøyaktig den samme konflikten. Bygges loggen først og
-oppbevaringen avgjøres etterpå, er svaret allerede gitt av konstruksjonen.
+`skriv_handling` er **ikke** deklarert: nivået leser ikke request-kroppen, og å føre en
+logglinje gjør nettopp det. Det ville sett ut som «får skrive litt», og vært en tilgang
+uten et endepunkt bak seg.
+
+**Historikken er `skriv_leder` av en annen grunn enn sletting: dataminimering** (André,
+17. sep. 2026). En ny operatør på vakt i kveld har ingen operativ grunn til å lese
+fjorårets helseopplysninger, og opplæring hører hjemme på en demo-vakt og ikke på ekte
+linjer. Flata kommer i pulje 3; nivået står allerede, fordi det er det som gir `les` sin
+betydning.
+
+## Loggen: de fire valgene som låser konstruksjonen
+
+Besvart av André 17. sep. 2026, **før koden**. De står her og ikke bare i CHANGELOG fordi
+hvert av dem er noe den neste kommer til å ville gjøre om, og da skal prisen være synlig.
+
+### 1. Ingen SHA-signatur. Lesbar historikk i stedet
+
+`NOTAT_DPIA_OG_FRITEKST.md` §7: fritekst arkiveres bevisst ikke, og `Oppdrag.fritekst` er
+alt holdt utenfor `ArkivertOppdrag` av den grunn. Et felt i en SHA-payload er **låst i 24
+måneder ved konstruksjon** — sletteinngangen i §4.4 ville da fått arkivet til å melde
+tukling. To funksjoner som spiser hverandre.
+
+Loggen blir derfor stående som levende rader, scopet til vakta, og slettes av
+`purge_old_logs`. Prisen, som skal være sagt: **loggen kan ikke bevise at den er urørt.**
+Den kan spore hvem som gjorde hva, men ikke at teksten ikke er endret.
+
+### 2. 730 dager, som en `AppSetting` — ikke en Railway-variabel
+
+André foreslo en Railway-variabel. Fire grunner til at den ikke er det, og den første er at
+prosjektet tok valget én gang før: `purge_old_logs` sin egen docstring sier at grensene
+ligger i kode «slik at en endring av lagringstid skjer i kode som kan revideres, **ikke i
+en skjult jobbkonfigurasjon**». En Railway-variabel er en skjult jobbkonfigurasjon.
+
+| | Railway-variabel | `AppSetting` |
+|---|---|---|
+| Audit | Ingen. Fristen går fra 730 til 30 og portalen vet det ikke | `core/signals.py` logger den. Nøkkelen `ko.logg_dager` skal **aldri** inn i `NOKLER_UTEN_AUDIT` |
+| To tjenester | Web og cron er separate. Settes den ett sted, viser web én frist og cron sletter etter en annen — `DATABASE_URL`-fella | Én rad begge leser |
+| Synlighet | Må åpnes i Railway | Står på `/portal-admin/innstillinger/` |
+
+730 fordi det er fristen audit-loggen, arkivkollapsen og `backups/`-prefikset alt har. Ett
+tall å forklare i A.9 i stedet for fire.
+
+**Fristen er ikke en sletterett**, og det står både i malbiten og i A.9: en fjernet linje
+ligger i modulfila offsite i inntil 730 dager og i den hele fila i 90. Samme forbehold som
+DPIA-notatet §6 tar for `Oppdrag.fritekst`.
+
+### 3. Ni systemhendelser, kuratert
+
+Lista og regelen bak den står i `ko/systemlinjer.py` — den er selve designarbeidet i denne
+puljen, ikke en detalj. Kort: **løft det som endrer situasjonen, ikke det som endrer
+oppsettet; løft hendelsen, ikke feltet; én linje per ting som skjedde.**
+
+Vaktlistas stemplinger er grensesaken, og svaret er «ikke nå»: volumet ville druknet loggen
+ved hvert vaktskifte. Tas opp i pulje 4, der lag-begrepet får et hjem.
+
+### 4. Historikk krever `skriv_leder`
+
+Se «Nivåene» over.
+
+## Logglinja: tre valg i modellen som ser ut som detaljer
+
+**Ingen FK til `Oppdrag`.** `oppdrag/arkiv.py` sier det selv: «oppdragene slettes fra tavla
+og historikken når de er frosset, og telleren nullstilles». En peker hit hadde vært en
+felle uansett `on_delete` — `PROTECT` blokkerer arkiveringen, `CASCADE` sletter halve
+loggen stille, `SET_NULL` etterlater en linje som sier «meldte Fremme» uten å si hvem.
+Linja fryser teksten i stedet, som §4.5 og §4.7 alt krever for brukernavn og kallesignal.
+
+**`korrigerer` *og* `rot`, og de gjør hver sin jobb.** `korrigerer` er kjeden, som i
+`Statusmelding`; `rot` er plassen i fortellingen. Med bare `korrigerer` ville ledd tre
+arvet ledd to sin plass — altså bunnen av loggen — og §4.3 sier hvorfor det er galt:
+linjene skal ikke hoppe rundt etter en korreksjon. `Coalesce('rot_id', 'id')` gjør de to
+til én sortering uten en join.
+
+**Sletteinngangen tømmer hele kjeden.** Rettes en linje og deretter fjernes den, ville den
+opprinnelige teksten blitt stående i den overstyrte raden — usynlig i loggen, fullt lesbar
+i basen og i backupen. En sletteinngang som lar en kopi ligge igjen er ikke en
+sletteinngang.
+
+## Løftet går med signaler, ikke med et register
+
+`ko` → `oppdrag` er den tillatte retningen. Et push-register hadde krevd at
+`oppdrag/services.py` meldte fra, og oppdragsmodulen skal ikke røres før pulje 5.
+
+Forbeholdet er ekte og står i `ko/systemlinjer.py`: **et signal ser raden, ikke
+intensjonen.** «Avbrutt fordi ingen svarte» og «avbrutt fordi pasienten gikk hjem» er
+samme rad. Trenger en linje intensjon, må kallstedet dytte — og *da* bygges registeret.
+
+Mottakerne kaster aldri. **En KO-logg som ikke lar seg skrive skal ikke ta ned en stempling
+i en bil**: bilen er det operative, loggen er dokumentasjonen.
+
+**Fire av de ni kodene fantes allerede som `oppdrag.Enhetshendelse`** — `tatt_av`,
+`rykket_videre`, `avbrutt`, `avventer`, med tidspunkt og bruker. Det er §2-erfaringen om
+igjen: sjekk om oppdragsmodulen har begrepet før du designer det inn i KO.
+
+## Det som ikke er bygget
+
+`Hendelse` (pulje 3) har fortsatt et åpent valg som skal besvares før koden — om en lukket
+hendelse kan åpnes igjen. Det står i `TODO.md`. Logglinja har med vilje **ingen FK til en
+hendelse ennå**: den legges til i pulje 3, sammen med regelen om at en linje kan knyttes
+til en hendelse i etterkant.

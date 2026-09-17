@@ -1483,9 +1483,10 @@ class AlleFileneGjenopprettesTests(TestCase):
     #: `backlog` står sist, og **plasseringen er vilkårlig** — modulen er den
     #: eneste uten peker til `core.Vakt`, så den har ingen forutsetning om at
     #: portalfila er lastet først. De andre har det, og for dem er rekkefølgen
-    #: bindende.
+    #: bindende. `ko` hører til de bindende: `Logglinje.vakt` er en
+    #: heltallspeker uten natural key, som alt annet som er scopet til vakta.
     REKKEFOLGE = ['portal', 'patients', 'arkiv', 'oppdrag', 'oppdrag_arkiv',
-                  'vaktliste', 'backlog']
+                  'vaktliste', 'ko', 'backlog']
 
     def setUp(self) -> None:
         registrer_alle_moduler()
@@ -1786,8 +1787,15 @@ class SignalerFyrerIkkeUnderLoaddataTests(TestCase):
         for sti in filer:
             navn = sti.parent.name
             tekst = sti.read_text(encoding='utf-8')
+            # **Begge sender-formene.** `sender=Klasse` er idiomet i huset,
+            # men `sender='app.Modell'` er like gyldig for Django — og en
+            # regex som bare tok den første ville sluppet en hel modul
+            # gjennom med testen grønn. Det er den sorten blindsone
+            # `_markuplitteraler()` lærte oss å lete etter: en skanner som
+            # melder grønt om en dekning den ikke har, er verre enn ingen.
             for treff in re.finditer(
-                    r'@receiver\((pre_save|post_save), sender=(\w+)\)\n(.*?)def ',
+                    r'@receiver\((pre_save|post_save), '
+                    r'sender=[\'"]?([\w.]+)[\'"]?\)\n(.*?)def ',
                     tekst, re.S):
                 if 'ikke_under_loaddata' in treff.group(3):
                     continue

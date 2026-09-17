@@ -427,7 +427,7 @@ skrevet for hånd, og ville ikke sett `core/signals.py` den dagen den kom. Den g
 
 Backup er **per modul**, ikke én samlet dump — pluss én hel databasebackup ved
 siden av. Hver modul registrerer en `BaseBackupHandler` i `core.backup`-registeret
-(fra `apps.ready()`). Åtte handlere i dag:
+(fra `apps.ready()`). Ni handlere i dag:
 
 | Slug | Fil | Innhold |
 |------|-----|---------|
@@ -437,6 +437,7 @@ siden av. Hver modul registrerer en `BaseBackupHandler` i `core.backup`-register
 | `oppdrag` | `oppdrag/backup.py` | Oppdrag, statusmeldinger, enhetsbytter, enheter, lokasjoner og verdimengdene |
 | `oppdrag_arkiv` | `oppdrag/backup.py` | `OppdragArkiv` + `ArkivertOppdrag`. Er også **sperren** foran kollaps |
 | `vaktliste` | `vaktliste/backup.py` | Korps, mannskap, kompetanser, ressurser, vaktposter, vaktlister |
+| `ko` | `ko/backup.py` | KO-loggen. **Backup, ikke arkiv**: loggen fryses aldri med en SHA-signatur, fordi et felt i signaturen er låst i 24 måneder og sletteinngangen i §4.4 da ville meldt tukling |
 | `backlog` | `backlog/backup.py` | Innspill (bugs og ønsker). **Eneste modulfil uten plass i rekkefølgen** — den peker ikke på en vakt |
 | `full` | `core/backup/full.py` | **Hele databasen** unntatt sesjoner, contenttypes, permissions og backup-metadata. Brukere, MFA og logg er med. Eget prefiks og egen frist offsite |
 
@@ -590,6 +591,7 @@ egne felter. Begge er nå registre etter samme idiom som `core/stats.py`:
 | `core/driftstatus.py` | Tall til `/portal-admin/server-status/` (`vaktbilde`, `epost`) | `<app>/driftstatus.py` |
 | `core/portalinnstillinger.py` | Felter på `/portal-admin/innstillinger/` — `mal`, `kontekst()`, `valider()`, `lagre()` | `<app>/portalinnstillinger.py` |
 | `core/kontokobling.py` | Kort på `/portal-admin/brukere/<pk>/` — `handling`, `mal`, `skjema()` | `<app>/kontokobling.py` |
+| `core/opprydding.py` | Data med en lagringstid `purge_old_logs` skal håndheve — `etikett`, `frist_dager()`, `antall_utlopte()`, `rydd()` | `<app>/opprydding.py` |
 
 **Regelen gjelder `accounts` og `audit` også** — de er rammeverk (`TEKNISK_GJELD.md` §1).
 Kontoappen importerte `patients.models` for å tegne kortet «Pasientregistrering»; det går
@@ -908,6 +910,16 @@ egen base i stedet for prøvebasen.
 ### Cron-jobbene (core/kommando.py)
 
 **To** jobber kjøres av Railway Cron: `purge_old_logs` og `kollaps_arkiv`.
+
+**`purge_old_logs` rydder også modulenes egne fristdata** (17. sep. 2026), gjennom
+`core/opprydding.py`. Jobben ligger i `audit/`, som er rammeverk og ikke får importere
+en modul — en cron-jobb er ingen unntaksgrunn, og registeret er samme mekanisme som
+driftsdashbordet og portalinnstillingene bruker. **`--days` gjelder rammeverkets
+tabeller og rører ikke handlerne:** modulenes frister eies av modulene, fordi det er
+modulen som vet hva dataene er, og ett flagg som stilte på to helt ulike lagringstider
+samtidig ville vært en felle den dagen noen brukte det. Én feilende handler stopper
+ikke de andre, men gjør jobben rød — å svelge feilen ville gitt en grønn jobb som ikke
+gjorde det den sier.
 Ingen har en bruker som ser på mens de kjører, så **begge pakker arbeidet i
 `lesbar_dbfeil('hva som ikke ble gjort')`** — en `OperationalError` blir da til
 én lesbar linje med årsak og råd, i stedet for fire stablede tracebacks. Jobben

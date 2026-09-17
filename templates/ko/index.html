@@ -4,8 +4,8 @@
 {% block title %}KO – Sanitetsportalen{% endblock %}
 
 {% comment %}
-  **Skallet (pulje 1).** Fire flater og en sidebar, og ingen av flatene har
-  innhold ennå. Se docs/FORSLAG_KO.md §7 og §10.
+  **Pulje 2: loggen.** Fire flater og en sidebar; loggen er fylt, de tre andre
+  kommer i pulje 3–5. Se docs/FORSLAG_KO.md §4 og §7.
 
   Hver tom flate sier hva som kommer og hvor tingen bor i dag. En blank fane
   ser ødelagt ut — særlig «Oppdragsliste», som beskriver noe som *finnes*, bare
@@ -43,8 +43,8 @@
   </div>
 
   <div class="alert alert-secondary py-2 px-3 small mb-3" role="note">
-    <strong>Skallet.</strong> Modulen er satt opp og tilgangen virker, men
-    flatene fylles i senere puljer. Sentralbordet ligger fortsatt på
+    <strong>Loggen virker.</strong> Ressursoversikt, oppdragsliste og hendelser
+    fylles i senere puljer. Sentralbordet ligger fortsatt på
     <a href="/oppdrag/">/oppdrag/</a> til det flyttes hit.
   </div>
 
@@ -119,18 +119,59 @@
           </div>
         </div>
 
+        {% comment %}
+          Loggen (§4). Skrivefeltet står **øverst**, ikke nederst: linja
+          skrives mens noe skjer, og feltet skal være der uten at man må rulle
+          forbi fire hundre linjer for å finne det.
+
+          Beholderen under har rullingen, ikke lista — en liste bygget med
+          `innerHTML` mister bredden sin om rullingen legges på den selv
+          (CLAUDE.md).
+        {% endcomment %}
         <div class="tab-pane fade" id="ko-flate-logg" role="tabpanel"
              aria-labelledby="ko-fane-logg" tabindex="0">
+          <div class="card mb-3" id="ko-logg-skjema">
+            <div class="card-body py-2">
+              <form id="ko-logg-form" autocomplete="off">
+                <div class="d-flex gap-2 align-items-start flex-wrap">
+                  <div class="flex-grow-1" style="min-width:240px;">
+                    <label class="visually-hidden" for="ko-logg-tekst">Ny linje</label>
+                    <textarea id="ko-logg-tekst" class="form-control" rows="2"
+                              maxlength="{{ ko_maks_tekst }}"
+                              placeholder="Hva skjedde? Skriv det du ville sagt på samband."></textarea>
+                  </div>
+                  <div style="width:140px;">
+                    <label class="visually-hidden" for="ko-logg-tid">Tidspunkt</label>
+                    <input type="time" id="ko-logg-tid" class="form-control"
+                           aria-describedby="ko-logg-tid-hjelp">
+                    <div class="form-text" id="ko-logg-tid-hjelp">Blank = nå</div>
+                  </div>
+                  <button type="submit" class="btn btn-primary" id="ko-logg-send">
+                    <i class="bi bi-plus-lg me-1"></i>Før
+                  </button>
+                </div>
+                <div class="form-text mt-1">
+                  Ikke skriv navn, adresse, fødselsnummer eller telefon. Loggen
+                  dekker det som skjer utenfor samleplass og sykestue; pasienten
+                  blir pasient i <a href="/pasienter/">/pasienter/</a>.
+                </div>
+                <div class="text-danger small mt-1 d-none" id="ko-logg-feil" role="alert"></div>
+              </form>
+            </div>
+          </div>
+
           <div class="card">
-            <div class="card-body">
-              <h2 class="h6 mb-2">Logg</h2>
-              <p class="text-muted small mb-0">
-                Én logg med alle linjer — det som blir sagt, kommentarer inne i
-                en hendelse, og de systemhendelsene som løftes inn. Den skal
-                være fullstendig og kjedelig. Kommer i pulje 2, og to valg må
-                besvares først: hvor lenge loggen oppbevares, og hvilke
-                systemhendelser som løftes inn i den.
-              </p>
+            <div class="card-header py-2 d-flex justify-content-between align-items-center">
+              <span class="small fw-semibold">
+                <i class="bi bi-list-ul me-1"></i>Logg
+                <span class="text-muted" id="ko-logg-vakt"></span>
+              </span>
+              <span class="small text-muted" id="ko-logg-antall"></span>
+            </div>
+            <div class="card-body p-0">
+              <div id="ko-logg-liste" style="max-height:60vh; overflow-y:auto;">
+                <p class="text-muted small p-3 mb-0">Laster …</p>
+              </div>
             </div>
           </div>
         </div>

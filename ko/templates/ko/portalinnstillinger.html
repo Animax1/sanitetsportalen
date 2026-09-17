@@ -1,0 +1,36 @@
+{% comment %}
+KOs felter på /portal-admin/innstillinger/.
+
+Malbiten bor i **modulen**, ikke i `core`: markupen kjenner feltene, og
+feltene er KOs. Den inkluderes av portalens side gjennom registeret i
+`core/portalinnstillinger.py`, og verdiene kommer fra handlerens `kontekst()`.
+
+**Hjelpeteksten sier hva fristen ikke er.** En oppbevaringstid som ser ut som
+en sletterett er verre enn ingen, fordi den lukker spørsmålet uten å svare på
+det — og backupene ligger der uansett hva tallet står på.
+{% endcomment %}
+  <div class="card mb-3">
+    <div class="card-header"><strong>KO-loggen</strong></div>
+    <div class="card-body">
+      <label class="form-label" for="ko_logg_dager">Oppbevaringstid</label>
+      <div class="input-group" style="max-width:220px;">
+        <input type="number" id="ko_logg_dager" name="ko_logg_dager"
+               class="form-control" min="{{ ko_logg_dager_min }}"
+               max="{{ ko_logg_dager_maks }}" value="{{ ko_logg_dager }}">
+        <span class="input-group-text">dager</span>
+      </div>
+      <div class="form-text">
+        Standard er 730 dager (2 år) — samme frist som revisjonsloggen,
+        arkivkollapsen og backupene hos Scaleway. <code>purge_old_logs</code>
+        sletter linjene når fristen er ute; jobben går natt til søndag, så
+        slettingen skjer inntil en uke etter grensa.
+      </div>
+      <div class="form-text">
+        <strong>Dette er ikke en sletterett.</strong> En linje som fjernes med
+        «Fjern» i loggen, eller som slettes når fristen løper ut, ligger
+        fortsatt i backupfilene: modulfila i 730 dager og den hele basen i 90.
+        De fristene styres av livssyklusreglene i bucketen, ikke av dette
+        tallet. Se personverndokumentasjonen A.9.
+      </div>
+    </div>
+  </div>

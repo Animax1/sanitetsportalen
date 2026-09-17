@@ -4,6 +4,257 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-17 — KO pulje 2: loggen  `#ko/loggen`
+
+Logglinjer, retting som ny rad, sletteinngangen, polling med `?siden=`, ni kuraterte
+systemhendelser, backup-handler, oppbevaringstid og de tre nivåene. `docs/FORSLAG_KO.md`
+§4, §7.1 og §10.
+
+### De to valgene ble besvart før koden, og det var riktig rekkefølge
+
+André svarte på begge. Det ene svaret endret konstruksjonen, og hadde ikke gjort det om
+loggen var bygget først.
+
+**«2 år initielt, men det bør nok være en railway variabel jeg kan styre. Enig?»**
+Enig i tallet, uenig i variabelen — og prosjektet hadde alt tatt det valget én gang.
+`purge_old_logs` sin egen docstring sier at grensene ligger i kode «slik at en endring av
+lagringstid skjer i kode som kan revideres, **ikke i en skjult jobbkonfigurasjon**». En
+Railway-variabel er en skjult jobbkonfigurasjon: ingen auditspor, må settes likt på både
+web- og cron-tjenesten (samme felle som en kopiert `DATABASE_URL`), og usynlig i portalen.
+Fristen er nå **`AppSetting['ko.logg_dager']`, standard 730 dager**, styrt fra
+`/portal-admin/innstillinger/` av global admin, auditlogget av `core/signals.py`.
+Nøkkelen skal aldri inn i `NOKLER_UTEN_AUDIT` — den er noe et menneske har bestemt, ikke
+noe maskinen har talt.
+
+**«Cron jobben purge_logs er vel den som fjerner data?»** Ja — `purge_old_logs`, som alt
+kjører på Railway Cron natt til søndag og bare rører databasen.
+
+**«Hvilke systemhendelser?» → «hva mener du?»** Forslaget ble godkjent som det sto: ni
+koder, med regelen skrevet ned i `ko/systemlinjer.py`.
+
+### «Når denne vakten er ferdig er det minst 12 mnd til neste vakt. Blir ikke det problematisk?»
+
+**Spørsmålet avdekket en felle jeg ikke hadde sett.** Scopingen løser det André var redd
+for — `hent_aktiv_vakt()` gjør at ny vakt gir tom logg, så den nye operatøren møter ikke
+fjorårets linjer. Men `oppdrag/arkiv.py` sier dette om arkivering: «oppdragene slettes fra
+tavla og historikken når de er frosset, og telleren nullstilles». **En FK fra logglinja til
+`Oppdrag` hadde vært en felle uansett `on_delete`:** `PROTECT` blokkerer arkiveringen,
+`CASCADE` sletter halve loggen stille, `SET_NULL` etterlater en linje som sier «meldte
+Fremme» uten å si hvem. Linja fryser derfor teksten — `#45`, kallesignalet — med FK-en
+utelatt. Det er samme regel §4.5 og §4.7 alt krever for brukernavn og kallesignal; jeg
+hadde bare ikke sett at den også gjaldt oppdragsnummeret.
+
+**Og det virkelige vinduet er ikke 12 måneder, det er de tre ukene etter vakta.** §4.2 sier
+loggen er «i praksis et dokument man leser etter et arrangement der noe gikk galt» — det
+leses dager til uker etter. Hadde linjene forsvunnet ved vaktarkivering, var dokumentet
+borte akkurat når det skulle leses.
+
+### Lesbar historikk, ikke et signert arkiv
+
+`NOTAT_DPIA_OG_FRITEKST.md` §7 slår fast at fritekst bevisst ikke arkiveres, og
+`Oppdrag.fritekst` er alt holdt utenfor `ArkivertOppdrag` av den grunn. **Et felt i en
+SHA-payload er låst i 24 måneder ved konstruksjon**, så sletteinngangen i §4.4 ville fått
+arkivet til å melde tukling. To funksjoner som spiser hverandre; valget falt på
+sletteinngangen.
+
+Prisen er sagt høyt, ikke gjemt: **loggen kan ikke bevise at den er urørt.** Den sporer
+hvem som gjorde hva, men ikke at teksten ikke er endret.
+
+**Fristen er ikke en sletterett**, og det står nå tre steder — i malbiten på
+innstillingssiden, i `ko/backup.py` og i A.9. En fjernet linje ligger i modulfila offsite i
+inntil 730 dager og i den hele fila i 90. Samme forbehold som DPIA-notatet §6 tar for
+`Oppdrag.fritekst`.
+
+### Ni systemhendelser, og regelen bak dem
+
+`ko/systemlinjer.py`. **Inkluderingsliste, og det er motsatt av `NOKLER_UTEN_AUDIT` — med
+vilje.** Der logges en ny nøkkel som standard, fordi en teller for mye er støy mens en
+innstilling for lite er et hull man oppdager et år senere. Her er det omvendt: loggen er et
+dokument et menneske leser, og en hendelse for mye koster lesbarheten til alle de andre.
+
+Regelen, i tre setninger: **løft det som endrer situasjonen, ikke det som endrer oppsettet;
+løft hendelsen, ikke feltet; én linje per ting som skjedde, ikke én per skriving.**
+
+Løftes: oppdrag opprettet, hver statusovergang per enhet, korrigert tidspunkt, enhet
+varslet, tatt av, rykket videre, avbrøt, avventer, og vaktmodus. Løftes ikke: verdimengder,
+feltendringer på oppdraget, innlogging, drift, pasientregistreringer — og vaktlistas
+stemplinger, som er grensesaken. «Lag 3 gikk av vakt» er ekte situasjonsinformasjon, men
+per-person-stempling på hver vaktpost ville druknet loggen ved hvert vaktskifte. Tas opp i
+pulje 4, der lag-begrepet får et hjem.
+
+**«Trenger ny ressurs» ble et flagg og ikke en linje til** (regel 3): bilen forsvant *og*
+oppdraget står uten ressurs er én hendelse sett fra hver sin side.
+
+**Fire av de ni kodene fantes allerede** som `oppdrag.Enhetshendelse` — `tatt_av`,
+`rykket_videre`, `avbrutt`, `avventer`, med tidspunkt og bruker. §2-erfaringen om igjen:
+sjekk om oppdragsmodulen har begrepet før du designer det inn i KO.
+`test_hver_enhetshendelse_er_vurdert` krever at hver type der enten løftes eller står i
+`ENHETSHENDELSER_UTELATT` med en begrunnelse — ellers ville en ny type falt stille ut.
+
+### Løftet går med signaler, ikke med et register i `core`
+
+Retningen `ko` → `oppdrag` holdes av konstruksjonen. Et push-register hadde krevd at
+`oppdrag/services.py` meldte fra, og oppdragsmodulen skal ikke røres før pulje 5.
+
+Forbeholdet er skrevet ned: **et signal ser raden, ikke intensjonen.** «Avbrutt fordi ingen
+svarte» og «avbrutt fordi pasienten gikk hjem» er samme rad. Trenger en linje intensjon,
+må kallstedet dytte — og *da* bygges registeret, ikke før.
+
+Mottakerne kaster aldri. **En KO-logg som ikke lar seg skrive skal ikke ta ned en stempling
+i en bil**: bilen er det operative, loggen er dokumentasjonen. En test pakker `systemlinje`
+i `side_effect=RuntimeError` og krever at oppdraget opprettes likevel.
+
+### `korrigerer` *og* `rot` — to felter som ser ut som ett for mye
+
+`korrigerer` er kjeden, som i `Statusmelding`. `rot` er plassen i fortellingen. Med bare
+`korrigerer` ville ledd tre i en kjede arvet ledd to sin plass, altså bunnen av loggen — og
+§4.3 sier hvorfor det er galt: linjene skal ikke hoppe rundt etter en korreksjon.
+`Coalesce('rot_id', 'id')` gjør de to til én sortering uten en join.
+`test_kjedet_retting_beholder_ogsaa_plassen` er prøven som skiller dem.
+
+`korrigerer` er en **OneToOne**, så databasen selv nekter to rettinger av samme linje. Et
+kappløp gir 409 og ikke en 500 — viewet fanger `IntegrityError` også, fordi sjekken i
+`korriger()` bare er for feilmeldingens skyld.
+
+### Sletteinngangen tømmer **hele kjeden**
+
+Den viktigste prøven i `ko/tests_logg.py`. Rettes en linje og deretter fjernes den, ville
+den opprinnelige teksten blitt stående i den overstyrte raden — usynlig i loggen, men fullt
+lesbar i basen og i backupfila. **En sletteinngang som lar en kopi ligge igjen, er ikke en
+sletteinngang.** Prøvd fra begge kanter: fra roten og fra rettingen.
+
+Auditraden skrives av viewet, som i `restore_backup`, og **bærer ikke den fjernede
+teksten** — lå den der, ville den ligget i auditloggen i 730 dager og inngangen vært et
+skuespill. Samme valg som `FELT_UTEN_VERDILOGGING` tar for `notat` i vaktlista.
+Systemlinjer røres ikke: de bærer ingen fritekst, og en inngang som nådde dem ville vært en
+vei til å fjerne sporet etter en overstyring.
+
+### `fjernede` i pollingsvaret, og hvorfor den ikke er sløsing
+
+Sletteinngangen **endrer** en rad i stedet for å legge til en ny, så den har ingen ny `id`
+og ville aldri kommet med i et `?siden=`-svar. Uten lista ville teksten blitt stående på
+hver annen operatørs skjerm til hun lastet siden på nytt — altså nøyaktig den teksten noen
+nettopp bestemte at ikke skulle stå der. Lista er liten og idempotent.
+
+### Oppryddingen måtte gå gjennom et register
+
+`purge_old_logs` ligger i `audit/`, som er rammeverk og måles av
+`core/tests_avhengighetsretning.py` med samme målestokk som `core`. **En cron-jobb er ingen
+unntaksgrunn.** Nytt register `core/opprydding.py`, samme idiom som `core/driftstatus.py`
+og `core/portalinnstillinger.py`; `ko/opprydding.py` melder seg inn fra `apps.ready()`.
+
+**`--days` gjelder rammeverkets tabeller og rører ikke handlerne.** Modulenes frister eies
+av modulene, fordi det er modulen som vet hva dataene er — ett flagg som stilte på to helt
+ulike lagringstider samtidig ville vært en felle den dagen noen brukte det. Én feilende
+handler stopper ikke de andre, men gjør jobben rød: å avbryte på den første ville latt en
+modul med en ødelagt spørring holde alle de andre lagringstidene uhåndhevet, stille, og å
+svelge feilen ville gitt en grønn jobb som ikke gjorde det den sier.
+
+**Klokka går fra `registrert_at`, ikke `tidspunkt`.** `tidspunkt` er korrigerbart, og en
+frist som lar seg flytte ved å rette et klokkeslett er ingen frist.
+
+### Nivåene: `les`, `skriv_full`, `skriv_leder` — lagt til i samme commit som endepunktene
+
+`ko/module.py` deklarerte bare `les` i pulje 1, med vilje. Nå er alle tre der, delt etter
+**hva slags skade en feil gjør**: den som fører loggen kan rette tilbake, fordi en retting
+er en ny rad som peker på den gamle; den som fjerner en linje tømmer innholdet for godt.
+
+KO er den første modulen der `skriv_leder` ikke betyr *oppsett mot drift*, men **hva som
+lar seg angre**. `MED_LEDER` i `vaktliste/tests_tilgang.py` er fire moduler nå, og
+begrunnelsen står der.
+
+`skriv_handling` er bevisst **ikke** deklarert: nivået leser ikke request-kroppen, og å
+føre en logglinje gjør nettopp det.
+
+**Historikk krever `skriv_leder` av en annen grunn: dataminimering** (André). En ny operatør
+på vakt i kveld har ingen operativ grunn til å lese fjorårets helseopplysninger. Flata
+kommer i pulje 3; nivået står allerede, fordi det er det som gir `les` sin betydning —
+«aktiv vakt», ikke «alt».
+
+### To skannere som meldte grønt om en dekning de ikke hadde
+
+**`SignalerFyrerIkkeUnderLoaddataTests` leste bare `sender=Klasse`.** Regexen var
+`sender=(\w+)`, og `sender='oppdrag.Oppdrag'` ville gått rett forbi den — fem nye
+mottakere uten dekning, med testen grønn. Regexen tar nå begge formene, og `ko/signals.py`
+bruker klasser som de andre modulene.
+
+**XSS-skanneren i `oppdrag/tests_xss.py` leser mal-strenger; `ko.js` bygger med
+konkatenering.** En kopi av den skanneren ville funnet null byggere og meldt grønt.
+`ko/tests_js.py` har sin egen som leser `'...' + felt + '...'`, med grensen skrevet ned:
+den ser datafelt limt rett inn, ikke lokale variabler bygget lenger oppe. Derfor står fem i
+`KO_GJENNOMGATT`, og derfor finnes oppførselsprøven som kjører byggerne med
+`<img src=x onerror=alert(1)>` i tekst, forfatter, ansvarsområde **og** `fjernet_av` — den
+siste er en gren som bare kjøres når noen har fjernet noe, altså sjelden og lett å glemme.
+
+En detalj som kostet to runder: `\+\s*([a-z]\w*(?:\.\w+)+)(?!\()` backtracker `\w+` til
+«ma» for å tilfredsstille lookaheaden, og rapporterer «rader.ma». Lookaheaden må være
+`(?![\w(])`. **En regel som melder «rader.ma» er en regel ingen forstår.**
+
+### Tre ting testene fant i min egen kode
+
+1. **`koKanSkrive()` og `koKanFjerne()` returnerte `undefined`**, ikke `false`, fordi
+   `|| t.admin` gir det siste leddet i kjeden. Falsy holdt i praksis; det er ikke det
+   samme som å være riktig, og en avgjørelsesfunksjon som svarer «undefined» på «har hun
+   lov?» er en funksjon man ikke kan stole på i en `=== false`.
+2. **Et manglende `ko_logg_dager` avviste hele innstillingssiden** — arrangementsnavnet og
+   vaktlistas felter med — fordi KO ikke fant sitt eget felt. **En modul som kan lamme
+   naboene sine ved å mangle en nøkkel, er feil bygget.** Fraværende felt betyr nå «behold
+   dagens verdi»; *tomt* felt betyr at et menneske har tømt det, og avvises.
+3. **Nivåetiketten manglet ordet «leder».** `LedernivaaetsPlassIStigenTests` krever det av
+   hver modul som deklarerer trinnet, og konvensjonen finnes fordi etiketten skal navngi
+   rollen. «Lede KO» ble «KO-leder».
+
+### Mutasjonstesting: 24 mutanter, tre overlevde først
+
+Tjenestelaget tungt, portene middels, markup ingen — som tabellen i `CLAUDE.md` sier. Kjørt
+med bare de testene som dekker hver mutant, ikke hele appen, og med diffen lest hver gang.
+
+**Tjenestelaget (10):** `MAKS_ALDER` av med én; `MAKS_FRAMTID` av med én; `MAKS_FRAMTID`
+fjernet; klemmingen i `oppbevaringsdager()` fjernet; `rot=linje.rot or linje` → `rot=linje`;
+sletteinngangen tømmer bare raden og ikke kjeden; `registrert_at` → `tidspunkt` i
+`slett_utlopte`; `korrigerer`-sjekken fjernet; `KILDE_SYSTEM`-grenen i `fjern()` fjernet;
+`if kode not in KODER` fjernet.
+
+**Modellen (2):** `filter(korrigert_av__isnull=True)` fjernet fra `gjeldende()`;
+`Coalesce('rot_id','id')` → `'id'`.
+
+**Portene (4):** `skriv_leder` → `skriv_full` på fjern-endepunktet; `confirm`-kravet
+fjernet; 409 → 400; vakt-scopet fjernet fra `logg_view`.
+
+**Løftet (4):** `fort_av_ko` invertert; ukjent konto påstår overstyring; `avventer` ut av
+`ENHETSHENDELSER`; korreksjonsgrenen fjernet fra `statusmelding_skrevet`.
+
+**JS og tegning (4):** `koKanFjerne` invertert; systemlinje-gaten fjernet fra
+`koLinjeKnapper`; `escapeHtml` fjernet fra teksten; `escapeHtml` fjernet fra `fjernet_av`;
+`trenger_ressurs`-flagget fjernet fra `tegn()`.
+
+**Tre overlevde, og alle tre var ekte hull:**
+
+1. **Begge tidsgrensene var udekket på selve grensa.** Prøvene sto et sekund utenfor og
+   tretti sekunder innenfor, så `>` → `>=` gikk grønt begge veier. Bakover treffer en
+   operatør som fører gårsdagens siste linje rett etter midnatt nøyaktig der; framover er
+   det en nettleserklokke som går et helt minutt foran.
+2. **`if kode not in KODER` var udekket.** Lista var dokumentasjon, ikke en port — en
+   skrivefeil i en signalmottaker kunne lagt en rad i loggen som `tegn()` ikke kjenner, og
+   den blir en tom linje: en rad som sier at noe skjedde uten å si hva.
+
+Alle 24 drept etter at prøvene ble skrevet.
+
+### Tallene fulgte med
+
+137 → 141 endepunkter, `/ko/` fra 2 til 6 ruter, åtte → ni backup-handlere.
+Gjenopprettingsrekkefølgen er **portal → patients → arkiv → oppdrag → oppdrag_arkiv →
+vaktliste → ko**; `Logglinje.vakt` er en heltallspeker uten natural key, som alt annet som
+er scopet til vakta.
+
+### Ikke bygget, med vilje
+
+Logglinja har **ingen FK til en hendelse ennå** — den kommer i pulje 3, sammen med regelen
+om at en linje kan knyttes til en hendelse i etterkant. Historikkflata for tidligere vakter
+er skrevet inn i TODO, ikke bygget: nivået den skal ligge bak står allerede.
+
+---
+
 ## 2026-09-17 — Backlog: typene styres av admin, varsel til dem som kan løse, «Rediger»  `#backlog/modulen`
 
 Tre ting etter at modulen gikk på staging, alle fra André.

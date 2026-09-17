@@ -11,12 +11,14 @@ JS-oppførsel testes ved å kjøre funksjonene, ikke ved å grep-e etter kodelin
 """
 from __future__ import annotations
 
+import json
+import re
 import unittest
 
 from django.test import SimpleTestCase
 
 from patients.js_test_utils import (JS_DIR, PORTAL_UTILS_JS, build_harness,
-                                    node_available, run_node)
+                                    extract_function, node_available, run_node)
 
 KO_JS = JS_DIR / 'ko.js'
 
@@ -135,3 +137,237 @@ class RadenEscaperBrukernavnTests(SimpleTestCase):
           assert(html.includes('ukjent'), 'inaktivkolonnen mangler: ' + html);
         ''', preamble=PREAMBLE)
         self.assertIn('OK', ut)
+
+
+# ════════════════════════════════════════════════════════════════════════════
+# LOGGEN (pulje 2)
+# ════════════════════════════════════════════════════════════════════════════
+
+KO_LOGG_BYGGERE = (
+    'koLinjeHtml',
+    'koLinjeTekst',
+    'koLinjeKnapper',
+    'koTilstedeRad',
+    # De to setter sammen ferdige fragmenter til en liste. De bygger markup
+    # like fullt, og står her og ikke i en unntaksliste: dagen noen limer et
+    # felt rett inn i overskriften, skal skanneren se det.
+    'koTegnLogg',
+    'koTegnTilstede',
+)
+
+#: Uttrykk som interpoleres uten `escapeHtml`, med begrunnelse.
+#: Samme form som `REVIEWED_INTERPOLATIONS` i `oppdrag/tests_xss.py`.
+KO_GJENNOMGATT = {
+    'merkeHtml': 'markup bygget to linjer over, merket selv escapet der',
+    'rettet': 'fast markup fra en ternær, ingen data i',
+    'omraade': 'markup bygget to linjer over, ansvarsområdet escapet der',
+    'hvem': 'markup bygget av en ternær; forfatternavnet escapet i den ene grenen',
+    'av': 'markup bygget to linjer over, navnet escapet der',
+}
+
+
+class LoggByggerneEscaperTests(SimpleTestCase):
+    """Statisk gjennomgang av byggerne i `ko.js`.
+
+    **Skanneren her leser konkatenering, ikke mal-strenger.** `ko.js` bygger
+    markup med `'...' + x + '...'`, mens `oppdrag/tests_xss.py` leser
+    `` `...${x}...` ``. En kopi av den skanneren ville funnet null byggere her
+    og meldt grønt — og en skanner som melder grønt om en dekning den ikke
+    har, er verre enn ingen skanner (`CLAUDE.md`).
+
+    **Grensen for hva den ser**, skrevet ned så den ikke må gjettes: den finner
+    et **datafelt** (`noe.felt`) limt rett inn i en konkatenering. En lokal
+    variabel bygget lenger oppe fanges *ikke* — derfor står de fem i
+    `KO_GJENNOMGATT`, og derfor finnes oppførselsprøven under, som kjører
+    byggerne med fiendtlige data gjennom den ekte inngangen.
+    """
+
+    def _kropp(self, navn):
+        kilde = KO_JS.read_text(encoding='utf-8')
+        kropp = extract_function(kilde, navn)
+        # **Strip kommentarene først.** En test som leser sin egen prosa måler
+        # at noen har skrevet om begrunnelsen, ikke at koden gjør det den sier
+        # (CLAUDE.md, 16. sep. 2026).
+        return '\n'.join(l for l in kropp.splitlines()
+                         if not l.lstrip().startswith('//'))
+
+    def test_hver_bygger_finnes(self):
+        """Vern mot at testen blir tom fordi en funksjon er omdøpt."""
+        kilde = KO_JS.read_text(encoding='utf-8')
+        for navn in KO_LOGG_BYGGERE:
+            with self.subTest(navn=navn):
+                self.assertIn(f'function {navn}(', kilde)
+
+    def test_ingen_bygger_staar_utenfor_skanningen(self):
+        """En håndholdt liste forfaller i stillhet.
+
+        `_enhetskort` i oppdragsmodulen ble hoistet ut av sin bygger og falt
+        ut av skanningen med det samme — ni byggere sto utenfor uten at noe
+        var rødt. Denne sammenligner lista med kilden, så neste utklipping
+        sier fra selv.
+        """
+        kilde = KO_JS.read_text(encoding='utf-8')
+        funn = set()
+        for navn in re.findall(r'^function (\w+)\(', kilde, re.M):
+            kropp = self._kropp(navn)
+            # En funksjon som limer noe inn i en streng med en tagg i.
+            if re.search(r"'[^']*<\w[^']*'\s*\+", kropp):
+                funn.add(navn)
+        self.assertEqual(sorted(funn - set(KO_LOGG_BYGGERE)), [], (
+            'Disse bygger markup i ko.js uten å bli skannet. Legg dem i '
+            'KO_LOGG_BYGGERE.'))
+
+    def test_hvert_datafelt_er_escapet_eller_gjennomgaatt(self):
+        uescapet = []
+        for navn in KO_LOGG_BYGGERE:
+            kropp = self._kropp(navn)
+            # `(?![\w(])` holder metodekall utenfor: `rader.map(...)` er en
+            # kjede, ikke et datafelt limt inn i markup. **`\w` må med i
+            # klassen** — uten den backtracker `\w+` til «ma» for å tilfredsstille
+            # lookaheaden, og treffet rapporteres som et halvt feltnavn i
+            # stedet for å forsvinne. En regel som melder «rader.ma» er en
+            # regel ingen forstår.
+            for uttrykk in re.findall(
+                    r'\+\s*([a-z]\w*(?:\.\w+)+)(?![\w(])', kropp):
+                if uttrykk in KO_GJENNOMGATT:
+                    continue
+                uescapet.append(f'{navn}(): + {uttrykk}')
+        self.assertEqual(uescapet, [], (
+            'Datafelt limt rett inn i markup i ko.js:\n  '
+            + '\n  '.join(uescapet)
+            + '\n\nPakk verdien i escapeHtml(). trustedHtml() er IKKE svaret: '
+              'den returnerer et objekt, og blir «[object Object]» når den '
+              'konkateneres. Se core/tests_js_regler.py.'))
+
+
+@unittest.skipUnless(node_available(), 'node er ikke tilgjengelig')
+class LoggEscapingOppforselTests(SimpleTestCase):
+    """Kjør byggerne med fiendtlige data og se at markup kommer ut som tekst.
+
+    **KO-loggen er portalens frieste felt.** Pasientmodulens kliniske felter er
+    valgt fra en fast verdimengde; her skriver en operatør hva som helst, og
+    det settes inn i DOM-en med `innerHTML`.
+    """
+
+    HARNESS = (
+        (PORTAL_UTILS_JS, ('escapeHtml',)),
+        (KO_JS, ('koKlokke', 'koLinjeMerke', 'koLinjeTekst', 'koLinjeKnapper',
+                 'koLinjeHtml', 'koKanSkrive', 'koKanFjerne')),
+    )
+
+    ONDSKAP = '<img src=x onerror=alert(1)>'
+
+    def setUp(self):
+        self.harness = build_harness(self.HARNESS)
+
+    def _kall(self, uttrykk, preamble=''):
+        ut = run_node(self.harness, f'console.log({uttrykk});',
+                      preamble='const window = {MODUL_TILGANG: '
+                               '{ko: "skriv_leder"}};\n' + preamble)
+        return ut
+
+    def _linje(self, **overstyr):
+        base = {
+            'id': 1, 'rot': 1, 'kilde': 'operator',
+            'tidspunkt': '2026-09-17T21:14:00', 'registrert_at': '2026-09-17T21:14:00',
+            'tekst': 'ok', 'systemkode': '', 'forfatter': 'kari',
+            'delt_konto': False, 'ansvarsomraade': '', 'korrigerer': None,
+            'fjernet': False, 'fjernet_av': '', 'fjernet_at': '',
+        }
+        base.update(overstyr)
+        return json.dumps(base)
+
+    def test_teksten_escapes(self):
+        ut = self._kall(f'koLinjeHtml({self._linje(tekst=self.ONDSKAP)})')
+        self.assertNotIn('<img', ut)
+        self.assertIn('&lt;img', ut)
+
+    def test_forfatteren_escapes(self):
+        """Brukernavnet er brukerdata: admin skriver det, og det fryses på
+        linja."""
+        ut = self._kall(f'koLinjeHtml({self._linje(forfatter=self.ONDSKAP)})')
+        self.assertNotIn('<img', ut)
+
+    def test_ansvarsomraadet_escapes(self):
+        ut = self._kall(f'koLinjeHtml({self._linje(ansvarsomraade=self.ONDSKAP)})')
+        self.assertNotIn('<img', ut)
+
+    def test_fjernet_av_escapes(self):
+        """Den fjernede linja tegner et *annet* navn enn forfatteren, og den
+        grenen kjøres bare når noen har fjernet noe — altså sjelden, og
+        derfor lett å glemme."""
+        ut = self._kall(f'koLinjeHtml({self._linje(fjernet=True, fjernet_av=self.ONDSKAP)})')
+        self.assertNotIn('<img', ut)
+
+    def test_fjernet_linje_viser_at_den_er_fjernet(self):
+        """**Et hull i loggen er verre enn en tømt linje**: da vet ingen at
+        det sto noe der (§4.4)."""
+        ut = self._kall(f'koLinjeHtml({self._linje(fjernet=True, tekst="", fjernet_av="andre")})')
+        self.assertIn('fjernet', ut)
+        self.assertIn('andre', ut)
+
+
+@unittest.skipUnless(node_available(), 'node er ikke tilgjengelig')
+class LoggReglerTests(SimpleTestCase):
+    """De tre funksjonene i loggen som *avgjør* noe.
+
+    Middels tyngde (`CLAUDE.md`): de er regler som tilfeldigvis kjører i en
+    nettleser, og de er grunnen til at slike regler skilles ut som egne
+    funksjoner i stedet for å ligge som en `if` inne i en bygger.
+    """
+
+    HARNESS = (
+        (PORTAL_UTILS_JS, ('escapeHtml',)),
+        (KO_JS, ('koLinjeMerke', 'koKanSkrive', 'koKanFjerne', 'koLinjeKnapper')),
+    )
+
+    def setUp(self):
+        self.harness = build_harness(self.HARNESS)
+
+    def _kall(self, uttrykk, tilgang):
+        ut = run_node(
+            self.harness, f'console.log(JSON.stringify({uttrykk}));',
+            preamble=f'const window = {{MODUL_TILGANG: {json.dumps(tilgang)}}};\n')
+        return ut.splitlines()[0]
+
+    def test_les_kan_verken_skrive_eller_fjerne(self):
+        self.assertEqual(self._kall('koKanSkrive()', {'ko': 'les'}), 'false')
+        self.assertEqual(self._kall('koKanFjerne()', {'ko': 'les'}), 'false')
+
+    def test_skriv_full_kan_skrive_men_ikke_fjerne(self):
+        """**Hele skillet mellom de to nivåene, målt.** Tegnes «Fjern» for
+        `skriv_full`, fører knappen til 403 — og en knapp som fører til en
+        vegg er verre enn ingen knapp."""
+        self.assertEqual(self._kall('koKanSkrive()', {'ko': 'skriv_full'}), 'true')
+        self.assertEqual(self._kall('koKanFjerne()', {'ko': 'skriv_full'}), 'false')
+
+    def test_skriv_leder_kan_begge(self):
+        self.assertEqual(self._kall('koKanSkrive()', {'ko': 'skriv_leder'}), 'true')
+        self.assertEqual(self._kall('koKanFjerne()', {'ko': 'skriv_leder'}), 'true')
+
+    def test_global_admin_kan_begge_uten_rad(self):
+        """Global admin har ingen `ModulTilgang`-rad og likevel full tilgang.
+        Samme felle som sidebaren gikk i: et filter på raden alene utelater
+        nettopp den som sitter i KO og administrerer portalen."""
+        self.assertEqual(self._kall('koKanSkrive()', {'admin': True}), 'true')
+        self.assertEqual(self._kall('koKanFjerne()', {'admin': True}), 'true')
+
+    def test_knappene_forsvinner_for_en_systemlinje(self):
+        """Systemlinjer kan verken rettes eller fjernes — de er en projeksjon
+        av noe som skjedde i oppdragsmodulen, og bærer ingen fritekst."""
+        linje = json.dumps({'id': 1, 'kilde': 'system', 'fjernet': False})
+        self.assertEqual(self._kall(f'koLinjeKnapper({linje})',
+                                    {'ko': 'skriv_leder'}), '""')
+
+    def test_knappene_forsvinner_for_en_fjernet_linje(self):
+        linje = json.dumps({'id': 1, 'kilde': 'operator', 'fjernet': True})
+        self.assertEqual(self._kall(f'koLinjeKnapper({linje})',
+                                    {'ko': 'skriv_leder'}), '""')
+
+    def test_merket_setter_fjernet_foran_delt(self):
+        """Rekkefølgen i `koLinjeMerke` er en avgjørelse: en fjernet linje fra
+        en delt konto skal merkes «fjernet», fordi det er den opplysningen som
+        forklarer hvorfor det ikke står noe der."""
+        linje = json.dumps({'fjernet': True, 'kilde': 'operator', 'delt_konto': True})
+        self.assertEqual(self._kall(f'koLinjeMerke({linje})', {'ko': 'les'}),
+                         '"fjernet"')
