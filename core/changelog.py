@@ -72,6 +72,9 @@ TEMAER: dict[str, dict[str, str]] = {
         'sikkerhet': 'gjennomgangene, rate-limiting, CSP, hodene',
         'tilgang': 'ModulTilgang, nivåstigen, dekoratørene, superbrukeren',
     },
+    'backlog': {
+        'modulen': 'innspill, angrefristen, løst-flagget, filteret',
+    },
     'ko': {
         'skallet': 'modulen, tilgangen, flatene, sidebaren',
     },

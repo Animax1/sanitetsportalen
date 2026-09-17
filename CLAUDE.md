@@ -87,14 +87,14 @@ python manage.py runserver           # http://127.0.0.1:8000/
 # altså vaktene rundt «DATABASE_URL må være PostgreSQL på Railway» og den
 # `_env_bool` som hadde rate-limitingen av i prod. Lista her utelot den, så den
 # som fulgte dokumentasjonen kjørte dem aldri.
-python manage.py test patients accounts audit core statistikk oppdrag vaktliste ko myproject -v 2
+python manage.py test patients accounts audit core statistikk oppdrag vaktliste ko backlog myproject -v 2
 
 # Samme suite, men delt. **190 s → ~106 s** (målt 16. sep. 2026, fire kjerner).
 # `core` må stå for seg: `core/tests_backup.py` skriver ekte backupfiler til én
 # mappe og rører det globale handlerregisteret, så fire arbeidere kolliderer —
 # feilen kommer ut som «cannot pickle 'traceback' object», som ikke ligner det
 # den er. Alt annet tåler `--parallel` fint.
-python manage.py test patients accounts audit statistikk oppdrag vaktliste ko myproject -v 1 --parallel 4
+python manage.py test patients accounts audit statistikk oppdrag vaktliste ko backlog myproject -v 1 --parallel 4
 python manage.py test core -v 1
 
 # Én enkelt test
@@ -172,6 +172,7 @@ eller gjelder den alle, står den her; ligger den i en app, står den i appens e
 | `vaktliste/CLAUDE.md` | `vaktliste/` | Korps og reservasjoner, skift, drift, planleggeren, offline |
 | `statistikk/CLAUDE.md` | `statistikk/` | Kilderegisteret og de to gatene |
 | `ko/CLAUDE.md` | `ko/` | Retningen oppover, projeksjonen, sidebaren, nivåene per pulje |
+| `backlog/CLAUDE.md` | `backlog/` | Angrefristen, de tre nivåene, hvorfor modulen står utenfor vaktscopet |
 
 **Modulfilene lastes ikke alltid, og det er hele poenget — men det koster noe.** Rota leses
 hver gang; en modulfil når noen faktisk arbeider i mappa. Derfor står **det som må vites før
@@ -426,7 +427,7 @@ skrevet for hånd, og ville ikke sett `core/signals.py` den dagen den kom. Den g
 
 Backup er **per modul**, ikke én samlet dump — pluss én hel databasebackup ved
 siden av. Hver modul registrerer en `BaseBackupHandler` i `core.backup`-registeret
-(fra `apps.ready()`). Sju handlere i dag:
+(fra `apps.ready()`). Åtte handlere i dag:
 
 | Slug | Fil | Innhold |
 |------|-----|---------|
@@ -436,6 +437,7 @@ siden av. Hver modul registrerer en `BaseBackupHandler` i `core.backup`-register
 | `oppdrag` | `oppdrag/backup.py` | Oppdrag, statusmeldinger, enhetsbytter, enheter, lokasjoner og verdimengdene |
 | `oppdrag_arkiv` | `oppdrag/backup.py` | `OppdragArkiv` + `ArkivertOppdrag`. Er også **sperren** foran kollaps |
 | `vaktliste` | `vaktliste/backup.py` | Korps, mannskap, kompetanser, ressurser, vaktposter, vaktlister |
+| `backlog` | `backlog/backup.py` | Innspill (bugs og ønsker). **Eneste modulfil uten plass i rekkefølgen** — den peker ikke på en vakt |
 | `full` | `core/backup/full.py` | **Hele databasen** unntatt sesjoner, contenttypes, permissions og backup-metadata. Brukere, MFA og logg er med. Eget prefiks og egen frist offsite |
 
 Gjenoppretting i tom base går i rekkefølge: **portal → patients → arkiv →
@@ -698,8 +700,9 @@ Alle temaene er mørke, så **enhver Bootstrap-klasse for dempet tekst må overs
 malen kan se den. `MorkTekstPaaMorkBakgrunnTests` løser `{% extends %}` og `{% static %}`
 og håndhever det.
 
-24 filer i `static/js/` (ingen bundler), fordelt på seks sider — pasientsiden,
-`/statistikk/`, `/vaktliste/`, `/ko/` og de to grensesnittene under `/oppdrag/`.
+25 filer i `static/js/` (ingen bundler), fordelt på sju sider — pasientsiden,
+`/statistikk/`, `/vaktliste/`, `/ko/`, `/backlog/` og de to grensesnittene under
+`/oppdrag/`.
 
 **To av sidene er delt i flere filer** (14. sep. 2026, gjeldspunkt 3.6): `vaktliste.js`
 var 3 801 linjer og `oppdrag-sentral.js` 1 991. **Delingen har en nedre grense som
@@ -737,6 +740,7 @@ håndhever det på cellebredden.
 | `oppdrag-enhet.js` | `/oppdrag/`, enhetskontoer | `oppdrag/CLAUDE.md` |
 | `vaktliste-*.js` (seks) | **kun** `/vaktliste/` | `vaktliste/CLAUDE.md` |
 | `ko.js` | **kun** `/ko/` | `ko/CLAUDE.md` |
+| `backlog.js` | **kun** `/backlog/` | `backlog/CLAUDE.md` |
 
 **`data-action` + `data-hendelse` er to lyttere, og bare én skal fyre.** Klikk­delegeringen
 i `portal-utils.js` treffer *alle* `[data-action]`. Et element som melder sin egen hendelse

@@ -873,10 +873,15 @@ class LedernivaaetsPlassIStigenTests(TestCase):
         self.assertFalse(har_tilgang(bruker, 'vaktliste', 'skriv_leder'))
 
     #: Modulene som har definert hva `skriv_leder` betyr hos dem. Vaktlista
-    #: (30. aug. 2026: setter opp vakta) og oppdrag (12. sep. 2026: setter opp
-    #: verdimengdene). Et nytt trinn er additivt — men bare der det er
-    #: forklart, og etiketten er forklaringen.
-    MED_LEDER = {'vaktliste', 'oppdrag'}
+    #: (30. aug. 2026: setter opp vakta), oppdrag (12. sep. 2026: setter opp
+    #: verdimengdene) og backlog (17. sep. 2026: avgjør hva som er løst). Et
+    #: nytt trinn er additivt — men bare der det er forklart, og etiketten er
+    #: forklaringen.
+    #:
+    #: **Tre moduler, tre betydninger, og det er hele poenget med `nivaa_navn`.**
+    #: «Setter opp vakta», «setter opp verdimengdene» og «leder backloggen» er
+    #: ikke samme fullmakt; det er bare samme trinn på stigen.
+    MED_LEDER = {'vaktliste', 'oppdrag', 'backlog'}
 
     def test_bare_modulene_som_har_forklart_nivaaet_tilbyr_det(self):
         """Matrisen tilbyr de nivåene modulen deklarerer og ingen andre. Kom

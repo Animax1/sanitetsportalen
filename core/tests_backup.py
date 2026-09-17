@@ -1480,8 +1480,12 @@ class AlleFileneGjenopprettesTests(TestCase):
     Rekkefølgen er bindende: **portal først**, deretter modulene.
     """
 
+    #: `backlog` står sist, og **plasseringen er vilkårlig** — modulen er den
+    #: eneste uten peker til `core.Vakt`, så den har ingen forutsetning om at
+    #: portalfila er lastet først. De andre har det, og for dem er rekkefølgen
+    #: bindende.
     REKKEFOLGE = ['portal', 'patients', 'arkiv', 'oppdrag', 'oppdrag_arkiv',
-                  'vaktliste']
+                  'vaktliste', 'backlog']
 
     def setUp(self) -> None:
         registrer_alle_moduler()

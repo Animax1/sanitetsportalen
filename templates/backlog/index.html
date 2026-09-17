@@ -1,0 +1,127 @@
+{% extends "core/base_portal.html" %}
+{% load static %}
+
+{% block title %}Backlog – Sanitetsportalen{% endblock %}
+
+{% comment %}
+  Endringsønsker og bugs. Ingen egen CSS-fil: portal.css overstyrer allerede
+  .text-muted og .form-text for mørk bakgrunn, og alt annet her er
+  Bootstrap-klasser base_portal temer.
+
+  Filteret står **synlig over lista**, aldri i en meny. Et filter skal aldri
+  skjule noe stille (CLAUDE.md) — antallet under sier hvor mange av hvor mange
+  som vises.
+{% endcomment %}
+
+{% block content %}
+
+<script nonce="{{ csp_nonce }}">
+  window.MODUL_TILGANG = {
+    backlog: "{{ modul_nivaa }}",
+    admin: {{ er_global_admin|yesno:"true,false" }}
+  };
+  window.BACKLOG_MODULER = {{ moduler_json }};
+  window.BACKLOG_TYPER = {{ typer_json }};
+</script>
+
+<div class="container-fluid px-3 px-md-4 py-3">
+
+  <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
+    <h1 class="h4 mb-0"><i class="bi bi-list-check me-2"></i>Backlog</h1>
+    <button type="button" class="btn btn-sm btn-primary d-none" id="backlog-ny-knapp"
+            data-action="backlogApneNy">
+      <i class="bi bi-plus-lg me-1"></i>Meld inn
+    </button>
+  </div>
+
+  {% comment %}
+    Filterlinja. `data-hendelse="change"` er ikke pynt: uten den fyrer
+    klikkdelegeringen i portal-utils.js på *klikk* — med den gamle verdien — og
+    ikke når du velger. Se `klikkSkalKjore()` i CLAUDE.md.
+  {% endcomment %}
+  <div class="d-flex flex-wrap align-items-end gap-2 mb-2">
+    <div>
+      <label class="form-label small mb-1" for="backlog-filter-type">Type</label>
+      <select id="backlog-filter-type" class="form-select form-select-sm"
+              data-action="backlogFilterEndret" data-hendelse="change">
+        <option value="">Alle</option>
+      </select>
+    </div>
+    <div>
+      <label class="form-label small mb-1" for="backlog-filter-lost">Status</label>
+      <select id="backlog-filter-lost" class="form-select form-select-sm"
+              data-action="backlogFilterEndret" data-hendelse="change">
+        <option value="0">Uløste</option>
+        <option value="1">Løste</option>
+        <option value="">Alle</option>
+      </select>
+    </div>
+    <div>
+      <label class="form-label small mb-1" for="backlog-filter-modul">Modul</label>
+      <select id="backlog-filter-modul" class="form-select form-select-sm"
+              data-action="backlogFilterEndret" data-hendelse="change">
+        <option value="">Alle</option>
+      </select>
+    </div>
+  </div>
+
+  {% comment %}
+    Teller som alltid står i bildet. «Et filter satt forrige gang som skjuler
+    det ene innspillet noen leter etter, er usynlig for den som har det.»
+  {% endcomment %}
+  <div id="backlog-teller" class="small text-muted mb-3">Laster …</div>
+
+  <div id="backlog-liste"></div>
+</div>
+
+{% comment %} Vinduet for innmelding og retting — samme skjema for begge. {% endcomment %}
+<div class="modal fade" id="backlog-modal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content" style="background:var(--portal-surface);border-color:var(--portal-border);">
+      <div class="modal-header">
+        <h2 class="modal-title h6" id="backlog-modal-tittel">Meld inn</h2>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"
+                aria-label="Lukk"></button>
+      </div>
+      <div class="modal-body">
+        <div class="mb-3">
+          <label class="form-label" for="backlog-felt-type">Type</label>
+          <select id="backlog-felt-type" class="form-select"></select>
+        </div>
+        <div class="mb-3">
+          <label class="form-label" for="backlog-felt-tittel">Tittel</label>
+          <input type="text" id="backlog-felt-tittel" class="form-control" maxlength="200">
+          <div class="form-text">Én setning. Det du ville sagt i chatten.</div>
+        </div>
+        <div class="mb-3">
+          <label class="form-label" for="backlog-felt-modul">Gjelder modul</label>
+          <select id="backlog-felt-modul" class="form-select">
+            <option value="">Ikke én bestemt</option>
+          </select>
+        </div>
+        <div class="mb-3">
+          <label class="form-label" for="backlog-felt-beskrivelse">Beskrivelse</label>
+          <textarea id="backlog-felt-beskrivelse" class="form-control" rows="5"></textarea>
+          <div class="form-text">Valgfritt. Hva du gjorde, hva du forventet, hva som skjedde.</div>
+        </div>
+        <div id="backlog-modal-feil" class="text-danger small d-none"></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Avbryt</button>
+        <button type="button" class="btn btn-primary" id="backlog-lagre-knapp"
+                data-action="backlogLagre">Lagre</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block extra_scripts %}
+{% comment %}
+  portal-utils.js, ikke patients-utils.js: sistnevnte gjør arbeid på toppnivå
+  og kaster på en side uten pasientskjemaene. Se CLAUDE.md.
+{% endcomment %}
+<script src="{% static 'js/portal-utils.js' %}"></script>
+<script src="{% static 'js/backlog.js' %}"></script>
+{% endblock %}

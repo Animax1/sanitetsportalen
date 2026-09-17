@@ -561,6 +561,27 @@ forbindelser. Tas opp igjen kun hvis `WEB_WORKERS` settes til 4 eller mer.
 
 Fem åpne spørsmål til André står i §6 i notatet.
 
+### Backlog-modulen (`/backlog/`)
+
+Levert 17. sep. 2026: innspill klassifisert som bug eller ønske, løst-flagg, filter på type,
+status og modul. Modulens egne regler står i [`backlog/CLAUDE.md`](./backlog/CLAUDE.md).
+
+- [ ] **Del ut tilgang til de som skal bruke den.** Ingen har en `ModulTilgang`-rad på
+      `backlog` i dag, så bare global admin ser modulen. Tre nivåer i matrisen: «ser
+      backloggen», «melder inn, retter sitt eget», «leder backloggen, setter løst».
+
+- [ ] **VURDER: skal admin varsles når noe meldes inn?** `core.notifications.notify()`
+      finnes og dedupliserer innen 24 timer, så det er få linjer. Men en backlog som
+      pling-er for hvert innspill blir en bjelle man slår av — og da mister varselet
+      verdien også den gangen det haster. Avgjøres etter at modulen har vært i bruk en
+      vakt eller to, ikke før.
+
+- [ ] **VURDER: trengs flere typer enn bug og ønske?** `Innspilltype` er `choices` med
+      vilje — «er dette en feil eller et ønske» er et strukturelt skille, ikke noe et
+      arrangement endrer. Blir «spørsmål» eller «teknisk gjeld» et behov, er det en
+      migrasjon på én linje; blir de mange og skiftende, er `Verdimengde` i
+      oppdragsmodulen mønsteret å flytte til.
+
 ### KO-modulen — se [`docs/FORSLAG_KO.md`](./docs/FORSLAG_KO.md)
 
 **Notatet er fortsatt et forslag** (17. sep. 2026), men **pulje 1 er bygget**: modulen er

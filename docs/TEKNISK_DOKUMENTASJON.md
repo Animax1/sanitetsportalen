@@ -7,7 +7,7 @@
 > 11.–13. september.
 >
 > **Dokumentet het «Pasientregistreringssystemet» fram til nå, og beskrev tre apper.**
-> Portalen har sju: pasientregistrering er én av fem brukervendte moduler.
+> Portalen har åtte: pasientregistrering er én av seks brukervendte moduler.
 >
 > **Hele dokumentet er gjennomgått.** Første runde tok kapittel 1, 3, 4, 6–10; andre runde
 > tok 5, 8A–8E og 13–16 etter at André påpekte at halvveis verifisert dokumentasjon er
@@ -26,7 +26,7 @@ Sanitetsportalen er en nettbasert applikasjon for sanitetsvakt og beredskap ved
 arrangementer. Den er bygget som et **rammeverk med moduler**, ikke som én applikasjon:
 `core` er portalen, og hver modul melder seg inn i den.
 
-Fem brukervendte moduler i dag:
+Seks brukervendte moduler i dag:
 
 | Modul | Hva den gjør |
 |---|---|
@@ -35,6 +35,7 @@ Fem brukervendte moduler i dag:
 | **Vaktliste** (`vaktliste`) | Mannskap, korps, ressurser og skift; innsjekk i drift |
 | **Statistikk** (`statistikk`) | Tall fra modulene. Eier ingen data selv |
 | **KO** (`ko`) | Situasjonsbildet: ressursoversikt, oppdragsliste, logg og hendelser. Eier ingen ressurser selv — **skallet er alt som finnes i dag**, se `ko/CLAUDE.md` |
+| **Backlog** (`backlog`) | Endringsønsker og bugs, med løst-flagg. Utviklingsverktøy, og den eneste modulen utenfor vaktscopet |
 
 Django 5.2, PostgreSQL i produksjon (SQLite lokalt), vanlig JavaScript uten rammeverk og
 uten bundler. Deployes på Railway. MFA (TOTP), tilgangsstyring per modul og audit-logging
@@ -444,7 +445,7 @@ deploy 2. Begge deler er rettet, men **strukturen er endret med vilje**: se 5.0.
 
 ### 5.0 Hva dette kapittelet er, og ikke er
 
-Portalen har **130 endepunkter** (utenom Django-admin, som bare rutes under `DEBUG`).
+Portalen har **135 endepunkter** (utenom Django-admin, som bare rutes under `DEBUG`).
 En håndskrevet liste over alle sammen ville rotnet fra dagen den ble skrevet — nøyaktig
 slik den gamle lista gjorde, med 16 oppføringer og ingen som merket at resten manglet.
 
@@ -478,6 +479,7 @@ for sti, view in sorted(gaa(get_resolver())):
 | `/accounts/` | 9 | `accounts/urls.py` | Innlogging, MFA, passord |
 | `/statistikk/` | 5 | `statistikk/urls.py` | Full statistikk per kilde |
 | `/ko/` | 2 | `ko/urls.py` | Situasjonsbildet (skallet) og sidebaren over hvem som har KO oppe |
+| `/backlog/` | 5 | `backlog/urls.py` | Endringsønsker og bugs: lista med filtre, innmelding, løst/gjenåpne |
 | `/varsler/`, `/api/`, rot | 13 | `core/urls.py` | Dashbord, varsler (3 sider + 4 API), «min profil», manifest, `robots.txt`, `/healthz/` og videresendingen fra `/api/` |
 
 **Noen stier er rene videresendinger** fra flater som har flyttet, og de er med i
@@ -917,7 +919,7 @@ pasientdata». Alle tre er borte — den første slettet i `patients/0017`.*
 | **Modulfiler** (seks) | «Pasientlista ble slettet ved et uhell — kan jeg få den tilbake uten å røre noe annet?» |
 | **Hel database** (`full`) | «Railway-prosjektet er borte — kan jeg reise portalen på nytt et annet sted?» |
 
-Sju handlere i registeret:
+Åtte handlere i registeret:
 
 | Slug | Fil | Innhold |
 |---|---|---|
@@ -1512,9 +1514,9 @@ driftslista slik at tester kan påstå noe om den uten å lese `settings.py` som
 
 ### 10.1 Arkitektur
 
-Vanlig JavaScript, **ingen rammeverk og ingen bundler**. 24 filer i `static/js/`, fordelt
-på seks sider: pasientsiden, `/statistikk/`, `/vaktliste/`, `/ko/` og de to grensesnittene
-under `/oppdrag/`.
+Vanlig JavaScript, **ingen rammeverk og ingen bundler**. 25 filer i `static/js/`, fordelt
+på sju sider: pasientsiden, `/statistikk/`, `/vaktliste/`, `/ko/`, `/backlog/` og de to
+grensesnittene under `/oppdrag/`.
 
 | Modul | Lastes | Ansvar |
 |---|---|---|

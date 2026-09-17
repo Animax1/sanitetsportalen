@@ -270,8 +270,8 @@ Railway la til. Første ledd er klientens påstand.
 
 ### Backup
 
-**To lag.** Sju handlere: seks modulfiler (`portal`, `patients`, `arkiv`, `oppdrag`,
-`oppdrag_arkiv`, `vaktliste`) og én hel databasebackup.
+**To lag.** Åtte handlere: sju modulfiler (`portal`, `patients`, `arkiv`, `oppdrag`,
+`oppdrag_arkiv`, `vaktliste`, `backlog`) og én hel databasebackup.
 
 **Den hele fila inneholder brukere, passordhasher, MFA-hemmeligheter og audit-logg, med
 vilje** — den skal kunne gjenopprettes i en tom base der det ikke finnes noen å logge inn

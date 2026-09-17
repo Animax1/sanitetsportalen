@@ -153,6 +153,7 @@ def _build_registry() -> tuple[Module, ...]:
     Django-oppstart (apps må være ferdig lastet før modeller refereres).
     """
     from accounts.module import AccountsModule  # noqa: WPS433
+    from backlog.module import BacklogModule  # noqa: WPS433
     from core.module import CoreModule  # noqa: WPS433
     from ko.module import KoModule  # noqa: WPS433
     from oppdrag.module import OppdragModule  # noqa: WPS433
@@ -168,6 +169,7 @@ def _build_registry() -> tuple[Module, ...]:
         VaktlisteModule,
         OppdragModule,
         KoModule,
+        BacklogModule,
     )
 
 

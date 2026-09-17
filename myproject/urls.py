@@ -58,6 +58,11 @@ urlpatterns = [
     # de kjenner ikke den. Se docs/FORSLAG_KO.md §3.3.
     path('ko/', include('ko.urls')),
 
+    # Backlog — endringsoensker og bugs (17. sep. 2026). Samme grunn til aa
+    # staa foer core. Modulen staar utenfor vaktscopet med vilje: et
+    # innspill beskriver portalen, ikke en vakt.
+    path('backlog/', include('backlog.urls')),
+
     # Sanitetsportal-skall (dashboard + legacy-redirects)
     # Mountet på '' så portal-dashboardet ligger på /.
     path('', include('core.urls')),

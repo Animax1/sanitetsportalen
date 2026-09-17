@@ -44,7 +44,7 @@ def _alle_ruter() -> list[str]:
 def ruter_per_prefiks() -> dict[str, int]:
     """{'/pasienter/': 17, ...} — og `'andre'` for alt som ikke har et av dem."""
     kjente = ('/pasienter/', '/oppdrag/', '/vaktliste/', '/portal-admin/',
-              '/accounts/', '/statistikk/', '/ko/')
+              '/accounts/', '/statistikk/', '/ko/', '/backlog/')
     ut = {p: 0 for p in kjente}
     ut['andre'] = 0
     for sti in _alle_ruter():

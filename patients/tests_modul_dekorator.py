@@ -111,6 +111,13 @@ class ModulDekoratorTests(SimpleTestCase):
             + '\n  '.join(funn)
         ))
 
+    def test_alle_backlogruter_er_dekorert(self):
+        funn = self._udekorerte('backlog/', 'backlog')
+        self.assertEqual(funn, [], (
+            'Endepunkter under /backlog/ uten @modul_kreves:\n  '
+            + '\n  '.join(funn)
+        ))
+
     def test_testen_finner_faktisk_ruter(self):
         """Vern mot at testen blir tom og dermed alltid grønn.
 
@@ -122,6 +129,7 @@ class ModulDekoratorTests(SimpleTestCase):
         self.assertGreaterEqual(len(_ruter_under('oppdrag/')), 6)
         self.assertGreaterEqual(len(_ruter_under('vaktliste/')), 6)
         self.assertGreaterEqual(len(_ruter_under('ko/')), 2)
+        self.assertGreaterEqual(len(_ruter_under('backlog/')), 4)
 
     def test_unntakene_finnes_fortsatt(self):
         """En begrunnelse for en rute som er borte er bare støy."""
@@ -130,6 +138,7 @@ class ModulDekoratorTests(SimpleTestCase):
         navn |= {n for n, _, _ in _ruter_under('oppdrag/')}
         navn |= {n for n, _, _ in _ruter_under('vaktliste/')}
         navn |= {n for n, _, _ in _ruter_under('ko/')}
+        navn |= {n for n, _, _ in _ruter_under('backlog/')}
         forsvunnet = set(UNNTAK) - navn
         self.assertEqual(forsvunnet, set(),
                          f'UNNTAK viser til ruter som ikke finnes: {forsvunnet}')

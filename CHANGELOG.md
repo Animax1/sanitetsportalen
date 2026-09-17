@@ -4,6 +4,103 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-17 — Ny modul: `/backlog/` — endringsønsker og bugs  `#backlog/modulen` `#core/tilgang`
+
+**André:** «Da blir modulen en backlog i systemet i stedet for innspill spredt i chatter.»
+
+Ett innspill per rad, klassifisert som **bug** eller **ønske**, med et **løst-flagg**.
+Lista filtreres på type, status og modul. Modulen er utviklingsverktøy for et knippe
+mennesker, ikke en flate for alle som går vakt.
+
+**Ingenting fantes fra før.** `Notification` er per mottaker med lest/ulest, altså et annet
+problem — men `notify()`-API-et ligger der om backloggen en dag skal si fra til noen.
+
+### Tre valg som ikke sto i bestillingen
+
+| Valg | Hvorfor |
+|---|---|
+| **Modulen står utenfor vaktscopet** | Alt annet er scopet til en `core.Vakt` fordi det beskriver *en vakt*. Et innspill beskriver **portalen**: «nedtrekket lukker seg når jeg velger» gjelder like mye i oktober. Scopet det til vakta, ville lista tømt seg selv ved hvert vaktbytte — og en backlog som glemmer er ikke en backlog |
+| **Angrefristen måles fra opprettelsen**, ikke fra siste endring | Fra endringstidspunktet ville hver retting forlenget fristen, og et innspill kunne holdes redigerbart i det uendelige ved å røres hver time. Da er ikke fristen en frist |
+| **En løst sak kan ikke rettes, selv innen timen** | Løst er et svar noen har gitt. Lar man forfatteren skrive om spørsmålet etterpå, blir svaret uforståelig. Følger av at løst er et flagg og ikke en sletting |
+
+**Global admin er ikke unntatt fristen.** Den verner ikke forfatteren, den verner *loggen* —
+«blir som en logg» var hele bestillingen.
+
+### Nivåene: Andrés tre, oversatt
+
+| Hans | Portalens | Etikett i matrisen |
+|---|---|---|
+| les | `les` | Lese: ser backloggen |
+| les/skriv | `skriv_full` | Skrive: melder inn, retter sitt eget |
+| les/skriv full | `skriv_leder` | Skrive full: leder backloggen, setter løst |
+
+**`skriv_handling` er hoppet over med vilje.** Nivået er «navngitte overganger som *ikke*
+leser request-kroppen», og å melde inn et innspill er nettopp å lese kroppen.
+
+**Og en eksisterende vakt sa fra med en gang.**
+`LedernivaaetsPlassIStigenTests.MED_LEDER` krever at en modul som deklarerer `skriv_leder`
+står på lista over dem som har *forklart* hva «leder» betyr der — ellers ville toppnivået
+snike seg inn uten at noen hadde definert det. Backlog står nå der med begrunnelse, og
+etiketten sier hva lederen gjør. Tre moduler, tre betydninger av samme trinn: «setter opp
+vakta», «setter opp verdimengdene», «leder backloggen».
+
+### Den andre vakten som fanget noe
+
+`AlleFileneGjenopprettesTests.REKKEFOLGE` krever at hver registrert backup-handler står i
+gjenopprettingsrekkefølgen. Backup-handleren ble skrevet i **samme commit som modellen** —
+vaktlistemodulen sto uten backup i det hele tatt fra den gikk i prod til 13. sep. 2026, og
+det ble oppdaget ved en gjennomgang og ikke av noe rødt.
+
+`backlog` står sist i rekkefølgen, og **plasseringen er vilkårlig**: modulen er den eneste
+uten peker til `core.Vakt`, så den har ingen forutsetning om at portalfila er lastet først.
+Begge brukerpekerne strippes (`opprettet_av`, `lost_av`) — med `natural_foreign` lagres de
+som brukernavn, og er kontoen slettet feiler **hele** gjenopprettingen. Navnene står frosset
+på raden og bærer opplysningen.
+
+### Filteret
+
+Serverens, med `?type=`, `?lost=` og `?modul=`. **Et ugyldig filter gir 400, ikke hele
+lista:** `?lost=kanskje` ville ellers vist alt, og den som filtrerte ville lest det som at
+det ikke finnes noen uløste. Et ukjent filter*navn* ignoreres derimot — en lenke fra en
+gammel fane skal vise lista, ikke en feilmelding.
+
+Telleren står i bildet hele tiden, også ufiltrert, så den ikke blir et signal man lærer seg
+å overse. **Et filter skal aldri skjule noe stille.**
+
+### Sekstenmutanter, alle drept — og to av dem løy først
+
+Tungt på tilgangsregelen (`kan_endres`: forfattersjekken, løst-vilkåret, grensen av med én,
+fristen målt fra endring), middels på portene (innmeldingsporten, løs-porten senket ett
+trinn, `kan_endres` fjernet fra viewet, ugyldig filterverdi), middels på JS-funksjonene som
+avgjør noe (`backlogNivaaMinst` invertert og av med én, `backlogTellertekst`, gatene i
+byggeren), lett på escapingen.
+
+**Én mutant hadde tom diff og ble meldt som overlevende** — søk-og-erstatt-strengen traff
+ikke, fordi markupen er `'</strong></div>'` og ikke `'</strong>'`. Det er mutantløgn nr. 2 i
+`CLAUDE.md`, en no-op, og den ble bare synlig fordi diffen leses. Kjørt på nytt med riktig
+streng: drept.
+
+### To feil funnet i egen kode underveis
+
+- **`klokke()` gir bare klokkeslett.** Riktig for en vakt der alt skjedde i dag,
+  misvisende i en backlog der et innspill kan være tre uker gammelt — «14:32» på noe fra
+  forrige måned lyver med et tall som ser presist ut. Egen `backlogTidspunkt()`.
+- **`toLocaleDateString` med `2-digit` er ikke stabil.** Den ga «17.9.» i node og «17.09»
+  andre steder. Et format som skifter med ICU-versjonen er et format man ikke kan skrive
+  en test på. Formateres nå for hånd, nullpolstret.
+
+Og en tredje, i harness-en: `extract_function()` leser fra signaturen til første `}` i
+kolonne 0, så en ettlinjes funksjon svelger den neste når den klippes ut. De to
+nivågatene er derfor skrevet over flere linjer, med kommentaren som sier hvorfor.
+
+Tallene fulgte med: 130 → 135 endepunkter, 24 → 25 JS-filer, sju → åtte backup-handlere,
+fem → seks brukervendte moduler, `/backlog/` som kjent prefiks i `tallfasit` med egen rad i
+`PAASTANDER`, og `backlog` i testkommandoen.
+
+Suite: 3 339 tester, grønn.
+
+---
+
 ## 2026-09-17 — De to valgene som blokkerer KO pulje 2, opp i toppen  `#core/dokumentasjon` `#ko/skallet`
 
 Ingen kodeendring. De to åpne valgene om KO-loggen lå som barn under «Pulje 2 — loggen»,

@@ -90,6 +90,7 @@ INSTALLED_APPS = [
     'oppdrag',
     'vaktliste',
     'ko',
+    'backlog',
     'audit',
     'django_otp',
     'django_otp.plugins.otp_totp',
