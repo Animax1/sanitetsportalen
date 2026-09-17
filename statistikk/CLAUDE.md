@@ -46,3 +46,29 @@ en side som later som den virker.
 oppdragsnotatet). Sluttiden er da avledet, ikke målt. Oppdraget telles i alle antall og
 fordelinger, og både det og negative varigheter rapporteres i `summary['utelatt']` og vises
 på siden.
+
+## Frontend — to filer, og gaten mellom dem
+
+Hva som lastes når står i rota; hva filene gjør står her.
+
+| Fil | Ansvar |
+|---|---|
+| `statistikk.js` | Pasientstatistikk (Chart.js), arkivmodus, kildefanene |
+| `statistikk-oppdrag.js` | Oppdragsfanen |
+
+**Chart.js lastes kun her.** Den er tung, og ingen annen side tegner grafer.
+
+**`statistikk-oppdrag.js` lastes bare for den som har oppdragstilgang** — samme
+komposisjonsregel som endepunktene følger. Kall fra `statistikk.js` går derfor gjennom
+`_kallOppdrag('navn')`, som sjekker at funksjonen finnes: et direkte kall ville vært en
+`ReferenceError` for alle som ser pasientfanen uten å ha oppdrag, og siden ville dødd på
+et faneskift i stedet for å vise den ene fanen brukeren faktisk har.
+
+**Byggerne i begge filene skannes av `patients/tests_xss_stats.py`.** Legger du til en ny
+bygger, skal den stå i lista der — en skanner som melder grønt om en dekning den ikke har,
+er verre enn ingen skanner.
+
+**Tabellene rulles på beholderen, ikke på tabellen** (`stats-rull`, 12. sep. 2026). De
+bygges med `innerHTML`, og en tabell med `display: block` mister bredden sin.
+`TabelleneRullerPaaTelefonTests` krever klassen på hver `tbl-*`/`xt-*`-beholder i begge
+fanene.

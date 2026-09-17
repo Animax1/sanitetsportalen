@@ -690,11 +690,9 @@ uten at noe feiler. Et nytt modulstilark må derfor definere de fire selv, og *i
 de fire portalen faktisk aliaser (da kan temaene komme i utakt). `statistikk.css` er
 mønsteret.
 
-**Statistikktabellene bygges med `innerHTML`, så rullingen ligger på beholderen i malen**
-(`stats-rull`, 12. sep. 2026), ikke på tabellen — en tabell med `display: block` mister
-bredden sin. `TabelleneRullerPaaTelefonTests` krever klassen på hver `tbl-*`/`xt-*`-beholder
-i begge fanene. Vaktlinja (`.vl-vaktvelger`) er tre linjer under 992 px: statusmerket
-slipper `nowrap` for spennet, og spaceren foran knappene tar hele linja.
+**En tabell bygget med `innerHTML` får rullingen på beholderen i malen, ikke på tabellen**
+— en tabell med `display: block` mister bredden sin. Hvilke beholdere det gjelder, står
+hos modulen.
 
 Alle temaene er mørke, så **enhver Bootstrap-klasse for dempet tekst må overstyres** der
 malen kan se den. `MorkTekstPaaMorkBakgrunnTests` løser `{% extends %}` og `{% static %}`
@@ -724,19 +722,21 @@ Kjører en tidlig fil noe, kan den lese en binding som ikke er nådd, og siden d
 og `read_js()` skjøter dem i lasterekkefølge — for alt som leser kilden er de én fil, som
 de er i nettleseren.
 
-| Modul | Lastes | Ansvar |
-|-------|--------|--------|
+**Rota kartlegger, modulfila forklarer.** *Når* en fil lastes er en grense mellom moduler
+og hører hjemme her; hva den *gjør* innvendig er modulens sak. `RotaKartleggerBareTests`
+håndhever det på cellebredden.
+
+| Fil | Lastes | Hva den gjør |
+|-----|--------|--------------|
 | `portal-utils.js` | **alle sider** | CSRF-fetch (`apiFetch`), `withSubmitGuard`, escaping, `fmtMin`, `klokke`, `data-action`-delegeringen |
-| `patients-utils.js` | pasientsiden, alltid | Rollesynlighet, delt tilstand, klokke, skjemahjelpere |
-| `patients-table.js` | pasientsiden, alltid | Tabulator-grid og tavle |
-| `patients-forms.js` | pasientsiden, alltid | Registrerings- og redigeringsskjema |
-| `patients-app.js` | pasientsiden, alltid | Oppstart (`DOMContentLoaded`), faneskift, auto-refresh, lastere for navneregistrene |
-| `patients-admin.js` | pasientsiden, **kun admin** | Registeradmin, sesjonstimeout, vaktavslutning/-gjenåpning, vaktarkiv |
-| `statistikk.js` | **kun** `/statistikk/` | Pasientstatistikk (Chart.js), arkivmodus, kildefanene |
-| `statistikk-oppdrag.js` | `/statistikk/`, **kun** med oppdragstilgang | Oppdragsfanen. Kall hit fra `statistikk.js` går gjennom `_kallOppdrag('navn')` |
-| `oppdrag-sentral-*.js` (fire: kjerne, oppdrag, admin, lasting) | `/oppdrag/`, kontoer uten enhet | Sentralbordet: enhetsliste, oppdragsliste, tidslinje, lokasjonsadmin. `oppstart()` tegner listene uansett hva første henting ga (`LASTEFEIL` til den lykkes), og pollingen settes i `finally` |
-| `oppdrag-enhet.js` | `/oppdrag/`, enhetskontoer | Enhetsskjermen: «neste» og statusens andre knapp (Avbryt/Behandlet på sted) mot de navngitte stemplingsendepunktene, offline-køen i `localStorage` (og «venter på dekning» først når eldste rad er 3 s gammel — `usendtAlder`, `USENDT_VENTETID_MS`), antall-knappene, og **lydvarselet** for ventende oppdrag (`lydTerskler()` leser `OPPDRAG_LYDVARSEL` fra tabellen `Lydvarsel`, hentet på nytt hvert 5. min; `skalPipe()`, `lydTikk()` hvert 5. s; Web Audio, **alltid på** — vekket av det første trykket på siden, `lydErKlar()`; `nyeOppdrag()` + `pipNytt()` for nytt oppdrag om admin ikke har slått det av; tida fra bilens `varslet_at`, og et usendt trykk i køen teller som svart). Serveren sender `neste_overgang`/`alternativ_overgang` per rad; kjeden og alternativene følger med som data kun for å projisere neste steg mens noe ligger usendt |
-| `vaktliste-*.js` (seks: kjerne, tegning, oversikt, handlinger, offline, register) | **kun** `/vaktliste/` | Hele vaktlistesiden: **én fane per ressursgruppe**, hver ressurs er et regneark med redigering i raden, «Oversikt» er utskriftslista, «Mannskap» er personellregisteret, og roller, grupper, korps og kompetanser administreres i modaler på siden. **Skjøten mellom `tegning` og `oversikt` går mellom regnearket og oppsummeringene** (15. sep. 2026): fanene, ressurskortene og radene man redigerer i ligger i den første; bemanningskurvene, utskriftslista, belastningen, «Tilstede nå» og «Mitt korps» leser de samme skiftene og svarer på noe annet |
+| `patients-utils.js`, `-table.js`, `-forms.js`, `-app.js` | pasientsiden, alltid | `patients/CLAUDE.md` |
+| `patients-admin.js` | pasientsiden, **kun admin** | `patients/CLAUDE.md` |
+| `statistikk.js` | **kun** `/statistikk/` | `statistikk/CLAUDE.md` |
+| `statistikk-oppdrag.js` | `/statistikk/`, **kun** med oppdragstilgang | `statistikk/CLAUDE.md` |
+| `oppdrag-sentral-*.js` (fire) | `/oppdrag/`, kontoer uten enhet | `oppdrag/CLAUDE.md` |
+| `oppdrag-enhet.js` | `/oppdrag/`, enhetskontoer | `oppdrag/CLAUDE.md` |
+| `vaktliste-*.js` (seks) | **kun** `/vaktliste/` | `vaktliste/CLAUDE.md` |
+| `ko.js` | **kun** `/ko/` | `ko/CLAUDE.md` |
 
 **`data-action` + `data-hendelse` er to lyttere, og bare én skal fyre.** Klikk­delegeringen
 i `portal-utils.js` treffer *alle* `[data-action]`. Et element som melder sin egen hendelse
@@ -768,10 +768,10 @@ kaster på en side uten pasientskjemaene. Trenger en ny modulside en helper derf
 helperen flyttes til `portal-utils.js`, ikke kopieres. `JsModulLastingTests` håndhever det
 ved å sammenligne hva `statistikk.js` kaller mot hva den faktisk laster.
 
-**Alt en ikke-admin kan nå på pasientsiden, må ligge i en alltid-lastet modul.**
-`read_write` har skrivetilgang uten admin-tilgang — derfor bor f.eks. `saveEventName` i
-`patients-app.js`. Kall fra alltid-lastet kode til `patients-admin.js` må gå gjennom
-`_kall('navn')`, som sjekker at funksjonen finnes. `JsModulLastingTests` håndhever dette.
+**Er en fil betinget lastet, må kall inn i den gå gjennom en vakt.** `patients-admin.js`
+lastes kun for admin, og `statistikk-oppdrag.js` kun med oppdragstilgang — et kall rett på
+et navn derfra er en `ReferenceError` for alle andre. `_kall('navn')` og
+`_kallOppdrag('navn')` sjekker at funksjonen finnes; `JsModulLastingTests` håndhever det.
 
 CSRF-sikret fetch-wrapper brukes for alle API-kall. Tabulator for pasientgrid, Chart.js for
 statistikk — og Chart.js lastes **kun** på `/statistikk/`.

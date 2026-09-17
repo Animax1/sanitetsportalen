@@ -704,3 +704,32 @@ fanevalget i `visFane()` og korpsvelgeren i `velgKorps()`. Sto planleggeren uten
 taket og timene usynlige nettopp der de skal styre arbeidet, og synlige bare i fanen som
 rapporterer i etterkant; det var tilstanden på en ny vaktliste til 15. sep. 2026, uten at
 noe feilet.
+
+## Frontend — seks filer, og hvor skjøtene går
+
+Hva som lastes når står i rota; hva filene gjør står her. Siden var **én fil på 3 801
+linjer** til 14. sep. 2026. Uten bundler deler delene ett globalt navnerom, så delingen er
+billig — `core/tests_js_splitt.py` håndhever at ingen funksjon faller mellom to filer,
+dupliseres, eller havner i utakt med `<script>`-rekkefølgen i malen.
+
+| Fil | Ansvar |
+|---|---|
+| `vaktliste-kjerne.js` | Tilstand og regler. **Må lastes først** — all `let`/`const` på toppnivå bor her |
+| `vaktliste-tegning.js` | Regnearket: fanene, ressurskortene og radene man redigerer i |
+| `vaktliste-oversikt.js` | Oppsummeringene: bemanningskurvene, utskriftslista, belastningen, «Tilstede nå», «Mitt korps» |
+| `vaktliste-handlinger.js` | Det som skriver |
+| `vaktliste-offline.js` | Service worker og kopien |
+| `vaktliste-register.js` | Mannskapsregisteret. **Sist** — `DOMContentLoaded`-kroken står her |
+
+**Skjøten mellom `tegning` og `oversikt` går mellom regnearket og oppsummeringene**
+(15. sep. 2026). De leser de samme skiftene og svarer på noe helt annet: det ene er der du
+fører, det andre er der du ser hva føringen ble. Skillet er ikke kosmetisk — det er
+grunnen til at `tegning` ikke vokser tilbake over 1 800 linjer.
+
+**Siden er én fane per ressursgruppe**, bygget av dataene og ikke av kode: fanene tilpasser
+seg vaktas art av seg selv. Hver ressurs er et regneark med redigering i raden. «Oversikt»
+er utskriftslista, «Mannskap» er personellregisteret, og roller, grupper, korps og
+kompetanser administreres i modaler på siden.
+
+**Vaktlinja (`.vl-vaktvelger`) er tre linjer under 992 px.** Statusmerket slipper `nowrap`
+for spennet, og spaceren foran knappene tar hele linja.

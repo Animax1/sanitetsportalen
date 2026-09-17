@@ -4,6 +4,69 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-17 — Rota kartlegger, modulfila forklarer — og vaktene måler tegn
+
+Ingen kodeendring, bare dokumentasjon og de testene som holder den i live.
+
+**Utløseren var at `CLAUDE.md` sto fire linjer fra `ROT_GRENSE`.** Gjennomgangen viste at
+grensa målte feil ting. To rader i frontend-tabellen hadde vokst til **888 og 652 tegn** —
+lydvarselets terskler, offline-køens ventetid, vaktlistas faneoppsett og skjøten mellom
+`tegning` og `oversikt`. Det er to hele modulavsnitt, skrevet som **to linjer**. En
+linjetelling så to; konteksten betalte ~470 tokens. Og `test_ingen_modul_har_sitt_eget_avsnitt_i_rota`
+så ingenting i det hele tatt, fordi den leter etter overskrifter av formen
+`### Noe (oppdrag/)` og en tabellrad ikke har noen.
+
+**Modulstoffet er flyttet dit det hører hjemme.** Rota beholder *når* en fil lastes — det
+er en grense mellom moduler — og modulfila forklarer hva den gjør:
+
+| Hvor | Hva som kom |
+|---|---|
+| `patients/CLAUDE.md` | De fem filene, og at alt en ikke-admin kan nå må ligge i en alltid-lastet fil |
+| `oppdrag/CLAUDE.md` | Sentralbordets fire filer, og enhetsskjermen: knappene, offline-køen, lydvarselet, og at tida måles fra bilens `varslet_at` |
+| `vaktliste/CLAUDE.md` | De seks filene, og hvorfor skjøten går mellom regnearket og oppsummeringene |
+| `statistikk/CLAUDE.md` | De to filene, `_kallOppdrag`-gaten, og at tabellene rulles på beholderen |
+
+**Målingen som forklarer hele saken:** etter flyttingen gikk rota **opp** to linjer og
+**ned** 1 751 tegn. Under den gamle grensa så oppryddingen altså ut som en forverring.
+Derfor måler grensene nå tegn: `ROT_TEGNGRENSE = 65 500` mot dagens 62 338.
+
+**Modulfilene har fått sitt eget tak** — `MODUL_TEGNGRENSE = 22 000`. Delingen 15. sep.
+flyttet 574 linjer ut av rota og satte ikke noe tak på der de havnet, og «flytt det til
+modulfila» er et svar som virker helt til modulfila er den nye monolitten.
+`vaktliste/CLAUDE.md` er 55 743 tegn og står som **navngitt unntak** i `FOR_STORE_I_DAG`,
+pinnet på dagens størrelse: fila kan krympe, ikke vokse. `test_unntakene_blir_ikke_slakke`
+krever at taket følger den nedover, ellers ville «vi rydder i vaktlista» kunne gjøres
+halvveis uten at noe merket det. Selve delingen står i `TODO.md`.
+
+**`RotaKartleggerBareTests` fanger tabellraden.** Regelen er bevisst *ikke* «ingen
+modulnavn i rota» — en gjennomgang fant femten slike, og **alle femten var riktige**: rota
+må kunne skrive `patients/tests_modul_dekorator.py` når den forklarer at hvert view skal
+være dekorert, og `oppdrag.Enhet` når den forklarer unntakslista i avhengighetsretningen.
+En test med falske funn blir slått av. Regelen er derfor smal: navngir første celle i en
+tabellrad en fil modulen eier, skal raden være et oppslag og ikke en beskrivelse (200
+tegn). Eierskapet **utledes** av filnavnet mot modulene som har egen fil — `ko.js` var
+dekket før noen skrev regelen.
+
+**Én ting ble rettet i rota fordi den var en dublett på vei til å bli to:**
+«last ikke `patients-utils.js` utenfor pasientsiden» ble først flyttet til
+`patients/CLAUDE.md` — men det er en regel for *andre* moduler, og den som bygger `/ko/`
+leser ikke pasientmodulens fil. Den står i rota. Samme vurdering tok CSP-ens `media-src`
+tilbake fra `oppdrag/CLAUDE.md`: den er portalens header, ikke oppdragsmodulens.
+
+**Ni mutanter: sju drept, to vakuøse.** Den som betydde noe:
+`FOR_STORE_I_DAG['vaktliste/CLAUDE.md']` var satt fra `wc -c`, som teller **bytes** — og
+æ, ø og å er to hver i UTF-8. Pinnen sto 1 441 tegn for høyt og lot fila vokse fritt;
+mutanten som la 1 150 tegn til vaktlistefila **overlevde**. Alle tre tallene er nå målt i
+tegn slik testen måler dem. De to vakuøse er mutasjoner av selve assertion-vilkåret
+(`if tegn >= tak` → `if False`), og de sier ingenting så lenge det ikke finnes brudd å
+finne: **den meningsfulle mutasjonen for en vakt er å innføre bruddet den skal fange.**
+Det er nettopp det sperrehakene `test_regelen_finner_faktisk_rader` og
+`test_ingen_modulfil_er_uten_tak` finnes for.
+
+Suite: 3 278 tester, grønn.
+
+---
+
 ## 2026-09-17 — KO-modulen, pulje 1: skallet
 
 **`/ko/` finnes.** Modulen er registrert, siden har de fire flatene fra `FORSLAG_KO.md` §7,

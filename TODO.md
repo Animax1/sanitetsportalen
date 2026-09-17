@@ -357,12 +357,18 @@ bindende: 1 før 2, fordi backupen speiler hvor modellene bor.
             backup 90 dager, modulfilene 730 dager offsite), A.10, A.11/A.6 (fil på e-post,
             offline drift)
       - [ ] `CLAUDE.md` — backup-avsnittet og hvor modellene bor
-- [ ] **`CLAUDE.md` i rota er fire linjer fra taket** (996 av `ROT_GRENSE = 1000`,
-      17. sep. 2026). Grensa i `core/tests_claude_md.py` er ikke et budsjett, den er en
-      røykvarsler for at delingen rot/modulfil er i ferd med å oppheve seg selv — men
-      fire linjer betyr at *neste* rammeverksregel ikke får plass uten at noen tar et
-      valg. To veier: flytt et avsnitt som egentlig er én moduls til modulfila, eller hev
-      grensa bevisst. Det som ikke duger er å hente plassen ved å slette noe nyttig.
+- [ ] **Del `vaktliste/CLAUDE.md`.** Den er 55 743 tegn (~17 000 tokens) — større enn
+      `oppdrag`, `patients`, `statistikk` og `ko` til sammen, ganger to, og den eneste
+      modulfila som står som unntak i `FOR_STORE_I_DAG` i `core/tests_claude_md.py`.
+      Taket er pinnet på dagens størrelse, så fila kan krympe men ikke vokse; en
+      sperrehake krever at taket følger den nedover.
+
+      Fila er ikke dårlig skrevet — den beskriver portalens største modul. Men den har
+      vokst uten tak siden den ble skilt ut 15. sep. 2026, og den skal deles etter samme
+      regel som rota ble: **planlegging, drift og registre er tre ting.** Merk at
+      delingen av rota gjorde nøyaktig denne feilen — den flyttet 574 linjer ut og satte
+      ikke noe tak på der de havnet. «Flytt det til modulfila» er et svar som virker helt
+      til modulfila er den nye monolitten.
 
 - [ ] **4. De mindre** (§3 i notatet), når man er i nærheten: brukeradmin importerer
       pasientregistrene (3.1), `/portal-admin/` samlet i én URL-fil (3.2), skimene

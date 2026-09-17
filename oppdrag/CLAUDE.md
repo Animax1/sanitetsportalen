@@ -200,3 +200,32 @@ to ID-er kan være like i to verdimengder.
 `enhet_vaktmodus_view`, `avvent_view` og `kvitter_avbrutt_view` krever alle `skriv_full`:
 de sier noe om beredskapen, ikke om ett oppdrags framdrift, og de er derfor operatørens —
 ikke bilens `skriv_handling`.
+
+## Frontend — to grensesnitt, to filsett
+
+Hva som lastes når står i rota; hva filene gjør står her.
+
+**`oppdrag-sentral-*.js` (fire: kjerne, oppdrag, admin, lasting)** — sentralbordet:
+enhetsliste, oppdragsliste, tidslinje, lokasjonsadmin. `oppstart()` tegner listene uansett
+hva første henting ga (`LASTEFEIL` til den lykkes), og pollingen settes i `finally`. Uten
+det ble en tom side stående etter én feilet henting, og den så ut som en vakt uten enheter.
+
+> Filene **flytter til KO i pulje 5** (`docs/FORSLAG_KO.md` §10) — en flytting, ikke en
+> kopi. Tuplene i `patients/js_test_utils.py` og `<script>`-rekkefølgen i malen følger med.
+
+**`oppdrag-enhet.js`** — enhetsskjermen. Fire ting den gjør, og hver av dem har en grunn:
+
+| Hva | Detalj |
+|---|---|
+| Knappene | «Neste» og statusens andre knapp (Avbryt / Behandlet på sted) mot de **navngitte** stemplingsendepunktene — de leser ikke request-kroppen |
+| Offline-køen | `localStorage`. «Venter på dekning» vises først når eldste rad er 3 s gammel — `usendtAlder`, `USENDT_VENTETID_MS`. Uten forsinkelsen blinket varselet ved hvert trykk på god dekning |
+| Lydvarselet | `lydTerskler()` leser `OPPDRAG_LYDVARSEL` fra tabellen `Lydvarsel`, hentet på nytt hvert 5. min; `skalPipe()` og `lydTikk()` hvert 5. s. Web Audio, **alltid på**, vekket av det første trykket på siden (`lydErKlar()`). `nyeOppdrag()` + `pipNytt()` for nytt oppdrag om admin ikke har slått det av |
+| Tida det måles fra | Bilens `varslet_at` — og **et usendt trykk i køen teller som svart**, ellers ville bilen pipt om et oppdrag mannskapet nettopp kvitterte ut uten dekning |
+
+**Serveren sender `neste_overgang`/`alternativ_overgang` per rad.** Kjeden og alternativene
+følger med som data **kun** for å projisere neste steg mens noe ligger usendt — klienten
+eier ikke statusmaskinen, og en klient som regnet den ut selv ville blitt uenig med
+serveren i nøyaktig det øyeblikket en overgang ble endret.
+
+**Hvorfor `_stilleLydbaerer()` finnes** står i rota, under CSP — `media-src` måtte
+åpnes for `blob:` for at iOS' ringebryter ikke skal dempe varselet.
