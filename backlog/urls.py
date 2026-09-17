@@ -26,6 +26,12 @@ urlpatterns = [
     path('api/innspill/<int:pk>/', views.innspill_detalj_view,
          name='backlog_api_innspill_detalj'),
 
+    # Kommentarer — tråden under én sak.
+    path('api/innspill/<int:pk>/kommentarer/', views.kommentarer_view,
+         name='backlog_api_kommentarer'),
+    path('api/kommentarer/<int:pk>/', views.kommentar_detalj_view,
+         name='backlog_api_kommentar_detalj'),
+
     # Backloginnstillinger: typene. Admin-styrt verdimengde, samme mønster som
     # oppdragsmodulens «Valglister».
     path('api/typer/', views.typer_view, name='backlog_api_typer'),

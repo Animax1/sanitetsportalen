@@ -25,7 +25,7 @@ from datetime import timedelta
 from pathlib import Path
 from unittest.mock import patch
 
-from django.test import TestCase, Client, override_settings
+from django.test import Client, SimpleTestCase, TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
 
@@ -1836,3 +1836,123 @@ class SignalerFyrerIkkeUnderLoaddataTests(TestCase):
         rad = AuditLog.objects.order_by('-created_at').first()
         self.assertEqual(rad.field_name, 'restore')
         self.assertEqual(rad.new_value, backup.filename)
+
+
+class BrukerpekereStrippesEllerBegrunnesTests(SimpleTestCase):
+    """En FK til en konto, ustrippet, gjør backupen ugjenopprettelig.
+
+    **Funnet ved mutasjonstesting 17. sep. 2026.** En mutant som fjernet
+    `'backlog.Kommentar': ['opprettet_av']` fra `strip_fields` overlevde — og
+    det er den verste sorten overlevende, fordi feilen den slipper gjennom
+    bare viser seg *den dagen man trenger backupen*.
+
+    Mekanikken står i `BaseBackupHandler.strip_fields`: serialiseringen kjører
+    med `natural_foreign=True`, så en FK til en bruker lagres som brukernavnet.
+    Er kontoen slettet i mellomtiden, feiler **hele** gjenopprettingen med
+    `DeserializationError` — ikke bare den ene raden.
+
+    Regelen her er ikke «alt må strippes». Å beholde pekeren er et gyldig valg
+    når koblingen er verdt mer enn gjenopprettbarheten. Regelen er at valget
+    skal være **tatt**, og stå skrevet: enten i `strip_fields`, eller i lista
+    under med en begrunnelse.
+
+    Den hele fila står utenfor, og det er hele forskjellen på den: brukerne er
+    med i den, så den er selvbærende og har ingen konto å savne.
+    """
+
+    #: Brukerpekere som **ikke** strippes i dag, med status.
+    #:
+    #: **De fire under er ikke vurdert.** De ble funnet av denne testen den
+    #: dagen den ble skrevet, i moduler arbeidet ikke gjaldt, og å stryke dem
+    #: fra en dump er et valg om hva en gjenoppretting skal gi tilbake — det
+    #: hører til den som eier modulen. Ført i `TODO.md`.
+    #:
+    #: Alle fire er `null=True` med `SET_NULL`, altså teknisk strippbare.
+    #: Spørsmålet er om koblingen er verdt mer enn gjenopprettbarheten:
+    #: `Forstehjelper.user` og `Helsepersonell.user` er kontokoblinger av samme
+    #: slag som `Mannskap.user`, som vaktlista **valgte** å stryke.
+    IKKE_STRIPPET: dict[str, str] = {
+        'patients.Forstehjelper.user': 'ikke vurdert — se TODO.md',
+        'patients.Helsepersonell.user': 'ikke vurdert — se TODO.md',
+        'oppdrag.Vaktmodusperiode.satt_av': 'ikke vurdert — se TODO.md',
+        'oppdrag.Enhetshendelse.kvittert_av': 'ikke vurdert — se TODO.md',
+    }
+
+    def _brukerpekere(self, handler):
+        """[(etikett.felt, er_strippet)] for hver FK til kontomodellen."""
+        from django.apps import apps as django_apps
+        from django.conf import settings as dj_settings
+
+        Bruker = django_apps.get_model(dj_settings.AUTH_USER_MODEL)
+        strip = {k.lower(): {f.lower() for f in v}
+                 for k, v in handler.get_strip_fields().items()}
+        ekskludert = {e.lower() for e in handler.collect_exclude()}
+
+        ut = []
+        for oppforing in handler.collect_apps():
+            # Samme oppløsning som `utled_restore_models`: `apps` tar både
+            # «app» og «app.Modell», og en test som leste bare den ene formen
+            # ville hoppet over arkivhandlerne i stillhet.
+            if '.' in oppforing:
+                kandidater = [django_apps.get_model(oppforing)]
+            else:
+                kandidater = list(
+                    django_apps.get_app_config(oppforing).get_models())
+            for modell in kandidater:
+                etikett = modell._meta.label
+                if etikett.lower() in ekskludert:
+                    continue
+                for felt in modell._meta.concrete_fields:
+                    if not felt.is_relation or felt.related_model is not Bruker:
+                        continue
+                    strippet = felt.name.lower() in strip.get(etikett.lower(), set())
+                    ut.append((f'{etikett}.{felt.name}', strippet))
+        return ut
+
+    def _alle(self):
+        registrer_alle_moduler()
+        ut = []
+        for handler in all_handlers():
+            # Den hele fila er selvbærende — brukerne er med i den.
+            if handler.slug == 'full':
+                continue
+            ut += self._brukerpekere(handler)
+        return ut
+
+    def test_hver_brukerpeker_er_strippet_eller_begrunnet(self):
+        funn = sorted(navn for navn, strippet in self._alle()
+                      if not strippet and navn not in self.IKKE_STRIPPET)
+        self.assertEqual(funn, [], (
+            'Fremmednøkler til en konto som verken strippes eller er begrunnet:\n  '
+            + '\n  '.join(funn)
+            + '\n\nSerialiseringen kjører med natural_foreign, så en slik FK lagres '
+              'som brukernavnet — er kontoen slettet, feiler HELE gjenopprettingen. '
+              'Legg feltet i handlerens `strip_fields`, eller før det opp i '
+              'IKKE_STRIPPET her med en begrunnelse for at koblingen er verdt mer '
+              'enn gjenopprettbarheten.'))
+
+    def test_lista_krymper_bare(self):
+        """Et unntak som er ryddet skal ut. Ellers blir lista en samling ting
+        som *en gang* var uavklart, og da slutter den å si noe om koden."""
+        strippet_likevel = sorted(
+            navn for navn, strippet in self._alle()
+            if strippet and navn in self.IKKE_STRIPPET)
+        self.assertEqual(strippet_likevel, [], (
+            'Disse står i IKKE_STRIPPET, men strippes nå. Ta dem ut av lista:\n  '
+            + '\n  '.join(strippet_likevel)))
+
+    def test_lista_peker_paa_felter_som_finnes(self):
+        """En begrunnelse for et felt som er borte er bare støy."""
+        kjente = {navn for navn, _ in self._alle()}
+        forsvunnet = sorted(set(self.IKKE_STRIPPET) - kjente)
+        self.assertEqual(forsvunnet, [], (
+            f'IKKE_STRIPPET viser til felter som ikke finnes: {forsvunnet}'))
+
+    def test_testen_finner_faktisk_brukerpekere(self):
+        """Sperrehake. Finner oppdagelsen ingen FK-er, passerer reglene over
+        trivielt — og det har skjedd i denne kodebasen før."""
+        alle = self._alle()
+        self.assertGreaterEqual(len(alle), 8, alle)
+        self.assertTrue(any(strippet for _, strippet in alle),
+                        'ingen peker regnes som strippet — leser testen '
+                        '`strip_fields` riktig?')

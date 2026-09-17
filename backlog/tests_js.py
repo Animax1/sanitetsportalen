@@ -21,7 +21,7 @@ HARNESS = (
     (PORTAL_UTILS_JS, ('escapeHtml',)),
     (BACKLOG_JS, ('backlogNivaaMinst', 'backlogKanMeldeInn', 'backlogKanLose',
                   'backlogTellertekst', 'backlogTidspunkt', 'backlogTypemerke',
-                  'backlogModulnavn', 'backlogKort')),
+                  'backlogModulnavn', 'backlogKort', 'backlogKommentarrad')),
 )
 
 #: Konstanten på toppnivå klippes ikke med av `build_harness`, og uten den er
@@ -168,16 +168,18 @@ class KortetEscaperTests(SimpleTestCase):
         ut = run_node(self.harness, '''
           globalThis.window = { MODUL_TILGANG: { backlog: 'skriv_leder' },
                                 BACKLOG_MODULER: [{slug: 'ko', navn: 'KO'}] };
-          const html = backlogKort({id: 3, type: 'bug', type_navn: 'Bug',
+          const html = backlogKort({id: 3, type: 1, type_navn: 'Bug',
             tittel: 'Nedtrekket lukker seg', beskrivelse: 'Skjer hver gang',
             modul_slug: 'ko', opprettet_av: 'kari',
             opprettet_at: '2026-09-17T10:00:00Z', lost: false, lost_av: '',
-            kan_endres: false});
+            kan_endres: false, kan_slettes: false, antall_kommentarer: 2});
           assert(html.includes('Nedtrekket lukker seg'), 'tittel mangler');
           assert(html.includes('Skjer hver gang'), 'beskrivelse mangler');
           assert(html.includes('KO'), 'modulnavnet mangler');
           assert(html.includes('backlogSettLost'), 'skriv_leder mangler loes-knapp');
-          assert(!html.includes('backlogSlett'), 'slett-knapp uten kan_endres');
+          assert(!html.includes('backlogSlett'), 'slett-knapp uten kan_slettes');
+          assert(html.includes('backlogApneKommentarer'), 'kommentarknappen mangler');
+          assert(html.includes('> 2<'), 'kommentartelleren mangler: ' + html);
         ''', preamble=PREAMBLE)
         self.assertIn('OK', ut)
 
@@ -187,18 +189,64 @@ class KortetEscaperTests(SimpleTestCase):
         ut = run_node(self.harness, '''
           globalThis.window = { MODUL_TILGANG: { backlog: 'skriv_full' },
                                 BACKLOG_MODULER: [] };
-          const base = {id: 3, type: 'bug', type_navn: 'Bug', tittel: 'T',
+          const base = {id: 3, type: 1, type_navn: 'Bug', tittel: 'T',
             beskrivelse: '', modul_slug: '', opprettet_av: 'kari',
-            opprettet_at: '2026-09-17T10:00:00Z', lost: false, lost_av: ''};
+            opprettet_at: '2026-09-17T10:00:00Z', lost: false, lost_av: '',
+            antall_kommentarer: 0};
 
-          const utenFrist = backlogKort({...base, kan_endres: false});
+          const utenFrist = backlogKort({...base, kan_endres: false, kan_slettes: false});
           assert(!utenFrist.includes('backlogSettLost'),
                  'skriv_full skal ikke se loes-knappen');
           assert(!utenFrist.includes('backlogSlett'),
-                 'uten kan_endres skal slett vaere borte');
+                 'uten kan_slettes skal slett vaere borte');
 
-          const medFrist = backlogKort({...base, kan_endres: true});
-          assert(medFrist.includes('backlogSlett'), 'kan_endres mangler slett');
-          assert(medFrist.includes('backlogApneRediger'), 'kan_endres mangler rett');
+          const medFrist = backlogKort({...base, kan_endres: true, kan_slettes: true});
+          assert(medFrist.includes('backlogSlett'), 'kan_slettes mangler slett');
+          assert(medFrist.includes('backlogApneRediger'), 'kan_endres mangler rediger');
+
+          // **Den nye skillelinja:** kommentert av andre -> kan redigeres,
+          // men ikke slettes. En slett-knapp her ville foert til 409.
+          const kommentert = backlogKort({...base, kan_endres: true, kan_slettes: false});
+          assert(kommentert.includes('backlogApneRediger'), 'rediger mangler');
+          assert(!kommentert.includes('backlogSlett'),
+                 'slett skal vaere borte naar andre har kommentert');
         ''', preamble=PREAMBLE)
+        self.assertIn('OK', ut)
+
+
+@unittest.skipUnless(node_available(), 'node er ikke tilgjengelig')
+class KommentarradTests(SimpleTestCase):
+    """Kommentarteksten er fritekst skrevet av en bruker, og raden settes inn
+    med `innerHTML`."""
+
+    def setUp(self):
+        self.harness = build_harness(HARNESS)
+
+    def test_teksten_og_navnet_escapes(self):
+        ut = run_node(self.harness, """
+          const html = backlogKommentarrad({
+            id: 1, tekst: '<img src=x onerror=alert(1)>',
+            opprettet_av: '<b>kari</b>',
+            opprettet_at: '2026-09-17T10:00:00Z', kan_endres: false});
+          assert(!html.includes('<img'), 'raa <img> i kommentaren: ' + html);
+          assert(!html.includes('<b>kari'), 'raa markup i navnet: ' + html);
+          assert(html.includes('&lt;img'), 'teksten ble ikke escapet');
+        """, preamble=PREAMBLE)
+        self.assertIn('OK', ut)
+
+    def test_sletteknappen_folger_fristen(self):
+        """Sperrehake mot testen over, og selve regelen: `kan_endres` kommer
+        fra serveren, som eier tida."""
+        ut = run_node(self.harness, """
+          const base = {id: 1, tekst: 'Hei', opprettet_av: 'kari',
+                        opprettet_at: '2026-09-17T10:00:00Z'};
+          const min = backlogKommentarrad({...base, kan_endres: true});
+          assert(min.includes('Hei'), 'teksten mangler');
+          assert(min.includes('backlogSlettKommentar'), 'slett mangler innen fristen');
+
+          const annens = backlogKommentarrad({...base, kan_endres: false});
+          assert(annens.includes('Hei'), 'teksten mangler');
+          assert(!annens.includes('backlogSlettKommentar'),
+                 'slett skal vaere borte uten kan_endres');
+        """, preamble=PREAMBLE)
         self.assertIn('OK', ut)

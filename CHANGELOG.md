@@ -240,9 +240,15 @@ fjernet; 409 → 400; vakt-scopet fjernet fra `logg_view`.
 
 Alle 24 drept etter at prøvene ble skrevet.
 
+**Mutant 25, etter flettingen:** `fjernet_av` fjernet fra `strip_fields` i `ko/backup.py`
+— drept av den nye `test_hver_brukerpeker_er_strippet_eller_begrunnet`, som kom inn med
+kommentartråden samme dag. Kjørt nettopp for å se at den nye vakten faktisk dekker KO og
+ikke bare gikk grønt fordi handleren tilfeldigvis sto riktig.
+
 ### Tallene fulgte med
 
-137 → 141 endepunkter, `/ko/` fra 2 til 6 ruter, åtte → ni backup-handlere.
+137 → 141 endepunkter, `/ko/` fra 2 til 6 ruter, åtte → ni backup-handlere. (Etter at
+kommentartråden i backlog ble flettet inn samme dag, står totalen på **143**.)
 Gjenopprettingsrekkefølgen er **portal → patients → arkiv → oppdrag → oppdrag_arkiv →
 vaktliste → ko**; `Logglinje.vakt` er en heltallspeker uten natural key, som alt annet som
 er scopet til vakta.
@@ -252,6 +258,65 @@ er scopet til vakta.
 Logglinja har **ingen FK til en hendelse ennå** — den kommer i pulje 3, sammen med regelen
 om at en linje kan knyttes til en hendelse i etterkant. Historikkflata for tidligere vakter
 er skrevet inn i TODO, ikke bygget: nivået den skal ligge bak står allerede.
+
+---
+
+## 2026-09-17 — Kommentarer på hvert innspill — og en mutant som fant fire hull i backupen  `#backlog/modulen` `#core/backup`
+
+**André:** «Kan du legge til en kommentar funksjon på hver sak/innspill?»
+
+En tråd under hver sak. Lesing er `les`, skriving `skriv_full` — den som bare ser
+backloggen er en tilskuer, ikke en deltaker. Antallet står på knappen inn til tråden, så
+den svarer på «er det noe her?» i det man ser etter veien inn.
+
+### Tre valg spørsmålet tvang fram
+
+| Valg | Hvorfor |
+|---|---|
+| **Tråden er åpen også på en løst sak** | Bevisst avvik fra at et løst innspill ikke kan redigeres. «Rettet i bygg `f3b279d`» **er** svaret, og det skrives etter at flagget er satt. Stengte vi tråden ved lukking, ble det umulig å notere hvordan saken ble løst akkurat der noen ville lett etter det |
+| **`kan_endre_kommentar` har to vilkår, ikke tre** | Forfatteren og fristen, uten `lost`. En kommentar er ikke spørsmålet; den er en setning i tråden, og en skrivefeil rettet av forfatteren ti minutter senere velter ingenting. Grensen selv deles — `_innen_fristen()` — for en grense skrevet to steder er to grenser |
+| **Sletting er strengere enn redigering** | Har noen *andre* skrevet i tråden, er saken ikke lenger et utkast — den er en samtale, og `CASCADE` ville tatt den andres setning med seg uten et ord. 409 med rådet «rediger den i stedet». Egne kommentarer teller ikke |
+
+`kan_slettes` er sitt eget svar i API-et, ikke `kan_endres`: **en sletteknapp som gir 409
+er en knapp som fører til en vegg.**
+
+**Varselet går til tråden, ikke til alle som kan løse.** Forfatteren og de som har
+kommentert, minus den som skriver nå. Varsler man bredere, blir tråden til støy for folk
+som ikke har spurt om noe; varsler man smalere — bare forfatteren — går et svar fra
+forfatteren aldri tilbake til den som spurte.
+
+### Ti mutanter, ni drept — og den tiende var det verdt å høre på
+
+Mutanten som fjernet `'backlog.Kommentar': ['opprettet_av']` fra `strip_fields`
+**overlevde**. Det er den verste sorten overlevende: mekanikken er dokumentert i
+`BaseBackupHandler.strip_fields` — serialiseringen kjører med `natural_foreign`, så en FK
+til en konto lagres som brukernavnet, og er kontoen slettet feiler **hele**
+gjenopprettingen med `DeserializationError`. Feilen viser seg bare den dagen man trenger
+backupen.
+
+**Det fantes ingen vakt.** Hver handler vedlikeholdt `strip_fields` for hånd, og en glemt
+brukerpeker var usynlig — nøyaktig «en håndholdt liste forfaller i stillhet», for tredje
+gang i dette prosjektet.
+
+`BrukerpekereStrippesEllerBegrunnesTests` **utleder** nå hvilke FK-er det gjelder, med
+samme oppløsning av `apps` som serialiseringen selv bruker (både «app» og «app.Modell» —
+en test som leste bare den ene formen ville hoppet over arkivhandlerne i stillhet).
+Regelen er ikke «alt må strippes»: å beholde pekeren er gyldig når koblingen er verdt mer
+enn gjenopprettbarheten. Regelen er at valget skal være **tatt**.
+
+**Og den fant fire ustrippede pekere i moduler arbeidet ikke gjaldt:**
+`patients.Forstehjelper.user`, `patients.Helsepersonell.user`,
+`oppdrag.Vaktmodusperiode.satt_av`, `oppdrag.Enhetshendelse.kvittert_av`. Alle fire er
+`null=True` med `SET_NULL`, altså teknisk strippbare — og `Forstehjelper.user` er en
+kontokobling av samme slag som `Mannskap.user`, som vaktlista **valgte** å stryke.
+
+De står i `IKKE_STRIPPET` som **ikke vurdert**, og ikke som rettet: å stryke et felt fra en
+dump er et valg om hva en gjenoppretting skal gi tilbake, og det hører til den som eier
+modulen. Ført i `TODO.md`.
+
+Tallene fulgte med: 137 → 139 endepunkter, `/backlog/` fra 7 til 9 ruter.
+
+Suite: 3 382 tester, grønn.
 
 ---
 

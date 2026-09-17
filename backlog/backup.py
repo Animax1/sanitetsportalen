@@ -42,6 +42,9 @@ class BacklogBackupHandler(BaseBackupHandler):
     #: fra en backup er uansett eldre enn den timen.
     strip_fields = {
         'backlog.Innspill': ['opprettet_av', 'lost_av'],
+        # Kommentarens peker like fullt: én slettet konto ville ellers tatt
+        # hele gjenopprettingen med seg. `opprettet_av_navn` bærer hvem.
+        'backlog.Kommentar': ['opprettet_av'],
     }
 
 

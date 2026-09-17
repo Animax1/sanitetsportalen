@@ -92,8 +92,13 @@ function backlogKort(rad) {
   }
   if (rad.kan_endres) {
     knapper += ' <button type="button" class="btn btn-sm btn-outline-primary"'
-      + ' data-action="backlogApneRediger" data-id="' + rad.id + '">Rediger</button>'
-      + ' <button type="button" class="btn btn-sm btn-outline-danger"'
+      + ' data-action="backlogApneRediger" data-id="' + rad.id + '">Rediger</button>';
+  }
+  // **Sletting leser `kan_slettes`, ikke `kan_endres`.** Har andre kommentert,
+  // kan saken redigeres men ikke slettes — og en knapp som gir 409 er en knapp
+  // som fører til en vegg.
+  if (rad.kan_slettes) {
+    knapper += ' <button type="button" class="btn btn-sm btn-outline-danger"'
       + ' data-action="backlogSlett" data-id="' + rad.id + '">Slett</button>';
   }
 
@@ -106,6 +111,13 @@ function backlogKort(rad) {
     ? ' · løst av ' + escapeHtml(rad.lost_av)
     : '';
 
+  // Telleren står på knappen, ikke ved siden av: da svarer den på «er det noe
+  // her?» i det man ser etter en vei inn i tråden.
+  const antall = rad.antall_kommentarer || 0;
+  const kommentarknapp = '<button type="button" class="btn btn-sm btn-outline-secondary"'
+    + ' data-action="backlogApneKommentarer" data-id="' + rad.id + '">'
+    + '<i class="bi bi-chat-left-text"></i> ' + antall + '</button> ';
+
   return '<div class="card mb-2"><div class="card-body py-2">'
     + '<div class="d-flex justify-content-between align-items-start gap-2 flex-wrap">'
     + '<div><div>' + backlogTypemerke(rad) + modulMerke + lostMerke
@@ -114,7 +126,7 @@ function backlogKort(rad) {
     + escapeHtml(rad.opprettet_av || 'ukjent') + ' · ' + backlogTidspunkt(rad.opprettet_at)
     + lostAv + '</div>'
     + beskrivelse + '</div>'
-    + '<div class="text-nowrap">' + knapper + '</div>'
+    + '<div class="text-nowrap">' + kommentarknapp + knapper + '</div>'
     + '</div></div></div>';
 }
 
@@ -239,6 +251,91 @@ async function backlogSlett(id) {
   const res = await apiFetch('/backlog/api/innspill/' + id + '/', {method: 'DELETE'});
   const svar = await res.json();
   if (svar.status === 'ok') backlogLast();
+}
+
+// ── Kommentarer ────────────────────────────────────────────────────────────
+
+let backlogKommentarSak = null;   // id-en tråden er åpen for
+
+function backlogKommentarFeil(melding) {
+  const boks = document.getElementById('backlog-kommentar-feil');
+  if (!boks) return;
+  boks.textContent = melding || '';
+  boks.classList.toggle('d-none', !melding);
+}
+
+function backlogKommentarrad(k) {
+  let knapper = '';
+  if (k.kan_endres) {
+    knapper = '<button type="button" class="btn btn-sm btn-link p-0 ms-2"'
+      + ' data-action="backlogSlettKommentar" data-id="' + k.id + '">Slett</button>';
+  }
+  return '<div class="border-bottom pb-2 mb-2">'
+    + '<div class="small text-muted">'
+    + escapeHtml(k.opprettet_av || 'ukjent') + ' · ' + backlogTidspunkt(k.opprettet_at)
+    + knapper + '</div>'
+    + '<div style="white-space:pre-wrap">' + escapeHtml(k.tekst) + '</div>'
+    + '</div>';
+}
+
+function backlogTegnKommentarer(rader) {
+  const boks = document.getElementById('backlog-kommentarliste');
+  if (!boks) return;
+  boks.innerHTML = (rader || []).map(backlogKommentarrad).join('')
+    || '<p class="text-muted mb-0">Ingen kommentarer ennå.</p>';
+}
+
+async function backlogLastKommentarer() {
+  if (backlogKommentarSak === null) return;
+  const res = await apiFetch('/backlog/api/innspill/' + backlogKommentarSak + '/kommentarer/');
+  const svar = await res.json();
+  if (svar.status !== 'ok') { backlogKommentarFeil(svar.message); return; }
+  backlogTegnKommentarer(svar.data);
+}
+
+function backlogApneKommentarer(id) {
+  const rad = backlogRader.find(r => r.id === id);
+  backlogKommentarSak = id;
+  backlogKommentarFeil('');
+  document.getElementById('backlog-kommentar-tekst').value = '';
+  document.getElementById('backlog-kommentar-tittel').textContent =
+    rad ? 'Kommentarer: ' + rad.tittel : 'Kommentarer';
+  // Skrivefeltet gates her og ikke i malen: vinduet åpnes på nytt hver gang,
+  // og `.d-none` satt én gang ved sidelasting ville vært borte.
+  document.getElementById('backlog-kommentar-skriv')
+    .classList.toggle('d-none', !backlogKanMeldeInn());
+  backlogTegnKommentarer([]);
+  backlogLastKommentarer();
+  bootstrap.Modal.getOrCreateInstance(
+    document.getElementById('backlog-kommentar-modal')).show();
+}
+
+async function backlogLagreKommentar() {
+  const felt = document.getElementById('backlog-kommentar-tekst');
+  const tekst = (felt.value || '').trim();
+  if (!tekst) { backlogKommentarFeil('Skriv noe før du lagrer'); return; }
+  await withSubmitGuard('backlog-kommentar-knapp', async () => {
+    const res = await apiFetch(
+      '/backlog/api/innspill/' + backlogKommentarSak + '/kommentarer/',
+      {method: 'POST', body: JSON.stringify({tekst: tekst})});
+    const svar = await res.json();
+    if (svar.status !== 'ok') { backlogKommentarFeil(svar.message); return; }
+    felt.value = '';
+    backlogKommentarFeil('');
+    backlogLastKommentarer();
+    // Telleren på kortet skal stemme med tråden man nettopp skrev i.
+    backlogLast();
+  });
+}
+
+async function backlogSlettKommentar(id) {
+  if (!confirm('Slette kommentaren? Dette kan ikke angres.')) return;
+  const res = await apiFetch('/backlog/api/kommentarer/' + id + '/', {method: 'DELETE'});
+  const svar = await res.json();
+  if (svar.status !== 'ok') { backlogKommentarFeil(svar.message); return; }
+  backlogKommentarFeil('');
+  backlogLastKommentarer();
+  backlogLast();
 }
 
 // ── Backloginnstillinger: typene ───────────────────────────────────────────

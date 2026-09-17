@@ -537,6 +537,27 @@ status og modul. Modulens egne regler står i [`backlog/CLAUDE.md`](./backlog/CL
       `backlog` i dag, så bare global admin ser modulen. Tre nivåer i matrisen: «ser
       backloggen», «melder inn, retter sitt eget», «leder backloggen, setter løst».
 
+- [ ] **Fire brukerpekere i backup er ikke vurdert** (funnet 17. sep. 2026, ved
+      mutasjonstesting av backlog-modulen): `patients.Forstehjelper.user`,
+      `patients.Helsepersonell.user`, `oppdrag.Vaktmodusperiode.satt_av` og
+      `oppdrag.Enhetshendelse.kvittert_av` står i `IKKE_STRIPPET` i
+      `core/tests_backup.py`.
+
+      **Hva det betyr:** serialiseringen kjører med `natural_foreign`, så en FK til en
+      konto lagres som brukernavnet. Er kontoen slettet i mellomtiden, feiler **hele**
+      gjenopprettingen av den fila med `DeserializationError` — ikke bare den ene raden,
+      og akkurat den dagen man trenger backupen.
+
+      **Det er ikke gitt at de skal strippes.** Å beholde pekeren er et gyldig valg når
+      koblingen er verdt mer enn gjenopprettbarheten. Alle fire er `null=True` med
+      `SET_NULL`, altså teknisk strippbare. `Forstehjelper.user` og `Helsepersonell.user`
+      er kontokoblinger av samme slag som `Mannskap.user`, som vaktlista **valgte** å
+      stryke — der settes koblingen på nytt via e-postadressen. Finnes den veien i
+      pasientmodulen også, er svaret sannsynligvis det samme.
+
+      Valget hører til den som eier modulen, og skal stå skrevet enten i `strip_fields`
+      eller i `IKKE_STRIPPET` med en begrunnelse.
+
 - [ ] **VURDER: skal typene kunne omsorteres?** `rekkefolge` finnes på `Innspilltype` og
       settes automatisk til opprettelsesrekkefølgen, men det er ingen flate for å endre
       den. Gjøres det, skal hele lista sendes i én PUT (`oppdrag`-mønsteret) og ikke «flytt

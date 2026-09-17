@@ -122,6 +122,38 @@
 </div>
 
 {% comment %}
+  Kommentartråden under én sak. Eget vindu framfor å utvide kortet: trådene
+  blir lange, og en liste der ett kort plutselig er ti ganger så høyt mister
+  oversikten som er hele grunnen til lista.
+{% endcomment %}
+<div class="modal fade" id="backlog-kommentar-modal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content" style="background:var(--portal-surface);border-color:var(--portal-border);">
+      <div class="modal-header">
+        <h2 class="modal-title h6" id="backlog-kommentar-tittel">Kommentarer</h2>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"
+                aria-label="Lukk"></button>
+      </div>
+      <div class="modal-body">
+        <div id="backlog-kommentarliste" class="mb-3"></div>
+        <div id="backlog-kommentar-skriv" class="d-none">
+          <label class="form-label" for="backlog-kommentar-tekst">Ny kommentar</label>
+          <textarea id="backlog-kommentar-tekst" class="form-control" rows="3"></textarea>
+          <button type="button" class="btn btn-primary btn-sm mt-2"
+                  id="backlog-kommentar-knapp" data-action="backlogLagreKommentar">
+            Legg til kommentar
+          </button>
+        </div>
+        <div id="backlog-kommentar-feil" class="text-danger small d-none mt-2"></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Lukk</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% comment %}
   Backloginnstillinger — typene. Lista og skjemaet i **samme vindu**, slik at
   man ser hva som finnes mens man legger til. Samme form som vaktlistas
   «Innstillinger» og oppdragsmodulens «Valglister».
