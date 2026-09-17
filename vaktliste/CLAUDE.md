@@ -17,6 +17,11 @@ fase 3–7 gjenstår — se `docs/BESLUTNING_VAKTLISTE.md`, som er besluttet i s
 | Ett skift er én rad | `Vaktpost`, med plan og faktisk i hvert sitt feltpar |
 | Planlagt vakt rører ikke pekeren | `services.opprett_planlagt_vakt()` |
 
+## Tilgang: badgen, reservasjonen og korpsfilteret
+
+Hvem som får se og røre hva. Rammeverkets nivåstige står i rota; her står hva
+nivåene *betyr* i vaktlista, og de to halvdelene som må sjekkes samlet.
+
 - **`Mannskap.korps` er badgen** tilgangsmodellen hviler på fra fase 3:
   `skriv_handling` betyr her «fører sitt eget korps» (avgrenset av badgen, ingen
   innsjekk), ikke stempling som i oppdrag. Matrisen trenger derfor en etikett per
@@ -69,51 +74,13 @@ fase 3–7 gjenstår — se `docs/BESLUTNING_VAKTLISTE.md`, som er besluttet i s
   autokoblingen og kontolista leser alle derfra; kobling for hånd til en adminkonto gir
   400. `konto_finnes` i svaret sier om en bruker med adressen finnes, regnet av ett sett
   e-poster, ikke én spørring per rad.
-- **Vaktlista som fil på e-post er reserven** (12. sep. 2026, notatet §12):
-  `vaktliste/fil.py` bygger `templates/vaktliste/fil.html` — selvstendig, uten
-  `{% static %}` og uten ikon-partialen (unntatt i `core/tests_manifest.py`). Telefon og
-  ISSI er med, **ikke** e-post, notat eller merknad. Mottakerne og bryteren for «Sett i
-  drift» er `AppSetting`-nøkler (`fil.MOTTAKERE_NOKKEL`, `fil.VED_DRIFT_NOKKEL`) satt
-  under portalinnstillingene; `send_fil()` kaster aldri og lager alltid en
-  `Utsending`-rad (auditlogget), og drift-viewet sender *etter* at drift er lagret —
-  e-post nede skal ikke stenge innsjekken. AHASend-transporten sender vedlegg som
-  base64 (`_vedlegg`). **Intervallsendingen** (13. sep. 2026, `fil.send_planlagte()`,
-  `INTERVALL_NOKKEL`/`BARE_ENDRET_NOKKEL`) kjøres av
-  `vaktliste.middleware.FilutsendingMiddleware` — trafikken er klokka, som for
-  backup — og sammenligner `Utsending.innhold_sha256` mot den sist *sendte*; klokka går
-  fra forrige *forsøk*. Middlewaren tas ut under test i `settings.py`, som
-  backup-planleggeren.
-- **Vaktlistevelgeren må ha `data-hendelse="change"`** (16. sep. 2026). Uten den fyrer
-  klikkdelegeringen i `portal-utils.js` på *klikk* — med verdien som alt sto der — og
-  ikke når man velger. Symptomet var «treg»: hvert forsøk på å åpne nedtrekket hentet
-  lista man allerede så, og byttet skjedde først ved neste klikk på velgeren.
-  `VelgerenFyrerPaaEndringTests` skanner malene: et `<select>` eller `<textarea>` med
-  `data-action` skal alltid oppgi hendelsen sin. `<input>` er utenfor med vilje — en
-  knapp er et `<input>` også, og der *er* klikk riktig hendelse.
-- **Sida kommer tilbake til lista man sto på**, ikke til den øverste
-  (`forsteListe()`/`huskListe()`, `localStorage`). ID-en sjekkes mot lista serveren
-  faktisk sendte: en vaktliste kan være slettet, eller tilgangen borte, siden sist — og
-  da er øverst riktig, som første gang. **Per nettleser, ikke per konto:** det er en
-  bekvemmelighet, ikke en innstilling, og «Logg ut» sender `Clear-Site-Data`, som rydder
-  den på en delt drifts-PC. Lagringen kaster i privat modus, så begge kallene står i
-  `try/catch` — en glemt liste er en bagatell, en side som dør på oppstart er det ikke.
-- **Offline drift på `/vaktliste/`** (13. sep. 2026, notatet §13): service workeren
-  `static/js/vaktliste-sw.js` serveres av `vaktliste.views.sw_view` på `/vaktliste/sw.js`
-  (en worker styrer bare stier under sin egen; uten innlogging, unntatt i
-  `patients/tests_modul_dekorator.py`, med egen CSP begrenset til `'self'`).
-  `avgjor()` er den ene regelen: API-GET nett først med kopi som reserve (header
-  `X-Vl-Kopi`), siden nett først, statisk kopi først; **aldri POST, aldri en
-  omdirigering** (innloggingssiden), og **ingen datakopi eldre enn 24 timer**
-  (`erForGammel`). **«Logg ut» sender `Clear-Site-Data: "cache", "storage"`** (13. sep.
-  2026) — Cache Storage, localStorage og workeren ryddes i ett på en delt drifts-PC;
-  cookies røres ikke. Køen for møtt/av vakt ligger i `vaktliste.js`
-  (`koLes`/`koSkriv`, `_leggIKo`, `_projiserKo`, `synkKo`, `tegnOffline`) — samme
-  mønster som bilens kø i `oppdrag-enhet.js`. **Står noe i kø, går alt i kø** —
-  rekkefølgen er regelen. `stempling_view` leser `tidspunkt` i kroppen, og
-  `services.vurder_klienttid` klipper det urimelige. Den gamle `OFFLINE_MODE`-en er
-  borte; Django-admin rutes bare under `DEBUG`.
-- **Kostbehov/matallergi lagres ikke** (art. 9 — besluttet holdt utenfor portalen), og
-  `Mannskap.notat` er unntatt verdilogging i audit (`signals.FELT_UTEN_VERDILOGGING`).
+
+## Plassen og skiftet — hvem får røre hva
+
+Skillet mellom å **sette opp** en plass og å **fylle** den går gjennom hele
+modulen. De to spørsmålene er `kan_sette_vaktpost()` og `kan_rore_vaktpost()`,
+og de må ikke slås sammen.
+
 - **En ledig plass har tre tilstander** (11.–12. sep. 2026): tildelt ett korps
   (`Vaktpost.korps`/ressursens), **åpen for alle** (`Vaktpost.alle_korps` — alle ser og kan
   fylle; het «utildelt» én dag), eller **planlagt** — lederens kladd, som `les` ikke ser og
@@ -211,6 +178,14 @@ fase 3–7 gjenstår — se `docs/BESLUTNING_VAKTLISTE.md`, som er besluttet i s
   korps-føreren skiftet framfor å melde forfall, forsvinner plassen og ikke bare
   personen, og lista ser dekket ut. Hun tømmer raden i stedet (`mannskap_id: null`),
   og da står behovet.
+- **Et skift redigeres i et vindu, ikke ved å settes opp på nytt.**
+  `apneRedigerVaktpost()` endrer mannskap, rolle, tider og merknad i én PUT;
+  serveren sjekker den doble regelen på nytt mot personen som skal inn. Å
+  bytte person ved å slette raden mistet tidene og rollen som sto der.
+  Sletting ligger inne i vinduet bak en bekreftelse, som på ressursen.
+
+## Vakta, tidene og skrivingene
+
 - **Vaktas lengde: start på `Vakt.startet`, slutt på `Vaktliste.planlagt_slutt`.**
   `Vakt.avsluttet` betyr «vakta ble avsluttet» — en hendelse — og kan ikke bære
   et anslag man flytter på. Spennet er det bemanningskurven tegnes over.
@@ -225,6 +200,9 @@ fase 3–7 gjenstår — se `docs/BESLUTNING_VAKTLISTE.md`, som er besluttet i s
   er fasit for duplikater, men en `IntegrityError` som fanges uten savepoint etterlater
   transaksjonen ubrukelig: sesjonslagringen feiler på vei ut, og brukeren får en naken
   400-side i stedet for feilmeldingen viewet formulerte.
+
+## Registrene og verdimengdene
+
 - **Registrene administreres på `/vaktliste/`, ikke i Django-admin.** Den
   flaten er kun rutet under `DEBUG` (S1), så `vaktliste/admin.py` er et
   utviklerverktøy — et register som *bare* finnes der, finnes ikke for brukeren.
@@ -258,26 +236,90 @@ fase 3–7 gjenstår — se `docs/BESLUTNING_VAKTLISTE.md`, som er besluttet i s
 - **Sletting av en ressurs ligger bak «Rediger ressurs» og krever bekreftelse to ganger.**
   CASCADE tar skiftene. Dialogen stopper feilklikket; `{"confirm": true}` i kroppen stopper
   et kall som treffer URL-en uten å mene det. De to er ikke samme sperre.
-- **En `<td>` må forbli en `table-cell`.** `display: flex` direkte på en celle tar den ut
-  av tabellens boksmodell, og alt etter den forskyves i forhold til overskriftene —
-  `table-layout: fixed` hjelper ikke. Legg layouten på et element *inne* i cella.
-  `TabellcellersLayoutTests` leser klassene som står på `<td>` **hvor som helst** i
-  modulens JS og håndhever regelen for dem alle.
-  - **Hvitliste, ikke svarteliste** (16. sep. 2026): en `<td>` får ha `display: table-cell`
-    eller ingen `display`. Lista sto som fem *farlige* verdier og manglet `inline-block` —
-    nøyaktig den `.vl-blokktid` har. En svarteliste må være komplett for å virke; en
-    hvitliste er det av seg selv.
-  - **Byggerne finnes ved å lete, ikke ved å stå i en liste.** Den håndholdte lista nevnte
-    seks byggere, og «Oversikt»-tabellen sto utenfor. Samme forfall som XSS-skanneren hadde
-    samme dag.
-  - **En klasse som er laget for et element *inne* i cella skal ikke settes på cella.**
-    `.vl-tidcelle` har `display: flex` og hører til en `<div>` i regnearkets tidskolonne;
-    «Oversikt» har sin egen `.vl-oversikt-tid` uten `display`.
-- **Et skift redigeres i et vindu, ikke ved å settes opp på nytt.**
-  `apneRedigerVaktpost()` endrer mannskap, rolle, tider og merknad i én PUT;
-  serveren sjekker den doble regelen på nytt mot personen som skal inn. Å
-  bytte person ved å slette raden mistet tidene og rollen som sto der.
-  Sletting ligger inne i vinduet bak en bekreftelse, som på ressursen.
+- **Ressursgruppene kan endres, deaktiveres og slettes** (16. sep. 2026, punkt 4). Serveren
+  har støttet PUT hele tiden; det manglet knapper. Tre regler:
+  - **En gruppe i bruk slettes ikke** (André: «de som er i bruk på vaktlister nå må jo få
+    bli») — `Ressurs.gruppe` er `PROTECT`, og viewet svarer med hvor mange ressurser det
+    gjelder og peker på `er_aktiv` som veien ut.
+  - **`er_aktiv` hadde ingen vei inn.** Feltet fantes fra 30. aug., nedtrekkene respekterte
+    det (`gruppaHarPlass`, og ressursens egen gruppe beholdes), og ingen skjerm kunne sette
+    det. Det er den verste sorten hull: mekanismen virker, så ingenting feiler, den er bare
+    uoppnåelig.
+  - **`Ressursrolle.gruppe` er `CASCADE`.** En gruppe *uten* ressurser lar seg slette — og
+    tok rollene sine med seg uten et ord. Sletting av en slik gruppe gir nå 409 med
+    antallet, og krever `{"confirm": true}`. Bekreftelsen kreves **bare når det finnes
+    roller**: et ekstra klikk på en tom gruppe er en vane man slutter å lese, og da er
+    bekreftelsen verdiløs den gangen den betyr noe.
+- **De øvrige verdimengdene sorteres alfabetisk — det finnes ingen `rekkefolge` å
+  vedlikeholde.** `Ressurs` er unntaket, fordi der styrer den fanerekkefølgen, og
+  der settes den automatisk til opprettelsesrekkefølgen. Sorteringen bruker
+  `Lower(...)`: uten den er «alfabetisk» databasens alfabet, og SQLite (dev) og
+  PostgreSQL (prod) svarer ulikt på store/små bokstaver. Æ/Ø/Å er fortsatt
+  databasens svar.
+- **ID-er fra klienten går gjennom `views._int()`.** Et nedtrekk med «Ingen valgt»
+  sender `''`, ikke `null`, og den strengen i et FK-filter gir `ValueError` — altså 500
+  der brukeren skulle fått «velg korps». `or None` dekker den tomme strengen, men ikke
+  en ikke-numerisk.
+
+- **Kostbehov/matallergi lagres ikke** (art. 9 — besluttet holdt utenfor portalen), og
+  `Mannskap.notat` er unntatt verdilogging i audit (`signals.FELT_UTEN_VERDILOGGING`).
+
+## Kompetanse, roller og rekkefølge
+
+- **`Kompetanse.bygger_paa` er en stige.** Har personen AFØR, skjules VFØR og
+  GFØR i alle lister — `services.synlige_kompetanser()`. Ringer stoppes ved
+  skriving; en ring som likevel finnes gir avkortet kjede, ikke evig løkke.
+- **`Ressursrolle` har en rangering, og den er data** (16. sep. 2026, André: «rollene
+  sorteres meningsfullt — leder øverst, hospitant nederst»). Alfabetisk satte «Hospitant»
+  over «Lagleder». `rekkefolge` + `Meta.ordering = [gruppe__rekkefolge, rekkefolge,
+  Lower(navn)]`; navnet avgjør bare uavgjort. **Ikke en liste i koden:** rollene seedes
+  ikke med faste navn — de kom fra det som fantes ved migrasjon `0007` — så en hardkodet
+  rangering ville truffet noen installasjoner og ikke andre. Samme begrunnelse
+  `Ressursgruppe` fikk 30. aug.
+  - **En ny rolle havner sist, og regelen ligger i `Ressursrolle.save()`.** Rollene
+    opprettes av den generiske registerfabrikken i `views_registre`, som bare kjenner
+    tekstfelter (`ekstra_felt` gjør `.strip()`); et heltall måtte fått et unntak inni
+    fabrikken, og da sto regelen der for alle tre verdimengdene mens bare én har den.
+    Telleren er **per gruppe** — «Sjåfør» på ambulansen og på laget er to rader.
+  - **Omsorteringen sender hele lista** (`PUT api/roller/rekkefolge/`, `kan_lede`), ikke
+    «opp» per rad: to kall som krysser hverandre bytter to par og etterlater en rekkefølge
+    ingen ba om. Serveren krever **nøyaktig** gruppas roller — et delvis sett ville gitt
+    noen rader nye tall og latt resten stå, og det er også den eneste måten å oppdage at
+    klienten og serveren ser ulike lister.
+- **Radene i en ressurs sorteres på tid, så rollens rangering, så navn**
+  (`Vaktpost.Meta.ordering`, 16. sep. 2026 — André: «en enhet/lag som har i synkende
+  rekkefølge lagsmedlem, lagleder, lagsmedlem, hospitant … flyttes ikke i enheten etter sin
+  rolle»). Laget sto i innsettingsrekkefølge, og da må man lese hver rad for å finne
+  lederen. Uten dette leddet var `Ressursrolle.rekkefolge` bare en sortering av
+  *nedtrekket* — den styrte ikke radene den beskriver. **Tida vinner over rollen:** en
+  hospitant som møter 08 står før en lagleder som møter 16, ellers slutter lista å være
+  kronologisk.
+  - **`nulls_last`/`nulls_first` står eksplisitt, og det er ikke pynt.** PostgreSQL (prod)
+    legger NULL sist i stigende sortering, SQLite (dev) legger dem først. Den gamle
+    kommentaren her påsto at ledige plasser sto først «innenfor samme starttid» — sant i
+    SQLite, aldri i prod, og udekket av noen test. En rad uten rolle hører nederst; en
+    ledig plass står først blant sine egne.
+  - Klienten sorterer **ikke** (`_posterFor()` filtrerer), så rekkefølgen er serverens.
+- **Navn endres i raden, med `_redigeringsrad()` — én form for hele modulen** (16. sep.
+  2026, André: «Det bør gå relativt automatisk ved endring av rollenavn, se andre navn i
+  enheten»). Rollen hadde **ingen** redigering: man måtte slette og opprette, og
+  `Vaktpost.rolle` gjør en rolle i bruk uslettelig — en omdøping var altså umulig. Gruppa
+  fikk en `prompt()` tidligere samme dag, som er *oppdragsmodulens* idiom; to former for
+  samme handling i samme modul er to kilder som glir fra hverandre.
+  - **Redigering i raden, ikke i et vindu på et vindu.** Rollevinduet er alt en modal.
+  - **Tilstanden (`rolleRedigeres`, `gruppeRedigeres`) ligger i JS, ikke i DOM-en** — samme
+    grunn som `ressursApen`: lista bygges på nytt ved hver lagring, og en `<input>` i
+    markupen ville forsvunnet med den. De er `let` på toppnivå, så en node-test må sette
+    dem selv (`build_harness` henter bare funksjoner).
+  - **Lagring kaller `_lastRegisterOgListe()`, ikke bare rollelista.** Rollenavnet står i
+    nedtrekket på hver rad i regnearket også; hentes bare lista, viser skiftene det gamle
+    navnet til neste sidelasting.
+
+## Planleggingsflatene: dager, kort og faner
+
+Dagen er ytterste nivå, ressursgruppa er fanen, og ressursen er kortet inni.
+Rekkefølgen er ikke kosmetikk — den er hva sida svarer på.
+
 - **Utskriftslista grupperes på dag, så ressurs** (15. sep. 2026 — snudd fra
   ressurs-først). Den svarer nå på «hvem er på vakt i dag, og hvor», som er det den som
   møter om morgenen spør om; før svarte den på «hvem står på denne bilen, og når», med
@@ -378,6 +420,24 @@ fase 3–7 gjenstår — se `docs/BESLUTNING_VAKTLISTE.md`, som er besluttet i s
   summerte samleplassen, ambulansene og KO til ett tall som ikke svarer på noe. Spennet er
   felles (`_vaktensSpenn()`) fordi to kurver man ikke kan sammenligne er verre enn én
   samlet.
+
+## Tabeller, tid og felter i grensesnittet
+
+- **En `<td>` må forbli en `table-cell`.** `display: flex` direkte på en celle tar den ut
+  av tabellens boksmodell, og alt etter den forskyves i forhold til overskriftene —
+  `table-layout: fixed` hjelper ikke. Legg layouten på et element *inne* i cella.
+  `TabellcellersLayoutTests` leser klassene som står på `<td>` **hvor som helst** i
+  modulens JS og håndhever regelen for dem alle.
+  - **Hvitliste, ikke svarteliste** (16. sep. 2026): en `<td>` får ha `display: table-cell`
+    eller ingen `display`. Lista sto som fem *farlige* verdier og manglet `inline-block` —
+    nøyaktig den `.vl-blokktid` har. En svarteliste må være komplett for å virke; en
+    hvitliste er det av seg selv.
+  - **Byggerne finnes ved å lete, ikke ved å stå i en liste.** Den håndholdte lista nevnte
+    seks byggere, og «Oversikt»-tabellen sto utenfor. Samme forfall som XSS-skanneren hadde
+    samme dag.
+  - **En klasse som er laget for et element *inne* i cella skal ikke settes på cella.**
+    `.vl-tidcelle` har `display: flex` og hører til en `<div>` i regnearkets tidskolonne;
+    «Oversikt» har sin egen `.vl-oversikt-tid` uten `display`.
 - **Markup som tegnes på nytt kan ikke gates av `gateKnapper()`.** Den setter
   `.d-none` én gang ved sidelasting; `tegnFaner()` og `mkRessurs()` bygger på
   nytt ved hvert panelbytte og må derfor spørre `kanLede()`/`kanBemanne()`
@@ -420,78 +480,22 @@ fase 3–7 gjenstår — se `docs/BESLUTNING_VAKTLISTE.md`, som er besluttet i s
   `vaktliste.js` nevner dagen én gang innenfor ett døgn og to ganger ellers —
   «20:00–04:00» alene sier ikke at skiftet går over midnatt, og arrangementer
   varer flere dager. Vaktas spenn utledes av skiftene, ikke av et felt.
-- **`Kompetanse.bygger_paa` er en stige.** Har personen AFØR, skjules VFØR og
-  GFØR i alle lister — `services.synlige_kompetanser()`. Ringer stoppes ved
-  skriving; en ring som likevel finnes gir avkortet kjede, ikke evig løkke.
-- **`Ressursrolle` har en rangering, og den er data** (16. sep. 2026, André: «rollene
-  sorteres meningsfullt — leder øverst, hospitant nederst»). Alfabetisk satte «Hospitant»
-  over «Lagleder». `rekkefolge` + `Meta.ordering = [gruppe__rekkefolge, rekkefolge,
-  Lower(navn)]`; navnet avgjør bare uavgjort. **Ikke en liste i koden:** rollene seedes
-  ikke med faste navn — de kom fra det som fantes ved migrasjon `0007` — så en hardkodet
-  rangering ville truffet noen installasjoner og ikke andre. Samme begrunnelse
-  `Ressursgruppe` fikk 30. aug.
-  - **En ny rolle havner sist, og regelen ligger i `Ressursrolle.save()`.** Rollene
-    opprettes av den generiske registerfabrikken i `views_registre`, som bare kjenner
-    tekstfelter (`ekstra_felt` gjør `.strip()`); et heltall måtte fått et unntak inni
-    fabrikken, og da sto regelen der for alle tre verdimengdene mens bare én har den.
-    Telleren er **per gruppe** — «Sjåfør» på ambulansen og på laget er to rader.
-  - **Omsorteringen sender hele lista** (`PUT api/roller/rekkefolge/`, `kan_lede`), ikke
-    «opp» per rad: to kall som krysser hverandre bytter to par og etterlater en rekkefølge
-    ingen ba om. Serveren krever **nøyaktig** gruppas roller — et delvis sett ville gitt
-    noen rader nye tall og latt resten stå, og det er også den eneste måten å oppdage at
-    klienten og serveren ser ulike lister.
-- **Radene i en ressurs sorteres på tid, så rollens rangering, så navn**
-  (`Vaktpost.Meta.ordering`, 16. sep. 2026 — André: «en enhet/lag som har i synkende
-  rekkefølge lagsmedlem, lagleder, lagsmedlem, hospitant … flyttes ikke i enheten etter sin
-  rolle»). Laget sto i innsettingsrekkefølge, og da må man lese hver rad for å finne
-  lederen. Uten dette leddet var `Ressursrolle.rekkefolge` bare en sortering av
-  *nedtrekket* — den styrte ikke radene den beskriver. **Tida vinner over rollen:** en
-  hospitant som møter 08 står før en lagleder som møter 16, ellers slutter lista å være
-  kronologisk.
-  - **`nulls_last`/`nulls_first` står eksplisitt, og det er ikke pynt.** PostgreSQL (prod)
-    legger NULL sist i stigende sortering, SQLite (dev) legger dem først. Den gamle
-    kommentaren her påsto at ledige plasser sto først «innenfor samme starttid» — sant i
-    SQLite, aldri i prod, og udekket av noen test. En rad uten rolle hører nederst; en
-    ledig plass står først blant sine egne.
-  - Klienten sorterer **ikke** (`_posterFor()` filtrerer), så rekkefølgen er serverens.
-- **Navn endres i raden, med `_redigeringsrad()` — én form for hele modulen** (16. sep.
-  2026, André: «Det bør gå relativt automatisk ved endring av rollenavn, se andre navn i
-  enheten»). Rollen hadde **ingen** redigering: man måtte slette og opprette, og
-  `Vaktpost.rolle` gjør en rolle i bruk uslettelig — en omdøping var altså umulig. Gruppa
-  fikk en `prompt()` tidligere samme dag, som er *oppdragsmodulens* idiom; to former for
-  samme handling i samme modul er to kilder som glir fra hverandre.
-  - **Redigering i raden, ikke i et vindu på et vindu.** Rollevinduet er alt en modal.
-  - **Tilstanden (`rolleRedigeres`, `gruppeRedigeres`) ligger i JS, ikke i DOM-en** — samme
-    grunn som `ressursApen`: lista bygges på nytt ved hver lagring, og en `<input>` i
-    markupen ville forsvunnet med den. De er `let` på toppnivå, så en node-test må sette
-    dem selv (`build_harness` henter bare funksjoner).
-  - **Lagring kaller `_lastRegisterOgListe()`, ikke bare rollelista.** Rollenavnet står i
-    nedtrekket på hver rad i regnearket også; hentes bare lista, viser skiftene det gamle
-    navnet til neste sidelasting.
-- **Ressursgruppene kan endres, deaktiveres og slettes** (16. sep. 2026, punkt 4). Serveren
-  har støttet PUT hele tiden; det manglet knapper. Tre regler:
-  - **En gruppe i bruk slettes ikke** (André: «de som er i bruk på vaktlister nå må jo få
-    bli») — `Ressurs.gruppe` er `PROTECT`, og viewet svarer med hvor mange ressurser det
-    gjelder og peker på `er_aktiv` som veien ut.
-  - **`er_aktiv` hadde ingen vei inn.** Feltet fantes fra 30. aug., nedtrekkene respekterte
-    det (`gruppaHarPlass`, og ressursens egen gruppe beholdes), og ingen skjerm kunne sette
-    det. Det er den verste sorten hull: mekanismen virker, så ingenting feiler, den er bare
-    uoppnåelig.
-  - **`Ressursrolle.gruppe` er `CASCADE`.** En gruppe *uten* ressurser lar seg slette — og
-    tok rollene sine med seg uten et ord. Sletting av en slik gruppe gir nå 409 med
-    antallet, og krever `{"confirm": true}`. Bekreftelsen kreves **bare når det finnes
-    roller**: et ekstra klikk på en tom gruppe er en vane man slutter å lese, og da er
-    bekreftelsen verdiløs den gangen den betyr noe.
-- **De øvrige verdimengdene sorteres alfabetisk — det finnes ingen `rekkefolge` å
-  vedlikeholde.** `Ressurs` er unntaket, fordi der styrer den fanerekkefølgen, og
-  der settes den automatisk til opprettelsesrekkefølgen. Sorteringen bruker
-  `Lower(...)`: uten den er «alfabetisk» databasens alfabet, og SQLite (dev) og
-  PostgreSQL (prod) svarer ulikt på store/små bokstaver. Æ/Ø/Å er fortsatt
-  databasens svar.
-- **ID-er fra klienten går gjennom `views._int()`.** Et nedtrekk med «Ingen valgt»
-  sender `''`, ikke `null`, og den strengen i et FK-filter gir `ValueError` — altså 500
-  der brukeren skulle fått «velg korps». `or None` dekker den tomme strengen, men ikke
-  en ikke-numerisk.
+- **Vaktlistevelgeren må ha `data-hendelse="change"`** (16. sep. 2026). Uten den fyrer
+  klikkdelegeringen i `portal-utils.js` på *klikk* — med verdien som alt sto der — og
+  ikke når man velger. Symptomet var «treg»: hvert forsøk på å åpne nedtrekket hentet
+  lista man allerede så, og byttet skjedde først ved neste klikk på velgeren.
+  `VelgerenFyrerPaaEndringTests` skanner malene: et `<select>` eller `<textarea>` med
+  `data-action` skal alltid oppgi hendelsen sin. `<input>` er utenfor med vilje — en
+  knapp er et `<input>` også, og der *er* klikk riktig hendelse.
+- **Sida kommer tilbake til lista man sto på**, ikke til den øverste
+  (`forsteListe()`/`huskListe()`, `localStorage`). ID-en sjekkes mot lista serveren
+  faktisk sendte: en vaktliste kan være slettet, eller tilgangen borte, siden sist — og
+  da er øverst riktig, som første gang. **Per nettleser, ikke per konto:** det er en
+  bekvemmelighet, ikke en innstilling, og «Logg ut» sender `Clear-Site-Data`, som rydder
+  den på en delt drifts-PC. Lagringen kaster i privat modus, så begge kallene står i
+  `try/catch` — en glemt liste er en bagatell, en side som dør på oppstart er det ikke.
+
+## Besetningen — koblingen til `/oppdrag/`
 
 **Besetningen i sentralbordet (fase 6) går én vei: `vaktliste` → `oppdrag`.**
 Oppdragsmodulen importerer **ikke** vaktlista; `oppdrag-sentral.js` henter
@@ -516,6 +520,8 @@ Oppdragsmodulen importerer **ikke** vaktlista; `oppdrag-sentral.js` henter
   koblet noe sted» (`services.koblet_i_annen_vakt`) — det kostet André en kveld 30. aug.
 - **Rekkefølgen sorteres i Python.** `rolle` er nullbar, og SQLite (dev) og
   PostgreSQL (prod) plasserer NULL i hver sin ende.
+
+## Belastning, budsjett og timeoversikt
 
 **Planleggingstall (fase 5) varsler, de sperrer ikke.** `services`
 regner ut timer, skift, lengste skift, korteste hvile og **overlapp** per person;
@@ -601,6 +607,8 @@ helt annet.
   nattevakt på feil dag. En test med falske skift må derfor bære **UTC**, som ORM-en
   gjør; bærer den norsk tid, går mutanten grønn.
 
+## Innsjekk, stempling og drift
+
 **Drift (fase 4) er en innsjekk-port, ikke en livssyklus.** `Vaktliste.status`
 har to verdier, og `drift` betyr én ting: møtt/av vakt er åpen. Overgangen går
 begge veier og rører ingen stempler.
@@ -642,6 +650,8 @@ begge veier og rører ingen stempler.
 - **Klienten har én `data-action` per overgang**, ikke én generisk:
   klikkdelegeringen i `portal-utils.js` sender ett argument. `STEMPLINGER` i
   `vaktliste.js` og i `services.py` holdes like av `StemplingsnavnTests`.
+
+## Planleggeren — grunnlaget for vaktlista
 
 **Planleggeren lager grunnlaget for vaktlista** (15. sep. 2026, `services.generer_grunnlag`,
 `POST api/vaktlister/<pk>/generer/`, `kan_lede`). Du sier «tre firemannslag 14–22, én
@@ -704,6 +714,42 @@ fanevalget i `visFane()` og korpsvelgeren i `velgKorps()`. Sto planleggeren uten
 taket og timene usynlige nettopp der de skal styre arbeidet, og synlige bare i fanen som
 rapporterer i etterkant; det var tilstanden på en ny vaktliste til 15. sep. 2026, uten at
 noe feilet.
+
+## Drift-reserven: fil på e-post og offline
+
+To måter lista overlever at noe er nede — og begge er reserver, ikke
+hovedveier.
+
+- **Vaktlista som fil på e-post er reserven** (12. sep. 2026, notatet §12):
+  `vaktliste/fil.py` bygger `templates/vaktliste/fil.html` — selvstendig, uten
+  `{% static %}` og uten ikon-partialen (unntatt i `core/tests_manifest.py`). Telefon og
+  ISSI er med, **ikke** e-post, notat eller merknad. Mottakerne og bryteren for «Sett i
+  drift» er `AppSetting`-nøkler (`fil.MOTTAKERE_NOKKEL`, `fil.VED_DRIFT_NOKKEL`) satt
+  under portalinnstillingene; `send_fil()` kaster aldri og lager alltid en
+  `Utsending`-rad (auditlogget), og drift-viewet sender *etter* at drift er lagret —
+  e-post nede skal ikke stenge innsjekken. AHASend-transporten sender vedlegg som
+  base64 (`_vedlegg`). **Intervallsendingen** (13. sep. 2026, `fil.send_planlagte()`,
+  `INTERVALL_NOKKEL`/`BARE_ENDRET_NOKKEL`) kjøres av
+  `vaktliste.middleware.FilutsendingMiddleware` — trafikken er klokka, som for
+  backup — og sammenligner `Utsending.innhold_sha256` mot den sist *sendte*; klokka går
+  fra forrige *forsøk*. Middlewaren tas ut under test i `settings.py`, som
+  backup-planleggeren.
+- **Offline drift på `/vaktliste/`** (13. sep. 2026, notatet §13): service workeren
+  `static/js/vaktliste-sw.js` serveres av `vaktliste.views.sw_view` på `/vaktliste/sw.js`
+  (en worker styrer bare stier under sin egen; uten innlogging, unntatt i
+  `patients/tests_modul_dekorator.py`, med egen CSP begrenset til `'self'`).
+  `avgjor()` er den ene regelen: API-GET nett først med kopi som reserve (header
+  `X-Vl-Kopi`), siden nett først, statisk kopi først; **aldri POST, aldri en
+  omdirigering** (innloggingssiden), og **ingen datakopi eldre enn 24 timer**
+  (`erForGammel`). **«Logg ut» sender `Clear-Site-Data: "cache", "storage"`** (13. sep.
+  2026) — Cache Storage, localStorage og workeren ryddes i ett på en delt drifts-PC;
+  cookies røres ikke. Køen for møtt/av vakt ligger i `vaktliste.js`
+  (`koLes`/`koSkriv`, `_leggIKo`, `_projiserKo`, `synkKo`, `tegnOffline`) — samme
+  mønster som bilens kø i `oppdrag-enhet.js`. **Står noe i kø, går alt i kø** —
+  rekkefølgen er regelen. `stempling_view` leser `tidspunkt` i kroppen, og
+  `services.vurder_klienttid` klipper det urimelige. Den gamle `OFFLINE_MODE`-en er
+  borte; Django-admin rutes bare under `DEBUG`.
+
 
 ## Frontend — seks filer, og hvor skjøtene går
 

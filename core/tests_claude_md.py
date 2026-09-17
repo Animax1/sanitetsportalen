@@ -72,12 +72,42 @@ MODUL_TEGNGRENSE = 22_000
 #: større, og det skal være en avgjørelse noen tar i en diff — ikke noe som
 #: skjer fordi testen ble rød en travel kveld.
 FOR_STORE_I_DAG: dict[str, int] = {
-    # 55 743 tegn (~17 000 tokens) 17. sep. 2026 — større enn `oppdrag`,
-    # `patients`, `statistikk` og `ko` til sammen, ganger to. Fila er ikke
-    # dårlig skrevet; den beskriver portalens største modul. Men den har vokst
-    # uten tak siden den ble skilt ut, og den skal deles etter samme regel som
-    # rota ble: planlegging, drift og registre er tre ting. Se `TODO.md`.
-    'vaktliste/CLAUDE.md': 55_800,
+    # 56 799 tegn 17. sep. 2026. Fila ble **strukturert** samme dag — 13
+    # seksjoner der det var én — og vokste 1 056 tegn av overskriftene og
+    # ingressene. Det er en bevisst byttehandel: en fil man kan lete i, og en
+    # vakt som kan si *hvilken* del som vokser, for prisen av tusen tegn.
+    #
+    # Den ble ikke kuttet, og det er også et valg. Hvert avsnitt bærer en regel
+    # **og** feilen som lærte oss den, og det er begrunnelsen som får reglene
+    # til å feste seg. Å hente tusen tegn ved å stryke «hvorfor» ville gjort
+    # fila kortere og dokumentasjonen dårligere. Se `TODO.md` for hva som
+    # faktisk kan gjøres: seksjonene er nå små nok til å vurderes hver for seg.
+    'vaktliste/CLAUDE.md': 56_900,
+}
+
+#: Over denne størrelsen må en modulfil ha seksjoner. Tallet er der en fil
+#: slutter å være noe man leser og blir noe man leter i.
+#:
+#: **Dette er regelen som ville fanget vaktlista i august.** Fila vokste til
+#: 707 linjer under **én** overskrift, og et flatt punktlista på den lengden har
+#: ingen steder ting «hører hjemme» — så alt havner nederst, og ingen kan se
+#: hvilken del som vokser. Størrelsen var symptomet; fraværet av struktur var
+#: årsaken.
+SEKSJONSKRAV_TEGN = 8_000
+MIN_SEKSJONER = 3
+
+#: Ingen enkeltseksjon i en modulfil skal passere denne. Største i dag er
+#: «Planleggingsflatene» på 8 003 tegn, og den er nettopp den som ikke skal
+#: vokse mer — da er den en monolitt inni fila som nettopp ble delt.
+SEKSJON_TEGNGRENSE = 9_000
+
+#: Modulfiler som mangler seksjoner i dag, med begrunnelse.
+#: Samme slags unntaksliste som `FOR_STORE_I_DAG`, og den skal krympe.
+UTEN_SEKSJONER_I_DAG: dict[str, str] = {
+    # 17 275 tegn under én overskrift 17. sep. 2026 — samme flate vegg som
+    # vaktlista hadde, bare mindre. Statusmaskinen, verdimengdene, bilens
+    # utganger og historikken er fire ting. Se `TODO.md`.
+    'oppdrag/CLAUDE.md': 'flat punktliste, skal struktureres — se TODO.md',
 }
 
 #: En tabellrad i rota som navngir en moduls egen fil skal være et *oppslag*,
@@ -287,6 +317,72 @@ class ModulfileneHarOgsaaEtTakTests(SimpleTestCase):
             'Disse takene er blitt slakke — senk dem til dagens størrelse, '
             'eller ta fila helt under MODUL_TEGNGRENSE og stryk unntaket:\n  '
             + '\n  '.join(slakke)))
+
+    def _seksjoner(self, sti: str) -> list[tuple[str, int]]:
+        """[(overskrift, tegn), ...] for hver `## `-seksjon i fila."""
+        ut, naa = [], None
+        for linje in (ROT / sti).read_text(encoding='utf-8').split('\n'):
+            if linje.startswith('## '):
+                naa = [linje[3:].strip(), 0]
+                ut.append(naa)
+            elif naa is not None:
+                naa[1] += len(linje) + 1
+        return [(navn, n) for navn, n in ut]
+
+    def test_en_stor_modulfil_maa_ha_seksjoner(self) -> None:
+        """**Regelen som ville fanget vaktlista i august.**
+
+        Fila vokste til 707 linjer under én overskrift. Et flatt punktliste på
+        den lengden har ingen steder ting «hører hjemme», så alt havner
+        nederst — og ingen kan se hvilken del som vokser. Størrelsen var
+        symptomet; fraværet av struktur var årsaken, og det er årsaken en vakt
+        skal måle.
+        """
+        funn = []
+        for sti in _modulfiler():
+            if sti in UTEN_SEKSJONER_I_DAG:
+                continue
+            tegn = self._tegn(sti)
+            if tegn < SEKSJONSKRAV_TEGN:
+                continue
+            antall = len(self._seksjoner(sti))
+            if antall < MIN_SEKSJONER:
+                funn.append(f'{sti}: {tegn} tegn, men {antall} seksjoner')
+        self.assertEqual(funn, [], (
+            f'Modulfiler over {SEKSJONSKRAV_TEGN} tegn uten minst '
+            f'{MIN_SEKSJONER} `## `-seksjoner:\n  ' + '\n  '.join(funn)
+            + '\n\nEn fil man ikke kan lete i, er en fil ingen finner regelen '
+              'sin i — og uten seksjoner kan ingen se hvilken del som vokser.'))
+
+    def test_ingen_enkeltseksjon_blir_en_monolitt(self) -> None:
+        """Seksjoner uten tak er den forrige feilen med et hakk mer struktur:
+        én seksjon som eter resten er en monolitt inni fila som nettopp ble
+        delt."""
+        funn = [f'{sti} → «{navn}»: {tegn} tegn'
+                for sti in _modulfiler()
+                for navn, tegn in self._seksjoner(sti)
+                if tegn > SEKSJON_TEGNGRENSE]
+        self.assertEqual(funn, [], (
+            f'Seksjoner over {SEKSJON_TEGNGRENSE} tegn:\n  ' + '\n  '.join(funn)
+            + '\n\nDel seksjonen, eller flytt det som egentlig er et eget tema.'))
+
+    def test_unntakene_uten_seksjoner_finnes_fortsatt(self) -> None:
+        """En begrunnelse for en fil som er borte — eller som *har* fått
+        seksjoner — er bare støy, og skjuler at jobben er gjort."""
+        feil = []
+        for sti in sorted(UTEN_SEKSJONER_I_DAG):
+            if sti not in _modulfiler():
+                feil.append(f'{sti}: finnes ikke')
+            elif len(self._seksjoner(sti)) >= MIN_SEKSJONER:
+                feil.append(f'{sti}: har seksjoner nå — stryk unntaket')
+        self.assertEqual(feil, [], '\n  '.join(feil))
+
+    def test_regelen_finner_faktisk_seksjoner(self) -> None:
+        """Sperrehake: leser `_seksjoner` feil, er begge reglene over grønne
+        for alltid."""
+        vaktliste = self._seksjoner('vaktliste/CLAUDE.md')
+        self.assertGreaterEqual(len(vaktliste), MIN_SEKSJONER, vaktliste)
+        self.assertTrue(all(tegn > 0 for _, tegn in vaktliste), vaktliste)
 
     def test_ingen_modulfil_er_uten_tak(self) -> None:
         """Sperrehake: finner ikke oppdagelsen noen filer, måler klassen

@@ -357,18 +357,27 @@ bindende: 1 før 2, fordi backupen speiler hvor modellene bor.
             backup 90 dager, modulfilene 730 dager offsite), A.10, A.11/A.6 (fil på e-post,
             offline drift)
       - [ ] `CLAUDE.md` — backup-avsnittet og hvor modellene bor
-- [ ] **Del `vaktliste/CLAUDE.md`.** Den er 55 743 tegn (~17 000 tokens) — større enn
-      `oppdrag`, `patients`, `statistikk` og `ko` til sammen, ganger to, og den eneste
-      modulfila som står som unntak i `FOR_STORE_I_DAG` i `core/tests_claude_md.py`.
-      Taket er pinnet på dagens størrelse, så fila kan krympe men ikke vokse; en
-      sperrehake krever at taket følger den nedover.
+- [ ] **Strukturér `oppdrag/CLAUDE.md`.** 17 275 tegn under **én** overskrift — samme
+      flate vegg vaktlista hadde, bare mindre, og den eneste fila som står i
+      `UTEN_SEKSJONER_I_DAG` i `core/tests_claude_md.py`. Statusmaskinen, verdimengdene,
+      bilens utganger og historikk-mot-arkiv er fire ting.
 
-      Fila er ikke dårlig skrevet — den beskriver portalens største modul. Men den har
-      vokst uten tak siden den ble skilt ut 15. sep. 2026, og den skal deles etter samme
-      regel som rota ble: **planlegging, drift og registre er tre ting.** Merk at
-      delingen av rota gjorde nøyaktig denne feilen — den flyttet 574 linjer ut og satte
-      ikke noe tak på der de havnet. «Flytt det til modulfila» er et svar som virker helt
-      til modulfila er den nye monolitten.
+      **Gjør det som med vaktlista: flytt, ikke skriv om.** Skriptet som gjorde det
+      beviste at hver setning var bevart ved å sammenligne mengden av linjer før og
+      etter. Det er den eneste måten å gjøre en slik omstokking uten å risikere at en
+      regel forsvinner i redigeringen.
+
+- [ ] **Vurder om `vaktliste/CLAUDE.md` kan krympes — seksjon for seksjon.** Fila er
+      strukturert (13 seksjoner, 17. sep. 2026) men ikke kortet ned; den er 56 799 tegn og
+      står pinnet i `FOR_STORE_I_DAG`. Kutt var **ikke** riktig den dagen, og grunnen bør
+      stå: hvert avsnitt bærer en regel *og* feilen som lærte oss den, og det er
+      begrunnelsen som får reglene til å feste seg. En kortere fil med dårligere
+      dokumentasjon er ikke en forbedring.
+
+      Det som *nå* er mulig, og som ikke var det før, er å vurdere én seksjon om gangen
+      mot CHANGELOG: står hele hendelsesforløpet der, kan modulfila nøye seg med regelen
+      og den ene setningen som gjør den huskbar. De tre største er «Planleggingsflatene»
+      (8 003), «Plassen og skiftet» (7 763) og «Planleggeren» (6 189).
 
 - [ ] **4. De mindre** (§3 i notatet), når man er i nærheten: brukeradmin importerer
       pasientregistrene (3.1), `/portal-admin/` samlet i én URL-fil (3.2), skimene

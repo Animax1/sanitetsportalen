@@ -4,6 +4,64 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-17 — Vaktlistefila fikk seksjoner, og vakten fikk noe å peke på
+
+**Oppgaven var «del `vaktliste/CLAUDE.md`», og den ble ikke løst slik.** Tre funn i
+rekkefølge, og hvert av dem snudde planen:
+
+**1. En fil ved siden av modulfila lastes ikke.** `vaktliste/CLAUDE.md` leses når noen
+arbeider i `vaktliste/`; `vaktliste/drift.md` leses av ingen. En filsplitt ville flyttet
+reglene til et sted der de bare finnes for den som vet at de finnes — nøyaktig fella
+prosjektet dokumenterer i sin egen innledning, der to-grener-regelen sto i en deploy-guide
+som ikke lastes.
+
+**2. Det var ikke noe fett å skjære bort.** Hele fila ble lest før noe ble rørt. Hvert
+avsnitt bærer en regel **og** feilen som lærte oss den — `readOnly` som ikke virker på
+`datetime-local`, `nulls_last` som skiller SQLite fra PostgreSQL, `splice(2, …)` mot en
+liste som ennå ikke hadde fått «Mannskap». Å hente tusen tegn ved å stryke «hvorfor» ville
+gjort fila kortere og dokumentasjonen dårligere, og det er akkurat det
+`core/tests_claude_md.py` advarer mot i sin egen docstring: grensa «kan tilfredsstilles ved
+å slette noe nyttig».
+
+**3. Den ekte defekten var ikke størrelsen.** **707 av 736 linjer lå under én
+overskrift.** Et flatt punktliste på den lengden har ingen steder ting hører hjemme, så alt
+havner nederst — og ingen kan se hvilken del som vokser. Størrelsen var symptomet.
+
+**Fila har nå 13 seksjoner der den hadde én**, største 109 linjer: tilgang, plassen og
+skiftet, vakta og tidene, registrene, kompetanse og roller, planleggingsflatene, tabeller
+og felter, besetningen mot `/oppdrag/`, belastning og budsjett, innsjekk og drift,
+planleggeren, drift-reserven, frontend.
+
+**Omstokkingen ble gjort av et skript som beviste at ingenting gikk tapt.** Fila ble
+parset i blokker, hver blokk tilordnet en seksjon, og skriptet krevde at hver linje ble
+brukt **nøyaktig én gang** og at mengden av ikke-tomme linjer var identisk før og etter.
+Det er den eneste måten å stokke om 736 linjer uten å risikere at en regel forsvinner i
+redigeringen. Ingen setning er endret.
+
+**Prisen er 1 056 tegn** (55 743 → 56 799) for overskriftene og seksjonsingressene. Det er
+en bevisst byttehandel: en fil man kan lete i, og en vakt som kan si *hvilken* del som
+vokser. Pinnen i `FOR_STORE_I_DAG` er justert, og begrunnelsen står i koden.
+
+**To nye regler — og det er den første som ville fanget vaktlista i august:**
+
+| Regel | Hva den fanger |
+|---|---|
+| `test_en_stor_modulfil_maa_ha_seksjoner` | En modulfil over 8 000 tegn må ha minst tre `## `-seksjoner. Måler **årsaken** (ingen struktur), ikke bare symptomet (størrelse) |
+| `test_ingen_enkeltseksjon_blir_en_monolitt` | Ingen seksjon over 9 000 tegn. Uten den er neste feil den forrige med et hakk mer struktur: én seksjon som eter resten |
+
+**Og regelen fant med en gang en fil til:** `oppdrag/CLAUDE.md` er 17 275 tegn under
+**én** overskrift — samme flate vegg, bare mindre. Den står i `UTEN_SEKSJONER_I_DAG` med
+begrunnelse og et punkt i `TODO.md`. Statusmaskinen, verdimengdene, bilens utganger og
+historikk-mot-arkiv er fire ting.
+
+**Tre mutanter, alle drept:** unntaket for oppdragsfila fjernet (regelen må fyre), to
+seksjoner slått sammen til én på 15 766 tegn (monolittregelen må fyre), og `_seksjoner()`
+satt til å lete etter `#### ` slik at den finner null (sperrehaken må fyre).
+
+Suite: 3 288 tester, grønn.
+
+---
+
 ## 2026-09-17 — Rota kartlegger, modulfila forklarer — og vaktene måler tegn
 
 Ingen kodeendring, bare dokumentasjon og de testene som holder den i live.
