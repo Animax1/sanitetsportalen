@@ -343,9 +343,9 @@ bindende: 1 før 2, fordi backupen speiler hvor modellene bor.
 > `docs/PLAN_REKKEFOLGE_2026-09.md`: det av punkt 2 som *ikke* rører `AppSetting`
 > (`vaktliste`-handler, `core.Vakt` i egen portalfil, gjenopprettingstesten i tom base,
 > 3.4 og omdøpingen) tas **før** flyttingen, så prod har en gjenopprettbar backup foran
-> tilstandsmigrasjonen. Hel backup og `AppSetting` i portalfila tas etter. Datteroppdrag
-> og statistikk-utvidelsen står etter dokumentrunden og etter første skarpe vakt med
-> oppdragsmodulen.
+> tilstandsmigrasjonen. Hel backup og `AppSetting` i portalfila tas etter. KO-modulen
+> (som erstattet datteroppdrag, 17. sep. 2026) og statistikk-utvidelsen står etter
+> dokumentrunden og etter første skarpe vakt med oppdragsmodulen.
 
 - [ ] **3. Dokumentrunden — når 1 og 2 er levert.** Én runde, ikke stykkevis, og den tar
       med seg **alt fra 11.–13. september** (sikkerhetsrundene, server-status, reserve og
@@ -488,17 +488,43 @@ forbindelser. Tas opp igjen kun hvis `WEB_WORKERS` settes til 4 eller mer.
 
 Fem åpne spørsmål til André står i §6 i notatet.
 
-### Datteroppdrag — én hendelse, flere pasienter — se `docs/FORSLAG_DATTEROPPDRAG.md`
+### KO-modulen — se [`docs/FORSLAG_KO.md`](./docs/FORSLAG_KO.md)
 
-- [ ] **Idé, ikke besluttet** (13. sep. 2026). Et oppdrag kan deles i datteroppdrag, ett
-      per pasient, med egen bil, grovsortering og tidslinje; `Oppdrag.forelder`, dybde
-      låst til ett nivå, pasientantall bare på bladene, arkivet får `forelder_nummer` bare
-      når satt. Gir hendelsestidslinje, ressursbruk og spredning per hendelse i
-      statistikken. To–tre kvelder.
-      - [ ] **Åpent valg, besvares når ideen tas opp:** hva skjer med morens bil når
-            den første datteren lages — blir den på moren, eller flyttes den? (§7 i
-            notatet). Står bevisst ikke i «Krever Andre»: den seksjonen er det som
-            blokkerer *nå*, og et valg inne i en upåbegynt idé blokkerer ingenting.
+**Forslag, ikke besluttet** (17. sep. 2026). Situasjonsbildet: ressursoversikt, oppdragsliste,
+logg/chat og hendelser, med sidebar over påloggede med KO-tilgang. `/oppdrag/` snevres inn
+til enhetens egen skjerm, og **sentralbordet flytter til KO** — en flytting av
+`oppdrag-sentral-*.js`, ikke en kopi. Notatet har sju foreslåtte puljer i §10.
+
+Forslaget erstatter datteroppdrag, som er arkivert: grupperingen hører hjemme i en
+`Hendelse` som finnes *før* oppdraget og også dekker lag. Begrunnelsen står i §9.3.
+
+- [ ] **Bygg KO etter puljene i §10.** Skallet og tilgangen først, så loggen, så hendelsene.
+      De tre spørsmålene under besvares underveis, hver før sin pulje.
+
+      - [ ] **Åpent valg, besvares før pulje 2 (loggen):** hvor lenge oppbevares KO-loggen,
+            og arkiveres den? `NOTAT_DPIA_OG_FRITEKST.md` §7 slår fast at fritekst bevisst
+            *ikke* arkiveres — et felt i arkivets SHA-signatur er låst i 24 måneder ved
+            konstruksjon. KO-loggen er i all hovedsak fritekst, og sletteinngangen i §4.4
+            har samme konflikt.
+
+      - [ ] **Åpent valg, besvares før pulje 2:** hvilke systemhendelser løftes inn i
+            loggen? Lista skal være eksplisitt og begrunnet, som `NOKLER_UTEN_AUDIT`.
+            Dette er selve designarbeidet i loggdelen, ikke en detalj.
+
+      - [ ] **Åpent valg, besvares før pulje 3 (hendelser):** skal en lukket hendelse kunne
+            åpnes igjen? Sannsynligvis ja, som en ny logglinje — men det er en operativ
+            avgjørelse.
+
+- [ ] **Delt konto skal bare kunne ha `ModulTilgang` til `oppdrag`.** `er_delt_konto` finnes
+      og styrer e-post, MFA og selvbetjent reset; den avgrenser ikke modultilgang. Håndheves
+      i skjemaet, i datalaget og med en test — sperrer som bare dekker dagens veier, ser ikke
+      en ny vei. Kan gjøres uavhengig av KO.
+
+- [ ] **`/park/` — eget notat skrives etter KO.** Lagets utfallsregistrering: problemstilling,
+      lokasjon, utfall, ingen stempling, ingen pålogging. Egen modell, egen kilde i
+      statistikken, ingen kobling til `/pasienter/`. Vaktnøkkel som admin kan generere og
+      trekke tilbake, og endepunktet er **skrive-bare**. Rutingflagget på `Ressursgruppe`
+      (`FORSLAG_KO.md` §3.2) hører til her.
 
 ### Brukere, e-post og roller — se `docs/BESLUTNING_BRUKERE_OG_EPOST.md`
 
@@ -717,8 +743,6 @@ beslutningen ble tatt 24. aug. 2026, og `ModulTilgang` erstatter dem. `statistik
 derfor ingen av dem: den gates midlertidig på `Module.min_rolle` inntil `ModulTilgang`
 finnes.
 
-- [ ] Vaktliste
-- [ ] KO-tavle
 - [ ] Integrasjon med produksjonsdatabase
 - [ ] Lage Locus-klone, hente sted via enhetens GPS
 

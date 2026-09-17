@@ -1,5 +1,11 @@
 # Forslag: datteroppdrag — én hendelse, flere pasienter
 
+> **ARKIVERT 17. sep. 2026 — erstattet, ikke gjennomført.** Forslaget under er *ikke*
+> gjeldende. Grupperingen det beskriver hører nå hjemme i KO-modulen, som `Hendelse` —
+> se [`../FORSLAG_KO.md`](../FORSLAG_KO.md) §9.3 for hvorfor konklusjonen i §2 er snudd.
+> Banneret står fordi et forkastet forslag leser som et levende forslag; de andre
+> dokumentene her beskriver arbeid som *er* gjort, og trenger ingen advarsel.
+
 Status: **idé, ikke besluttet.** Skrevet 13. september 2026 etter et hypotetisk spørsmål
 fra André. Ingenting av dette er bygget, og ett spørsmål må besvares av den som sitter på
 sentralbordet før noen skriver kode (§7). Arbeidslista er `TODO.md` under «Ideer».

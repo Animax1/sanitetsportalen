@@ -1,8 +1,12 @@
 # Strategisk plan: rekkefølgen på teknisk gjeld, backup, datteroppdrag og statistikk
 
+> **Delvis foreldet 17. sep. 2026.** Trinn 5 (datteroppdrag) er strøket — forslaget er
+> arkivert og erstattet av `docs/FORSLAG_KO.md`. Trinn 1–4 er gjennomført. Resten av
+> notatet står fordi begrunnelsene for rekkefølgen fortsatt gjelder.
+
 Status: **forslag, 13. september 2026.** Skrevet på spørsmål om hva som bør tas først av
 de fire tingene som ligger i backloggen etter kartleggingene 13. sep. Underlaget er
-`docs/TEKNISK_GJELD.md`, `docs/BACKUP.md`, `docs/FORSLAG_DATTEROPPDRAG.md`,
+`docs/TEKNISK_GJELD.md`, `docs/BACKUP.md`, `docs/archived/FORSLAG_DATTEROPPDRAG.md`,
 `docs/BESLUTNING_STATISTIKK.md`, `TODO.md` og `CLAUDE.md`, kontrollert mot koden samme
 dag. Arbeidslista er fortsatt `TODO.md`; dette notatet forklarer hvorfor den ser ut som
 den gjør. Slettes når rekkefølgen er gjennomført eller endret.
@@ -15,7 +19,7 @@ den gjør. Slettes når rekkefølgen er gjennomført eller endret.
 |---|---|---|---|---|
 | **Backup** (`BACKUP.md` §3) | Risikoreduksjon | Offsite-kopiene i prod kan **ikke gjenopprettes i tom base** (`core.Vakt` mangler), og **vaktlista er ikke dekket** — mannskap med telefon, e-post og ISSI ligger utenfor alle filer siden prod-merget 11. sep. | Bare livssyklusregelen (90 dager) på bucketen | 3–4 kvelder samlet |
 | **Teknisk gjeld** (`TEKNISK_GJELD.md` §2) | Risikoreduksjon / struktur | Ingenting går i stykker. Neste modul og neste utvikler betaler litt mer hver gang. Backupen speiler hvor modellene bor | Nei | 2 kvelder for flyttingen, småtingene underveis |
-| **Datteroppdrag** (`FORSLAG_DATTEROPPDRAG.md`) | Ny funksjon | Ingenting — oppdragsmodulen har alt «flere enheter», og har **aldri vært brukt på en skarp vakt** | **Ja**, §7: hva skjer med morens bil | 2–3 kvelder |
+| ~~**Datteroppdrag**~~ (arkivert 17. sep. 2026) | — | Strøket. Grupperingen hører hjemme i KO, se `FORSLAG_KO.md` §9.3 | — | — |
 | **Statistikk-utvidelsen** (`BESLUTNING_STATISTIKK.md`) | Ny funksjon | Ingenting operativt. Sanntidsfanen (A1–A4) har verdi under vakt, B–D er evaluering | **Ja**, fem spørsmål, og underlaget ligger i det gamle repoet | 25–35 timer, 8–12 kvelder |
 
 De fire er ikke samme slags arbeid. To av dem fjerner risiko, to av dem lager noe nytt —
@@ -116,16 +120,15 @@ faktisk gjelder — den er art. 30-protokollen, og skal ikke ligge foran koden.
 ### Port — første skarpe vakt med oppdragsmodulen
 
 Ikke kode, men den står mellom trinn 4 og alt under. Modulen er ferdig og testet, aldri
-brukt live. Det som kommer ut av den vakta bestemmer om datteroppdrag er det neste
-sentralbordet trenger, eller om det er noe helt annet.
+brukt live. Det som kommer ut av den vakta bestemmer hva sentralbordet trenger neste
+gang.
 
-### Trinn 5 — Datteroppdrag (2–3 kvelder), etter porten og etter §7
+### Trinn 5 — ~~Datteroppdrag~~ — strøket 17. sep. 2026
 
-Forslaget er godt formet: modellvalget (peker, ikke gruppetabell), dybde låst til ett
-nivå, antall bare på bladene, `forelder_nummer` i signaturen bare når satt. Det er
-klart til å bygges den dagen to ting foreligger: svaret på §7 (morens bil), og en vakt
-som har vist at hendelser faktisk vokser slik notatet antar. Bygges det før, gjetter vi
-på begge.
+Forslaget var godt formet, og det ble likevel feil svar: grupperingen det beskrev hører
+hjemme i KO-modulen, som en `Hendelse` som finnes *før* oppdraget og også dekker lag og
+hendelser uten en eneste enhet. `docs/FORSLAG_KO.md` §9.3 har hele begrunnelsen; notatet
+selv ligger i `docs/archived/`.
 
 ### Trinn 6 — Statistikk-utvidelsen, delt i to (8–12 kvelder)
 
@@ -168,7 +171,6 @@ ferdigstilles etter flyttingen», ikke «ingen backuparbeid før flyttingen».
 |---|---|---|
 | Trinn 1, prod-verifisering | IAM-nøkkel og de seks offsite-variablene på prod, prøv `hent_offsite` én gang | TODO, «Reserve og offline» punkt 3 |
 | Trinn 3, når koden er ute | Livssyklusregel 90 dager på `full/` | TODO, «Teknisk gjeld» punkt 2 |
-| Før trinn 5 | §7 i `FORSLAG_DATTEROPPDRAG.md`: morens bil | TODO, «Ideer» |
 | Før trinn 6 | De fem spørsmålene i `BESLUTNING_STATISTIKK.md`, og hvor underlaget hentes | TODO, «Forbedringsbacklog» |
 | Uavhengig | Organisasjonsnavn i A.4 | TODO, «Krever Andre» |
 

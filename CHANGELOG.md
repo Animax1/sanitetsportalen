@@ -4,6 +4,69 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-17 — Planforslag for KO-modulen, og datteroppdrag forkastet
+
+Ingen kodeendring. `docs/FORSLAG_KO.md` er et planforslag (ikke besluttet) etter en
+gjennomgang med André 16.–17. sep.: **KO-modulen** — situasjonsbildet med ressursoversikt,
+oppdragsliste, logg/chat, hendelser og en sidebar over påloggede med KO-tilgang.
+`/oppdrag/` snevres inn til enhetens egen skjerm, og **sentralbordet flytter til KO** som
+en flytting av `oppdrag-sentral-*.js`, ikke en kopi.
+
+**`docs/FORSLAG_DATTEROPPDRAG.md` er arkivert — erstattet, ikke gjennomført.** Notatet fra
+13. sep. foreslo `Oppdrag.forelder` og forkastet i §2 uttrykkelig en egen hendelsestabell,
+med begrunnelsen «Moren *er* et oppdrag med biler og stemplinger før noen vet hvor mange
+pasienter det er». Den begrunnelsen holdt **så lenge oppdraget var øverste nivå**. I KO er
+premisset snudd: hendelsen finnes *før* oppdraget, ofte uten oppdrag i det hele tatt, og
+den dekker i tillegg lag — som datteroppdrag aldri kunne. Hele resonnementet står i
+`FORSLAG_KO.md` §9.3. Det åpne spørsmålet i det gamle notatets §7 (hva skjer med morens bil)
+faller bort med modellen.
+
+`docs/archived/README.md` har fått en ny kategori, **«Forslag som er erstattet»**, og
+datteroppdrag-notatet er det eneste dokumentet der som har fått et banner på toppen.
+Grunnen: de andre arkiverte dokumentene beskriver gjennomført arbeid, og det leser man seg
+til. Et forkastet forslag leser nøyaktig som et levende forslag, og den som finner det ved
+å søke på «datteroppdrag» har ingen grunn til å åpne indeksfila først.
+
+**Gjennomgangen fant seks ting som allerede var bygget** (`FORSLAG_KO.md` §2). `Ressurs.enhet`
+— koblingen mellom vaktlistas ressurs og oppdragsmodulens enhet — er den viktigste: den er
+grunnlaget for hele ressursoversikten i KO, og den har ligget der siden fase 6.
+`CustomUser.er_delt_konto`, `Ressursgruppe` («samleplass, ambulanse, mannskapsbil, lag» —
+docstringen nevner KO selv), `Enhetstype`-flaggene, `neste_oppdragsnummer()` og
+`_list_active_sessions` er de fem andre. Mønsteret er nå navngitt i notatet: **før noe
+designes inn i KO, sjekk om vaktlista, oppdrag eller kontoappen allerede har begrepet.**
+
+De viktigste rammene som ble lagt:
+
+| Valg | Kort begrunnelse |
+|---|---|
+| **Enheter produserer tid, lag produserer utfall** | Setningen som fordeler ansvaret mellom `/oppdrag/` og `/park/`. Lagdata skal aldri havne i en responstidsstatistikk — ikke «mangler data», men «måler ikke det» |
+| Ressursoversikten er en **projeksjon**, ikke et register | Et eget KO-register ville gitt to navn på samme bil midt i en vakt. §9.1 |
+| **Én logg**, chat og hendelseskommentarer som linjer i den | Er chatten et eget sted, kommer dagen da den viktigste setningen ble sagt der og ikke står i loggen. §4.5 |
+| Loggen sorteres på **registreringsrekkefølge**, ikke på `tidspunkt` | En korrigert tid flytter ellers linja, og fortellingen blir uleselig — og det er som fortelling loggen har verdi. §4.3 |
+| Én smal, logget **sletteinngang** | Append-only og «fjern personopplysninger» står i direkte konflikt. Billig fra start, vond å ettermontere. §4.4 |
+| To nummerserier, **aldri omnummerert** | `H12` og `O45`, begge per vakt. Hierarkisk `H12.1` er forkastet: et oppdrag knyttes ofte til en hendelse i etterkant, og **et nummer som endrer seg er ikke en identifikator**. §6, §9.4 |
+| Ansvarsområde **vises**, tilgangsnivå **styrer** | Å la området gi tilgang dobler matrisen, og første gang den rette er opptatt møter du en vegg. §5.1 |
+| Hold KO **påføringsformet** | Flere operatører fungerer i `/oppdrag/` i dag fordi arbeidet der er nye rader. Polling holder så lenge det er sant; WebSockets er et infrahopp uten gevinst her. §7.1 |
+| De tre registrene teller **kontakter, ikke personer** | Én person kan bli registrert i `/park/`, i `/oppdrag/` og på samleplass. Summert blir 210 mennesker til 340 «pasienter». Ordet i overskriften er det eneste som hindrer feilen. §8 |
+
+`Oppdrag` får én nullbar FK til `Hendelse`; `ko` importerer `vaktliste` og `oppdrag`, ingen
+av dem importerer `ko`. KO blir øverste lag, og begge kantene skal håndheves med AST slik
+`OppdragImportererIkkeVaktlista` gjør i dag.
+
+Tre spørsmål står åpne i §11 og er lagt i `TODO.md` under «KO-modulen», hvert med hvilken
+pulje det må besvares før: oppbevaring/arkivering av loggen, hvilke systemhendelser som
+løftes inn i den, og om en lukket hendelse kan åpnes igjen. De står som «Åpent valg» og
+ikke under «Krever Andre» — modulen er upåbegynt, og seksjonen øverst er det som blokkerer
+*nå*.
+
+Ryddet med: `docs/PLAN_REKKEFOLGE_2026-09.md` (trinn 5 strøket, banner om at trinn 1–4 er
+gjennomført), `docs/FORSLAG_RAPPORTMODUL.md` (peker nå på `FORSLAG_KO.md` som eksempel på
+`FORSLAG_*`), `core/tests_todo.py` (docstringen pekte på datteroppdrag-punktet som mønster
+for «Åpent valg»). `- [ ] Vaktliste` og `- [ ] KO-tavle` er fjernet fra «Framtidige
+moduler»: vaktlista står i prod, og KO har fått sin egen seksjon.
+
+---
+
 ## 2026-09-16 — Resten av pulje 3 og sesjonsaktiviteten ut i prod
 
 Fire commits, `d16b6f6` → `0405a17`, verifisert på staging:

@@ -4,7 +4,7 @@
 > revidert samme dag etter at André utfordret den første versjonen — med rette; se §3.1.
 >
 > *Fila heter `FORSLAG_` og ikke `rapportmodul.md` for å følge navneskikken i `docs/`:
-> `BESLUTNING_*` er avgjort, `FORSLAG_*` er ikke. Se `FORSLAG_DATTEROPPDRAG.md`.*
+> `BESLUTNING_*` er avgjort, `FORSLAG_*` er ikke. Se `FORSLAG_KO.md`.*
 
 ---
 

@@ -1,7 +1,7 @@
 # Arkivert dokumentasjon
 
-Historikk. Alt her beskriver arbeid som **er gjennomført**, eller planer som er utført og
-erstattet av virkeligheten.
+Historikk. Alt her beskriver arbeid som **er gjennomført**, planer som er utført og
+erstattet av virkeligheten, eller forslag som er **forkastet til fordel for noe annet**.
 
 **Ingenting her skal oppdateres.** Er en påstand i et av disse dokumentene i utakt med
 koden, er det riktig — dokumentet beskriver kodebasen slik den var da leveransen ble gjort.
@@ -44,6 +44,21 @@ kontrollert.
 |---|---|---|
 | [`DATAIMPORT_FRA_GAMMEL_PROD.md`](./DATAIMPORT_FRA_GAMMEL_PROD.md) | Planen for å få årets pasientdata fra den gamle Pasientregistreringsappen inn i portalen (14. aug. 2026) | Utført 22. aug. 2026: 273 pasienter, 12 førstehjelpere, 6 helsepersonell, alle kontroller grønne — se TODO under «Dataimport fra gammel prod». `import_offline_data` er kommandoen som ble brukt, og den finnes fortsatt |
 | [`OPPSETT_KOLLAPS_CRON.md`](./OPPSETT_KOLLAPS_CRON.md) | Oppsettet av `kollaps_arkiv` som cron-jobb i Railway | Jobben står i `production` (`0 4 1 * *`) siden 22. aug. 2026, tørrkjørt 23. aug. Dokumentet ba selv om å bli slettet når jobben var oppe; det er arkivert i stedet, fordi sperrene det beskriver (backup etter arkivet, audit per kollaps) er verdt å ha et sted |
+
+## Forslag som er erstattet (arkivert 17. sep. 2026)
+
+Denne kategorien er ny, og den er annerledes enn de over: dokumentet beskriver ikke arbeid
+som er gjort, men arbeid som **ikke skal gjøres**.
+
+| Dokument | Hva det foreslo | Hva som erstattet det |
+|---|---|---|
+| [`FORSLAG_DATTEROPPDRAG.md`](./FORSLAG_DATTEROPPDRAG.md) | Ett oppdrag deles i datteroppdrag, ett per pasient, med `Oppdrag.forelder`. §2 forkastet uttrykkelig en egen hendelsestabell | [`../FORSLAG_KO.md`](../FORSLAG_KO.md). KO eier hendelsen, og da er premisset i §2 snudd: i KO finnes hendelsen *før* oppdraget, og ofte uten oppdrag. Begrunnelsen er tatt vare på i KO-notatets §9.3 |
+
+**Dette er det ene dokumentet her som har fått et banner på toppen.** De andre beskriver
+gjennomført arbeid, og en leser skjønner av innholdet at det er historie. Et forkastet
+forslag gjør ikke det — det leser nøyaktig som et levende forslag, og den som finner det
+ved å søke på «datteroppdrag» har ingen grunn til å gå hit for å lese indekslinja. Regelen
+«ingenting her skal oppdateres» gjelder innholdet; banneret sier hva dokumentet *er*.
 
 ---
 

@@ -86,7 +86,8 @@ class TodoForfallerIkkeTests(SimpleTestCase):
         upåbegynt idé er ikke det — det besvares når ideen tas opp. Merkes slikt
         likevel, fylles toppen av fila med ting han ikke kan gjøre noe med, og
         da slutter han å stole på den. Formuler det som «Åpent valg» i stedet;
-        datteroppdrag-punktet er mønsteret.
+        de tre punktene under «KO-modulen» er mønsteret — hvert av dem sier
+        hvilken pulje det må besvares før.
         """
         feil = [f'  linje {nr}: [{seksjon[:40]}] {tekst[:60]}'
                 for nr, _inn, merke, seksjon, tekst in _punkter()
