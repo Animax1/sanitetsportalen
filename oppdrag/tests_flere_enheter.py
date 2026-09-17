@@ -853,7 +853,7 @@ class SentralbordetsMatriseTests(TestCase):
             (OPPDRAG_SENTRAL_JS, ('renderOppdrag', 'venterForbiTerskel', 'lydTerskler', '_enhetsmatrise', '_grovMerke',
                                   'hastegradKlasse', 'tidSiden', 'mkEnhetsvalg',
                                   'mkEnhetsrader', '_enhetsknapper', 'kanAvvente', '_varsleValg',
-                                  '_lovligeOverganger', 'tidslinjeHtml', '_problemMedAntall', '_medAntall', '_grupperEnheter', '_typeRekkefolge', '_enhetskort',
+                                  '_lovligeOverganger', 'tidslinjeHtml', '_problemMedAntall', '_medAntall', '_grupperEnheter', '_typeRekkefolge', '_enhetskort', 'enhetskortInnmat',
                                   '_sorterOppdrag', '_manglerTrinn', '_manglerMinutter')),
         ))
 

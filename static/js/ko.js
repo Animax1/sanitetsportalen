@@ -215,7 +215,7 @@ function koLinjeKnapper(linje) {
   let ut = '';
   if (koKanSkrive()) {
     ut += '<button type="button" class="btn btn-link btn-sm p-0 me-2"'
-      + ' data-action="koRett" data-id="' + escapeHtml(linje.id) + '">Rett</button>';
+      + ' data-action="koRett" data-id="' + escapeHtml(linje.id) + '">Rediger</button>';
   }
   if (koKanFjerne()) {
     ut += '<button type="button" class="btn btn-link btn-sm p-0 text-danger"'
@@ -346,7 +346,7 @@ async function koSkriv() {
 async function koRett(id) {
   const linje = Array.from(koLinjer.values()).find(l => l.id === id);
   if (!linje) return;
-  const tekst = window.prompt('Rett linja. Den gamle blir stående som historikk.',
+  const tekst = window.prompt('Rediger linja. Den gamle blir stående som historikk.',
                               linje.tekst);
   if (tekst === null) return;
   const res = await apiFetch('/ko/api/logg/' + id + '/rett/', {
@@ -427,6 +427,10 @@ function koKanStyreRessurs(ressurs) {
 // Fargen bærer en påstand om hvem som kan sendes, så den er en regel og ikke
 // pynt. Ukjent status gir `secondary` og ikke grønt: en verdi vi ikke kjenner
 // skal aldri se ledig ut.
+//
+// **Enheten farges av `status-prikk`-klassen i innmaten**, som i
+// sentralbordet — én farge­kilde for enheter, ikke to. Denne svarer for
+// KO-førte statuser, som ikke finnes i oppdragsmodulens verdimengde.
 function koStatusklasse(ressurs) {
   if (!ressurs.status) return 'secondary';
   if (ressurs.fort_av_ko) {
@@ -438,9 +442,12 @@ function koStatusklasse(ressurs) {
 
 // «2 av 3 møtt» — og tallet er ikke pynt heller: en ressurs med skift men uten
 // noen møtt er nettopp den man tror man har.
+// `bemanning_*` og ikke `antall`: enhetskortet bruker `antall` om *pasienter*
+// på oppdraget. To betydninger i samme rad er en feil man ikke ser som en
+// feil, bare som et tall som er litt rart.
 function koBemanningstekst(ressurs) {
-  if (!ressurs.antall) return 'ingen på skift nå';
-  return ressurs.tilstede + ' av ' + ressurs.antall + ' møtt';
+  if (!ressurs.bemanning_antall) return 'ingen på skift nå';
+  return ressurs.bemanning_tilstede + ' av ' + ressurs.bemanning_antall + ' møtt';
 }
 
 function koRessursKnapper(ressurs) {
@@ -461,11 +468,49 @@ function koRessursKnapper(ressurs) {
   return ut + '</div>';
 }
 
+// **Enheten tegnes av `enhetskortInnmat()` fra oppdrag-kort.js — samme kode
+// som sentralbordet.** Det er hele svaret på feature parity (André, 17. sep.
+// 2026): en egen bygger her ville falt bak neste felt noen la til i
+// oppdragsmodulen, uten at noe ble rødt. Nøyaktig det hadde alt skjedd —
+// KOs første kort manglet passiv vakt, ventende, «ledig siden», sted og hele
+// oppdragslinja.
+//
+// Laget har ingen enhet (§3.1), og da er det KO som fører. Da tegnes navnet og
+// KO-statusen her, i samme form som innmaten, slik at radene ser like ut.
+function koLagInnmat(ressurs) {
+  return '<span class="status-prikk status-' + escapeHtml(ressurs.status) + '"></span>'
+    + '<div class="flex-grow-1">'
+    + '<div class="enhet-navn">' + escapeHtml(ressurs.navn) + '</div>'
+    + '<div class="enhet-meta">' + escapeHtml(koLagMeta(ressurs)) + '</div>'
+    + '</div>';
+}
+
+// «Ute av drift 21:14 · 12 min» — samme form som enhetens metalinje, og av
+// samme grunn: operatøren som skal sende noen vil vite hvem som har stått
+// lengst. Uten en føring står bare ordet.
+function koLagMeta(ressurs) {
+  if (!ressurs.status_satt_at) return ressurs.status_navn;
+  return ressurs.status_navn + ' ' + klokke(ressurs.status_satt_at)
+    + ' · ' + tidSiden(ressurs.status_satt_at);
+}
+
+// Besetningen står **under** kortet, som i sentralbordet, og bare når
+// serveren sendte den: mannskapslista henger på `vaktliste`-tilgang, ikke på
+// KO-tilgang (rollemodellen §5). En tom liste og «du får ikke se» ser derfor
+// like ut her, og det er med vilje.
+function koBesetningHtml(ressurs) {
+  if (!ressurs.mannskap.length) {
+    return '<div class="small text-muted">'
+      + escapeHtml(koBemanningstekst(ressurs)) + '</div>';
+  }
+  const navn = ressurs.mannskap.map((m) => escapeHtml(m.navn)
+    + (m.tilstede ? '' : ' <span class="text-muted">(ikke møtt)</span>')).join(', ');
+  return '<div class="small">' + navn + '</div>'
+    + '<div class="small text-muted">'
+    + escapeHtml(koBemanningstekst(ressurs)) + '</div>';
+}
+
 function koRessursHtml(ressurs) {
-  const mannskap = ressurs.mannskap.length
-    ? ressurs.mannskap.map((m) => escapeHtml(m.navn)
-        + (m.tilstede ? '' : ' <span class="text-muted">(ikke møtt)</span>')).join(', ')
-    : '<span class="text-muted">—</span>';
   // **Kilden til statusen står i bildet** (§3.1): «bilen sa det» mot «KO førte
   // det» er hele skillet den tredje kilden finnes for, og det skal ikke måtte
   // utledes av at en rad tilfeldigvis har knapper.
@@ -474,26 +519,18 @@ function koRessursHtml(ressurs) {
       + (ressurs.status_satt_av ? ' · ' + escapeHtml(ressurs.status_satt_av) : '')
       + '</span>'
     : '<span class="text-muted small">melder selv</span>';
-  const venter = ressurs.antall_ventende
-    ? ' <span class="text-muted small">(' + escapeHtml(ressurs.antall_ventende)
-      + ' venter)</span>'
-    : '';
+  const korps = ressurs.korps
+    ? ' <span class="text-muted small">' + escapeHtml(ressurs.korps) + '</span>' : '';
+  const innmat = ressurs.fort_av_ko
+    ? koLagInnmat(ressurs) : enhetskortInnmat(ressurs);
+  const besetning = koBesetningHtml(ressurs);
+  const knapper = koRessursKnapper(ressurs);
   return '<li class="list-group-item py-2">'
-    + '<div class="d-flex justify-content-between align-items-start gap-2">'
-    + '<div><span class="fw-semibold">' + escapeHtml(ressurs.navn) + '</span>'
-    + (ressurs.korps ? ' <span class="text-muted small">'
-        + escapeHtml(ressurs.korps) + '</span>' : '')
-    + '<div class="small">' + mannskap + '</div>'
-    + '<div class="small text-muted">' + escapeHtml(koBemanningstekst(ressurs))
-    + '</div></div>'
-    + '<div class="text-end">'
-    + '<span class="badge text-bg-' + koStatusklasse(ressurs) + '">'
-    + escapeHtml(ressurs.status_navn || 'ukjent') + '</span>' + venter
-    + '<div>' + kilde + '</div>'
-    + '</div></div>'
-    + koRessursKnapper(ressurs)
+    + '<div class="enhet-kort">' + innmat + korps + '</div>'
+    + besetning + kilde + knapper
     + '</li>';
 }
+
 
 function koTegnRessurser() {
   const boks = document.getElementById('ko-ressurser');

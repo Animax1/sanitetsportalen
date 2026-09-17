@@ -355,6 +355,114 @@ class ProblemstillingUdefinert(UlovligOvergang):
 
 
 @transaction.atomic
+def _aktivt_oppdrag_felter(rad) -> dict:
+    """Feltene enhetskortet viser om det aktive oppdraget.
+
+    Alle `None` når det ikke finnes noe, slik at kortet kan lese dem uten å
+    spørre. `rad` er enhetens koblingsrad: statusen og tidspunktet er *hennes*.
+    """
+    from .models import Statusmelding
+
+    if rad is None:
+        return {'oppdragsnummer': None, 'hastegrad': None, 'grovsortering': None,
+                'grovsortering_navn': None, 'problemstilling': None, 'antall': None,
+                'status_tidspunkt': None, 'sted_navn': ''}
+    oppdrag = rad.oppdrag
+    melding = Statusmelding.objects.gjeldende_for_status(
+        oppdrag, rad.status, oppdragsenhet=rad)
+    return {
+        'oppdragsnummer': oppdrag.oppdragsnummer,
+        'hastegrad': oppdrag.hastegrad,
+        'grovsortering': oppdrag.grovsortering,
+        'grovsortering_navn': choices.GROVSORTERING_NAVN.get(oppdrag.grovsortering, ''),
+        'problemstilling': oppdrag.problemstilling,
+        'antall': oppdrag.antall,
+        'status_tidspunkt': melding.tidspunkt.isoformat() if melding else None,
+        'sted_navn': choices.AVREIST_TIL_NAVN.get(melding.sted, '') if melding else '',
+    }
+
+
+def enhetskort(enhet, vakt=None, ledig_siden=None) -> dict:
+    """Alt et enhetskort viser — **den ene kilden, to lesere**.
+
+    Sentralbordet (`oppdrag.views.enheter_view`) og KOs ressursoversikt
+    (`ko.services.ressursbildet`) tegner samme kort, og skal derfor lese samme
+    felter. Lå serialiseringen i viewet, ville KO fått en kopi — og kopien
+    ville manglet neste felt noen la til her, uten at noe ble rødt. Feature
+    parity som holder, er den som følger av konstruksjonen (André, 17. sep.
+    2026: «Jeg vil ha det likt feature messig inn her i /ko»).
+
+    `ledig_siden` sendes inn av den som henter mange kort: `ledig_siden_bulk()`
+    svarer for hele lista i én spørring, og et oppslag per enhet ville vært N
+    spørringer på en liste som polles hvert tiende sekund.
+    """
+    info = enhet_status(enhet, vakt)
+    return {
+        'id': enhet.pk,
+        'navn': enhet.navn,
+        'pa_vakt': enhet.pa_vakt,
+        # Merket vises bare der det betyr noe: en ambulanse har ingen passiv
+        # vakt, og «Aktiv» på henne ville vært støy.
+        'kan_passiv_vakt': kan_passiv_vakt(enhet),
+        'kan_avvente': kan_avvente(enhet),
+        'passiv_vakt': enhet.passiv_vakt,
+        'er_aktiv': enhet.er_aktiv,
+        'username': getattr(enhet.user, 'username', '') or '',
+        'type': enhet.enhetstype_id,
+        'type_navn': enhet.enhetstype.navn if enhet.enhetstype else '',
+        'type_rekkefolge': (enhet.enhetstype.rekkefolge
+                            if enhet.enhetstype else None),
+        'status': info['status'],
+        'status_navn': info['status_navn'],
+        'antall_ventende': info['antall_ventende'],
+        'aktivt_oppdrag_id': (
+            info['aktivt_oppdrag'].pk if info['aktivt_oppdrag'] else None),
+        # **Bare for den som faktisk er ledig.** Står hun på et oppdrag, er
+        # «ledig siden» forrige gang hun var det — et tall som ser ut som
+        # nåtid og ikke er det.
+        'ledig_siden': (
+            ledig_siden.isoformat()
+            if info['status'] == choices.LEDIG and ledig_siden else None),
+        **_aktivt_oppdrag_felter(info['koblingsrad']),
+    }
+
+
+def tomt_enhetskort() -> dict:
+    """Formen et enhetskort har, uten en enhet bak.
+
+    KOs ressursoversikt viser også ressurser som **ikke** har en enhet — et
+    lag logger ikke inn, det er hele poenget (§3.1) — og radene skal likevel
+    ha samme form. Ellers måtte klienten spørre «finnes feltet» før hver
+    avlesing, og en manglende nøkkel blir `undefined` midt i en mal-streng.
+
+    **Nøklene står skrevet her og kontrolleres mot `enhetskort()`**, framfor å
+    utledes av den. Et første forsøk leste nøklene ut av kildekoden med en
+    regex (17. sep. 2026) og tok 16 av 24 — de åtte fra
+    `_aktivt_oppdrag_felter` kommer inn med `**` og sto i en annen funksjon.
+    En utledning som stille tar to tredjedeler er verre enn en liste: lista
+    har en test, og den sier fra.
+    """
+    return {
+        'id': None,
+        'navn': '',
+        'pa_vakt': False,
+        'kan_passiv_vakt': False,
+        'kan_avvente': False,
+        'passiv_vakt': False,
+        'er_aktiv': True,
+        'username': '',
+        'type': None,
+        'type_navn': '',
+        'type_rekkefolge': None,
+        'status': '',
+        'status_navn': '',
+        'antall_ventende': 0,
+        'aktivt_oppdrag_id': None,
+        'ledig_siden': None,
+        **_aktivt_oppdrag_felter(None),
+    }
+
+
 def sett_status(oppdrag, ny_status: str, *, bruker=None, tidspunkt=None,
                 forsinket: bool = False, automatisk: bool = False,
                 sted: str = '', enhet=None, manuell: bool = False,

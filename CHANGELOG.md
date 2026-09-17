@@ -4,6 +4,80 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-17 — Feature parity med sentralbordet: samme kode, ikke samme flid  `#ko/ressursbildet` `#oppdrag/sentralbord`
+
+André: «Du har tatt friheter med ressursoversikten. Det er ikke feature parity med
+/oppdrag. Jeg vil ha det likt feature messig inn her i /ko.» Og: «Endre navnet fra «rett»
+til «rediger» i loggen» — gjort, både på knappen og i ledeteksten.
+
+Han har rett. KOs første kort viste navn, besetning og status. Sentralbordets kort viser i
+tillegg **passiv vakt, antall ventende, «ledig siden», hvor bilen dro, og hele
+oppdragslinja** — nummer, hastegrad, bilens grovsortering og problemstillingen med
+pasientantall.
+
+### Parity som holder er den som følger av at det er samme kode
+
+To steder, samme grep:
+
+| Lag | Den ene kilden | Leses av |
+|---|---|---|
+| Server | `oppdrag.services.enhetskort()` | `oppdrag.views.enheter_view` og `ko.services._enhetsstatuser` |
+| Klient | `enhetskortInnmat()` i nye `static/js/oppdrag-kort.js` | `_enhetskort()` i sentralbordet og `koRessursHtml()` i KO |
+
+Å kopiere feltene ville gitt parity **den dagen**, og så tapt den ved neste felt noen la
+til — uten at noe ble rødt. Det er den samme feilklassen som gjenopprettingsrekkefølgen i
+morges: en påstand skrevet fire steder går i utakt, en utledning gjør det ikke.
+
+`tomt_enhetskort()` gir raden samme form for en ressurs **uten** enhet, så klienten slipper
+å spørre «finnes feltet» før hver avlesing — en manglende nøkkel blir `undefined` midt i en
+mal-streng.
+
+### Tre feil funnet mens paritet ble bygget
+
+**1. «antall» betød to ting i samme rad.** `enhetskort()` bruker `antall` om *pasienter* på
+oppdraget, og `_problemMedAntall()` leser nettopp det feltet. KOs rad skrev mannskapstallet
+dit. En bil på et transportoppdrag ville vist antall folk i bilen som antall pasienter — en
+feil ingen ser som en feil, bare som et tall som er litt rart. Heter nå `bemanning_antall`
+og `bemanning_tilstede`. **Funnet av testen, ikke av lesing:** det var første gang de to
+feltsettene møttes i samme rad.
+
+**2. Mannskapslista lå åpen for alle med `ko:les`.** Sentralbordet gater
+besetningspanelet på `har_tilgang(bruker, 'vaktliste', 'les')` — komposisjonsregelen fra
+rollemodellen §5, så en modul ikke gir avledet innsyn i en annens data. KOs ressursbilde
+sendte navnene til alle med KO-tilgang. Sto slik fra pulje 3 til nå; feilen var min, og den
+var stille — markupen så helt riktig ut. Gaten er nå den samme, og
+`test_endepunktet_gater_paa_vaktliste_og_ikke_paa_ko` prøver den gjennom den ekte inngangen.
+
+**3. `window.OPPDRAG_MED_ANTALL` manglet på KO-sida.** Det delte kortet slår opp der for å
+vite om problemstillingen bærer et antall. Uten den står «Transport» der det skulle stått
+«Transport · 3 pasienter»: kortet ser riktig ut og er fattigere, som er den stille varianten
+av å mangle parity.
+
+### Mutasjonstesting — to overlevende, og begge var ekte hull
+
+**9 mutanter.** Sperra mot koblet bil, gaten på vaktliste, KO som tegner sitt eget kort,
+et felt ute av `tomt_enhetskort()`, og fire til.
+
+**«KO leser `enhet_status` i stedet for `enhetskort`» overlevde først.** Raden får alle
+nøklene av `tomt_enhetskort()`, så testen min på «har feltet» gikk grønn mens feltene sto
+tomme. Den prøvde formen, ikke innholdet. `test_feltene_er_fylt_og_ikke_bare_til_stede`
+krever nå verdiene.
+
+**«ledig_siden droppes» overlevde.** Ingen test hadde en enhet som faktisk *var* ledig etter
+et oppdrag. Nå finnes den.
+
+Og én mutant var en ekte no-op: mannskapstallet skrevet i `antall` overskrives av
+`enhetskort()` like etter — for **enheten**. For laget finnes ingen slik overskriving, og
+det er der regelen måtte prøves. Mutantløgn nummer to, sett fra riktig kant.
+
+### Det som ikke ble delt
+
+`oppdrag-enhet.js` — bilens egen skjerm — har fortsatt sine egne kopier av
+`hastegradKlasse` og `_problemMedAntall`. Den laster ikke `oppdrag-kort.js`, og å rive i
+enhetsskjermen hører til pulje 4. Står i TODO.
+
+---
+
 ## 2026-09-17 — KO som konsoll: tre kolonner, og sida ruller ikke  `#ko/skallet`
 
 André, etter å ha sett pulje 3: «Logg skal være den sentrale delen. Ressursoversikt henger

@@ -287,6 +287,39 @@ ellers den aktive vaktas. Den ligger der og ikke her fordi det er vaktlistas reg
 drift, mens tavla spør globalt. Et forsøk på å slå de to sammen (17. sep. 2026) brøt
 nettopp den forskjellen, og suiten var grønn — ingen test hadde to lister i drift samtidig.
 
+## Feature parity med sentralbordet — ved konstruksjon, ikke ved flid
+
+André, 17. sep. 2026: «Det er ikke feature parity med /oppdrag. Jeg vil ha det likt feature
+messig inn her i /ko.» Det første kortet her viste navn, besetning og status, og manglet
+passiv vakt, ventende, «ledig siden», sted og hele oppdragslinja.
+
+**Parity som holder er den som følger av at det er samme kode.** To steder:
+
+| Lag | Den ene kilden | Leses av |
+|---|---|---|
+| Server | `oppdrag.services.enhetskort()` | `oppdrag.views.enheter_view` og `ko.services._enhetsstatuser` |
+| Klient | `enhetskortInnmat()` i `static/js/oppdrag-kort.js` | `_enhetskort()` i sentralbordet og `koRessursHtml()` her |
+
+Et utvalg av felter, eller en egen bygger, ville falt bak neste felt noen la til i
+oppdragsmodulen — uten at noe ble rødt. `tomt_enhetskort()` gir raden samme form for en
+ressurs **uten** enhet, så klienten slipper å spørre «finnes feltet» før hver avlesing.
+
+**`antall` betyr pasienter, ikke mannskap.** Det er enhetskortets felt, og
+`_problemMedAntall()` leser nettopp det: «Transport · 3 pasienter». KOs bemanningstall
+heter derfor `bemanning_antall` og `bemanning_tilstede`. Kollisjonen sto der i en time
+17. sep. 2026, og den var usynlig: en bil på et transportoppdrag ville vist antall folk i
+bilen som antall pasienter — et tall som bare er litt rart.
+
+**`window.OPPDRAG_MED_ANTALL` må settes av malen.** Det delte kortet slår opp der for å
+vite om problemstillingen bærer et antall. Uten den står «Transport» der det skulle stått
+«Transport · 3 pasienter» — kortet ser riktig ut og er fattigere, som er den stille
+varianten av å mangle parity.
+
+**Mannskapslista henger på `vaktliste`-tilgang, ikke på KO-tilgang.** Komposisjonsregelen
+fra rollemodellen §5, samme gate sentralbordet bruker for besetningspanelet. Den sto åpen
+fra pulje 3 til 17. sep. 2026: alle med `ko:les` fikk se hvem som gikk vakt, og markupen så
+helt riktig ut.
+
 **Grensesnittet gater på to ting, ikke én.** `koKanStyreRessurs()` krever både at brukeren
 kan skrive *og* at KO fører statusen for ressursen. Uten den andre halvdelen tegnes knapper
 på en koblet bil, serveren avviser dem, og operatøren står med en knapp som fører til en

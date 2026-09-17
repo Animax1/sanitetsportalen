@@ -41,7 +41,10 @@ from django.utils.dateparse import parse_datetime
 from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_http_methods
 
-from core.auth_decorators import er_global_admin, modul_kreves, nivaa_for
+from core.auth_decorators import (
+    er_global_admin, har_tilgang, modul_kreves, nivaa_for,
+)
+from core.jsdata import js_json
 from core.ratelimit import rate_limit
 from core.vakt import hent_aktiv_vakt
 
@@ -108,17 +111,27 @@ def _til_dict(linje):
 @modul_kreves('ko', 'les')
 @require_http_methods(['GET'])
 def index_view(request):
-    """Situasjonsbildet. Fire flater og en sidebar; loggen er fylt fra pulje 2.
+    """Situasjonsbildet: loggen, ressursoversikten og oppdragslista.
 
     Konteksten bærer nivået fordi **grensesnittet gater på
     `window.MODUL_TILGANG`, ikke på rollen** (`CLAUDE.md`): «Fjern» skal ikke
     tegnes for en som får 403 av den, og en knapp som fører til en vegg er
     verre enn ingen knapp.
+
+    **`med_antall` er ordforrådet det delte enhetskortet leser.**
+    `oppdrag-kort.js` tegnes av begge sidene, og `_problemMedAntall()` slår opp
+    her for å vite om problemstillingen bærer et pasientantall. Uten den står
+    «Transport» der det skulle stått «Transport · 3 pasienter» — kortet ser
+    riktig ut og er fattigere, som er den stille varianten av å mangle feature
+    parity.
     """
+    from oppdrag import verdier
+
     return render(request, 'ko/index.html', {
         'modul_nivaa': nivaa_for(request.user, 'ko') or '',
         'er_global_admin': er_global_admin(request.user),
         'ko_maks_tekst': services.MAKS_TEKST,
+        'med_antall': js_json(verdier.med_antall()),
     })
 
 
@@ -300,7 +313,19 @@ def ressurser_view(request):
     `les` og ikke mer: tavla er situasjonsbildet, og den som ikke får se hvem
     som er på vakt kan ikke lese loggen heller — linjene handler om dem.
     """
-    return JsonResponse({'status': 'ok', 'data': services.ressursbildet()})
+    return JsonResponse({'status': 'ok', 'data': _bilde(request)})
+
+
+def _bilde(request) -> dict:
+    """Ressursbildet slik *denne* brukeren får se det.
+
+    Mannskapslista henger på `vaktliste`-tilgang og ikke på KO-tilgang —
+    komposisjonsregelen fra rollemodellen §5, samme gate sentralbordet bruker
+    for besetningspanelet. Én funksjon, to kallsteder: lesingen og svaret på
+    en statusføring skal aldri kunne svare ulikt.
+    """
+    return services.ressursbildet(
+        kan_se_besetning=har_tilgang(request.user, 'vaktliste', 'les'))
 
 
 @modul_kreves('ko', 'skriv_full', svar='json')
@@ -335,4 +360,4 @@ def ressurs_status_view(request, pk):
             ressurs, data.get('status'), bruker=request.user)
     except services.Ugyldig as feil:
         return _feil(str(feil))
-    return JsonResponse({'status': 'ok', 'data': services.ressursbildet()})
+    return JsonResponse({'status': 'ok', 'data': _bilde(request)})

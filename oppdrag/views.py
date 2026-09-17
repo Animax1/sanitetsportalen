@@ -117,29 +117,6 @@ def index_view(request):
 
 # ── Enheter ──────────────────────────────────────────────────────────────────
 
-def _aktivt_oppdrag_felter(rad):
-    """Feltene enhetskortet viser om det aktive oppdraget — alle ``None``
-    når det ikke finnes noe, slik at kortet kan lese dem uten å spørre.
-    `rad` er enhetens koblingsrad: statusen og tidspunktet er *hennes*."""
-    if rad is None:
-        return {'oppdragsnummer': None, 'hastegrad': None, 'grovsortering': None,
-                'grovsortering_navn': None, 'problemstilling': None, 'antall': None,
-                'status_tidspunkt': None, 'sted_navn': ''}
-    oppdrag = rad.oppdrag
-    melding = Statusmelding.objects.gjeldende_for_status(
-        oppdrag, rad.status, oppdragsenhet=rad)
-    return {
-        'oppdragsnummer': oppdrag.oppdragsnummer,
-        'hastegrad': oppdrag.hastegrad,
-        'grovsortering': oppdrag.grovsortering,
-        'grovsortering_navn': choices.GROVSORTERING_NAVN.get(oppdrag.grovsortering, ''),
-        'problemstilling': oppdrag.problemstilling,
-        'antall': oppdrag.antall,
-        'status_tidspunkt': melding.tidspunkt.isoformat() if melding else None,
-        'sted_navn': choices.AVREIST_TIL_NAVN.get(melding.sted, '') if melding else '',
-    }
-
-
 def _synlig_for_bilen(request, oppdrag):
     """Lista utelater oppdraget 30 minutter etter Ledig — «en bil som blir
     stående ulåst». Detalj-, stemplings-, grovsorterings- og antall-endepunktet
@@ -177,41 +154,14 @@ def enheter_view(request):
     # hvert tiende sekund, og ett oppslag per enhet ville vært N spørringer.
     ledig_siden = services.ledig_siden_bulk(enheter, vakt)
 
-    data = [
-        {
-            'id': e.pk,
-            'navn': e.navn,
-            'pa_vakt': e.pa_vakt,
-            # Merket vises bare der det betyr noe: en ambulanse har ingen
-            # passiv vakt, og «Aktiv» på henne ville vært støy.
-            'kan_passiv_vakt': services.kan_passiv_vakt(e),
-            'kan_avvente': services.kan_avvente(e),
-            'passiv_vakt': e.passiv_vakt,
-            'er_aktiv': e.er_aktiv,
-            'username': getattr(e.user, 'username', '') or '',
-            'type': e.enhetstype_id,
-            'type_navn': e.enhetstype.navn if e.enhetstype else '',
-            'type_rekkefolge': e.enhetstype.rekkefolge if e.enhetstype else None,
-            'status': info['status'],
-            'status_navn': info['status_navn'],
-            'antall_ventende': info['antall_ventende'],
-            'aktivt_oppdrag_id': (
-                info['aktivt_oppdrag'].pk if info['aktivt_oppdrag'] else None),
-            # Det aktive oppdraget i ett blikk (prosjektleder, 11. sep.
-            # 2026): «det handler om å kjapt skaffe oversikt». Nummer,
-            # hastegrad, problemstilling og *når* statusen ble satt — uten
-            # å åpne oppdraget. Tomt når enheten er ledig.
-            # **Bare for den som faktisk er ledig.** Står hun på et oppdrag,
-            # er «ledig siden» forrige gang hun var det — et tall som ser ut
-            # som nåtid og ikke er det.
-            'ledig_siden': (
-                ledig_siden.get(e.pk).isoformat()
-                if info['status'] == choices.LEDIG and ledig_siden.get(e.pk)
-                else None),
-            **_aktivt_oppdrag_felter(info['koblingsrad']),
-        }
-        for e, info in ((e, services.enhet_status(e, vakt)) for e in enheter)
-    ]
+    # **Serialiseringen ligger i `services`, ikke her.** KOs ressursoversikt
+    # tegner samme kort og leser samme funksjon; en kopi ville manglet neste
+    # felt noen la til, uten at noe ble rødt. Se `services.enhetskort`.
+    #
+    # Det aktive oppdraget i ett blikk (prosjektleder, 11. sep. 2026): «det
+    # handler om å kjapt skaffe oversikt» — nummer, hastegrad, problemstilling
+    # og når statusen ble satt, uten å åpne oppdraget.
+    data = [services.enhetskort(e, vakt, ledig_siden.get(e.pk)) for e in enheter]
 
     # Enheter som ikke er på vakt sendes med, de filtreres ikke bort.
     # Sentralbordet viser dem i en egen gruppe: en bil som forsvinner fra

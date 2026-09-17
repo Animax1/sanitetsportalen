@@ -361,7 +361,7 @@ def sett_ressursstatus(ressurs, ny_status: str, *, bruker, naa=None):
     return rad
 
 
-def ressursbildet(naa=None) -> dict:
+def ressursbildet(naa=None, *, kan_se_besetning: bool = True) -> dict:
     """Tavla: hvem er på vakt, hvor står de, og hvem kan sendes.
 
     **En projeksjon, ikke et register.** Ingenting her lagres av KO utenom den
@@ -375,6 +375,7 @@ def ressursbildet(naa=None) -> dict:
     """
     from django.db.models import Prefetch
 
+    from oppdrag.services import tomt_enhetskort
     from vaktliste.models import Ressurs, Vaktpost
     from vaktliste.services import vaktliste_i_bruk
     from . import choices as ko_choices
@@ -408,18 +409,36 @@ def ressursbildet(naa=None) -> dict:
 
     grupper: list[dict] = []
     for r in ressurser:
-        rad = {
+        # **Feltene enheten bidrar med er `enhetskort()` sine, ikke et utvalg.**
+        # Kortet i KO skal kunne det sentralbordets kort kan (André, 17. sep.
+        # 2026), og den eneste måten det holder over tid er at begge leser
+        # samme funksjon. Et utvalg her ville vært en kopi som stille faller
+        # bak neste felt noen legger til.
+        rad = tomt_enhetskort()
+        rad.update({
             'id': r.pk,
             'navn': r.navn,
             'korps': r.korps.kortnavn or r.korps.navn if r.korps_id else '',
             'fort_av_ko': _fort_av_ko(r),
+            # **Mannskapslista er `vaktliste`-tilgang** (rollemodellen §5).
+            # Uten den utelates den helt — en tom liste og «du får ikke se»
+            # ser like ut i markupen, og det er med vilje: KO skal ikke gi
+            # avledet innsyn i hvem som går vakt.
             'mannskap': [{'navn': vp.mannskap.navn,
                           'rolle': vp.rolle.navn if vp.rolle_id else '',
                           'tilstede': vp.er_tilstede}
-                         for vp in r.naa_poster],
-        }
-        rad['antall'] = len(rad['mannskap'])
-        rad['tilstede'] = sum(1 for m in rad['mannskap'] if m['tilstede'])
+                         for vp in r.naa_poster] if kan_se_besetning else [],
+        })
+        # **`bemanning_*` og ikke `antall`/`tilstede`.** `enhetskort()` bruker
+        # `antall` om *pasienter* på oppdraget, og `_problemMedAntall()` i
+        # kortet leser nettopp det feltet: «Transport · 3 pasienter». Skrev vi
+        # mannskapstallet dit, ville en bil på et transportoppdrag vist antall
+        # folk i bilen som antall pasienter — en feil ingen ville sett som en
+        # feil, bare som et tall som var litt rart. Funnet 17. sep. 2026 av
+        # `test_oppdragslinja_staar_paa_kortet`, som er første gang de to
+        # feltsettene møttes i samme rad.
+        rad['bemanning_antall'] = len(rad['mannskap'])
+        rad['bemanning_tilstede'] = sum(1 for m in rad['mannskap'] if m['tilstede'])
         if rad['fort_av_ko']:
             ko_rad = getattr(r, 'ko_status', None)
             rad['status'] = ko_rad.status if ko_rad else ko_choices.STANDARD
@@ -428,12 +447,14 @@ def ressursbildet(naa=None) -> dict:
             rad['status_satt_at'] = (ko_rad.satt_at.isoformat()
                                      if ko_rad else None)
         else:
-            oppl = enhet_status.get(r.enhet_id) or {}
-            rad['status'] = oppl.get('status', '')
-            rad['status_navn'] = oppl.get('status_navn', '')
+            rad.update(enhet_status.get(r.enhet_id) or {})
             rad['status_satt_av'] = ''
             rad['status_satt_at'] = None
-            rad['antall_ventende'] = oppl.get('antall_ventende', 0)
+            # Ressursens navn vinner over enhetens: det er det navnet
+            # vaktlista og sambandet bruker, og `enhetskort()` skriver sitt
+            # eget `navn` og `id` inn over.
+            rad['id'] = r.pk
+            rad['navn'] = r.navn
 
         gruppenavn = r.gruppe.navn if r.gruppe_id else 'Uten gruppe'
         if not grupper or grupper[-1]['navn'] != gruppenavn:
@@ -449,21 +470,23 @@ def ressursbildet(naa=None) -> dict:
 
 
 def _enhetsstatuser(enhet_ider, vakt) -> dict:
-    """`{enhet_id: {...}}` for dem som melder selv.
+    """`{enhet_id: <enhetskort>}` for dem som melder selv.
 
     Ligger i en egen funksjon fordi den er **den ene kanten mot
     oppdragsmodulen** i ressursbildet. Står den for seg, er den både lett å
     finne og lett å bytte ut den dagen pulje 4 flytter sentralbordet.
+
+    Kaller `enhetskort()` og ikke `enhet_status()`: kortet i KO skal kunne det
+    sentralbordets kort kan, og da må det være samme funksjon som svarer.
+    `ledig_siden_bulk()` spørres for hele lista i én runde — tavla polles
+    hvert tjuende sekund, og ett oppslag per enhet ville vært N spørringer.
     """
     if not enhet_ider:
         return {}
     from oppdrag.models import Enhet
-    from oppdrag.services import enhet_status
+    from oppdrag.services import enhetskort, ledig_siden_bulk
 
-    ut = {}
-    for enhet in Enhet.objects.filter(pk__in=set(enhet_ider)):
-        oppl = enhet_status(enhet, vakt)
-        ut[enhet.pk] = {'status': oppl['status'],
-                        'status_navn': oppl['status_navn'],
-                        'antall_ventende': oppl['antall_ventende']}
-    return ut
+    enheter = list(Enhet.objects.select_related('user', 'enhetstype')
+                   .filter(pk__in=set(enhet_ider)))
+    ledig = ledig_siden_bulk(enheter, vakt)
+    return {e.pk: enhetskort(e, vakt, ledig.get(e.pk)) for e in enheter}

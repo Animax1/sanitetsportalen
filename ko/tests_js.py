@@ -22,6 +22,12 @@ from patients.js_test_utils import (JS_DIR, PORTAL_UTILS_JS, build_harness,
 
 KO_JS = JS_DIR / 'ko.js'
 
+#: Enhetskortets innmat, delt med sentralbordet (17. sep. 2026). `/ko/` laster
+#: den, så testene her må lese den — ellers kjører de mot en side som ikke
+#: finnes. Skanningen av *den* fila hører til `oppdrag/tests_xss.py`, som eier
+#: den; her brukes den bare som avhengighet, på samme måte som portal-utils.
+OPPDRAG_KORT_JS = JS_DIR / 'oppdrag-kort.js'
+
 HARNESS = (
     (PORTAL_UTILS_JS, ('escapeHtml',)),
     (KO_JS, ('koInaktivTekst', 'koKontomerke', 'koTilstedeRad')),
@@ -159,6 +165,8 @@ KO_LOGG_BYGGERE = (
     'koRessursHtml',
     'koRessursKnapper',
     'koTegnRessurser',
+    'koLagInnmat',
+    'koBesetningHtml',
 )
 
 #: Uttrykk som interpoleres uten `escapeHtml`, med begrunnelse.
@@ -176,6 +184,12 @@ KO_GJENNOMGATT = {
     's.klasse': 'Bootstrap-klasse fra KO_STATUSER, en konstant i fila — ikke '
                 'data. Kommer den en dag fra serveren, skal denne raden bort',
     'g.ressurser': 'ferdig markup fra koRessursHtml, som skannes for seg',
+    # Ressurskortet, etter at innmaten ble delt med sentralbordet.
+    'innmat': 'ferdig markup fra enhetskortInnmat() eller koLagInnmat(); '
+              'den første skannes av oppdrag/tests_xss.py, den andre her',
+    'besetning': 'ferdig markup fra koBesetningHtml(), som skannes for seg',
+    'knapper': 'ferdig markup fra koRessursKnapper(), som skannes for seg',
+    'navn': 'liste bygget to linjer over; hvert mannskapsnavn escapet der',
 }
 
 
@@ -470,10 +484,10 @@ class RessursreglerTests(SimpleTestCase):
         """«0 av 0 møtt» leses som en bemanningssvikt. Ingen skift er noe
         annet, og skal si noe annet."""
         self.assertEqual(
-            self._kall('koBemanningstekst({antall: 0, tilstede: 0})'),
+            self._kall('koBemanningstekst({bemanning_antall: 0, bemanning_tilstede: 0})'),
             '"ingen på skift nå"')
         self.assertEqual(
-            self._kall('koBemanningstekst({antall: 3, tilstede: 1})'),
+            self._kall('koBemanningstekst({bemanning_antall: 3, bemanning_tilstede: 1})'),
             '"1 av 3 møtt"')
 
 
@@ -482,9 +496,14 @@ class RessursEscapingTests(SimpleTestCase):
     """Mannskapsnavn og ressursnavn er brukerdata ført i vaktlista."""
 
     HARNESS = (
-        (PORTAL_UTILS_JS, ('escapeHtml',)),
+        (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue', 'klokke')),
+        # Innmaten er delt med sentralbordet, og `/ko/` laster fila. Kjøres
+        # den ikke med, prøver testen en side som ikke finnes.
+        (OPPDRAG_KORT_JS, ('enhetskortInnmat', 'tidSiden', 'hastegradKlasse',
+                           '_grovMerke', '_problemMedAntall', '_medAntall')),
         (KO_JS, ('koKanSkrive', 'koKanStyreRessurs', 'koStatusklasse',
-                 'koBemanningstekst', 'koRessursKnapper', 'koRessursHtml')),
+                 'koBemanningstekst', 'koRessursKnapper', 'koLagMeta',
+                 'koLagInnmat', 'koBesetningHtml', 'koRessursHtml')),
     )
 
     ONDSKAP = '<img src=x onerror=alert(1)>'
@@ -495,7 +514,7 @@ class RessursEscapingTests(SimpleTestCase):
     def _ressurs(self, **overstyr):
         base = {
             'id': 1, 'navn': 'Lag 3', 'korps': 'HGSD', 'fort_av_ko': True,
-            'mannskap': [], 'antall': 0, 'tilstede': 0,
+            'mannskap': [], 'bemanning_antall': 0, 'bemanning_tilstede': 0,
             'status': 'ledig', 'status_navn': 'Ledig',
             'status_satt_av': '', 'status_satt_at': None,
         }
@@ -516,7 +535,7 @@ class RessursEscapingTests(SimpleTestCase):
 
     def test_mannskapsnavnet_escapes(self):
         ut = self._tegn(mannskap=[{'navn': self.ONDSKAP, 'rolle': '',
-                                   'tilstede': True}], antall=1, tilstede=1)
+                                   'tilstede': True}], bemanning_antall=1, bemanning_tilstede=1)
         self.assertNotIn('<img', ut)
         self.assertIn('&lt;img', ut)
 
@@ -578,3 +597,119 @@ class KonsollhoydenTests(SimpleTestCase):
 
     def test_gulvet_holder_ogsaa_naar_regnestykket_blir_negativt(self):
         self.assertEqual(self._kall(900, 500), 360)
+
+
+@unittest.skipUnless(node_available(), 'node er ikke tilgjengelig')
+class KortetSierDetSammeSomSentralbordetTests(SimpleTestCase):
+    """Det sentralbordets kort viser om en enhet, skal KOs kort også vise.
+
+    **Prøvd gjennom den ekte inngangen** (`koRessursHtml`), ikke ved å kalle
+    `enhetskortInnmat` direkte: testene kan ellers gå grønne mens KO slutter å
+    kalle den — nøyaktig mutantløgn nummer tre i `CLAUDE.md`.
+    """
+
+    HARNESS = (
+        (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue', 'klokke')),
+        (OPPDRAG_KORT_JS, ('enhetskortInnmat', 'tidSiden', 'hastegradKlasse',
+                           '_grovMerke', '_problemMedAntall', '_medAntall')),
+        (KO_JS, ('koKanSkrive', 'koKanStyreRessurs', 'koStatusklasse',
+                 'koBemanningstekst', 'koRessursKnapper', 'koLagMeta',
+                 'koLagInnmat', 'koBesetningHtml', 'koRessursHtml')),
+    )
+
+    def setUp(self):
+        self.harness = build_harness(self.HARNESS)
+
+    def _enhet(self, **overstyr):
+        base = {
+            'id': 1, 'navn': 'Haugesund 56', 'korps': 'HGSD',
+            'fort_av_ko': False, 'mannskap': [], 'bemanning_antall': 0, 'bemanning_tilstede': 0,
+            'status': 'fremme', 'status_navn': 'Fremme',
+            'status_satt_av': '', 'status_satt_at': None,
+            'bemanning_antall': 0, 'bemanning_tilstede': 0,
+            'antall_ventende': 0, 'passiv_vakt': False, 'kan_passiv_vakt': False,
+            'status_tidspunkt': '2026-09-17T20:14:00', 'ledig_siden': None,
+            'sted_navn': '', 'oppdragsnummer': None, 'hastegrad': None,
+            'grovsortering': None, 'grovsortering_navn': None,
+            'problemstilling': None, 'antall': None,
+        }
+        base.update(overstyr)
+        return json.dumps(base)
+
+    def _tegn(self, **overstyr):
+        return run_node(
+            self.harness,
+            f'console.log(koRessursHtml({self._enhet(**overstyr)}));',
+            # **`globalThis.window`, ikke `const window`.** Det delte kortet
+            # leser `globalThis.window?.OPPDRAG_MED_ANTALL`, og en modul-const
+            # er ikke en egenskap på `globalThis` — oppslaget ble `undefined`,
+            # og «Transport · 3 pasienter» kom ut som bare «Transport».
+            preamble='globalThis.window = {MODUL_TILGANG: {ko: "skriv_full"}, '
+                     'OPPDRAG_MED_ANTALL: ["Transport"]};\n'
+                     + RESSURS_PREAMBLE)
+
+    def test_statusen_har_klokkeslett_og_tid_siden(self):
+        """«Fremme 22:14 · N min» — prosjektleder, 11. sep. 2026: «på statusen
+        så må tidsstemplet og vise». KOs første kort viste bare ordet."""
+        ut = self._tegn()
+        self.assertIn('Fremme', ut)
+        self.assertIn(':14', ut, 'klokkeslettet mangler')
+        self.assertIn('min', ut, 'tid siden mangler')
+
+    def test_ledig_siden_fyller_tomrommet(self):
+        """En ledig enhet har ingen koblingsrad, så `status_tidspunkt` er tomt
+        — og da skal `ledig_siden` bære tida (André, 15. sep. 2026)."""
+        ut = self._tegn(status='ledig', status_navn='Ledig',
+                        status_tidspunkt=None,
+                        ledig_siden='2026-09-17T20:00:00')
+        self.assertIn('Ledig', ut)
+        self.assertIn(':00', ut)
+
+    def test_ventende_staar_paa_kortet(self):
+        """«Ledig (2 venter)» er distinksjonen 113 trenger for å vite hvem som
+        kan sendes."""
+        ut = self._tegn(status='ledig', status_navn='Ledig', antall_ventende=2)
+        self.assertIn('2 venter', ut)
+
+    def test_stedet_staar_paa_kortet(self):
+        ut = self._tegn(status='avreist', status_navn='Avreist',
+                        sted_navn='Sykehus')
+        self.assertIn('Sykehus', ut)
+
+    def test_oppdragslinja_staar_paa_kortet(self):
+        """Nummer, hastegrad, grovsortering og problemstilling — det aktive
+        oppdraget i ett blikk, uten å åpne det."""
+        ut = self._tegn(oppdragsnummer=45, hastegrad='Akutt',
+                        grovsortering='rod', grovsortering_navn='Rød',
+                        problemstilling='Transport', antall=3)
+        self.assertIn('#45', ut)
+        self.assertIn('Akutt', ut)
+        self.assertIn('Rød', ut)
+        self.assertIn('3 pasienter', ut, 'antallet ved problemstillingen mangler')
+
+    def test_passiv_vakt_staar_bare_naar_typen_tillater_det(self):
+        """«Aktiv» skrives ikke, og passiv skrives ikke på en ambulanse."""
+        med = self._tegn(passiv_vakt=True, kan_passiv_vakt=True)
+        self.assertIn('passiv vakt', med)
+        uten = self._tegn(passiv_vakt=True, kan_passiv_vakt=False)
+        self.assertNotIn('passiv vakt', uten)
+
+    def test_ingen_object_object_paa_noen_rad(self):
+        """Fella som tok «Rett tid» og hvert enhetskort i ressurslista.
+        `trustedHtml('')` er et objekt like fullt, så den *tomme* grenen viser
+        det også — og da rammer det hver rad, ikke bare den ene."""
+        for felter in ({}, {'passiv_vakt': True, 'kan_passiv_vakt': True},
+                       {'oppdragsnummer': 45, 'hastegrad': 'Akutt'},
+                       {'fort_av_ko': True, 'status': 'pause',
+                        'status_navn': 'Pause'}):
+            with self.subTest(felter=felter):
+                self.assertNotIn('[object Object]', self._tegn(**felter))
+
+    def test_laget_faar_ingen_oppdragslinje(self):
+        """Et lag har ingen enhet og dermed ingen oppdrag — den grenen skal
+        ikke tegne en tom oppdragslinje."""
+        ut = self._tegn(fort_av_ko=True, status='opptatt',
+                        status_navn='Opptatt', status_satt_at='2026-09-17T20:14:00')
+        self.assertNotIn('enhet-oppdrag', ut)
+        self.assertIn('Opptatt', ut)
+        self.assertIn(':14', ut, 'KO-statusen skal ha tid, som enhetens')

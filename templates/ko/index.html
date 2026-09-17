@@ -50,6 +50,21 @@
     ko: "{{ modul_nivaa }}",
     admin: {{ er_global_admin|yesno:"true,false" }}
   };
+  {% comment %}
+    **Ordforrådet enhetskortet leser** (17. sep. 2026). `oppdrag-kort.js` er
+    delt med sentralbordet, og `_problemMedAntall()` slår opp i denne lista for
+    å vite om problemstillingen bærer et pasientantall. Uten den står
+    «Transport» der det skulle stått «Transport · 3 pasienter» — kortet ville
+    sett riktig ut og vært fattigere, som er den stille varianten av å mangle
+    feature parity.
+
+    Data inn i et skript-element går gjennom `js_json()` og aldri `json.dumps`
+    + `|safe` (CLAUDE.md). Og taggen skrives *ikke* ut i prosaen her: nonce-
+    skanneren i `patients/tests_security_headers.py` leser markup linje for
+    linje, og leste den som en ny blokk uten nonce. En kommentar som ser ut som
+    kode, er kode for den som leter etter kode.
+  {% endcomment %}
+  window.OPPDRAG_MED_ANTALL = {{ med_antall }};
 </script>
 
 <div class="container-fluid px-3 px-md-4 py-3">
@@ -199,5 +214,11 @@
   og kaster på en side uten pasientskjemaene. Se CLAUDE.md.
 {% endcomment %}
 <script src="{% static 'js/portal-utils.js' %}"></script>
+{% comment %}
+  **Enhetskortets innmat er delt med sentralbordet** (17. sep. 2026). De to
+  sidene tegner samme kort, og den eneste måten det holder over tid er at det
+  er samme kode som tegner det. Lastes før `ko.js`, som kaller inn i den.
+{% endcomment %}
+<script src="{% static 'js/oppdrag-kort.js' %}"></script>
 <script src="{% static 'js/ko.js' %}"></script>
 {% endblock %}

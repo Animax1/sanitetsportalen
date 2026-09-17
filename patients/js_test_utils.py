@@ -33,6 +33,10 @@ STATISTIKK_JS = JS_DIR / 'statistikk.js'
 STATISTIKK_OPPDRAG_JS = JS_DIR / 'statistikk-oppdrag.js'
 #: Sentralbordet er fire filer siden 14. sep. 2026 — se `VAKTLISTE_JS`.
 OPPDRAG_SENTRAL_JS = (
+    # Delt med `/ko/` (17. sep. 2026): enhetskortets innmat og ordforrådet
+    # rundt den. Står først fordi sentralfilene kaller inn i den, og fordi
+    # `read_js()` skjøter tuppelen i lasterekkefølge.
+    JS_DIR / 'oppdrag-kort.js',
     JS_DIR / 'oppdrag-sentral-kjerne.js',
     JS_DIR / 'oppdrag-sentral-oppdrag.js',
     JS_DIR / 'oppdrag-sentral-admin.js',

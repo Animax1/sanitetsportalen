@@ -214,8 +214,8 @@ class ProjeksjonenTests(Grunnoppsett):
         self._bemann(self.lag3, navn='Kari', mott=True)
         self._bemann(self.lag3, navn='Ola', mott=False)
         rad = self._ressurs(services.ressursbildet(), 'Lag 3')
-        self.assertEqual(rad['antall'], 2)
-        self.assertEqual(rad['tilstede'], 1)
+        self.assertEqual(rad['bemanning_antall'], 2)
+        self.assertEqual(rad['bemanning_tilstede'], 1)
 
     def test_bilens_status_kommer_fra_oppdragsmodulen(self):
         """Den andre kilden. Uten et oppdrag er hun `Ledig`, og det er
@@ -308,3 +308,199 @@ class PorteneTests(Grunnoppsett):
         data = self._post(self.lag3.pk).json()['data']
         rad = self._ressurs(data, 'Lag 3')
         self.assertEqual(rad['status'], ko_choices.OPPTATT)
+
+
+class FeatureParityMedSentralbordetTests(Grunnoppsett):
+    """KOs ressurskort skal kunne det sentralbordets kort kan.
+
+    André, 17. sep. 2026: «Det er ikke feature parity med /oppdrag. Jeg vil ha
+    det likt feature messig inn her i /ko.» Parity som *holder* er den som
+    følger av konstruksjonen — begge leser `oppdrag.services.enhetskort()` —
+    og disse prøvene er det som hindrer at de to glir fra hverandre igjen.
+    """
+
+    def test_enheten_baerer_alle_kortets_felter(self):
+        """Ikke et utvalg. Et utvalg ville falt bak neste felt noen la til i
+        oppdragsmodulen, uten at noe ble rødt."""
+        from oppdrag.services import tomt_enhetskort
+
+        rad = self._ressurs(services.ressursbildet(), 'Haugesund 56')
+        for felt in tomt_enhetskort():
+            with self.subTest(felt=felt):
+                self.assertIn(felt, rad)
+
+    def test_laget_har_samme_form_som_bilen(self):
+        """En manglende nøkkel blir `undefined` midt i en mal-streng, og da
+        står det «undefined» på tavla i stedet for ingenting."""
+        bilde = services.ressursbildet()
+        bil = self._ressurs(bilde, 'Haugesund 56')
+        lag = self._ressurs(bilde, 'Lag 3')
+        self.assertEqual(set(bil), set(lag))
+
+    def test_ressursens_navn_vinner_over_enhetens(self):
+        """`enhetskort()` skriver sitt eget `navn` og `id`. På tavla er det
+        vaktlistas navn som gjelder — det er det navnet sambandet bruker, og
+        `data-id` må peke på ressursen for at statusknappene skal treffe."""
+        # PK-ene må skille seg, ellers er assertionen under sann ved et
+        # uhell: i en fersk base er både ressursen og enheten nr. 1.
+        enhet2 = Enhet.objects.create(navn='Haugesund 57')
+        self.bil.enhet = enhet2
+        self.bil.navn = 'Bil A'
+        self.bil.save(update_fields=['enhet', 'navn'])
+        self.assertNotEqual(self.bil.pk, enhet2.pk)
+
+        rad = self._ressurs(services.ressursbildet(), 'Bil A')
+        self.assertEqual(rad['id'], self.bil.pk,
+                         'data-id må peke på ressursen, ikke på enheten')
+        self.assertEqual(rad['navn'], 'Bil A',
+                         'vaktlistas navn er det sambandet bruker')
+
+    def test_passiv_vakt_og_ventende_foelger_med(self):
+        """To felter sentralbordets kort viser og KO manglet før dette."""
+        rad = self._ressurs(services.ressursbildet(), 'Haugesund 56')
+        self.assertIn('passiv_vakt', rad)
+        self.assertIn('kan_passiv_vakt', rad)
+        self.assertEqual(rad['antall_ventende'], 0)
+
+    def test_feltene_er_fylt_og_ikke_bare_til_stede(self):
+        """**Sperrehake mot testen over.** Raden får alle nøklene av
+        `tomt_enhetskort()`, så en KO-side som sluttet å kalle `enhetskort()`
+        og bare fylte `status` ville gått grønn på «har feltet» — mutanten
+        overlevde nøyaktig sånn 17. sep. 2026. Her kreves *verdiene*.
+        """
+        from oppdrag.models import Enhetstype
+
+        # `Enhetstype.navn` er unik, og migrasjonene seeder settet.
+        type_, _ = Enhetstype.objects.get_or_create(navn='Ambulanse')
+        Enhetstype.objects.filter(pk=type_.pk).update(kan_passiv_vakt=True)
+        type_.refresh_from_db()
+        self.enhet.enhetstype = type_
+        self.enhet.passiv_vakt = True
+        self.enhet.pa_vakt = True
+        self.enhet.save(update_fields=['enhetstype', 'passiv_vakt', 'pa_vakt'])
+
+        rad = self._ressurs(services.ressursbildet(), 'Haugesund 56')
+        self.assertEqual(rad['type_navn'], 'Ambulanse')
+        self.assertTrue(rad['kan_passiv_vakt'])
+        self.assertTrue(rad['passiv_vakt'], 'passiv vakt kom ikke gjennom')
+        self.assertTrue(rad['pa_vakt'])
+        self.assertEqual(rad['status_navn'], 'Ledig')
+
+    def test_antall_er_pasienter_og_ikke_mannskap(self):
+        """**Navnekollisjonen.** `enhetskort()` bruker `antall` om pasienter på
+        oppdraget, og `_problemMedAntall()` i kortet leser nettopp det feltet:
+        «Transport · 3 pasienter». Skriver KO mannskapstallet dit, viser en bil
+        på et transportoppdrag antall folk i bilen som antall pasienter — en
+        feil ingen ser som en feil, bare som et tall som er litt rart.
+        """
+        from oppdrag.models import Lokasjon, Oppdrag
+        from oppdrag import services as oppdrag_services  # noqa: F401
+
+        self.operator = _gi_ko(_bruker('foerer'), 'skriv_full')
+        self._bemann(self.bil, navn='Kari')
+        self._bemann(self.bil, navn='Ola')
+        lok, _ = Lokasjon.objects.get_or_create(navn='Scene')
+        oppdrag = Oppdrag.objects.create(
+            vakt=self.vakt, enhet=self.enhet,
+            oppdragsnummer=oppdrag_services.neste_oppdragsnummer(self.vakt),
+            problemstilling='Transport', hastegrad='Akutt', lokasjon=lok,
+            antall=3)
+        # `Oppdrag.objects.create(enhet=...)` lager koblingsraden selv; et
+        # `varsle_enhet()` i tillegg avvises med «er alt varslet».
+        #
+        # **Enheten må ha *påbegynt*.** `aktiv_koblingsrad()` ser bort fra
+        # `venter`: en rad som ligger og venter teller ikke, for enheten har
+        # ikke rykket ut og kan sendes et annet sted. Uten stemplinga står
+        # oppdragsfeltene tomme, og testen ville målt feil ting.
+        rad_e = oppdrag.enheter.get(enhet=self.enhet)
+        oppdrag_services.foer_status(
+            oppdrag, self.enhet, 'rykker_ut',
+            tidspunkt=timezone.now(), bruker=self.operator)
+        rad_e.refresh_from_db()
+
+        rad = self._ressurs(services.ressursbildet(), 'Haugesund 56')
+        self.assertEqual(rad['antall'], 3, 'antall skal være pasientene')
+        self.assertEqual(rad['bemanning_antall'], 2, 'mannskapet har egne felter')
+        self.assertEqual(rad['problemstilling'], 'Transport')
+
+        # **Og laget skal ikke få mannskapstallet i pasientfeltet heller.**
+        # For enheten beskytter rekkefølgen oss — `enhetskort()` skriver
+        # `antall` etterpå — så en mutant som satte det galt der er en no-op.
+        # For laget finnes ingen slik overskriving, og det er der regelen må
+        # prøves (17. sep. 2026, overlevende mutant).
+        self._bemann(self.lag3, navn='Per')
+        lag = self._ressurs(services.ressursbildet(), 'Lag 3')
+        self.assertIsNone(lag['antall'],
+                          'laget har ingen pasienter — feltet er enhetens')
+        self.assertEqual(lag['bemanning_antall'], 1)
+
+    def test_ledig_siden_foelger_med(self):
+        """Feltet «ledig siden» fyller tomrommet for en ledig enhet (André,
+        15. sep. 2026): hun har ingen aktiv koblingsrad, så `status_tidspunkt`
+        er tomt, og operatøren som skal sende noen vil vite hvem som har stått
+        lengst. `ledig_siden_bulk()` spørres for hele lista i én runde, og en
+        KO-side som droppet argumentet ville mistet feltet i stillhet.
+        """
+        from oppdrag.models import Lokasjon, Oppdrag
+        from oppdrag import services as oppdrag_services
+
+        fører = _gi_ko(_bruker('ledigfoerer'), 'skriv_full')
+        lok, _ = Lokasjon.objects.get_or_create(navn='Scene')
+        oppdrag = Oppdrag.objects.create(
+            vakt=self.vakt, enhet=self.enhet,
+            oppdragsnummer=oppdrag_services.neste_oppdragsnummer(self.vakt),
+            problemstilling='Fall', hastegrad='Akutt', lokasjon=lok)
+        naa = timezone.now()
+        for status in ('rykker_ut', 'fremme', 'ledig'):
+            oppdrag_services.foer_status(oppdrag, self.enhet, status,
+                                         tidspunkt=naa, bruker=fører)
+
+        rad = self._ressurs(services.ressursbildet(), 'Haugesund 56')
+        self.assertEqual(rad['status'], 'ledig')
+        self.assertIsNotNone(
+            rad['ledig_siden'],
+            'ledig_siden kom ikke gjennom — kortet står da uten tid')
+
+
+class BesetningenEtterVaktlistetilgangTests(Grunnoppsett):
+    """**Mannskapslista er `vaktliste`-tilgang, ikke KO-tilgang.**
+
+    Komposisjonsregelen fra rollemodellen §5, og samme gate sentralbordet
+    bruker for besetningspanelet (`oppdrag/views.py`). Den sto åpen fra pulje 3
+    til 17. sep. 2026: alle med `ko:les` fikk se hvem som gikk vakt. Feilen var
+    stille — markupen så helt riktig ut.
+    """
+
+    def setUp(self):
+        super().setUp()
+        self._bemann(self.lag3, navn='Kari')
+        self.client = Client()
+
+    def test_uten_vaktlistetilgang_utelates_mannskapet(self):
+        bilde = services.ressursbildet(kan_se_besetning=False)
+        rad = self._ressurs(bilde, 'Lag 3')
+        self.assertEqual(rad['mannskap'], [])
+        self.assertEqual(rad['bemanning_antall'], 0)
+        self.assertEqual(rad['bemanning_tilstede'], 0)
+
+    def test_med_vaktlistetilgang_staar_navnene(self):
+        rad = self._ressurs(services.ressursbildet(kan_se_besetning=True), 'Lag 3')
+        self.assertEqual([m['navn'] for m in rad['mannskap']], ['Kari'])
+
+    @override_settings(SECURE_SSL_REDIRECT=False, RATELIMIT_ENABLE=False)
+    def test_endepunktet_gater_paa_vaktliste_og_ikke_paa_ko(self):
+        """Prøvd gjennom den ekte inngangen: en konto med full KO-tilgang og
+        **ingen** vaktlistetilgang skal ikke få navnene."""
+        bruker = _gi_ko(_bruker('bare_ko'), 'skriv_leder')
+        self.client.force_login(bruker)
+        data = self.client.get('/ko/api/ressurser/').json()['data']
+        navn = [m['navn'] for g in data['grupper'] for r in g['ressurser']
+                for m in r['mannskap']]
+        self.assertEqual(navn, [], 'KO-tilgang alene ga innsyn i vaktlista')
+
+        ModulTilgang.objects.update_or_create(
+            bruker=bruker, modul_slug='vaktliste', defaults={'nivaa': 'les'})
+        data = self.client.get('/ko/api/ressurser/').json()['data']
+        navn = [m['navn'] for g in data['grupper'] for r in g['ressurser']
+                for m in r['mannskap']]
+        self.assertEqual(navn, ['Kari'])

@@ -229,3 +229,19 @@ serveren i nøyaktig det øyeblikket en overgang ble endret.
 
 **Hvorfor `_stilleLydbaerer()` finnes** står i rota, under CSP — `media-src` måtte
 åpnes for `blob:` for at iOS' ringebryter ikke skal dempe varselet.
+
+**Enhetskortet er delt med `/ko/`** (17. sep. 2026). Serversiden:
+`services.enhetskort()` er den ene serialiseringen, og både `views.enheter_view` og
+`ko.services` leser den. Klienten: `static/js/oppdrag-kort.js` bærer innmaten
+(`enhetskortInnmat()`) og ordforrådet rundt — `tidSiden`, `hastegradKlasse`, `_grovMerke`,
+`_problemMedAntall`. Begge sidene laster fila; `_enhetskort()` her er en tynn ramme rundt
+innmaten med klikket som åpner besetningen.
+
+`tomt_enhetskort()` gir samme form uten en enhet, for KOs ressurser som er lag.
+`TomtEnhetskortHarSammeFormTests` krever at den håndskrevne lista og den ekte har samme
+nøkler — et forsøk på å utlede nøklene av kilden med en regex tok 16 av 24, fordi åtte
+kommer inn med `**` fra `_aktivt_oppdrag_felter`.
+
+**`oppdrag-enhet.js` deler ikke dette.** Bilens egen skjerm har fortsatt sine egne kopier
+av `hastegradKlasse` og `_problemMedAntall`, og de står igjen med vilje: den siden laster
+ikke `oppdrag-kort.js`, og å rive i enhetsskjermen hører til pulje 4. Står i `TODO.md`.

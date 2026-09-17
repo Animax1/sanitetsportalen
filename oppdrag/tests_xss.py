@@ -29,7 +29,7 @@ HTML_BUILDERS_PER_FIL = {
         # hver enhet i prod uten at noe var rødt). En utklipping flytter
         # markupen; lista her fulgte ikke etter.
         # `_manglendeByggereTests` under holder at det ikke kan gjenta seg.
-        '_enhetskort',
+        '_enhetskort', 'enhetskortInnmat',
         # De åtte andre som sto utenfor samme dag. Ingen av dem hadde
         # uescapet brukerdata — hullet var i dekningen, ikke i escapingen.
         'fyllProblemstillinger', 'visFoerStatus', 'visRedigerOppdrag',
@@ -77,6 +77,12 @@ REVIEWED_INTERPOLATIONS = {
     # «Avbrutt av Bil B» i historikklista (15. sep. 2026): markup bygget to
     # linjer over, med enhetsnavnene escapet inni. Tom streng uten avbrytelse.
     'avbruttMerke': 'markup bygget lokalt, enhetsnavnene escapet inni',
+    # Enhetskortet er delt med /ko/ (17. sep. 2026). De to fragmentene er
+    # ferdig markup fra byggere som selv skannes — `enhetskortInnmat` i
+    # oppdrag-kort.js, som står først i OPPDRAG_SENTRAL_JS og altså leses av
+    # samme skanner, og `mkBesetning` lenger nede i denne fila.
+    'innmat': 'ferdig markup fra enhetskortInnmat(), som skannes for seg',
+    'besetning': 'ferdig markup fra mkBesetning(), som skannes for seg',
     # Verdimengdene (12. sep. 2026): raden bygges av fragmenter som selv er
     # bygget med escHtmlValue/escapeHtml to linjer over, og av faste attributter
     # fra ternærer.
@@ -378,7 +384,7 @@ class OppdragEscapingOppforselTests(SimpleTestCase):
         (OPPDRAG_SENTRAL_JS, ('renderOppdrag', 'venterForbiTerskel', 'lydTerskler', 'renderEnheter', 'tidslinjeHtml',
                               'hastegradKlasse', 'mkBesetning',
                               'kanSeBesetning', 'tidSiden', '_grovMerke',
-                              '_enhetsmatrise', '_problemMedAntall', '_medAntall', '_grupperEnheter', '_typeRekkefolge', '_enhetskort',
+                              '_enhetsmatrise', '_problemMedAntall', '_medAntall', '_grupperEnheter', '_typeRekkefolge', '_enhetskort', 'enhetskortInnmat',
                               '_sorterOppdrag', '_manglerTrinn', '_manglerMinutter')),
     )
 

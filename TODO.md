@@ -644,6 +644,12 @@ bygget; det flyttet til `/park/`-punktet nederst, der det hører hjemme.*
       Vent til pulje 4: sentralbordet bærer lokasjonen på oppdraget, og de to skal ikke
       svare hver sitt om hvor bilen er.
 
+- [ ] **`oppdrag-enhet.js` deler ikke det delte enhetskortet.** Bilens egen skjerm har
+      egne kopier av `hastegradKlasse`, `_medAntall` og `_problemMedAntall`; sentralbordet
+      og `/ko/` leser dem nå fra `static/js/oppdrag-kort.js` (17. sep. 2026). Kopiene står
+      igjen med vilje — enhetsskjermen laster ikke fila, og å rive i den hører til pulje 4.
+      Tas da, sammen med resten.
+
 - [ ] **Pulje 4 — sentralbordet flyttes.** `oppdrag-sentral-*.js` blir KO sine,
       `oppdrag-enhet.js` blir hele `/oppdrag/`, og `Oppdrag` får den nullbare FK-en
       `hendelse`. Den største, og den eneste som rører `/oppdrag/`.

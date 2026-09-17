@@ -330,6 +330,11 @@ er lasterekkefølgen. To regler, begge håndhevet av `JsSplittenErKompletTests`:
 kjernen først (all toppnivå-tilstand), og alt som *kjører* på toppnivå sist —
 `DOMContentLoaded`-kroken leser bindinger fra alle de andre.
 {% endcomment %}
+{% comment %}
+  **Enhetskortets innmat er delt med /ko/** (17. sep. 2026). Lastes foran
+  sentralfilene fordi de kaller inn i den. Se static/js/oppdrag-kort.js.
+{% endcomment %}
+<script src="{% static 'js/oppdrag-kort.js' %}"></script>
 <script src="{% static 'js/oppdrag-sentral-kjerne.js' %}"></script>
 <script src="{% static 'js/oppdrag-sentral-oppdrag.js' %}"></script>
 <script src="{% static 'js/oppdrag-sentral-admin.js' %}"></script>

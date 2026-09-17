@@ -574,3 +574,24 @@ class ModulRegistreringTests(TestCase):
             username='sentral5', password='x', role='bruker',
             must_change_password=False)
         self.assertNotIn('oppdrag', {m.slug for m in get_nav_modules(bruker)})
+
+
+class TomtEnhetskortHarSammeFormTests(TestCase):
+    """`tomt_enhetskort()` er en håndskrevet liste, og dette er prøven som
+    holder den i live.
+
+    Lista er skrevet av med vilje — et forsøk på å utlede nøklene av
+    kildekoden med en regex tok 16 av 24, fordi åtte kommer inn med `**` fra
+    en annen funksjon (17. sep. 2026). En utledning som stille tar to
+    tredjedeler er verre enn en liste: lista har denne testen.
+    """
+
+    def test_samme_noekler_som_et_ekte_kort(self):
+        from oppdrag.models import Enhet
+        from oppdrag.services import enhetskort, tomt_enhetskort
+
+        enhet = Enhet.objects.create(navn='Haugesund 56')
+        self.assertEqual(
+            set(tomt_enhetskort()), set(enhetskort(enhet)),
+            'tomt_enhetskort() og enhetskort() har glidd fra hverandre — '
+            'KOs ressursoversikt gir da `undefined` på et felt bilen har')

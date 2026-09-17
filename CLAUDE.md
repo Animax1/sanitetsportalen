@@ -726,7 +726,7 @@ Alle temaene er mørke, så **enhver Bootstrap-klasse for dempet tekst må overs
 malen kan se den. `MorkTekstPaaMorkBakgrunnTests` løser `{% extends %}` og `{% static %}`
 og håndhever det.
 
-25 filer i `static/js/` (ingen bundler), fordelt på sju sider — pasientsiden,
+26 filer i `static/js/` (ingen bundler), fordelt på sju sider — pasientsiden,
 `/statistikk/`, `/vaktliste/`, `/ko/`, `/backlog/` og de to grensesnittene under
 `/oppdrag/`.
 
@@ -762,6 +762,7 @@ håndhever det på cellebredden.
 | `patients-admin.js` | pasientsiden, **kun admin** | `patients/CLAUDE.md` |
 | `statistikk.js` | **kun** `/statistikk/` | `statistikk/CLAUDE.md` |
 | `statistikk-oppdrag.js` | `/statistikk/`, **kun** med oppdragstilgang | `statistikk/CLAUDE.md` |
+| `oppdrag-kort.js` | `/oppdrag/` **og** `/ko/` | `oppdrag/CLAUDE.md` |
 | `oppdrag-sentral-*.js` (fire) | `/oppdrag/`, kontoer uten enhet | `oppdrag/CLAUDE.md` |
 | `oppdrag-enhet.js` | `/oppdrag/`, enhetskontoer | `oppdrag/CLAUDE.md` |
 | `vaktliste-*.js` (seks) | **kun** `/vaktliste/` | `vaktliste/CLAUDE.md` |
