@@ -1,6 +1,6 @@
 """Slå opp i CHANGELOG uten å lese den.
 
-    python manage.py changelog                      # alle 281 titlene
+    python manage.py changelog                      # alle titlene, én linje hver
     python manage.py changelog --temaer             # vokabularet
     python manage.py changelog --tema vaktliste/roller
     python manage.py changelog --app vaktliste

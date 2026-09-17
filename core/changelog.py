@@ -14,7 +14,7 @@ arkivet i praksis stengt for den som ikke alt vet hvor hun skal se.
 
 | Behov | Mekanisme |
 |---|---|
-| Følge en peker — «regelen viser til CHANGELOG 16. sep.» | Overskriften. 281 stk, ingen duplikate titler, ett `grep` |
+| Følge en peker — «regelen viser til CHANGELOG 16. sep.» | Overskriften. Ingen duplikate titler, ett `grep` |
 | Ramse opp et tema — «alt om planleggeren» | **Søkeordet**, denne fila |
 
 Formen er `` `#<app>/<tema>` `` **i overskriftslinja**, ikke på en linje under:
@@ -29,10 +29,11 @@ finnes. Temaene må stå i `TEMAER` — et vokabular uten register er en håndho
 liste, og de forfaller i stillhet: `#vaktliste/planlegger` og
 `#vaktliste/planlegging` ville vært to temaer ingen la merke til at var ett.
 
-**Historikken er ikke merket, og blir det ikke av seg selv.** 281 entries er
-skrevet uten søkeord. `manage.py changelog` uten argumenter skriver ut alle
-titlene — 281 linjer mot 11 651 — og dekker halen til den som leter i fortida.
-Søkeord settes framover, og bakover når noen først er inne i en entry.
+**Historikken er ikke merket, og blir det ikke av seg selv.** `manage.py
+changelog` uten argumenter skriver ut alle titlene — én linje per entry mot
+11 651 — og dekker halen til den som leter i fortida. `--umerkede` sier hvor
+mange som gjenstår. Søkeord settes framover, og bakover når noen først er inne
+i en entry.
 """
 from __future__ import annotations
 
@@ -56,23 +57,35 @@ SOKEORD = re.compile(r'`#([a-z_]+)/([a-z-]+)`')
 #: en tittel — og et vokabular med femti navn er et vokabular ingen husker, så
 #: folk finner på nye. Regn med en håndfull per modul.
 #:
-#: **Lista er liten med vilje, og skal vokse med merkingen — ikke foran den.**
-#: Første utkast hadde tjue temaer og fire i bruk, og `--temaer` ville da vist
-#: seksten rader med null. Det er verre enn en kort liste: et søkeord som
+#: **Lista vokser med merkingen, ikke foran den.** Første utkast hadde tjue
+#: temaer og fire i bruk, og `--temaer` ville da vist seksten rader med null. Det er verre enn en kort liste: et søkeord som
 #: svarer med ett treff der det finnes fem, får deg til å tro du har sett alt.
 #: Samme feilklasse som en skanner som melder grønt om en dekning den ikke har.
 #: `test_hvert_registrert_sokeord_er_i_bruk` håndhever rekkefølgen: merk
 #: entriene først, registrer temaet i samme commit.
 TEMAER: dict[str, dict[str, str]] = {
     'core': {
+        'audit': 'auditlogg, hva som logges og hva som med vilje ikke gjør det',
+        'backup': 'handlere, planen, klokka, offsite, gjenoppretting',
         'dokumentasjon': 'CLAUDE.md, TODO, CHANGELOG, vaktene rundt dem',
-        'tilgang': 'ModulTilgang, nivåstigen, dekoratørene',
+        'drift': 'Railway, cron, server-status, sesjoner, flyttingen til `core`',
+        'sikkerhet': 'gjennomgangene, rate-limiting, CSP, hodene',
+        'tilgang': 'ModulTilgang, nivåstigen, dekoratørene, superbrukeren',
     },
     'ko': {
         'skallet': 'modulen, tilgangen, flatene, sidebaren',
     },
+    'oppdrag': {
+        'enhetsskjerm': 'bilens side, offline-køen, lydvarselet',
+        'sentralbord': 'operatørens side, oppdragslista, tidslinja',
+        'statusmaskin': 'overganger, stemplinger, passiv vakt, avvente',
+    },
     'vaktliste': {
+        'belastning': 'timer, budsjett, tak, hvile, timeoversikt',
+        'offline': 'service worker, køen, fil på e-post, reserven',
         'planlegging': 'skift, plasser, ressurser, dagbolker, utskrift, planleggeren',
+        'roller': 'Ressursrolle, Ressursgruppe, kompetanser, rekkefølge',
+        'tilgang': 'badgen, reservasjonen, korpsfilteret, hvem får røre hva',
     },
 }
 

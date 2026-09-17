@@ -357,31 +357,23 @@ bindende: 1 før 2, fordi backupen speiler hvor modellene bor.
             backup 90 dager, modulfilene 730 dager offsite), A.10, A.11/A.6 (fil på e-post,
             offline drift)
       - [ ] `CLAUDE.md` — backup-avsnittet og hvor modellene bor
-- [ ] **Merk CHANGELOG-entriene med søkeord.** Mekanismen står (`core/changelog.py`,
-      `manage.py changelog`, `core/tests_changelog.py`), men bare **4 av 281** entries er
-      merket. Til de er det, svarer et temasøk med færre treff enn det finnes — og det er
-      verre enn ingen merking: du tror du har sett alt.
+- [ ] **Merk resten av CHANGELOG — 182 av 280 entries står uten søkeord.**
+      13.–17. sep. er gjort (97 entries, 15 temaer); halen er 29. aug. og bakover.
+      `python manage.py changelog --umerkede` viser hva som gjenstår.
 
-      **Målt problem** (17. sep. 2026): CHANGELOG er 11 651 linjer. «Rolle» gir 84 entries
-      som nevner ordet og seks som handler om det; «korps» 51 mot fire; «offline» 35 mot
-      to. Overskriften duger til å *følge en peker* — 281 titler, ingen duplikater — men
-      ikke til å *ramse opp et tema*.
+      **Det haster ikke, og det er verdt å si hvorfor:** de merkede er de siste fem
+      dagene, som er der oppslagene faktisk gjøres. For halen duger `manage.py changelog`
+      alene — 280 titler mot 11 651 linjer. Ta den når du likevel er inne i en gammel
+      entry.
 
-      **Ta 13.–17. sep. først** (~95 entries). Det er der oppslagene gjøres, og det dekker
-      alle temaene. For halen bakover finnes `manage.py changelog`, som skriver ut 281
-      titler i stedet for 11 651 linjer, og `--umerkede` viser hva som gjenstår.
+      **Merk med en eksplisitt tittel-til-tema-tabell, ikke nøkkelordsgjetting**, og la
+      skriptet kreve at hver tittel i tabellen finnes — ellers blir en skrivefeil en
+      stille ikke-merking. Mønsteret ligger i CHANGELOG 17. sep.
 
-      **Merk med en eksplisitt tittel-til-tema-tabell, ikke nøkkelordsgjetting** — og la
-      skriptet kreve at hver tittel i tabellen finnes, så en skrivefeil blir rød og ikke
-      en stille ikke-merking.
-
-      Temaene under er utkastet, med entries som allerede finnes for hvert. **Registrer
-      dem i `TEMAER` i samme commit som du merker entriene**, aldri foran:
-      - `vaktliste/`: `tilgang`, `roller`, `drift`, `belastning`, `offline`, `besetning`
-      - `oppdrag/`: `statusmaskin`, `enhetsskjerm`, `sentralbord`, `verdimengder`, `arkiv`
-      - `patients/`: `registrering`, `arkiv`, `registre`
-      - `statistikk/`: `kilder`
-      - `core/`: `backup`, `drift`, og to som mangler bøtte i dag — `audit` og `sikkerhet`
+      Temaer som ennå ikke finnes, og som halen trolig trenger: `patients/registrering`,
+      `patients/arkiv`, `patients/registre`, `statistikk/kilder`, `oppdrag/verdimengder`,
+      `oppdrag/arkiv`, `vaktliste/besetning`. **Registrer dem i `TEMAER` i samme commit
+      som du merker entriene**, aldri foran — testen håndhever rekkefølgen.
 
 - [ ] **Strukturér `oppdrag/CLAUDE.md`.** 17 275 tegn under **én** overskrift — samme
       flate vegg vaktlista hadde, bare mindre, og den eneste fila som står i

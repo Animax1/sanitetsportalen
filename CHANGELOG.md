@@ -4,6 +4,42 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-17 — 97 entries merket: fra 200 grep-treff til 5 oppslag  `#core/dokumentasjon`
+
+Mekanismen kom tidligere i dag; dette er merkingen som gjør den til noe. **13.–17. sep. er
+merket — 97 entries, 15 temaer.** Det er der oppslagene faktisk gjøres.
+
+**Målingen som viser hva det er verdt:**
+
+| Spørsmål | Før | Nå |
+|---|---|---|
+| «Hva har skjedd med roller i vaktlista?» | `grep -i rolle` → **200 linjetreff** spredt over 84 entries | `--tema vaktliste/roller` → **5 entries** |
+
+**Merket med en eksplisitt tittel-til-tema-tabell, ikke nøkkelordsgjetting.** Hver av de 97
+titlene er lest og tilordnet for hånd. Skriptet krevde at **hver tittel i tabellen finnes i
+CHANGELOG** — en skrivefeil ville blitt rød, ikke en stille ikke-merking. Alle 97 traff.
+Nøkkelordsgjetting ville vært samme feilklasse som en skanner med falske funn: den ville
+merket «rollemodellen» som `vaktliste/roller`, og da svarer temaet med entries som ikke
+handler om det.
+
+**Vokabularet ble utvidet fra 4 til 15 temaer — etter merkingen, ikke foran.** To temaer
+manglet bøtte og kom til underveis: `core/audit` og `core/sikkerhet`. Sju andre fra
+utkastet ble **ikke** registrert, fordi ingen av de 97 hørte til dem
+(`patients/*`, `statistikk/kilder`, `oppdrag/verdimengder`, `oppdrag/arkiv`,
+`vaktliste/besetning`) — de hører til halen, og registreres den dagen noen merker den.
+`test_hvert_registrert_sokeord_er_i_bruk` håndhever rekkefølgen.
+
+**Fordelingen sier noe om hvor arbeidet har ligget:** `core/dokumentasjon` 21,
+`vaktliste/planlegging` 17, `core/backup` 17, `core/drift` 10, `core/sikkerhet` 6.
+
+**182 entries står fortsatt umerket** — 29. aug. og bakover. Det er ført i `TODO.md` med
+begrunnelsen for at det ikke haster: for halen duger tittelindeksen alene, og
+`--umerkede` viser nøyaktig hva som gjenstår.
+
+Suite: 3 296 tester, grønn.
+
+---
+
 ## 2026-09-17 — Søkeord i CHANGELOG, så arkivet kan slås opp i  `#core/dokumentasjon`
 
 **André:** «Hensikten med slike søkeord er jo at da slipper du lese hele changelog som er
@@ -13,7 +49,7 @@ gigantisk.» Han hadde rett, og jeg svarte først på feil problem.
 
 | Behov | Virket før? |
 |---|---|
-| **Følge en peker** — «regelen viser til CHANGELOG 16. sep.» | Ja. 281 overskrifter, **null duplikate titler**, ett `grep` |
+| **Følge en peker** — «regelen viser til CHANGELOG 16. sep.» | Ja. 280 overskrifter, **null duplikate titler**, ett `grep` |
 | **Ramse opp et tema** — «hva har skjedd med planleggeren?» | **Nei** |
 
 **Målt, og verre enn antatt.** Arkivet er 11 651 linjer og 650 000 tegn. «Rolle» gir **84**
@@ -51,7 +87,7 @@ rekkefølgen: ta 13.–17. sep. først, der oppslagene faktisk gjøres.
 **For halen bakover finnes kommandoen nå:**
 
 ```powershell
-python manage.py changelog                  # alle 281 titlene — 281 linjer mot 11 651
+python manage.py changelog                  # alle titlene — 280 linjer mot 11 651
 python manage.py changelog --temaer         # vokabularet, med antall per tema
 python manage.py changelog --tema ko/skallet
 python manage.py changelog --app vaktliste
@@ -60,13 +96,13 @@ python manage.py changelog --umerkede       # hva som gjenstår
 
 Sperrehaker: parseren må finne over 200 entries, titlene må være unike (pekeren skal ikke
 være tvetydig), halen må leses ut av overskriften **og** en tittel uten søkeord må fortsatt
-gi hele tittelen — ellers ville de 277 umerkede mistet navnet sitt i parsingen.
+gi hele tittelen — ellers ville de umerkede mistet navnet sitt i parsingen.
 
 Suite: 3 296 tester, grønn.
 
 ---
 
-## 2026-09-17 — Vaktlistefila fikk seksjoner, og vakten fikk noe å peke på  `#core/dokumentasjon` `#vaktliste/planlegging`
+## 2026-09-17 — Vaktlistefila fikk seksjoner, og vakten fikk noe å peke på  `#core/dokumentasjon`
 
 **Oppgaven var «del `vaktliste/CLAUDE.md`», og den ble ikke løst slik.** Tre funn i
 rekkefølge, og hvert av dem snudde planen:
@@ -337,7 +373,7 @@ moduler»: vaktlista står i prod, og KO har fått sin egen seksjon.
 
 ---
 
-## 2026-09-16 — Resten av pulje 3 og sesjonsaktiviteten ut i prod
+## 2026-09-16 — Resten av pulje 3 og sesjonsaktiviteten ut i prod  `#vaktliste/planlegging` `#core/drift`
 
 Fire commits, `d16b6f6` → `0405a17`, verifisert på staging:
 
@@ -360,7 +396,7 @@ Suiten grønn på `0405a17`: 3 243 tester.
 
 ---
 
-## 2026-09-16 — Sesjonslista viser nå om det sitter noen der
+## 2026-09-16 — Sesjonslista viser nå om det sitter noen der  `#core/drift`
 
 **André:** «Enig med polling for å vise hvem som er aktiv nå — og så må jeg fortsatt se alle
 som er innlogget.»
@@ -408,7 +444,7 @@ et punkt som blir liggende og se ut som gjeld.
 
 ---
 
-## 2026-09-16 — Hvorfor «pålogget» ikke betyr «til stede»
+## 2026-09-16 — Hvorfor «pålogget» ikke betyr «til stede»  `#core/drift`
 
 **André:** «I /server-status/ ser du hvem som er pålogget, men de trenger ikke være faktisk
 aktive og bruke nettsiden — det kan være en fane.»
@@ -439,7 +475,7 @@ vakt.
 
 ---
 
-## 2026-09-16 — Pulje 3 punkt 5: fanerekka er to slags ting, og sto som én
+## 2026-09-16 — Pulje 3 punkt 5: fanerekka er to slags ting, og sto som én  `#vaktliste/planlegging`
 
 **André:** «De faste fanene skal se annerledes ut enn ressursgruppefanene. I dag ser
 «Oversikt» og «Ambulanse» like ut, og de er to ulike slags ting.»
@@ -490,7 +526,7 @@ staging.
 
 ---
 
-## 2026-09-16 — Punkt 3 brutt: korpsdelen var alt løst
+## 2026-09-16 — Punkt 3 brutt: korpsdelen var alt løst  `#vaktliste/tilgang`
 
 **André:** «Bryt dette og bare sett det i TODO for noe å vurdere senere. Det fungerer
 forsåvidt når det gjelder korps og du går inn på rediger ressurs og setter korps der.»
@@ -511,7 +547,7 @@ som gjentar seg, ikke en handling man gjør om igjen.
 
 ---
 
-## 2026-09-16 — Pulje 3A og 3B ut i prod
+## 2026-09-16 — Pulje 3A og 3B ut i prod  `#vaktliste/planlegging` `#vaktliste/roller`
 
 Sju commits, `64f62a3` → `5b9ac15`, alle verifisert på staging av André:
 
@@ -536,7 +572,7 @@ Suiten grønn på `5b9ac15`: 3 225 tester.
 
 ---
 
-## 2026-09-16 — «Kolonnen tid viser seg annerledes, samt linjen er ujevn»
+## 2026-09-16 — «Kolonnen tid viser seg annerledes, samt linjen er ujevn»  `#vaktliste/planlegging`
 
 **Meldt fra staging (André)** om «Oversikt»-fanen jeg bygget noen timer før. Cella hadde
 fått `.vl-blokktid` — en klasse laget for et `<span>` på en blokklinje, med
@@ -587,7 +623,7 @@ med mindre noe tester testen.
 
 ---
 
-## 2026-09-16 — Laget sorteres etter rolle, ikke etter når radene ble laget
+## 2026-09-16 — Laget sorteres etter rolle, ikke etter når radene ble laget  `#vaktliste/roller`
 
 **André:** «Det er en enhet/lag som har i synkende rekkefølge: lagsmedlem, lagleder,
 lagsmedlem, hospitant. Når jeg justerer på førstenevnte så flyttes den ikke i enheten etter
@@ -636,7 +672,7 @@ bare `Meta`), `vaktliste/tests_registre.py` (+4), `vaktliste/CLAUDE.md`.
 
 ---
 
-## 2026-09-16 — Roller kan endelig døpes om, og modulen har én form for det
+## 2026-09-16 — Roller kan endelig døpes om, og modulen har én form for det  `#vaktliste/roller`
 
 **André:** «Det bør gå relativt automatisk ved endring av rollenavn, se andre navn i
 enheten (altså ambulanse, lag osv).»
@@ -682,7 +718,7 @@ felle som `SISTE_LISTE_NOKKEL` gikk i tidligere samme dag.
 
 ---
 
-## 2026-09-16 — «Endret en rolle til hospitant og nå står den øverst»
+## 2026-09-16 — «Endret en rolle til hospitant og nå står den øverst»  `#vaktliste/roller`
 
 **Meldt fra staging (André).** Symptomet er ekte, og årsaken er den alfabetiske
 sorteringen: «Hospitant» går foran «Lagleder», «Lagsmedlem» og «Sjåfør». Det er nøyaktig
@@ -711,7 +747,7 @@ pushet.
 
 ---
 
-## 2026-09-16 — Pulje 3B: ressursgruppene kan endres, og rollene rangeres
+## 2026-09-16 — Pulje 3B: ressursgruppene kan endres, og rollene rangeres  `#vaktliste/roller`
 
 To punkter fra pulje 3. Begge viste seg å være **manglende flate over en mekanisme som
 alt virket** — den sorten hull der ingenting feiler, fordi funksjonen bare er uoppnåelig.
@@ -779,7 +815,7 @@ fortsatt alfabetisk, rollen sorterer på rangering med navnet som uavgjort.
 
 ---
 
-## 2026-09-16 — Pulje 3A: «Oversikt» ble en faktisk oversikt
+## 2026-09-16 — Pulje 3A: «Oversikt» ble en faktisk oversikt  `#vaktliste/belastning`
 
 **André, pulje 3 punkt 2:** «Ressursfanen som heter Oversikt viser mye av det som allerede
 er i de respektive ressursfanene. Må være en faktisk oversikt. Derfor nevnte jeg de ordene
@@ -837,7 +873,7 @@ et annet sted enn du tror»).
 
 ---
 
-## 2026-09-16 — Pulje 3A: «Planlegging»-fanen heter «Timeoversikt»
+## 2026-09-16 — Pulje 3A: «Planlegging»-fanen heter «Timeoversikt»  `#vaktliste/belastning`
 
 **André, pulje 3 punkt 1:** fanen skal hete «Timeoversikt», og siles på korps for den som
 ikke er leder.
@@ -895,7 +931,7 @@ som kan bli rødt.
 
 ---
 
-## 2026-09-16 — Pulje 2 og de tre rundene etter ut i prod
+## 2026-09-16 — Pulje 2 og de tre rundene etter ut i prod  `#oppdrag/statusmaskin`
 
 André: «Kan vi pushe det vi har gjort til main?» Seks commits, `11c068b` → `a7239c5`:
 
@@ -922,7 +958,7 @@ Suiten grønn på `a7239c5`: 3 184 tester.
 
 ---
 
-## 2026-09-16 — TODO var mer arkiv enn arbeidsliste
+## 2026-09-16 — TODO var mer arkiv enn arbeidsliste  `#core/dokumentasjon`
 
 **André:** «Hva kan vi gjøre med TODO for å optimalisere?» Målt først, ryddet etterpå.
 
@@ -988,7 +1024,7 @@ egen feil. En vakt som ikke kan bli rød, vokter ingenting.
 
 ---
 
-## 2026-09-16 — «[object Object]» på hver enhet: én linje, tre lag
+## 2026-09-16 — «[object Object]» på hver enhet: én linje, tre lag  `#oppdrag/sentralbord`
 
 **Meldt fra staging (André):** «I /oppdrag i «ressurser»-listen vises enhver enhet med
 navnet på enheten og `[object Object]` — på alle enhetene, uavhengig av hva flagget sier.»
@@ -1052,7 +1088,7 @@ med den delte kommandoen.
 
 ---
 
-## 2026-09-16 — Puljene skrives ned, og to testregler som koster en time i uka
+## 2026-09-16 — Puljene skrives ned, og to testregler som koster en time i uka  `#core/dokumentasjon`
 
 **André:** «Ligger puljene som vi har planlagt i noe notat? For jeg syns hver arbeid du
 gjør tar enormt lang tid.»
@@ -1100,7 +1136,7 @@ delt suite). Ingen kodeendring.
 
 ---
 
-## 2026-09-16 — Pulje 2, andre halvdel: passiv vakt, «avvente» og kvittert avbrytelse
+## 2026-09-16 — Pulje 2, andre halvdel: passiv vakt, «avvente» og kvittert avbrytelse  `#oppdrag/statusmaskin`
 
 Resten av pulje 2 i én runde, etter spesifikasjonen André ga samme dag. Tre ting som
 henger sammen, og én migrasjon — `oppdrag/0026`, **rene tillegg, null `RunPython`**, så
@@ -1208,7 +1244,7 @@ Hele suiten (3 172 tester) grønn.
 
 ---
 
-## 2026-09-16 — Pulje 2, første halvdel: «ledig siden» og varselbjella
+## 2026-09-16 — Pulje 2, første halvdel: «ledig siden» og varselbjella  `#oppdrag/sentralbord`
 
 To av de tre små i oppdragsmodulen. Ingen av dem rører statusmaskinen eller skjemaet;
 avbrutt-kvitteringen kommer for seg, fordi den trenger en migrasjon.
@@ -1267,7 +1303,7 @@ står i `CLAUDE.md`; den fortjener å bli lest før neste test skrives, ikke ett
 
 ---
 
-## 2026-09-16 — Velgeren var ikke treg, den fyrte på feil hendelse
+## 2026-09-16 — Velgeren var ikke treg, den fyrte på feil hendelse  `#vaktliste/planlegging`
 
 **Meldt fra staging (André):** «Når jeg skifter vaktliste tar det lang tid før fanene og
 vaktene oppdateres. Det er og forvirrende at om jeg er på en vaktliste og går ut av
@@ -1327,7 +1363,7 @@ Ingen migrasjon. Hele suiten (3 108 tester) grønn.
 
 ---
 
-## 2026-09-16 — Porten gjaldt innsendingen, ikke endringen
+## 2026-09-16 — Porten gjaldt innsendingen, ikke endringen  `#vaktliste/tilgang`
 
 **Meldt fra staging (André):** «Kan rapportere bug at de med les alle / skriv eget korps
 ikke kan skrive merknad hvis det står ledig plass. Bør de ha tilgang der når det står ledig
@@ -1375,7 +1411,7 @@ ingenting og ser ut som dekning.
 
 ---
 
-## 2026-09-16 — Et låst felt skal se låst ut, og fortsatt kunne leses
+## 2026-09-16 — Et låst felt skal se låst ut, og fortsatt kunne leses  `#vaktliste/planlegging`
 
 **André:** «De feltene i rediger skift og rediger ressurs som korps-fører ikke kan endre bør
 endre farge i feltet til noe som tydeliggjør at den er låst. Fortsatt lesbar.»
@@ -1415,7 +1451,7 @@ ingen overlevende.**
 
 ---
 
-## 2026-09-16 — Merknaden følger raden, ikke oppsettet
+## 2026-09-16 — Merknaden følger raden, ikke oppsettet  `#vaktliste/tilgang`
 
 **André:** «Merknad skal ikke låses for korps-føreren.»
 
@@ -1451,7 +1487,7 @@ overlevende.**
 
 ---
 
-## 2026-09-16 — En lås som ikke låste, og en navnerett som var stengt
+## 2026-09-16 — En lås som ikke låste, og en navnerett som var stengt  `#vaktliste/tilgang`
 
 To glipper i gårsdagens tilgangsrunde, meldt fra staging.
 
@@ -1509,7 +1545,7 @@ ressurs fritt vilt.
 
 ---
 
-## 2026-09-15 — Superbrukeren er én konto, ikke en kategori
+## 2026-09-15 — Superbrukeren er én konto, ikke en kategori  `#core/tilgang`
 
 **André, etter forrige runde:** «`is_superuser` skal ikke kunne demotes fra sin
 `role = admin`, siden is superuser er og skal være eksklusivt til bootstrap-kontoen.»
@@ -1551,7 +1587,7 @@ rundene, og der kan en administrator fortsatt degradere superbrukeren.
 
 ---
 
-## 2026-09-15 — Superbrukeren er nødutgangen, og Scaleway-kortet løy
+## 2026-09-15 — Superbrukeren er nødutgangen, og Scaleway-kortet løy  `#core/tilgang` `#core/backup`
 
 To korte punkter fra samme runde som vaktliste-porten over.
 
@@ -1615,7 +1651,7 @@ har nå en realistisk nøkkel. En sannhet om ett tegn er ikke en sannhet om en n
 
 ---
 
-## 2026-09-15 — Korps-føreren bemanner, hun setter ikke opp
+## 2026-09-15 — Korps-føreren bemanner, hun setter ikke opp  `#vaktliste/tilgang`
 
 **Meldt fra staging (André):**
 
@@ -1705,7 +1741,7 @@ Ingen migrasjon. Hele suiten (3 057 tester) grønn.
 
 ---
 
-## 2026-09-15 — CLAUDE.md delt, og mutasjonstestingen har fått et budsjett
+## 2026-09-15 — CLAUDE.md delt, og mutasjonstestingen har fått et budsjett  `#core/dokumentasjon`
 
 **Bedt om (André), to punkter fra forrige økt:** «CLAUDE.md skal splittes i rot +
 per-modul-filer» og «hold mutasjonstesting proporsjonal — tungt på services, lett på UI».
@@ -1786,7 +1822,7 @@ ORM-en gir UTC.
 
 ---
 
-## 2026-09-15 — «Ny vaktliste»: tidsfeltene som i planleggeren
+## 2026-09-15 — «Ny vaktliste»: tidsfeltene som i planleggeren  `#vaktliste/planlegging`
 
 **Bedt om (André):**
 
@@ -1821,7 +1857,7 @@ man ikke er ferdig.
 
 ---
 
-## 2026-09-15 — Planleggeren: budsjettet manglet, og oppsettet ble glemt
+## 2026-09-15 — Planleggeren: budsjettet manglet, og oppsettet ble glemt  `#vaktliste/planlegging` `#vaktliste/belastning`
 
 **Meldt fra staging (André):**
 
@@ -1892,7 +1928,7 @@ panelet med den ekte `tegnPanel()`.
 
 ---
 
-## 2026-09-15 — Planleggeren: tidsfeltene lot seg ikke skrive i
+## 2026-09-15 — Planleggeren: tidsfeltene lot seg ikke skrive i  `#vaktliste/planlegging`
 
 **Meldt fra staging (André):**
 
@@ -1930,7 +1966,7 @@ advarselsklassen faktisk settes.
 
 ---
 
-## 2026-09-15 — Planleggeren: «Legg til ressurs» flyttet ned
+## 2026-09-15 — Planleggeren: «Legg til ressurs» flyttet ned  `#vaktliste/planlegging`
 
 **Meldt fra staging (André):**
 
@@ -1954,7 +1990,7 @@ markupen.
 
 ---
 
-## 2026-09-15 — Planleggeren: plassene flyttet til vinduet, skiftlengde fjernet
+## 2026-09-15 — Planleggeren: plassene flyttet til vinduet, skiftlengde fjernet  `#vaktliste/planlegging`
 
 **Meldt fra staging (André):**
 
@@ -2003,7 +2039,7 @@ valgte bevisst og ikke testet. Den har en test nå.
 
 ---
 
-## 2026-09-15 — Planleggeren: feltene lot seg ikke fylle ut
+## 2026-09-15 — Planleggeren: feltene lot seg ikke fylle ut  `#vaktliste/planlegging`
 
 **Meldt fra staging (André):**
 
@@ -2056,7 +2092,7 @@ ID-lista.
 
 ---
 
-## 2026-09-15 — Planleggeren: fanen som lager grunnlaget
+## 2026-09-15 — Planleggeren: fanen som lager grunnlaget  `#vaktliste/planlegging`
 
 **Meldt fra staging (André):**
 
@@ -2170,7 +2206,7 @@ et år.
 
 ---
 
-## 2026-09-15 — Vaktas budsjett: steg 2 og 3 mot planleggerfanen
+## 2026-09-15 — Vaktas budsjett: steg 2 og 3 mot planleggerfanen  `#vaktliste/belastning`
 
 `docs/FORSLAG_PLANLEGGERFANE.md` §7, steg 2 og 3. **Gjort i samme omgang med vilje:** en
 «budsjettlinje» uten et budsjett er halve funksjonen, og taket er ett felt pluss én linje i
@@ -2258,7 +2294,7 @@ triggerkø å tømme.
 
 ---
 
-## 2026-09-15 — Overlappet har fått et navn: steg 1 mot planleggerfanen
+## 2026-09-15 — Overlappet har fått et navn: steg 1 mot planleggerfanen  `#vaktliste/belastning`
 
 Første kodesteg fra `docs/FORSLAG_PLANLEGGERFANE.md` §7. Punktet sto i TODO fra
 14. sep. 2026 og var ført opp som det som måtte løses **før** planleggeren: et tak som
@@ -2362,7 +2398,7 @@ med en gang. Et tall ingen test leser, råtner; begge er rettet nå.
 
 ---
 
-## 2026-09-15 — Planleggerfanen: åtte beslutninger, og en rettelse av mitt eget notat
+## 2026-09-15 — Planleggerfanen: åtte beslutninger, og en rettelse av mitt eget notat  `#vaktliste/planlegging`
 
 Gjennomgang av `docs/FORSLAG_PLANLEGGERFANE.md` med André. Ingenting er bygget — dette er
 underlaget som gjør at det *kan* bygges uten å ta de samme avgjørelsene om igjen.
@@ -2422,7 +2458,7 @@ avklarte spørsmål, ny §6 med beslutningene, §7 er rekkefølgen), `TODO.md`.
 
 ---
 
-## 2026-09-15 — «Avbrutt» og «trenger ny ressurs» var ett spørsmål, og måtte være to
+## 2026-09-15 — «Avbrutt» og «trenger ny ressurs» var ett spørsmål, og måtte være to  `#oppdrag/statusmaskin`
 
 **Meldt fra staging (André):**
 
@@ -2498,7 +2534,7 @@ som telles feil er verre enn ikke noe tak.
 
 ---
 
-## 2026-09-15 — Vaktlista: dagen ytterst i «Oversikt», og sammenslåtte ressurskort
+## 2026-09-15 — Vaktlista: dagen ytterst i «Oversikt», og sammenslåtte ressurskort  `#vaktliste/planlegging`
 
 To av de tre ønskene fra 14. sep. er levert. Drift-automatikken står igjen og tas for seg.
 
@@ -2659,7 +2695,7 @@ gjør), og et søk-og-erstatt i testfilene traff en JS-streng i stedet for en ha
 
 ---
 
-## 2026-09-14 — To notater: DPIA-vurderingen og vaktlisteutbedringene (ingen kode)
+## 2026-09-14 — To notater: DPIA-vurderingen og vaktlisteutbedringene (ingen kode)  `#core/dokumentasjon`
 
 To samtaler skrevet ned. Ingen kodeendring — begge notatene finnes for at beslutningene
 skal kunne tas med åpne øyne, og TODO peker til dem.
@@ -2721,7 +2757,7 @@ kunne stemple.
 
 ---
 
-## 2026-09-14 — 400 ved bemanning av ledig plass: nedtrekket tilbød et umulig valg
+## 2026-09-14 — 400 ved bemanning av ledig plass: nedtrekket tilbød et umulig valg  `#vaktliste/planlegging`
 
 **Meldt fra staging (André):**
 
@@ -2805,7 +2841,7 @@ toppnivå-avhengigheter til DOM-en.
 
 ---
 
-## 2026-09-14 — Minimerbare ressurser ført i TODO (ingen kode)
+## 2026-09-14 — Minimerbare ressurser ført i TODO (ingen kode)  `#core/dokumentasjon`
 
 **André:** minimerbare lag/ambulanser i gruppefanene, dagruppering som i Oversikt, og alle
 minimert som standard.
@@ -2835,7 +2871,7 @@ Tre ting ført opp som må avklares før noen bygger:
 
 ---
 
-## 2026-09-14 — To vaktlisteønsker ført i TODO (ingen kode)
+## 2026-09-14 — To vaktlisteønsker ført i TODO (ingen kode)  `#core/dokumentasjon`
 
 **«Sett i drift» skal bort — drift skal følge vakta** (André). Problemet den løser er
 ekte: glemmer noen å trykke, kan ingen stemple møtt ved vaktstart, altså nøyaktig når det
@@ -2869,7 +2905,7 @@ som skal faktureres. De to kan lande ulikt — men da bevisst.
 
 ---
 
-## 2026-09-14 — Rapportnotatet skrevet ferdig (ingen kode)
+## 2026-09-14 — Rapportnotatet skrevet ferdig (ingen kode)  `#core/dokumentasjon`
 
 `docs/FORSLAG_RAPPORTMODUL.md` er revidert etter diskusjonen med André. Fortsatt et
 forslag — ingen kode skrevet.
@@ -2923,7 +2959,7 @@ verifisert mot primærkilden** — Scaleways domene var blokkert av egress-proxy
 
 ---
 
-## 2026-09-14 — Vaktlista: overlappende skift ført i TODO (ingen kode)
+## 2026-09-14 — Vaktlista: overlappende skift ført i TODO (ingen kode)  `#core/dokumentasjon`
 
 Funnet mens rapportmodulen ble diskutert, men punktene hører hjemme i vaktlista og er
 uavhengige av om rapporten noen gang bygges.
@@ -2958,7 +2994,7 @@ pågår.
 
 ---
 
-## 2026-09-14 — Forslag: rapportmodul (ingen kode)
+## 2026-09-14 — Forslag: rapportmodul (ingen kode)  `#core/dokumentasjon`
 
 `docs/FORSLAG_RAPPORTMODUL.md`, skrevet på Andrés spørsmål om en `/rapport/`-modul som
 henter fra vaktlista og statistikken. **Ingen kode er skrevet** — dette er grunnlag for
@@ -3000,7 +3036,7 @@ A.8-formuleringen.
 
 ---
 
-## 2026-09-14 — Tallgjerdet: dokumentene kan ikke lenger lyve om antall
+## 2026-09-14 — Tallgjerdet: dokumentene kan ikke lenger lyve om antall  `#core/dokumentasjon`
 
 Det ene av tre åpne punkter som var verdt å lukke. De to andre —
 `accounts` → `oppdrag.Enhet` og `style-src 'unsafe-inline'` — ble gjennomgått og
@@ -3046,7 +3082,7 @@ løses av at noen leser diffen.
 
 ---
 
-## 2026-09-14 — Dokumentrunden del 3: resten av teknisk dokumentasjon
+## 2026-09-14 — Dokumentrunden del 3: resten av teknisk dokumentasjon  `#core/dokumentasjon`
 
 André: «Hvis teknisk dokumentasjon ikke er ferdig gjennomgått så må vi gjøre det.» Riktig
 innvending — **halvveis verifisert dokumentasjon er verre enn tydelig uverifisert**, fordi
@@ -3110,7 +3146,7 @@ og «mutasjonen ble aldri utført» ser helt like ut i en logg.*
 
 ---
 
-## 2026-09-14 — Dokumentrunden del 2, og den uforklarte feilen fikk et navn
+## 2026-09-14 — Dokumentrunden del 2, og den uforklarte feilen fikk et navn  `#core/dokumentasjon`
 
 Gjeldspunkt 3 er ferdig: alle seks dokumenter gjennomgått mot koden, pluss et gjerde
 som gjør mekanisk dokumentråte til en rød test.
@@ -3165,7 +3201,7 @@ Bekreftet med 30 kjøringer på PostgreSQL uten én feil.
 
 ---
 
-## 2026-09-14 — Dokumentrunden, del 1: deploy-guide, runbook og README
+## 2026-09-14 — Dokumentrunden, del 1: deploy-guide, runbook og README  `#core/dokumentasjon`
 
 Gjeldspunkt 3. Tre av seks dokumenter; de to store og gjerdet står igjen.
 
@@ -3204,7 +3240,7 @@ filstier, miljøvariabler, interne lenker, og `Procfile`-linjene ordrett.
 
 ---
 
-## 2026-09-14 — Arbeidsflyt: byggnummer ved push, og åpne punkter som ikke får gjemme seg
+## 2026-09-14 — Arbeidsflyt: byggnummer ved push, og åpne punkter som ikke får gjemme seg  `#core/dokumentasjon`
 
 To regler i `CLAUDE.md`, begge fra ting som gikk galt i dag.
 
@@ -3221,7 +3257,7 @@ en peker igjen der de lå.
 
 ---
 
-## 2026-09-14 — Service workeren til `vl-sw-5`, og utkastingen fikk en test
+## 2026-09-14 — Service workeren til `vl-sw-5`, og utkastingen fikk en test  `#vaktliste/offline`
 
 Bumpet foran prod-deployen. `activate` sletter alle `vl-sw-`-cacher som ikke
 bærer gjeldende versjon, og fram til nå lå den gamle, udelte `vaktliste.js`
@@ -3247,7 +3283,7 @@ workeren ikke eier), og versjonen ikke bumpet.
 
 ---
 
-## 2026-09-14 — Portalens egne tabeller auditlogges, og to lister som måtte finne selv
+## 2026-09-14 — Portalens egne tabeller auditlogges, og to lister som måtte finne selv  `#core/audit`
 
 **`core/signals.py`: `AppSetting`, `ModuleSettings` og `Vakt`.** Hullet André
 fant ved å spørre «logges ingenting fra core?». Svaret var nesten nei, og det
@@ -3309,7 +3345,7 @@ finnes lagt til.
 
 ---
 
-## 2026-09-14 — To funn fra staging: CSP blokkerte lydbæreren, modaler holdt på fokus
+## 2026-09-14 — To funn fra staging: CSP blokkerte lydbæreren, modaler holdt på fokus  `#oppdrag/enhetsskjerm`
 
 Begge meldt av André ved verifisering på staging, og begge var ekte feil bak en
 melding som så ut som støy.
@@ -3398,7 +3434,7 @@ kommet tilbake på fire fulle kjøringer etterpå. Den er *ikke* forklart av
 opprydningsfeilen over — det er en hypotese jeg ikke har bevist. Se TODO.
 
 
-## 2026-09-14 — Gjeldspunkt 3.6: de to store JS-filene delt
+## 2026-09-14 — Gjeldspunkt 3.6: de to store JS-filene delt  `#vaktliste/planlegging` `#oppdrag/sentralbord`
 
 `vaktliste.js` var 3 801 linjer, `oppdrag-sentral.js` 1 991. Nå fem og fire.
 
@@ -3447,7 +3483,7 @@ for alt som leser kilden er de fortsatt én fil, som de er i nettleseren.
 
 ---
 
-## 2026-09-14 — Gjeldspunkt 3.8: fem tester som målte kode, ikke oppførsel
+## 2026-09-14 — Gjeldspunkt 3.8: fem tester som målte kode, ikke oppførsel  `#core/dokumentasjon`
 
 Gjeldskartet sa «en del eldre tester grep-er etter kodelinjer». Da jeg gikk
 gjennom dem, var de fleste treffene **legitime**: XSS-skannerne leser kilden
@@ -3489,7 +3525,7 @@ Regelen står i `CLAUDE.md`.
 
 ---
 
-## 2026-09-14 — Gjeldspunkt 3.1: kontoappen kjenner ingen modul ved navn
+## 2026-09-14 — Gjeldspunkt 3.1: kontoappen kjenner ingen modul ved navn  `#core/tilgang`
 
 `accounts/forms.py` importerte `patients.models` for å tegne kortet
 «Pasientregistrering» på brukersiden — kontoappen kjente altså én modul ved
@@ -3522,7 +3558,7 @@ sperrehake på de to `Enhet`-importene. `core`s egen liste står fortsatt tom.
 
 ---
 
-## 2026-09-14 — To registre til: `core` kjenner ingen modul ved navn lenger
+## 2026-09-14 — To registre til: `core` kjenner ingen modul ved navn lenger  `#core/drift`
 
 `KJENTE_UNNTAK` er tom. Den sto med fem rader i går kveld — de eneste stedene
 rammeverket fortsatt importerte en modul — og begge er nå registre etter samme
@@ -3566,7 +3602,7 @@ det den er til for. Prøven bruker nå en ekte connection-streng og krever
 
 ---
 
-## 2026-09-14 — Flytting fase 4: adminflaten samlet, `core/views.py` delt, skimet slettet
+## 2026-09-14 — Flytting fase 4: adminflaten samlet, `core/views.py` delt, skimet slettet  `#core/drift`
 
 Siste fase i flytterunden. Ingen migrasjon.
 
@@ -3622,7 +3658,7 @@ ikke finnes, er verre enn ingen beskrivelse — den neste leter etter fila.
 
 ---
 
-## 2026-09-14 — Flytting fase 3: scopet, middlewaren, helsesjekken og dashbordet
+## 2026-09-14 — Flytting fase 3: scopet, middlewaren, helsesjekken og dashbordet  `#core/drift`
 
 Ingen migrasjon — ren kodeflytting.
 
@@ -3657,7 +3693,7 @@ og en test krever at en importvei som ryddes tas ut av den.
 
 ---
 
-## 2026-09-14 — Flytting fase 2: `AppSetting` og `Backup` til `core`
+## 2026-09-14 — Flytting fase 2: `AppSetting` og `Backup` til `core`  `#core/drift`
 
 De to portalvide modellene har aldri vært pasientdata. De lå i `patients` fordi
 den var første app og det ikke fantes noe annet sted — og resultatet var at
@@ -3707,7 +3743,7 @@ bodde i `patients`.
 
 ---
 
-## 2026-09-14 — Flytting fase 1: navnetabellen, satt på plass før den trengs
+## 2026-09-14 — Flytting fase 1: navnetabellen, satt på plass før den trengs  `#core/drift`
 
 `core.backup.oversett_modellnavn()` og `GAMLE_MODELLNAVN`. Tabellen er **tom**,
 så fasen endrer ingenting i dag. Det er hele poenget.
@@ -3750,7 +3786,7 @@ slettes i fase 4.
 
 ---
 
-## 2026-09-14 — Neste post planlagt: det portalvide ut av `patients`
+## 2026-09-14 — Neste post planlagt: det portalvide ut av `patients`  `#core/drift`
 
 `docs/PLAN_FLYTTING_TIL_CORE.md`. Trinn 2 i `PLAN_REKKEFOLGE_2026-09.md`, nå
 som backupomleggingen er ferdig og prod har en gjenopprettbar backup foran den
@@ -3786,7 +3822,7 @@ i tabellen den dagen noen gjenoppretter.
 
 ---
 
-## 2026-09-14 — Prefiksrutingen låst: `full/` kan ikke bli `backups/` i stillhet
+## 2026-09-14 — Prefiksrutingen låst: `full/` kan ikke bli `backups/` i stillhet  `#core/backup`
 
 André, etter deployen: «Hele databasen heter `backup-full-auto-…`, mens modulene
 heter `backup-<modul>-…`. Vil det fungere med `full/` og `backups/`?»
@@ -3826,7 +3862,7 @@ i `offsite.py` faller to av dem med «filene ville havnet under backups/ og fåt
 
 ---
 
-## 2026-09-14 — Migrasjonsprøve for Backupplan, før prod
+## 2026-09-14 — Migrasjonsprøve for Backupplan, før prod  `#core/backup`
 
 Før omleggingen går til prod: en prøve som kjører `core/0008`–`0010` mot ekte
 PostgreSQL **med rader i basen**, i den historiske formen.
@@ -3859,7 +3895,7 @@ det.
 
 ---
 
-## 2026-09-14 — Backup fase 8: den gamle veien er stengt
+## 2026-09-14 — Backup fase 8: den gamle veien er stengt  `#core/backup`
 
 Siste fase i backupomleggingen, og den eneste som bare fjerner ting. Tre
 levninger fra før `core.backup` er slettet, og migrasjonen er `patients/0017`.
@@ -3905,7 +3941,7 @@ alle åtte fasene er levert.**
 
 ---
 
-## 2026-09-14 — Backup fase 7: oppbevaringstidene, og et kort som leser dem tilbake
+## 2026-09-14 — Backup fase 7: oppbevaringstidene, og et kort som leser dem tilbake  `#core/backup`
 
 Fristene offsite håndheves av **Scaleway, ikke av oss**. Portalens IAM-nøkkel
 har ikke sletterett, og `enforce_cap` rører bare volumet — livssyklusreglene i
@@ -3940,7 +3976,7 @@ et S3-kall per sidelasting er et kall for mye.
 
 ---
 
-## 2026-09-13 — Backup fase 6: `verifiser_backup`
+## 2026-09-13 — Backup fase 6: `verifiser_backup`  `#core/backup`
 
 En backup ingen har gjenopprettet er en hypotese. Suiten har hatt en test som
 gjenoppretter alle filene i rekkefølge siden fase 3, men den bruker syntetiske
@@ -3986,7 +4022,7 @@ mot ekte filer — normalveien, den hele fila, en ødelagt fil og en tom.
 
 ---
 
-## 2026-09-13 — Backup fase 5: gjenoppretting fra kommandolinja
+## 2026-09-13 — Backup fase 5: gjenoppretting fra kommandolinja  `#core/backup`
 
 `manage.py gjenopprett` finnes nå. Veien fantes ikke før: `hent_offsite` henter
 og dekrypterer fila, men rører ikke databasen — siste linje den skrev var
@@ -4029,7 +4065,7 @@ dataene tilbake, og auditraden står med kilde.
 
 ---
 
-## 2026-09-13 — Backup fase 4: hele databasen i én fil
+## 2026-09-13 — Backup fase 4: hele databasen i én fil  `#core/backup`
 
 Katastrofekopien finnes nå. `core/backup/full.py` dumper alt i databasen unntatt
 sesjoner, contenttypes, permissions, `admin.LogEntry` og backup-metadata.
@@ -4081,7 +4117,7 @@ Uten den lander de første hele backupene under 730-dagersregelen.
 
 ---
 
-## 2026-09-13 — Backup fase 3: vaktlista dekket, og slettelista utledes
+## 2026-09-13 — Backup fase 3: vaktlista dekket, og slettelista utledes  `#core/backup`
 
 **Vaktlistemodulen hadde ingen backup i det hele tatt.** Korps, mannskap med
 telefon, e-post og ISSI, kompetanser, ressursgrupper og -roller, ressursene,
@@ -4121,7 +4157,7 @@ Verifisert: 2582 tester grønne på SQLite og PostgreSQL 16.
 
 ---
 
-## 2026-09-13 — Backup fase 2: alt på én side
+## 2026-09-13 — Backup fase 2: alt på én side  `#core/backup`
 
 `/portal-admin/backup/` er nå hele backup-flaten. Oversikten, én side per modul
 og veien mellom dem er lagt ned.
@@ -4173,7 +4209,7 @@ melding, «ta backup av alle» og gjenopprettingsbekreftelsen.
 
 ---
 
-## 2026-09-13 — Backup fase 1: `Backupplan`, og klokka ut av trafikken
+## 2026-09-13 — Backup fase 1: `Backupplan`, og klokka ut av trafikken  `#core/backup`
 
 Første kode i omleggingen (`docs/PLAN_BACKUP_OMLEGGING.md` fase 1).
 
@@ -4233,7 +4269,7 @@ migrert fram og kom ut med oppførselen i behold.
 
 ---
 
-## 2026-09-13 — Backup-planen versjon 3: klokka blir en tråd, ikke en cron-jobb
+## 2026-09-13 — Backup-planen versjon 3: klokka blir en tråd, ikke en cron-jobb  `#core/backup`
 
 Ingen kodeendring. På spørsmål om cron er den ideelle klokka ble fire alternativer veid,
 og svaret er nei — av en grunn som først ble synlig da filene ble fulgt til der de
@@ -4274,7 +4310,7 @@ Bucketen heter `sanitetsportalen`, og står nå i instruksen og runbooken. Plane
 
 ---
 
-## 2026-09-13 — Backup-planen versjon 2: svarene innarbeidet
+## 2026-09-13 — Backup-planen versjon 2: svarene innarbeidet  `#core/backup`
 
 Ingen kodeendring. André svarte på de fem spørsmålene, og planen er skrevet om.
 
@@ -4312,7 +4348,7 @@ legitimasjon til en laptop.
 
 ---
 
-## 2026-09-13 — Backup-omleggingen planlagt: `docs/PLAN_BACKUP_OMLEGGING.md`
+## 2026-09-13 — Backup-omleggingen planlagt: `docs/PLAN_BACKUP_OMLEGGING.md`  `#core/backup`
 
 Ingen kodeendring. Bestillingen var at modulenes backup og gjenoppretting er tungvint, at
 intervallet skal kunne settes fritt med valget mellom konsekvent lagring og lagring ved
@@ -4339,7 +4375,7 @@ gir 5–15 % av rå størrelse. Dagens kode gjør det riktig allerede.
 
 ---
 
-## 2026-09-13 — Strategisk plan for rekkefølgen: `docs/PLAN_REKKEFOLGE_2026-09.md`
+## 2026-09-13 — Strategisk plan for rekkefølgen: `docs/PLAN_REKKEFOLGE_2026-09.md`  `#core/dokumentasjon`
 
 Ingen kodeendring. På spørsmål om hva som bør tas først av teknisk gjeld, backup,
 datteroppdrag og statistikk-utvidelsen: **backuphullene først** (vaktlista er udekket og
@@ -4353,7 +4389,7 @@ og lar C/D vente. TODO har fått en henvisning under «Teknisk gjeld».
 
 ---
 
-## 2026-09-13 — Forslag: datteroppdrag, og `docs/` ryddet
+## 2026-09-13 — Forslag: datteroppdrag, og `docs/` ryddet  `#core/dokumentasjon`
 
 Ingen kodeendring. `docs/FORSLAG_DATTEROPPDRAG.md` er et idénotat (ikke besluttet):
 ett oppdrag deles i datteroppdrag, ett per pasient — `Oppdrag.forelder` med dybde låst
@@ -4367,7 +4403,7 @@ sentralbordet må svare på først. Står i TODO under «Ideer».
 blir stående — de forklarer hvorfor. `DEPLOY_GUIDE.md` og `TEKNISK_DOKUMENTASJON.md` er
 utdaterte, men aktive, og står i dokumentrunden i TODO.
 
-## 2026-09-13 — Backup-planen: `docs/BACKUP.md`
+## 2026-09-13 — Backup-planen: `docs/BACKUP.md`  `#core/backup`
 
 Ingen kodeendring. Besluttet: **to lag med hver sin frist** — en hel backup (alt unntatt
 sesjoner, kryptert, 90 dager, få filer) som katastrofekopi, og modulfilene som i dag med
@@ -4378,7 +4414,7 @@ på nytt etter gjenoppretting). Rekkefølgen er bindende: flyttingen ut av `pati
 først. Dokumentrunden etterpå tar med alt fra 11.–13. september — lista over hva som
 mangler hvor står i §5, og i `TODO.md`.
 
-## 2026-09-13 — Teknisk gjeld kartlagt: `docs/TEKNISK_GJELD.md`
+## 2026-09-13 — Teknisk gjeld kartlagt: `docs/TEKNISK_GJELD.md`  `#core/dokumentasjon`
 
 Ingen kodeendring. På spørsmål om hva backupene faktisk inneholder, og hvordan appen
 henger sammen, ble appene, modellene, importene på kryss, middlewaren og rutene gått
@@ -4390,7 +4426,7 @@ vaktlista har ingen handler, og «Vaktarkiv» skal hete «Pasientregistreringsar
 Arbeidslista står i `TODO.md` under «Teknisk gjeld», med bindende rekkefølge:
 flyttingen først, backupene etterpå.
 
-## 2026-09-13 — Prodtest av sikkerhetsrundene: fire funn rettet
+## 2026-09-13 — Prodtest av sikkerhetsrundene: fire funn rettet  `#core/sikkerhet`
 
 Ingen migrasjon. Andrés prodtest på staging av runde 1 og 2 ga 39 OK og 0 FEIL i
 scriptet, og fire ting på sidene:
@@ -4424,7 +4460,7 @@ scriptet, og fire ting på sidene:
 Tester: `oppdrag/tests_prodtest_13sep.py` (oppstarten og fristen, i node) og
 `vaktliste/tests_prodtest_13sep.py` (badge-varselet, koblingen, `registeretErTomt`).
 
-## 2026-09-13 — Sikkerhetsgjennomgangen, runde 2: 9 funn rettet
+## 2026-09-13 — Sikkerhetsgjennomgangen, runde 2: 9 funn rettet  `#core/sikkerhet`
 
 Ingen migrasjon. Numrene viser til `docs/SIKKERHETSGJENNOMGANG_2026-09-13.md`.
 
@@ -4465,7 +4501,7 @@ Ingen migrasjon. Numrene viser til `docs/SIKKERHETSGJENNOMGANG_2026-09-13.md`.
   manifest entry»). `!static/vendor/` i `.gitignore`, og en test som krever at filene
   er sporet av git.
 
-## 2026-09-13 — Sikkerhetsgjennomgangen, runde 1: 19 funn rettet
+## 2026-09-13 — Sikkerhetsgjennomgangen, runde 1: 19 funn rettet  `#core/sikkerhet`
 
 Ingen migrasjon. Numrene viser til `docs/SIKKERHETSGJENNOMGANG_2026-09-13.md`.
 
@@ -4508,7 +4544,7 @@ Ingen migrasjon. Numrene viser til `docs/SIKKERHETSGJENNOMGANG_2026-09-13.md`.
 - 46 nye tester i `*/tests_sikkerhet_runde1.py`; `tests_besetning` oppdatert
   til den nye regelen.
 
-## 2026-09-13 — Sikkerhetsgjennomgang: rapport
+## 2026-09-13 — Sikkerhetsgjennomgang: rapport  `#core/sikkerhet`
 
 `docs/SIKKERHETSGJENNOMGANG_2026-09-13.md`. Statisk gjennomgang i fire deler, hvert
 funn verifisert mot koden. Ingen kritiske. Fire høye: lagret JS-injeksjon gjennom
@@ -4518,7 +4554,7 @@ er klientstyrt), CDN uten SRI, og service-workerens kopi av mannskapsregisteret 
 ingenting rydder ved utlogging. Seksten middels, 22 lave, og en foreslått rekkefølge i
 tre runder. Ingen kode er endret i denne commiten.
 
-## 2026-09-13 — Sikkerhetssjekk utenfra: `scripts/sikkerhetssjekk.py`
+## 2026-09-13 — Sikkerhetssjekk utenfra: `scripts/sikkerhetssjekk.py`  `#core/sikkerhet`
 
 **Rettelse etter første kjøring mot staging:** Cloudflare sender hodenavn med små
 bokstaver (`location`), og WhiteNoise hasher `oppdrag-enhet.js` — scriptet meldte 65
@@ -4532,7 +4568,7 @@ innlogging, 14 skriveendepunkter uten CSRF, rate-limiting på innlogging, egen
 sesjonsfiksering, utlogging med POST, at gammel sesjons-ID dør, og konfigsjekken
 fra server-status. Kjørt lokalt mot en dev-server som kontroll av selve scriptet.
 
-## 2026-09-13 — Rate-limiting var av i prod: `RATELIMIT_ENABLE=true` ble lest som False
+## 2026-09-13 — Rate-limiting var av i prod: `RATELIMIT_ENABLE=true` ble lest som False  `#core/sikkerhet`
 
 Funnet av konfigsjekken på server-status, første kvelden den var oppe: kortet sa
 `RATELIMIT_ENABLE: False`, Railway sa `true`. `settings.py` leste variabelen med
@@ -4550,7 +4586,7 @@ variabelen har stått slik.
 - Ingen migrasjon. Etter deploy skal konfigsjekken vise `RATELIMIT_ENABLE: True`
   uten at noe endres i Railway.
 
-## 2026-09-13 — Server-status: ni nye mål på /portal-admin/server-status/
+## 2026-09-13 — Server-status: ni nye mål på /portal-admin/server-status/  `#core/drift`
 
 Ingen migrasjon. Gjennomgangen av dashbordet etter reserve 3 fant at det målte
 serveren, men ikke det serveren er til for, og at ett tall var galt.
@@ -4588,13 +4624,13 @@ serveren, men ikke det serveren er til for, og at ett tall var galt.
 - Verdiene i konfigsjekken brekker inne i kortet (`overflow-wrap: anywhere`,
   høyrestilt) i stedet for å gå utenfor — gjelder alle `status-row`-verdier.
 
-## 2026-09-13 — Runbook §8b: offsite-backup — oppsett, kontroll og gjenoppretting
+## 2026-09-13 — Runbook §8b: offsite-backup — oppsett, kontroll og gjenoppretting  `#core/backup`
 
 Dokumentasjon. Oppsettet hos Scaleway og i Railway, kontrollen før hver vakt,
 og gjenopprettingen med `hent_offsite`, inn i `docs/RUNBOOK_VAKT.md` som §8b.
 10a og lenketabellen peker dit.
 
-## 2026-09-13 — Reserve 3: backupene ut av Railway, til Scaleway
+## 2026-09-13 — Reserve 3: backupene ut av Railway, til Scaleway  `#core/backup`
 
 Én migrasjon, `core/0007` (`OffsiteKopi`). To nye avhengigheter: `boto3` og
 `cryptography`. Inert uten variablene — bare prod skal ha dem.
@@ -4613,7 +4649,7 @@ og gjenopprettingen med `hent_offsite`, inn i `docs/RUNBOOK_VAKT.md` som §8b.
   `OFFSITE_S3_ACCESS_KEY`, `OFFSITE_S3_SECRET_KEY`, `OFFSITE_BACKUP_KEY`.
 - Scaleway inn i personverndokumentasjonen A.2 som databehandler, med DPA.
 
-## 2026-09-13 — Reserve 2 og 4: offline drift på /vaktliste/, gammel offline-modus lagt ned
+## 2026-09-13 — Reserve 2 og 4: offline drift på /vaktliste/, gammel offline-modus lagt ned  `#vaktliste/offline`
 
 Ingen migrasjon. Deployes til staging først; testes i Chrome/Edge på PC.
 
@@ -4638,7 +4674,7 @@ Ingen migrasjon. Deployes til staging først; testes i Chrome/Edge på PC.
   importverktøy for den gamle appens SQLite. Dokumentasjonen (teknisk §11,
   personvern A.11, runbook) er skrevet om til den nye reserven.
 
-## 2026-09-13 — Reserve 1b: intervallsending mens lista er i drift
+## 2026-09-13 — Reserve 1b: intervallsending mens lista er i drift  `#vaktliste/offline`
 
 Én migrasjon, `vaktliste/0017` (`Utsending.innhold_sha256`, ny utløser
 «intervall»). Deployes til staging først.
