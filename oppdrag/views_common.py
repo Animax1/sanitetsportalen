@@ -174,6 +174,14 @@ def oppdrag_til_dict(oppdrag, *, for_enhet: bool = False,
         # `avbrutt_av`: slås den opp her, koster tavla to spørringer per rad.
         'avventer_av': (list(avventer_av) if avventer_av is not None
                         else services.avventer_av_bulk([oppdrag.pk]).get(oppdrag.pk, [])),
+        # **Hendelsen oppdraget hører til** (KO pulje 5, 18. sep. 2026). Lest
+        # herfra, skrevet bare av `ko.services.knytt_oppdrag`. Nummer og
+        # tittel følger med så tavla kan gruppere uten et oppslag per rad;
+        # `None` er «uten hendelse», som er det vanlige (§7).
+        'hendelse_id': oppdrag.hendelse_id,
+        'hendelse_nummer': (oppdrag.hendelse.hendelsesnummer
+                            if oppdrag.hendelse_id else None),
+        'hendelse_tittel': oppdrag.hendelse.tittel if oppdrag.hendelse_id else '',
     }
     skjul_fritekst = for_enhet and status == choices.TERMINAL
     data['fritekst'] = '' if skjul_fritekst else oppdrag.fritekst

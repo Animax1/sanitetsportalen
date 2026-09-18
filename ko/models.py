@@ -2,9 +2,8 @@
 
 Se `ko/CLAUDE.md` og `docs/FORSLAG_KO.md` §4. Modulen eier fortsatt ingen
 ressurser; det som kommer hit er *det som ble sagt og det som skjedde*, ikke et
-register over hvem som finnes. `Hendelse` kommer i pulje 3, og logglinja har
-derfor ennå ingen FK til en hendelse — den legges til der, sammen med regelen
-om at en linje kan knyttes til en hendelse i etterkant.
+register over hvem som finnes. `Hendelse` (pulje 5) er grupperingen av
+oppdragslista og filteret i loggen — se klassen nederst.
 
 **Én tabell, ikke to** (§4.1). Menneskeskrevne linjer, kommentarer og de
 systemhendelsene som løftes inn ligger side om side. Det gir hele loggen og
@@ -60,7 +59,7 @@ class LogglinjeManager(models.Manager):
         """
         return (self.filter(vakt=vakt)
                     .filter(korrigert_av__isnull=True)
-                    .select_related('forfatter', 'fjernet_av')
+                    .select_related('forfatter', 'fjernet_av', 'hendelse')
                     .order_by(Coalesce('rot_id', 'id'), 'id'))
 
 
@@ -171,6 +170,15 @@ class Logglinje(models.Model):
     fjernet_av_navn = models.CharField(
         max_length=150, blank=True, default='', verbose_name='Fjernet av (navn)')
 
+    #: **Hendelsen linja hører til, om noen** (§4.1). Nullbar, og settes i
+    #: etterkant like gjerne som ved skriving: man skjønner fem linjer på
+    #: etterskudd at de hørte sammen. `SET_NULL`, ikke `CASCADE` — slettes en
+    #: hendelse ved oppryddingen, skal linja bli stående; det er loggen som er
+    #: fasit, hendelsen er en gruppering av den.
+    hendelse = models.ForeignKey(
+        'Hendelse', null=True, blank=True, on_delete=models.SET_NULL,
+        related_name='linjer', verbose_name='Hendelse')
+
     class Meta:
         verbose_name = 'Logglinje'
         verbose_name_plural = 'Logglinjer'
@@ -195,3 +203,95 @@ class Logglinje(models.Model):
     @property
     def er_systemlinje(self) -> bool:
         return self.kilde == KILDE_SYSTEM
+
+
+#: Hendelsens to tilstander. **Ingen statusmaskin** (§3.3): hendelser har ikke
+#: et forløp, oppdrag har. Åpen eller lukket, og lukket kan åpnes igjen — en
+#: lukking er som regel en misforståelse eller et feilklikk når den må angres
+#: (André, 18. sep. 2026), og gjenåpningen logges som egen systemlinje.
+HENDELSE_APEN = 'apen'
+HENDELSE_LUKKET = 'lukket'
+HENDELSE_STATUS_VALG: tuple[tuple[str, str], ...] = (
+    (HENDELSE_APEN, 'Åpen'),
+    (HENDELSE_LUKKET, 'Lukket'),
+)
+
+
+class Hendelse(models.Model):
+    """Én hendelse — det man kaller den på samband (§3.3).
+
+    **Egen modell i `ko`, ikke `Oppdrag.forelder`** (§9.3): hendelsen finnes
+    *før* oppdraget, kan leve i tjue minutter før en ressurs sendes, og kan
+    avsluttes uten at noen rykket ut. `Oppdrag.hendelse` peker hit — fra
+    oppdrag til hendelse, aldri motsatt, så `oppdrag` ikke trenger å kjenne
+    `ko` (strengreferanse, ingen import; `ko/tests_avhengighet.py`).
+
+    **Nummeret identifiserer, FK-en relaterer** (§6). `H12` tildeles ved
+    opprettelse og endres aldri; hvilke oppdrag som hører til er en peker på
+    oppdraget og kan flyttes. Serien er per vakt og uavhengig av
+    oppdragsserien, så `H12` og `O12` er to ulike ting på nabolinjer.
+
+    **Hodet er det ene delte redigerbare i KO** (§7.1): tittel, lokasjon og
+    status. `versjon` og 409 ved uenighet, ellers spiser siste skriver den
+    andres tekst i stillhet. Alt annet i modulen er påføringer.
+
+    **Lokasjonen fryses som navn ved siden av FK-en**, som logglinja fryser
+    forfatteren: backupen stripper pekeren (den går *ut* av modulen, og
+    gjenopprettingen leser KO før oppdrag), og et arrangement der lokasjonen
+    er omdøpt i etterkant skal fortsatt vise hva som sto der da.
+    """
+
+    vakt = models.ForeignKey(
+        'core.Vakt', on_delete=models.PROTECT,
+        related_name='ko_hendelser', verbose_name='Vakt')
+    hendelsesnummer = models.IntegerField(verbose_name='Hendelsesnummer')
+    tittel = models.CharField(max_length=120, verbose_name='Tittel')
+    lokasjon = models.ForeignKey(
+        'oppdrag.Lokasjon', null=True, blank=True, on_delete=models.SET_NULL,
+        related_name='ko_hendelser', verbose_name='Lokasjon')
+    lokasjon_navn = models.CharField(
+        max_length=255, blank=True, default='', verbose_name='Lokasjon (navn)')
+    status = models.CharField(
+        max_length=8, choices=HENDELSE_STATUS_VALG, default=HENDELSE_APEN,
+        db_index=True, verbose_name='Status')
+    versjon = models.PositiveIntegerField(default=1, verbose_name='Versjon')
+
+    opprettet_at = models.DateTimeField(auto_now_add=True, verbose_name='Opprettet')
+    opprettet_av = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True,
+        on_delete=models.SET_NULL, related_name='ko_hendelser_opprettet',
+        verbose_name='Opprettet av')
+    opprettet_av_navn = models.CharField(
+        max_length=150, blank=True, default='', verbose_name='Opprettet av (navn)')
+    #: Linja hendelsen ble laget av (§4.5). **Linja blir stående** i loggen;
+    #: hendelsen peker tilbake. Flyttes linja inn i hendelsen, får loggen et
+    #: hull akkurat der det viktige skjedde.
+    opprettet_fra_linje = models.ForeignKey(
+        Logglinje, null=True, blank=True, on_delete=models.SET_NULL,
+        related_name='hendelser_opprettet_fra', verbose_name='Opprettet fra linje')
+
+    lukket_at = models.DateTimeField(null=True, blank=True, verbose_name='Lukket')
+    lukket_av = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True,
+        on_delete=models.SET_NULL, related_name='ko_hendelser_lukket',
+        verbose_name='Lukket av')
+    lukket_av_navn = models.CharField(
+        max_length=150, blank=True, default='', verbose_name='Lukket av (navn)')
+
+    class Meta:
+        verbose_name = 'Hendelse'
+        verbose_name_plural = 'Hendelser'
+        ordering = ['-hendelsesnummer']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['vakt', 'hendelsesnummer'],
+                name='unikt_hendelsesnummer_per_vakt',
+            ),
+        ]
+
+    def __str__(self):
+        return f'H{self.hendelsesnummer} {self.tittel}'
+
+    @property
+    def er_lukket(self) -> bool:
+        return self.status == HENDELSE_LUKKET

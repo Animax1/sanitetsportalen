@@ -5,8 +5,9 @@
 > gjelder her også. Regelen for hva som står hvor: ligger koden i en app, står regelen
 > her; gjelder den alle, står den i rota.
 
-Pulje 1 levert (skallet: modulen registrert, `/ko/`, sidebaren), **pulje 2** (loggen) og
-**pulje 3** (ressursbildet). Pulje 4–7 gjenstår — se `docs/FORSLAG_KO.md` §10, som er et **forslag**, ikke besluttet.
+Levert: pulje 1 (skallet), 2 (loggen), 3 (ressursbildet), 4 (sentralbordet flyttet inn)
+og **5 (hendelsene)**. Pulje 6–7 gjenstår — se `docs/FORSLAG_KO.md` §10, som er et
+**forslag**, ikke besluttet.
 
 **Siden har ingen faner, og det er en regel og ikke en smakssak** (André, 17. sep. 2026).
 Pulje 1 la de fire flatene i `nav-tabs`. En fane er riktig når flatene er *alternativer* —
@@ -71,7 +72,8 @@ og kan bli avsluttet uten at noen rykket ut.
 | **Hvilke systemhendelser som løftes inn, og hvorfor** | `ko/systemlinjer.py` |
 | Løftet selv | `ko/signals.py` |
 | Backup, opprydding, innstilling | `ko/backup.py`, `ko/opprydding.py`, `ko/portalinnstillinger.py` |
-| Ressurslista — samme kilde som sentralbordet | `ko/services.py`, `static/js/oppdrag-kort.js` |
+| **Hendelsene**: nummer, opprett, rediger, lukk, gjenåpne, knytt | `ko/services.py` (nederst), `ko/models.Hendelse` |
+| Grupperingen på tavla og «H12»-merket | `koGrupperOppdrag()` i `static/js/ko.js`, `_oppdragRadHtml()` i sentralbordet |
 
 ## Retningen: KO er øverste lag
 
@@ -80,9 +82,15 @@ med AST i `ko/tests_avhengighet.py` — samme grep som `OppdragImportererIkkeVak
 Testen bor her fordi det er KOs kant å forsvare: skriver noen `from ko.models import …` i
 `oppdrag/`, er det KO som har fått en ny og usynlig forelder.
 
-Den ene kanten som skal gå andre veien når den kommer, er `Oppdrag.hendelse` — en nullbar
-FK fra oppdrag til hendelsen (pulje 3/5). Den peker fra oppdrag til hendelse og aldri
-motsatt, og må da **navngis og begrunnes** i unntakslista, ikke bare skrives.
+Den ene kanten som går andre veien er `Oppdrag.hendelse` (pulje 5) — en nullbar FK fra
+oppdrag til hendelsen, som **strengreferanse** (`'ko.Hendelse'`) og uten en import: `oppdrag`
+leser feltet i `oppdrag_til_dict` og skriver det aldri; `ko.services.knytt_oppdrag` er den ene
+skriveren. `KJENTE_UNNTAK` i `ko/tests_avhengighet.py` står derfor fortsatt tom.
+
+**Og kanten snur gjenopprettingsrekkefølgen.** KO er øverste lag i koden og nest først i
+`GJENOPPRETTINGSREKKEFOLGE` (rett etter `portal`): oppdragsfila peker på hendelsene med et
+heltall. `Hendelse.lokasjon` strippes i `ko/backup.py` av samme grunn — beholdt, var det en
+sirkel — og navnet står frosset i `lokasjon_navn`, som forfatteren på linja.
 
 `core` skal fortsatt kunne kjøre uten `ko`: `core/tests_avhengighetsretning.py` har `ko` i
 `MODULAPPER`, og den ene tillatte importen er `core/modules.py` → `ko.module`, som er
@@ -222,7 +230,9 @@ sletteinngang.
 ## Løftet går med signaler, ikke med et register
 
 `ko` → `oppdrag` er den tillatte retningen. Et push-register hadde krevd at
-`oppdrag/services.py` meldte fra, og oppdragsmodulen skal ikke røres før pulje 5.
+`oppdrag/services.py` meldte fra, og oppdragsmodulen røres så lite som mulig.
+**Hendelseslinjene går ikke gjennom signaler:** de er operatørens handlinger, og
+`ko/services.py` skriver dem selv — med operatøren frosset som forfatter.
 
 Forbeholdet er ekte og står i `ko/systemlinjer.py`: **et signal ser raden, ikke
 intensjonen.** «Avbrutt fordi ingen svarte» og «avbrutt fordi pasienten gikk hjem» er
@@ -235,12 +245,39 @@ i en bil**: bilen er det operative, loggen er dokumentasjonen.
 `rykket_videre`, `avbrutt`, `avventer`, med tidspunkt og bruker. Det er §2-erfaringen om
 igjen: sjekk om oppdragsmodulen har begrepet før du designer det inn i KO.
 
-## Det som ikke er bygget
+## Hendelsene (pulje 5) — en gruppering, ikke en flate
 
-`Hendelse` (pulje 3) har fortsatt et åpent valg som skal besvares før koden — om en lukket
-hendelse kan åpnes igjen. Det står i `TODO.md`. Logglinja har med vilje **ingen FK til en
-hendelse ennå**: den legges til i pulje 3, sammen med regelen om at en linje kan knyttes
-til en hendelse i etterkant.
+Besvart av André 18. sep. 2026, før koden: **en lukket hendelse kan åpnes igjen** (det er
+en misforståelse eller et feilklikk når det skjer), **og det logges** — `HENDELSE_GJENAPNET`
+er en egen systemlinje, aldri en stille statusendring. Og **`O45`/`H12` overalt** (§6):
+formen på oppdragsnummeret bor i `oppdrag.services.oppdragsnr` og `oppdragsnr()` i
+`oppdrag-kort.js` (enhetsskjermen har sin egen kopi), hendelsens i `ko.systemlinjer.hendelsesnr`.
+
+Fem regler, alle i `ko/services.py`, alle prøvd med mutanter i `ko/tests_hendelser.py`:
+
+| Regel | Hvorfor |
+|---|---|
+| Nummeret tildeles ved opprettelse og endres aldri; serien er uavhengig av O-serien | §6: nummeret identifiserer, FK-en relaterer. Telleren er unntatt audit |
+| Lukking gir **409 med antallet** når hendelsen har åpne oppdrag, og går gjennom med `confirm` — og antallet står på linja | §4.6: en dør hun åpner bevisst, ikke en vegg. Ferdige oppdrag teller ikke |
+| Hodet (tittel, lokasjon) redigeres med `versjon`, 409 ved uenighet | §7.1: det ene delte redigerbare. Ingen systemlinje — `audit/` fører feltendringer |
+| `knytt_oppdrag` er den ene skriveren av `Oppdrag.hendelse`; lukket hendelse tar ikke imot | Ellers var «lukket» et ord uten mening, og 409-sperra omgått bakveien |
+| En hendelse laget **fra** en linje lar linja stå; linja får hendelsen, hendelsen peker tilbake | §4.5: flyttes linja inn, får loggen et hull der det viktige skjedde |
+
+**Lista følger med logg-pollen** (`hendelser` i `logg_view`), hele hver gang — som
+`fjernede`: en lukking eller omdøping har ingen ny id og ville aldri kommet gjennom
+`?siden=`. Ingen egen poller.
+
+**Grupperingen er en bryter på tavla, og den skjuler ingenting** (§7.2): av og på viser de
+samme radene. `koGrupperOppdrag()` er regelen — åpne hendelser nyeste først (også uten
+oppdrag: det er hendelsen som lever før en ressurs sendes), lukkede bare mens de har rader,
+«Uten hendelse» sist. `renderOppdrag()` i sentralbordet spør etter den gjennom en vakt
+(`typeof koGrupperOppdrag === 'function'`), for den fila kjører også på `/oppdrag/`, der lista
+er flat som før. Samme vakt for `koHendelseValg()` i detaljmodalen og `koEtterOpprettet()`
+etter «Nytt oppdrag». `TavlaSpoerEtterGrupperingenTests` holder kallstedet i live.
+
+**Knytting krever `skriv_full` i begge modulene**: det skriver på en oppdragsrad, og hvem
+som får det er oppdragsmodulens sak (komposisjonsregelen). Dekoratøren gir KO-nivået,
+viewet sjekker det andre.
 
 ## Sentralbordet kjører i `/ko/` (pulje 4)
 

@@ -393,6 +393,16 @@ class Oppdrag(BaseTimeStampedModel):
         settings.AUTH_USER_MODEL, null=True, blank=True,
         on_delete=models.SET_NULL, related_name='oppdrag_lagt_i_historikk',
         verbose_name='Flyttet av')
+    # **Hendelsen oppdraget hører til** (KO pulje 5, 18. sep. 2026). Nullbar,
+    # og peker fra oppdrag til hendelse — aldri motsatt — så denne modulen ikke
+    # trenger å kjenne `ko`: strengreferanse, ingen import
+    # (`ko/tests_avhengighet.py`). **Skrives bare av KO**
+    # (`ko.services.knytt_oppdrag`); `oppdrag_til_dict` leser den.
+    # `SET_NULL`: slettes hendelsen ved KO-oppryddingen, står oppdraget igjen
+    # som før — nummeret identifiserer, FK-en relaterer (§6).
+    hendelse = models.ForeignKey(
+        'ko.Hendelse', null=True, blank=True, on_delete=models.SET_NULL,
+        related_name='oppdrag', verbose_name='Hendelse')
 
     class Meta:
         verbose_name = 'Oppdrag'
@@ -412,7 +422,8 @@ class Oppdrag(BaseTimeStampedModel):
         ]
 
     def __str__(self) -> str:
-        return (f'Oppdrag #{self.oppdragsnummer} – {self.problemstilling} '
+        from .services import oppdragsnr
+        return (f'Oppdrag {oppdragsnr(self.oppdragsnummer)} – {self.problemstilling} '
                 f'({self.get_status_display()})')
 
     def save(self, *args, **kwargs):
@@ -865,4 +876,5 @@ class ArkivertOppdrag(models.Model):
         verbose_name_plural = 'Arkiverte oppdrag'
 
     def __str__(self) -> str:
-        return f'#{self.oppdragsnummer} {self.problemstilling}'
+        from .services import oppdragsnr
+        return f'{oppdragsnr(self.oppdragsnummer)} {self.problemstilling}'

@@ -401,7 +401,7 @@ def oppdrag_liste_view(request):
             # Ferdigstilte er ute av den aktive lista. De er ikke borte —
             # de ligger i `historikk_liste_view`, søkbare på nummer.
             qs = list(Oppdrag.objects.filter(vakt=vakt, historikk_fra__isnull=True)
-                      .select_related('enhet', 'lokasjon')
+                      .select_related('enhet', 'lokasjon', 'hendelse')
                       .prefetch_related('enheter__enhet').order_by('-created_at'))
             gjeldende = Statusmelding.objects.gjeldende_bulk([o.pk for o in qs])
             status_tid = status_tidspunkt_for(qs, gjeldende)
@@ -419,8 +419,12 @@ def oppdrag_liste_view(request):
             # ville da drukne i en 304.
             # Avventingen er med av samme grunn: operatøren setter «avventer»
             # uten at status eller tidspunkt endrer seg.
+            # Hendelsen er med (KO pulje 5): å knytte et oppdrag til en
+            # hendelse rører verken status eller tidspunkt, og grupperingen på
+            # tavla ville ellers stått gammel til neste stempling.
             etag_rader = [(r['id'], r['status'], r['enhet_id'], r['status_tidspunkt'],
-                           tuple(r['avbrutt_av']), tuple(r['avventer_av']))
+                           tuple(r['avbrutt_av']), tuple(r['avventer_av']),
+                           r['hendelse_id'])
                           for r in data]
 
         etag = etag_for(etag_rader)

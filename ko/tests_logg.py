@@ -497,7 +497,8 @@ class PollingenTests(TestCase):
             'oppdragsnummer': 45, 'enhet': 'HGSD 56', 'status_navn': 'Fremme'})
         linje = self._logg()['data'][0]
         self.assertEqual(linje['kilde'], KILDE_SYSTEM)
-        self.assertEqual(linje['tekst'], 'HGSD 56: Fremme (#45)')
+        # `O45`, ikke `#45`, fra pulje 5 (§6) — formen bor i `oppdrag.services.oppdragsnr`.
+        self.assertEqual(linje['tekst'], 'HGSD 56: Fremme (O45)')
         self.assertEqual(linje['forfatter'], '')
 
     def test_bare_aktiv_vakt(self):

@@ -159,6 +159,13 @@ function projiser(oppdragliste, ko) {
 }
 
 
+// **Egen kopi av `oppdragsnr()`**, som `hastegradKlasse` under: enhetsskjermen
+// laster ikke `oppdrag-kort.js`, der sentralbordets utgave bor. Samme form,
+// `O45` (§6 i KO-notatet, 18. sep. 2026).
+function oppdragsnr(nummer) {
+  return 'O' + nummer;
+}
+
 function hastegradKlasse(h) {
   return 'hastegrad-' + (h || '').toLowerCase();
 }
@@ -536,7 +543,7 @@ function renderAvsluttet() {
     return `
     <div class="oppdrag-rad oppdrag-avsluttet">
       <div class="d-flex align-items-center gap-2 flex-wrap">
-        <span class="oppdrag-nr">#${escHtmlValue(o.nummer)}</span>
+        <span class="oppdrag-nr">${escHtmlValue(oppdragsnr(o.nummer))}</span>
         <span class="oppdrag-meta">${escapeHtml(_problemMedAntall(o))}</span>
         <span class="ms-auto">
           <span class="${tidKlasse}"${tittel}>Ledig ${escapeHtml(tid)}</span>

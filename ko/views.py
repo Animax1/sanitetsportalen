@@ -5,8 +5,10 @@ nivåer:
 
 | Handling | Krav |
 |---|---|
-| Se siden, lese loggen, polle | `les` |
+| Se siden, lese loggen og hendelsene, polle | `les` |
 | Skrive en linje, rette en linje | `skriv_full` |
+| Opprette, redigere, lukke og gjenåpne en hendelse | `skriv_full` |
+| Knytte et oppdrag til en hendelse | `skriv_full` i **både** `ko` og `oppdrag` — det skriver på oppdraget |
 | Fjerne innholdet i en linje (§4.4) | `skriv_leder` |
 
 **Retting og fjerning er to navngitte stier**, ikke ett endepunkt som leser en
@@ -16,18 +18,18 @@ logg uten å slå opp hva som sto i den. Her betyr det dessuten at de to
 tilgangsnivåene ligger på hver sin dekoratør, i stedet for i en `if` inne i et
 delt view.
 
-**De gjenstående flatene er tomme, og de sier det selv.** Et «Oppdrag»-kort
-som bare er blankt ser ødelagt ut — særlig mens sentralbordet fortsatt står på
-`/oppdrag/` og flyttes først i pulje 5. Hver tom flate bærer derfor én linje om
-hva som kommer og hvor tingen bor i dag.
+**Hendelsene (pulje 5) følger med logg-pollen**, ikke et eget endepunkt:
+`logg_view` svarer med `hendelser` hver gang. Lista er kort (tallet hendelser i
+en vakt), tavla trenger den hvert 15. sekund uansett, og en poller til mot
+samme side ville vært en poller til. Skrivingen har navngitte stier.
 
 **Flatene er kolonner, ikke faner** (17. sep. 2026). Se `ko/CLAUDE.md`: tre av
 fire trengs for å fullføre én handling, og en skjult fane er en fane du ikke vet
 har endret seg.
 
 **Loggen er scopet til aktiv vakt**, og det er ikke bare et filter: `les`
-betyr «denne vakta». Tidligere vakters logg er `skriv_leder` og får sin egen
-flate i pulje 3 — se `ko/module.py`.
+betyr «denne vakta». Tidligere vakters logg er `skriv_leder` og har ennå ingen
+flate — se `ko/module.py` og `TODO.md`.
 """
 from __future__ import annotations
 
@@ -49,7 +51,7 @@ from core.ratelimit import rate_limit
 from core.vakt import hent_aktiv_vakt
 
 from . import services, systemlinjer
-from .models import Logglinje
+from .models import Hendelse, Logglinje
 from .tilstede import tilstede
 
 
@@ -105,6 +107,37 @@ def _til_dict(linje):
         'fjernet': linje.er_fjernet,
         'fjernet_av': linje.fjernet_av_navn,
         'fjernet_at': linje.fjernet_at.isoformat() if linje.fjernet_at else '',
+        # Hendelsen linja hører til (§4.1) — id til filteret, nummeret til
+        # merket «H12». Tittelen står i `hendelser` i samme svar.
+        'hendelse_id': linje.hendelse_id,
+        'hendelse_nummer': (linje.hendelse.hendelsesnummer
+                            if linje.hendelse_id else None),
+    }
+
+
+def _hendelse_til_dict(h):
+    """Én hendelse, slik tavla trenger den. `apne_oppdrag`/`antall_oppdrag`
+    settes av `services.hendelser_for` i én spørring; mangler de (en hendelse
+    hentet alene), telles de her."""
+    apne = getattr(h, 'apne_oppdrag', None)
+    return {
+        'id': h.pk,
+        'nummer': h.hendelsesnummer,
+        'kode': services.hendelsesnr(h.hendelsesnummer),
+        'tittel': h.tittel,
+        'lokasjon_id': h.lokasjon_id,
+        'lokasjon_navn': h.lokasjon_navn,
+        'status': h.status,
+        'versjon': h.versjon,
+        'opprettet_at': h.opprettet_at.isoformat(),
+        'opprettet_av': h.opprettet_av_navn,
+        'fra_linje': h.opprettet_fra_linje_id,
+        'lukket_at': h.lukket_at.isoformat() if h.lukket_at else '',
+        'lukket_av': h.lukket_av_navn,
+        'apne_oppdrag': apne if apne is not None else services.apne_oppdrag_i(h),
+        'antall_oppdrag': getattr(h, 'antall_oppdrag', None)
+                          if getattr(h, 'antall_oppdrag', None) is not None
+                          else h.oppdrag.count(),
     }
 
 
@@ -210,6 +243,9 @@ def logg_view(request):
         'data': linjer,
         'fjernede': fjernede,
         'vakt': vakt.navn,
+        # Hele lista hver gang, som `fjernede`: en hendelse som lukkes eller
+        # omdøpes får ingen ny id, og ville aldri kommet gjennom `?siden=`.
+        'hendelser': [_hendelse_til_dict(h) for h in services.hendelser_for(vakt)],
     })
 
 
@@ -311,20 +347,135 @@ def logg_fjern_view(request, pk):
     return JsonResponse({'status': 'ok', 'antall': antall})
 
 
+# ── Hendelsene (pulje 5) ─────────────────────────────────────────────────────
+#
+# Navngitte stier, som loggen: `ny`, `rediger`, `lukk`, `gjenapne`, og
+# oppdragets `hendelse`. Hver av dem er én regel i `services`, og viewet eier
+# bare HTTP-en: 400 for det som ikke lar seg gjøre, 409 for en konflikt om en
+# tilstand, 404 for noe utenfor vakta.
 
-@never_cache
-@modul_kreves('ko', 'les', svar='json')
-@require_http_methods(['GET'])
-@rate_limit(group='ko:ressurser', rate='120/m', method='GET')
-def ressurser_view(request):
-    """Enhetene, i samme form som `/oppdrag/api/enheter/`.
+def _hendelse(pk):
+    return get_object_or_404(Hendelse, pk=pk, vakt=hent_aktiv_vakt())
 
-    `les` og ikke mer: lista er situasjonsbildet, og den som ikke får se hvem
-    som er på vakt kan ikke lese loggen heller — linjene handler om dem.
 
-    **Skriving finnes ikke her.** Å sette en enhet av vakt eller i passiv vakt
-    er oppdragsmodulens endepunkter, og de blir KOs den dagen sentralbordet
-    flytter (pulje 4). Et eget skrive-endepunkt i mellomtiden ville vært en
-    andre vei inn til samme tilstand.
+def _lokasjon_fra(data):
+    """`(lokasjon, feil)`. `lokasjon_id` som tall gir raden, `None`/tom gir
+    ingen; et ukjent tall er 400 og ikke stille `None` — en lokasjon som
+    forsvinner uten å si fra er en feil man finner i loggen et døgn senere."""
+    from oppdrag.models import Lokasjon
+
+    raa = data.get('lokasjon_id')
+    if raa in (None, '', 0):
+        return None, None
+    try:
+        return Lokasjon.objects.get(pk=int(raa)), None
+    except (Lokasjon.DoesNotExist, ValueError, TypeError):
+        return None, 'Ukjent lokasjon.'
+
+
+@modul_kreves('ko', 'skriv_full', svar='json')
+@require_http_methods(['POST'])
+@rate_limit(group='ko:hendelse_ny', rate='60/m', method='POST')
+def hendelse_ny_view(request):
+    """Ny hendelse — fra en logglinje (`fra_linje`) eller fra ingenting."""
+    data = _json_body(request)
+    vakt = hent_aktiv_vakt()
+    lokasjon, feil = _lokasjon_fra(data)
+    if feil:
+        return _feil(feil)
+    fra_linje = None
+    if data.get('fra_linje'):
+        fra_linje = get_object_or_404(Logglinje, pk=data['fra_linje'], vakt=vakt)
+    try:
+        hendelse = services.opprett_hendelse(
+            vakt, data.get('tittel'), bruker=request.user,
+            lokasjon=lokasjon, fra_linje=fra_linje)
+    except services.Ugyldig as feil:
+        return _feil(str(feil))
+    return JsonResponse({'status': 'ok', 'data': _hendelse_til_dict(hendelse)},
+                        status=201)
+
+
+@modul_kreves('ko', 'skriv_full', svar='json')
+@require_http_methods(['POST'])
+@rate_limit(group='ko:hendelse_rediger', rate='60/m', method='POST')
+def hendelse_rediger_view(request, pk):
+    """Tittel og lokasjon, med `versjon` — 409 når noen andre rakk det først
+    (§7.1). `lokasjon_id` sendt som `null` tømmer; utelatt rører ikke."""
+    hendelse = _hendelse(pk)
+    data = _json_body(request)
+    lokasjon, feil = _lokasjon_fra(data)
+    if feil:
+        return _feil(feil)
+    try:
+        services.rediger_hendelse(
+            hendelse, bruker=request.user, versjon=data.get('versjon'),
+            tittel=data.get('tittel'),
+            lokasjon=lokasjon, sett_lokasjon='lokasjon_id' in data)
+    except services.Konflikt as feil:
+        return _feil(str(feil), status=409)
+    except services.Ugyldig as feil:
+        return _feil(str(feil))
+    return JsonResponse({'status': 'ok', 'data': _hendelse_til_dict(hendelse)})
+
+
+@modul_kreves('ko', 'skriv_full', svar='json')
+@require_http_methods(['POST'])
+@rate_limit(group='ko:hendelse_lukk', rate='60/m', method='POST')
+def hendelse_lukk_view(request, pk):
+    """Lukk. **409 med antallet** når hendelsen har åpne oppdrag, og gjennom
+    med `{"confirm": true}` (§4.6). Operatøren skal aldri møte en vegg, bare
+    en dør hun må åpne bevisst."""
+    hendelse = _hendelse(pk)
+    try:
+        services.lukk_hendelse(
+            hendelse, bruker=request.user,
+            confirm=bool(_json_body(request).get('confirm')))
+    except services.HarApneOppdrag as feil:
+        return JsonResponse({'status': 'error', 'message': str(feil),
+                             'apne_oppdrag': feil.antall}, status=409)
+    except services.Ugyldig as feil:
+        return _feil(str(feil))
+    return JsonResponse({'status': 'ok', 'data': _hendelse_til_dict(hendelse)})
+
+
+@modul_kreves('ko', 'skriv_full', svar='json')
+@require_http_methods(['POST'])
+@rate_limit(group='ko:hendelse_gjenapne', rate='60/m', method='POST')
+def hendelse_gjenapne_view(request, pk):
+    """Åpne igjen — logget som egen linje (André, 18. sep. 2026)."""
+    hendelse = _hendelse(pk)
+    try:
+        services.gjenapne_hendelse(hendelse, bruker=request.user)
+    except services.Ugyldig as feil:
+        return _feil(str(feil))
+    return JsonResponse({'status': 'ok', 'data': _hendelse_til_dict(hendelse)})
+
+
+@modul_kreves('ko', 'skriv_full', svar='json')
+@require_http_methods(['POST'])
+@rate_limit(group='ko:oppdrag_hendelse', rate='60/m', method='POST')
+def oppdrag_hendelse_view(request, pk):
+    """Knytt oppdraget til en hendelse (`hendelse_id`), eller løsne det
+    (`null`).
+
+    **Krever `skriv_full` i oppdragsmodulen også**, sjekket her og ikke bare
+    i dekoratøren: kallet skriver på en oppdragsrad, og hvem som får skrive på
+    oppdrag er oppdragsmodulens sak (komposisjonsregelen, rollemodellen §5).
+    Dekoratøren gir KO-nivået; denne linja gir det andre.
     """
-    return JsonResponse({'status': 'ok', 'data': services.ressursbildet()})
+    from oppdrag.models import Oppdrag
+
+    if not har_tilgang(request.user, 'oppdrag', 'skriv_full'):
+        return _feil('Krever skrivetilgang i oppdragsmodulen.', status=403)
+    vakt = hent_aktiv_vakt()
+    oppdrag = get_object_or_404(Oppdrag, pk=pk, vakt=vakt)
+    data = _json_body(request)
+    hendelse = None
+    if data.get('hendelse_id') is not None:
+        hendelse = get_object_or_404(Hendelse, pk=data['hendelse_id'], vakt=vakt)
+    try:
+        services.knytt_oppdrag(oppdrag, hendelse, bruker=request.user)
+    except services.Ugyldig as feil:
+        return _feil(str(feil))
+    return JsonResponse({'status': 'ok', 'hendelse_id': oppdrag.hendelse_id})

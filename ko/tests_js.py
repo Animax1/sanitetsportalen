@@ -159,6 +159,13 @@ KO_LOGG_BYGGERE = (
     # felt rett inn i overskriften, skal skanneren se det.
     'koTegnLogg',
     'koTegnTilstede',
+    # Hendelsene (pulje 5). Overskriften på tavla, knappene i den,
+    # knytt/løsne i detaljmodalen og nedtrekket i «Nytt oppdrag».
+    'koHendelseHode',
+    'koHendelseKnapper',
+    'koHendelseValg',
+    'koFyllHendelsevalg',
+    'koLeggHendelsevalgINyttOppdrag',
 )
 
 #: Uttrykk som interpoleres uten `escapeHtml`, med begrunnelse.
@@ -169,6 +176,16 @@ KO_GJENNOMGATT = {
     'omraade': 'markup bygget to linjer over, ansvarsområdet escapet der',
     'hvem': 'markup bygget av en ternær; forfatternavnet escapet i den ene grenen',
     'av': 'markup bygget to linjer over, navnet escapet der',
+    # Hendelsene (pulje 5):
+    'hendelseHtml': 'markup bygget rett over, nummeret escapet der',
+    'antallTekst': 'tall og et fast ord, escapet ved innsetting',
+    'sted': 'markup bygget rett over, lokasjonsnavnet escapet der',
+    'apne': 'markup bygget rett over, tallet escapet der',
+    'knapper': 'markup fra koHendelseKnapper(), som skannes for seg',
+    'id': 'escapeHtml over h.id, satt rett over',
+    'naa': 'markup bygget rett over, nummer og tittel escapet der',
+    'valg': 'options bygget rett over, id og tekst escapet der',
+    'losne': 'knapp bygget rett over, id escapet der',
 }
 
 
@@ -417,3 +434,174 @@ class KonsollhoydenTests(SimpleTestCase):
 
     def test_gulvet_holder_ogsaa_naar_regnestykket_blir_negativt(self):
         self.assertEqual(self._kall(900, 500), 360)
+
+
+# ════════════════════════════════════════════════════════════════════════════
+# Hendelsene (pulje 5): regelen for grupperingen, og nummerformene.
+# ════════════════════════════════════════════════════════════════════════════
+
+GRUPPERING_HARNESS = (
+    (PORTAL_UTILS_JS, ('escapeHtml',)),
+    (OPPDRAG_KORT_JS, ('oppdragsnr', 'hendelsesnr')),
+    (KO_JS, ('koGrupperOppdrag', 'koHendelseHode', 'koHendelseKnapper', 'koKanSkrive')),
+)
+
+#: `koGrupperOppdrag` leser to toppnivåbindinger, som `build_harness` ikke
+#: klipper med. Uten `koHendelser` er hver `.values()` et krasj.
+GRUPPERING_PREAMBLE = (
+    'let koHendelser = new Map();\n'
+    'let koGruppert = true;\n'
+    "globalThis.window = { MODUL_TILGANG: { ko: 'skriv_full' } };\n"
+)
+
+
+@unittest.skipUnless(node_available(), 'node er ikke tilgjengelig')
+class GrupperingsregelenTests(SimpleTestCase):
+    """`koGrupperOppdrag()` avgjør hva tavla viser, og prøves som en regel.
+
+    §7: hendelsene er en gruppering av oppdragslista. Tre ting regelen skal
+    holde: **av** betyr flat liste (`null`), en åpen hendelse uten oppdrag
+    skal likevel stå der (det er hendelsen som «lever i tjue minutter før en
+    ressurs sendes»), og «Uten hendelse» står sist — og skjuler ingenting.
+    """
+
+    def setUp(self):
+        self.harness = build_harness(GRUPPERING_HARNESS)
+
+    def _grupper(self, hendelser, rader, gruppert=True):
+        snippet = f'''
+            {json.dumps(hendelser)}.forEach((h) => koHendelser.set(h.id, h));
+            koGruppert = {'true' if gruppert else 'false'};
+            const ut = koGrupperOppdrag({json.dumps(rader)});
+            console.log(JSON.stringify(ut === null ? null : ut.map((g) => ({{
+              hendelse: g.hendelse ? g.hendelse.id : null,
+              rader: g.rader.map((o) => o.id),
+              hode: g.hode,
+            }}))));
+        '''
+        return json.loads(run_node(self.harness, snippet, preamble=GRUPPERING_PREAMBLE).splitlines()[0])
+
+    H1 = {'id': 1, 'nummer': 1, 'kode': 'H1', 'tittel': 'Brann', 'status': 'apen',
+          'lokasjon_navn': '', 'apne_oppdrag': 0}
+    H2 = {'id': 2, 'nummer': 2, 'kode': 'H2', 'tittel': 'Slagsmål', 'status': 'apen',
+          'lokasjon_navn': 'Scene sør', 'apne_oppdrag': 1}
+    H3 = {'id': 3, 'nummer': 3, 'kode': 'H3', 'tittel': 'Gammel', 'status': 'lukket',
+          'lokasjon_navn': '', 'apne_oppdrag': 0}
+
+    def test_av_gir_flat_liste(self):
+        self.assertIsNone(self._grupper([self.H1], [{'id': 10, 'hendelse_id': 1}], gruppert=False))
+
+    def test_aapen_hendelse_uten_oppdrag_staar_der(self):
+        ut = self._grupper([self.H1, self.H2], [{'id': 10, 'hendelse_id': 2}])
+        self.assertEqual([g['hendelse'] for g in ut], [2, 1])
+        self.assertEqual([g['rader'] for g in ut], [[10], []])
+
+    def test_tom_uten_hendelse_vises_bare_naar_den_er_alene(self):
+        """En overskrift over ingenting er støy — men er den hele lista, er
+        den lista, og skal stå."""
+        ut = self._grupper([], [])
+        self.assertEqual([g['hendelse'] for g in ut], [None])
+        ut = self._grupper([self.H1], [])
+        self.assertEqual([g['hendelse'] for g in ut], [1])
+
+    def test_lukket_hendelse_vises_bare_med_rader(self):
+        """Ellers ville oppdragene forsvunnet fra tavla idet hendelsen ble
+        lukket — og en lukket hendelse uten rader hører hjemme i loggen."""
+        ut = self._grupper([self.H1, self.H3], [{'id': 10, 'hendelse_id': 3}])
+        self.assertEqual([g['hendelse'] for g in ut], [1, 3])
+        ut = self._grupper([self.H1, self.H3], [{'id': 10, 'hendelse_id': None}])
+        self.assertEqual([g['hendelse'] for g in ut], [1, None])
+
+    def test_uten_hendelse_staar_sist_og_faar_alt_ukjent(self):
+        """Et oppdrag som peker på en hendelse tavla ikke har fått ennå (to
+        pollere, to klokker) skal ikke forsvinne."""
+        ut = self._grupper([self.H1], [
+            {'id': 10, 'hendelse_id': None}, {'id': 11, 'hendelse_id': 99}, {'id': 12, 'hendelse_id': 1}])
+        self.assertEqual(ut[-1]['hendelse'], None)
+        self.assertEqual(ut[-1]['rader'], [10, 11])
+        self.assertEqual(ut[0]['rader'], [12])
+
+    def test_ingenting_skjules(self):
+        """§7.2 for grupperingen: summen av radene er lista."""
+        rader = [{'id': i, 'hendelse_id': h} for i, h in ((1, 1), (2, 2), (3, None), (4, 3), (5, 7))]
+        ut = self._grupper([self.H1, self.H2, self.H3], rader)
+        self.assertEqual(sorted(sum((g['rader'] for g in ut), [])), [1, 2, 3, 4, 5])
+
+    def test_hodet_escaper_og_baerer_sted_og_tall(self):
+        h = dict(self.H2, tittel='<b>x</b>')
+        ut = self._grupper([h], [{'id': 10, 'hendelse_id': 2}, {'id': 11, 'hendelse_id': 2}])
+        hode = ut[0]['hode']
+        self.assertIn('&lt;b&gt;x&lt;/b&gt;', hode)
+        self.assertNotIn('<b>x</b>', hode)
+        self.assertIn('Scene sør', hode)
+        self.assertIn('2 oppdrag', hode)
+        self.assertIn('data-action="koLukkHendelse"', hode)
+        self.assertNotIn('data-action="koGjenapneHendelse"', hode)
+        ut = self._grupper([self.H3], [{'id': 10, 'hendelse_id': 3}, {'id': 11, 'hendelse_id': None}])
+        self.assertIn('data-action="koGjenapneHendelse"', ut[0]['hode'])
+        self.assertIn('Uten hendelse', ut[-1]['hode'])
+
+
+@unittest.skipUnless(node_available(), 'node er ikke tilgjengelig')
+class NummerformeneTests(SimpleTestCase):
+    """`O45` og `H12` (§6) — samme regel som `oppdrag.services.oppdragsnr` og
+    `ko.services.hendelsesnr` på serveren. Enhetsskjermen har sin egen kopi av
+    `oppdragsnr`, og den skal si det samme."""
+
+    def test_delte_formene(self):
+        harness = build_harness(((OPPDRAG_KORT_JS, ('oppdragsnr', 'hendelsesnr')),))
+        ut = run_node(harness, "console.log(oppdragsnr(45) + ' ' + hendelsesnr(12));")
+        self.assertEqual(ut.splitlines()[0], 'O45 H12')
+
+    def test_enhetsskjermens_kopi_sier_det_samme(self):
+        harness = build_harness(((JS_DIR / 'oppdrag-enhet.js', ('oppdragsnr',)),))
+        self.assertEqual(run_node(harness, 'console.log(oppdragsnr(45));').splitlines()[0], 'O45')
+
+
+@unittest.skipUnless(node_available(), 'node er ikke tilgjengelig')
+class TavlaSpoerEtterGrupperingenTests(SimpleTestCase):
+    """**Kallstedet, ikke bare regelen.** `renderOppdrag()` i
+    `oppdrag-sentral-oppdrag.js` skal spørre `koGrupperOppdrag()` når den
+    finnes. Testene over kaller regelen selv, og da kunne tavla slutte å
+    kalle den uten at noe ble rødt — regel 3 om mutanter i `CLAUDE.md`."""
+
+    def setUp(self):
+        from patients.js_test_utils import OPPDRAG_SENTRAL_JS
+        self.harness = build_harness((
+            (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue', 'klokke')),
+            (OPPDRAG_SENTRAL_JS, ('renderOppdrag', '_oppdragRadHtml', '_sorterOppdrag',
+                                  'oppdragsnr', 'hendelsesnr', 'hastegradKlasse',
+                                  'tidSiden', '_grovMerke', '_enhetsmatrise',
+                                  '_problemMedAntall', '_medAntall', 'venterForbiTerskel',
+                                  'lydTerskler', '_manglerTrinn', '_manglerMinutter')),
+            (KO_JS, ('koGrupperOppdrag', 'koHendelseHode', 'koHendelseKnapper', 'koKanSkrive')),
+        ))
+
+    def test_tavla_tegner_overskriften(self):
+        snippet = '''
+            const HASTEGRAD_REKKEFOLGE = ['Akutt', 'Haster', 'Vanlig', 'Drift'];
+            const MANGLER_TRINN = [[15, 'alvorlig'], [5, 'varsel'], [0, 'ny']];
+            let koHendelser = new Map([[1, {id: 1, nummer: 1, kode: 'H1', tittel: 'Brann',
+              status: 'apen', lokasjon_navn: '', apne_oppdrag: 1}]]);
+            let koGruppert = true;
+            let oppdragsliste = [{id: 7, nummer: 7, status: 'fremme', status_navn: 'Fremme',
+              enhet_navn: 'HGSD 56', lokasjon_navn: 'Scene', problemstilling: 'Fall',
+              hastegrad: 'Akutt', opprettet: '2026-08-28T20:00:00Z', fritekst: '',
+              hendelse_id: 1, hendelse_nummer: 1, hendelse_tittel: 'Brann', enheter: []}];
+            globalThis.window = { MODUL_TILGANG: { ko: 'skriv_full' } };
+            const el = { innerHTML: '' };
+            globalThis.document = { getElementById: (id) => id === 'oppdragsliste' ? el : null };
+            renderOppdrag();
+            console.log(JSON.stringify(el.innerHTML));
+            console.log(JSON.stringify(_oppdragRadHtml(oppdragsliste[0])));
+        '''
+        linjer = run_node(self.harness, snippet).splitlines()
+        ut, rad = json.loads(linjer[0]), json.loads(linjer[1])
+        self.assertIn('hendelse-hode', ut, 'tavla spurte ikke etter grupperingen')
+        self.assertIn('Brann', ut)
+        self.assertIn('O7', ut)
+        # Raden alene: overskriften bærer også et `hendelse-merke`, så et
+        # søk i hele tavla ser ikke om *raden* mistet sitt (mutant som
+        # overlevde 18. sep. 2026).
+        self.assertIn('hendelse-merke', rad, 'raden bærer H1-merket')
+        self.assertIn('>H1<', rad)

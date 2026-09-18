@@ -24,31 +24,54 @@ function renderOppdrag() {
 
   const sortert = _sorterOppdrag(oppdragsliste);
 
-  el.innerHTML = (sortert.map((o) => {
-    // Fragmentene bygges før mal-strengen, ikke inne i en ${...}. En nøstet
-    // mal-streng inne i en interpolasjon er vanskelig å lese — og XSS-vernet
-    // i tests_xss.py klarer ikke å se inn i den, så en uescapet verdi der
-    // ville passert stille.
-    const fritekstBlokk = o.fritekst
-      ? `<div class="oppdrag-fritekst">${escapeHtml(o.fritekst)}</div>`
-      : '';
-    // «Fremme · 12 min» og «14:20 · 31 min siden» — ren tekst, escapet ved
-    // innsetting. Uten statusmelding (venter) står bare ordet.
-    const statusTekst = o.status_tidspunkt
-      ? `${o.status_navn} · ${tidSiden(o.status_tidspunkt)}`
-      : String(o.status_navn);
-    const opprettetTekst = `${klokke(o.opprettet)} · ${tidSiden(o.opprettet)} siden`;
-    // To vurderinger, to plasser: KO/AMKs hastegrad til venstre, bilens
-    // grovsortering til høyre. Tom grovsortering vises som «—», fordi
-    // «ikke vurdert ennå» er informasjon.
-    const grovsortering = _grovMerke(o);
-    const manglerKlasse = o.trenger_ressurs ? ' oppdrag-rad-mangler mangler-' + _manglerTrinn(o) : '';
-    const venterKlasse = venterForbiTerskel(o) ? ' oppdrag-rad-venter-lenge' : '';
-    return `
+  // **Hendelsene er en gruppering av denne lista, ikke en egen flate** (KO
+  // pulje 5, §7). Grupperingen eies av `ko.js`, som er betinget lastet: på
+  // `/ko/` svarer `koGrupperOppdrag()` med grupper (eller `null` når
+  // bryteren er av), på `/oppdrag/` finnes den ikke og lista er flat som før.
+  // Kallet går gjennom en vakt av samme grunn som `_kallOppdrag` (CLAUDE.md).
+  const grupper = (typeof koGrupperOppdrag === 'function') ? koGrupperOppdrag(sortert) : null;
+  if (grupper) {
+    el.innerHTML = grupper.map((g) => g.hode + g.rader.map(_oppdragRadHtml).join('')).join('');
+    return;
+  }
+  el.innerHTML = sortert.map(_oppdragRadHtml).join('');
+}
+
+
+function _oppdragRadHtml(o) {
+  // Én rad på tavla. Skilt ut av `renderOppdrag` 18. sep. 2026, da lista
+  // fikk en gruppert visning — samme rad i begge.
+  //
+  // Fragmentene bygges før mal-strengen, ikke inne i en ${...}. En nøstet
+  // mal-streng inne i en interpolasjon er vanskelig å lese — og XSS-vernet
+  // i tests_xss.py klarer ikke å se inn i den, så en uescapet verdi der
+  // ville passert stille.
+  const fritekstBlokk = o.fritekst
+    ? `<div class="oppdrag-fritekst">${escapeHtml(o.fritekst)}</div>`
+    : '';
+  // «Fremme · 12 min» og «14:20 · 31 min siden» — ren tekst, escapet ved
+  // innsetting. Uten statusmelding (venter) står bare ordet.
+  const statusTekst = o.status_tidspunkt
+    ? `${o.status_navn} · ${tidSiden(o.status_tidspunkt)}`
+    : String(o.status_navn);
+  const opprettetTekst = `${klokke(o.opprettet)} · ${tidSiden(o.opprettet)} siden`;
+  // To vurderinger, to plasser: KO/AMKs hastegrad til venstre, bilens
+  // grovsortering til høyre. Tom grovsortering vises som «—», fordi
+  // «ikke vurdert ennå» er informasjon.
+  const grovsortering = _grovMerke(o);
+  const manglerKlasse = o.trenger_ressurs ? ' oppdrag-rad-mangler mangler-' + _manglerTrinn(o) : '';
+  const venterKlasse = venterForbiTerskel(o) ? ' oppdrag-rad-venter-lenge' : '';
+  // «Oppdrag 45 · Hendelse 12» (§6): visningen bærer relasjonen. Vises på
+  // begge sidene — på `/oppdrag/` er det den ene sporet av KO.
+  const hendelseMerke = o.hendelse_nummer
+    ? `<span class="hendelse-merke" title="${escHtmlValue(o.hendelse_tittel || '')}">${escHtmlValue(hendelsesnr(o.hendelse_nummer))}</span>`
+    : '';
+  return `
     <div class="oppdrag-rad${manglerKlasse}${venterKlasse}" data-action="visOppdrag" data-id="${escHtmlValue(o.id)}"
          role="button" tabindex="0">
       <div class="d-flex align-items-center gap-2 flex-wrap">
-        <span class="oppdrag-nr">#${escHtmlValue(o.nummer)}</span>
+        <span class="oppdrag-nr">${escHtmlValue(oppdragsnr(o.nummer))}</span>
+        ${hendelseMerke}
         <span class="hastegrad ${escHtmlValue(hastegradKlasse(o.hastegrad))}">${escapeHtml(o.hastegrad)}</span>
         ${grovsortering}
         <span class="oppdrag-problem">${escapeHtml(_problemMedAntall(o))}</span>
@@ -63,7 +86,6 @@ function renderOppdrag() {
       </div>
       ${fritekstBlokk}
     </div>`;
-  }).join(''));
 }
 
 
@@ -353,7 +375,7 @@ async function visOppdrag(id) {
   apentOppdrag = o;
   const navn = (o.enheter || []).map((e) => e.enhet_navn).join(', ') || o.enhet_navn;
   document.getElementById('detalj-tittel').textContent =
-    `#${o.nummer} ${o.problemstilling} – ${navn}`;
+    `${oppdragsnr(o.nummer)} ${o.problemstilling} – ${navn}`;
   const enheterFeil = document.getElementById('enheter-feil');
   if (enheterFeil) enheterFeil.classList.add('d-none');
   innhold.classList.remove('foer-aapen');
@@ -396,6 +418,10 @@ async function visOppdrag(id) {
   const redigerKnapp = OPPDRAG_TILGANG.kanSkrive
     ? `<button type="button" class="btn btn-link btn-sm p-0 ms-2" data-action="visRedigerOppdrag">Rediger</button>`
     : '';
+  // Hendelsen oppdraget hører til, med knytt/løsne — **KOs**, og bare på
+  // `/ko/`: `ko.js` er betinget lastet, og kallet går gjennom en vakt
+  // (CLAUDE.md). Markupen skannes i `ko/tests_js.py`, der byggeren bor.
+  const hendelseValg = (typeof koHendelseValg === 'function') ? koHendelseValg(o) : '';
   const slettKnapp = o.kan_slettes
     ? `<button type="button" class="btn btn-outline-danger btn-sm" data-action="slettOppdrag"
                data-id="${escHtmlValue(o.id)}"><i class="bi bi-trash me-1"></i>Slett oppdrag</button>`
@@ -408,6 +434,7 @@ async function visOppdrag(id) {
       ${redigerKnapp}
     </div>
     ${o.fritekst ? `<div class="oppdrag-fritekst mb-3">${escapeHtml(o.fritekst)}</div>` : ''}
+    ${hendelseValg}
     <div id="rediger-oppdrag"></div>
     <h6 class="text-muted">Enheter</h6>
     <div class="mb-3">${mkEnhetsrader(o)}${OPPDRAG_TILGANG.kanSkrive ? _varsleValg(o) : ''}</div>

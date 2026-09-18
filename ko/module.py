@@ -64,7 +64,7 @@ KoModule = Module(
     # her; uten etiketten deles nivået ut i god tro med feil modul i hodet.
     nivaa_navn=(
         ('les', 'Lese: situasjonsbildet og loggen'),
-        ('skriv_full', 'Føre loggen: skrive og rette linjer'),
+        ('skriv_full', 'Føre loggen og hendelsene: linjer, åpne og lukke hendelser'),
         ('skriv_leder', 'KO-leder: fjerner linjer, leser tidligere vakter'),
     ),
 )

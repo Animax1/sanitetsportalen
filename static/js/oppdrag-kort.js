@@ -20,6 +20,23 @@
 // Krever portal-utils.js (escapeHtml, escHtmlValue, klokke, apiFetch).
 // ════════════════════════════════════════════════════════════════════════════
 
+// ── Nummerformene ────────────────────────────────────────────────────────
+//
+// **`O45` og `H12`, ett sted** (18. sep. 2026, §6 i KO-notatet). Var `#45`
+// til KO fikk hendelser: `#45` og `H12` på nabolinjer i loggen er ikke
+// utvetydige, og det er i loggen de møtes. Samme regel som
+// `oppdrag.services.oppdragsnr()` på serveren — de to skal aldri være uenige.
+// Enhetsskjermen (`oppdrag-enhet.js`) har sin egen kopi, som for de andre
+// hjelperne der: den laster ikke denne fila.
+
+function oppdragsnr(nummer) {
+  return 'O' + nummer;
+}
+
+function hendelsesnr(nummer) {
+  return 'H' + nummer;
+}
+
 // Besetningspanelet er åpent for én enhet om gangen, og svarene caches til
 // neste henting. Tilstanden ligger her og ikke hos sidene: panelet er delt, og
 // to kopier ville gitt to ulike «hvilken er åpen».
@@ -131,7 +148,7 @@ function enhetskortInnmat(e) {
   const grov = e.oppdragsnummer != null ? _grovMerke(e) : '';
   const oppdragslinje = e.oppdragsnummer != null
     ? `<div class="enhet-oppdrag">
-         <span class="oppdrag-nr">#${escHtmlValue(e.oppdragsnummer)}</span>
+         <span class="oppdrag-nr">${escHtmlValue(oppdragsnr(e.oppdragsnummer))}</span>
          <span class="hastegrad ${escHtmlValue(hastegradKlasse(e.hastegrad))}">${escapeHtml(e.hastegrad || '')}</span>
          ${grov}
          <span class="enhet-oppdrag-problem">${escapeHtml(_problemMedAntall(e))}</span>

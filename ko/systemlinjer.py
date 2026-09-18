@@ -54,12 +54,16 @@ from __future__ import annotations
 
 from django.utils import timezone
 
+# `ko` → `oppdrag` er den tillatte retningen. Formen på oppdragsnummeret eies
+# av oppdragsmodulen, og skrives ikke om her.
+from oppdrag.services import oppdragsnr
+
 
 # ── Kodene ───────────────────────────────────────────────────────────────────
 #
 # **Kode og data, ikke ferdig tekst.** Setningen bygges her ved lesing, slik at
-# ordlyden kan rettes uten at historikken skrives om — «O45» i stedet for «#45»
-# når pulje 3 innfører nummerserien, jf. §6. Det som *kan forsvinne* fryses
+# ordlyden kan rettes uten at historikken skrives om — som da «#45» ble «O45»
+# 18. sep. 2026 (§6), uten en migrasjon. Det som *kan forsvinne* fryses
 # derimot i `systemdata` ved skriving: enheten kan omdøpes, oppdraget slettes
 # ved vaktarkivering, og en logg som mister subjektet sitt er verdiløs akkurat
 # når den leses (§4.5, §4.7).
@@ -73,6 +77,10 @@ ENHET_RYKKET_VIDERE = 'enhet_rykket_videre'
 ENHET_AVBROT = 'enhet_avbrot'
 ENHET_AVVENTER = 'enhet_avventer'
 VAKTMODUS = 'vaktmodus'
+HENDELSE_OPPRETTET = 'hendelse_opprettet'
+HENDELSE_LUKKET = 'hendelse_lukket'
+HENDELSE_GJENAPNET = 'hendelse_gjenapnet'
+OPPDRAG_KNYTTET = 'oppdrag_knyttet'
 
 #: Hver kode med sin begrunnelse. Lista er kontrakten: en kode som ikke står
 #: her, skrives ikke — `ko/tests_systemlinjer.py` håndhever begge veier, slik
@@ -100,6 +108,22 @@ KODER: dict[str, str] = {
         'en enhet blir glemt.',
     VAKTMODUS:
         'Forklarer hvorfor en bil ikke ble varslet.',
+    # Hendelsene (pulje 5). Fire koder, og de er **operatørens handlinger**,
+    # ikke løftet av et signal: KO-tjenestelaget skriver dem selv, og fryser
+    # operatøren som forfatter — «H12 lukket» uten hvem er en linje som ikke
+    # svarer på det man leser loggen for.
+    HENDELSE_OPPRETTET:
+        'Begynnelsen på en hendelse. En hendelse begynner når noen sier noe '
+        'over samband, ofte lenge før et oppdrag finnes.',
+    HENDELSE_LUKKET:
+        'Slutten — og om den ble lukket med åpne oppdrag, står det på linja. '
+        'Det er tilstanden der en enhet blir glemt (§4.6).',
+    HENDELSE_GJENAPNET:
+        'En lukking som var en misforståelse eller et feilklikk (André, '
+        '18. sep. 2026). Egen linje, aldri en stille statusendring.',
+    OPPDRAG_KNYTTET:
+        'Hvilke oppdrag som hørte til hvilken hendelse, med flyttinger. '
+        'Grupperingen på tavla forsvinner når vakta arkiveres; loggen står.',
 }
 
 
@@ -110,14 +134,25 @@ def _enhet(data) -> str:
 
 
 def _oppdrag(data) -> str:
-    """Oppdragsnummeret slik det sies. `#45` i dag; `O45` fra pulje 3 (§6).
+    """Oppdragsnummeret slik det sies: `O45` (§6, fra 18. sep. 2026).
 
-    Formen står **ett sted** nettopp fordi den skal byttes: i en logg der
-    hendelses- og oppdragsnumre står på nabolinjer er `#45` ikke utvetydig, og
-    det er i loggen de møtes.
+    Formen eies av oppdragsmodulen (`oppdrag.services.oppdragsnr`), og byttet
+    fra `#45` traff hele historikken uten en migrasjon — det er grunnen til at
+    systemlinjer lagres som kode + data.
     """
     nummer = data.get('oppdragsnummer')
-    return f'#{nummer}' if nummer else 'oppdrag'
+    return oppdragsnr(nummer) if nummer else 'oppdrag'
+
+
+def hendelsesnr(nummer) -> str:
+    """`H12` — hendelsesnummeret der plassen er trang (§6). Tvillingen av
+    `oppdragsnr`, og den ene formen KO selv eier."""
+    return f'H{nummer}'
+
+
+def _hendelse(data, nokkel='hendelsesnummer') -> str:
+    nummer = data.get(nokkel)
+    return hendelsesnr(nummer) if nummer else 'hendelse'
 
 
 def tegn(kode: str, data: dict) -> str:
@@ -167,6 +202,34 @@ def tegn(kode: str, data: dict) -> str:
     if kode == VAKTMODUS:
         navn = 'passiv vakt' if data.get('modus') == 'passiv' else 'aktiv vakt'
         return f'{_enhet(data)} satt i {navn}'
+    if kode == HENDELSE_OPPRETTET:
+        deler = [f'{_hendelse(data)} opprettet', data.get('tittel') or '',
+                 data.get('lokasjon') or '']
+        return ' · '.join(d for d in deler if d)
+    if kode == HENDELSE_LUKKET:
+        linje = f'{_hendelse(data)} lukket'
+        if data.get('tittel'):
+            linje += f' · {data["tittel"]}'
+        apne = data.get('apne_oppdrag') or 0
+        if apne:
+            # §4.6: døra hun åpnet bevisst skal stå i sporet.
+            linje += f' — med {apne} åpne oppdrag' if apne > 1 else ' — med 1 åpent oppdrag'
+        return linje
+    if kode == HENDELSE_GJENAPNET:
+        linje = f'{_hendelse(data)} åpnet igjen'
+        if data.get('tittel'):
+            linje += f' · {data["tittel"]}'
+        return linje
+    if kode == OPPDRAG_KNYTTET:
+        fra = data.get('fra_hendelsesnummer')
+        til = data.get('hendelsesnummer')
+        if til and fra:
+            return f'{_oppdrag(data)} flyttet fra {hendelsesnr(fra)} til {hendelsesnr(til)}'
+        if til:
+            return f'{_oppdrag(data)} knyttet til {hendelsesnr(til)}'
+        if fra:
+            return f'{_oppdrag(data)} løsnet fra {hendelsesnr(fra)}'
+        return f'{_oppdrag(data)} knyttet til hendelse'
     return ''
 
 

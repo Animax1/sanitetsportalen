@@ -25,7 +25,7 @@ class SentralbordetsOppstartTests(SimpleTestCase):
 
     HARNESS = ((OPPDRAG_SENTRAL_JS, ('_trygt', 'lastAlt', 'oppstart', '_visLastefeil', 'lastEnheter',
                                      'lastOppdrag', 'renderEnheter', 'tegnEnhetsliste',
-                                     'settEnhetslisteKilde', 'renderOppdrag')),)
+                                     'settEnhetslisteKilde', 'renderOppdrag', '_oppdragRadHtml', 'oppdragsnr', 'hendelsesnr')),)
 
     FORSPILL = '''
     let enheter = []; let oppdragsliste = []; let lokasjoner = [];

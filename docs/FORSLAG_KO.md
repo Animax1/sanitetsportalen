@@ -528,8 +528,8 @@ filtre og statistikk er forbedringer *av* det bildet og legges oppå uten å riv
 | **1 — Skallet** ✅ | Modulen registrert, `ModulTilgang('ko')`, siden, sidebar | Tilgangen må virke før noe legges bak den |
 | **2 — Loggen** ✅ | Logglinjer, retting, sletteinngang, polling med `?siden=`, ni systemhendelser, oppbevaring | Alt annet skriver inn i den |
 | **3 — Ressursoversikten** ✅ | Projeksjonen i §3.1, KO-ført status | **Byttet med hendelser 17. sep. 2026**, og levert samme dag. Rutingflagget er ikke med — se §3.2 |
-| **4 — Sentralbordet flyttes** | `oppdrag-sentral-*.js` → KO, oppdragslista inn i venstre kolonne | Den eneste som rører `/oppdrag/`. Må stå før hendelser, som grupperer den |
-| **5 — Hendelser** | `Hendelse`, nummerserie, linje → hendelse, gruppering av oppdragslista, lukking med 409 | Er en gruppering *av* pulje 4, og kan ikke bygges før lista den grupperer er her |
+| **4 — Sentralbordet flyttes** ✅ | `oppdrag-sentral-*.js` → KO, oppdragslista inn i venstre kolonne. Levert 18. sep. 2026 | Den eneste som rører `/oppdrag/`. Må stå før hendelser, som grupperer den |
+| **5 — Hendelser** ✅ | `Hendelse`, nummerserie, linje → hendelse, gruppering av oppdragslista, lukking med 409. Levert 18. sep. 2026 | Er en gruppering *av* pulje 4, og kan ikke bygges før lista den grupperer er her |
 | **6 — Chat og filter** | Admin-bryter, uformelle linjer, filter per operatør | Forbedringer |
 | **7 — Statistikk** | Kilde i `core/stats.py`, tallene i §8 | Trenger data fra en ekte vakt først |
 
@@ -557,6 +557,10 @@ Disse skal besvares før koden, ikke under:
    Forslag skrives her og avklares med André.
 2. **Skal en lukket hendelse kunne åpnes igjen?** Sannsynligvis ja, som en ny logglinje —
    men det er en operativ avgjørelse.
+
+   > **Besvart 18. sep. 2026 (André):** ja. Gjenåpning skjer «pga misforståelse eller
+   > feilklikk», og **det logges** — `HENDELSE_GJENAPNET` er en egen systemlinje. Samme dag:
+   > `H12`/`O45` overalt (§6), ikke bare i loggen.
 3. **Hvor lenge oppbevares KO-loggen, og arkiveres den?** `NOTAT_DPIA_OG_FRITEKST.md` §7
    slår fast at «fritekst bevisst ikke arkiveres» — et felt som inngår i arkivets
    SHA-signatur er låst i 24 måneder ved konstruksjon og kan ikke fjernes uten at arkivet

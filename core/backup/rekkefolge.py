@@ -30,9 +30,16 @@ from __future__ import annotations
 
 #: Rekkefølgen modulfilene tas i, i en tom base. `full` står utenfor — den
 #: er selvbærende og lastes alene.
+#:
+#: **`ko` står før `oppdrag` fra 18. sep. 2026** (KO pulje 5): `Oppdrag.hendelse`
+#: peker på `ko.Hendelse` med et heltall. KO er øverste lag i *koden* — ingen
+#: modul importerer den — og likevel nest først i gjenopprettingen; det er ikke
+#: en motsigelse, det er forskjellen på hvem som kjenner hvem og hvem som peker
+#: på hvem. `bindinger()` utleder kanten; hadde denne lista stått som før, ville
+#: `avvik()` sagt fra.
 GJENOPPRETTINGSREKKEFOLGE: tuple[str, ...] = (
-    'portal', 'patients', 'arkiv', 'oppdrag', 'oppdrag_arkiv', 'vaktliste',
-    'ko',
+    'portal', 'ko', 'patients', 'arkiv', 'oppdrag', 'oppdrag_arkiv',
+    'vaktliste',
 )
 
 #: Modulfiler uten en eneste peker ut av sitt eget datasett. De kan tas når

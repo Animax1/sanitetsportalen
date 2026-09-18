@@ -685,32 +685,22 @@ sentralbordet fra oppdragsmodulens egen kode, og oppdragsflata gates av `oppdrag
       igjen i pulje 4 med vilje: enhetsskjermen laster ikke `oppdrag-kort.js`, og den er
       den ene flata som *ikke* flytter. Tas hvis den noen gang skal dele mer.
 
-- [ ] **Pulje 5 — hendelser.** `Hendelse`, nummerserien, linje → hendelse, lukking med
-      409 og `confirm`. **Ikke en egen flate:** en gruppering av oppdragslista fra
-      pulje 4, med en bryter på lista (§7). `Oppdrag.hendelse` er grupperingen, og
-      §4.6-sperra krever at operatøren ser hendelsens åpne oppdrag i det hun lukker
-      den — to flater ville lagt nettopp den opplysningen der hun ikke står.
+*Pulje 5 (hendelser) er levert 18. sep. 2026 — se CHANGELOG. `ko.Hendelse`, `Oppdrag.hendelse`,
+`H12`/`O45`, gruppering av tavla med bryter, lukking med 409 og `confirm`, gjenåpning logget.*
 
-      Krever loggen **og** oppdragslista, og er derfor flyttet fra 3 til 5
-      (17. sep. 2026).
+- [ ] **Linje → hendelse i etterkant, og hendelsen som filter i loggen.** §4.1 sier «en
+      linje kan knyttes til en hendelse i etterkant», og datamodellen har det
+      (`Logglinje.hendelse`, `SET_NULL`) — men flata har det ikke: bare linja en hendelse
+      ble laget *av* får hendelsen. Hører hjemme i pulje 6 sammen med filteret per operatør,
+      fordi det er samme kontroll: «vis H12» er en hendelse som filter, og «legg denne linja
+      i H12» er den andre halvparten. Ett endepunkt (`logg/<pk>/hendelse/`) når flata kommer;
+      et endepunkt uten en flate er død kode.
 
-      - [ ] **Åpent valg, besvares før denne puljen:** skal en lukket hendelse kunne
-            åpnes igjen? Sannsynligvis ja, som en ny logglinje — men det er en operativ
-            avgjørelse.
-
-      - [ ] **Hendelsestelleren må inn i `NOKLER_UTEN_AUDIT`-prefiksene** (`core/signals.py`)
-            i samme commit som den skrives. `next_hendelse_nr_vakt_<pk>` er en teller
-            maskinen teller, ikke noe et menneske har bestemt — uten prefikset får du én
-            auditrad per hendelse, midt blant de ekte radene på nøyaktig de vaktene der
-            loggen betyr mest. Det er fella pasienttelleren gikk i.
-
-      - [ ] **Oppdragsnummeret bør bli `O45` samtidig som hendelsene får `H12`** (§6).
-            Alene er `#45` utvetydig; i en logg der begge står på nabolinjer er det ikke
-            det, og det er i loggen de møtes.
-
-            Formen står **ett sted** i KO: `_oppdrag()` i `ko/systemlinjer.py`. Det er
-            derfor systemlinjene lagres som kode + data og ikke som ferdig tekst — hele
-            historikken skifter form når den funksjonen endres, uten en migrasjon.
+- [ ] **Lokasjon på hendelsen kan settes fra API-et, ikke fra skjermen.** `rediger_hendelse`
+      tar `lokasjon_id`, og «Ny hendelse» er en `prompt()` med tittel. Et lite skjema (tittel +
+      lokasjonsnedtrekk fra samme kilde som «Nytt oppdrag») erstatter prompt-en når noen har
+      brukt den på en vakt og sagt hva som mangler. Prompt-en er der med vilje: loggen bruker
+      den samme for retting, og to ulike dialoger for samme slags handling er én for mye.
 
 - [ ] **Pulje 6 — chat og filter.** Admin-bryter for uformelle linjer (som er logglinjer
       uten hendelse, ikke en egen tabell), og filter per operatør husket i nettleseren.

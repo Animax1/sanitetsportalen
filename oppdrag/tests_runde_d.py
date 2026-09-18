@@ -245,7 +245,7 @@ class NyttOppdragSkjemaJsTests(SimpleTestCase):
 class EnhetsskjermJsTests(SimpleTestCase):
     HARNESS = (
         (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue', 'klokke')),
-        (OPPDRAG_ENHET_JS, ('renderAvsluttet', '_problemMedAntall', '_medAntall', '_udefinertVarsel',
+        (OPPDRAG_ENHET_JS, ('renderAvsluttet', 'oppdragsnr', '_problemMedAntall', '_medAntall', '_udefinertVarsel',
                             'koLes', 'koSkriv', 'koFjern', 'koNokkel', 'synk')),
     )
     STUBB = (
@@ -269,7 +269,7 @@ class EnhetsskjermJsTests(SimpleTestCase):
             renderAvsluttet();
             console.log(el.innerHTML);
         """)
-        self.assertIn('#12', ut)
+        self.assertIn('O12', ut)
         self.assertIn('Fallskade', ut)
 
     def test_udefinert_varsles_paa_kortet_foer_bilen_trykker(self):

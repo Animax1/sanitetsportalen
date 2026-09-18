@@ -49,7 +49,7 @@ function renderHistorikk() {
     <div class="oppdrag-rad" data-action="visOppdrag" data-id="${escHtmlValue(o.id)}"
          role="button" tabindex="0">
       <div class="d-flex align-items-center gap-2 flex-wrap">
-        <span class="oppdrag-nr">#${escHtmlValue(o.nummer)}</span>
+        <span class="oppdrag-nr">${escHtmlValue(oppdragsnr(o.nummer))}</span>
         <span class="hastegrad ${escHtmlValue(hastegradKlasse(o.hastegrad))}">${escapeHtml(o.hastegrad)}</span>
         <span class="oppdrag-problem">${escapeHtml(o.problemstilling)}</span>
       </div>
@@ -133,6 +133,11 @@ async function opprettOppdrag() {
   bootstrap.Modal.getInstance(document.getElementById('nyttOppdragModal'))?.hide();
   document.getElementById('nytt-fritekst').value = '';
   document.querySelectorAll('input[name="nytt-enhet"]:checked').forEach((i) => { i.checked = false; });
+  // **KO-kroken** (pulje 5): på `/ko/` kan operatøren ha valgt en hendelse i
+  // skjemaet, og da knyttes oppdraget til den nå. `ko.js` er betinget
+  // lastet, så kallet går gjennom en vakt (CLAUDE.md) — på `/oppdrag/`
+  // finnes verken nedtrekket eller funksjonen.
+  if (typeof koEtterOpprettet === 'function') await koEtterOpprettet(d.data.id);
   await lastAlt();
 }
 

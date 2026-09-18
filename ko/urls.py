@@ -22,4 +22,17 @@ urlpatterns = [
     path('api/logg/ny/', views.logg_skriv_view, name='ko_api_logg_ny'),
     path('api/logg/<int:pk>/rett/', views.logg_rett_view, name='ko_api_logg_rett'),
     path('api/logg/<int:pk>/fjern/', views.logg_fjern_view, name='ko_api_logg_fjern'),
+    # Hendelsene (pulje 5). Lesingen går med logg-pollen; skrivingen har
+    # navngitte stier, som loggen — én regel per sti.
+    path('api/hendelser/ny/', views.hendelse_ny_view, name='ko_api_hendelse_ny'),
+    path('api/hendelser/<int:pk>/rediger/', views.hendelse_rediger_view,
+         name='ko_api_hendelse_rediger'),
+    path('api/hendelser/<int:pk>/lukk/', views.hendelse_lukk_view,
+         name='ko_api_hendelse_lukk'),
+    path('api/hendelser/<int:pk>/gjenapne/', views.hendelse_gjenapne_view,
+         name='ko_api_hendelse_gjenapne'),
+    # Grupperingen skrives her og ikke i `/oppdrag/api/`: `Oppdrag.hendelse`
+    # er KOs peker, og oppdragsmodulen leser den bare.
+    path('api/oppdrag/<int:pk>/hendelse/', views.oppdrag_hendelse_view,
+         name='ko_api_oppdrag_hendelse'),
 ]

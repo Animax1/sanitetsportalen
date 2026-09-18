@@ -20,10 +20,13 @@ i den hele fila i 90. Det er ikke en sletterett — nøyaktig samme forbehold so
 levende raden er ekte beskyttelse mot «noen leser loggen tre måneder senere»,
 og den er ikke mer enn det. Står i `PERSONVERN_DOKUMENTASJON.md` A.9.
 
-**Rekkefølgen ved gjenoppretting: portalfila først.** `Logglinje.vakt` peker på
-`core.Vakt`, som ingen natural key har og derfor lagres som et heltall. Er
-vakta ikke der, feiler hele gjenopprettingen på fremmednøkkelen — samme grunn
-som for `patients`, `oppdrag` og `vaktliste`.
+**Rekkefølgen ved gjenoppretting: portalfila først, KO rett etter — før
+oppdrag.** `Logglinje.vakt` peker på `core.Vakt`, som ingen natural key har og
+derfor lagres som et heltall; er vakta ikke der, feiler gjenopprettingen på
+fremmednøkkelen. Og fra pulje 5 peker `oppdrag.Oppdrag.hendelse` **hit**, også
+som et heltall — så hendelsene må finnes før oppdragene lastes. KO er øverste
+lag i koden og nest nederst i gjenopprettingen; det er ikke en motsigelse, det
+er hva en peker er. `core.backup.rekkefolge` utleder kanten av modellene.
 """
 from __future__ import annotations
 
@@ -61,8 +64,15 @@ class KoBackupHandler(BaseBackupHandler):
     #: `korrigerer` og `rot` strippes heller ikke — de peker innad i settet, og
     #: uten dem ville en rettet linje kommet tilbake som to linjer som begge
     #: gjelder.
+    #:
+    #: `Hendelse.lokasjon` strippes **fordi den peker ut av modulen, ikke
+    #: fordi den peker på en bruker**: beholdt den, ville KO-fila krevd
+    #: oppdragsfila før seg — mens oppdragsfila krever KO-fila før seg
+    #: (`Oppdrag.hendelse`). En sirkel lar seg ikke gjenopprette. Navnet står
+    #: frosset i `lokasjon_navn`, som forfatteren gjør på linja.
     strip_fields = {
         'ko.Logglinje': ['forfatter', 'fjernet_av'],
+        'ko.Hendelse': ['opprettet_av', 'lukket_av', 'lokasjon'],
     }
 
 

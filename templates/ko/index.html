@@ -135,6 +135,15 @@
               <button type="submit" class="btn btn-primary" id="ko-logg-send">
                 <i class="bi bi-plus-lg me-1"></i>Ny
               </button>
+              {% comment %}
+                Ny hendelse fra ingenting (pulje 5). Den vanlige veien er
+                «Hendelse» på en logglinje — linja blir stående, hendelsen
+                peker tilbake (§4.5). Skjules for `les` i ko.js, som skjemaet.
+              {% endcomment %}
+              <button type="button" class="btn btn-outline-secondary" id="ko-ny-hendelse"
+                      data-action="koNyHendelse" title="Ny hendelse uten linje">
+                <i class="bi bi-flag me-1"></i>Hendelse
+              </button>
             </div>
             <div class="form-text mt-1">
               Ikke skriv navn, adresse, fødselsnummer eller telefon. Loggen
@@ -206,10 +215,23 @@
         er derfor den samme som i `templates/oppdrag/sentral.html`.
       {% endcomment %}
       <div class="card">
-        <div class="card-header py-2">
+        <div class="card-header py-2 d-flex justify-content-between align-items-center">
           <span class="small fw-semibold">
             <i class="bi bi-list-task me-1"></i>Oppdragsliste
           </span>
+          {% comment %}
+            **Hendelser er en gruppering av denne lista, ikke en egen flate**
+            (§7, pulje 5). Bryteren skjuler ingenting: av og på viser de samme
+            radene, med eller uten overskrifter. `data-hendelse="change"`
+            fordi en avkryssing melder sin egen hendelse — `klikkSkalKjore()`.
+          {% endcomment %}
+          {% if kan_se_oppdrag %}
+          <label class="small text-muted d-flex align-items-center gap-1 mb-0">
+            <input type="checkbox" class="form-check-input mt-0" id="ko-gruppert"
+                   data-action="koToggleGruppering" data-hendelse="change">
+            Gruppér på hendelse
+          </label>
+          {% endif %}
         </div>
         <div class="card-body ko-rull">
           {% if kan_se_oppdrag %}

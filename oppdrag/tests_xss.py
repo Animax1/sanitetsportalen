@@ -39,6 +39,8 @@ HTML_BUILDERS_PER_FIL = {
         'mkBesetning',
         '_besetningKontakt',
         'renderOppdrag',
+        # Raden på tavla, skilt ut 18. sep. 2026 da KO fikk gruppering.
+        '_oppdragRadHtml',
         '_grovMerke',
         # Flere enheter (11. sep. 2026): matrisen i lista, avkryssingen i
         # «Nytt oppdrag», radene og knappene i detaljvisningen.
@@ -202,6 +204,9 @@ REVIEWED_INTERPOLATIONS = {
     "d.krev_grov_avreist ? ' checked' : ''": 'hardkodet checked-attributt fra en ternær',
     'notat': 'markup bygget lokalt, notatet escapet inni',
     'radKlasse': 'hardkodet CSS-klasse fra en ternær',
+    # Hendelsene (KO pulje 5, 18. sep. 2026):
+    'hendelseMerke': 'markup bygget rett over, nummer og tittel escapet der',
+    'hendelseValg': 'markup fra koHendelseValg() i ko.js, som skannes i ko/tests_js.py — eller tom streng på /oppdrag/',
     'koblingKlasse': 'hardkodet CSS-klasse fra en ternær',
     'valgt': 'hardkodet selected-attributt fra en ternær',
     # Enhetsskjermens byggere (oppdrag-enhet.js):
@@ -381,7 +386,7 @@ class OppdragEscapingOppforselTests(SimpleTestCase):
     HARNESS = (
         (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue', 'trustedHtml', '_escHtml',
                            'klokke')),
-        (OPPDRAG_SENTRAL_JS, ('renderOppdrag', 'venterForbiTerskel', 'lydTerskler', 'renderEnheter', 'tegnEnhetsliste', 'settEnhetslisteKilde', 'tidslinjeHtml',
+        (OPPDRAG_SENTRAL_JS, ('renderOppdrag', '_oppdragRadHtml', 'oppdragsnr', 'hendelsesnr', 'venterForbiTerskel', 'lydTerskler', 'renderEnheter', 'tegnEnhetsliste', 'settEnhetslisteKilde', 'tidslinjeHtml',
                               'hastegradKlasse', 'mkBesetning',
                               'kanSeBesetning', 'tidSiden', '_grovMerke',
                               '_enhetsmatrise', '_problemMedAntall', '_medAntall', '_grupperEnheter', '_typeRekkefolge', '_enhetskort', 'enhetskortInnmat',
@@ -474,7 +479,7 @@ class EnhetEscapingOppforselTests(SimpleTestCase):
     HARNESS = (
         (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue', 'trustedHtml', '_escHtml',
                            'klokke')),
-        (OPPDRAG_ENHET_JS, ('renderAktivt', '_antallRad', '_udefinertVarsel', 'renderVentende', 'skalPipe', 'ventetSekunder', '_lydTerskler', 'lydTerskler', 'bilinnstillinger', 'renderAvsluttet',
+        (OPPDRAG_ENHET_JS, ('renderAktivt', 'oppdragsnr', '_antallRad', '_udefinertVarsel', 'renderVentende', 'skalPipe', 'ventetSekunder', '_lydTerskler', 'lydTerskler', 'bilinnstillinger', 'renderAvsluttet',
                             'tidslinjeEnhetHtml', 'hastegradKlasse',
                             '_stedvalg', '_grovsorteringsrad', '_kanGrovsortere', '_varsledeRad', '_problemMedAntall', '_medAntall')),
     )
@@ -583,7 +588,7 @@ class EnhetskortetTests(SimpleTestCase):
 
     def test_kortet_viser_oppdraget(self):
         ut = self._kort(self.AKTIV)
-        self.assertIn('#12', ut)
+        self.assertIn('O12', ut)   # `O45`-formen fra KO pulje 5 (§6)
         self.assertIn('Haster', ut)
         self.assertIn('Fallskade', ut)
         self.assertIn('hastegrad-haster', ut)
@@ -664,7 +669,7 @@ class AvreistTilOgGrovsorteringTests(SimpleTestCase):
     HARNESS = (
         (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue', 'trustedHtml', '_escHtml',
                            'klokke')),
-        (OPPDRAG_ENHET_JS, ('renderAktivt', '_antallRad', '_udefinertVarsel', 'tidslinjeEnhetHtml', 'hastegradKlasse',
+        (OPPDRAG_ENHET_JS, ('renderAktivt', 'oppdragsnr', '_antallRad', '_udefinertVarsel', 'tidslinjeEnhetHtml', 'hastegradKlasse',
                             '_stedvalg', '_grovsorteringsrad', '_kanGrovsortere', '_varsledeRad',
                             'koNokkel', 'koLes',
                             'koSkriv', 'koLeggTil', 'koFjern', 'lagNokkel', 'synk', '_problemMedAntall', '_medAntall')),

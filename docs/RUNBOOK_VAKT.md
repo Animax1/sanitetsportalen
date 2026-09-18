@@ -431,7 +431,7 @@ passordene som gjaldt da backupen ble tatt.
 fordi alt peker på vakta:
 
 ```
-portal → patients → arkiv → oppdrag → oppdrag_arkiv → vaktliste → ko
+portal → ko → patients → arkiv → oppdrag → oppdrag_arkiv → vaktliste
 ```
 
 `portal` bærer `core.Vakt`. Tas den ikke først, feiler de andre med

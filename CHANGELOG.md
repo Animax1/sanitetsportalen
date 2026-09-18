@@ -4,6 +4,118 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-18 — KO pulje 5: hendelser — `H12`, gruppering av tavla, lukking med 409, `O45` overalt  `#ko/sentralbordet` `#oppdrag/sentralbord`
+
+**To spørsmål ble besvart før koden** (André): en lukket hendelse **kan åpnes igjen** —
+«å åpne en hendelse vil være pga misforståelse eller feilklikk … må logges at den ble åpnet
+igjen» — og **`Hxx` og `Oxx` overalt**, ikke bare i loggen. Begge står i `FORSLAG_KO.md` §11
+som besvart, og §10 har ✅ på pulje 4 og 5 (pulje 4 manglet haken).
+
+### Det som er bygget
+
+- **`ko.Hendelse`** (§3.3): vakt, `hendelsesnummer`, tittel, lokasjon (FK til
+  `oppdrag.Lokasjon` **pluss frosset `lokasjon_navn`**), status åpen/lukket, `versjon`,
+  opprettet/lukket av med frosne navn, `opprettet_fra_linje`. **Ingen statusmaskin.**
+  `Logglinje.hendelse` (nullbar, `SET_NULL`) — linja er fasit, hendelsen er en gruppering.
+- **`Oppdrag.hendelse`**: nullbar FK til `'ko.Hendelse'` som strengreferanse — ingen import,
+  `KJENTE_UNNTAK` i `ko/tests_avhengighet.py` er fortsatt tom. **Skrives bare av
+  `ko.services.knytt_oppdrag`**; oppdragsmodulen leser den i `oppdrag_til_dict`
+  (`hendelse_id`, `hendelse_nummer`, `hendelse_tittel`) og har den i ETag-en — uten leddet
+  sto grupperingen gammel til neste stempling.
+- **Nummerserien** `next_hendelse_nr_vakt_<pk>`, tvilling av oppdragstelleren, atomisk,
+  gjenskapt fra data hvis raden mangler, **og i `NOKLER_UTEN_AUDIT` i samme commit** (§6:
+  «nøyaktig fella pasienttelleren gikk i»). Uavhengig av O-serien; nullstilles ikke av
+  vaktarkivet, for hendelsene arkiveres ikke — de følger loggens 730 dager i
+  `slett_utlopte`.
+- **Fem regler i `ko/services.py`:** `opprett_hendelse` (fra en linje: linja *blir stående*
+  og får hendelsen, hendelsen peker tilbake — §4.5), `rediger_hendelse` (`versjon`, 409 ved
+  uenighet — §7.1; ingen systemlinje, `audit/` fører feltendringer), `lukk_hendelse` (**409
+  med antallet** åpne oppdrag, gjennom med `confirm`, og antallet står på linja — §4.6;
+  ferdige oppdrag teller ikke), `gjenapne_hendelse` (logget, `lukket_*` tømt),
+  `knytt_oppdrag` (knytt/flytt/løsne med hver sin setning; lukket hendelse tar ikke imot;
+  annen vakt avvises). Alle skriver en systemlinje **med operatøren frosset som forfatter** —
+  «H12 lukket» uten hvem svarer ikke på det man leser loggen for.
+- **Fire nye systemkoder** i `ko/systemlinjer.py`: `hendelse_opprettet`, `hendelse_lukket`
+  («— med 2 åpne oppdrag» når døra ble åpnet bevisst), `hendelse_gjenapnet` («H12 åpnet
+  igjen»), `oppdrag_knyttet` («O45 knyttet til H12» / «flyttet fra H3 til H12» / «løsnet fra
+  H2»). Ni → tretten.
+- **`O45` i stedet for `#45`**, ett sted: `oppdrag.services.oppdragsnr()` (brukt av
+  `Enhetshendelse.detalj`, bjellevarselet, `__str__`, KO-loggen) og `oppdragsnr()` i
+  `oppdrag-kort.js` (tavla, historikken, detaljtittelen); `oppdrag-enhet.js` har sin egen kopi
+  som de andre hjelperne der. **Hele logghistorikken skiftet form uten en migrasjon** — det
+  er grunnen til at systemlinjer lagres som kode + data, og det var første gang det ble brukt.
+  Eldre `Enhetshendelse.detalj`-rader står med `#`.
+- **Endepunktene** (`ko/urls.py`, 6 → 11): `api/hendelser/ny/`, `<pk>/rediger/`, `<pk>/lukk/`,
+  `<pk>/gjenapne/`, og `api/oppdrag/<pk>/hendelse/` (knytt/løsne). Alle `ko:skriv_full`;
+  **knytting krever `oppdrag:skriv_full` i tillegg**, sjekket i viewet — det skriver på en
+  oppdragsrad, og hvem som får det er oppdragsmodulens sak. **Lesingen har ingen egen
+  poller:** `logg_view` svarer med `hendelser` (hele lista, som `fjernede`) hver gang.
+- **Tavla:** `renderOppdrag()` spør `koGrupperOppdrag()` gjennom en vakt (`typeof … ===
+  'function'`) — på `/oppdrag/` finnes den ikke og lista er flat som før. Regelen: åpne
+  hendelser nyeste først, også uten oppdrag; lukkede bare mens de har rader; «Uten hendelse»
+  sist, og bare når den har rader eller er alene. **Bryteren «Gruppér på hendelse» skjuler
+  ingenting** (§7.2) og huskes i `localStorage`. Raden bærer `H12`-merket på begge sidene.
+  Detaljmodalen har knytt/løsne (`koHendelseValg`), «Nytt oppdrag» får et hendelsesnedtrekk
+  lagt inn av `ko.js` (`koEtterOpprettet` knytter etter opprettelse), loggen har «Hendelse»
+  på hver operatørlinje og en knapp for hendelse uten linje.
+- **Backup:** `ko/backup.py` stripper `Hendelse.lokasjon` (og de to brukerpekerne). Uten det
+  var det en **sirkel** — oppdrag peker på ko, ko på oppdrag — og en sirkel lar seg ikke
+  gjenopprette. Dermed snur rekkefølgen: **`portal → ko → patients → arkiv → oppdrag →
+  oppdrag_arkiv → vaktliste`**. KO er øverste lag i koden og nest først i gjenopprettingen;
+  det er ikke en motsigelse, det er forskjellen på hvem som kjenner hvem og hvem som peker
+  på hvem. `bindinger()` utledet kanten, `avvik()` sa fra, og
+  `GjenopprettingsrekkefolgenIDokumenteneTests` pekte på de fire dokumentene som måtte
+  rettes (`CLAUDE.md`, `RUNBOOK_VAKT.md`, `TEKNISK_DOKUMENTASJON.md` × 2).
+
+### Sett i nettleser
+
+Playwright mot seedet base: `H2 Savnet barn ved inngang nord · 0 oppdrag`, `H1 Slagsmål
+scene sør · Scene · 1 oppdrag · 1 åpne` med «Rediger» og «Lukk», raden `O1 H1 AKUTT Transport
+· 3 pasienter` under, loggen med `O1 opprettet`, `Haugesund 56: Fremme (O1)`. Det som ble
+rettet av å se det: en tom «Uten hendelse · 0 oppdrag» sto som en overskrift over ingenting.
+
+### Vern og mutanter
+
+`ko/tests_hendelser.py` (44 tester: nummerering, opprettelse, redigering, lukking,
+gjenåpning, knytning, opprydding, portene, at loggen bærer hendelsene, at oppdragslista
+bærer hendelsen og ETag-en følger, og at backupen ikke har en sirkel) og `ko/tests_js.py`
+(grupperingsregelen som ren funksjon, nummerformene, **og kallstedet**:
+`TavlaSpoerEtterGrupperingenTests` kjører `renderOppdrag()` med `koGrupperOppdrag` til stede).
+
+**30 mutanter, 29 drept med det samme, én overlevde og ble drept etter at testen ble
+strammet.** Tjenestelaget (14): lukket-sperra, vaktsjekken og systemlinja i `knytt`;
+`confirm`-kravet, ferdige oppdrag talt med og antallet borte fra linja i `lukk`; systemlinja
+og `lukket_av_navn` i `gjenåpne`; versjonssjekken og tellingen i `rediger`; linja uten
+hendelse og forfatter uten frysing i `opprett`; tellingen i `hendelser_for`; oppryddingen.
+Portene (3): oppdrag-skriv-kravet, 409 uten antall, ukjent lokasjon stille `None`. ETag (1),
+backup-strippingen (1), audit-prefikset (1). JS (10): bryteren ignorert, åpne uten rader
+utelatt, lukkede uten rader tatt med, ukjent hendelse falt ut, eldste først, tittelen
+uescapet, tom uten-gruppe alltid med / borte når alene, **kallstedet til `koGrupperOppdrag`
+fjernet** — og **`${hendelseMerke}` fjernet fra raden, som overlevde**: testen søkte etter
+`hendelse-merke` i hele tavla, og overskriften bærer samme klasse. Den prøver nå raden alene
+(`_oppdragRadHtml`), og mutanten er død. Det er lyveren nr. 1 i `CLAUDE.md` — den traff et
+annet sted enn testen så.
+
+### Dokumentene
+
+`ko/CLAUDE.md` (fem utdaterte avsnitt om «pulje 3/5 kommer» er skrevet om; nytt avsnitt om
+hendelsene og om at kanten snur gjenopprettingen), `oppdrag/CLAUDE.md` (FK-en og `O45`),
+`FORSLAG_KO.md` §10/§11, `CLAUDE.md` (rekkefølgen, «tre ting binder»; 65 497 av 65 500 tegn),
+`TEKNISK_DOKUMENTASJON.md` (148 endepunkter, `/ko/` 11), `RUNBOOK_VAKT.md`. `TODO.md`: pulje
+5-blokka og `O45`-punktet er borte; to nye punkter — linje → hendelse i etterkant som del av
+pulje 6, og et lite skjema i stedet for `prompt()` når noen har brukt den på en vakt.
+
+**Ryddet i forbifarten:** `ko/views.py` hadde et dødt `ressurser_view` igjen fra pulje 3 —
+uten rute, og det kalte `services.ressursbildet`, som ikke finnes. Borte.
+
+**Suiten:** fire tester forventet `#`-formen (`ko/tests_logg`, `oppdrag/tests_runde_c`,
+`tests_runde_d`, `tests_xss`) og er rettet til `O`. Den siste gjemte seg bak
+`TypeError: cannot pickle 'traceback' object` fra `--parallel` — feilmeldingen som ikke
+ligner det den er (`CLAUDE.md`, «Commands»). Åtte node-harnesser fikk `_oppdragRadHtml`,
+`oppdragsnr` og `hendelsesnr` klippet med. 2 811 + 757 tester grønne.
+
+---
+
 ## 2026-09-18 — `/ko/` lastet aldri `oppdrag.css`: derfor så ikke lista ut som i `/oppdrag/`  `#ko/sentralbordet` `#oppdrag/sentralbord`
 
 **Symptomet:** ressursoversikten og oppdragslista i `/ko/` var «ikke lik den i /oppdrag» —

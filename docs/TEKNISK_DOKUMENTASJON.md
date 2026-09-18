@@ -445,7 +445,7 @@ deploy 2. Begge deler er rettet, men **strukturen er endret med vilje**: se 5.0.
 
 ### 5.0 Hva dette kapittelet er, og ikke er
 
-Portalen har **143 endepunkter** (utenom Django-admin, som bare rutes under `DEBUG`).
+Portalen har **148 endepunkter** (utenom Django-admin, som bare rutes under `DEBUG`).
 En håndskrevet liste over alle sammen ville rotnet fra dagen den ble skrevet — nøyaktig
 slik den gamle lista gjorde, med 16 oppføringer og ingen som merket at resten manglet.
 
@@ -478,7 +478,7 @@ for sti, view in sorted(gaa(get_resolver())):
 | `/portal-admin/` | 21 | `core/urls_admin.py` | Hele adminflaten. Navnerom `portaladmin` |
 | `/accounts/` | 9 | `accounts/urls.py` | Innlogging, MFA, passord |
 | `/statistikk/` | 5 | `statistikk/urls.py` | Full statistikk per kilde |
-| `/ko/` | 6 | `ko/urls.py` | Sida, sidebaren og loggen (les, skriv, rediger, fjern). Ressursene og oppdragene leses fra `/oppdrag/api/…` — se §7 i KO-notatet |
+| `/ko/` | 11 | `ko/urls.py` | Sida, sidebaren, loggen (les, skriv, rediger, fjern) og hendelsene (ny, rediger, lukk, gjenåpne, knytt oppdrag). Ressursene og oppdragene leses fra `/oppdrag/api/…` — se §7 i KO-notatet |
 | `/backlog/` | 9 | `backlog/urls.py` | Endringsønsker og bugs: lista med filtre, innmelding, kommentartråd, løst/gjenåpne, og typene i «Backloginnstillinger» |
 | `/varsler/`, `/api/`, rot | 13 | `core/urls.py` | Dashbord, varsler (3 sider + 4 API), «min profil», manifest, `robots.txt`, `/healthz/` og videresendingen fra `/api/` |
 
@@ -933,10 +933,11 @@ Ni handlere i registeret:
 | `backlog` | `backlog/backup.py` | Innspill. Eneste modulfil uten plass i rekkefølgen |
 | `full` | `core/backup/full.py` | **Hele databasen** unntatt sesjoner, contenttypes, rettighetsrader, Django-admins logg og backup-metadata |
 
-Gjenoppretting i tom base går i rekkefølge — **portal → patients → arkiv → oppdrag →
-oppdrag_arkiv → vaktliste → ko**. Tas ikke `portal` først, feiler de andre med
+Gjenoppretting i tom base går i rekkefølge — **portal → ko → patients → arkiv → oppdrag →
+oppdrag_arkiv → vaktliste**. Tas ikke `portal` først, feiler de andre med
 «Key (vakt_id)=(1) is not present in table core_vakt», fordi alt utenom `backlog` peker på
-vakta med et heltall.
+vakta med et heltall. `ko` står nest først av samme grunn: `oppdrag.Oppdrag.hendelse` peker
+på `ko.Hendelse` (KO pulje 5), og hendelsene må finnes før oppdragene lastes.
 
 **Men vakta er ikke den eneste bindingen, og det sto ikke skrevet noe sted før 17. sep.
 2026.** `vaktliste.Ressurs.enhet` peker på `oppdrag.Enhet` — også et heltall, siden `Enhet`
@@ -1926,7 +1927,7 @@ men **en regel om kodebasen**. De feiler når noen bryter en beslutning uten å 
 | `DataOgSkjemaISammeTransaksjonTests` | En migrasjon som skriver rader og så endrer skjema må tømme PostgreSQLs triggerkø |
 | `SlettelistaDekkerDumpenTests` | Hver modell som dumpes i en backup må også tømmes ved gjenoppretting |
 | `SignalerFyrerIkkeUnderLoaddataTests` | Hvert lagringssignal har `@ikke_under_loaddata`. Leter i **alle** `*/signals.py`, ikke en håndskrevet liste |
-| `AlleFileneGjenopprettesTests` | Rekkefølgen portal → patients → arkiv → oppdrag → oppdrag_arkiv → vaktliste → ko virker i en tom base, og kantene den bygger på utledes av modellene |
+| `AlleFileneGjenopprettesTests` | Rekkefølgen portal → ko → patients → arkiv → oppdrag → oppdrag_arkiv → vaktliste virker i en tom base, og kantene den bygger på utledes av modellene |
 | `ArkivSignaturLaastTests` | Arkivsignaturene er låst til literale hex-verdier. Feiler de etter en refaktorering, er det refaktoreringen som er feil |
 | `JsModulLastingTests` | Ingen side kaller en funksjon fra en modul den ikke laster |
 | `MorkTekstPaaMorkBakgrunnTests` | Hver Bootstrap-klasse for dempet tekst er overstyrt der malen kan se den |

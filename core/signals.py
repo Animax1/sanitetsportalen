@@ -68,6 +68,7 @@ VAKT_TABELL = 'core_vakt'
 NOKLER_UTEN_AUDIT = (
     'next_patient_nr_vakt_',    # teller, én skriving per pasient
     'next_oppdrag_nr_vakt_',    # teller, én skriving per oppdrag
+    'next_hendelse_nr_vakt_',   # teller, én skriving per KO-hendelse
     'cron.',                    # jobbstatus; vises bedre på server-status
 )
 

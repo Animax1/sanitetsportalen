@@ -39,12 +39,13 @@ class TrengerRessursTests(FlereEnheterBasis):
         h = Enhetshendelse.objects.get(oppdrag=forste)
         self.assertEqual(h.type, Enhetshendelse.RYKKET_VIDERE)
         self.assertEqual(h.enhet, self.a)
-        self.assertEqual(h.detalj, f'#{andre.oppdragsnummer}')
+        # `O2`, ikke `#2` (KO pulje 5, §6): formen bor i `services.oppdragsnr`.
+        self.assertEqual(h.detalj, f'O{andre.oppdragsnummer}')
         c = _klient(_bruker('sentral_c', 'skriv_full'))
         d = c.get(f'/oppdrag/api/oppdrag/{forste.pk}/').json()['data']
         self.assertTrue(d['trenger_ressurs'])
         self.assertEqual(d['enhetshendelser'][0]['type'], 'rykket_videre')
-        self.assertEqual(d['enhetshendelser'][0]['detalj'], f'#{andre.oppdragsnummer}')
+        self.assertEqual(d['enhetshendelser'][0]['detalj'], f'O{andre.oppdragsnummer}')
         self.assertTrue(d['kan_slettes'], 'sentralbordet kan stryke et oppdrag som venter på ressurs')
 
     def test_en_ny_enhet_tar_over_og_flagget_nullstilles(self):

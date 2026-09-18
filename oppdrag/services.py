@@ -105,6 +105,20 @@ def _nummer_nokkel(vakt) -> str:
     return f'next_oppdrag_nr_vakt_{vakt.pk}'
 
 
+def oppdragsnr(nummer) -> str:
+    """`O45` — oppdragsnummeret slik det skrives der plassen er trang (§6 i
+    KO-notatet). Var `#45` til 18. sep. 2026; byttet samtidig som hendelsene
+    fikk `H12`, fordi `#45` og `H12` på nabolinjer i KO-loggen ikke er
+    utvetydige — og det er i loggen de møtes.
+
+    **Formen står ett sted.** Alt som skriver nummeret som tekst kaller hit —
+    `Enhetshendelse.detalj`, bjellevarselet, `__str__` og KO-loggens
+    systemlinjer — og `oppdragsnr()` i `static/js/oppdrag-kort.js` er den
+    samme regelen på klientsida.
+    """
+    return f'O{nummer}'
+
+
 def neste_oppdragsnummer(vakt) -> int:
     """Hent og inkrementer neste oppdragsnummer for vakta, atomisk.
 
@@ -572,7 +586,7 @@ def start_oppdrag(oppdrag, *, bruker=None, tidspunkt=None,
                     tidspunkt=naa, automatisk=True, enhet=rad.enhet)
         Enhetshendelse.objects.create(
             oppdrag=forrige, enhet=rad.enhet, type=Enhetshendelse.RYKKET_VIDERE,
-            tidspunkt=naa, av=bruker, detalj=f'#{oppdrag.oppdragsnummer}')
+            tidspunkt=naa, av=bruker, detalj=oppdragsnr(oppdrag.oppdragsnummer))
 
     les_bjellevarselet(oppdrag, rad)
     return sett_status(oppdrag, choices.RYKKER_UT, bruker=bruker,
@@ -1004,7 +1018,7 @@ def varsle_bjelle(oppdrag, rad) -> None:
                 bruker,
                 module_slug='oppdrag',
                 kind=bjellenokkel(oppdrag),
-                title=f'Oppdrag #{oppdrag.oppdragsnummer}',
+                title=f'Oppdrag {oppdragsnr(oppdrag.oppdragsnummer)}',
                 message=f'{oppdrag.hastegrad} · {timezone.localtime(rad.varslet_at).strftime("%H:%M")}',
                 url='/oppdrag/',
             )

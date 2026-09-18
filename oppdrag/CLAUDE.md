@@ -210,8 +210,8 @@ enhetsliste, oppdragsliste, tidslinje, lokasjonsadmin. `oppstart()` tegner liste
 hva første henting ga (`LASTEFEIL` til den lykkes), og pollingen settes i `finally`. Uten
 det ble en tom side stående etter én feilet henting, og den så ut som en vakt uten enheter.
 
-> Filene **flytter til KO i pulje 5** (`docs/FORSLAG_KO.md` §10) — en flytting, ikke en
-> kopi. Tuplene i `patients/js_test_utils.py` og `<script>`-rekkefølgen i malen følger med.
+> Filene kjører i `/ko/` fra pulje 4 og er fortsatt oppdragsmodulens (`docs/FORSLAG_KO.md`
+> §10). Sentralbordet i `/oppdrag/` slås av først etter en ekte vakt — se `TODO.md`.
 
 **`oppdrag-enhet.js`** — enhetsskjermen. Fire ting den gjør, og hver av dem har en grunn:
 
@@ -272,3 +272,10 @@ ikke i den ene malen; ellers virker den bare på én av sidene.
 
 `/oppdrag/` er uendret i denne puljen — verifisert ved å sammenligne svaret fra ti endepunkter
 før og etter, ikke ved å lese diffen.
+
+**KO pulje 5 rører modulen to steder** (18. sep. 2026). `Oppdrag.hendelse` er en nullbar FK
+til `'ko.Hendelse'` — strengreferanse, ingen import, og **skrives bare av
+`ko.services.knytt_oppdrag`**; her leses den i `oppdrag_til_dict` (`hendelse_id`, `_nummer`,
+`_tittel`) og står i ETag-en. Og nummeret skrives **`O45`**, ikke `#45`: formen bor i
+`services.oppdragsnr()` og `oppdragsnr()` i `oppdrag-kort.js` (enhetsskjermen har egen kopi),
+og `Enhetshendelse.detalj` og bjellevarselet bruker den. Eldre `detalj`-rader står med `#`.

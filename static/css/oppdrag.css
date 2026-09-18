@@ -430,6 +430,40 @@
   flex: 0 0 auto;
 }
 
+/* Hendelsene (KO pulje 5, 18. sep. 2026). Merket «H12» står på oppdragsraden på
+   begge sidene — visningen bærer relasjonen (§6 i KO-notatet) — og
+   gruppeoverskriften bare i /ko/. Overskriften ligger her og ikke i ko.css:
+   ko.css er ren layout uten fargevariabler (se fila), og dette er en farget
+   regel. Formen er hastegradsmerkets, i en nøytral farge: det er en adresse,
+   ikke en alarm. */
+.hendelse-merke {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  padding: 0.1rem 0.45rem;
+  border-radius: 4px;
+  background: var(--surface-2);
+  border: 1px solid var(--border-color);
+  color: var(--text-main);
+  flex: 0 0 auto;
+}
+
+.hendelse-hode {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  padding: 0.4rem 0.9rem;
+  margin: 0.9rem 0 0.4rem;
+  border-bottom: 1px solid var(--border-color);
+}
+.hendelse-hode:first-child { margin-top: 0; }
+.hendelse-tittel { font-weight: 600; color: var(--text-main); }
+.hendelse-hode-lukket .hendelse-tittel,
+.hendelse-hode-uten .hendelse-tittel { color: var(--text-muted); font-weight: 500; }
+/* Radene under en overskrift får samme avstand som mellom rader ellers. */
+.hendelse-hode + .oppdrag-rad { margin-top: 0; }
+
 /* «Rett tid» i tidslinjen. Dempet: rettingen er en sjelden handling, og
  * knappen skal ikke konkurrere med klokkeslettet den står ved siden av. */
 .tidslinje-rett {

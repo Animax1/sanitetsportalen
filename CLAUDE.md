@@ -441,14 +441,14 @@ siden av. Hver modul registrerer en `BaseBackupHandler` i `core.backup`-register
 | `backlog` | `backlog/backup.py` | Innspill (bugs og ønsker). **Eneste modulfil uten plass i rekkefølgen** — den peker ikke på en vakt |
 | `full` | `core/backup/full.py` | **Hele databasen** unntatt sesjoner, contenttypes, permissions og backup-metadata. Brukere, MFA og logg er med. Eget prefiks og egen frist offsite |
 
-Gjenoppretting i tom base går i rekkefølge: **portal → patients → arkiv →
-oppdrag → oppdrag_arkiv → vaktliste → ko**, eller `full` alene. **Fasiten er
+Gjenoppretting i tom base går i rekkefølge: **portal → ko → patients → arkiv →
+oppdrag → oppdrag_arkiv → vaktliste**, eller `full` alene. **Fasiten er
 `core.backup.GJENOPPRETTINGSREKKEFOLGE`, ikke denne setningen** — den sto
 skrevet ut fire steder, og da `ko` kom ble tre av dem stående uten den.
-**To ting binder, ikke én:** alt utenom `backlog` peker på vakta med et
-heltall, *og* `vaktliste.Ressurs.enhet` peker på `oppdrag.Enhet`. Den som
-stokker om på bare den første grunnen legger `vaktliste` rett etter `portal` —
-lovlig etter teksten, og en `IntegrityError` i praksis.
+**Tre ting binder, ikke én:** alt utenom `backlog` peker på vakta med et
+heltall, `vaktliste.Ressurs.enhet` peker på `oppdrag.Enhet`, *og*
+`oppdrag.Oppdrag.hendelse` peker på `ko.Hendelse` — derfor står KO nest først.
+Den som stokker om på bare den første grunnen får en `IntegrityError`.
 `AlleFileneGjenopprettesTests` håndhever både rekkefølgen og at kantene
 utledes av modellene og ikke gjentas for hånd.
 
@@ -692,7 +692,7 @@ virkningsløs endring, ikke som en feil:
 | `static/css/statistikk.css` | **kun** `templates/statistikk/index.html` | definerer selv de fire `base_portal` mangler |
 | `static/css/vaktliste.css` | **kun** `templates/vaktliste/index.html` | samme |
 | `static/css/oppdrag.css` | begge `/oppdrag/`-malene **og** `templates/ko/index.html` — sentralbordets kort | samme |
-| `static/css/ko.css` | **kun** `templates/ko/index.html`, **etter** `oppdrag.css` | **ingen**, se fila |
+| `static/css/ko.css` | **kun** `templates/ko/index.html`, **etter** `oppdrag.css` | ingen, se fila |
 
 **Regelen gjelder et ark som *bruker* dem** — `ko.css` er ren layout; kommer en farget regel
 dit, går de fire inn i samme commit.
