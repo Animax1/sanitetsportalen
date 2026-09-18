@@ -80,6 +80,8 @@ TEMAER: dict[str, dict[str, str]] = {
         'loggen': 'logglinjer, retting, sletteinngangen, systemhendelsene som løftes inn',
         'ressursbildet': 'tavla: projeksjonen av vaktliste + oppdrag + KO-ført status',
         'sentralbordet': 'sentralbordet flyttet inn i /ko/, delingen og gatene',
+        'hendelseslogg': 'hendelsesloggen som egen flate: prioritet, bli med, ressursbehov, festing, lagsressurser',
+        'oppsett': '2×2-rutenettet: bytte plass, skillelinjer, oppsettet i localStorage',
     },
     'oppdrag': {
         'enhetsskjerm': 'bilens side, offline-køen, lydvarselet',

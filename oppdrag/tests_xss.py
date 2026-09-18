@@ -131,6 +131,9 @@ REVIEWED_INTERPOLATIONS = {
     # De er hoistet ut av mal-strengen nettopp for at denne testen skal kunne
     # lese dem: en nøstet mal-streng inne i en ${...} er usynlig for regexen.
     'fritekstBlokk': 'markup bygget lokalt, fritekst escapet inni',
+    # KO 18. sep. 2026: lagene på hendelsen og prioritetsikonet på H-merket.
+    'lagBlokk': 'markup bygget lokalt, lagsressursene escapet inni',
+    'prioIkon': 'fast ikonmarkup fra en ternær, ingen data i',
     'notatBlokk': 'markup bygget lokalt, notatene escapet inni',
     'knapp': 'markup bygget lokalt, id escapet inni',
     # Besetningspanelet (vaktliste fase 6). Alle tre er hoistet ut av

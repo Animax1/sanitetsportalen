@@ -34,13 +34,14 @@ from django.conf import settings
 from core import maltekst
 from django.test import SimpleTestCase
 
-from patients.js_test_utils import OPPDRAG_SENTRAL_JS, VAKTLISTE_JS
+from patients.js_test_utils import KO_JS, OPPDRAG_SENTRAL_JS, VAKTLISTE_JS
 
 #: (konstant, malen som laster dem). Rekkefølgen i konstanten er
 #: lasterekkefølgen, og malen må si det samme.
 SIDER = [
     (VAKTLISTE_JS, 'templates/vaktliste/index.html'),
     (OPPDRAG_SENTRAL_JS, 'templates/oppdrag/sentral.html'),
+    (KO_JS, 'templates/ko/index.html'),
 ]
 
 FUNKSJON = re.compile(r'^(?:async\s+)?function\s+(\w+)', re.M)

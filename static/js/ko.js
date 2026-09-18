@@ -1,14 +1,9 @@
 // ════════════════════════════════════════════════════════════════════════════
-// KO — situasjonsbildet. Denne fila eier **loggen**, **hendelsene** (pulje
-// 5), sidebaren og konsollhøyden. Listene eies av oppdrag-sentral-*.js
-// (pulje 4); grupperingen av oppdragslista på hendelse eies her, og
-// `renderOppdrag()` spør etter den gjennom `koGrupperOppdrag()`.
-//
-// Lastes kun av /ko/. Fortsatt **én fil**: 1 800-linjersgrensa i
-// core/tests_js_splitt.py gjelder de delte modulene, og denne er langt under
-// den. Deles den en dag, er regelen at alt som *kjører* på toppnivå står i den
-// siste fila — derfor ligger den ene `DOMContentLoaded`-kroken nederst her
-// allerede, som i de delte modulene.
+// ko.js — loggstrømmen, sidebaren, ansvarsmerket, vaktlistas ressurser, og
+// **den ene `DOMContentLoaded`-kroken**. Siste av KOs tre filer (`KO_JS` i
+// patients/js_test_utils.py): rutenettet bor i ko-layout.js, hendelsene i
+// ko-hendelser.js, og alt som *kjører* på toppnivå står nederst her
+// (CLAUDE.md). Listene eies av oppdrag-sentral-*.js (pulje 4).
 //
 // Krever portal-utils.js (apiFetch, escapeHtml, data-action-delegeringen).
 // ════════════════════════════════════════════════════════════════════════════
@@ -24,8 +19,7 @@ const KO_TILSTEDE_MS = 30000;
 // de lange fraværene kolonnen finnes for.
 const KO_AKTIV_GRENSE_S = 120;
 
-// Nedtrekket er lukket når sida lastes. Var `true` i pulje 1, da lista var en
-// egen kolonne som sto åpen.
+// Nedtrekket er lukket når sida lastes.
 let koSidebarSynlig = false;
 
 // **Regelen, ikke formateringen.** Egen funksjon fordi den avgjør noe: hva
@@ -94,11 +88,7 @@ async function koHentTilstede() {
 // Knappen har derfor `data-bs-toggle="dropdown"` og **ingen** `data-action`:
 // begge lytterne ville fyrt på samme klikk, og det er fella `klikkSkalKjore()`
 // i portal-utils.js finnes for. Bootstrap eier åpningen; vi eier bare hva som
-// hentes når den er åpen.
-//
-// Sparingen fra pulje 1 står: ingen polling av en liste ingen ser på. Den er
-// bare snudd — før var lista synlig som standard og kunne slås av, nå er den
-// lukket og hentes når den åpnes.
+// hentes når den er åpen. Ingen polling av en liste ingen ser på.
 function koSidebarLyttere() {
   const nedtrekk = document.getElementById('ko-sidebar-knapp');
   if (!nedtrekk) return;
@@ -110,59 +100,25 @@ function koSidebarLyttere() {
   rot.addEventListener('hide.bs.dropdown', () => { koSidebarSynlig = false; });
 }
 
-// ── Konsollhøyden ───────────────────────────────────────────────────────────
-//
-// **Sida skal ikke rulle — kolonnene skal.** Det er forskjellen på en konsoll
-// og en nettside: de tre flatene står på samme sted hele vakta, uansett hvor
-// mye som er i dem. Rulles sida, flytter skrivefeltet seg idet tavla får en rad
-// til, og operatøren treffer feil felt midt i sambandstrafikk.
-//
-// Høyden **måles**, den regnes ikke ut av en `calc()` med et fast tall: over
-// konsollen står portalheaderen, navigasjonen og eventuelle meldinger, og alle
-// tre kan brekke til to linjer på en smal skjerm. Et fast tall ville vært
-// riktig på én skjerm og galt på alle andre.
-
-// Luft under konsollen, så footeren ikke klistrer seg inntil.
-const KO_BUNNMARG = 16;
-
-// **Gulvet er en regel, ikke en forsiktighetsmargin.** Uten det gir et kort
-// vindu — eller en header som brakk i tre linjer — en konsoll på nitti piksler,
-// og da er alle tre kolonnene ubrukelige samtidig. Da er det bedre at sida
-// ruller: det ser rart ut, men alt er lesbart.
-const KO_MIN_HOYDE = 360;
-
-function koKonsollhoyde(toppOffset, vindushoyde) {
-  return Math.max(vindushoyde - toppOffset - KO_BUNNMARG, KO_MIN_HOYDE);
-}
-
-function koSettKonsollhoyde() {
-  const konsoll = document.querySelector('.ko-konsoll');
-  if (!konsoll) return;
-  const topp = konsoll.getBoundingClientRect().top;
-  konsoll.style.setProperty(
-    '--ko-hoyde', koKonsollhoyde(topp, window.innerHeight) + 'px');
-}
-
 
 // ════════════════════════════════════════════════════════════════════════════
-// LOGGEN (pulje 2) — docs/FORSLAG_KO.md §4
+// LOGGSTRØMMEN (pulje 2, form fra 18. sep. 2026) — docs/FORSLAG_KO.md §4
 //
-// Én strøm med alle linjer: menneskeskrevne og de systemhendelsene som løftes
-// inn (ko/systemlinjer.py). Den skal være **fullstendig og kjedelig** — den
-// eneste fella er å begynne å skjule ting i loggen for å gjøre den ryddig, for
-// da er den ikke lenger fasit.
+// Én tabell med alle linjer; **strømmen viser dem som ikke hører til en
+// hendelse**, pluss systemlinjene om hendelsene selv (opprettet, prioritet,
+// lukket) med H-merket. Kommentarene *inne* i en hendelse står i hendelsen —
+// ellers ble strømmen dobbelt så lang under en stor hendelse. Utskriften skal
+// ha alt, kronologisk (TODO.md). Festede linjer står øverst i egen boks.
 // ════════════════════════════════════════════════════════════════════════════
 
 // 15 sekunder. Loggen er det eneste på sida som endrer seg i sekunder: to
 // operatører fører samtidig, og en linje som kommer et halvt minutt for sent
-// er en linje man rekker å skrive på nytt. Bremsen er 240/m, altså to
-// størrelsesordener over dette.
+// er en linje man rekker å skrive på nytt. Bremsen er 240/m.
 const KO_LOGG_MS = 15000;
 
 // **`?siden=<id>` og ikke full henting** (§7.1). Arbeidet i KO er påføringer,
 // og polling skalerer fint så lenge nesten alt er nye rader. WebSockets er
-// bevisst ikke tatt i bruk: et stort infrahopp på Railway med synkron Django,
-// uten en gevinst som forsvarer det.
+// bevisst ikke tatt i bruk.
 let koSisteId = 0;
 
 // Linjene vi har tegnet, nøklet på `rot` — kjedens første ledd. **Ikke på
@@ -170,27 +126,25 @@ let koSisteId = 0;
 // den gamle plassen, ikke legge seg nederst. Serveren sorterer på det samme.
 let koLinjer = new Map();
 
+// Bryteren «System» i loggstrømmens hode.
+let koVisSystem = true;
+
 // **Returnerer en boolsk verdi, ikke det siste leddet i en `||`-kjede.**
 // `t.admin` er `undefined` når nøkkelen mangler, og en avgjørelsesfunksjon som
-// svarer «undefined» på «har hun lov?» er en funksjon man ikke kan stole på i
-// en `=== false` eller i en test. Falsy holdt i praksis; det er ikke det samme
-// som å være riktig.
+// svarer «undefined» på «har hun lov?» er en funksjon man ikke kan stole på.
 function koKanSkrive() {
   const t = window.MODUL_TILGANG || {};
   return Boolean(t.ko === 'skriv_full' || t.ko === 'skriv_leder' || t.admin);
 }
 
 // **Fjerning er `skriv_leder`, og knappen tegnes deretter.** Grensesnittet
-// gater på `window.MODUL_TILGANG` og ikke på rollen (CLAUDE.md) — en knapp som
-// fører til 403 er verre enn ingen knapp.
+// gater på `window.MODUL_TILGANG` og ikke på rollen (CLAUDE.md).
 function koKanFjerne() {
   const t = window.MODUL_TILGANG || {};
   return Boolean(t.ko === 'skriv_leder' || t.admin);
 }
 
 // Regelen, ikke formateringen: hva linja *påstår* om sin egen opprinnelse.
-// Egen funksjon fordi den avgjør noe — se `klikkSkalKjore()` i portal-utils.js
-// for hvorfor slike regler skilles ut.
 function koLinjeMerke(linje) {
   if (linje.fjernet) return 'fjernet';
   // Hendelseslinjene skal vises **tydelig som hendelse** (André, 18. sep.
@@ -200,6 +154,16 @@ function koLinjeMerke(linje) {
   if (linje.uformell) return 'chat';
   if (linje.delt_konto) return 'delt';
   return '';
+}
+
+// **Hører linja hjemme i strømmen?** Regelen for hva vinduet viser, skilt ut
+// fordi den avgjør noe: kommentarer i en hendelse står i hendelsen, mens
+// systemlinjene om hendelsen (opprettet, lukket, prioritet, knyttet) står i
+// strømmen med H-merket — de er situasjonen, og skal sees uten å åpne noe.
+function koIStrommen(linje) {
+  if (linje.hendelse_id && linje.kilde !== 'system') return false;
+  if (!koVisSystem && linje.kilde === 'system' && koLinjeMerke(linje) !== 'hendelse') return false;
+  return true;
 }
 
 function koKlokke(iso) {
@@ -224,72 +188,90 @@ function koLinjeTekst(linje) {
 function koLinjeKnapper(linje) {
   if (linje.kilde === 'system' || linje.fjernet) return '';
   let ut = '';
+  const id = escapeHtml(linje.id);
   if (koKanSkrive()) {
+    // Festing (18. sep. 2026): én knapp, som bytter mellom fest og løsne.
+    ut += linje.festet_at
+      ? '<button type="button" class="btn btn-link btn-sm p-0" title="Løsne"'
+        + ' data-action="koLosne" data-id="' + id + '"><i class="bi bi-pin-angle-fill"></i></button>'
+      : '<button type="button" class="btn btn-link btn-sm p-0" title="Fest øverst"'
+        + ' data-action="koFest" data-id="' + id + '"><i class="bi bi-pin-angle"></i></button>';
     // «Hendelse» lager en hendelse *av* linja (§4.5): linja blir stående, og
     // hendelsen peker tilbake. Vises ikke når linja alt hører til en.
     if (!linje.hendelse_id) {
-      ut += '<button type="button" class="btn btn-link btn-sm p-0 me-2"'
-        + ' data-action="koHendelseFraLinje" data-id="' + escapeHtml(linje.id) + '">Hendelse</button>';
+      ut += '<button type="button" class="btn btn-link btn-sm p-0" title="Lag hendelse av linja"'
+        + ' data-action="koHendelseFraLinje" data-id="' + id + '"><i class="bi bi-flag"></i></button>';
     }
-    ut += '<button type="button" class="btn btn-link btn-sm p-0 me-2"'
-      + ' data-action="koRett" data-id="' + escapeHtml(linje.id) + '">Rediger</button>';
+    ut += '<button type="button" class="btn btn-link btn-sm p-0" title="Rediger"'
+      + ' data-action="koRett" data-id="' + id + '"><i class="bi bi-pencil"></i></button>';
   }
   if (koKanFjerne()) {
-    ut += '<button type="button" class="btn btn-link btn-sm p-0 text-danger"'
-      + ' data-action="koFjern" data-id="' + escapeHtml(linje.id) + '">Fjern</button>';
+    ut += '<button type="button" class="btn btn-link btn-sm p-0 text-danger" title="Fjern innholdet"'
+      + ' data-action="koFjern" data-id="' + id + '"><i class="bi bi-trash"></i></button>';
   }
   return ut;
 }
 
 function koLinjeHtml(linje) {
   const merke = koLinjeMerke(linje);
-  // Hendelsesmerket er blått og linja uthevet; chat er dempet. Resten grått.
-  const merkeKlasse = merke === 'hendelse' ? 'text-bg-primary' : 'text-bg-secondary';
-  const merkeHtml = merke
-    ? ' <span class="badge ' + merkeKlasse + '">' + escapeHtml(merke) + '</span>'
-    : '';
-  const linjeKlasse = merke === 'hendelse' ? ' ko-linje-hendelse'
-    : (merke === 'chat' ? ' ko-linje-chat' : '');
-  // «H12» på linja (§4.1): hendelsen som filter, uten å skjule noe.
+  const system = linje.kilde === 'system';
+  const klasse = 'ls-linje' + (system ? ' ls-system' : '')
+    + (merke === 'hendelse' ? ' ls-hendelse' : '') + (merke === 'chat' ? ' ls-chat' : '');
+  // «H12» på linja (§4.1): hendelsen som adresse, uten å skjule noe. Klikk
+  // åpner hendelsen.
   const hendelseHtml = linje.hendelse_nummer
-    ? ' <span class="hendelse-merke">' + escapeHtml(hendelsesnr(linje.hendelse_nummer)) + '</span>'
+    ? '<span class="hendelse-merke me-1" role="button" data-action="koApneHendelse"'
+      + ' data-id="' + escapeHtml(linje.hendelse_id) + '">' + escapeHtml(hendelsesnr(linje.hendelse_nummer)) + '</span>'
     : '';
-  const rettet = linje.korrigerer
-    ? ' <span class="text-muted small">(rettet)</span>'
-    : '';
-  const omraade = linje.ansvarsomraade
-    ? ' <span class="text-muted small">· ' + escapeHtml(linje.ansvarsomraade) + '</span>'
-    : '';
+  const rettet = linje.korrigerer ? ' <span class="text-muted small">(rettet)</span>' : '';
+  const merkeHtml = (merke === 'chat' || merke === 'delt')
+    ? ' <span class="badge text-bg-secondary">' + escapeHtml(merke) + '</span>' : '';
   // Systemlinjer har ingen forfatter — de skjedde. **Hendelseslinjene har**:
   // «H12 lukket» er en handling, og operatøren står frosset på linja.
   const hvem = linje.forfatter
-    ? escapeHtml(linje.forfatter)
-    : '<span class="text-muted">system</span>';
-  return '<li class="list-group-item py-2' + linjeKlasse + '" data-rot="' + escapeHtml(linje.rot) + '">'
-    + '<div class="d-flex justify-content-between align-items-start gap-2">'
-    + '<div><span class="fw-semibold me-2">' + escapeHtml(koKlokke(linje.tidspunkt))
-    + '</span>' + hendelseHtml + koLinjeTekst(linje) + rettet + '</div>'
-    + '<div class="text-nowrap small">' + koLinjeKnapper(linje) + '</div>'
-    + '</div>'
-    + '<div class="small text-muted">' + hvem + merkeHtml + omraade + '</div>'
-    + '</li>';
+    ? escapeHtml(linje.forfatter) + (linje.ansvarsomraade ? ' · ' + escapeHtml(linje.ansvarsomraade) : '')
+    : 'system';
+  return '<div class="' + klasse + '" data-rot="' + escapeHtml(linje.rot) + '">'
+    + '<span class="tid">' + escapeHtml(koKlokke(linje.tidspunkt)) + '</span>'
+    + '<span class="tekst">' + hendelseHtml + koLinjeTekst(linje) + rettet + merkeHtml + '</span>'
+    + '<span class="verktoy"><span class="hvem">' + hvem + '</span> ' + koLinjeKnapper(linje) + '</span>'
+    + '</div>';
+}
+
+// En festet linje i boksen øverst: teksten, hvem som skrev den, og løsne.
+function koFestetHtml(linje) {
+  const losne = koKanSkrive()
+    ? '<button type="button" class="btn btn-link btn-sm p-0 ms-auto text-muted" title="Løsne"'
+      + ' data-action="koLosne" data-id="' + escapeHtml(linje.id) + '"><i class="bi bi-x-lg"></i></button>'
+    : '';
+  return '<div class="ls-festet"><i class="bi bi-pin-angle-fill"></i>'
+    + '<div>' + koLinjeTekst(linje) + ' <span class="hvem text-muted small">— '
+    + escapeHtml(linje.forfatter || '') + ' ' + escapeHtml(koKlokke(linje.tidspunkt)) + '</span></div>'
+    + losne + '</div>';
 }
 
 function koTegnLogg() {
   const boks = document.getElementById('ko-logg-liste');
   if (!boks) return;
-  const rader = Array.from(koLinjer.values());
-  // Samme sortering som serveren: kjedens første ledd, så id. Klienten kan få
-  // linjer i to omganger, og rekkefølgen skal ikke avhenge av når de kom.
-  rader.sort((a, b) => (a.rot - b.rot) || (a.id - b.id));
+  const alle = Array.from(koLinjer.values());
+  // Samme sortering som serveren: kjedens første ledd, så id — **nyeste
+  // øverst** i strømmen, så det siste som skjedde står nærmest øyet uten å
+  // rulle (skisse 6).
+  const rader = alle.filter(koIStrommen).sort((a, b) => (b.rot - a.rot) || (b.id - a.id));
+  const festede = alle.filter((l) => l.festet_at && !l.fjernet)
+    .sort((a, b) => String(a.festet_at).localeCompare(String(b.festet_at)));
   const antall = document.getElementById('ko-logg-antall');
-  if (antall) antall.textContent = rader.length + ' linjer';
-  if (rader.length === 0) {
-    boks.innerHTML = '<p class="text-muted small p-3 mb-0">Ingen linjer ennå.</p>';
+  if (antall) antall.textContent = '· ' + String(rader.length) + ' linjer';
+  if (rader.length === 0 && festede.length === 0) {
+    boks.innerHTML = '<p class="text-muted small p-2 mb-0">Ingen linjer ennå.</p>';
     return;
   }
-  boks.innerHTML = '<ul class="list-group list-group-flush">'
-    + rader.map(koLinjeHtml).join('') + '</ul>';
+  const festetHtml = festede.length
+    ? '<div class="ls-festet-hode"><i class="bi bi-pin-angle-fill me-1"></i>Festet</div>'
+      + festede.map(koFestetHtml).join('')
+      + '<div class="ls-festet-hode ls-strom-hode mt-2"><i class="bi bi-clock me-1"></i>Strøm</div>'
+    : '';
+  boks.innerHTML = festetHtml + '<div>' + rader.map(koLinjeHtml).join('') + '</div>';
 }
 
 async function koHentLogg() {
@@ -302,8 +284,6 @@ async function koHentLogg() {
     });
     // **Fjernede linjer kommer aldri gjennom `?siden=`**: sletteinngangen
     // endrer en rad i stedet for å legge til en ny, så den har ingen ny id.
-    // Uten denne løkka ville teksten blitt stående på hver annen operatørs
-    // skjerm til hun lastet siden på nytt.
     (data.fjernede || []).forEach(id => {
       koLinjer.forEach(linje => {
         if (linje.id === id && !linje.fjernet) {
@@ -312,8 +292,15 @@ async function koHentLogg() {
         }
       });
     });
-    const vakt = document.getElementById('ko-logg-vakt');
-    if (vakt && data.vakt) vakt.textContent = '· ' + data.vakt;
+    // Festing endrer heller ikke id-en; lista over festede sendes hel.
+    if (Array.isArray(data.festede)) {
+      const festet = new Map(data.festede.map((f) => [f.id, f]));
+      koLinjer.forEach((linje) => {
+        const f = festet.get(linje.id);
+        linje.festet_at = f ? f.festet_at : '';
+        linje.festet_av = f ? f.festet_av : '';
+      });
+    }
     koTegnLogg();
     // Hendelsene følger med hver poll — hele lista, som `fjernede`: en
     // hendelse som lukkes eller omdøpes har ingen ny id.
@@ -323,7 +310,7 @@ async function koHentLogg() {
     // der er fortsatt sanne. Feilen vises bare når det ikke står noe.
     const boks = document.getElementById('ko-logg-liste');
     if (boks && koLinjer.size === 0) {
-      boks.innerHTML = '<p class="text-muted small p-3 mb-0">Fikk ikke kontakt.</p>';
+      boks.innerHTML = '<p class="text-muted small p-2 mb-0">Fikk ikke kontakt.</p>';
     }
   }
 }
@@ -391,8 +378,7 @@ async function koRett(id) {
   if (!res.ok) {
     koLoggFeil(data.message || 'Rettingen gikk ikke gjennom.');
     // 409 betyr at noen andre rettet den først, og da er det den nye
-    // versjonen som gjelder — hent den før operatøren prøver igjen på et
-    // grunnlag som ikke finnes lenger.
+    // versjonen som gjelder — hent den før operatøren prøver igjen.
     if (res.status === 409) koHentLogg();
     return;
   }
@@ -424,325 +410,36 @@ async function koFjern(id) {
   koHentLogg();
 }
 
+// Fest og løsne (18. sep. 2026). Svaret er linja; den byttes ut på plass.
+async function _koFesting(id, sti) {
+  const res = await apiFetch('/ko/api/logg/' + id + '/' + sti + '/', {
+    method: 'POST', body: JSON.stringify({}),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) { koLoggFeil(data.message || 'Gikk ikke.'); return; }
+  koLinjer.set(data.data.rot, data.data);
+  koTegnLogg();
+}
+
+async function koFest(id) { await _koFesting(id, 'fest'); }
+async function koLosne(id) { await _koFesting(id, 'losne'); }
+
+function koVippSystem() {
+  const b = document.getElementById('ko-vis-system');
+  koVisSystem = !b || b.checked;
+  koTegnLogg();
+}
+
 
 // ════════════════════════════════════════════════════════════════════════════
 // Ressurslista og oppdragslista hentes **ikke herfra** (pulje 4).
-//
 // `/ko/` laster `oppdrag-sentral-*.js`, og de eier begge listene: henting med
-// ETag, tegning, polling og alle handlingene. En egen henter her ville vært en
-// andre poller mot de samme endepunktene, og to pollere som skriver til samme
-// `#enhetsliste` blir uenige før eller siden.
-//
-// Pulje 3 hadde en kort stund `/ko/api/ressurser/` med `ko:les` som gate. Den
-// er borte: oppdragsdata gates av **oppdragsmodulen**, også når sida er KO
-// (André, 18. sep. 2026). Se ko/CLAUDE.md.
+// ETag, tegning, polling og alle handlingene. Se ko/CLAUDE.md.
 // ════════════════════════════════════════════════════════════════════════════
 
 
 // ════════════════════════════════════════════════════════════════════════════
-// HENDELSENE (pulje 5) — docs/FORSLAG_KO.md §3.3, §4.6, §6, §7
-//
-// En hendelse er **en gruppering av oppdragslista og et filter i loggen**,
-// ikke en egen flate. Lista her kommer med logg-pollen; tavla spør etter
-// grupperingen gjennom `koGrupperOppdrag()`, og detaljmodalen etter
-// knytt/løsne gjennom `koHendelseValg()`. Begge kalles fra
-// `oppdrag-sentral-oppdrag.js` gjennom en vakt — den fila kjører også på
-// `/oppdrag/`, der denne ikke finnes.
-// ════════════════════════════════════════════════════════════════════════════
-
-//: Hendelsene i vakta, nøklet på id. Hele lista byttes ut ved hver poll.
-let koHendelser = new Map();
-
-//: Om oppdragslista grupperes på hendelse. Husket per nettleser: det er et
-//: visningsvalg, ikke data — og **det skjuler ingenting** (§7.2): av og på
-//: viser de samme radene, bare med eller uten overskrifter.
-let koGruppert = true;
-const KO_GRUPPERT_NOKKEL = 'ko.gruppert';
-
-function koLesGruppering() {
-  try {
-    const lagret = window.localStorage.getItem(KO_GRUPPERT_NOKKEL);
-    if (lagret !== null) koGruppert = lagret === '1';
-  } catch (e) { /* privat modus e.l. — standardverdien gjelder */ }
-  const bryter = document.getElementById('ko-gruppert');
-  if (bryter) bryter.checked = koGruppert;
-}
-
-function koToggleGruppering() {
-  const bryter = document.getElementById('ko-gruppert');
-  koGruppert = bryter ? bryter.checked : !koGruppert;
-  try { window.localStorage.setItem(KO_GRUPPERT_NOKKEL, koGruppert ? '1' : '0'); } catch (e) { /* som over */ }
-  koTegnOppdragslistaPaaNytt();
-}
-
-function koTegnOppdragslistaPaaNytt() {
-  // Sentralbordet eier lista og tegner den; vi ber om en ny tegning. Vakt
-  // fordi oppdragsflata ikke finnes uten oppdragstilgang (`kan_se_oppdrag`).
-  if (typeof renderOppdrag === 'function') renderOppdrag();
-}
-
-function koTaImotHendelser(liste) {
-  koHendelser = new Map((liste || []).map((h) => [h.id, h]));
-  koTegnOppdragslistaPaaNytt();
-  koFyllHendelsevalg();
-}
-
-function koApneHendelser() {
-  return Array.from(koHendelser.values()).filter((h) => h.status === 'apen');
-}
-
-// **Regelen for grupperingen**, som en ren funksjon over `sortert` — den
-// avgjør hva tavla viser, og prøves i node. `null` når bryteren er av
-// (tavla tegner flatt). Ellers: hver **åpen** hendelse, nyeste først, også
-// den som ennå ikke har et oppdrag — det er nettopp hendelsen som «lever i
-// tjue minutter før en ressurs sendes»; så lukkede hendelser som fortsatt
-// har rader på tavla (ellers ville radene forsvunnet); så «Uten hendelse»,
-// som er de fleste (§7) og derfor står sist og ikke som en bøtte på toppen.
-function koGrupperOppdrag(sortert) {
-  if (!koGruppert) return null;
-  const rader = sortert || [];
-  const perHendelse = new Map();
-  rader.forEach((o) => {
-    const id = o.hendelse_id || null;
-    if (!perHendelse.has(id)) perHendelse.set(id, []);
-    perHendelse.get(id).push(o);
-  });
-  const alle = Array.from(koHendelser.values()).sort((a, b) => b.nummer - a.nummer);
-  const grupper = [];
-  alle.filter((h) => h.status === 'apen').forEach((h) => {
-    grupper.push({ hendelse: h, hode: koHendelseHode(h, perHendelse.get(h.id) || []),
-                   rader: perHendelse.get(h.id) || [] });
-  });
-  alle.filter((h) => h.status !== 'apen' && perHendelse.has(h.id)).forEach((h) => {
-    grupper.push({ hendelse: h, hode: koHendelseHode(h, perHendelse.get(h.id)),
-                   rader: perHendelse.get(h.id) });
-  });
-  // Oppdrag som peker på en hendelse vi ikke har fått ennå (to pollere,
-  // to klokker) skal ikke forsvinne: de går i «Uten hendelse» til neste poll.
-  const kjente = new Set(alle.map((h) => h.id));
-  const uten = rader.filter((o) => !o.hendelse_id || !kjente.has(o.hendelse_id));
-  // En tom «Uten hendelse» skjuler ingenting, og en overskrift over ingenting
-  // er støy — men står den alene, er den lista, og da skal den stå.
-  if (uten.length || !grupper.length) {
-    grupper.push({ hendelse: null, hode: koHendelseHode(null, uten), rader: uten });
-  }
-  return grupper;
-}
-
-function koHendelseHode(h, rader) {
-  const antall = (rader || []).length;
-  const antallTekst = antall === 1 ? '1 oppdrag' : antall + ' oppdrag';
-  if (!h) {
-    return '<div class="hendelse-hode hendelse-hode-uten">'
-      + '<span class="hendelse-tittel">Uten hendelse</span>'
-      + '<span class="oppdrag-meta ms-2">' + escapeHtml(antallTekst) + '</span>'
-      + '</div>';
-  }
-  const lukket = h.status !== 'apen';
-  const sted = h.lokasjon_navn
-    ? '<span class="oppdrag-meta ms-2">· ' + escapeHtml(h.lokasjon_navn) + '</span>' : '';
-  const apne = h.apne_oppdrag
-    ? '<span class="oppdrag-meta ms-2">· ' + escapeHtml(h.apne_oppdrag) + ' åpne</span>' : '';
-  const knapper = koKanSkrive() ? koHendelseKnapper(h) : '';
-  return '<div class="hendelse-hode' + (lukket ? ' hendelse-hode-lukket' : '') + '" data-hendelse-id="' + escapeHtml(h.id) + '">'
-    + '<span class="hendelse-merke">' + escapeHtml(h.kode) + '</span>'
-    + '<span class="hendelse-tittel ms-2">' + escapeHtml(h.tittel) + '</span>'
-    + sted
-    + '<span class="oppdrag-meta ms-2">· ' + escapeHtml(antallTekst) + '</span>'
-    + apne
-    + (lukket ? '<span class="badge text-bg-secondary ms-2">lukket</span>' : '')
-    + '<span class="ms-auto d-flex gap-2">' + knapper + '</span>'
-    + '</div>';
-}
-
-function koHendelseKnapper(h) {
-  const id = escapeHtml(h.id);
-  if (h.status !== 'apen') {
-    return '<button type="button" class="btn btn-link btn-sm p-0"'
-      + ' data-action="koGjenapneHendelse" data-id="' + id + '">Åpne igjen</button>';
-  }
-  return '<button type="button" class="btn btn-link btn-sm p-0"'
-    + ' data-action="koRedigerHendelse" data-id="' + id + '">Rediger</button>'
-    + '<button type="button" class="btn btn-link btn-sm p-0"'
-    + ' data-action="koLukkHendelse" data-id="' + id + '">Lukk</button>';
-}
-
-// ── Detaljmodalen: hvilken hendelse oppdraget hører til ──────────────────
-
-function koHendelseValg(o) {
-  // Bare for den som kan skrive i **begge** modulene — serveren krever det.
-  const kanKnytte = koKanSkrive() && (window.OPPDRAG_TILGANG || {}).kanSkrive;
-  const naa = o.hendelse_nummer
-    ? '<span class="hendelse-merke">' + escapeHtml(hendelsesnr(o.hendelse_nummer)) + '</span>'
-      + ' <span>' + escapeHtml(o.hendelse_tittel || '') + '</span>'
-    : '<span class="text-muted">Uten hendelse</span>';
-  if (!kanKnytte) return '<div class="mb-2 small">Hendelse: ' + naa + '</div>';
-  const valg = koApneHendelser()
-    .filter((h) => h.id !== o.hendelse_id)
-    .map((h) => '<option value="' + escapeHtml(h.id) + '">' + escapeHtml(h.kode) + ' ' + escapeHtml(h.tittel) + '</option>')
-    .join('');
-  const losne = o.hendelse_id
-    ? '<button class="btn btn-outline-secondary" type="button"'
-      + ' data-action="koLosneOppdrag" data-id="' + escapeHtml(o.id) + '">Løsne</button>'
-    : '';
-  return '<div class="mb-2 small d-flex align-items-center gap-2 flex-wrap">'
-    + '<span>Hendelse: ' + naa + '</span>'
-    + '<span class="input-group input-group-sm w-auto">'
-    + '<select id="knytt-hendelse" class="form-select" aria-label="Hendelse">'
-    + '<option value="">Velg hendelse</option>' + valg + '</select>'
-    + '<button class="btn btn-outline-primary" type="button"'
-    + ' data-action="koKnyttOppdrag" data-id="' + escapeHtml(o.id) + '">Knytt</button>'
-    + losne
-    + '</span></div>';
-}
-
-async function _koSettHendelsePaaOppdrag(oppdragId, hendelseId) {
-  const res = await apiFetch('/ko/api/oppdrag/' + oppdragId + '/hendelse/', {
-    method: 'POST',
-    body: JSON.stringify({ hendelse_id: hendelseId }),
-  });
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok) {
-    window.alert(data.message || 'Kunne ikke knytte oppdraget.');
-    return false;
-  }
-  // Tavla har sin egen ETag; tving ny henting så grupperingen følger med.
-  if (typeof etagOppdrag !== 'undefined') etagOppdrag = null;
-  if (typeof visOppdrag === 'function') await visOppdrag(oppdragId);
-  if (typeof lastAlt === 'function') await lastAlt();
-  koHentLogg();
-  return true;
-}
-
-async function koKnyttOppdrag(oppdragId) {
-  const valg = document.getElementById('knytt-hendelse');
-  if (!valg || !valg.value) return;
-  await _koSettHendelsePaaOppdrag(oppdragId, Number(valg.value));
-}
-
-async function koLosneOppdrag(oppdragId) {
-  await _koSettHendelsePaaOppdrag(oppdragId, null);
-}
-
-// ── «Nytt oppdrag»: velg hendelse i samme skjema ─────────────────────────
-
-function koLeggHendelsevalgINyttOppdrag() {
-  // Nedtrekket legges inn i sentralbordets modal herfra, ikke i malbiten:
-  // `_sentralbord_modaler.html` er delt med `/oppdrag/`, der hendelser ikke
-  // finnes. Ett felt, og `koEtterOpprettet()` leser det.
-  const fritekst = document.getElementById('nytt-fritekst');
-  if (!fritekst || document.getElementById('nytt-hendelse')) return;
-  const boks = fritekst.closest('.mb-3');
-  if (!boks) return;
-  const felt = document.createElement('div');
-  felt.className = 'mb-3';
-  felt.innerHTML = '<label class="form-label" for="nytt-hendelse">Hendelse</label>'
-    + '<select id="nytt-hendelse" class="form-select"><option value="">Uten hendelse</option></select>'
-    + '<div class="form-text">Oppdraget knyttes til hendelsen når det er opprettet.</div>';
-  boks.parentNode.insertBefore(felt, boks);
-  koFyllHendelsevalg();
-}
-
-function koFyllHendelsevalg() {
-  const sel = document.getElementById('nytt-hendelse');
-  if (!sel) return;
-  const valgt = sel.value;
-  sel.innerHTML = '<option value="">Uten hendelse</option>'
-    + koApneHendelser().map((h) =>
-      '<option value="' + escapeHtml(h.id) + '">' + escapeHtml(h.kode) + ' ' + escapeHtml(h.tittel) + '</option>').join('');
-  if (valgt && koHendelser.has(Number(valgt))) sel.value = valgt;
-}
-
-async function koEtterOpprettet(oppdragId) {
-  const sel = document.getElementById('nytt-hendelse');
-  if (!sel || !sel.value) return;
-  const hendelseId = Number(sel.value);
-  sel.value = '';
-  const res = await apiFetch('/ko/api/oppdrag/' + oppdragId + '/hendelse/', {
-    method: 'POST',
-    body: JSON.stringify({ hendelse_id: hendelseId }),
-  });
-  if (!res.ok) {
-    const data = await res.json().catch(() => ({}));
-    window.alert(data.message || 'Oppdraget ble opprettet, men ikke knyttet til hendelsen.');
-  }
-  if (typeof etagOppdrag !== 'undefined') etagOppdrag = null;
-  koHentLogg();
-}
-
-// ── Handlingene på en hendelse ───────────────────────────────────────────
-
-async function _koHendelsehandling(sti, kropp) {
-  const res = await apiFetch(sti, { method: 'POST', body: JSON.stringify(kropp || {}) });
-  const data = await res.json().catch(() => ({}));
-  return { res, data };
-}
-
-async function koNyHendelse(forslag, fraLinjeId) {
-  const tittel = window.prompt('Hva kaller dere hendelsen på samband?', forslag || '');
-  if (tittel === null) return;
-  const { res, data } = await _koHendelsehandling('/ko/api/hendelser/ny/', {
-    tittel: tittel, fra_linje: fraLinjeId || null,
-  });
-  if (!res.ok) { koLoggFeil(data.message || 'Hendelsen ble ikke opprettet.'); return; }
-  koHentLogg();
-}
-
-function koHendelseFraLinje(linjeId) {
-  const linje = Array.from(koLinjer.values()).find((l) => l.id === linjeId);
-  koNyHendelse(linje ? linje.tekst.slice(0, 60) : '', linjeId);
-}
-
-async function koLukkHendelse(id) {
-  const h = koHendelser.get(id);
-  if (!h) return;
-  let { res, data } = await _koHendelsehandling('/ko/api/hendelser/' + id + '/lukk/');
-  if (res.status === 409) {
-    // §4.6: en dør hun må åpne bevisst, ikke en vegg. Antallet står i svaret.
-    const antall = data.apne_oppdrag || 0;
-    if (!window.confirm(
-        (data.message || 'Hendelsen har åpne oppdrag.')
-        + '\n\nLukke likevel? Oppdragene blir stående på tavla, og at du lukket med '
-        + antall + ' åpne står i loggen.')) {
-      return;
-    }
-    ({ res, data } = await _koHendelsehandling('/ko/api/hendelser/' + id + '/lukk/', { confirm: true }));
-  }
-  if (!res.ok) { window.alert(data.message || 'Hendelsen ble ikke lukket.'); return; }
-  koHentLogg();
-}
-
-async function koGjenapneHendelse(id) {
-  const { res, data } = await _koHendelsehandling('/ko/api/hendelser/' + id + '/gjenapne/');
-  if (!res.ok) { window.alert(data.message || 'Hendelsen ble ikke åpnet igjen.'); return; }
-  koHentLogg();
-}
-
-async function koRedigerHendelse(id) {
-  const h = koHendelser.get(id);
-  if (!h) return;
-  const tittel = window.prompt('Ny tittel på ' + h.kode + ':', h.tittel);
-  if (tittel === null || tittel === h.tittel) return;
-  const { res, data } = await _koHendelsehandling('/ko/api/hendelser/' + id + '/rediger/', {
-    tittel: tittel, versjon: h.versjon,
-  });
-  if (res.status === 409) {
-    // §7.1: noen andre endret hodet først. Hent det nye før hun prøver igjen.
-    window.alert(data.message || 'Hendelsen er endret av noen andre.');
-    koHentLogg();
-    return;
-  }
-  if (!res.ok) { window.alert(data.message || 'Hendelsen ble ikke endret.'); return; }
-  koHentLogg();
-}
-
-
-// ════════════════════════════════════════════════════════════════════════════
-// ANSVARSMERKET (pulje 6) — docs/FORSLAG_KO.md §5.1
-//
-// Vises, styrer ingenting. Nedtrekket i toppen setter operatørens eget merke;
-// serveren stempler det på linjene hun skriver, og sidebaren viser det ved
-// navnet.
+// ANSVARSMERKET (pulje 6) — docs/FORSLAG_KO.md §5.1. Vises, styrer ingenting.
 // ════════════════════════════════════════════════════════════════════════════
 
 async function koSettAnsvar() {
@@ -765,10 +462,6 @@ async function koSettAnsvar() {
 // /oppdrag/. Tegnes under enhetslista, gruppert på ressursgruppe, med samme
 // minimering som enhetstypene. **Ingen status** — hva en KO-ført status skal
 // hete er ubesvart (TODO.md), og kortet sier bare det vaktlista vet.
-//
-// Egen beholder (`#vaktliste-ressurser`), ikke `#enhetsliste`: sentralbordet
-// tegner den andre om igjen ved hver poll, og to skrivere til samme element
-// blir uenige.
 // ════════════════════════════════════════════════════════════════════════════
 
 const KO_RESSURSER_MS = 30000;
@@ -825,8 +518,17 @@ function koTegnRessurser() {
   }).join('');
 }
 
+// Sentralbordet kaller denne etter at det tegnet enhetslista (gjennom en
+// vakt), så gruppene under følger med — og tallet i vinduets hode.
 function koTegnRessurserPaaNytt() {
   koTegnRessurser();
+  const tall = document.getElementById('ko-ressurser-antall');
+  const liste = (typeof sisteEnhetsliste !== 'undefined' && Array.isArray(sisteEnhetsliste)) ? sisteEnhetsliste : [];
+  if (tall) {
+    const paVakt = liste.filter((e) => e.pa_vakt);
+    const ledige = paVakt.filter((e) => e.status === 'ledig').length;
+    tall.textContent = '· ' + ledige + ' ledig · ' + (liste.length - paVakt.length) + ' av vakt';
+  }
 }
 
 async function koHentRessurser() {
@@ -844,22 +546,17 @@ async function koHentRessurser() {
 // ════════════════════════════════════════════════════════════════════════════
 // OPPSTART
 //
-// **Alt som kjører på toppnivå står her, nederst.** Regelen er skrevet for de
-// delte modulene (CLAUDE.md), men den gjelder like fullt i én fil: kjører en
-// tidlig linje noe, kan den lese en binding som ikke er nådd, og siden dør på
-// en ReferenceError før noe er tegnet.
+// **Alt som kjører på toppnivå står her, nederst, i den siste fila.** Kjører
+// en tidlig fil noe, kan den lese en binding som ikke er nådd, og siden dør på
+// en ReferenceError før noe er tegnet (CLAUDE.md).
 // ════════════════════════════════════════════════════════════════════════════
 
 document.addEventListener('DOMContentLoaded', () => {
-  koSettKonsollhoyde();
-  // Ny måling ved endret vindusstørrelse. `resize` dekker også at headeren
-  // brekker til to linjer, som er den ekte grunnen målingen finnes.
-  window.addEventListener('resize', koSettKonsollhoyde);
+  koOppsettStart();
   koSidebarLyttere();
   setInterval(() => {
-    // Ikke poll en liste ingen ser på. Det er den ene sparingen som betyr noe
-    // her: flere operatører sitter på samme side hele vakta. Nedtrekket er
-    // lukket som standard, så dette er nå det normale tilfellet.
+    // Ikke poll en liste ingen ser på: flere operatører sitter på samme side
+    // hele vakta, og nedtrekket er lukket som standard.
     if (koSidebarSynlig) koHentTilstede();
   }, KO_TILSTEDE_MS);
 
@@ -868,20 +565,27 @@ document.addEventListener('DOMContentLoaded', () => {
     skjema.addEventListener('submit', (e) => {
       e.preventDefault();
       // `withSubmitGuard` og ikke en egen flagg-variabel: dobbelttrykk under
-      // en hendelse er regelen og ikke unntaket, og to like linjer i loggen er
-      // en feil man ikke oppdager før man leser den i etterkant.
+      // en hendelse er regelen og ikke unntaket.
       withSubmitGuard('ko-logg-send', koSkriv);
     });
+    const felt = document.getElementById('ko-logg-tekst');
+    // Enter sender, Shift+Enter gir ny linje — som i en chat, og som i
+    // hendelsen. Knappen står der fortsatt for den som vil klikke.
+    if (felt) {
+      felt.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); skjema.requestSubmit(); }
+      });
+    }
   }
 
   // Skjemaet skjules for den som bare har `les`. Serveren svarer 403 uansett,
   // men et skrivefelt som ikke kan sende er en vegg man går inn i.
   const boks = document.getElementById('ko-logg-skjema');
   if (boks && !koKanSkrive()) boks.classList.add('d-none');
-  const nyKnapp = document.getElementById('ko-ny-hendelse');
-  if (nyKnapp && !koKanSkrive()) nyKnapp.classList.add('d-none');
 
-  koLesGruppering();
+  const sok = document.getElementById('ko-hendelse-sok');
+  if (sok) sok.addEventListener('input', koSokEndret);
+
   koLeggHendelsevalgINyttOppdrag();
 
   koHentLogg();

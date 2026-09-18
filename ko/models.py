@@ -187,6 +187,20 @@ class Logglinje(models.Model):
     #: vises.
     uformell = models.BooleanField(default=False, verbose_name='Uformell (chat)')
 
+    #: **Festet i loggstrømmen** (André, 18. sep. 2026: «Nyttige beskjeder,
+    #: noen skal kunne pinnes»). Et tidspunkt og ikke en boolsk verdi, så
+    #: rekkefølgen blant de festede er «sist festet nederst» uten en kolonne
+    #: til. Navnet fryses som forfatteren: den som festet kan være borte når
+    #: noen lurer på hvorfor linja står øverst. Løsning tømmer alle tre.
+    festet_at = models.DateTimeField(
+        null=True, blank=True, db_index=True, verbose_name='Festet')
+    festet_av = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True,
+        on_delete=models.SET_NULL, related_name='ko_festede_logglinjer',
+        verbose_name='Festet av')
+    festet_av_navn = models.CharField(
+        max_length=150, blank=True, default='', verbose_name='Festet av (navn)')
+
     class Meta:
         verbose_name = 'Logglinje'
         verbose_name_plural = 'Logglinjer'
@@ -212,6 +226,10 @@ class Logglinje(models.Model):
     def er_systemlinje(self) -> bool:
         return self.kilde == KILDE_SYSTEM
 
+    @property
+    def er_festet(self) -> bool:
+        return self.festet_at is not None
+
 
 #: Hendelsens to tilstander. **Ingen statusmaskin** (§3.3): hendelser har ikke
 #: et forløp, oppdrag har. Åpen eller lukket, og lukket kan åpnes igjen — en
@@ -223,6 +241,57 @@ HENDELSE_STATUS_VALG: tuple[tuple[str, str], ...] = (
     (HENDELSE_APEN, 'Åpen'),
     (HENDELSE_LUKKET, 'Lukket'),
 )
+
+
+#: Prioritetene (André, 18. sep. 2026: «Grønn, Gul, Rød, Drift, Viktig med
+#: rød trekant utropstegn»). **Samme ordforråd som bilens grovsortering og
+#: oppdragets hastegrad**, med vilje: Grønn/Gul/Rød er det folk sier på
+#: samband, Drift er det oppdragsmodulen alt kaller det ikke-medisinske, og
+#: Viktig er flagget over dem alle. Rekkefølgen her er rangen — først i lista
+#: er øverst på tavla — og `PRIORITET_RANG` utledes av den, så de to aldri kan
+#: være uenige.
+PRIORITET_VIKTIG = 'viktig'
+PRIORITET_ROD = 'rod'
+PRIORITET_GUL = 'gul'
+PRIORITET_GRONN = 'gronn'
+PRIORITET_DRIFT = 'drift'
+PRIORITET_VALG: tuple[tuple[str, str], ...] = (
+    (PRIORITET_VIKTIG, 'Viktig'),
+    (PRIORITET_ROD, 'Rød'),
+    (PRIORITET_GUL, 'Gul'),
+    (PRIORITET_GRONN, 'Grønn'),
+    (PRIORITET_DRIFT, 'Drift'),
+)
+PRIORITET_NAVN: dict[str, str] = dict(PRIORITET_VALG)
+PRIORITET_RANG: dict[str, int] = {v: i for i, (v, _) in enumerate(PRIORITET_VALG)}
+PRIORITET_STANDARD = PRIORITET_GRONN
+
+
+class Ressursbehov(models.Model):
+    """Hva slags ressurs en hendelse trenger — «Ambulanse», «Lag», «Politi».
+
+    **Egen liste i KO, ikke `oppdrag.Enhetstype` eller `vaktliste.Ressursgruppe`**
+    (André, 18. sep. 2026: avkryssing, vedlikeholdt under KO-innstillinger av
+    admin og leder). Begrepet ble sjekket før det ble laget (rota, «Før du
+    designer noe nytt»): de to andre er *portalens egne* ressurser — det som
+    stempler og det som bemannes — mens et ressursbehov like gjerne er politi,
+    brann eller arrangørens vakter, som portalen ikke har og aldri skal
+    registrere. Samme form som `oppdrag.Lokasjon`: navn, aktiv, rekkefølge.
+    Deaktivering skjuler i skjemaet; hendelsene som alt peker på raden
+    beholder den.
+    """
+
+    navn = models.CharField(max_length=64, unique=True, verbose_name='Ressursbehov')
+    er_aktiv = models.BooleanField(default=True, verbose_name='Aktiv')
+    rekkefolge = models.IntegerField(default=100, verbose_name='Rekkefølge')
+
+    class Meta:
+        verbose_name = 'Ressursbehov'
+        verbose_name_plural = 'Ressursbehov'
+        ordering = ['rekkefolge', 'navn']
+
+    def __str__(self):
+        return self.navn
 
 
 class Hendelse(models.Model):
@@ -264,6 +333,29 @@ class Hendelse(models.Model):
         db_index=True, verbose_name='Status')
     versjon = models.PositiveIntegerField(default=1, verbose_name='Versjon')
 
+    #: Prioriteten (18. sep. 2026). Endres med en egen systemlinje, ikke
+    #: stille: «H14 satt til Viktig av Kari» er nøyaktig det man leter etter
+    #: når man i etterkant spør hvorfor to biler ble sendt.
+    prioritet = models.CharField(
+        max_length=8, choices=PRIORITET_VALG, default=PRIORITET_STANDARD,
+        db_index=True, verbose_name='Prioritet')
+    #: Fritekst, som `Oppdrag.fritekst`: **aldri verdilogget i audit** og
+    #: aldri i en SHA-signatur — se `NOTAT_DPIA_OG_FRITEKST.md` §7 og loggens
+    #: valg 1 i `ko/CLAUDE.md`.
+    beskrivelse = models.TextField(blank=True, default='', verbose_name='Beskrivelse')
+    #: Hvem som meldte den — «Lag 1», «publikum», «arrangør». Ikke en peker:
+    #: melderen er oftest ikke en konto.
+    melder = models.CharField(max_length=120, blank=True, default='', verbose_name='Melder')
+    #: Lagene som er på hendelsen, som tekst (André, 18. sep. 2026: «et
+    #: tekstfelt som lar en skrive inn lagene»). Vises på oppdragene som hører
+    #: til hendelsen — i bilen og i KO. Fritekst fordi et lag ikke er en
+    #: `oppdrag.Enhet` og ikke stempler; hva en KO-ført lagsstatus skal hete er
+    #: fortsatt ubesvart (`TODO.md`), og dette feltet er ikke et svar på det.
+    lagsressurser = models.CharField(
+        max_length=255, blank=True, default='', verbose_name='Lagsressurser')
+    ressursbehov = models.ManyToManyField(
+        Ressursbehov, blank=True, related_name='hendelser', verbose_name='Ressursbehov')
+
     opprettet_at = models.DateTimeField(auto_now_add=True, verbose_name='Opprettet')
     opprettet_av = models.ForeignKey(
         settings.AUTH_USER_MODEL, null=True, blank=True,
@@ -303,6 +395,42 @@ class Hendelse(models.Model):
     @property
     def er_lukket(self) -> bool:
         return self.status == HENDELSE_LUKKET
+
+
+class HendelseDeltaker(models.Model):
+    """Hvem som er *på* hendelsen (André, 18. sep. 2026: «hvis en bruker
+    registrerer noe i hendelsen så er de automatisk med»).
+
+    **Vises, styrer ingenting** — samme regel som ansvarsmerket (§5.1). Lista
+    svarer på «hvem jobber med H14 nå», så to operatører ikke sender hver sin
+    bil på samme melding. Raden skrives av `services.bli_med`, som kalles fra
+    hver skriving på hendelsen og fra «Bli med»-knappen; å lese hendelsen
+    melder ingen inn. Navnet fryses som på linja (§4.5).
+    """
+
+    hendelse = models.ForeignKey(
+        Hendelse, on_delete=models.CASCADE, related_name='deltakere',
+        verbose_name='Hendelse')
+    bruker = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True,
+        on_delete=models.SET_NULL, related_name='ko_hendelser_deltatt',
+        verbose_name='Bruker')
+    brukernavn = models.CharField(max_length=150, verbose_name='Brukernavn')
+    fra = models.DateTimeField(auto_now_add=True, verbose_name='Med fra')
+
+    class Meta:
+        verbose_name = 'Hendelsesdeltaker'
+        verbose_name_plural = 'Hendelsesdeltakere'
+        ordering = ['fra', 'id']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['hendelse', 'brukernavn'],
+                name='en_deltaker_per_hendelse',
+            ),
+        ]
+
+    def __str__(self):
+        return f'{self.brukernavn} på H{self.hendelse.hendelsesnummer}'
 
 
 class Ansvarsmerke(models.Model):

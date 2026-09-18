@@ -73,9 +73,13 @@ class KoBackupHandler(BaseBackupHandler):
     #: oppdragsfila før seg — mens oppdragsfila krever KO-fila før seg
     #: (`Oppdrag.hendelse`). En sirkel lar seg ikke gjenopprette. Navnet står
     #: frosset i `lokasjon_navn`, som forfatteren gjør på linja.
+    #:
+    #: `festet_av` og `HendelseDeltaker.bruker` (18. sep. 2026) følger samme
+    #: regel: navnet står frosset ved siden av, og pekeren er bekvemmelighet.
     strip_fields = {
-        'ko.Logglinje': ['forfatter', 'fjernet_av'],
+        'ko.Logglinje': ['forfatter', 'fjernet_av', 'festet_av'],
         'ko.Hendelse': ['opprettet_av', 'lukket_av', 'lokasjon'],
+        'ko.HendelseDeltaker': ['bruker'],
     }
 
 

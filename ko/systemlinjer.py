@@ -80,6 +80,7 @@ VAKTMODUS = 'vaktmodus'
 HENDELSE_OPPRETTET = 'hendelse_opprettet'
 HENDELSE_LUKKET = 'hendelse_lukket'
 HENDELSE_GJENAPNET = 'hendelse_gjenapnet'
+HENDELSE_PRIORITET = 'hendelse_prioritet'
 OPPDRAG_KNYTTET = 'oppdrag_knyttet'
 
 #: Hver kode med sin begrunnelse. Lista er kontrakten: en kode som ikke står
@@ -124,6 +125,10 @@ KODER: dict[str, str] = {
     OPPDRAG_KNYTTET:
         'Hvilke oppdrag som hørte til hvilken hendelse, med flyttinger. '
         'Grupperingen på tavla forsvinner når vakta arkiveres; loggen står.',
+    HENDELSE_PRIORITET:
+        '«H14 satt til Viktig av Kari» er en avgjørelse, ikke en feltendring '
+        '(18. sep. 2026): det er den man leter etter når man spør hvorfor to '
+        'biler ble sendt. Aldri en stille oppdatering.',
 }
 
 
@@ -205,7 +210,18 @@ def tegn(kode: str, data: dict) -> str:
     if kode == HENDELSE_OPPRETTET:
         deler = [f'{_hendelse(data)} opprettet', data.get('tittel') or '',
                  data.get('lokasjon') or '']
+        # Prioriteten står på linja bare når den sier noe — Grønn er
+        # normaltilstanden, og et merke på hver hendelse er støy.
+        if data.get('prioritet') and data['prioritet'] != 'Grønn':
+            deler.append(data['prioritet'])
         return ' · '.join(d for d in deler if d)
+    if kode == HENDELSE_PRIORITET:
+        linje = f'{_hendelse(data)} satt til {data.get("prioritet") or "?"}'
+        if data.get('fra_prioritet'):
+            linje += f' (var {data["fra_prioritet"]})'
+        if data.get('tittel'):
+            linje += f' · {data["tittel"]}'
+        return linje
     if kode == HENDELSE_LUKKET:
         linje = f'{_hendelse(data)} lukket'
         if data.get('tittel'):

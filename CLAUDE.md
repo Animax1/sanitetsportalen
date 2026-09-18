@@ -727,11 +727,11 @@ Alle temaene er mørke, så **enhver Bootstrap-klasse for dempet tekst må overs
 malen kan se den. `MorkTekstPaaMorkBakgrunnTests` løser `{% extends %}` og `{% static %}`
 og håndhever det.
 
-26 filer i `static/js/` (ingen bundler), fordelt på sju sider — pasientsiden,
+28 filer i `static/js/` (ingen bundler), på sju sider — pasientsiden,
 `/statistikk/`, `/vaktliste/`, `/ko/`, `/backlog/` og de to grensesnittene under
 `/oppdrag/`.
 
-**To av sidene er delt i flere filer** (14. sep. 2026, gjeldspunkt 3.6): `vaktliste.js`
+**Tre av sidene er delt i flere filer** (14. sep. 2026, gjeldspunkt 3.6): `vaktliste.js`
 var 3 801 linjer og `oppdrag-sentral.js` 1 991. **Delingen har en nedre grense som
 håndheves:** `test_hver_del_er_mindre_enn_den_var` krever at hver del er under 1 800
 linjer, ellers kunne én fil vokst tilbake til 3 800 mens de andre sto tomme og alle de
@@ -748,7 +748,7 @@ mellom filene, så det ville vært et krav ingen holder. Den ekte regelen er: **
 Kjører en tidlig fil noe, kan den lese en binding som ikke er nådd, og siden dør på en
 `ReferenceError` før noe er tegnet.
 
-`VAKTLISTE_JS` og `OPPDRAG_SENTRAL_JS` i `patients/js_test_utils.py` er derfor **tupler**,
+`VAKTLISTE_JS`, `OPPDRAG_SENTRAL_JS`, `KO_JS` i `patients/js_test_utils.py` er **tupler**,
 og `read_js()` skjøter dem i lasterekkefølge — for alt som leser kilden er de én fil, som
 de er i nettleseren.
 
@@ -767,7 +767,7 @@ håndhever det på cellebredden.
 | `oppdrag-sentral-*.js` (fire) | `/oppdrag/`, kontoer uten enhet | `oppdrag/CLAUDE.md` |
 | `oppdrag-enhet.js` | `/oppdrag/`, enhetskontoer | `oppdrag/CLAUDE.md` |
 | `vaktliste-*.js` (seks) | **kun** `/vaktliste/` | `vaktliste/CLAUDE.md` |
-| `ko.js` | **kun** `/ko/` | `ko/CLAUDE.md` |
+| `ko-*.js` | **kun** `/ko/` | `ko/CLAUDE.md` |
 | `backlog.js` | **kun** `/backlog/` | `backlog/CLAUDE.md` |
 
 **`data-action` + `data-hendelse` er to lyttere, og bare én skal fyre.** Klikk­delegeringen

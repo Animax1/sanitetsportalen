@@ -15,15 +15,14 @@
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Lukk"></button>
       </div>
       <div class="modal-body">
-        <div class="mb-3">
-          {# Avkryssing, ikke nedtrekk: operatøren sender gjerne to biler på #}
-          {# samme hendelse (flere enheter, 11. sep. 2026). #}
-          <div class="form-label">Enheter</div>
-          <div id="nytt-enheter" class="nytt-enheter"></div>
-          <div class="form-text">Kryss av én eller flere. Den første i lista blir primær.</div>
-        </div>
-        {# Hastegrad og lokasjon før problemstillingen (André, 12. sep. 2026): #}
+        {# Rekkefølgen er Andrés (18. sep. 2026): hvor, hastegrad, problemstilling, #}
+        {# enhet, fritekst, hendelse. Hastegrad står fortsatt før problemstillingen: #}
         {# «Drift» bytter ut lista over problemstillinger, så den må velges først. #}
+        <div class="mb-3">
+          <label class="form-label" for="nytt-lokasjon">Hvor</label>
+          <select id="nytt-lokasjon" class="form-select"></select>
+          <div class="form-text">Lista vedlikeholdes under «Valglister».</div>
+        </div>
         <div class="mb-3">
           <label class="form-label" for="nytt-hastegrad">Hastegrad</label>
           <select id="nytt-hastegrad" class="form-select"
@@ -32,15 +31,17 @@
           </select>
         </div>
         <div class="mb-3">
-          <label class="form-label" for="nytt-lokasjon">Lokasjon</label>
-          <select id="nytt-lokasjon" class="form-select"></select>
-          <div class="form-text">Lista vedlikeholdes under «Valglister».</div>
-        </div>
-        <div class="mb-3">
           <label class="form-label" for="nytt-problemstilling">Problemstilling</label>
           <select id="nytt-problemstilling" class="form-select">
             {% for p in problemstillinger %}<option>{{ p }}</option>{% endfor %}
           </select>
+        </div>
+        <div class="mb-3">
+          {# Avkryssing, ikke nedtrekk: operatøren sender gjerne to biler på #}
+          {# samme hendelse (flere enheter, 11. sep. 2026). #}
+          <div class="form-label">Enheter</div>
+          <div id="nytt-enheter" class="nytt-enheter"></div>
+          <div class="form-text">Kryss av én eller flere. Den første i lista blir primær.</div>
         </div>
         <div class="mb-3">
           <label class="form-label" for="nytt-fritekst">Fritekst</label>
@@ -49,6 +50,9 @@
             Vises i bilen til oppdraget avsluttes. Innholdet lagres ikke i auditloggen.
           </div>
         </div>
+        {# Hendelsen — sist, og bare på /ko/: `ko.js` fyller plassen. Tom her, #}
+        {# fordi oppdragsmodulen ikke kjenner hendelser. #}
+        <div id="nytt-hendelse-plass"></div>
         <div id="nytt-feil" class="text-danger small d-none"></div>
       </div>
       <div class="modal-footer">
@@ -60,16 +64,24 @@
 </div>
 {% endif %}
 
-{% if kan_lede %}
+{% if kan_lede or verdifaner_ekstra %}
+{% comment %}
+  Valglistene. På /ko/ heter vinduet «KO-innstillinger» (André, 18. sep. 2026)
+  og har en fane til — ressursbehovene — gjennom `verdifaner_ekstra`, som er
+  en generell krok og ikke en KO-referanse: oppdragsmodulen kjenner ikke `ko`.
+  Hver fane har sin egen dør: oppdragsmodulens tre og «Bilen» krever
+  `kan_lede` (oppdragsleder), ekstrafanene den døra modulen bak dem satte.
+{% endcomment %}
 <div class="modal fade" id="valglisterModal" tabindex="-1">
   <div class="modal-dialog modal-lg">
     <div class="modal-content">
       <div class="modal-header">
-        <h5 class="modal-title">Valglister <span class="enhet-meta fw-normal">· lokasjoner, enhetstyper, problemstillinger og bilen</span></h5>
+        <h5 class="modal-title">{{ valglister_tittel|default:"Valglister" }} <span class="enhet-meta fw-normal">· {% if kan_lede %}lokasjoner, enhetstyper, problemstillinger{% if er_global_admin %} og bilen{% endif %}{% endif %}{% for f in verdifaner_ekstra %}{% if kan_lede or not forloop.first %}, {% endif %}{{ f.navn|lower }}{% endfor %}</span></h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Lukk"></button>
       </div>
       <div class="modal-body">
         <ul class="nav nav-tabs mb-3">
+          {% if kan_lede %}
           <li class="nav-item"><button type="button" class="nav-link active" data-verdifane="lokasjoner"
                   data-action="velgVerdifane" data-arg="lokasjoner">Lokasjoner</button></li>
           <li class="nav-item"><button type="button" class="nav-link" data-verdifane="enhetstyper"
@@ -81,6 +93,11 @@
           <li class="nav-item"><button type="button" class="nav-link" data-verdifane="bilinnstillinger"
                   data-action="velgVerdifane" data-arg="bilinnstillinger">Bilen</button></li>
           {% endif %}
+          {% endif %}
+          {% for f in verdifaner_ekstra %}
+          <li class="nav-item"><button type="button" class="nav-link{% if not kan_lede and forloop.first %} active{% endif %}" data-verdifane="{{ f.slug }}"
+                  data-action="velgVerdifane" data-arg="{{ f.slug }}">{{ f.navn }}</button></li>
+          {% endfor %}
         </ul>
         <div class="input-group mb-3" id="ny-verdi-rad">
           <input type="text" id="ny-verdi" class="form-control" placeholder="Ny lokasjon">

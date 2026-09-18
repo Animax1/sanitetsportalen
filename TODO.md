@@ -585,8 +585,8 @@ status og modul. Modulens egne regler står i [`backlog/CLAUDE.md`](./backlog/CL
 
 **Notatet er fortsatt et forslag** (17. sep. 2026), men **pulje 1 er bygget**: modulen er
 registrert, `/ko/` finnes med sidebaren, og `ModulTilgang('ko')` virker. **Siden har ingen
-faner** — flatene står i to kolonner, og hendelser er en gruppering av oppdragslista og ikke
-en femte flate (§7, rettet 17. sep. 2026 etter André).
+faner** — fra 18. sep. 2026 står fire flater i 2×2, og hendelsesloggen er en egen flate
+(André; se CHANGELOG 18. sep. og `ko/CLAUDE.md`).
 Modulens egne regler står i [`ko/CLAUDE.md`](./ko/CLAUDE.md). `/oppdrag/` snevres inn til
 enhetens egen skjerm, og **sentralbordet flytter til KO** — en flytting av
 `oppdrag-sentral-*.js`, ikke en kopi. Puljene står i §10.
@@ -614,7 +614,9 @@ og ni kuraterte systemhendelser i `ko/systemlinjer.py`.*
 - [ ] **Utskrift av loggen.** §4.2 sier den skal være «utskrivbar», og det er ikke bygget.
       Det er ikke pynt: skal loggen leses i en gjennomgang etter et arrangement, leses den
       av flere samtidig rundt et bord. Rendres server-side fra de samme `_til_dict`-radene,
-      slik at papiret og skjermen sier det samme.
+      slik at papiret og skjermen sier det samme. **Og med alt, kronologisk** (18. sep.
+      2026): loggstrømmen på skjermen viser ikke kommentarene inne i hendelsene, og
+      utskriften er stedet der ingenting «bare ble sagt inne i hendelsen».
 
 *Pulje 3 (ressursoversikten) er levert 17. sep. 2026 — se CHANGELOG. Projeksjonen, den
 tredje kilden (`ko.Ressursstatus`) og tavla i venstre kolonne. Rutingflagget er **ikke**
@@ -688,19 +690,16 @@ sentralbordet fra oppdragsmodulens egen kode, og oppdragsflata gates av `oppdrag
 *Pulje 5 (hendelser) er levert 18. sep. 2026 — se CHANGELOG. `ko.Hendelse`, `Oppdrag.hendelse`,
 `H12`/`O45`, gruppering av tavla med bryter, lukking med 409 og `confirm`, gjenåpning logget.*
 
-- [ ] **Linje → hendelse i etterkant, og hendelsen som filter i loggen.** §4.1 sier «en
-      linje kan knyttes til en hendelse i etterkant», og datamodellen har det
-      (`Logglinje.hendelse`, `SET_NULL`) — men flata har det ikke: bare linja en hendelse
-      ble laget *av* får hendelsen. Hører hjemme i pulje 6 sammen med filteret per operatør,
-      fordi det er samme kontroll: «vis H12» er en hendelse som filter, og «legg denne linja
-      i H12» er den andre halvparten. Ett endepunkt (`logg/<pk>/hendelse/`) når flata kommer;
-      et endepunkt uten en flate er død kode.
+- [ ] **Linje i loggstrømmen → hendelse i etterkant.** §4.1 sier «en linje kan knyttes
+      til en hendelse i etterkant», og datamodellen har det (`Logglinje.hendelse`,
+      `SET_NULL`). Fra 18. sep. 2026 kan man skrive *i* hendelsen og lage en hendelse *av*
+      en linje; det som mangler er å flytte en eksisterende linje inn i en hendelse. Ett
+      endepunkt (`logg/<pk>/hendelse/`) og en handling på linja når noen savner det.
 
-- [ ] **Lokasjon på hendelsen kan settes fra API-et, ikke fra skjermen.** `rediger_hendelse`
-      tar `lokasjon_id`, og «Ny hendelse» er en `prompt()` med tittel. Et lite skjema (tittel +
-      lokasjonsnedtrekk fra samme kilde som «Nytt oppdrag») erstatter prompt-en når noen har
-      brukt den på en vakt og sagt hva som mangler. Prompt-en er der med vilje: loggen bruker
-      den samme for retting, og to ulike dialoger for samme slags handling er én for mye.
+- [ ] **Oppsettet i `/ko/` huskes per nettleser, ikke per bruker** (18. sep. 2026). Valgt
+      med vilje — KO-PC-en beholder sitt — men følger ikke operatøren til en annen maskin.
+      Per bruker på serveren når noen savner det; da som en `AppSetting`-lignende rad per
+      konto, ikke en ny tabell.
 
 *Pulje 6 (chat, ansvarsmerke, minimerbare grupper, vaktlistas ressurser på tavla) er
 levert 18. sep. 2026 — se CHANGELOG. Filteret ble til minimering etter André.*

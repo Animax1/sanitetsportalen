@@ -182,6 +182,13 @@ def oppdrag_til_dict(oppdrag, *, for_enhet: bool = False,
         'hendelse_nummer': (oppdrag.hendelse.hendelsesnummer
                             if oppdrag.hendelse_id else None),
         'hendelse_tittel': oppdrag.hendelse.tittel if oppdrag.hendelse_id else '',
+        # Prioriteten og lagene på hendelsen (KO, 18. sep. 2026). Lest her
+        # som nummer og tittel over: bilen skal se hvilke lag som er på
+        # hendelsen oppdraget hører til, og KO-raden bærer prioritetsmerket.
+        # Tom når oppdraget ikke hører til noen.
+        'hendelse_prioritet': oppdrag.hendelse.prioritet if oppdrag.hendelse_id else '',
+        'hendelse_lagsressurser': (oppdrag.hendelse.lagsressurser
+                                   if oppdrag.hendelse_id else ''),
     }
     skjul_fritekst = for_enhet and status == choices.TERMINAL
     data['fritekst'] = '' if skjul_fritekst else oppdrag.fritekst

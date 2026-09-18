@@ -4,43 +4,27 @@
 {% block title %}KO – Sanitetsportalen{% endblock %}
 
 {% comment %}
-  **Pulje 2: loggen.** Se docs/FORSLAG_KO.md §4 og §7.
+  **Fire vinduer i et 2×2-rutenett** (André, 18. sep. 2026, etter skissene som
+  ble avtalt før koden): Hendelseslogg og Loggstrøm øverst, Ressursoversikt og
+  Oppdragsliste nederst. Vinduene kan bytte plass og endre størrelse
+  (ko-layout.js), og **rammen holder alltid alle fire synlige** — det er
+  forskjellen på et rutenett og frie vinduer, og grunnen til at det ikke er
+  frie vinduer: et vindu som kan legges oppå et annet er et vindu som kan
+  forsvinne, og en flate ingen ser er en flate ingen vet har endret seg.
 
-  **Ingen faner.** Skallet i pulje 1 la de fire flatene i `nav-tabs`, og det var
-  feil form (André, 17. sep. 2026). En fane er riktig når flatene er
-  *alternativer* — man gjør det ene eller det andre. KOs flater brukes i **én**
-  bevegelse: sambandet sier noe, du fører linja, du ser hvem som er ledig, og du
-  sender. Tre av fire flater trengs for å fullføre én handling, og hver fane
-  koster et bytte som mister det du leste.
+  **Ingen faner.** Regelen fra 17. sep. 2026 står: flatene brukes i én
+  bevegelse, og en skjult fane er en fane du ikke vet har endret seg. 2×2 er
+  det samme prinsippet med fire flater i stedet for tre kolonner.
 
-  Den andre kostnaden er verre: **en skjult fane er en fane du ikke vet har
-  endret seg.** Siden poller (§7.1), så en annen operatørs logglinje, et nytt
-  oppdrag eller en ressurs som nettopp ble opptatt lander i en rute du ikke ser.
-  Et merke forteller *at* noe skjedde, ikke *hva* — og da er det enda et klikk
-  midt i sambandstrafikk. Hele grunnen til at KO finnes er at situasjonsbildet
-  skal være i ett blikk.
+  Knappene står i vinduet de gjelder: «Ny hendelse» i hendelsesloggen,
+  «Nytt oppdrag» og «Historikk» i oppdragslista, «Enheter» i
+  ressursoversikten. Verktøylinja øverst har bare det som gjelder hele sida.
 
-  Formen er derfor: **tavla og oppdragene til venstre, loggen som fast
-  kolonne til høyre.** Loggen er smal (tekstlinjer), skrives konstant og leses
-  konstant — den hører hjemme som et panel, ikke bak en fane.
-
-  Hver tom flate sier hva som kommer og hvor tingen bor i dag. En blank flate
-  ser ødelagt ut — særlig «Oppdrag», som beskriver noe som *finnes*, bare
-  på /oppdrag/ til pulje 5 flytter den.
-
-  Ingen egen CSS-fil: portal.css overstyrer allerede .text-muted og .form-text
-  for mørk bakgrunn, og alt annet her er Bootstrap-klasser base_portal temer.
-  Et nytt modulstilark måtte definert de fire variablene base_portal ikke
-  aliaser (CLAUDE.md), og det er en kostnad uten en regel å bære.
+  Sentralbordets kort og rader er stilt i oppdrag.css; ko.css lastes etter,
+  så konsollen kan overstyre.
 {% endcomment %}
 
 {% block extra_head %}
-{% comment %}
-  Sentralbordets kort og rader er stilt i oppdrag.css — uten den tegnes lista
-  som ren tekst (sett i nettleser 18. sep. 2026, etter tre forsøk som bare
-  sammenlignet server- og JS-siden). ko.css lastes etter, så konsollen kan
-  overstyre.
-{% endcomment %}
 <link rel="stylesheet" href="{% static 'css/oppdrag.css' %}">
 <link rel="stylesheet" href="{% static 'css/ko.css' %}">
 {% endblock %}
@@ -48,26 +32,49 @@
 {% block content %}
 
 {% comment %}
-  Modultilgang, ikke rolle (CLAUDE.md). Skallet har ingen knapper å gate ennå,
-  men mønsteret settes her slik at pulje 2 ikke må finne det opp — og slik at
-  den første knappen ikke blir den som også må innføre gaten.
+  Modultilgang, ikke rolle (CLAUDE.md). Data inn i et skript-element går
+  gjennom `js_json()`.
 {% endcomment %}
 <script nonce="{{ csp_nonce }}">
   window.MODUL_TILGANG = {
     ko: "{{ modul_nivaa }}",
     admin: {{ er_global_admin|yesno:"true,false" }}
   };
+  window.KO_BRUKERNAVN = "{{ request.user.username|escapejs }}";
+  window.KO_PRIORITETER = {{ prioriteter_json }};
+  window.KO_RESSURSBEHOV = {{ ressursbehov_json }};
+  window.VERDIFANER_EKSTRA = {{ verdifaner_ekstra_json }};
 </script>
 
-<div class="container-fluid px-3 px-md-4 py-3">
+<div class="container-fluid px-3 py-2">
 
-  <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-2">
-    <h1 class="h5 mb-0"><i class="bi bi-broadcast-pin me-2"></i>KO</h1>
+  <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-2" id="ko-verktoy">
+    <div class="d-flex align-items-center gap-3 flex-wrap">
+      <h1 class="h5 mb-0"><i class="bi bi-broadcast-pin me-2"></i>KO
+        <span class="text-muted fw-normal fs-6" id="ko-logg-vakt">· {{ vakt_navn }}</span></h1>
+      <div class="d-flex gap-2">
+        {% if kan_lede or verdifaner_ekstra %}
+        {# «KO-innstillinger» (André, 18. sep. 2026) — sentralbordets valglister #}
+        {# pluss KOs egne ressursbehov, i samme vindu. #}
+        <button type="button" class="btn btn-outline-secondary btn-sm"
+                data-bs-toggle="modal" data-bs-target="#valglisterModal"
+                data-action="lastVerdiadmin">
+          <i class="bi bi-sliders me-1"></i>KO-innstillinger
+        </button>
+        {% endif %}
+        {% if kan_se_oppdrag and kan_skrive %}
+        <button type="button" class="btn btn-outline-secondary btn-sm"
+                data-bs-toggle="modal" data-bs-target="#arkivModal"
+                data-action="lastArkiv">
+          <i class="bi bi-archive me-1"></i>Vaktarkiv
+        </button>
+        {% endif %}
+      </div>
+    </div>
     <div class="d-flex align-items-center gap-2">
       {% comment %}
         Ansvarsmerket (§5.1, pulje 6): hva du gjør nå. Vises ved navnet i
-        «Hvem er pålogget» og på linjene du skriver. Styrer ingenting — KO er
-        et rom der folk dekker for hverandre.
+        «Pålogget» og på linjene du skriver. Styrer ingenting.
       {% endcomment %}
       <label class="small text-muted d-flex align-items-center gap-1 mb-0">
         Ansvar
@@ -80,21 +87,15 @@
         </select>
       </label>
       {% comment %}
-        **Sidebaren er et nedtrekk, ikke en kolonne** (17. sep. 2026). «Hvem har
-        KO oppe» er en håndfull navn man kikker på, ikke noe man overvåker — og
-        en fjerde kolonne ville tatt bredde fra oppdragslista, som trenger den
-        mest.
-
-        `data-bs-toggle="dropdown"` **uten** `data-action`: begge ville fyrt på
-        samme klikk, og det er nettopp fella `klikkSkalKjore()` i
-        portal-utils.js finnes for. Bootstrap melder `show.bs.dropdown` og
-        `hide.bs.dropdown`, og ko.js henger seg på dem i stedet.
+        **Sidebaren er et nedtrekk, ikke en kolonne.** `data-bs-toggle="dropdown"`
+        **uten** `data-action`: begge ville fyrt på samme klikk
+        (`klikkSkalKjore()`). ko.js henger seg på Bootstraps hendelser.
       {% endcomment %}
       <div class="dropdown">
         <button type="button" class="btn btn-sm btn-outline-secondary dropdown-toggle"
                 id="ko-sidebar-knapp" data-bs-toggle="dropdown"
                 aria-expanded="false">
-          <i class="bi bi-people me-1"></i>Hvem er pålogget
+          <i class="bi bi-people me-1"></i>Pålogget
         </button>
         <div class="dropdown-menu dropdown-menu-end p-2" id="ko-sidebar"
              style="min-width:280px;">
@@ -104,172 +105,207 @@
           </div>
         </div>
       </div>
+      {% comment %}
+        Oppsettet: bytte plass gjøres med håndtaket i hvert vindu, størrelse
+        med skillelinjene. Her: tilbake til 2×2. Huskes per nettleser
+        (`ko.oppsett`), som gruppene på tavla.
+      {% endcomment %}
+      <div class="dropdown">
+        <button type="button" class="btn btn-sm btn-outline-secondary dropdown-toggle"
+                id="ko-oppsett-knapp" data-bs-toggle="dropdown" aria-expanded="false">
+          <i class="bi bi-grid-1x2 me-1"></i>Oppsett
+        </button>
+        <div class="dropdown-menu dropdown-menu-end p-2" style="min-width:260px;">
+          <div class="small text-muted mb-2">Dra <i class="bi bi-grip-vertical"></i> i et vindu over et
+            annet for å bytte plass. Dra i skillelinjene for å endre størrelse.</div>
+          <button type="button" class="btn btn-sm btn-outline-secondary w-100"
+                  data-action="koTilbakestillOppsett">
+            <i class="bi bi-arrow-counterclockwise me-1"></i>Tilbakestill til 2×2
+          </button>
+        </div>
+      </div>
     </div>
   </div>
 
-  {% comment %}
-    **Konsollen: tre kolonner, og sida ruller ikke — kolonnene gjør det.**
-    Rekkefølgen er operatørens arbeidsflyt fra venstre mot høyre: du hører noe,
-    fører linja, ser hvem som er ledig, og sender. Se `static/css/ko.css` og
-    `docs/FORSLAG_KO.md` §7.
-  {% endcomment %}
   {% if kan_se_oppdrag %}
-  {% comment %}
-    **Sentralbordets verktøylinje** (pulje 4). Nytt oppdrag, enheter,
-    historikk, valglister og vaktarkiv — samme markup som `/oppdrag/`, fra
-    samme fil. Knappene gates på oppdragsmodulens nivåer, ikke på KOs.
-  {% endcomment %}
-  {% include "oppdrag/_sentralbord_verktoy.html" %}
+  {% include "oppdrag/_sentralbord_oppsettvarsel.html" %}
   {% endif %}
 
-  <div class="ko-konsoll">
+  <div class="ko-konsoll" id="ko-konsoll">
+    <div class="ko-rad" id="ko-rad-1">
 
-    <div class="ko-kolonne ko-kolonne-logg">
-      {% comment %}
-        Loggen er **den sentrale delen** (André, 17. sep. 2026) — bredeste
-        kolonne, og den eneste med et skrivefelt. Feltet står **øverst**: linja
-        skrives mens noe skjer, og man skal ikke måtte rulle forbi fire hundre
-        linjer for å finne det.
-      {% endcomment %}
-      <div class="card mb-3" id="ko-logg-skjema">
-        <div class="card-body py-2">
-          <form id="ko-logg-form" autocomplete="off">
-            <div class="d-flex gap-2 align-items-start flex-wrap">
-              <div class="flex-grow-1" style="min-width:240px;">
-                <label class="visually-hidden" for="ko-logg-tekst">Ny linje</label>
-                <textarea id="ko-logg-tekst" class="form-control" rows="2"
-                          maxlength="{{ ko_maks_tekst }}"
-                          placeholder="Hva skjedde? Skriv det du ville sagt på samband."></textarea>
-              </div>
-              <div style="width:140px;">
-                <label class="visually-hidden" for="ko-logg-tid">Tidspunkt</label>
-                <input type="time" id="ko-logg-tid" class="form-control"
-                       aria-describedby="ko-logg-tid-hjelp">
-                <div class="form-text" id="ko-logg-tid-hjelp">Blank = nå</div>
-              </div>
-              <button type="submit" class="btn btn-primary" id="ko-logg-send">
-                <i class="bi bi-plus-lg me-1"></i>Ny
-              </button>
-              {% comment %}
-                Ny hendelse fra ingenting (pulje 5). Den vanlige veien er
-                «Hendelse» på en logglinje — linja blir stående, hendelsen
-                peker tilbake (§4.5). Skjules for `les` i ko.js, som skjemaet.
-              {% endcomment %}
-              <button type="button" class="btn btn-outline-secondary" id="ko-ny-hendelse"
-                      data-action="koNyHendelse" title="Ny hendelse uten linje">
-                <i class="bi bi-flag me-1"></i>Hendelse
-              </button>
-              {% if chat_tillatt %}
-              {% comment %}
-                Chat (§4.5, pulje 6): samme logg, et merke. Avkryssingen finnes
-                bare når admin har slått chatten på; serveren avviser flagget
-                ellers.
-              {% endcomment %}
-              <label class="small text-muted d-flex align-items-center gap-1 mb-0 ms-1">
-                <input type="checkbox" class="form-check-input mt-0" id="ko-logg-uformell">
-                chat
-              </label>
-              {% endif %}
-            </div>
-            <div class="form-text mt-1">
-              Ikke skriv navn, adresse, fødselsnummer eller telefon. Loggen
-              dekker det som skjer utenfor samleplass og sykestue; pasienten
-              blir pasient i <a href="/pasienter/">/pasienter/</a>.
-            </div>
-            <div class="text-danger small mt-1 d-none" id="ko-logg-feil" role="alert"></div>
-          </form>
-        </div>
-      </div>
-      <div class="card">
-        <div class="card-header py-2 d-flex justify-content-between align-items-center">
-          <span class="small fw-semibold">
-            <i class="bi bi-list-ul me-1"></i>Logg
-            <span class="text-muted" id="ko-logg-vakt"></span>
+      {# ═════ HENDELSESLOGG ═════ #}
+      <section class="ko-vindu" id="ko-vindu-hendelser" data-vindu="hendelser">
+        <div class="ko-vindu-hode">
+          <i class="bi bi-grip-vertical ko-grip" draggable="true" title="Dra for å bytte plass"></i>
+          <i class="bi bi-flag"></i><span class="ko-vindu-tittel">Hendelseslogg</span>
+          <span class="ko-vindu-tall" id="ko-hendelser-antall"></span>
+          <span class="ms-auto d-flex align-items-center gap-2">
+            {% comment %}
+              Søket (André, 18. sep. 2026: «en søk knapp som åpner et søkefelt
+              i hendelsesflaten»). Filtrerer lista som alt er hentet — den
+              følger med hver poll — på nummer, tittel, sted, melder og
+              beskrivelse. Som søket i oppdragshistorikken.
+            {% endcomment %}
+            <span class="input-group input-group-sm ko-sok d-none" id="ko-hendelse-sok-felt">
+              <input type="search" class="form-control" id="ko-hendelse-sok"
+                     placeholder="H-nr, tittel, sted, melder …" aria-label="Søk i hendelser">
+            </span>
+            <button type="button" class="btn btn-sm btn-outline-secondary" id="ko-hendelse-sok-knapp"
+                    data-action="koVippSok" title="Søk i hendelser" aria-label="Søk i hendelser">
+              <i class="bi bi-search"></i>
+            </button>
+            <label class="form-check form-switch m-0 small d-flex align-items-center gap-1">
+              <input class="form-check-input" type="checkbox" id="ko-vis-lukkede"
+                     data-action="koVippLukkede" data-hendelse="change" checked>
+              <span class="form-check-label text-muted">Vis lukkede</span>
+            </label>
+            {% if kan_skrive_ko %}
+            <button type="button" class="btn btn-primary btn-sm" id="ko-ny-hendelse"
+                    data-action="koNyHendelse">
+              <i class="bi bi-plus-lg me-1"></i>Ny hendelse
+            </button>
+            {% endif %}
           </span>
-          <span class="small text-muted" id="ko-logg-antall"></span>
+        </div>
+        <div class="ko-vindu-kropp" id="ko-hendelser-liste">
+          <p class="text-muted small p-2 mb-0">Laster …</p>
         </div>
         {% comment %}
-          `ko-rull` på selve card-body, som i de to andre kolonnene: et
-          mellomliggende element uten `min-height: 0` lar lista vokse forbi
-          kortet i stedet for å rulle.
+          Hendelsen åpnes **inne i vinduet** (André, 18. sep. 2026), ikke i en
+          modal: ressursene og oppdragene skal være synlige mens man jobber i
+          H14. Tegnes av `koTegnDetalj()` i ko-hendelser.js.
         {% endcomment %}
-        <div class="card-body p-0 ko-rull">
-          <div id="ko-logg-liste">
-            <p class="text-muted small p-3 mb-0">Laster …</p>
-          </div>
+        <div class="ko-vindu-kropp ko-detalj d-none" id="ko-hendelse-detalj"></div>
+      </section>
+
+      <div class="ko-splitter-v" data-splitter="rad-1" role="separator" aria-orientation="vertical"></div>
+
+      {# ═════ LOGGSTRØM ═════ #}
+      <section class="ko-vindu" id="ko-vindu-logg" data-vindu="logg">
+        <div class="ko-vindu-hode">
+          <i class="bi bi-grip-vertical ko-grip" draggable="true" title="Dra for å bytte plass"></i>
+          <i class="bi bi-chat-left-text"></i><span class="ko-vindu-tittel">Loggstrøm</span>
+          <span class="ko-vindu-tall" id="ko-logg-antall"></span>
+          <span class="ms-auto d-flex align-items-center gap-2">
+            <label class="form-check form-switch m-0 small d-flex align-items-center gap-1">
+              <input class="form-check-input" type="checkbox" id="ko-vis-system"
+                     data-action="koVippSystem" data-hendelse="change" checked>
+              <span class="form-check-label text-muted">System</span>
+            </label>
+          </span>
         </div>
-      </div>
+        <div class="ko-vindu-kropp" id="ko-logg-liste">
+          <p class="text-muted small p-2 mb-0">Laster …</p>
+        </div>
+        {% comment %}
+          Skrivefeltet står **nederst** i strømmen, som i en chat: nyeste
+          linje nærmest feltet. Skjules for `les` i ko.js.
+        {% endcomment %}
+        <div class="ko-vindu-fot" id="ko-logg-skjema">
+          <form id="ko-logg-form" autocomplete="off" class="d-flex gap-2 align-items-start">
+            <div class="flex-grow-1">
+              <label class="visually-hidden" for="ko-logg-tekst">Loggfør</label>
+              <textarea id="ko-logg-tekst" class="form-control form-control-sm" rows="2"
+                        maxlength="{{ ko_maks_tekst }}" placeholder="Loggfør"></textarea>
+            </div>
+            <div style="width:110px;">
+              <label class="visually-hidden" for="ko-logg-tid">Tidspunkt</label>
+              <input type="time" id="ko-logg-tid" class="form-control form-control-sm" title="Blank = nå">
+            </div>
+            {% if chat_tillatt %}
+            <label class="small text-muted d-flex align-items-center gap-1 mb-0 pt-1">
+              <input type="checkbox" class="form-check-input mt-0" id="ko-logg-uformell">
+              chat
+            </label>
+            {% endif %}
+            <button type="submit" class="btn btn-primary btn-sm" id="ko-logg-send" title="Loggfør">
+              <i class="bi bi-send"></i>
+            </button>
+          </form>
+          <div class="ko-hint mt-1">
+            Ikke skriv navn, adresse, fødselsnummer eller telefon. Pasienten blir pasient i
+            <a href="/pasienter/">/pasienter/</a>.
+          </div>
+          <div class="text-danger small mt-1 d-none" id="ko-logg-feil" role="alert"></div>
+        </div>
+      </section>
     </div>
 
-    <div class="ko-kolonne ko-kolonne-ressurser">
-      {% comment %}
-        **Ressurslista er sentralbordets egen**, tegnet av `tegnEnhetsliste()`
-        i `static/js/oppdrag-kort.js` — samme funksjon, samme enheter, samme
-        statuser (André, 18. sep. 2026: «Vi vil ha det likt i funksjonalitet
-        som vi hadde det i /oppdrag»). ID-ene `enhetsliste` og `av-vakt-teller`
-        er derfor de samme som i `templates/oppdrag/sentral.html`.
+    <div class="ko-splitter-h" data-splitter="rader" role="separator" aria-orientation="horizontal"></div>
 
-        Den står ved siden av oppdragslista fordi de to svarer på matchingen
-        sammen: hvem er ledig, og hva venter.
-      {% endcomment %}
-      <div class="card">
-        <div class="card-header py-2 d-flex justify-content-between align-items-center">
-          <span class="small fw-semibold">
-            <i class="bi bi-truck me-1"></i>Ressurser
-          </span>
-          <span class="small text-muted" id="av-vakt-teller"></span>
+    <div class="ko-rad" id="ko-rad-2">
+
+      {# ═════ RESSURSOVERSIKT ═════ #}
+      <section class="ko-vindu" id="ko-vindu-ressurser" data-vindu="ressurser">
+        <div class="ko-vindu-hode">
+          <i class="bi bi-grip-vertical ko-grip" draggable="true" title="Dra for å bytte plass"></i>
+          <i class="bi bi-truck"></i><span class="ko-vindu-tittel">Ressursoversikt</span>
+          <span class="ko-vindu-tall" id="ko-ressurser-antall"></span>
+          {% if kan_se_oppdrag and kan_skrive %}
+          <button type="button" class="btn btn-outline-secondary btn-sm ms-2"
+                  data-bs-toggle="modal" data-bs-target="#enheterModal"
+                  data-action="lastEnhetsadmin">
+            <i class="bi bi-truck me-1"></i>Enheter<span id="av-vakt-teller"></span>
+          </button>
+          {% else %}
+          <span id="av-vakt-teller" class="ko-vindu-tall"></span>
+          {% endif %}
         </div>
-        <div class="card-body ko-rull">
+        <div class="ko-vindu-kropp">
           {% if kan_se_oppdrag %}
+          {% comment %}
+            **Ressurslista er sentralbordets egen**, tegnet av `tegnEnhetsliste()`
+            i oppdrag-kort.js — samme ID-er som i /oppdrag/. Vaktlistas ressurser
+            uten enhet står under, i egen beholder (pulje 6).
+          {% endcomment %}
           <div id="enhetsliste" class="d-grid gap-2">
             <div class="tom-melding">Laster…</div>
           </div>
           {% if kan_se_vaktliste %}
-          {% comment %}
-            Vaktlistas ressurser uten oppdragsenhet (pulje 6) — lag,
-            samleplass, KO. Vaktlistas data, lånt inn: gaten er `les` i
-            vaktliste. Egen beholder, fordi sentralbordet tegner
-            `#enhetsliste` om igjen ved hver poll.
-          {% endcomment %}
           <div id="vaktliste-ressurser" class="d-grid gap-2 mt-2"></div>
           {% endif %}
           {% else %}
-          <p class="text-muted small mb-0">
-            Krever tilgang til oppdragsmodulen.
-          </p>
+          <p class="text-muted small mb-0">Krever tilgang til oppdragsmodulen.</p>
           {% endif %}
         </div>
-      </div>
-    </div>
+      </section>
 
-    <div class="ko-kolonne ko-kolonne-oppdrag">
-      {% comment %}
-        **Oppdragslista er sentralbordets egen** (pulje 4, 18. sep. 2026).
-        `/ko/` laster `oppdrag-sentral-*.js` og treffer `/oppdrag/api/...` med
-        de samme sperrene — en flytting, ikke en kopi. ID-en `oppdragsliste`
-        er derfor den samme som i `templates/oppdrag/sentral.html`.
-      {% endcomment %}
-      <div class="card">
-        <div class="card-header py-2 d-flex justify-content-between align-items-center">
-          <span class="small fw-semibold">
-            <i class="bi bi-list-task me-1"></i>Oppdragsliste
-          </span>
-          {% comment %}
-            **Hendelser er en gruppering av denne lista, ikke en egen flate**
-            (§7, pulje 5). Bryteren skjuler ingenting: av og på viser de samme
-            radene, med eller uten overskrifter. `data-hendelse="change"`
-            fordi en avkryssing melder sin egen hendelse — `klikkSkalKjore()`.
-          {% endcomment %}
+      <div class="ko-splitter-v" data-splitter="rad-2" role="separator" aria-orientation="vertical"></div>
+
+      {# ═════ OPPDRAGSLISTE ═════ #}
+      <section class="ko-vindu" id="ko-vindu-oppdrag" data-vindu="oppdrag">
+        <div class="ko-vindu-hode">
+          <i class="bi bi-grip-vertical ko-grip" draggable="true" title="Dra for å bytte plass"></i>
+          <i class="bi bi-list-task"></i><span class="ko-vindu-tittel">Oppdragsliste</span>
+          <span class="ko-vindu-tall" id="ko-oppdrag-antall"></span>
           {% if kan_se_oppdrag %}
-          <label class="small text-muted d-flex align-items-center gap-1 mb-0">
-            <input type="checkbox" class="form-check-input mt-0" id="ko-gruppert"
-                   data-action="koToggleGruppering" data-hendelse="change">
-            Gruppér på hendelse
-          </label>
+          {% comment %}
+            Knappene rett etter tittelen (André, 18. sep. 2026: «den lå for
+            langt vekke»). Gates på oppdragsmodulens nivåer.
+          {% endcomment %}
+          <span class="d-flex gap-2 ms-2">
+            {% if kan_skrive %}
+            <button type="button" class="btn btn-primary btn-sm"
+                    data-bs-toggle="modal" data-bs-target="#nyttOppdragModal">
+              <i class="bi bi-plus-lg me-1"></i>Nytt oppdrag
+            </button>
+            {% endif %}
+            <button type="button" class="btn btn-outline-secondary btn-sm"
+                    data-bs-toggle="modal" data-bs-target="#historikkModal"
+                    data-action="lastHistorikk">
+              <i class="bi bi-clock-history me-1"></i>Historikk
+            </button>
+          </span>
           {% endif %}
         </div>
-        <div class="card-body ko-rull">
+        <div class="ko-vindu-kropp">
           {% if kan_se_oppdrag %}
+          {% comment %}
+            **Oppdragslista er sentralbordets egen** (pulje 4). Ingen
+            hendelser i lista (André, 18. sep. 2026) — H-merket på raden bærer
+            koblingen, og hendelsene har sitt eget vindu.
+          {% endcomment %}
           <div id="oppdragsliste">
             <div class="tom-melding">Laster…</div>
           </div>
@@ -280,13 +316,92 @@
           </p>
           {% endif %}
         </div>
-      </div>
+      </section>
     </div>
   </div>
 </div>
 
 {% if kan_se_oppdrag %}
-{% include "oppdrag/_sentralbord_modaler.html" %}
+{% include "oppdrag/_sentralbord_modaler.html" with valglister_tittel="KO-innstillinger" %}
+{% elif verdifaner_ekstra %}
+{% include "oppdrag/_sentralbord_modaler.html" with valglister_tittel="KO-innstillinger" kan_skrive=False kan_lede=False %}
+{% endif %}
+
+{% if kan_skrive_ko %}
+{% comment %}
+  «Ny hendelse» / «Rediger hendelse». Ett skjema, to titler. Feltene i
+  Andrés rekkefølge (18. sep. 2026): hvor, hva, melder, beskrivelse,
+  prioritet, ressurser. Lokasjonene fylles av ko-hendelser.js fra
+  sentralbordets liste — samme kilde som «Nytt oppdrag».
+{% endcomment %}
+<div class="modal fade" id="koHendelseModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="ko-hendelse-modal-tittel"><i class="bi bi-flag me-2"></i>Ny hendelse</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Lukk"></button>
+      </div>
+      <div class="modal-body">
+        <form id="ko-hendelse-form" autocomplete="off">
+          <input type="hidden" id="ko-h-id" value="">
+          <input type="hidden" id="ko-h-versjon" value="">
+          <input type="hidden" id="ko-h-fra-linje" value="">
+          <div class="mb-3">
+            <label class="form-label" for="ko-h-lokasjon">Hvor</label>
+            <select id="ko-h-lokasjon" class="form-select"><option value="">—</option></select>
+            <div class="form-text">Samme liste som «Nytt oppdrag». Vedlikeholdes under KO-innstillinger.</div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label" for="ko-h-tittel">Hva skjer? <span class="text-danger">*</span></label>
+            <input type="text" id="ko-h-tittel" class="form-control" maxlength="120" required>
+            <div class="form-text">Det du ville kalt den på samband. Ikke navn eller fødselsnummer.</div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label" for="ko-h-melder">Melder</label>
+            <input type="text" id="ko-h-melder" class="form-control" maxlength="120"
+                   placeholder="Lag 1, publikum, arrangør …">
+          </div>
+          <div class="mb-3">
+            <label class="form-label" for="ko-h-beskrivelse">Beskrivelse</label>
+            <textarea id="ko-h-beskrivelse" class="form-control" rows="3" maxlength="{{ ko_maks_tekst }}"></textarea>
+          </div>
+          <div class="mb-3">
+            <div class="form-label">Prioritet</div>
+            <div class="ko-prio-valg" id="ko-h-prioritet" role="radiogroup" aria-label="Prioritet">
+              {% for verdi, navn in prioriteter %}
+              <button type="button" class="ko-prio-knapp ko-prio-{{ verdi }}"
+                      data-action="koVelgPrioritet" data-arg="{{ verdi }}"
+                      role="radio" aria-checked="false">{% if verdi == 'viktig' %}<i class="bi bi-exclamation-triangle-fill me-1"></i>{% endif %}{{ navn }}</button>
+              {% endfor %}
+            </div>
+            <div class="form-text">Kan endres senere, og endringen logges. Viktig gir rød ramme og står øverst.</div>
+          </div>
+          <div class="mb-2">
+            <div class="form-label">Ressurser</div>
+            <div class="ko-ressursbehov-valg" id="ko-h-ressursbehov">
+              {% for r in ressursbehov %}
+              <label class="form-check nytt-enhet-valg">
+                <input class="form-check-input" type="checkbox" value="{{ r.pk }}"> {{ r.navn }}
+              </label>
+              {% empty %}
+              <span class="form-text">Ingen ressursbehov er satt opp ennå — legg dem inn under KO-innstillinger.</span>
+              {% endfor %}
+            </div>
+            <div class="form-text">Hva trengs? Oppdragene opprettes etterpå, inne i hendelsen.</div>
+          </div>
+          <div class="ko-hint" id="ko-h-opprettes-av"></div>
+          <div id="ko-h-feil" class="text-danger small d-none mt-2" role="alert"></div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Avbryt</button>
+        <button type="button" class="btn btn-primary" id="ko-h-lagre" data-action="koLagreHendelse">
+          <i class="bi bi-flag me-1"></i><span id="ko-h-lagre-tekst">Opprett hendelse</span>
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
 {% endif %}
 {% endblock %}
 
@@ -298,12 +413,17 @@
 <script src="{% static 'js/portal-utils.js' %}"></script>
 {% comment %}
   **Sentralbordet kjører her** (pulje 4). Samme filer, samme rekkefølge som
-  `/oppdrag/` — se `oppdrag/_sentralbord_skript.html`. `ko.js` lastes til
-  slutt: den eier loggen og konsollhøyden, og sentralfilenes
-  `DOMContentLoaded` henter listene.
+  `/oppdrag/` — se `oppdrag/_sentralbord_skript.html`.
 {% endcomment %}
 {% if kan_se_oppdrag %}
 {% include "oppdrag/_sentralbord_skript.html" %}
 {% endif %}
+{% comment %}
+  KOs tre filer, i lasterekkefølge (`KO_JS` i patients/js_test_utils.py):
+  oppsettet, hendelsene, og til slutt loggen med den ene
+  `DOMContentLoaded`-kroken — alt som kjører på toppnivå står i den siste.
+{% endcomment %}
+<script src="{% static 'js/ko-layout.js' %}"></script>
+<script src="{% static 'js/ko-hendelser.js' %}"></script>
 <script src="{% static 'js/ko.js' %}"></script>
 {% endblock %}

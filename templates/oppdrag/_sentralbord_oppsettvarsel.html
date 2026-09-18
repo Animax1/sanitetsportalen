@@ -1,0 +1,15 @@
+{% comment %}
+  Oppsettvarselet. Egen malbit (18. sep. 2026) fordi `/ko/` har sin egen
+  verktøylinje — knappene står i vinduene der — men trenger varselet like
+  fullt. `visManglendeOppsett()` i oppdrag-sentral-lasting.js skriver hit.
+{% endcomment %}
+  <div id="mangler-oppsett" class="alert alert-warning d-none">
+    <strong>Modulen mangler oppsett.</strong>
+    <span id="mangler-hva"></span>
+    {% if er_global_admin %}
+    Bruk knappene øverst.
+    {% else %}
+    En administrator må legge dem inn.
+    {% endif %}
+  </div>
+

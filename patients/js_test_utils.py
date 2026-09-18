@@ -43,6 +43,13 @@ OPPDRAG_SENTRAL_JS = (
     JS_DIR / 'oppdrag-sentral-lasting.js',
 )
 OPPDRAG_ENHET_JS = JS_DIR / 'oppdrag-enhet.js'
+#: **KO er tre filer** (18. sep. 2026): rutenettet, hendelsene, og loggen med
+#: den ene `DOMContentLoaded`-kroken sist. Tuppel, som de andre delte sidene.
+KO_JS = (
+    JS_DIR / 'ko-layout.js',
+    JS_DIR / 'ko-hendelser.js',
+    JS_DIR / 'ko.js',
+)
 #: **Vaktlistesiden er seks filer** — fem siden 14. sep. 2026 (gjeldspunkt 3.6),
 #: og `vaktliste-oversikt.js` skilt ut fra tegningsfila 15. sep. 2026 da den
 #: passerte 1 800 linjer.

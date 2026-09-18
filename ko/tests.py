@@ -286,7 +286,8 @@ class SidenHarIngenFanerTests(TestCase):
     trengs for å fullføre **én** handling (hør, før linja, se hvem som er
     ledig, send), og en skjult fane er dessuten en fane man ikke vet har endret
     seg — siden poller, så andres logglinjer og nye oppdrag lander i en rute
-    ingen ser på. Se `ko/CLAUDE.md`.
+    ingen ser på. Fra 18. sep. 2026 er formen **fire vinduer i 2×2**, og rammen
+    holder alle fire synlige (André). Se `ko/CLAUDE.md`.
     """
 
     def setUp(self):
@@ -307,34 +308,44 @@ class SidenHarIngenFanerTests(TestCase):
         return svar.content.decode()
 
     def test_ingen_fanemekanikk_i_markupen(self):
+        """Valglistemodalen har faner *inne i seg* (lokasjoner, enhetstyper …)
+        — det er et skjema med tre lister, ikke sidas flater, og den er
+        sentralbordets egen. Regelen gjelder konsollen, så den måles på
+        markupen utenfor modalene."""
         markup = self._markup()
+        konsoll = markup[markup.index('id="ko-verktoy"'):markup.index('id="ko-vindu-oppdrag"')]
         for spor in ('nav-tabs', 'data-bs-toggle="tab"', 'tab-pane',
                      'role="tablist"'):
             with self.subTest(spor=spor):
                 self.assertNotIn(
-                    spor, markup,
+                    spor, konsoll,
                     f'{spor} er tilbake på /ko/ — flatene skal stå ved siden '
-                    f'av hverandre. En ny flate legges i en av kolonnene, '
-                    f'aldri som en fane til')
+                    f'av hverandre. En ny flate legges i rutenettet, aldri '
+                    f'som en fane til')
 
-    def test_de_tre_flatene_staar_som_kolonner(self):
-        """Konsollformen (17. sep. 2026): tre kolonner, ikke faner og ikke
-        stabling på PC. Rekkefølgen er operatørens arbeidsflyt fra venstre —
-        logg, ressurser, oppdrag — og den skal ikke stokkes om uten at noen
-        tar stilling til den."""
+    def test_de_fire_flatene_staar_i_rutenettet(self):
+        """2×2 (18. sep. 2026): hendelser og logg øverst, ressurser og oppdrag
+        nederst. Rekkefølgen i markupen er standardoppsettet; brukeren kan
+        bytte om i nettleseren, og det skal ikke stokkes om her uten at noen
+        tar stilling til det."""
         markup = self._markup()
-        for klasse in ('ko-konsoll', 'ko-kolonne-logg', 'ko-kolonne-ressurser',
-                       'ko-kolonne-oppdrag'):
-            with self.subTest(klasse=klasse):
-                self.assertIn(klasse, markup)
-        rekkefolge = [markup.index(k) for k in
-                      ('ko-kolonne-logg', 'ko-kolonne-ressurser',
-                       'ko-kolonne-oppdrag')]
+        self.assertIn('id="ko-konsoll"', markup)
+        vinduer = ['data-vindu="hendelser"', 'data-vindu="logg"',
+                   'data-vindu="ressurser"', 'data-vindu="oppdrag"']
+        for v in vinduer:
+            with self.subTest(vindu=v):
+                self.assertIn(v, markup)
+        rekkefolge = [markup.index(v) for v in vinduer]
         self.assertEqual(rekkefolge, sorted(rekkefolge),
-                         'kolonnene står ikke i arbeidsflytens rekkefølge')
+                         'vinduene står ikke i standardoppsettets rekkefølge')
+        # Rammen: to rader, en skillelinje i hver og en mellom dem.
+        self.assertEqual(markup.count('class="ko-splitter-v"'), 2)
+        self.assertEqual(markup.count('class="ko-splitter-h"'), 1)
+        # Hvert vindu har håndtaket som bytter plass.
+        self.assertEqual(markup.count('ko-grip'), 4)
 
     def test_sidebaren_tar_ikke_en_kolonne(self):
-        """«Hvem har KO oppe» er et nedtrekk fra knappen i toppen.
+        """«Pålogget» er et nedtrekk fra knappen i toppen.
 
         Og knappen har **ikke** `data-action` ved siden av `data-bs-toggle`:
         to lyttere på samme klikk er fella `klikkSkalKjore()` finnes for.
@@ -345,6 +356,7 @@ class SidenHarIngenFanerTests(TestCase):
         self.assertIn('data-bs-toggle="dropdown"', knapp)
         self.assertNotIn('data-action', knapp)
         self.assertIn('dropdown-menu', markup)
+        self.assertIn('>Pålogget', markup.replace('\n', ''))
 
     def test_loggen_og_tavla_staar_samtidig(self):
         """Det er *dette* fraværet av faner skal gi, og derfor det som prøves.
@@ -356,19 +368,48 @@ class SidenHarIngenFanerTests(TestCase):
         markup = self._markup()
         self.assertIn('id="ko-logg-form"', markup, 'skrivefeltet mangler')
         self.assertIn('id="ko-logg-liste"', markup, 'loggstrømmen mangler')
+        self.assertIn('id="ko-hendelser-liste"', markup, 'hendelsesloggen mangler')
         self.assertIn('id="enhetsliste"', markup, 'ressurslista mangler')
-        self.assertIn('Oppdragsliste', markup, 'oppdragsflata mangler')
+        self.assertIn('id="oppdragsliste"', markup, 'oppdragsflata mangler')
 
         # **Målt på elementene selv, ikke på et vindu foran dem.** Første
         # utgave leste de 400 tegnene før skrivefeltet og ble rød da
         # sentralbordets `#mangler-oppsett` — som med rette bærer `d-none` —
-        # havnet der (18. sep. 2026). En omtrentlig regel som treffer feil
-        # markup er en regel man slår av.
+        # havnet der (18. sep. 2026).
         import re
-        for klasse in ('ko-kolonne-logg', 'ko-kolonne-ressurser',
-                       'ko-kolonne-oppdrag'):
-            with self.subTest(klasse=klasse):
-                m = re.search(rf'class="[^"]*{klasse}[^"]*"', markup)
+        for navn in ('hendelser', 'logg', 'ressurser', 'oppdrag'):
+            with self.subTest(vindu=navn):
+                m = re.search(rf'<section class="[^"]*" id="ko-vindu-{navn}" data-vindu="{navn}"', markup)
                 self.assertIsNotNone(m)
                 self.assertNotIn('d-none', m.group(0),
-                                 f'{klasse} er skjult ved lasting')
+                                 f'vinduet {navn} er skjult ved lasting')
+
+    def test_knappene_staar_i_vinduet_de_gjelder(self):
+        """André, 18. sep. 2026: «Nytt oppdrag» rett etter oppdragslistas
+        tittel, «Historikk» ved siden av, «Enheter» i ressursoversikten, «Ny
+        hendelse» i hendelsesloggen. Verktøylinja har bare det som gjelder
+        hele sida. Målt på rekkefølgen i markupen. Oppdragsleder her, så
+        «KO-innstillinger» finnes å måle på."""
+        ModulTilgang.objects.update_or_create(
+            bruker=CustomUser.objects.get(username='operator'), modul_slug='oppdrag',
+            defaults={'nivaa': 'skriv_leder'})
+        markup = self._markup()
+        oppdrag = markup[markup.index('id="ko-vindu-oppdrag"'):]
+        oppdrag = oppdrag[:oppdrag.index('id="oppdragsliste"')]
+        self.assertIn('data-bs-target="#nyttOppdragModal"', oppdrag)
+        self.assertIn('data-bs-target="#historikkModal"', oppdrag)
+        ressurser = markup[markup.index('id="ko-vindu-ressurser"'):markup.index('id="enhetsliste"')]
+        self.assertIn('data-bs-target="#enheterModal"', ressurser)
+        hendelser = markup[markup.index('id="ko-vindu-hendelser"'):markup.index('id="ko-hendelser-liste"')]
+        self.assertIn('data-action="koNyHendelse"', hendelser)
+        self.assertIn('id="ko-hendelse-sok"', hendelser, 'søkefeltet i hendelsesflaten')
+        verktoy = markup[markup.index('id="ko-verktoy"'):markup.index('id="ko-konsoll"')]
+        for spor in ('#nyttOppdragModal', '#historikkModal', '#enheterModal'):
+            self.assertNotIn(spor, verktoy, f'{spor} skal ikke stå i verktøylinja')
+        self.assertIn('KO-innstillinger', verktoy)
+        self.assertNotIn('Valglister', verktoy)
+
+    def test_loggfoer_er_skrivefeltets_tekst(self):
+        """«Loggfør» (André, 18. sep. 2026), ikke «Hva skjedde? …»."""
+        markup = self._markup()
+        self.assertIn('placeholder="Loggfør"', markup)

@@ -162,16 +162,34 @@ class OppdragsflataGatesAvOppdragsmodulenTests(TestCase):
 
     def test_valglistene_krever_skriv_leder(self):
         """Verdimengdene settes opp av `skriv_leder` (André, 12. sep. 2026),
-        og nivået er oppdragsmodulens — også på KO-sida."""
-        bruker = _gi(_bruker('skriver'), 'ko', 'skriv_leder')
+        og nivået er oppdragsmodulens — også på KO-sida. Vinduet heter
+        «KO-innstillinger» der (18. sep. 2026), og KOs egen fane
+        (ressursbehovene) har sin egen dør: KO-leder."""
+        bruker = _gi(_bruker('skriver'), 'ko', 'skriv_full')
         _gi(bruker, 'oppdrag', 'skriv_full')
         self.client.force_login(bruker)
-        self.assertNotIn('data-bs-target="#valglisterModal"',
-                         self.client.get('/ko/').content.decode())
+        markup = self.client.get('/ko/').content.decode()
+        self.assertNotIn('data-bs-target="#valglisterModal"', markup)
+        self.assertNotIn('data-verdifane="ressursbehov"', markup)
 
         _gi(bruker, 'oppdrag', 'skriv_leder')
-        self.assertIn('data-bs-target="#valglisterModal"',
-                      self.client.get('/ko/').content.decode())
+        markup = self.client.get('/ko/').content.decode()
+        self.assertIn('data-bs-target="#valglisterModal"', markup)
+        self.assertIn('data-verdifane="lokasjoner"', markup)
+        self.assertNotIn('data-verdifane="ressursbehov"', markup,
+                         'oppdragsleder er ikke KO-leder')
+
+    def test_ko_leder_faar_ressursbehovfanen_uten_oppdragsleder(self):
+        """Den andre døra: KO-leder uten oppdragsleder-nivå ser
+        «KO-innstillinger» med bare ressursbehovene."""
+        bruker = _gi(_bruker('koleder'), 'ko', 'skriv_leder')
+        _gi(bruker, 'oppdrag', 'skriv_full')
+        self.client.force_login(bruker)
+        markup = self.client.get('/ko/').content.decode()
+        self.assertIn('data-bs-target="#valglisterModal"', markup)
+        self.assertIn('data-verdifane="ressursbehov"', markup)
+        self.assertNotIn('data-verdifane="lokasjoner"', markup)
+        self.assertIn('KO-innstillinger', markup)
 
     def test_uten_oppdragstilgang_tegnes_ikke_flata(self):
         self.client.force_login(_gi(_bruker('bare_ko'), 'ko', 'skriv_leder'))

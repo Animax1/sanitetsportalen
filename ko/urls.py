@@ -24,6 +24,9 @@ urlpatterns = [
     path('api/logg/ny/', views.logg_skriv_view, name='ko_api_logg_ny'),
     path('api/logg/<int:pk>/rett/', views.logg_rett_view, name='ko_api_logg_rett'),
     path('api/logg/<int:pk>/fjern/', views.logg_fjern_view, name='ko_api_logg_fjern'),
+    # Festing (18. sep. 2026) — to stier, som rett/fjern: én regel per sti.
+    path('api/logg/<int:pk>/fest/', views.logg_fest_view, name='ko_api_logg_fest'),
+    path('api/logg/<int:pk>/losne/', views.logg_losne_view, name='ko_api_logg_losne'),
     # Hendelsene (pulje 5). Lesingen går med logg-pollen; skrivingen har
     # navngitte stier, som loggen — én regel per sti.
     path('api/hendelser/ny/', views.hendelse_ny_view, name='ko_api_hendelse_ny'),
@@ -33,6 +36,16 @@ urlpatterns = [
          name='ko_api_hendelse_lukk'),
     path('api/hendelser/<int:pk>/gjenapne/', views.hendelse_gjenapne_view,
          name='ko_api_hendelse_gjenapne'),
+    path('api/hendelser/<int:pk>/prioritet/', views.hendelse_prioritet_view,
+         name='ko_api_hendelse_prioritet'),
+    path('api/hendelser/<int:pk>/bli-med/', views.hendelse_bli_med_view,
+         name='ko_api_hendelse_bli_med'),
+    # KO-innstillingene: ressursbehovene (18. sep. 2026).
+    path('api/ressursbehov/', views.ressursbehov_view, name='ko_api_ressursbehov'),
+    path('api/ressursbehov/rekkefolge/', views.ressursbehov_rekkefolge_view,
+         name='ko_api_ressursbehov_rekkefolge'),
+    path('api/ressursbehov/<int:pk>/', views.ressursbehov_detalj_view,
+         name='ko_api_ressursbehov_detalj'),
     # Grupperingen skrives her og ikke i `/oppdrag/api/`: `Oppdrag.hendelse`
     # er KOs peker, og oppdragsmodulen leser den bare.
     path('api/oppdrag/<int:pk>/hendelse/', views.oppdrag_hendelse_view,

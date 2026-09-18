@@ -17,8 +17,9 @@ from core.models import AppSetting
 from core.vakt import hent_aktiv_vakt
 
 from .models import (
-    HENDELSE_APEN, HENDELSE_LUKKET, KILDE_OPERATOR, KILDE_SYSTEM, Ansvarsmerke,
-    Hendelse, Logglinje,
+    HENDELSE_APEN, HENDELSE_LUKKET, KILDE_OPERATOR, KILDE_SYSTEM,
+    PRIORITET_NAVN, PRIORITET_STANDARD, Ansvarsmerke, Hendelse,
+    HendelseDeltaker, Logglinje, Ressursbehov,
 )
 
 
@@ -196,8 +197,15 @@ def _frys_forfatter(linje, bruker) -> None:
 
 
 def skriv_linje(vakt, raa_tekst, *, bruker, tidspunkt=None,
-                ansvarsomraade=None, uformell=False, naa=None) -> Logglinje:
+                ansvarsomraade=None, uformell=False, hendelse=None,
+                naa=None) -> Logglinje:
     """En menneskeskrevet linje. Den vanlige veien inn i loggen.
+
+    **`hendelse` gjør linja til en kommentar i hendelsen** (18. sep. 2026).
+    Samme tabell, samme regler — §4.1 sa «én logg, ikke to» nettopp for at
+    dette skulle være en peker og ikke en flytting. Og den som skriver i
+    hendelsen er *på* den: `bli_med` kalles her, ikke i viewet, så en klient
+    som går utenom skjermen får samme regel.
 
     **Ansvarsområdet stemples fra operatørens merke** når kallet ikke oppgir
     et (§5.1): det er slik «ført av Kari, samband» kommer på linja uten at hun
@@ -212,6 +220,8 @@ def skriv_linje(vakt, raa_tekst, *, bruker, tidspunkt=None,
     tid = vurder_tidspunkt(tidspunkt, naa)
     if uformell and not chat_tillatt():
         raise Ugyldig('Chatten er slått av. Skriv linja som en vanlig logglinje.')
+    if hendelse is not None and hendelse.vakt_id != vakt.pk:
+        raise Ugyldig('Hendelsen hører til en annen vakt.')
     if ansvarsomraade is None:
         ansvarsomraade = ansvar_for(bruker)
     linje = Logglinje(
@@ -221,9 +231,43 @@ def skriv_linje(vakt, raa_tekst, *, bruker, tidspunkt=None,
         tekst=tekst,
         ansvarsomraade=(ansvarsomraade or '').strip()[:40],
         uformell=bool(uformell),
+        hendelse=hendelse,
     )
     _frys_forfatter(linje, bruker)
     linje.save()
+    if hendelse is not None:
+        bli_med(hendelse, bruker)
+    return linje
+
+
+def fest_linje(linje, *, bruker, naa=None) -> Logglinje:
+    """Fest linja øverst i loggstrømmen. Idempotent: en linje som alt er
+    festet blir stående med den første festingen — to operatører som trykker
+    samtidig skal ikke bytte navn på hverandre. Systemlinjer og fjernede
+    linjer festes ikke: den ene er ikke en beskjed, den andre har ingen."""
+    if linje.kilde == KILDE_SYSTEM:
+        raise Ugyldig('Systemlinjer kan ikke festes.')
+    if linje.er_fjernet:
+        raise Ugyldig('Linja er fjernet og kan ikke festes.')
+    if linje.er_festet:
+        return linje
+    linje.festet_at = naa or timezone.now()
+    linje.festet_av = bruker if bruker and bruker.is_authenticated else None
+    linje.festet_av_navn = getattr(bruker, 'username', '') or ''
+    linje.save(update_fields=['festet_at', 'festet_av', 'festet_av_navn'])
+    return linje
+
+
+def losne_linje(linje, *, bruker) -> Logglinje:
+    """Ta linja ned igjen. Idempotent, og hvem som helst med `skriv_full`
+    kan løsne det en annen festet — det er en beskjed på en felles tavle,
+    ikke en eiendel."""
+    if not linje.er_festet:
+        return linje
+    linje.festet_at = None
+    linje.festet_av = None
+    linje.festet_av_navn = ''
+    linje.save(update_fields=['festet_at', 'festet_av', 'festet_av_navn'])
     return linje
 
 
@@ -392,6 +436,10 @@ def slett_utlopte(naa=None, *, dager=None) -> int:
 
 #: Lengste tittel. Det man kaller hendelsen på samband — kort.
 MAKS_TITTEL = 120
+#: Beskrivelsen har samme tak som en logglinje: fullstendig, ikke ubegrenset.
+MAKS_BESKRIVELSE = MAKS_TEKST
+MAKS_MELDER = 120
+MAKS_LAGSRESSURSER = 255
 
 
 def hendelsesnr(nummer) -> str:
@@ -441,21 +489,89 @@ def rens_tittel(raa) -> str:
     return tittel
 
 
+def rens_prioritet(raa) -> str:
+    """Én av `PRIORITET_VALG`. `None`/tom gir standarden — skjemaet kan
+    utelate feltet — men en ukjent verdi avvises, ikke rettes: «Kritisk» fra
+    en gammel klient skal ikke stille bli «Grønn»."""
+    verdi = (raa or '').strip().lower()
+    if not verdi:
+        return PRIORITET_STANDARD
+    if verdi not in PRIORITET_NAVN:
+        raise Ugyldig('Ukjent prioritet.')
+    return verdi
+
+
+def _rens_kort(raa, maks, hva) -> str:
+    tekst = (raa or '').strip()
+    if len(tekst) > maks:
+        raise Ugyldig(f'{hva} er for lang (maks {maks} tegn).')
+    return tekst
+
+
+def _ressursbehov_fra(ider):
+    """Radene bak en liste med id-er. Ukjent id er 400, ikke stille utelatt —
+    en avkryssing som forsvinner uten å si fra er en feil man ser i loggen et
+    døgn senere. `None` betyr «ikke oppgitt»; `[]` betyr «ingen»."""
+    if ider is None:
+        return None
+    if not isinstance(ider, (list, tuple)):
+        raise Ugyldig('Ressursbehov må være en liste.')
+    try:
+        onsket = {int(i) for i in ider}
+    except (TypeError, ValueError):
+        raise Ugyldig('Ressursbehov må være tall.')
+    rader = list(Ressursbehov.objects.filter(pk__in=onsket))
+    if len(rader) != len(onsket):
+        raise Ugyldig('Ukjent ressursbehov.')
+    return rader
+
+
 def _hendelsesdata(hendelse) -> dict:
     return {'hendelsesnummer': hendelse.hendelsesnummer, 'tittel': hendelse.tittel,
-            'lokasjon': hendelse.lokasjon_navn}
+            'lokasjon': hendelse.lokasjon_navn,
+            'prioritet': PRIORITET_NAVN.get(hendelse.prioritet, '')}
+
+
+def bli_med(hendelse, bruker) -> bool:
+    """Meld operatøren på hendelsen. Idempotent; `True` når raden var ny.
+
+    Kalles av **hver skriving på hendelsen** — kommentar, oppdrag, prioritet,
+    redigering — og av «Bli med»-knappen (André, 18. sep. 2026). Ikke av
+    lesing: å åpne H14 for å se hva som skjer er ikke å jobbe med den.
+    Anonyme og systemkall melder ingen inn.
+    """
+    if bruker is None or not getattr(bruker, 'is_authenticated', False):
+        return False
+    navn = getattr(bruker, 'username', '') or ''
+    if not navn:
+        return False
+    _, ny = HendelseDeltaker.objects.get_or_create(
+        hendelse=hendelse, brukernavn=navn, defaults={'bruker': bruker})
+    return ny
 
 
 @transaction.atomic
 def opprett_hendelse(vakt, raa_tittel, *, bruker, lokasjon=None,
-                     fra_linje=None) -> Hendelse:
+                     fra_linje=None, prioritet=None, beskrivelse=None,
+                     melder=None, ressursbehov=None) -> Hendelse:
     """Ny hendelse. Fra en logglinje eller fra ingenting.
 
     **Linja blir stående** (§4.5): hendelsen peker tilbake på den, og linja
     får hendelsen som sin — den er den første linja i hendelsens filter. Å
     flytte linja inn ville gitt loggen et hull akkurat der det viktige skjedde.
+
+    **Alt valideres før nummeret trekkes.** Telleren er atomisk og lar seg
+    ikke rulle tilbake av en 400 — en avvist innsending som alt hadde hentet
+    H14 ville etterlatt et hull i serien, og hull i en serie folk sier høyt
+    er spørsmål i etterkant.
+
+    Den som oppretter er på hendelsen fra første sekund (`bli_med`).
     """
     tittel = rens_tittel(raa_tittel)
+    prio = rens_prioritet(prioritet)
+    beskrivelse = _rens_kort(beskrivelse, MAKS_BESKRIVELSE, 'Beskrivelsen')
+    melder = _rens_kort(melder, MAKS_MELDER, 'Melder')
+    behov = _ressursbehov_fra(ressursbehov)
     if fra_linje is not None and fra_linje.vakt_id != vakt.pk:
         raise Ugyldig('Linja hører til en annen vakt.')
     hendelse = Hendelse(
@@ -464,16 +580,22 @@ def opprett_hendelse(vakt, raa_tittel, *, bruker, lokasjon=None,
         tittel=tittel,
         lokasjon=lokasjon,
         lokasjon_navn=getattr(lokasjon, 'navn', '') or '',
+        prioritet=prio,
+        beskrivelse=beskrivelse,
+        melder=melder,
         opprettet_av=bruker if bruker and bruker.is_authenticated else None,
         opprettet_av_navn=getattr(bruker, 'username', '') or '',
         opprettet_fra_linje=fra_linje,
     )
     hendelse.save()
+    if behov:
+        hendelse.ressursbehov.set(behov)
     if fra_linje is not None and fra_linje.hendelse_id is None:
         fra_linje.hendelse = hendelse
         fra_linje.save(update_fields=['hendelse'])
     systemlinje(vakt, _kode('HENDELSE_OPPRETTET'), _hendelsesdata(hendelse),
                 bruker=bruker, hendelse=hendelse)
+    bli_med(hendelse, bruker)
     return hendelse
 
 
@@ -497,12 +619,17 @@ def _krev_versjon(hendelse, versjon):
 
 @transaction.atomic
 def rediger_hendelse(hendelse, *, bruker, versjon, tittel=None,
-                     lokasjon=None, sett_lokasjon=False) -> Hendelse:
-    """Tittel og lokasjon. Ingen systemlinje: det er en feltendring, og
-    `audit/` fører dem — regel 2 i `ko/systemlinjer.py`.
+                     lokasjon=None, sett_lokasjon=False, beskrivelse=None,
+                     melder=None, lagsressurser=None, ressursbehov=None) -> Hendelse:
+    """Hodet: tittel, lokasjon, beskrivelse, melder, lagsressurser og
+    ressursbehov. Ingen systemlinje: det er feltendringer, og `audit/` fører
+    dem — regel 2 i `ko/systemlinjer.py`. Prioriteten har sin egen inngang
+    (`sett_prioritet`), fordi *den* er en handling og skal stå i loggen.
 
     `sett_lokasjon=True` med `lokasjon=None` tømmer lokasjonen; uten flagget
     rører kallet den ikke. Et nullbart felt trenger tre tilstander i kallet.
+    Tekstfeltene bruker `None` som «ikke oppgitt» og tom streng som «tøm».
+    Den som redigerer er på hendelsen.
     """
     _krev_versjon(hendelse, versjon)
     endret = []
@@ -515,10 +642,51 @@ def rediger_hendelse(hendelse, *, bruker, versjon, tittel=None,
         hendelse.lokasjon = lokasjon
         hendelse.lokasjon_navn = getattr(lokasjon, 'navn', '') or ''
         endret += ['lokasjon', 'lokasjon_navn']
-    if not endret:
+    for felt, raa, maks, hva in (
+            ('beskrivelse', beskrivelse, MAKS_BESKRIVELSE, 'Beskrivelsen'),
+            ('melder', melder, MAKS_MELDER, 'Melder'),
+            ('lagsressurser', lagsressurser, MAKS_LAGSRESSURSER, 'Lagsressurser')):
+        if raa is None:
+            continue
+        ny = _rens_kort(raa, maks, hva)
+        if ny != getattr(hendelse, felt):
+            setattr(hendelse, felt, ny)
+            endret.append(felt)
+    behov = _ressursbehov_fra(ressursbehov)
+    behov_endret = False
+    if behov is not None:
+        naa_ider = set(hendelse.ressursbehov.values_list('pk', flat=True))
+        if naa_ider != {r.pk for r in behov}:
+            behov_endret = True
+    if not endret and not behov_endret:
         raise Ugyldig('Ingenting er endret.')
+    if behov_endret:
+        hendelse.ressursbehov.set(behov)
     hendelse.versjon += 1
     hendelse.save(update_fields=endret + ['versjon'])
+    bli_med(hendelse, bruker)
+    return hendelse
+
+
+@transaction.atomic
+def sett_prioritet(hendelse, raa, *, bruker, naa=None) -> Hendelse:
+    """Sett prioriteten — **med en systemlinje**, aldri stille. «H14 satt
+    til Viktig» er en avgjørelse noen tok, og den skal stå i loggen med hvem
+    (André, 18. sep. 2026). Ingen versjon: feltet er ett valg av fem, og
+    siste trykk vinner uten at noen tekst går tapt. Versjonen telles likevel
+    opp, så en som redigerer hodet samtidig får vite at noe skjedde."""
+    ny = rens_prioritet(raa)
+    if ny == hendelse.prioritet:
+        raise Ugyldig('Prioriteten er alt satt.')
+    fra = hendelse.prioritet
+    hendelse.prioritet = ny
+    hendelse.versjon += 1
+    hendelse.save(update_fields=['prioritet', 'versjon'])
+    data = _hendelsesdata(hendelse)
+    data['fra_prioritet'] = PRIORITET_NAVN.get(fra, '')
+    systemlinje(hendelse.vakt, _kode('HENDELSE_PRIORITET'), data,
+                tidspunkt=naa or timezone.now(), bruker=bruker, hendelse=hendelse)
+    bli_med(hendelse, bruker)
     return hendelse
 
 
@@ -604,6 +772,8 @@ def knytt_oppdrag(oppdrag, hendelse, *, bruker, naa=None):
          'fra_hendelsesnummer': fra.hendelsesnummer if fra else None},
         tidspunkt=naa or timezone.now(), bruker=bruker,
         hendelse=hendelse or fra)
+    if hendelse is not None:
+        bli_med(hendelse, bruker)
     return oppdrag
 
 
@@ -620,5 +790,25 @@ def hendelser_for(vakt):
               apne_oppdrag=models.Count(
                   'oppdrag', distinct=True,
                   filter=~Q(oppdrag__status=choices.TERMINAL)))
+          .prefetch_related('ressursbehov', 'deltakere')
           .order_by('-hendelsesnummer'))
     return list(qs)
+
+
+def hendelse_med_telling(hendelse):
+    """Samme rad som `hendelser_for` gir, for én hendelse: viewet som
+    nettopp opprettet den skal svare med den formen tavla leser."""
+    from oppdrag import choices
+    return (Hendelse.objects.filter(pk=hendelse.pk)
+            .annotate(
+                antall_oppdrag=models.Count('oppdrag', distinct=True),
+                apne_oppdrag=models.Count(
+                    'oppdrag', distinct=True,
+                    filter=~Q(oppdrag__status=choices.TERMINAL)))
+            .prefetch_related('ressursbehov', 'deltakere')
+            .get())
+
+
+def ressursbehov_aktive():
+    """Avkryssingene i «Ny hendelse», i rekkefølge."""
+    return list(Ressursbehov.objects.filter(er_aktiv=True))

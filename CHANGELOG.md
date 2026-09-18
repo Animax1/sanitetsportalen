@@ -4,6 +4,103 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-18 — KO: fire flater i 2×2, hendelsesloggen som egen flate  `#ko/hendelseslogg` `#ko/oppsett` `#oppdrag/sentralbord` `#oppdrag/enhetsskjerm`
+
+André, 18. sep. 2026: «Ko modulen skal ha 4 flater. Hendelseslogg, Loggstrøm,
+Ressursoversikt og Oppdragsliste. Idag så er det uoversiktlig og meget basic.» Åtte skisser
+ble laget og avtalt **før** koden («Nydelig design og oppsett. Akkurat slik jeg så det for
+meg!»), og de er målet. Dette overstyrer «tre kolonner er taket» og «hendelser er en
+gruppering av oppdragslista» fra 17.–18. sep.; prinsippet uten faner står.
+
+### Det som er bygget
+
+- **2×2-rutenett** (`static/js/ko-layout.js`, `ko.css`): Hendelseslogg │ Loggstrøm øverst,
+  Ressursoversikt │ Oppdragsliste nederst. Håndtaket i hvert vindu dras over et annet for å
+  **bytte plass**; skillelinjene endrer **bredde per rad og høyde** mellom radene. Rammen
+  holder alle fire synlige — gulvet `KO_MIN_PROSENT` og `min-width`/`min-height` gjør det
+  umulig å dra en flate bort. Oppsettet huskes per nettleser (`ko.oppsett`); «Oppsett» i
+  verktøylinja tilbakestiller. `koGyldigOppsett()` avviser et lagret oppsett som mangler et
+  vindu.
+- **Hendelsesloggen** (`static/js/ko-hendelser.js`): stripete tabell — annenhver rad i to
+  toner — med prioritet, H-nr, tid, tittel med beskrivelse og melder, sted, ressursbehov,
+  oppdrag, opprettet av, status. **Prioritetene er Viktig, Rød, Gul, Grønn, Drift**
+  (André); Viktig gir rød ramme og rødt trekant-utropstegn, de andre en farget venstrekant
+  og et merke med tekst. Sortering som oppdragslista: lukkede nederst, så prioritet, så
+  nummer. **Søkeknapp** som åpner et felt i flata (nummer, tittel, sted, melder,
+  beskrivelse, lag). Bryter «Vis lukkede».
+- **Hendelsen åpnes inne i vinduet**, ikke i en modal: hode med prioritetsknapper og en
+  godt synlig grønn «Lukk hendelse», sted, melder, ressursbehov, opprettet av; «Oppdrag på
+  hendelsen» med **Nytt oppdrag** (sentralbordets skjema, hendelse og sted forhåndsvalgt)
+  og **Knytt eksisterende**; **Lagsressurser** som tekstfelt; tråden «Løpende» med
+  kommentarer og systemlinjer; skrivefelt (Enter sender). «På hendelsen: kari, andre» —
+  **den som registrerer noe i hendelsen er automatisk med** (kommentar, oppdrag,
+  prioritet, redigering), pluss en «Bli med»-knapp. `ko.HendelseDeltaker`, vises og styrer
+  ingenting.
+- **«Ny hendelse»-skjema** i Andrés rekkefølge: hvor, hva, melder, beskrivelse, prioritet
+  (fem knapper), ressurser som **avkryssing**. Opprettet av og tid settes automatisk.
+  Erstatter `prompt()`. Samme skjema redigerer hodet.
+- **Ressursbehovene** er en egen liste i KO (`ko.Ressursbehov`) under **KO-innstillinger**
+  — sentralbordets valgliste-modal med en fane til, lagt inn gjennom den generelle kroken
+  `verdifaner_ekstra`/`window.VERDIFANER_EKSTRA`, så `oppdrag` fortsatt ikke kjenner `ko`.
+  Settes opp av KO-leder eller admin; sletting er admin og bare for ubrukte. Begrepet ble
+  sjekket mot `oppdrag.Enhetstype` og `vaktliste.Ressursgruppe` først: politi og
+  arrangørvakter er ikke portalens ressurser, så en egen liste er riktig.
+- **Loggstrømmen** med **festede linjer** («noen skal kunne pinnes») øverst i egen boks:
+  `Logglinje.festet_at/festet_av/festet_av_navn`, `fest`/`losne`-stier på `skriv_full`,
+  idempotent, aldri systemlinjer. `festede` sendes hele med pollen, som `fjernede` — festing
+  har ingen ny id. Strømmen viser linjene uten hendelse pluss systemlinjene om hendelsene
+  (`koIStrommen`); kommentarene står i hendelsen. Skrivefeltet heter **«Loggfør»** og står
+  nederst; nyeste linje øverst. Bryter «System» demper stemplene, aldri hendelseslinjene.
+- **Oppdragslista uten hendelser** — grupperingen fra pulje 5 er fjernet. H-merket bærer
+  koblingen og rød trekant når hendelsen er Viktig, og raden viser **«Lag: Lag 1, Lag 3»**
+  fra hendelsen. Det samme feltet står i **bilen** (aktivt og ventende kort) — «et felt
+  med lagsressurser som kobles til hendelsen … såfremt oppdraget er koblet til en
+  hendelse». `oppdrag_til_dict` bærer `hendelse_prioritet` og `hendelse_lagsressurser`,
+  begge med i ETag-ene.
+- **«Nytt oppdrag»** i Andrés rekkefølge: hvor, hastegrad, problemstilling, enhet,
+  fritekst, hendelse. Gjelder også `/oppdrag/`. «Hendelse» fylles av KO i
+  `#nytt-hendelse-plass`.
+- **Knappene står i vinduet de gjelder**: «Nytt oppdrag» og «Historikk» rett etter
+  oppdragslistas tittel («den lå for langt vekke»), «Enheter» i ressursoversikten, «Ny
+  hendelse» i hendelsesloggen. «Valglister» heter **«KO-innstillinger»** på `/ko/`, «Hvem
+  er pålogget» heter **«Pålogget»**. Oppsettvarselet er egen malbit
+  (`_sentralbord_oppsettvarsel.html`), så `/ko/` kan ha sin egen verktøylinje.
+- **Prioritetsendring er en systemlinje** (`HENDELSE_PRIORITET`): «H14 satt til Viktig
+  (var Grønn) · tittel», med hvem. Opprettelseslinja bærer prioriteten når den ikke er
+  Grønn.
+- Modell: `Hendelse.prioritet/beskrivelse/melder/lagsressurser/ressursbehov`,
+  `HendelseDeltaker`, `Ressursbehov`, `Logglinje.festet_*` (`ko/0006`). Backup stripper
+  `festet_av` og `HendelseDeltaker.bruker`; navnene står frosset.
+- JS: `ko.js` delt i tre (`ko-layout.js`, `ko-hendelser.js`, `ko.js`), `KO_JS` er en
+  tuppel og registrert i `core/tests_js_splitt.py`. 28 JS-filer, 157 ruter, 19 under
+  `/ko/` — `TEKNISK_DOKUMENTASJON.md` oppdatert.
+
+### Sett i nettleseren, ikke bare i suiten
+
+Sida ble kjørt lokalt med seedet demovakt og styrt med Playwright: ingen JS-feil, oppsettet
+lagres, skjemaene har feltene i rett rekkefølge. Én feil funnet slik: **tråden i en åpen
+hendelse ble klemt til én linje** når hodet var høyt — `min-height: 10rem` på `.h-traad`.
+
+### Mutasjonstesting
+
+18 mutanter mot `ko/services.py`, `ko/systemlinjer.py` og `ko/views.py`, kjørt mot
+`ko.tests_hendelseslogg` (1,5 s): `bli_med` fjernet fra hvert av de fem kallstedene, ukjent
+prioritet sluppet gjennom, samme prioritet gir linje, prioritetsendring uten systemlinje,
+fest to ganger bytter navn, systemlinje kan festes, kommentar i annen vakt, ukjent
+ressursbehov utelatt stille, grense av med én, ressursbehov alene teller ikke, Grønn på
+opprettelseslinja, alle kan sette opp ressursbehov, ressursbehov i bruk kan slettes,
+hendelse utenfor vakta som kommentar. **18 av 18 fanget.** Prøvene for rutenettet
+(`koGyldigOppsett`, `koBytt`, `koKlemProsent`), sorteringen, søket og `koIStrommen` kjøres i
+node (`ko/tests_js.py`); `TavlaSierFraTilKoTests` holder kallstedet i `renderOppdrag()` i
+live.
+
+### Åpent, ført i TODO
+
+Utskrift med alt kronologisk (strømmen skjuler hendelseskommentarene), linje i strømmen →
+hendelse i etterkant, oppsett per bruker på serveren.
+
+---
+
 ## 2026-09-18 — KO pulje 7 (statistikk) avventes  `#ko/sentralbordet`
 
 André: «Vi avventer statistikk delen … det haster ikke.» Punktet i `TODO.md` er skrevet om

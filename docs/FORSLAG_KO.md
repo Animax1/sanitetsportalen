@@ -353,6 +353,13 @@ tredje serie er en tredje ting å forveksle. En kvittering til den som registrer
 
 ## 7. Grensesnittet
 
+> **Overstyrt 18. sep. 2026 (André), etter åtte skisser som ble avtalt før koden:** fire
+> flater i **2×2** — Hendelseslogg │ Loggstrøm øverst, Ressursoversikt │ Oppdragsliste
+> nederst — med vinduer som bytter plass og endrer størrelse innenfor en ramme som holder
+> alle fire synlige. **Hendelsene er en egen flate**, ikke en gruppering av oppdragslista,
+> og grupperingen på tavla er fjernet. Det som står under om tre kolonner og «tre er
+> taket» er historikk; prinsippet uten faner står. Gjeldende form: `ko/CLAUDE.md`.
+
 > **Rettet 17. sep. 2026, etter André.** Notatet sa «fire flater, én side», og pulje 1 leste
 > det som fire faner. Det var feil form, og retting nå er billig fordi tre av de fire
 > flatene fortsatt er tomme — i pulje 5 ville det vært en ombygging av tre fylte skjermer.

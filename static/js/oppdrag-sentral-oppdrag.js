@@ -19,22 +19,18 @@ function renderOppdrag() {
 
   if (!oppdragsliste.length) {
     el.innerHTML = ('<div class="tom-melding">Ingen oppdrag i vakten ennå.</div>');
+    if (typeof koEtterOppdragTegnet === 'function') koEtterOppdragTegnet();
     return;
   }
 
   const sortert = _sorterOppdrag(oppdragsliste);
-
-  // **Hendelsene er en gruppering av denne lista, ikke en egen flate** (KO
-  // pulje 5, §7). Grupperingen eies av `ko.js`, som er betinget lastet: på
-  // `/ko/` svarer `koGrupperOppdrag()` med grupper (eller `null` når
-  // bryteren er av), på `/oppdrag/` finnes den ikke og lista er flat som før.
-  // Kallet går gjennom en vakt av samme grunn som `_kallOppdrag` (CLAUDE.md).
-  const grupper = (typeof koGrupperOppdrag === 'function') ? koGrupperOppdrag(sortert) : null;
-  if (grupper) {
-    el.innerHTML = grupper.map((g) => g.hode + g.rader.map(_oppdragRadHtml).join('')).join('');
-    return;
-  }
+  // **Ingen hendelser i lista** (André, 18. sep. 2026): H-merket på raden
+  // bærer koblingen, og hendelsene har sitt eget vindu i /ko/. Grupperingen
+  // fra pulje 5 er borte. KO får beskjed etter tegningen — hendelsesloggen
+  // leser oppdragene herfra — gjennom en vakt, fordi denne fila også kjører
+  // på /oppdrag/, der `ko-hendelser.js` ikke finnes (CLAUDE.md).
   el.innerHTML = sortert.map(_oppdragRadHtml).join('');
+  if (typeof koEtterOppdragTegnet === 'function') koEtterOppdragTegnet();
 }
 
 
@@ -62,9 +58,19 @@ function _oppdragRadHtml(o) {
   const manglerKlasse = o.trenger_ressurs ? ' oppdrag-rad-mangler mangler-' + _manglerTrinn(o) : '';
   const venterKlasse = venterForbiTerskel(o) ? ' oppdrag-rad-venter-lenge' : '';
   // «Oppdrag 45 · Hendelse 12» (§6): visningen bærer relasjonen. Vises på
-  // begge sidene — på `/oppdrag/` er det den ene sporet av KO.
+  // begge sidene — på `/oppdrag/` er det den ene sporet av KO. Merket bærer
+  // også hendelsens prioritet (18. sep. 2026): rød trekant for Viktig.
+  // Bare Viktig har et ikon; resten bærer fargen i hendelsesloggen.
+  const prioIkon = o.hendelse_prioritet === 'viktig'
+    ? '<i class="bi bi-exclamation-triangle-fill me-1 text-danger"></i>' : '';
   const hendelseMerke = o.hendelse_nummer
-    ? `<span class="hendelse-merke" title="${escHtmlValue(o.hendelse_tittel || '')}">${escHtmlValue(hendelsesnr(o.hendelse_nummer))}</span>`
+    ? `<span class="hendelse-merke" title="${escHtmlValue(o.hendelse_tittel || '')}">${prioIkon}${escHtmlValue(hendelsesnr(o.hendelse_nummer))}</span>`
+    : '';
+  // Lagene på hendelsen (André, 18. sep. 2026: «et felt med lagsressurser
+  // som kobles til hendelsen … såfremt oppdraget er koblet til en hendelse»).
+  // Tom uten hendelse, eller når hendelsen ikke har fått lag ennå.
+  const lagBlokk = (o.hendelse_id && o.hendelse_lagsressurser)
+    ? `<div class="oppdrag-meta oppdrag-lag mt-1"><i class="bi bi-people me-1"></i>Lag: ${escapeHtml(o.hendelse_lagsressurser)}</div>`
     : '';
   return `
     <div class="oppdrag-rad${manglerKlasse}${venterKlasse}" data-action="visOppdrag" data-id="${escHtmlValue(o.id)}"
@@ -84,6 +90,7 @@ function _oppdragRadHtml(o) {
       <div class="oppdrag-meta mt-1">
         ${escapeHtml(o.lokasjon_navn)} · ${escapeHtml(opprettetTekst)}
       </div>
+      ${lagBlokk}
       ${fritekstBlokk}
     </div>`;
 }
@@ -422,6 +429,10 @@ async function visOppdrag(id) {
   // `/ko/`: `ko.js` er betinget lastet, og kallet går gjennom en vakt
   // (CLAUDE.md). Markupen skannes i `ko/tests_js.py`, der byggeren bor.
   const hendelseValg = (typeof koHendelseValg === 'function') ? koHendelseValg(o) : '';
+  // Lagene på hendelsen — samme blokk som på raden.
+  const lagBlokk = (o.hendelse_id && o.hendelse_lagsressurser)
+    ? `<div class="oppdrag-meta oppdrag-lag mb-2"><i class="bi bi-people me-1"></i>Lag: ${escapeHtml(o.hendelse_lagsressurser)}</div>`
+    : '';
   const slettKnapp = o.kan_slettes
     ? `<button type="button" class="btn btn-outline-danger btn-sm" data-action="slettOppdrag"
                data-id="${escHtmlValue(o.id)}"><i class="bi bi-trash me-1"></i>Slett oppdrag</button>`
@@ -435,6 +446,7 @@ async function visOppdrag(id) {
     </div>
     ${o.fritekst ? `<div class="oppdrag-fritekst mb-3">${escapeHtml(o.fritekst)}</div>` : ''}
     ${hendelseValg}
+    ${lagBlokk}
     <div id="rediger-oppdrag"></div>
     <h6 class="text-muted">Enheter</h6>
     <div class="mb-3">${mkEnhetsrader(o)}${OPPDRAG_TILGANG.kanSkrive ? _varsleValg(o) : ''}</div>

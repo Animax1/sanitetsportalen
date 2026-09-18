@@ -50,13 +50,4 @@
     </div>
   </div>
 
-  <div id="mangler-oppsett" class="alert alert-warning d-none">
-    <strong>Modulen mangler oppsett.</strong>
-    <span id="mangler-hva"></span>
-    {% if er_global_admin %}
-    Bruk knappene øverst.
-    {% else %}
-    En administrator må legge dem inn.
-    {% endif %}
-  </div>
-
+{% include "oppdrag/_sentralbord_oppsettvarsel.html" %}

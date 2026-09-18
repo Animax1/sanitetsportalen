@@ -6,10 +6,11 @@ nivåer:
 | Handling | Krav |
 |---|---|
 | Se siden, lese loggen og hendelsene, polle | `les` |
-| Skrive en linje, rette en linje | `skriv_full` |
-| Opprette, redigere, lukke og gjenåpne en hendelse | `skriv_full` |
+| Skrive en linje, rette en linje, feste og løsne en linje | `skriv_full` |
+| Opprette, redigere, prioritere, lukke og gjenåpne en hendelse, bli med | `skriv_full` |
 | Knytte et oppdrag til en hendelse | `skriv_full` i **både** `ko` og `oppdrag` — det skriver på oppdraget |
 | Fjerne innholdet i en linje (§4.4) | `skriv_leder` |
+| Sette opp ressursbehovene (KO-innstillinger) | `skriv_leder`, eller global admin |
 
 **Retting og fjerning er to navngitte stier**, ikke ett endepunkt som leser en
 `slett`-verdi ut av kroppen. Samme grep som `backlog` sine `lost`/`gjenapne`:
@@ -51,7 +52,7 @@ from core.ratelimit import rate_limit
 from core.vakt import hent_aktiv_vakt
 
 from . import services, systemlinjer
-from .models import Hendelse, Logglinje
+from .models import PRIORITET_VALG, Hendelse, Logglinje, Ressursbehov
 from .tilstede import tilstede
 
 
@@ -113,6 +114,10 @@ def _til_dict(linje):
         'hendelse_nummer': (linje.hendelse.hendelsesnummer
                             if linje.hendelse_id else None),
         'uformell': linje.uformell,
+        # Festet (18. sep. 2026): tidspunktet sorterer de festede, navnet
+        # sier hvem. Tom/`''` når linja ikke er festet.
+        'festet_at': linje.festet_at.isoformat() if linje.festet_at else '',
+        'festet_av': linje.festet_av_navn,
     }
 
 
@@ -139,7 +144,22 @@ def _hendelse_til_dict(h):
         'antall_oppdrag': getattr(h, 'antall_oppdrag', None)
                           if getattr(h, 'antall_oppdrag', None) is not None
                           else h.oppdrag.count(),
+        # Hodet (18. sep. 2026): prioritet, beskrivelse, melder,
+        # lagsressurser, ressursbehov og hvem som er på hendelsen. Alt
+        # følger med hver poll — lista er kort, og en hendelse som byttet
+        # prioritet har ingen ny id.
+        'prioritet': h.prioritet,
+        'beskrivelse': h.beskrivelse,
+        'melder': h.melder,
+        'lagsressurser': h.lagsressurser,
+        'ressursbehov': [{'id': r.pk, 'navn': r.navn} for r in h.ressursbehov.all()],
+        'deltakere': [d.brukernavn for d in h.deltakere.all()],
     }
+
+
+def _ressursbehov_til_dict(r):
+    return {'id': r.pk, 'navn': r.navn, 'er_aktiv': r.er_aktiv,
+            'rekkefolge': r.rekkefolge, 'i_bruk': r.hendelser.count()}
 
 
 @modul_kreves('ko', 'les')
@@ -167,6 +187,11 @@ def index_view(request):
     # linje. Gatene i den er **oppdragsmodulens**, også her — se funksjonens
     # egen docstring.
     kontekst = sentralbordkontekst(request)
+    ressursbehov = services.ressursbehov_aktive()
+    verdifaner_ekstra = [
+        {'slug': 'ressursbehov', 'navn': 'Ressursbehov', 'ny': 'Nytt ressursbehov',
+         'url': '/ko/api/ressursbehov/'},
+    ] if _kan_lede_ko(request) else []
     kontekst.update({
         'modul_nivaa': nivaa_for(request.user, 'ko') or '',
         'er_global_admin': er_global_admin(request.user),
@@ -184,8 +209,29 @@ def index_view(request):
         # Ansvarsmerket (§5.1): nedtrekket i toppen, og hva som står nå.
         'ansvarsomraader': services.ANSVARSOMRAADER,
         'mitt_ansvar': services.ansvar_for(request.user),
+        'vakt_navn': hent_aktiv_vakt().navn,
+        'kan_skrive_ko': har_tilgang(request.user, 'ko', 'skriv_full'),
+        # Hendelsesskjemaet (18. sep. 2026): prioritetene og avkryssingene.
+        'prioriteter': PRIORITET_VALG,
+        'prioriteter_json': js_json([list(p) for p in PRIORITET_VALG]),
+        'ressursbehov': ressursbehov,
+        'ressursbehov_json': js_json([[r.pk, r.navn] for r in ressursbehov]),
+        # KO-innstillingene — ressursbehovene — settes opp av KOs
+        # `skriv_leder` eller global admin. Sentralbordets valglister har
+        # sin egen gate (`kan_lede`, oppdragsmodulens); de to vises i samme
+        # vindu, men hver fane har sin egen dør.
+        'kan_lede_ko': _kan_lede_ko(request),
+        # Fanen legges til i sentralbordets valgliste-modal gjennom en
+        # generell krok (`verdifaner_ekstra`), så `oppdrag/` ikke kjenner KO.
+        'verdifaner_ekstra': verdifaner_ekstra,
+        'verdifaner_ekstra_json': js_json(verdifaner_ekstra),
     })
     return render(request, 'ko/index.html', kontekst)
+
+
+def _kan_lede_ko(request) -> bool:
+    return (er_global_admin(request.user)
+            or har_tilgang(request.user, 'ko', 'skriv_leder'))
 
 
 @modul_kreves('ko', 'les', svar='json')
@@ -260,10 +306,21 @@ def logg_view(request):
         .filter(vakt=vakt, fjernet_at__isnull=False)
         .values_list('pk', flat=True)
     )
+    # **De festede sendes hele hver gang, som `fjernede`** (18. sep. 2026):
+    # festing og løsning endrer en rad uten ny id, og ville aldri kommet
+    # gjennom `?siden=`. Lista er kort — en håndfull beskjeder — og klienten
+    # setter merket på de id-ene som står her og tar det av resten.
+    festede = [
+        {'id': pk, 'festet_at': tid.isoformat(), 'festet_av': navn}
+        for pk, tid, navn in Logglinje.objects
+        .filter(vakt=vakt, festet_at__isnull=False)
+        .values_list('pk', 'festet_at', 'festet_av_navn')
+    ]
     return JsonResponse({
         'status': 'ok',
         'data': linjer,
         'fjernede': fjernede,
+        'festede': festede,
         'vakt': vakt.navn,
         # Hele lista hver gang, som `fjernede`: en hendelse som lukkes eller
         # omdøpes får ingen ny id, og ville aldri kommet gjennom `?siden=`.
@@ -283,19 +340,49 @@ def logg_skriv_view(request):
     bruker treffer en løkke, ikke et menneske.
     """
     data = _json_body(request)
+    vakt = hent_aktiv_vakt()
+    # `hendelse_id` gjør linja til en kommentar i hendelsen. 404 utenfor
+    # vakta, som alle andre hendelsesstier.
+    hendelse = None
+    if data.get('hendelse_id') is not None:
+        hendelse = get_object_or_404(Hendelse, pk=data['hendelse_id'], vakt=vakt)
     try:
         linje = services.skriv_linje(
-            hent_aktiv_vakt(),
+            vakt,
             data.get('tekst'),
             bruker=request.user,
             tidspunkt=_tid(data.get('tidspunkt')),
             # `None` = «stemple fra merket mitt»; oppgitt verdi vinner.
             ansvarsomraade=data.get('ansvarsomraade'),
             uformell=bool(data.get('uformell')),
+            hendelse=hendelse,
         )
     except services.Ugyldig as feil:
         return _feil(str(feil))
     return JsonResponse({'status': 'ok', 'data': _til_dict(linje)}, status=201)
+
+
+@modul_kreves('ko', 'skriv_full', svar='json')
+@require_http_methods(['POST'])
+@rate_limit(group='ko:logg_fest', rate='60/m', method='POST')
+def logg_fest_view(request, pk):
+    """Fest linja øverst i loggstrømmen (18. sep. 2026). `skriv_full`, som
+    å skrive den — det er en beskjed på en felles tavle."""
+    linje = get_object_or_404(Logglinje, pk=pk, vakt=hent_aktiv_vakt())
+    try:
+        services.fest_linje(linje, bruker=request.user)
+    except services.Ugyldig as feil:
+        return _feil(str(feil))
+    return JsonResponse({'status': 'ok', 'data': _til_dict(linje)})
+
+
+@modul_kreves('ko', 'skriv_full', svar='json')
+@require_http_methods(['POST'])
+@rate_limit(group='ko:logg_losne', rate='60/m', method='POST')
+def logg_losne_view(request, pk):
+    linje = get_object_or_404(Logglinje, pk=pk, vakt=hent_aktiv_vakt())
+    services.losne_linje(linje, bruker=request.user)
+    return JsonResponse({'status': 'ok', 'data': _til_dict(linje)})
 
 
 @modul_kreves('ko', 'skriv_full', svar='json')
@@ -413,9 +500,14 @@ def hendelse_ny_view(request):
     try:
         hendelse = services.opprett_hendelse(
             vakt, data.get('tittel'), bruker=request.user,
-            lokasjon=lokasjon, fra_linje=fra_linje)
+            lokasjon=lokasjon, fra_linje=fra_linje,
+            prioritet=data.get('prioritet'),
+            beskrivelse=data.get('beskrivelse'),
+            melder=data.get('melder'),
+            ressursbehov=data.get('ressursbehov'))
     except services.Ugyldig as feil:
         return _feil(str(feil))
+    hendelse = services.hendelse_med_telling(hendelse)
     return JsonResponse({'status': 'ok', 'data': _hendelse_til_dict(hendelse)},
                         status=201)
 
@@ -435,11 +527,39 @@ def hendelse_rediger_view(request, pk):
         services.rediger_hendelse(
             hendelse, bruker=request.user, versjon=data.get('versjon'),
             tittel=data.get('tittel'),
-            lokasjon=lokasjon, sett_lokasjon='lokasjon_id' in data)
+            lokasjon=lokasjon, sett_lokasjon='lokasjon_id' in data,
+            beskrivelse=data.get('beskrivelse'),
+            melder=data.get('melder'),
+            lagsressurser=data.get('lagsressurser'),
+            ressursbehov=data.get('ressursbehov'))
     except services.Konflikt as feil:
         return _feil(str(feil), status=409)
     except services.Ugyldig as feil:
         return _feil(str(feil))
+    return JsonResponse({'status': 'ok', 'data': _hendelse_til_dict(hendelse)})
+
+
+@modul_kreves('ko', 'skriv_full', svar='json')
+@require_http_methods(['POST'])
+@rate_limit(group='ko:hendelse_prioritet', rate='60/m', method='POST')
+def hendelse_prioritet_view(request, pk):
+    """Prioriteten — logget som egen linje (18. sep. 2026)."""
+    hendelse = _hendelse(pk)
+    try:
+        services.sett_prioritet(hendelse, _json_body(request).get('prioritet'),
+                                bruker=request.user)
+    except services.Ugyldig as feil:
+        return _feil(str(feil))
+    return JsonResponse({'status': 'ok', 'data': _hendelse_til_dict(hendelse)})
+
+
+@modul_kreves('ko', 'skriv_full', svar='json')
+@require_http_methods(['POST'])
+@rate_limit(group='ko:hendelse_bli_med', rate='60/m', method='POST')
+def hendelse_bli_med_view(request, pk):
+    """«Bli med» (18. sep. 2026). Idempotent; svarer med lista."""
+    hendelse = _hendelse(pk)
+    services.bli_med(hendelse, request.user)
     return JsonResponse({'status': 'ok', 'data': _hendelse_til_dict(hendelse)})
 
 
@@ -503,3 +623,95 @@ def oppdrag_hendelse_view(request, pk):
     except services.Ugyldig as feil:
         return _feil(str(feil))
     return JsonResponse({'status': 'ok', 'hendelse_id': oppdrag.hendelse_id})
+
+
+# ── Ressursbehovene (KO-innstillinger, 18. sep. 2026) ────────────────────────
+#
+# Samme form som `oppdrag/views_verdier.py`: liste for `les`, opprett/endre/
+# omsortere for leder, sletting for global admin med `confirm` og 409 når
+# raden er i bruk. Skrevet her og ikke som en fjerde rad i oppdragsmodulens
+# `VERDIMENGDER`: tabellen er KOs, og `oppdrag` kjenner ikke `ko`.
+
+@never_cache
+@modul_kreves('ko', 'les', svar='json')
+@require_http_methods(['GET', 'POST'])
+@rate_limit(group='ko:ressursbehov', rate='60/m', method='POST')
+def ressursbehov_view(request):
+    if request.method == 'GET':
+        return JsonResponse({'status': 'ok', 'data': [
+            _ressursbehov_til_dict(r) for r in Ressursbehov.objects.all()]})
+    if not _kan_lede_ko(request):
+        return _feil('Å sette opp ressursbehovene er skriv_leder i KO.', 403)
+    navn = (_json_body(request).get('navn') or '').strip()
+    feil = _valider_ressursbehovnavn(navn)
+    if feil:
+        return _feil(feil)
+    siste = (Ressursbehov.objects.order_by('-rekkefolge')
+             .values_list('rekkefolge', flat=True).first())
+    rad = Ressursbehov.objects.create(navn=navn, rekkefolge=(siste or 0) + 10)
+    return JsonResponse({'status': 'ok', 'data': _ressursbehov_til_dict(rad)})
+
+
+def _valider_ressursbehovnavn(navn, *, unntatt_pk=None):
+    if not navn:
+        return 'Navn kan ikke være tomt.'
+    if len(navn) > 64:
+        return 'Navnet er for langt (maks 64 tegn).'
+    if Ressursbehov.objects.filter(navn=navn).exclude(pk=unntatt_pk).exists():
+        return f'«{navn}» finnes allerede.'
+    return None
+
+
+@modul_kreves('ko', 'les', svar='json')
+@require_http_methods(['PUT', 'DELETE'])
+@rate_limit(group='ko:ressursbehov_detalj', rate='60/m', method=['PUT', 'DELETE'])
+def ressursbehov_detalj_view(request, pk):
+    if not _kan_lede_ko(request):
+        return _feil('Å sette opp ressursbehovene er skriv_leder i KO.', 403)
+    rad = get_object_or_404(Ressursbehov, pk=pk)
+    data = _json_body(request)
+    if request.method == 'DELETE':
+        if not er_global_admin(request.user):
+            return _feil('Sletting er global admin.', 403)
+        if not data.get('confirm'):
+            return _feil('Bekreftelse mangler. Send {"confirm": true}.')
+        brukt = rad.hendelser.count()
+        if brukt:
+            return _feil(f'«{rad.navn}» er brukt av {brukt} hendelser og kan ikke '
+                         'slettes. Deaktiver den i stedet.', 409)
+        rad.delete()
+        return JsonResponse({'status': 'ok'})
+    if 'navn' in data:
+        navn = (data.get('navn') or '').strip()
+        feil = _valider_ressursbehovnavn(navn, unntatt_pk=rad.pk)
+        if feil:
+            return _feil(feil)
+        rad.navn = navn
+    if 'er_aktiv' in data:
+        rad.er_aktiv = bool(data['er_aktiv'])
+    rad.save()
+    return JsonResponse({'status': 'ok', 'data': _ressursbehov_til_dict(rad)})
+
+
+@modul_kreves('ko', 'les', svar='json')
+@require_http_methods(['PUT'])
+@rate_limit(group='ko:ressursbehov_rekkefolge', rate='30/m', method='PUT')
+def ressursbehov_rekkefolge_view(request):
+    """Hele lista, som i oppdragsmodulen: to «opp» som krysser hverandre i
+    nettet gir ellers en rekkefølge ingen ba om."""
+    if not _kan_lede_ko(request):
+        return _feil('Å sette opp ressursbehovene er skriv_leder i KO.', 403)
+    ider = _json_body(request).get('ider')
+    if not isinstance(ider, list) or not all(isinstance(i, int) for i in ider):
+        return _feil('Send `ider` som en liste med tall.')
+    rader = {r.pk: r for r in Ressursbehov.objects.filter(pk__in=ider)}
+    if len(rader) != len(set(ider)):
+        return _feil('Lista inneholder ukjente rader — hent den på nytt.')
+    for plass, rad_pk in enumerate(ider):
+        rad = rader[rad_pk]
+        ny = (plass + 1) * 10
+        if rad.rekkefolge != ny:
+            rad.rekkefolge = ny
+            rad.save(update_fields=['rekkefolge'])
+    return JsonResponse({'status': 'ok', 'data': [
+        _ressursbehov_til_dict(r) for r in Ressursbehov.objects.all()]})

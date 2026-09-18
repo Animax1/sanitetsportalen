@@ -415,6 +415,11 @@ function renderAktivt() {
     const fritekstBlokk = o.fritekst
       ? `<div class="oppdrag-fritekst">${escapeHtml(o.fritekst)}</div>`
       : '';
+    // Lagene på hendelsen oppdraget hører til (André, 18. sep. 2026). KO
+    // fører dem på hendelsen; bilen ser dem her. Tom uten hendelse eller lag.
+    const lagBlokk = (o.hendelse_id && o.hendelse_lagsressurser)
+      ? `<div class="oppdrag-meta oppdrag-lag mb-1"><i class="bi bi-people me-1"></i>Lag på hendelsen: ${escapeHtml(o.hendelse_lagsressurser)}</div>`
+      : '';
     const nesteKnapp = o.neste_overgang
       ? `<button type="button" class="btn btn-primary stor-knapp flex-grow-1"
                  id="stemple-neste-${escHtmlValue(o.id)}"
@@ -452,6 +457,7 @@ function renderAktivt() {
       <div class="oppdrag-meta mb-1">${escapeHtml(o.lokasjon_navn)}</div>
       ${udefinert}
       ${_varsledeRad(o)}
+      ${lagBlokk}
       ${fritekstBlokk}
       ${_antallRad(o)}
       ${grovRad}
@@ -487,6 +493,9 @@ function renderVentende() {
     const fritekstBlokk = o.fritekst
       ? `<div class="oppdrag-fritekst">${escapeHtml(o.fritekst)}</div>`
       : '';
+    const lagBlokk = (o.hendelse_id && o.hendelse_lagsressurser)
+      ? `<div class="oppdrag-meta oppdrag-lag mb-1"><i class="bi bi-people me-1"></i>Lag på hendelsen: ${escapeHtml(o.hendelse_lagsressurser)}</div>`
+      : '';
     const startKnapp = `
       <button type="button" class="btn btn-primary stor-knapp w-100 mt-2"
               id="stemple-neste-${escHtmlValue(o.id)}"
@@ -509,6 +518,7 @@ function renderVentende() {
       </div>
       <div class="oppdrag-meta mt-1">${escapeHtml(o.lokasjon_navn)} · ${escapeHtml(klokke(o.opprettet))}</div>
       ${_varsledeRad(o)}
+      ${lagBlokk}
       ${fritekstBlokk}
       ${andresTidslinje}
       ${startKnapp}

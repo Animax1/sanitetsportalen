@@ -17,10 +17,8 @@ import unittest
 
 from django.test import SimpleTestCase
 
-from patients.js_test_utils import (JS_DIR, PORTAL_UTILS_JS, build_harness,
-                                    extract_function, node_available, run_node)
-
-KO_JS = JS_DIR / 'ko.js'
+from patients.js_test_utils import (JS_DIR, KO_JS, PORTAL_UTILS_JS, build_harness,
+                                    extract_function, node_available, read_js, run_node)
 
 #: Enhetskortets innmat, delt med sentralbordet (17. sep. 2026). `/ko/` laster
 #: den, så testene her må lese den — ellers kjører de mot en side som ikke
@@ -150,55 +148,74 @@ class RadenEscaperBrukernavnTests(SimpleTestCase):
 # ════════════════════════════════════════════════════════════════════════════
 
 KO_LOGG_BYGGERE = (
+    # ko.js: loggstrømmen og sidebaren.
     'koLinjeHtml',
     'koLinjeTekst',
     'koLinjeKnapper',
+    'koFestetHtml',
     'koTilstedeRad',
     # De to setter sammen ferdige fragmenter til en liste. De bygger markup
     # like fullt, og står her og ikke i en unntaksliste: dagen noen limer et
     # felt rett inn i overskriften, skal skanneren se det.
     'koTegnLogg',
     'koTegnTilstede',
-    # Hendelsene (pulje 5). Overskriften på tavla, knappene i den,
-    # knytt/løsne i detaljmodalen og nedtrekket i «Nytt oppdrag».
-    'koHendelseHode',
-    'koHendelseKnapper',
-    'koHendelseValg',
-    'koFyllHendelsevalg',
-    'koLeggHendelsevalgINyttOppdrag',
     # Vaktlistas ressurser (pulje 6): kortet, mannskapslinja og lista.
     'koRessurskort',
     'koRessursMannskap',
     'koTegnRessurser',
+    # ko-hendelser.js (18. sep. 2026): tabellen, hendelsen åpnet i vinduet,
+    # skjemaet, knytt/løsne i detaljmodalen og nedtrekket i «Nytt oppdrag».
+    'koPrioMerke',
+    'koHendelseRadHtml',
+    'koTegnHendelser',
+    'koDetaljLinjeHtml',
+    'koHendelseOppdragHtml',
+    'koPrioKnapperHtml',
+    'koTegnDetalj',
+    'koFyllLokasjoner',
+    '_koFyllSkjema',
+    'koHendelseValg',
+    'koFyllHendelsevalg',
+    'koLeggHendelsevalgINyttOppdrag',
 )
 
 #: Uttrykk som interpoleres uten `escapeHtml`, med begrunnelse.
 #: Samme form som `REVIEWED_INTERPOLATIONS` i `oppdrag/tests_xss.py`.
 KO_GJENNOMGATT = {
-    'merkeHtml': 'markup bygget to linjer over, merket selv escapet der',
     'rettet': 'fast markup fra en ternær, ingen data i',
-    'omraade': 'markup bygget to linjer over, ansvarsområdet escapet der',
     'hvem': 'markup bygget av en ternær; forfatternavnet escapet i den ene grenen',
     'av': 'markup bygget to linjer over, navnet escapet der',
-    # Hendelsene (pulje 5):
-    'hendelseHtml': 'markup bygget rett over, nummeret escapet der',
-    'antallTekst': 'tall og et fast ord, escapet ved innsetting',
-    'sted': 'markup bygget rett over, lokasjonsnavnet escapet der',
-    'apne': 'markup bygget rett over, tallet escapet der',
-    'knapper': 'markup fra koHendelseKnapper(), som skannes for seg',
-    'id': 'escapeHtml over h.id, satt rett over',
+    'merkeHtml': 'markup bygget rett over, merket selv escapet der',
+    'hendelseHtml': 'markup bygget rett over, nummeret og id escapet der',
+    'losne': 'knapp bygget rett over, id escapet der',
+    'festetHtml': 'markup fra koFestetHtml(), som skannes for seg',
+    # Hendelsene:
     'naa': 'markup bygget rett over, nummer og tittel escapet der',
     'valg': 'options bygget rett over, id og tekst escapet der',
-    'losne': 'knapp bygget rett over, id escapet der',
-    # Pulje 6:
-    'linjeKlasse': 'hardkodet CSS-klasse fra en ternær',
-    'merkeKlasse': 'hardkodet CSS-klasse fra en ternær',
-    'ansvarHtml': 'markup bygget rett over, området escapet der',
+    'under': 'markup bygget rett over, beskrivelsen escapet der',
+    'melder': 'markup bygget rett over, melderen escapet der',
+    'behovHtml': 'markup bygget rett over, navnene escapet i map-en',
+    'behov': 'navnene escapet i map-en rett over',
+    'oppdragHtml': 'markup bygget rett over, nummer og tall escapet der',
+    'status': 'markup bygget rett over, klokkeslettet escapet der',
+    'tekst': 'escapeHtml eller fast markup, fra en ternær rett over',
+    'enheter': 'navnene escapet i map-en rett over',
+    'knapper': 'markup bygget i map-en rett over, verdi og navn escapet der',
+    'ikon': 'fast ikonmarkup fra en ternær',
+    'aktiv': 'CSS-klasse med verdien escapet, rett over',
+    'deltar': 'navnene escapet i map-en rett over',
+    'knyttValg': 'markup bygget rett over, id og tekst escapet der',
+    'nyttOppdrag': 'knapp bygget rett over, id escapet der',
+    'hodeKnapper': 'markup bygget rett over, id escapet der',
+    'bliMed': 'knapp bygget rett over, id escapet der',
+    'lagFelt': 'markup bygget rett over, verdi og id escapet der',
+    'skjema': 'markup bygget rett over, koden escapet der',
     'tall': 'escapeHtml over to tall og et fast ord, eller et fast ord',
     'hode': 'markup fra gruppehode() i oppdrag-kort.js, alt escapet der',
     'navn': 'mannskapsnavn escapet i map-en rett over',
     'nesteNavn': 'mannskapsnavn escapet i map-en rett over',
     'kort': 'markup fra koRessurskort(), som skannes for seg',
+    'ansvarHtml': 'markup bygget rett over, området escapet der',
 }
 
 
@@ -219,7 +236,7 @@ class LoggByggerneEscaperTests(SimpleTestCase):
     """
 
     def _kropp(self, navn):
-        kilde = KO_JS.read_text(encoding='utf-8')
+        kilde = read_js(KO_JS)
         kropp = extract_function(kilde, navn)
         # **Strip kommentarene først.** En test som leser sin egen prosa måler
         # at noen har skrevet om begrunnelsen, ikke at koden gjør det den sier
@@ -229,7 +246,7 @@ class LoggByggerneEscaperTests(SimpleTestCase):
 
     def test_hver_bygger_finnes(self):
         """Vern mot at testen blir tom fordi en funksjon er omdøpt."""
-        kilde = KO_JS.read_text(encoding='utf-8')
+        kilde = read_js(KO_JS)
         for navn in KO_LOGG_BYGGERE:
             with self.subTest(navn=navn):
                 self.assertIn(f'function {navn}(', kilde)
@@ -242,15 +259,15 @@ class LoggByggerneEscaperTests(SimpleTestCase):
         var rødt. Denne sammenligner lista med kilden, så neste utklipping
         sier fra selv.
         """
-        kilde = KO_JS.read_text(encoding='utf-8')
+        kilde = read_js(KO_JS)
         funn = set()
-        for navn in re.findall(r'^function (\w+)\(', kilde, re.M):
+        for navn in re.findall(r'^(?:async )?function (\w+)\(', kilde, re.M):
             kropp = self._kropp(navn)
             # En funksjon som limer noe inn i en streng med en tagg i.
             if re.search(r"'[^']*<\w[^']*'\s*\+", kropp):
                 funn.add(navn)
         self.assertEqual(sorted(funn - set(KO_LOGG_BYGGERE)), [], (
-            'Disse bygger markup i ko.js uten å bli skannet. Legg dem i '
+            'Disse bygger markup i KO-filene uten å bli skannet. Legg dem i '
             'KO_LOGG_BYGGERE.'))
 
     def test_hvert_datafelt_er_escapet_eller_gjennomgaatt(self):
@@ -269,7 +286,7 @@ class LoggByggerneEscaperTests(SimpleTestCase):
                     continue
                 uescapet.append(f'{navn}(): + {uttrykk}')
         self.assertEqual(uescapet, [], (
-            'Datafelt limt rett inn i markup i ko.js:\n  '
+            'Datafelt limt rett inn i markup i KO-filene:\n  '
             + '\n  '.join(uescapet)
             + '\n\nPakk verdien i escapeHtml(). trustedHtml() er IKKE svaret: '
               'den returnerer et objekt, og blir «[object Object]» når den '
@@ -289,6 +306,7 @@ class LoggEscapingOppforselTests(SimpleTestCase):
         (PORTAL_UTILS_JS, ('escapeHtml',)),
         (KO_JS, ('koKlokke', 'koLinjeMerke', 'koLinjeTekst', 'koLinjeKnapper',
                  'koLinjeHtml', 'koKanSkrive', 'koKanFjerne')),
+        (JS_DIR / 'oppdrag-kort.js', ('hendelsesnr',)),
     )
 
     ONDSKAP = '<img src=x onerror=alert(1)>'
@@ -309,6 +327,7 @@ class LoggEscapingOppforselTests(SimpleTestCase):
             'tekst': 'ok', 'systemkode': '', 'forfatter': 'kari',
             'delt_konto': False, 'ansvarsomraade': '', 'korrigerer': None,
             'fjernet': False, 'fjernet_av': '', 'fjernet_at': '',
+            'festet_at': '', 'festet_av': '', 'hendelse_id': None, 'hendelse_nummer': None,
         }
         base.update(overstyr)
         return json.dumps(base)
@@ -450,109 +469,215 @@ class KonsollhoydenTests(SimpleTestCase):
 
 
 # ════════════════════════════════════════════════════════════════════════════
-# Hendelsene (pulje 5): regelen for grupperingen, og nummerformene.
+# Hendelsesloggen (18. sep. 2026): sortering, søk, raden — og nummerformene.
 # ════════════════════════════════════════════════════════════════════════════
 
-GRUPPERING_HARNESS = (
-    (PORTAL_UTILS_JS, ('escapeHtml',)),
-    (OPPDRAG_KORT_JS, ('oppdragsnr', 'hendelsesnr')),
-    (KO_JS, ('koGrupperOppdrag', 'koHendelseHode', 'koHendelseKnapper', 'koKanSkrive')),
+#: `koSorterHendelser` leser prioritetene fra `window.KO_PRIORITETER`, som
+#: sida setter. Samme rekkefølge som `PRIORITET_VALG` på serveren.
+PRIORITET_PREAMBLE = (
+    "globalThis.window = { KO_PRIORITETER: [['viktig','Viktig'],['rod','Rød'],['gul','Gul'],"
+    "['gronn','Grønn'],['drift','Drift']], MODUL_TILGANG: { ko: 'skriv_full' } };\n"
+    "let koHendelser = new Map(); let koApenHendelseId = null; let koVisLukkede = true; let koSok = '';\n"
+    'let koLinjer = new Map(); let oppdragsliste = [];\n'
 )
 
-#: `koGrupperOppdrag` leser to toppnivåbindinger, som `build_harness` ikke
-#: klipper med. Uten `koHendelser` er hver `.values()` et krasj.
-GRUPPERING_PREAMBLE = (
-    'let koHendelser = new Map();\n'
-    'let koGruppert = true;\n'
-    "globalThis.window = { MODUL_TILGANG: { ko: 'skriv_full' } };\n"
+HENDELSE_HARNESS = (
+    (PORTAL_UTILS_JS, ('escapeHtml',)),
+    (JS_DIR / 'oppdrag-kort.js', ('oppdragsnr', 'hendelsesnr', 'hastegradKlasse')),
+    (KO_JS, ('koSorterHendelser', 'koHendelseTreffer', 'koSynligeHendelser', 'koApneHendelser',
+             'koPrioriteter', 'koPrioritetNavn', 'koPrioritetRang', 'koPrioMerke', 'koPrioIkon',
+             'koOppdragForHendelse', 'koHendelseRadHtml', 'koKlokke', 'koKanSkrive',
+             'koIStrommen', 'koLinjeMerke')),
 )
 
 
 @unittest.skipUnless(node_available(), 'node er ikke tilgjengelig')
-class GrupperingsregelenTests(SimpleTestCase):
-    """`koGrupperOppdrag()` avgjør hva tavla viser, og prøves som en regel.
-
-    §7: hendelsene er en gruppering av oppdragslista. Tre ting regelen skal
-    holde: **av** betyr flat liste (`null`), en åpen hendelse uten oppdrag
-    skal likevel stå der (det er hendelsen som «lever i tjue minutter før en
-    ressurs sendes»), og «Uten hendelse» står sist — og skjuler ingenting.
-    """
+class SorteringsregelenTests(SimpleTestCase):
+    """`koSorterHendelser()` avgjør hva som står øverst — **likt som
+    oppdragslista** (André, 18. sep. 2026): lukkede nederst, så prioriteten,
+    og innenfor den nummeret. Ren regel, og derfor prøvd som en."""
 
     def setUp(self):
-        self.harness = build_harness(GRUPPERING_HARNESS)
+        self.harness = build_harness(HENDELSE_HARNESS)
 
-    def _grupper(self, hendelser, rader, gruppert=True):
-        snippet = f'''
-            {json.dumps(hendelser)}.forEach((h) => koHendelser.set(h.id, h));
-            koGruppert = {'true' if gruppert else 'false'};
-            const ut = koGrupperOppdrag({json.dumps(rader)});
-            console.log(JSON.stringify(ut === null ? null : ut.map((g) => ({{
-              hendelse: g.hendelse ? g.hendelse.id : null,
-              rader: g.rader.map((o) => o.id),
-              hode: g.hode,
-            }}))));
-        '''
-        return json.loads(run_node(self.harness, snippet, preamble=GRUPPERING_PREAMBLE).splitlines()[0])
+    def _sorter(self, liste):
+        ut = run_node(self.harness,
+                      f'console.log(JSON.stringify(koSorterHendelser({json.dumps(liste)}).map((h) => h.nummer)));',
+                      preamble=PRIORITET_PREAMBLE)
+        return json.loads(ut.splitlines()[0])
 
-    H1 = {'id': 1, 'nummer': 1, 'kode': 'H1', 'tittel': 'Brann', 'status': 'apen',
-          'lokasjon_navn': '', 'apne_oppdrag': 0}
-    H2 = {'id': 2, 'nummer': 2, 'kode': 'H2', 'tittel': 'Slagsmål', 'status': 'apen',
-          'lokasjon_navn': 'Scene sør', 'apne_oppdrag': 1}
-    H3 = {'id': 3, 'nummer': 3, 'kode': 'H3', 'tittel': 'Gammel', 'status': 'lukket',
-          'lokasjon_navn': '', 'apne_oppdrag': 0}
+    def test_lukkede_nederst_saa_prioritet_saa_nummer(self):
+        liste = [
+            {'nummer': 1, 'status': 'apen', 'prioritet': 'gronn'},
+            {'nummer': 2, 'status': 'lukket', 'prioritet': 'viktig'},
+            {'nummer': 3, 'status': 'apen', 'prioritet': 'viktig'},
+            {'nummer': 4, 'status': 'apen', 'prioritet': 'rod'},
+            {'nummer': 5, 'status': 'apen', 'prioritet': 'gronn'},
+            {'nummer': 6, 'status': 'apen', 'prioritet': 'drift'},
+        ]
+        self.assertEqual(self._sorter(liste), [3, 4, 1, 5, 6, 2])
 
-    def test_av_gir_flat_liste(self):
-        self.assertIsNone(self._grupper([self.H1], [{'id': 10, 'hendelse_id': 1}], gruppert=False))
+    def test_ukjent_prioritet_loefter_ingenting(self):
+        """En verdi fra en eldre klient skal ikke havne øverst."""
+        liste = [{'nummer': 1, 'status': 'apen', 'prioritet': 'kritisk'},
+                 {'nummer': 2, 'status': 'apen', 'prioritet': 'drift'}]
+        self.assertEqual(self._sorter(liste), [2, 1])
 
-    def test_aapen_hendelse_uten_oppdrag_staar_der(self):
-        ut = self._grupper([self.H1, self.H2], [{'id': 10, 'hendelse_id': 2}])
-        self.assertEqual([g['hendelse'] for g in ut], [2, 1])
-        self.assertEqual([g['rader'] for g in ut], [[10], []])
+    def test_soeket_treffer_nummer_tittel_sted_melder_og_lag(self):
+        h = {'kode': 'H12', 'nummer': 12, 'tittel': 'Slagsmål', 'lokasjon_navn': 'Scene sør',
+             'melder': 'Lag 1', 'beskrivelse': 'to personer', 'lagsressurser': 'Lag 3'}
+        for sok, ventet in (('h12', True), ('12', True), ('slag', True), ('sør', True),
+                            ('lag 1', True), ('personer', True), ('lag 3', True),
+                            ('', True), ('  ', True), ('brann', False)):
+            with self.subTest(sok=sok):
+                ut = run_node(self.harness,
+                              f'console.log(koHendelseTreffer({json.dumps(h)}, {json.dumps(sok)}));',
+                              preamble=PRIORITET_PREAMBLE).splitlines()[0]
+                self.assertEqual(ut, 'true' if ventet else 'false')
 
-    def test_tom_uten_hendelse_vises_bare_naar_den_er_alene(self):
-        """En overskrift over ingenting er støy — men er den hele lista, er
-        den lista, og skal stå."""
-        ut = self._grupper([], [])
-        self.assertEqual([g['hendelse'] for g in ut], [None])
-        ut = self._grupper([self.H1], [])
-        self.assertEqual([g['hendelse'] for g in ut], [1])
+    def test_vis_lukkede_av_skjuler_bare_lukkede(self):
+        kode = (
+            "[{id: 1, nummer: 1, status: 'apen', prioritet: 'gronn'},"
+            " {id: 2, nummer: 2, status: 'lukket', prioritet: 'gronn'}].forEach((h) => koHendelser.set(h.id, h));\n"
+            'console.log(JSON.stringify(koSynligeHendelser().map((h) => h.id)));\n'
+            'koVisLukkede = false;\n'
+            'console.log(JSON.stringify(koSynligeHendelser().map((h) => h.id)));\n'
+        )
+        ut = run_node(self.harness, kode, preamble=PRIORITET_PREAMBLE).splitlines()
+        self.assertEqual(json.loads(ut[0]), [1, 2])
+        self.assertEqual(json.loads(ut[1]), [1])
 
-    def test_lukket_hendelse_vises_bare_med_rader(self):
-        """Ellers ville oppdragene forsvunnet fra tavla idet hendelsen ble
-        lukket — og en lukket hendelse uten rader hører hjemme i loggen."""
-        ut = self._grupper([self.H1, self.H3], [{'id': 10, 'hendelse_id': 3}])
-        self.assertEqual([g['hendelse'] for g in ut], [1, 3])
-        ut = self._grupper([self.H1, self.H3], [{'id': 10, 'hendelse_id': None}])
-        self.assertEqual([g['hendelse'] for g in ut], [1, None])
 
-    def test_uten_hendelse_staar_sist_og_faar_alt_ukjent(self):
-        """Et oppdrag som peker på en hendelse tavla ikke har fått ennå (to
-        pollere, to klokker) skal ikke forsvinne."""
-        ut = self._grupper([self.H1], [
-            {'id': 10, 'hendelse_id': None}, {'id': 11, 'hendelse_id': 99}, {'id': 12, 'hendelse_id': 1}])
-        self.assertEqual(ut[-1]['hendelse'], None)
-        self.assertEqual(ut[-1]['rader'], [10, 11])
-        self.assertEqual(ut[0]['rader'], [12])
+@unittest.skipUnless(node_available(), 'node er ikke tilgjengelig')
+class HendelsesradenTests(SimpleTestCase):
+    """Raden i tabellen: prioriteten er en klasse *og* et merke med tekst,
+    Viktig har utropstegnet, lukkede er merket, og alt brukerskrevet
+    escapes."""
 
-    def test_ingenting_skjules(self):
-        """§7.2 for grupperingen: summen av radene er lista."""
-        rader = [{'id': i, 'hendelse_id': h} for i, h in ((1, 1), (2, 2), (3, None), (4, 3), (5, 7))]
-        ut = self._grupper([self.H1, self.H2, self.H3], rader)
-        self.assertEqual(sorted(sum((g['rader'] for g in ut), [])), [1, 2, 3, 4, 5])
+    def setUp(self):
+        self.harness = build_harness(HENDELSE_HARNESS)
 
-    def test_hodet_escaper_og_baerer_sted_og_tall(self):
-        h = dict(self.H2, tittel='<b>x</b>')
-        ut = self._grupper([h], [{'id': 10, 'hendelse_id': 2}, {'id': 11, 'hendelse_id': 2}])
-        hode = ut[0]['hode']
-        self.assertIn('&lt;b&gt;x&lt;/b&gt;', hode)
-        self.assertNotIn('<b>x</b>', hode)
-        self.assertIn('Scene sør', hode)
-        self.assertIn('2 oppdrag', hode)
-        self.assertIn('data-action="koLukkHendelse"', hode)
-        self.assertNotIn('data-action="koGjenapneHendelse"', hode)
-        ut = self._grupper([self.H3], [{'id': 10, 'hendelse_id': 3}, {'id': 11, 'hendelse_id': None}])
-        self.assertIn('data-action="koGjenapneHendelse"', ut[0]['hode'])
-        self.assertIn('Uten hendelse', ut[-1]['hode'])
+    def _rad(self, h, oppdrag=None):
+        return run_node(self.harness,
+                        f'oppdragsliste = {json.dumps(oppdrag or [])};\n'
+                        f'console.log(koHendelseRadHtml({json.dumps(h)}));',
+                        preamble=PRIORITET_PREAMBLE)
+
+    H = {'id': 5, 'nummer': 14, 'kode': 'H14', 'tittel': 'Bevisstløs person', 'status': 'apen',
+         'prioritet': 'viktig', 'lokasjon_navn': 'Hovedscene', 'melder': 'Lag 1',
+         'beskrivelse': 'Mann ca. 40', 'lagsressurser': '', 'opprettet_at': '2026-09-18T21:42:00',
+         'opprettet_av': 'kari', 'lukket_at': '', 'apne_oppdrag': 1,
+         'ressursbehov': [{'id': 1, 'navn': 'Ambulanse'}], 'deltakere': ['kari']}
+
+    def test_viktig_har_ramme_og_utropstegn(self):
+        ut = self._rad(self.H)
+        self.assertIn('h-viktig', ut)
+        self.assertIn('bi-exclamation-triangle-fill', ut)
+        self.assertIn('>Viktig<', ut)
+
+    def test_de_andre_har_klasse_og_merke_men_ikke_ikon(self):
+        for prio, navn in (('rod', 'Rød'), ('gul', 'Gul'), ('gronn', 'Grønn'), ('drift', 'Drift')):
+            with self.subTest(prio=prio):
+                ut = self._rad(dict(self.H, prioritet=prio))
+                self.assertIn(f'h-{prio}', ut)
+                self.assertIn(f'>{navn}<', ut)
+                self.assertNotIn('bi-exclamation-triangle-fill', ut)
+
+    def test_lukket_er_merket(self):
+        ut = self._rad(dict(self.H, status='lukket', lukket_at='2026-09-18T22:00:00'))
+        self.assertIn('h-lukket', ut)
+        self.assertIn('Lukket', ut)
+
+    def test_oppdragene_paa_hendelsen_leses_fra_tavla(self):
+        ut = self._rad(self.H, [{'id': 9, 'nummer': 47, 'hendelse_id': 5}, {'id': 10, 'nummer': 48, 'hendelse_id': 6}])
+        self.assertIn('O47', ut)
+        self.assertNotIn('O48', ut)
+
+    def test_escaper_tittel_sted_melder_beskrivelse_og_behov(self):
+        ond = '<img src=x onerror=alert(1)>'
+        ut = self._rad(dict(self.H, tittel=ond, lokasjon_navn=ond, melder=ond, beskrivelse=ond,
+                            opprettet_av=ond, ressursbehov=[{'id': 1, 'navn': ond}]))
+        self.assertNotIn('<img', ut)
+        self.assertIn('&lt;img', ut)
+
+
+@unittest.skipUnless(node_available(), 'node er ikke tilgjengelig')
+class StroemmenTests(SimpleTestCase):
+    """`koIStrommen()` avgjør hva loggstrømmen viser: kommentarer i en
+    hendelse står i hendelsen, systemlinjene om hendelsen står i strømmen med
+    H-merket, og «System»-bryteren demper de andre systemlinjene — aldri
+    hendelseslinjene."""
+
+    def setUp(self):
+        self.harness = build_harness(HENDELSE_HARNESS)
+
+    def _i(self, linje, vis_system=True):
+        ut = run_node(self.harness,
+                      f'console.log(koIStrommen({json.dumps(linje)}));',
+                      preamble=PRIORITET_PREAMBLE + f'let koVisSystem = {"true" if vis_system else "false"};\n')
+        return ut.splitlines()[0] == 'true'
+
+    def test_kommentar_i_hendelse_staar_i_hendelsen(self):
+        self.assertFalse(self._i({'kilde': 'operator', 'hendelse_id': 5, 'systemkode': ''}))
+        self.assertTrue(self._i({'kilde': 'operator', 'hendelse_id': None, 'systemkode': ''}))
+
+    def test_systemlinja_om_hendelsen_staar_i_stroemmen(self):
+        self.assertTrue(self._i({'kilde': 'system', 'hendelse_id': 5, 'systemkode': 'hendelse_opprettet'}))
+        self.assertTrue(self._i({'kilde': 'system', 'hendelse_id': 5, 'systemkode': 'oppdrag_knyttet'}))
+
+    def test_system_av_demper_stemplene_men_ikke_hendelsene(self):
+        self.assertFalse(self._i({'kilde': 'system', 'hendelse_id': None, 'systemkode': 'oppdrag_status'}, False))
+        self.assertTrue(self._i({'kilde': 'system', 'hendelse_id': 5, 'systemkode': 'hendelse_lukket'}, False))
+        self.assertTrue(self._i({'kilde': 'operator', 'hendelse_id': None, 'systemkode': ''}, False))
+
+
+@unittest.skipUnless(node_available(), 'node er ikke tilgjengelig')
+class OppsettetTests(SimpleTestCase):
+    """Rutenettet (ko-layout.js): rammen holder fire vinduer. `koGyldigOppsett`
+    avviser alt som mangler et vindu, `koBytt` bytter to, og gulvet klemmer
+    en skillelinje før et vindu er borte."""
+
+    def setUp(self):
+        self.harness = build_harness(((KO_JS, ('koKlemProsent', 'koGyldigOppsett', 'koStandardOppsett',
+                                                'koBytt', 'koProsentAv')),))
+
+    PRE = ("const KO_VINDUER = ['hendelser', 'logg', 'ressurser', 'oppdrag'];\n"
+           "const KO_OPPSETT_STANDARD = { rader: [['hendelser', 'logg'], ['ressurser', 'oppdrag']], bredde: [56, 34], hoyde: 56 };\n"
+           'const KO_MIN_PROSENT = 20;\n')
+
+    def _kjor(self, kode):
+        return run_node(self.harness, kode, preamble=self.PRE).splitlines()
+
+    def test_gulvet_klemmer_begge_veier(self):
+        ut = self._kjor('console.log([koKlemProsent(5), koKlemProsent(50), koKlemProsent(99), koKlemProsent("x")].join(","));')
+        self.assertEqual(ut[0], '20,50,80,50')
+
+    def test_et_oppsett_som_mangler_et_vindu_avvises(self):
+        ut = self._kjor(
+            "console.log(koGyldigOppsett({rader: [['hendelser','logg'],['ressurser','ressurser']]}));\n"
+            "console.log(koGyldigOppsett({rader: [['hendelser','logg','ressurser'],['oppdrag']]}));\n"
+            'console.log(koGyldigOppsett(null));\n'
+            "console.log(JSON.stringify(koGyldigOppsett({rader: [['oppdrag','logg'],['ressurser','hendelser']], bredde: [5, 95], hoyde: 200})));\n")
+        self.assertEqual(ut[:3], ['null', 'null', 'null'])
+        self.assertEqual(json.loads(ut[3]),
+                         {'rader': [['oppdrag', 'logg'], ['ressurser', 'hendelser']], 'bredde': [20, 80], 'hoyde': 80})
+
+    def test_bytt_bytter_to_og_roerer_ikke_resten(self):
+        ut = self._kjor(
+            'const o = koStandardOppsett();\n'
+            "const ny = koBytt(o, 'oppdrag', 'hendelser');\n"
+            'console.log(JSON.stringify(ny.rader));\n'
+            'console.log(JSON.stringify(o.rader));\n'
+            "console.log(JSON.stringify(koBytt(o, 'oppdrag', 'oppdrag').rader));\n"
+            "console.log(JSON.stringify(koBytt(o, 'oppdrag', 'ukjent').rader));\n")
+        self.assertEqual(json.loads(ut[0]), [['oppdrag', 'logg'], ['ressurser', 'hendelser']])
+        self.assertEqual(json.loads(ut[1]), [['hendelser', 'logg'], ['ressurser', 'oppdrag']], 'det gamle er urørt')
+        self.assertEqual(json.loads(ut[2]), [['hendelser', 'logg'], ['ressurser', 'oppdrag']])
+        self.assertEqual(json.loads(ut[3]), [['hendelser', 'logg'], ['ressurser', 'oppdrag']])
+
+    def test_prosent_av_beholderen(self):
+        ut = self._kjor('console.log([koProsentAv(500, 0, 1000), koProsentAv(10, 0, 1000), koProsentAv(0, 0, 0)].join(","));')
+        self.assertEqual(ut[0], '50,20,50')
 
 
 @unittest.skipUnless(node_available(), 'node er ikke tilgjengelig')
@@ -572,11 +697,13 @@ class NummerformeneTests(SimpleTestCase):
 
 
 @unittest.skipUnless(node_available(), 'node er ikke tilgjengelig')
-class TavlaSpoerEtterGrupperingenTests(SimpleTestCase):
+class TavlaSierFraTilKoTests(SimpleTestCase):
     """**Kallstedet, ikke bare regelen.** `renderOppdrag()` i
-    `oppdrag-sentral-oppdrag.js` skal spørre `koGrupperOppdrag()` når den
-    finnes. Testene over kaller regelen selv, og da kunne tavla slutte å
-    kalle den uten at noe ble rødt — regel 3 om mutanter i `CLAUDE.md`."""
+    `oppdrag-sentral-oppdrag.js` skal kalle `koEtterOppdragTegnet()` når den
+    finnes — hendelsesloggen leser oppdragene fra tavla, og uten kallet står
+    den med gamle tall. Testene over kaller reglene selv, og da kunne tavla
+    slutte å si fra uten at noe ble rødt — regel 3 om mutanter i `CLAUDE.md`.
+    Og raden bærer lagene og prioritetsikonet fra hendelsen."""
 
     def setUp(self):
         from patients.js_test_utils import OPPDRAG_SENTRAL_JS
@@ -587,37 +714,38 @@ class TavlaSpoerEtterGrupperingenTests(SimpleTestCase):
                                   'tidSiden', '_grovMerke', '_enhetsmatrise',
                                   '_problemMedAntall', '_medAntall', 'venterForbiTerskel',
                                   'lydTerskler', '_manglerTrinn', '_manglerMinutter')),
-            (KO_JS, ('koGrupperOppdrag', 'koHendelseHode', 'koHendelseKnapper', 'koKanSkrive')),
         ))
 
-    def test_tavla_tegner_overskriften(self):
-        snippet = '''
-            const HASTEGRAD_REKKEFOLGE = ['Akutt', 'Haster', 'Vanlig', 'Drift'];
-            const MANGLER_TRINN = [[15, 'alvorlig'], [5, 'varsel'], [0, 'ny']];
-            let koHendelser = new Map([[1, {id: 1, nummer: 1, kode: 'H1', tittel: 'Brann',
-              status: 'apen', lokasjon_navn: '', apne_oppdrag: 1}]]);
-            let koGruppert = true;
-            let oppdragsliste = [{id: 7, nummer: 7, status: 'fremme', status_navn: 'Fremme',
-              enhet_navn: 'HGSD 56', lokasjon_navn: 'Scene', problemstilling: 'Fall',
-              hastegrad: 'Akutt', opprettet: '2026-08-28T20:00:00Z', fritekst: '',
-              hendelse_id: 1, hendelse_nummer: 1, hendelse_tittel: 'Brann', enheter: []}];
-            globalThis.window = { MODUL_TILGANG: { ko: 'skriv_full' } };
-            const el = { innerHTML: '' };
-            globalThis.document = { getElementById: (id) => id === 'oppdragsliste' ? el : null };
-            renderOppdrag();
-            console.log(JSON.stringify(el.innerHTML));
-            console.log(JSON.stringify(_oppdragRadHtml(oppdragsliste[0])));
-        '''
-        linjer = run_node(self.harness, snippet).splitlines()
-        ut, rad = json.loads(linjer[0]), json.loads(linjer[1])
-        self.assertIn('hendelse-hode', ut, 'tavla spurte ikke etter grupperingen')
-        self.assertIn('Brann', ut)
-        self.assertIn('O7', ut)
-        # Raden alene: overskriften bærer også et `hendelse-merke`, så et
-        # søk i hele tavla ser ikke om *raden* mistet sitt (mutant som
-        # overlevde 18. sep. 2026).
-        self.assertIn('hendelse-merke', rad, 'raden bærer H1-merket')
-        self.assertIn('>H1<', rad)
+    SNIPPET = (
+        "const HASTEGRAD_REKKEFOLGE = ['Akutt', 'Haster', 'Vanlig', 'Drift'];\n"
+        "const MANGLER_TRINN = [[15, 'alvorlig'], [5, 'varsel'], [0, 'ny']];\n"
+        "let oppdragsliste = [{id: 7, nummer: 7, status: 'fremme', status_navn: 'Fremme',\n"
+        "  enhet_navn: 'HGSD 56', lokasjon_navn: 'Scene', problemstilling: 'Fall',\n"
+        "  hastegrad: 'Akutt', opprettet: '2026-08-28T20:00:00Z', fritekst: '',\n"
+        "  hendelse_id: 1, hendelse_nummer: 1, hendelse_tittel: 'Brann',\n"
+        "  hendelse_prioritet: 'viktig', hendelse_lagsressurser: '<b>Lag 1</b>, Lag 3', enheter: []}];\n"
+        "globalThis.window = { MODUL_TILGANG: { ko: 'skriv_full' } };\n"
+        'let kalt = 0;\n'
+        'function koEtterOppdragTegnet() { kalt += 1; }\n'
+        "const el = { innerHTML: '' };\n"
+        "globalThis.document = { getElementById: (id) => id === 'oppdragsliste' ? el : null };\n"
+        'renderOppdrag();\n'
+        'console.log(kalt);\n'
+        'console.log(JSON.stringify(el.innerHTML));\n'
+        'oppdragsliste = [];\n'
+        'renderOppdrag();\n'
+        'console.log(kalt);\n'
+    )
+
+    def test_tavla_sier_fra_og_raden_baerer_hendelsen(self):
+        linjer = run_node(self.harness, self.SNIPPET).splitlines()
+        self.assertEqual(linjer[0], '1', 'tavla sa ikke fra til KO etter tegningen')
+        rad = json.loads(linjer[1])
+        self.assertIn('H1</span>', rad, 'raden bærer H1-merket')
+        self.assertIn('bi-exclamation-triangle-fill', rad, 'Viktig-ikonet på merket')
+        self.assertIn('Lag: &lt;b&gt;Lag 1&lt;/b&gt;, Lag 3', rad, 'lagene, escapet')
+        self.assertNotIn('hendelse-hode', rad, 'ingen gruppering på tavla lenger')
+        self.assertEqual(linjer[2], '2', 'også en tom tavle sier fra')
 
 
 # ════════════════════════════════════════════════════════════════════════════

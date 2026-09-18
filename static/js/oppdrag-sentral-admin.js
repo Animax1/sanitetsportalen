@@ -208,6 +208,26 @@ let verdiFane = 'lokasjoner';
 let verdier = { lokasjoner: [], enhetstyper: [], problemstillinger: [], bilinnstillinger: null };
 
 
+function _registrerEkstraVerdifaner() {
+  // **En annen modul kan legge en fane i vinduet uten at denne fila kjenner
+  // den** (KO-innstillinger, 18. sep. 2026). Sida setter
+  // `window.VERDIFANER_EKSTRA = [{slug, navn, ny, url}]`, og fanen får samme
+  // rad og samme handlinger som de tre — bare mot sin egen URL. Retningen
+  // holder: oppdragsmodulen leser en generell krok, ikke `ko`.
+  (globalThis.window?.VERDIFANER_EKSTRA || []).forEach((f) => {
+    if (!f?.slug || VERDIMENGDER[f.slug]) return;
+    VERDIMENGDER[f.slug] = { tittel: f.navn, ny: f.ny || '', url: f.url };
+  });
+}
+
+
+function _verdiUrl(slug) {
+  // Basen for én verdimengde, med skråstrek til slutt. Oppdragsmodulens egne
+  // ligger under `/oppdrag/api/`; en ekstra fane oppgir sin egen.
+  return (VERDIMENGDER[slug] && VERDIMENGDER[slug].url) || `/oppdrag/api/${slug}/`;
+}
+
+
 function _verdiArg(arg) {
   // «slug:id[:hva]» — klikkdelegeringen sender ett argument.
   const [slug, id, hva] = String(arg).split(':');
@@ -230,7 +250,7 @@ function _byggProblemkart(rader) {
 
 
 async function lastVerdier(slug) {
-  const res = await apiFetch(`/oppdrag/api/${slug}/`);
+  const res = await apiFetch(_verdiUrl(slug));
   if (!res.ok) return false;
   verdier[slug] = (await res.json()).data || [];
   if (slug === 'bilinnstillinger') {
@@ -269,8 +289,12 @@ async function lastLokasjoner() {
 
 
 async function lastVerdiadmin() {
+  _registrerEkstraVerdifaner();
   // Bilinnstillingene hentes bare for admin — fanen finnes ikke for andre.
+  // Fanene som finnes i vinduet er de sida tegnet; en fane uten knapp
+  // (oppdragsleder uten KO-leder, eller omvendt) hentes ikke.
   const slugs = Object.keys(VERDIMENGDER).filter(
+    (slug) => document.querySelector(`[data-verdifane="${slug}"]`)).filter(
     (slug) => slug !== 'bilinnstillinger' || globalThis.window?.OPPDRAG_TILGANG?.erAdmin);
   await Promise.all(slugs.map((slug) => lastVerdier(slug)));
   renderVerdiadmin();
@@ -410,6 +434,13 @@ function _verdirad(slug, r, forste, siste) {
 function renderVerdiadmin() {
   const el = document.getElementById('verdiliste');
   if (!el) return;
+  _registrerEkstraVerdifaner();
+  // Første fane sida faktisk har: en KO-leder uten oppdragsleder-nivå har
+  // ikke «Lokasjoner», og da skal vinduet åpne på den fanen som finnes.
+  if (!document.querySelector(`[data-verdifane="${verdiFane}"]`)) {
+    const forste = document.querySelector('[data-verdifane]');
+    if (forste) verdiFane = forste.dataset.verdifane;
+  }
   document.querySelectorAll('[data-verdifane]').forEach((k) => {
     k.classList.toggle('active', k.dataset.verdifane === verdiFane);
   });
@@ -448,7 +479,7 @@ async function leggTilVerdi() {
   if (verdiFane === 'problemstillinger') {
     kropp.kategori = document.getElementById('ny-verdi-kategori')?.value || 'medisinsk';
   }
-  if (await _verdiKall(`/oppdrag/api/${verdiFane}/`, { method: 'POST', body: JSON.stringify(kropp) },
+  if (await _verdiKall(_verdiUrl(verdiFane), { method: 'POST', body: JSON.stringify(kropp) },
                        'Kunne ikke legge til.')) {
     felt.value = '';
     await lastVerdier(verdiFane);
@@ -462,7 +493,7 @@ async function endreVerdinavn(arg) {
   if (!rad) return;
   const navn = (prompt('Nytt navn:', rad.navn) || '').trim();
   if (!navn || navn === rad.navn) return;
-  if (await _verdiKall(`/oppdrag/api/${slug}/${id}/`, { method: 'PUT', body: JSON.stringify({ navn }) },
+  if (await _verdiKall(`${_verdiUrl(slug)}${id}/`, { method: 'PUT', body: JSON.stringify({ navn }) },
                        'Kunne ikke endre navnet.')) {
     await lastVerdier(slug);
     renderVerdiadmin();
@@ -472,7 +503,7 @@ async function endreVerdinavn(arg) {
 
 async function settVerdiAktiv(arg) {
   const { slug, id, hva } = _verdiArg(arg);
-  if (await _verdiKall(`/oppdrag/api/${slug}/${id}/`,
+  if (await _verdiKall(`${_verdiUrl(slug)}${id}/`,
                        { method: 'PUT', body: JSON.stringify({ er_aktiv: hva === '1' }) },
                        'Kunne ikke endre.')) {
     await lastVerdier(slug);
@@ -517,7 +548,7 @@ async function flyttVerdi(arg) {
   const j = hva === 'opp' ? i - 1 : i + 1;
   if (i < 0 || j < 0 || j >= ider.length) return;
   [ider[i], ider[j]] = [ider[j], ider[i]];
-  if (await _verdiKall(`/oppdrag/api/${slug}/rekkefolge/`,
+  if (await _verdiKall(`${_verdiUrl(slug)}rekkefolge/`,
                        { method: 'PUT', body: JSON.stringify({ ider }) }, 'Kunne ikke flytte.')) {
     await lastVerdier(slug);
     renderVerdiadmin();
@@ -529,7 +560,7 @@ async function slettVerdi(arg) {
   const { slug, id, rad } = _verdiArg(arg);
   if (!rad) return;
   if (!confirm(`Slette «${rad.navn}» for godt?`)) return;
-  if (await _verdiKall(`/oppdrag/api/${slug}/${id}/`,
+  if (await _verdiKall(`${_verdiUrl(slug)}${id}/`,
                        { method: 'DELETE', body: JSON.stringify({ confirm: true }) }, 'Kunne ikke slette.')) {
     await lastVerdier(slug);
     renderVerdiadmin();

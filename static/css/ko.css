@@ -1,110 +1,275 @@
 /* ════════════════════════════════════════════════════════════════════════════
-   KO — konsollayouten. Lastes **kun** av templates/ko/index.html.
+   KO — konsollen. Lastes **kun** av templates/ko/index.html, etter
+   oppdrag.css, så konsollen får siste ord om sentralbordets kort.
 
-   **Ingen fargevariabler her, og det er et valg.** Regelen i CLAUDE.md sier at
-   et nytt modulstilark må definere de fire `base_portal` ikke aliaser
-   (`--text-muted`, `--text-soft`, `--surface-3`, `--header-bg`) — men den
-   gjelder et ark som *bruker* dem. Denne fila er ren layout: høyder, rulling
-   og kolonnebredder. Å skrive inn fire variabler ingen regel refererer til
-   ville vært død kode, og verre: en ny leser ville trodd de var i bruk.
-   Kommer en farget regel hit en dag, skal de fire inn i samme commit.
+   **Formen er 2×2** (André, 18. sep. 2026, etter skissene som ble avtalt før
+   koden): Hendelseslogg │ Loggstrøm øverst, Ressursoversikt │ Oppdragsliste
+   nederst. Vinduene bytter plass med håndtaket og endrer størrelse med
+   skillelinjene (ko-layout.js); rammen holder alle fire synlige.
 
-   **Formen er besluttet 17. sep. 2026 av André:** loggen er den sentrale
-   delen, ressursoversikten henger sammen med oppdragslisten, og PC er
-   hovedflata. Se docs/FORSLAG_KO.md §7 for hvorfor rekkefølgen er
-   Logg → Ressurser → Oppdrag og ikke Ressurser → Logg → Oppdrag.
+   **Fargevariablene er her fra denne fila** — prioritetsradene er fargede
+   regler, og da går de fire `base_portal` ikke aliaser inn i samme commit
+   (CLAUDE.md). Samme verdier som style.css og oppdrag.css.
    ════════════════════════════════════════════════════════════════════════════ */
 
-/* **Bredden slippes fri på KO-sida, og bare der.** `base_portal.html` kapper
-   `.portal-content` til 1400 px, som er riktig for en leseflate: en tekstlinje
-   på 1900 px er vond å følge. En konsoll er det motsatte — tre kolonner som
-   deler 1400 px gir 466 / 350 / 583, og da brekker enhetsbrikkene i
-   oppdragslista uansett hvor stor skjermen er. Kappet ville altså gjort en
-   2560-skjerm nøyaktig like trang som en laptop.
+:root {
+  --text-muted: #94a3b8;
+  --text-soft: #64748b;
+  --surface-3: #0b1220;
+  --header-bg: #0f3460;
+}
 
-   `:has()` framfor en ny blokk i `base_portal.html`: regelen gjelder én side,
-   og da skal den stå i den sidas eget ark. Faller `:has()` bort, er resultatet
-   den gamle bredden — trang, ikke ødelagt. */
+/* **Bredden slippes fri på KO-sida, og bare der.** `base_portal.html` kapper
+   `.portal-content` til 1400 px, som er riktig for en leseflate og galt for
+   en konsoll: fire vinduer som deler 1400 px brekker oppdragsradene uansett
+   hvor stor skjermen er. `:has()` framfor en ny blokk i base_portal: regelen
+   gjelder én side, og faller `:has()` bort er resultatet trangt, ikke ødelagt. */
 body:has(.ko-konsoll) .portal-content {
   max-width: none;
+  padding: 0.75rem 1rem;
 }
 
-/* **Sida skal ikke rulle — kolonnene skal.** Det er forskjellen på en konsoll
-   og en nettside: de tre flatene skal stå på samme sted hele vakta, uansett
-   hvor mye som er i dem. Rulles sida, flytter loggfeltet seg idet tavla får en
-   rad til, og operatøren treffer feil.
+/* ── Rutenettet ─────────────────────────────────────────────────────────── */
 
-   Høyden settes av `koSettKonsollhoyde()` i ko.js, ikke av en `calc()` med et
-   fast tall: over konsollen står header, nav og eventuelle meldinger, og alle
-   tre kan brekke til to linjer. `70vh` er reserven om JS-en aldri kjører —
-   for lite, men ikke ødelagt. */
+/* **Sida ruller ikke — vinduene gjør det.** Høyden settes av
+   `koSettKonsollhoyde()` i ko-layout.js, målt og ikke regnet ut med et fast
+   tall: header, nav og varsler over konsollen kan brekke til to linjer. `70vh`
+   er reserven om JS-en aldri kjører. */
 .ko-konsoll {
   display: flex;
-  gap: 0.75rem;
-  align-items: stretch;
+  flex-direction: column;
   height: var(--ko-hoyde, 70vh);
-}
-
-/* `min-height: 0` og `min-width: 0` er ikke pynt: uten dem nekter en
-   flex-boks å bli mindre enn innholdet sitt, og da ruller sida likevel —
-   akkurat den feilen layouten finnes for å hindre. */
-.ko-kolonne {
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-  min-width: 0;
-}
-
-/* 4 : 3 : 5. Forholdet mellom de to siste er sentralbordets eget (`col-lg-4` +
-   `col-lg-8` i templates/oppdrag/sentral.html), litt strammet — det er den
-   blokka pulje 4 flytter hit, og den skal kjenne seg igjen. */
-.ko-kolonne-logg { flex: 0 0 33.33%; }
-.ko-kolonne-ressurser { flex: 0 0 25%; }
-.ko-kolonne-oppdrag { flex: 1 1 auto; }
-
-.ko-kolonne > .card {
-  flex: 1 1 auto;
-  display: flex;
-  flex-direction: column;
   min-height: 0;
 }
 
-/* Loggkolonnen har **to** kort, og bare det nederste skal vokse. Uten dette
-   fikk skjemakortet også `flex: 1 1 auto`, ble klemt til under sin egen
-   høyde, og hint-linja under feltet lå oppå kortkanten (sett i nettleser
-   18. sep. 2026). */
-#ko-logg-skjema {
+.ko-rad {
+  display: flex;
+  min-height: 0;
+  flex: 1 1 50%;
+}
+
+/* `min-height: 0` og `min-width: 0` er ikke pynt: uten dem nekter en flex-boks
+   å bli mindre enn innholdet sitt, og da ruller sida likevel. `min-width` og
+   `min-height` i piksler er **gulvet**: en skillelinje kan ikke dras forbi
+   det, så ingen flate kan forsvinne. */
+.ko-vindu {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 50%;
+  min-width: 280px;
+  min-height: 180px;
+  background: var(--surface-1);
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.ko-vindu-hode {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.4rem 0.6rem;
+  border-bottom: 1px solid var(--border-color);
+  background: var(--surface-2);
+  font-size: 0.9rem;
+  font-weight: 600;
   flex: 0 0 auto;
+  flex-wrap: wrap;
 }
+.ko-vindu-tittel { white-space: nowrap; }
+.ko-vindu-tall { color: var(--text-muted); font-weight: 500; font-size: 0.8rem; }
+.ko-grip { color: var(--text-soft); cursor: grab; }
+.ko-grip:active { cursor: grabbing; }
+/* Vinduet man drar, og vinduet man holder over. */
+.ko-vindu-dras { opacity: 0.6; outline: 2px dashed var(--portal-accent); outline-offset: -2px; }
+.ko-vindu-mal { outline: 2px dashed #fbbf24; outline-offset: -2px; }
 
-.ko-rull {
+.ko-vindu-kropp {
   flex: 1 1 auto;
   overflow-y: auto;
   min-height: 0;
+  padding: 0.5rem 0.6rem;
 }
-
-/* Under 1400 px blir oppdragslista trang: enhetsbrikkene («Trenger ny ressurs
-   · 12 min», «Avbrutt av …») begynner å brekke i tre linjer. Loggen gir da fra
-   seg bredde — den tåler det, for en loggsetning er kort. */
-@media (max-width: 1399.98px) {
-  .ko-kolonne-logg { flex: 0 0 28%; }
-  .ko-kolonne-ressurser { flex: 0 0 24%; }
+.ko-vindu-fot {
+  flex: 0 0 auto;
+  border-top: 1px solid var(--border-color);
+  padding: 0.5rem 0.6rem;
+  background: var(--surface-2);
 }
+.ko-vindu-fot textarea { resize: none; }
+.ko-hint { font-size: 0.72rem; color: var(--text-soft); }
 
-/* Under 1200 px er tre kolonner ikke mulig, og da er stabling riktig svar —
-   ikke faner (se ko/CLAUDE.md). Loggen først, fordi den er den sentrale
-   delen. Høyden slippes samtidig: på en smal skjerm *skal* sida rulle, og en
-   låst høyde ville gitt tre bittesmå rullefelt inne i hverandre. */
+/* Skillelinjene. Treffflata er 8 px; streken i midten er det man ser. */
+.ko-splitter-v { flex: 0 0 8px; cursor: col-resize; position: relative; }
+.ko-splitter-h { flex: 0 0 8px; cursor: row-resize; position: relative; }
+.ko-splitter-v::after, .ko-splitter-h::after {
+  content: '';
+  position: absolute;
+  background: var(--border-color);
+  border-radius: 2px;
+}
+.ko-splitter-v::after { left: 3px; top: 40%; width: 2px; height: 20%; }
+.ko-splitter-h::after { top: 3px; left: 45%; height: 2px; width: 10%; }
+.ko-splitter-v:hover::after, .ko-splitter-h:hover::after,
+.ko-splitter-aktiv::after { background: var(--portal-accent); }
+/* Mens noen drar: ingen tekstmarkering, og pekeren holder formen over alt. */
+body.ko-drar { user-select: none; }
+body.ko-drar-v { cursor: col-resize; }
+body.ko-drar-h { cursor: row-resize; }
+
+/* Under 1200 px er 2×2 ikke mulig, og da stables vinduene — ikke faner
+   (ko/CLAUDE.md). Høyden slippes: på en smal skjerm *skal* sida rulle. */
 @media (max-width: 1199.98px) {
-  .ko-konsoll {
-    display: block;
-    height: auto;
-  }
-  .ko-kolonne { margin-bottom: 0.75rem; }
-  .ko-rull { max-height: 60vh; }
+  .ko-konsoll { height: auto; display: block; }
+  .ko-rad { display: block; }
+  .ko-vindu { margin-bottom: 0.75rem; flex-basis: auto !important; }
+  .ko-vindu-kropp { max-height: 55vh; }
+  .ko-splitter-v, .ko-splitter-h { display: none; }
 }
 
-/* Loggen (pulje 6): hendelseslinjene uthevet, chatlinjene dempet. Ren
-   layout/vekt — fargen kommer fra Bootstrap-merket (`text-bg-primary`). */
-.ko-linje-hendelse { font-weight: 600; }
-.ko-linje-chat { opacity: 0.75; }
+/* ── Hendelsesloggen ────────────────────────────────────────────────────── */
+
+/* Annenhver rad i to toner (André: «annenhver farge for synlighet og
+   lesbarhet»). Prioriteten er en venstrekant pluss et merke med tekst —
+   fargen bærer aldri informasjonen alene (WCAG 1.4.1). */
+.h-tabell { width: 100%; border-collapse: separate; border-spacing: 0 4px; font-size: 0.86rem; }
+.h-tabell th {
+  white-space: nowrap; font-size: 0.72rem; text-transform: uppercase;
+  letter-spacing: 0.06em; color: var(--text-muted); font-weight: 600; padding: 0.15rem 0.5rem;
+}
+.h-tabell td { padding: 0.45rem 0.5rem; vertical-align: middle; background: var(--surface-1); }
+.h-tabell tr.h-rad:nth-child(even) td { background: #172033; }
+.h-tabell tr.h-rad td:first-child { border-left: 4px solid transparent; border-radius: 8px 0 0 8px; }
+.h-tabell tr.h-rad td:last-child { border-radius: 0 8px 8px 0; }
+.h-tabell tr.h-rad { cursor: pointer; }
+.h-tabell tr.h-rad:hover td { background: #1e293b; }
+.h-tabell tr.h-rad:focus-visible td { outline: 2px solid var(--portal-accent); }
+.h-tabell tr.h-rad.h-apen td { background: #1e3a5f; }
+
+.h-tabell tr.h-gronn td:first-child { border-left-color: #16a34a; }
+.h-tabell tr.h-gul td:first-child   { border-left-color: #eab308; }
+.h-tabell tr.h-rod td:first-child   { border-left-color: #ef4444; }
+.h-tabell tr.h-drift td:first-child { border-left-color: #3b82f6; }
+/* Viktig: rød ramme rundt hele raden, og rødt utropstegn. */
+.h-tabell tr.h-viktig td:first-child { border-left-color: #ef4444; }
+.h-tabell tr.h-viktig td {
+  background: rgba(239, 68, 68, 0.10) !important;
+  box-shadow: inset 0 1px 0 rgba(239, 68, 68, 0.55), inset 0 -1px 0 rgba(239, 68, 68, 0.55);
+}
+.h-tabell tr.h-viktig td:last-child {
+  box-shadow: inset 0 1px 0 rgba(239, 68, 68, 0.55), inset 0 -1px 0 rgba(239, 68, 68, 0.55),
+              inset -1px 0 0 rgba(239, 68, 68, 0.55);
+}
+.h-tabell tr.h-lukket td { color: var(--text-muted); }
+.h-tabell tr.h-lukket .h-tittel { text-decoration: line-through; text-decoration-color: var(--text-soft); }
+
+.h-tittel { font-weight: 600; color: var(--text-main); }
+.h-under { color: var(--text-muted); font-size: 0.8rem; }
+.h-nowrap { white-space: nowrap; }
+.h-ressurs { color: #fde68a; font-size: 0.8rem; }
+.h-ikon { font-size: 1.05rem; width: 1.4rem; display: inline-block; text-align: center; color: #ef4444; }
+
+/* Prioritetsmerket — samme form som hastegradsmerket i oppdrag.css. */
+.ko-prio {
+  font-size: 0.72rem; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.05em; padding: 0.1rem 0.45rem; border-radius: 4px; white-space: nowrap;
+}
+.ko-prio-m-viktig { background: #7f1d1d; color: #fecaca; }
+.ko-prio-m-rod    { background: #7f1d1d; color: #fecaca; }
+.ko-prio-m-gul    { background: #78350f; color: #fde68a; }
+.ko-prio-m-gronn  { background: #14532d; color: #bbf7d0; }
+.ko-prio-m-drift  { background: #1e3a8a; color: #bfdbfe; }
+
+.badge-apen { background: #1d4ed8; }
+.badge-lukket { background: #334155; color: #cbd5e1; }
+
+/* Søkefeltet i hodet. */
+.ko-sok { width: 220px; }
+
+/* ── Hendelsen åpnet inne i vinduet ─────────────────────────────────────── */
+
+.ko-detalj { display: flex; flex-direction: column; }
+.h-hode {
+  border: 1px solid var(--border-color); border-left-width: 4px; border-radius: 8px;
+  padding: 0.6rem 0.8rem; background: var(--surface-2);
+}
+.h-hode.h-viktig, .h-hode.h-rod { border-left-color: #ef4444; background: rgba(239, 68, 68, 0.08); }
+.h-hode.h-viktig { border-color: rgba(239, 68, 68, 0.55); border-left-color: #ef4444; }
+.h-hode.h-gul   { border-left-color: #eab308; }
+.h-hode.h-gronn { border-left-color: #16a34a; }
+.h-hode.h-drift { border-left-color: #3b82f6; }
+.h-hode-tittel { font-weight: 700; font-size: 1rem; }
+.h-felt { font-size: 0.82rem; color: var(--text-muted); }
+.h-felt b { color: var(--text-main); font-weight: 600; }
+.h-beskrivelse { font-size: 0.86rem; white-space: pre-wrap; }
+.h-seksjon {
+  font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em;
+  color: var(--text-muted); font-weight: 600;
+}
+.h-oppdrag-rad {
+  display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; font-size: 0.85rem;
+  padding: 0.3rem 0.5rem; border: 1px solid var(--border-color); border-radius: 8px;
+  background: var(--surface-2); cursor: pointer;
+}
+/* Tråden får aldri mindre enn ~fem linjer: er hodet høyt og vinduet lavt,
+   ruller hele detaljvisningen i stedet (sett i nettleser 18. sep. 2026 —
+   tråden var klemt til én linje). */
+.h-traad { flex: 1 1 auto; overflow-y: auto; min-height: 10rem; }
+.h-linje { padding: 0.35rem 0.5rem; border-radius: 6px; font-size: 0.86rem; }
+.h-linje:nth-child(even) { background: #172033; }
+.h-linje .tid { font-weight: 600; margin-right: 0.4rem; }
+.h-linje .hvem { color: var(--text-muted); font-size: 0.78rem; }
+.h-linje.system { color: var(--text-muted); font-style: italic; }
+.ko-deltar { font-size: 0.8rem; color: var(--text-muted); }
+.ko-deltar .navn { color: #bfdbfe; font-weight: 600; }
+/* Prioritetsknappene i hodet: én er valgt, og den er fylt. */
+.ko-prio-gruppe .btn.aktiv-viktig, .ko-prio-gruppe .btn.aktiv-rod { background: #dc2626; border-color: #dc2626; color: #fff; }
+.ko-prio-gruppe .btn.aktiv-gul   { background: #eab308; border-color: #eab308; color: #111; }
+.ko-prio-gruppe .btn.aktiv-gronn { background: #16a34a; border-color: #16a34a; color: #fff; }
+.ko-prio-gruppe .btn.aktiv-drift { background: #2563eb; border-color: #2563eb; color: #fff; }
+/* «Lukk hendelse» skal være godt synlig (André, 18. sep. 2026). */
+.ko-lukk-knapp { font-weight: 700; }
+
+/* ── Skjemaet «Ny hendelse» ─────────────────────────────────────────────── */
+
+.ko-prio-valg { display: flex; gap: 0.4rem; flex-wrap: wrap; }
+.ko-prio-knapp {
+  flex: 1 1 0; min-height: 40px; font-weight: 700; border: 2px solid var(--border-color);
+  color: var(--text-main); background: transparent; border-radius: 6px; white-space: nowrap;
+}
+.ko-prio-knapp.ko-prio-gronn { border-color: #16a34a; color: #86efac; }
+.ko-prio-knapp.ko-prio-gul   { border-color: #eab308; color: #fde047; }
+.ko-prio-knapp.ko-prio-rod   { border-color: #dc2626; color: #fca5a5; }
+.ko-prio-knapp.ko-prio-drift { border-color: #3b82f6; color: #bfdbfe; }
+.ko-prio-knapp.ko-prio-viktig { border-color: #dc2626; color: #fca5a5; }
+.ko-prio-knapp.valgt.ko-prio-gronn { background: #16a34a; color: #fff; }
+.ko-prio-knapp.valgt.ko-prio-gul   { background: #eab308; color: #111; }
+.ko-prio-knapp.valgt.ko-prio-rod   { background: #dc2626; color: #fff; }
+.ko-prio-knapp.valgt.ko-prio-drift { background: #2563eb; color: #fff; }
+.ko-prio-knapp.valgt.ko-prio-viktig { background: #dc2626; color: #fff; }
+.ko-ressursbehov-valg { display: flex; flex-wrap: wrap; gap: 0.25rem 1rem; }
+
+/* ── Loggstrømmen ───────────────────────────────────────────────────────── */
+
+.ls-festet-hode {
+  font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.06em;
+  color: #a78bfa; font-weight: 600; margin: 0.2rem 0 0.3rem;
+}
+.ls-festet-hode.ls-strom-hode { color: var(--text-muted); }
+.ls-festet {
+  border: 1px dashed #a78bfa; border-radius: 8px; padding: 0.35rem 0.6rem; margin-bottom: 0.35rem;
+  background: rgba(167, 139, 250, 0.08); font-size: 0.86rem; display: flex; gap: 0.5rem; align-items: flex-start;
+}
+.ls-festet .bi-pin-angle-fill { color: #a78bfa; }
+.ls-linje { padding: 0.35rem 0.5rem; border-radius: 6px; font-size: 0.86rem; display: flex; gap: 0.5rem; align-items: flex-start; }
+.ls-linje:nth-child(even) { background: #172033; }
+.ls-linje .tid { font-weight: 600; white-space: nowrap; }
+.ls-linje .tekst { flex: 1 1 auto; overflow-wrap: anywhere; }
+.ls-linje .hvem { color: var(--text-muted); font-size: 0.78rem; white-space: nowrap; }
+.ls-linje.ls-system { color: var(--text-muted); }
+.ls-linje.ls-system .tekst { font-style: italic; }
+.ls-linje.ls-hendelse .tekst { font-weight: 600; font-style: normal; color: var(--text-main); }
+.ls-linje.ls-chat { opacity: 0.75; }
+.ls-linje .verktoy { margin-left: auto; white-space: nowrap; font-size: 0.78rem; }
+.ls-linje .verktoy .btn-link { padding: 0 0.2rem; font-size: 0.85rem; color: var(--text-muted); }
+.ls-linje .verktoy .btn-link:hover { color: var(--text-main); }

@@ -215,6 +215,7 @@ class VerdiadminJsTests(SimpleTestCase):
     HARNESS = (
         (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue')),
         (OPPDRAG_SENTRAL_JS, ('_verdirad', 'renderVerdiadmin', '_byggProblemkart', 'flyttVerdi',
+                              '_verdiUrl', '_registrerEkstraVerdifaner',
                               '_verdiArg', '_verdiKall')),
     )
 
