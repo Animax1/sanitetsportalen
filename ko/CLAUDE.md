@@ -242,38 +242,38 @@ hendelse kan åpnes igjen. Det står i `TODO.md`. Logglinja har med vilje **inge
 hendelse ennå**: den legges til i pulje 3, sammen med regelen om at en linje kan knyttes
 til en hendelse i etterkant.
 
-## Ressurslista (pulje 3) — sentralbordets egen
+## Sentralbordet kjører i `/ko/` (pulje 4)
 
-**KO viser `oppdrag.Enhet`, ikke `vaktliste.Ressurs`,** og tegner dem med
-`tegnEnhetsliste()` i `static/js/oppdrag-kort.js`. Samme funksjon, samme
-enheter, samme statuser, samme gruppering på enhetstype, samme
-besetningspanel. Det er ikke en likhet som skal vedlikeholdes — det er samme
-kode.
+**KO laster `oppdrag-sentral-*.js` og treffer `/oppdrag/api/…`.** Ressurslista, oppdragslista,
+verktøylinja, modalene og alle handlingene er oppdragsmodulens egne — samme kode, samme
+endepunkter, samme sperrer. Det er en flytting, ikke en kopi.
 
-**Og det er en korreksjon.** Første utgave (17. sep. 2026) bygget en egen
-projeksjon over `vaktliste.Ressurs` med en KO-ført status i fire verdier:
-«Ledig», «Opptatt», «Pause», «Ute av drift». `docs/FORSLAG_KO.md` §3.1 sier at
-KO skal føre status for dem som ikke stempler selv, men **ikke med hvilke ord**
-— og `/oppdrag/` har aldri hatt «Pause» eller «Ute av drift». Verdimengden var
-funnet på (André, 18. sep. 2026: «Her har du tatt deg grove friheter utenfor
-rammene som er satt»). Verdimengdefila i `ko/`, modellen `Ressursstatus` og
-systemkoden `ressurs_status` er **slettet** igjen; `ko/migrations/0003` slipper
-tabellen.
+| Hva | Hvor det bor | Delt av |
+|---|---|---|
+| Konteksten | `oppdrag.views.sentralbordkontekst()` | `/oppdrag/` og `/ko/` |
+| Verktøylinja | `templates/oppdrag/_sentralbord_verktoy.html` | begge |
+| Modalene | `templates/oppdrag/_sentralbord_modaler.html` | begge |
+| Globaler og skript | `templates/oppdrag/_sentralbord_skript.html` | begge |
+| Enhetskortet og lista | `static/js/oppdrag-kort.js` | begge |
 
-**Den tredje kilden i §3.1 er utsatt, ikke forkastet.** Den bygges når noen har
-bestemt hva statusene skal hete, og det er ikke en kodeoppgave. Står i
-`TODO.md`. Konsekvensen i mellomtiden skal stå skrevet: **et lag uten
-`oppdrag.Enhet` vises ikke på lista** — akkurat som i `/oppdrag/` i dag.
+**Oppdragsflata gates av `oppdrag`-modulen, ikke av `ko`** (André, 18. sep. 2026). Det er
+komposisjonsregelen fra rollemodellen §5 — samme som `kan_se_besetning` bruker for vaktlista:
+KO *viser* oppdragsmodulens data, og hvem som får se dem er oppdragsmodulens sak.
+`kan_se_oppdrag` avgjør om flata tegnes i det hele tatt; `kan_skrive` og `kan_lede` avgjør
+knappene, og begge er oppdragsnivåer.
 
-**KO har ingen skrive-endepunkter på enhetene.** Å sette en enhet av vakt eller
-i passiv vakt er oppdragsmodulens endepunkter, og de blir KOs den dagen
-sentralbordet flytter (pulje 4). Et eget i mellomtiden ville vært en andre vei
-inn til samme tilstand.
+**En KO-operatør trenger derfor to rader:** `ko` for loggen og `oppdrag` for oppdragene.
+Alternativet — egne KO-nivåer foran de samme endepunktene — ville lagt tilgangsmodellen to
+steder, og to steder glir fra hverandre.
 
-**Besetningspanelet gates på `vaktliste`-tilgang, ikke på KO-tilgang** —
-komposisjonsregelen fra rollemodellen §5, og samme gate sentralbordet bruker.
-Har ikke operatøren vaktlistetilgang, finnes panelet ikke, framfor å gi avledet
-innsyn i hvem som går vakt.
+**KO har ingen egne oppdragsendepunkter.** `/ko/api/ressurser/` fantes en dag i pulje 3 og er
+borte: den gatet oppdragsdata på `ko:les`. `ko.js` henter derfor verken ressurser eller
+oppdrag — sentralfilene eier begge listene, med sin egen ETag og polling. En henter til
+ville vært en andre poller mot de samme endepunktene, og to pollere som skriver til samme
+`#enhetsliste` blir uenige.
+
+**Loggen er fortsatt KOs egen**, og `ko:les` alene gir den. En operatør uten oppdragstilgang
+ser loggen og en beskjed om hva som mangler — ikke en tom kolonne.
 
 ## Feature parity med sentralbordet — ved konstruksjon, ikke ved flid
 
@@ -283,19 +283,11 @@ passiv vakt, ventende, «ledig siden», sted og hele oppdragslinja.
 
 **Parity som holder er den som følger av at det er samme kode.** To steder:
 
-| Lag | Den ene kilden | Leses av |
-|---|---|---|
-| Server | `oppdrag.services.enhetskort()` | `oppdrag.views.enheter_view` og `ko.services.ressursbildet` |
-| Klient | `tegnEnhetsliste()` i `static/js/oppdrag-kort.js` | `renderEnheter()` i sentralbordet og `koHentRessurser()` her |
+Fra pulje 4 er parity ikke lenger noe som *oppnås* — det er samme side. `/oppdrag/` og
+`/ko/` leser samme kontekst, samme maler, samme JS og samme endepunkter.
 
-Et utvalg av felter, eller en egen tegner, ville falt bak neste felt noen la til i
-oppdragsmodulen — uten at noe ble rødt.
-`test_samme_svar_som_oppdragsmodulens_endepunkt` sammenligner **hele svaret** fra de to
-endepunktene, ikke bare nøklene: en KO-side som filtrerte, sorterte eller scopet
-annerledes ville vært usynlig for en nøkkelsjekk.
-
-**`window.OPPDRAG_MED_ANTALL`, `OPPDRAG_ENHETSTYPER` og `KAN_SE_BESETNING` må settes av
-malen.** Det delte kortet slår opp i dem for pasientantall, gruppering og
-besetningspanelet. Uten `MED_ANTALL` står «Transport» der det skulle stått «Transport · 3
-pasienter» — flata ser riktig ut og er fattigere, som er den stille varianten av å mangle
-parity.
+`ko/tests_sentralbord.py` håndhever tre ting: at KO får **hele** konteksten (ikke et
+utvalg), at begge sidene laster **alle** sentralbordfilene i samme rekkefølge, og at de har
+de samme flatene. Den midterste er en sperrehake: begge sidene leser samme malbit, så en fil
+som faller ut faller ut begge steder — og likheten består mens flata er ødelagt. Fasiten er
+`OPPDRAG_SENTRAL_JS`.

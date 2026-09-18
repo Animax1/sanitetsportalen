@@ -79,6 +79,7 @@ TEMAER: dict[str, dict[str, str]] = {
         'skallet': 'modulen, tilgangen, flatene, sidebaren',
         'loggen': 'logglinjer, retting, sletteinngangen, systemhendelsene som løftes inn',
         'ressursbildet': 'tavla: projeksjonen av vaktliste + oppdrag + KO-ført status',
+        'sentralbordet': 'sentralbordet flyttet inn i /ko/, delingen og gatene',
     },
     'oppdrag': {
         'enhetsskjerm': 'bilens side, offline-køen, lydvarselet',

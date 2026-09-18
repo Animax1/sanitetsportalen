@@ -1,0 +1,62 @@
+{% comment %}
+  Verktøylinja og oppsettvarselet. Delt av `/oppdrag/` og `/ko/` (pulje 4).
+
+  Knappene gates på `kan_skrive` og `kan_lede`, som begge er
+  **oppdragsmodulens** nivåer — også når sida er KO. Se
+  `oppdrag.views.sentralbordkontekst`.
+{% endcomment %}
+  <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
+    <h1 class="h4 mb-0"><i class="bi bi-truck-front me-2"></i>Oppdrag</h1>
+    <div class="d-flex gap-2">
+      {% if kan_skrive %}
+      <button type="button" class="btn btn-primary btn-sm"
+              data-bs-toggle="modal" data-bs-target="#nyttOppdragModal">
+        <i class="bi bi-plus-lg me-1"></i>Nytt oppdrag
+      </button>
+      {% endif %}
+      {% if kan_skrive %}
+      <button type="button" class="btn btn-outline-secondary btn-sm"
+              data-bs-toggle="modal" data-bs-target="#enheterModal"
+              data-action="lastEnhetsadmin">
+        <i class="bi bi-truck me-1"></i>Enheter<span id="av-vakt-teller"></span>
+      </button>
+      {% endif %}
+      <button type="button" class="btn btn-outline-secondary btn-sm"
+              data-bs-toggle="modal" data-bs-target="#historikkModal"
+              data-action="lastHistorikk">
+        <i class="bi bi-clock-history me-1"></i>Historikk
+      </button>
+      {% if kan_lede %}
+      {# Valglistene — lokasjoner, enhetstyper, problemstillinger — er skriv_leder (12. sep. 2026). Het «Verdier» én dag; André ville ha et navn som sier hva det er. #}
+      <button type="button" class="btn btn-outline-secondary btn-sm"
+              data-bs-toggle="modal" data-bs-target="#valglisterModal"
+              data-action="lastVerdiadmin">
+        <i class="bi bi-list-ul me-1"></i>Valglister
+      </button>
+      {% endif %}
+      {% if kan_skrive %}
+      {% comment %}
+        Vaktarkivet (fase 7). Egen knapp, ikke en variant av «Historikk»:
+        historikken rydder tavla og er reversibel, arkivet fryser vakten med
+        signatur og en kollaps som sletter radnivået etter 24 måneder. To
+        handlinger som ser like ut i en meny, blir før eller siden forvekslet.
+      {% endcomment %}
+      <button type="button" class="btn btn-outline-secondary btn-sm"
+              data-bs-toggle="modal" data-bs-target="#arkivModal"
+              data-action="lastArkiv">
+        <i class="bi bi-archive me-1"></i>Vaktarkiv
+      </button>
+      {% endif %}
+    </div>
+  </div>
+
+  <div id="mangler-oppsett" class="alert alert-warning d-none">
+    <strong>Modulen mangler oppsett.</strong>
+    <span id="mangler-hva"></span>
+    {% if er_global_admin %}
+    Bruk knappene øverst.
+    {% else %}
+    En administrator må legge dem inn.
+    {% endif %}
+  </div>
+

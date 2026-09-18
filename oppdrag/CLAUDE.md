@@ -259,3 +259,16 @@ spør i stedet.
 Innmeldingen står **i** tegnefunksjonen og ikke på toppnivå, og det er en testbarhetsregel:
 `build_harness()` plukker ut funksjoner og kjører ikke toppnivålinjer, så et kallsted der
 kan fjernes uten at noe blir rødt. Mutanten overlevde nøyaktig sånn.
+
+**Sentralbordet kjører også i `/ko/` fra pulje 4** (18. sep. 2026), og delingen går på fire
+nivåer: konteksten (`views.sentralbordkontekst`), tre malbiter (`_sentralbord_verktoy`,
+`_sentralbord_modaler`, `_sentralbord_skript`), JS-en (`oppdrag-kort.js` pluss de fire
+`oppdrag-sentral-*.js`) og endepunktene, som er uendret.
+
+**Gatene er denne modulens, også når sida er KO.** `kan_skrive`, `kan_lede` og
+`kan_se_besetning` kommer fra `sentralbordkontekst()`, og KO legger bare til `kan_se_oppdrag`
+— om flata tegnes i det hele tatt. En ny gate skal derfor inn i `sentralbordkontekst()` og
+ikke i den ene malen; ellers virker den bare på én av sidene.
+
+`/oppdrag/` er uendret i denne puljen — verifisert ved å sammenligne svaret fra ti endepunkter
+før og etter, ikke ved å lese diffen.

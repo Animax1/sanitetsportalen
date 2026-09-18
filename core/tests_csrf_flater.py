@@ -31,6 +31,8 @@ import re
 from pathlib import Path
 
 from django.conf import settings
+
+from core import maltekst
 from django.test import Client, SimpleTestCase, TestCase, override_settings
 
 from accounts.models import CustomUser, ModulTilgang
@@ -39,13 +41,23 @@ from core.models import AppSetting
 
 
 def _maler():
+    """**Sidene, ikke malbitene.**
+
+    En fil som begynner med `_` er en bit noen inkluderer, ikke en flate noen
+    åpner — og tokenet hører hjemme på sida, ikke i biten. Uten skillet meldte
+    testen `_sentralbord_skript.html` som en flate uten token da sentralbordets
+    skript ble skilt ut (18. sep. 2026).
+
+    Biten blir ikke usynlig av det: `_js_filer_i()` leser sida **med** alt den
+    inkluderer, så JS-en i biten telles til sida som laster den.
+    """
     rot = Path(settings.BASE_DIR)
     ut = list((rot / 'templates').rglob('*.html'))
     for app in rot.iterdir():
         app_maler = app / 'templates'
         if app_maler.is_dir():
             ut.extend(app_maler.rglob('*.html'))
-    return ut
+    return [m for m in ut if not m.name.startswith('_')]
 
 
 def _js_filer_i(mal_tekst):
@@ -99,7 +111,9 @@ class CsrfPaaSkrivendeFlaterTests(SimpleTestCase):
     def _skrivende_maler(self):
         funn = []
         for mal in _maler():
-            tekst = mal.read_text(encoding='utf-8')
+            # Med alt sida inkluderer: JS-en kan ligge i en malbit, og da er
+            # det fortsatt sida som laster den.
+            tekst = maltekst.les(mal)
             for js in _js_filer_i(tekst):
                 if js.is_file() and SKRIVEMETODE.search(js.read_text(encoding='utf-8')):
                     funn.append((mal, js))

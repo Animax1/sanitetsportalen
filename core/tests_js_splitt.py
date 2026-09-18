@@ -30,6 +30,8 @@ import re
 from pathlib import Path
 
 from django.conf import settings
+
+from core import maltekst
 from django.test import SimpleTestCase
 
 from patients.js_test_utils import OPPDRAG_SENTRAL_JS, VAKTLISTE_JS
@@ -84,7 +86,10 @@ class JsSplittenErKompletTests(SimpleTestCase):
         rot = Path(settings.BASE_DIR)
         for filer, mal in SIDER:
             with self.subTest(mal=mal):
-                tekst = Path(rot, mal).read_text(encoding='utf-8')
+                # **Med det malen inkluderer.** Sentralbordets skript ligger
+                # i `oppdrag/_sentralbord_skript.html` fra 18. sep. 2026, og
+                # en vakt som bare leser sidefila ble blind uten å bli rød.
+                tekst = maltekst.les(Path(rot, mal))
                 i_malen = re.findall(r"\{%\s*static\s*'js/([\w.-]+\.js)'\s*%\}", tekst)
                 forventet = [Path(f).name for f in filer]
                 # Malen laster også `portal-utils.js` m.fl.; vi ser bare på våre.

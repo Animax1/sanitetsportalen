@@ -292,6 +292,12 @@ class SidenHarIngenFanerTests(TestCase):
         self.client = Client()
         bruker = _bruker('operator')
         _gi_ko(bruker, 'skriv_full')
+        # **Oppdragstilgang også.** Fra pulje 4 gates ressurslista og
+        # oppdragslista av oppdragsmodulen, ikke av KO — så en konto uten den
+        # raden ser loggen og ingenting mer, og da måler denne testen
+        # tilgangen i stedet for layouten.
+        ModulTilgang.objects.update_or_create(
+            bruker=bruker, modul_slug='oppdrag', defaults={'nivaa': 'skriv_full'})
         self.client.force_login(bruker)
 
     def _markup(self) -> str:
@@ -351,5 +357,17 @@ class SidenHarIngenFanerTests(TestCase):
         self.assertIn('id="ko-logg-liste"', markup, 'loggstrømmen mangler')
         self.assertIn('id="enhetsliste"', markup, 'ressurslista mangler')
         self.assertIn('Oppdragsliste', markup, 'oppdragsflata mangler')
-        self.assertNotIn('d-none', markup.split('id="ko-logg-form"')[0][-400:],
-                         'noe skjuler loggen ved lasting')
+
+        # **Målt på elementene selv, ikke på et vindu foran dem.** Første
+        # utgave leste de 400 tegnene før skrivefeltet og ble rød da
+        # sentralbordets `#mangler-oppsett` — som med rette bærer `d-none` —
+        # havnet der (18. sep. 2026). En omtrentlig regel som treffer feil
+        # markup er en regel man slår av.
+        import re
+        for klasse in ('ko-kolonne-logg', 'ko-kolonne-ressurser',
+                       'ko-kolonne-oppdrag'):
+            with self.subTest(klasse=klasse):
+                m = re.search(rf'class="[^"]*{klasse}[^"]*"', markup)
+                self.assertIsNotNone(m)
+                self.assertNotIn('d-none', m.group(0),
+                                 f'{klasse} er skjult ved lasting')

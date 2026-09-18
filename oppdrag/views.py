@@ -80,7 +80,27 @@ def index_view(request):
             'bilinnstillinger': js_json(verdier.bilinnstillinger()),
         })
 
-    return render(request, 'oppdrag/sentral.html', {
+    return render(request, 'oppdrag/sentral.html',
+                  sentralbordkontekst(request))
+
+
+
+def sentralbordkontekst(request) -> dict:
+    """Alt sentralbordflata trenger — **én kilde, to sider**.
+
+    `/oppdrag/` og `/ko/` viser samme sentralbord fra og med pulje 4, og
+    konteksten skal ikke skrives to ganger: en verdimengde som kom til i den
+    ene og ikke i den andre er et nedtrekk som er tomt på én av sidene, og det
+    ser ut som en datafeil og ikke som en glemt linje.
+
+    **Gatene er `oppdrag`-modulens, også når sida er KO** (André, 18. sep.
+    2026). Det er komposisjonsregelen fra rollemodellen §5, samme som
+    `kan_se_besetning` bruker for vaktlista: KO *viser* oppdragsmodulens data,
+    og hvem som får se dem er oppdragsmodulens sak. Alternativet — egne
+    KO-nivåer foran de samme endepunktene — ville lagt tilgangsmodellen to
+    steder, og to steder glir fra hverandre.
+    """
+    return {
         'kan_skrive': har_tilgang(request.user, 'oppdrag', 'skriv_full'),
         # Verdimengdene — lokasjoner, enhetstyper, problemstillinger — settes
         # opp av `skriv_leder` (André, 12. sep. 2026). Knappen vises bare da.
@@ -112,8 +132,7 @@ def index_view(request):
         'avreist_til': js_json(list(choices.AVREIST_TIL)),
         'status_navn': js_json(choices.STATUS_NAVN),
         'hastegrader': choices.HASTEGRAD,
-    })
-
+    }
 
 # ── Enheter ──────────────────────────────────────────────────────────────────
 

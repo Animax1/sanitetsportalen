@@ -1,5 +1,6 @@
 // ════════════════════════════════════════════════════════════════════════════
-// KO — situasjonsbildet. Pulje 1 (sidebaren), 2 (loggen), 3 (ressurslista).
+// KO — situasjonsbildet. Denne fila eier **loggen**, sidebaren og
+// konsollhøyden. Listene eies av oppdrag-sentral-*.js (pulje 4).
 //
 // Lastes kun av /ko/. Fortsatt **én fil**: 1 800-linjersgrensa i
 // core/tests_js_splitt.py gjelder de delte modulene, og denne er langt under
@@ -392,34 +393,17 @@ async function koFjern(id) {
 
 
 // ════════════════════════════════════════════════════════════════════════════
-// Ressurslista (pulje 3) — sentralbordets egen, tegnet av oppdrag-kort.js.
+// Ressurslista og oppdragslista hentes **ikke herfra** (pulje 4).
 //
-// **KO tegner ikke sitt eget kort.** Et tidligere forsøk (17. sep. 2026) bygget
-// en egen liste over `vaktliste.Ressurs` med fire KO-førte statuser — «Ledig»,
-// «Opptatt», «Pause», «Ute av drift». Verdimengden var funnet på: notatet sier
-// at KO skal føre status for dem som ikke stempler selv, men ikke med hvilke
-// ord, og `/oppdrag/` har aldri hatt de to siste. Se ko/CLAUDE.md.
+// `/ko/` laster `oppdrag-sentral-*.js`, og de eier begge listene: henting med
+// ETag, tegning, polling og alle handlingene. En egen henter her ville vært en
+// andre poller mot de samme endepunktene, og to pollere som skriver til samme
+// `#enhetsliste` blir uenige før eller siden.
 //
-// Her hentes bare dataene; `tegnEnhetsliste()` gjør resten og skriver til
-// `#enhetsliste` og `#av-vakt-teller` — de samme ID-ene sentralbordet bruker.
+// Pulje 3 hadde en kort stund `/ko/api/ressurser/` med `ko:les` som gate. Den
+// er borte: oppdragsdata gates av **oppdragsmodulen**, også når sida er KO
+// (André, 18. sep. 2026). Se ko/CLAUDE.md.
 // ════════════════════════════════════════════════════════════════════════════
-
-// 20 sekunder. Lista endrer seg oftere enn sidebaren (en status kan skifte midt
-// i en samtale) og sjeldnere enn loggen (som skrives mens man ser på).
-const KO_RESSURSER_MS = 20000;
-
-async function koHentRessurser() {
-  try {
-    const svar = await apiFetch('/ko/api/ressurser/');
-    if (!svar.ok) return;
-    const json = await svar.json();
-    tegnEnhetsliste(json.data || []);
-  } catch (e) {
-    // En liste som feiler skal ikke ta med seg loggen. Det forrige bildet blir
-    // stående, og det er riktigere enn et tomt: det sier i det minste hva som
-    // var sant sist.
-  }
-}
 
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -437,10 +421,6 @@ document.addEventListener('DOMContentLoaded', () => {
   // brekker til to linjer, som er den ekte grunnen målingen finnes.
   window.addEventListener('resize', koSettKonsollhoyde);
   koSidebarLyttere();
-  koHentRessurser();
-  // Tavla polles alltid — den står i venstre kolonne og er aldri skjult. Det
-  // er forskjellen fra sidebaren, som kan slås av og da ikke skal pollen.
-  setInterval(koHentRessurser, KO_RESSURSER_MS);
   setInterval(() => {
     // Ikke poll en liste ingen ser på. Det er den ene sparingen som betyr noe
     // her: flere operatører sitter på samme side hele vakta. Nedtrekket er

@@ -125,20 +125,25 @@ def index_view(request):
     riktig ut og er fattigere, som er den stille varianten av å mangle feature
     parity.
     """
-    from oppdrag import verdier
+    from oppdrag.views import sentralbordkontekst
 
-    return render(request, 'ko/index.html', {
+    # **Sentralbordets kontekst i sin helhet** (pulje 4). Ikke et utvalg: en
+    # verdimengde som kom til i `/oppdrag/` og ikke her ville gitt et tomt
+    # nedtrekk på KO-sida, og det ser ut som en datafeil og ikke som en glemt
+    # linje. Gatene i den er **oppdragsmodulens**, også her — se funksjonens
+    # egen docstring.
+    kontekst = sentralbordkontekst(request)
+    kontekst.update({
         'modul_nivaa': nivaa_for(request.user, 'ko') or '',
         'er_global_admin': er_global_admin(request.user),
         'ko_maks_tekst': services.MAKS_TEKST,
-        'med_antall': js_json(verdier.med_antall()),
-        'enhetstyper': js_json([[t.pk, t.navn] for t in verdier.enhetstyper()]),
-        # **Besetningspanelet gates på `vaktliste`-tilgang, ikke på KO.**
-        # Komposisjonsregelen fra rollemodellen §5, og nøyaktig samme gate
-        # sentralbordet bruker: har ikke operatøren vaktlistetilgang, finnes
-        # panelet ikke, framfor å gi avledet innsyn i hvem som går vakt.
-        'kan_se_besetning': har_tilgang(request.user, 'vaktliste', 'les'),
+        # **Har operatøren oppdragstilgang i det hele tatt?** Uten den tegnes
+        # ikke oppdragsflata — verken lista, verktøylinja eller modalene — og
+        # KO står som logg og ingenting mer. Serveren nekter uansett; dette
+        # avgjør om knappene finnes.
+        'kan_se_oppdrag': har_tilgang(request.user, 'oppdrag', 'les'),
     })
+    return render(request, 'ko/index.html', kontekst)
 
 
 @never_cache
@@ -305,8 +310,6 @@ def logg_fjern_view(request, pk):
     )
     return JsonResponse({'status': 'ok', 'antall': antall})
 
-
-# ── Ressurslista (§7) ────────────────────────────────────────────────────────
 
 
 @never_cache

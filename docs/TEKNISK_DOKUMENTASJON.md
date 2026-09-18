@@ -445,7 +445,7 @@ deploy 2. Begge deler er rettet, men **strukturen er endret med vilje**: se 5.0.
 
 ### 5.0 Hva dette kapittelet er, og ikke er
 
-Portalen har **144 endepunkter** (utenom Django-admin, som bare rutes under `DEBUG`).
+Portalen har **143 endepunkter** (utenom Django-admin, som bare rutes under `DEBUG`).
 En håndskrevet liste over alle sammen ville rotnet fra dagen den ble skrevet — nøyaktig
 slik den gamle lista gjorde, med 16 oppføringer og ingen som merket at resten manglet.
 
@@ -478,7 +478,7 @@ for sti, view in sorted(gaa(get_resolver())):
 | `/portal-admin/` | 21 | `core/urls_admin.py` | Hele adminflaten. Navnerom `portaladmin` |
 | `/accounts/` | 9 | `accounts/urls.py` | Innlogging, MFA, passord |
 | `/statistikk/` | 5 | `statistikk/urls.py` | Full statistikk per kilde |
-| `/ko/` | 7 | `ko/urls.py` | Situasjonsbildet: sidebaren, loggen (les, skriv, rediger, fjern) og ressurslista (les) |
+| `/ko/` | 6 | `ko/urls.py` | Sida, sidebaren og loggen (les, skriv, rediger, fjern). Ressursene og oppdragene leses fra `/oppdrag/api/…` — se §7 i KO-notatet |
 | `/backlog/` | 9 | `backlog/urls.py` | Endringsønsker og bugs: lista med filtre, innmelding, kommentartråd, løst/gjenåpne, og typene i «Backloginnstillinger» |
 | `/varsler/`, `/api/`, rot | 13 | `core/urls.py` | Dashbord, varsler (3 sider + 4 API), «min profil», manifest, `robots.txt`, `/healthz/` og videresendingen fra `/api/` |
 

@@ -1,0 +1,44 @@
+{% load static %}
+{% comment %}
+  Globalene og skriptene sentralbordet kjører. **Delt av `/oppdrag/` og
+  `/ko/`** (pulje 4, 18. sep. 2026): begge sidene kjører samme kode, og da må
+  begge sette samme data og laste de samme filene i den samme rekkefølgen.
+
+  Lå dette i to maler, ville en ny global lagt til i den ene gitt et tomt
+  nedtrekk i den andre — en feil som ser ut som en datafeil og ikke som en
+  glemt linje.
+
+  `portal-utils.js` lastes **ikke** her: den er alle sidenes, og hver side
+  laster den selv.
+
+  Data inn i et skript-element går gjennom `js_json()` (CLAUDE.md).
+{% endcomment %}
+<script nonce="{{ csp_nonce }}">
+  window.KAN_SE_BESETNING = {{ kan_se_besetning|yesno:"true,false" }};
+  window.OPPDRAG_TILGANG = {
+    kanSkrive: {% if kan_skrive %}true{% else %}false{% endif %},
+    kanLede: {% if kan_lede %}true{% else %}false{% endif %},
+    erAdmin: {% if er_global_admin %}true{% else %}false{% endif %}
+  };
+  window.OPPDRAG_AVREIST_TIL = {{ avreist_til }};
+  window.OPPDRAG_STATUS_NAVN = {{ status_navn }};
+  window.OPPDRAG_PROBLEMSTILLINGER_FOR = {{ problemstillinger_for }};
+  window.OPPDRAG_MED_ANTALL = {{ med_antall }};
+  window.OPPDRAG_ENHETSTYPER = {{ enhetstyper }};
+  window.OPPDRAG_LYDVARSEL = {{ lydvarsel }};
+</script>
+{% comment %}
+Delt i fire 14. sep. 2026 (gjeldspunkt 3.6). Ingen bundler, så rekkefølgen her
+er lasterekkefølgen. To regler, begge håndhevet av `JsSplittenErKompletTests`:
+kjernen først (all toppnivå-tilstand), og alt som *kjører* på toppnivå sist —
+`DOMContentLoaded`-kroken leser bindinger fra alle de andre.
+{% endcomment %}
+{% comment %}
+  **Enhetskortets innmat er delt med /ko/** (17. sep. 2026). Lastes foran
+  sentralfilene fordi de kaller inn i den. Se static/js/oppdrag-kort.js.
+{% endcomment %}
+<script src="{% static 'js/oppdrag-kort.js' %}"></script>
+<script src="{% static 'js/oppdrag-sentral-kjerne.js' %}"></script>
+<script src="{% static 'js/oppdrag-sentral-oppdrag.js' %}"></script>
+<script src="{% static 'js/oppdrag-sentral-admin.js' %}"></script>
+<script src="{% static 'js/oppdrag-sentral-lasting.js' %}"></script>

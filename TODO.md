@@ -660,32 +660,27 @@ bygget; det flyttet til `/park/`-punktet nederst, der det hører hjemme.*
       igjen med vilje — enhetsskjermen laster ikke fila, og å rive i den hører til pulje 4.
       Tas da, sammen med resten.
 
-- [ ] **Pulje 4 — sentralbordet flyttes.** `oppdrag-sentral-*.js` blir KO sine,
-      `oppdrag-enhet.js` blir hele `/oppdrag/`, og `Oppdrag` får den nullbare FK-en
-      `hendelse`. Den største, og den eneste som rører `/oppdrag/`.
+*Pulje 4 (sentralbordet) er levert 18. sep. 2026 — se CHANGELOG. `/ko/` kjører
+sentralbordet fra oppdragsmodulens egen kode, og oppdragsflata gates av `oppdrag`-modulen
+(André). En KO-operatør trenger derfor to rader: `ko` og `oppdrag`.*
 
-      **Den blokkerer nå hendelser** (flyttet fram fra 5 til 4, 17. sep. 2026). Etter
-      §7 er en hendelse en *gruppering av oppdragslista*, ikke en egen flate — og en
-      gruppering av noe som ikke er der ennå lar seg ikke prøve. Blir denne lang, er
-      det ressursoversikten som er levert i mellomtiden, og den er nyttig alene.
+- [ ] **Slå av sentralbordet i `/oppdrag/` — når KO er prøvd på en ekte vakt.**
+      `/oppdrag/` er uendret og fortsatt i drift; notatet §7 sier at det skal være «en
+      flytting, ikke en kopi», og det siste steget er å la `/oppdrag/` bli enhetsskjermen
+      alene. Det er en beslutning om en flate folk bruker, ikke en refaktorering — og
+      risikoen ved å vente er lav, siden begge sidene kjører **samme kode mot samme
+      endepunkter** og ikke kan bli uenige.
 
-      - [ ] **Systemlinjer som trenger *intensjon* må dytte, ikke leses av et signal.**
-            Løftet i pulje 2 går med signaler på `oppdrag`-modellene, og forbeholdet står
-            i `ko/systemlinjer.py`: et signal ser raden, ikke hvorfor. «Avbrutt fordi
-            ingen svarte» og «avbrutt fordi pasienten gikk hjem» er samme rad. Trengs
-            skillet, bygges et push-register i `core` etter mønsteret fra
-            `core/driftstatus.py` — og denne puljen er uansett den som rører
-            `oppdrag/`, så det er da det er billig.
+      Sjekk før avslagning: at ingen bokmerker peker på `/oppdrag/` for sentralbordarbeid,
+      og at alle som skal ha KO har begge modulradene.
 
-      - [ ] **FK-en er den ene kanten som går oppover, og den må navngis.** `KJENTE_UNNTAK`
-            i [`ko/tests_avhengighet.py`](./ko/tests_avhengighet.py) er stedet — men merk at
-            en FK med strengreferanse (`'ko.Hendelse'`) ikke krever en Python-import, så
-            unntaket trengs bare hvis noe i `oppdrag/` faktisk importerer `ko`.
+- [ ] **Delt konto og enhetskontoer må fortsatt til `/oppdrag/`.** `er_enhetskonto` får
+      enhetsskjermen, og den flytter ikke. Verdt å ha skrevet ned før noen slår av noe.
 
-      - [ ] **Tuplene i `patients/js_test_utils.py` og `<script>`-rekkefølgen i malen følger
-            med filene**, og 1 800-linjersgrensa gjelder uendret. Flyttes filene uten
-            tuplene, leser `read_js()` en side som ikke lastes lenger — og skanningen blir
-            grønn på feil kilde.
+- [ ] **`oppdrag-enhet.js` deler ikke det delte enhetskortet.** Bilens egen skjerm har
+      egne kopier av `hastegradKlasse`, `_medAntall` og `_problemMedAntall`. Kopiene sto
+      igjen i pulje 4 med vilje: enhetsskjermen laster ikke `oppdrag-kort.js`, og den er
+      den ene flata som *ikke* flytter. Tas hvis den noen gang skal dele mer.
 
 - [ ] **Pulje 5 — hendelser.** `Hendelse`, nummerserien, linje → hendelse, lukking med
       409 og `confirm`. **Ikke en egen flate:** en gruppering av oppdragslista fra

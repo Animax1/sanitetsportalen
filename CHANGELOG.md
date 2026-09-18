@@ -4,6 +4,92 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-18 — KO pulje 4: sentralbordet flyttet inn i `/ko/`  `#ko/sentralbordet` `#oppdrag/sentralbord`
+
+Den største puljen i KO-løpet. `/ko/` viser nå ressurslista, oppdragslista, verktøylinja og
+alle modalene — **oppdragsmodulens egne**, ikke en gjenskaping.
+
+### Ett spørsmål ble stilt før koden
+
+Notatet sier ikke hvordan den flyttede oppdragsflata gates, og det er et valg som endrer
+hvem som får bruke KO. Spurt, og svaret var **oppdrag-tilgang styrer**:
+
+> KO *viser* oppdragsmodulens data, og hvem som får se dem er oppdragsmodulens sak.
+
+Det er komposisjonsregelen fra rollemodellen §5, den samme `kan_se_besetning` bruker for
+vaktlista. Konsekvensen: **en KO-operatør trenger to rader**, `ko` for loggen og `oppdrag`
+for oppdragene. Alternativet — egne KO-nivåer foran ~20 av oppdragsmodulens endepunkter —
+ville lagt tilgangsmodellen to steder.
+
+Det gjorde puljen til en flytting uten en eneste ny gate, og det er grunnen til at den ble
+liten i stedet for stor.
+
+### Delt på fire nivåer
+
+| Hva | Hvor | Delt av |
+|---|---|---|
+| Konteksten | `oppdrag.views.sentralbordkontekst()` | begge sidene |
+| Verktøylinja | `templates/oppdrag/_sentralbord_verktoy.html` | begge |
+| Modalene | `templates/oppdrag/_sentralbord_modaler.html` | begge |
+| Globaler og skript | `templates/oppdrag/_sentralbord_skript.html` | begge |
+
+`/ko/api/ressurser/` er **borte** — den gatet oppdragsdata på `ko:les`, og det er nettopp
+det valget over sier nei til. `ko.js` henter derfor verken ressurser eller oppdrag:
+sentralfilene eier begge listene med sin egen ETag og polling. En henter til ville vært en
+andre poller mot de samme endepunktene, og to pollere som skriver til samme `#enhetsliste`
+blir uenige.
+
+### `/oppdrag` er bevist uendret, ikke antatt uendret
+
+Ti endepunkter ble dumpet før flyttingen — enheter (med og uten `?alle=1`), oppdrag,
+lokasjoner, enhetstyper, problemstillinger, historikk, arkiv, bilinnstillinger og sida selv
+— med en fikstur som dekker et oppdrag under arbeid, en enhet i passiv vakt, en av vakt og
+en pensjonert. Baselinen ble kjørt på nytt etter **hvert** steg:
+
+- etter at konteksten ble skilt ut → uendret
+- etter at malbitene ble skilt ut → uendret
+- etter at KO tok dem i bruk → uendret
+
+**En flytting bevises ved å sammenligne svaret, ikke ved å lese diffen.** Målingen avdekket
+også sin egen forutsetning: backupklokka er en tråd i web-prosessen og ga
+`SessionInterrupted` midt i dumpen, som så ut som endepunktfeil og ikke var det.
+
+### Mutasjonstesting
+
+**7 mutanter.** Gaten byttet fra `oppdrag` til `ko`, konteksten redusert til et utvalg,
+modalene utelatt fra KO, sentralfilene ikke lastet — alle drept.
+
+**To overlevde først, og begge var samme feilklasse:** testen min målte at de to sidene er
+*like*, ikke at de er *komplette*. Begge leser samme malbit, så en skriptfil som faller ut
+faller ut begge steder og likheten består. Og knappegaten kunne fjernes fordi testen så
+etter modalen — som gates i en *annen* malbit — og ikke etter knappen.
+`test_alle_sentralbordfilene_lastes` måler nå mot `OPPDRAG_SENTRAL_JS`, og knappetesten ser
+etter både knappen og modalen.
+
+### To vakter ble blindet av flyttingen, og det er verdt å merke seg
+
+`JsSplittenErKompletTests` og `CsrfPaaSkrivendeFlaterTests` leste malfila direkte. Da
+skriptene flyttet inn i `{% include %}`-biter, sluttet begge å se dem — **uten å bli
+røde**, som er det verste utfallet. De ble røde her bare fordi sentralbordfilene forsvant
+helt ut av sida de leste.
+
+Ny `core/maltekst.py`: les en mal **med alt den inkluderer**. Samme regel
+`MorkTekstPaaMorkBakgrunnTests` alt følger for `{% extends %}` — følg lastekjeden, ikke én
+fil. Og CSRF-vakten vurderer nå *sider* og ikke malbiter: en fil som begynner med `_` er en
+bit noen inkluderer, ikke en flate noen åpner, og tokenet hører hjemme på sida.
+
+Tre mutanter på vaktene selv (en fil fjernet fra skriptbiten, rekkefølgen snudd,
+csrf-metaen fjernet fra basemalen) — alle drept. **En vakt som overlevde en flytting er
+ikke bevist å virke; den er bevist å ikke ha sett noe.**
+
+### Hva som står igjen
+
+`/oppdrag/` er **uendret og fortsatt i drift**. Å slå av sentralbordet der er en beslutning
+om en flate folk bruker, ikke en refaktorering — den tas når KO er prøvd på en ekte vakt.
+Står i `TODO.md`.
+
+---
+
 ## 2026-09-18 — Verifisering av at `/oppdrag` står uendret — og én regresjon funnet  `#oppdrag/sentralbord`
 
 André: «Jeg er ekstremt skeptisk på det du har levert til nå i /ko. Men husk /oppdrag var i
