@@ -654,15 +654,18 @@ bygget; det flyttet til `/park/`-punktet nederst, der det hører hjemme.*
       `Ressursgruppe`). Den siste gjør fargene på lista til data — og da kan ingen si hva en
       gul rad betyr.
 
-- [ ] **`oppdrag-enhet.js` deler ikke det delte enhetskortet.** Bilens egen skjerm har
-      egne kopier av `hastegradKlasse`, `_medAntall` og `_problemMedAntall`; sentralbordet
-      og `/ko/` leser dem nå fra `static/js/oppdrag-kort.js` (17. sep. 2026). Kopiene står
-      igjen med vilje — enhetsskjermen laster ikke fila, og å rive i den hører til pulje 4.
-      Tas da, sammen med resten.
-
 *Pulje 4 (sentralbordet) er levert 18. sep. 2026 — se CHANGELOG. `/ko/` kjører
 sentralbordet fra oppdragsmodulens egen kode, og oppdragsflata gates av `oppdrag`-modulen
 (André). En KO-operatør trenger derfor to rader: `ko` og `oppdrag`.*
+
+- [ ] **Visuell kontroll av `/ko/` mot `/oppdrag/` er fortsatt manuell.** Tre forsøk på
+      «lik den i /oppdrag» gikk grønne i suiten og feilet i nettleseren, fordi `/ko/`
+      ikke lastet `oppdrag.css` (18. sep. 2026). Suiten holder nå stilarkene like, men
+      en layoutfeil (klemt kort, liste som ikke ruller) ser bare et øye. Et
+      Playwright-skjermbilde av begge sidene mot en seedet base — som
+      `scripts/lag_ikoner.py` alt gjør for ikonene — ville gjort kontrollen til en
+      kommando. Verdt å ta før sentralbordet i `/oppdrag/` slås av.
+
 
 - [ ] **Slå av sentralbordet i `/oppdrag/` — når KO er prøvd på en ekte vakt.**
       `/oppdrag/` er uendret og fortsatt i drift; notatet §7 sier at det skal være «en

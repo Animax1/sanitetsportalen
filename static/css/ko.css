@@ -69,6 +69,14 @@ body:has(.ko-konsoll) .portal-content {
   min-height: 0;
 }
 
+/* Loggkolonnen har **to** kort, og bare det nederste skal vokse. Uten dette
+   fikk skjemakortet også `flex: 1 1 auto`, ble klemt til under sin egen
+   høyde, og hint-linja under feltet lå oppå kortkanten (sett i nettleser
+   18. sep. 2026). */
+#ko-logg-skjema {
+  flex: 0 0 auto;
+}
+
 .ko-rull {
   flex: 1 1 auto;
   overflow-y: auto;

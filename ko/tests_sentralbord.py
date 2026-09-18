@@ -103,6 +103,35 @@ class KontekstenErDenSammeTests(TestCase):
                                  'en sentralbordfil mangler eller står i feil '
                                  'rekkefølge')
 
+    def test_ko_laster_stilarkene_sentralbordet_er_tegnet_med(self):
+        """Kortene og radene er stilt i `oppdrag.css`, ikke i markupen.
+
+        Tre forsøk på å få lista i `/ko/` til å se ut som i `/oppdrag/` gikk
+        grønne på server- og JS-siden og feilet i nettleseren (18. sep. 2026):
+        samme markup, samme data — men sida lastet aldri arket klassene står
+        i, så kortene ble ren tekst. Regelen: hvert stilark `/oppdrag/` laster,
+        laster `/ko/` også, og **før** `ko.css`, så konsollen får siste ord.
+        """
+        self.client.force_login(self.bruker)
+
+        def stilark(sti):
+            # Navnet før første punktum: WhiteNoise hasher fila til
+            # `oppdrag.bb76….css`, og testen skal ikke bry seg om hashen.
+            return [l.split('/static/css/')[1].split('.')[0]
+                    for l in self.client.get(sti).content.decode().splitlines()
+                    if 'stylesheet' in l and '/static/css/' in l]
+
+        fra_oppdrag = stilark('/oppdrag/')
+        fra_ko = stilark('/ko/')
+        # Sperrehake: er `oppdrag.css` borte fra /oppdrag/ også, er kravet
+        # under tomt — og det er den fila hele regelen handler om.
+        self.assertIn('oppdrag', fra_oppdrag)
+        for ark in fra_oppdrag:
+            with self.subTest(ark=ark):
+                self.assertIn(ark, fra_ko, f'/ko/ laster ikke {ark}')
+        self.assertLess(fra_ko.index('oppdrag'), fra_ko.index('ko'),
+                        'ko.css skal lastes etter oppdrag.css')
+
     def test_begge_sidene_har_de_samme_flatene(self):
         """ID-ene koden skriver til. En side som manglet én ville hatt en
         knapp som åpnet ingenting."""

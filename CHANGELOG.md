@@ -4,6 +4,54 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-18 — `/ko/` lastet aldri `oppdrag.css`: derfor så ikke lista ut som i `/oppdrag/`  `#ko/sentralbordet` `#oppdrag/sentralbord`
+
+**Symptomet:** ressursoversikten og oppdragslista i `/ko/` var «ikke lik den i /oppdrag» —
+ingen kort, ingen statusprikker, ingen hastegradsmerker, bare tekst under hverandre
+(«Haugesund 56 / Fremme 06:59 · nå / #1 Akutt Bil: —»). Tre forsøk på å rette det gikk
+grønne og feilet likevel (André: «opus prøvd 3 ganger … mislykkes»).
+
+**Årsaken var én manglende linje.** Sentralbordets markup bærer klassene (`.enhet-kort`,
+`.oppdrag-rad`, `.status-prikk`, `.hastegrad-*`, `.enhet-brikke`), men *reglene* står i
+`static/css/oppdrag.css` — og `templates/ko/index.html` lastet bare `ko.css`. Samme markup,
+samme data, samme JS; arket manglet. `oppdrag.css` lastes nå **før** `ko.css`, så konsollen
+kan overstyre.
+
+**Hvorfor tre forsøk ikke fant det:** alle tre verifiserte på server- og JS-siden — konteksten
+lik, skriptene like, ID-ene like, ti endepunkter identiske før og etter. Alt det var sant.
+Ingen tegnet sida i en nettleser. Denne gangen ble begge sidene åpnet med Playwright mot en
+seedet SQLite-base (`skjermbilde.js` i scratch: innlogging, 1920×1080, teller `.enhet-kort`,
+lister stilarkene), og feilen sto i stilarklista på første kjøring: `/oppdrag/` endte på
+`oppdrag.css`, `/ko/` på `ko.css`. **Lærdom:** en påstand om *utseende* bevises med et
+skjermbilde, ikke med en diff av svaret. Står som punkt i `TODO.md`.
+
+**To layoutfeil til, sett i samme skjermbilde** (`static/css/ko.css`, malen):
+- Skjemakortet øverst i loggkolonnen ble klemt: `.ko-kolonne > .card { flex: 1 1 auto }`
+  traff *begge* kortene, og hint-linja «Ikke skriv navn …» lå oppå kortkanten.
+  `#ko-logg-skjema { flex: 0 0 auto }`.
+- Loggen rullet ikke: `ko-rull` sto på `#ko-logg-liste` inne i en `card-body` uten
+  `min-height: 0`, så lista vokste forbi kortet og sida rullet i stedet. `ko-rull` står nå
+  på `card-body`, som i de to andre kolonnene.
+
+**Og to ganger på fem minutter skrev jeg en flerlinjes `{# … #}`** i malen — den rendres som
+tekst øverst på sida. `FlerlinjesMalkommentarTests` (13. sep.) ville sagt fra i suiten; jeg så
+det i skjermbildet før jeg kjørte den. Byttet til `{% comment %}`.
+
+**Vern:** `test_ko_laster_stilarkene_sentralbordet_er_tegnet_med` i `ko/tests_sentralbord.py`
+— hvert stilark `/oppdrag/` laster, laster `/ko/`, med `oppdrag.css` før `ko.css`, og med en
+sperrehake på at `/oppdrag/` faktisk laster `oppdrag.css` (ellers er kravet tomt). Navnene
+sammenlignes uten WhiteNoise-hashen (`oppdrag.bb76….css`). **Mutanter (3, alle drept):**
+`oppdrag.css` fjernet fra KO-malen, rekkefølgen snudd, `oppdrag.css` fjernet fra
+`sentral.html`. CSS-laget prøves ikke, etter tabellen i `CLAUDE.md`.
+
+**Dokumentene:** `CLAUDE.md` sa «Fem stilark» mens `static/css/` hadde sju — `notifications.css`
+og `oppdrag.css` sto ikke i tabellen, og det var nettopp den manglende raden som kunne fortalt
+at KO-sida trengte den. Tabellen har nå alle sju. Rota er 65 493 tegn av 65 500. `TODO.md`:
+et duplisert `oppdrag-enhet.js`-punkt fjernet (sto to ganger, med to datoer), og punktet om
+visuell kontroll lagt til.
+
+`/oppdrag/` er ikke rørt.
+
 ## 2026-09-18 — KO pulje 4: sentralbordet flyttet inn i `/ko/`  `#ko/sentralbordet` `#oppdrag/sentralbord`
 
 Den største puljen i KO-løpet. `/ko/` viser nå ressurslista, oppdragslista, verktøylinja og

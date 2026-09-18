@@ -35,6 +35,13 @@
 {% endcomment %}
 
 {% block extra_head %}
+{% comment %}
+  Sentralbordets kort og rader er stilt i oppdrag.css — uten den tegnes lista
+  som ren tekst (sett i nettleser 18. sep. 2026, etter tre forsøk som bare
+  sammenlignet server- og JS-siden). ko.css lastes etter, så konsollen kan
+  overstyre.
+{% endcomment %}
+<link rel="stylesheet" href="{% static 'css/oppdrag.css' %}">
 <link rel="stylesheet" href="{% static 'css/ko.css' %}">
 {% endblock %}
 
@@ -146,8 +153,13 @@
           </span>
           <span class="small text-muted" id="ko-logg-antall"></span>
         </div>
-        <div class="card-body p-0">
-          <div id="ko-logg-liste" class="ko-rull">
+        {% comment %}
+          `ko-rull` på selve card-body, som i de to andre kolonnene: et
+          mellomliggende element uten `min-height: 0` lar lista vokse forbi
+          kortet i stedet for å rulle.
+        {% endcomment %}
+        <div class="card-body p-0 ko-rull">
+          <div id="ko-logg-liste">
             <p class="text-muted small p-3 mb-0">Laster …</p>
           </div>
         </div>
