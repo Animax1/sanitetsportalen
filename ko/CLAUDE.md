@@ -71,8 +71,7 @@ og kan bli avsluttet uten at noen rykket ut.
 | **Hvilke systemhendelser som løftes inn, og hvorfor** | `ko/systemlinjer.py` |
 | Løftet selv | `ko/signals.py` |
 | Backup, opprydding, innstilling | `ko/backup.py`, `ko/opprydding.py`, `ko/portalinnstillinger.py` |
-| Ressursbildet — projeksjonen og den tredje kilden | `ko/services.py`, `ko/models.py` (`Ressursstatus`) |
-| KO-førte statuser, og hvorfor de er kode | `ko/choices.py` |
+| Ressurslista — samme kilde som sentralbordet | `ko/services.py`, `static/js/oppdrag-kort.js` |
 
 ## Retningen: KO er øverste lag
 
@@ -243,49 +242,38 @@ hendelse kan åpnes igjen. Det står i `TODO.md`. Logglinja har med vilje **inge
 hendelse ennå**: den legges til i pulje 3, sammen med regelen om at en linje kan knyttes
 til en hendelse i etterkant.
 
-## Ressursbildet (pulje 3, `FORSLAG_KO.md` §3.1)
+## Ressurslista (pulje 3) — sentralbordets egen
 
-**KO eier ikke ressursene.** Tavla er en projeksjon av tre kilder, og bare den tredje er
-vår:
+**KO viser `oppdrag.Enhet`, ikke `vaktliste.Ressurs`,** og tegner dem med
+`tegnEnhetsliste()` i `static/js/oppdrag-kort.js`. Samme funksjon, samme
+enheter, samme statuser, samme gruppering på enhetstype, samme
+besetningspanel. Det er ikke en likhet som skal vedlikeholdes — det er samme
+kode.
 
-| Hva | Hvor det leses |
-|---|---|
-| Hvem finnes og hvem er på skift nå | `vaktliste.Ressurs` + `Vaktpost` |
-| Status for dem som stempler selv | `oppdrag.services.enhet_status`, via `Ressurs.enhet` |
-| Status for dem som ikke gjør det | `ko.Ressursstatus` — ført av operatøren |
+**Og det er en korreksjon.** Første utgave (17. sep. 2026) bygget en egen
+projeksjon over `vaktliste.Ressurs` med en KO-ført status i fire verdier:
+«Ledig», «Opptatt», «Pause», «Ute av drift». `docs/FORSLAG_KO.md` §3.1 sier at
+KO skal føre status for dem som ikke stempler selv, men **ikke med hvilke ord**
+— og `/oppdrag/` har aldri hatt «Pause» eller «Ute av drift». Verdimengden var
+funnet på (André, 18. sep. 2026: «Her har du tatt deg grove friheter utenfor
+rammene som er satt»). Verdimengdefila i `ko/`, modellen `Ressursstatus` og
+systemkoden `ressurs_status` er **slettet** igjen; `ko/migrations/0003` slipper
+tabellen.
 
-**Hvem som fører utledes av `Ressurs.enhet`, ikke av et flagg.** Er den satt, eier
-oppdragsmodulen statusen; er den `NULL`, finnes det ingen som kan melde, og da er det KO.
-Et eget flagg ville vært en andre sannhet om det samme, og de to ville stått i strid den
-dagen noen koblet en enhet uten å rydde flagget. `_fort_av_ko()` er regelen, og den ligger
-som egen funksjon nettopp fordi den avgjør noe.
+**Den tredje kilden i §3.1 er utsatt, ikke forkastet.** Den bygges når noen har
+bestemt hva statusene skal hete, og det er ikke en kodeoppgave. Står i
+`TODO.md`. Konsekvensen i mellomtiden skal stå skrevet: **et lag uten
+`oppdrag.Enhet` vises ikke på lista** — akkurat som i `/oppdrag/` i dag.
 
-**Rutingflagget i §3.2 er et annet spørsmål.** Det avgjør `/oppdrag/` mot `/park/`, og
-`/park/` finnes ikke. Bygget nå ville det vært en bryter med én stilling, og korrelasjonen
-med «hvem stempler selv» er tilfeldig. Det hører til `/park/`-notatet, og står i TODO der.
+**KO har ingen skrive-endepunkter på enhetene.** Å sette en enhet av vakt eller
+i passiv vakt er oppdragsmodulens endepunkter, og de blir KOs den dagen
+sentralbordet flytter (pulje 4). Et eget i mellomtiden ville vært en andre vei
+inn til samme tilstand.
 
-**Tabellen er nåtilstand, ikke historikk — én rad per ressurs.** Hver føring skriver i
-stedet en systemlinje (`ressurs_status`), og det er den som svarer på «hvor lenge sto lag 3
-ute av drift». To kilder til samme historikk går i utakt første gang noe feiler halvveis,
-og da er det den lagrede som lyver: den ser autoritativ ut. De to skrives i **samme
-transaksjon**, og rekkefølgen er ikke likegyldig — en status uten linja si er en endring
-som aldri skjedde.
-
-**Fravær av rad er «Ledig».** Utledet, ikke lagret, av nøyaktig samme grunn som
-`oppdrag.services.enhet_status`: en lagret standard måtte settes for hver ressurs i hver
-vaktliste, og da er spørsmålet «hvem glemte å sette den» i stedet for «hvem er ledig».
-
-**Verdimengden er kode og ikke en tabell** — `ko/choices.py`. Regelen står i
-`oppdrag/choices.py`: *faglige verdimengder i kode, arrangementsdata i databasen.* «Ledig»,
-«Opptatt», «Pause» og «Ute av drift» er språket operatøren og tavla deler; det skifter ikke
-med arrangementet slik en dronegruppe eller et scenenavn gjør. En tabell ville dessuten
-gjort fargene på tavla til data, og da kan ingen si hva en gul rad betyr.
-
-**Hvilken vaktliste tavla viser er `vaktliste.services.vaktliste_i_bruk()`** — den i drift,
-ellers den aktive vaktas. Den ligger der og ikke her fordi det er vaktlistas regel, og
-`besetning()` har **ikke** fått den: den spør om *én enhet* og må lete i alle lister i
-drift, mens tavla spør globalt. Et forsøk på å slå de to sammen (17. sep. 2026) brøt
-nettopp den forskjellen, og suiten var grønn — ingen test hadde to lister i drift samtidig.
+**Besetningspanelet gates på `vaktliste`-tilgang, ikke på KO-tilgang** —
+komposisjonsregelen fra rollemodellen §5, og samme gate sentralbordet bruker.
+Har ikke operatøren vaktlistetilgang, finnes panelet ikke, framfor å gi avledet
+innsyn i hvem som går vakt.
 
 ## Feature parity med sentralbordet — ved konstruksjon, ikke ved flid
 
@@ -297,30 +285,17 @@ passiv vakt, ventende, «ledig siden», sted og hele oppdragslinja.
 
 | Lag | Den ene kilden | Leses av |
 |---|---|---|
-| Server | `oppdrag.services.enhetskort()` | `oppdrag.views.enheter_view` og `ko.services._enhetsstatuser` |
-| Klient | `enhetskortInnmat()` i `static/js/oppdrag-kort.js` | `_enhetskort()` i sentralbordet og `koRessursHtml()` her |
+| Server | `oppdrag.services.enhetskort()` | `oppdrag.views.enheter_view` og `ko.services.ressursbildet` |
+| Klient | `tegnEnhetsliste()` i `static/js/oppdrag-kort.js` | `renderEnheter()` i sentralbordet og `koHentRessurser()` her |
 
-Et utvalg av felter, eller en egen bygger, ville falt bak neste felt noen la til i
-oppdragsmodulen — uten at noe ble rødt. `tomt_enhetskort()` gir raden samme form for en
-ressurs **uten** enhet, så klienten slipper å spørre «finnes feltet» før hver avlesing.
+Et utvalg av felter, eller en egen tegner, ville falt bak neste felt noen la til i
+oppdragsmodulen — uten at noe ble rødt.
+`test_samme_svar_som_oppdragsmodulens_endepunkt` sammenligner **hele svaret** fra de to
+endepunktene, ikke bare nøklene: en KO-side som filtrerte, sorterte eller scopet
+annerledes ville vært usynlig for en nøkkelsjekk.
 
-**`antall` betyr pasienter, ikke mannskap.** Det er enhetskortets felt, og
-`_problemMedAntall()` leser nettopp det: «Transport · 3 pasienter». KOs bemanningstall
-heter derfor `bemanning_antall` og `bemanning_tilstede`. Kollisjonen sto der i en time
-17. sep. 2026, og den var usynlig: en bil på et transportoppdrag ville vist antall folk i
-bilen som antall pasienter — et tall som bare er litt rart.
-
-**`window.OPPDRAG_MED_ANTALL` må settes av malen.** Det delte kortet slår opp der for å
-vite om problemstillingen bærer et antall. Uten den står «Transport» der det skulle stått
-«Transport · 3 pasienter» — kortet ser riktig ut og er fattigere, som er den stille
-varianten av å mangle parity.
-
-**Mannskapslista henger på `vaktliste`-tilgang, ikke på KO-tilgang.** Komposisjonsregelen
-fra rollemodellen §5, samme gate sentralbordet bruker for besetningspanelet. Den sto åpen
-fra pulje 3 til 17. sep. 2026: alle med `ko:les` fikk se hvem som gikk vakt, og markupen så
-helt riktig ut.
-
-**Grensesnittet gater på to ting, ikke én.** `koKanStyreRessurs()` krever både at brukeren
-kan skrive *og* at KO fører statusen for ressursen. Uten den andre halvdelen tegnes knapper
-på en koblet bil, serveren avviser dem, og operatøren står med en knapp som fører til en
-vegg.
+**`window.OPPDRAG_MED_ANTALL`, `OPPDRAG_ENHETSTYPER` og `KAN_SE_BESETNING` må settes av
+malen.** Det delte kortet slår opp i dem for pasientantall, gruppering og
+besetningspanelet. Uten `MED_ANTALL` står «Transport» der det skulle stått «Transport · 3
+pasienter» — flata ser riktig ut og er fattigere, som er den stille varianten av å mangle
+parity.

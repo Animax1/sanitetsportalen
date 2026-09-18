@@ -495,7 +495,12 @@ class BesetningspanelTests(SimpleTestCase):
             globalThis.window = {{ KAN_SE_BESETNING: true }};
             globalThis.apenBesetning = 1;
             globalThis.besetninger = {{}};
-            globalThis.renderEnheter = () => {{}};
+            // `hentBesetning` tegner lista på nytt gjennom den delte
+            // `tegnEnhetsliste()` (18. sep. 2026) — het `renderEnheter` før
+            // ressurslista ble delt med /ko/. Tegningen er en annen regel enn
+            // den som måles her, og stubbes bort.
+            globalThis.tegnEnhetsliste = () => {{}};
+            globalThis.sisteEnhetsliste = [];
             globalThis.apiFetch = async () => ({{
               ok: {str(status == 200).lower()},
               json: async () => ({json.dumps(kropp)}),

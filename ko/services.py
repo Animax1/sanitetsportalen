@@ -14,6 +14,7 @@ from django.db.models import Q
 from django.utils import timezone
 
 from core.models import AppSetting
+from core.vakt import hent_aktiv_vakt
 
 from .models import KILDE_OPERATOR, KILDE_SYSTEM, Logglinje
 
@@ -295,198 +296,40 @@ def slett_utlopte(naa=None, *, dager=None) -> int:
     return antall
 
 
-# ── Ressursbildet (§3.1) ─────────────────────────────────────────────────────
-#
-# **KO eier ikke ressursene.** Tavla settes sammen av tre kilder, og denne
-# modulen legger bare til den tredje. Retningen er `ko` → `vaktliste` og
-# `ko` → `oppdrag`; ingen av dem kjenner `ko` (`ko/tests_avhengighet.py`).
+# ── Ressurslista (§7) ────────────────────────────────────────────────────────
 
 
-def _fort_av_ko(ressurs) -> bool:
-    """Fører KO statusen for denne ressursen?
+def ressursbildet(vakt=None) -> list:
+    """Enhetene, i nøyaktig samme form som sentralbordets egen liste.
 
-    **Utledet av `Ressurs.enhet`, ikke av et flagg** (se `Ressursstatus` sin
-    docstring). Er enheten satt, melder ressursen sin egen status gjennom
-    oppdragsmodulen; er den `NULL`, finnes det ingen som kan melde, og da er
-    det operatøren.
+    **Ikke en egen projeksjon.** Et tidligere forsøk (17. sep. 2026) bygget et
+    eget bilde over `vaktliste.Ressurs` med en KO-ført status i fire verdier —
+    «Ledig», «Opptatt», «Pause», «Ute av drift». Verdimengden var **funnet på**:
+    `docs/FORSLAG_KO.md` §3.1 sier at KO skal føre status for dem som ikke
+    stempler selv, men ikke med hvilke ord, og `/oppdrag/` har aldri hatt
+    «Pause» eller «Ute av drift» (André, 18. sep. 2026: «Her har du tatt deg
+    grove friheter utenfor rammene som er satt»).
+
+    KO viser derfor det `/oppdrag/` viste: `oppdrag.Enhet` gjennom
+    `oppdrag.services.enhetskort()`, med enhetsmodulens egne statuser. Den
+    tredje kilden i §3.1 er utsatt til noen har bestemt hva den skal hete —
+    se `TODO.md`.
+
+    `ledig_siden_bulk()` spørres for hele lista i én runde: lista polles
+    gjennom hele vakta, og ett oppslag per enhet ville vært N spørringer.
     """
-    return ressurs.enhet_id is None
+    from django.db.models.functions import Lower
 
-
-def sett_ressursstatus(ressurs, ny_status: str, *, bruker, naa=None):
-    """Før en status på en ressurs som ikke stempler selv.
-
-    Avviser en ressurs som **har** en enhet: den statusen eies av
-    oppdragsmodulen, og to kilder til samme sannhet går i utakt første gang
-    noe feiler halvveis. Feilen er en egen, navngitt en — svaret er ikke
-    «ugyldig verdi», det er «denne bilen melder selv».
-
-    Skriver en systemlinje i samme transaksjon som raden. Rekkefølgen er ikke
-    likegyldig: linja *er* historikken (tabellen bærer bare nåtilstanden), så
-    en status som lagres uten sin linje er en endring som aldri skjedde.
-    """
-    from .models import Ressursstatus
-    from . import choices as ko_choices
-    from . import systemlinjer
-
-    if not ko_choices.er_gyldig(ny_status):
-        raise Ugyldig(f'Ukjent status «{ny_status}».')
-    if not _fort_av_ko(ressurs):
-        raise Ugyldig(
-            f'{ressurs.navn} er koblet til en enhet og melder sin egen status. '
-            f'Før den i oppdragsmodulen.')
-
-    naa = naa or timezone.now()
-    vakt = ressurs.vaktliste.vakt
-    with transaction.atomic():
-        rad, _ = Ressursstatus.objects.update_or_create(
-            ressurs=ressurs,
-            defaults={
-                'status': ny_status,
-                'satt_at': naa,
-                'satt_av': bruker,
-                'satt_av_navn': getattr(bruker, 'username', '') or '',
-            })
-        systemlinje(
-            vakt, systemlinjer.RESSURS_STATUS,
-            {
-                # Frosset: ressursen forsvinner med vaktlista si, linja står
-                # i 730 dager.
-                'ressurs': ressurs.navn,
-                'gruppe': ressurs.gruppe.navn if ressurs.gruppe_id else '',
-                'status': ny_status,
-                'status_navn': ko_choices.STATUS_NAVN[ny_status],
-            },
-            tidspunkt=naa)
-    return rad
-
-
-def ressursbildet(naa=None, *, kan_se_besetning: bool = True) -> dict:
-    """Tavla: hvem er på vakt, hvor står de, og hvem kan sendes.
-
-    **En projeksjon, ikke et register.** Ingenting her lagres av KO utenom den
-    tredje kilden; de to andre leses hos den som eier dem.
-
-    Returnerer `{'vaktliste': ..., 'grupper': [...]}`, eller `vaktliste: None`
-    når ingen liste er i drift og den aktive vakta ikke har noen. **Tomt er ikke det
-    samme som ukoblet**, og de to skal ikke se like ut — samme skille
-    `vaktliste.services.besetning()` gjør mellom «ingen på vakt» og «ikke
-    koblet».
-    """
-    from django.db.models import Prefetch
-
-    from oppdrag.services import tomt_enhetskort
-    from vaktliste.models import Ressurs, Vaktpost
-    from vaktliste.services import vaktliste_i_bruk
-    from . import choices as ko_choices
-    from .models import Ressursstatus
-
-    naa = naa or timezone.now()
-    liste = vaktliste_i_bruk()
-    if liste is None:
-        return {'vaktliste': None, 'grupper': []}
-
-    # Skiftene som dekker **nå**, ikke hele døgnet. Samme spørsmål som
-    # `besetning()` stiller: «er ressursen bemannet», ikke «hvem har vakt i
-    # løpet av helga».
-    naavaerende = (Vaktpost.objects
-                   .filter(mannskap__isnull=False, fra_tid__lte=naa, til_tid__gte=naa)
-                   .select_related('mannskap', 'rolle')
-                   .order_by('mannskap__navn'))
-    ressurser = (Ressurs.objects
-                 .filter(vaktliste=liste)
-                 .select_related('gruppe', 'korps', 'enhet', 'ko_status')
-                 .prefetch_related(Prefetch('vaktposter', queryset=naavaerende,
-                                            to_attr='naa_poster'))
-                 .order_by('gruppe__rekkefolge', 'gruppe__navn',
-                           'rekkefolge', 'navn'))
-
-    # Statusen for dem som melder selv hentes i **én** spørring for alle
-    # enhetene, ikke én per ressurs: tavla polles gjennom hele vakta, og en
-    # N+1 her er 30 spørringer hvert tiende sekund.
-    enhet_status = _enhetsstatuser([r.enhet_id for r in ressurser if r.enhet_id],
-                                   liste.vakt)
-
-    grupper: list[dict] = []
-    for r in ressurser:
-        # **Feltene enheten bidrar med er `enhetskort()` sine, ikke et utvalg.**
-        # Kortet i KO skal kunne det sentralbordets kort kan (André, 17. sep.
-        # 2026), og den eneste måten det holder over tid er at begge leser
-        # samme funksjon. Et utvalg her ville vært en kopi som stille faller
-        # bak neste felt noen legger til.
-        rad = tomt_enhetskort()
-        rad.update({
-            'id': r.pk,
-            'navn': r.navn,
-            'korps': r.korps.kortnavn or r.korps.navn if r.korps_id else '',
-            'fort_av_ko': _fort_av_ko(r),
-            # **Mannskapslista er `vaktliste`-tilgang** (rollemodellen §5).
-            # Uten den utelates den helt — en tom liste og «du får ikke se»
-            # ser like ut i markupen, og det er med vilje: KO skal ikke gi
-            # avledet innsyn i hvem som går vakt.
-            'mannskap': [{'navn': vp.mannskap.navn,
-                          'rolle': vp.rolle.navn if vp.rolle_id else '',
-                          'tilstede': vp.er_tilstede}
-                         for vp in r.naa_poster] if kan_se_besetning else [],
-        })
-        # **`bemanning_*` og ikke `antall`/`tilstede`.** `enhetskort()` bruker
-        # `antall` om *pasienter* på oppdraget, og `_problemMedAntall()` i
-        # kortet leser nettopp det feltet: «Transport · 3 pasienter». Skrev vi
-        # mannskapstallet dit, ville en bil på et transportoppdrag vist antall
-        # folk i bilen som antall pasienter — en feil ingen ville sett som en
-        # feil, bare som et tall som var litt rart. Funnet 17. sep. 2026 av
-        # `test_oppdragslinja_staar_paa_kortet`, som er første gang de to
-        # feltsettene møttes i samme rad.
-        rad['bemanning_antall'] = len(rad['mannskap'])
-        rad['bemanning_tilstede'] = sum(1 for m in rad['mannskap'] if m['tilstede'])
-        if rad['fort_av_ko']:
-            ko_rad = getattr(r, 'ko_status', None)
-            rad['status'] = ko_rad.status if ko_rad else ko_choices.STANDARD
-            rad['status_navn'] = ko_choices.STATUS_NAVN[rad['status']]
-            rad['status_satt_av'] = ko_rad.satt_av_navn if ko_rad else ''
-            rad['status_satt_at'] = (ko_rad.satt_at.isoformat()
-                                     if ko_rad else None)
-        else:
-            rad.update(enhet_status.get(r.enhet_id) or {})
-            rad['status_satt_av'] = ''
-            rad['status_satt_at'] = None
-            # Ressursens navn vinner over enhetens: det er det navnet
-            # vaktlista og sambandet bruker, og `enhetskort()` skriver sitt
-            # eget `navn` og `id` inn over.
-            rad['id'] = r.pk
-            rad['navn'] = r.navn
-
-        gruppenavn = r.gruppe.navn if r.gruppe_id else 'Uten gruppe'
-        if not grupper or grupper[-1]['navn'] != gruppenavn:
-            grupper.append({'navn': gruppenavn,
-                            'ikon': r.gruppe.ikon if r.gruppe_id else '',
-                            'ressurser': []})
-        grupper[-1]['ressurser'].append(rad)
-
-    return {
-        'vaktliste': {'vakt_navn': liste.vakt.navn, 'i_drift': liste.i_drift},
-        'grupper': grupper,
-    }
-
-
-def _enhetsstatuser(enhet_ider, vakt) -> dict:
-    """`{enhet_id: <enhetskort>}` for dem som melder selv.
-
-    Ligger i en egen funksjon fordi den er **den ene kanten mot
-    oppdragsmodulen** i ressursbildet. Står den for seg, er den både lett å
-    finne og lett å bytte ut den dagen pulje 4 flytter sentralbordet.
-
-    Kaller `enhetskort()` og ikke `enhet_status()`: kortet i KO skal kunne det
-    sentralbordets kort kan, og da må det være samme funksjon som svarer.
-    `ledig_siden_bulk()` spørres for hele lista i én runde — tavla polles
-    hvert tjuende sekund, og ett oppslag per enhet ville vært N spørringer.
-    """
-    if not enhet_ider:
-        return {}
     from oppdrag.models import Enhet
     from oppdrag.services import enhetskort, ledig_siden_bulk
 
-    enheter = list(Enhet.objects.select_related('user', 'enhetstype')
-                   .filter(pk__in=set(enhet_ider)))
+    vakt = vakt or hent_aktiv_vakt()
+    # Samme spørring som `oppdrag.views.enheter_view`: pensjonerte enheter er
+    # ute, og `Lower` fordi «alfabetisk» ellers er databasens alfabet — SQLite
+    # og PostgreSQL svarer ulikt.
+    enheter = list(Enhet.objects
+                   .select_related('user', 'enhetstype')
+                   .filter(er_aktiv=True)
+                   .order_by(Lower('navn')))
     ledig = ledig_siden_bulk(enheter, vakt)
-    return {e.pk: enhetskort(e, vakt, ledig.get(e.pk)) for e in enheter}
+    return [enhetskort(e, vakt, ledig.get(e.pk)) for e in enheter]

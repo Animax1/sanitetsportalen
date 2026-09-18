@@ -23,13 +23,14 @@ class SentralbordetsOppstartTests(SimpleTestCase):
     settes selv om oppstarten kastet."""
 
     HARNESS = ((OPPDRAG_SENTRAL_JS, ('_trygt', 'lastAlt', 'oppstart', '_visLastefeil', 'lastEnheter',
-                                     'lastOppdrag', 'renderEnheter', 'renderOppdrag')),)
+                                     'lastOppdrag', 'renderEnheter', 'tegnEnhetsliste', 'renderOppdrag')),)
 
     FORSPILL = '''
     let enheter = []; let oppdragsliste = []; let lokasjoner = [];
     let etagEnheter = null; let etagOppdrag = null;
     let enheterHentet = false; let oppdragHentet = false;
     let besetninger = {}; let apenBesetning = null;
+    let sisteEnhetsliste = [];
     const elementer = {};
     globalThis.document = {
       getElementById: (id) => (elementer[id] ||= { innerHTML: '<div class="tom-melding">Laster…</div>', textContent: '' }),

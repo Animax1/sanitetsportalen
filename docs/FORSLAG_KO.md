@@ -89,6 +89,16 @@ Det siste punktet er det eneste nye, og det er ikke et register men en tilstand:
 `(ressurs, status, tidspunkt, ført av hvem)`. Den bærer i seg selv skillet mellom «bilen sa
 det» og «KO førte det», og det skillet må være synlig i grensesnittet og i loggen.
 
+> **Ikke bygget, og det er et åpent spørsmål og ikke en oppgave** (18. sep. 2026). Avsnittet
+> over sier *at* KO skal føre en status, men ikke **hvilke ord**. Et forsøk 17. sep. fant på
+> fire — «Ledig», «Opptatt», «Pause», «Ute av drift» — og ble rullet tilbake dagen etter:
+> «Jeg hadde aldri noe pause og ute av drift på de i /oppdrag» (André). Verdimengden er
+> operativt språk og må matche det folk sier på samband; den kan ikke utledes av koden.
+>
+> Pulje 3 leverte derfor `/oppdrag/` sin egen ressursliste, uendret. **Konsekvensen er at et
+> lag uten `oppdrag.Enhet` ikke står på lista** — like lite som i `/oppdrag/` i dag. Står i
+> `TODO.md`.
+
 **Ressurs henger på én vaktliste** (`FK` med `CASCADE`). «Lag 3» er altså en ny rad for hver
 vaktliste, mens `oppdrag.Enhet` er permanent. Konsekvensen er at statistikk over enheter
 gjennom en sesong er rett fram, mens statistikk over lag må matche på navn og gruppe, ikke
@@ -355,7 +365,7 @@ bruker dette på.»):
 | Kolonne | Flate | Innhold |
 |---|---|---|
 | Venstre, 4/12 | **Logg / chat** | Strømmen, med skrivefeltet øverst. Den sentrale delen: bredeste kolonne, den eneste med et skrivefelt |
-| Midten, 3/12 | **Ressursoversikt** | Tavla fra §3.1 — enheter og alt annet som bemannes |
+| Midten, 3/12 | **Ressurser** | `/oppdrag/` sin egen liste, tegnet av samme funksjon. §3.1s tredje kilde er utsatt — se boksen der |
 | Høyre, 5/12 | **Oppdrag og hendelser** | Sentralbordet, flyttet fra `/oppdrag/`. Hendelser er en **gruppering av denne lista**, ikke en egen flate |
 | *Nedtrekk i toppen* | *Sidebar* | Påloggede med KO-tilgang. En håndfull navn — en fjerde kolonne ville tatt bredde fra oppdragslista, som trenger den mest |
 

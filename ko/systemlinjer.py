@@ -73,7 +73,6 @@ ENHET_RYKKET_VIDERE = 'enhet_rykket_videre'
 ENHET_AVBROT = 'enhet_avbrot'
 ENHET_AVVENTER = 'enhet_avventer'
 VAKTMODUS = 'vaktmodus'
-RESSURS_STATUS = 'ressurs_status'
 
 #: Hver kode med sin begrunnelse. Lista er kontrakten: en kode som ikke står
 #: her, skrives ikke — `ko/tests_systemlinjer.py` håndhever begge veier, slik
@@ -101,12 +100,6 @@ KODER: dict[str, str] = {
         'en enhet blir glemt.',
     VAKTMODUS:
         'Forklarer hvorfor en bil ikke ble varslet.',
-    RESSURS_STATUS:
-        'KO-ført status på en ressurs som ikke stempler selv (§3.1). **Den '
-        'tiende koden, og den første som ikke løftes av et signal:** dette er '
-        'KOs egen handling, så tjenesten skriver linja direkte. Uten den '
-        'ligger historikken bare i én kolonne som overskrives, og «hvor lenge '
-        'sto lag 3 ute av drift» har ikke noe svar.',
 }
 
 
@@ -125,16 +118,6 @@ def _oppdrag(data) -> str:
     """
     nummer = data.get('oppdragsnummer')
     return f'#{nummer}' if nummer else 'oppdrag'
-
-
-def _ressurs(data) -> str:
-    """Navnet ressursen hadde da linja ble skrevet.
-
-    Frosset i `systemdata`, ikke slått opp: en `Ressurs` henger på én
-    vaktliste med `CASCADE` (§3.1), så rada er borte neste sesong mens linja
-    skal stå i 730 dager. Samme regel som enhetsnavnet.
-    """
-    return data.get('ressurs') or 'Ukjent ressurs'
 
 
 def tegn(kode: str, data: dict) -> str:
@@ -181,12 +164,6 @@ def tegn(kode: str, data: dict) -> str:
         return f'{_enhet(data)} avbrøt {_oppdrag(data)}' + _trenger(data)
     if kode == ENHET_AVVENTER:
         return f'{_enhet(data)} avventer {_oppdrag(data)}'
-    if kode == RESSURS_STATUS:
-        linje = f'{_ressurs(data)}: {data.get("status_navn") or "?"}'
-        # «Ført av KO» står alltid på denne koden — den *finnes* bare for dem
-        # som ikke melder selv (§3.1), og skillet «bilen sa det» mot «KO førte
-        # det» skal være synlig i loggen og ikke utledes av hvilken kode det er.
-        return linje + ' — ført av KO'
     if kode == VAKTMODUS:
         navn = 'passiv vakt' if data.get('modus') == 'passiv' else 'aktiv vakt'
         return f'{_enhet(data)} satt i {navn}'

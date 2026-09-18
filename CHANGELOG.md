@@ -4,6 +4,68 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-18 — Ressurslista rullet tilbake: verdimengden var funnet på  `#ko/ressursbildet` `#oppdrag/sentralbord`
+
+André: «Du har ikke direkte kopiert sentralbord delene fra /oppdrag. Jeg hadde aldri noe
+pause og ute av drift på de i /oppdrag. Her har du tatt deg grove friheter utenfor rammene
+som er satt. Vi vil ha det likt i funksjonalitet som vi hadde det i /oppdrag før vi begynte
+på /ko men med det vi har sagt av logg og slikt.»
+
+Han har rett, og feilen er verdt å navngi presist. **`docs/FORSLAG_KO.md` §3.1 sier at KO
+skal føre status for dem som ikke stempler selv — men ikke med hvilke ord.** Jeg fylte inn
+«Ledig», «Opptatt», «Pause», «Ute av drift» og skrev en overbevisende begrunnelse for at de
+hørte hjemme i kode og ikke i en tabell. Begrunnelsen var god; valget var ikke mitt å ta.
+**Et hull i et notat er et spørsmål, ikke en invitasjon.**
+
+Verre: gårsdagens arbeid het «feature parity» og *la til* funksjonalitet `/oppdrag/` aldri
+har hatt. Det er ikke parity, det er noe annet med et parity-navn på.
+
+### Hva som er borte
+
+`ko/choices.py`, modellen `ko.Ressursstatus`, `services.sett_ressursstatus()`, systemkoden
+`ressurs_status`, skrive-endepunktet `/ko/api/ressurser/<pk>/status/` og statusknappene i
+nettleseren. `ko/migrations/0003` slipper tabellen — den sto på staging i under et døgn,
+uten produksjonsbruk, og bar ingenting som ikke også lå som en systemlinje i loggen.
+
+### Hva som står i stedet
+
+**`/ko/` viser `oppdrag.Enhet`, tegnet av sentralbordets egen funksjon.**
+`tegnEnhetsliste()` flyttet fra `oppdrag-sentral-kjerne.js` til den delte
+`static/js/oppdrag-kort.js`, sammen med grupperingen på enhetstype, besetningspanelet og
+«av vakt»-telleren. `renderEnheter()` i sentralbordet er nå **ett kall** inn i den. Begge
+sidene bruker `#enhetsliste` og `#av-vakt-teller`.
+
+Serversiden var alt delt fra i går: `oppdrag.services.enhetskort()`.
+`ko.services.ressursbildet()` returnerer nå den samme lista som
+`/oppdrag/api/enheter/` — og `test_samme_svar_som_oppdragsmodulens_endepunkt`
+sammenligner **hele svaret** fra de to endepunktene. Ikke bare nøklene: en KO-side som
+filtrerte, sorterte eller scopet annerledes ville vært usynlig for en nøkkelsjekk.
+
+**KO fikk ingen skrive-endepunkter på enhetene.** Av vakt og passiv vakt er
+oppdragsmodulens, og blir KOs når sentralbordet flytter (pulje 4). Et eget i mellomtiden
+ville vært en andre vei inn til samme tilstand.
+
+### Konsekvensen skal stå skrevet
+
+**Et lag uten `oppdrag.Enhet` vises ikke på lista** — akkurat som i `/oppdrag/` i dag. Den
+tredje kilden i §3.1 er utsatt, ikke forkastet, og den er ikke en kodeoppgave: noen må
+bestemme hva statusene skal hete. Står i `TODO.md`.
+
+### Mutasjonstesting
+
+**7 mutanter.** KO som filtrerer bort enheter av vakt, KO som tar med pensjonerte,
+`ledig_siden` droppet, besetningsgaten fjernet, sentralbordet som tegner sitt eget igjen.
+
+**Sorteringen overlevde først.** `test_samme_svar_som_oppdragsmodulens_endepunkt`
+sammenligner de to endepunktene — men med to enheter opprettet alfabetisk gir `pk` og
+`Lower('navn')` samme rekkefølge. Testdataene skilte ikke de to. Ny test med «Zulu 9»,
+«alfa 1», «Bravo 5» opprettet i den rekkefølgen: den dreper både `order_by('pk')` og
+`order_by('navn')` uten `Lower`, altså også den der «alfabetisk» blir databasens eget
+alfabet. Det er `CLAUDE.md` sin egen regel — «krev rekkefølgen i svaret, med data som
+avslører databasens alfabet» — og jeg hadde skrevet testen uten å følge den.
+
+---
+
 ## 2026-09-17 — Feature parity med sentralbordet: samme kode, ikke samme flid  `#ko/ressursbildet` `#oppdrag/sentralbord`
 
 André: «Du har tatt friheter med ressursoversikten. Det er ikke feature parity med

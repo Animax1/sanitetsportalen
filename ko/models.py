@@ -24,8 +24,6 @@ from django.conf import settings
 from django.db import models
 from django.db.models.functions import Coalesce
 
-from . import choices as ko_choices
-
 
 #: Hvem som skrev linja. To verdier, og skillet er det §3.1 kaller «bilen sa
 #: det» mot «KO førte det» — det skal være synlig i grensesnittet og i loggen,
@@ -197,64 +195,3 @@ class Logglinje(models.Model):
     @property
     def er_systemlinje(self) -> bool:
         return self.kilde == KILDE_SYSTEM
-
-
-class Ressursstatus(models.Model):
-    """KO-ført status på én ressurs — **én rad per ressurs, ikke en historikk**.
-
-    Tredje rad i projeksjonen (§3.1): de som ikke stempler selv. En bil har en
-    `oppdrag.Enhet` og melder sin egen status; et lag har ingen `Enhet` i det
-    hele tatt — det er hele poenget med at de ikke logger inn — og da er det
-    operatøren som fører den.
-
-    **Hvem som fører utledes av `Ressurs.enhet`, ikke av et flagg.** Er den
-    satt, eier oppdragsmodulen statusen og denne raden skal ikke finnes; er den
-    `NULL`, er det KO. Et eget flagg ville vært en andre sannhet om det samme,
-    og de to ville stått i strid den dagen noen koblet en enhet uten å rydde
-    flagget. Rutingflagget i §3.2 er **et annet spørsmål** — det avgjør
-    `/oppdrag/` mot `/park/`, som ikke finnes ennå — og hører hjemme der.
-
-    **Historikken ligger i loggen, ikke her.** Hver føring skriver en
-    systemlinje (`ko/systemlinjer.py`, koden `ressurs_status`), og det er den
-    som svarer på «hvor lenge sto lag 3 ute av drift». To kilder til samme
-    historikk går i utakt første gang noe feiler halvveis, og da er det den
-    lagrede som lyver — den ser autoritativ ut. Derfor er denne tabellen ren
-    nåtilstand, oppdatert i stedet for påført.
-
-    **Fravær av rad er «Ledig»**, og det er ikke en verdi noen setter: det er
-    hva «KO har ikke ført noe» ser ut som. Samme konstruksjon som
-    `oppdrag.services.enhet_status`, og av samme grunn — en lagret standard
-    måtte settes for hver ressurs i hver vaktliste, og da er spørsmålet «hvem
-    glemte å sette den» i stedet for «hvem er ledig».
-    """
-
-    #: `CASCADE` og ikke `SET_NULL`: ressursen henger på én vaktliste (§3.1),
-    #: og en status uten ressursen sin er ikke et spor — den er en foreldreløs
-    #: rad ingen kan lese. Sporet ligger i loggen, som overlever.
-    ressurs = models.OneToOneField(
-        'vaktliste.Ressurs', on_delete=models.CASCADE,
-        related_name='ko_status', verbose_name='Ressurs')
-
-    status = models.CharField(
-        max_length=16, choices=ko_choices.STATUS_VALG,
-        default=ko_choices.STANDARD, verbose_name='Status')
-
-    satt_at = models.DateTimeField(verbose_name='Satt')
-
-    #: Kontoen kan forsvinne, og navnet skal ikke gjøre det — samme regel som
-    #: `forfatter_navn` på logglinja (§4.5). Navnet er fasit, FK-en er
-    #: bekvemmelighet, og backup-handleren stripper derfor FK-en og ikke navnet.
-    satt_av = models.ForeignKey(
-        settings.AUTH_USER_MODEL, null=True, blank=True,
-        on_delete=models.SET_NULL, related_name='ko_ressursstatuser',
-        verbose_name='Satt av')
-    satt_av_navn = models.CharField(
-        max_length=150, blank=True, default='', verbose_name='Satt av (navn)')
-
-    class Meta:
-        verbose_name = 'KO-ført ressursstatus'
-        verbose_name_plural = 'KO-førte ressursstatuser'
-        ordering = ['ressurs_id']
-
-    def __str__(self):
-        return f'{self.ressurs_id}: {self.status}'

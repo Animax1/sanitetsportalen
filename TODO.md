@@ -631,18 +631,28 @@ bygget; det flyttet til `/park/`-punktet nederst, der det hører hjemme.*
       fører. Blir mobil et ekte krav, er det en egen oppgave — og svaret er **ikke** faner:
       da er det heller loggen alene, med tavla som et nedtrekk ved siden av sidebaren.
 
-- [ ] **Merknad på en KO-ført status.** Ikke bygget, og det var et scope-valg: §3.1 ber om
-      `(ressurs, status, tidspunkt, ført av hvem)` og ikke mer. Men «Ute av drift» uten en
-      grunn er den statusen man må ringe for å forstå, og operatøren skriver grunnen i
-      loggen uansett. Vurder et kort fritekstfelt på raden — og da med samme forbehold som
-      resten av KO-loggen: det er fritekst, det arkiveres ikke, og det må inn i
-      oppbevaringsfristen.
+- [ ] **Hva skal en KO-ført ressursstatus hete? Spørsmålet må besvares før den bygges.**
+      Ikke merket «Krever Andre», og det er et bevisst valg: merket betyr «blokkerer nå»,
+      og dette blokkerer ingenting i dag — `/ko/` viser det `/oppdrag/` viser. Spørsmålet
+      tas når den tredje kilden tas.
 
-- [ ] **Tavla viser ikke hvor ressursen *er*.** «Hvor de står» i §3.1 er i dag besvart med
-      hvem som er på skift, ikke med en lokasjon. `oppdrag.Lokasjon` er verdimengden som
-      finnes, og en KO-ført lokasjon ville vært den samme konstruksjonen som statusen.
-      Vent til pulje 4: sentralbordet bærer lokasjonen på oppdraget, og de to skal ikke
-      svare hver sitt om hvor bilen er.
+      `FORSLAG_KO.md` §3.1 sier at KO skal føre status for dem som ikke stempler selv — et
+      lag har ingen `oppdrag.Enhet` og kan ikke melde noe selv. Notatet sier **ikke** hvilke
+      statuser det er, og det er ikke en kodeoppgave: det er operativt språk som må matche
+      det folk faktisk sier på samband.
+
+      Et forsøk 17. sep. 2026 fant på fire — «Ledig», «Opptatt», «Pause», «Ute av drift» —
+      og ble rullet tilbake dagen etter: «Jeg hadde aldri noe pause og ute av drift på de i
+      /oppdrag» (André). Se CHANGELOG 18. sep.
+
+      **Konsekvensen i mellomtiden:** et lag uten enhet står ikke på ressurslista i `/ko/`,
+      like lite som i `/oppdrag/`. Det er dagens tilstand og ikke en regresjon, men det er
+      også grunnen til at spørsmålet ikke kan utsettes i det uendelige.
+
+      Tre veier når svaret finnes: oppdragsmodulens egne statuser gjenbrukt, en kort egen
+      liste i kode (som `oppdrag/choices.py`), eller en tabell admin styrer (som
+      `Ressursgruppe`). Den siste gjør fargene på lista til data — og da kan ingen si hva en
+      gul rad betyr.
 
 - [ ] **`oppdrag-enhet.js` deler ikke det delte enhetskortet.** Bilens egen skjerm har
       egne kopier av `hastegradKlasse`, `_medAntall` og `_problemMedAntall`; sentralbordet

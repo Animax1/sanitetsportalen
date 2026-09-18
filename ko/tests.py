@@ -349,7 +349,7 @@ class SidenHarIngenFanerTests(TestCase):
         markup = self._markup()
         self.assertIn('id="ko-logg-form"', markup, 'skrivefeltet mangler')
         self.assertIn('id="ko-logg-liste"', markup, 'loggstrømmen mangler')
-        self.assertIn('Ressursoversikt', markup, 'tavla mangler')
+        self.assertIn('id="enhetsliste"', markup, 'ressurslista mangler')
         self.assertIn('Oppdragsliste', markup, 'oppdragsflata mangler')
         self.assertNotIn('d-none', markup.split('id="ko-logg-form"')[0][-400:],
                          'noe skjuler loggen ved lasting')

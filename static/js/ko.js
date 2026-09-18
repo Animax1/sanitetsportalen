@@ -1,5 +1,5 @@
 // ════════════════════════════════════════════════════════════════════════════
-// KO — situasjonsbildet. Pulje 1 (sidebaren), 2 (loggen), 3 (ressursbildet).
+// KO — situasjonsbildet. Pulje 1 (sidebaren), 2 (loggen), 3 (ressurslista).
 //
 // Lastes kun av /ko/. Fortsatt **én fil**: 1 800-linjersgrensa i
 // core/tests_js_splitt.py gjelder de delte modulene, og denne er langt under
@@ -392,205 +392,33 @@ async function koFjern(id) {
 
 
 // ════════════════════════════════════════════════════════════════════════════
-// Ressursbildet (pulje 3, §3.1) — tavla over hvem som er på vakt og hvor de er.
+// Ressurslista (pulje 3) — sentralbordets egen, tegnet av oppdrag-kort.js.
 //
-// **KO eier ikke ressursene.** Serveren setter bildet sammen av tre kilder;
-// her tegnes det bare. Det ene valget som ligger i klienten er om
-// statusknappene skal finnes på en rad, og det er en regel — se
-// `koKanStyreRessurs()`.
+// **KO tegner ikke sitt eget kort.** Et tidligere forsøk (17. sep. 2026) bygget
+// en egen liste over `vaktliste.Ressurs` med fire KO-førte statuser — «Ledig»,
+// «Opptatt», «Pause», «Ute av drift». Verdimengden var funnet på: notatet sier
+// at KO skal føre status for dem som ikke stempler selv, men ikke med hvilke
+// ord, og `/oppdrag/` har aldri hatt de to siste. Se ko/CLAUDE.md.
+//
+// Her hentes bare dataene; `tegnEnhetsliste()` gjør resten og skriver til
+// `#enhetsliste` og `#av-vakt-teller` — de samme ID-ene sentralbordet bruker.
 // ════════════════════════════════════════════════════════════════════════════
 
-// 20 sekunder. Tavla endrer seg oftere enn sidebaren (en status kan skifte
-// midt i en samtale) og sjeldnere enn loggen (som skrives mens man ser på).
+// 20 sekunder. Lista endrer seg oftere enn sidebaren (en status kan skifte midt
+// i en samtale) og sjeldnere enn loggen (som skrives mens man ser på).
 const KO_RESSURSER_MS = 20000;
-
-// Statusene KO fører. Rekkefølgen er knapperekkefølgen, og den er
-// **operatørens** og ikke alfabetisk: «Ledig» først fordi det er den man
-// trykker for å melde noen tilbake i tjeneste, og den gjør man oftest.
-const KO_STATUSER = [
-  { verdi: 'ledig', navn: 'Ledig', klasse: 'success' },
-  { verdi: 'opptatt', navn: 'Opptatt', klasse: 'warning' },
-  { verdi: 'pause', navn: 'Pause', klasse: 'info' },
-  { verdi: 'ute_av_drift', navn: 'Ute av drift', klasse: 'danger' },
-];
-
-let koRessursbilde = { vaktliste: null, grupper: [] };
-
-// **Regelen, ikke tegningen.** Knappene skal finnes bare når begge er sanne:
-// brukeren kan skrive, *og* det er KO som fører statusen for ressursen. Den
-// andre halvdelen er lett å glemme, og da tegner vi knapper på en koblet bil —
-// serveren avviser dem, og operatøren står med en knapp som fører til en vegg.
-function koKanStyreRessurs(ressurs) {
-  return Boolean(koKanSkrive() && ressurs && ressurs.fort_av_ko);
-}
-
-// Fargen bærer en påstand om hvem som kan sendes, så den er en regel og ikke
-// pynt. Ukjent status gir `secondary` og ikke grønt: en verdi vi ikke kjenner
-// skal aldri se ledig ut.
-//
-// **Enheten farges av `status-prikk`-klassen i innmaten**, som i
-// sentralbordet — én farge­kilde for enheter, ikke to. Denne svarer for
-// KO-førte statuser, som ikke finnes i oppdragsmodulens verdimengde.
-function koStatusklasse(ressurs) {
-  if (!ressurs.status) return 'secondary';
-  if (ressurs.fort_av_ko) {
-    const treff = KO_STATUSER.find((s) => s.verdi === ressurs.status);
-    return treff ? treff.klasse : 'secondary';
-  }
-  return ressurs.status === 'ledig' ? 'success' : 'warning';
-}
-
-// «2 av 3 møtt» — og tallet er ikke pynt heller: en ressurs med skift men uten
-// noen møtt er nettopp den man tror man har.
-// `bemanning_*` og ikke `antall`: enhetskortet bruker `antall` om *pasienter*
-// på oppdraget. To betydninger i samme rad er en feil man ikke ser som en
-// feil, bare som et tall som er litt rart.
-function koBemanningstekst(ressurs) {
-  if (!ressurs.bemanning_antall) return 'ingen på skift nå';
-  return ressurs.bemanning_tilstede + ' av ' + ressurs.bemanning_antall + ' møtt';
-}
-
-function koRessursKnapper(ressurs) {
-  if (!koKanStyreRessurs(ressurs)) return '';
-  let ut = '<div class="btn-group btn-group-sm mt-1" role="group"'
-    + ' aria-label="Sett status">';
-  for (const s of KO_STATUSER) {
-    const aktiv = ressurs.status === s.verdi
-      ? 'btn-' + s.klasse
-      : 'btn-outline-' + s.klasse;
-    ut += '<button type="button" class="btn ' + aktiv + '"'
-      + ' data-action="koSettRessursstatus"'
-      + ' data-id="' + escapeHtml(ressurs.id) + '"'
-      + ' data-felt="status"'
-      + ' data-verdi="' + escapeHtml(s.verdi) + '">'
-      + escapeHtml(s.navn) + '</button>';
-  }
-  return ut + '</div>';
-}
-
-// **Enheten tegnes av `enhetskortInnmat()` fra oppdrag-kort.js — samme kode
-// som sentralbordet.** Det er hele svaret på feature parity (André, 17. sep.
-// 2026): en egen bygger her ville falt bak neste felt noen la til i
-// oppdragsmodulen, uten at noe ble rødt. Nøyaktig det hadde alt skjedd —
-// KOs første kort manglet passiv vakt, ventende, «ledig siden», sted og hele
-// oppdragslinja.
-//
-// Laget har ingen enhet (§3.1), og da er det KO som fører. Da tegnes navnet og
-// KO-statusen her, i samme form som innmaten, slik at radene ser like ut.
-function koLagInnmat(ressurs) {
-  return '<span class="status-prikk status-' + escapeHtml(ressurs.status) + '"></span>'
-    + '<div class="flex-grow-1">'
-    + '<div class="enhet-navn">' + escapeHtml(ressurs.navn) + '</div>'
-    + '<div class="enhet-meta">' + escapeHtml(koLagMeta(ressurs)) + '</div>'
-    + '</div>';
-}
-
-// «Ute av drift 21:14 · 12 min» — samme form som enhetens metalinje, og av
-// samme grunn: operatøren som skal sende noen vil vite hvem som har stått
-// lengst. Uten en føring står bare ordet.
-function koLagMeta(ressurs) {
-  if (!ressurs.status_satt_at) return ressurs.status_navn;
-  return ressurs.status_navn + ' ' + klokke(ressurs.status_satt_at)
-    + ' · ' + tidSiden(ressurs.status_satt_at);
-}
-
-// Besetningen står **under** kortet, som i sentralbordet, og bare når
-// serveren sendte den: mannskapslista henger på `vaktliste`-tilgang, ikke på
-// KO-tilgang (rollemodellen §5). En tom liste og «du får ikke se» ser derfor
-// like ut her, og det er med vilje.
-function koBesetningHtml(ressurs) {
-  if (!ressurs.mannskap.length) {
-    return '<div class="small text-muted">'
-      + escapeHtml(koBemanningstekst(ressurs)) + '</div>';
-  }
-  const navn = ressurs.mannskap.map((m) => escapeHtml(m.navn)
-    + (m.tilstede ? '' : ' <span class="text-muted">(ikke møtt)</span>')).join(', ');
-  return '<div class="small">' + navn + '</div>'
-    + '<div class="small text-muted">'
-    + escapeHtml(koBemanningstekst(ressurs)) + '</div>';
-}
-
-function koRessursHtml(ressurs) {
-  // **Kilden til statusen står i bildet** (§3.1): «bilen sa det» mot «KO førte
-  // det» er hele skillet den tredje kilden finnes for, og det skal ikke måtte
-  // utledes av at en rad tilfeldigvis har knapper.
-  const kilde = ressurs.fort_av_ko
-    ? '<span class="text-muted small">ført av KO'
-      + (ressurs.status_satt_av ? ' · ' + escapeHtml(ressurs.status_satt_av) : '')
-      + '</span>'
-    : '<span class="text-muted small">melder selv</span>';
-  const korps = ressurs.korps
-    ? ' <span class="text-muted small">' + escapeHtml(ressurs.korps) + '</span>' : '';
-  const innmat = ressurs.fort_av_ko
-    ? koLagInnmat(ressurs) : enhetskortInnmat(ressurs);
-  const besetning = koBesetningHtml(ressurs);
-  const knapper = koRessursKnapper(ressurs);
-  return '<li class="list-group-item py-2">'
-    + '<div class="enhet-kort">' + innmat + korps + '</div>'
-    + besetning + kilde + knapper
-    + '</li>';
-}
-
-
-function koTegnRessurser() {
-  const boks = document.getElementById('ko-ressurser');
-  if (!boks) return;
-  const merke = document.getElementById('ko-ressurser-vakt');
-  if (merke) {
-    merke.textContent = koRessursbilde.vaktliste
-      ? koRessursbilde.vaktliste.vakt_navn
-        + (koRessursbilde.vaktliste.i_drift ? ' · i drift' : '')
-      : '';
-  }
-  if (!koRessursbilde.vaktliste) {
-    // **Ukoblet og tomt skal ikke se likt ut.** Ingen vaktliste er et oppsett
-    // som mangler; en tom liste er en vakt uten ressurser. Samme skille
-    // `vaktliste.services.besetning()` gjør.
-    boks.innerHTML = '<p class="text-muted small p-3 mb-0">Ingen vaktliste i drift'
-      + ' og ingen aktiv vakt. Sett en liste i drift i'
-      + ' <a href="/vaktliste/">vaktlista</a>.</p>';
-    return;
-  }
-  if (!koRessursbilde.grupper.length) {
-    boks.innerHTML = '<p class="text-muted small p-3 mb-0">Ingen ressurser i'
-      + ' denne vaktlista.</p>';
-    return;
-  }
-  let ut = '';
-  for (const g of koRessursbilde.grupper) {
-    ut += '<div class="px-3 pt-2 pb-1 small fw-semibold text-muted">'
-      + escapeHtml(g.navn) + '</div>'
-      + '<ul class="list-group list-group-flush">'
-      + g.ressurser.map(koRessursHtml).join('')
-      + '</ul>';
-  }
-  boks.innerHTML = ut;
-}
 
 async function koHentRessurser() {
   try {
     const svar = await apiFetch('/ko/api/ressurser/');
     if (!svar.ok) return;
     const json = await svar.json();
-    koRessursbilde = json.data || { vaktliste: null, grupper: [] };
-    koTegnRessurser();
+    tegnEnhetsliste(json.data || []);
   } catch (e) {
-    // En tavle som feiler skal ikke ta med seg loggen. Samme valg som
-    // sidebaren gjør — det forrige bildet blir stående, og det er riktigere
-    // enn et tomt: det sier i det minste hva som var sant sist.
+    // En liste som feiler skal ikke ta med seg loggen. Det forrige bildet blir
+    // stående, og det er riktigere enn et tomt: det sier i det minste hva som
+    // var sant sist.
   }
-}
-
-async function koSettRessursstatus(id, felt, verdi) {
-  const svar = await apiFetch('/ko/api/ressurser/' + encodeURIComponent(id)
-    + '/status/', {
-    method: 'POST',
-    body: JSON.stringify({ status: verdi }),
-  });
-  if (!svar.ok) return;
-  const json = await svar.json();
-  koRessursbilde = json.data || koRessursbilde;
-  koTegnRessurser();
 }
 
 

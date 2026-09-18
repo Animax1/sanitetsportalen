@@ -132,6 +132,12 @@ def index_view(request):
         'er_global_admin': er_global_admin(request.user),
         'ko_maks_tekst': services.MAKS_TEKST,
         'med_antall': js_json(verdier.med_antall()),
+        'enhetstyper': js_json([[t.pk, t.navn] for t in verdier.enhetstyper()]),
+        # **Besetningspanelet gates på `vaktliste`-tilgang, ikke på KO.**
+        # Komposisjonsregelen fra rollemodellen §5, og nøyaktig samme gate
+        # sentralbordet bruker: har ikke operatøren vaktlistetilgang, finnes
+        # panelet ikke, framfor å gi avledet innsyn i hvem som går vakt.
+        'kan_se_besetning': har_tilgang(request.user, 'vaktliste', 'les'),
     })
 
 
@@ -300,7 +306,7 @@ def logg_fjern_view(request, pk):
     return JsonResponse({'status': 'ok', 'antall': antall})
 
 
-# ── Ressursbildet (§3.1) ─────────────────────────────────────────────────────
+# ── Ressurslista (§7) ────────────────────────────────────────────────────────
 
 
 @never_cache
@@ -308,56 +314,14 @@ def logg_fjern_view(request, pk):
 @require_http_methods(['GET'])
 @rate_limit(group='ko:ressurser', rate='120/m', method='GET')
 def ressurser_view(request):
-    """Tavla. Polles som sidebaren, og bremsen er satt deretter.
+    """Enhetene, i samme form som `/oppdrag/api/enheter/`.
 
-    `les` og ikke mer: tavla er situasjonsbildet, og den som ikke får se hvem
+    `les` og ikke mer: lista er situasjonsbildet, og den som ikke får se hvem
     som er på vakt kan ikke lese loggen heller — linjene handler om dem.
+
+    **Skriving finnes ikke her.** Å sette en enhet av vakt eller i passiv vakt
+    er oppdragsmodulens endepunkter, og de blir KOs den dagen sentralbordet
+    flytter (pulje 4). Et eget skrive-endepunkt i mellomtiden ville vært en
+    andre vei inn til samme tilstand.
     """
-    return JsonResponse({'status': 'ok', 'data': _bilde(request)})
-
-
-def _bilde(request) -> dict:
-    """Ressursbildet slik *denne* brukeren får se det.
-
-    Mannskapslista henger på `vaktliste`-tilgang og ikke på KO-tilgang —
-    komposisjonsregelen fra rollemodellen §5, samme gate sentralbordet bruker
-    for besetningspanelet. Én funksjon, to kallsteder: lesingen og svaret på
-    en statusføring skal aldri kunne svare ulikt.
-    """
-    return services.ressursbildet(
-        kan_se_besetning=har_tilgang(request.user, 'vaktliste', 'les'))
-
-
-@modul_kreves('ko', 'skriv_full', svar='json')
-@require_http_methods(['POST'])
-@rate_limit(group='ko:ressurs_status', rate='120/m', method='POST')
-def ressurs_status_view(request, pk):
-    """Før en status på en ressurs som ikke stempler selv.
-
-    `skriv_full` og ikke `skriv_handling`: nivået under leser ikke
-    request-kroppen, og statusen *er* kroppen. Se tilgangsstigen i rota.
-
-    **404 og ikke 400 for en ressurs utenfor lista i bruk.** Tavla viser bare
-    den lista, så en ID utenfor den er enten en gammel fane eller noen som
-    gjetter — og begge skal få samme svar som for en ID som ikke finnes.
-    """
-    from vaktliste.models import Ressurs
-    from vaktliste.services import vaktliste_i_bruk
-
-    liste = vaktliste_i_bruk()
-    if liste is None:
-        return _feil('Ingen vaktliste er i drift.', status=404)
-    try:
-        ressurs = (Ressurs.objects
-                   .select_related('gruppe', 'vaktliste__vakt')
-                   .get(pk=pk, vaktliste=liste))
-    except Ressurs.DoesNotExist:
-        return _feil('Ressurs ikke funnet', status=404)
-
-    data = _json_body(request)
-    try:
-        services.sett_ressursstatus(
-            ressurs, data.get('status'), bruker=request.user)
-    except services.Ugyldig as feil:
-        return _feil(str(feil))
-    return JsonResponse({'status': 'ok', 'data': _bilde(request)})
+    return JsonResponse({'status': 'ok', 'data': services.ressursbildet()})

@@ -65,6 +65,8 @@
     kode, er kode for den som leter etter kode.
   {% endcomment %}
   window.OPPDRAG_MED_ANTALL = {{ med_antall }};
+  window.OPPDRAG_ENHETSTYPER = {{ enhetstyper }};
+  window.KAN_SE_BESETNING = {{ kan_se_besetning|yesno:"true,false" }};
 </script>
 
 <div class="container-fluid px-3 px-md-4 py-3">
@@ -72,7 +74,6 @@
   <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-2">
     <h1 class="h5 mb-0"><i class="bi bi-broadcast-pin me-2"></i>KO</h1>
     <div class="d-flex align-items-center gap-2">
-      <span class="small text-muted" id="ko-ressurser-vakt"></span>
       {% comment %}
         **Sidebaren er et nedtrekk, ikke en kolonne** (17. sep. 2026). «Hvem har
         KO oppe» er en håndfull navn man kikker på, ikke noe man overvåker — og
@@ -163,20 +164,25 @@
 
     <div class="ko-kolonne ko-kolonne-ressurser">
       {% comment %}
-        Tavla (§3.1). **En projeksjon, ikke et register.** Den står ved siden av
-        oppdragslista fordi de to svarer på matchingen sammen: hvem er ledig, og
-        hva venter. Det er også formen sentralbordet alt har (`col-lg-4` +
-        `col-lg-8`), og den blokka flytter hit i pulje 4.
+        **Ressurslista er sentralbordets egen**, tegnet av `tegnEnhetsliste()`
+        i `static/js/oppdrag-kort.js` — samme funksjon, samme enheter, samme
+        statuser (André, 18. sep. 2026: «Vi vil ha det likt i funksjonalitet
+        som vi hadde det i /oppdrag»). ID-ene `enhetsliste` og `av-vakt-teller`
+        er derfor de samme som i `templates/oppdrag/sentral.html`.
+
+        Den står ved siden av oppdragslista fordi de to svarer på matchingen
+        sammen: hvem er ledig, og hva venter.
       {% endcomment %}
       <div class="card">
-        <div class="card-header py-2">
+        <div class="card-header py-2 d-flex justify-content-between align-items-center">
           <span class="small fw-semibold">
-            <i class="bi bi-grid-3x3 me-1"></i>Ressursoversikt
+            <i class="bi bi-truck me-1"></i>Ressurser
           </span>
+          <span class="small text-muted" id="av-vakt-teller"></span>
         </div>
-        <div class="card-body p-0">
-          <div id="ko-ressurser" class="ko-rull">
-            <p class="text-muted small p-3 mb-0">Laster …</p>
+        <div class="card-body ko-rull">
+          <div id="enhetsliste" class="d-grid gap-2">
+            <div class="tom-melding">Laster…</div>
           </div>
         </div>
       </div>
@@ -186,7 +192,7 @@
       <div class="card">
         <div class="card-header py-2">
           <span class="small fw-semibold">
-            <i class="bi bi-truck me-1"></i>Oppdragsliste
+            <i class="bi bi-list-task me-1"></i>Oppdragsliste
           </span>
         </div>
         <div class="card-body ko-rull">

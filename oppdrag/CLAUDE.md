@@ -230,12 +230,15 @@ serveren i nøyaktig det øyeblikket en overgang ble endret.
 **Hvorfor `_stilleLydbaerer()` finnes** står i rota, under CSP — `media-src` måtte
 åpnes for `blob:` for at iOS' ringebryter ikke skal dempe varselet.
 
-**Enhetskortet er delt med `/ko/`** (17. sep. 2026). Serversiden:
+**Hele ressurslista er delt med `/ko/`** (18. sep. 2026). Serversiden:
 `services.enhetskort()` er den ene serialiseringen, og både `views.enheter_view` og
-`ko.services` leser den. Klienten: `static/js/oppdrag-kort.js` bærer innmaten
-(`enhetskortInnmat()`) og ordforrådet rundt — `tidSiden`, `hastegradKlasse`, `_grovMerke`,
-`_problemMedAntall`. Begge sidene laster fila; `_enhetskort()` her er en tynn ramme rundt
-innmaten med klikket som åpner besetningen.
+`ko.services.ressursbildet` leser den. Klienten: `static/js/oppdrag-kort.js` bærer
+`tegnEnhetsliste()` — grupperingen på enhetstype, kortet, besetningspanelet og
+«av vakt»-telleren — pluss ordforrådet rundt: `tidSiden`, `hastegradKlasse`, `_grovMerke`,
+`_problemMedAntall`. `renderEnheter()` her er nå ett kall inn i den.
+
+Begge sidene bruker ID-ene `#enhetsliste` og `#av-vakt-teller`, og begge må sette
+`window.OPPDRAG_ENHETSTYPER`, `OPPDRAG_MED_ANTALL` og `KAN_SE_BESETNING`.
 
 `tomt_enhetskort()` gir samme form uten en enhet, for KOs ressurser som er lag.
 `TomtEnhetskortHarSammeFormTests` krever at den håndskrevne lista og den ekte har samme

@@ -34,8 +34,6 @@ let oppdragHentet = false;
 // Hentes **når operatøren spør**, ikke ved hver polling: enhetslista pollet
 // hvert par sekund ville gitt ett kall per bil per runde, og svaret er
 // dessuten bare interessant i det øyeblikket noen lurer.
-let besetninger = {};
-let apenBesetning = null;
 
 const STATUS_REKKEFOLGE = ['venter', 'rykker_ut', 'fremme', 'avreist', 'leverer', 'ledig'];
 //: Lista sorteres på hastegraden operatøren satte (André, 12. sep. 2026),
@@ -102,194 +100,29 @@ function hastegradEndret(prefiks) {
 
 // ── Enhetsliste ─────────────────────────────────────────
 
+// **Ressurslista tegnes av `oppdrag-kort.js`, delt med `/ko/`** (18. sep.
+// 2026). Sentralbordet eier `enheter` og hentingen med ETag; tegningen er
+// felles, slik at de to sidene ikke kan komme til å vise ulike ting om samme
+// enhet. Se fila for hvorfor.
 function renderEnheter() {
-  const el = document.getElementById('enhetsliste');
-  if (!el) return;
-
-  // Tavla viser hvem som kan sendes nå. Antallet av vakt står på
-  // Enheter-knappen, der hele lista ligger.
-  const paVakt = enheter.filter((e) => e.pa_vakt);
-  const antallAv = enheter.length - paVakt.length;
-
-  if (!paVakt.length) {
-    el.innerHTML = '<div class="tom-melding">Ingen enheter på vakt.</div>';
-  } else {
-    // Gruppert på enhetstype, ambulansene først (André, 12. sep. 2026).
-    // Overskriften står bare når det finnes mer enn én type å skille.
-    const grupper = _grupperEnheter(paVakt);
-    el.innerHTML = grupper.map((g) => {
-      const hode = grupper.length > 1
-        ? `<div class="enhet-gruppe">${escapeHtml(g.navn)}</div>` : '';
-      return hode + g.enheter.map((e) => _enhetskort(e)).join('');
-    }).join('');
-  }
-
-  const teller = document.getElementById('av-vakt-teller');
-  if (teller) teller.textContent = antallAv ? ` (${antallAv} av vakt)` : '';
+  tegnEnhetsliste(enheter);
 }
 
 
-function _typeRekkefolge() {
-  // Typenes ID-er i visningsrekkefølge — tabellen `Enhetstype`, sortert av
-  // serveren (12. sep. 2026). `OPPDRAG_ENHETSTYPER` er `[[id, navn], …]`.
-  return (globalThis.window?.OPPDRAG_ENHETSTYPER || []).map((t) => String(t[0]));
-}
 
 
-function _grupperEnheter(liste) {
-  // [{type, navn, enheter}] i typenes rekkefølge — ambulanse først — og
-  // bare typene som faktisk finnes i lista. Enheter uten type, eller med en
-  // type som er tatt ut av lista, står sist. Innenfor gruppa alfabetisk
-  // (André, 12. sep. 2026). Én regel, to lesere: tavla og avkryssingen i
-  // «Nytt oppdrag».
-  const rekkefolge = _typeRekkefolge();
-  const navn = Object.fromEntries(
-    (globalThis.window?.OPPDRAG_ENHETSTYPER || []).map(([id, n]) => [String(id), n]));
-  const grupper = new Map();
-  liste.forEach((e) => {
-    const t = e.type == null ? '' : String(e.type);
-    if (!grupper.has(t)) grupper.set(t, []);
-    grupper.get(t).push(e);
-  });
-  const alfabetisk = (a, b) => String(a.navn).localeCompare(String(b.navn), 'nb', { sensitivity: 'base' });
-  return Array.from(grupper.entries())
-    .sort((a, b) => {
-      const ai = rekkefolge.indexOf(a[0]); const bi = rekkefolge.indexOf(b[0]);
-      return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi);
-    })
-    .map(([type, enheter]) => ({
-      type,
-      navn: navn[type] || (type === '' ? 'Uten type' : (enheter[0].type_navn || 'Annet')),
-      enheter: [...enheter].sort(alfabetisk),
-    }));
-}
 
 
-function _enhetskort(e) {
-  // **Innmaten er delt med KO** (17. sep. 2026, André: «Jeg vil ha det likt
-  // feature messig inn her i /ko»). Status, tid siden, passiv-merket og
-  // oppdragslinja ligger i `oppdrag-kort.js` og tegnes av begge sidene; det
-  // som står igjen her er sentralbordets egen ramme — klikket som åpner
-  // besetningen, og panelet under kortet.
-  //
-  // En kopi ville falt bak neste felt noen la til, uten at noe ble rødt.
-  // Samme grep som `oppdrag.services.enhetskort()` på serversiden.
-  const klikkbar = kanSeBesetning() ? ' enhet-kort-klikkbar' : '';
-  const apner = kanSeBesetning()
-    ? `data-action="visBesetning" data-id="${escHtmlValue(e.id)}"` : '';
-  // Hoistet ut av mal-strengen, som resten i denne fila: en nøstet mal-streng
-  // inne i en `${...}` er usynlig for XSS-skanneren.
-  const innmat = enhetskortInnmat(e);
-  const besetning = mkBesetning(e.id);
-  return `
-      <div class="enhet-kort${klikkbar}" ${apner}>
-        ${innmat}
-      </div>${besetning}`;
-}
 
 
-function kanSeBesetning() {
-  // Speiler `har_tilgang(bruker, 'vaktliste', 'les')`, satt av malen.
-  // **Komposisjonsregelen fra rollemodellen §5:** en modul viser bare kilder
-  // brukeren har tilgang til, framfor å gi avledet innsyn. Serveren nekter
-  // uansett — dette avgjør bare om panelet finnes.
-  return globalThis.window?.KAN_SE_BESETNING === true;
-}
 
 
-function mkBesetning(enhetId) {
-  // Panelet ligger *under* enhetskortet, ikke inni: kortet er en linje 113
-  // skummer, og en besetning på fire ville sprengt den.
-  if (apenBesetning !== enhetId) return '';
-  const b = besetninger[enhetId];
-  if (b === undefined) {
-    return '<div class="besetning"><span class="enhet-meta">Henter…</span></div>';
-  }
-  if (b.feil) {
-    // **Serverens forklaring, ikke vår egen.** Den vanligste grunnen til at
-    // en besetning ikke finnes er at bilen er koblet i en vakt man har
-    // *planlagt*, mens sentralbordet står i den aktive — og da er ikke
-    // oppsettet feil, det er feil vakt som er aktiv. Skrev vi vår egen
-    // generiske «ikke koblet» her, sendte vi operatøren ut på jakt etter en
-    // feil som ikke finnes.
-    return `<div class="besetning"><span class="enhet-meta">${escapeHtml(b.feil)}</span></div>`;
-  }
-  if (!b.mannskap.length) {
-    // Neste skift når ingen dekker nå: «ingen» alene sa ikke om bilen var
-    // ubemannet eller bare ikke begynt ennå (André, 12. sep. 2026).
-    const neste = (b.neste || []).length
-      ? ` Neste skift ${escapeHtml(klokke(b.neste_fra))}: `
-        + escapeHtml(b.neste.map((m) => m.navn).join(', ')) + '.'
-      : '';
-    return `<div class="besetning"><span class="enhet-meta">`
-         + `Ingen på vakt på ${escapeHtml(b.ressurs_navn)} nå.${neste}</span></div>`;
-  }
-
-  const rader = b.mannskap.map((m) => {
-    // Tre tilstander, ikke to: «møtt» og «av vakt» er begge stemplet, men
-    // bare den ene er til stede nå.
-    const merke = m.tilstede
-      ? '<span class="besetning-inne" title="Møtt">●</span>'
-      : (m.mott
-          ? '<span class="besetning-ute" title="Av vakt">○</span>'
-          : '<span class="besetning-ute" title="Ikke møtt">○</span>');
-    const rolle = m.rolle
-      ? `<span class="enhet-meta">${escapeHtml(m.rolle)}</span>` : '';
-    // Telefon og ISSI (André, 12. sep. 2026): operatøren skal kunne ringe
-    // bilen uten å åpne vaktlista. Telefonen er en `tel:`-lenke, ISSI ren
-    // tekst — nødnettet ringes fra terminalen, ikke fra nettleseren.
-    const kontakt = _besetningKontakt(m);
-    return `<div class="besetning-rad">${merke}
-              <span>${escapeHtml(m.navn)}</span>${rolle}${kontakt}</div>`;
-  }).join('');
-
-  const status = b.i_drift
-    ? `${escHtmlValue(b.tilstede)} av ${escHtmlValue(b.antall)} møtt`
-    : `${escHtmlValue(b.antall)} satt opp · innsjekk ikke åpnet`;
-
-  return `<div class="besetning">
-      <div class="besetning-topp">
-        <span>${escapeHtml(b.ressurs_navn)}</span>
-        <span class="enhet-meta">${status}</span>
-      </div>
-      ${rader}
-    </div>`;
-}
 
 
-function _besetningKontakt(m) {
-  const deler = [];
-  if (m.telefon) {
-    const tlf = String(m.telefon);
-    deler.push(`<a class="besetning-tlf" href="tel:${escHtmlValue(tlf.replace(/\s+/g, ''))}">`
-             + `<i class="bi bi-telephone"></i> ${escapeHtml(tlf)}</a>`);
-  }
-  if (m.issi) {
-    deler.push(`<span class="besetning-issi" title="ISSI (nødnett)">`
-             + `<i class="bi bi-broadcast"></i> ${escapeHtml(m.issi)}</span>`);
-  }
-  return deler.length ? `<span class="besetning-kontakt">${deler.join('')}</span>` : '';
-}
 
 
-async function visBesetning(enhetId) {
-  if (apenBesetning === enhetId) { apenBesetning = null; renderEnheter(); return; }
-  apenBesetning = enhetId;
-  renderEnheter();
-  await hentBesetning(enhetId);
-}
 
 
-async function hentBesetning(enhetId) {
-  const res = await apiFetch(`/vaktliste/api/enhet/${enhetId}/besetning/`);
-  const d = await res.json().catch(() => ({}));
-  // Serveren skiller mellom «koblet i en annen vakt» og «ikke koblet noe
-  // sted», og meldingen bæres uendret hit — se `mkBesetning`.
-  besetninger[enhetId] = res.ok
-    ? d.data
-    : { feil: d.message || 'Kunne ikke hente besetningen.' };
-  renderEnheter();
-}
 
 
 async function _settVakt(id, paVakt) {
