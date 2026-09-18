@@ -710,10 +710,14 @@ levert 18. sep. 2026 — se CHANGELOG. Filteret ble til minimering etter André.
       hete (punktet over) er blitt mer synlig, ikke mindre — når noen ser «Lag 3 · 2 av 3
       møtt» og vil skrive «sendt til H12», er det dette som mangler.
 
-- [ ] **Pulje 7 — statistikk.** `ko` melder seg inn i kilderegisteret i `core/stats.py`.
-      Trenger data fra en ekte vakt først. **Ordvalget er det eneste som hindrer feilen:**
-      «registreringer», ikke «pasienter», på alt som krysser registergrensene — ingen leser
-      metodikken før de siterer tallet.
+- [ ] **Pulje 7 — statistikk. Avventes, haster ikke** (André, 18. sep. 2026). Neste vakt
+      er ca. 250 dager fram, og notatet §8 sier puljen «trenger data fra en ekte vakt
+      først» — tallene (hendelser per vakt, varighet, ressursbruk, tid til første ressurs,
+      løst uten utrykning) skal formes av hva en vakt faktisk gir, ikke av en gjetning.
+      Tas opp etter første ekte vakt på `/ko/`. `ko` melder seg da inn i kilderegisteret i
+      `core/stats.py`. **Ordvalget er det eneste som hindrer feilen:** «registreringer»,
+      ikke «pasienter», på alt som krysser registergrensene — ingen leser metodikken før
+      de siterer tallet.
 
 - [ ] **Delt konto skal bare kunne ha `ModulTilgang` til `oppdrag`.** `er_delt_konto` finnes
       og styrer e-post, MFA og selvbetjent reset; den avgrenser ikke modultilgang. Håndheves

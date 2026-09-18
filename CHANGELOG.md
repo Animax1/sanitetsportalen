@@ -4,6 +4,14 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-18 — KO pulje 7 (statistikk) avventes  `#ko/sentralbordet`
+
+André: «Vi avventer statistikk delen … det haster ikke.» Punktet i `TODO.md` er skrevet om
+med begrunnelsen: notatet §8 krever data fra en ekte vakt, og neste er ca. 250 dager fram.
+Tas opp etter første ekte vakt på `/ko/`. Ingen kode.
+
+---
+
 ## 2026-09-18 — KO pulje 6: chat, ansvarsmerke, minimerbare grupper og vaktlistas ressurser på tavla  `#ko/sentralbordet` `#vaktliste/planlegging`
 
 **Notatet sa «chat og filter». André sa noe annet, og det er det som er bygget** (tre svar
