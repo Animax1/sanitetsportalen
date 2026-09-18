@@ -177,6 +177,8 @@ KO_LOGG_BYGGERE = (
     'koHendelseValg',
     'koFyllHendelsevalg',
     'koLeggHendelsevalgINyttOppdrag',
+    # «Nullstill»-fanen: ren markup uten data, men den bygger markup like fullt.
+    'koTegnNullstill',
 )
 
 #: Uttrykk som interpoleres uten `escapeHtml`, med begrunnelse.

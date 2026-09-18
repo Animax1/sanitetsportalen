@@ -46,6 +46,13 @@ urlpatterns = [
          name='ko_api_ressursbehov_rekkefolge'),
     path('api/ressursbehov/<int:pk>/', views.ressursbehov_detalj_view,
          name='ko_api_ressursbehov_detalj'),
+    path('api/ansvarsomraader/', views.ansvarsomraader_view, name='ko_api_ansvarsomraader'),
+    path('api/ansvarsomraader/rekkefolge/', views.ansvarsomraader_rekkefolge_view,
+         name='ko_api_ansvarsomraader_rekkefolge'),
+    path('api/ansvarsomraader/<int:pk>/', views.ansvarsomraade_detalj_view,
+         name='ko_api_ansvarsomraade_detalj'),
+    # Nullstilling (18. sep. 2026): global admin, `confirm`, aktiv vakt.
+    path('api/nullstill/<str:hva>/', views.nullstill_view, name='ko_api_nullstill'),
     # Grupperingen skrives her og ikke i `/oppdrag/api/`: `Oppdrag.hendelse`
     # er KOs peker, og oppdragsmodulen leser den bare.
     path('api/oppdrag/<int:pk>/hendelse/', views.oppdrag_hendelse_view,

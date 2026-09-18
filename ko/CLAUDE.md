@@ -33,18 +33,18 @@ er regelen som gjør det umulig å dra en flate bort. Oppsettet huskes **per net
 hvem som logger på. Et lagret oppsett leses som brukerdata — `koGyldigOppsett()` avviser
 alt som mangler et vindu.
 
-**Sida ruller ikke — vinduene gjør det.** Høyden **måles** av `koKonsollhoyde()` og regnes
-ikke ut av en `calc()`: header, nav og meldinger over konsollen kan brekke til to linjer.
-Gulvet (`KO_MIN_HOYDE`) er en regel: uten det gir et kort vindu fire ubrukelige rullefelt.
+**Sida ruller ikke — vinduene gjør det.** Høyden **måles** av `koKonsollhoyde()`, ikke
+regnet ut av en `calc()`: header, nav og meldinger kan brekke til to linjer. Gulvet
+(`KO_MIN_HOYDE`) er en regel: uten det gir et kort vindu fire ubrukelige rullefelt.
 
-**Knappene står i vinduet de gjelder** (André): «Ny hendelse» i hendelsesloggen, «Nytt
-oppdrag» og «Historikk» i oppdragslista, «Enheter» i ressursoversikten. Verktøylinja har
-bare det som gjelder hele sida: «KO-innstillinger», «Vaktarkiv», ansvarsmerket,
+**Knappene står i vinduet de gjelder**: «Ny hendelse» i hendelsesloggen, «Nytt oppdrag»
+og «Historikk» i oppdragslista, «Enheter» i ressursoversikten. Verktøylinja har bare det
+som gjelder hele sida: «KO-innstillinger», «Vaktarkiv», ansvarsmerket,
 «Pålogget» (nedtrekket) og «Oppsett». Sidebarknappen har `data-bs-toggle="dropdown"` og
 **ingen** `data-action` — to lyttere på samme klikk er fella `klikkSkalKjore()` finnes for.
 
-**Under 1200 px stables vinduene** og sida ruller normalt. Akseptert, ikke løst: KO brukes
-på en skjerm i et kommandopunkt. Kommer kravet om mobil, er svaret ikke faner.
+**Under 1200 px stables vinduene** og sida ruller normalt. Akseptert, ikke løst: KO
+brukes på en skjerm i et kommandopunkt. Svaret på mobil er ikke faner.
 
 **`/oppdrag/` er enhetsverktøyet, `/ko/` er situasjonsverktøyet.** Forskjellen er
 tidsaksen: et oppdrag begynner når bilen får det; **en hendelse begynner når noen sier noe
@@ -67,7 +67,7 @@ at noen rykket ut.
 | Hendelsesloggen i nettleseren: tabellen, søket, hendelsen åpnet i vinduet, skjemaet | `static/js/ko-hendelser.js` |
 | Rutenettet: bytte plass, skillelinjer, oppsettet i `localStorage` | `static/js/ko-layout.js` |
 | Festede linjer i loggstrømmen | `Logglinje.festet_*`, `services.fest_linje`/`losne_linje`, `festede` i `logg_view` |
-| Ressursbehovene (KO-innstillinger) | `ko.Ressursbehov`, `ressursbehov_*_view`, fanen via `verdifaner_ekstra` |
+| KO-innstillinger: ressursbehov, ansvarsområder, «Nullstill» (admin) | `VERDILISTER` og `NULLSTILL` i `ko/views.py`, fanene via `verdifaner_ekstra` |
 | «H12»-merket og lagene på oppdragsraden | `_oppdragRadHtml()` i sentralbordet, `oppdrag_til_dict` (`hendelse_prioritet`, `hendelse_lagsressurser`) |
 | Chat-merket, bryteren, ansvarsmerket | `Logglinje.uformell`, `services.chat_tillatt`, `ko.Ansvarsmerke`, `ko/portalinnstillinger.py` |
 | Minimerbare grupper på tavla | `gruppehode()`/`vippGruppe()` i `static/js/oppdrag-kort.js` |
@@ -245,7 +245,7 @@ viewet sjekker det andre.
 ## Hendelsesloggen som egen flate (18. sep. 2026)
 
 Besvart av André før koden, med de åtte skissene som fasit. Reglene bor i `ko/services.py`
-og er prøvd med 18 mutanter i `ko/tests_hendelseslogg.py` — alle fanget.
+og er prøvd med mutanter i `ko/tests_hendelseslogg.py` og `ko/tests_nullstill.py`.
 
 | Regel | Hvorfor |
 |---|---|
@@ -259,8 +259,7 @@ og er prøvd med 18 mutanter i `ko/tests_hendelseslogg.py` — alle fanget.
 | **Festing** i loggstrømmen: `skriv_full`, idempotent, aldri systemlinjer eller fjernede. `festede` sendes hele med pollen | Festing endrer en rad uten ny id og ville aldri kommet gjennom `?siden=` — som `fjernede` |
 
 **Sortering er oppdragslistas** (`koSorterHendelser`): lukkede nederst, så prioritet, så
-nummer. **Søket** filtrerer lista som alt er hentet (nummer, tittel, sted, melder,
-beskrivelse, lag). **Hendelsen åpnes inne i vinduet**, ikke i en modal: ressursene og
+nummer. **Søket** filtrerer lista som alt er hentet (nummer, tittel, sted, melder, lag). **Hendelsen åpnes inne i vinduet**, ikke i en modal: ressursene og
 oppdragene skal være synlige mens man jobber i H14. **Loggstrømmen viser linjene uten
 hendelse pluss systemlinjene om hendelsene** (`koIStrommen`); kommentarene står i hendelsen.
 Utskriften skal ha alt (TODO).
@@ -285,8 +284,8 @@ opprettet.
 
 **Ansvarsmerket vises og styrer ingenting** (§5.1). `ko.Ansvarsmerke`, én rad per konto
 (samme person på PC og telefon har ett ansvar), satt med `POST api/ansvar/` på `les`-nivå —
-den som bare leser kan likevel ha samband. Fast liste (`ANSVARSOMRAADER`), fordi «samband»
-og «Samband» skal være ett merke. `skriv_linje` stemper det når kallet ikke oppgir noe;
+den som bare leser kan likevel ha samband. Lista er `ko.Ansvarsomraade` (redigeres under
+KO-innstillinger fra 18. sep. 2026); merket er tekst, så omdøping rører ikke loggen. `skriv_linje` stemper det når kallet ikke oppgir noe;
 oppgitt verdi — også tom — vinner. `tilstede()` bærer det. **Ikke i backupen**: merket er
 hva som gjelder nå.
 
@@ -309,9 +308,9 @@ status for et lag skal hete er fortsatt ubesvart.
 verktøylinja, modalene og alle handlingene er oppdragsmodulens egne — samme kode, samme
 endepunkter, samme sperrer. Det er en flytting, ikke en kopi.
 
-Delt av begge sidene: `oppdrag.views.sentralbordkontekst()`, malbitene
-`templates/oppdrag/_sentralbord_{modaler,skript,oppsettvarsel}.html` og `oppdrag-kort.js`.
-`/ko/` har sin egen verktøylinje; `_sentralbord_verktoy.html` er `/oppdrag/` sin.
+Delt: `oppdrag.views.sentralbordkontekst()`, malbitene
+`_sentralbord_{modaler,skript,oppsettvarsel}.html` og `oppdrag-kort.js`. `/ko/` har sin
+egen verktøylinje; `_sentralbord_verktoy.html` er `/oppdrag/` sin.
 
 **Oppdragsflata gates av `oppdrag`-modulen, ikke av `ko`** (André, 18. sep. 2026). Det er
 komposisjonsregelen fra rollemodellen §5 — samme som `kan_se_besetning` bruker for vaktlista:

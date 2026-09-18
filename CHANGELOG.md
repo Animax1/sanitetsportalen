@@ -4,6 +4,36 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-18 — KO-innstillinger: «Nullstill» og redigerbare ansvarsområder  `#ko/hendelseslogg` `#ko/loggen`
+
+André: «Er det mulig å få til en nullstill knapp på oppdrag, hendelser og logg? Kan ha de
+i KO-innstillinger. Samme med å redigere ansvarsområder. Admin er eneste som kan
+nullstille. Det skal gå ann for test og utvikling. På prod så står admin ansvarlig for
+databehandlingen.»
+
+- **Nullstill**-fane i KO-innstillinger, bare for global admin: «Nullstill oppdragslista»,
+  «Nullstill hendelsesloggen», «Nullstill loggstrømmen». Alle tre scopet til **aktiv vakt**,
+  krever `confirm` server-side, og skriver én auditrad (`ko_nullstill_<hva>`) med antall
+  og hvem. Oppdragene nullstilles av oppdragsmodulens egen `nullstill_vakt` — samme
+  tømming som `arkiver_vakt(tomm=True)` gjør etter frysingen, bare uten frysingen; O- og
+  H-serien starter på 1 igjen. Hendelser slettet: linjene og oppdragene står, uten
+  H-merket (`SET_NULL`). Logg slettet: hendelsene står. Enheter, lokasjoner og valglister
+  røres aldri. Sjekket først: «Slett alle i historikken» fantes (bare historikken), og
+  vaktarkivet tømmer etter frysing — ingen av dem var «tøm uten spor», så inngangen er ny.
+- **Ansvarsområder** er en liste (`ko.Ansvarsomraade`) under KO-innstillinger, ikke lenger
+  tuppelen `ANSVARSOMRAADER` i kode. De fire gamle seedes av `ko/0007`. Merket på linjer og
+  kontoer er fortsatt tekst — omdøping skriver ikke om loggen. «I bruk» = kontoer som bærer
+  merket nå. Samme fabrikk som ressursbehovene i `ko/views.py` (`VERDILISTER`).
+- Sentralbordets valgliste-JS fikk en generell krok til: en ekstra fane kan oppgi `tegn`
+  (navnet på en global funksjon) og tegne seg selv, som «Bilen» — `koTegnNullstill()`.
+- 161 ruter, 23 under `/ko/`.
+
+Mutasjoner mot `ko.tests_nullstill` (2,6 s): scope fjernet fra hver av de tre
+nullstillingene, telleren ikke slettet (O og H), admin-sjekken fjernet, `confirm` fjernet,
+deaktivert område godtatt, ukjent område godtatt. **8 av 8 fanget.**
+
+---
+
 ## 2026-09-18 — KO: fire flater i 2×2, hendelsesloggen som egen flate  `#ko/hendelseslogg` `#ko/oppsett` `#oppdrag/sentralbord` `#oppdrag/enhetsskjerm`
 
 André, 18. sep. 2026: «Ko modulen skal ha 4 flater. Hendelseslogg, Loggstrøm,

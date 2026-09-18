@@ -1327,6 +1327,27 @@ def slett_oppdrag(oppdrag) -> None:
     oppdrag.delete()
 
 
+@transaction.atomic
+def nullstill_vakt(vakt) -> int:
+    """Slett **alle** oppdragene i vakta — tavla og historikken — og
+    telleren, uten arkivering (KO-innstillinger «Nullstill», 18. sep. 2026).
+
+    For test og utvikling; i prod er det global admin som står ansvarlig, og
+    viewet krever `confirm`. Samme tømming som `arkiver_vakt(tomm=True)` gjør
+    *etter* at radene er frosset — bare uten frysingen. Telleren slettes, ikke
+    settes til 1: `neste_oppdragsnummer` gjenskaper den fra det som finnes.
+    Enhetene, lokasjonene og verdimengdene røres ikke.
+    """
+    from core.models import AppSetting  # noqa: WPS433 — som i neste_oppdragsnummer
+
+    antall = 0
+    for oppdrag in Oppdrag.objects.filter(vakt=vakt):
+        slett_oppdrag(oppdrag)
+        antall += 1
+    AppSetting.objects.filter(key=_nummer_nokkel(vakt)).delete()
+    return antall
+
+
 def kan_slettes(oppdrag, user) -> bool:
     """Hvem får slette et oppdrag (André, 12. sep. 2026).
 

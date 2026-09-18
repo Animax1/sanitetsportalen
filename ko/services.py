@@ -18,7 +18,7 @@ from core.vakt import hent_aktiv_vakt
 
 from .models import (
     HENDELSE_APEN, HENDELSE_LUKKET, KILDE_OPERATOR, KILDE_SYSTEM,
-    PRIORITET_NAVN, PRIORITET_STANDARD, Ansvarsmerke, Hendelse,
+    PRIORITET_NAVN, PRIORITET_STANDARD, Ansvarsmerke, Ansvarsomraade, Hendelse,
     HendelseDeltaker, Logglinje, Ressursbehov,
 )
 
@@ -63,9 +63,16 @@ DAGER_STANDARD = 730
 #: man leser etter et arrangement der noe gikk galt.
 CHAT_NOKKEL = 'ko.chat_tillatt'
 
-#: Ansvarsområdene (§5.1). Fast liste i kode, ikke fritekst: «samband» og
-#: «Samband» skal være samme merke. Utvides her når noen savner ett.
-ANSVARSOMRAADER: tuple[str, ...] = ('samband', 'ressurser', 'logg', 'media')
+#: Ansvarsområdene (§5.1) var en fast tuppel til 18. sep. 2026; nå er de en
+#: liste admin og KO-leder redigerer (`Ansvarsomraade`). Disse fire seedes av
+#: `ko/0007`, og er fortsatt det `sett_ansvar` faller tilbake til i en base
+#: uten rader.
+ANSVARSOMRAADER_STANDARD: tuple[str, ...] = ('samband', 'ressurser', 'logg', 'media')
+
+
+def ansvarsomraader_aktive() -> list[str]:
+    """Navnene operatøren kan velge mellom, i rekkefølge."""
+    return list(Ansvarsomraade.objects.filter(er_aktiv=True).values_list('navn', flat=True))
 
 #: Grensene for hva fristen kan settes til. `0` er ikke lov: en logg som
 #: slettes samme døgn er ikke en logg, og «skru av oppbevaring» er ikke en
@@ -135,11 +142,17 @@ def ansvar_for(bruker) -> str:
 
 
 def sett_ansvar(bruker, omraade) -> str:
-    """Sett (eller tøm) operatørens ansvarsmerke. Ukjent område avvises —
-    lista er fast nettopp for at merket skal bety det samme hos alle."""
-    omraade = (omraade or '').strip().lower()
-    if omraade and omraade not in ANSVARSOMRAADER:
-        raise Ugyldig('Ukjent ansvarsområde.')
+    """Sett (eller tøm) operatørens ansvarsmerke. Ukjent eller deaktivert
+    område avvises — lista finnes nettopp for at merket skal bety det samme
+    hos alle. Sammenligningen er uten hensyn til store og små bokstaver, og
+    det lagrede navnet er listas."""
+    onsket = (omraade or '').strip().lower()
+    omraade = ''
+    if onsket:
+        treff = [n for n in ansvarsomraader_aktive() if n.lower() == onsket]
+        if not treff:
+            raise Ugyldig('Ukjent ansvarsområde.')
+        omraade = treff[0]
     Ansvarsmerke.objects.update_or_create(bruker=bruker, defaults={'omraade': omraade})
     return omraade
 
@@ -812,3 +825,34 @@ def hendelse_med_telling(hendelse):
 def ressursbehov_aktive():
     """Avkryssingene i «Ny hendelse», i rekkefølge."""
     return list(Ressursbehov.objects.filter(er_aktiv=True))
+
+
+# ── Nullstilling (18. sep. 2026) ─────────────────────────────────────────────
+#
+# «Det skal gå an for test og utvikling. På prod så står admin ansvarlig for
+# databehandlingen» (André). Tre navngitte inngangene, **global admin**,
+# bekreftelse server-side, én auditrad hver — og alle scopet til **aktiv
+# vakt**: en nullstilling skal aldri kunne ta med seg fjorårets logg. Oppdragene
+# nullstilles av oppdragsmodulens egen `nullstill_vakt`; retningen `ko` →
+# `oppdrag` holder.
+
+@transaction.atomic
+def nullstill_hendelser(vakt) -> int:
+    """Slett alle hendelsene i vakta og telleren. Linjene og oppdragene blir
+    stående — begge pekerne er `SET_NULL` — så loggen mister bare H-merkene,
+    ikke fortellingen. Returnerer antallet."""
+    antall = Hendelse.objects.filter(vakt=vakt).count()
+    Hendelse.objects.filter(vakt=vakt).delete()
+    AppSetting.objects.filter(key=_hendelsesnokkel(vakt)).delete()
+    return antall
+
+
+@transaction.atomic
+def nullstill_logg(vakt) -> int:
+    """Slett alle logglinjene i vakta, systemlinjer inkludert. `korrigerer` og
+    `rot` peker innad i settet og er `SET_NULL`, så rekkefølgen er trygg.
+    Hendelsene blir stående (uten linjer)."""
+    qs = Logglinje.objects.filter(vakt=vakt)
+    antall = qs.count()
+    qs.delete()
+    return antall

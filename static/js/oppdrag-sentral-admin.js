@@ -214,9 +214,11 @@ function _registrerEkstraVerdifaner() {
   // `window.VERDIFANER_EKSTRA = [{slug, navn, ny, url}]`, og fanen får samme
   // rad og samme handlinger som de tre — bare mot sin egen URL. Retningen
   // holder: oppdragsmodulen leser en generell krok, ikke `ko`.
+  // `tegn` er navnet på en global funksjon som tegner fanen selv (som
+  // «Bilen» gjør her): ingen liste å hente, ingen «Legg til».
   (globalThis.window?.VERDIFANER_EKSTRA || []).forEach((f) => {
     if (!f?.slug || VERDIMENGDER[f.slug]) return;
-    VERDIMENGDER[f.slug] = { tittel: f.navn, ny: f.ny || '', url: f.url };
+    VERDIMENGDER[f.slug] = { tittel: f.navn, ny: f.ny || '', url: f.url, tegn: f.tegn };
   });
 }
 
@@ -294,7 +296,7 @@ async function lastVerdiadmin() {
   // Fanene som finnes i vinduet er de sida tegnet; en fane uten knapp
   // (oppdragsleder uten KO-leder, eller omvendt) hentes ikke.
   const slugs = Object.keys(VERDIMENGDER).filter(
-    (slug) => document.querySelector(`[data-verdifane="${slug}"]`)).filter(
+    (slug) => document.querySelector(`[data-verdifane="${slug}"]`) && !VERDIMENGDER[slug].tegn).filter(
     (slug) => slug !== 'bilinnstillinger' || globalThis.window?.OPPDRAG_TILGANG?.erAdmin);
   await Promise.all(slugs.map((slug) => lastVerdier(slug)));
   renderVerdiadmin();
@@ -449,7 +451,21 @@ function renderVerdiadmin() {
   const nyKategori = document.getElementById('ny-verdi-kategori');
   if (nyKategori) nyKategori.classList.toggle('d-none', verdiFane !== 'problemstillinger');
   const nyRad = document.getElementById('ny-verdi-rad');
-  if (nyRad) nyRad.classList.toggle('d-none', verdiFane === 'bilinnstillinger');
+  const egenTegner = VERDIMENGDER[verdiFane]?.tegn;
+  if (nyRad) nyRad.classList.toggle('d-none', verdiFane === 'bilinnstillinger' || Boolean(egenTegner));
+  // Hjelpeteksten under lista handler om listene; en fane som tegner seg
+  // selv har sin egen.
+  const hjelp = el.nextElementSibling;
+  if (hjelp && hjelp.classList && hjelp.classList.contains('form-text')) {
+    hjelp.classList.toggle('d-none', Boolean(egenTegner));
+  }
+  if (egenTegner) {
+    // En fane fra en annen modul som tegner seg selv. Vakt, som alle kall
+    // inn i betinget lastede filer (CLAUDE.md).
+    const fn = globalThis[egenTegner];
+    el.innerHTML = (typeof fn === 'function') ? fn() : '';
+    return;
+  }
   if (verdiFane === 'bilinnstillinger') {
     el.innerHTML = _lydvarselSkjema(verdier.bilinnstillinger || {});
     return;

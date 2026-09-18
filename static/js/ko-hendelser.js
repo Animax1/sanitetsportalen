@@ -699,3 +699,48 @@ async function koEtterOpprettet(oppdragId) {
   if (typeof etagOppdrag !== 'undefined') etagOppdrag = null;
   koHentLogg();
 }
+
+
+// ── Nullstill (KO-innstillinger, 18. sep. 2026) ─────────────────────────────
+//
+// «Det skal gå an for test og utvikling. På prod så står admin ansvarlig for
+// databehandlingen» (André). Fanen tegnes herfra gjennom `tegn`-kroken i
+// sentralbordets admin-JS; serveren krever global admin og `confirm`, og
+// skriver en auditrad. Ren markup uten data — ingenting å escape.
+
+const KO_NULLSTILL = [
+  ['oppdrag', 'Nullstill oppdragslista', 'Alle oppdrag i aktiv vakt, tavla og historikken, med statusmeldingene. O-serien starter på 1 igjen. Enheter, lokasjoner og valglister røres ikke.'],
+  ['hendelser', 'Nullstill hendelsesloggen', 'Alle hendelser i aktiv vakt. Loggen og oppdragene blir stående, men mister H-merkene. H-serien starter på 1 igjen.'],
+  ['logg', 'Nullstill loggstrømmen', 'Alle logglinjer i aktiv vakt, systemlinjer og festede inkludert. Hendelsene blir stående uten linjer.'],
+];
+
+function koTegnNullstill() {
+  const rader = KO_NULLSTILL.map(([hva, tittel, tekst]) =>
+    '<div class="d-flex align-items-start gap-3 py-2 border-bottom">'
+    + '<div class="flex-grow-1"><div class="fw-semibold">' + tittel + '</div>'
+    + '<div class="oppdrag-meta">' + tekst + '</div></div>'
+    + '<button type="button" class="btn btn-sm btn-outline-danger" data-action="koNullstill"'
+    + ' data-arg="' + hva + '"><i class="bi bi-trash me-1"></i>Nullstill</button>'
+    + '</div>').join('');
+  return '<div class="alert alert-warning py-2 small mb-2"><strong>Sletter for godt, uten arkiv.</strong> '
+    + 'Ment for test og utvikling. I produksjon står du som admin ansvarlig for databehandlingen; '
+    + 'det som slettes finnes etterpå bare i backupen. Hver nullstilling logges i revisjonsloggen.</div>'
+    + rader;
+}
+
+async function koNullstill(hva) {
+  const rad = KO_NULLSTILL.find((r) => r[0] === hva);
+  if (!rad) return;
+  if (!window.confirm(rad[1] + '?\n\n' + rad[2] + '\n\nDette kan ikke angres.')) return;
+  const { res, data } = await _koHendelsehandling('/ko/api/nullstill/' + hva + '/', { confirm: true });
+  if (!res.ok) { window.alert(data.message || 'Nullstillingen gikk ikke gjennom.'); return; }
+  // Alt tegnes på nytt fra null: loggen henter alt igjen, og tavla nullstiller ETag-ene.
+  koLinjer = new Map();
+  koSisteId = 0;
+  koApenHendelseId = null;
+  if (typeof etagOppdrag !== 'undefined') etagOppdrag = null;
+  if (typeof etagEnheter !== 'undefined') etagEnheter = null;
+  if (typeof lastAlt === 'function') await lastAlt();
+  await koHentLogg();
+  window.alert(rad[1] + ': ' + data.antall + ' slettet.');
+}

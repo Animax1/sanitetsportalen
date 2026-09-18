@@ -433,6 +433,29 @@ class HendelseDeltaker(models.Model):
         return f'{self.brukernavn} på H{self.hendelse.hendelsesnummer}'
 
 
+class Ansvarsomraade(models.Model):
+    """Ansvarsområdene operatørene kan velge mellom — «samband», «ressurser»…
+
+    Var en fast tuppel i kode (`ANSVARSOMRAADER`) til 18. sep. 2026, da André
+    ville redigere dem under KO-innstillinger. Samme form som `Ressursbehov`:
+    navn, aktiv, rekkefølge. Merket på linjene (`Logglinje.ansvarsomraade`) og
+    på kontoen (`Ansvarsmerke.omraade`) er fortsatt **tekst**, ikke en peker:
+    et område som omdøpes eller deaktiveres skal ikke skrive om loggen.
+    """
+
+    navn = models.CharField(max_length=40, unique=True, verbose_name='Ansvarsområde')
+    er_aktiv = models.BooleanField(default=True, verbose_name='Aktiv')
+    rekkefolge = models.IntegerField(default=100, verbose_name='Rekkefølge')
+
+    class Meta:
+        verbose_name = 'Ansvarsområde'
+        verbose_name_plural = 'Ansvarsområder'
+        ordering = ['rekkefolge', 'navn']
+
+    def __str__(self):
+        return self.navn
+
+
 class Ansvarsmerke(models.Model):
     """Hva operatøren gjør nå — samband, ressurser, logg, media (§5.1).
 
