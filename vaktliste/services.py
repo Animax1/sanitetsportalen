@@ -1478,6 +1478,76 @@ def besetning(enhet_id, naa=None):
     }
 
 
+def ressurser_uten_enhet(naa=None):
+    """Ressursene i lista i bruk som **ikke** er koblet til en oppdragsenhet
+    — lag, samleplass, KO (KO pulje 6, André 18. sep. 2026: «få inn alle
+    enheter fra vaktlisten som kan velges i /ko som ikke allerede er i
+    /oppdrag»).
+
+    Samme scope som `vaktliste_i_bruk()`: lista i drift, ellers den aktive
+    vaktas. Og samme svar per ressurs som `besetning()` gir for en bil —
+    skiftene som dekker *nå*, ellers neste skift — men **uten telefon og
+    ISSI**: tavla svarer på «er laget bemannet», ikke på «ring laget», og
+    et nummer man ikke trenger er et nummer på en skjerm i et rom.
+
+    Ingen status. Hva en KO-ført status for et lag skal hete er ubesvart
+    (`TODO.md`), og kortet sier derfor bare det vaktlista vet: hvem, og om
+    de er stemplet inn.
+
+    Én spørring for vaktpostene, gruppert i Python: lista polles.
+    """
+    from .models import Vaktpost
+
+    naa = naa or timezone.now()
+    vaktliste = vaktliste_i_bruk()
+    if vaktliste is None:
+        return []
+    ressurser = list(vaktliste.ressurser
+                     .filter(enhet__isnull=True)
+                     .select_related('gruppe')
+                     .order_by('gruppe__rekkefolge', 'gruppe__navn', 'rekkefolge', 'navn'))
+    if not ressurser:
+        return []
+    poster = (Vaktpost.objects
+              .filter(ressurs__in=ressurser, mannskap__isnull=False, avmeldt_at__isnull=True)
+              .select_related('mannskap', 'rolle')
+              .order_by('fra_tid', 'mannskap__navn'))
+    per_ressurs: dict[int, list] = {}
+    for vp in poster:
+        per_ressurs.setdefault(vp.ressurs_id, []).append(vp)
+
+    def _rad(vp):
+        return {'navn': vp.mannskap.navn,
+                'rolle': vp.rolle.navn if vp.rolle else '',
+                'tilstede': vp.er_tilstede}
+
+    ut = []
+    for r in ressurser:
+        alle = per_ressurs.get(r.pk, [])
+        naa_poster = [vp for vp in alle if vp.fra_tid <= naa <= vp.til_tid]
+        mannskap = [_rad(vp) for vp in naa_poster]
+        mannskap.sort(key=lambda m: (not m['tilstede'], m['navn'].lower()))
+        neste, neste_fra = [], None
+        if not mannskap:
+            senere = [vp for vp in alle if vp.fra_tid > naa]
+            if senere:
+                neste_fra = senere[0].fra_tid
+                neste = [_rad(vp) for vp in senere if vp.fra_tid == neste_fra]
+        ut.append({
+            'id': r.pk,
+            'navn': r.navn,
+            'gruppe_id': r.gruppe_id,
+            'gruppe_navn': r.gruppe.navn,
+            'gruppe_ikon': r.gruppe.ikon,
+            'mannskap': mannskap,
+            'antall': len(mannskap),
+            'tilstede': sum(1 for m in mannskap if m['tilstede']),
+            'neste': neste,
+            'neste_fra': neste_fra.isoformat() if neste_fra else None,
+        })
+    return ut
+
+
 def koblet_i_annen_vakt(enhet_id):
     """Navnet på en vakt der enheten *er* koblet, men som ikke er den aktive.
 

@@ -218,6 +218,13 @@ vond.
 
 ### 4.5 Chat
 
+> **Bygget 18. sep. 2026 (pulje 6), etter André:** «Chat er bare en chattelogg hvor en kan
+> skrive fritt med tidsstempel. Admin skal kunne slå dette på/av.» Chat er et **merke på
+> linja** (`Logglinje.uformell`) i samme logg, satt med en avkryssing som bare finnes når
+> `ko.chat_tillatt` er på; linja vises dempet med «chat». Bryteren styrer om nye kan
+> skrives, ikke om de gamle vises. Og «hendelse må vises tydelig i loggen»: hendelseslinjene
+> har eget merke og er uthevet, med den som opprettet.
+
 Chat er **ikke en egen tabell** — det er logglinjer uten hendelse. Er chatten et eget sted,
 kommer dagen da den viktigste setningen ble sagt der og ikke står i loggen.
 
@@ -273,7 +280,12 @@ dobler matrisen, og første gang den rette er opptatt møter du en vegg i en sit
 vegger er dyre. KO er et rom der folk dekker for hverandre — det er hele grunnen til at de
 sitter sammen.
 
-Området står på linja («ført av Kari, samband») og kan være et filter i visningen. Skal noe
+Området står på linja («ført av Kari, samband») og kan være et filter i visningen.
+
+> **Bygget 18. sep. 2026:** `ko.Ansvarsmerke`, én rad per konto, satt fra et nedtrekk i
+> toppen av `/ko/` (samband / ressurser / logg / media — fast liste i kode). Vises ved navnet
+> i «Hvem er pålogget» og stemples på linjene. **Styrer ingenting** (André: «bare et merke
+> som gjør at folk vet hvem som har ansvar for hva. Ingen annen praktisk formål»). Skal noe
 gates ekstra — lukke en hendelse, overstyre en enhet — er `skriv_leder` verktøyet, og det
 finnes.
 
@@ -426,6 +438,14 @@ forsvarer det. Loggen pollers med `?siden=<id>`.
 
 ### 7.2 Filter per operatør
 
+> **Endret 18. sep. 2026 (André):** «Skal ikke være direkte filter sånn initielt tenker men
+> ressurstypene må kunne minimeres. Og så må vi få inn alle enheter fra vaktlisten som kan
+> velges i /ko som ikke allerede er i /oppdrag.» Bygget slik: hver gruppe på tavla —
+> enhetstypene og vaktlistas ressursgrupper — har en overskrift som lukker og åpner gruppa,
+> husket per nettleser, med antallet synlig når den er lukket. Vaktlistas ressurser uten
+> oppdragsenhet (lag, samleplass, KO) vises under enhetslista med bemanningen nå, uten
+> status — den tredje kilden i §3.1 venter fortsatt på ordene (`TODO.md`).
+
 Operatørene har ulike behov — den som har ansvar for bilressurser vil se dem, den som har
 lag vil se lagene. Løses som et **synlig filter husket per bruker i nettleseren**. Ingen ny
 tabell, ingen admin.
@@ -530,7 +550,7 @@ filtre og statistikk er forbedringer *av* det bildet og legges oppå uten å riv
 | **3 — Ressursoversikten** ✅ | Projeksjonen i §3.1, KO-ført status | **Byttet med hendelser 17. sep. 2026**, og levert samme dag. Rutingflagget er ikke med — se §3.2 |
 | **4 — Sentralbordet flyttes** ✅ | `oppdrag-sentral-*.js` → KO, oppdragslista inn i venstre kolonne. Levert 18. sep. 2026 | Den eneste som rører `/oppdrag/`. Må stå før hendelser, som grupperer den |
 | **5 — Hendelser** ✅ | `Hendelse`, nummerserie, linje → hendelse, gruppering av oppdragslista, lukking med 409. Levert 18. sep. 2026 | Er en gruppering *av* pulje 4, og kan ikke bygges før lista den grupperer er her |
-| **6 — Chat og filter** | Admin-bryter, uformelle linjer, filter per operatør | Forbedringer |
+| **6 — Chat og filter** ✅ | Admin-bryter, uformelle linjer, ansvarsmerke, minimerbare grupper, vaktlistas ressurser på tavla. Levert 18. sep. 2026 — filteret ble minimering, se §7.2 |
 | **7 — Statistikk** | Kilde i `core/stats.py`, tallene i §8 | Trenger data fra en ekte vakt først |
 
 **Hvorfor 3 og 5 byttet plass.** Så lenge «Hendelser» var en egen fane, kunne den bygges

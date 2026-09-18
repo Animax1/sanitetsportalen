@@ -22,6 +22,7 @@ class KoInnstillinger(BasePortalinnstillingHandler):
             'ko_logg_dager': services.oppbevaringsdager(),
             'ko_logg_dager_min': services.DAGER_MIN,
             'ko_logg_dager_maks': services.DAGER_MAKS,
+            'ko_chat_tillatt': services.chat_tillatt(),
         }
 
     def valider(self, post) -> dict:
@@ -45,9 +46,15 @@ class KoInnstillinger(BasePortalinnstillingHandler):
         """
         from ko import services
 
+        ut = {}
+        # Chat-bryteren (§4.5). En avkryssing sendes bare når den er krysset
+        # av, så «fraværende» må leses sammen med et skjult følgefelt:
+        # `ko_chat_sendt` sier at sida hadde feltet, og da er fravær «av».
+        if post.get('ko_chat_sendt') is not None:
+            ut['chat'] = post.get('ko_chat_tillatt') is not None
         raa = post.get('ko_logg_dager')
         if raa is None:
-            return {}
+            return ut
         try:
             dager = int(str(raa).strip())
         except (TypeError, ValueError):
@@ -58,15 +65,17 @@ class KoInnstillinger(BasePortalinnstillingHandler):
             raise ValidationError(
                 f'Oppbevaringstiden for KO-loggen må være mellom '
                 f'{services.DAGER_MIN} og {services.DAGER_MAKS} dager.')
-        return {'dager': dager}
+        ut['dager'] = dager
+        return ut
 
     def lagre(self, verdier: dict) -> None:
         from core.models import AppSetting
         from ko import services
 
-        if 'dager' not in verdier:
-            return
-        AppSetting.set(services.DAGER_NOKKEL, verdier['dager'])
+        if 'chat' in verdier:
+            AppSetting.set(services.CHAT_NOKKEL, 'true' if verdier['chat'] else 'false')
+        if 'dager' in verdier:
+            AppSetting.set(services.DAGER_NOKKEL, verdier['dager'])
 
 
 def register_handlers() -> None:

@@ -702,10 +702,13 @@ sentralbordet fra oppdragsmodulens egen kode, og oppdragsflata gates av `oppdrag
       brukt den på en vakt og sagt hva som mangler. Prompt-en er der med vilje: loggen bruker
       den samme for retting, og to ulike dialoger for samme slags handling er én for mye.
 
-- [ ] **Pulje 6 — chat og filter.** Admin-bryter for uformelle linjer (som er logglinjer
-      uten hendelse, ikke en egen tabell), og filter per operatør husket i nettleseren.
-      Én regel uansett løsning: **et filter skal aldri skjule noe stille** — «viser 2 av 5
-      grupper» skal stå i bildet hele tiden.
+*Pulje 6 (chat, ansvarsmerke, minimerbare grupper, vaktlistas ressurser på tavla) er
+levert 18. sep. 2026 — se CHANGELOG. Filteret ble til minimering etter André.*
+
+- [ ] **KO-ført status for lag er fortsatt ubesvart, og nå står lagene på tavla.** Kortet
+      sier bare det vaktlista vet: hvem, og om de er møtt. Spørsmålet om hva en status skal
+      hete (punktet over) er blitt mer synlig, ikke mindre — når noen ser «Lag 3 · 2 av 3
+      møtt» og vil skrive «sendt til H12», er det dette som mangler.
 
 - [ ] **Pulje 7 — statistikk.** `ko` melder seg inn i kilderegisteret i `core/stats.py`.
       Trenger data fra en ekte vakt først. **Ordvalget er det eneste som hindrer feilen:**

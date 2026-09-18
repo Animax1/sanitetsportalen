@@ -500,7 +500,8 @@ Rekkefølgen er ikke kosmetikk — den er hva sida svarer på.
 **Besetningen i sentralbordet (fase 6) går én vei: `vaktliste` → `oppdrag`.**
 Oppdragsmodulen importerer **ikke** vaktlista; `oppdrag-sentral.js` henter
 `/vaktliste/api/enhet/<pk>/besetning/` og rendrer svaret.
-`OppdragImportererIkkeVaktlista` leser importene med AST og håndhever det.
+`OppdragImportererIkkeVaktlista` leser importene med AST og håndhever det. KO henter
+ressursene **uten** enhet fra `api/ressurser/uten-enhet/` — samme gate, uten telefon.
 
 - **Gatet på `les` i vaktliste**, ikke i oppdrag — komposisjonsregelen fra
   rollemodellen §5. Malen får et flagg via `har_tilgang(..., 'vaktliste', ...)`:

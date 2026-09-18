@@ -52,6 +52,9 @@ urlpatterns = [
     # ikke vaktlista — se §6 i beslutningsnotatet.
     path('api/enhet/<int:pk>/besetning/', views.besetning_view,
          name='vaktliste_api_besetning'),
+    # KOs tavle (pulje 6): ressursene som ikke er koblet til en oppdragsenhet.
+    path('api/ressurser/uten-enhet/', views.ressurser_uten_enhet_view,
+         name='vaktliste_api_ressurser_uten_enhet'),
 
     # Planleggingstall (fase 5). Belastningen henger under én vaktliste;
     # grensene varslene måler mot er organisasjonens og gjelder alle.

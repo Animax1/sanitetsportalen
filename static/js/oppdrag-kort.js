@@ -345,6 +345,61 @@ async function hentBesetning(enhetId) {
 // som vi hadde det i /oppdrag»).
 //
 // Begge sidene bruker `#enhetsliste` og `#av-vakt-teller`.
+// ── Minimerbare grupper (KO pulje 6, André 18. sep. 2026: «ressurstypene må
+// kunne minimeres») ─────────────────────────────────────────────────────────
+//
+// Lukket-tilstanden huskes per nettleser: det er et visningsvalg, ikke data.
+// **En lukket gruppe skjuler ingenting stille** (§7.2 i KO-notatet):
+// overskriften står med antallet, og ett klikk åpner. Nøkkelen er
+// `type:<id>` for enhetstypene og `gruppe:<id>` for vaktlistas ressursgrupper,
+// så de to listene deler mekanismen uten å dele tilstand.
+
+const GRUPPER_LUKKET_NOKKEL = 'tavle.grupper.lukket';
+
+function _lukkedeGrupper() {
+  try {
+    const raa = globalThis.localStorage?.getItem(GRUPPER_LUKKET_NOKKEL);
+    const liste = raa ? JSON.parse(raa) : [];
+    return new Set(Array.isArray(liste) ? liste : []);
+  } catch (e) {
+    return new Set();
+  }
+}
+
+function gruppeErLukket(nokkel) {
+  return _lukkedeGrupper().has(nokkel);
+}
+
+function vippGruppe(nokkel) {
+  const lukkede = _lukkedeGrupper();
+  if (lukkede.has(nokkel)) lukkede.delete(nokkel); else lukkede.add(nokkel);
+  try {
+    globalThis.localStorage?.setItem(GRUPPER_LUKKET_NOKKEL, JSON.stringify(Array.from(lukkede)));
+  } catch (e) { /* privat modus e.l. — da huskes ikke valget, og det er alt */ }
+  tegnEnhetslistePaaNytt();
+  if (typeof koTegnRessurserPaaNytt === 'function') koTegnRessurserPaaNytt();
+}
+
+function gruppehode(nokkel, navn, antall, sammendrag) {
+  // Overskriften er knappen. Lukket: navn, antall og et kort sammendrag
+  // («2 ledig»), så det som er skjult likevel er lesbart.
+  const lukket = gruppeErLukket(nokkel);
+  const tall = lukket
+    ? ' <span class="enhet-gruppe-tall">' + escapeHtml(String(antall))
+      + (sammendrag ? ' · ' + escapeHtml(sammendrag) : '') + '</span>'
+    : '';
+  return '<div class="enhet-gruppe enhet-gruppe-knapp' + (lukket ? ' enhet-gruppe-lukket' : '')
+    + '" role="button" tabindex="0" data-action="vippGruppe" data-arg="' + escapeHtml(nokkel) + '">'
+    + '<i class="bi ' + (lukket ? 'bi-chevron-right' : 'bi-chevron-down') + ' me-1"></i>'
+    + escapeHtml(navn) + tall + '</div>';
+}
+
+function _ledigSammendrag(enheter) {
+  const ledige = enheter.filter((e) => e.status === 'ledig').length;
+  return ledige ? ledige + ' ledig' : '';
+}
+
+
 function tegnEnhetsliste(liste) {
   sisteEnhetsliste = liste || [];
   const el = document.getElementById('enhetsliste');
@@ -359,11 +414,14 @@ function tegnEnhetsliste(liste) {
     el.innerHTML = '<div class="tom-melding">Ingen enheter på vakt.</div>';
   } else {
     // Gruppert på enhetstype, ambulansene først (André, 12. sep. 2026).
-    // Overskriften står bare når det finnes mer enn én type å skille.
+    // Overskriften står bare når det finnes mer enn én type å skille — og
+    // fra pulje 6 er den en knapp som lukker gruppa.
     const grupper = _grupperEnheter(paVakt);
     el.innerHTML = grupper.map((g) => {
+      const nokkel = 'type:' + g.type;
       const hode = grupper.length > 1
-        ? `<div class="enhet-gruppe">${escapeHtml(g.navn)}</div>` : '';
+        ? gruppehode(nokkel, g.navn, g.enheter.length, _ledigSammendrag(g.enheter)) : '';
+      if (grupper.length > 1 && gruppeErLukket(nokkel)) return hode;
       return hode + g.enheter.map((e) => _enhetskort(e)).join('');
     }).join('');
   }

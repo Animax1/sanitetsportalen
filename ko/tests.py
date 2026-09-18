@@ -259,8 +259,9 @@ class SidebarenTests(TestCase):
         kropp = svar.content.decode()
         self.assertNotIn('session_key', kropp)
         for rad in json.loads(kropp)['data']:
+            # `ansvar` fra pulje 6 (§5.1): vises, styrer ingenting.
             self.assertEqual(set(rad), {
-                'brukernavn', 'er_delt_konto', 'er_global_admin', 'inaktiv_s'})
+                'brukernavn', 'er_delt_konto', 'er_global_admin', 'inaktiv_s', 'ansvar'})
 
     def test_utlopt_sesjon_teller_ikke(self):
         """Sperrehake mot at lista bare er «alle kontoer med KO-tilgang»."""

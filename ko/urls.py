@@ -14,6 +14,8 @@ from . import views
 urlpatterns = [
     path('', views.index_view, name='ko_index'),
     path('api/tilstede/', views.tilstede_view, name='ko_api_tilstede'),
+    # Eget ansvarsmerke (§5.1, pulje 6). Vises, styrer ingenting.
+    path('api/ansvar/', views.ansvar_view, name='ko_api_ansvar'),
     # Loggen (pulje 2). **Retting og fjerning er navngitte stier**, ikke et
     # felt i kroppen på skriveendepunktet: de to krever hvert sitt
     # tilgangsnivå, og et fritt ledd i kroppen ville flyttet den forskjellen

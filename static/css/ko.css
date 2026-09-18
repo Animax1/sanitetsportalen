@@ -103,3 +103,8 @@ body:has(.ko-konsoll) .portal-content {
   .ko-kolonne { margin-bottom: 0.75rem; }
   .ko-rull { max-height: 60vh; }
 }
+
+/* Loggen (pulje 6): hendelseslinjene uthevet, chatlinjene dempet. Ren
+   layout/vekt — fargen kommer fra Bootstrap-merket (`text-bg-primary`). */
+.ko-linje-hendelse { font-weight: 600; }
+.ko-linje-chat { opacity: 0.75; }

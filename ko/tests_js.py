@@ -166,6 +166,10 @@ KO_LOGG_BYGGERE = (
     'koHendelseValg',
     'koFyllHendelsevalg',
     'koLeggHendelsevalgINyttOppdrag',
+    # Vaktlistas ressurser (pulje 6): kortet, mannskapslinja og lista.
+    'koRessurskort',
+    'koRessursMannskap',
+    'koTegnRessurser',
 )
 
 #: Uttrykk som interpoleres uten `escapeHtml`, med begrunnelse.
@@ -186,6 +190,15 @@ KO_GJENNOMGATT = {
     'naa': 'markup bygget rett over, nummer og tittel escapet der',
     'valg': 'options bygget rett over, id og tekst escapet der',
     'losne': 'knapp bygget rett over, id escapet der',
+    # Pulje 6:
+    'linjeKlasse': 'hardkodet CSS-klasse fra en ternær',
+    'merkeKlasse': 'hardkodet CSS-klasse fra en ternær',
+    'ansvarHtml': 'markup bygget rett over, området escapet der',
+    'tall': 'escapeHtml over to tall og et fast ord, eller et fast ord',
+    'hode': 'markup fra gruppehode() i oppdrag-kort.js, alt escapet der',
+    'navn': 'mannskapsnavn escapet i map-en rett over',
+    'nesteNavn': 'mannskapsnavn escapet i map-en rett over',
+    'kort': 'markup fra koRessurskort(), som skannes for seg',
 }
 
 
@@ -605,3 +618,164 @@ class TavlaSpoerEtterGrupperingenTests(SimpleTestCase):
         # overlevde 18. sep. 2026).
         self.assertIn('hendelse-merke', rad, 'raden bærer H1-merket')
         self.assertIn('>H1<', rad)
+
+
+# ════════════════════════════════════════════════════════════════════════════
+# Pulje 6: merkene, minimerbare grupper og vaktlistas ressurskort.
+# ════════════════════════════════════════════════════════════════════════════
+
+@unittest.skipUnless(node_available(), 'node er ikke tilgjengelig')
+class MerkeneTests(SimpleTestCase):
+    """`koLinjeMerke()` avgjør hva linja *påstår* om seg selv. Rekkefølgen
+    er en avgjørelse: fjernet slår alt, en hendelseslinje er «hendelse» og
+    ikke «system» (André, 18. sep. 2026: «Hendelse må vises tydelig»), og
+    chat vises selv om kontoen er delt."""
+
+    def setUp(self):
+        self.harness = build_harness(((PORTAL_UTILS_JS, ('escapeHtml',)),
+                                      (KO_JS, ('koLinjeMerke',))))
+
+    def _merke(self, **linje):
+        base = {'fjernet': False, 'kilde': 'operator', 'systemkode': '',
+                'uformell': False, 'delt_konto': False}
+        base.update(linje)
+        return run_node(self.harness,
+                        f'console.log(JSON.stringify(koLinjeMerke({json.dumps(base)})));'
+                        ).splitlines()[0]
+
+    def test_hendelseslinja_er_hendelse_ikke_system(self):
+        self.assertEqual(self._merke(kilde='system', systemkode='hendelse_lukket'), '"hendelse"')
+        self.assertEqual(self._merke(kilde='system', systemkode='oppdrag_status'), '"system"')
+
+    def test_chat_foran_delt(self):
+        self.assertEqual(self._merke(uformell=True, delt_konto=True), '"chat"')
+        self.assertEqual(self._merke(delt_konto=True), '"delt"')
+        self.assertEqual(self._merke(), '""')
+
+    def test_fjernet_slaar_alt(self):
+        self.assertEqual(self._merke(fjernet=True, uformell=True,
+                                     kilde='system', systemkode='hendelse_opprettet'), '"fjernet"')
+
+
+@unittest.skipUnless(node_available(), 'node er ikke tilgjengelig')
+class MinimerbareGrupperTests(SimpleTestCase):
+    """Gruppeoverskriften er en knapp, og **en lukket gruppe skjuler ingenting
+    stille** (§7.2): antallet står i overskriften. Tilstanden huskes i
+    `localStorage`, stubbet her."""
+
+    LAGER = '''
+      const _lager = {};
+      globalThis.localStorage = {
+        getItem: (k) => (k in _lager ? _lager[k] : null),
+        setItem: (k, v) => { _lager[k] = String(v); },
+      };
+      globalThis.window = { OPPDRAG_ENHETSTYPER: [[1, 'Ambulanse'], [2, 'Lag']], MODUL_TILGANG: {} };
+      let sisteEnhetsliste = []; let enhetslisteKilde = null;
+      let besetninger = {}; let apenBesetning = null;
+      const GRUPPER_LUKKET_NOKKEL = 'tavle.grupper.lukket';
+      function tegnEnhetslistePaaNytt() {}
+      function mkBesetning() { return ''; }
+      function kanSeBesetning() { return false; }
+    '''
+
+    def setUp(self):
+        self.harness = build_harness((
+            (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue', 'klokke')),
+            (OPPDRAG_KORT_JS, ('_lukkedeGrupper', 'gruppeErLukket', 'vippGruppe', 'gruppehode',
+                               '_ledigSammendrag', 'tegnEnhetsliste', '_grupperEnheter',
+                               '_typeRekkefolge', '_enhetskort', 'enhetskortInnmat',
+                               'tidSiden', 'hastegradKlasse', '_grovMerke', '_problemMedAntall',
+                               '_medAntall', 'oppdragsnr')),
+        ))
+
+    def _kjor(self, kode):
+        return run_node(self.harness, self.LAGER + kode)
+
+    def test_vipp_lukker_og_aapner_og_huskes(self):
+        ut = self._kjor('''
+            console.log(gruppeErLukket('type:1'));
+            vippGruppe('type:1');
+            console.log(gruppeErLukket('type:1'));
+            console.log(localStorage.getItem('tavle.grupper.lukket'));
+            vippGruppe('type:1');
+            console.log(gruppeErLukket('type:1'));
+        ''').splitlines()
+        self.assertEqual(ut[:4], ['false', 'true', '["type:1"]', 'false'])
+
+    def test_lukket_gruppe_viser_antall_og_skjuler_kortene(self):
+        ut = self._kjor('''
+            const el = { innerHTML: '' };
+            globalThis.document = { getElementById: (id) => id === 'enhetsliste' ? el : null };
+            const liste = [
+              {id: 1, navn: 'HGSD 56', pa_vakt: true, type: 1, status: 'ledig', status_navn: 'Ledig'},
+              {id: 2, navn: 'KARM 12', pa_vakt: true, type: 1, status: 'fremme', status_navn: 'Fremme'},
+              {id: 3, navn: 'Lag 3', pa_vakt: true, type: 2, status: 'ledig', status_navn: 'Ledig'},
+            ];
+            tegnEnhetsliste(liste);
+            console.log(JSON.stringify(el.innerHTML));
+            vippGruppe('type:1');
+            tegnEnhetsliste(liste);
+            console.log(JSON.stringify(el.innerHTML));
+        ''').splitlines()
+        aapen, lukket = json.loads(ut[0]), json.loads(ut[1])
+        self.assertIn('HGSD 56', aapen)
+        self.assertIn('data-action="vippGruppe"', aapen)
+        self.assertNotIn('HGSD 56', lukket, 'kortene i den lukkede gruppa er borte')
+        self.assertIn('Lag 3', lukket, 'den andre gruppa står')
+        self.assertIn('enhet-gruppe-lukket', lukket)
+        self.assertIn('2 · 1 ledig', lukket, 'antallet og sammendraget står i overskriften')
+
+    def test_overskriften_escaper_navnet(self):
+        ut = self._kjor('''console.log(gruppehode('type:1', '<b>x</b>', 2, ''));''')
+        self.assertIn('&lt;b&gt;x&lt;/b&gt;', ut)
+        self.assertNotIn('<b>x</b>', ut)
+
+
+@unittest.skipUnless(node_available(), 'node er ikke tilgjengelig')
+class RessurskorteneTests(SimpleTestCase):
+    """Vaktlistas ressurser på tavla: kortet sier hvem og om de er møtt —
+    ingen status — og escaper navnene, som er fritekst fra et annet register."""
+
+    def setUp(self):
+        self.harness = build_harness((
+            (PORTAL_UTILS_JS, ('escapeHtml',)),
+            (KO_JS, ('koRessurskort', 'koRessursMannskap', 'koGrupperRessurser', 'koKlokke')),
+        ))
+
+    def _kort(self, r):
+        return run_node(self.harness, f'console.log(koRessurskort({json.dumps(r)}));')
+
+    def test_bemannet_kort(self):
+        ut = self._kort({'id': 1, 'navn': 'Lag 3', 'gruppe_ikon': 'people', 'antall': 2, 'tilstede': 1,
+                         'mannskap': [{'navn': 'Kari', 'tilstede': True}, {'navn': 'Ola', 'tilstede': False}],
+                         'neste': [], 'neste_fra': None})
+        self.assertIn('1 av 2 møtt', ut)
+        self.assertIn('Kari', ut)
+        self.assertIn('Ola <span class="text-muted">(ikke møtt)</span>', ut)
+        self.assertIn('bi-people', ut)
+
+    def test_ubemannet_med_neste(self):
+        ut = self._kort({'id': 1, 'navn': 'KO', 'gruppe_ikon': '', 'antall': 0, 'tilstede': 0,
+                         'mannskap': [], 'neste': [{'navn': 'Per', 'tilstede': False}],
+                         'neste_fra': '2026-09-18T16:00:00+02:00'})
+        self.assertIn('ubemannet', ut)
+        self.assertIn('Ingen nå', ut)
+        self.assertIn('Per', ut)
+
+    def test_escaper_navn_og_ikon(self):
+        ut = self._kort({'id': 1, 'navn': '<img src=x>', 'gruppe_ikon': '"><script>', 'antall': 1, 'tilstede': 1,
+                         'mannskap': [{'navn': '<b>Kari</b>', 'tilstede': True}], 'neste': [], 'neste_fra': None})
+        self.assertNotIn('<img src=x>', ut)
+        self.assertNotIn('<script>', ut)
+        self.assertNotIn('<b>Kari</b>', ut)
+
+    def test_grupperer_paa_ressursgruppe_i_rekkefoelge(self):
+        ut = run_node(self.harness, '''
+            const g = koGrupperRessurser([
+              {id: 1, navn: 'Lag 1', gruppe_id: 5, gruppe_navn: 'Lag'},
+              {id: 2, navn: 'KO', gruppe_id: 7, gruppe_navn: 'KO'},
+              {id: 3, navn: 'Lag 2', gruppe_id: 5, gruppe_navn: 'Lag'},
+            ]);
+            console.log(JSON.stringify(g.map((x) => [x.navn, x.ressurser.map((r) => r.navn)])));
+        ''').splitlines()[0]
+        self.assertEqual(json.loads(ut), [['Lag', ['Lag 1', 'Lag 2']], ['KO', ['KO']]])

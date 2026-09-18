@@ -240,10 +240,9 @@ serveren i nøyaktig det øyeblikket en overgang ble endret.
 Begge sidene bruker ID-ene `#enhetsliste` og `#av-vakt-teller`, og begge må sette
 `window.OPPDRAG_ENHETSTYPER`, `OPPDRAG_MED_ANTALL` og `KAN_SE_BESETNING`.
 
-`tomt_enhetskort()` gir samme form uten en enhet, for KOs ressurser som er lag.
-`TomtEnhetskortHarSammeFormTests` krever at den håndskrevne lista og den ekte har samme
-nøkler — et forsøk på å utlede nøklene av kilden med en regex tok 16 av 24, fordi åtte
-kommer inn med `**` fra `_aktivt_oppdrag_felter`.
+`tomt_enhetskort()` fantes fra pulje 3 til 18. sep. 2026, for KO-ressurser uten enhet; den ble
+død kode da KO fikk sentralbordets liste, og er slettet. Vaktlistas ressurser tegnes av
+`koRessurskort()` i `ko.js` med sin egen form.
 
 **`oppdrag-enhet.js` deler ikke dette.** Bilens egen skjerm har fortsatt sine egne kopier
 av `hastegradKlasse` og `_problemMedAntall`, og de står igjen med vilje: den siden laster

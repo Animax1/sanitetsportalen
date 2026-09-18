@@ -174,6 +174,13 @@
    statistikken, så de to ikke leser likt. */
 .hastegrad-drift   { background: #1e3a8a; color: #bfdbfe; }
 
+/* Gruppeoverskriften som knapp (KO pulje 6): lukker og åpner gruppa, og
+   viser antallet når den er lukket — det som er skjult skal være lesbart. */
+.enhet-gruppe-knapp { cursor: pointer; user-select: none; }
+.enhet-gruppe-knapp:hover { color: var(--text-main); }
+.enhet-gruppe-tall { text-transform: none; letter-spacing: 0; font-weight: 600; }
+.ko-ressurskort .ko-ressursikon { font-size: 1.1rem; color: var(--portal-text-muted, #94a3b8); }
+
 /* Enhetene gruppert på type, i tavla og i «Nytt oppdrag». */
 .enhet-gruppe {
   font-size: 0.72rem;

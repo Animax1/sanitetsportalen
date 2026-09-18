@@ -179,6 +179,14 @@ class Logglinje(models.Model):
         'Hendelse', null=True, blank=True, on_delete=models.SET_NULL,
         related_name='linjer', verbose_name='Hendelse')
 
+    #: **Chat er ikke en egen tabell** (§4.5, pulje 6) — det er en linje i
+    #: samme logg med dette merket. Er chatten et eget sted, kommer dagen da
+    #: den viktigste setningen ble sagt der og ikke står i loggen. Merket gjør
+    #: to ting: linja tegnes dempet, og admin-bryteren `ko.chat_tillatt`
+    #: avgjør om operatørene får sette det — ikke om linjene som alt finnes
+    #: vises.
+    uformell = models.BooleanField(default=False, verbose_name='Uformell (chat)')
+
     class Meta:
         verbose_name = 'Logglinje'
         verbose_name_plural = 'Logglinjer'
@@ -295,3 +303,36 @@ class Hendelse(models.Model):
     @property
     def er_lukket(self) -> bool:
         return self.status == HENDELSE_LUKKET
+
+
+class Ansvarsmerke(models.Model):
+    """Hva operatøren gjør nå — samband, ressurser, logg, media (§5.1).
+
+    **Vises, styrer ingenting** (André, 18. sep. 2026: «bare et merke som gjør
+    at folk vet hvem som har ansvar for hva. Ingen annen praktisk formål»).
+    Står ved navnet i «Hvem har KO oppe» og stemples på linjene hun skriver.
+    Aldri en gate: «bare sambandsoperatøren kan føre sambandslinjer» dobler
+    matrisen, og første gang den rette er opptatt møter du en vegg der vegger
+    er dyre.
+
+    **Én rad per konto, ikke per sesjon.** Samme person med KO på PC-en og på
+    telefonen har ett ansvar. Og i KO og ikke i sesjonen fordi `core/sesjoner.py`
+    ikke skal kjenne en KO-nøkkel — rammeverket kjenner ingen modul ved navn.
+
+    Ikke med i backupen: merket er hva som gjelder *nå*, og etter en
+    gjenoppretting er «nå» et annet.
+    """
+
+    bruker = models.OneToOneField(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE,
+        related_name='ko_ansvar', verbose_name='Bruker')
+    omraade = models.CharField(max_length=40, blank=True, default='',
+                               verbose_name='Ansvarsområde')
+    satt_at = models.DateTimeField(auto_now=True, verbose_name='Satt')
+
+    class Meta:
+        verbose_name = 'Ansvarsmerke'
+        verbose_name_plural = 'Ansvarsmerker'
+
+    def __str__(self):
+        return f'{self.bruker_id}: {self.omraade or "—"}'

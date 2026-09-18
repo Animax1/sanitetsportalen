@@ -55,8 +55,12 @@ function koTilstedeRad(rad) {
   const merkeHtml = merke
     ? ' <span class="badge text-bg-secondary">' + escapeHtml(merke) + '</span>'
     : '';
+  // Ansvarsmerket (§5.1): «Kari · samband». Vises, styrer ingenting.
+  const ansvarHtml = rad.ansvar
+    ? ' <span class="text-muted">· ' + escapeHtml(rad.ansvar) + '</span>'
+    : '';
   return '<li class="d-flex justify-content-between align-items-center gap-2 py-1">'
-    + '<span>' + escapeHtml(rad.brukernavn) + merkeHtml + '</span>'
+    + '<span>' + escapeHtml(rad.brukernavn) + merkeHtml + ansvarHtml + '</span>'
     + '<span class="text-muted">' + escapeHtml(koInaktivTekst(rad.inaktiv_s)) + '</span>'
     + '</li>';
 }
@@ -189,7 +193,11 @@ function koKanFjerne() {
 // for hvorfor slike regler skilles ut.
 function koLinjeMerke(linje) {
   if (linje.fjernet) return 'fjernet';
+  // Hendelseslinjene skal vises **tydelig som hendelse** (André, 18. sep.
+  // 2026) — de er operatørens handlinger, ikke en projeksjon av et stempel.
+  if (linje.kilde === 'system' && String(linje.systemkode || '').startsWith('hendelse_')) return 'hendelse';
   if (linje.kilde === 'system') return 'system';
+  if (linje.uformell) return 'chat';
   if (linje.delt_konto) return 'delt';
   return '';
 }
@@ -235,9 +243,13 @@ function koLinjeKnapper(linje) {
 
 function koLinjeHtml(linje) {
   const merke = koLinjeMerke(linje);
+  // Hendelsesmerket er blått og linja uthevet; chat er dempet. Resten grått.
+  const merkeKlasse = merke === 'hendelse' ? 'text-bg-primary' : 'text-bg-secondary';
   const merkeHtml = merke
-    ? ' <span class="badge text-bg-secondary">' + escapeHtml(merke) + '</span>'
+    ? ' <span class="badge ' + merkeKlasse + '">' + escapeHtml(merke) + '</span>'
     : '';
+  const linjeKlasse = merke === 'hendelse' ? ' ko-linje-hendelse'
+    : (merke === 'chat' ? ' ko-linje-chat' : '');
   // «H12» på linja (§4.1): hendelsen som filter, uten å skjule noe.
   const hendelseHtml = linje.hendelse_nummer
     ? ' <span class="hendelse-merke">' + escapeHtml(hendelsesnr(linje.hendelse_nummer)) + '</span>'
@@ -253,7 +265,7 @@ function koLinjeHtml(linje) {
   const hvem = linje.forfatter
     ? escapeHtml(linje.forfatter)
     : '<span class="text-muted">system</span>';
-  return '<li class="list-group-item py-2" data-rot="' + escapeHtml(linje.rot) + '">'
+  return '<li class="list-group-item py-2' + linjeKlasse + '" data-rot="' + escapeHtml(linje.rot) + '">'
     + '<div class="d-flex justify-content-between align-items-start gap-2">'
     + '<div><span class="fw-semibold me-2">' + escapeHtml(koKlokke(linje.tidspunkt))
     + '</span>' + hendelseHtml + koLinjeTekst(linje) + rettet + '</div>'
@@ -342,11 +354,15 @@ async function koSkriv() {
   const tidfelt = document.getElementById('ko-logg-tid');
   if (!felt) return;
   koLoggFeil('');
+  const uformell = document.getElementById('ko-logg-uformell');
   const res = await apiFetch('/ko/api/logg/ny/', {
     method: 'POST',
     body: JSON.stringify({
       tekst: felt.value,
       tidspunkt: koTidspunktISO(tidfelt ? tidfelt.value : ''),
+      // Chat (§4.5): samme logg, et merke. Avkryssingen finnes bare når
+      // admin har slått chatten på; serveren avviser flagget ellers.
+      uformell: Boolean(uformell && uformell.checked),
     }),
   });
   const data = await res.json();
@@ -722,6 +738,110 @@ async function koRedigerHendelse(id) {
 
 
 // ════════════════════════════════════════════════════════════════════════════
+// ANSVARSMERKET (pulje 6) — docs/FORSLAG_KO.md §5.1
+//
+// Vises, styrer ingenting. Nedtrekket i toppen setter operatørens eget merke;
+// serveren stempler det på linjene hun skriver, og sidebaren viser det ved
+// navnet.
+// ════════════════════════════════════════════════════════════════════════════
+
+async function koSettAnsvar() {
+  const sel = document.getElementById('ko-ansvar');
+  if (!sel) return;
+  const res = await apiFetch('/ko/api/ansvar/', {
+    method: 'POST', body: JSON.stringify({ omraade: sel.value }),
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    window.alert(data.message || 'Kunne ikke sette ansvarsområde.');
+  }
+}
+
+
+// ════════════════════════════════════════════════════════════════════════════
+// VAKTLISTAS RESSURSER UTEN OPPDRAGSENHET (pulje 6) — §3.1, §7.2
+//
+// Lag, samleplass, KO: det som bemannes i vaktlista, men aldri stempler i
+// /oppdrag/. Tegnes under enhetslista, gruppert på ressursgruppe, med samme
+// minimering som enhetstypene. **Ingen status** — hva en KO-ført status skal
+// hete er ubesvart (TODO.md), og kortet sier bare det vaktlista vet.
+//
+// Egen beholder (`#vaktliste-ressurser`), ikke `#enhetsliste`: sentralbordet
+// tegner den andre om igjen ved hver poll, og to skrivere til samme element
+// blir uenige.
+// ════════════════════════════════════════════════════════════════════════════
+
+const KO_RESSURSER_MS = 30000;
+let koRessurser = [];
+
+function koRessursMannskap(r) {
+  // Navnene hoistes ut før konkateneringen, som resten av byggerne: skanneren
+  // i ko/tests_js.py ser et datafelt limt inn, ikke at `map` escaper inni.
+  const navn = (r.mannskap || []).map((m) => escapeHtml(m.navn)
+    + (m.tilstede ? '' : ' <span class="text-muted">(ikke møtt)</span>')).join(', ');
+  if (navn) return navn;
+  const nesteNavn = (r.neste || []).map((m) => escapeHtml(m.navn)).join(', ');
+  if (nesteNavn) {
+    return '<span class="text-muted">Ingen nå · ' + escapeHtml(koKlokke(r.neste_fra)) + ': '
+      + nesteNavn + '</span>';
+  }
+  return '<span class="text-muted">Ingen på vakt</span>';
+}
+
+function koRessurskort(r) {
+  const tall = r.antall
+    ? escapeHtml(String(r.tilstede)) + ' av ' + escapeHtml(String(r.antall)) + ' møtt'
+    : 'ubemannet';
+  return '<div class="enhet-kort ko-ressurskort">'
+    + '<i class="bi bi-' + escapeHtml(r.gruppe_ikon || 'box') + ' ko-ressursikon"></i>'
+    + '<div class="flex-grow-1">'
+    + '<div class="enhet-navn">' + escapeHtml(r.navn) + '</div>'
+    + '<div class="enhet-meta">' + tall + '</div>'
+    + '<div class="enhet-meta">' + koRessursMannskap(r) + '</div>'
+    + '</div></div>';
+}
+
+function koGrupperRessurser(liste) {
+  const grupper = new Map();
+  (liste || []).forEach((r) => {
+    if (!grupper.has(r.gruppe_id)) grupper.set(r.gruppe_id, { id: r.gruppe_id, navn: r.gruppe_navn, ressurser: [] });
+    grupper.get(r.gruppe_id).ressurser.push(r);
+  });
+  return Array.from(grupper.values());
+}
+
+function koTegnRessurser() {
+  const el = document.getElementById('vaktliste-ressurser');
+  if (!el) return;
+  if (!koRessurser.length) { el.innerHTML = ''; return; }
+  el.innerHTML = koGrupperRessurser(koRessurser).map((g) => {
+    const nokkel = 'gruppe:' + escapeHtml(String(g.id));
+    const bemannet = g.ressurser.filter((r) => r.antall).length;
+    const hode = gruppehode(nokkel, g.navn, g.ressurser.length,
+                            bemannet ? String(bemannet) + ' bemannet' : '');
+    if (gruppeErLukket(nokkel)) return hode;
+    const kort = g.ressurser.map(koRessurskort).join('');
+    return hode + kort;
+  }).join('');
+}
+
+function koTegnRessurserPaaNytt() {
+  koTegnRessurser();
+}
+
+async function koHentRessurser() {
+  try {
+    const res = await apiFetch('/vaktliste/api/ressurser/uten-enhet/');
+    if (!res.ok) return;
+    koRessurser = (await res.json()).data || [];
+    koTegnRessurser();
+  } catch (e) {
+    // Lista som alt står er fortsatt sann; feilen viser seg ved neste poll.
+  }
+}
+
+
+// ════════════════════════════════════════════════════════════════════════════
 // OPPSTART
 //
 // **Alt som kjører på toppnivå står her, nederst.** Regelen er skrevet for de
@@ -766,4 +886,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
   koHentLogg();
   setInterval(koHentLogg, KO_LOGG_MS);
+
+  // Vaktlistas ressurser uten oppdragsenhet (pulje 6). Bare når flata finnes
+  // — den tegnes ikke uten vaktlistetilgang.
+  if (document.getElementById('vaktliste-ressurser')) {
+    koHentRessurser();
+    setInterval(koHentRessurser, KO_RESSURSER_MS);
+  }
 });

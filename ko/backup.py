@@ -44,7 +44,10 @@ class KoBackupHandler(BaseBackupHandler):
     display_name = 'KO-logg'
 
     apps = ['ko']
-    exclude = []
+    # Ansvarsmerket er hva som gjelder *nå*; etter en gjenoppretting er «nå»
+    # et annet, og en rad per konto som peker på en bruker er nettopp den
+    # sorten peker som feiler når kontoen er borte.
+    exclude = ['ko.Ansvarsmerke']
 
     #: FK-er ut av modulens eget datasett.
     #:

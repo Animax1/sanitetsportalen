@@ -65,6 +65,21 @@
     <h1 class="h5 mb-0"><i class="bi bi-broadcast-pin me-2"></i>KO</h1>
     <div class="d-flex align-items-center gap-2">
       {% comment %}
+        Ansvarsmerket (§5.1, pulje 6): hva du gjør nå. Vises ved navnet i
+        «Hvem er pålogget» og på linjene du skriver. Styrer ingenting — KO er
+        et rom der folk dekker for hverandre.
+      {% endcomment %}
+      <label class="small text-muted d-flex align-items-center gap-1 mb-0">
+        Ansvar
+        <select id="ko-ansvar" class="form-select form-select-sm w-auto"
+                data-action="koSettAnsvar" data-hendelse="change" aria-label="Ansvarsområde">
+          <option value=""{% if not mitt_ansvar %} selected{% endif %}>—</option>
+          {% for o in ansvarsomraader %}
+          <option value="{{ o }}"{% if o == mitt_ansvar %} selected{% endif %}>{{ o }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      {% comment %}
         **Sidebaren er et nedtrekk, ikke en kolonne** (17. sep. 2026). «Hvem har
         KO oppe» er en håndfull navn man kikker på, ikke noe man overvåker — og
         en fjerde kolonne ville tatt bredde fra oppdragslista, som trenger den
@@ -144,6 +159,17 @@
                       data-action="koNyHendelse" title="Ny hendelse uten linje">
                 <i class="bi bi-flag me-1"></i>Hendelse
               </button>
+              {% if chat_tillatt %}
+              {% comment %}
+                Chat (§4.5, pulje 6): samme logg, et merke. Avkryssingen finnes
+                bare når admin har slått chatten på; serveren avviser flagget
+                ellers.
+              {% endcomment %}
+              <label class="small text-muted d-flex align-items-center gap-1 mb-0 ms-1">
+                <input type="checkbox" class="form-check-input mt-0" id="ko-logg-uformell">
+                chat
+              </label>
+              {% endif %}
             </div>
             <div class="form-text mt-1">
               Ikke skriv navn, adresse, fødselsnummer eller telefon. Loggen
@@ -198,6 +224,15 @@
           <div id="enhetsliste" class="d-grid gap-2">
             <div class="tom-melding">Laster…</div>
           </div>
+          {% if kan_se_vaktliste %}
+          {% comment %}
+            Vaktlistas ressurser uten oppdragsenhet (pulje 6) — lag,
+            samleplass, KO. Vaktlistas data, lånt inn: gaten er `les` i
+            vaktliste. Egen beholder, fordi sentralbordet tegner
+            `#enhetsliste` om igjen ved hver poll.
+          {% endcomment %}
+          <div id="vaktliste-ressurser" class="d-grid gap-2 mt-2"></div>
+          {% endif %}
           {% else %}
           <p class="text-muted small mb-0">
             Krever tilgang til oppdragsmodulen.

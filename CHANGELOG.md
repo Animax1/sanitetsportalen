@@ -4,6 +4,88 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-18 — KO pulje 6: chat, ansvarsmerke, minimerbare grupper og vaktlistas ressurser på tavla  `#ko/sentralbordet` `#vaktliste/planlegging`
+
+**Notatet sa «chat og filter». André sa noe annet, og det er det som er bygget** (tre svar
+18. sep. 2026, alle notert i `FORSLAG_KO.md` §4.5, §5.1 og §7.2):
+
+- «Chat er bare en chattelogg hvor en kan skrive fritt med tidsstempel. Admin skal kunne slå
+  dette på/av. Hendelse må vises tydelig i loggen/chatten som Hendelse. Og hvem som
+  opprettet den.»
+- «Skal ikke være direkte filter sånn initielt tenker men **ressurstypene må kunne
+  minimeres**. Og så må vi få inn alle enheter fra vaktlisten som kan velges i /ko som ikke
+  allerede er i /oppdrag.» — og på oppfølgingen: **operatøren velger hvilke som vises**.
+- «Ansvarsområde er bare et merke som gjør at folk vet hvem som har ansvar for hva. Ingen
+  annen praktisk formål.»
+
+### Det som er bygget
+
+- **Chat er et merke på linja i samme logg** (`Logglinje.uformell`), ikke en tabell (§4.5).
+  Avkryssingen «chat» i skrivefeltet finnes bare når `ko.chat_tillatt` er på — en
+  `AppSetting`, auditlogget, **av som standard**, med avkryssing på
+  `/portal-admin/innstillinger/`. Sperren står i `skriv_linje` og ikke bare i skjemaet.
+  Bryteren styrer om *nye* kan skrives; linjene som alt finnes vises uansett, ellers får
+  loggen et hull. Retting arver merket. Linja vises dempet med «chat».
+- **Hendelseslinjene vises tydelig**: `koLinjeMerke()` gir `hendelse` for `hendelse_*`-kodene
+  foran `system`, blått merke, uthevet linje, og den som opprettet står under (frosset i
+  pulje 5).
+- **Ansvarsmerket** (§5.1): `ko.Ansvarsmerke`, én rad per konto, nedtrekk i toppen av `/ko/`
+  (samband / ressurser / logg / media — fast liste i kode, «Samband» og «samband» er ett
+  merke), `POST /ko/api/ansvar/` på `les`-nivå. Står ved navnet i «Hvem er pålogget» og
+  stemples på linjene (`skriv_linje` når kallet ikke oppgir noe; oppgitt verdi, også tom,
+  vinner). **Ikke i backupen** — merket er hva som gjelder nå.
+- **Ressurstypene kan minimeres.** Gruppeoverskriften på tavla er en knapp
+  (`gruppehode()`/`vippGruppe()` i `oppdrag-kort.js`, altså på begge sidene), husket per
+  nettleser under `tavle.grupper.lukket`, **og viser antallet når gruppa er lukket** — «2 ·
+  1 ledig». Det som er skjult er lesbart (§7.2).
+- **Vaktlistas ressurser uten oppdragsenhet står på tavla**: lag, samleplass, KO, under
+  enhetslista i sin egen beholder (`#vaktliste-ressurser` — sentralbordet tegner
+  `#enhetsliste` om igjen ved hver poll). `vaktliste.services.ressurser_uten_enhet()` og
+  `/vaktliste/api/ressurser/uten-enhet/`: skiftene som dekker nå, ellers neste skift,
+  **uten telefon og ISSI**, samme scope som `vaktliste_i_bruk()` og samme gate som
+  besetningen (`les` i vaktliste + alle korps). Kortet sier hvem og om de er møtt — **ingen
+  status**: hva en KO-ført status for et lag skal hete er fortsatt ubesvart (`TODO.md`), og
+  det ble ikke funnet på denne gangen heller.
+- `/ko/` 11 → 12 endepunkter, `/vaktliste/` 29 → 30, portalen 150.
+
+**Ryddet:** `oppdrag.services.tomt_enhetskort()` og `TomtEnhetskortHarSammeFormTests` — død
+kode siden pulje 4 tok KOs egen ressursliste bort; den eneste leseren var sin egen test.
+
+### Sett i nettleser
+
+Playwright mot seedet base: «Ansvar: samband» i toppen, «chat»-avkryssing, `∨ AMBULANSE` /
+`∨ UTEN TYPE` / `∨ LAG` / `∨ KO` som overskrifter, `Lag 1 · 1 av 2 møtt · Kari Nordmann,
+Ola Hansen (ikke møtt)`, `Lag 2 · ubemannet · Ingen nå · 15:04: Per Olsen`, `KO · ubemannet ·
+Ingen på vakt`.
+
+### Vern og mutanter
+
+`ko/tests_pulje6.py` (22: chatreglene, ansvarsmerket, portene, bryteren gjennom
+handleren), `vaktliste/tests_ressurser_uten_enhet.py` (7: scope, bemanning nå/neste,
+avmeldte, ingen telefon, gaten), `ko/tests_js.py` (+10: merkene, minimeringen med stubbet
+`localStorage`, ressurskortene, escaping).
+
+**20 mutanter, alle drept.** Tjenestelaget (9): chat-sperra fjernet, bryteren alltid av,
+ansvar stemples ikke, merket vinner over oppgitt, ukjent område slipper gjennom, retting
+arver ikke, `tilstede` uten ansvar, innstillingens fravær slår av, merket med i dumpen.
+Vaktlista (5): bilene med, avmeldte teller, gaten fjernet, neste skift borte, telefon
+lekker. JS (6): hendelse blir system, chat fjernet, lukket gruppe tegner kortene likevel,
+antallet borte fra overskriften, valget huskes ikke, overskriften uescapet.
+
+**Skanneren i `ko/tests_js.py` sa fra fire ganger** underveis — `escapeHtml(a + ' ' + b)`
+og `x.liste.map(...)` limt rett inn ser den som uescapet, fordi den leser konkatenering og
+ikke kall. Hoistet ut i `const`-er, som resten av byggerne. Den er streng på riktig side.
+
+### Dokumentene
+
+`ko/CLAUDE.md` (nytt avsnitt «Chat, ansvar og tavla»; tre avsnitt strammet for å holde
+taket på 22 000 tegn — 21 916), `vaktliste/CLAUDE.md` (ett tillegg; 56 895 av 56 900 tegn
+— taket der er nådd, neste tillegg må ta noe ut), `FORSLAG_KO.md` (§10 ✅ 6, og Andrés svar
+i §4.5, §5.1, §7.2), `TEKNISK_DOKUMENTASJON.md`, `TODO.md` (pulje 6 ut; nytt punkt om at
+KO-ført lagstatus nå er mer synlig, ikke mindre).
+
+---
+
 ## 2026-09-18 — KO pulje 5: hendelser — `H12`, gruppering av tavla, lukking med 409, `O45` overalt  `#ko/sentralbordet` `#oppdrag/sentralbord`
 
 **To spørsmål ble besvart før koden** (André): en lukket hendelse **kan åpnes igjen** —

@@ -441,42 +441,6 @@ def enhetskort(enhet, vakt=None, ledig_siden=None) -> dict:
     }
 
 
-def tomt_enhetskort() -> dict:
-    """Formen et enhetskort har, uten en enhet bak.
-
-    KOs ressursoversikt viser også ressurser som **ikke** har en enhet — et
-    lag logger ikke inn, det er hele poenget (§3.1) — og radene skal likevel
-    ha samme form. Ellers måtte klienten spørre «finnes feltet» før hver
-    avlesing, og en manglende nøkkel blir `undefined` midt i en mal-streng.
-
-    **Nøklene står skrevet her og kontrolleres mot `enhetskort()`**, framfor å
-    utledes av den. Et første forsøk leste nøklene ut av kildekoden med en
-    regex (17. sep. 2026) og tok 16 av 24 — de åtte fra
-    `_aktivt_oppdrag_felter` kommer inn med `**` og sto i en annen funksjon.
-    En utledning som stille tar to tredjedeler er verre enn en liste: lista
-    har en test, og den sier fra.
-    """
-    return {
-        'id': None,
-        'navn': '',
-        'pa_vakt': False,
-        'kan_passiv_vakt': False,
-        'kan_avvente': False,
-        'passiv_vakt': False,
-        'er_aktiv': True,
-        'username': '',
-        'type': None,
-        'type_navn': '',
-        'type_rekkefolge': None,
-        'status': '',
-        'status_navn': '',
-        'antall_ventende': 0,
-        'aktivt_oppdrag_id': None,
-        'ledig_siden': None,
-        **_aktivt_oppdrag_felter(None),
-    }
-
-
 def sett_status(oppdrag, ny_status: str, *, bruker=None, tidspunkt=None,
                 forsinket: bool = False, automatisk: bool = False,
                 sted: str = '', enhet=None, manuell: bool = False,

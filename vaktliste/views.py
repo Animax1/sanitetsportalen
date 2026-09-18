@@ -752,6 +752,23 @@ def ressurser_view(request, pk):
         {'status': 'ok', 'data': _ressurs_til_dict(ressurs)}, status=201)
 
 
+@never_cache
+@modul_kreves('vaktliste', 'les', svar='json')
+@require_http_methods(['GET'])
+def ressurser_uten_enhet_view(request):
+    """Ressursene uten oppdragsenhet, for KOs tavle (pulje 6).
+
+    Samme gate som `besetning_view` under, av samme grunn: svaret bærer navn
+    på mannskap fra alle korps, og en `les`-bruker som bare ser sitt eget
+    korps på `/vaktliste/` skal ikke få alle her. KO-operatøren har
+    `oppdrag:les` (tavla krever det); den som ser alle korps har det fra før.
+    """
+    if not (services.ser_alle_korps(request.user)
+            or har_tilgang(request.user, 'oppdrag', 'les')):
+        return _feil('Lista viser alle korps, og du ser bare ditt eget.', status=403)
+    return JsonResponse({'status': 'ok', 'data': services.ressurser_uten_enhet()})
+
+
 # ── Koblingen til /oppdrag (fase 6) ──────────────────────────────────────────
 
 @never_cache

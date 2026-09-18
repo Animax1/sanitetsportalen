@@ -17,8 +17,8 @@ from core.models import AppSetting
 from core.vakt import hent_aktiv_vakt
 
 from .models import (
-    HENDELSE_APEN, HENDELSE_LUKKET, KILDE_OPERATOR, KILDE_SYSTEM, Hendelse,
-    Logglinje,
+    HENDELSE_APEN, HENDELSE_LUKKET, KILDE_OPERATOR, KILDE_SYSTEM, Ansvarsmerke,
+    Hendelse, Logglinje,
 )
 
 
@@ -53,6 +53,18 @@ DAGER_NOKKEL = 'ko.logg_dager'
 #: 730 dager = 2 år. Samme frist som audit-loggen, arkivkollapsen og
 #: `backups/`-prefikset offsite — ett tall å forklare i A.9 i stedet for fire.
 DAGER_STANDARD = 730
+
+#: **Chat-bryteren** (§4.5, pulje 6). `AppSetting`, auditlogget som fristen
+#: over — noe et menneske har bestemt. Betyr «har operatørene lov til å
+#: skrive uformelle linjer», ikke «skjul en funksjon»: linjer som alt er
+#: skrevet vises uansett, ellers etterlater bryteren et hull i loggen.
+#: **Av som standard**: en chat ingen har bedt om er støy i det dokumentet
+#: man leser etter et arrangement der noe gikk galt.
+CHAT_NOKKEL = 'ko.chat_tillatt'
+
+#: Ansvarsområdene (§5.1). Fast liste i kode, ikke fritekst: «samband» og
+#: «Samband» skal være samme merke. Utvides her når noen savner ett.
+ANSVARSOMRAADER: tuple[str, ...] = ('samband', 'ressurser', 'logg', 'media')
 
 #: Grensene for hva fristen kan settes til. `0` er ikke lov: en logg som
 #: slettes samme døgn er ikke en logg, og «skru av oppbevaring» er ikke en
@@ -105,6 +117,30 @@ def oppbevaringsdager() -> int:
     except (TypeError, ValueError):
         return DAGER_STANDARD
     return max(DAGER_MIN, min(DAGER_MAKS, dager))
+
+
+def chat_tillatt() -> bool:
+    """Får operatørene skrive uformelle linjer? Lest fra `AppSetting`."""
+    raa = AppSetting.get(CHAT_NOKKEL, None)
+    return str(raa).strip().lower() in ('1', 'true', 'ja', 'on')
+
+
+def ansvar_for(bruker) -> str:
+    """Operatørens ansvarsmerke, eller tom streng."""
+    if bruker is None or not getattr(bruker, 'is_authenticated', False):
+        return ''
+    merke = Ansvarsmerke.objects.filter(bruker=bruker).first()
+    return merke.omraade if merke else ''
+
+
+def sett_ansvar(bruker, omraade) -> str:
+    """Sett (eller tøm) operatørens ansvarsmerke. Ukjent område avvises —
+    lista er fast nettopp for at merket skal bety det samme hos alle."""
+    omraade = (omraade or '').strip().lower()
+    if omraade and omraade not in ANSVARSOMRAADER:
+        raise Ugyldig('Ukjent ansvarsområde.')
+    Ansvarsmerke.objects.update_or_create(bruker=bruker, defaults={'omraade': omraade})
+    return omraade
 
 
 def vurder_tidspunkt(oppgitt, naa=None):
@@ -160,16 +196,31 @@ def _frys_forfatter(linje, bruker) -> None:
 
 
 def skriv_linje(vakt, raa_tekst, *, bruker, tidspunkt=None,
-                ansvarsomraade='', naa=None) -> Logglinje:
-    """En menneskeskrevet linje. Den vanlige veien inn i loggen."""
+                ansvarsomraade=None, uformell=False, naa=None) -> Logglinje:
+    """En menneskeskrevet linje. Den vanlige veien inn i loggen.
+
+    **Ansvarsområdet stemples fra operatørens merke** når kallet ikke oppgir
+    et (§5.1): det er slik «ført av Kari, samband» kommer på linja uten at hun
+    skriver det hver gang. Oppgitt verdi vinner — testene og API-et kan sette
+    det eksplisitt.
+
+    **`uformell` krever at chatten er slått på** (§4.5). Sperren står her og
+    ikke bare i skjemaet: en klient som sender flagget når admin har slått
+    chatten av, skal møte den samme døra.
+    """
     tekst = rens_tekst(raa_tekst)
     tid = vurder_tidspunkt(tidspunkt, naa)
+    if uformell and not chat_tillatt():
+        raise Ugyldig('Chatten er slått av. Skriv linja som en vanlig logglinje.')
+    if ansvarsomraade is None:
+        ansvarsomraade = ansvar_for(bruker)
     linje = Logglinje(
         vakt=vakt,
         kilde=KILDE_OPERATOR,
         tidspunkt=tid,
         tekst=tekst,
         ansvarsomraade=(ansvarsomraade or '').strip()[:40],
+        uformell=bool(uformell),
     )
     _frys_forfatter(linje, bruker)
     linje.save()
@@ -216,6 +267,8 @@ def korriger(linje, *, bruker, tekst=None, tidspunkt=None, naa=None) -> Logglinj
         tidspunkt=ny_tid,
         tekst=ny_tekst,
         ansvarsomraade=linje.ansvarsomraade,
+        # Merket arves: en retting av en chatlinje er fortsatt chat.
+        uformell=linje.uformell,
         korrigerer=linje,
         rot=linje.rot or linje,
     )

@@ -5,9 +5,9 @@
 > gjelder her også. Regelen for hva som står hvor: ligger koden i en app, står regelen
 > her; gjelder den alle, står den i rota.
 
-Levert: pulje 1 (skallet), 2 (loggen), 3 (ressursbildet), 4 (sentralbordet flyttet inn)
-og **5 (hendelsene)**. Pulje 6–7 gjenstår — se `docs/FORSLAG_KO.md` §10, som er et
-**forslag**, ikke besluttet.
+Levert: pulje 1 (skallet), 2 (loggen), 3 (ressursbildet), 4 (sentralbordet flyttet inn),
+5 (hendelsene) og **6 (chat, ansvarsmerke, minimering, vaktlistas ressurser)**. Pulje 7
+gjenstår — se `docs/FORSLAG_KO.md` §10, som er et **forslag**, ikke besluttet.
 
 **Siden har ingen faner, og det er en regel og ikke en smakssak** (André, 17. sep. 2026).
 Pulje 1 la de fire flatene i `nav-tabs`. En fane er riktig når flatene er *alternativer* —
@@ -46,10 +46,8 @@ kikker på; en fjerde kolonne ville tatt bredde fra oppdragslista, som trenger d
 Knappen har `data-bs-toggle="dropdown"` og **ingen** `data-action` — to lyttere på samme
 klikk er fella `klikkSkalKjore()` finnes for.
 
-**Under `xl` stables kolonnene**, loggen først, og høyden slippes så sida ruller normalt.
-Det er ikke løst, det er akseptert: KO brukes på en skjerm i et kommandopunkt, og en
-telefon kan uansett ikke vise en ressurstavle. Kommer kravet om mobil, er det en egen
-oppgave — og svaret er ikke faner.
+**Under `xl` stables kolonnene**, loggen først, og sida ruller normalt. Akseptert, ikke
+løst: KO brukes på en skjerm i et kommandopunkt. Kommer kravet om mobil, er svaret ikke faner.
 
 **Tre kolonner er taket.** Det er også hvorfor hendelser ikke kan bli en fjerde region:
 den er en gruppering av oppdragslista (§7), og layouten og puljeplanen peker samme vei.
@@ -74,6 +72,9 @@ og kan bli avsluttet uten at noen rykket ut.
 | Backup, opprydding, innstilling | `ko/backup.py`, `ko/opprydding.py`, `ko/portalinnstillinger.py` |
 | **Hendelsene**: nummer, opprett, rediger, lukk, gjenåpne, knytt | `ko/services.py` (nederst), `ko/models.Hendelse` |
 | Grupperingen på tavla og «H12»-merket | `koGrupperOppdrag()` i `static/js/ko.js`, `_oppdragRadHtml()` i sentralbordet |
+| Chat-merket, bryteren, ansvarsmerket | `Logglinje.uformell`, `services.chat_tillatt`, `ko.Ansvarsmerke`, `ko/portalinnstillinger.py` |
+| Minimerbare grupper på tavla | `gruppehode()`/`vippGruppe()` i `static/js/oppdrag-kort.js` |
+| Vaktlistas ressurser uten enhet | `vaktliste.services.ressurser_uten_enhet`, `koRessurskort()` i `ko.js` |
 
 ## Retningen: KO er øverste lag
 
@@ -105,10 +106,8 @@ verdt å huske fordi den ikke handler om opprettelse: feilen oppstår ved **endr
 retter kallesignalet ett sted, og tavla og enhetsskjermen viser ulike navn på samme bil
 midt i en vakt.
 
-Det gjelder også `oppdrag.Enhetstype` mot `vaktliste.Ressursgruppe`, som er den samme
-taksonomien vedlikeholdt to steder (§2.1). Den skal **ikke** slås sammen i dette arbeidet —
-den krymper av seg selv når sentralbordet flytter — men den er kjent, og skal ikke oppdages
-på nytt som om den var ny.
+Det gjelder også `oppdrag.Enhetstype` mot `vaktliste.Ressursgruppe` — samme taksonomi to
+steder (§2.1). Skal **ikke** slås sammen i dette arbeidet, men er kjent.
 
 ## Sidebaren svarer på «hvem har KO oppe», ikke «hvem dekker samband»
 
@@ -241,9 +240,8 @@ samme rad. Trenger en linje intensjon, må kallstedet dytte — og *da* bygges r
 Mottakerne kaster aldri. **En KO-logg som ikke lar seg skrive skal ikke ta ned en stempling
 i en bil**: bilen er det operative, loggen er dokumentasjonen.
 
-**Fire av de ni kodene fantes allerede som `oppdrag.Enhetshendelse`** — `tatt_av`,
-`rykket_videre`, `avbrutt`, `avventer`, med tidspunkt og bruker. Det er §2-erfaringen om
-igjen: sjekk om oppdragsmodulen har begrepet før du designer det inn i KO.
+**Fire av kodene fantes alt som `oppdrag.Enhetshendelse`** — sjekk om oppdragsmodulen har
+begrepet før du designer det inn i KO (§2).
 
 ## Hendelsene (pulje 5) — en gruppering, ikke en flate
 
@@ -278,6 +276,40 @@ etter «Nytt oppdrag». `TavlaSpoerEtterGrupperingenTests` holder kallstedet i l
 **Knytting krever `skriv_full` i begge modulene**: det skriver på en oppdragsrad, og hvem
 som får det er oppdragsmodulens sak (komposisjonsregelen). Dekoratøren gir KO-nivået,
 viewet sjekker det andre.
+
+## Chat, ansvar og tavla (pulje 6)
+
+Besvart av André 18. sep. 2026, før koden. Tre av notatets ideer ble til noe annet enn
+notatet sa, og det står i §4.5, §5.1 og §7.2 der.
+
+**Chat er et merke på linja, ikke et sted** (§4.5). `Logglinje.uformell`, satt av en
+avkryssing som bare finnes når `ko.chat_tillatt` (AppSetting, auditlogget, **av som
+standard**) er på. Sperren står i `skriv_linje`, ikke bare i skjemaet. Bryteren styrer om
+*nye* kan skrives — linjene som alt er skrevet vises uansett, ellers får loggen et hull.
+Retting arver merket. Og **hendelseslinjene vises tydelig**: `koLinjeMerke()` gir
+`hendelse` for `hendelse_*`-kodene, foran `system`, og linja er uthevet med den som
+opprettet.
+
+**Ansvarsmerket vises og styrer ingenting** (§5.1). `ko.Ansvarsmerke`, én rad per konto
+(samme person på PC og telefon har ett ansvar), satt med `POST api/ansvar/` på `les`-nivå —
+den som bare leser kan likevel ha samband. Fast liste (`ANSVARSOMRAADER`), fordi «samband»
+og «Samband» skal være ett merke. `skriv_linje` stemper det når kallet ikke oppgir noe;
+oppgitt verdi — også tom — vinner. `tilstede()` bærer det. **Ikke i backupen**: merket er
+hva som gjelder nå.
+
+**Filteret ble minimering** (§7.2, André: «ikke direkte filter … ressurstypene må kunne
+minimeres»). Gruppeoverskriften på tavla er en knapp; lukket-tilstanden huskes per
+nettleser under `tavle.grupper.lukket`, og **overskriften viser antallet når gruppa er
+lukket** — det som er skjult er lesbart. Mekanismen bor i `oppdrag-kort.js` og gjelder
+begge sidene; nøklene er `type:<id>` for enhetstypene og `gruppe:<id>` for vaktlistas
+ressursgrupper.
+
+**Vaktlistas ressurser uten oppdragsenhet står på tavla** — lag, samleplass, KO — under
+enhetslista, i sin egen beholder (`#vaktliste-ressurser`): sentralbordet tegner
+`#enhetsliste` om igjen ved hver poll, og to skrivere til samme element blir uenige. Data
+fra `/vaktliste/api/ressurser/uten-enhet/`, gatet av vaktlista (komposisjonsregelen), tegnet
+av `koRessurskort()`: hvem, og om de er møtt. **Ingen status** — hva en KO-ført status for
+et lag skal hete er fortsatt ubesvart, og kortet sier bare det vaktlista vet.
 
 ## Sentralbordet kjører i `/ko/` (pulje 4)
 
@@ -314,14 +346,10 @@ ser loggen og en beskjed om hva som mangler — ikke en tom kolonne.
 
 ## Feature parity med sentralbordet — ved konstruksjon, ikke ved flid
 
-André, 17. sep. 2026: «Det er ikke feature parity med /oppdrag. Jeg vil ha det likt feature
-messig inn her i /ko.» Det første kortet her viste navn, besetning og status, og manglet
-passiv vakt, ventende, «ledig siden», sted og hele oppdragslinja.
-
-**Parity som holder er den som følger av at det er samme kode.** To steder:
-
-Fra pulje 4 er parity ikke lenger noe som *oppnås* — det er samme side. `/oppdrag/` og
-`/ko/` leser samme kontekst, samme maler, samme JS og samme endepunkter.
+André, 17. sep. 2026: «Jeg vil ha det likt feature messig inn her i /ko.» Det første kortet
+her manglet passiv vakt, ventende, «ledig siden», sted og oppdragslinja. **Parity som
+holder er den som følger av at det er samme kode**: fra pulje 4 leser `/oppdrag/` og `/ko/`
+samme kontekst, maler, JS og endepunkter.
 
 `ko/tests_sentralbord.py` håndhever tre ting: at KO får **hele** konteksten (ikke et
 utvalg), at begge sidene laster **alle** sentralbordfilene i samme rekkefølge, og at de har

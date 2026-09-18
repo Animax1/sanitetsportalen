@@ -25,6 +25,8 @@ from core.models import ModuleSettings
 from core.modules import get_module
 from core.sesjoner import aktive_sesjoner
 
+from .models import Ansvarsmerke
+
 #: Modulens egen slug, ett sted. Brukes av filteret under og av testene.
 SLUG = 'ko'
 
@@ -94,6 +96,11 @@ def tilstede():
     med_rad = _har_ko_tilgang_ider(
         {b.id for b, _ in fra_sesjoner if b.id not in admin_ider})
     slipper_inn = admin_ider | med_rad
+    # Ansvarsmerkene i én spørring (§5.1): «Kari · samband». Vises, styrer
+    # ingenting — og lista polles, så ikke ett oppslag per rad.
+    ansvar = dict(Ansvarsmerke.objects
+                  .filter(bruker_id__in=slipper_inn)
+                  .values_list('bruker_id', 'omraade'))
 
     per_bruker = {}
     for bruker, rad in fra_sesjoner:
@@ -106,6 +113,7 @@ def tilstede():
                 'er_delt_konto': bool(getattr(bruker, 'er_delt_konto', False)),
                 'er_global_admin': bruker.id in admin_ider,
                 'inaktiv_s': rad['inaktiv_s'],
+                'ansvar': ansvar.get(bruker.id, ''),
             }
         else:
             forrige['inaktiv_s'] = _laveste(forrige['inaktiv_s'], rad['inaktiv_s'])

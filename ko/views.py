@@ -112,6 +112,7 @@ def _til_dict(linje):
         'hendelse_id': linje.hendelse_id,
         'hendelse_nummer': (linje.hendelse.hendelsesnummer
                             if linje.hendelse_id else None),
+        'uformell': linje.uformell,
     }
 
 
@@ -175,8 +176,29 @@ def index_view(request):
         # KO står som logg og ingenting mer. Serveren nekter uansett; dette
         # avgjør om knappene finnes.
         'kan_se_oppdrag': har_tilgang(request.user, 'oppdrag', 'les'),
+        # Vaktlistas ressurser uten oppdragsenhet (pulje 6) er vaktlistas
+        # data, lånt inn — gaten er `les` i **vaktliste**, som besetningen.
+        'kan_se_vaktliste': har_tilgang(request.user, 'vaktliste', 'les'),
+        # Chat (§4.5): bryteren avgjør om avkryssingen finnes i skjemaet.
+        'chat_tillatt': services.chat_tillatt(),
+        # Ansvarsmerket (§5.1): nedtrekket i toppen, og hva som står nå.
+        'ansvarsomraader': services.ANSVARSOMRAADER,
+        'mitt_ansvar': services.ansvar_for(request.user),
     })
     return render(request, 'ko/index.html', kontekst)
+
+
+@modul_kreves('ko', 'les', svar='json')
+@require_http_methods(['POST'])
+@rate_limit(group='ko:ansvar', rate='60/m', method='POST')
+def ansvar_view(request):
+    """Sett eget ansvarsmerke (§5.1). `les` holder: merket styrer ingenting,
+    og den som bare leser kan likevel ha ansvar for samband."""
+    try:
+        omraade = services.sett_ansvar(request.user, _json_body(request).get('omraade'))
+    except services.Ugyldig as feil:
+        return _feil(str(feil))
+    return JsonResponse({'status': 'ok', 'omraade': omraade})
 
 
 @never_cache
@@ -267,7 +289,9 @@ def logg_skriv_view(request):
             data.get('tekst'),
             bruker=request.user,
             tidspunkt=_tid(data.get('tidspunkt')),
-            ansvarsomraade=data.get('ansvarsomraade') or '',
+            # `None` = «stemple fra merket mitt»; oppgitt verdi vinner.
+            ansvarsomraade=data.get('ansvarsomraade'),
+            uformell=bool(data.get('uformell')),
         )
     except services.Ugyldig as feil:
         return _feil(str(feil))
