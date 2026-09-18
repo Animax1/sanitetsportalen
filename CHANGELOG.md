@@ -4,6 +4,56 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-18 — Verifisering av at `/oppdrag` står uendret — og én regresjon funnet  `#oppdrag/sentralbord`
+
+André: «Jeg er ekstremt skeptisk på det du har levert til nå i /ko. Men husk /oppdrag var i
+en veldig god stand før vi begynte med /ko.»
+
+Skepsisen er fortjent, og «stol på meg» er ikke et svar. Bekymringen er etterprøvbar, så den
+ble etterprøvd.
+
+### Hva målingen viste
+
+**Ti av tolv flyttede JS-funksjoner er byte for byte identiske** med utgaven før flyttingen
+(`hastegradKlasse`, `_problemMedAntall`, `_medAntall`, `_grovMerke`, `tidSiden`,
+`_typeRekkefolge`, `_grupperEnheter`, `kanSeBesetning`, `mkBesetning`,
+`_besetningKontakt`).
+
+**Og serversvaret er identisk.** `/oppdrag/api/enheter/` ble dumpet fra en `git worktree` på
+commit-en før endringene og fra dagens kode, med samme fikstur — fire enheter, én på
+oppdrag med tre pasienter, én i passiv vakt, én av vakt, én pensjonert. `diff` er tom.
+Mønsteret er verdt å huske: **en flytting bevises ved å sammenligne svaret, ikke ved å lese
+diffen.**
+
+### Den ene som ikke var identisk var en ekte regresjon
+
+`visBesetning()` og `hentBesetning()` tegnet før på nytt med `renderEnheter()`, som leser
+den **levende** `enheter`. Etter flyttingen kalte de `tegnEnhetsliste(sisteEnhetsliste)` —
+og `sisteEnhetsliste` er referansen fra forrige tegning.
+
+`lastEnheter()` gjør `enheter = (await res.json()).data`, altså en **ny array**, og tegner
+**ikke** i samme slengen: `lastAlt()` gjør det etterpå. Mellom de to fyres
+`hentBesetning(apenBesetning)` uten `await`. Løser den i det vinduet, tegnet den forrige
+rundes enheter. Vinduet er kort og retter seg selv ved neste tegning — men forskjellen var
+ekte, og det holder ikke i en modul som var i god stand.
+
+Sida melder nå inn hvor lista bor (`settEnhetslisteKilde`), og den delte koden **spør** i
+stedet for å huske. Innmeldingen står *i* `renderEnheter()` og ikke som en linje på
+toppnivå, og det er en testbarhetsregel: en toppnivålinje kjøres ikke av `build_harness()`,
+så kallstedet kunne fjernes uten at noe ble rødt — mutanten overlevde nøyaktig sånn.
+
+### Mutasjonstesting
+
+**4 mutanter.** Tilbake til husket liste (drept), kallstedet fjernet (**overlevde først** —
+testen satte kilden selv, mutantløgn nummer tre), og begge på nytt etter at innmeldingen
+flyttet inn i `renderEnheter()`.
+
+`DenDelteListaLeserDenLevendeEnhetslistaTests` går gjennom `renderEnheter()`, som er den
+ekte inngangen: den bytter ut arrayen uten en tegning imellom, og krever at den nye lista
+er den som tegnes.
+
+---
+
 ## 2026-09-18 — Ressurslista rullet tilbake: verdimengden var funnet på  `#ko/ressursbildet` `#oppdrag/sentralbord`
 
 André: «Du har ikke direkte kopiert sentralbord delene fra /oppdrag. Jeg hadde aldri noe

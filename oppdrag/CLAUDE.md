@@ -248,3 +248,14 @@ kommer inn med `**` fra `_aktivt_oppdrag_felter`.
 **`oppdrag-enhet.js` deler ikke dette.** Bilens egen skjerm har fortsatt sine egne kopier
 av `hastegradKlasse` og `_problemMedAntall`, og de står igjen med vilje: den siden laster
 ikke `oppdrag-kort.js`, og å rive i enhetsskjermen hører til pulje 4. Står i `TODO.md`.
+
+**Sentralbordet eier `enheter`, og melder det inn i `renderEnheter()`.** `lastEnheter()`
+bytter ut arrayen uten å tegne — `lastAlt()` tegner etterpå — og fyrer `hentBesetning()`
+uten `await` i mellomtiden. Husket den delte koden forrige tegnede liste, tegnet en
+besetning som løste i det vinduet forrige rundes enheter (funnet 18. sep. 2026, ved å
+sammenligne mot koden før flyttingen). `settEnhetslisteKilde(() => enheter)` gjør at den
+spør i stedet.
+
+Innmeldingen står **i** tegnefunksjonen og ikke på toppnivå, og det er en testbarhetsregel:
+`build_harness()` plukker ut funksjoner og kjører ikke toppnivålinjer, så et kallsted der
+kan fjernes uten at noe blir rødt. Mutanten overlevde nøyaktig sånn.

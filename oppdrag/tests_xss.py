@@ -23,7 +23,7 @@ from patients.js_test_utils import (
 # en bygger, legger den til her — ellers skanner testen forbi den.
 HTML_BUILDERS_PER_FIL = {
     OPPDRAG_SENTRAL_JS: (
-        'renderEnheter', 'tegnEnhetsliste',
+        'renderEnheter', 'tegnEnhetsliste', 'settEnhetslisteKilde',
         # **Kortet ble hoistet ut av `renderEnheter` og falt ut av skanningen
         # med det samme** (funnet 16. sep. 2026, da `[object Object]` sto på
         # hver enhet i prod uten at noe var rødt). En utklipping flytter
@@ -381,7 +381,7 @@ class OppdragEscapingOppforselTests(SimpleTestCase):
     HARNESS = (
         (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue', 'trustedHtml', '_escHtml',
                            'klokke')),
-        (OPPDRAG_SENTRAL_JS, ('renderOppdrag', 'venterForbiTerskel', 'lydTerskler', 'renderEnheter', 'tegnEnhetsliste', 'tidslinjeHtml',
+        (OPPDRAG_SENTRAL_JS, ('renderOppdrag', 'venterForbiTerskel', 'lydTerskler', 'renderEnheter', 'tegnEnhetsliste', 'settEnhetslisteKilde', 'tidslinjeHtml',
                               'hastegradKlasse', 'mkBesetning',
                               'kanSeBesetning', 'tidSiden', '_grovMerke',
                               '_enhetsmatrise', '_problemMedAntall', '_medAntall', '_grupperEnheter', '_typeRekkefolge', '_enhetskort', 'enhetskortInnmat',
@@ -393,6 +393,7 @@ class OppdragEscapingOppforselTests(SimpleTestCase):
     #: enhetskortet, og et lukket panel er den vanlige tilstanden.
     BESETNING_STUBB = ("globalThis.apenBesetning = null;\n"
                        "globalThis.sisteEnhetsliste = [];\n"
+                       "globalThis.enhetslisteKilde = null;\n"
                        "globalThis.besetninger = {};\n"
                        "globalThis.window = { KAN_SE_BESETNING: true };\n")
 

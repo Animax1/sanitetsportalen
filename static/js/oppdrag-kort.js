@@ -26,10 +26,28 @@
 let besetninger = {};
 let apenBesetning = null;
 
-// Den sist tegnede lista. `visBesetning()` og `hentBesetning()` må tegne på
-// nytt, og uten denne måtte de kalt tilbake til sida — som er nettopp den
-// koblingen delingen skulle fjerne.
+// Den sist tegnede lista, og **reserven** — ikke fasit. Se under.
 let sisteEnhetsliste = [];
+
+// **Hvem som eier lista.** Sentralbordet henter enhetene selv og bytter ut
+// `enheter` med en *ny* array ved hver runde (`lastEnheter`), uten å tegne i
+// samme slengen. En `sisteEnhetsliste` ville derfor pekt på forrige runde til
+// neste tegning kom — og en besetning som ble hentet i mellomtiden ville
+// tegnet den gamle lista.
+//
+// Vinduet er kort og retter seg selv ved neste tegning, men forskjellen var
+// ekte: før delingen (18. sep. 2026) leste `renderEnheter()` alltid den
+// *levende* `enheter`. Sida melder derfor inn hvor lista bor, og den delte
+// koden spør i stedet for å huske.
+let enhetslisteKilde = null;
+
+function settEnhetslisteKilde(fn) {
+  enhetslisteKilde = fn;
+}
+
+function tegnEnhetslistePaaNytt() {
+  tegnEnhetsliste(enhetslisteKilde ? enhetslisteKilde() : sisteEnhetsliste);
+}
 
 //: «Trenger ny ressurs» blir tydeligere jo lenger det står (minutter).
 //  Brukes av oppdragslista; står her fordi den hører til samme ordforråd.
@@ -283,9 +301,9 @@ function _besetningKontakt(m) {
 
 
 async function visBesetning(enhetId) {
-  if (apenBesetning === enhetId) { apenBesetning = null; tegnEnhetsliste(sisteEnhetsliste); return; }
+  if (apenBesetning === enhetId) { apenBesetning = null; tegnEnhetslistePaaNytt(); return; }
   apenBesetning = enhetId;
-  tegnEnhetsliste(sisteEnhetsliste);
+  tegnEnhetslistePaaNytt();
   await hentBesetning(enhetId);
 }
 
@@ -298,7 +316,7 @@ async function hentBesetning(enhetId) {
   besetninger[enhetId] = res.ok
     ? d.data
     : { feil: d.message || 'Kunne ikke hente besetningen.' };
-  tegnEnhetsliste(sisteEnhetsliste);
+  tegnEnhetslistePaaNytt();
 }
 
 

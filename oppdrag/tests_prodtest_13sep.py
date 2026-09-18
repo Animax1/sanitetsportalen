@@ -7,14 +7,15 @@ Kjøres i node (`patients/js_test_utils.py`), ikke grep-et.
 - 3.4: «venter på dekning» kom opp i det halve sekundet sendingen tok.
 """
 import json
+import unittest
 
 from django.test import SimpleTestCase
 
 from oppdrag.tests_offline_ko import FORSPILL
 from oppdrag.tests_runde_d import _konst
 from patients.js_test_utils import (
-    OPPDRAG_ENHET_JS, OPPDRAG_SENTRAL_JS, build_harness, node_available,
-    read_js, run_node,
+    OPPDRAG_ENHET_JS, OPPDRAG_SENTRAL_JS, PORTAL_UTILS_JS, build_harness,
+    node_available, read_js, run_node,
 )
 
 
@@ -23,14 +24,15 @@ class SentralbordetsOppstartTests(SimpleTestCase):
     settes selv om oppstarten kastet."""
 
     HARNESS = ((OPPDRAG_SENTRAL_JS, ('_trygt', 'lastAlt', 'oppstart', '_visLastefeil', 'lastEnheter',
-                                     'lastOppdrag', 'renderEnheter', 'tegnEnhetsliste', 'renderOppdrag')),)
+                                     'lastOppdrag', 'renderEnheter', 'tegnEnhetsliste',
+                                     'settEnhetslisteKilde', 'renderOppdrag')),)
 
     FORSPILL = '''
     let enheter = []; let oppdragsliste = []; let lokasjoner = [];
     let etagEnheter = null; let etagOppdrag = null;
     let enheterHentet = false; let oppdragHentet = false;
     let besetninger = {}; let apenBesetning = null;
-    let sisteEnhetsliste = [];
+    let sisteEnhetsliste = []; let enhetslisteKilde = null;
     const elementer = {};
     globalThis.document = {
       getElementById: (id) => (elementer[id] ||= { innerHTML: '<div class="tom-melding">Laster…</div>', textContent: '' }),
@@ -209,3 +211,88 @@ class VenterPaaDekningTests(SimpleTestCase):
             console.log(JSON.stringify([foer, synlig()]));
         ''')
         self.assertEqual(ut, [False, True])
+
+
+@unittest.skipUnless(node_available(), 'node er ikke tilgjengelig')
+class DenDelteListaLeserDenLevendeEnhetslistaTests(SimpleTestCase):
+    """`lastEnheter()` bytter ut `enheter` med en **ny** array uten å tegne.
+
+    Da ressurslista ble delt med `/ko/` (18. sep. 2026) husket den delte koden
+    den sist tegnede lista i stedet for å spørre sida. En besetning som ble
+    hentet i vinduet mellom bytte og tegning ville da tegnet forrige rundes
+    enheter. Vinduet var kort og rettet seg selv — men forskjellen var ekte, og
+    før delingen leste `renderEnheter()` alltid den levende `enheter`.
+
+    Prøven går gjennom `tegnEnhetslistePaaNytt()`, som er veien
+    `hentBesetning()` faktisk bruker.
+    """
+
+    HARNESS = (
+        (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue', 'klokke')),
+        (OPPDRAG_SENTRAL_JS, ('renderEnheter', 'tegnEnhetsliste',
+                              'tegnEnhetslistePaaNytt',
+                              'settEnhetslisteKilde', '_grupperEnheter',
+                              '_typeRekkefolge', '_enhetskort',
+                              'enhetskortInnmat', 'kanSeBesetning',
+                              'mkBesetning', '_besetningKontakt', 'tidSiden',
+                              'hastegradKlasse', '_grovMerke',
+                              '_problemMedAntall', '_medAntall')),
+    )
+
+    def setUp(self):
+        self.harness = build_harness(self.HARNESS)
+
+    def test_ny_array_naas_uten_en_tegning_imellom(self):
+        """**Gjennom `renderEnheter()`, ikke ved å sette kilden selv.**
+
+        Første utgave av denne testen kalte `settEnhetslisteKilde()` direkte,
+        og da kunne sentralbordet slutte å melde inn kilden uten at noe ble
+        rødt — mutantløgn nummer tre i `CLAUDE.md`. Innmeldingen ligger derfor
+        nå *i* `renderEnheter()`, som er den ekte inngangen.
+        """
+        ut = run_node(self.harness, """
+            let enheter = [{id: 1, navn: 'Gammel bil', pa_vakt: true,
+                            status: 'ledig', status_navn: 'Ledig',
+                            antall_ventende: 0}];
+            renderEnheter();
+
+            // Det `lastEnheter()` gjør: bytter ut arrayen, tegner ikke.
+            enheter = [{id: 2, navn: 'Ny bil', pa_vakt: true,
+                        status: 'ledig', status_navn: 'Ledig',
+                        antall_ventende: 0}];
+
+            // Det `hentBesetning()` gjør når svaret kommer.
+            tegnEnhetslistePaaNytt();
+            console.log(document.getElementById('enhetsliste').innerHTML);
+        """, preamble=self.DOM_STUBB)
+        self.assertIn('Ny bil', ut,
+                      'den delte lista tegnet forrige rundes enheter')
+        self.assertNotIn('Gammel bil', ut)
+
+    def test_uten_en_kilde_brukes_den_sist_tegnede(self):
+        """`/ko/` melder ingen kilde — den henter og tegner i samme kall, og
+        har ingen levende liste å spørre etter."""
+        ut = run_node(self.harness, """
+            settEnhetslisteKilde(null);
+            tegnEnhetsliste([{id: 1, navn: 'Fra KO', pa_vakt: true,
+                              status: 'ledig', status_navn: 'Ledig',
+                              antall_ventende: 0}]);
+            tegnEnhetslistePaaNytt();
+            console.log(document.getElementById('enhetsliste').innerHTML);
+        """, preamble=self.DOM_STUBB)
+        self.assertIn('Fra KO', ut)
+
+    # `build_harness` plukker ut funksjoner, ikke modulnivå-variablene de
+    # lukker over — de må derfor erklæres her, som i de andre harnessene i
+    # denne fila.
+    DOM_STUBB = """
+        globalThis.window = { KAN_SE_BESETNING: false, OPPDRAG_ENHETSTYPER: [] };
+        globalThis.apenBesetning = null;
+        globalThis.besetninger = {};
+        let enhetslisteKilde = null;
+        let sisteEnhetsliste = [];
+        const _noder = {};
+        globalThis.document = {
+          getElementById: (id) => (_noder[id] ||= { innerHTML: '', textContent: '' }),
+        };
+    """

@@ -499,8 +499,9 @@ class BesetningspanelTests(SimpleTestCase):
             // `tegnEnhetsliste()` (18. sep. 2026) — het `renderEnheter` før
             // ressurslista ble delt med /ko/. Tegningen er en annen regel enn
             // den som måles her, og stubbes bort.
-            globalThis.tegnEnhetsliste = () => {{}};
+            globalThis.tegnEnhetslistePaaNytt = () => {{}};
             globalThis.sisteEnhetsliste = [];
+            globalThis.enhetslisteKilde = null;
             globalThis.apiFetch = async () => ({{
               ok: {str(status == 200).lower()},
               json: async () => ({json.dumps(kropp)}),

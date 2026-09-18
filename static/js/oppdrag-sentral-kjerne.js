@@ -105,6 +105,17 @@ function hastegradEndret(prefiks) {
 // felles, slik at de to sidene ikke kan komme til å vise ulike ting om samme
 // enhet. Se fila for hvorfor.
 function renderEnheter() {
+  // **Sentralbordet eier `enheter`, og melder det inn her.** `lastEnheter()`
+  // bytter ut arrayen uten å tegne, så den delte koden må spørre etter den
+  // levende lista og ikke huske forrige — se `settEnhetslisteKilde` i
+  // oppdrag-kort.js.
+  //
+  // Innmeldingen står *i* tegnefunksjonen og ikke som en linje på toppnivå,
+  // og det er en testbarhetsregel: en toppnivålinje kjøres ikke av
+  // `build_harness()`, så kallstedet kunne fjernes uten at noe ble rødt.
+  // Mutanten overlevde nøyaktig sånn 18. sep. 2026. Kallet er idempotent, og
+  // den første tegningen kommer alltid før et besetningspanel kan åpnes.
+  settEnhetslisteKilde(() => enheter);
   tegnEnhetsliste(enheter);
 }
 
