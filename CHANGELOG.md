@@ -44,6 +44,52 @@ køen mister teksten, projeksjonen uten «Utført» (overlevde først).
 
 ---
 
+## 2026-09-19 — Testsjekklister for `/ko` og `/vaktliste`  `#ko` `#vaktliste` `#dokumentasjon`
+
+André, 19. sep. 2026: «Kan du lage to sjekklister for testing av appen? En for /ko og en
+for /vaktliste?»
+
+- **`docs/TESTSJEKKLISTE_KO.md`** og **`docs/TESTSJEKKLISTE_VAKTLISTE.md`** — manuelle
+  gjennomganger for staging, etter deploy, og før vakt. Begge er skrevet mot koden i samme
+  økt (`ko/views.py`, `ko/services.py`, `ko/models.py`, `vaktliste/services.py`, malene og
+  JS-filene), ikke mot hukommelsen: prioritetsrekka i KO er de seks som faktisk finnes
+  (Viktig, Rød, Gul, Grønn, Drift, **Plassering** — modulfila sier fortsatt fem),
+  meldervalgene er `MELDER_VALG`, stemplingsreglene er `services.STEMPLINGER`, og
+  fanerekkefølgen i vaktlista er den `tegnFaner()` bygger.
+- **Kontooppsett først, ikke til slutt.** Begge listene begynner med en tabell over
+  testkontoer per nivå, fordi **fravær av rad er ingen tilgang** og global admin får toppen
+  av stigen uten rader: en gjennomgang gjort med admin prøver nøyaktig den ene brukeren som
+  aldri møter en sperre. Vaktlistelista har seks kontoer, blant dem korps-føreren **uten
+  badge** — synligheten følger ikke stigen (`skriv_handling` ser alle korps, `les` bare
+  sitt eget).
+- **Hvert nivå prøves to ganger:** at knappen er borte, **og** at endepunktet svarer 403.
+  En knapp som fører til en vegg er verre enn ingen knapp, og en vegg uten knapp er ikke
+  det samme som en gate som virker.
+- **Egen seksjon for regresjoner som har truffet prod.** `[object Object]` i en
+  mal-streng, nedtrekket som lagret på klikk (`data-hendelse`), `readonly` uten virkning på
+  `datetime-local` i Safari, 403 på en merknad korps-føreren har lov til å skrive,
+  nattevakter på feil dag, «Mitt korps» inne i gruppefanene, planleggerfelter som ble
+  blanke. Alle er billige å prøve og dyre å oppdage på vakt.
+- **Ett funn av å lese framfor å huske: «tidligere vakters logg» har ingen flate.**
+  Nivået `skriv_leder` er deklarert for den i `ko/module.py`, men `logg_view` svarer bare
+  for aktiv vakt, og «Historikk»-knappen i KOs oppdragsliste er **oppdragsarkivet** —
+  gatet av oppdragstilgang, ikke av KO-nivået. Sjekklista sier det rett ut, så ingen
+  melder et manglende vaktvelger-nedtrekk som en feil.
+- **Listene sier hva de ikke er.** Reglene er prøvd i suiten, med mutanter; finner noen et
+  funn her som suiten burde ha tatt, er det to funn — feilen, og hullet i dekningen.
+- **Begge er ført opp i `DOKUMENTER` i `core/tests_dokumentråte.py`.** En sjekkliste som
+  peker på en fil eller en knapp som er flyttet, blir stille hoppet over av den som leser
+  den under tidspress — og det er den sorten dokument som råtner uten at noen gjør noe
+  galt. `TODO.md` har gjennomkjøringen som to åpne punkter, med iPhone/iPad nevnt for
+  låsepunktene i vaktlistelista.
+
+Ingen kodeendring, og derfor ingen mutanter: laget er «CSS, maler og tekster» i tabellen i
+`CLAUDE.md`, der øyet er raskere enn en mutant. Det ene som er kode — de to radene i
+`DOKUMENTER` — er kontrollert ved å kjøre `core.tests_dokumentråte` med en oppdiktet
+filsti i hver av de nye filene og se at den blir rød.
+
+---
+
 ## 2026-09-19 — Oppdrag uten enhet, «Tildelt», «Ikke aktuelt», «Plassering», fargeforklaring i ressursoversikten  `#oppdrag/sentralbord` `#oppdrag/statusmaskin` `#oppdrag/enhetsskjerm` `#ko/ressursbildet` `#ko/hendelseslogg`
 
 André, 19. sep. 2026, fire punkter med skisser først (A1/A2, B, C, D, E1 — alle valgt).

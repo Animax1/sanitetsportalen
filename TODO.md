@@ -334,6 +334,21 @@ foreldre, og et punkt som står under noe ferdig er et punkt ingen leser igjen.*
       lagringskrok — men det er kirurgi i brukeropprettelsen, og den skal ikke gjøres
       i forbifarten. Står i `KJENTE_UNNTAK_RAMMEVERK`, som ikke skal vokse.
 
+### Manuell testgjennomgang av `/ko` og `/vaktliste` — 19. sep. 2026
+
+Sjekklistene finnes; de er ikke kjørt. Suiten svarer på om reglene holder, sjekklistene på
+om flata gjør det — markup, låser, telefon, offline og sammensetningen av tre moduler i én
+nettleser.
+
+- [ ] **Kjør [`docs/TESTSJEKKLISTE_KO.md`](./docs/TESTSJEKKLISTE_KO.md) på staging**, med de
+      fem kontoene §0 beskriver. Nivåene er halve lista, og de kan ikke prøves med én
+      konto: global admin er nettopp den brukeren som aldri møter en sperre. Funn føres i
+      CHANGELOG med byggnummer.
+- [ ] **Kjør [`docs/TESTSJEKKLISTE_VAKTLISTE.md`](./docs/TESTSJEKKLISTE_VAKTLISTE.md) på
+      staging**, og ta §6 (låste felter) og §13 fra en iPhone eller iPad. De punktene
+      finnes bare der — `readonly` er uten virkning på `datetime-local`, og Safari
+      ignorerer `color` på et deaktivert felt. Funn føres i CHANGELOG med byggnummer.
+
 ### Teknisk gjeld — kartlagt 13. sep. 2026
 
 Underlaget er `docs/TEKNISK_GJELD.md`; det forklarer hvorfor. Rekkefølgen her er
