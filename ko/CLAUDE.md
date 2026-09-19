@@ -137,8 +137,7 @@ fjorårets helseopplysninger; opplæring hører hjemme på en demo-vakt.
 
 ## Loggen: de fire valgene som låser konstruksjonen
 
-Besvart av André 17. sep. 2026, **før koden**. De står her fordi den neste vil gjøre dem
-om, og da skal prisen være synlig.
+Besvart av André 17. sep. 2026, **før koden** — prisen skal være synlig.
 
 ### 1. Ingen SHA-signatur. Lesbar historikk i stedet
 
@@ -147,15 +146,15 @@ alt holdt utenfor `ArkivertOppdrag` av den grunn. Et felt i en SHA-payload er **
 måneder ved konstruksjon** — sletteinngangen i §4.4 ville da fått arkivet til å melde
 tukling. To funksjoner som spiser hverandre.
 
-Loggen står derfor som levende rader, scopet til vakta, slettet av `purge_old_logs`.
-Prisen: **loggen kan ikke bevise at den er urørt** — bare hvem som gjorde hva.
+Loggen står som levende rader i vakta, slettet av `purge_old_logs`. Prisen:
+**loggen kan ikke bevise at den er urørt** — bare hvem som gjorde hva.
 
 ### 2. 730 dager, som en `AppSetting` — ikke en Railway-variabel
 
-André foreslo en Railway-variabel: skjult jobbkonfigurasjon, uten audit, må settes likt
-på web og cron, usynlig i portalen. `AppSetting` er én rad begge leser, auditlogget av
+André foreslo en Railway-variabel: skjult jobbkonfigurasjon, uten audit, settes likt på
+web og cron, usynlig i portalen. `AppSetting` er én rad begge leser, auditlogget av
 `core/signals.py` — nøkkelen `ko.logg_dager` skal **aldri** inn i `NOKLER_UTEN_AUDIT`. 730
-fordi det er fristen audit-loggen, arkivkollapsen og `backups/`-prefikset alt har.
+fordi det er fristen audit-loggen, arkivkollapsen og `backups/` alt har.
 
 **Fristen er ikke en sletterett**, og det står både i malbiten og i A.9: en fjernet linje
 ligger i modulfila offsite i inntil 730 dager og i den hele fila i 90. Samme forbehold som
@@ -167,7 +166,7 @@ Lista og regelen bak den står i `ko/systemlinjer.py` — den er selve designarb
 puljen, ikke en detalj. Kort: **løft det som endrer situasjonen, ikke det som endrer
 oppsettet; løft hendelsen, ikke feltet; én linje per ting som skjedde.**
 
-Vaktlistas stemplinger: «ikke nå» — volumet ville druknet loggen.
+Vaktlistas stemplinger: «ikke nå» — volumet drukner loggen.
 
 ### 4. Historikk krever `skriv_leder` — se «Nivåene» over.
 
@@ -181,19 +180,18 @@ loggen, `SET_NULL` etterlater «meldte Fremme» uten hvem. Linja fryser teksten 
 bare `korrigerer` ville ledd tre arvet ledd to sin plass, og linjene skal ikke hoppe rundt
 etter en korreksjon (§4.3). `Coalesce('rot_id', 'id')` gjør de to til én sortering.
 
-**Sletteinngangen tømmer hele kjeden.** Ellers ble den opprinnelige teksten stående i den
-overstyrte raden — usynlig i loggen, lesbar i basen og i backupen.
+**Sletteinngangen tømmer hele kjeden.** Ellers sto den opprinnelige teksten igjen i den
+overstyrte raden — usynlig i loggen, lesbar i basen og backupen.
 
 ## Løftet går med signaler, ikke med et register
 
 `ko` → `oppdrag` er den tillatte retningen; et push-register hadde krevd at
 `oppdrag/services.py` meldte fra. **Hendelseslinjene går ikke gjennom signaler:** de er
-operatørens handlinger, og `ko/services.py` skriver dem selv. Forbeholdet står i
-`ko/systemlinjer.py`: **et signal ser raden, ikke intensjonen.** Mottakerne kaster aldri —
-**en KO-logg som ikke lar seg skrive skal ikke ta ned en stempling i en bil.**
+operatørens handlinger, og `ko/services.py` skriver dem selv. `ko/systemlinjer.py`: **et
+signal ser raden, ikke intensjonen.** Mottakerne kaster aldri — **en KO-logg som ikke lar
+seg skrive skal ikke ta ned en stempling i en bil.**
 
-**Fire av kodene fantes alt som `oppdrag.Enhetshendelse`** — sjekk om begrepet finnes før
-du designer det inn i KO (§2).
+**Fire av kodene fantes alt som `oppdrag.Enhetshendelse`** — sjekk før du designer.
 
 ## Hendelsene (pulje 5) — reglene som står
 
@@ -244,7 +242,7 @@ og er prøvd med mutanter i `ko/tests_hendelseslogg.py` og `ko/tests_nullstill.p
 | **Festing** i loggstrømmen: `skriv_full`, idempotent, aldri systemlinjer eller fjernede. `festede` sendes hele med pollen | Festing endrer en rad uten ny id og ville aldri kommet gjennom `?siden=` — som `fjernede` |
 
 **Sortering er oppdragslistas** (`koSorterHendelser`): lukkede nederst, prioritet, nummer.
-**Søket** filtrerer lista som alt er hentet (nummer, tittel, sted, melder, loggen, lag). **Hendelsen åpnes inne i vinduet**, ikke i en modal: ressursene og oppdragene skal
+**Søket** filtrerer lista som alt er hentet (nummer, tittel, sted, melder, logg, lag). **Hendelsen åpnes inne i vinduet**, ikke i en modal: ressursene og oppdragene skal
 være synlige mens man jobber i H14. **Loggstrømmen viser linjene uten
 hendelse pluss systemlinjene om hendelsene** (`koIStrommen`); kommentarene står i hendelsen.
 Utskriften skal ha alt (TODO).
@@ -284,8 +282,10 @@ enhetslista i egen beholder (`#vaktliste-ressurser`; sentralbordet tegner `#enhe
 igjen ved hver poll). Data fra `/vaktliste/api/ressurser/uten-enhet/`, gatet av vaktlista —
 **bare ressurser med et skift som dekker nå** (`ressurser_paa_vakt_naa`, samme regel som
 lagvelgeren) — tegnet av `koRessurskort()`: hvor mange som er møtt, og «På H14 · Hovedscene
-· 23 min» når laget står på en åpen hendelse; bilene viser oppdragets sted. «i» i hodet
-folder ut fargeforklaringen (`koLegendeHtml`, huskes i `ko.legende`). **Besetningen — navn, møtt, telefon, ISSI — står bak et klikk**, én om
+· 23 min» når laget står på en åpen hendelse; bilene viser oppdragets sted. «i» folder ut
+fargeforklaringen (`ko.legende`); kolonneknappen gir to kolonner med hele grupper per
+kolonne (`ko.ressurskolonner`). Oppdragslistas hode teller aktive · ventende · ferdig, og
+«Ventende» filtrerer (`koOppdragFilter`). **Besetningen — navn, møtt, telefon, ISSI — står bak et klikk**, én om
 gangen som bilens (André, 19. sep. 2026: «da sparer vi plass»). Alle | Biler | Lag i
 vinduets hode huskes per nettleser (`ko.ressursvisning`), og det skjulte står som et tall.
 

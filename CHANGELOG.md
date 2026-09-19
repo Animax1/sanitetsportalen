@@ -4,6 +4,46 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-19 — «Utført» på drift, skjemaet som hoppet ut, fritekst ved «Annet sted», to kolonner, «Ventende»  `#oppdrag/enhetsskjerm` `#oppdrag/sentralbord` `#oppdrag/statusmaskin` `#ko/ressursbildet` `#ko/sentralbordet`
+
+André, 19. sep. 2026, fem punkter.
+
+- **«Utført» i stedet for «Behandlet på sted» på Drift og Plassering.** Statusen i basen er
+  fortsatt `behandlet`; ordet byttes ett sted, `choices.status_navn_for(hastegrad, status)`,
+  og leses av bilens knapp (`alternativ_for(fra, hastegrad)`), meldingen, tidslinja,
+  enhetskortet og KO-loggens statuslinje. Bilens offline-projeksjon har samme regel.
+- **«Ved nytt oppdrag så hoppes det av og til ut av skjema».** Årsaken: pollingen bygde om
+  nedtrekkene og avkryssingen med `innerHTML` hvert 10.–30. sekund — et åpent nedtrekk
+  lukkes av det, og et element man er i ferd med å trykke på byttes ut. `fyllNedtrekk`
+  venter nå til neste poll når fokus står i det viste skjemaet (`skjemaErIBruk`), og rører
+  ikke markup som er uendret. `koFyllHendelsevalg` («Hendelse» i skjemaet) gjør det samme.
+- **Fritekst ved «Avreist → Annet sted».** Bilen får ett felt og én knapp i stedet for de
+  seks (`stempleAnnetSted`), teksten følger raden gjennom offline-køen og sendes som
+  `sted_tekst` i kroppen — det ene domenefeltet i det lukkede skjemaet
+  (`STEMPLING_TILLATTE_NOKLER`), lest bare når stedet er `annet`, kappet til 120 tegn.
+  `Statusmelding.sted_tekst` (`0029`); korreksjoner arver den; aldri verdilogget i audit
+  (`FELT_UTEN_VERDILOGGING`). Vises som «Annet sted: Legevakt Karmøy» i tidslinja, på tavla
+  og på enhetskortet. Sentralbordets føring har fått samme felt.
+- **To kolonner i ressursoversikten.** Kolonneknappen i hodet, huskes per nettleser
+  (`ko.ressurskolonner`). CSS-kolonner, og hver gruppe er en blokk med
+  `break-inside: avoid` — «en gruppe som mannskapsbil skal ikke begynne i kolonne 1 og så
+  gå over i kolonne 2». Blokkene tegnes av `tegnEnhetsliste` og `koTegnRessurser`.
+- **«Ventende» i oppdragslista.** Hodet teller «aktive · ventende · ferdig», der ventende
+  er oppdrag uten ressurs, og knappen «Ventende» filtrerer lista til dem
+  (`koOppdragFilter`, gjennom en vakt i `renderOppdrag` — på `/oppdrag/` finnes ikke
+  filteret). Ikke husket: et filter som overlever en refresh er et filter man glemmer.
+
+Mutasjonstesting, 20 mutanter, 20 drept etter to runder: `status_navn_for` på alt
+behandlet, `alternativ_for` uten hastegrad, KO-loggen fra `STATUS_NAVN`, teksten lagret
+uansett sted (overlevde først — API-et vasket før tjenesten; testet i tjenesten nå),
+korreksjonen mister teksten, `_sted_tekst` leser ikke kroppen, `sted_navn_for` uten tekst,
+verdilogging, føringen uten tekst, `skjemaErIBruk` alltid false, ombygging uansett,
+hendelsevalget under fokus, tellingen, filteret slipper alt, `renderOppdrag` uten filter,
+kolonner ikke husket, gruppene uten blokk, «Annet sted» stempler rett (overlevde først),
+køen mister teksten, projeksjonen uten «Utført» (overlevde først).
+
+---
+
 ## 2026-09-19 — Oppdrag uten enhet, «Tildelt», «Ikke aktuelt», «Plassering», fargeforklaring i ressursoversikten  `#oppdrag/sentralbord` `#oppdrag/statusmaskin` `#oppdrag/enhetsskjerm` `#ko/ressursbildet` `#ko/hendelseslogg`
 
 André, 19. sep. 2026, fire punkter med skisser først (A1/A2, B, C, D, E1 — alle valgt).

@@ -85,6 +85,19 @@ class BilensKnapperJsTests(SimpleTestCase):
         self.assertNotIn('stempleAlternativ', ut, 'mellom Avreist og Leverer: bare neste')
         self.assertEqual(ut.count('stor-knapp'), 1)
 
+    def test_projeksjonen_sier_utfort_uten_pasient(self):
+        """Den andre knappen mens «Fremme» ligger usendt: «Utført» på Drift og
+        Plassering, «Behandlet på sted» ellers (19. sep. 2026)."""
+        ut = run_node(self.harness, """
+            globalThis.OPPDRAG_NESTE = { rykker_ut: 'fremme', fremme: 'avreist' };
+            globalThis.OPPDRAG_STATUSNAVN = { fremme: 'Fremme' };
+            globalThis.OPPDRAG_ALTERNATIV = { fremme: 'behandlet' };
+            globalThis.OPPDRAG_ALTERNATIV_NAVN = { behandlet: 'Behandlet på sted' };
+            const k = [{ oppdragId: 7, overgang: 'fremme' }];
+            console.log(JSON.stringify(['Drift', 'Plassering', 'Akutt'].map((h) => projiser([{ id: 7, status: 'rykker_ut', hastegrad: h }], k)[0].alternativ_navn)));
+        """)
+        self.assertEqual(json.loads(ut.strip().splitlines()[0]), ['Utført', 'Utført', 'Behandlet på sted'])
+
     def test_projeksjonen_kjenner_avbryt(self):
         ut = run_node(self.harness, """
             globalThis.OPPDRAG_NESTE = { rykker_ut: 'fremme', fremme: 'avreist', behandlet: 'ledig' };

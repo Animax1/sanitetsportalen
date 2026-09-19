@@ -662,10 +662,40 @@ function koTegnRessurser() {
     const bemannet = g.ressurser.filter((r) => r.antall).length;
     const hode = gruppehode(nokkel, g.navn, g.ressurser.length,
                             bemannet ? String(bemannet) + ' bemannet' : '');
-    if (gruppeErLukket(nokkel)) return hode;
-    const kort = g.ressurser.map(koRessurskort).join('');
-    return hode + kort;
+    const kort = gruppeErLukket(nokkel) ? '' : g.ressurser.map(koRessurskort).join('');
+    return '<div class="enhet-gruppe-blokk">' + hode + kort + '</div>';
   }).join('');
+}
+
+// ── Én eller to kolonner i ressursoversikten (André, 19. sep. 2026) ─────────
+//
+// Huskes per nettleser som Alle | Biler | Lag. Kolonnene er CSS (`columns`),
+// og gruppene er blokker med `break-inside: avoid`: «en gruppe som
+// mannskapsbil skal ikke begynne i kolonne 1 og så gå over i kolonne 2».
+const KO_KOLONNER_NOKKEL = 'ko.ressurskolonner';
+
+function koLesKolonner() {
+  try { return window.localStorage.getItem(KO_KOLONNER_NOKKEL) === '2' ? 2 : 1; } catch (e) { return 1; }
+}
+
+function koLagreKolonner(antall) {
+  try { window.localStorage.setItem(KO_KOLONNER_NOKKEL, String(antall)); } catch (e) { /* privat modus */ }
+}
+
+function koBrukKolonner() {
+  const to = koLesKolonner() === 2;
+  const kropp = document.querySelector('#ko-vindu-ressurser .ko-vindu-kropp');
+  if (kropp) kropp.classList.toggle('ko-to-kolonner', to);
+  const knapp = document.getElementById('ko-kolonner-knapp');
+  if (knapp) {
+    knapp.classList.toggle('aktiv', to);
+    knapp.setAttribute('aria-pressed', to ? 'true' : 'false');
+  }
+}
+
+function koVippKolonner() {
+  koLagreKolonner(koLesKolonner() === 2 ? 1 : 2);
+  koBrukKolonner();
 }
 
 // Sentralbordet kaller denne etter at det tegnet enhetslista (gjennom en
@@ -747,6 +777,7 @@ document.addEventListener('DOMContentLoaded', () => {
   koRessursvisning = koLesRessursvisning();
   koBrukRessursvisning();
   koTegnLegende();
+  koBrukKolonner();
 
   koLeggHendelsevalgINyttOppdrag();
 

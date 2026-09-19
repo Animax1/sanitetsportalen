@@ -576,6 +576,20 @@ class DelingTests(_Grunnlag):
         self.assertEqual(Logglinje.objects.count(), antall, 'deling er en tilstand, ikke en hendelse')
 
 
+class UtfortILoggenTests(_Grunnlag):
+    def test_statuslinja_sier_utfort_uten_pasient(self):
+        """KO-loggen leser samme ord som bilen: «Utført» på Drift (19. sep.)."""
+        o = self._oppdrag()
+        Oppdrag.objects.filter(pk=o.pk).update(hastegrad='Drift', problemstilling='Utstyr')
+        o.refresh_from_db()
+        oservices.sett_status(o, choices.RYKKER_UT, enhet=self.enhet)
+        oservices.sett_status(o, choices.FREMME, enhet=self.enhet)
+        oservices.sett_status(o, choices.BEHANDLET, enhet=self.enhet)
+        linje = Logglinje.objects.filter(kilde=KILDE_SYSTEM, systemkode='oppdrag_status').order_by('-id').first()
+        self.assertEqual(linje.systemdata['status_navn'], 'Utført')
+        self.assertIn('Utført', systemlinjer.tegn(linje.systemkode, linje.systemdata))
+
+
 class KommentarTests(_Grunnlag):
     """En kommentar er en logglinje med hendelsen satt — én tabell."""
 

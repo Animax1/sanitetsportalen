@@ -152,7 +152,7 @@ class NyttOppdragSkjemaJsTests(SimpleTestCase):
         (OPPDRAG_SENTRAL_JS, ('fyllNedtrekk', 'mkEnhetsvalg', '_valgteEnheter',
                               '_grupperEnheter', '_typeRekkefolge',
                               'nullstillNyttOppdrag', 'hastegradEndret',
-                              'oppdaterOpprettKnapp', 'utenEnhetValgt')),
+                              'oppdaterOpprettKnapp', 'utenEnhetValgt', 'skjemaErIBruk')),
     )
 
     #: En liten DOM: avkryssingslista lager input-objekter av sin egen
@@ -224,6 +224,36 @@ class NyttOppdragSkjemaJsTests(SimpleTestCase):
         self.assertEqual(linjer[0], '[2,3]')
         self.assertEqual(linjer[1], '11')
         self.assertEqual(linjer[2], '[2]')
+
+    def test_skjemaet_bygges_ikke_om_mens_operatoren_staar_i_det(self):
+        """«Ved nytt oppdrag så hoppes det av og til ut av skjema» (André,
+        19. sep. 2026): `innerHTML` på et åpent nedtrekk lukker det. Står fokus
+        i det viste skjemaet, venter `fyllNedtrekk` — og uendret markup røres
+        ikke uansett."""
+        ut = run_node(self.harness, self.DOM + """
+            let skrevet = 0;
+            const enhetsvalgEl = { _html: '', querySelectorAll: () => [] };
+            Object.defineProperty(enhetsvalgEl, 'innerHTML', { get() { return this._html; }, set(v) { this._html = v; skrevet += 1; } });
+            const felt = {};
+            const modal = { classList: { contains: (k) => k === 'show' }, contains: (el) => el === felt };
+            globalThis.enheter = [{ id: 1, navn: 'A', pa_vakt: true, type: 1 }];
+            globalThis.lokasjoner = [];
+            let aktiv = null;
+            globalThis.document = {
+              getElementById: (id) => ({ 'nytt-enheter': enhetsvalgEl, 'nyttOppdragModal': modal })[id] || null,
+              querySelectorAll: () => [],
+              get activeElement() { return aktiv; },
+            };
+            fyllNedtrekk(); console.log(skjemaErIBruk(), skrevet);
+            fyllNedtrekk(); console.log(skrevet);
+            aktiv = felt;
+            globalThis.enheter = [{ id: 2, navn: 'B', pa_vakt: true, type: 1 }];
+            fyllNedtrekk(); console.log(skjemaErIBruk(), skrevet, enhetsvalgEl.innerHTML.includes('A'));
+            aktiv = null;
+            fyllNedtrekk(); console.log(skrevet, enhetsvalgEl.innerHTML.includes('B'));
+            aktiv = modal; console.log(skjemaErIBruk());
+        """).splitlines()
+        self.assertEqual(ut[:5], ['false 1', '1', 'true 1 true', '2 true', 'false'])
 
     def test_opprett_knappen_sier_uten_enhet_naar_ingen_er_krysset_av(self):
         """«Opprett uten enhet» og varselet når ingen er valgt (19. sep. 2026),

@@ -58,23 +58,50 @@ function fyllNedtrekk() {
   // oppdrag» bygges avkryssingen altså om under henne; det som sto krysset
   // av og valgt må derfor settes tilbake (André, 12. sep. 2026: «krysset
   // forsvinner når jeg går nedover i listen»).
+  //
+  // **Men ikke under hånden hennes** (André, 19. sep. 2026: «ved nytt
+  // oppdrag så hoppes det av og til ut av skjema»): `innerHTML` på et
+  // nedtrekk som står åpent lukker det, og på avkryssingen tar det bort
+  // elementet hun er i ferd med å trykke på. Står fokus i skjemaet, venter
+  // ombyggingen til neste poll — `skjemaErIBruk()` er regelen.
+  if (skjemaErIBruk()) return;
   const enhetsvalg = document.getElementById('nytt-enheter');
   if (enhetsvalg) {
     const krysset = _valgteEnheter();
-    enhetsvalg.innerHTML = mkEnhetsvalg()
-      || '<div class="tom-melding">Ingen enheter på vakt.</div>';
-    enhetsvalg.querySelectorAll('input[name="nytt-enhet"]').forEach((i) => {
-      if (krysset.includes(Number(i.value))) i.checked = true;
-    });
+    const ny = mkEnhetsvalg() || '<div class="tom-melding">Ingen enheter på vakt.</div>';
+    // Uendret markup røres ikke: en ombygging som ikke endrer noe, er bare
+    // et blink for den som ser på.
+    if (enhetsvalg.innerHTML !== ny) {
+      enhetsvalg.innerHTML = ny;
+      enhetsvalg.querySelectorAll('input[name="nytt-enhet"]').forEach((i) => {
+        if (krysset.includes(Number(i.value))) i.checked = true;
+      });
+    }
   }
   const lokvalg = document.getElementById('nytt-lokasjon');
   if (lokvalg) {
     const valgt = lokvalg.value;
     const aktive = lokasjoner.filter((l) => l.er_aktiv);
-    lokvalg.innerHTML = (aktive.map(
+    const ny = (aktive.map(
       (l) => `<option value="${escHtmlValue(l.id)}">${escapeHtml(l.navn)}</option>`).join(''));
-    if (valgt && aktive.some((l) => String(l.id) === String(valgt))) lokvalg.value = valgt;
+    if (lokvalg.innerHTML !== ny) {
+      lokvalg.innerHTML = ny;
+      if (valgt && aktive.some((l) => String(l.id) === String(valgt))) lokvalg.value = valgt;
+    }
   }
+}
+
+
+// Står fokus i «Nytt oppdrag» mens det er åpent? Da skal pollingen la
+// skjemaet være. Regelen står for seg fordi den avgjør noe, og fordi en
+// tilstandsløs DOM i testene skal kunne svare på den.
+function skjemaErIBruk() {
+  const modal = document.getElementById('nyttOppdragModal');
+  const aktiv = document.activeElement;
+  if (!modal || !aktiv || typeof modal.contains !== 'function') return false;
+  const klasser = modal.classList;
+  const vises = klasser && typeof klasser.contains === 'function' ? klasser.contains('show') : true;
+  return vises && modal.contains(aktiv) && aktiv !== modal;
 }
 
 

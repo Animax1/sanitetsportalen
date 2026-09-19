@@ -23,7 +23,15 @@ function renderOppdrag() {
     return;
   }
 
-  const sortert = _sorterOppdrag(oppdragsliste);
+  // Filteret er KOs (19. sep. 2026: «filter knapp for ventende oppdrag»),
+  // gjennom en vakt — på `/oppdrag/` finnes det ikke.
+  const synlige = (typeof koOppdragFilter === 'function') ? koOppdragFilter(oppdragsliste) : oppdragsliste;
+  if (!synlige.length) {
+    el.innerHTML = ('<div class="tom-melding">Ingen ventende oppdrag.</div>');
+    if (typeof koEtterOppdragTegnet === 'function') koEtterOppdragTegnet();
+    return;
+  }
+  const sortert = _sorterOppdrag(synlige);
   // **Ingen hendelser i lista** (André, 18. sep. 2026): H-merket på raden
   // bærer koblingen, og hendelsene har sitt eget vindu i /ko/. Grupperingen
   // fra pulje 5 er borte. KO får beskjed etter tegningen — hendelsesloggen
@@ -670,8 +678,11 @@ function visFoerStatus(enhetId) {
   skjema.innerHTML = (`
     <select id="foer-status" class="form-select form-select-sm w-auto" aria-label="Status"
             data-action="foerStatusEndret" data-hendelse="change">${statusvalg}</select>
-    <select id="foer-sted" class="form-select form-select-sm w-auto" aria-label="Sted ved Avreist"${stedSkjult}>
+    <select id="foer-sted" class="form-select form-select-sm w-auto" aria-label="Sted ved Avreist"${stedSkjult}
+            data-action="foerStatusEndret" data-hendelse="change">
       <option value="">Velg sted</option>${stedvalg}</select>
+    <input type="text" id="foer-sted-tekst" class="form-control form-control-sm w-auto" maxlength="120"
+           placeholder="Hvor?" aria-label="Annet sted" hidden>
     <input type="datetime-local" class="form-control form-control-sm w-auto"
            id="foer-tid" value="${_lokalNaa()}" step="60">
     <span id="foer-feil" class="text-danger small"></span>
@@ -812,6 +823,12 @@ function foerStatusEndret() {
   if (!status || !sted) return;
   sted.hidden = status.value !== 'avreist';
   if (sted.hidden) sted.value = '';
+  // Friteksten hører til «Annet sted» (19. sep. 2026) og vises bare da.
+  const tekst = document.getElementById('foer-sted-tekst');
+  if (tekst) {
+    tekst.hidden = sted.hidden || sted.value !== 'annet';
+    if (tekst.hidden) tekst.value = '';
+  }
 }
 
 
@@ -833,11 +850,13 @@ async function lagreFoerStatus(enhetId) {
   await withSubmitGuard('foer-lagre', async () => {
     // Stedet hører til «Avreist» og ingen annen status — sendes bare da.
     const stedLedd = (status.value === 'avreist' && sted && sted.value) ? `${sted.value}/` : '';
+    const stedTekst = document.getElementById('foer-sted-tekst');
     const res = await apiFetch(
       `/oppdrag/api/oppdrag/${apentOppdragId}/enheter/${Number(enhetId)}/status/${status.value}/${stedLedd}`, {
         method: 'POST',
         // Ingen sone på `datetime-local`; serveren tolker den som lokal tid.
-        body: JSON.stringify({ tidspunkt: tid.value }),
+        body: JSON.stringify({ tidspunkt: tid.value,
+                               sted_tekst: (stedTekst && !stedTekst.hidden) ? stedTekst.value : undefined }),
       });
     const d = await res.json();
     if (!res.ok || d.status !== 'ok') {

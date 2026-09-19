@@ -45,6 +45,8 @@ FELT_UTEN_AUDIT = frozenset({
 # endret, av hvem og når; hva som sto der sier den ikke.
 FELT_UTEN_VERDILOGGING = frozenset({
     'fritekst',
+    # «Annet sted: …» på statusmeldingen (19. sep. 2026) — fritekst som over.
+    'sted_tekst',
 })
 
 #: Det som skrives i stedet for verdien. En tom streng ville vært tvetydig —

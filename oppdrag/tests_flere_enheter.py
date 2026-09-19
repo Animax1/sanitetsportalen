@@ -617,6 +617,17 @@ class FoeringTests(SentralbordBasis):
                            data={'tidspunkt': (timezone.now() - timedelta(minutes=2)).isoformat()})
         self.assertEqual(res.status_code, 400)
 
+    def test_foering_med_annet_sted_baerer_teksten(self):
+        """Sentralbordets føring tar friteksten fra kroppen, som bilen."""
+        o = self._gammelt(self.a)
+        services.sett_status(o, choices.RYKKER_UT, tidspunkt=self._for(60))
+        services.sett_status(o, choices.FREMME, tidspunkt=self._for(50))
+        res = self.ks.post(self._url(o, self.a, 'avreist', 'annet'),
+                           content_type='application/json',
+                           data={'tidspunkt': self._for(40).isoformat(), 'sted_tekst': 'Hotellet'})
+        self.assertEqual(res.status_code, 200, res.content)
+        self.assertEqual(res.json()['data']['melding']['sted_navn'], 'Annet sted: Hotellet')
+
     def test_avreist_med_sted(self):
         o = self._gammelt(self.a)
         services.sett_status(o, choices.RYKKER_UT, tidspunkt=self._for(60))
@@ -1349,7 +1360,7 @@ class StedOgGrovKnappeneTests(TestCase):
             (OPPDRAG_ENHET_JS, ('_stedvalg', '_grovsorteringsrad', '_kanGrovsortere')),
         ))
 
-    STUBB = ("globalThis.AVREIST_TIL = [['sykehus','Sykehus'],['legevakt','Legevakt']];\n"
+    STUBB = ("globalThis.AVREIST_TIL = [['sykehus','Sykehus'],['legevakt','Legevakt']];\nglobalThis.velgerAnnetSted = false;\n"
              "globalThis.GROVSORTERING = [['rod','Rød'],['gul','Gul'],['gronn','Grønn']];\n"
              # Det delegeringen ser: dataset-attributtene på knappen i markupen.
              "function datasetFra(html, id) {\n"

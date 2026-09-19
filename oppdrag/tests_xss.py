@@ -9,6 +9,7 @@ nedtrekksliste.** Pasientmodulens kliniske felt er alle valgt fra en fast
 verdimengde; her skriver en operatør hva som helst, og det settes inn i DOM-en
 med `innerHTML`.
 """
+import json
 import re
 
 from django.test import SimpleTestCase
@@ -510,7 +511,7 @@ class EnhetEscapingOppforselTests(SimpleTestCase):
 
     #: Toppnivå-tilstanden `renderAktivt` leser: stedvalget, og listene som
     #: ellers settes av malen. Stubbes, som `OPPDRAG_NESTE` i køtestene.
-    STUBB = ("globalThis.velgerStedFor = null;\n"
+    STUBB = ("globalThis.velgerStedFor = null;\nglobalThis.velgerAnnetSted = false;\n"
              "globalThis.AVREIST_TIL = [['samleplass','Samleplass'],"
              "['skadepol','Skadepol'],['legevakt','Legevakt'],['sykehus','Sykehus'],"
              "['annen_ambulanse','Annen ambulanse'],['annet','Annet sted']];\n"
@@ -704,6 +705,27 @@ class EnhetskortetTests(SimpleTestCase):
         """)
         self.assertIn('>Venter<', ut)
 
+    def test_ko_filteret_avgjor_hva_lista_viser(self):
+        """Filteret «Ventende» er KOs (19. sep. 2026), gjennom en vakt: uten
+        `koOppdragFilter` vises alt; med, bare det den slipper gjennom, og
+        tom liste sier «Ingen ventende oppdrag.»."""
+        ut = run_node(self.harness, self.STUBB + """
+            globalThis.oppdragsliste = [
+              { id: 1, status: 'venter', status_navn: 'Venter', enhet_navn: 'E1', lokasjon_navn: 'Scene', nummer: 12,
+                problemstilling: 'Fallskade', hastegrad: 'Haster', opprettet: new Date().toISOString(), status_tidspunkt: null, fritekst: '', trenger_ressurs: false },
+              { id: 2, status: 'venter', status_navn: 'Venter', enhet_navn: '', enheter: [], lokasjon_navn: 'Scene', nummer: 13,
+                problemstilling: 'Uten bil', hastegrad: 'Haster', opprettet: new Date().toISOString(), status_tidspunkt: null, fritekst: '', trenger_ressurs: true, trenger_ressurs_siden: new Date().toISOString() }];
+            const el = { innerHTML: '' };
+            globalThis.document = { getElementById: () => el };
+            renderOppdrag(); console.log(el.innerHTML.includes('Fallskade') && el.innerHTML.includes('Uten bil'));
+            globalThis.koOppdragFilter = (l) => l.filter((o) => o.trenger_ressurs);
+            renderOppdrag(); console.log(!el.innerHTML.includes('Fallskade') && el.innerHTML.includes('Uten bil'));
+            oppdragsliste[1].trenger_ressurs = false;
+            renderOppdrag(); console.log(el.innerHTML);
+        """).strip().splitlines()
+        self.assertEqual(ut[0], 'true'); self.assertEqual(ut[1], 'true')
+        self.assertIn('Ingen ventende oppdrag.', ut[2])
+
 
 class AvreistTilOgGrovsorteringTests(SimpleTestCase):
     """Bilens skjerm: stedvalget ved «Avreist», og Rød/Gul/Grønn.
@@ -718,7 +740,8 @@ class AvreistTilOgGrovsorteringTests(SimpleTestCase):
         (OPPDRAG_ENHET_JS, ('renderAktivt', 'delteLinjerBlokk', 'erNyDelt', 'hendelsesnr', 'oppdragsnr', '_antallRad', '_udefinertVarsel', 'tidslinjeEnhetHtml', 'hastegradKlasse',
                             '_stedvalg', '_grovsorteringsrad', '_kanGrovsortere', '_varsledeRad',
                             'koNokkel', 'koLes',
-                            'koSkriv', 'koLeggTil', 'koFjern', 'lagNokkel', 'synk', '_problemMedAntall', '_medAntall')),
+                            'koSkriv', 'koLeggTil', 'koFjern', 'lagNokkel', 'synk', '_problemMedAntall', '_medAntall',
+                            'stempleAvreistTil', 'stempleAnnetSted', 'avbrytStedvalg')),
     )
     STUBB = EnhetEscapingOppforselTests.STUBB + (
         "globalThis.localStorage = (() => { const m = {}; return {"
@@ -760,6 +783,63 @@ class AvreistTilOgGrovsorteringTests(SimpleTestCase):
         self.assertEqual(ut.count('stempleAvreistTil'), 6)
         self.assertNotIn('stempleLedig', ut)
         self.assertIn('avbrytStedvalg', ut)
+
+    def test_annet_sted_aapner_fritekstfeltet(self):
+        """«Annet sted» spør hvor (19. sep. 2026): ett felt og én knapp i
+        stedet for de seks, og «Avbryt» står. Stempelet går med teksten."""
+        ut = run_node(self.harness, self.STUBB + self.AKTIV + """
+            globalThis.velgerStedFor = 1; globalThis.velgerAnnetSted = true;
+            renderAktivt();
+            console.log(el.innerHTML);
+        """)
+        self.assertIn('id="stemple-sted-tekst"', ut)
+        self.assertIn('data-action="stempleAnnetSted"', ut)
+        self.assertEqual(ut.count('stempleAvreistTil'), 0, 'de seks er borte mens feltet står')
+        self.assertIn('avbrytStedvalg', ut)
+        self.assertNotIn('stempleLedig', ut)
+
+    def test_annet_sted_stempler_ikke_foer_teksten_er_gitt(self):
+        """«Annet sted» åpner feltet; de fem andre stempler rett. Feltets knapp
+        stempler med teksten, «Avbryt» lukker begge."""
+        ut = run_node(self.harness, self.STUBB + """
+            const stemplet = [];
+            globalThis._stemple = async (id, overgang, knapp, sted, tekst) => { stemplet.push([id, overgang, sted, tekst]); };
+            globalThis.renderAlt = () => {};
+            globalThis.velgerStedFor = 7;
+            await stempleAvreistTil('annet');
+            console.log(JSON.stringify([globalThis.velgerAnnetSted, globalThis.velgerStedFor, stemplet]));
+            globalThis.document = { getElementById: (id) => id === 'stemple-sted-tekst' ? { value: '  Legevakt  ' } : null };
+            await stempleAnnetSted();
+            console.log(JSON.stringify([globalThis.velgerAnnetSted, globalThis.velgerStedFor, stemplet]));
+            globalThis.velgerStedFor = 8; globalThis.velgerAnnetSted = true;
+            avbrytStedvalg(); console.log(JSON.stringify([globalThis.velgerAnnetSted, globalThis.velgerStedFor]));
+            globalThis.velgerStedFor = 9;
+            await stempleAvreistTil('sykehus');
+            console.log(JSON.stringify([globalThis.velgerStedFor, stemplet[1]]));
+        """).strip().splitlines()
+        self.assertEqual(json.loads(ut[0]), [True, 7, []])
+        self.assertEqual(json.loads(ut[1]), [False, None, [[7, 'avreist', 'annet', 'Legevakt']]])
+        self.assertEqual(json.loads(ut[2]), [False, None])
+        self.assertEqual(json.loads(ut[3]), [None, [9, 'avreist', 'sykehus', None]])
+
+    def test_koen_baerer_annet_sted_teksten_i_kroppen(self):
+        ut = run_node(self.harness, self.STUBB + """
+            const rad = koLeggTil(7, 'avreist', 'annet', 'Legevakt <Karmøy>');
+            assert(koLes()[0].sted_tekst === 'Legevakt <Karmøy>', 'teksten overlever i koen');
+            assert(koLeggTil(7, 'avreist', 'sykehus').sted_tekst === null, 'uten tekst: null');
+            koSkriv([rad]);
+            const kall = [];
+            globalThis.apiFetch = async (url, init) => { kall.push([url, JSON.parse(init.body)]); return { ok: true }; };
+            globalThis.synkerNaa = false; globalThis.etagMine = null;
+            globalThis.skjulFeil = () => {}; globalThis.visUsendt = () => {};
+            globalThis.visFeil = () => {}; globalThis.lastMine = async () => {};
+            await synk();
+            console.log(JSON.stringify(kall));
+        """).strip().splitlines()
+        import json
+        kall = json.loads(next(l for l in ut if l.startswith('[[')))
+        self.assertEqual(kall[0][0], '/oppdrag/api/oppdrag/7/status/avreist/annet/')
+        self.assertEqual(kall[0][1]['sted_tekst'], 'Legevakt <Karmøy>')
 
     def test_koen_baerer_stedet_og_url_en_faar_det(self):
         ut = run_node(self.harness, self.STUBB + """

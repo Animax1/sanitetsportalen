@@ -381,6 +381,11 @@ Invarianten skrives derfor om, strengere formulert i stedet for svakere:
 > Kroppen har et **lukket skjema på to nøkler** — `klienttid` og `idempotency_key`. Alt
 > annet avvises med 400. Ingen domenefelt kan noensinne komme inn denne veien.
 
+*Ett navngitt unntak fra 19. sep. 2026:* `sted_tekst`, friteksten ved «Avreist → Annet
+sted». Den er det ene domenefeltet i settet (`STEMPLING_TILLATTE_NOKLER`), leses bare når
+stedet i URL-en er `annet`, og har ingen betydning for overgangen — den er et notat på
+meldingen, ikke et valg. Settet er fortsatt lukket og uttømmelig.
+
 Det er sterkere enn «leser ikke kroppen», fordi det er noe en test kan uttømme: send et
 felt som ikke står i settet, og krev 400. En feltwhitelist inne i en generell `PUT` — det
 §3.2 advarte mot — kan ikke testes slik, fordi settet av felter der vokser med modellen.

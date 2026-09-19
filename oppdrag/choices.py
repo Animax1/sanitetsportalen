@@ -157,6 +157,29 @@ AKTIVITET: dict[str, int] = {
 
 STATUS_NAVN: dict[str, str] = dict(STATUS_VALG)
 
+
+def status_navn_for(hastegrad: str | None, status: str | None) -> str:
+    """Statusens navn slik den skal leses **på dette oppdraget**.
+
+    «Behandlet på sted» heter «Utført» på oppdrag uten pasient (André,
+    19. sep. 2026: «Drift oppdrag erstatte behandlet på stedet med utført»).
+    Verdien i basen er den samme, `behandlet` — det er ordet som byttes, ikke
+    statusen. Ett sted for regelen: bilens knapp, tidslinja, tavla og KO-loggen
+    leser alle herfra.
+    """
+    if status == BEHANDLET and hastegrad in UTEN_PASIENT:
+        return 'Utført'
+    return STATUS_NAVN.get(status or '', status or '')
+
+
+def sted_navn_for(sted: str, sted_tekst: str = '') -> str:
+    """«Sykehus», eller «Annet sted: Legevakt Karmøy» når bilen skrev hvor
+    (19. sep. 2026). Tom for meldinger uten sted."""
+    navn = AVREIST_TIL_NAVN.get(sted, '')
+    if sted == 'annet' and sted_tekst:
+        return f'{navn}: {sted_tekst}'
+    return navn
+
 #: Statusen som avslutter et oppdrag. Enheten er ledig når den ikke har et
 #: oppdrag i en ikke-terminal status — det utledes, det lagres ikke.
 TERMINAL = LEDIG

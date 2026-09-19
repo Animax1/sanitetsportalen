@@ -4,6 +4,7 @@ Det som testes er grensene: hvem som slipper inn på hvilket nivå, at en
 enhetskonto kun får sine egne rader, og at skjulereglene håndheves i serverens
 svar og ikke i nettleseren.
 """
+import json
 from datetime import timedelta
 
 from django.core.cache import cache
@@ -627,6 +628,28 @@ class StemplingTests(StemplingBasis):
         Oppdrag.objects.filter(pk=o.pk).update(problemstilling=choices.UDEFINERT)
         self._stemple(o, 'rykker_ut')
         self.assertEqual(self._stemple(o, 'avbryt').status_code, 200, 'hun har ikke sett pasienten')
+
+    def test_den_andre_knappen_heter_utfort_uten_pasient(self):
+        """«Drift oppdrag erstatte behandlet på stedet med utført» (André,
+        19. sep. 2026). Statusen i basen er `behandlet`; ordet byttes i
+        knappen, i meldingen og i tidslinja — `choices.status_navn_for`."""
+        for hastegrad in ('Drift', 'Plassering'):
+            with self.subTest(hastegrad=hastegrad):
+                o = self._oppdrag()
+                Oppdrag.objects.filter(pk=o.pk).update(hastegrad=hastegrad, problemstilling='Utstyr')
+                self._stemple(o, 'rykker_ut'); self._stemple(o, 'fremme')
+                rad = next(r for r in self.bil.get('/oppdrag/api/oppdrag/').json()['data'] if r['id'] == o.pk)
+                self.assertEqual((rad['alternativ_overgang'], rad['alternativ_navn']), ('behandlet', 'Utført'))
+                res = self._stemple(o, 'behandlet')
+                self.assertEqual(res.status_code, 200, res.content)
+                self.assertEqual(res.json()['data']['melding']['status_navn'], 'Utført')
+                self.assertEqual(res.json()['data']['melding']['status'], 'behandlet', 'verdien er den samme')
+        o = self._oppdrag()
+        self._stemple(o, 'rykker_ut'); self._stemple(o, 'fremme')
+        rad = next(r for r in self.bil.get('/oppdrag/api/oppdrag/').json()['data'] if r['id'] == o.pk)
+        self.assertEqual(rad['alternativ_navn'], 'Behandlet på sted', 'med pasient som før')
+        self.assertEqual(choices.status_navn_for('Akutt', 'behandlet'), 'Behandlet på sted')
+        self.assertEqual(choices.status_navn_for('Drift', 'fremme'), 'Fremme')
 
     def test_svaret_baerer_den_andre_knappen(self):
         o = self._oppdrag()
@@ -1649,6 +1672,44 @@ class AvreistTilTests(OppdragBasis):
         melding = Statusmelding.objects.gjeldende_for_status(o, choices.AVREIST)
         self.assertEqual(melding.sted, 'sykehus')
         self.assertEqual(res.json()['data']['melding']['sted_navn'], 'Sykehus')
+
+    def test_annet_sted_faar_fritekst(self):
+        """«Ved annet sted på levering i oppdrag så får en et fritekstfelt»
+        (André, 19. sep. 2026). Teksten følger bare «annet», trimmes og kappes
+        til 120 tegn, og arves av en korreksjon."""
+        o = self._fremme()
+        res = self.c.post(f'/oppdrag/api/oppdrag/{o.pk}/status/avreist/annet/',
+                          content_type='application/json',
+                          data=json.dumps({'sted_tekst': '  Legevakt Karmøy  '}))
+        self.assertEqual(res.status_code, 200, res.content)
+        melding = Statusmelding.objects.gjeldende_for_status(o, choices.AVREIST)
+        self.assertEqual((melding.sted, melding.sted_tekst), ('annet', 'Legevakt Karmøy'))
+        d = res.json()['data']
+        self.assertEqual(d['melding']['sted_navn'], 'Annet sted: Legevakt Karmøy')
+        self.assertEqual(d['melding']['sted_tekst'], 'Legevakt Karmøy')
+        # Tavla og tidslinja leser det samme.
+        rad = self.c.get('/oppdrag/api/oppdrag/').json()['data'][0]
+        self.assertEqual(rad['enheter'][0]['sted_navn'], 'Annet sted: Legevakt Karmøy')
+        rettet = services.korriger_tidspunkt(melding, melding.tidspunkt - timedelta(minutes=2), bruker=self.bil)
+        self.assertEqual(rettet.sted_tekst, 'Legevakt Karmøy', 'korreksjonen arver teksten')
+        # Uten tekst: bare «Annet sted». Med et annet sted: teksten kastes.
+        o2 = self._fremme()
+        res = self.c.post(f'/oppdrag/api/oppdrag/{o2.pk}/status/avreist/annet/',
+                          content_type='application/json', data=json.dumps({}))
+        self.assertEqual(res.json()['data']['melding']['sted_navn'], 'Annet sted')
+        o3 = self._fremme()
+        res = self.c.post(f'/oppdrag/api/oppdrag/{o3.pk}/status/avreist/sykehus/',
+                          content_type='application/json', data=json.dumps({'sted_tekst': 'x'}))
+        self.assertEqual(Statusmelding.objects.gjeldende_for_status(o3, choices.AVREIST).sted_tekst, '')
+        o4 = self._fremme()
+        self.c.post(f'/oppdrag/api/oppdrag/{o4.pk}/status/avreist/annet/',
+                    content_type='application/json', data=json.dumps({'sted_tekst': 'x' * 200}))
+        self.assertEqual(len(Statusmelding.objects.gjeldende_for_status(o4, choices.AVREIST).sted_tekst), 120)
+        # Tjenestelaget vasker selv — en kaller som går utenom viewet skal
+        # ikke kunne legge tekst på «Sykehus».
+        o5 = self._fremme()
+        m = services.sett_status(o5, choices.AVREIST, sted='sykehus', sted_tekst='x')
+        self.assertEqual(m.sted_tekst, '')
 
     def test_alle_seks_stedene_godtas(self):
         for sted, navn in choices.AVREIST_TIL:

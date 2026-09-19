@@ -91,11 +91,11 @@ def enheter_til_liste(oppdrag, meldinger=None) -> list:
             # og da vises ingenting: «Aktiv» på en ambulanse er støy.
             'varslet_modus': rad.varslet_modus,
             'status': rad.status,
-            'status_navn': rad.get_status_display(),
+            'status_navn': choices.status_navn_for(oppdrag.hastegrad, rad.status),
             'status_tidspunkt': siste.tidspunkt.isoformat() if siste else None,
             # «Avreist → Sykehus» skal synes i sentralbordet, ikke bare i
             # tidslinjen (André, 12. sep. 2026).
-            'sted_navn': choices.AVREIST_TIL_NAVN.get(siste.sted, '') if siste else '',
+            'sted_navn': choices.sted_navn_for(siste.sted, siste.sted_tekst) if siste else '',
             'varslet_at': rad.varslet_at.isoformat(),
             'rekkefolge': rad.rekkefolge,
         })
@@ -151,7 +151,7 @@ def oppdrag_til_dict(oppdrag, *, for_enhet: bool = False,
         'lokasjon_id': oppdrag.lokasjon_id,
         'lokasjon_navn': oppdrag.lokasjon.navn,
         'status': status,
-        'status_navn': choices.STATUS_NAVN.get(status, status),
+        'status_navn': choices.status_navn_for(oppdrag.hastegrad, status),
         'enheter': enheter_til_liste(oppdrag, meldinger),
         'opprettet': oppdrag.created_at.isoformat(),
         'status_tidspunkt': status_tidspunkt,
@@ -207,11 +207,12 @@ def oppdrag_til_dict(oppdrag, *, for_enhet: bool = False,
         # det her — JS-en har ingen egen kopi av kjeden å komme i utakt med.
         neste = services.neste_i_kjeden(status)
         data['neste_overgang'] = neste
-        data['neste_navn'] = choices.STATUS_NAVN.get(neste) if neste else None
+        data['neste_navn'] = choices.status_navn_for(oppdrag.hastegrad, neste) if neste else None
         # Den andre knappen (12. sep. 2026): «Avbryt» i Rykker ut, «Behandlet
-        # på sted» i Fremme. Ingen egen Ledig-knapp lenger — Ledig er «neste»
-        # etter Leverer og Behandlet, og finnes ikke mellom Avreist og Leverer.
-        alternativ = services.alternativ_for(status)
+        # på sted» i Fremme — «Utført» på Drift og Plassering (19. sep. 2026).
+        # Ingen egen Ledig-knapp lenger — Ledig er «neste» etter Leverer og
+        # Behandlet, og finnes ikke mellom Avreist og Leverer.
+        alternativ = services.alternativ_for(status, oppdrag.hastegrad)
         data['alternativ_overgang'] = alternativ[0] if alternativ else None
         data['alternativ_navn'] = alternativ[1] if alternativ else None
         egen = koblingsrad.enhet_id if koblingsrad is not None else None
@@ -228,7 +229,7 @@ def melding_til_dict(melding) -> dict:
     return {
         'id': melding.pk,
         'status': melding.status,
-        'status_navn': melding.get_status_display(),
+        'status_navn': choices.status_navn_for(melding.oppdrag.hastegrad, melding.status),
         # Hvem sin melding: med flere enheter må tidslinjen si det.
         'enhet_id': melding.oppdragsenhet.enhet_id if melding.oppdragsenhet_id else None,
         'enhet_navn': melding.oppdragsenhet.enhet.navn if melding.oppdragsenhet_id else '',
@@ -241,7 +242,8 @@ def melding_til_dict(melding) -> dict:
         'korrigerer': melding.korrigerer_id,
         # «Avreist → Sykehus». Tom for alle andre statuser.
         'sted': melding.sted,
-        'sted_navn': choices.AVREIST_TIL_NAVN.get(melding.sted, ''),
+        'sted_tekst': melding.sted_tekst,
+        'sted_navn': choices.sted_navn_for(melding.sted, melding.sted_tekst),
     }
 
 

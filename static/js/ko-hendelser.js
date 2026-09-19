@@ -245,11 +245,39 @@ function koTaImotHendelser(liste) {
 function koEtterOppdragTegnet() {
   const liste = (typeof oppdragsliste !== 'undefined' && Array.isArray(oppdragsliste)) ? oppdragsliste : [];
   const tall = document.getElementById('ko-oppdrag-antall');
+  const telling = koOppdragTelling(liste);
   if (tall) {
-    const aktive = liste.filter((o) => o.status !== 'ledig').length;
-    tall.textContent = '· ' + aktive + ' aktive · ' + (liste.length - aktive) + ' ferdig';
+    tall.textContent = '· ' + telling.aktive + ' aktive · ' + telling.ventende + ' ventende · ' + telling.ferdig + ' ferdig';
+  }
+  const knapp = document.getElementById('ko-ventende-filter');
+  if (knapp) {
+    knapp.classList.toggle('aktiv', koVentendeFilter);
+    knapp.setAttribute('aria-pressed', koVentendeFilter ? 'true' : 'false');
+    const tallEl = knapp.querySelector('.tall');
+    if (tallEl) tallEl.textContent = telling.ventende ? String(telling.ventende) : '';
   }
   koTegnHendelser();
+}
+
+// «Aktive · ventende · ferdig» (André, 19. sep. 2026): ventende er oppdrag
+// uten ressurs (`trenger_ressurs`), aktive er resten som ikke er ferdige.
+function koOppdragTelling(liste) {
+  const ventende = liste.filter((o) => o.trenger_ressurs).length;
+  const ferdig = liste.filter((o) => o.status === 'ledig' && !o.trenger_ressurs).length;
+  return { aktive: liste.length - ventende - ferdig, ventende, ferdig };
+}
+
+// Filteret «Ventende»: bare oppdrag uten ressurs. Ikke husket — et filter
+// som overlever en refresh er et filter man glemmer at står på.
+let koVentendeFilter = false;
+
+function koOppdragFilter(liste) {
+  return koVentendeFilter ? liste.filter((o) => o.trenger_ressurs) : liste;
+}
+
+function koVippVentendeFilter() {
+  koVentendeFilter = !koVentendeFilter;
+  if (typeof renderOppdrag === 'function') renderOppdrag();
 }
 
 // ── Hendelsen åpnet inne i vinduet ──────────────────────────────────────────
@@ -1077,11 +1105,18 @@ function koNullstillHendelsevalg() {
 function koFyllHendelsevalg() {
   const sel = document.getElementById('nytt-hendelse');
   if (!sel) return;
+  // Ikke mens operatøren står i nedtrekket (19. sep. 2026: «hoppes det av
+  // og til ut av skjema») — `innerHTML` lukker et åpent nedtrekk. Og ikke
+  // når ingenting er endret: da er ombyggingen bare et blink.
+  if (globalThis.document && document.activeElement === sel) return;
   const valgt = sel.value;
-  sel.innerHTML = '<option value="">Uten hendelse</option>'
+  const ny = '<option value="">Uten hendelse</option>'
     + koApneHendelser().map((h) =>
       '<option value="' + escapeHtml(h.id) + '">' + escapeHtml(h.kode) + ' ' + escapeHtml(h.tittel) + '</option>').join('');
-  if (valgt && koHendelser.has(Number(valgt))) sel.value = valgt;
+  if (sel.innerHTML !== ny) {
+    sel.innerHTML = ny;
+    if (valgt && koHendelser.has(Number(valgt))) sel.value = valgt;
+  }
   koHendelsevalgEndret();
 }
 

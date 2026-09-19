@@ -815,6 +815,59 @@ class DelingOgLagTests(SimpleTestCase):
             {'id': 3, 'delt_at': '2026-09-19T11:00:00Z', 'delt_av': 'ola', 'delt_med': []},
         ])
 
+    def test_kolonnene_huskes_og_settes_paa_vinduet(self):
+        """Én eller to kolonner (André, 19. sep. 2026), huskes per nettleser."""
+        harness = build_harness(((KO_JS, ('koLesKolonner', 'koLagreKolonner', 'koBrukKolonner', 'koVippKolonner')),))
+        ut = run_node(harness, '''
+            const KO_KOLONNER_NOKKEL = 'ko.ressurskolonner';
+            const lager = {};
+            globalThis.window = { localStorage: { getItem: (k) => lager[k] ?? null, setItem: (k, v) => { lager[k] = v; } } };
+            const kropp = { klasser: new Set(), classList: { toggle(k, v) { v ? kropp.klasser.add(k) : kropp.klasser.delete(k); } } };
+            const knapp = { klasser: new Set(), attr: {}, classList: { toggle(k, v) { v ? knapp.klasser.add(k) : knapp.klasser.delete(k); } }, setAttribute(n, v) { this.attr[n] = v; } };
+            globalThis.document = { querySelector: () => kropp, getElementById: (id) => id === 'ko-kolonner-knapp' ? knapp : null };
+            koBrukKolonner(); console.log(koLesKolonner(), kropp.klasser.has('ko-to-kolonner'));
+            koVippKolonner(); console.log(koLesKolonner(), kropp.klasser.has('ko-to-kolonner'), knapp.attr['aria-pressed'], lager[KO_KOLONNER_NOKKEL]);
+            koVippKolonner(); console.log(koLesKolonner(), kropp.klasser.has('ko-to-kolonner'));
+        ''').splitlines()
+        self.assertEqual(ut[:3], ['1 false', '2 true true 2', '1 false'])
+
+    def test_ventende_telles_og_filtreres(self):
+        """«Aktive · ventende · ferdig», og filteret «Ventende» (19. sep. 2026)."""
+        harness = build_harness(((KO_JS, ('koOppdragTelling', 'koOppdragFilter', 'koVippVentendeFilter')),))
+        ut = run_node(harness, '''
+            let koVentendeFilter = false;
+            const liste = [{ id: 1, status: 'venter', trenger_ressurs: true }, { id: 2, status: 'fremme', trenger_ressurs: false },
+                           { id: 3, status: 'ledig', trenger_ressurs: false }, { id: 4, status: 'venter', trenger_ressurs: false }];
+            console.log(JSON.stringify(koOppdragTelling(liste)));
+            console.log(koOppdragFilter(liste).length);
+            let tegnet = 0; globalThis.renderOppdrag = () => { tegnet += 1; };
+            koVippVentendeFilter(); console.log(koVentendeFilter, tegnet, JSON.stringify(koOppdragFilter(liste).map((o) => o.id)));
+            koVippVentendeFilter(); console.log(koVentendeFilter, koOppdragFilter(liste).length);
+        ''').splitlines()
+        self.assertEqual(ut[:4], ['{"aktive":2,"ventende":1,"ferdig":1}', '4', 'true 1 [1]', 'false 4'])
+
+    def test_hendelsevalget_bygges_ikke_om_under_operatoren(self):
+        """Nedtrekket «Hendelse» fylles ved hver poll; står fokus i det, eller
+        er lista uendret, røres det ikke (19. sep. 2026)."""
+        harness = build_harness((
+            (PORTAL_UTILS_JS, ('escapeHtml',)),
+            (KO_JS, ('koFyllHendelsevalg', 'koApneHendelser', 'koSorterHendelser', 'koPrioritetRang', 'koPrioriteter')),
+        ))
+        ut = run_node(harness, PRIORITET_PREAMBLE + '''
+            let skrevet = 0; let kalt = 0;
+            globalThis.koHendelsevalgEndret = () => { kalt += 1; };
+            const sel = { _html: '', value: '' };
+            Object.defineProperty(sel, 'innerHTML', { get() { return this._html; }, set(v) { this._html = v; skrevet += 1; } });
+            let aktiv = null;
+            globalThis.document = { getElementById: (id) => id === 'nytt-hendelse' ? sel : null, get activeElement() { return aktiv; } };
+            koHendelser = new Map([[5, { id: 5, kode: 'H5', tittel: 'A', status: 'apen', prioritet: 'gul' }]]);
+            koFyllHendelsevalg(); koFyllHendelsevalg(); console.log(skrevet, kalt);
+            aktiv = sel; koHendelser.set(6, { id: 6, kode: 'H6', tittel: 'B', status: 'apen', prioritet: 'gul' });
+            koFyllHendelsevalg(); console.log(skrevet, sel.innerHTML.includes('H6'));
+            aktiv = null; koFyllHendelsevalg(); console.log(skrevet, sel.innerHTML.includes('H6'));
+        ''').splitlines()
+        self.assertEqual(ut[:3], ['1 2', '1 false', '2 true'])
+
     def test_fargeforklaringen_folder_ut_og_huskes(self):
         """«i» i ressursoversiktens hode (André, 19. sep. 2026, variant E1):
         av som standard, huskes per nettleser, og markupen tegnes først når
@@ -1185,6 +1238,7 @@ class MinimerbareGrupperTests(SimpleTestCase):
             console.log(JSON.stringify(el.innerHTML));
         ''').splitlines()
         aapen, lukket = json.loads(ut[0]), json.loads(ut[1])
+        self.assertEqual(aapen.count('enhet-gruppe-blokk'), 2, 'én blokk per gruppe (to kolonner, 19. sep. 2026)')
         self.assertIn('HGSD 56', aapen)
         self.assertIn('data-action="vippGruppe"', aapen)
         self.assertNotIn('HGSD 56', lukket, 'kortene i den lukkede gruppa er borte')

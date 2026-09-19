@@ -32,6 +32,7 @@ from audit.utils import ikke_under_loaddata
 # ville gått rett forbi den — altså fire mottakere uten dekning, med testen
 # grønn. Regexen er utvidet til å ta begge formene i samme slengen, men
 # idiomet her følger de andre modulene.
+from oppdrag import choices
 from oppdrag.models import (
     Enhetshendelse,
     Oppdrag,
@@ -141,7 +142,7 @@ def statusmelding_skrevet(sender, instance, created, **kwargs):
     felles = {
         'oppdragsnummer': oppdrag.oppdragsnummer,
         'enhet': _enhetsnavn(getattr(rad, 'enhet', None)),
-        'status_navn': instance.get_status_display(),
+        'status_navn': choices.status_navn_for(oppdrag.hastegrad, instance.status),
     }
     if instance.korrigerer_id:
         data = dict(felles)

@@ -389,6 +389,13 @@ class SynlighetForEnhetTests(TestCase):
 
 
 @override_settings(SECURE_SSL_REDIRECT=False)
+class StedTekstUtenVerdiloggingTests(TestCase):
+    def test_sted_tekst_logges_uten_verdi(self):
+        """«Annet sted: …» er fritekst som `Oppdrag.fritekst` (19. sep. 2026)."""
+        from oppdrag import signals
+        self.assertIn('sted_tekst', signals.FELT_UTEN_VERDILOGGING)
+
+
 class AuditFritekstTests(TestCase):
     """Fritekst logges som *endret*, men verdiene skrives ikke.
 

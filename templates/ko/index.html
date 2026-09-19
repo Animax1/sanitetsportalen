@@ -245,6 +245,10 @@
           </div>
           <span class="ko-vindu-tall" id="ko-ressurs-skjult"></span>
           {# Fargeforklaringen (19. sep. 2026): «i» folder den ut under hodet. #}
+          <button type="button" class="btn btn-outline-secondary btn-sm ms-1 ko-legende-knapp" id="ko-kolonner-knapp"
+                  data-action="koVippKolonner" title="Én eller to kolonner" aria-pressed="false">
+            <i class="bi bi-layout-split"></i>
+          </button>
           <button type="button" class="btn btn-outline-secondary btn-sm ms-1 ko-legende-knapp" id="ko-legende-knapp"
                   data-action="koVippLegende" title="Hva fargene betyr" aria-expanded="false" aria-controls="ko-legende">
             <i class="bi bi-info-circle"></i>
@@ -304,6 +308,11 @@
                     data-bs-toggle="modal" data-bs-target="#historikkModal"
                     data-action="lastHistorikk">
               <i class="bi bi-clock-history me-1"></i>Historikk
+            </button>
+            {# Filteret «Ventende» (19. sep. 2026): bare oppdrag uten ressurs. #}
+            <button type="button" class="btn btn-outline-warning btn-sm ko-ventende-knapp" id="ko-ventende-filter"
+                    data-action="koVippVentendeFilter" aria-pressed="false" title="Vis bare oppdrag uten ressurs">
+              <i class="bi bi-exclamation-triangle-fill me-1"></i>Ventende <span class="tall"></span>
             </button>
           </span>
           {% endif %}

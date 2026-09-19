@@ -422,13 +422,15 @@ function tegnEnhetsliste(liste) {
     // Gruppert på enhetstype, ambulansene først (André, 12. sep. 2026).
     // Overskriften står bare når det finnes mer enn én type å skille — og
     // fra pulje 6 er den en knapp som lukker gruppa.
+    // Hver gruppe i sin egen blokk (19. sep. 2026): i to kolonner på /ko/
+    // skal en gruppe stå samlet — `break-inside: avoid` på blokka.
     const grupper = _grupperEnheter(paVakt);
     el.innerHTML = grupper.map((g) => {
       const nokkel = 'type:' + g.type;
       const hode = grupper.length > 1
         ? gruppehode(nokkel, g.navn, g.enheter.length, _ledigSammendrag(g.enheter)) : '';
-      if (grupper.length > 1 && gruppeErLukket(nokkel)) return hode;
-      return hode + g.enheter.map((e) => _enhetskort(e)).join('');
+      const kort = (grupper.length > 1 && gruppeErLukket(nokkel)) ? '' : g.enheter.map((e) => _enhetskort(e)).join('');
+      return '<div class="enhet-gruppe-blokk">' + hode + kort + '</div>';
     }).join('');
   }
 

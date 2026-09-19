@@ -20,6 +20,9 @@ let etagMine = null;
 // Oppdraget som har stedvalget åpent — «Avreist» spør hvor (11. sep. 2026).
 // Ett om gangen: knappene bærer bare stedet, og oppdraget står her.
 let velgerStedFor = null;
+// «Annet sted» spør *hvor* med et fritekstfelt (André, 19. sep. 2026):
+// true mens feltet står åpent under stedvalget.
+let velgerAnnetSted = false;
 // Stedene og grovsorteringen kommer fra serveren via malen, som kjeden.
 const AVREIST_TIL = globalThis.OPPDRAG_AVREIST_TIL || [];
 const GROVSORTERING = globalThis.OPPDRAG_GROVSORTERING || [];
@@ -92,7 +95,7 @@ function lagNokkel() {
 }
 
 
-function koLeggTil(oppdragId, overgang, sted) {
+function koLeggTil(oppdragId, overgang, sted, stedTekst) {
     // Klienttiden fryses her, ved trykket — ikke ved sendingen. Uten det
     // ville statistikken vist når dekningen kom tilbake i stedet for når
     // mannskapet faktisk meldte.
@@ -103,6 +106,8 @@ function koLeggTil(oppdragId, overgang, sted) {
         oppdragId,
         overgang,
         sted: sted || null,
+        // Friteksten ved «Annet sted» (19. sep. 2026) følger raden i køen.
+        sted_tekst: stedTekst || null,
         klienttid: new Date().toISOString(),
     };
     const ko = koLes();
@@ -144,7 +149,10 @@ function projiser(oppdragliste, ko) {
           ? 'ledig' : siste.overgang;
         const nesteEtter = kjede[status] || null;
         const alt = (globalThis.OPPDRAG_ALTERNATIV || {})[status] || null;
-        const altNavn = (globalThis.OPPDRAG_ALTERNATIV_NAVN || {})[alt] || alt;
+        // «Utført» på Drift og Plassering (19. sep. 2026) — samme regel som
+        // `choices.status_navn_for` på serveren.
+        const altNavn = (alt === 'behandlet' && ['Drift', 'Plassering'].includes(o.hastegrad))
+          ? 'Utført' : ((globalThis.OPPDRAG_ALTERNATIV_NAVN || {})[alt] || alt);
         return {
             ...o,
             status,
@@ -299,6 +307,21 @@ function _stedvalg() {
              id="stemple-sted-${escHtmlValue(nokkel)}"
              data-action="stempleAvreistTil" data-arg="${escHtmlValue(nokkel)}">
        ${escapeHtml(navn)}</button>`).join('');
+  // «Annet sted» får et fritekstfelt (André, 19. sep. 2026): ett felt og én
+  // knapp i stedet for de seks — samme regel om at det ikke skal finnes en
+  // feil knapp å treffe midt i valget. Tom tekst er lov; stedet står uansett.
+  if (velgerAnnetSted) {
+    return `
+    <div class="mt-3">
+      <div class="oppdrag-meta mb-2">Avreist til annet sted — hvor?</div>
+      <input type="text" class="form-control form-control-lg" id="stemple-sted-tekst"
+             maxlength="120" placeholder="F.eks. Legevakt Karmøy" autocomplete="off">
+      <button type="button" class="btn btn-primary stor-knapp mt-2 w-100"
+              id="stemple-sted-annet-ok" data-action="stempleAnnetSted">Avreist</button>
+      <button type="button" class="btn btn-outline-light stor-knapp mt-2 w-100"
+              data-action="avbrytStedvalg">Avbryt</button>
+    </div>`;
+  }
   return `
     <div class="mt-3">
       <div class="oppdrag-meta mb-2">Avreist til:</div>
@@ -911,6 +934,8 @@ async function synk() {
             body: JSON.stringify({
               klienttid: rad.klienttid,
               idempotency_key: rad.nokkel,
+              // Det ene domenefeltet: friteksten ved «Annet sted».
+              sted_tekst: rad.sted_tekst || undefined,
             }),
           });
       } catch (e) {
@@ -956,12 +981,12 @@ async function synk() {
 }
 
 
-async function _stemple(id, overgang, knappId, sted) {
+async function _stemple(id, overgang, knappId, sted, stedTekst) {
   await withSubmitGuard(knappId, async () => {
     // Skriv lokalt FØRST. Skjermen skal vise trykket med en gang, også uten
     // dekning — en knapp som ser ut til å ha virket, men ikke har det, er
     // verre enn en som feiler synlig.
-    koLeggTil(id, overgang, sted);
+    koLeggTil(id, overgang, sted, stedTekst);
     renderAlt();
     await synk();
   });
@@ -987,12 +1012,30 @@ async function stempleAvreistTil(sted) {
   const id = velgerStedFor;
   if (id == null) return;
   if (!AVREIST_TIL.some((s) => s[0] === sted)) return;
+  if (sted === 'annet') {
+    // «Annet sted» spør hvor (19. sep. 2026): feltet åpnes, stempelet
+    // settes av `stempleAnnetSted` med teksten.
+    velgerAnnetSted = true;
+    renderAlt();
+    return;
+  }
   velgerStedFor = null;
   await _stemple(id, 'avreist', `stemple-sted-${sted}`, sted);
 }
 
+async function stempleAnnetSted() {
+  const id = velgerStedFor;
+  if (id == null) return;
+  const felt = document.getElementById('stemple-sted-tekst');
+  const tekst = (felt && felt.value ? felt.value : '').trim().slice(0, 120);
+  velgerStedFor = null;
+  velgerAnnetSted = false;
+  await _stemple(id, 'avreist', 'stemple-sted-annet-ok', 'annet', tekst);
+}
+
 function avbrytStedvalg() {
   velgerStedFor = null;
+  velgerAnnetSted = false;
   renderAlt();
 }
 

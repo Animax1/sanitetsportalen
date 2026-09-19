@@ -812,7 +812,7 @@ def foering_view(request, pk, enhet_pk, overgang, sted=None):
     try:
         melding = services.foer_status(
             oppdrag, enhet, overgang, tidspunkt=tidspunkt, bruker=request.user,
-            sted=sted or '')
+            sted=sted or '', sted_tekst=_sted_tekst(json_body(request), sted))
     except (services.UlovligOvergang, services.KorreksjonUgyldig) as feil:
         # 400, ikke 409: operatøren sitter ved et skjema, og meldingen sier
         # hvilket ledd som mangler eller hvilken nabo som er i veien.
@@ -865,11 +865,12 @@ def angre_view(request, pk, enhet_pk):
 
 # ── Stempling ────────────────────────────────────────────────────────────────
 
-#: Det lukkede kroppsskjemaet fra §5.1. To nøkler, og settet er hele
+#: Det lukkede kroppsskjemaet fra §5.1. Tre nøkler, og settet er hele
 #: kontrakten: en test kan uttømme det ved å sende en nøkkel til og kreve 400.
 #: En feltwhitelist inne i en generell PUT kan ikke testes slik — settet av
-#: felter der vokser med modellen.
-STEMPLING_TILLATTE_NOKLER = frozenset({'klienttid', 'idempotency_key'})
+#: felter der vokser med modellen. `sted_tekst` (19. sep. 2026) er det ene
+#: domenefeltet, og det leses bare ved «Annet sted» — se `_sted_tekst`.
+STEMPLING_TILLATTE_NOKLER = frozenset({'klienttid', 'idempotency_key', 'sted_tekst'})
 
 
 def _stempling_kropp(request):
@@ -977,6 +978,15 @@ def antall_view(request, pk, antall):
     oppdrag.save(update_fields=['antall', 'updated_at'])
     return JsonResponse({'status': 'ok', 'data': oppdrag_til_dict(
         oppdrag, for_enhet=True, koblingsrad=rad)})
+
+
+def _sted_tekst(data, sted) -> str:
+    """Friteksten ved «Annet sted» (19. sep. 2026) — bare da, ellers tom. Det
+    ene domenefeltet bilens endepunkt leser fra kroppen, og det er bevisst
+    smalt: en streng, kappet til 120 tegn, uten betydning for overgangen."""
+    if sted != 'annet':
+        return ''
+    return str(data.get('sted_tekst') or '').strip()[:120]
 
 
 @modul_kreves('oppdrag', 'skriv_handling', svar='json')
@@ -1120,7 +1130,8 @@ def stempling_view(request, pk, overgang, sted=None):
         else:
             melding = services.sett_status(
                 oppdrag, overgang, bruker=request.user, enhet=request.user.enhet,
-                tidspunkt=tidspunkt, forsinket=forsinket, sted=sted or '')
+                tidspunkt=tidspunkt, forsinket=forsinket, sted=sted or '',
+                sted_tekst=_sted_tekst(data, sted))
     except services.ProblemstillingUdefinert as feil:
         # Ikke en utdatert skjerm — et oppdrag som mangler noe. Meldingen er
         # bilens å lese, og 400 får køen til å slippe raden og vise den.

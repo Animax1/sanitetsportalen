@@ -714,6 +714,11 @@ class Statusmelding(BaseTimeStampedModel):
     sted = models.CharField(
         max_length=20, blank=True, default='', choices=choices.AVREIST_TIL,
         verbose_name='Avreist til')
+    # «Annet sted» får et fritekstfelt (André, 19. sep. 2026). Bare
+    # meningsfullt når `sted == 'annet'`; tømmes ellers i `sett_status`.
+    # Fritekst som `Oppdrag.fritekst`: logges som endret, aldri verdien.
+    sted_tekst = models.CharField(
+        max_length=120, blank=True, default='', verbose_name='Annet sted')
     # PROTECT: den korrigerte raden skal ikke kunne forsvinne under
     # korreksjonen — da ville tidslinjen vist en retting av ingenting.
     korrigerer = models.ForeignKey(

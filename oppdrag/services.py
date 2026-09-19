@@ -90,9 +90,13 @@ def neste_i_kjeden(fra: str) -> str | None:
     return choices.KJEDEN[i + 1]
 
 
-def alternativ_for(fra: str):
-    """``(overgang, navn)`` for den andre knappen i bilen, eller ``None``."""
-    return ALTERNATIV.get(fra)
+def alternativ_for(fra: str, hastegrad: str | None = None):
+    """``(overgang, navn)`` for den andre knappen i bilen, eller ``None``.
+    Navnet følger oppdraget: «Utført» der det ikke er noen pasient."""
+    alt = ALTERNATIV.get(fra)
+    if alt is None:
+        return None
+    return (alt[0], choices.status_navn_for(hastegrad, alt[0]) if alt[0] == choices.BEHANDLET else alt[1])
 
 
 # ── Oppdragsnummer ───────────────────────────────────────────────────────────
@@ -349,7 +353,8 @@ def enhet_status(enhet, vakt=None) -> dict:
     ventende = ventende_oppdrag(enhet, vakt)
     antall_ventende = ventende.count()
     status = rad.status if rad else choices.LEDIG
-    status_navn = rad.get_status_display() if rad else choices.STATUS_NAVN[choices.LEDIG]
+    status_navn = (choices.status_navn_for(rad.oppdrag.hastegrad, rad.status) if rad
+                   else choices.STATUS_NAVN[choices.LEDIG])
     tildelt_siden = None
     if rad is None and antall_ventende and not enhet.passiv_vakt:
         status, status_navn = TILDELT, 'Tildelt'
@@ -411,7 +416,7 @@ def _aktivt_oppdrag_felter(rad) -> dict:
         'problemstilling': oppdrag.problemstilling,
         'antall': oppdrag.antall,
         'status_tidspunkt': melding.tidspunkt.isoformat() if melding else None,
-        'sted_navn': choices.AVREIST_TIL_NAVN.get(melding.sted, '') if melding else '',
+        'sted_navn': choices.sted_navn_for(melding.sted, melding.sted_tekst) if melding else '',
         # Hvor oppdraget er (André, 19. sep. 2026: «lokasjon vises» i
         # ressursoversikten). `aktiv_koblingsrad` henter lokasjonen med.
         'lokasjon_navn': oppdrag.lokasjon.navn if oppdrag.lokasjon_id else '',
@@ -468,7 +473,7 @@ def enhetskort(enhet, vakt=None, ledig_siden=None) -> dict:
 def sett_status(oppdrag, ny_status: str, *, bruker=None, tidspunkt=None,
                 forsinket: bool = False, automatisk: bool = False,
                 sted: str = '', enhet=None, manuell: bool = False,
-                avbrutt: bool = False) -> Statusmelding:
+                avbrutt: bool = False, sted_tekst: str = '') -> Statusmelding:
     """Skriv en statusmelding og oppdater oppdragets cachede status.
 
     Kaster ``UlovligOvergang`` hvis overgangen ikke står i tabellen. Sjekken
@@ -515,6 +520,8 @@ def sett_status(oppdrag, ny_status: str, *, bruker=None, tidspunkt=None,
         automatisk=automatisk,
         manuell=manuell,
         sted=sted or '',
+        # Fritekst ved «Annet sted» (19. sep. 2026) — bare der, ellers tom.
+        sted_tekst=(sted_tekst or '').strip()[:120] if sted == 'annet' else '',
     )
     rad.status = ny_status
     rad.save(update_fields=['status', 'updated_at'])
@@ -1180,6 +1187,7 @@ def korriger_tidspunkt(melding, nytt_tidspunkt, *, bruker) -> Statusmelding:
         # Stedet følger med: en retting av klokkeslettet er ikke en retting
         # av hvor bilen dro, og en rad uten sted ville lest som «ukjent».
         sted=melding.sted,
+        sted_tekst=melding.sted_tekst,
     )
 
 
@@ -1280,7 +1288,7 @@ def valider_foering(rad, ny_status: str, tidspunkt, naa=None) -> None:
 
 @transaction.atomic
 def foer_status(oppdrag, enhet, ny_status: str, *, tidspunkt, bruker,
-                sted: str = '') -> Statusmelding:
+                sted: str = '', sted_tekst: str = '') -> Statusmelding:
     """Sentralbordet fører en status for en enhet — et stempel bilen glemte.
 
     Ikke et stempel fra bilen: raden merkes ``manuell`` og ``meldt_av`` er
@@ -1293,7 +1301,7 @@ def foer_status(oppdrag, enhet, ny_status: str, *, tidspunkt, bruker,
         raise UlovligOvergang('Enheten er ikke varslet på oppdraget.')
     valider_foering(rad, ny_status, tidspunkt)
     return sett_status(oppdrag, ny_status, bruker=bruker, tidspunkt=tidspunkt,
-                       sted=sted, enhet=rad.enhet, manuell=True)
+                       sted=sted, sted_tekst=sted_tekst, enhet=rad.enhet, manuell=True)
 
 
 def _slett_meldinger(qs) -> int:
