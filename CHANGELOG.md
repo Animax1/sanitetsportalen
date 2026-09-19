@@ -4,6 +4,71 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-19 — KO: lag på hendelsen, beskrivelsen som tillegg, melder som avkryssing, besetning bak et klikk  `#ko/hendelseslogg` `#ko/ressursbildet` `#oppdrag/sentralbord` `#oppdrag/enhetsskjerm` `#vaktliste/roller`
+
+André, 19. sep. 2026, etter fire skisser som ble avtalt før koden: «Det viktige er å vise om
+laget er opptatt på hendelse … Husk at lag får ikke oppdrag, de får oppdrag muntlig
+kommunisert på samband og blir registrert på hendelsen.» «Jeg elsker innspillet ditt med
+eget for oppdrag.» «Ressursoversikten viser ikke besetning og telefon som standard, du må
+trykke på ressursen for å se, da sparer vi plass.»
+
+- **Lagene på hendelsen** er nå rader (`ko.HendelseLag`) som peker på vaktlistas ressurser
+  uten oppdragsenhet — de samme som står som kort i ressursoversikten. Velges som
+  avkryssing i «Ny hendelse» (med «på H13 · 18 min» som hint der laget er opptatt), og
+  legges til / tas av inne i hendelsen som brikker med «siden 21:42 · 23 min». Hvert lag
+  som kommer til eller går er en systemlinje (`HENDELSE_LAG_PAA`, `HENDELSE_LAG_AV`);
+  ved opprettelse står lagene på opprettelseslinja. Lukket hendelse tar ikke imot.
+  **Lagkortet viser «På H14 · 23 min»** ved å slå laget opp i de åpne hendelsene på
+  klienten (`koLagPaa`) — ingen egen status, ingen ny poller. `Ressursbehov`-tabellen,
+  fanen under KO-innstillinger og fritekstfeltet `lagsressurser` er borte
+  (`ko/0008`–`0010`). Backupfiler fra 18. sep. bærer dem fortsatt: `core.backup` fikk
+  `UTGAATTE_FELT`/`UTGAATTE_MODELLER` (søsteren til `GAMLE_MODELLNAVN`) som tar dem ut
+  ved gjenoppretting, eksplisitt og ikke med `--ignorenonexistent`. `HendelseLag.ressurs`
+  strippes som `Hendelse.lokasjon` (sirkel `ko` → `vaktliste` → `oppdrag` → `ko`);
+  navnet fryses i `ressurs_navn`.
+- **Beskrivelsen er tillegg, aldri overskriving.** Hvert tillegg er en logglinje i
+  hendelsen med `Logglinje.beskrivelse=True`, så hvem og når står der av seg selv, og
+  retting/fjerning går gjennom loggens regler. Samme rekke vises i hendelsen, i
+  oppdragets detaljmodal («Beskrivelse H14», med skjema for å legge til på `/ko/`) og
+  på bilens skjerm (`hendelse_beskrivelse` i `oppdrag_til_dict`, i ETag-en; utelatt for
+  avsluttede oppdrag som friteksten). Nyeste tillegg er uthevet, og «nytt» står i ti
+  minutter (`koErNytt`). Oppdragets fritekst heter **«Bare dette oppdraget»** når
+  oppdraget hører til en hendelse. Det som sto i `Hendelse.beskrivelse` ble første
+  tillegg (`ko/0009`), ført av den som opprettet.
+- **Funnet under lesing, rettet:** `korriger()` kopierte ikke `hendelse` til den nye
+  raden — **en rettet kommentar i H14 falt ut av hendelsen og inn i loggstrømmen.**
+  Retting arver nå hendelsen og `beskrivelse`-merket.
+- **Melder** er avkryssing: Egen ressurs, AMK, Brann, Politi, LSKO, Andre — fast liste i
+  kode (`MELDER_VALG`), flere kan velges, «Andre» krever tekst og teksten tømmes uten
+  «Andre». Lagres som `melder_typer` (JSON) + `melder`; et gammelt melder-navn ble
+  «Andre» med teksten.
+- **Ressursoversikten**: Alle | Biler | Lag i vinduets hode, husket per nettleser
+  (`ko.ressursvisning`), det skjulte som et tall («4 biler skjult»). **Lagkortet åpner
+  besetningen ved klikk** — navn, møtt (●/○), telefon som `tel:`-lenke, ISSI — én om
+  gangen som bilens. `vaktliste.services.ressurser_uten_enhet` bærer derfor telefon og
+  ISSI fra 19. sep.; det var utelatt med vilje 18. sep. («et nummer man ikke trenger er
+  et nummer på en skjerm i et rom»), og holdes ved at tallene står bak klikket.
+- 159 ruter, 21 under `/ko/` (`api/hendelser/<pk>/lag/` kom til, tre ressursbehov-ruter
+  gikk). `ko/CLAUDE.md` og `TODO.md` (lagsstatus-punktet) oppdatert. Sjekket i
+  nettleseren med seedet vakt (Playwright): hendelsen med brikker og tillegg, skjemaet,
+  lagkortet klikket, Alle/Biler/Lag, oppdragets detaljmodal med «Beskrivelse H5» og
+  «Bare dette oppdraget» — ingen JS-feil.
+
+Mutasjoner, hver mot testene som dekker den (2–6 s per mutant): `rens_melder` × 3 (Andre
+uten tekst, tekst uten Andre, ukjent kode), `sett_lag` × 3 (lukket tar imot, ingen
+`HENDELSE_LAG_AV`, `bli_med` borte), `lag_som_kan_velges` uten `enhet__isnull`, `_lag_fra`
+med ukjent id stille utelatt, `skriv_linje` tillegg uten hendelse, `korriger` × 2
+(hendelsen og merket arves ikke), `beskrivelse_tillegg` × 2 (fjernede med, overstyrte ledd
+med), `_tillegg_prefetch` uten `beskrivelse=True`, `opprett_hendelse` × 2 (lagene ikke på
+linja, beskrivelsen ikke lagt til), `rediger_hendelse` med lag-endring ignorert,
+`fjern_utgaatte` × 2, ETag uten tilleggene, `hendelse_lag_view` senket til `les`,
+`for_enhet` viser beskrivelsen for avsluttede, vaktlista uten telefon, og JS: `koLagPaa`
+med lukkede, `koErNytt` grensa snudd, `koSkjultTall` feil tall, `koLagBrikkeHtml` rått
+navn, klikk-gaten på kortet borte, og **kallstedet** `koTaImotHendelser` →
+`koTegnRessurser` fjernet. **29 av 29 fanget.**
+
+---
+
 ## 2026-09-18 — KO-innstillinger: «Nullstill» og redigerbare ansvarsområder  `#ko/hendelseslogg` `#ko/loggen`
 
 André: «Er det mulig å få til en nullstill knapp på oppdrag, hendelser og logg? Kan ha de

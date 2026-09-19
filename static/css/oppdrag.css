@@ -605,3 +605,22 @@
 
 /* Dempeikonet i bilen (12. sep. 2026): lyd på som standard, dempet = tydelig. */
 .lyd-demp.lyd-demp-paa { color: #fbbf24; border-color: #fbbf24; }
+
+
+/* ── Beskrivelsen på hendelsen som tillegg (KO, 19. sep. 2026) ──────────────
+   Tegnes tre steder med samme klasse: i hendelsen på /ko/, i oppdragets
+   detaljmodal på begge sidene, og på bilens skjerm. Det nyeste tillegget har
+   en farget kant; «nytt» (gul) settes bare av KO, som kjenner klokka. */
+.b-tillegg {
+  padding: 0.35rem 0.5rem; border-radius: 6px; font-size: 0.86rem;
+  border-left: 3px solid transparent; white-space: pre-wrap;
+}
+.b-tillegg:nth-child(even) { background: #172033; }
+.b-tillegg .hvem { color: var(--text-muted); font-size: 0.76rem; margin-left: 0.4rem; white-space: nowrap; }
+.b-tillegg.nyest { border-left-color: var(--portal-accent); }
+.b-tillegg.nytt { border-left-color: #fbbf24; background: rgba(251, 191, 36, 0.10); }
+.b-tillegg .merke {
+  color: #fbbf24; font-size: 0.7rem; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.06em; margin-left: 0.4rem;
+}
+.b-skjema { display: flex; gap: 0.4rem; margin-top: 0.3rem; }

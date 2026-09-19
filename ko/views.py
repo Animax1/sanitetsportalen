@@ -10,7 +10,7 @@ nivåer:
 | Opprette, redigere, prioritere, lukke og gjenåpne en hendelse, bli med | `skriv_full` |
 | Knytte et oppdrag til en hendelse | `skriv_full` i **både** `ko` og `oppdrag` — det skriver på oppdraget |
 | Fjerne innholdet i en linje (§4.4) | `skriv_leder` |
-| Sette opp ressursbehovene (KO-innstillinger) | `skriv_leder`, eller global admin |
+| Sette opp ansvarsområdene (KO-innstillinger) | `skriv_leder`, eller global admin |
 
 **Retting og fjerning er to navngitte stier**, ikke ett endepunkt som leser en
 `slett`-verdi ut av kroppen. Samme grep som `backlog` sine `lost`/`gjenapne`:
@@ -52,8 +52,8 @@ from core.ratelimit import rate_limit
 from core.vakt import hent_aktiv_vakt
 
 from . import services, systemlinjer
-from .models import (PRIORITET_VALG, Ansvarsmerke, Ansvarsomraade, Hendelse, Logglinje,
-                     Ressursbehov)
+from .models import (MELDER_VALG, PRIORITET_VALG, Ansvarsmerke, Ansvarsomraade, Hendelse,
+                     Logglinje)
 from .tilstede import tilstede
 
 
@@ -119,6 +119,8 @@ def _til_dict(linje):
         # sier hvem. Tom/`''` når linja ikke er festet.
         'festet_at': linje.festet_at.isoformat() if linje.festet_at else '',
         'festet_av': linje.festet_av_navn,
+        # Et tillegg til hendelsens beskrivelse (19. sep. 2026).
+        'beskrivelse': linje.beskrivelse,
     }
 
 
@@ -145,22 +147,22 @@ def _hendelse_til_dict(h):
         'antall_oppdrag': getattr(h, 'antall_oppdrag', None)
                           if getattr(h, 'antall_oppdrag', None) is not None
                           else h.oppdrag.count(),
-        # Hodet (18. sep. 2026): prioritet, beskrivelse, melder,
-        # lagsressurser, ressursbehov og hvem som er på hendelsen. Alt
-        # følger med hver poll — lista er kort, og en hendelse som byttet
-        # prioritet har ingen ny id.
+        # Hodet (18. sep. 2026): prioritet, melder og hvem som er på
+        # hendelsen. Alt følger med hver poll — lista er kort, og en hendelse
+        # som byttet prioritet har ingen ny id.
         'prioritet': h.prioritet,
-        'beskrivelse': h.beskrivelse,
+        'melder_typer': list(h.melder_typer or []),
         'melder': h.melder,
-        'lagsressurser': h.lagsressurser,
-        'ressursbehov': [{'id': r.pk, 'navn': r.navn} for r in h.ressursbehov.all()],
+        'melder_tekst': services.melder_tekst(h),
+        # Beskrivelsen som tillegg og lagene på hendelsen (19. sep. 2026).
+        # Tilleggene er logglinjer og finnes alt i `koLinjer` på klienten;
+        # de sendes her likevel, fordi det er denne lista «Rediger oppdrag»
+        # og bilen leser gjennom `oppdrag_til_dict` — én form for alle tre.
+        'beskrivelse': h.beskrivelse_tillegg(),
+        'lag': [{'id': l.pk, 'ressurs_id': l.ressurs_id, 'navn': l.ressurs_navn,
+                 'fra': l.fra.isoformat(), 'av': l.av_navn} for l in h.lag.all()],
         'deltakere': [d.brukernavn for d in h.deltakere.all()],
     }
-
-
-def _ressursbehov_til_dict(r):
-    return {'id': r.pk, 'navn': r.navn, 'er_aktiv': r.er_aktiv,
-            'rekkefolge': r.rekkefolge, 'i_bruk': r.hendelser.count()}
 
 
 @modul_kreves('ko', 'les')
@@ -188,10 +190,7 @@ def index_view(request):
     # linje. Gatene i den er **oppdragsmodulens**, også her — se funksjonens
     # egen docstring.
     kontekst = sentralbordkontekst(request)
-    ressursbehov = services.ressursbehov_aktive()
     verdifaner_ekstra = [
-        {'slug': 'ressursbehov', 'navn': 'Ressursbehov', 'ny': 'Nytt ressursbehov',
-         'url': '/ko/api/ressursbehov/'},
         {'slug': 'ansvarsomraader', 'navn': 'Ansvarsområder', 'ny': 'Nytt ansvarsområde',
          'url': '/ko/api/ansvarsomraader/'},
     ] if _kan_lede_ko(request) else []
@@ -221,12 +220,14 @@ def index_view(request):
         'mitt_ansvar': services.ansvar_for(request.user),
         'vakt_navn': hent_aktiv_vakt().navn,
         'kan_skrive_ko': har_tilgang(request.user, 'ko', 'skriv_full'),
-        # Hendelsesskjemaet (18. sep. 2026): prioritetene og avkryssingene.
+        # Hendelsesskjemaet (18. sep. 2026): prioritetene, og melderne
+        # (19. sep. 2026) — fast liste i kode. Lagene fylles av klienten fra
+        # vaktlistas ressurser uten enhet, som alt polles.
         'prioriteter': PRIORITET_VALG,
         'prioriteter_json': js_json([list(p) for p in PRIORITET_VALG]),
-        'ressursbehov': ressursbehov,
-        'ressursbehov_json': js_json([[r.pk, r.navn] for r in ressursbehov]),
-        # KO-innstillingene — ressursbehovene — settes opp av KOs
+        'melder_valg': MELDER_VALG,
+        'melder_valg_json': js_json([list(m) for m in MELDER_VALG]),
+        # KO-innstillingene — ansvarsområdene — settes opp av KOs
         # `skriv_leder` eller global admin. Sentralbordets valglister har
         # sin egen gate (`kan_lede`, oppdragsmodulens); de to vises i samme
         # vindu, men hver fane har sin egen dør.
@@ -366,6 +367,9 @@ def logg_skriv_view(request):
             ansvarsomraade=data.get('ansvarsomraade'),
             uformell=bool(data.get('uformell')),
             hendelse=hendelse,
+            # Et tillegg til beskrivelsen (19. sep. 2026) — samme sti, ett
+            # merke til. Tjenestelaget krever hendelsen.
+            beskrivelse=bool(data.get('beskrivelse')),
         )
     except services.Ugyldig as feil:
         return _feil(str(feil))
@@ -513,8 +517,9 @@ def hendelse_ny_view(request):
             lokasjon=lokasjon, fra_linje=fra_linje,
             prioritet=data.get('prioritet'),
             beskrivelse=data.get('beskrivelse'),
+            melder_typer=data.get('melder_typer'),
             melder=data.get('melder'),
-            ressursbehov=data.get('ressursbehov'))
+            lag=data.get('lag'))
     except services.Ugyldig as feil:
         return _feil(str(feil))
     hendelse = services.hendelse_med_telling(hendelse)
@@ -538,10 +543,9 @@ def hendelse_rediger_view(request, pk):
             hendelse, bruker=request.user, versjon=data.get('versjon'),
             tittel=data.get('tittel'),
             lokasjon=lokasjon, sett_lokasjon='lokasjon_id' in data,
-            beskrivelse=data.get('beskrivelse'),
+            melder_typer=data.get('melder_typer'),
             melder=data.get('melder'),
-            lagsressurser=data.get('lagsressurser'),
-            ressursbehov=data.get('ressursbehov'))
+            lag=data.get('lag'))
     except services.Konflikt as feil:
         return _feil(str(feil), status=409)
     except services.Ugyldig as feil:
@@ -570,6 +574,22 @@ def hendelse_bli_med_view(request, pk):
     """«Bli med» (18. sep. 2026). Idempotent; svarer med lista."""
     hendelse = _hendelse(pk)
     services.bli_med(hendelse, request.user)
+    return JsonResponse({'status': 'ok', 'data': _hendelse_til_dict(hendelse)})
+
+
+@modul_kreves('ko', 'skriv_full', svar='json')
+@require_http_methods(['POST'])
+@rate_limit(group='ko:hendelse_lag', rate='60/m', method='POST')
+def hendelse_lag_view(request, pk):
+    """Lagene på hendelsen (19. sep. 2026): hele lista med ressurs-id-er,
+    og tjenestelaget regner differansen og logger hvert lag som kom til
+    eller gikk. Lukket hendelse tar ikke imot."""
+    hendelse = _hendelse(pk)
+    try:
+        services.sett_lag(hendelse, _json_body(request).get('lag'), bruker=request.user)
+    except services.Ugyldig as feil:
+        return _feil(str(feil))
+    hendelse = services.hendelse_med_telling(hendelse)
     return JsonResponse({'status': 'ok', 'data': _hendelse_til_dict(hendelse)})
 
 
@@ -635,13 +655,14 @@ def oppdrag_hendelse_view(request, pk):
     return JsonResponse({'status': 'ok', 'hendelse_id': oppdrag.hendelse_id})
 
 
-# ── KO-innstillingene: ressursbehov og ansvarsområder (18. sep. 2026) ────────
+# ── KO-innstillingene: ansvarsområdene (18. sep. 2026) ───────────────────────
 #
 # Samme form som `oppdrag/views_verdier.py`: liste for `les`, opprett/endre/
 # omsortere for leder (KO-leder eller global admin), sletting for global admin
-# med `confirm` og 409 når raden er i bruk. Én fabrikk, to tabeller — skrevet
-# her og ikke som rader i oppdragsmodulens `VERDIMENGDER`, fordi tabellene er
-# KOs og `oppdrag` ikke kjenner `ko`.
+# med `confirm` og 409 når raden er i bruk. Én fabrikk — skrevet her og ikke
+# som rader i oppdragsmodulens `VERDIMENGDER`, fordi tabellen er KOs og
+# `oppdrag` ikke kjenner `ko`. Fabrikken bar også `Ressursbehov` fra 18. til
+# 19. sep. 2026; lista ble erstattet av lagene fra vaktlista (`HendelseLag`).
 
 class _Verdiliste:
     """Én tabell: modellen, slugen og hva som teller som «i bruk»."""
@@ -664,8 +685,6 @@ class _Verdiliste:
 
 
 VERDILISTER = {
-    'ressursbehov': _Verdiliste(Ressursbehov, 'ressursbehov', 64,
-                                lambda r: r.hendelser.count()),
     # I bruk = kontoer som bærer merket nå. Linjene teller ikke: de er tekst,
     # og et område som slettes skal ikke skrive om loggen.
     'ansvarsomraader': _Verdiliste(Ansvarsomraade, 'ansvarsomraader', 40,
@@ -766,9 +785,6 @@ def _rekkefolge_view(slug):
     return view
 
 
-ressursbehov_view = _liste_view('ressursbehov')
-ressursbehov_detalj_view = _detalj_view('ressursbehov')
-ressursbehov_rekkefolge_view = _rekkefolge_view('ressursbehov')
 ansvarsomraader_view = _liste_view('ansvarsomraader')
 ansvarsomraade_detalj_view = _detalj_view('ansvarsomraader')
 ansvarsomraader_rekkefolge_view = _rekkefolge_view('ansvarsomraader')

@@ -633,28 +633,13 @@ bygget; det flyttet til `/park/`-punktet nederst, der det hører hjemme.*
       fører. Blir mobil et ekte krav, er det en egen oppgave — og svaret er **ikke** faner:
       da er det heller loggen alene, med tavla som et nedtrekk ved siden av sidebaren.
 
-- [ ] **Hva skal en KO-ført ressursstatus hete? Spørsmålet må besvares før den bygges.**
-      Ikke merket «Krever Andre», og det er et bevisst valg: merket betyr «blokkerer nå»,
-      og dette blokkerer ingenting i dag — `/ko/` viser det `/oppdrag/` viser. Spørsmålet
-      tas når den tredje kilden tas.
-
-      `FORSLAG_KO.md` §3.1 sier at KO skal føre status for dem som ikke stempler selv — et
-      lag har ingen `oppdrag.Enhet` og kan ikke melde noe selv. Notatet sier **ikke** hvilke
-      statuser det er, og det er ikke en kodeoppgave: det er operativt språk som må matche
-      det folk faktisk sier på samband.
-
-      Et forsøk 17. sep. 2026 fant på fire — «Ledig», «Opptatt», «Pause», «Ute av drift» —
-      og ble rullet tilbake dagen etter: «Jeg hadde aldri noe pause og ute av drift på de i
-      /oppdrag» (André). Se CHANGELOG 18. sep.
-
-      **Konsekvensen i mellomtiden:** et lag uten enhet står ikke på ressurslista i `/ko/`,
-      like lite som i `/oppdrag/`. Det er dagens tilstand og ikke en regresjon, men det er
-      også grunnen til at spørsmålet ikke kan utsettes i det uendelige.
-
-      Tre veier når svaret finnes: oppdragsmodulens egne statuser gjenbrukt, en kort egen
-      liste i kode (som `oppdrag/choices.py`), eller en tabell admin styrer (som
-      `Ressursgruppe`). Den siste gjør fargene på lista til data — og da kan ingen si hva en
-      gul rad betyr.
+- [ ] **Skal lagene ha en egen status utover «på hendelse»?** Fra 19. sep. 2026 står et lag
+      som «På H14 · 23 min» når det er registrert på en åpen hendelse (`ko.HendelseLag`),
+      og ellers som ledig med hvem som er møtt. Det dekker det André ba om («det viktige er
+      å vise om laget er opptatt på hendelse»). Det som *ikke* finnes er pause, ute av
+      drift og lignende — et forsøk på fire slike 17. sep. ble rullet tilbake («Jeg hadde
+      aldri noe pause og ute av drift på de i /oppdrag»). Tas opp bare om det meldes et
+      behov fra en ekte vakt; ikke merket «Krever Andre», for det blokkerer ingenting.
 
 *Pulje 4 (sentralbordet) er levert 18. sep. 2026 — se CHANGELOG. `/ko/` kjører
 sentralbordet fra oppdragsmodulens egen kode, og oppdragsflata gates av `oppdrag`-modulen

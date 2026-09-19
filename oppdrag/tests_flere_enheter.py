@@ -1214,7 +1214,7 @@ class DetaljvinduetTegnesPaaNyttTests(TestCase):
         self.harness = build_harness((
             (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue', 'trustedHtml', '_escHtml', 'klokke')),
             (OPPDRAG_SENTRAL_JS, ('visOppdrag', 'oppdragsnr', 'mkEnhetsrader', '_enhetsknapper', 'kanAvvente', '_varsleValg',
-                                  'tidslinjeHtml', 'hastegradKlasse', 'tidSiden')),
+                                  'tidslinjeHtml', 'hastegradKlasse', 'tidSiden', '_hendelseBeskrivelseHtml')),
         ))
 
     STUBB = """

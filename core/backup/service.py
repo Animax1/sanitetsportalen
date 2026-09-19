@@ -127,6 +127,76 @@ def oversett_modellnavn(raw: bytes) -> bytes:
     return json.dumps(objekter).encode('utf-8')
 
 
+# ── Felter og modeller som er borte ──────────────────────────────────────────
+#
+# Søsteren til tabellen over, for den andre måten skjemaet kan gå fra en fil:
+# et felt eller en modell som er **fjernet**. `loaddata` avviser en rad med et
+# felt modellen ikke har («Hendelse has no field named …»), og en fil tatt før
+# fjerningen lastes da ikke i det hele tatt — modulfila fra i går, som ligger
+# 730 dager offsite. Django har `--ignorenonexistent`, som svelger *alt*
+# ukjent; denne lista er eksplisitt av samme grunn som `GAMLE_MODELLNAVN`: en
+# feil i et modellnavn skal fortsatt feile høyt, og bare det som er tatt bort
+# med vilje skal slippe stille forbi. `core/tests_modellnavn.py` krever at
+# venstresida faktisk er borte fra modellene.
+#
+# Nøkkelen er `app_label.modellnavn` med små bokstaver, som i fila.
+UTGAATTE_FELT: dict[str, frozenset[str]] = {
+    # 19. sep. 2026: beskrivelsen ble tillegg (logglinjer), lagene ble rader
+    # (`HendelseLag`), ressursbehovene ble borte. Filene fra 18. sep. bærer
+    # de tre feltene; det som sto der er migrert av `ko/0009` i basen, men
+    # en fil er ikke basen.
+    'ko.hendelse': frozenset({'beskrivelse', 'lagsressurser', 'ressursbehov'}),
+}
+UTGAATTE_MODELLER: frozenset[str] = frozenset({
+    'ko.ressursbehov',   # 19. sep. 2026, se over
+})
+
+
+def fjern_utgaatte(raw: bytes) -> bytes:
+    """Ta ut felter og modeller som ikke finnes lenger, så eldre filer lastes.
+
+    Samme form som `oversett_modellnavn`: rask vei først — er ingen av
+    etikettene i bytene, røres ikke fila — og kaster aldri. Radene av en
+    utgått modell fjernes helt; et utgått felt fjernes fra raden, resten av
+    raden lastes. Loggfører hva som ble tatt ut, så en gjenoppretting som
+    mistet noe sier det i loggen og ikke i stillhet.
+    """
+    if not UTGAATTE_FELT and not UTGAATTE_MODELLER:
+        return raw
+    lav = raw.lower()
+    etiketter = set(UTGAATTE_FELT) | set(UTGAATTE_MODELLER)
+    if not any(f'"{e}"'.encode('utf-8') in lav for e in etiketter):
+        return raw
+    try:
+        objekter = json.loads(raw.decode('utf-8'))
+        if not isinstance(objekter, list):
+            return raw
+    except Exception as feil:   # noqa: BLE001 — se docstring
+        logger.warning('core.backup: kunne ikke lese fila for utgåtte felt: %s', feil)
+        return raw
+
+    beholdt, modeller_ut, felt_ut = [], 0, 0
+    for objekt in objekter:
+        if not isinstance(objekt, dict):
+            beholdt.append(objekt)
+            continue
+        etikett = str(objekt.get('model', '')).lower()
+        if etikett in UTGAATTE_MODELLER:
+            modeller_ut += 1
+            continue
+        felter = objekt.get('fields')
+        for navn in UTGAATTE_FELT.get(etikett, ()):
+            if isinstance(felter, dict) and navn in felter:
+                del felter[navn]
+                felt_ut += 1
+        beholdt.append(objekt)
+    if not modeller_ut and not felt_ut:
+        return raw
+    logger.info('core.backup: tok ut %d rader av utgåtte modeller og %d utgåtte felt '
+                'fra en eldre fil', modeller_ut, felt_ut)
+    return json.dumps(beholdt).encode('utf-8')
+
+
 def get_backup_dir() -> Path:
     """Returnerer Path til backup-mappen, opprett ved behov."""
     path = Path(os.environ.get('BACKUP_DIR', settings.BASE_DIR / 'backups'))
@@ -413,6 +483,7 @@ def restore_backup(backup, user=None, kilde: str = '') -> None:
     # mellom apper. Oversettelsen står her og ikke rett før `loaddata`, slik at
     # kontrollen under ser dagens modellnavn — ellers måtte den kjenne begge.
     raw = oversett_modellnavn(raw)
+    raw = fjern_utgaatte(raw)
 
     # Se over innholdet før det lastes. loaddata går utenom all
     # applikasjonsvalidering, så dette er eneste stedet vi får sjekket hva

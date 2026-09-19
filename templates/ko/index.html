@@ -42,7 +42,7 @@
   };
   window.KO_BRUKERNAVN = "{{ request.user.username|escapejs }}";
   window.KO_PRIORITETER = {{ prioriteter_json }};
-  window.KO_RESSURSBEHOV = {{ ressursbehov_json }};
+  window.KO_MELDER_VALG = {{ melder_valg_json }};
   window.VERDIFANER_EKSTRA = {{ verdifaner_ekstra_json }};
 </script>
 
@@ -55,7 +55,7 @@
       <div class="d-flex gap-2">
         {% if kan_lede or verdifaner_ekstra %}
         {# «KO-innstillinger» (André, 18. sep. 2026) — sentralbordets valglister #}
-        {# pluss KOs egne ressursbehov, i samme vindu. #}
+        {# pluss KOs egne ansvarsområder, i samme vindu. #}
         <button type="button" class="btn btn-outline-secondary btn-sm"
                 data-bs-toggle="modal" data-bs-target="#valglisterModal"
                 data-action="lastVerdiadmin">
@@ -242,6 +242,16 @@
           <i class="bi bi-grip-vertical ko-grip" draggable="true" title="Dra for å bytte plass"></i>
           <i class="bi bi-truck"></i><span class="ko-vindu-tittel">Ressursoversikt</span>
           <span class="ko-vindu-tall" id="ko-ressurser-antall"></span>
+          {% if kan_se_oppdrag and kan_se_vaktliste %}
+          {# Alle | Biler | Lag (André, 19. sep. 2026). Huskes per nettleser; #}
+          {# det skjulte står som et tall, som gruppene på tavla. #}
+          <div class="btn-group btn-group-sm ms-2" role="group" aria-label="Vis">
+            <button type="button" class="btn btn-outline-secondary" data-action="koVelgRessursvisning" data-arg="alle">Alle</button>
+            <button type="button" class="btn btn-outline-secondary" data-action="koVelgRessursvisning" data-arg="biler">Biler</button>
+            <button type="button" class="btn btn-outline-secondary" data-action="koVelgRessursvisning" data-arg="lag">Lag</button>
+          </div>
+          <span class="ko-vindu-tall" id="ko-ressurs-skjult"></span>
+          {% endif %}
           {% if kan_se_oppdrag and kan_skrive %}
           <button type="button" class="btn btn-outline-secondary btn-sm ms-2"
                   data-bs-toggle="modal" data-bs-target="#enheterModal"
@@ -331,8 +341,9 @@
 {% comment %}
   «Ny hendelse» / «Rediger hendelse». Ett skjema, to titler. Feltene i
   Andrés rekkefølge (18. sep. 2026): hvor, hva, melder, beskrivelse,
-  prioritet, ressurser. Lokasjonene fylles av ko-hendelser.js fra
-  sentralbordets liste — samme kilde som «Nytt oppdrag».
+  prioritet, lag. Lokasjonene fylles av ko-hendelser.js fra sentralbordets
+  liste — samme kilde som «Nytt oppdrag» — og lagene fra vaktlistas
+  ressurser uten enhet (19. sep. 2026). Melderen er avkryssing, fast liste.
 {% endcomment %}
 <div class="modal fade" id="koHendelseModal" tabindex="-1">
   <div class="modal-dialog">
@@ -357,13 +368,23 @@
             <div class="form-text">Det du ville kalt den på samband. Ikke navn eller fødselsnummer.</div>
           </div>
           <div class="mb-3">
-            <label class="form-label" for="ko-h-melder">Melder</label>
-            <input type="text" id="ko-h-melder" class="form-control" maxlength="120"
-                   placeholder="Lag 1, publikum, arrangør …">
+            <div class="form-label">Melder</div>
+            <div class="ko-melder-valg" id="ko-h-melder-typer">
+              {% for verdi, navn in melder_valg %}
+              <label class="form-check nytt-enhet-valg">
+                <input class="form-check-input" type="checkbox" value="{{ verdi }}"
+                       data-action="koMelderAndreEndret" data-hendelse="change"> {{ navn }}
+              </label>
+              {% endfor %}
+            </div>
+            <input type="text" id="ko-h-melder" class="form-control form-control-sm mt-2 d-none" maxlength="120"
+                   placeholder="Hvem, når «Andre» er valgt" aria-label="Melder (andre)">
+            <div class="form-text">Flere kan krysses av.</div>
           </div>
-          <div class="mb-3">
+          <div class="mb-3" id="ko-h-beskrivelse-blokk">
             <label class="form-label" for="ko-h-beskrivelse">Beskrivelse</label>
             <textarea id="ko-h-beskrivelse" class="form-control" rows="3" maxlength="{{ ko_maks_tekst }}"></textarea>
+            <div class="form-text">Blir første tillegg i beskrivelsen. Alt som skrives senere legges til under, med hvem og når.</div>
           </div>
           <div class="mb-3">
             <div class="form-label">Prioritet</div>
@@ -377,17 +398,9 @@
             <div class="form-text">Kan endres senere, og endringen logges. Viktig gir rød ramme og står øverst.</div>
           </div>
           <div class="mb-2">
-            <div class="form-label">Ressurser</div>
-            <div class="ko-ressursbehov-valg" id="ko-h-ressursbehov">
-              {% for r in ressursbehov %}
-              <label class="form-check nytt-enhet-valg">
-                <input class="form-check-input" type="checkbox" value="{{ r.pk }}"> {{ r.navn }}
-              </label>
-              {% empty %}
-              <span class="form-text">Ingen ressursbehov er satt opp ennå — legg dem inn under KO-innstillinger.</span>
-              {% endfor %}
-            </div>
-            <div class="form-text">Hva trengs? Oppdragene opprettes etterpå, inne i hendelsen.</div>
+            <div class="form-label">Lag på hendelsen</div>
+            <div class="ko-lag-valg" id="ko-h-lag"></div>
+            <div class="form-text">Vaktlistas ressurser uten oppdragsenhet — de som får oppdrag muntlig på samband. Kan legges til og tas av i hendelsen etterpå.</div>
           </div>
           <div class="ko-hint" id="ko-h-opprettes-av"></div>
           <div id="ko-h-feil" class="text-danger small d-none mt-2" role="alert"></div>

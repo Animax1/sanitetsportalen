@@ -46,6 +46,9 @@ from .service import (
     create_backup,
     enforce_cap,
     GAMLE_MODELLNAVN,
+    UTGAATTE_FELT,
+    UTGAATTE_MODELLER,
+    fjern_utgaatte,
     get_backup_dir,
     KIND_AUTO,
     KIND_MANUAL,
@@ -74,6 +77,9 @@ def register_handlers() -> None:
 
 __all__ = [
     'GAMLE_MODELLNAVN',
+    'UTGAATTE_FELT',
+    'UTGAATTE_MODELLER',
+    'fjern_utgaatte',
     'GJENOPPRETTINGSREKKEFOLGE',
     'UTEN_BINDING',
     'rekkefolge_avvik',

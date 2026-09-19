@@ -415,10 +415,20 @@ function renderAktivt() {
     const fritekstBlokk = o.fritekst
       ? `<div class="oppdrag-fritekst">${escapeHtml(o.fritekst)}</div>`
       : '';
-    // Lagene på hendelsen oppdraget hører til (André, 18. sep. 2026). KO
-    // fører dem på hendelsen; bilen ser dem her. Tom uten hendelse eller lag.
-    const lagBlokk = (o.hendelse_id && o.hendelse_lagsressurser)
-      ? `<div class="oppdrag-meta oppdrag-lag mb-1"><i class="bi bi-people me-1"></i>Lag på hendelsen: ${escapeHtml(o.hendelse_lagsressurser)}</div>`
+    // Lagene og beskrivelsen på hendelsen oppdraget hører til (André, 18.–19.
+    // sep. 2026). KO fører dem på hendelsen; bilen ser dem her. Tomme uten
+    // hendelse.
+    const lagNavn = (o.hendelse_id && Array.isArray(o.hendelse_lag)) ? o.hendelse_lag.join(', ') : '';
+    const lagBlokk = lagNavn
+      ? `<div class="oppdrag-meta oppdrag-lag mb-1"><i class="bi bi-people me-1"></i>Lag på hendelsen: ${escapeHtml(lagNavn)}</div>`
+      : '';
+    // Tilleggene i beskrivelsen, med hvem og når — samme tekst som KO ser.
+    // Rader bygget før mal-strengen (skanneren ser ikke inn i en nøstet).
+    const tillegg = (o.hendelse_id && Array.isArray(o.hendelse_beskrivelse)) ? o.hendelse_beskrivelse : [];
+    const tilleggRader = tillegg.map((t, i) => '<div class="b-tillegg' + (i === tillegg.length - 1 ? ' nyest' : '') + '">'
+      + escapeHtml(t.tekst) + '<span class="hvem">' + escapeHtml(t.av || '') + ' · ' + escapeHtml(klokke(t.tid)) + '</span></div>').join('');
+    const beskrivelseBlokk = tilleggRader
+      ? `<div class="oppdrag-beskrivelse mb-1"><div class="oppdrag-meta"><i class="bi bi-card-text me-1"></i>Beskrivelse på hendelsen</div>${tilleggRader}</div>`
       : '';
     const nesteKnapp = o.neste_overgang
       ? `<button type="button" class="btn btn-primary stor-knapp flex-grow-1"
@@ -458,6 +468,7 @@ function renderAktivt() {
       ${udefinert}
       ${_varsledeRad(o)}
       ${lagBlokk}
+      ${beskrivelseBlokk}
       ${fritekstBlokk}
       ${_antallRad(o)}
       ${grovRad}
@@ -493,8 +504,17 @@ function renderVentende() {
     const fritekstBlokk = o.fritekst
       ? `<div class="oppdrag-fritekst">${escapeHtml(o.fritekst)}</div>`
       : '';
-    const lagBlokk = (o.hendelse_id && o.hendelse_lagsressurser)
-      ? `<div class="oppdrag-meta oppdrag-lag mb-1"><i class="bi bi-people me-1"></i>Lag på hendelsen: ${escapeHtml(o.hendelse_lagsressurser)}</div>`
+    const lagNavn = (o.hendelse_id && Array.isArray(o.hendelse_lag)) ? o.hendelse_lag.join(', ') : '';
+    const lagBlokk = lagNavn
+      ? `<div class="oppdrag-meta oppdrag-lag mb-1"><i class="bi bi-people me-1"></i>Lag på hendelsen: ${escapeHtml(lagNavn)}</div>`
+      : '';
+    // Tilleggene i beskrivelsen, med hvem og når — samme tekst som KO ser.
+    // Rader bygget før mal-strengen (skanneren ser ikke inn i en nøstet).
+    const tillegg = (o.hendelse_id && Array.isArray(o.hendelse_beskrivelse)) ? o.hendelse_beskrivelse : [];
+    const tilleggRader = tillegg.map((t, i) => '<div class="b-tillegg' + (i === tillegg.length - 1 ? ' nyest' : '') + '">'
+      + escapeHtml(t.tekst) + '<span class="hvem">' + escapeHtml(t.av || '') + ' · ' + escapeHtml(klokke(t.tid)) + '</span></div>').join('');
+    const beskrivelseBlokk = tilleggRader
+      ? `<div class="oppdrag-beskrivelse mb-1"><div class="oppdrag-meta"><i class="bi bi-card-text me-1"></i>Beskrivelse på hendelsen</div>${tilleggRader}</div>`
       : '';
     const startKnapp = `
       <button type="button" class="btn btn-primary stor-knapp w-100 mt-2"
@@ -519,6 +539,7 @@ function renderVentende() {
       <div class="oppdrag-meta mt-1">${escapeHtml(o.lokasjon_navn)} · ${escapeHtml(klokke(o.opprettet))}</div>
       ${_varsledeRad(o)}
       ${lagBlokk}
+      ${beskrivelseBlokk}
       ${fritekstBlokk}
       ${andresTidslinje}
       ${startKnapp}

@@ -179,6 +179,17 @@ KO_LOGG_BYGGERE = (
     'koLeggHendelsevalgINyttOppdrag',
     # «Nullstill»-fanen: ren markup uten data, men den bygger markup like fullt.
     'koTegnNullstill',
+    # Lagene på hendelsen og beskrivelsen som tillegg (19. sep. 2026), og
+    # besetningen bak et klikk på lagkortet.
+    'koTilleggHtml',
+    'koTilleggSkjemaHtml',
+    'koBeskrivelseHtml',
+    'koLagBrikkeHtml',
+    'koLagVelgerHtml',
+    'koFyllLagvalg',
+    'koBeskrivelseSkjema',
+    'koRessursBesetningHtml',
+    'koRessursOpptattHtml',
 )
 
 #: Uttrykk som interpoleres uten `escapeHtml`, med begrunnelse.
@@ -525,12 +536,14 @@ class SorteringsregelenTests(SimpleTestCase):
                  {'nummer': 2, 'status': 'apen', 'prioritet': 'drift'}]
         self.assertEqual(self._sorter(liste), [2, 1])
 
-    def test_soeket_treffer_nummer_tittel_sted_melder_og_lag(self):
+    def test_soeket_treffer_nummer_tittel_sted_melder_tillegg_og_lag(self):
         h = {'kode': 'H12', 'nummer': 12, 'tittel': 'Slagsmål', 'lokasjon_navn': 'Scene sør',
-             'melder': 'Lag 1', 'beskrivelse': 'to personer', 'lagsressurser': 'Lag 3'}
+             'melder_typer': ['andre'], 'melder': 'kiosken', 'melder_tekst': 'Andre (kiosken)',
+             'beskrivelse': [{'tekst': 'to personer'}, {'tekst': 'én pågrepet'}],
+             'lag': [{'ressurs_id': 3, 'navn': 'Lag 3'}]}
         for sok, ventet in (('h12', True), ('12', True), ('slag', True), ('sør', True),
-                            ('lag 1', True), ('personer', True), ('lag 3', True),
-                            ('', True), ('  ', True), ('brann', False)):
+                            ('kiosk', True), ('andre', True), ('personer', True), ('pågrepet', True),
+                            ('lag 3', True), ('', True), ('  ', True), ('brann', False)):
             with self.subTest(sok=sok):
                 ut = run_node(self.harness,
                               f'console.log(koHendelseTreffer({json.dumps(h)}, {json.dumps(sok)}));',
@@ -566,10 +579,13 @@ class HendelsesradenTests(SimpleTestCase):
                         preamble=PRIORITET_PREAMBLE)
 
     H = {'id': 5, 'nummer': 14, 'kode': 'H14', 'tittel': 'Bevisstløs person', 'status': 'apen',
-         'prioritet': 'viktig', 'lokasjon_navn': 'Hovedscene', 'melder': 'Lag 1',
-         'beskrivelse': 'Mann ca. 40', 'lagsressurser': '', 'opprettet_at': '2026-09-18T21:42:00',
+         'prioritet': 'viktig', 'lokasjon_navn': 'Hovedscene', 'melder_typer': ['egen'],
+         'melder': '', 'melder_tekst': 'Egen ressurs',
+         'beskrivelse': [{'id': 1, 'tekst': 'Mann ca. 40', 'av': 'kari', 'tid': '2026-09-18T21:42:00'}],
+         'opprettet_at': '2026-09-18T21:42:00',
          'opprettet_av': 'kari', 'lukket_at': '', 'apne_oppdrag': 1,
-         'ressursbehov': [{'id': 1, 'navn': 'Ambulanse'}], 'deltakere': ['kari']}
+         'lag': [{'id': 1, 'ressurs_id': 7, 'navn': 'Lag 1', 'fra': '2026-09-18T21:42:00', 'av': 'kari'}],
+         'deltakere': ['kari']}
 
     def test_viktig_har_ramme_og_utropstegn(self):
         ut = self._rad(self.H)
@@ -595,10 +611,18 @@ class HendelsesradenTests(SimpleTestCase):
         self.assertIn('O47', ut)
         self.assertNotIn('O48', ut)
 
-    def test_escaper_tittel_sted_melder_beskrivelse_og_behov(self):
+    def test_raden_baerer_siste_tillegg_melder_og_lag(self):
+        ut = self._rad(dict(self.H, beskrivelse=[{'tekst': 'første'}, {'tekst': 'siste'}]))
+        self.assertIn('siste', ut)
+        self.assertNotIn('første', ut, 'bare det nyeste tillegget står under tittelen')
+        self.assertIn('Meldt av Egen ressurs', ut)
+        self.assertIn('Lag 1', ut)
+
+    def test_escaper_tittel_sted_melder_tillegg_og_lag(self):
         ond = '<img src=x onerror=alert(1)>'
-        ut = self._rad(dict(self.H, tittel=ond, lokasjon_navn=ond, melder=ond, beskrivelse=ond,
-                            opprettet_av=ond, ressursbehov=[{'id': 1, 'navn': ond}]))
+        ut = self._rad(dict(self.H, tittel=ond, lokasjon_navn=ond, melder_tekst=ond,
+                            beskrivelse=[{'tekst': ond}], opprettet_av=ond,
+                            lag=[{'id': 1, 'ressurs_id': 7, 'navn': ond, 'fra': '', 'av': ''}]))
         self.assertNotIn('<img', ut)
         self.assertIn('&lt;img', ut)
 
@@ -631,6 +655,82 @@ class StroemmenTests(SimpleTestCase):
         self.assertFalse(self._i({'kilde': 'system', 'hendelse_id': None, 'systemkode': 'oppdrag_status'}, False))
         self.assertTrue(self._i({'kilde': 'system', 'hendelse_id': 5, 'systemkode': 'hendelse_lukket'}, False))
         self.assertTrue(self._i({'kilde': 'operator', 'hendelse_id': None, 'systemkode': ''}, False))
+
+
+@unittest.skipUnless(node_available(), 'node er ikke tilgjengelig')
+class TilleggOgLagTests(SimpleTestCase):
+    """Beskrivelsen som tillegg og lagene på hendelsen (19. sep. 2026):
+    «nytt» i ti minutter, «siden»-teksten, tallet på det skjulte i
+    ressursoversikten — og at tekst, navn og lagnavn escapes."""
+
+    def setUp(self):
+        self.harness = build_harness((
+            (PORTAL_UTILS_JS, ('escapeHtml', 'fmtMin')),
+            (KO_JS, ('koErNytt', 'koSiden', 'koSkjultTall', 'koTilleggHtml', 'koLagBrikkeHtml',
+                     'koKlokke', 'koTilleggSkjemaHtml', 'koBeskrivelseHtml')),
+        ))
+
+    PRE = 'const KO_NYTT_MS = 10 * 60 * 1000;\n'
+
+    def _kjor(self, kode):
+        return run_node(self.harness, kode, preamble=self.PRE).splitlines()
+
+    def test_nytt_i_ti_minutter(self):
+        ut = self._kjor(
+            "const naa = Date.parse('2026-09-19T22:00:00Z');\n"
+            "console.log([koErNytt('2026-09-19T21:51:00Z', naa), koErNytt('2026-09-19T21:50:00Z', naa),"
+            " koErNytt('2026-09-19T21:49:59Z', naa), koErNytt('tull', naa), koErNytt('', naa)].join(','));")
+        self.assertEqual(ut[0], 'true,false,false,false,false')
+
+    def test_siden_i_minutter_og_timer(self):
+        ut = self._kjor(
+            "const naa = Date.parse('2026-09-19T22:00:00Z');\n"
+            "console.log([koSiden('2026-09-19T21:37:00Z', naa), koSiden('2026-09-19T20:55:00Z', naa),"
+            " koSiden('2026-09-19T22:30:00Z', naa), koSiden('x', naa)].join('|'));")
+        self.assertEqual(ut[0], '23 min|1t 5m|0 min|')
+
+    def test_tallet_paa_det_skjulte(self):
+        ut = self._kjor("console.log([koSkjultTall('alle', 4, 3), koSkjultTall('biler', 4, 3), koSkjultTall('lag', 4, 3),"
+                        " koSkjultTall('lag', 0, 3), koSkjultTall('biler', 4, 0)].join('|'));")
+        self.assertEqual(ut[0], '|3 lag skjult|4 biler skjult||')
+
+    def test_tillegget_baerer_hvem_naar_nyest_og_nytt(self):
+        ut = self._kjor(
+            "const t = {tekst: 'Pasienten våken', av: 'kari', tid: new Date(Date.now() - 60000).toISOString()};\n"
+            "console.log(koTilleggHtml(t, true));\n"
+            "console.log(koTilleggHtml({...t, tid: '2026-01-01T10:00:00Z', rettet: true}, false));\n")
+        self.assertIn('nyest', ut[0]); self.assertIn('nytt', ut[0]); self.assertIn('kari', ut[0])
+        self.assertNotIn('nyest', ut[1]); self.assertNotIn('class="merke"', ut[1]); self.assertIn('(rettet)', ut[1])
+
+    def test_hendelsene_tegner_lagkortene_paa_nytt(self):
+        """**Kallstedet, ikke bare regelen.** «På H14 · 23 min» leses av
+        kortet fra hendelsene, så `koTaImotHendelser()` må tegne kortene om
+        igjen — ellers står et lag som ledig til neste ressurs-poll."""
+        harness = build_harness((
+            (PORTAL_UTILS_JS, ('escapeHtml',)),
+            (KO_JS, ('koTaImotHendelser', 'koTegnHendelser', 'koFyllHendelsevalg',
+                     'koSorterHendelser', 'koSynligeHendelser', 'koApneHendelser',
+                     'koHendelseTreffer', 'koPrioriteter', 'koPrioritetRang')),
+        ))
+        ut = run_node(harness,
+                      'let kalt = 0; function koTegnRessurser() { kalt += 1; }\n'
+                      "globalThis.document = { getElementById: () => null, querySelectorAll: () => [] };\n"
+                      "koTaImotHendelser([{id: 1, status: 'apen'}]);\n"
+                      'console.log(kalt);', preamble=PRIORITET_PREAMBLE)
+        self.assertEqual(ut.splitlines()[0], '1')
+
+    def test_escaper_tekst_navn_og_lagnavn(self):
+        ond = '<img src=x onerror=alert(1)>'
+        ut = self._kjor(
+            f"console.log(koTilleggHtml({{tekst: {json.dumps(ond)}, av: {json.dumps(ond)}, tid: ''}}, true));\n"
+            f"console.log(koLagBrikkeHtml({{id: 3}}, {{ressurs_id: 9, navn: {json.dumps(ond)}, fra: ''}}, true));\n"
+            f"console.log(koBeskrivelseHtml({{id: 3, beskrivelse: [{{tekst: {json.dumps(ond)}, av: '', tid: ''}}]}}, true, 'f', 'h'));\n")
+        for linje in ut[:3]:
+            self.assertNotIn('<img', linje)
+            self.assertIn('&lt;img', linje)
+        self.assertIn('data-arg="3:9"', ut[1], 'ta av-knappen for den som kan')
+        self.assertIn('data-ko-tillegg="3"', ut[2], 'skjemaet for den som kan')
+        self.assertNotIn('data-ko-tillegg', self._kjor("console.log(koBeskrivelseHtml({id: 3, beskrivelse: []}, false, 'f', 'h'));")[0])
 
 
 @unittest.skipUnless(node_available(), 'node er ikke tilgjengelig')
@@ -725,7 +825,7 @@ class TavlaSierFraTilKoTests(SimpleTestCase):
         "  enhet_navn: 'HGSD 56', lokasjon_navn: 'Scene', problemstilling: 'Fall',\n"
         "  hastegrad: 'Akutt', opprettet: '2026-08-28T20:00:00Z', fritekst: '',\n"
         "  hendelse_id: 1, hendelse_nummer: 1, hendelse_tittel: 'Brann',\n"
-        "  hendelse_prioritet: 'viktig', hendelse_lagsressurser: '<b>Lag 1</b>, Lag 3', enheter: []}];\n"
+        "  hendelse_prioritet: 'viktig', hendelse_lag: ['<b>Lag 1</b>', 'Lag 3'], enheter: []}];\n"
         "globalThis.window = { MODUL_TILGANG: { ko: 'skriv_full' } };\n"
         'let kalt = 0;\n'
         'function koEtterOppdragTegnet() { kalt += 1; }\n'
@@ -863,41 +963,78 @@ class MinimerbareGrupperTests(SimpleTestCase):
 
 @unittest.skipUnless(node_available(), 'node er ikke tilgjengelig')
 class RessurskorteneTests(SimpleTestCase):
-    """Vaktlistas ressurser på tavla: kortet sier hvem og om de er møtt —
-    ingen status — og escaper navnene, som er fritekst fra et annet register."""
+    """Vaktlistas ressurser på tavla: kortet sier hvor mange som er møtt og
+    om laget er på en hendelse; **besetningen — navn, møtt, telefon, ISSI —
+    står bak et klikk** (André, 19. sep. 2026: «da sparer vi plass»). Alt
+    brukerskrevet escapes, det er fritekst fra et annet register."""
+
+    PRE = 'let koApenRessurs = null; let koHendelser = new Map();\n'
 
     def setUp(self):
         self.harness = build_harness((
-            (PORTAL_UTILS_JS, ('escapeHtml',)),
-            (KO_JS, ('koRessurskort', 'koRessursMannskap', 'koGrupperRessurser', 'koKlokke')),
+            (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue', 'fmtMin')),
+            (JS_DIR / 'oppdrag-kort.js', ('_besetningKontakt',)),
+            (KO_JS, ('koRessurskort', 'koRessursMannskap', 'koGrupperRessurser', 'koKlokke',
+                     'koRessursBesetningHtml', 'koRessursOpptattHtml', 'koSiden', 'koLagPaa')),
         ))
 
-    def _kort(self, r):
-        return run_node(self.harness, f'console.log(koRessurskort({json.dumps(r)}));')
+    R = {'id': 1, 'navn': 'Lag 3', 'gruppe_ikon': 'people', 'antall': 2, 'tilstede': 1,
+         'mannskap': [{'navn': 'Kari', 'rolle': 'Lagleder', 'telefon': '911 22 333', 'issi': '2401234', 'tilstede': True},
+                      {'navn': 'Ola', 'rolle': '', 'telefon': '', 'issi': '', 'tilstede': False}],
+         'neste': [], 'neste_fra': None}
 
-    def test_bemannet_kort(self):
-        ut = self._kort({'id': 1, 'navn': 'Lag 3', 'gruppe_ikon': 'people', 'antall': 2, 'tilstede': 1,
-                         'mannskap': [{'navn': 'Kari', 'tilstede': True}, {'navn': 'Ola', 'tilstede': False}],
-                         'neste': [], 'neste_fra': None})
+    def _kort(self, r, pre=''):
+        return run_node(self.harness, f'console.log(koRessurskort({json.dumps(r)}));', preamble=self.PRE + pre)
+
+    def test_lukket_kort_sier_tallet_men_ikke_hvem(self):
+        ut = self._kort(self.R)
         self.assertIn('1 av 2 møtt', ut)
-        self.assertIn('Kari', ut)
-        self.assertIn('Ola <span class="text-muted">(ikke møtt)</span>', ut)
         self.assertIn('bi-people', ut)
+        self.assertIn('enhet-kort-klikkbar', ut)
+        self.assertIn('data-action="koVippRessurs"', ut)
+        self.assertNotIn('Kari', ut, 'navnene står bak klikket')
+        self.assertNotIn('911', ut)
+
+    def test_klikket_kort_viser_navn_moett_telefon_og_issi(self):
+        ut = self._kort(self.R, 'koApenRessurs = 1;\n')
+        self.assertIn('ko-ressurskort-apen', ut)
+        self.assertIn('<span>Kari</span>', ut)
+        self.assertIn('Lagleder', ut)
+        self.assertIn('href="tel:91122333"', ut)
+        self.assertIn('2401234', ut)
+        self.assertIn('title="Møtt">●', ut)
+        self.assertIn('title="Ikke møtt">○', ut)
 
     def test_ubemannet_med_neste(self):
-        ut = self._kort({'id': 1, 'navn': 'KO', 'gruppe_ikon': '', 'antall': 0, 'tilstede': 0,
-                         'mannskap': [], 'neste': [{'navn': 'Per', 'tilstede': False}],
-                         'neste_fra': '2026-09-18T16:00:00+02:00'})
-        self.assertIn('ubemannet', ut)
+        r = {'id': 1, 'navn': 'KO', 'gruppe_ikon': '', 'antall': 0, 'tilstede': 0,
+             'mannskap': [], 'neste': [{'navn': 'Per', 'tilstede': False}],
+             'neste_fra': '2026-09-18T16:00:00+02:00'}
+        self.assertIn('ubemannet', self._kort(r))
+        ut = self._kort(r, 'koApenRessurs = 1;\n')
         self.assertIn('Ingen nå', ut)
         self.assertIn('Per', ut)
 
+    def test_paa_hendelse_leses_fra_de_aapne_hendelsene(self):
+        pre = ("koHendelser.set(5, {id: 5, kode: 'H14', tittel: 'Bevisstløs', status: 'apen',"
+               " lag: [{ressurs_id: 1, fra: new Date(Date.now() - 23 * 60000).toISOString()}]});\n"
+               "koHendelser.set(6, {id: 6, kode: 'H9', tittel: 'Lukket', status: 'lukket',"
+               " lag: [{ressurs_id: 1, fra: new Date().toISOString()}]});\n")
+        ut = self._kort(self.R, pre)
+        self.assertIn('På H14 · 23 min', ut)
+        self.assertIn('Bevisstløs', ut)
+        self.assertNotIn('H9', ut, 'en lukket hendelse holder ingen')
+        self.assertNotIn('På H', self._kort(dict(self.R, id=2), pre), 'et annet lag er ledig')
+
     def test_escaper_navn_og_ikon(self):
-        ut = self._kort({'id': 1, 'navn': '<img src=x>', 'gruppe_ikon': '"><script>', 'antall': 1, 'tilstede': 1,
-                         'mannskap': [{'navn': '<b>Kari</b>', 'tilstede': True}], 'neste': [], 'neste_fra': None})
-        self.assertNotIn('<img src=x>', ut)
-        self.assertNotIn('<script>', ut)
-        self.assertNotIn('<b>Kari</b>', ut)
+        ond = '<img src=x onerror=alert(1)>'
+        r = dict(self.R, navn=ond, gruppe_ikon='x" onload="alert(1)',
+                 mannskap=[{'navn': ond, 'rolle': ond, 'telefon': ond, 'issi': ond, 'tilstede': True}])
+        pre = ("koHendelser.set(5, {id: 5, kode: 'H14', tittel: '" + ond.replace("'", "\\'")
+               + "', status: 'apen', lag: [{ressurs_id: 1, fra: new Date().toISOString()}]});\n")
+        ut = self._kort(r, 'koApenRessurs = 1;\n' + pre)
+        self.assertNotIn('<img', ut)
+        self.assertNotIn('" onload="', ut)
+        self.assertIn('&lt;img', ut)
 
     def test_grupperer_paa_ressursgruppe_i_rekkefoelge(self):
         ut = run_node(self.harness, '''

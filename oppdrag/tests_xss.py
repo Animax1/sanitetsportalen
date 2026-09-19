@@ -55,6 +55,10 @@ HTML_BUILDERS_PER_FIL = {
         '_verdirad',
         'renderEnhetsadmin',
         'renderHistorikk',
+        # Beskrivelsen på hendelsen (KO, 19. sep. 2026): tilleggene med hvem
+        # og når, i detaljmodalen. Lagene står som en const i raden og i
+        # `visOppdrag`, som friteksten.
+        '_hendelseBeskrivelseHtml',
     ),
     OPPDRAG_ENHET_JS: (
         'tidslinjeEnhetHtml',
@@ -71,6 +75,16 @@ HTML_BUILDERS_PER_FIL = {
 ESCAPING_CALLS = ('escHtmlValue(', 'cellHtml(', '_escHtml(', 'escapeHtml(')
 
 REVIEWED_INTERPOLATIONS = {
+    # Beskrivelsen på hendelsen (19. sep. 2026): tilleggene bygges linje for
+    # linje med escapeHtml før mal-strengen, og skjemaet er KOs egen bygger,
+    # skannet i ko/tests_js.py. Etiketten og hinten er to faste strenger
+    # valgt av en ternær.
+    'beskrivelseBlokk': 'markup bygget rett over, tekst, navn og klokkeslett escapet der',
+    'tilleggRader': 'markup bygget rett over, tekst, navn og klokkeslett escapet der',
+    'nyest': 'hardkodet CSS-klasse fra en ternær',
+    'skjema': 'ferdig markup fra koBeskrivelseSkjema(), som skannes i ko/tests_js.py',
+    'fritekstEtikett': 'to faste ord valgt av en ternær',
+    'fritekstHint': 'fast markup valgt av en ternær, ingen data i',
     'klasse': 'intern CSS-klasse valgt av en ternær i koden',
     'tidKlasse': 'intern CSS-klasse valgt av en ternær i koden',
     'tittel': 'hardkodet title-attributt fra en ternær',

@@ -151,6 +151,7 @@ function koLinjeMerke(linje) {
   // 2026) — de er operatørens handlinger, ikke en projeksjon av et stempel.
   if (linje.kilde === 'system' && String(linje.systemkode || '').startsWith('hendelse_')) return 'hendelse';
   if (linje.kilde === 'system') return 'system';
+  if (linje.beskrivelse) return 'beskrivelse';
   if (linje.uformell) return 'chat';
   if (linje.delt_konto) return 'delt';
   return '';
@@ -467,6 +468,62 @@ async function koSettAnsvar() {
 const KO_RESSURSER_MS = 30000;
 let koRessurser = [];
 
+//: Ressursen med besetningen åpen — én om gangen, som `apenBesetning` for
+//: bilene (André, 19. sep. 2026: «du må trykke på ressursen for å se, da
+//: sparer vi plass»).
+let koApenRessurs = null;
+
+//: Alle | Biler | Lag i vinduets hode, husket per nettleser som oppsettet.
+const KO_RESSURSVISNING_NOKKEL = 'ko.ressursvisning';
+const KO_RESSURSVISNINGER = ['alle', 'biler', 'lag'];
+let koRessursvisning = 'alle';
+
+function koLesRessursvisning() {
+  try {
+    const v = localStorage.getItem(KO_RESSURSVISNING_NOKKEL);
+    return KO_RESSURSVISNINGER.includes(v) ? v : 'alle';
+  } catch (e) { return 'alle'; }
+}
+
+function koSettRessursvisning(v) {
+  koRessursvisning = KO_RESSURSVISNINGER.includes(v) ? v : 'alle';
+  try { localStorage.setItem(KO_RESSURSVISNING_NOKKEL, koRessursvisning); } catch (e) { /* privat modus */ }
+  koBrukRessursvisning();
+}
+
+// Regelen: hva som skjules for hver visning, og tallet på det skjulte. Det
+// som er skjult skal være lesbart (samme prinsipp som gruppene på tavla).
+function koSkjultTall(visning, antallBiler, antallLag) {
+  if (visning === 'biler') return antallLag ? String(antallLag) + ' lag skjult' : '';
+  if (visning === 'lag') return antallBiler ? String(antallBiler) + ' biler skjult' : '';
+  return '';
+}
+
+function koBrukRessursvisning() {
+  const biler = document.getElementById('enhetsliste');
+  const lag = document.getElementById('vaktliste-ressurser');
+  if (biler) biler.classList.toggle('d-none', koRessursvisning === 'lag');
+  if (lag) lag.classList.toggle('d-none', koRessursvisning === 'biler');
+  document.querySelectorAll('[data-action="koVelgRessursvisning"]').forEach((k) => {
+    const valgt = k.dataset.arg === koRessursvisning;
+    k.classList.toggle('active', valgt);
+    k.classList.toggle('btn-secondary', valgt);
+    k.classList.toggle('btn-outline-secondary', !valgt);
+  });
+  const skjult = document.getElementById('ko-ressurs-skjult');
+  if (skjult) {
+    const antallBiler = (typeof sisteEnhetsliste !== 'undefined' && Array.isArray(sisteEnhetsliste)) ? sisteEnhetsliste.length : 0;
+    skjult.textContent = koSkjultTall(koRessursvisning, antallBiler, koRessurser.length);
+  }
+}
+
+function koVelgRessursvisning(v) { koSettRessursvisning(v); }
+
+function koVippRessurs(id) {
+  koApenRessurs = koApenRessurs === Number(id) ? null : Number(id);
+  koTegnRessurser();
+}
+
 function koRessursMannskap(r) {
   // Navnene hoistes ut før konkateneringen, som resten av byggerne: skanneren
   // i ko/tests_js.py ser et datafelt limt inn, ikke at `map` escaper inni.
@@ -481,16 +538,49 @@ function koRessursMannskap(r) {
   return '<span class="text-muted">Ingen på vakt</span>';
 }
 
+// Besetningen bak et klikk (19. sep. 2026): navn, møtt, telefon som
+// ringbar lenke, ISSI — samme rader som bilens `mkBesetning`, med samme
+// kontaktbygger når den er lastet.
+function koRessursBesetningHtml(r) {
+  const rader = (r.mannskap || []).map((m) => {
+    const merke = m.tilstede
+      ? '<span class="besetning-inne" title="Møtt">●</span>'
+      : '<span class="besetning-ute" title="Ikke møtt">○</span>';
+    const rolle = m.rolle ? '<span class="enhet-meta">' + escapeHtml(m.rolle) + '</span>' : '';
+    const kontakt = (typeof _besetningKontakt === 'function') ? _besetningKontakt(m) : '';
+    return '<div class="besetning-rad">' + merke + '<span>' + escapeHtml(m.navn) + '</span>' + rolle + kontakt + '</div>';
+  }).join('');
+  return '<div class="besetning">' + (rader || '<span class="enhet-meta">' + koRessursMannskap(r) + '</span>') + '</div>';
+}
+
+// «På H14 · 23 min» — hendelsene laget står på, fra hendelsesloggen. Tom
+// når laget er ledig, eller når hendelsene ikke er lastet.
+function koRessursOpptattHtml(r) {
+  const paa = (typeof koLagPaa === 'function') ? koLagPaa(r.id) : [];
+  if (!paa.length) return '';
+  const hode = paa.map((x) => '<span class="ko-opptatt">På ' + escapeHtml(x.kode) + ' · '
+    + escapeHtml(koSiden(x.fra)) + '</span>').join(' ');
+  const linjer = paa.map((x) => '<div class="enhet-oppdrag" role="button" data-action="koApneHendelse"'
+    + ' data-id="' + escapeHtml(x.id) + '"><span class="hendelse-merke">' + escapeHtml(x.kode) + '</span>'
+    + '<span class="enhet-oppdrag-problem">' + escapeHtml(x.tittel) + '</span></div>').join('');
+  return '<div class="enhet-meta">' + hode + '</div>' + linjer;
+}
+
 function koRessurskort(r) {
   const tall = r.antall
     ? escapeHtml(String(r.tilstede)) + ' av ' + escapeHtml(String(r.antall)) + ' møtt'
     : 'ubemannet';
-  return '<div class="enhet-kort ko-ressurskort">'
+  const apen = koApenRessurs === r.id;
+  const besetning = apen ? koRessursBesetningHtml(r) : '';
+  const opptatt = koRessursOpptattHtml(r);
+  return '<div class="enhet-kort ko-ressurskort enhet-kort-klikkbar' + (apen ? ' ko-ressurskort-apen' : '') + '"'
+    + ' data-action="koVippRessurs" data-id="' + escapeHtml(r.id) + '" role="button" tabindex="0">'
     + '<i class="bi bi-' + escapeHtml(r.gruppe_ikon || 'box') + ' ko-ressursikon"></i>'
     + '<div class="flex-grow-1">'
     + '<div class="enhet-navn">' + escapeHtml(r.navn) + '</div>'
     + '<div class="enhet-meta">' + tall + '</div>'
-    + '<div class="enhet-meta">' + koRessursMannskap(r) + '</div>'
+    + opptatt
+    + besetning
     + '</div></div>';
 }
 
@@ -522,6 +612,7 @@ function koTegnRessurser() {
 // vakt), så gruppene under følger med — og tallet i vinduets hode.
 function koTegnRessurserPaaNytt() {
   koTegnRessurser();
+  koBrukRessursvisning();
   const tall = document.getElementById('ko-ressurser-antall');
   const liste = (typeof sisteEnhetsliste !== 'undefined' && Array.isArray(sisteEnhetsliste)) ? sisteEnhetsliste : [];
   if (tall) {
@@ -531,12 +622,23 @@ function koTegnRessurserPaaNytt() {
   }
 }
 
+// Enter eller «+» i et tilleggsskjema: kall handlingen skjemaet peker på,
+// med hendelsens id. Andre skjemaer røres ikke.
+function koTilleggSubmit(e) {
+  const form = e.target && e.target.closest ? e.target.closest('form[data-ko-tillegg]') : null;
+  if (!form) return;
+  e.preventDefault();
+  const handler = globalThis[form.dataset.koHandling];
+  if (typeof handler === 'function') handler(Number(form.dataset.koTillegg));
+}
+
 async function koHentRessurser() {
   try {
     const res = await apiFetch('/vaktliste/api/ressurser/uten-enhet/');
     if (!res.ok) return;
     koRessurser = (await res.json()).data || [];
     koTegnRessurser();
+    koBrukRessursvisning();
   } catch (e) {
     // Lista som alt står er fortsatt sann; feilen viser seg ved neste poll.
   }
@@ -585,6 +687,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const sok = document.getElementById('ko-hendelse-sok');
   if (sok) sok.addEventListener('input', koSokEndret);
+
+  // Skjemaene «Legg til i beskrivelsen» tegnes på nytt ved hver poll, så
+  // lytteren står på dokumentet: ett sted, for hendelsen og for
+  // oppdragets detaljmodal.
+  document.addEventListener('submit', koTilleggSubmit);
+
+  koRessursvisning = koLesRessursvisning();
+  koBrukRessursvisning();
 
   koLeggHendelsevalgINyttOppdrag();
 

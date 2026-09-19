@@ -1,5 +1,6 @@
 """Hendelsesloggen som egen flate (18. sep. 2026): prioritet, «bli med»,
-festing, ressursbehovene og feltene i hodet — reglene og portene.
+festing og feltene i hodet — og fra 19. sep. 2026 lagene på hendelsen,
+beskrivelsen som tillegg og melderen som avkryssing. Reglene og portene.
 
 Tyngden ligger i tjenestelaget, som `CLAUDE.md` sier: hver gren i
 `ko/services.py` prøves, fordi en feil der legger seg i data. Portene på
@@ -20,12 +21,14 @@ from django.test import Client, TestCase, override_settings
 from accounts.models import CustomUser, ModulTilgang
 from core.vakt import hent_aktiv_vakt, vakt_for_year
 from ko import services, systemlinjer
-from ko.models import (KILDE_SYSTEM, PRIORITET_GRONN, PRIORITET_RANG,
+from ko.models import (KILDE_SYSTEM, MELDER_VALG, PRIORITET_GRONN, PRIORITET_RANG,
                        PRIORITET_VALG, PRIORITET_VIKTIG, Hendelse,
-                       HendelseDeltaker, Logglinje, Ressursbehov)
+                       HendelseDeltaker, HendelseLag, Logglinje)
 from oppdrag import choices
 from oppdrag import services as oservices
 from oppdrag.models import Enhet, Lokasjon, Oppdrag
+from vaktliste.models import Vaktliste
+from vaktliste.test_helpers import LAG, gruppe, lag_ressurs
 
 
 def _bruker(navn, **kwargs):
@@ -47,8 +50,12 @@ class _Grunnlag(TestCase):
         self.andre = _bruker('ko2')
         self.enhet = Enhet.objects.create(navn='HGSD 56')
         self.lokasjon = Lokasjon.objects.create(navn='Scene sør')
-        self.amb = Ressursbehov.objects.create(navn='Ambulanse', rekkefolge=10)
-        self.lag = Ressursbehov.objects.create(navn='Lag', rekkefolge=20)
+        # Lagene er vaktlistas ressurser uten oppdragsenhet, i lista for
+        # aktiv vakt — samme scope som kortene på tavla.
+        self.vl = Vaktliste.objects.create(vakt=self.vakt)
+        self.lag1 = lag_ressurs(vaktliste=self.vl, navn='Lag 1', gruppe=gruppe(LAG))
+        self.lag2 = lag_ressurs(vaktliste=self.vl, navn='Lag 2', gruppe=gruppe(LAG))
+        self.bil = lag_ressurs(vaktliste=self.vl, navn='Ambulanse 1', enhet=self.enhet)
 
     def _hendelse(self, tittel='Slagsmål', **kw):
         return services.opprett_hendelse(self.vakt, tittel, bruker=self.operator, **kw)
@@ -167,7 +174,7 @@ class BliMedTests(_Grunnlag):
         services.sett_prioritet(h, 'rod', bruker=self.andre)
         self.assertIn('ko2', self._deltakere(h))
         tredje = _bruker('ko3')
-        services.rediger_hendelse(h, bruker=tredje, versjon=h.versjon, melder='Lag 2')
+        services.rediger_hendelse(h, bruker=tredje, versjon=h.versjon, melder_typer=['amk'])
         self.assertIn('ko3', self._deltakere(h))
 
     def test_idempotent_og_navnet_fryses(self):
@@ -188,15 +195,16 @@ class BliMedTests(_Grunnlag):
 
 
 class HodetTests(_Grunnlag):
-    """Beskrivelse, melder, lagsressurser og ressursbehov: valideres før
-    nummeret trekkes, redigeres med versjon."""
+    """Melder og beskrivelse: valideres før nummeret trekkes, redigeres med
+    versjon."""
 
     def test_feltene_lagres_ved_opprettelse(self):
-        h = self._hendelse(beskrivelse=' Mann ca. 40 ', melder='Lag 1',
-                           lokasjon=self.lokasjon, ressursbehov=[self.amb.pk, self.lag.pk])
-        self.assertEqual(h.beskrivelse, 'Mann ca. 40')
-        self.assertEqual(h.melder, 'Lag 1')
-        self.assertEqual(sorted(h.ressursbehov.values_list('navn', flat=True)), ['Ambulanse', 'Lag'])
+        h = self._hendelse(beskrivelse=' Mann ca. 40 ', melder_typer=['egen', 'andre'],
+                           melder='arrangørvakt', lokasjon=self.lokasjon)
+        self.assertEqual([t['tekst'] for t in h.beskrivelse_tillegg()], ['Mann ca. 40'])
+        self.assertEqual(h.melder_typer, ['egen', 'andre'])
+        self.assertEqual(h.melder, 'arrangørvakt')
+        self.assertEqual(services.melder_tekst(h), 'Egen ressurs, Andre (arrangørvakt)')
         self.assertEqual(h.lokasjon_navn, 'Scene sør')
 
     def test_for_lange_felt_avvises_foer_nummeret_trekkes(self):
@@ -206,68 +214,218 @@ class HodetTests(_Grunnlag):
                             ('melder', 'x' * (services.MAKS_MELDER + 1))):
             with self.subTest(felt=felt):
                 with self.assertRaises(services.Ugyldig):
-                    self._hendelse(**{felt: verdi})
+                    self._hendelse(melder_typer=['andre'], **{felt: verdi})
         self.assertEqual(Hendelse.objects.count(), 0)
         h = self._hendelse()
         self.assertEqual(h.hendelsesnummer, 1, 'ingen nummer brent')
 
     def test_grensene_selv_er_lov(self):
         h = self._hendelse(beskrivelse='x' * services.MAKS_BESKRIVELSE,
-                           melder='x' * services.MAKS_MELDER)
-        self.assertEqual(len(h.beskrivelse), services.MAKS_BESKRIVELSE)
+                           melder_typer=['andre'], melder='x' * services.MAKS_MELDER)
+        self.assertEqual(len(h.beskrivelse_tillegg()[0]['tekst']), services.MAKS_BESKRIVELSE)
 
-    def test_ukjent_ressursbehov_er_400_ikke_stille_utelatt(self):
-        with self.assertRaises(services.Ugyldig):
-            self._hendelse(ressursbehov=[self.amb.pk, 999])
-        with self.assertRaises(services.Ugyldig):
-            self._hendelse(ressursbehov='amb')
-        with self.assertRaises(services.Ugyldig):
-            self._hendelse(ressursbehov=['x'])
-        self.assertEqual(Hendelse.objects.count(), 0)
-
-    def test_rediger_hvert_felt(self):
-        h = self._hendelse()
+    def test_rediger_melder(self):
+        h = self._hendelse(melder_typer=['amk'])
         services.rediger_hendelse(h, bruker=self.operator, versjon=h.versjon,
-                                  beskrivelse='ny', melder='publikum',
-                                  lagsressurser='Lag 1, Lag 3',
-                                  ressursbehov=[self.lag.pk])
+                                  melder_typer=['politi', 'andre'], melder='publikum')
         h.refresh_from_db()
-        self.assertEqual((h.beskrivelse, h.melder, h.lagsressurser), ('ny', 'publikum', 'Lag 1, Lag 3'))
-        self.assertEqual(list(h.ressursbehov.values_list('pk', flat=True)), [self.lag.pk])
+        self.assertEqual((h.melder_typer, h.melder), (['politi', 'andre'], 'publikum'))
         self.assertEqual(h.versjon, 2)
 
-    def test_tom_streng_toemmer_none_roerer_ikke(self):
-        h = self._hendelse(melder='Lag 1', beskrivelse='b')
-        services.rediger_hendelse(h, bruker=self.operator, versjon=h.versjon, melder='')
-        h.refresh_from_db()
-        self.assertEqual(h.melder, '')
-        self.assertEqual(h.beskrivelse, 'b')
-
-    def test_ressursbehov_uendret_er_ingen_endring(self):
-        h = self._hendelse(ressursbehov=[self.amb.pk])
+    def test_uendret_melder_er_ingen_endring(self):
+        h = self._hendelse(melder_typer=['amk'])
         with self.assertRaises(services.Ugyldig):
             services.rediger_hendelse(h, bruker=self.operator, versjon=h.versjon,
-                                      ressursbehov=[self.amb.pk])
+                                      melder_typer=['amk'])
         h.refresh_from_db()
         self.assertEqual(h.versjon, 1)
-
-    def test_ressursbehov_alene_er_en_endring(self):
-        h = self._hendelse(ressursbehov=[self.amb.pk])
-        services.rediger_hendelse(h, bruker=self.operator, versjon=h.versjon, ressursbehov=[])
-        h.refresh_from_db()
-        self.assertEqual(h.ressursbehov.count(), 0)
-        self.assertEqual(h.versjon, 2)
-
-    def test_lagsressurser_for_lange_avvises(self):
-        h = self._hendelse()
-        with self.assertRaises(services.Ugyldig):
-            services.rediger_hendelse(h, bruker=self.operator, versjon=h.versjon,
-                                      lagsressurser='x' * (services.MAKS_LAGSRESSURSER + 1))
 
     def test_versjonen_kreves_fortsatt(self):
         h = self._hendelse()
         with self.assertRaises(services.Konflikt):
-            services.rediger_hendelse(h, bruker=self.operator, versjon=h.versjon + 1, melder='x')
+            services.rediger_hendelse(h, bruker=self.operator, versjon=h.versjon + 1,
+                                      melder_typer=['amk'])
+
+
+class MelderTests(_Grunnlag):
+    """Avkryssing, fast liste i kode, «Andre» med påkrevd tekst (André,
+    19. sep. 2026)."""
+
+    def test_lista_er_den_avtalte(self):
+        self.assertEqual([v for v, _ in MELDER_VALG], ['egen', 'amk', 'brann', 'politi', 'lsko', 'andre'])
+
+    def test_kodene_sorteres_i_listas_rekkefoelge_og_dedupliseres(self):
+        typer, tekst = services.rens_melder(['andre', 'AMK', 'egen', 'amk'], ' kiosken ')
+        self.assertEqual(typer, ['egen', 'amk', 'andre'])
+        self.assertEqual(tekst, 'kiosken')
+
+    def test_ukjent_kode_avvises(self):
+        with self.assertRaises(services.Ugyldig):
+            services.rens_melder(['brann', 'kystvakt'], '')
+        with self.assertRaises(services.Ugyldig):
+            services.rens_melder('amk', '')
+
+    def test_andre_krever_tekst(self):
+        with self.assertRaises(services.Ugyldig):
+            services.rens_melder(['andre'], '  ')
+        with self.assertRaises(services.Ugyldig):
+            self._hendelse(melder_typer=['egen', 'andre'])
+        self.assertEqual(Hendelse.objects.count(), 0, 'intet nummer brent')
+
+    def test_tekst_uten_andre_toemmes(self):
+        typer, tekst = services.rens_melder(['egen'], 'arrangør')
+        self.assertEqual((typer, tekst), (['egen'], ''))
+
+    def test_ikke_oppgitt_roerer_ikke(self):
+        typer, tekst = services.rens_melder(None, 'x')
+        self.assertIsNone(typer)
+        self.assertEqual(tekst, 'x')
+
+    def test_teksten_leses_slik(self):
+        h = self._hendelse(melder_typer=['egen', 'lsko'])
+        self.assertEqual(services.melder_tekst(h), 'Egen ressurs, LSKO')
+        self.assertEqual(services.melder_tekst(self._hendelse()), '')
+
+
+class LagTests(_Grunnlag):
+    """Lagene på hendelsen: vaktlistas ressurser uten enhet, differansen
+    logges, lukket hendelse tar ikke imot (André, 19. sep. 2026)."""
+
+    def _koder(self, h):
+        return [(l.systemkode, l.systemdata.get('lag'))
+                for l in Logglinje.objects.filter(kilde=KILDE_SYSTEM, hendelse=h).order_by('id')]
+
+    def test_lag_ved_opprettelse_staar_paa_opprettelseslinja(self):
+        h = self._hendelse(lag=[self.lag1.pk, self.lag2.pk])
+        self.assertEqual(h.lag_navn(), ['Lag 1', 'Lag 2'])
+        rad = HendelseLag.objects.get(hendelse=h, ressurs=self.lag1)
+        self.assertEqual((rad.ressurs_navn, rad.av_navn), ('Lag 1', 'ko1'))
+        self.assertIsNotNone(rad.fra)
+        koder = self._koder(h)
+        self.assertEqual([k for k, _ in koder], [systemlinjer.HENDELSE_OPPRETTET],
+                         'én linje, ikke én per lag')
+        tekst = systemlinjer.tegn(koder[0][0], Logglinje.objects.get(systemkode=koder[0][0]).systemdata)
+        self.assertIn('lag: Lag 1, Lag 2', tekst)
+
+    def test_sett_lag_regner_differansen_og_logger_hver(self):
+        h = self._hendelse(lag=[self.lag1.pk])
+        lagt_til, tatt_av = services.sett_lag(h, [self.lag2.pk], bruker=self.andre)
+        self.assertEqual((lagt_til, tatt_av), (['Lag 2'], ['Lag 1']))
+        self.assertEqual(h.lag_navn(), ['Lag 2'])
+        koder = self._koder(h)[1:]
+        self.assertEqual(koder, [(systemlinjer.HENDELSE_LAG_PAA, 'Lag 2'),
+                                 (systemlinjer.HENDELSE_LAG_AV, 'Lag 1')])
+        linje = Logglinje.objects.get(systemkode=systemlinjer.HENDELSE_LAG_PAA)
+        self.assertEqual(linje.forfatter_navn, 'ko2')
+        self.assertIn('Lag 2 registrert på H1', systemlinjer.tegn(linje.systemkode, linje.systemdata))
+        self.assertIn('ko2', self._deltakere(h), 'den som registrerer et lag er på hendelsen')
+
+    def test_samme_liste_er_ingen_endring_og_ingen_linje(self):
+        h = self._hendelse(lag=[self.lag1.pk])
+        foer = Logglinje.objects.count()
+        self.assertEqual(services.sett_lag(h, [self.lag1.pk], bruker=self.andre), ([], []))
+        self.assertEqual(Logglinje.objects.count(), foer)
+        self.assertNotIn('ko2', self._deltakere(h))
+
+    def test_bare_lag_uten_enhet_og_i_lista_i_bruk(self):
+        with self.assertRaises(services.Ugyldig):
+            self._hendelse(lag=[self.bil.pk])
+        annen = Vaktliste.objects.create(vakt=vakt_for_year(2031))
+        fremmed = lag_ressurs(vaktliste=annen, navn='Lag X', gruppe=gruppe(LAG))
+        with self.assertRaises(services.Ugyldig):
+            self._hendelse(lag=[fremmed.pk])
+        with self.assertRaises(services.Ugyldig):
+            self._hendelse(lag=[999])
+        with self.assertRaises(services.Ugyldig):
+            self._hendelse(lag='lag1')
+        self.assertEqual(Hendelse.objects.count(), 0, 'intet nummer brent')
+
+    def test_lukket_hendelse_tar_ikke_imot(self):
+        h = self._hendelse(lag=[self.lag1.pk])
+        services.lukk_hendelse(h, bruker=self.operator)
+        with self.assertRaises(services.Ugyldig):
+            services.sett_lag(h, [], bruker=self.operator)
+        self.assertEqual(h.lag_navn(), ['Lag 1'])
+
+    def test_rediger_hendelse_med_lag_gaar_gjennom_sett_lag(self):
+        h = self._hendelse()
+        services.rediger_hendelse(h, bruker=self.operator, versjon=h.versjon, lag=[self.lag2.pk])
+        h.refresh_from_db()
+        self.assertEqual((h.lag_navn(), h.versjon), (['Lag 2'], 2))
+        self.assertEqual(self._koder(h)[-1], (systemlinjer.HENDELSE_LAG_PAA, 'Lag 2'))
+        with self.assertRaises(services.Ugyldig):
+            services.rediger_hendelse(h, bruker=self.operator, versjon=h.versjon, lag=[self.lag2.pk])
+
+    def test_navnet_staar_naar_ressursen_er_borte(self):
+        h = self._hendelse(lag=[self.lag1.pk])
+        self.lag1.delete()
+        self.assertEqual(h.lag_navn(), ['Lag 1'])
+
+    def test_nullstilling_tar_lagene_med(self):
+        self._hendelse(lag=[self.lag1.pk])
+        services.nullstill_hendelser(self.vakt)
+        self.assertEqual(HendelseLag.objects.count(), 0)
+
+
+class BeskrivelseTests(_Grunnlag):
+    """Beskrivelsen er tillegg, aldri overskriving: logglinjer i hendelsen med
+    merket, hvem og når — retting og fjerning gjennom loggens regler."""
+
+    def test_tillegg_er_en_linje_i_hendelsen_med_merket(self):
+        h = self._hendelse(beskrivelse='første')
+        linje = services.legg_til_beskrivelse(h, 'andre', bruker=self.andre)
+        self.assertTrue(linje.beskrivelse)
+        self.assertEqual(linje.hendelse_id, h.pk)
+        self.assertEqual([(t['tekst'], t['av']) for t in h.beskrivelse_tillegg()],
+                         [('første', 'ko1'), ('andre', 'ko2')])
+        self.assertIn('ko2', self._deltakere(h))
+
+    def test_tillegg_uten_hendelse_avvises(self):
+        with self.assertRaises(services.Ugyldig):
+            services.skriv_linje(self.vakt, 'x', bruker=self.operator, beskrivelse=True)
+
+    def test_retting_arver_merket_og_hendelsen(self):
+        h = self._hendelse(beskrivelse='førstte')
+        gammel = Logglinje.objects.get(beskrivelse=True)
+        ny = services.korriger(gammel, bruker=self.operator, tekst='første')
+        self.assertTrue(ny.beskrivelse)
+        self.assertEqual(ny.hendelse_id, h.pk)
+        tillegg = h.beskrivelse_tillegg()
+        self.assertEqual([t['tekst'] for t in tillegg], ['første'])
+        self.assertTrue(tillegg[0]['rettet'])
+        self.assertEqual(tillegg[0]['rot'], gammel.pk, 'plassen i rekka er den gamle')
+
+    def test_en_vanlig_kommentar_arver_ogsaa_hendelsen_ved_retting(self):
+        """Fantes ikke før 19. sep. 2026: en rettet kommentar i H14 falt ut
+        av hendelsen og inn i loggstrømmen."""
+        h = self._hendelse()
+        linje = services.skriv_linje(self.vakt, 'kommentar', bruker=self.operator, hendelse=h)
+        ny = services.korriger(linje, bruker=self.operator, tekst='kommentaren')
+        self.assertEqual(ny.hendelse_id, h.pk)
+        self.assertFalse(ny.beskrivelse)
+
+    def test_fjernet_tillegg_er_ute_av_rekka(self):
+        h = self._hendelse(beskrivelse='første')
+        linje = services.legg_til_beskrivelse(h, 'feil', bruker=self.operator)
+        services.fjern(linje, bruker=self.operator)
+        self.assertEqual([t['tekst'] for t in h.beskrivelse_tillegg()], ['første'])
+
+    def test_rekka_prefetches_i_lista_og_er_den_samme(self):
+        h = self._hendelse(beskrivelse='første')
+        services.skriv_linje(self.vakt, 'en kommentar', bruker=self.andre, hendelse=h)
+        services.legg_til_beskrivelse(h, 'andre', bruker=self.andre)
+        fjernet = services.legg_til_beskrivelse(h, 'feil', bruker=self.andre)
+        services.fjern(fjernet, bruker=self.operator)
+        [rad] = services.hendelser_for(self.vakt)
+        self.assertTrue(hasattr(rad, 'tillegg'))
+        self.assertEqual([t['tekst'] for t in rad.beskrivelse_tillegg()], ['første', 'andre'],
+                         'kommentarer og fjernede tillegg er ikke i rekka')
+        self.assertEqual(rad.beskrivelse_tillegg(), h.beskrivelse_tillegg(), 'samme svar med og uten prefetch')
+
+    def test_tom_beskrivelse_gir_ingen_linje(self):
+        h = self._hendelse(beskrivelse='  ')
+        self.assertEqual(h.beskrivelse_tillegg(), [])
+        self.assertEqual(Logglinje.objects.filter(beskrivelse=True).count(), 0)
 
 
 class KommentarTests(_Grunnlag):
@@ -349,7 +507,8 @@ class PorteneTests(TestCase):
         self.skriver = _gi(_bruker('skriver'), 'ko', 'skriv_full')
         self.leder = _gi(_bruker('leder'), 'ko', 'skriv_leder')
         self.sjef = _bruker('sjef', role='admin')
-        self.amb = Ressursbehov.objects.create(navn='Ambulanse')
+        self.vl = Vaktliste.objects.create(vakt=self.vakt)
+        self.lag1 = lag_ressurs(vaktliste=self.vl, navn='Lag 1', gruppe=gruppe(LAG))
 
     def _post(self, bruker, sti, kropp=None, metode='post'):
         c = Client()
@@ -361,21 +520,54 @@ class PorteneTests(TestCase):
 
     def test_ny_hendelse_baerer_alle_feltene(self):
         svar = self._post(self.skriver, '/ko/api/hendelser/ny/', {
-            'tittel': 'Fall', 'prioritet': 'gul', 'melder': 'Lag 1',
-            'beskrivelse': 'b', 'ressursbehov': [self.amb.pk]})
+            'tittel': 'Fall', 'prioritet': 'gul', 'melder_typer': ['andre', 'egen'],
+            'melder': 'Lag 1', 'beskrivelse': 'b', 'lag': [self.lag1.pk]})
         self.assertEqual(svar.status_code, 201, svar.content)
         d = svar.json()['data']
-        self.assertEqual((d['prioritet'], d['melder'], d['beskrivelse']), ('gul', 'Lag 1', 'b'))
-        self.assertEqual(d['ressursbehov'], [{'id': self.amb.pk, 'navn': 'Ambulanse'}])
+        self.assertEqual((d['prioritet'], d['melder_typer'], d['melder']), ('gul', ['egen', 'andre'], 'Lag 1'))
+        self.assertEqual(d['melder_tekst'], 'Egen ressurs, Andre (Lag 1)')
+        self.assertEqual([(t['tekst'], t['av']) for t in d['beskrivelse']], [('b', 'skriver')])
+        self.assertEqual([(l['ressurs_id'], l['navn'], l['av']) for l in d['lag']],
+                         [(self.lag1.pk, 'Lag 1', 'skriver')])
+        self.assertTrue(d['lag'][0]['fra'])
         self.assertEqual(d['deltakere'], ['skriver'])
-        self.assertEqual(d['lagsressurser'], '')
         self.assertEqual(d['antall_oppdrag'], 0)
 
-    def test_ukjent_prioritet_og_ressursbehov_er_400(self):
-        self.assertEqual(self._post(self.skriver, '/ko/api/hendelser/ny/',
-                                    {'tittel': 'x', 'prioritet': 'kritisk'}).status_code, 400)
-        self.assertEqual(self._post(self.skriver, '/ko/api/hendelser/ny/',
-                                    {'tittel': 'x', 'ressursbehov': [999]}).status_code, 400)
+    def test_ukjent_prioritet_melder_og_lag_er_400(self):
+        for kropp in ({'tittel': 'x', 'prioritet': 'kritisk'},
+                      {'tittel': 'x', 'melder_typer': ['kystvakt']},
+                      {'tittel': 'x', 'melder_typer': ['andre']},
+                      {'tittel': 'x', 'lag': [999]}):
+            with self.subTest(kropp=kropp):
+                self.assertEqual(self._post(self.skriver, '/ko/api/hendelser/ny/', kropp).status_code, 400)
+        self.assertEqual(Hendelse.objects.count(), 0)
+
+    def test_lagene_settes_med_egen_sti_og_krever_skriv_full(self):
+        h = self._hendelse()
+        sti = f'/ko/api/hendelser/{h.pk}/lag/'
+        self.assertEqual(self._post(self.leser, sti, {'lag': [self.lag1.pk]}).status_code, 403)
+        svar = self._post(self.skriver, sti, {'lag': [self.lag1.pk]})
+        self.assertEqual(svar.status_code, 200, svar.content)
+        self.assertEqual([l['navn'] for l in svar.json()['data']['lag']], ['Lag 1'])
+        self.assertEqual(self._post(self.skriver, sti, {'lag': [999]}).status_code, 400)
+        self.assertEqual(self._post(self.skriver, sti, {}).status_code, 400, 'lista må oppgis')
+        svar = self._post(self.skriver, sti, {'lag': []})
+        self.assertEqual(svar.json()['data']['lag'], [])
+        koder = list(Logglinje.objects.filter(kilde=KILDE_SYSTEM, hendelse=h)
+                     .order_by('id').values_list('systemkode', flat=True))
+        self.assertEqual(koder[1:], [systemlinjer.HENDELSE_LAG_PAA, systemlinjer.HENDELSE_LAG_AV])
+
+    def test_tillegg_gjennom_loggstien_og_uten_hendelse(self):
+        h = self._hendelse()
+        svar = self._post(self.skriver, '/ko/api/logg/ny/',
+                          {'tekst': 'mer', 'hendelse_id': h.pk, 'beskrivelse': True})
+        self.assertEqual(svar.status_code, 201, svar.content)
+        self.assertTrue(svar.json()['data']['beskrivelse'])
+        self.assertEqual(self._post(self.skriver, '/ko/api/logg/ny/',
+                                    {'tekst': 'mer', 'beskrivelse': True}).status_code, 400)
+        c = Client(); c.force_login(self.leser)
+        [rad] = c.get('/ko/api/logg/').json()['hendelser']
+        self.assertEqual([t['tekst'] for t in rad['beskrivelse']], ['mer'])
 
     def test_prioritet_og_bli_med_krever_skriv_full(self):
         h = self._hendelse()
@@ -414,60 +606,154 @@ class PorteneTests(TestCase):
         self._post(self.skriver, f'/ko/api/logg/{linje.pk}/losne/')
         self.assertEqual(c.get('/ko/api/logg/').json()['festede'], [])
 
-    def test_rediger_baerer_de_nye_feltene(self):
+    def test_rediger_baerer_melder_og_lag(self):
         h = self._hendelse()
         svar = self._post(self.skriver, f'/ko/api/hendelser/{h.pk}/rediger/', {
-            'versjon': h.versjon, 'lagsressurser': 'Lag 1', 'melder': 'Lag 2'})
+            'versjon': h.versjon, 'melder_typer': ['brann'], 'lag': [self.lag1.pk]})
         self.assertEqual(svar.status_code, 200, svar.content)
-        self.assertEqual(svar.json()['data']['lagsressurser'], 'Lag 1')
+        d = svar.json()['data']
+        self.assertEqual((d['melder_tekst'], [l['navn'] for l in d['lag']]), ('Brann', ['Lag 1']))
 
-    def test_ressursbehov_settes_opp_av_ko_leder_eller_admin(self):
-        """Lista: `les`. Opprett/endre/rekkefølge: `skriv_leder` i KO, eller
-        global admin. Sletting: global admin, og bare ubrukte."""
-        c = Client(); c.force_login(self.leser)
-        self.assertEqual(c.get('/ko/api/ressursbehov/').status_code, 200)
-        self.assertEqual(self._post(self.skriver, '/ko/api/ressursbehov/', {'navn': 'Lag'}).status_code, 403)
-        svar = self._post(self.leder, '/ko/api/ressursbehov/', {'navn': 'Lag'})
-        self.assertEqual(svar.status_code, 200, svar.content)
-        pk = svar.json()['data']['id']
-        self.assertEqual(self._post(self.leder, '/ko/api/ressursbehov/', {'navn': 'Lag'}).status_code, 400, 'finnes alt')
-        self.assertEqual(self._post(self.leder, '/ko/api/ressursbehov/', {'navn': ''}).status_code, 400)
-        self.assertEqual(self._post(self.leder, f'/ko/api/ressursbehov/{pk}/',
-                                    {'er_aktiv': False}, 'put').status_code, 200)
-        self.assertFalse(Ressursbehov.objects.get(pk=pk).er_aktiv)
-        self.assertEqual(self._post(self.leder, '/ko/api/ressursbehov/rekkefolge/',
-                                    {'ider': [pk, self.amb.pk]}, 'put').status_code, 200)
-        self.assertLess(Ressursbehov.objects.get(pk=pk).rekkefolge,
-                        Ressursbehov.objects.get(pk=self.amb.pk).rekkefolge)
-        # Sletting
-        self.assertEqual(self._post(self.leder, f'/ko/api/ressursbehov/{pk}/', {'confirm': True}, 'delete').status_code, 403)
-        self.assertEqual(self._post(self.sjef, f'/ko/api/ressursbehov/{pk}/', {}, 'delete').status_code, 400, 'confirm')
-        h = self._hendelse()
-        h.ressursbehov.add(self.amb)
-        self.assertEqual(self._post(self.sjef, f'/ko/api/ressursbehov/{self.amb.pk}/', {'confirm': True}, 'delete').status_code, 409, 'i bruk')
-        self.assertEqual(self._post(self.sjef, f'/ko/api/ressursbehov/{pk}/', {'confirm': True}, 'delete').status_code, 200)
-        self.assertFalse(Ressursbehov.objects.filter(pk=pk).exists())
-
-    def test_sida_baerer_prioritetene_og_ressursbehovene(self):
+    def test_sida_baerer_prioritetene_melderne_og_lagvalget(self):
         c = Client(); c.force_login(self.skriver)
         html = c.get('/ko/').content.decode()
         self.assertIn('data-arg="viktig"', html)
         self.assertIn('id="koHendelseModal"', html)
-        self.assertIn('Ambulanse', html)
+        self.assertIn('value="lsko"', html)
+        self.assertIn('id="ko-h-lag"', html)
+        self.assertNotIn('ressursbehov', html.lower())
         c.force_login(self.leser)
         self.assertNotIn('id="koHendelseModal"', c.get('/ko/').content.decode(),
                          'skjemaet finnes ikke for den som ikke kan skrive')
 
-    def test_oppdraget_baerer_hendelsens_prioritet_og_lag(self):
-        """`oppdrag_til_dict` leser dem — det er slik bilen og KO-raden får dem."""
+    def test_oppdraget_baerer_hendelsens_prioritet_lag_og_beskrivelse(self):
+        """`oppdrag_til_dict` leser dem — det er slik bilen og KO-raden får
+        dem — og ETag-en snur når et tillegg kommer til."""
         _gi(self.skriver, 'oppdrag', 'skriv_full')
-        h = services.opprett_hendelse(self.vakt, 'H', bruker=self.skriver, prioritet='viktig')
-        services.rediger_hendelse(h, bruker=self.skriver, versjon=h.versjon, lagsressurser='Lag 1')
+        h = services.opprett_hendelse(self.vakt, 'H', bruker=self.skriver, prioritet='viktig',
+                                      lag=[self.lag1.pk], beskrivelse='første')
         enhet = Enhet.objects.create(navn='HGSD 56', pa_vakt=True)
         lok = Lokasjon.objects.create(navn='Scene')
         o = Oppdrag.objects.create(vakt=self.vakt, oppdragsnummer=1, enhet=enhet, lokasjon=lok,
                                    problemstilling='Fall', hastegrad=choices.HASTEGRAD[0])
         services.knytt_oppdrag(o, h, bruker=self.skriver)
         c = Client(); c.force_login(self.skriver)
-        rad = [r for r in c.get('/oppdrag/api/oppdrag/').json()['data'] if r['id'] == o.pk][0]
-        self.assertEqual((rad['hendelse_prioritet'], rad['hendelse_lagsressurser']), ('viktig', 'Lag 1'))
+        svar = c.get('/oppdrag/api/oppdrag/')
+        rad = [r for r in svar.json()['data'] if r['id'] == o.pk][0]
+        self.assertEqual((rad['hendelse_prioritet'], rad['hendelse_lag']), ('viktig', ['Lag 1']))
+        self.assertEqual([t['tekst'] for t in rad['hendelse_beskrivelse']], ['første'])
+        etag = svar['ETag']
+        self.assertEqual(c.get('/oppdrag/api/oppdrag/', HTTP_IF_NONE_MATCH=etag).status_code, 304)
+        services.legg_til_beskrivelse(h, 'andre', bruker=self.skriver)
+        self.assertEqual(c.get('/oppdrag/api/oppdrag/', HTTP_IF_NONE_MATCH=etag).status_code, 200,
+                         'et tillegg skal ikke drukne i en 304')
+
+    def test_bilen_mister_beskrivelsen_naar_oppdraget_er_avsluttet(self):
+        """Samme regel som friteksten: helseopplysninger skal ikke bli liggende
+        i bilen etter at oppdraget er ferdig."""
+        from oppdrag.views_common import oppdrag_til_dict
+        h = services.opprett_hendelse(self.vakt, 'H', bruker=self.skriver, beskrivelse='pasient')
+        enhet = Enhet.objects.create(navn='HGSD 56', pa_vakt=True)
+        lok = Lokasjon.objects.create(navn='Scene')
+        o = Oppdrag.objects.create(vakt=self.vakt, oppdragsnummer=1, enhet=enhet, lokasjon=lok,
+                                   problemstilling='Fall', hastegrad=choices.HASTEGRAD[0],
+                                   fritekst='x')
+        services.knytt_oppdrag(o, h, bruker=self.skriver)
+        self.assertEqual([t['tekst'] for t in oppdrag_til_dict(o, for_enhet=True)['hendelse_beskrivelse']],
+                         ['pasient'])
+        o.status = choices.TERMINAL
+        o.save()
+        rad = oppdrag_til_dict(o, for_enhet=True)
+        self.assertEqual((rad['hendelse_beskrivelse'], rad['fritekst']), ([], ''))
+        self.assertEqual([t['tekst'] for t in oppdrag_til_dict(o)['hendelse_beskrivelse']], ['pasient'],
+                         'sentralbordet ser den fortsatt')
+
+
+class GamleFilerTests(TestCase):
+    """En KO-fil fra 18. sep. 2026 bærer `ko.ressursbehov` og tre felter
+    som er borte. Den skal fortsatt lastes — 730 dager offsite."""
+
+    def test_utgaatte_felt_og_modeller_tas_ut(self):
+        from core.backup import UTGAATTE_FELT, UTGAATTE_MODELLER, fjern_utgaatte
+        from django.apps import apps
+        for etikett, felter in UTGAATTE_FELT.items():
+            modell = apps.get_model(etikett)
+            for felt in felter:
+                self.assertFalse(any(f.name == felt for f in modell._meta.get_fields()),
+                                 f'{etikett}.{felt} finnes fortsatt — da er raden feil')
+        for etikett in UTGAATTE_MODELLER:
+            app, navn = etikett.split('.')
+            self.assertFalse(any(m._meta.model_name == navn for m in apps.get_app_config(app).get_models()),
+                             f'{etikett} finnes fortsatt')
+        vakt = hent_aktiv_vakt()
+        fil = json.dumps([
+            {'model': 'ko.ressursbehov', 'pk': 1, 'fields': {'navn': 'Lag', 'er_aktiv': True, 'rekkefolge': 10}},
+            {'model': 'ko.hendelse', 'pk': 1, 'fields': {
+                'vakt': vakt.pk, 'hendelsesnummer': 7, 'tittel': 'Gammel', 'lokasjon_navn': '',
+                'status': 'apen', 'versjon': 1, 'prioritet': 'gronn', 'beskrivelse': 'tekst',
+                'melder': 'Lag 1', 'lagsressurser': 'Lag 1, Lag 3', 'ressursbehov': [1],
+                'opprettet_at': '2026-09-18T20:00:00Z', 'opprettet_av_navn': 'kari'}},
+        ]).encode('utf-8')
+        ut = json.loads(fjern_utgaatte(fil))
+        self.assertEqual([o['model'] for o in ut], ['ko.hendelse'])
+        self.assertNotIn('ressursbehov', ut[0]['fields'])
+        self.assertNotIn('beskrivelse', ut[0]['fields'])
+        self.assertEqual(ut[0]['fields']['melder'], 'Lag 1')
+        # Og det som er igjen lastes faktisk.
+        import tempfile
+        from django.core import management
+        with tempfile.NamedTemporaryFile('wb', suffix='.json', delete=False) as f:
+            f.write(json.dumps(ut).encode('utf-8'))
+        management.call_command('loaddata', f.name, verbosity=0)
+        self.assertEqual(Hendelse.objects.get(pk=1).tittel, 'Gammel')
+
+    def test_en_fil_uten_noe_utgaatt_roeres_ikke(self):
+        from core.backup import fjern_utgaatte
+        raa = b'[{"model": "ko.logglinje", "pk": 1, "fields": {"tekst": "x"}}]'
+        self.assertIs(fjern_utgaatte(raa), raa)
+
+
+class DatamigrasjonTests(TestCase):
+    """`ko/0009`: beskrivelsen ble første tillegg, melder-navnet ble
+    «Andre». Prøvd mot dagens modeller gjennom den ekte funksjonen — den
+    leser bare felter som finnes i den historiske formen *og* i dag, unntatt
+    de to som ble fjernet, og de settes her som attributter."""
+
+    def test_framover(self):
+        import importlib
+        from django.apps import apps
+        modul = importlib.import_module('ko.migrations.0009_beskrivelse_til_tillegg')
+        vakt = hent_aktiv_vakt()
+        bruker = _bruker('kari')
+
+        class _Apps:
+            """`apps.get_model` som gir dagens modeller, med de to gamle
+            feltene lagt på som attributter i minnet."""
+            @staticmethod
+            def get_model(app, navn):
+                Modell = apps.get_model(app, navn)
+                if navn != 'Hendelse':
+                    return Modell
+                h = Hendelse.objects.create(vakt=vakt, hendelsesnummer=1, tittel='Gammel',
+                                            opprettet_av=bruker, opprettet_av_navn='kari',
+                                            melder='Lag 1')
+                h.beskrivelse = 'sto i feltet'
+
+                class _Qs(list):
+                    def iterator(self):
+                        return iter(self)
+
+                class _Mgr:
+                    @staticmethod
+                    def exclude(**kw):
+                        return _Qs([h])
+
+                class _H:
+                    objects = _Mgr()
+                return _H
+
+        modul.framover(_Apps, None)
+        h = Hendelse.objects.get()
+        self.assertEqual([(t['tekst'], t['av']) for t in h.beskrivelse_tillegg()], [('sto i feltet', 'kari')])
+        self.assertEqual(h.beskrivelse_tillegg()[0]['tid'], h.opprettet_at.isoformat())
+        self.assertEqual(h.melder_typer, ['andre'])

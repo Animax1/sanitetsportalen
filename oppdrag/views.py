@@ -391,14 +391,15 @@ def oppdrag_liste_view(request):
                 data.append(rad)
             # Meldings-ID-ene må inn i ETag-en: en korreksjon endrer tidslinjen
             # uten å røre oppdragets status, og skal ikke drukne i en 304.
-            # Lagene på hendelsen er med (KO, 18. sep. 2026): KO skriver
-            # dem på hendelsen, ikke på oppdraget, og bilen ville ellers
-            # stått med gammel tekst til neste stempling.
+            # Lagene og beskrivelsen på hendelsen er med (KO, 18.–19. sep.
+            # 2026): KO skriver dem på hendelsen, ikke på oppdraget, og bilen
+            # ville ellers stått med gammel tekst til neste stempling.
             etag_rader = [
                 (r['id'], r['status'], r['enhet_id'],
                  tuple(m['id'] for m in r['statusmeldinger']),
                  tuple(m['id'] for m in r['andre_meldinger']),
-                 r['hendelse_lagsressurser'])
+                 tuple(r['hendelse_lag']),
+                 tuple(t['id'] for t in r['hendelse_beskrivelse']))
                 for r in data
             ]
         else:
@@ -429,7 +430,8 @@ def oppdrag_liste_view(request):
             etag_rader = [(r['id'], r['status'], r['enhet_id'], r['status_tidspunkt'],
                            tuple(r['avbrutt_av']), tuple(r['avventer_av']),
                            r['hendelse_id'], r['hendelse_prioritet'],
-                           r['hendelse_lagsressurser'])
+                           tuple(r['hendelse_lag']),
+                           tuple(t['id'] for t in r['hendelse_beskrivelse']))
                           for r in data]
 
         etag = etag_for(etag_rader)

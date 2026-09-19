@@ -6,50 +6,46 @@
 > her; gjelder den alle, står den i rota.
 
 Levert: pulje 1 (skallet), 2 (loggen), 3 (ressursbildet), 4 (sentralbordet flyttet inn),
-5 (hendelsene), 6 (chat, ansvarsmerke, minimering, vaktlistas ressurser) og **omleggingen
-18. sep. 2026: fire flater i 2×2, hendelsesloggen som egen flate**. Pulje 7 gjenstår — se
-`docs/FORSLAG_KO.md` §10, som er et **forslag**, ikke besluttet.
+5 (hendelsene), 6 (chat, ansvarsmerke, minimering, vaktlistas ressurser), **omleggingen
+18. sep. 2026: fire flater i 2×2, hendelsesloggen som egen flate**, og 19. sep.: lagene på
+hendelsen, beskrivelsen som tillegg, melder. Pulje 7 gjenstår — `docs/FORSLAG_KO.md` §10,
+et **forslag**.
 
 **Siden har ingen faner, og det er en regel og ikke en smakssak** (André, 17. sep. 2026).
 En fane er riktig når flatene er *alternativer*; KOs flater brukes i **én** bevegelse:
 sambandet sier noe, du fører linja, du ser hvem som er ledig, og du sender. Og **en skjult
-fane er en fane du ikke vet har endret seg**: siden poller, og andres linjer og nye oppdrag
-lander i en rute ingen ser på — mens hele grunnen til at KO finnes er at situasjonsbildet
-skal være i ett blikk.
+fane er en fane du ikke vet har endret seg**: siden poller, og andres linjer lander i en
+rute ingen ser på.
 
 **Formen er fire vinduer i 2×2** (André, 18. sep. 2026, etter åtte skisser som ble avtalt
 før koden — de er målet): `Hendelseslogg │ Loggstrøm` øverst, `Ressursoversikt │
-Oppdragsliste` nederst. Fra 17. sep. til 18. sep. var det tre kolonner med loggen først og
-«tre kolonner er taket»; det ble opphevet av André samme dag som hendelsene ble en egen
-flate. Prinsippet bak — alt synlig samtidig, ingen faner — står uendret.
+Oppdragsliste` nederst. «Tre kolonner er taket» fra 17. sep. ble opphevet av André samme
+dag som hendelsene ble en egen flate. Prinsippet — alt synlig samtidig, ingen faner — står.
 
 **Vinduene bytter plass og endrer størrelse, og rammen holder alle fire synlige**
 (`static/js/ko-layout.js`). Håndtaket i hvert vindu dras over et annet for å bytte plass,
 skillelinjene endrer bredde per rad og høyden mellom radene. Ikke frie vinduer, med vilje:
-et vindu som kan legges oppå et annet er et vindu som kan forsvinne, og en flate ingen ser
-er en flate ingen vet har endret seg. Gulvet (`KO_MIN_PROSENT`, `min-width`/`min-height`)
-er regelen som gjør det umulig å dra en flate bort. Oppsettet huskes **per nettleser**
-(`ko.oppsett`, som `tavle.grupper.lukket`): KO-PC-en i kommandopunktet beholder sitt uansett
-hvem som logger på. Et lagret oppsett leses som brukerdata — `koGyldigOppsett()` avviser
-alt som mangler et vindu.
+et vindu som kan legges oppå et annet er et vindu som kan forsvinne. Gulvet
+(`KO_MIN_PROSENT`, `min-width`/`min-height`) gjør det umulig å dra en flate bort. Oppsettet
+huskes **per nettleser** (`ko.oppsett`): KO-PC-en beholder sitt uansett hvem som logger
+på. Et lagret oppsett leses som brukerdata — `koGyldigOppsett()` avviser alt som mangler
+et vindu.
 
 **Sida ruller ikke — vinduene gjør det.** Høyden **måles** av `koKonsollhoyde()`, ikke
 regnet ut av en `calc()`: header, nav og meldinger kan brekke til to linjer. Gulvet
-(`KO_MIN_HOYDE`) er en regel: uten det gir et kort vindu fire ubrukelige rullefelt.
+(`KO_MIN_HOYDE`): uten det gir et kort vindu fire ubrukelige rullefelt.
 
 **Knappene står i vinduet de gjelder**: «Ny hendelse» i hendelsesloggen, «Nytt oppdrag»
 og «Historikk» i oppdragslista, «Enheter» i ressursoversikten. Verktøylinja har bare det
-som gjelder hele sida: «KO-innstillinger», «Vaktarkiv», ansvarsmerket,
-«Pålogget» (nedtrekket) og «Oppsett». Sidebarknappen har `data-bs-toggle="dropdown"` og
-**ingen** `data-action` — to lyttere på samme klikk er fella `klikkSkalKjore()` finnes for.
+som gjelder hele sida. Sidebarknappen har `data-bs-toggle="dropdown"` og **ingen**
+`data-action` — to lyttere på samme klikk er fella `klikkSkalKjore()` finnes for.
 
-**Under 1200 px stables vinduene** og sida ruller normalt. Akseptert, ikke løst: KO
-brukes på en skjerm i et kommandopunkt. Svaret på mobil er ikke faner.
+**Under 1200 px stables vinduene** og sida ruller normalt. Akseptert: KO brukes på en
+skjerm i et kommandopunkt.
 
-**`/oppdrag/` er enhetsverktøyet, `/ko/` er situasjonsverktøyet.** Forskjellen er
-tidsaksen: et oppdrag begynner når bilen får det; **en hendelse begynner når noen sier noe
-over samband**, kan leve i tjue minutter før en ressurs sendes, og kan bli avsluttet uten
-at noen rykket ut.
+**`/oppdrag/` er enhetsverktøyet, `/ko/` er situasjonsverktøyet.** Et oppdrag begynner når
+bilen får det; **en hendelse begynner når noen sier noe over samband**, og kan avsluttes
+uten at noen rykket ut.
 
 | Regel | Hvor |
 |---|---|
@@ -67,8 +63,9 @@ at noen rykket ut.
 | Hendelsesloggen i nettleseren: tabellen, søket, hendelsen åpnet i vinduet, skjemaet | `static/js/ko-hendelser.js` |
 | Rutenettet: bytte plass, skillelinjer, oppsettet i `localStorage` | `static/js/ko-layout.js` |
 | Festede linjer i loggstrømmen | `Logglinje.festet_*`, `services.fest_linje`/`losne_linje`, `festede` i `logg_view` |
-| KO-innstillinger: ressursbehov, ansvarsområder, «Nullstill» (admin) | `VERDILISTER` og `NULLSTILL` i `ko/views.py`, fanene via `verdifaner_ekstra` |
-| «H12»-merket og lagene på oppdragsraden | `_oppdragRadHtml()` i sentralbordet, `oppdrag_til_dict` (`hendelse_prioritet`, `hendelse_lagsressurser`) |
+| KO-innstillinger: ansvarsområder, «Nullstill» (admin) | `VERDILISTER` og `NULLSTILL` i `ko/views.py`, fanene via `verdifaner_ekstra` |
+| «H12»-merket, lagene og beskrivelsen på oppdraget og i bilen | `oppdrag_til_dict` (`hendelse_prioritet`, `hendelse_lag`, `hendelse_beskrivelse`), lest gjennom `Hendelse.lag_navn()` / `beskrivelse_tillegg()` |
+| **Lagene på hendelsen**, beskrivelsen som tillegg, melderen | `ko.HendelseLag`, `Logglinje.beskrivelse`, `MELDER_VALG`; `sett_lag`, `legg_til_beskrivelse`, `rens_melder` i `ko/services.py` |
 | Chat-merket, bryteren, ansvarsmerket | `Logglinje.uformell`, `services.chat_tillatt`, `ko.Ansvarsmerke`, `ko/portalinnstillinger.py` |
 | Minimerbare grupper på tavla | `gruppehode()`/`vippGruppe()` i `static/js/oppdrag-kort.js` |
 | Vaktlistas ressurser uten enhet | `vaktliste.services.ressurser_uten_enhet`, `koRessurskort()` i `ko.js` |
@@ -87,11 +84,11 @@ Den ene kanten andre veien er `Oppdrag.hendelse` (pulje 5) — en nullbar FK som
 
 **Og kanten snur gjenopprettingsrekkefølgen.** KO er øverste lag i koden og nest først i
 `GJENOPPRETTINGSREKKEFOLGE` (rett etter `portal`): oppdragsfila peker på hendelsene med et
-heltall. `Hendelse.lokasjon` strippes i `ko/backup.py` av samme grunn — beholdt, var det en
-sirkel — og navnet står frosset i `lokasjon_navn`, som forfatteren på linja.
+heltall. `Hendelse.lokasjon` og `HendelseLag.ressurs` strippes i `ko/backup.py` av samme
+grunn — beholdt, var det en sirkel — og navnene står frosset ved siden av.
 
-`core` skal fortsatt kunne kjøre uten `ko`: `core/tests_avhengighetsretning.py` har `ko` i
-`MODULAPPER`; den ene tillatte importen er `core/modules.py` → `ko.module`.
+`core` kjører uten `ko`: `core/tests_avhengighetsretning.py` har `ko` i `MODULAPPER`; den
+ene tillatte importen er `core/modules.py` → `ko.module`.
 
 ## Modulen eier ingen ressurser, og skal aldri gjøre det
 
@@ -101,18 +98,17 @@ forkastet i §9.1: feilen oppstår ved **endring** — noen retter kallesignalet
 tavla og enhetsskjermen viser ulike navn på samme bil midt i en vakt.
 
 Det gjelder også `oppdrag.Enhetstype` mot `vaktliste.Ressursgruppe` — samme taksonomi to
-steder (§2.1). Skal **ikke** slås sammen i dette arbeidet, men er kjent.
+steder (§2.1). Kjent, ikke slått sammen.
 
 ## Sidebaren svarer på «hvem har KO oppe», ikke «hvem dekker samband»
 
 `ko/tilstede.py`. Tre valg som hver for seg er en mulig feil:
 
 - **Filteret er `har_tilgang`-semantikk, ikke en rå `ModulTilgang`-spørring** — en rå
-  spørring ville utelatt global admin, som ingen rader har og full tilgang.
-- **Én rad per person, ikke per sesjon.** Samme operatør på PC og telefon er én person;
-  `inaktiv_s` blir den ferskeste av fanene. Adminlista lister sesjoner fordi den avslutter dem.
-- **Ingen `session_key` ut.** Et felt hvis eneste bruk er destruktiv skal ikke ligge og
-  vente på at noen finner ut hva det er.
+  spørring ville utelatt global admin, som ingen rader har.
+- **Én rad per person, ikke per sesjon.** PC og telefon er én person; `inaktiv_s` er den
+  ferskeste fanen. Adminlista lister sesjoner fordi den avslutter dem.
+- **Ingen `session_key` ut.** Et felt hvis eneste bruk er destruktiv skal ikke ligge og vente.
 
 **Pålogget er ikke til stede** — se rota. Derfor er `inaktiv_s` med som kolonne, og derfor
 er `null` («vet ikke») noe annet enn `0`. `koInaktivTekst()` i `static/js/ko.js` tar det
@@ -133,14 +129,11 @@ commit som endepunktene, delt der **skaden er ulik**:
 | `skriv_leder` | Sletteinngangen, og tidligere vakters logg | En fjernet linje finnes etterpå bare i en backupfil ingen har en knapp til |
 
 `skriv_handling` er **ikke** deklarert: nivået leser ikke request-kroppen, og å føre en
-logglinje gjør nettopp det. Det ville sett ut som «får skrive litt», og vært en tilgang
-uten et endepunkt bak seg.
+logglinje gjør nettopp det — en tilgang uten et endepunkt bak seg.
 
 **Historikken er `skriv_leder` av en annen grunn enn sletting: dataminimering** (André,
 17. sep. 2026). En ny operatør på vakt i kveld har ingen operativ grunn til å lese
-fjorårets helseopplysninger, og opplæring hører hjemme på en demo-vakt og ikke på ekte
-linjer. Flata kommer i pulje 3; nivået står allerede, fordi det er det som gir `les` sin
-betydning.
+fjorårets helseopplysninger; opplæring hører hjemme på en demo-vakt.
 
 ## Loggen: de fire valgene som låser konstruksjonen
 
@@ -155,8 +148,8 @@ måneder ved konstruksjon** — sletteinngangen i §4.4 ville da fått arkivet t
 tukling. To funksjoner som spiser hverandre.
 
 Loggen blir derfor stående som levende rader, scopet til vakta, og slettes av
-`purge_old_logs`. Prisen, som skal være sagt: **loggen kan ikke bevise at den er urørt.**
-Den kan spore hvem som gjorde hva, men ikke at teksten ikke er endret.
+`purge_old_logs`. Prisen: **loggen kan ikke bevise at den er urørt** — bare hvem som
+gjorde hva.
 
 ### 2. 730 dager, som en `AppSetting` — ikke en Railway-variabel
 
@@ -177,7 +170,7 @@ puljen, ikke en detalj. Kort: **løft det som endrer situasjonen, ikke det som e
 oppsettet; løft hendelsen, ikke feltet; én linje per ting som skjedde.**
 
 Vaktlistas stemplinger er grensesaken, og svaret er «ikke nå»: volumet ville druknet loggen
-ved hvert vaktskifte. Tas opp i pulje 4, der lag-begrepet får et hjem.
+ved hvert vaktskifte.
 
 ### 4. Historikk krever `skriv_leder`
 
@@ -216,19 +209,18 @@ Besvart av André 18. sep. 2026: **en lukket hendelse kan åpnes igjen, og det l
 (`HENDELSE_GJENAPNET`). **`O45`/`H12` overalt** (§6): `oppdrag.services.oppdragsnr`,
 `oppdragsnr()` i `oppdrag-kort.js` (enhetsskjermen har egen kopi), `ko.systemlinjer.hendelsesnr`.
 
-Fem regler, alle i `ko/services.py`, alle prøvd med mutanter i `ko/tests_hendelser.py`:
+Fem regler i `ko/services.py`, prøvd med mutanter i `ko/tests_hendelser.py`:
 
 | Regel | Hvorfor |
 |---|---|
 | Nummeret tildeles ved opprettelse og endres aldri; serien er uavhengig av O-serien | §6: nummeret identifiserer, FK-en relaterer. Telleren er unntatt audit |
-| Lukking gir **409 med antallet** når hendelsen har åpne oppdrag, og går gjennom med `confirm` — og antallet står på linja | §4.6: en dør hun åpner bevisst, ikke en vegg. Ferdige oppdrag teller ikke |
-| Hodet (tittel, lokasjon) redigeres med `versjon`, 409 ved uenighet | §7.1: det ene delte redigerbare. Ingen systemlinje — `audit/` fører feltendringer |
-| `knytt_oppdrag` er den ene skriveren av `Oppdrag.hendelse`; lukket hendelse tar ikke imot | Ellers var «lukket» et ord uten mening, og 409-sperra omgått bakveien |
+| Lukking gir **409 med antallet** når hendelsen har åpne oppdrag, går gjennom med `confirm`, og antallet står på linja | §4.6: en dør hun åpner bevisst, ikke en vegg |
+| Hodet (tittel, lokasjon, melder) redigeres med `versjon`, 409 ved uenighet | §7.1: det ene delte redigerbare. Ingen systemlinje — `audit/` fører feltendringer |
+| `knytt_oppdrag` er den ene skriveren av `Oppdrag.hendelse`; lukket hendelse tar ikke imot | Ellers var «lukket» et ord uten mening |
 | En hendelse laget **fra** en linje lar linja stå; linja får hendelsen, hendelsen peker tilbake | §4.5: flyttes linja inn, får loggen et hull der det viktige skjedde |
 
 **Lista følger med logg-pollen** (`hendelser` i `logg_view`), hele hver gang — som
-`fjernede`: en lukking eller omdøping har ingen ny id og ville aldri kommet gjennom
-`?siden=`. Ingen egen poller.
+`fjernede`: en lukking har ingen ny id og ville aldri kommet gjennom `?siden=`.
 
 **Grupperingen på tavla er borte** (18. sep. 2026, André: «ikke noen hendelser i
 oppdragslisten»). H-merket på raden bærer koblingen — med rød trekant når hendelsen er
@@ -254,20 +246,22 @@ og er prøvd med mutanter i `ko/tests_hendelseslogg.py` og `ko/tests_nullstill.p
 | **Den som registrerer noe i hendelsen er på den** — kommentar, oppdrag, prioritet, redigering, og «Bli med». Lesing melder ingen inn | «Hvem jobber med H14 nå», så to operatører ikke sender hver sin bil. Vises, styrer ingenting — som ansvarsmerket. Navnet fryses |
 | En kommentar er en logglinje med `hendelse_id`. Vakta må stemme; lukket hendelse tar imot | §4.1: én logg. En etterskrift etter lukking hører til hendelsen |
 | Alt i hodet valideres **før** nummeret trekkes | Telleren lar seg ikke rulle tilbake av en 400; et hull i H-serien er et spørsmål i etterkant |
-| Ressursbehovene er en egen liste i KO (`Ressursbehov`), ikke `Enhetstype`/`Ressursgruppe`; ukjent id er 400 | Politi og arrangørvakter er ikke portalens ressurser. Settes opp under KO-innstillinger av KO-leder eller admin |
-| `lagsressurser` er fritekst på hendelsen og følger oppdragene ut til bilen (`hendelse_lagsressurser`, med i ETag-en) | Et lag er ikke en `oppdrag.Enhet`; hva en KO-ført lagsstatus skal hete er fortsatt ubesvart |
+| **Lagene på hendelsen er vaktlistas ressurser uten enhet** (`HendelseLag`, 19. sep.), valgt i skjemaet eller med «+ Lag»; hvert lag som kommer til eller går er en systemlinje. Lukket hendelse tar ikke imot. Følger oppdragene ut til bilen (`hendelse_lag`, i ETag-en) | «Lag får ikke oppdrag, de får oppdrag muntlig … og blir registrert på hendelsen» (André). Kortet i ressursoversikten viser «På H14 · 23 min» ved å slå laget opp i de **åpne** hendelsene (`koLagPaa`) — ingen egen status. Erstattet `Ressursbehov` og fritekstfeltet `lagsressurser` fra 18. sep.; `ressurs` strippes i backupen som `lokasjon`, navnet fryses |
+| **Beskrivelsen er tillegg, aldri overskriving**: logglinjer i hendelsen med `Logglinje.beskrivelse`, samme rekke i hendelsen, i «Rediger oppdrag» og i bilen (`hendelse_beskrivelse`). Nyeste uthevet, «nytt» i ti minutter (`koErNytt`). Oppdragets fritekst er «Bare dette oppdraget» | André ville se hva som er nytt og hvem som skrev det; en retting arver merket **og hendelsen** — en rettet kommentar falt ut av hendelsen før 19. sep. |
+| **Melder** er avkryssing over `MELDER_VALG` (fast i kode), flere er lov; «Andre» krever tekst, og teksten tømmes uten «Andre» | Nødetatene endrer seg ikke per arrangement; en valgliste var én ting til å vedlikeholde |
 | **Festing** i loggstrømmen: `skriv_full`, idempotent, aldri systemlinjer eller fjernede. `festede` sendes hele med pollen | Festing endrer en rad uten ny id og ville aldri kommet gjennom `?siden=` — som `fjernede` |
 
 **Sortering er oppdragslistas** (`koSorterHendelser`): lukkede nederst, så prioritet, så
-nummer. **Søket** filtrerer lista som alt er hentet (nummer, tittel, sted, melder, lag). **Hendelsen åpnes inne i vinduet**, ikke i en modal: ressursene og
-oppdragene skal være synlige mens man jobber i H14. **Loggstrømmen viser linjene uten
+nummer. **Søket** filtrerer lista som alt er hentet (nummer, tittel, sted, melder, tillegg,
+lag). **Hendelsen åpnes inne i vinduet**, ikke i en modal: ressursene og oppdragene skal
+være synlige mens man jobber i H14. **Loggstrømmen viser linjene uten
 hendelse pluss systemlinjene om hendelsene** (`koIStrommen`); kommentarene står i hendelsen.
 Utskriften skal ha alt (TODO).
 
 **KO-innstillinger er sentralbordets valgliste-modal med en fane til**, lagt inn gjennom
 `verdifaner_ekstra` i konteksten og `window.VERDIFANER_EKSTRA` — en generell krok, ikke en
 KO-referanse: oppdragsmodulen kjenner fortsatt ikke `ko`. Hver fane har sin egen dør
-(`kan_lede` for oppdragsmodulens, `kan_lede_ko` for ressursbehovene).
+(`kan_lede` for oppdragsmodulens, `kan_lede_ko` for ansvarsområdene).
 
 ## Chat, ansvar og tavla (pulje 6)
 
@@ -290,17 +284,17 @@ oppgitt verdi — også tom — vinner. `tilstede()` bærer det. **Ikke i backup
 hva som gjelder nå.
 
 **Filteret ble minimering** (§7.2, André: «ikke direkte filter … ressurstypene må kunne
-minimeres»). Gruppeoverskriften på tavla er en knapp; lukket-tilstanden huskes per
-nettleser under `tavle.grupper.lukket`, og **overskriften viser antallet når gruppa er
-lukket** — det som er skjult er lesbart. Mekanismen bor i `oppdrag-kort.js` og gjelder
-begge sidene; nøklene er `type:<id>` for enhetstypene og `gruppe:<id>` for vaktlistas
-ressursgrupper.
+minimeres»). Gruppeoverskriften er en knapp; lukket-tilstanden huskes per nettleser under
+`tavle.grupper.lukket`, og **overskriften viser antallet når gruppa er lukket**. Bor i
+`oppdrag-kort.js`, begge sidene; nøkler `type:<id>` og `gruppe:<id>`.
 
 **Vaktlistas ressurser uten oppdragsenhet står på tavla** — lag, samleplass, KO — under
 enhetslista i egen beholder (`#vaktliste-ressurser`; sentralbordet tegner `#enhetsliste` om
 igjen ved hver poll). Data fra `/vaktliste/api/ressurser/uten-enhet/`, gatet av vaktlista,
-tegnet av `koRessurskort()`: hvem, og om de er møtt. **Ingen status** — hva en KO-ført
-status for et lag skal hete er fortsatt ubesvart.
+tegnet av `koRessurskort()`: hvor mange som er møtt, og «På H14 · 23 min» når laget står på
+en åpen hendelse. **Besetningen — navn, møtt, telefon, ISSI — står bak et klikk**, én om
+gangen som bilens (André, 19. sep. 2026: «da sparer vi plass»). Alle | Biler | Lag i
+vinduets hode huskes per nettleser (`ko.ressursvisning`), og det skjulte står som et tall.
 
 ## Sentralbordet kjører i `/ko/` (pulje 4)
 
@@ -319,20 +313,17 @@ KO *viser* oppdragsmodulens data, og hvem som får se dem er oppdragsmodulens sa
 knappene, og begge er oppdragsnivåer.
 
 **En KO-operatør trenger derfor to rader:** `ko` for loggen og `oppdrag` for oppdragene.
-Alternativet — egne KO-nivåer foran de samme endepunktene — ville lagt tilgangsmodellen to
-steder, og to steder glir fra hverandre.
+Egne KO-nivåer foran de samme endepunktene ville lagt tilgangsmodellen to steder.
 
-**KO har ingen egne oppdragsendepunkter.** `/ko/api/ressurser/` fantes en dag i pulje 3 og er
-borte: den gatet oppdragsdata på `ko:les`. Sentralfilene eier begge listene med egen ETag og
-polling; to pollere som skriver til samme `#enhetsliste` blir uenige.
+**KO har ingen egne oppdragsendepunkter.** `/ko/api/ressurser/` fantes en dag og er borte:
+den gatet oppdragsdata på `ko:les`, og to pollere mot samme `#enhetsliste` blir uenige.
 
-**Loggen er fortsatt KOs egen**, og `ko:les` alene gir den. En operatør uten oppdragstilgang
-ser loggen og en beskjed om hva som mangler — ikke en tom kolonne.
+**Loggen er fortsatt KOs egen**, og `ko:les` alene gir den. Uten oppdragstilgang ser
+operatøren loggen og en beskjed om hva som mangler — ikke en tom kolonne.
 
 ## Feature parity med sentralbordet — ved konstruksjon, ikke ved flid
 
 André, 17. sep. 2026: «Jeg vil ha det likt feature messig inn her i /ko.» **Parity som
 holder er den som følger av at det er samme kode.** `ko/tests_sentralbord.py` håndhever at
 KO får **hele** konteksten, at begge sidene laster **alle** sentralbordfilene i samme
-rekkefølge (fasit `OPPDRAG_SENTRAL_JS` — en sperrehake, for en fil som faller ut av den
-delte malbiten faller ut begge steder), og at de har de samme flatene.
+rekkefølge (fasit `OPPDRAG_SENTRAL_JS`), og at de har de samme flatene.

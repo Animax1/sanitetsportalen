@@ -164,30 +164,30 @@ class OppdragsflataGatesAvOppdragsmodulenTests(TestCase):
         """Verdimengdene settes opp av `skriv_leder` (André, 12. sep. 2026),
         og nivået er oppdragsmodulens — også på KO-sida. Vinduet heter
         «KO-innstillinger» der (18. sep. 2026), og KOs egen fane
-        (ressursbehovene) har sin egen dør: KO-leder."""
+        (ansvarsområdene) har sin egen dør: KO-leder."""
         bruker = _gi(_bruker('skriver'), 'ko', 'skriv_full')
         _gi(bruker, 'oppdrag', 'skriv_full')
         self.client.force_login(bruker)
         markup = self.client.get('/ko/').content.decode()
         self.assertNotIn('data-bs-target="#valglisterModal"', markup)
-        self.assertNotIn('data-verdifane="ressursbehov"', markup)
+        self.assertNotIn('data-verdifane="ansvarsomraader"', markup)
 
         _gi(bruker, 'oppdrag', 'skriv_leder')
         markup = self.client.get('/ko/').content.decode()
         self.assertIn('data-bs-target="#valglisterModal"', markup)
         self.assertIn('data-verdifane="lokasjoner"', markup)
-        self.assertNotIn('data-verdifane="ressursbehov"', markup,
+        self.assertNotIn('data-verdifane="ansvarsomraader"', markup,
                          'oppdragsleder er ikke KO-leder')
 
-    def test_ko_leder_faar_ressursbehovfanen_uten_oppdragsleder(self):
+    def test_ko_leder_faar_ansvarsfanen_uten_oppdragsleder(self):
         """Den andre døra: KO-leder uten oppdragsleder-nivå ser
-        «KO-innstillinger» med bare ressursbehovene."""
+        «KO-innstillinger» med bare ansvarsområdene."""
         bruker = _gi(_bruker('koleder'), 'ko', 'skriv_leder')
         _gi(bruker, 'oppdrag', 'skriv_full')
         self.client.force_login(bruker)
         markup = self.client.get('/ko/').content.decode()
         self.assertIn('data-bs-target="#valglisterModal"', markup)
-        self.assertIn('data-verdifane="ressursbehov"', markup)
+        self.assertIn('data-verdifane="ansvarsomraader"', markup)
         self.assertNotIn('data-verdifane="lokasjoner"', markup)
         self.assertIn('KO-innstillinger', markup)
 

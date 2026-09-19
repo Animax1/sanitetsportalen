@@ -40,12 +40,10 @@ urlpatterns = [
          name='ko_api_hendelse_prioritet'),
     path('api/hendelser/<int:pk>/bli-med/', views.hendelse_bli_med_view,
          name='ko_api_hendelse_bli_med'),
-    # KO-innstillingene: ressursbehovene (18. sep. 2026).
-    path('api/ressursbehov/', views.ressursbehov_view, name='ko_api_ressursbehov'),
-    path('api/ressursbehov/rekkefolge/', views.ressursbehov_rekkefolge_view,
-         name='ko_api_ressursbehov_rekkefolge'),
-    path('api/ressursbehov/<int:pk>/', views.ressursbehov_detalj_view,
-         name='ko_api_ressursbehov_detalj'),
+    # Lagene på hendelsen (19. sep. 2026): hele lista, differansen logges.
+    path('api/hendelser/<int:pk>/lag/', views.hendelse_lag_view,
+         name='ko_api_hendelse_lag'),
+    # KO-innstillingene: ansvarsområdene (18. sep. 2026).
     path('api/ansvarsomraader/', views.ansvarsomraader_view, name='ko_api_ansvarsomraader'),
     path('api/ansvarsomraader/rekkefolge/', views.ansvarsomraader_rekkefolge_view,
          name='ko_api_ansvarsomraader_rekkefolge'),

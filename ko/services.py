@@ -17,9 +17,9 @@ from core.models import AppSetting
 from core.vakt import hent_aktiv_vakt
 
 from .models import (
-    HENDELSE_APEN, HENDELSE_LUKKET, KILDE_OPERATOR, KILDE_SYSTEM,
-    PRIORITET_NAVN, PRIORITET_STANDARD, Ansvarsmerke, Ansvarsomraade, Hendelse,
-    HendelseDeltaker, Logglinje, Ressursbehov,
+    HENDELSE_APEN, HENDELSE_LUKKET, KILDE_OPERATOR, KILDE_SYSTEM, MELDER_ANDRE,
+    MELDER_NAVN, MELDER_VALG, PRIORITET_NAVN, PRIORITET_STANDARD, Ansvarsmerke,
+    Ansvarsomraade, Hendelse, HendelseDeltaker, HendelseLag, Logglinje,
 )
 
 
@@ -211,7 +211,7 @@ def _frys_forfatter(linje, bruker) -> None:
 
 def skriv_linje(vakt, raa_tekst, *, bruker, tidspunkt=None,
                 ansvarsomraade=None, uformell=False, hendelse=None,
-                naa=None) -> Logglinje:
+                beskrivelse=False, naa=None) -> Logglinje:
     """En menneskeskrevet linje. Den vanlige veien inn i loggen.
 
     **`hendelse` gjør linja til en kommentar i hendelsen** (18. sep. 2026).
@@ -228,6 +228,10 @@ def skriv_linje(vakt, raa_tekst, *, bruker, tidspunkt=None,
     **`uformell` krever at chatten er slått på** (§4.5). Sperren står her og
     ikke bare i skjemaet: en klient som sender flagget når admin har slått
     chatten av, skal møte den samme døra.
+
+    **`beskrivelse` gjør linja til et tillegg i hendelsens beskrivelse**
+    (19. sep. 2026), og krever derfor en hendelse: et tillegg uten en
+    beskrivelse å legge seg til finnes ikke.
     """
     tekst = rens_tekst(raa_tekst)
     tid = vurder_tidspunkt(tidspunkt, naa)
@@ -235,6 +239,8 @@ def skriv_linje(vakt, raa_tekst, *, bruker, tidspunkt=None,
         raise Ugyldig('Chatten er slått av. Skriv linja som en vanlig logglinje.')
     if hendelse is not None and hendelse.vakt_id != vakt.pk:
         raise Ugyldig('Hendelsen hører til en annen vakt.')
+    if beskrivelse and hendelse is None:
+        raise Ugyldig('Et tillegg til beskrivelsen må høre til en hendelse.')
     if ansvarsomraade is None:
         ansvarsomraade = ansvar_for(bruker)
     linje = Logglinje(
@@ -245,6 +251,7 @@ def skriv_linje(vakt, raa_tekst, *, bruker, tidspunkt=None,
         ansvarsomraade=(ansvarsomraade or '').strip()[:40],
         uformell=bool(uformell),
         hendelse=hendelse,
+        beskrivelse=bool(beskrivelse),
     )
     _frys_forfatter(linje, bruker)
     linje.save()
@@ -324,8 +331,11 @@ def korriger(linje, *, bruker, tekst=None, tidspunkt=None, naa=None) -> Logglinj
         tidspunkt=ny_tid,
         tekst=ny_tekst,
         ansvarsomraade=linje.ansvarsomraade,
-        # Merket arves: en retting av en chatlinje er fortsatt chat.
+        # Merkene arves: en retting av en chatlinje er fortsatt chat, og en
+        # retting av et tillegg står fortsatt i beskrivelsen.
         uformell=linje.uformell,
+        beskrivelse=linje.beskrivelse,
+        hendelse=linje.hendelse,
         korrigerer=linje,
         rot=linje.rot or linje,
     )
@@ -452,7 +462,6 @@ MAKS_TITTEL = 120
 #: Beskrivelsen har samme tak som en logglinje: fullstendig, ikke ubegrenset.
 MAKS_BESKRIVELSE = MAKS_TEKST
 MAKS_MELDER = 120
-MAKS_LAGSRESSURSER = 255
 
 
 def hendelsesnr(nummer) -> str:
@@ -521,21 +530,72 @@ def _rens_kort(raa, maks, hva) -> str:
     return tekst
 
 
-def _ressursbehov_fra(ider):
-    """Radene bak en liste med id-er. Ukjent id er 400, ikke stille utelatt —
-    en avkryssing som forsvinner uten å si fra er en feil man ser i loggen et
-    døgn senere. `None` betyr «ikke oppgitt»; `[]` betyr «ingen»."""
+def rens_melder(typer, tekst) -> tuple[list[str], str]:
+    """Melderen: kodene fra `MELDER_VALG` i fast rekkefølge, og teksten bak
+    «Andre». `None` for typene betyr «ikke oppgitt».
+
+    Ukjent kode er 400, ikke stille utelatt — en avkryssing som forsvinner
+    uten å si fra er en feil man ser i loggen et døgn senere. **Teksten
+    kreves når «Andre» er valgt, og tømmes når den ikke er:** «Andre» uten å
+    si hvem er ingen melder, og en tekst uten «Andre» er en melder ingen ser.
+    """
+    if typer is None:
+        return None, _rens_kort(tekst, MAKS_MELDER, 'Melder')
+    if not isinstance(typer, (list, tuple)):
+        raise Ugyldig('Melder må være en liste.')
+    onsket = {str(t).strip().lower() for t in typer}
+    ukjente = onsket - set(MELDER_NAVN)
+    if ukjente:
+        raise Ugyldig('Ukjent melder.')
+    valgte = [kode for kode, _ in MELDER_VALG if kode in onsket]
+    tekst = _rens_kort(tekst, MAKS_MELDER, 'Melder')
+    if MELDER_ANDRE in valgte and not tekst:
+        raise Ugyldig('Skriv hvem melderen er når «Andre» er valgt.')
+    if MELDER_ANDRE not in valgte:
+        tekst = ''
+    return valgte, tekst
+
+
+def melder_tekst(hendelse) -> str:
+    """«Egen ressurs, Andre (arrangørvakt)» — slik melderen leses. Bygges
+    her og ikke i nettleseren, så utskriften og skjermen sier det samme."""
+    deler = []
+    for kode in hendelse.melder_typer or []:
+        navn = MELDER_NAVN.get(kode, kode)
+        if kode == MELDER_ANDRE and hendelse.melder:
+            navn += f' ({hendelse.melder})'
+        deler.append(navn)
+    return ', '.join(deler)
+
+
+def lag_som_kan_velges(vakt):
+    """Ressursene et lag på hendelsen kan være: vaktlistas ressurser **uten**
+    oppdragsenhet, i lista som er i bruk. `ko` → `vaktliste` er den tillatte
+    retningen. Samme scope som `ressurser_uten_enhet()`, som tegner kortene —
+    et lag man kan velge skal være et lag man kan se."""
+    from vaktliste.models import Ressurs
+    from vaktliste.services import vaktliste_i_bruk
+
+    liste = vaktliste_i_bruk()
+    if liste is None:
+        return Ressurs.objects.none()
+    return Ressurs.objects.filter(vaktliste=liste, enhet__isnull=True)
+
+
+def _lag_fra(vakt, ider):
+    """Ressursene bak en liste med id-er. Ukjent id er 400. `None` betyr
+    «ikke oppgitt»; `[]` betyr «ingen»."""
     if ider is None:
         return None
     if not isinstance(ider, (list, tuple)):
-        raise Ugyldig('Ressursbehov må være en liste.')
+        raise Ugyldig('Lag må være en liste.')
     try:
         onsket = {int(i) for i in ider}
     except (TypeError, ValueError):
-        raise Ugyldig('Ressursbehov må være tall.')
-    rader = list(Ressursbehov.objects.filter(pk__in=onsket))
+        raise Ugyldig('Lag må være tall.')
+    rader = list(lag_som_kan_velges(vakt).filter(pk__in=onsket))
     if len(rader) != len(onsket):
-        raise Ugyldig('Ukjent ressursbehov.')
+        raise Ugyldig('Ukjent lag.')
     return rader
 
 
@@ -566,7 +626,7 @@ def bli_med(hendelse, bruker) -> bool:
 @transaction.atomic
 def opprett_hendelse(vakt, raa_tittel, *, bruker, lokasjon=None,
                      fra_linje=None, prioritet=None, beskrivelse=None,
-                     melder=None, ressursbehov=None) -> Hendelse:
+                     melder_typer=None, melder=None, lag=None) -> Hendelse:
     """Ny hendelse. Fra en logglinje eller fra ingenting.
 
     **Linja blir stående** (§4.5): hendelsen peker tilbake på den, og linja
@@ -579,12 +639,17 @@ def opprett_hendelse(vakt, raa_tittel, *, bruker, lokasjon=None,
     er spørsmål i etterkant.
 
     Den som oppretter er på hendelsen fra første sekund (`bli_med`).
+
+    **Beskrivelsen blir det første tillegget** (19. sep. 2026), ført av den
+    som oppretter — én mekanisme, ikke et felt pluss en rekke. Lagene som
+    velges i skjemaet står på opprettelseslinja, ikke som én linje hver: de
+    kom med hendelsen, og fem linjer for én handling leser som fem ting.
     """
     tittel = rens_tittel(raa_tittel)
     prio = rens_prioritet(prioritet)
     beskrivelse = _rens_kort(beskrivelse, MAKS_BESKRIVELSE, 'Beskrivelsen')
-    melder = _rens_kort(melder, MAKS_MELDER, 'Melder')
-    behov = _ressursbehov_fra(ressursbehov)
+    typer, melder = rens_melder(melder_typer, melder)
+    lagene = _lag_fra(vakt, lag) or []
     if fra_linje is not None and fra_linje.vakt_id != vakt.pk:
         raise Ugyldig('Linja hører til en annen vakt.')
     hendelse = Hendelse(
@@ -594,22 +659,82 @@ def opprett_hendelse(vakt, raa_tittel, *, bruker, lokasjon=None,
         lokasjon=lokasjon,
         lokasjon_navn=getattr(lokasjon, 'navn', '') or '',
         prioritet=prio,
-        beskrivelse=beskrivelse,
+        melder_typer=typer or [],
         melder=melder,
         opprettet_av=bruker if bruker and bruker.is_authenticated else None,
         opprettet_av_navn=getattr(bruker, 'username', '') or '',
         opprettet_fra_linje=fra_linje,
     )
     hendelse.save()
-    if behov:
-        hendelse.ressursbehov.set(behov)
     if fra_linje is not None and fra_linje.hendelse_id is None:
         fra_linje.hendelse = hendelse
         fra_linje.save(update_fields=['hendelse'])
-    systemlinje(vakt, _kode('HENDELSE_OPPRETTET'), _hendelsesdata(hendelse),
+    data = _hendelsesdata(hendelse)
+    if lagene:
+        data['lag'] = [r.navn for r in lagene]
+    systemlinje(vakt, _kode('HENDELSE_OPPRETTET'), data,
                 bruker=bruker, hendelse=hendelse)
+    if lagene:
+        sett_lag(hendelse, [r.pk for r in lagene], bruker=bruker, logg=False)
+    if beskrivelse:
+        legg_til_beskrivelse(hendelse, beskrivelse, bruker=bruker)
     bli_med(hendelse, bruker)
     return hendelse
+
+
+def legg_til_beskrivelse(hendelse, raa_tekst, *, bruker, naa=None) -> Logglinje:
+    """Et tillegg til beskrivelsen: en logglinje i hendelsen med merket.
+    Aldri en overskriving — det er hele poenget (André, 19. sep. 2026)."""
+    return skriv_linje(hendelse.vakt, raa_tekst, bruker=bruker, hendelse=hendelse,
+                       beskrivelse=True, naa=naa)
+
+
+@transaction.atomic
+def sett_lag(hendelse, ressurs_ider, *, bruker, naa=None, logg=True):
+    """Sett hvilke lag som er på hendelsen. Returnerer `(lagt_til, tatt_av)`
+    som navn.
+
+    **Mengde, ikke handling**, fordi skjemaet og brikkene i hendelsen begge
+    sender hele lista — og differansen regnes ut her, ett sted. Hvert lag som
+    kommer til eller går får sin egen systemlinje (`logg=True`); ved
+    opprettelse står de på opprettelseslinja i stedet. En lukket hendelse tar
+    ikke imot — som `knytt_oppdrag`: ellers betyr «lukket» ingenting.
+    """
+    if hendelse.er_lukket:
+        raise Ugyldig('Hendelsen er lukket — åpne den igjen først.')
+    onsket = _lag_fra(hendelse.vakt, ressurs_ider)
+    if onsket is None:
+        raise Ugyldig('Lag må være en liste.')
+    naa = naa or timezone.now()
+    naa_rader = {l.ressurs_id: l for l in hendelse.lag.all() if l.ressurs_id}
+    onsket_ider = {r.pk for r in onsket}
+    lagt_til, tatt_av = [], []
+    for r in onsket:
+        if r.pk in naa_rader:
+            continue
+        HendelseLag.objects.create(
+            hendelse=hendelse, ressurs=r, ressurs_navn=r.navn, fra=naa,
+            av=bruker if bruker and getattr(bruker, 'is_authenticated', False) else None,
+            av_navn=getattr(bruker, 'username', '') or '')
+        lagt_til.append(r.navn)
+    for ressurs_id, rad in naa_rader.items():
+        if ressurs_id not in onsket_ider:
+            tatt_av.append(rad.ressurs_navn)
+            rad.delete()
+    if logg:
+        for navn in lagt_til:
+            data = _hendelsesdata(hendelse)
+            data['lag'] = navn
+            systemlinje(hendelse.vakt, _kode('HENDELSE_LAG_PAA'), data,
+                        tidspunkt=naa, bruker=bruker, hendelse=hendelse)
+        for navn in tatt_av:
+            data = _hendelsesdata(hendelse)
+            data['lag'] = navn
+            systemlinje(hendelse.vakt, _kode('HENDELSE_LAG_AV'), data,
+                        tidspunkt=naa, bruker=bruker, hendelse=hendelse)
+    if lagt_til or tatt_av:
+        bli_med(hendelse, bruker)
+    return lagt_til, tatt_av
 
 
 def _kode(navn):
@@ -632,12 +757,14 @@ def _krev_versjon(hendelse, versjon):
 
 @transaction.atomic
 def rediger_hendelse(hendelse, *, bruker, versjon, tittel=None,
-                     lokasjon=None, sett_lokasjon=False, beskrivelse=None,
-                     melder=None, lagsressurser=None, ressursbehov=None) -> Hendelse:
-    """Hodet: tittel, lokasjon, beskrivelse, melder, lagsressurser og
-    ressursbehov. Ingen systemlinje: det er feltendringer, og `audit/` fører
-    dem — regel 2 i `ko/systemlinjer.py`. Prioriteten har sin egen inngang
-    (`sett_prioritet`), fordi *den* er en handling og skal stå i loggen.
+                     lokasjon=None, sett_lokasjon=False, melder_typer=None,
+                     melder=None, lag=None) -> Hendelse:
+    """Hodet: tittel, lokasjon, melder — og lagene, som går gjennom
+    `sett_lag` og logges der. Ingen systemlinje for feltene: det er
+    feltendringer, og `audit/` fører dem — regel 2 i `ko/systemlinjer.py`.
+    Prioriteten har sin egen inngang (`sett_prioritet`), fordi *den* er en
+    handling og skal stå i loggen. Beskrivelsen redigeres ikke her: den er
+    tillegg, og et tillegg legges til (`legg_til_beskrivelse`).
 
     `sett_lokasjon=True` med `lokasjon=None` tømmer lokasjonen; uten flagget
     rører kallet den ikke. Et nullbart felt trenger tre tilstander i kallet.
@@ -655,26 +782,25 @@ def rediger_hendelse(hendelse, *, bruker, versjon, tittel=None,
         hendelse.lokasjon = lokasjon
         hendelse.lokasjon_navn = getattr(lokasjon, 'navn', '') or ''
         endret += ['lokasjon', 'lokasjon_navn']
-    for felt, raa, maks, hva in (
-            ('beskrivelse', beskrivelse, MAKS_BESKRIVELSE, 'Beskrivelsen'),
-            ('melder', melder, MAKS_MELDER, 'Melder'),
-            ('lagsressurser', lagsressurser, MAKS_LAGSRESSURSER, 'Lagsressurser')):
-        if raa is None:
-            continue
-        ny = _rens_kort(raa, maks, hva)
-        if ny != getattr(hendelse, felt):
-            setattr(hendelse, felt, ny)
-            endret.append(felt)
-    behov = _ressursbehov_fra(ressursbehov)
-    behov_endret = False
-    if behov is not None:
-        naa_ider = set(hendelse.ressursbehov.values_list('pk', flat=True))
-        if naa_ider != {r.pk for r in behov}:
-            behov_endret = True
-    if not endret and not behov_endret:
+    if melder_typer is not None or melder is not None:
+        typer, tekst = rens_melder(
+            melder_typer if melder_typer is not None else hendelse.melder_typer,
+            melder if melder is not None else hendelse.melder)
+        if typer != (hendelse.melder_typer or []):
+            hendelse.melder_typer = typer
+            endret.append('melder_typer')
+        if tekst != hendelse.melder:
+            hendelse.melder = tekst
+            endret.append('melder')
+    lag_endret = False
+    if lag is not None:
+        onsket = {r.pk for r in _lag_fra(hendelse.vakt, lag)}
+        naa_ider = {l.ressurs_id for l in hendelse.lag.all() if l.ressurs_id}
+        lag_endret = onsket != naa_ider
+    if not endret and not lag_endret:
         raise Ugyldig('Ingenting er endret.')
-    if behov_endret:
-        hendelse.ressursbehov.set(behov)
+    if lag_endret:
+        sett_lag(hendelse, lag, bruker=bruker)
     hendelse.versjon += 1
     hendelse.save(update_fields=endret + ['versjon'])
     bli_med(hendelse, bruker)
@@ -803,9 +929,24 @@ def hendelser_for(vakt):
               apne_oppdrag=models.Count(
                   'oppdrag', distinct=True,
                   filter=~Q(oppdrag__status=choices.TERMINAL)))
-          .prefetch_related('ressursbehov', 'deltakere')
+          .prefetch_related('deltakere', 'lag', _tillegg_prefetch())
           .order_by('-hendelsesnummer'))
     return list(qs)
+
+
+def _tillegg_prefetch():
+    """Tilleggene i beskrivelsen, hentet i én spørring for hele lista og
+    lagt som `tillegg` på hver hendelse — `Hendelse.beskrivelse_tillegg()`
+    leser dem derfra. Samme filter som metoden bruker alene."""
+    from django.db.models import Prefetch
+    from django.db.models.functions import Coalesce
+    return Prefetch(
+        'linjer',
+        queryset=(Logglinje.objects
+                  .filter(beskrivelse=True, fjernet_at__isnull=True,
+                          korrigert_av__isnull=True)
+                  .order_by(Coalesce('rot_id', 'id'), 'id')),
+        to_attr='tillegg')
 
 
 def hendelse_med_telling(hendelse):
@@ -818,13 +959,8 @@ def hendelse_med_telling(hendelse):
                 apne_oppdrag=models.Count(
                     'oppdrag', distinct=True,
                     filter=~Q(oppdrag__status=choices.TERMINAL)))
-            .prefetch_related('ressursbehov', 'deltakere')
+            .prefetch_related('deltakere', 'lag', _tillegg_prefetch())
             .get())
-
-
-def ressursbehov_aktive():
-    """Avkryssingene i «Ny hendelse», i rekkefølge."""
-    return list(Ressursbehov.objects.filter(er_aktiv=True))
 
 
 # ── Nullstilling (18. sep. 2026) ─────────────────────────────────────────────

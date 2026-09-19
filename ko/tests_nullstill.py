@@ -185,7 +185,7 @@ class PorteneTests(TestCase):
         self.assertGreaterEqual(self._post(self.sjef, '/ko/api/nullstill/logg/', {'confirm': True}).json()['antall'], 1)
         self.assertEqual(Logglinje.objects.count(), 0)
 
-    def test_ansvarsomraadene_er_en_liste_med_samme_porter_som_ressursbehovene(self):
+    def test_ansvarsomraadene_er_en_liste_med_portene_fra_verdilistene(self):
         c = Client(); c.force_login(self.leder)
         self.assertEqual([r['navn'] for r in c.get('/ko/api/ansvarsomraader/').json()['data']],
                          ['samband', 'ressurser', 'logg', 'media'])

@@ -2,8 +2,9 @@
 
 Lag, samleplass, KO — det som bemannes i vaktlista, men aldri stempler i
 `/oppdrag/`. Tre ting bæres av testene her, samme tre som `tests_besetning.py`:
-gaten er vaktlistas, svaret er innskrenket (ingen telefon, ingen ISSI), og
-scopet er lista i bruk.
+gaten er vaktlistas, svaret bærer telefon og ISSI (fra 19. sep. 2026, André:
+alle ressurser skal ha «telefonnummer og ISSI» — bak et klikk), og scopet er
+lista i bruk.
 """
 from __future__ import annotations
 
@@ -68,13 +69,17 @@ class RessurserUtenEnhetTests(TilgangsBasis):
         rader = {r['navn']: r for r in services.ressurser_uten_enhet()}
         self.assertEqual(rader['Lag HGSD']['antall'], 0)
 
-    def test_svaret_baerer_ikke_telefon(self):
-        """Tavla svarer på «er laget bemannet», ikke på «ring laget»."""
+    def test_svaret_baerer_telefon_og_issi(self):
+        """Var uten til 19. sep. 2026 («et nummer man ikke trenger er et
+        nummer på en skjerm i et rom»); André ville ha dem, og kortet viser
+        dem først ved klikk. Samme felter som `besetning()` gir bilene."""
         self.p_hgsd.telefon = '99988777'
+        self.p_hgsd.issi = '2401234'
         self.p_hgsd.save()
         self._skift(self.res_hgsd, self.p_hgsd)
         rad = next(r for r in services.ressurser_uten_enhet() if r['navn'] == 'Lag HGSD')
-        self.assertEqual(set(rad['mannskap'][0]), {'navn', 'rolle', 'tilstede'})
+        self.assertEqual(set(rad['mannskap'][0]), {'navn', 'rolle', 'tilstede', 'telefon', 'issi'})
+        self.assertEqual((rad['mannskap'][0]['telefon'], rad['mannskap'][0]['issi']), ('99988777', '2401234'))
 
     def test_ingen_liste_gir_tom(self):
         AppSetting.set('aktiv_vakt_id', 999999)

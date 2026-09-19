@@ -187,6 +187,17 @@ class Logglinje(models.Model):
     #: vises.
     uformell = models.BooleanField(default=False, verbose_name='Uformell (chat)')
 
+    #: **Et tillegg til hendelsens beskrivelse** (André, 19. sep. 2026: «for
+    #: hver append i beskrivelse så markeres det … og logges i hendelsens logg
+    #: hvem har oppdatert beskrivelse»). Beskrivelsen er ikke et felt som
+    #: overskrives, men en rekke tillegg — og hvert tillegg er en logglinje i
+    #: hendelsen med dette merket, så hvem og når står der av seg selv, og
+    #: retting og fjerning går gjennom loggens egne regler. Samme grep som
+    #: `uformell`: et merke på linja, ikke en tabell til. Hendelsen,
+    #: «Rediger oppdrag» og bilen leser alle den samme rekka
+    #: (`Hendelse.beskrivelse_tillegg`).
+    beskrivelse = models.BooleanField(default=False, verbose_name='Tillegg til beskrivelsen')
+
     #: **Festet i loggstrømmen** (André, 18. sep. 2026: «Nyttige beskjeder,
     #: noen skal kunne pinnes»). Et tidspunkt og ikke en boolsk verdi, så
     #: rekkefølgen blant de festede er «sist festet nederst» uten en kolonne
@@ -266,32 +277,23 @@ PRIORITET_NAVN: dict[str, str] = dict(PRIORITET_VALG)
 PRIORITET_RANG: dict[str, int] = {v: i for i, (v, _) in enumerate(PRIORITET_VALG)}
 PRIORITET_STANDARD = PRIORITET_GRONN
 
-
-class Ressursbehov(models.Model):
-    """Hva slags ressurs en hendelse trenger — «Ambulanse», «Lag», «Politi».
-
-    **Egen liste i KO, ikke `oppdrag.Enhetstype` eller `vaktliste.Ressursgruppe`**
-    (André, 18. sep. 2026: avkryssing, vedlikeholdt under KO-innstillinger av
-    admin og leder). Begrepet ble sjekket før det ble laget (rota, «Før du
-    designer noe nytt»): de to andre er *portalens egne* ressurser — det som
-    stempler og det som bemannes — mens et ressursbehov like gjerne er politi,
-    brann eller arrangørens vakter, som portalen ikke har og aldri skal
-    registrere. Samme form som `oppdrag.Lokasjon`: navn, aktiv, rekkefølge.
-    Deaktivering skjuler i skjemaet; hendelsene som alt peker på raden
-    beholder den.
-    """
-
-    navn = models.CharField(max_length=64, unique=True, verbose_name='Ressursbehov')
-    er_aktiv = models.BooleanField(default=True, verbose_name='Aktiv')
-    rekkefolge = models.IntegerField(default=100, verbose_name='Rekkefølge')
-
-    class Meta:
-        verbose_name = 'Ressursbehov'
-        verbose_name_plural = 'Ressursbehov'
-        ordering = ['rekkefolge', 'navn']
-
-    def __str__(self):
-        return self.navn
+#: Hvem som meldte hendelsen (André, 19. sep. 2026: avkryssing, flere kan
+#: velges, «Andre» med tekst). **Fast liste i kode, ikke en valgliste:** de
+#: fem første er nødetatene og egen organisasjon, og de endrer seg ikke fra
+#: arrangement til arrangement. «Andre» bærer fritekst — arrangørvakt,
+#: publikum — og teksten kreves når den er valgt. Ingen peker: melderen er
+#: oftest ikke en konto.
+MELDER_EGEN = 'egen'
+MELDER_ANDRE = 'andre'
+MELDER_VALG: tuple[tuple[str, str], ...] = (
+    (MELDER_EGEN, 'Egen ressurs'),
+    ('amk', 'AMK'),
+    ('brann', 'Brann'),
+    ('politi', 'Politi'),
+    ('lsko', 'LSKO'),
+    (MELDER_ANDRE, 'Andre'),
+)
+MELDER_NAVN: dict[str, str] = dict(MELDER_VALG)
 
 
 class Hendelse(models.Model):
@@ -339,22 +341,19 @@ class Hendelse(models.Model):
     prioritet = models.CharField(
         max_length=8, choices=PRIORITET_VALG, default=PRIORITET_STANDARD,
         db_index=True, verbose_name='Prioritet')
-    #: Fritekst, som `Oppdrag.fritekst`: **aldri verdilogget i audit** og
-    #: aldri i en SHA-signatur — se `NOTAT_DPIA_OG_FRITEKST.md` §7 og loggens
-    #: valg 1 i `ko/CLAUDE.md`.
-    beskrivelse = models.TextField(blank=True, default='', verbose_name='Beskrivelse')
-    #: Hvem som meldte den — «Lag 1», «publikum», «arrangør». Ikke en peker:
-    #: melderen er oftest ikke en konto.
-    melder = models.CharField(max_length=120, blank=True, default='', verbose_name='Melder')
-    #: Lagene som er på hendelsen, som tekst (André, 18. sep. 2026: «et
-    #: tekstfelt som lar en skrive inn lagene»). Vises på oppdragene som hører
-    #: til hendelsen — i bilen og i KO. Fritekst fordi et lag ikke er en
-    #: `oppdrag.Enhet` og ikke stempler; hva en KO-ført lagsstatus skal hete er
-    #: fortsatt ubesvart (`TODO.md`), og dette feltet er ikke et svar på det.
-    lagsressurser = models.CharField(
-        max_length=255, blank=True, default='', verbose_name='Lagsressurser')
-    ressursbehov = models.ManyToManyField(
-        Ressursbehov, blank=True, related_name='hendelser', verbose_name='Ressursbehov')
+    #: **Beskrivelsen er ikke et felt** (19. sep. 2026). Den var en
+    #: `TextField` fra 18. sep., og ble til en rekke tillegg — logglinjer i
+    #: hendelsen med `Logglinje.beskrivelse` — fordi André ville se *hva i
+    #: teksten som er nytt* og hvem som la det til. Et felt som overskrives kan
+    #: ikke svare på det. `beskrivelse_tillegg()` under er den ene leseren;
+    #: oppdragsmodulen kaller den gjennom `Oppdrag.hendelse` uten å kjenne
+    #: linjemodellen. Teksten er fritekst som før: aldri verdilogget i audit,
+    #: aldri i en SHA-signatur (`NOTAT_DPIA_OG_FRITEKST.md` §7).
+    #:
+    #: Hvem som meldte: kodene fra `MELDER_VALG`, flere er lov, og `melder` er
+    #: teksten bak «Andre» — tom når «Andre» ikke er valgt.
+    melder_typer = models.JSONField(default=list, blank=True, verbose_name='Melder')
+    melder = models.CharField(max_length=120, blank=True, default='', verbose_name='Melder (andre)')
 
     opprettet_at = models.DateTimeField(auto_now_add=True, verbose_name='Opprettet')
     opprettet_av = models.ForeignKey(
@@ -395,6 +394,88 @@ class Hendelse(models.Model):
     @property
     def er_lukket(self) -> bool:
         return self.status == HENDELSE_LUKKET
+
+    def beskrivelse_tillegg(self) -> list[dict]:
+        """Tilleggene i beskrivelsen, i rekkefølge: `[{id, rot, tekst, av,
+        tid, rettet}]`. Gjeldende ledd i hver kjede, fjernede utelatt.
+
+        **Den ene leseren**, og derfor en metode på modellen og ikke en
+        spørring hver leser skriver selv: oppdragsmodulen kaller den gjennom
+        `Oppdrag.hendelse` for «Rediger oppdrag» og bilen, og kjenner verken
+        `Logglinje` eller merket. `services.hendelser_for` prefetcher rekka
+        som `tillegg`, så pollen ikke betaler én spørring per hendelse.
+        """
+        rader = getattr(self, 'tillegg', None)
+        if rader is None:
+            rader = list(self.linjer
+                         .filter(beskrivelse=True, fjernet_at__isnull=True,
+                                 korrigert_av__isnull=True)
+                         .order_by(Coalesce('rot_id', 'id'), 'id'))
+        return [{'id': l.pk, 'rot': l.rot_id or l.pk, 'tekst': l.tekst,
+                 'av': l.forfatter_navn, 'tid': l.tidspunkt.isoformat(),
+                 'rettet': l.korrigerer_id is not None}
+                for l in rader]
+
+    def lag_navn(self) -> list[str]:
+        """Navnene på lagene som er på hendelsen, i den rekkefølgen de kom.
+        Frosset navn (`ressurs_navn`), ikke ressursens: det er det som står
+        etter en gjenoppretting, og det er det som sto da det skjedde."""
+        return [l.ressurs_navn for l in self.lag.all()]
+
+
+class HendelseLag(models.Model):
+    """Et lag som er **på** hendelsen (André, 19. sep. 2026).
+
+    «Lag får ikke oppdrag, de får oppdrag muntlig kommunisert på samband og
+    blir registrert på hendelsen.» Derfor er dette en rad på hendelsen og
+    ikke en `oppdrag.Enhet`: laget stempler aldri, og det som skal vises er
+    *at* det er opptatt, *på hva*, og *hvor lenge* — «På H14 · 23 min» på
+    kortet i ressursoversikten. Erstatter fritekstfeltet `lagsressurser` og
+    listen `Ressursbehov` fra 18. sep., som begge var ord uten en peker.
+
+    **Pekeren går til vaktlistas ressurs**, ikke til et eget lagregister:
+    modulen eier ingen ressurser (§3.1, §9.1). Bare ressurser **uten**
+    oppdragsenhet kan stå her — bilene har oppdragene.
+
+    **`ressurs` strippes i backupen, og navnet fryses ved siden av.** Kanten
+    `ko` → `vaktliste` ville ellers gitt en sirkel i gjenopprettingen
+    (`vaktliste.Ressurs.enhet` → `oppdrag`, `oppdrag.Oppdrag.hendelse` → `ko`),
+    nøyaktig som `Hendelse.lokasjon`. Etter en gjenoppretting står navnet;
+    koblingen til kortet er borte, og det er prisen.
+
+    Registrering og fjerning skriver hver sin systemlinje (`HENDELSE_LAG_PAA`,
+    `HENDELSE_LAG_AV`) — hvem som ble sendt hvor er nøyaktig det man leser
+    loggen for. Raden slettes når laget tas av; historien står i loggen.
+    """
+
+    hendelse = models.ForeignKey(
+        Hendelse, on_delete=models.CASCADE, related_name='lag',
+        verbose_name='Hendelse')
+    ressurs = models.ForeignKey(
+        'vaktliste.Ressurs', null=True, blank=True, on_delete=models.SET_NULL,
+        related_name='ko_hendelser', verbose_name='Ressurs')
+    ressurs_navn = models.CharField(max_length=120, verbose_name='Ressurs (navn)')
+    fra = models.DateTimeField(verbose_name='På hendelsen fra')
+    av = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True,
+        on_delete=models.SET_NULL, related_name='ko_lag_registrert',
+        verbose_name='Registrert av')
+    av_navn = models.CharField(
+        max_length=150, blank=True, default='', verbose_name='Registrert av (navn)')
+
+    class Meta:
+        verbose_name = 'Lag på hendelse'
+        verbose_name_plural = 'Lag på hendelser'
+        ordering = ['fra', 'id']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['hendelse', 'ressurs'],
+                name='et_lag_en_gang_per_hendelse',
+            ),
+        ]
+
+    def __str__(self):
+        return f'{self.ressurs_navn} på H{self.hendelse.hendelsesnummer}'
 
 
 class HendelseDeltaker(models.Model):
@@ -437,7 +518,7 @@ class Ansvarsomraade(models.Model):
     """Ansvarsområdene operatørene kan velge mellom — «samband», «ressurser»…
 
     Var en fast tuppel i kode (`ANSVARSOMRAADER`) til 18. sep. 2026, da André
-    ville redigere dem under KO-innstillinger. Samme form som `Ressursbehov`:
+    ville redigere dem under KO-innstillinger. Samme form som `oppdrag.Lokasjon`:
     navn, aktiv, rekkefølge. Merket på linjene (`Logglinje.ansvarsomraade`) og
     på kontoen (`Ansvarsmerke.omraade`) er fortsatt **tekst**, ikke en peker:
     et område som omdøpes eller deaktiveres skal ikke skrive om loggen.

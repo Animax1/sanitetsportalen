@@ -76,10 +76,16 @@ class KoBackupHandler(BaseBackupHandler):
     #:
     #: `festet_av` og `HendelseDeltaker.bruker` (18. sep. 2026) følger samme
     #: regel: navnet står frosset ved siden av, og pekeren er bekvemmelighet.
+    #:
+    #: `HendelseLag.ressurs` (19. sep. 2026) er `Hendelse.lokasjon` om igjen,
+    #: mot vaktlista: `vaktliste.Ressurs.enhet` → `oppdrag` → `ko` er alt en
+    #: kjede, og en peker tilbake til vaktlista lukker den til en sirkel.
+    #: Navnet står i `ressurs_navn`; `av` er en brukerpeker som de andre.
     strip_fields = {
         'ko.Logglinje': ['forfatter', 'fjernet_av', 'festet_av'],
         'ko.Hendelse': ['opprettet_av', 'lukket_av', 'lokasjon'],
         'ko.HendelseDeltaker': ['bruker'],
+        'ko.HendelseLag': ['ressurs', 'av'],
     }
 
 

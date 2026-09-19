@@ -81,6 +81,8 @@ HENDELSE_OPPRETTET = 'hendelse_opprettet'
 HENDELSE_LUKKET = 'hendelse_lukket'
 HENDELSE_GJENAPNET = 'hendelse_gjenapnet'
 HENDELSE_PRIORITET = 'hendelse_prioritet'
+HENDELSE_LAG_PAA = 'hendelse_lag_paa'
+HENDELSE_LAG_AV = 'hendelse_lag_av'
 OPPDRAG_KNYTTET = 'oppdrag_knyttet'
 
 #: Hver kode med sin begrunnelse. Lista er kontrakten: en kode som ikke står
@@ -129,6 +131,13 @@ KODER: dict[str, str] = {
         '«H14 satt til Viktig av Kari» er en avgjørelse, ikke en feltendring '
         '(18. sep. 2026): det er den man leter etter når man spør hvorfor to '
         'biler ble sendt. Aldri en stille oppdatering.',
+    HENDELSE_LAG_PAA:
+        'Lagene får oppdrag muntlig på samband og registreres på hendelsen '
+        '(André, 19. sep. 2026). «Lag 2 registrert på H14» er den ene linja '
+        'som sier hvor laget ble sendt — det stempler aldri selv.',
+    HENDELSE_LAG_AV:
+        'Motstykket: laget er ledig igjen. Uten den ser kortet ledig ut mens '
+        'loggen fortsatt sier at det er på H14.',
 }
 
 
@@ -214,7 +223,18 @@ def tegn(kode: str, data: dict) -> str:
         # normaltilstanden, og et merke på hver hendelse er støy.
         if data.get('prioritet') and data['prioritet'] != 'Grønn':
             deler.append(data['prioritet'])
+        # Lagene som ble valgt i skjemaet står her, ikke som én linje hver.
+        lag = data.get('lag') or []
+        if lag:
+            deler.append('lag: ' + ', '.join(str(l) for l in lag))
         return ' · '.join(d for d in deler if d)
+    if kode == HENDELSE_LAG_PAA:
+        linje = f'{data.get("lag") or "Lag"} registrert på {_hendelse(data)}'
+        if data.get('tittel'):
+            linje += f' · {data["tittel"]}'
+        return linje
+    if kode == HENDELSE_LAG_AV:
+        return f'{data.get("lag") or "Lag"} tatt av {_hendelse(data)}'
     if kode == HENDELSE_PRIORITET:
         linje = f'{_hendelse(data)} satt til {data.get("prioritet") or "?"}'
         if data.get('fra_prioritet'):

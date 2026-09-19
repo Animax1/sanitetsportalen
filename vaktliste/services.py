@@ -1486,13 +1486,15 @@ def ressurser_uten_enhet(naa=None):
 
     Samme scope som `vaktliste_i_bruk()`: lista i drift, ellers den aktive
     vaktas. Og samme svar per ressurs som `besetning()` gir for en bil —
-    skiftene som dekker *nå*, ellers neste skift — men **uten telefon og
-    ISSI**: tavla svarer på «er laget bemannet», ikke på «ring laget», og
-    et nummer man ikke trenger er et nummer på en skjerm i et rom.
+    skiftene som dekker *nå*, ellers neste skift — **med telefon og ISSI**
+    fra 19. sep. 2026 (André: «alle ressurser … må ha navn, om de er
+    registrert møtt, telefonnummer og ISSI»). Svaret var uten dem til da,
+    med begrunnelsen at et nummer man ikke trenger er et nummer på en skjerm
+    i et rom; det holdes ved at kortet viser besetningen først ved klikk,
+    som bilene — ikke ved å holde tallene ute av svaret.
 
-    Ingen status. Hva en KO-ført status for et lag skal hete er ubesvart
-    (`TODO.md`), og kortet sier derfor bare det vaktlista vet: hvem, og om
-    de er stemplet inn.
+    Ingen status i vaktlistas svar. Om laget er opptatt på en hendelse
+    er KOs sak (`ko.HendelseLag`), og KO legger det på kortet selv.
 
     Én spørring for vaktpostene, gruppert i Python: lista polles.
     """
@@ -1519,6 +1521,8 @@ def ressurser_uten_enhet(naa=None):
     def _rad(vp):
         return {'navn': vp.mannskap.navn,
                 'rolle': vp.rolle.navn if vp.rolle else '',
+                'telefon': vp.mannskap.telefon,
+                'issi': vp.mannskap.issi,
                 'tilstede': vp.er_tilstede}
 
     ut = []

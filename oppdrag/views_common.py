@@ -182,16 +182,24 @@ def oppdrag_til_dict(oppdrag, *, for_enhet: bool = False,
         'hendelse_nummer': (oppdrag.hendelse.hendelsesnummer
                             if oppdrag.hendelse_id else None),
         'hendelse_tittel': oppdrag.hendelse.tittel if oppdrag.hendelse_id else '',
-        # Prioriteten og lagene på hendelsen (KO, 18. sep. 2026). Lest her
-        # som nummer og tittel over: bilen skal se hvilke lag som er på
-        # hendelsen oppdraget hører til, og KO-raden bærer prioritetsmerket.
-        # Tom når oppdraget ikke hører til noen.
+        # Prioriteten, lagene og beskrivelsen på hendelsen (KO, 18.–19. sep.
+        # 2026). Lest her som nummer og tittel over: bilen skal se hvilke lag
+        # som er på hendelsen og hva KO har skrevet om den, og KO-raden bærer
+        # prioritetsmerket. Tomt når oppdraget ikke hører til noen. Lagene og
+        # tilleggene er KOs, lest gjennom to metoder på hendelsen
+        # (`lag_navn`, `beskrivelse_tillegg`) — denne modulen kjenner verken
+        # lagmodellen eller loggen, og skal ikke gjøre det.
         'hendelse_prioritet': oppdrag.hendelse.prioritet if oppdrag.hendelse_id else '',
-        'hendelse_lagsressurser': (oppdrag.hendelse.lagsressurser
-                                   if oppdrag.hendelse_id else ''),
+        'hendelse_lag': oppdrag.hendelse.lag_navn() if oppdrag.hendelse_id else [],
     }
     skjul_fritekst = for_enhet and status == choices.TERMINAL
     data['fritekst'] = '' if skjul_fritekst else oppdrag.fritekst
+    # Beskrivelsen følger fritekstens regel: fritekst er der
+    # helseopplysningene havner (`NOTAT_DPIA_OG_FRITEKST.md` §7), og bilen
+    # skal ikke sitte med dem etter at oppdraget er avsluttet.
+    data['hendelse_beskrivelse'] = (
+        [] if skjul_fritekst or not oppdrag.hendelse_id
+        else oppdrag.hendelse.beskrivelse_tillegg())
     if for_enhet:
         # «Neste»-knappen vet hvilken overgang den utfører fordi serveren sier
         # det her — JS-en har ingen egen kopi av kjeden å komme i utakt med.
