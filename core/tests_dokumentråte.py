@@ -58,6 +58,12 @@ DOKUMENTER = [
     'backlog/CLAUDE.md',
     'docs/DEPLOY_GUIDE.md',
     'docs/RUNBOOK_VAKT.md',
+    # Testsjekklistene (19. sep. 2026). De navngir flater, filer og nivåer, og
+    # er nettopp den sorten dokument som råtner uten å si fra: en sjekkliste
+    # som peker på en knapp som er flyttet, blir stille hoppet over av den som
+    # leser den under tidspress.
+    'docs/TESTSJEKKLISTE_KO.md',
+    'docs/TESTSJEKKLISTE_VAKTLISTE.md',
     'docs/TEKNISK_DOKUMENTASJON.md',
     'docs/PERSONVERN_DOKUMENTASJON.md',
     'docs/BACKUP.md',
