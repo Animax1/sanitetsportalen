@@ -309,3 +309,39 @@ class EnhetsskjermJsTests(SimpleTestCase):
         self.assertEqual(linjer[0], '["feil:Meld problemstillingen til KO"]')
         self.assertEqual(linjer[1], '0', 'raden er strøket')
         self.assertEqual(linjer[2], '["skjul"]')
+
+
+class HastegradknappeneTests(SimpleTestCase):
+    """Hastegrad som knapper i «Nytt oppdrag» (André, 19. sep. 2026), med
+    verdien i det skjulte nedtrekket: knappen setter nedtrekket, går veien om
+    `hastegradEndret` så problemstillingene følger med, og knappene speiler
+    nedtrekket etterpå — også når skjemaet nullstilles."""
+
+    def setUp(self):
+        if not node_available():
+            self.skipTest('node er ikke tilgjengelig')
+        self.harness = build_harness((
+            (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue')),
+            (OPPDRAG_SENTRAL_JS, ('velgHastegrad', 'hastegradEndret',
+                                  'fyllProblemstillinger', 'problemstillingerFor')),
+        ))
+
+    STUBB = """
+        globalThis.window = { OPPDRAG_PROBLEMSTILLINGER_FOR: { Akutt: ['Fall'], Drift: ['Strøm'] } };
+        const knapp = (arg) => ({ dataset: { arg }, valgt: false, aria: '',
+          classList: { toggle(k, v) { if (k === 'valgt') this._v = v; }, get _valgt() { return this._v; } },
+          setAttribute(n, v) { this.aria = v; } });
+        const knapper = [knapp('Akutt'), knapp('Drift')];
+        const felter = { 'nytt-hastegrad': { value: 'Akutt' }, 'nytt-problemstilling': { value: '', innerHTML: '' } };
+        globalThis.document = {
+          getElementById: (id) => felter[id] || null,
+          querySelectorAll: () => knapper,
+        };
+        velgHastegrad('Drift');
+        console.log(felter['nytt-hastegrad'].value, '|', felter['nytt-problemstilling'].innerHTML.includes('Strøm'),
+                    '|', knapper.map((k) => k.classList._valgt + ':' + k.aria).join(','));
+    """
+
+    def test_knappen_setter_nedtrekket_og_problemstillingene_foelger(self):
+        ut = run_node(self.harness, self.STUBB).splitlines()[0]
+        self.assertEqual(ut, 'Drift | true | false:false,true:true')

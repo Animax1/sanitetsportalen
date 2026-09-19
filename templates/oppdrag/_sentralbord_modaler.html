@@ -24,8 +24,18 @@
           <div class="form-text">Lista vedlikeholdes under «Valglister».</div>
         </div>
         <div class="mb-3">
-          <label class="form-label" for="nytt-hastegrad">Hastegrad</label>
-          <select id="nytt-hastegrad" class="form-select"
+          <div class="form-label">Hastegrad</div>
+          {# Knapper, som prioriteten i «Ny hendelse» (André, 19. sep. 2026) — #}
+          {# med oppdragets egne navn. Nedtrekket står igjen skjult som verdien: #}
+          {# «Rediger» kopierer valgene derfra, og `hastegradEndret('nytt')` #}
+          {# leser det. Knappene setter det og sier fra. #}
+          <div class="hastegrad-valg" id="nytt-hastegrad-valg" role="radiogroup" aria-label="Hastegrad">
+            {% for h in hastegrader %}
+            <button type="button" class="hastegrad-knapp hastegrad-knapp-{{ h|lower }}"
+                    data-action="velgHastegrad" data-arg="{{ h }}" role="radio" aria-checked="false">{{ h }}</button>
+            {% endfor %}
+          </div>
+          <select id="nytt-hastegrad" class="form-select d-none" aria-hidden="true" tabindex="-1"
                   data-action="hastegradEndret" data-hendelse="change" data-arg="nytt">
             {% for h in hastegrader %}<option>{{ h }}</option>{% endfor %}
           </select>
@@ -44,11 +54,11 @@
           <div class="form-text">Kryss av én eller flere. Den første i lista blir primær.</div>
         </div>
         <div class="mb-3">
-          <label class="form-label" for="nytt-fritekst">Fritekst</label>
+          {# Etiketten og hinten har id-er: på /ko/ bytter KO dem til «Bare dette #}
+          {# oppdraget» når en hendelse er valgt — beskrivelsen følger med derfra. #}
+          <label class="form-label" for="nytt-fritekst" id="nytt-fritekst-label">Fritekst</label>
           <textarea id="nytt-fritekst" class="form-control" rows="3"></textarea>
-          <div class="form-text">
-            Vises i bilen til oppdraget avsluttes. Innholdet lagres ikke i auditloggen.
-          </div>
+          <div class="form-text" id="nytt-fritekst-hint">Vises i bilen til oppdraget avsluttes. Innholdet lagres ikke i auditloggen.</div>
         </div>
         {# Hendelsen — sist, og bare på /ko/: `ko.js` fyller plassen. Tom her, #}
         {# fordi oppdragsmodulen ikke kjenner hendelser. #}

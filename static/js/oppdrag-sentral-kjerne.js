@@ -73,6 +73,28 @@ function hastegradEndret(prefiks) {
   const h = document.getElementById(`${prefiks}-hastegrad`)?.value || '';
   const valgt = document.getElementById(`${prefiks}-problemstilling`)?.value || '';
   fyllProblemstillinger(prefiks, h, valgt);
+  // Knappene i «Nytt oppdrag» speiler nedtrekket (19. sep. 2026). Inne her
+  // og ikke i en egen funksjon: testene henter `hastegradEndret` alene, og
+  // en tilstandsløs DOM uten `querySelectorAll` skal ikke velte den.
+  if (prefiks === 'nytt' && typeof document.querySelectorAll === 'function') {
+    document.querySelectorAll('#nytt-hastegrad-valg .hastegrad-knapp').forEach((k) => {
+      const valgt = (k.dataset || {}).arg === h;
+      if (k.classList) k.classList.toggle('valgt', valgt);
+      if (k.setAttribute) k.setAttribute('aria-checked', valgt ? 'true' : 'false');
+    });
+  }
+}
+
+
+// Knappene i «Nytt oppdrag» (André, 19. sep. 2026: «lignende oppsett som ved
+// prioritet fra ny hendelse»). Verdien bor fortsatt i det skjulte nedtrekket
+// `#nytt-hastegrad`; knappen setter det og går veien om `hastegradEndret`,
+// så problemstillingene følger med som før.
+function velgHastegrad(verdi) {
+  const sel = document.getElementById('nytt-hastegrad');
+  if (!sel) return;
+  sel.value = verdi;
+  hastegradEndret('nytt');
 }
 
 

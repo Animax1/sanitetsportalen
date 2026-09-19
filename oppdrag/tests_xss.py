@@ -59,6 +59,8 @@ HTML_BUILDERS_PER_FIL = {
         # og når, i detaljmodalen. Lagene står som en const i raden og i
         # `visOppdrag`, som friteksten.
         '_hendelseBeskrivelseHtml',
+        # «Flytt» (19. sep. 2026): fra/til, bare enheter på vakt.
+        '_flyttValg',
     ),
     OPPDRAG_ENHET_JS: (
         'tidslinjeEnhetHtml',
@@ -84,6 +86,14 @@ REVIEWED_INTERPOLATIONS = {
     'nyest': 'hardkodet CSS-klasse fra en ternær',
     'skjema': 'ferdig markup fra koBeskrivelseSkjema(), som skannes i ko/tests_js.py',
     'fritekstEtikett': 'to faste ord valgt av en ternær',
+    # «Flytt» (19. sep. 2026): de to fragmentene bygges rett over med
+    # escapeHtml/escHtmlValue inni, og `flyttValg` er ferdig markup fra
+    # `_flyttValg()`, som skannes for seg.
+    'fra': 'markup bygget rett over, navn og id escapet der',
+    'fraValg': 'options bygget rett over, navn og id escapet der',
+    'tilValg': 'options bygget rett over, navn og id escapet der',
+    'til': 'markup bygget rett over, navn og id escapet der',
+    'flyttValg': 'ferdig markup fra _flyttValg(), som skannes for seg',
     'fritekstHint': 'fast markup valgt av en ternær, ingen data i',
     'klasse': 'intern CSS-klasse valgt av en ternær i koden',
     'tidKlasse': 'intern CSS-klasse valgt av en ternær i koden',

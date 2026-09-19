@@ -1214,7 +1214,8 @@ class DetaljvinduetTegnesPaaNyttTests(TestCase):
         self.harness = build_harness((
             (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue', 'trustedHtml', '_escHtml', 'klokke')),
             (OPPDRAG_SENTRAL_JS, ('visOppdrag', 'oppdragsnr', 'mkEnhetsrader', '_enhetsknapper', 'kanAvvente', '_varsleValg',
-                                  'tidslinjeHtml', 'hastegradKlasse', 'tidSiden', '_hendelseBeskrivelseHtml')),
+                                  'tidslinjeHtml', 'hastegradKlasse', 'tidSiden', '_hendelseBeskrivelseHtml',
+                                  '_flyttValg')),
         ))
 
     STUBB = """
@@ -1694,3 +1695,55 @@ class VarselbjellaTests(FlereEnheterBasis):
             rad = services.varsle_enhet(o, self.a)
         self.assertIsNotNone(rad.pk, 'enheten skal være varslet likevel')
         self.assertEqual(self._varsler(), [])
+
+
+class FlyttValgetTests(TestCase):
+    """«Flytt» i detaljvinduet (André, 19. sep. 2026): bare enheter **på
+    vakt** som ikke alt står på oppdraget — samme utvalg som «Varsle enhet
+    til» og det serveren godtar — og «Fra»/«Til» står skrevet."""
+
+    def setUp(self):
+        from patients.js_test_utils import (
+            OPPDRAG_SENTRAL_JS, PORTAL_UTILS_JS, build_harness, node_available)
+        if not node_available():
+            self.skipTest('node er ikke tilgjengelig')
+        self.harness = build_harness((
+            (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue')),
+            (OPPDRAG_SENTRAL_JS, ('_flyttValg',)),
+        ))
+
+    STUBB = """
+        globalThis.enheter = [
+          {id: 1, navn: 'A', pa_vakt: true},
+          {id: 2, navn: 'B', pa_vakt: true},
+          {id: 3, navn: 'C av vakt', pa_vakt: false},
+          {id: 4, navn: '<b>D</b>', pa_vakt: true},
+        ];
+    """
+
+    def _kjor(self, o):
+        from patients.js_test_utils import run_node
+        import json
+        return json.loads(run_node(self.harness, self.STUBB + f'console.log(JSON.stringify(_flyttValg({o})));').splitlines()[0])
+
+    def test_bare_paa_vakt_og_ikke_alt_paa_oppdraget(self):
+        ut = self._kjor("{id: 9, enhet_navn: 'A', enheter: [{enhet_id: 1, enhet_navn: 'A'}]}")
+        self.assertIn('value="2"', ut)
+        self.assertIn('value="4"', ut)
+        self.assertNotIn('value="3"', ut, 'av vakt skal ikke tilbys')
+        self.assertNotIn('value="1"', ut, 'enheten som alt er på oppdraget')
+        self.assertIn('>Fra<', ut); self.assertIn('>Til<', ut)
+        self.assertIn('fw-semibold">A<', ut, 'med én enhet på oppdraget er «fra» gitt')
+        self.assertNotIn('id="flytt-fra"', ut)
+        self.assertIn('&lt;b&gt;D&lt;/b&gt;', ut); self.assertNotIn('<b>D</b>', ut)
+
+    def test_flere_enheter_paa_oppdraget_gir_fra_nedtrekk(self):
+        ut = self._kjor("{id: 9, enhet_navn: 'A', enheter: [{enhet_id: 1, enhet_navn: 'A'}, {enhet_id: 2, enhet_navn: 'B'}]}")
+        self.assertIn('id="flytt-fra"', ut)
+        self.assertIn('value="4"', ut)
+        self.assertNotIn('value="2"', ut.split('id="flytt-enhet"')[1], 'B står alt på oppdraget')
+
+    def test_ingen_kandidater_sier_det_og_har_ingen_knapp(self):
+        ut = self._kjor("{id: 9, enhet_navn: 'A', enheter: [{enhet_id: 1, enhet_navn: 'A'}, {enhet_id: 2, enhet_navn: 'B'}, {enhet_id: 4, enhet_navn: 'D'}]}")
+        self.assertIn('ingen andre enheter på vakt', ut)
+        self.assertNotIn('data-action="flyttOppdrag"', ut)

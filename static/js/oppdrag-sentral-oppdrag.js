@@ -422,25 +422,7 @@ async function visOppdrag(id) {
     : '';
 
   // Med flere enheter er «flytt» flytt av én rad — hvilken, spørres om.
-  const flyttFra = (o.enheter || []).length > 1
-    ? `<select id="flytt-fra" class="form-select" aria-label="Flytt fra">
-        ${(o.enheter || []).map((e) => `<option value="${escHtmlValue(e.enhet_id)}">${escapeHtml(e.enhet_navn)}</option>`).join('')}
-       </select><span class="input-group-text">→</span>`
-    : '';
-  const flyttValg = OPPDRAG_TILGANG.kanSkrive
-    ? `
-      <hr>
-      <label class="form-label" for="flytt-enhet">Flytt til enhet</label>
-      <div class="input-group">
-        ${flyttFra}
-        <select id="flytt-enhet" class="form-select">
-          ${enheter.map((e) => `<option value="${escHtmlValue(e.id)}">${escapeHtml(e.navn)}</option>`).join('')}
-        </select>
-        <button class="btn btn-outline-primary" type="button"
-                data-action="flyttOppdrag" data-id="${escHtmlValue(o.id)}">Flytt</button>
-      </div>
-      <div id="flytt-feil" class="text-danger small mt-2 d-none"></div>`
-    : '';
+  const flyttValg = OPPDRAG_TILGANG.kanSkrive ? _flyttValg(o) : '';
 
   const redigerKnapp = OPPDRAG_TILGANG.kanSkrive
     ? `<button type="button" class="btn btn-link btn-sm p-0 ms-2" data-action="visRedigerOppdrag">Rediger</button>`
@@ -545,6 +527,41 @@ function kanAvvente(enhetId) {
   // endepunkt ikke svarer ulikt.
   const treff = (enheter || []).find((e) => e.id === enhetId);
   return !!(treff && treff.kan_avvente);
+}
+
+
+// «Flytt» (André, 19. sep. 2026: «viser alle enheter uavhengig om de er av
+// eller ei … hvem er fra og hvem er til?»). Bare enheter **på vakt** som ikke
+// alt står på oppdraget — samme utvalg som «Varsle enhet til», og det
+// serveren godtar. «Fra» og «Til» står skrevet; med én enhet på oppdraget
+// er «fra» gitt og vises som tekst.
+function _flyttValg(o) {
+  const paa = new Set((o.enheter || []).map((e) => e.enhet_id));
+  const kandidater = enheter.filter((e) => e.pa_vakt && !paa.has(e.id));
+  const paaOppdraget = o.enheter || [];
+  // Valgene bygges før mal-strengene — en nøstet mal-streng er usynlig for
+  // XSS-skanneren (oppdrag/tests_xss.py).
+  const fraValg = paaOppdraget.map((e) => `<option value="${escHtmlValue(e.enhet_id)}">${escapeHtml(e.enhet_navn)}</option>`).join('');
+  const tilValg = kandidater.map((e) => `<option value="${escHtmlValue(e.id)}">${escapeHtml(e.navn)}</option>`).join('');
+  const fra = paaOppdraget.length > 1
+    ? `<select id="flytt-fra" class="form-select" aria-label="Flytt fra enhet">${fraValg}</select>`
+    : `<span class="input-group-text fw-semibold">${escapeHtml(paaOppdraget[0]?.enhet_navn || o.enhet_navn || '')}</span>`;
+  const til = kandidater.length
+    ? `<select id="flytt-enhet" class="form-select" aria-label="Flytt til enhet">${tilValg}</select>
+       <button class="btn btn-outline-primary" type="button"
+               data-action="flyttOppdrag" data-id="${escHtmlValue(o.id)}">Flytt</button>`
+    : `<span class="input-group-text text-muted">ingen andre enheter på vakt</span>`;
+  return `<hr>
+      <div class="form-label">Flytt oppdraget til en annen enhet</div>
+      <div class="input-group input-group-sm">
+        <span class="input-group-text">Fra</span>
+        ${fra}
+        <span class="input-group-text">Til</span>
+        ${til}
+      </div>
+      <div class="form-text">Enheten under «Fra» tas av oppdraget; status og stempler står.
+        Skal en enhet <em>til</em> på oppdraget, bruk «Varsle enhet til» under Enheter.</div>
+      <div id="flytt-feil" class="text-danger small mt-2 d-none"></div>`;
 }
 
 

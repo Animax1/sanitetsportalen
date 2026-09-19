@@ -190,6 +190,8 @@ KO_LOGG_BYGGERE = (
     'koBeskrivelseSkjema',
     'koRessursBesetningHtml',
     'koRessursOpptattHtml',
+    # Beskrivelsen fra hendelsen i «Nytt oppdrag» (19. sep. 2026).
+    'koHendelseInfoHtml',
 )
 
 #: Uttrykk som interpoleres uten `escapeHtml`, med begrunnelse.
@@ -718,6 +720,42 @@ class TilleggOgLagTests(SimpleTestCase):
                       "koTaImotHendelser([{id: 1, status: 'apen'}]);\n"
                       'console.log(kalt);', preamble=PRIORITET_PREAMBLE)
         self.assertEqual(ut.splitlines()[0], '1')
+
+    def test_prioriteten_maa_velges(self):
+        """Ingen forhåndsvalgt prioritet (André, 19. sep. 2026: «litt
+        misvisende»). Regelen skjemaet nekter på."""
+        harness = build_harness(((KO_JS, ('koPrioritetValgt',)),))
+        ut = run_node(harness, "let koValgtPrioritet = ''; console.log(koPrioritetValgt());"
+                               " koValgtPrioritet = 'rod'; console.log(koPrioritetValgt());").splitlines()
+        self.assertEqual(ut[:2], ['false', 'true'])
+
+    def test_nytt_oppdrag_viser_beskrivelsen_og_kaller_friteksten_bare_dette_oppdraget(self):
+        """«Viktig at inne i nytt oppdrag at det kommer frem at beskrivelse fra
+        hendelse medfølger, og at fritekst bare gjelder enheter knyttet til
+        oppdraget» (André, 19. sep. 2026)."""
+        harness = build_harness((
+            (PORTAL_UTILS_JS, ('escapeHtml', 'fmtMin')),
+            (KO_JS, ('koHendelseInfoHtml', 'koHendelsevalgEndret', 'koTilleggHtml', 'koErNytt', 'koKlokke')),
+        ))
+        ut = run_node(harness, self.PRE + '''
+            let koHendelser = new Map([[5, {id: 5, kode: 'H5', beskrivelse: [{tekst: '<b>Mann</b> ca. 40', av: 'kari', tid: '2026-09-19T10:00:00Z'}]}]]);
+            const felter = {
+              'nytt-hendelse': { value: '5' }, 'nytt-hendelse-info': { innerHTML: '' },
+              'nytt-fritekst-label': { textContent: 'Fritekst', dataset: {} },
+              'nytt-fritekst-hint': { textContent: 'Vises i bilen.', dataset: {} },
+            };
+            globalThis.document = { getElementById: (id) => felter[id] || null };
+            koHendelsevalgEndret();
+            console.log(felter['nytt-hendelse-info'].innerHTML);
+            console.log(felter['nytt-fritekst-label'].textContent + ' | ' + felter['nytt-fritekst-hint'].textContent);
+            felter['nytt-hendelse'].value = '';
+            koHendelsevalgEndret();
+            console.log(JSON.stringify(felter['nytt-hendelse-info'].innerHTML) + ' | ' + felter['nytt-fritekst-label'].textContent + ' | ' + felter['nytt-fritekst-hint'].textContent);
+        ''').splitlines()
+        self.assertIn('Beskrivelse fra', ut[0]); self.assertIn('H5', ut[0]); self.assertIn('følger med', ut[0])
+        self.assertIn('&lt;b&gt;Mann', ut[0]); self.assertNotIn('<b>Mann', ut[0])
+        self.assertTrue(ut[1].startswith('Bare dette oppdraget | Gjelder bare enhetene'), ut[1])
+        self.assertEqual(ut[2], '"" | Fritekst | Vises i bilen.', 'uten hendelse står standardtekstene')
 
     def test_escaper_tekst_navn_og_lagnavn(self):
         ond = '<img src=x onerror=alert(1)>'

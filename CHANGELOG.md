@@ -4,6 +4,47 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-19 — KO/oppdrag: ingen forhåndsvalgt prioritet, hastegrad som knapper, «Flytt» viste enheter av vakt, beskrivelsen synlig i «Nytt oppdrag»  `#ko/hendelseslogg` `#oppdrag/sentralbord`
+
+André, 19. sep. 2026, etter forrige pulje: «litt misvisende med forhåndsvalgt prioritet»;
+«bytte nytt oppdrag fra select til lignende oppsett som ved prioritet»; «bug i redigering
+av oppdrag hvor flytt til enhet viser alle enheter uavhengig om de er av eller ei … hvem er
+fra og hvem er til?»; «viktig at inne i ny oppdrag at det kommer frem at beskrivelse fra
+hendelse medfølger, og at i fritekst bare gjelder enheter knyttet til oppdraget».
+
+- **«Ny hendelse» har ingen prioritet valgt på forhånd.** Skjemaet nekter å sende uten
+  («Velg prioritet.», `koPrioritetValgt`). Serveren beholder Grønn som standard for et
+  kall som utelater feltet — det er API-ets regel, og den var prøvd; skjemaet er det som
+  var misvisende.
+- **Hastegrad i «Nytt oppdrag» er knapper** — Akutt, Haster, Vanlig, Drift, oppdragets
+  egne navn — i samme form som prioritetsknappene. Nedtrekket `#nytt-hastegrad` står igjen
+  skjult som verdien: «Rediger» kopierer valgene derfra, og `hastegradEndret('nytt')`
+  bytter problemstillingene som før; knappen setter nedtrekket og går den veien
+  (`velgHastegrad`). Hastegraden er fortsatt forhåndsvalgt (Akutt) — problemstillingene
+  avhenger av den, og lista ville stått tom til noen valgte. Si fra om den også skal stå
+  åpen.
+- **«Flytt» i detaljvinduet tilbød alle enheter**, også de av vakt — serveren avviste dem,
+  så feilen var en 400 etter valget. Nå bare enheter **på vakt** som ikke alt står på
+  oppdraget, samme utvalg som «Varsle enhet til» (`_flyttValg`). Og «Fra» / «Til» står
+  skrevet: med én enhet på oppdraget vises den som tekst under «Fra», med flere som et
+  nedtrekk. Hinten sier hva flytting gjør (enheten under «Fra» tas av, status står) og
+  peker på «Varsle enhet til» for den som vil *legge til*. Uten kandidater står «ingen
+  andre enheter på vakt», ingen knapp.
+- **«Nytt oppdrag» viser beskrivelsen fra hendelsen** når en hendelse er valgt
+  («Beskrivelse fra H14 — følger med til enhetene på oppdraget», lesevisning), og
+  friteksten heter da **«Bare dette oppdraget»** med hinten «gjelder bare enhetene på dette
+  oppdraget». Etiketten og hinten i den delte malbiten fikk id-er; KO bytter tekstene
+  gjennom `koHendelsevalgEndret` og setter dem tilbake uten hendelse. På `/oppdrag/` står
+  de som før.
+
+Mutasjoner (3–8 s hver): `_flyttValg` × 3 (av vakt tilbys, enheten på oppdraget tilbys,
+navnet rått), `velgHastegrad` uten `hastegradEndret`, knappene speiler ikke nedtrekket,
+`koPrioritetValgt` alltid sant, etiketten byttes ikke, teksten i hendelsesinfoen rå.
+**8 av 8 fanget.** Kallstedet for prioritetssperra i `koLagreHendelse` er ikke prøvd —
+det er en DOM-handling uten harness, og sperra ble sett i nettleseren (Playwright).
+
+---
+
 ## 2026-09-19 — KO: lag på hendelsen, beskrivelsen som tillegg, melder som avkryssing, besetning bak et klikk  `#ko/hendelseslogg` `#ko/ressursbildet` `#oppdrag/sentralbord` `#oppdrag/enhetsskjerm` `#vaktliste/roller`
 
 André, 19. sep. 2026, etter fire skisser som ble avtalt før koden: «Det viktige er å vise om

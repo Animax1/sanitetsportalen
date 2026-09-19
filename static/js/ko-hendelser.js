@@ -24,8 +24,14 @@ let koApenHendelseId = null;
 let koVisLukkede = true;
 let koSok = '';
 
-//: Prioriteten valgt i skjemaet.
-let koValgtPrioritet = 'gronn';
+//: Prioriteten valgt i skjemaet. **Tom til operatøren velger** (André,
+//: 19. sep. 2026: «litt misvisende med forhåndsvalgt prioritet») — skjemaet
+//: nekter å sende uten, se `koPrioritetValgt`.
+let koValgtPrioritet = '';
+
+function koPrioritetValgt() {
+  return Boolean(koValgtPrioritet);
+}
 
 function koPrioriteter() {
   return (globalThis.window && window.KO_PRIORITETER) || [];
@@ -519,7 +525,7 @@ function _koFyllSkjema(h, fraLinjeId, forslag) {
   sett('ko-h-melder', h ? h.melder : '');
   sett('ko-h-beskrivelse', '');
   koFyllLokasjoner(h ? h.lokasjon_id : null);
-  koVelgPrioritet(h ? h.prioritet : 'gronn');
+  koVelgPrioritet(h ? h.prioritet : '');
   const typer = new Set(h ? (h.melder_typer || []) : []);
   document.querySelectorAll('#ko-h-melder-typer input[type="checkbox"]').forEach((b) => {
     b.checked = typer.has(b.value);
@@ -636,6 +642,10 @@ async function koLagreHendelse() {
       verdier.versjon = Number((document.getElementById('ko-h-versjon') || {}).value);
       svar = await _koHendelsehandling('/ko/api/hendelser/' + id + '/rediger/', verdier);
     } else {
+      if (!koPrioritetValgt()) {
+        if (feil) { feil.textContent = 'Velg prioritet.'; feil.classList.remove('d-none'); }
+        return;
+      }
       verdier.prioritet = koValgtPrioritet;
       verdier.beskrivelse = les('ko-h-beskrivelse');
       const fra = (document.getElementById('ko-h-fra-linje') || {}).value;
@@ -800,6 +810,7 @@ function koNyttOppdragFraHendelse(id) {
   koFyllHendelsevalg();
   const sel = document.getElementById('nytt-hendelse');
   if (sel) sel.value = String(h.id);
+  koHendelsevalgEndret();
   const lok = document.getElementById('nytt-lokasjon');
   if (lok && h.lokasjon_id) lok.value = String(h.lokasjon_id);
   bootstrap.Modal.getOrCreateInstance(el).show();
@@ -873,9 +884,48 @@ function koLeggHendelsevalgINyttOppdrag() {
   if (!plass || document.getElementById('nytt-hendelse')) return;
   plass.className = 'mb-3';
   plass.innerHTML = '<label class="form-label" for="nytt-hendelse">Hendelse</label>'
-    + '<select id="nytt-hendelse" class="form-select"><option value="">Uten hendelse</option></select>'
-    + '<div class="form-text">Oppdraget knyttes til hendelsen når det er opprettet. Kan endres senere.</div>';
+    + '<select id="nytt-hendelse" class="form-select" data-action="koHendelsevalgEndret" data-hendelse="change">'
+    + '<option value="">Uten hendelse</option></select>'
+    + '<div class="form-text">Oppdraget knyttes til hendelsen når det er opprettet. Kan endres senere.</div>'
+    + '<div id="nytt-hendelse-info" class="mt-2"></div>';
   koFyllHendelsevalg();
+}
+
+// Beskrivelsen fra hendelsen, vist i «Nytt oppdrag» så det er tydelig at den
+// følger med til enhetene (André, 19. sep. 2026). Lesevisning; tillegg
+// legges til i hendelsen.
+function koHendelseInfoHtml(h) {
+  const tillegg = h.beskrivelse || [];
+  const liste = tillegg.length
+    ? '<div class="b-liste b-liste-kompakt">' + tillegg.map((t, i) => koTilleggHtml(t, i === tillegg.length - 1)).join('') + '</div>'
+    : '<span class="text-muted small">Hendelsen har ingen beskrivelse ennå.</span>';
+  return '<div class="ko-hendelse-info"><div class="form-label mb-1">Beskrivelse fra '
+    + '<span class="hendelse-merke">' + escapeHtml(h.kode) + '</span> <span class="text-muted small fw-normal">'
+    + '— følger med til enhetene på oppdraget</span></div>' + liste + '</div>';
+}
+
+// Når hendelsen i skjemaet endres: vis beskrivelsen som følger med, og la
+// friteksten hete «Bare dette oppdraget» — den gjelder bare enhetene på
+// dette oppdraget, ikke hendelsen.
+function koHendelsevalgEndret() {
+  const sel = document.getElementById('nytt-hendelse');
+  const info = document.getElementById('nytt-hendelse-info');
+  const etikett = document.getElementById('nytt-fritekst-label');
+  const hint = document.getElementById('nytt-fritekst-hint');
+  if (!sel) return;
+  const h = koHendelser.get(Number(sel.value));
+  if (info) info.innerHTML = h ? koHendelseInfoHtml(h) : '';
+  if (etikett) {
+    if (!etikett.dataset.standard) etikett.dataset.standard = etikett.textContent;
+    etikett.textContent = h ? 'Bare dette oppdraget' : etikett.dataset.standard;
+  }
+  if (hint) {
+    if (!hint.dataset.standard) hint.dataset.standard = hint.textContent;
+    hint.textContent = h
+      ? 'Gjelder bare enhetene på dette oppdraget — beskrivelsen fra ' + h.kode
+        + ' står over og følger med av seg selv. Lagres ikke i auditloggen.'
+      : hint.dataset.standard;
+  }
 }
 
 function koFyllHendelsevalg() {
@@ -886,6 +936,7 @@ function koFyllHendelsevalg() {
     + koApneHendelser().map((h) =>
       '<option value="' + escapeHtml(h.id) + '">' + escapeHtml(h.kode) + ' ' + escapeHtml(h.tittel) + '</option>').join('');
   if (valgt && koHendelser.has(Number(valgt))) sel.value = valgt;
+  koHendelsevalgEndret();
 }
 
 // Etter «Opprett» i sentralbordets skjema: knytt til hendelsen som var valgt.
