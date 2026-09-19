@@ -21,6 +21,7 @@ modal på hver side, og `hide.bs.modal` bobler. Den er navngitt og ikke anonym
 av samme grunn som `klikkSkalKjore()`: en `if` inne i en lytter lar seg ikke
 kjøre her.
 """
+import re
 from django.test import SimpleTestCase
 
 from patients.js_test_utils import (
