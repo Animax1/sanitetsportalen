@@ -85,4 +85,7 @@ class ModalFokusTests(SimpleTestCase):
         og da er advarselen allerede avgitt."""
         kilde = read_js(PORTAL_UTILS_JS)
         self.assertIn("addEventListener('hide.bs.modal'", kilde)
-        self.assertNotIn("addEventListener('hidden.bs.modal'", kilde)
+        # Andre lyttere på `hidden.bs.modal` er lov (nullstillingen av skjemaer,
+        # 19. sep. 2026) — men ikke *denne*: fokus må slippes før `aria-hidden`.
+        for i in [m.start() for m in re.finditer(r"addEventListener\('hidden\.bs\.modal'", kilde)]:
+            self.assertNotIn('slippFokusFoerSkjul', kilde[i:i + 200])

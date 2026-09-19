@@ -148,6 +148,9 @@ function apneNyVaktliste() {
   _skjulFeil('ny-vakt-feil');
   const navn = document.getElementById('ny-vakt-navn');
   if (navn) navn.value = '';
+  // Kopiér-valget også (19. sep. 2026): et avvist forsøk skal ikke huskes.
+  const kopier = document.getElementById('ny-vakt-kopier');
+  if (kopier) kopier.selectedIndex = 0;
   const start = _nesteHeleTime();
   _settTidsfelt('ny-vakt-start', start);
   _settTidsfelt('ny-vakt-slutt', new Date(start.getTime() + NY_VAKT_SPENN_MS));
@@ -190,6 +193,9 @@ function apneNyRessurs(gruppeId) {
   // fanen man står i. Nedtrekket er fortsatt et nedtrekk, så den første
   // enheten i en ny gruppe også har en vei inn.
   _skjulFeil('ny-ressurs-feil');
+  // Navnet fra et avvist forsøk sto igjen ved neste åpning (19. sep. 2026).
+  const navnfelt = document.getElementById('ny-ressurs-navn');
+  if (navnfelt) navnfelt.value = '';
   const felt = document.getElementById('ny-ressurs-gruppe');
   const maal = gruppeId != null && gruppeId !== '' ? gruppeId : aktivFane;
   const valgbare = (aktivListe?.grupper || [])
@@ -482,10 +488,10 @@ function _redigeringsrad(id, navn, lagre, avbryt) {
         <input type="text" class="form-control" maxlength="120"
                id="rediger-navn-${escHtmlValue(id)}"
                value="${escHtmlValue(navn)}" aria-label="Nytt navn">
-        <button class="btn btn-primary" type="button"
-                data-action="${escHtmlValue(lagre)}" data-id="${escHtmlValue(id)}">Lagre</button>
         <button class="btn btn-outline-secondary" type="button"
                 data-action="${escHtmlValue(avbryt)}">Avbryt</button>
+        <button class="btn btn-primary" type="button"
+                data-action="${escHtmlValue(lagre)}" data-id="${escHtmlValue(id)}">Lagre</button>
       </div>
     </div>`;
 }

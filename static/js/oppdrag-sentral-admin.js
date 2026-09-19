@@ -292,6 +292,9 @@ async function lastLokasjoner() {
 
 async function lastVerdiadmin() {
   _registrerEkstraVerdifaner();
+  // Feltet «ny verdi» skal ikke huske et avvist forsøk (19. sep. 2026).
+  const nyVerdi = document.getElementById('ny-verdi');
+  if (nyVerdi) nyVerdi.value = '';
   // Bilinnstillingene hentes bare for admin — fanen finnes ikke for andre.
   // Fanene som finnes i vinduet er de sida tegnet; en fane uten knapp
   // (oppdragsleder uten KO-leder, eller omvendt) hentes ikke.

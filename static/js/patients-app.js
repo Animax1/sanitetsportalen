@@ -143,6 +143,12 @@ document.addEventListener('visibilitychange', async () => {
 });
 
 document.addEventListener('DOMContentLoaded', async () => {
+  // «Avslutt vakt» og «Lagre som arkiv» åpnes med data-bs-toggle og hadde
+  // ingen nullstilling: navnet og notatet fra et avvist forsøk sto igjen,
+  // med feilmeldingen under (André, 19. sep. 2026). Finnes bare for admin;
+  // hjelperen svarer false uten å klage når modalen ikke er på sida.
+  nullstillModalVedLukking('resetModal', ['avslutt-nytt-navn'], 'avslutt-feil');
+  nullstillModalVedLukking('arkivLagreModal', ['arkiv-arrangement-navn', 'arkiv-notat'], 'arkiv-lagre-feil');
   initTable();
   const mineBtn = document.getElementById('btn-mine');
   if (mineBtn) mineBtn.classList.toggle('active-mine', mineOnly);

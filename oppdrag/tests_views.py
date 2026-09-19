@@ -252,7 +252,11 @@ class FlyttTests(OppdragBasis):
 
         detalj = c.get(f'/oppdrag/api/oppdrag/{oppdrag.pk}/').json()['data']
         self.assertEqual(len(detalj['enhetsbytter']), 1)
-        self.assertEqual(detalj['status'], choices.FREMME)
+        # Bilen hadde rykket ut: den nye starter i Venter, den gamle står
+        # som Ledig med stemplene sine (André, 19. sep. 2026).
+        self.assertEqual(detalj['status'], choices.VENTER)
+        self.assertEqual({(e['enhet_navn'], e['status']) for e in detalj['enheter']},
+                         {(self.annen_enhet.navn, choices.VENTER), (self.enhet.navn, choices.LEDIG)})
 
 
 class LokasjonsadminTests(OppdragBasis):

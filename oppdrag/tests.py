@@ -276,12 +276,40 @@ class EnhetsbytteTests(TestCase):
         self.assertEqual(bytte.fra_enhet, self.fra)
         self.assertEqual(Enhetsbytte.objects.filter(oppdrag=oppdrag).count(), 1)
 
-    def test_statusen_staar_ved_bytte(self):
-        """En responstid som faktisk ble målt skal ikke nullstilles."""
-        oppdrag = _oppdrag(self.fra, status=choices.FREMME)
+    def test_bytte_etter_utrykning_gir_den_nye_venter_og_den_gamle_ledig(self):
+        """André, 19. sep. 2026: «Da er status til Hgsd også Rykker ut. Det
+        blir misvisende da det ikke er den enheten som har satt statusen.»
+
+        Den nye bilen har ikke rykket ut og får sin egen rad i Venter; den
+        gamle meldes Ledig automatisk, og stemplene dens står i eget navn —
+        responstiden som ble målt nullstilles ikke, den flytter bare ikke
+        over på en bil som ikke kjørte den.
+        """
+        oppdrag = _oppdrag(self.fra)
+        services.sett_status(oppdrag, choices.RYKKER_UT, bruker=self.bruker)
+        services.sett_status(oppdrag, choices.FREMME, bruker=self.bruker)
         services.flytt_til_enhet(oppdrag, self.til, bruker=self.bruker)
         oppdrag.refresh_from_db()
-        self.assertEqual(oppdrag.status, choices.FREMME)
+        self.assertEqual(oppdrag.status, choices.VENTER)
+        self.assertEqual(oppdrag.enhet, self.til, 'primær følger flyttingen')
+        ny = oppdrag.enheter.get(enhet=self.til)
+        gammel = oppdrag.enheter.get(enhet=self.fra)
+        self.assertEqual((ny.status, gammel.status), (choices.VENTER, choices.LEDIG))
+        self.assertEqual(oppdrag.primaer, ny, 'den nye tar den gamles plass i rekka')
+        self.assertEqual(
+            list(gammel.statusmeldinger.order_by('id').values_list('status', flat=True)),
+            [choices.RYKKER_UT, choices.FREMME, choices.LEDIG], 'stemplene står på den gamle')
+        self.assertTrue(gammel.statusmeldinger.order_by('-id').first().automatisk,
+                        'Ledig er automatisk, ikke stemplet')
+        self.assertEqual(ny.statusmeldinger.count(), 0, 'den nye har ikke stemplet noe')
+        self.assertIsNone(oppdrag.historikk_fra, 'oppdraget er ikke ferdig')
+
+    def test_bytte_mens_bilen_venter_peker_raden_om(self):
+        """Ingen stempler finnes, så raden bytter bare eier — ingen spøkelsesrad."""
+        oppdrag = _oppdrag(self.fra)
+        services.flytt_til_enhet(oppdrag, self.til, bruker=self.bruker)
+        self.assertEqual([r.enhet for r in oppdrag.enheter.all()], [self.til])
+        self.assertEqual(oppdrag.enheter.get().status, choices.VENTER)
 
     def test_bytte_til_samme_enhet_er_ingen_hendelse(self):
         oppdrag = _oppdrag(self.fra)

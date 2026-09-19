@@ -1155,14 +1155,30 @@ def korriger_tidspunkt(melding, nytt_tidspunkt, *, bruker) -> Statusmelding:
 
 
 @transaction.atomic
+@transaction.atomic
 def flytt_til_enhet(oppdrag, ny_enhet, *, bruker, fra_enhet=None) -> Enhetsbytte | None:
     """Flytt oppdraget til en annen enhet, og skriv det i oppdragets logg.
 
     Returnerer ``None`` hvis enheten er den samme — et bytte til seg selv er
     ikke en hendelse.
 
-    Statusen står. Meldingene den første enheten rakk å sende blir stående med
-    ``meldt_av`` intakt: de skjedde.
+    **To tilfeller, og skillet er om bilen har rykket ut** (André, 19. sep.
+    2026: «Sandnes 56 … endrer status til Rykker ut. Tar Sandnes 56 av
+    oppdrag og endrer til Haugesund 56. Da er status til Hgsd også Rykker
+    ut. Det blir misvisende da det ikke er den enheten som har satt
+    statusen»):
+
+    - Står raden i `Venter`, pekes den om til den nye enheten. Ingen stempler
+      finnes, så ingenting blir feil eier.
+    - Har bilen rykket ut, får den nye enheten **sin egen rad i `Venter`**,
+      og den gamle meldes `Ledig` — automatisk, ikke stemplet — med stemplene
+      sine intakt og i eget navn: de skjedde, og responstiden som ble målt
+      står. Den nye bilen har ikke rykket ut, og skal stemple det selv;
+      oppdragets status utledes derfor til `Venter`. Den nye raden tar den
+      gamles plass i rekka, så den er primær der den gamle var.
+
+    Fram til 19. sep. sto statusen ved bytte uansett — riktig i tida med én
+    enhet per oppdrag, og feil fra 11. sep. 2026, da statusen ble per enhet.
     """
     rad = koblingsrad(oppdrag, fra_enhet)
     if rad is None:
@@ -1179,8 +1195,15 @@ def flytt_til_enhet(oppdrag, ny_enhet, *, bruker, fra_enhet=None) -> Enhetsbytte
         byttet_av=bruker,
     )
     gammel = rad.enhet_id
-    rad.enhet = ny_enhet
-    rad.save(update_fields=['enhet', 'updated_at'])
+    if rad.status == choices.VENTER:
+        rad.enhet = ny_enhet
+        rad.save(update_fields=['enhet', 'updated_at'])
+    else:
+        ny_rad = varsle_enhet(oppdrag, ny_enhet, bruker=bruker)
+        ny_rad.rekkefolge, rad.rekkefolge = rad.rekkefolge, ny_rad.rekkefolge
+        ny_rad.save(update_fields=['rekkefolge', 'updated_at'])
+        rad.save(update_fields=['rekkefolge', 'updated_at'])
+        sett_status(oppdrag, choices.LEDIG, bruker=bruker, automatisk=True, enhet=rad.enhet)
     if oppdrag.enhet_id == gammel:
         # Den gamle kolonnen følger den primære til deploy 2 fjerner den.
         oppdrag.enhet = ny_enhet

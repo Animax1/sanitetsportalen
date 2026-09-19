@@ -807,13 +807,16 @@ function koNyttOppdragFraHendelse(id) {
   const h = koHendelser.get(Number(id));
   const el = document.getElementById('nyttOppdragModal');
   if (!h || !el || typeof bootstrap === 'undefined') return;
+  // **Vis først, fyll etterpå.** `show.bs.modal` fyrer inne i `.show()` og
+  // kjører `nullstillNyttOppdrag`, som setter nedtrekkene til første valg —
+  // fylt vi før, ble stedet vasket bort (funnet 19. sep. 2026).
+  bootstrap.Modal.getOrCreateInstance(el).show();
   koFyllHendelsevalg();
   const sel = document.getElementById('nytt-hendelse');
   if (sel) sel.value = String(h.id);
   koHendelsevalgEndret();
   const lok = document.getElementById('nytt-lokasjon');
   if (lok && h.lokasjon_id) lok.value = String(h.lokasjon_id);
-  bootstrap.Modal.getOrCreateInstance(el).show();
 }
 
 async function koKnyttEksisterende(id) {

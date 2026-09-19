@@ -4,6 +4,53 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-19 — Bugs: «Flytt» ga den nye bilen den gamles status, skjemaer husket avviste forsøk, Lagre/Avbryt i feil rekkefølge  `#oppdrag/statusmaskin` `#oppdrag/sentralbord` `#vaktliste/roller`
+
+André, 19. sep. 2026: «Setter oppdrag til f.eks. Sandnes 56, de endrer status til Rykker ut.
+Tar Sandnes 56 av oppdrag og endrer til Haugesund 56. Da er status til Hgsd også Rykker ut.
+Det blir misvisende da det ikke er den enheten som har satt statusen.» «Hvis man lagrer et
+skjema og får valideringsfeil, og så åpner det igjen så bør det nullstilles.» «Knappen for
+lagre og avbryt er feil plassert … primær lagre-knapp helt til høyre.»
+
+- **«Flytt til enhet» etter utrykning.** Ja, det var en feil — fra 11. sep. 2026, da statusen
+  ble per enhet. `flytt_til_enhet` pekte koblingsraden om til den nye bilen med status og
+  stempler intakt, så Haugesund 56 sto som «Rykker ut» med Sandnes 56 sine stempler i sin
+  tidslinje. Nå: står raden i **Venter**, pekes den om som før (ingen stempler, ingenting
+  blir feil eier). Har bilen **rykket ut**, får den nye sin egen rad i Venter og tar den
+  gamles plass i rekka (primær), og den gamle meldes Ledig — automatisk, ikke stemplet —
+  med stemplene sine i eget navn. Oppdragets status utledes til Venter: den nye bilen
+  skal stemple utrykningen selv. Responstiden som ble målt står på den som kjørte den.
+  `Enhetsbytte`-raden skrives som før. Testen `test_statusen_staar_ved_bytte` («en
+  responstid som faktisk ble målt skal ikke nullstilles») låste den gamle regelen; den er
+  erstattet — responstiden nullstilles fortsatt ikke, den flytter bare ikke over.
+- **Skjemaer som husket et avvist forsøk.** Kartlagt modal for modal: de fleste fylles av
+  JS før de vises og var riktige. Feilen lå i dem som åpnes med `data-bs-toggle` uten kode
+  på åpningsveien: «Avslutt vakt» og «Lagre som arkiv» (pasientsiden), «Vaktarkiv» og
+  «Historikk» (sentralbordet) — verdiene og feilmeldingen fra forrige forsøk sto igjen. Ny
+  hjelper `nullstillModalVedLukking(modalId, felter, feilId)` i `portal-utils.js`
+  nullstiller de navngitte feltene ved **lukking** (ikke åpning: `show.bs.modal` fyrer inne
+  i `.show()`, og et skjema JS fyller rett før visning ville fått verdiene vasket bort).
+  Bare navngitte felter — modaler med innstillinger hentet fra serveren (bilinnstillingene,
+  timetak, grenser) blankes ikke, for en blank innstilling er ikke den lagrede. I tillegg
+  fire enkeltfelter som manglet i sine åpningsfunksjoner: `n-helsepersonell` i «Ny
+  pasient», `ny-ressurs-navn` i «Ny ressurs», `ny-vakt-kopier` i «Ny vaktliste», «ny verdi»
+  i valglistene.
+- **Funnet under kartleggingen:** `koNyttOppdragFraHendelse` satte stedet og hendelsen
+  *før* `.show()`, og `nullstillNyttOppdrag` (på `show.bs.modal`) satte stedet tilbake til
+  første valg etterpå — usynlig i demoen fordi Hovedscene tilfeldigvis var først. Fyller nå
+  etter visning.
+- **Lagre/Avbryt.** Enig: sekundær til venstre, primær helt til høyre, i nedre høyre hjørne.
+  Rettet der de sto omvendt eller til venstre: «Rediger oppdrag», «Endre status» og «Rett
+  tid» i detaljvinduet, navneredigeringen i vaktlista (`_redigeringsrad`) og verdiskjemaet
+  under «Verdier». Modalfotene var alt riktige.
+
+Mutasjoner mot `oppdrag.tests.EnhetsbytteTests` (4 s hver): alltid ompeking (gammel regel),
+den gamle meldes ikke ledig, Ledig som stempel i stedet for automatisk, den nye tar ikke
+plassen i rekka, primær følger ikke. **5 av 5 fanget.** `nullstillFelter` prøvd mot et
+minimalt DOM (`core/tests_js_nullstill.py`); knappe-rekkefølgen er markup og prøves ikke.
+
+---
+
 ## 2026-09-19 — KO/oppdrag: ingen forhåndsvalgt prioritet, hastegrad som knapper, «Flytt» viste enheter av vakt, beskrivelsen synlig i «Nytt oppdrag»  `#ko/hendelseslogg` `#oppdrag/sentralbord`
 
 André, 19. sep. 2026, etter forrige pulje: «litt misvisende med forhåndsvalgt prioritet»;

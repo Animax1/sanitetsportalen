@@ -317,3 +317,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 // «Nytt oppdrag» begynner tomt hver gang det åpnes — se `nullstillNyttOppdrag`.
 document.getElementById('nyttOppdragModal')
   ?.addEventListener('show.bs.modal', nullstillNyttOppdrag);
+// Vaktarkivet og historikken åpnes med data-bs-toggle: notatet fra et avvist
+// forsøk og søketeksten skal ikke stå igjen (André, 19. sep. 2026).
+nullstillModalVedLukking('arkivModal', ['arkiv-notat'], 'arkiv-feil');
+nullstillModalVedLukking('historikkModal', ['historikk-sok'], 'historikk-feil');

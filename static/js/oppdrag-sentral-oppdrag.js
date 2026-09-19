@@ -672,11 +672,13 @@ function visFoerStatus(enhetId) {
       <option value="">Velg sted</option>${stedvalg}</select>
     <input type="datetime-local" class="form-control form-control-sm w-auto"
            id="foer-tid" value="${_lokalNaa()}" step="60">
-    <button type="button" class="btn btn-sm btn-primary"
-            id="foer-lagre" data-action="lagreFoerStatus" data-id="${escHtmlValue(enhetId)}">Endre</button>
-    <button type="button" class="btn btn-sm btn-outline-secondary"
-            data-action="avbrytFoerStatus">Avbryt</button>
-    <span id="foer-feil" class="text-danger small"></span>`);
+    <span id="foer-feil" class="text-danger small"></span>
+    <span class="ms-auto d-flex gap-2">
+      <button type="button" class="btn btn-sm btn-outline-secondary"
+              data-action="avbrytFoerStatus">Avbryt</button>
+      <button type="button" class="btn btn-sm btn-primary"
+              id="foer-lagre" data-action="lagreFoerStatus" data-id="${escHtmlValue(enhetId)}">Endre</button>
+    </span>`);
   rad.appendChild(skjema);
   document.getElementById('foer-tid').focus();
 }
@@ -764,10 +766,12 @@ function visRedigerOppdrag() {
       <div class="col-12"><label class="form-label" for="red-fritekst">${fritekstEtikett}</label>
         <textarea id="red-fritekst" class="form-control form-control-sm" rows="2">${escapeHtml(o.fritekst || '')}</textarea>${fritekstHint}</div>
       <div class="col-12 d-flex gap-2 align-items-center">
-        <button type="button" class="btn btn-sm btn-primary" id="red-lagre"
-                data-action="lagreOppdrag" data-id="${escHtmlValue(o.id)}">Lagre</button>
-        <button type="button" class="btn btn-sm btn-outline-secondary" data-action="visRedigerOppdrag">Avbryt</button>
         <span id="red-feil" class="text-danger small"></span>
+        <span class="ms-auto d-flex gap-2">
+          <button type="button" class="btn btn-sm btn-outline-secondary" data-action="visRedigerOppdrag">Avbryt</button>
+          <button type="button" class="btn btn-sm btn-primary" id="red-lagre"
+                  data-action="lagreOppdrag" data-id="${escHtmlValue(o.id)}">Lagre</button>
+        </span>
       </div>
     </div>`);
   fyllProblemstillinger('red', o.hastegrad, o.problemstilling);
@@ -871,11 +875,13 @@ function visRettTid(meldingId) {
   skjema.innerHTML = (`
     <input type="datetime-local" class="form-control form-control-sm w-auto"
            id="rett-tid-verdi" value="${lokal}">
-    <button type="button" class="btn btn-sm btn-primary"
-            id="rett-tid-lagre" data-action="lagreRettTid" data-id="${escHtmlValue(meldingId)}">Lagre</button>
-    <button type="button" class="btn btn-sm btn-outline-secondary"
-            data-action="avbrytRettTid">Avbryt</button>
-    <span id="rett-tid-feil" class="text-danger small"></span>`);
+    <span id="rett-tid-feil" class="text-danger small"></span>
+    <span class="ms-auto d-flex gap-2">
+      <button type="button" class="btn btn-sm btn-outline-secondary"
+              data-action="avbrytRettTid">Avbryt</button>
+      <button type="button" class="btn btn-sm btn-primary"
+              id="rett-tid-lagre" data-action="lagreRettTid" data-id="${escHtmlValue(meldingId)}">Lagre</button>
+    </span>`);
   rad.appendChild(skjema);
   document.getElementById('rett-tid-verdi').focus();
 }

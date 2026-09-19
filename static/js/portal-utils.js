@@ -326,3 +326,40 @@ function slippFokusFoerSkjul(modal, aktiv) {
 document.addEventListener('hide.bs.modal', (e) => {
   slippFokusFoerSkjul(e.target, document.activeElement);
 });
+
+
+// ── Skjemaer som skal starte blanke (André, 19. sep. 2026) ──────────────────
+//
+// «Hvis man lagrer et skjema og får valideringsfeil, og så åpner det igjen så
+// bør det nullstilles.» De fleste modalene fylles av JS *før* de vises, og
+// er alt riktige. Resten åpnes med `data-bs-toggle` og har ingen kode på
+// åpningsveien — der lå de forsøkte verdiene igjen, med feilmeldingen fra
+// forrige forsøk under. Hjelperen her nullstiller ved **lukking**, ikke ved
+// åpning: `show.bs.modal` fyrer *inne i* `.show()`, og et skjema som JS
+// fyller rett før det viser, ville da fått verdiene sine vasket bort.
+//
+// Bare felter som er navngitt nullstilles. Modaler med innstillinger som
+// hentes fra serveren (bilinnstillingene, timetaket, grensene) skal ikke
+// blankes — en blank innstilling er ikke det samme som den lagrede.
+function nullstillFelter(feltIder, feilId) {
+  (feltIder || []).forEach((id) => {
+    const felt = document.getElementById(id);
+    if (!felt) return;
+    if (felt.type === 'checkbox' || felt.type === 'radio') felt.checked = Boolean(felt.defaultChecked);
+    else if (felt.tagName === 'SELECT') felt.selectedIndex = 0;
+    else felt.value = felt.defaultValue || '';
+    if (felt.classList) felt.classList.remove('is-invalid');
+  });
+  const feil = feilId ? document.getElementById(feilId) : null;
+  if (feil) {
+    feil.textContent = '';
+    if (feil.classList) feil.classList.add('d-none');
+  }
+}
+
+function nullstillModalVedLukking(modalId, feltIder, feilId) {
+  const el = document.getElementById(modalId);
+  if (!el) return false;
+  el.addEventListener('hidden.bs.modal', () => nullstillFelter(feltIder, feilId));
+  return true;
+}

@@ -2,7 +2,9 @@
 // NEW PATIENT MODAL
 // ════════════════════════════════════════════════════════
 function openNewModal() {
-  ['n-problemstilling','n-arsak','n-transport','n-plassering','n-forstehjelper'].forEach(id => {
+  // `n-helsepersonell` var ikke med til 19. sep. 2026: etter en avvist
+  // innsending sto forrige valg igjen ved neste åpning.
+  ['n-problemstilling','n-arsak','n-transport','n-plassering','n-forstehjelper','n-helsepersonell'].forEach(id => {
     const el = document.getElementById(id);
     if (el) { el.value = ''; el.classList.remove('is-invalid'); }
   });
