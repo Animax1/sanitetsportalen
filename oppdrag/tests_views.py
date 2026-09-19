@@ -232,6 +232,20 @@ class EnhetslisteTests(OppdragBasis):
         andre = c.get('/oppdrag/api/enheter/', HTTP_IF_NONE_MATCH=etag)
         self.assertEqual(andre.status_code, 200)
 
+    def test_etag_endres_naar_oppdragets_lokasjon_endres(self):
+        """Kortet viser hvor oppdraget er (19. sep. 2026), og «Rediger
+        oppdrag» flytter det uten å røre status eller id."""
+        o = self._oppdrag(self.enhet, status=choices.FREMME)
+        c = _klient(_bruker('sentral11', 'les'))
+        svar = c.get('/oppdrag/api/enheter/')
+        rad = next(r for r in svar.json()['data'] if r['id'] == self.enhet.pk)
+        self.assertEqual(rad['lokasjon_navn'], 'Hovedscene')
+        etag = svar['ETag']
+        o.lokasjon = Lokasjon.objects.create(navn='Sykestue')
+        o.save()
+        andre = c.get('/oppdrag/api/enheter/', HTTP_IF_NONE_MATCH=etag)
+        self.assertEqual(andre.status_code, 200, 'flyttingen skal ikke drukne i en 304')
+
 
 class FlyttTests(OppdragBasis):
     def test_flytting_krever_skriv_full(self):

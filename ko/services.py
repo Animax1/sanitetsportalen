@@ -667,21 +667,34 @@ def melder_tekst(hendelse) -> str:
     return ', '.join(deler)
 
 
-def lag_som_kan_velges(vakt):
+def lag_som_kan_velges(vakt, hendelse=None):
     """Ressursene et lag på hendelsen kan være: vaktlistas ressurser **uten**
-    oppdragsenhet, i lista som er i bruk. `ko` → `vaktliste` er den tillatte
-    retningen. Samme scope som `ressurser_uten_enhet()`, som tegner kortene —
-    et lag man kan velge skal være et lag man kan se."""
+    oppdragsenhet, i lista som er i bruk, **med et skift som dekker nå**
+    (`ressurser_paa_vakt_naa`, André 19. sep. 2026: «bare de som er på vakt
+    nå»). `ko` → `vaktliste` er den tillatte retningen. Samme scope som
+    `ressurser_uten_enhet()`, som tegner kortene — et lag man kan velge skal
+    være et lag man kan se.
+
+    **Lagene som alt står på `hendelse` er lov uansett skift.** Skjemaet og
+    brikkene sender hele lista, og et lag hvis skift gikk ut mens det sto på
+    hendelsen skal ikke gjøre lista umulig å lagre — det tas av ved å utelates,
+    ikke ved at alt annet nektes."""
     from vaktliste.models import Ressurs
-    from vaktliste.services import vaktliste_i_bruk
+    from vaktliste.services import ressurser_paa_vakt_naa, vaktliste_i_bruk
 
     liste = vaktliste_i_bruk()
     if liste is None:
         return Ressurs.objects.none()
-    return Ressurs.objects.filter(vaktliste=liste, enhet__isnull=True)
+    paa_vakt = ressurser_paa_vakt_naa(liste)
+    if hendelse is None:
+        return paa_vakt
+    allerede = [l.ressurs_id for l in hendelse.lag.all() if l.ressurs_id]
+    return Ressurs.objects.filter(
+        Q(pk__in=paa_vakt.values('pk')) | Q(pk__in=allerede),
+        vaktliste=liste, enhet__isnull=True)
 
 
-def _lag_fra(vakt, ider):
+def _lag_fra(vakt, ider, hendelse=None):
     """Ressursene bak en liste med id-er. Ukjent id er 400. `None` betyr
     «ikke oppgitt»; `[]` betyr «ingen»."""
     if ider is None:
@@ -692,7 +705,7 @@ def _lag_fra(vakt, ider):
         onsket = {int(i) for i in ider}
     except (TypeError, ValueError):
         raise Ugyldig('Lag må være tall.')
-    rader = list(lag_som_kan_velges(vakt).filter(pk__in=onsket))
+    rader = list(lag_som_kan_velges(vakt, hendelse).filter(pk__in=onsket))
     if len(rader) != len(onsket):
         raise Ugyldig('Ukjent lag.')
     return rader
@@ -796,7 +809,7 @@ def sett_lag(hendelse, ressurs_ider, *, bruker, naa=None, logg=True):
     """
     if hendelse.er_lukket:
         raise Ugyldig('Hendelsen er lukket — åpne den igjen først.')
-    onsket = _lag_fra(hendelse.vakt, ressurs_ider)
+    onsket = _lag_fra(hendelse.vakt, ressurs_ider, hendelse)
     if onsket is None:
         raise Ugyldig('Lag må være en liste.')
     naa = naa or timezone.now()
@@ -888,7 +901,7 @@ def rediger_hendelse(hendelse, *, bruker, versjon, tittel=None,
             endret.append('melder')
     lag_endret = False
     if lag is not None:
-        onsket = {r.pk for r in _lag_fra(hendelse.vakt, lag)}
+        onsket = {r.pk for r in _lag_fra(hendelse.vakt, lag, hendelse)}
         naa_ider = {l.ressurs_id for l in hendelse.lag.all() if l.ressurs_id}
         lag_endret = onsket != naa_ider
     if not endret and not lag_endret:

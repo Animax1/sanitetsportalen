@@ -380,7 +380,7 @@ def _aktivt_oppdrag_felter(rad) -> dict:
     if rad is None:
         return {'oppdragsnummer': None, 'hastegrad': None, 'grovsortering': None,
                 'grovsortering_navn': None, 'problemstilling': None, 'antall': None,
-                'status_tidspunkt': None, 'sted_navn': ''}
+                'status_tidspunkt': None, 'sted_navn': '', 'lokasjon_navn': ''}
     oppdrag = rad.oppdrag
     melding = Statusmelding.objects.gjeldende_for_status(
         oppdrag, rad.status, oppdragsenhet=rad)
@@ -393,6 +393,9 @@ def _aktivt_oppdrag_felter(rad) -> dict:
         'antall': oppdrag.antall,
         'status_tidspunkt': melding.tidspunkt.isoformat() if melding else None,
         'sted_navn': choices.AVREIST_TIL_NAVN.get(melding.sted, '') if melding else '',
+        # Hvor oppdraget er (André, 19. sep. 2026: «lokasjon vises» i
+        # ressursoversikten). `aktiv_koblingsrad` henter lokasjonen med.
+        'lokasjon_navn': oppdrag.lokasjon.navn if oppdrag.lokasjon_id else '',
     }
 
 

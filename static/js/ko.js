@@ -542,11 +542,6 @@ function koRessursMannskap(r) {
   const navn = (r.mannskap || []).map((m) => escapeHtml(m.navn)
     + (m.tilstede ? '' : ' <span class="text-muted">(ikke møtt)</span>')).join(', ');
   if (navn) return navn;
-  const nesteNavn = (r.neste || []).map((m) => escapeHtml(m.navn)).join(', ');
-  if (nesteNavn) {
-    return '<span class="text-muted">Ingen nå · ' + escapeHtml(koKlokke(r.neste_fra)) + ': '
-      + nesteNavn + '</span>';
-  }
   return '<span class="text-muted">Ingen på vakt</span>';
 }
 
@@ -565,12 +560,15 @@ function koRessursBesetningHtml(r) {
   return '<div class="besetning">' + (rader || '<span class="enhet-meta">' + koRessursMannskap(r) + '</span>') + '</div>';
 }
 
-// «På H14 · 23 min» — hendelsene laget står på, fra hendelsesloggen. Tom
-// når laget er ledig, eller når hendelsene ikke er lastet.
+// «På H14 · Hovedscene · 23 min» — hendelsene laget står på, fra
+// hendelsesloggen, med hendelsens sted (André, 19. sep. 2026: «i
+// ressursoversikt er det ønskelig at lokasjon vises»). Tom når laget er
+// ledig, eller når hendelsene ikke er lastet.
 function koRessursOpptattHtml(r) {
   const paa = (typeof koLagPaa === 'function') ? koLagPaa(r.id) : [];
   if (!paa.length) return '';
-  const hode = paa.map((x) => '<span class="ko-opptatt">På ' + escapeHtml(x.kode) + ' · '
+  const hode = paa.map((x) => '<span class="ko-opptatt">På ' + escapeHtml(x.kode)
+    + (x.lokasjon_navn ? ' · ' + escapeHtml(x.lokasjon_navn) : '') + ' · '
     + escapeHtml(koSiden(x.fra)) + '</span>').join(' ');
   const linjer = paa.map((x) => '<div class="enhet-oppdrag" role="button" data-action="koApneHendelse"'
     + ' data-id="' + escapeHtml(x.id) + '"><span class="hendelse-merke">' + escapeHtml(x.kode) + '</span>'

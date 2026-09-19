@@ -43,6 +43,9 @@ class RessurserUtenEnhetTests(TilgangsBasis):
             til_tid=self.na + timedelta(hours=til), **felt)
 
     def test_bare_ressurser_uten_enhet(self):
+        self._skift(self.res_hgsd, self.p_hgsd)
+        self._skift(self.res_fri, self.p_karmoy)
+        self._skift(self.bil, self.p_hgsd)
         navn = [r['navn'] for r in services.ressurser_uten_enhet()]
         self.assertIn('Lag HGSD', navn)
         self.assertIn('KO', navn)
@@ -51,23 +54,32 @@ class RessurserUtenEnhetTests(TilgangsBasis):
     def test_bemanningen_er_de_som_har_skift_naa(self):
         self._skift(self.res_hgsd, self.p_hgsd, mott_at=self.na)
         self._skift(self.res_hgsd, self.p_karmoy)            # ikke møtt
-        self._skift(self.res_karmoy, self.p_karmoy, fra=5, til=13)   # senere
         rader = {r['navn']: r for r in services.ressurser_uten_enhet()}
         hgsd = rader['Lag HGSD']
         self.assertEqual((hgsd['antall'], hgsd['tilstede']), (2, 1))
         self.assertEqual([m['navn'] for m in hgsd['mannskap']], ['Kari', 'Ola'],
                          'de som er møtt først')
-        karmoy = rader['Lag Karmøy']
-        self.assertEqual(karmoy['antall'], 0)
-        self.assertEqual([m['navn'] for m in karmoy['neste']], ['Ola'])
-        self.assertIsNotNone(karmoy['neste_fra'])
-        self.assertEqual(rader['KO']['antall'], 0)
-        self.assertEqual(rader['KO']['neste'], [])
+        self.assertNotIn('neste', hgsd, 'et lag uten skift nå er ikke i lista, så «neste» er borte')
+
+    def test_bare_de_med_skift_naa_er_med(self):
+        """«Bare de som er på vakt nå» (André, 19. sep. 2026). Et lag hvis
+        skift starter senere, gikk ut, eller som ikke har noe skift, vises
+        ikke — heller ikke som ubemannet. Grensene selv er innenfor."""
+        self._skift(self.res_karmoy, self.p_karmoy, fra=5, til=13)      # senere
+        self.assertEqual([r['navn'] for r in services.ressurser_uten_enhet()], [])
+        self._skift(self.res_fri, self.p_hgsd, fra=-9, til=-1)           # gikk ut
+        self.assertEqual([r['navn'] for r in services.ressurser_uten_enhet()], [])
+        self._skift(self.res_hgsd, self.p_hgsd, fra=0, til=0)            # akkurat nå
+        rader = services.ressurser_uten_enhet(naa=self.na)
+        self.assertEqual([r['navn'] for r in rader], ['Lag HGSD'])
+        # Regelen er én, og lagvelgeren i KO leser den samme.
+        self.assertEqual([r.pk for r in services.ressurser_paa_vakt_naa(self.vl, self.na)],
+                         [self.res_hgsd.pk])
 
     def test_avmeldte_teller_ikke(self):
         self._skift(self.res_hgsd, self.p_hgsd, avmeldt_at=self.na)
         rader = {r['navn']: r for r in services.ressurser_uten_enhet()}
-        self.assertEqual(rader['Lag HGSD']['antall'], 0)
+        self.assertNotIn('Lag HGSD', rader, 'et avmeldt skift er ikke et skift')
 
     def test_svaret_baerer_telefon_og_issi(self):
         """Var uten til 19. sep. 2026 («et nummer man ikke trenger er et
@@ -93,6 +105,7 @@ class RessurserUtenEnhetTests(TilgangsBasis):
         self.assertEqual(svar.status_code, 403)
         ModulTilgang.objects.update_or_create(
             bruker=self.leser, modul_slug='oppdrag', defaults={'nivaa': 'les'})
+        self._skift(self.res_hgsd, self.p_hgsd)
         svar = self.c_leser.get(self.STI)
         self.assertEqual(svar.status_code, 200)
         self.assertIn('Lag HGSD', [r['navn'] for r in svar.json()['data']])

@@ -15,8 +15,10 @@ bare funksjonen.
 from __future__ import annotations
 
 import json
+from datetime import timedelta
 
 from django.test import Client, TestCase, override_settings
+from django.utils import timezone
 
 from accounts.models import CustomUser, ModulTilgang
 from core.vakt import hent_aktiv_vakt, vakt_for_year
@@ -27,8 +29,18 @@ from ko.models import (KILDE_OPERATOR, KILDE_SYSTEM, MELDER_VALG, PRIORITET_GRON
 from oppdrag import choices
 from oppdrag import services as oservices
 from oppdrag.models import Enhet, Lokasjon, Oppdrag
-from vaktliste.models import Vaktliste
+from vaktliste.models import Korps, Mannskap, Vaktliste, Vaktpost
 from vaktliste.test_helpers import LAG, gruppe, lag_ressurs
+
+
+def skift(ressurs, fra=-1, til=7):
+    """Et skift som dekker nå — lag på vakt (19. sep. 2026)."""
+    from datetime import timedelta
+    korps, _ = Korps.objects.get_or_create(navn='Testkorps')
+    person, _ = Mannskap.objects.get_or_create(navn='Mannskap ' + ressurs.navn, korps=korps)
+    naa = timezone.now()
+    return Vaktpost.objects.create(ressurs=ressurs, mannskap=person,
+                                   fra_tid=naa + timedelta(hours=fra), til_tid=naa + timedelta(hours=til))
 
 
 def _bruker(navn, **kwargs):
@@ -56,6 +68,10 @@ class _Grunnlag(TestCase):
         self.lag1 = lag_ressurs(vaktliste=self.vl, navn='Lag 1', gruppe=gruppe(LAG))
         self.lag2 = lag_ressurs(vaktliste=self.vl, navn='Lag 2', gruppe=gruppe(LAG))
         self.bil = lag_ressurs(vaktliste=self.vl, navn='Ambulanse 1', enhet=self.enhet)
+        # Bare lag på vakt nå kan velges (19. sep. 2026): de to får et skift.
+        self.lag3 = lag_ressurs(vaktliste=self.vl, navn='Lag 3', gruppe=gruppe(LAG))
+        for lag in (self.lag1, self.lag2):
+            skift(lag)
 
     def _hendelse(self, tittel='Slagsmål', **kw):
         return services.opprett_hendelse(self.vakt, tittel, bruker=self.operator, **kw)
@@ -332,6 +348,26 @@ class LagTests(_Grunnlag):
         self.assertEqual(services.sett_lag(h, [self.lag1.pk], bruker=self.andre), ([], []))
         self.assertEqual(Logglinje.objects.count(), foer)
         self.assertNotIn('ko2', self._deltakere(h))
+
+    def test_bare_lag_paa_vakt_naa_kan_velges(self):
+        """André, 19. sep. 2026: «bare de som er på vakt nå». Et lag uten
+        skift nå avvises; et lag som *står* på hendelsen får bli når skiftet
+        går ut — lista sendes hel, og skal fortsatt kunne lagres."""
+        with self.assertRaises(services.Ugyldig):
+            self._hendelse(lag=[self.lag3.pk])
+        self.assertEqual([r.pk for r in services.lag_som_kan_velges(self.vakt)],
+                         [self.lag1.pk, self.lag2.pk])
+        h = self._hendelse(lag=[self.lag1.pk])
+        Vaktpost.objects.filter(ressurs=self.lag1).update(til_tid=timezone.now() - timedelta(hours=1))
+        self.assertEqual([r.pk for r in services.lag_som_kan_velges(self.vakt)], [self.lag2.pk])
+        self.assertEqual(sorted(r.pk for r in services.lag_som_kan_velges(self.vakt, h)),
+                         sorted([self.lag1.pk, self.lag2.pk]), 'det som står der er lov')
+        services.sett_lag(h, [self.lag1.pk, self.lag2.pk], bruker=self.operator)
+        self.assertEqual(sorted(h.lag.values_list('ressurs_id', flat=True)),
+                         sorted([self.lag1.pk, self.lag2.pk]))
+        annen = self._hendelse('Annen')
+        with self.assertRaises(services.Ugyldig):
+            services.sett_lag(annen, [self.lag1.pk], bruker=self.operator)
 
     def test_bare_lag_uten_enhet_og_i_lista_i_bruk(self):
         with self.assertRaises(services.Ugyldig):
@@ -620,6 +656,7 @@ class PorteneTests(TestCase):
         self.sjef = _bruker('sjef', role='admin')
         self.vl = Vaktliste.objects.create(vakt=self.vakt)
         self.lag1 = lag_ressurs(vaktliste=self.vl, navn='Lag 1', gruppe=gruppe(LAG))
+        skift(self.lag1)
 
     def _post(self, bruker, sti, kropp=None, metode='post'):
         c = Client()

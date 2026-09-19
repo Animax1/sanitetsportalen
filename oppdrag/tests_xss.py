@@ -254,6 +254,7 @@ REVIEWED_INTERPOLATIONS = {
     # Sted i sentralbordet (12. sep. 2026): ren tekst i `meta`, som escapes ved innsetting.
     'e.sted_navn': 'bygger ren tekst i `sted`, som går inn i `meta` og escapes ved innsetting',
     'sted': 'ren tekst («→ Sykehus») i `meta`, som escapes ved innsetting',
+    'lokasjon': 'markup bygget rett over, navnet escapet der',
     'slett': 'markup bygget lokalt, id escapet inni',
     'angreKnapp': 'markup bygget lokalt, enhets-id escapet inni',
     # Sentralbordet med flere enheter (11. sep. 2026):
@@ -606,7 +607,7 @@ class EnhetskortetTests(SimpleTestCase):
         return {'id': 1, 'navn': 'HGSD 56', 'status': 'fremme', 'pa_vakt': True,
                 'status_navn': 'Fremme', 'antall_ventende': 0,
                 'oppdragsnummer': 12, 'hastegrad': 'Haster',
-                'problemstilling': 'Fallskade',
+                'problemstilling': 'Fallskade', 'lokasjon_navn': 'Hovedscene',
                 'status_tidspunkt': for_12_min_siden.isoformat()}
 
     def test_kortet_viser_oppdraget(self):
@@ -615,6 +616,14 @@ class EnhetskortetTests(SimpleTestCase):
         self.assertIn('Haster', ut)
         self.assertIn('Fallskade', ut)
         self.assertIn('hastegrad-haster', ut)
+        self.assertIn('enhet-oppdrag-sted', ut)
+        self.assertIn('Hovedscene', ut, 'hvor oppdraget er (19. sep. 2026)')
+        self.assertNotIn('enhet-oppdrag-sted', self._kort({**self.AKTIV, 'lokasjon_navn': ''}))
+
+    def test_lokasjonen_escapes(self):
+        ut = self._kort({**self.AKTIV, 'lokasjon_navn': '<img src=x onerror=alert(1)>'})
+        self.assertNotIn('<img src=x', ut)
+        self.assertIn('&lt;img', ut)
 
     def test_statusen_har_klokkeslett_og_tid_siden(self):
         ut = self._kort(self.AKTIV)

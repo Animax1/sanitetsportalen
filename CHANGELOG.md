@@ -4,6 +4,36 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-19 — KO: bare lag på vakt nå i ressursoversikten og lagvelgeren; sted på kortene  `#ko/ressursbildet` `#ko/hendelseslogg` `#vaktliste/roller` `#oppdrag/sentralbord`
+
+André, 19. sep. 2026: «bug: lag vises i ressursoversikt og i ny hendelse over lag selv om de
+ikke er på vakt enda, det er viktig at det er bare de som er på vakt nå som vises av lag.
+Enheter som er koblet til oppdrag må manuelt skrus av og på av ko som før.» Og: «I
+ressursoversikt er det ønskelig at lokasjon vises.»
+
+- **Bare lag med et skift som dekker nå.** `vaktliste.services.ressurser_paa_vakt_naa()`
+  er regelen — et skift med mannskap, ikke avmeldt, `fra_tid ≤ nå ≤ til_tid` — og den har
+  to lesere: `ressurser_uten_enhet()` (kortene) og `ko.services.lag_som_kan_velges()`
+  (lagvelgeren i «Ny hendelse» og «Legg til lag»). «På vakt» er vaktlistas eget begrep, ikke
+  om laget har *møtt*: et lag med skift nå og ingen møtt står som «0 av 2 møtt». Et lag hvis
+  skift starter senere vises ikke lenger som «ubemannet» med «neste»; `neste`/`neste_fra`
+  er ute av svaret og av `koRessursMannskap`. Bilene røres ikke — `pa_vakt` settes av KO
+  som før.
+- **Et lag som står på hendelsen får bli når skiftet går ut.** Skjemaet og brikkene sender
+  hele lista, og uten unntaket kunne lista ikke lagres: `lag_som_kan_velges(vakt, hendelse)`
+  tar med det som alt står der. Å *legge til* et lag uten skift avvises fortsatt.
+- **Sted på kortene.** Bilens kort viser oppdragets lokasjon etter problemstillingen
+  (`lokasjon_navn` i `enhetskort`, i ETag-en fordi «Rediger oppdrag» flytter uten å røre
+  status), på `/oppdrag/` og `/ko/`. Lagets kort viser hendelsens sted: «På H14 · Hovedscene
+  · 23 min».
+
+Mutasjonstesting, 8 mutanter, 8 drept etter to runder: skiftet som gikk ut, avmeldte,
+laget som står der, alle lag når hendelsen er oppgitt, opprett uten skiftsjekk, `koLagPaa`
+og kortet uten sted, ETag uten lokasjon (overlevde først — ingen test flyttet et oppdrag;
+`test_etag_endres_naar_oppdragets_lokasjon_endres` finnes nå).
+
+---
+
 ## 2026-09-19 — KO: «Logg i hendelse» med deling til enhetene, oppdragsnotat, hastegrad arver prioriteten, gult minutt i bilen, hvit «Fra»-tekst  `#ko/hendelseslogg` `#ko/loggen` `#oppdrag/sentralbord` `#oppdrag/enhetsskjerm`
 
 André, 19. sep. 2026: «inne i hendelsen så endrer vi beskrivelses loggen og løpende loggen

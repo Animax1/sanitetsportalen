@@ -501,7 +501,7 @@ Rekkefølgen er ikke kosmetikk — den er hva sida svarer på.
 Oppdragsmodulen importerer **ikke** vaktlista; `oppdrag-sentral.js` henter
 `/vaktliste/api/enhet/<pk>/besetning/` og rendrer svaret.
 `OppdragImportererIkkeVaktlista` leser importene med AST og håndhever det. KO henter
-ressursene **uten** enhet fra `api/ressurser/uten-enhet/` — samme gate, uten telefon.
+ressursene **uten** enhet og **på vakt nå** fra `api/ressurser/uten-enhet/` — samme gate.
 
 - **Gatet på `les` i vaktliste**, ikke i oppdrag — komposisjonsregelen fra
   rollemodellen §5. Malen får et flagg via `har_tilgang(..., 'vaktliste', ...)`:

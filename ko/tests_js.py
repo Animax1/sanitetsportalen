@@ -230,7 +230,6 @@ KO_GJENNOMGATT = {
     'tall': 'escapeHtml over to tall og et fast ord, eller et fast ord',
     'hode': 'markup fra gruppehode() i oppdrag-kort.js, alt escapet der',
     'navn': 'mannskapsnavn escapet i map-en rett over',
-    'nesteNavn': 'mannskapsnavn escapet i map-en rett over',
     'kort': 'markup fra koRessurskort(), som skannes for seg',
     'ansvarHtml': 'markup bygget rett over, området escapet der',
 }
@@ -1180,7 +1179,7 @@ class RessurskorteneTests(SimpleTestCase):
     R = {'id': 1, 'navn': 'Lag 3', 'gruppe_ikon': 'people', 'antall': 2, 'tilstede': 1,
          'mannskap': [{'navn': 'Kari', 'rolle': 'Lagleder', 'telefon': '911 22 333', 'issi': '2401234', 'tilstede': True},
                       {'navn': 'Ola', 'rolle': '', 'telefon': '', 'issi': '', 'tilstede': False}],
-         'neste': [], 'neste_fra': None}
+         }
 
     def _kort(self, r, pre=''):
         return run_node(self.harness, f'console.log(koRessurskort({json.dumps(r)}));', preamble=self.PRE + pre)
@@ -1204,22 +1203,16 @@ class RessurskorteneTests(SimpleTestCase):
         self.assertIn('title="Møtt">●', ut)
         self.assertIn('title="Ikke møtt">○', ut)
 
-    def test_ubemannet_med_neste(self):
-        r = {'id': 1, 'navn': 'KO', 'gruppe_ikon': '', 'antall': 0, 'tilstede': 0,
-             'mannskap': [], 'neste': [{'navn': 'Per', 'tilstede': False}],
-             'neste_fra': '2026-09-18T16:00:00+02:00'}
-        self.assertIn('ubemannet', self._kort(r))
-        ut = self._kort(r, 'koApenRessurs = 1;\n')
-        self.assertIn('Ingen nå', ut)
-        self.assertIn('Per', ut)
-
     def test_paa_hendelse_leses_fra_de_aapne_hendelsene(self):
-        pre = ("koHendelser.set(5, {id: 5, kode: 'H14', tittel: 'Bevisstløs', status: 'apen',"
+        pre = ("koHendelser.set(5, {id: 5, kode: 'H14', tittel: 'Bevisstløs', status: 'apen', lokasjon_navn: 'Hovedscene',"
                " lag: [{ressurs_id: 1, fra: new Date(Date.now() - 23 * 60000).toISOString()}]});\n"
                "koHendelser.set(6, {id: 6, kode: 'H9', tittel: 'Lukket', status: 'lukket',"
-               " lag: [{ressurs_id: 1, fra: new Date().toISOString()}]});\n")
+               " lag: [{ressurs_id: 1, fra: new Date().toISOString()}]});\n"
+               "koHendelser.set(7, {id: 7, kode: 'H15', tittel: 'Uten sted', status: 'apen', lokasjon_navn: '',"
+               " lag: [{ressurs_id: 1, fra: new Date(Date.now() - 5 * 60000).toISOString()}]});\n")
         ut = self._kort(self.R, pre)
-        self.assertIn('På H14 · 23 min', ut)
+        self.assertIn('På H14 · Hovedscene · 23 min', ut, 'stedet står på kortet (19. sep. 2026)')
+        self.assertIn('På H15 · 5 min', ut, 'uten sted: ingen tom ledd')
         self.assertIn('Bevisstløs', ut)
         self.assertNotIn('H9', ut, 'en lukket hendelse holder ingen')
         self.assertNotIn('På H', self._kort(dict(self.R, id=2), pre), 'et annet lag er ledig')

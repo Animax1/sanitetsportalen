@@ -58,6 +58,9 @@
   overflow-wrap: anywhere;
 }
 
+/* Hvor oppdraget er (19. sep. 2026) — dempet, etter problemstillingen. */
+.enhet-oppdrag-sted { color: var(--text-muted); white-space: nowrap; }
+
 /* Statusprikken bærer ikke informasjon alene — statusteksten står ved siden
  * av. Farge alene ville brutt WCAG 1.4.1. */
 .status-prikk {

@@ -126,7 +126,9 @@ function koLagPaa(ressursId) {
   koHendelser.forEach((h) => {
     if (h.status !== 'apen') return;
     (h.lag || []).forEach((l) => {
-      if (l.ressurs_id === ressursId) ut.push({ id: h.id, kode: h.kode, tittel: h.tittel, fra: l.fra });
+      if (l.ressurs_id === ressursId) {
+        ut.push({ id: h.id, kode: h.kode, tittel: h.tittel, fra: l.fra, lokasjon_navn: h.lokasjon_navn || '' });
+      }
     });
   });
   return ut;

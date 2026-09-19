@@ -1478,6 +1478,32 @@ def besetning(enhet_id, naa=None):
     }
 
 
+def ressurser_paa_vakt_naa(vaktliste, naa=None):
+    """Ressursene uten oppdragsenhet som har et skift som dekker **nå**.
+
+    «Det er viktig at det er bare de som er på vakt nå som vises av lag»
+    (André, 19. sep. 2026). «På vakt» er vaktlistas eget begrep: et skift med
+    mannskap, ikke avmeldt, som dekker tidspunktet — ikke om laget har møtt.
+    Bilene styres ikke herfra; de skrus av og på av KO som før (`pa_vakt`).
+
+    Ett sted for regelen, fordi den har to lesere: kortene i ressursoversikten
+    (`ressurser_uten_enhet`) og lagvelgeren i hendelsen
+    (`ko.services.lag_som_kan_velges`). Et lag man kan velge skal være et lag
+    man kan se — og var regelen skrevet to ganger, ville de gledet fra
+    hverandre ved neste endring.
+    """
+    from django.db.models import Exists, OuterRef
+
+    from .models import Vaktpost
+
+    naa = naa or timezone.now()
+    dekker = Vaktpost.objects.filter(
+        ressurs=OuterRef('pk'), mannskap__isnull=False, avmeldt_at__isnull=True,
+        fra_tid__lte=naa, til_tid__gte=naa)
+    return (Ressurs.objects.filter(vaktliste=vaktliste, enhet__isnull=True)
+            .annotate(_paa_vakt=Exists(dekker)).filter(_paa_vakt=True))
+
+
 def ressurser_uten_enhet(naa=None):
     """Ressursene i lista i bruk som **ikke** er koblet til en oppdragsenhet
     — lag, samleplass, KO (KO pulje 6, André 18. sep. 2026: «få inn alle
@@ -1485,8 +1511,9 @@ def ressurser_uten_enhet(naa=None):
     /oppdrag»).
 
     Samme scope som `vaktliste_i_bruk()`: lista i drift, ellers den aktive
-    vaktas. Og samme svar per ressurs som `besetning()` gir for en bil —
-    skiftene som dekker *nå*, ellers neste skift — **med telefon og ISSI**
+    vaktas — og **bare ressursene med et skift som dekker nå**
+    (`ressurser_paa_vakt_naa`, 19. sep. 2026). Samme svar per ressurs som
+    `besetning()` gir for en bil — skiftene som dekker *nå* — **med telefon og ISSI**
     fra 19. sep. 2026 (André: «alle ressurser … må ha navn, om de er
     registrert møtt, telefonnummer og ISSI»). Svaret var uten dem til da,
     med begrunnelsen at et nummer man ikke trenger er et nummer på en skjerm
@@ -1504,8 +1531,7 @@ def ressurser_uten_enhet(naa=None):
     vaktliste = vaktliste_i_bruk()
     if vaktliste is None:
         return []
-    ressurser = list(vaktliste.ressurser
-                     .filter(enhet__isnull=True)
+    ressurser = list(ressurser_paa_vakt_naa(vaktliste, naa)
                      .select_related('gruppe')
                      .order_by('gruppe__rekkefolge', 'gruppe__navn', 'rekkefolge', 'navn'))
     if not ressurser:
@@ -1531,12 +1557,6 @@ def ressurser_uten_enhet(naa=None):
         naa_poster = [vp for vp in alle if vp.fra_tid <= naa <= vp.til_tid]
         mannskap = [_rad(vp) for vp in naa_poster]
         mannskap.sort(key=lambda m: (not m['tilstede'], m['navn'].lower()))
-        neste, neste_fra = [], None
-        if not mannskap:
-            senere = [vp for vp in alle if vp.fra_tid > naa]
-            if senere:
-                neste_fra = senere[0].fra_tid
-                neste = [_rad(vp) for vp in senere if vp.fra_tid == neste_fra]
         ut.append({
             'id': r.pk,
             'navn': r.navn,
@@ -1546,8 +1566,6 @@ def ressurser_uten_enhet(naa=None):
             'mannskap': mannskap,
             'antall': len(mannskap),
             'tilstede': sum(1 for m in mannskap if m['tilstede']),
-            'neste': neste,
-            'neste_fra': neste_fra.isoformat() if neste_fra else None,
         })
     return ut
 

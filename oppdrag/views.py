@@ -188,7 +188,9 @@ def enheter_view(request):
     etag = etag_for([
         (r['id'], r['status'], r['antall_ventende'], r['aktivt_oppdrag_id'],
          r['pa_vakt'], r['er_aktiv'], r['status_tidspunkt'], r['type'],
-         r['ledig_siden'], r['passiv_vakt'])
+         r['ledig_siden'], r['passiv_vakt'],
+         # «Rediger oppdrag» kan flytte det uten å røre status eller id.
+         r['lokasjon_navn'])
         for r in data
     ])
     if request.META.get('HTTP_IF_NONE_MATCH') == etag:

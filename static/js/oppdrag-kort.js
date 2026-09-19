@@ -146,12 +146,17 @@ function enhetskortInnmat(e) {
   // Hoistet ut av mal-strengen, som resten — en nøstet mal-streng inne i en
   // `${...}` er usynlig for XSS-skannerne.
   const grov = e.oppdragsnummer != null ? _grovMerke(e) : '';
+  // Hvor oppdraget er (André, 19. sep. 2026) — bygget før mal-strengen.
+  const lokasjon = e.lokasjon_navn
+    ? '<span class="enhet-oppdrag-sted"><i class="bi bi-geo-alt"></i> ' + escapeHtml(e.lokasjon_navn) + '</span>'
+    : '';
   const oppdragslinje = e.oppdragsnummer != null
     ? `<div class="enhet-oppdrag">
          <span class="oppdrag-nr">${escHtmlValue(oppdragsnr(e.oppdragsnummer))}</span>
          <span class="hastegrad ${escHtmlValue(hastegradKlasse(e.hastegrad))}">${escapeHtml(e.hastegrad || '')}</span>
          ${grov}
          <span class="enhet-oppdrag-problem">${escapeHtml(_problemMedAntall(e))}</span>
+         ${lokasjon}
        </div>`
     : '';
   // **Passiv-merket vises bare der det betyr noe** (André, 16. sep. 2026):

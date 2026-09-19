@@ -284,9 +284,10 @@ minimeres»). Gruppeoverskriften er en knapp; lukket-tilstanden huskes per nettl
 
 **Vaktlistas ressurser uten oppdragsenhet står på tavla** — lag, samleplass, KO — under
 enhetslista i egen beholder (`#vaktliste-ressurser`; sentralbordet tegner `#enhetsliste` om
-igjen ved hver poll). Data fra `/vaktliste/api/ressurser/uten-enhet/`, gatet av vaktlista,
-tegnet av `koRessurskort()`: hvor mange som er møtt, og «På H14 · 23 min» når laget står på
-en åpen hendelse. **Besetningen — navn, møtt, telefon, ISSI — står bak et klikk**, én om
+igjen ved hver poll). Data fra `/vaktliste/api/ressurser/uten-enhet/`, gatet av vaktlista —
+**bare ressurser med et skift som dekker nå** (`ressurser_paa_vakt_naa`, samme regel som
+lagvelgeren) — tegnet av `koRessurskort()`: hvor mange som er møtt, og «På H14 · Hovedscene
+· 23 min» når laget står på en åpen hendelse. Bilenes kort viser oppdragets sted. **Besetningen — navn, møtt, telefon, ISSI — står bak et klikk**, én om
 gangen som bilens (André, 19. sep. 2026: «da sparer vi plass»). Alle | Biler | Lag i
 vinduets hode huskes per nettleser (`ko.ressursvisning`), og det skjulte står som et tall.
 
