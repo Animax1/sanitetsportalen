@@ -107,6 +107,13 @@ async function opprettOppdrag() {
   const feil = document.getElementById('nytt-feil');
   feil.classList.add('d-none');
 
+  // Ingen hastegrad er valgt fra start (19. sep. 2026), og serveren
+  // avviser tom — men det skal sies her, ved knappen, ikke som en 400.
+  if (!document.getElementById('nytt-hastegrad').value) {
+    feil.textContent = 'Velg hastegrad.';
+    feil.classList.remove('d-none');
+    return;
+  }
   const enhetIder = _valgteEnheter();
   if (!enhetIder.length) {
     feil.textContent = 'Kryss av minst én enhet.';
@@ -156,7 +163,7 @@ function nullstillNyttOppdrag() {
     const felt = document.getElementById(id);
     if (felt) felt.value = '';
   });
-  // Problemstillingene følger hastegraden som står valgt — den første nå.
+  // Problemstillingene følger hastegraden som står valgt — ingen nå.
   hastegradEndret('nytt');
 }
 

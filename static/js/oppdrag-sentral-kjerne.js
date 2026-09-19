@@ -62,6 +62,13 @@ function fyllProblemstillinger(prefiks, hastegrad, valgt) {
   // bilen, ikke her (12. sep. 2026).
   const sel = document.getElementById(`${prefiks}-problemstilling`);
   if (!sel) return;
+  // Uten hastegrad finnes ingen liste (19. sep. 2026: «nytt oppdrag uten
+  // hendelse skal ha ingen hastegrad selektert»). Ett tomt valg som sier
+  // hvorfor, så feltet ikke ser ødelagt ut.
+  if (!hastegrad) {
+    sel.innerHTML = '<option value="">Velg hastegrad først</option>';
+    return;
+  }
   const liste = problemstillingerFor(hastegrad);
   const ny = liste.includes(valgt) ? valgt : (liste[0] || '');
   sel.innerHTML = liste.map((p) =>

@@ -119,8 +119,13 @@ def _til_dict(linje):
         # sier hvem. Tom/`''` når linja ikke er festet.
         'festet_at': linje.festet_at.isoformat() if linje.festet_at else '',
         'festet_av': linje.festet_av_navn,
-        # Et tillegg til hendelsens beskrivelse (19. sep. 2026).
-        'beskrivelse': linje.beskrivelse,
+        # Deling med enhetene (19. sep. 2026): `delt_at` når linja er delt
+        # med alle oppdrag i hendelsen, `delt_med` oppdragene den er delt
+        # med enkeltvis. Tilstanden sendes hel i `delte` på hver poll; her
+        # står den for at en nyskrevet eller rettet linje kommer riktig.
+        'delt_at': linje.delt_at.isoformat() if linje.delt_at else None,
+        'delt_av': linje.delt_av_navn,
+        'delt_med': sorted(d.oppdrag_id for d in linje.delinger.all()),
     }
 
 
@@ -154,11 +159,7 @@ def _hendelse_til_dict(h):
         'melder_typer': list(h.melder_typer or []),
         'melder': h.melder,
         'melder_tekst': services.melder_tekst(h),
-        # Beskrivelsen som tillegg og lagene på hendelsen (19. sep. 2026).
-        # Tilleggene er logglinjer og finnes alt i `koLinjer` på klienten;
-        # de sendes her likevel, fordi det er denne lista «Rediger oppdrag»
-        # og bilen leser gjennom `oppdrag_til_dict` — én form for alle tre.
-        'beskrivelse': h.beskrivelse_tillegg(),
+        # Lagene på hendelsen (19. sep. 2026).
         'lag': [{'id': l.pk, 'ressurs_id': l.ressurs_id, 'navn': l.ressurs_navn,
                  'fra': l.fra.isoformat(), 'av': l.av_navn} for l in h.lag.all()],
         'deltakere': [d.brukernavn for d in h.deltakere.all()],
@@ -336,6 +337,9 @@ def logg_view(request):
         # Hele lista hver gang, som `fjernede`: en hendelse som lukkes eller
         # omdøpes får ingen ny id, og ville aldri kommet gjennom `?siden=`.
         'hendelser': [_hendelse_til_dict(h) for h in services.hendelser_for(vakt)],
+        # Delingstilstanden, hel hver gang (19. sep. 2026) — en angret deling
+        # er fravær, og fravær kommer aldri gjennom `?siden=`.
+        'delte': services.delte_for_vakt(vakt),
     })
 
 
@@ -367,9 +371,6 @@ def logg_skriv_view(request):
             ansvarsomraade=data.get('ansvarsomraade'),
             uformell=bool(data.get('uformell')),
             hendelse=hendelse,
-            # Et tillegg til beskrivelsen (19. sep. 2026) — samme sti, ett
-            # merke til. Tjenestelaget krever hendelsen.
-            beskrivelse=bool(data.get('beskrivelse')),
         )
     except services.Ugyldig as feil:
         return _feil(str(feil))
@@ -396,6 +397,46 @@ def logg_fest_view(request, pk):
 def logg_losne_view(request, pk):
     linje = get_object_or_404(Logglinje, pk=pk, vakt=hent_aktiv_vakt())
     services.losne_linje(linje, bruker=request.user)
+    return JsonResponse({'status': 'ok', 'data': _til_dict(linje)})
+
+
+def _oppdrag_for_deling(data, vakt):
+    """`oppdrag_id` i kroppen gjør delingen individuell. 404 utenfor vakta,
+    som hendelsesstiene; `None` når kroppen ikke oppgir noe."""
+    if data.get('oppdrag_id') is None:
+        return None
+    from oppdrag.models import Oppdrag
+    return get_object_or_404(Oppdrag, pk=data['oppdrag_id'], vakt=vakt)
+
+
+@modul_kreves('ko', 'skriv_full', svar='json')
+@require_http_methods(['POST'])
+@rate_limit(group='ko:logg_del', rate='60/m', method='POST')
+def logg_del_view(request, pk):
+    """Del linja med enhetene (19. sep. 2026). Uten `oppdrag_id` i kroppen:
+    med alle oppdrag fra hendelsen, nå og senere. `skriv_full`, som å skrive
+    den — det er det samme nivået som fører loggen."""
+    vakt = hent_aktiv_vakt()
+    linje = get_object_or_404(Logglinje, pk=pk, vakt=vakt)
+    try:
+        services.del_linje(linje, bruker=request.user,
+                           oppdrag=_oppdrag_for_deling(_json_body(request), vakt))
+    except services.Ugyldig as feil:
+        return _feil(str(feil))
+    return JsonResponse({'status': 'ok', 'data': _til_dict(linje)})
+
+
+@modul_kreves('ko', 'skriv_full', svar='json')
+@require_http_methods(['POST'])
+@rate_limit(group='ko:logg_angre_deling', rate='60/m', method='POST')
+def logg_angre_deling_view(request, pk):
+    vakt = hent_aktiv_vakt()
+    linje = get_object_or_404(Logglinje, pk=pk, vakt=vakt)
+    try:
+        services.angre_deling(linje, bruker=request.user,
+                              oppdrag=_oppdrag_for_deling(_json_body(request), vakt))
+    except services.Ugyldig as feil:
+        return _feil(str(feil))
     return JsonResponse({'status': 'ok', 'data': _til_dict(linje)})
 
 

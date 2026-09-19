@@ -190,6 +190,7 @@ body.ko-drar-h { cursor: row-resize; }
 .ko-prio-m-drift  { background: #1e3a8a; color: #bfdbfe; }
 
 .badge-apen { background: #1d4ed8; }
+.badge.delt { background: #15803d; color: #fff; }
 .badge-lukket { background: #334155; color: #cbd5e1; }
 
 /* Søkefeltet i hodet. */
@@ -229,6 +230,12 @@ body.ko-drar-h { cursor: row-resize; }
 .h-linje .tid { font-weight: 600; margin-right: 0.4rem; }
 .h-linje .hvem { color: var(--text-muted); font-size: 0.78rem; }
 .h-linje.system { color: var(--text-muted); font-style: italic; }
+/* Deling (19. sep. 2026): «Delt»-merket og Del/Angre-knappen på linja. */
+.h-linje .badge.delt { font-size: 0.65rem; vertical-align: middle; margin-left: 0.4rem; }
+.h-linje .ko-del-knapp { font-size: 0.78rem; text-decoration: none; margin-right: 0.5rem; }
+.h-linje .verktoy { margin-left: 0.5rem; white-space: nowrap; font-size: 0.78rem; }
+.h-linje .verktoy .btn-link { padding: 0 0.2rem; font-size: 0.85rem; color: var(--text-muted); }
+.h-linje .verktoy .btn-link:hover { color: var(--text-main); }
 .ko-deltar { font-size: 0.8rem; color: var(--text-muted); }
 .ko-deltar .navn { color: #bfdbfe; font-weight: 600; }
 /* Prioritetsknappene i hodet: én er valgt, og den er fylt. */
@@ -270,9 +277,8 @@ body.ko-drar-h { cursor: row-resize; }
 .lag-brikke .siden { color: var(--text-muted); }
 .lag-brikke .btn-link { color: var(--text-muted); line-height: 1; }
 .ko-opptatt { color: #fca5a5; font-weight: 600; }
-/* `.b-tillegg` og `.b-skjema` — tilleggene i beskrivelsen — står i
-   oppdrag.css: de tegnes på /oppdrag/, i bilen og her, og ett ark er ett. */
-.ko-tillegg-merke { font-size: 0.65rem; vertical-align: middle; }
+/* `.b-tillegg` — «Fra loggen i H14» — står i oppdrag.css: den tegnes på
+   /oppdrag/, i bilen og her, og ett ark er ett. */
 .ko-ressurskort.enhet-kort-klikkbar { cursor: pointer; }
 .ko-ressurskort-apen { border-color: var(--portal-accent); }
 .ko-ressurskort .enhet-oppdrag { cursor: pointer; }

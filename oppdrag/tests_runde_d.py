@@ -326,6 +326,35 @@ class HastegradknappeneTests(SimpleTestCase):
                                   'fyllProblemstillinger', 'problemstillingerFor')),
         ))
 
+    def test_uten_hastegrad_stopper_opprettelsen_ved_knappen(self):
+        """Ingen hastegrad er valgt fra start (19. sep. 2026), og det skal
+        sies ved knappen — ikke som en 400 fra serveren. **Kallstedet**:
+        `apiFetch` skal ikke nås."""
+        harness = build_harness(((OPPDRAG_SENTRAL_JS, ('opprettOppdrag', '_valgteEnheter')),))
+        ut = run_node(harness, """
+            let kall = 0;
+            globalThis.apiFetch = async () => { kall += 1; return { ok: true, json: async () => ({ status: 'ok', data: { id: 1 } }) }; };
+            const feil = { textContent: '', skjult: true, classList: { add() { feil.skjult = true; }, remove() { feil.skjult = false; } } };
+            const felter = { 'nytt-feil': feil, 'nytt-hastegrad': { value: '' } };
+            globalThis.document = { getElementById: (id) => felter[id] || null,
+                                    querySelectorAll: () => [{ value: '7' }] };
+            await opprettOppdrag();
+            console.log(JSON.stringify([feil.textContent, feil.skjult, kall]));
+        """).splitlines()[0]
+        self.assertEqual(ut, '["Velg hastegrad.",false,0]')
+
+    def test_problemstillingene_venter_paa_hastegraden(self):
+        """Uten hastegrad finnes ingen liste — ett tomt valg som sier hvorfor."""
+        ut = run_node(self.harness, """
+            globalThis.window = { OPPDRAG_PROBLEMSTILLINGER_FOR: { Akutt: ['Fall'] } };
+            const sel = { value: '', innerHTML: '' };
+            globalThis.document = { getElementById: (id) => id === 'nytt-problemstilling' ? sel : null };
+            fyllProblemstillinger('nytt', '', ''); console.log(sel.innerHTML);
+            fyllProblemstillinger('nytt', 'Akutt', ''); console.log(sel.innerHTML.includes('Fall'));
+        """).splitlines()
+        self.assertEqual(ut[0], '<option value="">Velg hastegrad først</option>')
+        self.assertEqual(ut[1], 'true')
+
     STUBB = """
         globalThis.window = { OPPDRAG_PROBLEMSTILLINGER_FOR: { Akutt: ['Fall'], Drift: ['Strøm'] } };
         const knapp = (arg) => ({ dataset: { arg }, valgt: false, aria: '',

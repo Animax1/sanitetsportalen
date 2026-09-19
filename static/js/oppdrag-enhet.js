@@ -166,6 +166,13 @@ function oppdragsnr(nummer) {
   return 'O' + nummer;
 }
 
+// «H14» — KOs nummer på hendelsen. Samme form som i `oppdrag-kort.js`, og
+// gjentatt her av samme grunn som `hastegradKlasse`: bilen laster ikke
+// sentralbordets filer.
+function hendelsesnr(nummer) {
+  return 'H' + nummer;
+}
+
 function hastegradKlasse(h) {
   return 'hastegrad-' + (h || '').toLowerCase();
 }
@@ -422,14 +429,10 @@ function renderAktivt() {
     const lagBlokk = lagNavn
       ? `<div class="oppdrag-meta oppdrag-lag mb-1"><i class="bi bi-people me-1"></i>Lag på hendelsen: ${escapeHtml(lagNavn)}</div>`
       : '';
-    // Tilleggene i beskrivelsen, med hvem og når — samme tekst som KO ser.
-    // Rader bygget før mal-strengen (skanneren ser ikke inn i en nøstet).
-    const tillegg = (o.hendelse_id && Array.isArray(o.hendelse_beskrivelse)) ? o.hendelse_beskrivelse : [];
-    const tilleggRader = tillegg.map((t, i) => '<div class="b-tillegg' + (i === tillegg.length - 1 ? ' nyest' : '') + '">'
-      + escapeHtml(t.tekst) + '<span class="hvem">' + escapeHtml(t.av || '') + ' · ' + escapeHtml(klokke(t.tid)) + '</span></div>').join('');
-    const beskrivelseBlokk = tilleggRader
-      ? `<div class="oppdrag-beskrivelse mb-1"><div class="oppdrag-meta"><i class="bi bi-card-text me-1"></i>Beskrivelse på hendelsen</div>${tilleggRader}</div>`
-      : '';
+    // Linjene KO har delt fra loggen i hendelsen, med hvem og når. Det som
+    // er delt det siste minuttet står gult (`erNyDelt`). Rader bygget før
+    // mal-strengen (skanneren ser ikke inn i en nøstet).
+    const beskrivelseBlokk = delteLinjerBlokk(o);
     const nesteKnapp = o.neste_overgang
       ? `<button type="button" class="btn btn-primary stor-knapp flex-grow-1"
                  id="stemple-neste-${escHtmlValue(o.id)}"
@@ -508,14 +511,10 @@ function renderVentende() {
     const lagBlokk = lagNavn
       ? `<div class="oppdrag-meta oppdrag-lag mb-1"><i class="bi bi-people me-1"></i>Lag på hendelsen: ${escapeHtml(lagNavn)}</div>`
       : '';
-    // Tilleggene i beskrivelsen, med hvem og når — samme tekst som KO ser.
-    // Rader bygget før mal-strengen (skanneren ser ikke inn i en nøstet).
-    const tillegg = (o.hendelse_id && Array.isArray(o.hendelse_beskrivelse)) ? o.hendelse_beskrivelse : [];
-    const tilleggRader = tillegg.map((t, i) => '<div class="b-tillegg' + (i === tillegg.length - 1 ? ' nyest' : '') + '">'
-      + escapeHtml(t.tekst) + '<span class="hvem">' + escapeHtml(t.av || '') + ' · ' + escapeHtml(klokke(t.tid)) + '</span></div>').join('');
-    const beskrivelseBlokk = tilleggRader
-      ? `<div class="oppdrag-beskrivelse mb-1"><div class="oppdrag-meta"><i class="bi bi-card-text me-1"></i>Beskrivelse på hendelsen</div>${tilleggRader}</div>`
-      : '';
+    // Linjene KO har delt fra loggen i hendelsen, med hvem og når. Det som
+    // er delt det siste minuttet står gult (`erNyDelt`). Rader bygget før
+    // mal-strengen (skanneren ser ikke inn i en nøstet).
+    const beskrivelseBlokk = delteLinjerBlokk(o);
     const startKnapp = `
       <button type="button" class="btn btn-primary stor-knapp w-100 mt-2"
               id="stemple-neste-${escHtmlValue(o.id)}"
@@ -1059,6 +1058,34 @@ async function stempleAlternativ(id) {
 
 // ── Lasting ─────────────────────────────────────────────
 
+// **Gult i ett minutt** (André, 19. sep. 2026: «hver tekst som er nytt i
+// enhetens oppdrag må vises med gul markert tekst. Og det skal vare i 1
+// minutt»). Regnet fra *delingen*, ikke fra når linja ble skrevet: det er
+// delingen som er nytt for bilen. Regelen står for seg fordi den avgjør et
+// merke, og fordi klokka må kunne oppgis i en test.
+const NY_DELT_MS = 60 * 1000;
+
+function erNyDelt(deltAt, naa) {
+  const t = Date.parse(deltAt || '');
+  if (isNaN(t)) return false;
+  return (naa === undefined ? Date.now() : naa) - t < NY_DELT_MS;
+}
+
+function delteLinjerBlokk(o, naa) {
+  const linjer = (o.hendelse_id && Array.isArray(o.delte_linjer)) ? o.delte_linjer : [];
+  if (!linjer.length) return '';
+  const rader = linjer.map((t) => '<div class="b-tillegg' + (erNyDelt(t.delt_at, naa) ? ' ny' : '') + '">'
+    + escapeHtml(t.tekst) + '<span class="hvem">' + escapeHtml(t.av || '') + ' · ' + escapeHtml(klokke(t.tid)) + '</span></div>').join('');
+  return '<div class="oppdrag-beskrivelse mb-1"><div class="oppdrag-meta"><i class="bi bi-card-text me-1"></i>Fra loggen i '
+    + '<span class="hendelse-merke">' + escapeHtml(hendelsesnr(o.hendelse_nummer)) + '</span></div>' + rader + '</div>';
+}
+
+// Det gule skal slukke av seg selv, også når serveren svarer 304 og
+// `lastMine` ikke tegner: tegn på nytt så lenge noe er nytt.
+function harNyDelt(liste, naa) {
+  return liste.some((o) => (o.delte_linjer || []).some((t) => erNyDelt(t.delt_at, naa)));
+}
+
 async function lastMine() {
   let res;
   try {
@@ -1068,7 +1095,10 @@ async function lastMine() {
   } catch (e) {
     return;   // nettbrudd midt i en poll — forrige visning står til neste
   }
-  if (res.status === 304) return;
+  if (res.status === 304) {
+    if (harNyDelt(mineOppdrag)) renderAlt();
+    return;
+  }
   if (!res.ok) return;
   etagMine = res.headers.get('ETag');
   // Serverens svar er sannheten, men det som ligger usendt legges oppå —

@@ -179,21 +179,21 @@ KO_LOGG_BYGGERE = (
     'koLeggHendelsevalgINyttOppdrag',
     # «Nullstill»-fanen: ren markup uten data, men den bygger markup like fullt.
     'koTegnNullstill',
-    # Lagene på hendelsen og beskrivelsen som tillegg (19. sep. 2026), og
-    # besetningen bak et klikk på lagkortet.
-    'koTilleggHtml',
-    'koTilleggSkjemaHtml',
-    'koBeskrivelseHtml',
+    # Lagene på hendelsen (19. sep. 2026), og besetningen bak et klikk på
+    # lagkortet.
     'koLagBrikkeHtml',
     'koLagVelgerHtml',
     'koFyllLagvalg',
-    'koBeskrivelseSkjema',
     'koRessursBesetningHtml',
     'koRessursOpptattHtml',
-    # Beskrivelsen fra hendelsen i «Nytt oppdrag» (19. sep. 2026).
-    'koHendelseInfoHtml',
-    # Rediger/fjern inne i hendelsen (19. sep. 2026).
+    # Arven i «Nytt oppdrag» (19. sep. 2026): teksten under nedtrekket.
+    'koHendelsevalgEndret',
+    # Rediger/fjern og deling inne i hendelsen (19. sep. 2026), og «Fra
+    # loggen i H14» i oppdragets detaljmodal.
     'koRettFjernKnapper',
+    'koDeltMerke',
+    'koDelingKnapper',
+    'koDelteLinjerHtml',
 )
 
 #: Uttrykk som interpoleres uten `escapeHtml`, med begrunnelse.
@@ -504,7 +504,7 @@ HENDELSE_HARNESS = (
     (KO_JS, ('koSorterHendelser', 'koHendelseTreffer', 'koSynligeHendelser', 'koApneHendelser',
              'koPrioriteter', 'koPrioritetNavn', 'koPrioritetRang', 'koPrioMerke', 'koPrioIkon',
              'koOppdragForHendelse', 'koHendelseRadHtml', 'koKlokke', 'koKanSkrive',
-             'koIStrommen', 'koLinjeMerke')),
+             'koIStrommen', 'koLinjeMerke', 'koHendelseLinjer', 'koOperatorlinjer')),
 )
 
 
@@ -540,17 +540,24 @@ class SorteringsregelenTests(SimpleTestCase):
                  {'nummer': 2, 'status': 'apen', 'prioritet': 'drift'}]
         self.assertEqual(self._sorter(liste), [2, 1])
 
-    def test_soeket_treffer_nummer_tittel_sted_melder_tillegg_og_lag(self):
-        h = {'kode': 'H12', 'nummer': 12, 'tittel': 'Slagsmål', 'lokasjon_navn': 'Scene sør',
+    def test_soeket_treffer_nummer_tittel_sted_melder_loggen_og_lag(self):
+        h = {'id': 4, 'kode': 'H12', 'nummer': 12, 'tittel': 'Slagsmål', 'lokasjon_navn': 'Scene sør',
              'melder_typer': ['andre'], 'melder': 'kiosken', 'melder_tekst': 'Andre (kiosken)',
-             'beskrivelse': [{'tekst': 'to personer'}, {'tekst': 'én pågrepet'}],
              'lag': [{'ressurs_id': 3, 'navn': 'Lag 3'}]}
+        # Loggen i hendelsen søkes — men ikke systemlinjene, ikke fjernede
+        # linjer, og ikke linjer i en annen hendelse.
+        linjer = ("koLinjer = new Map([[1, {id: 1, rot: 1, hendelse_id: 4, kilde: 'operator', tekst: 'to personer'}],"
+                  "[2, {id: 2, rot: 2, hendelse_id: 4, kilde: 'operator', tekst: 'én pågrepet'}],"
+                  "[3, {id: 3, rot: 3, hendelse_id: 4, kilde: 'system', tekst: 'Hendelse opprettet'}],"
+                  "[5, {id: 5, rot: 5, hendelse_id: 4, kilde: 'operator', tekst: 'kniv', fjernet: true}],"
+                  "[6, {id: 6, rot: 6, hendelse_id: 9, kilde: 'operator', tekst: 'brann'}]]);\n")
         for sok, ventet in (('h12', True), ('12', True), ('slag', True), ('sør', True),
                             ('kiosk', True), ('andre', True), ('personer', True), ('pågrepet', True),
-                            ('lag 3', True), ('', True), ('  ', True), ('brann', False)):
+                            ('lag 3', True), ('', True), ('  ', True), ('brann', False),
+                            ('opprettet', False), ('kniv', False)):
             with self.subTest(sok=sok):
                 ut = run_node(self.harness,
-                              f'console.log(koHendelseTreffer({json.dumps(h)}, {json.dumps(sok)}));',
+                              linjer + f'console.log(koHendelseTreffer({json.dumps(h)}, {json.dumps(sok)}));',
                               preamble=PRIORITET_PREAMBLE).splitlines()[0]
                 self.assertEqual(ut, 'true' if ventet else 'false')
 
@@ -576,16 +583,19 @@ class HendelsesradenTests(SimpleTestCase):
     def setUp(self):
         self.harness = build_harness(HENDELSE_HARNESS)
 
-    def _rad(self, h, oppdrag=None):
+    def _rad(self, h, oppdrag=None, linjer=None):
+        rader = [dict({'id': i + 1, 'rot': i + 1, 'hendelse_id': 5, 'kilde': 'operator'}, **l)
+                 for i, l in enumerate(linjer if linjer is not None
+                                       else [{'tekst': 'Mann ca. 40', 'forfatter': 'kari'}])]
         return run_node(self.harness,
                         f'oppdragsliste = {json.dumps(oppdrag or [])};\n'
+                        f'koLinjer = new Map({json.dumps([[l["id"], l] for l in rader])});\n'
                         f'console.log(koHendelseRadHtml({json.dumps(h)}));',
                         preamble=PRIORITET_PREAMBLE)
 
     H = {'id': 5, 'nummer': 14, 'kode': 'H14', 'tittel': 'Bevisstløs person', 'status': 'apen',
          'prioritet': 'viktig', 'lokasjon_navn': 'Hovedscene', 'melder_typer': ['egen'],
          'melder': '', 'melder_tekst': 'Egen ressurs',
-         'beskrivelse': [{'id': 1, 'tekst': 'Mann ca. 40', 'av': 'kari', 'tid': '2026-09-18T21:42:00'}],
          'opprettet_at': '2026-09-18T21:42:00',
          'opprettet_av': 'kari', 'lukket_at': '', 'apne_oppdrag': 1,
          'lag': [{'id': 1, 'ressurs_id': 7, 'navn': 'Lag 1', 'fra': '2026-09-18T21:42:00', 'av': 'kari'}],
@@ -615,18 +625,22 @@ class HendelsesradenTests(SimpleTestCase):
         self.assertIn('O47', ut)
         self.assertNotIn('O48', ut)
 
-    def test_raden_baerer_siste_tillegg_melder_og_lag(self):
-        ut = self._rad(dict(self.H, beskrivelse=[{'tekst': 'første'}, {'tekst': 'siste'}]))
+    def test_raden_baerer_siste_logglinje_melder_og_lag(self):
+        ut = self._rad(self.H, linjer=[{'tekst': 'første'}, {'tekst': 'siste'},
+                                       {'tekst': 'Lag 1 på', 'kilde': 'system'},
+                                       {'tekst': 'feil', 'fjernet': True}])
         self.assertIn('siste', ut)
-        self.assertNotIn('første', ut, 'bare det nyeste tillegget står under tittelen')
+        self.assertNotIn('første', ut, 'bare den nyeste linja står under tittelen')
+        self.assertNotIn('Lag 1 på', ut, 'systemlinjer og fjernede linjer teller ikke')
+        self.assertNotIn('feil', ut)
         self.assertIn('Meldt av Egen ressurs', ut)
         self.assertIn('Lag 1', ut)
 
-    def test_escaper_tittel_sted_melder_tillegg_og_lag(self):
+    def test_escaper_tittel_sted_melder_logglinje_og_lag(self):
         ond = '<img src=x onerror=alert(1)>'
-        ut = self._rad(dict(self.H, tittel=ond, lokasjon_navn=ond, melder_tekst=ond,
-                            beskrivelse=[{'tekst': ond}], opprettet_av=ond,
-                            lag=[{'id': 1, 'ressurs_id': 7, 'navn': ond, 'fra': '', 'av': ''}]))
+        ut = self._rad(dict(self.H, tittel=ond, lokasjon_navn=ond, melder_tekst=ond, opprettet_av=ond,
+                            lag=[{'id': 1, 'ressurs_id': 7, 'navn': ond, 'fra': '', 'av': ''}]),
+                       linjer=[{'tekst': ond}])
         self.assertNotIn('<img', ut)
         self.assertIn('&lt;img', ut)
 
@@ -667,30 +681,28 @@ class StroemmenTests(SimpleTestCase):
 
 
 @unittest.skipUnless(node_available(), 'node er ikke tilgjengelig')
-class TilleggOgLagTests(SimpleTestCase):
-    """Beskrivelsen som tillegg og lagene på hendelsen (19. sep. 2026):
-    «nytt» i ti minutter, «siden»-teksten, tallet på det skjulte i
+class DelingOgLagTests(SimpleTestCase):
+    """Deling av logglinjer med enhetene og lagene på hendelsen (19. sep.
+    2026): «Delt»-merket og Del/Angre etter nivå, «Fra loggen i H14» i
+    oppdragets detaljmodal, «siden»-teksten, tallet på det skjulte i
     ressursoversikten — og at tekst, navn og lagnavn escapes."""
+
+    DELING = ('koErDelt', 'koDeltEtikett', 'koDeltMerke', 'koDelingKnapper', 'koRettFjernKnapper',
+              'koKlokke', 'koKanSkrive', 'koKanFjerne', 'koDetaljLinjeHtml')
 
     def setUp(self):
         self.harness = build_harness((
             (PORTAL_UTILS_JS, ('escapeHtml', 'fmtMin')),
-            (KO_JS, ('koErNytt', 'koSiden', 'koSkjultTall', 'koTilleggHtml', 'koLagBrikkeHtml',
-                     'koKlokke', 'koTilleggSkjemaHtml', 'koBeskrivelseHtml', 'koRettFjernKnapper',
-                     'koKanSkrive', 'koKanFjerne')),
+            (OPPDRAG_KORT_JS, ('oppdragsnr',)),
+            (KO_JS, self.DELING + ('koSiden', 'koSkjultTall', 'koLagBrikkeHtml', 'koDelteLinjerHtml',
+                                   'koHendelseLinjer', 'koOperatorlinjer')),
         ))
 
-    PRE = "const KO_NYTT_MS = 10 * 60 * 1000;\nglobalThis.window = { MODUL_TILGANG: {} };\n"
+    PRE = ("globalThis.window = { MODUL_TILGANG: { ko: 'skriv_full' } };\n"
+           "let koLinjer = new Map(); let koHendelser = new Map(); let oppdragsliste = [];\n")
 
     def _kjor(self, kode):
         return run_node(self.harness, kode, preamble=self.PRE).splitlines()
-
-    def test_nytt_i_ti_minutter(self):
-        ut = self._kjor(
-            "const naa = Date.parse('2026-09-19T22:00:00Z');\n"
-            "console.log([koErNytt('2026-09-19T21:51:00Z', naa), koErNytt('2026-09-19T21:50:00Z', naa),"
-            " koErNytt('2026-09-19T21:49:59Z', naa), koErNytt('tull', naa), koErNytt('', naa)].join(','));")
-        self.assertEqual(ut[0], 'true,false,false,false,false')
 
     def test_siden_i_minutter_og_timer(self):
         ut = self._kjor(
@@ -704,13 +716,70 @@ class TilleggOgLagTests(SimpleTestCase):
                         " koSkjultTall('lag', 0, 3), koSkjultTall('biler', 4, 0)].join('|'));")
         self.assertEqual(ut[0], '|3 lag skjult|4 biler skjult||')
 
-    def test_tillegget_baerer_hvem_naar_nyest_og_nytt(self):
+    def test_delt_etiketten_sier_alle_eller_hvilke(self):
         ut = self._kjor(
-            "const t = {tekst: 'Pasienten våken', av: 'kari', tid: new Date(Date.now() - 60000).toISOString()};\n"
-            "console.log(koTilleggHtml(t, true));\n"
-            "console.log(koTilleggHtml({...t, tid: '2026-01-01T10:00:00Z', rettet: true}, false));\n")
-        self.assertIn('nyest', ut[0]); self.assertIn('nytt', ut[0]); self.assertIn('kari', ut[0])
-        self.assertNotIn('nyest', ut[1]); self.assertNotIn('class="merke"', ut[1]); self.assertIn('(rettet)', ut[1])
+            "oppdragsliste = [{id: 9, nummer: 47}, {id: 10, nummer: 48}];\n"
+            "console.log(JSON.stringify([koDeltEtikett({delt_at: '2026-09-19T10:00:00Z', delt_med: [9]}),"
+            " koDeltEtikett({delt_at: null, delt_med: [9, 10]}), koDeltEtikett({delt_at: null, delt_med: [11]}),"
+            " koDeltEtikett({delt_at: null, delt_med: []}), koDeltEtikett({})]));\n"
+            "console.log(JSON.stringify([koErDelt({delt_at: 'x'}), koErDelt({delt_med: [1]}), koErDelt({delt_med: []}), koErDelt({})]));")
+        self.assertEqual(ut[0], '["Delt","Delt · O47, O48","Delt · #11","",""]')
+        self.assertEqual(ut[1], '[true,true,false,false]')
+
+    def test_linja_i_hendelsen_baerer_merke_og_knapper_etter_nivaa(self):
+        """Del for `skriv_full` (samme nivå som å skrive), Angre når den er
+        delt, rediger for `skriv_full`, fjern for `skriv_leder`; ingenting
+        for `les`. Systemlinjer og fjernede linjer får ingen av delene."""
+        def kjor(nivaa):
+            return run_node(self.harness, self.PRE + f"globalThis.window = {{ MODUL_TILGANG: {{ ko: '{nivaa}' }} }};\n"
+                "console.log(koDetaljLinjeHtml({id: 42, kilde: 'operator', tekst: 'k', forfatter: 'kari', delt_at: null, delt_med: []}));\n"
+                "console.log(koDetaljLinjeHtml({id: 43, kilde: 'operator', tekst: 'd', forfatter: 'kari', delt_at: '2026-09-19T10:00:00Z', delt_av: 'ola', delt_med: []}));\n"
+                "console.log(koDetaljLinjeHtml({id: 44, kilde: 'system', tekst: 'H3 lukket'}));\n"
+                "console.log(koDetaljLinjeHtml({id: 45, kilde: 'operator', fjernet: true, delt_at: '2026-09-19T10:00:00Z'}));\n").splitlines()
+        les, skriv, leder = kjor('les'), kjor('skriv_full'), kjor('skriv_leder')
+        self.assertNotIn('data-action', les[0]); self.assertNotIn('data-action', les[1])
+        self.assertIn('>Delt</span>', les[1], 'merket vises for alle')
+        self.assertIn('data-action="koDelLinje" data-id="42"', skriv[0])
+        self.assertIn('data-action="koRett" data-id="42"', skriv[0]); self.assertNotIn('koFjern', skriv[0])
+        self.assertNotIn('class="badge delt"', skriv[0], 'intern linje har ikke merket')
+        self.assertIn('data-action="koAngreDeling" data-id="43"', skriv[1])
+        self.assertNotIn('koDelLinje', skriv[1])
+        self.assertIn('title="Delt av ola"', skriv[1]); self.assertIn(' delt">', skriv[1])
+        self.assertIn('data-action="koFjern" data-id="42"', leder[0])
+        for linje in (skriv[2], skriv[3]):
+            self.assertNotIn('data-action', linje, 'systemlinjer og fjernede: ingen verktøy')
+            self.assertNotIn('badge delt', linje)
+
+    def test_fra_loggen_i_oppdraget_uten_merker_med_del_og_angre(self):
+        """Bilde 3 er fasit (André, 19. sep. 2026): ingen grønne merker på
+        tekstene. Delt med alle: «alle». Delt med dette: «Angre». Intern:
+        «Del med <enhet>», dempet."""
+        kode = """
+            koHendelser = new Map([[5, {id: 5, kode: 'H14'}]]);
+            koLinjer = new Map([
+              [1, {id: 1, rot: 1, hendelse_id: 5, kilde: 'operator', tekst: 'Mann ca. 40', forfatter: 'kari', tidspunkt: '2026-09-19T10:00:00Z', delt_at: '2026-09-19T10:01:00Z', delt_med: []}],
+              [2, {id: 2, rot: 2, hendelse_id: 5, kilde: 'operator', tekst: 'Bare dere', forfatter: 'kari', tidspunkt: '2026-09-19T10:02:00Z', delt_at: null, delt_med: [9]}],
+              [3, {id: 3, rot: 3, hendelse_id: 5, kilde: 'operator', tekst: 'Intern <b>note</b>', forfatter: 'ola', tidspunkt: '2026-09-19T10:03:00Z', delt_at: null, delt_med: [10]}],
+              [4, {id: 4, rot: 4, hendelse_id: 5, kilde: 'system', tekst: 'Lag 1 på'}],
+            ]);
+            console.log(koDelteLinjerHtml({id: 9, hendelse_id: 5, enhet_navn: 'Mannskapsbil <2>'}));
+            console.log(JSON.stringify(koDelteLinjerHtml({id: 9, hendelse_id: 7})));
+            globalThis.window = { MODUL_TILGANG: { ko: 'les' } };
+            console.log(koDelteLinjerHtml({id: 9, hendelse_id: 5, enhet_navn: 'Mannskapsbil 2'}));
+        """
+        ut = self._kjor(kode)
+        self.assertIn('Fra loggen i <span class="hendelse-merke">H14</span>', ut[0])
+        self.assertNotIn('badge', ut[0], 'ingen merker på tekstene i oppdraget')
+        self.assertNotIn('Lag 1 på', ut[0], 'systemlinjer står ikke der')
+        self.assertIn('<span class="hvem">alle</span>', ut[0])
+        self.assertIn('data-action="koAngreDelingMedOppdrag" data-id="2" data-arg="9"', ut[0])
+        self.assertIn('data-action="koDelMedOppdrag" data-id="3" data-arg="9"', ut[0])
+        self.assertIn('Del med Mannskapsbil &lt;2&gt;', ut[0])
+        self.assertIn('b-tillegg intern">Intern &lt;b&gt;note', ut[0], 'delt med et annet oppdrag er intern her')
+        self.assertNotIn('<b>note', ut[0])
+        self.assertEqual(ut[1], '""', 'ukjent hendelse: ingenting')
+        self.assertNotIn('data-action', ut[2], 'den som bare leser får ingen knapper')
+        self.assertIn('Mann ca. 40', ut[2])
 
     def test_hendelsene_tegner_lagkortene_paa_nytt(self):
         """**Kallstedet, ikke bare regelen.** «På H14 · 23 min» leses av
@@ -728,6 +797,22 @@ class TilleggOgLagTests(SimpleTestCase):
                       "koTaImotHendelser([{id: 1, status: 'apen'}]);\n"
                       'console.log(kalt);', preamble=PRIORITET_PREAMBLE)
         self.assertEqual(ut.splitlines()[0], '1')
+
+    def test_pollen_setter_delingstilstanden_paa_alle_linjene(self):
+        """`delte` er hele lista: det som står der er delt, resten er intern
+        — også en linje som *var* delt og ikke står der lenger."""
+        harness = build_harness(((KO_JS, ('koTaImotDelte',)),))
+        ut = run_node(harness, """
+            let koLinjer = new Map([[1, {id: 1, delt_at: '2026-09-19T10:00:00Z', delt_av: 'kari', delt_med: []}],
+                                    [2, {id: 2, delt_at: null, delt_med: []}], [3, {id: 3}]]);
+            koTaImotDelte([{id: 2, delt_at: null, delt_av: '', delt_med: [9]}, {id: 3, delt_at: '2026-09-19T11:00:00Z', delt_av: 'ola', delt_med: []}]);
+            console.log(JSON.stringify([...koLinjer.values()]));
+        """).splitlines()[0]
+        self.assertEqual(json.loads(ut), [
+            {'id': 1, 'delt_at': None, 'delt_av': '', 'delt_med': []},
+            {'id': 2, 'delt_at': None, 'delt_av': '', 'delt_med': [9]},
+            {'id': 3, 'delt_at': '2026-09-19T11:00:00Z', 'delt_av': 'ola', 'delt_med': []},
+        ])
 
     def test_vis_lukkede_huskes_per_nettleser_og_er_av_som_standard(self):
         """André, 19. sep. 2026: «Når en refresher siden vises også avsluttede
@@ -761,26 +846,6 @@ class TilleggOgLagTests(SimpleTestCase):
         self.assertNotIn('value="8"', ut, 'lag som alt står på hendelsen tilbys ikke')
         self.assertIn('>Legg til</button>', ut)
 
-    def test_tillegg_og_traadlinjer_kan_rettes_og_fjernes_etter_nivaa(self):
-        """André, 19. sep. 2026: «kan man ikke redigere/slette beskrivelsen».
-        Rediger for `skriv_full`, fjern for `skriv_leder`; ingenting for `les`."""
-        harness = build_harness((
-            (PORTAL_UTILS_JS, ('escapeHtml', 'fmtMin')),
-            (KO_JS, ('koRettFjernKnapper', 'koTilleggHtml', 'koBeskrivelseHtml', 'koTilleggSkjemaHtml',
-                     'koErNytt', 'koKlokke', 'koKanSkrive', 'koKanFjerne', 'koDetaljLinjeHtml')),
-        ))
-        def kjor(nivaa):
-            return run_node(harness, self.PRE + f"globalThis.window = {{ MODUL_TILGANG: {{ ko: '{nivaa}' }} }};\n"
-                "console.log(koBeskrivelseHtml({id: 3, beskrivelse: [{id: 41, tekst: 'x', av: 'kari', tid: ''}]}, true, 'f', 'h'));\n"
-                "console.log(koDetaljLinjeHtml({id: 42, kilde: 'operator', tekst: 'k', forfatter: 'kari'}));\n"
-                "console.log(koDetaljLinjeHtml({id: 43, kilde: 'system', tekst: 'H3 lukket'}));\n").splitlines()
-        les, skriv, leder = kjor('les'), kjor('skriv_full'), kjor('skriv_leder')
-        self.assertNotIn('data-action="koRett"', les[0]); self.assertNotIn('koFjern', les[1])
-        self.assertIn('data-action="koRett" data-id="41"', skriv[0]); self.assertNotIn('koFjern', skriv[0])
-        self.assertIn('data-action="koRett" data-id="42"', skriv[1])
-        self.assertIn('data-action="koFjern" data-id="41"', leder[0]); self.assertIn('data-action="koFjern" data-id="42"', leder[1])
-        self.assertNotIn('koRett', leder[2], 'systemlinjer rettes ikke her')
-
     def test_feltene_overlever_en_omtegning(self):
         """Operatøren «datt ut av» skrivefeltet ved hver poll (André, 19. sep.
         2026): verdien, markøren og fokuset skal tilbake etter `innerHTML`."""
@@ -806,46 +871,65 @@ class TilleggOgLagTests(SimpleTestCase):
                                " koValgtPrioritet = 'rod'; console.log(koPrioritetValgt());").splitlines()
         self.assertEqual(ut[:2], ['false', 'true'])
 
-    def test_nytt_oppdrag_viser_beskrivelsen_og_kaller_friteksten_bare_dette_oppdraget(self):
-        """«Viktig at inne i nytt oppdrag at det kommer frem at beskrivelse fra
-        hendelse medfølger, og at fritekst bare gjelder enheter knyttet til
-        oppdraget» (André, 19. sep. 2026)."""
+    def test_hastegraden_arver_prioriteten(self):
+        """«Hvis viktig prioritering i hendelse så er det akutt hastegrad»
+        (André, 19. sep. 2026). Tabellen, og tom for alt annet."""
+        harness = build_harness(((KO_JS, ('koHastegradForHendelse',)),))
+        ut = run_node(harness, "console.log(JSON.stringify(['viktig','rod','gul','gronn','drift','tull',''].map((p) => koHastegradForHendelse({prioritet: p}))"
+                               " .concat([koHastegradForHendelse(null), koHastegradForHendelse(undefined)])));").splitlines()[0]
+        self.assertEqual(json.loads(ut), ['Akutt', 'Akutt', 'Haster', 'Vanlig', 'Drift', '', '', '', ''])
+
+    def test_nytt_oppdrag_arver_hastegrad_og_notat_bare_naar_valget_byttet(self):
+        """Hastegraden settes fra prioriteten og notatet fra den første linja,
+        og begge kan endres (André, 19. sep. 2026). Kjøres kallet igjen med
+        samme valg — som `koFyllHendelsevalg` gjør ved hver poll — røres
+        ingenting; operatørens hastegrad og tekst står. Uten hendelse: tom
+        hastegrad, og et arvet notat tas bort, et selvskrevet står."""
         harness = build_harness((
-            (PORTAL_UTILS_JS, ('escapeHtml', 'fmtMin')),
-            (KO_JS, ('koHendelseInfoHtml', 'koHendelsevalgEndret', 'koTilleggHtml', 'koErNytt', 'koKlokke')),
+            (PORTAL_UTILS_JS, ('escapeHtml',)),
+            (KO_JS, ('koHendelsevalgEndret', 'koHastegradForHendelse', 'koNotatForHendelse',
+                     'koOperatorlinjer', 'koHendelseLinjer', 'koNullstillHendelsevalg')),
         ))
         ut = run_node(harness, self.PRE + '''
-            let koHendelser = new Map([[5, {id: 5, kode: 'H5', beskrivelse: [{tekst: '<b>Mann</b> ca. 40', av: 'kari', tid: '2026-09-19T10:00:00Z'}]}]]);
+            koHendelser = new Map([[5, {id: 5, kode: 'H5', prioritet: 'gul'}], [6, {id: 6, kode: 'H6', prioritet: 'viktig'}]]);
+            koLinjer = new Map([[1, {id: 1, rot: 1, hendelse_id: 5, kilde: 'operator', tekst: 'Mann ca. 40'}],
+                                [2, {id: 2, rot: 2, hendelse_id: 5, kilde: 'operator', tekst: 'senere'}]]);
+            const valgt = [];
+            globalThis.velgHastegrad = (v) => valgt.push(v);
             const felter = {
-              'nytt-hendelse': { value: '5' }, 'nytt-hendelse-info': { innerHTML: '' },
-              'nytt-fritekst-label': { textContent: 'Fritekst', dataset: {} },
-              'nytt-fritekst-hint': { textContent: 'Vises i bilen.', dataset: {} },
+              'nytt-hendelse': { value: '5', dataset: {} }, 'nytt-hendelse-info': { innerHTML: '' },
+              'nytt-fritekst': { value: '', dataset: {} },
             };
             globalThis.document = { getElementById: (id) => felter[id] || null };
-            koHendelsevalgEndret();
-            console.log(felter['nytt-hendelse-info'].innerHTML);
-            console.log(felter['nytt-fritekst-label'].textContent + ' | ' + felter['nytt-fritekst-hint'].textContent);
+            const les = () => JSON.stringify([valgt.join(','), felter['nytt-fritekst'].value, felter['nytt-hendelse-info'].innerHTML.includes('H5')]);
+            koHendelsevalgEndret(); console.log(les());
+            felter['nytt-fritekst'].value = 'Mann ca. 40, våken';
+            koHendelsevalgEndret(); console.log(les());
+            felter['nytt-hendelse'].value = '6';
+            koHendelsevalgEndret(); console.log(les());
             felter['nytt-hendelse'].value = '';
-            koHendelsevalgEndret();
-            console.log(JSON.stringify(felter['nytt-hendelse-info'].innerHTML) + ' | ' + felter['nytt-fritekst-label'].textContent + ' | ' + felter['nytt-fritekst-hint'].textContent);
+            koHendelsevalgEndret(); console.log(les());
+            felter['nytt-fritekst'].value = '';
+            felter['nytt-hendelse'].value = '5'; koHendelsevalgEndret();
+            felter['nytt-hendelse'].value = ''; koHendelsevalgEndret(); console.log(les());
+            koNullstillHendelsevalg(); felter['nytt-hendelse'].value = '5'; koHendelsevalgEndret(); console.log(les());
         ''').splitlines()
-        self.assertIn('Beskrivelse fra', ut[0]); self.assertIn('H5', ut[0]); self.assertIn('følger med', ut[0])
-        self.assertIn('&lt;b&gt;Mann', ut[0]); self.assertNotIn('<b>Mann', ut[0])
-        self.assertTrue(ut[1].startswith('Bare dette oppdraget | Gjelder bare enhetene'), ut[1])
-        self.assertEqual(ut[2], '"" | Fritekst | Vises i bilen.', 'uten hendelse står standardtekstene')
+        self.assertEqual(json.loads(ut[0]), ['Haster', 'Mann ca. 40', True])
+        self.assertEqual(json.loads(ut[1]), ['Haster', 'Mann ca. 40, våken', True], 'samme valg igjen rører ingenting')
+        self.assertEqual(json.loads(ut[2]), ['Haster,Akutt', 'Mann ca. 40, våken', False], 'ny hendelse: hastegrad arves, egen tekst står')
+        self.assertEqual(json.loads(ut[3]), ['Haster,Akutt,', 'Mann ca. 40, våken', False], 'uten hendelse: ingen hastegrad, egen tekst står')
+        self.assertEqual(json.loads(ut[4]), ['Haster,Akutt,,Haster,', '', False], 'et arvet notat tas bort igjen med hendelsen')
+        self.assertEqual(json.loads(ut[5]), ['Haster,Akutt,,Haster,,Haster', 'Mann ca. 40', True], 'etter nullstilling arves det på nytt')
 
     def test_escaper_tekst_navn_og_lagnavn(self):
         ond = '<img src=x onerror=alert(1)>'
         ut = self._kjor(
-            f"console.log(koTilleggHtml({{tekst: {json.dumps(ond)}, av: {json.dumps(ond)}, tid: ''}}, true));\n"
-            f"console.log(koLagBrikkeHtml({{id: 3}}, {{ressurs_id: 9, navn: {json.dumps(ond)}, fra: ''}}, true));\n"
-            f"console.log(koBeskrivelseHtml({{id: 3, beskrivelse: [{{tekst: {json.dumps(ond)}, av: '', tid: ''}}]}}, true, 'f', 'h'));\n")
-        for linje in ut[:3]:
+            f"console.log(koDetaljLinjeHtml({{id: 1, kilde: 'operator', tekst: {json.dumps(ond)}, forfatter: {json.dumps(ond)}, delt_at: '2026-09-19T10:00:00Z', delt_av: {json.dumps(ond)}, delt_med: []}}));\n"
+            f"console.log(koLagBrikkeHtml({{id: 3}}, {{ressurs_id: 9, navn: {json.dumps(ond)}, fra: ''}}, true));\n")
+        for linje in ut[:2]:
             self.assertNotIn('<img', linje)
             self.assertIn('&lt;img', linje)
         self.assertIn('data-arg="3:9"', ut[1], 'ta av-knappen for den som kan')
-        self.assertIn('data-ko-tillegg="3"', ut[2], 'skjemaet for den som kan')
-        self.assertNotIn('data-ko-tillegg', self._kjor("console.log(koBeskrivelseHtml({id: 3, beskrivelse: []}, false, 'f', 'h'));")[0])
 
 
 @unittest.skipUnless(node_available(), 'node er ikke tilgjengelig')

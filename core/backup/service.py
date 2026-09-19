@@ -146,6 +146,9 @@ UTGAATTE_FELT: dict[str, frozenset[str]] = {
     # de tre feltene; det som sto der er migrert av `ko/0009` i basen, men
     # en fil er ikke basen.
     'ko.hendelse': frozenset({'beskrivelse', 'lagsressurser', 'ressursbehov'}),
+    # 19. sep. 2026, samme dag: tillegg-merket på linja ble til deling
+    # (`delt_at`). Filene fra timene imellom bærer `beskrivelse` på linjene.
+    'ko.logglinje': frozenset({'beskrivelse'}),
 }
 UTGAATTE_MODELLER: frozenset[str] = frozenset({
     'ko.ressursbehov',   # 19. sep. 2026, se over

@@ -35,8 +35,11 @@
                     data-action="velgHastegrad" data-arg="{{ h }}" role="radio" aria-checked="false">{{ h }}</button>
             {% endfor %}
           </div>
+          {# Det tomme valget først: ingen hastegrad er valgt før noen velger #}
+          {# — eller hendelsen i «Nytt oppdrag» på /ko/ arver den (19. sep. 2026). #}
           <select id="nytt-hastegrad" class="form-select d-none" aria-hidden="true" tabindex="-1"
                   data-action="hastegradEndret" data-hendelse="change" data-arg="nytt">
+            <option value=""></option>
             {% for h in hastegrader %}<option>{{ h }}</option>{% endfor %}
           </select>
         </div>
@@ -56,9 +59,9 @@
         <div class="mb-3">
           {# Etiketten og hinten har id-er: på /ko/ bytter KO dem til «Bare dette #}
           {# oppdraget» når en hendelse er valgt — beskrivelsen følger med derfra. #}
-          <label class="form-label" for="nytt-fritekst" id="nytt-fritekst-label">Fritekst</label>
+          <label class="form-label" for="nytt-fritekst" id="nytt-fritekst-label">Oppdragsnotat</label>
           <textarea id="nytt-fritekst" class="form-control" rows="3"></textarea>
-          <div class="form-text" id="nytt-fritekst-hint">Vises i bilen til oppdraget avsluttes. Innholdet lagres ikke i auditloggen.</div>
+          <div class="form-text" id="nytt-fritekst-hint">Bare enhetene på dette oppdraget ser notatet, til oppdraget avsluttes. Innholdet lagres ikke i auditloggen.</div>
         </div>
         {# Hendelsen — sist, og bare på /ko/: `ko.js` fyller plassen. Tom her, #}
         {# fordi oppdragsmodulen ikke kjenner hendelser. #}

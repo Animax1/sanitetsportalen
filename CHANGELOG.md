@@ -4,6 +4,72 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-19 — KO: «Logg i hendelse» med deling til enhetene, oppdragsnotat, hastegrad arver prioriteten, gult minutt i bilen, hvit «Fra»-tekst  `#ko/hendelseslogg` `#ko/loggen` `#oppdrag/sentralbord` `#oppdrag/enhetsskjerm`
+
+André, 19. sep. 2026: «inne i hendelsen så endrer vi beskrivelses loggen og løpende loggen
+om til en "Logg i hendelse" … det skal kunne sendes internt som vil si ikke til ressurser
+som standard. Men meldinger kan ettersendes til ressurs, alle som har oppdrag fra
+hendelsen. Individuelle settes inne i oppdraget.» Og: «Deling skal angres. Og alt som er
+delt skal deles med alle fremtidige og pågående oppdrag.»
+
+- **Én logg i hendelsen.** «Beskrivelse» og «Løpende» er slått sammen til «Logg i
+  hendelse», med skrivelinja fra «Løpende». Beskrivelsen fra «Ny hendelse» er den første
+  linja i loggen — `Logglinje.beskrivelse` (tillegg-merket fra tidligere i dag) er borte
+  (`ko/0011`), og `legg_til_beskrivelse`, tilleggsskjemaene og `koTilleggSubmit` med den.
+  Rediger/fjern står som før på hver linje.
+- **Intern til den deles.** En linje er KOs arbeidsnotat til noen trykker «Del».
+  `del_linje(linje)` setter `delt_at`/`delt_av` på linja: delt med **alle oppdrag i
+  hendelsen, nå og senere** — et oppdrag som opprettes etter delingen ser den også.
+  «Del med \<enhet\>» inne i oppdraget gir `ko.Linjedeling(linje, oppdrag)` — bare det
+  ene. Begge angres (`angre_deling`); å angre enkeltdelingen på en linje som er delt med
+  alle avvises med beskjed om hvor den angres. Delte linjer får merket **«Delt»** i
+  hendelsen (eller «Delt · O47» når de er delt enkeltvis); i oppdragets detaljvisning står
+  det ingen merker (bilde 3 er fasit), bare «alle» / «Angre» / «Del med Mannskapsbil 2».
+  Systemlinjer, fjernede og rettede linjer deles ikke; en retting arver delingen og
+  enkeltdelingene. Deling er en tilstand, ikke en hendelse — ingen systemlinje.
+- **Én leser:** `Hendelse.delte_linjer_for(oppdrag)` gir oppdragsmodulen og bilen det
+  som er delt (`delte_linjer` i `oppdrag_til_dict`, erstatter `hendelse_beskrivelse`),
+  skjult for terminal bil som friteksten. ETag-en bærer `(id, delt_at)` — en linje som
+  angres og deles på nytt har samme id. KO-klienten får tilstanden hel med hver poll
+  (`delte`, som `fjernede`/`festede`): det som ikke står i lista er intern.
+- **Bilen: «Fra loggen i H14»**, og hver delt linje står **gul i ett minutt** fra
+  delingen (`erNyDelt`, `.b-tillegg.ny`). `lastMine` tegner på nytt ved 304 så lenge noe
+  er gult, ellers hadde det gule stått til neste endring på serveren. Det gule «NYTT» i
+  KO er borte (`koErNytt`).
+- **«Nytt oppdrag» arver hendelsen.** Hastegraden settes av prioriteten (Viktig→Akutt,
+  Rød→Akutt, Gul→Haster, Grønn→Vanlig, Drift→Drift, `koHastegradForHendelse`) og
+  oppdragsnotatet av den første linja i loggen — begge kan endres. Arven kjører **bare når
+  valget faktisk byttet**: nedtrekket fylles på nytt ved hver poll, og uten sperren ville
+  operatørens hastegrad blitt satt tilbake hvert 15. sekund. Notatet overskrives bare når
+  det er tomt eller er det forrige arvede. **Uten hendelse er ingen hastegrad valgt**
+  (tomt valg først i nedtrekket, «Velg hastegrad først» i problemstillingene, «Velg
+  hastegrad.» ved knappen); «Rediger» tilbyr ikke det tomme valget.
+- **Fritekst heter Oppdragsnotat** — i «Nytt oppdrag», i «Rediger» og i hjelpeteksten.
+  «Bare dette oppdraget» er borte.
+- **Bug: hvit tekst ved «Fra»/«Til» i «Flytt oppdraget til en annen enhet».** Bootstraps
+  `.input-group-text` har lys bakgrunn og mørk tekst som standard; `oppdrag.css` gir den
+  kortets farger (`style.css` hadde alt regelen for pasientsiden).
+- **Backup:** `Linjedeling` er ekskludert — den peker på et oppdrag, og oppdragene
+  gjenopprettes *etter* KO; `delt_av` strippes som de andre brukerpekerne; filer fra
+  timene med `logglinje.beskrivelse` lastes fortsatt (`UTGAATTE_FELT`).
+- 161 endepunkter (23 under `/ko/`: `logg/<pk>/del/`, `logg/<pk>/angre-deling/`).
+
+Mutasjonstesting, 26 mutanter, 26 drept etter to runder: tjenestelaget (sperrene i
+`_kan_deles`, hendelsesjekken, idempotens, «angre enkelt når delt med alle», «angre alle
+lar enkeltdelingene stå», rettingen arver `delt_at` og delingene, filtrene i
+`delte_linjer_for`), portene (nivået på del-viewet, `delte` i pollen, bilen etter
+avslutning, `delt_at` i ETag-en, `Linjedeling` i backupen) og JS (arven ved hver poll,
+tabellen Rød→Akutt, `<` mot `<=` i det gule minuttet, 304-tegningen, `koTaImotDelte`
+nullstiller, systemlinjer og fjernede ute av «Fra loggen» og søket, Del-knappen for `les`,
+hastegradsjekken i `opprettOppdrag`). To overlevde første runde og sa noe om testene, ikke
+koden: Rød→Akutt overlevde fordi testen hadde skrevet tabellen av i sin egen preamble — den
+står nå inne i funksjonen; hastegradsjekken fordi ingen test gikk gjennom `opprettOppdrag`.
+Ikke prøvd: `kilde=KILDE_OPERATOR` i `delte_linjer_for` (en systemlinje får aldri `delt_at`,
+så mutanten er en no-op) og `linje__hendelse=self` på enkeltdelingene (samme grunn:
+`_oppdrag_i_hendelsen` sperrer ved opprettelse).
+
+---
+
 ## 2026-09-19 — KO: rediger/fjern inne i hendelsen, lagvelger uten forhåndsvalg, skrivefeltet overlever pollen, oppdragsstemplene ut av strømmen, lukk går til lista  `#ko/hendelseslogg` `#ko/loggen`
 
 André, 19. sep. 2026, fem punkter etter testing på staging.

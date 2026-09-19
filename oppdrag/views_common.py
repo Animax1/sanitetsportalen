@@ -182,24 +182,25 @@ def oppdrag_til_dict(oppdrag, *, for_enhet: bool = False,
         'hendelse_nummer': (oppdrag.hendelse.hendelsesnummer
                             if oppdrag.hendelse_id else None),
         'hendelse_tittel': oppdrag.hendelse.tittel if oppdrag.hendelse_id else '',
-        # Prioriteten, lagene og beskrivelsen på hendelsen (KO, 18.–19. sep.
-        # 2026). Lest her som nummer og tittel over: bilen skal se hvilke lag
-        # som er på hendelsen og hva KO har skrevet om den, og KO-raden bærer
-        # prioritetsmerket. Tomt når oppdraget ikke hører til noen. Lagene og
-        # tilleggene er KOs, lest gjennom to metoder på hendelsen
-        # (`lag_navn`, `beskrivelse_tillegg`) — denne modulen kjenner verken
-        # lagmodellen eller loggen, og skal ikke gjøre det.
+        # Prioriteten, lagene og de delte logglinjene på hendelsen (KO,
+        # 18.–19. sep. 2026). Lest her som nummer og tittel over: bilen skal
+        # se hvilke lag som er på hendelsen og det KO har *delt* om den, og
+        # KO-raden bærer prioritetsmerket. Tomt når oppdraget ikke hører til
+        # noen. Lagene og linjene er KOs, lest gjennom to metoder på
+        # hendelsen (`lag_navn`, `delte_linjer_for`) — denne modulen kjenner
+        # verken lagmodellen eller loggen, og skal ikke gjøre det.
         'hendelse_prioritet': oppdrag.hendelse.prioritet if oppdrag.hendelse_id else '',
         'hendelse_lag': oppdrag.hendelse.lag_navn() if oppdrag.hendelse_id else [],
     }
     skjul_fritekst = for_enhet and status == choices.TERMINAL
     data['fritekst'] = '' if skjul_fritekst else oppdrag.fritekst
-    # Beskrivelsen følger fritekstens regel: fritekst er der
+    # De delte linjene følger fritekstens regel: fritekst er der
     # helseopplysningene havner (`NOTAT_DPIA_OG_FRITEKST.md` §7), og bilen
-    # skal ikke sitte med dem etter at oppdraget er avsluttet.
-    data['hendelse_beskrivelse'] = (
+    # skal ikke sitte med dem etter at oppdraget er avsluttet. Hver rad
+    # bærer `delt_at`, så bilen kan vise det som er nytt for henne.
+    data['delte_linjer'] = (
         [] if skjul_fritekst or not oppdrag.hendelse_id
-        else oppdrag.hendelse.beskrivelse_tillegg())
+        else oppdrag.hendelse.delte_linjer_for(oppdrag))
     if for_enhet:
         # «Neste»-knappen vet hvilken overgang den utfører fordi serveren sier
         # det her — JS-en har ingen egen kopi av kjeden å komme i utakt med.

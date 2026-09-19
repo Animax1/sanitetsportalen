@@ -98,21 +98,21 @@ function _oppdragRadHtml(o) {
 }
 
 
-// Beskrivelsen på hendelsen (KO, 19. sep. 2026): tilleggene i rekkefølge,
-// med hvem og når, det nyeste uthevet. Lista er KOs og lest fra oppdraget
-// (`hendelse_beskrivelse`); skjemaet for å legge til er KOs også, og legges
-// til gjennom `koBeskrivelseSkjema()` bare på `/ko/`.
-function _hendelseBeskrivelseHtml(o) {
-  const tillegg = (o.hendelse_id && Array.isArray(o.hendelse_beskrivelse)) ? o.hendelse_beskrivelse : [];
-  if (!tillegg.length && typeof koBeskrivelseSkjema !== 'function') return '';
-  const rader = tillegg.map((t, i) => {
-    const nyest = i === tillegg.length - 1 ? ' nyest' : '';
-    return `<div class="b-tillegg${nyest}">${escapeHtml(t.tekst)}<span class="hvem">${escapeHtml(t.av || '')} · ${escapeHtml(klokke(t.tid))}</span></div>`;
-  }).join('');
-  const skjema = (typeof koBeskrivelseSkjema === 'function') ? koBeskrivelseSkjema(o) : '';
-  if (!rader && !skjema) return '';
-  const merke = o.hendelse_nummer ? `<span class="hendelse-merke ms-1">${escHtmlValue(hendelsesnr(o.hendelse_nummer))}</span>` : '';
-  return `<div class="mb-3"><h6 class="text-muted">Beskrivelse ${merke}</h6>${rader}${skjema}</div>`;
+// «Fra loggen i H14» (KO, 19. sep. 2026): linjene KO har delt med dette
+// oppdraget, i rekkefølge, med hvem og når. Lista er KOs og lest fra
+// oppdraget (`delte_linjer`). På `/ko/` tegner KO blokka selv gjennom
+// `koDelteLinjerHtml()` — der står også de interne linjene, med «Del» —
+// og kallet går gjennom en vakt fordi `ko.js` er betinget lastet.
+function _delteLinjerHtml(o) {
+  if (!o.hendelse_id) return '';
+  if (typeof koDelteLinjerHtml === 'function') return koDelteLinjerHtml(o);
+  const linjer = Array.isArray(o.delte_linjer) ? o.delte_linjer : [];
+  if (!linjer.length) return '';
+  const rader = linjer.map((t) =>
+    `<div class="b-tillegg">${escapeHtml(t.tekst)}<span class="hvem">${escapeHtml(t.av || '')} · ${escapeHtml(klokke(t.tid))}</span></div>`
+  ).join('');
+  const merke = `<span class="hendelse-merke">${escHtmlValue(hendelsesnr(o.hendelse_nummer))}</span>`;
+  return `<div class="mb-3"><h6 class="text-muted">Fra loggen i ${merke}</h6>${rader}</div>`;
 }
 
 
@@ -431,13 +431,13 @@ async function visOppdrag(id) {
   // `/ko/`: `ko.js` er betinget lastet, og kallet går gjennom en vakt
   // (CLAUDE.md). Markupen skannes i `ko/tests_js.py`, der byggeren bor.
   const hendelseValg = (typeof koHendelseValg === 'function') ? koHendelseValg(o) : '';
-  // Lagene på hendelsen — samme blokk som på raden — og beskrivelsen med
-  // tilleggene (skisse D), delt med hendelsen og bilen.
+  // Lagene på hendelsen — samme blokk som på raden — og linjene KO har
+  // delt fra loggen i hendelsen (skisse D), de samme som bilen ser.
   const lagNavn = (o.hendelse_id && Array.isArray(o.hendelse_lag)) ? o.hendelse_lag.join(', ') : '';
   const lagBlokk = lagNavn
     ? `<div class="oppdrag-meta oppdrag-lag mb-2"><i class="bi bi-people me-1"></i>Lag: ${escapeHtml(lagNavn)}</div>`
     : '';
-  const beskrivelse = _hendelseBeskrivelseHtml(o);
+  const beskrivelse = _delteLinjerHtml(o);
   const slettKnapp = o.kan_slettes
     ? `<button type="button" class="btn btn-outline-danger btn-sm" data-action="slettOppdrag"
                data-id="${escHtmlValue(o.id)}"><i class="bi bi-trash me-1"></i>Slett oppdrag</button>`
@@ -744,16 +744,18 @@ function visRedigerOppdrag() {
   const boks = document.getElementById('rediger-oppdrag');
   if (!o || !boks) return;
   if (boks.innerHTML) { boks.innerHTML = ''; return; }
+  // Det tomme valget i «Nytt oppdrag» («ingen hastegrad valgt») hører ikke
+  // hjemme her: et oppdrag som finnes har en hastegrad.
   const kopier = (fraId, valgt) => Array.from(document.querySelectorAll(`#${fraId} option`))
+    .filter((op) => op.value !== '')
     .map((op) => `<option value="${escHtmlValue(op.value)}"${op.value === valgt ? ' selected' : ''}>${escapeHtml(op.textContent)}</option>`)
     .join('');
   const lokvalg = lokasjoner.filter((l) => l.er_aktiv || l.id === o.lokasjon_id).map(
     (l) => `<option value="${escHtmlValue(l.id)}"${l.id === o.lokasjon_id ? ' selected' : ''}>${escapeHtml(l.navn)}</option>`).join('');
-  // «Bare dette oppdraget» (André, 19. sep. 2026) når oppdraget hører til en
-  // hendelse: beskrivelsen er hendelsens og deles; friteksten er oppdragets.
-  const fritekstEtikett = o.hendelse_id ? 'Bare dette oppdraget' : 'Fritekst';
-  const fritekstHint = o.hendelse_id
-    ? '<div class="form-text">Oppdragets egen tekst. Vises i bilen under beskrivelsen, ikke i hendelsen.</div>' : '';
+  // Oppdragsnotatet (André, 19. sep. 2026: «vi endrer fra fritekst til
+  // oppdragsnotat»): oppdragets egen tekst, og bare enhetene på oppdraget
+  // ser den. Det KO deler fra hendelsen står for seg.
+  const fritekstHint = '<div class="form-text">Oppdragets egen tekst — vises i bilen til oppdraget avsluttes.</div>';
   boks.innerHTML = (`
     <div class="row g-2 mt-1">
       <div class="col-md-6"><label class="form-label" for="red-hastegrad">Hastegrad</label>
@@ -763,7 +765,7 @@ function visRedigerOppdrag() {
         <select id="red-lokasjon" class="form-select form-select-sm">${lokvalg}</select></div>
       <div class="col-md-6"><label class="form-label" for="red-problemstilling">Problemstilling</label>
         <select id="red-problemstilling" class="form-select form-select-sm"></select></div>
-      <div class="col-12"><label class="form-label" for="red-fritekst">${fritekstEtikett}</label>
+      <div class="col-12"><label class="form-label" for="red-fritekst">Oppdragsnotat</label>
         <textarea id="red-fritekst" class="form-control form-control-sm" rows="2">${escapeHtml(o.fritekst || '')}</textarea>${fritekstHint}</div>
       <div class="col-12 d-flex gap-2 align-items-center">
         <span id="red-feil" class="text-danger small"></span>

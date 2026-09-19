@@ -19,7 +19,8 @@ from core.vakt import hent_aktiv_vakt
 from .models import (
     HENDELSE_APEN, HENDELSE_LUKKET, KILDE_OPERATOR, KILDE_SYSTEM, MELDER_ANDRE,
     MELDER_NAVN, MELDER_VALG, PRIORITET_NAVN, PRIORITET_STANDARD, Ansvarsmerke,
-    Ansvarsomraade, Hendelse, HendelseDeltaker, HendelseLag, Logglinje,
+    Ansvarsomraade, Hendelse, HendelseDeltaker, HendelseLag, Linjedeling,
+    Logglinje,
 )
 
 
@@ -211,7 +212,7 @@ def _frys_forfatter(linje, bruker) -> None:
 
 def skriv_linje(vakt, raa_tekst, *, bruker, tidspunkt=None,
                 ansvarsomraade=None, uformell=False, hendelse=None,
-                beskrivelse=False, naa=None) -> Logglinje:
+                naa=None) -> Logglinje:
     """En menneskeskrevet linje. Den vanlige veien inn i loggen.
 
     **`hendelse` gjør linja til en kommentar i hendelsen** (18. sep. 2026).
@@ -229,9 +230,10 @@ def skriv_linje(vakt, raa_tekst, *, bruker, tidspunkt=None,
     ikke bare i skjemaet: en klient som sender flagget når admin har slått
     chatten av, skal møte den samme døra.
 
-    **`beskrivelse` gjør linja til et tillegg i hendelsens beskrivelse**
-    (19. sep. 2026), og krever derfor en hendelse: et tillegg uten en
-    beskrivelse å legge seg til finnes ikke.
+    **Linja er intern til den deles** (19. sep. 2026): `delt_at` står tom, og
+    enhetene ser den ikke før `del_linje()` er kalt. Standarden er intern
+    fordi loggen er KOs arbeidsnotat, og det som skal ut til en bil er et
+    bevisst valg — se `del_linje`.
     """
     tekst = rens_tekst(raa_tekst)
     tid = vurder_tidspunkt(tidspunkt, naa)
@@ -239,8 +241,6 @@ def skriv_linje(vakt, raa_tekst, *, bruker, tidspunkt=None,
         raise Ugyldig('Chatten er slått av. Skriv linja som en vanlig logglinje.')
     if hendelse is not None and hendelse.vakt_id != vakt.pk:
         raise Ugyldig('Hendelsen hører til en annen vakt.')
-    if beskrivelse and hendelse is None:
-        raise Ugyldig('Et tillegg til beskrivelsen må høre til en hendelse.')
     if ansvarsomraade is None:
         ansvarsomraade = ansvar_for(bruker)
     linje = Logglinje(
@@ -251,7 +251,6 @@ def skriv_linje(vakt, raa_tekst, *, bruker, tidspunkt=None,
         ansvarsomraade=(ansvarsomraade or '').strip()[:40],
         uformell=bool(uformell),
         hendelse=hendelse,
-        beskrivelse=bool(beskrivelse),
     )
     _frys_forfatter(linje, bruker)
     linje.save()
@@ -332,16 +331,116 @@ def korriger(linje, *, bruker, tekst=None, tidspunkt=None, naa=None) -> Logglinj
         tekst=ny_tekst,
         ansvarsomraade=linje.ansvarsomraade,
         # Merkene arves: en retting av en chatlinje er fortsatt chat, og en
-        # retting av et tillegg står fortsatt i beskrivelsen.
+        # retting av en delt linje er fortsatt delt — bilen skal se rettingen,
+        # ikke miste linja. Delingene per oppdrag følger med av samme grunn.
         uformell=linje.uformell,
-        beskrivelse=linje.beskrivelse,
         hendelse=linje.hendelse,
+        delt_at=linje.delt_at,
+        delt_av=linje.delt_av,
+        delt_av_navn=linje.delt_av_navn,
         korrigerer=linje,
         rot=linje.rot or linje,
     )
     _frys_forfatter(ny, bruker)
     ny.save()
+    Linjedeling.objects.bulk_create([
+        Linjedeling(linje=ny, oppdrag_id=d.oppdrag_id, delt_at=d.delt_at,
+                    delt_av=d.delt_av, delt_av_navn=d.delt_av_navn)
+        for d in linje.delinger.all()])
     return ny
+
+
+# ── Deling med enhetene (19. sep. 2026) ──────────────────────────────────────
+#
+# «Det skal kunne sendes internt som vil si ikke til ressurser som standard.
+# Men meldinger kan ettersendes til ressurs, alle som har oppdrag fra
+# hendelsen. Individuelle settes inne i oppdraget.» (André). To former, én
+# leser: `Hendelse.delte_linjer_for(oppdrag)` er det oppdragsmodulen og bilen
+# spør, og den ser både `delt_at` på linja (alle oppdrag fra hendelsen, også
+# de som opprettes *etter* delingen) og `Linjedeling`-radene (ett oppdrag).
+# Begge angres. Ingen linje skrives — deling er en tilstand på linja, ikke en
+# hendelse i loggen, og det er derfor det ikke blir en systemlinje av det.
+
+
+def _kan_deles(linje):
+    if linje.kilde == KILDE_SYSTEM:
+        raise Ugyldig('Systemlinjer deles ikke; enhetene ser statusene selv.')
+    if linje.er_fjernet:
+        raise Ugyldig('Linja er fjernet og kan ikke deles.')
+    if Logglinje.objects.filter(korrigerer=linje).exists():
+        raise Ugyldig('Linja er rettet; del den gjeldende linja.')
+    if linje.hendelse_id is None:
+        raise Ugyldig('Bare linjer i en hendelse kan deles med enhetene.')
+
+
+def _oppdrag_i_hendelsen(linje, oppdrag):
+    if oppdrag.hendelse_id != linje.hendelse_id:
+        raise Ugyldig('Oppdraget hører ikke til linjas hendelse.')
+
+
+@transaction.atomic
+def del_linje(linje, *, bruker, oppdrag=None, naa=None) -> bool:
+    """Del linja med enhetene. Uten `oppdrag`: med alle oppdrag fra
+    hendelsen, nå og senere. Med: bare det ene. Idempotent — å dele en delt
+    linje er ikke en feil, det er «ja, fortsatt». Returnerer om noe ble gjort.
+    """
+    _kan_deles(linje)
+    tid = naa or timezone.now()
+    navn = getattr(bruker, 'username', '') or ''
+    konto = bruker if bruker and bruker.is_authenticated else None
+    if oppdrag is None:
+        if linje.delt_at is not None:
+            return False
+        linje.delt_at = tid
+        linje.delt_av = konto
+        linje.delt_av_navn = navn
+        linje.save(update_fields=['delt_at', 'delt_av', 'delt_av_navn'])
+        return True
+    _oppdrag_i_hendelsen(linje, oppdrag)
+    _, ny = Linjedeling.objects.get_or_create(
+        linje=linje, oppdrag=oppdrag,
+        defaults={'delt_at': tid, 'delt_av': konto, 'delt_av_navn': navn})
+    return ny
+
+
+@transaction.atomic
+def angre_deling(linje, *, bruker, oppdrag=None) -> bool:
+    """Motstykket. Uten `oppdrag` tas delingen med alle bort — delingene med
+    enkeltoppdrag står, de var egne valg. Med `oppdrag` tas bare den ene bort;
+    er linja delt med alle, ser oppdraget den fortsatt, og kallet sier fra.
+    """
+    if oppdrag is None:
+        if linje.delt_at is None:
+            return False
+        linje.delt_at = None
+        linje.delt_av = None
+        linje.delt_av_navn = ''
+        linje.save(update_fields=['delt_at', 'delt_av', 'delt_av_navn'])
+        return True
+    if linje.delt_at is not None:
+        raise Ugyldig('Linja er delt med alle oppdrag i hendelsen; '
+                      'angre den delingen i loggen.')
+    slettet, _ = Linjedeling.objects.filter(linje=linje, oppdrag=oppdrag).delete()
+    return slettet > 0
+
+
+def delte_for_vakt(vakt) -> list[dict]:
+    """Delingstilstanden for hele vakta, i den formen pollen sender hver
+    gang (`delte` i `logg_view`): én rad per gjeldende linje som er delt med
+    alle eller med minst ett oppdrag. Hele lista, ikke en diff — samme grunn
+    som `fjernede` og `festede`: en angret deling er fravær, og fravær kan
+    ikke sendes som en endring siden sist.
+    """
+    qs = (Logglinje.objects.filter(vakt=vakt, korrigert_av__isnull=True,
+                                   fjernet_at__isnull=True)
+          .filter(Q(delt_at__isnull=False) | Q(delinger__isnull=False))
+          .distinct().prefetch_related('delinger'))
+    return [{
+        'id': l.pk,
+        'delt_at': l.delt_at.isoformat() if l.delt_at else None,
+        'delt_av': l.delt_av_navn,
+        'delt_med': sorted(d.oppdrag_id for d in l.delinger.all()),
+    } for l in qs]
 
 
 def _kjeden_q(rot):
@@ -640,8 +739,10 @@ def opprett_hendelse(vakt, raa_tittel, *, bruker, lokasjon=None,
 
     Den som oppretter er på hendelsen fra første sekund (`bli_med`).
 
-    **Beskrivelsen blir det første tillegget** (19. sep. 2026), ført av den
-    som oppretter — én mekanisme, ikke et felt pluss en rekke. Lagene som
+    **Beskrivelsen blir den første linja i hendelsens logg** (19. sep. 2026),
+    ført av den som oppretter — én mekanisme, ikke et felt pluss en logg. Den
+    er intern som alle andre linjer; «Nytt oppdrag» kopierer den inn i
+    oppdragsnotatet, og der redigerer operatøren fritt. Lagene som
     velges i skjemaet står på opprettelseslinja, ikke som én linje hver: de
     kom med hendelsen, og fem linjer for én handling leser som fem ting.
     """
@@ -677,16 +778,9 @@ def opprett_hendelse(vakt, raa_tittel, *, bruker, lokasjon=None,
     if lagene:
         sett_lag(hendelse, [r.pk for r in lagene], bruker=bruker, logg=False)
     if beskrivelse:
-        legg_til_beskrivelse(hendelse, beskrivelse, bruker=bruker)
+        skriv_linje(vakt, beskrivelse, bruker=bruker, hendelse=hendelse)
     bli_med(hendelse, bruker)
     return hendelse
-
-
-def legg_til_beskrivelse(hendelse, raa_tekst, *, bruker, naa=None) -> Logglinje:
-    """Et tillegg til beskrivelsen: en logglinje i hendelsen med merket.
-    Aldri en overskriving — det er hele poenget (André, 19. sep. 2026)."""
-    return skriv_linje(hendelse.vakt, raa_tekst, bruker=bruker, hendelse=hendelse,
-                       beskrivelse=True, naa=naa)
 
 
 @transaction.atomic
@@ -764,7 +858,7 @@ def rediger_hendelse(hendelse, *, bruker, versjon, tittel=None,
     feltendringer, og `audit/` fører dem — regel 2 i `ko/systemlinjer.py`.
     Prioriteten har sin egen inngang (`sett_prioritet`), fordi *den* er en
     handling og skal stå i loggen. Beskrivelsen redigeres ikke her: den er
-    tillegg, og et tillegg legges til (`legg_til_beskrivelse`).
+    den første linja i loggen, og en linje rettes med `korriger`.
 
     `sett_lokasjon=True` med `lokasjon=None` tømmer lokasjonen; uten flagget
     rører kallet den ikke. Et nullbart felt trenger tre tilstander i kallet.
@@ -929,24 +1023,9 @@ def hendelser_for(vakt):
               apne_oppdrag=models.Count(
                   'oppdrag', distinct=True,
                   filter=~Q(oppdrag__status=choices.TERMINAL)))
-          .prefetch_related('deltakere', 'lag', _tillegg_prefetch())
+          .prefetch_related('deltakere', 'lag')
           .order_by('-hendelsesnummer'))
     return list(qs)
-
-
-def _tillegg_prefetch():
-    """Tilleggene i beskrivelsen, hentet i én spørring for hele lista og
-    lagt som `tillegg` på hver hendelse — `Hendelse.beskrivelse_tillegg()`
-    leser dem derfra. Samme filter som metoden bruker alene."""
-    from django.db.models import Prefetch
-    from django.db.models.functions import Coalesce
-    return Prefetch(
-        'linjer',
-        queryset=(Logglinje.objects
-                  .filter(beskrivelse=True, fjernet_at__isnull=True,
-                          korrigert_av__isnull=True)
-                  .order_by(Coalesce('rot_id', 'id'), 'id')),
-        to_attr='tillegg')
 
 
 def hendelse_med_telling(hendelse):
@@ -959,7 +1038,7 @@ def hendelse_med_telling(hendelse):
                 apne_oppdrag=models.Count(
                     'oppdrag', distinct=True,
                     filter=~Q(oppdrag__status=choices.TERMINAL)))
-            .prefetch_related('deltakere', 'lag', _tillegg_prefetch())
+            .prefetch_related('deltakere', 'lag')
             .get())
 
 

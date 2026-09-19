@@ -190,7 +190,6 @@
 .hastegrad-knapp.valgt.hastegrad-knapp-haster { background: #78350f; color: #fff; }
 .hastegrad-knapp.valgt.hastegrad-knapp-vanlig { background: #14532d; color: #fff; }
 .hastegrad-knapp.valgt.hastegrad-knapp-drift  { background: #1e3a8a; color: #fff; }
-.b-liste-kompakt .b-tillegg { font-size: 0.8rem; padding: 0.2rem 0.4rem; }
 
 /* Gruppeoverskriften som knapp (KO pulje 6): lukker og åpner gruppa, og
    viser antallet når den er lukket — det som er skjult skal være lesbart. */
@@ -625,20 +624,24 @@
 .lyd-demp.lyd-demp-paa { color: #fbbf24; border-color: #fbbf24; }
 
 
-/* ── Beskrivelsen på hendelsen som tillegg (KO, 19. sep. 2026) ──────────────
-   Tegnes tre steder med samme klasse: i hendelsen på /ko/, i oppdragets
-   detaljmodal på begge sidene, og på bilens skjerm. Det nyeste tillegget har
-   en farget kant; «nytt» (gul) settes bare av KO, som kjenner klokka. */
+/* ── «Fra loggen i H14» — linjene KO har delt (19. sep. 2026) ────────────────
+   Samme klasse i oppdragets detaljmodal på begge sidene og på bilens skjerm.
+   `.ny` er gul i ett minutt etter delingen, og settes bare av bilen
+   (`erNyDelt`); `.intern` er linjer KO ikke har delt, og finnes bare på /ko/. */
 .b-tillegg {
   padding: 0.35rem 0.5rem; border-radius: 6px; font-size: 0.86rem;
   border-left: 3px solid transparent; white-space: pre-wrap;
 }
 .b-tillegg:nth-child(even) { background: #172033; }
 .b-tillegg .hvem { color: var(--text-muted); font-size: 0.76rem; margin-left: 0.4rem; white-space: nowrap; }
-.b-tillegg.nyest { border-left-color: var(--portal-accent); }
-.b-tillegg.nytt { border-left-color: #fbbf24; background: rgba(251, 191, 36, 0.10); }
-.b-tillegg .merke {
-  color: #fbbf24; font-size: 0.7rem; font-weight: 700; text-transform: uppercase;
-  letter-spacing: 0.06em; margin-left: 0.4rem;
+.b-tillegg.ny { border-left-color: #fbbf24; background: rgba(251, 191, 36, 0.16); color: #fde68a; }
+.b-tillegg.intern { color: var(--text-muted); }
+.b-tillegg .verktoy { margin-left: 0.5rem; white-space: nowrap; }
+.b-tillegg .verktoy .btn-link { font-size: 0.78rem; text-decoration: none; }
+
+/* Bootstraps `.input-group-text` er lys på lys — hvit tekst på hvit
+   bakgrunn i «Flytt oppdraget til en annen enhet» (André, 19. sep. 2026).
+   Alle temaene er mørke, så den får kortets farger. */
+.input-group-text {
+  background: var(--surface-2); color: var(--text-main); border-color: var(--border-color);
 }
-.b-skjema { display: flex; gap: 0.4rem; margin-top: 0.3rem; }

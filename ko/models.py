@@ -21,7 +21,9 @@ from __future__ import annotations
 
 from django.conf import settings
 from django.db import models
+from django.db.models import Q
 from django.db.models.functions import Coalesce
+from django.utils import timezone
 
 
 #: Hvem som skrev linja. To verdier, og skillet er det §3.1 kaller «bilen sa
@@ -60,6 +62,7 @@ class LogglinjeManager(models.Manager):
         return (self.filter(vakt=vakt)
                     .filter(korrigert_av__isnull=True)
                     .select_related('forfatter', 'fjernet_av', 'hendelse')
+                    .prefetch_related('delinger')
                     .order_by(Coalesce('rot_id', 'id'), 'id'))
 
 
@@ -187,16 +190,21 @@ class Logglinje(models.Model):
     #: vises.
     uformell = models.BooleanField(default=False, verbose_name='Uformell (chat)')
 
-    #: **Et tillegg til hendelsens beskrivelse** (André, 19. sep. 2026: «for
-    #: hver append i beskrivelse så markeres det … og logges i hendelsens logg
-    #: hvem har oppdatert beskrivelse»). Beskrivelsen er ikke et felt som
-    #: overskrives, men en rekke tillegg — og hvert tillegg er en logglinje i
-    #: hendelsen med dette merket, så hvem og når står der av seg selv, og
-    #: retting og fjerning går gjennom loggens egne regler. Samme grep som
-    #: `uformell`: et merke på linja, ikke en tabell til. Hendelsen,
-    #: «Rediger oppdrag» og bilen leser alle den samme rekka
-    #: (`Hendelse.beskrivelse_tillegg`).
-    beskrivelse = models.BooleanField(default=False, verbose_name='Tillegg til beskrivelsen')
+    #: **Delt med enhetene** (André, 19. sep. 2026). Loggen i hendelsen er
+    #: intern i KO til operatøren deler en linje; da ser hver enhet med
+    #: oppdrag fra hendelsen den — også oppdrag som kommer til etterpå («alt
+    #: som er delt skal deles med alle framtidige og pågående oppdrag»). Kan
+    #: angres. Deling med **ett** oppdrag er `Linjedeling`. Et flagg på linja
+    #: og ikke en rad per oppdrag, nettopp fordi framtidige oppdrag skal
+    #: arve den uten at noen kopierer.
+    delt_at = models.DateTimeField(
+        null=True, blank=True, db_index=True, verbose_name='Delt')
+    delt_av = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True,
+        on_delete=models.SET_NULL, related_name='ko_delte_logglinjer',
+        verbose_name='Delt av')
+    delt_av_navn = models.CharField(
+        max_length=150, blank=True, default='', verbose_name='Delt av (navn)')
 
     #: **Festet i loggstrømmen** (André, 18. sep. 2026: «Nyttige beskjeder,
     #: noen skal kunne pinnes»). Et tidspunkt og ikke en boolsk verdi, så
@@ -240,6 +248,48 @@ class Logglinje(models.Model):
     @property
     def er_festet(self) -> bool:
         return self.festet_at is not None
+
+    @property
+    def er_delt(self) -> bool:
+        return self.delt_at is not None
+
+
+class Linjedeling(models.Model):
+    """Én linje delt med **ett** oppdrag (André, 19. sep. 2026: «individuelle
+    settes inne i oppdraget»). Motstykket til `Logglinje.delt_at`, som deler
+    med alle oppdrag fra hendelsen.
+
+    **Peker på oppdraget, og er derfor ikke med i backupen** (`ko/backup.py`):
+    oppdragene slettes ved arkivering og gjenopprettes etter KO, så raden
+    ville pekt på ingenting i en tom base. Slettes med oppdraget (CASCADE) —
+    linja står. Det er den ene pekeren fra loggen til et oppdrag, og den er
+    lov fordi den bærer en *tilstand nå*, ikke historikk: «denne bilen ser
+    denne linja». Historikken om hva som ble sagt står i linja.
+    """
+
+    linje = models.ForeignKey(
+        Logglinje, on_delete=models.CASCADE, related_name='delinger',
+        verbose_name='Linje')
+    oppdrag = models.ForeignKey(
+        'oppdrag.Oppdrag', on_delete=models.CASCADE, related_name='ko_delinger',
+        verbose_name='Oppdrag')
+    delt_at = models.DateTimeField(default=timezone.now, verbose_name='Delt')
+    delt_av = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True,
+        on_delete=models.SET_NULL, related_name='ko_linjedelinger',
+        verbose_name='Delt av')
+    delt_av_navn = models.CharField(
+        max_length=150, blank=True, default='', verbose_name='Delt av (navn)')
+
+    class Meta:
+        verbose_name = 'Linjedeling'
+        verbose_name_plural = 'Linjedelinger'
+        constraints = [
+            models.UniqueConstraint(fields=['linje', 'oppdrag'], name='en_deling_per_oppdrag'),
+        ]
+
+    def __str__(self):
+        return f'linje {self.linje_id} → oppdrag {self.oppdrag_id}'
 
 
 #: Hendelsens to tilstander. **Ingen statusmaskin** (§3.3): hendelser har ikke
@@ -342,10 +392,10 @@ class Hendelse(models.Model):
         max_length=8, choices=PRIORITET_VALG, default=PRIORITET_STANDARD,
         db_index=True, verbose_name='Prioritet')
     #: **Beskrivelsen er ikke et felt** (19. sep. 2026). Den var en
-    #: `TextField` fra 18. sep., og ble til en rekke tillegg — logglinjer i
-    #: hendelsen med `Logglinje.beskrivelse` — fordi André ville se *hva i
-    #: teksten som er nytt* og hvem som la det til. Et felt som overskrives kan
-    #: ikke svare på det. `beskrivelse_tillegg()` under er den ene leseren;
+    #: `TextField` fra 18. sep., og er nå den første linja i hendelsens logg
+    #: — fordi André ville se *hva som er nytt* og hvem som skrev det. Et
+    #: felt som overskrives kan ikke svare på det. Enhetene ser bare det som
+    #: er *delt*: `delte_linjer_for()` under er den ene leseren, og
     #: oppdragsmodulen kaller den gjennom `Oppdrag.hendelse` uten å kjenne
     #: linjemodellen. Teksten er fritekst som før: aldri verdilogget i audit,
     #: aldri i en SHA-signatur (`NOTAT_DPIA_OG_FRITEKST.md` §7).
@@ -395,25 +445,28 @@ class Hendelse(models.Model):
     def er_lukket(self) -> bool:
         return self.status == HENDELSE_LUKKET
 
-    def beskrivelse_tillegg(self) -> list[dict]:
-        """Tilleggene i beskrivelsen, i rekkefølge: `[{id, rot, tekst, av,
-        tid, rettet}]`. Gjeldende ledd i hver kjede, fjernede utelatt.
+    def delte_linjer_for(self, oppdrag) -> list[dict]:
+        """Linjene i hendelsen som er delt med `oppdrag`, i rekkefølge:
+        `[{id, rot, tekst, av, tid, delt_at}]`. Delt med alle
+        (`Logglinje.delt_at`) eller med dette ene (`Linjedeling`). Gjeldende
+        ledd i hver kjede, fjernede og systemlinjer utelatt.
 
-        **Den ene leseren**, og derfor en metode på modellen og ikke en
-        spørring hver leser skriver selv: oppdragsmodulen kaller den gjennom
-        `Oppdrag.hendelse` for «Rediger oppdrag» og bilen, og kjenner verken
-        `Logglinje` eller merket. `services.hendelser_for` prefetcher rekka
-        som `tillegg`, så pollen ikke betaler én spørring per hendelse.
+        **Den ene leseren**: oppdragsmodulen kaller den gjennom
+        `Oppdrag.hendelse` for detaljvinduet og bilen, og kjenner verken
+        `Logglinje` eller delingen. `delt_at` er linjas når den er delt med
+        alle, ellers delingens — det er tidspunktet bilen regner «ny tekst»
+        fra.
         """
-        rader = getattr(self, 'tillegg', None)
-        if rader is None:
-            rader = list(self.linjer
-                         .filter(beskrivelse=True, fjernet_at__isnull=True,
-                                 korrigert_av__isnull=True)
-                         .order_by(Coalesce('rot_id', 'id'), 'id'))
+        egne = {d.linje_id: d.delt_at
+                for d in Linjedeling.objects.filter(oppdrag=oppdrag, linje__hendelse=self)}
+        rader = (self.linjer
+                 .filter(kilde=KILDE_OPERATOR, fjernet_at__isnull=True,
+                         korrigert_av__isnull=True)
+                 .filter(Q(delt_at__isnull=False) | Q(pk__in=list(egne)))
+                 .order_by(Coalesce('rot_id', 'id'), 'id'))
         return [{'id': l.pk, 'rot': l.rot_id or l.pk, 'tekst': l.tekst,
                  'av': l.forfatter_navn, 'tid': l.tidspunkt.isoformat(),
-                 'rettet': l.korrigerer_id is not None}
+                 'delt_at': (l.delt_at or egne.get(l.pk)).isoformat()}
                 for l in rader]
 
     def lag_navn(self) -> list[str]:

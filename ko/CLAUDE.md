@@ -8,8 +8,8 @@
 Levert: pulje 1 (skallet), 2 (loggen), 3 (ressursbildet), 4 (sentralbordet flyttet inn),
 5 (hendelsene), 6 (chat, ansvarsmerke, minimering, vaktlistas ressurser), **omleggingen
 18. sep. 2026: fire flater i 2×2, hendelsesloggen som egen flate**, og 19. sep.: lagene på
-hendelsen, beskrivelsen som tillegg, melder. Pulje 7 gjenstår — `docs/FORSLAG_KO.md` §10,
-et **forslag**.
+hendelsen, loggen i hendelsen med deling, melder. Pulje 7 gjenstår — `docs/FORSLAG_KO.md`
+§10, et **forslag**.
 
 **Siden har ingen faner, og det er en regel og ikke en smakssak** (André, 17. sep. 2026).
 En fane er riktig når flatene er *alternativer*; KOs flater brukes i **én** bevegelse:
@@ -64,8 +64,8 @@ uten at noen rykket ut.
 | Rutenettet: bytte plass, skillelinjer, oppsettet i `localStorage` | `static/js/ko-layout.js` |
 | Festede linjer i loggstrømmen | `Logglinje.festet_*`, `services.fest_linje`/`losne_linje`, `festede` i `logg_view` |
 | KO-innstillinger: ansvarsområder, «Nullstill» (admin) | `VERDILISTER` og `NULLSTILL` i `ko/views.py`, fanene via `verdifaner_ekstra` |
-| «H12»-merket, lagene og beskrivelsen på oppdraget og i bilen | `oppdrag_til_dict` (`hendelse_prioritet`, `hendelse_lag`, `hendelse_beskrivelse`), lest gjennom `Hendelse.lag_navn()` / `beskrivelse_tillegg()` |
-| **Lagene på hendelsen**, beskrivelsen som tillegg, melderen | `ko.HendelseLag`, `Logglinje.beskrivelse`, `MELDER_VALG`; `sett_lag`, `legg_til_beskrivelse`, `rens_melder` i `ko/services.py` |
+| «H12»-merket, lagene og de delte linjene på oppdraget og i bilen | `oppdrag_til_dict` (`hendelse_prioritet`, `hendelse_lag`, `delte_linjer`), lest gjennom `Hendelse.lag_navn()` / `delte_linjer_for()` |
+| **Lagene på hendelsen**, deling av linjer, melderen | `ko.HendelseLag`, `Logglinje.delt_*`, `ko.Linjedeling`, `MELDER_VALG`; `sett_lag`, `del_linje`, `angre_deling`, `delte_for_vakt`, `rens_melder` i `ko/services.py` |
 | Chat-merket, bryteren, ansvarsmerket | `Logglinje.uformell`, `services.chat_tillatt`, `ko.Ansvarsmerke`, `ko/portalinnstillinger.py` |
 | Minimerbare grupper på tavla | `gruppehode()`/`vippGruppe()` i `static/js/oppdrag-kort.js` |
 | Vaktlistas ressurser uten enhet | `vaktliste.services.ressurser_uten_enhet`, `koRessurskort()` i `ko.js` |
@@ -137,8 +137,8 @@ fjorårets helseopplysninger; opplæring hører hjemme på en demo-vakt.
 
 ## Loggen: de fire valgene som låser konstruksjonen
 
-Besvart av André 17. sep. 2026, **før koden**. De står her og ikke bare i CHANGELOG fordi
-hvert av dem er noe den neste kommer til å ville gjøre om, og da skal prisen være synlig.
+Besvart av André 17. sep. 2026, **før koden**. De står her fordi hvert av dem er noe den
+neste vil gjøre om, og da skal prisen være synlig.
 
 ### 1. Ingen SHA-signatur. Lesbar historikk i stedet
 
@@ -147,15 +147,13 @@ alt holdt utenfor `ArkivertOppdrag` av den grunn. Et felt i en SHA-payload er **
 måneder ved konstruksjon** — sletteinngangen i §4.4 ville da fått arkivet til å melde
 tukling. To funksjoner som spiser hverandre.
 
-Loggen blir derfor stående som levende rader, scopet til vakta, og slettes av
-`purge_old_logs`. Prisen: **loggen kan ikke bevise at den er urørt** — bare hvem som
-gjorde hva.
+Loggen står derfor som levende rader, scopet til vakta, slettet av `purge_old_logs`.
+Prisen: **loggen kan ikke bevise at den er urørt** — bare hvem som gjorde hva.
 
 ### 2. 730 dager, som en `AppSetting` — ikke en Railway-variabel
 
-André foreslo en Railway-variabel. Den er en skjult jobbkonfigurasjon (`purge_old_logs`
-sin egen docstring), uten audit, må settes likt på web og cron (`DATABASE_URL`-fella), og
-er usynlig i portalen. `AppSetting` er én rad begge leser, auditlogget av
+André foreslo en Railway-variabel: skjult jobbkonfigurasjon, uten audit, må settes likt
+på web og cron, usynlig i portalen. `AppSetting` er én rad begge leser, auditlogget av
 `core/signals.py` — nøkkelen `ko.logg_dager` skal **aldri** inn i `NOKLER_UTEN_AUDIT`. 730
 fordi det er fristen audit-loggen, arkivkollapsen og `backups/`-prefikset alt har.
 
@@ -169,8 +167,7 @@ Lista og regelen bak den står i `ko/systemlinjer.py` — den er selve designarb
 puljen, ikke en detalj. Kort: **løft det som endrer situasjonen, ikke det som endrer
 oppsettet; løft hendelsen, ikke feltet; én linje per ting som skjedde.**
 
-Vaktlistas stemplinger er grensesaken, og svaret er «ikke nå»: volumet ville druknet loggen
-ved hvert vaktskifte.
+Vaktlistas stemplinger er grensesaken, og svaret er «ikke nå»: volumet ville druknet loggen.
 
 ### 4. Historikk krever `skriv_leder`
 
@@ -186,19 +183,16 @@ loggen, `SET_NULL` etterlater «meldte Fremme» uten hvem. Linja fryser teksten 
 bare `korrigerer` ville ledd tre arvet ledd to sin plass, og linjene skal ikke hoppe rundt
 etter en korreksjon (§4.3). `Coalesce('rot_id', 'id')` gjør de to til én sortering.
 
-**Sletteinngangen tømmer hele kjeden.** Rettes en linje og deretter fjernes den, ville den
-opprinnelige teksten blitt stående i den overstyrte raden — usynlig i loggen, fullt lesbar
-i basen og i backupen. En sletteinngang som lar en kopi ligge igjen er ikke en
-sletteinngang.
+**Sletteinngangen tømmer hele kjeden.** Ellers ble den opprinnelige teksten stående i den
+overstyrte raden — usynlig i loggen, lesbar i basen og i backupen.
 
 ## Løftet går med signaler, ikke med et register
 
 `ko` → `oppdrag` er den tillatte retningen; et push-register hadde krevd at
 `oppdrag/services.py` meldte fra. **Hendelseslinjene går ikke gjennom signaler:** de er
-operatørens handlinger, og `ko/services.py` skriver dem selv med operatøren som forfatter.
-Forbeholdet står i `ko/systemlinjer.py`: **et signal ser raden, ikke intensjonen.**
-Mottakerne kaster aldri — **en KO-logg som ikke lar seg skrive skal ikke ta ned en
-stempling i en bil.**
+operatørens handlinger, og `ko/services.py` skriver dem selv. Forbeholdet står i
+`ko/systemlinjer.py`: **et signal ser raden, ikke intensjonen.** Mottakerne kaster aldri —
+**en KO-logg som ikke lar seg skrive skal ikke ta ned en stempling i en bil.**
 
 **Fire av kodene fantes alt som `oppdrag.Enhetshendelse`** — sjekk om oppdragsmodulen har
 begrepet før du designer det inn i KO (§2).
@@ -246,13 +240,13 @@ og er prøvd med mutanter i `ko/tests_hendelseslogg.py` og `ko/tests_nullstill.p
 | **Den som registrerer noe i hendelsen er på den** — kommentar, oppdrag, prioritet, redigering, og «Bli med». Lesing melder ingen inn | «Hvem jobber med H14 nå», så to operatører ikke sender hver sin bil. Vises, styrer ingenting — som ansvarsmerket. Navnet fryses |
 | En kommentar er en logglinje med `hendelse_id`. Vakta må stemme; lukket hendelse tar imot | §4.1: én logg. En etterskrift etter lukking hører til hendelsen |
 | Alt i hodet valideres **før** nummeret trekkes | Telleren lar seg ikke rulle tilbake av en 400; et hull i H-serien er et spørsmål i etterkant |
-| **Lagene på hendelsen er vaktlistas ressurser uten enhet** (`HendelseLag`, 19. sep.), valgt i skjemaet eller med «+ Lag»; hvert lag som kommer til eller går er en systemlinje. Lukket hendelse tar ikke imot. Følger oppdragene ut til bilen (`hendelse_lag`, i ETag-en) | «Lag får ikke oppdrag, de får oppdrag muntlig … og blir registrert på hendelsen» (André). Kortet i ressursoversikten viser «På H14 · 23 min» ved å slå laget opp i de **åpne** hendelsene (`koLagPaa`) — ingen egen status. Erstattet `Ressursbehov` og fritekstfeltet `lagsressurser` fra 18. sep.; `ressurs` strippes i backupen som `lokasjon`, navnet fryses |
-| **Beskrivelsen er tillegg, aldri overskriving**: logglinjer i hendelsen med `Logglinje.beskrivelse`, samme rekke i hendelsen, i «Rediger oppdrag» og i bilen (`hendelse_beskrivelse`). Nyeste uthevet, «nytt» i ti minutter (`koErNytt`). Oppdragets fritekst er «Bare dette oppdraget» | André ville se hva som er nytt og hvem som skrev det; en retting arver merket **og hendelsen** — en rettet kommentar falt ut av hendelsen før 19. sep. |
+| **Lagene på hendelsen er vaktlistas ressurser uten enhet** (`HendelseLag`, 19. sep.), valgt i skjemaet eller med «Legg til»; hvert lag som kommer til eller går er en systemlinje. Lukket hendelse tar ikke imot. Følger oppdragene til bilen (`hendelse_lag`, i ETag-en) | «Lag får ikke oppdrag, de får oppdrag muntlig … og blir registrert på hendelsen» (André). Kortet i ressursoversikten viser «På H14 · 23 min» ved å slå laget opp i de **åpne** hendelsene (`koLagPaa`) — ingen egen status. `ressurs` strippes i backupen, navnet fryses |
+| **Loggen i hendelsen er intern til den deles** (19. sep.): beskrivelsen fra «Ny hendelse» er første linje; «Del» (`delt_at`) gir linja til *alle* oppdrag i hendelsen, også senere; «Del med \<enhet\>» i oppdraget (`Linjedeling`) gir den til ett. Begge angres; ingen systemlinje. Bilen ser bare det delte (`delte_linjer`, gul ett minutt fra `delt_at`); «Nytt oppdrag» arver hastegrad av prioriteten og beskrivelsen som oppdragsnotat | «Sendes internt som standard … ettersendes til ressurs» (André). En retting arver delingen. `Linjedeling` er **ikke** i backupen: den peker på et oppdrag, som gjenopprettes etter KO |
 | **Melder** er avkryssing over `MELDER_VALG` (fast i kode), flere er lov; «Andre» krever tekst, og teksten tømmes uten «Andre» | Nødetatene endrer seg ikke per arrangement; en valgliste var én ting til å vedlikeholde |
 | **Festing** i loggstrømmen: `skriv_full`, idempotent, aldri systemlinjer eller fjernede. `festede` sendes hele med pollen | Festing endrer en rad uten ny id og ville aldri kommet gjennom `?siden=` — som `fjernede` |
 
 **Sortering er oppdragslistas** (`koSorterHendelser`): lukkede nederst, så prioritet, så
-nummer. **Søket** filtrerer lista som alt er hentet (nummer, tittel, sted, melder, tillegg,
+nummer. **Søket** filtrerer lista som alt er hentet (nummer, tittel, sted, melder, loggen,
 lag). **Hendelsen åpnes inne i vinduet**, ikke i en modal: ressursene og oppdragene skal
 være synlige mens man jobber i H14. **Loggstrømmen viser linjene uten
 hendelse pluss systemlinjene om hendelsene** (`koIStrommen`); kommentarene står i hendelsen.

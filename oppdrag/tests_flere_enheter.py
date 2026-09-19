@@ -785,6 +785,51 @@ class BilenSerDeAndreTests(TestCase):
                 'fritekst': '', 'neste_overgang': 'rykker_ut', 'neste_navn': 'Rykker ut',
                 'statusmeldinger': [], 'varslede': [], **ekstra}
 
+    def test_fra_loggen_i_hendelsen_er_gul_i_ett_minutt(self):
+        """«Hver tekst som er nytt i enhetens oppdrag må vises med gul markert
+        tekst. Og det skal vare i 1 minutt» (André, 19. sep. 2026). Regnet
+        fra delingen; overskriften er «Fra loggen i H14» (bilde 3 er fasit)."""
+        import json
+        from patients.js_test_utils import run_node
+        naa = "Date.parse('2026-09-19T12:00:00Z')"
+        ut = run_node(self.harness, self.stubb + f"""
+            const NY_DELT_MS = 60 * 1000;
+            const o = {{hendelse_id: 5, hendelse_nummer: 14, delte_linjer: [
+              {{id: 1, tekst: 'Mann <b>ca. 40</b>', av: 'kari', tid: '2026-09-19T11:00:00Z', delt_at: '2026-09-19T11:59:01Z'}},
+              {{id: 2, tekst: 'gammel', av: 'ola', tid: '2026-09-19T11:00:00Z', delt_at: '2026-09-19T11:59:00Z'}},
+            ]}};
+            console.log(delteLinjerBlokk(o, {naa}));
+            console.log(JSON.stringify([erNyDelt('2026-09-19T11:59:01Z', {naa}), erNyDelt('2026-09-19T11:59:00Z', {naa}), erNyDelt('tull', {naa}), erNyDelt(null, {naa})]));
+            console.log(JSON.stringify([delteLinjerBlokk({{hendelse_id: 5, delte_linjer: []}}), delteLinjerBlokk({{hendelse_id: null, delte_linjer: [{{tekst: 'x', delt_at: ''}}]}})]));
+            console.log(JSON.stringify([harNyDelt([o], {naa}), harNyDelt([o], {naa} + 2000)]));
+        """).splitlines()
+        self.assertIn('Fra loggen i <span class="hendelse-merke">H14</span>', ut[0])
+        self.assertIn('b-tillegg ny">Mann &lt;b&gt;ca. 40', ut[0])
+        self.assertIn('b-tillegg">gammel', ut[0], 'ett minutt er grensen')
+        self.assertNotIn('<b>ca', ut[0])
+        self.assertEqual(ut[1], '[true,false,false,false]')
+        self.assertEqual(ut[2], '["",""]')
+        self.assertEqual(ut[3], '[true,false]', 'så lenge noe er gult må bilen tegne på nytt')
+
+    def test_bilen_tegner_paa_nytt_ved_304_saa_lenge_noe_er_gult(self):
+        """**Kallstedet.** `lastMine` tegner ikke ved 304 — og da ville det
+        gule stått til neste endring på serveren, ikke i ett minutt."""
+        from patients.js_test_utils import build_harness, run_node
+        from patients.js_test_utils import OPPDRAG_ENHET_JS
+        harness = build_harness(((OPPDRAG_ENHET_JS, ('lastMine', 'harNyDelt', 'erNyDelt')),))
+        ut = run_node(harness, """
+            const NY_DELT_MS = 60 * 1000;
+            let tegnet = 0; let etagMine = 'x';
+            globalThis.renderAlt = () => { tegnet += 1; };
+            globalThis.apiFetch = async () => ({ status: 304, ok: false });
+            globalThis.mineOppdrag = [{delte_linjer: [{delt_at: new Date().toISOString()}]}];
+            await lastMine();
+            mineOppdrag = [{delte_linjer: [{delt_at: '2026-01-01T00:00:00Z'}]}];
+            await lastMine();
+            console.log(tegnet);
+        """).splitlines()[0]
+        self.assertEqual(ut, '1')
+
     def test_varslede_vises_som_navn_og_escapes(self):
         o = self._oppdrag(varslede=['KARM 12', '<b>x</b>'])
         ut = self._render(o, 'renderVentende')
@@ -1214,7 +1259,7 @@ class DetaljvinduetTegnesPaaNyttTests(TestCase):
         self.harness = build_harness((
             (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue', 'trustedHtml', '_escHtml', 'klokke')),
             (OPPDRAG_SENTRAL_JS, ('visOppdrag', 'oppdragsnr', 'mkEnhetsrader', '_enhetsknapper', 'kanAvvente', '_varsleValg',
-                                  'tidslinjeHtml', 'hastegradKlasse', 'tidSiden', '_hendelseBeskrivelseHtml',
+                                  'tidslinjeHtml', 'hastegradKlasse', 'tidSiden', '_delteLinjerHtml',
                                   '_flyttValg')),
         ))
 

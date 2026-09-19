@@ -21,7 +21,7 @@ from django.test import Client, TestCase, override_settings
 from accounts.models import CustomUser, ModulTilgang
 from core.vakt import hent_aktiv_vakt, vakt_for_year
 from ko import services, systemlinjer
-from ko.models import (KILDE_SYSTEM, MELDER_VALG, PRIORITET_GRONN, PRIORITET_RANG,
+from ko.models import (KILDE_OPERATOR, KILDE_SYSTEM, MELDER_VALG, PRIORITET_GRONN, PRIORITET_RANG,
                        PRIORITET_VALG, PRIORITET_VIKTIG, Hendelse,
                        HendelseDeltaker, HendelseLag, Logglinje)
 from oppdrag import choices
@@ -68,6 +68,11 @@ class _Grunnlag(TestCase):
 
     def _deltakere(self, h):
         return sorted(h.deltakere.values_list('brukernavn', flat=True))
+
+    def _forste_linje(self, h):
+        """Beskrivelsen fra «Ny hendelse» — den første operatørlinja."""
+        return (Logglinje.objects.filter(hendelse=h, kilde=KILDE_OPERATOR)
+                .order_by('id').first())
 
     def _siste_system(self):
         return Logglinje.objects.filter(kilde=KILDE_SYSTEM).order_by('-id').first()
@@ -201,7 +206,8 @@ class HodetTests(_Grunnlag):
     def test_feltene_lagres_ved_opprettelse(self):
         h = self._hendelse(beskrivelse=' Mann ca. 40 ', melder_typer=['egen', 'andre'],
                            melder='arrangørvakt', lokasjon=self.lokasjon)
-        self.assertEqual([t['tekst'] for t in h.beskrivelse_tillegg()], ['Mann ca. 40'])
+        self.assertEqual(self._forste_linje(h).tekst, 'Mann ca. 40')
+        self.assertIsNone(self._forste_linje(h).delt_at, 'intern til den deles')
         self.assertEqual(h.melder_typer, ['egen', 'andre'])
         self.assertEqual(h.melder, 'arrangørvakt')
         self.assertEqual(services.melder_tekst(h), 'Egen ressurs, Andre (arrangørvakt)')
@@ -222,7 +228,7 @@ class HodetTests(_Grunnlag):
     def test_grensene_selv_er_lov(self):
         h = self._hendelse(beskrivelse='x' * services.MAKS_BESKRIVELSE,
                            melder_typer=['andre'], melder='x' * services.MAKS_MELDER)
-        self.assertEqual(len(h.beskrivelse_tillegg()[0]['tekst']), services.MAKS_BESKRIVELSE)
+        self.assertEqual(len(self._forste_linje(h).tekst), services.MAKS_BESKRIVELSE)
 
     def test_rediger_melder(self):
         h = self._hendelse(melder_typer=['amk'])
@@ -367,33 +373,131 @@ class LagTests(_Grunnlag):
         self.assertEqual(HendelseLag.objects.count(), 0)
 
 
-class BeskrivelseTests(_Grunnlag):
-    """Beskrivelsen er tillegg, aldri overskriving: logglinjer i hendelsen med
-    merket, hvem og når — retting og fjerning gjennom loggens regler."""
+class DelingTests(_Grunnlag):
+    """Loggen i hendelsen er intern til den deles (André, 19. sep. 2026).
+    `del_linje` uten oppdrag deler med alle oppdrag i hendelsen — også dem
+    som kommer senere — og med oppdrag bare det ene. Begge angres, og
+    `Hendelse.delte_linjer_for(oppdrag)` er den ene leseren."""
 
-    def test_tillegg_er_en_linje_i_hendelsen_med_merket(self):
+    def _knyttet(self, h):
+        o = self._oppdrag()
+        services.knytt_oppdrag(o, h, bruker=self.operator)
+        return o
+
+    def _tekster(self, h, o):
+        return [t['tekst'] for t in h.delte_linjer_for(o)]
+
+    def test_beskrivelsen_er_forste_linje_og_intern(self):
         h = self._hendelse(beskrivelse='første')
-        linje = services.legg_til_beskrivelse(h, 'andre', bruker=self.andre)
-        self.assertTrue(linje.beskrivelse)
-        self.assertEqual(linje.hendelse_id, h.pk)
-        self.assertEqual([(t['tekst'], t['av']) for t in h.beskrivelse_tillegg()],
-                         [('første', 'ko1'), ('andre', 'ko2')])
-        self.assertIn('ko2', self._deltakere(h))
+        o = self._knyttet(h)
+        linje = self._forste_linje(h)
+        self.assertEqual((linje.tekst, linje.forfatter_navn, linje.hendelse_id), ('første', 'ko1', h.pk))
+        self.assertEqual(self._tekster(h, o), [], 'ingenting er delt før noen deler')
 
-    def test_tillegg_uten_hendelse_avvises(self):
+    def test_tom_beskrivelse_gir_ingen_linje(self):
+        h = self._hendelse(beskrivelse='  ')
+        self.assertIsNone(self._forste_linje(h))
+
+    def test_del_med_alle_gjelder_naavaerende_og_framtidige_oppdrag(self):
+        h = self._hendelse(beskrivelse='første')
+        o1 = self._knyttet(h)
+        linje = self._forste_linje(h)
+        self.assertTrue(services.del_linje(linje, bruker=self.andre))
+        linje.refresh_from_db()
+        self.assertEqual((linje.delt_av_navn, linje.delt_av_id), ('ko2', self.andre.pk))
+        self.assertIsNotNone(linje.delt_at)
+        o2 = self._knyttet(h)
+        self.assertEqual(self._tekster(h, o1), ['første'])
+        self.assertEqual(self._tekster(h, o2), ['første'], 'et oppdrag som kom etter delingen ser den')
+        self.assertFalse(services.del_linje(linje, bruker=self.andre), 'idempotent')
+
+    def test_angre_deling_med_alle(self):
+        h = self._hendelse(beskrivelse='første')
+        o = self._knyttet(h)
+        linje = self._forste_linje(h)
+        services.del_linje(linje, bruker=self.operator)
+        self.assertTrue(services.angre_deling(linje, bruker=self.operator))
+        linje.refresh_from_db()
+        self.assertEqual((linje.delt_at, linje.delt_av_id, linje.delt_av_navn), (None, None, ''))
+        self.assertEqual(self._tekster(h, o), [])
+        self.assertFalse(services.angre_deling(linje, bruker=self.operator), 'ingenting å angre')
+
+    def test_del_med_ett_oppdrag_og_angre(self):
+        h = self._hendelse(beskrivelse='første')
+        o1 = self._knyttet(h)
+        o2 = self._knyttet(h)
+        linje = self._forste_linje(h)
+        self.assertTrue(services.del_linje(linje, bruker=self.andre, oppdrag=o1))
+        self.assertFalse(services.del_linje(linje, bruker=self.andre, oppdrag=o1), 'idempotent')
+        linje.refresh_from_db()
+        self.assertIsNone(linje.delt_at, 'deling med ett oppdrag rører ikke delingen med alle')
+        self.assertEqual(self._tekster(h, o1), ['første'])
+        self.assertEqual(self._tekster(h, o2), [])
+        d = linje.delinger.get()
+        self.assertEqual((d.oppdrag_id, d.delt_av_navn), (o1.pk, 'ko2'))
+        self.assertTrue(services.angre_deling(linje, bruker=self.andre, oppdrag=o1))
+        self.assertEqual(self._tekster(h, o1), [])
+        self.assertFalse(services.angre_deling(linje, bruker=self.andre, oppdrag=o1))
+
+    def test_angre_enkeltdeling_naar_linja_er_delt_med_alle_avvises(self):
+        h = self._hendelse(beskrivelse='første')
+        o = self._knyttet(h)
+        linje = self._forste_linje(h)
+        services.del_linje(linje, bruker=self.operator)
         with self.assertRaises(services.Ugyldig):
-            services.skriv_linje(self.vakt, 'x', bruker=self.operator, beskrivelse=True)
+            services.angre_deling(linje, bruker=self.operator, oppdrag=o)
 
-    def test_retting_arver_merket_og_hendelsen(self):
+    def test_angre_alle_lar_enkeltdelingene_staa(self):
+        h = self._hendelse(beskrivelse='første')
+        o = self._knyttet(h)
+        linje = self._forste_linje(h)
+        services.del_linje(linje, bruker=self.operator, oppdrag=o)
+        services.del_linje(linje, bruker=self.operator)
+        services.angre_deling(linje, bruker=self.operator)
+        self.assertEqual(self._tekster(h, o), ['første'], 'delingen med det ene var et eget valg')
+
+    def test_oppdrag_i_en_annen_hendelse_avvises(self):
+        h = self._hendelse(beskrivelse='første')
+        annen = self._hendelse('Annen')
+        o = self._knyttet(annen)
+        with self.assertRaises(services.Ugyldig):
+            services.del_linje(self._forste_linje(h), bruker=self.operator, oppdrag=o)
+
+    def test_systemlinje_fjernet_rettet_og_linje_uten_hendelse_deles_ikke(self):
+        h = self._hendelse(beskrivelse='første')
+        system = self._siste_system()
+        with self.assertRaises(services.Ugyldig):
+            services.del_linje(system, bruker=self.operator)
+        uten = services.skriv_linje(self.vakt, 'løs', bruker=self.operator)
+        with self.assertRaises(services.Ugyldig):
+            services.del_linje(uten, bruker=self.operator)
+        fjernet = services.skriv_linje(self.vakt, 'feil', bruker=self.operator, hendelse=h)
+        services.fjern(fjernet, bruker=self.operator)
+        fjernet.refresh_from_db()   # `fjern` skriver kjeden fra basen, ikke objektet
+        with self.assertRaises(services.Ugyldig):
+            services.del_linje(fjernet, bruker=self.operator)
+        gammel = self._forste_linje(h)
+        services.korriger(gammel, bruker=self.operator, tekst='første, rettet')
+        with self.assertRaises(services.Ugyldig):
+            services.del_linje(gammel, bruker=self.operator)
+
+    def test_retting_arver_delingen_og_hendelsen(self):
         h = self._hendelse(beskrivelse='førstte')
-        gammel = Logglinje.objects.get(beskrivelse=True)
+        o1 = self._knyttet(h)
+        o2 = self._knyttet(h)
+        gammel = self._forste_linje(h)
+        services.del_linje(gammel, bruker=self.andre, oppdrag=o2)
         ny = services.korriger(gammel, bruker=self.operator, tekst='første')
-        self.assertTrue(ny.beskrivelse)
         self.assertEqual(ny.hendelse_id, h.pk)
-        tillegg = h.beskrivelse_tillegg()
-        self.assertEqual([t['tekst'] for t in tillegg], ['første'])
-        self.assertTrue(tillegg[0]['rettet'])
-        self.assertEqual(tillegg[0]['rot'], gammel.pk, 'plassen i rekka er den gamle')
+        self.assertEqual([d.oppdrag_id for d in ny.delinger.all()], [o2.pk], 'delingen med det ene følger')
+        self.assertEqual(self._tekster(h, o2), ['første'])
+        self.assertEqual(self._tekster(h, o1), [])
+        services.del_linje(ny, bruker=self.andre)
+        nyere = services.korriger(ny, bruker=self.operator, tekst='første!')
+        self.assertEqual((nyere.delt_at, nyere.delt_av_navn), (ny.delt_at, 'ko2'))
+        rader = h.delte_linjer_for(o1)
+        self.assertEqual([(t['tekst'], t['rot']) for t in rader], [('første!', gammel.pk)],
+                         'den gjeldende linja, på plassen til den første')
 
     def test_en_vanlig_kommentar_arver_ogsaa_hendelsen_ved_retting(self):
         """Fantes ikke før 19. sep. 2026: en rettet kommentar i H14 falt ut
@@ -402,30 +506,37 @@ class BeskrivelseTests(_Grunnlag):
         linje = services.skriv_linje(self.vakt, 'kommentar', bruker=self.operator, hendelse=h)
         ny = services.korriger(linje, bruker=self.operator, tekst='kommentaren')
         self.assertEqual(ny.hendelse_id, h.pk)
-        self.assertFalse(ny.beskrivelse)
+        self.assertIsNone(ny.delt_at)
 
-    def test_fjernet_tillegg_er_ute_av_rekka(self):
+    def test_fjernet_linje_er_ute_selv_om_den_var_delt(self):
         h = self._hendelse(beskrivelse='første')
-        linje = services.legg_til_beskrivelse(h, 'feil', bruker=self.operator)
+        o = self._knyttet(h)
+        linje = services.skriv_linje(self.vakt, 'feil', bruker=self.operator, hendelse=h)
+        services.del_linje(linje, bruker=self.operator)
+        services.del_linje(self._forste_linje(h), bruker=self.operator)
         services.fjern(linje, bruker=self.operator)
-        self.assertEqual([t['tekst'] for t in h.beskrivelse_tillegg()], ['første'])
+        self.assertEqual(self._tekster(h, o), ['første'])
 
-    def test_rekka_prefetches_i_lista_og_er_den_samme(self):
+    def test_delte_for_vakt_er_hele_tilstanden(self):
         h = self._hendelse(beskrivelse='første')
-        services.skriv_linje(self.vakt, 'en kommentar', bruker=self.andre, hendelse=h)
-        services.legg_til_beskrivelse(h, 'andre', bruker=self.andre)
-        fjernet = services.legg_til_beskrivelse(h, 'feil', bruker=self.andre)
-        services.fjern(fjernet, bruker=self.operator)
-        [rad] = services.hendelser_for(self.vakt)
-        self.assertTrue(hasattr(rad, 'tillegg'))
-        self.assertEqual([t['tekst'] for t in rad.beskrivelse_tillegg()], ['første', 'andre'],
-                         'kommentarer og fjernede tillegg er ikke i rekka')
-        self.assertEqual(rad.beskrivelse_tillegg(), h.beskrivelse_tillegg(), 'samme svar med og uten prefetch')
+        o = self._knyttet(h)
+        a = self._forste_linje(h)
+        b = services.skriv_linje(self.vakt, 'b', bruker=self.operator, hendelse=h)
+        services.skriv_linje(self.vakt, 'c', bruker=self.operator, hendelse=h)
+        services.del_linje(a, bruker=self.andre)
+        services.del_linje(b, bruker=self.operator, oppdrag=o)
+        rader = {r['id']: r for r in services.delte_for_vakt(self.vakt)}
+        self.assertEqual(set(rader), {a.pk, b.pk}, 'den interne c står ikke i lista')
+        self.assertEqual((rader[a.pk]['delt_av'], rader[a.pk]['delt_med']), ('ko2', []))
+        self.assertEqual((rader[b.pk]['delt_at'], rader[b.pk]['delt_med']), (None, [o.pk]))
+        services.angre_deling(a, bruker=self.andre)
+        self.assertEqual([r['id'] for r in services.delte_for_vakt(self.vakt)], [b.pk])
 
-    def test_tom_beskrivelse_gir_ingen_linje(self):
-        h = self._hendelse(beskrivelse='  ')
-        self.assertEqual(h.beskrivelse_tillegg(), [])
-        self.assertEqual(Logglinje.objects.filter(beskrivelse=True).count(), 0)
+    def test_deling_er_ingen_logglinje(self):
+        h = self._hendelse(beskrivelse='første')
+        antall = Logglinje.objects.count()
+        services.del_linje(self._forste_linje(h), bruker=self.operator)
+        self.assertEqual(Logglinje.objects.count(), antall, 'deling er en tilstand, ikke en hendelse')
 
 
 class KommentarTests(_Grunnlag):
@@ -526,7 +637,9 @@ class PorteneTests(TestCase):
         d = svar.json()['data']
         self.assertEqual((d['prioritet'], d['melder_typer'], d['melder']), ('gul', ['egen', 'andre'], 'Lag 1'))
         self.assertEqual(d['melder_tekst'], 'Egen ressurs, Andre (Lag 1)')
-        self.assertEqual([(t['tekst'], t['av']) for t in d['beskrivelse']], [('b', 'skriver')])
+        self.assertNotIn('beskrivelse', d, 'beskrivelsen er en logglinje, ikke et felt på hendelsen')
+        linje = Logglinje.objects.get(hendelse_id=d['id'], kilde=KILDE_OPERATOR)
+        self.assertEqual((linje.tekst, linje.forfatter_navn), ('b', 'skriver'))
         self.assertEqual([(l['ressurs_id'], l['navn'], l['av']) for l in d['lag']],
                          [(self.lag1.pk, 'Lag 1', 'skriver')])
         self.assertTrue(d['lag'][0]['fra'])
@@ -557,17 +670,53 @@ class PorteneTests(TestCase):
                      .order_by('id').values_list('systemkode', flat=True))
         self.assertEqual(koder[1:], [systemlinjer.HENDELSE_LAG_PAA, systemlinjer.HENDELSE_LAG_AV])
 
-    def test_tillegg_gjennom_loggstien_og_uten_hendelse(self):
-        h = self._hendelse()
-        svar = self._post(self.skriver, '/ko/api/logg/ny/',
-                          {'tekst': 'mer', 'hendelse_id': h.pk, 'beskrivelse': True})
-        self.assertEqual(svar.status_code, 201, svar.content)
-        self.assertTrue(svar.json()['data']['beskrivelse'])
-        self.assertEqual(self._post(self.skriver, '/ko/api/logg/ny/',
-                                    {'tekst': 'mer', 'beskrivelse': True}).status_code, 400)
+    def _delt_oppdrag(self, h):
+        _gi(self.skriver, 'oppdrag', 'skriv_full')
+        enhet = Enhet.objects.create(navn='HGSD 56', pa_vakt=True)
+        lok = Lokasjon.objects.create(navn='Scene')
+        o = Oppdrag.objects.create(vakt=self.vakt, oppdragsnummer=1, enhet=enhet, lokasjon=lok,
+                                   problemstilling='Fall', hastegrad=choices.HASTEGRAD[0])
+        services.knytt_oppdrag(o, h, bruker=self.skriver)
+        return o
+
+    def test_deling_krever_skriv_full_og_pollen_baerer_de_delte(self):
+        h = services.opprett_hendelse(self.vakt, 'H', bruker=self.skriver, beskrivelse='b')
+        o = self._delt_oppdrag(h)
+        linje = Logglinje.objects.get(hendelse=h, kilde=KILDE_OPERATOR)
+        for sti in ('del', 'angre-deling'):
+            with self.subTest(sti=sti):
+                self.assertEqual(self._post(self.leser, f'/ko/api/logg/{linje.pk}/{sti}/').status_code, 403)
+        svar = self._post(self.skriver, f'/ko/api/logg/{linje.pk}/del/')
+        self.assertEqual(svar.status_code, 200, svar.content)
+        d = svar.json()['data']
+        self.assertTrue(d['delt_at'])
+        self.assertEqual((d['delt_av'], d['delt_med']), ('skriver', []))
         c = Client(); c.force_login(self.leser)
-        [rad] = c.get('/ko/api/logg/').json()['hendelser']
-        self.assertEqual([t['tekst'] for t in rad['beskrivelse']], ['mer'])
+        [rad] = c.get('/ko/api/logg/').json()['delte']
+        self.assertEqual((rad['id'], rad['delt_av'], rad['delt_med']), (linje.pk, 'skriver', []))
+        # Enkeltvis, med `oppdrag_id` i kroppen.
+        annen = services.skriv_linje(self.vakt, 'x', bruker=self.skriver, hendelse=h)
+        svar = self._post(self.skriver, f'/ko/api/logg/{annen.pk}/del/', {'oppdrag_id': o.pk})
+        self.assertEqual(svar.status_code, 200, svar.content)
+        self.assertEqual(svar.json()['data']['delt_med'], [o.pk])
+        self.assertEqual(self._post(self.skriver, f'/ko/api/logg/{annen.pk}/del/',
+                                    {'oppdrag_id': 999}).status_code, 404)
+        svar = self._post(self.skriver, f'/ko/api/logg/{linje.pk}/angre-deling/')
+        self.assertEqual(svar.status_code, 200)
+        self.assertIsNone(svar.json()['data']['delt_at'])
+        self.assertEqual(self._post(self.skriver, f'/ko/api/logg/{annen.pk}/angre-deling/',
+                                    {'oppdrag_id': o.pk}).json()['data']['delt_med'], [])
+        # En systemlinje er 400, ikke 500.
+        system = Logglinje.objects.filter(kilde=KILDE_SYSTEM).first()
+        self.assertEqual(self._post(self.skriver, f'/ko/api/logg/{system.pk}/del/').status_code, 400)
+
+    def test_loggstien_baerer_delingstilstanden_paa_linja(self):
+        h = self._hendelse()
+        svar = self._post(self.skriver, '/ko/api/logg/ny/', {'tekst': 'mer', 'hendelse_id': h.pk})
+        self.assertEqual(svar.status_code, 201, svar.content)
+        d = svar.json()['data']
+        self.assertEqual((d['delt_at'], d['delt_av'], d['delt_med']), (None, '', []))
+        self.assertNotIn('beskrivelse', d)
 
     def test_prioritet_og_bli_med_krever_skriv_full(self):
         h = self._hendelse()
@@ -626,46 +775,49 @@ class PorteneTests(TestCase):
         self.assertNotIn('id="koHendelseModal"', c.get('/ko/').content.decode(),
                          'skjemaet finnes ikke for den som ikke kan skrive')
 
-    def test_oppdraget_baerer_hendelsens_prioritet_lag_og_beskrivelse(self):
+    def test_oppdraget_baerer_hendelsens_prioritet_lag_og_delte_linjer(self):
         """`oppdrag_til_dict` leser dem — det er slik bilen og KO-raden får
-        dem — og ETag-en snur når et tillegg kommer til."""
-        _gi(self.skriver, 'oppdrag', 'skriv_full')
+        dem — og ETag-en snur når en linje deles, og når den deles på nytt."""
         h = services.opprett_hendelse(self.vakt, 'H', bruker=self.skriver, prioritet='viktig',
                                       lag=[self.lag1.pk], beskrivelse='første')
-        enhet = Enhet.objects.create(navn='HGSD 56', pa_vakt=True)
-        lok = Lokasjon.objects.create(navn='Scene')
-        o = Oppdrag.objects.create(vakt=self.vakt, oppdragsnummer=1, enhet=enhet, lokasjon=lok,
-                                   problemstilling='Fall', hastegrad=choices.HASTEGRAD[0])
-        services.knytt_oppdrag(o, h, bruker=self.skriver)
+        o = self._delt_oppdrag(h)
         c = Client(); c.force_login(self.skriver)
         svar = c.get('/oppdrag/api/oppdrag/')
         rad = [r for r in svar.json()['data'] if r['id'] == o.pk][0]
         self.assertEqual((rad['hendelse_prioritet'], rad['hendelse_lag']), ('viktig', ['Lag 1']))
-        self.assertEqual([t['tekst'] for t in rad['hendelse_beskrivelse']], ['første'])
+        self.assertEqual(rad['delte_linjer'], [], 'intern til den deles')
+        self.assertNotIn('hendelse_beskrivelse', rad)
         etag = svar['ETag']
         self.assertEqual(c.get('/oppdrag/api/oppdrag/', HTTP_IF_NONE_MATCH=etag).status_code, 304)
-        services.legg_til_beskrivelse(h, 'andre', bruker=self.skriver)
+        linje = Logglinje.objects.get(hendelse=h, kilde=KILDE_OPERATOR)
+        services.del_linje(linje, bruker=self.skriver)
+        svar = c.get('/oppdrag/api/oppdrag/', HTTP_IF_NONE_MATCH=etag)
+        self.assertEqual(svar.status_code, 200, 'en deling skal ikke drukne i en 304')
+        rad = [r for r in svar.json()['data'] if r['id'] == o.pk][0]
+        self.assertEqual([(t['tekst'], t['av']) for t in rad['delte_linjer']], [('første', 'skriver')])
+        self.assertTrue(rad['delte_linjer'][0]['delt_at'])
+        etag = svar['ETag']
+        services.angre_deling(linje, bruker=self.skriver)
+        services.del_linje(linje, bruker=self.skriver)
         self.assertEqual(c.get('/oppdrag/api/oppdrag/', HTTP_IF_NONE_MATCH=etag).status_code, 200,
-                         'et tillegg skal ikke drukne i en 304')
+                         'samme id, nytt `delt_at` — bilen skal vise den gul igjen')
 
-    def test_bilen_mister_beskrivelsen_naar_oppdraget_er_avsluttet(self):
+    def test_bilen_mister_de_delte_linjene_naar_oppdraget_er_avsluttet(self):
         """Samme regel som friteksten: helseopplysninger skal ikke bli liggende
         i bilen etter at oppdraget er ferdig."""
         from oppdrag.views_common import oppdrag_til_dict
         h = services.opprett_hendelse(self.vakt, 'H', bruker=self.skriver, beskrivelse='pasient')
-        enhet = Enhet.objects.create(navn='HGSD 56', pa_vakt=True)
-        lok = Lokasjon.objects.create(navn='Scene')
-        o = Oppdrag.objects.create(vakt=self.vakt, oppdragsnummer=1, enhet=enhet, lokasjon=lok,
-                                   problemstilling='Fall', hastegrad=choices.HASTEGRAD[0],
-                                   fritekst='x')
-        services.knytt_oppdrag(o, h, bruker=self.skriver)
-        self.assertEqual([t['tekst'] for t in oppdrag_til_dict(o, for_enhet=True)['hendelse_beskrivelse']],
+        o = self._delt_oppdrag(h)
+        o.fritekst = 'x'
+        o.save()
+        services.del_linje(Logglinje.objects.get(hendelse=h, kilde=KILDE_OPERATOR), bruker=self.skriver)
+        self.assertEqual([t['tekst'] for t in oppdrag_til_dict(o, for_enhet=True)['delte_linjer']],
                          ['pasient'])
         o.status = choices.TERMINAL
         o.save()
         rad = oppdrag_til_dict(o, for_enhet=True)
-        self.assertEqual((rad['hendelse_beskrivelse'], rad['fritekst']), ([], ''))
-        self.assertEqual([t['tekst'] for t in oppdrag_til_dict(o)['hendelse_beskrivelse']], ['pasient'],
+        self.assertEqual((rad['delte_linjer'], rad['fritekst']), ([], ''))
+        self.assertEqual([t['tekst'] for t in oppdrag_til_dict(o)['delte_linjer']], ['pasient'],
                          'sentralbordet ser den fortsatt')
 
 
@@ -696,6 +848,8 @@ class GamleFilerTests(TestCase):
         ]).encode('utf-8')
         ut = json.loads(fjern_utgaatte(fil))
         self.assertEqual([o['model'] for o in ut], ['ko.hendelse'])
+        self.assertIn('beskrivelse', UTGAATTE_FELT['ko.logglinje'],
+                      'linjene fra 19. sep. bar tillegg-merket — filene lever 730 dager')
         self.assertNotIn('ressursbehov', ut[0]['fields'])
         self.assertNotIn('beskrivelse', ut[0]['fields'])
         self.assertEqual(ut[0]['fields']['melder'], 'Lag 1')
@@ -711,49 +865,3 @@ class GamleFilerTests(TestCase):
         from core.backup import fjern_utgaatte
         raa = b'[{"model": "ko.logglinje", "pk": 1, "fields": {"tekst": "x"}}]'
         self.assertIs(fjern_utgaatte(raa), raa)
-
-
-class DatamigrasjonTests(TestCase):
-    """`ko/0009`: beskrivelsen ble første tillegg, melder-navnet ble
-    «Andre». Prøvd mot dagens modeller gjennom den ekte funksjonen — den
-    leser bare felter som finnes i den historiske formen *og* i dag, unntatt
-    de to som ble fjernet, og de settes her som attributter."""
-
-    def test_framover(self):
-        import importlib
-        from django.apps import apps
-        modul = importlib.import_module('ko.migrations.0009_beskrivelse_til_tillegg')
-        vakt = hent_aktiv_vakt()
-        bruker = _bruker('kari')
-
-        class _Apps:
-            """`apps.get_model` som gir dagens modeller, med de to gamle
-            feltene lagt på som attributter i minnet."""
-            @staticmethod
-            def get_model(app, navn):
-                Modell = apps.get_model(app, navn)
-                if navn != 'Hendelse':
-                    return Modell
-                h = Hendelse.objects.create(vakt=vakt, hendelsesnummer=1, tittel='Gammel',
-                                            opprettet_av=bruker, opprettet_av_navn='kari',
-                                            melder='Lag 1')
-                h.beskrivelse = 'sto i feltet'
-
-                class _Qs(list):
-                    def iterator(self):
-                        return iter(self)
-
-                class _Mgr:
-                    @staticmethod
-                    def exclude(**kw):
-                        return _Qs([h])
-
-                class _H:
-                    objects = _Mgr()
-                return _H
-
-        modul.framover(_Apps, None)
-        h = Hendelse.objects.get()
-        self.assertEqual([(t['tekst'], t['av']) for t in h.beskrivelse_tillegg()], [('sto i feltet', 'kari')])
-        self.assertEqual(h.beskrivelse_tillegg()[0]['tid'], h.opprettet_at.isoformat())
-        self.assertEqual(h.melder_typer, ['andre'])

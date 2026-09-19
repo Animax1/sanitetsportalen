@@ -47,7 +47,12 @@ class KoBackupHandler(BaseBackupHandler):
     # Ansvarsmerket er hva som gjelder *nå*; etter en gjenoppretting er «nå»
     # et annet, og en rad per konto som peker på en bruker er nettopp den
     # sorten peker som feiler når kontoen er borte.
-    exclude = ['ko.Ansvarsmerke']
+    # `Linjedeling` peker på et oppdrag, og oppdragene slettes ved
+    # arkivering og gjenopprettes *etter* KO — raden ville pekt på ingenting.
+    # Den bærer en tilstand nå («denne bilen ser denne linja»), ikke
+    # historikk; det som ble sagt står på linja, og delingen med alle
+    # (`Logglinje.delt_at`) er med. Se `ko/models.py`.
+    exclude = ['ko.Ansvarsmerke', 'ko.Linjedeling']
 
     #: FK-er ut av modulens eget datasett.
     #:
@@ -82,7 +87,7 @@ class KoBackupHandler(BaseBackupHandler):
     #: kjede, og en peker tilbake til vaktlista lukker den til en sirkel.
     #: Navnet står i `ressurs_navn`; `av` er en brukerpeker som de andre.
     strip_fields = {
-        'ko.Logglinje': ['forfatter', 'fjernet_av', 'festet_av'],
+        'ko.Logglinje': ['forfatter', 'fjernet_av', 'festet_av', 'delt_av'],
         'ko.Hendelse': ['opprettet_av', 'lukket_av', 'lokasjon'],
         'ko.HendelseDeltaker': ['bruker'],
         'ko.HendelseLag': ['ressurs', 'av'],

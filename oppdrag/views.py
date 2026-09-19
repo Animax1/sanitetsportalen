@@ -393,13 +393,14 @@ def oppdrag_liste_view(request):
             # uten å røre oppdragets status, og skal ikke drukne i en 304.
             # Lagene og beskrivelsen på hendelsen er med (KO, 18.–19. sep.
             # 2026): KO skriver dem på hendelsen, ikke på oppdraget, og bilen
-            # ville ellers stått med gammel tekst til neste stempling.
+            # ville ellers stått med gammel tekst til neste stempling. Både
+            # id og `delt_at` — en angret og delt igjen linje har samme id.
             etag_rader = [
                 (r['id'], r['status'], r['enhet_id'],
                  tuple(m['id'] for m in r['statusmeldinger']),
                  tuple(m['id'] for m in r['andre_meldinger']),
                  tuple(r['hendelse_lag']),
-                 tuple(t['id'] for t in r['hendelse_beskrivelse']))
+                 tuple((t['id'], t['delt_at']) for t in r['delte_linjer']))
                 for r in data
             ]
         else:
@@ -431,7 +432,7 @@ def oppdrag_liste_view(request):
                            tuple(r['avbrutt_av']), tuple(r['avventer_av']),
                            r['hendelse_id'], r['hendelse_prioritet'],
                            tuple(r['hendelse_lag']),
-                           tuple(t['id'] for t in r['hendelse_beskrivelse']))
+                           tuple((t['id'], t['delt_at']) for t in r['delte_linjer']))
                           for r in data]
 
         etag = etag_for(etag_rader)

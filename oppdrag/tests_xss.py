@@ -55,10 +55,10 @@ HTML_BUILDERS_PER_FIL = {
         '_verdirad',
         'renderEnhetsadmin',
         'renderHistorikk',
-        # Beskrivelsen på hendelsen (KO, 19. sep. 2026): tilleggene med hvem
-        # og når, i detaljmodalen. Lagene står som en const i raden og i
-        # `visOppdrag`, som friteksten.
-        '_hendelseBeskrivelseHtml',
+        # «Fra loggen i H14» (KO, 19. sep. 2026): linjene KO har delt, med
+        # hvem og når, i detaljmodalen. Lagene står som en const i raden og i
+        # `visOppdrag`, som notatet.
+        '_delteLinjerHtml',
         # «Flytt» (19. sep. 2026): fra/til, bare enheter på vakt.
         '_flyttValg',
     ),
@@ -70,6 +70,8 @@ HTML_BUILDERS_PER_FIL = {
         '_antallRad',
         'renderVentende', 'skalPipe', 'ventetSekunder', '_lydTerskler', 'lydTerskler',
         'renderAvsluttet',
+        # «Fra loggen i H14» i bilen (19. sep. 2026), gul i ett minutt.
+        'delteLinjerBlokk',
         '_varsledeRad',
     ),
 }
@@ -77,15 +79,9 @@ HTML_BUILDERS_PER_FIL = {
 ESCAPING_CALLS = ('escHtmlValue(', 'cellHtml(', '_escHtml(', 'escapeHtml(')
 
 REVIEWED_INTERPOLATIONS = {
-    # Beskrivelsen på hendelsen (19. sep. 2026): tilleggene bygges linje for
-    # linje med escapeHtml før mal-strengen, og skjemaet er KOs egen bygger,
-    # skannet i ko/tests_js.py. Etiketten og hinten er to faste strenger
-    # valgt av en ternær.
-    'beskrivelseBlokk': 'markup bygget rett over, tekst, navn og klokkeslett escapet der',
-    'tilleggRader': 'markup bygget rett over, tekst, navn og klokkeslett escapet der',
-    'nyest': 'hardkodet CSS-klasse fra en ternær',
-    'skjema': 'ferdig markup fra koBeskrivelseSkjema(), som skannes i ko/tests_js.py',
-    'fritekstEtikett': 'to faste ord valgt av en ternær',
+    # «Fra loggen i H14» (19. sep. 2026): blokka i bilen bygges av
+    # `delteLinjerBlokk()`, som skannes for seg.
+    'beskrivelseBlokk': 'ferdig markup fra delteLinjerBlokk(), som skannes for seg',
     # «Flytt» (19. sep. 2026): de to fragmentene bygges rett over med
     # escapeHtml/escHtmlValue inni, og `flyttValg` er ferdig markup fra
     # `_flyttValg()`, som skannes for seg.
@@ -94,7 +90,7 @@ REVIEWED_INTERPOLATIONS = {
     'tilValg': 'options bygget rett over, navn og id escapet der',
     'til': 'markup bygget rett over, navn og id escapet der',
     'flyttValg': 'ferdig markup fra _flyttValg(), som skannes for seg',
-    'fritekstHint': 'fast markup valgt av en ternær, ingen data i',
+    'fritekstHint': 'fast markup uten data i',
     'klasse': 'intern CSS-klasse valgt av en ternær i koden',
     'tidKlasse': 'intern CSS-klasse valgt av en ternær i koden',
     'tittel': 'hardkodet title-attributt fra en ternær',
@@ -506,7 +502,7 @@ class EnhetEscapingOppforselTests(SimpleTestCase):
     HARNESS = (
         (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue', 'trustedHtml', '_escHtml',
                            'klokke')),
-        (OPPDRAG_ENHET_JS, ('renderAktivt', 'oppdragsnr', '_antallRad', '_udefinertVarsel', 'renderVentende', 'skalPipe', 'ventetSekunder', '_lydTerskler', 'lydTerskler', 'bilinnstillinger', 'renderAvsluttet',
+        (OPPDRAG_ENHET_JS, ('renderAktivt', 'delteLinjerBlokk', 'erNyDelt', 'harNyDelt', 'hendelsesnr', 'oppdragsnr', '_antallRad', '_udefinertVarsel', 'renderVentende', 'skalPipe', 'ventetSekunder', '_lydTerskler', 'lydTerskler', 'bilinnstillinger', 'renderAvsluttet',
                             'tidslinjeEnhetHtml', 'hastegradKlasse',
                             '_stedvalg', '_grovsorteringsrad', '_kanGrovsortere', '_varsledeRad', '_problemMedAntall', '_medAntall')),
     )
@@ -696,7 +692,7 @@ class AvreistTilOgGrovsorteringTests(SimpleTestCase):
     HARNESS = (
         (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue', 'trustedHtml', '_escHtml',
                            'klokke')),
-        (OPPDRAG_ENHET_JS, ('renderAktivt', 'oppdragsnr', '_antallRad', '_udefinertVarsel', 'tidslinjeEnhetHtml', 'hastegradKlasse',
+        (OPPDRAG_ENHET_JS, ('renderAktivt', 'delteLinjerBlokk', 'erNyDelt', 'hendelsesnr', 'oppdragsnr', '_antallRad', '_udefinertVarsel', 'tidslinjeEnhetHtml', 'hastegradKlasse',
                             '_stedvalg', '_grovsorteringsrad', '_kanGrovsortere', '_varsledeRad',
                             'koNokkel', 'koLes',
                             'koSkriv', 'koLeggTil', 'koFjern', 'lagNokkel', 'synk', '_problemMedAntall', '_medAntall')),

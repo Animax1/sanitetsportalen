@@ -149,7 +149,6 @@ function koLinjeMerke(linje) {
   // 2026) — de er operatørens handlinger, ikke en projeksjon av et stempel.
   if (linje.kilde === 'system' && String(linje.systemkode || '').startsWith('hendelse_')) return 'hendelse';
   if (linje.kilde === 'system') return 'system';
-  if (linje.beskrivelse) return 'beskrivelse';
   if (linje.uformell) return 'chat';
   if (linje.delt_konto) return 'delt';
   return '';
@@ -305,6 +304,9 @@ async function koHentLogg() {
         linje.festet_av = f ? f.festet_av : '';
       });
     }
+    // Delingen (19. sep. 2026) endrer heller ikke id-en, og en angret
+    // deling er fravær: lista sendes hel, og tilstanden settes på alle.
+    if (Array.isArray(data.delte)) koTaImotDelte(data.delte);
     koTegnLogg();
     // Hendelsene følger med hver poll — hele lista, som `fjernede`: en
     // hendelse som lukkes eller omdøpes har ingen ny id.
@@ -317,6 +319,17 @@ async function koHentLogg() {
       boks.innerHTML = '<p class="text-muted small p-2 mb-0">Fikk ikke kontakt.</p>';
     }
   }
+}
+
+// Regelen for `delte`: det som står i lista er delt, alt annet er intern.
+function koTaImotDelte(delte) {
+  const delt = new Map(delte.map((d) => [d.id, d]));
+  koLinjer.forEach((linje) => {
+    const d = delt.get(linje.id);
+    linje.delt_at = d ? d.delt_at : null;
+    linje.delt_av = d ? d.delt_av : '';
+    linje.delt_med = d ? (d.delt_med || []) : [];
+  });
 }
 
 function koLoggFeil(melding) {
@@ -389,8 +402,9 @@ async function koRett(id) {
   koLinjer.set(data.data.rot, data.data);
   if (data.data.id > koSisteId) koSisteId = data.data.id;
   koTegnLogg();
-  // Tilleggene i beskrivelsen kommer fra serveren med hendelsene: hent dem.
+  // Hendelsesradene leser loggen: hent alt, så raden og bilen får rettingen.
   koHentLogg();
+  koHentOppdragPaaNytt();
 }
 
 async function koFjern(id) {
@@ -620,16 +634,6 @@ function koTegnRessurserPaaNytt() {
   }
 }
 
-// Enter eller «+» i et tilleggsskjema: kall handlingen skjemaet peker på,
-// med hendelsens id. Andre skjemaer røres ikke.
-function koTilleggSubmit(e) {
-  const form = e.target && e.target.closest ? e.target.closest('form[data-ko-tillegg]') : null;
-  if (!form) return;
-  e.preventDefault();
-  const handler = globalThis[form.dataset.koHandling];
-  if (typeof handler === 'function') handler(Number(form.dataset.koTillegg));
-}
-
 async function koHentRessurser() {
   try {
     const res = await apiFetch('/vaktliste/api/ressurser/uten-enhet/');
@@ -687,10 +691,10 @@ document.addEventListener('DOMContentLoaded', () => {
   if (sok) sok.addEventListener('input', koSokEndret);
   koStartVisLukkede();
 
-  // Skjemaene «Legg til i beskrivelsen» tegnes på nytt ved hver poll, så
-  // lytteren står på dokumentet: ett sted, for hendelsen og for
-  // oppdragets detaljmodal.
-  document.addEventListener('submit', koTilleggSubmit);
+  // «Nytt oppdrag» starter uten hendelse hver gang det åpnes, som resten av
+  // skjemaet (`nullstillNyttOppdrag`) — og arven må kunne kjøre på nytt.
+  const nyttModal = document.getElementById('nyttOppdragModal');
+  if (nyttModal) nyttModal.addEventListener('show.bs.modal', koNullstillHendelsevalg);
 
   koRessursvisning = koLesRessursvisning();
   koBrukRessursvisning();

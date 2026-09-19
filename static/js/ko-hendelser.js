@@ -86,25 +86,23 @@ function koSorterHendelser(liste) {
   });
 }
 
+// Operatørens linjer i hendelsen — det som er skrevet, ikke det som skjedde.
+// Loggen i hendelsen (19. sep. 2026) *er* beskrivelsen: den første linja er
+// det som sto i «Ny hendelse», og resten er ført etterpå. Fjernede linjer
+// er ikke med; en fjernet tekst er borte overalt.
+function koOperatorlinjer(h) {
+  return koHendelseLinjer(h).filter((l) => l.kilde !== 'system' && !l.fjernet);
+}
+
 // Søket i hendelsesflaten: nummer («H12» eller «12»), tittel, sted, melder,
-// tilleggene i beskrivelsen og lagene. Tom søketekst treffer alt.
+// loggen i hendelsen og lagene. Tom søketekst treffer alt.
 function koHendelseTreffer(h, sok) {
   const s = String(sok || '').trim().toLowerCase();
   if (!s) return true;
   const felt = [h.kode, String(h.nummer), h.tittel, h.lokasjon_navn, h.melder_tekst, h.melder]
-    .concat((h.beskrivelse || []).map((t) => t.tekst))
+    .concat(koOperatorlinjer(h).map((l) => l.tekst))
     .concat((h.lag || []).map((l) => l.navn));
   return felt.some((f) => String(f || '').toLowerCase().includes(s));
-}
-
-// **«Nytt» i ti minutter** (André, 19. sep. 2026: «lettere å se hva i
-// teksten som er nytt»). Regelen står for seg fordi den avgjør et merke.
-const KO_NYTT_MS = 10 * 60 * 1000;
-
-function koErNytt(iso, naa) {
-  const t = new Date(iso).getTime();
-  if (isNaN(t)) return false;
-  return (naa === undefined ? Date.now() : naa) - t < KO_NYTT_MS;
 }
 
 // «23 min», «1t 05m» — hvor lenge siden. Tom for et ugyldig tidspunkt.
@@ -169,10 +167,10 @@ function koHendelseRadHtml(h) {
   const lukket = h.status !== 'apen';
   const klasser = 'h-rad h-' + prio + (lukket ? ' h-lukket' : '')
     + (h.id === koApenHendelseId ? ' h-apen' : '');
-  // Siste tillegg i beskrivelsen står under tittelen — det nyeste er det
+  // Siste linje i hendelsens logg står under tittelen — det nyeste er det
   // man skummer etter.
-  const tillegg = h.beskrivelse || [];
-  const siste = tillegg.length ? tillegg[tillegg.length - 1].tekst : '';
+  const linjer = koOperatorlinjer(h);
+  const siste = linjer.length ? linjer[linjer.length - 1].tekst : '';
   const under = siste
     ? '<div class="h-under">' + escapeHtml(String(siste).slice(0, 90)) + '</div>' : '';
   const lag = (h.lag || []).map((l) => escapeHtml(l.navn)).join(', ');
@@ -277,22 +275,65 @@ function koDetaljLinjeHtml(linje) {
   const tekst = linje.fjernet
     ? '<em class="text-muted">Innholdet er fjernet.</em>'
     : escapeHtml(linje.tekst);
-  // Et tillegg i beskrivelsen er en linje i tråden også — merket sier at det
-  // står i beskrivelsen, så «hvem oppdaterte den» leses rett av tråden.
-  const merke = linje.beskrivelse
-    ? '<span class="badge text-bg-warning ko-tillegg-merke me-1">beskrivelse</span>' : '';
-  const verktoy = (system || linje.fjernet) ? '' : koRettFjernKnapper(linje.id);
-  return '<div class="h-linje' + (system ? ' system' : '') + '">'
+  const verktoy = (system || linje.fjernet) ? ''
+    : koDelingKnapper(linje) + koRettFjernKnapper(linje.id);
+  const delt = (system || linje.fjernet) ? '' : koDeltMerke(linje);
+  return '<div class="h-linje' + (system ? ' system' : '') + (koErDelt(linje) ? ' delt' : '') + '">'
     + '<span class="tid">' + escapeHtml(koKlokke(linje.tidspunkt)) + '</span>'
-    + merke + tekst + hvem + verktoy + '</div>';
+    + tekst + hvem + delt + verktoy + '</div>';
 }
 
-// ── Beskrivelsen som tillegg, og lagene på hendelsen (19. sep. 2026) ─────────
+// ── Deling med enhetene, og lagene på hendelsen (19. sep. 2026) ──────────────
+//
+// «Det skal kunne sendes internt som vil si ikke til ressurser som standard.
+// Men meldinger kan ettersendes til ressurs, alle som har oppdrag fra
+// hendelsen. Individuelle settes inne i oppdraget.» (André). Linja bærer
+// `delt_at` når den er delt med alle oppdrag i hendelsen — også dem som
+// kommer senere — og `delt_med` (oppdrags-id-er) når den er delt enkeltvis.
+// Begge angres. Tilstanden kommer hel med hver poll (`delte` i `koHentLogg`).
 
-// Rediger og fjern for en linje inne i hendelsen — tillegg og kommentarer
-// (André, 19. sep. 2026: «kan man ikke redigere/slette beskrivelsen»). Samme
-// handlinger som i strømmen (`koRett`, `koFjern`), uten fest og «lag
-// hendelse»: en linje i hendelsen er alt i en. Tom for den som bare leser.
+function koErDelt(linje) {
+  return Boolean(linje.delt_at) || (Array.isArray(linje.delt_med) && linje.delt_med.length > 0);
+}
+
+// Etiketten: «Delt» når linja er delt med alle, «Delt · O47, O48» når den
+// er delt med noen. Tom når den er intern.
+function koDeltEtikett(linje) {
+  if (linje.delt_at) return 'Delt';
+  const med = Array.isArray(linje.delt_med) ? linje.delt_med : [];
+  if (!med.length) return '';
+  const liste = (typeof oppdragsliste !== 'undefined' && Array.isArray(oppdragsliste)) ? oppdragsliste : [];
+  const numre = med.map((id) => {
+    const o = liste.find((x) => x.id === id);
+    return o ? oppdragsnr(o.nummer) : '#' + id;
+  });
+  return 'Delt · ' + numre.join(', ');
+}
+
+function koDeltMerke(linje) {
+  const etikett = koDeltEtikett(linje);
+  if (!etikett) return '';
+  const hvem = linje.delt_at && linje.delt_av ? ' title="Delt av ' + escapeHtml(linje.delt_av) + '"' : '';
+  return ' <span class="badge delt"' + hvem + '>' + escapeHtml(etikett) + '</span>';
+}
+
+// «Del» når linja er intern, «Angre» når den er delt med alle. En linje som
+// bare er delt enkeltvis får «Del» også — deling med alle er et steg opp, og
+// de enkeltvise angres inne i oppdraget. Tom for den som bare leser.
+function koDelingKnapper(linje) {
+  if (!koKanSkrive()) return '';
+  if (linje.delt_at) {
+    return '<button type="button" class="btn btn-link btn-sm p-0 ko-del-knapp" title="Angre delingen — enhetene mister linja"'
+      + ' data-action="koAngreDeling" data-id="' + escapeHtml(linje.id) + '"><i class="bi bi-arrow-counterclockwise me-1"></i>Angre</button>';
+  }
+  return '<button type="button" class="btn btn-link btn-sm p-0 ko-del-knapp" title="Del med alle enheter på oppdrag fra hendelsen, nå og senere"'
+    + ' data-action="koDelLinje" data-id="' + escapeHtml(linje.id) + '"><i class="bi bi-send me-1"></i>Del</button>';
+}
+
+// Rediger og fjern for en linje inne i hendelsen (André, 19. sep. 2026:
+// «kan man ikke redigere/slette beskrivelsen»). Samme handlinger som i
+// strømmen (`koRett`, `koFjern`), uten fest og «lag hendelse»: en linje i
+// hendelsen er alt i en. Tom for den som bare leser.
 function koRettFjernKnapper(id) {
   let ut = '';
   if (koKanSkrive()) {
@@ -306,39 +347,78 @@ function koRettFjernKnapper(id) {
   return ut ? '<span class="verktoy">' + ut + '</span>' : '';
 }
 
-// Ett tillegg: teksten, hvem og når. Det nyeste er uthevet, og «nytt» står
-// på det i ti minutter (`koErNytt`). `verktoy` er rediger/fjern der de
-// finnes — tomt i lesevisningen i «Nytt oppdrag».
-function koTilleggHtml(t, nyest, naa, verktoy) {
-  const klasse = 'b-tillegg' + (nyest ? ' nyest' : '') + (koErNytt(t.tid, naa) ? ' nytt' : '');
-  const nyttMerke = koErNytt(t.tid, naa) ? '<span class="merke">nytt</span>' : '';
-  const rettet = t.rettet ? ' <span class="text-muted small">(rettet)</span>' : '';
-  return '<div class="' + klasse + '">' + escapeHtml(t.tekst) + rettet
-    + '<span class="hvem">' + escapeHtml(t.av || '') + ' · ' + escapeHtml(koKlokke(t.tid)) + '</span>'
-    + nyttMerke + (verktoy || '') + '</div>';
+// Én deling eller angring mot serveren. Svaret er linja slik den nå står;
+// den legges inn og alt tegnes på nytt — hendelsen, og oppdraget om det er
+// åpent, for det er der «Fra loggen i H14» vises.
+async function _koDeling(sti, linjeId, oppdragId) {
+  const kropp = oppdragId ? { oppdrag_id: Number(oppdragId) } : {};
+  const res = await apiFetch('/ko/api/logg/' + linjeId + '/' + sti + '/', {
+    method: 'POST', body: JSON.stringify(kropp),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) { window.alert(data.message || 'Delingen ble ikke lagret.'); return false; }
+  koLinjer.set(data.data.rot, data.data);
+  // Hendelsen tegnes av `koTaImotHendelser` — hent loggen, så merket og
+  // knappen på linja følger svaret, og bilen får den gjennom oppdragslista.
+  await koHentLogg();
+  koHentOppdragPaaNytt();
+  if (typeof apentOppdragId !== 'undefined' && apentOppdragId && typeof visOppdrag === 'function') {
+    await visOppdrag(apentOppdragId);
+  }
+  return true;
 }
 
-// Skjemaet «Legg til i beskrivelsen». `feltId` er unik per sted, fordi den
-// samme beskrivelsen står både i hendelsen og i oppdragets detaljmodal. Et
-// ekte `<form>`, så Enter sender: `koTilleggSubmit` i ko.js lytter på
-// `submit` for hele dokumentet og kaller `handling` med hendelsens id.
-function koTilleggSkjemaHtml(hendelseId, feltId, handling) {
-  return '<form class="b-skjema" autocomplete="off" data-ko-tillegg="' + escapeHtml(hendelseId) + '"'
-    + ' data-ko-handling="' + escapeHtml(handling) + '">'
-    + '<input type="text" class="form-control form-control-sm" id="' + escapeHtml(feltId) + '"'
-    + ' maxlength="2000" placeholder="Legg til i beskrivelsen …" aria-label="Legg til i beskrivelsen">'
-    + '<button type="submit" class="btn btn-sm btn-outline-primary" title="Legg til">'
-    + '<i class="bi bi-plus-lg"></i></button></form>';
+async function koDelLinje(id) {
+  await _koDeling('del', id);
 }
 
-// Hele beskrivelsen: tilleggene, og skjemaet for den som kan skrive.
-function koBeskrivelseHtml(h, kan, feltId, handling) {
-  const tillegg = h.beskrivelse || [];
-  const liste = tillegg.length
-    ? tillegg.map((t, i) => koTilleggHtml(t, i === tillegg.length - 1, undefined, koRettFjernKnapper(t.id))).join('')
-    : '<span class="text-muted small">Ingen beskrivelse ennå.</span>';
-  const skjema = kan ? koTilleggSkjemaHtml(h.id, feltId, handling) : '';
-  return '<div class="b-liste">' + liste + '</div>' + skjema;
+async function koAngreDeling(id) {
+  await _koDeling('angre-deling', id);
+}
+
+// Fra oppdragets detaljmodal: `data-id` er linja, `data-arg` oppdraget.
+async function koDelMedOppdrag(id, oppdragId) {
+  await _koDeling('del', id, oppdragId);
+}
+
+async function koAngreDelingMedOppdrag(id, oppdragId) {
+  await _koDeling('angre-deling', id, oppdragId);
+}
+
+// Detaljmodalen på et oppdrag, på `/ko/`: «Fra loggen i H14» med *alle*
+// operatørlinjene i hendelsen — de delte som de står, de interne dempet med
+// «Del med <enhet>», de enkeltvis delte med «Angre». Ingen merker på
+// tekstene (André, 19. sep. 2026: bilde 3 er fasit). Kalles fra
+// `oppdrag-sentral-oppdrag.js` gjennom en vakt; på `/oppdrag/` tegner
+// oppdragsmodulen lista selv fra `delte_linjer`.
+function koDelteLinjerHtml(o) {
+  const h = koHendelser.get(Number(o.hendelse_id));
+  if (!h) return '';
+  const linjer = koOperatorlinjer(h);
+  if (!linjer.length) return '';
+  const kan = koKanSkrive();
+  const enhet = escapeHtml(o.enhet_navn || 'enheten');
+  const rader = linjer.map((l) => {
+    const medDette = Array.isArray(l.delt_med) && l.delt_med.includes(o.id);
+    const delt = Boolean(l.delt_at) || medDette;
+    let knapp = '';
+    if (kan && l.delt_at) {
+      knapp = '<span class="hvem">alle</span>';
+    } else if (kan && medDette) {
+      knapp = '<button type="button" class="btn btn-link btn-sm p-0 ko-del-knapp" title="Angre delingen med ' + enhet + '"'
+        + ' data-action="koAngreDelingMedOppdrag" data-id="' + escapeHtml(l.id) + '" data-arg="' + escapeHtml(o.id) + '">'
+        + '<i class="bi bi-arrow-counterclockwise me-1"></i>Angre</button>';
+    } else if (kan) {
+      knapp = '<button type="button" class="btn btn-link btn-sm p-0 ko-del-knapp" title="Del bare med dette oppdraget"'
+        + ' data-action="koDelMedOppdrag" data-id="' + escapeHtml(l.id) + '" data-arg="' + escapeHtml(o.id) + '">'
+        + '<i class="bi bi-send me-1"></i>Del med ' + enhet + '</button>';
+    }
+    return '<div class="b-tillegg' + (delt ? '' : ' intern') + '">' + escapeHtml(l.tekst)
+      + '<span class="hvem">' + escapeHtml(l.forfatter || '') + ' · ' + escapeHtml(koKlokke(l.tidspunkt)) + '</span>'
+      + (knapp ? '<span class="verktoy">' + knapp + '</span>' : '') + '</div>';
+  }).join('');
+  return '<div class="mb-3"><h6 class="text-muted">Fra loggen i <span class="hendelse-merke">' + escapeHtml(h.kode) + '</span></h6>'
+    + rader + '</div>';
 }
 
 // Ett lag på hendelsen: navnet, siden når, og «ta av» for den som kan.
@@ -425,7 +505,7 @@ function koTegnDetalj() {
   const liste = document.getElementById('ko-hendelser-liste');
   const h = koHendelser.get(koApenHendelseId);
   if (!boks || !h) { koApenHendelseId = null; if (boks) boks.classList.add('d-none'); return; }
-  const gjenopprett = koBevarFelter(['ko-hendelse-tekst', 'ko-hendelse-tid', 'ko-tillegg-' + escapeHtml(h.id),
+  const gjenopprett = koBevarFelter(['ko-hendelse-tekst', 'ko-hendelse-tid',
                                      'ko-lag-valg-' + escapeHtml(h.id), 'ko-knytt-valg']);
   liste.classList.add('d-none');
   boks.classList.remove('d-none');
@@ -466,7 +546,6 @@ function koTegnDetalj() {
   const lagBrikker = (h.lag || []).map((l) => koLagBrikkeHtml(h, l, kanLag)).join('')
     || '<span class="text-muted small">ingen</span>';
   const lagVelger = kanLag ? koLagVelgerHtml(h) : '';
-  const beskrivelse = koBeskrivelseHtml(h, kan, 'ko-tillegg-' + escapeHtml(h.id), 'koLeggTilBeskrivelse');
   const skjema = kan
     ? '<div class="ko-vindu-fot mt-2 rounded">'
       + '<form id="ko-hendelse-linje-form" class="d-flex gap-2 align-items-start" autocomplete="off">'
@@ -500,13 +579,12 @@ function koTegnDetalj() {
     + '<div class="d-flex align-items-center gap-2 flex-wrap mt-2"><span class="h-felt"><i class="bi bi-people"></i> Lag:</span>'
     + lagBrikker + lagVelger + '</div>'
     + '</div>'
-    + '<div class="h-seksjon mb-1">Beskrivelse</div>'
-    + '<div class="mb-2">' + beskrivelse + '</div>'
     + '<div class="d-flex align-items-center gap-2 mb-1 flex-wrap"><span class="h-seksjon">Oppdrag på hendelsen</span>'
     + '<span class="ms-auto d-flex gap-1 flex-wrap">' + nyttOppdrag + knyttValg + '</span></div>'
     + '<div class="d-grid gap-1 mb-2">' + (oppdrag.length ? oppdrag.map(koHendelseOppdragHtml).join('')
       : '<span class="text-muted small">Ingen oppdrag ennå.</span>') + '</div>'
-    + '<div class="h-seksjon mb-1">Løpende</div>'
+    + '<div class="d-flex align-items-center gap-2 mb-1 flex-wrap"><span class="h-seksjon">Logg i hendelse</span>'
+    + '<span class="text-muted small">intern til den deles — «Del» sender linja til alle enheter på oppdrag fra hendelsen</span></div>'
     + '<div class="h-traad" id="ko-hendelse-traad">' + (koHendelseLinjer(h).map(koDetaljLinjeHtml).join('')
       || '<span class="text-muted small">Ingen linjer ennå.</span>') + '</div>'
     + skjema;
@@ -603,8 +681,8 @@ function _koFyllSkjema(h, fraLinjeId, forslag) {
   });
   koMelderAndreEndret();
   koFyllLagvalg(h);
-  // Beskrivelsen legges til, aldri redigeres: ved redigering står den i
-  // hendelsen med sitt eget skjema, og blokka her skjules.
+  // Beskrivelsen er den første linja i loggen: ved redigering står den i
+  // hendelsen og rettes der, og blokka her skjules.
   const besk = document.getElementById('ko-h-beskrivelse-blokk');
   if (besk) besk.classList.toggle('d-none', Boolean(h));
   const tittel = document.getElementById('ko-hendelse-modal-tittel');
@@ -733,7 +811,7 @@ async function koLagreHendelse() {
     // Åpne den nye hendelsen med det samme — det er der oppdragene lages.
     if (!id && svar.data.data) koApenHendelseId = svar.data.data.id;
     koHentLogg();
-    // Lagene og beskrivelsen følger oppdragene ut til bilene.
+    // Lagene følger oppdragene ut til bilene.
     koHentOppdragPaaNytt();
   });
 }
@@ -779,47 +857,6 @@ async function koTaAvLag(arg) {
   const h = koHendelser.get(id);
   if (!h) return;
   await _koSettLag(id, (h.lag || []).map((l) => l.ressurs_id).filter((r) => r !== ressursId));
-}
-
-// Et tillegg til beskrivelsen: samme sti som en kommentar, med merket.
-async function _koLeggTilTillegg(hendelseId, feltId) {
-  const felt = document.getElementById(feltId);
-  if (!felt || !felt.value.trim()) return false;
-  const res = await apiFetch('/ko/api/logg/ny/', {
-    method: 'POST',
-    body: JSON.stringify({ tekst: felt.value, hendelse_id: Number(hendelseId), beskrivelse: true }),
-  });
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok) { window.alert(data.message || 'Tillegget ble ikke lagret.'); return false; }
-  felt.value = '';
-  koLinjer.set(data.data.rot, data.data);
-  if (data.data.id > koSisteId) koSisteId = data.data.id;
-  await koHentLogg();
-  koHentOppdragPaaNytt();
-  return true;
-}
-
-async function koLeggTilBeskrivelse(id) {
-  await _koLeggTilTillegg(id, 'ko-tillegg-' + id);
-}
-
-// Fra oppdragets detaljmodal (skisse D): samme tillegg, og oppdraget
-// tegnes på nytt så lista der oppdateres.
-async function koLeggTilBeskrivelseFraOppdrag(id) {
-  const ok = await _koLeggTilTillegg(id, 'ko-tillegg-o-' + id);
-  if (ok && typeof apentOppdragId !== 'undefined' && apentOppdragId && typeof visOppdrag === 'function') {
-    await visOppdrag(apentOppdragId);
-  }
-}
-
-// Detaljmodalen på et oppdrag: beskrivelsen på hendelsen, med skjemaet for
-// den som kan skrive i KO. Kalles fra `oppdrag-sentral-oppdrag.js` gjennom
-// en vakt; oppdragsmodulen tegner lista selv på `/oppdrag/`, der KO ikke
-// finnes, og denne legger skjemaet til på `/ko/`.
-function koBeskrivelseSkjema(o) {
-  if (!o.hendelse_id || !koKanSkrive()) return '';
-  const id = escapeHtml(o.hendelse_id);
-  return koTilleggSkjemaHtml(id, 'ko-tillegg-o-' + id, 'koLeggTilBeskrivelseFraOppdrag');
 }
 
 async function koLukkHendelse(id) {
@@ -969,41 +1006,65 @@ function koLeggHendelsevalgINyttOppdrag() {
   koFyllHendelsevalg();
 }
 
-// Beskrivelsen fra hendelsen, vist i «Nytt oppdrag» så det er tydelig at den
-// følger med til enhetene (André, 19. sep. 2026). Lesevisning; tillegg
-// legges til i hendelsen.
-function koHendelseInfoHtml(h) {
-  const tillegg = h.beskrivelse || [];
-  const liste = tillegg.length
-    ? '<div class="b-liste b-liste-kompakt">' + tillegg.map((t, i) => koTilleggHtml(t, i === tillegg.length - 1)).join('') + '</div>'
-    : '<span class="text-muted small">Hendelsen har ingen beskrivelse ennå.</span>';
-  return '<div class="ko-hendelse-info"><div class="form-label mb-1">Beskrivelse fra '
-    + '<span class="hendelse-merke">' + escapeHtml(h.kode) + '</span> <span class="text-muted small fw-normal">'
-    + '— følger med til enhetene på oppdraget</span></div>' + liste + '</div>';
+// **Hastegraden arver hendelsens prioritet** (André, 19. sep. 2026: «hvis
+// viktig prioritering i hendelse så er det akutt hastegrad»). Tabellen står
+// inne i funksjonen med vilje: testen henter funksjonen alene, og en tabell
+// utenfor måtte den ha skrevet av — da måler den avskriften, ikke regelen.
+// Ukjent prioritet gir tom — ingen valgt.
+function koHastegradForHendelse(h) {
+  const tabell = { viktig: 'Akutt', rod: 'Akutt', gul: 'Haster', gronn: 'Vanlig', drift: 'Drift' };
+  return (h && tabell[h.prioritet]) || '';
 }
 
-// Når hendelsen i skjemaet endres: vis beskrivelsen som følger med, og la
-// friteksten hete «Bare dette oppdraget» — den gjelder bare enhetene på
-// dette oppdraget, ikke hendelsen.
+// Oppdragsnotatet arver hendelsens beskrivelse — den første linja i loggen —
+// «men som kan endres av operatør». Tom uten hendelse eller uten linjer.
+function koNotatForHendelse(h) {
+  if (!h) return '';
+  const forste = koOperatorlinjer(h)[0];
+  return forste ? String(forste.tekst || '') : '';
+}
+
+// Når hendelsen i skjemaet endres: sett hastegraden fra prioriteten og
+// notatet fra beskrivelsen — **bare når valget faktisk byttet**. Nedtrekket
+// fylles på nytt ved hver poll (`koFyllHendelsevalg`), og hadde arven
+// kjørt da, ville operatørens egen hastegrad blitt satt tilbake hvert 15.
+// sekund. Notatet overskrives bare når det er tomt eller fortsatt er det
+// forrige arvede — det operatøren har skrevet selv står.
 function koHendelsevalgEndret() {
   const sel = document.getElementById('nytt-hendelse');
   const info = document.getElementById('nytt-hendelse-info');
-  const etikett = document.getElementById('nytt-fritekst-label');
-  const hint = document.getElementById('nytt-fritekst-hint');
   if (!sel) return;
-  const h = koHendelser.get(Number(sel.value));
-  if (info) info.innerHTML = h ? koHendelseInfoHtml(h) : '';
-  if (etikett) {
-    if (!etikett.dataset.standard) etikett.dataset.standard = etikett.textContent;
-    etikett.textContent = h ? 'Bare dette oppdraget' : etikett.dataset.standard;
+  const valgt = String(sel.value || '');
+  if ((sel.dataset || {}).arvet === valgt) return;
+  if (sel.dataset) sel.dataset.arvet = valgt;
+  const h = koHendelser.get(Number(valgt));
+  if (typeof velgHastegrad === 'function') velgHastegrad(koHastegradForHendelse(h));
+  const notat = document.getElementById('nytt-fritekst');
+  if (notat) {
+    const forrige = (notat.dataset || {}).arvet || '';
+    const nytt = koNotatForHendelse(h);
+    if (!String(notat.value || '').trim() || notat.value === forrige) notat.value = nytt;
+    if (notat.dataset) notat.dataset.arvet = nytt;
   }
-  if (hint) {
-    if (!hint.dataset.standard) hint.dataset.standard = hint.textContent;
-    hint.textContent = h
-      ? 'Gjelder bare enhetene på dette oppdraget — beskrivelsen fra ' + h.kode
-        + ' står over og følger med av seg selv. Lagres ikke i auditloggen.'
-      : hint.dataset.standard;
+  if (info) {
+    info.innerHTML = h
+      ? '<div class="form-text mb-0">Hastegrad og oppdragsnotat er hentet fra <span class="hendelse-merke">'
+        + escapeHtml(h.kode) + '</span> — begge kan endres. Linjer KO deler fra loggen i hendelsen følger oppdraget av seg selv.</div>'
+      : '';
   }
+}
+
+// Ved hver åpning av «Nytt oppdrag»: uten hendelse, og arven glemt, så
+// neste valg arver på nytt. Kalles fra `show.bs.modal` i ko.js.
+function koNullstillHendelsevalg() {
+  const sel = document.getElementById('nytt-hendelse');
+  if (!sel) return;
+  sel.value = '';
+  if (sel.dataset) delete sel.dataset.arvet;
+  const notat = document.getElementById('nytt-fritekst');
+  if (notat && notat.dataset) delete notat.dataset.arvet;
+  const info = document.getElementById('nytt-hendelse-info');
+  if (info) info.innerHTML = '';
 }
 
 function koFyllHendelsevalg() {
