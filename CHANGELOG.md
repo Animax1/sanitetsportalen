@@ -4,6 +4,49 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-19 — Oppdrag uten enhet, «Tildelt», «Ikke aktuelt», «Plassering», fargeforklaring i ressursoversikten  `#oppdrag/sentralbord` `#oppdrag/statusmaskin` `#oppdrag/enhetsskjerm` `#ko/ressursbildet` `#ko/hendelseslogg`
+
+André, 19. sep. 2026, fire punkter med skisser først (A1/A2, B, C, D, E1 — alle valgt).
+
+- **Å opprette oppdrag behøver ikke en ressurs.** `Oppdrag.enhet` er nullbar
+  (`oppdrag/0028`); `enhet_ider: []` oppretter oppdraget med `trenger_ressurs` satt fra
+  første sekund, og tavla viser det med samme merke og opptrapping (0/5/15 min) som når en
+  bil rykket videre — mekanismen fantes, bare inngangen er ny. Ingen lyd: «lyd skal bare
+  komme til enheter», og ingen er varslet. Knappen i «Nytt oppdrag» skifter til «Opprett
+  uten enhet» med et varsel når ingen er krysset av (`utenEnhetValgt`,
+  `oppdaterOpprettKnapp`), så det ikke skjer ved et uhell. Den første som varsles blir
+  primær og fyller kolonnen (`varsle_enhet`). En kropp helt uten enhetsfelt er fortsatt
+  400 — en gammel klient som glemte feltet skal ikke stille få et oppdrag uten bil.
+  Arkivet gir én rad med tomt enhetsnavn i stedet for ingen. Merket heter nå «Trenger
+  ressurs» (var «Trenger ny ressurs»); i hendelsens oppdragsliste står det samme merket.
+- **Ledig → Tildelt.** En enhet uten påbegynt oppdrag, men med ett som venter, vises som
+  «Tildelt 16:02 · 2 min» (`tildelt_siden` fra første varsling) i stedet for «Ledig · 1
+  venter». Visning, ikke status: `services.TILDELT` finnes ikke i statusmaskinen, og
+  koblingsradene står i Venter. Passiv vakt vises som før (avtalt). Prikken er en **hul
+  grønn ring** — paletten er brukt opp (Fremme blå, Behandlet grønn), og formen skiller
+  seg for den som ser dårlig forskjell på nyanser. «N ledig» i vinduets hode teller ikke
+  tildelte.
+- **Grovsortering «Ikke aktuelt»** (`ikke_aktuelt`, grått) — teller som satt der
+  grovsortering kreves. Feltet vidåpnet fra 8 til 16 tegn.
+- **«Plassering»** som prioritet i KO (etter Drift, lilla, `ko/0012`) **og** som hastegrad
+  i oppdragsmodulen med samme navn, så «Nytt oppdrag» arver den likt. Uten pasient som
+  Drift: driftens problemstillinger, aldri grovsortering. `choices.UTEN_PASIENT` er navnet
+  på regelen — den sto som `== DRIFT` seks steder.
+- **Fargeforklaring i ressursoversikten** (variant E1): «i» i hodet folder ut en stripe
+  med alle prikkene, trekanten, «passiv vakt» og «På H14»; valget huskes per nettleser
+  (`ko.legende`), av som standard.
+- **Sentralbordet på `/oppdrag/`** står — «avvente inntil videre» — kartlagt i TODO under
+  KO-modulen.
+
+Mutasjonstesting, 17 mutanter, 17 drept etter to runder: Tildelt på passiv vakt og med
+påbegynt, flagget ved opprettelse, `varsle_enhet` fyller kolonnen, manglende felt = ingen
+enhet, `passer` og `grov_kreves_for` bare Drift, grovraden og grovmerket på Plassering,
+`utenEnhetValgt`, legenden tegnes ikke / på som standard, hendelsesraden uten merke, kortet
+uten `tildelt_siden`, tom brikke uten enhet, arkivet mister oppdraget, Plassering før
+Drift. Én overlevde første runde: `_kanGrovsortere` var bare prøvd med Drift.
+
+---
+
 ## 2026-09-19 — KO: bare lag på vakt nå i ressursoversikten og lagvelgeren; sted på kortene  `#ko/ressursbildet` `#ko/hendelseslogg` `#vaktliste/roller` `#oppdrag/sentralbord`
 
 André, 19. sep. 2026: «bug: lag vises i ressursoversikt og i ny hendelse over lag selv om de

@@ -102,10 +102,11 @@ class BilensKnapperJsTests(SimpleTestCase):
         # viser Ledig, ikke et mellomsteg bilen aldri får se.
         self.assertEqual(json.loads(l[1]), ['ledig', None, None, None])
 
-    def test_drift_har_ingen_grovsorteringsrad(self):
+    def test_drift_og_plassering_har_ingen_grovsorteringsrad(self):
         ut = run_node(self.harness, """
             console.log(JSON.stringify([_kanGrovsortere({status: 'fremme', hastegrad: 'Akutt'}),
                                         _kanGrovsortere({status: 'fremme', hastegrad: 'Drift'}),
-                                        _kanGrovsortere({status: 'leverer', hastegrad: 'Drift'})]));
+                                        _kanGrovsortere({status: 'leverer', hastegrad: 'Drift'}),
+                                        _kanGrovsortere({status: 'fremme', hastegrad: 'Plassering'})]));
         """)
-        self.assertEqual(json.loads(ut.strip().splitlines()[0]), [True, False, False])
+        self.assertEqual(json.loads(ut.strip().splitlines()[0]), [True, False, False, False])

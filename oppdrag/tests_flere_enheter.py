@@ -273,7 +273,7 @@ class EnhetensSynTests(FlereEnheterBasis):
         services.sett_status(o, choices.RYKKER_UT, enhet=self.a)
         self.assertEqual(services.enhet_status(self.a)['status'], choices.RYKKER_UT)
         st_b = services.enhet_status(self.b)
-        self.assertEqual(st_b['status'], choices.LEDIG)
+        self.assertEqual(st_b['status'], services.TILDELT, 'har fått oppdrag, ikke rykket ut (19. sep. 2026)')
         self.assertEqual(st_b['antall_ventende'], 1)
 
     def test_vinduet_maales_mot_bilens_egen_ledigmelding(self):
@@ -454,13 +454,41 @@ class OpprettMedFlereEnheterTests(SentralbordBasis):
         self.assertEqual(res.status_code, 200, res.content)
         self.assertEqual(len(res.json()['data']['enheter']), 1)
 
-    def test_tom_liste_og_ukjent_enhet_avvises_uten_at_noe_opprettes(self):
-        for ider in ([], [self.a.pk, 999999], ['x'], 'ikke-en-liste'):
+    def test_ukjent_enhet_avvises_uten_at_noe_opprettes(self):
+        for ider in ([self.a.pk, 999999], ['x'], 'ikke-en-liste'):
             with self.subTest(ider=ider):
                 res = self.ks.post('/oppdrag/api/oppdrag/', content_type='application/json',
                                    data=self._kropp(enhet_ider=ider))
                 self.assertEqual(res.status_code, 400, res.content)
+        # En kropp helt uten enhetsfelt er fortsatt en feil — en gammel klient
+        # som glemte feltet skal ikke stille få et oppdrag uten bil.
+        res = self.ks.post('/oppdrag/api/oppdrag/', content_type='application/json', data=self._kropp())
+        self.assertEqual(res.status_code, 400, res.content)
         self.assertEqual(Oppdrag.objects.count(), 0)
+
+    def test_tom_liste_oppretter_uten_enhet_som_trenger_ressurs(self):
+        """«Å opprette oppdrag behøver ikke en ressurs» (André, 19. sep. 2026).
+        Oppdraget står som «Trenger ressurs» fra første sekund, med samme
+        opptrapping som når en bil rykket videre; den første som varsles blir
+        primær og fyller den gamle kolonnen."""
+        res = self.ks.post('/oppdrag/api/oppdrag/', content_type='application/json',
+                           data=self._kropp(enhet_ider=[]))
+        self.assertEqual(res.status_code, 200, res.content)
+        d = res.json()['data']
+        self.assertEqual((d['enhet_id'], d['enhet_navn'], d['enheter'], d['status']), (None, '', [], 'venter'))
+        self.assertTrue(d['trenger_ressurs'])
+        self.assertTrue(d['trenger_ressurs_siden'])
+        o = Oppdrag.objects.get(pk=d['id'])
+        self.assertIsNone(o.enhet)
+        self.assertEqual(services.utledet_status(o), choices.VENTER)
+        # Tavla og bilen leser den uten å snuble på en tom enhet.
+        self.assertEqual(self.ks.get('/oppdrag/api/oppdrag/').status_code, 200)
+        self.assertEqual(self.ks.get(f'/oppdrag/api/oppdrag/{o.pk}/').status_code, 200)
+        services.varsle_enhet(o, self.b, bruker=self.sentral)
+        o.refresh_from_db()
+        self.assertEqual(o.enhet, self.b, 'den første som varsles blir primær')
+        self.assertFalse(o.trenger_ressurs)
+        self.assertEqual([r.enhet for r in o.enheter.all()], [self.b])
 
     def test_enhet_som_ikke_er_paa_vakt_avviser_hele_opprettelsen(self):
         self.b.pa_vakt = False

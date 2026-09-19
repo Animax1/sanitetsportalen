@@ -114,12 +114,9 @@ async function opprettOppdrag() {
     feil.classList.remove('d-none');
     return;
   }
+  // **Ingen enhet er lov** (André, 19. sep. 2026): oppdraget opprettes som
+  // «Trenger ressurs», og knappen har alt sagt det (`oppdaterOpprettKnapp`).
   const enhetIder = _valgteEnheter();
-  if (!enhetIder.length) {
-    feil.textContent = 'Kryss av minst én enhet.';
-    feil.classList.remove('d-none');
-    return;
-  }
 
   const res = await apiFetch('/oppdrag/api/oppdrag/', {
     method: 'POST',
@@ -149,6 +146,21 @@ async function opprettOppdrag() {
 }
 
 
+// Knappen sier hva som skjer før man trykker (19. sep. 2026): «Opprett»
+// med enheter, «Opprett uten enhet» og et varsel når ingen er krysset av.
+// Regelen står for seg fordi den avgjør en tekst og et varsel.
+function utenEnhetValgt(antallValgte) {
+  return antallValgte === 0;
+}
+
+function oppdaterOpprettKnapp() {
+  const uten = utenEnhetValgt(typeof document.querySelectorAll === 'function' ? _valgteEnheter().length : 0);
+  const knapp = document.getElementById('nytt-opprett');
+  if (knapp) knapp.textContent = uten ? 'Opprett uten enhet' : 'Opprett';
+  const varsel = document.getElementById('nytt-uten-enhet');
+  if (varsel) varsel.classList.toggle('d-none', !uten);
+}
+
 function nullstillNyttOppdrag() {
   // Ved hver åpning (André, 12. sep. 2026: «husker den avhukede enheter fra
   // forrige opprettelse», og senere «nedtrekksfeltene … må starte øverst på
@@ -165,6 +177,7 @@ function nullstillNyttOppdrag() {
   });
   // Problemstillingene følger hastegraden som står valgt — ingen nå.
   hastegradEndret('nytt');
+  oppdaterOpprettKnapp();
 }
 
 
@@ -249,7 +262,9 @@ function _byggProblemkart(rader) {
   // hastegrader, drift → Drift, medisinsk → resten. Udefinert først.
   // Bygges her, ikke hentet, så nedtrekket følger med idet noen endrer lista.
   const aktive = rader.filter((r) => r.er_aktiv);
-  const passer = (r, h) => r.kategori === 'begge' || (r.kategori === 'drift') === (h === 'Drift');
+  // «Drift»-kategorien dekker begge hastegradene uten pasient
+  // (`choices.UTEN_PASIENT`); lista står her fordi testene henter funksjonen alene.
+  const passer = (r, h) => r.kategori === 'begge' || (r.kategori === 'drift') === ['Drift', 'Plassering'].includes(h);
   const kart = {};
   HASTEGRAD_REKKEFOLGE.forEach((h) => {
     kart[h] = aktive.filter((r) => passer(r, h)).map((r) => r.navn);

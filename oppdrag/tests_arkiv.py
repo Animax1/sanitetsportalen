@@ -171,6 +171,17 @@ class ArkiveringTests(ArkivBasis):
         _, antall = arkiver_vakt(self.vakt, '', self.admin)
         self.assertEqual(antall, 1)
 
+    def test_oppdrag_uten_enhet_arkiveres_med_tomt_navn(self):
+        """Opprettet uten enhet (19. sep. 2026) og aldri bemannet: én rad
+        med tomt enhetsnavn, ikke ingen rad — oppdraget skal ikke forsvinne
+        fra arkivet fordi ingen bil tok det."""
+        o = self._oppdrag(enhet=None, trenger_ressurs=True, trenger_ressurs_siden=self.naa)
+        self.assertFalse(o.enheter.exists())
+        _, antall = arkiver_vakt(self.vakt, '', self.admin)
+        self.assertEqual(antall, 1)
+        rad = ArkivertOppdrag.objects.get()
+        self.assertEqual((rad.enhet_navn, rad.sluttstatus), ('', choices.VENTER))
+
     def test_bare_vaktas_oppdrag_arkiveres(self):
         self._oppdrag()
         self._oppdrag(vakt=vakt_for_year(2097))

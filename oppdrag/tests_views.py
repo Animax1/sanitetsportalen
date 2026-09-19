@@ -215,8 +215,11 @@ class EnhetslisteTests(OppdragBasis):
         data = _klient(_bruker('sentral8', 'les')).get(
             '/oppdrag/api/enheter/').json()['data']
         rad = next(r for r in data if r['id'] == self.enhet.pk)
-        self.assertEqual(rad['status'], choices.LEDIG)
+        self.assertEqual((rad['status'], rad['status_navn']), ('tildelt', 'Tildelt'),
+                         'ledig → tildelt når hun får et oppdrag (André, 19. sep. 2026)')
         self.assertEqual(rad['antall_ventende'], 1)
+        self.assertTrue(rad['tildelt_siden'])
+        self.assertIsNone(rad['ledig_siden'])
 
     def test_etag_gir_304_naar_ingenting_er_endret(self):
         c = _klient(_bruker('sentral9', 'les'))

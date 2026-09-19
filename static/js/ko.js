@@ -321,6 +321,56 @@ async function koHentLogg() {
   }
 }
 
+// ── Fargeforklaringen i ressursoversikten (André, 19. sep. 2026) ──────────
+//
+// «i» i vinduets hode folder den ut og inn; valget huskes per nettleser som
+// Alle | Biler | Lag. Ren markup uten data — men den bygger markup, og står
+// derfor i byggerlista i ko/tests_js.py som «Nullstill»-fanen.
+const KO_LEGENDE_NOKKEL = 'ko.legende';
+
+function koLesLegende() {
+  try { return window.localStorage.getItem(KO_LEGENDE_NOKKEL) === 'ja'; } catch (e) { return false; }
+}
+
+function koLagreLegende(paa) {
+  try { window.localStorage.setItem(KO_LEGENDE_NOKKEL, paa ? 'ja' : 'nei'); } catch (e) { /* privat modus */ }
+}
+
+function koLegendeHtml() {
+  const rad = (prikk, navn, tekst) => '<span class="rad">' + prikk + '<b>' + navn + '</b>' + (tekst ? ' ' + tekst : '') + '</span>';
+  const p = (status) => '<span class="status-prikk status-' + status + '"></span>';
+  return rad(p('ledig'), 'Ledig', 'kan sendes')
+    + rad(p('tildelt'), 'Tildelt', 'har oppdrag, ikke rykket ut')
+    + rad(p('rykker_ut'), 'Rykker ut', '')
+    + rad(p('fremme'), 'Fremme', '')
+    + rad(p('behandlet'), 'Behandlet på sted', '')
+    + rad(p('avreist'), 'Avreist', '')
+    + rad(p('leverer'), 'Leverer', '')
+    + rad(p('av_vakt'), 'Av vakt', '')
+    + rad('<i class="bi bi-exclamation-triangle-fill"></i>', 'Trenger ressurs', 'oppdrag uten enhet')
+    + rad('<span class="enhet-passivmerke">passiv vakt</span>', '', 'sover, kan vekkes')
+    + rad('<span class="ko-opptatt">På H14</span>', '', 'laget står på en åpen hendelse');
+}
+
+function koTegnLegende() {
+  const boks = document.getElementById('ko-legende');
+  const knapp = document.getElementById('ko-legende-knapp');
+  const paa = koLesLegende();
+  if (boks) {
+    boks.classList.toggle('d-none', !paa);
+    if (paa && !boks.innerHTML) boks.innerHTML = koLegendeHtml();
+  }
+  if (knapp) {
+    knapp.classList.toggle('aktiv', paa);
+    knapp.setAttribute('aria-expanded', paa ? 'true' : 'false');
+  }
+}
+
+function koVippLegende() {
+  koLagreLegende(!koLesLegende());
+  koTegnLegende();
+}
+
 // Regelen for `delte`: det som står i lista er delt, alt annet er intern.
 function koTaImotDelte(delte) {
   const delt = new Map(delte.map((d) => [d.id, d]));
@@ -696,6 +746,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   koRessursvisning = koLesRessursvisning();
   koBrukRessursvisning();
+  koTegnLegende();
 
   koLeggHendelsevalgINyttOppdrag();
 

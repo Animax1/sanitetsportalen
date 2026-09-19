@@ -269,9 +269,9 @@ class AvbruttIListaJsTests(SimpleTestCase):
         """**De to er ulike opplysninger**: hvem som falt fra, og at noen må
         ut. Avbryter siste bil på et uløst oppdrag, er begge sanne."""
         ut = self._matrise("trenger_ressurs: true, avbrutt_av: ['Bil B']")
-        self.assertIn('Trenger ny ressurs', ut)
+        self.assertIn('Trenger ressurs', ut)
         self.assertIn('Avbrutt av Bil B', ut)
-        self.assertLess(ut.index('Trenger ny ressurs'), ut.index('Avbrutt av'),
+        self.assertLess(ut.index('Trenger ressurs'), ut.index('Avbrutt av'),
                         'kravet om handling står først, opplysningen etter')
 
     def test_flere_enheter_listes_med_komma(self):

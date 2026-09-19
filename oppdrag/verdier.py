@@ -96,7 +96,8 @@ def enhetstyper(*, inkluder_inaktive=False):
 # ── Lydvarselet ──────────────────────────────────────────────────────────────
 
 #: Tallene fra første utgave (André, 12. sep. 2026) — fasit til raden finnes.
-LYDVARSEL_STANDARD = {'Akutt': (60, 10), 'Haster': (300, 60), 'Vanlig': (900, 60), 'Drift': (900, 60)}
+LYDVARSEL_STANDARD = {'Akutt': (60, 10), 'Haster': (300, 60), 'Vanlig': (900, 60),
+                      'Drift': (900, 60), 'Plassering': (900, 60)}
 LYD_NYTT_NOKKEL = 'oppdrag_lyd_nytt'
 
 
@@ -156,7 +157,7 @@ def grov_kreves_for(oppdrag, overgang: str, fra_status: str) -> bool:
     2026: «Må kreve at grovsortering settes før ledig ved levering som
     minimum»); før Avreist bare når innstillingen sier det. Aldri på Drift —
     der er det ingen pasient å sortere."""
-    if oppdrag.hastegrad == choices.DRIFT:
+    if oppdrag.hastegrad in choices.UTEN_PASIENT:
         return False
     if overgang == choices.BEHANDLET:
         return True

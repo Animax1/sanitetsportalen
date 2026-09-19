@@ -66,7 +66,7 @@ def index_view(request):
             'enhet': request.user.enhet,
             'neste_kjede': js_json(neste),
             'status_navn': js_json(choices.STATUS_NAVN),
-            # Stedene ved «Avreist» og grovsorteringens tre verdier — data
+            # Stedene ved «Avreist» og grovsorteringens verdier — data
             # til knappene, som kjeden. Én kilde: `choices`.
             'avreist_til': js_json(list(choices.AVREIST_TIL)),
             'grovsortering': js_json(list(choices.GROVSORTERING)),
@@ -474,17 +474,24 @@ def oppdrag_liste_view(request):
 
     # Nummeret tildeles inne i transaksjonen: feiler opprettelsen, rulles
     # også telleren tilbake, og nummeret brennes ikke.
+    # **Uten enhet** (André, 19. sep. 2026: «å opprette oppdrag behøver ikke
+    # en ressurs»): oppdraget står som «Trenger ressurs» fra første sekund,
+    # med samme opptrapping på tavla som når en bil rykket videre. Ingen lyd
+    # — lyd går bare til enhetene, og ingen er varslet.
+    naa = timezone.now()
     with transaction.atomic():
         oppdrag = Oppdrag.objects.create(
             vakt=vakt,
             oppdragsnummer=services.neste_oppdragsnummer(vakt),
-            enhet=enheter[0],
+            enhet=enheter[0] if enheter else None,
             problemstilling=data['problemstilling'],
             hastegrad=data['hastegrad'],
             antall=data.get('antall'),
             lokasjon=lokasjon,
             fritekst=(data.get('fritekst') or '').strip(),
             opprettet_av=request.user,
+            trenger_ressurs=not enheter,
+            trenger_ressurs_siden=None if enheter else naa,
         )
         for enhet in enheter[1:]:
             services.varsle_enhet(oppdrag, enhet, bruker=request.user)
@@ -528,13 +535,22 @@ def _enheter_fra_kroppen(data):
     aktive og på vakt — én ukjent avviser hele opprettelsen, ikke bare den
     ene: operatøren mente å sende flere, og skal ikke få ett oppdrag med
     færre enn hun krysset av.
+
+    **Tom liste er lov** (19. sep. 2026): oppdraget opprettes uten enhet.
+    `enhet_ider` må da være oppgitt som `[]` — en kropp helt uten enhetsfelt
+    er fortsatt en feil, så en gammel klient som glemte feltet ikke stille
+    får et oppdrag uten bil.
     """
     ukjent = 'Ukjent enhet, eller enheten er ikke på vakt.'
     raa = data.get('enhet_ider')
     if raa is None:
+        if data.get('enhet_id') is None:
+            return None, 'Oppgi enhetene (tom liste for ingen).'
         raa = [data.get('enhet_id')]
-    if not isinstance(raa, list) or not raa:
+    if not isinstance(raa, list):
         return None, 'Oppgi minst én enhet.'
+    if not raa:
+        return [], None
     ider = []
     for verdi in raa:
         try:

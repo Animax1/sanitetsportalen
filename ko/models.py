@@ -316,12 +316,17 @@ PRIORITET_ROD = 'rod'
 PRIORITET_GUL = 'gul'
 PRIORITET_GRONN = 'gronn'
 PRIORITET_DRIFT = 'drift'
+#: «Plassering» (André, 19. sep. 2026): et lag eller en bil som skal stå et
+#: sted. Sist, etter Drift — og finnes som hastegrad i oppdragsmodulen med
+#: samme navn, så «Nytt oppdrag» arver den likt.
+PRIORITET_PLASSERING = 'plassering'
 PRIORITET_VALG: tuple[tuple[str, str], ...] = (
     (PRIORITET_VIKTIG, 'Viktig'),
     (PRIORITET_ROD, 'Rød'),
     (PRIORITET_GUL, 'Gul'),
     (PRIORITET_GRONN, 'Grønn'),
     (PRIORITET_DRIFT, 'Drift'),
+    (PRIORITET_PLASSERING, 'Plassering'),
 )
 PRIORITET_NAVN: dict[str, str] = dict(PRIORITET_VALG)
 PRIORITET_RANG: dict[str, int] = {v: i for i, (v, _) in enumerate(PRIORITET_VALG)}
@@ -389,7 +394,7 @@ class Hendelse(models.Model):
     #: stille: «H14 satt til Viktig av Kari» er nøyaktig det man leter etter
     #: når man i etterkant spør hvorfor to biler ble sendt.
     prioritet = models.CharField(
-        max_length=8, choices=PRIORITET_VALG, default=PRIORITET_STANDARD,
+        max_length=12, choices=PRIORITET_VALG, default=PRIORITET_STANDARD,
         db_index=True, verbose_name='Prioritet')
     #: **Beskrivelsen er ikke et felt** (19. sep. 2026). Den var en
     #: `TextField` fra 18. sep., og er nå den første linja i hendelsens logg

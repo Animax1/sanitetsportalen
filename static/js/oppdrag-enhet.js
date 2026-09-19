@@ -24,7 +24,7 @@ let velgerStedFor = null;
 const AVREIST_TIL = globalThis.OPPDRAG_AVREIST_TIL || [];
 const GROVSORTERING = globalThis.OPPDRAG_GROVSORTERING || [];
 
-const HASTEGRAD_REKKEFOLGE = ['Akutt', 'Haster', 'Vanlig', 'Drift'];
+const HASTEGRAD_REKKEFOLGE = ['Akutt', 'Haster', 'Vanlig', 'Drift', 'Plassering'];
 
 
 
@@ -310,8 +310,10 @@ function _stedvalg() {
 
 
 function _kanGrovsortere(o) {
-  // Ingen pasient på Drift (André, 12. sep. 2026) — raden vises ikke der.
-  if (o.hastegrad === 'Drift') return false;
+  // Ingen pasient på Drift og Plassering (André, 12. og 19. sep. 2026) —
+  // raden vises ikke der. Lista står inne i funksjonen (speiler
+  // `choices.UTEN_PASIENT`): testene henter funksjonen alene.
+  if (['Drift', 'Plassering'].includes(o.hastegrad)) return false;
   return ['fremme', 'avreist', 'leverer'].includes(o.status);
 }
 
@@ -644,7 +646,7 @@ function lydSkalSpille() {
 function lydTerskler() {
   const fra = bilinnstillinger().terskler;
   if (fra && typeof fra === 'object' && Object.keys(fra).length) return fra;
-  return { Akutt: [60, 10], Haster: [300, 60], Vanlig: [900, 60], Drift: [900, 60] };
+  return { Akutt: [60, 10], Haster: [300, 60], Vanlig: [900, 60], Drift: [900, 60], Plassering: [900, 60] };
 }
 
 
@@ -847,9 +849,9 @@ async function lastBilinnstillinger() {
 function grovKrevesFor(o, overgang) {
   // Speiler `verdier.grov_kreves_for` på serveren: alltid før Behandlet på
   // sted og før Ledig fra Leverer; før Avreist når admin har satt det.
-  // Aldri på Drift. Sjekkes før trykket går i køen, så bilen får beskjeden
-  // med en gang i stedet for en avvist rad.
-  if (o.hastegrad === 'Drift') return false;
+  // Aldri på Drift og Plassering. Sjekkes før trykket går i køen, så bilen
+  // får beskjeden med en gang i stedet for en avvist rad.
+  if (['Drift', 'Plassering'].includes(o.hastegrad)) return false;
   if (overgang === 'behandlet') return true;
   if (overgang === 'ledig' && o.status === 'leverer') return true;
   if (overgang === 'avreist') return bilinnstillinger().krev_grov_avreist === true;
@@ -859,7 +861,7 @@ function grovKrevesFor(o, overgang) {
 
 function _grovMangler(o, overgang) {
   if (o.grovsortering || !grovKrevesFor(o, overgang)) return false;
-  visFeil('Sett grovsortering (Rød, Gul eller Grønn) først.');
+  visFeil('Sett grovsortering (Rød, Gul, Grønn eller Ikke aktuelt) først.');
   return true;
 }
 

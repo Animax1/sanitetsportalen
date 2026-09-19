@@ -123,8 +123,9 @@ def _per_enhet(oppdrag, gjeldende):
     """``[(enhetsnavn, status, meldinger, modus), ...]`` — én per koblingsrad.
 
     Delt med `statistikk.rader_for_vakt`, så arkivet og live-tallene deler
-    én oppfatning av hva en rad er. Uten koblingsrader (kan ikke skje etter
-    `0011`) faller den tilbake til oppdragets egen enhet.
+    én oppfatning av hva en rad er. Uten koblingsrader — et oppdrag opprettet
+    uten enhet som aldri fikk en (19. sep. 2026) — blir det én rad med tomt
+    enhetsnavn og oppdragets egen status; oppdraget forsvinner ikke.
 
     `modus` er vaktmodusen som ble frosset da enheten ble varslet (16. sep.
     2026) — tom for alle som ikke har passiv vakt, og for rader fra før

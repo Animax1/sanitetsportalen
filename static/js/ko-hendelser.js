@@ -456,12 +456,17 @@ function koLagVelgerHtml(h) {
 
 function koHendelseOppdragHtml(o) {
   const enheter = (o.enheter || []).map((e) => escapeHtml(e.navn || e.enhet_navn || '')).filter(Boolean).join(', ');
+  // Opprettet uten enhet, eller bilen rykket videre (19. sep. 2026): samme
+  // merke som på tavla, så det leses likt begge steder.
+  const brikke = o.trenger_ressurs
+    ? '<span class="enhet-brikke enhet-brikke-mangler"><i class="bi bi-exclamation-triangle-fill"></i> Trenger ressurs</span>'
+    : '<span class="enhet-brikke"><span class="status-prikk status-' + escapeHtml(o.status) + '"></span>'
+      + (enheter || '<span class="text-muted">ingen enhet</span>') + ' · ' + escapeHtml(o.status_navn || '') + '</span>';
   return '<div class="h-oppdrag-rad" data-action="visOppdrag" data-id="' + escapeHtml(o.id) + '" role="button" tabindex="0">'
     + '<span class="hendelse-merke">' + escapeHtml(oppdragsnr(o.nummer)) + '</span>'
     + '<span class="hastegrad ' + escapeHtml(hastegradKlasse(o.hastegrad)) + '">' + escapeHtml(o.hastegrad || '') + '</span>'
     + '<span class="fw-semibold">' + escapeHtml(o.problemstilling || '') + '</span>'
-    + '<span class="enhet-brikke"><span class="status-prikk status-' + escapeHtml(o.status) + '"></span>'
-    + (enheter || '<span class="text-muted">ingen enhet</span>') + ' · ' + escapeHtml(o.status_navn || '') + '</span>'
+    + brikke
     + '<span class="ms-auto small">Åpne</span>'
     + '</div>';
 }
@@ -1014,7 +1019,7 @@ function koLeggHendelsevalgINyttOppdrag() {
 // utenfor måtte den ha skrevet av — da måler den avskriften, ikke regelen.
 // Ukjent prioritet gir tom — ingen valgt.
 function koHastegradForHendelse(h) {
-  const tabell = { viktig: 'Akutt', rod: 'Akutt', gul: 'Haster', gronn: 'Vanlig', drift: 'Drift' };
+  const tabell = { viktig: 'Akutt', rod: 'Akutt', gul: 'Haster', gronn: 'Vanlig', drift: 'Drift', plassering: 'Plassering' };
   return (h && tabell[h.prioritet]) || '';
 }
 

@@ -514,7 +514,7 @@ class EnhetEscapingOppforselTests(SimpleTestCase):
              "globalThis.AVREIST_TIL = [['samleplass','Samleplass'],"
              "['skadepol','Skadepol'],['legevakt','Legevakt'],['sykehus','Sykehus'],"
              "['annen_ambulanse','Annen ambulanse'],['annet','Annet sted']];\n"
-             "globalThis.GROVSORTERING = [['rod','Rød'],['gul','Gul'],['gronn','Grønn']];\n")
+             "globalThis.GROVSORTERING = [['rod','Rød'],['gul','Gul'],['gronn','Grønn'],['ikke_aktuelt','Ikke aktuelt']];\n")
 
     def setUp(self):
         if not node_available():
@@ -609,6 +609,20 @@ class EnhetskortetTests(SimpleTestCase):
                 'oppdragsnummer': 12, 'hastegrad': 'Haster',
                 'problemstilling': 'Fallskade', 'lokasjon_navn': 'Hovedscene',
                 'status_tidspunkt': for_12_min_siden.isoformat()}
+
+    def test_tildelt_kortet(self):
+        """Ledig → Tildelt når hun får et oppdrag (André, 19. sep. 2026): egen
+        prikk (hul ring, `status-tildelt`), «Tildelt 16:02 · 2 min» fra
+        varslingen, og oppdraget står ikke på kortet — hun har ikke rykket ut."""
+        from datetime import datetime, timedelta, timezone
+        for_2_min_siden = (datetime.now(timezone.utc) - timedelta(minutes=2)).isoformat()
+        ut = self._kort({'id': 1, 'navn': 'E1', 'status': 'tildelt', 'pa_vakt': True,
+                         'status_navn': 'Tildelt', 'antall_ventende': 1,
+                         'oppdragsnummer': None, 'hastegrad': None, 'problemstilling': None,
+                         'status_tidspunkt': None, 'ledig_siden': None, 'tildelt_siden': for_2_min_siden})
+        self.assertIn('status-tildelt', ut)
+        self.assertRegex(ut, r'Tildelt \d\d:\d\d · 2 min · 1 venter')
+        self.assertNotIn('enhet-oppdrag', ut)
 
     def test_kortet_viser_oppdraget(self):
         ut = self._kort(self.AKTIV)
@@ -801,7 +815,8 @@ class AvreistTilOgGrovsorteringTests(SimpleTestCase):
             renderAktivt();
             console.log(el.innerHTML);
         """)
-        self.assertEqual(ut.count('settGrovsortering'), 3)
+        self.assertEqual(ut.count('settGrovsortering'), 4, 'Rød, Gul, Grønn og Ikke aktuelt (19. sep. 2026)')
+        self.assertIn('grov-ikke_aktuelt"', ut)
         self.assertIn('grov-gul grov-valgt', ut)
         self.assertNotIn('grov-rod grov-valgt', ut)
         self.assertIn('Grovsortering: Gul', ut)
@@ -854,6 +869,12 @@ class SentralbordetsGrovmerkeTests(SimpleTestCase):
             renderOppdrag();
             console.log(el.innerHTML);
         """)
+
+    def test_uten_pasient_har_ikke_merket(self):
+        for h in ('Drift', 'Plassering'):
+            with self.subTest(hastegrad=h):
+                self.assertNotIn('grov-merke', self._rad(hastegrad=h))
+        self.assertIn('grov-ikke_aktuelt', self._rad(grovsortering='ikke_aktuelt', grovsortering_navn='Ikke aktuelt'))
 
     def test_hastegrad_forst_saa_grovsortering(self):
         ut = self._rad(grovsortering='rod', grovsortering_navn='Rød')

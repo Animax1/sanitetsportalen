@@ -591,6 +591,15 @@ Modulens egne regler står i [`ko/CLAUDE.md`](./ko/CLAUDE.md). `/oppdrag/` snevr
 enhetens egen skjerm, og **sentralbordet flytter til KO** — en flytting av
 `oppdrag-sentral-*.js`, ikke en kopi. Puljene står i §10.
 
+- [ ] **Fjerne sentralbordet fra `/oppdrag/`** — «avvente inntil videre, men noe å se på»
+      (André, 19. sep. 2026). `/ko/` har alt sentralbordet har (samme malbiter, samme
+      modaler). Det som henger på `/oppdrag/` for kontoer uten enhet, kartlagt 19. sep.:
+      tavla på `/ko/` krever `les` i KO, så brukere med bare oppdragstilgang mister den —
+      `/oppdrag/` må sende dem videre til `/ko/`, og den som mangler KO-tilgang skal få en
+      side som sier det, ikke 403; menyen «Oppdrag» bør skjules for kontoer uten enhet;
+      rundt tretti steder i ti testfiler laster `/oppdrag/` som sentralbord og må pekes om;
+      bjella til bilen lenker til `/oppdrag/` og røres ikke. Bilene beholder sida.
+
 Forslaget erstatter datteroppdrag, som er arkivert: grupperingen hører hjemme i en
 `Hendelse` som finnes *før* oppdraget og også dekker lag. Begrunnelsen står i §9.3.
 

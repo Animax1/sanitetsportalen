@@ -150,6 +150,7 @@ body.ko-drar-h { cursor: row-resize; }
 .h-tabell tr.h-gul td:first-child   { border-left-color: #eab308; }
 .h-tabell tr.h-rod td:first-child   { border-left-color: #ef4444; }
 .h-tabell tr.h-drift td:first-child { border-left-color: #3b82f6; }
+.h-tabell tr.h-plassering td:first-child { border-left-color: #a855f7; }
 /* Viktig: rød ramme rundt hele raden, og rødt utropstegn. */
 .h-tabell tr.h-viktig td:first-child { border-left-color: #ef4444; }
 .h-tabell tr.h-viktig td {
@@ -188,6 +189,7 @@ body.ko-drar-h { cursor: row-resize; }
 .ko-prio-m-gul    { background: #78350f; color: #fde68a; }
 .ko-prio-m-gronn  { background: #14532d; color: #bbf7d0; }
 .ko-prio-m-drift  { background: #1e3a8a; color: #bfdbfe; }
+.ko-prio-m-plassering { background: #3b0764; color: #e9d5ff; }
 
 .badge-apen { background: #1d4ed8; }
 .badge.delt { background: #15803d; color: #fff; }
@@ -208,6 +210,7 @@ body.ko-drar-h { cursor: row-resize; }
 .h-hode.h-gul   { border-left-color: #eab308; }
 .h-hode.h-gronn { border-left-color: #16a34a; }
 .h-hode.h-drift { border-left-color: #3b82f6; }
+.h-hode.h-plassering { border-left-color: #a855f7; }
 .h-hode-tittel { font-weight: 700; font-size: 1rem; }
 .h-felt { font-size: 0.82rem; color: var(--text-muted); }
 .h-felt b { color: var(--text-main); font-weight: 600; }
@@ -243,6 +246,7 @@ body.ko-drar-h { cursor: row-resize; }
 .ko-prio-gruppe .btn.aktiv-gul   { background: #eab308; border-color: #eab308; color: #111; }
 .ko-prio-gruppe .btn.aktiv-gronn { background: #16a34a; border-color: #16a34a; color: #fff; }
 .ko-prio-gruppe .btn.aktiv-drift { background: #2563eb; border-color: #2563eb; color: #fff; }
+.ko-prio-gruppe .btn.aktiv-plassering { background: #7e22ce; border-color: #7e22ce; color: #fff; }
 /* «Lukk hendelse» skal være godt synlig (André, 18. sep. 2026). */
 .ko-lukk-knapp { font-weight: 700; }
 
@@ -258,11 +262,13 @@ body.ko-drar-h { cursor: row-resize; }
 .ko-prio-knapp.ko-prio-rod   { border-color: #dc2626; color: #fca5a5; }
 .ko-prio-knapp.ko-prio-drift { border-color: #3b82f6; color: #bfdbfe; }
 .ko-prio-knapp.ko-prio-viktig { border-color: #dc2626; color: #fca5a5; }
+.ko-prio-knapp.ko-prio-plassering { border-color: #a855f7; color: #e9d5ff; }
 .ko-prio-knapp.valgt.ko-prio-gronn { background: #16a34a; color: #fff; }
 .ko-prio-knapp.valgt.ko-prio-gul   { background: #eab308; color: #111; }
 .ko-prio-knapp.valgt.ko-prio-rod   { background: #dc2626; color: #fff; }
 .ko-prio-knapp.valgt.ko-prio-drift { background: #2563eb; color: #fff; }
 .ko-prio-knapp.valgt.ko-prio-viktig { background: #dc2626; color: #fff; }
+.ko-prio-knapp.valgt.ko-prio-plassering { background: #7e22ce; color: #fff; }
 .ko-melder-valg { display: flex; flex-wrap: wrap; gap: 0.25rem 1rem; }
 .ko-lag-valg { display: grid; grid-template-columns: 1fr 1fr; gap: 0.25rem 0.75rem; }
 .ko-lag-valg .form-check { margin: 0; }
@@ -282,6 +288,18 @@ body.ko-drar-h { cursor: row-resize; }
 .ko-ressurskort.enhet-kort-klikkbar { cursor: pointer; }
 .ko-ressurskort-apen { border-color: var(--portal-accent); }
 .ko-ressurskort .enhet-oppdrag { cursor: pointer; }
+
+/* Fargeforklaringen under ressursoversiktens hode (19. sep. 2026). */
+.ko-legende {
+  display: flex; flex-wrap: wrap; gap: 0.35rem 1rem; font-size: 0.78rem; color: var(--text-muted);
+  padding: 0.45rem 0.6rem; border-bottom: 1px solid var(--border-color); background: var(--surface-2);
+}
+.ko-legende .rad { display: inline-flex; align-items: center; gap: 0.35rem; white-space: nowrap; }
+.ko-legende .status-prikk { width: 0.6rem; height: 0.6rem; }
+.ko-legende b { color: var(--text-main); font-weight: 600; }
+.ko-legende .bi-exclamation-triangle-fill { color: #f59e0b; }
+.ko-legende-knapp { padding: 0 0.4rem; }
+.ko-legende-knapp.aktiv { border-color: var(--portal-accent); color: var(--portal-accent); }
 
 /* ── Loggstrømmen ───────────────────────────────────────────────────────── */
 

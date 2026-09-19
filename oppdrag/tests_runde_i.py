@@ -15,7 +15,7 @@ from patients.js_test_utils import (
     OPPDRAG_ENHET_JS, OPPDRAG_SENTRAL_JS, PORTAL_UTILS_JS, build_harness,
     node_available, run_node)
 
-from . import verdier
+from . import choices, verdier
 from .models import Lydvarsel
 from .tests_runde_d import _konst
 from .models import Oppdrag
@@ -37,7 +37,8 @@ class LydvarselApiTests(OppdragBasis):
 
     def test_seedet_med_forste_utgaves_tall(self):
         self.assertEqual(verdier.lydvarsel(), {
-            'Akutt': [60, 10], 'Haster': [300, 60], 'Vanlig': [900, 60], 'Drift': [900, 60]})
+            'Akutt': [60, 10], 'Haster': [300, 60], 'Vanlig': [900, 60], 'Drift': [900, 60],
+            'Plassering': [900, 60]})
         self.assertTrue(verdier.lyd_ved_nytt_oppdrag())
         d = self.leser.get('/oppdrag/api/bilinnstillinger/').json()['data']
         self.assertEqual(d['terskler']['Akutt'], [60, 10])
@@ -60,10 +61,10 @@ class LydvarselApiTests(OppdragBasis):
         """«En ting vi må kunne deaktivere lydvarsel per hastegrad (påvirker
         ikke lyd ved nytt oppdrag i listen).» (André, 12. sep. 2026)"""
         d = self.leser.get('/oppdrag/api/bilinnstillinger/').json()['data']
-        self.assertEqual(d['aktive'], {'Akutt': True, 'Haster': True, 'Vanlig': True, 'Drift': True})
+        self.assertEqual(d['aktive'], {'Akutt': True, 'Haster': True, 'Vanlig': True, 'Drift': True, 'Plassering': True})
         res = _json(self.admin, 'put', '/oppdrag/api/bilinnstillinger/', {'aktive': {'Drift': False}})
         self.assertEqual(res.status_code, 200, res.content)
-        self.assertEqual(verdier.lydvarsel_aktive(), {'Akutt': True, 'Haster': True, 'Vanlig': True, 'Drift': False})
+        self.assertEqual(verdier.lydvarsel_aktive(), {'Akutt': True, 'Haster': True, 'Vanlig': True, 'Drift': False, 'Plassering': True})
         self.assertEqual(verdier.lydvarsel()['Drift'], [900, 60], 'tersklene står')
         self.assertTrue(verdier.lyd_ved_nytt_oppdrag(), 'pipet ved nytt oppdrag rører den ikke')
         for kropp in ({'aktive': {'Tull': False}}, {'aktive': [True]}):
@@ -122,6 +123,28 @@ class GrovsorteringKrevesTests(StemplingBasis):
         o.refresh_from_db()
         self.assertEqual(o.status, 'ledig')
         self.assertEqual(verdier.grov_kreves_for(o, 'ledig', 'leverer'), False)
+
+    def test_plassering_krever_aldri(self):
+        """«Plassering» (19. sep. 2026) er uten pasient, som Drift."""
+        o = self._oppdrag()
+        Oppdrag.objects.filter(pk=o.pk).update(hastegrad='Plassering', problemstilling='Utstyr')
+        self._til(o, 'rykker_ut', 'fremme', 'behandlet')
+        o.refresh_from_db()
+        self.assertEqual(o.status, 'ledig')
+        self.assertEqual(verdier.grov_kreves_for(o, 'behandlet', 'fremme'), False)
+
+    def test_ikke_aktuelt_teller_som_satt(self):
+        """«Ikke aktuelt» (André, 19. sep. 2026): bilen kom fram til ingen
+        pasient. Verdien finnes i mengden, og med den satt slipper bilen forbi
+        kravet før Behandlet — som med Rød, Gul og Grønn."""
+        self.assertEqual(choices.GROVSORTERING_NAVN['ikke_aktuelt'], 'Ikke aktuelt')
+        o = self._oppdrag()
+        self._til(o, 'rykker_ut', 'fremme')
+        self.assertEqual(self._stemple(o, 'behandlet').status_code, 400, 'ingen grovsortering ennå')
+        Oppdrag.objects.filter(pk=o.pk).update(grovsortering='ikke_aktuelt')
+        self._til(o, 'behandlet')
+        o.refresh_from_db()
+        self.assertEqual((o.status, o.grovsortering), ('ledig', 'ikke_aktuelt'))
 
 
 class LydAlltidPaaJsTests(SimpleTestCase):

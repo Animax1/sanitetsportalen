@@ -185,10 +185,12 @@ function _enhetsmatrise(o) {
   // notatet om flere enheter. Oppdragets egen status står fortsatt til
   // høyre i raden; den er utledet av disse. Uten `enheter` (eldre svar)
   // er det én brikke av toppnivåfeltene.
-  const rader = (o.enheter && o.enheter.length) ? o.enheter : [{
+  // Uten `enheter` (eldre svar) er det én brikke av toppnivåfeltene; uten
+  // enhet i det hele tatt (opprettet uten, 19. sep. 2026) ingen.
+  const rader = (o.enheter && o.enheter.length) ? o.enheter : (o.enhet_navn ? [{
     enhet_navn: o.enhet_navn, status: o.status, status_navn: o.status_navn,
     status_tidspunkt: o.status_tidspunkt,
-  }];
+  }] : []);
   // Bilen rykket videre og ingen har tatt over (André, 12. sep. 2026):
   // merket står først, så det er det første 113 ser på raden — med egen
   // trekant, ikke statusprikken bilene har, og med tida det har stått.
@@ -197,7 +199,7 @@ function _enhetsmatrise(o) {
   const mangler = o.trenger_ressurs
     ? `<span class="enhet-brikke enhet-brikke-mangler mangler-${escHtmlValue(_manglerTrinn(o))}">
       <i class="bi bi-exclamation-triangle-fill"></i>
-      <span>Trenger ny ressurs · ${escHtmlValue(_manglerMinutter(o))} min</span>
+      <span>Trenger ressurs · ${escHtmlValue(_manglerMinutter(o))} min</span>
     </span>` : '';
   // **«Avbrutt» er ikke «trenger ny ressurs»** (André, 15. sep. 2026). Avbrøt
   // en bil et oppdrag en annen alt hadde løst, sto det fram til da «trenger ny

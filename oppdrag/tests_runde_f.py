@@ -54,7 +54,8 @@ class LydvarselJsTests(SimpleTestCase):
     def test_tersklene_er_andres(self):
         ut = run_node(self.harness, "console.log(JSON.stringify(lydTerskler()));")
         verdier = json.loads(ut.strip().splitlines()[0])
-        self.assertEqual(verdier, {'Akutt': [60, 10], 'Haster': [300, 60], 'Vanlig': [900, 60], 'Drift': [900, 60]})
+        self.assertEqual(verdier, {'Akutt': [60, 10], 'Haster': [300, 60], 'Vanlig': [900, 60], 'Drift': [900, 60],
+                                   'Plassering': [900, 60]})
         self.assertEqual(set(verdier), set(choices.HASTEGRAD), 'én terskel per hastegrad')
 
     def test_forste_pip_og_kadensen_per_hastegrad(self):

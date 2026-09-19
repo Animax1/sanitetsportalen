@@ -73,6 +73,16 @@ class OpprettelseTests(OppdragBasis):
         self.assertEqual(res.status_code, 200, res.content)
         self.assertEqual(res.json()['data']['hastegrad'], 'Drift')
 
+    def test_plassering_tilbyr_driftens_problemstillinger(self):
+        """«Plassering» (19. sep. 2026), sist etter Drift, uten pasient."""
+        self.assertEqual(choices.HASTEGRAD[-2:], ('Drift', 'Plassering'))
+        res = self._post(hastegrad='Plassering', problemstilling='Matutlevering')
+        self.assertEqual(res.status_code, 200, res.content)
+        self.assertEqual(res.json()['data']['hastegrad'], 'Plassering')
+        self.assertEqual(self._post(hastegrad='Plassering', problemstilling='Pustevansker').status_code, 400,
+                         'ingen pasient — de medisinske tilbys ikke')
+        self.assertEqual(verdier.problemstillinger_for('Plassering'), verdier.problemstillinger_for('Drift'))
+
     def test_problemstillingen_maa_hore_til_hastegraden(self):
         for h, p in (('Drift', 'Pustevansker'), ('Vanlig', 'Matutlevering')):
             with self.subTest(h=h, p=p):

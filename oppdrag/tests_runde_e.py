@@ -243,7 +243,9 @@ class VerdiadminJsTests(SimpleTestCase):
             'Akutt': ['Udefinert', 'Pustevansker', 'Transport'],
             'Haster': ['Udefinert', 'Pustevansker', 'Transport'],
             'Vanlig': ['Udefinert', 'Pustevansker', 'Transport'],
-            'Drift': ['Udefinert', 'Transport', 'Utstyr']})
+            'Drift': ['Udefinert', 'Transport', 'Utstyr'],
+            # Plassering (19. sep. 2026) tilbyr driftens problemstillinger.
+            'Plassering': ['Udefinert', 'Transport', 'Utstyr']})
         self.assertEqual(json.loads(med), ['Transport'])
 
     def test_raden_har_flytt_og_den_faste_har_verken_slett_eller_endring(self):

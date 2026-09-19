@@ -78,12 +78,21 @@ PROBLEMSTILLING = PROBLEMSTILLING_MEDISINSK + tuple(
 #: oppdrag uten pasient — og det er den forskjellen som avgjør hvilke
 #: problemstillinger som tilbys.
 DRIFT = 'Drift'
+#: «Plassering» (André, 19. sep. 2026): et lag eller en bil som skal *stå* et
+#: sted — heller ikke det er en hastegrad i AMK-forstand, og heller ikke det
+#: har en pasient. Sist i lista, som i KOs prioriteter.
+PLASSERING = 'Plassering'
 HASTEGRAD = (
     'Akutt',
     'Haster',
     'Vanlig',
     DRIFT,
+    PLASSERING,
 )
+#: Hastegradene uten pasient: ingen grovsortering, driftens problemstillinger.
+#: Regelen sto som `== DRIFT` seks steder; ett navn, så «Plassering» ikke
+#: faller utenom halvparten av dem.
+UTEN_PASIENT: frozenset[str] = frozenset({DRIFT, PLASSERING})
 
 #: Seed for `Problemstilling.med_antall` (André, 12. sep. 2026: «Transport
 #: har antall som fast hele tall»). Etter `0020` er flagget på raden fasit.
@@ -174,10 +183,14 @@ AVREIST_TIL_NAVN: dict[str, str] = dict(AVREIST_TIL)
 #: Grovsorteringen bilen setter — Rød/Gul/Grønn — ved siden av hastegraden
 #: KO/AMK satte ved opprettelsen. To vurderinger fra to ståsteder, og begge
 #: skal synes (prosjektleder, 11. sep. 2026). Tom til bilen har satt den.
+#: «Ikke aktuelt» (André, 19. sep. 2026): pasienten er ikke en pasient —
+#: bilen kom fram til ingenting, eller til noen som gikk selv. Teller som
+#: satt der regelen krever grovsortering; vises grått.
 GROVSORTERING: tuple[tuple[str, str], ...] = (
     ('rod', 'Rød'),
     ('gul', 'Gul'),
     ('gronn', 'Grønn'),
+    ('ikke_aktuelt', 'Ikke aktuelt'),
 )
 GROVSORTERING_NAVN: dict[str, str] = dict(GROVSORTERING)
 

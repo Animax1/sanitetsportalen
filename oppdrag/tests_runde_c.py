@@ -96,6 +96,18 @@ class TrengerRessursJsTests(SimpleTestCase):
             self.skipTest('node er ikke tilgjengelig')
         self.harness = _konst(OPPDRAG_SENTRAL_JS, 'MANGLER_TRINN') + build_harness(self.HARNESS)
 
+    def test_opprettet_uten_enhet_gir_bare_merket(self):
+        """Uten enheter og uten `enhet_navn` (19. sep. 2026): merket alene,
+        ingen tom brikke med en statusprikk uten navn."""
+        ut = run_node(self.harness, """
+            const o = { id: 1, status: 'venter', status_navn: 'Venter', enhet_navn: '', enheter: [],
+                        trenger_ressurs: true, trenger_ressurs_siden: new Date().toISOString(), avbrutt_av: [], avventer_av: [] };
+            console.log(_enhetsmatrise(o));
+        """)
+        self.assertIn('Trenger ressurs · 0 min', ut)
+        self.assertEqual(ut.count('<span class="enhet-brikke'), 1, 'bare merket')
+        self.assertNotIn('status-prikk', ut)
+
     def test_merket_staar_forst_i_matrisen(self):
         ut = run_node(self.harness, """
             console.log(_enhetsmatrise({trenger_ressurs: true, enheter: [
@@ -105,9 +117,9 @@ class TrengerRessursJsTests(SimpleTestCase):
               {enhet_id: 1, enhet_navn: 'HGSD 56', status: 'ledig', status_navn: 'Ledig', status_tidspunkt: null}]}));
         """)
         med, uten = ut.split('---')
-        self.assertIn('Trenger ny ressurs', med)
-        self.assertLess(med.index('Trenger ny ressurs'), med.index('HGSD 56'))
-        self.assertNotIn('Trenger ny ressurs', uten)
+        self.assertIn('Trenger ressurs', med)
+        self.assertLess(med.index('Trenger ressurs'), med.index('HGSD 56'))
+        self.assertNotIn('Trenger ressurs', uten)
 
     def test_tidslinjen_sier_rykket_videre_med_nummer(self):
         ut = run_node(self.harness, """

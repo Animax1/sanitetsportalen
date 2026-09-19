@@ -38,7 +38,7 @@ let oppdragHentet = false;
 const STATUS_REKKEFOLGE = ['venter', 'rykker_ut', 'fremme', 'avreist', 'leverer', 'ledig'];
 //: Lista sorteres på hastegraden operatøren satte (André, 12. sep. 2026),
 //: og innenfor den på nummer. Ferdige oppdrag står nederst.
-const HASTEGRAD_REKKEFOLGE = ['Akutt', 'Haster', 'Vanlig', 'Drift'];
+const HASTEGRAD_REKKEFOLGE = ['Akutt', 'Haster', 'Vanlig', 'Drift', 'Plassering'];
 //: «Trenger ny ressurs» blir tydeligere jo lenger det står (minutter).
 const MANGLER_TRINN = [[15, 'alvorlig'], [5, 'varsel'], [0, 'ny']];
 

@@ -53,8 +53,11 @@
           {# Avkryssing, ikke nedtrekk: operatøren sender gjerne to biler på #}
           {# samme hendelse (flere enheter, 11. sep. 2026). #}
           <div class="form-label">Enheter</div>
-          <div id="nytt-enheter" class="nytt-enheter"></div>
-          <div class="form-text">Kryss av én eller flere. Den første i lista blir primær.</div>
+          <div id="nytt-enheter" class="nytt-enheter" data-action="oppdaterOpprettKnapp" data-hendelse="change"></div>
+          {# Ingen enhet er lov (19. sep. 2026): varselet sier hva som skjer, og knappen skifter tekst. #}
+          <div class="uten-enhet-varsel d-none mb-1" id="nytt-uten-enhet"><i class="bi bi-exclamation-triangle-fill"></i>
+            <div><b>Ingen enhet valgt.</b> Oppdraget opprettes som <b>Trenger ressurs</b> og står gult på tavla til du varsler en enhet fra oppdraget. Varselet trappes opp etter 5 og 15 minutter.</div></div>
+          <div class="form-text">Kryss av én eller flere, eller ingen. Den første i lista blir primær.</div>
         </div>
         <div class="mb-3">
           {# Etiketten og hinten har id-er: på /ko/ bytter KO dem til «Bare dette #}
@@ -70,7 +73,7 @@
       </div>
       <div class="modal-footer">
         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Avbryt</button>
-        <button type="button" class="btn btn-primary" data-action="opprettOppdrag">Opprett</button>
+        <button type="button" class="btn btn-primary" id="nytt-opprett" data-action="opprettOppdrag">Opprett</button>
       </div>
     </div>
   </div>

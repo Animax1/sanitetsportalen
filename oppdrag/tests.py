@@ -127,12 +127,36 @@ class EnhetStatusTests(TestCase):
         felt = {f.name for f in Enhet._meta.concrete_fields}
         self.assertNotIn('status', felt)
 
-    def test_ventende_oppdrag_gjor_ikke_enheten_opptatt(self):
-        """Enheten har fått et oppdrag, men ikke rykket ut. Den kan sendes."""
+    def test_ventende_oppdrag_gjor_enheten_tildelt_ikke_opptatt(self):
+        """Enheten har fått et oppdrag, men ikke rykket ut: «Tildelt» (André,
+        19. sep. 2026) — en visning, ingen koblingsrad står i den. Ingen
+        påbegynt, så `koblingsrad` er tom som for en ledig."""
+        o = _oppdrag(self.enhet, status=choices.VENTER)
+        info = services.enhet_status(self.enhet)
+        self.assertEqual((info['status'], info['status_navn']), (services.TILDELT, 'Tildelt'))
+        self.assertEqual(info['antall_ventende'], 1)
+        self.assertIsNone(info['koblingsrad'])
+        self.assertEqual(info['tildelt_siden'], o.enheter.get().varslet_at)
+        self.assertNotIn(services.TILDELT, choices.STATUS_NAVN, 'ikke en status i maskinen')
+
+    def test_passiv_vakt_vises_som_foer_selv_med_ventende(self):
+        """Hun sover; «Tildelt» på et kort som sier «passiv vakt» ville lest
+        som at noen er på vei (avtalt 19. sep. 2026)."""
+        self.enhet.passiv_vakt = True
+        self.enhet.save()
         _oppdrag(self.enhet, status=choices.VENTER)
         info = services.enhet_status(self.enhet)
         self.assertEqual(info['status'], choices.LEDIG)
-        self.assertEqual(info['antall_ventende'], 1)
+        self.assertIsNone(info['tildelt_siden'])
+
+    def test_tildelt_bare_uten_paabegynt(self):
+        """Rykket ut på ett og ett til venter: statusen er hennes egen på det
+        påbegynte, som før."""
+        o = _oppdrag(self.enhet, status=choices.VENTER)
+        services.sett_status(o, choices.RYKKER_UT, enhet=self.enhet)
+        _oppdrag(self.enhet, status=choices.VENTER)
+        info = services.enhet_status(self.enhet)
+        self.assertEqual((info['status'], info['antall_ventende']), (choices.RYKKER_UT, 1))
 
     def test_paabegynt_oppdrag_gir_enhetens_status(self):
         _oppdrag(self.enhet, status=choices.FREMME)

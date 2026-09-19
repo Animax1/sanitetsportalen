@@ -179,6 +179,8 @@ KO_LOGG_BYGGERE = (
     'koLeggHendelsevalgINyttOppdrag',
     # «Nullstill»-fanen: ren markup uten data, men den bygger markup like fullt.
     'koTegnNullstill',
+    # Fargeforklaringen i ressursoversikten (19. sep. 2026), samme sort.
+    'koLegendeHtml',
     # Lagene på hendelsen (19. sep. 2026), og besetningen bak et klikk på
     # lagkortet.
     'koLagBrikkeHtml',
@@ -492,7 +494,7 @@ class KonsollhoydenTests(SimpleTestCase):
 #: sida setter. Samme rekkefølge som `PRIORITET_VALG` på serveren.
 PRIORITET_PREAMBLE = (
     "globalThis.window = { KO_PRIORITETER: [['viktig','Viktig'],['rod','Rød'],['gul','Gul'],"
-    "['gronn','Grønn'],['drift','Drift']], MODUL_TILGANG: { ko: 'skriv_full' } };\n"
+    "['gronn','Grønn'],['drift','Drift'],['plassering','Plassering']], MODUL_TILGANG: { ko: 'skriv_full' } };\n"
     "let koHendelser = new Map(); let koApenHendelseId = null; let koVisLukkede = true; let koSok = '';\n"
     'let koLinjer = new Map(); let oppdragsliste = [];\n'
 )
@@ -607,7 +609,7 @@ class HendelsesradenTests(SimpleTestCase):
         self.assertIn('>Viktig<', ut)
 
     def test_de_andre_har_klasse_og_merke_men_ikke_ikon(self):
-        for prio, navn in (('rod', 'Rød'), ('gul', 'Gul'), ('gronn', 'Grønn'), ('drift', 'Drift')):
+        for prio, navn in (('rod', 'Rød'), ('gul', 'Gul'), ('gronn', 'Grønn'), ('drift', 'Drift'), ('plassering', 'Plassering')):
             with self.subTest(prio=prio):
                 ut = self._rad(dict(self.H, prioritet=prio))
                 self.assertIn(f'h-{prio}', ut)
@@ -813,6 +815,43 @@ class DelingOgLagTests(SimpleTestCase):
             {'id': 3, 'delt_at': '2026-09-19T11:00:00Z', 'delt_av': 'ola', 'delt_med': []},
         ])
 
+    def test_fargeforklaringen_folder_ut_og_huskes(self):
+        """«i» i ressursoversiktens hode (André, 19. sep. 2026, variant E1):
+        av som standard, huskes per nettleser, og markupen tegnes først når
+        den vises. Alle prikkene er med, «Tildelt» inkludert."""
+        harness = build_harness(((KO_JS, ('koLesLegende', 'koLagreLegende', 'koLegendeHtml',
+                                          'koTegnLegende', 'koVippLegende')),))
+        ut = run_node(harness, '''
+            const KO_LEGENDE_NOKKEL = 'ko.legende';
+            const lager = {};
+            globalThis.window = { localStorage: { getItem: (k) => lager[k] ?? null, setItem: (k, v) => { lager[k] = v; } } };
+            const boks = { innerHTML: '', klasser: new Set(['d-none']), classList: { toggle(k, v) { v ? boks.klasser.add(k) : boks.klasser.delete(k); } } };
+            const knapp = { klasser: new Set(), attr: {}, classList: { toggle(k, v) { v ? knapp.klasser.add(k) : knapp.klasser.delete(k); } }, setAttribute(n, v) { this.attr[n] = v; } };
+            globalThis.document = { getElementById: (id) => ({ 'ko-legende': boks, 'ko-legende-knapp': knapp })[id] || null };
+            koTegnLegende(); console.log(boks.klasser.has('d-none'), boks.innerHTML === '', knapp.attr['aria-expanded']);
+            koVippLegende(); console.log(boks.klasser.has('d-none'), boks.innerHTML.includes('status-tildelt'), knapp.klasser.has('aktiv'), lager[KO_LEGENDE_NOKKEL]);
+            koVippLegende(); console.log(boks.klasser.has('d-none'), koLesLegende());
+            globalThis.window.localStorage = { getItem() { throw new Error('privat'); }, setItem() { throw new Error('privat'); } };
+            koVippLegende(); console.log(koLesLegende());
+            const html = koLegendeHtml();
+            console.log(['ledig','tildelt','rykker_ut','fremme','behandlet','avreist','leverer','av_vakt'].every((s) => html.includes('status-' + s)), html.includes('Trenger ressurs'), html.includes('passiv vakt'));
+        ''').splitlines()
+        self.assertEqual(ut[:5], ['true true false', 'false true true ja', 'true false', 'false', 'true true true'])
+
+    def test_oppdraget_i_hendelsen_viser_trenger_ressurs(self):
+        """Opprettet uten enhet (19. sep. 2026): samme merke som på tavla."""
+        harness = build_harness((
+            (PORTAL_UTILS_JS, ('escapeHtml',)),
+            (OPPDRAG_KORT_JS, ('oppdragsnr', 'hastegradKlasse')),
+            (KO_JS, ('koHendelseOppdragHtml',)),
+        ))
+        ut = run_node(harness, """
+            console.log(koHendelseOppdragHtml({id: 1, nummer: 49, hastegrad: 'Haster', problemstilling: 'Vold/slag', status: 'venter', status_navn: 'Venter', enheter: [], trenger_ressurs: true}));
+            console.log(koHendelseOppdragHtml({id: 2, nummer: 50, hastegrad: 'Plassering', problemstilling: 'Utstyr', status: 'venter', status_navn: 'Venter', enheter: [{enhet_navn: 'Bil <1>'}], trenger_ressurs: false}));
+        """).splitlines()
+        self.assertIn('enhet-brikke-mangler', ut[0]); self.assertIn('Trenger ressurs', ut[0]); self.assertNotIn('ingen enhet', ut[0])
+        self.assertNotIn('enhet-brikke-mangler', ut[1]); self.assertIn('Bil &lt;1&gt; · Venter', ut[1]); self.assertIn('hastegrad-plassering', ut[1])
+
     def test_vis_lukkede_huskes_per_nettleser_og_er_av_som_standard(self):
         """André, 19. sep. 2026: «Når en refresher siden vises også avsluttede
         hendelser, selv om vis lukkede er trykt av.» Bryteren leses fra
@@ -874,9 +913,9 @@ class DelingOgLagTests(SimpleTestCase):
         """«Hvis viktig prioritering i hendelse så er det akutt hastegrad»
         (André, 19. sep. 2026). Tabellen, og tom for alt annet."""
         harness = build_harness(((KO_JS, ('koHastegradForHendelse',)),))
-        ut = run_node(harness, "console.log(JSON.stringify(['viktig','rod','gul','gronn','drift','tull',''].map((p) => koHastegradForHendelse({prioritet: p}))"
+        ut = run_node(harness, "console.log(JSON.stringify(['viktig','rod','gul','gronn','drift','plassering','tull',''].map((p) => koHastegradForHendelse({prioritet: p}))"
                                " .concat([koHastegradForHendelse(null), koHastegradForHendelse(undefined)])));").splitlines()[0]
-        self.assertEqual(json.loads(ut), ['Akutt', 'Akutt', 'Haster', 'Vanlig', 'Drift', '', '', '', ''])
+        self.assertEqual(json.loads(ut), ['Akutt', 'Akutt', 'Haster', 'Vanlig', 'Drift', 'Plassering', '', '', '', ''])
 
     def test_nytt_oppdrag_arver_hastegrad_og_notat_bare_naar_valget_byttet(self):
         """Hastegraden settes fra prioriteten og notatet fra den første linja,

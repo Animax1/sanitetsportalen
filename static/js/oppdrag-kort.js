@@ -95,7 +95,7 @@ function _grovMerke(o) {
   // `grovsortering` er nøkkelen (rod/gul/gronn) og styrer fargen;
   // `grovsortering_navn` er teksten.
   // Drift har ingen pasient å sortere (12. sep. 2026): ingen merke.
-  if (o.hastegrad === 'Drift') return '';
+  if (o.hastegrad === 'Drift' || o.hastegrad === 'Plassering') return '';
   if (!o.grovsortering) {
     return '<span class="grov-merke grov-tom" title="Bilen har ikke grovsortert ennå">Bil: —</span>';
   }
@@ -135,7 +135,8 @@ function enhetskortInnmat(e) {
   // har ingen aktiv koblingsrad, så `status_tidspunkt` er tomt og statusen sto
   // som et ord uten tid. Operatøren som skal sende noen vil vite hvem som har
   // stått lengst.
-  const siden = e.status_tidspunkt || e.ledig_siden;
+  // «Tildelt 16:02 · 2 min» (19. sep. 2026): fra den første varslingen.
+  const siden = e.status_tidspunkt || e.ledig_siden || e.tildelt_siden;
   const statusTid = siden ? ` ${klokke(siden)} · ${tidSiden(siden)}` : '';
   // «Avreist → Sykehus» — hvor bilen dro skal synes her også.
   const sted = e.sted_navn ? ` → ${e.sted_navn}` : '';

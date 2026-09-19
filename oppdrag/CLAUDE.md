@@ -17,7 +17,11 @@ Fem ting det er verdt å kjenne før man rører modulen:
 | Korreksjoner er **nye rader** som peker på den gamle | `Statusmelding.objects.gjeldende()` |
 | `fritekst` logges som endret, men **uten verdier** | `signals.FELT_UTEN_VERDILOGGING` |
 | «Historikk» rydder tavla, **arkivet fryser og lukker vakta** | `Oppdrag.historikk_fra` vs. `oppdrag/arkiv.py` |
-| Bilen rykker videre → oppdraget **trenger ny ressurs**, ikke ferdig | `Oppdrag.trenger_ressurs` + `trenger_ressurs_siden`, `services.start_oppdrag` |
+| Bilen rykker videre → oppdraget **trenger ressurs**, ikke ferdig | `Oppdrag.trenger_ressurs` + `trenger_ressurs_siden`, `services.start_oppdrag` |
+| **Et oppdrag kan opprettes uten enhet** (19. sep.) — `Oppdrag.enhet` nullbar, flagget satt fra start, samme opptrapping; den første som varsles blir primær. `enhet_ider: []` er lov, kropp uten feltet er 400 | `views.oppdrag_liste_view` (POST), `_enheter_fra_kroppen`, `services.varsle_enhet`; arkivet gir én rad med tomt navn (`arkiv._per_enhet`) |
+| **«Tildelt» er en visning, ingen status**: ingen påbegynt, minst ett ventende, ikke passiv vakt. Hul grønn ring; `tildelt_siden` fra første varsling | `services.enhet_status`, `TILDELT`; `.status-tildelt` |
+| **Uten pasient: Drift og Plassering** — driftens problemstillinger, aldri grovsortering, intet grovmerke | `choices.UTEN_PASIENT`; JS har lista inne i `_kanGrovsortere`/`grovKrevesFor`/`_grovMerke` fordi harnessene henter funksjoner alene |
+| Grovsorteringen har **«Ikke aktuelt»** (grått) — teller som satt | `choices.GROVSORTERING`, `.grov-ikke_aktuelt` |
 | «Trenger ny ressurs» spør **to** ting: er noen på vei, *og* var noen framme | `services.trenger_ny_ressurs()` |
 | Lista sorteres på hastegrad, så nummer; ferdige nederst | `_sorterOppdrag()` i `oppdrag-sentral.js` |
 | Bilen melder Ledig bare fra Leverer og Behandlet; Avbryt i Rykker ut, Behandlet på sted i Fremme | `services.BILEN_KAN_LEDIG_FRA`, `ALTERNATIV`, `avbryt_oppdrag` |
@@ -57,7 +61,7 @@ nytt oppdrag) og `oppdrag_krev_grov_avreist`. `views_verdier.bilinnstillinger_vi
 er lyden **på som standard**; dempeikonet husker per enhet (`erDempet`), og
 `lydSkalSpille()` er det ene stedet som slår sammen klar/admin/dempet. **Grovsortering
 kreves** (`verdier.grov_kreves_for`, speilet i `grovKrevesFor` i JS) før Behandlet på sted
-og før Ledig fra Leverer, før Avreist når bryteren sier det, aldri på Drift — og på Drift finnes verken
+og før Ledig fra Leverer, før Avreist når bryteren sier det, aldri på Drift og Plassering — og der finnes verken
 grovsorteringsraden i bilen (`_kanGrovsortere`) eller merket hos operatøren (`_grovMerke`) — sjekket i
 `stempling_view` etter at overgangen er lovlig, så 409 fortsatt vinner. Sentralbordet leser
 tersklene for **uthevingen** av ventende oppdrag forbi første terskel

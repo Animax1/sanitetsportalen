@@ -335,24 +335,43 @@ def enhet_status(enhet, vakt=None) -> dict:
     av vakta, og to kilder til samme sannhet går i utakt første gang noe
     feiler halvveis. Da er det den lagrede som lyver — den ser autoritativ ut.
 
-    ``Ledig (2 venter)`` er distinksjonen 113 trenger for å vite hvem som kan
-    sendes: enheten har fått to oppdrag, men ikke rykket ut på noen av dem.
+    **«Tildelt» er en visning, ikke en status** (André, 19. sep. 2026: «om
+    en ressurs står ledig og får tildelt et oppdrag skal det endres fra ledig
+    til tildelt»). En enhet uten påbegynt oppdrag, men med ett eller flere som
+    venter, står som `tildelt` her — statusmaskinen kjenner ikke ordet, og
+    koblingsradene står i `Venter` som før. `tildelt_siden` er når den
+    første ventende ble varslet. **Passiv vakt vises som før**: hun sover, og
+    «Tildelt» på et kort som sier «passiv vakt» ville lest som at noen er på
+    vei.
     """
     rad = aktiv_koblingsrad(enhet, vakt)
     aktivt = rad.oppdrag if rad is not None else None
-    antall_ventende = ventende_oppdrag(enhet, vakt).count()
+    ventende = ventende_oppdrag(enhet, vakt)
+    antall_ventende = ventende.count()
+    status = rad.status if rad else choices.LEDIG
+    status_navn = rad.get_status_display() if rad else choices.STATUS_NAVN[choices.LEDIG]
+    tildelt_siden = None
+    if rad is None and antall_ventende and not enhet.passiv_vakt:
+        status, status_navn = TILDELT, 'Tildelt'
+        tildelt_siden = (Oppdragsenhet.objects
+                         .filter(enhet=enhet, status=choices.VENTER, oppdrag__in=ventende)
+                         .order_by('varslet_at').values_list('varslet_at', flat=True).first())
     return {
         # Koblingsraden er *enhetens* status på oppdraget — med flere enheter
         # er ikke oppdragets status hennes.
         'koblingsrad': rad,
         'enhet': enhet,
-        'status': rad.status if rad else choices.LEDIG,
-        'status_navn': (
-            rad.get_status_display() if rad else choices.STATUS_NAVN[choices.LEDIG]
-        ),
+        'status': status,
+        'status_navn': status_navn,
         'aktivt_oppdrag': aktivt,
         'antall_ventende': antall_ventende,
+        'tildelt_siden': tildelt_siden,
     }
+
+
+#: Visningsstatusen for en enhet med ventende oppdrag og ingen påbegynt.
+#: Ikke i `choices.STATUS_VALG` med vilje: ingen koblingsrad kan stå i den.
+TILDELT = 'tildelt'
 
 
 # ── Overganger ───────────────────────────────────────────────────────────────
@@ -440,6 +459,8 @@ def enhetskort(enhet, vakt=None, ledig_siden=None) -> dict:
         'ledig_siden': (
             ledig_siden.isoformat()
             if info['status'] == choices.LEDIG and ledig_siden else None),
+        # «Tildelt 16:02 · 2 min» (19. sep. 2026): fra den første varslingen.
+        'tildelt_siden': info['tildelt_siden'].isoformat() if info['tildelt_siden'] else None,
         **_aktivt_oppdrag_felter(info['koblingsrad']),
     }
 
@@ -938,6 +959,11 @@ def varsle_enhet(oppdrag, enhet, *, bruker=None) -> Oppdragsenhet:
     # å kreve et klikk i tillegg ville lært operatøren å klikke det bort.
     kvitter_avbrutt(oppdrag, bruker=bruker)
     felter = ['status', 'updated_at']
+    if oppdrag.enhet_id is None:
+        # Opprettet uten enhet (19. sep. 2026): den første som varsles blir
+        # primær, så arkivet og den gamle kolonnen har et navn å frysе.
+        oppdrag.enhet = enhet
+        felter.append('enhet')
     if oppdrag.trenger_ressurs:
         # Ressursen er her. Flagget nullstilles før utledningen.
         oppdrag.trenger_ressurs = False

@@ -138,7 +138,7 @@ class ManglerTrinnJsTests(SimpleTestCase):
         self.assertIn('KARM 12', med)
         self.assertIn('bi-exclamation-triangle-fill', med, 'egen trekant, ikke statusprikken')
         self.assertIn('mangler-ny', med)
-        self.assertIn('Trenger ny ressurs · 0 min', med)
+        self.assertIn('Trenger ressurs · 0 min', med)
         self.assertIn('HGSD 56', uten, 'uten flagget står ferdige biler som før')
 
 
@@ -151,7 +151,8 @@ class NyttOppdragSkjemaJsTests(SimpleTestCase):
         (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue')),
         (OPPDRAG_SENTRAL_JS, ('fyllNedtrekk', 'mkEnhetsvalg', '_valgteEnheter',
                               '_grupperEnheter', '_typeRekkefolge',
-                              'nullstillNyttOppdrag', 'hastegradEndret')),
+                              'nullstillNyttOppdrag', 'hastegradEndret',
+                              'oppdaterOpprettKnapp', 'utenEnhetValgt')),
     )
 
     #: En liten DOM: avkryssingslista lager input-objekter av sin egen
@@ -223,6 +224,23 @@ class NyttOppdragSkjemaJsTests(SimpleTestCase):
         self.assertEqual(linjer[0], '[2,3]')
         self.assertEqual(linjer[1], '11')
         self.assertEqual(linjer[2], '[2]')
+
+    def test_opprett_knappen_sier_uten_enhet_naar_ingen_er_krysset_av(self):
+        """«Opprett uten enhet» og varselet når ingen er valgt (19. sep. 2026),
+        «Opprett» ellers. Regelen er `utenEnhetValgt`; kallstedet er
+        `oppdaterOpprettKnapp`, som `nullstillNyttOppdrag` kaller."""
+        ut = run_node(self.harness, """
+            const knapp = { textContent: 'Opprett' };
+            const varsel = { klasser: new Set(['d-none']), classList: { toggle(k, v) { v ? varsel.klasser.add(k) : varsel.klasser.delete(k); } } };
+            let valgte = [];
+            globalThis.document = { getElementById: (id) => ({ 'nytt-opprett': knapp, 'nytt-uten-enhet': varsel })[id] || null,
+                                    querySelectorAll: () => valgte };
+            oppdaterOpprettKnapp(); console.log(knapp.textContent, varsel.klasser.has('d-none'));
+            valgte = [{ value: '7' }];
+            oppdaterOpprettKnapp(); console.log(knapp.textContent, varsel.klasser.has('d-none'));
+            console.log(utenEnhetValgt(0), utenEnhetValgt(1), utenEnhetValgt(2));
+        """).splitlines()
+        self.assertEqual(ut[:3], ['Opprett uten enhet false', 'Opprett true', 'true false false'])
 
     def test_nullstilling_starter_alle_nedtrekk_overst(self):
         ut = run_node(self.harness, self.DOM + """

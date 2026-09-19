@@ -244,8 +244,8 @@ class Problemstilling(BaseTimeStampedModel):
         if self.kategori == self.BEGGE:
             return hastegrad in choices.HASTEGRAD
         if self.kategori == self.DRIFT:
-            return hastegrad == choices.DRIFT
-        return hastegrad in choices.HASTEGRAD and hastegrad != choices.DRIFT
+            return hastegrad in choices.UTEN_PASIENT
+        return hastegrad in choices.HASTEGRAD and hastegrad not in choices.UTEN_PASIENT
 
 
 class Lydvarsel(BaseTimeStampedModel):
@@ -330,10 +330,15 @@ class Oppdrag(BaseTimeStampedModel):
     # nummeret restarter på 1 hver vakt, slik at det holder seg kort nok til
     # å leses opp, og «oppdrag 14» aldri er tvetydig innenfor vakta.
     oppdragsnummer = models.IntegerField(verbose_name='Oppdragsnummer')
-    # PROTECT: et oppdrag uten enhet eller lokasjon gir ingen mening, og
-    # historikken skal ikke kunne forsvinne under den.
+    # PROTECT: historikken skal ikke kunne forsvinne under oppdraget.
+    # **Nullbar fra 19. sep. 2026** (André: «å opprette oppdrag behøver ikke
+    # en ressurs»): et oppdrag kan opprettes uten enhet og står da som
+    # «Trenger ressurs» (`trenger_ressurs`) til sentralbordet varsler en. Den
+    # første som varsles blir primær, og kolonnen fylles da — se
+    # `services.varsle_enhet`.
     enhet = models.ForeignKey(
-        Enhet, on_delete=models.PROTECT, related_name='oppdrag', verbose_name='Enhet')
+        Enhet, null=True, blank=True, on_delete=models.PROTECT,
+        related_name='oppdrag', verbose_name='Enhet')
     problemstilling = models.CharField(max_length=255, verbose_name='Problemstilling')
     hastegrad = models.CharField(
         max_length=16, choices=[(h, h) for h in choices.HASTEGRAD],
@@ -344,7 +349,7 @@ class Oppdrag(BaseTimeStampedModel):
     # ved siden av `hastegrad` — KO/AMKs vurdering ved opprettelsen — ikke i
     # stedet for. Tom betyr «ikke vurdert ennå», og det skal synes.
     grovsortering = models.CharField(
-        max_length=8, blank=True, default='', choices=choices.GROVSORTERING,
+        max_length=16, blank=True, default='', choices=choices.GROVSORTERING,
         verbose_name='Grovsortering')
     # Antall — for problemstillinger som bærer et (`Problemstilling.med_antall`,
     # transport). Tomt for alle andre. Ikke i arkivet: radformen der er del

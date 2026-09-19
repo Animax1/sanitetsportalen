@@ -105,9 +105,10 @@ class PrioritetTests(_Grunnlag):
     def test_rangen_er_rekkefolgen_i_valgene(self):
         """Viktig først. `PRIORITET_RANG` utledes av `PRIORITET_VALG`, så de to
         kan ikke være uenige — men at rekkefølgen *er* denne, er en avgjørelse
-        (André, 18. sep. 2026: Viktig, Rød, Gul, Grønn, Drift)."""
+        (André, 18. sep. 2026: Viktig, Rød, Gul, Grønn, Drift — og Plassering
+        sist, 19. sep.)."""
         self.assertEqual([v for v, _ in PRIORITET_VALG],
-                         ['viktig', 'rod', 'gul', 'gronn', 'drift'])
+                         ['viktig', 'rod', 'gul', 'gronn', 'drift', 'plassering'])
         self.assertEqual(PRIORITET_RANG['viktig'], 0)
         self.assertLess(PRIORITET_RANG['rod'], PRIORITET_RANG['drift'])
 

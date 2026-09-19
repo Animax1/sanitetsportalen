@@ -137,8 +137,9 @@ def oppdrag_til_dict(oppdrag, *, for_enhet: bool = False,
         # Nummeret man sier på samband. `id` er databasenøkkelen og skal ikke
         # vises — den er global og hopper mellom år.
         'nummer': oppdrag.oppdragsnummer,
+        # Tomt når oppdraget ble opprettet uten enhet (19. sep. 2026).
         'enhet_id': oppdrag.enhet_id,
-        'enhet_navn': oppdrag.enhet.navn,
+        'enhet_navn': oppdrag.enhet.navn if oppdrag.enhet_id else '',
         'problemstilling': oppdrag.problemstilling,
         # Antall for problemstillinger som bærer et (transport); ellers null.
         'antall': oppdrag.antall,

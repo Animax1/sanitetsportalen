@@ -79,6 +79,11 @@
 /* Venter beholder grått: oppdraget er tildelt, men ingen har rykket ut, og
  * det er nettopp forskjellen fra Ledig som skal være synlig. */
 .status-venter     { background: #64748b; }
+/* «Tildelt» (19. sep. 2026): enheten har fått oppdrag, men ikke rykket ut.
+ * En hul grønn ring, ikke en ny farge — paletten er brukt opp (Fremme er
+ * blå, Behandlet grønn), og formen skiller seg fra fargen for den som ser
+ * dårlig forskjell på nyanser. */
+.status-tildelt    { background: transparent; border: 2px solid #22c55e; }
 /* «Trenger ny ressurs»: bilen rykket videre, ingen har tatt over. */
 .status-mangler    { background: #f59e0b; }
 .enhet-brikke-mangler { color: #fde68a; font-weight: 600; }
@@ -176,6 +181,8 @@
 /* Drift er blå (André, 12. sep. 2026) — Vanlig flyttet til grønn, som i
    statistikken, så de to ikke leser likt. */
 .hastegrad-drift   { background: #1e3a8a; color: #bfdbfe; }
+/* Plassering er lilla (19. sep. 2026) — samme farge som prioriteten i KO. */
+.hastegrad-plassering { background: #3b0764; color: #e9d5ff; }
 
 /* Hastegrad som knapper i «Nytt oppdrag» (19. sep. 2026), samme form som
    prioritetsknappene i «Ny hendelse»: ramme i fargen, fylt når valgt. */
@@ -189,10 +196,12 @@
 .hastegrad-knapp-haster { border-color: #d97706; color: #fde68a; }
 .hastegrad-knapp-vanlig { border-color: #16a34a; color: #bbf7d0; }
 .hastegrad-knapp-drift  { border-color: #3b82f6; color: #bfdbfe; }
+.hastegrad-knapp-plassering { border-color: #a855f7; color: #e9d5ff; }
 .hastegrad-knapp.valgt.hastegrad-knapp-akutt  { background: #7f1d1d; color: #fff; }
 .hastegrad-knapp.valgt.hastegrad-knapp-haster { background: #78350f; color: #fff; }
 .hastegrad-knapp.valgt.hastegrad-knapp-vanlig { background: #14532d; color: #fff; }
 .hastegrad-knapp.valgt.hastegrad-knapp-drift  { background: #1e3a8a; color: #fff; }
+.hastegrad-knapp.valgt.hastegrad-knapp-plassering { background: #7e22ce; color: #fff; }
 
 /* Gruppeoverskriften som knapp (KO pulje 6): lukker og åpner gruppa, og
    viser antallet når den er lukket — det som er skjult skal være lesbart. */
@@ -238,6 +247,7 @@
 .grov-rod::before   { background: #dc2626; }
 .grov-gul::before   { background: #eab308; }
 .grov-gronn::before { background: #16a34a; }
+.grov-ikke_aktuelt::before { background: #64748b; }
 .grov-tom { color: var(--text-muted); }
 
 /* Knappene i bilen: tre, den valgte fylt. */
@@ -255,9 +265,12 @@
 .grov-knapp.grov-rod   { border-color: #dc2626; color: #fca5a5; }
 .grov-knapp.grov-gul   { border-color: #eab308; color: #fde047; }
 .grov-knapp.grov-gronn { border-color: #16a34a; color: #86efac; }
+/* «Ikke aktuelt» (19. sep. 2026): grått — ingen pasient å sortere. */
+.grov-knapp.grov-ikke_aktuelt { border-color: #64748b; color: #cbd5e1; }
 .grov-knapp.grov-rod.grov-valgt   { background: #dc2626; border-color: #dc2626; color: #fff; }
 .grov-knapp.grov-gul.grov-valgt   { background: #eab308; border-color: #eab308; color: #111; }
 .grov-knapp.grov-gronn.grov-valgt { background: #16a34a; border-color: #16a34a; color: #fff; }
+.grov-knapp.grov-ikke_aktuelt.grov-valgt { background: #475569; border-color: #475569; color: #fff; }
 
 /* Stedvalget ved «Avreist»: seks store knapper i to kolonner. */
 .stedvalg {
@@ -641,6 +654,13 @@
 .b-tillegg.intern { color: var(--text-muted); }
 .b-tillegg .verktoy { margin-left: 0.5rem; white-space: nowrap; }
 .b-tillegg .verktoy .btn-link { font-size: 0.78rem; text-decoration: none; }
+
+/* Varselet i «Nytt oppdrag» når ingen enhet er krysset av (19. sep. 2026). */
+.uten-enhet-varsel {
+  border: 1px solid #f59e0b; background: rgba(245, 158, 11, 0.10); border-radius: 8px;
+  padding: 0.5rem 0.7rem; font-size: 0.85rem; display: flex; gap: 0.6rem; align-items: flex-start;
+}
+.uten-enhet-varsel .bi { color: #f59e0b; font-size: 1.1rem; }
 
 /* Bootstraps `.input-group-text` er lys på lys — hvit tekst på hvit
    bakgrunn i «Flytt oppdraget til en annen enhet» (André, 19. sep. 2026).
