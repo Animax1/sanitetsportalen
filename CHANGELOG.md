@@ -4,6 +4,35 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-19 — KO: rediger/fjern inne i hendelsen, lagvelger uten forhåndsvalg, skrivefeltet overlever pollen, oppdragsstemplene ut av strømmen, lukk går til lista  `#ko/hendelseslogg` `#ko/loggen`
+
+André, 19. sep. 2026, fem punkter etter testing på staging.
+
+- **Rediger og fjern inne i hendelsen.** Tilleggene i beskrivelsen og kommentarene i
+  «Løpende» hadde ingen knapper — bare strømmen hadde. Nå har hver linje i hendelsen
+  rediger (`skriv_full`) og fjern (`skriv_leder`), samme handlinger som i strømmen
+  (`koRettFjernKnapper`); fest og «lag hendelse» tilbys ikke der, en linje i hendelsen er
+  alt i en. Systemlinjer rettes fortsatt ikke. `koRett` henter loggen på nytt etterpå, så
+  det rettede tillegget kommer fra serveren som resten av beskrivelsen.
+- **Lagvelgeren** i hendelsen sto på det første laget — «Legg til» kunne registrere et lag
+  ingen hadde valgt. Første valg er nå ledeteksten «Legg til lag …», og knappen heter
+  «Legg til». Uten valg skjer ingenting.
+- **Operatøren datt ut av skrivefeltet.** Hendelsen tegnes på nytt ved hver poll, og
+  `innerHTML` kastet feltene med det man hadde skrevet. `koBevarFelter()` tar vare på
+  verdi, markør og fokus i skrivefeltet, tidsfeltet, tilleggsfeltet, lagvelgeren og
+  knytt-velgeren før tegningen, og setter dem tilbake etter.
+- **Oppdragenes stempler er ute av loggstrømmen**, og «System»-bryteren gikk ut med dem.
+  Strømmen viser operatørlinjer uten hendelse og systemlinjene *om* hendelsene
+  (opprettet, lukket, prioritet, lag, knyttet). Stemplene står på tavla, i oppdraget og i
+  loggen for utskriften — de er ikke slettet, bare ikke i strømmen (`koIStrommen`).
+- **«Lukk hendelse» går tilbake til hendelsesloggen.**
+
+Reglene er prøvd i node: strømfilteret for fem oppdragskoder med og uten hendelse,
+knappene per nivå (les/skriv_full/skriv_leder) på tillegg, kommentar og systemlinje,
+lagvelgerens ledetekst, og at feltet får verdi, markør og fokus tilbake.
+
+---
+
 ## 2026-09-19 — KO: «Vis lukkede» huskes og er av som standard; lukkede hendelser grået ut  `#ko/hendelseslogg`
 
 André: «Når en refresher siden vises også avsluttede hendelser. Selv om vis lukkede er trykt

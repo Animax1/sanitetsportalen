@@ -192,6 +192,8 @@ KO_LOGG_BYGGERE = (
     'koRessursOpptattHtml',
     # Beskrivelsen fra hendelsen i «Nytt oppdrag» (19. sep. 2026).
     'koHendelseInfoHtml',
+    # Rediger/fjern inne i hendelsen (19. sep. 2026).
+    'koRettFjernKnapper',
 )
 
 #: Uttrykk som interpoleres uten `escapeHtml`, med begrunnelse.
@@ -633,16 +635,17 @@ class HendelsesradenTests(SimpleTestCase):
 class StroemmenTests(SimpleTestCase):
     """`koIStrommen()` avgjør hva loggstrømmen viser: kommentarer i en
     hendelse står i hendelsen, systemlinjene om hendelsen står i strømmen med
-    H-merket, og «System»-bryteren demper de andre systemlinjene — aldri
-    hendelseslinjene."""
+    H-merket — og oppdragenes stempler står **ikke** der (André, 19. sep.
+    2026: «statuser fra oppdrag fjernes fra loggstrøm og med det system
+    knappen»)."""
 
     def setUp(self):
         self.harness = build_harness(HENDELSE_HARNESS)
 
-    def _i(self, linje, vis_system=True):
+    def _i(self, linje):
         ut = run_node(self.harness,
                       f'console.log(koIStrommen({json.dumps(linje)}));',
-                      preamble=PRIORITET_PREAMBLE + f'let koVisSystem = {"true" if vis_system else "false"};\n')
+                      preamble=PRIORITET_PREAMBLE)
         return ut.splitlines()[0] == 'true'
 
     def test_kommentar_i_hendelse_staar_i_hendelsen(self):
@@ -653,10 +656,14 @@ class StroemmenTests(SimpleTestCase):
         self.assertTrue(self._i({'kilde': 'system', 'hendelse_id': 5, 'systemkode': 'hendelse_opprettet'}))
         self.assertTrue(self._i({'kilde': 'system', 'hendelse_id': 5, 'systemkode': 'oppdrag_knyttet'}))
 
-    def test_system_av_demper_stemplene_men_ikke_hendelsene(self):
-        self.assertFalse(self._i({'kilde': 'system', 'hendelse_id': None, 'systemkode': 'oppdrag_status'}, False))
-        self.assertTrue(self._i({'kilde': 'system', 'hendelse_id': 5, 'systemkode': 'hendelse_lukket'}, False))
-        self.assertTrue(self._i({'kilde': 'operator', 'hendelse_id': None, 'systemkode': ''}, False))
+    def test_oppdragenes_stempler_staar_aldri_i_stroemmen(self):
+        for kode in ('oppdrag_status', 'oppdrag_opprettet', 'enhet_varslet', 'enhet_avbrot', 'vaktmodus'):
+            with self.subTest(kode=kode):
+                self.assertFalse(self._i({'kilde': 'system', 'hendelse_id': None, 'systemkode': kode}))
+                self.assertFalse(self._i({'kilde': 'system', 'hendelse_id': 5, 'systemkode': kode}),
+                                 'heller ikke når oppdraget hører til en hendelse')
+        self.assertTrue(self._i({'kilde': 'system', 'hendelse_id': 5, 'systemkode': 'hendelse_lag_paa'}))
+        self.assertTrue(self._i({'kilde': 'operator', 'hendelse_id': None, 'systemkode': ''}))
 
 
 @unittest.skipUnless(node_available(), 'node er ikke tilgjengelig')
@@ -669,10 +676,11 @@ class TilleggOgLagTests(SimpleTestCase):
         self.harness = build_harness((
             (PORTAL_UTILS_JS, ('escapeHtml', 'fmtMin')),
             (KO_JS, ('koErNytt', 'koSiden', 'koSkjultTall', 'koTilleggHtml', 'koLagBrikkeHtml',
-                     'koKlokke', 'koTilleggSkjemaHtml', 'koBeskrivelseHtml')),
+                     'koKlokke', 'koTilleggSkjemaHtml', 'koBeskrivelseHtml', 'koRettFjernKnapper',
+                     'koKanSkrive', 'koKanFjerne')),
         ))
 
-    PRE = 'const KO_NYTT_MS = 10 * 60 * 1000;\n'
+    PRE = "const KO_NYTT_MS = 10 * 60 * 1000;\nglobalThis.window = { MODUL_TILGANG: {} };\n"
 
     def _kjor(self, kode):
         return run_node(self.harness, kode, preamble=self.PRE).splitlines()
@@ -740,6 +748,55 @@ class TilleggOgLagTests(SimpleTestCase):
             koLagreVisLukkede(true); console.log(koLesVisLukkede());
         ''').splitlines()
         self.assertEqual(ut[:4], ['false false', 'true true ja', 'false', 'false'])
+
+    def test_lagvelgeren_starter_paa_ledeteksten_og_knappen_heter_legg_til(self):
+        """André, 19. sep. 2026: «står automatisk på et lag — misvisende»."""
+        harness = build_harness((
+            (PORTAL_UTILS_JS, ('escapeHtml', 'fmtMin')),
+            (KO_JS, ('koLagVelgerHtml', 'koLagKandidater', 'koLagPaa', 'koSiden')),
+        ))
+        ut = run_node(harness, "let koRessurser = [{id: 7, navn: 'Lag 1'}, {id: 8, navn: 'Lag 2'}]; let koHendelser = new Map();\n"
+                               "console.log(koLagVelgerHtml({id: 3, lag: [{ressurs_id: 8}]}));").splitlines()[0]
+        self.assertIn('<option value="">Legg til lag …</option><option value="7">', ut)
+        self.assertNotIn('value="8"', ut, 'lag som alt står på hendelsen tilbys ikke')
+        self.assertIn('>Legg til</button>', ut)
+
+    def test_tillegg_og_traadlinjer_kan_rettes_og_fjernes_etter_nivaa(self):
+        """André, 19. sep. 2026: «kan man ikke redigere/slette beskrivelsen».
+        Rediger for `skriv_full`, fjern for `skriv_leder`; ingenting for `les`."""
+        harness = build_harness((
+            (PORTAL_UTILS_JS, ('escapeHtml', 'fmtMin')),
+            (KO_JS, ('koRettFjernKnapper', 'koTilleggHtml', 'koBeskrivelseHtml', 'koTilleggSkjemaHtml',
+                     'koErNytt', 'koKlokke', 'koKanSkrive', 'koKanFjerne', 'koDetaljLinjeHtml')),
+        ))
+        def kjor(nivaa):
+            return run_node(harness, self.PRE + f"globalThis.window = {{ MODUL_TILGANG: {{ ko: '{nivaa}' }} }};\n"
+                "console.log(koBeskrivelseHtml({id: 3, beskrivelse: [{id: 41, tekst: 'x', av: 'kari', tid: ''}]}, true, 'f', 'h'));\n"
+                "console.log(koDetaljLinjeHtml({id: 42, kilde: 'operator', tekst: 'k', forfatter: 'kari'}));\n"
+                "console.log(koDetaljLinjeHtml({id: 43, kilde: 'system', tekst: 'H3 lukket'}));\n").splitlines()
+        les, skriv, leder = kjor('les'), kjor('skriv_full'), kjor('skriv_leder')
+        self.assertNotIn('data-action="koRett"', les[0]); self.assertNotIn('koFjern', les[1])
+        self.assertIn('data-action="koRett" data-id="41"', skriv[0]); self.assertNotIn('koFjern', skriv[0])
+        self.assertIn('data-action="koRett" data-id="42"', skriv[1])
+        self.assertIn('data-action="koFjern" data-id="41"', leder[0]); self.assertIn('data-action="koFjern" data-id="42"', leder[1])
+        self.assertNotIn('koRett', leder[2], 'systemlinjer rettes ikke her')
+
+    def test_feltene_overlever_en_omtegning(self):
+        """Operatøren «datt ut av» skrivefeltet ved hver poll (André, 19. sep.
+        2026): verdien, markøren og fokuset skal tilbake etter `innerHTML`."""
+        harness = build_harness(((KO_JS, ('koBevarFelter',)),))
+        ut = run_node(harness, '''
+            let felt = { value: 'halv setn', selectionStart: 4, selectionEnd: 4, fokusert: false,
+                         focus() { this.fokusert = true; }, setSelectionRange(a, b) { this.omraade = [a, b]; } };
+            globalThis.document = { activeElement: felt, getElementById: (id) => id === 'a' ? felt : null };
+            const tilbake = koBevarFelter(['a', 'finnes-ikke']);
+            felt = { value: '', selectionStart: 0, selectionEnd: 0, fokusert: false,
+                     focus() { this.fokusert = true; }, setSelectionRange(a, b) { this.omraade = [a, b]; } };
+            document.activeElement = null;
+            tilbake();
+            console.log(JSON.stringify([felt.value, felt.fokusert, felt.omraade]));
+        ''').splitlines()[0]
+        self.assertEqual(ut, '["halv setn",true,[4,4]]')
 
     def test_prioriteten_maa_velges(self):
         """Ingen forhåndsvalgt prioritet (André, 19. sep. 2026: «litt

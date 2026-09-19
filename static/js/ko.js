@@ -126,8 +126,6 @@ let koSisteId = 0;
 // den gamle plassen, ikke legge seg nederst. Serveren sorterer på det samme.
 let koLinjer = new Map();
 
-// Bryteren «System» i loggstrømmens hode.
-let koVisSystem = true;
 
 // **Returnerer en boolsk verdi, ikke det siste leddet i en `||`-kjede.**
 // `t.admin` er `undefined` når nøkkelen mangler, og en avgjørelsesfunksjon som
@@ -159,12 +157,17 @@ function koLinjeMerke(linje) {
 
 // **Hører linja hjemme i strømmen?** Regelen for hva vinduet viser, skilt ut
 // fordi den avgjør noe: kommentarer i en hendelse står i hendelsen, mens
-// systemlinjene om hendelsen (opprettet, lukket, prioritet, knyttet) står i
-// strømmen med H-merket — de er situasjonen, og skal sees uten å åpne noe.
+// systemlinjene om hendelsen (opprettet, lukket, prioritet, lag, knyttet)
+// står i strømmen med H-merket — de er situasjonen, og skal sees uten å
+// åpne noe. **Oppdragenes stempler står ikke i strømmen** (André, 19. sep.
+// 2026: «statuser fra oppdrag fjernes fra loggstrøm og med det system
+// knappen») — de står på tavla og i oppdraget, og i loggen for utskriften.
+// Bryteren «System» gikk ut med dem.
 function koIStrommen(linje) {
-  if (linje.hendelse_id && linje.kilde !== 'system') return false;
-  if (!koVisSystem && linje.kilde === 'system' && koLinjeMerke(linje) !== 'hendelse') return false;
-  return true;
+  if (linje.kilde === 'system') {
+    return koLinjeMerke(linje) === 'hendelse' || linje.systemkode === 'oppdrag_knyttet';
+  }
+  return !linje.hendelse_id;
 }
 
 function koKlokke(iso) {
@@ -386,6 +389,8 @@ async function koRett(id) {
   koLinjer.set(data.data.rot, data.data);
   if (data.data.id > koSisteId) koSisteId = data.data.id;
   koTegnLogg();
+  // Tilleggene i beskrivelsen kommer fra serveren med hendelsene: hent dem.
+  koHentLogg();
 }
 
 async function koFjern(id) {
@@ -424,13 +429,6 @@ async function _koFesting(id, sti) {
 
 async function koFest(id) { await _koFesting(id, 'fest'); }
 async function koLosne(id) { await _koFesting(id, 'losne'); }
-
-function koVippSystem() {
-  const b = document.getElementById('ko-vis-system');
-  koVisSystem = !b || b.checked;
-  koTegnLogg();
-}
-
 
 // ════════════════════════════════════════════════════════════════════════════
 // Ressurslista og oppdragslista hentes **ikke herfra** (pulje 4).

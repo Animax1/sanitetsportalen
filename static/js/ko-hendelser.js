@@ -281,22 +281,41 @@ function koDetaljLinjeHtml(linje) {
   // står i beskrivelsen, så «hvem oppdaterte den» leses rett av tråden.
   const merke = linje.beskrivelse
     ? '<span class="badge text-bg-warning ko-tillegg-merke me-1">beskrivelse</span>' : '';
+  const verktoy = (system || linje.fjernet) ? '' : koRettFjernKnapper(linje.id);
   return '<div class="h-linje' + (system ? ' system' : '') + '">'
     + '<span class="tid">' + escapeHtml(koKlokke(linje.tidspunkt)) + '</span>'
-    + merke + tekst + hvem + '</div>';
+    + merke + tekst + hvem + verktoy + '</div>';
 }
 
 // ── Beskrivelsen som tillegg, og lagene på hendelsen (19. sep. 2026) ─────────
 
+// Rediger og fjern for en linje inne i hendelsen — tillegg og kommentarer
+// (André, 19. sep. 2026: «kan man ikke redigere/slette beskrivelsen»). Samme
+// handlinger som i strømmen (`koRett`, `koFjern`), uten fest og «lag
+// hendelse»: en linje i hendelsen er alt i en. Tom for den som bare leser.
+function koRettFjernKnapper(id) {
+  let ut = '';
+  if (koKanSkrive()) {
+    ut += '<button type="button" class="btn btn-link btn-sm p-0" title="Rediger"'
+      + ' data-action="koRett" data-id="' + escapeHtml(id) + '"><i class="bi bi-pencil"></i></button>';
+  }
+  if (koKanFjerne()) {
+    ut += '<button type="button" class="btn btn-link btn-sm p-0 text-danger" title="Fjern innholdet"'
+      + ' data-action="koFjern" data-id="' + escapeHtml(id) + '"><i class="bi bi-trash"></i></button>';
+  }
+  return ut ? '<span class="verktoy">' + ut + '</span>' : '';
+}
+
 // Ett tillegg: teksten, hvem og når. Det nyeste er uthevet, og «nytt» står
-// på det i ti minutter (`koErNytt`).
-function koTilleggHtml(t, nyest, naa) {
+// på det i ti minutter (`koErNytt`). `verktoy` er rediger/fjern der de
+// finnes — tomt i lesevisningen i «Nytt oppdrag».
+function koTilleggHtml(t, nyest, naa, verktoy) {
   const klasse = 'b-tillegg' + (nyest ? ' nyest' : '') + (koErNytt(t.tid, naa) ? ' nytt' : '');
   const nyttMerke = koErNytt(t.tid, naa) ? '<span class="merke">nytt</span>' : '';
   const rettet = t.rettet ? ' <span class="text-muted small">(rettet)</span>' : '';
   return '<div class="' + klasse + '">' + escapeHtml(t.tekst) + rettet
     + '<span class="hvem">' + escapeHtml(t.av || '') + ' · ' + escapeHtml(koKlokke(t.tid)) + '</span>'
-    + nyttMerke + '</div>';
+    + nyttMerke + (verktoy || '') + '</div>';
 }
 
 // Skjemaet «Legg til i beskrivelsen». `feltId` er unik per sted, fordi den
@@ -316,7 +335,7 @@ function koTilleggSkjemaHtml(hendelseId, feltId, handling) {
 function koBeskrivelseHtml(h, kan, feltId, handling) {
   const tillegg = h.beskrivelse || [];
   const liste = tillegg.length
-    ? tillegg.map((t, i) => koTilleggHtml(t, i === tillegg.length - 1)).join('')
+    ? tillegg.map((t, i) => koTilleggHtml(t, i === tillegg.length - 1, undefined, koRettFjernKnapper(t.id))).join('')
     : '<span class="text-muted small">Ingen beskrivelse ennå.</span>';
   const skjema = kan ? koTilleggSkjemaHtml(h.id, feltId, handling) : '';
   return '<div class="b-liste">' + liste + '</div>' + skjema;
@@ -344,10 +363,13 @@ function koLagVelgerHtml(h) {
       + (opptatt ? ' (på ' + escapeHtml(opptatt) + ')' : '') + '</option>';
   }).join('');
   if (!valg) return '';
+  // Første valg er en ledetekst, ikke et lag (André, 19. sep. 2026: «står
+  // automatisk på et lag — misvisende»). «Legg til» gjør ingenting uten valg.
   return '<span class="input-group input-group-sm w-auto">'
-    + '<select id="ko-lag-valg-' + escapeHtml(h.id) + '" class="form-select" aria-label="Legg til lag">' + valg + '</select>'
+    + '<select id="ko-lag-valg-' + escapeHtml(h.id) + '" class="form-select" aria-label="Legg til lag">'
+    + '<option value="">Legg til lag …</option>' + valg + '</select>'
     + '<button type="button" class="btn btn-outline-secondary" data-action="koLeggTilLag"'
-    + ' data-id="' + escapeHtml(h.id) + '"><i class="bi bi-plus-lg me-1"></i>Lag</button></span>';
+    + ' data-id="' + escapeHtml(h.id) + '">Legg til</button></span>';
 }
 
 function koHendelseOppdragHtml(o) {
@@ -373,11 +395,38 @@ function koPrioKnapperHtml(h) {
   return '<div class="btn-group btn-group-sm ko-prio-gruppe" role="group" aria-label="Prioritet">' + knapper + '</div>';
 }
 
+// **Det som står i feltene overlever en omtegning.** Hendelsen tegnes på
+// nytt ved hver poll (hvert 15. sekund), og `innerHTML` kaster feltene —
+// operatøren «datt ut av» skrivefeltet midt i en setning (André, 19. sep.
+// 2026). Verdien, markøren og fokuset tas vare på før og settes tilbake etter.
+function koBevarFelter(ider) {
+  const aktiv = (globalThis.document && document.activeElement) || null;
+  const husket = ider.map((id) => {
+    const el = document.getElementById(id);
+    if (!el) return null;
+    return { id, verdi: el.value, fokus: el === aktiv,
+             start: el.selectionStart, slutt: el.selectionEnd };
+  }).filter(Boolean);
+  return () => husket.forEach((f) => {
+    const el = document.getElementById(f.id);
+    if (!el) return;
+    if (f.verdi !== undefined && el.value !== f.verdi) el.value = f.verdi;
+    if (f.fokus && typeof el.focus === 'function') {
+      el.focus();
+      if (typeof el.setSelectionRange === 'function' && f.start != null) {
+        try { el.setSelectionRange(f.start, f.slutt); } catch (e) { /* select/number har ingen markør */ }
+      }
+    }
+  });
+}
+
 function koTegnDetalj() {
   const boks = document.getElementById('ko-hendelse-detalj');
   const liste = document.getElementById('ko-hendelser-liste');
   const h = koHendelser.get(koApenHendelseId);
   if (!boks || !h) { koApenHendelseId = null; if (boks) boks.classList.add('d-none'); return; }
+  const gjenopprett = koBevarFelter(['ko-hendelse-tekst', 'ko-hendelse-tid', 'ko-tillegg-' + escapeHtml(h.id),
+                                     'ko-lag-valg-' + escapeHtml(h.id), 'ko-knytt-valg']);
   liste.classList.add('d-none');
   boks.classList.remove('d-none');
   const kan = koKanSkrive();
@@ -474,6 +523,7 @@ function koTegnDetalj() {
   }
   const traad = document.getElementById('ko-hendelse-traad');
   if (traad) traad.scrollTop = traad.scrollHeight;
+  gjenopprett();
 }
 
 function koMittBrukernavn() {
@@ -788,6 +838,9 @@ async function koLukkHendelse(id) {
     ({ res, data } = await _koHendelsehandling('/ko/api/hendelser/' + id + '/lukk/', { confirm: true }));
   }
   if (!res.ok) { window.alert(data.message || 'Hendelsen ble ikke lukket.'); return; }
+  // Tilbake til lista (André, 19. sep. 2026): hendelsen er avsluttet, og
+  // neste ting å se på er de som fortsatt er åpne.
+  koApenHendelseId = null;
   koHentLogg();
 }
 
