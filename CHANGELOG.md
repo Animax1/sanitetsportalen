@@ -4,6 +4,21 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-19 — KO: «Vis lukkede» huskes og er av som standard; lukkede hendelser grået ut  `#ko/hendelseslogg`
+
+André: «Når en refresher siden vises også avsluttede hendelser. Selv om vis lukkede er trykt
+av. Kan og vær nyttig at lukkede hendelsers linjer er mer tydelig lukket, grået ut.»
+
+- Bryteren sto som `checked` i markupen og `true` i JS, og valget ble ikke lagret — hver
+  refresh startet på «vis». Nå huskes det per nettleser (`ko.vis_lukkede`, som oppsettet),
+  og **standarden er av**: tallet i vinduets hode («· 4 åpne · 2 lukket») sier at de
+  finnes, og en lukket hendelse i lista er støy for den som sitter med samband.
+- Lukkede rader: grå venstrekant uansett prioritet (ingen rød ramme for en lukket Viktig),
+  dempet (55 %), gjennomstreket tittel, prioritetsikonet borte, merkene i gråtoner. Hodet
+  på en åpnet lukket hendelse er grået ut på samme måte.
+
+---
+
 ## 2026-09-19 — Bugs: «Flytt» ga den nye bilen den gamles status, skjemaer husket avviste forsøk, Lagre/Avbryt i feil rekkefølge  `#oppdrag/statusmaskin` `#oppdrag/sentralbord` `#vaktliste/roller`
 
 André, 19. sep. 2026: «Setter oppdrag til f.eks. Sandnes 56, de endrer status til Rykker ut.

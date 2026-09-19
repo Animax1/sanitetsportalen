@@ -721,6 +721,26 @@ class TilleggOgLagTests(SimpleTestCase):
                       'console.log(kalt);', preamble=PRIORITET_PREAMBLE)
         self.assertEqual(ut.splitlines()[0], '1')
 
+    def test_vis_lukkede_huskes_per_nettleser_og_er_av_som_standard(self):
+        """André, 19. sep. 2026: «Når en refresher siden vises også avsluttede
+        hendelser, selv om vis lukkede er trykt av.» Bryteren leses fra
+        localStorage ved oppstart; uten noe lagret er den av."""
+        harness = build_harness(((KO_JS, ('koLesVisLukkede', 'koLagreVisLukkede', 'koStartVisLukkede')),))
+        ut = run_node(harness, '''
+            const KO_VIS_LUKKEDE_NOKKEL = 'ko.vis_lukkede';
+            let koVisLukkede = true;
+            const lager = {};
+            globalThis.localStorage = { getItem: (k) => lager[k] ?? null, setItem: (k, v) => { lager[k] = v; } };
+            const boks = { checked: true };
+            globalThis.document = { getElementById: (id) => id === 'ko-vis-lukkede' ? boks : null };
+            koStartVisLukkede(); console.log(koVisLukkede, boks.checked);
+            koLagreVisLukkede(true); koStartVisLukkede(); console.log(koVisLukkede, boks.checked, lager[KO_VIS_LUKKEDE_NOKKEL]);
+            koLagreVisLukkede(false); console.log(koLesVisLukkede());
+            globalThis.localStorage = { getItem() { throw new Error('privat'); }, setItem() { throw new Error('privat'); } };
+            koLagreVisLukkede(true); console.log(koLesVisLukkede());
+        ''').splitlines()
+        self.assertEqual(ut[:4], ['false false', 'true true ja', 'false', 'false'])
+
     def test_prioriteten_maa_velges(self):
         """Ingen forhåndsvalgt prioritet (André, 19. sep. 2026: «litt
         misvisende»). Regelen skjemaet nekter på."""

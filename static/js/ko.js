@@ -687,6 +687,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const sok = document.getElementById('ko-hendelse-sok');
   if (sok) sok.addEventListener('input', koSokEndret);
+  koStartVisLukkede();
 
   // Skjemaene «Legg til i beskrivelsen» tegnes på nytt ved hver poll, så
   // lytteren står på dokumentet: ett sted, for hendelsen og for

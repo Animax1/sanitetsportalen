@@ -20,9 +20,30 @@ let koHendelser = new Map();
 //: Hendelsen som står åpen inne i vinduet, eller `null` for lista.
 let koApenHendelseId = null;
 
-//: Bryterne i hodet.
-let koVisLukkede = true;
+//: Bryterne i hodet. «Vis lukkede» huskes per nettleser (André, 19. sep.
+//: 2026: «Når en refresher siden vises også avsluttede hendelser, selv om
+//: vis lukkede er trykt av») og er **av** som standard: tallet i vinduets
+//: hode sier at de finnes, og en lukket hendelse i lista er støy for den
+//: som sitter med samband.
+const KO_VIS_LUKKEDE_NOKKEL = 'ko.vis_lukkede';
+let koVisLukkede = false;
 let koSok = '';
+
+function koLesVisLukkede() {
+  try { return localStorage.getItem(KO_VIS_LUKKEDE_NOKKEL) === 'ja'; } catch (e) { return false; }
+}
+
+function koLagreVisLukkede(verdi) {
+  try { localStorage.setItem(KO_VIS_LUKKEDE_NOKKEL, verdi ? 'ja' : 'nei'); } catch (e) { /* privat modus */ }
+}
+
+// Ved oppstart (kalles fra ko.js): bryteren og lista følger det som ble
+// husket, ikke markupens standard.
+function koStartVisLukkede() {
+  koVisLukkede = koLesVisLukkede();
+  const b = document.getElementById('ko-vis-lukkede');
+  if (b) b.checked = koVisLukkede;
+}
 
 //: Prioriteten valgt i skjemaet. **Tom til operatøren velger** (André,
 //: 19. sep. 2026: «litt misvisende med forhåndsvalgt prioritet») — skjemaet
@@ -412,7 +433,7 @@ function koTegnDetalj() {
     + '<i class="bi bi-arrow-left me-1"></i>Hendelseslogg</button>'
     + '<span class="ko-deltar ms-auto"><i class="bi bi-people me-1"></i>På hendelsen: '
     + (deltar || '<span class="text-muted">ingen ennå</span>') + '</span>' + bliMed + '</div>'
-    + '<div class="h-hode h-' + prio + ' mb-2">'
+    + '<div class="h-hode h-' + prio + (lukket ? ' h-lukket' : '') + ' mb-2">'
     + '<div class="d-flex align-items-center gap-2 flex-wrap">'
     + koPrioIkon(h.prioritet)
     + '<span class="hendelse-merke">' + escapeHtml(h.kode) + '</span>'
@@ -796,6 +817,7 @@ function koSokEndret() {
 function koVippLukkede() {
   const b = document.getElementById('ko-vis-lukkede');
   koVisLukkede = !b || b.checked;
+  koLagreVisLukkede(koVisLukkede);
   koTegnHendelser();
 }
 
