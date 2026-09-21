@@ -46,11 +46,13 @@ HTML_BUILDERS_PER_FIL = {
         # Flere enheter (11. sep. 2026): matrisen i lista, avkryssingen i
         # «Nytt oppdrag», radene og knappene i detaljvisningen.
         '_enhetsmatrise',
+        'enhetAvventer',
         'mkEnhetsvalg',
         'mkEnhetsrader',
         '_enhetsknapper',
         '_varsleValg',
         'tidslinjeHtml',
+        'enhetshendelseTekst',
         # Verdimengdene (12. sep. 2026): lista og raden i «Verdier».
         'renderVerdiadmin',
         '_verdirad',
@@ -62,6 +64,7 @@ HTML_BUILDERS_PER_FIL = {
         '_delteLinjerHtml',
         # «Flytt» (19. sep. 2026): fra/til, bare enheter på vakt.
         '_flyttValg',
+        'flyttFraEnheter',
     ),
     OPPDRAG_ENHET_JS: (
         'tidslinjeEnhetHtml',
@@ -91,6 +94,11 @@ REVIEWED_INTERPOLATIONS = {
     'tilValg': 'options bygget rett over, navn og id escapet der',
     'til': 'markup bygget rett over, navn og id escapet der',
     'flyttValg': 'ferdig markup fra _flyttValg(), som skannes for seg',
+    # Avventmerket på enhetens egen brikke (21. sep. 2026). Begge er faste
+    # strenger fra en ternær over en boolsk regel (`enhetAvventer`) — ingen
+    # data passerer gjennom dem.
+    "venter ? ' enhet-brikke-avventer' : ''": 'fast CSS-klasse fra en ternær, ingen data i',
+    'pause': 'fast ikonmarkup fra en ternær, ingen data i',
     'fritekstHint': 'fast markup uten data i',
     'klasse': 'intern CSS-klasse valgt av en ternær i koden',
     'tidKlasse': 'intern CSS-klasse valgt av en ternær i koden',
@@ -411,7 +419,7 @@ class OppdragEscapingOppforselTests(SimpleTestCase):
     HARNESS = (
         (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue', 'trustedHtml', '_escHtml',
                            'klokke')),
-        (OPPDRAG_SENTRAL_JS, ('renderOppdrag', '_oppdragRadHtml', 'oppdragsnr', 'hendelsesnr', 'venterForbiTerskel', 'lydTerskler', 'renderEnheter', 'tegnEnhetsliste', 'settEnhetslisteKilde', 'tidslinjeHtml',
+        (OPPDRAG_SENTRAL_JS, ('renderOppdrag', '_oppdragRadHtml', 'oppdragsnr', 'hendelsesnr', 'venterForbiTerskel', 'lydTerskler', 'renderEnheter', 'tegnEnhetsliste', 'settEnhetslisteKilde', 'tidslinjeHtml', 'enhetshendelseTekst', 'enhetAvventer',
                               'hastegradKlasse', 'mkBesetning',
                               'kanSeBesetning', 'tidSiden', '_grovMerke',
                               '_enhetsmatrise', '_problemMedAntall', '_medAntall', '_grupperEnheter', '_typeRekkefolge', '_enhetskort', 'enhetskortInnmat',

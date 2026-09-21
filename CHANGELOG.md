@@ -4,6 +4,78 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-21 — Vinduer kan skjules, loggstrømmen filtreres, og avvent klonet enheten  `#ko/oppsett` `#ko/loggen` `#oppdrag/statusmaskin` `#oppdrag/sentralbord`
+
+Sju punkter fra André, 21. sep. 2026.
+
+**Vinduene kan skjules og hentes tilbake** (`#ko/oppsett`). Rammen holdt alle fire synlige
+fram til nå («en ramme rundt som sperrer for at de kan gjemmes og forsvinnes», 18. sep.).
+Bekymringen — en flate ingen ser er en flate ingen vet har endret seg, siden sida poller —
+er nå besvart i konstruksjonen framfor med et forbud: **et skjult vindu står alltid som en
+knapp i stripa over konsollen**, med navnet sitt, og `koKanSkjule()` nekter å skjule det
+siste synlige. Skjulknappen (`bi-eye-slash`) står i hvert vindus hode; `skjult` ligger i
+`ko.oppsett` og overlever en sidelasting. Naboen tar plassen; er begge i en rad skjult,
+forsvinner raden og den andre tar høyden — ellers sto en tom stripe igjen. Alle fire i
+`skjult` avvises ved innlesing: lagringen skal ikke kunne bære tilbake en tilstand
+grensesnittet har nektet.
+
+**Loggstrømmen filtreres: Alle | Meldinger | System** (`#ko/loggen`). Huskes per nettleser
+som Alle | Biler | Lag. **Festede linjer står uansett** — de er festet med vilje, og et
+filter som tok dem bort ville gjort festingen utilregnelig. Hodet teller det som faktisk
+står der, ikke totalen. Knapperaden skjules mens en hendelse står i vinduet: da filtrerer
+den ikke det man ser på. Tom strøm sier om det er filteret eller om det ikke står noe der,
+samme regel som `koOppdragTomMelding()`.
+
+**Og `avvent_oppdrag` er idempotent mens hun avventer.** Å skjule knappen holder ikke:
+`visOppdrag()` kan tegne på en liste som er et poll gammel, og offline-køen sender på
+nytt. Funnet ved å prøve endepunktet direkte etter at knappen var fikset — to «Avventer»
+i tidslinjen og to i hendelsens logg.
+
+**Bug: «Avvent» klonet enheten på tavla** (`#oppdrag/statusmaskin`). «Hvis du trykker
+avvent så klones det i oppdragslistens oversikt.» Klonen fulgte av konstruksjonen og var
+derfor sikker, ikke tilfeldig: `avventer_av_bulk` tar med **bare** rader som fortsatt står
+i `Venter` — altså nøyaktig de radene som også står i `enheter` — og det egne merket
+«Avventer: Lege 02» sto ved siden av hennes egen brikke. Avventingen er nå et merke **på**
+brikken (`enhetAvventer()`), og samme form i hendelsens oppdragsoversikt. **Og «Avvent»
+tilbys ikke på en som alt avventer:** raden blir stående i `Venter`, så serveren tok imot
+trykk nummer to og skrev en `Enhetshendelse` til — enheten kom da to ganger i tidslinjen.
+
+**Bug: tidslinjen kalte avvent «Tatt av»** (`#oppdrag/sentralbord`). Grenen var en ternær
+som endte på «Tatt av», så *alt* som ikke var avbrutt eller rykket videre ble til «Tatt
+av». `enhetshendelseTekst()` har nå ett ord per type og **ingen «ellers»** — en ny type i
+`Enhetshendelse` skal se rar ut, ikke lyve.
+
+**Enhetshendelsene henges på hendelsen oppdraget hører til** (`#ko/loggen`). «Det må
+logges i oppdrags tidslinjen at en enhet blir satt på avvent — det må og komme opp i
+hendelsens logg.» Uten `hendelse` havnet linja bare i vaktas logg, og `koIStrommen()`
+holder enhetslinjer ute av loggstrømmen — så den som satt i H6 så ingenting av at
+Mannskapsbil 1 avventet H6s eget oppdrag. Alle fire typene henges på, ikke bare
+avventingen: «tatt av» på et oppdrag i H6 er like mye H6s situasjon, og en logg med den
+ene og ikke de andre leser som et hull.
+
+**«Fra» i «Flytt oppdrag» viste biler som ikke har oppdraget.** Koblingsraden blir stående
+når en bil melder seg `Ledig` — stemplene hennes skal bevares — og hun sto derfor igjen i
+«Fra» på et oppdrag hun var ferdig med. På et oppdrag som har gått gjennom to biler så
+lista ut som hele flåten. `flyttFraEnheter()` tar bare rader som ikke er `Ledig`; er ingen
+igjen, står det at veien videre er «Legg til» i stedet for et nedtrekk som ikke virker.
+
+**«Varsle enhet til» heter «Legg til».**
+
+**Hendelsens oppdragsoversikt: én brikke per enhet, med status og tid.** «Det må og stå
+tidspunkt for nåværende status … må og skille mellom flere enheters ulike statuser.» Sto
+som ett navnedrag med *oppdragets* utledede status, og da var «Ambulanse 1, Lag 3 · Fremme»
+usant for begge. **`varslet_at` teller når hun ikke har stemplet ennå:** en enhet i
+«Venter» har ingen `Statusmelding`, og feltet sto tomt på nøyaktig den raden man lurer på —
+hvor lenge har hun visst om dette uten å rykke ut? «Trenger ressurs» står nå *foran*
+enhetene i stedet for i stedet for dem: begge kan være sanne samtidig.
+
+Mutanter: 28 skrevet, 28 drept — én overlevende underveis (`koLesLoggfilter` uten
+validering av lagret verdi) ble tettet med en test på en ukjent lagret verdi.
+
+Verifisert i Playwright mot seed: avvent på O4 (H6) gir én brikke, «Avventer: Mannskapsbil
+1» i tidslinjen og «Mannskapsbil 1 avventer O4» i H6s logg; skjuling overlever reload og
+det siste vinduet lar seg ikke skjule; filteret gir 12 + 6 = 18.
+
 ## 2026-09-21 — Hendelsen åpnes i loggstrømmens vindu, ikke over hendelsesloggen  `#ko/hendelseslogg`
 
 André, 21. sep. 2026: «når vi åpner en hendelse så skal det vises i loggstrømmens vindu og

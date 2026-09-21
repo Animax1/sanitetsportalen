@@ -5,11 +5,9 @@
 > gjelder her også. Regelen for hva som står hvor: ligger koden i en app, står regelen
 > her; gjelder den alle, står den i rota.
 
-Levert: pulje 1 (skallet), 2 (loggen), 3 (ressursbildet), 4 (sentralbordet flyttet inn),
-5 (hendelsene), 6 (chat, ansvarsmerke, minimering, vaktlistas ressurser), **omleggingen
-18. sep. 2026: fire flater i 2×2, hendelsesloggen som egen flate**, og 19. sep.: lagene på
-hendelsen, loggen i hendelsen med deling, melder. Pulje 7 gjenstår — `docs/FORSLAG_KO.md`
-§10, et **forslag**.
+Pulje 1–6 er levert (skallet, loggen, ressursbildet, sentralbordet flyttet inn,
+hendelsene, chat/ansvar/tavla), med omleggingen til fire flater i 2×2 18. sep. 2026.
+Historikken står i CHANGELOG; pulje 7 gjenstår — `docs/FORSLAG_KO.md` §10, et **forslag**.
 
 **Siden har ingen faner, og det er en regel og ikke en smakssak** (André, 17. sep. 2026).
 En fane er riktig når flatene er *alternativer*; KOs flater brukes i **én** bevegelse:
@@ -22,14 +20,17 @@ før koden — de er målet): `Hendelseslogg │ Loggstrøm` øverst, `Ressursov
 Oppdragsliste` nederst. «Tre kolonner er taket» fra 17. sep. ble opphevet av André samme
 dag som hendelsene ble en egen flate. Prinsippet — alt synlig samtidig, ingen faner — står.
 
-**Vinduene bytter plass og endrer størrelse, og rammen holder alle fire synlige**
-(`static/js/ko-layout.js`). Håndtaket i hvert vindu dras over et annet for å bytte plass,
-skillelinjene endrer bredde per rad og høyden mellom radene. Ikke frie vinduer, med vilje:
-et vindu som kan legges oppå et annet er et vindu som kan forsvinne. Gulvet
-(`KO_MIN_PROSENT`, `min-width`/`min-height`) gjør det umulig å dra en flate bort. Oppsettet
-huskes **per nettleser** (`ko.oppsett`): KO-PC-en beholder sitt uansett hvem som logger
-på. Et lagret oppsett leses som brukerdata — `koGyldigOppsett()` avviser alt som mangler
-et vindu.
+**Vinduene bytter plass, endrer størrelse og kan skjules** (`static/js/ko-layout.js`).
+Håndtaket dras over et annet vindu for å bytte plass; skillelinjene endrer bredde per rad
+og høyden mellom radene. Ikke frie vinduer, med vilje: et vindu som kan legges oppå et
+annet kan forsvinne, og gulvet (`KO_MIN_PROSENT`, `min-width`/`min-height`) hindrer at en
+flate dras bort. **Skjuling (21. sep. 2026) erstattet forbudet fra 18. sep.** («en ramme
+som sperrer for at de kan gjemmes»): et skjult vindu står alltid i stripa over konsollen
+med navnet sitt (`#ko-skjulte`), og `koKanSkjule()` nekter det siste synlige — skjult er
+da en tilstand man ser. Naboen tar plassen; er begge i en rad skjult, forsvinner raden.
+Oppsettet huskes **per nettleser** (`ko.oppsett`), `skjult` med: KO-PC-en beholder sitt
+uansett hvem som logger på. `koGyldigOppsett()` leser det som brukerdata og avviser både
+et oppsett som mangler et vindu og alle fire skjult.
 
 **Sida ruller ikke — vinduene gjør det.** Høyden **måles** av `koKonsollhoyde()`, ikke
 regnet ut av en `calc()`: header, nav og meldinger kan brekke til to linjer. Gulvet
@@ -227,8 +228,8 @@ se `statistikk/CLAUDE.md`.
 
 ## Hendelsesloggen som egen flate (18. sep. 2026)
 
-Besvart av André før koden, med de åtte skissene som fasit. Reglene bor i `ko/services.py`,
-mutanter i `ko/tests_hendelseslogg.py` og `tests_nullstill.py`.
+Besvart av André før koden, med de åtte skissene som fasit. Reglene bor i
+`ko/services.py`, mutanter i `ko/tests_hendelseslogg.py` og `tests_nullstill.py`.
 
 | Regel | Hvorfor |
 |---|---|
@@ -249,7 +250,9 @@ over lista: oversikten skal stå mens én hendelse er åpen. Strømmen og skrive
 skjules imens (`koVisStrommen`; `les` får ikke feltet tilbake); raden vipper
 (`koVippHendelse`), merkene i strømmen åpner bare. **Loggstrømmen viser linjene uten
 hendelse pluss systemlinjene om hendelsene** (`koIStrommen`); kommentarene står i hendelsen.
-Utskriften skal ha alt (TODO).
+Utskriften skal ha alt (TODO). **Alle | Meldinger | System** filtrerer strømmen
+(`koLoggfilterTreffer`, huskes per nettleser); **festede står uansett**, og hodet teller
+det filtrerte.
 
 **KO-innstillinger er sentralbordets valgliste-modal med en fane til**, lagt inn gjennom
 `verdifaner_ekstra` i konteksten og `window.VERDIFANER_EKSTRA` — en generell krok, ikke en
@@ -271,33 +274,38 @@ Retting arver merket. **Hendelseslinjene vises tydelig**: `koLinjeMerke()` gir
 **Ansvarsmerket vises og styrer ingenting** (§5.1). `ko.Ansvarsmerke`, én rad per konto
 (samme person på PC og telefon har ett ansvar), satt med `POST api/ansvar/` på `les` —
 den som bare leser kan likevel ha samband. Lista er `ko.Ansvarsomraade` (redigeres under
-KO-innstillinger fra 18. sep. 2026); merket er tekst, så omdøping rører ikke loggen. `skriv_linje` stemper det når kallet ikke oppgir noe;
-oppgitt verdi — også tom — vinner. `tilstede()` bærer det. **Ikke i backupen**: merket er
-hva som gjelder nå.
+KO-innstillinger fra 18. sep. 2026); merket er tekst, så omdøping rører ikke loggen.
+`skriv_linje` stemper det når kallet ikke oppgir noe; oppgitt verdi — også tom — vinner.
+`tilstede()` bærer det. **Ikke i backupen**: merket er hva som gjelder nå.
 
 **Filteret ble minimering** (§7.2, André: «ressurstypene må kunne minimeres»).
-Gruppeoverskriften er en knapp; lukket-tilstanden huskes per nettleser under
-`tavle.grupper.lukket`, og **overskriften viser antallet når gruppa er lukket**. I
-`oppdrag-kort.js`, begge sidene; nøkler `type:<id>` og `gruppe:<id>`.
+Gruppeoverskriften er en knapp; tilstanden huskes under `tavle.grupper.lukket`, og
+**overskriften viser antallet når gruppa er lukket**. I `oppdrag-kort.js`, begge sidene;
+nøkler `type:<id>` og `gruppe:<id>`.
 
 **Vaktlistas ressurser uten oppdragsenhet står på tavla** — lag, samleplass, KO — under
-enhetslista i egen beholder (`#vaktliste-ressurser`; sentralbordet tegner `#enhetsliste` om
-igjen ved hver poll). Data fra `/vaktliste/api/ressurser/uten-enhet/`, gatet av vaktlista,
+enhetslista i egen beholder (`#vaktliste-ressurser`; sentralbordet tegner `#enhetsliste`
+om igjen ved hver poll). Fra `/vaktliste/api/ressurser/uten-enhet/`, gatet av vaktlista,
 **bare ressurser med et skift som dekker nå** (`ressurser_paa_vakt_naa`, samme regel som
 lagvelgeren) — tegnet av `koRessurskort()`: hvor mange som er møtt, og «På H14 · Hovedscene
 · 23 min» når laget står på en åpen hendelse; biler viser oppdragets sted. «i» folder ut
 fargeforklaringen (`ko.legende`); kolonneknappen gir to kolonner, hele grupper per kolonne
 (`ko.ressurskolonner`). Oppdragslistas hode teller aktive · ferdig (historikken
 med); «Oppdrag uten ressurs» og «Tildelt» filtrerer, ett om gangen (`koOppdragFilter`).
-**Besetningen — navn, møtt, telefon, ISSI — står bak et klikk**, én om
-gangen som bilens. Alle | Biler | Lag i
-vinduets hode huskes per nettleser (`ko.ressursvisning`); det skjulte står som et tall.
+**Besetningen — navn, møtt, telefon, ISSI — står bak et klikk**, én om gangen som bilens.
+Alle | Biler | Lag huskes per nettleser (`ko.ressursvisning`); det skjulte står som et tall.
 
 ## Sentralbordet kjører i `/ko/` (pulje 4)
 
 **KO laster `oppdrag-sentral-*.js` og treffer `/oppdrag/api/…`.** Ressurslista, oppdragslista,
 verktøylinja, modalene og alle handlingene er oppdragsmodulens egne — samme kode, samme
 endepunkter, samme sperrer. Det er en flytting, ikke en kopi.
+
+**Og det er slik feature parity holder** (André, 17. sep. 2026: «Jeg vil ha det likt
+feature messig inn her i /ko») — ved konstruksjon, ikke ved flid.
+`ko/tests_sentralbord.py` håndhever at KO får **hele** konteksten, at begge sidene laster
+**alle** sentralbordfilene i samme rekkefølge (fasit `OPPDRAG_SENTRAL_JS`), og at de har
+de samme flatene.
 
 Delt: `oppdrag.views.sentralbordkontekst()`, malbitene
 `_sentralbord_{modaler,skript,oppsettvarsel}.html` og `oppdrag-kort.js`. `/ko/` har sin
@@ -318,9 +326,3 @@ den gatet oppdragsdata på `ko:les`, og to pollere mot samme `#enhetsliste` blir
 **Loggen er fortsatt KOs egen**, og `ko:les` alene gir den. Uten oppdragstilgang ser
 operatøren loggen og en beskjed om hva som mangler — ikke en tom kolonne.
 
-## Feature parity med sentralbordet — ved konstruksjon, ikke ved flid
-
-André, 17. sep. 2026: «Jeg vil ha det likt feature messig inn her i /ko.» **Parity som
-holder er den som følger av at det er samme kode.** `ko/tests_sentralbord.py` håndhever at
-KO får **hele** konteksten, at begge sidene laster **alle** sentralbordfilene i samme
-rekkefølge (fasit `OPPDRAG_SENTRAL_JS`), og at de har de samme flatene.

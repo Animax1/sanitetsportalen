@@ -336,3 +336,21 @@ body.ko-drar-h { cursor: row-resize; }
 .ls-linje .verktoy { margin-left: auto; white-space: nowrap; font-size: 0.78rem; }
 .ls-linje .verktoy .btn-link { padding: 0 0.2rem; font-size: 0.85rem; color: var(--text-muted); }
 .ls-linje .verktoy .btn-link:hover { color: var(--text-main); }
+
+/* ── Skjulte vinduer (21. sep. 2026) ────────────────────────────────────── */
+
+/* Stripa over konsollen. Den finnes bare når noe er skjult, og da er den
+   selve grunnen til at skjuling er trygt: et vindu ingen ser skal stå ett
+   sted med navnet sitt. Liten, men ikke dempet — den skal kunne finnes. */
+.ko-skjulte {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.5rem;
+}
+.ko-skjulte-tekst { font-size: 0.8rem; color: var(--text-muted); }
+.ko-hent-tilbake { --bs-btn-padding-y: 0.1rem; --bs-btn-padding-x: 0.45rem; font-size: 0.78rem; }
+
+/* Skjulknappen i vinduets hode: samme lille format som «i» og kolonnene. */
+.ko-skjul-knapp { --bs-btn-padding-y: 0.05rem; --bs-btn-padding-x: 0.35rem; }

@@ -125,6 +125,14 @@ gjennomgang av §2 og §10 på en liten skjerm.
       nå**. Et lag hvis skift starter om to timer skal ikke stå der.
 - [ ] **Et lag som alt står på hendelsen kan bli** når skiftet går ut — lagringen skal ikke
       låse seg. Å *legge til* et lag uten skift avvises.
+- [ ] **Skjul et vindu** med <i>øyet</i> i hodet → naboen tar plassen, og vinduet står i
+      stripa øverst med navnet sitt. Skjul begge i en rad → raden forsvinner og den andre
+      tar høyden. Prøv å skjule det siste synlige → skal ikke gå. Last sida på nytt →
+      skjulingen står. Hent alt tilbake → stripa forsvinner.
+- [ ] **Loggstrømmen: Alle | Meldinger | System.** Tallene skal summere til «Alle», de
+      **festede linjene står uansett**, hodet teller det filtrerte, og valget overlever en
+      sidelasting. Åpne en hendelse → knapperaden skjules; lukk → den er tilbake med
+      samme valg.
 - [ ] **Hendelsen åpnes i loggstrømmens vindu**, ikke i en modal: hendelsesloggen står
       med raden merket blått, og ressursoversikten og oppdragslista er synlige mens du
       arbeider i den. Klikk på samme rad igjen → lukkes; klikk på en annen rad → bytter.

@@ -86,7 +86,7 @@ class TrengerRessursTests(FlereEnheterBasis):
 class TrengerRessursJsTests(SimpleTestCase):
     HARNESS = (
         (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue', 'klokke')),
-        (OPPDRAG_SENTRAL_JS, ('_enhetsmatrise', 'tidslinjeHtml', 'tidSiden',
+        (OPPDRAG_SENTRAL_JS, ('_enhetsmatrise', 'enhetAvventer', 'tidslinjeHtml', 'enhetshendelseTekst', 'tidSiden',
                               '_manglerTrinn', '_manglerMinutter')),
     )
 

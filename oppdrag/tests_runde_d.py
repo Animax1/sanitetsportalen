@@ -101,7 +101,7 @@ class SorteringJsTests(SimpleTestCase):
 class ManglerTrinnJsTests(SimpleTestCase):
     HARNESS = (
         (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue', 'klokke')),
-        (OPPDRAG_SENTRAL_JS, ('_enhetsmatrise', '_manglerTrinn', '_manglerMinutter', 'tidSiden')),
+        (OPPDRAG_SENTRAL_JS, ('_enhetsmatrise', 'enhetAvventer', '_manglerTrinn', '_manglerMinutter', 'tidSiden')),
     )
 
     def setUp(self):

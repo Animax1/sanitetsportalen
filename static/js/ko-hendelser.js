@@ -237,6 +237,10 @@ function koVisStrommen(vis) {
   if (liste) liste.classList.toggle('d-none', !vis);
   const skjema = document.getElementById('ko-logg-skjema');
   if (skjema) skjema.classList.toggle('d-none', !(vis && koKanSkrive()));
+  // Filteret gjelder strømmen. Står en hendelse i vinduet, filtrerer det ikke
+  // det man ser på, og en knapperad som ikke gjør noe er verre enn ingen.
+  const filter = document.getElementById('ko-loggfilter');
+  if (filter) filter.classList.toggle('d-none', !vis);
   koTegnLoggHode();
 }
 
@@ -245,7 +249,10 @@ function koVisStrommen(vis) {
 function koLoggHodeTekst() {
   const h = koApenHendelseId !== null ? koHendelser.get(koApenHendelseId) : null;
   if (h) return '· ' + h.kode + ' · ' + h.tittel;
-  const linjer = Array.from(koLinjer.values()).filter(koIStrommen).length;
+  // Tallet teller det som faktisk står der, altså etter filteret: et hode som
+  // sier 18 over en liste med fire er et tall man ikke kan bruke til noe.
+  const linjer = Array.from(koLinjer.values())
+    .filter((l) => koIStrommen(l) && koLoggfilterTreffer(l, koLoggfilter)).length;
   return '· ' + String(linjer) + ' linjer';
 }
 
@@ -550,14 +557,45 @@ function koLagVelgerHtml(h) {
     + ' data-id="' + escapeHtml(h.id) + '">Legg til</button></span>';
 }
 
+// **Én brikke per enhet, med hennes egen status og hvor lenge den har stått**
+// (André, 21. sep. 2026: «det må og stå tidspunkt for nåværende status … må
+// og skille mellom flere enheters ulike statuser»). Sto som ett navnedrag med
+// *oppdragets* utledede status, og da var «Ambulanse 1, Lag 3 · Fremme» ikke
+// sant for noen av dem: den ene var fremme, den andre rykket ut. Samme form
+// som tavla, så de to leses likt — inkludert avventingen, som er et merke på
+// enhetens egen brikke og ikke en brikke til.
+function koHendelseOppdragEnheterHtml(o) {
+  return (o.enheter || []).map((e) => {
+    const navn = e.enhet_navn || e.navn || '';
+    const venter = (o.avventer_av || []).includes(navn);
+    // **`varslet_at` når hun ikke har stemplet ennå.** En enhet i «Venter»
+    // har ingen `Statusmelding` — statusen kom av varslingen — og feltet sto
+    // da tomt på nøyaktig den raden man lurer på: hvor lenge har hun visst om
+    // dette uten å rykke ut?
+    const naar = e.status_tidspunkt || e.varslet_at;
+    const siden = naar ? ' · ' + tidSiden(naar) : '';
+    return '<span class="enhet-brikke' + (venter ? ' enhet-brikke-avventer' : '') + '">'
+      + (venter ? '<i class="bi bi-pause-circle-fill"></i>' : '')
+      + '<span class="status-prikk status-' + escapeHtml(e.status || '') + '"></span>'
+      + '<span>' + escapeHtml(navn) + '</span>'
+      + '<span class="oppdrag-meta">' + escapeHtml(e.status_navn || '')
+      + escapeHtml(siden) + (venter ? ' · avventer' : '') + '</span></span>';
+  }).join('');
+}
+
 function koHendelseOppdragHtml(o) {
-  const enheter = (o.enheter || []).map((e) => escapeHtml(e.navn || e.enhet_navn || '')).filter(Boolean).join(', ');
+  const enhetsbrikker = koHendelseOppdragEnheterHtml(o);
   // Opprettet uten enhet, eller bilen rykket videre (19. sep. 2026): samme
-  // merke som på tavla, så det leses likt begge steder.
-  const brikke = o.trenger_ressurs
+  // merke som på tavla, så det leses likt begge steder. Merket står *foran*
+  // enhetene, ikke i stedet for dem: et oppdrag kan trenge en ressurs til
+  // mens en bil er på vei, og da er begge delene sanne.
+  const mangler = o.trenger_ressurs
     ? '<span class="enhet-brikke enhet-brikke-mangler"><i class="bi bi-exclamation-triangle-fill"></i> Trenger ressurs</span>'
-    : '<span class="enhet-brikke"><span class="status-prikk status-' + escapeHtml(o.status) + '"></span>'
-      + (enheter || '<span class="text-muted">ingen enhet</span>') + ' · ' + escapeHtml(o.status_navn || '') + '</span>';
+    : '';
+  const brikke = mangler + (enhetsbrikker
+    || (o.trenger_ressurs ? '' : '<span class="enhet-brikke"><span class="status-prikk status-'
+        + escapeHtml(o.status) + '"></span><span class="text-muted">ingen enhet</span> · '
+        + escapeHtml(o.status_navn || '') + '</span>'));
   return '<div class="h-oppdrag-rad" data-action="visOppdrag" data-id="' + escapeHtml(o.id) + '" role="button" tabindex="0">'
     + '<span class="hendelse-merke">' + escapeHtml(oppdragsnr(o.nummer)) + '</span>'
     + '<span class="hastegrad ' + escapeHtml(hastegradKlasse(o.hastegrad)) + '">' + escapeHtml(o.hastegrad || '') + '</span>'

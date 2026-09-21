@@ -209,6 +209,113 @@ class ModusenFrysesVedVarslingTests(PassivBasis):
         self.assertEqual(rad.varslet_modus, 'passiv')
 
 
+class AvventMerketJsTests(SimpleTestCase):
+    """Avventingen tegnes **på enhetens egen brikke**, ikke som en brikke til
+    (André, 21. sep. 2026: «hvis du trykker avvent så klones det i
+    oppdragslistens oversikt»), og tidslinjen kaller den ved navn.
+
+    Klonen fulgte av konstruksjonen og var derfor sikker, ikke tilfeldig:
+    `avventer_av` bygges av `avventer_av_bulk`, som **bare** tar med rader som
+    fortsatt står i `Venter` — altså nøyaktig de radene som også står i
+    `enheter`. Hver avventende enhet sto dermed to steder, hver gang."""
+
+    def setUp(self):
+        if not node_available():
+            self.skipTest('node er ikke tilgjengelig')
+        self.harness = build_harness((
+            (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue', 'klokke')),
+            (OPPDRAG_SENTRAL_JS, ('_enhetsmatrise', 'enhetAvventer', 'tidslinjeHtml',
+                                  'enhetshendelseTekst', 'tidSiden', '_manglerTrinn',
+                                  '_manglerMinutter')),
+        ))
+
+    OPPDRAG = ("{id: 1, trenger_ressurs: false, avbrutt_av: [], avventer_av: ['Lege 02'], "
+               "enheter: [{enhet_id: 1, enhet_navn: 'Lege 02', status: 'venter', "
+               "status_navn: 'Venter', status_tidspunkt: null}, "
+               "{enhet_id: 2, enhet_navn: 'HGSD 56', status: 'fremme', "
+               "status_navn: 'Fremme', status_tidspunkt: null}]}")
+
+    def test_den_avventende_tegnes_en_gang(self):
+        ut = run_node(self.harness, f'console.log(_enhetsmatrise({self.OPPDRAG}));')
+        self.assertEqual(ut.count('Lege 02'), 1, 'enheten skal stå én gang, ikke to')
+        self.assertEqual(ut.count('<span class="enhet-brikke'), 2, 'én brikke per enhet')
+
+    def test_merket_staar_paa_hennes_egen_brikke(self):
+        ut = run_node(self.harness, f'console.log(_enhetsmatrise({self.OPPDRAG}));')
+        hennes = [b for b in ut.split('<span class="enhet-brikke') if 'Lege 02' in b][0]
+        self.assertIn('enhet-brikke-avventer', hennes)
+        self.assertIn('bi-pause-circle-fill', hennes)
+        self.assertIn('avventer', hennes)
+        # Og statusen hennes står fortsatt: avventingen erstatter den ikke.
+        self.assertIn('Venter', hennes)
+
+    def test_den_andre_enheten_er_urort(self):
+        ut = run_node(self.harness, f'console.log(_enhetsmatrise({self.OPPDRAG}));')
+        hans = [b for b in ut.split('<span class="enhet-brikke') if 'HGSD 56' in b][0]
+        self.assertNotIn('enhet-brikke-avventer', hans)
+        self.assertNotIn('avventer', hans)
+
+    def test_regelen_leser_navnet_og_taaler_tomt(self):
+        ut = run_node(self.harness, """
+            console.log(enhetAvventer({avventer_av: ['Lege 02']}, 'Lege 02'));
+            console.log(enhetAvventer({avventer_av: ['Lege 02']}, 'HGSD 56'));
+            console.log(enhetAvventer({}, 'Lege 02'));
+            console.log(enhetAvventer({avventer_av: ['Lege 02']}, ''));
+        """).splitlines()
+        self.assertEqual(ut[:4], ['true', 'false', 'false', 'false'])
+
+    def test_knappen_tilbys_ikke_paa_en_som_alt_avventer(self):
+        """Koblingsraden blir stående i `Venter`, så serveren tar imot trykk
+        nummer to og skriver en `Enhetshendelse` til — og da sto enheten to
+        ganger i tidslinjen og to ganger i hendelsens logg."""
+        harness = build_harness((
+            (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue', 'klokke')),
+            (OPPDRAG_SENTRAL_JS, ('mkEnhetsrader', '_enhetsknapper', 'kanAvvente',
+                                  'enhetAvventer', 'tidSiden')),
+        ))
+        ut = run_node(harness, f"""
+            globalThis.OPPDRAG_TILGANG = {{ kanSkrive: true }};
+            globalThis.enheter = [{{id: 1, navn: 'Lege 02', kan_avvente: true}},
+                                  {{id: 2, navn: 'HGSD 56', kan_avvente: true}}];
+            console.log(mkEnhetsrader({self.OPPDRAG.replace("'fremme'", "'venter'").replace("'Fremme'", "'Venter'")}));
+        """)
+        hennes = [r for r in ut.split('<div class="enhet-rad"') if 'Lege 02' in r][0]
+        hans = [r for r in ut.split('<div class="enhet-rad"') if 'HGSD 56' in r][0]
+        self.assertNotIn('data-action="avventOppdrag"', hennes, 'hun avventer alt')
+        self.assertIn('avventer', hennes, 'men det skal stå at hun gjør det')
+        self.assertIn('Endre status', hennes, 'veien videre står ved siden av')
+        self.assertIn('data-action="avventOppdrag"', hans, 'den andre kan fortsatt settes')
+
+    def test_tidslinjen_sier_avventer_og_ikke_tatt_av(self):
+        """Grenen var en ternær som endte på «Tatt av», så *alt* som ikke var
+        avbrutt eller rykket videre ble til «Tatt av» — en enhet satt på
+        avvent sto som tatt av oppdraget."""
+        ut = run_node(self.harness, """
+            globalThis.OPPDRAG_STATUS_NAVN = {};
+            console.log(tidslinjeHtml({opprettet: '', enheter: [], historikk: [], enhetsbytter: [],
+              enhetshendelser: [
+                {type: 'avventer', detalj: '', enhet_navn: 'Lege 02',
+                 tidspunkt: '2026-09-21T20:10:00Z', av: 'kari'},
+                {type: 'tatt_av', detalj: '', enhet_navn: 'KARM 12',
+                 tidspunkt: '2026-09-21T20:05:00Z', av: 'kari'}]}));
+        """)
+        self.assertIn('Avventer: Lege 02', ut)
+        self.assertIn('Tatt av: KARM 12', ut)
+        self.assertNotIn('Tatt av: Lege 02', ut)
+
+    def test_en_ukjent_type_paastaar_ingenting(self):
+        """En ny type i `Enhetshendelse` skal se rar ut i tidslinjen, ikke
+        lyve om hva som skjedde."""
+        ut = run_node(self.harness, """
+            console.log(enhetshendelseTekst({type: 'noe_nytt', enhet_navn: 'X', detalj: ''}));
+            console.log(enhetshendelseTekst({type: 'rykket_videre', enhet_navn: 'X', detalj: '#12'}));
+            console.log(enhetshendelseTekst({type: 'avventer', enhet_navn: 'X', detalj: '#12'}));
+        """).splitlines()
+        self.assertNotIn('Tatt av', ut[0])
+        self.assertEqual(ut[1], 'Rykket videre til #12: X')
+        self.assertEqual(ut[2], 'Avventer: X', 'detaljen hører bare til «rykket videre»')
+
+
 class AvventeTests(PassivBasis):
 
     def test_operatoeren_setter_avventer(self):
@@ -227,6 +334,40 @@ class AvventeTests(PassivBasis):
         rad = services.koblingsrad(o, self.lege)
         self.assertIsNotNone(rad)
         self.assertEqual(rad.status, choices.VENTER)
+
+    def test_to_trykk_gir_en_hendelse(self):
+        """Raden blir stående i `Venter`, så ingen av sjekkene stopper trykk
+        nummer to — og hun kom da to ganger i tidslinjen og to ganger i
+        hendelsens logg. Klienten skjuler knappen, men et endepunkt som er
+        trygt bare fordi knappen er borte, er ikke trygt: lista kan være et
+        poll gammel, og offline-køen sender på nytt."""
+        o = self._oppdrag(self.lege)
+        forste = services.avvent_oppdrag(o, self.lege, bruker=self.operator)
+        igjen = services.avvent_oppdrag(o, self.lege, bruker=self.operator)
+        self.assertEqual(igjen.pk, forste.pk)
+        self.assertEqual(
+            o.enhetshendelser.filter(type=Enhetshendelse.AVVENTER).count(), 1)
+
+    def test_en_rad_som_foeres_tilbake_til_venter_avventer_igjen(self):
+        """**Ikke en ny regel, men en som er verdt å ha skrevet ned:**
+        `avventende_enhet_ider()` er hendelsen *snittet med* rader som står i
+        `Venter`, så føres raden tilbake dit — «Angre» på en stempling —
+        teller den gamle avventingen igjen. Det er riktig sett fra sambandet:
+        hun sa «ikke nå», og å angre utrykningen tar ikke det tilbake. Og det
+        er grunnen til at idempotensen over ikke trenger et eget felt å
+        nullstille."""
+        o = self._oppdrag(self.lege)
+        services.avvent_oppdrag(o, self.lege, bruker=self.operator)
+        services.sett_status(o, choices.RYKKER_UT, enhet=self.lege)
+        self.assertEqual(services.avventende_enhet_ider(o), set())
+        rad = services.koblingsrad(o, self.lege)
+        rad.status = choices.VENTER
+        rad.save(update_fields=['status'])
+        self.assertEqual(services.avventende_enhet_ider(o), {self.lege.pk})
+        services.avvent_oppdrag(o, self.lege, bruker=self.operator)
+        self.assertEqual(
+            o.enhetshendelser.filter(type=Enhetshendelse.AVVENTER).count(), 1,
+            'og da er det fortsatt samme avventing, ikke en ny')
 
     def test_hun_kan_rykke_ut_etterpaa_og_er_da_ikke_avventende(self):
         """Avventingen varer til hun rykker ut. Derfor trenger den ingen egen

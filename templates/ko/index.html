@@ -117,7 +117,9 @@
         </button>
         <div class="dropdown-menu dropdown-menu-end p-2" style="min-width:260px;">
           <div class="small text-muted mb-2">Dra <i class="bi bi-grip-vertical"></i> i et vindu over et
-            annet for å bytte plass. Dra i skillelinjene for å endre størrelse.</div>
+            annet for å bytte plass. Dra i skillelinjene for å endre størrelse.
+            <i class="bi bi-eye-slash"></i> skjuler et vindu; det kommer tilbake fra
+            stripa over konsollen. Det siste synlige kan ikke skjules.</div>
           <button type="button" class="btn btn-sm btn-outline-secondary w-100"
                   data-action="koTilbakestillOppsett">
             <i class="bi bi-arrow-counterclockwise me-1"></i>Tilbakestill til 2×2
@@ -130,6 +132,15 @@
   {% if kan_se_oppdrag %}
   {% include "oppdrag/_sentralbord_oppsettvarsel.html" %}
   {% endif %}
+
+  {% comment %}
+    **Stripa er hele grunnen til at skjuling er trygt** (André, 21. sep. 2026:
+    «vinduer må kunne gjemmes og hentes tilbake igjen»). Et skjult vindu står
+    her med navnet sitt, så «skjult» er en tilstand man ser — og veien tilbake
+    står der tilstanden står. Tom og borte når alt er framme; tegnes av
+    `koTegnSkjulte()` i ko-layout.js.
+  {% endcomment %}
+  <div class="ko-skjulte d-none" id="ko-skjulte"></div>
 
   <div class="ko-konsoll" id="ko-konsoll">
     <div class="ko-rad" id="ko-rad-1">
@@ -166,6 +177,11 @@
               <i class="bi bi-plus-lg me-1"></i>Ny hendelse
             </button>
             {% endif %}
+            <button type="button" class="btn btn-outline-secondary btn-sm ms-1 ko-skjul-knapp"
+                  data-action="koSkjulVindu" data-arg="hendelser"
+                  title="Skjul vinduet" aria-label="Skjul hendelsesloggen">
+              <i class="bi bi-eye-slash"></i>
+            </button>
           </span>
         </div>
         <div class="ko-vindu-kropp" id="ko-hendelser-liste">
@@ -181,6 +197,26 @@
           <i class="bi bi-grip-vertical ko-grip" draggable="true" title="Dra for å bytte plass"></i>
           <i class="bi bi-chat-left-text"></i><span class="ko-vindu-tittel">Loggstrøm</span>
           <span class="ko-vindu-tall" id="ko-logg-antall"></span>
+          {% comment %}
+            Alle | Meldinger | System (André, 21. sep. 2026: «loggstrømmen må
+            filtreres mellom system meldinger og bruker sendte meldinger»).
+            Huskes per nettleser som Alle | Biler | Lag i ressursoversikten.
+            **Festede linjer står uansett** — de er festet med vilje, og et
+            filter som tok dem bort ville gjort festingen utilregnelig.
+            Skjules mens en hendelse står i vinduet: da filtrerer den ikke
+            det man ser på.
+          {% endcomment %}
+          <div class="btn-group btn-group-sm ms-auto" role="group"
+               aria-label="Vis i loggstrømmen" id="ko-loggfilter">
+            <button type="button" class="btn btn-outline-secondary" data-action="koVelgLoggfilter" data-arg="alle">Alle</button>
+            <button type="button" class="btn btn-outline-secondary" data-action="koVelgLoggfilter" data-arg="meldinger">Meldinger</button>
+            <button type="button" class="btn btn-outline-secondary" data-action="koVelgLoggfilter" data-arg="system">System</button>
+          </div>
+          <button type="button" class="btn btn-outline-secondary btn-sm ms-1 ko-skjul-knapp"
+                  data-action="koSkjulVindu" data-arg="logg"
+                  title="Skjul vinduet" aria-label="Skjul loggstrømmen">
+            <i class="bi bi-eye-slash"></i>
+          </button>
         </div>
         {% comment %}
           Hendelsen åpnes **inne i et vindu**, ikke i en modal (André, 18. sep.
@@ -266,6 +302,11 @@
           {% else %}
           <span id="av-vakt-teller" class="ko-vindu-tall"></span>
           {% endif %}
+          <button type="button" class="btn btn-outline-secondary btn-sm ms-1 ko-skjul-knapp"
+                  data-action="koSkjulVindu" data-arg="ressurser"
+                  title="Skjul vinduet" aria-label="Skjul ressursoversikten">
+            <i class="bi bi-eye-slash"></i>
+          </button>
         </div>
         <div class="ko-legende d-none" id="ko-legende"></div>
         <div class="ko-vindu-kropp">
@@ -328,6 +369,12 @@
               <i class="bi bi-clock-history me-1"></i>Historikk
             </button>
           </span>
+          <button type="button" class="btn btn-outline-secondary btn-sm ms-1 ko-skjul-knapp"
+                  data-action="koSkjulVindu" data-arg="oppdrag"
+                  title="Skjul vinduet" aria-label="Skjul oppdragslista">
+            <i class="bi bi-eye-slash"></i>
+          </button>
+
           {% endif %}
         </div>
         <div class="ko-vindu-kropp">

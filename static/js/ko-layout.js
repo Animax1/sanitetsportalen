@@ -6,13 +6,16 @@
 // `koOppsettStart()` kalles fra `DOMContentLoaded`-kroken i ko.js, som er
 // den siste fila.
 //
-// **Rammen holder alle fire synlige.** Det er hele forskjellen på dette og
-// frie vinduer (André, 18. sep. 2026: «en ramme rundt som sperrer for at de
-// kan gjemmes og forsvinnes»). Et vindu kan bytte plass med et annet og få
-// mer eller mindre plass, men det kan ikke lukkes, legges oppå et annet
-// eller dras forbi gulvet (`min-width`/`min-height` i ko.css og
-// `KO_MIN_PROSENT` her). En flate ingen ser er en flate ingen vet har endret
-// seg — siden poller, og det er det samme argumentet som mot faner.
+// **Et vindu kan skjules, men ikke forsvinne.** Rammen holdt opprinnelig alle
+// fire synlige (André, 18. sep. 2026: «en ramme rundt som sperrer for at de
+// kan gjemmes og forsvinnes») — bekymringen var at en flate ingen ser er en
+// flate ingen vet har endret seg, siden sida poller. 21. sep. 2026 ba han om
+// skjuling likevel, og den bekymringen er besvart i konstruksjonen framfor
+// med et forbud: **et skjult vindu står alltid som en knapp i stripa over
+// konsollen**, med navnet sitt, og det siste synlige lar seg ikke skjule
+// (`koKanSkjule`). Da er «skjult» en tilstand man ser, ikke en flate som er
+// borte. Vinduet kan fortsatt ikke legges oppå et annet eller dras forbi
+// gulvet (`min-width`/`min-height` i ko.css og `KO_MIN_PROSENT` her).
 //
 // **Oppsettet huskes per nettleser** (`localStorage`), som gruppene på tavla
 // (`tavle.grupper.lukket`). En KO-PC i kommandopunktet beholder da oppsettet
@@ -33,6 +36,16 @@ const KO_OPPSETT_STANDARD = {
   rader: [['hendelser', 'logg'], ['ressurser', 'oppdrag']],
   bredde: [56, 34],
   hoyde: 56,
+  skjult: [],
+};
+
+//: Navnene i stripa og i menyen. Et skjult vindu skal stå med det det heter i
+//: hodet sitt, ikke med nøkkelen sin.
+const KO_VINDUSNAVN = {
+  hendelser: 'Hendelseslogg',
+  logg: 'Loggstrøm',
+  ressurser: 'Ressursoversikt',
+  oppdrag: 'Oppdragsliste',
 };
 
 //: Gulvet, i prosent. Under dette kan en skillelinje ikke dras: et vindu på
@@ -65,7 +78,43 @@ function koGyldigOppsett(raa) {
     rader: [[...raa.rader[0]], [...raa.rader[1]]],
     bredde,
     hoyde: koKlemProsent(raa.hoyde === undefined ? KO_OPPSETT_STANDARD.hoyde : raa.hoyde),
+    skjult: koGyldigSkjult(raa.skjult),
   };
+}
+
+// Skjultlista er brukerdata fra en annen versjon av sida, som resten: kjente
+// navn, hver én gang. **Alle fire skjult gir ingen** — en tom konsoll er
+// ingen tilstand noen har bedt om, og lagringen skal ikke kunne bære den
+// tilbake etter at `koKanSkjule()` har nektet den i grensesnittet.
+function koGyldigSkjult(raa) {
+  if (!Array.isArray(raa)) return [];
+  const rene = KO_VINDUER.filter((v) => raa.includes(v));
+  return rene.length >= KO_VINDUER.length ? [] : rene;
+}
+
+function koErSkjult(oppsett, navn) {
+  return (oppsett.skjult || []).includes(navn);
+}
+
+// **Det siste synlige vinduet lar seg ikke skjule.** Uten regelen kunne
+// konsollen bli tom, og da er det ingenting igjen å hente noe tilbake fra
+// utenom stripa — en tilstand det ikke er noen grunn til å tilby.
+function koKanSkjule(oppsett, navn) {
+  if (!KO_VINDUER.includes(navn) || koErSkjult(oppsett, navn)) return false;
+  return (oppsett.skjult || []).length < KO_VINDUER.length - 1;
+}
+
+function koSkjul(oppsett, navn) {
+  const ny = koGyldigOppsett(oppsett) || koStandardOppsett();
+  if (!koKanSkjule(ny, navn)) return ny;
+  ny.skjult = KO_VINDUER.filter((v) => v === navn || koErSkjult(ny, v));
+  return ny;
+}
+
+function koVisIgjen(oppsett, navn) {
+  const ny = koGyldigOppsett(oppsett) || koStandardOppsett();
+  ny.skjult = (ny.skjult || []).filter((v) => v !== navn);
+  return ny;
 }
 
 function koStandardOppsett() {
@@ -110,6 +159,10 @@ function koVinduElement(navn) {
 function koTegnOppsett(oppsett) {
   const rader = [document.getElementById('ko-rad-1'), document.getElementById('ko-rad-2')];
   if (!rader[0] || !rader[1]) return;
+  // **Et skjult vindu gir plassen sin til naboen, ikke til et hull.** Er
+  // begge i en rad skjult, forsvinner raden og den andre tar høyden — ellers
+  // sto en tom stripe igjen der raden var.
+  const radSynlig = [true, true];
   oppsett.rader.forEach((navn, i) => {
     const rad = rader[i];
     const splitter = rad.querySelector('.ko-splitter-v');
@@ -118,11 +171,59 @@ function koTegnOppsett(oppsett) {
     if (!venstre || !hoyre) return;
     rad.insertBefore(venstre, splitter);
     rad.appendChild(hoyre);
-    venstre.style.flex = '1 1 ' + oppsett.bredde[i] + '%';
-    hoyre.style.flex = '1 1 ' + (100 - oppsett.bredde[i]) + '%';
+    const skjultV = koErSkjult(oppsett, navn[0]);
+    const skjultH = koErSkjult(oppsett, navn[1]);
+    venstre.classList.toggle('d-none', skjultV);
+    hoyre.classList.toggle('d-none', skjultH);
+    if (splitter) splitter.classList.toggle('d-none', skjultV || skjultH);
+    venstre.style.flex = skjultH ? '1 1 100%' : '1 1 ' + oppsett.bredde[i] + '%';
+    hoyre.style.flex = skjultV ? '1 1 100%' : '1 1 ' + (100 - oppsett.bredde[i]) + '%';
+    radSynlig[i] = !(skjultV && skjultH);
   });
-  rader[0].style.flex = '1 1 ' + oppsett.hoyde + '%';
-  rader[1].style.flex = '1 1 ' + (100 - oppsett.hoyde) + '%';
+  const vannrett = document.querySelector('.ko-splitter-h');
+  if (vannrett) vannrett.classList.toggle('d-none', !(radSynlig[0] && radSynlig[1]));
+  rader.forEach((rad, i) => rad.classList.toggle('d-none', !radSynlig[i]));
+  if (radSynlig[0] && radSynlig[1]) {
+    rader[0].style.flex = '1 1 ' + oppsett.hoyde + '%';
+    rader[1].style.flex = '1 1 ' + (100 - oppsett.hoyde) + '%';
+  } else {
+    rader.forEach((rad) => { rad.style.flex = '1 1 100%'; });
+  }
+  koTegnSkjulte(oppsett);
+}
+
+// Stripa over konsollen: ett kort per skjult vindu, med navnet sitt. Den er
+// hele svaret på «en flate ingen ser» — skjult skal være en tilstand man ser,
+// og veien tilbake skal stå der tilstanden står.
+function koSkjulteHtml(oppsett) {
+  return (oppsett.skjult || []).map((v) => '<button type="button"'
+    + ' class="btn btn-sm btn-outline-secondary ko-hent-tilbake"'
+    + ' data-action="koVisVindu" data-arg="' + escapeHtml(v) + '">'
+    + '<i class="bi bi-eye me-1"></i>' + escapeHtml(KO_VINDUSNAVN[v] || v) + '</button>').join('');
+}
+
+function koTegnSkjulte(oppsett) {
+  const stripe = document.getElementById('ko-skjulte');
+  if (!stripe) return;
+  const skjult = oppsett.skjult || [];
+  stripe.classList.toggle('d-none', !skjult.length);
+  stripe.innerHTML = skjult.length
+    ? '<span class="ko-skjulte-tekst">Skjult:</span>' + koSkjulteHtml(oppsett) : '';
+}
+
+// Knappen i vinduets eget hode. Den siste synlige nekter — og sier det.
+function koSkjulVindu(navn) {
+  const ny = koSkjul(koOppsett || koLesOppsett(), navn);
+  if (ny.skjult.length === (koOppsett ? (koOppsett.skjult || []).length : 0)) return;
+  koOppsett = ny;
+  koLagreOppsett(koOppsett);
+  koTegnOppsett(koOppsett);
+}
+
+function koVisVindu(navn) {
+  koOppsett = koVisIgjen(koOppsett || koLesOppsett(), navn);
+  koLagreOppsett(koOppsett);
+  koTegnOppsett(koOppsett);
 }
 
 function koTilbakestillOppsett() {

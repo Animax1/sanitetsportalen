@@ -237,25 +237,28 @@ function _enhetsmatrise(o) {
     </span>` : '';
   // **«Avventer» er en tredje beskjed** (André, 16. sep. 2026): avbrutt sier
   // hva som skjedde, «trenger ny ressurs» krever handling nå, og avventer sier
-  // at noen har svart — bare ikke ja. Dempet som avbrutt-merket, ikke
-  // alarmerende: den som avventer har gitt beskjed.
-  const avventer = (o.avventer_av || []).length
-    ? `<span class="enhet-brikke enhet-brikke-avventer">
-      <i class="bi bi-pause-circle-fill"></i>
-      <span>Avventer: ${escapeHtml((o.avventer_av || []).join(', '))}</span>
-    </span>` : '';
+  // at noen har svart — bare ikke ja.
+  //
+  // **Men den er en egenskap ved enhetens rad, ikke en deltaker til** (André,
+  // 21. sep. 2026: «hvis du trykker avvent så klones det i oppdragslistens
+  // oversikt»). Avventingen rører ikke koblingsraden — det er hele poenget
+  // med den — så enheten står i `enheter` med status Venter *og* i
+  // `avventer_av`, og et eget merke ved siden av tegnet henne to ganger.
+  // Merket er derfor flyttet inn i hennes egen brikke.
   const synlige = o.trenger_ressurs ? rader.filter((e) => e.status !== 'ledig') : rader;
-  return mangler + avbrutt + avventer + synlige.map((e) => {
+  return mangler + avbrutt + synlige.map((e) => {
     const statusTid = e.status_tidspunkt ? ` · ${tidSiden(e.status_tidspunkt)}` : '';
     const sted = e.sted_navn ? ` → ${e.sted_navn}` : '';
-    const meta = `${e.status_navn}${sted}${statusTid}`;
+    const venter = enhetAvventer(o, e.enhet_navn);
+    const meta = `${e.status_navn}${sted}${statusTid}${venter ? ' · avventer' : ''}`;
     // **«Lege 02 (passiv vakt)»** (André, 16. sep. 2026). Modusen er den som
     // sto da hun ble varslet, ikke den hun står i nå — serveren fryser den
     // på koblingsraden. Aktiv vises ikke: «Aktiv» på en ambulanse er støy,
     // og tomt felt betyr «dette spørsmålet gjaldt ikke henne».
     const modus = e.varslet_modus === 'passiv' ? ' (passiv vakt)' : '';
-    return `<span class="enhet-brikke">
-      <span class="status-prikk status-${escHtmlValue(e.status)}"></span>
+    const pause = venter ? '<i class="bi bi-pause-circle-fill"></i>' : '';
+    return `<span class="enhet-brikke${venter ? ' enhet-brikke-avventer' : ''}">
+      ${pause}<span class="status-prikk status-${escHtmlValue(e.status)}"></span>
       <span>${escapeHtml(e.enhet_navn + modus)}</span>
       <span class="oppdrag-meta">${escapeHtml(meta)}</span>
     </span>`;
@@ -263,7 +266,34 @@ function _enhetsmatrise(o) {
 }
 
 
+// **Avventer denne enheten på dette oppdraget?** Egen funksjon fordi den
+// avgjør noe: står den som en `if` inne i byggeren, lar regelen seg ikke
+// kjøre. `avventer_av` er navn, og `Enhet.navn` er unik.
+function enhetAvventer(oppdrag, enhetNavn) {
+  if (!enhetNavn) return false;
+  return (oppdrag.avventer_av || []).includes(enhetNavn);
+}
+
+
 // ── Detaljvisning ───────────────────────────────────────
+
+// **Én tekst per type, og ingen «ellers»** (André, 21. sep. 2026: «det må
+// logges i oppdrags tidslinjen at en enhet blir satt på avvent»). Den sto
+// som en ternær med «Tatt av» i siste gren, og da ble *hver* type som ikke
+// var avbrutt eller rykket videre til «Tatt av» — en enhet satt på avvent
+// sto i tidslinjen som tatt av oppdraget. Fallet er nå navnløst og ikke en
+// påstand: en ny type i `Enhetshendelse` skal se rar ut, ikke lyve.
+function enhetshendelseTekst(h) {
+  const ord = {
+    tatt_av: 'Tatt av',
+    rykket_videre: 'Rykket videre',
+    avbrutt: 'Avbrutt',
+    avventer: 'Avventer',
+  }[h.type] || h.type || 'Hendelse';
+  const detalj = (h.type === 'rykket_videre' && h.detalj) ? ' til ' + h.detalj : '';
+  return ord + detalj + ': ' + h.enhet_navn;
+}
+
 
 function tidslinjeHtml(data) {
   // Unionen av statusmeldinger og enhetsbytter. De to er skilt i databasen
@@ -298,11 +328,7 @@ function tidslinjeHtml(data) {
     });
   });
   (data.enhetshendelser || []).forEach((h) => {
-    // «Rykket videre til #12: HGSD 56» — bilen dro til et annet oppdrag, og
-    // dette trenger en ny ressurs. Ellers «Tatt av».
-    const tekst = h.type === 'rykket_videre'
-      ? 'Rykket videre' + (h.detalj ? ' til ' + h.detalj : '') + ': ' + h.enhet_navn
-      : (h.type === 'avbrutt' ? 'Avbrutt: ' + h.enhet_navn : 'Tatt av: ' + h.enhet_navn);
+    const tekst = enhetshendelseTekst(h);
     rader.push({
       tid: h.tidspunkt,
       html: `
@@ -477,7 +503,7 @@ async function visOppdrag(id) {
 
 // ── Enhetene på oppdraget (flere enheter, 11. sep. 2026) ───────────
 // Radene i detaljvisningen, med handlingene per enhet: «Før status» (§9),
-// «Gjenåpne» og «Ta av». Og «Varsle enhet til» under dem. Alle går på
+// «Gjenåpne» og «Ta av». Og «Legg til» under dem. Alle går på
 // `apentOppdrag` — klikkdelegeringen sender ett argument, og det er enheten.
 
 //: Oppdraget som står åpent i detaljmodalen, som data. `apentOppdragId`
@@ -491,8 +517,9 @@ function mkEnhetsrader(o) {
     const statusTid = e.status_tidspunkt
       ? ` ${klokke(e.status_tidspunkt)} · ${tidSiden(e.status_tidspunkt)}` : '';
     const sted = e.sted_navn ? ` → ${e.sted_navn}` : '';
-    const meta = `${e.status_navn}${sted}${statusTid}`;
-    const knapper = OPPDRAG_TILGANG.kanSkrive ? _enhetsknapper(e, flere, o.id) : '';
+    const venter = enhetAvventer(o, e.enhet_navn);
+    const meta = `${e.status_navn}${sted}${statusTid}${venter ? ' · avventer' : ''}`;
+    const knapper = OPPDRAG_TILGANG.kanSkrive ? _enhetsknapper(e, flere, o.id, venter) : '';
     return `
       <div class="enhet-rad" id="enhet-rad-${escHtmlValue(e.enhet_id)}">
         <span class="status-prikk status-${escHtmlValue(e.status)}"></span>
@@ -504,7 +531,7 @@ function mkEnhetsrader(o) {
 }
 
 
-function _enhetsknapper(e, flere, oppdragId) {
+function _enhetsknapper(e, flere, oppdragId, avventer) {
   // Bare knappene som kan brukes: «Ta av» mens hun venter og ikke er den
   // siste, «Gjenåpne» når hun er ledig, «Før status» ellers. En knapp som
   // alltid feiler er verre enn ingen.
@@ -525,7 +552,13 @@ function _enhetsknapper(e, flere, oppdragId) {
   // loggen. Knappen vises bare før hun har rykket ut, og bare der
   // enhetstypen tillater det — `kanAvvente()` leser enhetslista, for
   // koblingsraden kjenner ikke typen.
-  if (e.status === 'venter' && kanAvvente(e.enhet_id)) {
+  //
+  // **Og ikke én gang til på en som alt avventer** (21. sep. 2026): raden
+  // blir stående i `Venter` — det er hele poenget med avventingen — så
+  // serveren tar imot trykk nummer to og skriver en `Enhetshendelse` til.
+  // Da kom hun to ganger i tidslinjen og to ganger i hendelsens logg. Veien
+  // videre for henne er «Endre status», som står ved siden av.
+  if (e.status === 'venter' && !avventer && kanAvvente(e.enhet_id)) {
     ut.push(`<button type="button" class="btn btn-outline-secondary btn-sm"
                      data-action="avventOppdrag" data-arg="${escHtmlValue(oppdragId + ':' + e.enhet_id)}">Avvent</button>`);
   }
@@ -543,14 +576,20 @@ function kanAvvente(enhetId) {
 
 
 // «Flytt» (André, 19. sep. 2026: «viser alle enheter uavhengig om de er av
-// eller ei … hvem er fra og hvem er til?»). Bare enheter **på vakt** som ikke
-// alt står på oppdraget — samme utvalg som «Varsle enhet til», og det
-// serveren godtar. «Fra» og «Til» står skrevet; med én enhet på oppdraget
-// er «fra» gitt og vises som tekst.
+// eller ei … hvem er fra og hvem er til?»). «Til» er enheter **på vakt** som
+// ikke alt står på oppdraget — samme utvalg som «Legg til». Med én enhet
+// under «Fra» er den gitt og vises som tekst.
 function _flyttValg(o) {
   const paa = new Set((o.enheter || []).map((e) => e.enhet_id));
   const kandidater = enheter.filter((e) => e.pa_vakt && !paa.has(e.id));
-  const paaOppdraget = o.enheter || [];
+  const paaOppdraget = flyttFraEnheter(o);
+  // Ingen har oppdraget — da er det ingenting å flytte *fra*, og veien
+  // videre er å varsle en ny enhet. Knappen skal ikke tilby noe som er tomt.
+  if (!paaOppdraget.length) {
+    return `<hr>
+      <div class="form-label">Flytt oppdraget til en annen enhet</div>
+      <div class="form-text">Ingen enhet har oppdraget nå — bruk «Legg til» under Enheter.</div>`;
+  }
   // Valgene bygges før mal-strengene — en nøstet mal-streng er usynlig for
   // XSS-skanneren (oppdrag/tests_xss.py).
   const fraValg = paaOppdraget.map((e) => `<option value="${escHtmlValue(e.enhet_id)}">${escapeHtml(e.enhet_navn)}</option>`).join('');
@@ -572,8 +611,20 @@ function _flyttValg(o) {
         ${til}
       </div>
       <div class="form-text">Enheten under «Fra» tas av oppdraget; status og stempler står.
-        Skal en enhet <em>til</em> på oppdraget, bruk «Varsle enhet til» under Enheter.</div>
+        Skal en enhet <em>til</em> på oppdraget, bruk «Legg til» under Enheter.</div>
       <div id="flytt-feil" class="text-danger small mt-2 d-none"></div>`;
+}
+
+
+// **«Fra» er enhetene som fortsatt *har* oppdraget** (André, 21. sep. 2026:
+// «fra lista viser alle biler — fra lista må bare vise biler som har
+// oppdraget»). Koblingsraden blir stående når en bil melder seg `Ledig`:
+// stemplene hennes skal bevares, og statistikken måler dem. Men da sto hun
+// igjen i «Fra» på et oppdrag hun var ferdig med — og på et oppdrag som har
+// gått gjennom to biler, så lista ut som hele flåten. `Ledig` er den ene
+// statusen som betyr «ikke min lenger»; alle de andre er pågående.
+function flyttFraEnheter(oppdrag) {
+  return (oppdrag.enheter || []).filter((e) => e.status !== 'ledig');
 }
 
 
@@ -588,7 +639,7 @@ function _varsleValg(o) {
     <div class="input-group input-group-sm mt-2">
       <select id="varsle-enhet" class="form-select" aria-label="Enhet å varsle">${valg}</select>
       <button class="btn btn-outline-primary" type="button"
-              data-action="varsleEnhet" data-id="${escHtmlValue(o.id)}">Varsle enhet til</button>
+              data-action="varsleEnhet" data-id="${escHtmlValue(o.id)}">Legg til</button>
     </div>`;
 }
 

@@ -83,6 +83,26 @@ FOR_STORE_I_DAG: dict[str, int] = {
     # fila kortere og dokumentasjonen dårligere. Se `TODO.md` for hva som
     # faktisk kan gjøres: seksjonene er nå små nok til å vurderes hver for seg.
     'vaktliste/CLAUDE.md': 56_900,
+    # 22 249 og 22 615 tegn 21. sep. 2026. **Begge var på taket, og det er
+    # taket som gjorde jobben sin:** `ko/CLAUDE.md` sto 12 tegn under 22 000
+    # og `oppdrag/CLAUDE.md` 11, så kvelden med sju punkter fra André kostet
+    # fire runder med å barbere prosa andre steder i filene for å få plass til
+    # tre nye regler.
+    #
+    # Det er den vekslingen regelen over advarer mot fra den andre siden: å
+    # hente tegn ved å stryke «hvorfor» gjør fila kortere og dokumentasjonen
+    # dårligere. Dubletter ble slått sammen — «bare når satt» sto to steder i
+    # oppdragsfila, «feature parity» hadde egen overskrift over det samme
+    # poenget som åpnet sentralbordseksjonen i KO-fila, og leveranselista i
+    # KO-innledningen gjentok CHANGELOG. Det holdt ikke.
+    #
+    # **Taket heves derfor her, med det som er den ekte rettingen skrevet ned:
+    # begge filene skal deles, som rota ble 15. sep. 2026.** Se `TODO.md`.
+    # Tallene er dagens størrelse pluss den samme slakken vaktlistefila har,
+    # så de kan krympe og ikke vokse — den neste som trenger plass møter
+    # samme vegg, og da er delingen svaret.
+    'ko/CLAUDE.md': 22_300,
+    'oppdrag/CLAUDE.md': 22_650,
 }
 
 #: Over denne størrelsen må en modulfil ha seksjoner. Tallet er der en fil

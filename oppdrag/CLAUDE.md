@@ -108,8 +108,7 @@ utenom `BILEN_KAN_LEDIG_FRA` med 400, mens sentralens føring følger `OVERGANGE
 (`status/avbryt/`), `services.avbryt_oppdrag` setter raden Ledig (uten Udefinert-sperre —
 hun så aldri pasienten), oppdraget til «trenger ny ressurs» og en `Enhetshendelse.AVBRUTT`.
 `utledet_av_statuser` rangerer med `choices.AKTIVITET`, ikke `KJEDEN.index`, fordi
-Behandlet ikke står i kjeden. Arkivraden har `behandlet_at`, som står i SHA-payloaden
-**bare når satt** — eldre arkiv har ingen slik nøkkel i signaturen sin.
+Behandlet ikke står i kjeden. Arkivraden har `behandlet_at` (se «Arkivet bærer modusen»).
 
 **«Avbrutt» og «trenger ny ressurs» er to ulike beskjeder** (15. sep. 2026). Regelen sto
 som ett spørsmål — «finnes det andre enheter som ikke er ledige» — og den kan ikke skille en
@@ -181,16 +180,27 @@ oppdraget, skal det stå «trenger ny ressurs», som er hele grunnen til at spø
 ut ikke blir stående merket. `avventer_av_bulk()` finnes fordi tavla polles
 hvert tiende sekund, samme grunn som `avbrutt_av_bulk`.
 
+**Og fordi hun blir stående, er avventingen et merke *på* brikken hennes**
+(`enhetAvventer()`, 21. sep.): `avventer_av` bærer nøyaktig de radene som også står i
+`enheter`, så et merke ved siden av tegnet henne to ganger. «Avvent» tilbys ikke på en som
+alt avventer, og `avvent_oppdrag` er **idempotent** imens: raden står, så ingen av
+sjekkene stoppet trykk nummer to.
+
+**Tidslinjen navngir hver type og har ingen «ellers»** (`enhetshendelseTekst()`): grenen
+endte på «Tatt av», så avvent sto som tatt av. En ny type skal se rar ut, ikke lyve.
+**Og «Fra» i «Flytt oppdrag» er de som fortsatt *har* oppdraget** (`flyttFraEnheter()`):
+raden blir stående når en bil melder seg `Ledig`, så hun sto igjen på et oppdrag hun var
+ferdig med. «Til» er uendret; knappen heter «Legg til».
+
 **Avbrutt-merket kvitteres** (`kvittert_at`/`kvittert_av` på `Enhetshendelse`). Det forsvant
 aldri av seg selv før, og et merke som blir stående gjennom vakta er et merke man slutter å
 se. To veier ut: operatøren trykker «Kvitter» i merket, eller **en ny enhet varsles** —
 `varsle_enhet` kvitterer, fordi det å sende noen ny *er* svaret på avbrytelsen. `avbrutt_av`
 og `avbrutt_av_bulk` filtrerer på `kvittert_at__isnull=True`.
 
-**Arkivet bærer modusen** (`ArkivertOppdrag.varslet_modus`), og den står i SHA-payloaden
-**bare når den er satt** — som `behandlet_at`, og som `varslet_at`, `grovsortering`,
-`avreist_til` og `enhetshendelser` fra statistikk 7b (21. sep. 2026, `statistikk/CLAUDE.md`).
-Eldre signaturer verifiserer uendret. `Enhetshendelse.varslet_at` settes for alle typer:
+**Arkivet bærer modusen** (`ArkivertOppdrag.varslet_modus`). Den, `behandlet_at` og
+`varslet_at`/`grovsortering`/`avreist_til`/`enhetshendelser` fra statistikk 7b står i
+SHA-payloaden **bare når de er satt**, så eldre signaturer verifiserer uendret. `Enhetshendelse.varslet_at` settes for alle typer:
 raden slettes ved tatt av, og hendelsen må selv huske hvor lenge hun sto bundet.
 Statistikken har `enheter_passiv`, `passiv_timer` og `oppdrag_i_passiv`; de to første er
 **live-tall** og finnes ikke i arkivet, det tredje overlever fordi stempelet ligger på radene.

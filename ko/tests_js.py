@@ -170,6 +170,9 @@ KO_LOGG_BYGGERE = (
     'koTegnHendelser',
     'koDetaljLinjeHtml',
     'koHendelseOppdragHtml',
+    # Enhetsbrikkene i hendelsens oppdragsoversikt (21. sep. 2026), skilt ut
+    # som egen bygger fordi de er én per enhet og ikke én per oppdrag.
+    'koHendelseOppdragEnheterHtml',
     'koPrioKnapperHtml',
     'koTegnDetalj',
     'koFyllLokasjoner',
@@ -181,6 +184,10 @@ KO_LOGG_BYGGERE = (
     'koTegnNullstill',
     # Fargeforklaringen i ressursoversikten (19. sep. 2026), samme sort.
     'koLegendeHtml',
+    # Stripa over konsollen (21. sep. 2026): kortene for de skjulte vinduene,
+    # og funksjonen som setter dem inn.
+    'koSkjulteHtml',
+    'koTegnSkjulte',
     # Lagene på hendelsen (19. sep. 2026), og besetningen bak et klikk på
     # lagkortet.
     'koLagBrikkeHtml',
@@ -497,6 +504,8 @@ PRIORITET_PREAMBLE = (
     "['gronn','Grønn'],['drift','Drift'],['plassering','Plassering']], MODUL_TILGANG: { ko: 'skriv_full' } };\n"
     "let koHendelser = new Map(); let koApenHendelseId = null; let koVisLukkede = true; let koSok = '';\n"
     'let koLinjer = new Map(); let oppdragsliste = [];\n'
+    # Loggfilteret (21. sep. 2026): `koLoggHodeTekst()` teller det filtrerte.
+    "let koLoggfilter = 'alle';\n"
 )
 
 HENDELSE_HARNESS = (
@@ -671,7 +680,8 @@ VINDU_DOM = """
 
 VINDU_HARNESS = HENDELSE_HARNESS + (
     (PORTAL_UTILS_JS, ('fmtMin',)),
-    (KO_JS, ('koTegnHendelser', 'koVisStrommen', 'koLoggHodeTekst', 'koTegnLoggHode', 'koTegnDetalj',
+    (KO_JS, ('koLoggfilterTreffer',
+             'koTegnHendelser', 'koVisStrommen', 'koLoggHodeTekst', 'koTegnLoggHode', 'koTegnDetalj',
              'koApneHendelse', 'koVippHendelse', 'koLukkDetalj', 'koRullTilLoggvinduet',
              'koDetaljLinjeHtml', 'koHendelseOppdragHtml', 'koPrioKnapperHtml', 'koLagBrikkeHtml',
              'koLagVelgerHtml', 'koLagKandidater', 'koLagPaa', 'koMittBrukernavn', 'koSiden',
@@ -792,6 +802,113 @@ class StroemmenTests(SimpleTestCase):
 
 
 @unittest.skipUnless(node_available(), 'node er ikke tilgjengelig')
+class LoggfilteretTests(SimpleTestCase):
+    """Alle | Meldinger | System i loggstrømmen (André, 21. sep. 2026:
+    «loggstrømmen må filtreres mellom system meldinger og bruker sendte
+    meldinger»). Valget huskes per nettleser, som Alle | Biler | Lag."""
+
+    def _kjor(self, kode, forspill=''):
+        harness = build_harness((
+            (PORTAL_UTILS_JS, ('escapeHtml',)),
+            (KO_JS, ('koLoggfilterTreffer', 'koLesLoggfilter', 'koLagreLoggfilter',
+                     'koVelgLoggfilter', 'koMerkLoggfilter', 'koStartLoggfilter',
+                     'koLoggTomMelding')),
+        ))
+        pre = ("const KO_LOGGFILTER_NOKKEL = 'ko.loggfilter';\n"
+               "const KO_LOGGFILTRE = ['alle', 'meldinger', 'system'];\n"
+               "let koLoggfilter = 'alle';\n"
+               'function koTegnLogg() { globalThis.tegnet = (globalThis.tegnet || 0) + 1; }\n')
+        return run_node(harness, forspill + kode, preamble=pre).splitlines()
+
+    def test_regelen_skiller_system_fra_meldinger(self):
+        ut = self._kjor("""
+            const sys = {kilde: 'system'}, folk = {kilde: 'operator'};
+            console.log(koLoggfilterTreffer(sys, 'alle'), koLoggfilterTreffer(folk, 'alle'));
+            console.log(koLoggfilterTreffer(sys, 'system'), koLoggfilterTreffer(folk, 'system'));
+            console.log(koLoggfilterTreffer(sys, 'meldinger'), koLoggfilterTreffer(folk, 'meldinger'));
+        """)
+        self.assertEqual(ut[:3], ['true true', 'true false', 'false true'])
+
+    def test_valget_huskes_og_et_ukjent_valg_gjor_ingenting(self):
+        ut = self._kjor("""
+            koVelgLoggfilter('system');
+            console.log(koLoggfilter, lager[KO_LOGGFILTER_NOKKEL], globalThis.tegnet);
+            koVelgLoggfilter('tull');
+            console.log(koLoggfilter, globalThis.tegnet, 'ukjent valg tegner ikke på nytt');
+            koLoggfilter = 'alle';
+            koStartLoggfilter();
+            console.log(koLoggfilter, 'lest tilbake');
+            // Lagret verdi er brukerdata fra en annen versjon av sida, som
+            // oppsettet: et navn vi ikke kjenner skal gi «alle», ikke et
+            // filter som slipper gjennom ingenting.
+            lager[KO_LOGGFILTER_NOKKEL] = 'bare_viktige';
+            koStartLoggfilter();
+            console.log(koLoggfilter, 'ukjent lagret verdi');
+            lager[KO_LOGGFILTER_NOKKEL] = '';
+            koStartLoggfilter();
+            console.log(koLoggfilter, 'tom lagret verdi');
+        """, forspill="""
+            const lager = {};
+            globalThis.window = { localStorage: { getItem: (k) => lager[k] ?? null,
+                                                  setItem: (k, v) => { lager[k] = v; } } };
+            globalThis.document = { getElementById: () => null };
+        """)
+        self.assertEqual(ut[0], 'system system 1')
+        self.assertEqual(ut[1], 'system 1 ukjent valg tegner ikke på nytt')
+        self.assertEqual(ut[2], 'system lest tilbake')
+        self.assertEqual(ut[3], 'alle ukjent lagret verdi')
+        self.assertEqual(ut[4], 'alle tom lagret verdi')
+
+    def test_en_privat_fane_faller_tilbake_paa_alle(self):
+        """localStorage kaster i en privat fane. Filteret skal da gjelde til
+        sida lastes på nytt, ikke ta ned strømmen."""
+        ut = self._kjor("""
+            console.log(koLesLoggfilter());
+            koLagreLoggfilter('system');
+            koVelgLoggfilter('meldinger');
+            console.log(koLoggfilter, 'valget virker likevel');
+        """, forspill="""
+            globalThis.window = { localStorage: { getItem() { throw new Error('privat'); },
+                                                  setItem() { throw new Error('privat'); } } };
+            globalThis.document = { getElementById: () => null };
+        """)
+        self.assertEqual(ut[0], 'alle')
+        self.assertEqual(ut[1], 'meldinger valget virker likevel')
+
+    def test_knappene_merkes_med_det_som_gjelder(self):
+        ut = self._kjor("""
+            koVelgLoggfilter('meldinger');
+            console.log(knapper.map((k) => k.dataset.arg + '=' + k.klasser.has('active') + '/' + k.attr['aria-pressed']).join(' '));
+        """, forspill="""
+            const lager = {};
+            globalThis.window = { localStorage: { getItem: (k) => lager[k] ?? null, setItem: (k, v) => { lager[k] = v; } } };
+            const knapper = ['alle', 'meldinger', 'system'].map((arg) => {
+              const k = { dataset: { arg }, klasser: new Set(), attr: {} };
+              k.classList = { toggle: (c, v) => { v ? k.klasser.add(c) : k.klasser.delete(c); } };
+              k.setAttribute = (n, v) => { k.attr[n] = v; };
+              return k;
+            });
+            const boks = { querySelectorAll: () => knapper, classList: { toggle() {} } };
+            globalThis.document = { getElementById: (id) => (id === 'ko-loggfilter' ? boks : null) };
+        """)
+        self.assertEqual(ut[0], 'alle=false/false meldinger=true/true system=false/false')
+
+    def test_tom_stroem_sier_om_det_er_filteret(self):
+        """Samme regel som `koOppdragTomMelding()`: teksten skal si om lista
+        er tom fordi filteret tok alt, eller fordi det ikke står noe der."""
+        ut = self._kjor("""
+            koLoggfilter = 'system'; console.log(koLoggTomMelding(true));
+            koLoggfilter = 'meldinger'; console.log(koLoggTomMelding(true));
+            koLoggfilter = 'alle'; console.log(koLoggTomMelding(true));
+            koLoggfilter = 'system'; console.log(koLoggTomMelding(false));
+        """, forspill='globalThis.document = { getElementById: () => null };')
+        self.assertEqual(ut[0], 'Ingen systemlinjer i strømmen.')
+        self.assertEqual(ut[1], 'Ingen meldinger i strømmen.')
+        self.assertEqual(ut[2], 'Ingen linjer ennå.')
+        self.assertEqual(ut[3], 'Ingen linjer ennå.', 'tom strøm er ikke filterets skyld')
+
+
+@unittest.skipUnless(node_available(), 'node er ikke tilgjengelig')
 class DelingOgLagTests(SimpleTestCase):
     """Deling av logglinjer med enhetene og lagene på hendelsen (19. sep.
     2026): «Delt»-merket og Del/Angre etter nivå, «Fra loggen i H14» i
@@ -811,6 +928,38 @@ class DelingOgLagTests(SimpleTestCase):
 
     PRE = ("globalThis.window = { MODUL_TILGANG: { ko: 'skriv_full' } };\n"
            "let koLinjer = new Map(); let koHendelser = new Map(); let oppdragsliste = [];\n")
+
+    #: Et rutenett av stubber: de to radene med hver sin skillelinje, de fire
+    #: vinduene, den vannrette skillelinja og stripa. `skjult` leses av
+    #: `d-none`, som er det `koTegnOppsett` faktisk setter.
+    DOM = """
+        function lagEl(id) {
+          const e = { id, innerHTML: '', style: {}, klasser: new Set(), barn: [] };
+          e.classList = { add: (k) => e.klasser.add(k), remove: (k) => e.klasser.delete(k),
+                          contains: (k) => e.klasser.has(k),
+                          toggle: (k, v) => { v ? e.klasser.add(k) : e.klasser.delete(k); } };
+          Object.defineProperty(e, 'skjult', { get: () => e.klasser.has('d-none') });
+          e.insertBefore = () => {}; e.appendChild = () => {};
+          return e;
+        }
+        const rad1Splitter = lagEl('splitter-1');
+        const rad2Splitter = lagEl('splitter-2');
+        const vannrett = lagEl('splitter-h');
+        const elementer = new Map();
+        for (const id of ['ko-rad-1', 'ko-rad-2', 'ko-skjulte', 'ko-vindu-hendelser',
+                          'ko-vindu-logg', 'ko-vindu-ressurser', 'ko-vindu-oppdrag']) {
+          elementer.set(id, lagEl(id));
+        }
+        elementer.get('ko-rad-1').querySelector = () => rad1Splitter;
+        elementer.get('ko-rad-2').querySelector = () => rad2Splitter;
+        const el = (id) => elementer.get(id);
+        globalThis.document = {
+          getElementById: (id) => elementer.get(id) || null,
+          querySelector: (v) => (v === '.ko-splitter-h' ? vannrett
+            : elementer.get('ko-vindu-' + (v.match(/data-vindu="(\\w+)"/) || [])[1]) || null),
+          querySelectorAll: () => [],
+        };
+    """
 
     def _kjor(self, kode):
         return run_node(self.harness, kode, preamble=self.PRE).splitlines()
@@ -1011,19 +1160,93 @@ class DelingOgLagTests(SimpleTestCase):
         ''').splitlines()
         self.assertEqual(ut[:5], ['true true false', 'false true true ja', 'true false', 'false', 'true true true'])
 
+    def _oppdragsrad(self, o):
+        harness = build_harness((
+            (PORTAL_UTILS_JS, ('escapeHtml', 'fmtMin')),
+            (OPPDRAG_KORT_JS, ('oppdragsnr', 'hastegradKlasse', 'tidSiden')),
+            (KO_JS, ('koHendelseOppdragHtml', 'koHendelseOppdragEnheterHtml')),
+        ))
+        return run_node(harness, f'console.log(koHendelseOppdragHtml({o}));').splitlines()[0]
+
     def test_oppdraget_i_hendelsen_viser_trenger_ressurs(self):
         """Opprettet uten enhet (19. sep. 2026): samme merke som på tavla."""
-        harness = build_harness((
-            (PORTAL_UTILS_JS, ('escapeHtml',)),
-            (OPPDRAG_KORT_JS, ('oppdragsnr', 'hastegradKlasse')),
-            (KO_JS, ('koHendelseOppdragHtml',)),
-        ))
-        ut = run_node(harness, """
-            console.log(koHendelseOppdragHtml({id: 1, nummer: 49, hastegrad: 'Haster', problemstilling: 'Vold/slag', status: 'venter', status_navn: 'Venter', enheter: [], trenger_ressurs: true}));
-            console.log(koHendelseOppdragHtml({id: 2, nummer: 50, hastegrad: 'Plassering', problemstilling: 'Utstyr', status: 'venter', status_navn: 'Venter', enheter: [{enhet_navn: 'Bil <1>'}], trenger_ressurs: false}));
-        """).splitlines()
-        self.assertIn('enhet-brikke-mangler', ut[0]); self.assertIn('Trenger ressurs', ut[0]); self.assertNotIn('ingen enhet', ut[0])
-        self.assertNotIn('enhet-brikke-mangler', ut[1]); self.assertIn('Bil &lt;1&gt; · Venter', ut[1]); self.assertIn('hastegrad-plassering', ut[1])
+        ut = self._oppdragsrad(
+            "{id: 1, nummer: 49, hastegrad: 'Haster', problemstilling: 'Vold/slag',"
+            " status: 'venter', status_navn: 'Venter', enheter: [], trenger_ressurs: true}")
+        self.assertIn('enhet-brikke-mangler', ut)
+        self.assertIn('Trenger ressurs', ut)
+        self.assertNotIn('ingen enhet', ut)
+
+    def test_hver_enhet_med_sin_egen_status_og_tid(self):
+        """André, 21. sep. 2026: «det må og stå tidspunkt for nåværende status
+        … må og skille mellom flere enheters ulike statuser».
+
+        Sto som ett navnedrag med *oppdragets* utledede status, og da var
+        «Ambulanse 1, Lag 3 · Fremme» usant for begge: den ene var fremme, den
+        andre rykket ut."""
+        ut = self._oppdragsrad(
+            "{id: 2, nummer: 50, hastegrad: 'Akutt', problemstilling: 'Fall',"
+            " status: 'fremme', status_navn: 'Fremme', trenger_ressurs: false,"
+            " avventer_av: [], enheter: ["
+            "  {enhet_navn: 'Bil <1>', status: 'fremme', status_navn: 'Fremme',"
+            "   status_tidspunkt: new Date(Date.now() - 12 * 60000).toISOString()},"
+            "  {enhet_navn: 'Lag 3', status: 'rykker_ut', status_navn: 'Rykker ut',"
+            "   status_tidspunkt: new Date(Date.now() - 3 * 60000).toISOString()}]}")
+        self.assertIn('Bil &lt;1&gt;', ut); self.assertNotIn('Bil <1>', ut)
+        self.assertIn('status-fremme', ut); self.assertIn('status-rykker_ut', ut)
+        self.assertIn('Fremme · 12 min', ut)
+        self.assertIn('Rykker ut · 3 min', ut)
+        self.assertEqual(ut.count('enhet-brikke'), 2, 'én brikke per enhet')
+
+    def test_uten_stempling_teller_varslingstida(self):
+        """En enhet i «Venter» har ingen `Statusmelding` — statusen kom av
+        varslingen. Feltet sto da tomt på nøyaktig den raden man lurer på:
+        hvor lenge har hun visst om dette uten å rykke ut?"""
+        ut = self._oppdragsrad(
+            "{id: 3, nummer: 51, hastegrad: 'Plassering', problemstilling: 'Utstyr',"
+            " status: 'venter', status_navn: 'Venter', trenger_ressurs: false,"
+            " enheter: [{enhet_navn: 'Bil 1', status: 'venter', status_navn: 'Venter',"
+            "            status_tidspunkt: null,"
+            "            varslet_at: new Date(Date.now() - 7 * 60000).toISOString()}]}")
+        self.assertIn('Venter · 7 min', ut)
+        self.assertIn('hastegrad-plassering', ut)
+
+    def test_uten_noe_tidspunkt_staar_statusen_alene(self):
+        """Og uten begge deler skal det stå «Venter», ikke «Venter · »."""
+        ut = self._oppdragsrad(
+            "{id: 3, nummer: 51, hastegrad: 'Akutt', problemstilling: 'Utstyr',"
+            " status: 'venter', status_navn: 'Venter', trenger_ressurs: false,"
+            " enheter: [{enhet_navn: 'Bil 1', status: 'venter', status_navn: 'Venter',"
+            "            status_tidspunkt: null, varslet_at: null}]}")
+        self.assertIn('>Venter</span>', ut)
+
+    def test_den_avventende_merkes_paa_sin_egen_brikke(self):
+        """Samme form som tavla: avventingen er et merke på enhetens brikke,
+        ikke en brikke til (klonen, 21. sep. 2026)."""
+        ut = self._oppdragsrad(
+            "{id: 4, nummer: 52, hastegrad: 'Akutt', problemstilling: 'Fall',"
+            " status: 'venter', status_navn: 'Venter', trenger_ressurs: false,"
+            " avventer_av: ['Lege 02'], enheter: ["
+            "  {enhet_navn: 'Lege 02', status: 'venter', status_navn: 'Venter', status_tidspunkt: null},"
+            "  {enhet_navn: 'Bil 1', status: 'venter', status_navn: 'Venter', status_tidspunkt: null}]}")
+        self.assertEqual(ut.count('Lege 02'), 1)
+        hennes = [b for b in ut.split('<span class="enhet-brikke') if 'Lege 02' in b][0]
+        self.assertIn('enhet-brikke-avventer', hennes)
+        self.assertIn('avventer', hennes)
+        hans = [b for b in ut.split('<span class="enhet-brikke') if 'Bil 1' in b][0]
+        self.assertNotIn('avventer', hans)
+
+    def test_trenger_ressurs_staar_foran_enhetene_som_er_igjen(self):
+        """Begge kan være sanne samtidig: en bil rykket videre, en annen er på
+        vei. Merket sto tidligere *i stedet for* enhetene."""
+        ut = self._oppdragsrad(
+            "{id: 5, nummer: 53, hastegrad: 'Akutt', problemstilling: 'Fall',"
+            " status: 'venter', status_navn: 'Venter', trenger_ressurs: true,"
+            " avventer_av: [], enheter: [{enhet_navn: 'Bil 1', status: 'venter',"
+            "   status_navn: 'Venter', status_tidspunkt: null}]}")
+        self.assertIn('Trenger ressurs', ut)
+        self.assertIn('Bil 1', ut)
+        self.assertLess(ut.index('Trenger ressurs'), ut.index('Bil 1'))
 
     def test_vis_lukkede_huskes_per_nettleser_og_er_av_som_standard(self):
         """André, 19. sep. 2026: «Når en refresher siden vises også avsluttede
@@ -1150,12 +1373,52 @@ class OppsettetTests(SimpleTestCase):
     en skillelinje før et vindu er borte."""
 
     def setUp(self):
-        self.harness = build_harness(((KO_JS, ('koKlemProsent', 'koGyldigOppsett', 'koStandardOppsett',
-                                                'koBytt', 'koProsentAv')),))
+        self.harness = build_harness((
+            (PORTAL_UTILS_JS, ('escapeHtml',)),
+            (KO_JS, ('koKlemProsent', 'koGyldigOppsett', 'koStandardOppsett',
+                     'koBytt', 'koProsentAv', 'koGyldigSkjult', 'koErSkjult',
+                     'koKanSkjule', 'koSkjul', 'koVisIgjen', 'koSkjulteHtml',
+                     'koTegnOppsett', 'koTegnSkjulte', 'koVinduElement')),
+        ))
 
     PRE = ("const KO_VINDUER = ['hendelser', 'logg', 'ressurser', 'oppdrag'];\n"
-           "const KO_OPPSETT_STANDARD = { rader: [['hendelser', 'logg'], ['ressurser', 'oppdrag']], bredde: [56, 34], hoyde: 56 };\n"
+           "const KO_OPPSETT_STANDARD = { rader: [['hendelser', 'logg'], ['ressurser', 'oppdrag']],"
+           ' bredde: [56, 34], hoyde: 56, skjult: [] };\n'
+           "const KO_VINDUSNAVN = { hendelser: 'Hendelseslogg', logg: 'Loggstrøm',"
+           " ressurser: 'Ressursoversikt', oppdrag: 'Oppdragsliste' };\n"
            'const KO_MIN_PROSENT = 20;\n')
+
+    #: Et rutenett av stubber: de to radene med hver sin skillelinje, de fire
+    #: vinduene, den vannrette skillelinja og stripa. `skjult` leses av
+    #: `d-none`, som er det `koTegnOppsett` faktisk setter.
+    DOM = """
+        function lagEl(id) {
+          const e = { id, innerHTML: '', style: {}, klasser: new Set(), barn: [] };
+          e.classList = { add: (k) => e.klasser.add(k), remove: (k) => e.klasser.delete(k),
+                          contains: (k) => e.klasser.has(k),
+                          toggle: (k, v) => { v ? e.klasser.add(k) : e.klasser.delete(k); } };
+          Object.defineProperty(e, 'skjult', { get: () => e.klasser.has('d-none') });
+          e.insertBefore = () => {}; e.appendChild = () => {};
+          return e;
+        }
+        const rad1Splitter = lagEl('splitter-1');
+        const rad2Splitter = lagEl('splitter-2');
+        const vannrett = lagEl('splitter-h');
+        const elementer = new Map();
+        for (const id of ['ko-rad-1', 'ko-rad-2', 'ko-skjulte', 'ko-vindu-hendelser',
+                          'ko-vindu-logg', 'ko-vindu-ressurser', 'ko-vindu-oppdrag']) {
+          elementer.set(id, lagEl(id));
+        }
+        elementer.get('ko-rad-1').querySelector = () => rad1Splitter;
+        elementer.get('ko-rad-2').querySelector = () => rad2Splitter;
+        const el = (id) => elementer.get(id);
+        globalThis.document = {
+          getElementById: (id) => elementer.get(id) || null,
+          querySelector: (v) => (v === '.ko-splitter-h' ? vannrett
+            : elementer.get('ko-vindu-' + (v.match(/data-vindu="(\\w+)"/) || [])[1]) || null),
+          querySelectorAll: () => [],
+        };
+    """
 
     def _kjor(self, kode):
         return run_node(self.harness, kode, preamble=self.PRE).splitlines()
@@ -1172,7 +1435,8 @@ class OppsettetTests(SimpleTestCase):
             "console.log(JSON.stringify(koGyldigOppsett({rader: [['oppdrag','logg'],['ressurser','hendelser']], bredde: [5, 95], hoyde: 200})));\n")
         self.assertEqual(ut[:3], ['null', 'null', 'null'])
         self.assertEqual(json.loads(ut[3]),
-                         {'rader': [['oppdrag', 'logg'], ['ressurser', 'hendelser']], 'bredde': [20, 80], 'hoyde': 80})
+                         {'rader': [['oppdrag', 'logg'], ['ressurser', 'hendelser']],
+                          'bredde': [20, 80], 'hoyde': 80, 'skjult': []})
 
     def test_bytt_bytter_to_og_roerer_ikke_resten(self):
         ut = self._kjor(
@@ -1190,6 +1454,88 @@ class OppsettetTests(SimpleTestCase):
     def test_prosent_av_beholderen(self):
         ut = self._kjor('console.log([koProsentAv(500, 0, 1000), koProsentAv(10, 0, 1000), koProsentAv(0, 0, 0)].join(","));')
         self.assertEqual(ut[0], '50,20,50')
+
+
+    # ── Skjuling (André, 21. sep. 2026) ────────────────────────────────────
+
+    def test_det_siste_synlige_lar_seg_ikke_skjule(self):
+        """Uten regelen kunne konsollen bli tom, og da er det ingenting igjen
+        å hente noe tilbake fra utenom stripa."""
+        ut = self._kjor(
+            'let o = koStandardOppsett();\n'
+            "for (const v of ['hendelser', 'logg', 'ressurser']) o = koSkjul(o, v);\n"
+            'console.log(JSON.stringify(o.skjult));\n'
+            "console.log(koKanSkjule(o, 'oppdrag'));\n"
+            "console.log(JSON.stringify(koSkjul(o, 'oppdrag').skjult), 'urørt');\n")
+        self.assertEqual(json.loads(ut[0]), ['hendelser', 'logg', 'ressurser'])
+        self.assertEqual(ut[1], 'false')
+        self.assertEqual(ut[2], '["hendelser","logg","ressurser"] urørt')
+
+    def test_skjul_og_hent_tilbake_er_rene_regler(self):
+        ut = self._kjor(
+            'const o = koStandardOppsett();\n'
+            "const ett = koSkjul(o, 'ressurser');\n"
+            "console.log(JSON.stringify(ett.skjult), JSON.stringify(o.skjult), 'det gamle er urørt');\n"
+            "console.log(koErSkjult(ett, 'ressurser'), koErSkjult(ett, 'logg'));\n"
+            "console.log(JSON.stringify(koVisIgjen(ett, 'ressurser').skjult));\n"
+            "console.log(JSON.stringify(koSkjul(ett, 'ukjent').skjult), 'ukjent navn gjør ingenting');\n"
+            "console.log(JSON.stringify(koSkjul(ett, 'ressurser').skjult), 'to ganger er én');\n")
+        self.assertEqual(ut[0], '["ressurser"] [] det gamle er urørt')
+        self.assertEqual(ut[1], 'true false')
+        self.assertEqual(json.loads(ut[2]), [])
+        self.assertEqual(ut[3], '["ressurser"] ukjent navn gjør ingenting')
+        self.assertEqual(ut[4], '["ressurser"] to ganger er én')
+
+    def test_lagret_skjultliste_leses_som_brukerdata(self):
+        """Alle fire skjult gir ingen: lagringen skal ikke kunne bære tilbake
+        en tilstand `koKanSkjule()` har nektet i grensesnittet."""
+        ut = self._kjor(
+            "console.log(JSON.stringify(koGyldigSkjult(['logg', 'tull', 'logg'])));\n"
+            "console.log(JSON.stringify(koGyldigSkjult(['hendelser','logg','ressurser','oppdrag'])));\n"
+            "console.log(JSON.stringify(koGyldigSkjult('logg')), JSON.stringify(koGyldigSkjult(undefined)));\n")
+        self.assertEqual(json.loads(ut[0]), ['logg'])
+        self.assertEqual(json.loads(ut[1]), [])
+        self.assertEqual(ut[2], '[] []')
+
+    def test_stripa_navngir_vinduet_og_escaper(self):
+        ut = self._kjor(
+            "console.log(koSkjulteHtml({skjult: ['ressurser', 'logg']}));\n"
+            "KO_VINDUSNAVN.logg = '<b>x</b>';\n"
+            "console.log(koSkjulteHtml({skjult: ['logg']}));\n")
+        self.assertIn('Ressursoversikt', ut[0])
+        self.assertIn('Loggstrøm', ut[0])
+        self.assertIn('data-action="koVisVindu" data-arg="ressurser"', ut[0])
+        self.assertIn('&lt;b&gt;x&lt;/b&gt;', ut[1]); self.assertNotIn('<b>x</b>', ut[1])
+
+    def test_naboen_tar_plassen_og_en_tom_rad_forsvinner(self):
+        """Et skjult vindu gir plassen sin til naboen, ikke til et hull — og
+        er begge i en rad skjult, forsvinner raden."""
+        ut = self._kjor(self.DOM + """
+            koTegnOppsett(koSkjul(koStandardOppsett(), 'logg'));
+            console.log(el('ko-vindu-logg').skjult, el('ko-vindu-hendelser').skjult,
+                        el('ko-vindu-hendelser').style.flex, el('ko-rad-1').skjult,
+                        rad1Splitter.skjult, vannrett.skjult);
+            let o = koSkjul(koStandardOppsett(), 'hendelser');
+            koTegnOppsett(koSkjul(o, 'logg'));
+            console.log(el('ko-rad-1').skjult, vannrett.skjult, el('ko-rad-2').style.flex);
+            koTegnOppsett(koStandardOppsett());
+            console.log(el('ko-vindu-logg').skjult, el('ko-rad-1').skjult, vannrett.skjult,
+                        el('ko-rad-1').style.flex);
+        """)
+        self.assertEqual(ut[0], 'true false 1 1 100% false true false',
+                         'naboen tar hele raden, skillelinja mellom dem er borte')
+        self.assertEqual(ut[1], 'true true 1 1 100%', 'tom rad borte, den andre tar høyden')
+        self.assertEqual(ut[2], 'false false false 1 1 56%', 'alt tilbake')
+
+    def test_stripa_vises_bare_naar_noe_er_skjult(self):
+        ut = self._kjor(self.DOM + """
+            koTegnOppsett(koStandardOppsett());
+            console.log(el('ko-skjulte').skjult, el('ko-skjulte').innerHTML === '');
+            koTegnOppsett(koSkjul(koStandardOppsett(), 'oppdrag'));
+            console.log(el('ko-skjulte').skjult, el('ko-skjulte').innerHTML.includes('Oppdragsliste'));
+        """)
+        self.assertEqual(ut[0], 'true true')
+        self.assertEqual(ut[1], 'false true')
 
 
 @unittest.skipUnless(node_available(), 'node er ikke tilgjengelig')
@@ -1223,7 +1569,7 @@ class TavlaSierFraTilKoTests(SimpleTestCase):
             (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue', 'klokke')),
             (OPPDRAG_SENTRAL_JS, ('renderOppdrag', '_oppdragRadHtml', '_sorterOppdrag',
                                   'oppdragsnr', 'hendelsesnr', 'hastegradKlasse',
-                                  'tidSiden', '_grovMerke', '_enhetsmatrise',
+                                  'tidSiden', '_grovMerke', '_enhetsmatrise', 'enhetAvventer',
                                   '_problemMedAntall', '_medAntall', 'venterForbiTerskel',
                                   'lydTerskler', '_manglerTrinn', '_manglerMinutter')),
         ))

@@ -253,6 +253,71 @@ function koFestetHtml(linje) {
     + losne + '</div>';
 }
 
+// ── Filteret i loggstrømmen (André, 21. sep. 2026) ─────────────────────────
+//
+// «Loggstrømmen må filtreres mellom system meldinger og bruker sendte
+// meldinger.» Tre valg, huskes per nettleser som Alle | Biler | Lag i
+// ressursoversikten. **Regelen er en egen funksjon** fordi den avgjør hva
+// som vises; en `if` inne i `koTegnLogg()` lar seg ikke kjøre for seg.
+const KO_LOGGFILTER_NOKKEL = 'ko.loggfilter';
+const KO_LOGGFILTRE = ['alle', 'meldinger', 'system'];
+
+let koLoggfilter = 'alle';
+
+function koLoggfilterTreffer(linje, valg) {
+  if (valg === 'system') return linje.kilde === 'system';
+  if (valg === 'meldinger') return linje.kilde !== 'system';
+  return true;
+}
+
+function koLesLoggfilter() {
+  try {
+    const lagret = globalThis.window?.localStorage?.getItem(KO_LOGGFILTER_NOKKEL);
+    return KO_LOGGFILTRE.includes(lagret) ? lagret : 'alle';
+  } catch (e) {
+    return 'alle';
+  }
+}
+
+function koLagreLoggfilter(valg) {
+  try {
+    globalThis.window?.localStorage?.setItem(KO_LOGGFILTER_NOKKEL, valg);
+  } catch (e) {
+    // Uten lagring gjelder valget til sida lastes på nytt. Ikke en feil.
+  }
+}
+
+function koMerkLoggfilter() {
+  const boks = document.getElementById('ko-loggfilter');
+  if (!boks) return;
+  boks.querySelectorAll('[data-action="koVelgLoggfilter"]').forEach((knapp) => {
+    const aktiv = knapp.dataset.arg === koLoggfilter;
+    knapp.classList.toggle('active', aktiv);
+    knapp.setAttribute('aria-pressed', aktiv ? 'true' : 'false');
+  });
+}
+
+function koVelgLoggfilter(valg) {
+  if (!KO_LOGGFILTRE.includes(valg)) return;
+  koLoggfilter = valg;
+  koLagreLoggfilter(valg);
+  koMerkLoggfilter();
+  koTegnLogg();
+}
+
+function koStartLoggfilter() {
+  koLoggfilter = koLesLoggfilter();
+  koMerkLoggfilter();
+}
+
+// Tom strøm betyr to ting: filteret tok alt, eller det står ingenting der.
+// Teksten skal si hvilket — samme regel som `koOppdragTomMelding()`.
+function koLoggTomMelding(harLinjer) {
+  if (harLinjer && koLoggfilter === 'system') return 'Ingen systemlinjer i strømmen.';
+  if (harLinjer && koLoggfilter === 'meldinger') return 'Ingen meldinger i strømmen.';
+  return 'Ingen linjer ennå.';
+}
+
 function koTegnLogg() {
   const boks = document.getElementById('ko-logg-liste');
   if (!boks) return;
@@ -260,13 +325,16 @@ function koTegnLogg() {
   // Samme sortering som serveren: kjedens første ledd, så id — **nyeste
   // øverst** i strømmen, så det siste som skjedde står nærmest øyet uten å
   // rulle (skisse 6).
-  const rader = alle.filter(koIStrommen).sort((a, b) => (b.rot - a.rot) || (b.id - a.id));
+  const iStrommen = alle.filter(koIStrommen);
+  const rader = iStrommen.filter((l) => koLoggfilterTreffer(l, koLoggfilter))
+    .sort((a, b) => (b.rot - a.rot) || (b.id - a.id));
   const festede = alle.filter((l) => l.festet_at && !l.fjernet)
     .sort((a, b) => String(a.festet_at).localeCompare(String(b.festet_at)));
   // Hodet sier hendelsen når en står åpen i vinduet — ko-hendelser.js.
   koTegnLoggHode();
   if (rader.length === 0 && festede.length === 0) {
-    boks.innerHTML = '<p class="text-muted small p-2 mb-0">Ingen linjer ennå.</p>';
+    boks.innerHTML = '<p class="text-muted small p-2 mb-0">'
+      + escapeHtml(koLoggTomMelding(iStrommen.length > 0)) + '</p>';
     return;
   }
   const festetHtml = festede.length
@@ -768,6 +836,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const sok = document.getElementById('ko-hendelse-sok');
   if (sok) sok.addEventListener('input', koSokEndret);
   koStartVisLukkede();
+  koStartLoggfilter();
 
   // «Nytt oppdrag» starter uten hendelse hver gang det åpnes, som resten av
   // skjemaet (`nullstillNyttOppdrag`) — og arven må kunne kjøre på nytt.

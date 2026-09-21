@@ -202,6 +202,45 @@ class LoftetSkjerTests(TestCase):
             type=Enhetshendelse.AVVENTER, av=self.operator)
         self.assertIn(systemlinjer.ENHET_AVVENTER, self._koder())
 
+    def test_enhetshendelsen_henges_paa_hendelsen_oppdraget_hoerer_til(self):
+        """André, 21. sep. 2026: «det må logges i oppdrags tidslinjen at en
+        enhet blir satt på avvent — det må og komme opp i hendelsens logg».
+
+        Uten `hendelse` havner linja bare i vaktas logg, og `koIStrommen()`
+        holder enhetslinjer ute av loggstrømmen — så den som satt i H-en så
+        ingenting av at en enhet avventet hennes eget oppdrag. Alle fire
+        typene henges på: «tatt av» på et oppdrag i H5 er like mye H5s
+        situasjon, og en logg med den ene og ikke de andre leser som et hull.
+        """
+        from .models import Hendelse
+        hendelse = Hendelse.objects.create(
+            vakt=self.vakt, hendelsesnummer=1, tittel='Scenekollaps',
+            lokasjon=self.lokasjon, opprettet_av=self.operator)
+        oppdrag = self._opprett()
+        oppdrag.hendelse = hendelse
+        oppdrag.save(update_fields=['hendelse'])
+        for type_, kode in (
+                (Enhetshendelse.AVVENTER, systemlinjer.ENHET_AVVENTER),
+                (Enhetshendelse.TATT_AV, systemlinjer.ENHET_TATT_AV),
+                (Enhetshendelse.AVBRUTT, systemlinjer.ENHET_AVBROT),
+                (Enhetshendelse.RYKKET_VIDERE, systemlinjer.ENHET_RYKKET_VIDERE)):
+            with self.subTest(type=type_):
+                Enhetshendelse.objects.create(
+                    oppdrag=oppdrag, enhet=self.enhet, type=type_, av=self.operator)
+                linje = Logglinje.objects.filter(systemkode=kode).latest('pk')
+                self.assertEqual(linje.hendelse_id, hendelse.pk)
+
+    def test_uten_hendelse_staar_linja_uten_hendelse(self):
+        """Det vanlige: et oppdrag uten H-nummer skal ikke havne i noens
+        hendelseslogg."""
+        oppdrag = self._opprett()
+        Enhetshendelse.objects.create(
+            oppdrag=oppdrag, enhet=self.enhet,
+            type=Enhetshendelse.AVVENTER, av=self.operator)
+        linje = Logglinje.objects.filter(
+            systemkode=systemlinjer.ENHET_AVVENTER).latest('pk')
+        self.assertIsNone(linje.hendelse_id)
+
     def test_trenger_ressurs_er_et_flagg_og_ikke_en_linje_til(self):
         """Regel 3: én linje per ting som skjedde. «Bilen avbrøt» og
         «oppdraget trenger ny ressurs» er én hendelse sett fra hver sin

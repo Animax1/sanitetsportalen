@@ -349,6 +349,21 @@ nettleser.
       finnes bare der — `readonly` er uten virkning på `datetime-local`, og Safari
       ignorerer `color` på et deaktivert felt. Funn føres i CHANGELOG med byggnummer.
 
+### Del `ko/CLAUDE.md` og `oppdrag/CLAUDE.md` — de er på taket (21. sep. 2026)
+
+- [ ] **Begge modulfilene sprengte 22 000-taket 21. sep. 2026, og taket ble hevet i
+      `core/tests_claude_md.py` som en midlertidig avgjørelse — ikke som svaret.**
+      KO-fila sto 12 tegn under grensa og oppdragsfila 11, så én kveld med sju punkter
+      fra André kostet fire runder med å barbere prosa andre steder bare for å få plass
+      til tre nye regler. Ekte dubletter ble slått sammen underveis («bare når satt» sto
+      to steder i oppdragsfila, «feature parity» hadde egen overskrift over samme poeng
+      som åpnet sentralbordseksjonen i KO-fila, leveranselista i KO-innledningen gjentok
+      CHANGELOG), og det holdt ikke.
+      Rettingen er den samme som rota fikk 15. sep. 2026: **del filene**. KO-fila har
+      allerede tydelige kandidater — hendelsesloggen som egen flate (3 968 tegn),
+      sentralbordet i `/ko/`, og rutenettet — og oppdragsfila har frontendseksjonen
+      (5 194 tegn). Tallene i `FOR_STORE_I_DAG` skal **ned** etterpå, ikke stå.
+
 ### Teknisk gjeld — kartlagt 13. sep. 2026
 
 Underlaget er `docs/TEKNISK_GJELD.md`; det forklarer hvorfor. Rekkefølgen her er

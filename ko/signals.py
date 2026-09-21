@@ -211,6 +211,16 @@ def enhetshendelse_skrevet(sender, instance, created, **kwargs):
     **«Trenger ny ressurs» er et flagg her og ikke en linje til** (regel 3).
     De to er én hendelse sett fra hver sin side: bilen forsvant *og* oppdraget
     står uten ressurs. To linjer ville lest som to ting som skjedde.
+
+    **Linja henges på hendelsen når oppdraget hører til en** (André, 21. sep.
+    2026: «det må logges i oppdrags tidslinjen at en enhet blir satt på avvent
+    — det må og komme opp i hendelsens logg»). Uten `hendelse` havner den bare
+    i vaktas logg, og `koIStrommen()` holder enhetslinjer ute av loggstrømmen
+    — så den som satt i H5 så ingenting av at lege 02 avventet H5s eget
+    oppdrag. Alle fire typene henges på, ikke bare avventingen: «tatt av» og
+    «avbrutt» på et oppdrag i H5 er like mye H5s situasjon, og en logg som
+    hadde den ene og ikke de andre ville lest som et hull.
+    Samme kall som `knytt_oppdrag` gjør for `oppdrag_knyttet`.
     """
     if not created:
         return
@@ -228,6 +238,7 @@ def enhetshendelse_skrevet(sender, instance, created, **kwargs):
             'trenger_ressurs': bool(oppdrag.trenger_ressurs),
         },
         tidspunkt=instance.tidspunkt,
+        hendelse=oppdrag.hendelse,
     )
 
 

@@ -934,10 +934,10 @@ class SentralbordetsMatriseTests(TestCase):
         self.harness = _konst(OPPDRAG_SENTRAL_JS, 'HASTEGRAD_REKKEFOLGE') + _konst(
             OPPDRAG_SENTRAL_JS, 'MANGLER_TRINN') + build_harness((
             (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue', 'trustedHtml', '_escHtml', 'klokke')),
-            (OPPDRAG_SENTRAL_JS, ('renderOppdrag', '_oppdragRadHtml', 'oppdragsnr', 'hendelsesnr', 'venterForbiTerskel', 'lydTerskler', '_enhetsmatrise', '_grovMerke',
+            (OPPDRAG_SENTRAL_JS, ('renderOppdrag', '_oppdragRadHtml', 'oppdragsnr', 'hendelsesnr', 'venterForbiTerskel', 'lydTerskler', '_enhetsmatrise', 'enhetAvventer', '_grovMerke',
                                   'hastegradKlasse', 'tidSiden', 'mkEnhetsvalg',
                                   'mkEnhetsrader', '_enhetsknapper', 'kanAvvente', '_varsleValg',
-                                  '_lovligeOverganger', 'tidslinjeHtml', '_problemMedAntall', '_medAntall', '_grupperEnheter', '_typeRekkefolge', '_enhetskort', 'enhetskortInnmat',
+                                  '_lovligeOverganger', 'tidslinjeHtml', 'enhetshendelseTekst', '_problemMedAntall', '_medAntall', '_grupperEnheter', '_typeRekkefolge', '_enhetskort', 'enhetskortInnmat',
                                   '_sorterOppdrag', '_manglerTrinn', '_manglerMinutter')),
         ))
 
@@ -1051,10 +1051,12 @@ class SentralbordetsMatriseTests(TestCase):
         self.assertNotIn('HGSD 56', ut)
         self.assertNotIn('TYSV 3', ut, 'ikke på vakt')
         # KARM 12 står alt på oppdraget som enhet 2 — ingen igjen å varsle.
-        self.assertNotIn('Varsle enhet til', ut)
+        self.assertNotIn('Legg til', ut)
         ut = self._kjor("console.log(_varsleValg({id: 1, enheter: [{enhet_id: 1}]}));")
         self.assertIn('KARM 12', ut)
-        self.assertIn('Varsle enhet til', ut)
+        # «Legg til», ikke «Varsle enhet til» (André, 21. sep. 2026).
+        self.assertIn('>Legg til<', ut)
+        self.assertNotIn('Varsle enhet til', ut)
 
     def test_lovlige_overganger_speiler_kjeden(self):
         ut = self._kjor("""
@@ -1300,7 +1302,8 @@ class DetaljvinduetTegnesPaaNyttTests(TestCase):
         self.harness = build_harness((
             (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue', 'trustedHtml', '_escHtml', 'klokke')),
             (OPPDRAG_SENTRAL_JS, ('visOppdrag', 'oppdragsnr', 'mkEnhetsrader', '_enhetsknapper', 'kanAvvente', '_varsleValg',
-                                  'tidslinjeHtml', 'hastegradKlasse', 'tidSiden', '_delteLinjerHtml',
+                                  'tidslinjeHtml', 'enhetshendelseTekst', 'hastegradKlasse', 'tidSiden', '_delteLinjerHtml',
+                                  'flyttFraEnheter', 'enhetAvventer',
                                   '_flyttValg')),
         ))
 
@@ -1525,7 +1528,7 @@ class TidslinjeMedVarsletOgAngreTests(TestCase):
             self.skipTest('node er ikke tilgjengelig')
         self.harness = build_harness((
             (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue', 'klokke')),
-            (OPPDRAG_SENTRAL_JS, ('tidslinjeHtml',)),
+            (OPPDRAG_SENTRAL_JS, ('tidslinjeHtml', 'enhetshendelseTekst')),
         ))
 
     def test_varslet_tatt_av_og_angre_paa_siste(self):
@@ -1784,9 +1787,10 @@ class VarselbjellaTests(FlereEnheterBasis):
 
 
 class FlyttValgetTests(TestCase):
-    """«Flytt» i detaljvinduet (André, 19. sep. 2026): bare enheter **på
-    vakt** som ikke alt står på oppdraget — samme utvalg som «Varsle enhet
-    til» og det serveren godtar — og «Fra»/«Til» står skrevet."""
+    """«Flytt» i detaljvinduet (André, 19. sep. 2026): «Til» er enheter **på
+    vakt** som ikke alt står på oppdraget — samme utvalg som «Legg til» og det
+    serveren godtar. «Fra» er de som **fortsatt har** oppdraget (21. sep.
+    2026). Begge ordene står skrevet."""
 
     def setUp(self):
         from patients.js_test_utils import (
@@ -1795,7 +1799,7 @@ class FlyttValgetTests(TestCase):
             self.skipTest('node er ikke tilgjengelig')
         self.harness = build_harness((
             (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue')),
-            (OPPDRAG_SENTRAL_JS, ('_flyttValg',)),
+            (OPPDRAG_SENTRAL_JS, ('_flyttValg', 'flyttFraEnheter')),
         ))
 
     STUBB = """
@@ -1828,6 +1832,39 @@ class FlyttValgetTests(TestCase):
         self.assertIn('id="flytt-fra"', ut)
         self.assertIn('value="4"', ut)
         self.assertNotIn('value="2"', ut.split('id="flytt-enhet"')[1], 'B står alt på oppdraget')
+
+    def test_fra_viser_bare_dem_som_fortsatt_har_oppdraget(self):
+        """André, 21. sep. 2026: «fra lista viser alle biler — fra lista må
+        bare vise biler som har oppdraget». Koblingsraden blir stående når en
+        bil melder seg `Ledig` (stemplene hennes skal bevares), og hun sto
+        derfor igjen i «Fra» på et oppdrag hun var ferdig med."""
+        ut = self._kjor("{id: 9, enhet_navn: 'A', enheter: ["
+                        "{enhet_id: 1, enhet_navn: 'A', status: 'ledig'},"
+                        "{enhet_id: 2, enhet_navn: 'B', status: 'fremme'}]}")
+        fra = ut.split('id="flytt-enhet"')[0]
+        self.assertNotIn('>A<', fra, 'A er ferdig med oppdraget')
+        self.assertIn('fw-semibold">B<', fra, 'én igjen: «fra» er gitt og vises som tekst')
+        self.assertNotIn('id="flytt-fra"', ut, 'ett valg er ikke et nedtrekk')
+
+    def test_to_som_fortsatt_har_det_gir_nedtrekk_med_begge(self):
+        ut = self._kjor("{id: 9, enhet_navn: 'A', enheter: ["
+                        "{enhet_id: 1, enhet_navn: 'A', status: 'venter'},"
+                        "{enhet_id: 2, enhet_navn: 'B', status: 'fremme'},"
+                        "{enhet_id: 4, enhet_navn: 'D', status: 'ledig'}]}")
+        fra = ut.split('id="flytt-enhet"')[0]
+        self.assertIn('id="flytt-fra"', ut)
+        self.assertIn('>A<', fra); self.assertIn('>B<', fra)
+        self.assertNotIn('>D<', fra, 'D er ferdig')
+
+    def test_ingen_har_oppdraget_gir_ingen_flytting(self):
+        """Er alle radene `Ledig`, er det ingenting å flytte *fra* — og veien
+        videre er å varsle en ny enhet, ikke et nedtrekk som ikke virker."""
+        ut = self._kjor("{id: 9, enhet_navn: 'A', enheter: ["
+                        "{enhet_id: 1, enhet_navn: 'A', status: 'ledig'}]}")
+        self.assertIn('Legg til', ut)
+        self.assertNotIn('id="flytt-fra"', ut)
+        self.assertNotIn('id="flytt-enhet"', ut)
+        self.assertNotIn('data-action="flyttOppdrag"', ut)
 
     def test_ingen_kandidater_sier_det_og_har_ingen_knapp(self):
         ut = self._kjor("{id: 9, enhet_navn: 'A', enheter: [{enhet_id: 1, enhet_navn: 'A'}, {enhet_id: 2, enhet_navn: 'B'}, {enhet_id: 4, enhet_navn: 'D'}]}")

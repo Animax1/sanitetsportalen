@@ -232,7 +232,7 @@ class AvbruttIListaJsTests(SimpleTestCase):
 
     HARNESS = (
         (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue', 'klokke')),
-        (OPPDRAG_SENTRAL_JS, ('_enhetsmatrise', 'tidSiden', '_manglerTrinn',
+        (OPPDRAG_SENTRAL_JS, ('_enhetsmatrise', 'enhetAvventer', 'tidSiden', '_manglerTrinn',
                               '_manglerMinutter')),
     )
 

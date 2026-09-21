@@ -756,6 +756,17 @@ def avvent_oppdrag(oppdrag, enhet, *, bruker=None, tidspunkt=None) -> Enhetshend
         raise UlovligOvergang('Enheten er ikke varslet på oppdraget.')
     if rad.status != choices.VENTER:
         raise UlovligOvergang('Avvente finnes bare før enheten har rykket ut.')
+    # **Idempotent på en som alt avventer** (21. sep. 2026). Raden blir
+    # stående i `Venter` — det er hele poenget — så ingenting i sjekkene over
+    # stopper trykk nummer to, og hun kom da to ganger i tidslinjen og to
+    # ganger i hendelsens logg. Klienten skjuler knappen, men et endepunkt som
+    # er trygt bare fordi knappen er borte, er ikke trygt: `visOppdrag()` kan
+    # tegne på en liste som er et poll gammel, og offline-køen sender på nytt.
+    # Den gjeldende hendelsen returneres, så kalleren ser det samme som før.
+    if enhet.pk in avventende_enhet_ider(oppdrag):
+        return (oppdrag.enhetshendelser
+                .filter(enhet=enhet, type=Enhetshendelse.AVVENTER)
+                .latest('tidspunkt', 'pk'))
     naa = tidspunkt or timezone.now()
     hendelse = Enhetshendelse.objects.create(
         oppdrag=oppdrag, enhet=enhet, type=Enhetshendelse.AVVENTER,
