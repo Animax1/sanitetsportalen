@@ -581,7 +581,8 @@ def start_oppdrag(oppdrag, *, bruker=None, tidspunkt=None,
                     tidspunkt=naa, automatisk=True, enhet=rad.enhet)
         Enhetshendelse.objects.create(
             oppdrag=forrige, enhet=rad.enhet, type=Enhetshendelse.RYKKET_VIDERE,
-            tidspunkt=naa, av=bruker, detalj=oppdragsnr(oppdrag.oppdragsnummer))
+            tidspunkt=naa, av=bruker, detalj=oppdragsnr(oppdrag.oppdragsnummer),
+            varslet_at=pagaende.varslet_at)
 
     les_bjellevarselet(oppdrag, rad)
     return sett_status(oppdrag, choices.RYKKER_UT, bruker=bruker,
@@ -758,7 +759,7 @@ def avvent_oppdrag(oppdrag, enhet, *, bruker=None, tidspunkt=None) -> Enhetshend
     naa = tidspunkt or timezone.now()
     hendelse = Enhetshendelse.objects.create(
         oppdrag=oppdrag, enhet=enhet, type=Enhetshendelse.AVVENTER,
-        tidspunkt=naa, av=bruker)
+        tidspunkt=naa, av=bruker, varslet_at=rad.varslet_at)
     if trenger_ny_ressurs(oppdrag, utenom_rad=rad):
         oppdrag.trenger_ressurs = True
         oppdrag.trenger_ressurs_siden = naa
@@ -920,7 +921,7 @@ def avbryt_oppdrag(oppdrag, *, bruker=None, tidspunkt=None,
                           forsinket=forsinket, enhet=rad.enhet, avbrutt=True)
     Enhetshendelse.objects.create(
         oppdrag=oppdrag, enhet=rad.enhet, type=Enhetshendelse.AVBRUTT,
-        tidspunkt=naa, av=bruker)
+        tidspunkt=naa, av=bruker, varslet_at=rad.varslet_at)
     return melding
 
 
@@ -1042,10 +1043,13 @@ def ta_av_enhet(oppdrag, enhet, *, bruker=None) -> None:
             'meld ledig i stedet.')
     if oppdrag.enheter.count() == 1:
         raise ValueError('Oppdraget må ha minst én enhet.')
+    varslet_at = rad.varslet_at
     rad.delete()
-    # Sporet i tidslinjen: raden er borte, hendelsen står.
+    # Sporet i tidslinjen: raden er borte, hendelsen står — med varslingstida,
+    # som ellers gikk tapt med raden (statistikk 7b).
     Enhetshendelse.objects.create(
-        oppdrag=oppdrag, enhet=enhet, type=Enhetshendelse.TATT_AV, av=bruker)
+        oppdrag=oppdrag, enhet=enhet, type=Enhetshendelse.TATT_AV, av=bruker,
+        varslet_at=varslet_at)
     if oppdrag.enhet_id == enhet.pk:
         # Den gamle kolonnen (deploy 1) skal peke på en som fortsatt er der.
         oppdrag.enhet = oppdrag.primaer.enhet

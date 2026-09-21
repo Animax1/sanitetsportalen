@@ -44,6 +44,15 @@ HTML_BUILDERS = (
     # gjennomgang som resten.
     'mkOppdragTiderTabell',
     'mkOppdragSdTabell',
+    # Pulje 7b (21. sep. 2026). Konkordanstabellen bygger egen markup;
+    # resten sender rader til mkStatsTable().
+    'mkVentetidTabell',
+    'mkAldriRykketTabell',
+    'mkKonkordansTabell',
+    'mkAvreistTabell',
+    'mkAnnetStedTabell',
+    'mkUtfallTabell',
+    'mkHendelserTabell',
 )
 
 # Funksjoner som escaper – en interpolasjon som starter med én av disse er OK.
@@ -180,7 +189,11 @@ class StatsEscapingBehaviourTests(SimpleTestCase):
         (PORTAL_UTILS_JS, ('escHtmlValue', 'trustedHtml', 'cellHtml', 'fmtMin')),
         (STATISTIKK_JS, ('mkStatsTable', 'mkCrosstab', 'mkObsTable',
                          'mkInterpretation')),
-        (STATISTIKK_OPPDRAG_JS, ('_sdRad', 'mkOppdragSdTabell')),
+        (STATISTIKK_OPPDRAG_JS, ('_sdRad', 'mkOppdragSdTabell', '_medianP90',
+                                 'mkVentetidTabell', 'mkAldriRykketTabell',
+                                 'mkKonkordansTabell', 'mkAvreistTabell',
+                                 'mkAnnetStedTabell', 'mkUtfallTabell',
+                                 'mkHendelserTabell')),
     )
 
     XSS = '<img src=x onerror=alert(1)>'

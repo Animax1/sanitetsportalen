@@ -146,8 +146,8 @@ sammen, og som alle tre er *flagget på enhetstypen*, ikke på enheten:
 
 **Flagget står på typen fordi det er en egenskap ved *slaget* ressurs, ikke ved bilen.**
 Spesialressurser (lege, psykososialt) går bakvakt; ambulanser gjør det ikke. Sto flagget
-på hver enhet, måtte det settes på nytt for hver bil som opprettes, og en glemt avkryssing
-ville sett ut som en bevisst beslutning. To *separate* flagg, ikke ett: å avvente et
+på hver enhet, måtte det settes for hver bil som opprettes, og en glemt avkryssing ville
+sett ut som en beslutning. To *separate* flagg, ikke ett: å avvente et
 oppdrag og å sove i bakvakt er to ulike ting, og en ressurs kan gjøre det ene uten det
 andre.
 
@@ -161,9 +161,8 @@ hun står på et oppdrag. Er hun aktiv, står det ingenting ekstra.
 `gjeldende_modus(enhet)` på koblingsraden. Leste vi enhetens `passiv_vakt` når statistikken
 ble regnet ut, ville et oppdrag hun kjørte i passiv vakt hoppet over til «aktiv» i det hun
 gikk aktiv neste morgen — og hele poenget med å dokumentere passiv tid ville vært borte.
-**Broen i `Oppdrag.save()` stempler den også**: den lager den *første* koblingsraden for et
-oppdrag opprettet med `enhet` satt, og uten stempelet der talte `oppdrag_i_passiv` bare
-enheter som ble lagt til etterpå. (Funnet av en mutant, ikke av en test — se CHANGELOG.)
+**Broen i `Oppdrag.save()` stempler den også** — den lager den *første* koblingsraden, og
+uten stempelet talte `oppdrag_i_passiv` bare enheter lagt til etterpå (funnet av en mutant).
 
 **`Vaktmodusperiode` er den andre halvparten av svaret.** Stempelet sier hva som gjaldt for
 *ett oppdrag*; perioden sier hvor mange *timer* hun sto passiv, også de timene ingenting
@@ -178,8 +177,8 @@ ikke rykker ut nå (`Enhetshendelse.AVVENTER`) — hun **blir stående varslet**
 og operatøren kan trykke «Rykk ut» senere. Begge deler står i loggen. Derfor teller hun
 **ikke** som «noen er på vei» i `trenger_ny_ressurs`: står hun avventende alene på
 oppdraget, skal det stå «trenger ny ressurs», som er hele grunnen til at spørsmålet stilles.
-`avventende_enhet_ider()` leser siste hendelse per enhet, så en enhet som avventet og
-deretter rykket ut ikke blir stående merket. `avventer_av_bulk()` finnes fordi tavla polles
+`avventende_enhet_ider()` leser siste hendelse per enhet, så den som avventet og så rykket
+ut ikke blir stående merket. `avventer_av_bulk()` finnes fordi tavla polles
 hvert tiende sekund, samme grunn som `avbrutt_av_bulk`.
 
 **Avbrutt-merket kvitteres** (`kvittert_at`/`kvittert_av` på `Enhetshendelse`). Det forsvant
@@ -189,11 +188,12 @@ se. To veier ut: operatøren trykker «Kvitter» i merket, eller **en ny enhet v
 og `avbrutt_av_bulk` filtrerer på `kvittert_at__isnull=True`.
 
 **Arkivet bærer modusen** (`ArkivertOppdrag.varslet_modus`), og den står i SHA-payloaden
-**bare når den er satt** — nøyaktig som `behandlet_at`. Rader for enheter uten passiv vakt,
-som er de fleste, får samme payload som før, og eldre signaturer verifiserer uendret.
+**bare når den er satt** — som `behandlet_at`, og som `varslet_at`, `grovsortering`,
+`avreist_til` og `enhetshendelser` fra statistikk 7b (21. sep. 2026, `statistikk/CLAUDE.md`).
+Eldre signaturer verifiserer uendret. `Enhetshendelse.varslet_at` settes for alle typer:
+raden slettes ved tatt av, og hendelsen må selv huske hvor lenge hun sto bundet.
 Statistikken har `enheter_passiv`, `passiv_timer` og `oppdrag_i_passiv`; de to første er
-**live-tall** og finnes ikke i arkivet (som `enheter_pa_vakt`), mens det tredje overlever
-arkiveringen fordi stempelet ligger på radene.
+**live-tall** og finnes ikke i arkivet, det tredje overlever fordi stempelet ligger på radene.
 
 **Flaggene krysses av i «Valglister» → Enhetstyper**, gjennom `Verdimengde.ekstra` —
 samme mekanisme som `kategori` og `med_antall` på en problemstilling. Å *sette opp* hva en

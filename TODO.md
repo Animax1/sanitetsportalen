@@ -607,11 +607,15 @@ enhetens egen skjerm, og **sentralbordet flytter til KO** — en flytting av
 `oppdrag-sentral-*.js`, ikke en kopi. Puljene står i §10.
 
 - [ ] **Pulje 7 — statistikk fra KO.** Forslaget står i
-      [`docs/FORSLAG_KO_STATISTIKK.md`](./docs/FORSLAG_KO_STATISTIKK.md) (21. sep. 2026):
-      hendelsesbildet (tid til første ressurs, lagtimer, løst uten utrykning, samtidighet),
-      loggen (rettinger, deling, stillhet), oppdragsfanen utvidet (avreist til,
-      hastegrad × grovsortering, oppdrag uten ressurs, p90) og belastning mot bemanning.
-      Fem spørsmål i §8 venter på André; 7a og 7b kan bygges uavhengig når de er besvart.
+      [`docs/FORSLAG_KO_STATISTIKK.md`](./docs/FORSLAG_KO_STATISTIKK.md) (21. sep. 2026).
+      **7b (oppdragsfanen) er bygget** samme dag. Igjen: **7a** KO-fanen — hendelsesbildet
+      (tid til første ressurs, lagtimer, hvem løste hendelsen, samtidighet, eskaleringer)
+      og loggen (rettinger, deling, stillhet); krever `HendelseLag.til`. **7c** belastning
+      mot bemanning (linjene i kø-grafen, enhetsutnyttelse); krever vaktlistas ressurser
+      koblet til enhetene. **7d** sammenligning mellom vakter, tidslinje, vaktrapport.
+      Skissene S4/S5 er valgt (tabell for «hvem løste»). Åpent fra §8: per ansvarsområde
+      og ikke per person i loggtallene, felt for forventet publikum, og om sammenligningen
+      er «siste n» eller fritt valg.
 
 - [ ] **Fjerne sentralbordet fra `/oppdrag/`** — «avvente inntil videre, men noe å se på»
       (André, 19. sep. 2026), og fra 18. sep.: «når KO er prøvd på en ekte vakt». Notatet §7

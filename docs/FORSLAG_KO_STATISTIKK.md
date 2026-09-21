@@ -148,7 +148,7 @@ skal stå én setning øverst som sier hvorfor. Det er det eneste som hindrer fe
 | Pulje | Innhold | Avhenger av |
 |---|---|---|
 | 7a | `ko/statistikk.py`: A1–A8, B1–B5; fanen «KO» med `statistikk-ko.js`; p90 i `_sd` | `HendelseLag.til` (liten migrasjon) |
-| 7b | Oppdragsfanen utvidet: C8 først, så C1–C6 med C4/C4b/C4c | ingenting |
+| 7b | **Bygget 21. sep. 2026.** Oppdragsfanen utvidet: C8, C1–C6 med C4/C4b/C4c. C7 venter på 7c | ingenting |
 | 7c | D1–D3 og C7: vaktlista inn | at vaktlistas ressurser er koblet til enhetene |
 | 7d | Sammenligning mellom vakter, tidslinja og vaktrapporten | 7a–7c, og utskriften i TODO |
 
@@ -163,5 +163,8 @@ i hver sin økt.
 4. C2 heter «triagekonkordans» her — hva vil dere kalle det på skjermen? Ordet skal ikke
    lyde som en karakter på bilen.
 5. Sammenligning mellom vakter: er det de siste *n* vaktene, eller velger man selv?
-6. Hastegraden som mangler (C8): er det smultringen, tabellen «Responstid per hastegrad»,
-   eller begge? Jeg ser bare fargekartet og sorteringen i koden.
+6. ~~Hastegraden som mangler (C8)~~ — begge fikk alle fem (21. sep.).
+
+**Valgt 21. sep. 2026, fra skissene:** ventetida som både stolper og tabell (S1 A+B), «hvem
+løste hendelsen» som tabell (S4 A), navnet «Meldt hastegrad (KO) × bilens grovsortering».
+Spørsmål 2, 3 og 5 står åpne.

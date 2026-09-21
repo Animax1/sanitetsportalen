@@ -88,6 +88,10 @@ TEMAER: dict[str, dict[str, str]] = {
         'sentralbord': 'operatørens side, oppdragslista, tidslinja',
         'statusmaskin': 'overganger, stemplinger, passiv vakt, avvente',
     },
+    'statistikk': {
+        'oppdragsfanen': 'oppdragsfanen på /statistikk/: tidsledd, ventetida i to, køen, KO mot bilen, p90',
+        'ko': 'KO-fanen: hendelsesbildet, loggen, belastning mot bemanning — forslaget',
+    },
     'vaktliste': {
         'belastning': 'timer, budsjett, tak, hvile, timeoversikt',
         'offline': 'service worker, køen, fil på e-post, reserven',

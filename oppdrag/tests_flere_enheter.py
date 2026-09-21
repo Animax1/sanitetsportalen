@@ -1225,7 +1225,9 @@ class ArkivOgStatistikkMedFlereEnheterTests(FlereEnheterBasis):
         self.assertEqual(s['summary']['responstid']['n'], 2)
         self.assertEqual(s['summary']['responstid']['min'], 10.0)
         self.assertEqual(s['summary']['responstid']['max'], 20.0)
-        self.assertEqual(dict(_flat(s['per_hastegrad'])), {'Akutt': 1}, 'ett oppdrag, ikke to')
+        # Alle fem hastegradene står der fra 7b (C8), også de på null.
+        self.assertEqual(dict(_flat(s['per_hastegrad']))['Akutt'], 1, 'ett oppdrag, ikke to')
+        self.assertEqual(sum(dict(_flat(s['per_hastegrad'])).values()), 1)
         self.assertEqual(dict(_flat(s['per_enhet'])), {'Haugesund 56': 1, 'Karmøy 12': 1})
         status = {r['status']: r['antall'] for r in s['status_naa']}
         self.assertEqual(status[choices.FREMME], 1, 'oppdragets status er den mest aktive')

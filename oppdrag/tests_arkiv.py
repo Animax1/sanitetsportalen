@@ -50,8 +50,10 @@ class ArkivBasis(TestCase):
         oppdrag = Oppdrag.objects.create(
             vakt=vakt, oppdragsnummer=services.neste_oppdragsnummer(vakt),
             **felter)
-        Oppdrag.objects.filter(pk=oppdrag.pk).update(
-            created_at=self.naa - timedelta(minutes=minutter_siden))
+        opprettet = self.naa - timedelta(minutes=minutter_siden)
+        Oppdrag.objects.filter(pk=oppdrag.pk).update(created_at=opprettet)
+        # Som i tests_statistikk: varslingen er samtidig med opprettelsen.
+        oppdrag.enheter.update(varslet_at=opprettet)
         oppdrag.refresh_from_db()
         return oppdrag
 

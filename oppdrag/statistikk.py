@@ -40,7 +40,9 @@ verdimengdene i ``choices.py``).
 """
 from __future__ import annotations
 
+import math
 import statistics as smod
+from datetime import datetime, timedelta
 
 from django.db.models import Prefetch
 from django.utils import timezone
@@ -48,8 +50,19 @@ from django.utils import timezone
 from core.stats import BaseStatistikkHandler, register
 
 from . import choices
-from .models import Enhet, Oppdrag, Oppdragsenhet, Statusmelding
+from .models import Enhet, Enhetshendelse, Oppdrag, Oppdragsenhet, Statusmelding
 from .services import utledet_av_statuser
+
+#: Hendelsestypene som kan la et oppdrag stå uten ressurs (pulje 7b). «Tatt
+#: av» er ikke med: den nekter å ta den siste, så noen står alltid igjen.
+_AVGANGER = (Enhetshendelse.AVBRUTT, Enhetshendelse.RYKKET_VIDERE,
+             Enhetshendelse.AVVENTER)
+
+#: Rangen hastegrad og grovsortering deles om (C2): «bilen fant det mer
+#: alvorlig» er en lavere rang enn meldt. Drift og Plassering har ingen
+#: pasient og står utenfor tabellen.
+_HASTEGRAD_RANG = {'Akutt': 0, 'Haster': 1, 'Vanlig': 2}
+_GROV_RANG = {'rod': 0, 'gul': 1, 'gronn': 2}
 
 #: Status → kolonnenavn på `ArkivertOppdrag`. Kartet er det ene stedet de to
 #: er koblet: `ArkivOppdragsstatusKolonnerTests` går gjennom statusene og
@@ -65,17 +78,47 @@ _STATUSFELT = {
 }
 
 
+def _p90(verdier):
+    """90-persentilen som nærmeste rang: verdien 90 % av målingene ligger
+    under eller på. Ikke interpolert — «90 % av akutte hadde bil fremme innen
+    7 min» skal peke på en måling som finnes."""
+    sortert = sorted(verdier)
+    return sortert[max(0, math.ceil(0.9 * len(sortert)) - 1)]
+
+
 def _sd(verdier):
-    """Sammendrag av en liste varigheter i minutter."""
+    """Sammendrag av en liste varigheter i minutter.
+
+    `p90` fra pulje 7b (21. sep. 2026): snittet dras av ett utlegg, og
+    medianen sier ingenting om halen. Pasientfanens `sd()` har ikke nøkkelen;
+    `_sdRad()` i JS tåler at den mangler.
+    """
     if not verdier:
-        return {'n': 0, 'mean': None, 'median': None, 'min': None, 'max': None}
+        return {'n': 0, 'mean': None, 'median': None, 'p90': None,
+                'min': None, 'max': None}
     return {
         'n': len(verdier),
         'mean': round(smod.mean(verdier), 1),
         'median': round(smod.median(verdier), 1),
+        'p90': round(_p90(verdier), 1),
         'min': round(min(verdier), 1),
         'max': round(max(verdier), 1),
     }
+
+
+def _i_hastegradrekkefolge(teller):
+    """Dict i AMK-rekkefølge, alle fem hastegradene med — også de på null.
+
+    C8 (André, 21. sep. 2026: «det mangler en hastegrad»). Sortert på antall
+    byttet smultringen rekkefølge fra vakt til vakt, og en hastegrad uten
+    oppdrag forsvant fra tegningen. Ukjente verdier — data fra før en
+    hastegrad ble omdøpt — legges sist, synkende.
+    """
+    ut = {h: teller.get(h, 0) for h in choices.HASTEGRAD}
+    for navn, antall in _sortert_synkende(
+            {k: v for k, v in teller.items() if k not in ut}).items():
+        ut[navn] = antall
+    return ut
 
 
 def _sortert_synkende(teller):
@@ -134,13 +177,15 @@ def rader_for_vakt(vakt):
     åpen fane — det er den samme regningen som gjorde pasientlista til appens
     dyreste sti før den fikk `select_related`.
     """
-    from .arkiv import _per_enhet
+    from .arkiv import _per_enhet, avreist_sted, enhetshendelser_for
 
     oppdragene = list(
         Oppdrag.objects
         .filter(vakt=vakt)
         .select_related('enhet', 'lokasjon')
-        .prefetch_related(Prefetch('enheter', Oppdragsenhet.objects.select_related('enhet')))
+        .prefetch_related(
+            Prefetch('enheter', Oppdragsenhet.objects.select_related('enhet')),
+            Prefetch('enhetshendelser', Enhetshendelse.objects.select_related('enhet')))
         .order_by('oppdragsnummer')
     )
     meldinger = Statusmelding.objects.gjeldende_bulk([o.pk for o in oppdragene])
@@ -150,7 +195,10 @@ def rader_for_vakt(vakt):
     # antall oppdrag telles distinkt i `_stats_fra_rader`.
     rader = []
     for oppdrag in oppdragene:
-        for enhetsnavn, status, gjeldende, modus in _per_enhet(oppdrag, meldinger[oppdrag.pk]):
+        hendelser = enhetshendelser_for(oppdrag)
+        for enhetsnavn, status, gjeldende, modus, varslet_at in _per_enhet(
+                oppdrag, meldinger[oppdrag.pk]):
+            sted, sted_tekst = avreist_sted(gjeldende)
             rader.append({
                 'oppdragsnummer': oppdrag.oppdragsnummer,
                 'hastegrad': oppdrag.hastegrad,
@@ -165,8 +213,21 @@ def rader_for_vakt(vakt):
                 # den peker på, og regelen bor i manageren.
                 'tider': {m.status: (m.tidspunkt, m.automatisk) for m in gjeldende},
                 'forsinket': sum(1 for m in gjeldende if m.forsinket),
+                # Pulje 7b. Radens: når *hun* ble varslet, og hvor hun dro.
+                # Oppdragets, gjentatt per rad som hastegraden: bilens
+                # grovsortering og enhetshendelsene.
+                'varslet_at': varslet_at,
+                'avreist_til': sted,
+                # Bare live — fritekst fryses ikke i arkivet.
+                'avreist_til_tekst': sted_tekst,
+                'grovsortering': oppdrag.grovsortering or '',
+                'enhetshendelser': hendelser,
             })
     return rader
+
+
+def _fra_iso(verdi):
+    return datetime.fromisoformat(verdi) if verdi else None
 
 
 def rader_for_arkiv(arkiv):
@@ -193,6 +254,15 @@ def rader_for_arkiv(arkiv):
             'opprettet': rad.opprettet_at,
             'tider': tider,
             'forsinket': rad.antall_forsinket,
+            'varslet_at': rad.varslet_at,
+            'avreist_til': rad.avreist_til or '',
+            'avreist_til_tekst': '',
+            'grovsortering': rad.grovsortering or '',
+            'enhetshendelser': [
+                {**h, 'tidspunkt': _fra_iso(h.get('tidspunkt')),
+                 'varslet_at': _fra_iso(h.get('varslet_at'))}
+                for h in (rad.enhetshendelser or [])
+            ],
         })
     return rader
 
@@ -239,12 +309,16 @@ def passiv_timer_for(vakt) -> float:
 
 
 def arkiv_stats(arkiv):
-    """Full statistikk for et arkiv, regnet fra de frosne radene."""
-    return _stats_fra_rader(rader_for_arkiv(arkiv))
+    """Full statistikk for et arkiv, regnet fra de frosne radene.
+
+    Et oppdrag som fortsatt ventet da vakta ble arkivert, ventet fram til
+    arkiveringen — ikke fram til nå, som kan være to år senere.
+    """
+    return _stats_fra_rader(rader_for_arkiv(arkiv), naa=arkiv.importert_at)
 
 
 def _stats_fra_rader(rader, *, enheter_pa_vakt=None, enheter_passiv=None,
-                     passiv_timer=None):
+                     passiv_timer=None, naa=None):
     """Tallene, regnet på nøytrale rader fra vakta eller fra et arkiv.
 
     **En rad er én enhets innsats på ett oppdrag** (11. sep. 2026). Det som
@@ -308,8 +382,10 @@ def _stats_fra_rader(rader, *, enheter_pa_vakt=None, enheter_passiv=None,
             oppdragstid_per_problem.setdefault(
                 problemstilling, []).append(oppdragstid)
 
-        gruppe = per_oppdrag.setdefault(rad['oppdragsnummer'], {'rad': rad, 'statuser': []})
+        gruppe = per_oppdrag.setdefault(
+            rad['oppdragsnummer'], {'rad': rad, 'statuser': [], 'rader': []})
         gruppe['statuser'].append(rad['status'])
+        gruppe['rader'].append(rad)
 
     # Oppdragets egne tall — én gang per nummer, uansett hvor mange biler.
     for gruppe in per_oppdrag.values():
@@ -324,6 +400,11 @@ def _stats_fra_rader(rader, *, enheter_pa_vakt=None, enheter_passiv=None,
 
     fullforte = status_naa.get(choices.TERMINAL, 0)
     total = len(per_oppdrag)
+
+    # Pulje 7b (21. sep. 2026). Hver del er en egen funksjon med egne tester
+    # — de er regler, og en `if` inne i løkka over lar seg ikke prøve alene.
+    naa = naa or timezone.now()
+    vente = _ventetid_og_koe(per_oppdrag, var, naa)
 
     return {
         'summary': {
@@ -358,12 +439,14 @@ def _stats_fra_rader(rader, *, enheter_pa_vakt=None, enheter_passiv=None,
             {'status': status, 'navn': navn, 'antall': status_naa.get(status, 0)}
             for status, navn in choices.STATUS_VALG
         ],
-        'per_hastegrad': _sortert_synkende(per_hastegrad),
+        'per_hastegrad': _i_hastegradrekkefolge(per_hastegrad),
         'per_problemstilling': _sortert_synkende(per_problemstilling),
         'per_lokasjon': _sortert_synkende(per_lokasjon),
         'per_enhet': _sortert_synkende(per_enhet),
         'responstid_per_hastegrad': {
-            navn: _sd(verdier) for navn, verdier in resp_per_hastegrad.items()},
+            navn: _sd(resp_per_hastegrad.get(navn, []))
+            for navn in _i_hastegradrekkefolge(
+                {k: len(v) for k, v in resp_per_hastegrad.items()})},
         'responstid_per_enhet': {
             navn: _sd(verdier) for navn, verdier in resp_per_enhet.items()},
         'oppdragstid_per_problemstilling': {
@@ -371,6 +454,308 @@ def _stats_fra_rader(rader, *, enheter_pa_vakt=None, enheter_passiv=None,
             for navn, verdier in sorted(oppdragstid_per_problem.items())},
         'ankomster': [
             {'time': time, 'antall': ankomster[time]} for time in range(24)],
+        # ── Pulje 7b ──
+        **vente,
+        'konkordans': _konkordans(per_oppdrag),
+        'avreist_til': _avreist_til(rader),
+        'utfall_per_problemstilling': _utfall_per_problemstilling(per_oppdrag),
+        'enhetshendelser': _enhetshendelser(per_oppdrag),
+    }
+
+
+# ── Pulje 7b: ventetida i to, køen, hvem løste hva ─────────────────────────
+
+
+def _minutter(fra, til):
+    return (til - fra).total_seconds() / 60
+
+
+def _tid(verdi):
+    """Tidspunktet i en `(tidspunkt, automatisk)`-tuppel, eller verdien selv."""
+    return verdi[0] if isinstance(verdi, tuple) else verdi
+
+
+def _andre_aktive(hendelse, rader):
+    """Var en *annen* enhet på oppdraget da hendelsen skjedde?
+
+    Samme spørsmål som `services.trenger_ny_ressurs` stiller live, stilt i
+    ettertid på radene: varslet før, og ikke ledig ennå. En bil som selv
+    avventet er ikke på vei, som der.
+    """
+    t = hendelse['tidspunkt']
+    for rad in rader:
+        if rad['enhet'] == hendelse['enhet'] or not rad['varslet_at']:
+            continue
+        if rad['varslet_at'] > t:
+            continue
+        ledig = _tid(rad['tider'].get(choices.LEDIG))
+        if ledig is not None and ledig <= t:
+            continue
+        return True
+    return False
+
+
+def _uten_ressurs_intervaller(gruppe):
+    """``[(fra, til)]`` der oppdraget sto uten noen som tok det.
+
+    Starter ved opprettelsen og ved hver avgang som etterlot oppdraget alene;
+    slutter ved neste varsling **eller** neste «Rykker ut» — den som avventet
+    kan ombestemme seg uten at noen ny varsles. ``til`` er ``None`` mens det
+    fortsatt står.
+    """
+    rad = gruppe['rad']
+    rader = gruppe['rader']
+    starter = [rad['opprettet']]
+    for h in rad['enhetshendelser']:
+        if h['type'] in _AVGANGER and not _andre_aktive(h, rader):
+            starter.append(h['tidspunkt'])
+    slutter = sorted(
+        [r['varslet_at'] for r in rader if r['varslet_at']]
+        + [_tid(r['tider'][choices.RYKKER_UT]) for r in rader
+           if choices.RYKKER_UT in r['tider']])
+    ut = []
+    for fra in sorted(starter):
+        # `>=`, ikke `>`: opprettet *med* enhet har varslingen i samme
+        # øyeblikk, og da er KO-ventetida null — ikke tida til Rykker ut.
+        til = next((t for t in slutter if t >= fra), None)
+        ut.append((fra, til))
+    return ut
+
+
+def _tildelt_venter_intervaller(gruppe):
+    """``[(fra, til, enhet)]`` der en enhet var varslet og ennå ikke rykket ut."""
+    ut = []
+    for r in gruppe['rader']:
+        if not r['varslet_at']:
+            continue
+        slutt = _tid(r['tider'].get(choices.RYKKER_UT)) or _tid(r['tider'].get(choices.LEDIG))
+        ut.append((r['varslet_at'], slutt, r['enhet']))
+    for h in gruppe['rad']['enhetshendelser']:
+        # Raden er slettet; hendelsen bærer varslingstida (0030).
+        if h['type'] == Enhetshendelse.TATT_AV and h['varslet_at']:
+            ut.append((h['varslet_at'], h['tidspunkt'], h['enhet']))
+    return ut
+
+
+def _timebolker(intervaller, naa):
+    """Per klokketime: hvor mange intervaller var åpne, og lengste ventetid.
+
+    Lengste er hvor lenge den som hadde ventet lengst hadde ventet ved
+    timens slutt (eller ved sitt eget slutt). Et åpent intervall løper til
+    ``naa``. Kappes ved 168 timer — en rad med et umulig tidspunkt skal ikke
+    låse endepunktet.
+    """
+    antall = {t: 0 for t in range(24)}
+    lengste = {t: 0.0 for t in range(24)}
+    for fra, til, *_ in intervaller:
+        til = til or naa
+        if til <= fra:
+            continue
+        t = timezone.localtime(fra).replace(minute=0, second=0, microsecond=0)
+        steg = 0
+        while t < til and steg < 168:
+            neste = t + timedelta(hours=1)
+            antall[t.hour] += 1
+            lengste[t.hour] = max(lengste[t.hour], _minutter(fra, min(til, neste)))
+            t = neste
+            steg += 1
+    return antall, lengste
+
+
+def _ventetid_og_koe(per_oppdrag, var, naa):
+    """C4, C4b og C4c — ventetida delt i to, køen per time, og de som aldri
+    rykket ut. Se `docs/FORSLAG_KO_STATISTIKK.md`."""
+    ko_vente, ko_per_hastegrad = [], {}
+    reaksjon, reaksjon_passiv = [], []
+    reaksjon_per_hastegrad, reaksjon_per_enhet = {}, {}
+    uten, tildelt = [], []
+    aldri_rykket = []
+    etter_avgang = 0
+    lengste_uten = None
+
+    for nummer, gruppe in per_oppdrag.items():
+        rad = gruppe['rad']
+        hastegrad = rad['hastegrad']
+
+        intervaller = _uten_ressurs_intervaller(gruppe)
+        if len(intervaller) > 1:
+            etter_avgang += 1
+        for fra, til in intervaller:
+            uten.append((fra, til))
+            minutter = _minutter(fra, til or naa)
+            if til is not None:
+                ko_vente.append(minutter)
+                ko_per_hastegrad.setdefault(hastegrad, []).append(minutter)
+            if minutter > 0 and (lengste_uten is None or minutter > lengste_uten['minutter']):
+                lengste_uten = {
+                    'minutter': round(minutter, 1), 'oppdragsnummer': nummer,
+                    'hastegrad': hastegrad, 'fra': fra.isoformat(),
+                    'paagaar': til is None,
+                }
+
+        tildelt.extend(_tildelt_venter_intervaller(gruppe))
+
+        for r in gruppe['rader']:
+            if not r['varslet_at']:
+                continue
+            rykker_ut = r['tider'].get(choices.RYKKER_UT)
+            if rykker_ut is None:
+                if choices.LEDIG in r['tider']:
+                    aldri_rykket.append({
+                        'oppdragsnummer': nummer, 'hastegrad': hastegrad,
+                        'problemstilling': r['problemstilling'], 'enhet': r['enhet'],
+                        'sto_i': round(_minutter(r['varslet_at'],
+                                                 _tid(r['tider'][choices.LEDIG])), 1),
+                        'endte': 'Meldt ledig uten å rykke ut',
+                    })
+                continue
+            minutter = var.minutter(r['varslet_at'], rykker_ut)
+            if minutter is None:
+                continue
+            if r.get('varslet_modus') == 'passiv':
+                reaksjon_passiv.append(minutter)
+                continue
+            reaksjon.append(minutter)
+            reaksjon_per_hastegrad.setdefault(hastegrad, []).append(minutter)
+            reaksjon_per_enhet.setdefault(r['enhet'], []).append(minutter)
+
+        for h in rad['enhetshendelser']:
+            if h['type'] == Enhetshendelse.TATT_AV:
+                aldri_rykket.append({
+                    'oppdragsnummer': nummer, 'hastegrad': hastegrad,
+                    'problemstilling': rad['problemstilling'], 'enhet': h['enhet'],
+                    'sto_i': (round(_minutter(h['varslet_at'], h['tidspunkt']), 1)
+                              if h['varslet_at'] else None),
+                    'endte': 'Tatt av',
+                })
+
+    uten_antall, uten_lengste = _timebolker(uten, naa)
+    tildelt_antall, tildelt_lengste = _timebolker(tildelt, naa)
+    koe = [
+        {'time': t, 'uten_ressurs': uten_antall[t], 'tildelt_venter': tildelt_antall[t],
+         'lengste': round(max(uten_lengste[t], tildelt_lengste[t]), 1)}
+        for t in range(24)
+    ]
+    topp = max(koe, key=lambda k: (k['uten_ressurs'] + k['tildelt_venter'], -k['time']))
+    flest = (None if not (topp['uten_ressurs'] + topp['tildelt_venter'])
+             else {'antall': topp['uten_ressurs'] + topp['tildelt_venter'], 'time': topp['time']})
+
+    hastegrader = _i_hastegradrekkefolge(
+        {k: len(v) for k, v in {**ko_per_hastegrad, **reaksjon_per_hastegrad}.items()})
+    return {
+        'ventetid_delt': {
+            'ko_ventetid': _sd(ko_vente),
+            'reaksjonstid': _sd(reaksjon),
+            'reaksjonstid_passiv': _sd(reaksjon_passiv),
+            'per_hastegrad': {
+                navn: {'ko_ventetid': _sd(ko_per_hastegrad.get(navn, [])),
+                       'reaksjonstid': _sd(reaksjon_per_hastegrad.get(navn, []))}
+                for navn in hastegrader},
+            'reaksjonstid_per_enhet': {
+                navn: _sd(verdier) for navn, verdier in sorted(reaksjon_per_enhet.items())},
+            'uten_ressurs_etter_avgang': etter_avgang,
+        },
+        'koe': koe,
+        'lengste_uten_ressurs': lengste_uten,
+        'flest_i_koe': flest,
+        'aldri_rykket_ut': sorted(aldri_rykket, key=lambda r: (r['oppdragsnummer'], r['enhet'])),
+    }
+
+
+def _konkordans(per_oppdrag):
+    """C2: meldt hastegrad (KO) × bilens grovsortering, én gang per oppdrag.
+
+    Drift og Plassering står utenfor — ingen pasient å sortere. `enige`,
+    `bilen_hoyere` og `bilen_lavere` teller bare de tre fargene; «ikke
+    aktuelt» og «ikke vurdert» er verken enighet eller avvik.
+    """
+    kolonner = [k for k, _ in choices.GROVSORTERING] + ['']
+    antall = {h: {k: 0 for k in kolonner} for h in _HASTEGRAD_RANG}
+    enige = hoyere = lavere = vurderte = 0
+    for gruppe in per_oppdrag.values():
+        rad = gruppe['rad']
+        hastegrad, grov = rad['hastegrad'], rad.get('grovsortering', '')
+        if hastegrad not in antall:
+            continue
+        antall[hastegrad][grov if grov in antall[hastegrad] else ''] += 1
+        if grov in _GROV_RANG:
+            vurderte += 1
+            diff = _GROV_RANG[grov] - _HASTEGRAD_RANG[hastegrad]
+            if diff == 0:
+                enige += 1
+            elif diff < 0:
+                hoyere += 1
+            else:
+                lavere += 1
+    return {
+        'rader': list(_HASTEGRAD_RANG),
+        'kolonner': [[k, n] for k, n in choices.GROVSORTERING] + [['', 'Ikke vurdert']],
+        'antall': antall,
+        'vurderte': vurderte, 'enige': enige,
+        'bilen_hoyere': hoyere, 'bilen_lavere': lavere,
+    }
+
+
+def _avreist_til(rader):
+    """C1: hvor bilene dro, per sted og sted × hastegrad. Per rad — det er
+    bilens tur. «Annet sted»-tekstene bare live; arkivet fryser dem ikke."""
+    navn_for = dict(choices.AVREIST_TIL)
+    per_sted = {navn: 0 for navn in navn_for.values()}
+    per_sted_hastegrad = {}
+    annet = []
+    for rad in rader:
+        if choices.AVREIST not in rad['tider']:
+            continue
+        sted = rad.get('avreist_til', '')
+        navn = navn_for.get(sted, '(ikke oppgitt)')
+        per_sted[navn] = per_sted.get(navn, 0) + 1
+        per_sted_hastegrad.setdefault(navn, {})
+        per_sted_hastegrad[navn][rad['hastegrad']] = (
+            per_sted_hastegrad[navn].get(rad['hastegrad'], 0) + 1)
+        if sted == 'annet' and rad.get('avreist_til_tekst'):
+            annet.append({'oppdragsnummer': rad['oppdragsnummer'],
+                          'enhet': rad['enhet'], 'tekst': rad['avreist_til_tekst']})
+    return {
+        'per_sted': per_sted,
+        'per_sted_hastegrad': per_sted_hastegrad,
+        'annet_tekster': sorted(annet, key=lambda a: a['oppdragsnummer']),
+    }
+
+
+def _utfall_per_problemstilling(per_oppdrag):
+    """C3: per problemstilling — behandlet på sted (utført for drift),
+    transportert, eller ingen av delene. Én gang per oppdrag: er én bil
+    avreist, er pasienten transportert uansett hva de andre stemplet."""
+    ut = {}
+    for gruppe in per_oppdrag.values():
+        problem = gruppe['rad']['problemstilling']
+        rad = ut.setdefault(problem, {'behandlet': 0, 'transportert': 0, 'uten': 0})
+        tider = [r['tider'] for r in gruppe['rader']]
+        if any(choices.AVREIST in t or choices.LEVERER in t for t in tider):
+            rad['transportert'] += 1
+        elif any(choices.BEHANDLET in t for t in tider):
+            rad['behandlet'] += 1
+        else:
+            rad['uten'] += 1
+    return dict(sorted(ut.items(), key=lambda p: (-sum(p[1].values()), p[0])))
+
+
+def _enhetshendelser(per_oppdrag):
+    """C5: avbrytelser, avventinger, rykket videre og tatt av — totalt og
+    per enhet."""
+    typer = [t for t, _ in Enhetshendelse.TYPER]
+    per_type = {t: 0 for t in typer}
+    per_enhet = {}
+    for gruppe in per_oppdrag.values():
+        for h in gruppe['rad']['enhetshendelser']:
+            if h['type'] not in per_type:
+                continue
+            per_type[h['type']] += 1
+            per_enhet.setdefault(h['enhet'], {t: 0 for t in typer})[h['type']] += 1
+    return {
+        'typer': [[t, navn] for t, navn in Enhetshendelse.TYPER],
+        'per_type': per_type,
+        'per_enhet': dict(sorted(per_enhet.items())),
     }
 
 

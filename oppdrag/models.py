@@ -577,6 +577,14 @@ class Enhetshendelse(BaseTimeStampedModel):
     type = models.CharField(max_length=16, choices=TYPER, verbose_name='Hendelse')
     detalj = models.CharField(max_length=64, blank=True, default='', verbose_name='Detalj')
     tidspunkt = models.DateTimeField(default=timezone.now)
+    # **Når enheten ble varslet på oppdraget** (21. sep. 2026, statistikk
+    # pulje 7b). Koblingsraden slettes ved «tatt av», og med den forsvant
+    # det eneste sporet av hvor lenge bilen sto bundet uten å rykke ut —
+    # nettopp tallet lista «tildelt, men rykket aldri ut» finnes for. Settes
+    # for alle typer, så hendelsen bærer sin egen «hadde vært på oppdraget
+    # i». `None` for hendelser fra før feltet fantes.
+    varslet_at = models.DateTimeField(
+        null=True, blank=True, verbose_name='Varslet på oppdraget')
     av = models.ForeignKey(
         settings.AUTH_USER_MODEL, null=True, blank=True,
         on_delete=models.SET_NULL, related_name='+')
@@ -863,6 +871,25 @@ class ArkivertOppdrag(models.Model):
     # `OppdragArkivHandler.rader_for_payload`.
     behandlet_at = models.DateTimeField(null=True, blank=True, verbose_name='Behandlet på sted')
     ledig_at = models.DateTimeField(null=True, blank=True, verbose_name='Ledig')
+
+    # **Statistikk pulje 7b** (21. sep. 2026). Fire felt til, alle i
+    # SHA-payloaden **bare når satt**, som `varslet_modus`: eldre arkiv
+    # verifiserer uendret. `avreist_til_tekst` finnes med vilje *ikke* —
+    # «Annet sted» er fritekst og følger `fritekst`-regelen over.
+    varslet_at = models.DateTimeField(
+        null=True, blank=True, verbose_name='Varslet',
+        help_text='Når enheten ble varslet på oppdraget. Bærer reaksjonstida.')
+    grovsortering = models.CharField(
+        max_length=16, blank=True, default='', verbose_name='Grovsortering')
+    avreist_til = models.CharField(
+        max_length=20, blank=True, default='', verbose_name='Avreist til')
+    #: Oppdragets enhetshendelser — tatt av, rykket videre, avbrutt, avventer
+    #: — som `[{type, tidspunkt, varslet_at, enhet}]` med ISO-tidspunkt.
+    #: **Oppdragets, ikke radens**, og gjentatt på hver rad som `hastegrad`
+    #: er: en enhet som ble tatt av har ingen rad, og hendelsen hennes må
+    #: likevel med. Leseren tar dem fra første rad per nummer.
+    enhetshendelser = models.JSONField(
+        default=list, blank=True, verbose_name='Enhetshendelser')
 
     #: Statusene som ble stemplet automatisk, som liste med statusnavn.
     #: §12.2: en varighet som slutter i en slik stempling er avledet, ikke

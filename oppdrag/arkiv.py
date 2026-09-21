@@ -25,7 +25,8 @@ from django.utils import timezone
 from core.arkiv import BaseArkivHandler, beregn_sha256, register
 
 from . import choices
-from .models import ArkivertOppdrag, Oppdrag, OppdragArkiv, Oppdragsenhet, Statusmelding
+from .models import (ArkivertOppdrag, Enhetshendelse, Oppdrag, OppdragArkiv,
+                     Oppdragsenhet, Statusmelding)
 from .statistikk import _STATUSFELT, arkiv_stats
 
 
@@ -52,7 +53,9 @@ def arkiver_vakt(vakt, notat, user, *, tomm=True):
             Oppdrag.objects
             .filter(vakt=vakt)
             .select_related('enhet', 'lokasjon')
-            .prefetch_related(Prefetch('enheter', Oppdragsenhet.objects.select_related('enhet')))
+            .prefetch_related(
+                Prefetch('enheter', Oppdragsenhet.objects.select_related('enhet')),
+                Prefetch('enhetshendelser', Enhetshendelse.objects.select_related('enhet')))
             .order_by('oppdragsnummer')
         )
         meldinger = Statusmelding.objects.gjeldende_bulk(
@@ -80,7 +83,15 @@ def arkiver_vakt(vakt, notat, user, *, tomm=True):
         # én bil per oppdrag er nøyaktig det det alltid har vært.
         rader = []
         for oppdrag in oppdragene:
-            for enhetsnavn, status, gjeldende, modus in _per_enhet(oppdrag, meldinger[oppdrag.pk]):
+            # Oppdragets hendelser, ISO-tidspunkt, gjentatt på hver rad —
+            # se feltet. `sted_tekst` fryses ikke: fritekst.
+            hendelser = [
+                {**h, 'tidspunkt': h['tidspunkt'].isoformat(),
+                 'varslet_at': h['varslet_at'].isoformat() if h['varslet_at'] else None}
+                for h in enhetshendelser_for(oppdrag)
+            ]
+            for enhetsnavn, status, gjeldende, modus, varslet_at in _per_enhet(
+                    oppdrag, meldinger[oppdrag.pk]):
                 per_status = {m.status: m for m in gjeldende}
                 felter = {
                     felt: (per_status[status_].tidspunkt if status_ in per_status else None)
@@ -91,6 +102,10 @@ def arkiver_vakt(vakt, notat, user, *, tomm=True):
                     oppdragsnummer=oppdrag.oppdragsnummer,
                     enhet_navn=enhetsnavn,
                     varslet_modus=modus,
+                    varslet_at=varslet_at,
+                    grovsortering=oppdrag.grovsortering or '',
+                    avreist_til=avreist_sted(gjeldende)[0],
+                    enhetshendelser=hendelser,
                     lokasjon_navn=oppdrag.lokasjon.navn if oppdrag.lokasjon else '',
                     problemstilling=oppdrag.problemstilling or '',
                     hastegrad=oppdrag.hastegrad or '',
@@ -120,7 +135,8 @@ def arkiver_vakt(vakt, notat, user, *, tomm=True):
 
 
 def _per_enhet(oppdrag, gjeldende):
-    """``[(enhetsnavn, status, meldinger, modus), ...]`` — én per koblingsrad.
+    """``[(enhetsnavn, status, meldinger, modus, varslet_at), ...]`` — én per
+    koblingsrad.
 
     Delt med `statistikk.rader_for_vakt`, så arkivet og live-tallene deler
     én oppfatning av hva en rad er. Uten koblingsrader — et oppdrag opprettet
@@ -134,13 +150,38 @@ def _per_enhet(oppdrag, gjeldende):
     rader = list(oppdrag.enheter.all())
     if not rader:
         return [(oppdrag.enhet.navn if oppdrag.enhet else '',
-                 oppdrag.status, gjeldende, '')]
+                 oppdrag.status, gjeldende, '', None)]
     return [
         (rad.enhet.navn, rad.status,
          [m for m in gjeldende if m.oppdragsenhet_id == rad.pk],
-         rad.varslet_modus)
+         rad.varslet_modus, rad.varslet_at)
         for rad in rader
     ]
+
+
+def enhetshendelser_for(oppdrag) -> list[dict]:
+    """Oppdragets enhetshendelser i den formen radene og arkivet bærer.
+
+    Tidspunktene er `datetime`; arkivet gjør dem om til ISO ved frysing og
+    `rader_for_arkiv` tilbake. Enhetsnavnet fryses som tekst, som alt annet.
+    """
+    return [
+        {
+            'type': h.type,
+            'tidspunkt': h.tidspunkt,
+            'varslet_at': h.varslet_at,
+            'enhet': h.enhet.navn,
+        }
+        for h in oppdrag.enhetshendelser.all()
+    ]
+
+
+def avreist_sted(gjeldende) -> tuple[str, str]:
+    """``(sted, sted_tekst)`` fra radens gjeldende Avreist-melding, ellers tomt."""
+    for m in gjeldende:
+        if m.status == choices.AVREIST:
+            return m.sted or '', m.sted_tekst or ''
+    return '', ''
 
 
 class OppdragArkivHandler(BaseArkivHandler):
@@ -187,6 +228,16 @@ class OppdragArkivHandler(BaseArkivHandler):
             # samme payload som før, og signaturene verifiserer uendret.
             if rad.varslet_modus:
                 data['varslet_modus'] = rad.varslet_modus
+            # Samme regel for de fire fra pulje 7b (21. sep. 2026): med bare
+            # når satt, så arkiv fra før dem verifiserer uendret.
+            if rad.varslet_at:
+                data['varslet_at'] = rad.varslet_at.isoformat()
+            if rad.grovsortering:
+                data['grovsortering'] = rad.grovsortering
+            if rad.avreist_til:
+                data['avreist_til'] = rad.avreist_til
+            if rad.enhetshendelser:
+                data['enhetshendelser'] = list(rad.enhetshendelser)
             for status, felt in _STATUSFELT.items():
                 verdi = getattr(rad, felt)
                 # `behandlet_at` kom 12. sep. 2026, etter at arkiv fantes med

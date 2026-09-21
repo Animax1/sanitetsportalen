@@ -72,3 +72,38 @@ er verre enn ingen skanner.
 bygges med `innerHTML`, og en tabell med `display: block` mister bredden sin.
 `TabelleneRullerPaaTelefonTests` krever klassen på hver `tbl-*`/`xt-*`-beholder i begge
 fanene.
+
+## Oppdragsfanen etter pulje 7b (21. sep. 2026)
+
+Utregningen bor i `oppdrag/statistikk.py`; det som står her er reglene som gjør at fanen
+kan leses likt live og fra et arkiv. Forslaget og skissene: `docs/FORSLAG_KO_STATISTIKK.md`.
+
+**Radformen bærer alt tallene trenger, og arkivet fryser den samme formen.** En rad er én
+enhets innsats på ett oppdrag; radens egne felt er `varslet_at` og `avreist_til`, og
+oppdragets — `grovsortering`, `enhetshendelser` — gjentas på hver rad som hastegraden gjør.
+Hendelsene *må* stå på oppdraget: en enhet som ble tatt av har ingen rad, og «tildelt, men
+rykket aldri ut» er nettopp henne. `avreist_til_tekst` er fritekst og finnes bare live.
+
+**«Uten ressurs» rekonstrueres, ikke leses.** `trenger_ressurs_siden` tømmes når en ny
+enhet varsles, så intervallene regnes av opprettelsen og av hver avgang som etterlot
+oppdraget alene (`_andre_aktive` stiller `trenger_ny_ressurs`-spørsmålet i ettertid), fram
+til neste varsling **eller** neste Rykker ut. Et åpent intervall slutter ved «nå» live og
+ved `importert_at` i et arkiv — aldri ved nå for en vakt som er over.
+
+**Ventetida = KO-ventetid + reaksjonstid.** Det gamle tallet står fortsatt; de to nye
+summerer til det. Reaksjonstid går gjennom `_Varigheter`, så en negativ (klokke som gikk
+feil) telles i `utelatt.negativ` som de andre. Passiv vakt holdes i eget ledd.
+
+**Alle fem hastegradene, i AMK-rekkefølge, også på null** — `_i_hastegradrekkefolge` er
+det ene stedet. Fargene i `statistikk-oppdrag.js` følger navnet; grått er for en verdi
+ingen kjenner.
+
+**Fiksturen må sette `varslet_at`.** `Oppdrag.save()` lager koblingsraden med nå, og en
+test som skrur `created_at` tilbake uten å flytte varslingen får negativ reaksjonstid på
+hvert oppdrag. `_oppdrag()`-hjelperne gjør det; en ny testfil skal også.
+
+**Byggerne bygger celler med `+`, ikke mal-strenger**, og kolonnelister står inline: en
+`${...}` i en bygger skal kunne leses som «escapet her», og testharnessen henter
+navngitte funksjoner, så en toppnivå-`const` er en `ReferenceError` der. Et arkiv frosset
+før 7b mangler nøklene; `_tegn7b` lar seksjonene stå tomme, og `_sdRad` tåler at `p90`
+mangler.

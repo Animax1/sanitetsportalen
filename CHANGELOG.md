@@ -4,7 +4,58 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
-## 2026-09-21 — Forslag: statistikk fra KO (pulje 7)  `#ko/hendelseslogg` `#statistikk`
+## 2026-09-21 — Statistikk pulje 7b: ventetida i to, køen, KO mot bilen, alle fem hastegradene  `#statistikk/oppdragsfanen` `#oppdrag/statusmaskin`
+
+André valgte fra skissene: ventetida som **både** stolper og tabell, «hvem løste» som
+tabell, navnet «Meldt hastegrad (KO) × bilens grovsortering». «Kjør på.»
+
+**Oppdragsfanen har åtte nye blokker** (`docs/FORSLAG_KO_STATISTIKK.md` C1–C8):
+
+- **Ventetida delt i to.** Dagens «ventetid» (opprettet → Rykker ut) blandet KOs tid og
+  bilens. Nå: **KO-ventetid** = uten ressurs → enhet varslet, **reaksjonstid** = varslet →
+  Rykker ut, begge median/p90 per hastegrad, reaksjonstid også per enhet; passiv vakt for
+  seg. «Uten ressurs» starter ved opprettelsen og ved hver avgang (avbrutt, rykket videre,
+  avventer) som etterlot oppdraget alene — samme spørsmål som `trenger_ny_ressurs` stiller
+  live, stilt i ettertid på radene (`_andre_aktive`). Slutter ved neste varsling **eller**
+  neste Rykker ut: den som avventet kan ombestemme seg. Åpne intervaller telles ikke i
+  ventetida (ikke målt ennå), men i køen.
+- **Køen per klokketime**: uten ressurs og tildelt-men-venter som stablede stolper, med
+  lengste ståtid over. Kort for lengste uten ressurs og flest i kø samtidig.
+- **Tildelt, men rykket aldri ut**: tatt av (med ståtid) og meldt ledig fra Venter.
+- **Meldt hastegrad × bilens grovsortering** med enige / bilen høyere / bilen lavere;
+  Drift og Plassering utenfor. **Avreist til** per sted og sted × hastegrad, med «Annet
+  sted»-tekstene (bare live). **Utfall per problemstilling** (behandlet/utført,
+  transportert, verken — er én bil avreist, er pasienten transportert). **Enhetshendelser
+  per enhet.**
+- **p90** i alle varighetstabellene (`_sd`, nærmeste rang). **Alle fem hastegradene** i
+  AMK-rekkefølge i smultringen og tabellene, også på null; «Plassering» har fått lilla —
+  den falt til grå.
+
+**Arkivet følger med** (`oppdrag/0030`): `ArkivertOppdrag` fryser `varslet_at`,
+`grovsortering`, `avreist_til` og oppdragets `enhetshendelser` (JSON, gjentatt per rad
+som hastegraden — en enhet som ble tatt av har ingen rad). I SHA-payloaden **bare når
+satt**, som `varslet_modus`; eldre arkiv verifiserer uendret. `sted_tekst` fryses ikke
+(fritekst). Et åpent intervall i et arkiv slutter ved `importert_at`, ikke ved nå.
+**`Enhetshendelse.varslet_at`** settes for alle fire typene: koblingsraden slettes ved
+tatt av, og med den forsvant «hvor lenge sto hun bundet».
+
+**Fiksturen bar ikke prod-formen.** `Oppdrag.save()` lager koblingsraden med
+`varslet_at=now`, og testene skrudde `created_at` tilbake — så hver reaksjonstid var
+negativ og hver KO-ventetid en time. `_oppdrag()`-hjelperne i `tests_statistikk`,
+`tests_arkiv` og den nye `tests_statistikk_7b` setter nå `varslet_at` = opprettelsen.
+Spørringsbudsjettet for oppdragsfanen er 7, ikke 6 (én prefetch til), og
+`tests_flere_enheter` ventet `{'Akutt': 1}` alene — nå står de fire andre der på null.
+
+Mutanter: **24/24 drept** i `_ventetid_og_koe`, `_andre_aktive`, `_konkordans`,
+`_utfall_per_problemstilling`, `_avreist_til`, `_i_hastegradrekkefolge`, `_p90`, arkivets
+payload og `services` — fire overlevde første runde og avslørte fire svake tester:
+symmetriske tall i konkordansen (1 og 1 lot høyere/lavere bytte), ingen rad med både
+behandlet og avreist, «nå» som var lik `importert_at` innenfor avrundingen, og kanten
+«en annen meldte ledig i samme øyeblikk». Playwright mot seed: fanen tegnes uten feil.
+
+---
+
+## 2026-09-21 — Forslag: statistikk fra KO (pulje 7)  `#ko/hendelseslogg` `#statistikk/ko` `#statistikk/oppdragsfanen`
 
 André: «Ut ifra alt vi genererer av data i /ko, hva er interessant å få hentet ut?»
 `docs/FORSLAG_KO_STATISTIKK.md`, kontrollert mot koden: hva som finnes av felt og

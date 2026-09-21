@@ -49,6 +49,10 @@ class OppdragStatsBasis(TestCase):
         # så testene må kunne plassere oppdraget i tid.
         opprettet = self.naa - timedelta(minutes=minutter_siden)
         Oppdrag.objects.filter(pk=oppdrag.pk).update(created_at=opprettet)
+        # Koblingsraden lages i `Oppdrag.save()` med `varslet_at=now` — i
+        # prod er det samme øyeblikk som `created_at`. Bærer ikke fiksturen
+        # den formen, står reaksjonstida (7b) som negativ på hvert oppdrag.
+        oppdrag.enheter.update(varslet_at=opprettet)
         oppdrag.refresh_from_db()
         return oppdrag
 
@@ -300,7 +304,7 @@ class GjeldendeBulkTests(OppdragStatsBasis):
             Statusmelding.objects.gjeldende_bulk([oppdrag.pk])[oppdrag.pk], [])
 
     def test_statistikken_bruker_faa_spoerringer(self):
-        """Tre spørringer for radene, uansett hvor mange oppdrag vakta har.
+        """Fire spørringer for radene, uansett hvor mange oppdrag vakta har.
 
         Ett kall per oppdrag ville gitt én spørring per rad — samme felle som
         pasientlista gikk i før den fikk `select_related`. Koblingsradene
@@ -311,9 +315,10 @@ class GjeldendeBulkTests(OppdragStatsBasis):
             oppdrag = self._oppdrag()
             self._stempel(oppdrag, choices.RYKKER_UT, 2)
 
-        with self.assertNumQueries(6):
-            # oppdrag + koblingsrader + statusmeldinger + to Enhet-tellinger
-            # (på vakt, og av dem passive) + vaktmodusperiodene.
+        with self.assertNumQueries(7):
+            # oppdrag + koblingsrader + enhetshendelser (7b) + statusmeldinger
+            # + to Enhet-tellinger (på vakt, og av dem passive) +
+            # vaktmodusperiodene.
             #
             # **Budsjettet er konstant, ikke lavt.** Poenget er at det ikke
             # vokser med antall oppdrag; to tellinger og én periodelesing er

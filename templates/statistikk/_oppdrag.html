@@ -81,6 +81,80 @@
     </div>
   </div>
 
+  {% comment %}
+    Pulje 7b (21. sep. 2026, docs/FORSLAG_KO_STATISTIKK.md). Ventetida i to:
+    KO-ventetid (uten ressurs → enhet varslet) og reaksjonstid (varslet →
+    Rykker ut). Begge skissene ble valgt — stolpene for blikket, tabellen for
+    p90. Alt fylles av statistikk-oppdrag.js; et arkiv frosset før 7b mangler
+    nøklene, og rendereren lar seksjonene stå tomme da.
+  {% endcomment %}
+  <div class="row g-2 mb-2">
+    <div class="col-md-6">
+      <div class="chart-card">
+        <div class="chart-title">Ventetid per hastegrad · median (min)</div>
+        <canvas id="chart-oppdrag-ventetid" height="190"></canvas>
+        <div class="small mt-1" style="color: var(--text-muted);">
+          <span style="color:#f59e0b">■</span> KO-ventetid: uten ressurs → enhet varslet
+          &nbsp; <span style="color:#3b82f6">■</span> Reaksjonstid: varslet → Rykker ut
+        </div>
+      </div>
+    </div>
+    <div class="col-md-6">
+      <div class="chart-card">
+        <div class="chart-title">Ventetid per hastegrad</div>
+        <div id="tbl-oppdrag-ventetid" class="stats-rull mt-2"></div>
+        <div id="oppdrag-ventetid-fot" class="small mt-2" style="color: var(--text-muted);"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="row g-2 mb-2">
+    <div class="col-md-6">
+      <div class="chart-card">
+        <div class="chart-title">Reaksjonstid per enhet · varslet → Rykker ut</div>
+        <div id="tbl-oppdrag-reaksjon-enhet" class="stats-rull mt-2"></div>
+      </div>
+    </div>
+    <div class="col-md-6">
+      <div class="chart-card">
+        <div class="chart-title">Tildelt, men rykket aldri ut</div>
+        <div id="tbl-oppdrag-aldri-rykket" class="stats-rull mt-2"></div>
+        <div id="oppdrag-aldri-rykket-fot" class="small mt-2" style="color: var(--text-muted);"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Køen per klokketime (C4b) -->
+  <div class="row g-2 mb-2">
+    <div class="col-12">
+      <div class="chart-card">
+        <div class="chart-title">Køen per klokketime · oppdrag som ventet</div>
+        <canvas id="chart-oppdrag-koe" height="110"></canvas>
+        <div class="small mt-1" style="color: var(--text-muted);">
+          <span style="color:#f59e0b">■</span> Uten ressurs
+          &nbsp; <span style="color:#3b82f6">■</span> Tildelt, venter
+          &nbsp;· Tallet over stolpen er lengste ståtid den timen
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="row g-2 mb-2">
+    <div class="col-6 col-md-3">
+      <div class="kpi-card kpi-yellow">
+        <div class="kpi-label">Lengste uten ressurs</div>
+        <div class="kpi-value" id="okpi-lengste-uten">–</div>
+        <div class="kpi-sub" id="okpi-lengste-uten-sub"></div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="kpi-card">
+        <div class="kpi-label">Flest i kø samtidig</div>
+        <div class="kpi-value" id="okpi-flest-koe">–</div>
+        <div class="kpi-sub" id="okpi-flest-koe-sub"></div>
+      </div>
+    </div>
+  </div>
+
   <!-- Fordelinger -->
   <div class="row g-2 mb-2">
     <div class="col-md-4">
@@ -99,6 +173,40 @@
       <div class="chart-card">
         <div class="chart-title">Oppdrag per enhet</div>
         <canvas id="chart-oppdrag-enhet" height="180"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- KO mot bilen (C2), avreist til (C1) -->
+  <div class="row g-2 mb-2">
+    <div class="col-md-7">
+      <div class="chart-card">
+        <div class="chart-title">Meldt hastegrad (KO) × bilens grovsortering</div>
+        <div id="tbl-oppdrag-konkordans" class="stats-rull mt-2"></div>
+        <div id="oppdrag-konkordans-fot" class="small mt-2" style="color: var(--text-muted);"></div>
+      </div>
+    </div>
+    <div class="col-md-5">
+      <div class="chart-card">
+        <div class="chart-title">Avreist til</div>
+        <div id="tbl-oppdrag-avreist" class="stats-rull mt-2"></div>
+        <div id="tbl-oppdrag-annet-sted" class="stats-rull mt-2"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Utfall (C3), enhetshendelser (C5) -->
+  <div class="row g-2 mb-2">
+    <div class="col-md-6">
+      <div class="chart-card">
+        <div class="chart-title">Utfall per problemstilling</div>
+        <div id="tbl-oppdrag-utfall" class="stats-rull mt-2"></div>
+      </div>
+    </div>
+    <div class="col-md-6">
+      <div class="chart-card">
+        <div class="chart-title">Avbrutt, avventet, rykket videre, tatt av · per enhet</div>
+        <div id="tbl-oppdrag-hendelser" class="stats-rull mt-2"></div>
       </div>
     </div>
   </div>
