@@ -149,7 +149,7 @@ skal stå én setning øverst som sier hvorfor. Det er det eneste som hindrer fe
 |---|---|---|
 | 7a | **Bygget 21. sep. 2026.** `ko/statistikk.py`: A1–A8, B1–B5; fanen «KO» med `statistikk-ko.js`. Lagene leses av systemlinjene; `HendelseLag.til` ble ikke lagt til | ingenting |
 | 7b | **Bygget 21. sep. 2026.** Oppdragsfanen utvidet: C8, C1–C6 med C4/C4b/C4c. C7 venter på 7c | ingenting |
-| 7c | D1–D3 og C7: vaktlista inn | at vaktlistas ressurser er koblet til enhetene |
+| 7c | **Bygget 21. sep. 2026.** D1–D2 og C7 som fane «Bemanning» (`vaktliste/statistikk.py`), linjer over køen og samtidigheten. D3 (per lag) står i KO-fanen fra 7a | at vaktlistas ressurser er koblet til enhetene — ellers «ukjent» |
 | 7d | Sammenligning mellom vakter, tidslinja og vaktrapporten | 7a–7c, og utskriften i TODO |
 
 Hver pulje gir én fane eller én blokk som kan leses alene. 7a og 7b er uavhengige og kan gå

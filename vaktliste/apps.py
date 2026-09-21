@@ -18,6 +18,11 @@ class VaktlisteConfig(AppConfig):
         from .backup import register_handlers as register_backup_handlers
         register_backup_handlers()
 
+        # Statistikkfanen «Bemanning» (pulje 7c). Uten registreringen finnes
+        # ikke kilden.
+        from .statistikk import register_handlers as register_statistikk_handlers
+        register_statistikk_handlers()
+
         # Driftsdashbordet (14. sep. 2026). Uten registreringen viser
         # `/portal-admin/server-status/` ingen vaktlister i drift og ingen
         # siste utsending — og `core` skal ikke kjenne modulen ved navn for

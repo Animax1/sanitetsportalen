@@ -25,7 +25,8 @@ import unittest
 from django.test import SimpleTestCase
 
 from patients.js_test_utils import (
-    ADMIN_JS, PORTAL_UTILS_JS, STATISTIKK_JS, STATISTIKK_KO_JS, STATISTIKK_OPPDRAG_JS,
+    ADMIN_JS, PORTAL_UTILS_JS, STATISTIKK_BEMANNING_JS, STATISTIKK_JS, STATISTIKK_KO_JS,
+    STATISTIKK_OPPDRAG_JS,
     build_harness, extract_function, read_js, run_node,
 )
 
@@ -63,6 +64,8 @@ HTML_BUILDERS = (
     'mkKoVarighetTabell',
     'mkKoLagTabell',
     'mkKoLoggTabell',
+    # Bemanningsfanen (pulje 7c). Enhetsnavn fra basen.
+    'mkBemanningUtnyttelseTabell',
 )
 
 # Funksjoner som escaper – en interpolasjon som starter med én av disse er OK.
@@ -122,7 +125,8 @@ class StatsEscapingSourceGuardTests(SimpleTestCase):
         # bare én, ville resten av vernet forsvunnet uten at noen test ble rød.
         cls.stats_src = (read_js(STATISTIKK_JS) + '\n' + read_js(ADMIN_JS)
                          + '\n' + read_js(STATISTIKK_OPPDRAG_JS)
-                         + '\n' + read_js(STATISTIKK_KO_JS))
+                         + '\n' + read_js(STATISTIKK_KO_JS)
+                         + '\n' + read_js(STATISTIKK_BEMANNING_JS))
         cls.utils_src = read_js(PORTAL_UTILS_JS)
 
     def test_escape_hjelperne_finnes_i_utils(self):
@@ -209,6 +213,7 @@ class StatsEscapingBehaviourTests(SimpleTestCase):
                             'mkKoVerkenTabell', 'mkKoForsteRessursTabell',
                             'mkKoEskaleringTabell', 'mkKoStillhetTabell',
                             'mkKoVarighetTabell', 'mkKoLagTabell', 'mkKoLoggTabell')),
+        (STATISTIKK_BEMANNING_JS, ('_timerTekst', 'mkBemanningUtnyttelseTabell')),
     )
 
     XSS = '<img src=x onerror=alert(1)>'

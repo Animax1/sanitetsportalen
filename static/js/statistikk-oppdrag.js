@@ -240,10 +240,19 @@ function _tegn7b(s) {
         + 'Hver er en enhet som var bundet uten å gjøre noe.'
       : '';
 
-  mkStabletChart('chart-oppdrag-koe', s.koe.map(k => String(k.time).padStart(2, '0')), [
-    { label: 'Uten ressurs', backgroundColor: '#f59e0b', data: s.koe.map(k => k.uten_ressurs) },
-    { label: 'Tildelt, venter', backgroundColor: '#3b82f6', data: s.koe.map(k => k.tildelt_venter) },
-  ], { etiketter: s.koe.map(k => (k.uten_ressurs + k.tildelt_venter) ? fmtMin(k.lengste) : '') });
+  // Køen tegnes med det samme; bemanningslinjene (7c) kommer fra
+  // vaktlistas kilde når kontoen har den, og grafen tegnes da på nytt.
+  // Uten tilgang svarer vakten `undefined`, og stolpene står alene.
+  const tegnKoe = (linjer) => mkStabletChart(
+    'chart-oppdrag-koe', s.koe.map(k => String(k.time).padStart(2, '0')), [
+      { label: 'Uten ressurs', backgroundColor: '#f59e0b', data: s.koe.map(k => k.uten_ressurs) },
+      { label: 'Tildelt, venter', backgroundColor: '#3b82f6', data: s.koe.map(k => k.tildelt_venter) },
+    ], { etiketter: s.koe.map(k => (k.uten_ressurs + k.tildelt_venter) ? fmtMin(k.lengste) : ''),
+         linjer });
+  tegnKoe([]);
+  Promise.resolve(_kallOppdrag('sikreBemanning')).then(b => {
+    if (b && oppdragStats === s) tegnKoe(_kallOppdrag('bemanningLinjer', b, ['enheter', 'lag']) || []);
+  });
 
   const lengste = s.lengste_uten_ressurs;
   document.getElementById('okpi-lengste-uten').textContent =

@@ -727,7 +727,7 @@ Alle temaene er mørke, så **enhver Bootstrap-klasse for dempet tekst må overs
 malen kan se den. `MorkTekstPaaMorkBakgrunnTests` løser `{% extends %}` og `{% static %}`
 og håndhever det.
 
-29 filer i `static/js/` (ingen bundler), på sju sider — pasientsiden,
+30 filer i `static/js/` (ingen bundler), på sju sider — pasientsiden,
 `/statistikk/`, `/vaktliste/`, `/ko/`, `/backlog/` og de to grensesnittene under
 `/oppdrag/`.
 
@@ -762,7 +762,7 @@ håndhever det på cellebredden.
 | `patients-utils.js`, `-table.js`, `-forms.js`, `-app.js` | pasientsiden, alltid | `patients/CLAUDE.md` |
 | `patients-admin.js` | pasientsiden, **kun admin** | `patients/CLAUDE.md` |
 | `statistikk.js` | **kun** `/statistikk/` | `statistikk/CLAUDE.md` |
-| `statistikk-oppdrag.js`, `statistikk-ko.js` | `/statistikk/`, **kun** med modultilgang | `statistikk/CLAUDE.md` |
+| `statistikk-oppdrag.js`, `-ko.js`, `-bemanning.js` | `/statistikk/`, **kun** med modultilgang | `statistikk/CLAUDE.md` |
 | `oppdrag-kort.js` | `/oppdrag/` **og** `/ko/` | `oppdrag/CLAUDE.md` |
 | `oppdrag-sentral-*.js` (fire) | `/oppdrag/`, kontoer uten enhet | `oppdrag/CLAUDE.md` |
 | `oppdrag-enhet.js` | `/oppdrag/`, enhetskontoer | `oppdrag/CLAUDE.md` |
@@ -801,9 +801,9 @@ helperen flyttes til `portal-utils.js`, ikke kopieres. `JsModulLastingTests` hå
 ved å sammenligne hva `statistikk.js` kaller mot hva den faktisk laster.
 
 **Er en fil betinget lastet, må kall inn i den gå gjennom en vakt.** `patients-admin.js`
-lastes kun for admin, og statistikkfanene kun med modultilgang — et kall rett på et navn
-derfra er en `ReferenceError` for alle andre. `_kall('navn')` og `_kallOppdrag('navn')`
-sjekker at funksjonen finnes; `JsModulLastingTests` vokter det.
+lastes kun for admin, statistikkfanene kun med modultilgang — et kall rett på et navn derfra
+er en `ReferenceError` for alle andre. `_kall('navn')` og `_kallOppdrag('navn')`
+sjekker at funksjonen finnes; `JsModulLastingTests` vokter.
 
 CSRF-sikret fetch-wrapper brukes for alle API-kall. Tabulator for pasientgrid, Chart.js for
 statistikk — og Chart.js lastes **kun** på `/statistikk/`.

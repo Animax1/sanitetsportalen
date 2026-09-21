@@ -48,6 +48,11 @@ class BaseStatistikkHandler:
 
     #: Rekkefølge på fanene. Lavest først.
     order: ClassVar[int] = 100
+    #: Nivået statistikkappen krever i kildemodulen (pulje 7c, 21. sep. 2026).
+    #: `les` for de fleste; vaktlista krever `les_alle`, fordi `les` der er
+    #: «sitt eget korps» og hele bemanningen ikke er det. Registeret kjenner
+    #: fortsatt ikke brukeren — det sier bare hva som skal spørres om.
+    nivaa: ClassVar[str] = 'les'
 
     def full_stats(self, vakt) -> dict:
         """Tallene for én vakt. Returner en JSON-serialiserbar dict."""

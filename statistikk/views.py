@@ -52,7 +52,7 @@ def lesbare_kilder(user):
     ``ModuleSettings`` — en deaktivert modul skal ikke lyse gjennom
     statistikken.
     """
-    return [h for h in all_handlers() if har_tilgang(user, h.slug, 'les')]
+    return [h for h in all_handlers() if har_tilgang(user, h.slug, h.nivaa)]
 
 
 def _kilde_for(user, slug):
@@ -60,7 +60,7 @@ def _kilde_for(user, slug):
     handler = get_handler(slug)
     if handler is None:
         return None
-    if not har_tilgang(user, handler.slug, 'les'):
+    if not har_tilgang(user, handler.slug, handler.nivaa):
         return None
     return handler
 
@@ -90,6 +90,7 @@ def statistikk_view(request):
         'har_patients': 'patients' in slugs,
         'har_oppdrag': 'oppdrag' in slugs,
         'har_ko': 'ko' in slugs,
+        'har_bemanning': 'vaktliste' in slugs,
     })
 
 

@@ -198,7 +198,11 @@ function cellHtml(v) {
 // varigheter, så helperen kan ikke bo i én av dem.
 function fmtMin(m) {
   if (m == null || m < 0) return '–';
-  const h = Math.floor(m / 60), min = Math.round(m % 60);
+  // Rund av til hele minutter FØR timene deles ut: 179,9 min var «2t 60m»
+  // (funnet i bemanningsfanen 21. sep. 2026), fordi timene ble regnet av
+  // 179,9 og minuttene av resten.
+  const tot = Math.round(m);
+  const h = Math.floor(tot / 60), min = tot % 60;
   return h > 0 ? `${h}t ${min}m` : `${min}m`;
 }
 

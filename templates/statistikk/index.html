@@ -362,6 +362,10 @@
 {% include "statistikk/_ko.html" %}
 {% endif %}
 
+{% if har_bemanning %}
+{% include "statistikk/_bemanning.html" %}
+{% endif %}
+
 </div>
 {% endblock %}
 
@@ -383,4 +387,5 @@
 {% endcomment %}
 {% if har_oppdrag %}<script src="{% static 'js/statistikk-oppdrag.js' %}"></script>{% endif %}
 {% if har_ko %}<script src="{% static 'js/statistikk-ko.js' %}"></script>{% endif %}
+{% if har_bemanning %}<script src="{% static 'js/statistikk-bemanning.js' %}"></script>{% endif %}
 {% endblock %}

@@ -502,23 +502,22 @@ Oppdragsmodulen importerer **ikke** vaktlista; `oppdrag-sentral.js` henter
 `/vaktliste/api/enhet/<pk>/besetning/` og rendrer svaret.
 `OppdragImportererIkkeVaktlista` leser importene med AST og håndhever det. KO henter
 ressursene **uten** enhet og **på vakt nå** fra `api/ressurser/uten-enhet/` — samme gate.
+**Statistikken** (`vaktliste/statistikk.py`, 7c) leser oppdragene samme vei; krever `les_alle`.
 
 - **Gatet på `les` i vaktliste**, ikke i oppdrag — komposisjonsregelen fra
   rollemodellen §5. Malen får et flagg via `har_tilgang(..., 'vaktliste', ...)`:
   en slug gjennom `core`, ikke en import.
-- **Svaret bærer navn, rolle, innsjekkstatus, telefon og ISSI** (telefon og ISSI
-  fra 12. sep. 2026 — «på koblede enheter i /oppdrag skal det vises telefon nummer
-  og ISSI»). Ikke kompetanser, ikke `notat`, ikke e-post eller konto — sentralbordet
-  skal kunne ringe bilen, ikke lese personalmapper. `Mannskap.issi` (`0015`) er
-  nødnettsterminalens nummer, tekst med ledende nuller, etter telefon og e-post i
-  registeret.
+- **Svaret bærer navn, rolle, innsjekkstatus, telefon og ISSI** (de to siste fra
+  12. sep. 2026). Ikke kompetanser, ikke `notat`, ikke e-post eller konto —
+  sentralbordet skal kunne ringe bilen, ikke lese personalmapper. `Mannskap.issi`
+  (`0015`) er nødnettsterminalens nummer, tekst med ledende nuller.
 - **Bare skiftene som dekker nå**, og **404 når enheten er ukoblet**: ubemannet
   og ukoblet er ulike svar på ulike problemer.
 - **Lista i drift vinner; ellers portalens aktive vakt** (12. sep. 2026 — «koblingen
   fungerer ikke»: vaktlista som kjørte lå på en annen vakt enn den aktive). Dekker
   ingen skift nå, sendes **neste skift** med (`neste`, `neste_fra`), så svaret er «ingen
-  nå, Kari fra 16:00». 404-meldingen skiller fortsatt «koblet i en annen vakt» fra «ikke
-  koblet noe sted» (`services.koblet_i_annen_vakt`) — det kostet André en kveld 30. aug.
+  nå, Kari fra 16:00». 404-meldingen skiller «koblet i en annen vakt» fra «ikke koblet
+  noe sted» (`services.koblet_i_annen_vakt`) — det kostet André en kveld 30. aug.
 - **Rekkefølgen sorteres i Python.** `rolle` er nullbar, og SQLite (dev) og
   PostgreSQL (prod) plasserer NULL i hver sin ende.
 

@@ -18,8 +18,9 @@ tallene.
 **Avhengighetsretningen er statistikk → moduler, aldri motsatt.** Modulen som eier
 dataene regner ut tallene; statistikk-appen henter, cacher og viser — og navngir ingen
 kildemodul. Registeret er `core/stats.py`, samme idiom som `core.backup` og `core.arkiv`:
-hver modul melder inn en `BaseStatistikkHandler` fra `apps.ready()`. Tre kilder i dag,
-`patients/statistikk.py`, `oppdrag/statistikk.py` og `ko/statistikk.py`.
+hver modul melder inn en `BaseStatistikkHandler` fra `apps.ready()`. Fire kilder i dag:
+`patients/statistikk.py`, `oppdrag/statistikk.py`, `ko/statistikk.py` og
+`vaktliste/statistikk.py`.
 
 `hent_aktiv_vakt` bor i **`core.vakt`** (flyttet dit 14. sep. 2026, sammen med
 `vakt_for_year`): den er portalens scope, delt av alle moduler, og lå i pasientmodulen
@@ -36,7 +37,8 @@ strengere beskyttet enn live-statistikken, og hadde det arvet modulens gate ved 
 ville alle med `les` på statistikk fått innsyn i arkiverte vakter uten at noen bestemte det.
 
 **Modulen komponerer tilgang, den eier den ikke** (§5). Den viser kun kilder brukeren har
-minst `les` på i kildemodulen — ellers ville aggregatene gitt avledet innsyn i data
+minst handlerens `nivaa` på i kildemodulen — `les` for de fleste, `les_alle` for vaktlista,
+der `les` er «sitt eget korps» (pulje 7c) — ellers ville aggregatene gitt avledet innsyn i data
 brukeren ikke har tilgang til. Regelen er **«vis det du har tilgang til»**, ikke «alt eller
 ingenting»: med to kilder ville det siste tatt statistikken fra alle som leser pasienter
 uten å ha oppdrag. Ingen lesbare kilder gir 403 på siden — en statistikkside uten tall er
@@ -56,6 +58,7 @@ Hva som lastes når står i rota; hva filene gjør står her.
 | `statistikk.js` | Pasientstatistikk (Chart.js), arkivmodus, kildefanene |
 | `statistikk-oppdrag.js` | Oppdragsfanen |
 | `statistikk-ko.js` | KO-fanen (pulje 7a). Lastes kun med KO-tilgang; samme vakt |
+| `statistikk-bemanning.js` | Bemanningsfanen (pulje 7c). Kun med `les_alle` i vaktlista; de to andre fanene henter linjene sine herfra gjennom vakten |
 
 **Chart.js lastes kun her.** Den er tung, og ingen annen side tegner grafer.
 
@@ -135,3 +138,28 @@ prioritet — medianen av medianer er ikke en median.
 
 **Fiksturen må sette `registrert_at`** på linjene: feltet er `auto_now_add`, og tid til
 retting og til deling regnes av det. `_linje()` i `ko/tests_statistikk.py` gjør det.
+
+## Bemanningsfanen (pulje 7c, 21. sep. 2026)
+
+`vaktliste/statistikk.py`, retningen `vaktliste` → `oppdrag` (den tillatte): per klokketime
+personer på vakt, møtt, lag og enheter; enhetstimer og lagtimer; oppdrag per enhetstime;
+og enhetsutnyttelse per bil — oppdragstid som andel av bemannet tid, og lengste ledigtid.
+
+**Vaktlista for vakta, ikke lista i drift.** `vaktliste_i_bruk()` svarer på «nå»;
+statistikk er per vakt, og `Vaktliste.vakt` er én-til-én.
+
+**Personer, ikke skift.** Én på to overlappende skift er én person i timen — nøkkelen i
+`_timebolker` er `mannskap_id`. Bemannet tid per ressurs er *unionen* av skiftene; to
+overlappende skift på en bil er ikke dobbel bemanning. Et skift som slutter 22:00 sto ikke
+i time 22.
+
+**«Ukjent», ikke null.** En bil uten ressurs i vaktlista får `None` i bemannet tid, andel
+og lengste ledigtid — et tall der ville sett ut som en måling. Andelen kappes ved 100.
+
+**De to andre fanene henter linjene sine herfra.** `sikreBemanning()` henter én gang og
+deler; oppdragsfanen og KO-fanen kaller den gjennom `_kallOppdrag()` og tegner grafen på
+nytt med linjene når svaret kommer. Uten tilgang svarer vakten `undefined`, og stolpene
+står alene. `mkStabletChart(..., {linjer})` legger dem på en høyre akse.
+
+**Svaret bærer aldri personnavn** — tall og enhetsnavn. `GateTests` i
+`vaktliste/tests_statistikk.py` leser hele svaret og krever det.

@@ -180,9 +180,15 @@ function renderKoStats(s) {
     : '<p class="text-muted small p-2 mb-0">Ingen — hver Rød og Viktig fikk lag eller oppdrag.</p>';
 
   const sam = s.samtidighet;
-  mkChart('chart-ko-samtidighet', 'bar',
-    sam.map(r => String(r.time).padStart(2, '0')), sam.map(r => r.apne),
-    sam.map(r => _koFarge(r.hoyeste)));
+  const tegnSam = (linjer) => mkStabletChart(
+    'chart-ko-samtidighet', sam.map(r => String(r.time).padStart(2, '0')),
+    [{ label: 'Åpne hendelser', data: sam.map(r => r.apne),
+       backgroundColor: sam.map(r => _koFarge(r.hoyeste)) }], { linjer });
+  tegnSam([]);
+  // Lagene på vakt fra vaktlistas kilde (7c), når kontoen har den.
+  Promise.resolve(_kallOppdrag('sikreBemanning')).then(b => {
+    if (b && koStats === s) tegnSam(_kallOppdrag('bemanningLinjer', b, ['lag', 'personer']) || []);
+  });
 
   document.getElementById('tbl-ko-eskaleringer').innerHTML = mkKoEskaleringTabell(s);
   const e = s.eskaleringer;

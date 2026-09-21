@@ -1,0 +1,91 @@
+{% comment %}
+  Bemanningsfanen (statistikk pulje 7c, 21. sep. 2026, docs/FORSLAG_KO_STATISTIKK.md
+  §2 D og C7). Rendres kun for kontoer med `les_alle` i vaktlista; gaten står i
+  statistikk/views.py gjennom handlerens `nivaa`. Tallene fylles av
+  statistikk-bemanning.js — tall og enhetsnavn, aldri personnavn.
+{% endcomment %}
+<div class="kilde-panel{% if kilder.0.slug == 'vaktliste' %} active{% endif %}" id="kilde-vaktliste">
+
+  <div class="small mb-2" style="color: var(--text-muted);">
+    Bemanningen fra vaktlista lagt under trykket fra oppdragene og hendelsene. «På vakt» er et
+    skift med mannskap som dekker timen; «møtt» er de som er registrert møtt.
+  </div>
+
+  <div class="row g-2 mb-2">
+    <div class="col-6 col-sm-4 col-md-2">
+      <div class="kpi-card kpi-blue">
+        <div class="kpi-label">Personer</div>
+        <div class="kpi-value" id="bkpi-personer">0</div>
+        <div class="kpi-sub" id="bkpi-personer-sub"></div>
+      </div>
+    </div>
+    <div class="col-6 col-sm-4 col-md-2">
+      <div class="kpi-card">
+        <div class="kpi-label">Møtt</div>
+        <div class="kpi-value" id="bkpi-mott">0</div>
+        <div class="kpi-sub">av skiftene</div>
+      </div>
+    </div>
+    <div class="col-6 col-sm-4 col-md-2">
+      <div class="kpi-card kpi-teal">
+        <div class="kpi-label">Enhetstimer</div>
+        <div class="kpi-value" id="bkpi-enhetstimer">–</div>
+        <div class="kpi-sub">biler bemannet</div>
+      </div>
+    </div>
+    <div class="col-6 col-sm-4 col-md-2">
+      <div class="kpi-card">
+        <div class="kpi-label">Lagtimer</div>
+        <div class="kpi-value" id="bkpi-lagtimer">–</div>
+        <div class="kpi-sub">lag og poster bemannet</div>
+      </div>
+    </div>
+    <div class="col-6 col-sm-4 col-md-2">
+      <div class="kpi-card kpi-yellow">
+        <div class="kpi-label">Oppdrag per enhetstime</div>
+        <div class="kpi-value" id="bkpi-per-enhetstime">–</div>
+        <div class="kpi-sub" id="bkpi-per-enhetstime-sub"></div>
+      </div>
+    </div>
+    <div class="col-6 col-sm-4 col-md-2">
+      <div class="kpi-card kpi-green">
+        <div class="kpi-label">Utnyttelse</div>
+        <div class="kpi-value" id="bkpi-utnyttelse">–</div>
+        <div class="kpi-sub">median, oppdragstid av bemannet</div>
+      </div>
+    </div>
+  </div>
+
+  <div id="bemanning-uten-liste" class="small mb-3 d-none" style="color: var(--text-muted);">
+    Vakta har ingen vaktliste. Bemanningstallene finnes ikke uten.
+  </div>
+
+  <div class="row g-2 mb-2">
+    <div class="col-12">
+      <div class="chart-card">
+        <div class="chart-title">På vakt per klokketime</div>
+        <canvas id="chart-bemanning-time" height="120"></canvas>
+        <div class="small mt-1" style="color: var(--text-muted);">
+          <span style="color:#22c55e">—</span> Personer &nbsp;
+          <span style="color:#86efac">—</span> Møtt &nbsp;
+          <span style="color:#a78bfa">—</span> Lag &nbsp;
+          <span style="color:#0ea5e9">—</span> Enheter
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="row g-2 mb-2">
+    <div class="col-12">
+      <div class="chart-card">
+        <div class="chart-title">Enhetsutnyttelse · oppdragstid som andel av bemannet tid</div>
+        <div id="tbl-bemanning-utnyttelse" class="stats-rull mt-2"></div>
+        <div class="small mt-2" style="color: var(--text-muted);">
+          «Ukjent» er en bil som ikke er koblet til en ressurs i vaktlista. Lengste ledigtid er
+          det lengste sammenhengende hullet uten oppdrag innenfor bemannet tid.
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /kilde-vaktliste -->

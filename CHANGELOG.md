@@ -4,6 +4,43 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-21 — Statistikk pulje 7c: fanen «Bemanning» — belastning mot bemanning  `#statistikk/oppdragsfanen` `#statistikk/ko` `#vaktliste/belastning`
+
+André: «gå videre på 7c». Fjerde kilde på `/statistikk/` (`vaktliste/statistikk.py`,
+`statistikk-bemanning.js`, `_bemanning.html`), retningen `vaktliste` → `oppdrag`.
+
+- **På vakt per klokketime**: personer, møtt, lag og enheter — vaktlistas skift lagt
+  under trykket. **Personer, ikke skift**: én på to overlappende skift er én. Møtt telles
+  fra møtt-tidspunktet. Enhetstimer og lagtimer er unionen av skiftene per ressurs.
+- **Oppdrag per enhetstime** — det ene normaliserte tallet uten publikumstall.
+- **Enhetsutnyttelse per bil**: bemannet tid, tid på oppdrag (varslet → ledig, pågående
+  til nå), andel (kappet ved 100) og lengste sammenhengende ledigtid innenfor bemannet
+  tid. **«Ukjent», ikke null**, for en bil som ikke er koblet til en ressurs i vaktlista.
+- **Linjene i de to andre fanene**: enheter og lag på vakt over køen i oppdragsfanen,
+  lag og personer over åpne hendelser i KO-fanen. `sikreBemanning()` henter én gang;
+  fanene kaller den gjennom `_kallOppdrag()` og tegner på nytt når svaret kommer — uten
+  tilgang står stolpene alene. `mkStabletChart` fikk `opts.linjer` på en høyre akse.
+
+**Kilden krever `les_alle`, ikke `les`.** `les` i vaktlista er «sitt eget korps», og hele
+bemanningen er ikke det. `BaseStatistikkHandler.nivaa` (standard `les`) er det nye
+knappet; statistikkappen spør `har_tilgang(user, slug, h.nivaa)`. Svaret bærer aldri
+personnavn — `GateTests` leser hele svaret.
+
+**Funnet underveis:** `fmtMin()` skrev «2t 60m» for 179,9 minutter — timene ble regnet
+av råtallet og minuttene av resten, avrundet hver for seg. Rundes nå til hele minutter
+først (`FmtMinTests` i `statistikk/tests.py`). Og «Personer» i grafen sto på 30 med 15
+personer: den talte skift. Og grafen «På vakt per klokketime» sto på 30 med 14: en
+stablet y-akse stabler linjer også, så personer + møtt + lag lå oppå hverandre —
+`mkStabletChart` stabler nå bare når det finnes stolper. 30 JS-filer.
+
+Mutanter: **19/19 drept** i `union`, `lengste_hull`, `_timebolker`, per-time-tallene,
+enhetstimer, utnyttelsen og gaten. Tre overlevde første runde: en no-op (`lengste_hull`
+slo sammen intervaller kallet alt hadde slått sammen — nå bare sortert), et oppdrag
+*etter* bemannet tid som ingen test hadde, og en median av to verdier som var lik
+snittet. Playwright mot seed med koblede biler: fanen og linjene tegnes uten feil.
+
+---
+
 ## 2026-09-21 — Statistikk pulje 7a: KO-fanen — hvem løste hendelsen, tid til første ressurs, stillhet  `#statistikk/ko` `#ko/hendelseslogg`
 
 André: «Ansvarsområde er ikke viktig, trenger ikke per person og forventet publikum.

@@ -156,7 +156,8 @@ function mkStabletChart(id, labels, datasets, opts = {}) {
     plugins.push({
       id: 'stolpeEtikett',
       afterDatasetsDraw(chart) {
-        const meta = chart.getDatasetMeta(datasets.length - 1);
+        // Stolpene ligger etter linjene i datasettlista.
+        const meta = chart.getDatasetMeta(chart.data.datasets.length - 1);
         const ctx = chart.ctx;
         ctx.save();
         ctx.fillStyle = '#fde68a';
@@ -169,22 +170,40 @@ function mkStabletChart(id, labels, datasets, opts = {}) {
       },
     });
   }
+  // Linjer over stolpene (pulje 7c): bemanningen fra vaktlista, på egen
+  // høyre akse så «3 på vakt» ikke drukner under «12 i kø». `linjeakse: 'y'`
+  // legger dem på samme akse — for en graf som bare har linjer.
+  const linjer = (opts.linjer || []).map(l => ({
+    type: 'line', yAxisID: opts.linjeakse || 'y2', tension: 0.25, pointRadius: 2,
+    borderWidth: 2, fill: false, ...l,
+  }));
+  const scales = {
+    x: { stacked: true, grid: { color: opts.horisontal ? chartGrid : 'transparent' },
+         title: opts.horisontal ? { display: true, text: 'minutter' } : undefined },
+    // Stablet bare når det finnes stolper: med `linjeakse: 'y'` og ingen
+    // stolper ville linjene stablet seg oppå hverandre (14 personer + 10
+    // møtt + 3 lag sto som 27, bemanningsfanen 21. sep. 2026).
+    y: { stacked: datasets.length > 0, grid: { color: opts.horisontal ? 'transparent' : chartGrid },
+         ticks: { precision: 0 }, beginAtZero: true },
+  };
+  if (linjer.length && !opts.linjeakse) {
+    scales.y2 = { position: 'right', grid: { display: false }, ticks: { precision: 0 },
+                  beginAtZero: true, title: { display: true, text: 'på vakt' } };
+  }
   charts[id] = new Chart(canvas.getContext('2d'), {
     type: 'bar',
     data: {
       labels,
-      datasets: datasets.map(d => ({ ...d, maxBarThickness: 28, borderRadius: 3 })),
+      datasets: [
+        ...linjer,
+        ...datasets.map(d => ({ ...d, maxBarThickness: 28, borderRadius: 3 })),
+      ],
     },
     options: {
       indexAxis: opts.horisontal ? 'y' : 'x',
       responsive: true,
       plugins: { legend: { display: false } },
-      scales: {
-        x: { stacked: true, grid: { color: opts.horisontal ? chartGrid : 'transparent' },
-             title: opts.horisontal ? { display: true, text: 'minutter' } : undefined },
-        y: { stacked: true, grid: { color: opts.horisontal ? 'transparent' : chartGrid },
-             ticks: { precision: 0 } },
-      },
+      scales,
     },
     plugins,
   });
@@ -668,6 +687,10 @@ function visKilde(slug) {
   }
   if (slug === 'ko') {
     _kallOppdrag('loadKoStats');
+    return;
+  }
+  if (slug === 'vaktliste') {
+    _kallOppdrag('loadBemanningStats');
     return;
   }
   // Pasientfanen: rendres på nytt av samme grunn som ved sub-faneskift —

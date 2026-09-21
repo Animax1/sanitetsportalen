@@ -394,3 +394,29 @@ class TabelleneRullerPaaTelefonTests(SimpleTestCase):
         self.assertIn('max-width: 100%', m.group(1))
         m = re.search(r'\.chart-title \{([^}]*)\}', css)
         self.assertIn('flex-wrap: wrap', m.group(1), 'tittel og merke på hver sin linje ved behov')
+
+
+class FmtMinTests(SimpleTestCase):
+    """`fmtMin()` i portal-utils.js — alle fanene skriver tider med den.
+
+    «2t 60m» sto i bemanningsfanen 21. sep. 2026: timene ble regnet av 179,9
+    og minuttene av resten, avrundet hver for seg.
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        from patients.js_test_utils import PORTAL_UTILS_JS, build_harness
+        cls.harness = build_harness(((PORTAL_UTILS_JS, ('fmtMin',)),))
+
+    def _fmt(self, verdi):
+        from patients.js_test_utils import run_node
+        # Harnessen skriver «OK» sist; ta det som sto før.
+        return run_node(self.harness, f'process.stdout.write(fmtMin({verdi}));').rsplit('OK', 1)[0]
+
+    def test_avrunding_ruller_over_i_timen(self):
+        self.assertEqual(self._fmt(179.9), '3t 0m')
+        self.assertEqual(self._fmt(59.6), '1t 0m')
+        self.assertEqual(self._fmt(59.4), '59m')
+        self.assertEqual(self._fmt(125), '2t 5m')
+        self.assertEqual(self._fmt('null'), '–')
