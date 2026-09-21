@@ -18,8 +18,8 @@ tallene.
 **Avhengighetsretningen er statistikk → moduler, aldri motsatt.** Modulen som eier
 dataene regner ut tallene; statistikk-appen henter, cacher og viser — og navngir ingen
 kildemodul. Registeret er `core/stats.py`, samme idiom som `core.backup` og `core.arkiv`:
-hver modul melder inn en `BaseStatistikkHandler` fra `apps.ready()`. To kilder i dag,
-`patients/statistikk.py` og `oppdrag/statistikk.py`.
+hver modul melder inn en `BaseStatistikkHandler` fra `apps.ready()`. Tre kilder i dag,
+`patients/statistikk.py`, `oppdrag/statistikk.py` og `ko/statistikk.py`.
 
 `hent_aktiv_vakt` bor i **`core.vakt`** (flyttet dit 14. sep. 2026, sammen med
 `vakt_for_year`): den er portalens scope, delt av alle moduler, og lå i pasientmodulen
@@ -55,12 +55,14 @@ Hva som lastes når står i rota; hva filene gjør står her.
 |---|---|
 | `statistikk.js` | Pasientstatistikk (Chart.js), arkivmodus, kildefanene |
 | `statistikk-oppdrag.js` | Oppdragsfanen |
+| `statistikk-ko.js` | KO-fanen (pulje 7a). Lastes kun med KO-tilgang; samme vakt |
 
 **Chart.js lastes kun her.** Den er tung, og ingen annen side tegner grafer.
 
-**`statistikk-oppdrag.js` lastes bare for den som har oppdragstilgang** — samme
-komposisjonsregel som endepunktene følger. Kall fra `statistikk.js` går derfor gjennom
-`_kallOppdrag('navn')`, som sjekker at funksjonen finnes: et direkte kall ville vært en
+**`statistikk-oppdrag.js` lastes bare for den som har oppdragstilgang, og
+`statistikk-ko.js` bare med KO-tilgang** — samme komposisjonsregel som endepunktene
+følger. Kall fra `statistikk.js` går derfor gjennom `_kallOppdrag('navn')` (navnet er
+historisk; vakten er felles), som sjekker at funksjonen finnes: et direkte kall ville vært en
 `ReferenceError` for alle som ser pasientfanen uten å ha oppdrag, og siden ville dødd på
 et faneskift i stedet for å vise den ene fanen brukeren faktisk har.
 
@@ -107,3 +109,29 @@ hvert oppdrag. `_oppdrag()`-hjelperne gjør det; en ny testfil skal også.
 navngitte funksjoner, så en toppnivå-`const` er en `ReferenceError` der. Et arkiv frosset
 før 7b mangler nøklene; `_tegn7b` lar seksjonene stå tomme, og `_sdRad` tåler at `p90`
 mangler.
+
+## KO-fanen (pulje 7a, 21. sep. 2026)
+
+Utregningen bor i `ko/statistikk.py`; retningen er `ko` → `oppdrag`, som ellers i modulen.
+Ingen arkiv — KO-loggen fryses aldri — så `arkiv_full_stats` er `None`.
+
+**Hendelser, ikke personer, og ikke per operatør.** Setningen øverst i fanen er det ene som
+hindrer at tre registre summeres til «pasienter» (notatet §8). André, 21. sep.:
+«ansvarsområde er ikke viktig, trenger ikke per person» — loggens tall går per time og per
+slag (rettinger, fjerninger, deling, KO-førte og forsinkede stemplinger).
+
+**Lag på hendelsen regnes av systemlinjene**, ikke av `HendelseLag`: raden slettes når
+laget tas av, linjene `hendelse_lag_paa`/`_av` og laglista på `hendelse_opprettet` står.
+`lagperioder()` er det ene stedet, og «bare lag» i «hvem løste hendelsen» avhenger av den —
+ellers ble et lag som ble tatt av før lukkingen til «verken». Et `til`-felt på raden er
+bevisst ikke tatt: det rører hvem tavla og skjemaet viser som «på hendelsen nå».
+
+**Tid til første ressurs** starter når KO hørte om hendelsen; et oppdrag knyttet til fra
+før den fantes teller som null. `alle` regnes av hendelsene, ikke av medianene per
+prioritet — medianen av medianer er ikke en median.
+
+**Stillhet** er hullet mellom to operatørlinjer, og fra den siste til nå, målt når minst
+én hendelse sto åpen *da hullet begynte*; under ett minutt er ikke et hull. Tre vises.
+
+**Fiksturen må sette `registrert_at`** på linjene: feltet er `auto_now_add`, og tid til
+retting og til deling regnes av det. `_linje()` i `ko/tests_statistikk.py` gjør det.

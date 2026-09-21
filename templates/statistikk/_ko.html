@@ -1,0 +1,190 @@
+{% comment %}
+  KO-fanen (statistikk pulje 7a, 21. sep. 2026, docs/FORSLAG_KO_STATISTIKK.md
+  §2 A og B, skissene S4 og S5). Rendres kun for kontoer med `les` i KO;
+  gaten står i statistikk/views.py. Tallene fylles av statistikk-ko.js —
+  alle verdier settes med textContent eller går gjennom mkStatsTable(), se
+  patients/tests_xss_stats.py.
+
+  Setningen under fanenavnet er det ene som hindrer feilen fra notatet §8:
+  tre registre som teller tre ting, og som noen summerer til «pasienter».
+{% endcomment %}
+<div class="kilde-panel{% if kilder.0.slug == 'ko' %} active{% endif %}" id="kilde-ko">
+
+  <div class="small mb-2" style="color: var(--text-muted);">
+    Tallene teller <b>hendelser</b> — ikke pasienter. Pasientregistreringen, oppdragene og
+    hendelsene er tre målinger av tre ting, og summeres ikke.
+  </div>
+
+  <!-- KPI-rad -->
+  <div class="row g-2 mb-2">
+    <div class="col-6 col-sm-4 col-md-2">
+      <div class="kpi-card kpi-blue">
+        <div class="kpi-label">Hendelser</div>
+        <div class="kpi-value" id="kkpi-hendelser">0</div>
+        <div class="kpi-sub" id="kkpi-hendelser-sub"></div>
+      </div>
+    </div>
+    <div class="col-6 col-sm-4 col-md-2">
+      <div class="kpi-card kpi-red">
+        <div class="kpi-label">Rød + Viktig</div>
+        <div class="kpi-value" id="kkpi-rod-viktig">0</div>
+        <div class="kpi-sub" id="kkpi-rod-viktig-sub"></div>
+      </div>
+    </div>
+    <div class="col-6 col-sm-4 col-md-2">
+      <div class="kpi-card">
+        <div class="kpi-label">Varighet</div>
+        <div class="kpi-value" id="kkpi-varighet">–</div>
+        <div class="kpi-sub" id="kkpi-varighet-sub">median · p90</div>
+      </div>
+    </div>
+    <div class="col-6 col-sm-4 col-md-2">
+      <div class="kpi-card">
+        <div class="kpi-label">Tid til første ressurs</div>
+        <div class="kpi-value" id="kkpi-forste-ressurs">–</div>
+        <div class="kpi-sub">median, lag eller bil</div>
+      </div>
+    </div>
+    <div class="col-6 col-sm-4 col-md-2">
+      <div class="kpi-card kpi-green">
+        <div class="kpi-label">Løst av lag alene</div>
+        <div class="kpi-value" id="kkpi-bare-lag">0</div>
+        <div class="kpi-sub" id="kkpi-bare-lag-sub"></div>
+      </div>
+    </div>
+    <div class="col-6 col-sm-4 col-md-2">
+      <div class="kpi-card kpi-teal">
+        <div class="kpi-label">Lagtimer</div>
+        <div class="kpi-value" id="kkpi-lagtimer">–</div>
+        <div class="kpi-sub" id="kkpi-lagtimer-sub"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Hvem løste hendelsen (A5) -->
+  <div class="row g-2 mb-2">
+    <div class="col-md-7">
+      <div class="chart-card">
+        <div class="chart-title">Hvem løste hendelsen · lukkede, uten Drift og Plassering</div>
+        <div id="tbl-ko-hvem-loste" class="stats-rull mt-2"></div>
+        <div id="ko-hvem-loste-fot" class="small mt-2" style="color: var(--text-muted);"></div>
+      </div>
+    </div>
+    <div class="col-md-5">
+      <div class="chart-card">
+        <div class="chart-title">Tid til første ressurs · per prioritet, median</div>
+        <div id="tbl-ko-forste-ressurs" class="stats-rull mt-2"></div>
+        <div class="small mt-2" style="color: var(--text-muted);">
+          Klokka starter når KO hørte om hendelsen, ikke når oppdraget ble laget.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="row g-2 mb-2">
+    <div class="col-12">
+      <div class="chart-card">
+        <div class="chart-title">
+          <i class="bi bi-exclamation-triangle-fill me-1" style="color:#fca5a5"></i>
+          Rød og Viktig lukket uten lag og uten oppdrag
+        </div>
+        <div id="tbl-ko-verken" class="stats-rull mt-2"></div>
+        <div class="small mt-2" style="color: var(--text-muted);">
+          Hver av disse er et spørsmål til gjennomgangen: for høy prioritet, eller gjorde noen
+          andre jobben?
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Samtidighet (A8), eskaleringer (A6) -->
+  <div class="row g-2 mb-2">
+    <div class="col-md-7">
+      <div class="chart-card">
+        <div class="chart-title">Åpne hendelser per klokketime · høyeste prioritet i fargen</div>
+        <canvas id="chart-ko-samtidighet" height="150"></canvas>
+      </div>
+    </div>
+    <div class="col-md-5">
+      <div class="chart-card">
+        <div class="chart-title">Eskaleringer · fra → til</div>
+        <div id="tbl-ko-eskaleringer" class="stats-rull mt-2"></div>
+        <div id="ko-eskaleringer-fot" class="small mt-2" style="color: var(--text-muted);"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Stillhet (B4), varighet (A2) -->
+  <div class="row g-2 mb-2">
+    <div class="col-md-6">
+      <div class="chart-card">
+        <div class="chart-title">Stillhet · lengste hull uten operatørlinje mens noe sto åpent</div>
+        <div id="tbl-ko-stillhet" class="stats-rull mt-2"></div>
+      </div>
+    </div>
+    <div class="col-md-6">
+      <div class="chart-card">
+        <div class="chart-title">Varighet per prioritet · opprettet → lukket</div>
+        <div id="tbl-ko-varighet" class="stats-rull mt-2"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Fordelinger (A1) -->
+  <div class="row g-2 mb-2">
+    <div class="col-md-4">
+      <div class="chart-card">
+        <div class="chart-title">Prioritet</div>
+        <canvas id="chart-ko-prioritet" height="200"></canvas>
+      </div>
+    </div>
+    <div class="col-md-4">
+      <div class="chart-card">
+        <div class="chart-title">Lokasjon</div>
+        <canvas id="chart-ko-lokasjon" height="200"></canvas>
+      </div>
+    </div>
+    <div class="col-md-4">
+      <div class="chart-card">
+        <div class="chart-title">Melder</div>
+        <canvas id="chart-ko-melder" height="200"></canvas>
+        <div class="small mt-1" style="color: var(--text-muted);">
+          En hendelse med flere meldere telles på hver av dem.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Lag (A4) og loggen (B1–B5) -->
+  <div class="row g-2 mb-2">
+    <div class="col-md-5">
+      <div class="chart-card">
+        <div class="chart-title">Lag på hendelser</div>
+        <div id="tbl-ko-lag" class="stats-rull mt-2"></div>
+        <div class="small mt-2" style="color: var(--text-muted);">
+          Timer fra laget ble satt på til det ble tatt av, eller hendelsen lukket.
+        </div>
+      </div>
+    </div>
+    <div class="col-md-7">
+      <div class="chart-card">
+        <div class="chart-title">Logglinjer per klokketime</div>
+        <canvas id="chart-ko-logg" height="120"></canvas>
+        <div class="small mt-1" style="color: var(--text-muted);">
+          <span style="color:#3b82f6">■</span> Operatør &nbsp;
+          <span style="color:#64748b">■</span> System
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="row g-2 mb-2">
+    <div class="col-12">
+      <div class="chart-card">
+        <div class="chart-title">Føringen · rettinger, fjerninger, deling, stemplinger</div>
+        <div id="tbl-ko-logg" class="stats-rull mt-2"></div>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /kilde-ko -->

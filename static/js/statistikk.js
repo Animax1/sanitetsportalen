@@ -140,6 +140,56 @@ function mkChart(id, type, labels, data, colors, horiz = false) {
 // ════════════════════════════════════════════════════════
 // STATISTICS – TABLE HELPERS
 // ════════════════════════════════════════════════════════
+// Stablet stolpediagram — mkChart() tegner ett datasett, og ventetida i to,
+// køen og loggen per time trenger to. Bor her og ikke i oppdragsfila fordi
+// KO-fanen også tegner med den, og den fila lastes uten oppdragstilgang.
+// Samme registrering i `charts`, så et nytt kall tegner over det gamle.
+function mkStabletChart(id, labels, datasets, opts = {}) {
+  const canvas = document.getElementById(id);
+  if (!canvas) return;
+  if (charts[id]) { charts[id].destroy(); delete charts[id]; }
+  if (!labels.length) return;
+  const plugins = [];
+  if (opts.etiketter) {
+    // Tallet over stolpen (lengste ståtid i køen). Tegnes over det øverste
+    // datasettet — det er det som har toppen.
+    plugins.push({
+      id: 'stolpeEtikett',
+      afterDatasetsDraw(chart) {
+        const meta = chart.getDatasetMeta(datasets.length - 1);
+        const ctx = chart.ctx;
+        ctx.save();
+        ctx.fillStyle = '#fde68a';
+        ctx.font = 'bold 11px system-ui';
+        ctx.textAlign = 'center';
+        meta.data.forEach((stolpe, i) => {
+          if (opts.etiketter[i]) ctx.fillText(opts.etiketter[i], stolpe.x, stolpe.y - 4);
+        });
+        ctx.restore();
+      },
+    });
+  }
+  charts[id] = new Chart(canvas.getContext('2d'), {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: datasets.map(d => ({ ...d, maxBarThickness: 28, borderRadius: 3 })),
+    },
+    options: {
+      indexAxis: opts.horisontal ? 'y' : 'x',
+      responsive: true,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { stacked: true, grid: { color: opts.horisontal ? chartGrid : 'transparent' },
+             title: opts.horisontal ? { display: true, text: 'minutter' } : undefined },
+        y: { stacked: true, grid: { color: opts.horisontal ? 'transparent' : chartGrid },
+             ticks: { precision: 0 } },
+      },
+    },
+    plugins,
+  });
+}
+
 function mkStatsTable(headers, rows, opts={}) {
   if (!rows.length) return '<p class="text-muted small p-2 mb-0">Ingen data</p>';
   const sigCol = opts.sigCol ?? -1;
@@ -583,10 +633,12 @@ function mkInterpretation(s) {
 // første gang den åpnes.
 
 // Renderingen av oppdragstallene ligger i statistikk-oppdrag.js, som kun
-// lastes for kontoer med oppdragstilgang. Samme vern som `_kall()` på
-// pasientsiden: uten sjekken ville et faneklikk gitt ReferenceError for
-// alle andre — og fanen finnes riktignok ikke for dem, men et direkte kall
-// fra alltid-lastet kode til en betinget lastet fil er hullet, ikke klikket.
+// lastes for kontoer med oppdragstilgang — og KO-tallene i statistikk-ko.js,
+// kun med KO-tilgang. Samme vern som `_kall()` på pasientsiden: uten sjekken
+// ville et faneklikk gitt ReferenceError for alle andre — og fanen finnes
+// riktignok ikke for dem, men et direkte kall fra alltid-lastet kode til en
+// betinget lastet fil er hullet, ikke klikket. Navnet er historisk; vakten
+// er den samme for begge filene.
 function _kallOppdrag(navn, ...args) {
   const fn = globalThis[navn];
   if (typeof fn !== 'function') return undefined;
@@ -612,6 +664,10 @@ function visKilde(slug) {
 
   if (slug === 'oppdrag') {
     _kallOppdrag('loadOppdragStats');
+    return;
+  }
+  if (slug === 'ko') {
+    _kallOppdrag('loadKoStats');
     return;
   }
   // Pasientfanen: rendres på nytt av samme grunn som ved sub-faneskift —

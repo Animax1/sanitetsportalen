@@ -25,7 +25,7 @@ import unittest
 from django.test import SimpleTestCase
 
 from patients.js_test_utils import (
-    ADMIN_JS, PORTAL_UTILS_JS, STATISTIKK_JS, STATISTIKK_OPPDRAG_JS,
+    ADMIN_JS, PORTAL_UTILS_JS, STATISTIKK_JS, STATISTIKK_KO_JS, STATISTIKK_OPPDRAG_JS,
     build_harness, extract_function, read_js, run_node,
 )
 
@@ -53,6 +53,16 @@ HTML_BUILDERS = (
     'mkAnnetStedTabell',
     'mkUtfallTabell',
     'mkHendelserTabell',
+    # KO-fanen (pulje 7a). Titler og siste logglinje er operatørskrevet
+    # fritekst; alle går gjennom mkStatsTable().
+    'mkKoHvemLosteTabell',
+    'mkKoVerkenTabell',
+    'mkKoForsteRessursTabell',
+    'mkKoEskaleringTabell',
+    'mkKoStillhetTabell',
+    'mkKoVarighetTabell',
+    'mkKoLagTabell',
+    'mkKoLoggTabell',
 )
 
 # Funksjoner som escaper – en interpolasjon som starter med én av disse er OK.
@@ -111,7 +121,8 @@ class StatsEscapingSourceGuardTests(SimpleTestCase):
         # markup med innerHTML, så gjennomgangen må dekke alle — leste vi
         # bare én, ville resten av vernet forsvunnet uten at noen test ble rød.
         cls.stats_src = (read_js(STATISTIKK_JS) + '\n' + read_js(ADMIN_JS)
-                         + '\n' + read_js(STATISTIKK_OPPDRAG_JS))
+                         + '\n' + read_js(STATISTIKK_OPPDRAG_JS)
+                         + '\n' + read_js(STATISTIKK_KO_JS))
         cls.utils_src = read_js(PORTAL_UTILS_JS)
 
     def test_escape_hjelperne_finnes_i_utils(self):
@@ -194,6 +205,10 @@ class StatsEscapingBehaviourTests(SimpleTestCase):
                                  'mkKonkordansTabell', 'mkAvreistTabell',
                                  'mkAnnetStedTabell', 'mkUtfallTabell',
                                  'mkHendelserTabell')),
+        (STATISTIKK_KO_JS, ('_koNavn', '_koMedianP90', 'mkKoHvemLosteTabell',
+                            'mkKoVerkenTabell', 'mkKoForsteRessursTabell',
+                            'mkKoEskaleringTabell', 'mkKoStillhetTabell',
+                            'mkKoVarighetTabell', 'mkKoLagTabell', 'mkKoLoggTabell')),
     )
 
     XSS = '<img src=x onerror=alert(1)>'

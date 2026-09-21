@@ -4,6 +4,46 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-21 — Statistikk pulje 7a: KO-fanen — hvem løste hendelsen, tid til første ressurs, stillhet  `#statistikk/ko` `#ko/hendelseslogg`
+
+André: «Ansvarsområde er ikke viktig, trenger ikke per person og forventet publikum.
+Trenger ikke sammenligning per nå.» Skissene S4 og S5 er bygget som fane «KO» på
+`/statistikk/` (`ko/statistikk.py`, `statistikk-ko.js`, `_ko.html`), gatet på `les` i KO
+som oppdragsfanen på oppdrag. Setningen øverst: tallene teller **hendelser**, ikke
+pasienter.
+
+- **Hvem løste hendelsen**: lukkede hendelser utenom Drift og Plassering i fire ruter —
+  lag og oppdrag, bare lag, bare oppdrag, verken — per prioritet, med tida fra lag satt på
+  til oppdrag laget. **Rød og Viktig lukket uten lag og uten oppdrag listes med navn**,
+  tid, hvem som lukket og siste operatørlinje.
+- **Tid til første ressurs** per prioritet: til oppdrag, til Rykker ut, til lag på, og det
+  første av dem. Klokka starter når KO hørte om hendelsen. `alle` regnes av hendelsene.
+- **Samtidighet** (åpne hendelser per klokketime, høyeste prioritet i fargen),
+  **eskaleringer** fra → til med opp/ned og median tid etter opprettelse, gjenåpninger,
+  varighet per prioritet med p90, fordeling per prioritet, lokasjon og melder.
+- **Lag på hendelser**: lagtimer og hendelser per lag. **Lagene leses av systemlinjene**
+  (`hendelse_lag_paa`/`_av`, laglista på `hendelse_opprettet`), ikke av `HendelseLag` —
+  raden slettes ved tatt av. `HendelseLag.til` fra forslaget ble ikke lagt til.
+- **Loggen**: linjer per time (operatør/system), rettinger med tid til retting,
+  fjerninger, delte hendelseslinjer med tid til deling, KO-førte og forsinkede
+  stemplinger, og **stillhet**: de tre lengste hullene uten operatørlinje mens noe sto
+  åpent, med det som pågår nå.
+
+Ingen arkiv for KO. `mkStabletChart` flyttet fra `statistikk-oppdrag.js` til `statistikk.js`
+— KO-fanen tegner med den, og oppdragsfila lastes ikke uten oppdragstilgang.
+`_kallOppdrag()` vokter begge de betinget lastede filene (navnet er historisk).
+29 JS-filer. Testene i `ko/tests_statistikk.py` setter `registrert_at` på linjene — feltet
+er `auto_now_add`, og tid til retting/deling regnes av det.
+
+Mutanter: **24/24 drept** (én til var en no-op: `fjern()` tømmer teksten, så
+fjernet-sjekken i «siste linje» var overflødig og er tatt bort). Seks overlevde første
+runde: symmetriske tall (én KO-ført og én forsinket stempling), «høyeste prioritet» som
+tilfeldigvis var den sist behandlede, oppdrag alltid etter laget, og kanten «lukket
+nøyaktig på hel time» — den avslørte at `<=` talte time 22 for en hendelse lukket 22:00,
+og er rettet til `<`. Playwright mot seed: fanen tegnes uten feil.
+
+---
+
 ## 2026-09-21 — Statistikk pulje 7b: ventetida i to, køen, KO mot bilen, alle fem hastegradene  `#statistikk/oppdragsfanen` `#oppdrag/statusmaskin`
 
 André valgte fra skissene: ventetida som **både** stolper og tabell, «hvem løste» som

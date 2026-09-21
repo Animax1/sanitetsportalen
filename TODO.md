@@ -608,14 +608,12 @@ enhetens egen skjerm, og **sentralbordet flytter til KO** — en flytting av
 
 - [ ] **Pulje 7 — statistikk fra KO.** Forslaget står i
       [`docs/FORSLAG_KO_STATISTIKK.md`](./docs/FORSLAG_KO_STATISTIKK.md) (21. sep. 2026).
-      **7b (oppdragsfanen) er bygget** samme dag. Igjen: **7a** KO-fanen — hendelsesbildet
-      (tid til første ressurs, lagtimer, hvem løste hendelsen, samtidighet, eskaleringer)
-      og loggen (rettinger, deling, stillhet); krever `HendelseLag.til`. **7c** belastning
-      mot bemanning (linjene i kø-grafen, enhetsutnyttelse); krever vaktlistas ressurser
-      koblet til enhetene. **7d** sammenligning mellom vakter, tidslinje, vaktrapport.
-      Skissene S4/S5 er valgt (tabell for «hvem løste»). Åpent fra §8: per ansvarsområde
-      og ikke per person i loggtallene, felt for forventet publikum, og om sammenligningen
-      er «siste n» eller fritt valg.
+      **7a (KO-fanen) og 7b (oppdragsfanen) er bygget** samme dag. Igjen: **7c**
+      belastning mot bemanning (linjene i kø-grafen, enhetsutnyttelse); krever vaktlistas
+      ressurser koblet til enhetene. **7d** tidslinje og vaktrapport — sammenligning
+      mellom vakter er «ikke per nå» (André, 21. sep.). Utskriften av loggen bør bygges
+      sammen med vaktrapporten. `HendelseLag.til` ble ikke lagt til: lagene leses av
+      systemlinjene, og et `til`-felt rører hvem tavla viser som «på hendelsen nå».
 
 - [ ] **Fjerne sentralbordet fra `/oppdrag/`** — «avvente inntil videre, men noe å se på»
       (André, 19. sep. 2026), og fra 18. sep.: «når KO er prøvd på en ekte vakt». Notatet §7

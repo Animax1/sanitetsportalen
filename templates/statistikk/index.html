@@ -358,6 +358,10 @@
 {% include "statistikk/_oppdrag.html" %}
 {% endif %}
 
+{% if har_ko %}
+{% include "statistikk/_ko.html" %}
+{% endif %}
+
 </div>
 {% endblock %}
 
@@ -378,4 +382,5 @@
   ReferenceError ved faneskift.
 {% endcomment %}
 {% if har_oppdrag %}<script src="{% static 'js/statistikk-oppdrag.js' %}"></script>{% endif %}
+{% if har_ko %}<script src="{% static 'js/statistikk-ko.js' %}"></script>{% endif %}
 {% endblock %}

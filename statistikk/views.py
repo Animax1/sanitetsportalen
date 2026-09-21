@@ -89,6 +89,7 @@ def statistikk_view(request):
         # ha pasientmarkupen liggende i kilden.
         'har_patients': 'patients' in slugs,
         'har_oppdrag': 'oppdrag' in slugs,
+        'har_ko': 'ko' in slugs,
     })
 
 

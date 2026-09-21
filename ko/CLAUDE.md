@@ -193,41 +193,43 @@ seg skrive skal ikke ta ned en stempling i en bil.**
 
 **Fire av kodene fantes alt som `oppdrag.Enhetshendelse`** — sjekk før du designer.
 
-## Hendelsene (pulje 5) — reglene som står
+## Hendelsene — reglene som står
 
-Besvart av André 18. sep. 2026: **en lukket hendelse kan åpnes igjen, og det logges**
+André 18. sep. 2026: **en lukket hendelse kan åpnes igjen, og det logges**
 (`HENDELSE_GJENAPNET`). **`O45`/`H12` overalt** (§6): `oppdrag.services.oppdragsnr`,
 `oppdragsnr()` i `oppdrag-kort.js` (enhetsskjermen har egen kopi), `ko.systemlinjer.hendelsesnr`.
 
-Fem regler i `ko/services.py`, prøvd med mutanter i `ko/tests_hendelser.py`:
+Fem regler i `ko/services.py`, mutanter i `ko/tests_hendelser.py`:
 
 | Regel | Hvorfor |
 |---|---|
 | Nummeret tildeles ved opprettelse og endres aldri; serien er uavhengig av O-serien | §6: nummeret identifiserer, FK-en relaterer. Telleren er unntatt audit |
 | Lukking gir **409 med antallet** når hendelsen har åpne oppdrag, går gjennom med `confirm`, og antallet står på linja | §4.6: en dør hun åpner bevisst, ikke en vegg |
 | Hodet (tittel, lokasjon, melder) redigeres med `versjon`, 409 ved uenighet | §7.1: det ene delte redigerbare. Ingen systemlinje — `audit/` fører feltendringer |
-| `knytt_oppdrag` er den ene skriveren av `Oppdrag.hendelse`; lukket hendelse tar ikke imot | Ellers var «lukket» et ord uten mening |
+| `knytt_oppdrag` er den ene skriveren av `Oppdrag.hendelse`; lukket hendelse tar ikke imot | Ellers betyr «lukket» ingenting |
 | En hendelse laget **fra** en linje lar linja stå; linja får hendelsen, hendelsen peker tilbake | §4.5: flyttes linja inn, får loggen et hull der det viktige skjedde |
 
 **Lista følger med logg-pollen** (`hendelser` i `logg_view`), hele hver gang — som
-`fjernede`: en lukking har ingen ny id og ville aldri kommet gjennom `?siden=`.
+`fjernede`: en lukking har ingen ny id og kommer aldri gjennom `?siden=`.
 
-**Grupperingen på tavla er borte** (18. sep. 2026, André: «ikke noen hendelser i
-oppdragslisten»). H-merket på raden bærer koblingen — med rød trekant når hendelsen er
-Viktig — og hendelsene har sitt eget vindu. `renderOppdrag()` sier fra til KO etter
-tegningen gjennom `koEtterOppdragTegnet()` (vakt, for fila kjører også på `/oppdrag/`);
-`TavlaSierFraTilKoTests` holder kallstedet i live. Samme vakt for `koHendelseValg()` i
+**Grupperingen på tavla er borte** (André, 18. sep. 2026: «ikke noen hendelser i
+oppdragslisten»). H-merket på raden bærer koblingen — rød trekant når hendelsen er Viktig —
+og hendelsene har sitt eget vindu. `renderOppdrag()` sier fra til KO etter
+tegningen gjennom `koEtterOppdragTegnet()` (vakt: fila kjører også på `/oppdrag/`);
+`TavlaSierFraTilKoTests` holder kallstedet. Samme vakt for `koHendelseValg()` i
 detaljmodalen og `koEtterOpprettet()` etter «Nytt oppdrag», der «Hendelse» står sist i
-skjemaet i plassen `#nytt-hendelse-plass`, som malbiten lar stå tom.
+skjemaet i plassen `#nytt-hendelse-plass`.
 
 **Knytting krever `skriv_full` i begge modulene**: det skriver på en oppdragsrad, og hvem
-som får det er oppdragsmodulens sak (komposisjonsregelen). Dekoratøren gir KO-nivået,
-viewet sjekker det andre.
+som får det er oppdragsmodulens sak (komposisjonsregelen). Dekoratøren gir KO-nivået, viewet det andre.
+
+**Statistikken (`ko/statistikk.py`) leser lagene av systemlinjene, ikke `HendelseLag`** —
+se `statistikk/CLAUDE.md`.
 
 ## Hendelsesloggen som egen flate (18. sep. 2026)
 
-Besvart av André før koden, med de åtte skissene som fasit. Reglene bor i `ko/services.py`
-og er prøvd med mutanter i `ko/tests_hendelseslogg.py` og `ko/tests_nullstill.py`.
+Besvart av André før koden, med de åtte skissene som fasit. Reglene bor i `ko/services.py`,
+mutanter i `ko/tests_hendelseslogg.py` og `tests_nullstill.py`.
 
 | Regel | Hvorfor |
 |---|---|

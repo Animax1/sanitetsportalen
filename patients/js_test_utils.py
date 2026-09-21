@@ -31,6 +31,7 @@ APP_JS = JS_DIR / 'patients-app.js'
 ADMIN_JS = JS_DIR / 'patients-admin.js'
 STATISTIKK_JS = JS_DIR / 'statistikk.js'
 STATISTIKK_OPPDRAG_JS = JS_DIR / 'statistikk-oppdrag.js'
+STATISTIKK_KO_JS = JS_DIR / 'statistikk-ko.js'
 #: Sentralbordet er fire filer siden 14. sep. 2026 — se `VAKTLISTE_JS`.
 OPPDRAG_SENTRAL_JS = (
     # Delt med `/ko/` (17. sep. 2026): enhetskortets innmat og ordforrådet

@@ -205,61 +205,12 @@ function mkHendelserTabell(h) {
   return mkStatsTable(['Enhet', ...h.typer.map(([kode, navn]) => korte[kode] || navn)], rader);
 }
 
-// Stablet stolpediagram — mkChart() i statistikk.js tegner ett datasett, og
-// ventetida i to og køen trenger to. Samme registrering i `charts`, så et
-// nytt kall tegner over det gamle.
-function _mkStablet(id, labels, datasets, opts = {}) {
-  const canvas = document.getElementById(id);
-  if (!canvas) return;
-  if (charts[id]) { charts[id].destroy(); delete charts[id]; }
-  if (!labels.length) return;
-  const plugins = [];
-  if (opts.etiketter) {
-    // Tallet over stolpen (lengste ståtid i køen). Tegnes over det øverste
-    // datasettet — det er det som har toppen.
-    plugins.push({
-      id: 'stolpeEtikett',
-      afterDatasetsDraw(chart) {
-        const meta = chart.getDatasetMeta(datasets.length - 1);
-        const ctx = chart.ctx;
-        ctx.save();
-        ctx.fillStyle = '#fde68a';
-        ctx.font = 'bold 11px system-ui';
-        ctx.textAlign = 'center';
-        meta.data.forEach((stolpe, i) => {
-          if (opts.etiketter[i]) ctx.fillText(opts.etiketter[i], stolpe.x, stolpe.y - 4);
-        });
-        ctx.restore();
-      },
-    });
-  }
-  charts[id] = new Chart(canvas.getContext('2d'), {
-    type: 'bar',
-    data: {
-      labels,
-      datasets: datasets.map(d => ({ ...d, maxBarThickness: 28, borderRadius: 3 })),
-    },
-    options: {
-      indexAxis: opts.horisontal ? 'y' : 'x',
-      responsive: true,
-      plugins: { legend: { display: false } },
-      scales: {
-        x: { stacked: true, grid: { color: opts.horisontal ? chartGrid : 'transparent' },
-             title: opts.horisontal ? { display: true, text: 'minutter' } : undefined },
-        y: { stacked: true, grid: { color: opts.horisontal ? 'transparent' : chartGrid },
-             ticks: { precision: 0 } },
-      },
-    },
-    plugins,
-  });
-}
-
 function _tegn7b(s) {
   const vd = s.ventetid_delt;
   if (!vd) return;   // arkiv frosset før pulje 7b
 
   const hastegrader = Object.keys(vd.per_hastegrad);
-  _mkStablet('chart-oppdrag-ventetid', hastegrader, [
+  mkStabletChart('chart-oppdrag-ventetid', hastegrader, [
     { label: 'KO-ventetid', backgroundColor: '#f59e0b',
       data: hastegrader.map(h => vd.per_hastegrad[h].ko_ventetid.median ?? 0) },
     { label: 'Reaksjonstid', backgroundColor: '#3b82f6',
@@ -289,7 +240,7 @@ function _tegn7b(s) {
         + 'Hver er en enhet som var bundet uten å gjøre noe.'
       : '';
 
-  _mkStablet('chart-oppdrag-koe', s.koe.map(k => String(k.time).padStart(2, '0')), [
+  mkStabletChart('chart-oppdrag-koe', s.koe.map(k => String(k.time).padStart(2, '0')), [
     { label: 'Uten ressurs', backgroundColor: '#f59e0b', data: s.koe.map(k => k.uten_ressurs) },
     { label: 'Tildelt, venter', backgroundColor: '#3b82f6', data: s.koe.map(k => k.tildelt_venter) },
   ], { etiketter: s.koe.map(k => (k.uten_ressurs + k.tildelt_venter) ? fmtMin(k.lengste) : '') });
