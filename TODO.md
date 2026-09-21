@@ -607,13 +607,18 @@ enhetens egen skjerm, og **sentralbordet flytter til KO** — en flytting av
 `oppdrag-sentral-*.js`, ikke en kopi. Puljene står i §10.
 
 - [ ] **Fjerne sentralbordet fra `/oppdrag/`** — «avvente inntil videre, men noe å se på»
-      (André, 19. sep. 2026). `/ko/` har alt sentralbordet har (samme malbiter, samme
-      modaler). Det som henger på `/oppdrag/` for kontoer uten enhet, kartlagt 19. sep.:
+      (André, 19. sep. 2026), og fra 18. sep.: «når KO er prøvd på en ekte vakt». Notatet §7
+      sier «en flytting, ikke en kopi», og det siste steget er å la `/oppdrag/` bli
+      enhetsskjermen alene. Risikoen ved å vente er lav: begge sidene kjører samme kode mot
+      samme endepunkter og kan ikke bli uenige. `/ko/` har alt sentralbordet har (samme
+      malbiter, samme modaler). Det som henger på `/oppdrag/` for kontoer uten enhet, kartlagt 19. sep.:
       tavla på `/ko/` krever `les` i KO, så brukere med bare oppdragstilgang mister den —
       `/oppdrag/` må sende dem videre til `/ko/`, og den som mangler KO-tilgang skal få en
       side som sier det, ikke 403; menyen «Oppdrag» bør skjules for kontoer uten enhet;
       rundt tretti steder i ti testfiler laster `/oppdrag/` som sentralbord og må pekes om;
-      bjella til bilen lenker til `/oppdrag/` og røres ikke. Bilene beholder sida.
+      bjella til bilen lenker til `/oppdrag/` og røres ikke. Bilene beholder sida. Sjekk
+      før avslagning: ingen bokmerker på `/oppdrag/` for sentralbordarbeid, og alle som
+      skal ha KO har begge modulradene.
 
 Forslaget erstatter datteroppdrag, som er arkivert: grupperingen hører hjemme i en
 `Hendelse` som finnes *før* oppdraget og også dekker lag. Begrunnelsen står i §9.3.
@@ -677,16 +682,6 @@ sentralbordet fra oppdragsmodulens egen kode, og oppdragsflata gates av `oppdrag
       `scripts/lag_ikoner.py` alt gjør for ikonene — ville gjort kontrollen til en
       kommando. Verdt å ta før sentralbordet i `/oppdrag/` slås av.
 
-
-- [ ] **Slå av sentralbordet i `/oppdrag/` — når KO er prøvd på en ekte vakt.**
-      `/oppdrag/` er uendret og fortsatt i drift; notatet §7 sier at det skal være «en
-      flytting, ikke en kopi», og det siste steget er å la `/oppdrag/` bli enhetsskjermen
-      alene. Det er en beslutning om en flate folk bruker, ikke en refaktorering — og
-      risikoen ved å vente er lav, siden begge sidene kjører **samme kode mot samme
-      endepunkter** og ikke kan bli uenige.
-
-      Sjekk før avslagning: at ingen bokmerker peker på `/oppdrag/` for sentralbordarbeid,
-      og at alle som skal ha KO har begge modulradene.
 
 - [ ] **Delt konto og enhetskontoer må fortsatt til `/oppdrag/`.** `er_enhetskonto` får
       enhetsskjermen, og den flytter ikke. Verdt å ha skrevet ned før noen slår av noe.
