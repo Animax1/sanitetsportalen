@@ -263,8 +263,8 @@ function koTegnLogg() {
   const rader = alle.filter(koIStrommen).sort((a, b) => (b.rot - a.rot) || (b.id - a.id));
   const festede = alle.filter((l) => l.festet_at && !l.fjernet)
     .sort((a, b) => String(a.festet_at).localeCompare(String(b.festet_at)));
-  const antall = document.getElementById('ko-logg-antall');
-  if (antall) antall.textContent = '· ' + String(rader.length) + ' linjer';
+  // Hodet sier hendelsen når en står åpen i vinduet — ko-hendelser.js.
+  koTegnLoggHode();
   if (rader.length === 0 && festede.length === 0) {
     boks.innerHTML = '<p class="text-muted small p-2 mb-0">Ingen linjer ennå.</p>';
     return;

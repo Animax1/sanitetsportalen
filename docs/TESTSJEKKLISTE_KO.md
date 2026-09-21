@@ -125,8 +125,11 @@ gjennomgang av §2 og §10 på en liten skjerm.
       nå**. Et lag hvis skift starter om to timer skal ikke stå der.
 - [ ] **Et lag som alt står på hendelsen kan bli** når skiftet går ut — lagringen skal ikke
       låse seg. Å *legge til* et lag uten skift avvises.
-- [ ] **Hendelsen åpnes inne i vinduet**, ikke i en modal: ressursoversikten og
-      oppdragslista er synlige mens du arbeider i den.
+- [ ] **Hendelsen åpnes i loggstrømmens vindu**, ikke i en modal: hendelsesloggen står
+      med raden merket blått, og ressursoversikten og oppdragslista er synlige mens du
+      arbeider i den. Klikk på samme rad igjen → lukkes; klikk på en annen rad → bytter.
+      «← Loggstrøm» gir strømmen og skrivefeltet tilbake — **ikke** skrivefeltet for en
+      konto med bare `les`.
 - [ ] **Rediger hodet i to faner samtidig.** Åpne samme hendelse i A og B, lagre i A, lagre
       så i B → B får **409** og en beskjed om at noen andre har endret, ikke en stille
       overskriving.

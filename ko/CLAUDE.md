@@ -209,21 +209,20 @@ Fem regler i `ko/services.py`, mutanter i `ko/tests_hendelser.py`:
 | `knytt_oppdrag` er den ene skriveren av `Oppdrag.hendelse`; lukket hendelse tar ikke imot | Ellers betyr «lukket» ingenting |
 | En hendelse laget **fra** en linje lar linja stå; linja får hendelsen, hendelsen peker tilbake | §4.5: flyttes linja inn, får loggen et hull der det viktige skjedde |
 
-**Lista følger med logg-pollen** (`hendelser` i `logg_view`), hele hver gang — som
-`fjernede`: en lukking har ingen ny id og kommer aldri gjennom `?siden=`.
+**Lista følger med logg-pollen** (`hendelser` i `logg_view`), hel — som `fjernede`: en
+lukking har ingen ny id og kommer aldri gjennom `?siden=`.
 
 **Grupperingen på tavla er borte** (André, 18. sep. 2026: «ikke noen hendelser i
 oppdragslisten»). H-merket på raden bærer koblingen — rød trekant når hendelsen er Viktig —
 og hendelsene har sitt eget vindu. `renderOppdrag()` sier fra til KO etter
 tegningen gjennom `koEtterOppdragTegnet()` (vakt: fila kjører også på `/oppdrag/`);
 `TavlaSierFraTilKoTests` holder kallstedet. Samme vakt for `koHendelseValg()` i
-detaljmodalen og `koEtterOpprettet()` etter «Nytt oppdrag», der «Hendelse» står sist i
-skjemaet i plassen `#nytt-hendelse-plass`.
+detaljmodalen og `koEtterOpprettet()` etter «Nytt oppdrag».
 
 **Knytting krever `skriv_full` i begge modulene**: det skriver på en oppdragsrad, og hvem
-som får det er oppdragsmodulens sak (komposisjonsregelen). Dekoratøren gir KO-nivået, viewet det andre.
+som får det er oppdragsmodulens sak. Dekoratøren gir KO-nivået, viewet det andre.
 
-**Statistikken (`ko/statistikk.py`) leser lagene av systemlinjene, ikke `HendelseLag`** —
+**Statistikken (`ko/statistikk.py`) leser lagene av systemlinjene, ikke `HendelseLag`**;
 se `statistikk/CLAUDE.md`.
 
 ## Hendelsesloggen som egen flate (18. sep. 2026)
@@ -244,8 +243,11 @@ mutanter i `ko/tests_hendelseslogg.py` og `tests_nullstill.py`.
 | **Festing** i loggstrømmen: `skriv_full`, idempotent, aldri systemlinjer eller fjernede. `festede` sendes hele med pollen | Festing endrer en rad uten ny id og ville aldri kommet gjennom `?siden=` — som `fjernede` |
 
 **Sortering er oppdragslistas** (`koSorterHendelser`): lukkede nederst, prioritet, nummer.
-**Søket** filtrerer lista som alt er hentet (nummer, tittel, sted, melder, logg, lag). **Hendelsen åpnes inne i vinduet**, ikke i en modal: ressursene og oppdragene skal
-være synlige mens man jobber i H14. **Loggstrømmen viser linjene uten
+**Søket** filtrerer lista som alt er hentet (nummer, tittel, sted, melder, logg, lag).
+**Hendelsen åpnes i loggstrømmens vindu** (André, 21. sep. 2026), ikke i en modal og ikke
+over lista: oversikten skal stå mens én hendelse er åpen. Strømmen og skrivefeltet
+skjules imens (`koVisStrommen`; `les` får ikke feltet tilbake); raden vipper
+(`koVippHendelse`), merkene i strømmen åpner bare. **Loggstrømmen viser linjene uten
 hendelse pluss systemlinjene om hendelsene** (`koIStrommen`); kommentarene står i hendelsen.
 Utskriften skal ha alt (TODO).
 
@@ -256,27 +258,26 @@ KO-referanse: oppdragsmodulen kjenner fortsatt ikke `ko`. Hver fane har sin egen
 
 ## Chat, ansvar og tavla (pulje 6)
 
-Besvart av André 18. sep. 2026, før koden. Tre av notatets ideer ble til noe annet enn
-notatet sa, og det står i §4.5, §5.1 og §7.2 der.
+Besvart av André 18. sep. 2026, før koden. Tre ideer ble til noe annet enn notatet sa
+(§4.5, §5.1, §7.2).
 
 **Chat er et merke på linja, ikke et sted** (§4.5). `Logglinje.uformell`, satt av en
 avkryssing som bare finnes når `ko.chat_tillatt` (AppSetting, auditlogget, **av som
 standard**) er på. Sperren står i `skriv_linje`, ikke bare i skjemaet. Bryteren styrer om
 *nye* kan skrives — linjene som alt er skrevet vises uansett, ellers får loggen et hull.
-Retting arver merket. Og **hendelseslinjene vises tydelig**: `koLinjeMerke()` gir
-`hendelse` for `hendelse_*`-kodene, foran `system`, og linja er uthevet med den som
-opprettet.
+Retting arver merket. **Hendelseslinjene vises tydelig**: `koLinjeMerke()` gir
+`hendelse` for `hendelse_*`-kodene, foran `system`; linja er uthevet med den som opprettet.
 
 **Ansvarsmerket vises og styrer ingenting** (§5.1). `ko.Ansvarsmerke`, én rad per konto
-(samme person på PC og telefon har ett ansvar), satt med `POST api/ansvar/` på `les`-nivå —
+(samme person på PC og telefon har ett ansvar), satt med `POST api/ansvar/` på `les` —
 den som bare leser kan likevel ha samband. Lista er `ko.Ansvarsomraade` (redigeres under
 KO-innstillinger fra 18. sep. 2026); merket er tekst, så omdøping rører ikke loggen. `skriv_linje` stemper det når kallet ikke oppgir noe;
 oppgitt verdi — også tom — vinner. `tilstede()` bærer det. **Ikke i backupen**: merket er
 hva som gjelder nå.
 
-**Filteret ble minimering** (§7.2, André: «ikke direkte filter … ressurstypene må kunne
-minimeres»). Gruppeoverskriften er en knapp; lukket-tilstanden huskes per nettleser under
-`tavle.grupper.lukket`, og **overskriften viser antallet når gruppa er lukket**. Bor i
+**Filteret ble minimering** (§7.2, André: «ressurstypene må kunne minimeres»).
+Gruppeoverskriften er en knapp; lukket-tilstanden huskes per nettleser under
+`tavle.grupper.lukket`, og **overskriften viser antallet når gruppa er lukket**. I
 `oppdrag-kort.js`, begge sidene; nøkler `type:<id>` og `gruppe:<id>`.
 
 **Vaktlistas ressurser uten oppdragsenhet står på tavla** — lag, samleplass, KO — under

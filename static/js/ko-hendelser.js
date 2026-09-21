@@ -189,7 +189,7 @@ function koHendelseRadHtml(h) {
     : '<span class="badge badge-apen">Åpen</span>';
   const melder = h.melder_tekst
     ? '<div class="h-under">Meldt av ' + escapeHtml(h.melder_tekst) + '</div>' : '';
-  return '<tr class="' + klasser + '" data-action="koApneHendelse" data-id="' + escapeHtml(h.id) + '"'
+  return '<tr class="' + klasser + '" data-action="koVippHendelse" data-id="' + escapeHtml(h.id) + '"'
     + ' role="button" tabindex="0">'
     + '<td>' + koPrioIkon(h.prioritet) + '</td>'
     + '<td class="h-nowrap"><span class="hendelse-merke">' + escapeHtml(h.kode) + '</span></td>'
@@ -211,23 +211,47 @@ function koTegnHendelser() {
   const apne = alle.filter((h) => h.status === 'apen').length;
   const tall = document.getElementById('ko-hendelser-antall');
   if (tall) tall.textContent = '· ' + apne + ' åpne · ' + (alle.length - apne) + ' lukket';
-  if (koApenHendelseId !== null) {
-    koTegnDetalj();
-    return;
-  }
-  boks.classList.remove('d-none');
-  const detalj = document.getElementById('ko-hendelse-detalj');
-  if (detalj) detalj.classList.add('d-none');
+  // Lista tegnes alltid — også med en hendelse åpen. Den åpne står i
+  // loggstrømmens vindu (André, 21. sep. 2026: «viktig å ha oversikten i
+  // hendelsesloggen foran loggstrømmen»), og raden hennes er merket.
   const rader = koSynligeHendelser();
   if (!rader.length) {
     boks.innerHTML = '<p class="text-muted small p-2 mb-0">'
       + (alle.length ? 'Ingen hendelser treffer.' : 'Ingen hendelser ennå.') + '</p>';
-    return;
+  } else {
+    boks.innerHTML = '<table class="h-tabell"><thead><tr>'
+      + '<th></th><th>Nr</th><th>Tid</th><th>Hendelse</th><th>Prioritet</th><th>Sted</th>'
+      + '<th>Lag</th><th>Oppdrag</th><th>Opprettet av</th><th>Status</th>'
+      + '</tr></thead><tbody>' + rader.map(koHendelseRadHtml).join('') + '</tbody></table>';
   }
-  boks.innerHTML = '<table class="h-tabell"><thead><tr>'
-    + '<th></th><th>Nr</th><th>Tid</th><th>Hendelse</th><th>Prioritet</th><th>Sted</th>'
-    + '<th>Lag</th><th>Oppdrag</th><th>Opprettet av</th><th>Status</th>'
-    + '</tr></thead><tbody>' + rader.map(koHendelseRadHtml).join('') + '</tbody></table>';
+  if (koApenHendelseId !== null) koTegnDetalj(); else koVisStrommen(true);
+}
+
+// Strømmen og hendelsen deler loggvinduet, og én av dem er synlig. Skjemaet
+// nederst følger strømmen — men bare for den som kan skrive: `les` fikk det
+// skjult ved oppstart, og en vending her skal ikke gi det tilbake.
+function koVisStrommen(vis) {
+  const detalj = document.getElementById('ko-hendelse-detalj');
+  if (detalj) detalj.classList.toggle('d-none', vis);
+  const liste = document.getElementById('ko-logg-liste');
+  if (liste) liste.classList.toggle('d-none', !vis);
+  const skjema = document.getElementById('ko-logg-skjema');
+  if (skjema) skjema.classList.toggle('d-none', !(vis && koKanSkrive()));
+  koTegnLoggHode();
+}
+
+// Loggvinduets hode: linjene i strømmen, eller hendelsen som står der i
+// stedet for den.
+function koLoggHodeTekst() {
+  const h = koApenHendelseId !== null ? koHendelser.get(koApenHendelseId) : null;
+  if (h) return '· ' + h.kode + ' · ' + h.tittel;
+  const linjer = Array.from(koLinjer.values()).filter(koIStrommen).length;
+  return '· ' + String(linjer) + ' linjer';
+}
+
+function koTegnLoggHode() {
+  const el = document.getElementById('ko-logg-antall');
+  if (el) el.textContent = koLoggHodeTekst();
 }
 
 function koTaImotHendelser(liste) {
@@ -312,6 +336,23 @@ function koOppdragTomMelding() {
 function koApneHendelse(id) {
   koApenHendelseId = Number(id);
   koTegnHendelser();
+  koRullTilLoggvinduet();
+}
+
+// Raden i tabellen vipper: et klikk på den som alt er åpen lukker henne.
+// Merkene i strømmen og på lagkortene åpner bare (`koApneHendelse`) — et
+// H5-merke i en loggline skal ikke lukke H5 fordi den tilfeldigvis sto oppe.
+function koVippHendelse(id) {
+  if (Number(id) === koApenHendelseId) koLukkDetalj(); else koApneHendelse(id);
+}
+
+// Under 1200 px stables vinduene, og hendelsen åpner seg da et stykke ned på
+// sida — uten rullingen ser klikket ut som om det ikke gjorde noe.
+function koRullTilLoggvinduet() {
+  const w = globalThis.window;
+  if (!w || typeof w.matchMedia !== 'function' || !w.matchMedia('(max-width: 1199.98px)').matches) return;
+  const vindu = document.getElementById('ko-vindu-logg');
+  if (vindu && typeof vindu.scrollIntoView === 'function') vindu.scrollIntoView({ block: 'start', behavior: 'smooth' });
 }
 
 function koLukkDetalj() {
@@ -564,13 +605,11 @@ function koBevarFelter(ider) {
 
 function koTegnDetalj() {
   const boks = document.getElementById('ko-hendelse-detalj');
-  const liste = document.getElementById('ko-hendelser-liste');
   const h = koHendelser.get(koApenHendelseId);
-  if (!boks || !h) { koApenHendelseId = null; if (boks) boks.classList.add('d-none'); return; }
+  if (!boks || !h) { koApenHendelseId = null; koVisStrommen(true); return; }
   const gjenopprett = koBevarFelter(['ko-hendelse-tekst', 'ko-hendelse-tid',
                                      'ko-lag-valg-' + escapeHtml(h.id), 'ko-knytt-valg']);
-  liste.classList.add('d-none');
-  boks.classList.remove('d-none');
+  koVisStrommen(false);
   const kan = koKanSkrive();
   const lukket = h.status !== 'apen';
   const deltar = (h.deltakere || []).map((n) => '<span class="navn">' + escapeHtml(n) + '</span>').join(', ');
@@ -620,7 +659,7 @@ function koTegnDetalj() {
   const prio = escapeHtml(h.prioritet || 'gronn');
   boks.innerHTML = '<div class="d-flex align-items-center gap-2 mb-2 flex-wrap">'
     + '<button type="button" class="btn btn-sm btn-outline-secondary" data-action="koLukkDetalj">'
-    + '<i class="bi bi-arrow-left me-1"></i>Hendelseslogg</button>'
+    + '<i class="bi bi-arrow-left me-1"></i>Loggstrøm</button>'
     + '<span class="ko-deltar ms-auto"><i class="bi bi-people me-1"></i>På hendelsen: '
     + (deltar || '<span class="text-muted">ingen ennå</span>') + '</span>' + bliMed + '</div>'
     + '<div class="h-hode h-' + prio + (lukket ? ' h-lukket' : '') + ' mb-2">'

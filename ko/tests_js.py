@@ -646,6 +646,116 @@ class HendelsesradenTests(SimpleTestCase):
         self.assertIn('&lt;img', ut)
 
 
+#: Et DOM-stubb for vinduene: `getElementById` lager elementet første gang
+#: det spørres etter, med `classList` og `innerHTML`, så synligheten lar seg
+#: lese etterpå. Bare det `koTegnHendelser`, `koVisStrommen` og
+#: `koTegnDetalj` rører.
+VINDU_DOM = """
+    const elementer = new Map();
+    function el(id) {
+      if (!elementer.has(id)) {
+        const e = { id, innerHTML: '', textContent: '', value: '', klasser: new Set(), scrollTop: 0, scrollHeight: 0,
+                    addEventListener() {}, querySelector: () => null, querySelectorAll: () => [] };
+        e.classList = { add: (k) => e.klasser.add(k), remove: (k) => e.klasser.delete(k),
+                        contains: (k) => e.klasser.has(k), toggle: (k, v) => { v ? e.klasser.add(k) : e.klasser.delete(k); } };
+        elementer.set(id, e);
+      }
+      return elementer.get(id);
+    }
+    globalThis.document = { getElementById: el, activeElement: null, querySelectorAll: () => [] };
+    const skjult = (id) => el(id).klasser.has('d-none');
+    function koTegnRessurser() {}
+    function withSubmitGuard() {}
+    function koBevarFelter() { return () => {}; }
+"""
+
+VINDU_HARNESS = HENDELSE_HARNESS + (
+    (PORTAL_UTILS_JS, ('fmtMin',)),
+    (KO_JS, ('koTegnHendelser', 'koVisStrommen', 'koLoggHodeTekst', 'koTegnLoggHode', 'koTegnDetalj',
+             'koApneHendelse', 'koVippHendelse', 'koLukkDetalj', 'koRullTilLoggvinduet',
+             'koDetaljLinjeHtml', 'koHendelseOppdragHtml', 'koPrioKnapperHtml', 'koLagBrikkeHtml',
+             'koLagVelgerHtml', 'koLagKandidater', 'koLagPaa', 'koMittBrukernavn', 'koSiden',
+             'koRettFjernKnapper', 'koDelingKnapper', 'koDeltMerke', 'koErDelt', 'koLinjeTekst', 'koKanFjerne', 'koDeltEtikett')),
+)
+
+
+@unittest.skipUnless(node_available(), 'node er ikke tilgjengelig')
+class HendelsenILoggvinduetTests(SimpleTestCase):
+    """Hendelsen åpnes i **loggstrømmens** vindu (André, 21. sep. 2026: «viktig
+    å ha oversikten i hendelsesloggen foran loggstrømmen»). Lista står med
+    raden merket, strømmen og skrivefeltet skjules imens, og hodet på
+    loggvinduet sier hvilken hendelse som står der."""
+
+    H5 = dict(HendelsesradenTests.H, id=5, kode='H5', tittel='Bevisstløs person')
+    H6 = dict(HendelsesradenTests.H, id=6, kode='H6', tittel='Slagsmål', prioritet='rod')
+
+    def _kjor(self, script, nivaa='skriv_full'):
+        preamble = PRIORITET_PREAMBLE.replace("ko: 'skriv_full'", f"ko: '{nivaa}'")
+        return run_node(build_harness(VINDU_HARNESS), VINDU_DOM
+                        + f'koHendelser = new Map({json.dumps([[5, self.H5], [6, self.H6]])});\n'
+                        + "koLinjer = new Map([[1, {id: 1, rot: 1, kilde: 'operator', hendelse_id: null, systemkode: ''}],"
+                        + " [2, {id: 2, rot: 2, kilde: 'operator', hendelse_id: 5, systemkode: ''}]]);\n"
+                        + script, preamble=preamble).splitlines()
+
+    def test_aapen_hendelse_staar_i_loggvinduet_og_lista_blir_staaende(self):
+        ut = self._kjor("""
+            koTegnHendelser();
+            console.log(skjult('ko-hendelse-detalj'), skjult('ko-logg-liste'), skjult('ko-logg-skjema'), el('ko-logg-antall').textContent);
+            koApneHendelse('5');
+            console.log(skjult('ko-hendelse-detalj'), skjult('ko-logg-liste'), skjult('ko-logg-skjema'), el('ko-logg-antall').textContent);
+            console.log(skjult('ko-hendelser-liste'), el('ko-hendelser-liste').innerHTML.includes('h-apen'),
+                        (el('ko-hendelser-liste').innerHTML.match(/h-apen/g) || []).length,
+                        el('ko-hendelse-detalj').innerHTML.includes('Bevisstløs person'),
+                        el('ko-hendelse-detalj').innerHTML.includes('data-action="koLukkDetalj"'),
+                        el('ko-hendelser-liste').innerHTML.includes('data-action="koVippHendelse"'));
+        """)
+        self.assertEqual(ut[0], 'true false false · 1 linjer', 'før: strømmen, med linja uten hendelse talt')
+        self.assertEqual(ut[1], 'false true true · H5 · Bevisstløs person', 'åpen: detaljen i loggvinduet, strømmen og feltet borte')
+        self.assertEqual(ut[2], 'false true 1 true true true', 'lista står, med nøyaktig én rad merket, og radene vipper')
+
+    def test_klikk_paa_raden_vipper_og_merkene_bare_aapner(self):
+        ut = self._kjor("""
+            koVippHendelse('5'); console.log(koApenHendelseId, skjult('ko-logg-liste'));
+            koVippHendelse('6'); console.log(koApenHendelseId, el('ko-logg-antall').textContent);
+            koVippHendelse('6'); console.log(koApenHendelseId, skjult('ko-logg-liste'), skjult('ko-hendelse-detalj'), el('ko-logg-antall').textContent);
+            koApneHendelse('5'); koApneHendelse('5'); console.log(koApenHendelseId, 'merket lukker ikke');
+            koLukkDetalj(); console.log(koApenHendelseId, skjult('ko-logg-liste'), (el('ko-hendelser-liste').innerHTML.match(/h-apen/g) || []).length);
+        """)
+        self.assertEqual(ut[0], '5 true')
+        self.assertEqual(ut[1], '6 · H6 · Slagsmål', 'en annen rad bytter direkte, uten å gå via strømmen')
+        self.assertEqual(ut[2], 'null false true · 1 linjer', 'samme rad igjen lukker, og hodet teller linjer igjen')
+        self.assertEqual(ut[3], '5 merket lukker ikke')
+        self.assertEqual(ut[4], 'null false 0')
+
+    def test_skrivefeltet_kommer_ikke_tilbake_for_les(self):
+        """`les` fikk feltet skjult ved oppstart. Å vise strømmen igjen skal
+        ikke gi det tilbake — det er en vegg man går inn i."""
+        ut = self._kjor("""
+            el('ko-logg-skjema').classList.add('d-none');
+            koApneHendelse('5'); koLukkDetalj();
+            console.log(skjult('ko-logg-liste'), skjult('ko-logg-skjema'));
+        """, nivaa='les')
+        self.assertEqual(ut[0], 'false true')
+
+    def test_hendelse_som_forsvinner_gir_stroemmen_tilbake(self):
+        """Pollen sender hele lista; er den åpne borte (nullstilt), står
+        strømmen der igjen — ikke et tomt vindu."""
+        ut = self._kjor("""
+            koApneHendelse('5'); koHendelser.delete(5); koTegnDetalj();
+            console.log(koApenHendelseId, skjult('ko-hendelse-detalj'), skjult('ko-logg-liste'), el('ko-logg-antall').textContent);
+        """)
+        self.assertEqual(ut[0], 'null true false · 1 linjer')
+
+    def test_rullingen_gjelder_bare_smal_skjerm(self):
+        ut = self._kjor("""
+            let rullet = 0; el('ko-vindu-logg').scrollIntoView = () => { rullet += 1; };
+            window.matchMedia = (q) => ({ matches: q.includes('1199.98px') && globalThis.smal });
+            globalThis.smal = false; koApneHendelse('5'); console.log(rullet);
+            globalThis.smal = true; koApneHendelse('6'); console.log(rullet);
+        """)
+        self.assertEqual(ut[:2], ['0', '1'])
+
+
 @unittest.skipUnless(node_available(), 'node er ikke tilgjengelig')
 class StroemmenTests(SimpleTestCase):
     """`koIStrommen()` avgjør hva loggstrømmen viser: kommentarer i en

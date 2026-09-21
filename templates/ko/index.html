@@ -171,12 +171,6 @@
         <div class="ko-vindu-kropp" id="ko-hendelser-liste">
           <p class="text-muted small p-2 mb-0">Laster …</p>
         </div>
-        {% comment %}
-          Hendelsen åpnes **inne i vinduet** (André, 18. sep. 2026), ikke i en
-          modal: ressursene og oppdragene skal være synlige mens man jobber i
-          H14. Tegnes av `koTegnDetalj()` i ko-hendelser.js.
-        {% endcomment %}
-        <div class="ko-vindu-kropp ko-detalj d-none" id="ko-hendelse-detalj"></div>
       </section>
 
       <div class="ko-splitter-v" data-splitter="rad-1" role="separator" aria-orientation="vertical"></div>
@@ -188,6 +182,15 @@
           <i class="bi bi-chat-left-text"></i><span class="ko-vindu-tittel">Loggstrøm</span>
           <span class="ko-vindu-tall" id="ko-logg-antall"></span>
         </div>
+        {% comment %}
+          Hendelsen åpnes **inne i et vindu**, ikke i en modal (André, 18. sep.
+          2026): ressursene og oppdragene skal være synlige mens man jobber i
+          H14. Og vinduet er **loggstrømmens**, ikke hendelsesloggens (André,
+          21. sep.): oversikten over hendelsene skal stå mens én av dem er
+          åpen. Strømmen og skrivefeltet skjules imens — `koVisStrommen()` i
+          ko-hendelser.js — og tegnes av `koTegnDetalj()`.
+        {% endcomment %}
+        <div class="ko-vindu-kropp ko-detalj d-none" id="ko-hendelse-detalj"></div>
         <div class="ko-vindu-kropp" id="ko-logg-liste">
           <p class="text-muted small p-2 mb-0">Laster …</p>
         </div>

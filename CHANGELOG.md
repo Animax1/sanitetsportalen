@@ -4,6 +4,34 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-21 — Hendelsen åpnes i loggstrømmens vindu, ikke over hendelsesloggen  `#ko/hendelseslogg`
+
+André, 21. sep. 2026: «når vi åpner en hendelse så skal det vises i loggstrømmens vindu og
+ikke i hendelsesloggens vindu, for det er viktig å ha oversikten i hendelsesloggen foran
+loggstrømmen.» Variant A av to skisser, uten bånd om at strømmen går i bakgrunnen.
+
+- **`#ko-hendelse-detalj` bor i loggseksjonen** i malen; ingen ny CSS. `koTegnHendelser()`
+  tegner lista alltid, med den åpne raden merket (`h-apen`), og kaller så `koTegnDetalj()`
+  eller `koVisStrommen(true)`. `koVisStrommen(vis)` er den ene bryteren: detaljen mot
+  strømlista og skrivefeltet — og feltet vises bare igjen for den som kan skrive, ellers
+  hadde `les` fått det tilbake etter første hendelse.
+- **Raden vipper** (`koVippHendelse`): samme rad igjen lukker, en annen rad bytter direkte.
+  H-merkene i strømmen og på lagkortene bruker fortsatt `koApneHendelse` og bare åpner —
+  et H5-merke i en logglinje skal ikke lukke H5 fordi den sto oppe.
+- **Loggvinduets hode** sier `· H5 · Bevisstløs person` mens hendelsen er åpen, ellers
+  `· 18 linjer` (`koLoggHodeTekst`, kalt fra både `koTegnLogg` og bryteren). Tilbakeknappen
+  heter «← Loggstrøm».
+- **Smal skjerm** (< 1200 px, vinduene stablet): loggvinduet rulles inn i synsfeltet ved
+  åpning (`koRullTilLoggvinduet`) — ellers så klikket ut som om det ikke gjorde noe.
+
+Tester: `HendelsenILoggvinduetTests` i `ko/tests_js.py` kjører `koTegnDetalj()` for
+alvor mot et DOM-stubb (`VINDU_DOM`). Mutanter 10/10 drept (vipp invertert, `les` får
+feltet, lista ikke tegnet når åpen, hodet sier alltid linjer, detaljen skjuler ikke
+strømmen, borte hendelse gir ikke strømmen, ruller alltid, raden bare åpner, `h-apen`
+borte, `koApneHendelse` tegner ikke). Playwright mot seed: kari åpner, bytter, lukker via
+rad og knapp, skriver i tråden, poll mens åpen; ola (`les`) får ikke feltet tilbake; 900 px
+ruller til loggvinduet.
+
 ## 2026-09-21 — Ferdige i historikken telles, og to filtre: «Oppdrag uten ressurs» og «Tildelt»  `#ko/sentralbordet` `#oppdrag/sentralbord`
 
 André, 21. sep. 2026: «ferdige oppdrag som vises i historikk vises ikke som "ferdig" i
