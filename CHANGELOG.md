@@ -4,6 +4,18 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-21 — Forslag: statistikk fra KO (pulje 7)  `#ko/hendelseslogg` `#statistikk`
+
+André: «Ut ifra alt vi genererer av data i /ko, hva er interessant å få hentet ut?»
+`docs/FORSLAG_KO_STATISTIKK.md`, kontrollert mot koden: hva som finnes av felt og
+systemlinjer, hva oppdragsfanen alt regner, og 26 tall i fire lag — hendelsesbildet, loggen,
+oppdragsfanen utvidet, belastning mot bemanning — med hvilke felt hvert tall regnes av. Med
+p90 framfor snitt, krysstabeller der to vurderinger møtes, og §8-regelen om at registrene
+teller kontakter og ikke personer. To hull sagt på forhånd: `HendelseLag` mangler `til`
+(loggen bærer det), og enhet på/av vakt er ikke tidsstemplet. Ingenting bygget.
+
+---
+
 ## 2026-09-19 — «Utført» på drift, skjemaet som hoppet ut, fritekst ved «Annet sted», to kolonner, «Ventende»  `#oppdrag/enhetsskjerm` `#oppdrag/sentralbord` `#oppdrag/statusmaskin` `#ko/ressursbildet` `#ko/sentralbordet`
 
 André, 19. sep. 2026, fem punkter.

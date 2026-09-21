@@ -606,6 +606,13 @@ Modulens egne regler står i [`ko/CLAUDE.md`](./ko/CLAUDE.md). `/oppdrag/` snevr
 enhetens egen skjerm, og **sentralbordet flytter til KO** — en flytting av
 `oppdrag-sentral-*.js`, ikke en kopi. Puljene står i §10.
 
+- [ ] **Pulje 7 — statistikk fra KO.** Forslaget står i
+      [`docs/FORSLAG_KO_STATISTIKK.md`](./docs/FORSLAG_KO_STATISTIKK.md) (21. sep. 2026):
+      hendelsesbildet (tid til første ressurs, lagtimer, løst uten utrykning, samtidighet),
+      loggen (rettinger, deling, stillhet), oppdragsfanen utvidet (avreist til,
+      hastegrad × grovsortering, oppdrag uten ressurs, p90) og belastning mot bemanning.
+      Fem spørsmål i §8 venter på André; 7a og 7b kan bygges uavhengig når de er besvart.
+
 - [ ] **Fjerne sentralbordet fra `/oppdrag/`** — «avvente inntil videre, men noe å se på»
       (André, 19. sep. 2026), og fra 18. sep.: «når KO er prøvd på en ekte vakt». Notatet §7
       sier «en flytting, ikke en kopi», og det siste steget er å la `/oppdrag/` bli
