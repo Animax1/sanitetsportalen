@@ -14,6 +14,13 @@ p90 framfor snitt, krysstabeller der to vurderinger møtes, og §8-regelen om at
 teller kontakter og ikke personer. To hull sagt på forhånd: `HendelseLag` mangler `til`
 (loggen bærer det), og enhet på/av vakt er ikke tidsstemplet. Ingenting bygget.
 
+Samme dag, tre vinklinger fra André: **ventetida deles i KO-ventetid og reaksjonstid**
+(uten ressurs → varslet, varslet → Rykker ut), en kø-kurve for «trenger ressurs» og «tildelt
+men venter», hendelser løst av *lag alene / oppdrag alene / verken* uten Drift og Plassering
+(A5, C4–C4c), og **«det mangler en hastegrad»** i oppdragsfanen: fargekartet i
+`statistikk-oppdrag.js` kjenner fire, «Plassering» faller til grå, og smultringen sorteres på
+antall, ikke i AMK-rekkefølge (C8, først i 7b).
+
 ---
 
 ## 2026-09-19 — «Utført» på drift, skjemaet som hoppet ut, fritekst ved «Annet sted», to kolonner, «Ventende»  `#oppdrag/enhetsskjerm` `#oppdrag/sentralbord` `#oppdrag/statusmaskin` `#ko/ressursbildet` `#ko/sentralbordet`

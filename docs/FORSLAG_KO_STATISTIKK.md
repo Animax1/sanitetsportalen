@@ -37,7 +37,7 @@ Dette er det bare KO kan svare på, og det notatet §8 lovte.
 | A2 | Varighet per hendelse (opprettet → lukket), median og p90 per prioritet | `opprettet_at`, `lukket_at` | Hvor lenge binder en Rød hendelse KO |
 | A3 | **Tid til første ressurs**: hendelse opprettet → første oppdrag på hendelsen → første «Rykker ut» → første lag satt på | `oppdrag_knyttet`, `Statusmelding`, `HendelseLag.fra` | Den ene KO-responstiden som ikke finnes i oppdragsfanen: oppdragets klokke starter når oppdraget lages, hendelsens når KO hørte om det |
 | A4 | Ressursbruk per hendelse: oppdrag, enheter, **lagtimer** (sum fra → av) | `Oppdrag.hendelse`, `HendelseLag`, `hendelse_lag_av` | Hva en hendelse *kostet* i ressurser, ikke bare hvor lenge den sto |
-| A5 | **Løst uten utrykning**: hendelser lukket uten ett eneste oppdrag, per prioritet | `Hendelse` uten `oppdrag` | Andelen lagene tar alene — argumentet for lag på vakt |
+| A5 | **Hvem løste hendelsen** (André, 21. sep.): hver lukkede hendelse legges i én av fire ruter — *lag og oppdrag*, *bare lag*, *bare oppdrag*, *verken* — per prioritet, **uten Drift og Plassering** (de er bestillinger, ikke hendelser som «løses») | `Oppdrag.hendelse`, systemlinja `hendelse_lag_paa` (raden i `HendelseLag` slettes når laget tas av, loggen står) | «Bare lag» er argumentet for lag på vakt. «Verken» er de KO løste fra bordet — telefon, vakter, publikum selv — og en **Rød eller Viktig i den ruta listes med navn**, ikke bare telles: enten var prioriteten for høy, eller så gjorde noen andre jobben. «Lag og oppdrag» får med tida fra lag på til oppdrag knyttet — eskaleringskjeden |
 | A6 | Eskaleringer: fra → til-matrise, og hvor lang tid etter opprettelse | `hendelse_prioritet` (`fra`/`til` i `systemdata`) | «Startet som Gul, ble Rød etter 12 min» er læring til neste vakt |
 | A7 | Gjenåpninger | `hendelse_gjenapnet` | Få, men hver er et spørsmål |
 | A8 | **Samtidighet**: åpne hendelser per klokketime, og toppen | `opprettet_at`/`lukket_at` | Belastningskurven for KO. Sammen med D1 sier den om bemanningen traff |
@@ -68,10 +68,13 @@ finnes, ikke i KO-fanen.
 | C1 | **Avreist til**: fordeling per sted, kryss mot hastegrad; «Annet sted»-tekstene listet | `Statusmelding.sted`, `sted_tekst` | Transportmønsteret — hvor mange gikk til sykehus mot legevakt mot samleplass. Med egen lege er andelen som *ikke* går videre selve poenget |
 | C2 | **Triagekonkordans**: KOs hastegrad × bilens grovsortering | `hastegrad`, `grovsortering` | Hvor ofte var bilens vurdering høyere eller lavere enn meldingen KO fikk. Ikke en fasit — to vurderinger fra to ståsteder — men avviket over mange vakter sier noe om meldekvaliteten |
 | C3 | Behandlet på sted / Utført / transportert, per problemstilling | sluttstatus-veien (`behandlet_at` mot `leverer_at`) | Andelen løst på stedet er tallet legen vil ha |
-| C4 | **Oppdrag uten ressurs**: antall opprettet uten enhet, tid til første varsling, lengste ventetid; per hastegrad | `trenger_ressurs_siden`, `Oppdragsenhet.varslet_at` | Ventetiden *før* responstiden begynner — den oppdragsfanen ikke ser i dag |
+| C4 | **Ventetida delt i to** (André, 21. sep.). Dagens «ventetid» er opprettet → Rykker ut, og blander to ting: **KO-ventetid** — fra oppdraget står uten ressurs til en enhet varsles — og **reaksjonstid** — fra enheten er varslet til hun stempler Rykker ut. Begge som median/p90 per hastegrad; reaksjonstid også per enhet, med passiv vakt for seg (`varslet_modus`) | `created_at` / `Enhetshendelse.rykket_videre` → første `Oppdragsenhet.varslet_at` (KO-ventetid); `varslet_at` → `RYKKER_UT` på samme koblingsrad (reaksjonstid) | Den ene er KOs tall, den andre er bilens. Summert blir de dagens ventetid, så ingenting går tapt — men «vi ventet 9 min» blir til «KO brukte 6 på å finne bil, bilen 3 på å rykke». `trenger_ressurs_siden` tømmes når en ny enhet varsles, så historikken rekonstrueres fra `rykket_videre`-hendelsen, ikke fra flagget |
+| C4b | **Køen**: oppdrag uten ressurs *og* tildelte som fortsatt venter, per klokketime — antall og lengste ståtid akkurat da | C4 × tidsaksen | Kurven som sier om det var for få biler, og *når*. D1 legger bemanningen under den |
+| C4c | **Tildelt, men rykket aldri ut**: koblingsrader som gikk fra Venter rett til avbrutt/tatt av, og hvor lenge de sto | `Enhetshendelse` uten `RYKKER_UT` på raden | Hver er en bil som ble bundet uten å gjøre noe — enten en feiltildeling eller en bil som ikke svarte |
 | C5 | Avbrytelser, avventinger, rykket videre, tatt av: antall og per enhet | `Enhetshendelse` | Hvor ofte måtte et oppdrag bemannes på nytt |
 | C6 | **p90** ved siden av median på alle varigheter | eksisterende `_sd` | «90 % av akutte hadde bil fremme innen 7 min» er setningen som kan stå i en rapport; snittet dras av ett utlegg |
 | C7 | Enhetsutnyttelse: oppdragstid som andel av bemannet tid, og lengste ledigtid, per enhet | `Statusmelding` × `Vaktpost` på enhetens ressurs | Var det for få biler, eller for mange |
+| C8 | **Alle fem hastegradene** i fanen (André, 21. sep.: «det mangler en hastegrad»). Kontrollert: `per_hastegrad` sorteres på antall, ikke i AMK-rekkefølge, og fargekartet i `statistikk-oppdrag.js` kjenner fire — «Plassering» faller til grå | `choices.HASTEGRAD` er fasit | Rekkefølgen og fargene skal komme fra én liste, ikke stå på nytt i JS-en. Tas først i 7b |
 
 ### D. Belastning mot bemanning (KO + vaktlista)
 
@@ -145,7 +148,7 @@ skal stå én setning øverst som sier hvorfor. Det er det eneste som hindrer fe
 | Pulje | Innhold | Avhenger av |
 |---|---|---|
 | 7a | `ko/statistikk.py`: A1–A8, B1–B5; fanen «KO» med `statistikk-ko.js`; p90 i `_sd` | `HendelseLag.til` (liten migrasjon) |
-| 7b | Oppdragsfanen utvidet: C1–C6 | ingenting |
+| 7b | Oppdragsfanen utvidet: C8 først, så C1–C6 med C4/C4b/C4c | ingenting |
 | 7c | D1–D3 og C7: vaktlista inn | at vaktlistas ressurser er koblet til enhetene |
 | 7d | Sammenligning mellom vakter, tidslinja og vaktrapporten | 7a–7c, og utskriften i TODO |
 
@@ -160,3 +163,5 @@ i hver sin økt.
 4. C2 heter «triagekonkordans» her — hva vil dere kalle det på skjermen? Ordet skal ikke
    lyde som en karakter på bilen.
 5. Sammenligning mellom vakter: er det de siste *n* vaktene, eller velger man selv?
+6. Hastegraden som mangler (C8): er det smultringen, tabellen «Responstid per hastegrad»,
+   eller begge? Jeg ser bare fargekartet og sorteringen i koden.
