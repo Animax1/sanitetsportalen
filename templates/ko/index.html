@@ -298,6 +298,21 @@
             langt vekke»). Gates på oppdragsmodulens nivåer.
           {% endcomment %}
           <span class="d-flex gap-2 ms-2">
+            {% comment %}
+              To filtre, ett om gangen, til venstre for «Nytt oppdrag» (André, 21. sep. 2026).
+              Tallet på knappen er det ene stedet det står; hodet teller aktive · ferdig.
+              (`{# … #}` er énlinjes — over to linjer ble den tegnet som tekst i hodet.)
+            {% endcomment %}
+            <button type="button" class="btn btn-outline-warning btn-sm ko-filter-knapp" id="ko-uten-ressurs-filter"
+                    data-action="koVippFilter" data-arg="uten_ressurs" aria-pressed="false"
+                    title="Vis bare oppdrag uten ressurs">
+              <i class="bi bi-exclamation-triangle-fill me-1"></i>Oppdrag uten ressurs <span class="tall"></span>
+            </button>
+            <button type="button" class="btn btn-outline-info btn-sm ko-filter-knapp tildelt" id="ko-tildelt-filter"
+                    data-action="koVippFilter" data-arg="tildelt" aria-pressed="false"
+                    title="Vis bare oppdrag der en enhet er varslet og ennå ikke har rykket ut">
+              <i class="bi bi-send me-1"></i>Tildelt <span class="tall"></span>
+            </button>
             {% if kan_skrive %}
             <button type="button" class="btn btn-primary btn-sm"
                     data-bs-toggle="modal" data-bs-target="#nyttOppdragModal">
@@ -308,11 +323,6 @@
                     data-bs-toggle="modal" data-bs-target="#historikkModal"
                     data-action="lastHistorikk">
               <i class="bi bi-clock-history me-1"></i>Historikk
-            </button>
-            {# Filteret «Ventende» (19. sep. 2026): bare oppdrag uten ressurs. #}
-            <button type="button" class="btn btn-outline-warning btn-sm ko-ventende-knapp" id="ko-ventende-filter"
-                    data-action="koVippVentendeFilter" aria-pressed="false" title="Vis bare oppdrag uten ressurs">
-              <i class="bi bi-exclamation-triangle-fill me-1"></i>Ventende <span class="tall"></span>
             </button>
           </span>
           {% endif %}

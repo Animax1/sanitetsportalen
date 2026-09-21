@@ -31,6 +31,7 @@ class SentralbordetsOppstartTests(SimpleTestCase):
     let enheter = []; let oppdragsliste = []; let lokasjoner = [];
     let etagEnheter = null; let etagOppdrag = null;
     let enheterHentet = false; let oppdragHentet = false;
+    let oppdragIHistorikk = 0;   // bor i kjerne.js, som harnessen ikke laster
     let besetninger = {}; let apenBesetning = null;
     let sisteEnhetsliste = []; let enhetslisteKilde = null;
     const elementer = {};

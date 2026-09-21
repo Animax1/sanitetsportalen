@@ -267,11 +267,18 @@ def rader_for_arkiv(arkiv):
     return rader
 
 
-def oppdrag_stats(vakt):
-    """Full statistikk for oppdragene i én vakt."""
+def oppdrag_stats(vakt, naa=None):
+    """Full statistikk for oppdragene i én vakt.
+
+    `naa` er der for testene: åpne intervaller (7b) løper til nå, og en test
+    som lot «nå» være klokka på veggen ga et annet svar kl. 20 enn kl. 11 —
+    timebolkene slår sammen dager, og et intervall som løp inn i neste døgn
+    talte to ganger i samme time.
+    """
     paa_vakt = Enhet.objects.filter(er_aktiv=True, pa_vakt=True)
     return _stats_fra_rader(
         rader_for_vakt(vakt),
+        naa=naa,
         # Enhetene er ikke scopet på vakt — de er oppsett, ikke vaktdata.
         # Tallet beskriver beredskapen akkurat nå, og finnes derfor bare for
         # den aktive vakta.

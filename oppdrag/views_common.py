@@ -19,13 +19,19 @@ def json_body(request):
     return data if isinstance(data, dict) else {}
 
 
-def etag_for(rader) -> str:
+def etag_for(rader, ekstra=None) -> str:
     """ETag over en liste av sammenlignbare tupler.
 
     Samme mønster som navneregistrene: sha256 brukes kun til identitet, ikke
     sikkerhet, og kortes til 16 tegn for å holde headeren kompakt.
+
+    `ekstra` er det som ikke er en rad — antall i historikken (21. sep.
+    2026). Det legges *ved siden av* radene, ikke inn i lista: `sorted()`
+    sammenligner tuplene ledd for ledd, og en tekstnøkkel mot en tall-ID
+    gir `TypeError` — og 500 på lista, som testen ikke så fordi tavla var
+    tom i begge kallene.
     """
-    raa = str(sorted(rader))
+    raa = str(sorted(rader)) + ('' if ekstra is None else '|' + str(ekstra))
     return '"v1:' + hashlib.sha256(raa.encode('utf-8')).hexdigest()[:16] + '"'
 
 

@@ -26,6 +26,9 @@ let etagOppdrag = null;
 //: (André, 13. sep. 2026: plassholderne sto tomme ved første besøk).
 let enheterHentet = false;
 let oppdragHentet = false;
+// Ferdige oppdrag som ligger i historikken — de er ute av `oppdragsliste`,
+// men KO teller dem som ferdige (21. sep. 2026).
+let oppdragIHistorikk = 0;
 
 // **Besetningen er vaktlistas data, lånt inn** (§6 i vaktlistenotatet).
 // Oppdragsmodulen importerer ikke vaktlista i Python — koblingen ligger her,

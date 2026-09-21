@@ -46,7 +46,9 @@ async function lastOppdrag() {
   if (res.status === 304) return false;
   if (!res.ok) return false;
   etagOppdrag = res.headers.get('ETag');
-  oppdragsliste = (await res.json()).data || [];
+  const svar = await res.json();
+  oppdragsliste = svar.data || [];
+  oppdragIHistorikk = svar.antall_i_historikk || 0;
   oppdragHentet = true;
   return true;
 }

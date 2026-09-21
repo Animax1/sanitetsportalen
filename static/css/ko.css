@@ -308,8 +308,9 @@ body.ko-drar-h { cursor: row-resize; }
 .enhet-gruppe-blokk { display: grid; gap: 0.5rem; margin-bottom: 0.5rem; }
 .ko-to-kolonner .enhet-gruppe-blokk { break-inside: avoid; page-break-inside: avoid; }
 /* Filteret «Ventende» i oppdragslistas hode. */
-.ko-ventende-knapp.aktiv { background: #78350f; border-color: #f59e0b; color: #fde68a; }
-.ko-ventende-knapp .tall:not(:empty)::before { content: '· '; }
+.ko-filter-knapp.aktiv { background: #78350f; border-color: #f59e0b; color: #fde68a; }
+.ko-filter-knapp.tildelt.aktiv { background: #164e63; border-color: #22d3ee; color: #cffafe; }
+.ko-filter-knapp .tall:not(:empty)::before { content: '· '; }
 
 /* ── Loggstrømmen ───────────────────────────────────────────────────────── */
 

@@ -27,7 +27,9 @@ function renderOppdrag() {
   // gjennom en vakt — på `/oppdrag/` finnes det ikke.
   const synlige = (typeof koOppdragFilter === 'function') ? koOppdragFilter(oppdragsliste) : oppdragsliste;
   if (!synlige.length) {
-    el.innerHTML = ('<div class="tom-melding">Ingen ventende oppdrag.</div>');
+    // Tomt fordi filteret tok alt, eller tomt fordi tavla er tom.
+    const tom = (typeof koOppdragTomMelding === 'function') ? koOppdragTomMelding() : 'Ingen ventende oppdrag.';
+    el.innerHTML = ('<div class="tom-melding">' + escapeHtml(tom) + '</div>');
     if (typeof koEtterOppdragTegnet === 'function') koEtterOppdragTegnet();
     return;
   }

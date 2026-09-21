@@ -71,7 +71,9 @@ class Basis(TestCase):
                                       tidspunkt=self._t(minutter), enhet=enhet)
 
     def stats(self):
-        return oppdrag_stats(self.vakt)
+        # «Nå» er 23:00 i fiksturen, ikke klokka på veggen: åpne intervaller
+        # løper til nå, og timebolkene slår sammen dager.
+        return oppdrag_stats(self.vakt, naa=self._t(180))
 
 
 class SammendragTests(TestCase):

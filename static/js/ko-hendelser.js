@@ -244,40 +244,67 @@ function koTaImotHendelser(liste) {
 // `renderOppdrag()`, fordi den fila også kjører på /oppdrag/.
 function koEtterOppdragTegnet() {
   const liste = (typeof oppdragsliste !== 'undefined' && Array.isArray(oppdragsliste)) ? oppdragsliste : [];
+  const iHistorikk = (typeof oppdragIHistorikk === 'number') ? oppdragIHistorikk : 0;
   const tall = document.getElementById('ko-oppdrag-antall');
-  const telling = koOppdragTelling(liste);
+  const telling = koOppdragTelling(liste, iHistorikk);
+  // Hodet teller aktive og ferdige; de to filtrene bærer sine egne tall
+  // (André, 21. sep. 2026: «litt dobbelt opp med ventende statistikk og knapp»).
   if (tall) {
-    tall.textContent = '· ' + telling.aktive + ' aktive · ' + telling.ventende + ' ventende · ' + telling.ferdig + ' ferdig';
+    tall.textContent = '· ' + telling.aktive + ' aktive · ' + telling.ferdig + ' ferdig';
   }
-  const knapp = document.getElementById('ko-ventende-filter');
-  if (knapp) {
-    knapp.classList.toggle('aktiv', koVentendeFilter);
-    knapp.setAttribute('aria-pressed', koVentendeFilter ? 'true' : 'false');
+  for (const [valg, id, antall] of [['uten_ressurs', 'ko-uten-ressurs-filter', telling.uten_ressurs],
+                                     ['tildelt', 'ko-tildelt-filter', telling.tildelt]]) {
+    const knapp = document.getElementById(id);
+    if (!knapp) continue;
+    const paa = koOppdragFilterValg === valg;
+    knapp.classList.toggle('aktiv', paa);
+    knapp.setAttribute('aria-pressed', paa ? 'true' : 'false');
     const tallEl = knapp.querySelector('.tall');
-    if (tallEl) tallEl.textContent = telling.ventende ? String(telling.ventende) : '';
+    if (tallEl) tallEl.textContent = antall ? String(antall) : '';
   }
   koTegnHendelser();
 }
 
-// «Aktive · ventende · ferdig» (André, 19. sep. 2026): ventende er oppdrag
-// uten ressurs (`trenger_ressurs`), aktive er resten som ikke er ferdige.
-function koOppdragTelling(liste) {
-  const ventende = liste.filter((o) => o.trenger_ressurs).length;
-  const ferdig = liste.filter((o) => o.status === 'ledig' && !o.trenger_ressurs).length;
-  return { aktive: liste.length - ventende - ferdig, ventende, ferdig };
+// Tellingen (André, 19. og 21. sep. 2026): «uten ressurs» er oppdrag som
+// trenger en (`trenger_ressurs`), «tildelt» er oppdrag der en enhet er
+// varslet og ennå ikke har rykket ut, «ferdig» er de meldt ledig — på
+// tavla **og i historikken**, dit et ferdig oppdrag går av seg selv. Aktive
+// er resten. `iHistorikk` er et argument, ikke en global, så regelen lar
+// seg kjøre i en test.
+function koOppdragTelling(liste, iHistorikk = 0) {
+  const uten_ressurs = liste.filter((o) => o.trenger_ressurs).length;
+  const tildelt = liste.filter((o) => o.status === 'venter' && !o.trenger_ressurs).length;
+  const ferdigPaaTavla = liste.filter((o) => o.status === 'ledig' && !o.trenger_ressurs).length;
+  return {
+    aktive: liste.length - uten_ressurs - ferdigPaaTavla,
+    uten_ressurs,
+    tildelt,
+    ferdig: ferdigPaaTavla + iHistorikk,
+  };
 }
 
-// Filteret «Ventende»: bare oppdrag uten ressurs. Ikke husket — et filter
-// som overlever en refresh er et filter man glemmer at står på.
-let koVentendeFilter = false;
+// Filtrene «Oppdrag uten ressurs» og «Tildelt»: ett om gangen, og ikke
+// husket — et filter som overlever en refresh er et filter man glemmer at
+// står på.
+let koOppdragFilterValg = null;
 
 function koOppdragFilter(liste) {
-  return koVentendeFilter ? liste.filter((o) => o.trenger_ressurs) : liste;
+  if (koOppdragFilterValg === 'uten_ressurs') return liste.filter((o) => o.trenger_ressurs);
+  if (koOppdragFilterValg === 'tildelt') return liste.filter((o) => o.status === 'venter' && !o.trenger_ressurs);
+  return liste;
 }
 
-function koVippVentendeFilter() {
-  koVentendeFilter = !koVentendeFilter;
+function koVippFilter(valg) {
+  koOppdragFilterValg = (koOppdragFilterValg === valg) ? null : valg;
   if (typeof renderOppdrag === 'function') renderOppdrag();
+}
+
+// Tom liste betyr to ting: filteret tok alt, eller tavla er tom. Teksten
+// skal si hvilket.
+function koOppdragTomMelding() {
+  if (koOppdragFilterValg === 'uten_ressurs') return 'Ingen oppdrag uten ressurs.';
+  if (koOppdragFilterValg === 'tildelt') return 'Ingen tildelte oppdrag som venter.';
+  return 'Ingen oppdrag på tavla.';
 }
 
 // ── Hendelsen åpnet inne i vinduet ──────────────────────────────────────────

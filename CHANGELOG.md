@@ -4,6 +4,42 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-21 — Ferdige i historikken telles, og to filtre: «Oppdrag uten ressurs» og «Tildelt»  `#ko/sentralbordet` `#oppdrag/sentralbord`
+
+André, 21. sep. 2026: «ferdige oppdrag som vises i historikk vises ikke som "ferdig" i
+tallstatistikken», «litt dobbelt opp med ventende statistikk og knapp», flytt knappen til
+venstre for «Nytt oppdrag», og en knapp til: «Tildelt».
+
+- **Bug:** et ferdig oppdrag går til historikken av seg selv i `sett_status`, og lista
+  `/oppdrag/api/oppdrag/` utelater historikken — så «ferdig» i oppdragslistas hode sto på
+  null hele vakta. Svaret bærer nå `antall_i_historikk`, og tallet er med i ETag-en (et
+  oppdrag som ryddes bort endrer ikke radene som står igjen). `koOppdragTelling(liste,
+  iHistorikk)` legger det til; argumentet er et argument, ikke en global, så regelen lar
+  seg kjøre i node.
+- **Hodet teller aktive · ferdig.** «Ventende» er borte fra teksten; tallet står på
+  knappen, ett sted.
+- **To filtre, ett om gangen**, til venstre for «Nytt oppdrag»: «Oppdrag uten ressurs»
+  (`trenger_ressurs`, het «Ventende») og «Tildelt» (en enhet varslet, ennå ikke rykket ut
+  — samme betydning som «Tildelt» på enhetskortet). `koVippFilter(valg)` gjennom
+  `data-arg`; `koOppdragTomMelding()` sier om lista er tom fordi filteret tok alt eller
+  fordi tavla er tom.
+
+**Første utgave ga 500 på lista** — «Kunne ikke hente lista — prøver igjen om 30
+sekunder» på `/ko/`: tallet lå som en tuppel *inne i* radene ETag-en sorterer, og
+`sorted()` sammenlignet tekstnøkkelen mot en tall-ID. Testen så det ikke, fordi tavla var
+tom i begge kallene og det aldri ble sammenlignet noe. `etag_for(rader, ekstra=…)` legger
+det som ikke er en rad ved siden av, og testen har en rad på tavla hele veien. Funnet av
+Playwright mot seed, ikke av suiten.
+
+**Og en test som var avhengig av klokka på veggen:** `test_tatt_av_med_staatid` (7b) lot
+«nå» være `timezone.now()`, og et åpent intervall fra 20:00 i går løp inn i time 20 i dag
+— timebolkene slår sammen dager, så tallet ble 3 etter kl. 20 og 2 før. Grønn hele
+formiddagen, rød om kvelden. `oppdrag_stats(vakt, naa=…)` tar nå «nå» som argument, og
+fiksturen setter det til 23:00. En Django-malkommentar `{# … #}` over to linjer ble
+tegnet som tekst i oppdragslistas hode — den er énlinjes; `{% comment %}` for resten.
+
+---
+
 ## 2026-09-21 — Statistikk pulje 7c: fanen «Bemanning» — belastning mot bemanning  `#statistikk/oppdragsfanen` `#statistikk/ko` `#vaktliste/belastning`
 
 André: «gå videre på 7c». Fjerde kilde på `/statistikk/` (`vaktliste/statistikk.py`,

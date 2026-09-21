@@ -203,6 +203,29 @@ class RadnivaaTests(OppdragBasis):
         self.assertEqual(data, [])
 
 
+class HistorikkTellesTests(OppdragBasis):
+    """Ferdige oppdrag i historikken telles med i lista (21. sep. 2026)."""
+
+    def test_antallet_folger_med_og_endrer_etag(self):
+        # Ett oppdrag på tavla hele veien: ETag-en sorterer radene, og
+        # tallet må ikke havne mellom dem (første utgave ga 500 med rader).
+        self._oppdrag(self.enhet, status=choices.FREMME)
+        c = _klient(_bruker('sentral_hist', 'les'))
+        forste = c.get('/oppdrag/api/oppdrag/')
+        self.assertEqual(forste.status_code, 200)
+        self.assertEqual(forste.json()['antall_i_historikk'], 0)
+        self.assertEqual(len(forste.json()['data']), 1)
+        o = self._oppdrag(self.enhet, status=choices.LEDIG)
+        o.historikk_fra = timezone.now()
+        o.save(update_fields=['historikk_fra'])
+        andre = c.get('/oppdrag/api/oppdrag/', HTTP_IF_NONE_MATCH=forste['ETag'])
+        self.assertEqual(andre.status_code, 200, 'ETag-en skal endre seg når et oppdrag ryddes bort')
+        self.assertEqual(andre.json()['antall_i_historikk'], 1)
+        self.assertEqual(len(andre.json()['data']), 1, 'det ferdige ligger ikke i lista')
+        tredje = c.get('/oppdrag/api/oppdrag/', HTTP_IF_NONE_MATCH=andre['ETag'])
+        self.assertEqual(tredje.status_code, 304)
+
+
 class EnhetslisteTests(OppdragBasis):
     """Utledet status, og ETag på pollingen."""
 

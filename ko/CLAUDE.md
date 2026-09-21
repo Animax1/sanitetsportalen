@@ -281,15 +281,16 @@ minimeres»). Gruppeoverskriften er en knapp; lukket-tilstanden huskes per nettl
 
 **Vaktlistas ressurser uten oppdragsenhet står på tavla** — lag, samleplass, KO — under
 enhetslista i egen beholder (`#vaktliste-ressurser`; sentralbordet tegner `#enhetsliste` om
-igjen ved hver poll). Data fra `/vaktliste/api/ressurser/uten-enhet/`, gatet av vaktlista —
+igjen ved hver poll). Data fra `/vaktliste/api/ressurser/uten-enhet/`, gatet av vaktlista,
 **bare ressurser med et skift som dekker nå** (`ressurser_paa_vakt_naa`, samme regel som
 lagvelgeren) — tegnet av `koRessurskort()`: hvor mange som er møtt, og «På H14 · Hovedscene
-· 23 min» når laget står på en åpen hendelse; bilene viser oppdragets sted. «i» folder ut
-fargeforklaringen (`ko.legende`); kolonneknappen gir to kolonner med hele grupper per
-kolonne (`ko.ressurskolonner`). Oppdragslistas hode teller aktive · ventende · ferdig, og
-«Ventende» filtrerer (`koOppdragFilter`). **Besetningen — navn, møtt, telefon, ISSI — står bak et klikk**, én om
-gangen som bilens (André, 19. sep. 2026: «da sparer vi plass»). Alle | Biler | Lag i
-vinduets hode huskes per nettleser (`ko.ressursvisning`), og det skjulte står som et tall.
+· 23 min» når laget står på en åpen hendelse; biler viser oppdragets sted. «i» folder ut
+fargeforklaringen (`ko.legende`); kolonneknappen gir to kolonner, hele grupper per kolonne
+(`ko.ressurskolonner`). Oppdragslistas hode teller aktive · ferdig (historikken
+med); «Oppdrag uten ressurs» og «Tildelt» filtrerer, ett om gangen (`koOppdragFilter`).
+**Besetningen — navn, møtt, telefon, ISSI — står bak et klikk**, én om
+gangen som bilens. Alle | Biler | Lag i
+vinduets hode huskes per nettleser (`ko.ressursvisning`); det skjulte står som et tall.
 
 ## Sentralbordet kjører i `/ko/` (pulje 4)
 

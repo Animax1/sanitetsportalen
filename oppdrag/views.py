@@ -436,13 +436,23 @@ def oppdrag_liste_view(request):
                            tuple(r['hendelse_lag']),
                            tuple((t['id'], t['delt_at']) for t in r['delte_linjer']))
                           for r in data]
+            # **Ferdige oppdrag i historikken telles med** (André, 21. sep.
+            # 2026: «ferdige oppdrag som vises i historikk vises ikke som
+            # ferdig i tallstatistikken»). Et ferdig oppdrag går til
+            # historikken av seg selv, så lista over inneholder nesten aldri
+            # et ferdig — tallet i hodet sto på null. Antallet følger med,
+            # og er med i ETag-en: et oppdrag som ryddes bort endrer ikke
+            # radene som står igjen.
+            i_historikk = Oppdrag.objects.filter(vakt=vakt, historikk_fra__isnull=False).count()
 
-        etag = etag_for(etag_rader)
+        etag = etag_for(etag_rader, ekstra=None if er_enhetskonto(request.user) else i_historikk)
         if request.META.get('HTTP_IF_NONE_MATCH') == etag:
             svar = HttpResponseNotModified()
             svar['ETag'] = etag
             return svar
-        svar = JsonResponse({'status': 'ok', 'data': data})
+        svar = JsonResponse({'status': 'ok', 'data': data,
+                             'antall_i_historikk': (0 if er_enhetskonto(request.user)
+                                                    else i_historikk)})
         svar['ETag'] = etag
         return svar
 

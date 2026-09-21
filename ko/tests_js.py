@@ -831,20 +831,30 @@ class DelingOgLagTests(SimpleTestCase):
         ''').splitlines()
         self.assertEqual(ut[:3], ['1 false', '2 true true 2', '1 false'])
 
-    def test_ventende_telles_og_filtreres(self):
-        """«Aktive · ventende · ferdig», og filteret «Ventende» (19. sep. 2026)."""
-        harness = build_harness(((KO_JS, ('koOppdragTelling', 'koOppdragFilter', 'koVippVentendeFilter')),))
+    def test_telling_og_de_to_filtrene(self):
+        """Uten ressurs, tildelt, ferdig — og ferdige i historikken teller med
+        (André, 21. sep. 2026: «vises ikke som ferdig i tallstatistikken»)."""
+        harness = build_harness(((KO_JS, ('koOppdragTelling', 'koOppdragFilter', 'koVippFilter',
+                                          'koOppdragTomMelding')),))
         ut = run_node(harness, '''
-            let koVentendeFilter = false;
+            let koOppdragFilterValg = null;
             const liste = [{ id: 1, status: 'venter', trenger_ressurs: true }, { id: 2, status: 'fremme', trenger_ressurs: false },
                            { id: 3, status: 'ledig', trenger_ressurs: false }, { id: 4, status: 'venter', trenger_ressurs: false }];
             console.log(JSON.stringify(koOppdragTelling(liste)));
-            console.log(koOppdragFilter(liste).length);
+            console.log(JSON.stringify(koOppdragTelling(liste, 5)));
+            console.log(koOppdragFilter(liste).length, koOppdragTomMelding());
             let tegnet = 0; globalThis.renderOppdrag = () => { tegnet += 1; };
-            koVippVentendeFilter(); console.log(koVentendeFilter, tegnet, JSON.stringify(koOppdragFilter(liste).map((o) => o.id)));
-            koVippVentendeFilter(); console.log(koVentendeFilter, koOppdragFilter(liste).length);
+            koVippFilter('uten_ressurs'); console.log(koOppdragFilterValg, tegnet, JSON.stringify(koOppdragFilter(liste).map((o) => o.id)), koOppdragTomMelding());
+            koVippFilter('tildelt'); console.log(koOppdragFilterValg, JSON.stringify(koOppdragFilter(liste).map((o) => o.id)), koOppdragTomMelding());
+            koVippFilter('tildelt'); console.log(koOppdragFilterValg, koOppdragFilter(liste).length);
         ''').splitlines()
-        self.assertEqual(ut[:4], ['{"aktive":2,"ventende":1,"ferdig":1}', '4', 'true 1 [1]', 'false 4'])
+        self.assertEqual(ut[:6], [
+            '{"aktive":2,"uten_ressurs":1,"tildelt":1,"ferdig":1}',
+            '{"aktive":2,"uten_ressurs":1,"tildelt":1,"ferdig":6}',
+            '4 Ingen oppdrag på tavla.',
+            'uten_ressurs 1 [1] Ingen oppdrag uten ressurs.',
+            'tildelt [4] Ingen tildelte oppdrag som venter.',
+            'null 4'])
 
     def test_hendelsevalget_bygges_ikke_om_under_operatoren(self):
         """Nedtrekket «Hendelse» fylles ved hver poll; står fokus i det, eller
