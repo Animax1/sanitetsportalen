@@ -85,6 +85,7 @@ HENDELSE_LAG_PAA = 'hendelse_lag_paa'
 HENDELSE_LAG_AV = 'hendelse_lag_av'
 OPPDRAG_KNYTTET = 'oppdrag_knyttet'
 TAVLE_FLYTTET = 'tavle_flyttet'
+TAVLE_RETTET = 'tavle_rettet'
 
 #: Hver kode med sin begrunnelse. Lista er kontrakten: en kode som ikke står
 #: her, skrives ikke — `ko/tests_systemlinjer.py` håndhever begge veier, slik
@@ -145,6 +146,10 @@ KODER: dict[str, str] = {
     TAVLE_FLYTTET:
         '«Lag 3 → Parkscene» er det tavla på veggen aldri kunne si: når, og '
         'hvem som flyttet. Forklarer hullene i «hvem har vært på Parkscene».',
+    TAVLE_RETTET:
+        'En retting skriver om historikken «Besøk» teller. Uten en linje ville '
+        'tallene endret seg uten at noen kunne si hvorfor — samme grunn som '
+        'TIDSPUNKT_KORRIGERT.',
 }
 
 
@@ -269,6 +274,18 @@ def tegn(kode: str, data: dict) -> str:
         if not til:
             return f'{hvem} uten plass' + (f' (var {fra})' if fra else '')
         return f'{hvem} → {til}' + (f' (fra {fra})' if fra else '')
+    if kode == TAVLE_RETTET:
+        hvem = data.get('ressurs') or 'Ressurs'
+        sted = data.get('sted') or ''
+        periode = '–'.join(t for t in (data.get('fra_foer') or '', data.get('til_foer') or '') if t)
+        if data.get('fjernet'):
+            return f'{hvem} {sted} {periode} fjernet fra tavla'.replace('  ', ' ')
+        deler = []
+        for felt, navn in (('fra', 'fra'), ('til', 'til')):
+            foer, etter = data.get(f'{felt}_foer') or '', data.get(felt) or ''
+            if foer != etter:
+                deler.append(f'{navn} {foer or "–"} → {etter or "–"}')
+        return f'{hvem} {sted} rettet: ' + ', '.join(deler)
     if kode == OPPDRAG_KNYTTET:
         fra = data.get('fra_hendelsesnummer')
         til = data.get('hendelsesnummer')

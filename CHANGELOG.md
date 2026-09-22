@@ -4,6 +4,65 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-22 — KO-tavla, steg 2: planlagte pauser, retting, «Besøk» og innstillingene  `#ko/oppsett`
+
+André: «Ja kjør begge stegene du.» Steg 2 er resten av skissene.
+
+**Pause-raden planlegges** (André: «la oss kunne sette en pause rad og legge inn pauser der
+for lagene»). «+ Planlegg» i Pause-raden gir et skjema med lag, fra og til; den planlagte
+står stiplet blå i raden, og **klikk på den** endrer eller fjerner. Fra ti minutter før får
+laget **«Pause nå»** — på stolpen i Pause-raden og på kortet i «Uten plass» — og KO starter
+den; **tavla flytter ingen av seg selv**. Står laget alt i pause, knyttes planen til den.
+Rød kant når tida gikk uten at pausen ble tatt. Regler: maks fire timer, ikke i fortida,
+aldri to over hverandre (heller ikke oppå en som er startet). Ny modell
+`ko.PlanlagtPause` (migrasjon `ko/0014`). **Vaktlistas avtalte pauser finnes ikke ennå** —
+regelen for når de kommer (vaktlista er utgangspunktet, KOs endring i drift vinner, merket
+«endret i drift») står i TODO; den trenger et kildefelt som legges til da.
+
+**Retting i etterkant** (skisse 3): klikk på en lukket stolpe, eller «Rett tidene» i linja
+når et lag er valgt. Et skjema med fra/til, ikke et dra i kanten — et feildrag på en travel
+tavle skal ikke flytte historikken stille. **Naboene tilpasses** (den forrige kortes, den
+neste begynner senere), men **en nabo forsvinner aldri**, og tida på en hendelse rettes
+ikke og gås ikke inn i. «Til» er låst på den åpne og der en hendelse tok over. «Fjern
+plasseringen» for en som aldri skjedde. Loggen får «Lag 1 Parkscene rettet: fra 20:10 →
+20:00» / «… fjernet fra tavla» (`TAVLE_RETTET`).
+
+**«Besøk»** (knappen i tavlas hode, skisse 4): per lokasjon, per ressurs, antall eller tid
+per døgn, hele vakta, tid totalt og sist der — «Lag 1 var 3 ganger på fredag men 0 på
+lørdag». Døgnet regnes fra døgnstarten (06:00), så en konsert kl. 01 hører til fredagen.
+Tida på en hendelse teller, også den laget står på nå. **På et fulgt sted (★) står nullene
+øverst**, så færrest besøk, så den som var der for lengst siden. Under tavla: **«★ Ikke
+vært på Parkscene denne vakta: Lag 4, …»**.
+
+**Innstillingene** (skisse 5): tidsvinduet **12–24 timer** og **døgnstarten** er
+portalinnstillinger (global admin, `/portal-admin/innstillinger/`). **KO-innstillinger fikk
+fanen «Tavla»** (`skriv_leder`): per lokasjon «På tavla» og «Følg besøk ★». KO eier
+avkryssingene, ikke lokasjonene — to ID-lister i `AppSetting`, auditlogget.
+
+**Endepunkter:** `PUT/DELETE /ko/api/tavle/plasseringer/<id>/`, `POST /ko/api/tavle/pauser/`,
+`PUT/DELETE /ko/api/tavle/pauser/<id>/`, `POST /ko/api/tavle/pauser/<id>/start/`,
+`GET/PUT /ko/api/tavle/oppsett/` — 167 ruter nå. Skriving er `skriv_full` i KO (oppsettet
+`skriv_leder`); bilene fortsatt bare med oppdragstilgang. Et ugyldig tidspunkt er en 400,
+ikke «nå» som i loggen: en retting som stille ble til nå, har skrevet om historikken.
+
+**Prøvd i Chromium:** «Pause nå» flyttet Lag 2 fra Village til Pause, «+ Planlegg» la inn
+en pause for Lag 3, retting av Lag 1s pause 20 minutter tidligere kortet Parkscene-stolpen
+før den, «Besøk» med nuller øverst, og fanen «Tavla» — ingen konsollfeil. **Én feil funnet
+der:** korte planlagte pauser lot teksten flyte over naboene, og «Pause nå» lå under en
+annen stolpe; klikket traff feil ting. Stolpen vokser nå framover til navnet og knappen får
+plass, og banen holdes opptatt så lenge.
+
+**Mutasjoner: 69, alle drept eller likeverdige.** Tjenestelaget, portene og
+portalinnstillingene (44): **5 overlevde første runde.** Tre av dem — at tida på en
+hendelse ikke rettes eller gås inn i — ble «drept» av prøver som avviste av **feil grunn**:
+tidene lå i framtida, så «fram i tid» slo til først. Prøven er skrevet om med alt i
+fortida. Den fjerde avdekket en regel: en startet pause blokkerte ikke en ny plan oppå
+seg; nå gjør den det. Den femte: fanen «Tavla» for `skriv_full` var ikke prøvd. JS (25):
+**6 overlevde** — tre fikk prøver (kortet viser neste pause som ikke er tatt; en knapp
+velger ingenting; et klikk som flytter åpner ikke skjemaet i tillegg), og tre var
+likeverdige og er forenklet bort (en pausesjekk i Besøk, «sist der» som alt er sist, og en
+midnattsomregning `koTavleTidNaer` alt gjør).
+
 ## 2026-09-22 — KO-tavla, steg 1: vinduet, dra og slipp, «Uten plass» og forrangen  `#ko/oppsett`
 
 André: «Hvis tavlen skal være på /ko så finner jeg den ikke» — den var skissert, ikke

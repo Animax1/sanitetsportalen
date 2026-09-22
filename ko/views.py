@@ -194,6 +194,9 @@ def index_view(request):
     verdifaner_ekstra = [
         {'slug': 'ansvarsomraader', 'navn': 'Ansvarsområder', 'ny': 'Nytt ansvarsområde',
          'url': '/ko/api/ansvarsomraader/'},
+        # Tavla (22. sep. 2026): «På tavla» og «Følg besøk ★» per lokasjon,
+        # tegnet av `koTegnTavleOppsett()` i ko-tavle.js gjennom kroken `tegn`.
+        {'slug': 'tavla', 'navn': 'Tavla', 'tegn': 'koTegnTavleOppsett'},
     ] if _kan_lede_ko(request) else []
     if er_global_admin(request.user):
         # «Nullstill» (André, 18. sep. 2026) — for test og utvikling; i prod
@@ -976,3 +979,153 @@ def tavle_uten_plass_view(request):
     except services.Ugyldig as e:
         return _feil(str(e))
     return JsonResponse({'status': 'ok'})
+
+
+# ── Tavla, steg 2: retting, pauser, oppsett ──────────────────────────────────
+
+def _tavle_tid(raa, hva):
+    """Et tidspunkt fra tavlas skjemaer. **Ugyldig er en 400 her**, ikke «nå»
+    som i loggen: en retting som stille ble til nå, har skrevet om historikken
+    til noe ingen ba om."""
+    t = parse_datetime(raa) if isinstance(raa, str) and raa else None
+    if t is None or timezone.is_naive(t):
+        raise services.Ugyldig(f'«{hva}» mangler eller er ikke et tidspunkt.')
+    return t
+
+
+def _bil_skjult(request, ressurs_id) -> bool:
+    """En bil man ikke får se uten oppdragstilgang (som `_tavle_ressurs`)."""
+    from vaktliste.models import Ressurs
+    if ressurs_id is None or har_tilgang(request.user, 'oppdrag', 'les'):
+        return False
+    return Ressurs.objects.filter(pk=ressurs_id, enhet__isnull=False).exists()
+
+
+@modul_kreves('ko', 'skriv_full', svar='json')
+@require_http_methods(['PUT', 'DELETE'])
+@rate_limit(group='ko:tavle_rett', rate='60/m', method=['PUT', 'DELETE'])
+def tavle_plassering_view(request, pk):
+    """Rett tidene på en plassering, eller fjern den (skisse 3)."""
+    from . import tavle
+    from .models import Tavleplassering
+
+    stengt = _tavle_gate(request)
+    if stengt:
+        return stengt
+    p = Tavleplassering.objects.filter(pk=pk, vakt=hent_aktiv_vakt()).first()
+    if p is None or _bil_skjult(request, p.ressurs_id):
+        return _feil('Ukjent plassering.', 404)
+    data = _json_body(request)
+    try:
+        if request.method == 'DELETE':
+            tavle.fjern(p, bruker=request.user)
+            return JsonResponse({'status': 'ok'})
+        fra = _tavle_tid(data.get('fra'), 'Fra')
+        til = _tavle_tid(data.get('til'), 'Til') if p.til is not None else None
+        tavle.rett(p, fra=fra, til=til, bruker=request.user)
+    except services.Ugyldig as e:
+        return _feil(str(e))
+    return JsonResponse({'status': 'ok'})
+
+
+@modul_kreves('ko', 'skriv_full', svar='json')
+@require_http_methods(['POST'])
+@rate_limit(group='ko:tavle_pauser', rate='60/m', method='POST')
+def tavle_pauser_view(request):
+    """Planlegg en pause for et lag (skisse 2, «+ Planlegg»)."""
+    from . import tavle
+
+    stengt = _tavle_gate(request)
+    if stengt:
+        return stengt
+    data = _json_body(request)
+    ressurs = _tavle_ressurs(request, data)
+    if ressurs is None:
+        return _feil('Ukjent ressurs.', 404)
+    try:
+        q = tavle.planlegg_pause(hent_aktiv_vakt(), ressurs, bruker=request.user,
+                                 fra=_tavle_tid(data.get('fra'), 'Fra'),
+                                 til=_tavle_tid(data.get('til'), 'Til'))
+    except services.Ugyldig as e:
+        return _feil(str(e))
+    return JsonResponse({'status': 'ok', 'data': {'id': q.pk}})
+
+
+def _tavle_pause(request, pk):
+    from .models import PlanlagtPause
+    q = PlanlagtPause.objects.filter(pk=pk, vakt=hent_aktiv_vakt()).first()
+    if q is None or _bil_skjult(request, q.ressurs_id):
+        return None
+    return q
+
+
+@modul_kreves('ko', 'skriv_full', svar='json')
+@require_http_methods(['PUT', 'DELETE'])
+@rate_limit(group='ko:tavle_pause', rate='60/m', method=['PUT', 'DELETE'])
+def tavle_pause_view(request, pk):
+    """Endre eller fjern en planlagt pause."""
+    from . import tavle
+
+    stengt = _tavle_gate(request)
+    if stengt:
+        return stengt
+    q = _tavle_pause(request, pk)
+    if q is None:
+        return _feil('Ukjent pause.', 404)
+    data = _json_body(request)
+    try:
+        if request.method == 'DELETE':
+            tavle.slett_pause(q)
+            return JsonResponse({'status': 'ok'})
+        tavle.planlegg_pause(q.vakt, q.ressurs, pause=q, bruker=request.user,
+                             fra=_tavle_tid(data.get('fra'), 'Fra'),
+                             til=_tavle_tid(data.get('til'), 'Til'))
+    except services.Ugyldig as e:
+        return _feil(str(e))
+    return JsonResponse({'status': 'ok'})
+
+
+@modul_kreves('ko', 'skriv_full', svar='json')
+@require_http_methods(['POST'])
+@rate_limit(group='ko:tavle_pause_start', rate='60/m', method='POST')
+def tavle_pause_start_view(request, pk):
+    """«Pause nå»: KO starter den; tavla flytter ingen av seg selv."""
+    from . import tavle
+
+    stengt = _tavle_gate(request)
+    if stengt:
+        return stengt
+    q = _tavle_pause(request, pk)
+    if q is None:
+        return _feil('Ukjent pause.', 404)
+    try:
+        tavle.start_pause(q, bruker=request.user)
+    except services.Ugyldig as e:
+        return _feil(str(e))
+    return JsonResponse({'status': 'ok'})
+
+
+@never_cache
+@modul_kreves('ko', 'les', svar='json')
+@require_http_methods(['GET', 'PUT'])
+@rate_limit(group='ko:tavle_oppsett', rate='30/m', method='PUT')
+def tavle_oppsett_view(request):
+    """KO-innstillinger, fanen «Tavla»: per lokasjon «På tavla» og «Følg
+    besøk ★». Å lese er `les`; å endre er KO-lederens (`skriv_leder`), som
+    resten av KO-innstillingene."""
+    from oppdrag.models import Lokasjon
+
+    from . import tavle
+
+    if request.method == 'PUT':
+        if not _kan_lede_ko(request):
+            return _feil('Å sette opp tavla er skriv_leder i KO.', 403)
+        data = _json_body(request)
+        try:
+            tavle.lagre_oppsett(skjulte_ider=data.get('skjulte'), fulgte_ider=data.get('fulgte'))
+        except services.Ugyldig as e:
+            return _feil(str(e))
+    ute, fulgt = set(tavle.skjulte()), set(tavle.fulgte())
+    return JsonResponse({'status': 'ok', 'data': [{
+        'id': l.pk, 'navn': l.navn, 'paa_tavla': l.pk not in ute, 'fulgt': l.pk in fulgt,
+    } for l in Lokasjon.objects.filter(er_aktiv=True).order_by('rekkefolge', 'navn')]})

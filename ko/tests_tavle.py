@@ -339,3 +339,292 @@ class PorteneTests(_Grunnlag):
         d = self._klient('les').get('/ko/api/tavle/').json()['data']
         self.assertNotIn('Nedlagt', [r['navn'] for r in d['rader']])
         self.assertEqual(d['plasseringer'], [])
+
+
+# ══ Steg 2: retting, planlagte pauser, innstillingene ═══════════════════════
+
+class RettTests(_Grunnlag):
+    """Skisse 3: «Lag 3 var egentlig på Parkscene fra 20:00». Naboene
+    tilpasses, men forsvinner aldri."""
+
+    def setUp(self):
+        super().setUp()
+        skift(self.lag1, fra=-5)   # på vakt da de første plasseringene ble satt
+        self.t0 = timezone.now() - timedelta(hours=3)
+        self.a = self._plasser(self.lag1, self.park, naa=self.t0)
+        self.b = self._plasser(self.lag1, self.club, naa=self.t0 + timedelta(hours=1))
+        self.c = self._plasser(self.lag1, pause=True, naa=self.t0 + timedelta(hours=2))
+        for p in (self.a, self.b, self.c):
+            p.refresh_from_db()
+
+    def _rett(self, p, fra, til=None):
+        return tavle.rett(p, fra=fra, til=til, bruker=self.operator)
+
+    def test_fra_tidligere_korter_den_forrige_og_logges(self):
+        ny_fra = self.b.fra - timedelta(minutes=10)
+        self._rett(self.b, ny_fra, self.b.til)
+        self.a.refresh_from_db()
+        self.assertEqual(self.a.til, ny_fra)
+        linje = Logglinje.objects.filter(systemkode=systemlinjer.TAVLE_RETTET).get()
+        tekst = systemlinjer.tegn(linje.systemkode, linje.systemdata)
+        self.assertIn('Lag 1 Club Venue rettet: fra', tekst)
+        self.assertEqual(linje.forfatter_navn, 'ko1')
+
+    def test_til_senere_skyver_den_neste(self):
+        ny_til = self.b.til + timedelta(minutes=10)
+        self._rett(self.b, self.b.fra, ny_til)
+        self.c.refresh_from_db()
+        self.assertEqual(self.c.fra, ny_til)
+        self.assertIsNone(self.c.til, 'den åpne forblir åpen')
+
+    def test_en_nabo_forsvinner_aldri(self):
+        with self.assertRaises(services.Ugyldig):
+            self._rett(self.b, self.a.fra, self.b.til)
+        with self.assertRaises(services.Ugyldig):
+            self._rett(self.b, self.b.fra, timezone.now() + timedelta(minutes=1))
+        with self.assertRaises(services.Ugyldig):
+            self._rett(self.a, self.a.fra, self.c.fra + timedelta(minutes=1))
+        self.a.refresh_from_db(); self.b.refresh_from_db()
+        self.assertEqual(self.a.til, self.b.fra, 'ingenting ble lagret halvveis')
+
+    def test_fram_i_tid_og_baklengs_avvises(self):
+        with self.assertRaises(services.Ugyldig):
+            self._rett(self.c, timezone.now() + timedelta(minutes=5))
+        with self.assertRaises(services.Ugyldig):
+            self._rett(self.b, self.b.til, self.b.fra)
+        with self.assertRaises(services.Ugyldig):
+            self._rett(self.b, self.b.fra, None)
+
+    def test_den_aapne_forblir_aapen(self):
+        self._rett(self.c, self.c.fra - timedelta(minutes=5), til=timezone.now() - timedelta(minutes=1))
+        self.c.refresh_from_db()
+        self.assertIsNone(self.c.til)
+
+    def test_ingen_endring_gir_ingen_linje(self):
+        self._rett(self.b, self.b.fra, self.b.til)
+        self.assertFalse(Logglinje.objects.filter(systemkode=systemlinjer.TAVLE_RETTET).exists())
+
+    def test_tida_paa_en_hendelse_rettes_ikke_og_gaas_ikke_inn_i(self):
+        """Alt i fortida, så ingen avvisning skyldes «fram i tid» — det var
+        grunnen de første prøvene her gikk grønne for mutanter."""
+        naa = timezone.now()
+        h = services.opprett_hendelse(self.vakt, 'Besvimt', bruker=self.operator, lokasjon=self.park)
+        services.sett_lag(h, [self.lag1.pk], bruker=self.operator, naa=naa - timedelta(minutes=30))
+        services.sett_lag(h, [], bruker=self.operator, naa=naa - timedelta(minutes=20))
+        d = self._plasser(self.lag1, self.club, naa=naa - timedelta(minutes=10))
+        hist = Tavleplassering.objects.get(hendelse_nummer=h.hendelsesnummer)
+        self.c.refresh_from_db()
+        with self.assertRaises(services.Ugyldig):
+            self._rett(hist, hist.fra - timedelta(minutes=1), hist.til)
+        with self.assertRaises(services.Ugyldig):
+            tavle.fjern(hist, bruker=self.operator)
+        with self.assertRaises(services.Ugyldig, msg='den forrige er en hendelse'):
+            self._rett(d, hist.til - timedelta(minutes=1))
+        with self.assertRaises(services.Ugyldig, msg='den neste er en hendelse'):
+            self._rett(self.c, self.c.fra, self.c.til + timedelta(minutes=1))
+        hist.refresh_from_db()
+        self.assertEqual((hist.fra, hist.til), (naa - timedelta(minutes=30), naa - timedelta(minutes=20)))
+
+    def test_fjern_sletter_og_logger(self):
+        tavle.fjern(self.b, bruker=self.operator)
+        self.assertFalse(Tavleplassering.objects.filter(pk=self.b.pk).exists())
+        linje = Logglinje.objects.filter(systemkode=systemlinjer.TAVLE_RETTET).get()
+        self.assertIn('fjernet fra tavla', systemlinjer.tegn(linje.systemkode, linje.systemdata))
+        tavle.fjern(self.c, bruker=self.operator)
+        self.assertIsNone(tavle.aapen(self.lag1), 'den åpne fjernet: laget står uten plass')
+
+
+class PlanlagtPauseTests(_Grunnlag):
+    """André: «la oss kunne sette en pause rad og legge inn pauser der for
+    lagene». Planen flytter ingen; KO starter den."""
+
+    def _plan(self, fra_min=10, lengde_min=30, ressurs=None, **kw):
+        naa = timezone.now()
+        return tavle.planlegg_pause(self.vakt, ressurs or self.lag1, bruker=self.operator,
+                                    fra=naa + timedelta(minutes=fra_min),
+                                    til=naa + timedelta(minutes=fra_min + lengde_min), **kw)
+
+    def test_planen_flytter_ingen(self):
+        p = self._plasser(self.lag1, self.park)
+        q = self._plan(fra_min=-5)
+        self.assertEqual(q.av_navn, 'ko1')
+        self.assertEqual(tavle.aapen(self.lag1), p, 'laget står der det sto')
+
+    def test_urimelige_planer_avvises(self):
+        with self.assertRaises(services.Ugyldig):
+            self._plan(lengde_min=0)
+        with self.assertRaises(services.Ugyldig):
+            self._plan(lengde_min=4 * 60 + 1)
+        with self.assertRaises(services.Ugyldig):
+            self._plan(fra_min=-60, lengde_min=30)
+        with self.assertRaises(services.Ugyldig):
+            self._plan(ressurs=self.av_vakt)
+
+    def test_en_startet_pause_blokkerer_ogsaa(self):
+        """Laget har pause da; en plan oppå den er to pauser samtidig."""
+        q = self._plan(fra_min=-5)
+        tavle.start_pause(q, bruker=self.operator)
+        with self.assertRaises(services.Ugyldig):
+            self._plan(fra_min=0)
+
+    def test_to_pauser_som_overlapper_avvises_men_endring_av_seg_selv_gaar(self):
+        q = self._plan()
+        with self.assertRaises(services.Ugyldig):
+            self._plan(fra_min=20)
+        self._plan(ressurs=self.lag2, fra_min=20)
+        endret = self._plan(fra_min=15, pause=q)
+        self.assertEqual(endret.pk, q.pk)
+        self.assertEqual(tavle.PlanlagtPause.objects.count(), 2)
+
+    def test_pause_naa_setter_laget_i_pause_og_peker_dit(self):
+        self._plasser(self.lag1, self.park)
+        q = self._plan(fra_min=-5)
+        p = tavle.start_pause(q, bruker=self.operator)
+        q.refresh_from_db()
+        self.assertTrue(p.pause)
+        self.assertEqual(q.startet, p)
+        with self.assertRaises(services.Ugyldig):
+            tavle.start_pause(q, bruker=self.operator)
+        with self.assertRaises(services.Ugyldig):
+            self._plan(pause=q)
+        with self.assertRaises(services.Ugyldig):
+            tavle.slett_pause(q)
+
+    def test_staar_laget_alt_i_pause_knyttes_planen_til_den(self):
+        p = self._plasser(self.lag1, pause=True)
+        q = self._plan(fra_min=-5)
+        self.assertEqual(tavle.start_pause(q, bruker=self.operator), p)
+        self.assertEqual(Tavleplassering.objects.filter(ressurs=self.lag1).count(), 1)
+
+    def test_laget_paa_en_hendelse_faar_ikke_pause(self):
+        q = self._plan(fra_min=-5)
+        h = services.opprett_hendelse(self.vakt, 'Besvimt', bruker=self.operator, lokasjon=self.park)
+        services.sett_lag(h, [self.lag1.pk], bruker=self.operator)
+        with self.assertRaises(services.Ugyldig):
+            tavle.start_pause(q, bruker=self.operator)
+        q.refresh_from_db()
+        self.assertIsNone(q.startet)
+
+    def test_uten_start_kan_den_slettes(self):
+        q = self._plan()
+        tavle.slett_pause(q)
+        self.assertFalse(tavle.PlanlagtPause.objects.exists())
+
+
+class InnstillingeneTests(_Grunnlag):
+
+    def test_tidsvinduet_klemmes_og_doegnstarten_valideres(self):
+        from core.models import AppSetting
+        self.assertEqual((tavle.timer(), tavle.dognstart()), (12, '06:00'))
+        AppSetting.set(tavle.TIMER_NOKKEL, '99')
+        self.assertEqual(tavle.timer(), 24)
+        AppSetting.set(tavle.TIMER_NOKKEL, '3')
+        self.assertEqual(tavle.timer(), 12)
+        AppSetting.set(tavle.TIMER_NOKKEL, 'tull')
+        self.assertEqual(tavle.timer(), 12)
+        AppSetting.set(tavle.DOGNSTART_NOKKEL, '25:00')
+        self.assertEqual(tavle.dognstart(), '06:00')
+        AppSetting.set(tavle.DOGNSTART_NOKKEL, '5:30')
+        self.assertEqual(tavle.dognstart(), '05:30')
+
+    def test_skjulte_er_ikke_rader_og_fulgte_foelger_svaret(self):
+        tavle.lagre_oppsett(skjulte_ider=[self.club.pk], fulgte_ider=[self.park.pk])
+        d = tavle.tavle_data(self.vakt)
+        self.assertEqual([r['navn'] for r in d['rader']], ['Parkscene'])
+        self.assertEqual(d['fulgte'], [self.park.pk])
+        with self.assertRaises(services.Ugyldig):
+            tavle.lagre_oppsett(skjulte_ider=[99999], fulgte_ider=[])
+        with self.assertRaises(services.Ugyldig):
+            tavle.lagre_oppsett(skjulte_ider='1', fulgte_ider=[])
+        self.assertEqual(tavle.skjulte(), [self.club.pk], 'et avslag lagrer ingenting')
+
+    def test_svaret_baerer_pausene_og_innstillingene(self):
+        naa = timezone.now()
+        tavle.planlegg_pause(self.vakt, self.lag1, bruker=self.operator,
+                             fra=naa + timedelta(minutes=5), til=naa + timedelta(minutes=35))
+        d = tavle.tavle_data(self.vakt)
+        self.assertEqual([(q['ressurs_navn'], q['startet']) for q in d['pauser']], [('Lag 1', False)])
+        self.assertEqual((d['timer'], d['dognstart']), (12, '06:00'))
+        self.assertTrue(d['vakt_start'])
+
+    def test_portalinnstillingene_validerer_og_fravaer_er_behold(self):
+        from django.core.exceptions import ValidationError
+
+        from ko.portalinnstillinger import KoInnstillinger
+        h = KoInnstillinger()
+        self.assertNotIn('tavle_timer', h.valider({}))
+        for feil in ({'ko_tavle_timer': '11'}, {'ko_tavle_timer': '25'}, {'ko_tavle_timer': 'x'},
+                     {'ko_tavle_dognstart': '6'}):
+            with self.subTest(feil=feil), self.assertRaises(ValidationError):
+                h.valider(feil)
+        h.lagre(h.valider({'ko_tavle_timer': '18', 'ko_tavle_dognstart': '07:00'}))
+        self.assertEqual((tavle.timer(), tavle.dognstart()), (18, '07:00'))
+        self.assertEqual(h.kontekst()['ko_tavle_timer'], 18)
+
+
+@override_settings(SECURE_SSL_REDIRECT=False, RATELIMIT_ENABLE=False)
+class PorteneSteg2Tests(PorteneTests):
+    """Portene for rettingen, pausene og oppsettet. Arver `_klient`."""
+
+    def _iso(self, dt):
+        return dt.isoformat()
+
+    def test_retting_krever_skriv_full_og_aktiv_vakt(self):
+        from core.models import Vakt
+        p = self._plasser(self.lag1, self.park, naa=timezone.now() - timedelta(minutes=30))
+        kropp = {'fra': self._iso(p.fra - timedelta(minutes=5))}
+        url = f'/ko/api/tavle/plasseringer/{p.pk}/'
+        self.assertEqual(self._klient('les').put(url, kropp, content_type='application/json').status_code, 403)
+        c = self._klient('skriv_full')
+        self.assertEqual(c.put(url, {'fra': 'tull'}, content_type='application/json').status_code, 400)
+        self.assertEqual(c.put(url, {'fra': '2026-09-22T10:00:00'}, content_type='application/json').status_code,
+                         400, 'uten tidssone er ikke et tidspunkt')
+        self.assertEqual(c.put(url, kropp, content_type='application/json').status_code, 200)
+        gammel = Vakt.objects.create(navn='i fjor', year=2025, startet=timezone.now())
+        Tavleplassering.objects.filter(pk=p.pk).update(vakt=gammel)
+        self.assertEqual(c.put(url, kropp, content_type='application/json').status_code, 404)
+        self.assertEqual(c.delete(url, {}, content_type='application/json').status_code, 404)
+
+    def test_fjern_og_bilen_uten_oppdragstilgang(self):
+        p = self._plasser(self.bil, self.park)
+        url = f'/ko/api/tavle/plasseringer/{p.pk}/'
+        self.assertEqual(self._klient('skriv_full', oppdrag=None).delete(
+            url, {}, content_type='application/json').status_code, 404)
+        self.assertEqual(self._klient('skriv_full').delete(
+            url, {}, content_type='application/json').status_code, 200)
+
+    def test_pausene_gjennom_endepunktene(self):
+        naa = timezone.now()
+        kropp = {'ressurs_id': self.lag1.pk, 'fra': self._iso(naa - timedelta(minutes=1)),
+                 'til': self._iso(naa + timedelta(minutes=29))}
+        self.assertEqual(self._klient('les').post('/ko/api/tavle/pauser/', kropp,
+                                                   content_type='application/json').status_code, 403)
+        c = self._klient('skriv_full')
+        r = c.post('/ko/api/tavle/pauser/', kropp, content_type='application/json')
+        self.assertEqual(r.status_code, 200, r.content)
+        pk = r.json()['data']['id']
+        kropp['til'] = self._iso(naa + timedelta(minutes=40))
+        self.assertEqual(c.put(f'/ko/api/tavle/pauser/{pk}/', kropp,
+                               content_type='application/json').status_code, 200)
+        self.assertEqual(self._klient('les').post(f'/ko/api/tavle/pauser/{pk}/start/', {},
+                                                   content_type='application/json').status_code, 403)
+        self.assertEqual(c.post(f'/ko/api/tavle/pauser/{pk}/start/', {},
+                                content_type='application/json').status_code, 200)
+        self.assertTrue(tavle.aapen(self.lag1).pause)
+        self.assertEqual(c.delete(f'/ko/api/tavle/pauser/{pk}/', {},
+                                  content_type='application/json').status_code, 400, 'startet')
+        self.assertEqual(c.delete('/ko/api/tavle/pauser/99999/', {},
+                                  content_type='application/json').status_code, 404)
+
+    def test_oppsettet_leses_av_les_og_endres_av_lederen(self):
+        url = '/ko/api/tavle/oppsett/'
+        kropp = {'skjulte': [self.club.pk], 'fulgte': [self.park.pk]}
+        d = self._klient('les').get(url).json()['data']
+        self.assertEqual([(l['navn'], l['paa_tavla'], l['fulgt']) for l in d],
+                         [('Club Venue', True, False), ('Parkscene', True, False)])
+        self.assertEqual(self._klient('skriv_full').put(url, kropp, content_type='application/json').status_code, 403)
+        r = self._klient('skriv_leder').put(url, kropp, content_type='application/json')
+        self.assertEqual(r.status_code, 200, r.content)
+        self.assertEqual([(l['navn'], l['paa_tavla'], l['fulgt']) for l in r.json()['data']],
+                         [('Club Venue', False, False), ('Parkscene', True, True)])
+        self.assertEqual(self._klient(None).get(url).status_code, 403)

@@ -145,54 +145,19 @@ ingen av dem gir feilmelding — de er bare stille inaktive.
 Sammenhengen, rekkefølgen og de åpne valgene står i
 [`docs/FORSLAG_VAKTLISTE_UTBEDRINGER.md`](./docs/FORSLAG_VAKTLISTE_UTBEDRINGER.md).*
 
-### KO-tavla — steg 1 levert 22. sep. 2026, steg 2 under arbeid
-
-Tavla på veggen i KO digitalt: lokasjoner som rader, tid som kolonner, lagene plassert
-i rutene. Skissene ligger i Artifact «KO-tavla — skisser» (fem artboards). **Svarene fra
-André 22. sep. 2026, før koden:**
-
-| Spørsmål | Svar |
-|---|---|
-| Plass i `/ko/` | **Bytter plass med Ressursoversikten**, ikke oppdragslista. Den skjulte står alltid i stripa |
-| Radene | **Oppdragsmodulens lokasjoner** (`oppdrag.Lokasjon`) |
-| Hvem kan plasseres | **Bare ledige.** Den som er på hendelse eller oppdrag står på tavla som det, og den har forrang |
-| Hendelse/oppdrag | Vises på tavla, merket «På H14» / «O12 Fremme», ved lokasjonen hendelsen eller oppdraget har |
-| «Ikke vært» | Per vakt **og** antall per døgn: «Lag 1 var 3 ganger fredag, 0 lørdag» |
-| Tidsvinduet | **Admininnstilling, 12–24 timer** |
-| Retting i etterkant | Ja |
-| Hvem flytter | Alle med KO-skrivetilgang (`skriv_full`) |
-| Filter | Alle, og per type — Lag, Spesiallag, Mannskapsbil, Ambulanse |
-
-**Og avklart 22. sep. 2026, etter skissene:**
-
-| Spørsmål | Svar |
-|---|---|
-| Pause | **Fast rad øverst**, ikke en lokasjon — ellers står «Pause» som sted i «Nytt oppdrag» |
-| Når hendelsen lukkes | Laget går til **«Uten plass»**, og det er en **egen kolonne** på tavla. Den er også et slippmål: dra et lag dit, så avsluttes plasseringen |
-| Fulgte steder (★), lokasjonene på tavla | KO-lederens innstilling (`skriv_leder`), fane «Tavla» i KO-innstillinger. KO eier avkryssingene, ikke lokasjonene |
-| Filteret | Bygges fra `vaktliste.Ressursgruppe`, ikke fire faste valg |
-| Planlagte pauser | **KO kan planlegge pauser i Pause-raden** for lag, også lag uten avtalt pause i vaktlista. **Vaktlista er utgangspunktet**: en avtalt pause derfra står der av seg selv. **KO kan endre den i drift**, og da gjelder KOs versjon resten av vakta, merket «endret i drift» — vaktlista overstyrer den ikke lenger. Når pausen er her, får laget «Pause nå»; KO starter den, tavla flytter ingen av seg selv |
-
-- [ ] **Steg 2 av tavla.** Steg 1 — vinduet, radene, «Uten plass», dra og slipp, filteret,
-      forrangen til hendelser og oppdrag — står i CHANGELOG. Igjen: planlagte pauser i
-      Pause-raden med «Pause nå» (regelen i tabellen over); retting av en plassering i
-      etterkant (fra/til, logget); «Besøk» per lokasjon per døgn og for hele vakta, med
-      døgnstart; tidsvinduet 12–24 t og døgnstarten som portalinnstilling (global admin);
-      «På tavla» og «Følg besøk ★» per lokasjon i KO-innstillinger (`skriv_leder`); og
-      «Ikke vært på \<fulgt sted\>» under tavla.
-
 ### Vaktlista: avtalte pauser — ønsket 22. sep. 2026
 
 - [ ] **Avtalte pauser i vaktlista, som tavla i `/ko/` henter.** André: «vi har planer om
       å hente avtalte pauser fra /vaktliste som er en funksjon som ikke er lagt inn enda».
       Kontrollert 22. sep. 2026: vaktlista har **hviletid mellom skift**
-      (`services._hviletider()`), men ingen pauser *i* et skift. Tavla viser en avtalt
-      pause stiplet i Pause-raden (skisse 2); når laget faktisk går, er det en vanlig
-      plassering i raden. Retningen er `ko` → `vaktliste`, som resten av ressursbildet.
-      **Tavla bygges ikke på denne:** KO planlegger pauser selv fra første versjon, og
-      vaktlistas pauser kobles på som utgangspunktet når de finnes (se regelen under
-      KO-tavla). Åpent når punktet tas opp: pause per plass eller per ressurs, og om den
-      teller i timene.
+      (`services._hviletider()`), men ingen pauser *i* et skift. Tavla har i dag KOs egne
+      planlagte pauser (`ko.PlanlagtPause`, «+ Planlegg» og «Pause nå» i Pause-raden).
+      **Regelen André ga når vaktlista får dem:** vaktlistas pause er utgangspunktet og
+      står i Pause-raden av seg selv; KO kan endre den i drift, og da gjelder KOs versjon
+      resten av vakta, merket «endret i drift» — vaktlista overstyrer den ikke lenger. KO
+      kan fortsatt planlegge for lag vaktlista ikke har gitt pause. Det krever et
+      kildefelt på `PlanlagtPause`. Retningen er `ko` → `vaktliste`. Åpent når punktet tas
+      opp: pause per plass eller per ressurs, og om den teller i timene.
 
 ### KO: «Avbrutt» i sentralbordets nedtrekk — bestilt 22. sep. 2026
 

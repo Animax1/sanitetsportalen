@@ -137,6 +137,14 @@ eier og hvor reglene står: `ko/CLAUDE.md`. Her er flaten.
 | **Ingen `min-width` på rutenettet** | Tavla står ofte i den smale plassen; rullet tidslinja vannrett, forsvant nå-streken |
 | Poller hvert 15. s **bare når den står framme**, tegner nå-streken hvert minutt | `koTegnOppsett` kaller `koTavleSynligNaa`, så en tavle som hentes fram viser nå |
 | Filteret er vaktlistas ressursgrupper, huskes per nettleser (`ko.tavle.filter`) | Gruppene finnes alt; fire faste valg ville vært en taksonomi til |
+| **Et klikk er en flytting når et lag er valgt**; ellers åpner det skjemaet til en planlagt pause eller en lukket plassering. Den åpne rettes fra «Rett tidene» i linja over | `koTavleKlikk` — rekkefølgen er regelen. En knapp (`data-action`) velger aldri noe |
+| **Retting er et skjema, ikke et dra i kanten** (skisse 3). Klokkeslett, ikke dato: `koTavleTidNaer` gir nærmeste tidspunkt rundt det som rettes | Et feildrag på en travel tavle skal ikke flytte historikken stille; «20:00» på en vakt over midnatt betyr nesten alltid den nærmeste |
+| «Til» er låst på den åpne og der en hendelse tok over (`koTavleSkjemaData`) | Hendelsen eier tida videre |
+| Et åpent skjema tegnes ikke om av pollen | Ellers tømmes feltet under fingrene |
+| Planlagt pause: stiplet i Pause-raden, «Pause nå» fra ti minutter før (`koTavlePauseStatus`), på stolpen og på kortet i «Uten plass» | KO starter den; tavla flytter ingen av seg selv. Rød kant når tida gikk uten at den ble tatt |
+| **«Besøk»** er en visning i samme vindu, regnet i nettleseren av vaktas plasseringer (`koTavleBesok`). Døgnet fra døgnstarten; nuller øverst på et fulgt sted | Alt ligger alt i svaret — ingen egen spørring å holde i takt |
+| «Ikke vært på \<fulgt sted\>» under tavla (`koTavleIkkeVaert`) | «Hvem skal få gå neste» uten å åpne noe |
+| Fanen «Tavla» i KO-innstillinger tegnes av `koTegnTavleOppsett` gjennom kroken `tegn` | Oppdragsmodulens JS kjenner ikke KO |
 
 **Gaten er komposisjonsregelen**: tavla krever `les` i vaktlista (403 ellers), bilene
 bare med `les` i oppdragsmodulen — både i svaret og ved flytting (404: en bil man ikke får

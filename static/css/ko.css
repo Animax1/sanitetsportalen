@@ -432,3 +432,28 @@ body.ko-drar-h { cursor: row-resize; }
   font-size: 0.8rem; font-weight: 700; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
 }
 body.ko-tavle-drar, body.ko-tavle-drar * { cursor: grabbing !important; user-select: none; }
+
+/* ── Tavla, steg 2 (22. sep. 2026): pausene, skjemaet, besøk ────────────── */
+.ko-tavle-stjerne { color: #fbbf24; }
+.ko-tavle-planlegg { --bs-btn-padding-y: 0; --bs-btn-padding-x: 0.3rem; --bs-btn-font-size: 0.7rem; }
+/* Den planlagte er en plan, ikke noe som skjedde: stiplet, blå som i skissen. */
+.ko-tavle-stolpe.ko-tavle-planlagt {
+  background: rgba(147, 197, 253, 0.12); border: 1px dashed #93c5fd; color: #bfdbfe; opacity: 1;
+  cursor: pointer;
+}
+.ko-tavle-stolpe.ko-tavle-pause-naa { border-style: solid; border-color: #fbbf24; color: #fde68a; }
+.ko-tavle-stolpe.ko-tavle-pause-ikke_tatt { border-color: #f87171; color: #fecaca; }
+.ko-tavle-pause-knapp { --bs-btn-padding-y: 0; --bs-btn-padding-x: 0.35rem; --bs-btn-font-size: 0.7rem; }
+.ko-tavle-stolpe[data-tavle-plassering] { cursor: pointer; }
+.ko-tavle-skjema {
+  padding: 0.5rem 0.75rem; border-bottom: 1px solid var(--portal-border); background: var(--portal-surface-2);
+}
+.ko-tavle-skjema-tittel { font-weight: 600; margin-bottom: 0.35rem; }
+.ko-tavle-dempet { color: var(--text-muted); }
+.ko-tavle-ikke-vaert { padding: 0.4rem 0.5rem; font-size: 0.8rem; border-top: 1px solid var(--portal-border); }
+.ko-tavle-navnelapp {
+  display: inline-block; padding: 0 0.4rem; border-radius: 8px; background: var(--portal-surface-2); margin: 0 0.1rem;
+}
+.ko-tavle-besok { padding: 0.5rem 0.75rem; width: 100%; overflow-x: auto; }
+.ko-tavle-besok-tabell td, .ko-tavle-besok-tabell th { white-space: nowrap; }
+.ko-tavle-besok-tabell tr.ko-tavle-null td { color: #fde68a; }

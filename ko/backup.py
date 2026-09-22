@@ -89,12 +89,15 @@ class KoBackupHandler(BaseBackupHandler):
     #:
     #: `Tavleplassering` (22. sep. 2026) er begge deler på én rad: ressursen
     #: mot vaktlista, lokasjonen mot oppdrag. Navnene står frosset.
+    #: `PlanlagtPause` har samme ressurspeker; `startet` peker innad i settet
+    #: og beholdes.
     strip_fields = {
         'ko.Logglinje': ['forfatter', 'fjernet_av', 'festet_av', 'delt_av'],
         'ko.Hendelse': ['opprettet_av', 'lukket_av', 'lokasjon'],
         'ko.HendelseDeltaker': ['bruker'],
         'ko.HendelseLag': ['ressurs', 'av'],
         'ko.Tavleplassering': ['ressurs', 'lokasjon', 'av'],
+        'ko.PlanlagtPause': ['ressurs', 'av'],
     }
 
 

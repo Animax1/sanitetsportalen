@@ -694,3 +694,47 @@ class Tavleplassering(models.Model):
     def __str__(self):
         sted = 'Pause' if self.pause else self.lokasjon_navn
         return f'{self.ressurs_navn} · {sted}'
+
+
+class PlanlagtPause(models.Model):
+    """En pause KO har planlagt for et lag (André, 22. sep. 2026).
+
+    «La oss kunne sette en pause rad og legge inn pauser der for lagene. Som
+    skal overstyres av /vaktliste men kunne endres på i drift og hvis lag
+    ikke har fått planlagt pause i /vaktliste.» **Vaktlista har ingen pauser
+    ennå** (TODO): i dag er alle planlagte pauser KOs egne. Den dagen
+    vaktlista får dem, blir de utgangspunktet, og en KO-endring i drift vinner
+    — det trenger et felt for kilden, og det legges til da, ikke nå.
+
+    **Planen flytter ingen.** Når tiden er inne, får laget «Pause nå», og KO
+    starter den; da blir det en vanlig plassering i Pause-raden, og `startet`
+    peker på den. Tavla flytter ingen av seg selv — et lag midt i noe skal
+    ikke forsvinne fra raden sin fordi klokka sa det.
+    """
+
+    vakt = models.ForeignKey(
+        'core.Vakt', on_delete=models.PROTECT,
+        related_name='ko_planlagte_pauser', verbose_name='Vakt')
+    ressurs = models.ForeignKey(
+        'vaktliste.Ressurs', null=True, blank=True, on_delete=models.SET_NULL,
+        related_name='ko_planlagte_pauser', verbose_name='Ressurs')
+    ressurs_navn = models.CharField(max_length=120, verbose_name='Ressurs (navn)')
+    fra = models.DateTimeField(verbose_name='Fra')
+    til = models.DateTimeField(verbose_name='Til')
+    startet = models.ForeignKey(
+        Tavleplassering, null=True, blank=True, on_delete=models.SET_NULL,
+        related_name='planlagt_pause', verbose_name='Startet som')
+    av = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True,
+        on_delete=models.SET_NULL, related_name='ko_planlagte_pauser',
+        verbose_name='Planlagt av')
+    av_navn = models.CharField(
+        max_length=150, blank=True, default='', verbose_name='Planlagt av (navn)')
+
+    class Meta:
+        verbose_name = 'Planlagt pause'
+        verbose_name_plural = 'Planlagte pauser'
+        ordering = ['fra', 'id']
+
+    def __str__(self):
+        return f'{self.ressurs_navn} · pause'

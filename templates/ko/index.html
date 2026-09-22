@@ -419,6 +419,12 @@
           <div class="btn-group btn-group-sm ms-2 flex-wrap" role="group" aria-label="Filter" id="ko-tavle-filter"></div>
           {% endif %}
           <span class="ms-auto d-flex align-items-center gap-1">
+            {% if kan_se_vaktliste %}
+            <button type="button" class="btn btn-outline-secondary btn-sm" id="ko-tavle-besok-knapp"
+                    data-action="koTavleVisBesok" title="Hvem har vært hvor, per døgn">
+              <i class="bi bi-bar-chart me-1"></i>Besøk
+            </button>
+            {% endif %}
             <button type="button" class="btn btn-outline-secondary btn-sm"
                     data-action="koByttPar" data-arg="tavle" title="Bytt til ressursoversikten">
               <i class="bi bi-arrow-left-right me-1"></i>Ressursoversikt
@@ -432,6 +438,7 @@
         </div>
         <div class="ko-tavle-melding d-none" id="ko-tavle-valgt" role="status"></div>
         <div class="alert alert-warning py-1 px-2 m-2 small d-none" id="ko-tavle-feil" role="alert"></div>
+        <div class="ko-tavle-skjema d-none" id="ko-tavle-skjema"></div>
         <div class="ko-vindu-kropp ko-tavle-kropp">
           {% if kan_se_vaktliste %}
           <div class="ko-tavle" id="ko-tavle"><div class="tom-melding">Laster…</div></div>

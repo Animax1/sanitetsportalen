@@ -23,7 +23,13 @@ HARNESS = (
     (KO_JS, ('koTavleKanSkrive', 'koTavleVindu', 'koTavleProsent', 'koTavleSynlig',
              'koTavleKanDras', 'koTavleMaal', 'koTavleVarighet', 'koTavleRader',
              'koTavleUtenPlass', 'koTavleStolpeHtml', 'koTavleRadHtml',
-             'koTavleUtenPlassHtml', 'koTavleFilterHtml', 'koTavleKlikk')),
+             'koTavleUtenPlassHtml', 'koTavleFilterHtml', 'koTavleKlikk',
+             # Steg 2.
+             'koTavleTo', 'koTavleHHMM', 'koTavleTidNaer', 'koTavlePauseStatus',
+             'koTavlePlanlagtHtml', 'koTavleValgtHtml', 'koTavleDognnokkel', 'koTavleDognene',
+             'koTavleBesok', 'koTavleIkkeVaert', 'koTavleDognnavn', 'koTavleSistHtml',
+             'koTavleBesokHtml', 'koTavleIkkeVaertHtml', 'koTavleSkjemaData',
+             'koTavleSkjemaHtml', 'koTavleSkjemaKropp', 'koTavleOppsettHtml')),
 )
 
 #: Klokka i testene: 22. sep. 2026 kl. 20:00 UTC.
@@ -70,6 +76,7 @@ class TavlereglerTests(SimpleTestCase):
     def setUp(self):
         self.harness = build_harness(HARNESS)
         self.pre = (_konst(TAVLE_JS, 'KO_TAVLE_LENGE_MIN')
+                    + _konst(TAVLE_JS, 'KO_TAVLE_PAUSE_FORVARSEL_MIN')
                     + 'let koTavleValgt = null;\n'
                     + 'let koKanSkriveSvar = true;\n'
                     + 'function koKanSkrive() { return koKanSkriveSvar; }\n'
@@ -251,3 +258,199 @@ class TavlereglerTests(SimpleTestCase):
         self.assertEqual(ut[1], '102')
         self.assertEqual(ut[2], 'null klikk igjen velger bort')
         self.assertEqual(json.loads(ut[3]), [[102, {'lokasjon_id': 2}]])
+
+
+#: Data for steg 2, bygget i **lokal tid** i node — så prøvene sier det samme
+#: i en container på UTC og på en PC i Norge. `L(d, t, m)` er 23.–24. sep. 2026.
+STEG2 = """
+const L = (d, t, m = 0) => new Date(2026, 8, d, t, m).getTime();
+const I = (ms) => new Date(ms).toISOString();
+const NAA2 = L(24, 2);
+const D2 = {
+  naa: I(NAA2), timer: 12, dognstart: '06:00', vakt_start: I(L(23, 14)), fulgte: [1],
+  rader: [{id: 1, navn: 'Parkscene'}, {id: 2, navn: 'Village'}],
+  grupper: [{id: 10, navn: 'Lag'}],
+  ressurser: [
+    {id: 101, navn: 'Lag 1', gruppe_id: 10, bil: false, opptatt: null},
+    {id: 102, navn: 'Lag 2', gruppe_id: 10, bil: false, opptatt: null},
+    {id: 103, navn: 'Lag 3', gruppe_id: 10, bil: false,
+     opptatt: {merke: 'På H4', tekst: 'På H4', lokasjon_id: 1, fra: I(L(24, 1, 30)), hendelse_id: 4}},
+  ],
+  plasseringer: [
+    // Lag 1: Parkscene 15–16 og 23–00:30 (fredag etter døgnstart), så Village.
+    {id: 1, ressurs_id: 101, ressurs_navn: 'Lag 1', lokasjon_id: 1, lokasjon_navn: 'Parkscene', pause: false,
+     hendelse_nummer: null, fra: I(L(23, 15)), til: I(L(23, 16))},
+    {id: 2, ressurs_id: 101, ressurs_navn: 'Lag 1', lokasjon_id: 1, lokasjon_navn: 'Parkscene', pause: false,
+     hendelse_nummer: null, fra: I(L(23, 23)), til: I(L(24, 0, 30))},
+    {id: 3, ressurs_id: 101, ressurs_navn: 'Lag 1', lokasjon_id: 2, lokasjon_navn: 'Village', pause: false,
+     hendelse_nummer: 7, fra: I(L(24, 0, 30)), til: I(L(24, 1))},
+    {id: 4, ressurs_id: 101, ressurs_navn: 'Lag 1', lokasjon_id: 2, lokasjon_navn: 'Village', pause: false,
+     hendelse_nummer: null, fra: I(L(24, 1)), til: null},
+  ],
+  pauser: [
+    {id: 50, ressurs_id: 102, ressurs_navn: 'Lag 2', fra: I(L(24, 2, 5)), til: I(L(24, 2, 35)), startet: false},
+    {id: 51, ressurs_id: 101, ressurs_navn: 'Lag 1', fra: I(L(24, 4)), til: I(L(24, 4, 30)), startet: false},
+    {id: 52, ressurs_id: 101, ressurs_navn: 'Lag 1', fra: I(L(23, 20)), til: I(L(23, 20, 30)), startet: true},
+  ],
+};
+"""
+
+
+@unittest.skipUnless(node_available(), 'node er ikke tilgjengelig')
+class Steg2Tests(TavlereglerTests):
+    """Steg 2 i nettleseren: tidene i skjemaet, pausene, «Besøk», «ikke vært»
+    og byggerne med fiendtlige navn. Arver harness og forspill."""
+
+    def _kjor(self, kode):
+        return run_node(self.harness, STEG2 + kode, preamble=self.pre).splitlines()
+
+    def test_klokkeslett_blir_naermeste_tidspunkt(self):
+        """«20:00» betyr den nærmeste 20:00 — også over midnatt."""
+        ut = self._json("""[
+            koTavleTidNaer(L(24, 0, 30), '23:50') === L(23, 23, 50),
+            koTavleTidNaer(L(23, 23, 30), '00:20') === L(24, 0, 20),
+            koTavleTidNaer(L(23, 20), '19:00') === L(23, 19),
+            koTavleTidNaer(L(23, 20), '24:00'), koTavleTidNaer(L(23, 20), 'x'),
+        ]""")
+        self.assertEqual(ut, [True, True, True, None, None])
+
+    def test_pausens_status(self):
+        ut = self._json("""D2.pauser.map((q) => koTavlePauseStatus(q, NAA2)).concat(
+            [koTavlePauseStatus(D2.pauser[0], L(24, 1, 54)), koTavlePauseStatus(D2.pauser[0], L(24, 2, 35))])""")
+        self.assertEqual(ut, ['naa', 'kommer', 'startet', 'kommer', 'ikke_tatt'],
+                         'ti minutter før er «nå»; ved slutt uten start er den ikke tatt')
+
+    def test_planlagte_staar_i_pause_raden_og_den_startede_ikke(self):
+        ut = self._json("koTavleRader(D2, koTavleVindu(NAA2, 12), 'alle')[0].stolper"
+                        ".map((s) => [s.pause_id, s.pause_status, s.dras])")
+        self.assertEqual(ut, [[50, 'naa', False], [51, 'kommer', False]])
+
+    def test_kortet_viser_neste_pause_som_ikke_er_tatt(self):
+        """En startet pause som begynte tidligere skal ikke skygge for den
+        neste."""
+        ut = self._json("""(() => {
+            const d = JSON.parse(JSON.stringify(D2));
+            d.pauser.push({id: 60, ressurs_id: 102, ressurs_navn: 'Lag 2', fra: I(L(23, 22)), til: I(L(23, 22, 30)), startet: true},
+                          {id: 61, ressurs_id: 102, ressurs_navn: 'Lag 2', fra: I(L(23, 23)), til: I(L(23, 23, 30)), startet: false});
+            return koTavleUtenPlass(d, 'alle', NAA2).ledige.map((r) => r.planlagt && r.planlagt.id);
+        })()""")
+        self.assertEqual(ut, [50])
+
+    def test_pause_naa_paa_kortet_og_i_raden_bare_for_den_som_skriver(self):
+        ut = self._kjor("""
+            const u = koTavleUtenPlass(D2, 'alle', NAA2);
+            console.log(JSON.stringify(u.ledige.map((r) => [r.navn, r.planlagt])));
+            const rad = koTavleRader(D2, koTavleVindu(NAA2, 12), 'alle')[0];
+            console.log(koTavleRadHtml(rad).includes('data-action="koTavleStartPause" data-arg="50"'),
+                        koTavleUtenPlassHtml(u).includes('data-action="koTavleStartPause"'));
+            koKanSkriveSvar = false;
+            console.log(koTavleRadHtml(rad).includes('koTavleStartPause'),
+                        koTavleUtenPlassHtml(u).includes('koTavleStartPause'),
+                        koTavleRadHtml(rad).includes('koTavlePlanlegg'));
+        """)
+        self.assertEqual(json.loads(ut[0]), [['Lag 2', {'id': 50, 'naa': True, 'kl': '02:05'}]])
+        self.assertEqual(ut[1], 'true true')
+        self.assertEqual(ut[2], 'false false false')
+
+    def test_doegnet_begynner_ved_doegnstarten(self):
+        ut = self._json("""[koTavleDognnokkel(L(24, 1), '06:00'), koTavleDognnokkel(L(24, 6), '06:00'),
+                            koTavleDognnokkel(L(24, 1), '00:00'), JSON.stringify(koTavleDognene(D2, NAA2))]""")
+        self.assertEqual(ut[:3], ['2026-09-23', '2026-09-24', '2026-09-24'])
+        self.assertEqual(json.loads(ut[3]), ['2026-09-23'], 'kl. 02 er fortsatt onsdagens døgn')
+
+    def test_besok_teller_per_doegn_hele_vakta_og_hendelsen_naa(self):
+        b = self._json("koTavleBesok(D2, 1, 'alle', NAA2)")
+        rader = {r['navn']: r for r in b['rader']}
+        self.assertEqual(rader['Lag 1']['per'], {'2026-09-23': 2})
+        self.assertEqual(rader['Lag 1']['antall'], 2)
+        self.assertEqual(rader['Lag 1']['tid_totalt'], (60 + 90) * 60000)
+        self.assertEqual(rader['Lag 3']['antall'], 1, 'laget på H4 ved Parkscene er der nå')
+        self.assertEqual(rader['Lag 3']['sist'], {'naa': True, 'til': self._json('NAA2'), 'merke': 'På H4'})
+        self.assertIsNone(rader['Lag 2']['sist'])
+
+    def test_fulgt_sted_gir_nuller_oeverst(self):
+        ut = self._json("""(() => {
+            const d = JSON.parse(JSON.stringify(D2));
+            d.ressurser[2].opptatt = null;
+            const lag2 = (fra, til) => ({id: fra, ressurs_id: 102, ressurs_navn: 'Lag 2', lokasjon_id: 1,
+              pause: false, hendelse_nummer: null, fra: I(fra), til: I(til)});
+            d.plasseringer.push(lag2(L(23, 17), L(23, 18)), lag2(L(23, 19), L(23, 20)));
+            return [koTavleBesok(D2, 1, 'alle', NAA2).rader.map((r) => r.navn),
+                    koTavleBesok(d, 1, 'alle', NAA2).rader.map((r) => r.navn),
+                    koTavleBesok(D2, 2, 'alle', NAA2).rader.map((r) => r.navn)];
+        })()""")
+        self.assertEqual(ut[0], ['Lag 2', 'Lag 3', 'Lag 1'], 'null først, så færrest besøk')
+        self.assertEqual(ut[1], ['Lag 3', 'Lag 2', 'Lag 1'],
+                         'likt antall: den som var der for lengst siden først')
+        self.assertEqual(ut[2], ['Lag 1', 'Lag 2', 'Lag 3'], 'ikke fulgt: ressursenes egen rekkefølge')
+
+    def test_ikke_vaert_gjelder_bare_fulgte_steder(self):
+        ut = self._json("koTavleIkkeVaert(D2, 'alle', NAA2)")
+        self.assertEqual(ut, [{'navn': 'Parkscene', 'ressurser': ['Lag 2']}])
+
+    def test_skjemaet_laaser_til_der_det_ikke_kan_endres(self):
+        ut = self._json("""[koTavleSkjemaData({type: 'rett', id: 4}, D2, NAA2),
+                            koTavleSkjemaData({type: 'rett', id: 2}, D2, NAA2),
+                            koTavleSkjemaData({type: 'rett', id: 1}, D2, NAA2),
+                            koTavleSkjemaData({type: 'rett', id: 999}, D2, NAA2)]""")
+        self.assertTrue(ut[0]['tilLaast'], 'den åpne slutter nå')
+        self.assertTrue(ut[1]['tilLaast'], 'H7 tok over 00:30')
+        self.assertIn('H7', ut[1]['hint'])
+        self.assertFalse(ut[2]['tilLaast'])
+        self.assertIsNone(ut[3])
+
+    def test_skjemaet_sender_tidspunkter_naer_det_de_retter(self):
+        ut = self._json("""[
+            koTavleSkjemaKropp({type: 'rett', id: 2}, D2, {fra: '22:50', til: '00:30'}, NAA2),
+            koTavleSkjemaKropp({type: 'rett', id: 4}, D2, {fra: '00:55', til: ''}, NAA2),
+            koTavleSkjemaKropp({type: 'pause', id: null}, D2, {fra: '23:50', til: '00:20', ressurs: '102'}, L(23, 23)),
+            koTavleSkjemaKropp({type: 'rett', id: 2}, D2, {fra: 'x', til: '00:30'}, NAA2),
+        ].map((k) => k && Object.fromEntries(Object.entries(k).map(([n, v]) => [n, typeof v === 'string' ? Date.parse(v) : v])))""")
+        L = lambda d, t, m=0: self._json(f'L({d}, {t}, {m})')
+        self.assertEqual(ut[0], {'fra': L(23, 22, 50), 'til': L(24, 0, 30)})
+        self.assertEqual(ut[1], {'fra': L(24, 0, 55)}, 'den åpne sender ingen «til»')
+        self.assertEqual(ut[2], {'fra': L(23, 23, 50), 'til': L(24, 0, 20), 'ressurs_id': 102},
+                         '«23:50–00:20» går over midnatt')
+        self.assertIsNone(ut[3])
+
+    def test_steg2_byggerne_escaper(self):
+        ut = self._kjor("""
+            const ondt = '<img src=x onerror=alert(1)>';
+            const d = JSON.parse(JSON.stringify(D2));
+            d.ressurser.forEach((r) => { r.navn = ondt; });
+            d.rader.forEach((l) => { l.navn = ondt; });
+            d.plasseringer.forEach((p) => { p.ressurs_navn = ondt; p.lokasjon_navn = ondt; });
+            d.ressurser[2].opptatt.merke = ondt;
+            d.dognstart = ondt;
+            const html = koTavleBesokHtml(d, koTavleBesok(d, 1, 'alle', NAA2), {maal: 'antall'}, 1)
+              + koTavleBesokHtml(d, koTavleBesok(d, 1, 'alle', NAA2), {maal: 'tid'}, 1)
+              + koTavleIkkeVaertHtml(koTavleIkkeVaert(d, 'alle', NAA2))
+              + koTavleSkjemaHtml(koTavleSkjemaData({type: 'rett', id: 2}, d, NAA2))
+              + koTavleSkjemaHtml(koTavleSkjemaData({type: 'pause', id: null}, d, NAA2))
+              + koTavleValgtHtml(d.ressurser[0], d.plasseringer[3])
+              + koTavleOppsettHtml([{id: 1, navn: ondt, paa_tavla: true, fulgt: false}]);
+            assert(!html.includes('<img'), 'rå markup slapp gjennom: ' + html);
+            assert(html.includes('&lt;img'), 'navnene forsvant i stedet for å escapes');
+        """)
+        self.assertIn('OK', ut)
+
+    def test_klikk_uten_valgt_lag_aapner_skjemaet_og_knapper_klikker_ikke(self):
+        ut = self._kjor("""
+            const aapnet = [];
+            globalThis.koTavleApneSkjema = (type, id) => aapnet.push([type, id]);
+            globalThis.koTavleFlytt = () => aapnet.push('flytt');
+            globalThis.koTegnTavle = () => {};
+            const med = (sel, attr, verdi) => ({ closest: (v) => (v === sel ? { getAttribute: (a) => (a === attr ? verdi : null) } : null) });
+            koTavleKlikk(med('[data-tavle-pause]', 'data-tavle-pause', '50'));
+            koTavleKlikk(med('[data-tavle-plassering]', 'data-tavle-plassering', '2'));
+            koTavleKlikk({ closest: (v) => (v === '[data-action]' ? {} : { getAttribute: () => '50' }) });
+            console.log(JSON.stringify(aapnet), koTavleValgt);
+            // Er et lag valgt, er et klikk i en rad en flytting — også når det
+            // treffer en gammel stolpe der. Skjemaet åpnes ikke i tillegg.
+            koTavleValgt = 101;
+            koTavleKlikk({ closest: (v) => (v === '[data-tavle-mal]' ? { getAttribute: () => '2' }
+              : (v === '[data-tavle-plassering]' ? { getAttribute: () => '3' } : null)) });
+            console.log(JSON.stringify(aapnet));
+        """)
+        self.assertEqual(ut[0], '[["pause",50],["rett",2]] null', 'knappen velger ingenting')
+        self.assertEqual(json.loads(ut[1]), [['pause', 50], ['rett', 2], 'flytt'])

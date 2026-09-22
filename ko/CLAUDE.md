@@ -229,8 +229,8 @@ KO-innstillinger fra 18. sep. 2026); merket er tekst, så omdøping rører ikke 
 
 ## Tavla (22. sep. 2026)
 
-Skissene ble avtalt før koden, og svarene står i `TODO.md` til steg 2 er levert. Flaten
-står i `templates/ko/CLAUDE.md`.
+Skissene ble avtalt før koden; svarene står i CHANGELOG (steg 1 og 2, 22. sep. 2026).
+Flaten står i `templates/ko/CLAUDE.md`.
 
 **Tavla eier én ting: hvor en *ledig* ressurs står** (`Tavleplassering`, frosne navn,
 `ressurs`/`lokasjon`/`av` strippet i backupen). Hvem som er på vakt, hvem som er opptatt og
@@ -245,6 +245,9 @@ hvilke rader som finnes er projeksjon — `opptatt()` utleder det ved hver lesin
 | Bilen står i raden til oppdragets lokasjon bare i `PAA_OPPDRAGETS_STED` | Fra Avreist er hun på vei bort |
 | Til samme sted igjen er en feil, ikke en ny rad | Ellers teller «Besøk» ett besøk som to |
 | Hver flytting er en systemlinje (`TAVLE_FLYTTET`) med hvem | Å gå på en hendelse har alt sin linje |
+| **Retting** (`rett`, `fjern`): naboene tilpasses i samme lagring, men **en nabo forsvinner aldri**, og tida på en hendelse rettes ikke og gås ikke inn i. Systemlinje `TAVLE_RETTET` | Historikken «Besøk» teller skal ikke endre seg uten et spor |
+| **Planlagt pause** (`PlanlagtPause`): KOs egen, maks fire timer, ikke i fortida, aldri to over hverandre — heller ikke oppå en startet. «Pause nå» (`start_pause`) plasserer i Pause-raden, eller knytter til pausen laget alt har | Planen flytter ingen. Vaktlistas pauser (TODO) blir utgangspunktet; da trengs et kildefelt |
+| **Innstillingene**: tidsvindu 12–24 t og døgnstart (portalinnstilling, global admin); «På tavla» og «Følg besøk ★» per lokasjon (`skriv_leder`) — ID-lister i `AppSetting`, auditlogget | KO eier avkryssingene, ikke lokasjonene |
 
 **Kjent grense:** bilens tid på oppdrag skrives ikke som tavlehistorikk — den står i
 oppdragsmodulen, og «Besøk» teller bare tavla og hendelsene.

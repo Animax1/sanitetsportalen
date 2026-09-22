@@ -211,6 +211,14 @@ KO_LOGG_BYGGERE = (
     'koTavleUtenPlassHtml',
     'koTavleFilterHtml',
     'koTegnTavle',
+    # Steg 2: pausen på kortet, linja for det valgte laget, skjemaet, besøk,
+    # «ikke vært» og fanen i KO-innstillinger.
+    'koTavlePlanlagtHtml',
+    'koTavleValgtHtml',
+    'koTavleSkjemaHtml',
+    'koTavleBesokHtml',
+    'koTavleIkkeVaertHtml',
+    'koTavleOppsettHtml',
 )
 
 #: Uttrykk som interpoleres uten `escapeHtml`, med begrunnelse.

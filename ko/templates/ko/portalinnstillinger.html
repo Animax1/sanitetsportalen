@@ -47,3 +47,24 @@ det — og backupene ligger der uansett hva tallet står på.
       </div>
     </div>
   </div>
+  <div class="card mb-3">
+    <div class="card-header"><strong>KO-tavla</strong></div>
+    <div class="card-body">
+      <label class="form-label" for="ko_tavle_timer">Tidsvindu</label>
+      <div class="input-group" style="max-width:220px;">
+        <input type="number" id="ko_tavle_timer" name="ko_tavle_timer" class="form-control"
+               min="{{ ko_tavle_timer_min }}" max="{{ ko_tavle_timer_maks }}" value="{{ ko_tavle_timer }}">
+        <span class="input-group-text">timer</span>
+      </div>
+      <div class="form-text">
+        Hvor mye tid tavla viser, {{ ko_tavle_timer_min }}–{{ ko_tavle_timer_maks }} timer.
+        Nå-streken står ved to tredjedeler, så det meste er det som har skjedd.
+      </div>
+      <label class="form-label mt-3" for="ko_tavle_dognstart">Døgnet starter</label>
+      <input type="time" id="ko_tavle_dognstart" name="ko_tavle_dognstart" class="form-control"
+             style="max-width:140px;" value="{{ ko_tavle_dognstart }}">
+      <div class="form-text">
+        Brukes av «Besøk»: med 06:00 hører en konsert kl. 01 til fredagen, ikke lørdagen.
+      </div>
+    </div>
+  </div>
