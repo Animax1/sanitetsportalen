@@ -4,6 +4,38 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-22 — Bilen kan avbryte også i Fremme, og «Dashboard» er borte fra menyen  `#oppdrag/enhetsskjerm` `#oppdrag/statusmaskin` `#core/grensesnitt`
+
+**Avbryt gjelder fra Rykker ut til og med Fremme** (`#oppdrag/statusmaskin`). André: «avbrutt
+som gjelder fra en trykker rykker ut til og med når en er fremme, gjelder ikke fra avreist
+av.» Avbryt var *den andre knappen* i Rykker ut (`ALTERNATIV`), og i Fremme hadde
+«Behandlet på sted» den plassen. **Avbryt er derfor sin egen knapp nå**, styrt av
+`services.AVBRYT_FRA = {Rykker ut, Fremme}`; `ALTERNATIV` har bare Behandlet igjen.
+`avbryt_oppdrag` avviser alt utenfor settet med 409 — fra Avreist har hun en pasient i
+bilen, og veien er Leverer eller KO. Det som skjer ved avbrytelsen er uendret: raden blir
+Ledig uten Udefinert-sperre, oppdraget går tilbake til KO som «trenger ny ressurs», og
+`Enhetshendelse.AVBRUTT` skrives. **En bil som avbryter i Fremme har ikke løst
+oppdraget** — `noen_loste_oppdraget()` teller bare Behandlet og Leverer.
+
+**På bilens skjerm** (`#oppdrag/enhetsskjerm`) står Avbryt i full bredde under de to andre,
+med rød kant, og spør før den sender. Tre knapper på rad fikk ikke plass på en telefon —
+Avbryt havnet utenfor kortet på 390 px — og den som sjelden brukes skal ikke ta plass fra
+dem som brukes hele tiden. Serveren sender `kan_avbryte` per rad, og siden får
+`OPPDRAG_AVBRYT_FRA` slik at knappen står også mens et trykk ligger usendt uten dekning.
+
+**«Dashboard» er borte fra modulmenyen** (`#core/grensesnitt`). André: «om du trykker på
+Sanitetsportalen så kommer du til hjemskjerm.» Logo og navn er nå **én** lenke hjem
+(«Til forsiden»). **Og headeren var for trang på telefon** etter at menyen flyttet inn i
+den: på 390 px overlappet bjella hamburgeren og klokka ble kuttet. Under 576 px står logoen
+alene som lenken hjem, og navnet gir plass. Sjekket i Chromium på 390 og 1440 px.
+
+**Mutasjonstesting:** 9 mutanter — settet uten Fremme, settet med Avreist, sperra i
+`avbryt_oppdrag` fjernet, `kan_avbryte` feil utledet, projeksjonen uten settet, knappen
+ugatet, knappen ikke tegnet, `OPPDRAG_AVBRYT_FRA` borte fra malen, og Dashboard tilbake i
+menyen. **Alle drept.** At malen sender `OPPDRAG_AVBRYT_FRA` hadde ingen test; den ble
+skrevet før mutanten ble kjørt, fordi Avbryt uten lista ville forsvunnet nettopp når bilen
+er uten dekning.
+
 ## 2026-09-22 — Menyen inn i headeren, «Behandlet» rosa, og KO setter alle statuser uten å slette loggen  `#oppdrag/statusmaskin` `#oppdrag/sentralbord` `#core/grensesnitt` `#core/dokumentasjon`
 
 Tre punkter fra backloggen i portalen, tatt stilling til med André først. Migrasjon

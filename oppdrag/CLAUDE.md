@@ -24,7 +24,7 @@ Fem ting det er verdt å kjenne før man rører modulen:
 | Grovsorteringen har **«Ikke aktuelt»** (grått) — teller som satt | `choices.GROVSORTERING`, `.grov-ikke_aktuelt` |
 | «Trenger ny ressurs» spør **to** ting: er noen på vei, *og* var noen framme | `services.trenger_ny_ressurs()` |
 | Lista sorteres på hastegrad, så nummer; ferdige nederst | `_sorterOppdrag()` i `oppdrag-sentral.js` |
-| Bilen melder Ledig bare fra Leverer og Behandlet; Avbryt i Rykker ut, Behandlet på sted i Fremme — **«Utført»** på Drift og Plassering, samme status | `services.BILEN_KAN_LEDIG_FRA`, `ALTERNATIV`, `alternativ_for(fra, hastegrad)`, `choices.status_navn_for` |
+| Bilen melder Ledig bare fra Leverer og Behandlet; Avbryt i Rykker ut og Fremme, Behandlet på sted i Fremme — **«Utført»** på Drift og Plassering | `services.BILEN_KAN_LEDIG_FRA`, `AVBRYT_FRA`, `ALTERNATIV`, `alternativ_for()`, `choices.status_navn_for` |
 | «Avreist → Annet sted» har et **fritekstfelt** (`Statusmelding.sted_tekst`, 19. sep.): bilen og føringen sender det i kroppen, bare ved `annet`; arves av korreksjon; aldri verdilogget | `_sted_tekst`, `STEMPLING_TILLATTE_NOKLER`, `choices.sted_navn_for`, `stempleAnnetSted` i bilen |
 | «Nytt oppdrag» bygges **ikke om** mens operatøren står i det: `fyllNedtrekk` venter når fokus er i det viste skjemaet, og rører ikke uendret markup | `skjemaErIBruk()` i `oppdrag-sentral-lasting.js`; `koFyllHendelsevalg` samme regel |
 | Bilen ser bare det lista viser (30 min etter Ledig) — også på detalj, stempling, grovsortering og antall; og aldri flåten, flytting eller verdimengdene | `views._synlig_for_bilen`, `er_enhetskonto`-sjekkene |
@@ -99,8 +99,8 @@ og en databasefeil fanget uten savepoint etterlater den ubrukelig.
 
 **Bilens utganger (12. sep. 2026):** «Behandlet på sted» (`BEHANDLET`) er en sidegren
 fra Fremme rett til Ledig — `KJEDEN` er lineær, `neste_i_kjeden` gir Ledig etter
-Leverer og Behandlet, og `alternativ_for()` gir den andre knappen (Avbryt i Rykker ut,
-Behandlet i Fremme). **Ett trykk på Behandlet skriver Behandlet og Ledig** med samme
+Leverer og Behandlet, og `alternativ_for()` gir den andre knappen (Behandlet i Fremme);
+Avbryt er egen knapp, i `AVBRYT_FRA`. **Ett trykk på Behandlet skriver Behandlet og Ledig** med samme
 tidspunkt (`services.behandle_paa_sted`, Ledig ikke `automatisk`; Udefinert sjekkes før noe
 skrives), og bilens projeksjon viser Ledig. Bilen har **ingen egen Ledig-knapp**; stemplingsviewet avviser Ledig
 utenom `BILEN_KAN_LEDIG_FRA` med 400. Sentralen (`foer_status`) setter
@@ -234,7 +234,7 @@ det ble en tom side stående etter én feilet henting, og den så ut som en vakt
 
 | Hva | Detalj |
 |---|---|
-| Knappene | «Neste» og statusens andre knapp (Avbryt / Behandlet på sted) mot de **navngitte** stemplingsendepunktene — de leser ikke request-kroppen |
+| Knappene | «Neste», den andre knappen og Avbryt mot de **navngitte** stemplingsendepunktene — de leser ikke request-kroppen |
 | Offline-køen | `localStorage`. «Venter på dekning» vises først når eldste rad er 3 s gammel — `usendtAlder`, `USENDT_VENTETID_MS`. Uten forsinkelsen blinket varselet ved hvert trykk på god dekning |
 | Lydvarselet | `lydTerskler()` leser `OPPDRAG_LYDVARSEL` fra tabellen `Lydvarsel`, hentet på nytt hvert 5. min; `skalPipe()` og `lydTikk()` hvert 5. s. Web Audio, **alltid på**, vekket av det første trykket på siden (`lydErKlar()`). `nyeOppdrag()` + `pipNytt()` for nytt oppdrag om admin ikke har slått det av |
 | Tida det måles fra | Bilens `varslet_at` — og **et usendt trykk i køen teller som svart**, ellers ville bilen pipt om et oppdrag mannskapet nettopp kvitterte ut uten dekning |

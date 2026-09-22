@@ -75,6 +75,7 @@ def index_view(request):
             # mens et trykk ligger usendt — samme grunn som kjeden.
             'alternativ': js_json({s: a[0] for s, a in services.ALTERNATIV.items()}),
             'alternativ_navn': js_json({a[0]: a[1] for a in services.ALTERNATIV.values()}),
+            'avbryt_fra': js_json(sorted(services.AVBRYT_FRA)),
             # Lydvarselets terskler og om nytt oppdrag skal pipe (12. sep.
             # 2026) — data fra tabellen, hentet på nytt hvert femte minutt.
             'bilinnstillinger': js_json(verdier.bilinnstillinger()),
@@ -1026,7 +1027,8 @@ def stempling_view(request, pk, overgang, sted=None):
             {'status': 'error', 'message': 'Oppdrag ikke funnet'}, status=404)
     # **Bilen melder Ledig bare fra Leverer og Behandlet** (André, 12. sep.
     # 2026: «Etter avreist kan du ikke slå deg ledig før du har levert»). I
-    # Rykker ut heter utgangen Avbryt, i Fremme Behandlet på sted. Sentralen
+    # Rykker ut og Fremme heter utgangen Avbryt, i Fremme også Behandlet på
+    # sted (22. sep. 2026). Sentralen
     # kan fortsatt føre Ledig fra alt — det går gjennom `foering_view`.
     if overgang == choices.LEDIG and rad.status not in services.BILEN_KAN_LEDIG_FRA:
         return JsonResponse({'status': 'error', 'message': (

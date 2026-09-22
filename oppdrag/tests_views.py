@@ -641,10 +641,25 @@ class StemplingTests(StemplingBasis):
         self.assertEqual(o.status, choices.VENTER, 'står på tavla hos sentralen')
         self.assertIsNone(o.historikk_fra)
         self.assertTrue(Enhetshendelse.objects.filter(oppdrag=o, type=Enhetshendelse.AVBRUTT).exists())
-        # Bare fra Rykker ut.
+
+    def test_avbryt_i_fremme_men_ikke_fra_avreist(self):
+        """«Fra en trykker rykker ut til og med når en er fremme, gjelder ikke
+        fra avreist av» (André, 22. sep. 2026)."""
+        o = self._oppdrag()
+        self._stemple(o, 'rykker_ut'); self._stemple(o, 'fremme')
+        resp = self._stemple(o, 'avbryt')
+        self.assertEqual(resp.status_code, 200, resp.content)
+        o.refresh_from_db()
+        self.assertEqual(services.koblingsrad(o, self.enhet).status, choices.LEDIG)
+        self.assertTrue(o.trenger_ressurs, 'tilbake til KO som «trenger ny ressurs»')
+        self.assertFalse(services.noen_loste_oppdraget(o), 'framme er ikke løst')
+        self.assertTrue(Enhetshendelse.objects.filter(oppdrag=o, type=Enhetshendelse.AVBRUTT).exists())
+        # Fra Avreist har hun en pasient i bilen.
         o2 = self._oppdrag()
         self._stemple(o2, 'rykker_ut'); self._stemple(o2, 'fremme')
+        self.assertEqual(self._stemple(o2, 'avreist/sykehus').status_code, 200)
         self.assertEqual(self._stemple(o2, 'avbryt').status_code, 409)
+        self.assertEqual(services.koblingsrad(o2, self.enhet).status, choices.AVREIST)
 
     def test_avbryt_slipper_udefinert(self):
         o = self._oppdrag()
@@ -678,15 +693,17 @@ class StemplingTests(StemplingBasis):
         o = self._oppdrag()
         rad = self.bil.get('/oppdrag/api/oppdrag/').json()['data'][0]
         self.assertIsNone(rad['alternativ_overgang'])
+        self.assertFalse(rad['kan_avbryte'], 'i Venter')
         self._stemple(o, 'rykker_ut')
         rad = self.bil.get('/oppdrag/api/oppdrag/').json()['data'][0]
-        self.assertEqual((rad['alternativ_overgang'], rad['alternativ_navn']), ('avbryt', 'Avbryt'))
+        self.assertEqual((rad['alternativ_overgang'], rad['kan_avbryte']), (None, True))
         self._stemple(o, 'fremme')
         rad = self.bil.get('/oppdrag/api/oppdrag/').json()['data'][0]
-        self.assertEqual(rad['alternativ_overgang'], 'behandlet')
+        self.assertEqual((rad['alternativ_overgang'], rad['kan_avbryte']), ('behandlet', True))
         self._stemple(o, 'avreist')
         rad = self.bil.get('/oppdrag/api/oppdrag/').json()['data'][0]
-        self.assertEqual((rad['neste_overgang'], rad['alternativ_overgang']), ('leverer', None))
+        self.assertEqual((rad['neste_overgang'], rad['alternativ_overgang'], rad['kan_avbryte']),
+                         ('leverer', None, False))
 
     def test_ulovlig_overgang_gir_409_og_ingen_rad(self):
         """Dobbelttrykket: det første vant, det andre skal ikke lage noe."""
@@ -1567,6 +1584,16 @@ class EnhetKjedeDataTests(StemplingBasis):
             with self.subTest(status=status):
                 self.assertEqual(sendt.get(status),
                                  services.neste_i_kjeden(status))
+
+    def test_avbryt_fra_stemmer_med_tjenestelaget(self):
+        """Uten lista ville Avbryt-knappen forsvunnet mens et trykk ligger
+        usendt — nettopp når bilen er uten dekning (22. sep. 2026)."""
+        import json as _json
+        import re
+        html = self.bil.get('/oppdrag/').content.decode()
+        treff = re.search(r'window\.OPPDRAG_AVBRYT_FRA = (\[.*?\]);', html, re.S)
+        self.assertIsNotNone(treff)
+        self.assertEqual(set(_json.loads(treff.group(1))), services.AVBRYT_FRA)
 
     def test_sentralbordet_faar_ikke_kjeden(self):
         """Den finnes for offline-køen, og sentralbordet har ingen kø."""

@@ -99,8 +99,10 @@ class StatusmaskinTests(TestCase):
         self.assertEqual(services.neste_i_kjeden(choices.BEHANDLET), choices.LEDIG)
         self.assertEqual(services.neste_i_kjeden(choices.LEDIG), None)
         self.assertEqual(services.alternativ_for(choices.FREMME), (choices.BEHANDLET, 'Behandlet på sted'))
-        self.assertEqual(services.alternativ_for(choices.RYKKER_UT), (choices.AVBRYT, 'Avbryt'))
+        # «Avbryt» er sin egen knapp fra 22. sep. 2026, ikke den andre.
+        self.assertIsNone(services.alternativ_for(choices.RYKKER_UT))
         self.assertIsNone(services.alternativ_for(choices.AVREIST))
+        self.assertEqual(services.AVBRYT_FRA, {choices.RYKKER_UT, choices.FREMME})
 
     def test_ulovlig_overgang_kaster(self):
         oppdrag = _oppdrag(_enhet('E1'))

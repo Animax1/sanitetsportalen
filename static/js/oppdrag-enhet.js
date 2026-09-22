@@ -149,6 +149,7 @@ function projiser(oppdragliste, ko) {
           ? 'ledig' : siste.overgang;
         const nesteEtter = kjede[status] || null;
         const alt = (globalThis.OPPDRAG_ALTERNATIV || {})[status] || null;
+        const kanAvbryte = (globalThis.OPPDRAG_AVBRYT_FRA || []).includes(status);
         // «Utført» på Drift og Plassering (19. sep. 2026) — samme regel som
         // `choices.status_navn_for` på serveren.
         const altNavn = (alt === 'behandlet' && ['Drift', 'Plassering'].includes(o.hastegrad))
@@ -161,6 +162,7 @@ function projiser(oppdragliste, ko) {
             neste_navn: nesteEtter ? (navn[nesteEtter] || nesteEtter) : null,
             alternativ_overgang: alt,
             alternativ_navn: alt ? altNavn : null,
+            kan_avbryte: kanAvbryte,
             usendt: true,
         };
     });
@@ -465,22 +467,32 @@ function renderAktivt() {
            ${escapeHtml(o.neste_navn)}</button>`
       : '';
     // **Ingen egen Ledig-knapp** (André, 12. sep. 2026). Den andre knappen
-    // er statusens: «Avbryt» i Rykker ut (enheten ledig, oppdraget tilbake
-    // til sentralen), «Behandlet på sted» i Fremme. Mellom Avreist og
-    // Leverer finnes bare «neste» — hun har en pasient i bilen. Ledig er
-    // «neste» etter Leverer og etter Behandlet.
+    // er statusens: «Behandlet på sted» i Fremme. Mellom Avreist og Leverer
+    // finnes bare «neste» — hun har en pasient i bilen. Ledig er «neste»
+    // etter Leverer og etter Behandlet.
     const altKnapp = o.alternativ_overgang
       ? `<button type="button" class="btn btn-outline-light stor-knapp"
                  id="stemple-alt-${escHtmlValue(o.id)}"
                  data-action="stempleAlternativ" data-id="${escHtmlValue(o.id)}">
            ${escapeHtml(o.alternativ_navn)}</button>`
       : '';
+    // **«Avbryt» i Rykker ut og Fremme** (André, 22. sep. 2026: «fra en
+    // trykker rykker ut til og med når en er fremme, gjelder ikke fra
+    // avreist av»). Egen knapp, ikke den andre: i Fremme står «Behandlet på
+    // sted» der. Rød kant, fordi den sender oppdraget tilbake til KO. Egen
+    // linje i full bredde under de to andre: tre knapper på rad får ikke plass
+    // på en telefon, og den som sjelden brukes skal ikke ta plass fra dem.
+    const avbrytKnapp = o.kan_avbryte
+      ? `<button type="button" class="btn btn-outline-danger stor-knapp w-100 mt-2"
+                 id="stemple-avbryt-${escHtmlValue(o.id)}"
+                 data-action="stempleAvbryt" data-id="${escHtmlValue(o.id)}">Avbryt</button>`
+      : '';
     // **Stedvalget erstatter knapperaden** når «Avreist» er trykket: seks
     // store knapper og «Avbryt», ingen annen knapp ved siden av — i en bil i
     // bevegelse skal det ikke finnes en feil knapp å treffe midt i valget.
     const knapperad = velgerStedFor === o.id
       ? _stedvalg()
-      : `<div class="d-flex gap-2 mt-3">${nesteKnapp}${altKnapp}</div>`;
+      : `<div class="d-flex gap-2 mt-3">${nesteKnapp}${altKnapp}</div>${avbrytKnapp}`;
     // Grovsorteringen er en vurdering av pasienten, og den finnes ikke før
     // bilen er framme (André, 12. sep. 2026). Under utrykning står den ikke.
     const grovRad = _kanGrovsortere(o) ? _grovsorteringsrad(o) : '';
@@ -1088,16 +1100,23 @@ async function settAntall(verdi) {
 }
 
 async function stempleAlternativ(id) {
-  // Den andre knappen: «Avbryt» spør først — den sender oppdraget tilbake
-  // til sentralen, og et feiltrykk i en bil i fart skal ikke gjøre det.
+  // Den andre knappen: «Behandlet på sted» i Fremme.
   const o = mineOppdrag.find((x) => x.id === id);
   if (!o || !o.alternativ_overgang) return;
   if (_grovMangler(o, o.alternativ_overgang)) return;
-  if (o.alternativ_overgang === 'avbryt'
-      && !confirm('Avbryte oppdraget? Enheten meldes ledig, og oppdraget går tilbake til sentralen som ventende.')) {
+  await _stemple(id, o.alternativ_overgang, `stemple-alt-${id}`);
+}
+
+async function stempleAvbryt(id) {
+  // «Avbryt» spør først — den sender oppdraget tilbake til sentralen, og et
+  // feiltrykk i en bil i fart skal ikke gjøre det. Ingen grovsortering: hun
+  // er ikke ferdig med pasienten, hun gir oppdraget fra seg.
+  const o = mineOppdrag.find((x) => x.id === id);
+  if (!o || !o.kan_avbryte) return;
+  if (!confirm('Avbryte oppdraget? Enheten meldes ledig, og oppdraget går tilbake til sentralen som ventende.')) {
     return;
   }
-  await _stemple(id, o.alternativ_overgang, `stemple-alt-${id}`);
+  await _stemple(id, 'avbryt', `stemple-avbryt-${id}`);
 }
 
 

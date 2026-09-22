@@ -147,6 +147,7 @@ REVIEWED_INTERPOLATIONS = {
     '_antallRad(o)': 'markup fra en bygger som selv skannes her',
     'venterLenge': 'hardkodet CSS-klasse fra en ternær over `skalPipe()`',
     'altKnapp': 'knapp bygget to linjer over med escHtmlValue/escapeHtml (12. sep. 2026)',
+    'avbrytKnapp': 'knapp bygget rett over med escHtmlValue, ingen data utenom id-en (22. sep. 2026)',
     'venterKlasse': 'hardkodet CSS-klasse fra en ternær over `venterForbiTerskel()`',
     'udefinert': 'markup fra `_udefinertVarsel()`, som er fast tekst uten data fra oppdraget',
     # `meta` er ren tekst, ikke markup, og escapes én gang ved innsetting.

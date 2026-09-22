@@ -350,7 +350,8 @@ class PortalDashboardViewTests(TestCase):
         self.assertContains(resp, 'href="/pasienter/"')
 
     def test_dashboard_inneholder_portal_navigasjon(self):
-        """Dashbordet skal vise portal-meny med Dashboard og Pasientregistrering."""
+        """Dashbordet skal vise portal-menyen med Pasientregistrering, og
+        merkenavnet som lenke hjem."""
         self.client.force_login(self.user)
         resp = self.client.get('/')
         # Brand-lenke til dashboard
@@ -358,7 +359,7 @@ class PortalDashboardViewTests(TestCase):
         # Modul-meny — sjekker nøkkelinnhold (HTML har whitespace mellom
         # ikon og tekst, så vi sjekker bare at navnene finnes i nav-en)
         self.assertContains(resp, 'class="portal-nav"')
-        self.assertContains(resp, 'Dashboard')
+        self.assertContains(resp, 'href="/" title="Til forsiden" class="brand-lenke"')
         self.assertContains(resp, 'Pasientregistrering')
 
     def test_dashboard_velkomst_inkluderer_brukernavn(self):
@@ -406,7 +407,9 @@ class PortalDashboardViewTests(TestCase):
         header = html[html.index('<div class="portal-header">'):html.index('<div class="portal-content">')]
         self.assertIn('<nav class="portal-nav"', header)
         nav = header[header.index('<nav class="portal-nav"'):header.index('</nav>')]
-        self.assertIn('Dashboard', nav)
+        # Ingen «Dashboard» (André, 22. sep. 2026): merkenavnet er veien hjem.
+        self.assertNotIn('Dashboard', nav)
+        self.assertIn('title="Til forsiden"', header)
         self.assertNotIn('/portal-admin/', nav, 'admin-lenkene står i avatar-menyen')
         avatar = header[header.index('<div class="user-info">'):]
         for lenke in ('/portal-admin/brukere/', '/portal-admin/server-status/',
@@ -600,24 +603,24 @@ class AdminNavPortalLenkeTests(TestCase):
         self.client.force_login(self.admin)
 
     def test_endre_passord_har_dashboard_lenke(self):
-        """Endre-passord-siden bruker base_portal.html og har Dashboard-lenke i portal-nav."""
+        """Endre-passord-siden bruker base_portal.html og har veien hjem i headeren."""
         resp = self.client.get('/accounts/change-password/')
         self.assertEqual(resp.status_code, 200)
-        self.assertContains(resp, 'Dashboard')
+        self.assertContains(resp, 'title="Til forsiden"')
         self.assertNotContains(resp, '>Pasientliste</a>')
 
     def test_brukere_har_dashboard_lenke(self):
-        """Brukere-siden bruker base_portal.html og har Dashboard-lenke i portal-nav."""
+        """Brukere-siden bruker base_portal.html og har veien hjem i headeren."""
         resp = self.client.get('/portal-admin/brukere/')
         self.assertEqual(resp.status_code, 200)
-        self.assertContains(resp, 'Dashboard')
+        self.assertContains(resp, 'title="Til forsiden"')
         self.assertNotContains(resp, '>Pasientliste</a>')
 
     def test_server_status_har_dashboard_lenke(self):
-        """Server-status-siden bruker base_portal.html og har Dashboard-lenke i portal-nav."""
+        """Server-status-siden bruker base_portal.html og har veien hjem i headeren."""
         resp = self.client.get('/portal-admin/server-status/')
         self.assertEqual(resp.status_code, 200)
-        self.assertContains(resp, 'Dashboard')
+        self.assertContains(resp, 'title="Til forsiden"')
         self.assertNotContains(resp, '>Pasientliste</a>')
 
 

@@ -45,12 +45,18 @@ OVERGANGER: dict[str, frozenset[str]] = {
 #: fører alt; dette er hva stemplingsendepunktet slipper gjennom.
 BILEN_KAN_LEDIG_FRA: frozenset[str] = frozenset({choices.LEVERER, choices.BEHANDLET})
 
-#: Den andre knappen i bilen per status: `Avbryt` i Rykker ut, `Behandlet på
-#: sted` i Fremme. Ellers ingen. Verdien er navnet i URL-en.
+#: Den andre knappen i bilen per status: `Behandlet på sted` i Fremme. Ellers
+#: ingen. Verdien er navnet i URL-en.
 ALTERNATIV: dict[str, tuple[str, str]] = {
-    choices.RYKKER_UT: (choices.AVBRYT, 'Avbryt'),
     choices.FREMME: (choices.BEHANDLET, 'Behandlet på sted'),
 }
+
+#: Hvor bilen kan **avbryte** (22. sep. 2026, André: «fra en trykker rykker ut
+#: til og med når en er fremme, gjelder ikke fra avreist av»). Avbryt var den
+#: andre knappen i Rykker ut; i Fremme hadde den plassen «Behandlet på sted».
+#: Den er derfor sin egen knapp nå, ikke et `ALTERNATIV`. Fra Avreist har hun
+#: en pasient i bilen, og da er veien Leverer — eller KO.
+AVBRYT_FRA: frozenset[str] = frozenset({choices.RYKKER_UT, choices.FREMME})
 
 
 #: Målstatusene et stemplingsendepunkt kan hete. Utledet fra tabellen, ikke
@@ -921,12 +927,13 @@ def trenger_ny_ressurs(oppdrag, *, utenom_rad) -> bool:
 @transaction.atomic
 def avbryt_oppdrag(oppdrag, *, bruker=None, tidspunkt=None,
                    forsinket: bool = False, enhet=None) -> Statusmelding:
-    """Bilen trykker «Avbryt» i Rykker ut (André, 12. sep. 2026).
+    """Bilen trykker «Avbryt» i Rykker ut eller Fremme (André, 12. og 22.
+    sep. 2026).
 
     Hun meldes ledig på oppdraget, og oppdraget går tilbake til Venter hos
     sentralen som «trenger ny ressurs» — samme spor som når hun rykker videre
-    (`start_oppdrag`), men uten et nytt oppdrag å dra til. Bare fra Rykker ut:
-    er hun framme, er svaret «Behandlet på sted» eller Avreist.
+    (`start_oppdrag`), men uten et nytt oppdrag å dra til. Bare fra
+    `AVBRYT_FRA`: fra Avreist har hun en pasient i bilen.
 
     `Ledig`-meldingen er ekte, ikke automatisk — tidspunktet er målt. Men
     «Udefinert» sperrer ikke: hun har ikke sett pasienten, og problemstillingen
@@ -936,8 +943,8 @@ def avbryt_oppdrag(oppdrag, *, bruker=None, tidspunkt=None,
     rad = koblingsrad(oppdrag, enhet)
     if rad is None:
         raise UlovligOvergang('Enheten er ikke varslet på oppdraget.')
-    if rad.status != choices.RYKKER_UT:
-        raise UlovligOvergang('Avbryt finnes bare i Rykker ut.')
+    if rad.status not in AVBRYT_FRA:
+        raise UlovligOvergang('Avbryt finnes bare i Rykker ut og Fremme.')
     if trenger_ny_ressurs(oppdrag, utenom_rad=rad):
         oppdrag.trenger_ressurs = True
         oppdrag.trenger_ressurs_siden = naa

@@ -143,7 +143,7 @@ STATUS_VALG: tuple[tuple[str, str], ...] = (
 )
 
 #: «Avbryt» (André, 12. sep. 2026) er en **handling**, ikke en status: bilen
-#: i `Rykker ut` melder seg ledig, og oppdraget går tilbake til Venter hos
+#: i `Rykker ut` eller `Fremme` (`services.AVBRYT_FRA`) melder seg ledig, og oppdraget går tilbake til Venter hos
 #: sentralen som «trenger ny ressurs». Navnet står i URL-en som en stempling
 #: (`status/avbryt/`), så køen i bilen kan bære den som alt annet.
 AVBRYT = 'avbryt'
