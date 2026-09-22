@@ -411,7 +411,7 @@ function koLegendeHtml() {
     + rad(p('tildelt'), 'Tildelt', 'har oppdrag, ikke rykket ut')
     + rad(p('rykker_ut'), 'Rykker ut', '')
     + rad(p('fremme'), 'Fremme', '')
-    + rad(p('behandlet'), 'Behandlet på sted', '')
+    + rad(p('behandlet'), 'Behandlet på sted / Utført', '')
     + rad(p('avreist'), 'Avreist', '')
     + rad(p('leverer'), 'Leverer', '')
     + rad(p('av_vakt'), 'Av vakt', '')

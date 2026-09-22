@@ -619,7 +619,8 @@ class StatusmeldingManager(models.Manager):
 
         En melding er overstyrt hvis en annen melding peker på den via
         ``korrigerer``. Korreksjoner kan kjedes: retter man en retting, er det
-        den siste som står, og den forrige blir overstyrt på samme måte.
+        den siste som står, og den forrige blir overstyrt på samme måte. En
+        melding som er **trukket tilbake** gjelder heller ikke.
         """
         return self.gjeldende_bulk([oppdrag.pk])[oppdrag.pk]
 
@@ -642,10 +643,13 @@ class StatusmeldingManager(models.Manager):
         alle = list(self.filter(oppdrag_id__in=ider)
                     .select_related('oppdragsenhet__enhet', 'meldt_av')
                     .order_by('created_at'))
+        # En tilbaketrukket rad overstyrer fortsatt den den rettet: trekkes en
+        # retting tilbake, skal ikke originalen bli gjeldende igjen. Derfor
+        # regnes `overstyrte` av alle radene, og tilbaketrukne siles etterpå.
         overstyrte = {m.korrigerer_id for m in alle if m.korrigerer_id}
         ut = {pk: [] for pk in ider}
         for melding in alle:
-            if melding.pk not in overstyrte:
+            if melding.pk not in overstyrte and melding.trukket_tilbake_at is None:
                 ut[melding.oppdrag_id].append(melding)
         return ut
 
@@ -732,6 +736,18 @@ class Statusmelding(BaseTimeStampedModel):
     korrigerer = models.ForeignKey(
         'self', null=True, blank=True, on_delete=models.PROTECT,
         related_name='korreksjoner', verbose_name='Korrigerer')
+    # **Trukket tilbake** (backlog, 22. sep. 2026): sentralbordet satte
+    # enheten tilbake til en tidligere status, og denne meldingen gjelder ikke
+    # lenger. Den blir stående — «loggen må bevares» (André) — og tidslinjen
+    # viser den gjennomstreket med hvem og når. Fram til da *slettet* «Angre»
+    # raden, og sporet fantes bare i revisjonsloggen, som bare admin ser.
+    # Hvem som gjelder avgjøres fortsatt ett sted: `gjeldende_bulk`.
+    trukket_tilbake_at = models.DateTimeField(
+        null=True, blank=True, verbose_name='Trukket tilbake')
+    trukket_tilbake_av = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True,
+        on_delete=models.SET_NULL, related_name='+',
+        verbose_name='Trukket tilbake av')
 
     objects = StatusmeldingManager()
 

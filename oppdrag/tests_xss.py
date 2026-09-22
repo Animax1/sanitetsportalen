@@ -225,6 +225,11 @@ REVIEWED_INTERPOLATIONS = {
     'stedvalg': 'options bygget lokalt, nøkkel og tekst escapet inni',
     'lokvalg': 'options bygget lokalt, id og navn escapet inni',
     'stedSkjult': 'hardkodet hidden-attributt fra en ternær',
+    # «Endre status» med alle statuser (22. sep. 2026): `valg()` escaper status
+    # og navn, og `gruppe()` escaper etiketten — begge bygget i samme funksjon.
+    'tidSkjult': 'hardkodet hidden-attributt fra en ternær',
+    "st === valgt ? ' selected' : ''": 'hardkodet selected-attributt fra en ternær',
+    "liste.map(valg).join('')": 'options fra valg(), som escaper status og navn',
     'kollaps': 'markup bygget lokalt, ingen data i den',
     "kopier('nytt-hastegrad', o.hastegrad)": 'options kopiert fra DOM-en, som selv ble bygget escapet',
     "p === ny ? ' selected' : ''": 'hardkodet selected-attributt fra en ternær',

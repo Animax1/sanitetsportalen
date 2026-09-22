@@ -393,6 +393,28 @@ class PortalDashboardViewTests(TestCase):
         self.assertNotContains(resp, 'Server-status')
         self.assertNotContains(resp, 'Innloggingslogg')
 
+    def test_menyen_staar_i_headeren_og_admin_i_avatarmenyen(self):
+        """«Gi mer plass i høyden» (backlog, 22. sep. 2026): modulene står i
+        den blå headeren, ikke i en egen rad under, og admin-lenkene bor i
+        avatar-menyen — ikke i modulmenyen, der de brakk raden til to linjer."""
+        admin = User.objects.create_superuser(
+            username='superadm', password='x', role='admin',
+            must_change_password=False,
+        )
+        self.client.force_login(admin)
+        html = self.client.get('/').content.decode()
+        header = html[html.index('<div class="portal-header">'):html.index('<div class="portal-content">')]
+        self.assertIn('<nav class="portal-nav"', header)
+        nav = header[header.index('<nav class="portal-nav"'):header.index('</nav>')]
+        self.assertIn('Dashboard', nav)
+        self.assertNotIn('/portal-admin/', nav, 'admin-lenkene står i avatar-menyen')
+        avatar = header[header.index('<div class="user-info">'):]
+        for lenke in ('/portal-admin/brukere/', '/portal-admin/server-status/',
+                      '/portal-admin/innloggingslogg/', '/portal-admin/backup/'):
+            self.assertIn(lenke, avatar)
+        # Og footeren står igjen: den bærer byggnummeret.
+        self.assertIn('class="portal-footer"', html)
+
 
 # ═══════════════════════════════════════════════════════════════════════════
 # Fase 2: Legacy-redirects fra gamle root-URL-er

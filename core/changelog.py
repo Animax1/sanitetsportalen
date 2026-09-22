@@ -69,6 +69,7 @@ TEMAER: dict[str, dict[str, str]] = {
         'backup': 'handlere, planen, klokka, offsite, gjenoppretting',
         'dokumentasjon': 'CLAUDE.md, TODO, CHANGELOG, vaktene rundt dem',
         'drift': 'Railway, cron, server-status, sesjoner, flyttingen til `core`',
+        'grensesnitt': 'base_portal: headeren, modulmenyen, avatar-menyen, footeren',
         'sikkerhet': 'gjennomgangene, rate-limiting, CSP, hodene',
         'tilgang': 'ModulTilgang, nivåstigen, dekoratørene, superbrukeren',
     },

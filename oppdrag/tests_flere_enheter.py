@@ -10,6 +10,7 @@ modellen hviler på, ikke flatene (de kommer i trinn 2–3):
 * Broen: all kode som fortsatt oppretter oppdrag med `enhet` får én
   koblingsrad uten å vite om den.
 """
+import json
 from datetime import timedelta
 
 from django.apps import apps
@@ -582,12 +583,25 @@ class FoeringTests(SentralbordBasis):
                 self.assertEqual(res.status_code, 400, res.content)
         self.assertEqual(Statusmelding.objects.count(), 0)
 
-    def test_overgangsreglene_gjelder_operatoren(self):
+    def test_operatoren_kan_hoppe_over_ledd_uten_at_tider_diktes(self):
+        """Fra 22. sep. 2026 kan KO sette alle statuser. Et hopp fra Venter
+        til Fremme skriver **én** melding — Rykker ut står uten tidspunkt, og
+        responstiden mangler heller enn å bli diktet."""
         o = self._gammelt(self.a)
         res = self.ks.post(self._url(o, self.a, 'fremme'), content_type='application/json',
                            data={'tidspunkt': self._for(30).isoformat()})
+        self.assertEqual(res.status_code, 200, res.content)
+        self.assertEqual(services.koblingsrad(o, self.a).status, choices.FREMME)
+        self.assertEqual([m.status for m in Statusmelding.objects.gjeldende(o)], [choices.FREMME])
+        self.assertTrue(Statusmelding.objects.get().manuell)
+
+    def test_samme_status_er_400(self):
+        o = self._gammelt(self.a)
+        services.sett_status(o, choices.RYKKER_UT, tidspunkt=self._for(60))
+        res = self.ks.post(self._url(o, self.a, 'rykker_ut'), content_type='application/json',
+                           data={'tidspunkt': self._for(30).isoformat()})
         self.assertEqual(res.status_code, 400)
-        self.assertIn('Venter', res.json()['message'])
+        self.assertIn('står alt', res.json()['message'])
 
     def test_ikke_i_framtiden_ikke_foer_oppdraget_ikke_bak_siste(self):
         o = self._gammelt(self.a)
@@ -668,69 +682,178 @@ class FoeringTests(SentralbordBasis):
         self.assertIsNotNone(o.historikk_fra)
 
 
-class GjenaapningTests(SentralbordBasis):
-    """§9: «Ledig» tas tilbake som en korreksjon — innen 48 timer."""
+class TilbakeTests(SentralbordBasis):
+    """Et steg tilbake **trekker meldingene tilbake** — det sletter dem ikke.
 
-    def _url(self, o, enhet):
-        return f'/oppdrag/api/oppdrag/{o.pk}/enheter/{enhet.pk}/gjenaapne/'
+    Backlog, 22. sep. 2026: «Blir feil å trykke angre i loggen, for loggen må
+    bevares.» «Angre» og «Gjenåpne» slettet meldingene, og sporet fantes bare
+    i revisjonsloggen. Nå står radene, merket med hvem og når, og
+    `gjeldende()` er stedet som lar dem ute av alt som regner.
+    """
 
-    def _ferdig(self, o, enhet, ledig_for=10):
+    def _url(self, o, enhet, maal, sted=None):
+        u = f'/oppdrag/api/oppdrag/{o.pk}/enheter/{enhet.pk}/status/{maal}/'
+        return u + f'{sted}/' if sted else u
+
+    def _post(self, o, enhet, maal, **kropp):
+        return self.ks.post(self._url(o, enhet, maal), content_type='application/json', data=kropp)
+
+    def _til_avreist(self, o, enhet=None):
+        enhet = enhet or self.a
         services.sett_status(o, choices.RYKKER_UT, enhet=enhet, tidspunkt=self._for(60))
         services.sett_status(o, choices.FREMME, enhet=enhet, tidspunkt=self._for(50))
-        services.sett_status(o, choices.LEDIG, enhet=enhet, tidspunkt=self._for(ledig_for))
+        return services.sett_status(o, choices.AVREIST, enhet=enhet, tidspunkt=self._for(40),
+                                    sted='sykehus')
 
-    def test_gjenaapning_setter_raden_tilbake_der_den_sto(self):
+    def test_tilbake_til_fremme_trekker_avreist_tilbake_og_beholder_raden(self):
         o = self._gammelt(self.a)
-        self._ferdig(o, self.a)
+        avreist = self._til_avreist(o)
+        res = self._post(o, self.a, 'fremme')
+        self.assertEqual(res.status_code, 200, res.content)
+        self.assertEqual(services.koblingsrad(o, self.a).status, choices.FREMME)
+        avreist.refresh_from_db()
+        self.assertIsNotNone(avreist.trukket_tilbake_at, 'raden står, merket')
+        self.assertEqual(avreist.trukket_tilbake_av, self.sentral)
+        self.assertEqual(Statusmelding.objects.count(), 3, 'ingenting er slettet')
+        self.assertEqual([m.status for m in Statusmelding.objects.gjeldende(o)],
+                         [choices.RYKKER_UT, choices.FREMME])
+        self.assertEqual(res.json()['data']['melding']['status'], choices.FREMME,
+                         'svaret er meldingen bak statusen hun står i nå')
+        # Og tidslinjen bærer den, med hvem.
+        hist = self.ks.get(f'/oppdrag/api/oppdrag/{o.pk}/').json()['data']['historikk']
+        trukket = [h for h in hist if h['trukket_tilbake_at']]
+        self.assertEqual([(h['status'], h['trukket_tilbake_av']) for h in trukket],
+                         [(choices.AVREIST, 'sentral')])
+
+    def test_tilbake_krever_ikke_tidspunkt(self):
+        o = self._gammelt(self.a)
+        self._til_avreist(o)
+        self.assertEqual(self._post(o, self.a, 'rykker_ut').status_code, 200)
+        self.assertEqual(services.koblingsrad(o, self.a).status, choices.RYKKER_UT)
+
+    def test_helt_tilbake_til_venter(self):
+        o = self._gammelt(self.a)
+        self._til_avreist(o)
+        res = self._post(o, self.a, 'venter')
+        self.assertEqual(res.status_code, 200, res.content)
+        self.assertIsNone(res.json()['data']['melding'], 'Venter har ingen melding')
+        self.assertEqual(services.koblingsrad(o, self.a).status, choices.VENTER)
+        self.assertEqual(Statusmelding.objects.gjeldende(o), [])
+        self.assertEqual(Statusmelding.objects.filter(trukket_tilbake_at__isnull=False).count(), 3)
+
+    def test_ledig_tas_tilbake_og_oppdraget_kommer_paa_tavla(self):
+        o = self._gammelt(self.a)
+        self._til_avreist(o)
+        services.sett_status(o, choices.LEVERER, tidspunkt=self._for(30))
+        services.sett_status(o, choices.LEDIG, tidspunkt=self._for(10))
         o.refresh_from_db()
         self.assertIsNotNone(o.historikk_fra)
-        res = self.ks.post(self._url(o, self.a), content_type='application/json', data={})
-        self.assertEqual(res.status_code, 200, res.content)
-        rad = services.koblingsrad(o, self.a)
-        self.assertEqual(rad.status, choices.FREMME)
+        self.assertEqual(self._post(o, self.a, 'leverer').status_code, 200)
         o.refresh_from_db()
-        self.assertEqual(o.status, choices.FREMME)
+        self.assertEqual(o.status, choices.LEVERER)
         self.assertIsNone(o.historikk_fra, 'tilbake på tavla')
-        # Ledig-meldingen er borte (sporet ligger i revisjonsloggen), og
-        # svaret er meldingen bak statusen raden står i nå.
-        self.assertFalse(Statusmelding.objects.filter(oppdragsenhet=rad, status=choices.LEDIG).exists())
-        fremme = Statusmelding.objects.gjeldende_for_status(o, choices.FREMME, oppdragsenhet=rad)
-        self.assertEqual(res.json()['data']['melding']['id'], fremme.pk)
-        # Og operatøren kan føre videre derfra.
-        res = self.ks.post(f'/oppdrag/api/oppdrag/{o.pk}/enheter/{self.a.pk}/status/avreist/legevakt/',
-                           content_type='application/json',
-                           data={'tidspunkt': self._for(5).isoformat()})
+        # Og operatøren fører videre derfra, med ny melding.
+        res = self._post(o, self.a, 'ledig', tidspunkt=self._for(5).isoformat())
         self.assertEqual(res.status_code, 200, res.content)
+        self.assertEqual(Statusmelding.objects.filter(status=choices.LEDIG).count(), 2,
+                         'den tilbaketrukne og den nye')
 
-    def test_ledig_rett_fra_venter_gjenaapnes_til_venter(self):
-        o = self._gammelt(self.a)
-        services.sett_status(o, choices.LEDIG, tidspunkt=self._for(10))
-        res = self.ks.post(self._url(o, self.a), content_type='application/json', data={})
-        self.assertEqual(res.status_code, 200, res.content)
-        self.assertEqual(services.koblingsrad(o, self.a).status, choices.VENTER)
-
-    def test_eldre_enn_48_timer_er_arkivets(self):
+    def test_ledig_eldre_enn_48_timer_er_arkivets(self):
         o = self._gammelt(self.a)
         Oppdrag.objects.filter(pk=o.pk).update(created_at=timezone.now() - timedelta(days=3))
-        self._ferdig(o, self.a, ledig_for=49 * 60)
-        res = self.ks.post(self._url(o, self.a), content_type='application/json', data={})
+        services.sett_status(o, choices.RYKKER_UT, tidspunkt=self._for(50 * 60))
+        services.sett_status(o, choices.LEDIG, tidspunkt=self._for(49 * 60))
+        res = self._post(o, self.a, 'rykker_ut')
         self.assertEqual(res.status_code, 400)
         self.assertIn('48 timer', res.json()['message'])
         self.assertEqual(services.koblingsrad(o, self.a).status, choices.LEDIG)
+        self.assertFalse(Statusmelding.objects.filter(trukket_tilbake_at__isnull=False).exists(),
+                         'ingenting trukket tilbake når føringen avvises')
 
-    def test_en_rad_som_ikke_er_ledig_kan_ikke_gjenaapnes(self):
+    def test_over_i_den_andre_grenen_trekker_tilbake_og_foerer(self):
+        """Behandlet ↔ Avreist: grenen trekkes tilbake, og målet føres som ny
+        melding — det krever tidspunkt."""
         o = self._gammelt(self.a)
-        res = self.ks.post(self._url(o, self.a), content_type='application/json', data={})
-        self.assertEqual(res.status_code, 400)
-        self.assertIn('ikke ledig', res.json()['message'])
+        avreist = self._til_avreist(o)
+        self.assertEqual(self._post(o, self.a, 'behandlet').status_code, 400, 'mangler tidspunkt')
+        avreist.refresh_from_db()
+        self.assertIsNone(avreist.trukket_tilbake_at)
+        res = self._post(o, self.a, 'behandlet', tidspunkt=self._for(45).isoformat())
+        self.assertEqual(res.status_code, 200, res.content)
+        avreist.refresh_from_db()
+        self.assertIsNotNone(avreist.trukket_tilbake_at)
+        self.assertEqual([m.status for m in Statusmelding.objects.gjeldende(o)],
+                         [choices.RYKKER_UT, choices.FREMME, choices.BEHANDLET])
 
-    def test_bare_hennes_rad_gjenaapnes(self):
+    def test_tilbaketrukket_leverer_loste_ikke_oppdraget(self):
+        o = self._gammelt(self.a)
+        self._til_avreist(o)
+        services.sett_status(o, choices.LEVERER, tidspunkt=self._for(30))
+        self.assertTrue(services.noen_loste_oppdraget(o))
+        self._post(o, self.a, 'avreist')
+        self.assertFalse(services.noen_loste_oppdraget(o))
+
+    def test_en_tilbaketrukket_melding_kan_ikke_rettes(self):
+        o = self._gammelt(self.a)
+        avreist = self._til_avreist(o)
+        self._post(o, self.a, 'fremme')
+        avreist.refresh_from_db()
+        with self.assertRaises(services.KorreksjonUgyldig):
+            services.valider_korreksjon(avreist, self._for(41))
+
+    def test_en_tilbaketrukket_retting_gjoer_ikke_originalen_gjeldende(self):
+        o = self._gammelt(self.a)
+        services.sett_status(o, choices.RYKKER_UT, tidspunkt=self._for(60))
+        f = services.sett_status(o, choices.FREMME, tidspunkt=self._for(50))
+        services.korriger_tidspunkt(f, self._for(48), bruker=self.sentral)
+        self._post(o, self.a, 'rykker_ut')
+        self.assertEqual([m.status for m in Statusmelding.objects.gjeldende(o)], [choices.RYKKER_UT])
+
+    def test_bare_hennes_rad(self):
         o = self._gammelt(self.a, self.b)
-        self._ferdig(o, self.a)
-        self._ferdig(o, self.b)
-        self.ks.post(self._url(o, self.b), content_type='application/json', data={})
-        self.assertEqual(services.koblingsrad(o, self.a).status, choices.LEDIG)
+        self._til_avreist(o, self.a)
+        self._til_avreist(o, self.b)
+        self._post(o, self.b, 'fremme')
+        self.assertEqual(services.koblingsrad(o, self.a).status, choices.AVREIST)
         self.assertEqual(services.koblingsrad(o, self.b).status, choices.FREMME)
+
+    def test_ledig_siden_teller_ikke_en_tilbaketrukket(self):
+        o = self._gammelt(self.a)
+        services.sett_status(o, choices.RYKKER_UT, tidspunkt=self._for(60))
+        services.sett_status(o, choices.LEDIG, tidspunkt=self._for(10))
+        self.assertIn(self.a.pk, services.ledig_siden_bulk([self.a]))
+        self._post(o, self.a, 'rykker_ut')
+        self.assertNotIn(self.a.pk, services.ledig_siden_bulk([self.a]))
+
+
+class RegelenForTilbakeTests(TestCase):
+    """`trekkes_tilbake` og `kan_foeres_til` — de to reglene `foer_status`
+    avgjør alt med, prøvd uttømmende over statusene."""
+
+    def test_trekkes_tilbake(self):
+        c = choices
+        tilfeller = {
+            (c.AVREIST, c.FREMME): True, (c.FREMME, c.FREMME): False,
+            (c.RYKKER_UT, c.FREMME): False, (c.LEDIG, c.LEVERER): True,
+            (c.BEHANDLET, c.AVREIST): True, (c.AVREIST, c.BEHANDLET): True,
+            (c.LEVERER, c.BEHANDLET): True, (c.BEHANDLET, c.LEVERER): True,
+            (c.FREMME, c.BEHANDLET): False, (c.RYKKER_UT, c.VENTER): True,
+        }
+        for (status, maal), svar in tilfeller.items():
+            with self.subTest(status=status, maal=maal):
+                self.assertIs(services.trekkes_tilbake(status, maal), svar)
+
+    def test_kan_foeres_til(self):
+        c = choices
+        tilfeller = {
+            (c.VENTER, c.FREMME): True, (c.VENTER, c.LEDIG): True,
+            (c.FREMME, c.BEHANDLET): True, (c.BEHANDLET, c.LEVERER): False,
+            (c.AVREIST, c.BEHANDLET): False, (c.LEVERER, c.FREMME): False,
+            (c.FREMME, c.FREMME): False, (c.FREMME, 'flyr'): False,
+        }
+        for (fra, til), svar in tilfeller.items():
+            with self.subTest(fra=fra, til=til):
+                self.assertIs(services.kan_foeres_til(fra, til), svar)
 
 
 class FlyttEnRadTests(SentralbordBasis):
@@ -932,12 +1055,13 @@ class SentralbordetsMatriseTests(TestCase):
             self.skipTest('node er ikke tilgjengelig')
         from .tests_runde_d import _konst
         self.harness = _konst(OPPDRAG_SENTRAL_JS, 'HASTEGRAD_REKKEFOLGE') + _konst(
-            OPPDRAG_SENTRAL_JS, 'MANGLER_TRINN') + build_harness((
+            OPPDRAG_SENTRAL_JS, 'MANGLER_TRINN') + _konst(
+            OPPDRAG_SENTRAL_JS, 'STATUS_RANG') + build_harness((
             (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue', 'trustedHtml', '_escHtml', 'klokke')),
             (OPPDRAG_SENTRAL_JS, ('renderOppdrag', '_oppdragRadHtml', 'oppdragsnr', 'hendelsesnr', 'venterForbiTerskel', 'lydTerskler', '_enhetsmatrise', 'enhetAvventer', '_grovMerke',
                                   'hastegradKlasse', 'tidSiden', 'mkEnhetsvalg',
                                   'mkEnhetsrader', '_enhetsknapper', 'kanAvvente', '_varsleValg',
-                                  '_lovligeOverganger', 'tidslinjeHtml', 'enhetshendelseTekst', '_problemMedAntall', '_medAntall', '_grupperEnheter', '_typeRekkefolge', '_enhetskort', 'enhetskortInnmat',
+                                  '_statusvalg', '_nesteStatus', 'tidslinjeHtml', 'enhetshendelseTekst', '_problemMedAntall', '_medAntall', '_grupperEnheter', '_typeRekkefolge', '_enhetskort', 'enhetskortInnmat',
                                   '_sorterOppdrag', '_manglerTrinn', '_manglerMinutter')),
         ))
 
@@ -1023,12 +1147,14 @@ class SentralbordetsMatriseTests(TestCase):
         self.assertEqual(ut.count('Endre status'), 2)
         self.assertEqual(ut.count('Ta av'), 1, 'bare den som venter')
         self.assertNotIn('Gjenåpne', ut)
+        # Den som er ledig får også «Endre status» (22. sep. 2026) — «Gjenåpne»
+        # er borte, og et steg tilbake er et valg i nedtrekket.
         ledig = self._kjor("""
             console.log(mkEnhetsrader({enheter: [{enhet_id: 1, enhet_navn: 'A', status: 'ledig',
               status_navn: 'Ledig', status_tidspunkt: null}]}));
         """)
-        self.assertIn('Gjenåpne', ledig)
-        self.assertNotIn('Endre status', ledig)
+        self.assertNotIn('Gjenåpne', ledig)
+        self.assertIn('Endre status', ledig)
         self.assertNotIn('Ta av', ledig)
 
     def test_den_siste_kan_ikke_tas_av_i_grensesnittet(self):
@@ -1058,13 +1184,29 @@ class SentralbordetsMatriseTests(TestCase):
         self.assertIn('>Legg til<', ut)
         self.assertNotIn('Varsle enhet til', ut)
 
-    def test_lovlige_overganger_speiler_kjeden(self):
+    def test_statusvalget_tilbyr_alle_utenom_den_hun_staar_i(self):
+        """«KO/administrator bør kunne sette alle statuser, også de som har
+        vært» (backlog, 22. sep. 2026). Delt i det som ligger bak og det som
+        ligger foran — og Behandlet, som deler trinn med Avreist, ligger bak
+        den som har reist."""
         ut = self._kjor("""
             console.log(JSON.stringify([
-              _lovligeOverganger('venter'), _lovligeOverganger('leverer'),
-              _lovligeOverganger('ledig')]));
+              _statusvalg('venter'), _statusvalg('avreist'), _statusvalg('ledig')]));
         """)
-        self.assertEqual(ut.splitlines()[0], '[["rykker_ut","ledig"],["ledig"],[]]')
+        venter, avreist, ledig = json.loads(ut.splitlines()[0])
+        self.assertEqual(venter, {'bak': [], 'foran': ['rykker_ut', 'fremme', 'avreist',
+                                                        'leverer', 'behandlet', 'ledig']})
+        self.assertEqual(avreist, {'bak': ['venter', 'rykker_ut', 'fremme', 'behandlet'],
+                                   'foran': ['leverer', 'ledig']})
+        self.assertEqual(ledig['foran'], [])
+        self.assertEqual(len(ledig['bak']), 6)
+
+    def test_neste_status_er_forvalget(self):
+        ut = self._kjor("""
+            console.log(JSON.stringify([_nesteStatus('venter'), _nesteStatus('leverer'),
+                                        _nesteStatus('behandlet'), _nesteStatus('ledig')]));
+        """)
+        self.assertEqual(json.loads(ut.splitlines()[0]), ['rykker_ut', 'ledig', 'ledig', None])
 
     def test_tidslinjen_sier_hvem_bare_med_flere_enheter(self):
         melding = ("{id: 1, status: 'fremme', status_navn: 'Fremme', enhet_navn: 'KARM 12',"
@@ -1139,8 +1281,11 @@ class InnlinjeskjemaeneTests(TestCase):
             self.skipTest('node er ikke tilgjengelig')
         self.harness = build_harness((
             (PORTAL_UTILS_JS, ('escapeHtml', 'escHtmlValue', 'trustedHtml', '_escHtml')),
-            (OPPDRAG_SENTRAL_JS, ('visRettTid', 'visFoerStatus', '_lovligeOverganger', '_lokalNaa')),
+            (OPPDRAG_SENTRAL_JS, ('visRettTid', 'visFoerStatus', '_statusvalg', '_nesteStatus',
+                                  '_forrigeStatus', '_trengerTid', '_lokalNaa')),
         ))
+        from .tests_runde_d import _konst
+        self.harness = _konst(OPPDRAG_SENTRAL_JS, 'STATUS_RANG') + self.harness
 
     def _skjema(self, kall):
         from patients.js_test_utils import run_node
@@ -1157,15 +1302,46 @@ class InnlinjeskjemaeneTests(TestCase):
         self.assertNotIn('[object Object]', ut)
         self.assertIn('data-action="lagreRettTid" data-id="5"', ut)
 
-    def test_foer_status_tilbyr_de_lovlige_overgangene_og_stedene(self):
+    def test_foer_status_tilbyr_alle_statusene_og_stedene(self):
         ut = self._skjema('visFoerStatus(4)')
         self.assertTrue(ut.startswith('string'), ut[:80])
         self.assertNotIn('[object Object]', ut)
-        self.assertIn('value="rykker_ut"', ut)
+        self.assertIn('value="rykker_ut" selected', ut, 'neste ledd er forvalget')
         self.assertIn('value="ledig"', ut)
-        self.assertNotIn('value="fremme"', ut, 'ikke et ledd hun kan hoppe til')
+        # Hopp framover er lov fra 22. sep. 2026.
+        self.assertIn('value="fremme"', ut)
+        self.assertNotIn('value="venter"', ut, 'ikke den hun står i')
         self.assertIn('Sykehus', ut)
         self.assertIn('data-action="lagreFoerStatus" data-id="4"', ut)
+        # En ny melding trenger et tidspunkt — feltet står synlig.
+        self.assertRegex(ut, r'id="foer-tid" value="[^"]*" step="60">')
+
+    def test_et_steg_tilbake_skjuler_klokkeslettet(self):
+        """Tilbake til en status hun har hatt skriver ingen ny melding, og
+        trenger derfor ingen tid. Forvalget for den som er ledig er statusen
+        hun sto i før."""
+        ut = self._skjema("""
+            apentOppdrag = { enheter: [{ enhet_id: 4, status: 'ledig' }],
+              statusmeldinger: [{ enhet_id: 4, status: 'rykker_ut' }, { enhet_id: 4, status: 'fremme' },
+                                { enhet_id: 4, status: 'ledig' }] };
+            visFoerStatus(4)""")
+        self.assertIn('value="fremme" selected', ut)
+        self.assertIn('label="Tilbake til"', ut)
+        self.assertNotIn('label="Videre"', ut, 'ingenting ligger foran Ledig')
+        self.assertRegex(ut, r'id="foer-tid" value="[^"]*" step="60" hidden>')
+
+    def test_tilbake_til_venter_trenger_ingen_tid_men_videre_gjoer(self):
+        """Venter har ingen melding å peke på, så den må være et eget ledd i
+        regelen — uten det ville KO måttet fylle inn en tid som ikke brukes.
+        (Overlevde som mutant 22. sep. 2026, før denne testen fantes.)"""
+        from patients.js_test_utils import run_node
+        ut = run_node(self.harness, self.DOM + """
+            apentOppdrag = { enheter: [{ enhet_id: 4, status: 'fremme' }],
+              statusmeldinger: [{ enhet_id: 4, status: 'rykker_ut' }, { enhet_id: 4, status: 'fremme' }] };
+            console.log(JSON.stringify([_trengerTid(4, 'venter'), _trengerTid(4, 'rykker_ut'),
+                                        _trengerTid(4, 'avreist'), _trengerTid(4, 'behandlet')]));
+        """)
+        self.assertEqual(json.loads(ut.splitlines()[0]), [False, False, True, True])
 
 
 # ── Trinn 4: arkiv og statistikk ────────────────────────────────────────────
@@ -1428,43 +1604,18 @@ class RapportToOppdragTests(SentralbordBasis):
                          [('tatt_av', 'Karmøy 12', 'sentral')])
         self.assertTrue(all(e['varslet_at'] for e in d['enheter']))
 
-    def test_angre_tar_siste_status_tilbake(self):
-        o = self._gammelt(self.a)
-        services.sett_status(o, choices.RYKKER_UT, tidspunkt=self._for(60))
-        services.sett_status(o, choices.FREMME, tidspunkt=self._for(50))
-        m = services.sett_status(o, choices.AVREIST, tidspunkt=self._for(40), sted='sykehus')
-        res = self.ks.post(f'/oppdrag/api/oppdrag/{o.pk}/enheter/{self.a.pk}/angre/')
-        self.assertEqual(res.status_code, 200, res.content)
-        rad = services.koblingsrad(o, self.a)
-        self.assertEqual(rad.status, choices.FREMME)
-        self.assertFalse(Statusmelding.objects.filter(pk=m.pk).exists(), 'Avreist-meldingen er borte')
-        self.assertEqual(res.json()['data']['melding']['status'], choices.FREMME)
-        # Angre helt tilbake til Venter.
-        self.ks.post(f'/oppdrag/api/oppdrag/{o.pk}/enheter/{self.a.pk}/angre/')
-        res = self.ks.post(f'/oppdrag/api/oppdrag/{o.pk}/enheter/{self.a.pk}/angre/')
-        self.assertEqual(res.status_code, 200)
-        self.assertIsNone(res.json()['data']['melding'], 'Venter har ingen melding')
-        self.assertEqual(services.koblingsrad(o, self.a).status, choices.VENTER)
-        res = self.ks.post(f'/oppdrag/api/oppdrag/{o.pk}/enheter/{self.a.pk}/angre/')
-        self.assertEqual(res.status_code, 400)
-
-    def test_angre_tar_med_rettingshistorikken_og_sletter_gjennom_korreksjoner(self):
-        """En status som er rettet («Rett tid») har to rader; angre tar begge —
-        ellers ble den gamle gjeldende igjen. Og et oppdrag med korreksjoner
-        kan slettes."""
+    def test_et_oppdrag_med_rettinger_og_tilbaketrukne_meldinger_kan_slettes(self):
+        """`korrigerer` er PROTECT; slettingen må koble dem fra hverandre."""
         o = self._gammelt(self.a)
         services.sett_status(o, choices.RYKKER_UT, tidspunkt=self._for(60))
         f = services.sett_status(o, choices.FREMME, tidspunkt=self._for(50))
         services.korriger_tidspunkt(f, self._for(48), bruker=self.sentral)
-        self.assertEqual(self.ks.post(f'/oppdrag/api/oppdrag/{o.pk}/enheter/{self.a.pk}/angre/').status_code, 200)
-        self.assertEqual(services.koblingsrad(o, self.a).status, choices.RYKKER_UT)
-        self.assertFalse(Statusmelding.objects.filter(oppdragsenhet__enhet=self.a, status=choices.FREMME).exists())
-        r = Statusmelding.objects.get(oppdragsenhet__enhet=self.a)
-        services.korriger_tidspunkt(r, self._for(61), bruker=self.sentral)
-        self.ks.post(f'/oppdrag/api/oppdrag/{o.pk}/enheter/{self.a.pk}/angre/')
+        self.ks.post(f'/oppdrag/api/oppdrag/{o.pk}/enheter/{self.a.pk}/status/venter/',
+                     content_type='application/json', data={})
         res = self.ks.delete(f'/oppdrag/api/oppdrag/{o.pk}/', content_type='application/json',
                              data={'confirm': True})
         self.assertEqual(res.status_code, 200, res.content)
+        self.assertFalse(Statusmelding.objects.filter(oppdrag_id=o.pk).exists())
 
     def test_sentralbordet_sletter_bare_mens_alle_venter(self):
         o = self._to_enheter()
@@ -1475,8 +1626,9 @@ class RapportToOppdragTests(SentralbordBasis):
         res = self.ks.delete(f'/oppdrag/api/oppdrag/{o.pk}/', content_type='application/json',
                              data={'confirm': True})
         self.assertEqual(res.status_code, 403)
-        # Angre B tilbake til Venter — da kan det slettes, med bekreftelse.
-        self.ks.post(f'/oppdrag/api/oppdrag/{o.pk}/enheter/{self.b.pk}/angre/')
+        # B tilbake til Venter — da kan det slettes, med bekreftelse.
+        self.ks.post(f'/oppdrag/api/oppdrag/{o.pk}/enheter/{self.b.pk}/status/venter/',
+                     content_type='application/json', data={})
         self.assertEqual(self.ks.delete(f'/oppdrag/api/oppdrag/{o.pk}/', content_type='application/json',
                                         data={}).status_code, 400, 'bekreftelse mangler')
         res = self.ks.delete(f'/oppdrag/api/oppdrag/{o.pk}/', content_type='application/json',
@@ -1520,7 +1672,7 @@ class RapportToOppdragTests(SentralbordBasis):
         self.assertEqual(kort['sted_navn'], 'Sykehus')
 
 
-class TidslinjeMedVarsletOgAngreTests(TestCase):
+class TidslinjeMedVarsletOgTilbaketrukketTests(TestCase):
     def setUp(self):
         from patients.js_test_utils import (
             OPPDRAG_SENTRAL_JS, PORTAL_UTILS_JS, build_harness, node_available)
@@ -1531,7 +1683,7 @@ class TidslinjeMedVarsletOgAngreTests(TestCase):
             (OPPDRAG_SENTRAL_JS, ('tidslinjeHtml', 'enhetshendelseTekst')),
         ))
 
-    def test_varslet_tatt_av_og_angre_paa_siste(self):
+    def test_varslet_tatt_av_og_tilbaketrukket(self):
         from patients.js_test_utils import run_node
         ut = run_node(self.harness, """
             globalThis.OPPDRAG_TILGANG = { kanSkrive: true };
@@ -1543,14 +1695,22 @@ class TidslinjeMedVarsletOgAngreTests(TestCase):
                                  tidspunkt: '2026-08-28T20:10:00Z', av: 'adm'}],
               historikk: [
                 {id: 1, enhet_id: 1, status: 'rykker_ut', status_navn: 'Rykker ut', tidspunkt: '2026-08-28T20:02:00Z'},
-                {id: 2, enhet_id: 1, status: 'fremme', status_navn: 'Fremme', tidspunkt: '2026-08-28T20:08:00Z'}],
+                {id: 2, enhet_id: 1, status: 'fremme', status_navn: 'Fremme', tidspunkt: '2026-08-28T20:08:00Z',
+                 trukket_tilbake_at: '2026-08-28T20:12:00Z', trukket_tilbake_av: '<i>ops</i>'}],
               enhetsbytter: []}));
         """)
         self.assertIn('Varslet: HGSD 56', ut)
         self.assertIn('Varslet: &lt;b&gt;KARM&lt;/b&gt;', ut)
         self.assertIn('Tatt av: &lt;b&gt;KARM&lt;/b&gt;', ut)
-        self.assertEqual(ut.count('data-action="angreStatus"'), 1, 'bare siste melding kan angres')
-        self.assertIn('data-action="angreStatus" data-id="1"', ut)
+        # «Angre» er borte (22. sep. 2026). Den tilbaketrukne raden står,
+        # gjennomstreket, med hvem — escapet — og uten «Rett tid».
+        self.assertNotIn('angreStatus', ut)
+        self.assertNotIn('>Angre<', ut)
+        self.assertIn('trukket tilbake', ut)
+        self.assertIn('&lt;i&gt;ops&lt;/i&gt;', ut)
+        self.assertNotIn('<i>ops</i>', ut)
+        self.assertEqual(ut.count('tidslinje-erstattet'), 1)
+        self.assertEqual(ut.count('data-action="visRettTid"'), 1, 'bare den gjeldende kan rettes')
         self.assertLess(ut.index('Rykker ut'), ut.index('Fremme'))
 
 

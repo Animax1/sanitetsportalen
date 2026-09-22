@@ -615,12 +615,12 @@ def oppdrag_detalj_view(request, pk):
             gjeldende = [m for m in alle_gjeldende if m.oppdragsenhet_id == kobling.pk]
             andre = [m for m in alle_gjeldende if m.oppdragsenhet_id != kobling.pk]
             alle = (Statusmelding.objects.filter(oppdragsenhet=kobling)
-                    .select_related('oppdragsenhet__enhet', 'meldt_av')
+                    .select_related('oppdragsenhet__enhet', 'meldt_av', 'trukket_tilbake_av')
                     .order_by('created_at'))
         else:
             gjeldende = Statusmelding.objects.gjeldende(oppdrag)
             alle = (Statusmelding.objects.filter(oppdrag=oppdrag)
-                    .select_related('oppdragsenhet__enhet', 'meldt_av')
+                    .select_related('oppdragsenhet__enhet', 'meldt_av', 'trukket_tilbake_av')
                     .order_by('created_at'))
         return JsonResponse({'status': 'ok', 'data': {
             **oppdrag_til_dict(oppdrag, for_enhet=er_enhetskonto(request.user),
@@ -790,14 +790,18 @@ def oppdragsenhet_view(request, pk, enhet_pk):
 @require_http_methods(['POST'])
 @rate_limit(group='oppdrag:foering', rate='60/m', method='POST')
 def foering_view(request, pk, enhet_pk, overgang, sted=None):
-    """Sentralbordet fører en status for en enhet (§9).
+    """Sentralbordet setter en enhets status (§9) — hvilken som helst av dem.
 
-    **Leser kroppen** — `tidspunkt` er påkrevd, for hele poenget er å føre
-    bakover i tid. Det er derfor `skriv_full` og ikke `skriv_handling`: bilens
-    stemplingsendepunkt leser ingen domenefelt, og dette er en annen aktør
-    med et annet endepunkt. Overgangsreglene gjelder også operatøren.
+    **Leser kroppen** — `tidspunkt` er påkrevd for en ny melding, for hele
+    poenget er å føre bakover i tid. Det er derfor `skriv_full` og ikke
+    `skriv_handling`: bilens stemplingsendepunkt leser ingen domenefelt, og
+    dette er en annen aktør med et annet endepunkt.
+
+    Fra 22. sep. 2026 går det også bakover, og da trekkes meldingene etter
+    målet tilbake i stedet for å slettes (`services.foer_status`). `venter`
+    er derfor et gyldig mål her, selv om ingen stempler den.
     """
-    if overgang not in services.STEMPLBARE:
+    if overgang not in services.FOERBARE:
         return JsonResponse(
             {'status': 'error', 'message': f'Ukjent overgang «{overgang}».'}, status=404)
     if sted and (overgang != choices.AVREIST or sted not in choices.AVREIST_TIL_NAVN):
@@ -808,16 +812,17 @@ def foering_view(request, pk, enhet_pk, overgang, sted=None):
     if feil:
         return feil
 
+    # Tom tidspunkt er lov: et steg tilbake skriver ingen ny melding, og da
+    # trengs det ingen tid. Tjenesten krever den der den trengs.
     raa = json_body(request).get('tidspunkt')
-    if not raa:
-        return JsonResponse(
-            {'status': 'error', 'message': 'Mangler tidspunkt.'}, status=400)
-    tidspunkt = parse_datetime(str(raa))
-    if tidspunkt is None:
-        return JsonResponse(
-            {'status': 'error', 'message': 'Ugyldig tidspunkt.'}, status=400)
-    if timezone.is_naive(tidspunkt):
-        tidspunkt = timezone.make_aware(tidspunkt)
+    tidspunkt = None
+    if raa:
+        tidspunkt = parse_datetime(str(raa))
+        if tidspunkt is None:
+            return JsonResponse(
+                {'status': 'error', 'message': 'Ugyldig tidspunkt.'}, status=400)
+        if timezone.is_naive(tidspunkt):
+            tidspunkt = timezone.make_aware(tidspunkt)
 
     try:
         melding = services.foer_status(
@@ -830,45 +835,7 @@ def foering_view(request, pk, enhet_pk, overgang, sted=None):
     oppdrag.refresh_from_db()
     return JsonResponse({'status': 'ok', 'data': {
         'oppdrag': oppdrag_til_dict(oppdrag),
-        'melding': melding_til_dict(melding),
-    }})
-
-
-@modul_kreves('oppdrag', 'skriv_full', svar='json')
-@require_http_methods(['POST'])
-@rate_limit(group='oppdrag:gjenaapne', rate='60/m', method='POST')
-def gjenaapne_view(request, pk, enhet_pk):
-    """Ta en enhets «Ledig» tilbake — innen `KORRIGERBAR_ETTER_LEDIG` (§9)."""
-    oppdrag, enhet, feil = _oppdrag_og_enhet(request, pk, enhet_pk)
-    if feil:
-        return feil
-    try:
-        melding = services.gjenaapne_enhet(oppdrag, enhet, bruker=request.user)
-    except (services.UlovligOvergang, services.KorreksjonUgyldig) as feil:
-        return JsonResponse({'status': 'error', 'message': str(feil)}, status=400)
-    oppdrag.refresh_from_db()
-    return JsonResponse({'status': 'ok', 'data': {
-        'oppdrag': oppdrag_til_dict(oppdrag),
-        'melding': melding_til_dict(melding) if melding else None,
-    }})
-
-
-@modul_kreves('oppdrag', 'skriv_full', svar='json')
-@require_http_methods(['POST'])
-@rate_limit(group='oppdrag:angre', rate='60/m', method='POST')
-def angre_view(request, pk, enhet_pk):
-    """Ta enhetens siste status tilbake (André, 12. sep. 2026). En korreksjon,
-    som «Gjenåpne» — den er dette med «Ledig» som siste status."""
-    oppdrag, enhet, feil = _oppdrag_og_enhet(request, pk, enhet_pk)
-    if feil:
-        return feil
-    try:
-        melding = services.angre_siste_status(oppdrag, enhet, bruker=request.user)
-    except (services.UlovligOvergang, services.KorreksjonUgyldig) as feil:
-        return JsonResponse({'status': 'error', 'message': str(feil)}, status=400)
-    oppdrag.refresh_from_db()
-    return JsonResponse({'status': 'ok', 'data': {
-        'oppdrag': oppdrag_til_dict(oppdrag),
+        # Meldingen bak statusen enheten står i nå — `None` for Venter.
         'melding': melding_til_dict(melding) if melding else None,
     }})
 

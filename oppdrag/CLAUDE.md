@@ -98,17 +98,18 @@ begge har `transaction.atomic()` rundt seg: `varsle_enhet` kan kjøre inne i en 
 og en databasefeil fanget uten savepoint etterlater den ubrukelig.
 
 **Bilens utganger (12. sep. 2026):** «Behandlet på sted» (`BEHANDLET`) er en sidegren
-fra Fremme rett til Ledig — `KJEDEN` er fortsatt lineær, `neste_i_kjeden` gir Ledig etter
+fra Fremme rett til Ledig — `KJEDEN` er lineær, `neste_i_kjeden` gir Ledig etter
 Leverer og Behandlet, og `alternativ_for()` gir den andre knappen (Avbryt i Rykker ut,
 Behandlet i Fremme). **Ett trykk på Behandlet skriver Behandlet og Ledig** med samme
 tidspunkt (`services.behandle_paa_sted`, Ledig ikke `automatisk`; Udefinert sjekkes før noe
 skrives), og bilens projeksjon viser Ledig. Bilen har **ingen egen Ledig-knapp**; stemplingsviewet avviser Ledig
-utenom `BILEN_KAN_LEDIG_FRA` med 400, mens sentralens føring følger `OVERGANGER` som før.
+utenom `BILEN_KAN_LEDIG_FRA` med 400. Sentralen (`foer_status`) setter
+alle statuser: bakover trekkes meldingene tilbake, aldri slettet; `gjeldende()` siler dem.
 «Avbryt» (`choices.AVBRYT`) er en handling, ikke en status: den går i køen som en stempling
 (`status/avbryt/`), `services.avbryt_oppdrag` setter raden Ledig (uten Udefinert-sperre —
 hun så aldri pasienten), oppdraget til «trenger ny ressurs» og en `Enhetshendelse.AVBRUTT`.
 `utledet_av_statuser` rangerer med `choices.AKTIVITET`, ikke `KJEDEN.index`, fordi
-Behandlet ikke står i kjeden. Arkivraden har `behandlet_at` (se «Arkivet bærer modusen»).
+Behandlet ikke står i kjeden.
 
 **«Avbrutt» og «trenger ny ressurs» er to ulike beskjeder** (15. sep. 2026). Regelen sto
 som ett spørsmål — «finnes det andre enheter som ikke er ledige» — og den kan ikke skille en

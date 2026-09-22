@@ -4,6 +4,82 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-22 — Menyen inn i headeren, «Behandlet» rosa, og KO setter alle statuser uten å slette loggen  `#oppdrag/statusmaskin` `#oppdrag/sentralbord` `#core/grensesnitt` `#core/dokumentasjon`
+
+Tre punkter fra backloggen i portalen, tatt stilling til med André først. Migrasjon
+`oppdrag/0031` legger bare til to nullbare felter; ingen eksisterende rad endres.
+
+**KO/administrator kan sette alle statuser — og «Angre» sletter ikke lenger loggen**
+(`#oppdrag/statusmaskin`). Backloggen: «I dropdown for status bør KO/administrator kunne
+sette alle statuser, også de som har vært. Blir feil å trykke angre i loggen, for loggen
+må bevares og det er ikke intuitivt å endre det der.» Det var verre enn det så ut:
+**`angre_siste_status` slettet statusmeldingene fra basen** (`_slett_meldinger`), og
+sporet fantes bare i revisjonsloggen, som bare admin ser. Det sto i strid med modulens
+egen regel for «Rett tid» — «`Statusmelding` er et spor av hva som faktisk ble meldt» —
+som skriver en ny rad og lar den gamle stå.
+
+- **«Endre status» tilbyr alle statuser** utenom den enheten står i, i to grupper:
+  *Videre* og *Tilbake til*. Forvalget er neste ledd, som før; for den som er ledig er det
+  statusen hun sto i før.
+- **Framover kan ledd hoppes over.** Leddene imellom står **uten** tidspunkt — de diktes
+  ikke. En responstid som mangler er ærligere enn en som er funnet på.
+- **Bakover trekkes meldingene tilbake**, med hvem og når
+  (`Statusmelding.trukket_tilbake_at`/`_av`). De står i tidslinjen, gjennomstreket, med
+  «trukket tilbake 19:45 av andre». Ingen ny melding skrives og ingen tid trengs, så
+  klokkeslettfeltet skjules (`_trengerTid()`).
+- **Over i den andre grenen** (Behandlet ↔ Avreist/Leverer) trekkes grenen tilbake og målet
+  føres som ny melding.
+- **«Angre» og «Gjenåpne» er borte**, med endepunktene `…/angre/` og `…/gjenaapne/`
+  (159 ruter, var 161). Den som er ledig får «Endre status» som alle andre.
+  48-timersgrensen for `Ledig` gjelder fortsatt: eldre enn det er oppdraget arkivets.
+
+**Én regel, ett sted:** `gjeldende_bulk()` siler bort tilbaketrukne rader, og alt som
+regner — statistikken, arkivet, bilens knapper, KO-tavla — går gjennom den. De to
+spørringene som går rett på tabellen fikk samme filter: `ledig_siden_bulk()` og
+`noen_loste_oppdraget()` — **en tilbaketrukket Leverer er ikke en jobb som ble gjort.**
+En tilbaketrukket retting overstyrer fortsatt originalen, så originalen blir ikke gjeldende
+igjen. «Rett tid» avviser en tilbaketrukket melding. Brukerpekeren strippes i backup som
+`meldt_av`.
+
+Reglene er to rene funksjoner, `trekkes_tilbake()` og `kan_foeres_til()`, prøvd uttømmende.
+`sett_status(hopp=True)` er sentralens vei; bilen går fortsatt gjennom `OVERGANGER`.
+
+**Mutasjonstesting:** 30 mutanter — 20 i tjenestelaget og viewet, 9 i JS-en som avgjør, og 1
+etter at en test ble lagt til. **2 overlevde først:**
+1. `>=` → `>` i `trekkes_tilbake`. **Ekvivalent:** det eneste paret på samme trinn er
+   Behandlet/Avreist, og det dekker `_andre_gren()` alene. Koden er forenklet til `>` så den
+   ikke later som den har en regel til.
+2. `_trengerTid()` uten Venter-regelen. **Ekte hull**, og test lagt til: Venter har ingen
+   melding å peke på, så uten regelen måtte KO fylt inn en tid som ikke brukes.
+
+**«Behandlet på sted» er rosa, ikke grønn** (`#oppdrag/sentralbord`). Backloggen: «Nå er
+den grønn, bør ikke være akkurat samme farge som Ledig.» Det var `#10b981` mot `#22c55e`,
+to grønnfarger som knapt skilles på en skjerm. Nå `#ec4899`: rosa finnes ikke andre steder
+på tavla, og ligger langt nok fra rødt til ikke å lese som alarm. **Fargeforklaringen fulgte
+med av seg selv** — `koLegendeHtml()` bruker CSS-klassen — og sier nå «Behandlet på sted /
+Utført», som statusen heter på oppdrag uten pasient.
+
+**Modulmenyen står i den blå headeren** (`#core/grensesnitt`). Backloggen: «Gi mer plass i
+høyden. Menyraden bør flyttes inn i hamburgermeny … fjern margin-top i .portal-footer.»
+Footeren ga ingen rader på `/ko/`: konsollen måler høyden sin og fyller vinduet ned til
+16 px over bunnen, så footeren lå alt under kanten. **Det som tok plassen var menyraden** —
+~45 px, og for en admin med tretten lenker brakk den til to linjer. Valgt sammen med André:
+
+- **Modulene i headeren, admin-lenkene i avatar-menyen.** Én rad spart, og bytte mellom
+  `/ko/` og `/vaktliste/` er fortsatt ett klikk. Fire av admin-lenkene sto alt begge steder;
+  nå står alle sju der, under «Administrasjon», med den aktive markert.
+- **Hamburger under 1200 px**, der modulene ikke får plass ved siden av klokka og bjella.
+  Lenkene tegnes fra én mal, `partials/_portal_moduler.html`, begge steder.
+- **Footerens luft er 0,5rem**, ikke 0. Footeren står igjen: den bærer byggnummeret staging
+  verifiseres mot.
+
+Headeren er sjekket i Chromium på 1440 og 1100 px, uten konsollfeil.
+
+**Og i dokumentene:** `oppdrag/CLAUDE.md` sa at «sentralens føring følger `OVERGANGER` som
+før» — det gjør den ikke lenger. Rettet innenfor taket (22 647 av 22 650 tegn), med en
+dublerende kryssreferanse strøket. `TEKNISK_DOKUMENTASJON.md`: 159 ruter, 32 under
+`/oppdrag/`.
+
 ## 2026-09-21 — Vinduer kan skjules, loggstrømmen filtreres, og avvent klonet enheten  `#ko/oppsett` `#ko/loggen` `#oppdrag/statusmaskin` `#oppdrag/sentralbord`
 
 Sju punkter fra André, 21. sep. 2026.

@@ -445,7 +445,7 @@ deploy 2. Begge deler er rettet, men **strukturen er endret med vilje**: se 5.0.
 
 ### 5.0 Hva dette kapittelet er, og ikke er
 
-Portalen har **161 endepunkter** (utenom Django-admin, som bare rutes under `DEBUG`).
+Portalen har **159 endepunkter** (utenom Django-admin, som bare rutes under `DEBUG`).
 En håndskrevet liste over alle sammen ville rotnet fra dagen den ble skrevet — nøyaktig
 slik den gamle lista gjorde, med 16 oppføringer og ingen som merket at resten manglet.
 
@@ -473,7 +473,7 @@ for sti, view in sorted(gaa(get_resolver())):
 | Prefiks | Antall | Rutet i | Innhold |
 |---|---|---|---|
 | `/pasienter/` | 17 | `patients/urls.py` | Pasient-CRUD, registre, arkiv, vaktstyring |
-| `/oppdrag/` | 34 | `oppdrag/urls.py` | Sentralbord, enhetsskjerm, stemplinger, verdimengder |
+| `/oppdrag/` | 32 | `oppdrag/urls.py` | Sentralbord, enhetsskjerm, stemplinger, verdimengder |
 | `/vaktliste/` | 30 | `vaktliste/urls.py` | Ressurser, vaktposter, mannskap, drift, service worker |
 | `/portal-admin/` | 21 | `core/urls_admin.py` | Hele adminflaten. Navnerom `portaladmin` |
 | `/accounts/` | 9 | `accounts/urls.py` | Innlogging, MFA, passord |

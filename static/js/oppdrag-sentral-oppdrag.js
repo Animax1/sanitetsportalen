@@ -304,16 +304,6 @@ function tidslinjeHtml(data) {
   const erstattet = new Set(
     (data.historikk || []).filter((m) => m.korrigerer).map((m) => m.korrigerer));
   const flere = (data.enheter || []).length > 1;
-  // Siste gjeldende melding per enhet — den eneste som kan angres.
-  const sisteFor = new Map();
-  (data.historikk || []).forEach((m) => {
-    if (erstattet.has(m.id)) return;
-    const s = sisteFor.get(m.enhet_id);
-    if (!s || m.tidspunkt > s.tid || (m.tidspunkt === s.tid && m.id > s.id)) {
-      sisteFor.set(m.enhet_id, { id: m.id, tid: m.tidspunkt });
-    }
-  });
-  sisteFor.forEach((v, k) => sisteFor.set(k, v.id));
 
   // Hvem som ble varslet, og hvem som ble tatt av (André, 12. sep. 2026).
   (data.enheter || []).forEach((e) => {
@@ -354,24 +344,26 @@ function tidslinjeHtml(data) {
     if (m.korrigerer) notat.push('rettet av sentralen');
     // §9: sentralbordet førte statusen — og hvem, for det er ikke bilen.
     if (m.manuell) notat.push('endret av KO' + (m.meldt_av ? ` (${m.meldt_av})` : ''));
-    const erErstattet = erstattet.has(m.id);
+    // Trukket tilbake (22. sep. 2026): raden står, gjennomstreket, med hvem
+    // og når — «loggen må bevares» (André). Det var «Angre» som slettet den.
+    if (m.trukket_tilbake_at) {
+      notat.push('trukket tilbake ' + klokke(m.trukket_tilbake_at)
+                 + (m.trukket_tilbake_av ? ` av ${m.trukket_tilbake_av}` : ''));
+    }
+    const erErstattet = erstattet.has(m.id) || Boolean(m.trukket_tilbake_at);
     const klasse = erErstattet ? 'tidslinje-rad tidslinje-erstattet' : 'tidslinje-rad';
     const notatBlokk = notat.length
       ? `<span class="tidslinje-notat">· ${escapeHtml(notat.join(', '))}</span>`
       : '';
-    // Kun gjeldende rader kan rettes. En overstyrt rad beskriver ikke lenger
-    // noe som gjelder, og serveren avviser den uansett — knappen skal ikke
-    // tilby noe som er stengt.
+    // Kun gjeldende rader kan rettes. En overstyrt eller tilbaketrukket rad
+    // beskriver ikke lenger noe som gjelder, og serveren avviser den uansett
+    // — knappen skal ikke tilby noe som er stengt.
     const rettKnapp = (OPPDRAG_TILGANG.kanSkrive && !erErstattet)
       ? `<button type="button" class="btn btn-link btn-sm tidslinje-rett p-0 ms-2"
                  data-action="visRettTid" data-id="${escHtmlValue(m.id)}">Rett tid</button>`
       : '';
-    // «Angre» på enhetens siste gjeldende melding (André, 12. sep. 2026):
-    // tar statusen tilbake til forrige, som en korreksjon.
-    const angreKnapp = (OPPDRAG_TILGANG.kanSkrive && !erErstattet && sisteFor.get(m.enhet_id) === m.id)
-      ? `<button type="button" class="btn btn-link btn-sm tidslinje-rett p-0 ms-2"
-                 data-action="angreStatus" data-id="${escHtmlValue(m.enhet_id)}">Angre</button>`
-      : '';
+    // Ingen «Angre» her lenger (22. sep. 2026): «det er ikke intuitivt å
+    // endre det der» (André). Et steg tilbake er et valg i «Endre status».
     // «Avreist → Sykehus» — stedet ved statusen, som på enhetsskjermen.
     // Og med flere enheter: hvem sin — «KARM 12: Fremme». Med én står
     // navnet alt i tittelen.
@@ -384,7 +376,7 @@ function tidslinjeHtml(data) {
           <span class="${tidKlasse}"${tittel}>${escapeHtml(klokke(m.tidspunkt))}</span>
           <span>${escapeHtml(statusMedSted)}</span>
           ${notatBlokk}
-          ${rettKnapp}${angreKnapp}
+          ${rettKnapp}
         </div>`,
     });
   });
@@ -533,16 +525,12 @@ function mkEnhetsrader(o) {
 
 function _enhetsknapper(e, flere, oppdragId, avventer) {
   // Bare knappene som kan brukes: «Ta av» mens hun venter og ikke er den
-  // siste, «Gjenåpne» når hun er ledig, «Før status» ellers. En knapp som
-  // alltid feiler er verre enn ingen.
+  // siste, og «Endre status» alltid. Også for den som er ledig — der sto
+  // «Gjenåpne» til 22. sep. 2026; nå er det et steg tilbake i nedtrekket.
+  // En knapp som alltid feiler er verre enn ingen.
   const ut = [];
-  if (e.status !== 'ledig') {
-    ut.push(`<button type="button" class="btn btn-outline-primary btn-sm"
-                     data-action="visFoerStatus" data-id="${escHtmlValue(e.enhet_id)}">Endre status</button>`);
-  } else {
-    ut.push(`<button type="button" class="btn btn-outline-secondary btn-sm"
-                     data-action="gjenaapneEnhet" data-id="${escHtmlValue(e.enhet_id)}">Gjenåpne</button>`);
-  }
+  ut.push(`<button type="button" class="btn btn-outline-primary btn-sm"
+                   data-action="visFoerStatus" data-id="${escHtmlValue(e.enhet_id)}">Endre status</button>`);
   if (e.status === 'venter' && flere) {
     ut.push(`<button type="button" class="btn btn-outline-danger btn-sm"
                      data-action="taAvEnhet" data-id="${escHtmlValue(e.enhet_id)}">Ta av</button>`);
@@ -644,17 +632,55 @@ function _varsleValg(o) {
 }
 
 
-function _lovligeOverganger(status) {
-  // Speiler `services.OVERGANGER`: neste ledd i kjeden, og «Ledig» fra alt.
-  // Serveren avgjør uansett; dette er hva nedtrekket tilbyr.
+//: Hvor langt i kjeden en status står. Speiler `services._REKKEFOLGE`:
+//: Behandlet er en sidegren fra Fremme og deler trinn med Avreist.
+const STATUS_RANG = { venter: 0, rykker_ut: 1, fremme: 2, avreist: 3, behandlet: 3, leverer: 4, ledig: 5 };
+
+function _statusvalg(status) {
+  // **Alle statuser utenom den hun står i** (backlog, 22. sep. 2026:
+  // «KO/administrator bør kunne sette alle statuser, også de som har vært»).
+  // To grupper: det som ligger bak (et steg tilbake — meldingene etter
+  // trekkes tilbake) og det som ligger foran (en ny melding, også med hopp).
+  // Serveren avgjør uansett; dette er hva nedtrekket tilbyr, i den
+  // rekkefølgen kjeden går.
+  const rang = STATUS_RANG[status] ?? -1;
+  const alle = ['venter', 'rykker_ut', 'fremme', 'avreist', 'leverer', 'behandlet', 'ledig']
+    .filter((s) => s !== status);
+  const bak = alle.filter((s) => STATUS_RANG[s] < rang
+    || (STATUS_RANG[s] === rang && s !== status));
+  return { bak, foran: alle.filter((s) => !bak.includes(s)) };
+}
+
+function _nesteStatus(status) {
+  // Det nedtrekket står på når det åpnes: neste ledd i kjeden, som før.
   const kjede = STATUS_REKKEFOLGE.filter((s) => s !== 'ledig');
   const i = kjede.indexOf(status);
-  const ut = [];
-  if (i >= 0 && i + 1 < kjede.length) ut.push(kjede[i + 1]);
-  // «Behandlet på sted» (12. sep. 2026): sidegrenen fra Fremme, rett til Ledig.
-  if (status === 'fremme') ut.push('behandlet');
-  if (status !== 'ledig') ut.push('ledig');
-  return ut;
+  if (i >= 0 && i + 1 < kjede.length) return kjede[i + 1];
+  return status === 'ledig' ? null : 'ledig';
+}
+
+function _forrigeStatus(enhetId, status) {
+  // Den høyeste gjeldende statusen hun har hatt før den hun står i nå.
+  const rang = STATUS_RANG[status] ?? -1;
+  const tidligere = ((apentOppdrag && apentOppdrag.statusmeldinger) || [])
+    .filter((m) => Number(m.enhet_id) === Number(enhetId) && STATUS_RANG[m.status] < rang)
+    .sort((a, b) => STATUS_RANG[a.status] - STATUS_RANG[b.status]);
+  return tidligere.length ? tidligere[tidligere.length - 1].status : null;
+}
+
+function _trengerTid(enhetId, maal) {
+  // Et steg tilbake til en status hun *har hatt* — eller til Venter —
+  // skriver ingen ny melding, og trenger derfor ikke noe tidspunkt. Alt
+  // annet er en føring, og den må ha et. Samme regel som `foer_status`.
+  if (maal === 'venter') return false;
+  const gjeldende = ((apentOppdrag && apentOppdrag.statusmeldinger) || [])
+    .filter((m) => Number(m.enhet_id) === Number(enhetId));
+  const e = ((apentOppdrag && apentOppdrag.enheter) || [])
+    .find((x) => Number(x.enhet_id) === Number(enhetId));
+  const rang = STATUS_RANG[maal];
+  const erBak = e && (STATUS_RANG[e.status] > rang
+    || (STATUS_RANG[e.status] === rang && e.status !== maal));
+  return !(erBak && gjeldende.some((m) => m.status === maal));
 }
 
 
@@ -696,14 +722,6 @@ async function taAvEnhet(enhetId) {
 }
 
 
-async function gjenaapneEnhet(enhetId) {
-  if (apentOppdragId === null) return;
-  await _enhetshandling(
-    `/oppdrag/api/oppdrag/${apentOppdragId}/enheter/${Number(enhetId)}/gjenaapne/`, 'POST',
-    'Kunne ikke gjenåpne.');
-}
-
-
 function visFoerStatus(enhetId) {
   const rad = document.getElementById(`enhet-rad-${enhetId}`);
   if (!rad || rad.querySelector('.foer-skjema')) return;
@@ -712,15 +730,20 @@ function visFoerStatus(enhetId) {
   if (!e) return;
 
   const navn = window.OPPDRAG_STATUS_NAVN || {};
-  const overganger = _lovligeOverganger(e.status);
-  const statusvalg = overganger.map(
-    (st) => `<option value="${escHtmlValue(st)}">${escapeHtml(navn[st] || st)}</option>`).join('');
+  const { bak, foran } = _statusvalg(e.status);
+  // Forvalget er neste ledd — og for den som er ledig, statusen hun sto i før.
+  const valgt = _nesteStatus(e.status) || _forrigeStatus(enhetId, e.status) || bak[bak.length - 1];
+  const valg = (st) => `<option value="${escHtmlValue(st)}"${st === valgt ? ' selected' : ''}>${escapeHtml(navn[st] || st)}</option>`;
+  const gruppe = (etikett, liste) => (liste.length
+    ? `<optgroup label="${escHtmlValue(etikett)}">${liste.map(valg).join('')}</optgroup>` : '');
+  const statusvalg = gruppe('Videre', foran) + gruppe('Tilbake til', bak);
   const stedvalg = (window.OPPDRAG_AVREIST_TIL || []).map(
     ([nokkel, tekst]) => `<option value="${escHtmlValue(nokkel)}">${escapeHtml(tekst)}</option>`).join('');
   // Stedet hører til «Avreist» og vises bare når det er valgt (André,
   // 12. sep. 2026). Nedtrekket melder `change`, og `foerStatusEndret`
   // slår stedet av og på.
-  const stedSkjult = overganger[0] === 'avreist' ? '' : ' hidden';
+  const stedSkjult = valgt === 'avreist' ? '' : ' hidden';
+  const tidSkjult = _trengerTid(enhetId, valgt) ? '' : ' hidden';
   // Ett skjema om gangen: de andre radenes knapper skjules mens dette står,
   // og radens egen «Endre status» låses (André, 12. sep. 2026).
   document.getElementById('detalj-innhold')?.classList.add('foer-aapen');
@@ -730,6 +753,7 @@ function visFoerStatus(enhetId) {
   skjema.className = 'foer-skjema mt-1 d-flex gap-2 align-items-center flex-wrap w-100';
   skjema.innerHTML = (`
     <select id="foer-status" class="form-select form-select-sm w-auto" aria-label="Status"
+            data-enhet="${escHtmlValue(enhetId)}"
             data-action="foerStatusEndret" data-hendelse="change">${statusvalg}</select>
     <select id="foer-sted" class="form-select form-select-sm w-auto" aria-label="Sted ved Avreist"${stedSkjult}
             data-action="foerStatusEndret" data-hendelse="change">
@@ -737,7 +761,7 @@ function visFoerStatus(enhetId) {
     <input type="text" id="foer-sted-tekst" class="form-control form-control-sm w-auto" maxlength="120"
            placeholder="Hvor?" aria-label="Annet sted" hidden>
     <input type="datetime-local" class="form-control form-control-sm w-auto"
-           id="foer-tid" value="${_lokalNaa()}" step="60">
+           id="foer-tid" value="${_lokalNaa()}" step="60"${tidSkjult}>
     <span id="foer-feil" class="text-danger small"></span>
     <span class="ms-auto d-flex gap-2">
       <button type="button" class="btn btn-sm btn-outline-secondary"
@@ -746,7 +770,7 @@ function visFoerStatus(enhetId) {
               id="foer-lagre" data-action="lagreFoerStatus" data-id="${escHtmlValue(enhetId)}">Endre</button>
     </span>`);
   rad.appendChild(skjema);
-  document.getElementById('foer-tid').focus();
+  document.getElementById('foer-status').focus();
 }
 
 
@@ -755,14 +779,6 @@ function avbrytFoerStatus() {
   document.getElementById('detalj-innhold')?.classList.remove('foer-aapen');
   document.querySelectorAll('#detalj-innhold [data-action="visFoerStatus"]')
     .forEach((b) => { b.disabled = false; });
-}
-
-
-async function angreStatus(enhetId) {
-  if (apentOppdragId === null) return;
-  await _enhetshandling(
-    `/oppdrag/api/oppdrag/${apentOppdragId}/enheter/${Number(enhetId)}/angre/`, 'POST',
-    'Kunne ikke angre.');
 }
 
 
@@ -870,10 +886,13 @@ async function lagreOppdrag(id) {
 
 
 function foerStatusEndret() {
-  // Stedet finnes bare for «Avreist».
+  // Stedet finnes bare for «Avreist», og klokkeslettet bare når det skrives
+  // en ny melding — et steg tilbake har ingen tid å føre (22. sep. 2026).
   const status = document.getElementById('foer-status');
   const sted = document.getElementById('foer-sted');
   if (!status || !sted) return;
+  const tid = document.getElementById('foer-tid');
+  if (tid) tid.hidden = !_trengerTid(status.dataset.enhet, status.value);
   sted.hidden = status.value !== 'avreist';
   if (sted.hidden) sted.value = '';
   // Friteksten hører til «Annet sted» (19. sep. 2026) og vises bare da.
@@ -898,7 +917,10 @@ async function lagreFoerStatus(enhetId) {
   const sted = document.getElementById('foer-sted');
   const tid = document.getElementById('foer-tid');
   const feil = document.getElementById('foer-feil');
-  if (!status || !tid || !tid.value || apentOppdragId === null) return;
+  if (!status || !tid || apentOppdragId === null) return;
+  // Tiden sendes bare når den står synlig — et steg tilbake har ingen.
+  const medTid = !tid.hidden;
+  if (medTid && !tid.value) return;
 
   await withSubmitGuard('foer-lagre', async () => {
     // Stedet hører til «Avreist» og ingen annen status — sendes bare da.
@@ -908,7 +930,7 @@ async function lagreFoerStatus(enhetId) {
       `/oppdrag/api/oppdrag/${apentOppdragId}/enheter/${Number(enhetId)}/status/${status.value}/${stedLedd}`, {
         method: 'POST',
         // Ingen sone på `datetime-local`; serveren tolker den som lokal tid.
-        body: JSON.stringify({ tidspunkt: tid.value,
+        body: JSON.stringify({ tidspunkt: medTid ? tid.value : undefined,
                                sted_tekst: (stedTekst && !stedTekst.hidden) ? stedTekst.value : undefined }),
       });
     const d = await res.json();

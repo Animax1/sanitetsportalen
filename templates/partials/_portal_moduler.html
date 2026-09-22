@@ -1,0 +1,11 @@
+{# Modullenkene i headeren — tegnet to ganger av base_portal.html: inline på brede skjermer, og i hamburgermenyen på smale. Én kilde, så de to ikke glir fra hverandre. `lenkeklasse` er '' inline og 'dropdown-item' i menyen. #}
+<a href="{% url 'core:portal_dashboard' %}" class="{{ lenkeklasse }}{% if request.resolver_match.url_name == 'portal_dashboard' %} active{% endif %}">
+  <i class="bi bi-grid-3x3-gap me-1"></i>Dashboard
+</a>
+{% for module in nav_modules %}
+  {% if module.url %}
+    <a href="{{ module.url }}" class="{{ lenkeklasse }}{% if module.url in request.path %} active{% endif %}">
+      <i class="bi bi-{{ module.icon }} me-1"></i>{{ module.name }}
+    </a>
+  {% endif %}
+{% endfor %}

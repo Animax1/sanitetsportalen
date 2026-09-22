@@ -54,7 +54,7 @@ class OppdragBackupHandler(BaseBackupHandler):
     # interessant i tidslinjen, ikke i en gjenoppretting av den.
     strip_fields = {
         'oppdrag.Oppdrag': ['opprettet_av', 'historikk_av'],
-        'oppdrag.Statusmelding': ['meldt_av'],
+        'oppdrag.Statusmelding': ['meldt_av', 'trukket_tilbake_av'],
         'oppdrag.Oppdragsenhet': ['varslet_av'],
         'oppdrag.Enhetsbytte': ['byttet_av'],
         'oppdrag.Enhetshendelse': ['av'],

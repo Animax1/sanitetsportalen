@@ -81,7 +81,7 @@
 .status-venter     { background: #64748b; }
 /* «Tildelt» (19. sep. 2026): enheten har fått oppdrag, men ikke rykket ut.
  * En hul grønn ring, ikke en ny farge — paletten er brukt opp (Fremme er
- * blå, Behandlet grønn), og formen skiller seg fra fargen for den som ser
+ * blå, Behandlet rosa), og formen skiller seg fra fargen for den som ser
  * dårlig forskjell på nyanser. */
 .status-tildelt    { background: transparent; border: 2px solid #22c55e; }
 /* «Trenger ny ressurs»: bilen rykket videre, ingen har tatt over. */
@@ -149,7 +149,11 @@
 .status-fremme     { background: #3b82f6; }
 .status-avreist    { background: #8b5cf6; }
 .status-leverer    { background: #06b6d4; }
-.status-behandlet  { background: #10b981; }
+/* Behandlet på sted / Utført er **rosa** (backlog, 22. sep. 2026): den var
+ * `#10b981`, en grønn som ikke lot seg skille fra Ledig på en skjerm. Rosa
+ * finnes ikke ellers på tavla, og ligger langt nok fra rødt til ikke å lese
+ * som alarm. `koLegendeHtml()` bruker klassen, så forklaringen følger med. */
+.status-behandlet  { background: #ec4899; }
 
 /* Enheter som ikke er på vakt dempes, men skjules ikke. Fargen bærer ikke
  * informasjonen alene — teksten «Ikke på vakt» står i kortet. */
@@ -393,8 +397,13 @@
   font-size: 0.8rem;
 }
 
+/* Streken går over tid og status, ikke over notatet: der står hvem som
+ * trakk meldingen tilbake og når (22. sep. 2026) — nettopp det som skal
+ * leses. `line-through` på raden ville arvet ned i notatet. */
 .tidslinje-erstattet {
   color: var(--text-soft);
+}
+.tidslinje-erstattet > span:not(.tidslinje-notat) {
   text-decoration: line-through;
 }
 

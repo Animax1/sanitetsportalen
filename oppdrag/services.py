@@ -59,6 +59,10 @@ ALTERNATIV: dict[str, tuple[str, str]] = {
 #: settet fem, ikke seks, selv om statusene er seks.
 STEMPLBARE: frozenset[str] = frozenset().union(*OVERGANGER.values())
 
+#: Det sentralbordet kan *sette* en enhet til (22. sep. 2026): alt bilen kan
+#: stemple, og `Venter` — helt tilbake til start.
+FOERBARE: frozenset[str] = STEMPLBARE | {choices.VENTER}
+
 
 def kan_gaa_til(fra: str, til: str) -> bool:
     """True hvis overgangen er lovlig.
@@ -473,7 +477,8 @@ def enhetskort(enhet, vakt=None, ledig_siden=None) -> dict:
 def sett_status(oppdrag, ny_status: str, *, bruker=None, tidspunkt=None,
                 forsinket: bool = False, automatisk: bool = False,
                 sted: str = '', enhet=None, manuell: bool = False,
-                avbrutt: bool = False, sted_tekst: str = '') -> Statusmelding:
+                avbrutt: bool = False, sted_tekst: str = '',
+                hopp: bool = False) -> Statusmelding:
     """Skriv en statusmelding og oppdater oppdragets cachede status.
 
     Kaster ``UlovligOvergang`` hvis overgangen ikke står i tabellen. Sjekken
@@ -492,7 +497,11 @@ def sett_status(oppdrag, ny_status: str, *, bruker=None, tidspunkt=None,
     rad = koblingsrad(oppdrag, enhet)
     if rad is None:
         raise UlovligOvergang('Enheten er ikke varslet på oppdraget.')
-    if not kan_gaa_til(rad.status, ny_status):
+    # `hopp` er sentralbordets føring (`foer_status`): KO kan hoppe over ledd
+    # framover, men aldri bakover eller over i den andre grenen. Bilen og
+    # alt annet går gjennom tabellen.
+    lovlig = kan_foeres_til if hopp else kan_gaa_til
+    if not lovlig(rad.status, ny_status):
         raise UlovligOvergang(
             f'Kan ikke gå fra {rad.status!r} til {ny_status!r}.'
         )
@@ -633,8 +642,10 @@ def ledig_siden_bulk(enheter, vakt=None) -> dict:
     ider = [getattr(e, 'pk', e) for e in enheter]
     if not ider:
         return {}
+    # En tilbaketrukket «Ledig» ble aldri stående (22. sep. 2026).
     qs = Statusmelding.objects.filter(
-        status=choices.LEDIG, oppdragsenhet__enhet_id__in=ider)
+        status=choices.LEDIG, oppdragsenhet__enhet_id__in=ider,
+        trukket_tilbake_at__isnull=True)
     if vakt is not None:
         qs = qs.filter(oppdrag__vakt=vakt)
     rader = list(qs.values_list('pk', 'oppdragsenhet__enhet_id', 'tidspunkt'))
@@ -874,8 +885,11 @@ def noen_loste_oppdraget(oppdrag) -> bool:
     En korreksjon erstatter tidspunktet, ikke hendelsen, så `.exists()` er
     riktig spørsmål — `gjeldende()` ville svart det samme og kostet mer.
     """
+    # Men en **tilbaketrukket** Leverer er ikke en jobb som ble gjort: KO
+    # trakk den tilbake fordi den var feil (22. sep. 2026).
     return Statusmelding.objects.filter(
-        oppdrag=oppdrag, status__in=LOSER_OPPDRAGET).exists()
+        oppdrag=oppdrag, status__in=LOSER_OPPDRAGET,
+        trukket_tilbake_at__isnull=True).exists()
 
 
 def trenger_ny_ressurs(oppdrag, *, utenom_rad) -> bool:
@@ -1148,6 +1162,9 @@ def valider_korreksjon(melding, nytt_tidspunkt, naa=None):
     """
     naa = naa or timezone.now()
 
+    if melding.trukket_tilbake_at is not None:
+        raise KorreksjonUgyldig(
+            'Denne meldingen er trukket tilbake. Før statusen på nytt i stedet.')
     if Statusmelding.objects.filter(korrigerer=melding).exists():
         raise KorreksjonUgyldig(
             'Denne meldingen er allerede rettet. Rett den nyeste i stedet.')
@@ -1272,28 +1289,58 @@ def flytt_til_enhet(oppdrag, ny_enhet, *, bruker, fra_enhet=None) -> Enhetsbytte
 KORRIGERBAR_ETTER_LEDIG = 48 * 3600   # sekunder
 
 
-def valider_foering(rad, ny_status: str, tidspunkt, naa=None) -> None:
-    """Kast hvis sentralbordet ikke kan føre ``ny_status`` for raden.
+def _rang(status: str) -> int:
+    """Hvor langt i kjeden en status står — `Venter` 0, `Ledig` sist."""
+    return _REKKEFOLGE.get(status, -1)
 
-    Overgangsreglene gjelder også for operatøren (`UlovligOvergang`): å føre
-    «Avreist» på en bil som står i «Venter» er en feil, ikke en korreksjon —
-    mangler et ledd, føres det først. Tidspunktet (`KorreksjonUgyldig`) må
-    være inntruffet, etter at oppdraget ble opprettet, og etter bilens
-    siste gjeldende melding: en føring bakover i tid er hele poenget, men
-    ikke bak det som alt står.
+
+def _andre_gren(a: str, b: str) -> bool:
+    """«Behandlet på sted» og Avreist/Leverer er to veier ut av `Fremme`, og
+    en enhet går bare den ene."""
+    return {a, b} in ({choices.BEHANDLET, choices.AVREIST},
+                      {choices.BEHANDLET, choices.LEVERER})
+
+
+def kan_foeres_til(fra: str, til: str) -> bool:
+    """Kan sentralbordet føre ``til`` **framover** fra ``fra``?
+
+    Ledd kan hoppes over (backlog, 22. sep. 2026: «KO/administrator bør kunne
+    sette alle statuser»). Leddene imellom står da **uten** tidspunkt — det
+    finner vi ikke på, og en responstid som mangler er ærligere enn en som er
+    diktet. Bakover og over i den andre grenen er ikke en føring, men en
+    tilbaketrekking; se `trekkes_tilbake`.
     """
-    naa = naa or timezone.now()
-    if not kan_gaa_til(rad.status, ny_status):
-        raise UlovligOvergang(
-            f'Kan ikke gå fra {rad.get_status_display()!r} til '
-            f'{choices.STATUS_NAVN.get(ny_status, ny_status)!r}.')
+    if fra not in _REKKEFOLGE or til not in _REKKEFOLGE:
+        return False
+    return _rang(til) > _rang(fra) and not _andre_gren(fra, til)
+
+
+def trekkes_tilbake(status: str, maal: str) -> bool:
+    """Skal en gjeldende melding med ``status`` trekkes tilbake når
+    sentralbordet setter enheten til ``maal``?
+
+    Ja for alt som står **etter** målet, og for den andre grenen. Det som står
+    før målet — og målet selv, om enheten var der — blir stående.
+
+    Behandlet og Avreist deler trinn, men trenger ingen egen regel: de er
+    nettopp den andre grenen. (Mutasjonstestingen 22. sep. 2026 viste at
+    `>=` og `>` her var samme funksjon — den ene sa mer enn den gjorde.)
+    """
+    if status == maal:
+        return False
+    return _rang(status) > _rang(maal) or _andre_gren(status, maal)
+
+
+def _valider_tidspunkt(rad, ny_status: str, tidspunkt, beholdte, naa) -> None:
+    """Tidspunktet for en ny melding: inntruffet, etter opprettelsen, og ikke
+    bak den siste meldingen som blir stående. En føring bakover i tid er hele
+    poenget, men ikke bak det som alt står."""
     if tidspunkt > naa + MINUTTSLAKK:
         raise KorreksjonUgyldig('Tidspunktet kan ikke ligge i framtiden.')
     if tidspunkt < rad.oppdrag.created_at - MINUTTSLAKK:
         raise KorreksjonUgyldig('Tidspunktet er før oppdraget ble opprettet.')
-    egne = Statusmelding.objects.gjeldende_for_enhet(rad)
-    if egne:
-        siste = max(egne, key=lambda m: m.tidspunkt)
+    if beholdte:
+        siste = max(beholdte, key=lambda m: m.tidspunkt)
         if tidspunkt < siste.tidspunkt:
             raise KorreksjonUgyldig(
                 f'«{choices.STATUS_NAVN.get(ny_status, ny_status)}» kan ikke være før '
@@ -1302,95 +1349,92 @@ def valider_foering(rad, ny_status: str, tidspunkt, naa=None) -> None:
 
 
 @transaction.atomic
-def foer_status(oppdrag, enhet, ny_status: str, *, tidspunkt, bruker,
-                sted: str = '', sted_tekst: str = '') -> Statusmelding:
-    """Sentralbordet fører en status for en enhet — et stempel bilen glemte.
+def foer_status(oppdrag, enhet, ny_status: str, *, tidspunkt=None, bruker,
+                sted: str = '', sted_tekst: str = '', naa=None) -> Statusmelding | None:
+    """Sentralbordet setter en enhets status — hvilken som helst av dem.
 
-    Ikke et stempel fra bilen: raden merkes ``manuell`` og ``meldt_av`` er
-    operatøren, så tidslinjen viser «ført av sentralen». Lukker **ikke**
-    bilens andre pågående oppdrag slik `start_oppdrag` gjør: tidspunktet er
-    fortid, og hva bilen gjorde siden er operatørens sak å føre.
-    """
-    rad = koblingsrad(oppdrag, enhet)
-    if rad is None:
-        raise UlovligOvergang('Enheten er ikke varslet på oppdraget.')
-    valider_foering(rad, ny_status, tidspunkt)
-    return sett_status(oppdrag, ny_status, bruker=bruker, tidspunkt=tidspunkt,
-                       sted=sted, sted_tekst=sted_tekst, enhet=rad.enhet, manuell=True)
+    Tre tilfeller, avgjort av hvor målet står:
 
+    * **Framover** (også med hopp): en ny melding, merket ``manuell`` med
+      operatøren som ``meldt_av`` — et stempel bilen glemte. Lukker **ikke**
+      bilens andre pågående oppdrag slik `start_oppdrag` gjør: tidspunktet
+      kan være fortid, og hva bilen gjorde siden er operatørens sak å føre.
+    * **Bakover til en status enheten har hatt**, eller til `Venter`:
+      meldingene etter trekkes tilbake, og ingen ny skrives. Tidspunktet
+      brukes ikke — statusen *hadde* allerede sitt.
+    * **Over i den andre grenen** (Behandlet ↔ Avreist/Leverer): begge
+      deler — grenen trekkes tilbake, og målet føres som ny melding.
 
-def _slett_meldinger(qs) -> int:
-    """Slett statusmeldinger uten å gå på `korrigerer`s PROTECT: rader som
-    peker på dem kobles fra først. Sporet av hva som sto der ligger i
-    revisjonsloggen, som logger slettinger."""
-    ider = list(qs.values_list('pk', flat=True))
-    if not ider:
-        return 0
-    Statusmelding.objects.filter(korrigerer_id__in=ider).update(korrigerer=None)
-    return Statusmelding.objects.filter(pk__in=ider).delete()[0]
+    **Ingenting slettes** (backlog, 22. sep. 2026: «loggen må bevares»).
+    Erstatter «Angre» og «Gjenåpne», som slettet meldingene. `Ledig` eldre
+    enn `KORRIGERBAR_ETTER_LEDIG` trekkes ikke tilbake — da er oppdraget
+    arkivets, ikke tavlas.
 
-
-@transaction.atomic
-def angre_siste_status(oppdrag, enhet, *, bruker=None):
-    """Ta enhetens nåværende status bort, tilbake til den forrige (André,
-    12. sep. 2026: «fjerne nåværende status og ta den tilbake til forrige»).
-
-    **Meldingene for statusen slettes**, med hele rettingshistorikken sin —
-    en korreksjon som pekte på dem ville ellers gjort den gamle raden
-    gjeldende igjen, og statusen sto der fortsatt. Slettingen logges i
-    revisjonsloggen. Den forrige statusen er den høyeste i kjeden som står
-    igjen; er ingen igjen, er det `Venter`. Returnerer meldingen bak den
-    forrige statusen, eller ``None`` for `Venter`.
-    `gjenaapne_enhet` er dette med «Ledig» som status, pluss 48-timersgrensen.
-    """
-    rad = koblingsrad(oppdrag, enhet)
-    if rad is None:
-        raise UlovligOvergang('Enheten er ikke varslet på oppdraget.')
-    if rad.status == choices.VENTER:
-        raise KorreksjonUgyldig('Enheten har ingen status å angre — hun venter.')
-    _slett_meldinger(Statusmelding.objects.filter(oppdragsenhet=rad, status=rad.status))
-    igjen = Statusmelding.objects.gjeldende_for_enhet(rad)
-    if igjen:
-        forrige = max(igjen, key=lambda m: (_REKKEFOLGE.get(m.status, -1), m.tidspunkt))
-        status, melding = forrige.status, forrige
-    else:
-        status, melding = choices.VENTER, None
-    rad.status = status
-    rad.save(update_fields=['status', 'updated_at'])
-    oppdrag.status = utledet_status(oppdrag)
-    felter = ['status', 'updated_at']
-    if oppdrag.status != choices.TERMINAL and oppdrag.historikk_fra is not None:
-        oppdrag.historikk_fra = None
-        oppdrag.historikk_av = None
-        felter += ['historikk_fra', 'historikk_av']
-    oppdrag.save(update_fields=felter)
-    return melding
-
-
-@transaction.atomic
-def gjenaapne_enhet(oppdrag, enhet, *, bruker, naa=None):
-    """Ta en enhets «Ledig» tilbake — innen `KORRIGERBAR_ETTER_LEDIG`.
-
-    `angre_siste_status` med «Ledig» som status, og en grense: etter 48
-    timer er oppdraget arkivets, ikke tavlas. Oppdraget hentes tilbake fra
-    historikken hvis det ikke lenger er ledig.
+    Returnerer den nye meldingen, meldingen bak statusen enheten står i nå,
+    eller ``None`` for `Venter`.
     """
     naa = naa or timezone.now()
     rad = koblingsrad(oppdrag, enhet)
     if rad is None:
         raise UlovligOvergang('Enheten er ikke varslet på oppdraget.')
-    if rad.status != choices.LEDIG:
-        raise KorreksjonUgyldig(
-            f'«{rad.enhet.navn}» er ikke ledig ({rad.get_status_display()}).')
+    if ny_status not in _REKKEFOLGE:
+        raise UlovligOvergang(f'Ukjent status {ny_status!r}.')
+    if ny_status == rad.status:
+        raise UlovligOvergang(
+            f'«{rad.enhet.navn}» står alt i '
+            f'«{choices.status_navn_for(oppdrag.hastegrad, ny_status)}».')
+
     egne = Statusmelding.objects.gjeldende_for_enhet(rad)
-    ledig = next((m for m in reversed(egne) if m.status == choices.LEDIG), None)
-    if ledig is None:
-        raise KorreksjonUgyldig('Fant ingen «Ledig»-melding å ta tilbake.')
-    if (naa - ledig.tidspunkt).total_seconds() > KORRIGERBAR_ETTER_LEDIG:
-        timer = KORRIGERBAR_ETTER_LEDIG // 3600
-        raise KorreksjonUgyldig(
-            f'«Ledig» er eldre enn {timer} timer — oppdraget er arkivets nå.')
-    return angre_siste_status(oppdrag, enhet, bruker=bruker)
+    tilbake = [m for m in egne if trekkes_tilbake(m.status, ny_status)]
+    beholdte = [m for m in egne if m not in tilbake]
+    for m in tilbake:
+        if (m.status == choices.LEDIG
+                and (naa - m.tidspunkt).total_seconds() > KORRIGERBAR_ETTER_LEDIG):
+            raise KorreksjonUgyldig(
+                f'«Ledig» er eldre enn {KORRIGERBAR_ETTER_LEDIG // 3600} timer '
+                f'— oppdraget er arkivets nå.')
+    naar_maalet = ny_status == choices.VENTER or any(m.status == ny_status for m in beholdte)
+    if not naar_maalet:
+        if tidspunkt is None:
+            raise KorreksjonUgyldig('Mangler tidspunkt.')
+        _valider_tidspunkt(rad, ny_status, tidspunkt, beholdte, naa)
+
+    # Alt er prøvd — nå skrives det. Per rad med `save()`, ikke `update()`,
+    # så signalene ser endringen som på alle andre rader.
+    for m in tilbake:
+        m.trukket_tilbake_at = naa
+        m.trukket_tilbake_av = bruker
+        m.save(update_fields=['trukket_tilbake_at', 'trukket_tilbake_av', 'updated_at'])
+    forrige = max(beholdte, key=lambda m: (_rang(m.status), m.tidspunkt), default=None)
+    rad.status = forrige.status if forrige else choices.VENTER
+    rad.save(update_fields=['status', 'updated_at'])
+
+    if not naar_maalet:
+        return sett_status(oppdrag, ny_status, bruker=bruker, tidspunkt=tidspunkt,
+                           sted=sted, sted_tekst=sted_tekst, enhet=rad.enhet,
+                           manuell=True, hopp=True)
+
+    oppdrag.status = utledet_status(oppdrag)
+    felter = ['status', 'updated_at']
+    if oppdrag.status != choices.TERMINAL and oppdrag.historikk_fra is not None:
+        # Tilbake på tavla: et oppdrag som ikke er ferdig hører ikke hjemme i
+        # historikken.
+        oppdrag.historikk_fra = None
+        oppdrag.historikk_av = None
+        felter += ['historikk_fra', 'historikk_av']
+    oppdrag.save(update_fields=felter)
+    return forrige
+
+
+def _slett_meldinger(qs) -> int:
+    """Slett statusmeldinger uten å gå på `korrigerer`s PROTECT: rader som
+    peker på dem kobles fra først. Brukes bare når hele oppdraget slettes —
+    en status som skal bort *trekkes tilbake* (`foer_status`)."""
+    ider = list(qs.values_list('pk', flat=True))
+    if not ider:
+        return 0
+    Statusmelding.objects.filter(korrigerer_id__in=ider).update(korrigerer=None)
+    return Statusmelding.objects.filter(pk__in=ider).delete()[0]
 
 
 @transaction.atomic

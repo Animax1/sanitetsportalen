@@ -131,16 +131,8 @@ ingen av dem gir feilmelding — de er bare stille inaktive.
       til hver jobb har kjørt én gang etter deployen — sjekk igjen dagen etter at de tre
       viser ✓.
 
-- [ ] **Kjør `scripts/sikkerhetssjekk.py` mot staging** med admin-, leser- og
-      enhetskonto, og lim inn rapporten. Runbook §14. Den prøver portalen *utenfra*, som
-      suiten aldri gjør.
-
 - [ ] **Backup: test de fem handlerne på staging**, så «Backup tatt — push til main», og
       prodtest 8.2/8.3 etter deployen.
-
-- [ ] **Sjekk på telefonen at ingen kolonne følger med når du scroller** (vaktlista,
-      under 768 px). Gjør den fortsatt det, er det ikke `position: sticky` som er
-      årsaken, og da trengs et skjermbilde.
 
 - [ ] **Bekreft cron-radnivået med egne øyne ved anledning:**
       `railway ssh --service web -- python manage.py shell -c "from core.models import Notification; print(Notification.objects.count())"`
@@ -152,6 +144,26 @@ ingen av dem gir feilmelding — de er bare stille inaktive.
 *De tre vaktlisteønskene under henger sammen — to av dem trenger samme dagruppering.
 Sammenhengen, rekkefølgen og de åpne valgene står i
 [`docs/FORSLAG_VAKTLISTE_UTBEDRINGER.md`](./docs/FORSLAG_VAKTLISTE_UTBEDRINGER.md).*
+
+### Oppdraget: endre verdier uten «Rediger» — backlog, 22. sep. 2026
+
+To innspill fra backloggen i portalen, som André vil se på etter menyen, fargen og
+statusføringen (levert 22. sep., se CHANGELOG). **Det gjelder inne på oppdraget**, ikke
+lista (André).
+
+- [ ] **Hastegrad, problemstilling, lokasjon og tildelt ressurs direkte i oppdraget**, uten
+      «Rediger» — «klikke på disse verdiene … gir en liten dropdown for de andre valgene».
+      Én mekanisme (klikk → nedtrekk → lagre ett felt), bygget én gang. Serveren er klar:
+      `PUT /oppdrag/api/oppdrag/<pk>/` tar ett felt om gangen. Tre ting å løse:
+      **hastegrad og problemstilling henger sammen** (`_valider_problemstilling_og_antall`)
+      — et bytte av hastegrad må be om problemstilling når den gamle ikke passer; **tildelt
+      ressurs** gir bare mening med null eller én enhet, ellers er det «Flytt»; og
+      endringen bør synes i oppdragets tidslinje, så et feilklikk ikke er stille.
+- [ ] **Beskrivelsen synlig uten «Rediger».** Oppdragsnotatet vises alt i `visOppdrag()`
+      når det står tekst i det — avklar med André hvilken tekst han ikke ser.
+- [ ] **Senere, om ønsket: det samme i lista.** Tre feller vinduet ikke har: tavla tegnes
+      på nytt ved hver polling (et åpent nedtrekk forsvinner), hele raden er en knapp som
+      åpner oppdraget, og et feilklikk på en travel tavle endrer et oppdrag stille.
 
 ### Vaktlista: fjern «Sett i drift», la drift følge vakta — ønsket 14. sep. 2026
 

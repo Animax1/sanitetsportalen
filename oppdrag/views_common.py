@@ -246,6 +246,11 @@ def melding_til_dict(melding) -> dict:
         # Ført av sentralbordet (§9), ikke stemplet av bilen.
         'manuell': melding.manuell,
         'korrigerer': melding.korrigerer_id,
+        # Trukket tilbake av sentralbordet (22. sep. 2026). Raden står i
+        # tidslinjen, gjennomstreket, med hvem og når — den slettes ikke.
+        'trukket_tilbake_at': (melding.trukket_tilbake_at.isoformat()
+                               if melding.trukket_tilbake_at else None),
+        'trukket_tilbake_av': getattr(melding.trukket_tilbake_av, 'username', '') or '',
         # «Avreist → Sykehus». Tom for alle andre statuser.
         'sted': melding.sted,
         'sted_tekst': melding.sted_tekst,
