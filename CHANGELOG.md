@@ -80,6 +80,14 @@ før» — det gjør den ikke lenger. Rettet innenfor taket (22 647 av 22 650 te
 dublerende kryssreferanse strøket. `TEKNISK_DOKUMENTASJON.md`: 159 ruter, 32 under
 `/oppdrag/`.
 
+## 2026-09-22 — TODO: det som gjenstår etter 21. sep. skrevet ned  `#core/dokumentasjon`
+
+Pulje 7d står med det som *er* bestemt (S6/S7, nedlasting som HTML, minst mulig
+personopplysninger, aktiv vakt) og det ene åpne valget (`les_alle` med etikett eller nytt
+`les_leder`), så det ikke må tas opp igjen. To nye punkter: pause KOs polling når fana er
+skjult, og «Til» i «Flytt oppdrag» som fortsatt tilbyr opptatte biler. Det gamle «Pulje 7
+— avventes, haster ikke» fra 18. sep. er slettet: 7a–7c er bygget.
+
 ## 2026-09-21 — Vinduer kan skjules, loggstrømmen filtreres, og avvent klonet enheten  `#ko/oppsett` `#ko/loggen` `#oppdrag/statusmaskin` `#oppdrag/sentralbord`
 
 Sju punkter fra André, 21. sep. 2026.

@@ -633,13 +633,38 @@ Modulens egne regler står i [`ko/CLAUDE.md`](./ko/CLAUDE.md). `/oppdrag/` snevr
 enhetens egen skjerm, og **sentralbordet flytter til KO** — en flytting av
 `oppdrag-sentral-*.js`, ikke en kopi. Puljene står i §10.
 
-- [ ] **Pulje 7 — statistikk fra KO.** Forslaget står i
-      [`docs/FORSLAG_KO_STATISTIKK.md`](./docs/FORSLAG_KO_STATISTIKK.md) (21. sep. 2026).
-      **7a (KO-fanen), 7b (oppdragsfanen) og 7c (bemanning) er bygget** samme dag. Igjen:
-      **7d** tidslinje og vaktrapport — sammenligning mellom vakter er «ikke per nå»
-      (André, 21. sep.). Utskriften av loggen bør bygges sammen med vaktrapporten. Åpent:
-      skal rapporten kunne lages for en arkivert vakt (KO-loggen arkiveres aldri)? `HendelseLag.til` ble ikke lagt til: lagene leses av
-      systemlinjene, og et `til`-felt rører hvem tavla viser som «på hendelsen nå».
+- [ ] **Pulje 7d — tidslinje og vaktrapport.** Det siste av pulje 7; 7a, 7b og 7c ble
+      bygget 21. sep. 2026 etter [`docs/FORSLAG_KO_STATISTIKK.md`](./docs/FORSLAG_KO_STATISTIKK.md).
+      «Vi skal ikke ta noe fra 7d enda» (André, 21. sep.) — men det som *er* bestemt, står
+      her, så det ikke må tas opp igjen:
+      - **Skissene er valgt:** S6, en tidslinje i KO-fanen med rader for hendelser, oppdrag
+        og lag, tegnet som SVG uten nytt bibliotek; og S7, vaktrapporten som en
+        server-rendret side med seks seksjoner og loggen inne i rapporten. Bare aktiv vakt.
+      - **Rapporten lastes ned via en knapp** (André), som en selvbærende HTML-fil — ikke
+        PDF, som hadde krevd et bibliotek for en side nettleseren alt kan skrive ut.
+      - **«Minst mulig personopplysninger»** (André): ingen mannskapsnavn, telefon eller
+        ISSI; problemstilling bare som kategori; ingen «generert av» eller «lukket av»;
+        operatørnavnene i loggen bak en avkryssing som er av som standard.
+      - **Tilgangen er åpen, og besvares når 7d tas opp:** André foreslo et nytt trinn
+        `les_leder`. Anbefalingen er å gjenbruke `les_alle` med modulens egen etikett
+        («Lese: vaktrapport», `Module.nivaa_navn`) — et nytt trinn i stigen er additivt,
+        men det er én matrise, én profil og én dekoratør til å holde i live for ett
+        endepunkt. Sammenligning mellom vakter er «ikke per nå».
+      - Åpent: skal rapporten kunne lages for en arkivert vakt (KO-loggen arkiveres aldri)?
+      - `HendelseLag.til` ble ikke lagt til: lagene leses av systemlinjene, og et
+        `til`-felt rører hvem tavla viser som «på hendelsen nå».
+
+- [ ] **Pause KOs polling når fana er skjult** (`document.hidden`). Tilbudt 21. sep. 2026
+      da André spurte hvor ofte vinduene polles: loggstrømmen hvert 15. sekund, ressursene
+      og tavla hvert 30., sidebaren hvert 30. når den er åpen. En fane i bakgrunnen holder
+      fire pollere gående for ingen; `visibilitychange` kan stanse dem og hente alt idet
+      fana kommer tilbake. Liten jobb, men rører alle fire klokkene — og `koSisteId`
+      gjør at loggen tar igjen det tapte av seg selv.
+
+- [ ] **«Til» i «Flytt oppdrag» tilbyr også opptatte biler.** Vurdert 21. sep. 2026 og
+      *ikke* gjort: André ba bare om «Fra». I dag kan et oppdrag flyttes til en bil som
+      står Fremme på et annet, uten at noe sier fra til den andre tavla. Svar når det
+      dukker opp på en vakt — filteret er én linje i `_flyttValg`, `e.status === 'ledig'`.
 
 - [ ] **Fjerne sentralbordet fra `/oppdrag/`** — «avvente inntil videre, men noe å se på»
       (André, 19. sep. 2026), og fra 18. sep.: «når KO er prøvd på en ekte vakt». Notatet §7
@@ -747,15 +772,6 @@ levert 18. sep. 2026 — se CHANGELOG. Filteret ble til minimering etter André.
       sier bare det vaktlista vet: hvem, og om de er møtt. Spørsmålet om hva en status skal
       hete (punktet over) er blitt mer synlig, ikke mindre — når noen ser «Lag 3 · 2 av 3
       møtt» og vil skrive «sendt til H12», er det dette som mangler.
-
-- [ ] **Pulje 7 — statistikk. Avventes, haster ikke** (André, 18. sep. 2026). Neste vakt
-      er ca. 250 dager fram, og notatet §8 sier puljen «trenger data fra en ekte vakt
-      først» — tallene (hendelser per vakt, varighet, ressursbruk, tid til første ressurs,
-      løst uten utrykning) skal formes av hva en vakt faktisk gir, ikke av en gjetning.
-      Tas opp etter første ekte vakt på `/ko/`. `ko` melder seg da inn i kilderegisteret i
-      `core/stats.py`. **Ordvalget er det eneste som hindrer feilen:** «registreringer»,
-      ikke «pasienter», på alt som krysser registergrensene — ingen leser metodikken før
-      de siterer tallet.
 
 - [ ] **Delt konto skal bare kunne ha `ModulTilgang` til `oppdrag`.** `er_delt_konto` finnes
       og styrer e-post, MFA og selvbetjent reset; den avgrenser ikke modultilgang. Håndheves
