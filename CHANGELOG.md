@@ -4,6 +4,16 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-22 — KO-tavla: pauser planlegges i Pause-raden  `#ko/oppsett`
+
+André: «la oss kunne sette en pause rad og legge inn pauser der for lagene. Som skal
+overstyres av /vaktliste men kunne endres på i drift og hvis lag ikke har fått planlagt
+pause i /vaktliste.» Regelen i TODO: **vaktlista er utgangspunktet, KOs endring i drift
+vinner**, merket «endret i drift», og KO kan planlegge for lag vaktlista ikke har gitt
+pause. Skisse 2 viser det: «+ Planlegg» i Pause-raden, klikk på en planlagt pause for å
+endre eller fjerne, farger per kilde (vaktliste, KO, endret i drift), og «Pause nå» på
+laget når tiden er inne — KO starter den; tavla flytter ingen av seg selv.
+
 ## 2026-09-22 — KO-tavla: svarene på skissene, og avtalte pauser i TODO  `#ko/oppsett` `#core/dokumentasjon`
 
 André svarte på de fire spørsmålene skissene reiste: **Pause** er en fast rad øverst;

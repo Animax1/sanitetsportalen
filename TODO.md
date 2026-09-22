@@ -171,6 +171,7 @@ André 22. sep. 2026, før koden:**
 | Når hendelsen lukkes | Laget går til **«Uten plass»**, og det er en **egen kolonne** på tavla. Den er også et slippmål: dra et lag dit, så avsluttes plasseringen |
 | Fulgte steder (★), lokasjonene på tavla | KO-lederens innstilling (`skriv_leder`), fane «Tavla» i KO-innstillinger. KO eier avkryssingene, ikke lokasjonene |
 | Filteret | Bygges fra `vaktliste.Ressursgruppe`, ikke fire faste valg |
+| Planlagte pauser | **KO kan planlegge pauser i Pause-raden** for lag, også lag uten avtalt pause i vaktlista. **Vaktlista er utgangspunktet**: en avtalt pause derfra står der av seg selv. **KO kan endre den i drift**, og da gjelder KOs versjon resten av vakta, merket «endret i drift» — vaktlista overstyrer den ikke lenger. Når pausen er her, får laget «Pause nå»; KO starter den, tavla flytter ingen av seg selv |
 
 - [ ] **Bygg tavla** etter skissene. Egen modell i `ko` som peker på
       `vaktliste.Ressurs` og `oppdrag.Lokasjon` med navnene frosset (som `HendelseLag`,
@@ -186,8 +187,10 @@ André 22. sep. 2026, før koden:**
       (`services._hviletider()`), men ingen pauser *i* et skift. Tavla viser en avtalt
       pause stiplet i Pause-raden (skisse 2); når laget faktisk går, er det en vanlig
       plassering i raden. Retningen er `ko` → `vaktliste`, som resten av ressursbildet.
-      Åpent når punktet tas opp: pause per plass eller per ressurs, og om den teller i
-      timene.
+      **Tavla bygges ikke på denne:** KO planlegger pauser selv fra første versjon, og
+      vaktlistas pauser kobles på som utgangspunktet når de finnes (se regelen under
+      KO-tavla). Åpent når punktet tas opp: pause per plass eller per ressurs, og om den
+      teller i timene.
 
 ### KO: «Avbrutt» i sentralbordets nedtrekk — bestilt 22. sep. 2026
 
