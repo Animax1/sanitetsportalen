@@ -145,6 +145,43 @@ ingen av dem gir feilmelding — de er bare stille inaktive.
 Sammenhengen, rekkefølgen og de åpne valgene står i
 [`docs/FORSLAG_VAKTLISTE_UTBEDRINGER.md`](./docs/FORSLAG_VAKTLISTE_UTBEDRINGER.md).*
 
+### KO-tavla — skisser 22. sep. 2026, bygges når André har sett dem
+
+Tavla på veggen i KO digitalt: lokasjoner som rader, tid som kolonner, lagene plassert
+i rutene. Skissene ligger i Artifact «KO-tavla — skisser» (fem artboards). **Svarene fra
+André 22. sep. 2026, før koden:**
+
+| Spørsmål | Svar |
+|---|---|
+| Plass i `/ko/` | **Bytter plass med Ressursoversikten**, ikke oppdragslista. Den skjulte står alltid i stripa |
+| Radene | **Oppdragsmodulens lokasjoner** (`oppdrag.Lokasjon`) |
+| Hvem kan plasseres | **Bare ledige.** Den som er på hendelse eller oppdrag står på tavla som det, og den har forrang |
+| Hendelse/oppdrag | Vises på tavla, merket «På H14» / «O12 Fremme», ved lokasjonen hendelsen eller oppdraget har |
+| «Ikke vært» | Per vakt **og** antall per døgn: «Lag 1 var 3 ganger fredag, 0 lørdag» |
+| Tidsvinduet | **Admininnstilling, 12–24 timer** |
+| Retting i etterkant | Ja |
+| Hvem flytter | Alle med KO-skrivetilgang (`skriv_full`) |
+| Filter | Alle, og per type — Lag, Spesiallag, Mannskapsbil, Ambulanse |
+
+- [ ] **Avklar det skissene foreslår, før koden:** «Pause» som fast rad og ikke en
+      lokasjon (ellers står den som sted i «Nytt oppdrag»); fulgte steder (★) og hvilke
+      lokasjoner som står på tavla som KOs egen innstilling; døgnet regnet fra 06:00;
+      filteret bygget fra `vaktliste.Ressursgruppe` og ikke fire faste valg; og hva som
+      skjer når en hendelse lukkes — går laget tilbake til sin forrige plass, eller står
+      det uten plass?
+- [ ] **Bygg tavla** etter skissene. Egen modell i `ko` som peker på
+      `vaktliste.Ressurs` og `oppdrag.Lokasjon` med navnene frosset (som `HendelseLag`,
+      strippet i backupen); dra og slipp med pekerhendelser, så det virker på nettbrett,
+      og klikk-så-rad som alternativ. `KO_VINDUER` i `ko-layout.js` må kjenne et femte
+      vindu. Flaten dokumenteres i `templates/ko/CLAUDE.md`.
+
+### KO: «Avbrutt» i sentralbordets nedtrekk — bestilt 22. sep. 2026
+
+- [ ] **KO skal kunne føre «Avbrutt» for en enhet i Rykker ut eller Fremme**, når bilen
+      melder det på samband. I dag kan KO bare sette «Ledig»: da føres det ikke som
+      avbrutt, og oppdraget blir ikke flagget «trenger ny ressurs». Samme regel som bilen
+      (`services.AVBRYT_FRA`, `avbryt_oppdrag`), med operatøren som den som meldte.
+
 ### Oppdraget: endre verdier uten «Rediger» — backlog, 22. sep. 2026
 
 To innspill fra backloggen i portalen, som André vil se på etter menyen, fargen og
@@ -361,20 +398,15 @@ nettleser.
       finnes bare der — `readonly` er uten virkning på `datetime-local`, og Safari
       ignorerer `color` på et deaktivert felt. Funn føres i CHANGELOG med byggnummer.
 
-### Del `ko/CLAUDE.md` og `oppdrag/CLAUDE.md` — de er på taket (21. sep. 2026)
+### Del `oppdrag/CLAUDE.md` — den er på taket (21. sep. 2026)
 
-- [ ] **Begge modulfilene sprengte 22 000-taket 21. sep. 2026, og taket ble hevet i
-      `core/tests_claude_md.py` som en midlertidig avgjørelse — ikke som svaret.**
-      KO-fila sto 12 tegn under grensa og oppdragsfila 11, så én kveld med sju punkter
-      fra André kostet fire runder med å barbere prosa andre steder bare for å få plass
-      til tre nye regler. Ekte dubletter ble slått sammen underveis («bare når satt» sto
-      to steder i oppdragsfila, «feature parity» hadde egen overskrift over samme poeng
-      som åpnet sentralbordseksjonen i KO-fila, leveranselista i KO-innledningen gjentok
-      CHANGELOG), og det holdt ikke.
-      Rettingen er den samme som rota fikk 15. sep. 2026: **del filene**. KO-fila har
-      allerede tydelige kandidater — hendelsesloggen som egen flate (3 968 tegn),
-      sentralbordet i `/ko/`, og rutenettet — og oppdragsfila har frontendseksjonen
-      (5 194 tegn). Tallene i `FOR_STORE_I_DAG` skal **ned** etterpå, ikke stå.
+- [ ] **Oppdragsfila sprengte 22 000-taket 21. sep. 2026, og taket ble hevet i
+      `core/tests_claude_md.py` som en midlertidig avgjørelse — ikke som svaret.** Den
+      står 3 tegn under det hevede taket, så neste regel møter veggen. KO-fila ble delt
+      22. sep. 2026 (se CHANGELOG): flaten til `templates/ko/CLAUDE.md`, som lastes når
+      noen arbeider i `templates/ko/`. **Samme grep passer her** — oppdragsfila har
+      frontendseksjonen (5 194 tegn), og `templates/oppdrag/` er der begge grensesnittene
+      bor. Flytt, ikke skriv om, og la tallet i `FOR_STORE_I_DAG` gå ned etterpå.
 
 ### Teknisk gjeld — kartlagt 13. sep. 2026
 

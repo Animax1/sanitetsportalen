@@ -55,6 +55,7 @@ DOKUMENTER = [
     'vaktliste/CLAUDE.md',
     'statistikk/CLAUDE.md',
     'ko/CLAUDE.md',
+    'templates/ko/CLAUDE.md',
     'backlog/CLAUDE.md',
     'docs/DEPLOY_GUIDE.md',
     'docs/RUNBOOK_VAKT.md',

@@ -82,11 +82,9 @@ python manage.py create_admin --username admin --password "bytt-meg"
 # Kjøre lokalt
 python manage.py runserver           # http://127.0.0.1:8000/
 
-# Tester – hele suiten. **`myproject` skal med** (14. sep. 2026): den bærer 32
-# tester på databasevalg, cache, `_env_bool`, statiske filer og migrasjoner —
-# altså vaktene rundt «DATABASE_URL må være PostgreSQL på Railway» og den
-# `_env_bool` som hadde rate-limitingen av i prod. Lista her utelot den, så den
-# som fulgte dokumentasjonen kjørte dem aldri.
+# Tester – hele suiten. **`myproject` skal med** (14. sep. 2026): den bærer
+# settings-vaktene — PostgreSQL på Railway, `_env_bool` som hadde rate-limitingen
+# av i prod. Lista her utelot den, og da kjørte ingen dem.
 python manage.py test patients accounts audit core statistikk oppdrag vaktliste ko backlog myproject -v 2
 
 # Samme suite, men delt. **190 s → ~106 s** (målt 16. sep. 2026, fire kjerner).
@@ -172,6 +170,7 @@ eller gjelder den alle, står den her; ligger den i en app, står den i appens e
 | `vaktliste/CLAUDE.md` | `vaktliste/` | Korps og reservasjoner, skift, drift, planleggeren, offline |
 | `statistikk/CLAUDE.md` | `statistikk/` | Kilderegisteret og de to gatene |
 | `ko/CLAUDE.md` | `ko/` | Retningen oppover, projeksjonen, sidebaren, nivåene per pulje |
+| `templates/ko/CLAUDE.md` | `templates/ko/` | KOs flate: vinduene, ressursoversikten, sentralbordet i `/ko/` |
 | `backlog/CLAUDE.md` | `backlog/` | Angrefristen, de tre nivåene, hvorfor modulen står utenfor vaktscopet |
 
 **Modulfilene lastes ikke alltid, og det er hele poenget — men det koster noe.** Rota leses
@@ -767,7 +766,7 @@ håndhever det på cellebredden.
 | `oppdrag-sentral-*.js` (fire) | `/oppdrag/`, kontoer uten enhet | `oppdrag/CLAUDE.md` |
 | `oppdrag-enhet.js` | `/oppdrag/`, enhetskontoer | `oppdrag/CLAUDE.md` |
 | `vaktliste-*.js` (seks) | **kun** `/vaktliste/` | `vaktliste/CLAUDE.md` |
-| `ko-*.js` | **kun** `/ko/` | `ko/CLAUDE.md` |
+| `ko-*.js` | **kun** `/ko/` | `templates/ko/CLAUDE.md` |
 | `backlog.js` | **kun** `/backlog/` | `backlog/CLAUDE.md` |
 
 **`data-action` + `data-hendelse` er to lyttere, og bare én skal fyre.** Klikk­delegeringen

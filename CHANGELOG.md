@@ -4,6 +4,31 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-22 — `ko/CLAUDE.md` delt: flaten til `templates/ko/CLAUDE.md`, og skisser av KO-tavla  `#core/dokumentasjon` `#ko/oppsett`
+
+**KO-fila var på taket** (22 249 av 22 300 tegn etter at taket ble hevet 21. sep.), og
+tavla kommer med et avsnitt til. André: «ko/claude.md finn en god løsning og løs det.»
+
+**Delingen følger når fila lastes.** Claude Code laster en CLAUDE.md når noen arbeider i
+mappa den står i. Modellene og reglene — retningen, nivåene, loggen, hendelsene — står
+igjen i `ko/CLAUDE.md` (15 455 tegn). **Flaten** — vinduene, rutenettet, hendelsesloggen i
+nettleseren, ressursoversikten og sentralbordet i `/ko/` — er flyttet til
+`templates/ko/CLAUDE.md` (7 494), fordi vinduer og knapper endres i `templates/ko/`.
+Flyttet, ikke skrevet om: hver ikke-tom linje fra før står i en av de to filene
+(kontrollert med skript). `static/js/ko-*.js` laster ingen av dem, som før; flatefila sier
+det i ingressen, og rotas frontend-tabell peker dit.
+
+**Vaktene kjenner flatefila** (`core/tests_claude_md.py`): `_modulfiler()` tar med
+`templates/<app>/CLAUDE.md`, så den må stå i `DOKUMENTER`, i tabellen i rota og under
+taket som modulfilene — ellers hadde delingen vært en vei rundt alle tre reglene.
+`ko/CLAUDE.md` er ute av `FOR_STORE_I_DAG`. Tre mutanter på vaktene, alle drept. Rota fikk
+plass til raden ved å korte kommentaren om `myproject` i kommandoblokka.
+
+**Skisser av KO-tavla** (`#ko/oppsett`), før koden, som André ba om: Artifact «KO-tavla —
+skisser» med fem artboards — `/ko/` med tavla på ressursoversiktens plass, tavla i detalj
+med dra og slipp og klikk-så-rad, retting av en plassering, «Besøk» per lokasjon og døgn,
+og innstillingene. Svarene hans og det som gjenstår å avklare står i TODO.
+
 ## 2026-09-22 — Bilen kan avbryte også i Fremme, og «Dashboard» er borte fra menyen  `#oppdrag/enhetsskjerm` `#oppdrag/statusmaskin` `#core/grensesnitt`
 
 **Avbryt gjelder fra Rykker ut til og med Fremme** (`#oppdrag/statusmaskin`). André: «avbrutt

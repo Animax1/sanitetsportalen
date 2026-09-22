@@ -83,8 +83,8 @@ FOR_STORE_I_DAG: dict[str, int] = {
     # fila kortere og dokumentasjonen dårligere. Se `TODO.md` for hva som
     # faktisk kan gjøres: seksjonene er nå små nok til å vurderes hver for seg.
     'vaktliste/CLAUDE.md': 56_900,
-    # 22 249 og 22 615 tegn 21. sep. 2026. **Begge var på taket, og det er
-    # taket som gjorde jobben sin:** `ko/CLAUDE.md` sto 12 tegn under 22 000
+    # 22 615 tegn 21. sep. 2026, og `ko/CLAUDE.md` 22 249. **Begge var på
+    # taket, og det er taket som gjorde jobben sin:** `ko/CLAUDE.md` sto 12 tegn under 22 000
     # og `oppdrag/CLAUDE.md` 11, så kvelden med sju punkter fra André kostet
     # fire runder med å barbere prosa andre steder i filene for å få plass til
     # tre nye regler.
@@ -101,7 +101,10 @@ FOR_STORE_I_DAG: dict[str, int] = {
     # Tallene er dagens størrelse pluss den samme slakken vaktlistefila har,
     # så de kan krympe og ikke vokse — den neste som trenger plass møter
     # samme vegg, og da er delingen svaret.
-    'ko/CLAUDE.md': 22_300,
+    #
+    # **KO-fila er delt** (22. sep. 2026): flaten — vinduene, rutenettet,
+    # ressursoversikten, sentralbordet i `/ko/` — til `templates/ko/CLAUDE.md`,
+    # og raden er borte herfra. Oppdragsfila står igjen.
     'oppdrag/CLAUDE.md': 22_650,
 }
 
@@ -140,16 +143,33 @@ RAD_TEGNGRENSE = 200
 #: skal dekkes fra dagen den finnes, og en håndholdt liste forfaller i stillhet.
 FILNAVN = re.compile(r'`([A-Za-z0-9_./*-]+\.(?:js|css|py|html))`')
 
-#: Raden i tabellen «Hvor dokumentasjonen bor».
-TABELLRAD = re.compile(r'^\|\s*`([a-z_]+/CLAUDE\.md)`\s*\|', re.M)
+#: Raden i tabellen «Hvor dokumentasjonen bor». `templates/ko/CLAUDE.md` er
+#: modulens *flatefil* (22. sep. 2026), og står i tabellen som de andre.
+TABELLRAD = re.compile(r'^\|\s*`((?:templates/)?[a-z_]+/CLAUDE\.md)`\s*\|', re.M)
 
 #: `### Vaktlistemodulen (vaktliste/)` — et avsnitt som har en modul som subjekt.
 MODULOVERSKRIFT = re.compile(r'^#{1,4} .*\(([a-z_]+)/\)', re.M)
 
 
 def _modulfiler() -> list[str]:
-    """Hver `<app>/CLAUDE.md` som finnes, som sti fra rota."""
-    return sorted(f'{p.parent.name}/CLAUDE.md' for p in ROT.glob('*/CLAUDE.md'))
+    """Hver `<app>/CLAUDE.md` og `templates/<app>/CLAUDE.md` som finnes, som
+    sti fra rota.
+
+    Den andre formen er **flatefila** (22. sep. 2026, da `ko/CLAUDE.md` ble
+    delt): Claude Code laster en CLAUDE.md når noen arbeider i mappa den står
+    i, og vinduene, knappene og rutenettet endres i `templates/<app>/`. Den
+    skal kontrolleres, føres opp og holdes under taket som modulfilene — ellers
+    var delingen en vei rundt alle tre reglene.
+    """
+    moduler = [f'{p.parent.name}/CLAUDE.md' for p in ROT.glob('*/CLAUDE.md')]
+    flater = [f'templates/{p.parent.name}/CLAUDE.md' for p in ROT.glob('templates/*/CLAUDE.md')]
+    return sorted(moduler + flater)
+
+
+def _app(sti: str) -> str:
+    """Hvilken app en modul- eller flatefil hører til."""
+    deler = sti.split('/')
+    return deler[1] if deler[0] == 'templates' else deler[0]
 
 
 class ModulfileneErMedTests(SimpleTestCase):
@@ -195,7 +215,7 @@ class RotaBeskriverRammeverketTests(SimpleTestCase):
         """`### Vaktlistemodulen (vaktliste/)` i rota betyr at avsnittet er
         skrevet to steder — eller flyttet tilbake."""
         rot = (ROT / 'CLAUDE.md').read_text(encoding='utf-8')
-        har_egen_fil = {s.split('/')[0] for s in _modulfiler()}
+        har_egen_fil = {_app(s) for s in _modulfiler()}
         funn = sorted({a for a in MODULOVERSKRIFT.findall(rot) if a in har_egen_fil})
         self.assertEqual(
             funn, [],
@@ -246,7 +266,7 @@ class RotaKartleggerBareTests(SimpleTestCase):
         slik at en ny modul er dekket fra dagen den har en fil.
         """
         stamme = navn.split('/')[-1].rsplit('.', 1)[0]
-        for app in (s.split('/')[0] for s in _modulfiler()):
+        for app in {_app(s) for s in _modulfiler()}:
             if stamme == app or stamme.startswith(app + '-'):
                 return app
         return None
