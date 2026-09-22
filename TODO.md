@@ -163,17 +163,31 @@ André 22. sep. 2026, før koden:**
 | Hvem flytter | Alle med KO-skrivetilgang (`skriv_full`) |
 | Filter | Alle, og per type — Lag, Spesiallag, Mannskapsbil, Ambulanse |
 
-- [ ] **Avklar det skissene foreslår, før koden:** «Pause» som fast rad og ikke en
-      lokasjon (ellers står den som sted i «Nytt oppdrag»); fulgte steder (★) og hvilke
-      lokasjoner som står på tavla som KOs egen innstilling; døgnet regnet fra 06:00;
-      filteret bygget fra `vaktliste.Ressursgruppe` og ikke fire faste valg; og hva som
-      skjer når en hendelse lukkes — går laget tilbake til sin forrige plass, eller står
-      det uten plass?
+**Og avklart 22. sep. 2026, etter skissene:**
+
+| Spørsmål | Svar |
+|---|---|
+| Pause | **Fast rad øverst**, ikke en lokasjon — ellers står «Pause» som sted i «Nytt oppdrag» |
+| Når hendelsen lukkes | Laget går til **«Uten plass»**, og det er en **egen kolonne** på tavla. Den er også et slippmål: dra et lag dit, så avsluttes plasseringen |
+| Fulgte steder (★), lokasjonene på tavla | KO-lederens innstilling (`skriv_leder`), fane «Tavla» i KO-innstillinger. KO eier avkryssingene, ikke lokasjonene |
+| Filteret | Bygges fra `vaktliste.Ressursgruppe`, ikke fire faste valg |
+
 - [ ] **Bygg tavla** etter skissene. Egen modell i `ko` som peker på
       `vaktliste.Ressurs` og `oppdrag.Lokasjon` med navnene frosset (som `HendelseLag`,
       strippet i backupen); dra og slipp med pekerhendelser, så det virker på nettbrett,
       og klikk-så-rad som alternativ. `KO_VINDUER` i `ko-layout.js` må kjenne et femte
       vindu. Flaten dokumenteres i `templates/ko/CLAUDE.md`.
+
+### Vaktlista: avtalte pauser — ønsket 22. sep. 2026
+
+- [ ] **Avtalte pauser i vaktlista, som tavla i `/ko/` henter.** André: «vi har planer om
+      å hente avtalte pauser fra /vaktliste som er en funksjon som ikke er lagt inn enda».
+      Kontrollert 22. sep. 2026: vaktlista har **hviletid mellom skift**
+      (`services._hviletider()`), men ingen pauser *i* et skift. Tavla viser en avtalt
+      pause stiplet i Pause-raden (skisse 2); når laget faktisk går, er det en vanlig
+      plassering i raden. Retningen er `ko` → `vaktliste`, som resten av ressursbildet.
+      Åpent når punktet tas opp: pause per plass eller per ressurs, og om den teller i
+      timene.
 
 ### KO: «Avbrutt» i sentralbordets nedtrekk — bestilt 22. sep. 2026
 

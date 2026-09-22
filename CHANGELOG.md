@@ -4,6 +4,17 @@ Nyeste endringer øverst. Legg til ny seksjon med `## YYYY-MM-DD` ved hver arbei
 
 ---
 
+## 2026-09-22 — KO-tavla: svarene på skissene, og avtalte pauser i TODO  `#ko/oppsett` `#core/dokumentasjon`
+
+André svarte på de fire spørsmålene skissene reiste: **Pause** er en fast rad øverst;
+**når hendelsen lukkes** går laget til **«Uten plass»**, som skal være en egen kolonne;
+fulgte steder og lokasjonene på tavla er KO-lederens innstilling; filteret bygges fra
+ressursgruppene i vaktlista. Skisse 2 er oppdatert: «Uten plass» er slippmål (dra dit for
+å avslutte en plassering), en demoknapp lukker H14 og viser Lag 3 flytte dit med
+hendelsens tid som stiplet historikk, og en avtalt pause står stiplet i Pause-raden.
+**Avtalte pauser i vaktlista** er ført i TODO — funksjonen finnes ikke; vaktlista har
+hviletid mellom skift (`_hviletider()`), ikke pauser i et skift.
+
 ## 2026-09-22 — `ko/CLAUDE.md` delt: flaten til `templates/ko/CLAUDE.md`, og skisser av KO-tavla  `#core/dokumentasjon` `#ko/oppsett`
 
 **KO-fila var på taket** (22 249 av 22 300 tegn etter at taket ble hevet 21. sep.), og
